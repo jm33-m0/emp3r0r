@@ -6,7 +6,7 @@ post-exploitation framework for linux
 
 ## updates
 
-<a href="https://jm33.me/emp3r0r-0x00.html" target="_blank"><img src="https://jm33.me/img/emp.jpg" /></a>
+<a href="https://jm33.me/emp3r0r-0x00.html" target="_blank">https://jm33.me/emp3r0r-0x00.html</a>
 
 ## demo
 
