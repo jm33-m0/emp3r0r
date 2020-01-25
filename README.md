@@ -44,15 +44,10 @@ cp .tmux.conf ~
 | Key Binding    | Description        |
 |----------------|--------------------|
 | C-x -          | Split vertically   |
-|----------------|--------------------|
 | C-x _          | Split horizontally |
-|----------------|--------------------|
 | C-x x          | Kill current pane  |
-|----------------|--------------------|
 | C-x c          | New tab            |
-|----------------|--------------------|
 | C-x [1,2,3...] | Switch to tab      |
-|----------------|--------------------|
 | C-x ,          | Rename tab         |
 
 legend: `C-x -` means `Control plus x, then -`
