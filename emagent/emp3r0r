@@ -1,0 +1,16 @@
+#!/bin/bash
+
+if ! command -v tmux >/dev/null 2>&1; then
+    echo "tmux not found"
+    exit 1
+fi
+
+[[ -f ./build/cc ]] || bash ./build.py cc
+
+cd build || exit 1
+
+if [ -n "$TMUX" ]; then
+    ./cc
+else
+    tmux new-session -s emp3r0r ./cc || tmux attach -t emp3r0r
+fi
