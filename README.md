@@ -51,3 +51,9 @@ cp .tmux.conf ~
 | C-x ,          | Rename tab         |
 
 legend: `C-x -` means `Control plus x, then -`
+
+## thanks
+
+- [readline](https://github.com/chzyer/readline)
+- [h2conn](https://github.com/posener/h2conn)
+- [diamorphine](https://github.com/m0nad/Diamorphine)
