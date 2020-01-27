@@ -35,16 +35,20 @@ class GoBuild:
         self.CCIP = cc_ip
         self.INDICATOR = cc_indicator
         self.UUID = str(uuid.uuid1())
-        f = open("./tls/rootCA.crt")
-        self.CA = f.read()
-        f.close()
+
+
 
     def build(self):
         '''
         cd to cmd and run go build
         '''
-        self.set_tags()
         self.gen_certs()
+        # CA
+        f = open("./tls/rootCA.crt")
+        self.CA = f.read()
+        f.close()
+
+        self.set_tags()
 
         for f in glob.glob("./tls/emp3r0r-*pem"):
             shutil.copy(f, "./build")
@@ -76,7 +80,7 @@ class GoBuild:
 
             f.close()
 
-        print("\u001b[33m[!] Generating new certs...\u001b[0m")
+        log_warn("[!] Generating new certs...")
         os.chdir("./tls")
         os.system(
             f"bash ./genkey-with-ip-san.sh {self.UUID} {self.UUID}.com {self.CCIP}")
@@ -211,11 +215,26 @@ def main(target):
     gobuild = GoBuild(target="agent", cc_indicator=indicator, cc_ip=ccip)
     gobuild.build()
 
+def log_error(msg):
+    '''
+    print in red
+    '''
+    print("\u001b[31m"+msg+"\u001b[0m")
+
+def log_warn(msg):
+    '''
+    print in red
+    '''
+    print("\u001b[33m"+msg+"\u001b[0m")
 
 if len(sys.argv) != 2:
     print(f"python3 {sys.argv[0]} [cc/agent]")
     sys.exit(1)
 try:
+    if not os.path.exists("./build"):
+        os.mkdir("./build")
     main(sys.argv[1])
 except KeyboardInterrupt:
     sys.exit(0)
+except BaseException:
+    log_error(f"[!] Exception:\n{traceback.format_exc()}")
