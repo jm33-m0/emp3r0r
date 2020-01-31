@@ -43,6 +43,7 @@ var (
 		"shell":       moduleShell,
 		"proxy":       moduleProxy,
 		"lpe_suggest": moduleLPE,
+		"get_root":    moduleGetRoot,
 	}
 )
 
@@ -289,4 +290,7 @@ func moduleLPE() {
 	if err != nil {
 		CliPrintError("Run %s: %v", cmd, err)
 	}
+}
+
+func moduleGetRoot() {
 }
