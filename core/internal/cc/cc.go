@@ -19,6 +19,9 @@ import (
 )
 
 var (
+	// EmpRoot root directory of emp3r0r
+	EmpRoot, _ = os.Getwd()
+
 	// Targets target list, with control (tun) interface
 	Targets = make(map[*agent.SystemInfo]*Control)
 
@@ -29,6 +32,9 @@ var (
 const (
 	// Temp where we save temp files
 	Temp = "/tmp/emp3r0r/"
+
+	// WWWRoot host static files for agent
+	WWWRoot = Temp + tun.FileAPI
 
 	// FileGetDir where we save #get files
 	FileGetDir = "/tmp/emp3r0r/file-get/"
