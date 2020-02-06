@@ -59,8 +59,8 @@ class GoBuild:
             return
 
         os.system(
-            f'''GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0 ''' +
-            f'''go build -ldflags="-s -w" -o ../../build/{self.target}''')
+            f'''GOOS={self.GOOS} GOARCH={self.GOARCH}''' +
+            f'''go build -ldflags='-s -w -extldflags "-static"' -o ../../build/{self.target}''')
 
         os.chdir("../../")
         os.system(f"upx -9 ./build/{self.target}")
