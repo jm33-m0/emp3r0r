@@ -51,11 +51,14 @@ class GoBuild:
         self.set_tags()
 
         for f in glob.glob("./tls/emp3r0r-*pem"):
+            print(f"Copy {f} to ./build")
             shutil.copy(f, "./build")
 
         try:
             os.chdir(f"./cmd/{self.target}")
         except BaseException:
+            log_error(f"Cannot cd to cmd/{self.target}")
+
             return
 
         os.system(
@@ -63,8 +66,14 @@ class GoBuild:
             f'''go build -ldflags='-s -w -extldflags "-static"' -o ../../build/{self.target}''')
 
         os.chdir("../../")
-        os.system(f"upx -9 ./build/{self.target}")
         self.unset_tags()
+
+        if os.path.exists(f"./build/{self.target}"):
+            os.system(f"upx -9 ./build/{self.target}")
+        else:
+            log_error("go build failed")
+            sys.exit(1)
+
 
     def gen_certs(self):
         '''
@@ -76,6 +85,7 @@ class GoBuild:
 
             if self.CCIP == f.read() and os.path.exists("./build/emp3r0r-key.pem"):
                 f.close()
+
                 return
 
             f.close()
@@ -170,6 +180,7 @@ def main(target):
 
     if target == "clean":
         clean()
+
         return
 
     # cc IP
@@ -200,6 +211,7 @@ def main(target):
     # indicator
 
     use_cached = False
+
     if os.path.exists("./build/indicator.txt"):
         f = open("./build/indicator.txt")
         indicator = f.read().strip()
@@ -234,7 +246,7 @@ try:
     if not os.path.exists("./build"):
         os.mkdir("./build")
     main(sys.argv[1])
-except KeyboardInterrupt:
+except (KeyboardInterrupt, EOFError, SystemExit):
     sys.exit(0)
 except BaseException:
     log_error(f"[!] Exception:\n{traceback.format_exc()}")
