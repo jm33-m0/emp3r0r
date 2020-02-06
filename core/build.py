@@ -31,6 +31,9 @@ class GoBuild:
         if self.GOARCH is None:
             self.GOARCH = "amd64"
 
+        # CA
+        self.CA = ""
+
         # tags
         self.CCIP = cc_ip
         self.INDICATOR = cc_indicator
@@ -51,7 +54,7 @@ class GoBuild:
         self.set_tags()
 
         for f in glob.glob("./tls/emp3r0r-*pem"):
-            print(f"Copy {f} to ./build")
+            print(f" Copy {f} to ./build")
             shutil.copy(f, "./build")
 
         try:
@@ -60,10 +63,9 @@ class GoBuild:
             log_error(f"Cannot cd to cmd/{self.target}")
 
             return
-
-        os.system(
-            f'''GOOS={self.GOOS} GOARCH={self.GOARCH}''' +
-            f'''go build -ldflags='-s -w -extldflags "-static"' -o ../../build/{self.target}''')
+        cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH}''' + \
+                f''' go build -ldflags='-s -w -extldflags "-static"' -o ../../build/{self.target}'''
+        os.system(cmd)
 
         os.chdir("../../")
         self.unset_tags()
@@ -139,7 +141,7 @@ def clean():
     for f in to_rm:
         try:
             os.remove(f)
-            print("Deleted "+f)
+            print(" Deleted "+f)
         except BaseException:
             traceback.print_exc()
 
