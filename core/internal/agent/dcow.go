@@ -217,7 +217,7 @@ func ParsePwd(id *string, restPwd bool) (string, int) {
 	)
 
 	for line, err := rstream.ReadString('\n'); err != io.EOF; line, err = rstream.ReadString('\n') {
-		err = backup.WriteString(line)
+		_, err = backup.WriteString(line)
 		if err != nil {
 			log.Print(err)
 		}

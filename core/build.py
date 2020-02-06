@@ -63,9 +63,12 @@ class GoBuild:
             log_error(f"Cannot cd to cmd/{self.target}")
 
             return
+
+        log_warn("GO BUILD starts...")
         cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH}''' + \
                 f''' go build -ldflags='-s -w -extldflags "-static"' -o ../../build/{self.target}'''
         os.system(cmd)
+        log_warn("GO BUILD ends...")
 
         os.chdir("../../")
         self.unset_tags()
