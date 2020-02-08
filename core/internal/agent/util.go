@@ -168,7 +168,16 @@ func Download(url, path string) (err error) {
 	return ioutil.WriteFile(path, data, 0600)
 }
 
-func collectSystemInfo() *SystemInfo {
+// GetKernelVersion uname -r
+func GetKernelVersion() (ver string) {
+	var si sysinfo.SysInfo
+	si.GetSysInfo()
+
+	return si.Kernel.Release
+}
+
+// CollectSystemInfo build system info object
+func CollectSystemInfo() *SystemInfo {
 	var (
 		si   sysinfo.SysInfo
 		info SystemInfo

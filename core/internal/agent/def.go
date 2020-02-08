@@ -17,6 +17,9 @@ var (
 
 	// SendCC used for sending data to CC
 	SendCC = make(chan []byte)
+
+	// KernelVersion get linux version
+	KernelVersion = GetKernelVersion()
 )
 
 const (
