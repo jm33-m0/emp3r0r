@@ -10,7 +10,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/fatih/color"
@@ -53,15 +52,19 @@ func ListTargets() {
 	color.Cyan("=================\n\n")
 
 	indent := strings.Repeat(" ", len(" [0] "))
+	hasroot := color.HiRedString("NO")
 	for target, control := range Targets {
-		color.Green(" [%d] Tag: %s (root: %v):"+
+		if target.HasRoot {
+			hasroot = color.HiGreenString("YES")
+		}
+		fmt.Printf(" [%d] Tag: %s (root: %v):"+
 			"\n%sCPU: %s"+
 			"\n%sMEM: %s"+
 			"\n%sOS: %s"+
 			"\n%sKernel: %s - %s"+
 			"\n%sFrom: %s"+
 			"\n%sIPs: %v",
-			control.Index, target.Tag, color.HiRedString(strconv.FormatBool(target.HasRoot)),
+			control.Index, target.Tag, hasroot,
 			indent, target.CPU,
 			indent, target.Mem,
 			indent, target.OS,

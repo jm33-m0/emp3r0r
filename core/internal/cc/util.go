@@ -112,6 +112,10 @@ func Download(url, path string) (err error) {
 
 // SendCmd send command to agent
 func SendCmd(cmd string, a *agent.SystemInfo) error {
+	if a == nil {
+		return errors.New("SendCmd: No such agent")
+	}
+
 	var cmdData agent.TunData
 
 	cmdData.Payload = fmt.Sprintf("cmd%s%s", agent.OpSep, cmd)
