@@ -65,8 +65,10 @@ class GoBuild:
             return
 
         log_warn("GO BUILD starts...")
-        cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH}''' + \
-                f''' go build -ldflags='-s -w -extldflags "-static"' -o ../../build/{self.target}'''
+        # cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH}''' + \
+        # f''' go build -ldflags='-s -w -extldflags "-static"' -o ../../build/{self.target}'''
+        cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0''' + \
+                f''' go build -ldflags='-s -w' -o ../../build/{self.target}'''
         os.system(cmd)
         log_warn("GO BUILD ends...")
 
