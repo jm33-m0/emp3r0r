@@ -127,6 +127,10 @@ func moduleShell() {
 
 	// write to given target's connection
 	tControl := Targets[target]
+	if tControl == nil {
+		CliPrintError("moduleShell: agent control interface not found")
+		return
+	}
 	if tControl.Conn == nil {
 		CliPrintError("moduleShell: agent is not connected")
 		return
@@ -238,6 +242,10 @@ func moduleCmd() {
 	}
 
 	// write to given target's connection
+	if Targets[target] == nil {
+		CliPrintError("moduleCmd: agent control interface not found")
+		return
+	}
 	if Targets[target].Conn == nil {
 		CliPrintError("moduleCmd: agent is not connected")
 		return
