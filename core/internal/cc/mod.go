@@ -297,4 +297,5 @@ func moduleGetRoot() {
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)
 	}
+	color.HiMagenta("Please wait for agent's response...")
 }
