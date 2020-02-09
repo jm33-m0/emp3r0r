@@ -10,7 +10,7 @@ post-exploitation framework for linux
 
 ## demo
 
-<a href="https://asciinema.org/a/Dya7dm71mhtKxUkM9PbbHmXEk" target="_blank"><img src="https://asciinema.org/a/Dya7dm71mhtKxUkM9PbbHmXEk.svg" /></a>
+[![asciicast](https://asciinema.org/a/XKGZmQooegJlwO6hHsDEOHHD8.svg)](https://asciinema.org/a/XKGZmQooegJlwO6hHsDEOHHD8)
 
 ## how to test
 
