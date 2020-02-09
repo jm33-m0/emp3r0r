@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
+	github.com/creack/pty v1.1.9
 	github.com/fatih/color v1.9.0
 	github.com/mcuadros/go-version v0.0.0-20190830083331-035f6764e8d2
 	github.com/mitchellh/go-ps v0.0.0-20190716172923-621e5597135b

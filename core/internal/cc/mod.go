@@ -293,4 +293,8 @@ func moduleLPE() {
 }
 
 func moduleGetRoot() {
+	err := SendCmd("get_root", CurrentTarget)
+	if err != nil {
+		CliPrintError("SendCmd: %v", err)
+	}
 }
