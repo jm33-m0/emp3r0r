@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/fatih/color"
@@ -60,7 +61,7 @@ func ListTargets() {
 			"\n%sKernel: %s - %s"+
 			"\n%sFrom: %s"+
 			"\n%sIPs: %v",
-			control.Index, target.Tag, target.HasRoot,
+			control.Index, target.Tag, color.HiRedString(strconv.FormatBool(target.HasRoot)),
 			indent, target.CPU,
 			indent, target.Mem,
 			indent, target.OS,
@@ -103,7 +104,11 @@ func ListModules() {
 
 // Send2Agent send TunData to agent
 func Send2Agent(data *agent.TunData, agent *agent.SystemInfo) (err error) {
-	var out = json.NewEncoder(Targets[agent].Conn)
+	ctrl := Targets[agent]
+	if ctrl == nil {
+		return errors.New("Send2Agent: Target is not connected")
+	}
+	out := json.NewEncoder(ctrl.Conn)
 
 	err = out.Encode(data)
 	return
