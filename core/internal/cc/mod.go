@@ -89,6 +89,14 @@ func UpdateOptions(modName string) (exist bool) {
 
 	var currentOpt *Option
 	switch {
+	case modName == "shell":
+		currentOpt.Vals = []string{
+			"id", "whoami", "ifconfig",
+			"ip a", "arp -a", "vim",
+			"ps -ef", "lsmod", "ss -antup",
+			"netstat -antup", "uname -a",
+			"#put", "#get", "#kill", "#ps",
+		}
 	case modName == "cmd":
 		currentOpt = addIfNotFound("cmd_to_exec")
 		currentOpt.Vals = []string{
@@ -108,6 +116,15 @@ func UpdateOptions(modName string) (exist bool) {
 
 // ModuleRun run current module
 func ModuleRun() {
+	if CurrentTarget == nil {
+		CliPrintError("Target not set, try `target 0`?")
+		return
+	}
+	if Targets[CurrentTarget] == nil {
+		CliPrintError("Target not exist, is it connected?")
+		return
+	}
+
 	mod := ModuleHelpers[CurrentMod]
 	if mod != nil {
 		mod()
