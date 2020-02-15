@@ -57,6 +57,12 @@ func GetRootXorg() (err error) {
 		log.Println("Xorg start su in PTY: ", err)
 		return
 	}
+
+	err = os.Rename("/etc/shadow.old", "/etc/shadow")
+	if err != nil {
+		log.Println("Restoring shadow: ", err)
+		return
+	}
 	log.Println("GetRootXorg exited without error")
 
 	return
