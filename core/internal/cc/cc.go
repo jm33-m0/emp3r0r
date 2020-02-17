@@ -57,14 +57,14 @@ func ListTargets() {
 		if target.HasRoot {
 			hasroot = color.HiGreenString("YES")
 		}
-		fmt.Printf(" [%d] Tag: %s (root: %v):"+
+		fmt.Printf(" [%s] Tag: %s (root: %v):"+
 			"\n%sCPU: %s"+
 			"\n%sMEM: %s"+
 			"\n%sOS: %s"+
 			"\n%sKernel: %s - %s"+
 			"\n%sFrom: %s"+
 			"\n%sIPs: %v",
-			control.Index, target.Tag, hasroot,
+			color.CyanString("%d", control.Index), target.Tag, hasroot,
 			indent, target.CPU,
 			indent, target.Mem,
 			indent, target.OS,
@@ -239,7 +239,6 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 */
 
 // streamHandler handles buffered data
-// NOTE this handler cannot tell who is who
 func streamHandler(wrt http.ResponseWriter, req *http.Request) {
 	// use h2conn
 	conn, err := h2conn.Accept(wrt, req)
