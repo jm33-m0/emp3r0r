@@ -56,11 +56,9 @@ func catchSignal(cancel context.CancelFunc) {
 	cancel()
 }
 
-// RequestTun send request to TunAPI, to establish a duplex tunnel
-func RequestTun() error {
+// ConnectCC connect to CC with h2conn
+func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, err error) {
 	var (
-		url  = CCAddress + tun.TunAPI
-		err  error
 		resp *http.Response
 	)
 	// use h2conn for duplex tunnel
@@ -71,25 +69,34 @@ func RequestTun() error {
 
 	h2 := h2conn.Client{Client: HTTPClient}
 
-	CCConn, resp, err = h2.Connect(ctx, url)
+	conn, resp, err = h2.Connect(ctx, url)
 	if err != nil {
 		log.Printf("Initiate conn: %s", err)
-		return err
+		return
 	}
 
-	defer CCConn.Close()
 	// Check server status code
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("Bad status code: %d", resp.StatusCode)
-		return err
+		return
 	}
 
+	return
+}
+
+// CCTun use the connection (CCConn)
+func CCTun(ctx context.Context) (err error) {
 	var (
 		in  = json.NewDecoder(CCConn)
 		out = json.NewEncoder(CCConn)
+		msg TunData // data being exchanged in the tunnel
 	)
-
-	var msg TunData // data being exchanged in the tunnel
+	defer func() {
+		err = CCConn.Close()
+		if err != nil {
+			log.Print(err)
+		}
+	}()
 
 	// check for CC server's response
 	go func() {

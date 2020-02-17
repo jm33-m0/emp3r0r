@@ -14,8 +14,11 @@ var (
 	// HTTPClient handles agent's http communication
 	HTTPClient = tun.EmpHTTPClient()
 
-	// CCConn the connection to CC
+	// CCConn the connection to CC, for JSON message-based communication
 	CCConn *h2conn.Conn
+
+	// CCStream used for buffered constant stream
+	CCStream *h2conn.Conn
 
 	// RecvCC used for receiving data from CC
 	RecvCC = make(chan []byte)
