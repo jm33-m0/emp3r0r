@@ -241,7 +241,7 @@ shell:
 			CliPrintError("moduleShell: %v", err)
 		}
 	}
-	CliPrintWarning("\nExiting shell[%d] ...", tControl.Index)
+	color.Yellow("\nExiting shell[%d] ...", tControl.Index)
 }
 
 // moduleCmd exec cmd on target
