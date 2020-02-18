@@ -5,6 +5,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/chzyer/readline"
 	"github.com/fatih/color"
@@ -187,6 +188,7 @@ shell:
 
 		case input == "bash":
 			reverseBash()
+			time.Sleep(1 * time.Second)
 			break shell
 
 		case inputSlice[0] == "#put":

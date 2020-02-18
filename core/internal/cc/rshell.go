@@ -123,4 +123,7 @@ func reverseBash() {
 		// send our byte
 		SendAgentBuf <- buf
 	}
+
+	// always send 'exit' to correctly log out our bash shell
+	SendAgentBuf <- []byte("exit\n\n")
 }
