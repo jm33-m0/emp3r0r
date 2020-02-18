@@ -9,6 +9,7 @@ require (
 	github.com/mitchellh/go-ps v0.0.0-20190716172923-621e5597135b
 	github.com/posener/h2conn v0.0.0-20180911140238-13e7df33ed15
 	github.com/zcalusic/sysinfo v0.0.0-20200109185024-6491b6eabd49
+	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
 	golang.org/x/net v0.0.0-20190620200207-3b0461eec859
 	golang.org/x/tools v0.0.0-20200115044656-831fdb1e1868
 )
