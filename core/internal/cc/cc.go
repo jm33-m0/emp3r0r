@@ -251,7 +251,7 @@ func streamHandler(wrt http.ResponseWriter, req *http.Request) {
 		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	CliPrintSuccess("Got a stream connection from %s", req.RemoteAddr)
+	CliPrintWarning("Got a stream connection from %s", req.RemoteAddr)
 
 	defer func() {
 		err = agent.CCStream.Close()

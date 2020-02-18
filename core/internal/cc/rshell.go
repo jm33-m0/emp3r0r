@@ -15,6 +15,12 @@ func reverseBash() {
 		CliPrintError("Cannot activate reverse shell on remote target: ", err)
 		return
 	}
+	defer func() {
+		err = agent.CCStream.Close()
+		if err != nil {
+			CliPrintWarning("Closing reverse shell connection: ", err)
+		}
+	}()
 
 	go func() {
 		for incoming := range RecvAgentBuf {
@@ -36,14 +42,21 @@ func reverseBash() {
 		buf := make([]byte, agent.BufSize)
 		_, err = os.Stdin.Read(buf)
 		if err != nil {
-			CliPrintWarning("Bash: %v", err)
+			CliPrintWarning("Bash read input: %v", err)
 		}
 		SendAgentBuf <- buf
-		if strings.HasPrefix(string(buf), "exit\n") {
+		if isExit(string(buf)) {
 			break
 		}
 	}
 
-	_ = agent.CCStream.Close()
 	CliPrintWarning("bash reverse shell exited")
+}
+
+func isExit(cmd string) (exit bool) {
+	if strings.HasPrefix(cmd, "exit\n") ||
+		strings.HasPrefix(cmd, "quit\n") {
+		exit = true
+	}
+	return
 }

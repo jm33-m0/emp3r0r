@@ -44,7 +44,7 @@ const (
 	OpSep = "cb433bd1-354c-4802-a4fa-ece518f3ded1"
 
 	// BufSize buffer size for CC/agent communication
-	BufSize = 128
+	BufSize = 1024
 )
 
 // SystemInfo agent properties

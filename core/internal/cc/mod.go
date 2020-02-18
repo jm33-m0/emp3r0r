@@ -187,7 +187,7 @@ shell:
 
 		case input == "bash":
 			reverseBash()
-			continue shell
+			break shell
 
 		case inputSlice[0] == "#put":
 			// #put file to agent

