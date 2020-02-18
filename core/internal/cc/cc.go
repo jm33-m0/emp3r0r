@@ -258,7 +258,7 @@ func streamHandler(wrt http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			CliPrintError("streamHandler failed to close connection: " + err.Error())
 		}
-		CliPrintSuccess("Closed stream connection from %s", req.RemoteAddr)
+		CliPrintWarning("Closed stream connection from %s", req.RemoteAddr)
 	}()
 
 	for {
