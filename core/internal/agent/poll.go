@@ -100,13 +100,13 @@ func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, cancel conte
 // CCTun use the connection (CCConn)
 func CCTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 	var (
-		in  = json.NewDecoder(CCConn)
-		out = json.NewEncoder(CCConn)
+		in  = json.NewDecoder(H2Conn)
+		out = json.NewEncoder(H2Conn)
 		msg TunData // data being exchanged in the tunnel
 	)
 	go catchInterruptAndExit(cancel)
 	defer func() {
-		err = CCConn.Close()
+		err = H2Conn.Close()
 		if err != nil {
 			log.Print("CCTun closing: ", err)
 		}

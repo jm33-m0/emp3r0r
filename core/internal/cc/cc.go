@@ -25,11 +25,11 @@ var (
 	// Targets target list, with control (tun) interface
 	Targets = make(map[*agent.SystemInfo]*Control)
 
-	// SendAgentBuf send data to agent
-	SendAgentBuf = make(chan []byte)
+	// SendAgent send data to agent
+	SendAgent = make(chan []byte)
 
-	// RecvAgentBuf h2conn buffered here
-	RecvAgentBuf = make(chan []byte)
+	// RecvAgent h2conn buffered here
+	RecvAgent = make(chan []byte)
 )
 
 const (
@@ -245,7 +245,7 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 func streamHandler(wrt http.ResponseWriter, req *http.Request) {
 	var err error
 	// use h2conn
-	agent.CCStream, err = h2conn.Accept(wrt, req)
+	agent.H2Stream, err = h2conn.Accept(wrt, req)
 	if err != nil {
 		CliPrintError("streamHandler: failed creating connection from %s: %s", req.RemoteAddr, err)
 		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -254,7 +254,7 @@ func streamHandler(wrt http.ResponseWriter, req *http.Request) {
 	CliPrintWarning("Got a stream connection from %s", req.RemoteAddr)
 
 	defer func() {
-		err = agent.CCStream.Close()
+		err = agent.H2Stream.Close()
 		if err != nil {
 			CliPrintError("streamHandler failed to close connection: " + err.Error())
 		}
@@ -263,12 +263,12 @@ func streamHandler(wrt http.ResponseWriter, req *http.Request) {
 
 	for {
 		data := make([]byte, agent.BufSize)
-		_, err = agent.CCStream.Read(data)
+		_, err = agent.H2Stream.Read(data)
 		if err != nil {
-			CliPrintWarning("streamHandler read from RecvAgentBuf: %v\nDisconnected", err)
+			CliPrintWarning("disconnected: streamHandler read from RecvAgentBuf: %v", err)
 			return
 		}
-		RecvAgentBuf <- data
+		RecvAgent <- data
 	}
 }
 

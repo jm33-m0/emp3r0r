@@ -149,7 +149,7 @@ func moduleShell() {
 	// send data
 	var data agent.TunData
 	CliPrintWarning("\nEntering shell of agent[%d] ...\n"+
-		"Note: Terminal apps like top and vim will NOT work, type `help` for more info",
+		"Note: Use `bash` command to start a bash reverse shell, type `help` for more info",
 		tControl.Index)
 
 shell:
