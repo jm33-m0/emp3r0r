@@ -228,3 +228,12 @@ func agentExists(agent *agent.SystemInfo) bool {
 
 	return false
 }
+
+// TermClear clear screen
+func TermClear() {
+	os.Stdout.WriteString("\033[2J")
+	err := CliBanner()
+	if err != nil {
+		CliPrintError("%v", err)
+	}
+}

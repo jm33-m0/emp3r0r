@@ -90,6 +90,10 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 		if err != nil {
 			CliPrintError("failed to restore terminal: %v\n%s", err, out)
 		}
+
+		// clear screen
+		TermClear()
+
 		err = ttyf.Close()
 		if err != nil {
 			CliPrintWarning("Closing /dev/tty: %v", err)

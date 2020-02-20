@@ -260,7 +260,7 @@ shell:
 			CliPrintError("moduleShell: %v", err)
 		}
 	}
-	color.Yellow("\nExiting shell[%d] ...", tControl.Index)
+	color.Yellow("\n[*] shell[%d] finished", tControl.Index)
 }
 
 // moduleCmd exec cmd on target
