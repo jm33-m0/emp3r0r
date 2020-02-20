@@ -1,6 +1,7 @@
 package cc
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -24,9 +25,6 @@ var (
 
 	// Targets target list, with control (tun) interface
 	Targets = make(map[*agent.SystemInfo]*Control)
-
-	// SendAgent send data to agent
-	SendAgent = make(chan []byte)
 
 	// RecvAgent h2conn buffered here
 	RecvAgent = make(chan []byte)
@@ -250,16 +248,17 @@ func streamHandler(wrt http.ResponseWriter, req *http.Request) {
 		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	CliPrintWarning("Got a stream connection from %s", req.RemoteAddr)
+	ctx, cancel := context.WithCancel(req.Context())
+	agent.H2Stream.Ctx = ctx
+	agent.H2Stream.Cancel = cancel
 	agent.H2Stream.Conn = conn
-	agent.H2Stream.IsClosed = false
+	CliPrintWarning("Got a stream connection from %s", req.RemoteAddr)
 
 	defer func() {
 		err = agent.H2Stream.Conn.Close()
 		if err != nil {
 			CliPrintError("streamHandler failed to close connection: " + err.Error())
 		}
-		agent.H2Stream.IsClosed = true
 		CliPrintWarning("Closed stream connection from %s", req.RemoteAddr)
 	}()
 
