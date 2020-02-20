@@ -67,7 +67,10 @@ func reverseBash() {
 			if agent.H2Stream.IsClosed {
 				break
 			}
-			os.Stdout.Write(incoming)
+			_, err = os.Stdout.Write(incoming)
+			if err != nil {
+				CliPrintWarning("Stdout write: %v", err)
+			}
 		}
 		CliPrintWarning("Read remote finished")
 	}()

