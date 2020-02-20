@@ -64,13 +64,20 @@ func reverseBash() {
 	// receive and display bash's output
 	go func() {
 		for incoming := range RecvAgent {
+			if agent.H2StreamDone {
+				break
+			}
 			os.Stdout.Write(incoming)
 		}
+		CliPrintWarning("Read remote finished")
 	}()
 
 	// send whatever input to target's bash
 	go func() {
 		for outgoing := range SendAgent {
+			if agent.H2StreamDone {
+				break
+			}
 
 			// if connection does not exist yet
 			if agent.H2Stream == nil {
@@ -78,10 +85,11 @@ func reverseBash() {
 			}
 			_, err = agent.H2Stream.Write(outgoing)
 			if err != nil {
-				log.Print("Send to remote: ", err)
-				return
+				CliPrintWarning("Send to remote: %v", err)
+				break
 			}
 		}
+		CliPrintWarning("Send to remote finished")
 	}()
 
 	/*
@@ -92,6 +100,10 @@ func reverseBash() {
 	signal.Notify(ch, syscall.SIGWINCH)
 	go func() {
 		for range ch {
+			if agent.H2StreamDone {
+				break
+			}
+
 			// resize local terminal
 			if err := pty.InheritSize(os.Stdin, ttyf); err != nil {
 				log.Printf("error resizing pty: %s", err)
@@ -106,6 +118,7 @@ func reverseBash() {
 				winSize.Rows, winSize.Cols)
 			SendAgent <- []byte(setupTermCmd)
 		}
+		CliPrintWarning("Terminal resizer finished")
 	}()
 	ch <- syscall.SIGWINCH // Initial resize.
 
@@ -125,8 +138,14 @@ func reverseBash() {
 		return
 	}
 
+	// read user input from /dev/tty
 	for {
-		// read user input from /dev/tty
+		// if connection is lost, press any key to exit
+		if agent.H2StreamDone {
+			CliPrintWarning("Remote bash disconnected, aborting...")
+			return
+		}
+
 		buf := make([]byte, agent.BufSize)
 		consoleReader := bufio.NewReader(ttyf)
 		_, err := consoleReader.Read(buf)
@@ -134,6 +153,7 @@ func reverseBash() {
 			CliPrintWarning("Bash read input: %v", err)
 			break
 		}
+		color.Red("%v", buf)
 		if buf[0] == 4 { // Ctrl-D is 4
 			color.Red("EOF")
 			break

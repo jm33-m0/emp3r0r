@@ -252,12 +252,14 @@ func streamHandler(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 	CliPrintWarning("Got a stream connection from %s", req.RemoteAddr)
+	agent.H2StreamDone = false
 
 	defer func() {
 		err = agent.H2Stream.Close()
 		if err != nil {
 			CliPrintError("streamHandler failed to close connection: " + err.Error())
 		}
+		agent.H2StreamDone = true
 		CliPrintWarning("Closed stream connection from %s", req.RemoteAddr)
 	}()
 
@@ -265,7 +267,7 @@ func streamHandler(wrt http.ResponseWriter, req *http.Request) {
 		data := make([]byte, agent.BufSize)
 		_, err = agent.H2Stream.Read(data)
 		if err != nil {
-			CliPrintWarning("disconnected: streamHandler read from RecvAgentBuf: %v", err)
+			CliPrintWarning("Disconnected: streamHandler read from RecvAgentBuf: %v", err)
 			return
 		}
 		RecvAgent <- data

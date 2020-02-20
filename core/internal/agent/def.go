@@ -20,6 +20,9 @@ var (
 	// H2Stream used for buffered constant stream
 	H2Stream *h2conn.Conn
 
+	// H2StreamDone whether H2Stream is finished
+	H2StreamDone bool
+
 	// RecvCC used for receiving data from CC
 	RecvCC = make(chan []byte)
 
