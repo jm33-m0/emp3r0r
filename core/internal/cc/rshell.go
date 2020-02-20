@@ -27,12 +27,10 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 	cancel := agent.H2Stream.Cancel
 
 	// receive and display bash's output
-	// FIXME the output may gets scrambled upon 2nd run
 	go func(ctx context.Context) {
 		for incoming := range recv {
 			select {
 			case <-ctx.Done():
-				color.Red("Receiver done as context canceled")
 				return
 			default:
 				_, err = os.Stdout.Write(incoming)
@@ -85,13 +83,8 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 
 	// clean up connection and TTY file
 	cleanup := func() {
-		CliPrintWarning("Cleaning up reverseBash")
-
 		// cancel context, cleanup all goroutines
 		cancel()
-		if ctx.Err() != nil {
-			CliPrintWarning("reverseBash context: %v", ctx.Err())
-		}
 
 		// restore terminal settings
 		out, err := exec.Command("stty", "-F", "/dev/tty", oldTerm).CombinedOutput()
@@ -107,7 +100,13 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 		if err != nil {
 			CliPrintWarning("Closing reverse shell connection: ", err)
 		}
-		CliPrintSuccess("Cleaned up reverseBash")
+
+		// nil out agent.H2Stream
+		agent.H2Stream.Conn = nil
+		agent.H2Stream.Ctx = nil
+		agent.H2Stream.Cancel = nil
+
+		// CliPrintSuccess("Cleaned up reverseBash")
 	}
 	defer cleanup()
 
@@ -165,7 +164,6 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 		// if connection is lost, press any key to exit
 		select {
 		case <-ctx.Done():
-			CliPrintWarning("Remote bash disconnected, aborting...")
 			return
 		default:
 			buf := make([]byte, agent.BufSize)
