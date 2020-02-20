@@ -45,7 +45,7 @@ connect:
 	// connect to TunAPI, the JSON based h2 tunnel
 	tunURL := agent.CCAddress + tun.TunAPI
 	conn, ctx, cancel, err := agent.ConnectCC(tunURL)
-	agent.H2Conn = conn
+	agent.H2Json = conn
 	if err != nil {
 		log.Println("ConnectCC: ", err)
 		time.Sleep(5 * time.Second)

