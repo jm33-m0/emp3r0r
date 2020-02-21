@@ -9,8 +9,10 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/creack/pty"
+	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/emagent/internal/agent"
 )
 
@@ -82,6 +84,13 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 
 	// clean up connection and TTY file
 	cleanup := func() {
+		// if already cleaned up
+		if agent.H2Stream.Conn == nil ||
+			agent.H2Stream.Ctx == nil ||
+			agent.H2Stream.Cancel == nil {
+			return
+		}
+
 		// cancel context, cleanup all goroutines
 		cancel()
 
@@ -90,9 +99,6 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 		if err != nil {
 			CliPrintError("failed to restore terminal: %v\n%s", err, out)
 		}
-
-		// clear screen
-		TermClear()
 
 		err = ttyf.Close()
 		if err != nil {
@@ -110,6 +116,8 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 		agent.H2Stream.Cancel = nil
 
 		// CliPrintSuccess("Cleaned up reverseBash")
+		// clear screen
+		TermClear()
 	}
 	defer cleanup()
 
@@ -163,6 +171,18 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 	}
 
 	// read user input from /dev/tty
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				cleanup()
+				color.HiCyan("Press any key to continue...")
+				return
+			default:
+				time.Sleep(100 * time.Millisecond)
+			}
+		}
+	}()
 	for ctx.Err() == nil {
 		// if connection is lost, press any key to exit
 		select {
