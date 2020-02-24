@@ -21,12 +21,6 @@ var (
 	// H2Stream used for buffered constant stream
 	H2Stream H2Conn
 
-	// RecvCC used for receiving data from CC
-	RecvCC = make(chan []byte)
-
-	// SendCC used for sending data to CC
-	SendCC = make(chan []byte)
-
 	// KernelVersion get linux version
 	KernelVersion = GetKernelVersion()
 )
@@ -61,16 +55,15 @@ type SystemInfo struct {
 	HasRoot bool     // is agent run as root?
 }
 
-// TunData data to send in the tunnel
-type TunData struct {
+// MsgTunData data to send in the tunnel
+type MsgTunData struct {
 	Payload string `json:"payload"` // payload
 	Tag     string `json:"tag"`     // tag of the agent
 }
 
 // H2Conn add `IsClosed` to h2conn.Conn
 type H2Conn struct {
-	Conn     *h2conn.Conn
-	IsClosed bool
-	Ctx      context.Context
-	Cancel   context.CancelFunc
+	Conn   *h2conn.Conn
+	Ctx    context.Context
+	Cancel context.CancelFunc
 }

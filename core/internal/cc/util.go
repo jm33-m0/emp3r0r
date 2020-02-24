@@ -16,7 +16,7 @@ import (
 )
 
 // processAgentData deal with data from agent side
-func processAgentData(data *agent.TunData) {
+func processAgentData(data *agent.MsgTunData) {
 	payloadSplit := strings.Split(data.Payload, agent.OpSep)
 	op := payloadSplit[0]
 
@@ -116,7 +116,7 @@ func SendCmd(cmd string, a *agent.SystemInfo) error {
 		return errors.New("SendCmd: No such agent")
 	}
 
-	var cmdData agent.TunData
+	var cmdData agent.MsgTunData
 
 	cmdData.Payload = fmt.Sprintf("cmd%s%s", agent.OpSep, cmd)
 	cmdData.Tag = a.Tag
@@ -205,7 +205,7 @@ func TmuxSplit(hV, cmd string) error {
 		!IsCommandExist("tmux") ||
 		!IsCommandExist("less") {
 
-		return errors.New("You need to run emp3r0r under tmux, and make sure less is installed")
+		return errors.New("You need to run emp3r0r under `tmux`, and make sure `less` is installed")
 	}
 
 	job := fmt.Sprintf("tmux split-window -%s %s", hV, cmd)
