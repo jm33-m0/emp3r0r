@@ -28,9 +28,9 @@ func GetRootXorg(ctx context.Context, cancel context.CancelFunc) (err error) {
 	var out []byte
 	defer func() {
 		cancel()
-		err = os.Chdir(AgentRoot)
-		if err != nil {
-			log.Printf("failed to cd back to %s", AgentRoot)
+		e := os.Chdir(AgentRoot)
+		if e != nil {
+			log.Printf("failed to cd back to %s\n%v", AgentRoot, e)
 		}
 	}()
 

