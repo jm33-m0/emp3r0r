@@ -60,7 +60,7 @@ func CliMain() {
 
 start:
 	EmpReadLine, err = readline.NewEx(&readline.Config{
-		Prompt:          color.CyanString("emp3r0r > "),
+		Prompt:          color.HiCyanString("emp3r0r > "),
 		HistoryFile:     "./emp3r0r.history",
 		AutoComplete:    CliCompleter,
 		InterruptPrompt: "^C\nExiting...\n",

