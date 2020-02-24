@@ -18,9 +18,6 @@ var (
 	// H2Json the connection to CC, for JSON message-based communication
 	H2Json *h2conn.Conn
 
-	// H2Stream used for buffered constant stream
-	H2Stream H2Conn
-
 	// KernelVersion get linux version
 	KernelVersion = GetKernelVersion()
 )
@@ -38,8 +35,8 @@ const (
 	// OpSep separator of CC payload
 	OpSep = "cb433bd1-354c-4802-a4fa-ece518f3ded1"
 
-	// BufSize buffer size for reverse shell communication
-	BufSize = 1
+	// RShellBufSize buffer size of reverse shell stream must be 1
+	RShellBufSize = 1
 )
 
 // SystemInfo agent properties
@@ -61,7 +58,7 @@ type MsgTunData struct {
 	Tag     string `json:"tag"`     // tag of the agent
 }
 
-// H2Conn add `IsClosed` to h2conn.Conn
+// H2Conn add context to h2conn.Conn
 type H2Conn struct {
 	Conn   *h2conn.Conn
 	Ctx    context.Context

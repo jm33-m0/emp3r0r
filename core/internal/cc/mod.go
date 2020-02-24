@@ -196,7 +196,7 @@ shell:
 			}
 			// wait for agent to send shell
 			for {
-				if agent.H2Stream.Ctx != nil && agent.H2Stream.Conn != nil {
+				if RShellStream.H2x.Ctx != nil && RShellStream.H2x.Conn != nil {
 					break
 				}
 				time.Sleep(200 * time.Millisecond)
@@ -204,7 +204,7 @@ shell:
 
 			// launch local terminal to use remote bash shell
 			send := make(chan []byte)
-			reverseBash(agent.H2Stream.Ctx, send, ShellRecvBuf)
+			reverseBash(RShellStream.H2x.Ctx, send, RShellStream.Buf)
 			time.Sleep(1 * time.Second)
 			break shell
 

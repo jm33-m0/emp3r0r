@@ -10,6 +10,9 @@ const (
 	// ReverseShellAPI duplex tunnel between agent and cc
 	ReverseShellAPI = "rshell"
 
+	// ProxyAPI proxy interface
+	ProxyAPI = "proxy"
+
 	// FileAPI host some files
 	FileAPI = "www/"
 )

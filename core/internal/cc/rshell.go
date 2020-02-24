@@ -13,7 +13,6 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/fatih/color"
-	"github.com/jm33-m0/emp3r0r/emagent/internal/agent"
 )
 
 func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
@@ -25,7 +24,8 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 		return
 	}
 
-	cancel := agent.H2Stream.Cancel
+	cancel := RShellStream.H2x.Cancel
+	CliPrintWarning("Entering bash...")
 
 	// receive and display bash's output
 	go func(ctx context.Context) {
@@ -57,10 +57,10 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 			default:
 
 				// if connection does not exist yet
-				if agent.H2Stream.Conn == nil {
+				if RShellStream.H2x.Conn == nil {
 					continue
 				}
-				_, err = agent.H2Stream.Conn.Write(outgoing)
+				_, err = RShellStream.H2x.Conn.Write(outgoing)
 				if err != nil {
 					CliPrintWarning("Send to remote: %v", err)
 					return
@@ -85,9 +85,9 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 	// clean up connection and TTY file
 	cleanup := func() {
 		// if already cleaned up
-		if agent.H2Stream.Conn == nil ||
-			agent.H2Stream.Ctx == nil ||
-			agent.H2Stream.Cancel == nil {
+		if RShellStream.H2x.Conn == nil ||
+			RShellStream.H2x.Ctx == nil ||
+			RShellStream.H2x.Cancel == nil {
 			return
 		}
 
@@ -105,17 +105,17 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 			CliPrintWarning("Closing /dev/tty: %v", err)
 		}
 
-		err = agent.H2Stream.Conn.Close()
+		err = RShellStream.H2x.Conn.Close()
 		if err != nil {
 			CliPrintWarning("Closing reverse shell connection: ", err)
 		}
 
-		// nil out agent.H2Stream
-		agent.H2Stream.Conn = nil
-		agent.H2Stream.Ctx = nil
-		agent.H2Stream.Cancel = nil
+		// nil out H2Stream
+		RShellStream.H2x.Conn = nil
+		RShellStream.H2x.Ctx = nil
+		RShellStream.H2x.Cancel = nil
 
-		// CliPrintSuccess("Cleaned up reverseBash")
+		CliPrintWarning("Cleaned up reverseBash")
 		// clear screen
 		TermClear()
 	}
@@ -189,7 +189,7 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 		case <-ctx.Done():
 			return
 		default:
-			buf := make([]byte, agent.BufSize)
+			buf := make([]byte, RShellStream.BufSize)
 			consoleReader := bufio.NewReader(ttyf)
 			_, err := consoleReader.Read(buf)
 			if err != nil {

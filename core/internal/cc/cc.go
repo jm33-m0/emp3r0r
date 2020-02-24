@@ -22,9 +22,6 @@ var (
 
 	// Targets target list, with control (tun) interface
 	Targets = make(map[*agent.SystemInfo]*Control)
-
-	// ShellRecvBuf h2conn buffered here
-	ShellRecvBuf = make(chan []byte)
 )
 
 const (

