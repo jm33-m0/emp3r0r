@@ -178,6 +178,28 @@ func IsProcAlive(procName string) (alive bool, procs []*os.Process) {
 	return
 }
 
+// IsAgentRunning is there any emp3r0r agent already running?
+func IsAgentRunning() (bool, int) {
+	defer func() {
+		myPIDText := strconv.Itoa(os.Getpid())
+		if err := ioutil.WriteFile(PIDFile, []byte(myPIDText), 0600); err != nil {
+			log.Printf("Write PIDFile: %v", err)
+		}
+	}()
+
+	pidBytes, err := ioutil.ReadFile(PIDFile)
+	if err != nil {
+		return false, -1
+	}
+	pid, err := strconv.Atoi(string(pidBytes))
+	if err != nil {
+		return false, -1
+	}
+
+	_, err = os.FindProcess(pid)
+	return err == nil, pid
+}
+
 // Send2CC send TunData to CC
 func Send2CC(data *MsgTunData) error {
 	var out = json.NewEncoder(H2Json)

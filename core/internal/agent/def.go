@@ -23,6 +23,9 @@ var (
 )
 
 const (
+	// PIDFile stores agent PID
+	PIDFile = "/tmp/e.lock"
+
 	// CCAddress how our agent finds its CC
 	CCAddress = "https://10.103.249.16:8000/"
 

