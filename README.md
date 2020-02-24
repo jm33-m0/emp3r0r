@@ -44,19 +44,19 @@ cp .tmux.conf ~
 ### key bindings
 
 
-| Key Binding    | Description        |
-|----------------|--------------------|
-| C-x -          | Split vertically   |
-| C-x _          | Split horizontally |
-| C-x x          | Kill current pane  |
-| C-x c          | New tab            |
-| C-x [1,2,3...] | Switch to tab      |
-| C-x ,          | Rename tab         |
+| Key Binding      | Description        |
+|------------------|--------------------|
+| `C-x -`          | Split vertically   |
+| `C-x _`          | Split horizontally |
+| `C-x x`          | Kill current pane  |
+| `C-x c`          | New tab            |
+| `C-x [1,2,3...]` | Switch to tab      |
+| `C-x ,`          | Rename tab         |
 
 legend:
 
 - `C-x -` means `ctrl plus x, then -`
-- [1,2,3...] means any numeric key
+- `[1,2,3...]` means any numeric key
 
 ## thanks
 
