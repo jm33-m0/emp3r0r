@@ -30,7 +30,7 @@ var (
 	ProxyStream = &StreamHandler{H2x: nil, BufSize: 1024, Buf: make(chan []byte)}
 )
 
-// proxyHandler handles proxy
+// proxyHandler handles proxy/port forwarding
 func (sh *StreamHandler) proxyHandler(wrt http.ResponseWriter, req *http.Request) {
 	// use h2conn
 	conn, err := h2conn.Accept(wrt, req)
@@ -53,11 +53,12 @@ func (sh *StreamHandler) proxyHandler(wrt http.ResponseWriter, req *http.Request
 		CliPrintWarning("Closed proxy connection from %s", req.RemoteAddr)
 	}()
 
-	for {
+	for ctx.Err() == nil {
 		data := make([]byte, sh.BufSize)
 		_, err = sh.H2x.Conn.Read(data)
 		if err != nil {
-			CliPrintWarning("Disconnected: proxyHandler read from RecvAgentBuf: %v", err)
+			CliPrintWarning("Disconnected: proxyHandler read: %v", err)
+			cancel()
 			return
 		}
 		sh.Buf <- data
@@ -66,6 +67,15 @@ func (sh *StreamHandler) proxyHandler(wrt http.ResponseWriter, req *http.Request
 
 // rshellHandler handles buffered data
 func (sh *StreamHandler) rshellHandler(wrt http.ResponseWriter, req *http.Request) {
+	// check if an agent is already connected
+	if sh.H2x.Ctx != nil ||
+		sh.H2x.Cancel != nil ||
+		sh.H2x.Conn != nil {
+		CliPrintError("rshellHandler: occupied")
+		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
 	// use h2conn
 	conn, err := h2conn.Accept(wrt, req)
 	if err != nil {

@@ -110,7 +110,7 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 			CliPrintWarning("Closing reverse shell connection: ", err)
 		}
 
-		// nil out H2Stream
+		// nil out RShellStream
 		RShellStream.H2x.Conn = nil
 		RShellStream.H2x.Ctx = nil
 		RShellStream.H2x.Cancel = nil
