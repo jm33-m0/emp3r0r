@@ -88,7 +88,7 @@ func processCCData(data *MsgTunData) {
 		}
 
 		/*
-			!command: special commands
+			!command: special commands (not sent by user)
 		*/
 
 		// LPE helper

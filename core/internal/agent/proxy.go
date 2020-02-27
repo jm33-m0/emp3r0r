@@ -8,33 +8,36 @@ import (
 )
 
 // Socks5Proxy sock5 local proxy server, like `ss-local`
-func Socks5Proxy(op string) error {
-	socks5.Debug = true
-	s, err := socks5.NewClassicServer("127.0.0.1:10800", "127.0.0.1", "", "", 0, 0, 0, 60)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		err = s.Stop()
+func Socks5Proxy(op string) (err error) {
+	switch op {
+	case "on":
+		go func() {
+			if ProxyServer == nil {
+				socks5.Debug = true
+				ProxyServer, err = socks5.NewClassicServer("127.0.0.1:10800", "127.0.0.1", "", "", 0, 0, 0, 60)
+				if err != nil {
+					log.Println(err)
+					return
+				}
+			}
+
+			log.Print("Socks5Proxy started")
+			err = ProxyServer.Run(nil)
+			if err != nil {
+				log.Println(err)
+			}
+			log.Print("Socks5Proxy stopped")
+		}()
+	case "off":
+		log.Print("Stopping Socks5Proxy")
+		err = ProxyServer.Stop()
 		if err != nil {
 			log.Print(err)
 		}
-	}()
-
-	switch op {
-	case "on":
-		err = s.Run(nil)
-		if err != nil {
-			log.Println(err)
-		}
-	case "off":
-		err = s.Stop()
-		if err != nil {
-			log.Println(err)
-		}
+		ProxyServer = nil
 	default:
 		return errors.New("Operation not supported")
 	}
 
-	return nil
+	return err
 }
