@@ -225,7 +225,10 @@ func listValChoices() func(string) []string {
 			return Options["cmd_to_exec"].Vals
 		case "lpe_suggest":
 			return Options["lpe_helper"].Vals
+		case "proxy":
+			return append(Options["status"].Vals, Options["port"].Vals...)
 		}
+
 		return nil
 	}
 }

@@ -99,6 +99,12 @@ func UpdateOptions(modName string) (exist bool) {
 			"ps -ef", "lsmod", "ss -antup",
 			"netstat -antup", "uname -a",
 		}
+	case modName == "proxy":
+		portOpt := addIfNotFound("port")
+		portOpt.Vals = []string{"1080", "8080"}
+		statusOpt := addIfNotFound("status")
+		statusOpt.Vals = []string{"on", "off"}
+
 	case modName == "lpe_suggest":
 		currentOpt = addIfNotFound("lpe_helper")
 		currentOpt.Vals = []string{"lpe_les", "lpe_upc"}
@@ -293,7 +299,13 @@ func moduleCmd() {
 }
 
 func moduleProxy() {
-
+	cmd := fmt.Sprintf("!proxy %s", Options["status"].Val)
+	err := SendCmd(cmd, CurrentTarget)
+	if err != nil {
+		CliPrintError("SendCmd: %v", err)
+		return
+	}
+	color.HiMagenta("Please wait for agent's response...")
 }
 
 func moduleLPE() {
@@ -323,7 +335,7 @@ func moduleLPE() {
 
 	// exec
 	CliPrintWarning("This can take some time, please be patient")
-	cmd := Options["lpe_helper"].Val
+	cmd := "!" + Options["lpe_helper"].Val
 	CliPrintWarning("Running " + cmd)
 	err = SendCmd(cmd, target)
 	if err != nil {
@@ -332,7 +344,7 @@ func moduleLPE() {
 }
 
 func moduleGetRoot() {
-	err := SendCmd("get_root", CurrentTarget)
+	err := SendCmd("!get_root", CurrentTarget)
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)
 		return

