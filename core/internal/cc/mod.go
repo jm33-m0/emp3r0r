@@ -1,6 +1,7 @@
 package cc
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"strconv"
@@ -44,6 +45,7 @@ var (
 		"cmd":         moduleCmd,
 		"shell":       moduleShell,
 		"proxy":       moduleProxy,
+		"port_fwd":    modulePortFwd,
 		"lpe_suggest": moduleLPE,
 		"get_root":    moduleGetRoot,
 	}
@@ -99,6 +101,13 @@ func UpdateOptions(modName string) (exist bool) {
 			"ps -ef", "lsmod", "ss -antup",
 			"netstat -antup", "uname -a",
 		}
+
+	case modName == "port_fwd":
+		portOpt := addIfNotFound("to_port")
+		portOpt.Vals = []string{"1080", "8080", "22", "23", "21"}
+		statusOpt := addIfNotFound("listen_port")
+		statusOpt.Vals = []string{"8080", "1080", "22", "23", "21"}
+
 	case modName == "proxy":
 		portOpt := addIfNotFound("port")
 		portOpt.Vals = []string{"1080", "8080"}
@@ -298,6 +307,17 @@ func moduleCmd() {
 	}
 }
 
+func modulePortFwd() {
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		err := PortFwd(ctx, cancel, Options["listen_port"].Val, Options["to_port"].Val)
+		if err != nil {
+			CliPrintError("PortFwd failed: %v", err)
+		}
+	}()
+	color.HiMagenta("Please wait for agent's response...")
+}
+
 func moduleProxy() {
 	cmd := fmt.Sprintf("!proxy %s", Options["status"].Val)
 	err := SendCmd(cmd, CurrentTarget)
@@ -305,6 +325,16 @@ func moduleProxy() {
 		CliPrintError("SendCmd: %v", err)
 		return
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		err = PortFwd(ctx, cancel, "10800", "10800")
+		if err != nil {
+			CliPrintError("PortFwd failed: %v", err)
+			return
+		}
+	}()
+
 	color.HiMagenta("Please wait for agent's response...")
 }
 

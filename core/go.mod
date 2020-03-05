@@ -6,6 +6,7 @@ require (
 	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
 	github.com/creack/pty v1.1.9
 	github.com/fatih/color v1.9.0
+	github.com/google/uuid v1.1.1
 	github.com/mitchellh/go-ps v0.0.0-20190716172923-621e5597135b
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/posener/h2conn v0.0.0-20180911140238-13e7df33ed15

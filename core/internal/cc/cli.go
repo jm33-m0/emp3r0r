@@ -227,6 +227,8 @@ func listValChoices() func(string) []string {
 			return Options["lpe_helper"].Vals
 		case "proxy":
 			return append(Options["status"].Vals, Options["port"].Vals...)
+		case "port_fwd":
+			return append(Options["listen_port"].Vals, Options["to_port"].Vals...)
 		}
 
 		return nil

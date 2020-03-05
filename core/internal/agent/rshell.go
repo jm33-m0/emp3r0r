@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/creack/pty"
 	"github.com/jm33-m0/emp3r0r/emagent/internal/tun"
@@ -64,6 +65,7 @@ func ActivateShell() {
 			default:
 				// if connection does not exist yet
 				if conn == nil {
+					time.Sleep(100 * time.Millisecond)
 					continue
 				}
 				data := make([]byte, RShellBufSize)
@@ -85,6 +87,7 @@ func ActivateShell() {
 		default:
 			// if connection does not exist yet
 			if conn == nil {
+				time.Sleep(100 * time.Millisecond)
 				continue
 			}
 			_, err = conn.Write(outgoing)

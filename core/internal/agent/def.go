@@ -44,6 +44,9 @@ const (
 
 	// RShellBufSize buffer size of reverse shell stream must be 1
 	RShellBufSize = 1
+
+	// ProxyBufSize buffer size of port fwd
+	ProxyBufSize = 1024
 )
 
 // SystemInfo agent properties
