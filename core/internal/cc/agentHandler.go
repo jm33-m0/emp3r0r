@@ -36,7 +36,7 @@ func processAgentData(data *agent.MsgTunData) {
 				t.Year(), t.Month(), t.Day(),
 				t.Hour(), t.Minute(), t.Second())
 
-			CliPrintWarning("Output will be displayed in new window")
+			CliPrintInfo("Output will be displayed in new window")
 			err := ioutil.WriteFile(logname, []byte(out), 0600)
 			if err != nil {
 				CliPrintWarning(err.Error())

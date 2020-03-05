@@ -115,6 +115,11 @@ start:
 	goto start
 }
 
+// CliPrintInfo print log in blue
+func CliPrintInfo(format string, a ...interface{}) {
+	log.Println(color.BlueString(format, a...))
+}
+
 // CliPrintWarning print log in yellow
 func CliPrintWarning(format string, a ...interface{}) {
 	log.Println(color.YellowString(format, a...))

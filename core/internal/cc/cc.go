@@ -135,7 +135,7 @@ func PutFile(lpath, rpath string, a *agent.SystemInfo) error {
 	if sizemB > 20 {
 		return errors.New("please do NOT transfer large files this way as it's too NOISY, aborting")
 	}
-	CliPrintWarning("\nPutFile:\nUploading '%s' to\n'%s' "+
+	CliPrintInfo("\nPutFile:\nUploading '%s' to\n'%s' "+
 		"on %s, agent [%d]\n"+
 		"size: %d bytes (%.2fmB)\n"+
 		"sha256sum: %x",

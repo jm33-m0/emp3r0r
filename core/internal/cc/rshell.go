@@ -25,7 +25,7 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 	}
 
 	cancel := RShellStream.H2x.Cancel
-	CliPrintWarning("Entering bash...")
+	CliPrintInfo("Entering bash...")
 
 	// receive and display bash's output
 	go func(ctx context.Context) {
@@ -115,7 +115,7 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 		RShellStream.H2x.Ctx = nil
 		RShellStream.H2x.Cancel = nil
 
-		CliPrintWarning("Cleaned up reverseBash")
+		CliPrintInfo("Cleaned up reverseBash")
 		// clear screen
 		TermClear()
 	}
@@ -149,7 +149,7 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 				send <- []byte(setupTermCmd)
 			}
 		}
-		CliPrintWarning("Terminal resizer finished")
+		CliPrintInfo("Terminal resizer finished")
 		cancel()
 	}(ctx)
 	ch <- syscall.SIGWINCH // Initial resize.

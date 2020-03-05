@@ -44,7 +44,6 @@ func SendCmd(cmd string, a *agent.SystemInfo) error {
 	cmdData.Payload = fmt.Sprintf("cmd%s%s", agent.OpSep, cmd)
 	cmdData.Tag = a.Tag
 
-	CliPrintWarning("Sent `%s`", cmd)
 	return Send2Agent(&cmdData, a)
 }
 
