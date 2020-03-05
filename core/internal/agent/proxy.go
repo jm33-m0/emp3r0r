@@ -73,13 +73,13 @@ func PortFwd(toPort, sessionID string) (err error) {
 	if err != nil {
 		return err
 	}
-	log.Printf("PortFwd: -> %d (%s)", port, sessionID)
 
 	// request a port fwd
 	// connect CC
 	conn, ctx, cancel, err = ConnectCC(url)
+	log.Printf("PortFwd started: -> %d (%s)", port, sessionID)
 
-	go fwdToDport(ctx, cancel, port, sendcc, recvcc)
+	go fwdToDport(ctx, cancel, port, sessionID, sendcc, recvcc)
 
 	defer func() {
 		cancel()
@@ -104,6 +104,7 @@ func PortFwd(toPort, sessionID string) (err error) {
 		}
 	}()
 
+	// send out data via h2conn
 	for outgoing := range sendcc {
 		select {
 		case <-ctx.Done():
@@ -126,7 +127,9 @@ func PortFwd(toPort, sessionID string) (err error) {
 }
 
 func fwdToDport(ctx context.Context, cancel context.CancelFunc,
-	dport int, send chan []byte, recv chan []byte) {
+	dport int, sessionID string,
+	send chan []byte, recv chan []byte) {
+
 	defer func() {
 		cancel()
 		log.Printf("fwdToDport %d exited", dport)
@@ -140,6 +143,10 @@ func fwdToDport(ctx context.Context, cancel context.CancelFunc,
 		log.Printf("fwdToDport %d: %v", dport, err)
 		return
 	}
+
+	// send handshake
+	send <- []byte(sessionID)
+	log.Print("PortFwd: sent hello")
 
 	// read from CC, send to target port
 	go func() {

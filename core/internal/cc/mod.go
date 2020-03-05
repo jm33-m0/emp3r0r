@@ -163,7 +163,7 @@ func moduleShell() {
 
 	// send data
 	var data agent.MsgTunData
-	CliPrintWarning("\nEntering shell of agent[%d] ...\n"+
+	CliPrintInfo("\nEntering shell of agent[%d] ...\n"+
 		"Note: Use `bash` command to start a bash reverse shell, type `help` for more info",
 		tControl.Index)
 
@@ -275,7 +275,7 @@ shell:
 			CliPrintError("moduleShell: %v", err)
 		}
 	}
-	CliPrintWarning("\n[*] shell[%d] finished", tControl.Index)
+	CliPrintInfo("\n[*] shell[%d] finished", tControl.Index)
 }
 
 // moduleCmd exec cmd on target
@@ -351,7 +351,7 @@ func moduleLPE() {
 	}
 
 	// download third-party LPE helper
-	CliPrintWarning("Updating local LPE helpers...")
+	CliPrintInfo("Updating local LPE helpers...")
 	err := Download(lesURL, Temp+tun.FileAPI+"lpe_les")
 	if err != nil {
 		CliPrintWarning("Failed to download LES: %v", err)
@@ -364,9 +364,9 @@ func moduleLPE() {
 	}
 
 	// exec
-	CliPrintWarning("This can take some time, please be patient")
+	CliPrintInfo("This can take some time, please be patient")
 	cmd := "!" + Options["lpe_helper"].Val
-	CliPrintWarning("Running " + cmd)
+	CliPrintInfo("Running " + cmd)
 	err = SendCmd(cmd, target)
 	if err != nil {
 		CliPrintError("Run %s: %v", cmd, err)

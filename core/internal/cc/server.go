@@ -1,6 +1,7 @@
 package cc
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io/ioutil"
@@ -25,13 +26,13 @@ type StreamHandler struct {
 
 var (
 	// RShellStream reverse shell handler
-	RShellStream = &StreamHandler{H2x: nil, BufSize: 1, Buf: make(chan []byte)}
+	RShellStream = &StreamHandler{H2x: nil, BufSize: agent.RShellBufSize, Buf: make(chan []byte)}
 
 	// ProxyStream proxy handler
-	ProxyStream = &StreamHandler{H2x: nil, BufSize: 1024, Buf: make(chan []byte)}
+	ProxyStream = &StreamHandler{H2x: nil, BufSize: agent.ProxyBufSize, Buf: make(chan []byte)}
 
-	// PortFwdHandlers port mappings/forwardings: { sessionID:StreamHandler }
-	PortFwdHandlers = make(map[string]*StreamHandler)
+	// PortFwds port mappings/forwardings: { sessionID:StreamHandler }
+	PortFwds = make(map[string]*PortFwdSession)
 )
 
 // portFwdHandler handles proxy/port forwarding
@@ -55,27 +56,28 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 		CliPrintError("portFwd connection: handshake failed: %s\n%v", req.RemoteAddr, err)
 		return
 	}
+	buf = bytes.Trim(buf, "\x00")
 	sessionID, err := uuid.ParseBytes(buf)
 	if err != nil {
 		CliPrintError("portFwd connection: handshake failed: %s\n%v", req.RemoteAddr, err)
 		return
 	}
 	// check if session ID exists in the map, if not, this connection cannot be accpeted
-	if _, exist := PortFwdHandlers[sessionID.String()]; !exist {
+	if _, exist := PortFwds[sessionID.String()]; !exist {
 		CliPrintError("portFwd connection unrecognized session ID: %s from %s", sessionID.String(), req.RemoteAddr)
 		return
 	}
-	PortFwdHandlers[sessionID.String()] = sh // cache this connection
-
-	CliPrintWarning("Got a portFwd connection from %s", req.RemoteAddr)
+	PortFwds[sessionID.String()].Sh = sh // cache this connection
+	// handshake success
+	CliPrintInfo("Got a portFwd connection from %s", req.RemoteAddr)
 
 	defer func() {
 		err = sh.H2x.Conn.Close()
 		if err != nil {
 			CliPrintError("portFwdHandler failed to close connection: " + err.Error())
 		}
-		delete(PortFwdHandlers, sessionID.String())
-		CliPrintWarning("Closed portFwd connection from %s", req.RemoteAddr)
+		delete(PortFwds, sessionID.String())
+		CliPrintInfo("Closed portFwd connection from %s", req.RemoteAddr)
 	}()
 
 	for ctx.Err() == nil {
@@ -112,7 +114,7 @@ func (sh *StreamHandler) rshellHandler(wrt http.ResponseWriter, req *http.Reques
 	sh.H2x.Ctx = ctx
 	sh.H2x.Cancel = cancel
 	sh.H2x.Conn = conn
-	CliPrintWarning("Got a reverse shell connection from %s", req.RemoteAddr)
+	CliPrintInfo("Got a reverse shell connection from %s", req.RemoteAddr)
 
 	defer func() {
 		err = sh.H2x.Conn.Close()
