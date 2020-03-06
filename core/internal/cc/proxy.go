@@ -1,6 +1,7 @@
 package cc
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net"
@@ -51,13 +52,22 @@ func PortFwd(ctx context.Context, cancel context.CancelFunc, listenPort, toPort 
 	portfwd.Cancel = cancel
 	PortFwds[fwdID] = &portfwd
 
-	defer func() {
+	cleanup := func() {
 		cancel()
 		ln.Close()
 		delete(PortFwds, fwdID)
-		CliPrintInfo("PortFwd (%s): %s exited", fwdID, portfwd.Description)
+		CliPrintInfo("PortFwd session (%s: %s) has finished", fwdID, portfwd.Description)
+	}
+
+	// catch cancel event, and trigger the termination of parent function
+	go func() {
+		for ctx.Err() == nil {
+			time.Sleep(1 * time.Second)
+		}
+		_, _ = net.Dial("tcp", "127.0.0.1:"+listenPort)
 	}()
 
+	defer cleanup()
 	for ctx.Err() == nil {
 		if PortFwds[fwdID].Sh == nil {
 			time.Sleep(100 * time.Millisecond)
@@ -75,54 +85,64 @@ func PortFwd(ctx context.Context, cancel context.CancelFunc, listenPort, toPort 
 }
 
 func handlePerConn(conn net.Conn, fwdID string) {
-	sh := PortFwds[fwdID].Sh
+	pf, exist := PortFwds[fwdID]
+	if !exist {
+		return
+	}
+	sh := pf.Sh
 	if sh == nil {
-		CliPrintError("PortFwd: StreamHandler not found")
+		CliPrintWarning("PortFwd: StreamHandler not found")
 		return
 	}
 	var err error
 	send := make(chan []byte)
 	recv := make(chan []byte)
 
-	connCtx, cancel := context.WithCancel(context.Background())
+	connCtx, connCancel := context.WithCancel(context.Background())
+
+	// clean up all goroutines
+	cleanup := func() {
+		conn.Close()
+		send <- []byte("exit\n")
+		recv <- []byte("exit\n")
+		CliPrintInfo("PortFwd conn handler (%s) finished", conn.RemoteAddr().String())
+		connCancel()
+	}
 
 	// send data to listen port
 	go func() {
-		defer cancel()
+		defer cleanup()
 		for incoming := range recv {
-			select {
-			case <-connCtx.Done():
+			incoming = bytes.Trim(incoming, "\x00") // trim NULLs
+			if connCtx.Err() != nil {
 				return
-			default:
-				_, err = conn.Write(incoming)
-				if err != nil {
-					CliPrintWarning("PortFwd write to listenPort %s\n%v", conn.RemoteAddr().String(), err)
-					return
-				}
+			}
+			_, err = conn.Write(incoming)
+			if err != nil {
+				CliPrintWarning("PortFwd write to listenPort %s\n%v", conn.RemoteAddr().String(), err)
+				return
 			}
 		}
 	}()
 
 	// send data to agent via h2conn
 	go func() {
-		defer cancel()
+		defer cleanup()
 		for outgoing := range send {
-			select {
-			case <-connCtx.Done():
+			if connCtx.Err() != nil {
 				return
-			default:
-				_, err = sh.H2x.Conn.Write(outgoing)
-				if err != nil {
-					CliPrintWarning("PortFwd write to agent port: %v", err)
-					return
-				}
+			}
+			_, err = sh.H2x.Conn.Write(outgoing)
+			if err != nil {
+				CliPrintWarning("PortFwd write to agent port: %v", err)
+				return
 			}
 		}
 	}()
 
 	// read from local listen port, write to h2conn
 	go func() {
-		defer cancel()
+		defer cleanup()
 		for connCtx.Err() == nil {
 			buf := make([]byte, agent.ProxyBufSize)
 			_, err = conn.Read(buf)
@@ -135,20 +155,11 @@ func handlePerConn(conn net.Conn, fwdID string) {
 	}()
 
 	// read from h2conn, write to local listen port
-	defer func() {
-		err = conn.Close()
-		if err != nil {
-			CliPrintWarning("PortFwd closing client connection: %v", err)
-		}
-		cancel()
-		CliPrintInfo("PortFwd request finished")
-	}()
+	defer cleanup()
 	for readbuf := range sh.Buf {
-		select {
-		case <-connCtx.Done():
+		if connCtx.Err() != nil {
 			return
-		default:
-			recv <- readbuf
 		}
+		recv <- readbuf
 	}
 }

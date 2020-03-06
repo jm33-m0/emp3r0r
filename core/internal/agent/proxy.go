@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -28,6 +29,7 @@ func Socks5Proxy(op string) (err error) {
 		if err != nil {
 			log.Print(err)
 		}
+		ProxyServer = nil
 	default:
 		return errors.New("Operation not supported")
 	}
@@ -150,8 +152,9 @@ func fwdToDport(ctx context.Context, cancel context.CancelFunc,
 
 	// read from CC, send to target port
 	go func() {
-		defer func() { cancel() }()
+		defer cancel()
 		for incoming := range recv {
+			incoming = bytes.Trim(incoming, "\x00") // trim NULLs
 			select {
 			case <-ctx.Done():
 				return
