@@ -17,6 +17,10 @@ import (
 )
 
 var (
+	// DebugLevel what kind fof logs do we want to see
+	// 0 (INFO) -> 1 (WARN) -> 2 (ERROR)
+	DebugLevel = 0
+
 	// EmpRoot root directory of emp3r0r
 	EmpRoot, _ = os.Getwd()
 

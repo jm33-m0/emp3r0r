@@ -117,12 +117,16 @@ start:
 
 // CliPrintInfo print log in blue
 func CliPrintInfo(format string, a ...interface{}) {
-	log.Println(color.BlueString(format, a...))
+	if DebugLevel == 0 {
+		log.Println(color.BlueString(format, a...))
+	}
 }
 
 // CliPrintWarning print log in yellow
 func CliPrintWarning(format string, a ...interface{}) {
-	log.Println(color.YellowString(format, a...))
+	if DebugLevel <= 1 {
+		log.Println(color.YellowString(format, a...))
+	}
 }
 
 // CliPrintSuccess print log in green
