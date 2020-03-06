@@ -96,7 +96,7 @@ func ListModules() {
 	color.Cyan("Available modules\n")
 	color.Cyan("=================\n\n")
 	for mod := range ModuleHelpers {
-		color.Green("[+] " + mod)
+		color.Green(mod)
 	}
 }
 

@@ -9,23 +9,25 @@ import (
 
 // Commands holds all commands and their help string, command: help
 var Commands = map[string]string{
-	"target":     "Set target. eg. `target <index>`",
-	"set":        "Set an option. eg. `set <option> <val>`",
-	"use":        "Use a module. eg. `use <module_name>`",
-	"run":        "Run selected module, make sure you have set required options",
-	"info":       "What options do we have?",
-	"ls_targets": "List all targets",
-	"ls_modules": "List all modules",
-	"help":       "Print this help",
-	"exit":       "Exit",
+	"target":       "Set target. eg. `target <index>`",
+	"set":          "Set an option. eg. `set <option> <val>`",
+	"use":          "Use a module. eg. `use <module_name>`",
+	"run":          "Run selected module, make sure you have set required options",
+	"info":         "What options do we have?",
+	"ls_targets":   "List all targets",
+	"ls_modules":   "List all modules",
+	"ls_port_fwds": "List all port mappings",
+	"help":         "Print this help",
+	"exit":         "Exit",
 }
 
 // CmdHelpers holds a map of helper functions
 var CmdHelpers = map[string]func(){
-	"ls_targets": ListTargets,
-	"ls_modules": ListModules,
-	"info":       CliListOptions,
-	"run":        ModuleRun,
+	"ls_targets":   ListTargets,
+	"ls_modules":   ListModules,
+	"ls_port_fwds": ListPortFwds,
+	"info":         CliListOptions,
+	"run":          ModuleRun,
 }
 
 // CmdHandler processes user commands

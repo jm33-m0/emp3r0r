@@ -76,7 +76,15 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 		if err != nil {
 			CliPrintError("portFwdHandler failed to close connection: " + err.Error())
 		}
-		delete(PortFwds, sessionID.String())
+		portfwd, exist := PortFwds[sessionID.String()]
+		// cancel PortFwd context
+		if exist {
+			portfwd.Cancel()
+		} else {
+			CliPrintWarning("portFwdHandler: cannot find port mapping: %s", sessionID.String())
+		}
+		// cancel HTTP request context
+		cancel()
 		CliPrintInfo("Closed portFwd connection from %s", req.RemoteAddr)
 	}()
 
@@ -85,7 +93,6 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 		_, err = sh.H2x.Conn.Read(data)
 		if err != nil {
 			CliPrintWarning("Disconnected: portFwdHandler read: %v", err)
-			cancel()
 			return
 		}
 		sh.Buf <- data
