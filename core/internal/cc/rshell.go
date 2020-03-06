@@ -2,6 +2,7 @@ package cc
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -30,6 +31,7 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 	// receive and display bash's output
 	go func(ctx context.Context) {
 		for incoming := range recv {
+			incoming = bytes.Trim(incoming, "\x00") // trim NULL bytes
 			select {
 			case <-ctx.Done():
 				return

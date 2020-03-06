@@ -42,8 +42,8 @@ const (
 	// OpSep separator of CC payload
 	OpSep = "cb433bd1-354c-4802-a4fa-ece518f3ded1"
 
-	// RShellBufSize buffer size of reverse shell stream must be 1
-	RShellBufSize = 1
+	// RShellBufSize buffer size of reverse shell stream
+	RShellBufSize = 128
 
 	// ProxyBufSize buffer size of port fwd
 	ProxyBufSize = 1024

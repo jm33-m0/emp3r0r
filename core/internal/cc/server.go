@@ -79,13 +79,14 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 		portfwd, exist := PortFwds[sessionID.String()]
 		// cancel PortFwd context
 		if exist {
+			CliPrintInfo("portFwdHandler: closing port mapping: %s", sessionID.String())
 			portfwd.Cancel()
 		} else {
 			CliPrintWarning("portFwdHandler: cannot find port mapping: %s", sessionID.String())
 		}
 		// cancel HTTP request context
 		cancel()
-		CliPrintInfo("Closed portFwd connection from %s", req.RemoteAddr)
+		CliPrintInfo("portFwdHandler: closed portFwd connection from %s", req.RemoteAddr)
 	}()
 
 	for ctx.Err() == nil {
@@ -202,12 +203,12 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// msgTunHandler duplex tunnel between agent and cc
+// msgTunHandler JSON message based tunnel between agent and cc
 func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 	// use h2conn
 	conn, err := h2conn.Accept(wrt, req)
 	if err != nil {
-		CliPrintError("tunHandler: failed creating connection from %s: %s", req.RemoteAddr, err)
+		CliPrintError("msgTunHandler: failed creating connection from %s: %s", req.RemoteAddr, err)
 		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
@@ -216,13 +217,13 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 		for t, c := range Targets {
 			if c.Conn == conn {
 				delete(Targets, t)
-				CliPrintWarning("tunHandler: agent [%d]:%s disconnected\n", c.Index, t.Tag)
+				CliPrintWarning("msgTunHandler: agent [%d]:%s disconnected\n", c.Index, t.Tag)
 				break
 			}
 		}
 		err = conn.Close()
 		if err != nil {
-			CliPrintError("tunHandler failed to close connection: " + err.Error())
+			CliPrintError("msgTunHandler failed to close connection: " + err.Error())
 		}
 	}()
 
@@ -246,7 +247,7 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 		if msg.Payload == "hello" {
 			err = out.Encode(msg)
 			if err != nil {
-				CliPrintWarning("tunHandler cannot send hello to agent [%s]", msg.Tag)
+				CliPrintWarning("msgTunHandler cannot send hello to agent [%s]", msg.Tag)
 				return
 			}
 		}
@@ -257,7 +258,7 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 		// assign this Conn to a known agent
 		agent := GetTargetFromTag(msg.Tag)
 		if agent == nil {
-			CliPrintWarning("tunHandler: agent not recognized")
+			CliPrintWarning("msgTunHandler: agent not recognized")
 			return
 		}
 		Targets[agent].Conn = conn

