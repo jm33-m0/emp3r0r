@@ -14,9 +14,10 @@ import (
 
 // PortFwdSession holds controller interface of a port-fwd session
 type PortFwdSession struct {
-	Sh          *StreamHandler
-	Cancel      context.CancelFunc
-	Description string
+	Sh          *StreamHandler     // related to HTTP handler
+	Ctx         context.Context    // PortFwd context
+	Cancel      context.CancelFunc // PortFwd cancel
+	Description string             // fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, toPort)
 }
 
 // ListPortFwds list currently active port mappings
@@ -24,13 +25,20 @@ func ListPortFwds() {
 	color.Cyan("Active port mappings\n")
 	color.Cyan("====================\n\n")
 	for id, portmap := range PortFwds {
-		color.Green("%s: %s\n", id, portmap.Description)
+		color.Green("%s (%s)\n", portmap.Description, id)
 	}
 }
 
 // PortFwd forward from ccPort to dstPort on agent, via h2conn
 // as if the dstPort is listening on CC machine
 func PortFwd(ctx context.Context, cancel context.CancelFunc, listenPort, toPort string) (err error) {
+	// is this mapping already active?
+	for id, session := range PortFwds {
+		if session.Description == fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, toPort) {
+			return fmt.Errorf("Such mapping already exists:\n%s", id)
+		}
+	}
+
 	fwdID := uuid.New().String()
 	cmd := fmt.Sprintf("!port_fwd %s %s", toPort, fwdID)
 	err = SendCmd(cmd, CurrentTarget)
@@ -49,6 +57,7 @@ func PortFwd(ctx context.Context, cancel context.CancelFunc, listenPort, toPort 
 	var portfwd PortFwdSession
 	portfwd.Sh = nil
 	portfwd.Description = fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, toPort)
+	portfwd.Ctx = ctx
 	portfwd.Cancel = cancel
 	PortFwds[fwdID] = &portfwd
 
@@ -147,7 +156,7 @@ func handlePerConn(conn net.Conn, fwdID string) {
 			buf := make([]byte, agent.ProxyBufSize)
 			_, err = conn.Read(buf)
 			if err != nil {
-				CliPrintWarning("PortFwd read from tcp: %s to h2conn\nERROR: %v", conn.LocalAddr().String(), err)
+				CliPrintWarning("PortFwd read from tcp: %s to h2conn\nERROR: %v", conn.RemoteAddr().String(), err)
 				return
 			}
 			send <- buf

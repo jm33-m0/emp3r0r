@@ -103,10 +103,16 @@ func UpdateOptions(modName string) (exist bool) {
 		}
 
 	case modName == "port_fwd":
+		// rport
 		portOpt := addIfNotFound("to_port")
 		portOpt.Vals = []string{"1080", "8080", "22", "23", "21"}
-		statusOpt := addIfNotFound("listen_port")
-		statusOpt.Vals = []string{"8080", "1080", "22", "23", "21"}
+		// listen on port
+		lportOpt := addIfNotFound("listen_port")
+		lportOpt.Vals = []string{"8080", "1080", "22", "23", "21"}
+		// on/off
+		switchOpt := addIfNotFound("switch")
+		switchOpt.Vals = []string{"on", "off"}
+		switchOpt.Val = "on"
 
 	case modName == "proxy":
 		portOpt := addIfNotFound("port")
@@ -308,14 +314,33 @@ func moduleCmd() {
 }
 
 func modulePortFwd() {
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		err := PortFwd(ctx, cancel, Options["listen_port"].Val, Options["to_port"].Val)
-		if err != nil {
-			CliPrintError("PortFwd failed: %v", err)
+	switch Options["switch"].Val {
+	case "off":
+		for id, session := range PortFwds {
+			if session.Description == fmt.Sprintf("%s (Local) -> %s (Agent)",
+				Options["listen_port"].Val,
+				Options["to_port"].Val) {
+				session.Cancel() // cancel the PortFwd session
+
+				// tell the agent to close connection
+				// make sure handler returns
+				cmd := fmt.Sprintf("!port_fwd %s stop", id)
+				err := SendCmd(cmd, CurrentTarget)
+				if err != nil {
+					CliPrintError("SendCmd: %v", err)
+					return
+				}
+			}
 		}
-	}()
-	color.HiMagenta("Please wait for agent's response...")
+	default:
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			err := PortFwd(ctx, cancel, Options["listen_port"].Val, Options["to_port"].Val)
+			if err != nil {
+				CliPrintError("PortFwd failed: %v", err)
+			}
+		}()
+	}
 }
 
 func moduleProxy() {

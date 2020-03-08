@@ -108,16 +108,22 @@ func processCCData(data *MsgTunData) {
 			if len(cmdSlice) != 3 {
 				return
 			}
-
-			out = fmt.Sprintf("Success")
-			toPort := cmdSlice[1]
-			sessionID := cmdSlice[len(cmdSlice)-1]
-			err = PortFwd(toPort, sessionID)
-			if err != nil {
-				out = fmt.Sprintf("Failed to execute your command: %v", err)
+			switch cmdSlice[2] {
+			case "stop":
+				sessionID := cmdSlice[1]
+				PortFwds[sessionID].Cancel()
+			default:
+				toPort := cmdSlice[1]
+				sessionID := cmdSlice[2]
+				go func() {
+					err = PortFwd(toPort, sessionID)
+					if err != nil {
+						log.Printf("PortFwd failed: %v", err)
+					}
+				}()
 			}
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
-			goto send
+
+			return
 		}
 
 		// get_root

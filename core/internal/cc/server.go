@@ -71,16 +71,22 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 	// handshake success
 	CliPrintInfo("Got a portFwd connection from %s", req.RemoteAddr)
 
+	// check if the mapping exists
+	pf, exists := PortFwds[sessionID.String()]
+	if !exists {
+		return
+	}
+
 	defer func() {
 		err = sh.H2x.Conn.Close()
 		if err != nil {
 			CliPrintError("portFwdHandler failed to close connection: " + err.Error())
 		}
-		portfwd, exist := PortFwds[sessionID.String()]
 		// cancel PortFwd context
-		if exist {
+		pf, exists = PortFwds[sessionID.String()]
+		if exists {
 			CliPrintInfo("portFwdHandler: closing port mapping: %s", sessionID.String())
-			portfwd.Cancel()
+			pf.Cancel()
 		} else {
 			CliPrintWarning("portFwdHandler: cannot find port mapping: %s", sessionID.String())
 		}
@@ -89,7 +95,12 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 		CliPrintInfo("portFwdHandler: closed portFwd connection from %s", req.RemoteAddr)
 	}()
 
-	for ctx.Err() == nil {
+	for ctx.Err() == nil && pf.Ctx.Err() == nil {
+		_, exist := PortFwds[sessionID.String()]
+		if !exist {
+			CliPrintWarning("Disconnected: portFwdHandler: port mapping not found")
+			return
+		}
 		data := make([]byte, sh.BufSize)
 		_, err = sh.H2x.Conn.Read(data)
 		if err != nil {

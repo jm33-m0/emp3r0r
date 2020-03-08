@@ -15,6 +15,15 @@ import (
 	"github.com/txthinking/socks5"
 )
 
+// PortFwdSession manage a port fwd session
+type PortFwdSession struct {
+	Ctx    context.Context
+	Cancel context.CancelFunc
+}
+
+// PortFwds manage port mappings
+var PortFwds = make(map[string]*PortFwdSession)
+
 // Socks5Proxy sock5 proxy server on agent, to use it, forward port 10800 to CC
 func Socks5Proxy(op string) (err error) {
 	switch op {
@@ -59,6 +68,8 @@ func socks5Start() {
 // PortFwd port mapping, receive CC's request data then send it to target port on agent
 func PortFwd(toPort, sessionID string) (err error) {
 	var (
+		session PortFwdSession
+
 		url  = CCAddress + tun.ProxyAPI
 		port int
 
@@ -86,8 +97,35 @@ func PortFwd(toPort, sessionID string) (err error) {
 	defer func() {
 		cancel()
 		conn.Close()
+		delete(PortFwds, sessionID)
+		log.Printf("PortFwd stopped: -> %d (%s)", port, sessionID)
 	}()
 
+	// save this session
+	session.Ctx = ctx
+	session.Cancel = cancel
+	PortFwds[sessionID] = &session
+
+	// check if h2conn is disconnected,
+	// if yes, kill all goroutines and cleanup
+	go func() {
+		buf := make([]byte, ProxyBufSize)
+		for ctx.Err() == nil {
+			time.Sleep(1 * time.Second)
+			_, err = conn.Read(buf)
+			if err != nil {
+				log.Printf("test remote h2conn: %v", err)
+				break
+			}
+		}
+
+		// clean up
+		cancel()
+		sendcc <- []byte("exit")
+		recvcc <- []byte("exit")
+	}()
+
+	// read data from h2conn
 	go func() {
 		for ctx.Err() == nil {
 			// if connection does not exist yet
@@ -148,7 +186,6 @@ func fwdToDport(ctx context.Context, cancel context.CancelFunc,
 
 	// send handshake
 	send <- []byte(sessionID)
-	log.Print("PortFwd: sent hello")
 
 	// read from CC, send to target port
 	go func() {
