@@ -207,7 +207,7 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 		inx := len(Targets)
 		Targets[&target] = &Control{Index: inx, Conn: nil}
 		shortname := strings.Split(target.Tag, "-")[0]
-		CliPrintSuccess("\n[%d] Knock.. Knock...\n%s from %s,"+
+		CliPrintSuccess("\n[%d] Knock.. Knock...\n%s from %s, "+
 			"running '%s'\n",
 			inx, shortname, target.IP,
 			target.OS)

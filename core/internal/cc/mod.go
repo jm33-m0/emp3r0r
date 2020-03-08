@@ -281,7 +281,7 @@ shell:
 			CliPrintError("moduleShell: %v", err)
 		}
 	}
-	CliPrintInfo("\n[*] shell[%d] finished", tControl.Index)
+	CliPrintSuccess("\n[*] shell[%d] finished", tControl.Index)
 }
 
 // moduleCmd exec cmd on target
@@ -344,23 +344,21 @@ func modulePortFwd() {
 }
 
 func moduleProxy() {
-	cmd := fmt.Sprintf("!proxy %s", Options["status"].Val)
-	err := SendCmd(cmd, CurrentTarget)
-	if err != nil {
-		CliPrintError("SendCmd: %v", err)
-		return
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
+		cmd := fmt.Sprintf("!proxy %s", Options["status"].Val)
+		err := SendCmd(cmd, CurrentTarget)
+		if err != nil {
+			CliPrintError("SendCmd: %v", err)
+			return
+		}
+
+		ctx, cancel := context.WithCancel(context.Background())
 		err = PortFwd(ctx, cancel, "10800", "10800")
 		if err != nil {
 			CliPrintError("PortFwd failed: %v", err)
 			return
 		}
 	}()
-
-	color.HiMagenta("Please wait for agent's response...")
 }
 
 func moduleLPE() {

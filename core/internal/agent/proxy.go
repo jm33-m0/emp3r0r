@@ -140,6 +140,10 @@ func PortFwd(toPort, sessionID string) (err error) {
 				cancel()
 				return
 			}
+
+			// FIXME check origin
+			log.Printf("reading from h2conn: %s, to port %s", sessionID, toPort)
+
 			recvcc <- data
 		}
 	}()

@@ -238,7 +238,7 @@ func listValChoices() func(string) []string {
 			return append(Options["status"].Vals, Options["port"].Vals...)
 		case "port_fwd":
 			ret := append(Options["listen_port"].Vals, Options["to_port"].Vals...)
-			ret = append(ret, Options["stop"].Vals...)
+			ret = append(ret, Options["switch"].Vals...)
 			return ret
 		}
 

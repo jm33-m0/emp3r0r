@@ -141,6 +141,10 @@ func handlePerConn(conn net.Conn, fwdID string) {
 			if connCtx.Err() != nil {
 				return
 			}
+
+			// FIXME check destination
+			CliPrintInfo("PortFwd write to agent port: %s", pf.Description)
+
 			_, err = sh.H2x.Conn.Write(outgoing)
 			if err != nil {
 				CliPrintWarning("PortFwd write to agent port: %v", err)
@@ -149,7 +153,7 @@ func handlePerConn(conn net.Conn, fwdID string) {
 		}
 	}()
 
-	// read from local listen port, write to h2conn
+	// read from local listen port, push to send channel, to be sent to agent via h2conn
 	go func() {
 		defer cleanup()
 		for connCtx.Err() == nil {
@@ -163,7 +167,7 @@ func handlePerConn(conn net.Conn, fwdID string) {
 		}
 	}()
 
-	// read from h2conn, write to local listen port
+	// read from h2conn, push to recv channel
 	defer cleanup()
 	for readbuf := range sh.Buf {
 		if connCtx.Err() != nil {
