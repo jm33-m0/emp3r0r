@@ -119,10 +119,12 @@ func UpdateOptions(modName string) (exist bool) {
 		portOpt.Vals = []string{"1080", "8080"}
 		statusOpt := addIfNotFound("status")
 		statusOpt.Vals = []string{"on", "off"}
+		statusOpt.Val = "on"
 
 	case modName == "lpe_suggest":
 		currentOpt = addIfNotFound("lpe_helper")
 		currentOpt.Vals = []string{"lpe_les", "lpe_upc"}
+		currentOpt.Val = "lpe_les"
 	}
 
 	return

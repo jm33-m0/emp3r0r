@@ -121,14 +121,8 @@ func PortFwd(toPort, sessionID string) (err error) {
 	// check if h2conn is disconnected,
 	// if yes, kill all goroutines and cleanup
 	go func() {
-		buf := make([]byte, ProxyBufSize)
 		for ctx.Err() == nil {
 			time.Sleep(1 * time.Second)
-			_, err = conn.Read(buf)
-			if err != nil {
-				log.Printf("test remote h2conn: %v", err)
-				break
-			}
 		}
 
 		// clean up
@@ -148,8 +142,7 @@ func PortFwd(toPort, sessionID string) (err error) {
 			data := make([]byte, ProxyBufSize)
 			_, err = conn.Read(data)
 			if err != nil {
-				log.Print("Read remote: ", err)
-				cancel()
+				log.Printf("Read from h2conn: %v", err)
 				return
 			}
 
@@ -183,10 +176,6 @@ func fwdToDport(ctx context.Context, cancel context.CancelFunc,
 	dport int, sessionID string,
 	send chan []byte, recv chan []byte) {
 
-	defer func() {
-		cancel()
-		log.Printf("fwdToDport %d exited", dport)
-	}()
 	var err error
 
 	// connect to target port
@@ -217,15 +206,20 @@ func fwdToDport(ctx context.Context, cancel context.CancelFunc,
 			}
 		}
 	}()
+	defer func() {
+		dest.Close()
+		cancel()
+		log.Printf("fwdToDport %d exited", dport)
+	}()
 
 	// read from target port, send to CC
 	for ctx.Err() == nil {
 		buf := make([]byte, ProxyBufSize)
 		_, err = dest.Read(buf)
-		send <- buf
 		if err != nil {
-			log.Printf("port %d read: %v", dport, err)
+			log.Printf("Read from port %d: %v", dport, err)
 			return
 		}
+		send <- buf
 	}
 }

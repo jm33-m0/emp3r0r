@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/fatih/color"
@@ -41,6 +42,8 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 	*/
 
 	handlePerConn := func(conn net.Conn, fwdID string) {
+		var err error
+
 		pf, exist := PortFwds[fwdID]
 		if !exist {
 			return
@@ -50,9 +53,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 			CliPrintWarning("PortFwd: StreamHandler not found")
 			return
 		}
-		var err error
-		send := make(chan []byte)
-		recv := make(chan []byte)
+		send := make(chan []byte) // recv is sh.Buf
 
 		connCtx, connCancel := context.WithCancel(context.Background())
 
@@ -60,7 +61,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		cleanup := func() {
 			conn.Close()
 			send <- []byte("exit\n")
-			recv <- []byte("exit\n")
+			sh.Buf <- []byte("exit\n")
 			CliPrintInfo("PortFwd conn handler (%s) finished", conn.RemoteAddr().String())
 			connCancel()
 		}
@@ -68,7 +69,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		// send data to listen port
 		go func() {
 			defer cleanup()
-			for incoming := range recv {
+			for incoming := range sh.Buf {
 				incoming = bytes.Trim(incoming, "\x00") // trim NULLs
 				if connCtx.Err() != nil {
 					return
@@ -89,35 +90,24 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 					return
 				}
 
-				_, err = sh.H2x.Conn.Write(outgoing)
+				_, err := sh.H2x.Conn.Write(outgoing)
 				if err != nil {
-					CliPrintWarning("PortFwd write to agent port: %v", err)
+					CliPrintWarning("PortFwd write %s to agent port: %v", strconv.Quote(string(outgoing)), err)
 					return
 				}
 			}
 		}()
 
 		// read from local listen port, push to send channel, to be sent to agent via h2conn
-		go func() {
-			defer cleanup()
-			for connCtx.Err() == nil {
-				buf := make([]byte, agent.ProxyBufSize)
-				_, err = conn.Read(buf)
-				if err != nil {
-					CliPrintWarning("PortFwd read from tcp: %s to h2conn\nERROR: %v", conn.RemoteAddr().String(), err)
-					return
-				}
-				send <- buf
-			}
-		}()
-
-		// read from h2conn, push to recv channel
 		defer cleanup()
-		for readbuf := range sh.Buf {
-			if connCtx.Err() != nil {
+		for connCtx.Err() == nil {
+			buf := make([]byte, agent.ProxyBufSize)
+			_, err = conn.Read(buf)
+			if err != nil {
+				CliPrintWarning("PortFwd read from tcp: %s to h2conn\nERROR: %v", conn.RemoteAddr().String(), err)
 				return
 			}
-			recv <- readbuf
+			send <- buf
 		}
 	}
 
@@ -129,6 +119,12 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 	cancel := pf.Cancel
 	toPort := pf.Tport
 	listenPort := pf.Lport
+
+	_, e1 := strconv.Atoi(toPort)
+	_, e2 := strconv.Atoi(listenPort)
+	if e1 != nil || e2 != nil {
+		return fmt.Errorf("Invalid port: %v (to_port), %v (listen_port)", e1, e2)
+	}
 
 	// is this mapping already active?
 	for id, session := range PortFwds {
@@ -160,7 +156,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		cancel()
 		ln.Close()
 		delete(PortFwds, fwdID)
-		CliPrintInfo("PortFwd session (%s: %s) has finished", fwdID, pf.Description)
+		CliPrintWarning("PortFwd session (%s: %s) has finished", fwdID, pf.Description)
 	}
 
 	// catch cancel event, and trigger the termination of parent function
