@@ -37,8 +37,12 @@ var (
 
 // portFwdHandler handles proxy/port forwarding
 func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Request) {
-	// use h2conn
-	conn, err := h2conn.Accept(wrt, req)
+	var (
+		err error
+		h2x agent.H2Conn
+	)
+	sh.H2x = &h2x
+	sh.H2x.Conn, err = h2conn.Accept(wrt, req)
 	if err != nil {
 		CliPrintError("portFwdHandler: failed creating connection from %s: %s", req.RemoteAddr, err)
 		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -47,11 +51,14 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 	ctx, cancel := context.WithCancel(req.Context())
 	sh.H2x.Ctx = ctx
 	sh.H2x.Cancel = cancel
-	sh.H2x.Conn = conn
+
+	// save sh
+	shCopy := *sh
 
 	// record this connection to port forwarding map
 	buf := make([]byte, sh.BufSize)
-	_, err = conn.Read(buf)
+	_, err = sh.H2x.Conn.Read(buf)
+
 	if err != nil {
 		CliPrintError("portFwd connection: handshake failed: %s\n%v", req.RemoteAddr, err)
 		return
@@ -63,19 +70,14 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 		return
 	}
 	// check if session ID exists in the map, if not, this connection cannot be accpeted
-	if _, exist := PortFwds[sessionID.String()]; !exist {
+	pf, exist := PortFwds[sessionID.String()]
+	if !exist {
 		CliPrintError("portFwd connection unrecognized session ID: %s from %s", sessionID.String(), req.RemoteAddr)
 		return
 	}
-	PortFwds[sessionID.String()].Sh = sh // cache this connection
+	pf.Sh = &shCopy // cache this connection
 	// handshake success
-	CliPrintInfo("Got a portFwd connection from %s", req.RemoteAddr)
-
-	// check if the mapping exists
-	pf, exists := PortFwds[sessionID.String()]
-	if !exists {
-		return
-	}
+	CliPrintSuccess("Got a portFwd connection (%s) from %s", sessionID.String(), req.RemoteAddr)
 
 	defer func() {
 		err = sh.H2x.Conn.Close()
@@ -83,8 +85,8 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 			CliPrintError("portFwdHandler failed to close connection: " + err.Error())
 		}
 		// cancel PortFwd context
-		pf, exists = PortFwds[sessionID.String()]
-		if exists {
+		pf, exist = PortFwds[sessionID.String()]
+		if exist {
 			CliPrintInfo("portFwdHandler: closing port mapping: %s", sessionID.String())
 			pf.Cancel()
 		} else {
@@ -92,15 +94,16 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 		}
 		// cancel HTTP request context
 		cancel()
-		CliPrintInfo("portFwdHandler: closed portFwd connection from %s", req.RemoteAddr)
+		CliPrintWarning("portFwdHandler: closed portFwd connection from %s", req.RemoteAddr)
 	}()
 
 	for ctx.Err() == nil && pf.Ctx.Err() == nil {
-		_, exist := PortFwds[sessionID.String()]
+		_, exist = PortFwds[sessionID.String()]
 		if !exist {
 			CliPrintWarning("Disconnected: portFwdHandler: port mapping not found")
 			return
 		}
+
 		data := make([]byte, sh.BufSize)
 		_, err = sh.H2x.Conn.Read(data)
 		if err != nil {
@@ -112,6 +115,7 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 }
 
 // rshellHandler handles buffered data
+// FIXME need to implement verification
 func (sh *StreamHandler) rshellHandler(wrt http.ResponseWriter, req *http.Request) {
 	// check if an agent is already connected
 	if sh.H2x.Ctx != nil ||
@@ -133,7 +137,7 @@ func (sh *StreamHandler) rshellHandler(wrt http.ResponseWriter, req *http.Reques
 	sh.H2x.Ctx = ctx
 	sh.H2x.Cancel = cancel
 	sh.H2x.Conn = conn
-	CliPrintInfo("Got a reverse shell connection from %s", req.RemoteAddr)
+	CliPrintSuccess("Got a reverse shell connection from %s", req.RemoteAddr)
 
 	defer func() {
 		err = sh.H2x.Conn.Close()
