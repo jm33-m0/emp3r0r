@@ -178,7 +178,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		if err != nil {
 			return err
 		}
-		go handlePerConn(conn, fwdID)
+		handlePerConn(conn, fwdID)
 	}
 
 	return
