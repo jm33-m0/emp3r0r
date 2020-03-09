@@ -176,7 +176,10 @@ func fwdToDport(ctx context.Context, cancel context.CancelFunc,
 	dport int, sessionID string,
 	send chan []byte, recv chan []byte) {
 
-	var err error
+	var (
+		err error
+		n   int
+	)
 
 	// connect to target port
 	destAddr := fmt.Sprintf("127.0.0.1:%d", dport)
@@ -215,9 +218,9 @@ func fwdToDport(ctx context.Context, cancel context.CancelFunc,
 	// read from target port, send to CC
 	for ctx.Err() == nil {
 		buf := make([]byte, ProxyBufSize)
-		_, err = dest.Read(buf)
+		n, err = dest.Read(buf)
 		if err != nil {
-			log.Printf("Read from port %d: %v", dport, err)
+			log.Printf("Read %d bytes from port %d: %v", n, dport, err)
 			return
 		}
 		send <- buf
