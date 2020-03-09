@@ -111,11 +111,14 @@ func processCCData(data *MsgTunData) {
 			switch cmdSlice[2] {
 			case "stop":
 				sessionID := cmdSlice[1]
-				PortFwds[sessionID].Cancel()
+				pf, exist := PortFwds[sessionID]
+				if exist {
+					pf.Cancel()
+				}
 			default:
-				toPort := cmdSlice[1]
-				sessionID := cmdSlice[2]
 				go func() {
+					toPort := cmdSlice[1]
+					sessionID := cmdSlice[2]
 					err = PortFwd(toPort, sessionID)
 					if err != nil {
 						log.Printf("PortFwd failed: %v", err)

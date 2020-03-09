@@ -333,9 +333,11 @@ func modulePortFwd() {
 			}
 		}
 	default:
-		ctx, cancel := context.WithCancel(context.Background())
+		var pf PortFwdSession
+		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
+		pf.Lport, pf.Tport = Options["listen_port"].Val, Options["to_port"].Val
 		go func() {
-			err := PortFwd(ctx, cancel, Options["listen_port"].Val, Options["to_port"].Val)
+			err := pf.RunPortFwd()
 			if err != nil {
 				CliPrintError("PortFwd failed: %v", err)
 			}
@@ -352,12 +354,15 @@ func moduleProxy() {
 			return
 		}
 
-		ctx, cancel := context.WithCancel(context.Background())
-		err = PortFwd(ctx, cancel, "10800", "10800")
-		if err != nil {
-			CliPrintError("PortFwd failed: %v", err)
-			return
-		}
+		var pf PortFwdSession
+		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
+		pf.Lport, pf.Tport = "10800", "10800"
+		go func() {
+			err := pf.RunPortFwd()
+			if err != nil {
+				CliPrintError("PortFwd failed: %v", err)
+			}
+		}()
 	}()
 }
 

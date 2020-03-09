@@ -14,10 +14,13 @@ import (
 
 // PortFwdSession holds controller interface of a port-fwd session
 type PortFwdSession struct {
-	Sh          *StreamHandler     // related to HTTP handler
-	Ctx         context.Context    // PortFwd context
-	Cancel      context.CancelFunc // PortFwd cancel
-	Description string             // fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, toPort)
+	Lport       string // listen_port
+	Tport       string // to_port
+	Description string // fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, toPort)
+
+	Sh     *StreamHandler     // related to HTTP handler
+	Ctx    context.Context    // PortFwd context
+	Cancel context.CancelFunc // PortFwd cancel
 }
 
 // ListPortFwds list currently active port mappings
@@ -25,16 +28,111 @@ func ListPortFwds() {
 	color.Cyan("Active port mappings\n")
 	color.Cyan("====================\n\n")
 	for id, portmap := range PortFwds {
+		// color.Green("%s (%s)\nsh: %p, h2conn: %p", portmap.Description, id, portmap.Sh, portmap.Sh.H2x.Conn)
 		color.Green("%s (%s)\n", portmap.Description, id)
 	}
 }
 
-// PortFwd forward from ccPort to dstPort on agent, via h2conn
+// RunPortFwd forward from ccPort to dstPort on agent, via h2conn
 // as if the dstPort is listening on CC machine
-func PortFwd(ctx context.Context, cancel context.CancelFunc, listenPort, toPort string) (err error) {
+func (pf *PortFwdSession) RunPortFwd() (err error) {
+	/*
+		handle connections to "localhost:listenPort"
+	*/
+
+	handlePerConn := func(conn net.Conn, fwdID string) {
+		pf, exist := PortFwds[fwdID]
+		if !exist {
+			return
+		}
+		sh := pf.Sh
+		if sh == nil {
+			CliPrintWarning("PortFwd: StreamHandler not found")
+			return
+		}
+		var err error
+		send := make(chan []byte)
+		recv := make(chan []byte)
+
+		connCtx, connCancel := context.WithCancel(context.Background())
+
+		// clean up all goroutines
+		cleanup := func() {
+			conn.Close()
+			send <- []byte("exit\n")
+			recv <- []byte("exit\n")
+			CliPrintInfo("PortFwd conn handler (%s) finished", conn.RemoteAddr().String())
+			connCancel()
+		}
+
+		// send data to listen port
+		go func() {
+			defer cleanup()
+			for incoming := range recv {
+				incoming = bytes.Trim(incoming, "\x00") // trim NULLs
+				if connCtx.Err() != nil {
+					return
+				}
+				_, err = conn.Write(incoming)
+				if err != nil {
+					CliPrintWarning("PortFwd write to listenPort %s\n%v", conn.RemoteAddr().String(), err)
+					return
+				}
+			}
+		}()
+
+		// send data to agent via h2conn
+		go func() {
+			defer cleanup()
+			for outgoing := range send {
+				if connCtx.Err() != nil {
+					return
+				}
+
+				_, err = sh.H2x.Conn.Write(outgoing)
+				if err != nil {
+					CliPrintWarning("PortFwd write to agent port: %v", err)
+					return
+				}
+			}
+		}()
+
+		// read from local listen port, push to send channel, to be sent to agent via h2conn
+		go func() {
+			defer cleanup()
+			for connCtx.Err() == nil {
+				buf := make([]byte, agent.ProxyBufSize)
+				_, err = conn.Read(buf)
+				if err != nil {
+					CliPrintWarning("PortFwd read from tcp: %s to h2conn\nERROR: %v", conn.RemoteAddr().String(), err)
+					return
+				}
+				send <- buf
+			}
+		}()
+
+		// read from h2conn, push to recv channel
+		defer cleanup()
+		for readbuf := range sh.Buf {
+			if connCtx.Err() != nil {
+				return
+			}
+			recv <- readbuf
+		}
+	}
+
+	/*
+		start port mapping
+	*/
+
+	ctx := pf.Ctx
+	cancel := pf.Cancel
+	toPort := pf.Tport
+	listenPort := pf.Lport
+
 	// is this mapping already active?
 	for id, session := range PortFwds {
-		if session.Description == fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, toPort) {
+		if session.Description == pf.Description {
 			return fmt.Errorf("Such mapping already exists:\n%s", id)
 		}
 	}
@@ -53,19 +151,16 @@ func PortFwd(ctx context.Context, cancel context.CancelFunc, listenPort, toPort 
 		return err
 	}
 
-	// mark this session
-	var portfwd PortFwdSession
-	portfwd.Sh = nil
-	portfwd.Description = fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, toPort)
-	portfwd.Ctx = ctx
-	portfwd.Cancel = cancel
-	PortFwds[fwdID] = &portfwd
+	// mark this session, save to PortFwds
+	pf.Sh = nil
+	pf.Description = fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, toPort)
+	PortFwds[fwdID] = pf
 
 	cleanup := func() {
 		cancel()
 		ln.Close()
 		delete(PortFwds, fwdID)
-		CliPrintInfo("PortFwd session (%s: %s) has finished", fwdID, portfwd.Description)
+		CliPrintInfo("PortFwd session (%s: %s) has finished", fwdID, pf.Description)
 	}
 
 	// catch cancel event, and trigger the termination of parent function
@@ -91,88 +186,4 @@ func PortFwd(ctx context.Context, cancel context.CancelFunc, listenPort, toPort 
 	}
 
 	return
-}
-
-func handlePerConn(conn net.Conn, fwdID string) {
-	pf, exist := PortFwds[fwdID]
-	if !exist {
-		return
-	}
-	sh := pf.Sh
-	if sh == nil {
-		CliPrintWarning("PortFwd: StreamHandler not found")
-		return
-	}
-	var err error
-	send := make(chan []byte)
-	recv := make(chan []byte)
-
-	connCtx, connCancel := context.WithCancel(context.Background())
-
-	// clean up all goroutines
-	cleanup := func() {
-		conn.Close()
-		send <- []byte("exit\n")
-		recv <- []byte("exit\n")
-		CliPrintInfo("PortFwd conn handler (%s) finished", conn.RemoteAddr().String())
-		connCancel()
-	}
-
-	// send data to listen port
-	go func() {
-		defer cleanup()
-		for incoming := range recv {
-			incoming = bytes.Trim(incoming, "\x00") // trim NULLs
-			if connCtx.Err() != nil {
-				return
-			}
-			_, err = conn.Write(incoming)
-			if err != nil {
-				CliPrintWarning("PortFwd write to listenPort %s\n%v", conn.RemoteAddr().String(), err)
-				return
-			}
-		}
-	}()
-
-	// send data to agent via h2conn
-	go func() {
-		defer cleanup()
-		for outgoing := range send {
-			if connCtx.Err() != nil {
-				return
-			}
-
-			// FIXME check destination
-			CliPrintInfo("PortFwd write to agent port: %s", pf.Description)
-
-			_, err = sh.H2x.Conn.Write(outgoing)
-			if err != nil {
-				CliPrintWarning("PortFwd write to agent port: %v", err)
-				return
-			}
-		}
-	}()
-
-	// read from local listen port, push to send channel, to be sent to agent via h2conn
-	go func() {
-		defer cleanup()
-		for connCtx.Err() == nil {
-			buf := make([]byte, agent.ProxyBufSize)
-			_, err = conn.Read(buf)
-			if err != nil {
-				CliPrintWarning("PortFwd read from tcp: %s to h2conn\nERROR: %v", conn.RemoteAddr().String(), err)
-				return
-			}
-			send <- buf
-		}
-	}()
-
-	// read from h2conn, push to recv channel
-	defer cleanup()
-	for readbuf := range sh.Buf {
-		if connCtx.Err() != nil {
-			return
-		}
-		recv <- readbuf
-	}
 }
