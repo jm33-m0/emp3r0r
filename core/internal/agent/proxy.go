@@ -1,10 +1,10 @@
 package agent
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"strconv"
@@ -83,10 +83,6 @@ func PortFwd(toPort, sessionID string) (err error) {
 		url  = CCAddress + tun.ProxyAPI
 		port int
 
-		// buffers
-		sendcc = make(chan []byte)
-		recvcc = make(chan []byte)
-
 		// connection
 		conn   *h2conn.Conn
 		ctx    context.Context
@@ -102,7 +98,7 @@ func PortFwd(toPort, sessionID string) (err error) {
 	conn, ctx, cancel, err = ConnectCC(url)
 	log.Printf("PortFwd started: -> %d (%s)", port, sessionID)
 
-	go fwdToDport(ctx, cancel, port, sessionID, sendcc, recvcc)
+	go fwdToDport(ctx, cancel, port, sessionID, conn)
 
 	defer func() {
 		cancel()
@@ -120,109 +116,59 @@ func PortFwd(toPort, sessionID string) (err error) {
 
 	// check if h2conn is disconnected,
 	// if yes, kill all goroutines and cleanup
-	go func() {
-		for ctx.Err() == nil {
-			time.Sleep(1 * time.Second)
-		}
-
-		// clean up
-		cancel()
-		sendcc <- []byte("exit")
-		recvcc <- []byte("exit")
-	}()
-
-	// read data from h2conn
-	go func() {
-		for ctx.Err() == nil {
-			// if connection does not exist yet
-			if conn == nil {
-				time.Sleep(100 * time.Millisecond)
-				continue
-			}
-			data := make([]byte, ProxyBufSize)
-			_, err = conn.Read(data)
-			if err != nil {
-				log.Printf("Read from h2conn: %v", err)
-				return
-			}
-
-			recvcc <- data
-		}
-	}()
-
-	// send out data via h2conn
-	for outgoing := range sendcc {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			// if connection does not exist yet
-			if conn == nil {
-				time.Sleep(100 * time.Millisecond)
-				continue
-			}
-			_, err = conn.Write(outgoing)
-			if err != nil {
-				log.Print("Send to remote: ", err)
-				return
-			}
-		}
+	for ctx.Err() == nil {
+		time.Sleep(1 * time.Second)
 	}
-
 	return
 }
 
 func fwdToDport(ctx context.Context, cancel context.CancelFunc,
-	dport int, sessionID string,
-	send chan []byte, recv chan []byte) {
+	dport int, sessionID string, h2 *h2conn.Conn) {
 
-	var (
-		err error
-		n   int
-	)
+	var err error
 
 	// connect to target port
 	destAddr := fmt.Sprintf("127.0.0.1:%d", dport)
 	dest, err := net.Dial("tcp", destAddr)
+	defer func() {
+		cancel()
+		if dest != nil {
+			dest.Close()
+		}
+		log.Printf("fwdToDport %d exited", dport)
+	}()
 	if err != nil {
 		log.Printf("fwdToDport %d: %v", dport, err)
 		return
 	}
 
-	// send handshake
-	send <- []byte(sessionID)
-
-	// read from CC, send to target port
+	// io.Copy
 	go func() {
 		defer cancel()
-		for incoming := range recv {
-			incoming = bytes.Trim(incoming, "\x00") // trim NULLs
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				_, err := dest.Write(incoming)
-				if err != nil {
-					log.Printf("write to port %d: %v", dport, err)
-					return
-				}
-			}
-		}
-	}()
-	defer func() {
-		dest.Close()
-		cancel()
-		log.Printf("fwdToDport %d exited", dport)
-	}()
-
-	// read from target port, send to CC
-	for ctx.Err() == nil {
-		buf := make([]byte, ProxyBufSize)
-		n, err = dest.Read(buf)
+		_, err = io.Copy(dest, h2)
 		if err != nil {
-			log.Printf("Read %d bytes from port %d: %v", n, dport, err)
+			log.Printf("dest -> h2: %v", err)
 			return
 		}
-		send <- buf
+	}()
+	go func() {
+		defer cancel()
+		_, err = io.Copy(h2, dest)
+		if err != nil {
+			log.Printf("h2 -> dest: %v", err)
+			return
+		}
+	}()
+
+	_, err = h2.Write([]byte(sessionID))
+	if err != nil {
+		log.Printf("Send hello: %v", err)
+		return
 	}
+
+	for ctx.Err() == nil {
+		time.Sleep(500 * time.Millisecond)
+	}
+	_, _ = h2.Write([]byte("exit\n"))
+	_, _ = dest.Write([]byte("exit\n"))
 }
