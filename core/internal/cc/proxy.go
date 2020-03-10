@@ -29,7 +29,10 @@ func ListPortFwds() {
 	color.Cyan("Active port mappings\n")
 	color.Cyan("====================\n\n")
 	for id, portmap := range PortFwds {
-		// color.Green("%s (%s)\nsh: %p, h2conn: %p", portmap.Description, id, portmap.Sh, portmap.Sh.H2x.Conn)
+		if portmap.Sh == nil {
+			portmap.Cancel()
+			continue
+		}
 		color.Green("%s (%s)\n", portmap.Description, id)
 	}
 }
@@ -169,11 +172,16 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 
 	defer cleanup()
 	for ctx.Err() == nil {
-		if PortFwds[fwdID].Sh == nil {
+		p, exist := PortFwds[fwdID]
+		if !exist {
+			return
+		}
+		if p.Sh == nil {
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 
+		// listen
 		conn, err := ln.Accept()
 		if err != nil {
 			return err

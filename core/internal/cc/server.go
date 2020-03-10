@@ -64,6 +64,7 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 		return
 	}
 	buf = bytes.Trim(buf, "\x00")
+
 	sessionID, err := uuid.ParseBytes(buf)
 	if err != nil {
 		CliPrintError("portFwd connection: handshake failed: %s\n%v", req.RemoteAddr, err)
@@ -84,6 +85,7 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 		if err != nil {
 			CliPrintError("portFwdHandler failed to close connection: " + err.Error())
 		}
+
 		// cancel PortFwd context
 		pf, exist = PortFwds[sessionID.String()]
 		if exist {
@@ -115,7 +117,7 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 }
 
 // rshellHandler handles buffered data
-// FIXME need to implement verification
+// TODO need to implement verification
 func (sh *StreamHandler) rshellHandler(wrt http.ResponseWriter, req *http.Request) {
 	// check if an agent is already connected
 	if sh.H2x.Ctx != nil ||
