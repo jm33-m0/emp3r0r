@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/google/uuid"
@@ -106,13 +107,7 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 			return
 		}
 
-		data := make([]byte, sh.BufSize)
-		_, err = sh.H2x.Conn.Read(data)
-		if err != nil {
-			CliPrintWarning("Disconnected: portFwdHandler read: %v", err)
-			return
-		}
-		sh.Buf <- data
+		time.Sleep(200 * time.Millisecond)
 	}
 }
 

@@ -1,16 +1,15 @@
 package cc
 
 import (
-	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"time"
 
 	"github.com/fatih/color"
 	"github.com/google/uuid"
-	"github.com/jm33-m0/emp3r0r/emagent/internal/agent"
 )
 
 // PortFwdSession holds controller interface of a port-fwd session
@@ -56,61 +55,39 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 			CliPrintWarning("PortFwd: StreamHandler not found")
 			return
 		}
-		send := make(chan []byte) // recv is sh.Buf
 
 		connCtx, connCancel := context.WithCancel(context.Background())
 
 		// clean up all goroutines
 		cleanup := func() {
+			_, _ = conn.Write([]byte("exit"))
 			conn.Close()
-			send <- []byte("exit\n")
-			sh.Buf <- []byte("exit\n")
 			CliPrintInfo("PortFwd conn handler (%s) finished", conn.RemoteAddr().String())
 			connCancel()
 		}
 
-		// send data to listen port
+		// io.Copy
 		go func() {
 			defer cleanup()
-			for incoming := range sh.Buf {
-				incoming = bytes.Trim(incoming, "\x00") // trim NULLs
-				if connCtx.Err() != nil {
-					return
-				}
-				_, err = conn.Write(incoming)
-				if err != nil {
-					CliPrintWarning("PortFwd write to listenPort %s\n%v", conn.RemoteAddr().String(), err)
-					return
-				}
-			}
-		}()
-
-		// send data to agent via h2conn
-		go func() {
-			defer cleanup()
-			for outgoing := range send {
-				if connCtx.Err() != nil {
-					return
-				}
-
-				_, err := sh.H2x.Conn.Write(outgoing)
-				if err != nil {
-					CliPrintWarning("PortFwd write %s to agent port: %v", strconv.Quote(string(outgoing)), err)
-					return
-				}
-			}
-		}()
-
-		// read from local listen port, push to send channel, to be sent to agent via h2conn
-		defer cleanup()
-		for connCtx.Err() == nil {
-			buf := make([]byte, agent.ProxyBufSize)
-			_, err = conn.Read(buf)
+			_, err = io.Copy(sh.H2x.Conn, conn)
 			if err != nil {
-				CliPrintWarning("PortFwd read from tcp: %s to h2conn\nERROR: %v", conn.RemoteAddr().String(), err)
+				CliPrintWarning("conn -> h2: %v", err)
 				return
 			}
-			send <- buf
+		}()
+		go func() {
+			defer cleanup()
+			_, err = io.Copy(conn, sh.H2x.Conn)
+			if err != nil {
+				CliPrintWarning("h2 -> conn: %v", err)
+				return
+			}
+		}()
+
+		// keep running until context is canceled
+		defer cleanup()
+		for connCtx.Err() == nil {
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 

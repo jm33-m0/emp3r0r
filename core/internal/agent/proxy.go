@@ -147,7 +147,7 @@ func fwdToDport(ctx context.Context, cancel context.CancelFunc,
 		defer cancel()
 		_, err = io.Copy(dest, h2)
 		if err != nil {
-			log.Printf("dest -> h2: %v", err)
+			log.Printf("h2 -> dest: %v", err)
 			return
 		}
 	}()
@@ -155,7 +155,7 @@ func fwdToDport(ctx context.Context, cancel context.CancelFunc,
 		defer cancel()
 		_, err = io.Copy(h2, dest)
 		if err != nil {
-			log.Printf("h2 -> dest: %v", err)
+			log.Printf("dest -> h2: %v", err)
 			return
 		}
 	}()
