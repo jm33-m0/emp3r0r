@@ -10,7 +10,13 @@ post-exploitation framework for linux
 
 ## demo
 
+### reverse shell
+
 [![asciicast](https://asciinema.org/a/TyicxXCmZXcr5iG8lylDNa11m.svg)](https://asciinema.org/a/TyicxXCmZXcr5iG8lylDNa11m)
+
+### port forwarding
+
+[![asciicast](https://asciinema.org/a/jGe5Z6fN4AkH107hUZtvqZmt3.svg)](https://asciinema.org/a/jGe5Z6fN4AkH107hUZtvqZmt3)
 
 ## how to test
 

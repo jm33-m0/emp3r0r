@@ -65,8 +65,8 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 		return
 	}
 	buf = bytes.Trim(buf, "\x00")
-	origBuf := buf
-	isSubSession := false
+	origBuf := buf        // in case we need the orignal session-id, for sub-sessions
+	isSubSession := false // sub-session is part of a port-mapping, every client connection starts a sub-session (h2conn)
 	if strings.Contains(string(buf), "_") {
 		isSubSession = true
 		idstr := strings.Split(string(buf), "_")[0]
