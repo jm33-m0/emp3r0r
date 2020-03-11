@@ -39,8 +39,6 @@ class GoBuild:
         self.INDICATOR = cc_indicator
         self.UUID = str(uuid.uuid1())
 
-
-
     def build(self):
         '''
         cd to cmd and run go build
@@ -68,7 +66,7 @@ class GoBuild:
         # cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH}''' + \
         # f''' go build -ldflags='-s -w -extldflags "-static"' -o ../../build/{self.target}'''
         cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0''' + \
-                f''' go build -ldflags='-s -w' -o ../../build/{self.target}'''
+            f''' go build -ldflags='-s -w' -o ../../build/{self.target}'''
         os.system(cmd)
         log_warn("GO BUILD ends...")
 
@@ -80,7 +78,6 @@ class GoBuild:
         else:
             log_error("go build failed")
             sys.exit(1)
-
 
     def gen_certs(self):
         '''
@@ -169,12 +166,12 @@ def yes_no(prompt):
     '''
     y/n?
     '''
-    answ = input(prompt).lower().strip()
+    answ = input(prompt + " [Y/n] ").lower().strip()
 
-    if answ in ["y", "yes", "yea", "yeah"]:
-        return True
+    if answ in ["n", "no", "nah", "nay"]:
+        return False
 
-    return False
+    return True
 
 
 def main(target):
@@ -196,7 +193,7 @@ def main(target):
         f = open("./build/ccip.txt")
         ccip = f.read().strip()
         f.close()
-        use_cached = yes_no("Use cached CC IP? [y/N] ")
+        use_cached = yes_no("Use cached CC IP?")
 
     if not use_cached:
         ccip = input("CC server IP: ").strip()
@@ -223,7 +220,7 @@ def main(target):
         f = open("./build/indicator.txt")
         indicator = f.read().strip()
         f.close()
-        use_cached = yes_no("Use cached CC indicator? [y/N] ")
+        use_cached = yes_no("Use cached CC indicator?")
 
     if not use_cached:
         indicator = input("CC status indicator: ").strip()
@@ -234,17 +231,20 @@ def main(target):
     gobuild = GoBuild(target="agent", cc_indicator=indicator, cc_ip=ccip)
     gobuild.build()
 
+
 def log_error(msg):
     '''
     print in red
     '''
     print("\u001b[31m"+msg+"\u001b[0m")
 
+
 def log_warn(msg):
     '''
     print in red
     '''
     print("\u001b[33m"+msg+"\u001b[0m")
+
 
 if len(sys.argv) != 2:
     print(f"python3 {sys.argv[0]} [cc/agent]")
