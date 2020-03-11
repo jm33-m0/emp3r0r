@@ -69,14 +69,6 @@ func socks5Start() {
 
 // PortFwd port mapping, receive CC's request data then send it to target port on agent
 func PortFwd(toPort, sessionID string) (err error) {
-	// ignore if a session already exists
-	for _, s := range PortFwds {
-		if s.ToPort == toPort {
-			log.Printf("%s duplicated session", toPort)
-			return
-		}
-	}
-
 	var (
 		session PortFwdSession
 

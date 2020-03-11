@@ -65,21 +65,36 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 		return
 	}
 	buf = bytes.Trim(buf, "\x00")
+	origBuf := buf
+	isSubSession := false
+	if strings.Contains(string(buf), "_") {
+		isSubSession = true
+		idstr := strings.Split(string(buf), "_")[0]
+		buf = []byte(idstr)
+	}
 
 	sessionID, err := uuid.ParseBytes(buf)
 	if err != nil {
-		CliPrintError("portFwd connection: handshake failed: %s\n%v", req.RemoteAddr, err)
+		CliPrintError("portFwd connection: failed to parse UUID: %s from %s\n%v", buf, req.RemoteAddr, err)
 		return
 	}
-	// check if session ID exists in the map, if not, this connection cannot be accpeted
+	// check if session ID exists in the map,
 	pf, exist := PortFwds[sessionID.String()]
 	if !exist {
-		CliPrintError("portFwd connection unrecognized session ID: %s from %s", sessionID.String(), req.RemoteAddr)
+		CliPrintError("Unknown ID: %s", sessionID.String())
 		return
 	}
-	pf.Sh = &shCopy // cache this connection
-	// handshake success
-	CliPrintSuccess("Got a portFwd connection (%s) from %s", sessionID.String(), req.RemoteAddr)
+	pf.Sh = make(map[string]*StreamHandler)
+	if !isSubSession {
+		pf.Sh[sessionID.String()] = &shCopy // cache this connection
+
+		// handshake success
+		CliPrintSuccess("Got a portFwd connection (%s) from %s", sessionID.String(), req.RemoteAddr)
+	} else {
+		pf.Sh[string(origBuf)] = &shCopy // cache this connection
+		// handshake success
+		CliPrintInfo("Got a portFwd sub-connection (%s) from %s", string(origBuf), req.RemoteAddr)
+	}
 
 	defer func() {
 		err = sh.H2x.Conn.Close()
@@ -87,10 +102,17 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 			CliPrintError("portFwdHandler failed to close connection: " + err.Error())
 		}
 
+		// if this connection is just a sub-connection
+		// keep the port-mapping, only close h2conn
+		if string(origBuf) != sessionID.String() {
+			cancel()
+			CliPrintInfo("portFwdHandler: closed connection %s", origBuf)
+			return
+		}
+
 		// cancel PortFwd context
 		pf, exist = PortFwds[sessionID.String()]
 		if exist {
-			CliPrintInfo("portFwdHandler: closing port mapping: %s", sessionID.String())
 			pf.Cancel()
 		} else {
 			CliPrintWarning("portFwdHandler: cannot find port mapping: %s", sessionID.String())

