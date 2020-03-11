@@ -117,7 +117,8 @@ func UpdateOptions(modName string) (exist bool) {
 
 	case modName == "proxy":
 		portOpt := addIfNotFound("port")
-		portOpt.Vals = []string{"1080", "8080"}
+		portOpt.Vals = []string{"1080", "8080", "10800", "10888"}
+		portOpt.Val = "8080"
 		statusOpt := addIfNotFound("status")
 		statusOpt.Vals = []string{"on", "off"}
 		statusOpt.Val = "on"
@@ -352,24 +353,49 @@ func modulePortFwd() {
 }
 
 func moduleProxy() {
+	// proxy
+	proxyCtx, proxyCancel := context.WithCancel(context.Background())
+	port := Options["port"].Val
+	status := Options["status"].Val
+
+	// port-fwd
+	var pf PortFwdSession
+	pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
+	pf.Lport, pf.Tport = port, port
+
+	// proxy command, start socks5 server on agent
 	go func() {
-		cmd := fmt.Sprintf("!proxy %s", Options["status"].Val)
+		if _, err := strconv.Atoi(port); err != nil {
+			CliPrintError("Invalid port: %v", err)
+			return
+		}
+		cmd := fmt.Sprintf("!proxy %s %s", status, port)
 		err := SendCmd(cmd, CurrentTarget)
 		if err != nil {
 			CliPrintError("SendCmd: %v", err)
 			return
 		}
+		defer proxyCancel() // mark proxy command as done
+	}()
 
-		var pf PortFwdSession
-		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
-		pf.Lport, pf.Tport = "10800", "10800"
+	switch status {
+	case "on":
+		// port mapping
 		go func() {
+			for proxyCtx.Err() == nil {
+				time.Sleep(100 * time.Millisecond)
+			}
+
 			err := pf.RunPortFwd()
 			if err != nil {
 				CliPrintError("PortFwd failed: %v", err)
 			}
 		}()
-	}()
+	case "off":
+		pf.Cancel()
+	default:
+		CliPrintError("Unknown operation '%s'", status)
+	}
 }
 
 func moduleLPE() {

