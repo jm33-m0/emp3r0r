@@ -167,6 +167,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		}
 
 		go func() {
+			// sub-session (streamHandler) ID
 			shID := fmt.Sprintf("%s_%d", fwdID, agent.RandInt(0, 1024))
 			cmd = fmt.Sprintf("!port_fwd %s %s", toPort, shID)
 			err = SendCmd(cmd, CurrentTarget)

