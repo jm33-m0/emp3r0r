@@ -62,7 +62,7 @@ cp .tmux.conf ~
 legend:
 
 - <kbd>C-x -</kbd> means <kbd>Ctrl</kbd> plus <kbd>X</kbd>, then <kbd>-</kbd>
-- `[1,2,3...]` means any numeric key
+- <kbd>[1,2,3...]</kbd> means any numeric key
 
 ## thanks
 
