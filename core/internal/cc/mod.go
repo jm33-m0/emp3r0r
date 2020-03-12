@@ -392,7 +392,22 @@ func moduleProxy() {
 			}
 		}()
 	case "off":
-		pf.Cancel()
+		for id, session := range PortFwds {
+			if session.Description == fmt.Sprintf("%s (Local) -> %s (Agent)",
+				port,
+				port) {
+				session.Cancel() // cancel the PortFwd session
+
+				// tell the agent to close connection
+				// make sure handler returns
+				cmd := fmt.Sprintf("!port_fwd %s stop", id)
+				err := SendCmd(cmd, CurrentTarget)
+				if err != nil {
+					CliPrintError("SendCmd: %v", err)
+					return
+				}
+			}
+		}
 	default:
 		CliPrintError("Unknown operation '%s'", status)
 	}
