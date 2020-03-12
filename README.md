@@ -50,18 +50,18 @@ cp .tmux.conf ~
 ### key bindings
 
 
-| Key Binding      | Description        |
-|------------------|--------------------|
-| `C-x -`          | Split vertically   |
-| `C-x _`          | Split horizontally |
-| `C-x x`          | Kill current pane  |
-| `C-x c`          | New tab            |
-| `C-x [1,2,3...]` | Switch to tab      |
-| `C-x ,`          | Rename tab         |
+| Key Binding                | Description        |
+|----------------------------|--------------------|
+| <kbd>C-x - </kbd>          | Split vertically   |
+| <kbd>C-x _ </kbd>          | Split horizontally |
+| <kbd>C-x x </kbd>          | Kill current pane  |
+| <kbd>C-x c </kbd>          | New tab            |
+| <kbd>C-x [1,2,3...] </kbd> | Switch to tab      |
+| <kbd>C-x , </kbd>          | Rename tab         |
 
 legend:
 
-- `C-x -` means `ctrl plus x, then -`
+- <kbd>C-x -</kbd> means <kbd>Ctrl</kbd> plus <kbd>X</kbd>, then <kbd>-</kbd>
 - `[1,2,3...]` means any numeric key
 
 ## thanks
