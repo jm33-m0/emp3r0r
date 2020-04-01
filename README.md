@@ -12,13 +12,13 @@ post-exploitation framework for linux
 
 ### reverse shell
 
-<p align="center">
+<p>
     <img width="600" src="/img/rshell.svg">
 </p>
 
 ### port forwarding
 
-<p align="center">
+<p>
     <img width="600" src="/img/portfwd.svg">
 </p>
 
