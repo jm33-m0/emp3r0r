@@ -12,11 +12,15 @@ post-exploitation framework for linux
 
 ### reverse shell
 
-[![asciicast](https://asciinema.org/a/EGbe2qzVxgCXBA0LXn9LZCHal.svg)](https://asciinema.org/a/EGbe2qzVxgCXBA0LXn9LZCHal)
+<p align="center">
+    <img width="600" src="/img/rshell.svg">
+</p>
 
 ### port forwarding
 
-[![asciicast](https://asciinema.org/a/jGe5Z6fN4AkH107hUZtvqZmt3.svg)](https://asciinema.org/a/jGe5Z6fN4AkH107hUZtvqZmt3)
+<p align="center">
+    <img width="600" src="/img/portfwd.svg">
+</p>
 
 ## how to test
 
