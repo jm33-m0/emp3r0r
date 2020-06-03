@@ -95,12 +95,17 @@ class GoBuild:
             f.close()
 
         log_warn("[!] Generating new certs...")
-        os.chdir("./tls")
-        os.system(
-            f"bash ./genkey-with-ip-san.sh {self.UUID} {self.UUID}.com {self.CCIP}")
-        os.rename(f"./{self.UUID}-cert.pem", "./emp3r0r-cert.pem")
-        os.rename(f"./{self.UUID}-key.pem", "./emp3r0r-key.pem")
-        os.chdir("..")
+        try:
+            os.chdir("./tls")
+            os.system(
+                f"bash ./genkey-with-ip-san.sh {self.UUID} {self.UUID}.com {self.CCIP}")
+            os.rename(f"./{self.UUID}-cert.pem", "./emp3r0r-cert.pem")
+            os.rename(f"./{self.UUID}-key.pem", "./emp3r0r-key.pem")
+            os.chdir("..")
+        except BaseException as exc:
+            log_error(
+                f"[-] Something went wrong, see above for details: {exc}")
+            sys.exit(1)
 
     def unset_tags(self):
         '''

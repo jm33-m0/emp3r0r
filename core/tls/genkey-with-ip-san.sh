@@ -35,11 +35,12 @@ if [ ! -f "${CAFILE}" ]; then
     openssl genrsa -des3 \
         -passout "${PASSOPT}" \
         -out "${CAKEY}" 2048
-    openssl req -new -x509 -days 365 \
+    openssl req -new -x509 -days 3650 \
         -batch \
         -passin "${PASSOPT}" \
         -key "${CAKEY}" \
         -passout "${PASSOPT}" \
+        -subj "/prompt=no" \
         -out "${CAFILE}"
     echo "<< certificate authority generated."
 fi
@@ -78,7 +79,7 @@ keypair() {
         -config "${ROOT}/openssl-${NAME}.cnf"
 
     echo ".. certificate"
-    openssl x509 -req -days 365 \
+    openssl x509 -req -days 3650 \
         -passin "${PASSOPT}" \
         -in "${ROOT}/${NAME}-req.csr" \
         -CA "${CAFILE}" \
