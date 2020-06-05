@@ -232,6 +232,8 @@ func listValChoices() func(string) []string {
 		switch CurrentMod {
 		case "cmd":
 			return Options["cmd_to_exec"].Vals
+		case "clean_log":
+			return Options["keyword"].Vals
 		case "lpe_suggest":
 			return Options["lpe_helper"].Vals
 		case "proxy":

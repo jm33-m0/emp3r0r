@@ -49,6 +49,7 @@ var (
 		"port_fwd":    modulePortFwd,
 		"lpe_suggest": moduleLPE,
 		"get_root":    moduleGetRoot,
+		"clean_log":   moduleLogCleaner,
 		"persistence": modulePersistence,
 	}
 )
@@ -115,6 +116,11 @@ func UpdateOptions(modName string) (exist bool) {
 		switchOpt := addIfNotFound("switch")
 		switchOpt.Vals = []string{"on", "off"}
 		switchOpt.Val = "on"
+
+	case modName == "clean_log":
+		// keyword to clean
+		keywordOpt := addIfNotFound("keyword")
+		keywordOpt.Vals = []string{"root", "admin"}
 
 	case modName == "proxy":
 		portOpt := addIfNotFound("port")
@@ -461,6 +467,16 @@ func moduleGetRoot() {
 func modulePersistence() {
 	// TODO select menu
 	err := SendCmd("!persistence", CurrentTarget)
+	if err != nil {
+		CliPrintError("SendCmd: %v", err)
+		return
+	}
+	color.HiMagenta("Please wait for agent's response...")
+}
+
+func moduleLogCleaner() {
+	cmd := fmt.Sprintf("!clean_log %s", Options["keyword"].Val)
+	err := SendCmd(cmd, CurrentTarget)
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)
 		return
