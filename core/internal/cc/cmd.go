@@ -103,6 +103,7 @@ func CmdHandler(cmd string) (err error) {
 }
 
 // CmdHelp prints help in two columns
+// print help for modules
 func CmdHelp(mod string) {
 	help := make(map[string]string)
 	switch mod {
@@ -116,6 +117,24 @@ func CmdHelp(mod string) {
 	case "cmd":
 		help = map[string]string{
 			"cmd_to_exec": "Press TAB for some hints",
+		}
+		CliPrettyPrint("Option", "Help", &help)
+	case "port_fwd":
+		help = map[string]string{
+			"to_port":     "Port (to forward to) on agent side",
+			"listen_port": "Listen on CC side",
+			"switch":      "Turn port mapping On/Off",
+		}
+		CliPrettyPrint("Option", "Help", &help)
+	case "proxy":
+		help = map[string]string{
+			"port":   "Port of our local proxy server",
+			"status": "Turn proxy On/Off",
+		}
+		CliPrettyPrint("Option", "Help", &help)
+	case "clean_log":
+		help = map[string]string{
+			"keyword": "Delete all log entries containing this keyword",
 		}
 		CliPrettyPrint("Option", "Help", &help)
 	default:
