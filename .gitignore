@@ -81,3 +81,6 @@ lkm/modules.order
 lkm/Module.symvers
 lkm/Mkfile.old
 lkm/dkms.conf
+
+# fuck spotlight
+.DS_Store
