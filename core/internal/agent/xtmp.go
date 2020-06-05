@@ -30,10 +30,10 @@ func deleteXtmpEntry(keyword string) (err error) {
 		}
 
 		// back up xtmp file
-		err = ioutil.WriteFile(path+".bak", xmtpData, 0664)
-		if err != nil {
-			return fmt.Errorf("Failed to backup %s: %v", path, err)
-		}
+		// err = ioutil.WriteFile(path+".bak", xmtpData, 0664)
+		// if err != nil {
+		// 	return fmt.Errorf("Failed to backup %s: %v", path, err)
+		// }
 
 		for offset < len(xmtpData) {
 			buf := xmtpData[offset:(offset + 384)]
