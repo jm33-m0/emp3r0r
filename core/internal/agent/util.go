@@ -43,6 +43,14 @@ func IsProcAlive(procName string) (alive bool, procs []*os.Process) {
 	return
 }
 
+// IsFileExist check if a file exists
+func IsFileExist(path string) bool {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+
 // IsAgentRunning is there any emp3r0r agent already running?
 func IsAgentRunning() (bool, int) {
 	defer func() {
