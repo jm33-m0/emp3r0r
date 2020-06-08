@@ -9,7 +9,8 @@ import (
 
 // CleanAllByKeyword delete any entries containing keyword in ALL known log files
 func CleanAllByKeyword(keyword string) (err error) {
-	return fmt.Errorf("deleteXtmpEntry: %v\ndeleteAuthEntry: %v", deleteXtmpEntry(keyword), deleteAuthEntry(keyword))
+	return fmt.Errorf("deleteXtmpEntry: %v\ndeleteAuthEntry: %v",
+		deleteXtmpEntry(keyword), deleteAuthEntry(keyword))
 }
 
 // deleteXtmpEntry delete a wtmp/utmp/btmp entry containing keyword

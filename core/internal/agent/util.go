@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -150,6 +151,30 @@ func CollectSystemInfo() *SystemInfo {
 	info.IPs = collectLocalIPs()
 
 	return &info
+}
+
+// CheckAccount : check account info by parsing /etc/passwd
+func CheckAccount(username string) (accountInfo map[string]string, err error) {
+	passwdData, err := ioutil.ReadFile("/etc/passwd")
+	lines := strings.Split(string(passwdData), "\n")
+	for _, line := range lines {
+		fields := strings.Split(line, ":")
+		accountInfo["username"] = fields[0]
+		if username != accountInfo["username"] {
+			return nil, errors.New("User not found")
+		}
+		accountInfo["home"] = fields[len(fields)-2]
+		accountInfo["shell"] = fields[len(fields)-1]
+	}
+	return
+}
+
+// AddCronJob add a cron job without terminal
+// this creates a cron job for whoever runs the function
+func AddCronJob(job string) error {
+	cmdStr := fmt.Sprintf("(crontab -l 2>/dev/null; echo '%s') | crontab -", job)
+	cmd := exec.Command("/bin/sh", "-c", cmdStr)
+	return cmd.Start()
 }
 
 func getMemSize() (size int) {
