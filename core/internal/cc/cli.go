@@ -236,6 +236,8 @@ func listValChoices() func(string) []string {
 			return Options["keyword"].Vals
 		case "lpe_suggest":
 			return Options["lpe_helper"].Vals
+		case "persistence":
+			return append(Options["method"].Vals)
 		case "proxy":
 			return append(Options["status"].Vals, Options["port"].Vals...)
 		case "port_fwd":

@@ -134,6 +134,17 @@ func UpdateOptions(modName string) (exist bool) {
 		currentOpt = addIfNotFound("lpe_helper")
 		currentOpt.Vals = []string{"lpe_les", "lpe_upc"}
 		currentOpt.Val = "lpe_les"
+
+	case modName == "persistence":
+		currentOpt = addIfNotFound("method")
+		methods := make([]string, len(agent.PersistMethods))
+		i := 0
+		for k := range agent.PersistMethods {
+			methods[i] = k
+			i++
+		}
+		currentOpt.Vals = methods
+		currentOpt.Val = "all"
 	}
 
 	return
@@ -465,8 +476,8 @@ func moduleGetRoot() {
 }
 
 func modulePersistence() {
-	// TODO select menu
-	err := SendCmd("!persistence", CurrentTarget)
+	cmd := fmt.Sprintf("!persistence %s", Options["method"].Val)
+	err := SendCmd(cmd, CurrentTarget)
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)
 		return

@@ -111,6 +111,20 @@ func Download(url, path string) (err error) {
 	return ioutil.WriteFile(path, data, 0600)
 }
 
+// AppendToFile append text to a file
+func AppendToFile(filename string, text string) (err error) {
+	f, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	if _, err = f.WriteString(text); err != nil {
+		return
+	}
+	return
+}
+
 // Copy copy file from src to dst
 func Copy(src, dst string) error {
 	in, err := ioutil.ReadFile(src)
