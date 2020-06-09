@@ -92,21 +92,21 @@ i can go further by making the whole thing a botnet:
 
 ### modules
 
-- [x]`cmd` : execute shell command on target
-- [x]`shell` : a basic command shell, with several helpers (a **real bash shell**, file uploading/downloading, vim, etc)
-- [x]`lpe_suggest` : invoke [upc](https://github.com/pentestmonkey/unix-privesc-check/blob/master/upc.sh) and
+- [x] `cmd` : execute shell command on target
+- [x] `shell` : a basic command shell, with several helpers (a **real bash shell**, file uploading/downloading, vim, etc)
+- [x] `lpe_suggest` : invoke [upc](https://github.com/pentestmonkey/unix-privesc-check/blob/master/upc.sh) and
 [les](https://github.com/mzet-/linux-exploit-suggester), open their reports with `less` in new tmux window
-- [x]`get_root` : automatic **privilege escalation**
-- [ ]`lkm` : an **lkm** providing APIs for file/proc hiding, hidden backdoor, etc. automatically compiled for target kernel
-- [ ]`injector` : **inject** code into running processes via `PTRACE`
-- [x]`persistence` : get **persistence** via various methods
-- [ ]`harvester` : **credentials** harvesting
-- [ ]`data_exfil` : data exfiltration
-- [x]`proxy` : socks5 **proxy over HTTP2**
-- [x]`port_forward`: port mapping over HTTP2
-- [ ]`containerized` : run code in a **container** (for better hiding)
-- [ ]`evilkvm` : take advantage of kvm
-- [ ]`vuln_scan`: discover and take over more targets in the network
+- [x] `get_root` : automatic **privilege escalation**
+- [ ] `lkm` : an **lkm** providing APIs for file/proc hiding, hidden backdoor, etc. automatically compiled for target kernel
+- [ ] `injector` : **inject** code into running processes via `PTRACE`
+- [x] `persistence` : get **persistence** via various methods
+- [ ] `harvester` : **credentials** harvesting
+- [ ] `data_exfil` : data exfiltration
+- [x] `proxy` : socks5 **proxy over HTTP2**
+- [x] `port_forward`: port mapping over HTTP2
+- [ ] `containerized` : run code in a **container** (for better hiding)
+- [ ] `evilkvm` : take advantage of kvm
+- [ ] `vuln_scan`: discover and take over more targets in the network
 
 ## about tmux
 
