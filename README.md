@@ -76,6 +76,8 @@ cd core
 - [x] **LPE suggest** and auto root
 - [x] an indicator for CC status, which can be used by agents to check if CC is online,
 which, can be accessed via services like Github and Twitter, drawing less attention
+- [x] persistence via various ways
+- [ ] hide itself via libc-hijacking and syscall hijacking
 
 #### internal networks
 
@@ -98,6 +100,8 @@ i can go further by making the whole thing a botnet:
 [les](https://github.com/mzet-/linux-exploit-suggester), open their reports with `less` in new tmux window
 - [x] `get_root` : automatic **privilege escalation**
 - [ ] `lkm` : an **lkm** providing APIs for file/proc hiding, hidden backdoor, etc. automatically compiled for target kernel
+- [ ] `libc_hijack` : compile a shared library on target machine and make it `LD_ PRELOAD`, so we can hijack many libc calls, providing similiar features
+like `lkm`, but more portable
 - [ ] `injector` : **inject** code into running processes via `PTRACE`
 - [x] `persistence` : get **persistence** via various methods
 - [ ] `harvester` : **credentials** harvesting
