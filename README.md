@@ -100,8 +100,7 @@ i can go further by making the whole thing a botnet:
 [les](https://github.com/mzet-/linux-exploit-suggester), open their reports with `less` in new tmux window
 - [x] `get_root` : automatic **privilege escalation**
 - [ ] `lkm` : an **lkm** providing APIs for file/proc hiding, hidden backdoor, etc. automatically compiled for target kernel
-- [ ] `libc_hijack` : compile a shared library on target machine and make it `LD_ PRELOAD`, so we can hijack many libc calls, providing similiar features
-like `lkm`, but more portable
+- [ ] `libc_hijack` : upload a shared library (libemp.so) on target machine and make it `LD_PRELOAD`, so we can hijack many libc calls, providing similiar features like `lkm`, but more portable
 - [ ] `injector` : **inject** code into running processes via `PTRACE`
 - [x] `persistence` : get **persistence** via various methods
 - [ ] `harvester` : **credentials** harvesting
