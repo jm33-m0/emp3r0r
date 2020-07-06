@@ -22,6 +22,12 @@ import (
 	"github.com/zcalusic/sysinfo"
 )
 
+// IsCommandExist check if an executable is in $PATH
+func IsCommandExist(exe string) bool {
+	_, err := exec.LookPath(exe)
+	return err == nil
+}
+
 // IsProcAlive check if a process name exists, returns its PID
 func IsProcAlive(procName string) (alive bool, procs []*os.Process) {
 	allprocs, err := gops.Processes()
@@ -157,6 +163,8 @@ func CollectSystemInfo() *SystemInfo {
 	info.Arch = si.Kernel.Architecture
 	info.CPU = fmt.Sprintf("%s (x%d)", si.CPU.Model, getCPUCnt())
 	info.Mem = fmt.Sprintf("%d kB", getMemSize())
+	info.Hardware = CheckProduct()
+	info.Container = CheckContainer()
 
 	// have root?
 	info.HasRoot = os.Geteuid() == 0

@@ -51,20 +51,24 @@ func ListTargets() {
 	color.Cyan("=================\n\n")
 
 	indent := strings.Repeat(" ", len(" [0] "))
-	hasroot := color.HiRedString("NO")
 	for target, control := range Targets {
+		hasroot := color.HiRedString("NO")
 		if target.HasRoot {
 			hasroot = color.HiGreenString("YES")
 		}
 		fmt.Printf(" [%s] Tag: %s (root: %v):"+
 			"\n%sCPU: %s"+
+			"\n%sHardware: %s"+
+			"\n%sContainer: %s"+
 			"\n%sMEM: %s"+
 			"\n%sOS: %s"+
 			"\n%sKernel: %s - %s"+
 			"\n%sFrom: %s"+
-			"\n%sIPs: %v",
+			"\n%sIPs: %v\n\n",
 			color.CyanString("%d", control.Index), target.Tag, hasroot,
 			indent, target.CPU,
+			indent, target.Hardware,
+			indent, target.Container,
 			indent, target.Mem,
 			indent, target.OS,
 			indent, target.Kernel, target.Arch,
