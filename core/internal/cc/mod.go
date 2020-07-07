@@ -11,8 +11,8 @@ import (
 	"github.com/chzyer/readline"
 	"github.com/fatih/color"
 	"github.com/google/uuid"
-	"github.com/jm33-m0/emp3r0r/emagent/internal/agent"
-	"github.com/jm33-m0/emp3r0r/emagent/internal/tun"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent"
+	"github.com/jm33-m0/emp3r0r/core/internal/tun"
 )
 
 // Option all necessary info of an option

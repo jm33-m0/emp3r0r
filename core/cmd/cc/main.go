@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/jm33-m0/emp3r0r/emagent/internal/cc"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc"
 )
 
 func main() {

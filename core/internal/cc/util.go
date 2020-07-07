@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/emagent/internal/agent"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent"
 )
 
 // Download download file using default http client

