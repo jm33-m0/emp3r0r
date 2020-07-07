@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/chzyer/readline"
+	"github.com/bettercap/readline"
 	"github.com/fatih/color"
 )
 
