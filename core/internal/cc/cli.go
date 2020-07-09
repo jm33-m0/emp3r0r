@@ -24,12 +24,13 @@ var (
 
 	// EmpReadLine : our commandline
 	EmpReadLine *readline.Instance
+
+	err error
 )
 
 // CliMain launches the commandline UI
 func CliMain() {
-	var err error
-
+	// completer
 	CmdCompls = []readline.PrefixCompleterInterface{
 		readline.PcItem("set",
 			readline.PcItemDynamic(listOptions(),
@@ -55,10 +56,19 @@ func CliMain() {
 		CmdCompls = append(CmdCompls, readline.PcItem(cmd))
 	}
 	CmdCompls = append(CmdCompls, readline.PcItemDynamic(listFiles("./")))
-
 	CliCompleter.SetChildren(CmdCompls)
 
-start:
+	// prompt setup
+	filterInput := func(r rune) (rune, bool) {
+		switch r {
+		// block CtrlZ feature
+		case readline.CharCtrlZ:
+			return r, false
+		}
+		return r, true
+	}
+
+	// set up readline instance
 	EmpReadLine, err = readline.NewEx(&readline.Config{
 		Prompt:          color.HiCyanString("emp3r0r > "),
 		HistoryFile:     "./emp3r0r.history",
@@ -73,9 +83,9 @@ start:
 		panic(err)
 	}
 	defer EmpReadLine.Close()
-
 	log.SetOutput(EmpReadLine.Stderr())
 
+start:
 	for {
 		line, err := EmpReadLine.Readline()
 		if err == readline.ErrInterrupt {
@@ -85,7 +95,8 @@ start:
 				continue
 			}
 		} else if err == io.EOF {
-			break
+			CliPrintError("EOF error")
+			os.Exit(1)
 		}
 
 		line = strings.TrimSpace(line)
@@ -295,13 +306,4 @@ func listFiles(path string) func(string) []string {
 		}
 		return names
 	}
-}
-
-func filterInput(r rune) (rune, bool) {
-	switch r {
-	// block CtrlZ feature
-	case readline.CharCtrlZ:
-		return r, false
-	}
-	return r, true
 }
