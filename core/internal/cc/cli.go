@@ -74,7 +74,7 @@ func CliMain() {
 		HistoryFile:     "./emp3r0r.history",
 		AutoComplete:    CliCompleter,
 		InterruptPrompt: "^C\nExiting...\n",
-		EOFPrompt:       "EOF caught\nExiting...\n",
+		EOFPrompt:       "^D\nEOF caught\nExiting...\n",
 
 		HistorySearchFold:   true,
 		FuncFilterInputRune: filterInput,

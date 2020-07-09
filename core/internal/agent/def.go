@@ -21,9 +21,6 @@ var (
 
 	// ProxyServer Socks5 proxy listening on port 10800
 	ProxyServer *socks5.Server
-
-	// KernelVersion get linux version
-	KernelVersion = GetKernelVersion()
 )
 
 const (
