@@ -117,9 +117,9 @@ func processCCData(data *MsgTunData) {
 				}
 			default:
 				go func() {
-					toPort := cmdSlice[1]
+					to := cmdSlice[1]
 					sessionID := cmdSlice[2]
-					err = PortFwd(toPort, sessionID)
+					err = PortFwd(to, sessionID)
 					if err != nil {
 						log.Printf("PortFwd failed: %v", err)
 					}

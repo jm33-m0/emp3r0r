@@ -16,7 +16,7 @@ import (
 // PortFwdSession holds controller interface of a port-fwd session
 type PortFwdSession struct {
 	Lport       string // listen_port
-	Tport       string // to_port
+	To       string // to_port
 	Description string // fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, toPort)
 
 	Sh     map[string]*StreamHandler // related to HTTP handler
@@ -106,7 +106,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 
 	ctx := pf.Ctx
 	cancel := pf.Cancel
-	toPort := pf.Tport
+	toPort := pf.To
 	listenPort := pf.Lport
 
 	_, e1 := strconv.Atoi(toPort)

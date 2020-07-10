@@ -107,8 +107,8 @@ func UpdateOptions(modName string) (exist bool) {
 
 	case modName == "port_fwd":
 		// rport
-		portOpt := addIfNotFound("to_port")
-		portOpt.Vals = []string{"1080", "8080", "22", "23", "21"}
+		portOpt := addIfNotFound("to")
+		portOpt.Vals = []string{"127.0.0.1:22", "127.0.0.1:8080"}
 		// listen on port
 		lportOpt := addIfNotFound("listen_port")
 		lportOpt.Vals = []string{"8080", "1080", "22", "23", "21"}
@@ -344,7 +344,7 @@ func modulePortFwd() {
 		for id, session := range PortFwds {
 			if session.Description == fmt.Sprintf("%s (Local) -> %s (Agent)",
 				Options["listen_port"].Val,
-				Options["to_port"].Val) {
+				Options["to"].Val) {
 				session.Cancel() // cancel the PortFwd session
 
 				// tell the agent to close connection
@@ -360,7 +360,7 @@ func modulePortFwd() {
 	default:
 		var pf PortFwdSession
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
-		pf.Lport, pf.Tport = Options["listen_port"].Val, Options["to_port"].Val
+		pf.Lport, pf.To = Options["listen_port"].Val, Options["to"].Val
 		go func() {
 			err := pf.RunPortFwd()
 			if err != nil {
@@ -379,7 +379,7 @@ func moduleProxy() {
 	// port-fwd
 	var pf PortFwdSession
 	pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
-	pf.Lport, pf.Tport = port, port
+	pf.Lport, pf.To = port, port
 
 	// proxy command, start socks5 server on agent
 	go func() {

