@@ -23,7 +23,7 @@ func IsPortOpen(host string, port string) bool {
 
 // ValidateIP is this IP legit?
 func ValidateIP(ip string) bool {
-	return net.ParseIP(ip) == nil
+	return net.ParseIP(ip) != nil
 }
 
 // ValidateIPPort check if the host string looks like IP:Port
@@ -32,12 +32,12 @@ func ValidateIPPort(to string) bool {
 	if len(fields) != 2 {
 		return false
 	}
-	_, err := strconv.Atoi(fields[1])
-	if err != nil {
-		return false
-	}
 	host := fields[0]
 	if !ValidateIP(host) {
+		return false
+	}
+	_, err := strconv.Atoi(fields[1])
+	if err != nil {
 		return false
 	}
 	return true

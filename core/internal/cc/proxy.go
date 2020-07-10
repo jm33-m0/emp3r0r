@@ -11,12 +11,13 @@ import (
 	"github.com/fatih/color"
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent"
+	"github.com/jm33-m0/emp3r0r/core/internal/tun"
 )
 
 // PortFwdSession holds controller interface of a port-fwd session
 type PortFwdSession struct {
 	Lport       string // listen_port
-	To       string // to_port
+	To          string // to_port
 	Description string // fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, toPort)
 
 	Sh     map[string]*StreamHandler // related to HTTP handler
@@ -106,17 +107,16 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 
 	ctx := pf.Ctx
 	cancel := pf.Cancel
-	toPort := pf.To
+	toAddr := pf.To
 	listenPort := pf.Lport
 
-	_, e1 := strconv.Atoi(toPort)
 	_, e2 := strconv.Atoi(listenPort)
-	if e1 != nil || e2 != nil {
-		return fmt.Errorf("Invalid port: %v (to_port), %v (listen_port)", e1, e2)
+	if !tun.ValidateIPPort(toAddr) || e2 != nil {
+		return fmt.Errorf("Invalid address/port: %s (to), %v (listen_port)", toAddr, e2)
 	}
 
 	fwdID := uuid.New().String()
-	cmd := fmt.Sprintf("!port_fwd %s %s", toPort, fwdID)
+	cmd := fmt.Sprintf("!port_fwd %s %s", toAddr, fwdID)
 	err = SendCmd(cmd, CurrentTarget)
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)
@@ -131,7 +131,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 
 	// mark this session, save to PortFwds
 	pf.Sh = nil
-	pf.Description = fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, toPort)
+	pf.Description = fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, toAddr)
 	PortFwds[fwdID] = pf
 
 	cleanup := func() {
@@ -169,7 +169,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		go func() {
 			// sub-session (streamHandler) ID
 			shID := fmt.Sprintf("%s_%d", fwdID, agent.RandInt(0, 1024))
-			cmd = fmt.Sprintf("!port_fwd %s %s", toPort, shID)
+			cmd = fmt.Sprintf("!port_fwd %s %s", toAddr, shID)
 			err = SendCmd(cmd, CurrentTarget)
 			if err != nil {
 				CliPrintError("SendCmd: %v", err)
