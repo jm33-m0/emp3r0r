@@ -143,7 +143,7 @@ legend:
 ## thanks
 
 - [pty](https://github.com/creack/pty)
-- [readline](https://github.com/chzyer/readline)
+- [readline](https://github.com/bettercap/readline)
 - [h2conn](https://github.com/posener/h2conn)
 - [diamorphine](https://github.com/m0nad/Diamorphine)
 - [Upgrading Simple Shells to Fully Interactive TTYs](https://blog.ropnop.com/upgrading-simple-shells-to-fully-interactive-ttys/)
