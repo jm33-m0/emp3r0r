@@ -95,8 +95,8 @@ start:
 				continue
 			}
 		} else if err == io.EOF {
-			CliPrintError("EOF error")
-			os.Exit(1)
+			CliPrintError("EOF")
+			os.Exit(0)
 		}
 
 		line = strings.TrimSpace(line)
