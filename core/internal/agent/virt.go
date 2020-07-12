@@ -26,7 +26,7 @@ func CheckContainer() (product string) {
 	}
 	lines := strings.Split(string(data), "\n")
 	for _, line := range lines {
-		if strings.Contains(line, "memory") {
+		if strings.Contains(line, "freezer") {
 			log.Println("Checking if we are in a container...")
 			fields := strings.Split(line, ":")
 			if len(fields) > 1 &&
