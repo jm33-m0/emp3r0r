@@ -53,10 +53,15 @@ func ListTargets() {
 	indent := strings.Repeat(" ", len(" [0] "))
 	for target, control := range Targets {
 		hasroot := color.HiRedString("NO")
+		hastor := color.HiRedString("NO")
 		if target.HasRoot {
 			hasroot = color.HiGreenString("YES")
 		}
+		if target.HasTor {
+			hastor = color.HiGreenString("YES")
+		}
 		fmt.Printf(" [%s] Tag: %s (root: %v):"+
+			"\n%sTor: %s"+
 			"\n%sCPU: %s"+
 			"\n%sHardware: %s"+
 			"\n%sContainer: %s"+
@@ -66,6 +71,7 @@ func ListTargets() {
 			"\n%sFrom: %s"+
 			"\n%sIPs: %v\n\n",
 			color.CyanString("%d", control.Index), target.Tag, hasroot,
+			indent, hastor,
 			indent, target.CPU,
 			indent, target.Hardware,
 			indent, target.Container,

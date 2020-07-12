@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/tun"
 	gops "github.com/mitchellh/go-ps"
 	"github.com/zcalusic/sysinfo"
 )
@@ -168,6 +169,9 @@ func CollectSystemInfo() *SystemInfo {
 
 	// have root?
 	info.HasRoot = os.Geteuid() == 0
+
+	// is cc on tor?
+	info.HasTor = tun.IsTor(CCAddress)
 
 	// IP address?
 	info.IPs = collectLocalIPs()
