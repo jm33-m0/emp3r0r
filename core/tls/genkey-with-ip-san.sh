@@ -67,7 +67,12 @@ keypair() {
         -out "${ROOT}/${NAME}-key.pem" 2048
 
     cp "${ROOT}/openssl.cnf" "${ROOT}/openssl-${NAME}.cnf"
-    echo -e "\nIP.1 = ${IP}" >>"${ROOT}/openssl-${NAME}.cnf"
+    # validate IP
+    if [[ "$IP" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo -e "\nIP.1 = ${IP}" >>"${ROOT}/openssl-${NAME}.cnf"
+    else
+        echo -e "\nDNS.1 = ${IP}" >>"${ROOT}/openssl-${NAME}.cnf"
+    fi
 
     echo ".. request"
     openssl req -subj "/CN=${HOSTNAME}" -new \
