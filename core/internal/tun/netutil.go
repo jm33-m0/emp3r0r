@@ -42,9 +42,3 @@ func ValidateIPPort(to string) bool {
 	}
 	return true
 }
-
-// IsTor2Web check if CC address is a tor2web service
-func IsTor2Web(addr string) bool {
-	fields := strings.Split(addr, ".")
-	return fields[len(fields)-2] == "onion"
-}
