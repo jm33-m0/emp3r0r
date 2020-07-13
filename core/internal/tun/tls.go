@@ -4,9 +4,11 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"log"
+	"net"
 	"net/http"
 
 	"golang.org/x/net/http2"
+	"golang.org/x/net/proxy"
 )
 
 var (
@@ -20,7 +22,7 @@ var (
 )
 
 // EmpHTTPClient add our CA to trusted CAs, while keeps TLS InsecureVerify on
-func EmpHTTPClient(proxy string) *http.Client {
+func EmpHTTPClient(proxyServer string) *http.Client {
 	// Get the SystemCertPool, continue with an empty pool on error
 	rootCAs, _ := x509.SystemCertPool()
 	if rootCAs == nil {
@@ -38,12 +40,22 @@ func EmpHTTPClient(proxy string) *http.Client {
 		RootCAs:            rootCAs,
 	}
 
-	// TODO use a socks5 proxy
-	if proxy != "" {
-	}
-
 	// return our http client
 	tr := &http2.Transport{TLSClientConfig: config}
+
+	// TODO use a socks5 proxy
+	// currently it's a hack, as there's no official way of configuring a proxy for HTTP2
+	if proxyServer != "" {
+		dialer, err := proxy.SOCKS5("tcp", proxyServer, nil, proxy.Direct)
+		proxyDialer := func(network string, addr string, cfg *tls.Config) (c net.Conn, e error) {
+			c, e = dialer.Dial(network, addr) // this is a TCP dialer, thus no TLS, not usable
+			return
+		}
+		if err != nil {
+			log.Printf("failed to set proxy: %v", err)
+		}
+		tr.DialTLS = proxyDialer
+	}
 
 	return &http.Client{Transport: tr}
 }
