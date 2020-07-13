@@ -33,9 +33,11 @@ func CheckContainer() (product string) {
 				fields[len(fields)-1] != "/" {
 				product = strings.Split(fields[2], "/")[1]
 				log.Println("Inside a container: ", product)
+				return
 			}
 		}
 	}
+	log.Println("no, we are not")
 
 	return
 }
