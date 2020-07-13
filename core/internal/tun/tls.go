@@ -20,7 +20,7 @@ var (
 )
 
 // EmpHTTPClient add our CA to trusted CAs, while keeps TLS InsecureVerify on
-func EmpHTTPClient() *http.Client {
+func EmpHTTPClient(proxy string) *http.Client {
 	// Get the SystemCertPool, continue with an empty pool on error
 	rootCAs, _ := x509.SystemCertPool()
 	if rootCAs == nil {
@@ -36,6 +36,10 @@ func EmpHTTPClient() *http.Client {
 	config := &tls.Config{
 		InsecureSkipVerify: false,
 		RootCAs:            rootCAs,
+	}
+
+	// TODO use a socks5 proxy
+	if proxy != "" {
 	}
 
 	// return our http client

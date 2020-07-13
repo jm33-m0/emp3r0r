@@ -49,6 +49,11 @@ func main() {
 	} else {
 		agent.CCAddress += "/"
 	}
+
+	// if CC is behind tor, a proxy is needed
+	if tun.IsTor(agent.CCAddress) {
+		agent.HTTPClient = tun.EmpHTTPClient("")
+	}
 connect:
 
 	// check preset CC status URL, if CC is supposed to be offline, take a nap
