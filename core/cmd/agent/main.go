@@ -53,7 +53,8 @@ func main() {
 	// if CC is behind tor, a proxy is needed
 	agent.HTTPClient = tun.EmpHTTPClient("")
 	if tun.IsTor(agent.CCAddress) {
-		agent.HTTPClient = tun.EmpHTTPClient("127.0.0.1:9050")
+		log.Printf("CC is on TOR: %s", agent.CCAddress)
+		agent.HTTPClient = tun.EmpHTTPClient("socks5://127.0.0.1:9050")
 	}
 connect:
 

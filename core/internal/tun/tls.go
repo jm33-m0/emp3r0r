@@ -4,11 +4,10 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"log"
-	"net"
 	"net/http"
+	"net/url"
 
 	"golang.org/x/net/http2"
-	"golang.org/x/net/proxy"
 )
 
 var (
@@ -41,20 +40,19 @@ func EmpHTTPClient(proxyServer string) *http.Client {
 	}
 
 	// return our http client
-	tr := &http2.Transport{TLSClientConfig: config}
+	tr := &http.Transport{TLSClientConfig: config}
 
-	// TODO use a socks5 proxy
-	// currently it's a hack, as there's no official way of configuring a proxy for HTTP2
+	// use a socks5 proxy
 	if proxyServer != "" {
-		dialer, err := proxy.SOCKS5("tcp", proxyServer, nil, proxy.Direct)
-		proxyDialer := func(network string, addr string, cfg *tls.Config) (c net.Conn, e error) {
-			c, e = dialer.Dial(network, addr) // this is a TCP dialer, thus no TLS, not usable
-			return
-		}
+		proxyUrl, err := url.Parse(proxyServer)
 		if err != nil {
-			log.Printf("failed to set proxy: %v", err)
+			log.Printf("Invalid proxy: %v", err)
 		}
-		tr.DialTLS = proxyDialer
+		tr.Proxy = http.ProxyURL(proxyUrl)
+	}
+	err := http2.ConfigureTransport(tr) // upgrade to HTTP2, while keeping http.Transport
+	if err != nil {
+		log.Fatalf("Cannot switch to HTTP2: %v", err)
 	}
 
 	return &http.Client{Transport: tr}
