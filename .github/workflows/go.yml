@@ -31,7 +31,7 @@ jobs:
         fi
 
     - name: Build
-      run: go build -v .
+      run: cd core && go build -v .
 
     - name: Test
-      run: go test -v .
+      run: cd core && go test -v .
