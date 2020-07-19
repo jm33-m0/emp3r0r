@@ -1,10 +1,7 @@
 # emp3r0r
 linux post-exploitation
 
-![Go](https://github.com/jm33-m0/emp3r0r/workflows/Go/badge.svg)
-
 **This project is NOT finished**
-
 
 <!-- vim-markdown-toc GFM -->
 
