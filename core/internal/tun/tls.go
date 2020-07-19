@@ -46,7 +46,7 @@ func EmpHTTPClient(proxyServer string) *http.Client {
 	if proxyServer != "" {
 		proxyUrl, err := url.Parse(proxyServer)
 		if err != nil {
-			log.Printf("Invalid proxy: %v", err)
+			log.Fatalf("Invalid proxy: %v", err)
 		}
 		tr.Proxy = http.ProxyURL(proxyUrl)
 	}

