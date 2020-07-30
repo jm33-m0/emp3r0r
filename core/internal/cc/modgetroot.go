@@ -29,6 +29,16 @@ func moduleLPE() {
 		CliPrintWarning("Failed to download LES: %v", err)
 		return
 	}
+	// err = PutFile(Temp+tun.FileAPI+"lpe_les", "/tmp/lpe_les", target)
+	// if err != nil {
+	// 	CliPrintWarning("Failed to upload LES: %v", err)
+	// 	return
+	// }
+	// err = PutFile(Temp+tun.FileAPI+"lpe_upc", "/tmp/lpe_upc", target)
+	// if err != nil {
+	// 	CliPrintWarning("Failed to upload LES: %v", err)
+	// 	return
+	// }
 
 	// exec
 	CliPrintInfo("This can take some time, please be patient")

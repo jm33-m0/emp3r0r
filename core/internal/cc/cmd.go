@@ -1,6 +1,7 @@
 package cc
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -65,6 +66,10 @@ func CmdHandler(cmd string) (err error) {
 				}
 				UpdateOptions(CurrentMod)
 				color.HiGreen("Using module '%s'", CurrentMod)
+				EmpReadLine.SetPrompt(
+					fmt.Sprintf("%s (%s) "+color.HiCyanString("> "),
+						color.HiCyanString("emp3r0r"),
+						color.HiBlueString(CurrentMod)))
 				return
 			}
 		}

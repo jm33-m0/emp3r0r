@@ -26,11 +26,11 @@ var (
 
 	// ShellHelpInfo provide utilities like ps, kill, etc
 	ShellHelpInfo = map[string]string{
-		"bash":  "A reverse bash shell from HTTP2 tunnel, press Ctrl-D to leave",
-		"#ps":   "List processes: `#ps`",
-		"#kill": "Kill process: `#kill <PID>`",
-		"#put":  "Put a file from CC to agent: `#put <local file> <remote path>`",
-		"#get":  "Get a file from agent: `#get <remote file>`",
+		"bash": "A reverse bash shell from HTTP2 tunnel, press Ctrl-D to leave",
+		"ps":   "List processes: `ps`",
+		"kill": "Kill process: `kill <PID>`",
+		"put":  "Put a file from CC to agent: `put <local file> <remote path>`",
+		"get":  "Get a file from agent: `get <remote file>`",
 	}
 
 	// ModuleHelpers a map of module helpers

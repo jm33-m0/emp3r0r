@@ -17,5 +17,5 @@ const (
 	ProxyAPI = WebRoot + "/proxy"
 
 	// FileAPI host some files
-	FileAPI = WebRoot + "/www/"
+	FileAPI = "/www/"
 )

