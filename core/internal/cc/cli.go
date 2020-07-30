@@ -25,6 +25,9 @@ var (
 	// EmpReadLine : our commandline
 	EmpReadLine *readline.Instance
 
+	// EmpPrompt : the prompt string
+	EmpPrompt = color.HiCyanString("emp3r0r > ")
+
 	err error
 )
 
@@ -70,7 +73,7 @@ func CliMain() {
 
 	// set up readline instance
 	EmpReadLine, err = readline.NewEx(&readline.Config{
-		Prompt:          color.HiCyanString("emp3r0r > "),
+		Prompt:          EmpPrompt,
 		HistoryFile:     "./emp3r0r.history",
 		AutoComplete:    CliCompleter,
 		InterruptPrompt: "^C\nExiting...\n",
@@ -156,7 +159,7 @@ func CliYesNo(prompt string) bool {
 	EmpReadLine.Config.EOFPrompt = ""
 	EmpReadLine.Config.InterruptPrompt = ""
 
-	defer EmpReadLine.SetPrompt(color.CyanString("emp3r0r > "))
+	defer EmpReadLine.SetPrompt(EmpPrompt)
 
 	answer, err := EmpReadLine.Readline()
 	if err != nil {

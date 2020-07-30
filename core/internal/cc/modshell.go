@@ -70,8 +70,8 @@ func moduleShell() {
 shell:
 	for {
 		// set prompt to shell
-		EmpReadLine.SetPrompt(color.HiMagentaString("shell [%d] > ", tControl.Index))
 		oldPrompt := EmpReadLine.Config.Prompt
+		EmpReadLine.SetPrompt(color.HiMagentaString("shell [%d] > ", tControl.Index))
 		defer EmpReadLine.SetPrompt(oldPrompt)
 
 		// read user input
