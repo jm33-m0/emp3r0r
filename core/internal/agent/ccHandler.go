@@ -194,7 +194,7 @@ func processCCData(data *MsgTunData) {
 	// #put file from CC
 	case "FILE":
 		if len(payloadSplit) != 3 {
-			data2send.Payload = fmt.Sprintf("#put failed: malformed #put command")
+			data2send.Payload = "#put failed: malformed #put command"
 			goto send
 		}
 
