@@ -13,6 +13,9 @@ var (
 	// AgentRoot root directory of emp3r0r
 	AgentRoot, _ = os.Getwd()
 
+	// UtilsPath binary path of utilities
+	UtilsPath = AgentRoot + "..."
+
 	// HTTPClient handles agent's http communication
 	HTTPClient *http.Client
 

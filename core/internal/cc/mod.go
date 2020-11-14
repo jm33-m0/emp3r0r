@@ -43,6 +43,7 @@ var (
 		"get_root":    moduleGetRoot,
 		"clean_log":   moduleLogCleaner,
 		"persistence": modulePersistence,
+		"utils":       moduleUtils,
 	}
 )
 

