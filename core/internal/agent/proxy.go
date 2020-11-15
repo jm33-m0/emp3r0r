@@ -31,7 +31,7 @@ func Socks5Proxy(op string, port string) (err error) {
 		var err error
 		if ProxyServer == nil {
 			socks5.Debug = true
-			ProxyServer, err = socks5.NewClassicServer("127.0.0.1:"+port, "127.0.0.1", "", "", 0, 0, 0, 60)
+			ProxyServer, err = socks5.NewClassicServer("127.0.0.1:"+port, "127.0.0.1", "", "", 10, 10)
 			if err != nil {
 				log.Println(err)
 				return
