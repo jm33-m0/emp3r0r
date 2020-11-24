@@ -110,10 +110,10 @@ func UpdateOptions(modName string) (exist bool) {
 		switchOpt.Vals = []string{"on", "off"}
 		switchOpt.Val = "on"
 
-	case modName == "utils":
+	case modName == "install_utils":
 		// url of utils.zip
 		keywordOpt := addIfNotFound("url")
-		keywordOpt.Vals = []string{"http://127.0.0.1:8000/utils.zip"}
+		keywordOpt.Vals = []string{"http://127.0.0.1:8000/utils.zip", "http://127.0.0.1/utils.zip"}
 
 	case modName == "clean_log":
 		// keyword to clean

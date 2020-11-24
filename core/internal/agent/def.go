@@ -14,7 +14,7 @@ var (
 	AgentRoot, _ = os.Getwd()
 
 	// UtilsPath binary path of utilities
-	UtilsPath = AgentRoot + "..."
+	UtilsPath = AgentRoot + ".bin"
 
 	// HTTPClient handles agent's http communication
 	HTTPClient *http.Client
