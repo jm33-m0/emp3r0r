@@ -138,6 +138,11 @@ func CmdHelp(mod string) {
 			"status": "Turn proxy On/Off",
 		}
 		CliPrettyPrint("Option", "Help", &help)
+	case "utils":
+		help = map[string]string{
+			"url": "Download URL of utils.zip",
+		}
+		CliPrettyPrint("Option", "Help", &help)
 	case "clean_log":
 		help = map[string]string{
 			"keyword": "Delete all log entries containing this keyword",
