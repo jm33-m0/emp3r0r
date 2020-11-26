@@ -138,9 +138,9 @@ func CmdHelp(mod string) {
 			"status": "Turn proxy On/Off",
 		}
 		CliPrettyPrint("Option", "Help", &help)
-	case "install_utils":
+	case "vaccine":
 		help = map[string]string{
-			"url": "Download URL of utils.zip",
+			"<N/A>": "vaccine module helps you install additional tools on target system",
 		}
 		CliPrettyPrint("Option", "Help", &help)
 	case "clean_log":

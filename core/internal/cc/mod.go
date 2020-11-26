@@ -35,15 +35,15 @@ var (
 
 	// ModuleHelpers a map of module helpers
 	ModuleHelpers = map[string]func(){
-		"cmd":           moduleCmd,
-		"shell":         moduleShell,
-		"proxy":         moduleProxy,
-		"port_fwd":      modulePortFwd,
-		"lpe_suggest":   moduleLPE,
-		"get_root":      moduleGetRoot,
-		"clean_log":     moduleLogCleaner,
-		"persistence":   modulePersistence,
-		"install_utils": moduleUtils,
+		"cmd":         moduleCmd,
+		"shell":       moduleShell,
+		"proxy":       moduleProxy,
+		"port_fwd":    modulePortFwd,
+		"lpe_suggest": moduleLPE,
+		"get_root":    moduleGetRoot,
+		"clean_log":   moduleLogCleaner,
+		"persistence": modulePersistence,
+		"vaccine":     moduleVaccine,
 	}
 )
 
@@ -109,11 +109,6 @@ func UpdateOptions(modName string) (exist bool) {
 		switchOpt := addIfNotFound("switch")
 		switchOpt.Vals = []string{"on", "off"}
 		switchOpt.Val = "on"
-
-	case modName == "install_utils":
-		// url of utils.zip
-		keywordOpt := addIfNotFound("url")
-		keywordOpt.Vals = []string{"http://127.0.0.1:8000/utils.zip", "http://127.0.0.1/utils.zip"}
 
 	case modName == "clean_log":
 		// keyword to clean
