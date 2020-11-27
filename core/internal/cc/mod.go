@@ -35,15 +35,15 @@ var (
 
 	// ModuleHelpers a map of module helpers
 	ModuleHelpers = map[string]func(){
-		"cmd":         moduleCmd,
-		"shell":       moduleShell,
-		"proxy":       moduleProxy,
-		"port_fwd":    modulePortFwd,
-		"lpe_suggest": moduleLPE,
-		"get_root":    moduleGetRoot,
-		"clean_log":   moduleLogCleaner,
-		"persistence": modulePersistence,
-		"vaccine":     moduleVaccine,
+		agent.ModCMD:         moduleCmd,
+		agent.ModSHELL:       moduleShell,
+		agent.ModPROXY:       moduleProxy,
+		agent.ModPORT_FWD:    modulePortFwd,
+		agent.ModLPE_SUGGEST: moduleLPE,
+		agent.ModGET_ROOT:    moduleGetRoot,
+		agent.ModCLEAN_LOG:   moduleLogCleaner,
+		agent.ModPERSISTENCE: modulePersistence,
+		agent.ModVACCINE:     moduleVaccine,
 	}
 )
 
@@ -89,7 +89,7 @@ func UpdateOptions(modName string) (exist bool) {
 
 	var currentOpt *Option
 	switch {
-	case modName == "cmd":
+	case modName == agent.ModCMD:
 		currentOpt = addIfNotFound("cmd_to_exec")
 		currentOpt.Vals = []string{
 			"id", "whoami", "ifconfig",
@@ -98,7 +98,7 @@ func UpdateOptions(modName string) (exist bool) {
 			"netstat -antup", "uname -a",
 		}
 
-	case modName == "port_fwd":
+	case modName == agent.ModPORT_FWD:
 		// rport
 		portOpt := addIfNotFound("to")
 		portOpt.Vals = []string{"127.0.0.1:22", "127.0.0.1:8080"}
@@ -110,12 +110,12 @@ func UpdateOptions(modName string) (exist bool) {
 		switchOpt.Vals = []string{"on", "off"}
 		switchOpt.Val = "on"
 
-	case modName == "clean_log":
+	case modName == agent.ModCLEAN_LOG:
 		// keyword to clean
 		keywordOpt := addIfNotFound("keyword")
 		keywordOpt.Vals = []string{"root", "admin"}
 
-	case modName == "proxy":
+	case modName == agent.ModPROXY:
 		portOpt := addIfNotFound("port")
 		portOpt.Vals = []string{"1080", "8080", "10800", "10888"}
 		portOpt.Val = "8080"
@@ -123,12 +123,12 @@ func UpdateOptions(modName string) (exist bool) {
 		statusOpt.Vals = []string{"on", "off"}
 		statusOpt.Val = "on"
 
-	case modName == "lpe_suggest":
+	case modName == agent.ModLPE_SUGGEST:
 		currentOpt = addIfNotFound("lpe_helper")
 		currentOpt.Vals = []string{"lpe_les", "lpe_upc"}
 		currentOpt.Val = "lpe_les"
 
-	case modName == "persistence":
+	case modName == agent.ModPERSISTENCE:
 		currentOpt = addIfNotFound("method")
 		methods := make([]string, len(agent.PersistMethods))
 		i := 0

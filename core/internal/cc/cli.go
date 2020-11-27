@@ -13,6 +13,7 @@ import (
 
 	"github.com/bettercap/readline"
 	"github.com/fatih/color"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent"
 )
 
 var (
@@ -244,17 +245,17 @@ aHViLmNvbS9qbTMzLW0wL2VtcDNyMHIKCmJ5IGptMzMtbTAKCgo=
 func listValChoices() func(string) []string {
 	return func(line string) []string {
 		switch CurrentMod {
-		case "cmd":
+		case agent.ModCMD:
 			return Options["cmd_to_exec"].Vals
-		case "clean_log":
+		case agent.ModCLEAN_LOG:
 			return Options["keyword"].Vals
-		case "lpe_suggest":
+		case agent.ModLPE_SUGGEST:
 			return Options["lpe_helper"].Vals
-		case "persistence":
-			return append(Options["method"].Vals)
-		case "proxy":
+		case agent.ModPERSISTENCE:
+			return Options["method"].Vals
+		case agent.ModPROXY:
 			return append(Options["status"].Vals, Options["port"].Vals...)
-		case "port_fwd":
+		case agent.ModPORT_FWD:
 			ret := append(Options["listen_port"].Vals, Options["to"].Vals...)
 			ret = append(ret, Options["switch"].Vals...)
 			return ret

@@ -52,6 +52,19 @@ const (
 	ProxyBufSize = 1024
 )
 
+// Module names
+const (
+	ModCMD         = "cmd"
+	ModCLEAN_LOG   = "clean_log"
+	ModLPE_SUGGEST = "lpe_suggest"
+	ModPERSISTENCE = "persistence"
+	ModPROXY       = "proxy"
+	ModPORT_FWD    = "port_fwd"
+	ModSHELL       = "shell"
+	ModVACCINE     = "vaccine"
+	ModGET_ROOT    = "get_root"
+)
+
 // SystemInfo agent properties
 type SystemInfo struct {
 	Tag       string   // identifier of the agent
