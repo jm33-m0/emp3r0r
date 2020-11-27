@@ -211,7 +211,7 @@ func cmdBash() (err error) {
 	// wait for agent to send shell
 	for {
 		if RShellStatus != nil {
-			CliPrintError("[-] An error occured: %v", RShellStatus)
+			CliPrintError("\n[-] An error occured: %v\n", RShellStatus)
 			return RShellStatus
 		}
 		if RShellStream.H2x.Ctx != nil && RShellStream.H2x.Conn != nil {
