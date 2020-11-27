@@ -28,6 +28,11 @@ func processAgentData(data *agent.MsgTunData) {
 		out := strings.Join(payloadSplit[2:], " ")
 		outLines := strings.Split(out, "\n")
 
+		// if cmd is `bash`, our shell is likey broken
+		if strings.HasPrefix(cmd, "bash") {
+			RShellStatus = fmt.Errorf("Reverse shell error: %v", out)
+		}
+
 		// optimize output
 		if len(outLines) > 20 {
 			t := time.Now()

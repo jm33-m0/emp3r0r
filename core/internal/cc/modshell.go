@@ -12,6 +12,9 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent"
 )
 
+// RShellStatus stores error message from agent
+var RShellStatus error
+
 // moduleCmd exec cmd on target
 func moduleCmd() {
 	// find target
@@ -207,6 +210,10 @@ func cmdBash() (err error) {
 
 	// wait for agent to send shell
 	for {
+		if RShellStatus != nil {
+			CliPrintError("[-] An error occured: %v", RShellStatus)
+			return RShellStatus
+		}
 		if RShellStream.H2x.Ctx != nil && RShellStream.H2x.Conn != nil {
 			break
 		}
