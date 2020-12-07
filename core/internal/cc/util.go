@@ -13,8 +13,8 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent"
 )
 
-// Download download file using default http client
-func Download(url, path string) (err error) {
+// DownloadFile download file using default http client
+func DownloadFile(url, path string) (err error) {
 	var (
 		resp *http.Response
 		data []byte
