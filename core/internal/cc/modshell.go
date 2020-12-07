@@ -12,8 +12,8 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent"
 )
 
-// RShellStatus stores error message from agent
-var RShellStatus error
+// RShellStatus stores errors from reverseBash
+var RShellStatus = make(map[string]error)
 
 // moduleCmd exec cmd on target
 func moduleCmd() {
@@ -210,9 +210,9 @@ func cmdBash() (err error) {
 
 	// wait for agent to send shell
 	for {
-		if RShellStatus != nil {
-			CliPrintError("\n[-] An error occured: %v\n", RShellStatus)
-			return RShellStatus
+		if RShellStatus[token] != nil {
+			CliPrintError("\n[-] An error occured: %v\n", RShellStatus[token])
+			return RShellStatus[token]
 		}
 		if RShellStream.H2x.Ctx != nil && RShellStream.H2x.Conn != nil {
 			break

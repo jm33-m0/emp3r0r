@@ -30,7 +30,8 @@ func processAgentData(data *agent.MsgTunData) {
 
 		// if cmd is `bash`, our shell is likey broken
 		if strings.HasPrefix(cmd, "bash") {
-			RShellStatus = fmt.Errorf("Reverse shell error: %v", out)
+			shellToken := strings.Split(cmd, " ")[1]
+			RShellStatus[shellToken] = fmt.Errorf("Reverse shell error: %v", out)
 		}
 
 		// optimize output
