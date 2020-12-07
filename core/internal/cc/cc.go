@@ -47,7 +47,7 @@ type Control struct {
 
 // ListTargets list currently connected targets
 func ListTargets() {
-	color.Cyan("Connected targets\n")
+	color.Cyan("Connected agents\n")
 	color.Cyan("=================\n\n")
 
 	indent := strings.Repeat(" ", len(" [0] "))
@@ -60,7 +60,8 @@ func ListTargets() {
 		if target.HasTor {
 			hastor = color.HiGreenString("YES")
 		}
-		fmt.Printf(" [%s] Tag: %s (root: %v):"+
+		fmt.Printf(" [%s] Tag: %s"+
+			"\n%sRoot: %s"+
 			"\n%sTor: %s"+
 			"\n%sCPU: %s"+
 			"\n%sHardware: %s"+
@@ -69,17 +70,18 @@ func ListTargets() {
 			"\n%sOS: %s"+
 			"\n%sKernel: %s - %s"+
 			"\n%sFrom: %s"+
-			"\n%sIPs: %v\n\n",
-			color.CyanString("%d", control.Index), target.Tag, hasroot,
-			indent, hastor,
-			indent, target.CPU,
-			indent, target.Hardware,
-			indent, target.Container,
-			indent, target.Mem,
-			indent, target.OS,
-			indent, target.Kernel, target.Arch,
-			indent, target.IP,
-			indent, target.IPs)
+			"\n%sIPs: %s\n\n",
+			color.CyanString("%d", control.Index), strings.Repeat(" ", (15-len("Tag")))+target.Tag,
+			indent, strings.Repeat(" ", (15-len("Root")))+hasroot,
+			indent, strings.Repeat(" ", (15-len("Tor")))+hastor,
+			indent, strings.Repeat(" ", (15-len("CPU")))+color.HiMagentaString(target.CPU),
+			indent, strings.Repeat(" ", (15-len("Hardware")))+color.HiCyanString(target.Hardware),
+			indent, strings.Repeat(" ", (15-len("Container")))+target.Container,
+			indent, strings.Repeat(" ", (15-len("MEM")))+target.Mem,
+			indent, strings.Repeat(" ", (15-len("OS")))+color.HiWhiteString(target.OS),
+			indent, strings.Repeat(" ", (15-len("Kernel")))+color.HiBlueString(target.Kernel), color.HiWhiteString(target.Arch),
+			indent, strings.Repeat(" ", (15-len("From")))+color.HiYellowString(target.IP),
+			indent, strings.Repeat(" ", (15-len("IPs")))+strings.Join(target.IPs, ", "))
 	}
 }
 
