@@ -121,7 +121,7 @@ func CmdHelp(mod string) {
 			"lpe_helper": "'unix-privesc-check' or 'linux-exploit-suggester'?",
 		}
 		CliPrettyPrint("Option", "Help", &help)
-	case agent.ModCMD:
+	case agent.ModCMD_EXEC:
 		help = map[string]string{
 			"cmd_to_exec": "Press TAB for some hints",
 		}

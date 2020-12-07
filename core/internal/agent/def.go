@@ -54,13 +54,13 @@ const (
 
 // Module names
 const (
-	ModCMD         = "cmd"
+	ModCMD_EXEC    = "cmd_exec"
 	ModCLEAN_LOG   = "clean_log"
 	ModLPE_SUGGEST = "lpe_suggest"
-	ModPERSISTENCE = "persistence"
-	ModPROXY       = "proxy"
+	ModPERSISTENCE = "get_persistence"
+	ModPROXY       = "run_proxy"
 	ModPORT_FWD    = "port_fwd"
-	ModSHELL       = "shell"
+	ModSHELL       = "interactive_shell"
 	ModVACCINE     = "vaccine"
 	ModGET_ROOT    = "get_root"
 )

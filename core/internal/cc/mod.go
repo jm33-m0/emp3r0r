@@ -35,7 +35,7 @@ var (
 
 	// ModuleHelpers a map of module helpers
 	ModuleHelpers = map[string]func(){
-		agent.ModCMD:         moduleCmd,
+		agent.ModCMD_EXEC:    moduleCmd,
 		agent.ModSHELL:       moduleShell,
 		agent.ModPROXY:       moduleProxy,
 		agent.ModPORT_FWD:    modulePortFwd,
@@ -89,7 +89,7 @@ func UpdateOptions(modName string) (exist bool) {
 
 	var currentOpt *Option
 	switch {
-	case modName == agent.ModCMD:
+	case modName == agent.ModCMD_EXEC:
 		currentOpt = addIfNotFound("cmd_to_exec")
 		currentOpt.Vals = []string{
 			"id", "whoami", "ifconfig",

@@ -245,7 +245,7 @@ aHViLmNvbS9qbTMzLW0wL2VtcDNyMHIKCmJ5IGptMzMtbTAKCgo=
 func listValChoices() func(string) []string {
 	return func(line string) []string {
 		switch CurrentMod {
-		case agent.ModCMD:
+		case agent.ModCMD_EXEC:
 			return Options["cmd_to_exec"].Vals
 		case agent.ModCLEAN_LOG:
 			return Options["keyword"].Vals
