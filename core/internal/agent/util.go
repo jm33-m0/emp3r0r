@@ -98,7 +98,7 @@ func RandInt(min, max int) int {
 	return min + rand.New(seed).Intn(max-min)
 }
 
-// Download download via HTTP
+// Download download via EmpHTTPClient
 func Download(url, path string) (err error) {
 	var (
 		resp *http.Response
