@@ -65,6 +65,19 @@ const (
 	ModGET_ROOT    = "get_root"
 )
 
+// Module help info
+var ModuleDocs = map[string]string{
+	ModCMD_EXEC:    "Run a single command on a target",
+	ModCLEAN_LOG:   "Delete lines containing keyword from *tmp logs",
+	ModLPE_SUGGEST: "Run unix-priv-check and linux exploit suggester",
+	ModPERSISTENCE: "Get persistence via built-in methods",
+	ModPROXY:       "Start a socks proxy on target, and use it locally on C2 side",
+	ModPORT_FWD:    "Port mapping",
+	ModSHELL:       "Run custom bash on target, a perfect reverse shell",
+	ModVACCINE:     "Vaccine helps you install additional tools on target system",
+	ModGET_ROOT:    "Try some built-in LPE exploits",
+}
+
 // SystemInfo agent properties
 type SystemInfo struct {
 	Tag       string   // identifier of the agent

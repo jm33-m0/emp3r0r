@@ -107,11 +107,7 @@ func GetTargetFromTag(tag string) (target *agent.SystemInfo) {
 
 // ListModules list all available modules
 func ListModules() {
-	color.Cyan("Available modules\n")
-	color.Cyan("=================\n\n")
-	for mod := range ModuleHelpers {
-		color.Green(mod)
-	}
+	CliPrettyPrint("Module Name", "Help", &agent.ModuleDocs)
 }
 
 // Send2Agent send MsgTunData to agent

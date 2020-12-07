@@ -11,6 +11,7 @@ import (
 
 // Commands holds all commands and their help string, command: help
 var Commands = map[string]string{
+	"help":         "Print this help, 'help <module>' gives help for a module",
 	"target":       "Set target. eg. `target <index>`",
 	"set":          "Set an option. eg. `set <option> <val>`",
 	"use":          "Use a module. eg. `use <module_name>`",
@@ -19,7 +20,6 @@ var Commands = map[string]string{
 	"ls_targets":   "List all targets",
 	"ls_modules":   "List all modules",
 	"ls_port_fwds": "List all port mappings",
-	"help":         "Print this help",
 	"exit":         "Exit",
 }
 
@@ -139,17 +139,19 @@ func CmdHelp(mod string) {
 			"status": "Turn proxy On/Off",
 		}
 		CliPrettyPrint("Option", "Help", &help)
-	case agent.ModVACCINE:
-		help = map[string]string{
-			"<N/A>": "vaccine module helps you install additional tools on target system",
-		}
-		CliPrettyPrint("Option", "Help", &help)
 	case agent.ModCLEAN_LOG:
 		help = map[string]string{
 			"keyword": "Delete all log entries containing this keyword",
 		}
 		CliPrettyPrint("Option", "Help", &help)
 	default:
+		for modname, modhelp := range agent.ModuleDocs {
+			if mod == modname {
+				help = map[string]string{"<N/A>": modhelp}
+				CliPrettyPrint("Option", "Help", &help)
+				return
+			}
+		}
 		CliPrintError("Help yourself")
 	}
 }
