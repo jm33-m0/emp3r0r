@@ -3,13 +3,16 @@ linux post-exploitation
 
 **Still under active development**
 
+
 <!-- vim-markdown-toc GFM -->
 
 * [updates](#updates)
 * [features](#features)
-* [demo](#demo)
-    * [reverse shell](#reverse-shell)
-    * [port forwarding](#port-forwarding)
+* [screenshots](#screenshots)
+    * [emp3r0r](#emp3r0r)
+    * [basic command shell](#basic-command-shell)
+    * [fully interactive and stealth bash shell](#fully-interactive-and-stealth-bash-shell)
+    * [agent traffic](#agent-traffic)
 * [how to test](#how-to-test)
 * [about tmux](#about-tmux)
     * [in case you don't know](#in-case-you-dont-know)
