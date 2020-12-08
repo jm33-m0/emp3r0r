@@ -52,32 +52,32 @@ func ListTargets() {
 
 	indent := strings.Repeat(" ", len(" [0] "))
 	for target, control := range Targets {
-		hasroot := color.HiRedString("NO")
+		userInfo := color.HiRedString(target.User)
 		hastor := color.HiRedString("NO")
 		if target.HasRoot {
-			hasroot = color.HiGreenString("YES")
+			userInfo = color.HiGreenString(target.User)
 		}
 		if target.HasTor {
 			hastor = color.HiGreenString("YES")
 		}
 		fmt.Printf(" [%s] Tag: %s"+
-			"\n%sRoot: %s"+
+			"\n%sUser: %s"+
 			"\n%sTor: %s"+
 			"\n%sCPU: %s"+
+			"\n%sMEM: %s"+
 			"\n%sHardware: %s"+
 			"\n%sContainer: %s"+
-			"\n%sMEM: %s"+
 			"\n%sOS: %s"+
 			"\n%sKernel: %s - %s"+
 			"\n%sFrom: %s"+
 			"\n%sIPs: %s\n\n",
 			color.CyanString("%d", control.Index), strings.Repeat(" ", (15-len("Tag")))+target.Tag,
-			indent, strings.Repeat(" ", (15-len("Root")))+hasroot,
+			indent, strings.Repeat(" ", (15-len("User")))+userInfo,
 			indent, strings.Repeat(" ", (15-len("Tor")))+hastor,
 			indent, strings.Repeat(" ", (15-len("CPU")))+color.HiMagentaString(target.CPU),
+			indent, strings.Repeat(" ", (15-len("MEM")))+target.Mem,
 			indent, strings.Repeat(" ", (15-len("Hardware")))+color.HiCyanString(target.Hardware),
 			indent, strings.Repeat(" ", (15-len("Container")))+target.Container,
-			indent, strings.Repeat(" ", (15-len("MEM")))+target.Mem,
 			indent, strings.Repeat(" ", (15-len("OS")))+color.HiWhiteString(target.OS),
 			indent, strings.Repeat(" ", (15-len("Kernel")))+color.HiBlueString(target.Kernel), color.HiWhiteString(target.Arch),
 			indent, strings.Repeat(" ", (15-len("From")))+color.HiYellowString(target.IP),

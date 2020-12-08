@@ -90,6 +90,7 @@ type SystemInfo struct {
 	Arch      string   // kernel architecture
 	IP        string   // public IP of the target
 	IPs       []string // IPs that are found on target's NICs
+	User      string   // user account info
 	HasRoot   bool     // is agent run as root?
 	HasTor    bool     // is agent from Tor?
 }

