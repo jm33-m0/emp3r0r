@@ -69,8 +69,8 @@ cd emp3r0r
 cp .tmux.conf ~ # if you wish to use my tmux config
 
 cd core
-./build.py # select a target to build: ./build.py <cc/agent>
-(cd build && ./cc) # launch CC server (with a user interface)
+./build.py cc # select a target to build: ./build.py <cc/agent>
+./emp3r0r # launch CC server (with a user interface)
 
 # on the target linux machine
 ./agent
