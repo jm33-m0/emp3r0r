@@ -164,7 +164,7 @@ func CollectSystemInfo() *SystemInfo {
 	info.Kernel = si.Kernel.Release
 	info.Arch = si.Kernel.Architecture
 	info.CPU = fmt.Sprintf("%s (x%d)", si.CPU.Model, getCPUCnt())
-	info.Mem = fmt.Sprintf("%d kB", getMemSize())
+	info.Mem = fmt.Sprintf("%d MB", getMemSize())
 	info.Hardware = CheckProduct()
 	info.Container = CheckContainer()
 
@@ -240,8 +240,9 @@ func getMemSize() (size int) {
 
 		if lineSplit[0] == "MemTotal:" {
 			size, err = strconv.Atoi(lineSplit[1])
+			size /= 1024
 			if err != nil {
-				size = 0
+				size = -1
 			}
 		}
 	}
