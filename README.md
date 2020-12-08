@@ -3,13 +3,12 @@ linux post-exploitation
 
 **Still under active development**
 
-
 <!-- vim-markdown-toc GFM -->
 
 * [updates](#updates)
 * [features](#features)
 * [screenshots](#screenshots)
-    * [emp3r0r](#emp3r0r)
+    * [system info and modules](#system-info-and-modules)
     * [basic command shell](#basic-command-shell)
     * [fully interactive and stealth bash shell](#fully-interactive-and-stealth-bash-shell)
     * [agent traffic](#agent-traffic)
@@ -45,7 +44,7 @@ linux post-exploitation
 
 ## screenshots
 
-### emp3r0r
+### system info and modules
 
 ![emp3r0r](./img/emp3r0r.webp)
 
