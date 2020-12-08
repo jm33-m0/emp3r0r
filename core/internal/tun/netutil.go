@@ -55,7 +55,10 @@ func IsTor(addr string) bool {
 
 // HasInternetAccess does this machine has internet access, if yes, what's its exposed IP?
 func HasInternetAccess() bool {
-	resp, err := http.Get("http://www.msftncsi.com/ncsi.txt")
+	client := http.Client{
+		Timeout: 5 * time.Second,
+	}
+	resp, err := client.Get("http://www.msftncsi.com/ncsi.txt")
 	if err != nil {
 		return false
 	}
