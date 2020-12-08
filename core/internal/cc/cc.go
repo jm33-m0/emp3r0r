@@ -54,15 +54,20 @@ func ListTargets() {
 	for target, control := range Targets {
 		userInfo := color.HiRedString(target.User)
 		hastor := color.HiRedString("NO")
+		hasInternet := color.HiRedString("NO")
 		if target.HasRoot {
 			userInfo = color.HiGreenString(target.User)
 		}
 		if target.HasTor {
 			hastor = color.HiGreenString("YES")
 		}
+		if target.HasInternet {
+			hasInternet = color.HiGreenString("YES")
+		}
 		fmt.Printf(" [%s] Tag: %s"+
 			"\n%sUser: %s"+
 			"\n%sTor: %s"+
+			"\n%sInternet: %s"+
 			"\n%sCPU: %s"+
 			"\n%sMEM: %s"+
 			"\n%sHardware: %s"+
@@ -74,6 +79,7 @@ func ListTargets() {
 			color.CyanString("%d", control.Index), strings.Repeat(" ", (15-len("Tag")))+target.Tag,
 			indent, strings.Repeat(" ", (15-len("User")))+userInfo,
 			indent, strings.Repeat(" ", (15-len("Tor")))+hastor,
+			indent, strings.Repeat(" ", (15-len("Internet")))+hasInternet,
 			indent, strings.Repeat(" ", (15-len("CPU")))+color.HiMagentaString(target.CPU),
 			indent, strings.Repeat(" ", (15-len("MEM")))+target.Mem,
 			indent, strings.Repeat(" ", (15-len("Hardware")))+color.HiCyanString(target.Hardware),

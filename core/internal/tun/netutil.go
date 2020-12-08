@@ -1,7 +1,9 @@
 package tun
 
 import (
+	"io/ioutil"
 	"net"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -37,10 +39,7 @@ func ValidateIPPort(to string) bool {
 		return false
 	}
 	_, err := strconv.Atoi(fields[1])
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 // IsTor is the C2 on Tor?
@@ -52,4 +51,22 @@ func IsTor(addr string) bool {
 	nopath := strings.Split(addr, "/")[2]
 	fields := strings.Split(nopath, ".")
 	return fields[len(fields)-1] == "onion"
+}
+
+// HasInternetAccess does this machine has internet access, if yes, what's its exposed IP?
+func HasInternetAccess() bool {
+	resp, err := http.Get("http://www.msftncsi.com/ncsi.txt")
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+
+	respData, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return false
+	}
+	if string(respData) == "Microsoft NCSI" {
+		return true
+	}
+	return false
 }

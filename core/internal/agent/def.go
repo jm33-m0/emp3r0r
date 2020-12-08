@@ -80,19 +80,20 @@ var ModuleDocs = map[string]string{
 
 // SystemInfo agent properties
 type SystemInfo struct {
-	Tag       string   // identifier of the agent
-	Hardware  string   // machine details
-	Container string   // container tech (if any)
-	CPU       string   // CPU info
-	Mem       string   // memory size
-	OS        string   // OS name and version
-	Kernel    string   // kernel release
-	Arch      string   // kernel architecture
-	IP        string   // public IP of the target
-	IPs       []string // IPs that are found on target's NICs
-	User      string   // user account info
-	HasRoot   bool     // is agent run as root?
-	HasTor    bool     // is agent from Tor?
+	Tag         string   // identifier of the agent
+	Hardware    string   // machine details
+	Container   string   // container tech (if any)
+	CPU         string   // CPU info
+	Mem         string   // memory size
+	OS          string   // OS name and version
+	Kernel      string   // kernel release
+	Arch        string   // kernel architecture
+	IP          string   // public IP of the target
+	IPs         []string // IPs that are found on target's NICs
+	User        string   // user account info
+	HasRoot     bool     // is agent run as root?
+	HasTor      bool     // is agent from Tor?
+	HasInternet bool     // has internet access?
 }
 
 // MsgTunData data to send in the tunnel

@@ -182,6 +182,9 @@ func CollectSystemInfo() *SystemInfo {
 	// is cc on tor?
 	info.HasTor = tun.IsTor(CCAddress)
 
+	// has internet?
+	info.HasInternet = tun.HasInternetAccess()
+
 	// IP address?
 	info.IPs = collectLocalIPs()
 
