@@ -25,39 +25,44 @@ linux post-exploitation
 ## features
 
 * beautiful terminal UI
-* perfect reverse shell (true color, key bindings, custom bashrc, custom bash binary, etc)
-* auto persistence via various methods
-* post-exploitation tools like nmap, socat, are integreted with reverse shell
-* port mapping, socks5 proxy
+* **perfect reverse shell** (true color, key bindings, custom bashrc, custom bash binary, etc)
+* auto **persistence** via various methods
+* **post-exploitation tools** like nmap, socat, are integreted with reverse shell
+* port mapping, socks5 **proxy**
 * auto root
-* LPE suggest
+* **LPE** suggest
 * system info collecting
 * file management
 * log cleaner
-* stealth connection
+* **stealth** connection
 * internet access checker
-* all of these in one HTTP2 connection
-* can be encapsulated in any external proxies such as TOR, and CDNs
+* all of these in one **HTTP2** connection
+* can be encapsulated in any external proxies such as **TOR**, and **CDNs**
 * and many more...
 
-## demo
+## screenshots
 
-### reverse shell
+### emp3r0r
 
-<p>
-    <img width="600" src="/img/rshell.svg">
-</p>
+![emp3r0r](./img/emp3r0r.webp)
 
-### port forwarding
+### basic command shell
 
-<p>
-    <img width="600" src="/img/portfwd.svg">
-</p>
+![cmd shell](./img/shell.webp)
+
+### fully interactive and stealth bash shell
+
+![bash](./img/bash.webp)
+
+### agent traffic
+
+![traffic](./img/traffic.webp)
+
 
 ## how to test
 
 ```bash
-git clone git@github.com:jm33-m0/emp3r0r.git
+git clone https://github.com/jm33-m0/emp3r0r.git
 
 cd emp3r0r
 
@@ -65,7 +70,7 @@ cp .tmux.conf ~ # if you wish to use my tmux config
 
 cd core
 ./build.py # select a target to build: ./build.py <cc/agent>
-./emp3r0r # launch CC server (with a user interface)
+(cd build && ./cc) # launch CC server (with a user interface)
 
 # on the target linux machine
 ./agent
