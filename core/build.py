@@ -8,10 +8,10 @@ this script replaces build.sh, coz bash/sed/awk is driving me insane
 
 import glob
 import os
+import shutil
 import sys
 import traceback
 import uuid
-import shutil
 
 
 class GoBuild:
@@ -118,8 +118,9 @@ class GoBuild:
         '''
 
         sed("./internal/tun/tls.go", self.CA, "[emp3r0r_ca]")
-        sed("./internal/agent/def.go", self.CCIP, "[cc_ipaddr]")
         sed("./internal/agent/def.go", self.INDICATOR, "[cc_indicator]")
+        # in case we use the same IP for indicator and CC
+        sed("./internal/agent/def.go", self.CCIP, "[cc_ipaddr]")
         sed("./internal/agent/def.go", self.UUID, "[agent_uuid]")
 
     def set_tags(self):
