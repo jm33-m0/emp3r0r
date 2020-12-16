@@ -64,6 +64,26 @@ func ListTargets() {
 		if target.HasInternet {
 			hasInternet = color.HiGreenString("YES")
 		}
+
+		// split long lines
+		splitLongLine := func(line string, titleLen int) (ret string) {
+			if len(line) < 55 {
+				return line
+			}
+			ret = line[:55]
+			for i := 1; i <= len(line)/55; i++ {
+				endslice := 55 * (i + 1)
+				if endslice >= len(line) {
+					endslice = len(line)
+				}
+				ret += fmt.Sprintf("\n%s%s", strings.Repeat(" ", 25-titleLen), line[55*i:endslice])
+			}
+
+			return
+		}
+		arpTab := splitLongLine(strings.Join(target.ARP, ", "), 3)
+		ips := splitLongLine(strings.Join(target.IPs, ", "), 3)
+
 		fmt.Printf(" [%s] Tag: %s"+
 			"\n%sUser: %s"+
 			"\n%sTor: %s"+
@@ -75,7 +95,8 @@ func ListTargets() {
 			"\n%sOS: %s"+
 			"\n%sKernel: %s - %s"+
 			"\n%sFrom: %s"+
-			"\n%sIPs: %s\n\n",
+			"\n%sIPs: %s"+
+			"\n%sARP: %s\n\n",
 			color.CyanString("%d", control.Index), strings.Repeat(" ", (15-len("Tag")))+target.Tag,
 			indent, strings.Repeat(" ", (15-len("User")))+userInfo,
 			indent, strings.Repeat(" ", (15-len("Tor")))+hastor,
@@ -87,7 +108,8 @@ func ListTargets() {
 			indent, strings.Repeat(" ", (15-len("OS")))+color.HiWhiteString(target.OS),
 			indent, strings.Repeat(" ", (15-len("Kernel")))+color.HiBlueString(target.Kernel), color.HiWhiteString(target.Arch),
 			indent, strings.Repeat(" ", (15-len("From")))+color.HiYellowString(target.IP),
-			indent, strings.Repeat(" ", (15-len("IPs")))+strings.Join(target.IPs, ", "))
+			indent, strings.Repeat(" ", (15-len("IPs")))+color.BlueString(ips),
+			indent, strings.Repeat(" ", (15-len("ARP")))+color.HiWhiteString(arpTab))
 	}
 }
 

