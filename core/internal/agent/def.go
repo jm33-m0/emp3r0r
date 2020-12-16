@@ -33,6 +33,9 @@ const (
 	// PIDFile stores agent PID
 	PIDFile = "/tmp/e.lock"
 
+	// SocketName name of our unix socket
+	SocketName = "/tmp/ssh-s6Y4tDtahIuL"
+
 	// CCPort port of c2
 	CCPort = "8000"
 

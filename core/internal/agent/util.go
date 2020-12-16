@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -61,8 +62,8 @@ func IsFileExist(path string) bool {
 	return true
 }
 
-// IsAgentRunning is there any emp3r0r agent already running?
-func IsAgentRunning() (bool, int) {
+// IsAgentRunningPID is there any emp3r0r agent already running?
+func IsAgentRunningPID() (bool, int) {
 	defer func() {
 		myPIDText := strconv.Itoa(os.Getpid())
 		if err := ioutil.WriteFile(PIDFile, []byte(myPIDText), 0600); err != nil {
@@ -81,6 +82,49 @@ func IsAgentRunning() (bool, int) {
 
 	_, err = os.FindProcess(pid)
 	return err == nil, pid
+}
+
+// is the agent alive?
+// connect to SocketName, send a message, see if we get a reply
+func IsAgentAlive() bool {
+	log.Println("Testing if agent is alive...")
+	c, err := net.Dial("unix", SocketName)
+	if err != nil {
+		log.Printf("Seems dead: %v", err)
+		return false
+	}
+	defer c.Close()
+
+	replyFromAgent := make(chan string, 1)
+	reader := func(r io.Reader) {
+		buf := make([]byte, 1024)
+		for {
+			n, err := r.Read(buf[:])
+			if err != nil {
+				return
+			}
+			replyFromAgent <- string(buf[0:n])
+		}
+	}
+
+	// listen for reply from agent
+	go reader(c)
+
+	// send hello to agent
+	for {
+		_, err := c.Write([]byte("emp3r0r"))
+		if err != nil {
+			log.Print("write error:", err)
+			break
+		}
+		if <-replyFromAgent == "emp3r0r" {
+			log.Println("Yes it's alive")
+			return true
+		}
+		time.Sleep(1e9)
+	}
+
+	return false
 }
 
 // Send2CC send TunData to CC
