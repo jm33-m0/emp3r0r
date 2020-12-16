@@ -16,10 +16,11 @@ require (
 	github.com/pierrec/lz4 v2.6.0+incompatible // indirect
 	github.com/posener/h2conn v0.0.0-20180911140238-13e7df33ed15
 	github.com/txthinking/runnergroup v0.0.0-20200327135940-540a793bb997 // indirect
-	github.com/txthinking/socks5 v0.0.0-20201001150204-6c35fb6096be
-	github.com/txthinking/x v0.0.0-20200813135806-2c9a7191ffb3 // indirect
+	github.com/txthinking/socks5 v0.0.0-20201123045853-9265fe887898
+	github.com/txthinking/x v0.0.0-20201210150116-a8015a742c8c // indirect
 	github.com/ulikunitz/xz v0.5.8 // indirect
+	github.com/vishvananda/netlink v1.1.0
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/zcalusic/sysinfo v0.0.0-20200820110305-ef1bb2697bc2
-	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b
+	golang.org/x/net v0.0.0-20201216054612-986b41b23924
 )
