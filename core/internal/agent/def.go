@@ -26,7 +26,7 @@ var (
 	ProxyServer *socks5.Server
 
 	// CCAddress how our agent finds its CC
-	CCAddress = "https://10.103.249.16"
+	CCAddress = "https://[cc_ipaddr]"
 )
 
 const (

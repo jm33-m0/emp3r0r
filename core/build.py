@@ -20,7 +20,7 @@ class GoBuild:
     '''
 
     def __init__(self, target="cc",
-                 cc_indicator="cc_indicator", cc_ip="10.103.249.16"):
+                 cc_indicator="cc_indicator", cc_ip="[cc_ipaddr]"):
         self.target = target
         self.GOOS = os.getenv("GOOS")
         self.GOARCH = os.getenv("GOARCH")
@@ -118,7 +118,7 @@ class GoBuild:
         '''
 
         sed("./internal/tun/tls.go", self.CA, "[emp3r0r_ca]")
-        sed("./internal/agent/def.go", self.CCIP, "10.103.249.16")
+        sed("./internal/agent/def.go", self.CCIP, "[cc_ipaddr]")
         sed("./internal/agent/def.go", self.INDICATOR, "[cc_indicator]")
         sed("./internal/agent/def.go", self.UUID, "[agent_uuid]")
 
@@ -133,7 +133,7 @@ class GoBuild:
         '''
 
         sed("./internal/tun/tls.go", "[emp3r0r_ca]", self.CA)
-        sed("./internal/agent/def.go", "10.103.249.16", self.CCIP)
+        sed("./internal/agent/def.go", "[cc_ipaddr]", self.CCIP)
         sed("./internal/agent/def.go", "[cc_indicator]", self.INDICATOR)
         sed("./internal/agent/def.go", "[agent_uuid]", self.UUID)
 
@@ -183,7 +183,7 @@ def main(target):
     '''
     main main main
     '''
-    ccip = "10.103.249.16"
+    ccip = "[cc_ipaddr]"
     indicator = "[cc_indicator]"
     use_cached = False
 
