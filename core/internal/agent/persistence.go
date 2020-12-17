@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-// TODO
+// TODO implement more methods
 
 var (
 	// PersistMethods CC calls one of these methods to get persistence, or all of them at once

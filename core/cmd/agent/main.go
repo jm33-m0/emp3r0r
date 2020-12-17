@@ -127,8 +127,7 @@ func socketListen() {
 	if agent.IsFileExist(agent.SocketName) {
 		log.Printf("%s exists, testing connection...", agent.SocketName)
 		if agent.IsAgentAlive() {
-			log.Printf("%s exists, and agent is alive, aborting socketListen", agent.SocketName)
-			return
+			log.Fatalf("%s exists, and agent is alive, aborting", agent.SocketName)
 		}
 		err := os.Remove(agent.SocketName)
 		if err != nil {
