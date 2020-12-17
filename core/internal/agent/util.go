@@ -255,7 +255,7 @@ func CheckAccount(username string) (accountInfo map[string]string, err error) {
 		line := scanner.Text()
 		fields := strings.Split(line, ":")
 		accountInfo["username"] = fields[0]
-		if username == accountInfo["username"] {
+		if username != accountInfo["username"] {
 			continue
 		}
 		accountInfo["home"] = fields[len(fields)-2]
