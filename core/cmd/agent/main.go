@@ -87,6 +87,10 @@ func main() {
 		}
 		agent.HTTPClient = tun.EmpHTTPClient(*c2proxy)
 	}
+	// if user specified a proxy, use it
+	if *c2proxy != "" {
+		agent.HTTPClient = tun.EmpHTTPClient(*c2proxy)
+	}
 connect:
 
 	// check preset CC status URL, if CC is supposed to be offline, take a nap
