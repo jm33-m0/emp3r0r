@@ -1,6 +1,6 @@
 module github.com/jm33-m0/emp3r0r/core
 
-go 1.14
+go 1.15
 
 require (
 	github.com/bettercap/readline v0.0.0-20180208083827-9cec905dd291
@@ -9,7 +9,7 @@ require (
 	github.com/fatih/color v1.10.0
 	github.com/golang/snappy v0.0.2 // indirect
 	github.com/google/uuid v1.1.2
-	github.com/jm33-m0/go-cdn2proxy v0.0.0-20201218093545-38c91a27e096
+	github.com/jm33-m0/go-cdn2proxy v0.0.0-20201218130613-c17f7b2f63da
 	github.com/mholt/archiver v3.1.1+incompatible
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/nwaples/rardecode v1.1.0 // indirect

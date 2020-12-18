@@ -17,7 +17,7 @@ func main() {
 
 	if *cdnproxy != "" {
 		go func() {
-			err := cdn2proxy.StartServer(*cdnproxy, "127.0.0.1:"+agent.CCPort)
+			err := cdn2proxy.StartServer(*cdnproxy, "127.0.0.1:"+agent.CCPort, true)
 			if err != nil {
 				log.Fatal(err)
 			}
