@@ -9,7 +9,7 @@ require (
 	github.com/fatih/color v1.10.0
 	github.com/golang/snappy v0.0.2 // indirect
 	github.com/google/uuid v1.1.2
-	github.com/jm33-m0/go-cdn2proxy v0.0.0-20201218130613-c17f7b2f63da
+	github.com/jm33-m0/go-cdn2proxy v0.0.0-20201218135803-4dcc402f9643
 	github.com/mholt/archiver v3.1.1+incompatible
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/nwaples/rardecode v1.1.0 // indirect
