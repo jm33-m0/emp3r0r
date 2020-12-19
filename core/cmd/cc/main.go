@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"log"
+	"os"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc"
@@ -17,7 +18,11 @@ func main() {
 
 	if *cdnproxy != "" {
 		go func() {
-			err := cdn2proxy.StartServer(*cdnproxy, "127.0.0.1:"+agent.CCPort, cc.EmpReadLine.Stderr())
+			logFile, err := os.OpenFile("/tmp/ws.log", os.O_CREATE|os.O_RDWR, 0600)
+			if err != nil {
+				log.Fatal(err)
+			}
+			err = cdn2proxy.StartServer(*cdnproxy, "127.0.0.1:"+agent.CCPort, logFile)
 			if err != nil {
 				log.Fatal(err)
 			}
