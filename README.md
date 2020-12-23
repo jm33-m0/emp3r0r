@@ -13,9 +13,6 @@ linux post-exploitation
     * [fully interactive and stealth bash shell](#fully-interactive-and-stealth-bash-shell)
     * [agent traffic](#agent-traffic)
 * [how to test](#how-to-test)
-* [about tmux](#about-tmux)
-    * [in case you don't know](#in-case-you-dont-know)
-    * [key bindings](#key-bindings)
 * [thanks](#thanks)
 
 <!-- vim-markdown-toc -->
@@ -63,49 +60,7 @@ linux post-exploitation
 
 ## how to test
 
-```bash
-git clone https://github.com/jm33-m0/emp3r0r.git
-
-cd emp3r0r
-
-cp .tmux.conf ~ # if you wish to use my tmux config
-
-cd core
-./build.py cc # select a target to build: ./build.py <cc/agent>
-./emp3r0r # launch CC server (with a user interface)
-
-# on the target linux machine
-./agent
-```
-
-## about tmux
-
-### in case you don't know
-
-emp3r0r utilizes [tmux](https://github.com/tmux/tmux/wiki) to provide features like remote editing, cmd output viewing.
-
-if you wish to use my tmux config, you can put `.tmux.conf` under your `$HOME`
-
-```
-cp .tmux.conf ~
-```
-
-### key bindings
-
-
-| Key Binding                | Description        |
-|----------------------------|--------------------|
-| <kbd>C-x - </kbd>          | Split vertically   |
-| <kbd>C-x _ </kbd>          | Split horizontally |
-| <kbd>C-x x </kbd>          | Kill current pane  |
-| <kbd>C-x c </kbd>          | New tab            |
-| <kbd>C-x [1,2,3...] </kbd> | Switch to tab      |
-| <kbd>C-x , </kbd>          | Rename tab         |
-
-legend:
-
-- <kbd>C-x -</kbd> means <kbd>Ctrl</kbd> plus <kbd>X</kbd>, then <kbd>-</kbd>
-- <kbd>[1,2,3...]</kbd> means any numeric key
+please read the [wiki](https://github.com/jm33-m0/emp3r0r/wiki/)
 
 ## thanks
 
