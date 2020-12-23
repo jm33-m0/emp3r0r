@@ -27,6 +27,9 @@ linux post-exploitation
 * **perfect reverse shell** (true color, key bindings, custom bashrc, custom bash binary, etc)
 * auto **persistence** via various methods
 * **post-exploitation tools** like nmap, socat, are integreted with reverse shell
+* **credential harvesting**
+* process **injection**
+* ELF **patcher**
 * port mapping, socks5 **proxy**
 * auto root
 * **LPE** suggest
