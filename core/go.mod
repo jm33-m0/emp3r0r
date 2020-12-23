@@ -1,6 +1,6 @@
 module github.com/jm33-m0/emp3r0r/core
 
-go 1.15
+go 1.13
 
 require (
 	github.com/bettercap/readline v0.0.0-20180208083827-9cec905dd291
