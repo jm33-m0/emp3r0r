@@ -100,7 +100,8 @@ func main() {
 	// if user wants to use CDN proxy
 	if *cdnProxy != "" {
 		go func() {
-			err := cdn2proxy.StartProxy("127.0.0.1:10888", *cdnProxy)
+			// you can change DoH server here if needed
+			err := cdn2proxy.StartProxy("127.0.0.1:10888", *cdnProxy, "https://9.9.9.9/dns-query")
 			if err != nil {
 				log.Fatal(err)
 			}

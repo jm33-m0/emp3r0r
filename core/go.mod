@@ -3,10 +3,13 @@ module github.com/jm33-m0/emp3r0r/core
 go 1.13
 
 require (
+	github.com/bettercap/readline v0.0.0-20180208083827-9cec905dd291
 	github.com/creack/pty v1.1.11
 	github.com/dsnet/compress v0.0.1 // indirect
+	github.com/fatih/color v1.10.0
 	github.com/golang/snappy v0.0.2 // indirect
-	github.com/jm33-m0/go-cdn2proxy v0.0.0-20201224092952-ea96dadbfdde
+	github.com/google/uuid v1.1.2
+	github.com/jm33-m0/go-cdn2proxy v1.0.1
 	github.com/mholt/archiver v3.1.1+incompatible
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/nwaples/rardecode v1.1.0 // indirect
