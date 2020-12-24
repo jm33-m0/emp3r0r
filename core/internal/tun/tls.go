@@ -22,16 +22,12 @@ var (
 
 // EmpHTTPClient add our CA to trusted CAs, while keeps TLS InsecureVerify on
 func EmpHTTPClient(proxyServer string) *http.Client {
-	// Get the SystemCertPool, continue with an empty pool on error
-	// rootCAs, _ := x509.SystemCertPool()
-	// if rootCAs == nil {
-	// 	rootCAs = x509.NewCertPool()
-	// }
+	// start with an empty pool
 	rootCAs := x509.NewCertPool()
 
-	// Append our cert to the system pool
+	// add our cert
 	if ok := rootCAs.AppendCertsFromPEM(CACrt); !ok {
-		log.Println("No certs appended, using system certs only")
+		log.Println("No certs appended")
 	}
 
 	// Trust the augmented cert pool in our client
@@ -43,7 +39,7 @@ func EmpHTTPClient(proxyServer string) *http.Client {
 	// return our http client
 	tr := &http.Transport{TLSClientConfig: config}
 
-	// use a socks5 proxy
+	// use a proxy for our HTTP client
 	if proxyServer != "" {
 		proxyUrl, err := url.Parse(proxyServer)
 		if err != nil {
