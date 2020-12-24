@@ -3,13 +3,10 @@ module github.com/jm33-m0/emp3r0r/core
 go 1.13
 
 require (
-	github.com/bettercap/readline v0.0.0-20180208083827-9cec905dd291
 	github.com/creack/pty v1.1.11
 	github.com/dsnet/compress v0.0.1 // indirect
-	github.com/fatih/color v1.10.0
 	github.com/golang/snappy v0.0.2 // indirect
-	github.com/google/uuid v1.1.2
-	github.com/jm33-m0/go-cdn2proxy v0.0.0-20201219105929-6a6a1f8851f5
+	github.com/jm33-m0/go-cdn2proxy v0.0.0-20201224092952-ea96dadbfdde
 	github.com/mholt/archiver v3.1.1+incompatible
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/nwaples/rardecode v1.1.0 // indirect
@@ -23,5 +20,5 @@ require (
 	github.com/vishvananda/netlink v1.1.0
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/zcalusic/sysinfo v0.0.0-20200820110305-ef1bb2697bc2
-	golang.org/x/net v0.0.0-20201216054612-986b41b23924
+	golang.org/x/net v0.0.0-20201224014010-6772e930b67b
 )
