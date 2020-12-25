@@ -5,7 +5,10 @@ if ! command -v tmux >/dev/null 2>&1; then
     exit 1
 fi
 
-[[ -f ./build/cc ]] || python3 ./build.py cc
+[[ -f ./build/cc ]] || (
+    echo "[-] Building CC server as it's not found"
+    python3 ./build.py cc
+)
 
 (
     cd build || exit 1
