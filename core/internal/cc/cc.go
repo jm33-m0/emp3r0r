@@ -45,7 +45,7 @@ type Control struct {
 	Conn  *h2conn.Conn
 }
 
-// ListTargets list currently connected targets
+// ListTargets list currently connected agents
 func ListTargets() {
 	color.Cyan("Connected agents\n")
 	color.Cyan("=================\n\n")
@@ -85,6 +85,7 @@ func ListTargets() {
 		ips := splitLongLine(strings.Join(target.IPs, ", "), 3)
 
 		fmt.Printf(" [%s] Tag: %s"+
+			"\n%sHostname: %s"+
 			"\n%sUser: %s"+
 			"\n%sTor: %s"+
 			"\n%sInternet: %s"+
@@ -98,6 +99,7 @@ func ListTargets() {
 			"\n%sIPs: %s"+
 			"\n%sARP: %s\n\n",
 			color.CyanString("%d", control.Index), strings.Repeat(" ", (15-len("Tag")))+target.Tag,
+			indent, strings.Repeat(" ", (15-len("Hostname")))+target.Hostname,
 			indent, strings.Repeat(" ", (15-len("User")))+userInfo,
 			indent, strings.Repeat(" ", (15-len("Tor")))+hastor,
 			indent, strings.Repeat(" ", (15-len("Internet")))+hasInternet,

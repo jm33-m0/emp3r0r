@@ -91,7 +91,8 @@ var ModuleDocs = map[string]string{
 // SystemInfo agent properties
 type SystemInfo struct {
 	Tag         string   // identifier of the agent
-	Hardware    string   // machine details
+	Hostname    string   // Hostname and machine ID
+	Hardware    string   // machine details and hypervisor
 	Container   string   // container tech (if any)
 	CPU         string   // CPU info
 	Mem         string   // memory size

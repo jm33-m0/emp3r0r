@@ -13,7 +13,11 @@ import (
 func CheckProduct() (virt string) {
 	var si sysinfo.SysInfo
 	si.GetSysInfo() // read sysinfo
-	virt = fmt.Sprintf("%s (%s) by %s", si.Product.Name, si.Product.Version, si.Product.Vendor)
+	hypervisor := si.Node.Hypervisor
+	if hypervisor == "" {
+		hypervisor = "no hypervisor"
+	}
+	virt = fmt.Sprintf("%s (%s) by %s, %s", si.Product.Name, si.Product.Version, si.Product.Vendor, hypervisor)
 	return
 }
 

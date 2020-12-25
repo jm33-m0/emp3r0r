@@ -227,6 +227,7 @@ func CollectSystemInfo() *SystemInfo {
 	info.Tag = Tag
 
 	info.OS = fmt.Sprintf("%s %s", si.OS.Name, si.OS.Version)
+	info.Hostname = fmt.Sprintf("%s (%s)", si.Node.Hostname, si.Node.MachineID)
 	info.Kernel = si.Kernel.Release
 	info.Arch = si.Kernel.Architecture
 	info.CPU = fmt.Sprintf("%s (x%d)", si.CPU.Model, getCPUCnt())
