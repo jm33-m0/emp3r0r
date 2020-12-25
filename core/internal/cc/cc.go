@@ -72,6 +72,9 @@ func ListTargets() {
 			}
 			ret = line[:55]
 			for i := 1; i <= len(line)/55; i++ {
+				if i == 2 {
+					break
+				}
 				endslice := 55 * (i + 1)
 				if endslice >= len(line) {
 					endslice = len(line)
@@ -84,34 +87,31 @@ func ListTargets() {
 		arpTab := splitLongLine(strings.Join(target.ARP, ", "), 3)
 		ips := splitLongLine(strings.Join(target.IPs, ", "), 3)
 
-		fmt.Printf(" [%s] Tag: %s"+
-			"\n%sHostname: %s"+
-			"\n%sUser: %s"+
-			"\n%sTor: %s"+
-			"\n%sInternet: %s"+
-			"\n%sCPU: %s"+
-			"\n%sMEM: %s"+
-			"\n%sHardware: %s"+
-			"\n%sContainer: %s"+
-			"\n%sOS: %s"+
-			"\n%sKernel: %s - %s"+
-			"\n%sFrom: %s"+
-			"\n%sIPs: %s"+
-			"\n%sARP: %s\n\n",
-			color.CyanString("%d", control.Index), strings.Repeat(" ", (15-len("Tag")))+target.Tag,
-			indent, strings.Repeat(" ", (15-len("Hostname")))+target.Hostname,
-			indent, strings.Repeat(" ", (15-len("User")))+userInfo,
-			indent, strings.Repeat(" ", (15-len("Tor")))+hastor,
-			indent, strings.Repeat(" ", (15-len("Internet")))+hasInternet,
-			indent, strings.Repeat(" ", (15-len("CPU")))+color.HiMagentaString(target.CPU),
-			indent, strings.Repeat(" ", (15-len("MEM")))+target.Mem,
-			indent, strings.Repeat(" ", (15-len("Hardware")))+color.HiCyanString(target.Hardware),
-			indent, strings.Repeat(" ", (15-len("Container")))+target.Container,
-			indent, strings.Repeat(" ", (15-len("OS")))+color.HiWhiteString(target.OS),
-			indent, strings.Repeat(" ", (15-len("Kernel")))+color.HiBlueString(target.Kernel), color.HiWhiteString(target.Arch),
-			indent, strings.Repeat(" ", (15-len("From")))+color.HiYellowString(target.IP),
-			indent, strings.Repeat(" ", (15-len("IPs")))+color.BlueString(ips),
-			indent, strings.Repeat(" ", (15-len("ARP")))+color.HiWhiteString(arpTab))
+		// info map
+		infoMap := map[string]string{
+			"Hostname":  color.HiCyanString(target.Hostname),
+			"User":      userInfo,
+			"Tor":       hastor,
+			"Internet":  hasInternet,
+			"CPU":       color.HiMagentaString(target.CPU),
+			"MEM":       target.Mem,
+			"Hardware":  color.HiCyanString(target.Hardware),
+			"Container": target.Container,
+			"OS":        color.HiWhiteString(target.OS),
+			"Kernel":    color.HiBlueString(target.Kernel) + ", " + color.HiWhiteString(target.Arch),
+			"From":      color.HiYellowString(target.IP),
+			"IPs":       color.BlueString(ips),
+			"ARP":       color.HiWhiteString(arpTab),
+		}
+
+		// print
+		fmt.Printf(" [%s] Tag: %s", color.CyanString("%d", control.Index), strings.Repeat(" ", (14-len("Tag")))+
+			color.CyanString(target.Tag))
+
+		for key, val := range infoMap {
+			fmt.Printf("\n%s%s:%s%s", indent, key, strings.Repeat(" ", (15-len(key))), val)
+		}
+		fmt.Print("\n\n\n\n")
 	}
 }
 
