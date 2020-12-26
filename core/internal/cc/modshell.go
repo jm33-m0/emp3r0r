@@ -77,6 +77,22 @@ func moduleShell() {
 	if target.HasRoot {
 		shellPrompt = color.HiCyanString("[%d] ", tControl.Index) + color.HiGreenString("%s@%s# ", username, hostname)
 	}
+
+	// set autocomplete
+	var shellCmdCompls []readline.PrefixCompleterInterface
+	for cmd := range ShellHelpInfo {
+		if cmd == "put" {
+			continue
+		}
+		shellCmdCompls = append(shellCmdCompls, readline.PcItem(cmd))
+	}
+	shellCmdCompls = append(shellCmdCompls, readline.PcItemDynamic(listFiles("./")))
+	shellCmdCompls = append(shellCmdCompls,
+		readline.PcItem("put",
+			readline.PcItemDynamic(listFiles("./"))),
+	)
+	CliCompleter.SetChildren(shellCmdCompls)
+	defer CliCompleter.SetChildren(CmdCompls)
 shell:
 	for {
 		// set prompt to shell
@@ -151,7 +167,7 @@ shell:
 			continue shell
 
 		case inputSlice[0] == "get":
-			// #put file to agent
+			// #get file from agent
 			if len(inputSlice) != 2 {
 				CliPrintError("get <remote path>")
 				continue shell
@@ -160,10 +176,11 @@ shell:
 			if err = GetFile(inputSlice[1], target); err != nil {
 				CliPrintError("Cannot get %s: %v", inputSlice[2], err)
 			}
+
 			continue shell
 
 		case inputSlice[0] == "put":
-			// #put file to agent
+			// #put file on agent
 			if len(inputSlice) != 3 {
 				CliPrintError("put <local path> <remote path>")
 				continue shell

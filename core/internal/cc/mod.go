@@ -26,6 +26,7 @@ var (
 
 	// ShellHelpInfo provide utilities like ps, kill, etc
 	ShellHelpInfo = map[string]string{
+		"help":  "Display this help",
 		"bash":  "A reverse bash shell from HTTP2 tunnel, press Ctrl-D to leave",
 		"#ps":   "List processes: `ps`",
 		"#kill": "Kill process: `kill <PID>`",
