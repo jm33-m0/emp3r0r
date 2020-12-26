@@ -141,6 +141,7 @@ shell:
 			fmt.Printf("IP addresses: %s\nARP cache: %s",
 				strings.Join(target.IPs, ", "),
 				strings.Join(target.ARP, ", "))
+			color.Cyan("[*] Updated:\n")
 
 			// get refreshed results
 			err = SendCmd("#net", target)
