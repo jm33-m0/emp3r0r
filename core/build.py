@@ -212,8 +212,10 @@ def main(target):
         f.close()
 
     if target == "cc":
-        cc_other = input(
-            "Additional CC server addresses (separate with space): ").strip()
+        cc_other = ""
+        if not os.path.exists("./build/emp3r0r-key.pem"):
+            cc_other = input(
+                "Additional CC server addresses (separate with space): ").strip()
         gobuild = GoBuild(target="cc", cc_ip=ccip, cc_other_names=cc_other)
         gobuild.build()
 
