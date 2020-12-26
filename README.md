@@ -9,6 +9,7 @@ linux post-exploitation
 * [features](#features)
 * [screenshots](#screenshots)
     * [system info and modules](#system-info-and-modules)
+    * [agent info](#agent-info)
     * [basic command shell](#basic-command-shell)
     * [fully interactive and stealth bash shell](#fully-interactive-and-stealth-bash-shell)
     * [agent traffic](#agent-traffic)
@@ -47,6 +48,10 @@ linux post-exploitation
 ### system info and modules
 
 ![emp3r0r](./img/emp3r0r.webp)
+
+### agent info
+
+![ls_targets](./img/ls_targets.webp)
 
 ### basic command shell
 
