@@ -53,13 +53,9 @@ func ListTargets() {
 	indent := strings.Repeat(" ", len(" [0] "))
 	for target, control := range Targets {
 		userInfo := color.HiRedString(target.User)
-		hastor := color.HiRedString("NO")
 		hasInternet := color.HiRedString("NO")
 		if target.HasRoot {
 			userInfo = color.HiGreenString(target.User)
-		}
-		if target.HasTor {
-			hastor = color.HiGreenString("YES")
 		}
 		if target.HasInternet {
 			hasInternet = color.HiGreenString("YES")
@@ -91,7 +87,6 @@ func ListTargets() {
 		infoMap := map[string]string{
 			"Hostname":  color.HiCyanString(target.Hostname),
 			"User":      userInfo,
-			"Tor":       hastor,
 			"Internet":  hasInternet,
 			"CPU":       color.HiMagentaString(target.CPU),
 			"MEM":       target.Mem,
@@ -99,7 +94,7 @@ func ListTargets() {
 			"Container": target.Container,
 			"OS":        color.HiWhiteString(target.OS),
 			"Kernel":    color.HiBlueString(target.Kernel) + ", " + color.HiWhiteString(target.Arch),
-			"From":      color.HiYellowString(target.IP) + color.HiBlueString(" - (%s)", target.Transport),
+			"From":      color.HiYellowString(target.IP) + fmt.Sprintf(" - %s", color.HiGreenString(target.Transport)),
 			"IPs":       color.BlueString(ips),
 			"ARP":       color.HiWhiteString(arpTab),
 		}

@@ -17,6 +17,7 @@ func CheckProduct() (virt string) {
 	if hypervisor == "" {
 		hypervisor = "no hypervisor"
 	}
+
 	virt = fmt.Sprintf("%s (%s) by %s, %s", si.Product.Name, si.Product.Version, si.Product.Vendor, hypervisor)
 	return
 }
