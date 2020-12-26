@@ -204,7 +204,8 @@ def main(target):
         use_cached = yes_no(f"Use cached CC address ({ccip})?")
 
     if not use_cached:
-        clean()
+        if yes_no("Clean everything and start over?"):
+            clean()
         ccip = input("CC server address (domain name or ip address): ").strip()
         f = open("./build/ccip.txt", "w+")
         f.write(ccip)
