@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# pylint: disable=invalid-name, broad-except, too-many-arguments
+# pylint: disable=invalid-name, broad-except, too-many-arguments, too-many-instance-attributes, line-too-long
 
 '''
 this script replaces build.sh, coz bash/sed/awk is driving me insane
@@ -20,7 +20,7 @@ class GoBuild:
     '''
 
     def __init__(self, target="cc",
-                 cc_indicator="cc_indicator", cc_ip="[cc_ipaddr]"):
+                 cc_indicator="cc_indicator", cc_ip="[cc_ipaddr]", cc_other_names=""):
         self.target = target
         self.GOOS = os.getenv("GOOS")
         self.GOARCH = os.getenv("GOARCH")
@@ -36,6 +36,8 @@ class GoBuild:
 
         # tags
         self.CCIP = cc_ip
+        if cc_other_names != "":
+            self.CC_OTHER_NAMES = cc_other_names
         self.INDICATOR = cc_indicator
         self.UUID = str(uuid.uuid1())
 
@@ -98,7 +100,7 @@ class GoBuild:
         try:
             os.chdir("./tls")
             os.system(
-                f"bash ./genkey-with-ip-san.sh {self.UUID} {self.UUID}.com {self.CCIP}")
+                f"bash ./genkey-with-ip-san.sh {self.UUID} {self.UUID}.com {self.CCIP} {self.CC_OTHER_NAMES}")
             os.rename(f"./{self.UUID}-cert.pem", "./emp3r0r-cert.pem")
             os.rename(f"./{self.UUID}-key.pem", "./emp3r0r-key.pem")
             os.chdir("..")
@@ -199,7 +201,7 @@ def main(target):
         f = open("./build/ccip.txt")
         ccip = f.read().strip()
         f.close()
-        use_cached = yes_no("Use cached CC address?")
+        use_cached = yes_no(f"Use cached CC address ({ccip})?")
 
     if not use_cached:
         clean()
@@ -209,7 +211,9 @@ def main(target):
         f.close()
 
     if target == "cc":
-        gobuild = GoBuild(target="cc", cc_ip=ccip)
+        cc_other = input(
+            "Additional CC server addresses (separate with space): ").strip()
+        gobuild = GoBuild(target="cc", cc_ip=ccip, cc_other_names=cc_other)
         gobuild.build()
 
         return

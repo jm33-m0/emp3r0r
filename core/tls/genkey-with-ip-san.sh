@@ -49,7 +49,7 @@ fi
 keypair() {
     local NAME=$1
     local HOSTNAME=$2
-    local IP=$3
+    local IP=("${@:2}")
 
     local SERIALOPT=""
     if [ ! -f "${ROOT}/ca.srl" ]; then
@@ -68,11 +68,14 @@ keypair() {
 
     cp "${ROOT}/openssl.cnf" "${ROOT}/openssl-${NAME}.cnf"
     # validate IP
-    if [[ "$IP" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo -e "\nIP.1 = ${IP}" >>"${ROOT}/openssl-${NAME}.cnf"
-    else
-        echo -e "\nDNS.1 = ${IP}" >>"${ROOT}/openssl-${NAME}.cnf"
-    fi
+    local i=0
+    for name in "${IP[@]}"; do
+        if [[ "$name" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo -e "\nIP.$((i++)) = $name" >>"${ROOT}/openssl-${NAME}.cnf"
+        else
+            echo -e "\nDNS.$((i++)) = $name" >>"${ROOT}/openssl-${NAME}.cnf"
+        fi
+    done
 
     echo ".. request"
     openssl req -subj "/CN=${HOSTNAME}" -new \
@@ -117,4 +120,4 @@ if [ -z "$3" ]; then
     exit 1
 fi
 
-keypair "$1" "$2" "$3"
+keypair "$@"
