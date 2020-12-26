@@ -100,6 +100,8 @@ shell:
 		EmpReadLine.SetPrompt(shellPrompt)
 		defer EmpReadLine.SetPrompt(oldPrompt)
 
+		// line feed
+		fmt.Println()
 		// read user input
 		input, err := EmpReadLine.Readline()
 		if err != nil {
