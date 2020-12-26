@@ -99,7 +99,7 @@ func ListTargets() {
 			"Container": target.Container,
 			"OS":        color.HiWhiteString(target.OS),
 			"Kernel":    color.HiBlueString(target.Kernel) + ", " + color.HiWhiteString(target.Arch),
-			"From":      color.HiYellowString(target.IP),
+			"From":      color.HiYellowString(target.IP) + color.HiBlueString(" - (%s)", target.Transport),
 			"IPs":       color.BlueString(ips),
 			"ARP":       color.HiWhiteString(arpTab),
 		}

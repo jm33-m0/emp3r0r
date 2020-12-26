@@ -233,6 +233,7 @@ func CollectSystemInfo() *SystemInfo {
 	info.Mem = fmt.Sprintf("%d MB", getMemSize())
 	info.Hardware = CheckProduct()
 	info.Container = CheckContainer()
+	info.Transport = Transport
 
 	// have root?
 	info.HasRoot = os.Geteuid() == 0

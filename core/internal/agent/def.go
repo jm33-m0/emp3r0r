@@ -14,6 +14,9 @@ var (
 	// AgentRoot root directory of emp3r0r
 	AgentRoot, _ = os.Getwd()
 
+	// Transport what transport is this agent using? (HTTP2 / CDN / TOR)
+	Transport = "HTTP2"
+
 	// UtilsPath binary path of utilities
 	UtilsPath = AgentRoot + "/..."
 
@@ -91,6 +94,7 @@ var ModuleDocs = map[string]string{
 // SystemInfo agent properties
 type SystemInfo struct {
 	Tag         string   // identifier of the agent
+	Transport   string   // transport the agent uses (HTTP2 / CDN / TOR)
 	Hostname    string   // Hostname and machine ID
 	Hardware    string   // machine details and hypervisor
 	Container   string   // container tech (if any)
