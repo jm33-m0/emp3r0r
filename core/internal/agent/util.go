@@ -22,7 +22,6 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/tun"
 	gops "github.com/mitchellh/go-ps"
-	"github.com/vishvananda/netlink"
 	"github.com/zcalusic/sysinfo"
 )
 
@@ -253,10 +252,10 @@ func CollectSystemInfo() *SystemInfo {
 	info.HasInternet = tun.HasInternetAccess()
 
 	// IP address?
-	info.IPs = collectLocalIPs()
+	info.IPs = tun.CollectLocalIPs()
 
 	// arp -a ?
-	info.ARP = ipNeigh()
+	info.ARP = tun.IPNeigh()
 
 	return &info
 }
@@ -337,87 +336,6 @@ func getCPUCnt() (cpuCnt int) {
 	}
 
 	return
-}
-
-func collectLocalIPs() (ips []string) {
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		return []string{"Not available"}
-	}
-
-	for _, i := range ifaces {
-		addrs, err := i.Addrs()
-		if err != nil {
-			continue
-		}
-
-		for _, addr := range addrs {
-			var ip net.IP
-			switch v := addr.(type) {
-			case *net.IPNet:
-				ip = v.IP
-			case *net.IPAddr:
-				ip = v.IP
-			}
-			ipaddr := ip.String()
-			if ipaddr == "::1" ||
-				ipaddr == "127.0.0.1" ||
-				strings.HasPrefix(ipaddr, "fe80:") {
-				continue
-			}
-
-			ips = append(ips, ipaddr)
-		}
-	}
-
-	return
-}
-
-// get all interfaces
-func ipLink() (links []netlink.Link) {
-	links, err := netlink.LinkList()
-	if err != nil {
-		log.Printf("Failed to get network interfaces: %v", err)
-		return nil
-	}
-
-	return
-}
-
-func linkIdx2Name(index int) (name string) {
-	link, err := netlink.LinkByIndex(index)
-	if err != nil {
-		log.Printf("Cannot read name from interface %d: %v", index, err)
-		return "N/A"
-	}
-
-	return link.Attrs().Name
-}
-
-func ipNeigh() []string {
-	var (
-		mappings  []string
-		neighList []netlink.Neigh
-	)
-	links := ipLink()
-	if links == nil {
-		return []string{"N/A"}
-	}
-	for _, link := range links {
-		ifIdx := link.Attrs().Index
-		l, err := netlink.NeighList(ifIdx, netlink.FAMILY_ALL)
-		neighList = append(neighList, l...)
-		if err != nil {
-			log.Printf("Cannot get neigh list on interface %d: %v", ifIdx, err)
-			continue
-		}
-	}
-
-	for _, n := range neighList {
-		mappings = append(mappings, fmt.Sprintf("%s (%s)", n.IP.String(), linkIdx2Name(n.LinkIndex)))
-	}
-
-	return mappings
 }
 
 // send local file to CC
