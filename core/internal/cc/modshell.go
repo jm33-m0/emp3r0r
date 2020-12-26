@@ -138,10 +138,10 @@ shell:
 
 		case inputSlice[0] == "#net":
 			color.Cyan("[*] On connect:\n")
-			fmt.Printf("IP addresses: %s\nARP cache: %s",
+			fmt.Printf("IP addresses: %s\nARP cache: %s\n",
 				strings.Join(target.IPs, ", "),
 				strings.Join(target.ARP, ", "))
-			color.Cyan("[*] Updated:\n")
+			color.Cyan("\n[*] Updated:\n")
 
 			// get refreshed results
 			err = SendCmd("#net", target)
