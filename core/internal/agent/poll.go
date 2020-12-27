@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -36,7 +37,7 @@ func CheckIn() error {
 }
 
 // IsCCOnline check CCIndicator
-func IsCCOnline() bool {
+func IsCCOnline(proxy string) bool {
 	t := &http.Transport{
 		Dial: (&net.Dialer{
 			Timeout:   60 * time.Second,
@@ -44,6 +45,13 @@ func IsCCOnline() bool {
 		}).Dial,
 		// We use ABSURDLY large keys, and should probably not.
 		TLSHandshakeTimeout: 60 * time.Second,
+	}
+	if proxy != "" {
+		proxyUrl, err := url.Parse(proxy)
+		if err != nil {
+			log.Fatalf("Invalid proxy: %v", err)
+		}
+		t.Proxy = http.ProxyURL(proxyUrl)
 	}
 	client := http.Client{
 		Transport: t,

