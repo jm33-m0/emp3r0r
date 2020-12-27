@@ -32,6 +32,7 @@ linux post-exploitation
 * **credential harvesting**
 * process **injection**
 * ELF **patcher**
+* **hide processes and files** via libc hijacking
 * port mapping, socks5 **proxy**
 * auto root
 * **LPE** suggest
@@ -40,6 +41,7 @@ linux post-exploitation
 * log cleaner
 * **stealth** connection
 * internet access checker
+* **autoproxy** for semi-isolated networks
 * all of these in one **HTTP2** connection
 * can be encapsulated in any external proxies such as **TOR**, and **CDNs**
 * and many more...
