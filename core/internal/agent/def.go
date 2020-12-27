@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/tun"
 	"github.com/posener/h2conn"
 	"github.com/txthinking/socks5"
 )
@@ -16,6 +17,9 @@ var (
 
 	// Transport what transport is this agent using? (HTTP2 / CDN / TOR)
 	Transport = "HTTP2"
+
+	// AESKey generated from Tag -> md5sum, type: []byte
+	AESKey = tun.GenAESKey("Your Pre Shared AES Key: " + OpSep)
 
 	// UtilsPath binary path of utilities
 	UtilsPath = AgentRoot + "/..."
@@ -48,6 +52,9 @@ const (
 
 	// CCPort port of c2
 	CCPort = "8000"
+
+	// BroadcastPort port of broadcast server
+	BroadcastPort = "8889"
 
 	// CCIndicator check this before trying connection
 	CCIndicator = "[cc_indicator]"

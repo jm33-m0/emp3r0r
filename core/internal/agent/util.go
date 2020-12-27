@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bufio"
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -251,6 +252,16 @@ func CollectSystemInfo() *SystemInfo {
 
 	// has internet?
 	info.HasInternet = tun.HasInternetAccess()
+
+	if !info.HasInternet {
+		// listen for proxy broadcast if no internet
+		ctx, cancel := context.WithCancel(context.Background())
+		go BroadcastServer(ctx, cancel)
+	} else {
+		// send proxy broadcast if we had internet
+		ctx, cancel := context.WithCancel(context.Background())
+		go StartBroadcast(ctx, cancel)
+	}
 
 	// IP address?
 	info.IPs = tun.CollectLocalIPs()

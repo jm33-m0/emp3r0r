@@ -115,7 +115,7 @@ func CollectLocalIPs() (ips []string) {
 
 // IPa works like `ip addr`, covers both IPv4 and IPv6
 func IPa() (ips []string) {
-	links := ipLink()
+	links := IPLink()
 	if links == nil {
 		return []string{"N/A"}
 	}
@@ -134,9 +134,28 @@ func IPa() (ips []string) {
 	return
 }
 
+// IPaddr returns netlink.Addr in IPv4
+func IPaddr() (ips []netlink.Addr) {
+	links := IPLink()
+	if links == nil {
+		return nil
+	}
+	for _, link := range links {
+		addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
+		if err != nil {
+			log.Printf("cannot get addr list from %d: %v", link.Attrs().Index, err)
+			continue
+		}
+		for _, addr := range addrs {
+			ips = append(ips, addr)
+		}
+	}
+	return
+}
+
 // IPr works like `ip r`, covers both IPv4 and IPv6
 func IPr() (routes []string) {
-	links := ipLink()
+	links := IPLink()
 	if links == nil {
 		return []string{"N/A"}
 	}
@@ -168,8 +187,8 @@ func IPr() (routes []string) {
 	return
 }
 
-// get all interfaces
-func ipLink() (links []netlink.Link) {
+// IPLink get all interfaces
+func IPLink() (links []netlink.Link) {
 	links, err := netlink.LinkList()
 	if err != nil {
 		log.Printf("Failed to get network interfaces: %v", err)
@@ -195,7 +214,7 @@ func IPNeigh() []string {
 		mappings  []string
 		neighList []netlink.Neigh
 	)
-	links := ipLink()
+	links := IPLink()
 	if links == nil {
 		return []string{"N/A"}
 	}
