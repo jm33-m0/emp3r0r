@@ -33,8 +33,11 @@ var (
 	// H2Json the connection to CC, for JSON message-based communication
 	H2Json *h2conn.Conn
 
-	// ProxyServer Socks5 proxy listening on port 10800
+	// ProxyServer Socks5 proxy listening on agent
 	ProxyServer *socks5.Server
+
+	// AgentProxy hosted by other agents who have internet access
+	AgentProxy = ""
 
 	// CCAddress how our agent finds its CC
 	CCAddress = "https://[cc_ipaddr]"

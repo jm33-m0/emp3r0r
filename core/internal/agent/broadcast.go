@@ -37,6 +37,14 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc) (err error)
 			continue
 		}
 		log.Printf("BroadcastServer: %s sent this: %s\n", addr, decMsg)
+		if AgentProxy != "" && tun.IsProxyOK(AgentProxy) {
+			log.Printf("BroadcastServer: %s already set and working fine\n", AgentProxy)
+			continue
+		}
+		if tun.IsProxyOK(decMsg) {
+			AgentProxy = decMsg
+			log.Printf("BroadcastServer: %s set as AgentProxy\n", AgentProxy)
+		}
 	}
 	return
 }
@@ -66,6 +74,10 @@ func BroadcastMsg(msg, dst string) (err error) {
 }
 
 func StartBroadcast(ctx context.Context, cancel context.CancelFunc) {
+	// start a socks5 proxy
+	Socks5Proxy("on", "0.0.0.0:8388")
+	defer Socks5Proxy("off", "0.0.0.0:8388")
+
 	defer cancel()
 	proxyMsg := "socks5://127.0.0.1:1080"
 	for ctx.Err() == nil {

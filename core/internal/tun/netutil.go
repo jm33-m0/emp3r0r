@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -61,6 +62,35 @@ func IsTor(addr string) bool {
 func HasInternetAccess() bool {
 	client := http.Client{
 		Timeout: 5 * time.Second,
+	}
+	resp, err := client.Get("http://www.msftncsi.com/ncsi.txt")
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+
+	respData, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return false
+	}
+	if string(respData) == "Microsoft NCSI" {
+		return true
+	}
+	return false
+}
+
+// IsProxyOK test if the proxy works
+func IsProxyOK(proxy string) bool {
+	tr := &http.Transport{}
+	proxyUrl, err := url.Parse(proxy)
+	if err != nil {
+		log.Printf("Invalid proxy: %v", err)
+		return false
+	}
+	tr.Proxy = http.ProxyURL(proxyUrl)
+	client := http.Client{
+		Timeout:   5 * time.Second,
+		Transport: tr,
 	}
 	resp, err := client.Get("http://www.msftncsi.com/ncsi.txt")
 	if err != nil {

@@ -25,17 +25,22 @@ type PortFwdSession struct {
 // PortFwds manage port mappings
 var PortFwds = make(map[string]*PortFwdSession)
 
-// Socks5Proxy sock5 proxy server on agent, to use it, forward port 10800 to CC
-func Socks5Proxy(op string, port string) (err error) {
+// Socks5Proxy sock5 proxy server on agent, listening on addr
+// to use it, forward port 10800 to CC
+// op: on/off
+func Socks5Proxy(op string, addr string) (err error) {
 	socks5Start := func() {
 		var err error
 		if ProxyServer == nil {
 			socks5.Debug = true
-			ProxyServer, err = socks5.NewClassicServer("127.0.0.1:"+port, "127.0.0.1", "", "", 10, 10)
+			ProxyServer, err = socks5.NewClassicServer(addr, "127.0.0.1", "", "", 10, 10)
 			if err != nil {
 				log.Println(err)
 				return
 			}
+		} else {
+			log.Printf("Socks5Proxy is already running on %s", ProxyServer.ServerAddr.String())
+			return
 		}
 
 		log.Print("Socks5Proxy started")

