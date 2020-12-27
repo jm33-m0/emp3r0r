@@ -61,6 +61,7 @@ func BroadcastMsg(msg, dst string) (err error) {
 	}
 
 	_, err = pc.WriteTo([]byte(encMsg), addr)
+	log.Printf("BroadcastMsg: sent %s (%s) to %s", encMsg, msg, dst)
 	return
 }
 
@@ -75,12 +76,7 @@ func StartBroadcast(ctx context.Context, cancel context.CancelFunc) {
 				continue
 			}
 			proxyMsg = fmt.Sprintf("socks5://%s:8388", ip.IP.String())
-			encProxyMsg := tun.AESEncrypt(AESKey, proxyMsg)
-			if encProxyMsg == "" {
-				log.Printf("cannot encrypt %s", proxyMsg)
-				continue
-			}
-			err := BroadcastMsg(encProxyMsg, ip.Broadcast.String())
+			err := BroadcastMsg(proxyMsg, ip.Broadcast.String())
 			if err != nil {
 				log.Print(err)
 			}
