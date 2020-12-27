@@ -36,7 +36,7 @@ var (
 	// ProxyServer Socks5 proxy listening on agent
 	ProxyServer *socks5.Server
 
-	// AgentProxy hosted by other agents who have internet access
+	// AgentProxy used by this agent to communicate with CC server
 	AgentProxy = ""
 
 	// CCAddress how our agent finds its CC
