@@ -234,7 +234,7 @@ def main(target):
         f = open("./build/indicator.txt")
         indicator = f.read().strip()
         f.close()
-        use_cached = yes_no("Use cached CC indicator?")
+        use_cached = yes_no(f"Use cached CC indicator ({indicator})?")
 
     if not use_cached:
         indicator = input("CC status indicator: ").strip()
