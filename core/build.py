@@ -36,8 +36,7 @@ class GoBuild:
 
         # tags
         self.CCIP = cc_ip
-        if cc_other_names != "":
-            self.CC_OTHER_NAMES = cc_other_names
+        self.CC_OTHER_NAMES = cc_other_names
         self.INDICATOR = cc_indicator
         self.UUID = str(uuid.uuid1())
 
