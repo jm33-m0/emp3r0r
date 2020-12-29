@@ -148,7 +148,12 @@ func UpdateOptions(modName string) (exist bool) {
 // ModuleRun run current module
 func ModuleRun() {
 	if CurrentTarget == nil {
-		CliPrintError("Target not set, try `target 0`?")
+		if CurrentMod == agent.ModCMD_EXEC &&
+			!CliYesNo("Run on all targets") {
+			CliPrintError("Target not set, try `target 0`?")
+			return
+		}
+		ModuleHelpers[agent.ModCMD_EXEC]()
 		return
 	}
 	if Targets[CurrentTarget] == nil {

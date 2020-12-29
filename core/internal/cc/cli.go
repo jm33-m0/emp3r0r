@@ -122,7 +122,7 @@ start:
 	}
 
 	// ask the user if they really want to leave
-	if CliYesNo("Are you sure you want to leave? [y/N]") {
+	if CliYesNo("Are you sure you want to leave") {
 		os.Exit(0)
 	}
 
@@ -156,7 +156,7 @@ func CliPrintError(format string, a ...interface{}) {
 
 // CliYesNo prompt for a y/n answer from user
 func CliYesNo(prompt string) bool {
-	EmpReadLine.SetPrompt(color.CyanString(prompt))
+	EmpReadLine.SetPrompt(color.CyanString(prompt) + "? [y/N] ")
 	EmpReadLine.Config.EOFPrompt = ""
 	EmpReadLine.Config.InterruptPrompt = ""
 

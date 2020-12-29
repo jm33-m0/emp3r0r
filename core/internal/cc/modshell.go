@@ -17,10 +17,28 @@ var RShellStatus = make(map[string]error)
 
 // moduleCmd exec cmd on target
 func moduleCmd() {
+	// send command
+	execOnTarget := func(target *agent.SystemInfo) {
+		if Targets[target].Conn == nil {
+			CliPrintError("moduleCmd: agent %s is not connected", target.Tag)
+			return
+		}
+		var data agent.MsgTunData
+		data.Payload = "cmd" + agent.OpSep + Options["cmd_to_exec"].Val
+		data.Tag = target.Tag
+		err := Send2Agent(&data, target)
+		if err != nil {
+			CliPrintError("moduleCmd: %v", err)
+		}
+	}
+
 	// find target
 	target := CurrentTarget
 	if target == nil {
-		CliPrintError("moduleCmd: Target does not exist")
+		CliPrintWarning("emp3r0r will execute `%s` on all targets this time", Options["cmd_to_exec"].Val)
+		for target := range Targets {
+			execOnTarget(target)
+		}
 		return
 	}
 
@@ -29,19 +47,7 @@ func moduleCmd() {
 		CliPrintError("moduleCmd: agent control interface not found")
 		return
 	}
-	if Targets[target].Conn == nil {
-		CliPrintError("moduleCmd: agent is not connected")
-		return
-	}
-
-	// send data
-	var data agent.MsgTunData
-	data.Payload = "cmd" + agent.OpSep + Options["cmd_to_exec"].Val
-	data.Tag = target.Tag
-	err := Send2Agent(&data, target)
-	if err != nil {
-		CliPrintError("moduleCmd: %v", err)
-	}
+	execOnTarget(target)
 }
 
 // moduleShell like moduleCmd, but interactive, like all shells do
