@@ -8,15 +8,15 @@ linux post-exploitation
 <!-- vim-markdown-toc GFM -->
 
 * [updates](#updates)
+* [how to use](#how-to-use)
 * [features](#features)
 * [screenshots](#screenshots)
     * [help and modules](#help-and-modules)
-    * [agent info](#agent-info)
+    * [system info](#system-info)
     * [auto proxy for agents without direct internet access](#auto-proxy-for-agents-without-direct-internet-access)
     * [basic command shell](#basic-command-shell)
     * [fully interactive and stealth bash shell](#fully-interactive-and-stealth-bash-shell)
     * [agent traffic](#agent-traffic)
-* [how to test](#how-to-test)
 * [thanks](#thanks)
 
 <!-- vim-markdown-toc -->
@@ -24,6 +24,10 @@ linux post-exploitation
 ## updates
 
 <a href="https://jm33.me/emp3r0r-0x00.html" target="_blank">https://jm33.me/emp3r0r-0x00.html</a>
+
+## how to use
+
+please read the [wiki](https://github.com/jm33-m0/emp3r0r/wiki/)
 
 ## features
 
@@ -54,7 +58,7 @@ linux post-exploitation
 
 ![emp3r0r](./img/emp3r0r.webp)
 
-### agent info
+### system info
 
 ![ls_targets](./img/ls_targets.webp)
 
@@ -73,11 +77,6 @@ linux post-exploitation
 ### agent traffic
 
 ![traffic](./img/traffic.webp)
-
-
-## how to test
-
-please read the [wiki](https://github.com/jm33-m0/emp3r0r/wiki/)
 
 ## thanks
 
