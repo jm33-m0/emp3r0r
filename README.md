@@ -3,6 +3,8 @@ linux post-exploitation
 
 **Still under active development**
 
+<a href="https://www.freebuf.com/sectool/259079.html" target="_blank">中文介绍</a>
+
 <!-- vim-markdown-toc GFM -->
 
 * [updates](#updates)
