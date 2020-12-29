@@ -76,7 +76,10 @@ func Socks5Proxy(op string, addr string) (err error) {
 // addr: forward to this addr
 // port: listen on this port
 func TCPFwd(addr, port string, ctx context.Context, cancel context.CancelFunc) (err error) {
-	defer cancel()
+	defer func() {
+		log.Printf("%s <- 0.0.0.0:%s exited", addr, port)
+		cancel()
+	}()
 	serveConn := func(conn net.Conn) {
 		dst, err := net.Dial("tcp", addr)
 		if err != nil {
@@ -94,6 +97,7 @@ func TCPFwd(addr, port string, ctx context.Context, cancel context.CancelFunc) (
 			time.Sleep(time.Duration(RandInt(1, 20)) * time.Millisecond)
 		}
 	}
+	log.Printf("[+] Serving %s on 0.0.0.0:%s...", addr, port)
 	l, err := net.Listen("tcp", "0.0.0.0:"+port)
 	for ctx.Err() == nil {
 		lconn, err := l.Accept()

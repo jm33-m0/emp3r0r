@@ -53,11 +53,13 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc) (err error)
 				log.Printf("TCPFwd: invalid proxy addr: %s", AgentProxy)
 				continue
 			}
-			err = TCPFwd(sl[1], ProxyPort, ctx, cancel)
-			if err != nil {
-				log.Print("TCPFwd: ", err)
-			}
-			go StartBroadcast(ctx, cancel)
+			go func() {
+				err = TCPFwd(sl[1], ProxyPort, ctx, cancel)
+				if err != nil {
+					log.Print("TCPFwd: ", err)
+				}
+			}()
+			go StartBroadcast(false, ctx, cancel)
 		}
 	}
 	return
@@ -87,12 +89,17 @@ func BroadcastMsg(msg, dst string) (err error) {
 	return
 }
 
-func StartBroadcast(ctx context.Context, cancel context.CancelFunc) {
-	// start a socks5 proxy
-	Socks5Proxy("on", "0.0.0.0:"+ProxyPort)
-	defer Socks5Proxy("off", "0.0.0.0:"+ProxyPort)
+func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.CancelFunc) {
+	if start_socks5 {
+		// start a socks5 proxy
+		Socks5Proxy("on", "0.0.0.0:"+ProxyPort)
+		defer Socks5Proxy("off", "0.0.0.0:"+ProxyPort)
+	}
 
-	defer cancel()
+	defer func() {
+		log.Print("Broadcasting stopped")
+		cancel()
+	}()
 	proxyMsg := "socks5://127.0.0.1:1080"
 	for ctx.Err() == nil {
 		time.Sleep(time.Duration(RandInt(10, 120)) * time.Second)

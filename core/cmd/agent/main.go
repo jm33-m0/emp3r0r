@@ -78,7 +78,7 @@ func main() {
 		// if we do, we are feeling helpful
 		ctx, cancel := context.WithCancel(context.Background())
 		log.Println("[+] It seems that we have internet access, let's start a socks5 proxy to help others")
-		go agent.StartBroadcast(ctx, cancel)
+		go agent.StartBroadcast(true, ctx, cancel)
 	} else {
 		// we don't, just wait for some other agents to help us
 		log.Println("[-] We don't have internet access, waiting for other agents to give us a proxy...")
