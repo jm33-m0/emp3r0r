@@ -67,7 +67,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc) (err error)
 
 // BroadcastMsg send a broadcast message on a network
 func BroadcastMsg(msg, dst string) (err error) {
-	pc, err := net.ListenPacket("udp4", ":"+BroadcastPort)
+	pc, err := net.ListenPacket("udp4", ":8887")
 	if err != nil {
 		return
 	}
@@ -102,6 +102,7 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 	}()
 	proxyMsg := "socks5://127.0.0.1:1080"
 	for ctx.Err() == nil {
+		log.Print("Broadcasting our proxy...")
 		time.Sleep(time.Duration(RandInt(10, 120)) * time.Second)
 		ips := tun.IPaddr()
 		for _, ip := range ips {
@@ -111,7 +112,7 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 			proxyMsg = fmt.Sprintf("socks5://%s:%s", ip.IP.String(), ProxyPort)
 			err := BroadcastMsg(proxyMsg, ip.Broadcast.String())
 			if err != nil {
-				log.Print(err)
+				log.Printf("BroadcastMsg failed: %v", err)
 			}
 		}
 	}
