@@ -162,7 +162,7 @@ i wrote about this in my [blog](https://jm33.me/sshd-injection-and-password-harv
 
 currently emp3r0r supports [CVE-2018-14665](https://jm33.me/sshd-injection-and-password-harvesting.html), agents can exploit this vulnerability if possible, and restart itself with root privilege
 
-![get_root.png](/home/jm33/projects/emp3r0r/img/get_root.png.webp)
+![get_root.png](./img/get_root.png.webp)
 
 #### LPE suggest
 
@@ -173,21 +173,21 @@ upload the latest:
 
 and run them on target system, return the results
 
-![lpe_suggest.png](/home/jm33/projects/emp3r0r/img/lpe_suggest.png.webp)
+![lpe_suggest.png](./img/lpe_suggest.png.webp)
 
 #### port mapping
 
 map any target addresses to CC side, using HTTP2 (or whatever transport your agent uses)
 
-![port_fwd.png](/home/jm33/projects/emp3r0r/img/port_fwd.png.webp)
+![port_fwd.png](./img/port_fwd.png.webp)
 
 #### plugin system
 
 yes, there is a plugin system. please read the [wiki](https://github.com/jm33-m0/emp3r0r/wiki/Plugins) for more information
 
-![plugins.png](/home/jm33/projects/emp3r0r/img/plugins.png.webp)
+![plugins.png](./img/plugins.png.webp)
 
-![plugins-bash.png](/home/jm33/projects/emp3r0r/img/plugins-bash.png.webp)
+![plugins-bash.png](./img/plugins-bash.png.webp)
 
 ### roadmap
 
