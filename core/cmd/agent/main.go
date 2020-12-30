@@ -104,7 +104,7 @@ func main() {
 	// if CC is behind tor, a proxy is needed
 	if tun.IsTor(agent.CCAddress) {
 		log.Printf("CC is on TOR: %s", agent.CCAddress)
-		agent.Transport = "TOR"
+		agent.Transport = fmt.Sprintf("TOR (%s)", agent.CCAddress)
 		agent.AgentProxy = *c2proxy
 		if *c2proxy == "" {
 			agent.AgentProxy = "socks5://127.0.0.1:9050"
