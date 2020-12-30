@@ -84,8 +84,8 @@ func ListTargets() {
 		ips := splitLongLine(strings.Join(target.IPs, ", "), 3)
 
 		// agent process info
-		agentProc := target.Process
-		procInfo := fmt.Sprintf("PID: %s (%d), PPID: %s (%d)",
+		agentProc := *target.Process
+		procInfo := fmt.Sprintf("%s (%d) <- %s (%d)",
 			agentProc.Cmdline, agentProc.PID, agentProc.Parent, agentProc.PPID)
 
 		// info map

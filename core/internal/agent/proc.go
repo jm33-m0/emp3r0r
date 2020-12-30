@@ -12,13 +12,14 @@ import (
 )
 
 // CheckAgentProcess fill up info.AgentProcess
-func CheckAgentProcess() (agentProc *AgentProcess) {
-	agentProc.PID = os.Getpid()
-	agentProc.PPID = os.Getppid()
-	agentProc.Cmdline = ProcCmdline(agentProc.PID)
-	agentProc.Parent = ProcCmdline(agentProc.PPID)
+func CheckAgentProcess() *AgentProcess {
+	p := &AgentProcess{}
+	p.PID = os.Getpid()
+	p.PPID = os.Getppid()
+	p.Cmdline = ProcCmdline(p.PID)
+	p.Parent = ProcCmdline(p.PPID)
 
-	return
+	return p
 }
 
 // ProcCmdline read cmdline data of a process
