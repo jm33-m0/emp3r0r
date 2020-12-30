@@ -83,9 +83,15 @@ func ListTargets() {
 		arpTab := splitLongLine(strings.Join(target.ARP, ", "), 3)
 		ips := splitLongLine(strings.Join(target.IPs, ", "), 3)
 
+		// agent process info
+		agentProc := target.Process
+		procInfo := fmt.Sprintf("PID: %s (%d), PPID: %s (%d)",
+			agentProc.Cmdline, agentProc.PID, agentProc.Parent, agentProc.PPID)
+
 		// info map
 		infoMap := map[string]string{
 			"Hostname":  color.HiCyanString(target.Hostname),
+			"Process":   color.HiMagentaString(procInfo),
 			"User":      userInfo,
 			"Internet":  hasInternet,
 			"CPU":       color.HiMagentaString(target.CPU),
