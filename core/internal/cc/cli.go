@@ -156,7 +156,7 @@ func CliPrintError(format string, a ...interface{}) {
 
 // CliYesNo prompt for a y/n answer from user
 func CliYesNo(prompt string) bool {
-	EmpReadLine.SetPrompt(color.CyanString(prompt) + "? [y/N] ")
+	EmpReadLine.SetPrompt(color.CyanString(prompt + "? [y/N] "))
 	EmpReadLine.Config.EOFPrompt = ""
 	EmpReadLine.Config.InterruptPrompt = ""
 
