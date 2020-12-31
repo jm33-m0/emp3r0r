@@ -47,6 +47,8 @@ yes i just want to make a post-exploitation tool for linux users like me, who wa
 
 another reason is compatibility. as emp3r0r is mostly written in [Go](https://golang.org), and fully static (so are all the plugins used by emp3r0r), it will run everywhere (tested on Linux 2.6 and above) you want, regardless of the shitty environments. in some cases you wont even find bash on your target, dont worry, emp3r0r uploads its own [bash](https://github.com/jm33-m0/static-bins/tree/main/vaccine) and many other useful tools
 
+why is it called `emp3r0r`? because theres an [empire](https://github.com/BC-SECURITY/empire)
+
 i hope this tool helps you, and i will add features to it as i learn new things
 
 ## what does it do
@@ -88,7 +90,7 @@ below is a screenshot of emp3r0r's CC server, which has 3 agent coming from 3 di
 
 #### auto proxy for agents without direct internet access
 
-emp3r0r agents checks if they have internet access on start, and start a socks5 proxy if they do, then they broadcast their proxy (in encrypted form) on each network they can reach
+emp3r0r agents check if they have internet access on start, and start a socks5 proxy if they do, then they broadcast their proxy addresses (in encrypted form) on each network they can reach
 
 if an agent doesn't have internet, its going to listen for such broadcasts. when it receives a working proxy, it starts a port mapping of that proxy and broadcasts it to its own networks, bringing the proxy to every agent it can ever touch, and eventually bring all agents to our CC server.
 
@@ -104,7 +106,7 @@ you can set the URL to a GitHub page or other less suspicious sites, your agents
 
 no CC communication will happen when the agent thinks CC is offline
 
-if it is:
+if it isnt:
 
 bare HTTP2 traffic:
 
@@ -140,7 +142,7 @@ besides, it provides several useful helpers:
 - command autocompletion
 - `#net` shows basic network info, such as `ip a`, `ip r`, `ip neigh`
 - `#kill` processes, and a simple `#ps`
-- `bash` !!! this is the real bash shell, keep reading!
+- `bash` !!! this is the real bash shell, keep on reading!
 
 ![cmd shell](./img/shell.webp)
 
@@ -196,7 +198,6 @@ yes, there is a plugin system. please read the [wiki](https://github.com/jm33-m0
 heres a list of features i plan to add
 
 - port mapping among agents
-
 - network scanner
 - passive scanner, for host/service discovery
 - exploit kit

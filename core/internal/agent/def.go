@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -16,7 +17,7 @@ var (
 	AgentRoot, _ = os.Getwd()
 
 	// Transport what transport is this agent using? (HTTP2 / CDN / TOR)
-	Transport = "HTTP2"
+	Transport = fmt.Sprintf("HTTP2 (%s)", CCAddress)
 
 	// AESKey generated from Tag -> md5sum, type: []byte
 	AESKey = tun.GenAESKey("Your Pre Shared AES Key: " + OpSep)
@@ -123,6 +124,16 @@ type SystemInfo struct {
 	HasRoot     bool     // is agent run as root?
 	HasTor      bool     // is agent from Tor?
 	HasInternet bool     // has internet access?
+
+	Process *AgentProcess // agent's process
+}
+
+// AgentProcess process info of our agent
+type AgentProcess struct {
+	PID     int    // pid
+	PPID    int    // parent PID
+	Cmdline string // process name and command line args
+	Parent  string // parent process name and cmd line args
 }
 
 // MsgTunData data to send in the tunnel
