@@ -46,7 +46,7 @@ func IsCCOnline(proxy string) bool {
 		// We use ABSURDLY large keys, and should probably not.
 		TLSHandshakeTimeout: 60 * time.Second,
 	}
-	if proxy != "" && !tun.IsTor(CCAddress) {
+	if proxy != "" && strings.HasPrefix(Transport, "HTTP2") {
 		proxyUrl, err := url.Parse(proxy)
 		if err != nil {
 			log.Fatalf("Invalid proxy: %v", err)
