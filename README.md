@@ -4,8 +4,7 @@ linux post-exploitation framework made by linux user
 **Still under active development**
 
 - [中文介绍](https://www.freebuf.com/sectool/259079.html)
-
-- [see my blog for updates](https://jm33.me/emp3r0r-0x00.html)
+- [check my blog for updates](https://jm33.me/emp3r0r-0x00.html)
 - [how to use](https://github.com/jm33-m0/emp3r0r/wiki)
 
 ____
@@ -14,6 +13,7 @@ ____
 
 <!-- vim-markdown-toc GFM -->
 
+* [TODOs](#todos)
 * [why another post-exploitation tool?](#why-another-post-exploitation-tool)
 * [what does it do](#what-does-it-do)
     * [glance](#glance)
@@ -37,6 +37,13 @@ ____
 
 <!-- vim-markdown-toc -->
 ____
+
+## TODOs
+
+- [x] packer: cryptor + `memfd_create`
+- [ ] packer: use `shm_open` in older Linux kernels
+- [ ] dropper: downloader (stage 0) shellcode
+- [ ] dropper: shellcode injector - python
 
 ## why another post-exploitation tool?
 
