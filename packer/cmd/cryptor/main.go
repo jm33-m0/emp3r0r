@@ -33,13 +33,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	out, err := exec.Command("go", "build").CombinedOutput()
+	out, err := exec.Command("go", "build", "-ldflags=-s -w", "-o", "../../stub.exe").CombinedOutput()
 	if err != nil {
 		log.Fatalf("go build failed: %v\n%s", err, out)
-	}
-	err = os.Rename("./stub", "../../stub.exe")
-	if err != nil {
-		log.Fatal(err)
 	}
 	err = os.Chdir("../../")
 	if err != nil {
