@@ -21,6 +21,7 @@ ____
         * [transports](#transports)
         * [auto proxy for agents without direct internet access](#auto-proxy-for-agents-without-direct-internet-access)
         * [agent traffic](#agent-traffic)
+        * [packer - start agent in memory](#packer---start-agent-in-memory)
         * [hide processes and files](#hide-processes-and-files)
         * [persistence](#persistence)
     * [modules](#modules)
@@ -116,6 +117,14 @@ when using Cloudflare CDN as CC frontend:
 
 ![cdn](./img/cdn.webp)
 
+#### packer - start agent in memory
+
+[packer](https://github.com/jm33-m0/emp3r0r/wiki/Packer) encrypts `agent` binary, and runs it from memory (using `memfd_create`)
+
+currently emp3r0r is mostly memory-based, if used with this packer
+
+![packer](./img/packer.webp)
+
 #### hide processes and files
 
 currently emp3r0r uses [libemp3r0r](https://github.com/jm33-m0/emp3r0r/tree/master/libemp3r0r) to hide its files and processes, which utilizes glibc hijacking
@@ -207,6 +216,7 @@ heres a list of features i plan to add
 ## thanks
 
 - [pty](https://github.com/creack/pty)
+- [guitmz](https://github.com/guitmz)
 - [readline](https://github.com/bettercap/readline)
 - [h2conn](https://github.com/posener/h2conn)
 - [diamorphine](https://github.com/m0nad/Diamorphine)
