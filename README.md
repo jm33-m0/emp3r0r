@@ -13,7 +13,7 @@ ____
 
 <!-- vim-markdown-toc GFM -->
 
-* [TODOs](#todos)
+* [what to expect (in future releases)](#what-to-expect-in-future-releases)
 * [why another post-exploitation tool?](#why-another-post-exploitation-tool)
 * [what does it do](#what-does-it-do)
     * [glance](#glance)
@@ -38,7 +38,7 @@ ____
 <!-- vim-markdown-toc -->
 ____
 
-## TODOs
+## what to expect (in future releases)
 
 - [x] packer: cryptor + `memfd_create`
 - [ ] packer: use `shm_open` in older Linux kernels
