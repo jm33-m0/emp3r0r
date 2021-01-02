@@ -32,7 +32,6 @@ ____
         * [LPE suggest](#lpe-suggest)
         * [port mapping](#port-mapping)
         * [plugin system](#plugin-system)
-    * [roadmap](#roadmap)
 * [thanks](#thanks)
 
 <!-- vim-markdown-toc -->
@@ -44,6 +43,12 @@ ____
 - [ ] packer: use `shm_open` in older Linux kernels
 - [ ] dropper: downloader (stage 0) shellcode
 - [ ] dropper: shellcode injector - python
+- [ ] port mapping among agents
+- [ ] network scanner
+- [ ] passive scanner, for host/service discovery
+- [ ] exploit kit
+- [ ] conservative weak credentials scanner
+- [ ] auto pwn using weak credentials and RCEs
 
 ## why another post-exploitation tool?
 
@@ -208,17 +213,6 @@ yes, there is a plugin system. please read the [wiki](https://github.com/jm33-m0
 ![plugins.png](./img/plugins.png.webp)
 
 ![plugins-bash.png](./img/plugins-bash.png.webp)
-
-### roadmap
-
-heres a list of features i plan to add
-
-- port mapping among agents
-- network scanner
-- passive scanner, for host/service discovery
-- exploit kit
-- conservative weak credentials scanner
-- auto pwn using weak credentials and RCEs
 
 ## thanks
 
