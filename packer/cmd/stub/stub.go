@@ -47,7 +47,8 @@ func runFromMemory(procName string, buffer []byte) {
 	syscall.Dup2(int(file.Fd()), int(os.Stdin.Fd()))
 	file.Close()
 
-	_ = syscall.Exec(fdPath, []string{procName}, nil)
+	progWithArgs := append([]string{procName}, os.Args[1:]...)
+	_ = syscall.Exec(fdPath, progWithArgs, nil)
 }
 
 func main() {
