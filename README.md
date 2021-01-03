@@ -40,7 +40,7 @@ ____
 ## what to expect (in future releases)
 
 - [x] packer: cryptor + `memfd_create`
-- [ ] packer: use `shm_open` in older Linux kernels
+- [x] packer: use `shm_open` in older Linux kernels
 - [ ] dropper: downloader (stage 0) shellcode
 - [ ] dropper: shellcode injector - python
 - [ ] port mapping among agents
