@@ -4,9 +4,12 @@ go 1.13
 
 require (
 	github.com/bettercap/readline v0.0.0-20180208083827-9cec905dd291
+	github.com/chzyer/logex v1.1.10 // indirect
+	github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1 // indirect
 	github.com/creack/pty v1.1.11
 	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/fatih/color v1.10.0
+	github.com/frankban/quicktest v1.11.3 // indirect
 	github.com/golang/snappy v0.0.2 // indirect
 	github.com/google/uuid v1.1.2
 	github.com/jm33-m0/go-cdn2proxy v1.0.1
