@@ -63,10 +63,7 @@ _open_file:
 	xchg %ebx, %edi
 
 _gen_http_request:
-
-#
-# < use gen_httpreq.c, to generate a HTTP GET request. >
-#
+	;[http req]
 
 _gen_http_eof:
 
