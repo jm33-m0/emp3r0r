@@ -110,14 +110,14 @@ int printx(char* fmt, ...)
 
     buf_length = strlen(buf);
 
-    printf("\nURL: %s\n", buf);
-    printf("Header Length: %d bytes\n", buf_length);
+    /* printf("\nURL: %s\n", buf); */
+    /* printf("Header Length: %d bytes\n", buf_length); */
 
     for (i = 1; buf_length > (i * 4); i++) {
         pad_length = ((i + 1) * 4) - buf_length;
     }
 
-    printf("Padding Length: %d bytes\n\n", pad_length);
+    /* printf("Padding Length: %d bytes\n\n", pad_length); */
 
     tot_length = buf_length + pad_length;
 
@@ -144,39 +144,40 @@ int printx(char* fmt, ...)
 
     for (i = tot_length - 1; i > -1; i -= 4) {
 
-        printf("\t\"\\x%02x\\x%02x\\x%02x\\x%02x\\x%02x\" // pushl $0x%02x%02x%02x%02x\n",
-            X86_PUSH, w_buf[i - 3], w_buf[i - 2], w_buf[i - 1], w_buf[i], w_buf[i - 3], w_buf[i - 2], w_buf[i - 1], w_buf[i]);
+        /* printf("\t\"\\x%02x\\x%02x\\x%02x\\x%02x\\x%02x\" // pushl $0x%02x%02x%02x%02x\n", */
+        /*     X86_PUSH, w_buf[i - 3], w_buf[i - 2], w_buf[i - 1], w_buf[i], w_buf[i - 3], w_buf[i - 2], w_buf[i - 1], w_buf[i]); */
+        printf("pushl $0x%02x%02x%02x%02x\n",
+            w_buf[i - 3], w_buf[i - 2], w_buf[i - 1], w_buf[i]);
     }
 
     if (pad_length) {
-
         free(w_buf);
     }
 
     //
     // The EDX register is assumed to be zero-out within the shellcode.
     //
+    /*  */
+    /* if (tot_length < 256) { */
+    /*  */
+    /*     // 8bit value */
+    /*  */
+    /*     X86_MOV_TO_DL(tot_length); */
+    /*  */
+    /* } else if (tot_length < 655356) { */
+    /*  */
+    /*     // 16bit value */
+    /*  */
+    /*     X86_MOV_TO_DX(tot_length); */
+    /*  */
+    /* } else { */
+    /*  */
+    /*     // 32bit value, rarely but possible ;-) */
+    /*  */
+    /*     X86_MOV_TO_EDX(tot_length); */
+    /* } */
 
-    if (tot_length < 256) {
-
-        // 8bit value
-
-        X86_MOV_TO_DL(tot_length);
-
-    } else if (tot_length < 655356) {
-
-        // 16bit value
-
-        X86_MOV_TO_DX(tot_length);
-
-    } else {
-
-        // 32bit value, rarely but possible ;-)
-
-        X86_MOV_TO_EDX(tot_length);
-    }
-
-    fputc('\n', stdout);
+    fputs("\n", stdout);
 
     return 1;
 }
