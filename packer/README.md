@@ -25,4 +25,4 @@ TODO
 
 ## thanks
 
-[guitmz](https://github.com/guitmz)
+based on [guitmz](https://github.com/guitmz)'s [great work](https://github.com/guitmz/ezuri)
