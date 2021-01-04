@@ -41,8 +41,9 @@ ____
 
 - [x] packer: cryptor + `memfd_create`
 - [x] packer: use `shm_open` in older Linux kernels
+- [x] dropper: shellcode injector - python
+- [ ] dropper: shellcode injector - dd
 - [ ] dropper: downloader (stage 0) shellcode
-- [ ] dropper: shellcode injector - python
 - [ ] port mapping among agents
 - [ ] network scanner
 - [ ] passive scanner, for host/service discovery
