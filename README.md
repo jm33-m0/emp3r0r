@@ -22,6 +22,7 @@ ____
         * [auto proxy for agents without direct internet access](#auto-proxy-for-agents-without-direct-internet-access)
         * [agent traffic](#agent-traffic)
         * [packer - start agent in memory](#packer---start-agent-in-memory)
+        * [dropper - pure memory based agent launching](#dropper---pure-memory-based-agent-launching)
         * [hide processes and files](#hide-processes-and-files)
         * [persistence](#persistence)
     * [modules](#modules)
