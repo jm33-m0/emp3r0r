@@ -4,6 +4,8 @@
 generate a one liner for python based shellcode delivery
 '''
 
+# pylint: disable=invalid-name
+
 import base64
 import sys
 
