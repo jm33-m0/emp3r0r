@@ -138,6 +138,14 @@ currently emp3r0r is mostly memory-based, if used with this packer
 
 ![packer](./img/packer.webp)
 
+#### dropper - pure memory based agent launching
+
+[dropper](https://github.com/jm33-m0/emp3r0r/wiki/Dropper) drops a shellcode or script on your target, eventually runs your agent, in a stealth way
+
+below is a screenshot of a python based shellcode delivery to agent execution:
+
+![dropper](./img/dropper.webp)
+
 #### hide processes and files
 
 currently emp3r0r uses [libemp3r0r](https://github.com/jm33-m0/emp3r0r/tree/master/libemp3r0r) to hide its files and processes, which utilizes glibc hijacking
