@@ -45,7 +45,7 @@ ____
 - [x] dropper: shellcode injector - python
 - [ ] dropper: shellcode injector - dd
 - [ ] dropper: downloader (stage 0) shellcode
-- [ ] port mapping among agents
+- [ ] port mapping: forward from CC to agents
 - [ ] network scanner
 - [ ] passive scanner, for host/service discovery
 - [ ] exploit kit
