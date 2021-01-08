@@ -43,9 +43,10 @@ ____
 - [x] packer: cryptor + `memfd_create`
 - [x] packer: use `shm_open` in older Linux kernels
 - [x] dropper: shellcode injector - python
+- [ ] injector: inject shellcode into another process, using GDB
+- [ ] port mapping: forward from CC to agents, so you can use encapsulate other tools (such as Cobalt Strike) in emp3r0r's CC tunnel
 - [ ] dropper: shellcode injector - dd
 - [ ] dropper: downloader (stage 0) shellcode
-- [ ] port mapping: forward from CC to agents
 - [ ] network scanner
 - [ ] passive scanner, for host/service discovery
 - [ ] exploit kit
