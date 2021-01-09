@@ -92,7 +92,12 @@ func main() {
 		// we don't, just wait for some other agents to help us
 		log.Println("[-] We don't have internet access, waiting for other agents to give us a proxy...")
 		ctx, cancel := context.WithCancel(context.Background())
-		go agent.BroadcastServer(ctx, cancel)
+		go func() {
+			err := agent.BroadcastServer(ctx, cancel)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}()
 		for ctx.Err() == nil {
 			if agent.AgentProxy != "" {
 				log.Printf("[+] Thank you! We got a proxy: %s", agent.AgentProxy)

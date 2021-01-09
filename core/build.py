@@ -118,6 +118,8 @@ class GoBuild:
         - CC IP: IP of CC server, ./internal/agent/def.go
         '''
 
+        sed("./internal/agent/def.go",
+            f"/dev/shm/.../{uuid.uuid4()}", "[agent_root]")
         sed("./internal/tun/tls.go", self.CA, "[emp3r0r_ca]")
         sed("./internal/agent/def.go", self.INDICATOR, "[cc_indicator]")
         # in case we use the same IP for indicator and CC
