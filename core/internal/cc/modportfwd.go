@@ -26,6 +26,8 @@ func modulePortFwd() {
 				}
 			}
 		}
+	case "reverse": // expose a dest from CC to agent
+		// TODO
 	default:
 		var pf PortFwdSession
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())

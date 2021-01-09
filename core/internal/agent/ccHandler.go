@@ -121,6 +121,8 @@ func processCCData(data *MsgTunData) {
 				if exist {
 					pf.Cancel()
 				}
+			case "reverse":
+				// TODO
 			default:
 				go func() {
 					to := cmdSlice[1]

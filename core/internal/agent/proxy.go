@@ -89,8 +89,19 @@ func TCPFwd(addr, port string, ctx context.Context, cancel context.CancelFunc) (
 		defer dst.Close()
 		defer conn.Close()
 
-		go io.Copy(dst, conn)
-		go io.Copy(conn, dst)
+		// IO copy
+		go func() {
+			_, err = io.Copy(dst, conn)
+			if err != nil {
+				log.Print(err)
+			}
+		}()
+		go func() {
+			_, err = io.Copy(conn, dst)
+			if err != nil {
+				log.Print(err)
+			}
+		}()
 
 		// wait to be canceled
 		for ctx.Err() == nil {
@@ -110,7 +121,7 @@ func TCPFwd(addr, port string, ctx context.Context, cancel context.CancelFunc) (
 	return
 }
 
-// PortFwd port mapping, receive CC's request data then send it to target port on agent
+// PortFwd port mapping, receive request data then send it to target port on remote address
 func PortFwd(to, sessionID string) (err error) {
 	var (
 		session PortFwdSession
