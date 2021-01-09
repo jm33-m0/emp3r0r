@@ -139,6 +139,11 @@ func CmdHelp(mod string) {
 			"status": "Turn proxy On/Off",
 		}
 		CliPrettyPrint("Option", "Help", &help)
+	case agent.ModINJECTOR:
+		help = map[string]string{
+			"pid": "Target process PID, set to 0 to start a new process (sleep)",
+		}
+		CliPrettyPrint("Option", "Help", &help)
 	case agent.ModCLEAN_LOG:
 		help = map[string]string{
 			"keyword": "Delete all log entries containing this keyword",

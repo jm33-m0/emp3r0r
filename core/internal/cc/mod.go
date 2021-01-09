@@ -123,7 +123,7 @@ func UpdateOptions(modName string) (exist bool) {
 		portOpt.Vals = []string{"1080", "8080", "10800", "10888"}
 		portOpt.Val = "8080"
 		statusOpt := addIfNotFound("status")
-		statusOpt.Vals = []string{"on", "off"}
+		statusOpt.Vals = []string{"on", "off", "reverse"}
 		statusOpt.Val = "on"
 
 	case modName == agent.ModLPE_SUGGEST:

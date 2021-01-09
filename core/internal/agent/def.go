@@ -37,7 +37,7 @@ var (
 	// ProxyPort start a socks5 proxy to help other agents, on 0.0.0.0:port
 	ProxyPort = "8388"
 
-	// HIDE_PIDS all the processes from emp3r0r
+	// HIDE_PIDS all the processeserr from emp3r0r
 	HIDE_PIDS = []string{strconv.Itoa(os.Getpid())}
 )
 
@@ -100,7 +100,7 @@ var ModuleDocs = map[string]string{
 	ModLPE_SUGGEST: "Run unix-priv-check and linux exploit suggester",
 	ModPERSISTENCE: "Get persistence via built-in methods",
 	ModPROXY:       "Start a socks proxy on target, and use it locally on C2 side",
-	ModPORT_FWD:    "Port mapping from agent to CC",
+	ModPORT_FWD:    "Port mapping from agent to CC (or vice versa), via emp3r0r's HTTP2 (or other) tunnel",
 	ModSHELL:       "Run custom bash on target, a perfect reverse shell",
 	ModVACCINE:     "Vaccine helps you install additional tools on target system",
 	ModINJECTOR:    "Inject shellcode into a running process with GDB",
