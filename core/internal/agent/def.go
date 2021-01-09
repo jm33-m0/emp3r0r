@@ -90,6 +90,7 @@ const (
 	ModPORT_FWD    = "port_fwd"
 	ModSHELL       = "interactive_shell"
 	ModVACCINE     = "vaccine"
+	ModINJECTOR    = "injector"
 	ModGET_ROOT    = "get_root"
 )
 
@@ -100,9 +101,10 @@ var ModuleDocs = map[string]string{
 	ModLPE_SUGGEST: "Run unix-priv-check and linux exploit suggester",
 	ModPERSISTENCE: "Get persistence via built-in methods",
 	ModPROXY:       "Start a socks proxy on target, and use it locally on C2 side",
-	ModPORT_FWD:    "Port mapping",
+	ModPORT_FWD:    "Port mapping from agent to CC",
 	ModSHELL:       "Run custom bash on target, a perfect reverse shell",
 	ModVACCINE:     "Vaccine helps you install additional tools on target system",
+	ModINJECTOR:    "Inject shellcode into a running process with GDB",
 	ModGET_ROOT:    "Try some built-in LPE exploits",
 }
 

