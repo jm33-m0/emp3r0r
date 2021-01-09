@@ -86,6 +86,10 @@ func DownloadViaCC(url, path string) (err error) {
 	if err != nil {
 		return
 	}
+	log.Printf("DownloadViaCC: downloading from %s to %s...", url, path)
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Error, status code %d", resp.StatusCode)
+	}
 
 	data, err = ioutil.ReadAll(resp.Body)
 	defer resp.Body.Close()
