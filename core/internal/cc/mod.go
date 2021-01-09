@@ -132,9 +132,9 @@ func UpdateOptions(modName string) (exist bool) {
 		currentOpt.Val = "lpe_les"
 
 	case modName == agent.ModINJECTOR:
-		currentOpt = addIfNotFound("shellcode_file")
-		currentOpt.Vals = []string{"shellcode.txt"}
-		currentOpt.Val = "shellcode.txt"
+		pidOpt := addIfNotFound("pid")
+		pidOpt.Vals = []string{"0"}
+		pidOpt.Val = "0"
 
 	case modName == agent.ModPERSISTENCE:
 		currentOpt = addIfNotFound("method")

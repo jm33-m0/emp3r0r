@@ -255,6 +255,8 @@ func listValChoices() func(string) []string {
 			return Options["method"].Vals
 		case agent.ModPROXY:
 			return append(Options["status"].Vals, Options["port"].Vals...)
+		case agent.ModINJECTOR:
+			return Options["pid"].Vals
 		case agent.ModPORT_FWD:
 			ret := append(Options["listen_port"].Vals, Options["to"].Vals...)
 			ret = append(ret, Options["switch"].Vals...)
