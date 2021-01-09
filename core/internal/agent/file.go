@@ -1,10 +1,13 @@
 package agent
 
 import (
+	"bufio"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 )
 
@@ -49,6 +52,23 @@ func AppendToFile(filename string, text string) (err error) {
 		return
 	}
 	return
+}
+
+// IsStrInFile works like grep, check if a string is in a text file
+func IsStrInFile(text, filepath string) bool {
+	f, err := os.Open(filepath)
+	if err != nil {
+		log.Print(err)
+		return false
+	}
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		if strings.Contains(s.Text(), text) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Copy copy file from src to dst

