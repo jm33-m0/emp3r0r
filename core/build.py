@@ -160,10 +160,14 @@ def clean():
 
     for f in to_rm:
         try:
-            os.remove(f)
+            # remove directories too
+            if os.path.isdir(f):
+                os.removedirs(f)
+            else:
+                os.remove(f)
             print(" Deleted "+f)
         except BaseException:
-            traceback.print_exc()
+            log_error(traceback.format_exc)
 
 
 def sed(path, old, new):
