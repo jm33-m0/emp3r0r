@@ -16,7 +16,7 @@ import (
 
 // PortFwdSession manage a port fwd session
 type PortFwdSession struct {
-	To     string
+	Addr   string // is a listener when `reverse` is set, a dialer when used normally
 	Conn   *h2conn.Conn
 	Ctx    context.Context
 	Cancel context.CancelFunc
@@ -122,7 +122,7 @@ func TCPFwd(addr, port string, ctx context.Context, cancel context.CancelFunc) (
 }
 
 // PortFwd port mapping, receive request data then send it to target port on remote address
-func PortFwd(to, sessionID string) (err error) {
+func PortFwd(addr, sessionID string, reverse bool) (err error) {
 	var (
 		session PortFwdSession
 
@@ -133,26 +133,30 @@ func PortFwd(to, sessionID string) (err error) {
 		ctx    context.Context
 		cancel context.CancelFunc
 	)
-	if !tun.ValidateIPPort(to) {
-		return fmt.Errorf("Invalid address: %s", to)
+	if !tun.ValidateIPPort(addr) {
+		return fmt.Errorf("Invalid address: %s", addr)
 	}
 
 	// request a port fwd
 	// connect CC
 	conn, ctx, cancel, err = ConnectCC(url)
-	log.Printf("PortFwd started: -> %s (%s)", to, sessionID)
+	log.Printf("PortFwd started: %s (%s)", addr, sessionID)
 
-	go fwdToDport(ctx, cancel, to, sessionID, conn)
+	if reverse {
+		go listenForFwd(ctx, cancel, addr, sessionID, conn)
+	} else {
+		go fwdToDport(ctx, cancel, addr, sessionID, conn)
+	}
 
 	defer func() {
 		cancel()
 		conn.Close()
 		delete(PortFwds, sessionID)
-		log.Printf("PortFwd stopped: -> %s (%s)", to, sessionID)
+		log.Printf("PortFwd stopped: %s (%s)", addr, sessionID)
 	}()
 
 	// save this session
-	session.To = to
+	session.Addr = addr
 	session.Conn = conn
 	session.Ctx = ctx
 	session.Cancel = cancel
@@ -166,6 +170,40 @@ func PortFwd(to, sessionID string) (err error) {
 	return
 }
 
+// start a local listener on agent, forward connections to CC
+func listenForFwd(ctx context.Context, cancel context.CancelFunc,
+	from, sessionID string, h2 *h2conn.Conn) {
+	var err error
+
+	// listen
+	l, err := net.Listen("tcp", from)
+	if err != nil {
+		log.Printf("listen on %s failed: %s", from, err)
+	}
+	defer func() {
+		cancel()
+		l.Close()
+	}()
+
+	// serve
+	for ctx.Err() == nil {
+		conn, err := l.Accept()
+		if err != nil {
+			log.Print(err)
+			continue
+		}
+		go func() {
+			defer conn.Close()
+			go io.Copy(conn, h2)
+			go io.Copy(h2, conn)
+			for ctx.Err() == nil {
+				time.Sleep(100 * time.Millisecond)
+			}
+		}()
+	}
+}
+
+// forward request to destination
 func fwdToDport(ctx context.Context, cancel context.CancelFunc,
 	to string, sessionID string, h2 *h2conn.Conn) {
 
