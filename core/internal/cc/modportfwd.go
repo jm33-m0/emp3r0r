@@ -31,7 +31,7 @@ func modulePortFwd() {
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
 		pf.Lport, pf.To = Options["listen_port"].Val, Options["to"].Val
 		go func() {
-			err := pf.RunReversedPortFwd()
+			err := pf.InitReversedPortFwd()
 			if err != nil {
 				CliPrintError("PortFwd failed: %v", err)
 			}

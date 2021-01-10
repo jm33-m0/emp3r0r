@@ -38,6 +38,39 @@ func ListPortFwds() {
 	}
 }
 
+// InitReversedPortFwd send portfwd command to agent and set up a reverse port mapping
+func (pf *PortFwdSession) InitReversedPortFwd() (err error) {
+	toAddr := pf.To
+	listenPort := pf.Lport
+
+	_, e2 := strconv.Atoi(listenPort)
+	if !tun.ValidateIPPort(toAddr) || e2 != nil {
+		return fmt.Errorf("Invalid address/port: %s (to), %v (listen_port)", toAddr, e2)
+	}
+
+	fwdID := uuid.New().String()
+	cmd := fmt.Sprintf("!port_fwd %s %s", toAddr, fwdID)
+	err = SendCmd(cmd, CurrentTarget)
+	if err != nil {
+		CliPrintError("SendCmd: %v", err)
+		return
+	}
+
+	// mark this session, save to PortFwds
+	pf.Sh = nil
+	pf.Description = fmt.Sprintf("%s (Local) <- %s (Agent)", toAddr, listenPort)
+	PortFwds[fwdID] = pf
+
+	// tell agent to start this mapping
+	cmd = fmt.Sprintf("!port_fwd %s reverse", listenPort)
+	err = SendCmd(cmd, CurrentTarget)
+	if err != nil {
+		CliPrintError("SendCmd: %v", err)
+		return
+	}
+	return
+}
+
 // RunReversedPortFwd expose service on CC side to agent, via h2conn
 // as if the service is listening on agent machine
 func (pf *PortFwdSession) RunReversedPortFwd(sh *StreamHandler) (err error) {
