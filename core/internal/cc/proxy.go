@@ -48,21 +48,14 @@ func (pf *PortFwdSession) InitReversedPortFwd() (err error) {
 		return fmt.Errorf("Invalid address/port: %s (to), %v (listen_port)", toAddr, e2)
 	}
 
-	fwdID := uuid.New().String()
-	cmd := fmt.Sprintf("!port_fwd %s %s", toAddr, fwdID)
-	err = SendCmd(cmd, CurrentTarget)
-	if err != nil {
-		CliPrintError("SendCmd: %v", err)
-		return
-	}
-
 	// mark this session, save to PortFwds
+	fwdID := uuid.New().String()
 	pf.Sh = nil
 	pf.Description = fmt.Sprintf("%s (Local) <- %s (Agent)", toAddr, listenPort)
 	PortFwds[fwdID] = pf
 
 	// tell agent to start this mapping
-	cmd = fmt.Sprintf("!port_fwd %s reverse", listenPort)
+	cmd := fmt.Sprintf("!port_fwd %s %s reverse", listenPort, fwdID)
 	err = SendCmd(cmd, CurrentTarget)
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)
@@ -195,7 +188,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 	}
 
 	fwdID := uuid.New().String()
-	cmd := fmt.Sprintf("!port_fwd %s %s", toAddr, fwdID)
+	cmd := fmt.Sprintf("!port_fwd %s %s on", toAddr, fwdID)
 	err = SendCmd(cmd, CurrentTarget)
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)
@@ -248,7 +241,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		go func() {
 			// sub-session (streamHandler) ID
 			shID := fmt.Sprintf("%s_%d", fwdID, agent.RandInt(0, 1024))
-			cmd = fmt.Sprintf("!port_fwd %s %s", toAddr, shID)
+			cmd = fmt.Sprintf("!port_fwd %s %s on", toAddr, shID)
 			err = SendCmd(cmd, CurrentTarget)
 			if err != nil {
 				CliPrintError("SendCmd: %v", err)

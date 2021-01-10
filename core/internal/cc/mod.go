@@ -110,7 +110,7 @@ func UpdateOptions(modName string) (exist bool) {
 		lportOpt.Vals = []string{"8080", "1080", "22", "23", "21"}
 		// on/off
 		switchOpt := addIfNotFound("switch")
-		switchOpt.Vals = []string{"on", "off"}
+		switchOpt.Vals = []string{"on", "off", "reverse"}
 		switchOpt.Val = "on"
 
 	case modName == agent.ModCLEAN_LOG:
