@@ -200,7 +200,9 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 		}()
 
 		// tell CC this is a subsession (same mapping but different h2 req)
-		_, err = h2.Write([]byte(sessionID))
+		// sub-session (streamHandler) ID
+		shID := fmt.Sprintf("%s_%d-reverse", sessionID, RandInt(0, 1024))
+		_, err = h2.Write([]byte(shID))
 		if err != nil {
 			log.Printf("reverse port mapping hello: %v", err)
 			return

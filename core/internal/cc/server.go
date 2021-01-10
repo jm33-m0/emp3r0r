@@ -89,13 +89,18 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 	pf.Sh = make(map[string]*StreamHandler)
 	if !isSubSession {
 		pf.Sh[sessionID.String()] = &shCopy // cache this connection
-
 		// handshake success
 		CliPrintSuccess("Got a portFwd connection (%s) from %s", sessionID.String(), req.RemoteAddr)
 	} else {
 		pf.Sh[string(origBuf)] = &shCopy // cache this connection
 		// handshake success
 		CliPrintInfo("Got a portFwd sub-connection (%s) from %s", string(origBuf), req.RemoteAddr)
+		if strings.HasSuffix(string(origBuf), "-reverse") {
+			err = pf.RunReversedPortFwd(&shCopy) // handle this reverse port mapping request
+			if err != nil {
+				CliPrintError("RunReversedPortFwd: %v", err)
+			}
+		}
 	}
 
 	defer func() {

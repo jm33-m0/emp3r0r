@@ -40,7 +40,47 @@ func ListPortFwds() {
 
 // RunReversedPortFwd expose service on CC side to agent, via h2conn
 // as if the service is listening on agent machine
-func (pf *PortFwdSession) RunReversedPortFwd() (err error) {
+func (pf *PortFwdSession) RunReversedPortFwd(sh *StreamHandler) (err error) {
+	// dial dest
+	conn, err := net.Dial("tcp", pf.To)
+	if err != nil {
+		CliPrintWarning("RunReversedPortFwd failed to connect to %s: %v", pf.To, err)
+		return
+	}
+
+	// clean up all goroutines
+	cleanup := func() {
+		_, _ = conn.Write([]byte("exit"))
+		conn.Close()
+		sh.H2x.Conn.Close()
+		CliPrintInfo("PortFwd conn handler (%s) finished", conn.RemoteAddr().String())
+		sh.H2x.Cancel() // cancel this h2 connection
+	}
+
+	// io.Copy
+	go func() {
+		defer cleanup()
+		_, err = io.Copy(sh.H2x.Conn, conn)
+		if err != nil {
+			CliPrintWarning("conn -> h2: %v", err)
+			return
+		}
+	}()
+	go func() {
+		defer cleanup()
+		_, err = io.Copy(conn, sh.H2x.Conn)
+		if err != nil {
+			CliPrintWarning("h2 -> conn: %v", err)
+			return
+		}
+	}()
+
+	// keep running until context is canceled
+	defer cleanup()
+	for sh.H2x.Ctx.Err() == nil {
+		time.Sleep(500 * time.Millisecond)
+	}
+
 	return
 }
 
