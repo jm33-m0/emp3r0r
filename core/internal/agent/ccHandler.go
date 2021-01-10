@@ -122,12 +122,19 @@ func processCCData(data *MsgTunData) {
 					pf.Cancel()
 				}
 			case "reverse":
-				// TODO
+				go func() {
+					addr := cmdSlice[1]
+					sessionID := cmdSlice[2]
+					err = PortFwd(addr, sessionID, true)
+					if err != nil {
+						log.Printf("PortFwd failed: %v", err)
+					}
+				}()
 			default:
 				go func() {
 					to := cmdSlice[1]
 					sessionID := cmdSlice[2]
-					err = PortFwd(to, sessionID)
+					err = PortFwd(to, sessionID, false)
 					if err != nil {
 						log.Printf("PortFwd failed: %v", err)
 					}

@@ -17,8 +17,8 @@ import (
 // PortFwdSession holds controller interface of a port-fwd session
 type PortFwdSession struct {
 	Lport       string // listen_port
-	To          string // to_port
-	Description string // fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, toPort)
+	To          string // to address
+	Description string // fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, to_addr)
 
 	Sh     map[string]*StreamHandler // related to HTTP handler
 	Ctx    context.Context           // PortFwd context
@@ -36,6 +36,12 @@ func ListPortFwds() {
 		}
 		color.Green("%s (%s)\n", portmap.Description, id)
 	}
+}
+
+// RunReversedPortFwd expose service on CC side to agent, via h2conn
+// as if the service is listening on agent machine
+func (pf *PortFwdSession) RunReversedPortFwd() (err error) {
+	return
 }
 
 // RunPortFwd forward from ccPort to dstPort on agent, via h2conn

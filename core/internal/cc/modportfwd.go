@@ -27,7 +27,15 @@ func modulePortFwd() {
 			}
 		}
 	case "reverse": // expose a dest from CC to agent
-		// TODO
+		var pf PortFwdSession
+		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
+		pf.Lport, pf.To = Options["listen_port"].Val, Options["to"].Val
+		go func() {
+			err := pf.RunReversedPortFwd()
+			if err != nil {
+				CliPrintError("PortFwd failed: %v", err)
+			}
+		}()
 	default:
 		var pf PortFwdSession
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())

