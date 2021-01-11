@@ -84,15 +84,15 @@ class GoBuild:
         # cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH}''' + \
         # f''' go build -ldflags='-s -w -extldflags "-static"' -o ../../build/{self.target}'''
         cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0''' + \
-            f''' go build -ldflags='-s -w' -o ../../build/{self.target}'''
+            f''' go build -ldflags='-s -w' -o ../../build/{self.target}-{self.UUID}'''
         os.system(cmd)
         log_warn("GO BUILD ends...")
 
         os.chdir("../../")
         self.unset_tags()
 
-        if os.path.exists(f"./build/{self.target}"):
-            os.system(f"upx -9 ./build/{self.target}")
+        if os.path.exists(f"./build/{self.target}-{self.UUID}"):
+            os.system(f"upx -9 ./build/{self.target}-{self.UUID}")
         else:
             log_error("go build failed")
             sys.exit(1)
