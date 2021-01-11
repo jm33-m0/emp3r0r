@@ -128,15 +128,15 @@ func CmdHelp(mod string) {
 		CliPrettyPrint("Option", "Help", &help)
 	case agent.ModPORT_FWD:
 		help = map[string]string{
-			"to_port":     "Port (to forward to) on agent side",
-			"listen_port": "Listen on CC side",
-			"switch":      "Turn port mapping On/Off",
+			"to_port":     "Port (to forward to) on agent/CC side",
+			"listen_port": "Listen on CC/agent side",
+			"switch":      "Turn port mapping on/off, or use `reverse` mapping",
 		}
 		CliPrettyPrint("Option", "Help", &help)
 	case agent.ModPROXY:
 		help = map[string]string{
 			"port":   "Port of our local proxy server",
-			"status": "Turn proxy On/Off",
+			"status": "Turn proxy on/off",
 		}
 		CliPrettyPrint("Option", "Help", &help)
 	case agent.ModINJECTOR:
