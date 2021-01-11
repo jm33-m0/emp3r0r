@@ -20,6 +20,7 @@ ____
     * [core features](#core-features)
         * [transports](#transports)
         * [auto proxy for agents without direct internet access](#auto-proxy-for-agents-without-direct-internet-access)
+        * [anti-antivirus (or anti-whateveryoucallthem)](#anti-antivirus-or-anti-whateveryoucallthem)
         * [agent traffic](#agent-traffic)
         * [packer - start agent in memory](#packer---start-agent-in-memory)
         * [dropper - pure memory based agent launching](#dropper---pure-memory-based-agent-launching)
@@ -45,6 +46,7 @@ ____
 - [x] packer: use `shm_open` in older Linux kernels
 - [x] dropper: shellcode injector - python
 - [x] port mapping: forward from CC to agents, so you can use encapsulate other tools (such as Cobalt Strike) in emp3r0r's CC tunnel
+- [x] randomize everything that can be randomized (file path, port number, etc)
 - [ ] injector: inject shellcode into another process, using GDB
 - [ ] dropper: shellcode injector - dd
 - [ ] dropper: downloader (stage 0) shellcode
@@ -87,6 +89,7 @@ i hope this tool helps you, and i will add features to it as i learn new things
 * file management
 * log cleaner
 * **stealth** connection
+* anti-antivirus
 * internet access checker
 * **autoproxy** for semi-isolated networks
 * all of these in one **HTTP2** connection
@@ -114,6 +117,13 @@ if an agent doesn't have internet, its going to listen for such broadcasts. when
 in the following example, we have 3 agents, among which only one (`[1]`) has internet access, and `[0]` has to use the proxy passed by `[2]`
 
 ![autoproxy](./img/autoproxy.webp)
+
+#### anti-antivirus (or anti-whateveryoucallthem)
+
+- a cryptor that loads agent into memory
+- shellcode dropper
+- everything is randomized
+- one agent build for each target
 
 #### agent traffic
 
