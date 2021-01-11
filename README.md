@@ -32,6 +32,7 @@ ____
         * [auto root](#auto-root)
         * [LPE suggest](#lpe-suggest)
         * [port mapping](#port-mapping)
+        * [reverse port mapping (interoperability with other frameworks)](#reverse-port-mapping-interoperability-with-other-frameworks)
         * [plugin system](#plugin-system)
 * [thanks](#thanks)
 
@@ -43,8 +44,8 @@ ____
 - [x] packer: cryptor + `memfd_create`
 - [x] packer: use `shm_open` in older Linux kernels
 - [x] dropper: shellcode injector - python
+- [x] port mapping: forward from CC to agents, so you can use encapsulate other tools (such as Cobalt Strike) in emp3r0r's CC tunnel
 - [ ] injector: inject shellcode into another process, using GDB
-- [ ] port mapping: forward from CC to agents, so you can use encapsulate other tools (such as Cobalt Strike) in emp3r0r's CC tunnel
 - [ ] dropper: shellcode injector - dd
 - [ ] dropper: downloader (stage 0) shellcode
 - [ ] network scanner
@@ -216,6 +217,12 @@ and run them on target system, return the results
 map any target addresses to CC side, using HTTP2 (or whatever transport your agent uses)
 
 ![port_fwd.png](./img/port_fwd.png.webp)
+
+#### reverse port mapping (interoperability with other frameworks)
+
+this screenshot shows a [meterpreter](https://www.offensive-security.com/metasploit-unleashed/meterpreter-basics/) session established with the help of `emp3r0r`
+
+![reverse port mapping](./img/reverse_portfwd.webp)
 
 #### plugin system
 
