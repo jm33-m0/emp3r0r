@@ -335,6 +335,7 @@ elif len(sys.argv) == 3:
     yes_to_all = sys.argv[2] == "-y"
 
 try:
+    randomize_ports()
     if not os.path.exists("./build"):
         os.mkdir("./build")
 
