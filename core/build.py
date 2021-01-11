@@ -297,7 +297,7 @@ if os.path.exists(BUILD_JSON):
 # command line args
 yes_to_all = False
 if len(sys.argv) < 2:
-    print(f"python3 {sys.argv[0]} [cc/agent]")
+    print(f"python3 {sys.argv[0]} cc/agent [-y]")
     sys.exit(1)
 elif len(sys.argv) == 3:
     # if `-y` is specified, no questions will be asked
