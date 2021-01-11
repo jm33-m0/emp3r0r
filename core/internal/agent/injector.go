@@ -30,6 +30,11 @@ func gdbInjectShellcode(shellcode *string, pid, shellcodeLen int) error {
 	return nil
 }
 
+// pyInjectShellcode pure go, using ptrace
+func pyInjectShellcode(shellcode *string, shellcodeLen int) error {
+	return nil
+}
+
 // goInjectShellcode pure go, using ptrace
 func goInjectShellcode(shellcode *string, pid, shellcodeLen int) error {
 	return nil
@@ -56,6 +61,8 @@ func InjectShellcode(pid int, method string) (err error) {
 		err = gdbInjectShellcode(&shellcode, pid, shellcodeLen)
 	case "native":
 		err = goInjectShellcode(&shellcode, pid, shellcodeLen)
+	case "py":
+		err = pyInjectShellcode(&shellcode, shellcodeLen)
 	default:
 		err = fmt.Errorf("%s is not supported", method)
 	}
