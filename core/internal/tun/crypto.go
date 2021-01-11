@@ -82,3 +82,18 @@ func SHA256Sum(text string) string {
 	sumbytes := sha256.Sum256([]byte(text))
 	return fmt.Sprintf("%x", sumbytes)
 }
+
+// Base64Encode encode a string with base64
+func Base64Encode(text string) string {
+	return base64.URLEncoding.EncodeToString([]byte(text))
+}
+
+// Base64Decode decode a base64 encoded string (to []byte)
+func Base64Decode(text string) []byte {
+	dec, err := base64.URLEncoding.DecodeString(text)
+	if err != nil {
+		log.Print(err)
+		return nil
+	}
+	return dec
+}
