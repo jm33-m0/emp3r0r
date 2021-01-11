@@ -27,6 +27,7 @@ ____
         * [hide processes and files](#hide-processes-and-files)
         * [persistence](#persistence)
     * [modules](#modules)
+        * [shellcode loader](#shellcode-loader)
         * [basic command shell](#basic-command-shell)
         * [fully interactive and stealth bash shell](#fully-interactive-and-stealth-bash-shell)
         * [credential harvesting](#credential-harvesting)
@@ -47,7 +48,9 @@ ____
 - [x] dropper: shellcode injector - python
 - [x] port mapping: forward from CC to agents, so you can use encapsulate other tools (such as Cobalt Strike) in emp3r0r's CC tunnel
 - [x] randomize everything that can be randomized (file path, port number, etc)
-- [ ] injector: inject shellcode into another process, using GDB
+- [x] injector: shellcode loader, using python2
+- [ ] injector: shellcode loader, using go
+- [ ] injector: inject shellcode into another process, using gdb
 - [ ] dropper: shellcode injector - dd
 - [ ] dropper: downloader (stage 0) shellcode
 - [ ] network scanner
@@ -94,6 +97,7 @@ i hope this tool helps you, and i will add features to it as i learn new things
 * **autoproxy** for semi-isolated networks
 * all of these in one **HTTP2** connection
 * can be encapsulated in any external proxies such as **TOR**, and **CDNs**
+* interoperability with **metasploit / Cobalt Strike**
 * and many more...
 
 ### core features
@@ -174,6 +178,14 @@ currently implemented methods:
 more will be added in the future
 
 ### modules
+
+#### shellcode loader
+
+this module helps you execute meterpreter or Cobalt Strike shellcode directly in emp3r0r's memory,
+when used with [reverse_portfwd](#reverse-port-mapping-interoperability-with-other-frameworks),
+you can use other post-exploitation frameworks right inside emp3r0r, combining all the best things you need from them
+
+![shellcode loader](./img/shellcode_loader-msf.webp)
 
 #### basic command shell
 
