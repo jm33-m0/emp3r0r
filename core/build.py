@@ -6,9 +6,11 @@
 this script replaces build.sh, coz bash/sed/awk is driving me insane
 '''
 
+import atexit
 import glob
 import json
 import os
+import readline
 import shutil
 import sys
 import traceback
@@ -262,20 +264,30 @@ def log_error(msg):
 
 def log_warn(msg):
     '''
-    print in red
+    print in yellow
     '''
     print("\u001b[33m"+msg+"\u001b[0m")
+
+
+def save(prev_h_len, hfile):
+    '''
+    append to histfile
+    '''
+    new_h_len = readline.get_current_history_length()
+    readline.set_history_length(1000)
+    readline.append_history_file(new_h_len - prev_h_len, hfile)
 
 
 # JSON config file, cache some user data
 BUILD_JSON = "./build/build.json"
 CACHED_CONF = {}
-try:
-    jsonf = open(BUILD_JSON)
-    CACHED_CONF = json.load(jsonf)
-    jsonf.close()
-except BaseException:
-    log_warn(traceback.format_exc())
+if os.path.exists(BUILD_JSON):
+    try:
+        jsonf = open(BUILD_JSON)
+        CACHED_CONF = json.load(jsonf)
+        jsonf.close()
+    except BaseException:
+        log_warn(traceback.format_exc())
 
 
 if len(sys.argv) != 2:
@@ -284,6 +296,17 @@ if len(sys.argv) != 2:
 try:
     if not os.path.exists("./build"):
         os.mkdir("./build")
+
+    # support GNU readline interface, command history
+    histfile = "./build/.build_py_history"
+    try:
+        readline.read_history_file(histfile)
+        h_len = readline.get_current_history_length()
+    except FileNotFoundError:
+        open(histfile, 'wb').close()
+        h_len = 0
+    atexit.register(save, h_len, histfile)
+
     main(sys.argv[1])
 except (KeyboardInterrupt, EOFError, SystemExit):
     sys.exit(0)
