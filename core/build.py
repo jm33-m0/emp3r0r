@@ -190,6 +190,10 @@ def yes_no(prompt):
     '''
     y/n?
     '''
+    if yes_to_all:
+        log_warn(f"Choosing 'yes' for '{prompt}'")
+        return True
+
     answ = input(prompt + " [Y/n] ").lower().strip()
 
     if answ in ["n", "no", "nah", "nay"]:
@@ -290,9 +294,15 @@ if os.path.exists(BUILD_JSON):
         log_warn(traceback.format_exc())
 
 
-if len(sys.argv) != 2:
+# command line args
+yes_to_all = False
+if len(sys.argv) < 2:
     print(f"python3 {sys.argv[0]} [cc/agent]")
     sys.exit(1)
+elif len(sys.argv) == 3:
+    # if `-y` is specified, no questions will be asked
+    yes_to_all = sys.argv[2] == "-y"
+
 try:
     if not os.path.exists("./build"):
         os.mkdir("./build")
