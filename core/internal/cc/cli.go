@@ -43,7 +43,7 @@ func CliMain() {
 		readline.PcItem("use",
 			readline.PcItemDynamic(listMods())),
 
-		readline.PcItem("help",
+		readline.PcItem(HELP,
 			readline.PcItemDynamic(listMods())),
 
 		readline.PcItem("target",
@@ -54,7 +54,7 @@ func CliMain() {
 		if cmd == "set" ||
 			cmd == "use" ||
 			cmd == "target" ||
-			cmd == "help" {
+			cmd == HELP {
 			continue
 		}
 		CmdCompls = append(CmdCompls, readline.PcItem(cmd))
@@ -256,7 +256,7 @@ func listValChoices() func(string) []string {
 		case agent.ModPROXY:
 			return append(Options["status"].Vals, Options["port"].Vals...)
 		case agent.ModINJECTOR:
-			return Options["pid"].Vals
+			return append(Options["pid"].Vals, Options["method"].Vals...)
 		case agent.ModPORT_FWD:
 			ret := append(Options["listen_port"].Vals, Options["to"].Vals...)
 			ret = append(ret, Options["switch"].Vals...)

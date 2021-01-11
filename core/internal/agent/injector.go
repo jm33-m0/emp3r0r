@@ -117,7 +117,7 @@ func InjectShellcode(pid int, method string) (err error) {
 		err = gdbInjectShellcode(&shellcode, pid, shellcodeLen)
 	case "native":
 		err = goShellcodeLoader(&shellcode, shellcodeLen)
-	case "py":
+	case "python":
 		err = pyShellcodeLoader(&shellcode, shellcodeLen)
 	default:
 		err = fmt.Errorf("%s is not supported", method)

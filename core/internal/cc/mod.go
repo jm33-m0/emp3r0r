@@ -26,7 +26,7 @@ var (
 
 	// ShellHelpInfo provide utilities like ps, kill, etc
 	ShellHelpInfo = map[string]string{
-		"help":  "Display this help",
+		HELP:    "Display this help",
 		"bash":  "A reverse bash shell from HTTP2 tunnel, press Ctrl-D to leave",
 		"#ps":   "List processes: `ps`",
 		"#kill": "Kill process: `kill <PID>`",
@@ -135,6 +135,9 @@ func UpdateOptions(modName string) (exist bool) {
 		pidOpt := addIfNotFound("pid")
 		pidOpt.Vals = []string{"0"}
 		pidOpt.Val = "0"
+		methodOpt := addIfNotFound("method")
+		methodOpt.Vals = []string{"gdb", "native", "python"}
+		methodOpt.Val = "python"
 
 	case modName == agent.ModPERSISTENCE:
 		currentOpt = addIfNotFound("method")

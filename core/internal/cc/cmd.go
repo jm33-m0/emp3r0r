@@ -11,7 +11,7 @@ import (
 
 // Commands holds all commands and their help string, command: help
 var Commands = map[string]string{
-	"help":         "Print this help, 'help <module>' gives help for a module",
+	HELP:           "Print this help, 'help <module>' gives help for a module",
 	"target":       "Set target. eg. `target <index>`",
 	"set":          "Set an option. eg. `set <option> <val>`",
 	"use":          "Use a module. eg. `use <module_name>`",
@@ -32,6 +32,8 @@ var CmdHelpers = map[string]func(){
 	"run":          ModuleRun,
 }
 
+const HELP = "help" // fuck goconst
+
 // CmdHandler processes user commands
 func CmdHandler(cmd string) (err error) {
 	cmdSplit := strings.Fields(cmd)
@@ -42,7 +44,7 @@ func CmdHandler(cmd string) (err error) {
 	switch {
 	case cmd == "":
 		return
-	case cmdSplit[0] == "help":
+	case cmdSplit[0] == HELP:
 		if len(cmdSplit) > 2 {
 			CliPrintError("WTF?")
 			return

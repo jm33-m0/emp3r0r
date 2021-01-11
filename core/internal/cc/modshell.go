@@ -133,7 +133,7 @@ shell:
 			break shell
 		case input == "":
 			continue shell
-		case input == "help":
+		case input == HELP:
 			CliPrettyPrint("Helper", "Usage", &ShellHelpInfo)
 			continue shell
 
