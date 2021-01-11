@@ -182,8 +182,8 @@ more will be added in the future
 #### shellcode loader
 
 this module helps you execute meterpreter or Cobalt Strike shellcode directly in emp3r0r's memory,
-when used with [reverse_portfwd](#reverse-port-mapping-interoperability-with-other-frameworks),
-you can use other post-exploitation frameworks right inside emp3r0r, combining all the best things you need from them
+combined with [reverse_portfwd](#reverse-port-mapping-interoperability-with-other-frameworks),
+you can use other post-exploitation frameworks right inside emp3r0r
 
 ![shellcode loader](./img/shellcode_loader-msf.webp)
 
