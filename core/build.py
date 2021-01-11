@@ -10,6 +10,7 @@ import atexit
 import glob
 import json
 import os
+import random
 import readline
 import shutil
 import sys
@@ -135,6 +136,13 @@ class GoBuild:
         # in case we use the same IP for indicator and CC
         sed("./internal/agent/def.go", self.CCIP, "[cc_ipaddr]")
         sed("./internal/agent/def.go", self.UUID, "[agent_uuid]")
+        # restore ports
+        sed("./internal/agent/def.go",
+            f"CCPort = \"{CACHED_CONF['cc_port']}\"", "CCPort = \"[cc_port]\"")
+        sed("./internal/agent/def.go",
+            f"ProxyPort = \"{CACHED_CONF['proxy_port']}\"", "ProxyPort = \"[proxy_port]\"")
+        sed("./internal/agent/def.go",
+            f"BroadcastPort = \"{CACHED_CONF['broadcast_port']}\"", "BroadcastPort = \"[broadcast_port]\"")
 
     def set_tags(self):
         '''
@@ -148,6 +156,12 @@ class GoBuild:
 
         sed("./internal/tun/tls.go", "[emp3r0r_ca]", self.CA)
         sed("./internal/agent/def.go", "[cc_ipaddr]", self.CCIP)
+        sed("./internal/agent/def.go",
+            "[cc_port]", CACHED_CONF['cc_port'])
+        sed("./internal/agent/def.go",
+            "[proxy_port]", CACHED_CONF['proxy_port'])
+        sed("./internal/agent/def.go",
+            "[broadcast_port]", CACHED_CONF['broadcast_port'])
         sed("./internal/agent/def.go", "[agent_root]", self.AgentRoot)
         sed("./internal/agent/def.go", "[cc_indicator]", self.INDICATOR)
         sed("./internal/agent/def.go", "[agent_uuid]", self.UUID)
@@ -292,6 +306,23 @@ if os.path.exists(BUILD_JSON):
         jsonf.close()
     except BaseException:
         log_warn(traceback.format_exc())
+
+
+def rand_port():
+    '''
+    returns a random int between 1024 and 65535
+    '''
+    return random.randint(1025, 65534)
+
+
+def randomize_ports():
+    '''
+    randomize every port used by emp3r0r agent,
+    cache them in build.json
+    '''
+    CACHED_CONF['cc_port'] = rand_port()
+    CACHED_CONF['proxy_port'] = rand_port()
+    CACHED_CONF['broadcast_port'] = rand_port()
 
 
 # command line args

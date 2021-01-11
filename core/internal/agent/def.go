@@ -34,9 +34,6 @@ var (
 	// AgentProxy used by this agent to communicate with CC server
 	AgentProxy = ""
 
-	// ProxyPort start a socks5 proxy to help other agents, on 0.0.0.0:port
-	ProxyPort = "8388"
-
 	// HIDE_PIDS all the processeserr from emp3r0r
 	HIDE_PIDS = []string{strconv.Itoa(os.Getpid())}
 )
@@ -58,10 +55,13 @@ const (
 	SocketName = AgentRoot + "/.s6Y4tDtahIuL"
 
 	// CCPort port of c2
-	CCPort = "8000"
+	CCPort = "[cc_port]"
+
+	// ProxyPort start a socks5 proxy to help other agents, on 0.0.0.0:port
+	ProxyPort = "[proxy_port]"
 
 	// BroadcastPort port of broadcast server
-	BroadcastPort = "8889"
+	BroadcastPort = "[broadcast_port]"
 
 	// CCIndicator check this before trying connection
 	CCIndicator = "[cc_indicator]"
