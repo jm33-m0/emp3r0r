@@ -312,7 +312,7 @@ def rand_port():
     '''
     returns a random int between 1024 and 65535
     '''
-    return random.randint(1025, 65534)
+    return str(random.randint(1025, 65534))
 
 
 def randomize_ports():
