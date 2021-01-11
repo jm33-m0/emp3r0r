@@ -122,7 +122,10 @@ func processCCData(data *MsgTunData) {
 				pf, exist := PortFwds[sessionID]
 				if exist {
 					pf.Cancel()
+					log.Printf("port mapping %s stopped", pf.Addr)
+					break
 				}
+				log.Printf("port mapping %s not found", pf.Addr)
 			case "reverse":
 				go func() {
 					addr := cmdSlice[1]

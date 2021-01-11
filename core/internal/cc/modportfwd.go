@@ -12,14 +12,9 @@ func modulePortFwd() {
 	case "off":
 		// ugly, i know, it will delete port mappings matching current lport-to combination
 		for id, session := range PortFwds {
-			if session.Description == fmt.Sprintf("%s (Local) -> %s (Agent)",
-				Options["listen_port"].Val,
-				Options["to"].Val) ||
-				session.Description == fmt.Sprintf("%s (Local) <- %s (Agent)",
-					Options["listen_port"].Val,
-					Options["to"].Val) {
-
-				session.Cancel() // cancel the PortFwd session
+			if session.To == Options["to"].Val && session.Lport == Options["listen_port"].Val {
+				session.Cancel()     // cancel the PortFwd session
+				delete(PortFwds, id) // remove from port mapping list
 
 				// tell the agent to close connection
 				// make sure handler returns
@@ -31,7 +26,7 @@ func modulePortFwd() {
 				}
 				return
 			}
-			CliPrintError("Could not find port mapping (to %s, listen on %s)",
+			CliPrintError("Could not find port mapping (to %s, listening on %s)",
 				Options["to"].Val, Options["listen_port"].Val)
 		}
 	case "reverse": // expose a dest from CC to agent

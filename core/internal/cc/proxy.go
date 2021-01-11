@@ -76,7 +76,7 @@ func (pf *PortFwdSession) RunReversedPortFwd(sh *StreamHandler) (err error) {
 
 	// clean up all goroutines
 	cleanup := func() {
-		_, _ = conn.Write([]byte("exit"))
+		_, _ = conn.Write([]byte("exit\n"))
 		conn.Close()
 		sh.H2x.Conn.Close()
 		CliPrintInfo("PortFwd conn handler (%s) finished", conn.RemoteAddr().String())
