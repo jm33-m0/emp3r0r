@@ -320,9 +320,12 @@ def randomize_ports():
     randomize every port used by emp3r0r agent,
     cache them in build.json
     '''
-    CACHED_CONF['cc_port'] = rand_port()
-    CACHED_CONF['proxy_port'] = rand_port()
-    CACHED_CONF['broadcast_port'] = rand_port()
+    if 'cc_port' not in CACHED_CONF:
+        CACHED_CONF['cc_port'] = rand_port()
+    if 'proxy_port' not in CACHED_CONF:
+        CACHED_CONF['proxy_port'] = rand_port()
+    if 'broadcast_port' not in CACHED_CONF:
+        CACHED_CONF['broadcast_port'] = rand_port()
 
 
 # command line args
