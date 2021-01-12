@@ -49,7 +49,7 @@ ____
 - [x] port mapping: forward from CC to agents, so you can use encapsulate other tools (such as Cobalt Strike) in emp3r0r's CC tunnel
 - [x] randomize everything that can be randomized (file path, port number, etc)
 - [x] injector: shellcode loader, using python2
-- [ ] injector: shellcode loader, using go
+- [x] injector: shellcode loader, using go and ptrace syscall
 - [ ] injector: inject shellcode into another process, using gdb
 - [ ] dropper: shellcode injector - dd
 - [ ] dropper: downloader (stage 0) shellcode
