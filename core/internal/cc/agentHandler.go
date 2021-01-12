@@ -60,7 +60,7 @@ func processAgentData(data *agent.MsgTunData) {
 			CliPrintError("Failed to opent tmux window: %v", err)
 		}
 
-		log.Printf("\n[%s] %s:\n%s\n", color.CyanString("%d", contrlIf.Index), color.HiBlueString(cmd), color.HiWhiteString(out))
+		log.Printf("\n[%s] %s:\n%s\n", color.CyanString("%d", contrlIf.Index), color.HiMagentaString(cmd), color.HiWhiteString(out))
 
 	// save file from #get
 	case "FILE":
