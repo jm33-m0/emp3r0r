@@ -49,7 +49,7 @@ class GoBuild:
         if "agent_root" in CACHED_CONF:
             self.AgentRoot = CACHED_CONF['agent_root']
         else:
-            self.AgentRoot = f"/dev/shm/.../{uuid.uuid4()}"
+            self.AgentRoot = f"/dev/shm/.{uuid.uuid4()}"
             CACHED_CONF['agent_root'] = self.AgentRoot
 
     def build(self):
