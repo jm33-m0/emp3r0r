@@ -31,4 +31,7 @@ func moduleInjector() {
 		return
 	}
 	CliPrintInfo("Please wait...")
+	if method == "native" {
+		CliPrintInfo("The shellcode will live in `sleep` process, you will get notified when it exits")
+	}
 }

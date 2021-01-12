@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent"
 )
 
@@ -59,7 +60,7 @@ func processAgentData(data *agent.MsgTunData) {
 			CliPrintError("Failed to opent tmux window: %v", err)
 		}
 
-		log.Printf("\n[%d] %s:\n%s\n", contrlIf.Index, cmd, out)
+		log.Printf("\n[%s] %s:\n%s\n\n", color.CyanString("%d", contrlIf.Index), color.HiMagentaString(cmd), color.HiWhiteString(out))
 
 	// save file from #get
 	case "FILE":

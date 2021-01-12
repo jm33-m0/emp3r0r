@@ -137,7 +137,7 @@ func UpdateOptions(modName string) (exist bool) {
 		pidOpt.Val = "0"
 		methodOpt := addIfNotFound("method")
 		methodOpt.Vals = []string{"gdb", "native", "python"}
-		methodOpt.Val = "python"
+		methodOpt.Val = "native"
 
 	case modName == agent.ModPERSISTENCE:
 		currentOpt = addIfNotFound("method")

