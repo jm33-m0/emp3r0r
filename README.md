@@ -258,6 +258,7 @@ yes, there is a plugin system. please read the [wiki](https://github.com/jm33-m0
 
 - [pty](https://github.com/creack/pty)
 - [guitmz](https://github.com/guitmz)
+- [sektor7](https://blog.sektor7.net/#!res/2018/pure-in-memory-linux.md)
 - [readline](https://github.com/bettercap/readline)
 - [h2conn](https://github.com/posener/h2conn)
 - [diamorphine](https://github.com/m0nad/Diamorphine)
