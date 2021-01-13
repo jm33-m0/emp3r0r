@@ -191,9 +191,10 @@ func AddCronJob(job string) error {
 	return cmd.Start()
 }
 
-// Inject shellcode into a running process, restart emp3r0r agent if it's not running
+// Inject shellcode into a running process, the shellcode will make sure emp3r0r is alive
+// TODO
 func injector() (err error) {
-	return
+	return nil
 }
 
 func service() (err error) {

