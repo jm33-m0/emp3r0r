@@ -139,6 +139,8 @@ func Injector(shellcode *string, pid int) error {
 			return fmt.Errorf("%d does not exist: %v", pid, err)
 		}
 		pid = proc.Pid
+
+		// https://github.com/golang/go/issues/43685
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
 		err = syscall.PtraceAttach(pid)
