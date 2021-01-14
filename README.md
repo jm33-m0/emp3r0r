@@ -49,10 +49,9 @@ ____
 - [x] port mapping: forward from CC to agents, so you can use encapsulate other tools (such as Cobalt Strike) in emp3r0r's CC tunnel
 - [x] randomize everything that can be randomized (file path, port number, etc)
 - [x] injector: shellcode loader, using python2
-- [x] injector: shellcode loader, using go and ptrace syscall
-- [ ] injector: inject shellcode into another process, using gdb
-- [ ] dropper: shellcode injector - dd
-- [ ] dropper: downloader (stage 0) shellcode
+- [x] injector: inject shellcode into arbitrary process, using go and ptrace syscall
+- [ ] injector: recover process after injection
+- [ ] persistence: inject guardian shellcode into arbitrary process to gain persistence
 - [ ] network scanner
 - [ ] passive scanner, for host/service discovery
 - [ ] exploit kit
@@ -83,6 +82,7 @@ i hope this tool helps you, and i will add features to it as i learn new things
 * **post-exploitation tools** like nmap, socat, are integreted with reverse shell
 * **credential harvesting**
 * process **injection**
+* **shellcode** injection and dropper
 * ELF **patcher**
 * **hide processes and files** via libc hijacking
 * port mapping, socks5 **proxy**
