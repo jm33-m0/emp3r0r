@@ -120,7 +120,7 @@ func CmdHelp(mod string) {
 		CliPrettyPrint("Command", "Description", &Commands)
 	case agent.ModLPE_SUGGEST:
 		help = map[string]string{
-			"lpe_helper": "'unix-privesc-check' or 'linux-exploit-suggester'?",
+			"lpe_helper": "'linux-smart-enumeration' or 'linux-exploit-suggester'?",
 		}
 		CliPrettyPrint("Option", "Help", &help)
 	case agent.ModCMD_EXEC:

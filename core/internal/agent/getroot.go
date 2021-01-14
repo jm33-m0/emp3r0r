@@ -91,8 +91,8 @@ func lpeHelper(method string) string {
 	// run the script
 	log.Println("Running LPE suggest")
 	cmd := exec.Command("/bin/bash", "-c", string(scriptData))
-	if method == "lpe_upc" {
-		cmd = exec.Command("/bin/bash", "-c", string(scriptData))
+	if method == "lpe_lse" {
+		cmd = exec.Command("/bin/bash", "-c", string(scriptData), "-i")
 	}
 
 	outBytes, err := cmd.CombinedOutput()

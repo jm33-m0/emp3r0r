@@ -128,7 +128,9 @@ func UpdateOptions(modName string) (exist bool) {
 
 	case modName == agent.ModLPE_SUGGEST:
 		currentOpt = addIfNotFound("lpe_helper")
-		currentOpt.Vals = []string{"lpe_les", "lpe_upc"}
+		for name := range LPEHelpers {
+			currentOpt.Vals = append(currentOpt.Vals, name)
+		}
 		currentOpt.Val = "lpe_les"
 
 	case modName == agent.ModINJECTOR:

@@ -97,7 +97,7 @@ const (
 var ModuleDocs = map[string]string{
 	ModCMD_EXEC:    "Run a single command on a target",
 	ModCLEAN_LOG:   "Delete lines containing keyword from *tmp logs",
-	ModLPE_SUGGEST: "Run unix-priv-check and linux exploit suggester",
+	ModLPE_SUGGEST: "Run linux-smart-enumeration or linux exploit suggester",
 	ModPERSISTENCE: "Get persistence via built-in methods",
 	ModPROXY:       "Start a socks proxy on target, and use it locally on C2 side",
 	ModPORT_FWD:    "Port mapping from agent to CC (or vice versa), via emp3r0r's HTTP2 (or other) tunnel",
