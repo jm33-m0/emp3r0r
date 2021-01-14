@@ -8,8 +8,10 @@ import (
 func moduleLPE() {
 	const (
 		lesURL = "https://raw.githubusercontent.com/mzet-/linux-exploit-suggester/master/linux-exploit-suggester.sh"
-		upcURL = "https://raw.githubusercontent.com/pentestmonkey/unix-privesc-check/1_x/unix-privesc-check"
+		// upcURL = "https://raw.githubusercontent.com/pentestmonkey/unix-privesc-check/1_x/unix-privesc-check"
+		upcURL = "https://raw.githubusercontent.com/jm33-m0/static-bins/main/vaccine/x86_64/unix-privesc-check"
 	)
+
 	// target
 	target := CurrentTarget
 	if target == nil {

