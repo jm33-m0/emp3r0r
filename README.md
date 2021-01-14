@@ -52,6 +52,7 @@ ____
 - [x] injector: inject shellcode into arbitrary process, using go and ptrace syscall
 - [ ] injector: recover process after injection
 - [ ] persistence: inject guardian shellcode into arbitrary process to gain persistence
+- [ ] store `vaccine` files in anonymous memory location instead of `/dev/shm`
 - [ ] network scanner
 - [ ] passive scanner, for host/service discovery
 - [ ] exploit kit
