@@ -50,8 +50,8 @@ ____
 - [x] randomize everything that can be randomized (file path, port number, etc)
 - [x] injector: shellcode loader, using python2
 - [x] injector: inject shellcode into arbitrary process, using go and ptrace syscall
-- [ ] injector: recover process after injection
-- [ ] persistence: inject guardian shellcode into arbitrary process to gain persistence
+- [x] injector: recover process after injection
+- [x] persistence: inject guardian shellcode into arbitrary process to gain persistence
 - [ ] store `vaccine` files in anonymous memory location instead of `/dev/shm`
 - [ ] network scanner
 - [ ] passive scanner, for host/service discovery
