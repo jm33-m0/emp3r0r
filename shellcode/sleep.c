@@ -15,7 +15,7 @@ int main(int argc, char* argv[])
         sleep(1);
         time(&rawtime);
         timeinfo = localtime(&rawtime);
-        printf("%s: sleeping", asctime(timeinfo));
+        printf("%s: sleeping\n", asctime(timeinfo));
     }
     return 0;
 }
