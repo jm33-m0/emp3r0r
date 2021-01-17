@@ -237,15 +237,12 @@ func Injector(shellcode *string, pid int) error {
 		}
 		log.Printf("Restored %d bytes at origRip (0x%x)", n, origRip)
 
-		// continue and wait
-		err = syscall.PtraceCont(pid, 0)
+		// let it run
+		err = syscall.PtraceDetach(pid)
 		if err != nil {
-			return fmt.Errorf("Continue: %v", err)
+			return fmt.Errorf("Continue detach: %v", err)
 		}
-		_, err = syscall.Wait4(pid, &ws, 0, nil)
-		if err != nil {
-			return fmt.Errorf("continue: wait4: %v", err)
-		}
+		log.Printf("%d will continue to run", pid)
 
 		return nil
 	default:
