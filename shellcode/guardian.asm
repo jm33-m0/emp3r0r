@@ -22,11 +22,21 @@ watchdog:
 	cmp rax, 0x0; check return value
 	je  exec; exec if in child
 
+	;;  wait to clean up zombies
+	xor rdi, rdi
+	mov rdi, -1
+	xor rsi, rsi
+	xor rdx, rdx
+	xor r10, r10
+	xor rax, rax
+	mov al, 0x72
+	syscall
+
 	;;   sleep
 	xor  rax, rax
 	mov  al, 0x23; syscall nanosleep
-	push 10; sleep sec
-	push 10
+	push 10; sleep nano sec
+	push 20; sec
 	mov  rdi, rsp
 	xor  rsi, rsi
 	xor  rdx, rdx
@@ -59,3 +69,12 @@ exec:
 pause:
 	;;  trap
 	int 0x3
+
+	; exit:
+	; ;; exit
+	; xor rax, rax
+	; xor rdi, rdi
+	; xor rsi, rsi
+	; mov al, 0x3c; syscall exit
+	; mov di, 0x0; exit code
+	; syscall
