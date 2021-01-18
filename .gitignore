@@ -84,3 +84,6 @@ lkm/dkms.conf
 
 # fuck spotlight
 .DS_Store
+
+# shellcode.txt
+shellcode.txt
