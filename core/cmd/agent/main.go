@@ -26,6 +26,9 @@ func main() {
 	daemon := flag.Bool("daemon", false, "Daemonize")
 	flag.Parse()
 
+	// don't be hasty
+	time.Sleep(time.Duration(agent.RandInt(3, 10)) * time.Second)
+
 	// silent switch
 	log.SetOutput(ioutil.Discard)
 	if !*silent {
