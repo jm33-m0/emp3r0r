@@ -22,16 +22,18 @@ watchdog:
 	cmp rax, 0x0; check return value
 	je  exec; exec if in child
 
+wait4zombie:
 	;;  wait to clean up zombies
 	xor rdi, rdi
-	mov rdi, -1
+	mov rdi, rax
 	xor rsi, rsi
 	xor rdx, rdx
 	xor r10, r10
 	xor rax, rax
-	mov al, 0x72
+	mov al, 0x3d
 	syscall
 
+sleep:
 	;;   sleep
 	xor  rax, rax
 	mov  al, 0x23; syscall nanosleep
