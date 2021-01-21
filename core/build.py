@@ -49,7 +49,7 @@ class GoBuild:
         if "agent_root" in CACHED_CONF:
             self.AgentRoot = CACHED_CONF['agent_root']
         else:
-            self.AgentRoot = f"/dev/shm/.{uuid.uuid4()}"
+            self.AgentRoot = f"/dev/shm/.{rand_str(random.randint(3, 9))}"
             CACHED_CONF['agent_root'] = self.AgentRoot
 
     def build(self):
@@ -177,6 +177,7 @@ def clean():
     for f in to_rm:
         try:
             # remove directories too
+
             if os.path.isdir(f):
                 os.removedirs(f)
             else:
@@ -204,8 +205,10 @@ def yes_no(prompt):
     '''
     y/n?
     '''
+
     if yes_to_all:
         log_warn(f"Choosing 'yes' for '{prompt}'")
+
         return True
 
     answ = input(prompt + " [Y/n] ").lower().strip()
@@ -214,6 +217,19 @@ def yes_no(prompt):
         return False
 
     return True
+
+
+def rand_str(length):
+    '''
+    random string
+    '''
+    uuidstr = str(uuid.uuid4()).replace('-', '')
+
+    # we don't want the string to be long
+    if length >= len(uuidstr):
+        return uuidstr
+
+    return uuidstr[:length]
 
 
 def main(target):
@@ -299,6 +315,7 @@ def save(prev_h_len, hfile):
 # JSON config file, cache some user data
 BUILD_JSON = "./build/build.json"
 CACHED_CONF = {}
+
 if os.path.exists(BUILD_JSON):
     try:
         jsonf = open(BUILD_JSON)
@@ -312,6 +329,7 @@ def rand_port():
     '''
     returns a random int between 1024 and 65535
     '''
+
     return str(random.randint(1025, 65534))
 
 
@@ -320,16 +338,20 @@ def randomize_ports():
     randomize every port used by emp3r0r agent,
     cache them in build.json
     '''
+
     if 'cc_port' not in CACHED_CONF:
         CACHED_CONF['cc_port'] = rand_port()
+
     if 'proxy_port' not in CACHED_CONF:
         CACHED_CONF['proxy_port'] = rand_port()
+
     if 'broadcast_port' not in CACHED_CONF:
         CACHED_CONF['broadcast_port'] = rand_port()
 
 
 # command line args
 yes_to_all = False
+
 if len(sys.argv) < 2:
     print(f"python3 {sys.argv[0]} cc/agent [-y]")
     sys.exit(1)
@@ -339,6 +361,7 @@ elif len(sys.argv) == 3:
 
 try:
     randomize_ports()
+
     if not os.path.exists("./build"):
         os.mkdir("./build")
 
