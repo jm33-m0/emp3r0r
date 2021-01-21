@@ -3,6 +3,7 @@
  * */
 
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -15,7 +16,10 @@ int main(int argc, char* argv[])
         sleep(1);
         time(&rawtime);
         timeinfo = localtime(&rawtime);
-        printf("%s: sleeping\n", asctime(timeinfo));
+        char* timestr = asctime(timeinfo);
+        timestr[strlen(timestr) - 1] = '\0';
+
+        printf("%s: sleeping\n", timestr);
     }
     return 0;
 }
