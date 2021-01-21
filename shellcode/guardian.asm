@@ -48,15 +48,11 @@ sleep:
 exec:
 	;;   char **envp
 	xor  rdx, rdx
+	xor  rax, rax
 	push rdx; '\0'
 
-	;;   char *filename
-	xor  rax, rax
-	mov  rdi, 0x652f2f706d742f2f; path to the executable
-	push rdi; save to stack
-	push rsp
-	pop  rdi
-	mov  rdi, rsp
+	;;     char *filename
+	;[push filename here]
 
 	;;   char **argv
 	push rdx; '\0'
