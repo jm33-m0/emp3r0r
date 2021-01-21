@@ -3,6 +3,22 @@ linux post-exploitation framework made by linux user
 
 **Still under active development**
 
+```text
+
+░░░░░░░ ░░░    ░░░ ░░░░░░  ░░░░░░  ░░░░░░   ░░░░░░  ░░░░░░
+▒▒      ▒▒▒▒  ▒▒▒▒ ▒▒   ▒▒      ▒▒ ▒▒   ▒▒ ▒▒  ▒▒▒▒ ▒▒   ▒▒
+▒▒▒▒▒   ▒▒ ▒▒▒▒ ▒▒ ▒▒▒▒▒▒   ▒▒▒▒▒  ▒▒▒▒▒▒  ▒▒ ▒▒ ▒▒ ▒▒▒▒▒▒
+▓▓      ▓▓  ▓▓  ▓▓ ▓▓           ▓▓ ▓▓   ▓▓ ▓▓▓▓  ▓▓ ▓▓   ▓▓
+███████ ██      ██ ██      ██████  ██   ██  ██████  ██   ██
+
+
+a linux post-exploitation framework made by linux user
+
+by jm33-ng
+
+https://github.com/jm33-m0/emp3r0r
+```
+
 - [中文介绍](https://www.freebuf.com/sectool/259079.html)
 - [check my blog for updates](https://jm33.me/emp3r0r-0x00.html)
 - [how to use](https://github.com/jm33-m0/emp3r0r/wiki)
