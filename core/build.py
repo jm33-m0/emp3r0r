@@ -132,9 +132,9 @@ class GoBuild:
         sed("./internal/tun/tls.go", self.CA, "[emp3r0r_ca]")
         # guadian_shellcode
         sed("./internal/agent/def.go", f"GuardianShellcode = `{CACHED_CONF['guadian_shellcode']}`",
-            "[persistence_shellcode]")
-        sed("./internal/agent/def.go", f"GuardianAgentPath = `{CACHED_CONF['guardian_agent_path']}`",
-            "[persistence_agent_path]")
+            "GuardianShellcode = `[persistence_shellcode]`")
+        sed("./internal/agent/def.go", f"GuardianAgentPath = \"{CACHED_CONF['guardian_agent_path']}\"",
+            "GuardianAgentPath = \"[persistence_agent_path]\"")
         # cc indicator
         sed("./internal/agent/def.go", self.INDICATOR, "[cc_indicator]")
         # in case we use the same IP for indicator and CC
