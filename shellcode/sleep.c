@@ -19,7 +19,9 @@ int main(int argc, char* argv[])
         char* timestr = asctime(timeinfo);
         timestr[strlen(timestr) - 1] = '\0';
 
-        printf("%s: sleeping\n", timestr);
+        int pid = getpid();
+
+        printf("%d - %s: sleeping\n", pid, timestr);
     }
     return 0;
 }
