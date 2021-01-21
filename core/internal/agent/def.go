@@ -39,6 +39,9 @@ var (
 
 	// GuardianShellcode inject into a process to gain persistence
 	GuardianShellcode = `[persistence_shellcode]`
+
+	// GuardianAgentPath where the agent binary is stored
+	GuardianAgentPath = "[persistence_agent_path]"
 )
 
 const (

