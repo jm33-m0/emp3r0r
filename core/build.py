@@ -96,8 +96,8 @@ class GoBuild:
         os.chdir("../../")
         self.unset_tags()
 
-        if os.path.exists(f"./build/{build_target}"):
-            os.system(f"upx -9 ./build/{build_target}")
+        if os.path.exists(f"./build/{build_target.split('/')[-1]}"):
+            os.system(f"upx -9 ./build/{build_target.split('/')[-1]}")
         else:
             log_error("go build failed")
             sys.exit(1)
