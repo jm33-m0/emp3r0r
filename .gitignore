@@ -87,3 +87,6 @@ lkm/dkms.conf
 
 # shellcode.txt
 shellcode.txt
+
+# temp
+temp*
