@@ -45,6 +45,9 @@ var (
 )
 
 const (
+	// Version record version on build time
+	Version = "[emp3r0r_version_string]"
+
 	// AgentRoot root directory of emp3r0r
 	AgentRoot = "[agent_root]"
 
