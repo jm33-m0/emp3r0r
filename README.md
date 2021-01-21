@@ -3,7 +3,7 @@ linux post-exploitation framework made by linux user
 
 **Still under active development**
 
-![logo](./img/logo.webp)
+![logo](./img/emp3r0r.png)
 
 - [中文介绍](https://www.freebuf.com/sectool/259079.html)
 - [check my blog for updates](https://jm33.me/emp3r0r-0x00.html)
