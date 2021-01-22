@@ -137,11 +137,12 @@ class GoBuild:
             self.AgentRoot, "[agent_root]")
         # CA
         sed("./internal/tun/tls.go", self.CA, "[emp3r0r_ca]")
-        # guadian_shellcode
-        sed("./internal/agent/def.go", f"GuardianShellcode = `{CACHED_CONF['guadian_shellcode']}`",
-            "GuardianShellcode = `[persistence_shellcode]`")
-        sed("./internal/agent/def.go", f"GuardianAgentPath = \"{CACHED_CONF['guardian_agent_path']}\"",
-            "GuardianAgentPath = \"[persistence_agent_path]\"")
+        if self.target == "agent":
+            # guardian_shellcode
+            sed("./internal/agent/def.go", f"GuardianShellcode = `{CACHED_CONF['guardian_shellcode']}`",
+                "GuardianShellcode = `[persistence_shellcode]`")
+            sed("./internal/agent/def.go", f"GuardianAgentPath = \"{CACHED_CONF['guardian_agent_path']}\"",
+                "GuardianAgentPath = \"[persistence_agent_path]\"")
         # cc indicator
         sed("./internal/agent/def.go", self.INDICATOR, "[cc_indicator]")
         # in case we use the same IP for indicator and CC
@@ -163,11 +164,12 @@ class GoBuild:
         # version
         sed("./internal/agent/def.go",
             "Version = \"[emp3r0r_version_string]\"", f"Version = \"{self.VERSION}\"")
-        # guadian shellcode
-        sed("./internal/agent/def.go",
-            "[persistence_shellcode]", CACHED_CONF['guadian_shellcode'])
-        sed("./internal/agent/def.go",
-            "[persistence_agent_path]", CACHED_CONF['guardian_agent_path'])
+        if self.target == "agent":
+            # guardian shellcode
+            sed("./internal/agent/def.go",
+                "[persistence_shellcode]", CACHED_CONF['guardian_shellcode'])
+            sed("./internal/agent/def.go",
+                "[persistence_agent_path]", CACHED_CONF['guardian_agent_path'])
         # CA
         sed("./internal/tun/tls.go", "[emp3r0r_ca]", self.CA)
         # CC IP
@@ -310,15 +312,15 @@ def main(target):
 
     use_cached = False
 
-    if "guadian_shellcode" in CACHED_CONF and "guardian_agent_path" in CACHED_CONF:
-        guadian_shellcode = CACHED_CONF['guadian_shellcode']
+    if "guardian_shellcode" in CACHED_CONF and "guardian_agent_path" in CACHED_CONF:
+        guardian_shellcode = CACHED_CONF['guardian_shellcode']
         guardian_agent_path = CACHED_CONF['guardian_agent_path']
         use_cached = yes_no(
-            f"Use cached {len(guadian_shellcode)} bytes of guardian shellcode ({guardian_agent_path})?")
+            f"Use cached {len(guardian_shellcode)} bytes of guardian shellcode ({guardian_agent_path})?")
 
     if not use_cached:
-        path = input("Agent path for guadian shellcode: ").strip()
-        CACHED_CONF['guadian_shellcode'] = gen_guardian_shellcode(path)
+        path = input("Agent path for guardian shellcode: ").strip()
+        CACHED_CONF['guardian_shellcode'] = gen_guardian_shellcode(path)
         CACHED_CONF['guardian_agent_path'] = path
 
     gobuild = GoBuild(target="agent", cc_indicator=indicator, cc_ip=ccip)
@@ -419,12 +421,15 @@ def get_version():
             ["/bin/sh", "-c", check],
             stderr=subprocess.STDOUT, timeout=3)
     except KeyboardInterrupt:
-        return ""
+        return "Unknown"
     except BaseException:
         check = "git describe --always"
-        out = subprocess.check_output(
-            ["/bin/sh", "-c", check],
-            stderr=subprocess.STDOUT, timeout=3)
+        try:
+            out = subprocess.check_output(
+                ["/bin/sh", "-c", check],
+                stderr=subprocess.STDOUT, timeout=3)
+        except BaseException:
+            return "Unknown"
 
     return out.decode("utf-8").strip()
 
