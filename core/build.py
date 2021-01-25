@@ -429,7 +429,13 @@ def get_version():
                 ["/bin/sh", "-c", check],
                 stderr=subprocess.STDOUT, timeout=3)
         except BaseException:
-            return "Unknown"
+            try:
+                versionf = open(".version")
+                version = versionf.read()
+                versionf.close()
+                return version
+            except BaseException:
+                return "Unknown"
 
     return out.decode("utf-8").strip()
 

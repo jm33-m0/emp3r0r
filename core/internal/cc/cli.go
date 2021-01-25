@@ -211,7 +211,7 @@ func CliBanner() error {
 	}
 
 	color.Cyan(string(data))
-	color.Cyan("Version: %s\n\n", agent.Version)
+	color.Cyan("version: %s\n\n", agent.Version)
 	return nil
 }
 
