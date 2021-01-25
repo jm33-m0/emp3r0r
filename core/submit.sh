@@ -15,11 +15,11 @@ yes_no() {
 
 yes_no "[?] Add new tag" && (
     read -r -p "[?] Enter new version tag: " tag
-    git tag "$tag" -a -m "$tag"
+    git tag "v$tag" -a -m "v$tag"
 )
 
 version=$(git describe --tags || git describe --always)
 echo "$version" >.version
 git add .version
 git commit .version -m "bump version to $version"
-git push --tags
+git push origin --tags
