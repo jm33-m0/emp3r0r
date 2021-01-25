@@ -13,6 +13,11 @@ yes_no() {
     done
 }
 
+if [ ! "$(git status)" = "*up to date*" ]; then
+    echo "[-] Commit and push your work before using this script"
+    lazygit
+fi
+
 yes_no "[?] Add new tag" && (
     read -r -p "[?] Enter new version tag: " tag
     git tag "v$tag" -a -m "v$tag"
