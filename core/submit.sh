@@ -13,7 +13,7 @@ yes_no() {
     done
 }
 
-if [ ! "$(git status)" = "*up to date*" ]; then
+if [[ $(git status --porcelain) ]]; then
     echo "[-] Commit and push your work before using this script"
     lazygit
 fi
