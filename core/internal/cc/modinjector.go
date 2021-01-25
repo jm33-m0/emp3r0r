@@ -17,8 +17,8 @@ func moduleInjector() {
 	// shellcode.txt
 	pid := Options["pid"].Val
 	if !agent.IsFileExist(WWWRoot + "shellcode.txt") {
-		CliPrintError("%sshellcode.txt does not exist", WWWRoot)
-		return
+		CliPrintWarning("%sshellcode.txt does not exist,"+
+			" the agent will be using built-in guardian shellcode", WWWRoot)
 	}
 	// choose a shellcode loader
 	method := Options["method"].Val

