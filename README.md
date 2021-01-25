@@ -29,6 +29,7 @@ ____
         * [hide processes and files](#hide-processes-and-files)
         * [persistence](#persistence)
     * [modules](#modules)
+        * [shellcode injection](#shellcode-injection)
         * [shellcode loader](#shellcode-loader)
         * [basic command shell](#basic-command-shell)
         * [fully interactive and stealth bash shell](#fully-interactive-and-stealth-bash-shell)
@@ -150,6 +151,7 @@ when using Cloudflare CDN as CC frontend:
 
 ![cdn](./img/cdn.webp)
 
+
 #### packer - start agent in memory
 
 [packer](https://github.com/jm33-m0/emp3r0r/wiki/Packer) encrypts `agent` binary, and runs it from memory (using `memfd_create`)
@@ -174,6 +176,7 @@ currently emp3r0r uses [libemp3r0r](https://github.com/jm33-m0/emp3r0r/tree/mast
 
 currently implemented methods:
 
+- [shellcode injection](#shellcode-injection)
 - [libemp3r0r](https://github.com/jm33-m0/emp3r0r/tree/master/libemp3r0r)
 - cron
 - bash profile and command injection
@@ -181,6 +184,12 @@ currently implemented methods:
 more will be added in the future
 
 ### modules
+
+#### shellcode injection
+
+inject guardian shellcode into arbitrary process, to gain persistence
+
+![shellcode injection](./img/shellcode-inject.webp)
 
 #### shellcode loader
 
