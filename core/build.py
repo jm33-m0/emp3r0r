@@ -431,7 +431,7 @@ def get_version():
         except BaseException:
             try:
                 versionf = open(".version")
-                version = versionf.read()
+                version = versionf.read().strip()
                 versionf.close()
                 return version
             except BaseException:
