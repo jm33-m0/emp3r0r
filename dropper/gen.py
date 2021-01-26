@@ -106,7 +106,7 @@ class Dropper:
         shellcode loader code
         '''
         shellcode = input(
-            "[?] shellcode hex string (eg. '\\x00\\x01'): ").strip()
+            "[?] shellcode hex string (eg. \\x00\\x01): ").strip()
         self.args.append(shellcode)
 
     def config_memfd_exec(self):
@@ -157,6 +157,9 @@ except FileNotFoundError:
     h_len = 0
 atexit.register(save, h_len, histfile)
 
-# run
-dropper_gen = Dropper(dropper_selection)
-dropper_gen.gen_cmd()
+try:
+    # run
+    dropper_gen = Dropper(dropper_selection)
+    dropper_gen.gen_cmd()
+except KeyboardInterrupt:
+    sys.exit(0)
