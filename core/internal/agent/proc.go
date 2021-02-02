@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bufio"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -37,7 +38,7 @@ func ProcCmdline(pid int) (cmdline string) {
 // UpdateHIDE_PIDS update HIDE PID list
 func UpdateHIDE_PIDS() error {
 	HIDE_PIDS = RemoveDupsFromArray(HIDE_PIDS)
-	return ioutil.WriteFile("/dev/shm/emp3r0r_pids", []byte(strings.Join(HIDE_PIDS, "\n")), 0600)
+	return ioutil.WriteFile(AgentRoot+"/emp3r0r_pids", []byte(strings.Join(HIDE_PIDS, "\n")), 0600)
 }
 
 // IsAgentRunningPID is there any emp3r0r agent already running?
@@ -60,6 +61,24 @@ func IsAgentRunningPID() (bool, int) {
 
 	_, err = os.FindProcess(pid)
 	return err == nil, pid
+}
+
+// ProcUID get euid of a process
+func ProcUID(pid int) string {
+	f, err := os.Open(fmt.Sprintf("/proc/%d/status", pid))
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "Uid:") {
+			uid := strings.Fields(line)[1]
+			return uid
+		}
+	}
+	return ""
 }
 
 // IsProcAlive check if a process name exists, returns its process(es)

@@ -61,7 +61,11 @@ func main() {
 
 		// exit, leave the existing agent instance running
 		if agent.IsAgentAlive() {
-			log.Fatal("Agent is already running and responsive, aborting")
+			if os.Geteuid() == 0 && agent.ProcUID(pid) != "0" {
+				log.Println("Escalating privilege...")
+			} else {
+				log.Fatal("Agent is already running and responsive, aborting")
+			}
 		}
 
 		// if agent is not responsive, kill it, and start a new instance
