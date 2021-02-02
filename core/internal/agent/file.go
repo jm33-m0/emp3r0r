@@ -2,6 +2,8 @@ package agent
 
 import (
 	"bufio"
+	crypto_rand "crypto/rand"
+	"encoding/binary"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -82,6 +84,13 @@ func Copy(src, dst string) error {
 
 // RandInt random int between given interval
 func RandInt(min, max int) int {
-	seed := rand.NewSource(time.Now().UTC().Unix())
-	return min + rand.New(seed).Intn(max-min)
+	var b [8]byte
+	_, err := crypto_rand.Read(b[:])
+	if err != nil {
+		log.Println("cannot seed math/rand package with cryptographically secure random number generator")
+		log.Println("falling back to math/rand with time seed")
+		return rand.New(rand.NewSource(time.Now().UnixNano())).Intn(max-min) + min
+	}
+	rand.Seed(int64(binary.LittleEndian.Uint64(b[:])))
+	return min + rand.Intn(max-min)
 }
