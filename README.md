@@ -8,6 +8,7 @@ linux post-exploitation framework made by linux user
 - [中文介绍](https://www.freebuf.com/sectool/259079.html)
 - [check my blog for updates](https://jm33.me/emp3r0r-0x00.html)
 - [how to use](https://github.com/jm33-m0/emp3r0r/wiki)
+- **collaborators wanted!!!** please [contact me](https://jm33.me/pages/got-something-to-say.html) if you are interested
 
 ____
 
@@ -55,10 +56,10 @@ ____
 - [x] injector: inject shellcode into arbitrary process, using go and ptrace syscall
 - [x] injector: recover process after injection
 - [x] persistence: inject guardian shellcode into arbitrary process to gain persistence
-- [ ] store `vaccine` files in anonymous memory location instead of `/dev/shm`
+- [ ] **headless CC**, control using existing commands, can be useful when we write a web-based GUI
+- [ ] **exploit kit**
 - [ ] network scanner
 - [ ] passive scanner, for host/service discovery
-- [ ] exploit kit
 - [ ] conservative weak credentials scanner
 - [ ] auto pwn using weak credentials and RCEs
 
