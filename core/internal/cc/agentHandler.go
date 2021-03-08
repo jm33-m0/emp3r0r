@@ -72,7 +72,7 @@ func processAgentData(data *agent.MsgTunData) {
 		b64filedata := payloadSplit[2]
 		filedata, err := base64.StdEncoding.DecodeString(b64filedata)
 		if err != nil {
-			CliPrintError("processAgentData failed to decode file data: ", err)
+			CliPrintError("processAgentData failed to decode file data: %v", err)
 			return
 		}
 
@@ -80,13 +80,13 @@ func processAgentData(data *agent.MsgTunData) {
 		if _, err := os.Stat(FileGetDir); os.IsNotExist(err) {
 			err = os.MkdirAll(FileGetDir, 0700)
 			if err != nil {
-				CliPrintError("mkdir -p /tmp/emp3r0r/file-get: ", err)
+				CliPrintError("mkdir -p /tmp/emp3r0r/file-get: %v", err)
 				return
 			}
 		}
 		err = ioutil.WriteFile(FileGetDir+filename, filedata, 0600)
 		if err != nil {
-			CliPrintError("processAgentData failed to save file: ", err)
+			CliPrintError("processAgentData failed to save file: %v", err)
 			return
 		}
 
