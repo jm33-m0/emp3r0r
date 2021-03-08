@@ -1,15 +1,20 @@
 package cc
 
 import (
+	"log"
 	"net"
 	"os"
 
+	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent"
 )
 
 const SocketName = "/tmp/emp3r0r.socket"
 
-func APIMain() {
+var APIConn net.Conn
+
+func HeadlessMain() {
+	log.Printf("%s", color.CyanString("Starting emp3r0r API server"))
 	APIListen()
 }
 
@@ -38,6 +43,8 @@ func APIListen() {
 			CliPrintError("emp3r0r API: accept error:", err)
 			return
 		}
+		APIConn = conn
+		log.Printf("%s: %s", color.BlueString("emp3r0r got an API connection"), conn.RemoteAddr().String())
 		processAPIReq(conn)
 	}
 }

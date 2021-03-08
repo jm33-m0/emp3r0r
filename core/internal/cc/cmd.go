@@ -45,6 +45,11 @@ func CmdHandler(cmd string) (err error) {
 	case cmd == "":
 		return
 	case cmdSplit[0] == HELP:
+		// no help in headless mode
+		if IsHeadless {
+			return
+		}
+
 		if len(cmdSplit) > 2 {
 			CliPrintError("WTF?")
 			return
@@ -57,7 +62,7 @@ func CmdHandler(cmd string) (err error) {
 
 	case cmdSplit[0] == "use":
 		if len(cmdSplit) != 2 {
-			color.Red("use what? " + strconv.Quote(cmd))
+			CliPrintError("use what? " + strconv.Quote(cmd))
 			return
 		}
 
@@ -68,20 +73,22 @@ func CmdHandler(cmd string) (err error) {
 					delete(Options, k)
 				}
 				UpdateOptions(CurrentMod)
-				color.HiGreen("Using module '%s'", CurrentMod)
-				dynamicPrompt := fmt.Sprintf("%s (%s) "+color.HiCyanString("> "),
-					color.HiCyanString("emp3r0r"),
-					color.HiBlueString(CurrentMod))
-				EmpReadLine.Config.Prompt = dynamicPrompt
-				EmpReadLine.SetPrompt(dynamicPrompt)
+				CliPrintInfo("Using module %s", strconv.Quote(CurrentMod))
+				if !IsHeadless {
+					dynamicPrompt := fmt.Sprintf("%s (%s) "+color.HiCyanString("> "),
+						color.HiCyanString("emp3r0r"),
+						color.HiBlueString(CurrentMod))
+					EmpReadLine.Config.Prompt = dynamicPrompt
+					EmpReadLine.SetPrompt(dynamicPrompt)
+				}
 				return
 			}
 		}
-		color.Red("No such module: '%s'", cmdSplit[1])
+		CliPrintError("No such module: %s", strconv.Quote(cmdSplit[1]))
 
 	case cmdSplit[0] == "set":
 		if len(cmdSplit) < 3 {
-			color.Red("set what? " + strconv.Quote(cmd))
+			CliPrintError("set what? " + strconv.Quote(cmd))
 			return
 		}
 
@@ -90,12 +97,12 @@ func CmdHandler(cmd string) (err error) {
 
 	case cmdSplit[0] == "target":
 		if len(cmdSplit) != 2 {
-			color.Red("set target to what? " + strconv.Quote(cmd))
+			CliPrintError("set target to what? " + strconv.Quote(cmd))
 			return
 		}
 		index, e := strconv.Atoi(cmdSplit[1])
 		if e != nil {
-			color.Red("Cannot set target: %v", e)
+			CliPrintError("Cannot set target: %v", e)
 			return e
 		}
 		CurrentTarget = GetTargetFromIndex(index)
@@ -103,7 +110,7 @@ func CmdHandler(cmd string) (err error) {
 	default:
 		helper := CmdHelpers[cmd]
 		if helper == nil {
-			color.Red("Unknown command: " + strconv.Quote(cmd))
+			CliPrintError("Unknown command: " + strconv.Quote(cmd))
 			return
 		}
 		helper()

@@ -161,7 +161,7 @@ func ModuleRun() {
 	if CurrentTarget == nil {
 		if CurrentMod == agent.ModCMD_EXEC {
 			if !CliYesNo("Run on all targets") {
-				CliPrintError("Target not set, try `target 0`?")
+				CliPrintError("Target not specified")
 				return
 			}
 			ModuleHelpers[agent.ModCMD_EXEC]()
@@ -169,7 +169,7 @@ func ModuleRun() {
 		}
 	}
 	if Targets[CurrentTarget] == nil {
-		CliPrintError("Target not exist, type `info` to check")
+		CliPrintError("Target (%s) does not exist", CurrentTarget.Tag)
 		return
 	}
 
@@ -177,6 +177,6 @@ func ModuleRun() {
 	if mod != nil {
 		mod()
 	} else {
-		CliPrintError("Module '%s' not found", CurrentMod)
+		CliPrintError("Module %s not found", strconv.Quote(CurrentMod))
 	}
 }

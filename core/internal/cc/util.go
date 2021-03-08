@@ -160,3 +160,11 @@ func TermClear() {
 		CliPrintError("%v", err)
 	}
 }
+
+// GetDateTime get current date and time, for logging
+func GetDateTime() (datetime string) {
+	now := time.Now()
+	datetime = now.String()
+
+	return
+}

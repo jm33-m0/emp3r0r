@@ -25,8 +25,21 @@ type PortFwdSession struct {
 	Cancel context.CancelFunc        // PortFwd cancel
 }
 
+// TODO
+func headlessListPortFwds() (err error) {
+	return
+}
+
 // ListPortFwds list currently active port mappings
 func ListPortFwds() {
+	if IsHeadless {
+		err := headlessListPortFwds()
+		if err != nil {
+			CliPrintError("ListPortFwds: %v", err)
+		}
+		return
+	}
+
 	color.Cyan("Active port mappings\n")
 	color.Cyan("====================\n\n")
 	for id, portmap := range PortFwds {

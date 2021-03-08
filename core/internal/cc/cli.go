@@ -134,6 +134,13 @@ start:
 func CliPrintInfo(format string, a ...interface{}) {
 	if DebugLevel == 0 {
 		log.Println(color.BlueString(format, a...))
+		if IsHeadless {
+			// send to socket
+			_, err := APIConn.Write([]byte(GetDateTime() + " INFO: " + fmt.Sprintf(format, a...)))
+			if err != nil {
+				log.Printf("CliPrintInfo: %v", err)
+			}
+		}
 	}
 }
 
@@ -141,21 +148,47 @@ func CliPrintInfo(format string, a ...interface{}) {
 func CliPrintWarning(format string, a ...interface{}) {
 	if DebugLevel <= 1 {
 		log.Println(color.YellowString(format, a...))
+		if IsHeadless {
+			// send to socket
+			_, err := APIConn.Write([]byte(GetDateTime() + " WARN: " + fmt.Sprintf(format, a...)))
+			if err != nil {
+				log.Printf("CliPrintWarning: %v", err)
+			}
+		}
 	}
 }
 
 // CliPrintSuccess print log in green
 func CliPrintSuccess(format string, a ...interface{}) {
 	log.Println(color.HiGreenString(format, a...))
+	if IsHeadless {
+		// send to socket
+		_, err := APIConn.Write([]byte(GetDateTime() + " SUCCESS: " + fmt.Sprintf(format, a...)))
+		if err != nil {
+			log.Printf("CliPrintSuccess: %v", err)
+		}
+	}
 }
 
 // CliPrintError print log in red
 func CliPrintError(format string, a ...interface{}) {
 	log.Println(color.HiRedString(format, a...))
+	if IsHeadless {
+		// send to socket
+		_, err := APIConn.Write([]byte(GetDateTime() + " ERROR: " + fmt.Sprintf(format, a...)))
+		if err != nil {
+			log.Printf("CliPrintError: %v", err)
+		}
+	}
 }
 
 // CliYesNo prompt for a y/n answer from user
 func CliYesNo(prompt string) bool {
+	// always return true if there's no way to show prompt
+	if IsHeadless {
+		return true
+	}
+
 	EmpReadLine.SetPrompt(color.CyanString(prompt + "? [y/N] "))
 	EmpReadLine.Config.EOFPrompt = ""
 	EmpReadLine.Config.InterruptPrompt = ""
@@ -187,6 +220,11 @@ func CliListOptions() {
 
 	for k, v := range Options {
 		opts[k] = v.Val
+	}
+
+	if IsHeadless {
+		// TODO write JSON to APIConn
+		return
 	}
 	CliPrettyPrint("Option", "Value", &opts)
 }
