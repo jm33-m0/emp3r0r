@@ -2,7 +2,7 @@ package cc
 
 import (
 	"github.com/fatih/color"
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 )
 
 // LPEHelpers scripts that help you get root

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 )
 
 // BroadcastServer listen on a UDP port for broadcasts

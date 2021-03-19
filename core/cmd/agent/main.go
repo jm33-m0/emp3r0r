@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/agent"
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 )
 

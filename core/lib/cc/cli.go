@@ -13,7 +13,7 @@ import (
 
 	"github.com/bettercap/readline"
 	"github.com/fatih/color"
-	"github.com/jm33-m0/emp3r0r/core/internal/agent"
+	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 )
 
 var (

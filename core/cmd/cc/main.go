@@ -6,8 +6,8 @@ import (
 	"os"
 
 	"github.com/fatih/color"
-	"github.com/jm33-m0/emp3r0r/core/internal/agent"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc"
+	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc"
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 )
 
