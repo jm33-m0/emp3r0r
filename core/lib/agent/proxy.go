@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/posener/h2conn"
 	"github.com/txthinking/socks5"
 )
@@ -105,7 +106,7 @@ func TCPFwd(addr, port string, ctx context.Context, cancel context.CancelFunc) (
 
 		// wait to be canceled
 		for ctx.Err() == nil {
-			time.Sleep(time.Duration(RandInt(1, 20)) * time.Millisecond)
+			time.Sleep(time.Duration(util.RandInt(1, 20)) * time.Millisecond)
 		}
 	}
 	log.Printf("[+] Serving %s on 0.0.0.0:%s...", addr, port)
@@ -197,7 +198,7 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 		}()
 
 		// tell CC this is a reversed port mapping
-		shID := fmt.Sprintf("%s_%d-reverse", sessionID, RandInt(0, 1024))
+		shID := fmt.Sprintf("%s_%d-reverse", sessionID, util.RandInt(0, 1024))
 		_, err = h2.Write([]byte(shID))
 		if err != nil {
 			log.Printf("reverse port mapping hello: %v", err)

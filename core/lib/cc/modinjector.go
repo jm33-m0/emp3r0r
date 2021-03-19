@@ -3,7 +3,7 @@ package cc
 import (
 	"fmt"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func moduleInjector() {
@@ -16,7 +16,7 @@ func moduleInjector() {
 
 	// shellcode.txt
 	pid := Options["pid"].Val
-	if !agent.IsFileExist(WWWRoot + "shellcode.txt") {
+	if !util.IsFileExist(WWWRoot + "shellcode.txt") {
 		CliPrintWarning("%sshellcode.txt does not exist,"+
 			" the agent will be using built-in guardian shellcode", WWWRoot)
 	}

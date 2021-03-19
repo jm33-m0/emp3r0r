@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/fatih/color"
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 const SocketName = "/tmp/emp3r0r.socket"
@@ -23,7 +23,7 @@ func HeadlessMain() {
 // using a console
 func APIListen() {
 	// if socket file exists
-	if agent.IsFileExist(SocketName) {
+	if util.IsFileExist(SocketName) {
 		err := os.Remove(SocketName)
 		if err != nil {
 			CliPrintError("Failed to delete socket: %v", err)

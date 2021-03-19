@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	gops "github.com/mitchellh/go-ps"
 )
 
@@ -37,7 +38,7 @@ func ProcCmdline(pid int) (cmdline string) {
 
 // UpdateHIDE_PIDS update HIDE PID list
 func UpdateHIDE_PIDS() error {
-	HIDE_PIDS = RemoveDupsFromArray(HIDE_PIDS)
+	HIDE_PIDS = util.RemoveDupsFromArray(HIDE_PIDS)
 	return ioutil.WriteFile(AgentRoot+"/emp3r0r_pids", []byte(strings.Join(HIDE_PIDS, "\n")), 0600)
 }
 

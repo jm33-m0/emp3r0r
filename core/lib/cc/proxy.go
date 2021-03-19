@@ -10,8 +10,8 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/google/uuid"
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // PortFwdSession holds controller interface of a port-fwd session
@@ -253,7 +253,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 
 		go func() {
 			// sub-session (streamHandler) ID
-			shID := fmt.Sprintf("%s_%d", fwdID, agent.RandInt(0, 1024))
+			shID := fmt.Sprintf("%s_%d", fwdID, util.RandInt(0, 1024))
 			cmd = fmt.Sprintf("!port_fwd %s %s on", toAddr, shID)
 			err = SendCmd(cmd, CurrentTarget)
 			if err != nil {

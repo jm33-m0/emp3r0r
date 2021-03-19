@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // BroadcastServer listen on a UDP port for broadcasts
@@ -103,8 +104,8 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 	proxyMsg := "socks5://127.0.0.1:1080"
 	for ctx.Err() == nil {
 		log.Print("Broadcasting our proxy...")
-		time.Sleep(time.Duration(RandInt(10, 120)) * time.Second)
-		ips := tun.IPaddr()
+		time.Sleep(time.Duration(util.RandInt(10, 120)) * time.Second)
+		ips := IPaddr()
 		for _, ip := range ips {
 			if ip.Broadcast == nil {
 				continue

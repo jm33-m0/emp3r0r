@@ -153,7 +153,7 @@ func CollectSystemInfo() *SystemInfo {
 	info.IPs = tun.CollectLocalIPs()
 
 	// arp -a ?
-	info.ARP = tun.IPNeigh()
+	info.ARP = IPNeigh()
 
 	return &info
 }

