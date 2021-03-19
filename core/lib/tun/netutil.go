@@ -176,9 +176,7 @@ func IPaddr() (ips []netlink.Addr) {
 			log.Printf("cannot get addr list from %d: %v", link.Attrs().Index, err)
 			continue
 		}
-		for _, addr := range addrs {
-			ips = append(ips, addr)
-		}
+		ips = append(ips, addrs...)
 	}
 	return
 }
@@ -205,7 +203,7 @@ func IPr() (routes []string) {
 				routeStr = fmt.Sprintf("default via %s", route.Gw.String())
 			}
 			if route.Src == nil && route.Dst != nil {
-				routeStr = fmt.Sprintf("%s", route.Dst.String())
+				routeStr = route.Dst.String()
 			}
 			if route.Src != nil && route.Dst != nil {
 				routeStr = fmt.Sprintf("%s via %s", route.Dst.String(), route.Src.String())
