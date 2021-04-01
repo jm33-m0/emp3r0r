@@ -150,7 +150,7 @@ func CollectSystemInfo() *SystemInfo {
 	info.HasInternet = tun.HasInternetAccess()
 
 	// IP address?
-	info.IPs = tun.CollectLocalIPs()
+	info.IPs = tun.IPa()
 
 	// arp -a ?
 	info.ARP = IPNeigh()

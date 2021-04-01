@@ -8,44 +8,6 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-// IPa works like `ip addr`, covers both IPv4 and IPv6
-func IPa() (ips []string) {
-	links := IPLink()
-	if links == nil {
-		return []string{"N/A"}
-	}
-	for _, link := range links {
-		addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
-		if err != nil {
-			log.Printf("cannot get addr list from %d: %v", link.Attrs().Index, err)
-			continue
-		}
-		for _, addr := range addrs {
-			ip := fmt.Sprintf("%s (%s)", addr.IP.String(), linkIdx2Name(link.Attrs().Index))
-			ips = append(ips, ip)
-		}
-	}
-
-	return
-}
-
-// IPaddr returns netlink.Addr in IPv4
-func IPaddr() (ips []netlink.Addr) {
-	links := IPLink()
-	if links == nil {
-		return nil
-	}
-	for _, link := range links {
-		addrs, err := netlink.AddrList(link, netlink.FAMILY_V4)
-		if err != nil {
-			log.Printf("cannot get addr list from %d: %v", link.Attrs().Index, err)
-			continue
-		}
-		ips = append(ips, addrs...)
-	}
-	return
-}
-
 // IPr works like `ip r`, covers both IPv4 and IPv6
 func IPr() (routes []string) {
 	links := IPLink()

