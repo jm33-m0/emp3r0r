@@ -9,6 +9,7 @@ linux post-exploitation framework made by linux user
 - [check my blog for updates](https://jm33.me/emp3r0r-0x00.html)
 - [how to use](https://github.com/jm33-m0/emp3r0r/wiki)
 - **collaborators wanted!!!** please [contact me](https://jm33.me/pages/got-something-to-say.html) if you are interested
+- **cross-platform** support is in progress, contribute if you want emp3r0r to run on other systems
 
 ____
 
@@ -60,7 +61,7 @@ ____
 - [ ] **exploit kit**
 - [ ] network scanner
 - [ ] passive scanner, for host/service discovery
-- [ ] conservative weak credentials scanner
+- [ ] password spray
 - [ ] auto pwn using weak credentials and RCEs
 
 ## why another post-exploitation tool?
