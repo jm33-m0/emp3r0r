@@ -55,7 +55,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc) (err error)
 				continue
 			}
 			go func() {
-				err = TCPFwd(sl[1], ProxyPort, ctx, cancel)
+				err = tun.TCPFwd(sl[1], ProxyPort, ctx, cancel)
 				if err != nil {
 					log.Print("TCPFwd: ", err)
 				}
