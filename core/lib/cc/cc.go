@@ -68,11 +68,7 @@ func ListTargets() {
 
 	indent := strings.Repeat(" ", len(" [0] "))
 	for target, control := range Targets {
-		userInfo := color.HiRedString(target.User)
 		hasInternet := color.HiRedString("NO")
-		if target.HasRoot {
-			userInfo = color.HiGreenString(target.User)
-		}
 		if target.HasInternet {
 			hasInternet = color.HiGreenString("YES")
 		}
@@ -98,6 +94,11 @@ func ListTargets() {
 		}
 		arpTab := splitLongLine(strings.Join(target.ARP, ", "), 3)
 		ips := splitLongLine(strings.Join(target.IPs, ", "), 3)
+		target.User = splitLongLine(target.User, 4)
+		userInfo := color.HiRedString(target.User)
+		if target.HasRoot {
+			userInfo = color.HiGreenString(target.User)
+		}
 
 		// agent process info
 		agentProc := *target.Process
