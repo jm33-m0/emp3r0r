@@ -73,6 +73,10 @@ func TCPFwd(addr, port string, ctx context.Context, cancel context.CancelFunc) (
 	}
 	log.Printf("[+] Serving %s on 0.0.0.0:%s...", addr, port)
 	l, err := net.Listen("tcp", "0.0.0.0:"+port)
+	if err != nil {
+		log.Printf("unable to listen on 0.0.0.0:%s: %v", port, err)
+		return
+	}
 	for ctx.Err() == nil {
 		lconn, err := l.Accept()
 		if err != nil {
