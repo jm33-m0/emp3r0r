@@ -80,7 +80,7 @@ func ListTargets() {
 			}
 			ret = line[:55]
 			for i := 1; i <= len(line)/55; i++ {
-				if i == 2 {
+				if i == 4 {
 					break
 				}
 				endslice := 55 * (i + 1)
@@ -99,6 +99,7 @@ func ListTargets() {
 		if target.HasRoot {
 			userInfo = color.HiGreenString(target.User)
 		}
+		cpuinfo := color.HiMagentaString(splitLongLine(target.CPU, 3))
 
 		// agent process info
 		agentProc := *target.Process
@@ -111,7 +112,7 @@ func ListTargets() {
 			"Process":   color.HiMagentaString(procInfo),
 			"User":      userInfo,
 			"Internet":  hasInternet,
-			"CPU":       color.HiMagentaString(target.CPU),
+			"CPU":       cpuinfo,
 			"MEM":       target.Mem,
 			"Hardware":  color.HiCyanString(target.Hardware),
 			"Container": target.Container,

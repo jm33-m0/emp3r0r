@@ -12,6 +12,7 @@ require (
 	github.com/frankban/quicktest v1.11.3 // indirect
 	github.com/golang/snappy v0.0.2 // indirect
 	github.com/google/uuid v1.1.2
+	github.com/jaypipes/ghw v0.7.0
 	github.com/jm33-m0/go-cdn2proxy v1.0.1
 	github.com/mholt/archiver v3.1.1+incompatible
 	github.com/mitchellh/go-ps v1.0.0

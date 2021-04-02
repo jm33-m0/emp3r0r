@@ -1,26 +1,10 @@
 package agent
 
 import (
-	"fmt"
 	"io/ioutil"
 	"log"
 	"strings"
-
-	"github.com/zcalusic/sysinfo"
 )
-
-// CheckProduct check machine details
-func CheckProduct() (virt string) {
-	var si sysinfo.SysInfo
-	si.GetSysInfo() // read sysinfo
-	hypervisor := si.Node.Hypervisor
-	if hypervisor == "" {
-		hypervisor = "no hypervisor"
-	}
-
-	virt = fmt.Sprintf("%s (%s) by %s, %s", si.Product.Name, si.Product.Version, si.Product.Vendor, hypervisor)
-	return
-}
 
 // CheckContainer are we in a container? what container is it?
 func CheckContainer() (product string) {

@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"bufio"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -14,11 +13,11 @@ import (
 	"net/http"
 	"os"
 	"os/user"
-	"strconv"
-	"strings"
+	"runtime"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/zcalusic/sysinfo"
 )
 
@@ -101,14 +100,6 @@ func DownloadViaCC(url, path string) (data []byte, err error) {
 	return
 }
 
-// GetKernelVersion uname -r
-func GetKernelVersion() (ver string) {
-	var si sysinfo.SysInfo
-	si.GetSysInfo()
-
-	return si.Kernel.Release
-}
-
 // CollectSystemInfo build system info object
 func CollectSystemInfo() *SystemInfo {
 	var (
@@ -120,12 +111,17 @@ func CollectSystemInfo() *SystemInfo {
 	info.Tag = Tag
 
 	info.OS = fmt.Sprintf("%s %s", si.OS.Name, si.OS.Version)
-	info.Hostname = fmt.Sprintf("%s (%s)", si.Node.Hostname, si.Node.MachineID)
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Printf("Gethostname: %v", err)
+		hostname = "unknown_host"
+	}
+	info.Hostname = hostname
 	info.Kernel = si.Kernel.Release
-	info.Arch = si.Kernel.Architecture
-	info.CPU = fmt.Sprintf("%s (x%d)", si.CPU.Model, getCPUCnt())
-	info.Mem = fmt.Sprintf("%d MB", getMemSize())
-	info.Hardware = CheckProduct()
+	info.Arch = runtime.GOARCH
+	info.CPU = util.GetCPUInfo()
+	info.Mem = fmt.Sprintf("%d MB", util.GetMemSize())
+	info.Hardware = util.CheckProduct()
 	info.Container = CheckContainer()
 	info.Transport = Transport
 
@@ -156,76 +152,6 @@ func CollectSystemInfo() *SystemInfo {
 	info.ARP = IPNeigh()
 
 	return &info
-}
-
-// CheckAccount : check account info by parsing /etc/passwd
-func CheckAccount(username string) (accountInfo map[string]string, err error) {
-	// initialize accountInfo map
-	accountInfo = make(map[string]string)
-
-	// parse /etc/passwd
-	passwdFile, err := os.Open("/etc/passwd")
-	if err != nil {
-		log.Println(err)
-		return nil, err
-	}
-	scanner := bufio.NewScanner(passwdFile)
-	for scanner.Scan() {
-		line := scanner.Text()
-		fields := strings.Split(line, ":")
-		accountInfo["username"] = fields[0]
-		if username != accountInfo["username"] {
-			continue
-		}
-		accountInfo["home"] = fields[len(fields)-2]
-		accountInfo["shell"] = fields[len(fields)-1]
-
-	}
-
-	return
-}
-
-func getMemSize() (size int) {
-	var err error
-	f, err := os.Open("/proc/meminfo")
-	if err != nil {
-		return
-	}
-	defer f.Close()
-
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		lineSplit := strings.Fields(scanner.Text())
-
-		if lineSplit[0] == "MemTotal:" {
-			size, err = strconv.Atoi(lineSplit[1])
-			size /= 1024
-			if err != nil {
-				size = -1
-			}
-		}
-	}
-
-	return
-}
-
-func getCPUCnt() (cpuCnt int) {
-	f, err := os.Open("/proc/cpuinfo")
-	if err != nil {
-		return
-	}
-	defer f.Close()
-
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-
-		if strings.HasPrefix(line, "processor") {
-			cpuCnt++
-		}
-	}
-
-	return
 }
 
 // send local file to CC
