@@ -81,7 +81,7 @@ func processAPIReq(c net.Conn) {
 		cmd := string(data)
 		cmd = strings.TrimSpace(cmd)
 		err = CmdHandler(cmd)
-		CliPrintInfo("emp3r0r received %s", strconv.Quote(cmd))
+		log.Printf("emp3r0r received %s", color.BlueString(strconv.Quote(cmd)))
 		if err != nil {
 			CliPrintError("Command failed: %v", err)
 		}
