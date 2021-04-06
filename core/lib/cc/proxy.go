@@ -2,6 +2,7 @@ package cc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -25,8 +26,28 @@ type PortFwdSession struct {
 	Cancel context.CancelFunc        // PortFwd cancel
 }
 
-// TODO
+type mapping struct {
+	id          string // portfwd id
+	description string // details
+}
+
 func headlessListPortFwds() (err error) {
+	var mappings []mapping
+	for id, portmap := range PortFwds {
+		if portmap.Sh == nil {
+			portmap.Cancel()
+			continue
+		}
+		var permapping mapping
+		permapping.id = id
+		permapping.description = portmap.Description
+		mappings = append(mappings, permapping)
+	}
+	data, err := json.Marshal(mappings)
+	if err != nil {
+		return
+	}
+	_, err = APIConn.Write([]byte(data))
 	return
 }
 

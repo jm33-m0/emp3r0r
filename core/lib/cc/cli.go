@@ -2,6 +2,7 @@ package cc
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -136,7 +137,17 @@ func CliPrintInfo(format string, a ...interface{}) {
 		log.Println(color.BlueString(format, a...))
 		if IsHeadless {
 			// send to socket
-			_, err := APIConn.Write([]byte(GetDateTime() + " INFO: " + fmt.Sprintf(format, a...)))
+			var resp APIResponse
+			msg := GetDateTime() + " INFO: " + fmt.Sprintf(format, a...)
+			resp.MsgData = []byte(msg)
+			resp.Alert = false
+			resp.MsgType = LOG
+			data, err := json.Marshal(resp)
+			if err != nil {
+				log.Printf("CliPrintInfo: %v", err)
+				return
+			}
+			_, err = APIConn.Write([]byte(data))
 			if err != nil {
 				log.Printf("CliPrintInfo: %v", err)
 			}
@@ -150,7 +161,17 @@ func CliPrintWarning(format string, a ...interface{}) {
 		log.Println(color.YellowString(format, a...))
 		if IsHeadless {
 			// send to socket
-			_, err := APIConn.Write([]byte(GetDateTime() + " WARN: " + fmt.Sprintf(format, a...)))
+			var resp APIResponse
+			msg := GetDateTime() + " WARN: " + fmt.Sprintf(format, a...)
+			resp.MsgData = []byte(msg)
+			resp.Alert = false
+			resp.MsgType = LOG
+			data, err := json.Marshal(resp)
+			if err != nil {
+				log.Printf("CliPrintWarning: %v", err)
+				return
+			}
+			_, err = APIConn.Write([]byte(data))
 			if err != nil {
 				log.Printf("CliPrintWarning: %v", err)
 			}
@@ -163,7 +184,17 @@ func CliPrintSuccess(format string, a ...interface{}) {
 	log.Println(color.HiGreenString(format, a...))
 	if IsHeadless {
 		// send to socket
-		_, err := APIConn.Write([]byte(GetDateTime() + " SUCCESS: " + fmt.Sprintf(format, a...)))
+		var resp APIResponse
+		msg := GetDateTime() + " SUCCESS: " + fmt.Sprintf(format, a...)
+		resp.MsgData = []byte(msg)
+		resp.Alert = true
+		resp.MsgType = LOG
+		data, err := json.Marshal(resp)
+		if err != nil {
+			log.Printf("CliPrintSuccess: %v", err)
+			return
+		}
+		_, err = APIConn.Write([]byte(data))
 		if err != nil {
 			log.Printf("CliPrintSuccess: %v", err)
 		}
@@ -175,7 +206,17 @@ func CliPrintError(format string, a ...interface{}) {
 	log.Println(color.HiRedString(format, a...))
 	if IsHeadless {
 		// send to socket
-		_, err := APIConn.Write([]byte(GetDateTime() + " ERROR: " + fmt.Sprintf(format, a...)))
+		var resp APIResponse
+		msg := GetDateTime() + " ERROR: " + fmt.Sprintf(format, a...)
+		resp.MsgData = []byte(msg)
+		resp.Alert = true
+		resp.MsgType = LOG
+		data, err := json.Marshal(resp)
+		if err != nil {
+			log.Printf("CliPrintError: %v", err)
+			return
+		}
+		_, err = APIConn.Write([]byte(data))
 		if err != nil {
 			log.Printf("CliPrintError: %v", err)
 		}
@@ -222,10 +263,6 @@ func CliListOptions() {
 		opts[k] = v.Val
 	}
 
-	if IsHeadless {
-		// TODO write JSON to APIConn
-		return
-	}
 	CliPrettyPrint("Option", "Value", &opts)
 }
 
@@ -255,6 +292,29 @@ func CliBanner() error {
 
 // CliPrettyPrint prints two-column help info
 func CliPrettyPrint(header1, header2 string, map2write *map[string]string) {
+	if IsHeadless {
+		// send to socket
+		var resp APIResponse
+		msg, err := json.Marshal(map2write)
+		if err != nil {
+			log.Printf("CliPrettyPrint: %v", err)
+			return
+		}
+		resp.MsgData = msg
+		resp.Alert = true
+		resp.MsgType = JSON
+		data, err := json.Marshal(resp)
+		if err != nil {
+			log.Printf("CliPrettyPrint: %v", err)
+			return
+		}
+		_, err = APIConn.Write([]byte(data))
+		if err != nil {
+			log.Printf("CliPrettyPrint: %v", err)
+		}
+		return
+	}
+
 	cnt := 10
 	sep := strings.Repeat(" ", cnt)
 	color.Cyan("%s%s%s\n", header1, sep, header2)

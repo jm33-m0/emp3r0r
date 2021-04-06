@@ -48,8 +48,25 @@ type Control struct {
 	Conn  *h2conn.Conn
 }
 
-// TODO
+// send JSON encoded target list to frontend
 func headlessListTargets() (err error) {
+	var targets []agent.SystemInfo
+	for target, control := range Targets {
+		targets[control.Index] = *target
+	}
+	data, err := json.Marshal(targets)
+	if err != nil {
+		return
+	}
+	var resp APIResponse
+	resp.MsgData = data
+	resp.MsgType = JSON
+	resp.Alert = false
+	respdata, err := json.Marshal(resp)
+	if err != nil {
+		return
+	}
+	_, err = APIConn.Write([]byte(respdata))
 	return
 }
 
@@ -158,9 +175,6 @@ func GetTargetFromTag(tag string) (target *agent.SystemInfo) {
 
 // ListModules list all available modules
 func ListModules() {
-	if IsHeadless {
-		return
-	}
 	CliPrettyPrint("Module Name", "Help", &agent.ModuleDocs)
 }
 

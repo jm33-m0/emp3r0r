@@ -9,9 +9,22 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-const SocketName = "/tmp/emp3r0r.socket"
+const (
+	SocketName = "/tmp/emp3r0r.socket"
+
+	// for stupid goconst
+	LOG  = "log"
+	JSON = "JSON"
+)
 
 var APIConn net.Conn
+
+// APIResponse what the frontend sees, in JSON
+type APIResponse struct {
+	MsgType string // log/json, tells frontend where to put it
+	MsgData []byte // data payload, can be a JSON string or ordinary string
+	Alert   bool   // whether to alert the frontend user
+}
 
 func HeadlessMain() {
 	log.Printf("%s", color.CyanString("Starting emp3r0r API server"))
@@ -33,14 +46,14 @@ func APIListen() {
 
 	l, err := net.Listen("unix", SocketName)
 	if err != nil {
-		CliPrintError("listen error:", err)
+		CliPrintError("listen error: %v", err)
 		return
 	}
 
 	for {
 		conn, err := l.Accept()
 		if err != nil {
-			CliPrintError("emp3r0r API: accept error:", err)
+			CliPrintError("emp3r0r API: accept error: %v", err)
 			return
 		}
 		APIConn = conn
