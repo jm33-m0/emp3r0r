@@ -51,8 +51,8 @@ type Control struct {
 // send JSON encoded target list to frontend
 func headlessListTargets() (err error) {
 	var targets []agent.SystemInfo
-	for target, control := range Targets {
-		targets[control.Index] = *target
+	for target := range Targets {
+		targets = append(targets, *target)
 	}
 	data, err := json.Marshal(targets)
 	if err != nil {

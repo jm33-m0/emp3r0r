@@ -2,6 +2,7 @@ package cc
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -28,6 +29,25 @@ func processAgentData(data *agent.MsgTunData) {
 		cmd := payloadSplit[1]
 		out := strings.Join(payloadSplit[2:], " ")
 		outLines := strings.Split(out, "\n")
+
+		// headless mode
+		if IsHeadless {
+			// send to socket
+			var resp APIResponse
+			msg := fmt.Sprintf("%s:\n%s", cmd, out)
+			resp.MsgData = []byte(msg)
+			resp.Alert = false
+			resp.MsgType = CMD
+			data, err := json.Marshal(resp)
+			if err != nil {
+				log.Printf("processAgentData cmd output: %v", err)
+				return
+			}
+			_, err = APIConn.Write([]byte(data))
+			if err != nil {
+				log.Printf("processAgentData cmd output: %v", err)
+			}
+		}
 
 		// if cmd is `bash`, our shell is likey broken
 		if strings.HasPrefix(cmd, "bash") {

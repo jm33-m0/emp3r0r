@@ -4,6 +4,8 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -15,13 +17,14 @@ const (
 	// for stupid goconst
 	LOG  = "log"
 	JSON = "JSON"
+	CMD  = "cmd"
 )
 
 var APIConn net.Conn
 
 // APIResponse what the frontend sees, in JSON
 type APIResponse struct {
-	MsgType string // log/json, tells frontend where to put it
+	MsgType string // log/json/cmd, tells frontend where to put it
 	MsgData []byte // data payload, can be a JSON string or ordinary string
 	Alert   bool   // whether to alert the frontend user
 }
@@ -72,11 +75,12 @@ func processAPIReq(c net.Conn) {
 		}
 
 		data := buf[0:nr]
-		CliPrintInfo("emp3r0r received \"%s\"", data)
 
 		// deal with the command
 		cmd := string(data)
+		cmd = strings.TrimSpace(cmd)
 		err = CmdHandler(cmd)
+		CliPrintInfo("emp3r0r received %s", strconv.Quote(cmd))
 		if err != nil {
 			CliPrintError("Command failed: %v", err)
 		}
