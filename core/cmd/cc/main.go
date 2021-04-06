@@ -37,11 +37,11 @@ func main() {
 	}
 
 	// use emp3r0r in terminal or from other frontend
-	log.Printf("%s", color.YellowString("emp3r0r CC is running in headless mode!"))
 	if !*headless {
 		cc.CliMain()
 		os.Exit(0)
 	}
 
+	log.Printf("%s", color.YellowString("emp3r0r CC is running in headless mode!"))
 	cc.HeadlessMain()
 }

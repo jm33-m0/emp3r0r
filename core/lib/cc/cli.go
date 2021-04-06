@@ -301,7 +301,7 @@ func CliPrettyPrint(header1, header2 string, map2write *map[string]string) {
 			return
 		}
 		resp.MsgData = msg
-		resp.Alert = true
+		resp.Alert = false
 		resp.MsgType = JSON
 		data, err := json.Marshal(resp)
 		if err != nil {
