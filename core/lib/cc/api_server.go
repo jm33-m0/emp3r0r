@@ -60,6 +60,7 @@ func APIListen() {
 			return
 		}
 		APIConn = conn
+		IsHeadless = APIConn != nil // update IsHeadless status
 		log.Printf("%s: %s", color.BlueString("emp3r0r got an API connection"), conn.RemoteAddr().String())
 		processAPIReq(conn)
 	}
