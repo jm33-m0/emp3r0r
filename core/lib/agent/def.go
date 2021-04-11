@@ -42,9 +42,10 @@ var (
 
 	// GuardianAgentPath where the agent binary is stored
 	GuardianAgentPath = "[persistence_agent_path]"
-)
 
-const (
+	/*
+		config vars
+	*/
 	// Version record version on build time
 	Version = "[emp3r0r_version_string]"
 
@@ -78,9 +79,11 @@ const (
 	// Tag uuid of this agent
 	Tag = "[agent_uuid]"
 
-	// OpSep separator of CC payload
+	// OpSep separator of CC payload, has to stay static, can be modified at compile-time
 	OpSep = "cb433bd1-354c-4802-a4fa-ece518f3ded1"
+)
 
+const (
 	// RShellBufSize buffer size of reverse shell stream
 	RShellBufSize = 128
 

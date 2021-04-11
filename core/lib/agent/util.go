@@ -108,14 +108,14 @@ func CollectSystemInfo() *SystemInfo {
 	)
 	si.GetSysInfo() // read sysinfo
 
-	info.Tag = Tag
-
 	info.OS = fmt.Sprintf("%s %s", si.OS.Name, si.OS.Version)
 	hostname, err := os.Hostname()
 	if err != nil {
 		log.Printf("Gethostname: %v", err)
 		hostname = "unknown_host"
 	}
+	Tag = util.GetHostID()
+	info.Tag = Tag // use hostid
 	info.Hostname = hostname
 	info.Kernel = si.Kernel.Release
 	info.Arch = runtime.GOARCH
