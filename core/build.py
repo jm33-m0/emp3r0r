@@ -58,16 +58,22 @@ class GoBuild:
         '''
         cd to cmd and run go build
         '''
-        # write cache
-        json_file = open(BUILD_JSON, "w+")
-        json.dump(CACHED_CONF, json_file)
-        json_file.close()
-
         self.gen_certs()
         # CA
         f = open("./tls/rootCA.crt")
         self.CA = f.read()
         f.close()
+
+        # cache CA, too
+        CACHED_CONF['ca'] = self.CA
+
+        # cache version
+        CACHED_CONF['version'] = self.VERSION
+
+        # write cache
+        json_file = open(BUILD_JSON, "w+")
+        json.dump(CACHED_CONF, json_file)
+        json_file.close()
 
         self.set_tags()
 
