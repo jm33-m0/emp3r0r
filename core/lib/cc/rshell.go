@@ -26,7 +26,7 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 	}
 
 	cancel := RShellStream.H2x.Cancel
-	CliPrintInfo("Entering bash...")
+	CliPrintInfo("Entering shell...")
 
 	// receive and display bash's output
 	go func(ctx context.Context) {
@@ -109,7 +109,7 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 
 		err = RShellStream.H2x.Conn.Close()
 		if err != nil {
-			CliPrintWarning("Closing reverse shell connection: ", err)
+			CliPrintWarning("Closing reverse shell connection: %v", err)
 		}
 
 		// nil out RShellStream
