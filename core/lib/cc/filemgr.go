@@ -26,7 +26,7 @@ func LsAgentFiles(cmd string) {
 	}
 }
 
-func DownloadFromAgent(cmd string) {
+func UploadToAgent(cmd string) {
 	// target
 	target := SelectCurrentTarget()
 	if target == nil {
@@ -46,7 +46,7 @@ func DownloadFromAgent(cmd string) {
 	}
 }
 
-func UploadToAgent(cmd string) {
+func DownloadFromAgent(cmd string) {
 	// target
 	target := SelectCurrentTarget()
 	if target == nil {
