@@ -59,7 +59,9 @@ func GetHostID() (id string) {
 		return
 	}
 
-	id = fmt.Sprintf("%s_%s-agent", name, productInfo.UUID)
+	if productInfo.UUID != "unknown" {
+		id = fmt.Sprintf("%s_%s-agent", name, productInfo.UUID)
+	}
 	return
 }
 
