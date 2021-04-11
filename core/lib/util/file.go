@@ -44,7 +44,7 @@ func LsPath(path string) (res string, err error) {
 			dent.Ftype = "dir"
 		}
 		dent.Permission = f.Mode().String()
-		dent.Size = fmt.Sprintf("%dK", f.Size()/1024)
+		dent.Size = fmt.Sprintf("%d bytes", f.Size())
 		dents = append(dents, dent)
 	}
 
