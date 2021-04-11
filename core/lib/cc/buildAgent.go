@@ -10,6 +10,7 @@ import (
 func GenAgent() {
 	buildJSONFile := "./build.json"
 	stubFile := "./stub.exe"
+	outfile := "./agent.exe"
 	CliPrintWarning("Make sure %s and %s exist", buildJSONFile, stubFile)
 
 	// read file
@@ -35,12 +36,13 @@ func GenAgent() {
 	}
 	toWrite = append(toWrite, []byte(agent.OpSep)...)
 	toWrite = append(toWrite, encJSONBytes...)
-	err = ioutil.WriteFile("packed.exe", toWrite, 0755)
+	err = ioutil.WriteFile(outfile, toWrite, 0755)
 	if err != nil {
 		CliPrintError("%v", err)
 		return
 	}
 
 	// done
-	CliPrintSuccess("Generated packed.exe")
+	CliPrintSuccess("Generated %s from %s and %s, you can use %s on arbitrary target",
+		outfile, stubFile, buildJSONFile, outfile)
 }
