@@ -4,6 +4,8 @@ import (
 	"bufio"
 	crypto_rand "crypto/rand"
 	"encoding/binary"
+	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -12,6 +14,45 @@ import (
 	"strings"
 	"time"
 )
+
+// Dentry Directory entry
+type Dentry struct {
+	Name       string `json:"name"`  // filename
+	Ftype      string `json:"ftype"` // file/dir
+	Size       string `json:"size"`  // 100
+	Date       string `json:"date"`  // 2021-01-01
+	Owner      string `json:"owner"` // jm33
+	Permission string `json:"perm"`  // -rwxr-xr-x
+}
+
+// LsPath ls path and return a json
+func LsPath(path string) (res string, err error) {
+	files, err := ioutil.ReadDir("./")
+	if err != nil {
+		log.Printf("LsPath: %v", err)
+		return
+	}
+
+	// parse
+	var dents []Dentry
+	for _, f := range files {
+		var dent Dentry
+		dent.Name = f.Name()
+		dent.Date = f.ModTime().String()
+		dent.Ftype = "file"
+		if f.IsDir() {
+			dent.Ftype = "dir"
+		}
+		dent.Permission = f.Mode().String()
+		dent.Size = fmt.Sprintf("%dK", f.Size()/1024)
+		dents = append(dents, dent)
+	}
+
+	// json
+	jsonData, err := json.Marshal(dents)
+	res = string(jsonData)
+	return
+}
 
 // IsCommandExist check if an executable is in $PATH
 func IsCommandExist(exe string) bool {

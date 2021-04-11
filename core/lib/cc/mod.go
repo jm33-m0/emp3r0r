@@ -180,3 +180,26 @@ func ModuleRun() {
 		CliPrintError("Module %s not found", strconv.Quote(CurrentMod))
 	}
 }
+
+// SelectCurrentTarget check if current target is set and alive
+func SelectCurrentTarget() (target *agent.SystemInfo) {
+	// find target
+	target = CurrentTarget
+	if target == nil {
+		CliPrintError("SelectCurrentTarget: Target does not exist")
+		return nil
+	}
+
+	// write to given target's connection
+	tControl := Targets[target]
+	if tControl == nil {
+		CliPrintError("SelectCurrentTarget: agent control interface not found")
+		return nil
+	}
+	if tControl.Conn == nil {
+		CliPrintError("SelectCurrentTarget: agent is not connected")
+		return nil
+	}
+
+	return
+}

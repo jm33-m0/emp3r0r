@@ -12,6 +12,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // processAgentData deal with data from agent side
@@ -35,6 +36,7 @@ func processAgentData(data *agent.MsgTunData) {
 			// send to socket
 			var resp APIResponse
 			msg := fmt.Sprintf("%s:\n%s", cmd, out)
+			resp.Cmd = cmd
 			resp.MsgData = []byte(msg)
 			resp.Alert = false
 			resp.MsgType = CMD
@@ -53,6 +55,19 @@ func processAgentData(data *agent.MsgTunData) {
 		if strings.HasPrefix(cmd, "bash") {
 			shellToken := strings.Split(cmd, " ")[1]
 			RShellStatus[shellToken] = fmt.Errorf("Reverse shell error: %v", out)
+		}
+
+		// ls command
+		if strings.HasPrefix(cmd, "ls") {
+			var dents []util.Dentry
+			err = json.Unmarshal([]byte(out), &dents)
+			if err != nil {
+				CliPrintError("ls: %v", err)
+			}
+
+			for _, d := range dents {
+				color.Blue("%s: %s, %s, %s", d.Name, d.Ftype, d.Size, d.Permission)
+			}
 		}
 
 		// optimize output

@@ -59,6 +59,7 @@ func headlessListTargets() (err error) {
 		return
 	}
 	var resp APIResponse
+	resp.Cmd = "ls_targets"
 	resp.MsgData = data
 	resp.MsgType = JSON
 	resp.Alert = false

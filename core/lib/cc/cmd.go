@@ -32,6 +32,13 @@ var CmdHelpers = map[string]func(){
 	"run":          ModuleRun,
 }
 
+// FileManagerHelpers manage agent files
+var FileManagerHelpers = map[string]func(string){
+	"ls":  LsAgentFiles,
+	"put": UploadToAgent,
+	"get": DownloadFromAgent,
+}
+
 const HELP = "help" // fuck goconst
 
 // CmdHandler processes user commands
@@ -110,7 +117,12 @@ func CmdHandler(cmd string) (err error) {
 	default:
 		helper := CmdHelpers[cmd]
 		if helper == nil {
-			CliPrintError("Unknown command: " + strconv.Quote(cmd))
+			filehelper := FileManagerHelpers[cmdSplit[0]]
+			if filehelper == nil {
+				CliPrintError("Unknown command: " + strconv.Quote(cmd))
+				return
+			}
+			filehelper(cmd)
 			return
 		}
 		helper()

@@ -24,6 +24,7 @@ var APIConn net.Conn
 
 // APIResponse what the frontend sees, in JSON
 type APIResponse struct {
+	Cmd     string // user cmd
 	MsgType string // log/json/cmd, tells frontend where to put it
 	MsgData []byte // data payload, can be a JSON string or ordinary string
 	Alert   bool   // whether to alert the frontend user
