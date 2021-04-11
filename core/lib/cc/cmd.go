@@ -116,7 +116,7 @@ func CmdHandler(cmd string) (err error) {
 		if e != nil {
 			CurrentTarget = GetTargetFromTag(cmdSplit[1])
 			if CurrentTarget != nil {
-				CliPrintSuccess("Now targeting %s", cmdSplit[1])
+				CliPrintSuccess("Now targeting %s", CurrentTarget.Tag)
 				return nil
 			}
 			return fmt.Errorf("cannot set target by index: %v", e)
@@ -126,7 +126,7 @@ func CmdHandler(cmd string) (err error) {
 			CliPrintWarning("Target does not exist, no target has been selected")
 			return fmt.Errorf("target not set or is nil")
 		}
-		CliPrintSuccess("Now targeting %s", cmdSplit[1])
+		CliPrintSuccess("Now targeting %s", CurrentTarget.Tag)
 
 	default:
 		helper := CmdHelpers[cmd]
