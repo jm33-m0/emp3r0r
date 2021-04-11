@@ -249,7 +249,7 @@ func cmdBash() (err error) {
 	cmd := fmt.Sprintf("bash %s", token)
 	err = SendCmd(cmd, CurrentTarget)
 	if err != nil {
-		CliPrintError("Cannot activate reverse shell on remote target: ", err)
+		CliPrintError("Cannot activate reverse shell on remote target: %v", err)
 		return
 	}
 
