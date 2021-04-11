@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cheynewallace/tabby"
 	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -66,11 +67,16 @@ func processAgentData(data *agent.MsgTunData) {
 				return
 			}
 
-			ds := ""
+			t := tabby.New()
+			t.AddHeader("Name", "Type", "Size", "Permission")
 			for _, d := range dents {
-				ds += color.BlueString("%s%s: %s, %s, %s\n", strings.Repeat(" ", 15), d.Name, d.Ftype, d.Size, d.Permission)
+				t.AddLine(color.HiBlueString(d.Name),
+					color.BlueString(d.Ftype),
+					color.BlueString(d.Size),
+					color.BlueString(d.Permission))
 			}
-			CliPrintInfo("Listing current path:\n%s", ds)
+			CliPrintInfo("Listing current path:")
+			t.Print()
 			return
 		}
 
