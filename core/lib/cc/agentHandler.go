@@ -69,7 +69,7 @@ func processAgentData(data *agent.MsgTunData) {
 			for _, d := range dents {
 				ds += color.BlueString("%s%s: %s, %s, %s\n", strings.Repeat(" ", 15), d.Name, d.Ftype, d.Size, d.Permission)
 			}
-			CliPrintInfo("Listing current path: %s", ds)
+			CliPrintInfo("Listing current path:\n%s", ds)
 			return
 		}
 
