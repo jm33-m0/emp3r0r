@@ -8,13 +8,12 @@ import (
 	"log"
 	"os"
 	"strings"
-	"text/tabwriter"
 	"time"
 
-	"github.com/cheynewallace/tabby"
 	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
+	"github.com/jm33-m0/tabby"
 )
 
 // processAgentData deal with data from agent side
@@ -69,8 +68,7 @@ func processAgentData(data *agent.MsgTunData) {
 			}
 
 			// write to emp3r0r console
-			empTabwriter := tabwriter.NewWriter(EmpReadLine.Stderr(), 0, 0, 2, ' ', 0)
-			t := tabby.NewCustom(empTabwriter)
+			t := tabby.New()
 			t.AddHeader("Name", "Type", "Size", "Permission")
 			for _, d := range dents {
 				t.AddLine(color.HiBlueString(d.Name),
@@ -78,8 +76,7 @@ func processAgentData(data *agent.MsgTunData) {
 					color.BlueString(d.Size),
 					color.BlueString(d.Permission))
 			}
-			CliPrintInfo("Listing current path:\n")
-			t.Print()
+			CliPrintInfo("Listing current path:\n%s", t.String())
 			CliPrintInfo("End of listing\n")
 			return
 		}
