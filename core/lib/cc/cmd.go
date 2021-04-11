@@ -40,6 +40,7 @@ var CmdHelpers = map[string]func(){
 // FileManagerHelpers manage agent files
 var FileManagerHelpers = map[string]func(string){
 	"ls":  LsAgentFiles,
+	"pwd": LsAgentFiles,
 	"put": UploadToAgent,
 	"get": DownloadFromAgent,
 }
