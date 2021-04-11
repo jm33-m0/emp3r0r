@@ -3,6 +3,7 @@ package util
 import (
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/jaypipes/ghw"
 )
@@ -45,14 +46,20 @@ loopProcessors:
 
 // GetHostID unique identifier of the host
 func GetHostID() (id string) {
-	id = fmt.Sprintf("emp3r0r-agent-%d", RandInt(0, 10000))
+	id = fmt.Sprintf("unknown_%d-agent", RandInt(0, 10000))
+	name, err := os.Hostname()
+	if err != nil {
+		log.Printf("GetHostID: %v", err)
+		return
+	}
+	id = fmt.Sprintf("%s_%d-agent", name, RandInt(0, 10000))
 	productInfo, err := ghw.Product()
 	if err != nil {
 		log.Printf("GetHostID: %v", err)
 		return
 	}
 
-	id = productInfo.UUID
+	id = fmt.Sprintf("%s_%s-agent", name, productInfo.UUID)
 	return
 }
 
