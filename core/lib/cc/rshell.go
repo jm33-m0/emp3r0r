@@ -107,10 +107,11 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 			CliPrintWarning("Closing /dev/tty: %v", err)
 		}
 
-		err = RShellStream.H2x.Conn.Close()
-		if err != nil {
-			CliPrintWarning("Closing reverse shell connection: %v", err)
-		}
+		// no need to close this
+		// err = RShellStream.H2x.Conn.Close()
+		// if err != nil {
+		// 	CliPrintWarning("Closing reverse shell connection: %v", err)
+		// }
 
 		// nil out RShellStream
 		RShellStream.H2x.Conn = nil
