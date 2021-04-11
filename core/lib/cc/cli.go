@@ -48,7 +48,7 @@ func CliMain() {
 			readline.PcItemDynamic(listMods())),
 
 		readline.PcItem("target",
-			readline.PcItemDynamic(listTargetIndex())),
+			readline.PcItemDynamic(listTargetIndexTags())),
 	}
 
 	for cmd := range Commands {
@@ -384,13 +384,15 @@ func listMods() func(string) []string {
 	}
 }
 
-// autocomplete target index
-func listTargetIndex() func(string) []string {
+// autocomplete target index and tags
+func listTargetIndexTags() func(string) []string {
 	return func(line string) []string {
 		names := make([]string, 0)
-		for _, c := range Targets {
+		for t, c := range Targets {
 			idx := c.Index
+			tag := t.Tag
 			names = append(names, strconv.Itoa(idx))
+			names = append(names, tag)
 		}
 		return names
 	}

@@ -114,10 +114,19 @@ func CmdHandler(cmd string) (err error) {
 		}
 		index, e := strconv.Atoi(cmdSplit[1])
 		if e != nil {
-			CliPrintError("Cannot set target: %v", e)
-			return e
+			CurrentTarget = GetTargetFromTag(cmdSplit[1])
+			if CurrentTarget != nil {
+				CliPrintSuccess("Now targeting %s", cmdSplit[1])
+				return nil
+			}
+			return fmt.Errorf("cannot set target by index: %v", e)
 		}
 		CurrentTarget = GetTargetFromIndex(index)
+		if CurrentTarget == nil {
+			CliPrintWarning("Target does not exist, no target has been selected")
+			return fmt.Errorf("target not set or is nil")
+		}
+		CliPrintSuccess("Now targeting %s", cmdSplit[1])
 
 	default:
 		helper := CmdHelpers[cmd]
