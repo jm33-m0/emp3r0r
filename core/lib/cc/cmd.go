@@ -17,6 +17,10 @@ var Commands = map[string]string{
 	"use":          "Use a module. eg. `use <module_name>`",
 	"run":          "Run selected module, make sure you have set required options",
 	"info":         "What options do we have?",
+	"gen_agent":    "Generate agent with provided binary and build.json",
+	"ls":           "List current directory of selected agent",
+	"get":          "Download a file from selected agent",
+	"put":          "Upload a file to selected agent",
 	"ls_targets":   "List all targets",
 	"ls_modules":   "List all modules",
 	"ls_port_fwds": "List all port mappings",
@@ -30,6 +34,7 @@ var CmdHelpers = map[string]func(){
 	"ls_port_fwds": ListPortFwds,
 	"info":         CliListOptions,
 	"run":          ModuleRun,
+	"gen_agent":    GenAgent,
 }
 
 // FileManagerHelpers manage agent files
