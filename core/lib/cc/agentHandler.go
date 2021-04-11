@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"text/tabwriter"
 	"time"
 
 	"github.com/cheynewallace/tabby"
@@ -67,7 +68,9 @@ func processAgentData(data *agent.MsgTunData) {
 				return
 			}
 
-			t := tabby.New()
+			// write to emp3r0r console
+			empTabwriter := tabwriter.NewWriter(EmpReadLine.Stderr(), 0, 0, 2, ' ', 0)
+			t := tabby.NewCustom(empTabwriter)
 			t.AddHeader("Name", "Type", "Size", "Permission")
 			for _, d := range dents {
 				t.AddLine(color.HiBlueString(d.Name),
