@@ -2,6 +2,7 @@ package cc
 
 import (
 	"io/ioutil"
+	"strconv"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -11,7 +12,8 @@ func GenAgent() {
 	buildJSONFile := "./build.json"
 	stubFile := "./stub.exe"
 	outfile := "./agent.exe"
-	CliPrintWarning("Make sure %s and %s exist", buildJSONFile, stubFile)
+	CliPrintWarning("Make sure %s and %s exist, and %s must NOT be packed",
+		buildJSONFile, stubFile, strconv.Quote(stubFile))
 
 	// read file
 	jsonBytes, err := ioutil.ReadFile(buildJSONFile)
