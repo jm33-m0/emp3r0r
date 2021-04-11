@@ -10,7 +10,7 @@ import (
 func GenAgent() {
 	buildJSONFile := "./build.json"
 	stubFile := "./stub.exe"
-	CliPrintWarning("Make sure ./%s and ./%s exist", buildJSONFile, stubFile)
+	CliPrintWarning("Make sure %s and %s exist", buildJSONFile, stubFile)
 
 	// read file
 	jsonBytes, err := ioutil.ReadFile(buildJSONFile)
