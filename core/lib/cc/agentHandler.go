@@ -65,11 +65,11 @@ func processAgentData(data *agent.MsgTunData) {
 				CliPrintError("ls: %v", err)
 			}
 
-			CliPrintInfo("Listing current path:")
+			ds := ""
 			for _, d := range dents {
-				color.Blue("%s: %s, %s, %s", d.Name, d.Ftype, d.Size, d.Permission)
+				ds += color.BlueString("%s%s: %s, %s, %s\n", strings.Repeat(" ", 15), d.Name, d.Ftype, d.Size, d.Permission)
 			}
-			CliPrintInfo("Listing current path done")
+			CliPrintInfo("Listing current path: %s", ds)
 			return
 		}
 
