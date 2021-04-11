@@ -62,7 +62,8 @@ func processAgentData(data *agent.MsgTunData) {
 			var dents []util.Dentry
 			err = json.Unmarshal([]byte(out), &dents)
 			if err != nil {
-				CliPrintError("ls: %v: %s", err, out)
+				CliPrintError("ls: %v:\n%s", err, out)
+				return
 			}
 
 			ds := ""
