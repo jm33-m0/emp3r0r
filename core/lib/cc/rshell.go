@@ -164,6 +164,7 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 	setupTermCmd := fmt.Sprintf("stty rows %d columns %d;clear\n",
 		currentWinSize.Rows, currentWinSize.Cols)
 	send <- []byte(setupTermCmd)
+	CliPrintInfo("Sent stty resize command")
 
 	// switch to raw mode
 	out, err = exec.Command("stty", "-F", "/dev/tty", "raw", "-echo").CombinedOutput()
@@ -171,6 +172,7 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 		CliPrintError("stty raw mode failed: %v\n%s", err, out)
 		return
 	}
+	CliPrintWarning("Now in raw mode")
 
 	// read user input from /dev/tty
 	go func() {
