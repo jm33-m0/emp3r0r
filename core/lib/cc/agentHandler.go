@@ -75,8 +75,9 @@ func processAgentData(data *agent.MsgTunData) {
 					color.BlueString(d.Size),
 					color.BlueString(d.Permission))
 			}
-			CliPrintInfo("Listing current path:")
+			CliPrintInfo("Listing current path:\n")
 			t.Print()
+			CliPrintInfo("End of listing\n")
 			return
 		}
 
