@@ -47,6 +47,18 @@ func SendCmd(cmd string, a *agent.SystemInfo) error {
 	return Send2Agent(&cmdData, a)
 }
 
+// SendCmdToCurrentTarget send a command to currently selected agent
+func SendCmdToCurrentTarget(cmd string) error {
+	// target
+	target := SelectCurrentTarget()
+	if target == nil {
+		return fmt.Errorf("You have to select a target first")
+	}
+
+	// send cmd
+	return SendCmd(cmd, target)
+}
+
 // IsCommandExist check if an executable is in $PATH
 func IsCommandExist(exe string) bool {
 	_, err := exec.LookPath(exe)
