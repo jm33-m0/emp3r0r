@@ -13,7 +13,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/jm33-m0/tabby"
+	"github.com/olekukonko/tablewriter"
 )
 
 // processAgentData deal with data from agent side
@@ -67,16 +67,33 @@ func processAgentData(data *agent.MsgTunData) {
 				return
 			}
 
-			// write to emp3r0r console
-			t := tabby.New()
-			t.AddHeader("Name", "Type", "Size", "Permission")
+			// build table
+			tdata := [][]string{}
+			tableString := &strings.Builder{}
+			table := tablewriter.NewWriter(tableString)
+			table.SetHeader([]string{"Name", "Type", "Size", "Time", "Permission"})
+			table.SetBorder(true)
+
+			// color
+			table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
+				tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
+				tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
+				tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
+				tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor})
+
+			table.SetColumnColor(tablewriter.Colors{tablewriter.FgHiBlueColor},
+				tablewriter.Colors{tablewriter.FgBlueColor},
+				tablewriter.Colors{tablewriter.FgBlueColor},
+				tablewriter.Colors{tablewriter.FgBlueColor},
+				tablewriter.Colors{tablewriter.FgBlueColor})
+
+			// fill table
 			for _, d := range dents {
-				t.AddLine(color.HiBlueString(d.Name),
-					color.BlueString(d.Ftype),
-					color.BlueString(d.Size),
-					color.BlueString(d.Permission))
+				tdata = append(tdata, []string{d.Name, d.Ftype, d.Size, d.Date, d.Permission})
 			}
-			CliPrintInfo("Listing current path:\n%s", t.String())
+			table.AppendBulk(tdata)
+			table.Render()
+			CliPrintInfo("Listing current path:\n%s", tableString.String())
 			CliPrintInfo("End of listing\n")
 			return
 		}
