@@ -11,6 +11,7 @@ require (
 	github.com/google/uuid v1.2.0
 	github.com/jaypipes/ghw v0.7.0
 	github.com/jm33-m0/go-cdn2proxy v1.0.1
+	github.com/kbinani/screenshot v0.0.0-20210326165202-b96eb3309bb0
 	github.com/mholt/archiver v3.1.1+incompatible
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/nwaples/rardecode v1.1.0 // indirect

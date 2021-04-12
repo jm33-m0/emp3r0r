@@ -25,6 +25,7 @@ var Commands = map[string]string{
 	"kill":         "Terminate a process on selected agent: eg. `kill <pid>`",
 	"get":          "Download a file from selected agent",
 	"put":          "Upload a file to selected agent",
+	"screenshot":   "Take a screenshot of selected agent",
 	"ls_targets":   "List all targets",
 	"ls_modules":   "List all modules",
 	"ls_port_fwds": "List all port mappings",
@@ -38,6 +39,7 @@ var CmdHelpers = map[string]func(){
 	"ls_port_fwds": ListPortFwds,
 	"info":         CliListOptions,
 	"run":          ModuleRun,
+	"screenshot":   TakeScreenshot,
 	"gen_agent":    GenAgent,
 }
 

