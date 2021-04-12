@@ -18,6 +18,7 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/pierrec/lz4 v2.6.0+incompatible // indirect
 	github.com/posener/h2conn v0.0.0-20180911140238-13e7df33ed15
+	github.com/shirou/gopsutil/v3 v3.21.3
 	github.com/txthinking/runnergroup v0.0.0-20210326110939-37fc67d0da7c // indirect
 	github.com/txthinking/socks5 v0.0.0-20210326104807-61b5745ff346
 	github.com/txthinking/x v0.0.0-20210326105829-476fab902fbe // indirect

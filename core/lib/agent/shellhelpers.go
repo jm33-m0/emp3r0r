@@ -1,13 +1,14 @@
 package agent
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
-	gops "github.com/mitchellh/go-ps"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // shellHelper ps and kill and other helpers
@@ -85,13 +86,17 @@ func shellKill(args []string) (out string, err error) {
 }
 
 func shellPs() (out string, err error) {
-	procs, err := gops.Processes()
+	out = "Failed to get process list"
+	procs := util.ProcessList()
+	if procs == nil {
+		return out, fmt.Errorf("Error: %v", out)
+	}
+
+	data, err := json.Marshal(procs)
 	if err != nil {
 		return
 	}
+	out = string(data)
 
-	for _, proc := range procs {
-		out = fmt.Sprintf("%s\n%d<-%d    %s", out, proc.Pid(), proc.PPid(), proc.Executable())
-	}
 	return
 }

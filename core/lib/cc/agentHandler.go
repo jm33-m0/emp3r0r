@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -56,6 +57,44 @@ func processAgentData(data *agent.MsgTunData) {
 		if strings.HasPrefix(cmd, "bash") {
 			shellToken := strings.Split(cmd, " ")[1]
 			RShellStatus[shellToken] = fmt.Errorf("Reverse shell error: %v", out)
+		}
+
+		// ps command
+		if strings.HasPrefix(cmd, "#ps") {
+			var procs []util.ProcEntry
+			err = json.Unmarshal([]byte(out), &procs)
+			if err != nil {
+				CliPrintError("ps: %v:\n%s", err, out)
+				return
+			}
+
+			// build table
+			tdata := [][]string{}
+			tableString := &strings.Builder{}
+			table := tablewriter.NewWriter(tableString)
+			table.SetHeader([]string{"Name", "PID", "PPID", "User"})
+			table.SetBorder(true)
+			table.SetAutoWrapText(true)
+
+			// color
+			table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
+				tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
+				tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
+				tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor})
+
+			table.SetColumnColor(tablewriter.Colors{tablewriter.FgHiBlueColor},
+				tablewriter.Colors{tablewriter.FgBlueColor},
+				tablewriter.Colors{tablewriter.FgBlueColor},
+				tablewriter.Colors{tablewriter.FgBlueColor})
+
+			// fill table
+			for _, p := range procs {
+				tdata = append(tdata, []string{p.Name, strconv.Itoa(p.PID), strconv.Itoa(p.PPID), p.Token})
+			}
+			table.AppendBulk(tdata)
+			table.Render()
+			CliPrintInfo("Listing processes:\033[0m\n%s", tableString.String())
+			return
 		}
 
 		// ls command

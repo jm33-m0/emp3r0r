@@ -1,20 +1,78 @@
 package util
 
 import (
+	"fmt"
 	"log"
 	"os"
 
 	gops "github.com/mitchellh/go-ps"
+	"github.com/shirou/gopsutil/v3/process"
 )
+
+// ProcEntry a process entry of a process list
+type ProcEntry struct {
+	Name    string `json:"name"`
+	Cmdline string `json:"cmdline"`
+	Token   string `json:"token"`
+	PID     int    `json:"pid"`
+	PPID    int    `json:"ppid"`
+}
+
+// ProcessList a list of current processes
+func ProcessList() (list []ProcEntry) {
+	var (
+		err error
+		p   ProcEntry
+	)
+
+	procs, err := process.Processes()
+	if err != nil {
+		log.Printf("ProcessList: %v", err)
+		return nil
+	}
+
+	// loop through processes
+	for _, proc := range procs {
+		p.Cmdline, err = proc.Cmdline()
+		if err != nil {
+			log.Printf("proc cmdline: %v", err)
+			p.Cmdline = "unknown_cmdline"
+		}
+		p.Name, err = proc.Name()
+		if err != nil {
+			log.Printf("proc name: %v", err)
+			p.Name = "unknown_proc"
+		}
+		p.PID = int(proc.Pid)
+		i, err := proc.Ppid()
+		p.PPID = int(i)
+		if err != nil {
+			log.Printf("proc ppid: %v", err)
+			p.PPID = 0
+		}
+		p.Token, err = proc.Username()
+		if err != nil {
+			log.Printf("proc token: %v", err)
+			p.Token = "unknown_user"
+		}
+
+		list = append(list, p)
+	}
+	return
+}
 
 // ProcCmdline read cmdline data of a process
 func ProcCmdline(pid int) string {
-	proc, err := gops.FindProcess(pid)
+	proc, err := process.NewProcess(int32(pid))
 	if err != nil || proc == nil {
 		log.Printf("No such process (%d): %v", pid, err)
-		return "unknown_process"
+		return "dead_process"
 	}
-	return proc.Executable()
+	cmdline, err := proc.Cmdline()
+	if err != nil {
+		return fmt.Sprintf("err_%v", err)
+	}
+	return cmdline
 }
 
 // IsProcAlive check if a process name exists, returns its process(es)

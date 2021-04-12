@@ -11,6 +11,10 @@ func SingleArgCmd(cmd string) {
 		CliPrintError("%s requires one argument", cmdname)
 		return
 	}
+	if cmdname == "kill" {
+		inputSlice[0] = "#kill"
+		cmd = strings.Join(inputSlice, " ")
+	}
 
 	// send cmd
 	err := SendCmdToCurrentTarget(cmd)
@@ -22,6 +26,9 @@ func SingleArgCmd(cmd string) {
 
 func NoArgCmd(cmd string) {
 	// send cmd
+	if cmd == "ps" {
+		cmd = "#ps"
+	}
 	err := SendCmdToCurrentTarget(cmd)
 	if err != nil {
 		CliPrintError("%s failed: %v", cmd, err)
