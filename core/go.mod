@@ -11,10 +11,10 @@ require (
 	github.com/google/uuid v1.2.0
 	github.com/jaypipes/ghw v0.7.0
 	github.com/jm33-m0/go-cdn2proxy v1.0.1
-	github.com/jm33-m0/tabby v1.1.3
 	github.com/mholt/archiver v3.1.1+incompatible
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/nwaples/rardecode v1.1.0 // indirect
+	github.com/olekukonko/tablewriter v0.0.5
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/pierrec/lz4 v2.6.0+incompatible // indirect
 	github.com/posener/h2conn v0.0.0-20180911140238-13e7df33ed15
