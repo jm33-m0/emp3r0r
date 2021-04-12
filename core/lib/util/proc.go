@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 
 	gops "github.com/mitchellh/go-ps"
 	"github.com/shirou/gopsutil/v3/process"
@@ -53,7 +54,16 @@ func ProcessList() (list []ProcEntry) {
 		p.Token, err = proc.Username()
 		if err != nil {
 			log.Printf("proc token: %v", err)
-			p.Token = "unknown_user"
+			uids, err := proc.Uids()
+			if err != nil {
+				p.Token = "unknown_user"
+			}
+			for i, uid := range uids {
+				p.Token += strconv.Itoa(int(uid))
+				if i != len(uids)-1 {
+					p.Token += ", "
+				}
+			}
 		}
 
 		list = append(list, p)
