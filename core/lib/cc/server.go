@@ -179,9 +179,11 @@ func (sh *StreamHandler) rshellHandler(wrt http.ResponseWriter, req *http.Reques
 	CliPrintSuccess("Got a reverse shell connection (%s) from %s", sh.Text, req.RemoteAddr)
 
 	defer func() {
-		err = sh.H2x.Conn.Close()
-		if err != nil {
-			CliPrintError("rshellHandler failed to close connection: " + err.Error())
+		if sh.H2x.Conn != nil {
+			err = sh.H2x.Conn.Close()
+			if err != nil {
+				CliPrintError("rshellHandler failed to close connection: " + err.Error())
+			}
 		}
 		sh.Text = ""
 		sh.H2x.Cancel()
