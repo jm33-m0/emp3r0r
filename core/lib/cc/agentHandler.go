@@ -94,7 +94,6 @@ func processAgentData(data *agent.MsgTunData) {
 			table.AppendBulk(tdata)
 			table.Render()
 			CliPrintInfo("Listing current path:\033[0m\n%s", tableString.String())
-			CliPrintInfo("End of listing\n")
 			return
 		}
 
