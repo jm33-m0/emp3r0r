@@ -89,7 +89,7 @@ func shellPs() (out string, err error) {
 	out = "Failed to get process list"
 	procs := util.ProcessList()
 	if procs == nil {
-		return out, fmt.Errorf("Error: %v", out)
+		return out, fmt.Errorf("error: %s", out)
 	}
 
 	data, err := json.Marshal(procs)
