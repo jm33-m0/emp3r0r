@@ -110,7 +110,7 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 		// no need to close this
 		// err = RShellStream.H2x.Conn.Close()
 		// if err != nil {
-		// 	CliPrintWarning("Closing reverse shell connection: %v", err)
+		//	CliPrintWarning("Closing reverse shell connection: %v", err)
 		// }
 
 		// nil out RShellStream
@@ -147,9 +147,11 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 					CliPrintWarning("Cannot get terminal size: %v", err)
 					return
 				}
-				setupTermCmd := fmt.Sprintf("stty rows %d columns %d;clear\n",
-					winSize.Rows, winSize.Cols)
-				send <- []byte(setupTermCmd)
+				if !strings.Contains(CurrentTarget.OS, "Windows") {
+					setupTermCmd := fmt.Sprintf("stty rows %d columns %d;clear\n",
+						winSize.Rows, winSize.Cols)
+					send <- []byte(setupTermCmd)
+				}
 			}
 		}
 		CliPrintInfo("Terminal resizer finished")
@@ -157,23 +159,26 @@ func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 	}(ctx)
 	ch <- syscall.SIGWINCH // Initial resize.
 
-	// resize remote terminal to match local
-	currentWinSize, err := pty.GetsizeFull(os.Stdin)
-	if err != nil {
-		CliPrintWarning("Cannot get terminal size: %v", err)
-	}
-	setupTermCmd := fmt.Sprintf("stty rows %d columns %d;clear\n",
-		currentWinSize.Rows, currentWinSize.Cols)
-	send <- []byte(setupTermCmd)
-	CliPrintInfo("Sent stty resize command")
+	if !strings.Contains(CurrentTarget.OS, "Windows") {
+		CliPrintInfo("Target is Linux, sending stty resize command")
+		// resize remote terminal to match local
+		currentWinSize, err := pty.GetsizeFull(os.Stdin)
+		if err != nil {
+			CliPrintWarning("Cannot get terminal size: %v", err)
+		}
+		setupTermCmd := fmt.Sprintf("stty rows %d columns %d;clear\n",
+			currentWinSize.Rows, currentWinSize.Cols)
+		send <- []byte(setupTermCmd)
+		CliPrintInfo("Sent stty resize command")
 
-	// switch to raw mode
-	out, err = exec.Command("stty", "-F", "/dev/tty", "raw", "-echo").CombinedOutput()
-	if err != nil {
-		CliPrintError("stty raw mode failed: %v\n%s", err, out)
-		return
+		// switch to raw mode
+		out, err = exec.Command("stty", "-F", "/dev/tty", "raw", "-echo").CombinedOutput()
+		if err != nil {
+			CliPrintError("stty raw mode failed: %v\n%s", err, out)
+			return
+		}
+		CliPrintWarning("Now in raw mode")
 	}
-	CliPrintWarning("Now in raw mode")
 
 	// read user input from /dev/tty
 	go func() {

@@ -73,7 +73,7 @@ func moduleShell() {
 	// send data
 	var data agent.MsgTunData
 	CliPrintInfo("\nEntering shell of agent[%d] ...\n"+
-		"Note: Use `bash` command to start a bash reverse shell, type `help` for more info",
+		"Note: Use `upgrade` command to start a fully interactive reverse shell, type `help` for more info",
 		tControl.Index)
 
 	// prompt info
@@ -137,7 +137,7 @@ shell:
 			CliPrettyPrint("Helper", "Usage", &ShellHelpInfo)
 			continue shell
 
-		case input == "bash":
+		case input == "upgrade":
 			if err = cmdBash(); err != nil {
 				return
 			}
@@ -265,7 +265,7 @@ func cmdBash() (err error) {
 		time.Sleep(200 * time.Millisecond)
 	}
 
-	// launch local terminal to use remote bash shell
+	// set up local terminal to use remote bash shell
 	send := make(chan []byte)
 	reverseBash(RShellStream.H2x.Ctx, send, RShellStream.Buf)
 	time.Sleep(1 * time.Second)
