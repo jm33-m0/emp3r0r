@@ -140,7 +140,7 @@ func SetDynamicPrompt() {
 			shortName = strings.Split(CurrentTarget.Tag, "-agent")[0]
 		}
 		if CurrentMod == "<blank>" {
-			CurrentMod = "root" // if no module is selected
+			CurrentMod = "none" // if no module is selected
 		}
 		dynamicPrompt := fmt.Sprintf("%s @%s (%s) "+color.HiCyanString("> "),
 			color.HiCyanString("emp3r0r"),
