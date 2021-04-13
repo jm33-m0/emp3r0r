@@ -10,6 +10,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // RShellStatus stores errors from reverseBash
@@ -206,7 +207,7 @@ shell:
 				continue shell
 			}
 			filepath := inputSlice[1]
-			filename := FileBaseName(filepath)
+			filename := util.FileBaseName(filepath)
 
 			// tell user what to do
 			color.HiBlue("[*] Now edit %s in vim window",

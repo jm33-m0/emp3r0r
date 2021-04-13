@@ -124,8 +124,8 @@ func VimEdit(filepath string) (err error) {
 // TmuxSplit split tmux window, and run command in the new pane
 func TmuxSplit(hV, cmd string) error {
 	if os.Getenv("TMUX") == "" ||
-		!IsCommandExist("tmux") ||
-		!IsCommandExist("less") {
+		!util.IsCommandExist("tmux") ||
+		!util.IsCommandExist("less") {
 
 		return errors.New("You need to run emp3r0r under `tmux`, and make sure `less` is installed")
 	}

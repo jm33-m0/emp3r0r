@@ -14,13 +14,14 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/fatih/color"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func reverseBash(ctx context.Context, send chan []byte, recv chan []byte) {
 	var err error
 
 	// check if stty is installed
-	if !IsCommandExist("stty") {
+	if !util.IsCommandExist("stty") {
 		CliPrintError("stty is not found, wtf?")
 		return
 	}
