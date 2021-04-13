@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 )
 
@@ -87,7 +86,7 @@ func CmdHandler(cmd string) (err error) {
 			CliPrintError("use what? " + strconv.Quote(cmd))
 			return
 		}
-
+		SetDynamicPrompt()
 		for mod := range ModuleHelpers {
 			if mod == cmdSplit[1] {
 				CurrentMod = cmdSplit[1]
@@ -96,13 +95,6 @@ func CmdHandler(cmd string) (err error) {
 				}
 				UpdateOptions(CurrentMod)
 				CliPrintInfo("Using module %s", strconv.Quote(CurrentMod))
-				if !IsHeadless {
-					dynamicPrompt := fmt.Sprintf("%s (%s) "+color.HiCyanString("> "),
-						color.HiCyanString("emp3r0r"),
-						color.HiBlueString(CurrentMod))
-					EmpReadLine.Config.Prompt = dynamicPrompt
-					EmpReadLine.SetPrompt(dynamicPrompt)
-				}
 				return
 			}
 		}
@@ -122,6 +114,8 @@ func CmdHandler(cmd string) (err error) {
 			CliPrintError("set target to what? " + strconv.Quote(cmd))
 			return
 		}
+		defer SetDynamicPrompt()
+
 		index, e := strconv.Atoi(cmdSplit[1])
 		if e != nil {
 			CurrentTarget = GetTargetFromTag(cmdSplit[1])

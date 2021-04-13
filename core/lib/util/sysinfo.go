@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/google/uuid"
 	"github.com/jaypipes/ghw"
 )
 
@@ -52,7 +53,8 @@ func GetHostID() (id string) {
 		log.Printf("GetHostID: %v", err)
 		return
 	}
-	id = fmt.Sprintf("%s_%d-agent", name, RandInt(0, 10000))
+	uuidstr := uuid.New().String()
+	id = fmt.Sprintf("%s_%s-agent", name, uuidstr)
 	productInfo, err := ghw.Product()
 	if err != nil {
 		log.Printf("GetHostID: %v", err)

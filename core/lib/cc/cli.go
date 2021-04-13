@@ -91,6 +91,7 @@ func CliMain() {
 	log.SetOutput(EmpReadLine.Stderr())
 
 start:
+	SetDynamicPrompt()
 	for {
 		line, err := EmpReadLine.Readline()
 		if err == readline.ErrInterrupt {
@@ -129,6 +130,26 @@ start:
 
 	fmt.Printf("\n")
 	goto start
+}
+
+// SetDynamicPrompt set prompt with module and target info
+func SetDynamicPrompt() {
+	if !IsHeadless {
+		shortName := "local" // if no target is selected
+		if CurrentTarget != nil {
+			shortName = strings.Split(CurrentTarget.Tag, "-agent")[0]
+		}
+		if CurrentMod == "<blank>" {
+			CurrentMod = "root" // if no module is selected
+		}
+		dynamicPrompt := fmt.Sprintf("%s @%s (%s) "+color.HiCyanString("> "),
+			color.HiCyanString("emp3r0r"),
+			color.HiMagentaString(shortName),
+			color.HiBlueString(CurrentMod),
+		)
+		EmpReadLine.Config.Prompt = dynamicPrompt
+		EmpReadLine.SetPrompt(dynamicPrompt)
+	}
 }
 
 // CliPrintInfo print log in blue
