@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/user"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/jaypipes/ghw"
@@ -45,16 +47,28 @@ loopProcessors:
 	return
 }
 
+func GetUsername() string {
+	// user account info
+	u, err := user.Current()
+	if err != nil {
+		log.Printf("GetUsername: %v", err)
+		return "unknown_user"
+	}
+	return u.Username
+}
+
 // GetHostID unique identifier of the host
 func GetHostID() (id string) {
-	id = fmt.Sprintf("unknown_%d-agent", RandInt(0, 10000))
+	shortID := strconv.Itoa(RandInt(10, 10240))
+	id = fmt.Sprintf("unknown_%s-agent", shortID)
 	name, err := os.Hostname()
 	if err != nil {
 		log.Printf("GetHostID: %v", err)
 		return
 	}
+	name = fmt.Sprintf("%s\\%s", name, GetUsername())
 	uuidstr := uuid.New().String()
-	id = fmt.Sprintf("%s_%s-agent", name, uuidstr)
+	id = fmt.Sprintf("%s_%s-agent-%s", name, shortID, uuidstr)
 	productInfo, err := ghw.Product()
 	if err != nil {
 		log.Printf("GetHostID: %v", err)
@@ -62,7 +76,7 @@ func GetHostID() (id string) {
 	}
 
 	if productInfo.UUID != "unknown" {
-		id = fmt.Sprintf("%s_%s-agent", name, productInfo.UUID)
+		id = fmt.Sprintf("%s_%s-agent-%s", name, shortID, productInfo.UUID)
 	}
 	return
 }
