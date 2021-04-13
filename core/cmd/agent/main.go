@@ -172,6 +172,14 @@ func main() {
 		log.Print(err)
 	}
 
+	// agent root
+	if !util.IsFileExist(agent.AgentRoot) {
+		err = os.MkdirAll(agent.AgentRoot, 0700)
+		if err != nil {
+			log.Printf("MkdirAll %s: %v", agent.AgentRoot, err)
+		}
+	}
+
 	// apply whatever proxy setting we have just added
 	agent.HTTPClient = tun.EmpHTTPClient(agent.AgentProxy)
 connect:
