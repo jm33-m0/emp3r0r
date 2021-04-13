@@ -37,23 +37,17 @@ func processScreenshot(out string, target *agent.SystemInfo) (err error) {
 		return
 	}
 
+	// basename
+	path := util.FileBaseName(out)
+
 	// be sure we have downloaded the file
 	for {
 		time.Sleep(100 * time.Millisecond)
-		if !util.IsFileExist(FileGetDir+out+".emp3r0r") &&
-			util.IsFileExist(FileGetDir+out) {
+		if !util.IsFileExist(FileGetDir+path+".emp3r0r") &&
+			util.IsFileExist(FileGetDir+path) {
 			break
 		}
 	}
-
-	// tell agent to delete the remote file
-	err = SendCmd("rm "+out, target)
-	if err != nil {
-		CliPrintWarning("Failed to delete remote file %s: %v", strconv.Quote(out), err)
-	}
-
-	// basename
-	path := util.FileBaseName(out)
 
 	// unzip if it's zip
 	if strings.HasSuffix(path, ".zip") {
@@ -68,12 +62,18 @@ func processScreenshot(out string, target *agent.SystemInfo) (err error) {
 	// open it if possible
 	if util.IsCommandExist("xdg-open") &&
 		os.Getenv("DISPLAY") != "" {
-		CliPrintSuccess("Seems like we can open the picture for you to view, hold on")
+		CliPrintInfo("Seems like we can open the picture for you to view, hold on")
 		cmd := exec.Command("xdg-open", FileGetDir+path)
 		err = cmd.Start()
 		if err != nil {
 			return fmt.Errorf("Crap, we cannot open the picture: %v", err)
 		}
+	}
+
+	// tell agent to delete the remote file
+	err = SendCmd("rm "+out, target)
+	if err != nil {
+		CliPrintWarning("Failed to delete remote file %s: %v", strconv.Quote(out), err)
 	}
 
 	return
