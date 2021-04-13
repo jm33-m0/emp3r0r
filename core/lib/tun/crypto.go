@@ -131,6 +131,12 @@ func SHA256Sum(text string) string {
 	return fmt.Sprintf("%x", sumbytes)
 }
 
+func SHA256SumRaw(data []byte) string {
+	// file sha256sum
+	sum := sha256.Sum256(data)
+	return fmt.Sprintf("%x", sum)
+}
+
 // Base64Encode encode a string with base64
 func Base64Encode(text string) string {
 	return base64.URLEncoding.EncodeToString([]byte(text))

@@ -13,6 +13,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/olekukonko/tablewriter"
 )
@@ -210,6 +211,9 @@ func processAgentData(data *agent.MsgTunData) {
 			CliPrintError("processAgentData failed to save file: %v", err)
 			return
 		}
+		size := float32(len(filedata)) / 1024
+		sha256sum := tun.SHA256SumRaw(filedata)
+		CliPrintWarning("Downloaded %fKB to %s%s (%s)", size, FileGetDir, filename, sha256sum)
 
 	default:
 	}

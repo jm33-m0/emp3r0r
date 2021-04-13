@@ -245,7 +245,6 @@ func PutFile(lpath, rpath string, a *agent.SystemInfo) error {
 func GetFile(filepath string, a *agent.SystemInfo) error {
 	var data agent.MsgTunData
 	cmd := fmt.Sprintf("#get %s", filepath)
-	CliPrintWarning("Check %s%s for downloaded file", FileGetDir, filepath)
 
 	data.Payload = fmt.Sprintf("cmd%s%s", agent.OpSep, cmd)
 	data.Tag = a.Tag

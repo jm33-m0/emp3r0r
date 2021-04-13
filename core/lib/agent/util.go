@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -165,9 +164,7 @@ func file2CC(filepath string) (checksum string, err error) {
 	if err != nil {
 		return
 	}
-	// file sha256sum
-	sum := sha256.Sum256(bytes)
-	checksum = fmt.Sprintf("%x", sum)
+	checksum = tun.SHA256SumRaw(bytes)
 
 	// base64 encode
 	payload := base64.StdEncoding.EncodeToString(bytes)
