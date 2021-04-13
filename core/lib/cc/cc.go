@@ -110,19 +110,19 @@ func ListTargets() {
 
 			return
 		}
-		arpTab := splitLongLine(strings.Join(target.ARP, ", "), 3)
-		ips := splitLongLine(strings.Join(target.IPs, ", "), 3)
-		target.User = splitLongLine(target.User, 4)
+		arpTab := splitLongLine(strings.Join(target.ARP, ", "), 4)
+		ips := splitLongLine(strings.Join(target.IPs, ", "), 4)
+		target.User = splitLongLine(target.User, 5)
 		userInfo := color.HiRedString(target.User)
 		if target.HasRoot {
 			userInfo = color.HiGreenString(target.User)
 		}
-		cpuinfo := color.HiMagentaString(splitLongLine(target.CPU, 3))
+		cpuinfo := color.HiMagentaString(splitLongLine(target.CPU, 4))
 
 		// agent process info
 		agentProc := *target.Process
-		procInfo := fmt.Sprintf("%s (%d) <- %s (%d)",
-			agentProc.Cmdline, agentProc.PID, agentProc.Parent, agentProc.PPID)
+		procInfo := splitLongLine(fmt.Sprintf("%s (%d) <- %s (%d)",
+			agentProc.Cmdline, agentProc.PID, agentProc.Parent, agentProc.PPID), 4)
 
 		// info map
 		infoMap := map[string]string{
