@@ -79,7 +79,7 @@ func CliMain() {
 		HistoryFile:     "./emp3r0r.history",
 		AutoComplete:    CliCompleter,
 		InterruptPrompt: "^C\nExiting...\n",
-		EOFPrompt:       "^D\nEOF caught\nExiting...\n",
+		EOFPrompt:       "^D\nExiting...\n",
 
 		HistorySearchFold:   true,
 		FuncFilterInputRune: filterInput,
@@ -101,8 +101,7 @@ start:
 				continue
 			}
 		} else if err == io.EOF {
-			CliPrintError("EOF")
-			os.Exit(0)
+			break
 		}
 
 		line = strings.TrimSpace(line)
@@ -144,7 +143,7 @@ func SetDynamicPrompt() {
 		}
 		dynamicPrompt := fmt.Sprintf("%s @%s (%s) "+color.HiCyanString("> "),
 			color.HiCyanString("emp3r0r"),
-			color.HiMagentaString(shortName),
+			color.CyanString(shortName),
 			color.HiBlueString(CurrentMod),
 		)
 		EmpReadLine.Config.Prompt = dynamicPrompt
