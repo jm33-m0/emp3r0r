@@ -151,6 +151,17 @@ func agentExists(agent *agent.SystemInfo) bool {
 	return false
 }
 
+// assignTargetIndex assign an index number to new agent
+func assignTargetIndex() (index int) {
+	for _, c := range Targets {
+		if index == c.Index {
+			index++
+		}
+	}
+
+	return
+}
+
 // TermClear clear screen
 func TermClear() {
 	os.Stdout.WriteString("\033[2J")

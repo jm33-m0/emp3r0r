@@ -272,9 +272,10 @@ func CliYesNo(prompt string) bool {
 func CliListOptions() {
 	opts := make(map[string]string)
 	opts["module"] = CurrentMod
-	tc, exist := Targets[CurrentTarget]
+	_, exist := Targets[CurrentTarget]
 	if exist {
-		opts["target"] = strconv.Itoa(tc.Index)
+		shortName := strings.Split(CurrentTarget.Tag, "-agent")[0]
+		opts["target"] = shortName
 	} else {
 		opts["target"] = "<blank>"
 	}

@@ -251,9 +251,9 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 	target.IP = req.RemoteAddr
 
 	if !agentExists(&target) {
-		inx := len(Targets)
+		inx := assignTargetIndex()
 		Targets[&target] = &Control{Index: inx, Conn: nil}
-		shortname := strings.Split(target.Tag, "-")[0]
+		shortname := strings.Split(target.Tag, "-agent")[0]
 		CliPrintSuccess("\n[%d] Knock.. Knock...\n%s from %s, "+
 			"running '%s'\n",
 			inx, shortname, fmt.Sprintf("%s - %s", target.IP, target.Transport),
