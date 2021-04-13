@@ -52,9 +52,12 @@ func processScreenshot(out string, target *agent.SystemInfo) (err error) {
 		CliPrintWarning("Failed to delete remote file %s: %v", strconv.Quote(out), err)
 	}
 
+	// basename
+	path := util.FileBaseName(out)
+
 	// unzip if it's zip
-	if strings.HasSuffix(out, ".zip") {
-		err = archiver.Unarchive(FileGetDir+out, FileGetDir)
+	if strings.HasSuffix(path, ".zip") {
+		err = archiver.Unarchive(FileGetDir+path, FileGetDir)
 		if err != nil {
 			return fmt.Errorf("Unarchive screenshot zip: %v", err)
 		}
@@ -66,7 +69,7 @@ func processScreenshot(out string, target *agent.SystemInfo) (err error) {
 	if util.IsCommandExist("xdg-open") &&
 		os.Getenv("DISPLAY") != "" {
 		CliPrintSuccess("Seems like we can open the picture for you to view, hold on")
-		cmd := exec.Command("xdg-open", FileGetDir+out)
+		cmd := exec.Command("xdg-open", FileGetDir+path)
 		err = cmd.Start()
 		if err != nil {
 			return fmt.Errorf("Crap, we cannot open the picture: %v", err)
