@@ -19,6 +19,7 @@ var Commands = map[string]string{
 	"gen_agent":    "Generate agent with provided binary and build.json",
 	"ls":           "List current directory of selected agent",
 	"cd":           "Change current working directory of selected agent",
+	"rm":           "Delete a file/directory on selected agent",
 	"pwd":          "Current working directory of selected agent",
 	"ps":           "Process list of selected agent",
 	"kill":         "Terminate a process on selected agent: eg. `kill <pid>`",
@@ -47,6 +48,7 @@ var FileManagerHelpers = map[string]func(string){
 	"ls":   NoArgCmd,
 	"pwd":  NoArgCmd,
 	"cd":   SingleArgCmd,
+	"rm":   SingleArgCmd,
 	"put":  UploadToAgent,
 	"get":  DownloadFromAgent,
 	"ps":   NoArgCmd,
@@ -86,7 +88,7 @@ func CmdHandler(cmd string) (err error) {
 			CliPrintError("use what? " + strconv.Quote(cmd))
 			return
 		}
-		SetDynamicPrompt()
+		defer SetDynamicPrompt()
 		for mod := range ModuleHelpers {
 			if mod == cmdSplit[1] {
 				CurrentMod = cmdSplit[1]

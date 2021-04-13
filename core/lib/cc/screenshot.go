@@ -46,6 +46,12 @@ func processScreenshot(out string, target *agent.SystemInfo) (err error) {
 		}
 	}
 
+	// tell agent to delete the remote file
+	err = SendCmd("rm "+out, target)
+	if err != nil {
+		CliPrintWarning("Failed to delete remote file %s: %v", strconv.Quote(out), err)
+	}
+
 	// unzip if it's zip
 	if strings.HasSuffix(out, ".zip") {
 		err = archiver.Unarchive(FileGetDir+out, FileGetDir)
