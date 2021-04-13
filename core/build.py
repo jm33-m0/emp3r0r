@@ -51,7 +51,7 @@ class GoBuild:
         if "agent_root" in CACHED_CONF:
             self.AgentRoot = CACHED_CONF['agent_root']
         else:
-            self.AgentRoot = f"/dev/shm/.{rand_str(random.randint(3, 9))}"
+            self.AgentRoot = f".{rand_str(random.randint(3, 9))}"
             CACHED_CONF['agent_root'] = self.AgentRoot
 
     def build(self):
