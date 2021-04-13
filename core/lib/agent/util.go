@@ -169,13 +169,6 @@ func file2CC(filepath string) (checksum string, err error) {
 	sum := sha256.Sum256(bytes)
 	checksum = fmt.Sprintf("%x", sum)
 
-	// file size
-	size := len(bytes)
-	sizemB := float32(size) / 1024 / 1024
-	if sizemB > 20 {
-		return checksum, errors.New("please do NOT transfer large files this way as it's too NOISY, aborting")
-	}
-
 	// base64 encode
 	payload := base64.StdEncoding.EncodeToString(bytes)
 
