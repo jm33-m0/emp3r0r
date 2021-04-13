@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // DownloadFile download file using default http client
@@ -59,25 +60,11 @@ func SendCmdToCurrentTarget(cmd string) error {
 	return SendCmd(cmd, target)
 }
 
-// IsCommandExist check if an executable is in $PATH
-func IsCommandExist(exe string) bool {
-	_, err := exec.LookPath(exe)
-	return err == nil
-}
-
-// FileBaseName /path/to/foo -> foo
-func FileBaseName(filepath string) (filename string) {
-	// we only need the filename
-	filepathSplit := strings.Split(filepath, "/")
-	filename = filepathSplit[len(filepathSplit)-1]
-	return
-}
-
 // VimEdit launch local vim to edit files
 func VimEdit(filepath string) (err error) {
 	if os.Getenv("TMUX") == "" ||
-		!IsCommandExist("tmux") ||
-		!IsCommandExist("vim") {
+		!util.IsCommandExist("tmux") ||
+		!util.IsCommandExist("vim") {
 
 		return errors.New("You need to run emp3r0r under tmux, and make sure vim is installed")
 	}

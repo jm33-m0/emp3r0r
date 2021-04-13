@@ -178,7 +178,7 @@ func processAgentData(data *agent.MsgTunData) {
 		filepath := payloadSplit[1]
 
 		// we only need the filename
-		filename := FileBaseName(filepath)
+		filename := util.FileBaseName(filepath)
 
 		b64filedata := payloadSplit[2]
 		filedata, err := base64.StdEncoding.DecodeString(b64filedata)

@@ -135,3 +135,11 @@ func RandInt(min, max int) int {
 	rand.Seed(int64(binary.LittleEndian.Uint64(b[:])))
 	return min + rand.Intn(max-min)
 }
+
+// FileBaseName /path/to/foo -> foo
+func FileBaseName(filepath string) (filename string) {
+	// we only need the filename
+	filepathSplit := strings.Split(filepath, "/")
+	filename = filepathSplit[len(filepathSplit)-1]
+	return
+}
