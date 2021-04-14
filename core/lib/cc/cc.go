@@ -143,7 +143,7 @@ func ListTargets() {
 
 		// print
 		fmt.Printf(" [%s] Tag: %s", color.CyanString("%d", control.Index), strings.Repeat(" ", (14-len("Tag")))+
-			color.CyanString(target.Tag))
+			color.CyanString(splitLongLine(target.Tag, 3)))
 
 		for key, val := range infoMap {
 			fmt.Printf("\n%s%s:%s%s", indent, key, strings.Repeat(" ", (15-len(key))), val)
