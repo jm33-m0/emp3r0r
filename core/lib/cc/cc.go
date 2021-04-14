@@ -126,7 +126,7 @@ func ListTargets() {
 
 		// info map
 		infoMap := map[string]string{
-			"Hostname":  color.HiCyanString(target.Hostname),
+			"Hostname":  color.HiCyanString(splitLongLine(target.Hostname, 3)),
 			"Process":   color.HiMagentaString(procInfo),
 			"User":      userInfo,
 			"Internet":  hasInternet,
