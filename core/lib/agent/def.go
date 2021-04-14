@@ -16,6 +16,9 @@ var (
 	// CCAddress how our agent finds its CC
 	CCAddress = "https://[cc_ipaddr]"
 
+	// CCIP IP address of CC
+	CCIP = ""
+
 	// Transport what transport is this agent using? (HTTP2 / CDN / TOR)
 	Transport = fmt.Sprintf("HTTP2 (%s)", CCAddress)
 
