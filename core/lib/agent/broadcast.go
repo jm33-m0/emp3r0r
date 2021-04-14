@@ -130,18 +130,20 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc) (err error)
 				}
 			}()
 
-			// find an IP that can be connected to
-			for _, ipnetstr := range tun.IPa() {
-				selfaddr := strings.Split(ipnetstr, "/")[0]
-				rproxymsg := fmt.Sprintf("%s:%d", selfaddr, reverseProxyPort)
-				err = BroadcastMsg(rproxymsg, addr.String())
-				if err != nil {
-					log.Printf("Send reverse proxy request to %s failed: %v", addr, err)
+			// broadcast our request
+			ips := tun.IPaddr()
+			for _, netip := range ips {
+				rproxymsg := fmt.Sprintf("%s:%d", netip.IP.String(), reverseProxyPort)
+				broadcastAddr := tun.IPbroadcastAddr(netip)
+				if broadcastAddr == "" {
 					continue
+				}
+				err := BroadcastMsg(rproxymsg, broadcastAddr+":"+BroadcastPort)
+				if err != nil {
+					log.Printf("BroadcastMsg failed: %v", err)
 				}
 				log.Printf("Sending reverse proxy request %s to %s", strconv.Quote(rproxymsg), addr)
 			}
-
 			rproxy := fmt.Sprintf("socks5://127.0.0.1:%s", ProxyPort)
 			retry := 0 // don't stuck here
 			for !tun.IsProxyOK(rproxy) && retry < 15 {
