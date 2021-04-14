@@ -112,7 +112,7 @@ func main() {
 		ctx, cancel := context.WithCancel(context.Background())
 		log.Println("[+] It seems that we have internet access, let's start a socks5 proxy to help others")
 		go agent.StartBroadcast(true, ctx, cancel)
-		// also listen for broadcasts in case some agents want use to connect to them
+		// also listen for broadcasts
 		go func() {
 			for agent.ReverseBroadcastPort == "" {
 				time.Sleep(100 * time.Millisecond)

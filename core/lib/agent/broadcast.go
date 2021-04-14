@@ -135,6 +135,8 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 			}()
 
 			// broadcast our request
+			// NOTE upstream agents might not heard from us due to the firewall
+			// but send broadcast anyways
 			ips := tun.IPaddr()
 			for _, netip := range ips {
 				rproxymsg := fmt.Sprintf("%s:%d", netip.IP.String(), reverseProxyPort)
