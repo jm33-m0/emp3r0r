@@ -55,7 +55,8 @@ func IsTor(addr string) bool {
 	return fields[len(fields)-1] == "onion"
 }
 
-// HasInternetAccess does this machine has internet access, if yes, what's its exposed IP?
+// HasInternetAccess does this machine has internet access,
+// does NOT use any proxies
 func HasInternetAccess() bool {
 	client := http.Client{
 		Timeout: 5 * time.Second,
@@ -206,4 +207,21 @@ func IPr() (routes []string) {
 // IPNeigh works like `ip neigh`, dumps ARP cache
 func IPNeigh() []string {
 	return []string{""}
+}
+
+// FindIPToUse find an IP that resides in target IP range
+// target: 192.168.1.1/24
+func FindIPToUse(target string) string {
+	_, subnet, _ := net.ParseCIDR(target)
+	for _, ipnetstr := range IPa() {
+		ipstr := strings.Split(ipnetstr, "/")[0]
+		ip := net.ParseIP(ipstr)
+		if ip == nil {
+			continue
+		}
+		if subnet.Contains(ip) {
+			return ip.String()
+		}
+	}
+	return ""
 }

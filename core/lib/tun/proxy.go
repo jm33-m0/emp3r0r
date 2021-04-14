@@ -138,3 +138,51 @@ func FwdToDport(ctx context.Context, cancel context.CancelFunc,
 	_, _ = h2.Write([]byte("exit\n"))
 	_, _ = dest.Write([]byte("exit\n"))
 }
+
+// TCPConnJoin join two TCP connections
+func TCPConnJoin(ctx context.Context, cancel context.CancelFunc, addr1, addr2 string) error {
+	conn, err := net.Dial("tcp", addr1)
+	if err != nil {
+		return fmt.Errorf("TCPConnJoin addr1: %v", err)
+	}
+	// connect to addr2
+	conn1, err := net.Dial("tcp", addr2)
+	if err != nil {
+		return fmt.Errorf("TCPConnJoin addr2: %v", err)
+	}
+
+	// cleanup
+	defer func() {
+		conn.Close()
+		conn1.Close()
+		cancel()
+	}()
+
+	// copy conn to CC
+	go func() {
+		defer cancel()
+		for conn == nil || conn1 == nil {
+			time.Sleep(100 * time.Millisecond)
+		}
+		_, err := io.Copy(conn, conn1)
+		if err != nil {
+			log.Printf("iocopy: conn <- conn1: %v", err)
+		}
+	}()
+	go func() {
+		defer cancel()
+		for conn == nil || conn1 == nil {
+			time.Sleep(100 * time.Millisecond)
+		}
+		_, err := io.Copy(conn1, conn)
+		if err != nil {
+			log.Printf("iocopy: conn -> conn1: %v", err)
+		}
+	}()
+
+	// wait to be canceled
+	for ctx.Err() == nil {
+		time.Sleep(100 * time.Millisecond)
+	}
+	return nil
+}
