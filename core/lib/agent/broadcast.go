@@ -18,12 +18,16 @@ var ReverseConns []string // remember reverse proxies
 
 // BroadcastServer listen on a UDP port for broadcasts
 // wait for some other agents to announce their internet proxy
-func BroadcastServer(ctx context.Context, cancel context.CancelFunc) (err error) {
+func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string) (err error) {
 	var (
 		passProxyCnt int // one time only
 	)
 	defer cancel()
-	pc, err := net.ListenPacket("udp4", ":"+BroadcastPort)
+	bindaddr := ":" + port
+	if port == "" {
+		bindaddr = ":" + BroadcastPort
+	}
+	pc, err := net.ListenPacket("udp4", bindaddr)
 	if err != nil {
 		return
 	}
@@ -138,7 +142,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc) (err error)
 				if broadcastAddr == "" {
 					continue
 				}
-				err := BroadcastMsg(rproxymsg, broadcastAddr+":"+BroadcastPort)
+				err := BroadcastMsg(rproxymsg, broadcastAddr+":"+ReverseBroadcastPort)
 				if err != nil {
 					log.Printf("BroadcastMsg failed: %v", err)
 				}

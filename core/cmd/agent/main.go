@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -99,6 +100,13 @@ func main() {
 	go socketListen()
 
 	// do we have internet?
+	p, err := strconv.Atoi(agent.BroadcastPort)
+	if err != nil {
+		log.Printf("WTF? BroadcastPort %s: %v", agent.BroadcastPort, err)
+		return
+	}
+	rBport := p + 3
+	agent.ReverseBroadcastPort = strconv.Itoa(rBport)
 	if tun.HasInternetAccess() {
 		// if we do, we are feeling helpful
 		ctx, cancel := context.WithCancel(context.Background())
@@ -106,7 +114,10 @@ func main() {
 		go agent.StartBroadcast(true, ctx, cancel)
 		// also listen for broadcasts in case some agents want use to connect to them
 		go func() {
-			err := agent.BroadcastServer(ctx, cancel)
+			for agent.ReverseBroadcastPort == "" {
+				time.Sleep(100 * time.Millisecond)
+			}
+			err = agent.BroadcastServer(ctx, cancel, agent.ReverseBroadcastPort)
 			if err != nil {
 				log.Printf("BroadcastServer: %v", err)
 			}
@@ -116,7 +127,7 @@ func main() {
 		log.Println("[-] We don't have internet access, waiting for other agents to give us a proxy...")
 		ctx, cancel := context.WithCancel(context.Background())
 		go func() {
-			err := agent.BroadcastServer(ctx, cancel)
+			err := agent.BroadcastServer(ctx, cancel, "")
 			if err != nil {
 				log.Fatal(err)
 			}

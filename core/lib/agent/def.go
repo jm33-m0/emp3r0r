@@ -76,6 +76,9 @@ var (
 	// BroadcastPort port of broadcast server
 	BroadcastPort = "[broadcast_port]"
 
+	// ReverseBroadcastPort the broadcaster becomes receiver
+	ReverseBroadcastPort = ""
+
 	// CCIndicator check this before trying connection
 	CCIndicator = "[cc_indicator]"
 
