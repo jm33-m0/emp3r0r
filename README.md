@@ -187,6 +187,18 @@ more will be added in the future
 
 ### modules
 
+#### reverse proxy
+
+think it as `ssh -R`, when autoproxy module doesn't work because of the **firewall** on the agent that provides proxy service, what can you do?
+
+in normal circumstances, we would use `ssh -R` to map our client-side port to the ssh server, so the server can connect to us to share our internet connection.
+
+thats exactly what emp3r0r does, except it doesn't require any openssh binaries to be installed, type `use reverse_proxy` to get started!
+
+with this feature you can bring **every host that you can reach** to emp3r0r CC server.
+
+![reverse_proxy](./img/reverse_proxy.webp)
+
 #### shellcode injection
 
 inject guardian shellcode into arbitrary process, to gain persistence
