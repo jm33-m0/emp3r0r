@@ -9,8 +9,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 )
 
-var ReverseConns = make(map[string]context.CancelFunc) // remember reverse proxies
-
 // StartReverseProxy connect to an agent, provide reverse proxy for it, target format: ip
 func StartReverseProxy(target string, ctx context.Context, cancel context.CancelFunc) error {
 	// the port to connect to

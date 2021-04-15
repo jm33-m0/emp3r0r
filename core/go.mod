@@ -3,10 +3,12 @@ module github.com/jm33-m0/emp3r0r/core
 go 1.13
 
 require (
+	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
 	github.com/bettercap/readline v0.0.0-20210228151553-655e48bcb7bf
 	github.com/creack/pty v1.1.11
 	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/fatih/color v1.10.0
+	github.com/gliderlabs/ssh v0.3.2
 	github.com/golang/snappy v0.0.3 // indirect
 	github.com/google/uuid v1.2.0
 	github.com/jaypipes/ghw v0.7.0
@@ -27,6 +29,6 @@ require (
 	github.com/vishvananda/netlink v1.1.0
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/zcalusic/sysinfo v0.0.0-20210226105846-b810d137e525
-	golang.org/x/net v0.0.0-20210410081132-afb366fc7cd1
-	golang.org/x/sys v0.0.0-20210330210617-4fbd30eecc44
+	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
+	golang.org/x/net v0.0.0-20210414194228-064579744ee0
 )

