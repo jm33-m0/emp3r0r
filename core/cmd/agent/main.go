@@ -9,7 +9,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 
@@ -100,13 +99,6 @@ func main() {
 	go socketListen()
 
 	// do we have internet?
-	p, err := strconv.Atoi(agent.BroadcastPort)
-	if err != nil {
-		log.Printf("WTF? BroadcastPort %s: %v", agent.BroadcastPort, err)
-		return
-	}
-	rBport := p + 3
-	agent.ReverseBroadcastPort = strconv.Itoa(rBport)
 	if tun.HasInternetAccess() {
 		// if we do, we are feeling helpful
 		ctx, cancel := context.WithCancel(context.Background())
