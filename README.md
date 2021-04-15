@@ -31,6 +31,7 @@ ____
         * [hide processes and files](#hide-processes-and-files)
         * [persistence](#persistence)
     * [modules](#modules)
+        * [reverse proxy](#reverse-proxy)
         * [shellcode injection](#shellcode-injection)
         * [shellcode loader](#shellcode-loader)
         * [basic command shell](#basic-command-shell)
