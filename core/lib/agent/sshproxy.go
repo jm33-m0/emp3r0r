@@ -123,9 +123,7 @@ func SSHProxyClient(serverAddr string, ctx context.Context, cancel context.Cance
 	for ctx.Err() == nil {
 		inconn, err := l.Accept()
 		if err != nil {
-			log.Printf("SSHProxyClient listener: %v", err)
-			time.Sleep(time.Second)
-			continue
+			return fmt.Errorf("SSHProxyClient finished: %v", err)
 		}
 		go serveConn(inconn)
 	}
