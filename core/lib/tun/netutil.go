@@ -100,10 +100,8 @@ func IsProxyOK(proxy string) bool {
 	if err != nil {
 		return false
 	}
-	if string(respData) == "Microsoft NCSI" {
-		return true
-	}
-	return false
+	log.Printf("IsProxyOK: testing proxy %s: %s", proxy, respData)
+	return string(respData) == "Microsoft NCSI"
 }
 
 // IPWithMask net.IP and net.IPMask

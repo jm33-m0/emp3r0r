@@ -37,16 +37,17 @@ var (
 
 	// ModuleHelpers a map of module helpers
 	ModuleHelpers = map[string]func(){
-		agent.ModCMD_EXEC:    moduleCmd,
-		agent.ModSHELL:       moduleShell,
-		agent.ModPROXY:       moduleProxy,
-		agent.ModPORT_FWD:    modulePortFwd,
-		agent.ModLPE_SUGGEST: moduleLPE,
-		agent.ModGET_ROOT:    moduleGetRoot,
-		agent.ModCLEAN_LOG:   moduleLogCleaner,
-		agent.ModPERSISTENCE: modulePersistence,
-		agent.ModVACCINE:     moduleVaccine,
-		agent.ModINJECTOR:    moduleInjector,
+		agent.ModCMD_EXEC:     moduleCmd,
+		agent.ModSHELL:        moduleShell,
+		agent.ModPROXY:        moduleProxy,
+		agent.ModPORT_FWD:     modulePortFwd,
+		agent.ModLPE_SUGGEST:  moduleLPE,
+		agent.ModGET_ROOT:     moduleGetRoot,
+		agent.ModCLEAN_LOG:    moduleLogCleaner,
+		agent.ModPERSISTENCE:  modulePersistence,
+		agent.ModVACCINE:      moduleVaccine,
+		agent.ModINJECTOR:     moduleInjector,
+		agent.ModREVERSEPROXY: moduleReverseProxy,
 	}
 )
 
@@ -140,6 +141,11 @@ func UpdateOptions(modName string) (exist bool) {
 		methodOpt := addIfNotFound("method")
 		methodOpt.Vals = []string{"gdb", "native", "python"}
 		methodOpt.Val = "native"
+
+	case modName == agent.ModREVERSEPROXY:
+		pidOpt := addIfNotFound("addr")
+		pidOpt.Vals = []string{"127.0.0.1"}
+		pidOpt.Val = "<blank>"
 
 	case modName == agent.ModPERSISTENCE:
 		currentOpt = addIfNotFound("method")

