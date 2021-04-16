@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/user"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -176,4 +177,16 @@ func file2CC(filepath string) (checksum string, err error) {
 
 	// send
 	return checksum, Send2CC(&fileData)
+}
+
+func calculateReverseProxyPort() string {
+	p, err := strconv.Atoi(ProxyPort)
+	if err != nil {
+		log.Printf("WTF? ProxyPort %s: %v", ProxyPort, err)
+		return "22222"
+	}
+
+	// reverseProxyPort
+	rProxyPortInt := p + 1
+	return strconv.Itoa(rProxyPortInt)
 }

