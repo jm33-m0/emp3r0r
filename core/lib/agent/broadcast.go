@@ -44,6 +44,21 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 			log.Printf("SSHProxyServer: %v", err)
 		}
 	}()
+	// monitor socks5://127.0.0.1:ProxyPort until it works
+	go func() {
+		// does the proxy work?
+		rproxy := fmt.Sprintf("socks5://127.0.0.1:%s", ProxyPort)
+		for !tun.IsProxyOK(rproxy) {
+			time.Sleep(time.Second)
+		}
+		AgentProxy = rproxy
+		log.Printf("[+] Reverse proxy configured to %s", rproxy)
+
+		// pass the proxy to others
+		if AgentProxy == rproxy {
+			go passProxy(ctx, cancel, &passProxyCnt)
+		}
+	}()
 
 	// keep listening for broadcasts
 	for ctx.Err() == nil {
@@ -74,19 +89,6 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 
 		} else {
 			log.Printf("Oh crap! %s doen't work, we have to wait for a reverse proxy", decMsg)
-
-			// does the proxy work?
-			rproxy := fmt.Sprintf("socks5://127.0.0.1:%s", ProxyPort)
-			for !tun.IsProxyOK(rproxy) {
-				time.Sleep(time.Second)
-			}
-			AgentProxy = rproxy
-			log.Printf("[+] Reverse proxy configured to %s", rproxy)
-
-			// pass the proxy to others
-			if AgentProxy == rproxy {
-				go passProxy(ctx, cancel, &passProxyCnt)
-			}
 		}
 	}
 	return
