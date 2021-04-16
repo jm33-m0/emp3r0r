@@ -85,11 +85,17 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 			}
 			AgentProxy = rproxy
 			log.Printf("[+] Reverse proxy configured to %s", rproxy)
+
+			// pass the proxy to others
+			if AgentProxy == rproxy {
+				go passProxy(ctx, cancel, &passProxyCnt)
+			}
 		}
 	}
 	return
 }
 
+// passProxy let other agents on our network use our AgentProxy
 func passProxy(ctx context.Context, cancel context.CancelFunc, count *int) {
 	// one time only
 	*count++
@@ -98,13 +104,18 @@ func passProxy(ctx context.Context, cancel context.CancelFunc, count *int) {
 		return
 	}
 
-	log.Printf("[+] BroadcastServer: %s will be served here too, let's hope it helps more agents\n", AgentProxy)
-	sl := strings.Split(AgentProxy, "//")
+	proxyAddr := AgentProxy
+	sl := strings.Split(proxyAddr, "//")
 	if len(sl) < 2 {
-		log.Printf("TCPFwd: invalid proxy addr: %s", AgentProxy)
+		log.Printf("TCPFwd: invalid proxy addr: %s", proxyAddr)
 		return
 	}
 	go func() {
+		if strings.HasPrefix(sl[1], "127.0.0.1") {
+			log.Printf("AgentProxy is %s, we are already serving the proxy, let's start broadcasting right away", proxyAddr)
+			return
+		}
+		log.Printf("[+] BroadcastServer: %s will be served here too, let's hope it helps more agents\n", proxyAddr)
 		err := tun.TCPFwd(sl[1], ProxyPort, ctx, cancel)
 		if err != nil {
 			log.Print("TCPFwd: ", err)
