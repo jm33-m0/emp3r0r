@@ -12,6 +12,7 @@ linux post-exploitation framework made by linux user
 - [how to use](https://github.com/jm33-m0/emp3r0r/wiki)
 - **collaborators wanted!!!** please [contact me](https://jm33.me/pages/got-something-to-say.html) if you are interested
 - **cross-platform** support is in progress, contribute if you want emp3r0r to run on other systems
+- **Windows** is officially supported with core features enabled, but it **won't** be open sourced. however, you can **port emp3r0r to any platforms** that golang supports, with the codebase provided here, ask any questions [here](https://github.com/jm33-m0/emp3r0r/discussions/24)
 
 ____
 
@@ -242,6 +243,10 @@ emp3r0r's terminal supports **everything your current terminal supports**, you c
 but wait, it's more than just a reverse bash shell, with [module vaccine](https://github.com/jm33-m0/static-bins/tree/main/vaccine), you can use whatever tool you like on your target system
 
 ![bash](./img/bash.webp)
+
+you can also have it on Windows targets:
+
+![windows_rshell](./img/windows_rshell.webp)
 
 #### credential harvesting
 
