@@ -13,6 +13,9 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
+// ReverseConns record ssh reverse proxy sessions
+var ReverseConns = make(map[string]context.CancelFunc)
+
 // BroadcastServer listen on a UDP port for broadcasts
 // wait for some other agents to announce their internet proxy
 func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string) (err error) {
