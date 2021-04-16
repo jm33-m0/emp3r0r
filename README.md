@@ -60,8 +60,9 @@ ____
 - [x] injector: inject shellcode into arbitrary process, using go and ptrace syscall
 - [x] injector: recover process after injection
 - [x] persistence: inject guardian shellcode into arbitrary process to gain persistence
-- [ ] **headless CC**, control using existing commands, can be useful when we write a web-based GUI
-- [ ] **exploit kit**
+- [x] **headless CC**, control using existing commands, can be useful when we write a web-based GUI
+- [x] screenshot, supports both windows and linux
+- [x] reverse proxy
 - [ ] network scanner
 - [ ] passive scanner, for host/service discovery
 - [ ] password spray
@@ -101,9 +102,11 @@ i hope this tool helps you, and i will add features to it as i learn new things
 * file management
 * log cleaner
 * **stealth** connection
+* screenshot
 * anti-antivirus
 * internet access checker
 * **autoproxy** for semi-isolated networks
+* **reverse proxy** to bring every host online
 * all of these in one **HTTP2** connection
 * can be encapsulated in any external proxies such as **TOR**, and **CDNs**
 * interoperability with **metasploit / Cobalt Strike**
