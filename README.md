@@ -3,17 +3,16 @@ linux post-exploitation framework made by linux user
 
 **Still under active development**
 
-![logo](./img/emp3r0r.png)
-
-![reverse_proxy](./img/reverse_proxy.png)
-
 - [中文介绍](https://www.freebuf.com/sectool/259079.html)
 - [check my blog for updates](https://jm33.me/emp3r0r-0x00.html)
 - [how to use](https://github.com/jm33-m0/emp3r0r/wiki)
 - **collaborators wanted!!!** please [contact me](https://jm33.me/pages/got-something-to-say.html) if you are interested
 - **cross-platform** support is in progress, contribute if you want emp3r0r to run on other systems
-- **Windows** is officially supported with core features enabled, but it **won't** be open sourced. however, you can **port emp3r0r to any platforms** that golang supports, with the codebase provided here, ask any questions [here](https://github.com/jm33-m0/emp3r0r/discussions/24)
+- **Windows** is officially supported with core features enabled, but it **won't** be open sourced. however, you can **port emp3r0r to any platforms** that golang supports, with the codebase provided here, ask any questions in [this thread](https://github.com/jm33-m0/emp3r0r/discussions/24)
 
+![logo](./img/emp3r0r.png)
+
+![reverse_proxy](./img/reverse_proxy.png)
 ____
 
 ## table of contents
