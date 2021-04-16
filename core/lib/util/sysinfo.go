@@ -14,10 +14,11 @@ import (
 func GetMemSize() int {
 	memInfo, err := ghw.Memory()
 	if err != nil {
+		log.Printf("GetMemSize error: %v", err)
 		return -1
 	}
 
-	return int(memInfo.TotalUsableBytes) / 1024 / 1024
+	return int(float32(memInfo.TotalUsableBytes) / 1024 / 1024)
 }
 
 func GetCPUInfo() (info string) {
