@@ -62,7 +62,7 @@ class GoBuild:
         # CA
         if 'ca' in CACHED_CONF:
             log_warn(
-                f"Using cached CA cert ({self.CA}),\nmake sure you have the coresponding keypair signed by it")
+                f"Using cached CA cert ({CACHED_CONF['ca']}),\nmake sure you have the coresponding keypair signed by it")
             self.CA = CACHED_CONF['ca']
         else:
             f = open("./tls/rootCA.crt")
