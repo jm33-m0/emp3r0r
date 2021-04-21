@@ -60,12 +60,15 @@ class GoBuild:
         '''
         self.gen_certs()
         # CA
-        f = open("./tls/rootCA.crt")
-        self.CA = f.read()
-        f.close()
+        if 'ca' in CACHED_CONF:
+            self.CA = CACHED_CONF['ca']
+        else:
+            f = open("./tls/rootCA.crt")
+            self.CA = f.read()
+            f.close()
 
-        # cache CA, too
-        CACHED_CONF['ca'] = self.CA
+            # cache CA, too
+            CACHED_CONF['ca'] = self.CA
 
         # cache version
         CACHED_CONF['version'] = self.VERSION
