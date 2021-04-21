@@ -82,9 +82,12 @@ class GoBuild:
 
         self.set_tags()
 
-        for f in glob.glob("./tls/emp3r0r-*pem"):
-            print(f" Copy {f} to ./build")
-            shutil.copy(f, "./build")
+        # copy the server/cc keypair to ./build for later use
+        if os.path.isdir("./tls"):
+            log_warn("[*] Copying CC keypair to ./build")
+            for f in glob.glob("./tls/emp3r0r-*pem"):
+                print(f" Copy {f} to ./build")
+                shutil.copy(f, "./build")
 
         try:
             os.chdir(f"./cmd/{self.target}")
