@@ -133,22 +133,20 @@ start:
 
 // SetDynamicPrompt set prompt with module and target info
 func SetDynamicPrompt() {
-	if !IsHeadless {
-		shortName := "local" // if no target is selected
-		if CurrentTarget != nil {
-			shortName = strings.Split(CurrentTarget.Tag, "-agent")[0]
-		}
-		if CurrentMod == "<blank>" {
-			CurrentMod = "none" // if no module is selected
-		}
-		dynamicPrompt := fmt.Sprintf("%s @%s (%s) "+color.HiCyanString("> "),
-			color.HiCyanString("emp3r0r"),
-			color.CyanString(shortName),
-			color.HiBlueString(CurrentMod),
-		)
-		EmpReadLine.Config.Prompt = dynamicPrompt
-		EmpReadLine.SetPrompt(dynamicPrompt)
+	shortName := "local" // if no target is selected
+	if CurrentTarget != nil {
+		shortName = strings.Split(CurrentTarget.Tag, "-agent")[0]
 	}
+	if CurrentMod == "<blank>" {
+		CurrentMod = "none" // if no module is selected
+	}
+	dynamicPrompt := fmt.Sprintf("%s @%s (%s) "+color.HiCyanString("> "),
+		color.HiCyanString("emp3r0r"),
+		color.CyanString(shortName),
+		color.HiBlueString(CurrentMod),
+	)
+	EmpReadLine.Config.Prompt = dynamicPrompt
+	EmpReadLine.SetPrompt(dynamicPrompt)
 }
 
 // CliPrintInfo print log in blue
@@ -319,7 +317,6 @@ func CliPrettyPrint(header1, header2 string, map2write *map[string]string) {
 		msg, err := json.Marshal(map2write)
 		if err != nil {
 			log.Printf("CliPrettyPrint: %v", err)
-			return
 		}
 		resp.MsgData = msg
 		resp.Alert = false
@@ -327,13 +324,11 @@ func CliPrettyPrint(header1, header2 string, map2write *map[string]string) {
 		data, err := json.Marshal(resp)
 		if err != nil {
 			log.Printf("CliPrettyPrint: %v", err)
-			return
 		}
 		_, err = APIConn.Write([]byte(data))
 		if err != nil {
 			log.Printf("CliPrettyPrint: %v", err)
 		}
-		return
 	}
 
 	cnt := 10

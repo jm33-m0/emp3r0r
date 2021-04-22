@@ -40,8 +40,9 @@ func main() {
 	if !*headless {
 		cc.CliMain()
 		os.Exit(0)
+	} else {
+		log.Printf("%s", color.YellowString("emp3r0r CC is running in headless mode!"))
+		go cc.HeadlessMain()
+		cc.CliMain()
 	}
-
-	log.Printf("%s", color.YellowString("emp3r0r CC is running in headless mode!"))
-	cc.HeadlessMain()
 }

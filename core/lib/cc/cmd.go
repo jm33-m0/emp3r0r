@@ -68,11 +68,6 @@ func CmdHandler(cmd string) (err error) {
 	case cmd == "":
 		return
 	case cmdSplit[0] == HELP:
-		// no help in headless mode
-		if IsHeadless {
-			return
-		}
-
 		if len(cmdSplit) > 2 {
 			CliPrintError("WTF?")
 			return

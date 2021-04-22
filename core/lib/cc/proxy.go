@@ -58,7 +58,6 @@ func ListPortFwds() {
 		if err != nil {
 			CliPrintError("ListPortFwds: %v", err)
 		}
-		return
 	}
 
 	color.Cyan("Active port mappings\n")

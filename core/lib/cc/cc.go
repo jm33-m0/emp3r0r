@@ -78,7 +78,6 @@ func ListTargets() {
 		if err := headlessListTargets(); err != nil {
 			CliPrintError("ls_targets: %v", err)
 		}
-		return
 	}
 
 	color.Cyan("Connected agents\n")
