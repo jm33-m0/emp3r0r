@@ -61,7 +61,7 @@ func APIListen() {
 			return
 		}
 		APIConn = conn
-		IsAPIEnabled = APIConn != nil // update IsHeadless status
+		IsAPIEnabled = APIConn != nil // update IsAPIEnabled status
 		log.Printf("%s: %s", color.BlueString("emp3r0r got an API connection"), conn.RemoteAddr().String())
 		processAPIReq(conn)
 	}
