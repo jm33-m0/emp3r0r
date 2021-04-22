@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc"
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
@@ -37,12 +36,8 @@ func main() {
 	}
 
 	// use emp3r0r in terminal or from other frontend
-	if !*apiserver {
-		cc.CliMain()
-		os.Exit(0)
-	} else {
-		log.Printf("%s", color.YellowString("emp3r0r CC is running in headless mode!"))
+	if *apiserver {
 		go cc.APIMain()
-		cc.CliMain()
 	}
+	cc.CliMain()
 }
