@@ -30,7 +30,7 @@ type APIResponse struct {
 	Alert   bool   // whether to alert the frontend user
 }
 
-func HeadlessMain() {
+func APIMain() {
 	log.Printf("%s", color.CyanString("Starting emp3r0r API server"))
 	APIListen()
 }
@@ -61,7 +61,7 @@ func APIListen() {
 			return
 		}
 		APIConn = conn
-		IsHeadless = APIConn != nil // update IsHeadless status
+		IsAPIEnabled = APIConn != nil // update IsHeadless status
 		log.Printf("%s: %s", color.BlueString("emp3r0r got an API connection"), conn.RemoteAddr().String())
 		processAPIReq(conn)
 	}

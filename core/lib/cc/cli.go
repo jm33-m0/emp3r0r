@@ -153,7 +153,7 @@ func SetDynamicPrompt() {
 func CliPrintInfo(format string, a ...interface{}) {
 	if DebugLevel == 0 {
 		log.Println(color.BlueString(format, a...))
-		if IsHeadless {
+		if IsAPIEnabled {
 			// send to socket
 			var resp APIResponse
 			msg := GetDateTime() + " INFO: " + fmt.Sprintf(format, a...)
@@ -177,7 +177,7 @@ func CliPrintInfo(format string, a ...interface{}) {
 func CliPrintWarning(format string, a ...interface{}) {
 	if DebugLevel <= 1 {
 		log.Println(color.YellowString(format, a...))
-		if IsHeadless {
+		if IsAPIEnabled {
 			// send to socket
 			var resp APIResponse
 			msg := GetDateTime() + " WARN: " + fmt.Sprintf(format, a...)
@@ -200,7 +200,7 @@ func CliPrintWarning(format string, a ...interface{}) {
 // CliPrintSuccess print log in green
 func CliPrintSuccess(format string, a ...interface{}) {
 	log.Println(color.HiGreenString(format, a...))
-	if IsHeadless {
+	if IsAPIEnabled {
 		// send to socket
 		var resp APIResponse
 		msg := GetDateTime() + " SUCCESS: " + fmt.Sprintf(format, a...)
@@ -222,7 +222,7 @@ func CliPrintSuccess(format string, a ...interface{}) {
 // CliPrintError print log in red
 func CliPrintError(format string, a ...interface{}) {
 	log.Println(color.HiRedString(format, a...))
-	if IsHeadless {
+	if IsAPIEnabled {
 		// send to socket
 		var resp APIResponse
 		msg := GetDateTime() + " ERROR: " + fmt.Sprintf(format, a...)
@@ -244,7 +244,7 @@ func CliPrintError(format string, a ...interface{}) {
 // CliYesNo prompt for a y/n answer from user
 func CliYesNo(prompt string) bool {
 	// always return true if there's no way to show prompt
-	if IsHeadless {
+	if IsAPIEnabled {
 		return true
 	}
 
@@ -311,7 +311,7 @@ func CliBanner() error {
 
 // CliPrettyPrint prints two-column help info
 func CliPrettyPrint(header1, header2 string, map2write *map[string]string) {
-	if IsHeadless {
+	if IsAPIEnabled {
 		// send to socket
 		var resp APIResponse
 		msg, err := json.Marshal(map2write)

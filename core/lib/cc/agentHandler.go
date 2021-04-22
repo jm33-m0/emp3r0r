@@ -35,7 +35,7 @@ func processAgentData(data *agent.MsgTunData) {
 		outLines := strings.Split(out, "\n")
 
 		// headless mode
-		if IsHeadless {
+		if IsAPIEnabled {
 			// send to socket
 			var resp APIResponse
 			msg := fmt.Sprintf("%s:\n%s", cmd, out)

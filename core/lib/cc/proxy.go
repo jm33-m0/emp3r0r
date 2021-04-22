@@ -53,7 +53,7 @@ func headlessListPortFwds() (err error) {
 
 // ListPortFwds list currently active port mappings
 func ListPortFwds() {
-	if IsHeadless {
+	if IsAPIEnabled {
 		err := headlessListPortFwds()
 		if err != nil {
 			CliPrintError("ListPortFwds: %v", err)

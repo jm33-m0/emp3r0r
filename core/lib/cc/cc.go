@@ -21,8 +21,8 @@ var (
 	// 0 (INFO) -> 1 (WARN) -> 2 (ERROR)
 	DebugLevel = 0
 
-	// IsHeadless Indicate whether we are in headless mode
-	IsHeadless = false
+	// IsAPIEnabled Indicate whether we are in headless mode
+	IsAPIEnabled = false
 
 	// EmpRoot root directory of emp3r0r
 	EmpRoot, _ = os.Getwd()
@@ -74,7 +74,7 @@ func headlessListTargets() (err error) {
 // ListTargets list currently connected agents
 func ListTargets() {
 	// return JSON data to APIConn in headless mode
-	if IsHeadless {
+	if IsAPIEnabled {
 		if err := headlessListTargets(); err != nil {
 			CliPrintError("ls_targets: %v", err)
 		}
