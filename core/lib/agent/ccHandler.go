@@ -359,8 +359,11 @@ func processCCData(data *MsgTunData) {
 			data2send.Payload = fmt.Sprintf("#put %s failed: %v", path, err)
 			goto send
 		}
-		log.Printf("Saved %s from CC", path)
-		data2send.Payload = fmt.Sprintf("#put %s successfully done", path)
+		size := float32(len(decData)) / 1024
+		sha256sum := tun.SHA256SumRaw(decData)
+		data2send.Payload = fmt.Sprintf("#put %s successfully done:\n%fKB (%s)", path, size, sha256sum)
+		log.Printf("Saved %s from CC\n%s", path, data2send.Payload)
+		goto send
 
 	default:
 	}
