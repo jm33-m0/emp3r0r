@@ -173,13 +173,11 @@ func ModuleRun() {
 			ModuleHelpers[agent.ModCMD_EXEC]()
 			return
 		}
+		CliPrintError("Target not specified")
+		return
 	}
 	if Targets[CurrentTarget] == nil {
-		if CurrentTarget != nil {
-			CliPrintError("Target (%s) does not exist", CurrentTarget.Tag)
-		} else {
-			CliPrintError("Target not set")
-		}
+		CliPrintError("Target (%s) does not exist", CurrentTarget.Tag)
 		return
 	}
 
