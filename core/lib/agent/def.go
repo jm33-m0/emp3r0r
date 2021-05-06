@@ -127,35 +127,34 @@ var ModuleDocs = map[string]string{
 	ModREVERSEPROXY: "Manually proxy agents who are unable to use our forward proxy",
 }
 
-// SystemInfo agent properties
 type SystemInfo struct {
-	Tag         string   // identifier of the agent
-	Transport   string   // transport the agent uses (HTTP2 / CDN / TOR)
-	Hostname    string   // Hostname and machine ID
-	Hardware    string   // machine details and hypervisor
-	Container   string   // container tech (if any)
-	CPU         string   // CPU info
-	Mem         string   // memory size
-	OS          string   // OS name and version
-	Kernel      string   // kernel release
-	Arch        string   // kernel architecture
-	IP          string   // public IP of the target
-	IPs         []string // IPs that are found on target's NICs
-	ARP         []string // ARP table
-	User        string   // user account info
-	HasRoot     bool     // is agent run as root?
-	HasTor      bool     // is agent from Tor?
-	HasInternet bool     // has internet access?
+	Tag         string   `json:"Tag"`         // identifier of the agent
+	Transport   string   `json:"Transport"`   // transport the agent uses (HTTP2 / CDN / TOR)
+	Hostname    string   `json:"Hostname"`    // Hostname and machine ID
+	Hardware    string   `json:"Hardware"`    // machine details and hypervisor
+	Container   string   `json:"Container"`   // container tech (if any)
+	CPU         string   `json:"CPU"`         // CPU info
+	Mem         string   `json:"Mem"`         // memory size
+	OS          string   `json:"OS"`          // OS name and version
+	Kernel      string   `json:"Kernel"`      // kernel release
+	Arch        string   `json:"Arch"`        // kernel architecture
+	IP          string   `json:"IP"`          // public IP of the target
+	IPs         []string `json:"IPs"`         // IPs that are found on target's NICs
+	ARP         []string `json:"ARP"`         // ARP table
+	User        string   `json:"User"`        // user account info
+	HasRoot     bool     `json:"HasRoot"`     // is agent run as root?
+	HasTor      bool     `json:"HasTor"`      // is agent from Tor?
+	HasInternet bool     `json:"HasInternet"` // has internet access?
 
 	Process *AgentProcess // agent's process
 }
 
 // AgentProcess process info of our agent
 type AgentProcess struct {
-	PID     int    // pid
-	PPID    int    // parent PID
-	Cmdline string // process name and command line args
-	Parent  string // parent process name and cmd line args
+	PID     int    `json:"PID"`     // pid
+	PPID    int    `json:"PPID"`    // parent PID
+	Cmdline string `json:"Cmdline"` // process name and command line args
+	Parent  string `json:"Parent"`  // parent process name and cmd line args
 }
 
 // MsgTunData data to send in the tunnel
