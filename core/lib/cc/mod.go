@@ -175,7 +175,11 @@ func ModuleRun() {
 		}
 	}
 	if Targets[CurrentTarget] == nil {
-		CliPrintError("Target (%s) does not exist", CurrentTarget.Tag)
+		if CurrentTarget != nil {
+			CliPrintError("Target (%s) does not exist", CurrentTarget.Tag)
+		} else {
+			CliPrintError("Target not set")
+		}
 		return
 	}
 
