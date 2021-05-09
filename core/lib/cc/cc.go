@@ -210,12 +210,9 @@ func PutFile(lpath, rpath string, a *agent.SystemInfo) error {
 	// file size
 	size := len(bytes)
 	sizemB := float32(size) / 1024 / 1024
-	if sizemB > 20 {
-		return errors.New("please do NOT transfer large files this way as it's too NOISY, aborting")
-	}
 	CliPrintInfo("\nPutFile:\nUploading '%s' to\n'%s' "+
 		"on %s, agent [%d]\n"+
-		"size: %d bytes (%.2fmB)\n"+
+		"size: %d bytes (%.2fMB)\n"+
 		"sha256sum: %x",
 		lpath, rpath,
 		a.IP, Targets[a].Index,
