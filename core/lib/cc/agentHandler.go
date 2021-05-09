@@ -194,11 +194,11 @@ func processAgentData(data *agent.MsgTunData) {
 			_ = os.Remove(temp)
 		}()
 
-		// save to /tmp for security
+		// save to FileGetDir
 		if _, err := os.Stat(FileGetDir); os.IsNotExist(err) {
 			err = os.MkdirAll(FileGetDir, 0700)
 			if err != nil {
-				CliPrintError("mkdir -p /tmp/emp3r0r/file-get: %v", err)
+				CliPrintError("mkdir -p %s: %v", FileGetDir, err)
 				return
 			}
 		}
