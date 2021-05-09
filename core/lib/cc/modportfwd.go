@@ -62,7 +62,7 @@ func moduleProxy() {
 	// port-fwd
 	var pf PortFwdSession
 	pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
-	pf.Lport, pf.To = port, port
+	pf.Lport, pf.To = port, "127.0.0.1:"+port
 
 	// proxy command, start socks5 server on agent
 	go func() {

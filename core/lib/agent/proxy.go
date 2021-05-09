@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -67,6 +68,7 @@ func PortFwd(addr, sessionID string, reverse bool) (err error) {
 		conn   *h2conn.Conn
 		ctx    context.Context
 		cancel context.CancelFunc
+		mutex  = &sync.Mutex{}
 	)
 	if !tun.ValidateIPPort(addr) && !reverse {
 		return fmt.Errorf("Invalid address: %s", addr)
@@ -89,7 +91,10 @@ func PortFwd(addr, sessionID string, reverse bool) (err error) {
 		if conn != nil {
 			conn.Close()
 		}
+
+		mutex.Lock()
 		delete(PortFwds, sessionID)
+		mutex.Unlock()
 		log.Printf("PortFwd stopped: %s (%s)", addr, sessionID)
 	}()
 
@@ -98,7 +103,9 @@ func PortFwd(addr, sessionID string, reverse bool) (err error) {
 	session.Conn = conn
 	session.Ctx = ctx
 	session.Cancel = cancel
+	mutex.Lock()
 	PortFwds[sessionID] = &session
+	mutex.Unlock()
 
 	// check if h2conn is disconnected,
 	// if yes, kill all goroutines and cleanup
