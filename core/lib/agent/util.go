@@ -161,7 +161,8 @@ func file2CC(filepath string, offset int64) (checksum string, err error) {
 	if err != nil {
 		return
 	}
-	var bytes []byte
+	total := util.FileSize(filepath)
+	bytes := make([]byte, total-offset)
 	_, err = f.ReadAt(bytes, offset)
 	if err != nil {
 		return
