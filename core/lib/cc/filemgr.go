@@ -69,9 +69,11 @@ func DownloadFromAgent(cmd string) {
 	if len(inputSlice) != 2 {
 		CliPrintError("get <remote path>")
 		return
-	}
-
-	if err = GetFile(inputSlice[1], target); err != nil {
-		CliPrintError("Cannot get %s: %v", inputSlice[2], err)
+	} else {
+		go func() {
+			if err = GetFile(inputSlice[1], target); err != nil {
+				CliPrintError("Cannot get %s: %v", inputSlice[2], err)
+			}
+		}()
 	}
 }

@@ -249,6 +249,12 @@ func StatFile(filepath string, a *agent.SystemInfo) (fi *os.FileInfo, err error)
 	}
 	var fileinfo os.FileInfo
 
+	defer func() {
+		CmdResultsMutex.Lock()
+		delete(CmdResults, cmd)
+		CmdResultsMutex.Unlock()
+	}()
+
 	for {
 		time.Sleep(100 * time.Millisecond)
 		res, exists := CmdResults[cmd]

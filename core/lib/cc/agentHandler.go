@@ -22,6 +22,9 @@ import (
 // CmdResults receive response from agent and cache them
 var CmdResults = make(map[string]string)
 
+// mutex
+var CmdResultsMutex = &sync.Mutex{}
+
 // processAgentData deal with data from agent side
 func processAgentData(data *agent.MsgTunData) {
 	payloadSplit := strings.Split(data.Payload, agent.OpSep)
@@ -29,9 +32,6 @@ func processAgentData(data *agent.MsgTunData) {
 
 	target := GetTargetFromTag(data.Tag)
 	contrlIf := Targets[target]
-
-	// mutex
-	var mutex = &sync.Mutex{}
 
 	switch op {
 
@@ -181,9 +181,9 @@ func processAgentData(data *agent.MsgTunData) {
 
 		log.Printf("\n[%s] %s:\n%s\n\n", color.CyanString("%d", contrlIf.Index), color.HiMagentaString(cmd), color.HiWhiteString(out))
 		// cache this cmd response
-		mutex.Lock()
+		CmdResultsMutex.Lock()
 		CmdResults[cmd] = out
-		mutex.Unlock()
+		CmdResultsMutex.Unlock()
 
 	// save file from #get
 	case "FILE":
