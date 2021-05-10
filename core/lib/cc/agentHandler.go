@@ -201,7 +201,7 @@ func processAgentData(data *agent.MsgTunData) {
 		filewrite := FileGetDir + filename + ".downloading" // we will write to this file
 		targetFile := FileGetDir + filename                 // will copy the downloaded file here
 		targetSize := util.FileSize(targetFile)             // check if we reach this size
-		f, err := os.OpenFile(filewrite, os.O_APPEND|os.O_CREATE, 0600)
+		f, err := os.OpenFile(filewrite, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 		if err != nil {
 			CliPrintError("processAgentData write file: %v", err)
 		}

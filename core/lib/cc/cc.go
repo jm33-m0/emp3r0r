@@ -241,13 +241,13 @@ func PutFile(lpath, rpath string, a *agent.SystemInfo) error {
 }
 
 // StatFile Get stat info of a file on agent
-func StatFile(filepath string, a *agent.SystemInfo) (fi *os.FileInfo, err error) {
-	cmd := "!stat " + filepath + uuid.NewString()
+func StatFile(filepath string, a *agent.SystemInfo) (fi *util.FileStat, err error) {
+	cmd := fmt.Sprintf("!stat %s %s", filepath, uuid.NewString())
 	err = SendCmd(cmd, a)
 	if err != nil {
 		return
 	}
-	var fileinfo os.FileInfo
+	var fileinfo util.FileStat
 
 	defer func() {
 		CmdResultsMutex.Lock()
@@ -259,7 +259,7 @@ func StatFile(filepath string, a *agent.SystemInfo) (fi *os.FileInfo, err error)
 		time.Sleep(100 * time.Millisecond)
 		res, exists := CmdResults[cmd]
 		if exists {
-			err = json.Unmarshal([]byte(res), fileinfo)
+			err = json.Unmarshal([]byte(res), &fileinfo)
 			if err != nil {
 				return
 			}
@@ -273,6 +273,12 @@ func StatFile(filepath string, a *agent.SystemInfo) (fi *os.FileInfo, err error)
 
 // GetFile get file from agent
 func GetFile(filepath string, a *agent.SystemInfo) error {
+	if !util.IsFileExist(FileGetDir) {
+		err := os.MkdirAll(FileGetDir, 0700)
+		if err != nil {
+			return fmt.Errorf("GetFile mkdir %s: %v", FileGetDir, err)
+		}
+	}
 	var data agent.MsgTunData
 	filename := FileGetDir + util.FileBaseName(filepath) // will copy the downloaded file here when we are done
 	tempname := filename + ".downloading"                // will be writing to this file
@@ -283,7 +289,7 @@ func GetFile(filepath string, a *agent.SystemInfo) error {
 		return fmt.Errorf("GetFile: failed to stat %s: %v", filepath, err)
 	}
 	fileinfo := *fi
-	filesize := fileinfo.Size()
+	filesize := fileinfo.Size
 	err = util.AllocateFile(filename, filesize)
 	if err != nil {
 		return fmt.Errorf("GetFile: %s allocate file: %v", filepath, err)

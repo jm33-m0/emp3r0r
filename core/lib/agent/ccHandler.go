@@ -158,7 +158,10 @@ func processCCData(data *MsgTunData) {
 			if err != nil {
 				out = fmt.Sprintf("cant stat file %s: %v", cmdSlice[1], err)
 			}
-			fiData, err := json.Marshal(fi)
+			var fstat util.FileStat
+			fstat.Permission = fi.Mode().String()
+			fstat.Size = fi.Size()
+			fiData, err := json.Marshal(fstat)
 			out = string(fiData)
 			if err != nil {
 				out = fmt.Sprintf("cant marshal file info %s: %v", cmdSlice[1], err)

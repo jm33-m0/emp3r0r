@@ -72,7 +72,7 @@ func DownloadFromAgent(cmd string) {
 	} else {
 		go func() {
 			if err = GetFile(inputSlice[1], target); err != nil {
-				CliPrintError("Cannot get %s: %v", inputSlice[2], err)
+				CliPrintError("Cannot get %s: %v", inputSlice[1], err)
 			}
 		}()
 	}

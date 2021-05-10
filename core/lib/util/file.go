@@ -25,6 +25,12 @@ type Dentry struct {
 	Permission string `json:"perm"`  // -rwxr-xr-x
 }
 
+// FileStat stat info of a file
+type FileStat struct {
+	Permission string `json:"permission"`
+	Size       int64  `json:"size"`
+}
+
 // LsPath ls path and return a json
 func LsPath(path string) (res string, err error) {
 	files, err := ioutil.ReadDir("./")
@@ -153,7 +159,7 @@ func AllocateFile(filepath string, n int64) (err error) {
 			return
 		}
 	}
-	f, err := os.OpenFile(filepath, os.O_CREATE|os.O_APPEND, 0600)
+	f, err := os.OpenFile(filepath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
 	if err != nil {
 		return
 	}
