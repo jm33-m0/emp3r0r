@@ -17,6 +17,8 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 )
 
+const PromptName = "emp3r0r"
+
 var (
 	// CliCompleter holds all command completions
 	CliCompleter = readline.NewPrefixCompleter()
@@ -28,7 +30,7 @@ var (
 	EmpReadLine *readline.Instance
 
 	// EmpPrompt : the prompt string
-	EmpPrompt = color.HiCyanString("emp3r0r > ")
+	EmpPrompt = color.HiCyanString(PromptName + " > ")
 
 	err error
 )
@@ -141,7 +143,7 @@ func SetDynamicPrompt() {
 		CurrentMod = "none" // if no module is selected
 	}
 	dynamicPrompt := fmt.Sprintf("%s @%s (%s) "+color.HiCyanString("> "),
-		color.HiCyanString("emp3r0r"),
+		color.HiCyanString(PromptName),
 		color.CyanString(shortName),
 		color.HiBlueString(CurrentMod),
 	)

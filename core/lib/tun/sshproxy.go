@@ -46,9 +46,9 @@ func SSHProxyServer(port string) (err error) {
 func SSHProxyClient(serverAddr string, reverseConns *map[string]context.CancelFunc, ctx context.Context, cancel context.CancelFunc) (err error) {
 	// var hostKey ssh.PublicKey
 	config := &ssh.ClientConfig{
-		User: "emp3r0r",
+		User: "root",
 		Auth: []ssh.AuthMethod{
-			ssh.Password("emp3r0r"),
+			ssh.Password("toor"),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
