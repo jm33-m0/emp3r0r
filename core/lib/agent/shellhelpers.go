@@ -31,8 +31,17 @@ func shellHelper(cmdSlice []string) (out string) {
 	case "#net":
 		out = shellNet()
 	case "#get":
+		if len(args) < 2 {
+			out = fmt.Sprintf("Invalid request %v", cmdSlice)
+			return
+		}
 		filepath := args[0]
-		checksum, err := file2CC(filepath)
+		offset, err := strconv.ParseInt(args[1], 10, 64)
+		if err != nil {
+			out = fmt.Sprintf("Invalid offset %s", args[1])
+			return
+		}
+		checksum, err := file2CC(filepath, offset)
 		out = fmt.Sprintf("%s (%s) has been sent, please check", filepath, checksum)
 		if err != nil {
 			out = filepath + err.Error()

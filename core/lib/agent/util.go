@@ -155,13 +155,14 @@ func CollectSystemInfo() *SystemInfo {
 }
 
 // send local file to CC
-func file2CC(filepath string) (checksum string, err error) {
+func file2CC(filepath string, offset int64) (checksum string, err error) {
 	// open and read the target file
 	f, err := os.Open(filepath)
 	if err != nil {
 		return
 	}
-	bytes, err := ioutil.ReadAll(f)
+	var bytes []byte
+	_, err = f.ReadAt(bytes, offset)
 	if err != nil {
 		return
 	}

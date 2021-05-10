@@ -143,3 +143,35 @@ func FileBaseName(filepath string) (filename string) {
 	filename = filepathSplit[len(filepathSplit)-1]
 	return
 }
+
+// AllocateFile allocate n bytes for a file, will delete the target file if already exists
+func AllocateFile(filepath string, n int64) (err error) {
+	var i int64 = 0
+	if IsFileExist(filepath) {
+		err = os.Remove(filepath)
+		if err != nil {
+			return
+		}
+	}
+	f, err := os.OpenFile(filepath, os.O_CREATE|os.O_APPEND, 0600)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	for ; i <= n; i++ {
+		f.Write([]byte("\x00"))
+	}
+
+	return
+}
+
+// FileSize calc file size
+func FileSize(path string) (size int64) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		log.Printf("FileSize %s: %v", path, err)
+		return -1
+	}
+	size = fi.Size()
+	return
+}

@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 )
 
@@ -128,6 +129,16 @@ func MD5Sum(text string) string {
 // SHA256Sum calc sha256 of a string
 func SHA256Sum(text string) string {
 	sumbytes := sha256.Sum256([]byte(text))
+	return fmt.Sprintf("%x", sumbytes)
+}
+
+// SHA256SumFile calc sha256 of a file
+func SHA256SumFile(path string) string {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return "error"
+	}
+	sumbytes := sha256.Sum256([]byte(data))
 	return fmt.Sprintf("%x", sumbytes)
 }
 

