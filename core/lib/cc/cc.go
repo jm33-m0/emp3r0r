@@ -290,7 +290,7 @@ func GetFile(filepath string, a *agent.SystemInfo) error {
 	}
 	fileinfo := *fi
 	filesize := fileinfo.Size
-	err = util.AllocateFile(filename, filesize)
+	err = util.FileAllocate(filename, filesize)
 	if err != nil {
 		return fmt.Errorf("GetFile: %s allocate file: %v", filepath, err)
 	}

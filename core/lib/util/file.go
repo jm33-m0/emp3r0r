@@ -150,23 +150,20 @@ func FileBaseName(filepath string) (filename string) {
 	return
 }
 
-// AllocateFile allocate n bytes for a file, will delete the target file if already exists
-func AllocateFile(filepath string, n int64) (err error) {
-	var i int64 = 0
+// FileAllocate allocate n bytes for a file, will delete the target file if already exists
+func FileAllocate(filepath string, n int64) (err error) {
 	if IsFileExist(filepath) {
 		err = os.Remove(filepath)
 		if err != nil {
 			return
 		}
 	}
-	f, err := os.OpenFile(filepath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+	f, err := os.Create(filepath)
 	if err != nil {
 		return
 	}
 	defer f.Close()
-	for ; i <= n; i++ {
-		f.Write([]byte("\x00"))
-	}
+	f.Truncate(n)
 
 	return
 }
