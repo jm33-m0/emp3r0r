@@ -27,7 +27,9 @@ type Dentry struct {
 
 // FileStat stat info of a file
 type FileStat struct {
+	Name       string `json:"name"`
 	Permission string `json:"permission"`
+	Checksum   string `json:"checksum"`
 	Size       int64  `json:"size"`
 }
 

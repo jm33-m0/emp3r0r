@@ -161,6 +161,8 @@ func processCCData(data *MsgTunData) {
 			var fstat util.FileStat
 			fstat.Permission = fi.Mode().String()
 			fstat.Size = fi.Size()
+			fstat.Checksum = tun.SHA256SumFile(cmdSlice[1])
+			fstat.Name = util.FileBaseName(cmdSlice[1])
 			fiData, err := json.Marshal(fstat)
 			out = string(fiData)
 			if err != nil {

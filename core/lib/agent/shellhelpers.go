@@ -41,7 +41,7 @@ func shellHelper(cmdSlice []string) (out string) {
 			out = fmt.Sprintf("Invalid offset %s", args[1])
 			return
 		}
-		checksum, err := file2CC(filepath, offset)
+		checksum, err := sendFile2CC(filepath, offset)
 		out = fmt.Sprintf("%s (%s) has been sent, please check", filepath, checksum)
 		if err != nil {
 			out = filepath + err.Error()

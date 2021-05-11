@@ -18,4 +18,7 @@ const (
 
 	// FileAPI host some files
 	FileAPI = "/www/"
+
+	// FTPAPI file transfer
+	FTPAPI = "/ftp/"
 )

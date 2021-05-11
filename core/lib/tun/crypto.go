@@ -9,8 +9,8 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
+	"os"
 )
 
 // AESEncryptRaw encrypt bytes
@@ -132,14 +132,20 @@ func SHA256Sum(text string) string {
 	return fmt.Sprintf("%x", sumbytes)
 }
 
-// SHA256SumFile calc sha256 of a file
+// SHA256SumFile calc sha256 of a file (of any size)
 func SHA256SumFile(path string) string {
-	data, err := ioutil.ReadFile(path)
+	f, err := os.Open(path)
 	if err != nil {
-		return "error"
+		return err.Error()
 	}
-	sumbytes := sha256.Sum256([]byte(data))
-	return fmt.Sprintf("%x", sumbytes)
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return err.Error()
+	}
+
+	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
 func SHA256SumRaw(data []byte) string {
