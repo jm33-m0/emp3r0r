@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -132,14 +133,17 @@ func GetFile(filepath string, a *agent.SystemInfo) error {
 	}
 
 	// mark this file transfer stream
-	var ftpSh *StreamHandler
+	ftpSh := &StreamHandler{}
 	// tell agent where to seek the left bytes
-	ftpSh.Token = uuid.New().String()
+	ftpSh.Token = uuid.NewString()
+	ftpSh.Mutex = &sync.Mutex{}
+	ftpSh.Buf = make(chan []byte)
+	ftpSh.BufSize = 1024
 	ftpSh.Mutex.Lock()
 	FTPStreams[filepath] = ftpSh
 	ftpSh.Mutex.Unlock()
 	cmd := fmt.Sprintf("#get %s %d %s", filepath, offset, ftpSh.Token)
-
+	// register FTP handler
 	data.Payload = fmt.Sprintf("cmd%s%s", agent.OpSep, cmd)
 	data.Tag = a.Tag
 	err = Send2Agent(&data, a)

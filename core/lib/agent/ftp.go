@@ -40,7 +40,8 @@ func file2CC(filepath string, offset int64) (checksum string, err error) {
 }
 
 // sendFile2CC send file to CC, with buffering
-func sendFile2CC(filepath string, offset int64) (checksum string, err error) {
+func sendFile2CC(filepath string, offset int64, token string) (checksum string, err error) {
+	log.Printf("Sending %s to CC, offset=%d", filepath, offset)
 	// open and read the target file
 	f, err := os.Open(filepath)
 	if err != nil {
@@ -53,9 +54,11 @@ func sendFile2CC(filepath string, offset int64) (checksum string, err error) {
 	}
 
 	// connect
-	url := CCAddress + tun.FTPAPI
+	url := CCAddress + "/" + tun.FTPAPI + token
 	conn, ctx, cancel, err := ConnectCC(url)
+	log.Printf("sendFile2CC: connection: %s", url)
 	if err != nil {
+		log.Printf("sendFile2CC: connection failed: %v", err)
 		return
 	}
 	defer cancel()
@@ -65,6 +68,8 @@ func sendFile2CC(filepath string, offset int64) (checksum string, err error) {
 		send = make(chan []byte, 1024)
 		buf  = make([]byte, 1024)
 	)
+	send <- []byte(token)
+	log.Printf("Sent token %s", token)
 	go func() {
 		for outgoing := range send {
 			outgoing = bytes.Trim(outgoing, "\x00") // trim NULL

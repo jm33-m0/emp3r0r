@@ -11,6 +11,7 @@ require (
 	github.com/gliderlabs/ssh v0.3.2
 	github.com/golang/snappy v0.0.3 // indirect
 	github.com/google/uuid v1.2.0
+	github.com/gorilla/mux v1.8.0
 	github.com/jaypipes/ghw v0.7.0
 	github.com/jm33-m0/go-cdn2proxy v1.0.1
 	github.com/kbinani/screenshot v0.0.0-20210326165202-b96eb3309bb0
