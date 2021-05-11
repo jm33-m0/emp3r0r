@@ -246,7 +246,7 @@ shell:
 func cmdBash() (err error) {
 	// activate reverse shell in agent
 	token := uuid.New().String()
-	RShellStream.Text = token
+	RShellStream.Token = token
 	cmd := fmt.Sprintf("bash %s", token)
 	err = SendCmd(cmd, CurrentTarget)
 	if err != nil {
