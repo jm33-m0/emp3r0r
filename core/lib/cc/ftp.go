@@ -142,6 +142,11 @@ func GetFile(filepath string, a *agent.SystemInfo) error {
 	ftpSh.Mutex.Lock()
 	FTPStreams[filepath] = ftpSh
 	ftpSh.Mutex.Unlock()
+
+	// h2x
+	ftpSh.H2x = new(agent.H2Conn)
+
+	// cmd
 	cmd := fmt.Sprintf("#get %s %d %s", filepath, offset, ftpSh.Token)
 	// register FTP handler
 	data.Payload = fmt.Sprintf("cmd%s%s", agent.OpSep, cmd)

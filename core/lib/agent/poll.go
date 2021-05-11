@@ -93,6 +93,7 @@ func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, cancel conte
 
 	h2 := h2conn.Client{Client: HTTPClient}
 
+	log.Printf("ConnectCC: connecting to %s", url)
 	conn, resp, err = h2.Connect(ctx, url)
 	if err != nil {
 		log.Printf("Initiate conn: %s", err)

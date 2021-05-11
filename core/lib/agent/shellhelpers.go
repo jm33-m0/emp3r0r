@@ -47,6 +47,7 @@ func shellHelper(cmdSlice []string) (out string) {
 		checksum, err := sendFile2CC(filepath, offset, token)
 		out = fmt.Sprintf("%s (%s) has been sent, please check", filepath, checksum)
 		if err != nil {
+			log.Printf("#GET: %v", err)
 			out = filepath + err.Error()
 		}
 	default:

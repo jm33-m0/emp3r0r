@@ -57,6 +57,7 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 	}
 
 	var err error
+	sh.H2x = &agent.H2Conn{}
 	// use h2conn
 	sh.H2x.Conn, err = h2conn.Accept(wrt, req)
 	if err != nil {
@@ -67,16 +68,11 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 
 	// agent auth
 	sh.H2x.Ctx, sh.H2x.Cancel = context.WithCancel(req.Context())
-	buf := make([]byte, sh.BufSize)
-	_, err = sh.H2x.Conn.Read(buf)
-	buf = bytes.Trim(buf, "\x00")
-	agentToken, err := uuid.ParseBytes(buf)
-	if err != nil {
-		CliPrintError("Invalid ftp token %s: %v", buf, err)
-		return
-	}
-	if agentToken.String() != sh.Token {
-		CliPrintError("Invalid ftp token '%s vs %s'", agentToken.String(), sh.Token)
+	// token from URL
+	vars := mux.Vars(req)
+	token := vars["token"]
+	if token != sh.Token {
+		CliPrintError("Invalid ftp token '%s vs %s'", token, sh.Token)
 		return
 	}
 	CliPrintSuccess("Got a ftp connection (%s) from %s", sh.Token, req.RemoteAddr)
@@ -111,8 +107,8 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 		return
 	}
 	targetFile := FileGetDir + util.FileBaseName(filename)
-	filewrite := filename + ".downloading"
-	targetSize := util.FileSize(filename)
+	filewrite := FileGetDir + filename + ".downloading"
+	targetSize := util.FileSize(targetFile)
 	// FileGetDir
 	if !util.IsFileExist(FileGetDir) {
 		err = os.MkdirAll(FileGetDir, 0700)
@@ -151,7 +147,7 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 
 	// have we finished downloading?
 	nowSize := util.FileSize(filewrite)
-	if nowSize == targetSize {
+	if nowSize == targetSize && nowSize >= 0 {
 		err = os.Rename(filewrite, targetFile)
 		if err != nil {
 			CliPrintError("Failed to save downloaded file %s: %v", targetFile, err)
