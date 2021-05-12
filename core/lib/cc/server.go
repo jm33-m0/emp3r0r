@@ -75,7 +75,7 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 		CliPrintError("Invalid ftp token '%s vs %s'", token, sh.Token)
 		return
 	}
-	CliPrintSuccess("Got a ftp connection (%s) from %s", sh.Token, req.RemoteAddr)
+	CliPrintInfo("Got a ftp connection (%s) from %s", sh.Token, req.RemoteAddr)
 
 	// save the file
 	filename := ""
@@ -83,6 +83,20 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 		if sh.Token == persh.Token {
 			filename = fname
 			break
+		}
+	}
+	// abort if we dont have the filename
+	if filename == "" {
+		CliPrintError("%s failed to parse filename", sh.Token)
+		return
+	}
+	filewrite := FileGetDir + filename + ".downloading"
+	// FileGetDir
+	if !util.IsFileExist(FileGetDir) {
+		err = os.MkdirAll(FileGetDir, 0700)
+		if err != nil {
+			CliPrintError("mkdir -p %s: %v", FileGetDir, err)
+			return
 		}
 	}
 	defer func() {
@@ -99,24 +113,23 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 		delete(FTPStreams, filename)
 		sh.Mutex.Unlock()
 		CliPrintWarning("Closed ftp connection from %s", req.RemoteAddr)
-	}()
 
-	// abort if we dont have the filename
-	if filename == "" {
-		CliPrintError("%s failed to parse filename", sh.Token)
-		return
-	}
-	targetFile := FileGetDir + util.FileBaseName(filename)
-	filewrite := FileGetDir + filename + ".downloading"
-	targetSize := util.FileSize(targetFile)
-	// FileGetDir
-	if !util.IsFileExist(FileGetDir) {
-		err = os.MkdirAll(FileGetDir, 0700)
-		if err != nil {
-			CliPrintError("mkdir -p %s: %v", FileGetDir, err)
+		// have we finished downloading?
+		targetFile := FileGetDir + util.FileBaseName(filename)
+		nowSize := util.FileSize(filewrite)
+		targetSize := util.FileSize(targetFile)
+		if nowSize == targetSize && nowSize >= 0 {
+			err = os.Rename(filewrite, targetFile)
+			if err != nil {
+				CliPrintError("Failed to save downloaded file %s: %v", targetFile, err)
+			}
+			checksum := tun.SHA256SumFile(targetFile)
+			CliPrintSuccess("Downloaded %d bytes to %s (%s)", nowSize, targetFile, checksum)
 			return
 		}
-	}
+		CliPrintWarning("Incomplete download (%d of %d bytes), will continue if you run GET again", nowSize, targetSize)
+	}()
+
 	go func() {
 		f, err := os.OpenFile(filewrite, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 		if err != nil {
@@ -135,7 +148,7 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 	}()
 
 	// read filedata
-	for len(sh.Buf) > 0 {
+	for sh.H2x.Ctx.Err() == nil {
 		data := make([]byte, sh.BufSize)
 		_, err = sh.H2x.Conn.Read(data)
 		if err != nil {
@@ -144,19 +157,6 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 		}
 		sh.Buf <- data
 	}
-
-	// have we finished downloading?
-	nowSize := util.FileSize(filewrite)
-	if nowSize == targetSize && nowSize >= 0 {
-		err = os.Rename(filewrite, targetFile)
-		if err != nil {
-			CliPrintError("Failed to save downloaded file %s: %v", targetFile, err)
-		}
-		checksum := tun.SHA256SumFile(targetFile)
-		CliPrintSuccess("Downloaded %d bytes to %s (%s)", nowSize, targetFile, checksum)
-		return
-	}
-	CliPrintWarning("Incomplete download (%d of %d bytes), will continue if you run GET again", nowSize, targetSize)
 }
 
 // portFwdHandler handles proxy/port forwarding

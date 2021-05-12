@@ -2,7 +2,6 @@ package agent
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/base64"
 	"fmt"
 	"log"
@@ -68,37 +67,39 @@ func sendFile2CC(filepath string, offset int64, token string) (checksum string, 
 
 	// read
 	var (
-		send = make(chan []byte, 1024)
-		buf  = make([]byte, 1024)
+		// send = make(chan []byte, 1024*8)
+		buf []byte
 	)
-	go func() {
-		for outgoing := range send {
-			outgoing = bytes.Trim(outgoing, "\x00") // trim NULL
-			select {
-			case <-ctx.Done():
+
+	// read file and send data
+	log.Printf("Reading from %s", filepath)
+	scanner := bufio.NewScanner(f)
+	scanner.Split(bufio.ScanBytes)
+	for ctx.Err() == nil && scanner.Scan() {
+		buf = append(buf, scanner.Bytes()...)
+		if len(buf) == 1024*8 {
+			_, err = conn.Write(buf)
+			if err != nil {
 				return
-			default:
-				_, err = conn.Write(outgoing)
-				if err != nil {
-					log.Printf("conn write: %v", err)
-					return
-				}
 			}
+			buf = make([]byte, 0)
+			continue
 		}
-	}()
-	reader := bufio.NewReader(f)
-	for ctx.Err() == nil {
-		_, err = reader.Read(buf)
+		// fmt.Printf("%x", scanner.Bytes())
+	}
+	if len(buf) > 0 && len(buf) < 1024*8 {
+		_, err = conn.Write(buf)
 		if err != nil {
 			return
 		}
-		send <- buf
+		buf = buf[:]
 	}
 
 	// checksum
 	go func() {
 		checksum = tun.SHA256SumFile(filepath)
 	}()
+	log.Printf("Reading %s finished, calculating sha256sum", filepath)
 	for checksum == "" {
 		time.Sleep(100 * time.Millisecond)
 	}

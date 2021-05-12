@@ -121,15 +121,8 @@ func GetFile(filepath string, a *agent.SystemInfo) error {
 	// what if we have downloaded part of the file
 	var offset int64 = 0
 	if util.IsFileExist(tempname) {
-		fiTotal, err := os.Stat(filename)
-		if err != nil {
-			CliPrintWarning("GetFile: read %s: %v", filename, err)
-		}
-		fiHave, err := os.Stat(tempname)
-		if err != nil {
-			CliPrintWarning("GetFile: read %s: %v", tempname, err)
-		}
-		offset = fiTotal.Size() - fiHave.Size()
+		fiHave := util.FileSize(tempname)
+		offset = fiHave
 	}
 
 	// mark this file transfer stream
@@ -138,7 +131,7 @@ func GetFile(filepath string, a *agent.SystemInfo) error {
 	ftpSh.Token = uuid.NewString()
 	ftpSh.Mutex = &sync.Mutex{}
 	ftpSh.Buf = make(chan []byte)
-	ftpSh.BufSize = 1024
+	ftpSh.BufSize = 1024 * 8
 	ftpSh.Mutex.Lock()
 	FTPStreams[filepath] = ftpSh
 	ftpSh.Mutex.Unlock()
