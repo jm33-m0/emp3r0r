@@ -5,6 +5,7 @@ go 1.13
 require (
 	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
 	github.com/bettercap/readline v0.0.0-20210228151553-655e48bcb7bf
+	github.com/cavaliercoder/grab v2.0.0+incompatible
 	github.com/creack/pty v1.1.11
 	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/fatih/color v1.10.0
