@@ -56,6 +56,17 @@ func Socks5Proxy(op string, addr string) (err error) {
 	return err
 }
 
+// isPortFwdExist is there a port mapping to this addr already?
+func isPortFwdExist(addr string) bool {
+	for _, session := range PortFwds {
+		if session.Addr == addr {
+			return true
+		}
+	}
+
+	return false
+}
+
 // PortFwd port mapping, receive request data then send it to target port on remote address
 // addr: when reversed, addr should be port
 func PortFwd(addr, sessionID string, reverse bool) (err error) {

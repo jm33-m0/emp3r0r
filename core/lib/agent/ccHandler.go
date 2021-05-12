@@ -251,8 +251,8 @@ func processCCData(data *MsgTunData) {
 				return
 			}
 			log.Printf("Got proxy request: %s", cmdSlice)
-			port := cmdSlice[2]
-			err = Socks5Proxy(cmdSlice[1], "127.0.0.1:"+port)
+			addr := cmdSlice[2]
+			err = Socks5Proxy(cmdSlice[1], addr)
 			if err != nil {
 				log.Printf("Failed to start Socks5Proxy: %v", err)
 			}
@@ -297,6 +297,19 @@ func processCCData(data *MsgTunData) {
 			default:
 			}
 
+			return
+		}
+
+		// delete_portfwd
+		if cmdSlice[0] == "!delete_portfwd" {
+			if len(cmdSlice) != 2 {
+				return
+			}
+			for id, session := range PortFwds {
+				if id == cmdSlice[1] {
+					session.Cancel()
+				}
+			}
 			return
 		}
 

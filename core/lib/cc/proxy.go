@@ -7,10 +7,12 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/fatih/color"
 	"github.com/google/uuid"
+	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -21,6 +23,7 @@ type PortFwdSession struct {
 	To          string // to address
 	Description string // fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, to_addr)
 
+	Agent  *agent.SystemInfo         // agent who holds this port mapping session
 	Sh     map[string]*StreamHandler // related to HTTP handler
 	Ctx    context.Context           // PortFwd context
 	Cancel context.CancelFunc        // PortFwd cancel
@@ -49,6 +52,24 @@ func headlessListPortFwds() (err error) {
 	}
 	_, err = APIConn.Write([]byte(data))
 	return
+}
+
+// DeletePortFwdSession delete a port mapping session by ID
+func DeletePortFwdSession(sessionID string) {
+	var mutex = &sync.Mutex{}
+	mutex.Lock()
+	defer mutex.Unlock()
+	for id, session := range PortFwds {
+		if id == sessionID {
+			err := SendCmd("!delete_portfwd "+id, session.Agent)
+			if err != nil {
+				CliPrintError("Tell agent %s to delete port mapping %s: %v", session.Agent.Tag, sessionID, err)
+				return
+			}
+			session.Cancel()
+			delete(PortFwds, id)
+		}
+	}
 }
 
 // ListPortFwds list currently active port mappings
@@ -115,6 +136,9 @@ func (pf *PortFwdSession) RunReversedPortFwd(sh *StreamHandler) (err error) {
 		CliPrintInfo("PortFwd conn handler (%s) finished", conn.RemoteAddr().String())
 		sh.H2x.Cancel() // cancel this h2 connection
 	}
+
+	// remember the agent
+	pf.Agent = CurrentTarget
 
 	// io.Copy
 	go func() {
@@ -214,6 +238,9 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 	cancel := pf.Cancel
 	toAddr := pf.To
 	listenPort := pf.Lport
+
+	// remember the agent
+	pf.Agent = CurrentTarget
 
 	_, e2 := strconv.Atoi(listenPort)
 	if !tun.ValidateIPPort(toAddr) || e2 != nil {

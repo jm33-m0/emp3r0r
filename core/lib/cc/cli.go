@@ -49,6 +49,9 @@ func CliMain() {
 		readline.PcItem(HELP,
 			readline.PcItemDynamic(listMods())),
 
+		readline.PcItem("delete_port_mapping",
+			readline.PcItemDynamic(listPortMappings())),
+
 		readline.PcItem("target",
 			readline.PcItemDynamic(listTargetIndexTags())),
 	}
@@ -399,6 +402,17 @@ func listMods() func(string) []string {
 			names = append(names, mod)
 		}
 		return names
+	}
+}
+
+// autocomplete portfwd session IDs
+func listPortMappings() func(string) []string {
+	return func(line string) []string {
+		ids := make([]string, 0)
+		for id := range PortFwds {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 }
 

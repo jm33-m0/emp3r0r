@@ -10,26 +10,27 @@ import (
 
 // Commands holds all commands and their help string, command: help
 var Commands = map[string]string{
-	HELP:           "Print this help, 'help <module>' gives help for a module",
-	"target":       "Set target. eg. `target <index>`",
-	"set":          "Set an option. eg. `set <option> <val>`",
-	"use":          "Use a module. eg. `use <module_name>`",
-	"run":          "Run selected module, make sure you have set required options",
-	"info":         "What options do we have?",
-	"gen_agent":    "Generate agent with provided binary and build.json",
-	"ls":           "List current directory of selected agent",
-	"cd":           "Change current working directory of selected agent",
-	"rm":           "Delete a file/directory on selected agent",
-	"pwd":          "Current working directory of selected agent",
-	"ps":           "Process list of selected agent",
-	"kill":         "Terminate a process on selected agent: eg. `kill <pid>`",
-	"get":          "Download a file from selected agent",
-	"put":          "Upload a file to selected agent",
-	"screenshot":   "Take a screenshot of selected agent",
-	"ls_targets":   "List all targets",
-	"ls_modules":   "List all modules",
-	"ls_port_fwds": "List all port mappings",
-	"exit":         "Exit",
+	HELP:                  "Print this help, 'help <module>' gives help for a module",
+	"target":              "Set target. eg. `target <index>`",
+	"set":                 "Set an option. eg. `set <option> <val>`",
+	"use":                 "Use a module. eg. `use <module_name>`",
+	"run":                 "Run selected module, make sure you have set required options",
+	"info":                "What options do we have?",
+	"gen_agent":           "Generate agent with provided binary and build.json",
+	"ls":                  "List current directory of selected agent",
+	"cd":                  "Change current working directory of selected agent",
+	"rm":                  "Delete a file/directory on selected agent",
+	"pwd":                 "Current working directory of selected agent",
+	"ps":                  "Process list of selected agent",
+	"kill":                "Terminate a process on selected agent: eg. `kill <pid>`",
+	"get":                 "Download a file from selected agent",
+	"put":                 "Upload a file to selected agent",
+	"screenshot":          "Take a screenshot of selected agent",
+	"ls_targets":          "List all targets",
+	"ls_modules":          "List all modules",
+	"ls_port_fwds":        "List all port mappings",
+	"delete_port_mapping": "Delete a port mapping",
+	"exit":                "Exit",
 }
 
 // CmdHelpers holds a map of helper functions
@@ -105,6 +106,13 @@ func CmdHandler(cmd string) (err error) {
 
 		// hand to SetOption helper
 		SetOption(cmdSplit[1:])
+
+	case cmdSplit[0] == "delete_port_mapping":
+		if len(cmdSplit) < 2 {
+			CliPrintError("Delete what port mapping? " + strconv.Quote(cmd))
+			return
+		}
+		DeletePortFwdSession(cmdSplit[1])
 
 	case cmdSplit[0] == "target":
 		if len(cmdSplit) != 2 {
