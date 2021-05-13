@@ -3,8 +3,6 @@ package cc
 import (
 	"context"
 	"fmt"
-	"strconv"
-	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 )
@@ -66,29 +64,8 @@ func moduleProxy() {
 
 	switch status {
 	case "on":
-		// proxy
-		proxyCtx, proxyCancel := context.WithCancel(context.Background())
-		// proxy command, start socks5 server on agent
+		// port mapping of default socks5 proxy
 		go func() {
-			if _, err := strconv.Atoi(port); err != nil {
-				CliPrintError("Invalid port: %v", err)
-				return
-			}
-			cmd := fmt.Sprintf("!proxy %s %s", status, pf.To)
-			err := SendCmd(cmd, CurrentTarget)
-			if err != nil {
-				CliPrintError("SendCmd: %v", err)
-				return
-			}
-			defer proxyCancel() // mark proxy command as done
-		}()
-
-		// port mapping
-		go func() {
-			for proxyCtx.Err() == nil {
-				time.Sleep(100 * time.Millisecond)
-			}
-
 			err := pf.RunPortFwd()
 			if err != nil {
 				CliPrintError("PortFwd failed: %v", err)
