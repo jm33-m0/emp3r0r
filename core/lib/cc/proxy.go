@@ -3,10 +3,12 @@ package cc
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,7 +16,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // PortFwdSession holds controller interface of a port-fwd session
@@ -142,7 +143,6 @@ func (pf *PortFwdSession) RunReversedPortFwd(sh *StreamHandler) (err error) {
 
 	// io.Copy
 	go func() {
-		defer cleanup()
 		_, err = io.Copy(sh.H2x.Conn, conn)
 		if err != nil {
 			CliPrintWarning("conn -> h2: %v", err)
@@ -150,7 +150,6 @@ func (pf *PortFwdSession) RunReversedPortFwd(sh *StreamHandler) (err error) {
 		}
 	}()
 	go func() {
-		defer cleanup()
 		_, err = io.Copy(conn, sh.H2x.Conn)
 		if err != nil {
 			CliPrintWarning("h2 -> conn: %v", err)
@@ -182,15 +181,15 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		)
 
 		// wait for agent to connect
-		for i := 0; i < 100; i++ {
-			time.Sleep(200 * time.Millisecond)
+		for i := 0; i < 1e5; i++ {
+			time.Sleep(time.Millisecond)
 			sh, exist = pf.Sh[fwdID]
 			if exist {
 				break
 			}
 		}
 		if !exist {
-			CliPrintWarning("handlePerConn timeout")
+			err = errors.New("handlePerConn: timeout")
 			return
 		}
 
@@ -207,7 +206,6 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 
 		// io.Copy
 		go func() {
-			defer cleanup()
 			_, err = io.Copy(sh.H2x.Conn, conn)
 			if err != nil {
 				CliPrintWarning("conn -> h2: %v", err)
@@ -215,7 +213,6 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 			}
 		}()
 		go func() {
-			defer cleanup()
 			_, err = io.Copy(conn, sh.H2x.Conn)
 			if err != nil {
 				CliPrintWarning("h2 -> conn: %v", err)
@@ -225,8 +222,8 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 
 		// keep running until context is canceled
 		defer cleanup()
-		for connCtx.Err() == nil {
-			time.Sleep(500 * time.Millisecond)
+		for connCtx.Err() == nil && sh.H2x.Ctx.Err() == nil {
+			time.Sleep(10 * time.Millisecond)
 		}
 	}
 
@@ -239,6 +236,8 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 	toAddr := pf.To
 	listenPort := pf.Lport
 
+	var mutex = &sync.Mutex{}
+
 	// remember the agent
 	pf.Agent = CurrentTarget
 
@@ -247,6 +246,13 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		return fmt.Errorf("Invalid address/port: %s (to), %v (listen_port)", toAddr, e2)
 	}
 
+	// listen on listenPort, and do the forward
+	ln, err := net.Listen("tcp", ":"+listenPort)
+	if err != nil {
+		return fmt.Errorf("RunPortFwd: %v", err)
+	}
+
+	// send command to agent, with session ID
 	fwdID := uuid.New().String()
 	cmd := fmt.Sprintf("!port_fwd %s %s on", toAddr, fwdID)
 	err = SendCmd(cmd, CurrentTarget)
@@ -255,20 +261,18 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		return
 	}
 
-	// listen on listenPort, and do the forward
-	ln, err := net.Listen("tcp", ":"+listenPort)
-	if err != nil {
-		return err
-	}
-
 	// mark this session, save to PortFwds
 	pf.Sh = nil
 	pf.Description = fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, toAddr)
+	mutex.Lock()
 	PortFwds[fwdID] = pf
+	mutex.Unlock()
 
 	cleanup := func() {
 		cancel()
 		ln.Close()
+		mutex.Lock()
+		defer mutex.Unlock()
 		delete(PortFwds, fwdID)
 		CliPrintWarning("PortFwd session (%s: %s) has finished", fwdID, pf.Description)
 	}
@@ -297,12 +301,14 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		if e != nil {
 			CliPrintError("Listening on port %s: %v", p.Lport, e)
 		}
+		// mark src port
+		srcPort := strings.Split(conn.RemoteAddr().String(), ":")[1]
 
 		go func() {
 			// sub-session (streamHandler) ID
-			shID := fmt.Sprintf("%s_%d", fwdID, util.RandInt(0, 1024))
+			shID := fmt.Sprintf("%s_%s", fwdID, srcPort)
 			cmd = fmt.Sprintf("!port_fwd %s %s on", toAddr, shID)
-			err = SendCmd(cmd, CurrentTarget)
+			err = SendCmd(cmd, pf.Agent)
 			if err != nil {
 				CliPrintError("SendCmd: %v", err)
 				return
