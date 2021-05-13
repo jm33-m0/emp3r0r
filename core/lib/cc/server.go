@@ -221,8 +221,8 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 			if err != nil {
 				CliPrintError("RunReversedPortFwd: %v", err)
 			}
-		} else {
-			CliPrintInfo("Got a portFwd sub-connection (%s) from %s", string(origBuf), req.RemoteAddr)
+			// } else {
+			// CliPrintInfo("Got a portFwd sub-connection (%s) from %s", string(origBuf), req.RemoteAddr)
 		}
 	}
 
