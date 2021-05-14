@@ -49,11 +49,11 @@ func CliMain() {
 		readline.PcItem(HELP,
 			readline.PcItemDynamic(listMods())),
 
-		readline.PcItem("delete_port_mapping",
-			readline.PcItemDynamic(listPortMappings())),
-
 		readline.PcItem("target",
 			readline.PcItemDynamic(listTargetIndexTags())),
+
+		readline.PcItem("delete_port_fwd",
+			readline.PcItemDynamic(listPortMappings())),
 	}
 
 	for cmd := range Commands {
@@ -344,7 +344,7 @@ func CliPrettyPrint(header1, header2 string, map2write *map[string]string) {
 	fmt.Println("")
 
 	for c1, c2 := range *map2write {
-		cnt = len(header1) + 10 - len(c1)
+		cnt = len(header1) + 18 - len(c1) // NOTE cannot be too long or cnt can be negative
 		sep = strings.Repeat(" ", cnt)
 		color.Cyan("%s%s%s\n", c1, sep, c2)
 	}
