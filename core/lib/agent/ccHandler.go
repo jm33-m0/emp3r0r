@@ -148,7 +148,7 @@ func processCCData(data *MsgTunData) {
 			goto send
 		}
 
-		// current working directory
+		// put file on agent
 		if cmdSlice[0] == "put" {
 			if len(cmdSlice) < 4 {
 				return
