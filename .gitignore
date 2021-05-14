@@ -1,5 +1,6 @@
 # Prerequisites
 *.d
+*private*
 
 # go.sum
 go.sum
