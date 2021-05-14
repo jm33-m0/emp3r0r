@@ -29,7 +29,11 @@ func Screenshot() (path string, err error) {
 			return
 		}
 		path = fmt.Sprintf("%s-%d_%dx%d.png", timedate, i, bounds.Dx(), bounds.Dy())
-		picfile, _ := os.Create(path)
+		picfile, e := os.Create(path)
+		if e != nil {
+			err = fmt.Errorf("Create %s: %v", path, e)
+			return
+		}
 		defer picfile.Close()
 		err = png.Encode(picfile, img)
 		if err != nil {
