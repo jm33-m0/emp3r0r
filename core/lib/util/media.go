@@ -3,7 +3,6 @@ package util
 import (
 	"fmt"
 	"image/png"
-	"log"
 	"os"
 	"time"
 
@@ -13,7 +12,7 @@ import (
 
 // Screenshot take a screenshot in a cross-platform way
 // returns path of taken screenshot
-func Screenshot() (path string) {
+func Screenshot() (path string, err error) {
 	n := screenshot.NumActiveDisplays()
 	var pics []string
 
@@ -24,16 +23,17 @@ func Screenshot() (path string) {
 	for i := 0; i < n; i++ {
 		bounds := screenshot.GetDisplayBounds(i)
 
-		img, err := screenshot.CaptureRect(bounds)
-		if err != nil {
-			panic(err)
+		img, e := screenshot.CaptureRect(bounds)
+		if e != nil {
+			err = e
+			return
 		}
 		path = fmt.Sprintf("%s-%d_%dx%d.png", timedate, i, bounds.Dx(), bounds.Dy())
 		picfile, _ := os.Create(path)
 		defer picfile.Close()
 		err = png.Encode(picfile, img)
 		if err != nil {
-			log.Printf("PNG encode: %v", err)
+			err = fmt.Errorf("PNG encode: %v", err)
 			return
 		}
 		pics = append(pics, path)
@@ -43,10 +43,10 @@ func Screenshot() (path string) {
 	// pack them into one zip archive
 	if len(pics) > 1 {
 		path = timedate + ".zip"
-		err := archiver.Archive(pics, path)
+		err = archiver.Archive(pics, path)
 		if err != nil {
-			log.Printf("Making archive: %v", err)
-			return ""
+			err = fmt.Errorf("Making archive: %v", err)
+			return
 		}
 	}
 

