@@ -146,7 +146,7 @@ func sendFile2CC(filepath string, offset int64, token string) (checksum string, 
 		if err != nil {
 			return
 		}
-		buf = buf[:]
+		log.Printf("Sending remaining %d bytes", len(buf))
 	}
 
 	// checksum

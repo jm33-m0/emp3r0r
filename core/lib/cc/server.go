@@ -128,35 +128,38 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 			CliPrintSuccess("Downloaded %d bytes to %s (%s)", nowSize, targetFile, checksum)
 			return
 		}
+		if nowSize > targetSize {
+			CliPrintError("Downloaded (%d of %d bytes), WTF?", nowSize, targetSize)
+			return
+		}
 		CliPrintWarning("Incomplete download (%d of %d bytes), will continue if you run GET again", nowSize, targetSize)
 	}()
 
-	go func() {
-		f, err := os.OpenFile(filewrite, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-		if err != nil {
-			CliPrintError("ftpHandler write file: %v", err)
-		}
-		defer f.Close()
-
-		// write the file
-		for filedata := range sh.Buf {
-			_, err = f.Write(filedata)
-			if err != nil {
-				CliPrintError("ftpHandler failed to save file: %v", err)
-				return
-			}
-		}
-	}()
+	// open file for writing
+	f, err := os.OpenFile(filewrite, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		CliPrintError("ftpHandler write file: %v", err)
+	}
+	defer f.Close()
 
 	// read filedata
 	for sh.H2x.Ctx.Err() == nil {
 		data := make([]byte, sh.BufSize)
-		_, err = sh.H2x.Conn.Read(data)
+		n, err := sh.H2x.Conn.Read(data)
 		if err != nil {
 			CliPrintWarning("Disconnected: ftpHandler read: %v", err)
 			return
 		}
-		sh.Buf <- data
+		if n < sh.BufSize {
+			data = data[:n]
+		}
+
+		// write the file
+		_, err = f.Write(data)
+		if err != nil {
+			CliPrintError("ftpHandler failed to save file: %v", err)
+			return
+		}
 	}
 }
 
