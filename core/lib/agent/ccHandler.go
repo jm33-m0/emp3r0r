@@ -190,14 +190,16 @@ func processCCData(data *MsgTunData) {
 			}
 
 			fi, err := os.Stat(cmdSlice[1])
-			if err != nil {
+			if err != nil || fi == nil {
 				out = fmt.Sprintf("cant stat file %s: %v", cmdSlice[1], err)
+				data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+				goto send
 			}
-			var fstat util.FileStat
-			fstat.Permission = fi.Mode().String()
+			fstat := &util.FileStat{}
+			fstat.Name = util.FileBaseName(cmdSlice[1])
 			fstat.Size = fi.Size()
 			fstat.Checksum = tun.SHA256SumFile(cmdSlice[1])
-			fstat.Name = util.FileBaseName(cmdSlice[1])
+			fstat.Permission = fi.Mode().String()
 			fiData, err := json.Marshal(fstat)
 			out = string(fiData)
 			if err != nil {
