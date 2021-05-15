@@ -3,7 +3,9 @@ package util
 import (
 	"fmt"
 	"image/png"
+	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/kbinani/screenshot"
@@ -15,6 +17,12 @@ import (
 func Screenshot() (path string, err error) {
 	n := screenshot.NumActiveDisplays()
 	var pics []string
+	if n <= 0 {
+		err = fmt.Errorf("%d displays detected, aborting", n)
+		log.Printf("Zero displays: %v", err)
+		return
+	}
+	log.Printf("Taking screenshot of %d displays", n)
 
 	now := time.Now()
 	timedate := fmt.Sprintf("%d-%02d-%02d_%02d-%02d-%02d",
@@ -26,18 +34,22 @@ func Screenshot() (path string, err error) {
 		img, e := screenshot.CaptureRect(bounds)
 		if e != nil {
 			err = e
+			log.Printf("CaptureRect: %v", err)
 			return
 		}
 		path = fmt.Sprintf("%s-%d_%dx%d.png", timedate, i, bounds.Dx(), bounds.Dy())
 		picfile, e := os.Create(path)
 		if e != nil {
-			err = fmt.Errorf("Create %s: %v", path, e)
+			err = fmt.Errorf("create %s: %v", path, e)
+			log.Printf("Create picfile: %v", err)
 			return
 		}
+		log.Printf("Taken screenshot %s", strconv.Quote(path))
 		defer picfile.Close()
 		err = png.Encode(picfile, img)
 		if err != nil {
 			err = fmt.Errorf("PNG encode: %v", err)
+			log.Printf("PNG encode: %v", err)
 			return
 		}
 		pics = append(pics, path)
@@ -50,6 +62,7 @@ func Screenshot() (path string, err error) {
 		err = archiver.Archive(pics, path)
 		if err != nil {
 			err = fmt.Errorf("Making archive: %v", err)
+			log.Printf("Making archive: %v", err)
 			return
 		}
 	}

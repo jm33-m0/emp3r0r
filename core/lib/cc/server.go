@@ -90,6 +90,7 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 		CliPrintError("%s failed to parse filename", sh.Token)
 		return
 	}
+	filename = util.FileBaseName(filename) // we dont want the full path
 	filewrite := FileGetDir + filename + ".downloading"
 	// FileGetDir
 	if !util.IsFileExist(FileGetDir) {
@@ -133,7 +134,7 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 	go func() {
 		f, err := os.OpenFile(filewrite, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 		if err != nil {
-			CliPrintError("processAgentData write file: %v", err)
+			CliPrintError("ftpHandler write file: %v", err)
 		}
 		defer f.Close()
 
@@ -141,7 +142,7 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 		for filedata := range sh.Buf {
 			_, err = f.Write(filedata)
 			if err != nil {
-				CliPrintError("processAgentData failed to save file: %v", err)
+				CliPrintError("ftpHandler failed to save file: %v", err)
 				return
 			}
 		}
