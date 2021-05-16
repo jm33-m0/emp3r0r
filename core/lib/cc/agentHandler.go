@@ -149,7 +149,11 @@ func processAgentData(data *agent.MsgTunData) {
 			// fill table
 			for _, d := range dents {
 				tdata = append(tdata, []string{d.Name, d.Ftype, d.Size, d.Date, d.Permission})
-				LsDir = append(LsDir, d.Name)
+				if d.Ftype == "file" {
+					LsDir = append(LsDir, d.Name)
+				} else {
+					LsDir = append(LsDir, d.Name+"/")
+				}
 			}
 			table.AppendBulk(tdata)
 			table.Render()
