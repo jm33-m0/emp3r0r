@@ -96,6 +96,12 @@ func GetFile(filepath string, a *agent.SystemInfo) error {
 	var data agent.MsgTunData
 	filename := FileGetDir + util.FileBaseName(filepath) // will copy the downloaded file here when we are done
 	tempname := filename + ".downloading"                // will be writing to this file
+	lock := filename + ".lock"                           // don't try to duplicate the task
+
+	// is this file already being downloaded?
+	if util.IsFileExist(lock) {
+		return fmt.Errorf("%s is already being downloaded", filename)
+	}
 
 	// stat target file, know its size, and allocate the file on disk
 	fi, err := StatFile(filepath, a)
@@ -140,5 +146,8 @@ func GetFile(filepath string, a *agent.SystemInfo) error {
 		CliPrintError("GetFile send command: %v", err)
 		return err
 	}
-	return nil
+
+	// create lock file
+	_, err = os.Create(lock)
+	return err
 }

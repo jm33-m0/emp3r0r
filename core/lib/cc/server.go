@@ -52,7 +52,7 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 		sh.H2x.Cancel != nil ||
 		sh.H2x.Conn != nil {
 		CliPrintError("ftpHandler: occupied")
-		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		http.Error(wrt, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 
@@ -62,7 +62,7 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 	sh.H2x.Conn, err = h2conn.Accept(wrt, req)
 	if err != nil {
 		CliPrintError("ftpHandler: failed creating connection from %s: %s", req.RemoteAddr, err)
-		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		http.Error(wrt, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 
@@ -92,6 +92,14 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 	}
 	filename = util.FileBaseName(filename) // we dont want the full path
 	filewrite := FileGetDir + filename + ".downloading"
+	lock := FileGetDir + filename + ".lock"
+	// is the file already being downloaded?
+	if util.IsFileExist(lock) {
+		CliPrintError("%s is already being downloaded", filename)
+		http.Error(wrt, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
+
 	// FileGetDir
 	if !util.IsFileExist(FileGetDir) {
 		err = os.MkdirAll(FileGetDir, 0700)
@@ -114,6 +122,12 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 		delete(FTPStreams, filename)
 		sh.Mutex.Unlock()
 		CliPrintWarning("Closed ftp connection from %s", req.RemoteAddr)
+
+		// delete the lock file, unlock download session
+		err = os.Remove(lock)
+		if err != nil {
+			CliPrintWarning("Remove %s: %v", lock, err)
+		}
 
 		// have we finished downloading?
 		targetFile := FileGetDir + util.FileBaseName(filename)
