@@ -4,6 +4,9 @@ import (
 	"strings"
 )
 
+// LsDir cache items in current directory
+var LsDir []string
+
 func SingleArgCmd(cmd string) {
 	inputSlice := strings.Fields(cmd)
 	cmdname := inputSlice[0]

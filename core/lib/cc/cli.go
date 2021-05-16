@@ -46,6 +46,12 @@ func CliMain() {
 		readline.PcItem("use",
 			readline.PcItemDynamic(listMods())),
 
+		readline.PcItem("rm",
+			readline.PcItemDynamic(listDir())),
+
+		readline.PcItem("cd",
+			readline.PcItemDynamic(listDir())),
+
 		readline.PcItem(HELP,
 			readline.PcItemDynamic(listMods())),
 
@@ -60,6 +66,9 @@ func CliMain() {
 		if cmd == "set" ||
 			cmd == "use" ||
 			cmd == "target" ||
+			cmd == "delete_port_fwd" ||
+			cmd == "rm" ||
+			cmd == "cd" ||
 			cmd == HELP {
 			continue
 		}
@@ -437,6 +446,17 @@ func listOptions() func(string) []string {
 
 		for opt := range Options {
 			names = append(names, opt)
+		}
+		return names
+	}
+}
+
+// autocomplete items in current directory
+func listDir() func(string) []string {
+	return func(line string) []string {
+		names := make([]string, 0)
+		for _, name := range LsDir {
+			names = append(names, name)
 		}
 		return names
 	}

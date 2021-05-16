@@ -124,6 +124,8 @@ func processAgentData(data *agent.MsgTunData) {
 				return
 			}
 
+			LsDir = nil // clear cache
+
 			// build table
 			tdata := [][]string{}
 			tableString := &strings.Builder{}
@@ -147,6 +149,7 @@ func processAgentData(data *agent.MsgTunData) {
 			// fill table
 			for _, d := range dents {
 				tdata = append(tdata, []string{d.Name, d.Ftype, d.Size, d.Date, d.Permission})
+				LsDir = append(LsDir, d.Name)
 			}
 			table.AppendBulk(tdata)
 			table.Render()
