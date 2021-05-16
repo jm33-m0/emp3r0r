@@ -49,6 +49,9 @@ func CliMain() {
 		readline.PcItem("rm",
 			readline.PcItemDynamic(listDir())),
 
+		readline.PcItem("mv",
+			readline.PcItemDynamic(listDir())),
+
 		readline.PcItem("cd",
 			readline.PcItemDynamic(listDir())),
 
@@ -68,6 +71,7 @@ func CliMain() {
 			cmd == "target" ||
 			cmd == "delete_port_fwd" ||
 			cmd == "rm" ||
+			cmd == "mv" ||
 			cmd == "cd" ||
 			cmd == HELP {
 			continue
