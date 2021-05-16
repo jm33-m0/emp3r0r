@@ -100,6 +100,9 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 		return
 	}
 
+	// create lock file
+	_, err = os.Create(lock)
+
 	// FileGetDir
 	if !util.IsFileExist(FileGetDir) {
 		err = os.MkdirAll(FileGetDir, 0700)

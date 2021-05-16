@@ -147,7 +147,5 @@ func GetFile(filepath string, a *agent.SystemInfo) error {
 		return err
 	}
 
-	// create lock file
-	_, err = os.Create(lock)
 	return err
 }
