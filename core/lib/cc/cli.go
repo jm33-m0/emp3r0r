@@ -55,6 +55,9 @@ func CliMain() {
 		readline.PcItem("cd",
 			readline.PcItemDynamic(listDir())),
 
+		readline.PcItem("get",
+			readline.PcItemDynamic(listDir())),
+
 		readline.PcItem(HELP,
 			readline.PcItemDynamic(listMods())),
 
@@ -68,6 +71,7 @@ func CliMain() {
 	for cmd := range Commands {
 		if cmd == "set" ||
 			cmd == "use" ||
+			cmd == "get" ||
 			cmd == "target" ||
 			cmd == "delete_port_fwd" ||
 			cmd == "rm" ||
