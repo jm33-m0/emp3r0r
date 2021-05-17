@@ -10,7 +10,7 @@ var LsDir []string
 func SingleArgCmd(cmd string) {
 	inputSlice := strings.Fields(cmd)
 	cmdname := inputSlice[0]
-	if len(inputSlice) != 2 {
+	if len(inputSlice) < 2 {
 		CliPrintError("%s requires one argument", cmdname)
 		return
 	}
@@ -30,7 +30,7 @@ func SingleArgCmd(cmd string) {
 func DoubleArgCmd(cmd string) {
 	inputSlice := strings.Fields(cmd)
 	cmdname := inputSlice[0]
-	if len(inputSlice) != 3 {
+	if len(inputSlice) < 3 {
 		CliPrintError("%s requires two arguments", cmdname)
 		return
 	}
