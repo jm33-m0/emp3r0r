@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -104,6 +103,10 @@ func ListTargets() {
 		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor})
 
 	table.SetColumnColor(tablewriter.Colors{tablewriter.FgHiBlueColor},
+		tablewriter.Colors{tablewriter.FgBlueColor},
+		tablewriter.Colors{tablewriter.FgBlueColor},
+		tablewriter.Colors{tablewriter.FgBlueColor},
+		tablewriter.Colors{tablewriter.FgBlueColor},
 		tablewriter.Colors{tablewriter.FgBlueColor})
 	// fill table
 	for target, control := range Targets {
@@ -144,7 +147,7 @@ func GetTargetDetails(target *agent.SystemInfo) {
 	tdata := [][]string{}
 	tableString := &strings.Builder{}
 	table := tablewriter.NewWriter(tableString)
-	table.SetHeader([]string{"Index", strconv.Itoa(control.Index)})
+	table.SetHeader([]string{"Property", "Value"})
 	table.SetBorder(true)
 	table.SetRowLine(true)
 	table.SetAutoWrapText(true)
@@ -196,7 +199,9 @@ func GetTargetDetails(target *agent.SystemInfo) {
 		control.Label = "nolabel"
 	}
 
-	labelRow := []string{"Label", color.HiMagentaString(control.Label)}
+	indexRow := []string{"Index", color.HiMagentaString("%d", control.Index)}
+	labelRow := []string{"Label", color.HiCyanString(control.Label)}
+	tdata = append(tdata, indexRow)
 	tdata = append(tdata, labelRow)
 	for key, val := range infoMap {
 		tdata = append(tdata, []string{key, val})
