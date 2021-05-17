@@ -46,8 +46,12 @@ class GoBuild:
         self.UUID = str(uuid.uuid1())
         self.VERSION = get_version()
 
-        # agent root directory
+        # indicator text
+        self.INDICATOR_TEXT = "emp3r0r"
+        if 'indicator_text' in CACHED_CONF:
+            self.INDICATOR_TEXT = CACHED_CONF['indicator_text']
 
+        # agent root directory
         if "agent_root" in CACHED_CONF:
             self.AgentRoot = CACHED_CONF['agent_root']
         else:
@@ -163,6 +167,8 @@ class GoBuild:
                 "GuardianAgentPath = \"[persistence_agent_path]\"")
         # cc indicator
         sed("./lib/agent/def.go", self.INDICATOR, "[cc_indicator]")
+        # cc indicator text
+        sed("./lib/agent/def.go", self.INDICATOR_TEXT, "[agent_cc_text]")
         # in case we use the same IP for indicator and CC
         sed("./lib/agent/def.go", self.CCIP, "[cc_ipaddr]")
         sed("./lib/agent/def.go", self.UUID, "[agent_uuid]")
@@ -196,6 +202,8 @@ class GoBuild:
         sed("./lib/agent/def.go", "[agent_root]", self.AgentRoot)
         # indicator
         sed("./lib/agent/def.go", "[cc_indicator]", self.INDICATOR)
+        # cc indicator text
+        sed("./lib/agent/def.go", self.INDICATOR_TEXT, "[agent_cc_text]")
         # agent UUID
         sed("./lib/agent/def.go", "[agent_uuid]", self.UUID)
         # ports
@@ -325,6 +333,18 @@ def main(target):
     if not use_cached:
         indicator = input("CC status indicator: ").strip()
         CACHED_CONF['cc_indicator'] = indicator
+
+    # indicator text
+
+    use_cached = False
+
+    if "indicator_text" in CACHED_CONF:
+        use_cached = yes_no(
+            f"Use cached CC indicator text ({CACHED_CONF['indicator_text']})?")
+
+    if not use_cached:
+        indicator_text = input("CC status indicator text: ").strip()
+        CACHED_CONF['indicator_text'] = indicator_text
 
     # guardian shellcode
 

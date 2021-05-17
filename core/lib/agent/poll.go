@@ -71,7 +71,7 @@ func IsCCOnline(proxy string) bool {
 	}
 	defer resp.Body.Close()
 
-	return strings.Contains(string(data), "emp3r0r")
+	return strings.Contains(string(data), CCIndicatorText)
 }
 
 func catchInterruptAndExit(cancel context.CancelFunc) {

