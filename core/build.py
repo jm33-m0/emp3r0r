@@ -168,7 +168,8 @@ class GoBuild:
         # cc indicator
         sed("./lib/agent/def.go", self.INDICATOR, "[cc_indicator]")
         # cc indicator text
-        sed("./lib/agent/def.go", self.INDICATOR_TEXT, "[agent_cc_text]")
+        sed("./lib/agent/def.go",
+            f"CCIndicatorText = {self.INDICATOR_TEXT}", "CCIndicatorText = [agent_cc_text]")
         # in case we use the same IP for indicator and CC
         sed("./lib/agent/def.go", self.CCIP, "[cc_ipaddr]")
         sed("./lib/agent/def.go", self.UUID, "[agent_uuid]")
