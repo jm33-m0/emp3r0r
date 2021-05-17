@@ -102,12 +102,6 @@ func ListTargets() {
 		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
 		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor})
 
-	table.SetColumnColor(tablewriter.Colors{tablewriter.FgHiBlueColor},
-		tablewriter.Colors{tablewriter.FgBlueColor},
-		tablewriter.Colors{tablewriter.FgBlueColor},
-		tablewriter.Colors{tablewriter.FgBlueColor},
-		tablewriter.Colors{tablewriter.FgBlueColor},
-		tablewriter.Colors{tablewriter.FgBlueColor})
 	// fill table
 	for target, control := range Targets {
 		// print
@@ -155,9 +149,6 @@ func GetTargetDetails(target *agent.SystemInfo) {
 	// color
 	table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiMagentaColor},
 		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor})
-
-	table.SetColumnColor(tablewriter.Colors{tablewriter.FgHiBlueColor},
-		tablewriter.Colors{tablewriter.FgBlueColor})
 
 	hasInternet := color.HiRedString("NO")
 	if target.HasInternet {
