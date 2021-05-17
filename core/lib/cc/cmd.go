@@ -157,6 +157,7 @@ func CmdHandler(cmd string) (err error) {
 		if e != nil {
 			CurrentTarget = GetTargetFromTag(cmdSplit[1])
 			if CurrentTarget != nil {
+				GetTargetDetails(CurrentTarget)
 				CliPrintSuccess("Now targeting %s", CurrentTarget.Tag)
 				return nil
 			}
