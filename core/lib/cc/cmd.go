@@ -118,6 +118,34 @@ func CmdHandler(cmd string) (err error) {
 		}
 		DeletePortFwdSession(cmdSplit[1])
 
+	case cmdSplit[0] == "label":
+		if len(cmdSplit) < 2 {
+			CliPrintError("Invalid command %s, usage: 'label <target tag/index> <label>'", strconv.Quote(cmd))
+			return
+		}
+		index, e := strconv.Atoi(cmdSplit[1])
+		label := strings.Join(cmdSplit[2:], " ")
+
+		var target *agent.SystemInfo
+		if e != nil {
+			target = GetTargetFromTag(cmdSplit[1])
+			if target != nil {
+				Targets[target].Label = label // set label
+				labelAgents()
+				CliPrintSuccess("%s has been labeled as %s", target.Tag, label)
+				return nil
+			}
+			return fmt.Errorf("cannot set target label by index: %v", e)
+		}
+		target = GetTargetFromIndex(index)
+		if target == nil {
+			CliPrintWarning("Target does not exist")
+			return fmt.Errorf("target not set or is nil")
+		}
+		Targets[target].Label = label // set label
+		labelAgents()
+		CliPrintSuccess("%s has been labeled as %s", target.Tag, label)
+
 	case cmdSplit[0] == "target":
 		if len(cmdSplit) != 2 {
 			CliPrintError("set target to what? " + strconv.Quote(cmd))

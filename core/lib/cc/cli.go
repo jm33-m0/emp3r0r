@@ -67,6 +67,9 @@ func CliMain() {
 		readline.PcItem("target",
 			readline.PcItemDynamic(listTargetIndexTags())),
 
+		readline.PcItem("label",
+			readline.PcItemDynamic(listTargetIndexTags())),
+
 		readline.PcItem("delete_port_fwd",
 			readline.PcItemDynamic(listPortMappings())),
 	}
@@ -77,6 +80,7 @@ func CliMain() {
 			cmd == "get" ||
 			cmd == "cp" ||
 			cmd == "target" ||
+			cmd == "label" ||
 			cmd == "delete_port_fwd" ||
 			cmd == "rm" ||
 			cmd == "mv" ||

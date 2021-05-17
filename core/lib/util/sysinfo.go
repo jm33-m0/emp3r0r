@@ -1,11 +1,12 @@
 package util
 
 import (
+	"bytes"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/user"
-	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/jaypipes/ghw"
@@ -58,9 +59,46 @@ func GetUsername() string {
 	return u.Username
 }
 
+// Golang code to get MAC address for purposes of generating a unique id. Returns a uint64.
+// Skips virtual MAC addresses (Locally Administered Addresses).
+func macUint64() uint64 {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return uint64(0)
+	}
+
+	for _, i := range interfaces {
+		if i.Flags&net.FlagUp != 0 && bytes.Compare(i.HardwareAddr, nil) != 0 {
+
+			// Skip locally administered addresses
+			if i.HardwareAddr[0]&2 == 2 {
+				continue
+			}
+
+			var mac uint64
+			for j, b := range i.HardwareAddr {
+				if j >= 8 {
+					break
+				}
+				mac <<= 8
+				mac += uint64(b)
+			}
+
+			return mac
+		}
+	}
+
+	return uint64(0)
+}
+
+// generate a static short identifier for the current host
+func genShortID() (id string) {
+	return fmt.Sprintf("%x", macUint64())
+}
+
 // GetHostID unique identifier of the host
 func GetHostID() (id string) {
-	shortID := strconv.Itoa(RandInt(10, 10240))
+	shortID := genShortID()
 	id = fmt.Sprintf("unknown_%s-agent", shortID)
 	name, err := os.Hostname()
 	if err != nil {

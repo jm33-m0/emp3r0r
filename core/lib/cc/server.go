@@ -430,6 +430,12 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 			"running '%s'\n",
 			inx, shortname, fmt.Sprintf("%s - %s", target.IP, target.Transport),
 			target.OS)
+
+		// set labels
+		if util.IsFileExist(AgentsJSON) {
+			var mutex = &sync.Mutex{}
+			SetAgentLabel(&target, mutex)
+		}
 	}
 }
 

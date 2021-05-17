@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
@@ -41,8 +43,9 @@ const (
 
 // Control controller interface of a target
 type Control struct {
-	Index int
-	Conn  *h2conn.Conn
+	Index int          // index of a connected agent
+	Label string       // custom label for an agent
+	Conn  *h2conn.Conn // connection of an agent
 }
 
 // send JSON encoded target list to frontend
@@ -138,6 +141,10 @@ func ListTargets() {
 		}
 
 		// print
+		if control.Label != "" {
+			fmt.Printf(" [%s] Label: %s", color.CyanString("%d", control.Index), strings.Repeat(" ", (14-len("Label")))+
+				color.CyanString(splitLongLine(control.Label, 3)))
+		}
 		fmt.Printf(" [%s] Tag: %s", color.CyanString("%d", control.Index), strings.Repeat(" ", (14-len("Tag")))+
 			color.CyanString(splitLongLine(target.Tag, 3)))
 
@@ -148,7 +155,7 @@ func ListTargets() {
 	}
 }
 
-// GetTargetFromIndex find target from Targets via control index
+// GetTargetFromIndex find target from Targets via control index, return nil if not found
 func GetTargetFromIndex(index int) (target *agent.SystemInfo) {
 	for t, ctl := range Targets {
 		if ctl.Index == index {
@@ -159,7 +166,7 @@ func GetTargetFromIndex(index int) (target *agent.SystemInfo) {
 	return
 }
 
-// GetTargetFromTag find target from Targets via tag
+// GetTargetFromTag find target from Targets via tag, return nil if not found
 func GetTargetFromTag(tag string) (target *agent.SystemInfo) {
 	for t := range Targets {
 		if t.Tag == tag {
@@ -167,6 +174,64 @@ func GetTargetFromTag(tag string) (target *agent.SystemInfo) {
 			break
 		}
 	}
+	return
+}
+
+type LabeledAgent struct {
+	Tag   string `json:"tag"`
+	Label string `json:"label"`
+}
+
+const AgentsJSON = "agents.json"
+
+// save custom labels
+func labelAgents() {
+	var labeledAgents []LabeledAgent
+	for t, c := range Targets {
+		if c.Label == "" {
+			continue
+		}
+		labeled := &LabeledAgent{}
+		labeled.Label = c.Label
+		labeled.Tag = t.Tag
+		labeledAgents = append(labeledAgents, *labeled)
+	}
+	data, err := json.Marshal(labeledAgents)
+	if err != nil {
+		CliPrintWarning("Saving labeled agents: %v", err)
+		return
+	}
+
+	// write file
+	err = ioutil.WriteFile(AgentsJSON, data, 0600)
+	if err != nil {
+		CliPrintWarning("Saving labeled agents: %v", err)
+	}
+}
+
+// SetAgentLabel if an agent is already labeled, we can set its label in later sessions
+func SetAgentLabel(a *agent.SystemInfo, mutex *sync.Mutex) {
+	data, err := ioutil.ReadFile(AgentsJSON)
+	if err != nil {
+		CliPrintWarning("SetAgentLabel: %v", err)
+		return
+	}
+	var labeledAgents []LabeledAgent
+	err = json.Unmarshal(data, &labeledAgents)
+	if err != nil {
+		CliPrintWarning("SetAgentLabel: %v", err)
+		return
+	}
+
+	for _, labeled := range labeledAgents {
+		if a.Tag == labeled.Tag {
+			mutex.Lock()
+			defer mutex.Unlock()
+			Targets[a].Label = labeled.Label
+			return
+		}
+	}
+
 	return
 }
 
