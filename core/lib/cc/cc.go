@@ -12,6 +12,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/posener/h2conn"
 )
 
@@ -83,7 +84,7 @@ func ListTargets() {
 	color.Cyan("Connected agents\n")
 	color.Cyan("=================\n\n")
 
-	indent := strings.Repeat(" ", len(" [0] "))
+	indent := strings.Repeat(" ", len(" [ 0 ] "))
 	for target, control := range Targets {
 		hasInternet := color.HiRedString("NO")
 		if target.HasInternet {
@@ -141,12 +142,12 @@ func ListTargets() {
 		}
 
 		// print
-		if control.Label != "" {
-			fmt.Printf(" [%s] Label: %s", color.CyanString("%d", control.Index), strings.Repeat(" ", (14-len("Label")))+
-				color.CyanString(splitLongLine(control.Label, 3)))
-		}
-		fmt.Printf(" [%s] Tag: %s", color.CyanString("%d", control.Index), strings.Repeat(" ", (14-len("Tag")))+
+		fmt.Printf(" [ %s ] Tag: %s\n", color.CyanString("%d", control.Index), strings.Repeat(" ", (14-len("Tag")))+
 			color.CyanString(splitLongLine(target.Tag, 3)))
+		if control.Label != "" {
+			fmt.Printf("%sLabel: %s\n", indent, strings.Repeat(" ", (14-len("Label")))+
+				color.HiMagentaString(splitLongLine(control.Label, 3)))
+		}
 
 		for key, val := range infoMap {
 			fmt.Printf("\n%s%s:%s%s", indent, key, strings.Repeat(" ", (15-len(key))), val)
@@ -186,7 +187,24 @@ const AgentsJSON = "agents.json"
 
 // save custom labels
 func labelAgents() {
-	var labeledAgents []LabeledAgent
+	var (
+		labeledAgents []LabeledAgent
+		old           []LabeledAgent
+	)
+	// what if agent.json already have some records
+	if util.IsFileExist(AgentsJSON) {
+		data, err := ioutil.ReadFile(AgentsJSON)
+		if err != nil {
+			CliPrintWarning("Reading labeled agents: %v", err)
+		}
+		err = json.Unmarshal(data, &old)
+		if err != nil {
+			CliPrintWarning("Reading labeled agents: %v", err)
+		}
+	}
+
+	// save current labels
+outter:
 	for t, c := range Targets {
 		if c.Label == "" {
 			continue
@@ -194,13 +212,30 @@ func labelAgents() {
 		labeled := &LabeledAgent{}
 		labeled.Label = c.Label
 		labeled.Tag = t.Tag
+
+		// exists in json file?
+		for _, l := range old {
+			if l.Tag == labeled.Tag {
+				l.Label = labeled.Label // update label
+				continue outter
+			}
+		}
+
+		// if new, write it
 		labeledAgents = append(labeledAgents, *labeled)
 	}
+
+	if len(labeledAgents) == 0 {
+		CliPrintError("Nothing to label")
+		return
+	}
+
 	data, err := json.Marshal(labeledAgents)
 	if err != nil {
 		CliPrintWarning("Saving labeled agents: %v", err)
 		return
 	}
+	labeledAgents = append(labeledAgents, old...) // append old labels
 
 	// write file
 	err = ioutil.WriteFile(AgentsJSON, data, 0600)
@@ -210,7 +245,7 @@ func labelAgents() {
 }
 
 // SetAgentLabel if an agent is already labeled, we can set its label in later sessions
-func SetAgentLabel(a *agent.SystemInfo, mutex *sync.Mutex) {
+func SetAgentLabel(a *agent.SystemInfo, mutex *sync.Mutex) (label string) {
 	data, err := ioutil.ReadFile(AgentsJSON)
 	if err != nil {
 		CliPrintWarning("SetAgentLabel: %v", err)
@@ -228,6 +263,7 @@ func SetAgentLabel(a *agent.SystemInfo, mutex *sync.Mutex) {
 			mutex.Lock()
 			defer mutex.Unlock()
 			Targets[a].Label = labeled.Label
+			label = labeled.Label
 			return
 		}
 	}

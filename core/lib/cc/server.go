@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -426,16 +427,17 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 		inx := assignTargetIndex()
 		Targets[&target] = &Control{Index: inx, Conn: nil}
 		shortname := strings.Split(target.Tag, "-agent")[0]
-		CliPrintSuccess("\n[%d] Knock.. Knock...\n%s from %s, "+
-			"running '%s'\n",
-			inx, shortname, fmt.Sprintf("%s - %s", target.IP, target.Transport),
-			target.OS)
-
 		// set labels
 		if util.IsFileExist(AgentsJSON) {
 			var mutex = &sync.Mutex{}
-			SetAgentLabel(&target, mutex)
+			if l := SetAgentLabel(&target, mutex); l != "" {
+				shortname = l
+			}
 		}
+		CliPrintSuccess("\n[%d] Knock.. Knock...\n%s from %s, "+
+			"running %s\n",
+			inx, shortname, fmt.Sprintf("%s - %s", target.IP, target.Transport),
+			strconv.Quote(target.OS))
 	}
 }
 
