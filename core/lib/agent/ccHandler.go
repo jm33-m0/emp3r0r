@@ -220,7 +220,7 @@ func processCCData(data *MsgTunData) {
 				return
 			}
 
-			path := strings.Join(cmdSlice[1:], " ")
+			path := cmdSlice[1]
 			fi, err := os.Stat(path)
 			if err != nil || fi == nil {
 				out = fmt.Sprintf("cant stat file %s: %v", path, err)
