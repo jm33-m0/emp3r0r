@@ -14,6 +14,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
+	"github.com/otiai10/copy"
 )
 
 // exec cmd, receive data, etc
@@ -104,7 +105,21 @@ func processCCData(data *MsgTunData) {
 			goto send
 		}
 
-		// remove file/dir
+		// copy file/dir
+		if cmdSlice[0] == "cp" {
+			if len(cmdSlice) != 3 {
+				return
+			}
+
+			out = fmt.Sprintf("%s has been copied to %s", cmdSlice[1], cmdSlice[2])
+			if err = copy.Copy(cmdSlice[1], cmdSlice[2]); err != nil {
+				out = fmt.Sprintf("Failed to copy %s to %s: %v", cmdSlice[1], cmdSlice[2], err)
+			}
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			goto send
+		}
+
+		// move file/dir
 		if cmdSlice[0] == "mv" {
 			if len(cmdSlice) != 3 {
 				return
