@@ -11,8 +11,8 @@ linux post-exploitation framework made by linux user
 - **Windows** is officially supported with core features enabled, but it **won't** be open sourced. however, you can **port emp3r0r to any platforms** that golang supports, with the codebase provided here, ask any questions in [this thread](https://github.com/jm33-m0/emp3r0r/discussions/24)
 
 ![logo](./img/emp3r0r.png)
+![ls_targets](./img/ls_targets.png)
 
-![reverse_proxy](./img/reverse_proxy.png)
 ____
 
 ## table of contents
