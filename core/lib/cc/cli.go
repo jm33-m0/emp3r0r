@@ -361,7 +361,7 @@ func CliPrettyPrint(header1, header2 string, map2write *map[string]string) {
 		}
 	}
 
-	cnt := 10
+	cnt := 18
 	sep := strings.Repeat(" ", cnt)
 	color.Cyan("%s%s%s\n", header1, sep, header2)
 
