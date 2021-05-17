@@ -214,9 +214,10 @@ outter:
 		labeled.Tag = t.Tag
 
 		// exists in json file?
-		for _, l := range old {
+		for i, l := range old {
 			if l.Tag == labeled.Tag {
 				l.Label = labeled.Label // update label
+				old[i] = l
 				continue outter
 			}
 		}
@@ -224,18 +225,16 @@ outter:
 		// if new, write it
 		labeledAgents = append(labeledAgents, *labeled)
 	}
+	labeledAgents = append(labeledAgents, old...) // append old labels
 
 	if len(labeledAgents) == 0 {
-		CliPrintError("Nothing to label")
 		return
 	}
-
 	data, err := json.Marshal(labeledAgents)
 	if err != nil {
 		CliPrintWarning("Saving labeled agents: %v", err)
 		return
 	}
-	labeledAgents = append(labeledAgents, old...) // append old labels
 
 	// write file
 	err = ioutil.WriteFile(AgentsJSON, data, 0600)

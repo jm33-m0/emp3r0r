@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/user"
 
-	"github.com/google/uuid"
 	"github.com/jaypipes/ghw"
 )
 
@@ -64,6 +63,7 @@ func GetUsername() string {
 func macUint64() uint64 {
 	interfaces, err := net.Interfaces()
 	if err != nil {
+		log.Printf("macUint64: %v", err)
 		return uint64(0)
 	}
 
@@ -106,8 +106,7 @@ func GetHostID() (id string) {
 		return
 	}
 	name = fmt.Sprintf("%s\\%s", name, GetUsername())
-	uuidstr := uuid.New().String()
-	id = fmt.Sprintf("%s_%s-agent-%s", name, shortID, uuidstr)
+	id = fmt.Sprintf("%s_%s-agent-nomachineid", name, shortID)
 	productInfo, err := ghw.Product()
 	if err != nil {
 		log.Printf("GetHostID: %v", err)
