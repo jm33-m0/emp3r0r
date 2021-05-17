@@ -13,6 +13,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
+	"github.com/olekukonko/tablewriter"
 	"github.com/posener/h2conn"
 )
 
@@ -84,49 +85,45 @@ func ListTargets() {
 	color.Cyan("Connected agents\n")
 	color.Cyan("=================\n\n")
 
-	indent := strings.Repeat(" ", len(" [ 0 ] "))
+	// fill table
 	for target, control := range Targets {
+		// build table
+		tdata := [][]string{}
+		tableString := &strings.Builder{}
+		table := tablewriter.NewWriter(tableString)
+		table.SetHeader([]string{"Tag", color.HiCyanString("[%d] %s", control.Index, target.Tag)})
+		table.SetBorder(true)
+		table.SetRowLine(true)
+		table.SetAutoWrapText(true)
+
+		// color
+		table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
+			tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor})
+
+		table.SetColumnColor(tablewriter.Colors{tablewriter.FgHiBlueColor},
+			tablewriter.Colors{tablewriter.FgBlueColor})
+
 		hasInternet := color.HiRedString("NO")
 		if target.HasInternet {
 			hasInternet = color.HiGreenString("YES")
 		}
 
-		// split long lines
-		splitLongLine := func(line string, titleLen int) (ret string) {
-			if len(line) < 55 {
-				return line
-			}
-			ret = line[:55]
-			for i := 1; i <= len(line)/55; i++ {
-				if i == 4 {
-					break
-				}
-				endslice := 55 * (i + 1)
-				if endslice >= len(line) {
-					endslice = len(line)
-				}
-				ret += fmt.Sprintf("\n%s%s", strings.Repeat(" ", 25-titleLen), line[55*i:endslice])
-			}
-
-			return
-		}
-		arpTab := splitLongLine(strings.Join(target.ARP, ", "), 4)
-		ips := splitLongLine(strings.Join(target.IPs, ", "), 4)
-		target.User = splitLongLine(target.User, 5)
+		arpTab := strings.Join(target.ARP, ", ")
+		ips := strings.Join(target.IPs, ", ")
 		userInfo := color.HiRedString(target.User)
 		if target.HasRoot {
 			userInfo = color.HiGreenString(target.User)
 		}
-		cpuinfo := color.HiMagentaString(splitLongLine(target.CPU, 4))
+		cpuinfo := color.HiMagentaString(target.CPU)
 
 		// agent process info
 		agentProc := *target.Process
-		procInfo := splitLongLine(fmt.Sprintf("%s (%d) <- %s (%d)",
-			agentProc.Cmdline, agentProc.PID, agentProc.Parent, agentProc.PPID), 4)
+		procInfo := fmt.Sprintf("%s (%d) <- %s (%d)",
+			agentProc.Cmdline, agentProc.PID, agentProc.Parent, agentProc.PPID)
 
 		// info map
 		infoMap := map[string]string{
-			"Hostname":  color.HiCyanString(splitLongLine(target.Hostname, 3)),
+			"Hostname":  color.HiCyanString(target.Hostname),
 			"Process":   color.HiMagentaString(procInfo),
 			"User":      userInfo,
 			"Internet":  hasInternet,
@@ -142,17 +139,20 @@ func ListTargets() {
 		}
 
 		// print
-		fmt.Printf(" [ %s ] Tag: %s\n", color.CyanString("%d", control.Index), strings.Repeat(" ", (14-len("Tag")))+
-			color.CyanString(splitLongLine(target.Tag, 3)))
-		if control.Label != "" {
-			fmt.Printf("%sLabel: %s\n", indent, strings.Repeat(" ", (14-len("Label")))+
-				color.HiMagentaString(splitLongLine(control.Label, 3)))
+		if control.Label == "" {
+			control.Label = "nolabel"
 		}
 
+		labelRow := []string{"Label", color.HiMagentaString(control.Label)}
+		tdata = append(tdata, labelRow)
 		for key, val := range infoMap {
-			fmt.Printf("\n%s%s:%s%s", indent, key, strings.Repeat(" ", (15-len(key))), val)
+			tdata = append(tdata, []string{key, val})
 		}
-		fmt.Print("\n\n\n\n")
+
+		// rendor table
+		table.AppendBulk(tdata)
+		table.Render()
+		fmt.Printf("\n\033[0m%s\n\n", tableString)
 	}
 }
 
