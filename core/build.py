@@ -204,7 +204,8 @@ class GoBuild:
         # indicator
         sed("./lib/agent/def.go", "[cc_indicator]", self.INDICATOR)
         # cc indicator text
-        sed("./lib/agent/def.go", "[agent_cc_text]", self.INDICATOR_TEXT)
+        sed("./lib/agent/def.go",
+            "CCIndicatorText = [agent_cc_text]", f"CCIndicatorText = {self.INDICATOR_TEXT}")
         # agent UUID
         sed("./lib/agent/def.go", "[agent_uuid]", self.UUID)
         # ports
