@@ -423,7 +423,7 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 	// set target IP
 	target.IP = req.RemoteAddr
 
-	if !agentExists(&target) {
+	if !IsAgentExist(&target) {
 		inx := assignTargetIndex()
 		Targets[&target] = &Control{Index: inx, Conn: nil}
 		shortname := strings.Split(target.Tag, "-agent")[0]

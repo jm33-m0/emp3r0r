@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -85,75 +86,125 @@ func ListTargets() {
 	color.Cyan("Connected agents\n")
 	color.Cyan("=================\n\n")
 
+	// build table
+	tdata := [][]string{}
+	tableString := &strings.Builder{}
+	table := tablewriter.NewWriter(tableString)
+	table.SetHeader([]string{"Index", "Label", "Tag", "OS", "IPs", "From"})
+	table.SetBorder(true)
+	table.SetRowLine(true)
+	table.SetAutoWrapText(true)
+
+	// color
+	table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiMagentaColor},
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiCyanColor},
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor})
+
+	table.SetColumnColor(tablewriter.Colors{tablewriter.FgHiBlueColor},
+		tablewriter.Colors{tablewriter.FgBlueColor})
 	// fill table
 	for target, control := range Targets {
-		// build table
-		tdata := [][]string{}
-		tableString := &strings.Builder{}
-		table := tablewriter.NewWriter(tableString)
-		table.SetHeader([]string{"Tag", color.HiCyanString("[%d] %s", control.Index, target.Tag)})
-		table.SetBorder(true)
-		table.SetRowLine(true)
-		table.SetAutoWrapText(true)
-
-		// color
-		table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
-			tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor})
-
-		table.SetColumnColor(tablewriter.Colors{tablewriter.FgHiBlueColor},
-			tablewriter.Colors{tablewriter.FgBlueColor})
-
-		hasInternet := color.HiRedString("NO")
-		if target.HasInternet {
-			hasInternet = color.HiGreenString("YES")
-		}
-
-		arpTab := strings.Join(target.ARP, ", ")
-		ips := strings.Join(target.IPs, ", ")
-		userInfo := color.HiRedString(target.User)
-		if target.HasRoot {
-			userInfo = color.HiGreenString(target.User)
-		}
-		cpuinfo := color.HiMagentaString(target.CPU)
-
-		// agent process info
-		agentProc := *target.Process
-		procInfo := fmt.Sprintf("%s (%d) <- %s (%d)",
-			agentProc.Cmdline, agentProc.PID, agentProc.Parent, agentProc.PPID)
-
-		// info map
-		infoMap := map[string]string{
-			"Hostname":  color.HiCyanString(target.Hostname),
-			"Process":   color.HiMagentaString(procInfo),
-			"User":      userInfo,
-			"Internet":  hasInternet,
-			"CPU":       cpuinfo,
-			"MEM":       target.Mem,
-			"Hardware":  color.HiCyanString(target.Hardware),
-			"Container": target.Container,
-			"OS":        color.HiWhiteString(target.OS),
-			"Kernel":    color.HiBlueString(target.Kernel) + ", " + color.HiWhiteString(target.Arch),
-			"From":      color.HiYellowString(target.IP) + fmt.Sprintf(" - %s", color.HiGreenString(target.Transport)),
-			"IPs":       color.BlueString(ips),
-			"ARP":       color.HiWhiteString(arpTab),
-		}
-
 		// print
 		if control.Label == "" {
-			control.Label = "nolabel"
+			control.Label = "-"
+		}
+		index := color.HiMagentaString("%d", control.Index)
+		label := color.HiCyanString(control.Label)
+		tag := color.HiCyanString(target.Tag)
+
+		// info map
+		ips := strings.Join(target.IPs, ", ")
+		infoMap := map[string]string{
+			"OS":   color.HiWhiteString(target.OS),
+			"From": color.HiYellowString(target.IP) + fmt.Sprintf(" - %s", color.HiGreenString(target.Transport)),
+			"IPs":  color.BlueString(ips),
 		}
 
-		labelRow := []string{"Label", color.HiMagentaString(control.Label)}
-		tdata = append(tdata, labelRow)
-		for key, val := range infoMap {
-			tdata = append(tdata, []string{key, val})
-		}
-
-		// rendor table
-		table.AppendBulk(tdata)
-		table.Render()
-		fmt.Printf("\n\033[0m%s\n\n", tableString)
+		var row = []string{index, label, tag, infoMap["OS"], infoMap["IPs"], infoMap["From"]}
+		tdata = append(tdata, row)
 	}
+	// rendor table
+	table.AppendBulk(tdata)
+	table.Render()
+	fmt.Printf("\n\033[0m%s\n\n", tableString)
+}
+
+func GetTargetDetails(target *agent.SystemInfo) {
+	// exists?
+	if !IsAgentExist(target) {
+		CliPrintError("Target does not exist")
+		return
+	}
+	control := Targets[target]
+
+	// build table
+	tdata := [][]string{}
+	tableString := &strings.Builder{}
+	table := tablewriter.NewWriter(tableString)
+	table.SetHeader([]string{"Index", strconv.Itoa(control.Index)})
+	table.SetBorder(true)
+	table.SetRowLine(true)
+	table.SetAutoWrapText(true)
+
+	// color
+	table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiMagentaColor},
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor})
+
+	table.SetColumnColor(tablewriter.Colors{tablewriter.FgHiBlueColor},
+		tablewriter.Colors{tablewriter.FgBlueColor})
+
+	hasInternet := color.HiRedString("NO")
+	if target.HasInternet {
+		hasInternet = color.HiGreenString("YES")
+	}
+
+	arpTab := strings.Join(target.ARP, ", ")
+	ips := strings.Join(target.IPs, ", ")
+	userInfo := color.HiRedString(target.User)
+	if target.HasRoot {
+		userInfo = color.HiGreenString(target.User)
+	}
+	cpuinfo := color.HiMagentaString(target.CPU)
+
+	// agent process info
+	agentProc := *target.Process
+	procInfo := fmt.Sprintf("%s (%d) <- %s (%d)",
+		agentProc.Cmdline, agentProc.PID, agentProc.Parent, agentProc.PPID)
+
+	// info map
+	infoMap := map[string]string{
+		"Hostname":  color.HiCyanString(target.Hostname),
+		"Process":   color.HiMagentaString(procInfo),
+		"User":      userInfo,
+		"Internet":  hasInternet,
+		"CPU":       cpuinfo,
+		"MEM":       target.Mem,
+		"Hardware":  color.HiCyanString(target.Hardware),
+		"Container": target.Container,
+		"OS":        color.HiWhiteString(target.OS),
+		"Kernel":    color.HiBlueString(target.Kernel) + ", " + color.HiWhiteString(target.Arch),
+		"From":      color.HiYellowString(target.IP) + fmt.Sprintf(" - %s", color.HiGreenString(target.Transport)),
+		"IPs":       color.BlueString(ips),
+		"ARP":       color.HiWhiteString(arpTab),
+	}
+
+	// print
+	if control.Label == "" {
+		control.Label = "nolabel"
+	}
+
+	labelRow := []string{"Label", color.HiMagentaString(control.Label)}
+	tdata = append(tdata, labelRow)
+	for key, val := range infoMap {
+		tdata = append(tdata, []string{key, val})
+	}
+	// rendor table
+	table.AppendBulk(tdata)
+	table.Render()
+	fmt.Printf("\n\033[0m%s\n\n", tableString)
 }
 
 // GetTargetFromIndex find target from Targets via control index, return nil if not found

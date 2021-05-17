@@ -167,6 +167,8 @@ func CmdHandler(cmd string) (err error) {
 			CliPrintWarning("Target does not exist, no target has been selected")
 			return fmt.Errorf("target not set or is nil")
 		}
+
+		GetTargetDetails(CurrentTarget)
 		CliPrintSuccess("Now targeting %s", CurrentTarget.Tag)
 
 	default:

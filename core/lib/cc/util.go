@@ -140,8 +140,8 @@ func TmuxSplit(hV, cmd string) error {
 	return nil
 }
 
-// agentExists is agent already in target list?
-func agentExists(agent *agent.SystemInfo) bool {
+// IsAgentExist is agent already in target list?
+func IsAgentExist(agent *agent.SystemInfo) bool {
 	for a := range Targets {
 		if a.Tag == agent.Tag {
 			return true
