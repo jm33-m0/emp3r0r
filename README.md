@@ -8,12 +8,12 @@ linux post-exploitation framework made by linux user
 - [how to use](https://github.com/jm33-m0/emp3r0r/wiki)
 - **collaborators wanted!!!** please [contact me](https://jm33.me/pages/got-something-to-say.html) if you are interested
 - **cross-platform** support is in progress, contribute if you want emp3r0r to run on other systems
-- **Windows** is officially supported with core features enabled, but it **won't** be open sourced. however, you can **port emp3r0r to any platforms** that golang supports, with the codebase provided here, ask any questions in [this thread](https://github.com/jm33-m0/emp3r0r/discussions/24)
+- feel free to develop your **private version** of emp3r0r, and i would appreciate that you contribute back to this branch
 
 ![logo](./img/emp3r0r.png)
 ![ls_targets](./img/ls_targets.png)
 
-____
+----------
 
 ## table of contents
 
@@ -47,7 +47,6 @@ ____
 * [thanks](#thanks)
 
 <!-- vim-markdown-toc -->
-____
 
 ## what to expect (in future releases)
 
@@ -63,6 +62,9 @@ ____
 - [x] **headless CC**, control using existing commands, can be useful when we write a web-based GUI
 - [x] screenshot, supports both windows and linux
 - [x] reverse proxy
+- [x] better file manager
+- [x] resumable download/upload
+- [x] screenshot
 - [ ] network scanner
 - [ ] passive scanner, for host/service discovery
 - [ ] password spray
@@ -299,3 +301,4 @@ yes, there is a plugin system. please read the [wiki](https://github.com/jm33-m0
 - [h2conn](https://github.com/posener/h2conn)
 - [diamorphine](https://github.com/m0nad/Diamorphine)
 - [Upgrading Simple Shells to Fully Interactive TTYs](https://blog.ropnop.com/upgrading-simple-shells-to-fully-interactive-ttys/)
+- more can be found in [`go.mod`](./core/go.mod)
