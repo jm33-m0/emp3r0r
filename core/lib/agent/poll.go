@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"time"
 
@@ -71,6 +72,7 @@ func IsCCOnline(proxy string) bool {
 	}
 	defer resp.Body.Close()
 
+	log.Printf("Checking CCIndicator (%s) for %s", CCIndicator, strconv.Quote(CCIndicatorText))
 	return strings.Contains(string(data), CCIndicatorText)
 }
 
