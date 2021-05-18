@@ -22,6 +22,7 @@ var Commands = map[string]string{
 	"cp":              "Copy a file to another location on selected target",
 	"cd":              "Change current working directory of selected agent",
 	"rm":              "Delete a file/directory on selected agent",
+	"mkdir":           "Create new directory on selected agent",
 	"pwd":             "Current working directory of selected agent",
 	"ps":              "Process list of selected agent",
 	"kill":            "Terminate a process on selected agent: eg. `kill <pid>`",
@@ -48,16 +49,17 @@ var CmdHelpers = map[string]func(){
 
 // FileManagerHelpers manage agent files
 var FileManagerHelpers = map[string]func(string){
-	"ls":   NoArgCmd,
-	"pwd":  NoArgCmd,
-	"cd":   SingleArgCmd,
-	"mv":   DoubleArgCmd,
-	"cp":   DoubleArgCmd,
-	"rm":   SingleArgCmd,
-	"put":  UploadToAgent,
-	"get":  DownloadFromAgent,
-	"ps":   NoArgCmd,
-	"kill": SingleArgCmd,
+	"ls":    NoArgCmd,
+	"pwd":   NoArgCmd,
+	"cd":    SingleArgCmd,
+	"mv":    DoubleArgCmd,
+	"cp":    DoubleArgCmd,
+	"rm":    SingleArgCmd,
+	"mkdir": SingleArgCmd,
+	"put":   UploadToAgent,
+	"get":   DownloadFromAgent,
+	"ps":    NoArgCmd,
+	"kill":  SingleArgCmd,
 }
 
 const HELP = "help" // fuck goconst

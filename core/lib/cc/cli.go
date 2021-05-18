@@ -52,6 +52,9 @@ func CliMain() {
 		readline.PcItem("mv",
 			readline.PcItemDynamic(listDir())),
 
+		readline.PcItem("mkdir",
+			readline.PcItemDynamic(listDir())),
+
 		readline.PcItem("cp",
 			readline.PcItemDynamic(listDir())),
 
@@ -79,6 +82,7 @@ func CliMain() {
 			cmd == "use" ||
 			cmd == "get" ||
 			cmd == "cp" ||
+			cmd == "mkdir" ||
 			cmd == "target" ||
 			cmd == "label" ||
 			cmd == "delete_port_fwd" ||
