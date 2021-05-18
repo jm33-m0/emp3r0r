@@ -64,6 +64,9 @@ func CliMain() {
 		readline.PcItem("get",
 			readline.PcItemDynamic(listDir())),
 
+		readline.PcItem("put",
+			readline.PcItemDynamic(listFiles("./"))),
+
 		readline.PcItem(HELP,
 			readline.PcItemDynamic(listMods())),
 
@@ -81,6 +84,7 @@ func CliMain() {
 		if cmd == "set" ||
 			cmd == "use" ||
 			cmd == "get" ||
+			cmd == "put" ||
 			cmd == "cp" ||
 			cmd == "mkdir" ||
 			cmd == "target" ||
