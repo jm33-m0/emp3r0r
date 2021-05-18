@@ -133,6 +133,15 @@ func Copy(src, dst string) error {
 
 // RandInt random int between given interval
 func RandInt(min, max int) int {
+	// if we get nonsense values
+	// give them random int anyway
+	if min > max ||
+		min < 0 ||
+		max < 0 {
+		min = RandInt(0, 100)
+		max = min + RandInt(0, 100)
+	}
+
 	var b [8]byte
 	_, err := crypto_rand.Read(b[:])
 	if err != nil {
