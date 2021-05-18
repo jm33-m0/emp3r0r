@@ -103,6 +103,8 @@ func sendFile2CC(filepath string, offset int64, token string) (checksum string, 
 		err = fmt.Errorf("sendFile2CC: failed to open %s: %v", filepath, err)
 		return
 	}
+	defer f.Close()
+
 	// seek offset
 	_, err = f.Seek(offset, 0)
 	if err != nil {
