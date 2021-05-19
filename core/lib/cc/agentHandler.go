@@ -92,6 +92,7 @@ func processAgentData(data *agent.MsgTunData) {
 			table := tablewriter.NewWriter(tableString)
 			table.SetHeader([]string{"Name", "PID", "PPID", "User"})
 			table.SetBorder(true)
+			table.SetRowLine(true)
 			table.SetAutoWrapText(true)
 
 			// color
@@ -131,6 +132,7 @@ func processAgentData(data *agent.MsgTunData) {
 			tableString := &strings.Builder{}
 			table := tablewriter.NewWriter(tableString)
 			table.SetHeader([]string{"Name", "Type", "Size", "Time", "Permission"})
+			table.SetRowLine(true)
 			table.SetBorder(true)
 
 			// color
