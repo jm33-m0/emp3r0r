@@ -9,7 +9,6 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/fatih/color"
@@ -57,9 +56,8 @@ func headlessListPortFwds() (err error) {
 
 // DeletePortFwdSession delete a port mapping session by ID
 func DeletePortFwdSession(sessionID string) {
-	var mutex = &sync.Mutex{}
-	mutex.Lock()
-	defer mutex.Unlock()
+	PortFwdsMutex.Lock()
+	defer PortFwdsMutex.Unlock()
 	for id, session := range PortFwds {
 		if id == sessionID {
 			err := SendCmd("!delete_portfwd "+id, session.Agent)
@@ -107,7 +105,9 @@ func (pf *PortFwdSession) InitReversedPortFwd() (err error) {
 	fwdID := uuid.New().String()
 	pf.Sh = nil
 	pf.Description = fmt.Sprintf("%s (Local) <- %s (Agent)", toAddr, listenPort)
+	PortFwdsMutex.Lock()
 	PortFwds[fwdID] = pf
+	PortFwdsMutex.Unlock()
 
 	// tell agent to start this mapping
 	cmd := fmt.Sprintf("!port_fwd %s %s reverse", listenPort, fwdID)
@@ -236,8 +236,6 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 	toAddr := pf.To
 	listenPort := pf.Lport
 
-	var mutex = &sync.Mutex{}
-
 	// remember the agent
 	pf.Agent = CurrentTarget
 
@@ -264,15 +262,15 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 	// mark this session, save to PortFwds
 	pf.Sh = nil
 	pf.Description = fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, toAddr)
-	mutex.Lock()
+	PortFwdsMutex.Lock()
 	PortFwds[fwdID] = pf
-	mutex.Unlock()
+	PortFwdsMutex.Unlock()
 
 	cleanup := func() {
 		cancel()
 		ln.Close()
-		mutex.Lock()
-		defer mutex.Unlock()
+		PortFwdsMutex.Lock()
+		defer PortFwdsMutex.Unlock()
 		delete(PortFwds, fwdID)
 		CliPrintWarning("PortFwd session (%s: %s) has finished", fwdID, pf.Description)
 	}

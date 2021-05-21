@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -127,12 +126,11 @@ func GetFile(filepath string, a *agent.SystemInfo) error {
 	ftpSh := &StreamHandler{}
 	// tell agent where to seek the left bytes
 	ftpSh.Token = uuid.NewString()
-	ftpSh.Mutex = &sync.Mutex{}
 	ftpSh.Buf = make(chan []byte)
 	ftpSh.BufSize = 1024 * 8
-	ftpSh.Mutex.Lock()
+	FTPMutex.Lock()
 	FTPStreams[filepath] = ftpSh
-	ftpSh.Mutex.Unlock()
+	FTPMutex.Unlock()
 
 	// h2x
 	ftpSh.H2x = new(agent.H2Conn)

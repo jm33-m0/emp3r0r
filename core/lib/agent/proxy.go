@@ -23,8 +23,13 @@ type PortFwdSession struct {
 	Cancel context.CancelFunc
 }
 
-// PortFwds manage port mappings
-var PortFwds = make(map[string]*PortFwdSession)
+var (
+	// PortFwds manage port mappings
+	PortFwds = make(map[string]*PortFwdSession)
+
+	// PortFwdsMutex lock map
+	PortFwdsMutex = &sync.Mutex{}
+)
 
 // Socks5Proxy sock5 proxy server on agent, listening on addr
 // to use it, forward port 10800 to CC
@@ -79,7 +84,6 @@ func PortFwd(addr, sessionID string, reverse bool) (err error) {
 		conn   *h2conn.Conn
 		ctx    context.Context
 		cancel context.CancelFunc
-		mutex  = &sync.Mutex{}
 	)
 	if !tun.ValidateIPPort(addr) && !reverse {
 		return fmt.Errorf("Invalid address: %s", addr)
@@ -103,9 +107,9 @@ func PortFwd(addr, sessionID string, reverse bool) (err error) {
 			conn.Close()
 		}
 
-		mutex.Lock()
+		PortFwdsMutex.Lock()
 		delete(PortFwds, sessionID)
-		mutex.Unlock()
+		PortFwdsMutex.Unlock()
 		log.Printf("PortFwd stopped: %s (%s)", addr, sessionID)
 	}()
 
@@ -114,9 +118,9 @@ func PortFwd(addr, sessionID string, reverse bool) (err error) {
 	session.Conn = conn
 	session.Ctx = ctx
 	session.Cancel = cancel
-	mutex.Lock()
+	PortFwdsMutex.Lock()
 	PortFwds[sessionID] = &session
-	mutex.Unlock()
+	PortFwdsMutex.Unlock()
 
 	// check if h2conn is disconnected,
 	// if yes, kill all goroutines and cleanup

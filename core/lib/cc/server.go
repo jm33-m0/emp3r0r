@@ -29,7 +29,6 @@ type StreamHandler struct {
 	Buf     chan []byte   // buffer for receiving data
 	Token   string        // token string, for agent auth
 	BufSize int           // buffer size for reverse shell should be 1
-	Mutex   *sync.Mutex   // prevent concurrent write to map
 }
 
 var (
@@ -42,8 +41,20 @@ var (
 	// FTPStreams file transfer handlers
 	FTPStreams = make(map[string]*StreamHandler)
 
+	// FTPMutex lock
+	FTPMutex = &sync.Mutex{}
+
+	// RShellStreams rshell handlers
+	RShellStreams = make(map[string]*StreamHandler)
+
+	// RShellMutex lock
+	RShellMutex = &sync.Mutex{}
+
 	// PortFwds port mappings/forwardings: { sessionID:StreamHandler }
 	PortFwds = make(map[string]*PortFwdSession)
+
+	// PortFwdsMutex lock
+	PortFwdsMutex = &sync.Mutex{}
 )
 
 // ftpHandler handles buffered data
@@ -122,9 +133,9 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 		}
 		sh.Token = ""
 		sh.H2x.Cancel()
-		sh.Mutex.Lock()
+		FTPMutex.Lock()
 		delete(FTPStreams, filename)
-		sh.Mutex.Unlock()
+		FTPMutex.Unlock()
 		CliPrintWarning("Closed ftp connection from %s", req.RemoteAddr)
 
 		// delete the lock file, unlock download session
