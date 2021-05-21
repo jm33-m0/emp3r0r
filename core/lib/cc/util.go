@@ -121,6 +121,23 @@ func VimEdit(filepath string) (err error) {
 	return errors.New("don't know if vim has done editing")
 }
 
+// TmuxNewWindow split tmux window, and run command in the new pane
+func TmuxNewWindow(name, cmd string) error {
+	if os.Getenv("TMUX") == "" ||
+		!util.IsCommandExist("tmux") {
+		return errors.New("You need to run emp3r0r under `tmux`")
+	}
+
+	job := fmt.Sprintf("tmux new-window -n %s %s", name, cmd)
+
+	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%v: %s", err, out)
+	}
+
+	return nil
+}
+
 // TmuxSplit split tmux window, and run command in the new pane
 func TmuxSplit(hV, cmd string) error {
 	if os.Getenv("TMUX") == "" ||
