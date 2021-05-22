@@ -62,16 +62,11 @@ func PutFile(lpath, rpath string, a *agent.SystemInfo) error {
 	)
 
 	// move file to wwwroot, then move it back when we are done with it
-	err := os.Rename(lpath, WWWRoot+util.FileBaseName(lpath))
+	CliPrintInfo("Copy %s to %s", lpath, WWWRoot+util.FileBaseName(lpath))
+	err := util.Copy(lpath, WWWRoot+util.FileBaseName(lpath))
 	if err != nil {
-		return fmt.Errorf("Move %s to %s: %v", lpath, WWWRoot+util.FileBaseName(lpath), err)
+		return fmt.Errorf("Copy %s to %s: %v", lpath, WWWRoot+util.FileBaseName(lpath), err)
 	}
-	defer func() {
-		err := os.Rename(WWWRoot+util.FileBaseName(lpath), lpath)
-		if err != nil {
-			CliPrintWarning("Move %s to %s: %v", WWWRoot+util.FileBaseName(lpath), lpath, err)
-		}
-	}()
 
 	// send cmd
 	cmd := fmt.Sprintf("put %s %s %d", lpath, rpath, size)
