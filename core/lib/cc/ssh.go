@@ -34,6 +34,7 @@ func SSHClient(shell, port string) (err error) {
 	for _, p := range PortFwds {
 		if p.Agent == CurrentTarget && p.To == to {
 			exists = true
+			lport = p.Lport // use the correct port
 			break
 		}
 	}
