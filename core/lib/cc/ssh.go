@@ -78,6 +78,6 @@ wait:
 
 	// let's do the ssh
 	CliPrintSuccess("Opening SSH session for %s in new tmux window", CurrentTarget.Tag)
-	sshCmd := fmt.Sprintf("ssh -p %s -o UserKnownHostsFile=/dev/null 127.0.0.1", lport)
+	sshCmd := fmt.Sprintf("ssh -p %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 127.0.0.1", lport)
 	return TmuxNewWindow(fmt.Sprintf("ssh-%s", CurrentTarget.Hostname), sshCmd)
 }
