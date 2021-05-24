@@ -102,6 +102,19 @@ func UpdateOptions(modName string) (exist bool) {
 			"netstat -antup", "uname -a",
 		}
 
+	case modName == agent.ModSHELL:
+		shellOpt := addIfNotFound("shell")
+		shellOpt.Vals = []string{
+			"bash", "zsh", "sh", "python", "python3",
+			"cmd.exe", "powershell.exe",
+		}
+		shellOpt.Val = "bash"
+		portOpt := addIfNotFound("port")
+		portOpt.Vals = []string{
+			agent.SSHDPort, "22222",
+		}
+		portOpt.Val = agent.SSHDPort
+
 	case modName == agent.ModPORT_FWD:
 		// rport
 		portOpt := addIfNotFound("to")

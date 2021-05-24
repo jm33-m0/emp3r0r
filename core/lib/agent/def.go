@@ -82,6 +82,9 @@ var (
 	// BroadcastPort port of broadcast server
 	BroadcastPort = "[broadcast_port]"
 
+	// SSHDPort port of sshd
+	SSHDPort = "[sshd_port]"
+
 	// CCIndicator check this before trying connection
 	CCIndicator = "[cc_indicator]"
 

@@ -5,7 +5,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // Commands holds all commands and their help string, command: help
@@ -173,6 +175,36 @@ func CmdHandler(cmd string) (err error) {
 
 		GetTargetDetails(CurrentTarget)
 		CliPrintSuccess("Now targeting %s", CurrentTarget.Tag)
+
+	case cmdSplit[0] == "vim":
+
+		if len(cmdSplit) < 2 {
+			CliPrintError("What file do you want to edit?")
+			return
+		}
+		filepath := strings.Join(cmdSplit[1:], " ")
+		filename := util.FileBaseName(filepath)
+
+		// tell user what to do
+		color.HiBlue("[*] Now edit %s in vim window",
+			filepath)
+
+		// edit remote files
+		if GetFile(filepath, CurrentTarget) != nil {
+			CliPrintError("Cannot download %s", filepath)
+			return
+		}
+
+		if err = VimEdit(FileGetDir + filename); err != nil {
+			CliPrintError("VimEdit: %v", err)
+			return
+		} // wait until vim exits
+
+		// upload the new file to target
+		if PutFile(FileGetDir+filename, filepath, CurrentTarget) != nil {
+			CliPrintError("Cannot upload %s", filepath)
+			return
+		}
 
 	default:
 		helper := CmdHelpers[cmd]

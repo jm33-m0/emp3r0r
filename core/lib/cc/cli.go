@@ -64,6 +64,9 @@ func CliMain() {
 		readline.PcItem("get",
 			readline.PcItemDynamic(listDir())),
 
+		readline.PcItem("vim",
+			readline.PcItemDynamic(listDir())),
+
 		readline.PcItem("put",
 			readline.PcItemDynamic(listFiles("./"))),
 
@@ -84,6 +87,7 @@ func CliMain() {
 		if cmd == "set" ||
 			cmd == "use" ||
 			cmd == "get" ||
+			cmd == "vim" ||
 			cmd == "put" ||
 			cmd == "cp" ||
 			cmd == "mkdir" ||
@@ -407,6 +411,9 @@ func listValChoices() func(string) []string {
 		switch CurrentMod {
 		case agent.ModCMD_EXEC:
 			return Options["cmd_to_exec"].Vals
+		case agent.ModSHELL:
+			ret := append(Options["shell"].Vals, Options["port"].Vals...)
+			return ret
 		case agent.ModCLEAN_LOG:
 			return Options["keyword"].Vals
 		case agent.ModLPE_SUGGEST:
