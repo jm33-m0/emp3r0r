@@ -212,7 +212,8 @@ func CmdHandler(cmd string) (err error) {
 		if helper == nil {
 			filehelper := FileManagerHelpers[cmdSplit[0]]
 			if filehelper == nil {
-				CliPrintError("Unknown command: " + strconv.Quote(cmd))
+				CliPrintWarning("Exec: " + strconv.Quote(cmd))
+				SendCmdToCurrentTarget(cmd)
 				return
 			}
 			filehelper(cmd)
