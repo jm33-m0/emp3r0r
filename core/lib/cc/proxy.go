@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
+	"github.com/olekukonko/tablewriter"
 )
 
 // PortFwdSession holds controller interface of a port-fwd session
@@ -82,13 +83,40 @@ func ListPortFwds() {
 
 	color.Cyan("Active port mappings\n")
 	color.Cyan("====================\n\n")
+
+	// build table
+	tdata := [][]string{}
+	tableString := &strings.Builder{}
+	table := tablewriter.NewWriter(tableString)
+	table.SetHeader([]string{"Local Port", "To", "Agent", "ID"})
+	table.SetBorder(true)
+	table.SetRowLine(true)
+	table.SetAutoWrapText(true)
+	table.SetAutoFormatHeaders(true)
+	table.SetReflowDuringAutoWrap(true)
+
+	// color
+	table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiMagentaColor},
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiCyanColor},
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiBlueColor},
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiYellowColor})
+
+	table.SetColumnColor(tablewriter.Colors{tablewriter.FgHiMagentaColor},
+		tablewriter.Colors{tablewriter.FgHiCyanColor},
+		tablewriter.Colors{tablewriter.FgBlueColor},
+		tablewriter.Colors{tablewriter.FgYellowColor})
 	for id, portmap := range PortFwds {
 		if portmap.Sh == nil {
 			portmap.Cancel()
 			continue
 		}
-		color.Green("%s (%s)\n", portmap.Description, id)
+		tdata = append(tdata, []string{portmap.Lport, portmap.To, portmap.Agent.Tag, id})
 	}
+
+	// rendor table
+	table.AppendBulk(tdata)
+	table.Render()
+	fmt.Printf("\n\033[0m%s\n\n", tableString)
 }
 
 // InitReversedPortFwd send portfwd command to agent and set up a reverse port mapping
