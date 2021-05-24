@@ -29,6 +29,7 @@ var Commands = map[string]string{
 	"ps":              "Process list of selected agent",
 	"kill":            "Terminate a process on selected agent: eg. `kill <pid>`",
 	"get":             "Download a file from selected agent",
+	"vim":             "Edit a text file on selected agent",
 	"put":             "Upload a file to selected agent",
 	"screenshot":      "Take a screenshot of selected agent",
 	"ls_targets":      "List all targets",
