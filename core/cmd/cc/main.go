@@ -38,7 +38,6 @@ func readJSONConfig(filename string) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to decrypt JSON config: %v", err)
 	}
-	log.Printf("Read config data: %v", config)
 
 	// set up runtime vars
 	agent.Version = config.Version
