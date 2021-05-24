@@ -229,7 +229,7 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 		buf = []byte(idstr)
 	}
 
-	sessionID, err := uuid.ParseBytes(buf)
+	sessionID, err := uuid.ParseBytes(buf[:36]) // uuid is 36 bytes long
 	if err != nil {
 		CliPrintError("portFwd connection: failed to parse UUID: %s from %s\n%v", buf, req.RemoteAddr, err)
 		return
