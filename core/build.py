@@ -150,36 +150,39 @@ class GoBuild:
         '''
         restore tags in the source
         '''
-
         # version
-        sed("./lib/agent/def.go",
-            f"Version = \"{self.VERSION}\"", "Version = \"[emp3r0r_version_string]\"")
-        # agent root path
-        sed("./lib/agent/def.go",
-            self.AgentRoot, "[agent_root]")
-        # CA
-        sed("./lib/tun/tls.go", self.CA, "[emp3r0r_ca]")
+        unsed("./lib/agent/def.go",
+              "Version = \"[emp3r0r_version_string]\"", f"Version = \"{self.VERSION}\"")
         if self.target == "agent":
-            # guardian_shellcode
-            sed("./lib/agent/def.go", f"GuardianShellcode = `{CACHED_CONF['guardian_shellcode']}`",
-                "GuardianShellcode = `[persistence_shellcode]`")
-            sed("./lib/agent/def.go", f"GuardianAgentPath = \"{CACHED_CONF['guardian_agent_path']}\"",
-                "GuardianAgentPath = \"[persistence_agent_path]\"")
-        # cc indicator
-        sed("./lib/agent/def.go", self.INDICATOR, "[cc_indicator]")
+            # guardian shellcode
+            unsed("./lib/agent/def.go",
+                  "[persistence_shellcode]", CACHED_CONF['guardian_shellcode'])
+            unsed("./lib/agent/def.go",
+                  "[persistence_agent_path]", CACHED_CONF['guardian_agent_path'])
+        # CA
+        unsed("./lib/tun/tls.go", "[emp3r0r_ca]", self.CA)
+        # CC IP
+        unsed("./lib/agent/def.go",
+              "CCAddress = \"https://[cc_ipaddr]\"", f"CCAddress = \"https://{self.CCIP}\"")
+        # agent root path
+        unsed("./lib/agent/def.go",
+              "AgentRoot = \"[agent_root]\"", f"AgentRoot = \"{self.AgentRoot}\"")
+        # indicator
+        unsed("./lib/agent/def.go", "[cc_indicator]", self.INDICATOR)
         # cc indicator text
-        sed("./lib/agent/def.go",
-            f"CCIndicatorText = \"{self.INDICATOR_TEXT}\"", "CCIndicatorText = \"[agent_cc_text]\"")
-        # in case we use the same IP for indicator and CC
-        sed("./lib/agent/def.go", self.CCIP, "[cc_ipaddr]")
-        sed("./lib/agent/def.go", self.UUID, "[agent_uuid]")
-        # restore ports
-        sed("./lib/agent/def.go",
-            f"CCPort = \"{CACHED_CONF['cc_port']}\"", "CCPort = \"[cc_port]\"")
-        sed("./lib/agent/def.go",
-            f"ProxyPort = \"{CACHED_CONF['proxy_port']}\"", "ProxyPort = \"[proxy_port]\"")
-        sed("./lib/agent/def.go",
-            f"BroadcastPort = \"{CACHED_CONF['broadcast_port']}\"", "BroadcastPort = \"[broadcast_port]\"")
+        unsed("./lib/agent/def.go",
+              "CCIndicatorText = \"[agent_cc_text]\"", f"CCIndicatorText = \"{self.INDICATOR_TEXT}\"")
+        # agent UUID
+        unsed("./lib/agent/def.go", "[agent_uuid]", self.UUID)
+        # ports
+        unsed("./lib/agent/def.go",
+              "CCPort = \"[cc_port]\"", f"CCPort = \"{CACHED_CONF['cc_port']}\"")
+        unsed("./lib/agent/def.go",
+              "SSHDPort = \"[sshd_port]\"", f"SSHDPort = \"{CACHED_CONF['sshd_port']}\"")
+        unsed("./lib/agent/def.go",
+              "ProxyPort = \"[proxy_port]\"", f"ProxyPort = \"{CACHED_CONF['proxy_port']}\"")
+        unsed("./lib/agent/def.go",
+              "BroadcastPort = \"[broadcast_port]\"", f"BroadcastPort = \"{CACHED_CONF['broadcast_port']}\"")
 
     def set_tags(self):
         '''
@@ -198,9 +201,11 @@ class GoBuild:
         # CA
         sed("./lib/tun/tls.go", "[emp3r0r_ca]", self.CA)
         # CC IP
-        sed("./lib/agent/def.go", "[cc_ipaddr]", self.CCIP)
+        sed("./lib/agent/def.go",
+            "CCAddress = \"https://[cc_ipaddr]\"", f"CCAddress = \"https://{self.CCIP}\"")
         # agent root path
-        sed("./lib/agent/def.go", "[agent_root]", self.AgentRoot)
+        sed("./lib/agent/def.go",
+            "AgentRoot = \"[agent_root]\"", f"AgentRoot = \"{self.AgentRoot}\"")
         # indicator
         sed("./lib/agent/def.go", "[cc_indicator]", self.INDICATOR)
         # cc indicator text
@@ -210,11 +215,13 @@ class GoBuild:
         sed("./lib/agent/def.go", "[agent_uuid]", self.UUID)
         # ports
         sed("./lib/agent/def.go",
-            "[cc_port]", CACHED_CONF['cc_port'])
+            "CCPort = \"[cc_port]\"", f"CCPort = \"{CACHED_CONF['cc_port']}\"")
         sed("./lib/agent/def.go",
-            "[proxy_port]", CACHED_CONF['proxy_port'])
+            "SSHDPort = \"[sshd_port]\"", f"SSHDPort = \"{CACHED_CONF['sshd_port']}\"")
         sed("./lib/agent/def.go",
-            "[broadcast_port]", CACHED_CONF['broadcast_port'])
+            "ProxyPort = \"[proxy_port]\"", f"ProxyPort = \"{CACHED_CONF['proxy_port']}\"")
+        sed("./lib/agent/def.go",
+            "BroadcastPort = \"[broadcast_port]\"", f"BroadcastPort = \"{CACHED_CONF['broadcast_port']}\"")
 
 
 def clean():
@@ -235,6 +242,20 @@ def clean():
             print(" Deleted "+f)
         except BaseException:
             log_error(traceback.format_exc)
+
+
+def unsed(path, new, old):
+    '''
+    works like `sed -i s/old/new/g file`
+    '''
+    rf = open(path)
+    text = rf.read()
+    to_write = text.replace(old, new)
+    rf.close()
+
+    f = open(path, "w")
+    f.write(to_write)
+    f.close()
 
 
 def sed(path, old, new):
@@ -419,6 +440,9 @@ def randomize_ports():
 
     if 'cc_port' not in CACHED_CONF:
         CACHED_CONF['cc_port'] = rand_port()
+
+    if 'sshd_port' not in CACHED_CONF:
+        CACHED_CONF['sshd_port'] = rand_port()
 
     if 'proxy_port' not in CACHED_CONF:
         CACHED_CONF['proxy_port'] = rand_port()
