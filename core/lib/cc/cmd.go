@@ -212,7 +212,7 @@ func CmdHandler(cmd string) (err error) {
 		if helper == nil {
 			filehelper := FileManagerHelpers[cmdSplit[0]]
 			if filehelper == nil {
-				CliPrintWarning("Exec: " + strconv.Quote(cmd))
+				CliPrintWarning("Exec: %s on %s", strconv.Quote(cmd), strconv.Quote(CurrentTarget.Tag))
 				SendCmdToCurrentTarget(cmd)
 				return
 			}
