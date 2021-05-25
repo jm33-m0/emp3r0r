@@ -23,28 +23,24 @@ func setWinsize(f *os.File, w, h int) {
 func SSHD(shell, port string) (err error) {
 	ssh.Handle(func(s ssh.Session) {
 		cmd := exec.Command(shell)
-		ptyReq, winCh, isPty := s.Pty()
-		if isPty {
-			cmd.Env = append(cmd.Env, fmt.Sprintf("TERM=%s", ptyReq.Term))
-			f, err := pty.Start(cmd)
-			if err != nil {
-				err = fmt.Errorf("Start PTY: %v", err)
-				return
-			}
-			go func() {
-				for win := range winCh {
-					setWinsize(f, win.Width, win.Height)
-				}
-			}()
-			go func() {
-				io.Copy(f, s) // stdin
-			}()
-			io.Copy(s, f) // stdout
-			cmd.Wait()
-		} else {
-			io.WriteString(s, "No PTY requested.\n")
-			s.Exit(1)
+		ptyReq, winCh, _ := s.Pty()
+		log.Printf("Got an SSH PTY request: %s", ptyReq.Term)
+		cmd.Env = append(cmd.Env, fmt.Sprintf("TERM=%s", ptyReq.Term))
+		f, err := pty.Start(cmd)
+		if err != nil {
+			err = fmt.Errorf("Start PTY: %v", err)
+			return
 		}
+		go func() {
+			for win := range winCh {
+				setWinsize(f, win.Width, win.Height)
+			}
+		}()
+		go func() {
+			io.Copy(f, s) // stdin
+		}()
+		io.Copy(s, f) // stdout
+		cmd.Wait()
 	})
 
 	log.Printf("Starting SSHD on port %s...", port)

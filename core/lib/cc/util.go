@@ -158,7 +158,7 @@ func TmuxNewWindow(name, cmd string) error {
 		return errors.New("You need to run emp3r0r under `tmux`")
 	}
 
-	job := exec.Command("tmux", "new-window", "-n", name, fmt.Sprintf("'%s | read'", cmd))
+	job := exec.Command("tmux", "new-window", "-n", name, fmt.Sprintf("'%s || read'", cmd))
 	out, err := job.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%v: %s", err, out)

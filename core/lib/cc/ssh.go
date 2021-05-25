@@ -39,6 +39,7 @@ func SSHClient(shell, port string) (err error) {
 		if err != nil {
 			return
 		}
+		CliPrintInfo("Starting sshd on target %s", strconv.Quote(CurrentTarget.Tag))
 
 		// set up port mapping for the ssh session
 		CliPrintInfo("Setting up port mapping for sshd")
@@ -82,6 +83,6 @@ wait:
 	CliPrintSuccess("Opening SSH session for %s in new window. "+
 		"If that fails, please execute command %s manaully",
 		CurrentTarget.Tag, strconv.Quote(sshCmd))
-	// return TmuxNewWindow(fmt.Sprintf("ssh-%s", CurrentTarget.Hostname), sshCmd)
+
 	return OpenInNewTerminalWindow(fmt.Sprintf("ssh-%s", CurrentTarget.Hostname), sshCmd)
 }
