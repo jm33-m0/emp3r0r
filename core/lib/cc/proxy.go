@@ -68,8 +68,7 @@ func DeletePortFwdSession(sessionID string) {
 		if id == sessionID {
 			err := SendCmd("!delete_portfwd "+id, session.Agent)
 			if err != nil {
-				CliPrintError("Tell agent %s to delete port mapping %s: %v", session.Agent.Tag, sessionID, err)
-				return
+				CliPrintWarning("Tell agent %s to delete port mapping %s: %v", session.Agent.Tag, sessionID, err)
 			}
 			session.Cancel()
 			delete(PortFwds, id)
@@ -121,7 +120,7 @@ func ListPortFwds() {
 			to = portmap.To + " (CC) "
 			lport = portmap.Lport + " (Agent) "
 		}
-		tdata = append(tdata, []string{lport, to, portmap.Agent.Tag, id})
+		tdata = append(tdata, []string{lport, to, SplitLongLine(portmap.Agent.Tag, 10), SplitLongLine(id, 10)})
 	}
 
 	// rendor table
