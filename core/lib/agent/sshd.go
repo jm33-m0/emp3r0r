@@ -23,9 +23,11 @@ func setWinsize(f *os.File, w, h int) {
 func SSHD(shell, port string) (err error) {
 	ssh.Handle(func(s ssh.Session) {
 		cmd := exec.Command(shell)
-		ptyReq, winCh, _ := s.Pty()
+		ptyReq, winCh, isPTY := s.Pty()
 		log.Printf("Got an SSH PTY request: %s", ptyReq.Term)
-		cmd.Env = append(cmd.Env, fmt.Sprintf("TERM=%s", ptyReq.Term))
+		if isPTY {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("TERM=%s", ptyReq.Term))
+		}
 		f, err := pty.Start(cmd)
 		if err != nil {
 			err = fmt.Errorf("Start PTY: %v", err)
