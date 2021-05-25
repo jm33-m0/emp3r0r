@@ -143,7 +143,7 @@ func OpenInNewTerminalWindow(name, cmd string) error {
 	// works fine for gnome-terminal and xfce4-terminal
 	job := fmt.Sprintf("%s -t '%s' -e '%s || read'", terminal, name, cmd)
 
-	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
+	out, err := exec.Command("/bin/bash", "-c", job).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%v: %s", err, out)
 	}
