@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strconv"
 	"time"
 
@@ -79,7 +80,12 @@ wait:
 	}
 
 	// let's do the ssh
-	sshCmd := fmt.Sprintf("ssh -p %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 127.0.0.1", lport)
+	sshPath, err := exec.LookPath("ssh")
+	if err != nil {
+		CliPrintError("ssh not found, please install it first: %v", err)
+	}
+	sshCmd := fmt.Sprintf("%s -p %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 127.0.0.1",
+		sshPath, lport)
 	CliPrintSuccess("Opening SSH session for %s in new window. "+
 		"If that fails, please execute command %s manaully",
 		CurrentTarget.Tag, strconv.Quote(sshCmd))
