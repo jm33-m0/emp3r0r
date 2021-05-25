@@ -23,6 +23,7 @@ type PortFwdSession struct {
 	Lport       string // listen_port
 	To          string // to address
 	Description string // fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, to_addr)
+	Reverse     bool   // from agent to cc or cc to agent
 
 	Agent  *agent.SystemInfo         // agent who holds this port mapping session
 	Sh     map[string]*StreamHandler // related to HTTP handler
@@ -31,8 +32,10 @@ type PortFwdSession struct {
 }
 
 type mapping struct {
-	id          string // portfwd id
-	description string // details
+	Id          string `json:"id"`    // portfwd id
+	Agent       string `json:"agent"` // agent tag
+	Reverse     bool   `json:"reverse"`
+	Description string `json:"description"` // details
 }
 
 func headlessListPortFwds() (err error) {
@@ -43,8 +46,10 @@ func headlessListPortFwds() (err error) {
 			continue
 		}
 		var permapping mapping
-		permapping.id = id
-		permapping.description = portmap.Description
+		permapping.Id = id
+		permapping.Description = portmap.Description
+		permapping.Agent = portmap.Agent.Tag
+		permapping.Reverse = portmap.Reverse
 		mappings = append(mappings, permapping)
 	}
 	data, err := json.Marshal(mappings)
@@ -110,7 +115,13 @@ func ListPortFwds() {
 			portmap.Cancel()
 			continue
 		}
-		tdata = append(tdata, []string{portmap.Lport, portmap.To, portmap.Agent.Tag, id})
+		to := portmap.To + " (Agent) "
+		lport := portmap.Lport + " (CC) "
+		if portmap.Reverse {
+			to = portmap.To + " (CC) "
+			lport = portmap.Lport + " (Agent) "
+		}
+		tdata = append(tdata, []string{lport, to, portmap.Agent.Tag, id})
 	}
 
 	// rendor table
@@ -133,6 +144,8 @@ func (pf *PortFwdSession) InitReversedPortFwd() (err error) {
 	fwdID := uuid.New().String()
 	pf.Sh = nil
 	pf.Description = fmt.Sprintf("%s (Local) <- %s (Agent)", toAddr, listenPort)
+	pf.Reverse = true
+	pf.Agent = CurrentTarget
 	PortFwdsMutex.Lock()
 	PortFwds[fwdID] = pf
 	PortFwdsMutex.Unlock()
@@ -168,6 +181,7 @@ func (pf *PortFwdSession) RunReversedPortFwd(sh *StreamHandler) (err error) {
 
 	// remember the agent
 	pf.Agent = CurrentTarget
+	pf.Reverse = false
 
 	// io.Copy
 	go func() {
