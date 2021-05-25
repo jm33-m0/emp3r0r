@@ -20,13 +20,6 @@ func SSHClient(shell, port string) (err error) {
 		return
 	}
 
-	// start sshd server on target
-	cmd := fmt.Sprintf("!sshd %s %s", shell, port)
-	err = SendCmdToCurrentTarget(cmd)
-	if err != nil {
-		return
-	}
-
 	// is port mapping already done?
 	lport := strconv.Itoa(util.RandInt(2048, 65535))
 	to := "127.0.0.1:" + port
@@ -40,6 +33,13 @@ func SSHClient(shell, port string) (err error) {
 	}
 
 	if !exists {
+		// start sshd server on target
+		cmd := fmt.Sprintf("!sshd %s %s", shell, port)
+		err = SendCmdToCurrentTarget(cmd)
+		if err != nil {
+			return
+		}
+
 		// set up port mapping for the ssh session
 		CliPrintInfo("Setting up port mapping for sshd")
 		pf := &PortFwdSession{}
@@ -78,7 +78,8 @@ wait:
 	}
 
 	// let's do the ssh
-	CliPrintSuccess("Opening SSH session for %s in new tmux window", CurrentTarget.Tag)
+	CliPrintSuccess("Opening SSH session for %s in new window", CurrentTarget.Tag)
 	sshCmd := fmt.Sprintf("ssh -p %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 127.0.0.1", lport)
-	return TmuxNewWindow(fmt.Sprintf("ssh-%s", CurrentTarget.Hostname), sshCmd)
+	// return TmuxNewWindow(fmt.Sprintf("ssh-%s", CurrentTarget.Hostname), sshCmd)
+	return OpenInNewTerminalWindow(fmt.Sprintf("ssh-%s", CurrentTarget.Hostname), sshCmd)
 }

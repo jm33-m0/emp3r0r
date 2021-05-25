@@ -121,6 +121,36 @@ func VimEdit(filepath string) (err error) {
 	return errors.New("don't know if vim has done editing")
 }
 
+// get available terminal emulator on current system
+func getTerminalEmulator() (res string) {
+	terms := []string{"gnome-terminal", "xfce4-terminal", "xterm"}
+	for _, term := range terms {
+		if util.IsCommandExist(term) {
+			res = term
+			break
+		}
+	}
+	return
+}
+
+// OpenInNewTerminalWindow run a command in new terminal emulator window
+func OpenInNewTerminalWindow(name, cmd string) error {
+	terminal := getTerminalEmulator()
+	if terminal == "" {
+		return fmt.Errorf("No available terminal emulator")
+	}
+
+	// works fine for gnome-terminal and xfce4-terminal
+	job := fmt.Sprintf("%s -t '%s' -e '%s || read'", terminal, name, cmd)
+
+	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%v: %s", err, out)
+	}
+
+	return nil
+}
+
 // TmuxNewWindow split tmux window, and run command in the new pane
 func TmuxNewWindow(name, cmd string) error {
 	if os.Getenv("TMUX") == "" ||
@@ -128,9 +158,8 @@ func TmuxNewWindow(name, cmd string) error {
 		return errors.New("You need to run emp3r0r under `tmux`")
 	}
 
-	job := fmt.Sprintf("tmux new-window -n %s '%s || read'", name, cmd)
-
-	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
+	job := exec.Command("tmux", "new-window", "-n", name, fmt.Sprintf("'%s | read'", cmd))
+	out, err := job.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%v: %s", err, out)
 	}
