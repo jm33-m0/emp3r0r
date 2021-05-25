@@ -180,7 +180,7 @@ func (pf *PortFwdSession) RunReversedPortFwd(sh *StreamHandler) (err error) {
 
 	// remember the agent
 	pf.Agent = CurrentTarget
-	pf.Reverse = false
+	pf.Reverse = true
 
 	// io.Copy
 	go func() {
