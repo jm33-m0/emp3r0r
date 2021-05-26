@@ -166,13 +166,19 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 		}()
 	}
 
+	// broadcast interval
+	if emp3r0r_data.BroadcastIntervalMax == 0 {
+		log.Println("Broadcasting is turned off, aborting")
+		return
+	}
+
 	defer func() {
 		log.Print("Broadcasting stopped")
 		cancel()
 	}()
 	for ctx.Err() == nil {
 		log.Print("Broadcasting our proxy...")
-		time.Sleep(time.Duration(util.RandInt(10, 120)) * time.Second)
+		time.Sleep(time.Duration(util.RandInt(emp3r0r_data.BroadcastIntervalMin, emp3r0r_data.BroadcastIntervalMax)) * time.Second)
 		ips := tun.IPaddr()
 		for _, netip := range ips {
 			proxyMsg := fmt.Sprintf("socks5://%s:%s", netip.IP.String(), emp3r0r_data.ProxyPort)

