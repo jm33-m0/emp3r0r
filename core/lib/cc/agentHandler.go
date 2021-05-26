@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/olekukonko/tablewriter"
@@ -26,8 +26,8 @@ var CmdResults = make(map[string]string)
 var CmdResultsMutex = &sync.Mutex{}
 
 // processAgentData deal with data from agent side
-func processAgentData(data *agent.MsgTunData) {
-	payloadSplit := strings.Split(data.Payload, agent.OpSep)
+func processAgentData(data *emp3r0r_data.MsgTunData) {
+	payloadSplit := strings.Split(data.Payload, emp3r0r_data.OpSep)
 	op := payloadSplit[0]
 
 	target := GetTargetFromTag(data.Tag)

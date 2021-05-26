@@ -4,14 +4,14 @@ import (
 	"io/ioutil"
 	"strconv"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 )
 
 func GenAgent() {
 	buildJSONFile := "./build.json"
 	stubFile := "./stub.exe"
-	outfile := "./agent.exe"
+	outfile := "./emp3r0r_data.exe"
 	CliPrintWarning("Make sure %s and %s exist, and %s must NOT be packed",
 		buildJSONFile, stubFile, strconv.Quote(stubFile))
 
@@ -23,7 +23,7 @@ func GenAgent() {
 	}
 
 	// encrypt
-	key := tun.GenAESKey(agent.OpSep)
+	key := tun.GenAESKey(emp3r0r_data.OpSep)
 	encJSONBytes := tun.AESEncryptRaw(key, jsonBytes)
 	if encJSONBytes == nil {
 		CliPrintError("Failed to encrypt %s", buildJSONFile)
@@ -36,7 +36,7 @@ func GenAgent() {
 		CliPrintError("%v", err)
 		return
 	}
-	toWrite = append(toWrite, []byte(agent.OpSep)...)
+	toWrite = append(toWrite, []byte(emp3r0r_data.OpSep)...)
 	toWrite = append(toWrite, encJSONBytes...)
 	err = ioutil.WriteFile(outfile, toWrite, 0755)
 	if err != nil {

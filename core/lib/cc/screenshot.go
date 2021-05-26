@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/mholt/archiver"
 )
@@ -26,7 +26,7 @@ func TakeScreenshot() {
 	// then we handle the cmd output in agentHandler
 }
 
-func processScreenshot(out string, target *agent.SystemInfo) (err error) {
+func processScreenshot(out string, target *emp3r0r_data.SystemInfo) (err error) {
 	if strings.Contains(out, "Error") {
 		return fmt.Errorf(out)
 	}

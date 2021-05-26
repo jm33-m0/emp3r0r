@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 )
 
 func modulePortFwd() {
@@ -60,7 +60,7 @@ func moduleProxy() {
 	// port-fwd
 	var pf PortFwdSession
 	pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
-	pf.Lport, pf.To = port, "127.0.0.1:"+agent.ProxyPort
+	pf.Lport, pf.To = port, "127.0.0.1:"+emp3r0r_data.ProxyPort
 
 	switch status {
 	case "on":

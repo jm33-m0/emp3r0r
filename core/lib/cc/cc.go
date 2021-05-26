@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/fatih/color"
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/olekukonko/tablewriter"
@@ -29,7 +29,7 @@ var (
 	EmpRoot, _ = os.Getwd()
 
 	// Targets target list, with control (tun) interface
-	Targets = make(map[*agent.SystemInfo]*Control)
+	Targets = make(map[*emp3r0r_data.SystemInfo]*Control)
 )
 
 const (
@@ -52,7 +52,7 @@ type Control struct {
 
 // send JSON encoded target list to frontend
 func headlessListTargets() (err error) {
-	var targets []agent.SystemInfo
+	var targets []emp3r0r_data.SystemInfo
 	for target := range Targets {
 		targets = append(targets, *target)
 	}
@@ -157,7 +157,7 @@ func ListTargets() {
 	fmt.Printf("\n\033[0m%s\n\n", tableString)
 }
 
-func GetTargetDetails(target *agent.SystemInfo) {
+func GetTargetDetails(target *emp3r0r_data.SystemInfo) {
 	// exists?
 	if !IsAgentExist(target) {
 		CliPrintError("Target does not exist")
@@ -234,7 +234,7 @@ func GetTargetDetails(target *agent.SystemInfo) {
 }
 
 // GetTargetFromIndex find target from Targets via control index, return nil if not found
-func GetTargetFromIndex(index int) (target *agent.SystemInfo) {
+func GetTargetFromIndex(index int) (target *emp3r0r_data.SystemInfo) {
 	for t, ctl := range Targets {
 		if ctl.Index == index {
 			target = t
@@ -245,7 +245,7 @@ func GetTargetFromIndex(index int) (target *agent.SystemInfo) {
 }
 
 // GetTargetFromTag find target from Targets via tag, return nil if not found
-func GetTargetFromTag(tag string) (target *agent.SystemInfo) {
+func GetTargetFromTag(tag string) (target *emp3r0r_data.SystemInfo) {
 	for t := range Targets {
 		if t.Tag == tag {
 			target = t
@@ -268,7 +268,7 @@ func labelAgents() {
 		labeledAgents []LabeledAgent
 		old           []LabeledAgent
 	)
-	// what if agent.json already have some records
+	// what if emp3r0r_data.json already have some records
 	if util.IsFileExist(AgentsJSON) {
 		data, err := ioutil.ReadFile(AgentsJSON)
 		if err != nil {
@@ -321,7 +321,7 @@ outter:
 }
 
 // SetAgentLabel if an agent is already labeled, we can set its label in later sessions
-func SetAgentLabel(a *agent.SystemInfo, mutex *sync.Mutex) (label string) {
+func SetAgentLabel(a *emp3r0r_data.SystemInfo, mutex *sync.Mutex) (label string) {
 	data, err := ioutil.ReadFile(AgentsJSON)
 	if err != nil {
 		CliPrintWarning("SetAgentLabel: %v", err)
@@ -349,11 +349,11 @@ func SetAgentLabel(a *agent.SystemInfo, mutex *sync.Mutex) (label string) {
 
 // ListModules list all available modules
 func ListModules() {
-	CliPrettyPrint("Module Name", "Help", &agent.ModuleDocs)
+	CliPrettyPrint("Module Name", "Help", &emp3r0r_data.ModuleDocs)
 }
 
 // Send2Agent send MsgTunData to agent
-func Send2Agent(data *agent.MsgTunData, agent *agent.SystemInfo) (err error) {
+func Send2Agent(data *emp3r0r_data.MsgTunData, agent *emp3r0r_data.SystemInfo) (err error) {
 	ctrl := Targets[agent]
 	if ctrl == nil {
 		return errors.New("Send2Agent: Target is not connected")

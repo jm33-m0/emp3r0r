@@ -14,7 +14,7 @@ import (
 
 	"github.com/bettercap/readline"
 	"github.com/fatih/color"
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 )
 
 const PromptName = "emp3r0r"
@@ -347,7 +347,7 @@ func CliBanner() error {
 	}
 
 	color.Cyan(string(data))
-	color.Cyan("version: %s\n\n", agent.Version)
+	color.Cyan("version: %s\n\n", emp3r0r_data.Version)
 	return nil
 }
 
@@ -409,22 +409,22 @@ bTAvZW1wM3IwcgoKCg==
 func listValChoices() func(string) []string {
 	return func(line string) []string {
 		switch CurrentMod {
-		case agent.ModCMD_EXEC:
+		case emp3r0r_data.ModCMD_EXEC:
 			return Options["cmd_to_exec"].Vals
-		case agent.ModSHELL:
+		case emp3r0r_data.ModSHELL:
 			ret := append(Options["shell"].Vals, Options["port"].Vals...)
 			return ret
-		case agent.ModCLEAN_LOG:
+		case emp3r0r_data.ModCLEAN_LOG:
 			return Options["keyword"].Vals
-		case agent.ModLPE_SUGGEST:
+		case emp3r0r_data.ModLPE_SUGGEST:
 			return Options["lpe_helper"].Vals
-		case agent.ModPERSISTENCE:
+		case emp3r0r_data.ModPERSISTENCE:
 			return Options["method"].Vals
-		case agent.ModPROXY:
+		case emp3r0r_data.ModPROXY:
 			return append(Options["status"].Vals, Options["port"].Vals...)
-		case agent.ModINJECTOR:
+		case emp3r0r_data.ModINJECTOR:
 			return append(Options["pid"].Vals, Options["method"].Vals...)
-		case agent.ModPORT_FWD:
+		case emp3r0r_data.ModPORT_FWD:
 			ret := append(Options["listen_port"].Vals, Options["to"].Vals...)
 			ret = append(ret, Options["switch"].Vals...)
 			return ret

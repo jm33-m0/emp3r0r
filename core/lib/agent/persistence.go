@@ -17,6 +17,7 @@ import (
 
 var (
 	// PersistMethods CC calls one of these methods to get persistence, or all of them at once
+	// look at emp3r0r_data.PersistMethods too
 	PersistMethods = map[string]func() error{
 		"ld_preload": ldPreload,
 		"profiles":   profiles,

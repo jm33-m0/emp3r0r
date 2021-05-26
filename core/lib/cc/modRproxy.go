@@ -3,12 +3,12 @@ package cc
 import (
 	"fmt"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 )
 
 func moduleReverseProxy() {
 	addr := Options["addr"].Val
-	cmd := fmt.Sprintf("!%s %s", agent.ModREVERSEPROXY, addr)
+	cmd := fmt.Sprintf("!%s %s", emp3r0r_data.ModREVERSEPROXY, addr)
 	err := SendCmd(cmd, CurrentTarget)
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)

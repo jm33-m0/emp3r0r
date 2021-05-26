@@ -13,7 +13,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/google/uuid"
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/olekukonko/tablewriter"
 )
@@ -25,7 +25,7 @@ type PortFwdSession struct {
 	Description string // fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, to_addr)
 	Reverse     bool   // from agent to cc or cc to agent
 
-	Agent  *agent.SystemInfo         // agent who holds this port mapping session
+	Agent  *emp3r0r_data.SystemInfo  // agent who holds this port mapping session
 	Sh     map[string]*StreamHandler // related to HTTP handler
 	Ctx    context.Context           // PortFwd context
 	Cancel context.CancelFunc        // PortFwd cancel

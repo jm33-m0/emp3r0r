@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 )
 
 // Option all necessary info of an option
@@ -19,7 +19,7 @@ var (
 	CurrentMod = "<blank>"
 
 	// CurrentTarget selected target
-	CurrentTarget *agent.SystemInfo
+	CurrentTarget *emp3r0r_data.SystemInfo
 
 	// Options currently available options for `set`
 	Options = make(map[string]*Option)
@@ -37,17 +37,17 @@ var (
 
 	// ModuleHelpers a map of module helpers
 	ModuleHelpers = map[string]func(){
-		agent.ModCMD_EXEC:     moduleCmd,
-		agent.ModSHELL:        moduleShell,
-		agent.ModPROXY:        moduleProxy,
-		agent.ModPORT_FWD:     modulePortFwd,
-		agent.ModLPE_SUGGEST:  moduleLPE,
-		agent.ModGET_ROOT:     moduleGetRoot,
-		agent.ModCLEAN_LOG:    moduleLogCleaner,
-		agent.ModPERSISTENCE:  modulePersistence,
-		agent.ModVACCINE:      moduleVaccine,
-		agent.ModINJECTOR:     moduleInjector,
-		agent.ModREVERSEPROXY: moduleReverseProxy,
+		emp3r0r_data.ModCMD_EXEC:     moduleCmd,
+		emp3r0r_data.ModSHELL:        moduleShell,
+		emp3r0r_data.ModPROXY:        moduleProxy,
+		emp3r0r_data.ModPORT_FWD:     modulePortFwd,
+		emp3r0r_data.ModLPE_SUGGEST:  moduleLPE,
+		emp3r0r_data.ModGET_ROOT:     moduleGetRoot,
+		emp3r0r_data.ModCLEAN_LOG:    moduleLogCleaner,
+		emp3r0r_data.ModPERSISTENCE:  modulePersistence,
+		emp3r0r_data.ModVACCINE:      moduleVaccine,
+		emp3r0r_data.ModINJECTOR:     moduleInjector,
+		emp3r0r_data.ModREVERSEPROXY: moduleReverseProxy,
 	}
 )
 
@@ -93,7 +93,7 @@ func UpdateOptions(modName string) (exist bool) {
 
 	var currentOpt *Option
 	switch {
-	case modName == agent.ModCMD_EXEC:
+	case modName == emp3r0r_data.ModCMD_EXEC:
 		currentOpt = addIfNotFound("cmd_to_exec")
 		currentOpt.Vals = []string{
 			"id", "whoami", "ifconfig",
@@ -102,7 +102,7 @@ func UpdateOptions(modName string) (exist bool) {
 			"netstat -antup", "uname -a",
 		}
 
-	case modName == agent.ModSHELL:
+	case modName == emp3r0r_data.ModSHELL:
 		shellOpt := addIfNotFound("shell")
 		shellOpt.Vals = []string{
 			"bash", "zsh", "sh", "python", "python3",
@@ -111,11 +111,11 @@ func UpdateOptions(modName string) (exist bool) {
 		shellOpt.Val = "bash"
 		portOpt := addIfNotFound("port")
 		portOpt.Vals = []string{
-			agent.SSHDPort, "22222",
+			emp3r0r_data.SSHDPort, "22222",
 		}
-		portOpt.Val = agent.SSHDPort
+		portOpt.Val = emp3r0r_data.SSHDPort
 
-	case modName == agent.ModPORT_FWD:
+	case modName == emp3r0r_data.ModPORT_FWD:
 		// rport
 		portOpt := addIfNotFound("to")
 		portOpt.Vals = []string{"127.0.0.1:22", "127.0.0.1:8080"}
@@ -127,12 +127,12 @@ func UpdateOptions(modName string) (exist bool) {
 		switchOpt.Vals = []string{"on", "off", "reverse"}
 		switchOpt.Val = "on"
 
-	case modName == agent.ModCLEAN_LOG:
+	case modName == emp3r0r_data.ModCLEAN_LOG:
 		// keyword to clean
 		keywordOpt := addIfNotFound("keyword")
 		keywordOpt.Vals = []string{"root", "admin"}
 
-	case modName == agent.ModPROXY:
+	case modName == emp3r0r_data.ModPROXY:
 		portOpt := addIfNotFound("port")
 		portOpt.Vals = []string{"1080", "8080", "10800", "10888"}
 		portOpt.Val = "8080"
@@ -140,14 +140,14 @@ func UpdateOptions(modName string) (exist bool) {
 		statusOpt.Vals = []string{"on", "off", "reverse"}
 		statusOpt.Val = "on"
 
-	case modName == agent.ModLPE_SUGGEST:
+	case modName == emp3r0r_data.ModLPE_SUGGEST:
 		currentOpt = addIfNotFound("lpe_helper")
 		for name := range LPEHelpers {
 			currentOpt.Vals = append(currentOpt.Vals, name)
 		}
 		currentOpt.Val = "lpe_les"
 
-	case modName == agent.ModINJECTOR:
+	case modName == emp3r0r_data.ModINJECTOR:
 		pidOpt := addIfNotFound("pid")
 		pidOpt.Vals = []string{"0"}
 		pidOpt.Val = "0"
@@ -155,16 +155,16 @@ func UpdateOptions(modName string) (exist bool) {
 		methodOpt.Vals = []string{"gdb", "native", "python"}
 		methodOpt.Val = "native"
 
-	case modName == agent.ModREVERSEPROXY:
+	case modName == emp3r0r_data.ModREVERSEPROXY:
 		pidOpt := addIfNotFound("addr")
 		pidOpt.Vals = []string{"127.0.0.1"}
 		pidOpt.Val = "<blank>"
 
-	case modName == agent.ModPERSISTENCE:
+	case modName == emp3r0r_data.ModPERSISTENCE:
 		currentOpt = addIfNotFound("method")
-		methods := make([]string, len(agent.PersistMethods))
+		methods := make([]string, len(emp3r0r_data.PersistMethods))
 		i := 0
-		for k := range agent.PersistMethods {
+		for k := range emp3r0r_data.PersistMethods {
 			methods[i] = k
 			i++
 		}
@@ -178,12 +178,12 @@ func UpdateOptions(modName string) (exist bool) {
 // ModuleRun run current module
 func ModuleRun() {
 	if CurrentTarget == nil {
-		if CurrentMod == agent.ModCMD_EXEC {
+		if CurrentMod == emp3r0r_data.ModCMD_EXEC {
 			if !CliYesNo("Run on all targets") {
 				CliPrintError("Target not specified")
 				return
 			}
-			ModuleHelpers[agent.ModCMD_EXEC]()
+			ModuleHelpers[emp3r0r_data.ModCMD_EXEC]()
 			return
 		}
 		CliPrintError("Target not specified")
@@ -203,7 +203,7 @@ func ModuleRun() {
 }
 
 // SelectCurrentTarget check if current target is set and alive
-func SelectCurrentTarget() (target *agent.SystemInfo) {
+func SelectCurrentTarget() (target *emp3r0r_data.SystemInfo) {
 	// find target
 	target = CurrentTarget
 	if target == nil {

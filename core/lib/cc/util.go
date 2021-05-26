@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -35,14 +35,14 @@ func DownloadFile(url, path string) (err error) {
 }
 
 // SendCmd send command to agent
-func SendCmd(cmd string, a *agent.SystemInfo) error {
+func SendCmd(cmd string, a *emp3r0r_data.SystemInfo) error {
 	if a == nil {
 		return errors.New("SendCmd: No such agent")
 	}
 
-	var cmdData agent.MsgTunData
+	var cmdData emp3r0r_data.MsgTunData
 
-	cmdData.Payload = fmt.Sprintf("cmd%s%s", agent.OpSep, cmd)
+	cmdData.Payload = fmt.Sprintf("cmd%s%s", emp3r0r_data.OpSep, cmd)
 	cmdData.Tag = a.Tag
 
 	return Send2Agent(&cmdData, a)
@@ -187,9 +187,9 @@ func TmuxSplit(hV, cmd string) error {
 }
 
 // IsAgentExist is agent already in target list?
-func IsAgentExist(agent *agent.SystemInfo) bool {
+func IsAgentExist(agent *emp3r0r_data.SystemInfo) bool {
 	for a := range Targets {
-		if a.Tag == agent.Tag {
+		if a.Tag == emp3r0r_data.Tag {
 			return true
 		}
 	}
