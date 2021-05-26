@@ -308,8 +308,8 @@ def main(target):
     '''
     main main main
     '''
-    ccip = "[cc_ipaddr]"
-    indicator = "[cc_indicator]"
+    ccip = ""
+    indicator = ""
     use_cached = False
 
     if target == "clean":
@@ -326,15 +326,13 @@ def main(target):
     if not use_cached:
         if yes_no("Clean everything and start over?"):
             clean()
-        ccip = input("CC server address (domain name or ip address): ").strip()
-        CACHED_CONF['ccip'] = ccip
+        ccip = input(
+            "CC server address (domain name or ip address, can be more than one, separate with space):\n> ").strip()
+        CACHED_CONF['ccip'] = ccip[0]
 
     if target == "cc":
-        cc_other = ""
+        cc_other = ' '.join(ccip[1:])
 
-        if not os.path.exists("./build/emp3r0r-key.pem"):
-            cc_other = input(
-                "Additional CC server addresses (separate with space): ").strip()
         gobuild = GoBuild(target="cc", cc_ip=ccip, cc_other_names=cc_other)
         gobuild.build()
 
