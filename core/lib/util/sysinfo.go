@@ -97,7 +97,7 @@ func genShortID() (id string) {
 }
 
 // GetHostID unique identifier of the host
-func GetHostID() (id string) {
+func GetHostID(fallbackUUID string) (id string) {
 	shortID := genShortID()
 	id = fmt.Sprintf("unknown_%s-agent", shortID)
 	name, err := os.Hostname()
@@ -106,7 +106,7 @@ func GetHostID() (id string) {
 		return
 	}
 	name = fmt.Sprintf("%s\\%s", name, GetUsername())
-	id = fmt.Sprintf("%s_%s-agent-nomachineid", name, shortID)
+	id = fmt.Sprintf("%s_%s-agent-%s", name, shortID, fallbackUUID)
 	productInfo, err := ghw.Product()
 	if err != nil {
 		log.Printf("GetHostID: %v", err)
