@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -15,10 +14,8 @@ import (
 
 // SSHClient ssh to sshd server, with shell access in a new tmux window
 func SSHClient(shell, port string) (err error) {
-	if !util.IsCommandExist("ssh") ||
-		!util.IsCommandExist("tmux") ||
-		os.Getenv("TMUX") == "" {
-		err = fmt.Errorf("ssh and tmux must be installed, and emp3r0r must be run under tmux session")
+	if !util.IsCommandExist("ssh") {
+		err = fmt.Errorf("ssh must be installed")
 		return
 	}
 
