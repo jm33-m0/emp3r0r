@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -52,7 +53,11 @@ func SSHClient(shell, port string) (err error) {
 		}()
 		for {
 			time.Sleep(100 * time.Millisecond)
-			_, exists := CmdResults[cmd]
+			res, exists := CmdResults[cmd]
+			if !strings.Contains(res, "success") {
+				err = fmt.Errorf("Start sshd failed: %s", res)
+				return
+			}
 			if exists {
 				break
 			}
