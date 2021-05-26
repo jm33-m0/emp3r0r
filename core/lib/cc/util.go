@@ -189,7 +189,7 @@ func TmuxSplit(hV, cmd string) error {
 // IsAgentExist is agent already in target list?
 func IsAgentExist(agent *emp3r0r_data.SystemInfo) bool {
 	for a := range Targets {
-		if a.Tag == emp3r0r_data.Tag {
+		if a.Tag == emp3r0r_data.AgentUUID {
 			return true
 		}
 	}

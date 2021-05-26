@@ -98,8 +98,8 @@ var (
 	// IndicatorWaitMax cc indicator wait seconds
 	IndicatorWaitMax = 120
 
-	// Tag uuid of this agent
-	Tag = "[agent_uuid]"
+	// AgentUUID uuid of this agent
+	AgentUUID = "[agent_uuid]"
 )
 
 const (
