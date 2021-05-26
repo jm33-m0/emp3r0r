@@ -21,15 +21,14 @@ func setWinsize(f *os.File, w, h int) {
 // SSHD start a ssh server to provide shell access for clients
 // the server binds local interface only
 func SSHD(shell, port string) (err error) {
-	ssh.Handle(func(s ssh.Session) {
-		exe, err := exec.LookPath(shell)
-		if err != nil {
-			res := fmt.Sprintf("%s not found (%v), aborting", shell, err)
-			log.Print(res)
-			io.WriteString(s, res)
-			return
-		}
+	exe, err := exec.LookPath(shell)
+	if err != nil {
+		res := fmt.Sprintf("%s not found (%v), aborting", shell, err)
+		log.Print(res)
+		return
+	}
 
+	ssh.Handle(func(s ssh.Session) {
 		cmd := exec.Command(exe)
 		ptyReq, winCh, isPTY := s.Pty()
 		log.Printf("Got an SSH PTY request: %s", ptyReq.Term)
