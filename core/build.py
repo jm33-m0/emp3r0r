@@ -175,6 +175,24 @@ class GoBuild:
         unsed("./lib/data/def.go",
               "CCIndicator = \"[cc_indicator]\"", f"CCIndicator = \"{self.INDICATOR}\"")
 
+        # indicator wait
+        if 'indicator_wait_min' in CACHED_CONF:
+            unsed("./lib/data/def.go",
+                  "IndicatorWaitMin = 30", f"IndicatorWaitMin = {CACHED_CONF['indicator_wait_min']}")
+
+        if 'indicator_wait_max' in CACHED_CONF:
+            unsed("./lib/data/def.go",
+                  "IndicatorWaitMax = 120", f"IndicatorWaitMax = {CACHED_CONF['indicator_wait_max']}")
+
+        # broadcast_interval
+        if 'broadcast_interval_min' in CACHED_CONF:
+            unsed("./lib/data/def.go",
+                  "BroadcastIntervalMin = 30", f"BroadcastIntervalMin = {CACHED_CONF['broadcast_interval_min']}")
+
+        if 'broadcast_interval_max' in CACHED_CONF:
+            unsed("./lib/data/def.go",
+                  "BroadcastIntervalMax = 120", f"BroadcastIntervalMax = {CACHED_CONF['broadcast_interval_max']}")
+
         # cc indicator text
         unsed("./lib/data/def.go",
               "CCIndicatorText = \"[indicator_text]\"", f"CCIndicatorText = \"{self.INDICATOR_TEXT}\"")
@@ -225,6 +243,24 @@ class GoBuild:
         # indicator
         sed("./lib/data/def.go",
             "CCIndicator = \"[cc_indicator]\"", f"CCIndicator = \"{self.INDICATOR}\"")
+
+        # indicator wait
+        if 'indicator_wait_min' in CACHED_CONF:
+            sed("./lib/data/def.go",
+                "IndicatorWaitMin = 30", f"IndicatorWaitMin = {CACHED_CONF['indicator_wait_min']}")
+
+        if 'indicator_wait_max' in CACHED_CONF:
+            sed("./lib/data/def.go",
+                "IndicatorWaitMax = 120", f"IndicatorWaitMax = {CACHED_CONF['indicator_wait_max']}")
+
+        # broadcast_interval
+        if 'broadcast_interval_min' in CACHED_CONF:
+            sed("./lib/data/def.go",
+                "BroadcastIntervalMin = 30", f"BroadcastIntervalMin = {CACHED_CONF['broadcast_interval_min']}")
+
+        if 'broadcast_interval_max' in CACHED_CONF:
+            sed("./lib/data/def.go",
+                "BroadcastIntervalMax = 120", f"BroadcastIntervalMax = {CACHED_CONF['broadcast_interval_max']}")
 
         # cc indicator text
         sed("./lib/data/def.go",
