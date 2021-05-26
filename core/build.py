@@ -81,7 +81,7 @@ class GoBuild:
 
         # write cache
         json_file = open(BUILD_JSON, "w+")
-        json.dump(CACHED_CONF, json_file)
+        json.dump(CACHED_CONF, json_file, indent=4)
         json_file.close()
 
         self.set_tags()
