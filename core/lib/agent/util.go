@@ -87,8 +87,8 @@ func CollectSystemInfo() *emp3r0r_data.SystemInfo {
 		log.Printf("Gethostname: %v", err)
 		hostname = "unknown_host"
 	}
-	emp3r0r_data.AgentUUID = util.GetHostID(emp3r0r_data.AgentUUID)
-	info.Tag = emp3r0r_data.AgentUUID // use hostid
+	emp3r0r_data.AgentTag = util.GetHostID(emp3r0r_data.AgentUUID)
+	info.Tag = emp3r0r_data.AgentTag // use hostid
 	info.Hostname = hostname
 	info.Kernel = si.Kernel.Release
 	info.Arch = runtime.GOARCH

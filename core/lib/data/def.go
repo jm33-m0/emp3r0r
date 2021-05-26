@@ -100,6 +100,9 @@ var (
 
 	// AgentUUID uuid of this agent
 	AgentUUID = "[agent_uuid]"
+
+	// AgenTag tag of this agent
+	AgentTag = ""
 )
 
 const (
