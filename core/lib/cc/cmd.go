@@ -211,9 +211,12 @@ func CmdHandler(cmd string) (err error) {
 		helper := CmdHelpers[cmd]
 		if helper == nil {
 			filehelper := FileManagerHelpers[cmdSplit[0]]
-			if filehelper == nil {
+			if filehelper == nil && CurrentTarget != nil {
 				CliPrintWarning("Exec: %s on %s", strconv.Quote(cmd), strconv.Quote(CurrentTarget.Tag))
 				SendCmdToCurrentTarget(cmd)
+				return
+			} else if CurrentTarget == nil {
+				CliPrintError("Select a target so you can execute commands on it")
 				return
 			}
 			filehelper(cmd)
