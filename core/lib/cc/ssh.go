@@ -35,12 +35,14 @@ func SSHClient(shell, port string) (err error) {
 
 	if !exists {
 		// start sshd server on target
-		cmd := fmt.Sprintf("!sshd %s %s", shell, port)
-		err = SendCmdToCurrentTarget(cmd)
-		if err != nil {
-			return
+		if shell != "bash" {
+			cmd := fmt.Sprintf("!sshd %s %s", shell, port)
+			err = SendCmdToCurrentTarget(cmd)
+			if err != nil {
+				return
+			}
+			CliPrintInfo("Starting sshd (%s) on target %s", shell, strconv.Quote(CurrentTarget.Tag))
 		}
-		CliPrintInfo("Starting sshd on target %s", strconv.Quote(CurrentTarget.Tag))
 
 		// set up port mapping for the ssh session
 		CliPrintInfo("Setting up port mapping for sshd")
