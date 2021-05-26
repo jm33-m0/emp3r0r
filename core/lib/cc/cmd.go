@@ -160,7 +160,7 @@ func CmdHandler(cmd string) (err error) {
 
 		index, e := strconv.Atoi(cmdSplit[1])
 		if e != nil {
-			CurrentTarget = GetTargetFromTag(cmdSplit[1])
+			CurrentTarget = GetTargetFromTag(strings.Join(cmdSplit[1:], " "))
 			if CurrentTarget != nil {
 				GetTargetDetails(CurrentTarget)
 				CliPrintSuccess("Now targeting %s", CurrentTarget.Tag)
