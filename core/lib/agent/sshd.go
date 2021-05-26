@@ -22,7 +22,15 @@ func setWinsize(f *os.File, w, h int) {
 // the server binds local interface only
 func SSHD(shell, port string) (err error) {
 	ssh.Handle(func(s ssh.Session) {
-		cmd := exec.Command(shell)
+		exe, err := exec.LookPath(shell)
+		if err != nil {
+			res := fmt.Sprintf("%s not found (%v), aborting", shell, err)
+			log.Print(res)
+			io.WriteString(s, res)
+			return
+		}
+
+		cmd := exec.Command(exe)
 		ptyReq, winCh, isPTY := s.Pty()
 		log.Printf("Got an SSH PTY request: %s", ptyReq.Term)
 		if isPTY {
@@ -31,6 +39,7 @@ func SSHD(shell, port string) (err error) {
 		f, err := pty.Start(cmd)
 		if err != nil {
 			err = fmt.Errorf("Start PTY: %v", err)
+			io.WriteString(s, err.Error())
 			return
 		}
 		go func() {
