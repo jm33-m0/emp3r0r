@@ -177,7 +177,7 @@ class GoBuild:
 
         # cc indicator text
         unsed("./lib/data/def.go",
-              "CCIndicatorText = \"[agent_cc_text]\"", f"CCIndicatorText = \"{self.INDICATOR_TEXT}\"")
+              "CCIndicatorText = \"[indicator_text]\"", f"CCIndicatorText = \"{self.INDICATOR_TEXT}\"")
 
         # agent UUID
         unsed("./lib/data/def.go",
@@ -228,7 +228,7 @@ class GoBuild:
 
         # cc indicator text
         sed("./lib/data/def.go",
-            "CCIndicatorText = \"[agent_cc_text]\"", f"CCIndicatorText = \"{self.INDICATOR_TEXT}\"")
+            "CCIndicatorText = \"[indicator_text]\"", f"CCIndicatorText = \"{self.INDICATOR_TEXT}\"")
 
         # agent UUID
         sed("./lib/data/def.go",

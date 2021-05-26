@@ -73,7 +73,7 @@ func IsCCOnline(proxy string) bool {
 	}
 	defer resp.Body.Close()
 
-	log.Printf("Checking emp3r0r_data.CCIndicator (%s) for %s", emp3r0r_data.CCIndicator, strconv.Quote(emp3r0r_data.CCIndicatorText))
+	log.Printf("Checking CCIndicator (%s) for %s", emp3r0r_data.CCIndicator, strconv.Quote(emp3r0r_data.CCIndicatorText))
 	return strings.Contains(string(data), emp3r0r_data.CCIndicatorText)
 }
 
