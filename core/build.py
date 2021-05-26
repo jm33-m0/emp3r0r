@@ -258,10 +258,12 @@ def clean():
     for f in to_rm:
         try:
             # remove directories too
-
             if os.path.isdir(f):
-                os.removedirs(f)
+                os.system(f"rm -rf {f}")
             else:
+                # we don't need to delete the config file
+                if f.endswith("build.json"):
+                    continue
                 os.remove(f)
             print(" Deleted "+f)
         except BaseException:
