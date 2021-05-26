@@ -8,8 +8,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 )
@@ -40,12 +40,12 @@ func readJSONConfig(filename string) (err error) {
 	}
 
 	// set up runtime vars
-	agent.Version = config.Version
-	agent.SSHDPort = config.SSHDPort
-	agent.BroadcastPort = config.BroadcastPort
-	agent.ProxyPort = config.ProxyPort
-	agent.CCPort = config.CCPort
-	agent.CCAddress = fmt.Sprintf("https://%s", config.CCIP)
+	emp3r0r_data.Version = config.Version
+	emp3r0r_data.SSHDPort = config.SSHDPort
+	emp3r0r_data.BroadcastPort = config.BroadcastPort
+	emp3r0r_data.ProxyPort = config.ProxyPort
+	emp3r0r_data.CCPort = config.CCPort
+	emp3r0r_data.CCAddress = fmt.Sprintf("https://%s", config.CCIP)
 
 	// CA
 	tun.CACrt = []byte(config.CA)
@@ -73,7 +73,7 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
-			err = cdn2proxy.StartServer(*cdnproxy, "127.0.0.1:"+agent.CCPort, logFile)
+			err = cdn2proxy.StartServer(*cdnproxy, "127.0.0.1:"+emp3r0r_data.CCPort, logFile)
 			if err != nil {
 				log.Fatal(err)
 			}
