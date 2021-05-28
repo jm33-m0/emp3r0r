@@ -37,7 +37,7 @@ linux post-exploitation framework made by linux user
         * [shellcode injection](#shellcode-injection)
         * [shellcode loader](#shellcode-loader)
         * [basic command shell](#basic-command-shell)
-        * [fully interactive and stealth bash shell](#fully-interactive-and-stealth-bash-shell)
+        * [ssh to any kind of shells you like!](#ssh-to-any-kind-of-shells-you-like)
         * [credential harvesting](#credential-harvesting)
         * [auto root](#auto-root)
         * [LPE suggest](#lpe-suggest)
@@ -65,6 +65,7 @@ linux post-exploitation framework made by linux user
 - [x] better file manager
 - [x] resumable download/upload
 - [x] screenshot
+- [x] **better shells!**
 - [ ] network scanner
 - [ ] passive scanner, for host/service discovery
 - [ ] password spray
@@ -235,19 +236,31 @@ besides, it provides several useful helpers:
 
 ![cmd shell](./img/shell.webp)
 
-#### fully interactive and stealth bash shell
+#### ssh to any kind of shells you like!
 
-a reverse bash shell, started with custom `bash` binary and `bashrc`, leaving no trace on the system shell
+with module `interactive_shell`, you can set `shell` to normal `bash`, `sh`, `busybox`, or even `python` if you like!
 
-emp3r0r's terminal supports **everything your current terminal supports**, you can use it just like an [openssh](https://www.openssh.com/) session
+all the shells works like you `ssh` to the host, for most cases, **PTY is fully enabled**
 
-but wait, it's more than just a reverse bash shell, with [module vaccine](https://github.com/jm33-m0/static-bins/tree/main/vaccine), you can use whatever tool you like on your target system
+this is choosing a shell to `ssh` into, by default we are doing `bash`
 
-![bash](./img/bash.webp)
+![ssh-shell](./img/ssh-shell.png)
 
-you can also have it on Windows targets:
+you can see the `bash` shell you just created in a new tmux window
 
-![windows_rshell](./img/windows_rshell.webp)
+![bash](./img/bash.png)
+
+and `python`? you can `spaw('bash')` if you like
+
+![python](./img/python_shell.png)
+
+you can open **as many shells as you like**!
+
+each shell has its own port mapping, allowing you to `ssh -p port localhost` directly.
+
+with tmux you can see all of your shells organized cleanly in your current tmux session
+
+![shells](./img/shells.png)
 
 #### credential harvesting
 
