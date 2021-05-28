@@ -32,6 +32,11 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 
 	target := GetTargetFromTag(data.Tag)
 	contrlIf := Targets[target]
+	if target == nil || contrlIf == nil {
+		CliPrintError("Target %s cannot be found, however, it left a message saying:\n%v",
+			data.Tag, payloadSplit)
+		return
+	}
 
 	switch op {
 
