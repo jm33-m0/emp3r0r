@@ -40,23 +40,23 @@ func SSHClient(shell, port string) (err error) {
 				return
 			}
 			CliPrintInfo("Starting sshd (%s) on target %s", shell, strconv.Quote(CurrentTarget.Tag))
-		}
 
-		// wait until sshd is up
-		defer func() {
-			CmdResultsMutex.Lock()
-			delete(CmdResults, cmd)
-			CmdResultsMutex.Unlock()
-		}()
-		for {
-			time.Sleep(100 * time.Millisecond)
-			res, exists := CmdResults[cmd]
-			if !strings.Contains(res, "success") {
-				err = fmt.Errorf("Start sshd failed: %s", res)
-				return
-			}
-			if exists {
-				break
+			// wait until sshd is up
+			defer func() {
+				CmdResultsMutex.Lock()
+				delete(CmdResults, cmd)
+				CmdResultsMutex.Unlock()
+			}()
+			for {
+				time.Sleep(100 * time.Millisecond)
+				res, exists := CmdResults[cmd]
+				if !strings.Contains(res, "success") {
+					err = fmt.Errorf("Start sshd failed: %s", res)
+					return
+				}
+				if exists {
+					break
+				}
 			}
 		}
 
@@ -108,5 +108,11 @@ wait:
 		"If that fails, please execute command %s manaully",
 		CurrentTarget.Tag, strconv.Quote(sshCmd))
 
-	return TmuxNewWindow(fmt.Sprintf("ssh-%s", CurrentTarget.Hostname), sshCmd)
+	// agent name
+	name := CurrentTarget.Hostname
+	label := Targets[CurrentTarget].Label
+	if label != "nolabel" {
+		name = label
+	}
+	return TmuxNewWindow(fmt.Sprintf("%s-%s", name, shell), sshCmd)
 }
