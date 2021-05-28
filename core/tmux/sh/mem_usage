@@ -1,0 +1,3 @@
+#!/bin/bash
+
+echo "$(free -m | awk '/Mem/{printf($3)}') MB"

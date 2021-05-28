@@ -11,9 +11,15 @@ fi
 )
 
 (
-    cd build || exit 1
+    tmux source-file ./tmux/.tmux.conf
+    cp -r ./tmux/sh /tmp
+    cd build || {
+        echo "./build doesn't exist"
+        exit 1
+    }
 
     if [ -n "$TMUX" ]; then
+        tmux rename-session emp3r0r
         ./cc "$@"
     else
         tmux new-session -s emp3r0r ./cc "$@" || tmux attach -t emp3r0r
