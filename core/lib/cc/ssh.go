@@ -108,5 +108,5 @@ wait:
 		"If that fails, please execute command %s manaully",
 		CurrentTarget.Tag, strconv.Quote(sshCmd))
 
-	return OpenInNewTerminalWindow(fmt.Sprintf("ssh-%s", CurrentTarget.Hostname), sshCmd)
+	return TmuxNewWindow(fmt.Sprintf("ssh-%s", CurrentTarget.Hostname), sshCmd)
 }

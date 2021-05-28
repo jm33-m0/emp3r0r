@@ -158,7 +158,8 @@ func TmuxNewWindow(name, cmd string) error {
 		return errors.New("You need to run emp3r0r under `tmux`")
 	}
 
-	job := exec.Command("tmux", "new-window", "-n", name, fmt.Sprintf("'%s || read'", cmd))
+	tmuxCmd := fmt.Sprintf("tmux new-window -n %s '%s || read'", name, cmd)
+	job := exec.Command("/bin/sh", "-c", tmuxCmd)
 	out, err := job.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%v: %s", err, out)
@@ -176,7 +177,7 @@ func TmuxSplit(hV, cmd string) error {
 		return errors.New("You need to run emp3r0r under `tmux`, and make sure `less` is installed")
 	}
 
-	job := fmt.Sprintf("tmux split-window -%s %s", hV, cmd)
+	job := fmt.Sprintf("tmux split-window -%s '%s || read'", hV, cmd)
 
 	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
 	if err != nil {
