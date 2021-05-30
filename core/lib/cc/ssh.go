@@ -111,7 +111,7 @@ wait:
 	// agent name
 	name := CurrentTarget.Hostname
 	label := Targets[CurrentTarget].Label
-	if label != "nolabel" {
+	if label != "nolabel" && label != "-" {
 		name = label
 	}
 	return TmuxNewWindow(fmt.Sprintf("%s-%s", name, shell), sshCmd)
