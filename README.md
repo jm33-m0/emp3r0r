@@ -11,21 +11,11 @@ linux post-exploitation framework made by linux user
 - **cross-platform** support is in progress, contribute if you want emp3r0r to run on other systems
 - feel free to develop your **private version** of emp3r0r, and i would appreciate that you contribute back to this branch
 
-![logo](./img/emp3r0r.png)
-![ls_targets](./img/ls_targets.png)
+
+https://user-images.githubusercontent.com/10167884/120102336-11e19000-c17d-11eb-8dc7-c18ce5cb5927.mp4
+
 
 ----------
-
-## table of contents
-
-<!-- vim-markdown-toc GFM -->
-
-* [glance](#glance)
-* [what to expect (in future releases)](#what-to-expect-in-future-releases)
-
-<!-- vim-markdown-toc -->
-
-## glance
 
 ## what to expect (in future releases)
 
