@@ -1,7 +1,6 @@
 package cc
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -228,7 +227,7 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 		token = idstr
 	}
 
-	sessionID, err := uuid.Parse(token) // uuid is 36 bytes long
+	sessionID, err := uuid.Parse(token)
 	if err != nil {
 		CliPrintError("portFwd connection: failed to parse UUID: %s from %s\n%v", token, req.RemoteAddr, err)
 		return
@@ -248,13 +247,13 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 		pf.Sh[string(origToken)] = &shCopy // cache this connection
 		// handshake success
 		if strings.HasSuffix(string(origToken), "-reverse") {
-			CliPrintSuccess("Got a portFwd (reverse) connection (%s) from %s", string(origToken), req.RemoteAddr)
+			CliPrintInfo("Got a portFwd (reverse) connection (%s) from %s", string(origToken), req.RemoteAddr)
 			err = pf.RunReversedPortFwd(&shCopy) // handle this reverse port mapping request
 			if err != nil {
 				CliPrintError("RunReversedPortFwd: %v", err)
 			}
-		} else {
-			CliPrintInfo("Got a portFwd sub-connection (%s) from %s", string(origToken), req.RemoteAddr)
+			// } else {
+			// 	CliPrintInfo("Got a portFwd sub-connection (%s) from %s", string(origToken), req.RemoteAddr)
 		}
 	}
 
@@ -295,65 +294,6 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 	}
 }
 
-// rshellHandler handles buffered data
-func (sh *StreamHandler) rshellHandler(wrt http.ResponseWriter, req *http.Request) {
-	// check if an agent is already connected
-	if sh.H2x.Ctx != nil ||
-		sh.H2x.Cancel != nil ||
-		sh.H2x.Conn != nil {
-		CliPrintError("rshellHandler: occupied")
-		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-
-	var err error
-	// use h2conn
-	sh.H2x.Conn, err = h2conn.Accept(wrt, req)
-	if err != nil {
-		CliPrintError("rshellHandler: failed creating connection from %s: %s", req.RemoteAddr, err)
-		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-
-	// agent auth
-	sh.H2x.Ctx, sh.H2x.Cancel = context.WithCancel(req.Context())
-	buf := make([]byte, sh.BufSize)
-	_, err = sh.H2x.Conn.Read(buf)
-	buf = bytes.Trim(buf, "\x00")
-	agentToken, err := uuid.ParseBytes(buf)
-	if err != nil {
-		CliPrintError("Invalid rshell token %s: %v", buf, err)
-		return
-	}
-	if agentToken.String() != sh.Token {
-		CliPrintError("Invalid rshell token '%s vs %s'", agentToken.String(), sh.Token)
-		return
-	}
-	CliPrintSuccess("Got a reverse shell connection (%s) from %s", sh.Token, req.RemoteAddr)
-
-	defer func() {
-		if sh.H2x.Conn != nil {
-			err = sh.H2x.Conn.Close()
-			if err != nil {
-				CliPrintError("rshellHandler failed to close connection: " + err.Error())
-			}
-		}
-		sh.Token = ""
-		sh.H2x.Cancel()
-		CliPrintWarning("Closed reverse shell connection from %s", req.RemoteAddr)
-	}()
-
-	for {
-		data := make([]byte, sh.BufSize)
-		_, err = sh.H2x.Conn.Read(data)
-		if err != nil {
-			CliPrintWarning("Disconnected: rshellHandler read: %v", err)
-			return
-		}
-		sh.Buf <- data
-	}
-}
-
 func dispatcher(wrt http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 
@@ -380,8 +320,6 @@ func dispatcher(wrt http.ResponseWriter, req *http.Request) {
 			}
 		}
 		wrt.WriteHeader(http.StatusForbidden)
-	case tun.ReverseShellAPI:
-		RShellStream.rshellHandler(wrt, req)
 	case tun.ProxyAPI:
 		ProxyStream.portFwdHandler(wrt, req)
 	default:
