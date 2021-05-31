@@ -24,20 +24,21 @@ https://user-images.githubusercontent.com/10167884/120104002-eebade80-c184-11eb-
 * **perfect reverse shell** (true color, key bindings, custom bashrc, custom bash binary, etc)
 * auto **persistence** via various methods
 * **post-exploitation tools** like nmap, socat, are integreted with reverse shell
-* **credential harvesting**
+* **credential harvesting** (WIP)
 * process **injection**
 * **shellcode** injection and dropper
 * ELF **patcher**
 * **hide processes and files** via libc hijacking
-* port mapping, socks5 **proxy**
+* **port mapping**, from c2 side to agent side, and vice versa
+* agent side socks5 **proxy**
+* **ssh server**
 * auto root
 * **LPE** suggest
 * system info collecting
-* file management, **resumable download
+* file management, **resumable download**
 * log cleaner
 * screenshot
 * **stealth** connection
-* screenshot
 * anti-antivirus
 * internet access checker
 * **autoproxy** for semi-isolated networks
