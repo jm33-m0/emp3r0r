@@ -217,25 +217,20 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 		CliPrintWarning("%s h2 disconnected", sh.Token)
 		return
 	}
-	buf := make([]byte, sh.BufSize)
-	_, err = sh.H2x.Conn.Read(buf)
 
-	if err != nil {
-		CliPrintError("portFwd connection: handshake failed: %s\n%v", req.RemoteAddr, err)
-		return
-	}
-	buf = bytes.Trim(buf, "\x00")
-	origBuf := buf        // in case we need the orignal session-id, for sub-sessions
+	vars := mux.Vars(req)
+	token := vars["token"]
+	origToken := token    // in case we need the orignal session-id, for sub-sessions
 	isSubSession := false // sub-session is part of a port-mapping, every client connection starts a sub-session (h2conn)
-	if strings.Contains(string(buf), "_") {
+	if strings.Contains(string(token), "_") {
 		isSubSession = true
-		idstr := strings.Split(string(buf), "_")[0]
-		buf = []byte(idstr)
+		idstr := strings.Split(string(token), "_")[0]
+		token = idstr
 	}
 
-	sessionID, err := uuid.ParseBytes(buf[:36]) // uuid is 36 bytes long
+	sessionID, err := uuid.Parse(token) // uuid is 36 bytes long
 	if err != nil {
-		CliPrintError("portFwd connection: failed to parse UUID: %s from %s\n%v", buf, req.RemoteAddr, err)
+		CliPrintError("portFwd connection: failed to parse UUID: %s from %s\n%v", token, req.RemoteAddr, err)
 		return
 	}
 	// check if session ID exists in the map,
@@ -250,16 +245,16 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 		// handshake success
 		CliPrintSuccess("Got a portFwd connection (%s) from %s", sessionID.String(), req.RemoteAddr)
 	} else {
-		pf.Sh[string(origBuf)] = &shCopy // cache this connection
+		pf.Sh[string(origToken)] = &shCopy // cache this connection
 		// handshake success
-		if strings.HasSuffix(string(origBuf), "-reverse") {
-			CliPrintSuccess("Got a portFwd (reverse) connection (%s) from %s", string(origBuf), req.RemoteAddr)
+		if strings.HasSuffix(string(origToken), "-reverse") {
+			CliPrintSuccess("Got a portFwd (reverse) connection (%s) from %s", string(origToken), req.RemoteAddr)
 			err = pf.RunReversedPortFwd(&shCopy) // handle this reverse port mapping request
 			if err != nil {
 				CliPrintError("RunReversedPortFwd: %v", err)
 			}
-			// } else {
-			// CliPrintInfo("Got a portFwd sub-connection (%s) from %s", string(origBuf), req.RemoteAddr)
+		} else {
+			CliPrintInfo("Got a portFwd sub-connection (%s) from %s", string(origToken), req.RemoteAddr)
 		}
 	}
 
@@ -271,9 +266,9 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 
 		// if this connection is just a sub-connection
 		// keep the port-mapping, only close h2conn
-		if string(origBuf) != sessionID.String() {
+		if string(origToken) != sessionID.String() {
 			cancel()
-			CliPrintInfo("portFwdHandler: closed connection %s", origBuf)
+			CliPrintInfo("portFwdHandler: closed connection %s", origToken)
 			return
 		}
 

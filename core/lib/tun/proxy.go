@@ -124,12 +124,6 @@ func FwdToDport(ctx context.Context, cancel context.CancelFunc,
 		}
 	}()
 
-	_, err = h2.Write([]byte(sessionID))
-	if err != nil {
-		log.Printf("Send hello: %v", err)
-		return
-	}
-
 	for ctx.Err() == nil {
 		time.Sleep(500 * time.Millisecond)
 	}

