@@ -35,6 +35,7 @@ var Commands = map[string]string{
 	"ls_targets":      "List all targets",
 	"ls_modules":      "List all modules",
 	"ls_port_fwds":    "List all port mappings",
+	"debug":           "Set debug level: -1 (least verbose) to 1 (most verbose)",
 	"delete_port_fwd": "Delete a port mapping",
 	"exit":            "Exit",
 }
@@ -115,6 +116,18 @@ func CmdHandler(cmd string) (err error) {
 
 		// hand to SetOption helper
 		SetOption(cmdSplit[1:])
+
+	case cmdSplit[0] == "debug":
+		if len(cmdSplit) < 2 {
+			CliPrintError("debug <-1, 0, 1>")
+			return
+		}
+		level, e := strconv.Atoi(cmdSplit[1])
+		if e != nil {
+			CliPrintError("Invalid debug level: %v", err)
+			return
+		}
+		DebugLevel = level
 
 	case cmdSplit[0] == "delete_port_fwd":
 		if len(cmdSplit) < 2 {
