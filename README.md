@@ -18,7 +18,9 @@ https://user-images.githubusercontent.com/10167884/120104002-eebade80-c184-11eb-
 
 ## features
 
-* beautiful terminal UI
+* beautiful terminal UI, use tmux for window management
+* multi-tasking, you don't need to wait for any commands to finish
+* basic API provided through unix socket
 * **perfect reverse shell** (true color, key bindings, custom bashrc, custom bash binary, etc)
 * auto **persistence** via various methods
 * **post-exploitation tools** like nmap, socat, are integreted with reverse shell
@@ -31,8 +33,9 @@ https://user-images.githubusercontent.com/10167884/120104002-eebade80-c184-11eb-
 * auto root
 * **LPE** suggest
 * system info collecting
-* file management
+* file management, **resumable download
 * log cleaner
+* screenshot
 * **stealth** connection
 * screenshot
 * anti-antivirus
