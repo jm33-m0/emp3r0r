@@ -191,10 +191,34 @@ func SetDynamicPrompt() {
 	EmpReadLine.SetPrompt(dynamicPrompt)
 }
 
+// CliPrintDebug print log in blue
+func CliPrintDebug(format string, a ...interface{}) {
+	if DebugLevel < 0 {
+		log.Println(color.BlueString(format, a...))
+		if IsAPIEnabled {
+			// send to socket
+			var resp APIResponse
+			msg := GetDateTime() + " INFO: " + fmt.Sprintf(format, a...)
+			resp.MsgData = []byte(msg)
+			resp.Alert = false
+			resp.MsgType = LOG
+			data, err := json.Marshal(resp)
+			if err != nil {
+				log.Printf("CliPrintInfo: %v", err)
+				return
+			}
+			_, err = APIConn.Write([]byte(data))
+			if err != nil {
+				log.Printf("CliPrintInfo: %v", err)
+			}
+		}
+	}
+}
+
 // CliPrintInfo print log in blue
 func CliPrintInfo(format string, a ...interface{}) {
-	if DebugLevel == 0 {
-		log.Println(color.BlueString(format, a...))
+	if DebugLevel >= 0 {
+		log.Println(color.HiBlueString(format, a...))
 		if IsAPIEnabled {
 			// send to socket
 			var resp APIResponse
@@ -217,7 +241,7 @@ func CliPrintInfo(format string, a ...interface{}) {
 
 // CliPrintWarning print log in yellow
 func CliPrintWarning(format string, a ...interface{}) {
-	if DebugLevel <= 1 {
+	if DebugLevel >= 1 {
 		log.Println(color.YellowString(format, a...))
 		if IsAPIEnabled {
 			// send to socket
