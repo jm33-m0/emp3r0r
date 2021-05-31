@@ -81,6 +81,7 @@ func SSHClient(shell, port string) (err error) {
 	}
 
 	// wait until the port mapping is ready
+	exists = false
 wait:
 	for i := 0; i < 100; i++ {
 		if exists {
