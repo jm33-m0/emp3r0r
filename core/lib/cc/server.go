@@ -213,6 +213,10 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 	shCopy := *sh
 
 	// record this connection to port forwarding map
+	if sh.H2x.Conn == nil {
+		CliPrintWarning("%s h2 disconnected", sh.Token)
+		return
+	}
 	buf := make([]byte, sh.BufSize)
 	_, err = sh.H2x.Conn.Read(buf)
 

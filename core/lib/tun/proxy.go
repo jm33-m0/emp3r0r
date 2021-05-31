@@ -112,14 +112,14 @@ func FwdToDport(ctx context.Context, cancel context.CancelFunc,
 	go func() {
 		_, err = io.Copy(dest, h2)
 		if err != nil {
-			log.Printf("h2 -> dest: %v", err)
+			log.Printf("FwdToDport (%s): h2 -> dest: %v", sessionID, err)
 			return
 		}
 	}()
 	go func() {
 		_, err = io.Copy(h2, dest)
 		if err != nil {
-			log.Printf("dest -> h2: %v", err)
+			log.Printf("FwdToDport (%s): dest -> h2: %v", sessionID, err)
 			return
 		}
 	}()
