@@ -51,12 +51,13 @@ func SSHClient(shell, port string) (err error) {
 			for {
 				time.Sleep(100 * time.Millisecond)
 				res, exists := CmdResults[cmd]
-				if !strings.Contains(res, "success") {
-					err = fmt.Errorf("Start sshd failed: %s", res)
-					return
-				}
 				if exists {
-					break
+					if strings.Contains(res, "success") {
+						break
+					} else {
+						err = fmt.Errorf("Start sshd failed: %s", res)
+						return
+					}
 				}
 			}
 		}
