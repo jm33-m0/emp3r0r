@@ -247,13 +247,13 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 		pf.Sh[string(origToken)] = &shCopy // cache this connection
 		// handshake success
 		if strings.HasSuffix(string(origToken), "-reverse") {
-			CliPrintInfo("Got a portFwd (reverse) connection (%s) from %s", string(origToken), req.RemoteAddr)
+			CliPrintDebug("Got a portFwd (reverse) connection (%s) from %s", string(origToken), req.RemoteAddr)
 			err = pf.RunReversedPortFwd(&shCopy) // handle this reverse port mapping request
 			if err != nil {
 				CliPrintError("RunReversedPortFwd: %v", err)
 			}
-			// } else {
-			// 	CliPrintInfo("Got a portFwd sub-connection (%s) from %s", string(origToken), req.RemoteAddr)
+		} else {
+			CliPrintDebug("Got a portFwd sub-connection (%s) from %s", string(origToken), req.RemoteAddr)
 		}
 	}
 
@@ -267,7 +267,7 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 		// keep the port-mapping, only close h2conn
 		if string(origToken) != sessionID.String() {
 			cancel()
-			CliPrintInfo("portFwdHandler: closed connection %s", origToken)
+			CliPrintDebug("portFwdHandler: closed connection %s", origToken)
 			return
 		}
 

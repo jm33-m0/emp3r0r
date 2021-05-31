@@ -174,7 +174,7 @@ func (pf *PortFwdSession) RunReversedPortFwd(sh *StreamHandler) (err error) {
 		_, _ = conn.Write([]byte("exit\n"))
 		conn.Close()
 		sh.H2x.Conn.Close()
-		CliPrintInfo("PortFwd conn handler (%s) finished", conn.RemoteAddr().String())
+		CliPrintDebug("PortFwd conn handler (%s) finished", conn.RemoteAddr().String())
 		sh.H2x.Cancel() // cancel this h2 connection
 	}
 
@@ -186,14 +186,14 @@ func (pf *PortFwdSession) RunReversedPortFwd(sh *StreamHandler) (err error) {
 	go func() {
 		_, err = io.Copy(sh.H2x.Conn, conn)
 		if err != nil {
-			CliPrintWarning("conn -> h2: %v", err)
+			CliPrintDebug("conn -> h2: %v", err)
 			return
 		}
 	}()
 	go func() {
 		_, err = io.Copy(conn, sh.H2x.Conn)
 		if err != nil {
-			CliPrintWarning("h2 -> conn: %v", err)
+			CliPrintDebug("h2 -> conn: %v", err)
 			return
 		}
 	}()
@@ -241,7 +241,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 			_, _ = conn.Write([]byte("exit"))
 			conn.Close()
 			sh.H2x.Conn.Close()
-			CliPrintInfo("PortFwd conn handler (%s) finished", conn.RemoteAddr().String())
+			CliPrintDebug("PortFwd conn handler (%s) finished", conn.RemoteAddr().String())
 			connCancel()
 		}
 
