@@ -14,9 +14,35 @@ linux post-exploitation framework made by linux user
 
 https://user-images.githubusercontent.com/10167884/120104002-eebade80-c184-11eb-820c-30fd3da9db41.mp4
 
-
-
 ----------
+
+## features
+
+* beautiful terminal UI
+* **perfect reverse shell** (true color, key bindings, custom bashrc, custom bash binary, etc)
+* auto **persistence** via various methods
+* **post-exploitation tools** like nmap, socat, are integreted with reverse shell
+* **credential harvesting**
+* process **injection**
+* **shellcode** injection and dropper
+* ELF **patcher**
+* **hide processes and files** via libc hijacking
+* port mapping, socks5 **proxy**
+* auto root
+* **LPE** suggest
+* system info collecting
+* file management
+* log cleaner
+* **stealth** connection
+* screenshot
+* anti-antivirus
+* internet access checker
+* **autoproxy** for semi-isolated networks
+* **reverse proxy** to bring every host online
+* all of these in one **HTTP2** connection
+* can be encapsulated in any external proxies such as **TOR**, and **CDNs**
+* interoperability with **metasploit / Cobalt Strike**
+* and many more...
 
 ## what to expect (in future releases)
 
