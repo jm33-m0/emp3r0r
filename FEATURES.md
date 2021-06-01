@@ -7,9 +7,7 @@ linux post-exploitation framework made by linux user
 
 <!-- vim-markdown-toc GFM -->
 
-* [why another post-exploitation tool?](#why-another-post-exploitation-tool)
 * [what does it do](#what-does-it-do)
-    * [glance](#glance)
     * [core features](#core-features)
         * [transports](#transports)
         * [auto proxy for agents without direct internet access](#auto-proxy-for-agents-without-direct-internet-access)
@@ -34,20 +32,6 @@ linux post-exploitation framework made by linux user
 * [thanks](#thanks)
 
 <!-- vim-markdown-toc -->
-
-## why another post-exploitation tool?
-
-why not? i dont see many post-exploitation frameworks for linux systems, even if there were, they are nothing like mine
-
-as a linux user, the most critical thing for remote administration is **terminal**. if you hate the garbage reverse shell experience (sometimes it aint even a shell), take a look at emp3r0r, you will be impressed
-
-yes i just want to make a post-exploitation tool for linux users like me, who want better experience in their hacking
-
-another reason is compatibility. as emp3r0r is mostly written in [Go](https://golang.org), and fully static (so are all the plugins used by emp3r0r), it will run everywhere (tested on Linux 2.6 and above) you want, regardless of the shitty environments. in some cases you wont even find bash on your target, dont worry, emp3r0r uploads its own [bash](https://github.com/jm33-m0/static-bins/tree/main/vaccine) and many other useful tools
-
-why is it called `emp3r0r`? because theres an [empire](https://github.com/BC-SECURITY/empire)
-
-i hope this tool helps you, and i will add features to it as i learn new things
 
 ## what does it do
 
