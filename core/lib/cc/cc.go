@@ -20,7 +20,7 @@ import (
 var (
 	// DebugLevel what kind fof logs do we want to see
 	// 3 (DEBUG) -> 2 (INFO) -> 1 (WARN)
-	DebugLevel = 0
+	DebugLevel = 2
 
 	// IsAPIEnabled Indicate whether we are in headless mode
 	IsAPIEnabled = false
