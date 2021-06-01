@@ -258,9 +258,11 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 	}
 
 	defer func() {
-		err = sh.H2x.Conn.Close()
-		if err != nil {
-			CliPrintError("portFwdHandler failed to close connection: " + err.Error())
+		if sh.H2x.Conn != nil {
+			err = sh.H2x.Conn.Close()
+			if err != nil {
+				CliPrintError("portFwdHandler failed to close connection: " + err.Error())
+			}
 		}
 
 		// if this connection is just a sub-connection
