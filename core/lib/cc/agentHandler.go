@@ -66,12 +66,6 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 			}
 		}
 
-		// if cmd is `bash`, our shell is likey broken
-		if strings.HasPrefix(cmd, "bash") {
-			shellToken := strings.Split(cmd, " ")[1]
-			RShellStatus[shellToken] = fmt.Errorf("Reverse shell error: %v", out)
-		}
-
 		// screenshot command
 		if strings.HasPrefix(cmd, "screenshot") {
 			go func() {
@@ -117,8 +111,10 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 			}
 			table.AppendBulk(tdata)
 			table.Render()
-			CliMsg("Listing processes:\033[0m\n%s", tableString.String())
-			return
+			// CliMsg("Listing processes:\033[0m\n%s", tableString.String())
+			// return
+			out = tableString.String()
+			outLines = strings.Split(out, "\n")
 		}
 
 		// ls command
@@ -164,8 +160,10 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 			}
 			table.AppendBulk(tdata)
 			table.Render()
-			CliMsg("Listing current path:\033[0m\n%s", tableString.String())
-			return
+			// CliMsg("Listing current path:\033[0m\n%s", tableString.String())
+			// return
+			out = tableString.String()
+			outLines = strings.Split(out, "\n")
 		}
 
 		// optimize output
