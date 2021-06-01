@@ -198,7 +198,7 @@ func CliPrintDebug(format string, a ...interface{}) {
 		if IsAPIEnabled {
 			// send to socket
 			var resp APIResponse
-			msg := GetDateTime() + " INFO: " + fmt.Sprintf(format, a...)
+			msg := GetDateTime() + " DEBUG: " + fmt.Sprintf(format, a...)
 			resp.MsgData = []byte(msg)
 			resp.Alert = false
 			resp.MsgType = LOG
@@ -215,7 +215,7 @@ func CliPrintDebug(format string, a ...interface{}) {
 	}
 }
 
-// CliPrintInfo print log in blue
+// CliPrintInfo print log in hiblue
 func CliPrintInfo(format string, a ...interface{}) {
 	if DebugLevel >= 2 {
 		log.Println(color.HiBlueString(format, a...))
@@ -235,6 +235,28 @@ func CliPrintInfo(format string, a ...interface{}) {
 			if err != nil {
 				log.Printf("CliPrintInfo: %v", err)
 			}
+		}
+	}
+}
+
+// CliMsg print log in cyan, regardless of debug level
+func CliMsg(format string, a ...interface{}) {
+	log.Println(color.CyanString(format, a...))
+	if IsAPIEnabled {
+		// send to socket
+		var resp APIResponse
+		msg := GetDateTime() + " MSG: " + fmt.Sprintf(format, a...)
+		resp.MsgData = []byte(msg)
+		resp.Alert = false
+		resp.MsgType = LOG
+		data, err := json.Marshal(resp)
+		if err != nil {
+			log.Printf("CliPrintInfo: %v", err)
+			return
+		}
+		_, err = APIConn.Write([]byte(data))
+		if err != nil {
+			log.Printf("CliPrintInfo: %v", err)
 		}
 	}
 }

@@ -1,7 +1,6 @@
 package cc
 
 import (
-	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 )
 
@@ -29,7 +28,7 @@ func moduleLPE() {
 	}
 
 	// exec
-	CliPrintInfo("This can take some time, please be patient")
+	CliMsg("This can take some time, please be patient")
 	cmd := "!" + helperName
 	CliPrintInfo("Running " + cmd)
 	err = SendCmd(cmd, target)
@@ -44,5 +43,5 @@ func moduleGetRoot() {
 		CliPrintError("SendCmd: %v", err)
 		return
 	}
-	color.HiMagenta("Please wait for agent's response...")
+	CliPrintInfo("Please wait for agent's response...")
 }

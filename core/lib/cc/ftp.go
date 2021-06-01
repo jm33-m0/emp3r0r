@@ -51,7 +51,7 @@ func PutFile(lpath, rpath string, a *emp3r0r_data.SystemInfo) error {
 	// file size
 	size := util.FileSize(lpath)
 	sizemB := float32(size) / 1024 / 1024
-	CliPrintInfo("\nPutFile:\nUploading '%s' to\n'%s' "+
+	CliMsg("\nPutFile:\nUploading '%s' to\n'%s' "+
 		"on %s, agent [%d]\n"+
 		"size: %d bytes (%.2fMB)\n"+
 		"sha256sum: %s",
@@ -108,7 +108,7 @@ func GetFile(filepath string, a *emp3r0r_data.SystemInfo) error {
 	if err != nil {
 		return fmt.Errorf("GetFile: %s allocate file: %v", filepath, err)
 	}
-	CliPrintInfo("We will be downloading %s, %d bytes in total (%s)", filepath, filesize, fileinfo.Checksum)
+	CliMsg("We will be downloading %s, %d bytes in total (%s)", filepath, filesize, fileinfo.Checksum)
 
 	// what if we have downloaded part of the file
 	var offset int64 = 0

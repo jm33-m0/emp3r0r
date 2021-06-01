@@ -117,7 +117,7 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 			}
 			table.AppendBulk(tdata)
 			table.Render()
-			CliPrintInfo("Listing processes:\033[0m\n%s", tableString.String())
+			CliMsg("Listing processes:\033[0m\n%s", tableString.String())
 			return
 		}
 
@@ -164,7 +164,7 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 			}
 			table.AppendBulk(tdata)
 			table.Render()
-			CliPrintInfo("Listing current path:\033[0m\n%s", tableString.String())
+			CliMsg("Listing current path:\033[0m\n%s", tableString.String())
 			return
 		}
 
