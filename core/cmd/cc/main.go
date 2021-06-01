@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/cc"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
@@ -53,8 +54,37 @@ func readJSONConfig(filename string) (err error) {
 	return
 }
 
+// cleanup temp files
+func cleanup() bool {
+	// is cc currently running?
+	if tun.IsPortOpen("127.0.0.1", emp3r0r_data.CCPort) {
+		return false
+	}
+
+	// unlock downloads
+	files, err := ioutil.ReadDir(cc.FileGetDir)
+	if err != nil {
+		return true
+	}
+	for _, f := range files {
+		if strings.HasSuffix(f.Name(), ".lock") {
+			err = os.Remove(f.Name())
+			if err != nil {
+				log.Fatalf("Remove %s: %v", f.Name(), err)
+			}
+		}
+	}
+
+	return true
+}
+
 func main() {
 	go cc.TLSServer()
+
+	// cleanup or abort
+	if !cleanup() {
+		log.Fatal("CC is already running")
+	}
 
 	cdnproxy := flag.String("cdn2proxy", "", "Start cdn2proxy server on this port")
 	config := flag.String("config", "build.json", "Use this config file to update hardcoded variables")
