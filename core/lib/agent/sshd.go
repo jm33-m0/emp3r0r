@@ -30,6 +30,7 @@ func SSHD(shell, port string) (err error) {
 
 	ssh.Handle(func(s ssh.Session) {
 		cmd := exec.Command(exe)
+		cmd.Env = append(cmd.Env, os.Environ()...)
 		ptyReq, winCh, isPTY := s.Pty()
 		if isPTY {
 			log.Printf("Got an SSH PTY request: %s", ptyReq.Term)
