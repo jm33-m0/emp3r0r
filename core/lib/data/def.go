@@ -35,6 +35,12 @@ var (
 	// AgentProxy used by this agent to communicate with CC server
 	AgentProxy = ""
 
+	// DoHServer DNS over HTTPS server for global name resolving
+	DoHServer = ""
+
+	// CDNProxy websocket address of the C2 behind CDN
+	CDNProxy = ""
+
 	// SocketName name of our unix socket
 	SocketName = AgentRoot + "/.s6Y4tDtahIuL"
 
