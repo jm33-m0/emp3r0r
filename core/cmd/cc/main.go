@@ -68,7 +68,7 @@ func cleanup() bool {
 	}
 	for _, f := range files {
 		if strings.HasSuffix(f.Name(), ".lock") {
-			err = os.Remove(f.Name())
+			err = os.Remove(cc.FileGetDir + f.Name())
 			if err != nil {
 				log.Fatalf("Remove %s: %v", f.Name(), err)
 			}
