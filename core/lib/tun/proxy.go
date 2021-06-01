@@ -13,7 +13,6 @@ import (
 )
 
 // StartSocks5Proxy sock5 proxy server on agent, listening on addr
-// to use it, forward port 10800 to CC
 func StartSocks5Proxy(addr string, proxyserver *socks5.Server) (err error) {
 	if proxyserver == nil {
 		socks5.Debug = true

@@ -119,7 +119,7 @@ func CmdHandler(cmd string) (err error) {
 
 	case cmdSplit[0] == "debug":
 		if len(cmdSplit) < 2 {
-			CliPrintError("debug <-1, 0, 1>")
+			CliPrintError("debug [ 1, 2, 3 ]")
 			return
 		}
 		level, e := strconv.Atoi(cmdSplit[1])

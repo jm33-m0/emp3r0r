@@ -193,7 +193,7 @@ func SetDynamicPrompt() {
 
 // CliPrintDebug print log in blue
 func CliPrintDebug(format string, a ...interface{}) {
-	if DebugLevel < 0 {
+	if DebugLevel >= 3 {
 		log.Println(color.BlueString(format, a...))
 		if IsAPIEnabled {
 			// send to socket
@@ -217,7 +217,7 @@ func CliPrintDebug(format string, a ...interface{}) {
 
 // CliPrintInfo print log in blue
 func CliPrintInfo(format string, a ...interface{}) {
-	if DebugLevel >= 0 {
+	if DebugLevel >= 2 {
 		log.Println(color.HiBlueString(format, a...))
 		if IsAPIEnabled {
 			// send to socket
