@@ -17,11 +17,11 @@ require (
 	github.com/google/uuid v1.2.0
 	github.com/gorilla/mux v1.8.0
 	github.com/jaypipes/ghw v0.8.0
-	github.com/jm33-m0/go-cdn2proxy v1.0.1
+	github.com/jm33-m0/go-cdn2proxy v1.0.2-0.20210602084838-6df129e761d9
 	github.com/kbinani/screenshot v0.0.0-20210326165202-b96eb3309bb0
 	github.com/mholt/archiver v3.1.1+incompatible
 	github.com/mitchellh/go-ps v1.0.0
-	github.com/ncruces/go-dns v1.0.0
+	github.com/ncruces/go-dns v1.1.0
 	github.com/nwaples/rardecode v1.1.0 // indirect
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/otiai10/copy v1.6.0
