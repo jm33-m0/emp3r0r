@@ -2,7 +2,6 @@ package cc
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -356,7 +355,7 @@ func ListModules() {
 func Send2Agent(data *emp3r0r_data.MsgTunData, agent *emp3r0r_data.SystemInfo) (err error) {
 	ctrl := Targets[agent]
 	if ctrl == nil {
-		return errors.New("Send2Agent: Target is not connected")
+		return fmt.Errorf("Send2Agent (%s): Target is not connected", data.Payload)
 	}
 	out := json.NewEncoder(ctrl.Conn)
 

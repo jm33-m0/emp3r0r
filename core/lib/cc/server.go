@@ -242,7 +242,7 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 	if !isSubSession {
 		pf.Sh[sessionID.String()] = &shCopy // cache this connection
 		// handshake success
-		CliPrintSuccess("Got a portFwd connection (%s) from %s", sessionID.String(), req.RemoteAddr)
+		CliPrintDebug("Got a portFwd connection (%s) from %s", sessionID.String(), req.RemoteAddr)
 	} else {
 		pf.Sh[string(origToken)] = &shCopy // cache this connection
 		// handshake success
