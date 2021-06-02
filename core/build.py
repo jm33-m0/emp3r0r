@@ -106,8 +106,14 @@ class GoBuild:
             build_target = f"../../build/{self.target}-{self.UUID}"
         # cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH}''' + \
         # f''' go build -ldflags='-s -w -extldflags "-static"' -o ../../build/{self.target}'''
+
         cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0''' + \
             f''' go build -ldflags='-s -w' -o {build_target}'''
+        # garble
+        if shutil.which("garble"):
+            cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0 GOPRIVATE=''' + \
+                f''' garble -literals -tiny build -o {build_target} -ldflags="-v -buildmode=pie" -trimpath .'''
+
         os.system(cmd)
         log_warn("GO BUILD ends...")
 
