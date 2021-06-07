@@ -432,10 +432,14 @@ def main(target):
             clean()
         ccip = input(
             "CC server address (domain name or ip address, can be more than one, separate with space):\n> ").strip()
-        CACHED_CONF['ccip'] = ccip[0]
+        CACHED_CONF['ccip'] = ccip
+        if len(ccip.split()) > 1:
+            CACHED_CONF['ccip'] = ccip[0]
 
     if target == "cc":
-        cc_other = ' '.join(ccip[1:])
+        cc_other = ""
+        if len(ccip.split()) > 1:
+            cc_other = ' '.join(ccip[1:])
 
         gobuild = GoBuild(target="cc", cc_ip=ccip, cc_other_names=cc_other)
         gobuild.build()
