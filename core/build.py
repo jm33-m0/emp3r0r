@@ -58,6 +58,18 @@ class GoBuild:
             self.AgentRoot = f".{rand_str(random.randint(3, 9))}"
             CACHED_CONF['agent_root'] = self.AgentRoot
 
+        # DoH
+        if "doh_server" not in CACHED_CONF:
+            CACHED_CONF['doh_server'] = ""
+
+        # agent proxy
+        if "agent_proxy" not in CACHED_CONF:
+            CACHED_CONF['agent_proxy'] = ""
+
+        # cdn proxy
+        if "cdn_proxy" not in CACHED_CONF:
+            CACHED_CONF['cdn_proxy'] = ""
+
     def build(self):
         '''
         cd to cmd and run go build
