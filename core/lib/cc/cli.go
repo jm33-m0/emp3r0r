@@ -176,7 +176,7 @@ start:
 // SetDynamicPrompt set prompt with module and target info
 func SetDynamicPrompt() {
 	shortName := "local" // if no target is selected
-	if CurrentTarget != nil {
+	if CurrentTarget != nil && IsAgentExist(CurrentTarget) {
 		shortName = strings.Split(CurrentTarget.Tag, "-agent")[0]
 	}
 	if CurrentMod == "<blank>" {

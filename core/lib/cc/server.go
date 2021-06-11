@@ -405,6 +405,7 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 		for t, c := range Targets {
 			if c.Conn == conn {
 				delete(Targets, t)
+				SetDynamicPrompt()
 				CliPrintWarning("msgTunHandler: agent [%d]:%s disconnected\n", c.Index, t.Tag)
 				break
 			}
