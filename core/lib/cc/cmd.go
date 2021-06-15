@@ -2,6 +2,7 @@ package cc
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 
@@ -128,6 +129,9 @@ func CmdHandler(cmd string) (err error) {
 			return
 		}
 		DebugLevel = level
+		if DebugLevel > 2 {
+			log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Llongfile | log.Lmsgprefix)
+		}
 
 	case cmdSplit[0] == "delete_port_fwd":
 		if len(cmdSplit) < 2 {

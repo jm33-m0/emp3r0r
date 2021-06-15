@@ -285,9 +285,33 @@ func CliPrintWarning(format string, a ...interface{}) {
 	}
 }
 
+// CliAlert print log in blinking text
+func CliAlert(textColor color.Attribute, format string, a ...interface{}) {
+	alertColor := color.New(color.Bold, textColor, color.BlinkSlow)
+	log.Print(alertColor.Sprintf(format, a...))
+	if IsAPIEnabled {
+		// send to socket
+		var resp APIResponse
+		msg := GetDateTime() + " ALERT: " + fmt.Sprintf(format, a...)
+		resp.MsgData = []byte(msg)
+		resp.Alert = false
+		resp.MsgType = LOG
+		data, err := json.Marshal(resp)
+		if err != nil {
+			log.Printf("CliAlert: %v", err)
+			return
+		}
+		_, err = APIConn.Write([]byte(data))
+		if err != nil {
+			log.Printf("CliAlert: %v", err)
+		}
+	}
+}
+
 // CliPrintSuccess print log in green
 func CliPrintSuccess(format string, a ...interface{}) {
-	log.Println(color.HiGreenString(format, a...))
+	successColor := color.New(color.Bold, color.FgHiGreen)
+	log.Print(successColor.Sprintf(format, a...))
 	if IsAPIEnabled {
 		// send to socket
 		var resp APIResponse
@@ -309,7 +333,8 @@ func CliPrintSuccess(format string, a ...interface{}) {
 
 // CliPrintError print log in red
 func CliPrintError(format string, a ...interface{}) {
-	log.Println(color.HiRedString(format, a...))
+	errorColor := color.New(color.Bold, color.FgHiRed)
+	log.Print(errorColor.Sprintf(format, a...))
 	if IsAPIEnabled {
 		// send to socket
 		var resp APIResponse

@@ -384,7 +384,7 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 				shortname = l
 			}
 		}
-		CliPrintSuccess("\n[%d] Knock.. Knock...\n%s from %s, "+
+		CliAlert(color.FgHiGreen, "\n[%d] Knock.. Knock...\n%s from %s, "+
 			"running %s\n",
 			inx, shortname, fmt.Sprintf("%s - %s", target.IP, target.Transport),
 			strconv.Quote(target.OS))
@@ -406,7 +406,7 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 			if c.Conn == conn {
 				delete(Targets, t)
 				SetDynamicPrompt()
-				CliPrintWarning("msgTunHandler: agent [%d]:%s disconnected\n", c.Index, t.Tag)
+				CliAlert(color.FgHiYellow, "msgTunHandler: agent [%d]:%s disconnected\n", c.Index, t.Tag)
 				break
 			}
 		}
