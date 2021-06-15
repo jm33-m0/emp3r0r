@@ -385,7 +385,7 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 			}
 		}
 		CliAlert(color.FgHiGreen, "[%d] Knock.. Knock...", inx)
-		CliPrintSuccess("%s from %s, "+
+		CliMsg("%s from %s, "+
 			"running %s\n",
 			shortname, fmt.Sprintf("%s - %s", target.IP, target.Transport),
 			strconv.Quote(target.OS))
@@ -407,8 +407,8 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 			if c.Conn == conn {
 				delete(Targets, t)
 				SetDynamicPrompt()
-				CliAlert(color.FgHiYellow, "[%d] Heads up!", c.Index)
-				CliPrintWarning("[%d] agent %s disconnected\n", c.Index, strconv.Quote(t.Tag))
+				CliAlert(color.FgHiRed, "[%d] Agent dies", c.Index)
+				CliMsg("[%d] agent %s disconnected\n", c.Index, strconv.Quote(t.Tag))
 				break
 			}
 		}
