@@ -239,10 +239,10 @@ func CliPrintInfo(format string, a ...interface{}) {
 	}
 }
 
-// CliPrintWarning print log in yellow
+// CliPrintWarning print log in hiyellow
 func CliPrintWarning(format string, a ...interface{}) {
 	if DebugLevel >= 1 {
-		log.Println(color.YellowString(format, a...))
+		log.Println(color.HiYellowString(format, a...))
 		if IsAPIEnabled {
 			// send to socket
 			var resp APIResponse
