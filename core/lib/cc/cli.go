@@ -183,9 +183,9 @@ func SetDynamicPrompt() {
 		CurrentMod = "none" // if no module is selected
 	}
 	dynamicPrompt := fmt.Sprintf("%s @%s (%s) "+color.HiCyanString("> "),
-		color.HiCyanString(PromptName),
-		color.CyanString(shortName),
-		color.HiBlueString(CurrentMod),
+		color.New(color.Bold, color.FgHiCyan).Sprint(PromptName),
+		color.New(color.FgCyan, color.Underline).Sprint(shortName),
+		color.New(color.FgHiBlue).Sprint(CurrentMod),
 	)
 	EmpReadLine.Config.Prompt = dynamicPrompt
 	EmpReadLine.SetPrompt(dynamicPrompt)
@@ -204,12 +204,12 @@ func CliPrintDebug(format string, a ...interface{}) {
 			resp.MsgType = LOG
 			data, err := json.Marshal(resp)
 			if err != nil {
-				log.Printf("CliPrintInfo: %v", err)
+				log.Printf("CliPrintDebug: %v", err)
 				return
 			}
 			_, err = APIConn.Write([]byte(data))
 			if err != nil {
-				log.Printf("CliPrintInfo: %v", err)
+				log.Printf("CliPrintDebug: %v", err)
 			}
 		}
 	}
@@ -239,28 +239,6 @@ func CliPrintInfo(format string, a ...interface{}) {
 	}
 }
 
-// CliMsg print log in cyan, regardless of debug level
-func CliMsg(format string, a ...interface{}) {
-	log.Println(color.CyanString(format, a...))
-	if IsAPIEnabled {
-		// send to socket
-		var resp APIResponse
-		msg := GetDateTime() + " MSG: " + fmt.Sprintf(format, a...)
-		resp.MsgData = []byte(msg)
-		resp.Alert = false
-		resp.MsgType = LOG
-		data, err := json.Marshal(resp)
-		if err != nil {
-			log.Printf("CliPrintInfo: %v", err)
-			return
-		}
-		_, err = APIConn.Write([]byte(data))
-		if err != nil {
-			log.Printf("CliPrintInfo: %v", err)
-		}
-	}
-}
-
 // CliPrintWarning print log in yellow
 func CliPrintWarning(format string, a ...interface{}) {
 	if DebugLevel >= 1 {
@@ -281,6 +259,28 @@ func CliPrintWarning(format string, a ...interface{}) {
 			if err != nil {
 				log.Printf("CliPrintWarning: %v", err)
 			}
+		}
+	}
+}
+
+// CliMsg print log in cyan, regardless of debug level
+func CliMsg(format string, a ...interface{}) {
+	log.Println(color.CyanString(format, a...))
+	if IsAPIEnabled {
+		// send to socket
+		var resp APIResponse
+		msg := GetDateTime() + " MSG: " + fmt.Sprintf(format, a...)
+		resp.MsgData = []byte(msg)
+		resp.Alert = false
+		resp.MsgType = LOG
+		data, err := json.Marshal(resp)
+		if err != nil {
+			log.Printf("CliMsg: %v", err)
+			return
+		}
+		_, err = APIConn.Write([]byte(data))
+		if err != nil {
+			log.Printf("CliMsg: %v", err)
 		}
 	}
 }
