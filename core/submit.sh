@@ -24,7 +24,7 @@ yes_no "[?] Add new tag" && (
     echo -n "v$tag" >.version
     git commit .version -S -m "bump version to $tag"
     git add .version
-    git tag "v$tag" -S -a -m "v$tag"
+    git tag "v$tag" -a -m "v$tag"
 )
 
 git push
