@@ -1,6 +1,6 @@
 module github.com/jm33-m0/emp3r0r/core
 
-go 1.13
+go 1.16
 
 require (
 	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
@@ -8,9 +8,9 @@ require (
 	github.com/cavaliercoder/grab v2.0.0+incompatible
 	github.com/chzyer/logex v1.1.10 // indirect
 	github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1 // indirect
-	github.com/creack/pty v1.1.12
+	github.com/creack/pty v1.1.13
 	github.com/dsnet/compress v0.0.1 // indirect
-	github.com/fatih/color v1.11.0
+	github.com/fatih/color v1.12.0
 	github.com/frankban/quicktest v1.13.0 // indirect
 	github.com/gliderlabs/ssh v0.3.2
 	github.com/golang/snappy v0.0.3 // indirect
@@ -26,16 +26,16 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/otiai10/copy v1.6.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
-	github.com/pierrec/lz4 v2.6.0+incompatible // indirect
+	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/posener/h2conn v0.0.0-20180911140238-13e7df33ed15
-	github.com/shirou/gopsutil/v3 v3.21.4
-	github.com/txthinking/runnergroup v0.0.0-20210326110939-37fc67d0da7c // indirect
-	github.com/txthinking/socks5 v0.0.0-20210326104807-61b5745ff346
+	github.com/shirou/gopsutil/v3 v3.21.5
+	github.com/txthinking/runnergroup v0.0.0-20210608031112-152c7c4432bf // indirect
+	github.com/txthinking/socks5 v0.0.0-20210608030952-444f74aaf176
 	github.com/txthinking/x v0.0.0-20210326105829-476fab902fbe // indirect
 	github.com/ulikunitz/xz v0.5.10 // indirect
 	github.com/vishvananda/netlink v1.1.0
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
-	github.com/zcalusic/sysinfo v0.0.0-20210226105846-b810d137e525
+	github.com/zcalusic/sysinfo v0.0.0-20210609180555-aff387a52b3a
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
-	golang.org/x/net v0.0.0-20210510120150-4163338589ed
+	golang.org/x/net v0.0.0-20210614182718-04defd469f4e
 )
