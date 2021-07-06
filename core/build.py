@@ -128,6 +128,9 @@ class GoBuild:
         # cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH}''' + \
         # f''' go build -ldflags='-s -w -extldflags "-static"' -o ../../build/{self.target}'''
 
+        # go mod
+        os.system('go mod tidy')
+
         cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0''' + \
             f""" go build -o {build_target} -ldflags='-s -w -buildmode=pie' -trimpath"""
         # # garble
