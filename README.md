@@ -29,7 +29,11 @@ https://user-images.githubusercontent.com/10167884/122037656-5d479f80-ce07-11eb-
 
 why not? i dont see many post-exploitation frameworks for linux systems, even if there were, they are nothing like mine
 
-as a linux user, the most critical thing for remote administration is **terminal**. if you hate the garbage reverse shell experience (sometimes it aint even a shell), take a look at emp3r0r, you will be impressed
+first and foremost, user experience. please, just forget the "reverse shell cheatsheet", no one do that in real-world hacking
+
+nobody likes the garbage reverse shell. what emp3r0r does is to simply use your `ssh` for the whole shell thing, you will be impressed
+
+support for [mosh](https://mosh.org/) is also planned, with which you wont be annoyed by input lag anymore, and the connection will be much more stable than ssh (its called mobile ssh for a reason)
 
 yes i just want to make a post-exploitation tool for linux users like me, who want better experience in their hacking
 
