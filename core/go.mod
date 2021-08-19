@@ -38,4 +38,5 @@ require (
 	github.com/zcalusic/sysinfo v0.0.0-20210609180555-aff387a52b3a
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 )
