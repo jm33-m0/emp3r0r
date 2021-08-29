@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/user"
+	"strings"
 
 	"github.com/jaypipes/ghw"
 )
@@ -20,6 +21,20 @@ func GetMemSize() int {
 	}
 
 	return int(float32(memInfo.TotalUsableBytes) / 1024 / 1024)
+}
+
+func GetGPUInfo() (info string) {
+	gpuinfo, err := ghw.GPU()
+	if err != nil {
+		return "no_gpu"
+	}
+
+	for _, card := range gpuinfo.GraphicsCards {
+		info += card.String() + "\n"
+	}
+
+	info = strings.TrimSpace(info)
+	return
 }
 
 func GetCPUInfo() (info string) {
