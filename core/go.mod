@@ -35,7 +35,6 @@ require (
 	github.com/ulikunitz/xz v0.5.10 // indirect
 	github.com/vishvananda/netlink v1.1.0
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
-	github.com/zcalusic/sysinfo v0.0.0-20210609180555-aff387a52b3a
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect

@@ -16,7 +16,6 @@ import (
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/zcalusic/sysinfo"
 )
 
 // is the agent alive?
@@ -75,13 +74,10 @@ func Send2CC(data *emp3r0r_data.MsgTunData) error {
 
 // CollectSystemInfo build system info object
 func CollectSystemInfo() *emp3r0r_data.SystemInfo {
-	var (
-		si   sysinfo.SysInfo
-		info emp3r0r_data.SystemInfo
-	)
-	si.GetSysInfo() // read sysinfo
+	var info emp3r0r_data.SystemInfo
+	osinfo := GetOSInfo()
 
-	info.OS = fmt.Sprintf("%s %s", si.OS.Name, si.OS.Version)
+	info.OS = fmt.Sprintf("%s %s (%s)", osinfo.Name, osinfo.Version, osinfo.Architecture)
 	hostname, err := os.Hostname()
 	if err != nil {
 		log.Printf("Gethostname: %v", err)
@@ -90,7 +86,7 @@ func CollectSystemInfo() *emp3r0r_data.SystemInfo {
 	emp3r0r_data.AgentTag = util.GetHostID(emp3r0r_data.AgentUUID)
 	info.Tag = emp3r0r_data.AgentTag // use hostid
 	info.Hostname = hostname
-	info.Kernel = si.Kernel.Release
+	info.Kernel = util.GetKernelVersion()
 	info.Arch = runtime.GOARCH
 	info.CPU = util.GetCPUInfo()
 	info.Mem = fmt.Sprintf("%d MB", util.GetMemSize())
