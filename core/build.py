@@ -615,6 +615,9 @@ def gen_guardian_shellcode(path):
     '''
     ../shellcode/gen.py
     '''
+
+    if not shutil.which("nasm"):
+        log_error("nasm not found")
     try:
         pwd = os.getcwd()
         os.chdir("../shellcode")
@@ -623,7 +626,7 @@ def gen_guardian_shellcode(path):
 
         shellcode = out.decode('utf-8')
 
-        if "Failed" in shellcode:
+        if "\\x48" not in shellcode:
             log_error("Failed to generate shellcode: "+out)
 
             return "N/A"
