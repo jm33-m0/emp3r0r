@@ -3,8 +3,7 @@ linux post-exploitation framework made by linux user
 
 **Still under active development**
 
-- [features](./FEATURES.md)
-- [中文介绍](https://www.freebuf.com/sectool/259079.html)
+- [screenshots](./FEATURES.md)
 - [check my blog for updates](https://jm33.me)
 - [how to use](https://github.com/jm33-m0/emp3r0r/wiki)
 
@@ -14,13 +13,11 @@ emp3r0r was initially developed as one of my weaponizing experiments, i tried to
 
 what makes emp3r0r different? well, first of all, its the first C2 framework that targets Linux platform, and you can use basically any other tools through it. if you need more reasons to try it out, check [features](#features)
 
-the name *emp3r0r* comes from [empire](https://github.com/BC-SECURITY/Empire/) project 
+the name *emp3r0r* comes from [empire](https://github.com/BC-SECURITY/Empire/) project
 
 https://user-images.githubusercontent.com/10167884/122037656-5d479f80-ce07-11eb-96af-4b4d2c06c61b.mp4
 
 ----------
-
-## features
 
 * beautiful terminal UI, use tmux for window management
 * multi-tasking, you don't need to wait for any commands to finish
