@@ -11,7 +11,7 @@ linux post-exploitation framework made by linux user
 
 emp3r0r was initially developed as one of my weaponizing experiments, i tried to implement common Linux adversary techniques and some of my own ideas, it was a learning process for me
 
-what makes emp3r0r different? well, first of all, its the first C2 framework that targets Linux platform, and you can use basically any other tools through it. if you need more reasons to try it out, check [features](#features)
+what makes emp3r0r different? well, first of all, its the first C2 framework that targets Linux platform, and you can use basically any other tools through it. if you need more reasons to try it out, check [features](./FEATURES.md)
 
 the name *emp3r0r* comes from [empire](https://github.com/BC-SECURITY/Empire/) project
 
