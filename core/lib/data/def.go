@@ -192,6 +192,7 @@ type SystemInfo struct {
 	Hardware    string        `json:"Hardware"`    // machine details and hypervisor
 	Container   string        `json:"Container"`   // container tech (if any)
 	CPU         string        `json:"CPU"`         // CPU info
+	GPU         string        `json:"GPU"`         // GPU info
 	Mem         string        `json:"Mem"`         // memory size
 	OS          string        `json:"OS"`          // OS name and version
 	Kernel      string        `json:"Kernel"`      // kernel release

@@ -134,10 +134,11 @@ class GoBuild:
 
         cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0''' + \
             f""" go build -o {build_target} -ldflags='-s -w -buildmode=pie' -trimpath"""
-        # # garble
-        # if shutil.which("garble") and self.target != "cc":
-        #     cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0 GOPRIVATE=''' + \
-        #         f''' garble -literals -tiny build -o {build_target} -ldflags="-v -buildmode=pie" -trimpath .'''
+        # garble
+
+        if shutil.which("garble") and self.target != "cc":
+            cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0 GOPRIVATE=''' + \
+                f''' garble -literals -tiny build -o {build_target} -ldflags="-v -buildmode=pie" -trimpath .'''
 
         os.system(cmd)
         log_warn("GO BUILD ends...")
@@ -148,10 +149,7 @@ class GoBuild:
         targetFile = f"./build/{build_target.split('/')[-1]}"
 
         if os.path.exists(targetFile):
-            if not targetFile.endswith("/cc"):
-                os.system(f"upx -9 {targetFile}")
-            else:
-                log_warn(f"{targetFile} generated")
+            log_warn(f"{targetFile} generated")
         else:
             log_error("go build failed")
             sys.exit(1)
@@ -532,6 +530,9 @@ def gen_guardian_shellcode(path):
     '''
     ../shellcode/gen.py
     '''
+
+    if not shutil.which("nasm"):
+        log_error("nasm not found")
     try:
         pwd = os.getcwd()
         os.chdir("../shellcode")
@@ -540,7 +541,7 @@ def gen_guardian_shellcode(path):
 
         shellcode = out.decode('utf-8')
 
-        if "Failed" in shellcode:
+        if "\\x48" not in shellcode:
             log_error("Failed to generate shellcode: "+out)
 
             return "N/A"

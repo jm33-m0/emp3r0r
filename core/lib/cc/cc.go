@@ -189,6 +189,7 @@ func GetTargetDetails(target *emp3r0r_data.SystemInfo) {
 		userInfo = color.HiGreenString(target.User)
 	}
 	cpuinfo := color.HiMagentaString(target.CPU)
+	gpuinfo := color.HiMagentaString(target.GPU)
 
 	// agent process info
 	agentProc := *target.Process
@@ -202,6 +203,7 @@ func GetTargetDetails(target *emp3r0r_data.SystemInfo) {
 		"User":      userInfo,
 		"Internet":  hasInternet,
 		"CPU":       cpuinfo,
+		"GPU":       gpuinfo,
 		"MEM":       target.Mem,
 		"Hardware":  color.HiCyanString(target.Hardware),
 		"Container": target.Container,
