@@ -452,9 +452,14 @@ def main(target):
         CACHED_CONF['doh_server'] = doh
 
     # guardian shellcode
-    path = f"/tmp/{tempfile._get_candidate_names()}"
+    path = f"/tmp/{next(tempfile._get_candidate_names())}"
     CACHED_CONF['guardian_shellcode'] = gen_guardian_shellcode(path)
     CACHED_CONF['guardian_agent_path'] = path
+
+    # option to disable autoproxy and broadcasting
+
+    if not yes_no("Use autoproxy (will enable UDP broadcasting)"):
+        CACHED_CONF['broadcast_interval_max'] = 0
 
     gobuild = GoBuild(target="agent", cc_indicator=indicator, cc_ip=ccip)
     gobuild.build()
