@@ -154,6 +154,15 @@ class GoBuild:
             log_error("go build failed")
             sys.exit(1)
 
+        # pack agent binary with packer
+        shutil.copy(targetFile, "../packer/agent")
+        os.chdir("../packer")
+        os.system("bash ./build.sh")
+        os.system("./cryptor.exe")
+        shutil.move("agent.packed.exe", f"../core/{targetFile}")
+        os.chdir("../core")
+        log_warn(f"{targetFile} packed")
+
     def gen_certs(self):
         '''
         generate server cert/key, and CA if necessary
