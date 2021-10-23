@@ -29,6 +29,7 @@ https://user-images.githubusercontent.com/10167884/122037656-5d479f80-ce07-11eb-
 * process **injection**
 * **shellcode** injection and dropper
 * ELF **patcher**
+* **packer** that encrypts and compresses agent binary, and runs agent in a covert way
 * **hide processes and files** via libc hijacking
 * **port mapping**, from c2 side to agent side, and vice versa
 * agent side socks5 **proxy**
