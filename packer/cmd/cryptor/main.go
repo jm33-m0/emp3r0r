@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -9,6 +10,7 @@ import (
 	"os/exec"
 
 	"github.com/jm33-m0/emp3r0r/packer/internal/utils"
+	"github.com/mholt/archiver"
 )
 
 func main() {
@@ -20,10 +22,27 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	origSize := float32(len(elfBytes))
+	log.Printf("ELF size: %d bytes", int(origSize))
+	var compressedBytes []byte
+
+	// compress
+	gz := &archiver.Gz{CompressionLevel: 9}
+	r, err := os.Open(*inputELF)
+	if err != nil {
+		log.Fatal(err)
+	}
+	bufCompress := bytes.NewBuffer(compressedBytes)
+	err = gz.Compress(r, bufCompress)
+	if err != nil {
+		log.Fatal(err)
+	}
+	newSize := float32(bufCompress.Len())
+	log.Printf("ELF compressed: %d bytes (%.2f%%)", int(newSize), newSize/origSize)
 
 	// encrypt
 	key := utils.GenAESKey(utils.Key)
-	encELFBytes := utils.AESEncrypt(key, elfBytes)
+	encELFBytes := utils.AESEncrypt(key, bufCompress.Bytes())
 	if encELFBytes == nil {
 		log.Fatalf("failed to encrypt %s", *inputELF)
 	}
