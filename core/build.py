@@ -58,7 +58,7 @@ class GoBuild:
         if "agent_root" in CACHED_CONF:
             self.AgentRoot = CACHED_CONF['agent_root']
         else:
-            self.AgentRoot = f".{rand_str(random.randint(3, 9))}"
+            self.AgentRoot = f"/tmp/Temp-{uuid.uuid4()}"
             CACHED_CONF['agent_root'] = self.AgentRoot
 
         # DoH
@@ -401,7 +401,8 @@ def main(target):
         use_cached = yes_no(f"Use cached CC indicator ({indicator})?")
 
     if not use_cached:
-        indicator = input("CC status indicator URL (leave empty to disable): ").strip()
+        indicator = input(
+            "CC status indicator URL (leave empty to disable): ").strip()
         CACHED_CONF['cc_indicator'] = indicator
 
     if CACHED_CONF['cc_indicator'] != "":
@@ -413,7 +414,8 @@ def main(target):
                 f"Use cached CC indicator text ({CACHED_CONF['indicator_text']})?")
 
         if not use_cached:
-            indicator_text = input("CC status indicator text (leave empty to disable): ").strip()
+            indicator_text = input(
+                "CC status indicator text (leave empty to disable): ").strip()
             CACHED_CONF['indicator_text'] = indicator_text
 
     # Agent proxy
@@ -424,7 +426,8 @@ def main(target):
             f"Use cached agent proxy ({CACHED_CONF['agent_proxy']})?")
 
     if not use_cached:
-        agentproxy = input("Proxy server for agent (leave empty to disable): ").strip()
+        agentproxy = input(
+            "Proxy server for agent (leave empty to disable): ").strip()
         CACHED_CONF['agent_proxy'] = agentproxy
 
     # CDN
