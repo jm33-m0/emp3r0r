@@ -161,6 +161,11 @@ class GoBuild:
         os.system("./cryptor.exe")
         shutil.move("agent.packed.exe", f"../core/{targetFile}")
         os.chdir("../core")
+        os.chmod(targetFile, 0o755)
+
+        if shutil.which("upx"):
+            os.system(f"upx -9 {targetFile}")
+
         log_warn(f"{targetFile} packed")
 
     def gen_certs(self):
