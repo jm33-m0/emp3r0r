@@ -57,7 +57,7 @@ var (
 	Version = "[version_string]"
 
 	// AgentRoot root directory
-	AgentRoot = ".agent"
+	AgentRoot = "[agent_root]"
 
 	// UtilsPath binary path of utilities
 	UtilsPath = AgentRoot + "/bin"
@@ -67,9 +67,6 @@ var (
 
 	// PIDFile stores agent PID
 	PIDFile = AgentRoot + "/.e.lock"
-
-	// SocketName name of our unix socket
-	// SocketName = AgentRoot + "/.s6Y4tDtahIuL"
 
 	// CCPort port of c2
 	CCPort = "[cc_port]"
