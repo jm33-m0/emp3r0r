@@ -1,5 +1,6 @@
 #!/bin/bash
 
+go mod tidy
 (
     cd ./cmd/cryptor/ || exit 1
     go build -o cryptor.exe &&
