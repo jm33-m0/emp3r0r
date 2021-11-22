@@ -5,24 +5,33 @@ if ! command -v tmux >/dev/null 2>&1; then
     exit 1
 fi
 
+tmux_conf="$PWD/tmux/.tmux.conf"
+[[ -f "$tmux_conf" ]] || {
+    echo "$tmux_conf" not found
+    exit 1
+}
+
 [[ -f ./build/cc ]] || (
     echo "[-] Building CC server as it's not found"
     python3 ./build.py cc
 )
 
 (
-    tmux source-file ./tmux/.tmux.conf
     cp -r ./tmux/sh /tmp
     cd build || {
         echo "./build doesn't exist"
         exit 1
     }
 
-    if [ -n "$TMUX" ]; then
-        tmux rename-session emp3r0r
+    [[ -n "$TMUX" ]] || {
+        tmux new-session -A -f "$tmux_conf" -s emp3r0r -n cc ./cc "$@"
+        exit
+    }
+
+    [[ -n "$TMUX" ]] && {
         tmux rename-window cc
+        tmux rename-session emp3r0r
+        tmux source-file "$tmux_conf"
         ./cc "$@"
-    else
-        tmux new-session -s emp3r0r ./cc "$@" || tmux attach -t emp3r0r
-    fi
+    }
 )
