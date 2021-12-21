@@ -38,7 +38,7 @@ func main() {
 		log.Fatal(err)
 	}
 	newSize := float32(bufCompress.Len())
-	log.Printf("ELF compressed: %d bytes (%.2f%%)", int(newSize), newSize/origSize)
+	log.Printf("ELF compressed: %d bytes (%.2f%%)", int(newSize), (newSize/origSize)*100)
 
 	// encrypt
 	key := utils.GenAESKey(utils.Key)
