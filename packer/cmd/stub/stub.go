@@ -108,6 +108,6 @@ func main() {
 	}
 
 	// write ELF to memory and run it
-	procName := fmt.Sprintf("[kworker/3:%s]", utils.RandStr(7))
+	procName := fmt.Sprintf("[kworker/%d:%s]", utils.RandInt(), utils.RandStr(7))
 	runFromMemory(procName, w.Bytes())
 }

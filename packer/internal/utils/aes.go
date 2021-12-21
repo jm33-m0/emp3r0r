@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	mathRand "math/rand"
+	"time"
 )
 
 const (
@@ -19,11 +20,17 @@ const (
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 func RandStr(n int) string {
+	mathRand.Seed(time.Now().Unix())
 	b := make([]rune, n)
 	for i := range b {
 		b[i] = letters[mathRand.Intn(len(letters))]
 	}
 	return string(b)
+}
+
+func RandInt() int {
+	mathRand.Seed(time.Now().Unix())
+	return mathRand.Intn(10)
 }
 
 // MD5Sum calc md5 of a string
