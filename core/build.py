@@ -165,8 +165,10 @@ class GoBuild:
             os.chdir("../core")
             os.chmod(targetFile, 0o755)
 
-            if shutil.which("upx"):
-                os.system(f"upx -9 {targetFile}")
+            # upx breaks existing compression in `packer`
+            # it's disabled until this issue is solved
+            # if shutil.which("upx"):
+            #     os.system(f"upx -9 {targetFile}")
 
             log_warn(f"{targetFile} packed")
 
