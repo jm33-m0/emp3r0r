@@ -47,11 +47,21 @@ class GoBuild:
         self.UUID = str(uuid.uuid1())
         self.VERSION = get_version()
 
+        # webroot
+
+        if 'webroot' in CACHED_CONF:
+            self.WebRoot = CACHED_CONF['webroot']
+        else:
+            self.WebRoot = str(uuid.uuid1())
+            CACHED_CONF['webroot'] = self.WebRoot
+
         # indicator text
-        self.INDICATOR_TEXT = "emp3r0r"
 
         if 'indicator_text' in CACHED_CONF:
             self.INDICATOR_TEXT = CACHED_CONF['indicator_text']
+        else:
+            self.INDICATOR_TEXT = "emp3r0r"
+            CACHED_CONF['indicator_text'] = self.INDICATOR_TEXT
 
         # agent root directory
 
@@ -98,7 +108,7 @@ class GoBuild:
         # cache version
         CACHED_CONF['version'] = self.VERSION
 
-        # write cache
+        # write cached configs
         json_file = open(BUILD_JSON, "w+")
         json.dump(CACHED_CONF, json_file, indent=4)
         json_file.close()
@@ -202,6 +212,7 @@ class GoBuild:
         # backup source file
         try:
             shutil.copy("./lib/tun/tls.go", "/tmp/tls.go")
+            shutil.copy("./lib/tun/api.go", "/tmp/api.go")
             shutil.copy("./lib/data/def.go", "/tmp/def.go")
         except BaseException:
             log_error(f"Failed to backup source files:\n{traceback.format_exc()}")
@@ -220,6 +231,9 @@ class GoBuild:
 
         # CA
         sed("./lib/tun/tls.go", "[emp3r0r_ca]", self.CA)
+
+        # webroot
+        sed("./lib/tun/api.go", 'WebRoot = "emp3r0r"', f'WebRoot = "{self.WebRoot}"')
 
         # CC IP
         sed("./lib/data/def.go",
@@ -291,6 +305,7 @@ class GoBuild:
         try:
             shutil.move("/tmp/def.go", "./lib/data/def.go")
             shutil.move("/tmp/tls.go", "./lib/tun/tls.go")
+            shutil.move("/tmp/api.go", "./lib/tun/api.go")
         except BaseException:
             log_error(traceback.format_exc())
 

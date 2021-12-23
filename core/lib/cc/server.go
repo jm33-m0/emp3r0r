@@ -342,7 +342,7 @@ func TLSServer() {
 	// File server
 	r.PathPrefix("/www/").Handler(http.StripPrefix("/www/", http.FileServer(http.Dir(WWWRoot))))
 	// handlers
-	r.HandleFunc("/emp3r0r/{api}/{token}", dispatcher)
+	r.HandleFunc(fmt.Sprintf("/%s/{api}/{token}", tun.WebRoot), dispatcher)
 
 	// use router
 	http.Handle("/", r)
