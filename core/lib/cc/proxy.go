@@ -31,7 +31,7 @@ type PortFwdSession struct {
 	Cancel context.CancelFunc        // PortFwd cancel
 }
 
-type mapping struct {
+type port_mapping struct {
 	Id          string `json:"id"`    // portfwd id
 	Agent       string `json:"agent"` // agent tag
 	Reverse     bool   `json:"reverse"`
@@ -39,13 +39,13 @@ type mapping struct {
 }
 
 func headlessListPortFwds() (err error) {
-	var mappings []mapping
+	var mappings []port_mapping
 	for id, portmap := range PortFwds {
 		if portmap.Sh == nil {
 			portmap.Cancel()
 			continue
 		}
-		var permapping mapping
+		var permapping port_mapping
 		permapping.Id = id
 		permapping.Description = portmap.Description
 		permapping.Agent = portmap.Agent.Tag

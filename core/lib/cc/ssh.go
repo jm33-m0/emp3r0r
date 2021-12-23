@@ -13,6 +13,9 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
+// shell - port mapping
+var shellPort = make(map[string][]string)
+
 // SSHClient ssh to sshd server, with shell access in a new tmux window
 func SSHClient(shell, port string) (err error) {
 	if !util.IsCommandExist("ssh") {
@@ -27,6 +30,16 @@ func SSHClient(shell, port string) (err error) {
 	for _, p := range PortFwds {
 		if p.Agent == CurrentTarget && p.To == to {
 			exists = true
+			for s, ports := range shellPort {
+				for _, p := range ports {
+					if port == p && s != shell {
+						new_port := strconv.Itoa(util.RandInt(2048, 65535))
+						CliPrintError("Port %s has %s shell on it, restarting with a different port %s", port, s, new_port)
+						SSHClient(shell, new_port)
+						return
+					}
+				}
+			}
 			lport = p.Lport // use the correct port
 			break
 		}
@@ -117,5 +130,8 @@ wait:
 	if label != "nolabel" && label != "-" {
 		name = label
 	}
-	return TmuxNewWindow(fmt.Sprintf("%s-%s", name, shell), sshCmd)
+
+	// remeber shell-port mapping
+	shellPort[shell] = append(shellPort[shell], port)
+	return TmuxNewWindow(fmt.Sprintf("%s-%s-%s", name, shell, port), sshCmd)
 }

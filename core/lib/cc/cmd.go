@@ -286,6 +286,12 @@ func CmdHelp(mod string) {
 			"keyword": "Delete all log entries containing this keyword",
 		}
 		CliPrettyPrint("Option", "Help", &help)
+	case emp3r0r_data.ModSHELL:
+		help = map[string]string{
+			"shell": "Shell program to run",
+			"port":  "The (sshd) port that our shell will be using",
+		}
+		CliPrettyPrint("Option", "Help", &help)
 	default:
 		for modname, modhelp := range emp3r0r_data.ModuleDocs {
 			if mod == modname {
