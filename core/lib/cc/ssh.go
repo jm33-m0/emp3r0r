@@ -34,7 +34,8 @@ func SSHClient(shell, port string) (err error) {
 				for _, p := range ports {
 					if port == p && s != shell {
 						new_port := strconv.Itoa(util.RandInt(2048, 65535))
-						CliPrintError("Port %s has %s shell on it, restarting with a different port %s", port, s, new_port)
+						CliPrintWarning("Port %s has %s shell on it, restarting with a different port %s", port, s, new_port)
+						SetOption([]string{"port", new_port})
 						SSHClient(shell, new_port)
 						return
 					}
