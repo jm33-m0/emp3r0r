@@ -48,6 +48,9 @@ func main() {
 		log.SetOutput(os.Stderr)
 	}
 
+	// PATH
+	os.Setenv("PATH", "/bin:/usr/bin:/usr/local/bin")
+
 	// mkdir -p
 	if !util.IsFileExist(emp3r0r_data.UtilsPath) {
 		err = os.MkdirAll(emp3r0r_data.UtilsPath, 0700)

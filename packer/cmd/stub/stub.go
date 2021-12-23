@@ -75,6 +75,7 @@ func runFromMemory(procName string, buffer []byte) {
 		log.Fatal(err)
 	}
 	cmd := exec.Command(procName, os.Args[1:]...)
+	cmd.Env = os.Environ()
 	err = cmd.Start()
 	if err != nil {
 		log.Fatal(err)
