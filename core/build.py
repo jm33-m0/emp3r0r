@@ -407,7 +407,7 @@ def main(target):
         CACHED_CONF['ccip'] = ccip
 
         if len(ccip.split()) > 1:
-            CACHED_CONF['ccip'] = ccip[0]
+            CACHED_CONF['ccip'] = ccip.split()[0]
 
     if target == "cc":
         cc_other = ""
