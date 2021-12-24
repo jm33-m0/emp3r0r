@@ -16,7 +16,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/jaypipes/ghw v0.8.0
-	github.com/jm33-m0/go-cdn2proxy v1.1.1
+	github.com/jm33-m0/go-cdn2proxy v1.1.2
 	github.com/kbinani/screenshot v0.0.0-20210720154843-7d3a670d8329
 	github.com/mholt/archiver v3.1.1+incompatible
 	github.com/mitchellh/go-ps v1.0.0

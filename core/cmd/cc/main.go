@@ -103,7 +103,7 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
-			err = cdn2proxy.StartServer(*cdnproxy, "127.0.0.1:"+emp3r0r_data.CCPort, logFile)
+			err = cdn2proxy.StartServer(*cdnproxy, "127.0.0.1:"+emp3r0r_data.CCPort, "ws", logFile)
 			if err != nil {
 				log.Fatal(err)
 			}
