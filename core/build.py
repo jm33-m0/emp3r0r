@@ -170,7 +170,7 @@ class GoBuild:
             shutil.copy(targetFile, "../packer/agent")
             os.chdir("../packer")
             os.system("bash ./build.sh")
-            os.system("./cryptor.exe")
+            os.system("CGO_ENABLED=0 ./cryptor.exe")
             shutil.move("agent.packed.exe", f"../core/{targetFile}")
             os.chdir("../core")
             os.chmod(targetFile, 0o755)
