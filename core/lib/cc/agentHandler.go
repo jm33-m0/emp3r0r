@@ -43,8 +43,18 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 	// cmd output from agent
 	case "cmd":
 		cmd := payloadSplit[1]
-		out := strings.Join(payloadSplit[2:], " ")
+		out := strings.Join(payloadSplit[2:len(payloadSplit)-1], " ")
 		outLines := strings.Split(out, "\n")
+
+		// time spent on this cmd
+		cmd_id := payloadSplit[len(payloadSplit)-1]
+		start_time, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", CmdTime[cmd+cmd_id])
+		if err != nil {
+			CliPrintWarning("Parsing timestamp %s: %v", CmdTime[cmd+cmd_id], err)
+		} else {
+			time_spent := time.Since(start_time)
+			CliPrintInfo("Command %s took %s", strconv.Quote(cmd), time_spent)
+		}
 
 		// headless mode
 		if IsAPIEnabled {

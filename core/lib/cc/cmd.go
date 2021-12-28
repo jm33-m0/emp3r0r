@@ -5,6 +5,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/fatih/color"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
@@ -66,6 +67,10 @@ var FileManagerHelpers = map[string]func(string){
 	"ps":    NoArgCmd,
 	"kill":  SingleArgCmd,
 }
+
+// CmdTime Record the time spent on each command
+var CmdTime = make(map[string]string)
+var CmdTimeMutex = &sync.Mutex{}
 
 const HELP = "help" // fuck goconst
 

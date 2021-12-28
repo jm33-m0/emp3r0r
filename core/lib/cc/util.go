@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -42,8 +43,18 @@ func SendCmd(cmd string, a *emp3r0r_data.SystemInfo) error {
 
 	var cmdData emp3r0r_data.MsgTunData
 
-	cmdData.Payload = fmt.Sprintf("cmd%s%s", emp3r0r_data.OpSep, cmd)
+	// add UUID to each command for tracking
+	cmd_id := uuid.New().String()
+	cmdData.Payload = fmt.Sprintf("cmd%s%s%s%s",
+		emp3r0r_data.OpSep, cmd,
+		emp3r0r_data.OpSep, cmd_id)
 	cmdData.Tag = a.Tag
+
+	// timestamp
+	cmdData.Time = time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST")
+	CmdTimeMutex.Lock()
+	CmdTime[cmd+cmd_id] = cmdData.Time
+	CmdTimeMutex.Unlock()
 
 	return Send2Agent(&cmdData, a)
 }

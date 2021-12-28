@@ -216,6 +216,7 @@ type AgentProcess struct {
 type MsgTunData struct {
 	Payload string `json:"payload"` // payload
 	Tag     string `json:"tag"`     // tag of the agent
+	Time    string `json:"time"`    // timestamp
 }
 
 // H2Conn add context to h2conn.Conn

