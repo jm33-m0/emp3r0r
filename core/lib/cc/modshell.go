@@ -67,6 +67,7 @@ func moduleShell() {
 	port := Options["port"].Val
 	if shell == "bash" {
 		port = emp3r0r_data.SSHDPort
+		SSHShellPort["bash"] = port
 	}
 
 	// run
