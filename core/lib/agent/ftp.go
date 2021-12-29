@@ -98,6 +98,7 @@ func DownloadViaCC(url, path string) (data []byte, err error) {
 }
 
 // sendFile2CC send file to CC, with buffering
+// using FTP API
 func sendFile2CC(filepath string, offset int64, token string) (checksum string, err error) {
 	log.Printf("Sending %s to CC, offset=%d", filepath, offset)
 	// open and read the target file

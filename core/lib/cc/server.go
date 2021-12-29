@@ -188,6 +188,11 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 			CliPrintError("ftpHandler failed to save file: %v", err)
 			return
 		}
+		// have we finished downloading?
+		targetFile := FileGetDir + util.FileBaseName(filename)
+		nowSize := util.FileSize(filewrite)
+		targetSize := util.FileSize(targetFile)
+		CliPrintInfo("Saved %.2f%% of %s", (float32(nowSize)/float32(targetSize))*100, filename)
 	}
 }
 
