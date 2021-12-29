@@ -1,12 +1,10 @@
 package cc
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -14,7 +12,6 @@ import (
 
 	"github.com/fatih/color"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
-	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/olekukonko/tablewriter"
 )
@@ -206,58 +203,6 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 		CmdResultsMutex.Lock()
 		CmdResults[cmd] = out
 		CmdResultsMutex.Unlock()
-
-	// save file from #get
-	case "FILE":
-		filepath := payloadSplit[1]
-
-		// we only need the filename
-		filename := util.FileBaseName(filepath)
-
-		b64filedata := payloadSplit[2]
-		filedata, err := base64.StdEncoding.DecodeString(b64filedata)
-		if err != nil {
-			CliPrintError("processAgentData failed to decode file data: %v", err)
-			return
-		}
-		filewrite := FileGetDir + filename + ".downloading" // we will write to this file
-		targetFile := FileGetDir + filename                 // will copy the downloaded file here
-		targetSize := util.FileSize(targetFile)             // check if we reach this size
-		f, err := os.OpenFile(filewrite, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-		if err != nil {
-			CliPrintError("processAgentData write file: %v", err)
-		}
-		defer f.Close()
-
-		// save to FileGetDir
-		if !util.IsFileExist(FileGetDir) {
-			err = os.MkdirAll(FileGetDir, 0700)
-			if err != nil {
-				CliPrintError("mkdir -p %s: %v", FileGetDir, err)
-				return
-			}
-		}
-		_, err = f.Write(filedata)
-		if err != nil {
-			CliPrintError("processAgentData failed to save file: %v", err)
-			return
-		}
-		downloadedSize := float32(len(filedata)) / 1024
-		sha256sumFile := tun.SHA256SumFile(filewrite)
-		sha256sumPart := tun.SHA256SumRaw(filedata)
-		CliPrintInfo("Downloaded %fKB (%s) to %s, sha256sum of downloaded file is %s", downloadedSize, sha256sumPart, filewrite, sha256sumFile)
-
-		// have we finished downloading?
-		nowSize := util.FileSize(filewrite)
-		if nowSize == targetSize {
-			err = os.Rename(filewrite, targetFile)
-			if err != nil {
-				CliPrintError("Failed to save downloaded file %s: %v", targetFile, err)
-			}
-			CliPrintSuccess("Downloaded %d bytes to %s", nowSize, targetFile)
-			return
-		}
-		CliPrintWarning("Incomplete download (%d of %d bytes), will continue if you run GET again", nowSize, targetSize)
 
 	default:
 	}
