@@ -175,9 +175,22 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 	targetFile := FileGetDir + util.FileBaseName(filename)
 	targetSize := util.FileSize(targetFile)
 	nowSize := util.FileSize(filewrite)
-	bar := progressbar.DefaultBytes(targetSize)
+	bar := progressbar.DefaultBytesSilent(targetSize)
 	bar.Add64(nowSize) // downloads are resumable
+	defer bar.Finish()
 	defer bar.Close()
+	defer bar.Clear()
+
+	go func() {
+		for state := bar.State(); state.CurrentPercent < 1; time.Sleep(time.Second) {
+			state = bar.State()
+			if state.CurrentPercent == 1 || state.SecondsLeft <= 0 {
+				break
+			}
+			CliPrintInfo("%.2f%% downloaded at %.2fKB/s, %.2fs passed, %.2fs left",
+				state.CurrentPercent*100, state.KBsPerSecond, state.SecondsSince, state.SecondsLeft)
+		}
+	}()
 
 	// read filedata
 	for sh.H2x.Ctx.Err() == nil {
