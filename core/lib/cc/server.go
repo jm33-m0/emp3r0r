@@ -152,9 +152,8 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 		}
 
 		// have we finished downloading?
-		targetFile := FileGetDir + util.FileBaseName(filename)
-		nowSize := util.FileSize(filewrite)
-		targetSize := util.FileSize(targetFile)
+		nowSize = util.FileSize(filewrite)
+		targetSize = util.FileSize(targetFile)
 		if nowSize == targetSize && nowSize >= 0 {
 			err = os.Rename(filewrite, targetFile)
 			if err != nil {

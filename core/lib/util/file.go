@@ -183,8 +183,7 @@ func FileAllocate(filepath string, n int64) (err error) {
 func FileSize(path string) (size int64) {
 	fi, err := os.Stat(path)
 	if err != nil {
-		log.Printf("FileSize %s: %v", path, err)
-		return -1
+		return 0
 	}
 	size = fi.Size()
 	return

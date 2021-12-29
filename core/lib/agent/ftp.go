@@ -125,6 +125,7 @@ func sendFile2CC(filepath string, offset int64, token string) (err error) {
 		return
 	}
 	defer cancel()
+	defer conn.Close()
 
 	// read
 	var (
