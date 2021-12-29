@@ -177,6 +177,7 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 	nowSize := util.FileSize(filewrite)
 	bar := progressbar.DefaultBytes(targetSize)
 	bar.Add64(nowSize) // downloads are resumable
+	defer bar.Close()
 
 	// read filedata
 	for sh.H2x.Ctx.Err() == nil {
@@ -197,7 +198,7 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 			return
 		}
 
-		// have we finished downloading?
+		// progress
 		bar.Add(sh.BufSize)
 	}
 }
