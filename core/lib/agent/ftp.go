@@ -99,7 +99,7 @@ func DownloadViaCC(url, path string) (data []byte, err error) {
 
 // sendFile2CC send file to CC, with buffering
 // using FTP API
-func sendFile2CC(filepath string, offset int64, token string) (checksum string, err error) {
+func sendFile2CC(filepath string, offset int64, token string) (err error) {
 	log.Printf("Sending %s to CC, offset=%d", filepath, offset)
 	// open and read the target file
 	f, err := os.Open(filepath)
@@ -128,7 +128,6 @@ func sendFile2CC(filepath string, offset int64, token string) (checksum string, 
 
 	// read
 	var (
-		// send = make(chan []byte, 1024*8)
 		buf []byte
 	)
 
@@ -153,15 +152,6 @@ func sendFile2CC(filepath string, offset int64, token string) (checksum string, 
 			return
 		}
 		log.Printf("Sending remaining %d bytes", len(buf))
-	}
-
-	// checksum
-	go func() {
-		checksum = tun.SHA256SumFile(filepath)
-	}()
-	log.Printf("Reading %s finished, calculating sha256sum", filepath)
-	for checksum == "" {
-		time.Sleep(100 * time.Millisecond)
 	}
 
 	return
