@@ -87,7 +87,6 @@ func GetFile(filepath string, a *emp3r0r_data.SystemInfo) error {
 		}
 	}
 	CliPrintInfo("Waiting for response from agent %s", a.Tag)
-	var data emp3r0r_data.MsgTunData
 	filename := FileGetDir + util.FileBaseName(filepath) // will copy the downloaded file here when we are done
 	tempname := filename + ".downloading"                // will be writing to this file
 	lock := filename + ".lock"                           // don't try to duplicate the task
@@ -132,9 +131,7 @@ func GetFile(filepath string, a *emp3r0r_data.SystemInfo) error {
 
 	// cmd
 	cmd := fmt.Sprintf("#get %s %d %s", filepath, offset, ftpSh.Token)
-	data.Payload = fmt.Sprintf("cmd%s%s", emp3r0r_data.OpSep, cmd)
-	data.Tag = a.Tag
-	err = Send2Agent(&data, a)
+	err = SendCmd(cmd, a)
 	if err != nil {
 		CliPrintError("GetFile send command: %v", err)
 		return err
