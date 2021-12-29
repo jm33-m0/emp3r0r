@@ -26,6 +26,7 @@ require (
 	github.com/otiai10/copy v1.7.0
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/posener/h2conn v0.0.0-20180911140238-13e7df33ed15
+	github.com/schollz/progressbar/v3 v3.8.5
 	github.com/shirou/gopsutil/v3 v3.21.11
 	github.com/txthinking/socks5 v0.0.0-20211121111206-e03c1217a50b
 	github.com/ulikunitz/xz v0.5.10 // indirect
