@@ -42,7 +42,7 @@ var (
 	CDNProxy = ""
 
 	// SocketName name of our unix socket
-	SocketName = AgentRoot + "/.s6Y4tDtahIuL"
+	SocketName = AgentRoot + "/.socket"
 
 	// HIDE_PIDS all the processes
 	HIDE_PIDS = []string{strconv.Itoa(os.Getpid())}
@@ -66,7 +66,7 @@ var (
 	Libemp3r0rFile = UtilsPath + "/libe.so"
 
 	// PIDFile stores agent PID
-	PIDFile = AgentRoot + "/.e.lock"
+	PIDFile = AgentRoot + "/.pid"
 
 	// CCPort port of c2
 	CCPort = "[cc_port]"

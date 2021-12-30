@@ -55,6 +55,22 @@ class GoBuild:
             self.WebRoot = str(uuid.uuid1())
             CACHED_CONF['webroot'] = self.WebRoot
 
+        # pid file name
+
+        if 'pid_file' in CACHED_CONF:
+            self.PIDFile = CACHED_CONF['pid_file']
+        else:
+            self.PIDFile = str(uuid.uuid1())
+            CACHED_CONF['pid_file'] = self.PIDFile
+
+        # socket name
+
+        if 'socket' in CACHED_CONF:
+            self.Socket = CACHED_CONF['socket']
+        else:
+            self.Socket = str(uuid.uuid1())
+            CACHED_CONF['socket'] = self.Socket
+
         # indicator text
 
         if 'indicator_text' in CACHED_CONF:
@@ -234,6 +250,16 @@ class GoBuild:
 
         # webroot
         sed("./lib/tun/api.go", 'WebRoot = "emp3r0r"', f'WebRoot = "{self.WebRoot}"')
+
+        # Socket name
+        sed("./lib/data/def.go",
+            '''SocketName = AgentRoot + "/.socket"''',
+            f'''SocketName = AgentRoot + "/{self.Socket}"''')
+
+        # PID file name
+        sed("./lib/data/def.go",
+            '''PIDFile = AgentRoot + "/.pid"''',
+            f'''PIDFile = AgentRoot + "/{self.PIDFile}"''')
 
         # CC IP
         sed("./lib/data/def.go",

