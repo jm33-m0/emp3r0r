@@ -68,29 +68,27 @@ func SSHClient(shell, port string) (err error) {
 	if !exists {
 		// start sshd server on target
 		cmd := fmt.Sprintf("!sshd %s %s %s", shell, port, uuid.NewString())
-		if shell != "bash" {
-			err = SendCmdToCurrentTarget(cmd)
-			if err != nil {
-				return
-			}
-			CliPrintInfo("Starting sshd (%s) on target %s", shell, strconv.Quote(CurrentTarget.Tag))
+		err = SendCmdToCurrentTarget(cmd)
+		if err != nil {
+			return
+		}
+		CliPrintInfo("Starting sshd (%s) on target %s", shell, strconv.Quote(CurrentTarget.Tag))
 
-			// wait until sshd is up
-			defer func() {
-				CmdResultsMutex.Lock()
-				delete(CmdResults, cmd)
-				CmdResultsMutex.Unlock()
-			}()
-			for {
-				time.Sleep(100 * time.Millisecond)
-				res, exists := CmdResults[cmd]
-				if exists {
-					if strings.Contains(res, "success") {
-						break
-					} else {
-						err = fmt.Errorf("Start sshd (%s) failed: %s", shell, res)
-						return
-					}
+		// wait until sshd is up
+		defer func() {
+			CmdResultsMutex.Lock()
+			delete(CmdResults, cmd)
+			CmdResultsMutex.Unlock()
+		}()
+		for {
+			time.Sleep(100 * time.Millisecond)
+			res, exists := CmdResults[cmd]
+			if exists {
+				if strings.Contains(res, "success") {
+					break
+				} else {
+					err = fmt.Errorf("Start sshd (%s) failed: %s", shell, res)
+					return
 				}
 			}
 		}

