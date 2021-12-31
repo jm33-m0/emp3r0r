@@ -29,7 +29,7 @@ func moduleLPE() {
 
 	// exec
 	CliMsg("This can take some time, please be patient")
-	cmd := "!" + helperName
+	cmd := "!lpe " + helperName
 	CliPrintInfo("Running " + cmd)
 	err = SendCmd(cmd, target)
 	if err != nil {
