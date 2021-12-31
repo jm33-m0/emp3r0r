@@ -36,9 +36,8 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 	}
 
 	switch op {
-
-	// cmd output from agent
 	case "cmd":
+		// cmd output from agent
 		cmd := payloadSplit[1]
 		out := strings.Join(payloadSplit[2:len(payloadSplit)-1], " ")
 		outLines := strings.Split(out, "\n")
@@ -203,7 +202,6 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 		CmdResultsMutex.Lock()
 		CmdResults[cmd] = out
 		CmdResultsMutex.Unlock()
-
 	default:
 	}
 }

