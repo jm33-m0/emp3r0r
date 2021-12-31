@@ -53,11 +53,13 @@ var (
 
 // SetOption set an option to value, `set` command
 func SetOption(args []string) {
+	opt := args[0]
 	if len(args) < 2 {
+		// clear value
+		Options[opt].Val = ""
 		return
 	}
 
-	opt := args[0]
 	val := args[1:] // in case val contains spaces
 
 	if _, exist := Options[opt]; !exist {

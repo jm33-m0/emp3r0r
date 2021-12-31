@@ -39,6 +39,8 @@ func SSHD(shell, port string, args []string) (err error) {
 			cmd = exec.Command(v_bash, "--rcfile", emp3r0r_data.UtilsPath+"/.bashrc")
 		}
 		cmd.Env = append(cmd.Env, os.Environ()...)
+		log.Printf("sshd execute: %s %v, env=%s", exe, args, cmd.Env)
+
 		ptyReq, winCh, isPTY := s.Pty()
 		if isPTY {
 			log.Printf("Got an SSH PTY request: %s", ptyReq.Term)

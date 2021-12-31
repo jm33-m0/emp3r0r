@@ -51,6 +51,7 @@ var CmdHelpers = map[string]func(){
 	"run":          ModuleRun,
 	"screenshot":   TakeScreenshot,
 	"gen_agent":    GenAgent,
+	"suicide":      Suicide,
 }
 
 // FileManagerHelpers manage agent files
@@ -115,11 +116,6 @@ func CmdHandler(cmd string) (err error) {
 		CliPrintError("No such module: %s", strconv.Quote(cmdSplit[1]))
 
 	case cmdSplit[0] == "set":
-		if len(cmdSplit) < 3 {
-			CliPrintError("set what? " + strconv.Quote(cmd))
-			return
-		}
-
 		// hand to SetOption helper
 		SetOption(cmdSplit[1:])
 

