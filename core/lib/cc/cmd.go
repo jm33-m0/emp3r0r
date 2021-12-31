@@ -294,6 +294,7 @@ func CmdHelp(mod string) {
 	case emp3r0r_data.ModSHELL:
 		help = map[string]string{
 			"shell": "Shell program to run",
+			"args":  "Command line args of the shell program",
 			"port":  "The (sshd) port that our shell will be using",
 		}
 		CliPrettyPrint("Option", "Help", &help)

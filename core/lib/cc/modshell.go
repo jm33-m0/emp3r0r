@@ -64,6 +64,7 @@ func moduleShell() {
 
 	// options
 	shell := Options["shell"].Val
+	args := Options["args"].Val
 	port := Options["port"].Val
 	if shell == "bash" {
 		port = emp3r0r_data.SSHDPort
@@ -71,7 +72,7 @@ func moduleShell() {
 	}
 
 	// run
-	err := SSHClient(shell, port)
+	err := SSHClient(shell, args, port)
 	if err != nil {
 		CliPrintError("moduleShell: %v", err)
 	}

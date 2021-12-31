@@ -109,6 +109,9 @@ func UpdateOptions(modName string) (exist bool) {
 			"cmd.exe", "powershell.exe",
 		}
 		shellOpt.Val = "bash"
+
+		argsOpt := addIfNotFound("args")
+		argsOpt.Val = ""
 		portOpt := addIfNotFound("port")
 		portOpt.Vals = []string{
 			emp3r0r_data.SSHDPort, "22222",

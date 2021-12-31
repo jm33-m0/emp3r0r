@@ -21,7 +21,7 @@ var SSHShellPort = make(map[string]string)
 // SSHClient ssh to sshd server, with shell access in a new tmux window
 // shell: the executable to run, eg. bash, python
 // port: serve this shell on agent side 127.0.0.1:port
-func SSHClient(shell, port string) (err error) {
+func SSHClient(shell, args, port string) (err error) {
 	if !util.IsCommandExist("ssh") {
 		err = fmt.Errorf("ssh must be installed")
 		return
@@ -54,7 +54,7 @@ func SSHClient(shell, port string) (err error) {
 					new_port := strconv.Itoa(util.RandInt(2048, 65535))
 					CliPrintWarning("Port %s has %s shell on it, restarting with a different port %s", port, s, new_port)
 					SetOption([]string{"port", new_port})
-					SSHClient(shell, new_port)
+					SSHClient(shell, args, new_port)
 					return
 				}
 			}
