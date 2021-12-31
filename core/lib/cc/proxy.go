@@ -66,7 +66,7 @@ func DeletePortFwdSession(sessionID string) {
 	defer PortFwdsMutex.Unlock()
 	for id, session := range PortFwds {
 		if id == sessionID {
-			err := SendCmd("!delete_portfwd "+id, session.Agent)
+			err := SendCmd("!delete_portfwd "+id, "", session.Agent)
 			if err != nil {
 				CliPrintWarning("Tell agent %s to delete port mapping %s: %v", session.Agent.Tag, sessionID, err)
 			}
@@ -151,7 +151,7 @@ func (pf *PortFwdSession) InitReversedPortFwd() (err error) {
 
 	// tell agent to start this mapping
 	cmd := fmt.Sprintf("!port_fwd %s %s reverse", listenPort, fwdID)
-	err = SendCmd(cmd, CurrentTarget)
+	err = SendCmd(cmd, "", CurrentTarget)
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)
 		return
@@ -294,7 +294,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 	// send command to agent, with session ID
 	fwdID := uuid.New().String()
 	cmd := fmt.Sprintf("!port_fwd %s %s on", toAddr, fwdID)
-	err = SendCmd(cmd, CurrentTarget)
+	err = SendCmd(cmd, "", CurrentTarget)
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)
 		return
@@ -347,7 +347,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 			// sub-session (streamHandler) ID
 			shID := fmt.Sprintf("%s_%s", fwdID, srcPort)
 			cmd = fmt.Sprintf("!port_fwd %s %s on", toAddr, shID)
-			err = SendCmd(cmd, pf.Agent)
+			err = SendCmd(cmd, "", pf.Agent)
 			if err != nil {
 				CliPrintError("SendCmd: %v", err)
 				return

@@ -36,7 +36,7 @@ func DownloadFile(url, path string) (err error) {
 }
 
 // SendCmd send command to agent
-func SendCmd(cmd string, a *emp3r0r_data.SystemInfo) error {
+func SendCmd(cmd, cmd_id string, a *emp3r0r_data.SystemInfo) error {
 	if a == nil {
 		return errors.New("SendCmd: No such agent")
 	}
@@ -44,7 +44,9 @@ func SendCmd(cmd string, a *emp3r0r_data.SystemInfo) error {
 	var cmdData emp3r0r_data.MsgTunData
 
 	// add UUID to each command for tracking
-	cmd_id := uuid.New().String()
+	if cmd_id == "" {
+		cmd_id = uuid.New().String()
+	}
 	cmdData.Payload = fmt.Sprintf("cmd%s%s%s%s",
 		emp3r0r_data.OpSep, cmd,
 		emp3r0r_data.OpSep, cmd_id)
@@ -60,7 +62,7 @@ func SendCmd(cmd string, a *emp3r0r_data.SystemInfo) error {
 }
 
 // SendCmdToCurrentTarget send a command to currently selected agent
-func SendCmdToCurrentTarget(cmd string) error {
+func SendCmdToCurrentTarget(cmd, cmd_id string) error {
 	// target
 	target := SelectCurrentTarget()
 	if target == nil {
@@ -68,7 +70,7 @@ func SendCmdToCurrentTarget(cmd string) error {
 	}
 
 	// send cmd
-	return SendCmd(cmd, target)
+	return SendCmd(cmd, cmd_id, target)
 }
 
 // VimEdit launch local vim to edit files

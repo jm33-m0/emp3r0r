@@ -200,7 +200,7 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 		log.Printf("\n[%s] %s:\n%s\n\n", color.CyanString("%d", contrlIf.Index), color.HiMagentaString(cmd), color.HiWhiteString(out))
 		// cache this cmd response
 		CmdResultsMutex.Lock()
-		CmdResults[cmd] = out
+		CmdResults[cmd_id] = out
 		CmdResultsMutex.Unlock()
 	default:
 	}

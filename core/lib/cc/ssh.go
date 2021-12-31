@@ -67,24 +67,26 @@ func SSHClient(shell, args, port string) (err error) {
 
 	if !exists {
 		// start sshd server on target
-		cmd := fmt.Sprintf("!sshd %s %s %s %s", uuid.NewString(), shell, port, args)
-		err = SendCmdToCurrentTarget(cmd)
+		cmd_id := uuid.NewString()
+		cmd := fmt.Sprintf("!sshd %s %s %s", shell, port, args)
+		cmd = strings.TrimSpace(cmd) // in case there is no args, which gives us trailing whitespace
+		err = SendCmdToCurrentTarget(cmd, cmd_id)
 		if err != nil {
 			return
 		}
-		CliPrintInfo("Starting sshd (%s) on target %s", shell, strconv.Quote(CurrentTarget.Tag))
+		CliPrintInfo("Waiting for sshd (%s) on target %s", shell, strconv.Quote(CurrentTarget.Tag))
 
 		// wait until sshd is up
 		defer func() {
 			CmdResultsMutex.Lock()
-			delete(CmdResults, cmd)
+			delete(CmdResults, cmd_id)
 			CmdResultsMutex.Unlock()
 		}()
 		is_response := false
 		res := ""
 		for i := 0; i < 100; i++ {
 			time.Sleep(100 * time.Millisecond)
-			res, is_response = CmdResults[cmd]
+			res, is_response = CmdResults[cmd_id]
 			if is_response {
 				if strings.Contains(res, "success") {
 					break
@@ -144,7 +146,7 @@ wait:
 	}
 	sshCmd := fmt.Sprintf("%s -p %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 127.0.0.1",
 		sshPath, lport)
-	CliPrintSuccess("Opening SSH (%s - %s) session for %s in new window.\n"+
+	CliPrintSuccess("\nOpening SSH (%s - %s) session for %s in new window.\n"+
 		"If that fails, please execute command\n%s\nmanaully",
 		shell, port, CurrentTarget.Tag, sshCmd)
 

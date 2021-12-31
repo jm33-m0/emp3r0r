@@ -1,5 +1,5 @@
 package cc
 
 func Suicide() {
-	SendCmdToCurrentTarget("suicide")
+	SendCmdToCurrentTarget("suicide", "")
 }

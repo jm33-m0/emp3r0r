@@ -14,8 +14,9 @@ import (
 
 // StatFile Get stat info of a file on agent
 func StatFile(filepath string, a *emp3r0r_data.SystemInfo) (fi *util.FileStat, err error) {
-	cmd := fmt.Sprintf("!stat %s %s", filepath, uuid.NewString())
-	err = SendCmd(cmd, a)
+	cmd_id := uuid.NewString()
+	cmd := fmt.Sprintf("!stat %s", filepath)
+	err = SendCmd(cmd, cmd_id, a)
 	if err != nil {
 		return
 	}
@@ -23,13 +24,13 @@ func StatFile(filepath string, a *emp3r0r_data.SystemInfo) (fi *util.FileStat, e
 
 	defer func() {
 		CmdResultsMutex.Lock()
-		delete(CmdResults, cmd)
+		delete(CmdResults, cmd_id)
 		CmdResultsMutex.Unlock()
 	}()
 
 	for {
 		time.Sleep(100 * time.Millisecond)
-		res, exists := CmdResults[cmd]
+		res, exists := CmdResults[cmd_id]
 		if exists {
 			err = json.Unmarshal([]byte(res), &fileinfo)
 			if err != nil {
@@ -70,7 +71,7 @@ func PutFile(lpath, rpath string, a *emp3r0r_data.SystemInfo) error {
 
 	// send cmd
 	cmd := fmt.Sprintf("put %s %s %d", lpath, rpath, size)
-	err = SendCmd(cmd, a)
+	err = SendCmd(cmd, "", a)
 	if err != nil {
 		return fmt.Errorf("PutFile send command: %v", err)
 	}
@@ -131,7 +132,7 @@ func GetFile(filepath string, a *emp3r0r_data.SystemInfo) error {
 
 	// cmd
 	cmd := fmt.Sprintf("#get %s %d %s", filepath, offset, ftpSh.Token)
-	err = SendCmd(cmd, a)
+	err = SendCmd(cmd, "", a)
 	if err != nil {
 		CliPrintError("GetFile send command: %v", err)
 		return err

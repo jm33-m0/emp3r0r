@@ -19,7 +19,7 @@ func modulePortFwd() {
 				// tell the agent to close connection
 				// make sure handler returns
 				cmd := fmt.Sprintf("!port_fwd %s stop stop", id) // cmd format: !port_fwd [to/listen] [shID] [operation]
-				err := SendCmd(cmd, CurrentTarget)
+				err := SendCmd(cmd, "", CurrentTarget)
 				if err != nil {
 					CliPrintError("SendCmd: %v", err)
 					return
@@ -81,7 +81,7 @@ func moduleProxy() {
 				// tell the agent to close connection
 				// make sure handler returns
 				cmd := fmt.Sprintf("!delete_portfwd %s", id)
-				err := SendCmd(cmd, session.Agent)
+				err := SendCmd(cmd, "", session.Agent)
 				if err != nil {
 					CliPrintError("SendCmd: %v", err)
 					return

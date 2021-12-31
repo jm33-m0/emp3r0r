@@ -8,7 +8,7 @@ import (
 
 func modulePersistence() {
 	cmd := fmt.Sprintf("!persistence %s", Options["method"].Val)
-	err := SendCmd(cmd, CurrentTarget)
+	err := SendCmd(cmd, "", CurrentTarget)
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)
 		return
@@ -18,7 +18,7 @@ func modulePersistence() {
 
 func moduleLogCleaner() {
 	cmd := fmt.Sprintf("!clean_log %s", Options["keyword"].Val)
-	err := SendCmd(cmd, CurrentTarget)
+	err := SendCmd(cmd, "", CurrentTarget)
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)
 		return

@@ -9,7 +9,7 @@ import (
 func moduleReverseProxy() {
 	addr := Options["addr"].Val
 	cmd := fmt.Sprintf("!%s %s", emp3r0r_data.ModREVERSEPROXY, addr)
-	err := SendCmd(cmd, CurrentTarget)
+	err := SendCmd(cmd, "", CurrentTarget)
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)
 		return

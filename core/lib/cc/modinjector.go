@@ -25,7 +25,7 @@ func moduleInjector() {
 	cmd := fmt.Sprintf("!inject %s %s", method, pid)
 
 	// tell agent to inject this shellcode
-	err = SendCmd(cmd, target)
+	err = SendCmd(cmd, "", target)
 	if err != nil {
 		CliPrintError("Could not send command to agent: %v", err)
 		return

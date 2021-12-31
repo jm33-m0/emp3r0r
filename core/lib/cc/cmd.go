@@ -34,6 +34,7 @@ var Commands = map[string]string{
 	"vim":             "Edit a text file on selected agent",
 	"put":             "Upload a file to selected agent",
 	"screenshot":      "Take a screenshot of selected agent",
+	"suicide":         "Kill agent process, delete agent root directory",
 	"ls_targets":      "List all targets",
 	"ls_modules":      "List all modules",
 	"ls_port_fwds":    "List all port mappings",
@@ -233,7 +234,7 @@ func CmdHandler(cmd string) (err error) {
 			filehelper := FileManagerHelpers[cmdSplit[0]]
 			if filehelper == nil && CurrentTarget != nil {
 				CliPrintWarning("Exec: %s on %s", strconv.Quote(cmd), strconv.Quote(CurrentTarget.Tag))
-				SendCmdToCurrentTarget(cmd)
+				SendCmdToCurrentTarget(cmd, "")
 				return
 			} else if CurrentTarget == nil {
 				CliPrintError("Select a target so you can execute commands on it")

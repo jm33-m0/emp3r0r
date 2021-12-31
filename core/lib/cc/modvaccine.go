@@ -10,7 +10,7 @@ func moduleVaccine() {
 		return
 	}
 
-	err := SendCmd("!utils", CurrentTarget)
+	err := SendCmd("!utils", "", CurrentTarget)
 	if err != nil {
 		CliPrintError("[-] SendCmd failed: %v", err)
 	}
