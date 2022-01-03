@@ -35,7 +35,7 @@ type FileStat struct {
 
 // LsPath ls path and return a json
 func LsPath(path string) (res string, err error) {
-	files, err := ioutil.ReadDir("./")
+	files, err := ioutil.ReadDir(path)
 	if err != nil {
 		log.Printf("LsPath: %v", err)
 		return

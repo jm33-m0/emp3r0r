@@ -55,6 +55,9 @@ func CliMain() {
 		readline.PcItem("mkdir",
 			readline.PcItemDynamic(listDir())),
 
+		readline.PcItem("ls",
+			readline.PcItemDynamic(listDir())),
+
 		readline.PcItem("cp",
 			readline.PcItemDynamic(listDir())),
 
@@ -96,6 +99,7 @@ func CliMain() {
 			cmd == "delete_port_fwd" ||
 			cmd == "rm" ||
 			cmd == "mv" ||
+			cmd == "ls" ||
 			cmd == "cd" ||
 			cmd == HELP {
 			continue
@@ -553,7 +557,7 @@ func listOptions() func(string) []string {
 	}
 }
 
-// autocomplete items in current directory
+// remote ls autocomplete items in current directory
 func listDir() func(string) []string {
 	return func(line string) []string {
 		names := make([]string, 0)
@@ -565,6 +569,7 @@ func listDir() func(string) []string {
 }
 
 // Function constructor - constructs new function for listing given directory
+// local ls
 func listFiles(path string) func(string) []string {
 	return func(line string) []string {
 		names := make([]string, 0)
