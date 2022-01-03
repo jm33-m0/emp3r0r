@@ -198,6 +198,7 @@ func GetTargetDetails(target *emp3r0r_data.SystemInfo) {
 
 	// info map
 	infoMap := map[string]string{
+		"Version":   color.HiWhiteString(target.Version),
 		"Hostname":  color.HiCyanString(target.Hostname),
 		"Process":   color.HiMagentaString(procInfo),
 		"User":      userInfo,

