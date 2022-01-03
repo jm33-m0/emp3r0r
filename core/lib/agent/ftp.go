@@ -51,7 +51,9 @@ func DownloadViaCC(url, path string) (data []byte, err error) {
 	if path == "" {
 		retData = true
 		log.Printf("No path specified, will return []byte")
+		// still gotta write to a temp file
 		path = fmt.Sprintf("%s/%s", os.TempDir(), uuid.NewString())
+		defer os.RemoveAll(path)
 	}
 
 	// use EmpHTTPClient
@@ -64,9 +66,8 @@ func DownloadViaCC(url, path string) (data []byte, err error) {
 		return
 	}
 	resp := client.Do(req)
-	// if writing to file
-	if !retData {
-		data, err = ioutil.ReadFile(path)
+	if retData {
+		data, err = ioutil.ReadFile(path) // temp file
 		return data, fmt.Errorf("HTTP request failed: %v", err)
 	}
 
