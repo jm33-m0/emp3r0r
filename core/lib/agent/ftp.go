@@ -64,7 +64,8 @@ func DownloadViaCC(url, path string) (data []byte, err error) {
 		return
 	}
 	resp := client.Do(req)
-	if retData {
+	// if writing to file
+	if !retData {
 		data, err = ioutil.ReadFile(path)
 		return data, fmt.Errorf("HTTP request failed: %v", err)
 	}
