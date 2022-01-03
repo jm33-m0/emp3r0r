@@ -55,5 +55,6 @@ func UpgradeAgent() {
 		CliPrintError("Make sure %s/agent exists", WWWRoot)
 		return
 	}
-	SendCmdToCurrentTarget("!upgrade_agent", "")
+	checksum := tun.SHA256SumFile(WWWRoot + "agent")
+	SendCmdToCurrentTarget("!upgrade_agent "+checksum, "")
 }

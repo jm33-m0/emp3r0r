@@ -460,8 +460,14 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 		// upgrade
 	case "!upgrade_agent":
+		if len(cmdSlice) != 2 {
+			sendResponse(fmt.Sprintf("args error: %v", cmdSlice))
+			return
+		}
+
 		out = "Done"
-		err = Upgrade()
+		checksum := cmdSlice[1]
+		err = Upgrade(checksum)
 		if err != nil {
 			out = err.Error()
 		}
