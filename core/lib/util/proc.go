@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 
 	gops "github.com/mitchellh/go-ps"
 	"github.com/shirou/gopsutil/v3/process"
@@ -127,4 +128,10 @@ func PidOf(name string) []int {
 	}
 
 	return pids
+}
+
+// sleep for a random interval
+func TakeASnap() {
+	interval := time.Duration(RandInt(20, 10000))
+	time.Sleep(interval * time.Millisecond)
 }
