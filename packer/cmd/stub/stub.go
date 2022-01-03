@@ -87,6 +87,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	os.RemoveAll(os.Args[0]) // self destruction
 	// locate the ELF file
 	elfbegining := bytes.LastIndex(wholeStub, []byte(utils.Sep))
 	elfBytes := wholeStub[(elfbegining + len(utils.Sep)):]
