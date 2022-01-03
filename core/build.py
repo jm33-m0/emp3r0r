@@ -244,7 +244,7 @@ class GoBuild:
 
         # version
         sed("./lib/data/def.go",
-            "Version = \"[emp3r0r_version_string]\"", f"Version = \"{self.VERSION}\"")
+            '''Version = "[version_string]"''', f'''Version = "{self.VERSION}"''')
 
         if self.target == "agent":
             # guardian shellcode
