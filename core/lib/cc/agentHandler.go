@@ -160,10 +160,12 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 		// fill table
 		for _, d := range dents {
 			tdata = append(tdata, []string{d.Name, d.Ftype, d.Size, d.Date, d.Permission})
-			if d.Ftype == "file" {
-				LsDir = append(LsDir, d.Name)
-			} else {
-				LsDir = append(LsDir, d.Name+"/")
+			if len(cmd_slice) == 1 {
+				if d.Ftype == "file" {
+					LsDir = append(LsDir, d.Name)
+				} else {
+					LsDir = append(LsDir, d.Name+"/")
+				}
 			}
 		}
 
