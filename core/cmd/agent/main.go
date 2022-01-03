@@ -27,6 +27,7 @@ func main() {
 	c2proxy := flag.String("proxy", "", "Proxy for emp3r0r agent's C2 communication")
 	cdnProxy := flag.String("cdnproxy", "", "CDN proxy for emp3r0r agent's C2 communication")
 	doh := flag.String("doh", "", "DNS over HTTPS server for CDN proxy's DNS requests")
+	replace := flag.Bool("replace", false, "Replace existing agent process")
 	silent := flag.Bool("silent", false, "Suppress output")
 	daemon := flag.Bool("daemon", false, "Daemonize")
 	version := flag.Bool("version", false, "Show version info")
@@ -98,7 +99,7 @@ func main() {
 		if agent.IsAgentAlive() {
 			if os.Geteuid() == 0 && agent.ProcUID(pid) != "0" {
 				log.Println("Escalating privilege...")
-			} else {
+			} else if !*replace {
 				log.Fatal("Agent is already running and responsive, aborting")
 			}
 		}

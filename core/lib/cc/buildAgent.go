@@ -6,6 +6,7 @@ import (
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func GenAgent() {
@@ -47,4 +48,12 @@ func GenAgent() {
 	// done
 	CliPrintSuccess("Generated %s from %s and %s, you can use %s on arbitrary target",
 		outfile, stubFile, buildJSONFile, outfile)
+}
+
+func UpgradeAgent() {
+	if !util.IsFileExist(WWWRoot + "agent") {
+		CliPrintError("Make sure %s/agent exists", WWWRoot)
+		return
+	}
+	SendCmdToCurrentTarget("!upgrade_agent", "")
 }

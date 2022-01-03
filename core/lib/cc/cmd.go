@@ -21,6 +21,7 @@ var Commands = map[string]string{
 	"run":             "Run selected module, make sure you have set required options",
 	"info":            "What options do we have?",
 	"gen_agent":       "Generate agent with provided binary and build.json",
+	"upgrade_agent":   "Upgrade agent on selected target",
 	"ls":              "List current directory of selected agent",
 	"mv":              "Move a file to another location on selected target",
 	"cp":              "Copy a file to another location on selected target",
@@ -45,14 +46,15 @@ var Commands = map[string]string{
 
 // CmdHelpers holds a map of helper functions
 var CmdHelpers = map[string]func(){
-	"ls_targets":   ListTargets,
-	"ls_modules":   ListModules,
-	"ls_port_fwds": ListPortFwds,
-	"info":         CliListOptions,
-	"run":          ModuleRun,
-	"screenshot":   TakeScreenshot,
-	"gen_agent":    GenAgent,
-	"suicide":      Suicide,
+	"ls_targets":    ListTargets,
+	"ls_modules":    ListModules,
+	"ls_port_fwds":  ListPortFwds,
+	"info":          CliListOptions,
+	"run":           ModuleRun,
+	"screenshot":    TakeScreenshot,
+	"gen_agent":     GenAgent,
+	"upgrade_agent": UpgradeAgent,
+	"suicide":       Suicide,
 }
 
 // FileManagerHelpers manage agent files
