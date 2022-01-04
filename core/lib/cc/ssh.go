@@ -68,8 +68,10 @@ func SSHClient(shell, args, port string) (err error) {
 	if !exists {
 		// start sshd server on target
 		cmd_id := uuid.NewString()
+		if args == "" {
+			args = "--"
+		}
 		cmd := fmt.Sprintf("!sshd %s %s %s", shell, port, args)
-		cmd = strings.TrimSpace(cmd) // in case there is no args, which gives us trailing whitespace
 		err = SendCmdToCurrentTarget(cmd, cmd_id)
 		if err != nil {
 			return
