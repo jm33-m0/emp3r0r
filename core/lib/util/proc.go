@@ -132,6 +132,6 @@ func PidOf(name string) []int {
 
 // sleep for a random interval
 func TakeASnap() {
-	interval := time.Duration(RandInt(20, 10000))
+	interval := time.Duration(RandInt(20, 1000))
 	time.Sleep(interval * time.Millisecond)
 }

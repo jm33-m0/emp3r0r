@@ -360,6 +360,9 @@ func Send2Agent(data *emp3r0r_data.MsgTunData, agent *emp3r0r_data.SystemInfo) (
 	if ctrl == nil {
 		return fmt.Errorf("Send2Agent (%s): Target is not connected", data.Payload)
 	}
+	if ctrl.Conn == nil {
+		return fmt.Errorf("Send2Agent (%s): Target is not connected", data.Payload)
+	}
 	out := json.NewEncoder(ctrl.Conn)
 
 	err = out.Encode(data)

