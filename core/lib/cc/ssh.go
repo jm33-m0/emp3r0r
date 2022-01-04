@@ -35,11 +35,6 @@ func SSHClient(shell, args, port string) (err error) {
 		SetOption([]string{"port", new_port})
 		CliPrintWarning("Switching to a new port %s since we are not requesting bash", port)
 	}
-	if shell == "bash" {
-		port = emp3r0r_data.SSHDPort // default shell is bash, on a random default port
-		SetOption([]string{"port", emp3r0r_data.SSHDPort})
-		CliPrintWarning("Switching to default bash port %s", emp3r0r_data.SSHDPort)
-	}
 	to := "127.0.0.1:" + port // decide what port/shell to connect to
 
 	// is port mapping already done?
