@@ -1,5 +1,5 @@
 # emp3r0r
-linux post-exploitation framework made by linux user
+Linux/Windows post-exploitation framework made by linux user
 
 **Still under active development**
 
