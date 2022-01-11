@@ -1,5 +1,7 @@
 package main
 
+// +build=linux
+
 import (
 	"encoding/json"
 	"flag"

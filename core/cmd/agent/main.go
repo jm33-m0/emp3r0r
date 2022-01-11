@@ -1,5 +1,7 @@
 package main
 
+// build +linux
+
 import (
 	"context"
 	"flag"

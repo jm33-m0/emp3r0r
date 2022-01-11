@@ -1,5 +1,7 @@
 package agent
 
+// build +linux
+
 /*
 install tools to emp3r0r_data.UtilsPath, for lateral movement
 */

@@ -6,6 +6,8 @@
 
 package agent
 
+// build +linux
+
 import (
 	"bufio"
 	"fmt"

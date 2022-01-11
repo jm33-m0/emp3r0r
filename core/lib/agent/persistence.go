@@ -1,5 +1,7 @@
 package agent
 
+// build +linux
+
 import (
 	"errors"
 	"fmt"
