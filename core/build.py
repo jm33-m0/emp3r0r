@@ -34,6 +34,9 @@ class GoBuild:
         if self.GOOS is None:
             self.GOOS = "linux"
 
+        if self.target == "agentw":
+            self.GOOS = "windows"
+
         if self.GOARCH is None:
             self.GOARCH = "amd64"
 
@@ -92,7 +95,10 @@ class GoBuild:
         if "agent_root" in CACHED_CONF:
             self.AgentRoot = CACHED_CONF['agent_root']
         else:
-            self.AgentRoot = f"/tmp/{rand_str(random.randint(5, 10))}"
+            if self.target == "agent":
+                self.AgentRoot = f"/tmp/{rand_str(random.randint(5, 10))}"
+            elif self.target == "agentw":
+                self.AgentRoot = f"{rand_str(random.randint(5, 10))}"
             CACHED_CONF['agent_root'] = self.AgentRoot
 
         # DoH
@@ -160,6 +166,8 @@ class GoBuild:
 
         if self.target == "agent":
             build_target = f"../../build/{self.target}-{self.UUID}"
+        elif self.target == "agentw":
+            build_target = f"../../build/{self.target}-{self.UUID}.exe"
         # cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH}''' + \
         # f''' go build -ldflags='-s -w -extldflags "-static"' -o ../../build/{self.target}'''
 
@@ -168,6 +176,7 @@ class GoBuild:
 
         cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0''' + \
             f""" go build -o {build_target} -ldflags='-s -w -buildmode=pie' -trimpath"""
+
         # garble
 
         if shutil.which("garble") and self.target != "cc":
@@ -459,7 +468,7 @@ def main(target):
 
         return
 
-    if target != "agent":
+    if target not in ("agent", "agentw"):
         print("Unknown target")
 
         return
@@ -534,7 +543,7 @@ def main(target):
     if not yes_no("Use autoproxy (will enable UDP broadcasting)"):
         CACHED_CONF['broadcast_interval_max'] = 0
 
-    gobuild = GoBuild(target="agent", cc_indicator=indicator, cc_ip=ccip)
+    gobuild = GoBuild(target=target, cc_indicator=indicator, cc_ip=ccip)
     gobuild.build()
 
 
