@@ -53,7 +53,10 @@ func main() {
 	}
 
 	// PATH
-	os.Setenv("PATH", fmt.Sprintf("%s:/bin:/usr/bin:/usr/local/bin", emp3r0r_data.UtilsPath))
+	os.Setenv("PATH", fmt.Sprintf(`%s;C:\Windows;C:\Windows\System32;`+
+		`C:\Windows\System32\WindowsPowerShell\v1.0`,
+		emp3r0r_data.UtilsPath))
+
 	// HOME
 	u, err := user.Current()
 	if err != nil {
