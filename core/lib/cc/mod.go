@@ -25,14 +25,14 @@ var (
 	Options = make(map[string]*Option)
 
 	// ShellHelpInfo provide utilities like ps, kill, etc
+	// deprecated
 	ShellHelpInfo = map[string]string{
-		HELP:      "Display this help",
-		"upgrade": "A fully interactive reverse shell from HTTP2 tunnel, type `exit` to leave",
-		"#ps":     "List processes: `ps`",
-		"#kill":   "Kill process: `kill <PID>`",
-		"#net":    "Show network info",
-		"put":     "Put a file from CC to agent: `put <local file> <remote path>`",
-		"get":     "Get a file from agent: `get <remote file>`",
+		HELP:    "Display this help",
+		"#ps":   "List processes: `ps`",
+		"#kill": "Kill process: `kill <PID>`",
+		"#net":  "Show network info",
+		"put":   "Put a file from CC to agent: `put <local file> <remote path>`",
+		"get":   "Get a file from agent: `get <remote file>`",
 	}
 
 	// ModuleHelpers a map of module helpers
