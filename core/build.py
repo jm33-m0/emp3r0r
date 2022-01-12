@@ -58,6 +58,14 @@ class GoBuild:
             self.WebRoot = str(uuid.uuid1())
             CACHED_CONF['webroot'] = self.WebRoot
 
+        # OpSep
+
+        if 'opsep' in CACHED_CONF:
+            self.OpSep = CACHED_CONF['opsep']
+        else:
+            self.OpSep = str(uuid.uuid1())
+            CACHED_CONF['opsep'] = self.OpSep
+
         # pid file name
 
         if 'pid_file' in CACHED_CONF:
@@ -267,6 +275,11 @@ class GoBuild:
 
         # webroot
         sed("./lib/tun/api.go", 'WebRoot = "emp3r0r"', f'WebRoot = "{self.WebRoot}"')
+
+        # opsep
+        sed("./lib/data/def.go",
+            '''OpSep = "cb433bd1-354c-4802-a4fa-ece518f3ded1"''',
+            f'''OpSep = "{self.OpSep}"''')
 
         # Socket name
         sed("./lib/data/def.go",
