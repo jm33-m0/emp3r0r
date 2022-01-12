@@ -90,7 +90,7 @@ func CollectSystemInfo() *emp3r0r_data.SystemInfo {
 	info.Tag = emp3r0r_data.AgentTag // use hostid
 	info.Hostname = hostname
 	info.Version = emp3r0r_data.Version
-	info.Kernel = util.GetKernelVersion()
+	info.Kernel = GetKernelVersion()
 	info.Arch = runtime.GOARCH
 	info.CPU = util.GetCPUInfo()
 	info.GPU = util.GetGPUInfo()
