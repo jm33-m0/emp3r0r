@@ -100,7 +100,7 @@ func CollectSystemInfo() *emp3r0r_data.SystemInfo {
 	info.Transport = emp3r0r_data.Transport
 
 	// have root?
-	info.HasRoot = os.Geteuid() == 0
+	info.HasRoot = IsPrivileged()
 
 	// process
 	info.Process = CheckAgentProcess()
