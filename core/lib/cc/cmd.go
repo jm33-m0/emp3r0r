@@ -113,6 +113,8 @@ func CmdHandler(cmd string) (err error) {
 				}
 				UpdateOptions(CurrentMod)
 				CliPrintInfo("Using module %s", strconv.Quote(CurrentMod))
+				CliListOptions()
+
 				return
 			}
 		}
