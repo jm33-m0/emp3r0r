@@ -256,57 +256,16 @@ func CmdHandler(cmd string) (err error) {
 // print help for modules
 func CmdHelp(mod string) {
 	help := make(map[string]string)
-	switch mod {
-	case "":
-		CliPrettyPrint("Command", "Description", &Commands)
-	case emp3r0r_data.ModLPE_SUGGEST:
-		help = map[string]string{
-			"lpe_helper": "'linux-smart-enumeration' or 'linux-exploit-suggester'?",
-		}
-		CliPrettyPrint("Option", "Help", &help)
-	case emp3r0r_data.ModCMD_EXEC:
-		help = map[string]string{
-			"cmd_to_exec": "Press TAB for some hints",
-		}
-		CliPrettyPrint("Option", "Help", &help)
-	case emp3r0r_data.ModPORT_FWD:
-		help = map[string]string{
-			"to_port":     "Port (to forward to) on agent/CC side",
-			"listen_port": "Listen on CC/agent side",
-			"switch":      "Turn port mapping on/off, or use `reverse` mapping",
-		}
-		CliPrettyPrint("Option", "Help", &help)
-	case emp3r0r_data.ModPROXY:
-		help = map[string]string{
-			"port":   "Port of our local proxy server",
-			"status": "Turn proxy on/off",
-		}
-		CliPrettyPrint("Option", "Help", &help)
-	case emp3r0r_data.ModINJECTOR:
-		help = map[string]string{
-			"pid": "Target process PID, set to 0 to start a new process (sleep)",
-		}
-		CliPrettyPrint("Option", "Help", &help)
-	case emp3r0r_data.ModCLEAN_LOG:
-		help = map[string]string{
-			"keyword": "Delete all log entries containing this keyword",
-		}
-		CliPrettyPrint("Option", "Help", &help)
-	case emp3r0r_data.ModSHELL:
-		help = map[string]string{
-			"shell": "Shell program to run",
-			"args":  "Command line args of the shell program",
-			"port":  "The (sshd) port that our shell will be using",
-		}
-		CliPrettyPrint("Option", "Help", &help)
-	default:
-		for modname, modhelp := range emp3r0r_data.ModuleDocs {
-			if mod == modname {
+	for modname, modhelp := range emp3r0r_data.ModuleComments {
+		if mod == modname {
+			exists := false
+			help, exists = emp3r0r_data.ModuleHelp[modname]
+			if !exists {
 				help = map[string]string{"<N/A>": modhelp}
-				CliPrettyPrint("Option", "Help", &help)
-				return
 			}
+			CliPrettyPrint("Option", "Help", &help)
+			return
 		}
-		CliPrintError("Help yourself")
 	}
+	CliPrintError("Help yourself")
 }

@@ -15,6 +15,11 @@ type Option struct {
 }
 
 var (
+	// ModuleDir stores custom modules
+	// cc binary is saved as `./core/build/cc`,
+	// and modules are stored in `./core/modules`
+	ModuleDir = "../modules/"
+
 	// CurrentMod selected module
 	CurrentMod = "<blank>"
 
@@ -175,6 +180,14 @@ func UpdateOptions(modName string) (exist bool) {
 		}
 		currentOpt.Vals = methods
 		currentOpt.Val = "all"
+
+	default:
+		// custom modules
+		for arg := range emp3r0r_data.ModuleHelp[modName] {
+			addIfNotFound(arg)
+
+			// TODO read default values
+		}
 	}
 
 	return

@@ -39,7 +39,7 @@ func readJSONConfig(filename string) (err error) {
 	var config Config
 	err = json.Unmarshal(jsonData, &config)
 	if err != nil {
-		return fmt.Errorf("failed to decrypt JSON config: %v", err)
+		return fmt.Errorf("failed to parse JSON config: %v", err)
 	}
 
 	// set up runtime vars
@@ -121,5 +121,6 @@ func main() {
 	if *apiserver {
 		go cc.APIMain()
 	}
+	cc.InitModules()
 	cc.CliMain()
 }

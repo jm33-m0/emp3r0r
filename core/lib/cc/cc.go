@@ -351,7 +351,7 @@ func SetAgentLabel(a *emp3r0r_data.SystemInfo, mutex *sync.Mutex) (label string)
 
 // ListModules list all available modules
 func ListModules() {
-	CliPrettyPrint("Module Name", "Help", &emp3r0r_data.ModuleDocs)
+	CliPrettyPrint("Module Name", "Help", &emp3r0r_data.ModuleComments)
 }
 
 // Send2Agent send MsgTunData to agent
