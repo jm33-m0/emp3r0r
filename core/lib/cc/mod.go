@@ -184,9 +184,12 @@ func UpdateOptions(modName string) (exist bool) {
 	default:
 		// custom modules
 		for arg := range emp3r0r_data.ModuleHelp[modName] {
-			addIfNotFound(arg)
+			argOpt := addIfNotFound(arg)
 
-			// TODO read default values
+			// read default values
+			modConf := ModuleConfigs[modName]
+			val := modConf.Options[arg][0]
+			argOpt.Val = val
 		}
 	}
 
