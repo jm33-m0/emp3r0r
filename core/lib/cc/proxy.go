@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fatih/color"
 	"github.com/google/uuid"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -84,9 +83,6 @@ func ListPortFwds() {
 			CliPrintError("ListPortFwds: %v", err)
 		}
 	}
-
-	color.Cyan("Active port mappings\n")
-	color.Cyan("====================\n\n")
 
 	// build table
 	tdata := [][]string{}

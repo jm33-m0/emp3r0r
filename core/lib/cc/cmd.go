@@ -113,6 +113,7 @@ func CmdHandler(cmd string) (err error) {
 				}
 				UpdateOptions(CurrentMod)
 				CliPrintInfo("Using module %s", strconv.Quote(CurrentMod))
+				ModuleDetails(CurrentMod)
 				CliListOptions()
 
 				return
@@ -256,6 +257,11 @@ func CmdHandler(cmd string) (err error) {
 // print help for modules
 func CmdHelp(mod string) {
 	help := make(map[string]string)
+	if mod == "" {
+		CliPrettyPrint("Command", "Help", &Commands)
+		return
+	}
+
 	for modname, modhelp := range emp3r0r_data.ModuleComments {
 		if mod == modname {
 			exists := false

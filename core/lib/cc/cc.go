@@ -101,9 +101,6 @@ func ListTargets() {
 		}
 	}
 
-	color.Cyan("Connected agents\n")
-	color.Cyan("=================\n\n")
-
 	// build table
 	tdata := [][]string{}
 	tableString := &strings.Builder{}

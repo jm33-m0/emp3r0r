@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strconv"
+	"strings"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	"github.com/olekukonko/tablewriter"
 )
 
 // ModConfig config.json of a module
@@ -33,8 +35,50 @@ type ModConfig struct {
 	Options map[string][]string `json:"options"`
 }
 
+// stores module configs
+var ModuleConfigs = make(map[string]ModConfig, 1)
+
 // moduleCustom run a custom module
 func moduleCustom() {
+}
+
+// Print module meta data
+func ModuleDetails(modName string) {
+	config, exists := ModuleConfigs[modName]
+	if !exists {
+		return
+	}
+
+	// build table
+	tdata := [][]string{}
+	tableString := &strings.Builder{}
+	table := tablewriter.NewWriter(tableString)
+	table.SetHeader([]string{"Name", "Exec", "Platform", "Author", "Date", "Comment"})
+	table.SetBorder(true)
+	table.SetRowLine(true)
+	table.SetAutoWrapText(true)
+
+	// color
+	table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor})
+
+	table.SetColumnColor(tablewriter.Colors{tablewriter.FgHiBlueColor},
+		tablewriter.Colors{tablewriter.FgBlueColor},
+		tablewriter.Colors{tablewriter.FgBlueColor},
+		tablewriter.Colors{tablewriter.FgBlueColor},
+		tablewriter.Colors{tablewriter.FgBlueColor},
+		tablewriter.Colors{tablewriter.FgBlueColor})
+
+	// fill table
+	tdata = append(tdata, []string{config.Name, config.Exec, config.Platform, config.Author, config.Date, config.Comment})
+	table.AppendBulk(tdata)
+	table.Render()
+	out := tableString.String()
+	CliPrintInfo("Module details:\n%s", out)
 }
 
 // scan custom modules in ModuleDir,
@@ -65,6 +109,7 @@ func InitModules() {
 			CliPrintWarning("Loading config from %s: %v", config.Name, err)
 			continue
 		}
+		ModuleConfigs[config.Name] = *config
 		CliPrintInfo("Loaded module %s", strconv.Quote(config.Name))
 	}
 	CliPrintInfo("Loaded %d modules", len(ModuleHelpers))

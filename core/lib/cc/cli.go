@@ -15,6 +15,7 @@ import (
 	"github.com/bettercap/readline"
 	"github.com/fatih/color"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	"github.com/olekukonko/tablewriter"
 )
 
 const PromptName = "emp3r0r"
@@ -448,18 +449,30 @@ func CliPrettyPrint(header1, header2 string, map2write *map[string]string) {
 		}
 	}
 
-	cnt := 18
-	sep := strings.Repeat(" ", cnt)
-	color.Cyan("%s%s%s\n", header1, sep, header2)
+	// build table
+	tdata := [][]string{}
+	tableString := &strings.Builder{}
+	table := tablewriter.NewWriter(tableString)
+	table.SetHeader([]string{header1, header2})
+	table.SetBorder(true)
+	table.SetRowLine(true)
+	table.SetAutoWrapText(true)
 
-	color.Cyan("%s%s%s\n", strings.Repeat("=", len(header1)), sep, strings.Repeat("=", len(header2)))
-	fmt.Println("")
+	// color
+	table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor})
 
+	table.SetColumnColor(tablewriter.Colors{tablewriter.FgHiBlueColor},
+		tablewriter.Colors{tablewriter.FgBlueColor})
+
+	// fill table
 	for c1, c2 := range *map2write {
-		cnt = len(header1) + 18 - len(c1) // NOTE cannot be too long or cnt can be negative
-		sep = strings.Repeat(" ", cnt)
-		color.Cyan("%s%s%s\n", c1, sep, c2)
+		tdata = append(tdata, []string{c1, c2})
 	}
+	table.AppendBulk(tdata)
+	table.Render()
+	out := tableString.String()
+	CliPrintInfo("\n%s", out)
 }
 
 // encoded logo of emp3r0r

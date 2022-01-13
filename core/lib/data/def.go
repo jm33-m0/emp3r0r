@@ -122,7 +122,7 @@ const (
 	Unknown = "Unknown"
 )
 
-// Module names
+// built-in module names
 const (
 	ModCMD_EXEC     = "cmd_exec"
 	ModCLEAN_LOG    = "clean_log"
@@ -147,7 +147,7 @@ var PersistMethods = map[string]string{
 	"patcher":    "patcher",
 }
 
-// Module help info
+// Module help info, ls_modules shows this
 var ModuleComments = map[string]string{
 	ModCMD_EXEC:     "Run a single command on a target",
 	ModCLEAN_LOG:    "Delete lines containing keyword from *tmp logs",
@@ -163,6 +163,7 @@ var ModuleComments = map[string]string{
 }
 
 // Module help for options, does not include every module since not all modules need args
+// help module shows this
 var ModuleHelp = map[string]map[string]string{
 	ModCMD_EXEC: {
 		"cmd_to_exec": "Press TAB for some hints",
