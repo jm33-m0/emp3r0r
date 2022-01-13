@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/olekukonko/tablewriter"
 )
 
@@ -40,6 +42,37 @@ var ModuleConfigs = make(map[string]ModConfig, 1)
 
 // moduleCustom run a custom module
 func moduleCustom() {
+	config_json := ModuleDir + CurrentMod + "/config.json"
+	temp_config_json := Temp + "/config.json"
+	// update config.json
+	util.Copy(config_json, temp_config_json)
+	defer os.Rename(temp_config_json, config_json)
+	config, err := readModCondig(temp_config_json)
+	if err != nil {
+		CliPrintError("Read config: %v", err)
+		return
+	}
+	for opt, val := range config.Options {
+		val[0] = Options[opt].Val
+	}
+	err = writeModCondig(config, config_json)
+	if err != nil {
+		CliPrintError("Update config.json: %v", err)
+		return
+	}
+
+	// compress module files
+	err = util.TarBz2(ModuleDir+CurrentMod, WWWRoot+CurrentMod)
+	if err != nil {
+		CliPrintError("Compressing %s: %v", CurrentMod, err)
+		return
+	}
+
+	// tell agent to download and execute this module
+	err = SendCmdToCurrentTarget("!custom_module "+CurrentMod, "")
+	if err != nil {
+		CliPrintError("Sending command to %s: %v", CurrentTarget.Tag, err)
+	}
 }
 
 // Print module meta data
@@ -131,6 +164,18 @@ func readModCondig(file string) (pconfig *ModConfig, err error) {
 	}
 	pconfig = &config
 	return
+}
+
+// writeModCondig read config.json of a module
+func writeModCondig(config *ModConfig, outfile string) (err error) {
+	// parse the json
+	data, err := json.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON config: %v", err)
+	}
+
+	// write config.json
+	return ioutil.WriteFile(outfile, data, 0600)
 }
 
 func updateModuleHelp(config *ModConfig) error {

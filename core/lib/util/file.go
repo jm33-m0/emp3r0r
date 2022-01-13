@@ -2,6 +2,7 @@ package util
 
 import (
 	"bufio"
+	"context"
 	crypto_rand "crypto/rand"
 	"encoding/binary"
 	"encoding/json"
@@ -14,6 +15,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/mholt/archiver/v4"
 )
 
 // Dentry Directory entry
@@ -199,4 +202,35 @@ func FileSize(path string) (size int64) {
 	}
 	size = fi.Size()
 	return
+}
+
+func TarBz2(dir, outfile string) error {
+	// map files on disk to their paths in the archive
+	files, err := archiver.FilesFromDisk(map[string]string{
+		dir: "",
+	})
+	if err != nil {
+		return err
+	}
+
+	// create the output file we'll write to
+	out, err := os.Create(outfile + ".tar.bz2")
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	// we can use the CompressedArchive type to gzip a tarball
+	// (compression is not required; you could use Tar directly)
+	format := archiver.CompressedArchive{
+		Compression: archiver.Bz2{},
+		Archival:    archiver.Tar{},
+	}
+
+	// create the archive
+	err = format.Archive(context.Background(), out, files)
+	if err != nil {
+		return err
+	}
+	return nil
 }
