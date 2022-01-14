@@ -122,6 +122,10 @@ func CmdHandler(cmd string) (err error) {
 		CliPrintError("No such module: %s", strconv.Quote(cmdSplit[1]))
 
 	case cmdSplit[0] == "set":
+		if len(cmdSplit) < 2 {
+			CliPrintError("set what?")
+			return
+		}
 		// hand to SetOption helper
 		SetOption(cmdSplit[1:])
 
