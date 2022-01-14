@@ -11,10 +11,7 @@ Linux/Windows post-exploitation framework made by linux user
 
 
 
-
-
-https://user-images.githubusercontent.com/10167884/149533186-fb2aa7de-b63a-450c-a414-096938861503.mp4
-
+https://user-images.githubusercontent.com/10167884/149536874-0d541bd0-a836-4c08-afc8-e57d0ab695f1.mp4
 
 
 
