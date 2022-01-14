@@ -50,10 +50,6 @@ currently emp3r0r has limited Windows support
 * log cleaner
 * screenshot
 * **stealth** connection
-
-https://user-images.githubusercontent.com/10167884/149533159-cf67b395-3477-4f64-b00c-8ca27e7c0356.mp4
-
-
 * anti-antivirus
 * internet access checker
 * **autoproxy** for semi-isolated networks
