@@ -62,6 +62,9 @@ var (
 	// UtilsPath binary path of utilities
 	UtilsPath = AgentRoot + "/bin"
 
+	// DefaultShell the shell to use, use static bash binary when possible
+	DefaultShell = UtilsPath + "/bash"
+
 	// Libemp3r0rFile shard library of emp3r0r, for hiding and persistence
 	Libemp3r0rFile = UtilsPath + "/libe.so"
 

