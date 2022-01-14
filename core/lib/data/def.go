@@ -182,8 +182,8 @@ var ModuleHelp = map[string]map[string]string{
 		"status": "Turn proxy on/off",
 	},
 	ModPORT_FWD: {
-		"to_port":     "Port (to forward to) on agent/CC side",
-		"listen_port": "Listen on CC/agent side",
+		"to":          "Address:Port (to forward to) on agent/CC side",
+		"listen_port": "Listen port on CC/agent side",
 		"switch":      "Turn port mapping on/off, or use `reverse` mapping",
 	},
 	ModSHELL: {
