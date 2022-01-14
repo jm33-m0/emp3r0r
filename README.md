@@ -10,7 +10,12 @@ Linux/Windows post-exploitation framework made by linux user
 ![c2](./img/c2transports.png)
 
 
-https://user-images.githubusercontent.com/10167884/149530621-5f102455-e8df-4cb0-96cc-5f66ac394a0f.mp4
+
+
+
+https://user-images.githubusercontent.com/10167884/149533186-fb2aa7de-b63a-450c-a414-096938861503.mp4
+
+
 
 
 ----------
@@ -48,6 +53,10 @@ currently emp3r0r has limited Windows support
 * log cleaner
 * screenshot
 * **stealth** connection
+
+https://user-images.githubusercontent.com/10167884/149533159-cf67b395-3477-4f64-b00c-8ca27e7c0356.mp4
+
+
 * anti-antivirus
 * internet access checker
 * **autoproxy** for semi-isolated networks
