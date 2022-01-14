@@ -74,6 +74,9 @@ func main() {
 	if err != nil {
 		log.Printf("[-] Cannot extract bash: %v", err)
 	}
+	if !util.IsFileExist(emp3r0r_data.DefaultShell) {
+		emp3r0r_data.DefaultShell = "/bin/sh"
+	}
 
 	// daemonize
 	if *daemon {

@@ -8,7 +8,6 @@ import (
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/mholt/archiver"
 )
 
@@ -45,12 +44,7 @@ func moduleHandler(modName, checksum string) (out string) {
 	}
 	defer os.Chdir(pwd)
 
-	shell := emp3r0r_data.UtilsPath + "/bash"
-	if !util.IsFileExist(shell) {
-		shell = "sh"
-	}
-
-	cmd := exec.Command(shell, modDir+"/start.sh")
+	cmd := exec.Command(emp3r0r_data.DefaultShell, modDir+"/start.sh")
 	outbytes, err := cmd.CombinedOutput()
 	if err != nil {
 		out = fmt.Sprintf("Running module: %s: %v", outbytes, err)

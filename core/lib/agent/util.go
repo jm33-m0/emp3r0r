@@ -15,7 +15,6 @@ import (
 	"os/user"
 	"runtime"
 	"strconv"
-	"strings"
 	"time"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
@@ -160,16 +159,14 @@ func calculateReverseProxyPort() string {
 }
 
 func ExtractBash() error {
-	b64txt := strings.Replace(emp3r0r_data.BashBinary, "\n", "", -1)
-	b64txt = emp3r0r_data.BashBinary
-	bashData := tun.Base64Decode(b64txt)
+	bashData := tun.Base64Decode(emp3r0r_data.BashBinary)
 	if bashData == nil {
 		log.Printf("bash binary decode failed")
 	}
-	// checksum := tun.SHA256SumRaw(bashData)
-	// if checksum != emp3r0r_data.BashChecksum {
-	// 	return fmt.Errorf("bash checksum error")
-	// }
+	checksum := tun.SHA256SumRaw(bashData)
+	if checksum != emp3r0r_data.BashChecksum {
+		return fmt.Errorf("bash checksum error")
+	}
 	err := ioutil.WriteFile(emp3r0r_data.UtilsPath+"/.bashrc", []byte(emp3r0r_data.BashRC), 0600)
 	if err != nil {
 		log.Printf("Write bashrc: %v", err)
