@@ -17,7 +17,7 @@ what makes emp3r0r different? well, first of all, its the first C2 framework tha
 
 the name *emp3r0r* comes from [empire](https://github.com/BC-SECURITY/Empire/) project
 
-https://user-images.githubusercontent.com/10167884/122037656-5d479f80-ce07-11eb-96af-4b4d2c06c61b.mp4
+currently emp3r0r has limited Windows support
 
 ----------
 
@@ -25,18 +25,19 @@ https://user-images.githubusercontent.com/10167884/122037656-5d479f80-ce07-11eb-
 * multi-tasking, you don't need to wait for any commands to finish
 * basic API provided through unix socket
 * **perfect reverse shell** (true color, key bindings, custom bashrc, custom bash binary, etc)
+* **built-in static bash binary**
 * auto **persistence** via various methods
 * **post-exploitation tools** like nmap, socat, are integreted with reverse shell
 * **credential harvesting** (WIP)
 * process **injection**
 * **shellcode** injection and dropper
-* ELF **patcher**
+* ELF **patcher** (WIP)
 * **packer** that encrypts and compresses agent binary, and runs agent in a covert way
-* **hide processes and files** via libc hijacking
+* **hide processes and files** via libc hijacking (WIP)
 * **port mapping**, from c2 side to agent side, and vice versa
 * agent side socks5 **proxy**
 * **ssh server**
-* auto root
+* auto root (WIP)
 * **LPE** suggest
 * system info collecting
 * file management, **resumable download**
@@ -50,4 +51,5 @@ https://user-images.githubusercontent.com/10167884/122037656-5d479f80-ce07-11eb-
 * all of these in one **HTTP2** connection
 * can be encapsulated in any external proxies such as **TOR**, and **CDNs**
 * interoperability with **metasploit / Cobalt Strike**
+* **custom modules**
 * and many more...
