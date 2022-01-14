@@ -9,6 +9,10 @@ Linux/Windows post-exploitation framework made by linux user
 
 ![c2](./img/c2transports.png)
 
+
+https://user-images.githubusercontent.com/10167884/149530621-5f102455-e8df-4cb0-96cc-5f66ac394a0f.mp4
+
+
 ----------
 
 emp3r0r was initially developed as one of my weaponizing experiments, i tried to implement common Linux adversary techniques and some of my own ideas, it was a learning process for me
