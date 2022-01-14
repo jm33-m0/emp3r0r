@@ -42,7 +42,7 @@ var ModuleConfigs = make(map[string]ModConfig, 1)
 
 // moduleCustom run a custom module
 func moduleCustom() {
-	start_sh := ModuleDir + CurrentMod + "/start.sh"
+	start_sh := WWWRoot + CurrentMod + ".sh"
 	config, exists := ModuleConfigs[CurrentMod]
 	if !exists {
 		CliPrintError("Config of %s does not exist", CurrentMod)
@@ -51,6 +51,9 @@ func moduleCustom() {
 	for opt, val := range config.Options {
 		val[0] = Options[opt].Val
 	}
+
+	// most of the time, start.sh is the only file changing
+	// and it's very small, so we host it for agents to download
 	err = genStartScript(&config, start_sh)
 	if err != nil {
 		CliPrintError("Generating start.sh: %v", err)
