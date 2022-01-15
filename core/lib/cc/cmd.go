@@ -128,6 +128,7 @@ func CmdHandler(cmd string) (err error) {
 		}
 		// hand to SetOption helper
 		SetOption(cmdSplit[1:])
+		CliListOptions()
 
 	case cmdSplit[0] == "debug":
 		if len(cmdSplit) < 2 {
