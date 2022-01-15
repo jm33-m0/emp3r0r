@@ -104,10 +104,9 @@ class GoBuild:
         if "agent_root" in CACHED_CONF:
             self.AgentRoot = CACHED_CONF['agent_root']
         else:
-            if self.target == "agent":
-                self.AgentRoot = f"/tmp/{rand_str(random.randint(5, 10))}"
-            elif self.target == "agentw":
-                self.AgentRoot = f"{rand_str(random.randint(5, 10))}"
+            # by default mkdir in current directory
+            self.AgentRoot = f"{rand_str(random.randint(5, 10))}"
+
             CACHED_CONF['agent_root'] = self.AgentRoot
 
         # DoH
