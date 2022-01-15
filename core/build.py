@@ -709,7 +709,7 @@ try:
         h_len = 0
     atexit.register(save, h_len, histfile)
 
-    main(sys.argv[1])
+    main(args.target)
 except (KeyboardInterrupt, EOFError, SystemExit):
     sys.exit(0)
 except BaseException:
