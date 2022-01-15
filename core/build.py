@@ -6,6 +6,7 @@
 this script replaces build.sh, coz bash/sed/awk is driving me insane
 '''
 
+import argparse
 import atexit
 import glob
 import json
@@ -176,20 +177,18 @@ class GoBuild:
             build_target = f"../../build/{self.target}-{self.UUID}"
         elif self.target == "agentw":
             build_target = f"../../build/{self.target}-{self.UUID}.exe"
-        # cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH}''' + \
-        # f''' go build -ldflags='-s -w -extldflags "-static"' -o ../../build/{self.target}'''
 
         # go mod
         os.system('go mod tidy')
 
         cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0''' + \
-            f""" go build -o {build_target} -ldflags='-s -w -buildmode=pie' -trimpath"""
+            f""" go build -o {build_target} -ldflags='-s -w' -trimpath"""
 
         # garble
 
-        if shutil.which("garble") and self.target != "cc":
+        if shutil.which("garble") and self.target != "cc" and args.garble:
             cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0 GOPRIVATE=''' + \
-                f''' garble -literals -tiny build -o {build_target} -ldflags="-v -buildmode=pie" -trimpath .'''
+                f''' garble -literals -tiny build -o {build_target} -ldflags="-v" -trimpath .'''
 
         os.system(cmd)
         log_warn("GO BUILD ends...")
@@ -207,7 +206,7 @@ class GoBuild:
 
         # pack agent binary with packer
 
-        if self.target == "agent":
+        if self.target == "agent" and args.pack:
             shutil.copy(targetFile, "../packer/agent")
             os.chdir("../packer")
             os.system("bash ./build.sh")
@@ -215,11 +214,6 @@ class GoBuild:
             shutil.move("agent.packed.exe", f"../core/{targetFile}")
             os.chdir("../core")
             os.chmod(targetFile, 0o755)
-
-            # upx breaks existing compression in `packer`
-            # it's disabled until this issue is solved
-            # if shutil.which("upx"):
-            #     os.system(f"upx -9 {targetFile}")
 
             log_warn(f"{targetFile} packed")
 
@@ -683,12 +677,21 @@ def get_version():
 # command line args
 yes_to_all = False
 
-if len(sys.argv) < 2:
-    print(f"python3 {sys.argv[0]} cc/agent [-y]")
-    sys.exit(1)
-elif len(sys.argv) == 3:
-    # if `-y` is specified, no questions will be asked
-    yes_to_all = sys.argv[2] == "-y"
+parser = argparse.ArgumentParser(description="Build emp3r0r CC/Agent bianaries")
+parser.add_argument('--target', type=str, required=True,
+                    help='Build target, can be cc/agent/agentw')
+parser.add_argument('--pack', action="store_true", required=False,
+                    help='Pack agent binary, only available under Linux, do not use with --dll')
+parser.add_argument('--dll', action="store_true", required=False,
+                    help='Load agent binary into any processes using shared library injection')
+parser.add_argument('--garble', action="store_true", required=False,
+                    help='Obfuscate agent binary with garble')
+parser.add_argument('--yes', action="store_true", required=False,
+                    help='Do not ask questions, take default answers')
+args = parser.parse_args()
+
+if args.yes:
+    yes_to_all = True
 
 try:
     randomize_ports()
