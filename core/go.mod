@@ -15,6 +15,7 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/jaypipes/ghw v0.8.0
 	github.com/jm33-m0/go-cdn2proxy v1.1.2
+	github.com/jm33-m0/go-lpe v0.0.0-20220127100252-84bc16d959b5
 	github.com/kbinani/screenshot v0.0.0-20210720154843-7d3a670d8329
 	github.com/klauspost/compress v1.14.1 // indirect
 	github.com/mholt/archiver v3.1.1+incompatible
@@ -30,7 +31,6 @@ require (
 	github.com/shirou/gopsutil/v3 v3.21.11
 	github.com/txthinking/socks5 v0.0.0-20211121111206-e03c1217a50b
 	github.com/vishvananda/netlink v1.1.0
-	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
 	golang.org/x/net v0.0.0-20211216030914-fe4d6282115f
 	golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e

@@ -1,0 +1,11 @@
+{
+    "name": "pkexec-lpe",
+    "exec": "pkexec-lpe",
+    "platform": "Linux",
+    "author": "blasty, jm33-ng",
+    "date": "2022-01-27",
+    "comment": "CVE-2021-4034",
+    "options": {
+        "n/a": "This module doesn't has any options"
+    }
+}
