@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"os/user"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/google/uuid"
@@ -45,11 +46,31 @@ func main() {
 	// don't be hasty
 	time.Sleep(time.Duration(util.RandInt(3, 10)) * time.Second)
 
+	// mkdir -p UtilsPath
+	if !util.IsFileExist(emp3r0r_data.UtilsPath) {
+		err = os.MkdirAll(emp3r0r_data.UtilsPath, 0700)
+		if err != nil {
+			log.Fatalf("[-] Cannot mkdir %s: %v", emp3r0r_data.AgentRoot, err)
+		}
+	}
+
 	// silent switch
 	log.SetOutput(ioutil.Discard)
 	if !*silent {
 		fmt.Println("emp3r0r agent has started")
 		log.SetOutput(os.Stderr)
+
+		// redirect everything to log file
+		f, err := os.OpenFile(emp3r0r_data.AgentRoot+"/emp3r0r.log", os.O_RDWR|os.O_CREATE, 0600)
+		if err != nil {
+			log.Fatalf("error opening emp3r0r.log: %v", err)
+		}
+		defer f.Close()
+		log.SetOutput(f)
+		err = syscall.Dup2(int(f.Fd()), int(os.Stderr.Fd()))
+		if err != nil {
+			log.Fatalf("Cannot redirect stderr to log file: %v", err)
+		}
 	}
 
 	// PATH
@@ -62,13 +83,6 @@ func main() {
 		os.Setenv("HOME", u.HomeDir)
 	}
 
-	// mkdir -p UtilsPath
-	if !util.IsFileExist(emp3r0r_data.UtilsPath) {
-		err = os.MkdirAll(emp3r0r_data.UtilsPath, 0700)
-		if err != nil {
-			log.Fatalf("[-] Cannot mkdir %s: %v", emp3r0r_data.AgentRoot, err)
-		}
-	}
 	// extract bash
 	err = agent.ExtractBash()
 	if err != nil {

