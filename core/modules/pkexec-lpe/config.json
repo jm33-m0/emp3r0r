@@ -6,6 +6,6 @@
     "date": "2022-01-27",
     "comment": "CVE-2021-4034",
     "options": {
-        "--": "This module doesn't has any options"
+        "--": ["", "This module doesn't has any options"]
     }
 }
