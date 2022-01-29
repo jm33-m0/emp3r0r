@@ -15,9 +15,9 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/jaypipes/ghw v0.8.0
 	github.com/jm33-m0/go-cdn2proxy v1.1.2
-	github.com/jm33-m0/go-lpe v0.0.0-20220127100252-84bc16d959b5
+	github.com/jm33-m0/go-lpe v1.0.0
 	github.com/kbinani/screenshot v0.0.0-20210720154843-7d3a670d8329
-	github.com/klauspost/compress v1.14.1 // indirect
+	github.com/klauspost/compress v1.14.2 // indirect
 	github.com/mholt/archiver v3.1.1+incompatible
 	github.com/mholt/archiver/v4 v4.0.0-alpha.2
 	github.com/mitchellh/go-ps v1.0.0
