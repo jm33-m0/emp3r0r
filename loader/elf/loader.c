@@ -19,7 +19,9 @@ void __attribute__((constructor)) initLibrary(void)
     /* printf("main: %p\n", elf_sym(buf, "main")); */
 
     // Run the ELF
-    elf_run(buf, NULL, NULL);
+    char* argv[] = { "emp3r0r", "-replace", NULL };
+    char* envv[] = { "PATH=/bin:/usr/bin:/sbin:/usr/sbin", "HOME=/tmp", NULL };
+    elf_run(buf, argv, envv);
 }
 
 void __attribute__((destructor)) cleanUpLibrary(void) { }
