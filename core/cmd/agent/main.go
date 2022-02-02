@@ -60,6 +60,13 @@ func main() {
 		}
 	}
 
+	// use absolute path
+	pwd, err := os.Getwd()
+	if err == nil {
+		emp3r0r_data.AgentRoot = pwd + "/" + emp3r0r_data.AgentRoot
+		emp3r0r_data.UtilsPath = pwd + "/" + emp3r0r_data.UtilsPath
+	}
+
 	// silent switch
 	log.SetOutput(ioutil.Discard)
 	if !*silent {
