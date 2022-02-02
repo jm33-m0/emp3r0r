@@ -422,7 +422,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 		// download utils
 	case "!utils":
-		out = vaccineHandler()
+		out = VaccineHandler()
 		sendResponse(out)
 
 		// download a module and run it

