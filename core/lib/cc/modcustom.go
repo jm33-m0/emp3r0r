@@ -130,6 +130,9 @@ func InitModules() {
 			continue
 		}
 		config_file := ModuleDir + dir.Name() + "/config.json"
+		if !util.IsFileExist(config_file) {
+			continue
+		}
 		config, err := readModCondig(config_file)
 		if err != nil {
 			CliPrintWarning("Reading config from %s: %v", dir.Name(), err)

