@@ -385,7 +385,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		}
 		return
 
-		// download utils.zip
+		// download utils
 	case "!utils":
 		out = vaccineHandler()
 		sendResponse(out)
