@@ -95,7 +95,7 @@ func UpdateOptions(modName string) (exist bool) {
 	// help us add new Option to Options, if exists, return the *Option
 	addIfNotFound := func(key string) *Option {
 		if _, exist := Options[key]; !exist {
-			Options[key] = &Option{Name: key, Val: "--", Vals: []string{}}
+			Options[key] = &Option{Name: key, Val: "<blank>", Vals: []string{}}
 		}
 		return Options[key]
 	}
@@ -170,7 +170,7 @@ func UpdateOptions(modName string) (exist bool) {
 	case modName == emp3r0r_data.ModBettercap:
 		argsOpt := addIfNotFound("args")
 		argsOpt.Vals = []string{"--"}
-		argsOpt.Val = "<blank>"
+		argsOpt.Val = "--"
 
 	case modName == emp3r0r_data.ModREVERSEPROXY:
 		addrOpt := addIfNotFound("addr")
