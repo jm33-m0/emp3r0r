@@ -1,0 +1,4 @@
+package cc
+
+func moduleGDB() {
+}

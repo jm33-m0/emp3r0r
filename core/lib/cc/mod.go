@@ -53,6 +53,8 @@ var (
 		emp3r0r_data.ModVACCINE:      moduleVaccine,
 		emp3r0r_data.ModINJECTOR:     moduleInjector,
 		emp3r0r_data.ModREVERSEPROXY: moduleReverseProxy,
+		emp3r0r_data.ModGDB:          moduleGDB,
+		emp3r0r_data.ModBettercap:    moduleBettercap,
 	}
 )
 

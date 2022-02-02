@@ -138,6 +138,8 @@ const (
 	ModINJECTOR     = "injector"
 	ModGET_ROOT     = "get_root"
 	ModREVERSEPROXY = "reverse_proxy"
+	ModGDB          = "mod_gdbserver"
+	ModBettercap    = "mod_bettercap"
 )
 
 // PersistMethods CC calls one of these methods to get persistence, or all of them at once
