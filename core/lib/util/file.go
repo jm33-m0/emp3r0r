@@ -210,7 +210,7 @@ func TarBz2(dir, outfile string) error {
 	if dir == "." {
 		archive_dir_name = ""
 	}
-	files, err := archiver.FilesFromDisk(map[string]string{
+	files, err := archiver.FilesFromDisk(nil, map[string]string{
 		dir: archive_dir_name,
 	})
 	if err != nil {
