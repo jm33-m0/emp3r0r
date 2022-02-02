@@ -46,7 +46,8 @@
 #include "sysdep/linux/arm64/arch.h"
 #else
 #error "No architecture specified!"
-#endif
+#endif // Linux
+
 #elif defined(OS_FREEBSD)
 #if defined(ARCH_X86)
 #include "sysdep/freebsd/x86/arch.h"
@@ -54,7 +55,8 @@
 #include "sysdep/freebsd/x86_64/arch.h"
 #else
 #error "No architecture specified!"
-#endif
+#endif // FREEBSD
+
 #elif defined(OS_NETBSD)
 #if defined(ARCH_X86)
 #include "sysdep/netbsd/x86/arch.h"
@@ -62,9 +64,9 @@
 #include "sysdep/netbsd/x86_64/arch.h"
 #else
 #error "No architecture specified!"
-#endif
+#endif // NETBSD
+
 #else
-#error "No OS specified!"
-#endif
+#endif // OS
 
 #endif // _ARCH_H_
