@@ -165,6 +165,8 @@ var ModuleComments = map[string]string{
 	ModINJECTOR:     "Inject shellcode into a running process with GDB",
 	ModGET_ROOT:     "Try some built-in LPE exploits",
 	ModREVERSEPROXY: "Manually proxy agents who are unable to use our forward proxy",
+	ModBettercap:    "Remote bettercap, offered as an interactive shell",
+	ModGDB:          "Remote gdbserver, debug anything",
 }
 
 // Module help for options, does not include every module since not all modules need args
@@ -198,6 +200,9 @@ var ModuleHelp = map[string]map[string]string{
 	},
 	ModREVERSEPROXY: {
 		"addr": "Target host to proxy, we will connect to it and proxy it out",
+	},
+	ModBettercap: {
+		"args": "Command line args for bettercap",
 	},
 }
 
