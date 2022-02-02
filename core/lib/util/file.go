@@ -206,8 +206,12 @@ func FileSize(path string) (size int64) {
 
 func TarBz2(dir, outfile string) error {
 	// map files on disk to their paths in the archive
+	archive_dir_name := FileBaseName(dir)
+	if dir == "." {
+		archive_dir_name = ""
+	}
 	files, err := archiver.FilesFromDisk(map[string]string{
-		dir: FileBaseName(dir),
+		dir: archive_dir_name,
 	})
 	if err != nil {
 		return err

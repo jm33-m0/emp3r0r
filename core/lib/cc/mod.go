@@ -95,7 +95,7 @@ func UpdateOptions(modName string) (exist bool) {
 	// help us add new Option to Options, if exists, return the *Option
 	addIfNotFound := func(key string) *Option {
 		if _, exist := Options[key]; !exist {
-			Options[key] = &Option{Name: key, Val: "<blank>", Vals: []string{}}
+			Options[key] = &Option{Name: key, Val: "--", Vals: []string{}}
 		}
 		return Options[key]
 	}
@@ -167,10 +167,15 @@ func UpdateOptions(modName string) (exist bool) {
 		methodOpt.Vals = []string{"gdb", "native", "python"}
 		methodOpt.Val = "native"
 
+	case modName == emp3r0r_data.ModBettercap:
+		argsOpt := addIfNotFound("args")
+		argsOpt.Vals = []string{"--"}
+		argsOpt.Val = "<blank>"
+
 	case modName == emp3r0r_data.ModREVERSEPROXY:
-		pidOpt := addIfNotFound("addr")
-		pidOpt.Vals = []string{"127.0.0.1"}
-		pidOpt.Val = "<blank>"
+		addrOpt := addIfNotFound("addr")
+		addrOpt.Vals = []string{"127.0.0.1"}
+		addrOpt.Val = "<blank>"
 
 	case modName == emp3r0r_data.ModPERSISTENCE:
 		currentOpt = addIfNotFound("method")
@@ -189,7 +194,10 @@ func UpdateOptions(modName string) (exist bool) {
 			argOpt := addIfNotFound(arg)
 
 			// read default values
-			modConf := ModuleConfigs[modName]
+			modConf, exist := ModuleConfigs[modName]
+			if !exist {
+				continue
+			}
 			val := modConf.Options[arg][0]
 			argOpt.Val = val
 		}

