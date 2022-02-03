@@ -13,7 +13,7 @@ tmux_conf="$PWD/tmux/.tmux.conf"
 
 [[ -f ./build/cc ]] || (
     echo "[-] Building CC server as it's not found"
-    python3 ./build.py cc
+    python3 ./build.py --target cc
 )
 
 (
