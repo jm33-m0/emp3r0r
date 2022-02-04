@@ -16,7 +16,7 @@ import (
 func CopySelfTo(dest_path string) (err error) {
 	elf_data, err := ioutil.ReadFile("/proc/self/exe")
 	if err != nil {
-		return
+		return fmt.Errorf("Read self exe: %v", err)
 	}
 
 	return ioutil.WriteFile(dest_path, elf_data, 0755)
