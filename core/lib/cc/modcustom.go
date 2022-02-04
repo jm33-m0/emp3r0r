@@ -125,6 +125,12 @@ func InitModules() {
 		return
 	}
 
+	// get vaccine ready
+	err = CreateVaccineArchive()
+	if err != nil {
+		CliPrintWarning("CreateVaccineArchive: %v", err)
+	}
+
 	for _, dir := range dirs {
 		if !dir.IsDir() {
 			continue

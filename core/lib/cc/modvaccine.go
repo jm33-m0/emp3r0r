@@ -1,6 +1,7 @@
 package cc
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -10,22 +11,28 @@ import (
 // statically linked, built under alpine
 func moduleVaccine() {
 	go func() {
-		pwd, _ := os.Getwd()
-		err := os.Chdir(ModuleDir + "/vaccine")
+		err := CreateVaccineArchive()
 		if err != nil {
-			CliPrintError("Entering vaccine dir: %v", err)
+			CliPrintError("CreateVaccineArchive: %v", err)
 			return
 		}
-		defer os.Chdir(pwd)
-		err = util.TarBz2(".", WWWRoot+"utils.tar.bz2")
-		if err != nil {
-			CliPrintError("Creating vaccine archive: %v", err)
-			return
-		}
-
 		err = SendCmd("!utils", "", CurrentTarget)
 		if err != nil {
 			CliPrintError("SendCmd failed: %v", err)
 		}
 	}()
+}
+
+func CreateVaccineArchive() (err error) {
+	pwd, _ := os.Getwd()
+	err = os.Chdir(ModuleDir + "/vaccine")
+	if err != nil {
+		return fmt.Errorf("Entering vaccine dir: %v", err)
+	}
+	defer os.Chdir(pwd)
+	err = util.TarBz2(".", WWWRoot+"utils.tar.bz2")
+	if err != nil {
+		return fmt.Errorf("Creating vaccine archive: %v", err)
+	}
+	return
 }
