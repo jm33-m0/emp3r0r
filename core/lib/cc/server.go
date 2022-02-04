@@ -415,6 +415,26 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 			"running %s\n",
 			shortname, fmt.Sprintf("%s - %s", target.IP, target.Transport),
 			strconv.Quote(target.OS))
+	} else {
+		// just update this agent's sysinfo
+		for a := range Targets {
+			if a.Tag == target.Tag {
+				a = &target
+				break
+			}
+		}
+		shortname := strings.Split(target.Tag, "-agent")[0]
+		// set labels
+		if util.IsFileExist(AgentsJSON) {
+			var mutex = &sync.Mutex{}
+			if l := SetAgentLabel(&target, mutex); l != "" {
+				shortname = l
+			}
+		}
+		CliPrintDebug("Refreshing sysinfo\n%s from %s, "+
+			"running %s\n",
+			shortname, fmt.Sprintf("%s - %s", target.IP, target.Transport),
+			strconv.Quote(target.OS))
 	}
 }
 
