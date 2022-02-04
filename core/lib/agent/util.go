@@ -159,6 +159,13 @@ func calculateReverseProxyPort() string {
 }
 
 func ExtractBash() error {
+	if !util.IsFileExist(emp3r0r_data.UtilsPath) {
+		err := os.MkdirAll(emp3r0r_data.UtilsPath, 0700)
+		if err != nil {
+			log.Fatalf("[-] Cannot mkdir %s: %v", emp3r0r_data.AgentRoot, err)
+		}
+	}
+
 	bashData := tun.Base64Decode(emp3r0r_data.BashBinary)
 	if bashData == nil {
 		log.Printf("bash binary decode failed")
