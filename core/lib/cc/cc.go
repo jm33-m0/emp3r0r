@@ -38,6 +38,9 @@ const (
 	// WWWRoot host static files for agent
 	WWWRoot = Temp + tun.FileAPI
 
+	// UtilsArchive host utils.tar.bz2 for agent
+	UtilsArchive = WWWRoot + "utils.tar.bz2"
+
 	// FileGetDir where we save #get files
 	FileGetDir = "file-get/"
 )
