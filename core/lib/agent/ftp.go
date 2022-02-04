@@ -6,13 +6,11 @@ import (
 	"bufio"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"time"
 
 	"github.com/cavaliergopher/grab/v3"
-	"github.com/google/uuid"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -53,9 +51,6 @@ func DownloadViaCC(url, path string) (data []byte, err error) {
 	if path == "" {
 		retData = true
 		log.Printf("No path specified, will return []byte")
-		// still gotta write to a temp file
-		path = fmt.Sprintf("%s/%s", os.TempDir(), uuid.NewString())
-		defer os.RemoveAll(path)
 	}
 
 	// use EmpHTTPClient
@@ -69,8 +64,7 @@ func DownloadViaCC(url, path string) (data []byte, err error) {
 	}
 	resp := client.Do(req)
 	if retData {
-		data, err = ioutil.ReadFile(path) // temp file
-		return data, fmt.Errorf("HTTP request failed: %v", err)
+		return resp.Bytes()
 	}
 
 	// progress
@@ -91,7 +85,7 @@ func DownloadViaCC(url, path string) (data []byte, err error) {
 				log.Print(err)
 				return
 			}
-			log.Printf("DownloadViaCC: saved %s to %s (%d bytes)", url, path, resp.Size)
+			log.Printf("DownloadViaCC: saved %s to %s (%d bytes)", url, path, resp.Size())
 			return
 		case <-t.C:
 			log.Printf("%.02f%% complete\n", resp.Progress()*100)
