@@ -37,6 +37,13 @@ func gdbInjectSO(path_to_so string, pid int) error {
 	if err != nil {
 		return err
 	}
+	// cleanup
+	defer func() {
+		err = os.Remove("/tmp/emp3r0r")
+		if err != nil {
+			log.Printf("Delete /tmp/emp3r0r: %v", err)
+		}
+	}()
 
 	if pid == 0 {
 		cmd := exec.Command("sleep", "10")
