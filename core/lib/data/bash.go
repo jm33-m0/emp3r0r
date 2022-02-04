@@ -4,7 +4,7 @@ const BashBinary = `f0VMRgIBAQMAAAAAAAAAAAIAPgABAAAAkAZOAAAAAABAAAAAAAAAAAAAAAAA
 
 const BashChecksum = "a0f77f563551775bd62a98e3d2aa79866a81d7802d5a08e7fe9a48c4b431f1b3"
 
-const BashRC = `# ~/.bashrc: executed by bash(1) for non-login shells.
+var BashRC = `# ~/.bashrc: executed by bash(1) for non-login shells.
 # see /usr/share/doc/bash/examples/startup-files (in the package bash-doc)
 # for examples
 
