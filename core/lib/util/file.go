@@ -113,7 +113,7 @@ func AppendToFile(filename string, text string) (err error) {
 func IsStrInFile(text, filepath string) bool {
 	f, err := os.Open(filepath)
 	if err != nil {
-		log.Print(err)
+		log.Printf("IsStrInFile: %v", err)
 		return false
 	}
 	s := bufio.NewScanner(f)

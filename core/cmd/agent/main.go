@@ -69,6 +69,7 @@ func main() {
 
 	// silent switch
 	log.SetOutput(ioutil.Discard)
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
 	if !*silent {
 		fmt.Println("emp3r0r agent has started")
 		log.SetOutput(os.Stderr)
