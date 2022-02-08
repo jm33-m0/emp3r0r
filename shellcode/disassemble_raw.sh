@@ -10,4 +10,4 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
-rasm2 -d -a x86 -b 64 "$(xxd -i "$1" | grep 0x | tr -d ',' | tr -d '[:space:]' | sed 's/0x//g')"
+rasm2 -D -a x86 -b 64 "$(xxd -i "$1" | grep 0x | tr -d ',' | tr -d '[:space:]' | sed 's/0x//g')"
