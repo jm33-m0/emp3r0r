@@ -65,8 +65,8 @@ exec:
 	syscall
 
 pause:
-	;;  trap
-	int 0x3
+	;; trap
+	int3
 
 	; exit:
 	; ;; exit
