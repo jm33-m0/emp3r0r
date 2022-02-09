@@ -79,13 +79,14 @@ func main() {
 			emp3r0r_data.AgentRoot),
 			os.O_RDWR|os.O_CREATE, 0600)
 		if err != nil {
-			log.Fatalf("error opening emp3r0r.log: %v", err)
-		}
-		defer f.Close()
-		log.SetOutput(f)
-		err = syscall.Dup2(int(f.Fd()), int(os.Stderr.Fd()))
-		if err != nil {
-			log.Fatalf("Cannot redirect stderr to log file: %v", err)
+			log.Printf("error opening emp3r0r.log: %v", err)
+		} else {
+			log.SetOutput(f)
+			defer f.Close()
+			err = syscall.Dup2(int(f.Fd()), int(os.Stderr.Fd()))
+			if err != nil {
+				log.Fatalf("Cannot redirect stderr to log file: %v", err)
+			}
 		}
 	}
 
