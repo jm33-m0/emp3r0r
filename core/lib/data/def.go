@@ -162,7 +162,7 @@ var ModuleComments = map[string]string{
 	ModPORT_FWD:     "Port mapping from agent to CC (or vice versa), via HTTP2 (or other) tunnel",
 	ModSHELL:        "Run custom bash on target, a perfect reverse shell",
 	ModVACCINE:      "Vaccine helps you install additional tools on target system",
-	ModINJECTOR:     "Inject shellcode into a running process with GDB",
+	ModINJECTOR:     "Inject shellcode/loader.so into a running process",
 	ModGET_ROOT:     "Try some built-in LPE exploits",
 	ModREVERSEPROXY: "Manually proxy agents who are unable to use our forward proxy",
 	ModBettercap:    "Remote bettercap, offered as an interactive shell",
@@ -196,7 +196,8 @@ var ModuleHelp = map[string]map[string]string{
 		"port":  "The (sshd) port that our shell will be using",
 	},
 	ModINJECTOR: {
-		"pid": "Target process PID, set to 0 to start a new process (sleep)",
+		"pid":    "Target process PID, set to 0 to start a new process (sleep)",
+		"method": "Use `inject_shellcode` to inject any shellcode, use `*_loader` to inject loader.so",
 	},
 	ModREVERSEPROXY: {
 		"addr": "Target host to proxy, we will connect to it and proxy it out",

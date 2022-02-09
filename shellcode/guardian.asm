@@ -64,9 +64,9 @@ exec:
 	cdq
 	syscall
 
-	; pause:
-	; ;; trap
-	; int3
+pause:
+	;; trap
+	int3
 
 	; exit:
 	; ;; exit

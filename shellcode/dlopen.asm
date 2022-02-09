@@ -4,9 +4,10 @@
 	global  _start
 
 _start:
-	xor eax, eax
-	xor edi, edi
-	xor esi, esi
+	xor  eax, eax
+	xor  edi, edi
+	xor  esi, esi
+	push rdi; '\0' terminates string
 
 	;;     char *filename
 	;[push filename here]

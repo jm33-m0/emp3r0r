@@ -164,8 +164,8 @@ func UpdateOptions(modName string) (exist bool) {
 		pidOpt.Vals = []string{"0"}
 		pidOpt.Val = "0"
 		methodOpt := addIfNotFound("method")
-		methodOpt.Vals = []string{"gdb", "native", "python"}
-		methodOpt.Val = "native"
+		methodOpt.Vals = []string{"gdb_loader", "inject_shellcode", "inject_loader"}
+		methodOpt.Val = "inject_shellcode"
 
 	case modName == emp3r0r_data.ModBettercap:
 		argsOpt := addIfNotFound("args")
