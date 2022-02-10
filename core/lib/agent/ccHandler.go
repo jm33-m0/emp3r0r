@@ -410,7 +410,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 			return
 		}
 		out = fmt.Sprintf("%s: success", cmdSlice[1])
-		pid, err := strconv.ParseInt(cmdSlice[2], 10, 64)
+		pid, err := strconv.ParseInt(cmdSlice[2], 10, 32)
 		if err != nil {
 			log.Print("Invalid pid")
 		}
