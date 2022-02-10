@@ -276,19 +276,6 @@ class GoBuild:
             f'''Version = "{self.VERSION}"''',
         )
 
-        if self.target == "agent":
-            # guardian shellcode
-            sed(
-                "./lib/data/def.go",
-                "[persistence_shellcode]",
-                CACHED_CONF["guardian_shellcode"],
-            )
-            sed(
-                "./lib/data/def.go",
-                "[persistence_agent_path]",
-                CACHED_CONF["guardian_agent_path"],
-            )
-
         # CA
         sed("./lib/tun/tls.go", "[emp3r0r_ca]", self.CA)
 
@@ -623,11 +610,6 @@ def main(target):
         doh = input("DNS over HTTP server (leave empty to disable): ").strip()
         CACHED_CONF["doh_server"] = doh
 
-    # guardian shellcode
-    path = f"/tmp/{next(tempfile._get_candidate_names())}"
-    CACHED_CONF["guardian_shellcode"] = gen_guardian_shellcode(path)
-    CACHED_CONF["guardian_agent_path"] = path
-
     # option to disable autoproxy and broadcasting
 
     if not yes_no("Use autoproxy (will enable UDP broadcasting)"):
@@ -698,33 +680,6 @@ def randomize_ports():
 
     if "broadcast_port" not in CACHED_CONF:
         CACHED_CONF["broadcast_port"] = rand_port()
-
-
-def gen_guardian_shellcode(path):
-    """
-    ../shellcode/gen.py
-    """
-
-    if not shutil.which("nasm"):
-        log_error("nasm not found")
-    try:
-        pwd = os.getcwd()
-        os.chdir("../shellcode")
-        out = subprocess.check_output(["python3", "gen.py", path])
-        os.chdir(pwd)
-
-        shellcode = out.decode("utf-8")
-
-        if "\\x48" not in shellcode:
-            log_error("Failed to generate shellcode: " + out)
-
-            return "N/A"
-    except BaseException:
-        log_error(traceback.format_exc())
-
-        return "N/A"
-
-    return shellcode
 
 
 def get_version():
