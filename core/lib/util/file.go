@@ -132,6 +132,13 @@ func Copy(src, dst string) error {
 	if err != nil {
 		return err
 	}
+	if IsFileExist(dst) {
+		err = os.RemoveAll(dst)
+		if err != nil {
+			log.Printf("Copy: %s exists and cannot be removed", dst)
+		}
+	}
+
 	return ioutil.WriteFile(dst, in, 0755)
 }
 
