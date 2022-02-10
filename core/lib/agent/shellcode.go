@@ -12,7 +12,8 @@ import (
 )
 
 var (
-	dlopen_shellcode = "31f0" + "31ff" + "31f6" + // clear rax, rdi, rsi
+	dlopen_shellcode = "31f0" + "31ff" + "31f6" +
+		"31d2" + "31c9" + "31db" + // clear rax, rdi, rsi
 		"57" + // push rdi '\0'
 		// filename is path to loader.so
 		// to be replaced with
