@@ -44,12 +44,6 @@ func main() {
 		return
 	}
 
-	// self delete
-	err = os.Remove(os.Args[0])
-	if err != nil {
-		log.Printf("Self delete: %v", err)
-	}
-
 	// don't be hasty
 	time.Sleep(time.Duration(util.RandInt(3, 10)) * time.Second)
 
