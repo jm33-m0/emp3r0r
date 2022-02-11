@@ -16,6 +16,7 @@ import (
 	"os/user"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
@@ -51,12 +52,12 @@ func IsAgentAlive() bool {
 
 	// send hello to agent
 	for {
-		_, err := c.Write([]byte("emp3r0r"))
+		_, err := c.Write([]byte(fmt.Sprintf("hello from %d", os.Getpid())))
 		if err != nil {
 			log.Print("write error:", err)
 			break
 		}
-		if <-replyFromAgent == "emp3r0r" {
+		if strings.Contains(<-replyFromAgent, "emp3r0r") {
 			log.Println("Yes it's alive")
 			return true
 		}
