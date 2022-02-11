@@ -24,7 +24,11 @@ tmux_conf="$PWD/tmux/.tmux.conf"
     }
 
     [[ -n "$TMUX" ]] || {
-        tmux new-session -A -f "$tmux_conf" -s emp3r0r -n cc ./cc "$@"
+        tmux -f "$tmux_conf" new-session -A -s emp3r0r -n cc ./cc "$@" || {
+            echo "$0 must be run in tmux"
+            exit 1
+        }
+
         exit
     }
 
