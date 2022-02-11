@@ -25,6 +25,11 @@ _start:
 	push rdi
 	add  rsp, 7
 	mov  rdi, rsp
+
+	;;   balance stack
+	;;   7 pushes, we must add one more push
+	sub  rsp, 7
+	push rdi
 	mov  sil, 2
 	mov  rax, 0x7fdbd84e9800; change me to real __libc_dlopen_mode address
 	call rax
