@@ -147,9 +147,13 @@ test_agent:
 		}
 
 		// if agent is not responsive, kill it, and start a new instance
-		err = proc.Kill()
-		if err != nil {
-			log.Println("Failed to kill old emp3r0r", err)
+		// after IsAgentAlive(), the PID file gets replaced with current process's PID
+		// if we kill it, we will be killing ourselves
+		if proc.Pid != os.Getpid() {
+			err = proc.Kill()
+			if err != nil {
+				log.Println("Failed to kill old emp3r0r", err)
+			}
 		}
 	}
 
