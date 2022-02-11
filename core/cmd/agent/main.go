@@ -78,7 +78,7 @@ func main() {
 		// redirect everything to log file
 		f, err := os.OpenFile(fmt.Sprintf("%s/emp3r0r.log",
 			emp3r0r_data.AgentRoot),
-			os.O_RDWR|os.O_CREATE, 0600)
+			os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
 		if err != nil {
 			log.Printf("error opening emp3r0r.log: %v", err)
 		} else {
