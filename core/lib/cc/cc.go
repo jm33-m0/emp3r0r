@@ -108,7 +108,7 @@ func ListTargets() {
 	tdata := [][]string{}
 	tableString := &strings.Builder{}
 	table := tablewriter.NewWriter(tableString)
-	table.SetHeader([]string{"Index", "Label", "Tag", "OS", "IPs", "From"})
+	table.SetHeader([]string{"Index", "Label", "Tag", "OS", "PROCESS", "IPs", "From"})
 	table.SetBorder(true)
 	table.SetRowLine(true)
 	table.SetAutoWrapText(true)
@@ -120,6 +120,7 @@ func ListTargets() {
 		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiCyanColor},
 		tablewriter.Colors{tablewriter.Bold, tablewriter.FgBlueColor},
 		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiWhiteColor},
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiCyanColor},
 		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiBlueColor},
 		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiYellowColor})
 
@@ -127,6 +128,7 @@ func ListTargets() {
 		tablewriter.Colors{tablewriter.FgHiCyanColor},
 		tablewriter.Colors{tablewriter.FgBlueColor},
 		tablewriter.Colors{tablewriter.FgHiWhiteColor},
+		tablewriter.Colors{tablewriter.FgHiCyanColor},
 		tablewriter.Colors{tablewriter.FgHiBlueColor},
 		tablewriter.Colors{tablewriter.FgYellowColor})
 
@@ -140,14 +142,18 @@ func ListTargets() {
 		label := control.Label
 
 		// info map
+		procInfo := fmt.Sprintf("%s (%d)\n<- %s (%d)",
+			target.Process.Cmdline, target.Process.PID, target.Process.Parent, target.Process.PPID)
 		ips := strings.Join(target.IPs, ",\n")
 		infoMap := map[string]string{
-			"OS":   SplitLongLine(target.OS, 15),
-			"From": fmt.Sprintf("%s\nvia %s", target.IP, target.Transport),
-			"IPs":  ips,
+			"OS":      SplitLongLine(target.OS, 15),
+			"PROCESS": SplitLongLine(procInfo, 15),
+			"From":    fmt.Sprintf("%s\nvia %s", target.IP, target.Transport),
+			"IPs":     ips,
 		}
 
-		var row = []string{index, label, SplitLongLine(target.Tag, 15), infoMap["OS"], infoMap["IPs"], infoMap["From"]}
+		var row = []string{index, label, SplitLongLine(target.Tag, 15),
+			infoMap["OS"], infoMap["PROCESS"], infoMap["IPs"], infoMap["From"]}
 		tdata = append(tdata, row)
 	}
 	// rendor table
