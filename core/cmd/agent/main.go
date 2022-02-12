@@ -50,8 +50,6 @@ func main() {
 	// mkdir -p UtilsPath
 	// use absolute path
 	// TODO find a better location for temp files
-	emp3r0r_data.AgentRoot = "/tmp/" + emp3r0r_data.AgentRoot
-	emp3r0r_data.UtilsPath = "/tmp/" + emp3r0r_data.UtilsPath
 	if !util.IsFileExist(emp3r0r_data.UtilsPath) {
 		err = os.MkdirAll(emp3r0r_data.UtilsPath, 0700)
 		if err != nil {
