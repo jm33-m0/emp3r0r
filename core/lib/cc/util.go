@@ -188,7 +188,7 @@ func assignTargetIndex() (index int) {
 
 // TermClear clear screen
 func TermClear() {
-	os.Stdout.WriteString("\033[2J")
+	os.Stdout.WriteString(ClearTerm)
 	err := CliBanner()
 	if err != nil {
 		CliPrintError("%v", err)

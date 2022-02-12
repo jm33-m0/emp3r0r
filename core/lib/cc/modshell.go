@@ -72,7 +72,7 @@ func moduleShell() {
 	}
 
 	// run
-	err := SSHClient(shell, args, port)
+	err := SSHClient(shell, args, port, false)
 	if err != nil {
 		CliPrintError("moduleShell: %v", err)
 	}

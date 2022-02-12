@@ -15,7 +15,7 @@ func moduleBettercap() {
 
 	args := Options["args"].Val
 	port := strconv.Itoa(util.RandInt(1024, 65535))
-	err := SSHClient(emp3r0r_data.UtilsPath+"/bettercap", args, port)
+	err := SSHClient(emp3r0r_data.UtilsPath+"/bettercap", args, port, false)
 	if err != nil {
 		CliPrintError("moduleBettercap: %v", err)
 	}

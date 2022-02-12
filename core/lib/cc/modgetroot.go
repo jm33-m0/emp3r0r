@@ -11,30 +11,32 @@ var LPEHelpers = map[string]string{
 }
 
 func moduleLPE() {
-	// target
-	target := CurrentTarget
-	if target == nil {
-		CliPrintError("Target not exist")
-		return
-	}
-	helperName := Options["lpe_helper"].Val
+	go func() {
+		// target
+		target := CurrentTarget
+		if target == nil {
+			CliPrintError("Target not exist")
+			return
+		}
+		helperName := Options["lpe_helper"].Val
 
-	// download third-party LPE helper
-	CliPrintInfo("Updating local LPE helper...")
-	err := DownloadFile(LPEHelpers[helperName], Temp+tun.FileAPI+helperName)
-	if err != nil {
-		CliPrintError("Failed to download %s: %v", helperName, err)
-		return
-	}
+		// download third-party LPE helper
+		CliPrintInfo("Updating local LPE helper...")
+		err := DownloadFile(LPEHelpers[helperName], Temp+tun.FileAPI+helperName)
+		if err != nil {
+			CliPrintError("Failed to download %s: %v", helperName, err)
+			return
+		}
 
-	// exec
-	CliMsg("This can take some time, please be patient")
-	cmd := "!lpe " + helperName
-	CliPrintInfo("Running " + cmd)
-	err = SendCmd(cmd, "", target)
-	if err != nil {
-		CliPrintError("Run %s: %v", cmd, err)
-	}
+		// exec
+		CliMsg("This can take some time, please be patient")
+		cmd := "!lpe " + helperName
+		CliPrintInfo("Running " + cmd)
+		err = SendCmd(cmd, "", target)
+		if err != nil {
+			CliPrintError("Run %s: %v", cmd, err)
+		}
+	}()
 }
 
 func moduleGetRoot() {

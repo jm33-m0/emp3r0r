@@ -25,7 +25,57 @@ var (
 
 	// Displays agent output, separated from logs
 	AgentOutputWindow *Emp3r0rPane
+
+	// Displays bash shell for selected agent
+	AgentShellWindow *Emp3r0rPane
+
+	// Put all windows in this map
+	TmuxWindows = make(map[string]*Emp3r0rPane)
 )
+
+// TmuxPrintf like printf, but prints to a tmux pane/window
+// id: pane unique id
+func TmuxPrintf(clear bool, id string, format string, a ...interface{}) {
+	if clear {
+		err := TmuxClearPane(id)
+		if err != nil {
+			CliPrintWarning("Clear pane: %v", err)
+		}
+	}
+	msg := fmt.Sprintf(format, a...)
+
+	idx := TmuxPaneID2Index(id)
+	if idx < 0 {
+		CliPrintWarning("Cannot find tmux window "+id+
+			", printing to main window instead.\n\n"+
+			format, a...)
+	}
+
+	// find target pane and print msg
+	for pane_id, window := range TmuxWindows {
+		if pane_id != id {
+			continue
+		}
+		_, err = window.FD.WriteString(msg)
+		if err != nil {
+			CliPrintWarning("Cannot print on tmux window "+id+
+				", printing to main window instead.\n\n"+
+				format, a...)
+		}
+		break
+	}
+}
+
+func TmuxClearPane(id string) (err error) {
+	idx := TmuxPaneID2Index(id)
+	job := fmt.Sprintf("tmux clear-history -t %d", idx)
+	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
+	if err != nil {
+		err = fmt.Errorf("exec tmux clear pane: %s\n%v", out, err)
+		return
+	}
+	return
+}
 
 func TmuxKillPane(id string) (err error) {
 	idx := TmuxPaneID2Index(id)
@@ -40,13 +90,11 @@ func TmuxKillPane(id string) (err error) {
 
 // TmuxDeinitWindows close previously opened tmux windows
 func TmuxDeinitWindows() {
-	err := TmuxKillPane(AgentOutputWindow.ID)
-	if err != nil {
-		log.Printf("TmuxDeinitWindows: %v", err)
-	}
-	err = TmuxKillPane(AgentInfoWindow.ID)
-	if err != nil {
-		log.Fatalf("TmuxDeinitWindows: %v", err)
+	for id := range TmuxWindows {
+		err = TmuxKillPane(id)
+		if err != nil {
+			log.Printf("TmuxDeinitWindows: %v", err)
+		}
 	}
 }
 
@@ -54,17 +102,19 @@ func TmuxDeinitWindows() {
 // - command output window
 // - current agent info
 func TmuxInitWindows() (err error) {
-	pane, err := TmuxNewPane("h", -1, 30, "/bin/cat")
+	pane, err := TmuxNewPane("h", "", 30, "/bin/cat")
 	if err != nil {
 		return
 	}
 	AgentInfoWindow = pane
+	TmuxWindows[AgentInfoWindow.ID] = AgentInfoWindow
 
-	pane, err = TmuxNewPane("v", -1, 40, "/bin/cat")
+	pane, err = TmuxNewPane("v", "", 40, "/bin/cat")
 	if err != nil {
 		return
 	}
 	AgentOutputWindow = pane
+	TmuxWindows[AgentOutputWindow.ID] = AgentOutputWindow
 
 	return
 }
@@ -73,12 +123,16 @@ func TmuxInitWindows() (err error) {
 // hV: horizontal or vertical split
 // target_pane: target_pane tmux index, split this pane
 // size: percentage, do not append %
-func TmuxNewPane(hV string, target_pane int, size int, cmd string) (pane *Emp3r0rPane, err error) {
+func TmuxNewPane(hV string, target_pane_id string, size int, cmd string) (pane *Emp3r0rPane, err error) {
 	if os.Getenv("TMUX") == "" ||
 		!util.IsCommandExist("tmux") {
 
 		err = errors.New("You need to run emp3r0r under `tmux`")
 		return
+	}
+	target_pane := TmuxPaneID2Index(target_pane_id)
+	if target_pane < 0 {
+
 	}
 
 	job := fmt.Sprintf(`tmux split-window -%s -p %d -P -d -F "#{pane_id}:#{pane_pid}:#{pane_tty}" '%s'`,

@@ -17,7 +17,10 @@ import (
 	"github.com/olekukonko/tablewriter"
 )
 
-const PromptName = "emp3r0r"
+const (
+	PromptName = "emp3r0r"
+	ClearTerm  = "\033[2J"
+)
 
 var (
 	// CliCompleter holds all command completions

@@ -3,7 +3,6 @@ package cc
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"strconv"
 	"strings"
@@ -43,7 +42,7 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 	cmd := payloadSplit[1]
 	cmd_slice := strings.Fields(cmd)
 	out := strings.Join(payloadSplit[2:len(payloadSplit)-1], " ")
-	outLines := strings.Split(out, "\n")
+	// outLines := strings.Split(out, "\n")
 
 	// time spent on this cmd
 	cmd_id := payloadSplit[len(payloadSplit)-1]
@@ -120,10 +119,7 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 		}
 		table.AppendBulk(tdata)
 		table.Render()
-		// CliMsg("Listing processes:\033[0m\n%s", tableString.String())
-		// return
 		out = tableString.String()
-		outLines = strings.Split(out, "\n")
 
 		// ls command
 	case "ls":
@@ -173,39 +169,10 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 		table.AppendBulk(tdata)
 		table.Render()
 		out = tableString.String()
-		outLines = strings.Split(out, "\n")
 	}
 
-	// optimize output
-	if len(outLines) > 20 {
-		t := time.Now()
-		logname := fmt.Sprintf("%scmd-%d-%02d-%02dT%02d:%02d:%02d.log",
-			Temp,
-			t.Year(), t.Month(), t.Day(),
-			t.Hour(), t.Minute(), t.Second())
+	TmuxPrintf(false, AgentOutputWindow.ID, "\n[%s] %s:\n%s\n\n", color.CyanString("%d", contrlIf.Index), color.HiMagentaString(cmd), color.HiWhiteString(out))
 
-		CliPrintInfo("Output will be displayed in new window")
-		err := ioutil.WriteFile(logname, []byte(out), 0600)
-		if err != nil {
-			CliPrintWarning(err.Error())
-		}
-
-		viewCmd := fmt.Sprintf(`less -f -r %s`,
-			logname)
-
-		// split window vertically
-		target_pane := TmuxPaneID2Index(AgentOutputWindow.ID)
-		if target_pane < 0 {
-			target_pane = -1
-		}
-		if _, err = TmuxNewPane("h", target_pane, 50, viewCmd); err == nil {
-			CliPrintSuccess("View result in new window (press q to quit)")
-			return
-		}
-		CliPrintError("Failed to opent tmux window: %v", err)
-	}
-
-	log.Printf("\n[%s] %s:\n%s\n\n", color.CyanString("%d", contrlIf.Index), color.HiMagentaString(cmd), color.HiWhiteString(out))
 	// cache this cmd response
 	CmdResultsMutex.Lock()
 	CmdResults[cmd_id] = out
