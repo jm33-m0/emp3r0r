@@ -112,6 +112,9 @@ class GoBuild:
             # by default mkdir in current directory
             self.AgentRoot = f"{rand_str(random.randint(5, 10))}"
 
+            if self.GOOS == "linux":
+                self.AgentRoot = "/tmp/" + self.AgentRoot
+
             CACHED_CONF["agent_root"] = self.AgentRoot
 
         # DoH
