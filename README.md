@@ -13,6 +13,11 @@ Linux/Windows post-exploitation framework made by linux user
 https://user-images.githubusercontent.com/10167884/153613523-38f4fe43-8fb0-40b6-be0e-d0415f10b454.mp4
 
 
+
+https://user-images.githubusercontent.com/10167884/153705228-8d2587fe-915b-4e86-b92b-db9b55a2af30.mp4
+
+
+
 ----------
 
 emp3r0r was initially developed as one of my weaponizing experiments, i tried to implement common Linux adversary techniques and some of my own ideas, it was a learning process for me
