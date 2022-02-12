@@ -115,7 +115,8 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 
 		// fill table
 		for _, p := range procs {
-			tdata = append(tdata, []string{p.Name, strconv.Itoa(p.PID), strconv.Itoa(p.PPID), p.Token})
+			pname := SplitLongLine(p.Name, 20)
+			tdata = append(tdata, []string{pname, strconv.Itoa(p.PID), strconv.Itoa(p.PPID), p.Token})
 		}
 		table.AppendBulk(tdata)
 		table.Render()
@@ -155,7 +156,8 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 
 		// fill table
 		for _, d := range dents {
-			tdata = append(tdata, []string{d.Name, d.Ftype, d.Size, d.Date, d.Permission})
+			dname := SplitLongLine(d.Name, 20)
+			tdata = append(tdata, []string{dname, d.Ftype, d.Size, d.Date, d.Permission})
 			if len(cmd_slice) == 1 {
 				if d.Ftype == "file" {
 					LsDir = append(LsDir, d.Name)
