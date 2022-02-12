@@ -66,6 +66,22 @@ func TmuxPrintf(clear bool, id string, format string, a ...interface{}) {
 	}
 }
 
+func TmuxIsPaneAlive(id string) bool {
+	for pane_id, pane := range TmuxWindows {
+		if id != pane_id {
+			continue
+		}
+		b := make([]byte, 1)
+		_, err := pane.FD.Read(b)
+		if err == nil {
+			return true
+		}
+		break
+	}
+
+	return false
+}
+
 func TmuxClearPane(id string) (err error) {
 	idx := TmuxPaneID2Index(id)
 	job := fmt.Sprintf("tmux clear-history -t %d", idx)

@@ -22,7 +22,8 @@ var SSHShellPort = make(map[string]string)
 // shell: the executable to run, eg. bash, python
 // port: serve this shell on agent side 127.0.0.1:port
 func SSHClient(shell, args, port string, split bool) (err error) {
-	if split && AgentShellWindow != nil {
+	if split && AgentShellWindow != nil &&
+		TmuxIsPaneAlive(AgentShellWindow.ID) {
 		return
 	}
 
