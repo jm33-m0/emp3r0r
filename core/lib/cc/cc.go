@@ -350,7 +350,9 @@ func SetAgentLabel(a *emp3r0r_data.SystemInfo, mutex *sync.Mutex) (label string)
 		if a.Tag == labeled.Tag {
 			mutex.Lock()
 			defer mutex.Unlock()
-			Targets[a].Label = labeled.Label
+			if Targets[a] != nil {
+				Targets[a].Label = labeled.Label
+			}
 			label = labeled.Label
 			return
 		}
