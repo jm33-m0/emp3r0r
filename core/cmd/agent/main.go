@@ -48,18 +48,15 @@ func main() {
 	time.Sleep(time.Duration(util.RandInt(3, 10)) * time.Second)
 
 	// mkdir -p UtilsPath
+	// use absolute path
+	// TODO find a better location for temp files
+	emp3r0r_data.AgentRoot = "/tmp/" + emp3r0r_data.AgentRoot
+	emp3r0r_data.UtilsPath = "/tmp/" + emp3r0r_data.UtilsPath
 	if !util.IsFileExist(emp3r0r_data.UtilsPath) {
 		err = os.MkdirAll(emp3r0r_data.UtilsPath, 0700)
 		if err != nil {
 			log.Fatalf("[-] Cannot mkdir %s: %v", emp3r0r_data.AgentRoot, err)
 		}
-	}
-
-	// use absolute path
-	pwd, err := os.Getwd()
-	if err == nil {
-		emp3r0r_data.AgentRoot = pwd + "/" + emp3r0r_data.AgentRoot
-		emp3r0r_data.UtilsPath = pwd + "/" + emp3r0r_data.UtilsPath
 	}
 
 	// silent switch
