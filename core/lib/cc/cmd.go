@@ -188,25 +188,44 @@ func CmdHandler(cmd string) (err error) {
 			return
 		}
 		defer SetDynamicPrompt()
+		var target_to_set *emp3r0r_data.SystemInfo
 
-		index, e := strconv.Atoi(cmdSplit[1])
-		if e != nil {
-			CurrentTarget = GetTargetFromTag(strings.Join(cmdSplit[1:], " "))
-			if CurrentTarget != nil {
-				GetTargetDetails(CurrentTarget)
-				CliPrintSuccess("Now targeting %s", CurrentTarget.Tag)
-				return nil
+		// select by tag or index
+		target_to_set = GetTargetFromTag(strings.Join(cmdSplit[1:], " "))
+		if target_to_set == nil {
+			index, e := strconv.Atoi(cmdSplit[1])
+			if e == nil {
+				target_to_set = GetTargetFromIndex(index)
 			}
-			return fmt.Errorf("cannot set target by index: %v", e)
 		}
-		CurrentTarget = GetTargetFromIndex(index)
-		if CurrentTarget == nil {
+
+		select_agent := func(a *emp3r0r_data.SystemInfo) {
+			CurrentTarget = a
+			GetTargetDetails(CurrentTarget)
+			CliPrintSuccess("Now targeting %s", CurrentTarget.Tag)
+			SetDynamicPrompt()
+
+			// kill shell window
+			if AgentShellWindow != nil {
+				CliPrintInfo("Updating shell window")
+				err = TmuxKillPane(AgentShellWindow.ID)
+				if err != nil {
+					CliPrintWarning("Updating shell window: %v", err)
+				}
+				AgentShellWindow = nil
+			}
+			SSHClient("bash", "", emp3r0r_data.SSHDPort, true)
+		}
+
+		if target_to_set == nil {
+			// if still nothing
 			CliPrintWarning("Target does not exist, no target has been selected")
 			return fmt.Errorf("target not set or is nil")
-		}
 
-		GetTargetDetails(CurrentTarget)
-		CliPrintSuccess("Now targeting %s", CurrentTarget.Tag)
+		} else {
+			// lets start the bash shell
+			go select_agent(target_to_set)
+		}
 
 	case cmdSplit[0] == "vim":
 

@@ -3,7 +3,6 @@ package cc
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"strconv"
@@ -93,8 +92,25 @@ func TmuxClearPane(id string) (err error) {
 	return
 }
 
+// TmuxResizePane resize pane in x/y to number of lines
+func TmuxResizePane(id, direction string, lines int) (err error) {
+	idx := TmuxPaneID2Index(id)
+	if idx < 0 {
+		return fmt.Errorf("Pane %s not found", id)
+	}
+	job := fmt.Sprintf("tmux resize-pane -t %d -%s %d", idx, direction, lines)
+	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
+	if err != nil {
+		err = fmt.Errorf("exec tmux resize-pane: %s\n%v", out, err)
+		return
+	}
+	return
+}
 func TmuxKillPane(id string) (err error) {
 	idx := TmuxPaneID2Index(id)
+	if idx < 0 {
+		return fmt.Errorf("Pane %s not found", id)
+	}
 	job := fmt.Sprintf("tmux kill-pane -t %d", idx)
 	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
 	if err != nil {
@@ -107,10 +123,7 @@ func TmuxKillPane(id string) (err error) {
 // TmuxDeinitWindows close previously opened tmux windows
 func TmuxDeinitWindows() {
 	for id := range TmuxWindows {
-		err = TmuxKillPane(id)
-		if err != nil {
-			log.Printf("TmuxDeinitWindows: %v", err)
-		}
+		TmuxKillPane(id)
 	}
 }
 
@@ -118,7 +131,7 @@ func TmuxDeinitWindows() {
 // - command output window
 // - current agent info
 func TmuxInitWindows() (err error) {
-	pane, err := TmuxNewPane("h", "", 30, "/bin/cat")
+	pane, err := TmuxNewPane("h", "", 24, "/bin/cat")
 	if err != nil {
 		return
 	}

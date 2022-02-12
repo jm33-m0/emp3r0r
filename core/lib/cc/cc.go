@@ -239,10 +239,10 @@ func GetTargetDetails(target *emp3r0r_data.SystemInfo) {
 	// rendor table
 	table.AppendBulk(tdata)
 	table.Render()
+	lines := len(strings.Split(tableString.String(), "\n"))
+	TmuxResizePane(AgentInfoWindow.ID, "y", lines)
 	TmuxPrintf(true, AgentInfoWindow.ID, "\n\033[0m%s\n\n", tableString.String())
 
-	// lets start the bash shell
-	SSHClient("bash", "", emp3r0r_data.SSHDPort, true)
 }
 
 // GetTargetFromIndex find target from Targets via control index, return nil if not found
