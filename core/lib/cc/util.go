@@ -164,42 +164,6 @@ func OpenInNewTerminalWindow(name, cmd string) error {
 	return nil
 }
 
-// TmuxNewWindow split tmux window, and run command in the new pane
-func TmuxNewWindow(name, cmd string) error {
-	if os.Getenv("TMUX") == "" ||
-		!util.IsCommandExist("tmux") {
-		return errors.New("You need to run emp3r0r under `tmux`")
-	}
-
-	tmuxCmd := fmt.Sprintf("tmux new-window -n %s '%s || read'", name, cmd)
-	job := exec.Command("/bin/sh", "-c", tmuxCmd)
-	out, err := job.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%v: %s", err, out)
-	}
-
-	return nil
-}
-
-// TmuxSplit split tmux window, and run command in the new pane
-func TmuxSplit(hV, cmd string) error {
-	if os.Getenv("TMUX") == "" ||
-		!util.IsCommandExist("tmux") ||
-		!util.IsCommandExist("less") {
-
-		return errors.New("You need to run emp3r0r under `tmux`, and make sure `less` is installed")
-	}
-
-	job := fmt.Sprintf("tmux split-window -%s '%s || read'", hV, cmd)
-
-	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%v: %s", err, out)
-	}
-
-	return nil
-}
-
 // IsAgentExist is agent already in target list?
 func IsAgentExist(t *emp3r0r_data.SystemInfo) bool {
 	for a := range Targets {

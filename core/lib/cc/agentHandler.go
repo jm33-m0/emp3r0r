@@ -194,7 +194,11 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 			logname)
 
 		// split window vertically
-		if err = TmuxSplit("v", viewCmd); err == nil {
+		target_pane := TmuxPaneID2Index(AgentOutputWindow.ID)
+		if target_pane < 0 {
+			target_pane = -1
+		}
+		if _, err = TmuxNewPane("h", target_pane, 50, viewCmd); err == nil {
 			CliPrintSuccess("View result in new window (press q to quit)")
 			return
 		}

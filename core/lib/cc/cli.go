@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 
@@ -137,6 +136,13 @@ func CliMain() {
 	defer EmpReadLine.Close()
 	log.SetOutput(EmpReadLine.Stderr())
 
+	err = TmuxInitWindows()
+	if err != nil {
+		log.Fatalf("TMUX: %v", err)
+	}
+
+	defer TmuxDeinitWindows()
+
 start:
 	SetDynamicPrompt()
 	for {
@@ -157,7 +163,8 @@ start:
 		case "commands":
 			CliListCmds(EmpReadLine.Stderr())
 		case "exit":
-			os.Exit(0)
+			// os.Exit(0)
+			return
 
 		// process other commands
 		default:
@@ -171,7 +178,8 @@ start:
 
 	// ask the user if they really want to leave
 	if CliYesNo("Are you sure you want to leave") {
-		os.Exit(0)
+		// os.Exit(0)
+		return
 	}
 
 	fmt.Printf("\n")
