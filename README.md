@@ -10,12 +10,7 @@ Linux/Windows post-exploitation framework made by linux user
 ![c2](./img/c2transports.png)
 
 
-https://user-images.githubusercontent.com/10167884/153613523-38f4fe43-8fb0-40b6-be0e-d0415f10b454.mp4
-
-
-
-https://user-images.githubusercontent.com/10167884/153705228-8d2587fe-915b-4e86-b92b-db9b55a2af30.mp4
-
+https://user-images.githubusercontent.com/10167884/153719283-28b32190-b415-4816-bc32-66f8c9236acd.mp4
 
 
 ----------
