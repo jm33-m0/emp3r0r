@@ -7,11 +7,11 @@ Linux/Windows post-exploitation framework made by linux user
 - [check my blog for updates](https://jm33.me)
 - [how to use](https://github.com/jm33-m0/emp3r0r/wiki)
 
-![c2](./img/c2transports.png)
-
 
 https://user-images.githubusercontent.com/10167884/153719283-28b32190-b415-4816-bc32-66f8c9236acd.mp4
 
+
+![c2](./img/c2transports.png)
 
 ----------
 
