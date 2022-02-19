@@ -131,14 +131,17 @@ func TmuxDeinitWindows() {
 // - command output window
 // - current agent info
 func TmuxInitWindows() (err error) {
-	pane, err := TmuxNewPane("h", "", 24, "/bin/cat")
+	// pane title
+	TmuxSetPaneTitle("Command", "")
+
+	pane, err := TmuxNewPane("System Info", "h", "", 24, "/bin/cat")
 	if err != nil {
 		return
 	}
 	AgentInfoWindow = pane
 	TmuxWindows[AgentInfoWindow.ID] = AgentInfoWindow
 
-	pane, err = TmuxNewPane("v", "", 40, "/bin/cat")
+	pane, err = TmuxNewPane("Agent", "v", "", 40, "/bin/cat")
 	if err != nil {
 		return
 	}
@@ -152,7 +155,7 @@ func TmuxInitWindows() (err error) {
 // hV: horizontal or vertical split
 // target_pane: target_pane tmux index, split this pane
 // size: percentage, do not append %
-func TmuxNewPane(hV string, target_pane_id string, size int, cmd string) (pane *Emp3r0rPane, err error) {
+func TmuxNewPane(title, hV string, target_pane_id string, size int, cmd string) (pane *Emp3r0rPane, err error) {
 	if os.Getenv("TMUX") == "" ||
 		!util.IsCommandExist("tmux") {
 
@@ -198,7 +201,22 @@ func TmuxNewPane(hV string, target_pane_id string, size int, cmd string) (pane *
 	}
 	pane.FD = tty_file // no need to close files, since CC's interface always needs them
 
+	err = TmuxSetPaneTitle(title, pane.ID)
 	return
+}
+
+func TmuxSetPaneTitle(title, pane_id string) error {
+	// set pane title
+	tmux_cmd := []string{"select-pane", "-t", pane_id, "-T", title}
+	if pane_id == "" {
+		tmux_cmd = []string{"select-pane", "-T", title}
+	}
+	out, err := exec.Command("tmux", tmux_cmd...).CombinedOutput()
+	if err != nil {
+		err = fmt.Errorf("%s\n%v", out, err)
+	}
+
+	return err
 }
 
 // Convert tmux pane's unique ID to index number, for use with select-pane

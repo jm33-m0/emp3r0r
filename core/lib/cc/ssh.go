@@ -162,9 +162,9 @@ wait:
 	// remeber shell-port mapping
 	SSHShellPort[shell] = port
 	if split {
-		AgentShellWindow, err = TmuxNewPane("h", AgentOutputWindow.ID, 40, sshCmd)
+		AgentShellWindow, err = TmuxNewPane("Shell", "h", AgentOutputWindow.ID, 40, sshCmd)
 		TmuxWindows[AgentShellWindow.ID] = AgentShellWindow
 		return err
 	}
-	return TmuxNewWindow(fmt.Sprintf("emp3r0r_shell-%d/%s/%s-%s", util.RandInt(0, 1024), name, shell, port), sshCmd)
+	return TmuxNewWindow(fmt.Sprintf("shell/%s/%s-%s", name, shell, port), sshCmd)
 }

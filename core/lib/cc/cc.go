@@ -239,8 +239,10 @@ func GetTargetDetails(target *emp3r0r_data.SystemInfo) {
 	// rendor table
 	table.AppendBulk(tdata)
 	table.Render()
-	lines := len(strings.Split(tableString.String(), "\n"))
-	TmuxResizePane(AgentInfoWindow.ID, "y", lines)
+	num_of_lines := len(strings.Split(tableString.String(), "\n"))
+	num_of_columns := len(strings.Split(tableString.String(), "\n")[0])
+	TmuxResizePane(AgentInfoWindow.ID, "y", num_of_lines)
+	TmuxResizePane(AgentInfoWindow.ID, "x", num_of_columns)
 	TmuxPrintf(true, AgentInfoWindow.ID, "\n\033[0m%s\n\n", tableString.String())
 
 }
