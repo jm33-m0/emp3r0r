@@ -82,6 +82,7 @@ func main() {
 
 	// PATH
 	os.Setenv("PATH", fmt.Sprintf("%s:/bin:/usr/bin:/usr/local/bin", emp3r0r_data.UtilsPath))
+
 	// HOME
 	u, err := user.Current()
 	if err != nil {

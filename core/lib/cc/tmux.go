@@ -134,14 +134,19 @@ func TmuxInitWindows() (err error) {
 	// pane title
 	TmuxSetPaneTitle("Command", "")
 
-	pane, err := TmuxNewPane("System Info", "h", "", 24, "/bin/cat")
+	cat := "./cat"
+	if !util.IsFileExist(cat) {
+		cat = "/bin/cat"
+	}
+
+	pane, err := TmuxNewPane("System Info", "h", "", 24, cat)
 	if err != nil {
 		return
 	}
 	AgentInfoWindow = pane
 	TmuxWindows[AgentInfoWindow.ID] = AgentInfoWindow
 
-	pane, err = TmuxNewPane("Agent", "v", "", 40, "/bin/cat")
+	pane, err = TmuxNewPane("Agent", "v", "", 40, cat)
 	if err != nil {
 		return
 	}
