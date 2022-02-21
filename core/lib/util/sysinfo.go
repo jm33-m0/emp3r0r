@@ -14,7 +14,7 @@ import (
 )
 
 func GetMemSize() int {
-	memInfo, err := ghw.Memory()
+	memInfo, err := ghw.Memory(ghw.WithDisableWarnings())
 	if err != nil {
 		log.Printf("GetMemSize error: %v", err)
 		return -1
@@ -24,7 +24,7 @@ func GetMemSize() int {
 }
 
 func GetGPUInfo() (info string) {
-	gpuinfo, err := ghw.GPU()
+	gpuinfo, err := ghw.GPU(ghw.WithDisableWarnings())
 	if err != nil {
 		return "no_gpu"
 	}
@@ -38,7 +38,7 @@ func GetGPUInfo() (info string) {
 }
 
 func GetCPUInfo() (info string) {
-	cpuinfo, err := ghw.CPU()
+	cpuinfo, err := ghw.CPU(ghw.WithDisableWarnings())
 	if err != nil {
 		return
 	}
@@ -151,7 +151,7 @@ func GetHostID(fallbackUUID string) (id string) {
 // CheckProduct check machine details
 func CheckProduct() (product string) {
 	product = "unknown_product"
-	productInfo, err := ghw.Product()
+	productInfo, err := ghw.Product(ghw.WithDisableWarnings())
 	if err != nil {
 		return
 	}
