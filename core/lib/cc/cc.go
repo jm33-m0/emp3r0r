@@ -152,6 +152,13 @@ func ListTargets() {
 			"IPs":     ips,
 		}
 
+		// is this agent currently selected?
+		if CurrentTarget != nil {
+			if CurrentTarget.Tag == target.Tag {
+				index = fmt.Sprintf("%s %s", color.HiGreenString("✓"), index)
+			}
+		}
+
 		var row = []string{index, label, SplitLongLine(target.Tag, 15),
 			infoMap["OS"], infoMap["PROCESS"], infoMap["IPs"], infoMap["From"]}
 		tdata = append(tdata, row)

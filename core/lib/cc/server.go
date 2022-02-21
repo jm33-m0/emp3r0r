@@ -415,6 +415,8 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 			"running %s\n",
 			shortname, fmt.Sprintf("%s - %s", target.IP, target.Transport),
 			strconv.Quote(target.OS))
+
+		ListTargets() // refresh agent list
 	} else {
 		// just update this agent's sysinfo
 		for a := range Targets {
@@ -455,6 +457,7 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 				SetDynamicPrompt()
 				CliAlert(color.FgHiRed, "[%d] Agent dies", c.Index)
 				CliMsg("[%d] agent %s disconnected\n", c.Index, strconv.Quote(t.Tag))
+				ListTargets()
 				break
 			}
 		}
