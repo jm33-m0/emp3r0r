@@ -108,7 +108,7 @@ func ListTargets() {
 	tdata := [][]string{}
 	tableString := &strings.Builder{}
 	table := tablewriter.NewWriter(tableString)
-	table.SetHeader([]string{"Index", "Label", "Tag", "OS", "PROCESS", "IPs", "From"})
+	table.SetHeader([]string{"Index", "Label", "Tag", "OS", "IPs", "From"})
 	table.SetBorder(true)
 	table.SetRowLine(true)
 	table.SetAutoWrapText(true)
@@ -117,7 +117,6 @@ func ListTargets() {
 
 	// color
 	table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiMagentaColor},
-		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiCyanColor},
 		tablewriter.Colors{tablewriter.Bold, tablewriter.FgBlueColor},
 		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiWhiteColor},
 		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiCyanColor},
@@ -125,7 +124,6 @@ func ListTargets() {
 		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiYellowColor})
 
 	table.SetColumnColor(tablewriter.Colors{tablewriter.FgHiMagentaColor},
-		tablewriter.Colors{tablewriter.FgHiCyanColor},
 		tablewriter.Colors{tablewriter.FgBlueColor},
 		tablewriter.Colors{tablewriter.FgHiWhiteColor},
 		tablewriter.Colors{tablewriter.FgHiCyanColor},
@@ -136,31 +134,28 @@ func ListTargets() {
 	for target, control := range Targets {
 		// print
 		if control.Label == "" {
-			control.Label = "-"
+			control.Label = "nolabel"
 		}
 		index := fmt.Sprintf("%d", control.Index)
 		label := control.Label
 
 		// info map
-		procInfo := fmt.Sprintf("%s (%d)\n<- %s (%d)",
-			target.Process.Cmdline, target.Process.PID, target.Process.Parent, target.Process.PPID)
 		ips := strings.Join(target.IPs, ",\n")
 		infoMap := map[string]string{
-			"OS":      SplitLongLine(target.OS, 15),
-			"PROCESS": SplitLongLine(procInfo, 15),
-			"From":    fmt.Sprintf("%s\nvia %s", target.IP, target.Transport),
-			"IPs":     ips,
+			"OS":   SplitLongLine(target.OS, 15),
+			"From": fmt.Sprintf("%s\nvia %s", target.IP, target.Transport),
+			"IPs":  ips,
 		}
 
 		// is this agent currently selected?
 		if CurrentTarget != nil {
 			if CurrentTarget.Tag == target.Tag {
-				index = fmt.Sprintf("%s %s", color.HiGreenString("✓"), index)
+				index = color.New(color.FgHiGreen, color.Bold).Sprintf("%d", control.Index)
 			}
 		}
 
 		var row = []string{index, label, SplitLongLine(target.Tag, 15),
-			infoMap["OS"], infoMap["PROCESS"], infoMap["IPs"], infoMap["From"]}
+			infoMap["OS"], infoMap["IPs"], infoMap["From"]}
 		tdata = append(tdata, row)
 	}
 	// rendor table
@@ -170,12 +165,16 @@ func ListTargets() {
 	if err != nil {
 		CliPrintWarning("Update AgentListWindow: %v", err)
 	}
-	pane, err := TmuxNewPane("Agent List", "v", "", 33, "./cat")
+	pane, err := TmuxNewPane("Agent List", "h", "1", 33, "./cat")
 	if err != nil {
 		CliPrintWarning("Update AgentListWindow: %v", err)
 	}
 	AgentListWindow = pane
 	TmuxWindows[AgentListWindow.ID] = AgentListWindow
+
+	// resize in case it gets wider
+	tableRows := strings.Split(tableString.String(), "\n")
+	AgentListWindow.TmuxResizePane("x", len(tableRows[0]))
 	AgentListWindow.TmuxPrintf(false, "\n\033[0m%s\n\n", tableString.String())
 }
 
@@ -258,10 +257,12 @@ func GetTargetDetails(target *emp3r0r_data.SystemInfo) {
 	table.Render()
 	num_of_lines := len(strings.Split(tableString.String(), "\n"))
 	num_of_columns := len(strings.Split(tableString.String(), "\n")[0])
-	TmuxResizePane(AgentInfoWindow.ID, "y", num_of_lines)
-	TmuxResizePane(AgentInfoWindow.ID, "x", num_of_columns)
+	AgentInfoWindow.TmuxResizePane("y", num_of_lines)
+	AgentInfoWindow.TmuxResizePane("x", num_of_columns)
 	AgentInfoWindow.TmuxPrintf(true, "\n\033[0m%s\n\n", tableString.String())
 
+	// Update Agent list
+	ListTargets()
 }
 
 // GetTargetFromIndex find target from Targets via control index, return nil if not found

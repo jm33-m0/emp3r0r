@@ -162,7 +162,7 @@ wait:
 	// remeber shell-port mapping
 	SSHShellPort[shell] = port
 	if split {
-		AgentShellWindow, err = TmuxNewPane("Shell", "h", "", 40, sshCmd)
+		AgentShellWindow, err = TmuxNewPane("Shell", "v", "1", 33, sshCmd)
 		TmuxWindows[AgentShellWindow.ID] = AgentShellWindow
 		return err
 	}

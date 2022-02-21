@@ -100,8 +100,46 @@ func TmuxClearPane(id string) (err error) {
 	return
 }
 
+func (pane *Emp3r0rPane) TmuxPaneSize() (x, y int) {
+	idx := TmuxPaneID2Index(pane.ID)
+	if idx < 0 {
+		return
+	}
+
+	x_out, err := exec.Command("/bin/sh", "-c",
+		fmt.Sprintf("tmux display -p -t %d '#{pane_width}'", idx)).CombinedOutput()
+	if err != nil {
+		CliPrintWarning("tmux: %s\n%v", x_out, err)
+		return
+	}
+	x_str := strings.TrimSpace(string(x_out))
+	y_out, err := exec.Command("/bin/sh", "-c",
+		fmt.Sprintf("tmux display -p -t %d '#{pane_height}'", idx)).CombinedOutput()
+	if err != nil {
+		CliPrintWarning("tmux: %s\n%v", y_out, err)
+		return
+	}
+	y_str := strings.TrimSpace(string(y_out))
+
+	// parse
+	x, err = strconv.Atoi(x_str)
+	if err != nil {
+		CliPrintWarning("tmux: %s\n%v", x_out, err)
+		return
+	}
+
+	y, err = strconv.Atoi(y_str)
+	if err != nil {
+		CliPrintWarning("tmux: %s\n%v", y_out, err)
+		return
+	}
+
+	return
+}
+
 // TmuxResizePane resize pane in x/y to number of lines
-func TmuxResizePane(id, direction string, lines int) (err error) {
+func (pane *Emp3r0rPane) TmuxResizePane(direction string, lines int) (err error) {
+	id := pane.ID
 	idx := TmuxPaneID2Index(id)
 	if idx < 0 {
 		return fmt.Errorf("Pane %s not found", id)
@@ -186,7 +224,7 @@ func TmuxInitWindows() (err error) {
 	AgentOutputWindow.TmuxPrintf(true, color.HiYellowString("..."))
 
 	// Agent list: ls_targets
-	pane, err = TmuxNewPane("Agent List", "v", "", 33, cat)
+	pane, err = TmuxNewPane("Agent List", "h", "", 33, cat)
 	if err != nil {
 		return
 	}
@@ -208,9 +246,15 @@ func TmuxNewPane(title, hV string, target_pane_id string, size int, cmd string) 
 		err = errors.New("You need to run emp3r0r under `tmux`")
 		return
 	}
-	target_pane := TmuxPaneID2Index(target_pane_id)
-	if target_pane < 0 {
 
+	// target pane Index
+	target_pane, err := strconv.Atoi(target_pane_id)
+	if err != nil {
+		target_pane = TmuxPaneID2Index(target_pane_id)
+		if target_pane < 0 {
+			err = fmt.Errorf("ID %s not recognized", target_pane_id)
+			return
+		}
 	}
 
 	job := fmt.Sprintf(`tmux split-window -%s -p %d -P -d -F "#{pane_id}:#{pane_pid}:#{pane_tty}" '%s'`,
