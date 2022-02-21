@@ -159,7 +159,17 @@ func ListTargets() {
 	// rendor table
 	table.AppendBulk(tdata)
 	table.Render()
-	fmt.Printf("\n\033[0m%s\n\n", tableString)
+	err = AgentListWindow.TmuxKillPane()
+	if err != nil {
+		CliPrintWarning("Update AgentListWindow: %v", err)
+	}
+	pane, err := TmuxNewPane("Agent List", "v", "", 33, "./cat")
+	if err != nil {
+		CliPrintWarning("Update AgentListWindow: %v", err)
+	}
+	AgentListWindow = pane
+	TmuxWindows[AgentListWindow.ID] = AgentListWindow
+	AgentListWindow.TmuxPrintf(false, "\n\033[0m%s\n\n", tableString.String())
 }
 
 func GetTargetDetails(target *emp3r0r_data.SystemInfo) {
@@ -243,7 +253,7 @@ func GetTargetDetails(target *emp3r0r_data.SystemInfo) {
 	num_of_columns := len(strings.Split(tableString.String(), "\n")[0])
 	TmuxResizePane(AgentInfoWindow.ID, "y", num_of_lines)
 	TmuxResizePane(AgentInfoWindow.ID, "x", num_of_columns)
-	TmuxPrintf(true, AgentInfoWindow.ID, "\n\033[0m%s\n\n", tableString.String())
+	AgentInfoWindow.TmuxPrintf(true, "\n\033[0m%s\n\n", tableString.String())
 
 }
 

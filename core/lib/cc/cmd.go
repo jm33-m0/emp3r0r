@@ -208,7 +208,7 @@ func CmdHandler(cmd string) (err error) {
 			// kill shell window
 			if AgentShellWindow != nil {
 				CliPrintInfo("Updating shell window")
-				err = TmuxKillPane(AgentShellWindow.ID)
+				err = AgentShellWindow.TmuxKillPane()
 				if err != nil {
 					CliPrintWarning("Updating shell window: %v", err)
 				}

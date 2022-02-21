@@ -148,7 +148,7 @@ wait:
 	}
 	sshCmd := fmt.Sprintf("%s -p %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 127.0.0.1",
 		sshPath, lport)
-	CliPrintSuccess("\nOpening SSH (%s - %s) session for %s in new window.\n"+
+	CliPrintInfo("\nOpening SSH (%s - %s) session for %s in new window.\n"+
 		"If that fails, please execute command\n%s\nmanaully",
 		shell, port, CurrentTarget.Tag, sshCmd)
 
@@ -162,7 +162,7 @@ wait:
 	// remeber shell-port mapping
 	SSHShellPort[shell] = port
 	if split {
-		AgentShellWindow, err = TmuxNewPane("Shell", "h", AgentOutputWindow.ID, 40, sshCmd)
+		AgentShellWindow, err = TmuxNewPane("Shell", "h", "", 40, sshCmd)
 		TmuxWindows[AgentShellWindow.ID] = AgentShellWindow
 		return err
 	}

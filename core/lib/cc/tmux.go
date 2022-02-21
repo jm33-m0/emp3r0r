@@ -8,7 +8,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 // Emp3r0rPane a tmux window/pane that makes emp3r0r CC's interface
@@ -25,6 +27,9 @@ var (
 	// Displays agent output, separated from logs
 	AgentOutputWindow *Emp3r0rPane
 
+	// Displays agent list
+	AgentListWindow *Emp3r0rPane
+
 	// Displays bash shell for selected agent
 	AgentShellWindow *Emp3r0rPane
 
@@ -34,14 +39,17 @@ var (
 
 // TmuxPrintf like printf, but prints to a tmux pane/window
 // id: pane unique id
-func TmuxPrintf(clear bool, id string, format string, a ...interface{}) {
+func (pane *Emp3r0rPane) TmuxPrintf(clear bool, format string, a ...interface{}) {
+	id := pane.ID
+	msg := fmt.Sprintf(format, a...)
+
 	if clear {
 		err := TmuxClearPane(id)
 		if err != nil {
 			CliPrintWarning("Clear pane: %v", err)
 		}
+		msg = fmt.Sprintf("%s%s", ClearTerm, msg)
 	}
-	msg := fmt.Sprintf(format, a...)
 
 	idx := TmuxPaneID2Index(id)
 	if idx < 0 {
@@ -106,7 +114,8 @@ func TmuxResizePane(id, direction string, lines int) (err error) {
 	}
 	return
 }
-func TmuxKillPane(id string) (err error) {
+func (pane *Emp3r0rPane) TmuxKillPane() (err error) {
+	id := pane.ID
 	idx := TmuxPaneID2Index(id)
 	if idx < 0 {
 		return fmt.Errorf("Pane %s not found", id)
@@ -122,9 +131,15 @@ func TmuxKillPane(id string) (err error) {
 
 // TmuxDeinitWindows close previously opened tmux windows
 func TmuxDeinitWindows() {
-	for id := range TmuxWindows {
-		TmuxKillPane(id)
+	for _, pane := range TmuxWindows {
+		pane.TmuxKillPane()
 	}
+}
+
+// TermSize Get terminal size
+func TermSize() (width, height int, err error) {
+	width, height, err = terminal.GetSize(int(os.Stdin.Fd()))
+	return
 }
 
 // TmuxInitWindows split current terminal into several windows/panes
@@ -134,24 +149,50 @@ func TmuxInitWindows() (err error) {
 	// pane title
 	TmuxSetPaneTitle("Command", "")
 
-	cat := "./cat"
-	if !util.IsFileExist(cat) {
-		cat = "/bin/cat"
+	// check terminal size, prompt user to run emp3r0r C2 in a bigger window
+	w, h, err := TermSize()
+	if err != nil {
+		CliPrintWarning("Get terminal size: %v", err)
+	}
+	if w < 200 || h < 60 {
+		CliPrintWarning("I need a bigger window, make sure the window size is at least 200x60 (w*h)")
+		CliPrintWarning("Please maximize the terminal window if possible")
 	}
 
+	// we don't want the tmux pane be killed
+	// so easily. Yes, fuck /bin/cat, we use our own cat
+	cat := "./cat"
+	if !util.IsFileExist(cat) {
+		err = fmt.Errorf("Check if ./build/cat exists. If not, build it")
+		return
+	}
+
+	// system info of selected agent
 	pane, err := TmuxNewPane("System Info", "h", "", 24, cat)
 	if err != nil {
 		return
 	}
 	AgentInfoWindow = pane
 	TmuxWindows[AgentInfoWindow.ID] = AgentInfoWindow
+	AgentInfoWindow.TmuxPrintf(true, color.HiYellowString("Try `target 0`?"))
 
-	pane, err = TmuxNewPane("Agent", "v", "", 40, cat)
+	// Agent output
+	pane, err = TmuxNewPane("Agent", "v", "", 24, cat)
 	if err != nil {
 		return
 	}
 	AgentOutputWindow = pane
 	TmuxWindows[AgentOutputWindow.ID] = AgentOutputWindow
+	AgentOutputWindow.TmuxPrintf(true, color.HiYellowString("..."))
+
+	// Agent list: ls_targets
+	pane, err = TmuxNewPane("Agent List", "v", "", 33, cat)
+	if err != nil {
+		return
+	}
+	AgentListWindow = pane
+	TmuxWindows[AgentListWindow.ID] = AgentListWindow
+	AgentListWindow.TmuxPrintf(true, color.HiYellowString("No agents connected"))
 
 	return
 }

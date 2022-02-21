@@ -173,7 +173,12 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 		out = tableString.String()
 	}
 
-	TmuxPrintf(false, AgentOutputWindow.ID, "\n[%s] %s:\n%s\n\n", color.CyanString("%d", contrlIf.Index), color.HiMagentaString(cmd), color.HiWhiteString(out))
+	// Command output
+	AgentOutputWindow.TmuxPrintf(false,
+		"\n[%s] %s:\n%s\n\n",
+		color.CyanString("%d", contrlIf.Index),
+		color.HiMagentaString(cmd),
+		color.HiWhiteString(out))
 
 	// cache this cmd response
 	CmdResultsMutex.Lock()
