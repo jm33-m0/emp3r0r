@@ -29,6 +29,8 @@ func main() {
 	// copies everything from stdin to stdout
 	// if any error occurs, abort
 	for {
+		// loop forever, in case the user sends us a fucking EOF/Ctrl-D
+		// io.Copy aborts on EOF
 		_, err := io.Copy(os.Stdin, os.Stdout)
 		if err != nil {
 			log.Fatal(err)
