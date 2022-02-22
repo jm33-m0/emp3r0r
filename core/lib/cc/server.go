@@ -458,7 +458,7 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 				CliAlert(color.FgHiRed, "[%d] Agent dies", c.Index)
 				CliMsg("[%d] agent %s disconnected\n", c.Index, strconv.Quote(t.Tag))
 				ListTargets()
-				AgentInfoWindow.TmuxPrintf(true, color.HiYellowString("No agent selected"))
+				AgentInfoPane.TmuxPrintf(true, color.HiYellowString("No agent selected"))
 				break
 			}
 		}

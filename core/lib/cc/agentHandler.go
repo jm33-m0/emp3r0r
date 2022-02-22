@@ -122,6 +122,10 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 		table.Render()
 		out = tableString.String()
 
+		// resize pane since table might mess up
+		x := len(strings.Split(out, "\n")[0])
+		AgentOutputPane.TmuxResizePane("x", x)
+
 		// ls command
 	case "ls":
 		var dents []util.Dentry
@@ -171,10 +175,14 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 		table.AppendBulk(tdata)
 		table.Render()
 		out = tableString.String()
+
+		// resize pane since table might mess up
+		x := len(strings.Split(out, "\n")[0])
+		AgentOutputPane.TmuxResizePane("x", x)
 	}
 
 	// Command output
-	AgentOutputWindow.TmuxPrintf(false,
+	AgentOutputPane.TmuxPrintf(false,
 		"\n[%s] %s:\n%s\n\n",
 		color.CyanString("%d", contrlIf.Index),
 		color.HiMagentaString(cmd),

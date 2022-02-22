@@ -206,13 +206,13 @@ func CmdHandler(cmd string) (err error) {
 			SetDynamicPrompt()
 
 			// kill shell window
-			if AgentShellWindow != nil {
+			if AgentShellPane != nil {
 				CliPrintInfo("Updating shell window")
-				err = AgentShellWindow.TmuxKillPane()
+				err = AgentShellPane.TmuxKillPane()
 				if err != nil {
 					CliPrintWarning("Updating shell window: %v", err)
 				}
-				AgentShellWindow = nil
+				AgentShellPane = nil
 			}
 			SSHClient("bash", "", emp3r0r_data.SSHDPort, true)
 		}

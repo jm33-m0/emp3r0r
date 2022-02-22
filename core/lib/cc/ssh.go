@@ -23,7 +23,7 @@ var SSHShellPort = make(map[string]string)
 // port: serve this shell on agent side 127.0.0.1:port
 func SSHClient(shell, args, port string, split bool) (err error) {
 	// if the shell window exists, abort
-	if split && AgentShellWindow != nil {
+	if split && AgentShellPane != nil {
 		return
 	}
 
@@ -162,8 +162,8 @@ wait:
 	// remeber shell-port mapping
 	SSHShellPort[shell] = port
 	if split {
-		AgentShellWindow, err = TmuxNewPane("Shell", "v", "1", 33, sshCmd)
-		TmuxWindows[AgentShellWindow.ID] = AgentShellWindow
+		AgentShellPane, err = TmuxNewPane("Shell", "v", "1", 40, sshCmd)
+		TmuxPanes[AgentShellPane.ID] = AgentShellPane
 		return err
 	}
 	return TmuxNewWindow(fmt.Sprintf("shell/%s/%s-%s", name, shell, port), sshCmd)
