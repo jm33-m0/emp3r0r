@@ -8,9 +8,9 @@ Linux/Windows post-exploitation framework made by linux user
 - [how to use](https://github.com/jm33-m0/emp3r0r/wiki)
 
 
-https://user-images.githubusercontent.com/10167884/155106403-ca6bd763-7f09-4aae-adc3-67f7a36f99ad.mp4
-
 ![UI](https://user-images.githubusercontent.com/10167884/155084808-fb0df1ef-6eab-4894-8af0-81934e9cd25e.png)
+
+https://user-images.githubusercontent.com/10167884/155106403-ca6bd763-7f09-4aae-adc3-67f7a36f99ad.mp4
 
 ![c2](./img/c2transports.png)
 
