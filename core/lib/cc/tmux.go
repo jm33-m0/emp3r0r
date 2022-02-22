@@ -86,6 +86,17 @@ func TmuxCurrentWindow() (index int) {
 	return
 }
 
+func (pane *Emp3r0rPane) TmuxRespawn() (err error) {
+	pane.Index = TmuxPaneID2Index(pane.ID)
+
+	out, err := exec.Command("tmux", "respawn-pane", "-t", strconv.Itoa(pane.Index)).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("TmuxRespawn %s: %s\n%v", pane.ID, out, err)
+	}
+
+	return
+}
+
 // TmuxPrintf like printf, but prints to a tmux pane/window
 // id: pane unique id
 func (pane *Emp3r0rPane) TmuxPrintf(clear bool, format string, a ...interface{}) {
@@ -107,9 +118,11 @@ func (pane *Emp3r0rPane) TmuxPrintf(clear bool, format string, a ...interface{})
 	TmuxUpdatePane(pane)
 	id := pane.ID
 	if !pane.Alive {
-		CliPrintWarning("Tmux window %s is dead/gone:\n"+
-			"printing to main window instead.\n\n", id)
-		CliPrintWarning(format, a...)
+		CliPrintWarning("Tmux window %s is dead/gone, respawning...", id)
+		err = pane.TmuxRespawn()
+		if err == nil {
+			pane.TmuxPrintf(clear, format, a...)
+		}
 		return
 	}
 
