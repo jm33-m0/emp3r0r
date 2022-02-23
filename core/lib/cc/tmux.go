@@ -167,7 +167,7 @@ func (pane *Emp3r0rPane) TmuxClearPane() (err error) {
 	}
 
 	// update
-	TmuxUpdatePane(pane)
+	defer TmuxUpdatePane(pane)
 	return
 }
 
