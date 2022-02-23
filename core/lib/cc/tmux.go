@@ -423,6 +423,10 @@ func TmuxNewPane(title, hV string, target_pane_id string, size int, cmd string) 
 
 // Sync changes of a pane
 func TmuxUpdatePane(pane *Emp3r0rPane) {
+	if pane == nil {
+		CliPrintWarning("Update pane: no pane to update")
+		return
+	}
 	pane.Alive, pane.Index, pane.TTY, pane.PID, pane.Cmd, pane.Width, pane.Height = pane.TmuxPaneDetails()
 }
 
