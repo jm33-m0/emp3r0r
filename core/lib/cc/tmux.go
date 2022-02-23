@@ -59,10 +59,9 @@ func TmuxCurrentPane() (index int) {
 
 	out_str := strings.TrimSpace(string(out))
 	index, err = strconv.Atoi(out_str)
-	if err == nil {
+	if err != nil {
 		return
 	}
-
 	return
 }
 
@@ -78,11 +77,7 @@ func TmuxCurrentWindow() (index int) {
 	}
 
 	out_str := strings.TrimSpace(string(out))
-	index, err = strconv.Atoi(out_str)
-	if err == nil {
-		return
-	}
-
+	index, _ = strconv.Atoi(out_str)
 	return
 }
 
@@ -101,13 +96,7 @@ func (pane *Emp3r0rPane) TmuxRespawn() (err error) {
 // TmuxPrintf like printf, but prints to a tmux pane/window
 // id: pane unique id
 func (pane *Emp3r0rPane) TmuxPrintf(clear bool, format string, a ...interface{}) {
-	if pane == nil {
-		CliPrintWarning("TmuxPrintf: pane not found")
-		return
-	}
-
 	msg := fmt.Sprintf(format, a...)
-
 	if clear {
 		err := pane.TmuxClearPane()
 		if err != nil {
@@ -128,7 +117,7 @@ func (pane *Emp3r0rPane) TmuxPrintf(clear bool, format string, a ...interface{})
 	}
 
 	// print msg
-	err = ioutil.WriteFile(pane.TTY, []byte(msg), 0777)
+	var err = ioutil.WriteFile(pane.TTY, []byte(msg), 0777)
 	if err != nil {
 		CliPrintWarning("Cannot print on tmux window %s: %v,\n"+
 			"printing to main window instead.\n\n",
@@ -139,11 +128,6 @@ func (pane *Emp3r0rPane) TmuxPrintf(clear bool, format string, a ...interface{})
 }
 
 func (pane *Emp3r0rPane) TmuxClearPane() (err error) {
-	if pane == nil {
-		CliPrintWarning("TmuxClearPane: pane not found")
-		return
-	}
-
 	id := pane.ID
 
 	proc, err := os.FindProcess(pane.PID)
@@ -230,11 +214,6 @@ func (pane *Emp3r0rPane) TmuxPaneDetails() (
 
 // TmuxResizePane resize pane in x/y to number of lines
 func (pane *Emp3r0rPane) TmuxResizePane(direction string, lines int) (err error) {
-	if pane == nil {
-		CliPrintWarning("TmuxResizePane: pane not found")
-		return
-	}
-
 	id := pane.ID
 	idx := TmuxPaneID2Index(id)
 	if idx < 0 {
