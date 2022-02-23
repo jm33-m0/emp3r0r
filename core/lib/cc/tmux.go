@@ -84,7 +84,7 @@ func TmuxCurrentWindow() (index int) {
 	return
 }
 
-func (pane *Emp3r0rPane) TmuxRespawn() (err error) {
+func (pane *Emp3r0rPane) Respawn() (err error) {
 	pane.Index = TmuxPaneID2Index(pane.ID)
 
 	defer TmuxUpdatePane(pane)
@@ -96,12 +96,12 @@ func (pane *Emp3r0rPane) TmuxRespawn() (err error) {
 	return
 }
 
-// TmuxPrintf like printf, but prints to a tmux pane/window
+// Printf like printf, but prints to a tmux pane/window
 // id: pane unique id
-func (pane *Emp3r0rPane) TmuxPrintf(clear bool, format string, a ...interface{}) {
+func (pane *Emp3r0rPane) Printf(clear bool, format string, a ...interface{}) {
 	msg := fmt.Sprintf(format, a...)
 	if clear {
-		err := pane.TmuxClearPane()
+		err := pane.ClearPane()
 		if err != nil {
 			CliPrintWarning("Clear pane: %v", err)
 		}
@@ -112,9 +112,9 @@ func (pane *Emp3r0rPane) TmuxPrintf(clear bool, format string, a ...interface{})
 	id := pane.ID
 	if !pane.Alive {
 		CliPrintWarning("Tmux window %s is dead/gone, respawning...", id)
-		err = pane.TmuxRespawn()
+		err = pane.Respawn()
 		if err == nil {
-			pane.TmuxPrintf(clear, format, a...)
+			pane.Printf(clear, format, a...)
 		}
 		return
 	}
@@ -130,7 +130,7 @@ func (pane *Emp3r0rPane) TmuxPrintf(clear bool, format string, a ...interface{})
 	}
 }
 
-func (pane *Emp3r0rPane) TmuxClearPane() (err error) {
+func (pane *Emp3r0rPane) ClearPane() (err error) {
 	id := pane.ID
 
 	proc, err := os.FindProcess(pane.PID)
@@ -159,8 +159,8 @@ func (pane *Emp3r0rPane) TmuxClearPane() (err error) {
 	return
 }
 
-// TmuxPaneDetails Get details of a tmux pane
-func (pane *Emp3r0rPane) TmuxPaneDetails() (
+// PaneDetails Get details of a tmux pane
+func (pane *Emp3r0rPane) PaneDetails() (
 	is_alive bool,
 	index int,
 	tty string,
@@ -215,8 +215,8 @@ func (pane *Emp3r0rPane) TmuxPaneDetails() (
 	return
 }
 
-// TmuxResizePane resize pane in x/y to number of lines
-func (pane *Emp3r0rPane) TmuxResizePane(direction string, lines int) (err error) {
+// ResizePane resize pane in x/y to number of lines
+func (pane *Emp3r0rPane) ResizePane(direction string, lines int) (err error) {
 	id := pane.ID
 	idx := TmuxPaneID2Index(id)
 	if idx < 0 {
@@ -239,7 +239,7 @@ func TmuxKillWindow(index int) (err error) {
 	return
 }
 
-func (pane *Emp3r0rPane) TmuxKillPane() (err error) {
+func (pane *Emp3r0rPane) KillPane() (err error) {
 	id := pane.ID
 	idx := TmuxPaneID2Index(id)
 	if idx < 0 {
@@ -257,10 +257,10 @@ func (pane *Emp3r0rPane) TmuxKillPane() (err error) {
 // TmuxDeinitWindows close previously opened tmux windows
 func TmuxDeinitWindows() {
 	for _, pane := range TmuxPanes {
-		pane.TmuxKillPane()
+		pane.KillPane()
 	}
 
-	CommandPane.TmuxKillPane()
+	CommandPane.KillPane()
 }
 
 // TermSize Get terminal size
@@ -332,7 +332,7 @@ func TmuxInitWindows() (err error) {
 			return
 		}
 		TmuxPanes[pane.ID] = pane
-		pane.TmuxPrintf(false, color.HiYellowString(place_holder))
+		pane.Printf(false, color.HiYellowString(place_holder))
 
 		return
 	}
@@ -427,7 +427,7 @@ func TmuxUpdatePane(pane *Emp3r0rPane) {
 		CliPrintWarning("Update pane: no pane to update")
 		return
 	}
-	pane.Alive, pane.Index, pane.TTY, pane.PID, pane.Cmd, pane.Width, pane.Height = pane.TmuxPaneDetails()
+	pane.Alive, pane.Index, pane.TTY, pane.PID, pane.Cmd, pane.Width, pane.Height = pane.PaneDetails()
 }
 
 func TmuxSetPaneTitle(title, pane_id string) error {

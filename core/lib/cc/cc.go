@@ -186,7 +186,7 @@ func ListTargets() {
 	table.Render()
 
 	// resize in case it gets wider
-	AgentListPane.TmuxPrintf(true, "\n\033[0m%s\n\n", tableString.String())
+	AgentListPane.Printf(true, "\n\033[0m%s\n\n", tableString.String())
 }
 
 func GetTargetDetails(target *emp3r0r_data.SystemInfo) {
@@ -268,9 +268,9 @@ func GetTargetDetails(target *emp3r0r_data.SystemInfo) {
 	table.Render()
 	num_of_lines := len(strings.Split(tableString.String(), "\n"))
 	num_of_columns := len(strings.Split(tableString.String(), "\n")[0])
-	AgentInfoPane.TmuxResizePane("y", num_of_lines)
-	AgentInfoPane.TmuxResizePane("x", num_of_columns)
-	AgentInfoPane.TmuxPrintf(true, "\n\033[0m%s\n\n", tableString.String())
+	AgentInfoPane.ResizePane("y", num_of_lines)
+	AgentInfoPane.ResizePane("x", num_of_columns)
+	AgentInfoPane.Printf(true, "\n\033[0m%s\n\n", tableString.String())
 
 	// Update Agent list
 	ListTargets()

@@ -124,7 +124,7 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 
 		// resize pane since table might mess up
 		x := len(strings.Split(out, "\n")[0])
-		AgentOutputPane.TmuxResizePane("x", x)
+		AgentOutputPane.ResizePane("x", x)
 
 		// ls command
 	case "ls":
@@ -178,11 +178,11 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 
 		// resize pane since table might mess up
 		x := len(strings.Split(out, "\n")[0])
-		AgentOutputPane.TmuxResizePane("x", x)
+		AgentOutputPane.ResizePane("x", x)
 	}
 
 	// Command output
-	AgentOutputPane.TmuxPrintf(false,
+	AgentOutputPane.Printf(false,
 		"\n[%s] %s:\n%s\n\n",
 		color.CyanString("%d", contrlIf.Index),
 		color.HiMagentaString(cmd),
