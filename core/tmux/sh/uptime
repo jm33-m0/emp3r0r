@@ -1,0 +1,3 @@
+#!/bin/bash
+
+uptime | cut -d ',' -f1 | sed 's/\ \ /\ /g'

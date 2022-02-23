@@ -20,7 +20,7 @@ func SingleArgCmd(cmd string) {
 	}
 
 	// send cmd
-	err := SendCmdToCurrentTarget(cmd)
+	err := SendCmdToCurrentTarget(cmd, "")
 	if err != nil {
 		CliPrintError("%s failed: %v", cmdname, err)
 		return
@@ -36,7 +36,7 @@ func DoubleArgCmd(cmd string) {
 	}
 
 	// send cmd
-	err := SendCmdToCurrentTarget(cmd)
+	err := SendCmdToCurrentTarget(cmd, "")
 	if err != nil {
 		CliPrintError("%s failed: %v", cmdname, err)
 		return
@@ -48,7 +48,7 @@ func NoArgCmd(cmd string) {
 	if cmd == "ps" {
 		cmd = "#ps"
 	}
-	err := SendCmdToCurrentTarget(cmd)
+	err := SendCmdToCurrentTarget(cmd, "")
 	if err != nil {
 		CliPrintError("%s failed: %v", cmd, err)
 		return

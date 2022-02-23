@@ -5,6 +5,8 @@
 # go.sum
 go.sum
 
+*.log
+
 # certs
 *.pem
 *.cert

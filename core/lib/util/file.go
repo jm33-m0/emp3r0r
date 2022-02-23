@@ -2,6 +2,7 @@ package util
 
 import (
 	"bufio"
+	"context"
 	crypto_rand "crypto/rand"
 	"encoding/binary"
 	"encoding/json"
@@ -9,10 +10,13 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
+	mathRand "math/rand"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/mholt/archiver/v4"
 )
 
 // Dentry Directory entry
@@ -35,7 +39,7 @@ type FileStat struct {
 
 // LsPath ls path and return a json
 func LsPath(path string) (res string, err error) {
-	files, err := ioutil.ReadDir("./")
+	files, err := ioutil.ReadDir(path)
 	if err != nil {
 		log.Printf("LsPath: %v", err)
 		return
@@ -109,7 +113,7 @@ func AppendToFile(filename string, text string) (err error) {
 func IsStrInFile(text, filepath string) bool {
 	f, err := os.Open(filepath)
 	if err != nil {
-		log.Print(err)
+		log.Printf("IsStrInFile: %v", err)
 		return false
 	}
 	defer f.Close()
@@ -130,6 +134,13 @@ func Copy(src, dst string) error {
 	if err != nil {
 		return err
 	}
+	if IsFileExist(dst) {
+		err = os.RemoveAll(dst)
+		if err != nil {
+			log.Printf("Copy: %s exists and cannot be removed", dst)
+		}
+	}
+
 	return ioutil.WriteFile(dst, in, 0755)
 }
 
@@ -153,6 +164,17 @@ func RandInt(min, max int) int {
 	}
 	rand.Seed(int64(binary.LittleEndian.Uint64(b[:])))
 	return min + rand.Intn(max-min)
+}
+
+// RandStr random string
+func RandStr(n int) string {
+	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	mathRand.Seed(time.Now().Unix())
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[mathRand.Intn(len(letters))]
+	}
+	return string(b)
 }
 
 // FileBaseName /path/to/foo -> foo
@@ -185,9 +207,55 @@ func FileAllocate(filepath string, n int64) (err error) {
 func FileSize(path string) (size int64) {
 	fi, err := os.Stat(path)
 	if err != nil {
-		log.Printf("FileSize %s: %v", path, err)
-		return -1
+		return 0
 	}
 	size = fi.Size()
 	return
+}
+
+func TarBz2(dir, outfile string) error {
+	// map files on disk to their paths in the archive
+	archive_dir_name := FileBaseName(dir)
+	if dir == "." {
+		archive_dir_name = ""
+	}
+	files, err := archiver.FilesFromDisk(nil, map[string]string{
+		dir: archive_dir_name,
+	})
+	if err != nil {
+		return err
+	}
+
+	// create the output file we'll write to
+	out, err := os.Create(outfile)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	// we can use the CompressedArchive type to gzip a tarball
+	// (compression is not required; you could use Tar directly)
+	format := archiver.CompressedArchive{
+		Compression: archiver.Bz2{},
+		Archival:    archiver.Tar{},
+	}
+
+	// create the archive
+	err = format.Archive(context.Background(), out, files)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func ReverseString(s string) string {
+	rns := []rune(s) // convert to rune
+	for i, j := 0, len(rns)-1; i < j; i, j = i+1, j-1 {
+		// swap the letters of the string,
+		// like first with last and so on.
+		rns[i], rns[j] = rns[j], rns[i]
+	}
+
+	// return the reversed string.
+	return string(rns)
 }

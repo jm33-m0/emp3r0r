@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 )
 
 func modulePortFwd() {
@@ -19,7 +19,7 @@ func modulePortFwd() {
 				// tell the agent to close connection
 				// make sure handler returns
 				cmd := fmt.Sprintf("!port_fwd %s stop stop", id) // cmd format: !port_fwd [to/listen] [shID] [operation]
-				err := SendCmd(cmd, CurrentTarget)
+				err := SendCmd(cmd, "", CurrentTarget)
 				if err != nil {
 					CliPrintError("SendCmd: %v", err)
 					return
@@ -60,7 +60,7 @@ func moduleProxy() {
 	// port-fwd
 	var pf PortFwdSession
 	pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
-	pf.Lport, pf.To = port, "127.0.0.1:"+agent.ProxyPort
+	pf.Lport, pf.To = port, "127.0.0.1:"+emp3r0r_data.ProxyPort
 
 	switch status {
 	case "on":
@@ -81,7 +81,7 @@ func moduleProxy() {
 				// tell the agent to close connection
 				// make sure handler returns
 				cmd := fmt.Sprintf("!delete_portfwd %s", id)
-				err := SendCmd(cmd, session.Agent)
+				err := SendCmd(cmd, "", session.Agent)
 				if err != nil {
 					CliPrintError("SendCmd: %v", err)
 					return

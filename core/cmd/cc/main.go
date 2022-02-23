@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 package main
 
 import (
@@ -7,9 +10,10 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 )
@@ -36,16 +40,16 @@ func readJSONConfig(filename string) (err error) {
 	var config Config
 	err = json.Unmarshal(jsonData, &config)
 	if err != nil {
-		return fmt.Errorf("failed to decrypt JSON config: %v", err)
+		return fmt.Errorf("failed to parse JSON config: %v", err)
 	}
 
 	// set up runtime vars
-	agent.Version = config.Version
-	agent.SSHDPort = config.SSHDPort
-	agent.BroadcastPort = config.BroadcastPort
-	agent.ProxyPort = config.ProxyPort
-	agent.CCPort = config.CCPort
-	agent.CCAddress = fmt.Sprintf("https://%s", config.CCIP)
+	emp3r0r_data.Version = config.Version
+	emp3r0r_data.SSHDPort = config.SSHDPort
+	emp3r0r_data.BroadcastPort = config.BroadcastPort
+	emp3r0r_data.ProxyPort = config.ProxyPort
+	emp3r0r_data.CCPort = config.CCPort
+	emp3r0r_data.CCAddress = fmt.Sprintf("https://%s", config.CCIP)
 
 	// CA
 	tun.CACrt = []byte(config.CA)
@@ -53,8 +57,37 @@ func readJSONConfig(filename string) (err error) {
 	return
 }
 
+// cleanup temp files
+func cleanup() bool {
+	// is cc currently running?
+	if tun.IsPortOpen("127.0.0.1", emp3r0r_data.CCPort) {
+		return false
+	}
+
+	// unlock downloads
+	files, err := ioutil.ReadDir(cc.FileGetDir)
+	if err != nil {
+		return true
+	}
+	for _, f := range files {
+		if strings.HasSuffix(f.Name(), ".lock") {
+			err = os.Remove(cc.FileGetDir + f.Name())
+			if err != nil {
+				log.Fatalf("Remove %s: %v", f.Name(), err)
+			}
+		}
+	}
+
+	return true
+}
+
 func main() {
 	go cc.TLSServer()
+
+	// cleanup or abort
+	if !cleanup() {
+		log.Fatal("CC is already running")
+	}
 
 	cdnproxy := flag.String("cdn2proxy", "", "Start cdn2proxy server on this port")
 	config := flag.String("config", "build.json", "Use this config file to update hardcoded variables")
@@ -73,7 +106,7 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
-			err = cdn2proxy.StartServer(*cdnproxy, "127.0.0.1:"+agent.CCPort, logFile)
+			err = cdn2proxy.StartServer(*cdnproxy, "127.0.0.1:"+emp3r0r_data.CCPort, "ws", logFile)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -89,5 +122,6 @@ func main() {
 	if *apiserver {
 		go cc.APIMain()
 	}
+	cc.InitModules()
 	cc.CliMain()
 }

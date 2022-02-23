@@ -163,7 +163,7 @@ func Base64Encode(text string) string {
 func Base64Decode(text string) []byte {
 	dec, err := base64.URLEncoding.DecodeString(text)
 	if err != nil {
-		log.Print(err)
+		log.Printf("Base64Decode: %v", err)
 		return nil
 	}
 	return dec

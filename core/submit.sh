@@ -15,13 +15,14 @@ yes_no() {
 
 if [[ $(git status --porcelain) ]]; then
     echo "[-] Commit and push your work before using this script"
-    lazygit
+    git status
+    exit
 fi
 
 yes_no "[?] Add new tag" && (
     read -r -p "[?] Enter new version tag: " tag
     echo -n "v$tag" >.version
-    git commit .version -m "bump version to $tag"
+    git commit .version -S -m "bump version to $tag"
     git add .version
     git tag "v$tag" -a -m "v$tag"
 )

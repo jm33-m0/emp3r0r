@@ -10,7 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	"github.com/google/uuid"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -35,21 +36,33 @@ func DownloadFile(url, path string) (err error) {
 }
 
 // SendCmd send command to agent
-func SendCmd(cmd string, a *agent.SystemInfo) error {
+func SendCmd(cmd, cmd_id string, a *emp3r0r_data.SystemInfo) error {
 	if a == nil {
 		return errors.New("SendCmd: No such agent")
 	}
 
-	var cmdData agent.MsgTunData
+	var cmdData emp3r0r_data.MsgTunData
 
-	cmdData.Payload = fmt.Sprintf("cmd%s%s", agent.OpSep, cmd)
+	// add UUID to each command for tracking
+	if cmd_id == "" {
+		cmd_id = uuid.New().String()
+	}
+	cmdData.Payload = fmt.Sprintf("cmd%s%s%s%s",
+		emp3r0r_data.OpSep, cmd,
+		emp3r0r_data.OpSep, cmd_id)
 	cmdData.Tag = a.Tag
+
+	// timestamp
+	cmdData.Time = time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST")
+	CmdTimeMutex.Lock()
+	CmdTime[cmd+cmd_id] = cmdData.Time
+	CmdTimeMutex.Unlock()
 
 	return Send2Agent(&cmdData, a)
 }
 
 // SendCmdToCurrentTarget send a command to currently selected agent
-func SendCmdToCurrentTarget(cmd string) error {
+func SendCmdToCurrentTarget(cmd, cmd_id string) error {
 	// target
 	target := SelectCurrentTarget()
 	if target == nil {
@@ -57,7 +70,7 @@ func SendCmdToCurrentTarget(cmd string) error {
 	}
 
 	// send cmd
-	return SendCmd(cmd, target)
+	return SendCmd(cmd, cmd_id, target)
 }
 
 // VimEdit launch local vim to edit files
@@ -143,42 +156,7 @@ func OpenInNewTerminalWindow(name, cmd string) error {
 	// works fine for gnome-terminal and xfce4-terminal
 	job := fmt.Sprintf("%s -t '%s' -e '%s || read'", terminal, name, cmd)
 
-	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%v: %s", err, out)
-	}
-
-	return nil
-}
-
-// TmuxNewWindow split tmux window, and run command in the new pane
-func TmuxNewWindow(name, cmd string) error {
-	if os.Getenv("TMUX") == "" ||
-		!util.IsCommandExist("tmux") {
-		return errors.New("You need to run emp3r0r under `tmux`")
-	}
-
-	job := exec.Command("tmux", "new-window", "-n", name, fmt.Sprintf("'%s | read'", cmd))
-	out, err := job.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%v: %s", err, out)
-	}
-
-	return nil
-}
-
-// TmuxSplit split tmux window, and run command in the new pane
-func TmuxSplit(hV, cmd string) error {
-	if os.Getenv("TMUX") == "" ||
-		!util.IsCommandExist("tmux") ||
-		!util.IsCommandExist("less") {
-
-		return errors.New("You need to run emp3r0r under `tmux`, and make sure `less` is installed")
-	}
-
-	job := fmt.Sprintf("tmux split-window -%s %s", hV, cmd)
-
-	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
+	out, err := exec.Command("/bin/bash", "-c", job).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%v: %s", err, out)
 	}
@@ -187,9 +165,9 @@ func TmuxSplit(hV, cmd string) error {
 }
 
 // IsAgentExist is agent already in target list?
-func IsAgentExist(agent *agent.SystemInfo) bool {
+func IsAgentExist(t *emp3r0r_data.SystemInfo) bool {
 	for a := range Targets {
-		if a.Tag == agent.Tag {
+		if a.Tag == t.Tag {
 			return true
 		}
 	}
@@ -210,7 +188,7 @@ func assignTargetIndex() (index int) {
 
 // TermClear clear screen
 func TermClear() {
-	os.Stdout.WriteString("\033[2J")
+	os.Stdout.WriteString(ClearTerm)
 	err := CliBanner()
 	if err != nil {
 		CliPrintError("%v", err)

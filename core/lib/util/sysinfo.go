@@ -3,16 +3,18 @@ package util
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"os/user"
+	"strings"
 
 	"github.com/jaypipes/ghw"
 )
 
 func GetMemSize() int {
-	memInfo, err := ghw.Memory()
+	memInfo, err := ghw.Memory(ghw.WithDisableWarnings())
 	if err != nil {
 		log.Printf("GetMemSize error: %v", err)
 		return -1
@@ -21,8 +23,22 @@ func GetMemSize() int {
 	return int(float32(memInfo.TotalUsableBytes) / 1024 / 1024)
 }
 
+func GetGPUInfo() (info string) {
+	gpuinfo, err := ghw.GPU(ghw.WithDisableWarnings())
+	if err != nil {
+		return "no_gpu"
+	}
+
+	for _, card := range gpuinfo.GraphicsCards {
+		info += card.String() + "\n"
+	}
+
+	info = strings.TrimSpace(info)
+	return
+}
+
 func GetCPUInfo() (info string) {
-	cpuinfo, err := ghw.CPU()
+	cpuinfo, err := ghw.CPU(ghw.WithDisableWarnings())
 	if err != nil {
 		return
 	}
@@ -56,6 +72,19 @@ func GetUsername() string {
 		return "unknown_user"
 	}
 	return u.Username
+}
+
+func GetKernelVersion() (uname string) {
+	release, err := ioutil.ReadFile("/proc/sys/kernel/osrelease")
+	if err != nil {
+		release = []byte("unknown_release")
+	}
+	version, err := ioutil.ReadFile("/proc/sys/kernel/version")
+	if err != nil {
+		version = []byte("unknown_version")
+	}
+
+	return fmt.Sprintf("%s Linux %s", release, version)
 }
 
 // Golang code to get MAC address for purposes of generating a unique id. Returns a uint64.
@@ -97,7 +126,7 @@ func genShortID() (id string) {
 }
 
 // GetHostID unique identifier of the host
-func GetHostID() (id string) {
+func GetHostID(fallbackUUID string) (id string) {
 	shortID := genShortID()
 	id = fmt.Sprintf("unknown_%s-agent", shortID)
 	name, err := os.Hostname()
@@ -106,7 +135,7 @@ func GetHostID() (id string) {
 		return
 	}
 	name = fmt.Sprintf("%s\\%s", name, GetUsername())
-	id = fmt.Sprintf("%s_%s-agent-nomachineid", name, shortID)
+	id = fmt.Sprintf("%s_%s-agent-%s", name, shortID, fallbackUUID)
 	productInfo, err := ghw.Product()
 	if err != nil {
 		log.Printf("GetHostID: %v", err)
@@ -122,7 +151,7 @@ func GetHostID() (id string) {
 // CheckProduct check machine details
 func CheckProduct() (product string) {
 	product = "unknown_product"
-	productInfo, err := ghw.Product()
+	productInfo, err := ghw.Product(ghw.WithDisableWarnings())
 	if err != nil {
 		return
 	}

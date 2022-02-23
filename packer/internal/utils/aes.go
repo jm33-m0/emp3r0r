@@ -8,12 +8,30 @@ import (
 	"fmt"
 	"io"
 	"log"
+	mathRand "math/rand"
+	"time"
 )
 
 const (
 	Sep = "c7c53de5-c719-4c12-be88-c227a59b4286"
 	Key = "fb9dce35-8190-4a88-a832-64a39b975ccf-ThisIsYourAESKey"
 )
+
+var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+func RandStr(n int) string {
+	mathRand.Seed(time.Now().Unix())
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[mathRand.Intn(len(letters))]
+	}
+	return string(b)
+}
+
+func RandInt() int {
+	mathRand.Seed(time.Now().Unix())
+	return mathRand.Intn(10)
+}
 
 // MD5Sum calc md5 of a string
 func MD5Sum(text string) string {

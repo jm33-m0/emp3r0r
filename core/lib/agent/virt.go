@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 package agent
 
 import (
@@ -16,7 +19,6 @@ func CheckContainer() (product string) {
 	lines := strings.Split(string(data), "\n")
 	for _, line := range lines {
 		if strings.Contains(line, "freezer") {
-			log.Println("Checking if we are in a container...")
 			fields := strings.Split(line, ":")
 			if len(fields) > 1 &&
 				fields[len(fields)-1] != "/" {
@@ -26,7 +28,6 @@ func CheckContainer() (product string) {
 			}
 		}
 	}
-	log.Println("no, we are not")
 
 	return
 }

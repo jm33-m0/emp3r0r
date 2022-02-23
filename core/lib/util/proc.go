@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
+	"time"
 
 	gops "github.com/mitchellh/go-ps"
 	"github.com/shirou/gopsutil/v3/process"
@@ -71,6 +73,21 @@ func ProcessList() (list []ProcEntry) {
 	return
 }
 
+// ProcExe read exe path of a process
+func ProcExe(pid int) string {
+	proc, err := process.NewProcess(int32(pid))
+	if err != nil || proc == nil {
+		log.Printf("No such process (%d): %v", pid, err)
+		return "dead_process"
+	}
+	exe, err := proc.Exe()
+	if err != nil {
+		return fmt.Sprintf("err_%v", err)
+	}
+	exe = strings.Fields(exe)[0] // get rid of other stuff
+	return exe
+}
+
 // ProcCmdline read cmdline data of a process
 func ProcCmdline(pid int) string {
 	proc, err := process.NewProcess(int32(pid))
@@ -79,6 +96,7 @@ func ProcCmdline(pid int) string {
 		return "dead_process"
 	}
 	cmdline, err := proc.Cmdline()
+
 	if err != nil {
 		return fmt.Sprintf("err_%v", err)
 	}
@@ -127,4 +145,10 @@ func PidOf(name string) []int {
 	}
 
 	return pids
+}
+
+// sleep for a random interval
+func TakeASnap() {
+	interval := time.Duration(RandInt(100, 2000))
+	time.Sleep(interval * time.Millisecond)
 }

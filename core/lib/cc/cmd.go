@@ -2,11 +2,13 @@ package cc
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/fatih/color"
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -19,6 +21,7 @@ var Commands = map[string]string{
 	"run":             "Run selected module, make sure you have set required options",
 	"info":            "What options do we have?",
 	"gen_agent":       "Generate agent with provided binary and build.json",
+	"upgrade_agent":   "Upgrade agent on selected target",
 	"ls":              "List current directory of selected agent",
 	"mv":              "Move a file to another location on selected target",
 	"cp":              "Copy a file to another location on selected target",
@@ -32,22 +35,26 @@ var Commands = map[string]string{
 	"vim":             "Edit a text file on selected agent",
 	"put":             "Upload a file to selected agent",
 	"screenshot":      "Take a screenshot of selected agent",
+	"suicide":         "Kill agent process, delete agent root directory",
 	"ls_targets":      "List all targets",
 	"ls_modules":      "List all modules",
 	"ls_port_fwds":    "List all port mappings",
+	"debug":           "Set debug level: -1 (least verbose) to 1 (most verbose)",
 	"delete_port_fwd": "Delete a port mapping",
 	"exit":            "Exit",
 }
 
 // CmdHelpers holds a map of helper functions
 var CmdHelpers = map[string]func(){
-	"ls_targets":   ListTargets,
-	"ls_modules":   ListModules,
-	"ls_port_fwds": ListPortFwds,
-	"info":         CliListOptions,
-	"run":          ModuleRun,
-	"screenshot":   TakeScreenshot,
-	"gen_agent":    GenAgent,
+	"ls_targets":    ListTargets,
+	"ls_modules":    ListModules,
+	"ls_port_fwds":  ListPortFwds,
+	"info":          CliListOptions,
+	"run":           ModuleRun,
+	"screenshot":    TakeScreenshot,
+	"gen_agent":     GenAgent,
+	"upgrade_agent": UpgradeAgent,
+	"suicide":       Suicide,
 }
 
 // FileManagerHelpers manage agent files
@@ -64,6 +71,10 @@ var FileManagerHelpers = map[string]func(string){
 	"ps":    NoArgCmd,
 	"kill":  SingleArgCmd,
 }
+
+// CmdTime Record the time spent on each command
+var CmdTime = make(map[string]string)
+var CmdTimeMutex = &sync.Mutex{}
 
 const HELP = "help" // fuck goconst
 
@@ -102,19 +113,39 @@ func CmdHandler(cmd string) (err error) {
 				}
 				UpdateOptions(CurrentMod)
 				CliPrintInfo("Using module %s", strconv.Quote(CurrentMod))
+				ModuleDetails(CurrentMod)
+				CliListOptions()
+
 				return
 			}
 		}
 		CliPrintError("No such module: %s", strconv.Quote(cmdSplit[1]))
 
 	case cmdSplit[0] == "set":
-		if len(cmdSplit) < 3 {
-			CliPrintError("set what? " + strconv.Quote(cmd))
+		if len(cmdSplit) < 2 {
+			CliPrintError("set what?")
 			return
 		}
-
 		// hand to SetOption helper
 		SetOption(cmdSplit[1:])
+		CliListOptions()
+
+	case cmdSplit[0] == "debug":
+		if len(cmdSplit) < 2 {
+			CliPrintError("debug [ 0, 1, 2, 3 ]")
+			return
+		}
+		level, e := strconv.Atoi(cmdSplit[1])
+		if e != nil {
+			CliPrintError("Invalid debug level: %v", err)
+			return
+		}
+		DebugLevel = level
+		if DebugLevel > 2 {
+			log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Llongfile | log.Lmsgprefix)
+		} else {
+			log.SetFlags(log.Ldate | log.Ltime | log.LstdFlags)
+		}
 
 	case cmdSplit[0] == "delete_port_fwd":
 		if len(cmdSplit) < 2 {
@@ -131,7 +162,7 @@ func CmdHandler(cmd string) (err error) {
 		index, e := strconv.Atoi(cmdSplit[1])
 		label := strings.Join(cmdSplit[2:], " ")
 
-		var target *agent.SystemInfo
+		var target *emp3r0r_data.SystemInfo
 		if e != nil {
 			target = GetTargetFromTag(cmdSplit[1])
 			if target != nil {
@@ -157,25 +188,44 @@ func CmdHandler(cmd string) (err error) {
 			return
 		}
 		defer SetDynamicPrompt()
+		var target_to_set *emp3r0r_data.SystemInfo
 
-		index, e := strconv.Atoi(cmdSplit[1])
-		if e != nil {
-			CurrentTarget = GetTargetFromTag(cmdSplit[1])
-			if CurrentTarget != nil {
-				GetTargetDetails(CurrentTarget)
-				CliPrintSuccess("Now targeting %s", CurrentTarget.Tag)
-				return nil
+		// select by tag or index
+		target_to_set = GetTargetFromTag(strings.Join(cmdSplit[1:], " "))
+		if target_to_set == nil {
+			index, e := strconv.Atoi(cmdSplit[1])
+			if e == nil {
+				target_to_set = GetTargetFromIndex(index)
 			}
-			return fmt.Errorf("cannot set target by index: %v", e)
 		}
-		CurrentTarget = GetTargetFromIndex(index)
-		if CurrentTarget == nil {
+
+		select_agent := func(a *emp3r0r_data.SystemInfo) {
+			CurrentTarget = a
+			GetTargetDetails(CurrentTarget)
+			CliPrintSuccess("Now targeting %s", CurrentTarget.Tag)
+			SetDynamicPrompt()
+
+			// kill shell window
+			if AgentShellPane != nil {
+				CliPrintInfo("Updating shell window")
+				err = AgentShellPane.TmuxKillPane()
+				if err != nil {
+					CliPrintWarning("Updating shell window: %v", err)
+				}
+				AgentShellPane = nil
+			}
+			SSHClient("bash", "", emp3r0r_data.SSHDPort, true)
+		}
+
+		if target_to_set == nil {
+			// if still nothing
 			CliPrintWarning("Target does not exist, no target has been selected")
 			return fmt.Errorf("target not set or is nil")
-		}
 
-		GetTargetDetails(CurrentTarget)
-		CliPrintSuccess("Now targeting %s", CurrentTarget.Tag)
+		} else {
+			// lets start the bash shell
+			go select_agent(target_to_set)
+		}
 
 	case cmdSplit[0] == "vim":
 
@@ -211,9 +261,12 @@ func CmdHandler(cmd string) (err error) {
 		helper := CmdHelpers[cmd]
 		if helper == nil {
 			filehelper := FileManagerHelpers[cmdSplit[0]]
-			if filehelper == nil {
-				CliPrintWarning("Exec: " + strconv.Quote(cmd))
-				SendCmdToCurrentTarget(cmd)
+			if filehelper == nil && CurrentTarget != nil {
+				CliPrintWarning("Exec: %s on %s", strconv.Quote(cmd), strconv.Quote(CurrentTarget.Tag))
+				SendCmdToCurrentTarget(cmd, "")
+				return
+			} else if CurrentTarget == nil {
+				CliPrintError("Select a target so you can execute commands on it")
 				return
 			}
 			filehelper(cmd)
@@ -228,50 +281,21 @@ func CmdHandler(cmd string) (err error) {
 // print help for modules
 func CmdHelp(mod string) {
 	help := make(map[string]string)
-	switch mod {
-	case "":
-		CliPrettyPrint("Command", "Description", &Commands)
-	case agent.ModLPE_SUGGEST:
-		help = map[string]string{
-			"lpe_helper": "'linux-smart-enumeration' or 'linux-exploit-suggester'?",
-		}
-		CliPrettyPrint("Option", "Help", &help)
-	case agent.ModCMD_EXEC:
-		help = map[string]string{
-			"cmd_to_exec": "Press TAB for some hints",
-		}
-		CliPrettyPrint("Option", "Help", &help)
-	case agent.ModPORT_FWD:
-		help = map[string]string{
-			"to_port":     "Port (to forward to) on agent/CC side",
-			"listen_port": "Listen on CC/agent side",
-			"switch":      "Turn port mapping on/off, or use `reverse` mapping",
-		}
-		CliPrettyPrint("Option", "Help", &help)
-	case agent.ModPROXY:
-		help = map[string]string{
-			"port":   "Port of our local proxy server",
-			"status": "Turn proxy on/off",
-		}
-		CliPrettyPrint("Option", "Help", &help)
-	case agent.ModINJECTOR:
-		help = map[string]string{
-			"pid": "Target process PID, set to 0 to start a new process (sleep)",
-		}
-		CliPrettyPrint("Option", "Help", &help)
-	case agent.ModCLEAN_LOG:
-		help = map[string]string{
-			"keyword": "Delete all log entries containing this keyword",
-		}
-		CliPrettyPrint("Option", "Help", &help)
-	default:
-		for modname, modhelp := range agent.ModuleDocs {
-			if mod == modname {
-				help = map[string]string{"<N/A>": modhelp}
-				CliPrettyPrint("Option", "Help", &help)
-				return
-			}
-		}
-		CliPrintError("Help yourself")
+	if mod == "" {
+		CliPrettyPrint("Command", "Help", &Commands)
+		return
 	}
+
+	for modname, modhelp := range emp3r0r_data.ModuleComments {
+		if mod == modname {
+			exists := false
+			help, exists = emp3r0r_data.ModuleHelp[modname]
+			if !exists {
+				help = map[string]string{"<N/A>": modhelp}
+			}
+			CliPrettyPrint("Option", "Help", &help)
+			return
+		}
+	}
+	CliPrintError("Help yourself")
 }

