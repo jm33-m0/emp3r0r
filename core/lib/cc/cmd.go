@@ -181,6 +181,7 @@ func CmdHandler(cmd string) (err error) {
 		Targets[target].Label = label // set label
 		labelAgents()
 		CliPrintSuccess("%s has been labeled as %s", target.Tag, label)
+		ListTargets() // update agent list
 
 	case cmdSplit[0] == "target":
 		if len(cmdSplit) != 2 {
