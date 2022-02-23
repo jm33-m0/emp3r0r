@@ -58,7 +58,10 @@ func TmuxCurrentPane() (index int) {
 	}
 
 	out_str := strings.TrimSpace(string(out))
-	index, _ = strconv.Atoi(out_str)
+	index, err = strconv.Atoi(out_str)
+	if err != nil {
+		return
+	}
 	return
 }
 
