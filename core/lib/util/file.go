@@ -116,6 +116,8 @@ func IsStrInFile(text, filepath string) bool {
 		log.Printf("IsStrInFile: %v", err)
 		return false
 	}
+	defer f.Close()
+
 	s := bufio.NewScanner(f)
 	for s.Scan() {
 		if strings.Contains(s.Text(), text) {
