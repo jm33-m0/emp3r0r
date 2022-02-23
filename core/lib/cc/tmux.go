@@ -60,7 +60,7 @@ func TmuxCurrentPane() (index int) {
 	out_str := strings.TrimSpace(string(out))
 	index, err = strconv.Atoi(out_str)
 	if err != nil {
-		return
+		return // returns -1 if fail to parse as int
 	}
 	return
 }
@@ -77,7 +77,10 @@ func TmuxCurrentWindow() (index int) {
 	}
 
 	out_str := strings.TrimSpace(string(out))
-	index, _ = strconv.Atoi(out_str)
+	index, err = strconv.Atoi(out_str)
+	if err != nil {
+		return // returns -1 if fail to parse as int
+	}
 	return
 }
 
@@ -117,7 +120,7 @@ func (pane *Emp3r0rPane) TmuxPrintf(clear bool, format string, a ...interface{})
 	}
 
 	// print msg
-	var err = ioutil.WriteFile(pane.TTY, []byte(msg), 0777)
+	err := ioutil.WriteFile(pane.TTY, []byte(msg), 0777)
 	if err != nil {
 		CliPrintWarning("Cannot print on tmux window %s: %v,\n"+
 			"printing to main window instead.\n\n",
