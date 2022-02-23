@@ -89,6 +89,7 @@ func TmuxCurrentWindow() (index int) {
 func (pane *Emp3r0rPane) TmuxRespawn() (err error) {
 	pane.Index = TmuxPaneID2Index(pane.ID)
 
+	defer TmuxUpdatePane(pane)
 	out, err := exec.Command("tmux", "respawn-pane", "-t", strconv.Itoa(pane.Index)).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("TmuxRespawn %s: %s\n%v", pane.ID, out, err)
