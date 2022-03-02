@@ -185,7 +185,6 @@ func ListTargets() {
 	table.AppendBulk(tdata)
 	table.Render()
 
-	// resize in case it gets wider
 	AgentListPane.Printf(true, "\n\033[0m%s\n\n", tableString.String())
 }
 
