@@ -15,7 +15,7 @@ import (
 // StatFile Get stat info of a file on agent
 func StatFile(filepath string, a *emp3r0r_data.SystemInfo) (fi *util.FileStat, err error) {
 	cmd_id := uuid.NewString()
-	cmd := fmt.Sprintf("!stat %s", filepath)
+	cmd := fmt.Sprintf("%s %s", emp3r0r_data.C2CmdStat, filepath)
 	err = SendCmd(cmd, cmd_id, a)
 	if err != nil {
 		return

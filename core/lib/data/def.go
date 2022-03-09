@@ -207,6 +207,24 @@ var ModuleHelp = map[string]map[string]string{
 	},
 }
 
+// C2Commands
+const (
+	C2CmdCleanLog      = "!clean_log"
+	C2CmdUpdateAgent   = "!upgrade_agent"
+	C2CmdGetRoot       = "!get_root"
+	C2CmdPersistence   = "!persistence"
+	C2CmdCustomModule  = "!custom_module"
+	C2CmdInject        = "!inject"
+	C2CmdUtils         = "!utils"
+	C2CmdDeletePortFwd = "!delete_portfwd"
+	C2CmdPortFwd       = "!port_fwd"
+	C2CmdProxy         = "!proxy"
+	C2CmdSSHD          = "!sshd"
+	C2CmdLPE           = "!lpe"
+	C2CmdReverseProxy  = "!" + ModREVERSEPROXY
+	C2CmdStat          = "!stat"
+)
+
 // Config build.json config file
 type Config struct {
 	Version              string `json:"version"`                // agent version

@@ -1,6 +1,7 @@
 package cc
 
 import (
+	"fmt"
 	"io/ioutil"
 	"strconv"
 
@@ -56,5 +57,5 @@ func UpgradeAgent() {
 		return
 	}
 	checksum := tun.SHA256SumFile(WWWRoot + "agent")
-	SendCmdToCurrentTarget("!upgrade_agent "+checksum, "")
+	SendCmdToCurrentTarget(fmt.Sprintf("%s %s", emp3r0r_data.C2CmdUpdateAgent, checksum), "")
 }

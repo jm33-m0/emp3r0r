@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -16,7 +17,7 @@ func moduleVaccine() {
 			CliPrintError("CreateVaccineArchive: %v", err)
 			return
 		}
-		err = SendCmd("!utils", "", CurrentTarget)
+		err = SendCmd(emp3r0r_data.C2CmdUtils, "", CurrentTarget)
 		if err != nil {
 			CliPrintError("SendCmd failed: %v", err)
 		}

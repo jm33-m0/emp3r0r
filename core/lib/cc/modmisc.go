@@ -4,10 +4,11 @@ import (
 	"fmt"
 
 	"github.com/fatih/color"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 )
 
 func modulePersistence() {
-	cmd := fmt.Sprintf("!persistence %s", Options["method"].Val)
+	cmd := fmt.Sprintf("%s %s", emp3r0r_data.C2CmdPersistence, Options["method"].Val)
 	err := SendCmd(cmd, "", CurrentTarget)
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)
@@ -17,7 +18,7 @@ func modulePersistence() {
 }
 
 func moduleLogCleaner() {
-	cmd := fmt.Sprintf("!clean_log %s", Options["keyword"].Val)
+	cmd := fmt.Sprintf("%s %s", emp3r0r_data.C2CmdCleanLog, Options["keyword"].Val)
 	err := SendCmd(cmd, "", CurrentTarget)
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)

