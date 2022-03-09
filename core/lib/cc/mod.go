@@ -54,7 +54,6 @@ var (
 		emp3r0r_data.ModINJECTOR:     moduleInjector,
 		emp3r0r_data.ModREVERSEPROXY: moduleReverseProxy,
 		emp3r0r_data.ModGDB:          moduleGDB,
-		emp3r0r_data.ModBettercap:    moduleBettercap,
 	}
 )
 
@@ -166,11 +165,6 @@ func UpdateOptions(modName string) (exist bool) {
 		methodOpt := addIfNotFound("method")
 		methodOpt.Vals = []string{"gdb_loader", "inject_shellcode", "inject_loader"}
 		methodOpt.Val = "inject_shellcode"
-
-	case modName == emp3r0r_data.ModBettercap:
-		argsOpt := addIfNotFound("args")
-		argsOpt.Vals = []string{"--"}
-		argsOpt.Val = "--"
 
 	case modName == emp3r0r_data.ModREVERSEPROXY:
 		addrOpt := addIfNotFound("addr")

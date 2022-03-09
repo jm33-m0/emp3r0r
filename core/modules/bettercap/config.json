@@ -1,0 +1,12 @@
+{
+    "name": "bettercap",
+    "exec": "bettercap",
+    "platform": "Linux",
+    "interactive": true,
+    "author": "jm33-ng",
+    "date": "2022-03-09",
+    "comment": "Run bettercap as an interactive shell",
+    "options": {
+        "args": ["--", "run bettercap with this commandline arg"]
+    }
+}

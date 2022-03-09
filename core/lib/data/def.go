@@ -139,7 +139,6 @@ const (
 	ModGET_ROOT     = "get_root"
 	ModREVERSEPROXY = "reverse_proxy"
 	ModGDB          = "gdbserver"
-	ModBettercap    = "bettercap"
 )
 
 // PersistMethods CC calls one of these methods to get persistence, or all of them at once
@@ -165,7 +164,6 @@ var ModuleComments = map[string]string{
 	ModINJECTOR:     "Inject shellcode/loader.so into a running process",
 	ModGET_ROOT:     "Try some built-in LPE exploits",
 	ModREVERSEPROXY: "Manually proxy agents who are unable to use our forward proxy",
-	ModBettercap:    "Remote bettercap, offered as an interactive shell",
 	ModGDB:          "Remote gdbserver, debug anything",
 }
 
@@ -201,9 +199,6 @@ var ModuleHelp = map[string]map[string]string{
 	},
 	ModREVERSEPROXY: {
 		"addr": "Target host to proxy, we will connect to it and proxy it out",
-	},
-	ModBettercap: {
-		"args": "Command line args for bettercap",
 	},
 }
 

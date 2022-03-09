@@ -214,6 +214,9 @@ func FileSize(path string) (size int64) {
 }
 
 func TarBz2(dir, outfile string) error {
+	// remove outfile
+	os.RemoveAll(outfile)
+
 	// map files on disk to their paths in the archive
 	archive_dir_name := FileBaseName(dir)
 	if dir == "." {
