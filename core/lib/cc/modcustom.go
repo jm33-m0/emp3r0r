@@ -70,7 +70,7 @@ func moduleCustom() {
 
 	// tell agent to download and execute this module
 	checksum := tun.SHA256SumFile(tarball)
-	cmd := fmt.Sprintf("!custom_module %s %s", CurrentMod, checksum)
+	cmd := fmt.Sprintf("%s %s %s", emp3r0r_data.C2CmdCustomModule, CurrentMod, checksum)
 	err = SendCmdToCurrentTarget(cmd, "")
 	if err != nil {
 		CliPrintError("Sending command %s to %s: %v", cmd, CurrentTarget.Tag, err)
