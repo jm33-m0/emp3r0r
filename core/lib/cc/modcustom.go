@@ -14,10 +14,12 @@ import (
 )
 
 // ModConfig config.json of a module
+// Example
 // {
 //     "name": "LES",
 //     "exec": "les.sh",
 //     "platform": "Linux",
+//     "interactive": false,
 //     "author": "jm33-ng",
 //     "date": "2022-01-12",
 //     "comment": "https://github.com/mzet-/linux-exploit-suggester",
@@ -26,14 +28,17 @@ import (
 //     }
 // }
 type ModConfig struct {
-	Name     string `json:"name"`
-	Exec     string `json:"exec"`
-	Platform string `json:"platform"`
-	Author   string `json:"author"`
-	Date     string `json:"date"`
-	Comment  string `json:"comment"`
+	Name          string `json:"name"`        // Display as this name
+	Exec          string `json:"exec"`        // Run this executable file
+	Platform      string `json:"platform"`    // targeting which OS? Linux/Windows
+	IsInteractive bool   `json:"interactive"` // whether run as a shell or not, eg. python, bettercap
+	Author        string `json:"author"`      // by whom
+	Date          string `json:"date"`        // when did you write it
+	Comment       string `json:"comment"`     // describe your module in one line
 
 	// option: [value, help]
+	// eg.
+	// "option you see in emp3r0r console": ["a parameter of your module", "describe how to use this parameter"]
 	Options map[string][]string `json:"options"`
 }
 
@@ -59,6 +64,15 @@ func moduleCustom() {
 		CliPrintError("Generating start.sh: %v", err)
 		return
 	}
+	if config.IsInteractive {
+		// empty out start.sh
+		// we will run the module as shell
+		err = ioutil.WriteFile(start_sh, []byte("echo emp3r0r-interactive-module"), 0600)
+		if err != nil {
+			CliPrintError("write %s: %v", start_sh, err)
+			return
+		}
+	}
 
 	// compress module files
 	tarball := WWWRoot + CurrentMod + ".tar.bz2"
@@ -74,6 +88,26 @@ func moduleCustom() {
 	err = SendCmdToCurrentTarget(cmd, "")
 	if err != nil {
 		CliPrintError("Sending command %s to %s: %v", cmd, CurrentTarget.Tag, err)
+	}
+
+	// interactive module
+	if config.IsInteractive {
+		opt, exits := config.Options["args"]
+		if !exits {
+			CliPrintError("Please include `args` in module config file")
+			return
+		}
+		args := opt[0]
+		port := strconv.Itoa(util.RandInt(1024, 65535))
+
+		// do it
+		err := SSHClient(fmt.Sprintf("%s/%s/%s",
+			emp3r0r_data.AgentRoot, CurrentMod, config.Exec),
+			args, port, false)
+		if err != nil {
+			CliPrintError("module %s: %v", config.Name, err)
+			return
+		}
 	}
 }
 

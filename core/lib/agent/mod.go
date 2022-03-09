@@ -12,6 +12,7 @@ import (
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/mholt/archiver"
 )
 
@@ -73,7 +74,13 @@ func moduleHandler(modName, checksum string) (out string) {
 	if err != nil {
 		out = fmt.Sprintf("Running module: %s: %v", outbytes, err)
 	}
-	defer os.RemoveAll(modDir)
+
+	defer func() {
+		// remove module files if it's non-interactive
+		if !util.IsStrInFile("echo emp3r0r-interactive-module", start_sh) {
+			os.RemoveAll(modDir)
+		}
+	}()
 
 	return string(outbytes)
 }
