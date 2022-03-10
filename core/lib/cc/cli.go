@@ -166,7 +166,10 @@ start:
 		case "commands":
 			CliListCmds(EmpReadLine.Stderr())
 		case "exit":
-			// os.Exit(0)
+			return
+		case "quit":
+			return
+		case "q":
 			return
 
 		// process other commands
