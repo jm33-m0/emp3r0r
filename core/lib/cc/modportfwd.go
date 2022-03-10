@@ -62,6 +62,7 @@ func moduleProxy() {
 	var pf PortFwdSession
 	pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
 	pf.Lport, pf.To = port, "127.0.0.1:"+emp3r0r_data.ProxyPort
+	pf.Description = fmt.Sprintf("Agent Proxy:\n%s (Local) -> %s (Agent)", pf.Lport, pf.To)
 
 	switch status {
 	case "on":
@@ -74,9 +75,7 @@ func moduleProxy() {
 		}()
 	case "off":
 		for id, session := range PortFwds {
-			if session.Description == fmt.Sprintf("%s (Local) -> %s (Agent)",
-				pf.Lport,
-				pf.To) {
+			if session.Description == pf.Description {
 				session.Cancel() // cancel the PortFwd session
 
 				// tell the agent to close connection

@@ -294,15 +294,15 @@ func TmuxInitWindows() (err error) {
 	// home tmux window id
 	HomeWindow = TmuxCurrentWindow()
 
+	// remain-on-exit for current tmux window
+	// "on" is necessary
+	TmuxSetOpt("remain-on-exit on")
+
 	// main window
 	CommandPane = &Emp3r0rPane{}
 	CommandPane.Index = 1
 	CommandPane.Name = "Emp3r0r Console"
 	TmuxUpdatePane(CommandPane)
-
-	// remain-on-exit for current tmux window
-	// "on" is necessary
-	TmuxSetOpt("remain-on-exit on")
 
 	// pane title
 	TmuxSetPaneTitle("Emp3r0r Console", CommandPane.ID)

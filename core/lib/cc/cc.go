@@ -81,16 +81,17 @@ func SplitLongLine(line string, linelen int) (ret string) {
 		return line
 	}
 	ret = line[:linelen]
-	for i := 1; i <= len(line)/linelen; i++ {
-		if i == 4 {
-			break
+
+	temp := ""
+	for n, c := range line[linelen:] {
+		if n >= linelen && n%linelen == 0 {
+			ret += fmt.Sprintf("\n%s", temp)
+			temp = ""
 		}
-		endslice := linelen * (i + 1)
-		if endslice >= len(line) {
-			endslice = len(line)
-		}
-		ret += fmt.Sprintf("\n%s", line[linelen*i:endslice])
+		temp += string(c)
 	}
+	ret += fmt.Sprintf("%s", temp)
+	temp = ""
 
 	return
 }

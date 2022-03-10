@@ -106,6 +106,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 		// set up port mapping for the ssh session
 		CliPrintInfo("Setting up port mapping (local %s -> remote %s) for sshd (%s)", lport, to, shell)
 		pf := &PortFwdSession{}
+		pf.Description = fmt.Sprintf("ssh shell (%s)", shell)
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
 		pf.Lport, pf.To = lport, to
 		go func() {

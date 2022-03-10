@@ -483,6 +483,7 @@ func CliPrettyPrint(header1, header2 string, map2write *map[string]string) {
 	table.AppendBulk(tdata)
 	table.Render()
 	out := tableString.String()
+	AdaptiveTable(out)
 	CliPrintInfo("\n%s", out)
 }
 
@@ -602,5 +603,14 @@ func listFiles(path string) func(string) []string {
 			names = append(names, f.Name())
 		}
 		return names
+	}
+}
+
+// automatically resize CommandPane according to table width
+func AdaptiveTable(tableString string) {
+	TmuxUpdatePane(CommandPane)
+	row_len := len(strings.Split(tableString, "\n")[0])
+	if CommandPane.Width < row_len {
+		CommandPane.ResizePane("x", row_len)
 	}
 }

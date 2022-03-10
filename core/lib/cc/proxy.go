@@ -88,7 +88,7 @@ func ListPortFwds() {
 	tdata := [][]string{}
 	tableString := &strings.Builder{}
 	table := tablewriter.NewWriter(tableString)
-	table.SetHeader([]string{"Local Port", "To", "Agent", "ID"})
+	table.SetHeader([]string{"Local Port", "To", "Agent", "Description", "ID"})
 	table.SetBorder(true)
 	table.SetRowLine(true)
 	table.SetAutoWrapText(true)
@@ -99,12 +99,15 @@ func ListPortFwds() {
 	table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiMagentaColor},
 		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiCyanColor},
 		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiBlueColor},
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiCyanColor},
 		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiYellowColor})
 
 	table.SetColumnColor(tablewriter.Colors{tablewriter.FgHiMagentaColor},
 		tablewriter.Colors{tablewriter.FgHiCyanColor},
 		tablewriter.Colors{tablewriter.FgBlueColor},
+		tablewriter.Colors{tablewriter.FgHiCyanColor},
 		tablewriter.Colors{tablewriter.FgYellowColor})
+
 	for id, portmap := range PortFwds {
 		if portmap.Sh == nil {
 			portmap.Cancel()
@@ -116,13 +119,20 @@ func ListPortFwds() {
 			to = portmap.To + " (CC) "
 			lport = portmap.Lport + " (Agent) "
 		}
-		tdata = append(tdata, []string{lport, to, SplitLongLine(portmap.Agent.Tag, 10), SplitLongLine(id, 10)})
+		tdata = append(tdata,
+			[]string{
+				lport,
+				to,
+				SplitLongLine(portmap.Agent.Tag, 10),
+				SplitLongLine(portmap.Description, 10),
+				SplitLongLine(id, 10)})
 	}
 
 	// rendor table
 	table.AppendBulk(tdata)
 	table.Render()
-	fmt.Printf("\n\033[0m%s\n\n", tableString)
+	AdaptiveTable(tableString.String())
+	fmt.Printf("\n\033[0m%s\n\n", tableString.String())
 }
 
 // InitReversedPortFwd send portfwd command to agent and set up a reverse port mapping
@@ -138,7 +148,9 @@ func (pf *PortFwdSession) InitReversedPortFwd() (err error) {
 	// mark this session, save to PortFwds
 	fwdID := uuid.New().String()
 	pf.Sh = nil
-	pf.Description = fmt.Sprintf("%s (Local) <- %s (Agent)", toAddr, listenPort)
+	if pf.Description == "" {
+		pf.Description = "Reverse mapping"
+	}
 	pf.Reverse = true
 	pf.Agent = CurrentTarget
 	PortFwdsMutex.Lock()
@@ -298,7 +310,9 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 
 	// mark this session, save to PortFwds
 	pf.Sh = nil
-	pf.Description = fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, toAddr)
+	if pf.Description == "" {
+		pf.Description = "Agent to CC mapping"
+	}
 	PortFwdsMutex.Lock()
 	PortFwds[fwdID] = pf
 	PortFwdsMutex.Unlock()
@@ -309,7 +323,9 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		PortFwdsMutex.Lock()
 		defer PortFwdsMutex.Unlock()
 		delete(PortFwds, fwdID)
-		CliPrintWarning("PortFwd session (%s: %s) has finished", fwdID, pf.Description)
+		CliPrintWarning("PortFwd session (%s) has finished:\n"+
+			"%s -> %s\n%s",
+			pf.Description, pf.Lport, pf.To, fwdID)
 	}
 
 	// catch cancel event, and trigger the termination of parent function

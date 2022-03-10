@@ -169,6 +169,7 @@ func ModuleDetails(modName string) {
 	table.AppendBulk(tdata)
 	table.Render()
 	out := tableString.String()
+	AdaptiveTable(out)
 	CliPrintInfo("Module details:\n%s", out)
 }
 
