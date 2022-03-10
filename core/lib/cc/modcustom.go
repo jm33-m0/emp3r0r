@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/google/uuid"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -46,6 +47,9 @@ type ModConfig struct {
 
 // stores module configs
 var ModuleConfigs = make(map[string]ModConfig, 1)
+
+// stores module names
+var ModuleNames = []string{}
 
 // moduleCustom run a custom module
 func moduleCustom() {
@@ -210,6 +214,12 @@ func InitModules() {
 		ModuleConfigs[config.Name] = *config
 		CliPrintInfo("Loaded module %s", strconv.Quote(config.Name))
 	}
+
+	// make []string for fuzzysearch
+	for name, comment := range emp3r0r_data.ModuleComments {
+		ModuleNames = append(ModuleNames, fmt.Sprintf("%s: %s", color.HiBlueString(name), comment))
+	}
+
 	CliPrintInfo("Loaded %d modules", len(ModuleHelpers))
 }
 

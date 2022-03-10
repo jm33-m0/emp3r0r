@@ -38,6 +38,7 @@ var Commands = map[string]string{
 	"suicide":         "Kill agent process, delete agent root directory",
 	"ls_targets":      "List all targets",
 	"ls_modules":      "List all modules",
+	"search":          "Search modules",
 	"ls_port_fwds":    "List all port mappings",
 	"debug":           "Set debug level: -1 (least verbose) to 1 (most verbose)",
 	"delete_port_fwd": "Delete a port mapping",
@@ -120,6 +121,13 @@ func CmdHandler(cmd string) (err error) {
 			}
 		}
 		CliPrintError("No such module: %s", strconv.Quote(cmdSplit[1]))
+
+	case cmdSplit[0] == "search":
+		if len(cmdSplit) < 2 {
+			CliPrintError("search what?")
+			return
+		}
+		ModuleSearch(cmdSplit[1])
 
 	case cmdSplit[0] == "set":
 		if len(cmdSplit) < 2 {

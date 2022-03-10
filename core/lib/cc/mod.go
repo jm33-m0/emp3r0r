@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	"github.com/lithammer/fuzzysearch/fuzzy"
 )
 
 // Option all necessary info of an option
@@ -248,4 +249,10 @@ func SelectCurrentTarget() (target *emp3r0r_data.SystemInfo) {
 	}
 
 	return
+}
+
+// search modules, powered by fuzzysearch
+func ModuleSearch(query string) {
+	result := fuzzy.Find(query, ModuleNames)
+	CliPrintInfo("\n%s\n", strings.Join(result, "\n"))
 }

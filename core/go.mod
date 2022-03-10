@@ -14,6 +14,7 @@ require (
 	github.com/jm33-m0/go-cdn2proxy v1.1.2
 	github.com/jm33-m0/go-lpe v1.0.0
 	github.com/kbinani/screenshot v0.0.0-20210720154843-7d3a670d8329
+	github.com/lithammer/fuzzysearch v1.1.3
 	github.com/mholt/archiver v3.1.1+incompatible
 	github.com/mholt/archiver/v4 v4.0.0-alpha.4
 	github.com/mitchellh/go-ps v1.0.0
