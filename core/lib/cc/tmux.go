@@ -18,6 +18,8 @@ import (
 type Emp3r0rPane struct {
 	Alive  bool   // indicates that pane is not dead
 	ID     string // tmux pane unique ID, needs to be converted to index when using select-pane
+	Title  string // title of pane
+	Name   string // intial title of pane, doesn't change even if pane is dead
 	TTY    string // eg. /dev/pts/1, write to this file to get your message displayed on this pane
 	PID    int    // PID of the process running in tmux pane
 	Cmd    string // cmdline of the process
@@ -27,6 +29,8 @@ type Emp3r0rPane struct {
 }
 
 var (
+	// home tmux window
+	HomeWindow string
 
 	// Console titled "Command"
 	CommandPane *Emp3r0rPane
@@ -68,19 +72,14 @@ func TmuxCurrentPane() (index int) {
 // All panes live in this tmux window,
 // returns the index of the window
 // returns -1 when error occurs
-func TmuxCurrentWindow() (index int) {
-	index = -1
-	out, err := exec.Command("tmux", "display-message", "-p", `'#I'`).CombinedOutput()
+func TmuxCurrentWindow() (id string) {
+	out, err := exec.Command("tmux", "display-message", "-p", `'#{window_id}'`).CombinedOutput()
 	if err != nil {
 		CliPrintWarning("TmuxCurrentWindow: %v", err)
 		return
 	}
 
-	out_str := strings.TrimSpace(string(out))
-	index, err = strconv.Atoi(out_str)
-	if err != nil {
-		return // returns -1 if fail to parse as int
-	}
+	id = strings.TrimSpace(string(out))
 	return
 }
 
@@ -105,13 +104,12 @@ func (pane *Emp3r0rPane) Printf(clear bool, format string, a ...interface{}) {
 		if err != nil {
 			CliPrintWarning("Clear pane: %v", err)
 		}
-		// msg = fmt.Sprintf("%s%s", ClearTerm, msg)
 	}
 
 	TmuxUpdatePane(pane)
 	id := pane.ID
 	if !pane.Alive {
-		CliPrintWarning("Tmux window %s is dead/gone, respawning...", id)
+		CliPrintWarning("Tmux window %s (%s) is dead/gone, respawning...", id, pane.Title)
 		err = pane.Respawn()
 		if err == nil {
 			pane.Printf(clear, format, a...)
@@ -122,10 +120,11 @@ func (pane *Emp3r0rPane) Printf(clear bool, format string, a ...interface{}) {
 	// print msg
 	err := ioutil.WriteFile(pane.TTY, []byte(msg), 0777)
 	if err != nil {
-		CliPrintWarning("Cannot print on tmux window %s: %v,\n"+
+		CliPrintWarning("Cannot print on tmux window %s (%s): %v,\n"+
 			"printing to main window instead.\n\n",
-			err,
-			id)
+			id,
+			pane.Title,
+			err)
 		CliPrintWarning(format, a...)
 	}
 }
@@ -163,6 +162,7 @@ func (pane *Emp3r0rPane) ClearPane() (err error) {
 func (pane *Emp3r0rPane) PaneDetails() (
 	is_alive bool,
 	index int,
+	title string,
 	tty string,
 	pid int,
 	cmd string,
@@ -179,7 +179,8 @@ func (pane *Emp3r0rPane) PaneDetails() (
 
 	out, err := exec.Command("/bin/sh", "-c",
 		fmt.Sprintf("tmux display -p -t %d "+
-			`'#{pane_dead}:#{pane_tty}:#{pane_pid}:#{pane_width}:#{pane_height}:#{pane_current_command}'`,
+			`'#{pane_dead}:#{pane_tty}:#{pane_pid}:#{pane_width}:`+
+			`#{pane_height}:#{pane_current_command}:#{pane_title}'`,
 			index)).CombinedOutput()
 	if err != nil {
 		CliPrintWarning("tmux: %s\n%v", out, err)
@@ -212,6 +213,7 @@ func (pane *Emp3r0rPane) PaneDetails() (
 	}
 
 	cmd = out_split[5]
+	title = out_split[6]
 	return
 }
 
@@ -272,7 +274,7 @@ func TermSize() (width, height int, err error) {
 // Set tmux option of current tmux window
 func TmuxSetOpt(opt string) (err error) {
 	main_window_index := TmuxCurrentWindow()
-	if main_window_index < 0 {
+	if main_window_index == "" {
 		return fmt.Errorf("Cannot find main window")
 	}
 	job := fmt.Sprintf("tmux set-option %s", opt)
@@ -289,9 +291,13 @@ func TmuxSetOpt(opt string) (err error) {
 // - command output window
 // - current agent info
 func TmuxInitWindows() (err error) {
+	// home tmux window id
+	HomeWindow = TmuxCurrentWindow()
+
 	// main window
 	CommandPane = &Emp3r0rPane{}
 	CommandPane.Index = 1
+	CommandPane.Name = "Emp3r0r Console"
 	TmuxUpdatePane(CommandPane)
 
 	// remain-on-exit for current tmux window
@@ -333,6 +339,8 @@ func TmuxInitWindows() (err error) {
 		}
 		TmuxPanes[pane.ID] = pane
 		pane.Printf(false, color.HiYellowString(place_holder))
+
+		pane.Name = title
 
 		return
 	}
@@ -415,19 +423,24 @@ func TmuxNewPane(title, hV string, target_pane_id string, size int, cmd string) 
 	}
 	pane.TTY = strings.TrimSpace(tmux_res_split[2])
 
-	TmuxUpdatePane(pane)
-
 	err = TmuxSetPaneTitle(title, pane.ID)
+	TmuxUpdatePane(pane)
 	return
 }
 
 // Sync changes of a pane
 func TmuxUpdatePane(pane *Emp3r0rPane) {
-	if pane == nil {
-		CliPrintWarning("Update pane: no pane to update")
+	if TmuxCurrentWindow() != HomeWindow {
 		return
 	}
-	pane.Alive, pane.Index, pane.TTY, pane.PID, pane.Cmd, pane.Width, pane.Height = pane.PaneDetails()
+	if pane == nil {
+		CliPrintWarning("UpdatePane: no pane to update")
+		return
+	}
+	pane.Alive, pane.Index, pane.Title, pane.TTY, pane.PID, pane.Cmd, pane.Width, pane.Height = pane.PaneDetails()
+	if pane.Title == "" {
+		pane.Title = pane.Name
+	}
 }
 
 func TmuxSetPaneTitle(title, pane_id string) error {
