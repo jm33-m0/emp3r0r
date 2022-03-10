@@ -70,8 +70,8 @@ func TmuxCurrentPane() (index int) {
 }
 
 // All panes live in this tmux window,
-// returns the index of the window
-// returns -1 when error occurs
+// returns the unique ID of the window
+// returns "" when error occurs
 func TmuxCurrentWindow() (id string) {
 	out, err := exec.Command("tmux", "display-message", "-p", `'#{window_id}'`).CombinedOutput()
 	if err != nil {
