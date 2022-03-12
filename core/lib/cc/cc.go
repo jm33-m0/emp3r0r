@@ -27,6 +27,9 @@ var (
 	// EmpRoot root directory of emp3r0r
 	EmpRoot, _ = os.Getwd()
 
+	// FileGetDir where we save #get files
+	FileGetDir = EmpRoot + "/file-get/"
+
 	// Targets target list, with control (tun) interface
 	Targets = make(map[*emp3r0r_data.SystemInfo]*Control)
 )
@@ -40,9 +43,6 @@ const (
 
 	// UtilsArchive host utils.tar.bz2 for agent
 	UtilsArchive = WWWRoot + "utils.tar.bz2"
-
-	// FileGetDir where we save #get files
-	FileGetDir = "file-get/"
 )
 
 // Control controller interface of a target
