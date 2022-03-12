@@ -186,6 +186,10 @@ func ListTargets() {
 	table.AppendBulk(tdata)
 	table.Render()
 
+	if AgentListPane == nil {
+		CliPrintError("AgentListPane doesn't exist")
+		return
+	}
 	AgentListPane.Printf(true, "\n\033[0m%s\n\n", tableString.String())
 }
 
@@ -268,6 +272,10 @@ func GetTargetDetails(target *emp3r0r_data.SystemInfo) {
 	table.Render()
 	num_of_lines := len(strings.Split(tableString.String(), "\n"))
 	num_of_columns := len(strings.Split(tableString.String(), "\n")[0])
+	if AgentInfoPane == nil {
+		CliPrintError("AgentInfoPane doesn't exist")
+		return
+	}
 	AgentInfoPane.ResizePane("y", num_of_lines)
 	AgentInfoPane.ResizePane("x", num_of_columns)
 	AgentInfoPane.Printf(true, "\n\033[0m%s\n\n", tableString.String())
