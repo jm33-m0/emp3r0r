@@ -28,7 +28,7 @@ currently emp3r0r has limited Windows support
 
 * beautiful terminal UI, use tmux for window management
 * multi-tasking, you don't need to wait for any commands to finish
-* basic API provided through unix socket
+* **python3** support, easily run your exploits/tools on any linux host
 * **perfect reverse shell** (true color, key bindings, custom bashrc, custom bash binary, etc)
 * **built-in static bash binary**
 * auto **persistence** via various methods
@@ -38,14 +38,14 @@ currently emp3r0r has limited Windows support
 * **shellcode** injection and dropper
 * ELF **patcher** (WIP)
 * **packer** that encrypts and compresses agent binary, and runs agent in a covert way
-* **hide processes and files** via libc hijacking (WIP)
+* **hide processes and files** (WIP)
 * **port mapping**, from c2 side to agent side, and vice versa
 * agent side socks5 **proxy**
 * **ssh server**
-* auto root (WIP)
+* [**auto root**](https://github.com/jm33-m0/go-lpe)
 * **LPE** suggest
 * system info collecting
-* file management, **resumable download**
+* file management, **resumable download/upload**
 * log cleaner
 * screenshot
 * **stealth** connection
