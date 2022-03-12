@@ -10,7 +10,6 @@ import (
 
 	"github.com/fatih/color"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
-	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/olekukonko/tablewriter"
 	"github.com/posener/h2conn"
@@ -39,7 +38,7 @@ const (
 	Temp = "/tmp/emp3r0r/"
 
 	// WWWRoot host static files for agent
-	WWWRoot = Temp + tun.FileAPI
+	WWWRoot = Temp + "www/"
 
 	// UtilsArchive host utils.tar.bz2 for agent
 	UtilsArchive = WWWRoot + "utils.tar.bz2"
