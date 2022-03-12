@@ -1,0 +1,12 @@
+{
+    "name": "py_info",
+    "exec": "run.py",
+    "platform": "Linux",
+    "interactive": false,
+    "author": "jm33-ng",
+    "date": "2022-03-12",
+    "comment": "Check basic python info",
+    "options": {
+        "NA": ["--", "Not available"]
+    }
+}

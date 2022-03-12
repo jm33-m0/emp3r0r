@@ -122,6 +122,6 @@ func main() {
 	if *apiserver {
 		go cc.APIMain()
 	}
-	cc.InitModules()
+	go cc.InitModules()
 	cc.CliMain()
 }

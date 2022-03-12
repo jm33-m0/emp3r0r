@@ -10,7 +10,6 @@ import (
 
 	"github.com/fatih/color"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
-	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/olekukonko/tablewriter"
 	"github.com/posener/h2conn"
@@ -27,6 +26,9 @@ var (
 	// EmpRoot root directory of emp3r0r
 	EmpRoot, _ = os.Getwd()
 
+	// FileGetDir where we save #get files
+	FileGetDir = EmpRoot + "/file-get/"
+
 	// Targets target list, with control (tun) interface
 	Targets = make(map[*emp3r0r_data.SystemInfo]*Control)
 )
@@ -36,13 +38,10 @@ const (
 	Temp = "/tmp/emp3r0r/"
 
 	// WWWRoot host static files for agent
-	WWWRoot = Temp + tun.FileAPI
+	WWWRoot = Temp + "www/"
 
 	// UtilsArchive host utils.tar.bz2 for agent
 	UtilsArchive = WWWRoot + "utils.tar.bz2"
-
-	// FileGetDir where we save #get files
-	FileGetDir = "file-get/"
 )
 
 // Control controller interface of a target
@@ -186,6 +185,10 @@ func ListTargets() {
 	table.AppendBulk(tdata)
 	table.Render()
 
+	if AgentListPane == nil {
+		CliPrintError("AgentListPane doesn't exist")
+		return
+	}
 	AgentListPane.Printf(true, "\n\033[0m%s\n\n", tableString.String())
 }
 
@@ -268,6 +271,10 @@ func GetTargetDetails(target *emp3r0r_data.SystemInfo) {
 	table.Render()
 	num_of_lines := len(strings.Split(tableString.String(), "\n"))
 	num_of_columns := len(strings.Split(tableString.String(), "\n")[0])
+	if AgentInfoPane == nil {
+		CliPrintError("AgentInfoPane doesn't exist")
+		return
+	}
 	AgentInfoPane.ResizePane("y", num_of_lines)
 	AgentInfoPane.ResizePane("x", num_of_columns)
 	AgentInfoPane.Printf(true, "\n\033[0m%s\n\n", tableString.String())

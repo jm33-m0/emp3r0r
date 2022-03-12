@@ -25,13 +25,16 @@ func moduleVaccine() {
 }
 
 func CreateVaccineArchive() (err error) {
-	CliPrintInfo("Creating %s for module vaccine, allow up to 10 seconds...", UtilsArchive)
+	CliPrintInfo("Creating archive (%s) for module vaccine...", UtilsArchive)
 	pwd, _ := os.Getwd()
 	err = os.Chdir(ModuleDir + "/vaccine")
 	if err != nil {
 		return fmt.Errorf("Entering vaccine dir: %v", err)
 	}
-	defer os.Chdir(pwd)
+	defer func() {
+		CliPrintInfo("Created %.2fMB archive (%s) for module vaccine", float64(util.FileSize(UtilsArchive))/1024/1024, UtilsArchive)
+		os.Chdir(pwd)
+	}()
 	err = util.TarBz2(".", UtilsArchive)
 	if err != nil {
 		return fmt.Errorf("Creating vaccine archive: %v", err)
