@@ -244,7 +244,7 @@ func readModCondig(file string) (pconfig *ModConfig, err error) {
 
 // genStartScript read config.json of a module
 func genStartScript(config *ModConfig, outfile string) (err error) {
-	data := ""
+	data := "chmod 755 ./*\n" // make things executable
 	for opt, val_help := range config.Options {
 		data = fmt.Sprintf("%s %s=%s ", data, opt, val_help[0])
 	}
