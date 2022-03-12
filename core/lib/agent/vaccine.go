@@ -25,7 +25,8 @@ var (
 
 	// run python scripts with this command
 	// LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/u/alpine/lib PYTHONPATH="/tmp/python3.9:/tmp/python3.9/site-packages:/tmp/python3.9/lib-dynload" /tmp/python3
-	PythonCmd = fmt.Sprintf("PYTHONPATH=%s PYTHONHOME=%s LD_LIBRARY_PATH=%s %s ",
+	PythonCmd = fmt.Sprintf("PYTHONPATH=%s PYTHONHOME=%s "+
+		"LD_LIBRARY_PATH=%s:/usr/lib:/lib:/lib64:/usr/lib64:/usr/lib32 %s ",
 		PythonPath, PythonLib, emp3r0r_data.LibPath,
 		emp3r0r_data.UtilsPath+"/python3")
 
