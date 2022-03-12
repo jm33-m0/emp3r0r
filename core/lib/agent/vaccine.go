@@ -20,12 +20,14 @@ import (
 
 var (
 	PythonArchive = emp3r0r_data.UtilsPath + "/python3.9.tar.xz"
-	PythonPath    = emp3r0r_data.UtilsPath + "/python3.9"
+	PythonLib     = emp3r0r_data.UtilsPath + "/python3.9"
+	PythonPath    = fmt.Sprintf("%s:%s:%s", PythonLib, PythonLib+"/lib-dynload", PythonLib+"/site-packages")
 
 	// run python scripts with this command
 	// LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/u/alpine/lib PYTHONPATH="/tmp/python3.9:/tmp/python3.9/site-packages:/tmp/python3.9/lib-dynload" /tmp/python3
-	PythonCmd = fmt.Sprintf("PYTHONPATH=%s PYTHONHOME=%s %s LD_LIBRARY_PATH=$LD_LIBRARY_PATH:%s",
-		PythonPath, PythonPath, emp3r0r_data.UtilsPath+"/python3", emp3r0r_data.AgentRoot+"/lib")
+	PythonCmd = fmt.Sprintf("PYTHONPATH=%s PYTHONHOME=%s LD_LIBRARY_PATH=$LD_LIBRARY_PATH:%s %s",
+		PythonPath, PythonPath, emp3r0r_data.AgentRoot+"/lib",
+		emp3r0r_data.UtilsPath+"/python3")
 
 	// run python itself with this script
 	PythonLauncher = fmt.Sprintf("#!%s\n%s"+`"$@"`+"\n", emp3r0r_data.DefaultShell, PythonCmd)
