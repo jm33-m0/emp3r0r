@@ -1,12 +1,13 @@
 # emp3r0r
 Linux/Windows post-exploitation framework made by linux user
 
-**Still under active development**
+**emp3r0r C2 (Linux) is ready for testing, please report bugs if you find any**
 
 - [screenshots](./FEATURES.md)
 - [check my blog for updates](https://jm33.me)
 - [how to use](https://github.com/jm33-m0/emp3r0r/wiki)
 - [write modules for emp3r0r](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r)
+- [download latest release (do not clone)](https://github.com/jm33-m0/emp3r0r/releases)
 
 
 ![UI](https://user-images.githubusercontent.com/10167884/155084808-fb0df1ef-6eab-4894-8af0-81934e9cd25e.png)
