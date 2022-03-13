@@ -6,6 +6,7 @@ Linux/Windows post-exploitation framework made by linux user
 - [screenshots](./FEATURES.md)
 - [check my blog for updates](https://jm33.me)
 - [how to use](https://github.com/jm33-m0/emp3r0r/wiki)
+- [write modules for emp3r0r](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r)
 
 
 ![UI](https://user-images.githubusercontent.com/10167884/155084808-fb0df1ef-6eab-4894-8af0-81934e9cd25e.png)
@@ -26,22 +27,22 @@ currently emp3r0r has limited Windows support
 
 ----------
 
-* beautiful terminal UI, use tmux for window management
+* beautiful terminal UI, use [tmux](https://github.com/tmux/tmux) for window management
 * multi-tasking, you don't need to wait for any commands to finish
-* **python3** support, easily run your exploits/tools on any linux host
-* **perfect reverse shell** (true color, key bindings, custom bashrc, custom bash binary, etc)
-* **built-in static bash binary**
+* module support: provide [**python3.9** environment](https://github.com/jm33-m0/emp3r0r/releases/tag/v1.3.10), easily run your exploits/tools on any linux host
+* **perfect shell experience** via SSH, compatible with any SSH client
+* **bettercap**
+* [**built-in static bash binary**](https://github.com/jm33-m0/emp3r0r/blob/master/core/lib/data/bash.go)
 * auto **persistence** via various methods
-* **post-exploitation tools** like nmap, socat, are integreted with reverse shell
+* [**post-exploitation tools**](https://github.com/jm33-m0/emp3r0r/tree/master/core/modules/vaccine) like nmap, socat
 * **credential harvesting** (WIP)
-* process **injection**
-* **shellcode** injection and dropper
+* [process **injection**](https://jm33.me/emp3r0r-injection.html)
+* [**shellcode** injection](https://jm33.me/process-injection-on-linux.html)
 * ELF **patcher** (WIP)
-* **packer** that encrypts and compresses agent binary, and runs agent in a covert way
+* [**packer**](https://github.com/jm33-m0/emp3r0r/tree/master/packer) that encrypts and compresses agent binary, and runs agent in a covert way
 * **hide processes and files** (WIP)
 * **port mapping**, from c2 side to agent side, and vice versa
 * agent side socks5 **proxy**
-* **ssh server**
 * [**auto root**](https://github.com/jm33-m0/go-lpe)
 * **LPE** suggest
 * system info collecting
@@ -53,8 +54,8 @@ currently emp3r0r has limited Windows support
 * internet access checker
 * **autoproxy** for semi-isolated networks
 * **reverse proxy** to bring every host online
-* all of these in one **HTTP2** connection
+* all of these in **HTTP2**
 * can be encapsulated in any external proxies such as **TOR**, and **CDNs**
-* interoperability with **metasploit / Cobalt Strike**
-* **custom modules**
+* [interoperability with **metasploit / Cobalt Strike**](https://github.com/jm33-m0/emp3r0r/wiki/Interoperability-with-metasploit-and-other-C2-frameworks)
+* [**custom modules**](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r)
 * and many more...
