@@ -55,7 +55,7 @@ currently emp3r0r has limited Windows support
 * **autoproxy** for semi-isolated networks
 * **reverse proxy** to bring every host online
 * all of these in **HTTP2**
-* can be encapsulated in any external proxies such as **TOR**, and **CDNs**
+* can be encapsulated in any external proxies such as [**TOR**, and **CDNs**](https://github.com/jm33-m0/emp3r0r/raw/master/img/c2transports.png)
 * [interoperability with **metasploit / Cobalt Strike**](https://github.com/jm33-m0/emp3r0r/wiki/Interoperability-with-metasploit-and-other-C2-frameworks)
 * [**custom modules**](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r)
 * and many more...
