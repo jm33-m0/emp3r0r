@@ -68,7 +68,7 @@ func moduleHandler(modName, checksum string) (out string) {
 	if err != nil {
 		log.Printf("Read %s: %v", start_sh, err)
 	}
-	log.Printf("Running start.sh %s", shdata)
+	log.Printf("Running start.sh:\n%s", shdata)
 
 	outbytes, err := cmd.CombinedOutput()
 	if err != nil {

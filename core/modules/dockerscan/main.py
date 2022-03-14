@@ -3,9 +3,12 @@
 import os
 import sys
 
-if len(sys.argv) > 1:
+if len(sys.argv) == 1:
     args = os.environ["ARGS"]
-    os.system(f"{sys.executable} {sys.argv[0]} {args}")
+    cmd = f"{sys.argv[0]} {args}"
+    print(cmd)
+    os.system(cmd)
+    sys.exit(0)
 
 libs = f"{os.getcwd()}/libs"
 
