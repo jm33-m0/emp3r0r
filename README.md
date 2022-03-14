@@ -4,10 +4,10 @@ Linux/Windows post-exploitation framework made by linux user
 **emp3r0r C2 (Linux) is ready for testing, please report bugs if you find any**
 
 - [screenshots](./FEATURES.md)
-- [check my blog for updates](https://jm33.me)
 - [how to use](https://github.com/jm33-m0/emp3r0r/wiki)
-- [write modules for emp3r0r](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r)
+- [check my blog for updates](https://jm33.me)
 - [download latest release (do not clone)](https://github.com/jm33-m0/emp3r0r/releases)
+- [write modules for emp3r0r, with your favorite languages](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r)
 
 
 ![UI](https://user-images.githubusercontent.com/10167884/155084808-fb0df1ef-6eab-4894-8af0-81934e9cd25e.png)
@@ -22,9 +22,9 @@ emp3r0r was initially developed as one of my weaponizing experiments, i tried to
 
 what makes emp3r0r different? well, first of all, its the first C2 framework that targets Linux platform, and you can use basically any other tools through it. if you need more reasons to try it out, check [features](./FEATURES.md)
 
-the name *emp3r0r* comes from [empire](https://github.com/BC-SECURITY/Empire/) project
+emp3r0r also has complete [**python3.9 support**](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r#python), that is less than 7MB with necessary third party packages such as `requests` and `mysql`
 
-currently emp3r0r has limited Windows support
+Windows support is experimental, improve it if you need it
 
 ----------
 
@@ -32,7 +32,7 @@ currently emp3r0r has limited Windows support
 * multi-tasking, you don't need to wait for any commands to finish
 * module support: provide [**python3.9** environment](https://github.com/jm33-m0/emp3r0r/releases/tag/v1.3.10), easily run your exploits/tools on any linux host
 * **perfect shell experience** via SSH, compatible with any SSH client
-* **bettercap**
+* [**bettercap**](https://github.com/bettercap/bettercap)
 * [**built-in static bash binary**](https://github.com/jm33-m0/emp3r0r/blob/master/core/lib/data/bash.go)
 * auto **persistence** via various methods
 * [**post-exploitation tools**](https://github.com/jm33-m0/emp3r0r/tree/master/core/modules/vaccine) like nmap, socat
