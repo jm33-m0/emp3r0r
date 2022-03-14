@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -176,6 +177,10 @@ func ModuleDetails(modName string) {
 // scan custom modules in ModuleDir,
 // and update ModuleHelpers, ModuleDocs
 func InitModules() {
+	if !util.IsFileExist(WWWRoot) {
+		os.MkdirAll(WWWRoot, 0700)
+	}
+
 	dirs, err := ioutil.ReadDir(ModuleDir)
 	if err != nil {
 		CliPrintError("Failed to scan custom modules: %v", err)
