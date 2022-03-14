@@ -1,0 +1,16 @@
+../../bin/dxf,sha256=816mjLV-QmS_VMY32Gf6BcANjsQFztAzwOIjfa7xV3k,207
+dxf/__init__.py,sha256=R-WcIi9Ihnr-TAaL5hPrGJqBiwwplQ30qxmersheHuA,26053
+dxf/__main__.py,sha256=zZ6YKnPfKwClNkEbaA1TefND9XNVv7Mn6fRtQZmnOCg,32
+dxf/__pycache__/__init__.cpython-39.pyc,,
+dxf/__pycache__/__main__.cpython-39.pyc,,
+dxf/__pycache__/exceptions.cpython-39.pyc,,
+dxf/__pycache__/main.cpython-39.pyc,,
+dxf/exceptions.py,sha256=kiJ4FUR-W5ZtNXbHMdEeK9Loc7_uDoLCz6jGvf_vmPY,2248
+dxf/main.py,sha256=jxoX0QFUZN4zm5ZOPzDD8jH5pxDuCBJdUK3pHBKDCtw,6798
+python_dxf-5.1.1.dist-info/INSTALLER,sha256=zuuue4knoyJ-UwPPXg8fezS7VCrXJQrAP7zeNuwvFQg,4
+python_dxf-5.1.1.dist-info/METADATA,sha256=KlLIRq0Ks7mXX-jR2z-CP1ixAk3ivvScJQ_qoi1SBI8,7606
+python_dxf-5.1.1.dist-info/RECORD,,
+python_dxf-5.1.1.dist-info/REQUESTED,sha256=47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU,0
+python_dxf-5.1.1.dist-info/WHEEL,sha256=G16H4A3IeoQmnOrYV4ueZGKSjhipXx8zc8nu9FGlvMA,92
+python_dxf-5.1.1.dist-info/entry_points.txt,sha256=IWU-Jj6MCQcOuynADmICP2v-V4SfQtALQX4noOASJJU,38
+python_dxf-5.1.1.dist-info/top_level.txt,sha256=KIorSkG8NEY_3rZSrWwFTW3B7KcbCpQvklGPcthVgYQ,4
