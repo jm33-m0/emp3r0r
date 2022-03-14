@@ -6,7 +6,7 @@ Linux/Windows post-exploitation framework made by linux user
 - [screenshots](./FEATURES.md)
 - [how to use](https://github.com/jm33-m0/emp3r0r/wiki)
 - [check my blog for updates](https://jm33.me)
-- [download latest release (do not clone)](https://github.com/jm33-m0/emp3r0r/releases)
+- [download from here (do not clone)](https://github.com/jm33-m0/emp3r0r/releases)
 - [write modules for emp3r0r, with your favorite languages](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r)
 
 
