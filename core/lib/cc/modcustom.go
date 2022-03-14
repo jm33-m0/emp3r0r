@@ -260,11 +260,13 @@ func genStartScript(config *ModConfig, outfile string) (err error) {
 }
 
 func updateModuleHelp(config *ModConfig) error {
+	help_map := make(map[string]string)
 	for opt, val_help := range config.Options {
 		if len(val_help) < 2 {
 			return fmt.Errorf("%s config error: %s incomplete", config.Name, opt)
 		}
-		emp3r0r_data.ModuleHelp[config.Name] = map[string]string{opt: val_help[1]}
+		help_map[opt] = val_help[1]
+		emp3r0r_data.ModuleHelp[config.Name] = help_map
 	}
 	return nil
 }
