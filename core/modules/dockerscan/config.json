@@ -7,6 +7,6 @@
     "date": "2019-07-27",
     "comment": "docker security scanner, see https://github.com/cr0hn/dockerscan",
     "options": {
-        "args": ["-d -h", "Pass command line args to dockerscan"]
+        "ARGS": ["-h", "Pass command line args to dockerscan"]
     }
 }
