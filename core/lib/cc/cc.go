@@ -258,7 +258,7 @@ func GetTargetDetails(target *emp3r0r_data.SystemInfo) {
 
 	indexRow := []string{"Index", color.HiMagentaString("%d", control.Index)}
 	labelRow := []string{"Label", color.HiCyanString(control.Label)}
-	tagRow := []string{"Tag", color.CyanString(SplitLongLine(target.Tag, 45))}
+	tagRow := []string{"Tag", color.CyanString(SplitLongLine(target.Tag, 20))}
 	tdata = append(tdata, indexRow)
 	tdata = append(tdata, labelRow)
 	tdata = append(tdata, tagRow)
