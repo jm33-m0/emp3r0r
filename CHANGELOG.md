@@ -1,5 +1,13 @@
 # Changelog
 
+### [1.3.18](https://github.com/jm33-m0/emp3r0r/compare/v1.3.17...v1.3.18) (2022-03-15)
+
+
+### Bug Fixes
+
+* catch errors when using gen_agent ([699ebf2](https://github.com/jm33-m0/emp3r0r/commit/699ebf233e6bd1bccc0067a7795e03278a5f09a1))
+* default shell should be static bash ([e789658](https://github.com/jm33-m0/emp3r0r/commit/e789658621a09c47a0e938a0cc0912866e9cc550))
+
 ### [1.3.17](https://github.com/jm33-m0/emp3r0r/compare/v1.3.16...v1.3.17) (2022-03-15)
 
 
