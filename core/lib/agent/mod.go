@@ -61,6 +61,15 @@ func moduleHandler(modName, checksum string) (out string) {
 	}
 	defer os.Chdir(pwd)
 
+	// chmod 755 *
+	files, err := ioutil.ReadDir("./")
+	if err != nil {
+		return err.Error()
+	}
+	for _, f := range files {
+		os.Chmod(f.Name(), 0755)
+	}
+
 	cmd := exec.Command(emp3r0r_data.DefaultShell, start_sh)
 
 	// debug
