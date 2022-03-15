@@ -247,7 +247,13 @@ func SelectCurrentTarget() (target *emp3r0r_data.SystemInfo) {
 }
 
 // search modules, powered by fuzzysearch
-func ModuleSearch(query string) {
+func ModuleSearch(cmd string) {
+	cmdSplit := strings.Fields(cmd)
+	if len(cmdSplit) < 2 {
+		CliPrintError("search <module keywords>")
+		return
+	}
+	query := strings.Join(cmdSplit[1:], " ")
 	result := fuzzy.Find(query, ModuleNames)
 	CliPrintInfo("\n%s\n", strings.Join(result, "\n"))
 }

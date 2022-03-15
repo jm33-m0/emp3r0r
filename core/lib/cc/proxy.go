@@ -60,7 +60,13 @@ func headlessListPortFwds() (err error) {
 }
 
 // DeletePortFwdSession delete a port mapping session by ID
-func DeletePortFwdSession(sessionID string) {
+func DeletePortFwdSession(cmd string) {
+	cmdSplit := strings.Fields(cmd)
+	if len(cmdSplit) != 2 {
+		CliPrintError("delete_port_fwd <mapping id>")
+		return
+	}
+	sessionID := cmdSplit[1]
 	PortFwdsMutex.Lock()
 	defer PortFwdsMutex.Unlock()
 	for id, session := range PortFwds {

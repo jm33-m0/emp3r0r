@@ -1,13 +1,11 @@
 package cc
 
 import (
-	"fmt"
 	"log"
 	"strconv"
 	"strings"
 	"sync"
 
-	"github.com/fatih/color"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -58,19 +56,26 @@ var CmdFuncs = map[string]func(){
 	"suicide":       Suicide,
 }
 
-// FileManagerFuncs manage agent files
-var FileManagerFuncs = map[string]func(string){
-	"ls":    NoArgCmd,
-	"pwd":   NoArgCmd,
-	"cd":    SingleArgCmd,
-	"mv":    DoubleArgCmd,
-	"cp":    DoubleArgCmd,
-	"rm":    SingleArgCmd,
-	"mkdir": SingleArgCmd,
-	"put":   UploadToAgent,
-	"get":   DownloadFromAgent,
-	"ps":    NoArgCmd,
-	"kill":  SingleArgCmd,
+// SingleArgFuncs commands that accept a single string parameter
+var SingleArgFuncs = map[string]func(string){
+	"ls":              NoArgCmd,
+	"pwd":             NoArgCmd,
+	"cd":              SingleArgCmd,
+	"mv":              DoubleArgCmd,
+	"cp":              DoubleArgCmd,
+	"rm":              SingleArgCmd,
+	"mkdir":           SingleArgCmd,
+	"put":             UploadToAgent,
+	"get":             DownloadFromAgent,
+	"ps":              NoArgCmd,
+	"kill":            SingleArgCmd,
+	"delete_port_fwd": DeletePortFwdSession,
+	"debug":           setDebugLevel,
+	"search":          ModuleSearch,
+	"vim":             vimEditFile,
+	"set":             setOptVal,
+	"label":           setTargetLabel,
+	"target":          setCurrentTarget,
 }
 
 // CmdTime Record the time spent on each command
@@ -122,166 +127,22 @@ func CmdHandler(cmd string) (err error) {
 		}
 		CliPrintError("No such module: %s", strconv.Quote(cmdSplit[1]))
 
-	case cmdSplit[0] == "search":
-		if len(cmdSplit) < 2 {
-			CliPrintError("search what?")
-			return
-		}
-		ModuleSearch(cmdSplit[1])
-
-	case cmdSplit[0] == "set":
-		if len(cmdSplit) < 2 {
-			CliPrintError("set what?")
-			return
-		}
-		// hand to SetOption helper
-		SetOption(cmdSplit[1:])
-		CliListOptions()
-
-	case cmdSplit[0] == "debug":
-		if len(cmdSplit) < 2 {
-			CliPrintError("debug [ 0, 1, 2, 3 ]")
-			return
-		}
-		level, e := strconv.Atoi(cmdSplit[1])
-		if e != nil {
-			CliPrintError("Invalid debug level: %v", err)
-			return
-		}
-		DebugLevel = level
-		if DebugLevel > 2 {
-			log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Llongfile | log.Lmsgprefix)
-		} else {
-			log.SetFlags(log.Ldate | log.Ltime | log.LstdFlags)
-		}
-
-	case cmdSplit[0] == "delete_port_fwd":
-		if len(cmdSplit) < 2 {
-			CliPrintError("Delete what port mapping? " + strconv.Quote(cmd))
-			return
-		}
-		DeletePortFwdSession(cmdSplit[1])
-
-	case cmdSplit[0] == "label":
-		if len(cmdSplit) < 2 {
-			CliPrintError("Invalid command %s, usage: 'label <target tag/index> <label>'", strconv.Quote(cmd))
-			return
-		}
-		index, e := strconv.Atoi(cmdSplit[1])
-		label := strings.Join(cmdSplit[2:], " ")
-
-		var target *emp3r0r_data.SystemInfo
-		if e != nil {
-			target = GetTargetFromTag(cmdSplit[1])
-			if target != nil {
-				Targets[target].Label = label // set label
-				labelAgents()
-				CliPrintSuccess("%s has been labeled as %s", target.Tag, label)
-				return nil
-			}
-			return fmt.Errorf("cannot set target label by index: %v", e)
-		}
-		target = GetTargetFromIndex(index)
-		if target == nil {
-			CliPrintWarning("Target does not exist")
-			return fmt.Errorf("target not set or is nil")
-		}
-		Targets[target].Label = label // set label
-		labelAgents()
-		CliPrintSuccess("%s has been labeled as %s", target.Tag, label)
-		ListTargets() // update agent list
-
-	case cmdSplit[0] == "target":
-		if len(cmdSplit) != 2 {
-			CliPrintError("set target to what? " + strconv.Quote(cmd))
-			return
-		}
-		defer SetDynamicPrompt()
-		var target_to_set *emp3r0r_data.SystemInfo
-
-		// select by tag or index
-		target_to_set = GetTargetFromTag(strings.Join(cmdSplit[1:], " "))
-		if target_to_set == nil {
-			index, e := strconv.Atoi(cmdSplit[1])
-			if e == nil {
-				target_to_set = GetTargetFromIndex(index)
-			}
-		}
-
-		select_agent := func(a *emp3r0r_data.SystemInfo) {
-			CurrentTarget = a
-			GetTargetDetails(CurrentTarget)
-			CliPrintSuccess("Now targeting %s", CurrentTarget.Tag)
-			SetDynamicPrompt()
-
-			// kill shell window
-			if AgentShellPane != nil {
-				CliPrintInfo("Updating shell window")
-				err = AgentShellPane.KillPane()
-				if err != nil {
-					CliPrintWarning("Updating shell window: %v", err)
-				}
-				AgentShellPane = nil
-			}
-			SSHClient("bash", "", emp3r0r_data.SSHDPort, true)
-		}
-
-		if target_to_set == nil {
-			// if still nothing
-			CliPrintWarning("Target does not exist, no target has been selected")
-			return fmt.Errorf("target not set or is nil")
-
-		} else {
-			// lets start the bash shell
-			go select_agent(target_to_set)
-		}
-
-	case cmdSplit[0] == "vim":
-
-		if len(cmdSplit) < 2 {
-			CliPrintError("What file do you want to edit?")
-			return
-		}
-		filepath := strings.Join(cmdSplit[1:], " ")
-		filename := util.FileBaseName(filepath)
-
-		// tell user what to do
-		color.HiBlue("[*] Now edit %s in vim window",
-			filepath)
-
-		// edit remote files
-		if GetFile(filepath, CurrentTarget) != nil {
-			CliPrintError("Cannot download %s", filepath)
-			return
-		}
-
-		if err = VimEdit(FileGetDir + filename); err != nil {
-			CliPrintError("VimEdit: %v", err)
-			return
-		} // wait until vim exits
-
-		// upload the new file to target
-		if PutFile(FileGetDir+filename, filepath, CurrentTarget) != nil {
-			CliPrintError("Cannot upload %s", filepath)
-			return
-		}
-
 	default:
 		helper := CmdFuncs[cmd]
-		if helper == nil {
-			filehelper := FileManagerFuncs[cmdSplit[0]]
-			if filehelper == nil && CurrentTarget != nil {
-				CliPrintWarning("Exec: %s on %s", strconv.Quote(cmd), strconv.Quote(CurrentTarget.Tag))
-				SendCmdToCurrentTarget(cmd, "")
-				return
-			} else if CurrentTarget == nil {
-				CliPrintError("Select a target so you can execute commands on it")
-				return
-			}
-			filehelper(cmd)
+		if helper != nil {
+			helper()
 			return
 		}
-		helper()
+		helper_w_arg := SingleArgFuncs[cmdSplit[0]]
+		if helper_w_arg == nil && CurrentTarget != nil {
+			CliPrintWarning("Exec: %s on %s", strconv.Quote(cmd), strconv.Quote(CurrentTarget.Tag))
+			SendCmdToCurrentTarget(cmd, "")
+			return
+		} else if CurrentTarget == nil {
+			CliPrintError("No agent selected, try `target <index>`")
+			return
+		}
+		helper_w_arg(cmd)
 	}
 	return
 }
@@ -307,4 +168,143 @@ func CmdHelp(mod string) {
 		}
 	}
 	CliPrintError("Help yourself")
+}
+
+func setDebugLevel(cmd string) {
+	cmdSplit := strings.Fields(cmd)
+	if len(cmdSplit) != 2 {
+		CliPrintError("debug <0, 1, 2, 3>")
+		return
+	}
+	level, e := strconv.Atoi(cmdSplit[1])
+	if e != nil {
+		CliPrintError("Invalid debug level: %v", err)
+		return
+	}
+	DebugLevel = level
+	if DebugLevel > 2 {
+		log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Llongfile | log.Lmsgprefix)
+	} else {
+		log.SetFlags(log.Ldate | log.Ltime | log.LstdFlags)
+	}
+}
+
+func vimEditFile(cmd string) {
+	cmdSplit := strings.Fields(cmd)
+	if len(cmdSplit) < 2 {
+		CliPrintError("What file to edit?")
+		return
+	}
+	filepath := strings.Join(cmdSplit[1:], " ")
+	filename := util.FileBaseName(filepath)
+
+	// tell user what to do
+	CliPrintInfo("[*] Now edit %s in vim window",
+		filepath)
+
+	// edit remote files
+	if GetFile(filepath, CurrentTarget) != nil {
+		CliPrintError("Cannot download %s", filepath)
+		return
+	}
+
+	if err = VimEdit(FileGetDir + filename); err != nil {
+		CliPrintError("VimEdit: %v", err)
+		return
+	} // wait until vim exits
+
+	// upload the new file to target
+	if PutFile(FileGetDir+filename, filepath, CurrentTarget) != nil {
+		CliPrintError("Cannot upload %s", filepath)
+		return
+	}
+}
+
+func setCurrentTarget(cmd string) {
+	cmdSplit := strings.Fields(cmd)
+	if len(cmdSplit) != 2 {
+		CliPrintError("set target to what? " + strconv.Quote(cmd))
+		return
+	}
+	defer SetDynamicPrompt()
+	var target_to_set *emp3r0r_data.SystemInfo
+
+	// select by tag or index
+	target_to_set = GetTargetFromTag(strings.Join(cmdSplit[1:], " "))
+	if target_to_set == nil {
+		index, e := strconv.Atoi(cmdSplit[1])
+		if e == nil {
+			target_to_set = GetTargetFromIndex(index)
+		}
+	}
+
+	select_agent := func(a *emp3r0r_data.SystemInfo) {
+		CurrentTarget = a
+		GetTargetDetails(CurrentTarget)
+		CliPrintSuccess("Now targeting %s", CurrentTarget.Tag)
+		SetDynamicPrompt()
+
+		// kill shell window
+		if AgentShellPane != nil {
+			CliPrintInfo("Updating shell window")
+			err = AgentShellPane.KillPane()
+			if err != nil {
+				CliPrintInfo("Updating shell window: %v", err)
+			}
+			AgentShellPane = nil
+		}
+		SSHClient("bash", "", emp3r0r_data.SSHDPort, true)
+	}
+
+	if target_to_set == nil {
+		// if still nothing
+		CliPrintError("Target does not exist, no target has been selected")
+		return
+
+	} else {
+		// lets start the bash shell
+		go select_agent(target_to_set)
+	}
+}
+
+func setTargetLabel(cmd string) {
+	cmdSplit := strings.Fields(cmd)
+	if len(cmdSplit) < 2 {
+		CliPrintError("Invalid command %s, usage: 'label <target tag/index> <label>'", strconv.Quote(cmd))
+		return
+	}
+	index, e := strconv.Atoi(cmdSplit[1])
+	label := strings.Join(cmdSplit[2:], " ")
+
+	var target *emp3r0r_data.SystemInfo
+	if e != nil {
+		target = GetTargetFromTag(cmdSplit[1])
+		if target != nil {
+			Targets[target].Label = label // set label
+			labelAgents()
+			CliPrintSuccess("%s has been labeled as %s", target.Tag, label)
+		}
+		CliPrintError("cannot set target label by index: %v", e)
+		return
+	}
+	target = GetTargetFromIndex(index)
+	if target == nil {
+		CliPrintError("Target does not exist")
+		return
+	}
+	Targets[target].Label = label // set label
+	labelAgents()
+	CliPrintSuccess("%s has been labeled as %s", target.Tag, label)
+	ListTargets() // update agent list
+}
+
+func setOptVal(cmd string) {
+	cmdSplit := strings.Fields(cmd)
+	if len(cmdSplit) < 2 {
+		CliPrintError("set what?")
+		return
+	}
+	// hand to SetOption helper
+	SetOption(cmdSplit[1:])
+	CliListOptions()
 }
