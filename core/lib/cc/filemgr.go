@@ -7,7 +7,7 @@ import (
 // LsDir cache items in current directory
 var LsDir []string
 
-func SingleArgCmd(cmd string) {
+func FSSingleArgCmd(cmd string) {
 	inputSlice := strings.Fields(cmd)
 	cmdname := inputSlice[0]
 	if len(inputSlice) < 2 {
@@ -27,7 +27,7 @@ func SingleArgCmd(cmd string) {
 	}
 }
 
-func DoubleArgCmd(cmd string) {
+func FSDoubleArgCmd(cmd string) {
 	inputSlice := strings.Fields(cmd)
 	cmdname := inputSlice[0]
 	if len(inputSlice) < 3 {
@@ -43,7 +43,7 @@ func DoubleArgCmd(cmd string) {
 	}
 }
 
-func NoArgCmd(cmd string) {
+func FSNoArgCmd(cmd string) {
 	// send cmd
 	if cmd == "ps" {
 		cmd = "#ps"
