@@ -5,7 +5,7 @@ command -v git || {
     exit 1
 }
 
-version="$(git describe --always)"
+version="$(git describe --tags)"
 echo -n "$version" | tee ./core/.version || {
     echo "Failed to write version string"
     exit 2
