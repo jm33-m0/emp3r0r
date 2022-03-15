@@ -144,7 +144,7 @@ class GoBuild:
             )
             self.CA = CACHED_CONF["ca"]
         else:
-            with open("./tls/rootCA.crt", encoding='utf-8') as f:
+            with open("./tls/rootCA.crt", encoding="utf-8") as f:
                 self.CA = f.read()
 
             # cache CA, too
@@ -154,7 +154,7 @@ class GoBuild:
         CACHED_CONF["version"] = self.VERSION
 
         # write cached configs
-        with open(BUILD_JSON, "w+", encoding='utf-8') as json_file:
+        with open(BUILD_JSON, "w+", encoding="utf-8") as json_file:
             json.dump(CACHED_CONF, json_file, indent=4)
 
         self.set_tags()
@@ -185,7 +185,10 @@ class GoBuild:
             build_target = f"../../build/{self.target}-{self.UUID}.exe"
 
         # go mod
-        os.system("go mod tidy")
+
+        if os.system("go mod tidy") != 0:
+            if yes_no("go mod tidy failed, goodbye?"):
+                sys.exit(1)
 
         cmd = (
             f"""GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0"""
@@ -202,9 +205,14 @@ class GoBuild:
                 )
                 log_warn("Using garble to build agent binary")
 
-        os.system(cmd)
         log_warn("GO BUILD ends...")
         log_warn("----------------")
+
+        if os.system(cmd) != 0:
+            log_error(f"failed to build {self.target}")
+
+            if yes_no("Goodbye?"):
+                sys.exit(1)
 
         os.chdir("../../")
         self.unset_tags()
@@ -258,8 +266,7 @@ class GoBuild:
             os.rename(f"./{self.UUID}-key.pem", "./emp3r0r-key.pem")
             os.chdir("..")
         except BaseException as exc:
-            log_error(
-                f"[-] Something went wrong, see above for details: {exc}")
+            log_error(f"[-] Something went wrong, see above for details: {exc}")
             sys.exit(1)
 
     def set_tags(self):
@@ -273,8 +280,7 @@ class GoBuild:
             shutil.copy("./lib/tun/api.go", "/tmp/api.go")
             shutil.copy("./lib/data/def.go", "/tmp/def.go")
         except BaseException:
-            log_error(
-                f"Failed to backup source files:\n{traceback.format_exc()}")
+            log_error(f"Failed to backup source files:\n{traceback.format_exc()}")
             sys.exit(1)
 
         # version
@@ -288,8 +294,7 @@ class GoBuild:
         sed("./lib/tun/tls.go", "[emp3r0r_ca]", self.CA)
 
         # webroot
-        sed("./lib/tun/api.go", 'WebRoot = "emp3r0r"',
-            f'WebRoot = "{self.WebRoot}"')
+        sed("./lib/tun/api.go", 'WebRoot = "emp3r0r"', f'WebRoot = "{self.WebRoot}"')
 
         # opsep
         sed(
@@ -475,11 +480,11 @@ def sed(path, old, new):
     works like `sed -i s/old/new/g file`
     """
     log_warn(f"sed -i s/{old}/{new}/g {path}")
-    with open(path, encoding='utf-8') as rf:
+    with open(path, encoding="utf-8") as rf:
         text = rf.read()
         to_write = text.replace(old, new)
 
-    with open(path, "w", encoding='utf-8') as f:
+    with open(path, "w", encoding="utf-8") as f:
         f.write(to_write)
 
 
@@ -573,8 +578,7 @@ def main(target):
         use_cached = yes_no(f"Use cached CC indicator ({indicator})?")
 
     if not use_cached:
-        indicator = input(
-            "CC status indicator URL (leave empty to disable): ").strip()
+        indicator = input("CC status indicator URL (leave empty to disable): ").strip()
         CACHED_CONF["cc_indicator"] = indicator
 
     if CACHED_CONF["cc_indicator"] != "":
@@ -596,20 +600,17 @@ def main(target):
     use_cached = False
 
     if "agent_proxy" in CACHED_CONF:
-        use_cached = yes_no(
-            f"Use cached agent proxy ({CACHED_CONF['agent_proxy']})?")
+        use_cached = yes_no(f"Use cached agent proxy ({CACHED_CONF['agent_proxy']})?")
 
     if not use_cached:
-        agentproxy = input(
-            "Proxy server for agent (leave empty to disable): ").strip()
+        agentproxy = input("Proxy server for agent (leave empty to disable): ").strip()
         CACHED_CONF["agent_proxy"] = agentproxy
 
     # CDN
     use_cached = False
 
     if "cdn_proxy" in CACHED_CONF:
-        use_cached = yes_no(
-            f"Use cached CDN server ({CACHED_CONF['cdn_proxy']})?")
+        use_cached = yes_no(f"Use cached CDN server ({CACHED_CONF['cdn_proxy']})?")
 
     if not use_cached:
         cdn = input("CDN websocket server (leave empty to disable): ").strip()
@@ -619,8 +620,7 @@ def main(target):
     use_cached = False
 
     if "doh_server" in CACHED_CONF:
-        use_cached = yes_no(
-            f"Use cached DoH server ({CACHED_CONF['doh_server']})?")
+        use_cached = yes_no(f"Use cached DoH server ({CACHED_CONF['doh_server']})?")
 
     if not use_cached:
         doh = input("DNS over HTTP server (leave empty to disable): ").strip()
@@ -738,8 +738,7 @@ def get_version():
 # command line args
 yes_to_all = False
 
-parser = argparse.ArgumentParser(
-    description="Build emp3r0r CC/Agent bianaries")
+parser = argparse.ArgumentParser(description="Build emp3r0r CC/Agent bianaries")
 parser.add_argument(
     "--target", type=str, required=True, help="Build target, can be cc/agent/agentw"
 )

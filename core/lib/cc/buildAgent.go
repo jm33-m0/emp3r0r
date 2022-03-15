@@ -61,7 +61,7 @@ func BuildAgent() {
 		CliPrintError("Something went wrong, please check `build.py` output")
 		return
 	}
-	CliPrintSuccess("Agent binary generated under `./build`, run it on your target host and wait for the knock")
+	CliPrintInfo("Run ./build/agentXXX on your target host and wait for the knock")
 }
 
 func UpgradeAgent() {
