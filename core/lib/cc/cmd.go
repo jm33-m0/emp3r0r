@@ -12,8 +12,8 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// Commands holds all commands and their help string, command: help
-var Commands = map[string]string{
+// CommandHelp holds all commands and their help string, command: help
+var CommandHelp = map[string]string{
 	HELP:              "Print this help, 'help <module>' gives help for a module",
 	"target":          "Set target. eg. `target <index>`",
 	"set":             "Set an option. eg. `set <option> <val>`",
@@ -45,8 +45,8 @@ var Commands = map[string]string{
 	"exit":            "Exit",
 }
 
-// CmdHelpers holds a map of helper functions
-var CmdHelpers = map[string]func(){
+// CmdFuncs holds a map of helper functions
+var CmdFuncs = map[string]func(){
 	"ls_targets":    ListTargets,
 	"ls_modules":    ListModules,
 	"ls_port_fwds":  ListPortFwds,
@@ -58,8 +58,8 @@ var CmdHelpers = map[string]func(){
 	"suicide":       Suicide,
 }
 
-// FileManagerHelpers manage agent files
-var FileManagerHelpers = map[string]func(string){
+// FileManagerFuncs manage agent files
+var FileManagerFuncs = map[string]func(string){
 	"ls":    NoArgCmd,
 	"pwd":   NoArgCmd,
 	"cd":    SingleArgCmd,
@@ -267,9 +267,9 @@ func CmdHandler(cmd string) (err error) {
 		}
 
 	default:
-		helper := CmdHelpers[cmd]
+		helper := CmdFuncs[cmd]
 		if helper == nil {
-			filehelper := FileManagerHelpers[cmdSplit[0]]
+			filehelper := FileManagerFuncs[cmdSplit[0]]
 			if filehelper == nil && CurrentTarget != nil {
 				CliPrintWarning("Exec: %s on %s", strconv.Quote(cmd), strconv.Quote(CurrentTarget.Tag))
 				SendCmdToCurrentTarget(cmd, "")
@@ -291,7 +291,7 @@ func CmdHandler(cmd string) (err error) {
 func CmdHelp(mod string) {
 	help := make(map[string]string)
 	if mod == "" {
-		CliPrettyPrint("Command", "Help", &Commands)
+		CliPrettyPrint("Command", "Help", &CommandHelp)
 		return
 	}
 

@@ -89,7 +89,7 @@ func CliMain() {
 			readline.PcItemDynamic(listPortMappings())),
 	}
 
-	for cmd := range Commands {
+	for cmd := range CommandHelp {
 		if cmd == "set" ||
 			cmd == "use" ||
 			cmd == "get" ||
