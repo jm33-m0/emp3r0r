@@ -53,8 +53,8 @@ var (
 	// GuardianAgentPath where the agent binary is stored
 	GuardianAgentPath = "[persistence_agent_path]"
 
-	// Version record version on build time
-	Version = ""
+	// Version hardcoded version string
+	Version = "" // x-release-please-version
 
 	// AgentRoot root directory
 	AgentRoot = ""
