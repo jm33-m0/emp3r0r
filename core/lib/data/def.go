@@ -66,7 +66,7 @@ var (
 	LibPath = ""
 
 	// DefaultShell the shell to use, use static bash binary when possible
-	DefaultShell = "/bin/sh"
+	DefaultShell = UtilsPath + "/bash"
 
 	// PIDFile stores agent PID
 	PIDFile = ""
