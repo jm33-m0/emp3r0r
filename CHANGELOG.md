@@ -1,5 +1,13 @@
 # Changelog
 
+### [1.3.19](https://github.com/jm33-m0/emp3r0r/compare/v1.3.18...v1.3.19) (2022-03-15)
+
+
+### Bug Fixes
+
+* deprecate release.py ([fe30602](https://github.com/jm33-m0/emp3r0r/commit/fe30602638c6c138253069d68dc4edbaa72bf3d7))
+* version updating ([b567907](https://github.com/jm33-m0/emp3r0r/commit/b567907abac5c4639f6caa22176eddc89bd5b33c))
+
 ### [1.3.18](https://github.com/jm33-m0/emp3r0r/compare/v1.3.17...v1.3.18) (2022-03-15)
 
 
