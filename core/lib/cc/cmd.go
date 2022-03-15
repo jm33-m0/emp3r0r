@@ -138,7 +138,7 @@ func CmdHandler(cmd string) (err error) {
 			CliPrintWarning("Exec: %s on %s", strconv.Quote(cmd), strconv.Quote(CurrentTarget.Tag))
 			SendCmdToCurrentTarget(cmd, "")
 			return
-		} else if CurrentTarget == nil {
+		} else if CurrentTarget == nil && cmdSplit[0] != "target" {
 			CliPrintError("No agent selected, try `target <index>`")
 			return
 		}
