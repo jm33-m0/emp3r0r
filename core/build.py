@@ -16,7 +16,6 @@ import readline
 import shutil
 import subprocess
 import sys
-import tempfile
 import traceback
 import uuid
 
@@ -145,9 +144,8 @@ class GoBuild:
             )
             self.CA = CACHED_CONF["ca"]
         else:
-            f = open("./tls/rootCA.crt")
-            self.CA = f.read()
-            f.close()
+            with open("./tls/rootCA.crt", encoding='utf-8') as f:
+                self.CA = f.read()
 
             # cache CA, too
             CACHED_CONF["ca"] = self.CA
@@ -156,9 +154,8 @@ class GoBuild:
         CACHED_CONF["version"] = self.VERSION
 
         # write cached configs
-        json_file = open(BUILD_JSON, "w+")
-        json.dump(CACHED_CONF, json_file, indent=4)
-        json_file.close()
+        with open(BUILD_JSON, "w+", encoding='utf-8') as json_file:
+            json.dump(CACHED_CONF, json_file, indent=4)
 
         self.set_tags()
 
@@ -477,14 +474,13 @@ def sed(path, old, new):
     """
     works like `sed -i s/old/new/g file`
     """
-    rf = open(path)
-    text = rf.read()
-    to_write = text.replace(old, new)
-    rf.close()
+    log_warn(f"sed -i s/{old}/{new}/g {path}")
+    with open(path, encoding='utf-8') as rf:
+        text = rf.read()
+        to_write = text.replace(old, new)
 
-    f = open(path, "w")
-    f.write(to_write)
-    f.close()
+    with open(path, "w", encoding='utf-8') as f:
+        f.write(to_write)
 
 
 def yes_no(prompt):
