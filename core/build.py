@@ -197,16 +197,13 @@ class GoBuild:
 
         # garble
 
-        if (
-            shutil.which("garble")
-            and self.target != "cc"
-            and yes_no("Use garble to obfuscate agent binary?")
-        ):
-            cmd = (
-                f"""GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0 GOPRIVATE="""
-                + f""" garble -literals -tiny build -o {build_target} -ldflags="-v" -trimpath ."""
-            )
-            log_warn("Using garble to build agent binary")
+        if shutil.which("garble") and self.target.startswith("agent"):
+            if yes_no("Use garble to obfuscate agent binary?"):
+                cmd = (
+                    f"""GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0 GOPRIVATE="""
+                    + f""" garble -literals -tiny build -o {build_target} -ldflags="-v" -trimpath ."""
+                )
+                log_warn("Using garble to build agent binary")
 
         os.system(cmd)
         log_warn("GO BUILD ends...")

