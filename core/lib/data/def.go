@@ -54,7 +54,8 @@ var (
 	GuardianAgentPath = "[persistence_agent_path]"
 
 	// Version hardcoded version string
-	Version = "" // x-release-please-version
+	// see https://github.com/googleapis/release-please/blob/f398bdffdae69772c61a82cd7158cca3478c2110/src/updaters/generic.ts#L30
+	Version = "v1.3.19" // x-release-please-version
 
 	// AgentRoot root directory
 	AgentRoot = ""
