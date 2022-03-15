@@ -7,8 +7,9 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
-      - run: cd ${{ github.workspace }} && ls -lah
-      - run: cd ${{ github.workspace }} && bash ./release.sh
+      - run: pwd
+      - run: ls -lah ${{ github.workspace }}
+      - run: bash ./release.sh
       - uses: google-github-actions/release-please-action@v3
         with:
           release-type: go
