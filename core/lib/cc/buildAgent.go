@@ -3,6 +3,7 @@ package cc
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"strconv"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
@@ -49,6 +50,13 @@ func GenAgent() {
 	// done
 	CliPrintSuccess("Generated %s from %s and %s, you can use %s on arbitrary target",
 		outfile, stubFile, buildJSONFile, outfile)
+}
+
+// BuildAgent invoke build.py and guide user to build agent binary
+func BuildAgent() {
+	os.Chdir("..")
+	defer os.Chdir("build")
+	TmuxNewWindow("build-agent", "./build.py --target agent")
 }
 
 func UpgradeAgent() {
