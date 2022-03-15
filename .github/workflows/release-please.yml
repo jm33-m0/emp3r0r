@@ -36,7 +36,7 @@ jobs:
           files: |
             core/.version
           commit-message: write version string
-          ref: refs/heads/my-branch
+          ref: refs/heads/master
 
       - uses: google-github-actions/release-please-action@v3
         with:
