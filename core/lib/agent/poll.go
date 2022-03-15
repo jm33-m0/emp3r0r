@@ -66,12 +66,12 @@ func IsCCOnline(proxy string) bool {
 	}
 	resp, err := client.Get(emp3r0r_data.CCIndicator)
 	if err != nil {
-		log.Print(err)
+		log.Printf("IsCCOnline: %s: %v", emp3r0r_data.CCIndicator, err)
 		return false
 	}
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Print(err)
+		log.Printf("IsCCOnline: %s: %v", emp3r0r_data.CCIndicator, err)
 		return false
 	}
 	defer resp.Body.Close()

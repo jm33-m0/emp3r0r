@@ -29,7 +29,7 @@ class GoBuild:
     def __init__(
         self,
         target="cc",
-        cc_indicator="cc_indicator",
+        cc_indicator="",
         cc_ip="[cc_ipaddr]",
         cc_other_names="",
     ):
@@ -336,8 +336,15 @@ class GoBuild:
         # indicator
         sed(
             "./lib/data/def.go",
-            'CCIndicator = "[cc_indicator]"',
+            'CCIndicator = ""',
             f'CCIndicator = "{self.INDICATOR}"',
+        )
+
+        # cc indicator text
+        sed(
+            "./lib/data/def.go",
+            'CCIndicatorText = ""',
+            f'CCIndicatorText = "{self.INDICATOR_TEXT}"',
         )
 
         # indicator wait
@@ -371,13 +378,6 @@ class GoBuild:
                 "BroadcastIntervalMax = 120",
                 f"BroadcastIntervalMax = {CACHED_CONF['broadcast_interval_max']}",
             )
-
-        # cc indicator text
-        sed(
-            "./lib/data/def.go",
-            'CCIndicatorText = "[indicator_text]"',
-            f'CCIndicatorText = "{self.INDICATOR_TEXT}"',
-        )
 
         # agent UUID
         sed(

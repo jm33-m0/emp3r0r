@@ -96,10 +96,10 @@ var (
 	BroadcastIntervalMax = 0
 
 	// CCIndicator check this before trying connection
-	CCIndicator = "cc_indicator"
+	CCIndicator = ""
 
 	// CCIndicatorText content of your indicator file
-	CCIndicatorText = "emp3r0r"
+	CCIndicatorText = ""
 
 	// IndicatorWaitMin cc indicator wait seconds
 	IndicatorWaitMin = 30
