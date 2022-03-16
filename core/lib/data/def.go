@@ -64,7 +64,7 @@ var (
 	UtilsPath = ""
 
 	// LibPath
-	LibPath = ""
+	LibPath = AgentRoot + "/lib"
 
 	// DefaultShell the shell to use, use static bash binary when possible
 	DefaultShell = UtilsPath + "/bash"
