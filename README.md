@@ -10,11 +10,13 @@ Linux/Windows post-exploitation framework made by linux user
 - [download from here (do not clone)](https://github.com/jm33-m0/emp3r0r/releases)
 - [write modules for emp3r0r, with your favorite languages](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r)
 
-![image](https://user-images.githubusercontent.com/10167884/158535621-6c0ecbc5-47cb-4ad2-bbf6-4e625eef1f84.png)
+![image](https://user-images.githubusercontent.com/10167884/158553129-65359a8c-8a78-4c0c-833b-6dec4d5cd7ac.png)
 
 <details><summary>more screenshots / videos</summary>
 
 https://user-images.githubusercontent.com/10167884/155106403-ca6bd763-7f09-4aae-adc3-67f7a36f99ad.mp4
+
+![image](https://user-images.githubusercontent.com/10167884/158535621-6c0ecbc5-47cb-4ad2-bbf6-4e625eef1f84.png)
 
 ![c2](./img/c2transports.png)
 
