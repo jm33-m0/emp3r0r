@@ -59,20 +59,20 @@ func moduleHandler(modName, checksum string) (out string) {
 	if err != nil {
 		return fmt.Sprintf("cd to module dir: %v", err)
 	}
-	defer os.Chdir(pwd)
 
 	// process files in module archive
+	libs_tarball := "libs.tar.xz"
 	files, err := ioutil.ReadDir("./")
 	if err != nil {
 		return fmt.Sprintf("Processing module files: %v", err)
 	}
 	for _, f := range files {
 		os.Chmod(f.Name(), 0700)
-		if util.IsFileExist("libs.tar.xz") {
+		if util.IsFileExist(libs_tarball) {
 			os.RemoveAll("libs")
-			err = archiver.Unarchive("libs.tar.xz", "./")
+			err = archiver.Unarchive(libs_tarball, "./")
 			if err != nil {
-				return fmt.Sprintf("Unarchive libs.tar.xz: %v", err)
+				return fmt.Sprintf("Unarchive %s: %v", libs_tarball, err)
 			}
 		}
 	}
@@ -92,6 +92,7 @@ func moduleHandler(modName, checksum string) (out string) {
 	}
 
 	defer func() {
+		os.Chdir(pwd)
 		// remove module files if it's non-interactive
 		if !util.IsStrInFile("echo emp3r0r-interactive-module", start_sh) {
 			os.RemoveAll(modDir)
