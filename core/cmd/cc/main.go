@@ -20,7 +20,6 @@ import (
 
 // Config change cc's configuration at runtime
 type Config struct {
-	Version       string `json:"version"`
 	SSHDPort      string `json:"sshd_port"`
 	BroadcastPort string `json:"broadcast_port"`
 	ProxyPort     string `json:"proxy_port"`
@@ -44,7 +43,6 @@ func readJSONConfig(filename string) (err error) {
 	}
 
 	// set up runtime vars
-	emp3r0r_data.Version = config.Version
 	emp3r0r_data.SSHDPort = config.SSHDPort
 	emp3r0r_data.BroadcastPort = config.BroadcastPort
 	emp3r0r_data.ProxyPort = config.ProxyPort
