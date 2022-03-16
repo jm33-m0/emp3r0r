@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	cowsay "github.com/Code-Hex/Neo-cowsay/v2"
 	"github.com/bettercap/readline"
 	"github.com/fatih/color"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
@@ -437,7 +438,19 @@ func CliBanner() error {
 	}
 
 	color.Cyan(string(data))
-	color.Cyan("version: %s\n\n", emp3r0r_data.Version)
+	cow, err := cowsay.New(
+		cowsay.BallonWidth(40),
+		cowsay.Random(),
+	)
+	if err != nil {
+		log.Fatalf("CowSay: %v", err)
+	}
+	say, err := cow.Say(fmt.Sprintf("welcome! you are using version %s, C2 listening on *:%s",
+		emp3r0r_data.Version, emp3r0r_data.CCPort))
+	if err != nil {
+		log.Fatalf("CowSay: %v", err)
+	}
+	color.Cyan("%s\n\n", say)
 	return nil
 }
 
@@ -504,8 +517,8 @@ ICAgICDilpPilpMg4paT4paTICAg4paT4paTIOKWk+KWk+KWk+KWkyAg4paT4paTIOKWk+KWkyAg
 IOKWk+KWkwrilojilojilojilojilojilojilogg4paI4paIICAgICAg4paI4paIIOKWiOKWiCAg
 ICAgIOKWiOKWiOKWiOKWiOKWiOKWiCAg4paI4paIICAg4paI4paIICDilojilojilojilojiloji
 loggIOKWiOKWiCAgIOKWiOKWiAoKCmEgbGludXggcG9zdC1leHBsb2l0YXRpb24gZnJhbWV3b3Jr
-IG1hZGUgYnkgbGludXggdXNlcgoKYnkgam0zMy1uZwoKaHR0cHM6Ly9naXRodWIuY29tL2ptMzMt
-bTAvZW1wM3IwcgoKCg==
+IG1hZGUgYnkgbGludXggdXNlcgoKaHR0cHM6Ly9naXRodWIuY29tL2ptMzMtbTAvZW1wM3IwcgoK
+Cg==
 `
 
 // autocomplete module options

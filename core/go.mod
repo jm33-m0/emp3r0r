@@ -3,6 +3,7 @@ module github.com/jm33-m0/emp3r0r/core
 go 1.17
 
 require (
+	github.com/Code-Hex/Neo-cowsay/v2 v2.0.4
 	github.com/bettercap/readline v0.0.0-20210228151553-655e48bcb7bf
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/creack/pty v1.1.17
@@ -32,6 +33,7 @@ require (
 )
 
 require (
+	github.com/Code-Hex/go-wordwrap v1.0.0 // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
@@ -76,7 +78,6 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/text v0.3.7 // indirect
-	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
