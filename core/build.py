@@ -28,7 +28,7 @@ class GoBuild:
         self,
         target="cc",
         cc_indicator="",
-        cc_ip="[cc_ipaddr]",
+        cc_host="",
         cc_other_names="",
     ):
         self.target = target
@@ -48,7 +48,7 @@ class GoBuild:
         self.CA = ""
 
         # tags
-        self.CCIP = cc_ip
+        self.CCHost = cc_host
         self.CC_OTHER_NAMES = cc_other_names
         self.INDICATOR = cc_indicator
         self.UUID = str(uuid.uuid1())
@@ -245,8 +245,8 @@ class GoBuild:
         generate server cert/key, and CA if necessary
         """
 
-        if "ccip" in CACHED_CONF:
-            if self.CCIP == CACHED_CONF["ccip"] and os.path.exists(
+        if "cc_host" in CACHED_CONF:
+            if self.CCHost == CACHED_CONF["cc_host"] and os.path.exists(
                 "./build/emp3r0r-key.pem"
             ):
                 return
@@ -255,14 +255,13 @@ class GoBuild:
         try:
             os.chdir("./tls")
             os.system(
-                f"bash ./genkey-with-ip-san.sh {self.UUID} {self.UUID}.com {self.CCIP} {self.CC_OTHER_NAMES}"
+                f"bash ./genkey-with-ip-san.sh {self.UUID} {self.UUID}.com {self.CCHost} {self.CC_OTHER_NAMES}"
             )
             os.rename(f"./{self.UUID}-cert.pem", "./emp3r0r-cert.pem")
             os.rename(f"./{self.UUID}-key.pem", "./emp3r0r-key.pem")
             os.chdir("..")
         except BaseException as exc:
-            log_error(
-                f"[-] Something went wrong, see above for details: {exc}")
+            log_error(f"[-] Something went wrong, see above for details: {exc}")
             sys.exit(1)
 
     def set_tags(self):
@@ -276,16 +275,14 @@ class GoBuild:
             shutil.copy("./lib/tun/api.go", "/tmp/api.go")
             shutil.copy("./lib/data/def.go", "/tmp/def.go")
         except BaseException:
-            log_error(
-                f"Failed to backup source files:\n{traceback.format_exc()}")
+            log_error(f"Failed to backup source files:\n{traceback.format_exc()}")
             sys.exit(1)
 
         # CA
         sed("./lib/tun/tls.go", "[emp3r0r_ca]", self.CA)
 
         # webroot
-        sed("./lib/tun/api.go", 'WebRoot = "emp3r0r"',
-            f'WebRoot = "{self.WebRoot}"')
+        sed("./lib/tun/api.go", 'WebRoot = "emp3r0r"', f'WebRoot = "{self.WebRoot}"')
 
         # opsep
         sed(
@@ -319,7 +316,7 @@ class GoBuild:
         sed(
             "./lib/data/def.go",
             'CCAddress = ""',
-            f'CCAddress = "https://{self.CCIP}"',
+            f'CCAddress = "https://{self.CCHost}"',
         )
 
         # agent root path
@@ -515,7 +512,7 @@ def main(target):
     """
     main main main
     """
-    ccip = ""
+    cc_host = ""
     indicator = ""
     use_cached = False
 
@@ -526,31 +523,31 @@ def main(target):
 
     # cc IP
 
-    if "ccip" in CACHED_CONF:
-        ccip = CACHED_CONF["ccip"]
-        use_cached = yes_no(f"Use cached CC address ({ccip})?")
+    if "cc_host" in CACHED_CONF:
+        cc_host = CACHED_CONF["cc_host"]
+        use_cached = yes_no(f"Use cached CC address ({cc_host})?")
 
     if not use_cached:
         if yes_no("Clean everything and start over?"):
             clean()
-        ccip = input(
+        cc_host = input(
             "CC server address (domain name or ip address, can be more than one, separate with space):\n> "
         ).strip()
-        CACHED_CONF["ccip"] = ccip
+        CACHED_CONF["cc_host"] = cc_host
 
-        if len(ccip.split()) > 1:
-            CACHED_CONF["ccip"] = ccip.split()[0]
+        if len(cc_host.split()) > 1:
+            CACHED_CONF["cc_host"] = cc_host.split()[0]
 
     if target == "cc":
         cc_other = ""
 
-        if len(ccip.split()) > 1:
-            cc_other = " ".join(ccip[1:])
+        if len(cc_host.split()) > 1:
+            cc_other = " ".join(cc_host[1:])
 
-        gobuild = GoBuild(target="cc", cc_ip=ccip, cc_other_names=cc_other)
+        gobuild = GoBuild(target="cc", cc_host=cc_host, cc_other_names=cc_other)
         gobuild.build()
 
-        cat_build = GoBuild(target="cat", cc_ip=ccip, cc_other_names=cc_other)
+        cat_build = GoBuild(target="cat", cc_host=cc_host, cc_other_names=cc_other)
         cat_build.build()
 
         return
@@ -569,8 +566,7 @@ def main(target):
         use_cached = yes_no(f"Use cached CC indicator ({indicator})?")
 
     if not use_cached:
-        indicator = input(
-            "CC status indicator URL (leave empty to disable): ").strip()
+        indicator = input("CC status indicator URL (leave empty to disable): ").strip()
         CACHED_CONF["cc_indicator"] = indicator
 
     if CACHED_CONF["cc_indicator"] != "":
@@ -592,20 +588,17 @@ def main(target):
     use_cached = False
 
     if "agent_proxy" in CACHED_CONF:
-        use_cached = yes_no(
-            f"Use cached agent proxy ({CACHED_CONF['agent_proxy']})?")
+        use_cached = yes_no(f"Use cached agent proxy ({CACHED_CONF['agent_proxy']})?")
 
     if not use_cached:
-        agentproxy = input(
-            "Proxy server for agent (leave empty to disable): ").strip()
+        agentproxy = input("Proxy server for agent (leave empty to disable): ").strip()
         CACHED_CONF["agent_proxy"] = agentproxy
 
     # CDN
     use_cached = False
 
     if "cdn_proxy" in CACHED_CONF:
-        use_cached = yes_no(
-            f"Use cached CDN server ({CACHED_CONF['cdn_proxy']})?")
+        use_cached = yes_no(f"Use cached CDN server ({CACHED_CONF['cdn_proxy']})?")
 
     if not use_cached:
         cdn = input("CDN websocket server (leave empty to disable): ").strip()
@@ -615,8 +608,7 @@ def main(target):
     use_cached = False
 
     if "doh_server" in CACHED_CONF:
-        use_cached = yes_no(
-            f"Use cached DoH server ({CACHED_CONF['doh_server']})?")
+        use_cached = yes_no(f"Use cached DoH server ({CACHED_CONF['doh_server']})?")
 
     if not use_cached:
         doh = input("DNS over HTTP server (leave empty to disable): ").strip()
@@ -627,7 +619,7 @@ def main(target):
     if not yes_no("Use autoproxy (will enable UDP broadcasting)"):
         CACHED_CONF["broadcast_interval_max"] = 0
 
-    gobuild = GoBuild(target=target, cc_indicator=indicator, cc_ip=ccip)
+    gobuild = GoBuild(target=target, cc_indicator=indicator, cc_host=cc_host)
     gobuild.build()
 
 
@@ -704,8 +696,7 @@ def randomize_ports():
 # command line args
 yes_to_all = False
 
-parser = argparse.ArgumentParser(
-    description="Build emp3r0r CC/Agent bianaries")
+parser = argparse.ArgumentParser(description="Build emp3r0r CC/Agent bianaries")
 parser.add_argument(
     "--target", type=str, required=True, help="Build target, can be cc/agent/agentw"
 )
