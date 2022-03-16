@@ -1,2 +1,0 @@
-[console_scripts]
-dxf = dxf.main:main
