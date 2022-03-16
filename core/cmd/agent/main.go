@@ -156,12 +156,9 @@ test_agent:
 	// start socket listener
 	go socketListen()
 
-	// parse C2 address
-	emp3r0r_data.CCIP = strings.Split(emp3r0r_data.CCAddress, "/")[2]
-	emp3r0r_data.CCAddress = fmt.Sprintf("%s:%s/", emp3r0r_data.CCAddress, emp3r0r_data.CCPort)
-
 	// if CC is behind tor, a proxy is needed
 	if tun.IsTor(emp3r0r_data.CCAddress) {
+		emp3r0r_data.CCAddress = fmt.Sprintf("%s/", emp3r0r_data.CCAddress)
 		log.Printf("CC is on TOR: %s", emp3r0r_data.CCAddress)
 		emp3r0r_data.Transport = fmt.Sprintf("TOR (%s)", emp3r0r_data.CCAddress)
 		emp3r0r_data.AgentProxy = *c2proxy
@@ -169,7 +166,11 @@ test_agent:
 			emp3r0r_data.AgentProxy = "socks5://127.0.0.1:9050"
 		}
 		log.Printf("CC is on TOR (%s), using %s as TOR proxy", emp3r0r_data.CCAddress, emp3r0r_data.AgentProxy)
+	} else {
+		// parse C2 address
+		emp3r0r_data.CCAddress = fmt.Sprintf("%s:%s/", emp3r0r_data.CCAddress, emp3r0r_data.CCPort)
 	}
+	log.Printf("CCAddress is: %s", emp3r0r_data.CCAddress)
 
 	// if user specified a proxy, use it
 	if *c2proxy != "" {
