@@ -557,6 +557,7 @@ def main(target):
         gobuild = GoBuild(target="cc", cc_host=cc_host, cc_other_names=cc_other)
         gobuild.build()
 
+        log_warn("\n\nBuilding cat...")
         cat_build = GoBuild(target="cat", cc_host=cc_host, cc_other_names=cc_other)
         cat_build.build()
 
