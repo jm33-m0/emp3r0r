@@ -3,6 +3,10 @@ linux post-exploitation framework made by linux user
 
 ----------
 
+ARCHIVED, this file won't be updated, please check [README](./README.md)
+
+----------
+
 ## table of contents
 
 <!-- vim-markdown-toc GFM -->
