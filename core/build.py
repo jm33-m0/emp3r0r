@@ -201,9 +201,6 @@ class GoBuild:
                     )
                     log_warn("Using garble to build agent binary")
 
-            log_warn("GO BUILD ends...")
-            log_warn("----------------")
-
             if os.system(cmd) != 0:
                 log_error(f"failed to build {self.target}")
 
@@ -215,6 +212,8 @@ class GoBuild:
             log_error("Aborted")
         finally:
             self.unset_tags()
+            log_warn("GO BUILD ends...")
+            log_warn("----------------")
 
         targetFile = f"{PWD}/build/{build_target.split('/')[-1]}"
 
