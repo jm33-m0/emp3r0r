@@ -1,5 +1,14 @@
 # Changelog
 
+### [1.4.1](https://github.com/jm33-m0/emp3r0r/compare/v1.4.0...v1.4.1) (2022-03-16)
+
+
+### Bug Fixes
+
+* onion address checking ([628d527](https://github.com/jm33-m0/emp3r0r/commit/628d5275d59e2adee687c8d48ed85ec15ca24c95))
+* print 'go build ends' after `go build` ([a73ff81](https://github.com/jm33-m0/emp3r0r/commit/a73ff8165d24227cf633910e4b7857614a3ee7a6))
+* restore source files when build is aborted ([07ab26c](https://github.com/jm33-m0/emp3r0r/commit/07ab26c86d03e64f9ab1fa08d23d0c13a19671fd))
+
 ## [1.4.0](https://github.com/jm33-m0/emp3r0r/compare/v1.3.20...v1.4.0) (2022-03-16)
 
 
