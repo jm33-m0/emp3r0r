@@ -4,9 +4,7 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -18,41 +16,14 @@ import (
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 )
 
-// Config change cc's configuration at runtime
-type Config struct {
-	SSHDPort      string `json:"sshd_port"`
-	BroadcastPort string `json:"broadcast_port"`
-	ProxyPort     string `json:"proxy_port"`
-	CCPort        string `json:"cc_port"`
-	CCIP          string `json:"ccip"`
-	CA            string `json:"ca"`
-}
-
 func readJSONConfig(filename string) (err error) {
 	// read JSON
 	jsonData, err := ioutil.ReadFile(filename)
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 
-	// parse the json
-	var config Config
-	err = json.Unmarshal(jsonData, &config)
-	if err != nil {
-		return fmt.Errorf("failed to parse JSON config: %v", err)
-	}
-
-	// set up runtime vars
-	emp3r0r_data.SSHDPort = config.SSHDPort
-	emp3r0r_data.BroadcastPort = config.BroadcastPort
-	emp3r0r_data.ProxyPort = config.ProxyPort
-	emp3r0r_data.CCPort = config.CCPort
-	emp3r0r_data.CCAddress = fmt.Sprintf("https://%s", config.CCIP)
-
-	// CA
-	tun.CACrt = []byte(config.CA)
-
-	return
+	return emp3r0r_data.ReadJSONConfig(jsonData)
 }
 
 // cleanup temp files

