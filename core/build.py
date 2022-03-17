@@ -173,7 +173,7 @@ class GoBuild:
 
             log_warn("GO BUILD starts...")
             log_warn("------------------")
-            build_target = f"{PWD}/build/{self.target}"
+            build_target = f"{PWD}/{self.target}.exe"
 
             if self.target == "agent":
                 build_target = f"{PWD}/build/{self.target}-{self.UUID}"
