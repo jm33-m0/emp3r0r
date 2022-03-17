@@ -13,7 +13,7 @@ import (
 func GenAgent() {
 	buildJSONFile := EmpRoot + "/emp3r0r.json"
 	stubFile := EmpRoot + "/stub.exe"
-	outfile := EmpRoot + "/emp3r0r_data.exe"
+	outfile := EmpRoot + "/agent.exe"
 	CliPrintWarning("Make sure %s and %s exist, and %s must NOT be packed",
 		buildJSONFile, stubFile, strconv.Quote(stubFile))
 
