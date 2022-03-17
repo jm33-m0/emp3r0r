@@ -8,7 +8,6 @@ import (
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
-	"github.com/mholt/archiver"
 )
 
 var RuntimeConfig = &emp3r0r_data.Config{}
@@ -27,18 +26,7 @@ func ApplyRuntimeConfig() (err error) {
 	key := tun.GenAESKey(RuntimeConfig.MagicString)
 	jsonData := tun.AESDecryptRaw(key, jsonBytes)
 	if jsonData == nil {
-		err = fmt.Errorf("Decrypt JSON failed")
-		return
-	}
-
-	// decompress
-	var decompressedBytes []byte
-	gz := &archiver.Gz{CompressionLevel: 9}
-	r := bytes.NewReader(jsonData)
-	w := bytes.NewBuffer(decompressedBytes)
-	err = gz.Decompress(r, w)
-	if err != nil {
-		err = fmt.Errorf("Decompress JSON: %v", err)
+		err = fmt.Errorf("Decrypt JSON with key %s failed", key)
 		return
 	}
 
