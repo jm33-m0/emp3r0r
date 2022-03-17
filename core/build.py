@@ -467,7 +467,7 @@ def clean():
             else:
                 # we don't need to delete the config file
 
-                if f.endswith("build.json"):
+                if f.endswith("emp3r0r.json"):
                     continue
                 os.remove(f)
             log_success(" Deleted " + f)
@@ -677,7 +677,7 @@ def save(prev_h_len, hfile):
 PWD = os.getcwd()
 
 # JSON config file, cache some user data
-BUILD_JSON = f"{PWD}/build/build.json"
+BUILD_JSON = f"{PWD}/build/emp3r0r.json"
 CACHED_CONF = {}
 
 if os.path.exists(BUILD_JSON):
@@ -700,7 +700,7 @@ def rand_port():
 def randomize_ports():
     """
     randomize every port used by emp3r0r agent,
-    cache them in build.json
+    cache them in emp3r0r.json
     """
 
     if "cc_port" not in CACHED_CONF:
