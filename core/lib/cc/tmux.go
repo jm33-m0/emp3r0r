@@ -49,6 +49,9 @@ var (
 
 	// Put all windows in this map
 	TmuxPanes = make(map[string]*Emp3r0rPane)
+
+	// CAT use this cat to replace /bin/cat
+	CAT = EmpRoot + "/cat.exe"
 )
 
 // returns the index of current pane
@@ -87,7 +90,9 @@ func (pane *Emp3r0rPane) Respawn() (err error) {
 	pane.Index = TmuxPaneID2Index(pane.ID)
 
 	defer TmuxUpdatePane(pane)
-	out, err := exec.Command("tmux", "respawn-pane", "-t", strconv.Itoa(pane.Index)).CombinedOutput()
+	out, err := exec.Command("tmux", "respawn-pane",
+		"-t", strconv.Itoa(pane.Index),
+		CAT).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("TmuxRespawn %s: %s\n%v", pane.ID, out, err)
 	}
@@ -113,6 +118,8 @@ func (pane *Emp3r0rPane) Printf(clear bool, format string, a ...interface{}) {
 		err = pane.Respawn()
 		if err == nil {
 			pane.Printf(clear, format, a...)
+		} else {
+			CliPrintError("Respawn error: %v", err)
 		}
 		return
 	}
@@ -212,7 +219,8 @@ func (pane *Emp3r0rPane) PaneDetails() (
 		height = -1
 	}
 
-	cmd = out_split[5]
+	// cmd = out_split[5]
+	cmd = CAT
 	title = out_split[6]
 	return
 }
@@ -319,7 +327,7 @@ func TmuxInitWindows() (err error) {
 
 	// we don't want the tmux pane be killed
 	// so easily. Yes, fuck /bin/cat, we use our own cat
-	cat := EmpRoot + "/cat.exe"
+	cat := CAT
 	if !util.IsFileExist(cat) {
 		pwd, e := os.Getwd()
 		if e != nil {
@@ -328,6 +336,7 @@ func TmuxInitWindows() (err error) {
 		err = fmt.Errorf("PWD=%s, check if %s exists. If not, build it", pwd, cat)
 		return
 	}
+	CliPrintInfo("Using %s", cat)
 
 	new_pane := func(
 		title,
