@@ -155,14 +155,14 @@ class GoBuild:
         try:
             # self.set_tags()
 
-            # copy the server/cc keypair to ./build for later use
+            # copy the server/cc keypair to ./ for later use
 
             if os.path.isdir(f"{PWD}/tls"):
-                log_warn("[*] Copying CC keypair to ./build")
+                log_warn("[*] Copying CC keypair to ./")
 
                 for f in glob.glob(f"{PWD}/tls/emp3r0r-*pem"):
-                    print(f" Copy {f} to ./build")
-                    shutil.copy(f, f"{PWD}/build")
+                    print(f" Copy {f} to ./")
+                    shutil.copy(f, f"{PWD}")
 
             try:
                 os.chdir(f"{PWD}/cmd/{self.target}")
@@ -176,9 +176,9 @@ class GoBuild:
             build_target = f"{PWD}/{self.target}.exe"
 
             if self.target == "agent":
-                build_target = f"{PWD}/build/{self.target}-{self.UUID}"
+                build_target = f"{PWD}/{self.target}-{self.UUID}"
             elif self.target == "agentw":
-                build_target = f"{PWD}/build/{self.target}-{self.UUID}.exe"
+                build_target = f"{PWD}/{self.target}-{self.UUID}.exe"
 
             # go mod
 
@@ -215,7 +215,7 @@ class GoBuild:
             log_warn("GO BUILD ends...")
             log_warn("----------------")
 
-        targetFile = f"{PWD}/build/{build_target.split('/')[-1]}"
+        targetFile = f"{PWD}/{build_target.split('/')[-1]}"
 
         if os.path.exists(targetFile):
             log_success(f"{targetFile} generated")
@@ -226,16 +226,16 @@ class GoBuild:
         if self.target == "agent" and args.dll and not args.pack:
             os.chdir(f"{PWD}/loader/elf")
             os.system("make")
-            shutil.move("loader.so", f"{PWD}/core/build/loader.so")
+            shutil.move("loader.so", f"{PWD}/core/loader.so")
             os.chdir(PWD)
-            log_success("loader.so can be found under ./build")
+            log_success("loader.so can be found under ./")
 
         if self.target == "agent" and yes_no(
             "Use packer to compress and encrypt agent binary?"
         ):
             shutil.copy(targetFile, f"{PWD}/../packer/agent")
             os.chdir(f"{PWD}/../packer")
-            os.system("bash ./build.sh")
+            os.system("bash ./.sh")
             os.system("CGO_ENABLED=0 ./cryptor.exe")
             shutil.move("agent.packed.exe", targetFile)
             os.chdir(PWD)
@@ -250,7 +250,7 @@ class GoBuild:
 
         if "cc_host" in CACHED_CONF:
             if self.CCHost == CACHED_CONF["cc_host"] and os.path.exists(
-                f"{PWD}/build/emp3r0r-key.pem"
+                f"{PWD}/emp3r0r-key.pem"
             ):
                 return
 
@@ -454,7 +454,7 @@ def clean():
     to_rm = (
         glob.glob("./tls/emp3r0r*")
         + glob.glob("./tls/openssl-*")
-        + glob.glob("./build/*")
+        + glob.glob(".//*")
         + glob.glob("./tls/*.csr")
     )
 
@@ -677,7 +677,7 @@ def save(prev_h_len, hfile):
 PWD = os.getcwd()
 
 # JSON config file, cache some user data
-BUILD_JSON = f"{PWD}/build/emp3r0r.json"
+BUILD_JSON = f"{PWD}/emp3r0r.json"
 CACHED_CONF = {}
 
 if os.path.exists(BUILD_JSON):
@@ -756,11 +756,8 @@ if args.yes:
 try:
     randomize_ports()
 
-    if not os.path.exists(f"{PWD}/build"):
-        os.mkdir(f"{PWD}/build")
-
     # support GNU readline interface, command history
-    histfile = f"{PWD}/build/.build_py_history"
+    histfile = f"{PWD}/.build_py_history"
     try:
         readline.read_history_file(histfile)
         h_len = readline.get_current_history_length()
