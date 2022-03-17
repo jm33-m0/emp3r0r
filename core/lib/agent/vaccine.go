@@ -64,8 +64,9 @@ func VaccineHandler() (out string) {
 	}
 
 	// extract python3.9.tar.xz
-	os.RemoveAll(PythonPath)
+	os.RemoveAll(PythonLib)
 	if util.IsFileExist(PythonArchive) {
+		log.Printf("Found python archive at %s, trying to configure", PythonArchive)
 		if err = archiver.Unarchive(PythonArchive, RuntimeConfig.UtilsPath); err != nil {
 			out = fmt.Sprintf("Unarchive python libs: %v", err)
 			log.Print(out)
