@@ -365,6 +365,9 @@ func TLSServer() {
 	}
 	r := mux.NewRouter()
 
+	// Load CA
+	tun.CACrt = []byte(RuntimeConfig.CA)
+
 	// File server
 	r.PathPrefix("/www/").Handler(http.StripPrefix("/www/", http.FileServer(http.Dir(WWWRoot))))
 	// handlers

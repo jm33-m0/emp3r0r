@@ -51,7 +51,6 @@ func cleanup() bool {
 }
 
 func main() {
-	go cc.TLSServer()
 
 	// cleanup or abort
 	if !cleanup() {
@@ -59,7 +58,7 @@ func main() {
 	}
 
 	cdnproxy := flag.String("cdn2proxy", "", "Start cdn2proxy server on this port")
-	config := flag.String("config", "build.json", "Use this config file to update hardcoded variables")
+	config := flag.String("config", "emp3r0r.json", "Use this config file to update hardcoded variables")
 	apiserver := flag.Bool("api", false, "Run API server in background, you can send commands to /tmp/emp3r0r.socket")
 	flag.Parse()
 
@@ -67,6 +66,9 @@ func main() {
 	err := readJSONConfig(*config)
 	if err != nil {
 		log.Fatalf("Read config: %s", err)
+	} else {
+		go cc.TLSServer()
+		go cc.InitModules()
 	}
 
 	if *cdnproxy != "" {
@@ -91,6 +93,5 @@ func main() {
 	if *apiserver {
 		go cc.APIMain()
 	}
-	go cc.InitModules()
 	cc.CliMain()
 }
