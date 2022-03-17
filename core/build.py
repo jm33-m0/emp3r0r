@@ -153,7 +153,7 @@ class GoBuild:
             json.dump(CACHED_CONF, json_file, indent=4)
 
         try:
-            self.set_tags()
+            # self.set_tags()
 
             # copy the server/cc keypair to ./build for later use
 
@@ -211,7 +211,7 @@ class GoBuild:
         except (KeyboardInterrupt, EOFError, SystemError, SystemExit):
             log_error("Aborted")
         finally:
-            self.unset_tags()
+            # self.unset_tags()
             log_warn("GO BUILD ends...")
             log_warn("----------------")
 
@@ -264,7 +264,8 @@ class GoBuild:
             os.rename(f"./{self.UUID}-key.pem", "./emp3r0r-key.pem")
             os.chdir(PWD)
         except BaseException as exc:
-            log_error(f"[-] Something went wrong, see above for details: {exc}")
+            log_error(
+                f"[-] Something went wrong, see above for details: {exc}")
             sys.exit(1)
 
     def set_tags(self):
@@ -278,7 +279,8 @@ class GoBuild:
             shutil.copy(f"{PWD}/lib/tun/api.go", "/tmp/api.go")
             shutil.copy(f"{PWD}/lib/data/def.go", "/tmp/def.go")
         except BaseException:
-            log_error(f"Failed to backup source files:\n{traceback.format_exc()}")
+            log_error(
+                f"Failed to backup source files:\n{traceback.format_exc()}")
             sys.exit(1)
 
         os.chdir(PWD)
@@ -287,7 +289,8 @@ class GoBuild:
         sed("./lib/tun/tls.go", "[emp3r0r_ca]", self.CA)
 
         # webroot
-        sed("./lib/tun/api.go", 'WebRoot = "emp3r0r"', f'WebRoot = "{self.WebRoot}"')
+        sed("./lib/tun/api.go", 'WebRoot = "emp3r0r"',
+            f'WebRoot = "{self.WebRoot}"')
 
         # opsep
         sed(
@@ -553,11 +556,13 @@ def main(target):
         if len(cc_host.split()) > 1:
             cc_other = " ".join(cc_host[1:])
 
-        gobuild = GoBuild(target="cc", cc_host=cc_host, cc_other_names=cc_other)
+        gobuild = GoBuild(target="cc", cc_host=cc_host,
+                          cc_other_names=cc_other)
         gobuild.build()
 
         log_warn("\n\nBuilding cat...")
-        cat_build = GoBuild(target="cat", cc_host=cc_host, cc_other_names=cc_other)
+        cat_build = GoBuild(target="cat", cc_host=cc_host,
+                            cc_other_names=cc_other)
         cat_build.build()
 
         return
@@ -576,7 +581,8 @@ def main(target):
         use_cached = yes_no(f"Use cached CC indicator ({indicator})?")
 
     if not use_cached:
-        indicator = input("CC status indicator URL (leave empty to disable): ").strip()
+        indicator = input(
+            "CC status indicator URL (leave empty to disable): ").strip()
         CACHED_CONF["cc_indicator"] = indicator
 
     if CACHED_CONF["cc_indicator"] != "":
@@ -598,17 +604,20 @@ def main(target):
     use_cached = False
 
     if "agent_proxy" in CACHED_CONF:
-        use_cached = yes_no(f"Use cached agent proxy ({CACHED_CONF['agent_proxy']})?")
+        use_cached = yes_no(
+            f"Use cached agent proxy ({CACHED_CONF['agent_proxy']})?")
 
     if not use_cached:
-        agentproxy = input("Proxy server for agent (leave empty to disable): ").strip()
+        agentproxy = input(
+            "Proxy server for agent (leave empty to disable): ").strip()
         CACHED_CONF["agent_proxy"] = agentproxy
 
     # CDN
     use_cached = False
 
     if "cdn_proxy" in CACHED_CONF:
-        use_cached = yes_no(f"Use cached CDN server ({CACHED_CONF['cdn_proxy']})?")
+        use_cached = yes_no(
+            f"Use cached CDN server ({CACHED_CONF['cdn_proxy']})?")
 
     if not use_cached:
         cdn = input("CDN websocket server (leave empty to disable): ").strip()
@@ -618,7 +627,8 @@ def main(target):
     use_cached = False
 
     if "doh_server" in CACHED_CONF:
-        use_cached = yes_no(f"Use cached DoH server ({CACHED_CONF['doh_server']})?")
+        use_cached = yes_no(
+            f"Use cached DoH server ({CACHED_CONF['doh_server']})?")
 
     if not use_cached:
         doh = input("DNS over HTTP server (leave empty to disable): ").strip()
@@ -709,7 +719,8 @@ def randomize_ports():
 # command line args
 yes_to_all = False
 
-parser = argparse.ArgumentParser(description="Build emp3r0r CC/Agent bianaries")
+parser = argparse.ArgumentParser(
+    description="Build emp3r0r CC/Agent bianaries")
 parser.add_argument(
     "--target", type=str, required=True, help="Build target, can be cc/agent/agentw"
 )
