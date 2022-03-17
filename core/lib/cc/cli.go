@@ -110,7 +110,6 @@ func CliMain() {
 		}
 		CmdCompls = append(CmdCompls, readline.PcItem(cmd))
 	}
-	CmdCompls = append(CmdCompls, readline.PcItemDynamic(listFiles("./")))
 	CliCompleter.SetChildren(CmdCompls)
 
 	// prompt setup
