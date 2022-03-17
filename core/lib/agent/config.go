@@ -19,11 +19,11 @@ func ApplyRuntimeConfig() (err error) {
 	}
 
 	// locate the JSON file
-	jsonBegining := bytes.LastIndex(wholeStub, []byte(RuntimeConfig.MagicString))
-	jsonBytes := wholeStub[(jsonBegining + len(RuntimeConfig.MagicString)):]
+	jsonBegining := bytes.LastIndex(wholeStub, []byte(emp3r0r_data.MagicString))
+	jsonBytes := wholeStub[(jsonBegining + len(emp3r0r_data.MagicString)):]
 
 	// decrypt attached JSON file
-	key := tun.GenAESKey(RuntimeConfig.MagicString)
+	key := tun.GenAESKey(emp3r0r_data.MagicString)
 	jsonData := tun.AESDecryptRaw(key, jsonBytes)
 	if jsonData == nil {
 		err = fmt.Errorf("Decrypt JSON with key %s failed", key)
