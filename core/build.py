@@ -38,9 +38,6 @@ class GoBuild:
         if self.GOOS is None:
             self.GOOS = "linux"
 
-        if self.target == "agentw":
-            self.GOOS = "windows"
-
         if self.GOARCH is None:
             self.GOARCH = "amd64"
 
@@ -365,11 +362,6 @@ def main(target):
 
         return
 
-    if target not in ("agent", "agentw"):
-        log_error("Unknown target")
-
-        return
-
     # indicator
 
     use_cached = False
@@ -520,7 +512,7 @@ yes_to_all = False
 parser = argparse.ArgumentParser(
     description="Build emp3r0r CC/Agent bianaries")
 parser.add_argument(
-    "--target", type=str, required=True, help="Build target, can be cc/agent/agentw"
+    "--target", type=str, required=True, help="Build target, can be cc/agent"
 )
 parser.add_argument(
     "--garble",
