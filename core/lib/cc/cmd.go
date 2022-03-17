@@ -52,6 +52,7 @@ var CmdFuncs = map[string]func(){
 	"run":           ModuleRun,
 	"screenshot":    TakeScreenshot,
 	"upgrade_agent": UpgradeAgent,
+	"gen_agent":     GenAgent,
 	"suicide":       Suicide,
 }
 
