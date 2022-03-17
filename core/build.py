@@ -153,8 +153,6 @@ class GoBuild:
             json.dump(CACHED_CONF, json_file, indent=4)
 
         try:
-            # self.set_tags()
-
             # copy the server/cc keypair to ./ for later use
 
             if os.path.isdir(f"{PWD}/tls"):
@@ -176,9 +174,7 @@ class GoBuild:
             build_target = f"{PWD}/{self.target}.exe"
 
             if self.target == "agent":
-                build_target = f"{PWD}/{self.target}-{self.UUID}"
-            elif self.target == "agentw":
-                build_target = f"{PWD}/{self.target}-{self.UUID}.exe"
+                build_target = f"{PWD}/stub.exe"
 
             # go mod
 
@@ -267,184 +263,6 @@ class GoBuild:
             log_error(
                 f"[-] Something went wrong, see above for details: {exc}")
             sys.exit(1)
-
-    def set_tags(self):
-        """
-        modify some tags in the source
-        """
-
-        # backup source file
-        try:
-            shutil.copy(f"{PWD}/lib/tun/tls.go", "/tmp/tls.go")
-            shutil.copy(f"{PWD}/lib/tun/api.go", "/tmp/api.go")
-            shutil.copy(f"{PWD}/lib/data/def.go", "/tmp/def.go")
-        except BaseException:
-            log_error(
-                f"Failed to backup source files:\n{traceback.format_exc()}")
-            sys.exit(1)
-
-        os.chdir(PWD)
-
-        # CA
-        sed("./lib/tun/tls.go", "[emp3r0r_ca]", self.CA)
-
-        # webroot
-        sed("./lib/tun/api.go", 'WebRoot = "emp3r0r"',
-            f'WebRoot = "{self.WebRoot}"')
-
-        # opsep
-        sed(
-            "./lib/data/def.go",
-            '''OpSep = ""''',
-            f'''OpSep = "{self.OpSep}"''',
-        )
-
-        # Socket name
-        sed(
-            "./lib/data/def.go",
-            '''SocketName = ""''',
-            f'''SocketName = AgentRoot + "/{self.Socket}"''',
-        )
-
-        # utils path
-        sed(
-            "./lib/data/def.go",
-            '''UtilsPath = ""''',
-            f'''UtilsPath = AgentRoot + "/{self.UtilsPath}"''',
-        )
-
-        # PID file name
-        sed(
-            "./lib/data/def.go",
-            '''PIDFile = ""''',
-            f'''PIDFile = AgentRoot + "/{self.PIDFile}"''',
-        )
-
-        # CC IP
-        sed(
-            "./lib/data/def.go",
-            'CCAddress = ""',
-            f'CCAddress = "https://{self.CCHost}"',
-        )
-
-        # agent root path
-        sed(
-            "./lib/data/def.go",
-            'AgentRoot = ""',
-            f'AgentRoot = "{self.AgentRoot}"',
-        )
-
-        # indicator
-        sed(
-            "./lib/data/def.go",
-            'CCIndicator = ""',
-            f'CCIndicator = "{self.INDICATOR}"',
-        )
-
-        # cc indicator text
-        sed(
-            "./lib/data/def.go",
-            'CCIndicatorText = ""',
-            f'CCIndicatorText = "{self.INDICATOR_TEXT}"',
-        )
-
-        # indicator wait
-
-        if "indicator_wait_min" in CACHED_CONF:
-            sed(
-                "./lib/data/def.go",
-                "IndicatorWaitMin = 30",
-                f"IndicatorWaitMin = {CACHED_CONF['indicator_wait_min']}",
-            )
-
-        if "indicator_wait_max" in CACHED_CONF:
-            sed(
-                "./lib/data/def.go",
-                "IndicatorWaitMax = 120",
-                f"IndicatorWaitMax = {CACHED_CONF['indicator_wait_max']}",
-            )
-
-        # broadcast_interval
-
-        if "broadcast_interval_min" in CACHED_CONF:
-            sed(
-                "./lib/data/def.go",
-                "BroadcastIntervalMin = 30",
-                f"BroadcastIntervalMin = {CACHED_CONF['broadcast_interval_min']}",
-            )
-
-        if "broadcast_interval_max" in CACHED_CONF:
-            sed(
-                "./lib/data/def.go",
-                "BroadcastIntervalMax = 120",
-                f"BroadcastIntervalMax = {CACHED_CONF['broadcast_interval_max']}",
-            )
-
-        # agent UUID
-        sed(
-            "./lib/data/def.go",
-            'AgentUUID = ""',
-            f'AgentUUID = "{self.UUID}"',
-        )
-
-        # DoH
-        sed(
-            "./lib/data/def.go",
-            'DoHServer = ""',
-            f"DoHServer = \"{CACHED_CONF['doh_server']}\"",
-        )
-
-        # CDN
-        sed(
-            "./lib/data/def.go",
-            'CDNProxy = ""',
-            f"CDNProxy = \"{CACHED_CONF['cdn_proxy']}\"",
-        )
-
-        # Agent Proxy
-        sed(
-            "./lib/data/def.go",
-            'AgentProxy = ""',
-            f"AgentProxy = \"{CACHED_CONF['agent_proxy']}\"",
-        )
-
-        # ports
-        sed(
-            "./lib/data/def.go",
-            'CCPort = ""',
-            f"CCPort = \"{CACHED_CONF['cc_port']}\"",
-        )
-
-        sed(
-            "./lib/data/def.go",
-            'SSHDPort = ""',
-            f"SSHDPort = \"{CACHED_CONF['sshd_port']}\"",
-        )
-
-        sed(
-            "./lib/data/def.go",
-            'ProxyPort = ""',
-            f"ProxyPort = \"{CACHED_CONF['proxy_port']}\"",
-        )
-
-        sed(
-            "./lib/data/def.go",
-            'BroadcastPort = ""',
-            f"BroadcastPort = \"{CACHED_CONF['broadcast_port']}\"",
-        )
-
-    def unset_tags(self):
-        log_warn("Trying to restore files...")
-        # restore source files
-        try:
-            log_warn(shutil.move("/tmp/def.go", f"{PWD}/lib/data/def.go"))
-            log_warn(shutil.move("/tmp/tls.go", f"{PWD}/lib/tun/tls.go"))
-            log_warn(shutil.move("/tmp/api.go", f"{PWD}/lib/tun/api.go"))
-        except BaseException:
-            log_error(f"Failed to restore files:\n{traceback.format_exc()}")
-        finally:
-            yes_no("Make sure Go source files are restored")
-            os.chdir(PWD)
 
 
 def clean():
