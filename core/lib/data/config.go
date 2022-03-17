@@ -33,10 +33,6 @@ func ReadJSONConfig(jsonData []byte, config_to_write *Config) (err error) {
 	DefaultShell = config_to_write.UtilsPath + "/bash"
 	AESKey = GenAESKey("Your Pre Shared AES Key: " + MagicString)
 
-	// file paths
-	config_to_write.UtilsPath = fmt.Sprintf("%s/%s", config_to_write.AgentRoot, config_to_write.UtilsPath)
-	config_to_write.SocketName = fmt.Sprintf("%s/%s", config_to_write.AgentRoot, config_to_write.SocketName)
-
 	// debug
 	log.Printf("config:\n%v", *config_to_write)
 
