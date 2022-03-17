@@ -6,6 +6,7 @@
 go.sum
 
 *.log
+*.json
 
 # certs
 *.pem
