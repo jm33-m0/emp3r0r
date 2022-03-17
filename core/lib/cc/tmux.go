@@ -325,7 +325,7 @@ func TmuxInitWindows() (err error) {
 		if e != nil {
 			pwd = e.Error()
 		}
-		err = fmt.Errorf("PWD=%s, check if ./build/cat exists. If not, build it", pwd)
+		err = fmt.Errorf("PWD=%s, check if %s exists. If not, build it", pwd, cat)
 		return
 	}
 
