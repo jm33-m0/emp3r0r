@@ -219,26 +219,6 @@ class GoBuild:
             log_error("go build failed")
             sys.exit(1)
 
-        if self.target == "agent" and args.dll and not args.pack:
-            os.chdir(f"{PWD}/loader/elf")
-            os.system("make")
-            shutil.move("loader.so", f"{PWD}/core/loader.so")
-            os.chdir(PWD)
-            log_success("loader.so can be found under ./")
-
-        if self.target == "agent" and yes_no(
-            "Use packer to compress and encrypt agent binary?"
-        ):
-            shutil.copy(targetFile, f"{PWD}/../packer/agent")
-            os.chdir(f"{PWD}/../packer")
-            os.system("bash ./.sh")
-            os.system("CGO_ENABLED=0 ./cryptor.exe")
-            shutil.move("agent.packed.exe", targetFile)
-            os.chdir(PWD)
-            os.chmod(targetFile, 0o755)
-
-            log_success(f"{targetFile} packed")
-
     def gen_certs(self):
         """
         generate server cert/key, and CA if necessary
@@ -541,18 +521,6 @@ parser = argparse.ArgumentParser(
     description="Build emp3r0r CC/Agent bianaries")
 parser.add_argument(
     "--target", type=str, required=True, help="Build target, can be cc/agent/agentw"
-)
-parser.add_argument(
-    "--pack",
-    action="store_true",
-    required=False,
-    help="Pack agent binary, only available under Linux, do not use with --dll",
-)
-parser.add_argument(
-    "--dll",
-    action="store_true",
-    required=False,
-    help="Load agent binary into any processes using shared library injection",
 )
 parser.add_argument(
     "--garble",
