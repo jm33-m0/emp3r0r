@@ -3,7 +3,6 @@ package cc
 import (
 	"fmt"
 	"io/ioutil"
-	"strconv"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -14,8 +13,13 @@ func GenAgent() {
 	buildJSONFile := EmpRoot + "/emp3r0r.json"
 	stubFile := EmpRoot + "/stub.exe"
 	outfile := EmpRoot + "/agent.exe"
-	CliPrintWarning("Make sure %s and %s exist, and %s must NOT be packed",
-		buildJSONFile, stubFile, strconv.Quote(stubFile))
+
+	CliPrintInfo("Please anwser a few questions in the new tmux window, come back here when you are done")
+	err := TmuxNewWindow("gen-agent", "./build.py --target agent")
+	if err != nil {
+		CliPrintError("Something went wrong, please check build.py's output")
+		return
+	}
 
 	// read file
 	jsonBytes, err := ioutil.ReadFile(buildJSONFile)
