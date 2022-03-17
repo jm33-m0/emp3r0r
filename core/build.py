@@ -204,7 +204,6 @@ class GoBuild:
         except (KeyboardInterrupt, EOFError, SystemError, SystemExit):
             log_error("Aborted")
         finally:
-            # self.unset_tags()
             log_warn("GO BUILD ends...")
             log_warn("----------------")
 
