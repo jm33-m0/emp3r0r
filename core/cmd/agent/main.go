@@ -40,7 +40,7 @@ func main() {
 	// applyRuntimeConfig
 	err = agent.ApplyRuntimeConfig()
 	if err != nil {
-		log.Fatalf("Read config: %v", err)
+		log.Fatalf("ApplyRuntimeConfig: %v", err)
 	}
 
 	// version
