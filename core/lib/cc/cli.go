@@ -125,7 +125,7 @@ func CliMain() {
 	// set up readline instance
 	EmpReadLine, err = readline.NewEx(&readline.Config{
 		Prompt:          EmpPrompt,
-		HistoryFile:     "./emp3r0r.history",
+		HistoryFile:     "./.emp3r0r.history",
 		AutoComplete:    CliCompleter,
 		InterruptPrompt: "^C\nExiting...\n",
 		EOFPrompt:       "^D\nExiting...\n",
