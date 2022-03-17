@@ -43,13 +43,13 @@ type Config struct {
 	ReverseProxyPort     string `json:"reverse_proxy_port"`     // "reverse_proxy_port": "56239",
 	SSHDPort             string `json:"sshd_port"`              // "sshd_port": "2222",
 	BroadcastPort        string `json:"broadcast_port"`         // "broadcast_port": "58485",
-	BroadcastIntervalMin int    `json:"broadcast_interval_min"` // "broadcast_interval_min": 60, // seconds, set max to 0 to disable
-	BroadcastIntervalMax int    `json:"broadcast_interval_max"` // "broadcast_interval_max": 120, // seconds, set max to 0 to disable
+	BroadcastIntervalMin int    `json:"broadcast_interval_min"` // seconds, set max to 0 to disable
+	BroadcastIntervalMax int    `json:"broadcast_interval_max"` // seconds, set max to 0 to disable
 	CCHost               string `json:"ccip"`                   // "ccip": "192.168.40.137",
 	PIDFile              string `json:"pid_file"`               // "pid_file": ".848ba.pid",
 	CCIndicator          string `json:"cc_indicator"`           // "cc_indicator": "cc_indicator",
-	IndicatorWaitMin     int    `json:"indicator_wait_min"`     // "indicator_wait_min": 60, // seconds
-	IndicatorWaitMax     int    `json:"indicator_wait_max"`     // "indicator_wait_max": 120, // seconds, set max to 0 to disable
+	IndicatorWaitMin     int    `json:"indicator_wait_min"`     // seconds
+	IndicatorWaitMax     int    `json:"indicator_wait_max"`     // seconds, set max to 0 to disable
 	CCIndicatorText      string `json:"indicator_text"`         // "indicator_text": "myawesometext"
 	CA                   string `json:"ca"`                     // CA cert from server side
 	MagicString          string `json:"magic"`                  // MagicString as separator/password
@@ -60,5 +60,5 @@ type Config struct {
 	AgentRoot            string `json:"agent_root"`             // "agent_root": "/dev/shm/.848ba",
 	UtilsPath            string `json:"utils_path"`             // where to store `vaccine` files
 	AgentUUID            string `json:"agent_uuid"`             // UUID of agent
-	AgentTag             string `json:"agent_tag"`              // tag of agent, generated from UUID
+	AgentTag             string `json:"agent_tag"`              // generated from UUID, will be used to identidy agents
 }
