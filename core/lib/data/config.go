@@ -62,7 +62,7 @@ type Config struct {
 	AgentProxy           string `json:"agent_proxy"`            // proxy for C2 transport
 	CDNProxy             string `json:"cdn_proxy"`              // websocket proxy, see go-cdn2proxy
 	DoHServer            string `json:"doh_server"`             // DNS over HTTPS server, for name resolving
-	SocketName           string `json:"socket_name"`            // agent socket, use this to check agent status
+	SocketName           string `json:"socket"`                 // agent socket, use this to check agent status
 	AgentRoot            string `json:"agent_root"`             // "agent_root": "/dev/shm/.848ba",
 	UtilsPath            string `json:"utils_path"`             // where to store `vaccine` files
 	AgentUUID            string `json:"agent_uuid"`             // UUID of agent
