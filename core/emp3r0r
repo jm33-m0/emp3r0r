@@ -20,7 +20,7 @@ tmux_conf="$PWD/tmux/.tmux.conf"
     cp -r ./tmux/sh /tmp
 
     [[ -n "$TMUX" ]] || {
-        tmux -f "$tmux_conf" new-session -A -s emp3r0r -n cc ./cc "$@" || {
+        tmux -f "$tmux_conf" new-session -A -s emp3r0r -n cc ./cc.exe "$@" || {
             echo "$0 must be run in tmux"
             exit 1
         }
@@ -32,6 +32,6 @@ tmux_conf="$PWD/tmux/.tmux.conf"
         tmux rename-window cc
         tmux rename-session emp3r0r
         tmux source-file "$tmux_conf"
-        ./cc "$@"
+        ./cc.exe "$@"
     }
 )
