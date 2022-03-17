@@ -249,7 +249,7 @@ def clean():
     to_rm = (
         glob.glob("./tls/emp3r0r*")
         + glob.glob("./tls/openssl-*")
-        + glob.glob(".//*")
+        + glob.glob("*.exe")
         + glob.glob("./tls/*.csr")
     )
 
