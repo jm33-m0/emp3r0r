@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.5.1](https://github.com/jm33-m0/emp3r0r/compare/v1.5.0...v1.5.1) (2022-03-17)
+
+
+### Bug Fixes
+
+* gen_agent: build stub.exe first ([ae01a32](https://github.com/jm33-m0/emp3r0r/commit/ae01a322bb5e0e40a8b8af9aa31e9964903f6b9e))
+
 ## [1.5.0](https://github.com/jm33-m0/emp3r0r/compare/v1.4.1...v1.5.0) (2022-03-17)
 
 
