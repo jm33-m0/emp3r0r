@@ -77,22 +77,6 @@ class GoBuild:
             self.PIDFile = rand_str(random.randint(3, 10))
             CACHED_CONF["pid_file"] = self.PIDFile
 
-        # util path name
-
-        if "utils_path" in CACHED_CONF:
-            self.UtilsPath = CACHED_CONF["utils_path"]
-        else:
-            self.UtilsPath = rand_str(random.randint(3, 10))
-            CACHED_CONF["utils_path"] = self.UtilsPath
-
-        # socket name
-
-        if "socket" in CACHED_CONF:
-            self.Socket = CACHED_CONF["socket"]
-        else:
-            self.Socket = rand_str(random.randint(3, 10))
-            CACHED_CONF["socket"] = self.Socket
-
         # indicator text
 
         if "indicator_text" in CACHED_CONF:
@@ -113,6 +97,22 @@ class GoBuild:
                 self.AgentRoot = "/tmp/" + self.AgentRoot
 
             CACHED_CONF["agent_root"] = self.AgentRoot
+
+        # util path name
+
+        if "utils_path" in CACHED_CONF:
+            self.UtilsPath = CACHED_CONF["utils_path"]
+        else:
+            self.UtilsPath = f"{self.AgentRoot}/{rand_str(random.randint(3, 10))}"
+            CACHED_CONF["utils_path"] = self.UtilsPath
+
+        # socket name
+
+        if "socket" in CACHED_CONF:
+            self.Socket = CACHED_CONF["socket"]
+        else:
+            self.Socket = f"{self.AgentRoot}/{rand_str(random.randint(3, 10))}"
+            CACHED_CONF["socket"] = self.Socket
 
         # DoH
 
