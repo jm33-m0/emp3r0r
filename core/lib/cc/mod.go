@@ -19,7 +19,7 @@ var (
 	// ModuleDir stores custom modules
 	// cc binary is saved as `./core/build/cc`,
 	// and modules are stored in `./core/modules`
-	ModuleDir = "../modules/"
+	ModuleDir = EmpRoot + "/modules/"
 
 	// CurrentMod selected module
 	CurrentMod = "<blank>"

