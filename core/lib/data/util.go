@@ -5,8 +5,8 @@ import (
 	"fmt"
 )
 
-// genAESKey generate AES key from any string
-func genAESKey(seed string) []byte {
+// GenAESKey generate AES key from any string
+func GenAESKey(seed string) []byte {
 	md5sum := md5Sum(seed)
 	return []byte(md5sum)[:32]
 }

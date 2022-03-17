@@ -61,7 +61,7 @@ func moduleProxy() {
 	// port-fwd
 	var pf PortFwdSession
 	pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
-	pf.Lport, pf.To = port, "127.0.0.1:"+emp3r0r_data.ProxyPort
+	pf.Lport, pf.To = port, "127.0.0.1:"+RuntimeConfig.ProxyPort
 	pf.Description = fmt.Sprintf("Agent Proxy:\n%s (Local) -> %s (Agent)", pf.Lport, pf.To)
 
 	switch status {

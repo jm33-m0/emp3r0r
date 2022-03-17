@@ -26,7 +26,7 @@ func GenAgent() {
 	}
 
 	// encrypt
-	key := tun.GenAESKey(emp3r0r_data.OpSep)
+	key := tun.GenAESKey(RuntimeConfig.MagicString)
 	encJSONBytes := tun.AESEncryptRaw(key, jsonBytes)
 	if encJSONBytes == nil {
 		CliPrintError("Failed to encrypt %s", buildJSONFile)
@@ -39,7 +39,7 @@ func GenAgent() {
 		CliPrintError("%v", err)
 		return
 	}
-	toWrite = append(toWrite, []byte(emp3r0r_data.OpSep)...)
+	toWrite = append(toWrite, []byte(RuntimeConfig.MagicString)...)
 	toWrite = append(toWrite, encJSONBytes...)
 	err = ioutil.WriteFile(outfile, toWrite, 0755)
 	if err != nil {

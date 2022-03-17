@@ -14,7 +14,7 @@ var (
 
 	// CACrt for TLS server cert signing
 	// fill our CA pem text when compiling
-	// taken care by build.sh
+	// taken care by build.py
 	CACrt = []byte(`
 [emp3r0r_ca]
 		`)

@@ -446,7 +446,7 @@ func CliBanner() error {
 		log.Fatalf("CowSay: %v", err)
 	}
 	say, err := cow.Say(fmt.Sprintf("welcome! you are using version %s, C2 listening on *:%s",
-		emp3r0r_data.Version, emp3r0r_data.CCPort))
+		emp3r0r_data.Version, RuntimeConfig.CCPort))
 	if err != nil {
 		log.Fatalf("CowSay: %v", err)
 	}

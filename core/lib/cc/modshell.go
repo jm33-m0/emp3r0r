@@ -16,7 +16,7 @@ func moduleCmd() {
 			return
 		}
 		var data emp3r0r_data.MsgTunData
-		data.Payload = "cmd" + emp3r0r_data.OpSep + Options["cmd_to_exec"].Val
+		data.Payload = "cmd" + RuntimeConfig.MagicString + Options["cmd_to_exec"].Val
 		data.Tag = target.Tag
 		err := Send2Agent(&data, target)
 		if err != nil {
@@ -67,7 +67,7 @@ func moduleShell() {
 	args := Options["args"].Val
 	port := Options["port"].Val
 	if shell == "bash" {
-		port = emp3r0r_data.SSHDPort
+		port = RuntimeConfig.SSHDPort
 		SSHShellPort["bash"] = port
 	}
 

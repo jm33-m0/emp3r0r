@@ -124,7 +124,7 @@ func moduleCustom() {
 
 			// do it
 			err := SSHClient(fmt.Sprintf("%s/%s/%s",
-				emp3r0r_data.AgentRoot, CurrentMod, config.Exec),
+				RuntimeConfig.AgentRoot, CurrentMod, config.Exec),
 				args, port, false)
 			if err != nil {
 				CliPrintError("module %s: %v", config.Name, err)

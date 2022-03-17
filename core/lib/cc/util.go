@@ -48,8 +48,8 @@ func SendCmd(cmd, cmd_id string, a *emp3r0r_data.SystemInfo) error {
 		cmd_id = uuid.New().String()
 	}
 	cmdData.Payload = fmt.Sprintf("cmd%s%s%s%s",
-		emp3r0r_data.OpSep, cmd,
-		emp3r0r_data.OpSep, cmd_id)
+		RuntimeConfig.MagicString, cmd,
+		RuntimeConfig.MagicString, cmd_id)
 	cmdData.Tag = a.Tag
 
 	// timestamp

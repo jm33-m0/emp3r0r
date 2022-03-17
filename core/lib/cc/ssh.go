@@ -35,7 +35,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 	// bash or not
 	lport := strconv.Itoa(util.RandInt(2048, 65535)) // shell gets mapped here
 	new_port := strconv.Itoa(util.RandInt(2048, 65535))
-	if port == emp3r0r_data.SSHDPort && shell != "bash" {
+	if port == RuntimeConfig.SSHDPort && shell != "bash" {
 		port = new_port // reset port if trying to open shells other than bash
 		SetOption([]string{"port", new_port})
 		CliPrintWarning("Switching to a new port %s since we are not requesting bash", port)

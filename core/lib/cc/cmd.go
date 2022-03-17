@@ -253,7 +253,7 @@ func setCurrentTarget(cmd string) {
 			}
 			AgentShellPane = nil
 		}
-		SSHClient("bash", "", emp3r0r_data.SSHDPort, true)
+		SSHClient("bash", "", RuntimeConfig.SSHDPort, true)
 	}
 
 	if target_to_set == nil {

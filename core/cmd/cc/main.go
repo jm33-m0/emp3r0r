@@ -23,13 +23,13 @@ func readJSONConfig(filename string) (err error) {
 		return
 	}
 
-	return emp3r0r_data.ReadJSONConfig(jsonData)
+	return emp3r0r_data.ReadJSONConfig(jsonData, cc.RuntimeConfig)
 }
 
 // cleanup temp files
 func cleanup() bool {
 	// is cc currently running?
-	if tun.IsPortOpen("127.0.0.1", emp3r0r_data.CCPort) {
+	if tun.IsPortOpen("127.0.0.1", cc.RuntimeConfig.CCPort) {
 		return false
 	}
 
@@ -66,7 +66,7 @@ func main() {
 	// read config file
 	err := readJSONConfig(*config)
 	if err != nil {
-		log.Printf("Read config: %s", err)
+		log.Fatalf("Read config: %s", err)
 	}
 
 	if *cdnproxy != "" {
@@ -75,7 +75,7 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
-			err = cdn2proxy.StartServer(*cdnproxy, "127.0.0.1:"+emp3r0r_data.CCPort, "ws", logFile)
+			err = cdn2proxy.StartServer(*cdnproxy, "127.0.0.1:"+cc.RuntimeConfig.CCPort, "ws", logFile)
 			if err != nil {
 				log.Fatal(err)
 			}
