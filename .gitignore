@@ -23,7 +23,7 @@ vmlinu*
 
 # temp
 *.tmp
-*.history
+*history
 *.orig
 
 # build
