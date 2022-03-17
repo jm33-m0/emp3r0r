@@ -11,17 +11,13 @@ tmux_conf="$PWD/tmux/.tmux.conf"
     exit 1
 }
 
-[[ -f ./build/cc ]] || (
+[[ -f ./cc.exe ]] || (
     echo "[-] Building CC server as it's not found"
     python3 ./build.py --target cc
 )
 
 (
     cp -r ./tmux/sh /tmp
-    cd build || {
-        echo "./build doesn't exist"
-        exit 1
-    }
 
     [[ -n "$TMUX" ]] || {
         tmux -f "$tmux_conf" new-session -A -s emp3r0r -n cc ./cc "$@" || {
