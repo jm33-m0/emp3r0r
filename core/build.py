@@ -544,7 +544,7 @@ try:
     atexit.register(save, h_len, histfile)
 
     main(args.target)
-    yes_no(f"{args.target} successfully built, goodbye?")
+    yes_no(f"{args.target} successfully completed, goodbye?")
 
 except (KeyboardInterrupt, EOFError, SystemExit):
     sys.exit(0)
