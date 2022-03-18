@@ -23,6 +23,11 @@ func GenAgent() {
 	stubFile := EmpRoot + "/stub.exe"
 	outfile := EmpRoot + "/agent.exe"
 
+	if !util.IsFileExist(stubFile) {
+		CliPrintError("%s not found, build it first", stubFile)
+		return
+	}
+
 	// fill emp3r0r.json
 	err := PromptForConfig(true)
 	if err != nil {
@@ -158,32 +163,6 @@ func PromptForConfig(isAgent bool) (err error) {
 		}
 	}
 
-	// random ports
-	cc_port, err := read_from_cached("cc_port", true)
-	if err != nil {
-		cc_port = util.RandInt(1025, 65534)
-	} else {
-		RuntimeConfig.CCPort = fmt.Sprintf("%v", cc_port)
-	}
-	sshd_port, err := read_from_cached("sshd_port", true)
-	if err != nil {
-		sshd_port = util.RandInt(1025, 65534)
-	} else {
-		RuntimeConfig.SSHDPort = fmt.Sprintf("%v", sshd_port)
-	}
-	proxy_port, err := read_from_cached("proxy_port", true)
-	if err != nil {
-		proxy_port = util.RandInt(1025, 65534)
-	} else {
-		RuntimeConfig.ProxyPort = fmt.Sprintf("%v", proxy_port)
-	}
-	broadcast_port, err := read_from_cached("broadcast_port", true)
-	if err != nil {
-		broadcast_port = util.RandInt(1025, 65534)
-	} else {
-		RuntimeConfig.BroadcastPort = fmt.Sprintf("%v", broadcast_port)
-	}
-
 	// random strings
 	agent_root, err := read_from_cached("agent_root", true)
 	if err != nil {
@@ -224,7 +203,8 @@ func PromptForConfig(isAgent bool) (err error) {
 		RuntimeConfig.BroadcastIntervalMax = 0
 	}
 
-	return
+	// save emp3r0r.json
+	return save_config_json()
 }
 
 // GenC2Certs generate certificates for CA and emp3r0r C2 server
@@ -235,7 +215,28 @@ func GenC2Certs(hosts []string) (err error) {
 			return fmt.Errorf("Generate CA: %v", err)
 		}
 	}
+	if !util.IsFileExist(CAKeyFile) || !util.IsFileExist(CACrtFile) {
+		return fmt.Errorf("%s or %s still not found", CAKeyFile, CACrtFile)
+	}
 
 	// generate server cert
 	return tun.GenCerts(hosts, "emp3r0r", false)
+}
+
+func save_config_json() (err error) {
+	w_data, err := json.Marshal(RuntimeConfig)
+	if err != nil {
+		return fmt.Errorf("Saving %s: %v", EmpConfigFile, err)
+	}
+	return ioutil.WriteFile(EmpConfigFile, w_data, 0600)
+}
+
+func InitConfigFile(cc_host string) (err error) {
+	RuntimeConfig.CCHost = cc_host
+	RuntimeConfig.CCPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
+	RuntimeConfig.ProxyPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
+	RuntimeConfig.BroadcastPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
+	RuntimeConfig.SSHDPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
+
+	return save_config_json()
 }
