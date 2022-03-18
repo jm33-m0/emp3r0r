@@ -163,32 +163,6 @@ func PromptForConfig(isAgent bool) (err error) {
 		}
 	}
 
-	// random strings
-	agent_root, err := read_from_cached("agent_root", true)
-	if err != nil {
-		agent_root = util.RandStr(util.RandInt(6, 20))
-	} else {
-		RuntimeConfig.AgentRoot = fmt.Sprintf("/tmp/ssh-%v", agent_root)
-	}
-	utils_path, err := read_from_cached("utils_path", true)
-	if err != nil {
-		utils_path = util.RandStr(util.RandInt(3, 20))
-	} else {
-		RuntimeConfig.UtilsPath = fmt.Sprintf("%s/%v", RuntimeConfig.AgentRoot, utils_path)
-	}
-	socket, err := read_from_cached("socket", true)
-	if err != nil {
-		socket = util.RandStr(util.RandInt(3, 20))
-	} else {
-		RuntimeConfig.SocketName = fmt.Sprintf("%s/%v", RuntimeConfig.AgentRoot, socket)
-	}
-	pid_file, err := read_from_cached("pid_file", true)
-	if err != nil {
-		pid_file = util.RandStr(util.RandInt(3, 20))
-	} else {
-		RuntimeConfig.PIDFile = fmt.Sprintf("%s/%v", RuntimeConfig.AgentRoot, pid_file)
-	}
-
 	// if building CC, we can safely ignore varibles below
 	if !isAgent {
 		return
@@ -238,11 +212,22 @@ func save_config_json() (err error) {
 }
 
 func InitConfigFile(cc_host string) (err error) {
+	// random ports
 	RuntimeConfig.CCHost = cc_host
 	RuntimeConfig.CCPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.ProxyPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.BroadcastPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.SSHDPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
+
+	// random strings
+	agent_root := util.RandStr(util.RandInt(6, 20))
+	RuntimeConfig.AgentRoot = fmt.Sprintf("/tmp/ssh-%v", agent_root)
+	utils_path := util.RandStr(util.RandInt(3, 20))
+	RuntimeConfig.UtilsPath = fmt.Sprintf("%s/%v", RuntimeConfig.AgentRoot, utils_path)
+	socket := util.RandStr(util.RandInt(3, 20))
+	RuntimeConfig.SocketName = fmt.Sprintf("%s/%v", RuntimeConfig.AgentRoot, socket)
+	pid_file := util.RandStr(util.RandInt(3, 20))
+	RuntimeConfig.PIDFile = fmt.Sprintf("%s/%v", RuntimeConfig.AgentRoot, pid_file)
 
 	return save_config_json()
 }
