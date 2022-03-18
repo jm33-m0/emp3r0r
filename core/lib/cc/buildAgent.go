@@ -193,13 +193,19 @@ func PromptForConfig(isAgent bool) (err error) {
 	if !isAgent {
 		return
 	}
-	RuntimeConfig.CDNProxy = fmt.Sprintf("%v",
-		ask("CDN proxy (leave empty to disable), eg. wss://example.com/ws/path", "cdn_proxy"))
-	RuntimeConfig.AgentProxy = fmt.Sprintf("%v",
-		ask("Agent proxy (leave empty to disable), eg. socks5://127.0.0.1:1080", "agent_proxy"))
-	RuntimeConfig.DoHServer = fmt.Sprintf("%v",
-		ask("DoH server (leave empty to disable), eg. https://1.1.1.1/dns-query", "doh_server"))
-	if CliYesNo("Disable autoproxy feature (if you want to avoid UDP broadcasting)") {
+	if CliYesNo("Enable CDN proxy") {
+		RuntimeConfig.CDNProxy = fmt.Sprintf("%v",
+			ask("CDN proxy, eg. wss://example.com/ws/path", "cdn_proxy"))
+	}
+	if CliYesNo("Enable agent proxy (for C2 transport)") {
+		RuntimeConfig.AgentProxy = fmt.Sprintf("%v",
+			ask("Agent proxy, eg. socks5://127.0.0.1:1080", "agent_proxy"))
+	}
+	if CliYesNo("Enable DoH (DNS over HTTPS)") {
+		RuntimeConfig.DoHServer = fmt.Sprintf("%v",
+			ask("DoH server, eg. https://1.1.1.1/dns-query", "doh_server"))
+	}
+	if !CliYesNo("Enable autoproxy feature (will enable UDP broadcasting)") {
 		RuntimeConfig.BroadcastIntervalMax = 0
 	}
 
