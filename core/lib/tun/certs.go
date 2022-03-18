@@ -91,6 +91,7 @@ func GenCerts(hosts []string, outname string, isCA bool) (err error) {
 			}
 		}
 
+		// ca key file
 		ca_data, err := ioutil.ReadFile("ca-key.pem")
 		if err != nil {
 			return fmt.Errorf("Read ca-key.pem: %v", err)
@@ -98,9 +99,10 @@ func GenCerts(hosts []string, outname string, isCA bool) (err error) {
 		block, _ := pem.Decode(ca_data)
 		cakey, _ = x509.ParseECPrivateKey(block.Bytes)
 
-		ca_data, err = ioutil.ReadFile("ca-key.pem")
+		// ca cert file
+		ca_data, err = ioutil.ReadFile("ca-cert.pem")
 		if err != nil {
-			return fmt.Errorf("Read ca-key.pem: %v", err)
+			return fmt.Errorf("Read ca-cert.pem: %v", err)
 		}
 		block, _ = pem.Decode(ca_data)
 		cacrt, _ = x509.ParseCertificate(block.Bytes)
@@ -126,7 +128,7 @@ func GenCerts(hosts []string, outname string, isCA bool) (err error) {
 
 	// key
 	pem.Encode(out, pemBlockForKey(priv))
-	err = ioutil.WriteFile(outname, out.Bytes(), 0600)
+	err = ioutil.WriteFile(outkey, out.Bytes(), 0600)
 	if err != nil {
 		return fmt.Errorf("Write %s: %v", outkey, err)
 	}
