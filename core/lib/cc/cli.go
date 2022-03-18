@@ -380,22 +380,27 @@ func CliAsk(prompt string) (answer string) {
 		return "No terminal available"
 	}
 
-	EmpReadLine.SetPrompt(color.CyanString(prompt))
+	EmpReadLine.SetPrompt(color.HiCyanString(prompt))
 	EmpReadLine.Config.EOFPrompt = ""
 	EmpReadLine.Config.InterruptPrompt = ""
 
 	defer EmpReadLine.SetPrompt(EmpPrompt)
 
 	var err error
-	answer, err = EmpReadLine.Readline()
-	if err != nil {
-		if err == readline.ErrInterrupt || err == io.EOF {
-			return answer
+	for {
+		answer, err = EmpReadLine.Readline()
+		if err != nil {
+			if err == readline.ErrInterrupt || err == io.EOF {
+				return answer
+			}
+			CliPrintError("CliAsk: %v", err)
 		}
-		CliPrintError("CliAsk: %v", err)
+		answer = strings.TrimSpace(answer)
+		if answer != "" {
+			break
+		}
 	}
 
-	answer = strings.TrimSpace(answer)
 	return
 }
 
@@ -406,7 +411,7 @@ func CliYesNo(prompt string) bool {
 		return true
 	}
 
-	EmpReadLine.SetPrompt(color.CyanString(prompt + "? [y/N] "))
+	EmpReadLine.SetPrompt(color.HiCyanString(prompt + "? [y/N] "))
 	EmpReadLine.Config.EOFPrompt = ""
 	EmpReadLine.Config.InterruptPrompt = ""
 
