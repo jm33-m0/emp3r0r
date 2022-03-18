@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.6.0](https://github.com/jm33-m0/emp3r0r/compare/v1.5.1...v1.6.0) (2022-03-18)
+
+
+### Features
+
+* implement build.py in CC ([4d237b0](https://github.com/jm33-m0/emp3r0r/commit/4d237b058c37ec97c390530609bf5c55642b0a07))
+
+
+### Bug Fixes
+
+* build --clean success message ([6eebb2b](https://github.com/jm33-m0/emp3r0r/commit/6eebb2b78d84cd7632fca6a120eceb7979b112ac))
+* build.py --target clean deletes everything ([6842acc](https://github.com/jm33-m0/emp3r0r/commit/6842accd8cc7ab9e9324243b0f98e8c042ac0483))
+* ca key file name ([5547eed](https://github.com/jm33-m0/emp3r0r/commit/5547eeddf1f326242e4483c1a632acf831eb5b79))
+* CliAsk: ignore ctrl-c and EOF ([85180af](https://github.com/jm33-m0/emp3r0r/commit/85180af56a61b8706eee8f0f7612572f0393051b))
+* disallow empty input ([2c3c76d](https://github.com/jm33-m0/emp3r0r/commit/2c3c76da6bd711de28cd1defb890cd444492a536))
+* emp3r0r.json initialization not complete ([6369379](https://github.com/jm33-m0/emp3r0r/commit/6369379271a15f014a5bb6481a4020a54d86293b))
+* init emp3r0r.json when it's not found ([1aed32c](https://github.com/jm33-m0/emp3r0r/commit/1aed32c897f0783c2c878b6f28112a8cbd860458))
+* toggle some config options on/off ([abe600f](https://github.com/jm33-m0/emp3r0r/commit/abe600f0079bfa884c8f73a2585340679daacf96))
+
 ### [1.5.1](https://github.com/jm33-m0/emp3r0r/compare/v1.5.0...v1.5.1) (2022-03-17)
 
 
