@@ -391,7 +391,7 @@ func CliAsk(prompt string) (answer string) {
 		answer, err = EmpReadLine.Readline()
 		if err != nil {
 			if err == readline.ErrInterrupt || err == io.EOF {
-				return answer
+				continue
 			}
 			CliPrintError("CliAsk: %v", err)
 		}
