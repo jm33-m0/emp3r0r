@@ -373,6 +373,32 @@ func CliPrintError(format string, a ...interface{}) {
 	}
 }
 
+// CliAsk prompt for an answer from user
+func CliAsk(prompt string) (answer string) {
+	// if there's no way to show prompt
+	if IsAPIEnabled {
+		return "No terminal available"
+	}
+
+	EmpReadLine.SetPrompt(color.CyanString(prompt))
+	EmpReadLine.Config.EOFPrompt = ""
+	EmpReadLine.Config.InterruptPrompt = ""
+
+	defer EmpReadLine.SetPrompt(EmpPrompt)
+
+	var err error
+	answer, err = EmpReadLine.Readline()
+	if err != nil {
+		if err == readline.ErrInterrupt || err == io.EOF {
+			return answer
+		}
+		CliPrintError("CliAsk: %v", err)
+	}
+
+	answer = strings.TrimSpace(answer)
+	return
+}
+
 // CliYesNo prompt for a y/n answer from user
 func CliYesNo(prompt string) bool {
 	// always return true if there's no way to show prompt

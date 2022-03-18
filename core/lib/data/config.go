@@ -33,6 +33,15 @@ func ReadJSONConfig(jsonData []byte, config_to_write *Config) (err error) {
 	DefaultShell = config_to_write.UtilsPath + "/bash"
 	AESKey = GenAESKey("Your Pre Shared AES Key: " + MagicString)
 
+	// time intervals
+	config_to_write.BroadcastIntervalMin = 30
+	config_to_write.BroadcastIntervalMax = 130
+	config_to_write.IndicatorWaitMin = 30
+	config_to_write.IndicatorWaitMax = 130
+
+	// indicator_text
+	config_to_write.CCIndicatorText = "emp3r0r"
+
 	return
 }
 

