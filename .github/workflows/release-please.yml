@@ -27,7 +27,7 @@ jobs:
           cd core || exit 1
           ls -lah
           bash ./emp3r0r --release || exit 2
-          mv emp3r0r.tar.xz emp3r0r-v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.patch }}.tar.xz || exit 3
+          mv emp3r0r.tar.xz emp3r0r-v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}.tar.xz || exit 3
           ls -lah
-          curl --upload-file ./emp3r0r-v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.patch }}.tar.xz -X POST -H "Accept: application/x-tar" ${{ steps.release.outputs.upload_url }} || exit 4
+          curl --data-binary @emp3r0r-v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}.tar.xz -X POST -d "name=emp3r0r-v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}.tar.xz" -H "Accept: application/x-xz" ${{ steps.release.outputs.upload_url }} || exit 4
 
