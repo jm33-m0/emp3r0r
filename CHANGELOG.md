@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.6.1](https://github.com/jm33-m0/emp3r0r/compare/v1.6.0...v1.6.1) (2022-03-20)
+
+
+### Bug Fixes
+
+* update go dependencies ([018b533](https://github.com/jm33-m0/emp3r0r/commit/018b533e55d6bfd15a2e28ca85a144adea87d42f))
+
 ## [1.6.0](https://github.com/jm33-m0/emp3r0r/compare/v1.5.1...v1.6.0) (2022-03-18)
 
 
