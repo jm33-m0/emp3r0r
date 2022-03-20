@@ -31,20 +31,22 @@ case "$1" in
         info "Installing garble"
         go install mvdan.cc/garble@latest || error "Failed to install garble"
     }
+    temp=/tmp/emp3r0r
+    [[ -d "$temp" ]] || mkdir -p "$temp"
 
     info "[-] Building binaries"
-    cd cmd/cc && go build -o "$pwd/cc.exe"
-    cd "$pwd/cmd/cat" && go build -o "$pwd/cat.exe"
+    cd cmd/cc && go build -o "$temp/cc.exe"
+    cd "$pwd/cmd/cat" && go build -o "$temp/cat.exe"
 
-    cd "$pwd/cmd/agent" && garble -tiny build -o "$pwd/stub.exe" -ldflags='-s -w -v' || exit 1
+    cd "$pwd/cmd/agent" && garble -tiny build -o "$temp/stub.exe" -ldflags='-s -w -v' || exit 1
 
     # tar
-    [[ -d /tmp/emp3r0r ]] || mkdir -p /tmp/emp3r0r
+    info "Preparing to archive files"
     cd /tmp || error "Cannot cd to /tmp"
-    cp -avR "$pwd/*.exe" ./emp3r0r
-    cp -avR "$pwd/tmux" ./emp3r0r
-    cp -avR "$pwd/modules" ./emp3r0r
-    cp -avR "$pwd/emp3r0r" ./emp3r0r/emp3r0r
+    cp -avR "$pwd/tmux" "$temp"
+    cp -avR "$pwd/modules" "$temp"
+    cp -avR "$pwd/emp3r0r" "$temp"
+    info "Tar XZ"
     tar -cJvpf "$pwd/emp3r0r.tar.xz" ./emp3r0r
     success "Packaged emp3r0r"
     exit 0
