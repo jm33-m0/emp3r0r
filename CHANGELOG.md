@@ -1,5 +1,13 @@
 # Changelog
 
+### [1.6.3](https://github.com/jm33-m0/emp3r0r/compare/v1.6.2...v1.6.3) (2022-03-20)
+
+
+### Bug Fixes
+
+* curl upload asset ([876935e](https://github.com/jm33-m0/emp3r0r/commit/876935e6336d5b2821aaf2381ae0fd68ce5376ce))
+* release-please action ([056dd03](https://github.com/jm33-m0/emp3r0r/commit/056dd03acf9deb64d28c9e332b5a0b80247f769f))
+
 ### [1.6.2](https://github.com/jm33-m0/emp3r0r/compare/v1.6.1...v1.6.2) (2022-03-20)
 
 
