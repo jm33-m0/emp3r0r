@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.6.5](https://github.com/jm33-m0/emp3r0r/compare/v1.6.4...v1.6.5) (2022-03-20)
+
+
+### Bug Fixes
+
+* upload-asset: file not found ([a3a6c10](https://github.com/jm33-m0/emp3r0r/commit/a3a6c10d6a90dd00c376b60fccd243ab9ed4aecc))
+
 ### [1.6.4](https://github.com/jm33-m0/emp3r0r/compare/v1.6.3...v1.6.4) (2022-03-20)
 
 
