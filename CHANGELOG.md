@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.6.11](https://github.com/jm33-m0/emp3r0r/compare/v1.6.10...v1.6.11) (2022-03-20)
+
+
+### Bug Fixes
+
+* save some time if release not created ([2dc20ef](https://github.com/jm33-m0/emp3r0r/commit/2dc20ef0107b64d6c718d9421771cad96a5212cd))
+
 ### [1.6.10](https://github.com/jm33-m0/emp3r0r/compare/v1.6.9...v1.6.10) (2022-03-20)
 
 
