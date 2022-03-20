@@ -21,13 +21,21 @@ jobs:
         with:
           go-version: '^1.18'
 
-      - name: Create release archive
+      - name: Create archive
         if: ${{ steps.release.outputs.release_created }}
         run: |
           cd core || exit 1
           ls -lah
           bash ./emp3r0r --release || exit 2
-          mv emp3r0r.tar.xz emp3r0r-v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}.tar.xz || exit 3
           ls -lah
-          curl --data-binary @emp3r0r-v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}.tar.xz -X POST -d "name=emp3r0r-v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}.tar.xz" -H "Accept: application/x-xz" ${{ steps.release.outputs.upload_url }} || exit 4
 
+      - uses: PeerXu/upload-asset@v1
+        with:
+          file: ./core/emp3r0r.tar.xz
+          os: linux
+          arch: amd64
+          with_tag: true
+          with_sha1: true
+          suffix: .tar.xz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
