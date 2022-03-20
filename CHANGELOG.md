@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.6.6](https://github.com/jm33-m0/emp3r0r/compare/v1.6.5...v1.6.6) (2022-03-20)
+
+
+### Bug Fixes
+
+* workflow steps ([3a3b0bd](https://github.com/jm33-m0/emp3r0r/commit/3a3b0bdbc3b33efadc3a726a5422370a79edc81a))
+
 ### [1.6.5](https://github.com/jm33-m0/emp3r0r/compare/v1.6.4...v1.6.5) (2022-03-20)
 
 
