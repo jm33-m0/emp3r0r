@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.6.4](https://github.com/jm33-m0/emp3r0r/compare/v1.6.3...v1.6.4) (2022-03-20)
+
+
+### Bug Fixes
+
+* trying to upload assets ([8fb049d](https://github.com/jm33-m0/emp3r0r/commit/8fb049d51ba8e25a62cee13a7acdeeffee2e73e5))
+
 ### [1.6.2](https://github.com/jm33-m0/emp3r0r/compare/v1.6.1...v1.6.2) (2022-03-20)
 
 
