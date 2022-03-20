@@ -15,35 +15,40 @@ command -v garble || {
     go install mvdan.cc/garble@latest || exit 1
 }
 
-tmux_conf="$PWD/tmux/.tmux.conf"
-[[ -f "$tmux_conf" ]] || {
-    echo "$tmux_conf" not found
-    exit 1
-}
-
 # build
 pwd="$(pwd)"
+go mod tidy || {
+    echo "go mod tidy"
+    exit 1
+}
 [[ -f ./cc.exe ]] || (
     echo "[-] Building CC server as it's not found"
     cd cmd/cc && go build -o "$pwd/cc.exe"
-    cd "$pwd" &&
-        cd cmd/cat && go build -o "$pwd/cat.exe"
+    cd "$pwd/cmd/cat" && go build -o "$pwd/cat.exe"
 )
 
-cd "$pwd" || {
-    echo "WTF? cd $pwd"
-    exit 1
-}
 [[ -f stub.exe ]] || {
-    (
-        cd cmd/agent && garble -tiny build -o "$pwd/stub.exe" -ldflags='-s -w -v'
-    ) || exit 1
+    cd "$pwd/cmd/agent" && garble -tiny build -o "$pwd/stub.exe" -ldflags='-s -w -v' || exit 1
+}
+
+cd "$pwd" || exit 1
+
+[[ "$1" = "--release" ]] && {
+    tar -cJvpf emp3r0r.tar.xz ./emp3r0r ./*.exe modules tmux
+    echo "Packaged emp3r0r"
+    exit 0
 }
 
 { [[ -f emp3r0r-cert.pem ]] && [[ -f emp3r0r-key.pem ]]; } || {
     echo -ne "CC names (can be IPs and/or domain names), separate with space:\n>> "
     read -r hosts
     ./cc.exe -gencert "$hosts"
+}
+
+tmux_conf="$PWD/tmux/.tmux.conf"
+[[ -f "$tmux_conf" ]] || {
+    echo "$tmux_conf" not found
+    exit 1
 }
 
 (
