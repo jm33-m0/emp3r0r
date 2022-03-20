@@ -31,4 +31,5 @@ jobs:
           bash ./emp3r0r --release || exit 2
           mv emp3r0r.tar.xz emp3r0r-v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}.tar.xz || exit 3
           ls -lah
+          echo ${{ steps.release.outputs.upload_url }}
           curl -F 'name=emp3r0r.tar.xz' -F 'label=emp3r0r.tar.xz' -F 'file=@emp3r0r-v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}.tar.xz' -X POST -H "Accept: application/x-xz" ${{ steps.release.outputs.upload_url }}
