@@ -30,6 +30,7 @@ jobs:
           ls -lah      
       
       - name: Upload archive
+        if: ${{ steps.release.outputs.release_created }}
         uses: PeerXu/upload-asset@v1
         with:
           file: ./core/emp3r0r.tar.xz
