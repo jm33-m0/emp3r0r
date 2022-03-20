@@ -204,6 +204,10 @@ func GenC2Certs(hosts []string) (err error) {
 }
 
 func save_config_json() (err error) {
+	err = loadCA()
+	if err != nil {
+		return fmt.Errorf("save_config_json: %v", err)
+	}
 	w_data, err := json.Marshal(RuntimeConfig)
 	if err != nil {
 		return fmt.Errorf("Saving %s: %v", EmpConfigFile, err)
@@ -230,4 +234,15 @@ func InitConfigFile(cc_host string) (err error) {
 	RuntimeConfig.PIDFile = fmt.Sprintf("%s/%v", RuntimeConfig.AgentRoot, pid_file)
 
 	return save_config_json()
+}
+
+func loadCA() error {
+	// CA cert
+	ca_data, err := ioutil.ReadFile(CACrtFile)
+	if err != nil {
+		return fmt.Errorf("failed to read CA cert: %v", err)
+	}
+	tun.CACrt = ca_data
+	RuntimeConfig.CA = string(tun.CACrt)
+	return nil
 }

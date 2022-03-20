@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
@@ -38,5 +39,6 @@ func ApplyRuntimeConfig() (err error) {
 
 	// CA
 	tun.CACrt = []byte(RuntimeConfig.CA)
+	log.Printf("CACrt:\n%s", tun.CACrt)
 	return
 }
