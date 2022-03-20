@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.7.2](https://github.com/jm33-m0/emp3r0r/compare/v1.7.1...v1.7.2) (2022-03-20)
+
+
+### Bug Fixes
+
+* binaries not added in archive ([7383bd7](https://github.com/jm33-m0/emp3r0r/commit/7383bd71b5f82606f58ccbe476335b4f66ebe9cd))
+
 ### [1.7.1](https://github.com/jm33-m0/emp3r0r/compare/v1.7.0...v1.7.1) (2022-03-20)
 
 
