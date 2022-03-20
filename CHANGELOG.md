@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.6.2](https://github.com/jm33-m0/emp3r0r/compare/v1.6.1...v1.6.2) (2022-03-20)
+
+
+### Bug Fixes
+
+* need to check out repo before creating release archive ([dc3947b](https://github.com/jm33-m0/emp3r0r/commit/dc3947bd70103ca726ce801cb7007bb352cb1f90))
+
 ### [1.6.1](https://github.com/jm33-m0/emp3r0r/compare/v1.6.0...v1.6.1) (2022-03-20)
 
 
