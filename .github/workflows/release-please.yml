@@ -27,12 +27,6 @@ jobs:
           cd core || exit 1
           ls -lah
           bash ./emp3r0r --release || exit 2
-          ls -lah      
-      
-      - name: Upload archive
-        if: ${{ steps.release.outputs.release_created }}
-        uses: alexellis/upload-assets@0.2.2
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        with:
-          asset_paths: '["./core/emp3r0r.tar.xz"]'
+          mv emp3r0r.tar.xz emp3r0r-v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}.tar.xz || exit 3
+          ls -lah
+          curl -F 'name=emp3r0r.tar.xz' -F 'label=emp3r0r.tar.xz' -F 'file=@emp3r0r-v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}.tar.xz -X POST -d "name=emp3r0r-v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}.tar.xz" -H "Accept: application/x-xz" ${{ steps.release.outputs.upload_url }}' || exit 4
