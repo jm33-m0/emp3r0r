@@ -16,8 +16,10 @@ jobs:
           extra-files: core/lib/data/def.go
 
       - uses: actions/checkout@v2
+        if: ${{ steps.release.outputs.release_created }}
 
       - uses: actions/setup-go@v2
+        if: ${{ steps.release.outputs.release_created }}
         with:
           go-version: '^1.18'
 
