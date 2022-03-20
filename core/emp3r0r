@@ -1,7 +1,7 @@
 #!/bin/bash
 
 success() {
-    echo -e "\n\e[32m[INFO] $1\e[0m\n"
+    echo -e "\n\e[32m[SUCCESS] $1\e[0m\n"
 }
 
 info() {
@@ -23,14 +23,13 @@ case "$1" in
 --release)
     # build
     # -----
-    go mod tidy
     command -v go || {
         error "You need to set up Go first"
     }
-
+    go mod tidy || error "go mod tidy"
     command -v garble || {
         info "Installing garble"
-        go install mvdan.cc/garble@latest || exit 1
+        go install mvdan.cc/garble@latest || error "Failed to install garble"
     }
 
     info "[-] Building binaries"
@@ -39,9 +38,14 @@ case "$1" in
 
     cd "$pwd/cmd/agent" && garble -tiny build -o "$pwd/stub.exe" -ldflags='-s -w -v' || exit 1
 
-    cd "$pwd" || exit 1
-
-    tar -cJvpf emp3r0r.tar.xz ./emp3r0r ./*.exe modules tmux
+    # tar
+    [[ -d /tmp/emp3r0r ]] || mkdir -p /tmp/emp3r0r
+    cd /tmp || error "Cannot cd to /tmp"
+    cp -avR "$pwd/*.exe" ./emp3r0r
+    cp -avR "$pwd/tmux" ./emp3r0r
+    cp -avR "$pwd/modules" ./emp3r0r
+    cp -avR "$pwd/emp3r0r" ./emp3r0r/emp3r0r
+    tar -cJvpf "$pwd/emp3r0r.tar.xz" ./emp3r0r
     success "Packaged emp3r0r"
     exit 0
 
