@@ -1,5 +1,13 @@
 # Changelog
 
+### [1.7.4](https://github.com/jm33-m0/emp3r0r/compare/v1.7.3...v1.7.4) (2022-03-20)
+
+
+### Bug Fixes
+
+* abort when CA is not added ([3edca43](https://github.com/jm33-m0/emp3r0r/commit/3edca43d8d18765dec794f5e5d4368475963d4fd))
+* CA cert missing ([b1885b9](https://github.com/jm33-m0/emp3r0r/commit/b1885b9e81a40fe3072caf15ddd17fb59da35547))
+
 ### [1.7.3](https://github.com/jm33-m0/emp3r0r/compare/v1.7.2...v1.7.3) (2022-03-20)
 
 
