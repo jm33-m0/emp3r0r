@@ -24,10 +24,10 @@ jobs:
       - name: Create release archive
         if: ${{ steps.release.outputs.release_created }}
         run: |
-          cd core || exit 1
+          cd ${{  }} core || exit 1
           ls -lah
           bash ./emp3r0r --release || exit 2
           mv emp3r0r.tar.xz emp3r0r-v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.patch }}.tar.xz || exit 3
           ls -lah
-          curl -F emp3r0r-v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.patch }}.tar.xz -X POST -H "Accept: application/x-tar" ${{ steps.release.outputs.upload_url }} || exit 4
+          curl --upload-file ./emp3r0r-v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.patch }}.tar.xz -X POST -H "Accept: application/x-tar" ${{ steps.release.outputs.upload_url }} || exit 4
 
