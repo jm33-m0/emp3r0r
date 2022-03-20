@@ -27,8 +27,9 @@ jobs:
           cd core || exit 1
           ls -lah
           bash ./emp3r0r --release || exit 2
-          ls -lah
-
+          ls -lah      
+      
+      - name: Upload archive
         uses: PeerXu/upload-asset@v1
         with:
           file: ./core/emp3r0r.tar.xz
