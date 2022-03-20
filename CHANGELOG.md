@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.6.13](https://github.com/jm33-m0/emp3r0r/compare/v1.6.12...v1.6.13) (2022-03-20)
+
+
+### Bug Fixes
+
+* upload.sh ([ad2315b](https://github.com/jm33-m0/emp3r0r/commit/ad2315b4efd58a50aa8a43cf0df8c25946f4612d))
+
 ### [1.6.12](https://github.com/jm33-m0/emp3r0r/compare/v1.6.11...v1.6.12) (2022-03-20)
 
 
