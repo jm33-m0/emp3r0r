@@ -54,8 +54,8 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 					new_port := strconv.Itoa(util.RandInt(2048, 65535))
 					CliPrintWarning("Port %s has %s shell on it, restarting with a different port %s", port, s, new_port)
 					SetOption([]string{"port", new_port})
-					SSHClient(shell, args, new_port, split)
-					return
+					err = SSHClient(shell, args, new_port, split)
+					return err
 				}
 			}
 			// if a shell is already open, use it
@@ -90,7 +90,9 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 			time.Sleep(100 * time.Millisecond)
 			res, is_response = CmdResults[cmd_id]
 			if is_response {
-				if strings.Contains(res, "success") {
+				if strings.Contains(res, "success") ||
+					strings.Contains(res,
+						fmt.Sprintf("listen tcp 127.0.0.1:%s: bind: address already in use", port)) {
 					break
 				} else {
 					err = fmt.Errorf("Start sshd (%s) failed: %s", shell, res)
