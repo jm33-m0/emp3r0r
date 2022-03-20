@@ -29,7 +29,7 @@ jobs:
           bash ./emp3r0r --release || exit 2
           ls -lah
 
-      - uses: PeerXu/upload-asset@v1
+        uses: PeerXu/upload-asset@v1
         with:
           file: ./core/emp3r0r.tar.xz
           os: linux
