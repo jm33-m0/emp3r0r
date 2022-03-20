@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.6.10](https://github.com/jm33-m0/emp3r0r/compare/v1.6.9...v1.6.10) (2022-03-20)
+
+
+### Bug Fixes
+
+* curl cmd in workflow file ([db91dd2](https://github.com/jm33-m0/emp3r0r/commit/db91dd272657a35ccda0f53268f188f60d8e80da))
+
 ### [1.6.9](https://github.com/jm33-m0/emp3r0r/compare/v1.6.8...v1.6.9) (2022-03-20)
 
 
