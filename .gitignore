@@ -2,6 +2,9 @@
 *.d
 *private*
 
+# binary release
+emp3r0r*.tar.xz
+
 # go.sum
 go.sum
 
