@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/jm33-m0/emp3r0r/compare/v1.6.13...v1.7.0) (2022-03-20)
+
+
+### Features
+
+* improved C2 launcher, auto-build working ([b33aa19](https://github.com/jm33-m0/emp3r0r/commit/b33aa19a05b74ee8a43980ea741c3d953f98cfa0))
+
 ### [1.6.13](https://github.com/jm33-m0/emp3r0r/compare/v1.6.12...v1.6.13) (2022-03-20)
 
 
