@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.7.1](https://github.com/jm33-m0/emp3r0r/compare/v1.7.0...v1.7.1) (2022-03-20)
+
+
+### Bug Fixes
+
+* build script typo, archive structure ([ced5651](https://github.com/jm33-m0/emp3r0r/commit/ced56510e4bd82e94894f276c247b345a07150ce))
+
 ## [1.7.0](https://github.com/jm33-m0/emp3r0r/compare/v1.6.13...v1.7.0) (2022-03-20)
 
 
