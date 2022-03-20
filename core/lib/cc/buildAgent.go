@@ -237,6 +237,12 @@ func InitConfigFile(cc_host string) (err error) {
 	pid_file := util.RandStr(util.RandInt(3, 20))
 	RuntimeConfig.PIDFile = fmt.Sprintf("%s/%v", RuntimeConfig.AgentRoot, pid_file)
 
+	// time intervals
+	RuntimeConfig.BroadcastIntervalMin = 30
+	RuntimeConfig.BroadcastIntervalMax = 130
+	RuntimeConfig.IndicatorWaitMin = 30
+	RuntimeConfig.IndicatorWaitMax = 130
+
 	return save_config_json()
 }
 
