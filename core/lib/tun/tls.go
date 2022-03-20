@@ -27,7 +27,7 @@ func EmpHTTPClient(proxyServer string) *http.Client {
 
 	// add our cert
 	if ok := rootCAs.AppendCertsFromPEM(CACrt); !ok {
-		log.Println("No certs appended")
+		log.Fatal("No certs appended")
 	}
 
 	// Trust the augmented cert pool in our client
