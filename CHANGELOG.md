@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.7.3](https://github.com/jm33-m0/emp3r0r/compare/v1.7.2...v1.7.3) (2022-03-20)
+
+
+### Bug Fixes
+
+* disable CGO to build static binaries ([f12190f](https://github.com/jm33-m0/emp3r0r/commit/f12190f31ab4791f2029a05b9de6c6075c730fdd))
+
 ### [1.7.2](https://github.com/jm33-m0/emp3r0r/compare/v1.7.1...v1.7.2) (2022-03-20)
 
 
