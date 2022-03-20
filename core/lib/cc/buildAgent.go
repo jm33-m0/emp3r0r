@@ -56,8 +56,12 @@ func GenAgent() {
 		CliPrintError("Read stub: %v", err)
 		return
 	}
-	toWrite = append(toWrite, []byte(emp3r0r_data.MagicString)...)
+	sep := []byte(strings.Repeat(emp3r0r_data.MagicString, 3))
+
+	// wrap the config data with magic string
+	toWrite = append(toWrite, sep...)
 	toWrite = append(toWrite, encJSONBytes...)
+	toWrite = append(toWrite, sep...)
 	err = ioutil.WriteFile(outfile, toWrite, 0755)
 	if err != nil {
 		CliPrintError("Save agent binary %s: %v", outfile, err)
