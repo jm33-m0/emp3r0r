@@ -1,72 +1,91 @@
 #!/bin/bash
 
-if ! command -v tmux >/dev/null 2>&1; then
-    echo "tmux not found"
-    exit 1
-fi
+success() {
+    echo -e "\n\e[32m[INFO] $1\e[0m\n"
+}
 
-command -v go || {
-    echo "You need to set up Go first"
+info() {
+    echo -e "\e[34m[INFO] $1\e[0m"
+}
+
+error() {
+    echo -e "\n\e[31m[ERROR] $1\e[0m\n"
     exit 1
 }
 
-command -v garble || {
-    echo "Installing garble"
-    go install mvdan.cc/garble@latest || exit 1
+warn() {
+    echo -e "\e[33m[WARN] $1\e[0m"
 }
 
-# build
 pwd="$(pwd)"
-go mod tidy || {
-    echo "go mod tidy"
-    exit 1
-}
-[[ -f ./cc.exe ]] || (
-    echo "[-] Building CC server as it's not found"
+
+case "$1" in
+--release)
+    # build
+    # -----
+    go mod tidy
+    command -v go || {
+        error "You need to set up Go first"
+    }
+
+    command -v garble || {
+        info "Installing garble"
+        go install mvdan.cc/garble@latest || exit 1
+    }
+
+    info "[-] Building binaries"
     cd cmd/cc && go build -o "$pwd/cc.exe"
     cd "$pwd/cmd/cat" && go build -o "$pwd/cat.exe"
-)
 
-[[ -f stub.exe ]] || {
     cd "$pwd/cmd/agent" && garble -tiny build -o "$pwd/stub.exe" -ldflags='-s -w -v' || exit 1
-}
 
-cd "$pwd" || exit 1
+    cd "$pwd" || exit 1
 
-[[ "$1" = "--release" ]] && {
     tar -cJvpf emp3r0r.tar.xz ./emp3r0r ./*.exe modules tmux
-    echo "Packaged emp3r0r"
+    success "Packaged emp3r0r"
     exit 0
-}
 
-{ [[ -f emp3r0r-cert.pem ]] && [[ -f emp3r0r-key.pem ]]; } || {
-    echo -ne "CC names (can be IPs and/or domain names), separate with space:\n>> "
-    read -r hosts
-    ./cc.exe -gencert "$hosts"
-}
+    ;;
 
-tmux_conf="$PWD/tmux/.tmux.conf"
-[[ -f "$tmux_conf" ]] || {
-    echo "$tmux_conf" not found
-    exit 1
-}
+*)
+    # Generate certs
+    # --------------
+    { [[ -f emp3r0r-cert.pem ]] && [[ -f emp3r0r-key.pem ]]; } || {
+        echo -ne "\e[36mCC names (can be IPs and/or domain names), separate with space:\n>>\e[0m "
+        read -r hosts
+        ./cc.exe -gencert "$hosts"
+    }
 
-(
-    cp -r ./tmux/sh /tmp
+    # Run C2 server with tmux UI
+    # --------------------------
+    if ! command -v tmux >/dev/null 2>&1; then
+        error "tmux not found"
+    fi
 
+    tmux_conf="$pwd/tmux/.tmux.conf"
+    [[ -f "$tmux_conf" ]] || {
+        error "$tmux_conf not found"
+    }
+
+    # helper scripts for tmux status line
+    cp -r "$pwd/tmux/sh" /tmp
+
+    # if not in a tmux session
     [[ -n "$TMUX" ]] || {
+        # create tmux session with our config file
         tmux -f "$tmux_conf" new-session -A -s emp3r0r -n cc ./cc.exe "$@" || {
-            echo "$0 must be run in tmux"
-            exit 1
+            error "$0 must be run in tmux"
         }
-
         exit
     }
 
+    # if already in a tmux session
     [[ -n "$TMUX" ]] && {
+        # rename, and source our config file
         tmux rename-window cc
         tmux rename-session emp3r0r
         tmux source-file "$tmux_conf"
         ./cc.exe "$@"
     }
-)
+    ;;
+esac
