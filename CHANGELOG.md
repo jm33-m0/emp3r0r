@@ -1,5 +1,13 @@
 # Changelog
 
+### [1.7.6](https://github.com/jm33-m0/emp3r0r/compare/v1.7.5...v1.7.6) (2022-03-20)
+
+
+### Bug Fixes
+
+* ssh shell fails to start due to 'already bind' error ([18004a9](https://github.com/jm33-m0/emp3r0r/commit/18004a9e4641516d3941cde336eb8e970b9bba15))
+* unable to config time intervals ([b242e80](https://github.com/jm33-m0/emp3r0r/commit/b242e80582d1052c663c9e37fe41b6efbbd983e9))
+
 ### [1.7.5](https://github.com/jm33-m0/emp3r0r/compare/v1.7.4...v1.7.5) (2022-03-20)
 
 
