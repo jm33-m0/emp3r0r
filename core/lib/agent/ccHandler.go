@@ -1,7 +1,5 @@
 package agent
 
-// build +linux
-
 import (
 	"fmt"
 	"log"

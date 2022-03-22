@@ -4,9 +4,10 @@
 
 // adapted by jm33-m0, 2021
 
-package agent
+//go:build linux
+// +build linux
 
-// build +linux
+package agent
 
 import (
 	"bufio"

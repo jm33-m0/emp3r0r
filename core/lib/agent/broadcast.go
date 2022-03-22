@@ -1,7 +1,5 @@
 package agent
 
-// build +linux
-
 import (
 	"context"
 	"fmt"

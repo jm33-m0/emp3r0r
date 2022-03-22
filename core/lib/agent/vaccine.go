@@ -1,7 +1,5 @@
 package agent
 
-// build +linux
-
 /*
 install tools to RuntimeConfig.UtilsPath, for lateral movement
 */
