@@ -26,8 +26,9 @@ func readJSONConfig(filename string) (err error) {
 	return emp3r0r_data.ReadJSONConfig(jsonData, cc.RuntimeConfig)
 }
 
-// cleanup temp files
-func cleanup() bool {
+// unlock_downloads if there are incomplete file downloads that are "locked", unlock them
+// unless CC is actually running/downloading
+func unlock_downloads() bool {
 	// is cc currently running?
 	if tun.IsPortOpen("127.0.0.1", cc.RuntimeConfig.CCPort) {
 		return false
@@ -51,9 +52,8 @@ func cleanup() bool {
 }
 
 func main() {
-
 	// cleanup or abort
-	if !cleanup() {
+	if !unlock_downloads() {
 		log.Fatal("CC is already running")
 	}
 
