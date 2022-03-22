@@ -37,11 +37,14 @@ case "$1" in
     export CGO_ENABLED=0
     export XZ_DEFAULTS='-T0 -9'
 
-    info "Building binaries"
-    cd cmd/cc && go build -o "$temp/cc.exe"
-    cd "$pwd/cmd/cat" && go build -o "$temp/cat.exe"
+    info "Building CC"
+    cd cmd/cc && go build -o "$temp/cc.exe" -ldflags='-s -w -v'
+    info "Building cat"
+    cd "$pwd/cmd/cat" && go build -o "$temp/cat.exe" -ldflags='-s -w -v'
 
+    info "Building agent stub"
     cd "$pwd/cmd/agent" && garble -tiny build -o "$temp/stub.exe" -ldflags='-s -w -v'
+    info "Building agent stub for Windows"
     cd "$pwd/cmd/agent" && GOOS=windows garble -tiny build -o "$temp/stub-win.exe" -ldflags='-s -w -v'
 
     # tar

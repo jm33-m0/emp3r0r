@@ -91,14 +91,7 @@ func main() {
 		os.Setenv("HOME", u.HomeDir)
 	}
 
-	// extract bash
-	err = agent.ExtractBash()
-	if err != nil {
-		log.Printf("[-] Cannot extract bash: %v", err)
-	}
-	if !util.IsFileExist(emp3r0r_data.DefaultShell) {
-		emp3r0r_data.DefaultShell = "/bin/sh"
-	}
+	emp3r0r_data.DefaultShell = "cmd.exe"
 
 	// daemonize
 	if *daemon {
