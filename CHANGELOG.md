@@ -1,5 +1,14 @@
 # Changelog
 
+### [1.8.1](https://github.com/jm33-m0/emp3r0r/compare/v1.8.0...v1.8.1) (2022-03-22)
+
+
+### Bug Fixes
+
+* 'unknown_host' in agent tag ([1aa8eb4](https://github.com/jm33-m0/emp3r0r/commit/1aa8eb47aa01f0a9a6322d82318e8fb4fd64fec2))
+* no build option for Windows ([9c7d22d](https://github.com/jm33-m0/emp3r0r/commit/9c7d22deea7525e7dd888692716c7495a5c5486b))
+* reduce agent binary size for windows version ([9a486f7](https://github.com/jm33-m0/emp3r0r/commit/9a486f7bf9a0a2647709ee36f7bba8cc5a5939d4))
+
 ## [1.8.0](https://github.com/jm33-m0/emp3r0r/compare/v1.7.6...v1.8.0) (2022-03-22)
 
 
