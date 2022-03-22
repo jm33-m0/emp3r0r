@@ -120,7 +120,7 @@ func GetHostID(fallbackUUID string) (id string) {
 		log.Printf("GetHostID: %v", err)
 		return
 	}
-	name = fmt.Sprintf("%s\\%s-unknown-host", name, GetUsername()) // hostname\\username
+	name = fmt.Sprintf("%s\\%s", name, GetUsername()) // hostname\\username
 	id = fmt.Sprintf("%s_%s-agent", name, shortID)
 	productInfo, err := ghw.Product()
 	if err != nil {
