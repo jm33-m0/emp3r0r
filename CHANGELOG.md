@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.8.0](https://github.com/jm33-m0/emp3r0r/compare/v1.7.6...v1.8.0) (2022-03-22)
+
+
+### Features
+
+* Add cross-platform support ([666051d](https://github.com/jm33-m0/emp3r0r/commit/666051dca08804b25ecdd217a003aa72890b8871))
+* recognize more linux distros, and get vendor name ([5f4df0d](https://github.com/jm33-m0/emp3r0r/commit/5f4df0d3c5771bd902edac316150060e92d23236))
+
+
+### Bug Fixes
+
+* remove binary from source tree ([c5955b8](https://github.com/jm33-m0/emp3r0r/commit/c5955b8b89d01c2609028c1f4464d778661adbd9))
+
 ### [1.7.6](https://github.com/jm33-m0/emp3r0r/compare/v1.7.5...v1.7.6) (2022-03-20)
 
 
