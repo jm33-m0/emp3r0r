@@ -197,14 +197,13 @@ func IPbroadcastAddr(ipMask IPWithMask) string {
 }
 
 // IPr works like `ip r`, covers both IPv4 and IPv6
-// TODO windows version
 func IPr() (routes []string) {
-	return []string{"N/A"}
+	return crossPlatformIPr()
 }
 
 // IPNeigh works like `ip neigh`, dumps ARP cache
 func IPNeigh() []string {
-	return []string{""}
+	return crossPlatformIPNeigh()
 }
 
 // FindIPToUse find an IP that resides in target IP range

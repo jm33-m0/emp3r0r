@@ -61,8 +61,8 @@ func shellHelper(cmdSlice []string) (out string) {
 
 func shellNet() (out string) {
 	ipa := tun.IPa()
-	ipneigh := IPNeigh()
-	ipr := IPr()
+	ipneigh := tun.IPNeigh()
+	ipr := tun.IPr()
 
 	out = fmt.Sprintf("[*] ip addr:\n    %s"+
 		"\n\n[*] ip route:\n    %s"+

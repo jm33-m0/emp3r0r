@@ -3,7 +3,6 @@ package util
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -72,19 +71,6 @@ func GetUsername() string {
 		return "unknown_user"
 	}
 	return u.Username
-}
-
-func GetKernelVersion() (uname string) {
-	release, err := ioutil.ReadFile("/proc/sys/kernel/osrelease")
-	if err != nil {
-		release = []byte("unknown_release")
-	}
-	version, err := ioutil.ReadFile("/proc/sys/kernel/version")
-	if err != nil {
-		version = []byte("unknown_version")
-	}
-
-	return fmt.Sprintf("%s Linux %s", release, version)
 }
 
 // Golang code to get MAC address for purposes of generating a unique id. Returns a uint64.
