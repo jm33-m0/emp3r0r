@@ -35,6 +35,7 @@ case "$1" in
     [[ -d "$temp" ]] || mkdir -p "$temp"
 
     export CGO_ENABLED=0
+    export XZ_DEFAULTS='-T0 -9'
 
     info "[-] Building binaries"
     cd cmd/cc && go build -o "$temp/cc.exe"
@@ -49,7 +50,8 @@ case "$1" in
     cp -aR "$pwd/modules" "$temp"
     cp -aR "$pwd/emp3r0r" "$temp"
     info "Tar XZ"
-    tar -cJpf "$pwd/emp3r0r.tar.xz" ./emp3r0r
+    # XZ_OPT='-T0 -9' tar -cJpf "$pwd/emp3r0r.tar.xz" ./emp3r0r
+    tar -c -I 'xz -9 -T0' -p -f "$pwd/emp3r0r.tar.xz" ./emp3r0r
     success "Packaged emp3r0r"
     exit 0
 
