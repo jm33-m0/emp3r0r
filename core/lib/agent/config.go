@@ -100,6 +100,7 @@ func readConfigFromMem() (data []byte, err error) {
 
 // DumpSelfMem dump everything (readable) from self process
 // will dump libraries as well, if any
+// Linux only
 func DumpSelfMem() (memdata [][]byte, err error) {
 	maps_file := fmt.Sprintf("/proc/%d/maps", os.Getpid())
 	mem_file := fmt.Sprintf("/proc/%d/mem", os.Getpid())

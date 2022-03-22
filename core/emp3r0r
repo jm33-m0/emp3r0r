@@ -41,7 +41,8 @@ case "$1" in
     cd cmd/cc && go build -o "$temp/cc.exe"
     cd "$pwd/cmd/cat" && go build -o "$temp/cat.exe"
 
-    cd "$pwd/cmd/agent" && garble -tiny build -o "$temp/stub.exe" -ldflags='-s -w -v' || exit 1
+    cd "$pwd/cmd/agent" && garble -tiny build -o "$temp/stub.exe" -ldflags='-s -w -v'
+    cd "$pwd/cmd/agent" && GOOS=windows garble -tiny build -o "$temp/stub-win.exe" -ldflags='-s -w -v'
 
     # tar
     info "Preparing to archive files"

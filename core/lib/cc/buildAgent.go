@@ -23,6 +23,12 @@ func GenAgent() {
 	stubFile := EmpRoot + "/stub.exe"
 	outfile := EmpRoot + "/agent.exe"
 
+	os_choice := CliAsk("Generate agent for (1) Linux, (2) Windows (default is Linux)?")
+	if os_choice == "2" {
+		stubFile = EmpRoot + "/stub-win.exe"
+		CliPrintInfo("You chose Windows")
+	}
+
 	if !util.IsFileExist(stubFile) {
 		CliPrintError("%s not found, build it first", stubFile)
 		return
