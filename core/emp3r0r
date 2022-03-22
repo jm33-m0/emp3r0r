@@ -37,7 +37,7 @@ case "$1" in
     export CGO_ENABLED=0
     export XZ_DEFAULTS='-T0 -9'
 
-    info "[-] Building binaries"
+    info "Building binaries"
     cd cmd/cc && go build -o "$temp/cc.exe"
     cd "$pwd/cmd/cat" && go build -o "$temp/cat.exe"
 
