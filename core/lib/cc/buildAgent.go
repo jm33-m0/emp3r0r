@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"strconv"
 	"strings"
+	"time"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -20,12 +21,18 @@ const (
 )
 
 func GenAgent() {
-	stubFile := EmpDataDir + "/stub.exe"
-	outfile := EmpDataDir + "/agent.exe"
+	now := time.Now()
+	stubFile := EmpBuildDir + "/stub.exe"
+	outfile := fmt.Sprintf("%s/agent_%d-%d-%d_%d-%d-%d.exe",
+		EmpWorkSpace,
+		now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 
-	os_choice := CliAsk("Generate agent for (1) Linux, (2) Windows (default is Linux)?")
+	os_choice := CliAsk("Generate agent for (1) Linux, (2) Windows: ")
 	if os_choice == "2" {
-		stubFile = EmpWorkSpace + "/stub-win.exe"
+		stubFile = EmpBuildDir + "/stub-win.exe"
+		outfile = fmt.Sprintf("%s/agent_windows_%d-%d-%d_%d-%d-%d.exe",
+			EmpWorkSpace,
+			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 		CliPrintInfo("You chose Windows")
 	}
 

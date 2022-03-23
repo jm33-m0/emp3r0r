@@ -30,8 +30,11 @@ var (
 	// EmpWorkSpace workspace directory of emp3r0r
 	EmpWorkSpace = ""
 
-	// EmpDataDir prefix/emp3r0r
+	// EmpDataDir prefix/lib/emp3r0r
 	EmpDataDir = ""
+
+	// EmpBuildDir prefix/lib/emp3r0r/build
+	EmpBuildDir = ""
 
 	// FileGetDir where we save #get files
 	FileGetDir = ""
@@ -438,6 +441,7 @@ func DirSetup() (err error) {
 	}
 	// eg. /usr/local/lib/emp3r0r
 	EmpDataDir = Prefix + "/lib/emp3r0r"
+	EmpBuildDir = EmpDataDir + "/build"
 	CAT = EmpDataDir + "/emp3r0r-cat"
 	if !util.IsFileExist(EmpDataDir) {
 		return fmt.Errorf("emp3r0r is not installed correctly: %s not found", EmpDataDir)
