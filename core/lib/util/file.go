@@ -217,6 +217,10 @@ func TarBz2(dir, outfile string) error {
 	// remove outfile
 	os.RemoveAll(outfile)
 
+	if !IsFileExist(dir) {
+		return fmt.Errorf("%s does not exist", dir)
+	}
+
 	// map files on disk to their paths in the archive
 	archive_dir_name := FileBaseName(dir)
 	if dir == "." {
