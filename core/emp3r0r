@@ -18,9 +18,13 @@ warn() {
 }
 
 pwd="$(pwd)"
+prefix="/usr/local"
+[[ -n "$PREFIX" ]] && prefix="$PREFIX"
+bin_dir="$prefix/bin"
+data_dir="$prefix/lib/emp3r0r"
+build_dir="$data_dir/build"
 
-case "$1" in
---release)
+build() {
     # build
     # -----
     command -v go || {
@@ -31,21 +35,52 @@ case "$1" in
         info "Installing garble"
         go install mvdan.cc/garble@latest || error "Failed to install garble"
     }
-    temp=/tmp/emp3r0r
+    temp=/tmp/emp3r0r-build
     [[ -d "$temp" ]] || mkdir -p "$temp"
 
+    # no fucking glibc!
     export CGO_ENABLED=0
-    export XZ_DEFAULTS='-T0 -9'
 
     info "Building CC"
-    cd cmd/cc && go build -o "$temp/cc.exe" -ldflags='-s -w -v'
+    {
+        cd cmd/cc && go build -o "$temp/cc.exe" -ldflags='-s -w -v'
+    } || error "build cc"
     info "Building cat"
-    cd "$pwd/cmd/cat" && go build -o "$temp/cat.exe" -ldflags='-s -w -v'
+    {
+        cd "$pwd/cmd/cat" && go build -o "$temp/cat.exe" -ldflags='-s -w -v'
+    } || error "build cat"
 
     info "Building agent stub"
-    cd "$pwd/cmd/agent" && garble -tiny build -o "$temp/stub.exe" -ldflags='-s -w -v'
+    {
+        cd "$pwd/cmd/agent" && garble -tiny build -o "$temp/stub.exe" -ldflags='-s -w -v'
+    } || error "build stub"
     info "Building agent stub for Windows"
-    cd "$pwd/cmd/agent" && GOOS=windows garble -tiny build -o "$temp/stub-win.exe" -ldflags='-s -w -v'
+    {
+        cd "$pwd/cmd/agent" && GOOS=windows garble -tiny build -o "$temp/stub-win.exe" -ldflags='-s -w -v'
+    } || error "build stub-win"
+}
+
+install() {
+    [[ "$EUID" -eq 0 ]] || error "You must be root to install emp3r0r"
+    info "emp3r0r will be installed to $prefix"
+    mkdir -p "$build_dir" || error "Failed to mkdir $build_dir"
+    cp -avR tmux "$data_dir" || error "tmux"
+    cp -avR modules "$data_dir" || error "modules"
+    cp -avR stub.exe "$build_dir/stub" error "stub"
+    cp -avR stub-win.exe "$build_dir/stub.exe" || error "stub-win"
+
+    # emp3r0r binaries
+    chmod 755 "$0" cc.exe cat.exe
+    cp -avR "$0" "$bin_dir/emp3r0r" || error "$0"
+    cp -avR cc.exe "$bin_dir/emp3r0r-cc" || error "emp3r0r-cc"
+    cp -avR cat.exe "$bin_dir/emp3r0r-cat" || error "emp3r0r-cat"
+
+    success "Installed emp3r0r, please check"
+}
+
+case "$1" in
+--release)
+    build
 
     # tar
     info "Preparing to archive files"
@@ -54,20 +89,41 @@ case "$1" in
     cp -aR "$pwd/modules" "$temp"
     cp -aR "$pwd/emp3r0r" "$temp"
     info "Tar XZ"
-    # XZ_OPT='-T0 -9' tar -cJpf "$pwd/emp3r0r.tar.xz" ./emp3r0r
-    tar -c -I 'xz -9 -T0' -p -f "$pwd/emp3r0r.tar.xz" ./emp3r0r
+    XZ_OPT='-T0 -9' tar -cJpf "$pwd/emp3r0r.tar.xz" ./emp3r0r
     success "Packaged emp3r0r"
     exit 0
 
     ;;
 
+--build)
+    build
+    exit 0
+
+    ;;
+
+--install)
+    build &&
+        cd "$temp" && install
+    cd "$pwd" || error "cd $pwd"
+    exit 0
+
+    ;;
+
 *)
+    command -v emp3r0r || error "Run \"$0 --install\" first"
+    command -v emp3r0r-cc || error "Run \"$0 --install\" first"
+    command -v emp3r0r-cat || error "Run \"$0 --install\" first"
+
+    # workspace is ~/.emp3r0r
+    # ------------------
+    [[ -d ~/.emp30r ]] || mkdir -p ~/.emp3r0r
+
     # Generate certs
     # --------------
-    { [[ -f emp3r0r-cert.pem ]] && [[ -f emp3r0r-key.pem ]]; } || {
+    { [[ -f ~/.emp3r0r/emp3r0r-cert.pem ]] && [[ -f ~/.emp3r0r/emp3r0r-key.pem ]]; } || {
         echo -ne "\e[36mCC names (can be IPs and/or domain names), separate with space:\n>>\e[0m "
         read -r hosts
-        ./cc.exe -gencert "$hosts"
+        emp3r0r-cc -gencert "$hosts"
     }
 
     # Run C2 server with tmux UI
@@ -76,18 +132,18 @@ case "$1" in
         error "tmux not found"
     fi
 
-    tmux_conf="$pwd/tmux/.tmux.conf"
+    tmux_conf="$data_dir/tmux/.tmux.conf"
     [[ -f "$tmux_conf" ]] || {
         error "$tmux_conf not found"
     }
 
     # helper scripts for tmux status line
-    cp -r "$pwd/tmux/sh" /tmp
+    cp -r "$data_dir/tmux/sh" /tmp
 
     # if not in a tmux session
     [[ -n "$TMUX" ]] || {
         # create tmux session with our config file
-        tmux -f "$tmux_conf" new-session -A -s emp3r0r -n cc ./cc.exe "$@" || {
+        tmux -f "$tmux_conf" new-session -A -s emp3r0r -n cc emp3r0r-cc "$@" || {
             error "$0 must be run in tmux"
         }
         exit
@@ -99,7 +155,8 @@ case "$1" in
         tmux rename-window cc
         tmux rename-session emp3r0r
         tmux source-file "$tmux_conf"
-        ./cc.exe "$@"
+        emp3r0r-cc "$@"
     }
+
     ;;
 esac
