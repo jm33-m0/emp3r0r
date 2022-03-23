@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/user"
 	"strings"
 	"sync"
 
@@ -23,14 +24,20 @@ var (
 	// IsAPIEnabled Indicate whether we are in headless mode
 	IsAPIEnabled = false
 
-	// EmpRoot root directory of emp3r0r
-	EmpRoot, _ = os.Getwd()
+	// Prefix /usr or /usr/local, can be set through $EMP3R0R_PREFIX
+	Prefix = ""
+
+	// EmpWorkSpace workspace directory of emp3r0r
+	EmpWorkSpace = ""
+
+	// EmpDataDir prefix/emp3r0r
+	EmpDataDir = ""
 
 	// FileGetDir where we save #get files
-	FileGetDir = EmpRoot + "/file-get/"
+	FileGetDir = ""
 
 	// EmpConfigFile emp3r0r.json
-	EmpConfigFile = EmpRoot + "/emp3r0r.json"
+	EmpConfigFile = ""
 
 	// Targets target list, with control (tun) interface
 	Targets = make(map[*emp3r0r_data.SystemInfo]*Control)
@@ -419,5 +426,43 @@ func Send2Agent(data *emp3r0r_data.MsgTunData, agent *emp3r0r_data.SystemInfo) (
 	out := json.NewEncoder(ctrl.Conn)
 
 	err = out.Encode(data)
+	return
+}
+
+// DirSetup set workspace, module directories, etc
+func DirSetup() (err error) {
+	// prefix
+	Prefix = os.Getenv("EMP3R0R_PREFIX")
+	if Prefix == "" {
+		Prefix = "/usr/local"
+	}
+	// eg. /usr/local/lib/emp3r0r
+	EmpDataDir = Prefix + "/lib/emp3r0r"
+	CAT = EmpDataDir + "/emp3r0r-cat"
+	if !util.IsFileExist(EmpDataDir) {
+		return fmt.Errorf("emp3r0r is not installed correctly: %s not found", EmpDataDir)
+	}
+	if !util.IsFileExist(CAT) {
+		return fmt.Errorf("emp3r0r is not installed correctly: %s not found", CAT)
+	}
+
+	// set workspace to ~/.emp3r0r
+	u, err := user.Current()
+	if err != nil {
+		return fmt.Errorf("Get current user: %v", err)
+	}
+	EmpWorkSpace = fmt.Sprintf("%s/.emp3r0r", u.HomeDir)
+	if !util.IsFileExist(EmpWorkSpace) {
+		err = os.MkdirAll(EmpWorkSpace, 0700)
+		if err != nil {
+			return fmt.Errorf("mkdir %s: %v", EmpWorkSpace, err)
+		}
+	}
+	FileGetDir = EmpWorkSpace + "/file-get/"
+	EmpConfigFile = EmpWorkSpace + "/emp3r0r.json"
+
+	// Module directories
+	ModuleDirs = []string{EmpDataDir + "/modules", EmpWorkSpace + "/modules"}
+
 	return
 }

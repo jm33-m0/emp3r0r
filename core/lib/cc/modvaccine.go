@@ -26,13 +26,13 @@ func moduleVaccine() {
 
 func CreateVaccineArchive() (err error) {
 	CliPrintInfo("Creating archive (%s) for module vaccine...", UtilsArchive)
-	err = os.Chdir(ModuleDir + "/vaccine")
+	err = os.Chdir(EmpDataDir + "/modules/vaccine") // vaccine is always stored under EmpDataDir
 	if err != nil {
 		return fmt.Errorf("Entering vaccine dir: %v", err)
 	}
 	defer func() {
 		CliPrintInfo("Created %.2fMB archive (%s) for module vaccine", float64(util.FileSize(UtilsArchive))/1024/1024, UtilsArchive)
-		os.Chdir(EmpRoot)
+		os.Chdir(EmpWorkSpace)
 	}()
 	err = util.TarBz2(".", UtilsArchive)
 	if err != nil {

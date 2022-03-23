@@ -72,8 +72,8 @@ install() {
     # emp3r0r binaries
     chmod 755 "$0" cc.exe cat.exe
     cp -avR "$0" "$bin_dir/emp3r0r" || error "$0"
-    cp -avR cc.exe "$bin_dir/emp3r0r-cc" || error "emp3r0r-cc"
-    cp -avR cat.exe "$bin_dir/emp3r0r-cat" || error "emp3r0r-cat"
+    cp -avR cc.exe "$data_dir/emp3r0r-cc" || error "emp3r0r-cc"
+    cp -avR cat.exe "$data_dir/emp3r0r-cat" || error "emp3r0r-cat"
 
     success "Installed emp3r0r, please check"
 }
@@ -110,9 +110,12 @@ case "$1" in
     ;;
 
 *)
-    command -v emp3r0r || error "Run \"$0 --install\" first"
-    command -v emp3r0r-cc || error "Run \"$0 --install\" first"
-    command -v emp3r0r-cat || error "Run \"$0 --install\" first"
+    if ! test -e "$prefix/lib/emp3r0r/emp3r0r-cc"; then
+        prefix="/usr"
+        if ! test -e "$prefix/lib/emp3r0r/emp3r0r-cc"; then
+            error "Run emp3r0r not installed"
+        fi
+    fi
 
     # workspace is ~/.emp3r0r
     # ------------------
@@ -125,6 +128,7 @@ case "$1" in
         read -r hosts
         emp3r0r-cc -gencert "$hosts"
     }
+    cc="$prefix/emp3r0r-cc"
 
     # Run C2 server with tmux UI
     # --------------------------
@@ -143,7 +147,7 @@ case "$1" in
     # if not in a tmux session
     [[ -n "$TMUX" ]] || {
         # create tmux session with our config file
-        tmux -f "$tmux_conf" new-session -A -s emp3r0r -n cc emp3r0r-cc "$@" || {
+        tmux -f "$tmux_conf" new-session -A -s emp3r0r -n cc "$cc" "$@" || {
             error "$0 must be run in tmux"
         }
         exit
@@ -155,7 +159,7 @@ case "$1" in
         tmux rename-window cc
         tmux rename-session emp3r0r
         tmux source-file "$tmux_conf"
-        emp3r0r-cc "$@"
+        "$cc" "$@"
     }
 
     ;;

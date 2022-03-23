@@ -52,9 +52,17 @@ func unlock_downloads() bool {
 }
 
 func main() {
+	var err error
+
 	// cleanup or abort
 	if !unlock_downloads() {
 		log.Fatal("CC is already running")
+	}
+
+	// set up dirs
+	err = cc.DirSetup()
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	cdnproxy := flag.String("cdn2proxy", "", "Start cdn2proxy server on this port")
@@ -76,7 +84,7 @@ func main() {
 	}
 
 	// read config file
-	err := readJSONConfig(*config)
+	err = readJSONConfig(*config)
 	if err != nil {
 		log.Fatalf("Read %s: %v", *config, err)
 	} else {

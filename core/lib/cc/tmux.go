@@ -51,7 +51,7 @@ var (
 	TmuxPanes = make(map[string]*Emp3r0rPane)
 
 	// CAT use this cat to replace /bin/cat
-	CAT = EmpRoot + "/cat.exe"
+	CAT = "emp3r0r-cat"
 )
 
 // returns the index of current pane

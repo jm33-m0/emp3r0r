@@ -16,10 +16,8 @@ type Option struct {
 }
 
 var (
-	// ModuleDir stores custom modules
-	// cc binary is saved as `./core/build/cc`,
-	// and modules are stored in `./core/modules`
-	ModuleDir = EmpRoot + "/modules/"
+	// ModuleDir stores modules
+	ModuleDirs []string
 
 	// CurrentMod selected module
 	CurrentMod = "<blank>"
