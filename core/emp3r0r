@@ -66,8 +66,8 @@ install() {
     mkdir -p "$build_dir" || error "Failed to mkdir $build_dir"
     cp -avR tmux "$data_dir" || error "tmux"
     cp -avR modules "$data_dir" || error "modules"
-    cp -avR stub.exe "$build_dir/stub" error "stub"
-    cp -avR stub-win.exe "$build_dir/stub.exe" || error "stub-win"
+    cp -avR stub.exe "$build_dir/stub.exe" || error "stub"
+    cp -avR stub-win.exe "$build_dir/stub-win.exe" || error "stub-win"
 
     # emp3r0r binaries
     chmod 755 "$0" cc.exe cat.exe
@@ -89,9 +89,10 @@ case "$1" in
     cp -aR "$pwd/modules" "$temp"
     cp -aR "$pwd/emp3r0r" "$temp"
     info "Tar XZ"
-    XZ_OPT='-T0 -9' tar -cJpf "$pwd/emp3r0r.tar.xz" ./emp3r0r
+    XZ_OPT='-T0 -9' tar -cJpf "$pwd/emp3r0r.tar.xz" ./emp3r0r-build || error "tar -cJpf"
     success "Packaged emp3r0r"
-    exit 0
+    cd "$pwd" &&
+        exit 0
 
     ;;
 
@@ -102,33 +103,36 @@ case "$1" in
     ;;
 
 --install)
-    build &&
-        cd "$temp" && install
+    install || error "install failed"
     cd "$pwd" || error "cd $pwd"
     exit 0
 
     ;;
 
 *)
+    # find prefix, either /usr or /usr/local
     if ! test -e "$prefix/lib/emp3r0r/emp3r0r-cc"; then
         prefix="/usr"
         if ! test -e "$prefix/lib/emp3r0r/emp3r0r-cc"; then
-            error "Run emp3r0r not installed"
+            error "emp3r0r not installed"
         fi
     fi
+    data_dir="$prefix/lib/emp3r0r"
+    cc="$data_dir/emp3r0r-cc"
+    [[ -z "$HOME" ]] && error "HOME not set"
+    workspace="$HOME/.emp3r0r"
 
     # workspace is ~/.emp3r0r
     # ------------------
-    [[ -d ~/.emp30r ]] || mkdir -p ~/.emp3r0r
+    [[ -d "$workspace" ]] || mkdir -p "$workspace"
 
     # Generate certs
     # --------------
-    { [[ -f ~/.emp3r0r/emp3r0r-cert.pem ]] && [[ -f ~/.emp3r0r/emp3r0r-key.pem ]]; } || {
+    { [[ -f "$workspace/emp3r0r-cert.pem" ]] && [[ -f "$workspace/emp3r0r-key.pem" ]]; } || {
         echo -ne "\e[36mCC names (can be IPs and/or domain names), separate with space:\n>>\e[0m "
         read -r hosts
-        emp3r0r-cc -gencert "$hosts"
+        "$cc" -gencert "$hosts"
     }
-    cc="$prefix/emp3r0r-cc"
 
     # Run C2 server with tmux UI
     # --------------------------
