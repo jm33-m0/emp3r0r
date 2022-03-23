@@ -20,8 +20,8 @@ const (
 )
 
 func GenAgent() {
-	stubFile := EmpWorkSpace + "/stub.exe"
-	outfile := EmpWorkSpace + "/agent.exe"
+	stubFile := EmpDataDir + "/stub.exe"
+	outfile := EmpDataDir + "/agent.exe"
 
 	os_choice := CliAsk("Generate agent for (1) Linux, (2) Windows (default is Linux)?")
 	if os_choice == "2" {

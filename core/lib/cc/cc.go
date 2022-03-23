@@ -461,6 +461,12 @@ func DirSetup() (err error) {
 	FileGetDir = EmpWorkSpace + "/file-get/"
 	EmpConfigFile = EmpWorkSpace + "/emp3r0r.json"
 
+	// cd to workspace
+	err = os.Chdir(EmpWorkSpace)
+	if err != nil {
+		return fmt.Errorf("cd to workspace %s: %v", EmpWorkSpace, err)
+	}
+
 	// Module directories
 	ModuleDirs = []string{EmpDataDir + "/modules", EmpWorkSpace + "/modules"}
 

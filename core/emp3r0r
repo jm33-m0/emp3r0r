@@ -112,11 +112,14 @@ case "$1" in
 *)
     # find prefix, either /usr or /usr/local
     if ! test -e "$prefix/lib/emp3r0r/emp3r0r-cc"; then
+        # if not found in /usr/local then set to /usr
         prefix="/usr"
         if ! test -e "$prefix/lib/emp3r0r/emp3r0r-cc"; then
+            # if still nothing, abort
             error "emp3r0r not installed"
         fi
     fi
+    export EMP3R0R_PREFIX="$prefix" # emp3r0r-cc will read this
     data_dir="$prefix/lib/emp3r0r"
     cc="$data_dir/emp3r0r-cc"
     [[ -z "$HOME" ]] && error "HOME not set"
@@ -125,6 +128,7 @@ case "$1" in
     # workspace is ~/.emp3r0r
     # ------------------
     [[ -d "$workspace" ]] || mkdir -p "$workspace"
+    cd "$workspace" || error "Failed to enter $workspace"
 
     # Generate certs
     # --------------
@@ -141,19 +145,15 @@ case "$1" in
     fi
 
     tmux_conf="$data_dir/tmux/.tmux.conf"
-    [[ -f "$tmux_conf" ]] || {
-        error "$tmux_conf not found"
-    }
+    [[ -f "$tmux_conf" ]] || error "$tmux_conf not found"
 
     # helper scripts for tmux status line
-    cp -r "$data_dir/tmux/sh" /tmp
+    [[ -d "$workspace/sh" ]] || cp -r "$data_dir/tmux/sh" "$workspace" || error "copy tmux scripts"
 
     # if not in a tmux session
     [[ -n "$TMUX" ]] || {
         # create tmux session with our config file
-        tmux -f "$tmux_conf" new-session -A -s emp3r0r -n cc "$cc" "$@" || {
-            error "$0 must be run in tmux"
-        }
+        tmux -f "$tmux_conf" new-session -A -s emp3r0r -n cc "$cc" "$@" || error "$0 must be run in tmux"
         exit
     }
 
