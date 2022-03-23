@@ -350,6 +350,29 @@ func CliPrintSuccess(format string, a ...interface{}) {
 	}
 }
 
+// CliFatalError print log in red, and exit
+func CliFatalError(format string, a ...interface{}) {
+	errorColor := color.New(color.Bold, color.FgHiRed)
+	log.Fatal(errorColor.Sprintf(format, a...))
+	if IsAPIEnabled {
+		// send to socket
+		var resp APIResponse
+		msg := GetDateTime() + " ERROR: " + fmt.Sprintf(format, a...)
+		resp.MsgData = []byte(msg)
+		resp.Alert = true
+		resp.MsgType = LOG
+		data, err := json.Marshal(resp)
+		if err != nil {
+			log.Printf("CliPrintError: %v", err)
+			return
+		}
+		_, err = APIConn.Write([]byte(data))
+		if err != nil {
+			log.Printf("CliPrintError: %v", err)
+		}
+	}
+}
+
 // CliPrintError print log in red
 func CliPrintError(format string, a ...interface{}) {
 	errorColor := color.New(color.Bold, color.FgHiRed)
