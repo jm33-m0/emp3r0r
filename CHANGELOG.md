@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.9.0](https://github.com/jm33-m0/emp3r0r/compare/v1.8.1...v1.9.0) (2022-03-23)
+
+
+### Features
+
+* emp3r0r installer ([f126780](https://github.com/jm33-m0/emp3r0r/commit/f12678038a53e12862865b17048e2e7ba69b4ba0))
+* install emp3r0r to your system, load custom modules from ~/.emp3r0r ([77f1564](https://github.com/jm33-m0/emp3r0r/commit/77f1564d9dd556271efb726272278121ad3cd747))
+* use colored print for all fatal errors ([9933d86](https://github.com/jm33-m0/emp3r0r/commit/9933d8635318757ca8d4e477fc3ea66cc013ec8b))
+
+
+### Bug Fixes
+
+* cannot pack custom modules due to incorrect path ([c535350](https://github.com/jm33-m0/emp3r0r/commit/c535350a52f4d6906d8fe1473398636ccd983fd1))
+* emp3r0r launcher/installer path error ([e4e7a91](https://github.com/jm33-m0/emp3r0r/commit/e4e7a91e931ede594aaaaac8320b189546b8ac2d))
+* gen_agent: binaries not found ([31b68d1](https://github.com/jm33-m0/emp3r0r/commit/31b68d13fd0e7d620d920ff46a466692462f6f01))
+* modules don't load ([7bac146](https://github.com/jm33-m0/emp3r0r/commit/7bac14606a9a4df253d210ab29a30c35bde5257c))
+* path errors ([70d8362](https://github.com/jm33-m0/emp3r0r/commit/70d8362fd688d6ab629deac201578c8d27a034e7))
+* set correct location for tmux scripts ([a58c1a3](https://github.com/jm33-m0/emp3r0r/commit/a58c1a3381d905ecf260f1b29f2705e4c2f5b8f2))
+
 ### [1.8.1](https://github.com/jm33-m0/emp3r0r/compare/v1.8.0...v1.8.1) (2022-03-22)
 
 
