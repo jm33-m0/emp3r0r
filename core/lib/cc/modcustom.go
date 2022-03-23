@@ -190,6 +190,11 @@ func InitModules() {
 	}
 
 	load_mod := func(mod_dir string) {
+		// don't bother if module dir not found
+		if !util.IsFileExist(mod_dir) {
+			return
+		}
+		CliPrintInfo("Scanning %s for modules", mod_dir)
 		dirs, err := ioutil.ReadDir(mod_dir)
 		if err != nil {
 			CliPrintError("Failed to scan custom modules: %v", err)
@@ -199,7 +204,7 @@ func InitModules() {
 			if !dir.IsDir() {
 				continue
 			}
-			config_file := mod_dir + dir.Name() + "/config.json"
+			config_file := fmt.Sprintf("%s/%s/config.json", mod_dir, dir.Name())
 			if !util.IsFileExist(config_file) {
 				continue
 			}
