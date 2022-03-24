@@ -49,7 +49,7 @@ func Packer(inputELF string) (err error) {
 	}
 
 	// append to stub
-	stub_file := "packer_stub.exe"
+	stub_file := EmpBuildDir + "/packer_stub.exe"
 	packed_file := fmt.Sprintf("%s.packed.exe", inputELF)
 	toWrite, err := ioutil.ReadFile(stub_file)
 	if err != nil {

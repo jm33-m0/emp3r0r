@@ -45,6 +45,10 @@ build() {
     {
         cd cmd/cc && go build -o "$temp/cc.exe" -ldflags='-s -w -v'
     } || error "build cc"
+    info "Building Packer stub"
+    {
+        cd cmd/packer_stub && garble -tiny build -o "$temp/packer_stub.exe" -ldflags='-s -w -v'
+    } || error "build cc"
     info "Building cat"
     {
         cd "$pwd/cmd/cat" && go build -o "$temp/cat.exe" -ldflags='-s -w -v'
@@ -68,6 +72,7 @@ install() {
     cp -avR modules "$data_dir" || error "modules"
     cp -avR stub.exe "$build_dir/stub.exe" || error "stub"
     cp -avR stub-win.exe "$build_dir/stub-win.exe" || error "stub-win"
+    cp -avR packer_stub.exe "$build_dir/packer_stub.exe" || error "packer_stub"
 
     # emp3r0r binaries
     chmod 755 "$0" cc.exe cat.exe
