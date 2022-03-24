@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.10.1](https://github.com/jm33-m0/emp3r0r/compare/v1.10.0...v1.10.1) (2022-03-24)
+
+
+### Bug Fixes
+
+* packer_stub.exe path ([7b7a2d7](https://github.com/jm33-m0/emp3r0r/commit/7b7a2d7b49d86dec2948d3de18c66ff918c30c49))
+
 ## [1.10.0](https://github.com/jm33-m0/emp3r0r/compare/v1.9.0...v1.10.0) (2022-03-24)
 
 
