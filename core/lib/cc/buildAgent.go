@@ -86,6 +86,13 @@ func GenAgent() {
 		outfile, stubFile, EmpConfigFile, outfile)
 }
 
+// PackAgentBinary pack agent ELF binary with Packer()
+func PackAgentBinary() (err error) {
+	answ := CliAsk("Path to agent binary: ")
+
+	return Packer(answ)
+}
+
 func UpgradeAgent() {
 	if !util.IsFileExist(WWWRoot + "agent") {
 		CliPrintError("Make sure %s/agent exists", WWWRoot)

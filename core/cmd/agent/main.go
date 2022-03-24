@@ -89,7 +89,7 @@ func main() {
 	// PATH
 	os.Setenv("PATH", fmt.Sprintf("%s:/bin:/usr/bin:/usr/local/bin", agent.RuntimeConfig.UtilsPath))
 
-	// HOME
+	// set HOME to correct value
 	u, err := user.Current()
 	if err != nil {
 		log.Printf("Get user info: %v", err)

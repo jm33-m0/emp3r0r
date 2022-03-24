@@ -17,11 +17,11 @@ import (
 var RuntimeConfig = &emp3r0r_data.Config{}
 
 func ApplyRuntimeConfig() (err error) {
-	encJsonData, err := readConfigFromFile()
+	encJsonData, err := DigEmbeddedDataFromArg0()
 	if err != nil {
 		e := err
 		log.Printf("readConfigFromFile: %v", err)
-		encJsonData, err = readConfigFromMem()
+		encJsonData, err = DigEmbededDataFromMem()
 		if err != nil {
 			return fmt.Errorf("readConfigFromFile: %v. readConfigFromMem: %v", e, err)
 		}
@@ -50,7 +50,9 @@ func ApplyRuntimeConfig() (err error) {
 	return
 }
 
-func readConfigFromFile() (data []byte, err error) {
+// DigEmbededDataFromFile search args[0] file content for data embeded between two separators
+// separator is MagicString*3
+func DigEmbeddedDataFromArg0() (data []byte, err error) {
 	wholeStub, err := ioutil.ReadFile(os.Args[0])
 	if err != nil {
 		return
@@ -70,7 +72,9 @@ func readConfigFromFile() (data []byte, err error) {
 	return
 }
 
-func readConfigFromMem() (data []byte, err error) {
+// DigEmbededDataFromMem search process memory for data embeded between two separators
+// separator is MagicString*3
+func DigEmbededDataFromMem() (data []byte, err error) {
 	mem_regions, err := DumpSelfMem()
 	if err != nil {
 		err = fmt.Errorf("Cannot dump self memory: %v", err)
