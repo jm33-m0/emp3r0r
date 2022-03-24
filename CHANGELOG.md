@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.10.0](https://github.com/jm33-m0/emp3r0r/compare/v1.9.0...v1.10.0) (2022-03-24)
+
+
+### Features
+
+* check if agent is started by ELF loader by PATH hash ([2df3c1d](https://github.com/jm33-m0/emp3r0r/commit/2df3c1d827f5634bc25f2ae9f116bfdfa99e88a4))
+* integrate packer into C2 ([c81cd7d](https://github.com/jm33-m0/emp3r0r/commit/c81cd7dd1e69042fb2fe78964eae3c4884ae6542))
+
+
+### Bug Fixes
+
+* pack_agent command ([7d2dcea](https://github.com/jm33-m0/emp3r0r/commit/7d2dcea321695a52256416a1f29e7fd672953fe4))
+
 ## [1.9.0](https://github.com/jm33-m0/emp3r0r/compare/v1.8.1...v1.9.0) (2022-03-23)
 
 
