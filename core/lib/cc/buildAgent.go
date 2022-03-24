@@ -87,10 +87,13 @@ func GenAgent() {
 }
 
 // PackAgentBinary pack agent ELF binary with Packer()
-func PackAgentBinary() (err error) {
+func PackAgentBinary() {
 	answ := CliAsk("Path to agent binary: ")
 
-	return Packer(answ)
+	err := Packer(answ)
+	if err != nil {
+		CliPrintError("PackAgentBinary: %v", err)
+	}
 }
 
 func UpgradeAgent() {

@@ -18,7 +18,8 @@ var CommandHelp = map[string]string{
 	"use":             "Use a module. eg. `use <module_name>`",
 	"run":             "Run selected module, make sure you have set required options",
 	"info":            "What options do we have?",
-	"gen_agent":       "Generate agent with provided binary and build.json",
+	"gen_agent":       "Generate agent with provided binary and emp3r0r.json",
+	"pack_agent":      "Pack agent to make it smaller and harder to analysis",
 	"upgrade_agent":   "Upgrade agent on selected target",
 	"ls":              "List current directory of selected agent",
 	"mv":              "Move a file to another location on selected target",
@@ -53,6 +54,7 @@ var CmdFuncs = map[string]func(){
 	"screenshot":    TakeScreenshot,
 	"upgrade_agent": UpgradeAgent,
 	"gen_agent":     GenAgent,
+	"pack_agent":    PackAgentBinary,
 	"suicide":       Suicide,
 }
 
