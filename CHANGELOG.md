@@ -1,5 +1,20 @@
 # Changelog
 
+### [1.10.3](https://github.com/jm33-m0/emp3r0r/compare/v1.10.2...v1.10.3) (2022-03-25)
+
+
+### Bug Fixes
+
+* filename autocompletion for packer ([1a9d180](https://github.com/jm33-m0/emp3r0r/commit/1a9d180e95b83a52d3007880b0d987803b9208be))
+* make packed binaries executable by default ([5d2c944](https://github.com/jm33-m0/emp3r0r/commit/5d2c9448adea5b8f684b8e80cc601f6f962f6b91))
+* packed agent cannot find config data ([e621808](https://github.com/jm33-m0/emp3r0r/commit/e621808bed15ea0ec4189e5c31240b9f31034a4f))
+* packer blocks UI ([6788b35](https://github.com/jm33-m0/emp3r0r/commit/6788b351cae09dd90f6fbe14e9ef6a9cbb27ac66))
+* reduce packer_stub binary size ([c67fff9](https://github.com/jm33-m0/emp3r0r/commit/c67fff9632d2d4f6c9647828731e1e782730dd14))
+* reduce size of data package ([c441325](https://github.com/jm33-m0/emp3r0r/commit/c441325aa23f7b166b2419049163af59a653e83f))
+* unable to extract config data when agent is packed ([c8b5198](https://github.com/jm33-m0/emp3r0r/commit/c8b5198553357ba5fd8c35d159231d0e17fbbee6))
+* unable to extract data from file/mem ([eff9574](https://github.com/jm33-m0/emp3r0r/commit/eff9574417883ec6c8b5820bb0b199acea7806bd))
+* unable to extract embeded json config ([1c80ec8](https://github.com/jm33-m0/emp3r0r/commit/1c80ec869f6dc24fa692d89422c04ac746e970f2))
+
 ### [1.10.2](https://github.com/jm33-m0/emp3r0r/compare/v1.10.1...v1.10.2) (2022-03-25)
 
 
