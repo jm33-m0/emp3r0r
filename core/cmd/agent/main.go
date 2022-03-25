@@ -404,7 +404,7 @@ func inject_and_run() (err error) {
 	if path_hash == "f74980d53e01a9ca2078f3894390606d4ecc1b0fc70d284faa16043d718ad0a5" {
 		return fmt.Errorf("This process is started by injector, aborting")
 	}
-	cmd := exec.Command("cat")
+	cmd := exec.Command("/bin/cat")
 	err = cmd.Run()
 	if err != nil {
 		return
