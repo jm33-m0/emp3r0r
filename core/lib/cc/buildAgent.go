@@ -102,10 +102,12 @@ func PackAgentBinary() {
 	// ask
 	answ := CliAsk("Path to agent binary: ")
 
-	err := Packer(answ)
-	if err != nil {
-		CliPrintError("PackAgentBinary: %v", err)
-	}
+	go func() {
+		err := Packer(answ)
+		if err != nil {
+			CliPrintError("PackAgentBinary: %v", err)
+		}
+	}()
 }
 
 func UpgradeAgent() {
