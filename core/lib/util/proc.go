@@ -103,6 +103,16 @@ func ProcCmdline(pid int) string {
 	return cmdline
 }
 
+// IsPIDAlive check if a process name exists, returns its process(es)
+func IsPIDAlive(pid int) (alive bool) {
+	alive, err := process.PidExists(int32(pid))
+	if err != nil {
+		log.Printf("IsPIDAlive: %v", err)
+		return false
+	}
+	return
+}
+
 // IsProcAlive check if a process name exists, returns its process(es)
 func IsProcAlive(procName string) (alive bool, procs []*os.Process) {
 	allprocs, err := gops.Processes()
