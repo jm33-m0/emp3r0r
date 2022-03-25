@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bettercap/readline"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -88,6 +89,13 @@ func GenAgent() {
 
 // PackAgentBinary pack agent ELF binary with Packer()
 func PackAgentBinary() {
+	// completer
+	compls := []readline.PrefixCompleterInterface{
+		readline.PcItemDynamic(listFiles("./"))}
+	CliCompleter.SetChildren(compls)
+	defer CliCompleter.SetChildren(CmdCompls)
+
+	// ask
 	answ := CliAsk("Path to agent binary: ")
 
 	err := Packer(answ)
