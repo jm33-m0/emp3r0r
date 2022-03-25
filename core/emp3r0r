@@ -24,6 +24,10 @@ bin_dir="$prefix/bin"
 data_dir="$prefix/lib/emp3r0r"
 build_dir="$data_dir/build"
 
+# build and tar
+temp=/tmp/emp3r0r-build
+[[ -d "$temp" ]] || mkdir -p "$temp"
+
 build() {
     # build
     # -----
@@ -35,8 +39,6 @@ build() {
         info "Installing garble"
         go install mvdan.cc/garble@latest || error "Failed to install garble"
     }
-    temp=/tmp/emp3r0r-build
-    [[ -d "$temp" ]] || mkdir -p "$temp"
 
     # no fucking glibc!
     export CGO_ENABLED=0
@@ -47,8 +49,9 @@ build() {
     } || error "build cc"
     info "Building Packer stub"
     {
-        cd cmd/packer_stub && garble -tiny build -o "$temp/packer_stub.exe" -ldflags='-s -w -v'
-    } || error "build cc"
+        # -tiny doesn't work, perhaps a bug of garble
+        cd "$pwd/cmd/packer_stub" && garble build -o "$temp/packer_stub.exe" -ldflags='-s -w -v'
+    } || error "build packer_stub"
     info "Building cat"
     {
         cd "$pwd/cmd/cat" && go build -o "$temp/cat.exe" -ldflags='-s -w -v'
@@ -56,11 +59,12 @@ build() {
 
     info "Building agent stub"
     {
-        cd "$pwd/cmd/agent" && garble -tiny build -o "$temp/stub.exe" -ldflags='-s -w -v'
+        # -tiny doesn't work, perhaps a bug of garble
+        cd "$pwd/cmd/agent" && garble build -o "$temp/stub.exe" -ldflags='-s -w -v'
     } || error "build stub"
     info "Building agent stub for Windows"
     {
-        cd "$pwd/cmd/agent" && GOOS=windows garble -tiny build -o "$temp/stub-win.exe" -ldflags='-s -w -v'
+        cd "$pwd/cmd/agent" && GOOS=windows garble build -o "$temp/stub-win.exe" -ldflags='-s -w -v'
     } || error "build stub-win"
 }
 
@@ -85,31 +89,27 @@ install() {
 
 case "$1" in
 --release)
-    build
-
-    # tar
-    info "Preparing to archive files"
-    cd /tmp || error "Cannot cd to /tmp"
-    cp -aR "$pwd/tmux" "$temp"
-    cp -aR "$pwd/modules" "$temp"
-    cp -aR "$pwd/emp3r0r" "$temp"
-    info "Tar XZ"
-    XZ_OPT='-T0 -9' tar -cJpf "$pwd/emp3r0r.tar.xz" ./emp3r0r-build || error "tar -cJpf"
-    success "Packaged emp3r0r"
-    cd "$pwd" &&
-        exit 0
+    (build) && (
+        info "Preparing to archive files"
+        cd /tmp || error "Cannot cd to /tmp"
+        cp -aR "$pwd/tmux" "$temp" || error "cp tmux"
+        cp -aR "$pwd/modules" "$temp" || error "cp modules"
+        cp -aR "$pwd/emp3r0r" "$temp" || error "cp emp3r0r"
+        info "Tar XZ"
+        XZ_OPT='-T0 -9' tar -cJpf "$pwd/emp3r0r.tar.xz" ./emp3r0r-build || error "tar -cJpf"
+        success "Packaged emp3r0r"
+    )
 
     ;;
 
 --build)
-    build
-    exit 0
+    (build) &&
+        exit 0
 
     ;;
 
 --install)
-    install || error "install failed"
-    cd "$pwd" || error "cd $pwd"
+    (install) || error "install failed"
     exit 0
 
     ;;
