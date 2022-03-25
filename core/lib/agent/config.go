@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"encoding/base64"
 	"fmt"
 	"log"
 
@@ -12,32 +13,39 @@ import (
 var RuntimeConfig = &emp3r0r_data.Config{}
 
 func ApplyRuntimeConfig() (err error) {
-	encJsonData, err := util.DigEmbeddedDataFromArg0()
+	readJsonData, err := util.DigEmbeddedDataFromArg0()
 	if err != nil {
 		e := err
 		log.Printf("read config from file: %v", err)
-		encJsonData, err = util.DigEmbededDataFromMem()
+		readJsonData, err = util.DigEmbededDataFromMem()
 		if err != nil {
 			return fmt.Errorf("read config from file: %v. from memory: %v", e, err)
 		}
 	}
 
+	// base64 decode
+	var decoded_json_data []byte
+	_, err = base64.StdEncoding.Decode(readJsonData, decoded_json_data)
+	if err != nil {
+		return fmt.Errorf("ApplyRuntimeConfig: base64 decode: %v", err)
+	}
+
 	// decrypt attached JSON file
 	key := tun.GenAESKey(emp3r0r_data.MagicString)
-	decJsonData := tun.AESDecryptRaw(key, encJsonData)
-	if decJsonData == nil {
+	jsonData := tun.AESDecryptRaw(key, decoded_json_data)
+	if jsonData == nil {
 		err = fmt.Errorf("Decrypt JSON with key %s failed", key)
 		return
 	}
 
 	// parse JSON
-	err = emp3r0r_data.ReadJSONConfig(decJsonData, RuntimeConfig)
+	err = emp3r0r_data.ReadJSONConfig(jsonData, RuntimeConfig)
 	if err != nil {
-		short_view := decJsonData
-		if len(decJsonData) > 100 {
-			short_view = decJsonData[:100]
+		short_view := jsonData
+		if len(jsonData) > 100 {
+			short_view = jsonData[:100]
 		}
-		return fmt.Errorf("parsing %d bytes of JSON data (%s...): %v", len(decJsonData), short_view, err)
+		return fmt.Errorf("parsing %d bytes of JSON data (%s...): %v", len(jsonData), short_view, err)
 	}
 
 	// CA

@@ -13,23 +13,29 @@ import (
 
 // DigEmbededDataFromFile search args[0] file content for data embeded between two separators
 // separator is MagicString*3
-func DigEmbeddedDataFromArg0() (data []byte, err error) {
+func DigEmbeddedDataFromArg0() ([]byte, error) {
 	wholeStub, err := ioutil.ReadFile(os.Args[0])
 	if err != nil {
-		return
+		return nil, err
 	}
-	sep := []byte(strings.Repeat(emp3r0r_data.MagicString, 3))
 
-	// locate the JSON file
-	split := bytes.Split(wholeStub, sep)
+	return DigEmbeddedData(wholeStub)
+}
+
+// DigEmbeddedData search for embedded data in given []byte buffer
+func DigEmbeddedData(data []byte) (embedded_data []byte, err error) {
+	sep := []byte(strings.Repeat(emp3r0r_data.MagicString, 3))
+	err = fmt.Errorf("No magic string found")
+
+	// locate embedded_data
+	split := bytes.Split(data, sep)
 	if len(split) < 2 {
-		return nil, fmt.Errorf("No magic string found in file %s", os.Args[0])
+		return
 	}
 	data = split[1]
 	if len(data) <= 0 {
-		return nil, fmt.Errorf("No config data found in file %s", os.Args[0])
+		return
 	}
-
 	return
 }
 
@@ -44,17 +50,14 @@ func DigEmbededDataFromMem() (data []byte, err error) {
 
 	var (
 		mem_region []byte
-		sep        = []byte(strings.Repeat(emp3r0r_data.MagicString, 3))
 	)
 	for _, mem_region = range mem_regions {
-		// locate the JSON file
-		split := bytes.Split(mem_region, sep)
-		if len(split) < 2 {
+		data, err = DigEmbeddedData(mem_region)
+		if err != nil {
+			log.Print(err)
 			continue
 		}
-		data = split[1]
-		log.Printf("len(split) = %d, split[0] = %s... (%d bytes), split[1] = %s... (%d bytes)",
-			len(split), split[0], len(split[0][:30]), split[1][:30], len(split[1]))
+		break
 	}
 	if len(data) <= 0 {
 		return nil, fmt.Errorf("No config data found in memory")

