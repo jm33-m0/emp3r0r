@@ -59,7 +59,7 @@ func Packer(inputELF string) (err error) {
 	toWrite = append(toWrite, sep...)
 	toWrite = append(toWrite, encELFBytes...)
 	toWrite = append(toWrite, sep...)
-	err = ioutil.WriteFile(packed_file, toWrite, 0600)
+	err = ioutil.WriteFile(packed_file, toWrite, 0755)
 	if err != nil {
 		return fmt.Errorf("write to packed file %s: %v", packed_file, err)
 	}
