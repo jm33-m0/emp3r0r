@@ -24,8 +24,7 @@ func ApplyRuntimeConfig() (err error) {
 	}
 
 	// base64 decode
-	var decoded_json_data []byte
-	_, err = base64.StdEncoding.Decode(readJsonData, decoded_json_data)
+	decoded_json_data, err := base64.StdEncoding.DecodeString(string(readJsonData))
 	if err != nil {
 		return fmt.Errorf("ApplyRuntimeConfig: base64 decode: %v", err)
 	}

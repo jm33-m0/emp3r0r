@@ -25,7 +25,7 @@ func DigEmbeddedDataFromArg0() ([]byte, error) {
 // DigEmbeddedData search for embedded data in given []byte buffer
 func DigEmbeddedData(data []byte) (embedded_data []byte, err error) {
 	sep := []byte(strings.Repeat(emp3r0r_data.MagicString, 3))
-	err = fmt.Errorf("No magic string found")
+	err = fmt.Errorf("DigEmbeddedData: No magic string found")
 
 	// locate embedded_data
 	split := bytes.Split(data, sep)
@@ -36,6 +36,7 @@ func DigEmbeddedData(data []byte) (embedded_data []byte, err error) {
 	if len(data) <= 0 {
 		return
 	}
+	err = nil
 	return
 }
 
@@ -48,13 +49,10 @@ func DigEmbededDataFromMem() (data []byte, err error) {
 		return
 	}
 
-	var (
-		mem_region []byte
-	)
-	for _, mem_region = range mem_regions {
+	for n, mem_region := range mem_regions {
 		data, err = DigEmbeddedData(mem_region)
 		if err != nil {
-			log.Print(err)
+			log.Printf("memory region %d (%d bytes): %v", n, len(mem_region), err)
 			continue
 		}
 		break

@@ -66,8 +66,7 @@ func GenAgent() {
 	}
 
 	// base64
-	var json_data_to_write []byte
-	base64.StdEncoding.Encode(json_data_to_write, encryptedJSONBytes)
+	json_data_to_write := base64.StdEncoding.EncodeToString(encryptedJSONBytes)
 
 	// write
 	toWrite, err := ioutil.ReadFile(stubFile)
@@ -79,7 +78,7 @@ func GenAgent() {
 
 	// wrap the config data with magic string
 	toWrite = append(toWrite, sep...)
-	toWrite = append(toWrite, json_data_to_write...)
+	toWrite = append(toWrite, []byte(json_data_to_write)...)
 	toWrite = append(toWrite, sep...)
 	err = ioutil.WriteFile(outfile, toWrite, 0755)
 	if err != nil {
