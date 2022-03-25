@@ -15,10 +15,10 @@ func ApplyRuntimeConfig() (err error) {
 	encJsonData, err := util.DigEmbeddedDataFromArg0()
 	if err != nil {
 		e := err
-		log.Printf("DigEmbeddedDataFromArg0: %v", err)
+		log.Printf("read config from file: %v", err)
 		encJsonData, err = util.DigEmbededDataFromMem()
 		if err != nil {
-			return fmt.Errorf("DigEmbededDataFromArg0: %v. DigEmbededDataFromMem: %v", e, err)
+			return fmt.Errorf("read config from file: %v. from memory: %v", e, err)
 		}
 	}
 
