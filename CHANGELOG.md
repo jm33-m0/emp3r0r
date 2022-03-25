@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.10.4](https://github.com/jm33-m0/emp3r0r/compare/v1.10.3...v1.10.4) (2022-03-25)
+
+
+### Bug Fixes
+
+* unable to execute cat since `PATH` is not set ([5049837](https://github.com/jm33-m0/emp3r0r/commit/5049837726f009891137364cbabec3533359f7bd))
+
 ### [1.10.3](https://github.com/jm33-m0/emp3r0r/compare/v1.10.2...v1.10.3) (2022-03-25)
 
 
