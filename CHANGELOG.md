@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.10.2](https://github.com/jm33-m0/emp3r0r/compare/v1.10.1...v1.10.2) (2022-03-25)
+
+
+### Bug Fixes
+
+* `emp3r0r --release` fails to build packer_stub ([5dd8f99](https://github.com/jm33-m0/emp3r0r/commit/5dd8f997e249abd84b7128760731ae72e0f42131))
+
 ### [1.10.1](https://github.com/jm33-m0/emp3r0r/compare/v1.10.0...v1.10.1) (2022-03-24)
 
 
