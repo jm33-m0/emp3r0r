@@ -11,7 +11,7 @@ require (
 	github.com/gliderlabs/ssh v0.3.3
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
-	github.com/jaypipes/ghw v0.8.0
+	github.com/jaypipes/ghw v0.9.0
 	github.com/jm33-m0/go-cdn2proxy v1.1.2
 	github.com/jm33-m0/go-lpe v1.0.0
 	github.com/kbinani/screenshot v0.0.0-20210720154843-7d3a670d8329
@@ -46,7 +46,7 @@ require (
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
-	github.com/jaypipes/pcidb v0.6.0 // indirect
+	github.com/jaypipes/pcidb v1.0.0 // indirect
 	github.com/jezek/xgb v1.0.0 // indirect
 	github.com/klauspost/compress v1.15.1 // indirect
 	github.com/klauspost/pgzip v1.2.5 // indirect
