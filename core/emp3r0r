@@ -61,7 +61,7 @@ build() {
     {
         # -tiny doesn't work, perhaps a bug of garble
         cd "$pwd/cmd/agent" && garble build -o "$temp/stub.exe" -ldflags='-s -w -v'
-    } || error "build stub"
+    } || error "build agent stub"
     info "Building agent stub for Windows"
     {
         cd "$pwd/cmd/agent" && GOOS=windows garble build -o "$temp/stub-win.exe" -ldflags='-s -w -v'

@@ -1,6 +1,7 @@
 package cc
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bettercap/readline"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -57,11 +59,14 @@ func GenAgent() {
 
 	// encrypt
 	key := tun.GenAESKey(emp3r0r_data.MagicString)
-	encJSONBytes := tun.AESEncryptRaw(key, jsonBytes)
-	if encJSONBytes == nil {
+	encryptedJSONBytes := tun.AESEncryptRaw(key, jsonBytes)
+	if encryptedJSONBytes == nil {
 		CliPrintError("Failed to encrypt %s with key %s", EmpConfigFile, key)
 		return
 	}
+
+	// base64
+	json_data_to_write := base64.StdEncoding.EncodeToString(encryptedJSONBytes)
 
 	// write
 	toWrite, err := ioutil.ReadFile(stubFile)
@@ -73,7 +78,7 @@ func GenAgent() {
 
 	// wrap the config data with magic string
 	toWrite = append(toWrite, sep...)
-	toWrite = append(toWrite, encJSONBytes...)
+	toWrite = append(toWrite, []byte(json_data_to_write)...)
 	toWrite = append(toWrite, sep...)
 	err = ioutil.WriteFile(outfile, toWrite, 0755)
 	if err != nil {
@@ -88,12 +93,21 @@ func GenAgent() {
 
 // PackAgentBinary pack agent ELF binary with Packer()
 func PackAgentBinary() {
+	// completer
+	compls := []readline.PrefixCompleterInterface{
+		readline.PcItemDynamic(listFiles("./"))}
+	CliCompleter.SetChildren(compls)
+	defer CliCompleter.SetChildren(CmdCompls)
+
+	// ask
 	answ := CliAsk("Path to agent binary: ")
 
-	err := Packer(answ)
-	if err != nil {
-		CliPrintError("PackAgentBinary: %v", err)
-	}
+	go func() {
+		err := Packer(answ)
+		if err != nil {
+			CliPrintError("PackAgentBinary: %v", err)
+		}
+	}()
 }
 
 func UpgradeAgent() {
