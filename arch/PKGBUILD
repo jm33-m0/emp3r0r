@@ -2,14 +2,14 @@
 # See COPYING for license details.
 
 pkgname=emp3r0r
-pkgver=$(pkgver)
+pkgver=v1.10.4
 pkgrel=1
 pkgdesc='Linux post-exploitation framework made by linux user.'
 arch=('x86_64')
 groups=('blackarch')
 url='https://github.com/jm33-m0/emp3r0r'
 license=('MIT')
-depends=('tmux')
+depends=('tmux' 'bash')
 makedepends=('git' 'go')
 source=("git+https://github.com/jm33-m0/emp3r0r.git")
 sha512sums=('SKIP')
@@ -39,22 +39,17 @@ build() {
 package() {
     cd $pkgname
 
-    install -Dm 755 $pkgname "$pkgdir/usr/bin/$pkgname"
-    install -Dm 755 $pkgname "$pkgdir/usr/lib/$pkgname"
-    install -Dm 755 $pkgname "$pkgdir/usr/lib/$pkgname/build"
+    mkdir -p "$pkgdir/usr/lib/$pkgname/build"
+    install -Dm 755 emp3r0r-cc "$pkgdir/usr/lib/$pkgname"
+    install -Dm 755 emp3r0r-cat "$pkgdir/usr/lib/$pkgname"
+    install -Dm 755 ./*.exe "$pkgdir/usr/lib/$pkgname/build"
+    install -Dm 755 "./core/$pkgname" "$pkgdir/usr/bin/$pkgname"
     install -Dm 644 -t "$pkgdir/usr/share/doc/$pkgname/" README.md
     # Only install license if required according to
     # https://wiki.archlinux.org/index.php/PKGBUILD#license
     install -Dm 644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 
-    # stub exe
-    cp ./*.exe "$pkgdir/usr/lib/emp3r0r/build"
-
-    # main executables
-    cp core/emp3r0r "$pkgdir/usr/bin/$pkgname"
-    cp emp3r0r-cat "$pkgdir/usr/lib/emp3r0r"
-    cp emp3r0r-cc "$pkgdir/usr/lib/emp3r0r"
-    chmod +x "$pkgdir/usr/bin/$pkgname"
-    chmod +x "$pkgdir/usr/lib/emp3r0r/emp3r0r-cc"
-    chmod +x "$pkgdir/usr/lib/emp3r0r/emp3r0r-cat"
+    # extra files
+    cp -r ./core/tmux "$pkgdir/usr/lib/$pkgname"
+    cp -r ./core/modules "$pkgdir/usr/lib/$pkgname"
 }
