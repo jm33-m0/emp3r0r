@@ -1,5 +1,13 @@
 # Changelog
 
+### [1.10.6](https://github.com/jm33-m0/emp3r0r/compare/v1.10.5...v1.10.6) (2022-03-27)
+
+
+### Bug Fixes
+
+* [#105](https://github.com/jm33-m0/emp3r0r/issues/105) ([32d88f7](https://github.com/jm33-m0/emp3r0r/commit/32d88f72b7b400959e41031414370baa0beba42e))
+* [#105](https://github.com/jm33-m0/emp3r0r/issues/105), show C2 names in cowsay ([d76e7cb](https://github.com/jm33-m0/emp3r0r/commit/d76e7cb6c33de6c4cda989ec516ac2dde919aac5))
+
 ### [1.10.5](https://github.com/jm33-m0/emp3r0r/compare/v1.10.4...v1.10.5) (2022-03-26)
 
 
