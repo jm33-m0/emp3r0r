@@ -13,6 +13,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"math/big"
 	"net"
 	"os"
@@ -107,7 +108,7 @@ func GenCerts(hosts []string, outname string, isCA bool) (err error) {
 		block, _ = pem.Decode(ca_data)
 		cacrt, _ = x509.ParseCertificate(block.Bytes)
 
-		// generate
+		// generate C2 server certificate, signed by our CA
 		derBytes, err = x509.CreateCertificate(rand.Reader, &template, cacrt, publicKey(priv), cakey)
 		if err != nil {
 			return fmt.Errorf("Failed to create certificate: %v", err)
@@ -136,6 +137,31 @@ func GenCerts(hosts []string, outname string, isCA bool) (err error) {
 	return
 }
 
-func SignCertWithCA(cafile, cert_to_sign string) (err error) {
+// NamesInCert find domain names and IPs in server certificate
+func NamesInCert(cert_file string) (names []string) {
+	cert, err := ParseCert(cert_file)
+	if err != nil {
+		log.Printf("ParseCert %s: %v", cert_file, err)
+		return
+	}
+	for _, netip := range cert.IPAddresses {
+		ip := netip.String()
+		names = append(names, ip)
+	}
+	for _, domain := range cert.DNSNames {
+		names = append(names, domain)
+	}
+
 	return
+}
+
+// ParseCert read from PEM file and return parsed cert
+func ParseCert(cert_file string) (cert *x509.Certificate, err error) {
+	cert_data, err := ioutil.ReadFile(cert_file)
+	if err != nil {
+		err = fmt.Errorf("Read ca-cert.pem: %v", err)
+		return
+	}
+	block, _ := pem.Decode(cert_data)
+	return x509.ParseCertificate(block.Bytes)
 }
