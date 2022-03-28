@@ -278,6 +278,7 @@ func InjectSO(pid int) error {
 	if err != nil {
 		return err
 	}
+	defer os.RemoveAll("/tmp/emp3r0r") // in case we have this file remaining on disk
 	return injectSOWorker(so_path, pid)
 }
 
