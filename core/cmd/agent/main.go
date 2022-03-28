@@ -38,10 +38,11 @@ func main() {
 	flag.Parse()
 
 	// inject
-	err = inject_and_run()
-	if err != nil {
-		log.Print(err)
-	}
+	// disabled for now, will re-enable when it's usable
+	// err = inject_and_run()
+	// if err != nil {
+	// 	log.Print(err)
+	// }
 
 	// applyRuntimeConfig
 	err = agent.ApplyRuntimeConfig()

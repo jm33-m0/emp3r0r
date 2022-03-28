@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -179,16 +180,16 @@ func PromptForConfig(isAgent bool) (err error) {
 	var ans string
 	if !isAgent {
 		ans = fmt.Sprintf("%v",
-			ask("CC host(s), can be one or more IPs or domain names, separate with space\n"+
-				"NOTE: Only the first host name will be used by agent, the others are ", "cc_host"))
+			ask("CC host(s), can be one or more IPs or domain names, separate with space\n", "cc_host"))
 	} else {
 		ans = fmt.Sprintf("%v",
 			ask("CC host for agent to connect to, can be an IP or a domain name", "cc_host"))
 	}
 	cc_hosts := strings.Fields(ans)
 	RuntimeConfig.CCHost = cc_hosts[0]
+	existing_names := tun.NamesInCert(ServerCrtFile)
 	exists := false
-	for _, c2_name := range cc_hosts {
+	for _, c2_name := range existing_names {
 		if c2_name == RuntimeConfig.CCHost {
 			exists = true
 			break
@@ -198,10 +199,16 @@ func PromptForConfig(isAgent bool) (err error) {
 	if !exists {
 		CliPrintWarning("Name '%s' is not covered by our server cert, re-generating",
 			RuntimeConfig.CCHost)
+		cc_hosts = append(cc_hosts, existing_names...) // append new name
+		// remove old certs
+		os.RemoveAll(ServerCrtFile)
+		os.RemoveAll(ServerKeyFile)
 		err = GenC2Certs(cc_hosts)
 		if err != nil {
 			return fmt.Errorf("GenAgent: failed to generate certs: %v", err)
 		}
+		CliPrintWarning("You will need to restart emp3r0r C2 server to apply name '%s'",
+			RuntimeConfig.CCHost)
 	}
 
 	// if building CC, we can safely ignore varibles below

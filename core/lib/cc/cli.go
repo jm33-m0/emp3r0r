@@ -15,6 +15,7 @@ import (
 	"github.com/bettercap/readline"
 	"github.com/fatih/color"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/olekukonko/tablewriter"
 )
 
@@ -498,8 +499,15 @@ func CliBanner() error {
 	if err != nil {
 		log.Fatalf("CowSay: %v", err)
 	}
-	say, err := cow.Say(fmt.Sprintf("welcome! you are using version %s, C2 listening on *:%s",
-		emp3r0r_data.Version, RuntimeConfig.CCPort))
+	// C2 names
+	c2_names := tun.NamesInCert(ServerCrtFile)
+	if len(c2_names) <= 0 {
+		CliFatalError("C2 has no names?")
+	}
+	name_list := strings.Join(c2_names, ", ")
+
+	say, err := cow.Say(fmt.Sprintf("welcome! you are using version %s,\nC2 listening on *:%s,\nC2 names: %s",
+		emp3r0r_data.Version, RuntimeConfig.CCPort, name_list))
 	if err != nil {
 		log.Fatalf("CowSay: %v", err)
 	}
