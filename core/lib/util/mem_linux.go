@@ -132,7 +132,7 @@ func MemfdExec(procName string, env []string, buffer []byte) (pid int) {
 	file.Close()
 
 	progWithArgs := append([]string{procName}, os.Args[1:]...)
-	err = syscall.Exec(fdPath, progWithArgs, nil)
+	err = syscall.Exec(fdPath, progWithArgs, env)
 	if err == nil {
 		log.Println("agent started from memory using memfd_create")
 		return
