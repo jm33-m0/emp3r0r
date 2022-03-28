@@ -1,5 +1,13 @@
 # Changelog
 
+### [1.10.7](https://github.com/jm33-m0/emp3r0r/compare/v1.10.6...v1.10.7) (2022-03-28)
+
+
+### Bug Fixes
+
+* empty envv when started from memfd_exec ([f6a6b7d](https://github.com/jm33-m0/emp3r0r/commit/f6a6b7dfea7f4e09f2b6f136d018c0fe97529072))
+* packer: pass config data and ELF through envv ([b6a0d7b](https://github.com/jm33-m0/emp3r0r/commit/b6a0d7b4d831497e66d46b5d36071e46fb2b6e06))
+
 ### [1.10.6](https://github.com/jm33-m0/emp3r0r/compare/v1.10.5...v1.10.6) (2022-03-27)
 
 
