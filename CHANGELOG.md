@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.11.0](https://github.com/jm33-m0/emp3r0r/compare/v1.10.7...v1.11.0) (2022-03-29)
+
+
+### Features
+
+* add shadowsocks ([a8117e9](https://github.com/jm33-m0/emp3r0r/commit/a8117e97a6c818b9c548bc474027cc47dd24b708))
+* Add Shadowsocks obfuscator to C2 transport ([73a4d67](https://github.com/jm33-m0/emp3r0r/commit/73a4d6782712388e3ee76b9babcfa3b6dc314f30))
+* use upx to further compress packed agent binaries ([1c6800f](https://github.com/jm33-m0/emp3r0r/commit/1c6800ff4a3162c8e64f72f28b78f2582f0e2db7))
+
+
+### Bug Fixes
+
+* `garble -tiny` now works ([3c1b9b3](https://github.com/jm33-m0/emp3r0r/commit/3c1b9b32e1fa4476f7ed6a047689f3c47482879b))
+
 ### [1.10.7](https://github.com/jm33-m0/emp3r0r/compare/v1.10.6...v1.10.7) (2022-03-28)
 
 
