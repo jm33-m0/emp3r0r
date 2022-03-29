@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"strings"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/mholt/archiver"
 )
 
@@ -62,6 +64,16 @@ func Packer(inputELF string) (err error) {
 	err = ioutil.WriteFile(packed_file, toWrite, 0755)
 	if err != nil {
 		return fmt.Errorf("write to packed file %s: %v", packed_file, err)
+	}
+
+	// upx
+	if util.IsCommandExist("upx") {
+		CliPrintInfo("Using upx to further compress the executable %s", packed_file)
+		cmd := exec.Command("upx", "-9", packed_file)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("Packer: upx: %s (%v)", out, err)
+		}
 	}
 
 	// done
