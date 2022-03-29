@@ -47,11 +47,6 @@ build() {
     {
         cd cmd/cc && go build -o "$temp/cc.exe" -ldflags='-s -w -v'
     } || error "build cc"
-    info "Building Packer stub"
-    {
-        # -tiny doesn't work, perhaps a bug of garble
-        cd "$pwd/cmd/packer_stub" && garble build -o "$temp/packer_stub.exe" -ldflags='-s -w -v'
-    } || error "build packer_stub"
     info "Building cat"
     {
         cd "$pwd/cmd/cat" && go build -o "$temp/cat.exe" -ldflags='-s -w -v'
@@ -60,12 +55,17 @@ build() {
     info "Building agent stub"
     {
         # -tiny doesn't work, perhaps a bug of garble
-        cd "$pwd/cmd/agent" && garble build -o "$temp/stub.exe" -ldflags='-s -w -v'
+        cd "$pwd/cmd/agent" && garble -tiny build -o "$temp/stub.exe" -ldflags='-s -w -v'
     } || error "build agent stub"
     info "Building agent stub for Windows"
     {
-        cd "$pwd/cmd/agent" && GOOS=windows garble build -o "$temp/stub-win.exe" -ldflags='-s -w -v'
+        cd "$pwd/cmd/agent" && GOOS=windows garble -tiny build -o "$temp/stub-win.exe" -ldflags='-s -w -v'
     } || error "build stub-win"
+
+    info "Building Packer stub"
+    {
+        cd "$pwd/cmd/packer_stub" && garble -tiny build -o "$temp/packer_stub.exe" -ldflags='-s -w -v'
+    } || error "build packer_stub"
 }
 
 install() {
@@ -172,4 +172,5 @@ case "$1" in
     }
 
     ;;
+
 esac
