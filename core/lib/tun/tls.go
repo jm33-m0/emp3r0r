@@ -28,16 +28,16 @@ func EmpHTTPClient(proxyServer string) *http.Client {
 
 	// add our cert
 	if ok := rootCAs.AppendCertsFromPEM(CACrt); !ok {
-		FatalError("No certs appended")
+		FatalError("No CA certs appended")
 	}
 
-	// Trust the augmented cert pool in our client
+	// Trust the augmented cert pool in our TLS client
 	config := &tls.Config{
 		InsecureSkipVerify: false,
 		RootCAs:            rootCAs,
 	}
 
-	// return our http client
+	// transport of our http client, with configured TLS client
 	tr := &http.Transport{TLSClientConfig: config}
 
 	// use a proxy for our HTTP client
