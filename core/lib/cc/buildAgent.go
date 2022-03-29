@@ -219,6 +219,10 @@ func PromptForConfig(isAgent bool) (err error) {
 		RuntimeConfig.CDNProxy = fmt.Sprintf("%v",
 			ask("CDN proxy, eg. wss://example.com/ws/path", "cdn_proxy"))
 	}
+	if CliYesNo("Enable Shadowsocks proxy " +
+		"(C2 traffic and auto-proxy will be encapsulated in Shadowsocks)") {
+		RuntimeConfig.UseShadowsocks = true
+	}
 	if CliYesNo("Enable agent proxy (for C2 transport)") {
 		RuntimeConfig.AgentProxy = fmt.Sprintf("%v",
 			ask("Agent proxy, eg. socks5://127.0.0.1:1080", "agent_proxy"))
@@ -270,6 +274,7 @@ func InitConfigFile(cc_host string) (err error) {
 	RuntimeConfig.ProxyPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.BroadcastPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.SSHDPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
+	RuntimeConfig.ShadowsocksPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 
 	// random strings
 	agent_root := util.RandStr(util.RandInt(6, 20))
@@ -280,6 +285,7 @@ func InitConfigFile(cc_host string) (err error) {
 	RuntimeConfig.SocketName = fmt.Sprintf("%s/%v", RuntimeConfig.AgentRoot, socket)
 	pid_file := util.RandStr(util.RandInt(3, 20))
 	RuntimeConfig.PIDFile = fmt.Sprintf("%s/%v", RuntimeConfig.AgentRoot, pid_file)
+	RuntimeConfig.ShadowsocksPassword = util.RandStr(20)
 
 	// time intervals
 	RuntimeConfig.BroadcastIntervalMin = 30

@@ -33,7 +33,6 @@ var (
 )
 
 // Socks5Proxy sock5 proxy server on agent, listening on addr
-// to use it, forward port 10800 to CC
 // op: on/off
 func Socks5Proxy(op string, addr string) (err error) {
 	// op

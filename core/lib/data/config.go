@@ -40,6 +40,9 @@ func ReadJSONConfig(jsonData []byte, config_to_write *Config) (err error) {
 type Config struct {
 	CCPort               string `json:"cc_port"`                // "cc_port": "5381",
 	ProxyPort            string `json:"proxy_port"`             // "proxy_port": "56238",
+	ShadowsocksPassword  string `json:"shadowsocks_password"`   // password of shadowsocks proxy server
+	ShadowsocksPort      string `json:"shadowsocks_port"`       // server port of shadowsocks proxy server
+	UseShadowsocks       bool   `json:"use_shadowsocks"`        // enable shadowsocks proxy server for C2 transport
 	ReverseProxyPort     string `json:"reverse_proxy_port"`     // "reverse_proxy_port": "56239",
 	SSHDPort             string `json:"sshd_port"`              // "sshd_port": "2222",
 	BroadcastPort        string `json:"broadcast_port"`         // "broadcast_port": "58485",

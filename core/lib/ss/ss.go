@@ -15,6 +15,8 @@ var config struct {
 	TCPCork    bool // coalesce writing first few packets
 }
 
+const AEADCipher = "AEAD_CHACHA20_POLY1305"
+
 // shadowsocks config options
 var flags struct {
 	Client     string // client connect address or url
@@ -35,6 +37,9 @@ var flags struct {
 	PluginOpts string // Set SIP003 plugin options. (e.g., "server;tls;host=mydomain.me")
 }
 
+// Start shadowsocks server / client
+// server_addr: addr of shadowsocks server
+// socks_addr: addr of the local socks5 proxy started by shadowsocks client
 func SSMain(server_addr, socks_addr,
 	cipher, password string,
 	isServer, verbose bool) (err error) {

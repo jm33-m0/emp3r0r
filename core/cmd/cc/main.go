@@ -89,6 +89,7 @@ func main() {
 		log.Fatalf("Read %s: %v", *config, err)
 	} else {
 		go cc.TLSServer()
+		go cc.ShadowsocksServer()
 		go cc.InitModules()
 	}
 
