@@ -157,8 +157,8 @@ func PidOf(name string) []int {
 	return pids
 }
 
-// sleep for a random interval
+// sleep for a random interval between 120ms to 120s
 func TakeASnap() {
-	interval := time.Duration(RandInt(100, 2000))
+	interval := time.Duration(RandInt(120, 120000))
 	time.Sleep(interval * time.Millisecond)
 }
