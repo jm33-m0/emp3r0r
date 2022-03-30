@@ -150,6 +150,7 @@ func ModuleDetails(modName string) {
 	table.SetBorder(true)
 	table.SetRowLine(true)
 	table.SetAutoWrapText(true)
+	table.SetColWidth(20)
 
 	// color
 	table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},

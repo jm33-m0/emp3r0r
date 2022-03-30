@@ -103,9 +103,10 @@ func ListTargets() {
 	table.SetHeader([]string{"Index", "Label", "Tag", "OS", "Process", "User", "IPs", "From"})
 	table.SetBorder(true)
 	table.SetRowLine(true)
-	table.SetAutoWrapText(false)
+	table.SetAutoWrapText(true)
 	table.SetAutoFormatHeaders(true)
 	table.SetReflowDuringAutoWrap(true)
+	table.SetColWidth(20)
 
 	// color
 	table.SetHeaderColor(
@@ -145,9 +146,9 @@ func ListTargets() {
 		// info map
 		ips := strings.Join(target.IPs, ",\n")
 		infoMap := map[string]string{
-			"OS":      util.SplitLongLine(target.OS, 15),
-			"Process": util.SplitLongLine(procInfo, 15),
-			"User":    util.SplitLongLine(target.User, 15),
+			"OS":      util.SplitLongLine(target.OS, 20),
+			"Process": util.SplitLongLine(procInfo, 20),
+			"User":    util.SplitLongLine(target.User, 20),
 			"From":    fmt.Sprintf("%s\nvia %s", target.From, target.Transport),
 			"IPs":     ips,
 		}
@@ -200,6 +201,7 @@ func GetTargetDetails(target *emp3r0r_data.SystemInfo) {
 	table.SetBorder(true)
 	table.SetRowLine(true)
 	table.SetAutoWrapText(true)
+	table.SetColWidth(20)
 
 	// color
 	table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiCyanColor},

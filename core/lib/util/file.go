@@ -282,7 +282,7 @@ func SplitLongLine(line string, linelen int) (ret string) {
 		}
 		temp += string(c)
 	}
-	ret = fmt.Sprintf("%s%s", ret, temp)
+	ret = fmt.Sprintf("%s\n%s", ret, temp)
 	temp = ""
 
 	return

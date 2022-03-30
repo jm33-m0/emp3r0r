@@ -101,6 +101,7 @@ func ListPortFwds() {
 	table.SetAutoWrapText(true)
 	table.SetAutoFormatHeaders(true)
 	table.SetReflowDuringAutoWrap(true)
+	table.SetColWidth(10)
 
 	// color
 	table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiMagentaColor},

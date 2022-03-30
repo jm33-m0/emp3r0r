@@ -101,6 +101,7 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 		table.SetBorder(true)
 		table.SetRowLine(true)
 		table.SetAutoWrapText(true)
+		table.SetColWidth(20)
 
 		// color
 		table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
@@ -144,6 +145,8 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 		table.SetHeader([]string{"Name", "Type", "Size", "Time", "Permission"})
 		table.SetRowLine(true)
 		table.SetBorder(true)
+		table.SetColWidth(20)
+		table.SetAutoWrapText(true)
 
 		// color
 		table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
