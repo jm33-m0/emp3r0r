@@ -169,10 +169,10 @@ func RandInt(min, max int) int {
 // RandStr random string
 func RandStr(n int) string {
 	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	mathRand.Seed(time.Now().Unix())
+	mathRand.Seed(int64(RandInt(0xff, 0xffffffff)))
 	b := make([]rune, n)
 	for i := range b {
-		b[i] = letters[mathRand.Intn(len(letters))]
+		b[i] = letters[int64(RandInt(0, len(letters)))]
 	}
 	return string(b)
 }
