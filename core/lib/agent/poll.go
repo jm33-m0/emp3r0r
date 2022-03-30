@@ -162,7 +162,7 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 			err = out.Encode(msg)
 			if err != nil {
 				log.Printf("agent cannot connect to cc: %v", err)
-				util.TakeASnap()
+				util.TakeABlink()
 				continue
 			}
 			return true
