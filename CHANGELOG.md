@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.12.0](https://github.com/jm33-m0/emp3r0r/compare/v1.11.0...v1.12.0) (2022-03-30)
+
+
+### Features
+
+* randomize heartbeat payload length ([920d01d](https://github.com/jm33-m0/emp3r0r/commit/920d01dfe3fbb77edf8245c4b8d88624178b8d52))
+* reduce and randomize C2 heart-beat traffic, may cause longer wait time in agent state checking ([dee4b30](https://github.com/jm33-m0/emp3r0r/commit/dee4b30e4bd696b46c044386d219040715ad35ad))
+
+
+### Bug Fixes
+
+* agent does not connect immediately after checking in ([afa4bff](https://github.com/jm33-m0/emp3r0r/commit/afa4bff4b54807a991c6d364b1384a6d6cdf54bf))
+* agent re-connection takes too long ([4febec6](https://github.com/jm33-m0/emp3r0r/commit/4febec6c7add168919f957cb7808df7c04ac2f10))
+* alert user only when the agent is connected correctly ([44ee708](https://github.com/jm33-m0/emp3r0r/commit/44ee7086340d4c8d36d0be2b6ec28bcfb3bbb705))
+* line wrapping in `CliPrettyPrint` ([f406224](https://github.com/jm33-m0/emp3r0r/commit/f4062247518cda72642b65558743d03d08eac395))
+* line wrapping in agent list brings extra whitespaces ([3a03153](https://github.com/jm33-m0/emp3r0r/commit/3a03153c5f05fda718392661ae30f6c79335f6c5))
+* line wrapping inside tables ([5f6b3db](https://github.com/jm33-m0/emp3r0r/commit/5f6b3db264dcfb93237504c35578049c0db33d81))
+* RandStr not random enough with time.Now as seed ([e3aed62](https://github.com/jm33-m0/emp3r0r/commit/e3aed626744c55b0488a4035ce256aa17f48e6a2))
+* some values in emp3r0r.json are not updated ([70c0f5e](https://github.com/jm33-m0/emp3r0r/commit/70c0f5ec7c6b0dd458b6cbdfeb4489904925bd10))
+
 ## [1.11.0](https://github.com/jm33-m0/emp3r0r/compare/v1.10.7...v1.11.0) (2022-03-29)
 
 
