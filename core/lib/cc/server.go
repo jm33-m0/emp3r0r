@@ -500,8 +500,10 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 		}
 		// read hello from agent, set its Conn if needed, and hello back
 		// close connection if agent is not responsive
-		if msg.Payload == "hello" {
-			err = out.Encode(msg)
+		if strings.HasPrefix(msg.Payload, "hello") {
+			reply_msg := msg
+			reply_msg.Payload = "hello" + util.RandStr(util.RandInt(10, 100))
+			err = out.Encode(reply_msg)
 			if err != nil {
 				CliPrintWarning("msgTunHandler cannot send hello to agent %s", msg.Tag)
 				return
