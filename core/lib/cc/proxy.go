@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/olekukonko/tablewriter"
 )
 
@@ -129,9 +130,9 @@ func ListPortFwds() {
 			[]string{
 				lport,
 				to,
-				SplitLongLine(portmap.Agent.Tag, 10),
-				SplitLongLine(portmap.Description, 10),
-				SplitLongLine(id, 10)})
+				util.SplitLongLine(portmap.Agent.Tag, 10),
+				util.SplitLongLine(portmap.Description, 10),
+				util.SplitLongLine(id, 10)})
 	}
 
 	// rendor table

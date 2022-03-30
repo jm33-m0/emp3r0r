@@ -87,27 +87,6 @@ func headlessListTargets() (err error) {
 	return
 }
 
-// Split long lines
-func SplitLongLine(line string, linelen int) (ret string) {
-	if len(line) < linelen {
-		return line
-	}
-	ret = line[:linelen]
-
-	temp := ""
-	for n, c := range line[linelen:] {
-		if n >= linelen && n%linelen == 0 {
-			ret += fmt.Sprintf("\n%s", temp)
-			temp = ""
-		}
-		temp += string(c)
-	}
-	ret += fmt.Sprintf("%s", temp)
-	temp = ""
-
-	return
-}
-
 // ListTargets list currently connected agents
 func ListTargets() {
 	// return JSON data to APIConn in headless mode
@@ -124,7 +103,7 @@ func ListTargets() {
 	table.SetHeader([]string{"Index", "Label", "Tag", "OS", "Process", "User", "IPs", "From"})
 	table.SetBorder(true)
 	table.SetRowLine(true)
-	table.SetAutoWrapText(true)
+	table.SetAutoWrapText(false)
 	table.SetAutoFormatHeaders(true)
 	table.SetReflowDuringAutoWrap(true)
 
@@ -166,21 +145,21 @@ func ListTargets() {
 		// info map
 		ips := strings.Join(target.IPs, ",\n")
 		infoMap := map[string]string{
-			"OS":      SplitLongLine(target.OS, 15),
-			"Process": SplitLongLine(procInfo, 15),
-			"User":    SplitLongLine(target.User, 15),
+			"OS":      util.SplitLongLine(target.OS, 15),
+			"Process": util.SplitLongLine(procInfo, 15),
+			"User":    util.SplitLongLine(target.User, 15),
 			"From":    fmt.Sprintf("%s\nvia %s", target.From, target.Transport),
 			"IPs":     ips,
 		}
 
-		var row = []string{index, label, SplitLongLine(target.Tag, 15),
+		var row = []string{index, label, util.SplitLongLine(target.Tag, 15),
 			infoMap["OS"], infoMap["Process"], infoMap["User"], infoMap["IPs"], infoMap["From"]}
 
 		// is this agent currently selected?
 		if CurrentTarget != nil {
 			if CurrentTarget.Tag == target.Tag {
 				index = color.New(color.FgHiGreen, color.Bold).Sprintf("%d", control.Index)
-				row = []string{index, label, SplitLongLine(target.Tag, 15),
+				row = []string{index, label, util.SplitLongLine(target.Tag, 15),
 					infoMap["OS"], infoMap["Process"], infoMap["User"], infoMap["IPs"], infoMap["From"]}
 
 				// put this row at top
@@ -271,7 +250,7 @@ func GetTargetDetails(target *emp3r0r_data.SystemInfo) {
 
 	indexRow := []string{"Index", color.HiMagentaString("%d", control.Index)}
 	labelRow := []string{"Label", color.HiCyanString(control.Label)}
-	tagRow := []string{"Tag", color.CyanString(SplitLongLine(target.Tag, 20))}
+	tagRow := []string{"Tag", color.CyanString(util.SplitLongLine(target.Tag, 20))}
 	tdata = append(tdata, indexRow)
 	tdata = append(tdata, labelRow)
 	tdata = append(tdata, tagRow)

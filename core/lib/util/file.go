@@ -266,3 +266,24 @@ func ReverseString(s string) string {
 	// return the reversed string.
 	return string(rns)
 }
+
+// Split long lines
+func SplitLongLine(line string, linelen int) (ret string) {
+	if len(line) < linelen {
+		return line
+	}
+	ret = line[:linelen]
+
+	temp := ""
+	for n, c := range line[linelen:] {
+		if n >= linelen && n%linelen == 0 {
+			ret = fmt.Sprintf("%s\n%s", ret, temp)
+			temp = ""
+		}
+		temp += string(c)
+	}
+	ret = fmt.Sprintf("%s%s", ret, temp)
+	temp = ""
+
+	return
+}
