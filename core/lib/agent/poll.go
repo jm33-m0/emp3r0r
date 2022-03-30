@@ -141,7 +141,7 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 				break
 			}
 			payload := msg.Payload
-			if payload == "hello" {
+			if strings.HasPrefix(payload, "hello") {
 				continue
 			}
 
@@ -157,7 +157,7 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 			cnt-- // consume cnt
 
 			// send hello
-			msg.Payload = "hello"
+			msg.Payload = "hello" + util.RandStr(util.RandInt(1, 100))
 			msg.Tag = RuntimeConfig.AgentTag
 			err = out.Encode(msg)
 			if err != nil {
