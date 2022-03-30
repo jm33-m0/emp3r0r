@@ -16,6 +16,7 @@ import (
 	"github.com/fatih/color"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/olekukonko/tablewriter"
 )
 
@@ -557,7 +558,8 @@ func CliPrettyPrint(header1, header2 string, map2write *map[string]string) {
 
 	// fill table
 	for c1, c2 := range *map2write {
-		tdata = append(tdata, []string{c1, c2})
+		tdata = append(tdata,
+			[]string{util.SplitLongLine(c1, 20), util.SplitLongLine(c2, 20)})
 	}
 	table.AppendBulk(tdata)
 	table.Render()
