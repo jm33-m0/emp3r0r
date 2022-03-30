@@ -169,7 +169,7 @@ func ListTargets() {
 			"OS":      SplitLongLine(target.OS, 15),
 			"Process": SplitLongLine(procInfo, 15),
 			"User":    SplitLongLine(target.User, 15),
-			"From":    fmt.Sprintf("%s\nvia %s", target.IP, target.Transport),
+			"From":    fmt.Sprintf("%s\nvia %s", target.From, target.Transport),
 			"IPs":     ips,
 		}
 
@@ -259,7 +259,7 @@ func GetTargetDetails(target *emp3r0r_data.SystemInfo) {
 		"Container": target.Container,
 		"OS":        color.HiWhiteString(target.OS),
 		"Kernel":    color.HiBlueString(target.Kernel) + ", " + color.HiWhiteString(target.Arch),
-		"From":      color.HiYellowString(target.IP) + fmt.Sprintf(" - %s", color.HiGreenString(target.Transport)),
+		"From":      color.HiYellowString(target.From) + fmt.Sprintf(" - %s", color.HiGreenString(target.Transport)),
 		"IPs":       color.BlueString(ips),
 		"ARP":       color.HiWhiteString(arpTab),
 	}

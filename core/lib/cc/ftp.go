@@ -57,7 +57,7 @@ func PutFile(lpath, rpath string, a *emp3r0r_data.SystemInfo) error {
 		"size: %d bytes (%.2fMB)\n"+
 		"sha256sum: %s",
 		lpath, rpath,
-		a.IP, Targets[a].Index,
+		a.From, Targets[a].Index,
 		size, sizemB,
 		sum,
 	)

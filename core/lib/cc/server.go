@@ -412,7 +412,7 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 	}
 
 	// set target IP
-	target.IP = req.RemoteAddr
+	target.From = req.RemoteAddr
 
 	if !IsAgentExist(&target) {
 		inx := assignTargetIndex()
@@ -427,7 +427,7 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 		}
 		CliMsg("Checked in: %s from %s, "+
 			"running %s\n",
-			shortname, fmt.Sprintf("%s - %s", target.IP, target.Transport),
+			shortname, fmt.Sprintf("%s - %s", target.From, target.Transport),
 			strconv.Quote(target.OS))
 
 		ListTargets() // refresh agent list
@@ -449,7 +449,7 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 		}
 		CliPrintDebug("Refreshing sysinfo\n%s from %s, "+
 			"running %s\n",
-			shortname, fmt.Sprintf("%s - %s", target.IP, target.Transport),
+			shortname, fmt.Sprintf("%s - %s", target.From, target.Transport),
 			strconv.Quote(target.OS))
 	}
 }

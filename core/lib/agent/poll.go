@@ -148,7 +148,7 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 			// process CC data
 			go processCCData(&msg)
 		}
-		log.Println("check CC response: exited")
+		log.Println("Check CC response: exited")
 	}()
 
 	sendHello := func(cnt int) bool {
