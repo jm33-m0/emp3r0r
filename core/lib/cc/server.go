@@ -521,7 +521,7 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 		}
 		if Targets[agent].Conn == nil {
 			CliAlert(color.FgHiGreen, "[%d] Knock.. Knock...", Targets[agent].Index)
-			CliAlert(color.FgHiCyan, "[%d] agent %s connected", Targets[agent].Index, strconv.Quote(shortname))
+			CliAlert(color.FgHiGreen, "agent %s connected", strconv.Quote(shortname))
 		}
 		Targets[agent].Conn = conn
 	}
