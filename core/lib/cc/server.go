@@ -425,8 +425,7 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 				shortname = l
 			}
 		}
-		CliAlert(color.FgHiGreen, "[%d] Knock.. Knock...", inx)
-		CliMsg("%s from %s, "+
+		CliMsg("Checked in: %s from %s, "+
 			"running %s\n",
 			shortname, fmt.Sprintf("%s - %s", target.IP, target.Transport),
 			strconv.Quote(target.OS))
@@ -515,11 +514,15 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 
 		// assign this Conn to a known agent
 		agent := GetTargetFromTag(msg.Tag)
+		shortname := strings.Split(agent.Tag, "-agent")[0]
 		if agent == nil {
 			CliPrintWarning("msgTunHandler: agent not recognized")
 			return
 		}
+		if Targets[agent].Conn == nil {
+			CliAlert(color.FgHiGreen, "[%d] Knock.. Knock...", Targets[agent].Index)
+			CliAlert(color.FgHiCyan, "[%d] agent %s connected", Targets[agent].Index, strconv.Quote(shortname))
+		}
 		Targets[agent].Conn = conn
-
 	}
 }
