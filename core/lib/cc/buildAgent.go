@@ -218,21 +218,31 @@ func PromptForConfig(isAgent bool) (err error) {
 	if CliYesNo("Enable CDN proxy") {
 		RuntimeConfig.CDNProxy = fmt.Sprintf("%v",
 			ask("CDN proxy, eg. wss://example.com/ws/path", "cdn_proxy"))
+	} else {
+		RuntimeConfig.CDNProxy = ""
 	}
 	if CliYesNo("Enable Shadowsocks proxy " +
 		"(C2 traffic and auto-proxy will be encapsulated in Shadowsocks)") {
 		RuntimeConfig.UseShadowsocks = true
+	} else {
+		RuntimeConfig.UseShadowsocks = false
 	}
 	if CliYesNo("Enable agent proxy (for C2 transport)") {
 		RuntimeConfig.AgentProxy = fmt.Sprintf("%v",
 			ask("Agent proxy, eg. socks5://127.0.0.1:1080", "agent_proxy"))
+	} else {
+		RuntimeConfig.AgentProxy = ""
 	}
 	if CliYesNo("Enable DoH (DNS over HTTPS)") {
 		RuntimeConfig.DoHServer = fmt.Sprintf("%v",
 			ask("DoH server, eg. https://1.1.1.1/dns-query", "doh_server"))
+	} else {
+		RuntimeConfig.DoHServer = ""
 	}
 	if !CliYesNo("Enable autoproxy feature (will enable UDP broadcasting)") {
 		RuntimeConfig.BroadcastIntervalMax = 0
+	} else {
+		RuntimeConfig.BroadcastIntervalMax = 120
 	}
 
 	// save emp3r0r.json
