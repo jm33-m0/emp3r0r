@@ -33,6 +33,7 @@ func ShadowsocksServer() {
 	if err != nil {
 		CliFatalError("ShadowsocksServer: %v", err)
 	}
+	go KCPListenAndServe()
 }
 
 // TLSServer start HTTPS server

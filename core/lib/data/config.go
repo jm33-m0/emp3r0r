@@ -42,7 +42,9 @@ type Config struct {
 	ProxyPort            string `json:"proxy_port"`             // "proxy_port": "56238",
 	ShadowsocksPassword  string `json:"shadowsocks_password"`   // password of shadowsocks proxy server
 	ShadowsocksPort      string `json:"shadowsocks_port"`       // server port of shadowsocks proxy server
+	KCPPort              string `json:"kcp_port"`               // server port of kcp server
 	UseShadowsocks       bool   `json:"use_shadowsocks"`        // enable shadowsocks proxy server for C2 transport
+	UseKCP               bool   `json:"use_kcp"`                // enable KCP for Shadowsocks C2 transport
 	ReverseProxyPort     string `json:"reverse_proxy_port"`     // "reverse_proxy_port": "56239",
 	SSHDPort             string `json:"sshd_port"`              // "sshd_port": "2222",
 	BroadcastPort        string `json:"broadcast_port"`         // "broadcast_port": "58485",
