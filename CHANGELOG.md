@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.13.0](https://github.com/jm33-m0/emp3r0r/compare/v1.12.0...v1.13.0) (2022-03-31)
+
+
+### Features
+
+* add KCP C2 transport ([d33c9a1](https://github.com/jm33-m0/emp3r0r/commit/d33c9a102424067f90eee6a9fb79972df3c0ef71))
+* add KCP transport, C2 traffic in obfuscated and fast UDP ([024543e](https://github.com/jm33-m0/emp3r0r/commit/024543efd03884343560c475990ad07f5743d208))
+
 ## [1.12.0](https://github.com/jm33-m0/emp3r0r/compare/v1.11.0...v1.12.0) (2022-03-30)
 
 
