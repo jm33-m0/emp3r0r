@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.14.0](https://github.com/jm33-m0/emp3r0r/compare/v1.13.0...v1.14.0) (2022-03-31)
+
+
+### Features
+
+* add verification to handshake process ([6a9fc04](https://github.com/jm33-m0/emp3r0r/commit/6a9fc0404c562c547e6676e95e2d8ec5a483279b))
+
 ## [1.13.0](https://github.com/jm33-m0/emp3r0r/compare/v1.12.0...v1.13.0) (2022-03-31)
 
 
