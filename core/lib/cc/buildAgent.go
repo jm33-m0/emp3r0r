@@ -222,10 +222,18 @@ func PromptForConfig(isAgent bool) (err error) {
 		RuntimeConfig.CDNProxy = ""
 	}
 	if CliYesNo("Enable Shadowsocks proxy " +
-		"(C2 traffic and auto-proxy will be encapsulated in Shadowsocks)") {
+		"(C2 traffic will be encapsulated in Shadowsocks)") {
+		RuntimeConfig.UseShadowsocks = true
+		if CliYesNo("Enable KCP " +
+			"(Shadowsocks traffic will be converted to UDP and go through KCP tunnel)") {
+			RuntimeConfig.UseKCP = true
+		} else {
+			RuntimeConfig.UseKCP = false
+		}
 		RuntimeConfig.UseShadowsocks = true
 	} else {
 		RuntimeConfig.UseShadowsocks = false
+		RuntimeConfig.UseKCP = false
 	}
 	if CliYesNo("Enable agent proxy (for C2 transport)") {
 		RuntimeConfig.AgentProxy = fmt.Sprintf("%v",
@@ -285,6 +293,7 @@ func InitConfigFile(cc_host string) (err error) {
 	RuntimeConfig.BroadcastPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.SSHDPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.ShadowsocksPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
+	RuntimeConfig.KCPPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 
 	// random strings
 	agent_root := util.RandStr(util.RandInt(6, 20))
