@@ -151,6 +151,12 @@ func BroadcastMsg(msg, dst string) (err error) {
 }
 
 func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.CancelFunc) {
+	// broadcast interval
+	if RuntimeConfig.BroadcastIntervalMax == 0 {
+		log.Println("Broadcasting is turned off, aborting")
+		return
+	}
+
 	if start_socks5 {
 		// start a socks5 proxy
 		err := Socks5Proxy("on", "0.0.0.0:"+RuntimeConfig.ProxyPort)
@@ -164,12 +170,6 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 				log.Printf("Socks5Proxy off: %v", err)
 			}
 		}()
-	}
-
-	// broadcast interval
-	if RuntimeConfig.BroadcastIntervalMax == 0 {
-		log.Println("Broadcasting is turned off, aborting")
-		return
 	}
 
 	defer func() {
