@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.14.5](https://github.com/jm33-m0/emp3r0r/compare/v1.14.4...v1.14.5) (2022-04-01)
+
+
+### Bug Fixes
+
+* address [#45](https://github.com/jm33-m0/emp3r0r/issues/45), do not start socks5 proxy unless told to ([e9deb8e](https://github.com/jm33-m0/emp3r0r/commit/e9deb8e402dbc5147b3d89eda8d31333d65d5756))
+
 ### [1.14.4](https://github.com/jm33-m0/emp3r0r/compare/v1.14.3...v1.14.4) (2022-04-01)
 
 
