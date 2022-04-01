@@ -2,6 +2,7 @@ package ss
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -14,31 +15,26 @@ import (
 )
 
 // Create a SOCKS server listening on addr and proxy to server.
-func socksLocal(addr, server string, shadow func(net.Conn) net.Conn) {
-	logf("SOCKS proxy %s <-> %s", addr, server)
-	tcpLocal(addr, server, shadow, func(c net.Conn) (socks.Addr, error) { return socks.Handshake(c) })
-}
-
-// Create a TCP tunnel from addr to target via server.
-func tcpTun(addr, server, target string, shadow func(net.Conn) net.Conn) {
-	tgt := socks.ParseAddr(target)
-	if tgt == nil {
-		logf("invalid target address %q", target)
-		return
-	}
-	logf("TCP tunnel %s <-> %s <-> %s", addr, server, target)
-	tcpLocal(addr, server, shadow, func(net.Conn) (socks.Addr, error) { return tgt, nil })
+func socksLocal(addr, server string, shadow func(net.Conn) net.Conn,
+	ctx context.Context, cancel context.CancelFunc) {
+	logf("Shadowsocks local SOCKS proxy %s <-> %s", addr, server)
+	tcpLocal(addr, server, shadow,
+		func(c net.Conn) (socks.Addr, error) { return socks.Handshake(c) },
+		ctx, cancel)
 }
 
 // Listen on addr and proxy to server to reach target from getAddr.
-func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(net.Conn) (socks.Addr, error)) {
+func tcpLocal(addr, server string,
+	shadow func(net.Conn) net.Conn, getAddr func(net.Conn) (socks.Addr, error),
+	ctx context.Context, cancel context.CancelFunc) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		logf("failed to listen on %s: %v", addr, err)
 		return
 	}
+	defer cancel()
 
-	for {
+	for ctx.Err() == nil {
 		c, err := l.Accept()
 		if err != nil {
 			logf("failed to accept: %s", err)
@@ -93,15 +89,17 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 }
 
 // Listen on addr for incoming connections.
-func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
+func tcpRemote(addr string, shadow func(net.Conn) net.Conn,
+	ctx context.Context, cancel context.CancelFunc) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		logf("failed to listen on %s: %v", addr, err)
 		return
 	}
+	defer cancel()
 
 	logf("listening TCP on %s", addr)
-	for {
+	for ctx.Err() == nil {
 		c, err := l.Accept()
 		if err != nil {
 			logf("failed to accept: %v", err)

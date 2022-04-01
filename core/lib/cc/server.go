@@ -27,8 +27,18 @@ import (
 // You can use the offical Shadowsocks program to start
 // the same Shadowsocks server on any host that you find convenient
 func ShadowsocksServer() {
-	err := ss.SSMain("0.0.0.0:"+RuntimeConfig.ShadowsocksPort, "", ss.AEADCipher,
-		RuntimeConfig.ShadowsocksPassword, true, false)
+	ctx, cancel := context.WithCancel(context.Background())
+	var ss_config = &ss.SSConfig{
+		ServerAddr:     "0.0.0.0:" + RuntimeConfig.ShadowsocksPort,
+		LocalSocksAddr: "",
+		Cipher:         ss.AEADCipher,
+		Password:       RuntimeConfig.ShadowsocksPassword,
+		IsServer:       true,
+		Verbose:        false,
+		Ctx:            ctx,
+		Cancel:         cancel,
+	}
+	err := ss.SSMain(ss_config)
 	if err != nil {
 		CliFatalError("ShadowsocksServer: %v", err)
 	}

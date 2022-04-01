@@ -35,8 +35,14 @@ func KCPListenAndServe() {
 func fwd2Shadowsocks(conn *kcp.UDPSession) {
 	ss_addr := fmt.Sprintf("127.0.0.1:%s", RuntimeConfig.ShadowsocksPort)
 	ss_conn, err := net.Dial("tcp", ss_addr)
-	defer ss_conn.Close()
-	defer conn.Close()
+	defer func() {
+		if ss_conn != nil {
+			ss_conn.Close()
+		}
+		if conn != nil {
+			conn.Close()
+		}
+	}()
 	if err != nil {
 		CliPrintWarning("fwd2Shadowsocks: connecting to shadowsocks: %v", err)
 		return

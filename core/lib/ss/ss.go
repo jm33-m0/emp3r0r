@@ -1,6 +1,7 @@
 package ss
 
 import (
+	"context"
 	"net/url"
 	"strings"
 	"time"
@@ -37,18 +38,29 @@ var flags struct {
 	PluginOpts string // Set SIP003 plugin options. (e.g., "server;tls;host=mydomain.me")
 }
 
+// SSConfig start ss server/client with this config
+type SSConfig struct {
+	ServerAddr     string
+	LocalSocksAddr string
+	Cipher         string
+	Password       string
+	IsServer       bool
+	Verbose        bool
+
+	// used as switch
+	Ctx    context.Context
+	Cancel context.CancelFunc
+}
+
 // Start shadowsocks server / client
 // server_addr: addr of shadowsocks server
 // socks_addr: addr of the local socks5 proxy started by shadowsocks client
-func SSMain(server_addr, socks_addr,
-	cipher, password string,
-	isServer, verbose bool) (err error) {
-
-	config.Verbose = verbose // verbose logging
+func SSMain(ss_config *SSConfig) (err error) {
+	config.Verbose = ss_config.Verbose // verbose logging
 
 	// ss:// URL as server address
-	if strings.HasPrefix(server_addr, "ss://") {
-		server_addr, cipher, password, err = parseURL(server_addr)
+	if strings.HasPrefix(ss_config.ServerAddr, "ss://") {
+		ss_config.ServerAddr, ss_config.Cipher, ss_config.Password, err = parseURL(ss_config.ServerAddr)
 		if err != nil {
 			return
 		}
@@ -56,14 +68,16 @@ func SSMain(server_addr, socks_addr,
 
 	var key []byte // leave empty to use password
 	// Derive key from password if given key is empty.
-	ciph, err := core.PickCipher(cipher, key, password)
+	ciph, err := core.PickCipher(ss_config.Cipher, key, ss_config.Password)
 	if err != nil {
 		return
 	}
-	if isServer {
-		go tcpRemote(server_addr, ciph.StreamConn)
+	if ss_config.IsServer {
+		go tcpRemote(ss_config.ServerAddr, ciph.StreamConn, ss_config.Ctx, ss_config.Cancel)
 	} else {
-		go socksLocal(socks_addr, server_addr, ciph.StreamConn)
+		go socksLocal(ss_config.LocalSocksAddr, ss_config.ServerAddr,
+			ciph.StreamConn,
+			ss_config.Ctx, ss_config.Cancel)
 	}
 
 	return
