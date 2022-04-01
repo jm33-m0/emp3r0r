@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.14.3](https://github.com/jm33-m0/emp3r0r/compare/v1.14.2...v1.14.3) (2022-04-01)
+
+
+### Bug Fixes
+
+* vaccine fails to configure on agent start ([c74e7fb](https://github.com/jm33-m0/emp3r0r/commit/c74e7fb8611f767807a8fde3a2fa73fced741c12))
+
 ### [1.14.2](https://github.com/jm33-m0/emp3r0r/compare/v1.14.1...v1.14.2) (2022-04-01)
 
 
