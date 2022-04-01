@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"strconv"
@@ -61,6 +60,39 @@ func TLSServer() {
 	err := http.ListenAndServeTLS(fmt.Sprintf(":%s", RuntimeConfig.CCPort), EmpWorkSpace+"/emp3r0r-cert.pem", EmpWorkSpace+"/emp3r0r-key.pem", nil)
 	if err != nil {
 		CliFatalError("Failed to start HTTPS server at *:%s", RuntimeConfig.CCPort)
+	}
+}
+
+func dispatcher(wrt http.ResponseWriter, req *http.Request) {
+	vars := mux.Vars(req)
+
+	var rshellConn, proxyConn emp3r0r_data.H2Conn
+	RShellStream.H2x = &rshellConn
+	ProxyStream.H2x = &proxyConn
+
+	token := vars["token"]
+	api := tun.WebRoot + "/" + vars["api"]
+	switch api {
+	// Message-based communication
+	case tun.CheckInAPI:
+		checkinHandler(wrt, req)
+	case tun.MsgAPI:
+		msgTunHandler(wrt, req)
+
+	// stream based
+	case tun.FTPAPI:
+		// find handler with token
+		for _, sh := range FTPStreams {
+			if token == sh.Token {
+				sh.ftpHandler(wrt, req)
+				return
+			}
+		}
+		wrt.WriteHeader(http.StatusForbidden)
+	case tun.ProxyAPI:
+		ProxyStream.portFwdHandler(wrt, req)
+	default:
+		wrt.WriteHeader(http.StatusBadRequest)
 	}
 }
 
@@ -363,52 +395,24 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 	}
 }
 
-func dispatcher(wrt http.ResponseWriter, req *http.Request) {
-	vars := mux.Vars(req)
-
-	var rshellConn, proxyConn emp3r0r_data.H2Conn
-	RShellStream.H2x = &rshellConn
-	ProxyStream.H2x = &proxyConn
-
-	token := vars["token"]
-	api := tun.WebRoot + "/" + vars["api"]
-	switch api {
-	// Message-based communication
-	case tun.CheckInAPI:
-		checkinHandler(wrt, req)
-	case tun.MsgAPI:
-		msgTunHandler(wrt, req)
-
-	// stream based
-	case tun.FTPAPI:
-		// find handler with token
-		for _, sh := range FTPStreams {
-			if token == sh.Token {
-				sh.ftpHandler(wrt, req)
-				return
-			}
-		}
-		wrt.WriteHeader(http.StatusForbidden)
-	case tun.ProxyAPI:
-		ProxyStream.portFwdHandler(wrt, req)
-	default:
-		wrt.WriteHeader(http.StatusBadRequest)
-	}
-}
-
 // receive checkin requests from agents, add them to `Targets`
 func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
-	var target emp3r0r_data.SystemInfo
-	jsonData, err := ioutil.ReadAll(req.Body)
-	defer req.Body.Close()
+	// use h2conn
+	conn, err := h2conn.Accept(wrt, req)
+	defer conn.Close()
 	if err != nil {
-		CliPrintError("checkinHandler: " + err.Error())
+		CliPrintError("checkinHandler: failed creating connection from %s: %s", req.RemoteAddr, err)
+		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
+	var (
+		target emp3r0r_data.SystemInfo
+		in     = json.NewDecoder(conn)
+	)
 
-	err = json.Unmarshal(jsonData, &target)
+	err = in.Decode(&target)
 	if err != nil {
-		CliPrintError("checkinHandler: " + err.Error())
+		CliPrintError("checkinHandler: %v", err)
 		return
 	}
 
@@ -515,6 +519,10 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 
 		// assign this Conn to a known agent
 		agent := GetTargetFromTag(msg.Tag)
+		if agent == nil {
+			CliPrintError("%v: no agent found by this msg", msg)
+			return
+		}
 		shortname := strings.Split(agent.Tag, "-agent")[0]
 		if agent == nil {
 			CliPrintWarning("msgTunHandler: agent not recognized")

