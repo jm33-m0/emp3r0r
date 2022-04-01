@@ -42,6 +42,14 @@ build() {
 
     # no fucking glibc!
     export CGO_ENABLED=0
+    gobuild_cmd="garble"
+    build_opt="build -tiny"
+    ldflags="-s -w -v"
+    [[ "$1" = "--debug" ]] && {
+        gobuild_cmd="go"
+        build_opt="build"
+        ldflags="-v"
+    }
 
     info "Building CC"
     {
@@ -54,17 +62,16 @@ build() {
 
     info "Building agent stub"
     {
-        # -tiny doesn't work, perhaps a bug of garble
-        cd "$pwd/cmd/agent" && garble -tiny build -o "$temp/stub.exe" -ldflags='-s -w -v'
+        cd "$pwd/cmd/agent" && "$gobuild_cmd" "$build_opt" -o "$temp/stub.exe" -ldflags="$ldflags"
     } || error "build agent stub"
     info "Building agent stub for Windows"
     {
-        cd "$pwd/cmd/agent" && GOOS=windows garble -tiny build -o "$temp/stub-win.exe" -ldflags='-s -w -v'
+        cd "$pwd/cmd/agent" && GOOS=windows "$gobuild_cmd" "$build_opt" -o "$temp/stub-win.exe" -ldflags="$ldflags"
     } || error "build stub-win"
 
     info "Building Packer stub"
     {
-        cd "$pwd/cmd/packer_stub" && garble -tiny build -o "$temp/packer_stub.exe" -ldflags='-s -w -v'
+        cd "$pwd/cmd/packer_stub" && "$gobuild_cmd" "$build_opt" -o "$temp/packer_stub.exe" -ldflags="$ldflags"
     } || error "build packer_stub"
 }
 
@@ -90,6 +97,21 @@ install() {
 case "$1" in
 --release)
     (build) && (
+        info "Preparing to archive files"
+        cd /tmp || error "Cannot cd to /tmp"
+        cp -aR "$pwd/tmux" "$temp" || error "cp tmux"
+        cp -aR "$pwd/modules" "$temp" || error "cp modules"
+        cp -aR "$pwd/emp3r0r" "$temp" || error "cp emp3r0r"
+        info "Tar XZ"
+        XZ_OPT='-T0 -9' tar -cJpf "$pwd/emp3r0r.tar.xz" ./emp3r0r-build || error "tar -cJpf"
+        success "Packaged emp3r0r"
+    )
+
+    ;;
+
+--debug)
+
+    (build --debug) && (
         info "Preparing to archive files"
         cd /tmp || error "Cannot cd to /tmp"
         cp -aR "$pwd/tmux" "$temp" || error "cp tmux"
