@@ -22,9 +22,12 @@ func KCPClient() {
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%s", RuntimeConfig.KCPPort))
 	if err != nil {
 		log.Printf("KCPClient: %v", err)
+		return
 	}
 	defer func() {
-		ln.Close()
+		if ln != nil {
+			ln.Close()
+		}
 		log.Print("KCPClient exited")
 	}()
 
