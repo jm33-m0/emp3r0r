@@ -74,6 +74,7 @@ func Send2CC(data *emp3r0r_data.MsgTunData) error {
 
 // CollectSystemInfo build system info object
 func CollectSystemInfo() *emp3r0r_data.SystemInfo {
+	log.Println("Collecting system info for checking in")
 	var info emp3r0r_data.SystemInfo
 	osinfo := GetOSInfo()
 

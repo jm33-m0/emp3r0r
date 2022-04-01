@@ -320,7 +320,7 @@ connect:
 	// check in with system info
 	err = agent.CheckIn()
 	if err != nil {
-		log.Println("CheckIn: ", err)
+		log.Printf("CheckIn error: %v, sleeping, will retry later", err)
 		util.TakeASnap()
 		goto connect
 	}
@@ -331,7 +331,7 @@ connect:
 	conn, ctx, cancel, err := agent.ConnectCC(msgURL)
 	emp3r0r_data.H2Json = conn
 	if err != nil {
-		log.Println("ConnectCC: ", err)
+		log.Printf("Connect CC failed: %v, sleeping, will retry later", err)
 		util.TakeASnap()
 		goto connect
 	}
