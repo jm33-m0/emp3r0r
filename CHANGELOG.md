@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.14.4](https://github.com/jm33-m0/emp3r0r/compare/v1.14.3...v1.14.4) (2022-04-01)
+
+
+### Bug Fixes
+
+* `garble -tiny build` in build script ([b643875](https://github.com/jm33-m0/emp3r0r/commit/b6438756aa6a7433b703c787593504661b6b8175))
+
 ### [1.14.3](https://github.com/jm33-m0/emp3r0r/compare/v1.14.2...v1.14.3) (2022-04-01)
 
 
