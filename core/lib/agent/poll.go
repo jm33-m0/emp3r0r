@@ -128,7 +128,7 @@ func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, cancel conte
 
 	// kill connection on timeout
 	countdown := 10
-	for ctx.Err() == nil && countdown > 0 {
+	for conn == nil && countdown > 0 {
 		countdown--
 		time.Sleep(time.Second)
 	}
