@@ -64,6 +64,7 @@ emp3r0r also has complete [**python3.9 support**](https://github.com/jm33-m0/emp
 * **autoproxy** for semi-isolated networks
 * **reverse proxy** to bring every host online
 * all of these in **HTTP2**
+* painlessly encapsulated in **Shadowsocks and KCP**
 * can be encapsulated in any external proxies such as [**TOR**, and **CDNs**](https://github.com/jm33-m0/emp3r0r/raw/master/img/c2transports.png)
 * [interoperability with **metasploit / Cobalt Strike**](https://github.com/jm33-m0/emp3r0r/wiki/Interoperability-with-metasploit-and-other-C2-frameworks)
 * [**custom modules**](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r)
