@@ -43,11 +43,10 @@ build() {
     # no fucking glibc!
     export CGO_ENABLED=0
     gobuild_cmd="garble"
-    build_opt="build -tiny"
+    build_opt="build"
     ldflags="-s -w -v"
     [[ "$1" = "--debug" ]] && {
         gobuild_cmd="go"
-        build_opt="build"
         ldflags="-v"
     }
 
