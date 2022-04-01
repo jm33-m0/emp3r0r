@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/fatih/color"
 	"golang.org/x/net/http2"
@@ -38,7 +39,10 @@ func EmpHTTPClient(proxyServer string) *http.Client {
 	}
 
 	// transport of our http client, with configured TLS client
-	tr := &http.Transport{TLSClientConfig: config}
+	tr := &http.Transport{
+		TLSClientConfig:     config,
+		TLSHandshakeTimeout: 10 * time.Second,
+	}
 
 	// use a proxy for our HTTP client
 	if proxyServer != "" {

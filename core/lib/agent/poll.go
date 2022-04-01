@@ -39,6 +39,7 @@ func CheckIn() error {
 	if err != nil {
 		return err
 	}
+	log.Println("Checked in")
 	return nil
 }
 
