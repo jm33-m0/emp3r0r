@@ -61,7 +61,7 @@ func VaccineHandler() (out string) {
 	}
 
 	// extract python3.9.tar.xz
-	log.Printf("Python environment: %s, %s, %s", PythonArchive, PythonLib, PythonPath)
+	log.Printf("Pre-set Python environment: %s, %s, %s", PythonArchive, PythonLib, PythonPath)
 	os.RemoveAll(PythonLib)
 	if util.IsFileExist(PythonArchive) {
 		log.Printf("Found python archive at %s, trying to configure", PythonArchive)
@@ -75,6 +75,7 @@ func VaccineHandler() (out string) {
 		if err != nil {
 			out = fmt.Sprintf("Write python launcher: %v", err)
 		}
+		log.Println("Python configured")
 	}
 	os.Remove(RuntimeConfig.AgentRoot + "/utils.tar.bz2")
 

