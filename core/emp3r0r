@@ -43,10 +43,11 @@ build() {
     # no fucking glibc!
     export CGO_ENABLED=0
     gobuild_cmd="garble"
-    build_opt="build"
+    build_opt="-tiny build"
     ldflags="-s -w -v"
     [[ "$1" = "--debug" ]] && {
         gobuild_cmd="go"
+        build_opt="build"
         ldflags="-v"
     }
 
@@ -61,16 +62,19 @@ build() {
 
     info "Building agent stub"
     {
-        cd "$pwd/cmd/agent" && "$gobuild_cmd" "$build_opt" -o "$temp/stub.exe" -ldflags="$ldflags"
+        cd "$pwd/cmd/agent" &&
+            sh -c "$gobuild_cmd $build_opt -o \"$temp/stub.exe\" -ldflags=\"$ldflags\""
     } || error "build agent stub"
     info "Building agent stub for Windows"
     {
-        cd "$pwd/cmd/agent" && GOOS=windows "$gobuild_cmd" "$build_opt" -o "$temp/stub-win.exe" -ldflags="$ldflags"
+        cd "$pwd/cmd/agent" &&
+            GOOS=windows sh -c "$gobuild_cmd $build_opt -o \"$temp/stub-win.exe\" -ldflags=\"$ldflags\""
     } || error "build stub-win"
 
     info "Building Packer stub"
     {
-        cd "$pwd/cmd/packer_stub" && "$gobuild_cmd" "$build_opt" -o "$temp/packer_stub.exe" -ldflags="$ldflags"
+        cd "$pwd/cmd/packer_stub" &&
+            sh -c "$gobuild_cmd $build_opt -o \"$temp/packer_stub.exe\" -ldflags=\"$ldflags\""
     } || error "build packer_stub"
 }
 
