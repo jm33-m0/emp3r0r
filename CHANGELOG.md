@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.14.2](https://github.com/jm33-m0/emp3r0r/compare/v1.14.1...v1.14.2) (2022-04-01)
+
+
+### Bug Fixes
+
+* `emp3r0r --release` cannot build agent stub ([a277515](https://github.com/jm33-m0/emp3r0r/commit/a277515557c8c1fab3ecd7a971cff71a1981bf1d))
+
 ### [1.14.1](https://github.com/jm33-m0/emp3r0r/compare/v1.14.0...v1.14.1) (2022-04-01)
 
 
