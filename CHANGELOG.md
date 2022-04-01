@@ -1,5 +1,17 @@
 # Changelog
 
+### [1.14.1](https://github.com/jm33-m0/emp3r0r/compare/v1.14.0...v1.14.1) (2022-04-01)
+
+
+### Bug Fixes
+
+* agent not reconnecting immediately after losing connection ([59eaa1f](https://github.com/jm33-m0/emp3r0r/commit/59eaa1ff6b64f4d07fc84db31a468276ba833102))
+* ConnectCC stucks when using KCP ([58d5f89](https://github.com/jm33-m0/emp3r0r/commit/58d5f89aa0506c95f1d29824046979ab2026393b))
+* ConnectCC timeout not implemented correctly ([d58ac5e](https://github.com/jm33-m0/emp3r0r/commit/d58ac5eaed680ab591091f920a39d801cba1b090))
+* KCPClient crash ([f5202ef](https://github.com/jm33-m0/emp3r0r/commit/f5202ef5c6d70279c096cf4a5be55af12c9f2782))
+* KCPClient not aware of C2 disconnection ([58a63a2](https://github.com/jm33-m0/emp3r0r/commit/58a63a22d70877f3aee0ea71b49e502db2245257))
+* timeout TLS handshake, do not wait infinitely ([24dd54f](https://github.com/jm33-m0/emp3r0r/commit/24dd54f96a7c83f8439394eb35314154dc2ce0e3))
+
 ## [1.14.0](https://github.com/jm33-m0/emp3r0r/compare/v1.13.0...v1.14.0) (2022-03-31)
 
 
