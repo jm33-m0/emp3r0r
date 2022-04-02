@@ -284,7 +284,7 @@ func CliPrintWarning(format string, a ...interface{}) {
 	}
 }
 
-// CliMsg print log in cyan, regardless of debug level
+// CliMsg print log in bold cyan, regardless of debug level
 func CliMsg(format string, a ...interface{}) {
 	msg_color := color.New(color.Bold, color.FgCyan)
 	log.Println(msg_color.Sprintf(format, a...))

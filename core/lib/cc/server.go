@@ -409,7 +409,13 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 	// use h2conn
 	conn, err := h2conn.Accept(wrt, req)
-	defer conn.Close()
+	defer func() {
+		err = conn.Close()
+		if err != nil {
+			CliPrintWarning("checkinHandler close connection: %v", err)
+		}
+		CliPrintDebug("checkinHandler finished")
+	}()
 	if err != nil {
 		CliPrintError("checkinHandler: failed creating connection from %s: %s", req.RemoteAddr, err)
 		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -422,7 +428,7 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 
 	err = in.Decode(&target)
 	if err != nil {
-		CliPrintError("checkinHandler: %v", err)
+		CliPrintWarning("checkinHandler decode: %v", err)
 		return
 	}
 
@@ -442,7 +448,7 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 		}
 		CliMsg("Checked in: %s from %s, "+
 			"running %s\n",
-			shortname, fmt.Sprintf("%s - %s", target.From, target.Transport),
+			strconv.Quote(shortname), fmt.Sprintf("'%s - %s'", target.From, target.Transport),
 			strconv.Quote(target.OS))
 
 		ListTargets() // refresh agent list
@@ -469,7 +475,7 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// msgTunHandler JSON message based tunnel between agent and cc
+// msgTunHandler JSON message based (C&C) tunnel between agent and cc
 func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 	// use h2conn
 	conn, err := h2conn.Accept(wrt, req)
