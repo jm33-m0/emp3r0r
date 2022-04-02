@@ -54,6 +54,97 @@ var (
 	CAT = "emp3r0r-cat"
 )
 
+// TmuxInitWindows split current terminal into several windows/panes
+// - command output window
+// - current agent info
+func TmuxInitWindows() (err error) {
+	// home tmux window id
+	HomeWindow = TmuxCurrentWindow()
+
+	// remain-on-exit for current tmux window
+	// "on" is necessary
+	TmuxSetOpt("remain-on-exit on")
+
+	// main window
+	CommandPane = &Emp3r0rPane{}
+	CommandPane.Index = 1
+	CommandPane.Name = "Emp3r0r Console"
+	TmuxUpdatePane(CommandPane)
+
+	// pane title
+	TmuxSetPaneTitle("Emp3r0r Console", CommandPane.ID)
+
+	// check terminal size, prompt user to run emp3r0r C2 in a bigger window
+	w, h, err := TermSize()
+	if err != nil {
+		CliPrintWarning("Get terminal size: %v", err)
+	}
+	if w < 200 || h < 60 {
+		CliPrintWarning("I need a bigger window, make sure the window size is at least 200x60 (w*h)")
+		CliPrintWarning("Please maximize the terminal window if possible")
+	}
+
+	// we don't want the tmux pane be killed
+	// so easily. Yes, fuck /bin/cat, we use our own cat
+	cat := CAT
+	if !util.IsFileExist(cat) {
+		pwd, e := os.Getwd()
+		if e != nil {
+			pwd = e.Error()
+		}
+		err = fmt.Errorf("PWD=%s, check if %s exists. If not, build it", pwd, cat)
+		return
+	}
+	CliPrintInfo("Using %s", cat)
+
+	new_pane := func(
+		title,
+		place_holder,
+		direction,
+		from_pane string,
+		size_percentage int) (pane *Emp3r0rPane, err error) {
+
+		// system info of selected agent
+		pane, err = TmuxNewPane(title, direction, from_pane, size_percentage, cat)
+		if err != nil {
+			return
+		}
+		TmuxPanes[pane.ID] = pane
+		pane.Printf(false, color.HiYellowString(place_holder))
+
+		pane.Name = title
+
+		return
+	}
+
+	// system info of selected agent
+	AgentInfoPane, err = new_pane("Agent System Info", "Try `target 0`?", "h", "", 24)
+	if err != nil {
+		return
+	}
+
+	// Agent List
+	AgentListPane, err = new_pane("Agent List", "No agents connected", "v", "", 24)
+	if err != nil {
+		return
+	}
+
+	// Agent output
+	AgentOutputPane, err = new_pane("Agent Handler", "Command results go below...\n", "h", "", 33)
+	if err != nil {
+		return
+	}
+
+	// check panes
+	if AgentListPane == nil ||
+		AgentOutputPane == nil ||
+		AgentInfoPane == nil {
+		return fmt.Errorf("One or more tmux panes failed to initialize:\n%v", TmuxPanes)
+	}
+
+	return
+}
+
 // returns the index of current pane
 // returns -1 when error occurs
 func TmuxCurrentPane() (index int) {
@@ -290,97 +381,6 @@ func TmuxSetOpt(opt string) (err error) {
 	if err != nil {
 		err = fmt.Errorf("exec tmux set-option %s: %s\n%v", opt, out, err)
 		return
-	}
-
-	return
-}
-
-// TmuxInitWindows split current terminal into several windows/panes
-// - command output window
-// - current agent info
-func TmuxInitWindows() (err error) {
-	// home tmux window id
-	HomeWindow = TmuxCurrentWindow()
-
-	// remain-on-exit for current tmux window
-	// "on" is necessary
-	TmuxSetOpt("remain-on-exit on")
-
-	// main window
-	CommandPane = &Emp3r0rPane{}
-	CommandPane.Index = 1
-	CommandPane.Name = "Emp3r0r Console"
-	TmuxUpdatePane(CommandPane)
-
-	// pane title
-	TmuxSetPaneTitle("Emp3r0r Console", CommandPane.ID)
-
-	// check terminal size, prompt user to run emp3r0r C2 in a bigger window
-	w, h, err := TermSize()
-	if err != nil {
-		CliPrintWarning("Get terminal size: %v", err)
-	}
-	if w < 200 || h < 60 {
-		CliPrintWarning("I need a bigger window, make sure the window size is at least 200x60 (w*h)")
-		CliPrintWarning("Please maximize the terminal window if possible")
-	}
-
-	// we don't want the tmux pane be killed
-	// so easily. Yes, fuck /bin/cat, we use our own cat
-	cat := CAT
-	if !util.IsFileExist(cat) {
-		pwd, e := os.Getwd()
-		if e != nil {
-			pwd = e.Error()
-		}
-		err = fmt.Errorf("PWD=%s, check if %s exists. If not, build it", pwd, cat)
-		return
-	}
-	CliPrintInfo("Using %s", cat)
-
-	new_pane := func(
-		title,
-		place_holder,
-		direction,
-		from_pane string,
-		size_percentage int) (pane *Emp3r0rPane, err error) {
-
-		// system info of selected agent
-		pane, err = TmuxNewPane(title, direction, from_pane, size_percentage, cat)
-		if err != nil {
-			return
-		}
-		TmuxPanes[pane.ID] = pane
-		pane.Printf(false, color.HiYellowString(place_holder))
-
-		pane.Name = title
-
-		return
-	}
-
-	// system info of selected agent
-	AgentInfoPane, err = new_pane("Agent System Info", "Try `target 0`?", "h", "", 24)
-	if err != nil {
-		return
-	}
-
-	// Agent List
-	AgentListPane, err = new_pane("Agent List", "No agents connected", "v", "", 24)
-	if err != nil {
-		return
-	}
-
-	// Agent output
-	AgentOutputPane, err = new_pane("Agent Handler", "Nothing to see here", "h", "", 33)
-	if err != nil {
-		return
-	}
-
-	// check panes
-	if AgentListPane == nil ||
-		AgentOutputPane == nil ||
-		AgentInfoPane == nil {
-		return fmt.Errorf("One or more tmux panes failed to initialize:\n%v", TmuxPanes)
 	}
 
 	return
