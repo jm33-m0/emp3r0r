@@ -1,7 +1,6 @@
 package cc
 
 import (
-	"log"
 	"strconv"
 	"strings"
 	"sync"
@@ -171,25 +170,6 @@ func CmdHelp(mod string) {
 		}
 	}
 	CliPrintError("Help yourself")
-}
-
-func setDebugLevel(cmd string) {
-	cmdSplit := strings.Fields(cmd)
-	if len(cmdSplit) != 2 {
-		CliPrintError("debug <0, 1, 2, 3>")
-		return
-	}
-	level, e := strconv.Atoi(cmdSplit[1])
-	if e != nil {
-		CliPrintError("Invalid debug level: %v", err)
-		return
-	}
-	DebugLevel = level
-	if DebugLevel > 2 {
-		log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Llongfile | log.Lmsgprefix)
-	} else {
-		log.SetFlags(log.Ldate | log.Ltime | log.LstdFlags)
-	}
 }
 
 func vimEditFile(cmd string) {
