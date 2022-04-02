@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.14.7](https://github.com/jm33-m0/emp3r0r/compare/v1.14.6...v1.14.7) (2022-04-02)
+
+
+### Bug Fixes
+
+* [#118](https://github.com/jm33-m0/emp3r0r/issues/118) implement a 2min timeout in C&C tun ([2ecccf6](https://github.com/jm33-m0/emp3r0r/commit/2ecccf60db1966fe83e8c5006618da02b4b20356))
+
 ### [1.14.6](https://github.com/jm33-m0/emp3r0r/compare/v1.14.5...v1.14.6) (2022-04-02)
 
 
