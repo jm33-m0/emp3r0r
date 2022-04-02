@@ -1,5 +1,13 @@
 # Changelog
 
+### [1.14.6](https://github.com/jm33-m0/emp3r0r/compare/v1.14.5...v1.14.6) (2022-04-02)
+
+
+### Bug Fixes
+
+* `cc_indicator` option not covered by `gen_agent` ([374ad67](https://github.com/jm33-m0/emp3r0r/commit/374ad67677d0d50fb368754e0513d11916c944b4))
+* logging level in checkinHandler ([ea06c68](https://github.com/jm33-m0/emp3r0r/commit/ea06c68084b803b2a0ae7caa444df321d93d5361))
+
 ### [1.14.5](https://github.com/jm33-m0/emp3r0r/compare/v1.14.4...v1.14.5) (2022-04-01)
 
 
