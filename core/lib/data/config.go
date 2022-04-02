@@ -52,10 +52,10 @@ type Config struct {
 	BroadcastIntervalMax int    `json:"broadcast_interval_max"` // seconds, set max to 0 to disable
 	CCHost               string `json:"ccip"`                   // "ccip": "192.168.40.137",
 	PIDFile              string `json:"pid_file"`               // "pid_file": ".848ba.pid",
-	CCIndicator          string `json:"cc_indicator"`           // "cc_indicator": "cc_indicator",
+	CCIndicator          string `json:"cc_indicator"`           // URL of CC indicator
 	IndicatorWaitMin     int    `json:"indicator_wait_min"`     // seconds
 	IndicatorWaitMax     int    `json:"indicator_wait_max"`     // seconds, set max to 0 to disable
-	CCIndicatorText      string `json:"indicator_text"`         // "indicator_text": "myawesometext"
+	CCIndicatorText      string `json:"indicator_text"`         // what to send in response when indicator URL is requested
 	CA                   string `json:"ca"`                     // CA cert from server side
 	AgentProxy           string `json:"agent_proxy"`            // proxy for C2 transport
 	CDNProxy             string `json:"cdn_proxy"`              // websocket proxy, see go-cdn2proxy

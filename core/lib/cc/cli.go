@@ -406,7 +406,7 @@ func CliAsk(prompt string) (answer string) {
 		return "No terminal available"
 	}
 
-	EmpReadLine.SetPrompt(color.HiCyanString(prompt))
+	EmpReadLine.SetPrompt(color.HiMagentaString(prompt))
 	EmpReadLine.Config.EOFPrompt = ""
 	EmpReadLine.Config.InterruptPrompt = ""
 
@@ -437,7 +437,7 @@ func CliYesNo(prompt string) bool {
 		return true
 	}
 
-	EmpReadLine.SetPrompt(color.HiCyanString(prompt + "? [y/N] "))
+	EmpReadLine.SetPrompt(color.HiMagentaString(prompt + "? [y/N] "))
 	EmpReadLine.Config.EOFPrompt = ""
 	EmpReadLine.Config.InterruptPrompt = ""
 

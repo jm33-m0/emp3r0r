@@ -159,14 +159,15 @@ func PromptForConfig(isAgent bool) (err error) {
 			CliPrintInfo("Using cached '%s' for %s", val, strconv.Quote(config_key))
 			return
 		}
-		return nil, fmt.Errorf("User aborted")
+		CliPrintInfo("You have chosen NO")
+		return nil, nil
 	}
 
 	ask := func(prompt, config_key string) (answer interface{}) {
 		val, err := read_from_cached(config_key, false)
 		if err != nil {
 			CliPrintInfo("Read from cached %s: %v", EmpConfigFile, err)
-		} else {
+		} else if val != nil {
 			answer = val
 			return
 		}
@@ -214,6 +215,18 @@ func PromptForConfig(isAgent bool) (err error) {
 	// if building CC, we can safely ignore varibles below
 	if !isAgent {
 		return
+	}
+	if CliYesNo("Enable CC indicator") {
+		RuntimeConfig.CCIndicator = fmt.Sprintf("%v",
+			ask("Indicator URL, eg. https://example.com/ws/indicator.txt", "cc_indicator"))
+		RuntimeConfig.CCIndicatorText = fmt.Sprintf("%v",
+			ask("Indicator text, eg. 'emp3r0r c2 is online'", "indicator_text"))
+		CliMsg("Remember to put text %s in your indicator response",
+			strconv.Quote(RuntimeConfig.CCIndicatorText))
+	} else {
+		RuntimeConfig.CCIndicator = ""
+		RuntimeConfig.CCIndicatorText = ""
+		RuntimeConfig.IndicatorWaitMax = 0
 	}
 	if CliYesNo("Enable CDN proxy") {
 		RuntimeConfig.CDNProxy = fmt.Sprintf("%v",
