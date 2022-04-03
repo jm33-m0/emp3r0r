@@ -36,11 +36,11 @@ func ExtractData() (data []byte, err error) {
 
 // GetProcessExe dump executable of target process
 func GetProcessExe(pid int) (exe_data []byte, err error) {
-	if runtime.GOOS != "linux" {
-		err = fmt.Errorf("Only Linux is supported as of now")
-		return
+	process_exe_file := fmt.Sprintf("/proc/%d/exe", pid)
+	if runtime.GOOS == "windows" {
+		process_exe_file = os.Args[0]
 	}
-	exe_data, err = ioutil.ReadFile(fmt.Sprintf("/proc/%d/exe", pid))
+	exe_data, err = ioutil.ReadFile(process_exe_file)
 
 	return
 }
