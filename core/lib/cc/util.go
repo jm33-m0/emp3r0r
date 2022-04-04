@@ -79,9 +79,9 @@ func wait_for_cmd_response(cmd, cmd_id string, agent *emp3r0r_data.AgentSystemIn
 		}
 		wait_time := time.Since(now)
 		if wait_time > 20*time.Second {
-			CliPrintError("Executing %s on %s: took too long (%v), removing agent from list",
-				strconv.Quote(agent.Name),
+			CliPrintError("Executing %s on %s: unresponsive for %v, removing agent from list",
 				strconv.Quote(cmd),
+				strconv.Quote(agent.Name),
 				wait_time)
 			ctrl.Cancel()
 			return
