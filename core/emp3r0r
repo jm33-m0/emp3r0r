@@ -28,6 +28,10 @@ build_dir="$data_dir/build"
 temp=/tmp/emp3r0r-build
 [[ -d "$temp" ]] || mkdir -p "$temp"
 
+# GOPATH
+[[ -z "$GOPATH" ]] && export GOPATH="$HOME/go"
+export PATH="$GOPATH/bin:$PATH"
+
 build() {
     # build
     # -----
