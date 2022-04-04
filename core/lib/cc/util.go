@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,9 +37,9 @@ func DownloadFile(url, path string) (err error) {
 }
 
 // SendCmd send command to agent
-func SendCmd(cmd, cmd_id string, a *emp3r0r_data.SystemInfo) error {
+func SendCmd(cmd, cmd_id string, a *emp3r0r_data.AgentSystemInfo) error {
 	if a == nil {
-		return errors.New("SendCmd: No such agent")
+		return fmt.Errorf("SendCmd: agent '%s' not found", a.Tag)
 	}
 
 	var cmdData emp3r0r_data.MsgTunData
@@ -58,7 +59,35 @@ func SendCmd(cmd, cmd_id string, a *emp3r0r_data.SystemInfo) error {
 	CmdTime[cmd+cmd_id] = cmdData.Time
 	CmdTimeMutex.Unlock()
 
+	if !strings.HasPrefix(cmd, "!") {
+		go wait_for_cmd_response(cmd, cmd_id, a)
+	}
+
 	return Send2Agent(&cmdData, a)
+}
+
+func wait_for_cmd_response(cmd, cmd_id string, agent *emp3r0r_data.AgentSystemInfo) {
+	ctrl, exists := Targets[agent]
+	if !exists || agent == nil {
+		CliPrintWarning("SendCmd: agent '%s' not connected", agent.Tag)
+		return
+	}
+	now := time.Now()
+	for ctrl.Ctx.Err() == nil {
+		if _, exists := CmdResults[cmd_id]; exists {
+			return
+		}
+		wait_time := time.Since(now)
+		if wait_time > 20*time.Second {
+			CliPrintError("Executing %s on %s: took too long (%v), removing agent from list",
+				strconv.Quote(agent.Name),
+				strconv.Quote(cmd),
+				wait_time)
+			ctrl.Cancel()
+			return
+		}
+		util.TakeABlink()
+	}
 }
 
 // SendCmdToCurrentTarget send a command to currently selected agent
@@ -165,7 +194,7 @@ func OpenInNewTerminalWindow(name, cmd string) error {
 }
 
 // IsAgentExist is agent already in target list?
-func IsAgentExist(t *emp3r0r_data.SystemInfo) bool {
+func IsAgentExist(t *emp3r0r_data.AgentSystemInfo) bool {
 	for a := range Targets {
 		if a.Tag == t.Tag {
 			return true
