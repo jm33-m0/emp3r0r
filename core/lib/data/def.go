@@ -157,9 +157,10 @@ const (
 	C2CmdStat          = "!stat"
 )
 
-// SystemInfo agent properties
-type SystemInfo struct {
+// AgentSystemInfo agent properties
+type AgentSystemInfo struct {
 	Tag         string        `json:"Tag"`         // identifier of the agent
+	Name        string        `json:"Name"`        // short name of the agent
 	Version     string        `json:"Version"`     // agent version
 	Transport   string        `json:"Transport"`   // transport the agent uses (HTTP2 / CDN / TOR)
 	Hostname    string        `json:"Hostname"`    // Hostname and machine ID

@@ -210,7 +210,7 @@ func setCurrentTarget(cmd string) {
 		return
 	}
 	defer SetDynamicPrompt()
-	var target_to_set *emp3r0r_data.SystemInfo
+	var target_to_set *emp3r0r_data.AgentSystemInfo
 
 	// select by tag or index
 	target_to_set = GetTargetFromTag(strings.Join(cmdSplit[1:], " "))
@@ -221,7 +221,7 @@ func setCurrentTarget(cmd string) {
 		}
 	}
 
-	select_agent := func(a *emp3r0r_data.SystemInfo) {
+	select_agent := func(a *emp3r0r_data.AgentSystemInfo) {
 		CurrentTarget = a
 		GetTargetDetails(CurrentTarget)
 		CliPrintSuccess("Now targeting %s", CurrentTarget.Tag)
@@ -262,7 +262,7 @@ func setTargetLabel(cmd string) {
 	index, e := strconv.Atoi(cmdSplit[1])
 	label := strings.Join(cmdSplit[2:], " ")
 
-	var target *emp3r0r_data.SystemInfo
+	var target *emp3r0r_data.AgentSystemInfo
 	if e != nil {
 		target = GetTargetFromTag(cmdSplit[1])
 		if target != nil {

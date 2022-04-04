@@ -422,7 +422,7 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 	var (
-		target emp3r0r_data.SystemInfo
+		target emp3r0r_data.AgentSystemInfo
 		in     = json.NewDecoder(conn)
 	)
 
@@ -549,7 +549,7 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 				CliPrintError("%v: no agent found by this msg", msg)
 				return
 			}
-			shortname := strings.Split(agent.Tag, "-agent")[0]
+			shortname := agent.Name
 			if agent == nil {
 				CliPrintWarning("msgTunHandler: agent not recognized")
 				return
@@ -559,6 +559,8 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 				CliAlert(color.FgHiGreen, "agent %s connected", strconv.Quote(shortname))
 			}
 			Targets[agent].Conn = conn
+			Targets[agent].Ctx = ctx
+			Targets[agent].Cancel = cancel
 		}
 	}()
 
@@ -569,7 +571,7 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 		agent_by_conn := GetTargetFromH2Conn(conn)
 		name := emp3r0r_data.Unknown
 		if agent_by_conn != nil {
-			name = strings.Split(agent_by_conn.Tag, "-agent")[0]
+			name = agent_by_conn.Name
 		}
 		CliPrintDebug("Last handshake from agent '%s': %v ago", name, since_last_handshake)
 		if since_last_handshake > 2*time.Minute {

