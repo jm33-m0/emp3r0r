@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 
 	"github.com/gliderlabs/ssh"
 )
@@ -13,19 +14,24 @@ import (
 // SSHD start a ssh server to provide shell access for clients
 // the server binds local interface only
 func crossPlatformSSHD(shell, port string, args []string) (err error) {
-	exe, e := exec.LookPath(shell)
-	if err != nil {
-		err = fmt.Errorf("%s not found (%v)", shell, e)
-		log.Print(err)
+	if strings.HasSuffix(shell, "bash") {
+		shell = "cmd.exe"
+	} else {
+		exe, e := exec.LookPath(shell)
+		if err != nil {
+			err = fmt.Errorf("%s not found (%v)", shell, e)
+			log.Print(err)
+			return
+		}
+		shell = exe
 	}
-	shell = exe
 	log.Printf("Using %s shell", strconv.Quote(shell))
+	args = append([]string{shell}, args...)
 
 	ssh.Handle(func(s ssh.Session) {
-		cmd := exec.Command(shell, args...) // shell command
-		cmd.Env = append(cmd.Env, os.Environ()...)
-		// cmd.Env = append(cmd.Env, "TERM=xterm")
-		cmd.Stderr = s
+		cmd := exec.Command("conhost.exe", args...) // shell command
+		cmd.Env = os.Environ()
+		cmd.Stderr = s.Stderr()
 		cmd.Stdin = s
 		cmd.Stdout = s
 		err = cmd.Start()

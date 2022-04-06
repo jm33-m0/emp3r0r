@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"runtime"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -16,6 +17,10 @@ import (
 )
 
 func VaccineHandler() (out string) {
+	if runtime.GOOS != "linux" {
+		return "Only supported in Linux"
+	}
+
 	var (
 		PythonArchive = RuntimeConfig.UtilsPath + "/python3.9.tar.xz"
 		PythonLib     = RuntimeConfig.UtilsPath + "/python3.9"

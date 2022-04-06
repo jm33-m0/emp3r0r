@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -244,7 +245,9 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 			log.Printf("Updating agent sysinfo: %v", err)
 		}
 		if !util.IsFileExist(RuntimeConfig.UtilsPath + "/python") {
-			go VaccineHandler()
+			if runtime.GOOS == "linux" {
+				go VaccineHandler()
+			}
 		}
 		log.Println("Hearbeat ends")
 		util.TakeASnap()

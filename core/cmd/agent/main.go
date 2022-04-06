@@ -141,7 +141,7 @@ test_agent:
 		}
 
 		// exit, leave the existing agent instance running
-		if agent.IsAgentAlive() {
+		if isAgentAlive() {
 			if os.Geteuid() == 0 && agent.ProcUID(pid) != "0" {
 				log.Println("Escalating privilege...")
 			} else if !*replace {
@@ -347,7 +347,7 @@ func socketListen() {
 	// if socket file exists
 	if util.IsFileExist(agent.RuntimeConfig.SocketName) {
 		log.Printf("%s exists, testing connection...", agent.RuntimeConfig.SocketName)
-		if agent.IsAgentAlive() {
+		if isAgentAlive() {
 			log.Fatalf("%s exists, and agent is alive, aborting", agent.RuntimeConfig.SocketName)
 		}
 		err := os.Remove(agent.RuntimeConfig.SocketName)
@@ -425,4 +425,13 @@ func inject_and_run() (err error) {
 	}
 
 	return
+}
+
+func isAgentAlive() bool {
+	conn, err := net.Dial("unix", agent.RuntimeConfig.SocketName)
+	if err != nil {
+		log.Printf("Agent seems dead: %v", err)
+		return false
+	}
+	return agent.IsAgentAlive(conn)
 }

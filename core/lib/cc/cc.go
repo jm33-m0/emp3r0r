@@ -221,13 +221,16 @@ func GetTargetDetails(target *emp3r0r_data.AgentSystemInfo) {
 	if target.HasRoot {
 		userInfo = color.HiGreenString(target.User)
 	}
+	userInfo = util.SplitLongLine(userInfo, 20)
 	cpuinfo := color.HiMagentaString(target.CPU)
 	gpuinfo := color.HiMagentaString(target.GPU)
+	gpuinfo = util.SplitLongLine(gpuinfo, 20)
 
 	// agent process info
 	agentProc := *target.Process
 	procInfo := fmt.Sprintf("%s (%d)\n<- %s (%d)",
 		agentProc.Cmdline, agentProc.PID, agentProc.Parent, agentProc.PPID)
+	procInfo = util.SplitLongLine(procInfo, 20)
 
 	// info map
 	infoMap := map[string]string{

