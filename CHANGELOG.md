@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.15.2](https://github.com/jm33-m0/emp3r0r/compare/v1.15.1...v1.15.2) (2022-04-06)
+
+
+### Bug Fixes
+
+* windows `interactive_shell` has visible console windows ([4dfd893](https://github.com/jm33-m0/emp3r0r/commit/4dfd8938645827d6ffdd731ffb1601dadaf6d7f9))
+
 ### [1.15.1](https://github.com/jm33-m0/emp3r0r/compare/v1.15.0...v1.15.1) (2022-04-06)
 
 
