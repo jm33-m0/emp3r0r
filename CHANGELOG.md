@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.15.1](https://github.com/jm33-m0/emp3r0r/compare/v1.15.0...v1.15.1) (2022-04-06)
+
+
+### Bug Fixes
+
+* [#94](https://github.com/jm33-m0/emp3r0r/issues/94) windows support now complete ([d7b812d](https://github.com/jm33-m0/emp3r0r/commit/d7b812df0a5a77aec24c58df99f6b3bf925c8b2b))
+
 ## [1.15.0](https://github.com/jm33-m0/emp3r0r/compare/v1.14.7...v1.15.0) (2022-04-04)
 
 
