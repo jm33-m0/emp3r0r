@@ -1,6 +1,7 @@
 package cc
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -43,7 +44,7 @@ var (
 	EmpConfigFile = ""
 
 	// Targets target list, with control (tun) interface
-	Targets = make(map[*emp3r0r_data.SystemInfo]*Control)
+	Targets = make(map[*emp3r0r_data.AgentSystemInfo]*Control)
 )
 
 const (
@@ -59,14 +60,16 @@ const (
 
 // Control controller interface of a target
 type Control struct {
-	Index int          // index of a connected agent
-	Label string       // custom label for an agent
-	Conn  *h2conn.Conn // connection of an agent
+	Index  int          // index of a connected agent
+	Label  string       // custom label for an agent
+	Conn   *h2conn.Conn // h2 connection of an agent
+	Ctx    context.Context
+	Cancel context.CancelFunc
 }
 
 // send JSON encoded target list to frontend
 func headlessListTargets() (err error) {
-	var targets []emp3r0r_data.SystemInfo
+	var targets []emp3r0r_data.AgentSystemInfo
 	for target := range Targets {
 		targets = append(targets, *target)
 	}
@@ -185,7 +188,7 @@ func ListTargets() {
 	AgentListPane.Printf(true, "\n\033[0m%s\n\n", tableString.String())
 }
 
-func GetTargetDetails(target *emp3r0r_data.SystemInfo) {
+func GetTargetDetails(target *emp3r0r_data.AgentSystemInfo) {
 	// exists?
 	if !IsAgentExist(target) {
 		CliPrintError("Target does not exist")
@@ -278,7 +281,7 @@ func GetTargetDetails(target *emp3r0r_data.SystemInfo) {
 }
 
 // GetTargetFromIndex find target from Targets via control index, return nil if not found
-func GetTargetFromIndex(index int) (target *emp3r0r_data.SystemInfo) {
+func GetTargetFromIndex(index int) (target *emp3r0r_data.AgentSystemInfo) {
 	for t, ctl := range Targets {
 		if ctl.Index == index {
 			target = t
@@ -289,7 +292,7 @@ func GetTargetFromIndex(index int) (target *emp3r0r_data.SystemInfo) {
 }
 
 // GetTargetFromTag find target from Targets via tag, return nil if not found
-func GetTargetFromTag(tag string) (target *emp3r0r_data.SystemInfo) {
+func GetTargetFromTag(tag string) (target *emp3r0r_data.AgentSystemInfo) {
 	for t := range Targets {
 		if t.Tag == tag {
 			target = t
@@ -300,7 +303,7 @@ func GetTargetFromTag(tag string) (target *emp3r0r_data.SystemInfo) {
 }
 
 // GetTargetFromH2Conn find target from Targets via HTTP2 connection ID, return nil if not found
-func GetTargetFromH2Conn(conn *h2conn.Conn) (target *emp3r0r_data.SystemInfo) {
+func GetTargetFromH2Conn(conn *h2conn.Conn) (target *emp3r0r_data.AgentSystemInfo) {
 	for t, ctrl := range Targets {
 		if conn == ctrl.Conn {
 			target = t
@@ -376,7 +379,7 @@ outter:
 }
 
 // SetAgentLabel if an agent is already labeled, we can set its label in later sessions
-func SetAgentLabel(a *emp3r0r_data.SystemInfo, mutex *sync.Mutex) (label string) {
+func SetAgentLabel(a *emp3r0r_data.AgentSystemInfo, mutex *sync.Mutex) (label string) {
 	data, err := ioutil.ReadFile(AgentsJSON)
 	if err != nil {
 		CliPrintWarning("SetAgentLabel: %v", err)
@@ -410,7 +413,7 @@ func ListModules() {
 }
 
 // Send2Agent send MsgTunData to agent
-func Send2Agent(data *emp3r0r_data.MsgTunData, agent *emp3r0r_data.SystemInfo) (err error) {
+func Send2Agent(data *emp3r0r_data.MsgTunData, agent *emp3r0r_data.AgentSystemInfo) (err error) {
 	ctrl := Targets[agent]
 	if ctrl == nil {
 		return fmt.Errorf("Send2Agent (%s): Target is not connected", data.Payload)

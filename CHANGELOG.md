@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.15.0](https://github.com/jm33-m0/emp3r0r/compare/v1.14.7...v1.15.0) (2022-04-04)
+
+
+### Features
+
+* remove agent on command exec timeout ([97eacdb](https://github.com/jm33-m0/emp3r0r/commit/97eacdbf7841b314062fbcb6148463b1018ff1bd))
+
 ### [1.14.7](https://github.com/jm33-m0/emp3r0r/compare/v1.14.6...v1.14.7) (2022-04-02)
 
 

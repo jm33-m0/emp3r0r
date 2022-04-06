@@ -10,15 +10,12 @@ var RShellStatus = make(map[string]error)
 // moduleCmd exec cmd on target
 func moduleCmd() {
 	// send command
-	execOnTarget := func(target *emp3r0r_data.SystemInfo) {
+	execOnTarget := func(target *emp3r0r_data.AgentSystemInfo) {
 		if Targets[target].Conn == nil {
 			CliPrintError("moduleCmd: agent %s is not connected", target.Tag)
 			return
 		}
-		var data emp3r0r_data.MsgTunData
-		data.Payload = "cmd" + emp3r0r_data.MagicString + Options["cmd_to_exec"].Val
-		data.Tag = target.Tag
-		err := Send2Agent(&data, target)
+		err := SendCmdToCurrentTarget(Options["cmd_to_exec"].Val, "")
 		if err != nil {
 			CliPrintError("moduleCmd: %v", err)
 		}

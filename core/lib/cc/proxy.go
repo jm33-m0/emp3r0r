@@ -25,10 +25,10 @@ type PortFwdSession struct {
 	Description string // fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, to_addr)
 	Reverse     bool   // from agent to cc or cc to agent
 
-	Agent  *emp3r0r_data.SystemInfo  // agent who holds this port mapping session
-	Sh     map[string]*StreamHandler // related to HTTP handler
-	Ctx    context.Context           // PortFwd context
-	Cancel context.CancelFunc        // PortFwd cancel
+	Agent  *emp3r0r_data.AgentSystemInfo // agent who holds this port mapping session
+	Sh     map[string]*StreamHandler     // related to HTTP handler
+	Ctx    context.Context               // PortFwd context
+	Cancel context.CancelFunc            // PortFwd cancel
 }
 
 type port_mapping struct {
