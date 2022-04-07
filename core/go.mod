@@ -10,6 +10,7 @@ require (
 	github.com/creack/pty v1.1.18
 	github.com/fatih/color v1.13.0
 	github.com/gliderlabs/ssh v0.3.3
+	github.com/gonutz/w32/v2 v2.4.0
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
 	github.com/jaypipes/ghw v0.9.0
