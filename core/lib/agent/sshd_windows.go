@@ -19,7 +19,9 @@ import (
 // the server binds local interface only
 func crossPlatformSSHD(shell, port string, args []string) (err error) {
 	if strings.HasSuffix(shell, "bash") {
-		shell = "cmd.exe"
+		// to use conhost.exe, the target must be at least Windows 7
+		// so it's safe to just set shell to powershell.exe
+		shell = "powershell.exe"
 	} else {
 		exe, e := exec.LookPath(shell)
 		if err != nil {
@@ -74,7 +76,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 						return
 					}
 					shell_proc := children[0] // there should be only 1 child
-					SetWinsize(int(shell_proc.Pid), win.Width, win.Height)
+					SetCosoleWinsize(int(shell_proc.Pid), win.Width, win.Height)
 				}
 				util.TakeABlink()
 			}

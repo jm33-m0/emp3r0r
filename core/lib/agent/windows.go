@@ -10,6 +10,7 @@ import (
 
 	"github.com/gonutz/w32/v2"
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 )
 
 // see https://gist.github.com/SCP002/ab863ef9ffbacedc2c0b1b4d30e80805
@@ -95,20 +96,39 @@ func GetConsolePids(pidsLen int) ([]uint32, error) {
 	}
 }
 
-// SetWinsize resize main window of given process
-// w/h: width/height in pixels
-// window position resets to 0, 0
-func SetWinsize(pid, w, h int) {
+// SetCosoleWinsize resize main window of given console process
+// w/h: width/height in characters
+// window position resets to 0, 0 (pixel)
+func SetCosoleWinsize(pid, w, h int) {
 	whandle, err := GetWindowHandleByPID(pid, true)
 	if err != nil {
 		log.Printf("SetWinsize: %v", err)
 		return
 	}
-	w_px := w * (16 / 72) * 96
-	h_px := h * (16 / 72) * 96
+	// read default font size from registry
+	console_reg_key, err := registry.OpenKey(registry.CURRENT_USER, "Console", registry.QUERY_VALUE)
+	if err != nil {
+		log.Printf("SetCosoleWinsize: %v", err)
+		return
+	}
+	defer console_reg_key.Close()
+	font_size_val, _, err := console_reg_key.GetIntegerValue("FontSize")
+	if err != nil {
+		log.Printf("SetConsoleWinSize: query fontsize: %v", err)
+		return
+	}
+	font_size := int(font_size_val >> 16)
+	log.Printf("Default font size of console host is %d (0x%x), parsed from 0x%x",
+		font_size, font_size, font_size_val)
+
+	// I don't know why, but if you do some math you will get this
+	w_px := w * font_size / 2
+	h_px := h * font_size
+
+	// set window size in pixels
 	if w32.SetWindowPos(whandle, whandle, 0, 0, w_px, h_px, w32.SWP_NOMOVE|w32.SWP_NOZORDER) {
-		log.Printf("Window (0x%x) of %d has been resized to %dx%d (chars)",
-			whandle, pid, w, h)
+		log.Printf("Window (0x%x) of %d has been resized to %dx%d (chars) or %dx%d (pixels)",
+			whandle, pid, w, h, w_px, h_px)
 	}
 }
 
