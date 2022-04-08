@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.15.3](https://github.com/jm33-m0/emp3r0r/compare/v1.15.2...v1.15.3) (2022-04-07)
+
+
+### Bug Fixes
+
+* [#122](https://github.com/jm33-m0/emp3r0r/issues/122) partially fix, shell window in main tmux pane now works ([17141b8](https://github.com/jm33-m0/emp3r0r/commit/17141b84c46f4986c7baf8fee9213d8478d1f6d0))
+
 ### [1.15.2](https://github.com/jm33-m0/emp3r0r/compare/v1.15.1...v1.15.2) (2022-04-06)
 
 
