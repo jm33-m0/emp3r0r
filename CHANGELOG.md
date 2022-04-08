@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.15.4](https://github.com/jm33-m0/emp3r0r/compare/v1.15.3...v1.15.4) (2022-04-08)
+
+
+### Bug Fixes
+
+* [#122](https://github.com/jm33-m0/emp3r0r/issues/122) window resizing now works mostly ([bb1af5d](https://github.com/jm33-m0/emp3r0r/commit/bb1af5d694c685982190c24bd6b9351c482c62fa))
+
 ### [1.15.3](https://github.com/jm33-m0/emp3r0r/compare/v1.15.2...v1.15.3) (2022-04-07)
 
 
