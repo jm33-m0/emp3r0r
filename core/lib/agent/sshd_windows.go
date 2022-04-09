@@ -62,6 +62,10 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			for ctx.Err() == nil {
 				if cmd.Process != nil {
 					win := <-winCh
+					if win.Width <= 0 || win.Height <= 0 {
+						log.Printf("w/h is 0, aborting")
+						return
+					}
 					conhost_pid := int32(cmd.Process.Pid)
 					conhost_proc, err := process.NewProcess(conhost_pid)
 					if err != nil {
