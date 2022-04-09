@@ -72,16 +72,25 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 						log.Printf("conhost process %d not found", conhost_pid)
 						continue
 					}
-					children, err := conhost_proc.Children()
-					if err != nil {
-						log.Printf("conhost get children: %v", err)
+
+					var shell_proc *process.Process
+					// wait until conhost.exe starts the shell
+					for i := 0; i < 5; i++ {
+						util.TakeABlink()
+						children, err := conhost_proc.Children()
+						if err != nil {
+							log.Printf("conhost get children: %v", err)
+							return
+						}
+						if len(children) > 0 {
+							shell_proc = children[0] // there should be only 1 child
+							break
+						}
+					}
+					if shell_proc == nil {
+						log.Printf("conhost.exe (%d) has no shell spawned", conhost_pid)
 						return
 					}
-					if len(children) == 0 {
-						log.Print("conhost has no children, shell won't be resized")
-						return
-					}
-					shell_proc := children[0] // there should be only 1 child
 					SetCosoleWinsize(int(shell_proc.Pid), win.Width, win.Height)
 				}
 				util.TakeABlink()
