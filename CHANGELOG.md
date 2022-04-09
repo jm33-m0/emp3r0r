@@ -1,5 +1,13 @@
 # Changelog
 
+### [1.15.5](https://github.com/jm33-m0/emp3r0r/compare/v1.15.4...v1.15.5) (2022-04-09)
+
+
+### Bug Fixes
+
+* `interactive_shell` for Windows: fails to find shell process sometimes ([bf1883d](https://github.com/jm33-m0/emp3r0r/commit/bf1883d17bfb133d73870f3d6e7fdcd8c75a24e4))
+* `interactive_shell` for Windows: too many callback functions ([1f0155b](https://github.com/jm33-m0/emp3r0r/commit/1f0155b34715bcf6ce04206dc18699d4e04e429e))
+
 ### [1.15.4](https://github.com/jm33-m0/emp3r0r/compare/v1.15.3...v1.15.4) (2022-04-08)
 
 
