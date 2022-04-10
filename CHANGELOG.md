@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.15.6](https://github.com/jm33-m0/emp3r0r/compare/v1.15.5...v1.15.6) (2022-04-10)
+
+
+### Bug Fixes
+
+* windows sysinfo ([8c7c080](https://github.com/jm33-m0/emp3r0r/commit/8c7c080235f54f3f6c6e5234fb54084b7d805d3b))
+
 ### [1.15.5](https://github.com/jm33-m0/emp3r0r/compare/v1.15.4...v1.15.5) (2022-04-09)
 
 
