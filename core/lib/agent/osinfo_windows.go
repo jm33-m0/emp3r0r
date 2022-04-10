@@ -8,7 +8,7 @@ import (
 	"log"
 	"runtime"
 	"strings"
-	"unsafe"
+	"time"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"golang.org/x/sys/windows"
@@ -17,8 +17,7 @@ import (
 
 func crossPlatformGetOSInfo() *OSInfo {
 	osinfo := OSInfo{}
-	osinfo.Name = "Windows"
-	osinfo.Release = getOSRelease()
+	osinfo.Name = getOSName()
 	osinfo.Version = GetKernelVersion()
 	osinfo.Vendor = "Microsoft"
 	osinfo.Kernel = osinfo.Version // let's see if this needs to be something else
@@ -47,51 +46,30 @@ func crossPlatformGetOSInfo() *OSInfo {
 	return &osinfo
 }
 
-func getOSRelease() (release string) {
-	var err error
+func getOSName() string {
+	current_ver_key, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows NT\CurrentVersion`, registry.QUERY_VALUE)
+	if err != nil {
+		log.Printf("getOSRelease: Open key: %v", err)
+	}
+	defer current_ver_key.Close()
+	product_name, _, err := current_ver_key.GetStringValue(`ProductName`)
+	if err != nil {
+		log.Printf("Product name: %v", err)
+		product_name = "Unknown_Product"
+	}
+	owner, _, err := current_ver_key.GetStringValue(`RegisteredOwner`)
+	if err != nil {
+		log.Printf("Registered owner: %v", err)
+		product_name = "Unknown_Owner"
+	}
+	install_date_unix, _, err := current_ver_key.GetIntegerValue(`InstallDate`)
+	if err != nil {
+		log.Printf("Install date: %v", err)
+		install_date_unix = 0
+	}
+	install_time := time.Unix(int64(install_date_unix), 0)
 
-	var h windows.Handle // like HostIDWithContext(), we query the registry using the raw windows.RegOpenKeyEx/RegQueryValueEx
-	err = windows.RegOpenKeyEx(windows.HKEY_LOCAL_MACHINE, windows.StringToUTF16Ptr(`SOFTWARE\Microsoft\Windows NT\CurrentVersion`), 0, windows.KEY_READ|windows.KEY_WOW64_64KEY, &h)
-	if err != nil {
-		return
-	}
-	defer func() {
-		err := windows.RegCloseKey(h)
-		if err != nil {
-			log.Printf("RegCloseKey: %v", err)
-		}
-	}()
-	var bufLen uint32
-	var valType uint32
-	err = windows.RegQueryValueEx(h, windows.StringToUTF16Ptr(`ProductName`), nil, &valType, nil, &bufLen)
-	if err != nil {
-		log.Printf("Query ProductName: %v", err)
-		release = "Unknown_Product"
-	}
-	regBuf := make([]uint16, bufLen/2+1)
-	err = windows.RegQueryValueEx(h, windows.StringToUTF16Ptr(`ProductName`), nil, &valType, (*byte)(unsafe.Pointer(&regBuf[0])), &bufLen)
-	if err != nil {
-		log.Printf("Query ProductName: %v", err)
-		release = "Unknown_Product"
-	} else {
-		release = windows.UTF16ToString(regBuf[:])
-	}
-	release = strings.TrimPrefix(release, "Microsoft")
-	release = strings.TrimPrefix(release, "Windows")
-	// append Service Pack number, only on success
-	err = windows.RegQueryValueEx(h, windows.StringToUTF16Ptr(`CSDVersion`), nil, &valType, nil, &bufLen)
-	if err != nil {
-		log.Printf("CSDVersion: %v", err)
-		release += " - Unknown_CSDVersion"
-	} else {
-		regBuf = make([]uint16, bufLen/2+1)
-		err = windows.RegQueryValueEx(h, windows.StringToUTF16Ptr(`CSDVersion`), nil, &valType, (*byte)(unsafe.Pointer(&regBuf[0])), &bufLen)
-		if err == nil {
-			release = fmt.Sprintf("%s - %s", release, windows.UTF16ToString(regBuf[:]))
-		}
-	}
-
-	return
+	return fmt.Sprintf("%s (registered to %s on %v)", product_name, owner, install_time)
 }
 
 func GetKernelVersion() (ver string) {
@@ -130,7 +108,13 @@ func GetKernelVersion() (ver string) {
 		log.Print(err)
 		return
 	}
-	ver = fmt.Sprintf("%s, build %s", ver, cb)
+	buildlab_ex, _, err := k.GetStringValue("BuildLabEx")
+	if err != nil {
+		log.Printf("BuildLabEx: %v", err)
+		buildlab_ex = cb
+	}
+
+	ver = fmt.Sprintf("%s, build %s", ver, buildlab_ex)
 
 	return
 }
