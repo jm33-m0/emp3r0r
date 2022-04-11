@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.15.7](https://github.com/jm33-m0/emp3r0r/compare/v1.15.6...v1.15.7) (2022-04-11)
+
+
+### Bug Fixes
+
+* [#122](https://github.com/jm33-m0/emp3r0r/issues/122) title bar height not considered ([98cc556](https://github.com/jm33-m0/emp3r0r/commit/98cc5562c373ce144a3dbf445af7ee0c28567811))
+
 ### [1.15.6](https://github.com/jm33-m0/emp3r0r/compare/v1.15.5...v1.15.6) (2022-04-10)
 
 
