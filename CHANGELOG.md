@@ -1,5 +1,12 @@
 # Changelog
 
+### [1.15.8](https://github.com/jm33-m0/emp3r0r/compare/v1.15.7...v1.15.8) (2022-04-11)
+
+
+### Bug Fixes
+
+* Tmux UI outputs on wrong panes/windows ([b440c60](https://github.com/jm33-m0/emp3r0r/commit/b440c60a16476cdc528f7a44518545ae422d3af2))
+
 ### [1.15.7](https://github.com/jm33-m0/emp3r0r/compare/v1.15.6...v1.15.7) (2022-04-11)
 
 
