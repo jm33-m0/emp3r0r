@@ -60,6 +60,12 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			}
 		}()
 		go func() {
+			defer func() {
+				f.Close()
+				if cmd.Process != nil {
+					cmd.Process.Kill()
+				}
+			}()
 			io.Copy(f, s) // stdin
 		}()
 		io.Copy(s, f) // stdout

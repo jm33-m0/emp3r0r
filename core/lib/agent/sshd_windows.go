@@ -58,7 +58,13 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			log.Print("Got an SSH request")
 		}
 		go func() {
-			defer cancel()
+			defer func() {
+				cancel()
+				if cmd.Process != nil {
+					// cleanup obsolete shell process
+					cmd.Process.Kill()
+				}
+			}()
 			for ctx.Err() == nil {
 				if cmd.Process != nil {
 					win := <-winCh
@@ -102,7 +108,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			log.Printf("Start shell %s: %v", shell, err)
 			return
 		}
-		err = cmd.Wait()
+		err = cmd.Wait() // wait until shell process dies
 		if err != nil {
 			log.Printf("Wait shell %s: %v", shell, err)
 			return
