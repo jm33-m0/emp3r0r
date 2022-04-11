@@ -15,7 +15,9 @@ import (
 
 // see https://gist.github.com/SCP002/ab863ef9ffbacedc2c0b1b4d30e80805
 var (
-	Kernel32DLL = windows.NewLazyDLL("kernel32.dll")
+	Kernel32DLL        = windows.NewLazyDLL("kernel32.dll")
+	ConsoleExtraWidth  = 0 // scroll bar, etc
+	ConsoleExtraHeight = 0 // title bar
 )
 
 // IsMainWindow returns true if a window with the specified handle is a main window.
@@ -117,13 +119,48 @@ func SetCosoleWinsize(pid, w, h int) {
 		log.Printf("SetConsoleWinSize: query fontsize: %v", err)
 		return
 	}
-	font_size := int(font_size_val >> 16)
+	font_size := int(font_size_val >> 16) // font height in pixels, width = h/2
 	log.Printf("Default font size of console host is %d (0x%x), parsed from 0x%x",
 		font_size, font_size, font_size_val)
-
-	// I don't know why, but if you do some math you will get this
+	// what size in pixels we need
 	w_px := w * font_size / 2
 	h_px := h * font_size
+
+	if ConsoleExtraHeight == 0 && ConsoleExtraWidth == 0 {
+		// Get default window size
+		now_size, _, err := console_reg_key.GetIntegerValue("WindowSize")
+		if err != nil {
+			log.Printf("window size: %v", err)
+			return
+		}
+		// in chars
+		default_width := int(now_size & 0xffff)
+		default_height := int(now_size >> 16)
+		// in pixels
+		default_w_px := default_width * font_size / 2
+		default_h_px := default_height * font_size
+		log.Printf("Default window (client rectangle) is %dx%d (chars) or %dx%d (pixels)",
+			default_width, default_height,
+			default_w_px, default_h_px)
+		// window size in pixels, including title bar and frame
+		now_rect := w32.GetWindowRect(whandle)
+		now_w_px := int(now_rect.Width())
+		now_h_px := int(now_rect.Height())
+		if now_h_px <= 0 || now_w_px <= 0 {
+			log.Printf("Now window (normal rectangle) size is %dx%d, aborting", now_w_px, now_h_px)
+			return
+		}
+		// calculate extra width and height
+		ConsoleExtraHeight = now_h_px - default_h_px
+		ConsoleExtraWidth = now_w_px - default_w_px
+		if ConsoleExtraWidth <= 0 || ConsoleExtraHeight <= 0 {
+			log.Printf("Extra width %d, extra height %d, aborting", ConsoleExtraWidth, ConsoleExtraHeight)
+			return
+		}
+
+	}
+	w_px = w_px + ConsoleExtraWidth
+	h_px = h_px + ConsoleExtraHeight
 
 	// set window size in pixels
 	if w32.SetWindowPos(whandle, whandle, 0, 0, w_px, h_px, w32.SWP_NOMOVE|w32.SWP_NOZORDER) {
