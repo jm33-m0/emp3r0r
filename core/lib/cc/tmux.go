@@ -163,6 +163,15 @@ func TmuxCurrentPane() (index int) {
 	return
 }
 
+func TmuxGoHome() (res bool) {
+	out, err := exec.Command("/bin/sh", "-c", "tmux select-window -t "+HomeWindow).CombinedOutput()
+	if err != nil {
+		CliPrintWarning("TmuxGoHome: %v: %s", err, out)
+		return
+	}
+	return true
+}
+
 // All panes live in this tmux window,
 // returns the unique ID of the window
 // returns "" when error occurs
@@ -178,14 +187,11 @@ func TmuxCurrentWindow() (id string) {
 }
 
 func (pane *Emp3r0rPane) Respawn() (err error) {
-	pane.Index = TmuxPaneID2Index(pane.ID)
-
 	defer TmuxUpdatePane(pane)
 	out, err := exec.Command("tmux", "respawn-pane",
-		"-t", strconv.Itoa(pane.Index),
-		CAT).CombinedOutput()
+		"-t", pane.ID, CAT).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("TmuxRespawn %s: %s\n%v", pane.ID, out, err)
+		return fmt.Errorf("TmuxRespawn %s: %s, %v", pane.ID, out, err)
 	}
 
 	return
@@ -236,15 +242,14 @@ func (pane *Emp3r0rPane) ClearPane() (err error) {
 	}
 	proc.Kill() // kill the process (cat) that lives inside target pane, to restart later
 
-	idx := TmuxPaneID2Index(id)
-	job := fmt.Sprintf("tmux respawn-pane -t %d -k %s", idx, pane.Cmd)
+	job := fmt.Sprintf("tmux respawn-pane -t %s -k %s", id, pane.Cmd)
 	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
 	if err != nil {
 		err = fmt.Errorf("exec tmux respawn pane: %s\n%v", out, err)
 		return
 	}
 
-	job = fmt.Sprintf("tmux clear-history -t %d", idx)
+	job = fmt.Sprintf("tmux clear-history -t %s", id)
 	out, err = exec.Command("/bin/sh", "-c", job).CombinedOutput()
 	if err != nil {
 		err = fmt.Errorf("exec tmux clear-history: %s\n%v", out, err)
@@ -267,6 +272,13 @@ func (pane *Emp3r0rPane) PaneDetails() (
 	width int,
 	height int) {
 
+	if pane.ID == "" {
+		return
+	}
+	if !TmuxGoHome() {
+		return
+	}
+
 	index = pane.Index
 	if pane.ID != "" {
 		index = TmuxPaneID2Index(pane.ID)
@@ -276,12 +288,12 @@ func (pane *Emp3r0rPane) PaneDetails() (
 	}
 
 	out, err := exec.Command("/bin/sh", "-c",
-		fmt.Sprintf("tmux display -p -t %d "+
+		fmt.Sprintf("tmux display -p -t %s "+
 			`'#{pane_dead}:#{pane_tty}:#{pane_pid}:#{pane_width}:`+
 			`#{pane_height}:#{pane_current_command}:#{pane_title}'`,
-			index)).CombinedOutput()
+			pane.ID)).CombinedOutput()
 	if err != nil {
-		CliPrintWarning("tmux: %s\n%v", out, err)
+		CliPrintWarning("tmux get pane details: %s, %v", out, err)
 		return
 	}
 	out_str := strings.TrimSpace(string(out))
@@ -319,11 +331,7 @@ func (pane *Emp3r0rPane) PaneDetails() (
 // ResizePane resize pane in x/y to number of lines
 func (pane *Emp3r0rPane) ResizePane(direction string, lines int) (err error) {
 	id := pane.ID
-	idx := TmuxPaneID2Index(id)
-	if idx < 0 {
-		return fmt.Errorf("Pane %s not found", id)
-	}
-	job := fmt.Sprintf("tmux resize-pane -t %d -%s %d", idx, direction, lines)
+	job := fmt.Sprintf("tmux resize-pane -t %s -%s %d", id, direction, lines)
 	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
 	if err != nil {
 		err = fmt.Errorf("exec tmux resize-pane: %s\n%v", out, err)
@@ -332,8 +340,8 @@ func (pane *Emp3r0rPane) ResizePane(direction string, lines int) (err error) {
 	return
 }
 
-func TmuxKillWindow(index int) (err error) {
-	out, err := exec.Command("tmux", "kill-window", "-t", strconv.Itoa(index)).CombinedOutput()
+func TmuxKillWindow(id string) (err error) {
+	out, err := exec.Command("tmux", "kill-window", "-t", id).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%s\n%v", out, err)
 	}
@@ -342,11 +350,7 @@ func TmuxKillWindow(index int) (err error) {
 
 func (pane *Emp3r0rPane) KillPane() (err error) {
 	id := pane.ID
-	idx := TmuxPaneID2Index(id)
-	if idx < 0 {
-		return fmt.Errorf("Pane %s not found", id)
-	}
-	job := fmt.Sprintf("tmux kill-pane -t %d", idx)
+	job := fmt.Sprintf("tmux kill-pane -t %s", id)
 	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
 	if err != nil {
 		err = fmt.Errorf("exec tmux kill-pane: %s\n%v", out, err)
@@ -443,7 +447,7 @@ func TmuxNewPane(title, hV string, target_pane_id string, size int, cmd string) 
 
 // Sync changes of a pane
 func TmuxUpdatePane(pane *Emp3r0rPane) {
-	if TmuxCurrentWindow() != HomeWindow {
+	if !TmuxGoHome() {
 		return
 	}
 	if pane == nil {
@@ -457,14 +461,12 @@ func TmuxUpdatePane(pane *Emp3r0rPane) {
 }
 
 func TmuxSetPaneTitle(title, pane_id string) error {
-	// pane index
-	index := TmuxPaneID2Index(pane_id)
-	if index < 0 {
-		return fmt.Errorf("No such pane %s", pane_id)
+	if !TmuxGoHome() {
+		return fmt.Errorf("TmuxSetPaneTitle: not in home window")
 	}
 
 	// set pane title
-	tmux_cmd := []string{"select-pane", "-t", strconv.Itoa(index), "-T", title}
+	tmux_cmd := []string{"select-pane", "-t", pane_id, "-T", title}
 
 	out, err := exec.Command("tmux", tmux_cmd...).CombinedOutput()
 	if err != nil {
@@ -478,6 +480,9 @@ func TmuxSetPaneTitle(title, pane_id string) error {
 // returns -1 if failed
 func TmuxPaneID2Index(id string) (index int) {
 	index = -1
+	if !TmuxGoHome() {
+		return
+	}
 
 	out, err := exec.Command("/bin/sh", "-c", "tmux list-pane").CombinedOutput()
 	if err != nil {
