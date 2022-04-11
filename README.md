@@ -1,14 +1,15 @@
 # emp3r0r
-Linux post-exploitation framework made by linux user
+Linux/Windows post-exploitation framework made by linux user
 
 ## current state
 
-**emp3r0r C2 (Linux) is ready for testing, please report bugs if you find any**
+**emp3r0r C2 (Linux and Windows) is ready for testing, please report bugs if you find any**
 
 - [how to use](https://github.com/jm33-m0/emp3r0r/wiki)
 - [check my blog for updates](https://jm33.me)
 - [download from here (do not clone)](https://github.com/jm33-m0/emp3r0r/releases)
 - [write modules for emp3r0r, with your favorite languages](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r)
+- Windows support is ready, with fully-interactive shell <details><summary>view screenshot</summary>![image](https://user-images.githubusercontent.com/10167884/162661854-a52fc5bc-b322-4099-8a06-8f2aaa76b3ea.png)</details>
 
 ![image](https://user-images.githubusercontent.com/10167884/158553129-65359a8c-8a78-4c0c-833b-6dec4d5cd7ac.png)
 
@@ -39,7 +40,7 @@ emp3r0r also has complete [**python3.9 support**](https://github.com/jm33-m0/emp
 * beautiful terminal UI, use [tmux](https://github.com/tmux/tmux) for window management
 * multi-tasking, you don't need to wait for any commands to finish
 * module support: provide [**python3.9** environment](https://github.com/jm33-m0/emp3r0r/releases/tag/v1.3.10), easily run your exploits/tools on any linux host
-* **perfect shell experience** via SSH, compatible with any SSH client
+* **perfect shell experience** via SSH, compatible with any SSH client, also available for **Windows**
 * [**bettercap**](https://github.com/bettercap/bettercap)
 * [**built-in static bash binary**](https://github.com/jm33-m0/emp3r0r/blob/master/core/lib/data/bash.go)
 * auto **persistence** via various methods
