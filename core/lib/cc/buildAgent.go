@@ -307,7 +307,7 @@ func InitConfigFile(cc_host string) (err error) {
 	RuntimeConfig.SSHDPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.ShadowsocksPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.KCPPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
-	RuntimeConfig.Timeout = util.RandInt(5000, 10000)
+	RuntimeConfig.Timeout = util.RandInt(10000, 20000)
 
 	// random strings
 	agent_root := util.RandStr(util.RandInt(6, 20))
