@@ -5,13 +5,12 @@ Linux/Windows post-exploitation framework made by linux user
 
 **emp3r0r C2 (Linux and Windows) is ready for testing, please report bugs if you find any**
 
-- [how to use](https://github.com/jm33-m0/emp3r0r/wiki)
-- [check my blog for updates](https://jm33.me)
-- [download from here (do not clone)](https://github.com/jm33-m0/emp3r0r/releases)
-- [write modules for emp3r0r, with your favorite languages](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r)
+- read the [wiki](https://github.com/jm33-m0/emp3r0r/wiki) to get started
+- download from [here](https://github.com/jm33-m0/emp3r0r/releases)
+- [write modules](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r) for emp3r0r, with your favorite languages
 - Windows support is ready, with fully-interactive shell <details><summary>view screenshot</summary>![image](https://user-images.githubusercontent.com/10167884/162661854-a52fc5bc-b322-4099-8a06-8f2aaa76b3ea.png)</details>
 
-![image](https://user-images.githubusercontent.com/10167884/158553129-65359a8c-8a78-4c0c-833b-6dec4d5cd7ac.png)
+![image](https://user-images.githubusercontent.com/10167884/163743855-6639c6aa-9b3a-4891-8845-1505236ac026.png)
 
 <details><summary>more screenshots / videos</summary>
 
