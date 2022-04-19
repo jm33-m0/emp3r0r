@@ -1,5 +1,13 @@
 # Changelog
 
+### [1.15.9](https://github.com/jm33-m0/emp3r0r/compare/v1.15.8...v1.15.9) (2022-04-19)
+
+
+### Bug Fixes
+
+* command pane remains after exiting emp3r0r ([ed3cf1c](https://github.com/jm33-m0/emp3r0r/commit/ed3cf1cec5220bec3f7f9f61f86816323148c356))
+* selected agent not visible as it's on top of the list ([48fc9a2](https://github.com/jm33-m0/emp3r0r/commit/48fc9a219eb4b8308e416bc6821079993d00e49e))
+
 ### [1.15.8](https://github.com/jm33-m0/emp3r0r/compare/v1.15.7...v1.15.8) (2022-04-11)
 
 
