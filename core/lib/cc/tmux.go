@@ -361,11 +361,11 @@ func (pane *Emp3r0rPane) KillPane() (err error) {
 
 // TmuxDeinitWindows close previously opened tmux windows
 func TmuxDeinitWindows() {
-	for _, pane := range TmuxPanes {
-		pane.KillPane()
+	// kill session altogether
+	out, err := exec.Command("/bin/sh", "-c", "tmux kill-session -t emp3r0r").CombinedOutput()
+	if err != nil {
+		CliPrintError("exec tmux kill-session -t emp3r0r: %s\n%v", out, err)
 	}
-
-	CommandPane.KillPane()
 }
 
 // TermSize Get terminal size
