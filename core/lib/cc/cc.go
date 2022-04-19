@@ -133,8 +133,9 @@ func ListTargets() {
 		tablewriter.Colors{tablewriter.FgYellowColor})    // IPs
 
 	// fill table
+	var tail []string
 	for target, control := range Targets {
-		// print
+		// label
 		if control.Label == "" {
 			control.Label = "nolabel"
 		}
@@ -166,16 +167,16 @@ func ListTargets() {
 				row = []string{index, label, util.SplitLongLine(target.Tag, 15),
 					infoMap["OS"], infoMap["Process"], infoMap["User"], infoMap["IPs"], infoMap["From"]}
 
-				// put this row at top
-				if len(tdata) > 0 {
-					temp := tdata[0]
-					tdata[0] = row
-					row = temp
-				}
+				// put this row at bottom, so it's always visible
+				tail = row
+				continue
 			}
 		}
 
 		tdata = append(tdata, row)
+	}
+	if tail != nil {
+		tdata = append(tdata, tail)
 	}
 	// rendor table
 	table.AppendBulk(tdata)
