@@ -70,7 +70,7 @@ func tcpLocal(addr, server string,
 				return
 			}
 			defer rc.Close()
-			if config.TCPCork {
+			if ServerConfig.TCPCork {
 				rc = timedCork(rc, 10*time.Millisecond, 1280)
 			}
 			rc = shadow(rc)
@@ -108,7 +108,7 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn,
 
 		go func() {
 			defer c.Close()
-			if config.TCPCork {
+			if ServerConfig.TCPCork {
 				c = timedCork(c, 10*time.Millisecond, 1280)
 			}
 			sc := shadow(c)

@@ -9,8 +9,8 @@ import (
 	"github.com/shadowsocks/go-shadowsocks2/core"
 )
 
-// controls logging behavior
-var config struct {
+// controls ss server
+var ServerConfig struct {
 	Verbose    bool
 	UDPTimeout time.Duration
 	TCPCork    bool // coalesce writing first few packets
@@ -56,7 +56,7 @@ type SSConfig struct {
 // server_addr: addr of shadowsocks server
 // socks_addr: addr of the local socks5 proxy started by shadowsocks client
 func SSMain(ss_config *SSConfig) (err error) {
-	config.Verbose = ss_config.Verbose // verbose logging
+	ServerConfig.Verbose = ss_config.Verbose // verbose logging
 
 	// ss:// URL as server address
 	if strings.HasPrefix(ss_config.ServerAddr, "ss://") {

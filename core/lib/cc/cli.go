@@ -15,6 +15,7 @@ import (
 	"github.com/bettercap/readline"
 	"github.com/fatih/color"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	"github.com/jm33-m0/emp3r0r/core/lib/ss"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/olekukonko/tablewriter"
@@ -710,6 +711,7 @@ func setDebugLevel(cmd string) {
 	DebugLevel = level
 	if DebugLevel > 2 {
 		log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lmsgprefix)
+		ss.ServerConfig.Verbose = true
 	} else {
 		log.SetFlags(log.Ldate | log.Ltime | log.LstdFlags)
 	}
