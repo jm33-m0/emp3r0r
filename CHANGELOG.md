@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.0](https://github.com/jm33-m0/emp3r0r/compare/v1.15.9...v1.16.0) (2022-05-17)
+
+
+### Features
+
+* enable logging for shadowsocks server when debug level is set to `3` ([4d79ea9](https://github.com/jm33-m0/emp3r0r/commit/4d79ea9e52b0debdbc7aee6347eb2c4603b3d8b3))
+
 ### [1.15.9](https://github.com/jm33-m0/emp3r0r/compare/v1.15.8...v1.15.9) (2022-04-19)
 
 
