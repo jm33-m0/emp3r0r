@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -138,7 +139,10 @@ func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, cancel conte
 }
 
 // HandShakes record each hello message and C2's reply
-var HandShakes = make(map[string]bool)
+var (
+	HandShakes      = make(map[string]bool)
+	HandShakesMutex = &sync.RWMutex{}
+)
 
 // CCMsgTun use the connection (CCConn)
 func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
@@ -177,7 +181,9 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 				for hello := range HandShakes {
 					if strings.HasPrefix(payload, hello) {
 						log.Printf("Hello (%s) acknowledged", payload)
+						HandShakesMutex.Lock()
 						HandShakes[hello] = true
+						HandShakesMutex.Unlock()
 						break
 					}
 				}
@@ -192,8 +198,11 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 
 	wait_hello := func(hello string) bool {
 		// delete key, forget about this hello when we are done
-		defer delete(HandShakes, hello)
-
+		defer func() {
+			HandShakesMutex.Lock()
+			delete(HandShakes, hello)
+			HandShakesMutex.Unlock()
+		}()
 		// wait until timeout or success
 		for i := 0; i < RuntimeConfig.Timeout; i++ {
 			// if hello marked as success, return true
