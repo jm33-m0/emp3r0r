@@ -6,7 +6,7 @@ Always use the latest version
 
 ## Reporting a Vulnerability
 
-Send them to [jm33@jm33.me](/just-copy-it), use the following pubkey if you want
+Send them to [jm33@jm33.me](mailto:jm33@jm33.me), use the following pubkey if you want
 
 ```
 -----BEGIN PGP PUBLIC KEY BLOCK-----
