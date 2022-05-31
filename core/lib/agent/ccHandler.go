@@ -253,6 +253,9 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		cmd_arg = append(cmd_arg, strings.Join(cmdSlice, " "))
 		cmd := exec.Command(emp3r0r_data.DefaultShell, cmd_arg...)
 		if runtime.GOOS != "linux" {
+			if !strings.HasSuffix(cmd_arg[0], ".exe") {
+				cmd_arg[0] += ".exe"
+			}
 			cmd = exec.Command(cmd_arg[0], cmd_arg[1:]...)
 		}
 		outCombined, err = cmd.CombinedOutput()
