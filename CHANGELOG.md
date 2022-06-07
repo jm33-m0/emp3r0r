@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.16.2](https://github.com/jm33-m0/emp3r0r/compare/v1.16.1...v1.16.2) (2022-06-07)
+
+
+### Bug Fixes
+
+* [#136](https://github.com/jm33-m0/emp3r0r/issues/136) ([f433a7f](https://github.com/jm33-m0/emp3r0r/commit/f433a7f47e948589d46dc6e925dd768c63ef4d81))
+* conhost.exe cannot exec commands on Windows 7 ([5107eb7](https://github.com/jm33-m0/emp3r0r/commit/5107eb7776b9f184e4a510060516d42e096907a9))
+
 ### [1.16.1](https://github.com/jm33-m0/emp3r0r/compare/v1.16.0...v1.16.1) (2022-05-18)
 
 
