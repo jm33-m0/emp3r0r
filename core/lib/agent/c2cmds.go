@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
@@ -26,7 +27,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			return
 		}
 
-		path := cmdSlice[1]
+		path := strings.Join(cmdSlice[1:], " ")
 		fi, err := os.Stat(path)
 		if err != nil || fi == nil {
 			out = fmt.Sprintf("cant stat file %s: %v", path, err)

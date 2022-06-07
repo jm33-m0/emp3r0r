@@ -57,8 +57,8 @@ var CmdFuncs = map[string]func(){
 	"suicide":       Suicide,
 }
 
-// SingleArgCmdFuncs commands that accept a single string parameter
-var SingleArgCmdFuncs = map[string]func(string){
+// CmdFuncsWithArgs commands that accept a single string parameter
+var CmdFuncsWithArgs = map[string]func(string){
 	"ls":              FSNoArgCmd,
 	"pwd":             FSNoArgCmd,
 	"cd":              FSSingleArgCmd,
@@ -134,7 +134,7 @@ func CmdHandler(cmd string) (err error) {
 			helper()
 			return
 		}
-		helper_w_arg := SingleArgCmdFuncs[cmdSplit[0]]
+		helper_w_arg := CmdFuncsWithArgs[cmdSplit[0]]
 		if helper_w_arg == nil && CurrentTarget != nil {
 			CliPrintWarning("Exec: %s on %s", strconv.Quote(cmd), strconv.Quote(CurrentTarget.Tag))
 			SendCmdToCurrentTarget(cmd, "")

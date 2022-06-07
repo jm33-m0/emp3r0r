@@ -84,13 +84,14 @@ func DownloadFromAgent(cmd string) {
 	}
 
 	inputSlice := strings.Fields(cmd)
-	// #get file from agent
-	if len(inputSlice) != 2 {
-		CliPrintError("get <remote path>")
+	if len(inputSlice) < 2 {
+		CliPrintError("get <file path>")
 		return
 	} else {
+		file_to_get := strings.Join(inputSlice[1:], " ")
+		// #get file from agent
 		go func() {
-			if err = GetFile(inputSlice[1], target); err != nil {
+			if err = GetFile(file_to_get, target); err != nil {
 				CliPrintError("Cannot get %s: %v", inputSlice[1], err)
 			}
 		}()
