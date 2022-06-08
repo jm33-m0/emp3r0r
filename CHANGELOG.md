@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.0](https://github.com/jm33-m0/emp3r0r/compare/v1.16.2...v1.17.0) (2022-06-08)
+
+
+### Features
+
+* [#163](https://github.com/jm33-m0/emp3r0r/issues/163) support quoted and escaped commands ([dddfd5c](https://github.com/jm33-m0/emp3r0r/commit/dddfd5c518ed0a82ec69afc79576861ff3f85208))
+
 ## [1.16.2](https://github.com/jm33-m0/emp3r0r/compare/v1.16.1...v1.16.2) (2022-06-07)
 
 
