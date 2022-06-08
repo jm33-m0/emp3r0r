@@ -56,7 +56,7 @@ func SendCmd(cmd, cmd_id string, a *emp3r0r_data.AgentSystemInfo) error {
 	// timestamp
 	cmdData.Time = time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST")
 	CmdTimeMutex.Lock()
-	CmdTime[cmd+cmd_id] = cmdData.Time
+	CmdTime[cmd_id] = cmdData.Time
 	CmdTimeMutex.Unlock()
 
 	if !strings.HasPrefix(cmd, "!") {

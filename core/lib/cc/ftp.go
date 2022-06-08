@@ -15,7 +15,7 @@ import (
 // StatFile Get stat info of a file on agent
 func StatFile(filepath string, a *emp3r0r_data.AgentSystemInfo) (fi *util.FileStat, err error) {
 	cmd_id := uuid.NewString()
-	cmd := fmt.Sprintf("%s %s", emp3r0r_data.C2CmdStat, filepath)
+	cmd := fmt.Sprintf("%s '%s'", emp3r0r_data.C2CmdStat, filepath)
 	err = SendCmd(cmd, cmd_id, a)
 	if err != nil {
 		return
@@ -47,7 +47,7 @@ func StatFile(filepath string, a *emp3r0r_data.AgentSystemInfo) (fi *util.FileSt
 // PutFile put file to agent
 func PutFile(lpath, rpath string, a *emp3r0r_data.AgentSystemInfo) error {
 	// file sha256sum
-	CliPrintInfo("Calculating sha256sum of %s", lpath)
+	CliPrintInfo("Calculating sha256sum of '%s'", lpath)
 	sum := tun.SHA256SumFile(lpath)
 	// file size
 	size := util.FileSize(lpath)
@@ -70,7 +70,7 @@ func PutFile(lpath, rpath string, a *emp3r0r_data.AgentSystemInfo) error {
 	}
 
 	// send cmd
-	cmd := fmt.Sprintf("put %s %s %d", lpath, rpath, size)
+	cmd := fmt.Sprintf("put '%s' '%s' %d", lpath, rpath, size)
 	err = SendCmd(cmd, "", a)
 	if err != nil {
 		return fmt.Errorf("PutFile send command: %v", err)
@@ -131,8 +131,7 @@ func GetFile(filepath string, a *emp3r0r_data.AgentSystemInfo) error {
 	ftpSh.H2x = new(emp3r0r_data.H2Conn)
 
 	// cmd
-	get_params := fmt.Sprintf(`{"path":"%s","offset":%d,"token":"%s"}`, filepath, offset, ftpSh.Token)
-	cmd := fmt.Sprintf("#get %s", get_params)
+	cmd := fmt.Sprintf("#get '%s' %d '%s'", filepath, offset, ftpSh.Token)
 	err = SendCmd(cmd, "", a)
 	if err != nil {
 		CliPrintError("GetFile send command: %v", err)

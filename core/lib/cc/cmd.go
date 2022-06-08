@@ -87,7 +87,7 @@ const HELP = "help" // fuck goconst
 
 // CmdHandler processes user commands
 func CmdHandler(cmd string) (err error) {
-	cmdSplit := strings.Fields(cmd)
+	cmdSplit := util.ParseCmd(cmd)
 	if len(cmdSplit) < 0 {
 		return
 	}
@@ -173,7 +173,7 @@ func CmdHelp(mod string) {
 }
 
 func vimEditFile(cmd string) {
-	cmdSplit := strings.Fields(cmd)
+	cmdSplit := util.ParseCmd(cmd)
 	if len(cmdSplit) < 2 {
 		CliPrintError("What file to edit?")
 		return
@@ -285,7 +285,7 @@ func setTargetLabel(cmd string) {
 }
 
 func setOptVal(cmd string) {
-	cmdSplit := strings.Fields(cmd)
+	cmdSplit := util.ParseCmd(cmd)
 	if len(cmdSplit) < 2 {
 		CliPrintError("set what?")
 		return

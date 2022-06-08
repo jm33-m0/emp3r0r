@@ -669,6 +669,8 @@ func listDir() func(string) []string {
 	return func(line string) []string {
 		names := make([]string, 0)
 		for _, name := range LsDir {
+			name = strings.ReplaceAll(name, "\t", "\\t")
+			name = strings.ReplaceAll(name, " ", "\\ ")
 			names = append(names, name)
 		}
 		return names
@@ -682,7 +684,9 @@ func listFiles(path string) func(string) []string {
 		names := make([]string, 0)
 		files, _ := ioutil.ReadDir(path)
 		for _, f := range files {
-			names = append(names, f.Name())
+			name := strings.ReplaceAll(f.Name(), "\t", "\\t")
+			name = strings.ReplaceAll(name, " ", "\\ ")
+			names = append(names, name)
 		}
 		return names
 	}

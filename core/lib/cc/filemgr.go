@@ -1,14 +1,17 @@
 package cc
 
 import (
+	"fmt"
 	"strings"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // LsDir cache items in current directory
 var LsDir []string
 
 func FSSingleArgCmd(cmd string) {
-	inputSlice := strings.Fields(cmd)
+	inputSlice := util.ParseCmd(cmd)
 	cmdname := inputSlice[0]
 	if len(inputSlice) < 2 {
 		CliPrintError("%s requires one argument", cmdname)
@@ -20,7 +23,9 @@ func FSSingleArgCmd(cmd string) {
 	}
 
 	// send cmd
-	err := SendCmdToCurrentTarget(cmd, "")
+	err := SendCmdToCurrentTarget(
+		fmt.Sprintf("%s '%s'", inputSlice[0], inputSlice[1]),
+		"")
 	if err != nil {
 		CliPrintError("%s failed: %v", cmdname, err)
 		return
@@ -28,7 +33,7 @@ func FSSingleArgCmd(cmd string) {
 }
 
 func FSDoubleArgCmd(cmd string) {
-	inputSlice := strings.Fields(cmd)
+	inputSlice := util.ParseCmd(cmd)
 	cmdname := inputSlice[0]
 	if len(inputSlice) < 3 {
 		CliPrintError("%s requires two arguments", cmdname)
@@ -36,7 +41,10 @@ func FSDoubleArgCmd(cmd string) {
 	}
 
 	// send cmd
-	err := SendCmdToCurrentTarget(cmd, "")
+	err := SendCmdToCurrentTarget(
+		fmt.Sprintf("%s '%s' '%s'",
+			inputSlice[0], inputSlice[1], inputSlice[2]),
+		"")
 	if err != nil {
 		CliPrintError("%s failed: %v", cmdname, err)
 		return
@@ -63,7 +71,7 @@ func UploadToAgent(cmd string) {
 		return
 	}
 
-	inputSlice := strings.Fields(cmd)
+	inputSlice := util.ParseCmd(cmd)
 	// #put file on agent
 	if len(inputSlice) != 3 {
 		CliPrintError("put <local path> <remote path>")
@@ -83,7 +91,7 @@ func DownloadFromAgent(cmd string) {
 		return
 	}
 
-	inputSlice := strings.Fields(cmd)
+	inputSlice := util.ParseCmd(cmd)
 	if len(inputSlice) < 2 {
 		CliPrintError("get <file path>")
 		return
