@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.1](https://github.com/jm33-m0/emp3r0r/compare/v1.17.0...v1.17.1) (2022-06-08)
+
+
+### Bug Fixes
+
+* [#139](https://github.com/jm33-m0/emp3r0r/issues/139) ([77c5d3c](https://github.com/jm33-m0/emp3r0r/commit/77c5d3cd3b61d858f6fd044167a166f12dc93b1b))
+
 ## [1.17.0](https://github.com/jm33-m0/emp3r0r/compare/v1.16.2...v1.17.0) (2022-06-08)
 
 
