@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.2](https://github.com/jm33-m0/emp3r0r/compare/v1.17.1...v1.17.2) (2022-06-08)
+
+
+### Bug Fixes
+
+* [#139](https://github.com/jm33-m0/emp3r0r/issues/139) linux cmd exec ([eb73ec5](https://github.com/jm33-m0/emp3r0r/commit/eb73ec53cc8a50cd958963131471ff3c2faa20b6))
+
 ## [1.17.1](https://github.com/jm33-m0/emp3r0r/compare/v1.17.0...v1.17.1) (2022-06-08)
 
 
