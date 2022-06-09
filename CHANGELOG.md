@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.3](https://github.com/jm33-m0/emp3r0r/compare/v1.17.2...v1.17.3) (2022-06-09)
+
+
+### Bug Fixes
+
+* race condition in polling ([0caba63](https://github.com/jm33-m0/emp3r0r/commit/0caba63155bbdd6a50d606c67c7bc65268b2395b))
+
 ## [1.17.2](https://github.com/jm33-m0/emp3r0r/compare/v1.17.1...v1.17.2) (2022-06-08)
 
 
