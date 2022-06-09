@@ -231,7 +231,9 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 				util.TakeABlink()
 				continue
 			}
+			HandShakesMutex.Lock()
 			HandShakes[hello_msg.Payload] = false
+			HandShakesMutex.Unlock()
 			log.Printf("Hello (%s) sent", hello_msg.Payload)
 			if !wait_hello(hello_msg.Payload) {
 				cancel()
