@@ -101,6 +101,12 @@ install() {
     success "Installed emp3r0r, please check"
 }
 
+create_tar_xz() {
+    info "Tar XZ"
+    tar -cJvp ./emp3r0r-build -f "$pwd/emp3r0r.tar.xz" || error "failed to create archive"
+    success "Packaged emp3r0r"
+}
+
 case "$1" in
 --release)
     (build) && (
@@ -109,9 +115,7 @@ case "$1" in
         cp -aR "$pwd/tmux" "$temp" || error "cp tmux"
         cp -aR "$pwd/modules" "$temp" || error "cp modules"
         cp -aR "$pwd/emp3r0r" "$temp" || error "cp emp3r0r"
-        info "Tar XZ"
-        XZ_OPT='-T0 -9' tar -cJpf "$pwd/emp3r0r.tar.xz" ./emp3r0r-build || error "tar -cJpf"
-        success "Packaged emp3r0r"
+        create_tar_xz
     )
 
     ;;
@@ -124,9 +128,7 @@ case "$1" in
         cp -aR "$pwd/tmux" "$temp" || error "cp tmux"
         cp -aR "$pwd/modules" "$temp" || error "cp modules"
         cp -aR "$pwd/emp3r0r" "$temp" || error "cp emp3r0r"
-        info "Tar XZ"
-        XZ_OPT='-T0 -9' tar -cJpf "$pwd/emp3r0r.tar.xz" ./emp3r0r-build || error "tar -cJpf"
-        success "Packaged emp3r0r"
+        create_tar_xz
     )
 
     ;;
