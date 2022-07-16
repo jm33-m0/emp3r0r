@@ -15,7 +15,7 @@ func moduleCmd() {
 			CliPrintError("moduleCmd: agent %s is not connected", target.Tag)
 			return
 		}
-		err := SendCmdToCurrentTarget(Options["cmd_to_exec"].Val, "")
+		err := SendCmd(Options["cmd_to_exec"].Val, "", target)
 		if err != nil {
 			CliPrintError("moduleCmd: %v", err)
 		}
@@ -25,8 +25,8 @@ func moduleCmd() {
 	target := CurrentTarget
 	if target == nil {
 		CliPrintWarning("emp3r0r will execute `%s` on all targets this time", Options["cmd_to_exec"].Val)
-		for target := range Targets {
-			execOnTarget(target)
+		for per_target := range Targets {
+			execOnTarget(per_target)
 		}
 		return
 	}
