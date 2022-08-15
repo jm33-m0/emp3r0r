@@ -39,29 +39,28 @@ build() {
         error "You need to set up Go first"
     }
     go mod tidy || error "go mod tidy"
-    command -v garble || {
-        info "Installing garble"
-        go install mvdan.cc/garble@latest || error "Failed to install garble"
-    }
 
     # no fucking glibc!
     export CGO_ENABLED=0
-    gobuild_cmd="garble"
-    build_opt="-tiny build"
-    ldflags="-s -w -v"
-    [[ "$1" = "--debug" ]] && {
+    if [[ "$1" = "--debug" ]]; then
         gobuild_cmd="go"
         build_opt="build"
         ldflags="-v"
-    }
+    else
+        gobuild_cmd="garble"
+        build_opt="-tiny build"
+        ldflags="-s -w -v"
+        info "Setting up garble"
+        go install mvdan.cc/garble@latest || error "Failed to install garble"
+    fi
 
     info "Building CC"
     {
-        cd cmd/cc && go build -o "$temp/cc.exe" -ldflags='-s -w -v'
+        cd cmd/cc && go build -o "$temp/cc.exe" -ldflags="$ldflags"
     } || error "build cc"
     info "Building cat"
     {
-        cd "$pwd/cmd/cat" && go build -o "$temp/cat.exe" -ldflags='-s -w -v'
+        cd "$pwd/cmd/cat" && go build -o "$temp/cat.exe" -ldflags="$ldflags"
     } || error "build cat"
 
     info "Building agent stub"
