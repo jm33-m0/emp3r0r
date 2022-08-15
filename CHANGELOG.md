@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.17.5](https://github.com/jm33-m0/emp3r0r/compare/v1.17.4...v1.17.5) (2022-08-15)
+
+
+### Bug Fixes
+
+* optimize build script ([3ebbee9](https://github.com/jm33-m0/emp3r0r/commit/3ebbee9b64a3f4b102b3fc303c683396d5011fd0))
+* smaller tar archive ([07e6e9e](https://github.com/jm33-m0/emp3r0r/commit/07e6e9e046725d8e5bf876f20df084e2adcef4bf))
+
 ## [1.17.4](https://github.com/jm33-m0/emp3r0r/compare/v1.17.3...v1.17.4) (2022-07-16)
 
 
