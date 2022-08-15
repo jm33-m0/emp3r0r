@@ -103,7 +103,7 @@ install() {
 
 create_tar_xz() {
     info "Tar XZ"
-    tar -cJvp ./emp3r0r-build -f "$pwd/emp3r0r.tar.xz" || error "failed to create archive"
+    XZ_OPT='-T0 -9' tar -cJpf "$pwd/emp3r0r.tar.xz" ./emp3r0r-build || error "failed to create archive"
     success "Packaged emp3r0r"
 }
 
