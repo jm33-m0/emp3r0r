@@ -119,3 +119,11 @@ func RandStr(n int) string {
 	}
 	return string(b)
 }
+
+// HexEncode hex encode string, eg. "Hello" -> "\x48\x65\x6c\x6c\x6f"
+func HexEncode(s string) (result string) {
+	for _, c := range s {
+		result = fmt.Sprintf("%s\\x%x", result, c)
+	}
+	return
+}
