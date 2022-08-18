@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.0](https://github.com/jm33-m0/emp3r0r/compare/v1.17.5...v1.18.0) (2022-08-18)
+
+
+### Features
+
+* bash dropper ([79406ed](https://github.com/jm33-m0/emp3r0r/commit/79406edb35dedeffe69c925fca4825e52de53f6c))
+
 ## [1.17.5](https://github.com/jm33-m0/emp3r0r/compare/v1.17.4...v1.17.5) (2022-08-15)
 
 
