@@ -130,6 +130,8 @@ func GetHostID(fallbackUUID string) (id string) {
 
 	if productInfo.UUID != "unknown" {
 		id = fmt.Sprintf("%s_%s-agent-%s", name, shortID, productInfo.UUID)
+	} else {
+		id = fmt.Sprintf("%s_%s-agent-%s", name, shortID, fallbackUUID)
 	}
 	return
 }
