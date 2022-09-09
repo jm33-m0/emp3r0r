@@ -25,7 +25,7 @@ func moduleLPE() {
 
 		// download third-party LPE helper
 		CliPrintInfo("Updating local LPE helper...")
-		err := DownloadFile(LPEHelpers[helperName], Temp+tun.FileAPI+helperName)
+		err := DownloadFile(LPEHelpers[helperName], Temp+tun.WWW+helperName)
 		if err != nil {
 			CliPrintError("Failed to download %s: %v", helperName, err)
 			return

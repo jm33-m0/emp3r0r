@@ -20,5 +20,8 @@ const (
 	FTPAPI = WebRoot + "/ftp"
 
 	// FileAPI host some files
-	FileAPI = "/www/"
+	FileAPI = WebRoot + "/www"
+
+	// Static hosting
+	WWW = "/www/"
 )

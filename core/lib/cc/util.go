@@ -193,6 +193,17 @@ func OpenInNewTerminalWindow(name, cmd string) error {
 	return nil
 }
 
+// IsAgentExistByTag is agent already in target list?
+func IsAgentExistByTag(tag string) bool {
+	for a := range Targets {
+		if a.Tag == tag {
+			return true
+		}
+	}
+
+	return false
+}
+
 // IsAgentExist is agent already in target list?
 func IsAgentExist(t *emp3r0r_data.AgentSystemInfo) bool {
 	for a := range Targets {

