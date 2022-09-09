@@ -142,6 +142,8 @@ func Copy(src, dst string) error {
 // FileBaseName /path/to/foo -> foo
 func FileBaseName(filepath string) (filename string) {
 	// we only need the filename
+	filepath = strings.ReplaceAll(filepath, "\\", "/") // DOS path symbol
+	filepath = strings.ReplaceAll(filepath, "..", "")  // prevent directory traversal
 	filepathSplit := strings.Split(filepath, "/")
 	filename = filepathSplit[len(filepathSplit)-1]
 	return
