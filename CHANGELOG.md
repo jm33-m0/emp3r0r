@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.19.0](https://github.com/jm33-m0/emp3r0r/compare/v1.18.0...v1.19.0) (2022-09-09)
+
+
+### Features
+
+* fixed [#160](https://github.com/jm33-m0/emp3r0r/issues/160), file server rewritten, allow only connected agents to download files from CC ([cafeb9d](https://github.com/jm33-m0/emp3r0r/commit/cafeb9d5f6690d6b6e41a26899d481d644ae29af))
+
+
+### Bug Fixes
+
+* use fallback UUID when unable to obtain product serial ([bbbfd73](https://github.com/jm33-m0/emp3r0r/commit/bbbfd739bdc0d1a28935aafd9cd23515776f78fb))
+
 ## [1.18.0](https://github.com/jm33-m0/emp3r0r/compare/v1.17.5...v1.18.0) (2022-08-18)
 
 
