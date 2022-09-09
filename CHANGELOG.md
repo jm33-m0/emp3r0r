@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.19.1](https://github.com/jm33-m0/emp3r0r/compare/v1.19.0...v1.19.1) (2022-09-09)
+
+
+### Bug Fixes
+
+* sanitize filename ([33f724e](https://github.com/jm33-m0/emp3r0r/commit/33f724eabfa3c879b4cb4f4360716825c3ef2930))
+
 ## [1.19.0](https://github.com/jm33-m0/emp3r0r/compare/v1.18.0...v1.19.0) (2022-09-09)
 
 
