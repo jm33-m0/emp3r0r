@@ -16,16 +16,16 @@ import (
 
 // Emp3r0rPane a tmux window/pane that makes emp3r0r CC's interface
 type Emp3r0rPane struct {
-	Alive  bool   // indicates that pane is not dead
-	ID     string // tmux pane unique ID, needs to be converted to index when using select-pane
-	Title  string // title of pane
-	Name   string // intial title of pane, doesn't change even if pane is dead
-	TTY    string // eg. /dev/pts/1, write to this file to get your message displayed on this pane
-	PID    int    // PID of the process running in tmux pane
-	Cmd    string // cmdline of the process
-	Index  int    // tmux pane index, may change
-	Width  int    // width of pane, number of chars
-	Height int    // height of pane, number of chars
+	Alive    bool   // indicates that pane is not dead
+	ID       string // tmux pane unique ID
+	WindowID string // tmux window unique ID, indicates the window that the pane lives in
+	Title    string // title of pane
+	Name     string // intial title of pane, doesn't change even if pane is dead
+	TTY      string // eg. /dev/pts/1, write to this file to get your message displayed on this pane
+	PID      int    // PID of the process running in tmux pane
+	Cmd      string // cmdline of the process
+	Width    int    // width of pane, number of chars
+	Height   int    // height of pane, number of chars
 }
 
 var (
@@ -63,11 +63,10 @@ func TmuxInitWindows() (err error) {
 
 	// remain-on-exit for current tmux window
 	// "on" is necessary
-	TmuxSetOpt("remain-on-exit on")
+	TmuxSetOpt(HomeWindow, "remain-on-exit on")
 
 	// main window
 	CommandPane = &Emp3r0rPane{}
-	CommandPane.Index = 1
 	CommandPane.Name = "Emp3r0r Console"
 	TmuxUpdatePane(CommandPane)
 
@@ -79,8 +78,8 @@ func TmuxInitWindows() (err error) {
 	if err != nil {
 		CliPrintWarning("Get terminal size: %v", err)
 	}
-	if w < 200 || h < 60 {
-		CliPrintWarning("I need a bigger window, make sure the window size is at least 200x60 (w*h)")
+	if w < 180 || h < 40 {
+		CliPrintWarning("I need a bigger window, make sure the window size is at least 180x40 (w*h)")
 		CliPrintWarning("Please maximize the terminal window if possible")
 	}
 
@@ -123,17 +122,18 @@ func TmuxInitWindows() (err error) {
 		return
 	}
 
-	// Agent List
-	AgentListPane, err = new_pane("Agent List", "No agents connected", "v", "", 24)
-	if err != nil {
-		return
-	}
-
 	// Agent output
 	AgentOutputPane, err = new_pane("Agent Handler", "Command results go below...\n", "h", "", 33)
 	if err != nil {
 		return
 	}
+
+	// Agent List
+	AgentListPane, err = new_pane("Agent List", "No agents connected", "", "", 0)
+	if err != nil {
+		return
+	}
+	TmuxSetOpt(AgentListPane.WindowID, "remain-on-exit on")
 
 	// check panes
 	if AgentListPane == nil ||
@@ -163,10 +163,10 @@ func TmuxCurrentPane() (index int) {
 	return
 }
 
-func TmuxGoHome() (res bool) {
-	out, err := exec.Command("/bin/sh", "-c", "tmux select-window -t "+HomeWindow).CombinedOutput()
+func TmuxSwitchWindow(window_id string) (res bool) {
+	out, err := exec.Command("/bin/sh", "-c", "tmux select-window -t "+window_id).CombinedOutput()
 	if err != nil {
-		CliPrintWarning("TmuxGoHome: %v: %s", err, out)
+		CliPrintWarning("TmuxSwitchWindow: %v: %s", err, out)
 		return
 	}
 	return true
@@ -191,7 +191,7 @@ func (pane *Emp3r0rPane) Respawn() (err error) {
 	out, err := exec.Command("tmux", "respawn-pane",
 		"-t", pane.ID, CAT).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("TmuxRespawn %s: %s, %v", pane.ID, out, err)
+		return fmt.Errorf("Respawning pane (pane_id=%s): %s, %v", pane.ID, out, err)
 	}
 
 	return
@@ -204,10 +204,15 @@ func (pane *Emp3r0rPane) Printf(clear bool, format string, a ...interface{}) {
 	if clear {
 		err := pane.ClearPane()
 		if err != nil {
-			CliPrintWarning("Clear pane: %v", err)
+			CliPrintWarning("Clear pane failed: %v", err)
 		}
 	}
 
+	if !TmuxSwitchWindow(pane.WindowID) {
+		CliPrintWarning("pane '%s' printf: unable to switch to tmux window '%s'",
+			pane.Title, pane.WindowID)
+	}
+	defer TmuxSwitchWindow(HomeWindow)
 	TmuxUpdatePane(pane)
 	id := pane.ID
 	if !pane.Alive {
@@ -236,12 +241,6 @@ func (pane *Emp3r0rPane) Printf(clear bool, format string, a ...interface{}) {
 func (pane *Emp3r0rPane) ClearPane() (err error) {
 	id := pane.ID
 
-	proc, err := os.FindProcess(pane.PID)
-	if err != nil {
-		CliPrintWarning("Clear Pane: finding pane PID %d: %v", pane.PID, err)
-	}
-	proc.Kill() // kill the process (cat) that lives inside target pane, to restart later
-
 	job := fmt.Sprintf("tmux respawn-pane -t %s -k %s", id, pane.Cmd)
 	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
 	if err != nil {
@@ -264,7 +263,6 @@ func (pane *Emp3r0rPane) ClearPane() (err error) {
 // PaneDetails Get details of a tmux pane
 func (pane *Emp3r0rPane) PaneDetails() (
 	is_alive bool,
-	index int,
 	title string,
 	tty string,
 	pid int,
@@ -275,16 +273,8 @@ func (pane *Emp3r0rPane) PaneDetails() (
 	if pane.ID == "" {
 		return
 	}
-	if !TmuxGoHome() {
+	if pane.WindowID == "" {
 		return
-	}
-
-	index = pane.Index
-	if pane.ID != "" {
-		index = TmuxPaneID2Index(pane.ID)
-		if index < 0 {
-			return
-		}
 	}
 
 	out, err := exec.Command("/bin/sh", "-c",
@@ -375,11 +365,7 @@ func TermSize() (width, height int, err error) {
 }
 
 // Set tmux option of current tmux window
-func TmuxSetOpt(opt string) (err error) {
-	main_window_index := TmuxCurrentWindow()
-	if main_window_index == "" {
-		return fmt.Errorf("Cannot find main window")
-	}
+func TmuxSetOpt(index, opt string) (err error) {
 	job := fmt.Sprintf("tmux set-option %s", opt)
 	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
 	if err != nil {
@@ -401,22 +387,19 @@ func TmuxNewPane(title, hV string, target_pane_id string, size int, cmd string) 
 		err = errors.New("You need to run emp3r0r under `tmux`")
 		return
 	}
+	is_new_window := hV == "" && size == 0
 
-	// target pane Index
-	target_pane, err := strconv.Atoi(target_pane_id)
-	if err != nil {
-		target_pane = TmuxPaneID2Index(target_pane_id)
-		if target_pane < 0 {
-			err = fmt.Errorf("ID %s not recognized", target_pane_id)
-			return
-		}
+	job := fmt.Sprintf(`tmux split-window -%s -p %d -P -d -F "#{pane_id}:#{pane_pid}:#{pane_tty}:#{window_id}" '%s'`,
+		hV, size, cmd)
+	if target_pane_id != "" {
+		job = fmt.Sprintf(`tmux split-window -t %s -%s -p %d -P -d -F "#{pane_id}:#{pane_pid}:#{pane_tty}:#{window_id}" '%s'`,
+			target_pane_id, hV, size, cmd)
 	}
 
-	job := fmt.Sprintf(`tmux split-window -%s -p %d -P -d -F "#{pane_id}:#{pane_pid}:#{pane_tty}" '%s'`,
-		hV, size, cmd)
-	if target_pane > 0 {
-		job = fmt.Sprintf(`tmux split-window -t %d -%s -p %d -P -d -F "#{pane_id}:#{pane_pid}:#{pane_tty}" '%s'`,
-			target_pane, hV, size, cmd)
+	// what if i want to open a new tmux window?
+	if is_new_window {
+		job = fmt.Sprintf(`tmux new-window -n '%s' -P -d -F "#{pane_id}:#{pane_pid}:#{pane_tty}:#{window_id}" '%s'`,
+			title, cmd)
 	}
 
 	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
@@ -426,8 +409,9 @@ func TmuxNewPane(title, hV string, target_pane_id string, size int, cmd string) 
 	}
 	tmux_result := string(out)
 	tmux_res_split := strings.Split(tmux_result, ":")
-	if len(tmux_res_split) != 3 {
-		err = fmt.Errorf("tmux result cannot be parsed: %s", tmux_result)
+	if len(tmux_res_split) < 3 {
+		err = fmt.Errorf("tmux result cannot be parsed:\n%s\n==>\n%s",
+			strconv.Quote(job), strconv.Quote(tmux_result))
 		return
 	}
 
@@ -439,6 +423,7 @@ func TmuxNewPane(title, hV string, target_pane_id string, size int, cmd string) 
 		return
 	}
 	pane.TTY = strings.TrimSpace(tmux_res_split[2])
+	pane.WindowID = strings.TrimSpace(tmux_res_split[3])
 
 	err = TmuxSetPaneTitle(title, pane.ID)
 	TmuxUpdatePane(pane)
@@ -447,24 +432,17 @@ func TmuxNewPane(title, hV string, target_pane_id string, size int, cmd string) 
 
 // Sync changes of a pane
 func TmuxUpdatePane(pane *Emp3r0rPane) {
-	if !TmuxGoHome() {
-		return
-	}
 	if pane == nil {
 		CliPrintWarning("UpdatePane: no pane to update")
 		return
 	}
-	pane.Alive, pane.Index, pane.Title, pane.TTY, pane.PID, pane.Cmd, pane.Width, pane.Height = pane.PaneDetails()
+	pane.Alive, pane.Title, pane.TTY, pane.PID, pane.Cmd, pane.Width, pane.Height = pane.PaneDetails()
 	if pane.Title == "" {
 		pane.Title = pane.Name
 	}
 }
 
 func TmuxSetPaneTitle(title, pane_id string) error {
-	if !TmuxGoHome() {
-		return fmt.Errorf("TmuxSetPaneTitle: not in home window")
-	}
-
 	// set pane title
 	tmux_cmd := []string{"select-pane", "-t", pane_id, "-T", title}
 
@@ -474,45 +452,6 @@ func TmuxSetPaneTitle(title, pane_id string) error {
 	}
 
 	return err
-}
-
-// Convert tmux pane's unique ID to index number, for use with select-pane
-// returns -1 if failed
-func TmuxPaneID2Index(id string) (index int) {
-	index = -1
-	if !TmuxGoHome() {
-		return
-	}
-
-	out, err := exec.Command("/bin/sh", "-c", "tmux list-pane").CombinedOutput()
-	if err != nil {
-		CliPrintWarning("exec tmux: %s\n%v", out, err)
-		return
-	}
-	tmux_res := strings.Split(string(out), "\n")
-	if len(tmux_res) < 1 {
-		CliPrintWarning("parse tmux output: no pane found: %s", out)
-		return
-	}
-	for _, line := range tmux_res {
-		if strings.Contains(line, id) {
-			line_split := strings.Fields(line)
-			if len(line_split) < 7 {
-				CliPrintWarning("parse tmux output: format error: %s", out)
-				return
-			}
-			idx := strings.TrimSuffix(line_split[0], ":")
-			i, err := strconv.Atoi(idx)
-			if err != nil {
-				CliPrintWarning("parse tmux output: invalid index (%s): %s", idx, out)
-				return
-			}
-			index = i
-			break
-		}
-	}
-
-	return
 }
 
 // TmuxNewWindow split tmux window, and run command in the new pane
