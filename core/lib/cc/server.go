@@ -230,6 +230,29 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 	targetSize := util.FileSize(targetFile)
 	nowSize := util.FileSize(filewrite)
 
+	// open file for writing
+	f, err := os.OpenFile(filewrite, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		CliPrintError("ftpHandler write file: %v", err)
+	}
+	defer f.Close()
+
+	// progressbar
+	targetSize = util.FileSize(targetFile)
+	nowSize = util.FileSize(filewrite)
+	bar := progressbar.DefaultBytesSilent(targetSize)
+	bar.Add64(nowSize) // downloads are resumable
+	defer bar.Close()
+
+	// log progress instead of showing the actual progressbar
+	go func() {
+		for state := bar.State(); state.CurrentPercent < 1; time.Sleep(time.Second) {
+			state = bar.State()
+			CliPrintInfo("%.2f%% downloaded at %.2fKB/s, %.2fs passed, %.2fs left",
+				state.CurrentPercent*100, state.KBsPerSecond, state.SecondsSince, state.SecondsLeft)
+		}
+	}()
+
 	// on exit
 	defer func() {
 		// cleanup
@@ -269,29 +292,6 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 			return
 		}
 		CliPrintWarning("Incomplete download (%d of %d bytes), will continue if you run GET again", nowSize, targetSize)
-	}()
-
-	// open file for writing
-	f, err := os.OpenFile(filewrite, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-	if err != nil {
-		CliPrintError("ftpHandler write file: %v", err)
-	}
-	defer f.Close()
-
-	// progressbar
-	targetSize = util.FileSize(targetFile)
-	nowSize = util.FileSize(filewrite)
-	bar := progressbar.DefaultBytesSilent(targetSize)
-	bar.Add64(nowSize) // downloads are resumable
-	defer bar.Close()
-
-	// log progress instead of showing the actual progressbar
-	go func() {
-		for state := bar.State(); state.CurrentPercent < 1; time.Sleep(time.Second) {
-			state = bar.State()
-			CliPrintInfo("%.2f%% downloaded at %.2fKB/s, %.2fs passed, %.2fs left",
-				state.CurrentPercent*100, state.KBsPerSecond, state.SecondsSince, state.SecondsLeft)
-		}
 	}()
 
 	// read filedata
