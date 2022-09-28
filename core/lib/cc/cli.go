@@ -144,7 +144,7 @@ func CliMain() {
 
 	err = TmuxInitWindows()
 	if err != nil {
-		log.Fatalf("TMUX: %v", err)
+		log.Fatalf("Fatal TMUX error: %v, please run `tmux kill-server` and re-run emp3r0r", err)
 	}
 
 	defer TmuxDeinitWindows()
