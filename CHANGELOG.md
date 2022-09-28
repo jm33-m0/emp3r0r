@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.20.0](https://github.com/jm33-m0/emp3r0r/compare/v1.19.1...v1.20.0) (2022-09-28)
+
+
+### Features
+
+* enable tabbed UI, move agentlist to tab ([7417076](https://github.com/jm33-m0/emp3r0r/commit/7417076637f5aa333e754ba1a9fa5a80bfd0e80c))
+
+
+### Bug Fixes
+
+* confusing tmux error messages ([1edb75b](https://github.com/jm33-m0/emp3r0r/commit/1edb75b3d50bc39392523efbabdfd0c017f78be2))
+* killing non-existent processes ([03fdf33](https://github.com/jm33-m0/emp3r0r/commit/03fdf3343b6a15b1492470e4cacb471541f9001f))
+* premature downloading from agent side, '.downloading' file not removed ([b4598d5](https://github.com/jm33-m0/emp3r0r/commit/b4598d5efa7c31569dc215d7bde65e109d0321ab))
+
 ## [1.19.1](https://github.com/jm33-m0/emp3r0r/compare/v1.19.0...v1.19.1) (2022-09-09)
 
 
