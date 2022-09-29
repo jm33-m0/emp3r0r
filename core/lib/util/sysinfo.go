@@ -163,7 +163,7 @@ func ScanPATH() (exes []string) {
 			exes = append(exes, f.Name())
 		}
 	}
-	log.Printf("Found executables from PATH (%s):\n%v", path_str, exes)
+	log.Printf("Found %d executables from PATH (%s)", len(exes), path_str)
 	return
 }
 
