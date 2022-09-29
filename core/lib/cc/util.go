@@ -75,10 +75,13 @@ func wait_for_cmd_response(cmd, cmd_id string, agent *emp3r0r_data.AgentSystemIn
 	now := time.Now()
 	for ctrl.Ctx.Err() == nil {
 		if _, exists := CmdResults[cmd_id]; exists {
+			CmdResultsMutex.Lock()
+			delete(CmdResults, cmd_id)
+			CmdResultsMutex.Unlock()
 			return
 		}
 		wait_time := time.Since(now)
-		if wait_time > 20*time.Second {
+		if wait_time > 1*time.Minute {
 			CliPrintError("Executing %s on %s: unresponsive for %v, removing agent from list",
 				strconv.Quote(cmd),
 				strconv.Quote(agent.Name),

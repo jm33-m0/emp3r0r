@@ -46,6 +46,10 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 
 	// time spent on this cmd
 	cmd_id := payloadSplit[len(payloadSplit)-1]
+	// cache this cmd response
+	CmdResultsMutex.Lock()
+	CmdResults[cmd_id] = out
+	CmdResultsMutex.Unlock()
 	start_time, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", CmdTime[cmd_id])
 	if err != nil {
 		CliPrintWarning("Parsing timestamp '%s': %v", CmdTime[cmd_id], err)
@@ -191,8 +195,4 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 		color.HiMagentaString(cmd),
 		color.HiWhiteString(out))
 
-	// cache this cmd response
-	CmdResultsMutex.Lock()
-	CmdResults[cmd_id] = out
-	CmdResultsMutex.Unlock()
 }
