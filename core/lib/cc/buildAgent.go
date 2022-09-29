@@ -97,7 +97,7 @@ func GenAgent() {
 func PackAgentBinary() {
 	// completer
 	compls := []readline.PrefixCompleterInterface{
-		readline.PcItemDynamic(listFiles("./"))}
+		readline.PcItemDynamic(listLocalFiles("./"))}
 	CliCompleter.SetChildren(compls)
 	defer CliCompleter.SetChildren(CmdCompls)
 

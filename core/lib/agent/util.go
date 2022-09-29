@@ -120,6 +120,9 @@ func CollectSystemInfo() *emp3r0r_data.AgentSystemInfo {
 	// arp -a ?
 	info.ARP = nil
 
+	// exes in PATH
+	info.Exes = util.ScanPATH()
+
 	return &info
 }
 

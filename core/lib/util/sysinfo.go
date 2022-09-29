@@ -3,10 +3,12 @@ package util
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"os/user"
+	"runtime"
 	"strings"
 
 	"github.com/jaypipes/ghw"
@@ -133,6 +135,35 @@ func GetHostID(fallbackUUID string) (id string) {
 	} else {
 		id = fmt.Sprintf("%s_%s-agent-%s", name, shortID, fallbackUUID)
 	}
+	return
+}
+
+// ScanPATH scan $PATH and return a list of executables, for autocomplete
+func ScanPATH() (exes []string) {
+	path_str := os.Getenv("PATH")
+	sep := ":"
+	if runtime.GOOS == "windows" {
+		sep = ";"
+	}
+
+	paths := strings.Split(path_str, sep)
+	if len(paths) < 1 {
+		exes = []string{""}
+		log.Printf("Empty PATH: %s", path_str)
+		return
+	}
+
+	// scan paths
+	for _, path := range paths {
+		files, err := ioutil.ReadDir(path)
+		if err != nil {
+			continue
+		}
+		for _, f := range files {
+			exes = append(exes, f.Name())
+		}
+	}
+	log.Printf("Found executables from PATH (%s):\n%v", path_str, exes)
 	return
 }
 

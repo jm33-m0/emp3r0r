@@ -33,6 +33,9 @@ var (
 	// CmdCompls completions for readline
 	CmdCompls []readline.PrefixCompleterInterface
 
+	// InitCmdCompls initial completions for readline, so we can roll back
+	InitCmdCompls []readline.PrefixCompleterInterface
+
 	// EmpReadLine : our commandline
 	EmpReadLine *readline.Instance
 
@@ -54,31 +57,31 @@ func CliMain() {
 			readline.PcItemDynamic(listMods())),
 
 		readline.PcItem("rm",
-			readline.PcItemDynamic(listDir())),
+			readline.PcItemDynamic(listRemoteDir())),
 
 		readline.PcItem("mv",
-			readline.PcItemDynamic(listDir())),
+			readline.PcItemDynamic(listRemoteDir())),
 
 		readline.PcItem("mkdir",
-			readline.PcItemDynamic(listDir())),
+			readline.PcItemDynamic(listRemoteDir())),
 
 		readline.PcItem("ls",
-			readline.PcItemDynamic(listDir())),
+			readline.PcItemDynamic(listRemoteDir())),
 
 		readline.PcItem("cp",
-			readline.PcItemDynamic(listDir())),
+			readline.PcItemDynamic(listRemoteDir())),
 
 		readline.PcItem("cd",
-			readline.PcItemDynamic(listDir())),
+			readline.PcItemDynamic(listRemoteDir())),
 
 		readline.PcItem("get",
-			readline.PcItemDynamic(listDir())),
+			readline.PcItemDynamic(listRemoteDir())),
 
 		readline.PcItem("vim",
-			readline.PcItemDynamic(listDir())),
+			readline.PcItemDynamic(listRemoteDir())),
 
 		readline.PcItem("put",
-			readline.PcItemDynamic(listFiles("./"))),
+			readline.PcItemDynamic(listLocalFiles("./"))),
 
 		readline.PcItem(HELP,
 			readline.PcItemDynamic(listMods())),
@@ -114,6 +117,8 @@ func CliMain() {
 		CmdCompls = append(CmdCompls, readline.PcItem(cmd))
 	}
 	CliCompleter.SetChildren(CmdCompls)
+	// remember initial CmdCompls
+	InitCmdCompls = CmdCompls
 
 	// prompt setup
 	filterInput := func(r rune) (rune, bool) {
@@ -664,8 +669,39 @@ func listOptions() func(string) []string {
 	}
 }
 
+// remote autocomplete items in $PATH
+func listAgentExes(agent *emp3r0r_data.AgentSystemInfo) []string {
+	CliPrintDebug("listing exes in PATH")
+	exes := make([]string, 0)
+	if agent == nil {
+		CliPrintDebug("No valid target selected so no autocompletion for exes")
+		return exes
+	}
+	for _, exe := range agent.Exes {
+		exe = strings.ReplaceAll(exe, "\t", "\\t")
+		exe = strings.ReplaceAll(exe, " ", "\\ ")
+		exes = append(exes, exe)
+	}
+	CliPrintDebug("Exes found on agent '%s':\n%v",
+		agent.Tag, exes)
+	return exes
+}
+
+// when a target is selected, update CmdCompls with PATH items
+func updateAgentExes(agent *emp3r0r_data.AgentSystemInfo) {
+	exes := listAgentExes(agent)
+	temp_CmdCompls := InitCmdCompls
+
+	for _, exe := range exes {
+		temp_CmdCompls = append(temp_CmdCompls, readline.PcItem(exe))
+	}
+
+	CmdCompls = temp_CmdCompls
+	CliCompleter.SetChildren(CmdCompls)
+}
+
 // remote ls autocomplete items in current directory
-func listDir() func(string) []string {
+func listRemoteDir() func(string) []string {
 	return func(line string) []string {
 		names := make([]string, 0)
 		for _, name := range LsDir {
@@ -679,7 +715,7 @@ func listDir() func(string) []string {
 
 // Function constructor - constructs new function for listing given directory
 // local ls
-func listFiles(path string) func(string) []string {
+func listLocalFiles(path string) func(string) []string {
 	return func(line string) []string {
 		names := make([]string, 0)
 		files, _ := ioutil.ReadDir(path)

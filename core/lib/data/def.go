@@ -180,6 +180,7 @@ type AgentSystemInfo struct {
 	HasTor      bool          `json:"HasTor"`      // is agent from Tor?
 	HasInternet bool          `json:"HasInternet"` // has internet access?
 	Process     *AgentProcess `json:"Process"`     // agent's process
+	Exes        []string      `json:"Exes"`        // executables found in agent's $PATH
 }
 
 // AgentProcess process info of our agent

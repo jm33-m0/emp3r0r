@@ -240,6 +240,8 @@ func setCurrentTarget(cmd string) {
 		if err != nil {
 			CliPrintError("SSHClient: %v", err)
 		}
+
+		updateAgentExes(target_to_set)
 	}
 
 	if target_to_set == nil {
