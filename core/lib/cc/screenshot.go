@@ -41,11 +41,23 @@ func processScreenshot(out string, target *emp3r0r_data.AgentSystemInfo) (err er
 	path := util.FileBaseName(out)
 
 	// be sure we have downloaded the file
+	is_download_completed := func() bool {
+		return !util.IsFileExist(FileGetDir+path+".downloading") &&
+			util.IsFileExist(FileGetDir+path)
+	}
+
+	is_download_corrupted := func() bool {
+		return !is_download_completed() && !util.IsFileExist(FileGetDir+path+".lock")
+	}
 	for {
 		time.Sleep(100 * time.Millisecond)
-		if !util.IsFileExist(FileGetDir+path+".downloading") &&
-			util.IsFileExist(FileGetDir+path) {
+		if is_download_completed() {
 			break
+		}
+		if is_download_corrupted() {
+			CliPrintWarning("Processing screenshot %s: incomplete download detected, retrying...",
+				strconv.Quote(out))
+			return processScreenshot(out, target)
 		}
 	}
 
