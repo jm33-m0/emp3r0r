@@ -159,9 +159,6 @@ wait:
 		sshPath, lport)
 	sftpCmd := fmt.Sprintf("%s -P %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 127.0.0.1",
 		sftpPath, lport)
-	CliPrintInfo("\nOpening SSH (%s - %s) session for %s in new window.\n"+
-		"If that fails, please execute command\n%s\nmanaully",
-		shell, port, CurrentTarget.Tag, sshCmd)
 
 	// agent name
 	name := CurrentTarget.Hostname
@@ -173,14 +170,22 @@ wait:
 	// remeber shell-port mapping
 	SSHShellPort[shell] = port
 	if split {
-		AgentShellPane, err = TmuxNewPane("Shell", "v", CommandPane.ID, 40, sshCmd)
-		if err != nil {
-			return err
+		if CurrentTarget.GOOS != "windows" {
+			CliPrintInfo("\nOpening SSH (%s - %s) session for %s in Shell window.\n"+
+				"If that fails, please execute command\n%s\nmanaully",
+				shell, port, CurrentTarget.Tag, sshCmd)
+			AgentShellPane, err = TmuxNewPane("Shell", "v", CommandPane.ID, 40, sshCmd)
+			if err != nil {
+				return err
+			}
 		}
 		AgentSFTPPane, err = TmuxNewPane("SFTP", "v", AgentOutputPane.ID, 30, sftpCmd)
 		TmuxPanes[AgentShellPane.ID] = AgentShellPane
 		TmuxPanes[AgentSFTPPane.ID] = AgentSFTPPane
 		return err
 	}
+	CliPrintInfo("\nOpening SSH (%s - %s) session for %s in Shell tab.\n"+
+		"If that fails, please execute command\n%s\nmanaully",
+		shell, port, CurrentTarget.Tag, sshCmd)
 	return TmuxNewWindow(fmt.Sprintf("shell/%s/%s-%s", name, shell, port), sshCmd)
 }

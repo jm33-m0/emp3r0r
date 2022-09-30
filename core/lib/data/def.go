@@ -170,6 +170,7 @@ type AgentSystemInfo struct {
 	GPU         string        `json:"GPU"`         // GPU info
 	Mem         string        `json:"Mem"`         // memory size
 	OS          string        `json:"OS"`          // OS name and version
+	GOOS        string        `json:"GOOS"`        // runtime.GOOS
 	Kernel      string        `json:"Kernel"`      // kernel release
 	Arch        string        `json:"Arch"`        // kernel architecture
 	From        string        `json:"From"`        // where the agent is coming from, usually a public IP, or 127.0.0.1

