@@ -7,6 +7,9 @@
 
 * sftp support ([9b84eb9](https://github.com/jm33-m0/emp3r0r/commit/9b84eb929eea7687e0f9bf05df37802592f02126))
 
+![image](https://user-images.githubusercontent.com/10167884/193186205-44c9e201-b3d0-4ced-b955-ad07c4f49de3.png)
+
+
 ## [1.21.0](https://github.com/jm33-m0/emp3r0r/compare/v1.20.0...v1.21.0) (2022-09-29)
 
 
