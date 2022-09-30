@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.21.0](https://github.com/jm33-m0/emp3r0r/compare/v1.20.0...v1.21.0) (2022-09-29)
+
+
+### Features
+
+* autocomplete items in PATH on target system ([a1a6268](https://github.com/jm33-m0/emp3r0r/commit/a1a626810fff3aac06cc3119b1b4cfa710109332))
+
+
+### Bug Fixes
+
+* empty agent uuid ([416aadc](https://github.com/jm33-m0/emp3r0r/commit/416aadcec61ada4f1dbf2020ad2f78afcfd04fdd))
+* fail to check command output from agent, agent then gets marked as unresponsive incorrectly ([14553b6](https://github.com/jm33-m0/emp3r0r/commit/14553b6251f8beefda676a96b9f090c3a5c40bab))
+* lengthy log ([a3e2f72](https://github.com/jm33-m0/emp3r0r/commit/a3e2f72321febcd18529cb3861e51cbe918761d3))
+* screenshot downloading fails ([886e864](https://github.com/jm33-m0/emp3r0r/commit/886e864679bd91590e576e0b61d9288bde0cbd42))
+
 ## [1.20.0](https://github.com/jm33-m0/emp3r0r/compare/v1.19.1...v1.20.0) (2022-09-28)
 
 
