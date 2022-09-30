@@ -23,8 +23,10 @@ var SSHShellPort = make(map[string]string)
 // port: serve this shell on agent side 127.0.0.1:port
 func SSHClient(shell, args, port string, split bool) (err error) {
 	// if the shell window exists, abort
-	if split && AgentShellPane != nil {
-		return
+	if split {
+		if AgentShellPane != nil || AgentSFTPPane != nil {
+			return
+		}
 	}
 
 	if !util.IsCommandExist("ssh") {

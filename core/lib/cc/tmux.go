@@ -29,6 +29,12 @@ type Emp3r0rPane struct {
 }
 
 var (
+	// TermWidth
+	TermWidth int
+
+	// TermHeight
+	TermHeight int
+
 	// home tmux window
 	HomeWindow string
 
@@ -71,17 +77,19 @@ func TmuxInitWindows() (err error) {
 	// main window
 	CommandPane = &Emp3r0rPane{}
 	CommandPane.Name = "Emp3r0r Console"
+	CommandPane.ID = TmuxCurrentPane()
+	CommandPane.WindowID = TmuxCurrentWindow()
 	TmuxUpdatePane(CommandPane)
 
 	// pane title
 	TmuxSetPaneTitle("Emp3r0r Console", CommandPane.ID)
 
 	// check terminal size, prompt user to run emp3r0r C2 in a bigger window
-	w, h, err := TermSize()
+	TermWidth, TermHeight, err = TermSize()
 	if err != nil {
 		CliPrintWarning("Get terminal size: %v", err)
 	}
-	if w < 180 || h < 40 {
+	if TermWidth < 180 || TermHeight < 40 {
 		CliPrintWarning("I need a bigger window, make sure the window size is at least 180x40 (w*h)")
 		CliPrintWarning("Please maximize the terminal window if possible")
 	}
@@ -148,21 +156,50 @@ func TmuxInitWindows() (err error) {
 	return
 }
 
+func TmuxDisplay(msg string) (res string) {
+	out, err := exec.Command("tmux", "display-message", "-p", msg).CombinedOutput()
+	if err != nil {
+		CliPrintWarning("TmuxDisplay: %v", err)
+		return
+	}
+
+	return string(out)
+}
+
+// TmuxWindowSize size in chars, of the current tmux window/tab
+func TmuxWindowSize() (x, y int) {
+	// initialize
+	x = -1
+	y = x
+
+	// tmux display
+	tmux_display := func(msg string) (res int) {
+		out_str := strings.TrimSpace(TmuxDisplay(msg))
+		out_str = strings.ReplaceAll(out_str, "'", "") // we get '123' so we have to remove the quotes
+		res, err = strconv.Atoi(out_str)
+		if err != nil {
+			CliPrintDebug("Unable to get %s (%s): %v", msg, out_str, err)
+			return -1 // returns -1 if fail to parse as int
+		}
+		CliPrintDebug("TmuxWindowSize %s -> %s", msg, out_str)
+		return
+	}
+	x = tmux_display(`#{window_width}`)
+	y = tmux_display(`#{window_height}`)
+
+	return
+}
+
 // returns the index of current pane
 // returns -1 when error occurs
-func TmuxCurrentPane() (index int) {
-	index = -1
-	out, err := exec.Command("tmux", "display-message", "-p", `'#P'`).CombinedOutput()
+func TmuxCurrentPane() (pane_id string) {
+	out, err := exec.Command("tmux", "display-message", "-p", `'#{pane_id}'`).CombinedOutput()
 	if err != nil {
 		CliPrintWarning("TmuxCurrentPane: %v", err)
 		return
 	}
 
-	out_str := strings.TrimSpace(string(out))
-	index, err = strconv.Atoi(out_str)
-	if err != nil {
-		return // returns -1 if fail to parse as int
-	}
+	pane_id = strings.TrimSpace(string(out))
 	return
 }
 
@@ -281,7 +318,7 @@ func (pane *Emp3r0rPane) PaneDetails() (
 	}
 
 	out, err := exec.Command("/bin/sh", "-c",
-		fmt.Sprintf("tmux display -p -t %s "+
+		fmt.Sprintf("tmux display-message -p -t %s "+
 			`'#{pane_dead}:#{pane_tty}:#{pane_pid}:#{pane_width}:`+
 			`#{pane_height}:#{pane_current_command}:#{pane_title}'`,
 			pane.ID)).CombinedOutput()
@@ -325,6 +362,7 @@ func (pane *Emp3r0rPane) PaneDetails() (
 func (pane *Emp3r0rPane) ResizePane(direction string, lines int) (err error) {
 	id := pane.ID
 	job := fmt.Sprintf("tmux resize-pane -t %s -%s %d", id, direction, lines)
+	CliPrintDebug("Resizing pane %s: %s", pane.Title, job)
 	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
 	if err != nil {
 		err = fmt.Errorf("exec tmux resize-pane: %s\n%v", out, err)
@@ -491,4 +529,43 @@ func TmuxSplit(hV, cmd string) error {
 	}
 
 	return nil
+}
+
+// FitPanes adjust width of panes to fit them in the terminal window
+// triggered by agent output
+func FitPanes(output_pane_x int) {
+	TmuxUpdatePanes()
+	// update panes
+	defer TmuxUpdatePanes()
+
+	// in this case no need to resize
+	if output_pane_x <= AgentOutputPane.Width {
+		CliPrintDebug("No need to fit panes")
+		return
+	}
+
+	TermWidth, TermHeight = TmuxWindowSize()
+	if TermHeight < 0 || TermWidth < 0 {
+		CliPrintWarning("Unable to get terminal size")
+		return
+	}
+
+	// if Output pane too wide
+	if output_pane_x >= TermWidth {
+		CliPrintWarning("Terminal too narrow (%d chars)", TermWidth)
+		return
+	}
+
+	// resize
+	target_width := output_pane_x - AgentOutputPane.Width
+	CommandPane.ResizePane("L", target_width)
+	CliPrintDebug("Resizing agent handler pane %d-%d=%d chars to the left",
+		output_pane_x, AgentOutputPane.Width, target_width)
+	AgentInfoPane.ResizePane("x", AgentInfoPane.Width)
+}
+
+func TmuxUpdatePanes() {
+	TmuxUpdatePane(CommandPane)
+	TmuxUpdatePane(AgentOutputPane)
+	TmuxUpdatePane(AgentInfoPane)
 }

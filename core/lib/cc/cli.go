@@ -730,9 +730,10 @@ func listLocalFiles(path string) func(string) []string {
 
 // automatically resize CommandPane according to table width
 func AdaptiveTable(tableString string) {
-	TmuxUpdatePane(CommandPane)
+	TmuxUpdatePanes()
 	row_len := len(strings.Split(tableString, "\n")[0])
 	if CommandPane.Width < row_len {
+		CliPrintDebug("Command Pane %d vs %d table width, resizing", CommandPane.Width, row_len)
 		CommandPane.ResizePane("x", row_len)
 	}
 }

@@ -227,7 +227,15 @@ func setCurrentTarget(cmd string) {
 		CliPrintSuccess("Now targeting %s", CurrentTarget.Tag)
 		SetDynamicPrompt()
 
-		// kill shell window
+		// kill shell and sftp window
+		if AgentSFTPPane != nil {
+			CliPrintInfo("Updating sftp window")
+			err = AgentSFTPPane.KillPane()
+			if err != nil {
+				CliPrintInfo("Updating sftp window: %v", err)
+			}
+			AgentSFTPPane = nil
+		}
 		if AgentShellPane != nil {
 			CliPrintInfo("Updating shell window")
 			err = AgentShellPane.KillPane()

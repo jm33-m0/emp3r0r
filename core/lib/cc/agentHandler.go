@@ -129,7 +129,7 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 
 		// resize pane since table might mess up
 		x := len(strings.Split(out, "\n")[0])
-		AgentOutputPane.ResizePane("x", x)
+		FitPanes(x)
 
 		// ls command
 	case "ls":
@@ -185,7 +185,7 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 
 		// resize pane since table might mess up
 		x := len(strings.Split(out, "\n")[0])
-		AgentOutputPane.ResizePane("x", x)
+		FitPanes(x)
 	}
 
 	// Command output
