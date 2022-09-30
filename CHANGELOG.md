@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.22.2](https://github.com/jm33-m0/emp3r0r/compare/v1.22.1...v1.22.2) (2022-09-30)
+
+
+### Bug Fixes
+
+* broken shell pane for windows targets ([3cbd03a](https://github.com/jm33-m0/emp3r0r/commit/3cbd03a1ea9fec077a6d16210ef49cbe5d95345f))
+
 ## [1.22.1](https://github.com/jm33-m0/emp3r0r/compare/v1.22.0...v1.22.1) (2022-09-30)
 
 
