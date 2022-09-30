@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.22.1](https://github.com/jm33-m0/emp3r0r/compare/v1.22.0...v1.22.1) (2022-09-30)
+
+
+### Bug Fixes
+
+* tmux pane resizing issues ([7849902](https://github.com/jm33-m0/emp3r0r/commit/78499022d53ccdc5060e76388d49f91c2b1c76e6))
+
 ## [1.22.0](https://github.com/jm33-m0/emp3r0r/compare/v1.21.0...v1.22.0) (2022-09-30)
 
 
