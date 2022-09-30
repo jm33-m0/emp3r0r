@@ -29,18 +29,35 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 		}
 	}
 
+	// check if sftp is requested
+	is_sftp := shell == "sftp"
+	ssh_prog := "ssh"
+	if is_sftp {
+		ssh_prog = "sftp"
+		shell = "bash"
+	}
+	// in linux we will open a bash shell automatically, which can be used for SFTP
+	// in Windows it's not the same case
+	is_new_port_needed := (port == RuntimeConfig.SSHDPort && shell != "bash") ||
+		(is_sftp && CurrentTarget.GOOS == "windows")
+
 	if !util.IsCommandExist("ssh") {
 		err = fmt.Errorf("ssh must be installed")
 		return
 	}
 
-	// bash or not
+	// check if we need a new (SSH) port (on the agent side, for new shell)
 	lport := strconv.Itoa(util.RandInt(2048, 65535)) // shell gets mapped here
 	new_port := strconv.Itoa(util.RandInt(2048, 65535))
-	if port == RuntimeConfig.SSHDPort && shell != "bash" {
-		port = new_port // reset port if trying to open shells other than bash
-		SetOption([]string{"port", new_port})
-		CliPrintWarning("Switching to a new port %s since we are not requesting bash", port)
+	if is_new_port_needed {
+		port = new_port // reset port
+
+		// if sftp is requested, we are not using `interactive_shell` module
+		// so no options to set
+		if !is_sftp {
+			SetOption([]string{"port", new_port})
+		}
+		CliPrintWarning("Switching to a new port %s since we are requesting a new shell (%s)", port, shell)
 	}
 	to := "127.0.0.1:" + port // decide what port/shell to connect to
 
@@ -147,18 +164,16 @@ wait:
 	}
 
 	// let's do the ssh
-	sshPath, err := exec.LookPath("ssh")
+	sshPath, err := exec.LookPath(ssh_prog)
 	if err != nil {
-		CliPrintError("ssh not found, please install it first: %v", err)
-	}
-	sftpPath, err := exec.LookPath("sftp")
-	if err != nil {
-		CliPrintError("sftp not found, please install it first: %v", err)
+		CliPrintError("%s not found, please install it first: %v", ssh_prog, err)
 	}
 	sshCmd := fmt.Sprintf("%s -p %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 127.0.0.1",
 		sshPath, lport)
-	sftpCmd := fmt.Sprintf("%s -P %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 127.0.0.1",
-		sftpPath, lport)
+	if is_sftp {
+		sshCmd = fmt.Sprintf("%s -P %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 127.0.0.1",
+			sshPath, lport)
+	}
 
 	// agent name
 	name := CurrentTarget.Hostname
@@ -169,23 +184,35 @@ wait:
 
 	// remeber shell-port mapping
 	SSHShellPort[shell] = port
+	// if open in split tmux pane
 	if split {
-		if CurrentTarget.GOOS != "windows" {
-			CliPrintInfo("\nOpening SSH (%s - %s) session for %s in Shell window.\n"+
-				"If that fails, please execute command\n%s\nmanaully",
-				shell, port, CurrentTarget.Tag, sshCmd)
-			AgentShellPane, err = TmuxNewPane("Shell", "v", CommandPane.ID, 40, sshCmd)
-			if err != nil {
-				return err
-			}
+		if CurrentTarget.GOOS == "windows" && !is_sftp {
+			CliPrintDebug("Refuse to open shell automatically on Windows")
+			return
 		}
-		AgentSFTPPane, err = TmuxNewPane("SFTP", "v", AgentOutputPane.ID, 30, sftpCmd)
-		TmuxPanes[AgentShellPane.ID] = AgentShellPane
-		TmuxPanes[AgentSFTPPane.ID] = AgentSFTPPane
+
+		if is_sftp {
+			AgentSFTPPane, err = TmuxNewPane("SFTP", "v", AgentOutputPane.ID, 30, sshCmd)
+			TmuxPanes[AgentSFTPPane.ID] = AgentSFTPPane
+		} else {
+			AgentShellPane, err = TmuxNewPane("Shell", "v", CommandPane.ID, 30, sshCmd)
+			TmuxPanes[AgentShellPane.ID] = AgentShellPane
+		}
 		return err
 	}
+
+	// if open in new tmux window
 	CliPrintInfo("\nOpening SSH (%s - %s) session for %s in Shell tab.\n"+
 		"If that fails, please execute command\n%s\nmanaully",
 		shell, port, CurrentTarget.Tag, sshCmd)
+
+	// if SFTP is requested, open in file manager with XDG-OPEN
+	if is_sftp {
+		// open in file manager
+		err = exec.Command("xdg-open", fmt.Sprintf("sftp://127.0.0.1"+":"+lport)).Start()
+		return
+	}
+
+	// if a shell is wanted, just open in new tmux window, you will see a new tab
 	return TmuxNewWindow(fmt.Sprintf("shell/%s/%s-%s", name, shell, port), sshCmd)
 }

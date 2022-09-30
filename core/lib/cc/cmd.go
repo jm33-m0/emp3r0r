@@ -13,6 +13,7 @@ import (
 var CommandHelp = map[string]string{
 	HELP:              "Print this help, 'help <module>' gives help for a module",
 	"target":          "Set target. eg. `target <index>`",
+	"file_manager":    "Browse remote files in your local file manager with SFTP protocol",
 	"set":             "Set an option. eg. `set <option> <val>`",
 	"use":             "Use a module. eg. `use <module_name>`",
 	"run":             "Run selected module, make sure you have set required options",
@@ -51,6 +52,7 @@ var CmdFuncs = map[string]func(){
 	"info":          CliListOptions,
 	"run":           ModuleRun,
 	"screenshot":    TakeScreenshot,
+	"file_manager":  OpenFileManager,
 	"upgrade_agent": UpgradeAgent,
 	"gen_agent":     GenAgent,
 	"pack_agent":    PackAgentBinary,
@@ -244,9 +246,19 @@ func setCurrentTarget(cmd string) {
 			}
 			AgentShellPane = nil
 		}
-		err = SSHClient("bash", "", RuntimeConfig.SSHDPort, true)
+
+		// do not open shell automatically in Windows
+		if a.GOOS != "windows" {
+			CliPrintInfo("Opening Shell window")
+			err = SSHClient("bash", "", RuntimeConfig.SSHDPort, true)
+			if err != nil {
+				CliPrintError("SSHClient: %v", err)
+			}
+		}
+		CliPrintInfo("Opening SFTP window")
+		err = SSHClient("sftp", "", RuntimeConfig.SSHDPort, true)
 		if err != nil {
-			CliPrintError("SSHClient: %v", err)
+			CliPrintError("SFTPClient: %v", err)
 		}
 
 		updateAgentExes(target_to_set)
