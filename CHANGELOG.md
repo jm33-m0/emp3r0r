@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.22.0](https://github.com/jm33-m0/emp3r0r/compare/v1.21.0...v1.22.0) (2022-09-30)
+
+
+### Features
+
+* sftp support ([9b84eb9](https://github.com/jm33-m0/emp3r0r/commit/9b84eb929eea7687e0f9bf05df37802592f02126))
+
 ## [1.21.0](https://github.com/jm33-m0/emp3r0r/compare/v1.20.0...v1.21.0) (2022-09-29)
 
 
