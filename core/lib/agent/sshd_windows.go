@@ -35,9 +35,17 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		}
 		shell = exe
 	}
+	// ssh server
+	ssh_server := ssh.Server{
+		Addr: "127.0.0.1:" + port,
+		SubsystemHandlers: map[string]ssh.SubsystemHandler{
+			"sftp": SftpHandler,
+		},
+	}
+
 	log.Printf("Using %s shell", strconv.Quote(shell))
 
-	ssh.Handle(func(s ssh.Session) {
+	ssh_server.Handle(func(s ssh.Session) {
 		cmd := exec.Command(shell, args...)
 		if IsConPTYSupported() {
 			log.Print("ConPTY supported, the shell will be interactive")
@@ -127,7 +135,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 	})
 
 	log.Printf("Starting SSHD on port %s...", port)
-	return ssh.ListenAndServe("127.0.0.1:"+port, nil)
+	return ssh_server.ListenAndServe()
 }
 
 // test if ConPTY is implemented in current OS

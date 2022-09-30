@@ -149,8 +149,14 @@ wait:
 	if err != nil {
 		CliPrintError("ssh not found, please install it first: %v", err)
 	}
+	sftpPath, err := exec.LookPath("sftp")
+	if err != nil {
+		CliPrintError("sftp not found, please install it first: %v", err)
+	}
 	sshCmd := fmt.Sprintf("%s -p %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 127.0.0.1",
 		sshPath, lport)
+	sftpCmd := fmt.Sprintf("%s -P %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 127.0.0.1",
+		sftpPath, lport)
 	CliPrintInfo("\nOpening SSH (%s - %s) session for %s in new window.\n"+
 		"If that fails, please execute command\n%s\nmanaully",
 		shell, port, CurrentTarget.Tag, sshCmd)
@@ -165,8 +171,13 @@ wait:
 	// remeber shell-port mapping
 	SSHShellPort[shell] = port
 	if split {
-		AgentShellPane, err = TmuxNewPane("Shell", "v", "1", 40, sshCmd)
+		AgentShellPane, err = TmuxNewPane("Shell", "v", CommandPane.ID, 40, sshCmd)
+		if err != nil {
+			return err
+		}
+		AgentSFTPPane, err = TmuxNewPane("SFTP", "v", AgentOutputPane.ID, 30, sftpCmd)
 		TmuxPanes[AgentShellPane.ID] = AgentShellPane
+		TmuxPanes[AgentSFTPPane.ID] = AgentSFTPPane
 		return err
 	}
 	return TmuxNewWindow(fmt.Sprintf("shell/%s/%s-%s", name, shell, port), sshCmd)

@@ -47,6 +47,9 @@ var (
 	// Displays bash shell for selected agent
 	AgentShellPane *Emp3r0rPane
 
+	// SFTP shell for selected agent
+	AgentSFTPPane *Emp3r0rPane
+
 	// Put all windows in this map
 	TmuxPanes = make(map[string]*Emp3r0rPane)
 

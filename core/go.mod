@@ -24,6 +24,7 @@ require (
 	github.com/ncruces/go-dns v1.1.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/otiai10/copy v1.7.0
+	github.com/pkg/sftp v1.13.5
 	github.com/posener/h2conn v0.0.0-20180911140238-13e7df33ed15
 	github.com/schollz/progressbar/v3 v3.8.6
 	github.com/shadowsocks/go-shadowsocks2 v0.1.5
@@ -56,6 +57,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.0.12 // indirect
 	github.com/klauspost/pgzip v1.2.5 // indirect
 	github.com/klauspost/reedsolomon v1.9.16 // indirect
+	github.com/kr/fs v0.1.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/lxn/win v0.0.0-20210218163916-a377121e959e // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
