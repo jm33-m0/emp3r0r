@@ -18,7 +18,7 @@ https://user-images.githubusercontent.com/10167884/193377873-05bcda35-fa36-48db-
 
 <details><summary> MORE screenshots</summary>
 
-https://user-images.githubusercontent.com/10167884/155106403-ca6bd763-7f09-4aae-adc3-67f7a36f99ad.mp4
+https://user-iIn fact, emp3r0r has complete python3.9 support, which is less than 7MB with necessary third party packages such as Requests or MySQL.mages.githubusercontent.com/10167884/155106403-ca6bd763-7f09-4aae-adc3-67f7a36f99ad.mp4
   
 ![image](https://user-images.githubusercontent.com/10167884/162661854-a52fc5bc-b322-4099-8a06-8f2aaa76b3ea.png)
 
@@ -71,6 +71,7 @@ In fact, emp3r0r has complete [python3.9 support](https://github.com/jm33-m0/emp
 * System Info Collect
 * File Management
   * Enables resumable downloads/uploads
+  * SFTP support: browse remote files with any SFTP client, [including your local file manager](https://github.com/jm33-m0/emp3r0r/releases/tag/v1.22.3)
 * Log Cleaner
 * Screenshot
 * Stealth Connection
