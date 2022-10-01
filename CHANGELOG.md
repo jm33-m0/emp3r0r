@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.22.3](https://github.com/jm33-m0/emp3r0r/compare/v1.22.2...v1.22.3) (2022-10-01)
+
+
+### Bug Fixes
+
+* sftp improvements ([80deffd](https://github.com/jm33-m0/emp3r0r/commit/80deffdca98541e0a873a59452424cdbec61d656))
+* sftp pane not opening ([82e2fc5](https://github.com/jm33-m0/emp3r0r/commit/82e2fc5269e3c137eac7e2b60e5f27ce4cfa5210))
+
 ## [1.22.2](https://github.com/jm33-m0/emp3r0r/compare/v1.22.1...v1.22.2) (2022-09-30)
 
 
