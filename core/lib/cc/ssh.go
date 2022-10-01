@@ -22,12 +22,6 @@ var SSHShellPort = make(map[string]string)
 // shell: the executable to run, eg. bash, python
 // port: serve this shell on agent side 127.0.0.1:port
 func SSHClient(shell, args, port string, split bool) (err error) {
-	// if the shell window exists, abort
-	if split {
-		if AgentShellPane != nil || AgentSFTPPane != nil {
-			return
-		}
-	}
 
 	// check if sftp is requested
 	is_sftp := shell == "sftp"
@@ -35,6 +29,15 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 	if is_sftp {
 		ssh_prog = "sftp"
 		shell = "bash"
+	}
+
+	// if shell/sftp pane already exists, abort
+	if split {
+		if AgentShellPane != nil {
+			if !is_sftp && AgentSFTPPane != nil {
+				return
+			}
+		}
 	}
 	// in linux we will open a bash shell automatically, which can be used for SFTP
 	// in Windows it's not the same case
