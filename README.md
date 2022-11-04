@@ -3,7 +3,9 @@ A post-exploitation framework for Linux/Windows
 
 ## Status
 
-**emp3r0r C2 (Linux/Windows) is ready for testing. Please report bugs if you find any.**
+**I have many planned features for this project, what I don't have is the time to write them. I will be working on my schoolwork in the foreseeable future, if you want to change or add something (I am sure there are a lot of bugs and/or bad designs to be fixed), please submit a pull request**
+
+- emp3r0r C2 (Linux/Windows) is ready for testing. Please report bugs if you find any.
 - Read [wiki](https://github.com/jm33-m0/emp3r0r/wiki) to get started
 - Download from [here](https://github.com/jm33-m0/emp3r0r/releases)
 - [Write modules](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r) for emp3r0r with your favorite languages
