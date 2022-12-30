@@ -32,7 +32,9 @@ func GenAgent() {
 		now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 
 	os_choice := CliAsk("Generate agent for (1) Linux, (2) Windows: ")
-	if os_choice == "2" {
+	is_win := os_choice == "2"
+	is_linux := os_choice == "1"
+	if is_win {
 		stubFile = EmpBuildDir + "/stub-win.exe"
 		outfile = fmt.Sprintf("%s/agent_windows_%d-%d-%d_%d-%d-%d.exe",
 			EmpWorkSpace,
@@ -91,6 +93,12 @@ func GenAgent() {
 	// done
 	CliPrintSuccess("Generated %s from %s and %s, you can run %s on arbitrary target",
 		outfile, stubFile, EmpConfigFile, outfile)
+
+	// pack it accordingly
+	// currently only Linux is supported
+	if is_linux {
+		Packer(outfile)
+	}
 }
 
 // PackAgentBinary pack agent ELF binary with Packer()
