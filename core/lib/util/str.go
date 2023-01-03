@@ -120,6 +120,24 @@ func RandStr(n int) string {
 	return string(b)
 }
 
+// Random bytes
+func RandBytes(n int) []byte {
+	var all_bytes []byte
+	for b := 0; b <= 255; b++ {
+		if b == 0 {
+			continue
+		}
+		all_bytes = append(all_bytes, byte(b))
+	}
+	rand.Seed(int64(RandInt(0xff, 0xffffffff)))
+	rand_bytes := make([]byte, n)
+	for i := range rand_bytes {
+		rand_bytes[i] = all_bytes[int64(RandInt(0, len(all_bytes)))]
+	}
+
+	return rand_bytes
+}
+
 // HexEncode hex encode string, eg. "Hello" -> "\x48\x65\x6c\x6c\x6f"
 func HexEncode(s string) (result string) {
 	for _, c := range s {

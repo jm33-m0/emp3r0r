@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"runtime"
-	"strings"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 )
@@ -16,11 +15,10 @@ import (
 func ExtractData() (data []byte, err error) {
 	data, err = DigEmbeddedDataFromExe()
 	if err != nil {
-		e := err
-		log.Printf("Extract ELF from args[0]: %v", err)
+		log.Printf("Extract data from executable: %v", err)
 		data, err = DigEmbededDataFromMem()
 		if err != nil {
-			err = fmt.Errorf("Extract data from args[0]: %v. from memory: %v", e, err)
+			err = fmt.Errorf("Extract data from memory: %v", err)
 			return
 		}
 		log.Printf("Found %d bytes in memory", len(data))
@@ -59,7 +57,11 @@ func DigEmbeddedDataFromExe() ([]byte, error) {
 
 // DigEmbeddedData search for embedded data in given []byte buffer
 func DigEmbeddedData(data []byte) (embedded_data []byte, err error) {
-	sep := []byte(strings.Repeat(emp3r0r_data.MagicString, 3))
+	// extract the last N bytes to use as magic string
+	magic_str := data[len(data)-len(emp3r0r_data.OneTimeMagicBytes):]
+	log.Printf("Trying magic string %x (%d bytes)", magic_str, len(magic_str))
+
+	sep := bytes.Repeat(magic_str, 3)
 
 	// locate embedded_data
 	split := bytes.Split(data, sep)
@@ -72,6 +74,11 @@ func DigEmbeddedData(data []byte) (embedded_data []byte, err error) {
 		err = fmt.Errorf("Digged nothing from %d of given data", len(data))
 		return
 	}
+
+	// now we have the correct magic string
+	emp3r0r_data.OneTimeMagicBytes = magic_str
+	log.Printf("Now we have magic string %x (%d bytes)",
+		emp3r0r_data.OneTimeMagicBytes, len(emp3r0r_data.OneTimeMagicBytes))
 	return
 }
 
@@ -87,13 +94,13 @@ func DigEmbededDataFromMem() (data []byte, err error) {
 	for n, mem_region := range mem_regions {
 		data, err = DigEmbeddedData(mem_region)
 		if err != nil {
-			log.Printf("memory region %d (%d bytes): %v", n, len(mem_region), err)
+			log.Printf("Nothing in memory region %d (%d bytes): %v", n, len(mem_region), err)
 			continue
 		}
 		break
 	}
 	if len(data) <= 0 {
-		return nil, fmt.Errorf("No config data found in memory")
+		return nil, fmt.Errorf("No data found in memory")
 	}
 
 	return

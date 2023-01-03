@@ -28,7 +28,8 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 	payloadSplit := strings.Split(data.Payload, emp3r0r_data.MagicString)
 	if len(payloadSplit) <= 1 {
-		log.Printf("Cannot parse CC command: %s, wrong OpSep maybe?", data.Payload)
+		log.Printf("Cannot parse CC command: %s, wrong OpSep (should be %s) maybe?",
+			data.Payload, emp3r0r_data.MagicString)
 		return
 	}
 	cmd_id := payloadSplit[len(payloadSplit)-1]

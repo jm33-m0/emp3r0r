@@ -2,6 +2,7 @@ package util
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -217,4 +218,14 @@ func TarBz2(dir, outfile string) error {
 		return err
 	}
 	return nil
+}
+
+func ReplaceBytesInFile(path string, old []byte, replace_with []byte) (err error) {
+	file_bytes, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+
+	to_write := bytes.ReplaceAll(file_bytes, old, replace_with)
+	return os.WriteFile(path, to_write, 0644)
 }

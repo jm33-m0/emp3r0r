@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	// MagicString as separator/password
-	MagicString = "c44ccf2a-c651-4cec-9f32-1ff9621b5518"
+	// OneTimeMagicBytes as separator/password
+	OneTimeMagicBytes = []byte("c44ccf2a-c651-4cec-9f32-1ff9621b5518")
 
 	// Transport what transport is this agent using? (HTTP2 / CDN / TOR)
 	Transport = "HTTP2"
@@ -47,7 +47,19 @@ var (
 	AESKey []byte
 )
 
+// Build
+var (
+	// to be updated by DirSetup
+	Stub_Linux          = ""
+	Stub_Windows        = ""
+	Packer_Stub         = ""
+	Packer_Stub_Windows = ""
+)
+
 const (
+	// Magic String
+	MagicString = "06c1ae26-8b34-11ed-9866-000c29d9ff59"
+
 	// Version hardcoded version string
 	// see https://github.com/googleapis/release-please/blob/f398bdffdae69772c61a82cd7158cca3478c2110/src/updaters/generic.ts#L30
 	Version = "v1.22.3" // x-release-please-version
