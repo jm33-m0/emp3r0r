@@ -56,7 +56,6 @@ func unlock_downloads() bool {
 func init_magic_str() {
 	default_magic_str := emp3r0r_data.OneTimeMagicBytes
 	emp3r0r_data.OneTimeMagicBytes = util.RandBytes(len(default_magic_str))
-	cc.CliPrintInfo("Magic string is %x this time", emp3r0r_data.OneTimeMagicBytes)
 
 	// update binaries
 	err := util.ReplaceBytesInFile(emp3r0r_data.Stub_Linux, []byte(default_magic_str), []byte(emp3r0r_data.OneTimeMagicBytes))
