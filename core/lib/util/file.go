@@ -91,8 +91,22 @@ func RemoveDupsFromArray(array []string) (result []string) {
 	return result
 }
 
-// AppendToFile append text to a file
-func AppendToFile(filename string, text string) (err error) {
+// AppendToFile append bytes to a file
+func AppendToFile(filename string, data []byte) (err error) {
+	f, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	if _, err = f.Write(data); err != nil {
+		return
+	}
+	return
+}
+
+// AppendTextToFile append text to a file
+func AppendTextToFile(filename string, text string) (err error) {
 	f, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
 		return

