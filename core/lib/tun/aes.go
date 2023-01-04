@@ -25,9 +25,7 @@ func PKCS5Trimming(encrypt []byte) []byte {
 
 // AESEncryptRaw encrypt bytes
 func AESEncryptRaw(key, plaintext []byte) []byte {
-	if len(plaintext)%aes.BlockSize != 0 {
-		plaintext = PKCS5Padding(plaintext, aes.BlockSize)
-	}
+	plaintext = PKCS5Padding(plaintext, aes.BlockSize)
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -77,9 +75,7 @@ func AESDecryptRaw(key, ciphertext []byte) []byte {
 // AESEncrypt string to base64 crypto using AES
 func AESEncrypt(key []byte, text string) string {
 	plaintext := []byte(text)
-	if len(text)%aes.BlockSize != 0 {
-		plaintext = PKCS5Padding([]byte(text), aes.BlockSize)
-	}
+	plaintext = PKCS5Padding([]byte(text), aes.BlockSize)
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
