@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.23.0](https://github.com/jm33-m0/emp3r0r/compare/v1.22.3...v1.23.0) (2023-01-04)
+
+
+### Features
+
+* ditch static magic string for packer ([f7edcc6](https://github.com/jm33-m0/emp3r0r/commit/f7edcc6c6eecc3cb5d9ff2dbffc3b739efefe029))
+* improve agent binary structure ([fd76e5c](https://github.com/jm33-m0/emp3r0r/commit/fd76e5cd3bb8efcd2b017ca24ada5d432e070b0c))
+* pack agent binary by default (linux) ([4811229](https://github.com/jm33-m0/emp3r0r/commit/4811229b8ca75a13c6ba691e0a432d4bdbad03aa))
+* use AES-CBC mode to support tiny-AES ([72c4cea](https://github.com/jm33-m0/emp3r0r/commit/72c4cea4bf2d6dc178b55531c58f6f632a717765))
+
+
+### Bug Fixes
+
+* make bash command line look normal ([2315c96](https://github.com/jm33-m0/emp3r0r/commit/2315c96f006619fc110dce5dae534ac541aeb426))
+* xz should be single-threaded ([4056da9](https://github.com/jm33-m0/emp3r0r/commit/4056da9a55277a9190a97da4641f43e33cf44ae5))
+
 ## [1.22.3](https://github.com/jm33-m0/emp3r0r/compare/v1.22.2...v1.22.3) (2022-10-01)
 
 
