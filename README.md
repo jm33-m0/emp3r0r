@@ -3,13 +3,11 @@ A post-exploitation framework for Linux/Windows
 
 ## Status
 
-**I have many planned features for this project, what I don't have is the time to write them. I will be working on my schoolwork in the foreseeable future, if you want to change or add something (I am sure there are a lot of bugs and/or bad designs to be fixed), please submit a pull request**
-
 - emp3r0r C2 (Linux/Windows) is ready for testing. Please report bugs if you find any.
 - Read [wiki](https://github.com/jm33-m0/emp3r0r/wiki) to get started
 - Download from [here](https://github.com/jm33-m0/emp3r0r/releases)
 - [Write modules](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r) for emp3r0r with your favorite languages
-- Windows support is ready with fully-interactive shell 
+- Windows support is ready with fully-interactive shell
 
 
 
@@ -21,7 +19,7 @@ https://user-images.githubusercontent.com/10167884/193377873-05bcda35-fa36-48db-
 <details><summary> MORE screenshots</summary>
 
 https://user-images.githubusercontent.com/10167884/155106403-ca6bd763-7f09-4aae-adc3-67f7a36f99ad.mp4
-  
+
 ![image](https://user-images.githubusercontent.com/10167884/162661854-a52fc5bc-b322-4099-8a06-8f2aaa76b3ea.png)
 
 ![image](https://user-images.githubusercontent.com/10167884/163743855-6639c6aa-9b3a-4891-8845-1505236ac026.png)
@@ -56,7 +54,7 @@ In fact, emp3r0r has complete [python3.9 support](https://github.com/jm33-m0/emp
 * [Bettercap](https://github.com/bettercap/bettercap)
 * [Built-in Static Bash Binary](https://github.com/jm33-m0/emp3r0r/blob/master/core/lib/data/bash.go)
 * Auto persistence via various methods
-* [Post-exploitation Tools](https://github.com/jm33-m0/emp3r0r/tree/master/core/modules/vaccine) 
+* [Post-exploitation Tools](https://github.com/jm33-m0/emp3r0r/tree/master/core/modules/vaccine)
   * Nmap, Socat, Ncat, Bettercap, etc
 * Credential Harvesting (WIP)
 * [Process Injection](https://jm33.me/emp3r0r-injection.html)
@@ -79,7 +77,7 @@ In fact, emp3r0r has complete [python3.9 support](https://github.com/jm33-m0/emp
 * Stealth Connection
 * Anti-Antivirus
 * Internet Access Checker
-* Autoproxy 
+* Autoproxy
   * For semi-isolated networks
 * Reverse Proxy
   * To bring every host online
