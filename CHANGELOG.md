@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.23.2](https://github.com/jm33-m0/emp3r0r/compare/v1.23.1...v1.23.2) (2023-02-20)
+
+
+### Bug Fixes
+
+* go get -u ([8c90301](https://github.com/jm33-m0/emp3r0r/commit/8c903010692512a0c9d740d9cc4436428ba5b90d))
+
 ## [1.23.1](https://github.com/jm33-m0/emp3r0r/compare/v1.23.0...v1.23.1) (2023-02-20)
 
 
