@@ -19,7 +19,7 @@ require (
 	github.com/kbinani/screenshot v0.0.0-20210720154843-7d3a670d8329
 	github.com/lithammer/fuzzysearch v1.1.3
 	github.com/mholt/archiver v3.1.1+incompatible
-	github.com/mholt/archiver/v4 v4.0.0-alpha.6
+	github.com/mholt/archiver/v4 v4.0.0-alpha.7
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/ncruces/go-dns v1.1.0
 	github.com/olekukonko/tablewriter v0.0.5
@@ -42,8 +42,7 @@ require (
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/andybalholm/brotli v1.0.4 // indirect
 	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
-	github.com/chzyer/logex v1.2.0 // indirect
-	github.com/chzyer/test v0.0.0-20210722231415-061457976a23 // indirect
+	github.com/chzyer/test v1.0.0 // indirect
 	github.com/dsnet/compress v0.0.2-0.20210315054119-f66993602bf5 // indirect
 	github.com/frankban/quicktest v1.14.3 // indirect
 	github.com/gen2brain/shm v0.0.0-20210511105953-083dbc7d9d83 // indirect
