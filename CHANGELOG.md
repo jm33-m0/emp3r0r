@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.23.1](https://github.com/jm33-m0/emp3r0r/compare/v1.23.0...v1.23.1) (2023-02-20)
+
+
+### Bug Fixes
+
+* remove packer ([713e725](https://github.com/jm33-m0/emp3r0r/commit/713e725d0bcb285ac69efcc17c1ecee113569dcd))
+* upgrade deps ([441b978](https://github.com/jm33-m0/emp3r0r/commit/441b978d39ee40a783ee275d3028d31a34287473))
+
 ## [1.23.0](https://github.com/jm33-m0/emp3r0r/compare/v1.22.3...v1.23.0) (2023-01-04)
 
 
