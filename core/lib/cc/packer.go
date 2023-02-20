@@ -19,7 +19,7 @@ import (
 // Packer compress and encrypt ELF, append it to packer_stub.exe
 // encryption key is generated from MagicString
 func Packer(inputELF string) (err error) {
-	magic_str := string(emp3r0r_data.OneTimeMagicBytes)
+	magic_str := emp3r0r_data.MagicString
 
 	// read file
 	elfBytes, err := ioutil.ReadFile(inputELF)
@@ -58,10 +58,7 @@ func Packer(inputELF string) (err error) {
 	if err != nil {
 		return fmt.Errorf("cannot read %s: %v", stub_file, err)
 	}
-	sep := bytes.Repeat(emp3r0r_data.OneTimeMagicBytes, 3)
-	toWrite = append(toWrite, sep...)
 	toWrite = append(toWrite, encELFBytes...)
-	toWrite = append(toWrite, sep...)
 	err = ioutil.WriteFile(packed_file, toWrite, 0755)
 	if err != nil {
 		return fmt.Errorf("write to packed file %s: %v", packed_file, err)
@@ -80,12 +77,6 @@ func Packer(inputELF string) (err error) {
 	// remove "UPX" strings
 	util.ReplaceBytesInFile(packed_file, []byte("UPX"), util.RandBytes(3))
 	util.ReplaceBytesInFile(packed_file, []byte("upx"), util.RandBytes(3))
-
-	// append magic string to binary
-	err = util.AppendToFile(packed_file, emp3r0r_data.OneTimeMagicBytes)
-	if err != nil {
-		CliPrintWarning("Appending magic string to %s: %v", packed_file, err)
-	}
 
 	// done
 	CliPrintSuccess("%s has been packed as %s", inputELF, packed_file)

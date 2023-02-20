@@ -63,8 +63,6 @@ func init_magic_str() {
 		cc.CliPrintError("init_magic_str %v", err)
 	}
 	util.ReplaceBytesInFile(emp3r0r_data.Stub_Windows, []byte(default_magic_str), []byte(emp3r0r_data.OneTimeMagicBytes))
-	util.ReplaceBytesInFile(emp3r0r_data.Packer_Stub_Windows, []byte(default_magic_str), []byte(emp3r0r_data.OneTimeMagicBytes))
-	util.ReplaceBytesInFile(emp3r0r_data.Packer_Stub, []byte(default_magic_str), []byte(emp3r0r_data.OneTimeMagicBytes))
 }
 
 func main() {

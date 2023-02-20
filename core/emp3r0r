@@ -73,12 +73,6 @@ build() {
         cd "$pwd/cmd/agent" &&
             GOOS=windows sh -c "$gobuild_cmd $build_opt -o \"$temp/stub-win.exe\" -ldflags=\"$ldflags\""
     } || error "build stub-win"
-
-    info "Building Packer stub"
-    {
-        cd "$pwd/cmd/packer_stub" &&
-            sh -c "$gobuild_cmd $build_opt -o \"$temp/packer_stub.exe\" -ldflags=\"$ldflags\""
-    } || error "build packer_stub"
 }
 
 install() {
@@ -89,7 +83,6 @@ install() {
     cp -avR modules "$data_dir" || error "modules"
     cp -avR stub.exe "$build_dir/stub.exe" || error "stub"
     cp -avR stub-win.exe "$build_dir/stub-win.exe" || error "stub-win"
-    cp -avR packer_stub.exe "$build_dir/packer_stub.exe" || error "packer_stub"
 
     # emp3r0r binaries
     chmod 755 "$0" cc.exe cat.exe

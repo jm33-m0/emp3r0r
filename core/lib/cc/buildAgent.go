@@ -33,7 +33,7 @@ func GenAgent() {
 
 	os_choice := CliAsk("Generate agent for (1) Linux, (2) Windows: ")
 	is_win := os_choice == "2"
-	is_linux := os_choice == "1"
+	// is_linux := os_choice == "1"
 	if is_win {
 		stubFile = emp3r0r_data.Stub_Windows
 		outfile = fmt.Sprintf("%s/agent_windows_%d-%d-%d_%d-%d-%d.exe",
@@ -93,9 +93,9 @@ func GenAgent() {
 
 	// pack it accordingly
 	// currently only Linux is supported
-	if is_linux {
-		Packer(outfile)
-	}
+	// if is_linux {
+	// 	Packer(outfile)
+	// }
 }
 
 // PackAgentBinary pack agent ELF binary with Packer()

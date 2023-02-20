@@ -130,21 +130,3 @@ func GenAESKey(seed string) []byte {
 	md5sum := MD5Sum(seed)
 	return []byte(md5sum)[:32]
 }
-
-// func TestAES() {
-// 	plaintext := "123456"
-// 	plainbytes := []byte(plaintext)
-//
-// 	key := GenAESKey("adodnodnvpddpmdspcdpsmdpcmspdcmsp")
-//
-// 	cipherText := AESEncrypt(key, plaintext)
-// 	cipherBytes := AESEncryptRaw(key, plainbytes)
-//
-// 	decText := AESDecrypt(key, cipherText)
-// 	decBytes := AESDecryptRaw(key, cipherBytes)
-//
-// 	log.Printf("%s -> %v -> %s",
-// 		plaintext, cipherText, decText)
-// 	log.Printf("%s -> %v -> %s",
-// 		plainbytes, cipherBytes, decBytes)
-// }
