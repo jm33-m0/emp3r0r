@@ -27,13 +27,16 @@ const (
 func GenAgent() {
 	now := time.Now()
 	stubFile := emp3r0r_data.Stub_Linux
-	outfile := fmt.Sprintf("%s/agent_linux_%d-%d-%d_%d-%d-%d.exe",
+	outfile := fmt.Sprintf("%s/agent_linux_%d-%d-%d_%d-%d-%d",
 		EmpWorkSpace,
 		now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 
 	os_choice := CliAsk("Generate agent for (1) Linux, (2) Windows: ")
 	is_win := os_choice == "2"
-	// is_linux := os_choice == "1"
+	is_linux := os_choice == "1"
+	if is_linux {
+		CliPrintInfo("You chose Linux")
+	}
 	if is_win {
 		stubFile = emp3r0r_data.Stub_Windows
 		outfile = fmt.Sprintf("%s/agent_windows_%d-%d-%d_%d-%d-%d.exe",
