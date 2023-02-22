@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.23.4](https://github.com/jm33-m0/emp3r0r/compare/v1.23.3...v1.23.4) (2023-02-22)
+
+
+### Bug Fixes
+
+* embeded bash binary won't run, throws SEGV ([9fca402](https://github.com/jm33-m0/emp3r0r/commit/9fca402d7eb52a76fb67d0bfa72057e196a38486))
+
 ## [1.23.3](https://github.com/jm33-m0/emp3r0r/compare/v1.23.2...v1.23.3) (2023-02-22)
 
 
