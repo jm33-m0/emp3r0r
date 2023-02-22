@@ -20,8 +20,8 @@ var (
 	// HTTPClient handles agent's http communication
 	HTTPClient *http.Client
 
-	// H2Json the connection to CC, for JSON message-based communication
-	H2Json *h2conn.Conn
+	// CCMsgConn the connection to CC, for JSON message-based communication
+	CCMsgConn *h2conn.Conn
 
 	// KCPKeep: when disconnected from C2, KCP client should be notified
 	KCPKeep = true
