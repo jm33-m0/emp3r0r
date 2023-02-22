@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.23.3](https://github.com/jm33-m0/emp3r0r/compare/v1.23.2...v1.23.3) (2023-02-22)
+
+
+### Bug Fixes
+
+* [#152](https://github.com/jm33-m0/emp3r0r/issues/152): drop extension name for Linux agent binary ([79dfba2](https://github.com/jm33-m0/emp3r0r/commit/79dfba272360069ac4305891857b71b7c6655343))
+* agent fails to connect on first try ([1675de9](https://github.com/jm33-m0/emp3r0r/commit/1675de98b715d603ca40d54ab26bb3d2bfe6f896))
+* report arp cache ([658c823](https://github.com/jm33-m0/emp3r0r/commit/658c823f0ca19582a1d0d934e57e7979c76743e3))
+
 ## [1.23.2](https://github.com/jm33-m0/emp3r0r/compare/v1.23.1...v1.23.2) (2023-02-20)
 
 
