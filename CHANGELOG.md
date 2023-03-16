@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.23.5](https://github.com/jm33-m0/emp3r0r/compare/v1.23.4...v1.23.5) (2023-03-16)
+
+
+### Bug Fixes
+
+* /bin/bash doesnt exist on some systems ([794887f](https://github.com/jm33-m0/emp3r0r/commit/794887fe8836f3cb0a1dc5570003f5014b1de91c))
+* auto-modify cmdline args (linux) ([b4ca3a3](https://github.com/jm33-m0/emp3r0r/commit/b4ca3a3a06df7d0740d55845356eb8b86543943a))
+
 ## [1.23.4](https://github.com/jm33-m0/emp3r0r/compare/v1.23.3...v1.23.4) (2023-02-22)
 
 
