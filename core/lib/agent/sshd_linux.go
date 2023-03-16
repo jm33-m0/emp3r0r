@@ -46,7 +46,6 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			if err != nil {
 				log.Printf("sshd: extract built-in bash: %v", err)
 			}
-			cmd = exec.Command("/bin/bash")
 			bash_home := RuntimeConfig.UtilsPath // change home to use our bashrc
 			os.Setenv("HOME", bash_home)
 			os.Setenv("SHELL", cmd.Path)
