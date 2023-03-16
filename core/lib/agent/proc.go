@@ -42,3 +42,8 @@ func IsAgentRunningPID() (bool, int) {
 	_, err = os.FindProcess(pid)
 	return err == nil, pid
 }
+
+// SetProcessName rename agent process by modifying its argv, all cmdline args are dropped
+func SetProcessName(name string) {
+	crossPlatformSetProcName(name)
+}
