@@ -45,14 +45,23 @@ In fact, emp3r0r has complete [python3.9 support](https://github.com/jm33-m0/emp
 ## Features
 * Beautiful Terminal UI
   * Use [tmux](https://github.com/tmux/tmux) for window management
+* Stealth
+  * Automatically changes `argv` so you won't notice it in `ps` listing
+  * [Built-in **Elvish Shell** with the same disguise as main process](https://elv.sh/)
+  * Stealth Connection
+  * Reverse Proxy
+  * To bring every host online
+  * All of these in HTTP2
+  * Painlessly encapsulated in Shadowsocks and KCP
+  * Able to encapsulate in any external proxies such as [**TOR** and **CDN**s](https://github.com/jm33-m0/emp3r0r/raw/master/img/c2transports.png)
 * Multi-Tasking
   * Don't have to wait for any commands to finish
 * Module Support
-  * Provides [python3.9 environment](https://github.com/jm33-m0/emp3r0r/releases/tag/v1.3.10) that can easily run your exploits/tools on any Linux host
+  * Provides [**python3.9** environment](https://github.com/jm33-m0/emp3r0r/releases/tag/v1.3.10) that can easily run your exploits/tools on any Linux host
+  * [Custom Modules](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r)
 * Perfect Shell Experience via SSH
   * Compatible with any SSH client and available for Windows
 * [Bettercap](https://github.com/bettercap/bettercap)
-* [Built-in Static Bash Binary](https://github.com/jm33-m0/emp3r0r/blob/master/core/lib/data/bash.go)
 * Auto persistence via various methods
 * [Post-exploitation Tools](https://github.com/jm33-m0/emp3r0r/tree/master/core/modules/vaccine)
   * Nmap, Socat, Ncat, Bettercap, etc
@@ -71,19 +80,12 @@ In fact, emp3r0r has complete [python3.9 support](https://github.com/jm33-m0/emp
 * System Info Collect
 * File Management
   * Enables resumable downloads/uploads
-  * SFTP support: browse remote files with any SFTP client, [including your local file manager](https://github.com/jm33-m0/emp3r0r/releases/tag/v1.22.3)
+  * SFTP support: browse remote files with any SFTP client, [including your local **GUI file manager**](https://github.com/jm33-m0/emp3r0r/releases/tag/v1.22.3)
 * Log Cleaner
 * Screenshot
-* Stealth Connection
 * Anti-Antivirus
 * Internet Access Checker
 * Autoproxy
   * For semi-isolated networks
-* Reverse Proxy
-  * To bring every host online
-* All of these in HTTP2
-* Painlessly encapsulated in Shadowsocks and KCP
-* Able to encapsulate in any external proxies such as [TOR and CDNs](https://github.com/jm33-m0/emp3r0r/raw/master/img/c2transports.png)
 * [Interoperability with Metasploit/Cobalt Strike](https://github.com/jm33-m0/emp3r0r/wiki/Interoperability-with-metasploit-and-other-C2-frameworks)
-* [Custom Modules](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r)
 * and many more :)
