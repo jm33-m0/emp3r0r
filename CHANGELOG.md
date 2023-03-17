@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.24.1](https://github.com/jm33-m0/emp3r0r/compare/v1.24.0...v1.24.1) (2023-03-17)
+
+
+### Bug Fixes
+
+* `elvsh` shell for windows ([e4d97d8](https://github.com/jm33-m0/emp3r0r/commit/e4d97d8f9c5cc886efa782879377d754c2f2f911))
+* `PATH` env should contain `sbin` paths ([4036968](https://github.com/jm33-m0/emp3r0r/commit/40369682981190dad41e1080e568fd0fa1979a17))
+
 ## [1.24.0](https://github.com/jm33-m0/emp3r0r/compare/v1.23.6...v1.24.0) (2023-03-17)
 
 
