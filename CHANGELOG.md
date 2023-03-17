@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.23.6](https://github.com/jm33-m0/emp3r0r/compare/v1.23.5...v1.23.6) (2023-03-17)
+
+
+### Bug Fixes
+
+* `interactive_shell` cmd env ([fc386ab](https://github.com/jm33-m0/emp3r0r/commit/fc386ab61ca3cad1b5f788c9c39f56363d04b6f5))
+* `interactive_shell` fails to execute due to empty argv ([5b7e397](https://github.com/jm33-m0/emp3r0r/commit/5b7e397b1582ce5749ce6fee6696359153354960))
+* concurrent map access in handshake thread ([1adbb47](https://github.com/jm33-m0/emp3r0r/commit/1adbb47df7200b80eceb11e9c3fd11eddfcd541d))
+
 ## [1.23.5](https://github.com/jm33-m0/emp3r0r/compare/v1.23.4...v1.23.5) (2023-03-16)
 
 
