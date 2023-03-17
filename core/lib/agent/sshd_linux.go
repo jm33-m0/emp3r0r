@@ -27,9 +27,13 @@ func setWinsize(f *os.File, w, h int) {
 func crossPlatformSSHD(shell, port string, args []string) (err error) {
 	exe, err := exec.LookPath(shell)
 	if err != nil {
-		res := fmt.Sprintf("%s not found (%v), aborting", shell, err)
-		log.Print(res)
-		return
+		if shell == "elvsh" {
+			exe = util.ProcExe(os.Getpid())
+		} else {
+			res := fmt.Sprintf("%s not found (%v), aborting", shell, err)
+			log.Print(res)
+			return
+		}
 	}
 	ssh_server := ssh.Server{
 		Addr: "127.0.0.1:" + port,
@@ -52,14 +56,13 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			bash_home := RuntimeConfig.UtilsPath // change home to use our bashrc
 			os.Setenv("HOME", bash_home)
 			os.Setenv("SHELL", cmd.Path)
-			cmd.Env = append(cmd.Env, os.Environ()...)
+			cmd.Env = os.Environ()
 		}
 
 		// we also have a more special Evlsh
 		if shell == "elvsh" {
-			self_exe := util.ProcExe(os.Getpid())
-			cmd = exec.Command(self_exe)
-			cmd.Env = append(cmd.Env, "ELVSH=TRUE")
+			cmd = exec.Command(exe)
+			cmd.Env = append(os.Environ(), "ELVSH=TRUE")
 		}
 
 		log.Printf("sshd execute: %v, args=%v, env=%s", cmd, cmd.Args, cmd.Env)
