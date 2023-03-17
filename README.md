@@ -47,7 +47,7 @@ In fact, emp3r0r has complete [python3.9 support](https://github.com/jm33-m0/emp
   * Use [tmux](https://github.com/tmux/tmux) for window management
 * Stealth
   * Automatically changes `argv` so you won't notice it in `ps` listing
-  * [Built-in **Elvish Shell** with the same disguise as main process](https://elv.sh/)
+  * Built-in [**Elvish Shell**](https://elv.sh/) with the same disguise as main process
   * Stealth Connection
   * Reverse Proxy
   * To bring every host online
