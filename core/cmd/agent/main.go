@@ -108,7 +108,7 @@ func main() {
 	}
 
 	// PATH
-	os.Setenv("PATH", fmt.Sprintf("%s:/bin:/usr/bin:/usr/local/bin", agent.RuntimeConfig.UtilsPath))
+	os.Setenv("PATH", fmt.Sprintf("%s:/bin:/usr/bin:/usr/local/bin:/sbin:/usr/sbin:/usr/local/sbin:/snap/bin", agent.RuntimeConfig.UtilsPath))
 
 	// set HOME to correct value
 	u, err := user.Current()
