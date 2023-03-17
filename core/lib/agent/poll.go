@@ -200,7 +200,10 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 		// wait until timeout or success
 		for i := 0; i < RuntimeConfig.Timeout; i++ {
 			// if hello marked as success, return true
-			if HandShakes[hello] {
+			HandShakesMutex.RLock()
+			isSuccess := HandShakes[hello]
+			HandShakesMutex.RUnlock()
+			if isSuccess {
 				log.Printf("Hello (%s) done", hello)
 				return true
 			}
