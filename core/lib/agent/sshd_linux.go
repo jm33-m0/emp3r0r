@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/creack/pty"
 	"github.com/gliderlabs/ssh"
@@ -64,6 +65,15 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			cmd = exec.Command(exe)
 			cmd.Env = append(os.Environ(), "ELVSH=TRUE")
 		}
+
+		// remove empty arg in cmd.Args
+		var tmp_args []string
+		for _, arg := range cmd.Args {
+			if strings.TrimSpace(arg) != "" {
+				tmp_args = append(tmp_args, arg)
+			}
+		}
+		cmd.Args = tmp_args
 
 		log.Printf("sshd execute: %v, args=%v, env=%s", cmd, cmd.Args, cmd.Env)
 

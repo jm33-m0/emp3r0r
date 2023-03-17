@@ -214,13 +214,11 @@ func setCurrentTarget(cmd string) {
 			AgentShellPane = nil
 		}
 
-		// do not open shell automatically in Windows
-		if a.GOOS != "windows" {
-			CliPrintInfo("Opening Shell window")
-			err = SSHClient("elvsh", "", RuntimeConfig.SSHDPort, true)
-			if err != nil {
-				CliPrintError("SSHClient: %v", err)
-			}
+		// open a shell
+		CliPrintInfo("Opening Shell window")
+		err = SSHClient("elvsh", "", RuntimeConfig.SSHDPort, true)
+		if err != nil {
+			CliPrintError("SSHClient: %v", err)
 		}
 		CliPrintInfo("Opening SFTP window")
 		err = SSHClient("sftp", "", RuntimeConfig.SSHDPort, true)

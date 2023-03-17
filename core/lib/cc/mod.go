@@ -115,7 +115,7 @@ func UpdateOptions(modName string) (exist bool) {
 			"bash", "zsh", "sh", "python", "python3",
 			"cmd.exe", "powershell.exe",
 		}
-		shellOpt.Val = "bash"
+		shellOpt.Val = "elvsh"
 
 		argsOpt := addIfNotFound("args")
 		argsOpt.Val = ""

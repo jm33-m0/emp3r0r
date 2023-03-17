@@ -39,10 +39,8 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 			}
 		}
 	}
-	// in linux we will open a elvsh shell automatically, which can be used for SFTP
-	// in Windows it's not the same case
-	is_new_port_needed := (port == RuntimeConfig.SSHDPort && shell != "elvsh") ||
-		(is_sftp && CurrentTarget.GOOS == "windows")
+	// we will open a elvsh shell automatically, which can be used for SFTP
+	is_new_port_needed := (port == RuntimeConfig.SSHDPort && shell != "elvsh")
 
 	if !util.IsCommandExist("ssh") {
 		err = fmt.Errorf("ssh must be installed")
@@ -189,11 +187,6 @@ wait:
 	SSHShellPort[shell] = port
 	// if open in split tmux pane
 	if split {
-		if CurrentTarget.GOOS == "windows" && !is_sftp {
-			CliPrintDebug("Refuse to open shell automatically on Windows")
-			return
-		}
-
 		if is_sftp {
 			AgentSFTPPane, err = TmuxNewPane("SFTP", "v", AgentOutputPane.ID, 30, sshCmd)
 			TmuxPanes[AgentSFTPPane.ID] = AgentSFTPPane

@@ -63,9 +63,9 @@ func moduleShell() {
 	shell := Options["shell"].Val
 	args := Options["args"].Val
 	port := Options["port"].Val
-	if shell == "bash" {
+	if shell == "bash" || shell == "elvish" {
 		port = RuntimeConfig.SSHDPort
-		SSHShellPort["bash"] = port
+		SSHShellPort[shell] = port
 	}
 
 	// run
