@@ -40,6 +40,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 
 	ssh_server.Handle(func(s ssh.Session) {
 		cmd := exec.Command(exe, args...)
+		cmd.Env = os.Environ()
 
 		// we have a special bashrc and we would like to apply it
 		if shell == "bash" {
