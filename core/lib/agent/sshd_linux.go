@@ -54,6 +54,14 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			os.Setenv("SHELL", cmd.Path)
 			cmd.Env = append(cmd.Env, os.Environ()...)
 		}
+
+		// we also have a more special Evlsh
+		if shell == "elvsh" {
+			self_exe := util.ProcExe(os.Getpid())
+			cmd = exec.Command(self_exe)
+			cmd.Env = append(cmd.Env, "ELVSH=TRUE")
+		}
+
 		log.Printf("sshd execute: %v, args=%v, env=%s", cmd, cmd.Args, cmd.Env)
 
 		ptyReq, winCh, isPTY := s.Pty()

