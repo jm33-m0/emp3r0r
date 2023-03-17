@@ -77,9 +77,6 @@ func CliMain() {
 		readline.PcItem("get",
 			readline.PcItemDynamic(listRemoteDir())),
 
-		readline.PcItem("vim",
-			readline.PcItemDynamic(listRemoteDir())),
-
 		readline.PcItem("put",
 			readline.PcItemDynamic(listLocalFiles("./"))),
 
@@ -100,7 +97,6 @@ func CliMain() {
 		if cmd == "set" ||
 			cmd == "use" ||
 			cmd == "get" ||
-			cmd == "vim" ||
 			cmd == "put" ||
 			cmd == "cp" ||
 			cmd == "mkdir" ||

