@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.24.0](https://github.com/jm33-m0/emp3r0r/compare/v1.23.6...v1.24.0) (2023-03-17)
+
+
+### Features
+
+* add elvsh as default shell ([12eba72](https://github.com/jm33-m0/emp3r0r/commit/12eba72ec21d7bb3b88b8b924a00731705d5ea51))
+
+
+### Bug Fixes
+
+* elvsh not working in ssh ([18773eb](https://github.com/jm33-m0/emp3r0r/commit/18773eb290734939e186e2505a61eca07d511d70))
+* elvsh should reuse sftp port ([8d8c99d](https://github.com/jm33-m0/emp3r0r/commit/8d8c99d418484cba4e1da2c83d59c06bddb53b8b))
+* elvsh: disable daemon ([96e5293](https://github.com/jm33-m0/emp3r0r/commit/96e52934d2045f0ea8460539915e65040c088baf))
+* remove `vim` command in favor of `file_manager` ([6164d95](https://github.com/jm33-m0/emp3r0r/commit/6164d9599f6a750ae4c459e32898644ccd8831d7))
+
 ## [1.23.6](https://github.com/jm33-m0/emp3r0r/compare/v1.23.5...v1.23.6) (2023-03-17)
 
 
