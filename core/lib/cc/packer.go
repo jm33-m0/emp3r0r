@@ -64,21 +64,20 @@ func Packer(inputELF string) (err error) {
 		return fmt.Errorf("write to packed file %s: %v", packed_file, err)
 	}
 
-	// upx
+	// done
+	CliPrintSuccess("%s has been packed as %s", inputELF, packed_file)
+	return
+}
+
+func upx(bin_to_pack, outfile string) (err error) {
 	if util.IsCommandExist("upx") {
-		CliPrintInfo("Using upx to further compress the executable %s", packed_file)
-		cmd := exec.Command("upx", "-9", packed_file)
+		CliPrintInfo("Using UPX to compress the executable %s", bin_to_pack)
+		cmd := exec.Command("upx", "-9", bin_to_pack, "-o", outfile)
 		out, err := cmd.CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("Packer: upx: %s (%v)", out, err)
+			return fmt.Errorf("UPX: %s (%v)", out, err)
 		}
 	}
 
-	// remove "UPX" strings
-	util.ReplaceBytesInFile(packed_file, []byte("UPX"), util.RandBytes(3))
-	util.ReplaceBytesInFile(packed_file, []byte("upx"), util.RandBytes(3))
-
-	// done
-	CliPrintSuccess("%s has been packed as %s", inputELF, packed_file)
 	return
 }

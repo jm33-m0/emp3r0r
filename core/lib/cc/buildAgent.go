@@ -94,11 +94,27 @@ func GenAgent() {
 	CliPrintSuccess("Generated %s from %s and %s, you can run %s on arbitrary target",
 		outfile, stubFile, EmpConfigFile, outfile)
 
-	// pack it accordingly
-	// currently only Linux is supported
-	// if is_linux {
-	// 	Packer(outfile)
-	// }
+	// pack it with upx
+	packed_file := fmt.Sprintf("%s.packed", outfile)
+	err = upx(outfile, packed_file)
+	if err != nil {
+		CliPrintWarning("UPX: %v", err)
+		return
+	}
+
+	// append magic_str so it will still extract config data
+	packed_bin_data, err := os.ReadFile(packed_file)
+	if err != nil {
+		CliPrintError("Failed to read UPX packed file: %v", err)
+		return
+	}
+	toWrite = append(packed_bin_data, sep...)
+	toWrite = append(toWrite, encryptedJSONBytes...)
+	toWrite = append(toWrite, sep...)
+	err = os.WriteFile(packed_file, toWrite, 0755)
+	if err != nil {
+		CliPrintError("Failed to save final agent binary: %v", err)
+	}
 }
 
 // PackAgentBinary pack agent ELF binary with Packer()
