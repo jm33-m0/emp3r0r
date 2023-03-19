@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.24.2](https://github.com/jm33-m0/emp3r0r/compare/v1.24.1...v1.24.2) (2023-03-19)
+
+
+### Bug Fixes
+
+* agent won't run when packed by upx ([4d35ef9](https://github.com/jm33-m0/emp3r0r/commit/4d35ef9d0fef31aa2fbadbffb426319c43618997))
+
 ## [1.24.1](https://github.com/jm33-m0/emp3r0r/compare/v1.24.0...v1.24.1) (2023-03-17)
 
 
