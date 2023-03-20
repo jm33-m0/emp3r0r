@@ -49,8 +49,6 @@ In fact, emp3r0r has complete [python3.9 support](https://github.com/jm33-m0/emp
   * Automatically changes `argv` so you won't notice it in `ps` listing
   * Built-in [**Elvish Shell**](https://elv.sh/) with the same disguise as main process
   * Stealth Connection
-  * Reverse Proxy
-  * To bring every host online
   * All of these in HTTP2
   * Painlessly encapsulated in Shadowsocks and KCP
   * Able to encapsulate in any external proxies such as [**TOR** and **CDN**s](https://github.com/jm33-m0/emp3r0r/raw/master/img/c2transports.png)
@@ -87,5 +85,7 @@ In fact, emp3r0r has complete [python3.9 support](https://github.com/jm33-m0/emp
 * Internet Access Checker
 * Autoproxy
   * For semi-isolated networks
+* Reverse Proxy
+  * To bring every host online
 * [Interoperability with Metasploit/Cobalt Strike](https://github.com/jm33-m0/emp3r0r/wiki/Interoperability-with-metasploit-and-other-C2-frameworks)
 * and many more :)
