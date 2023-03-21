@@ -402,7 +402,7 @@ func CliPrintError(format string, a ...interface{}) {
 }
 
 // CliAsk prompt for an answer from user
-func CliAsk(prompt string) (answer string) {
+func CliAsk(prompt string, allow_empty bool) (answer string) {
 	// if there's no way to show prompt
 	if IsAPIEnabled {
 		return "No terminal available"
@@ -424,7 +424,7 @@ func CliAsk(prompt string) (answer string) {
 			CliPrintError("CliAsk: %v", err)
 		}
 		answer = strings.TrimSpace(answer)
-		if answer != "" {
+		if answer != "" && !allow_empty {
 			break
 		}
 	}

