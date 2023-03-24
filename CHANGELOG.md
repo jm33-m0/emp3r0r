@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.0](https://github.com/jm33-m0/emp3r0r/compare/v1.24.2...v1.25.0) (2023-03-24)
+
+
+### Features
+
+* implement basic stager (linux/bash) ([9f4f9ba](https://github.com/jm33-m0/emp3r0r/commit/9f4f9baed0e85096c9950a7fa219ab3eadeb0fb9))
+
 ## [1.24.2](https://github.com/jm33-m0/emp3r0r/compare/v1.24.1...v1.24.2) (2023-03-19)
 
 
