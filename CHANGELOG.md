@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.25.1](https://github.com/jm33-m0/emp3r0r/compare/v1.25.0...v1.25.1) (2023-03-24)
+
+
+### Bug Fixes
+
+* `linux/bash` stager serving: incorrect path ([0f1b33f](https://github.com/jm33-m0/emp3r0r/commit/0f1b33fb1ebdd4d416e2d0759f407ac8cfeba72f))
+* linux agent proc renaming when using `linux/bash` stager ([575777f](https://github.com/jm33-m0/emp3r0r/commit/575777f1a51c22492fd61b5307680f59bf218b45))
+
 ## [1.25.0](https://github.com/jm33-m0/emp3r0r/compare/v1.24.2...v1.25.0) (2023-03-24)
 
 
