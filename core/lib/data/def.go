@@ -88,6 +88,7 @@ const (
 	ModGET_ROOT     = "get_root"
 	ModREVERSEPROXY = "reverse_proxy"
 	ModGDB          = "gdbserver"
+	ModStager       = "stager"
 )
 
 // PersistMethods CC calls one of these methods to get persistence, or all of them at once
@@ -114,6 +115,7 @@ var ModuleComments = map[string]string{
 	ModGET_ROOT:     "Try some built-in LPE exploits",
 	ModREVERSEPROXY: "Manually proxy agents who are unable to use our forward proxy",
 	ModGDB:          "Remote gdbserver, debug anything",
+	ModStager:       "Generate a stager for staged payload delivering",
 }
 
 // Module help for options, does not include every module since not all modules need args
@@ -148,6 +150,10 @@ var ModuleHelp = map[string]map[string]string{
 	},
 	ModREVERSEPROXY: {
 		"addr": "Target host to proxy, we will connect to it and proxy it out",
+	},
+	ModStager: {
+		"type":       "Stager format, eg. bash script",
+		"agent_path": "Path to the agent binary that will be downloaded and executed on target hosts",
 	},
 }
 

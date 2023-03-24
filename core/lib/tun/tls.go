@@ -65,3 +65,9 @@ func FatalError(format string, a ...interface{}) {
 	errorColor := color.New(color.Bold, color.FgHiRed)
 	log.Fatal(errorColor.Sprintf(format, a...))
 }
+
+// Info print log in blue
+func Info(format string, a ...interface{}) {
+	infoColor := color.New(color.FgHiBlue)
+	log.Print(infoColor.Sprintf(format, a...))
+}

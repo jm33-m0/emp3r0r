@@ -1,6 +1,7 @@
 package cc
 
 import (
+	"os"
 	"strconv"
 	"strings"
 
@@ -53,6 +54,7 @@ var (
 		emp3r0r_data.ModINJECTOR:     moduleInjector,
 		emp3r0r_data.ModREVERSEPROXY: moduleReverseProxy,
 		emp3r0r_data.ModGDB:          moduleGDB,
+		emp3r0r_data.ModStager:       modStager,
 	}
 )
 
@@ -181,6 +183,26 @@ func UpdateOptions(modName string) (exist bool) {
 		currentOpt.Vals = methods
 		currentOpt.Val = "all"
 
+	case modName == emp3r0r_data.ModStager:
+		stager_type_opt := addIfNotFound("type")
+		stager_type_opt.Val = Stagers[0]
+		stager_type_opt.Vals = Stagers
+
+		agentpath_type_opt := addIfNotFound("agent_path")
+		agentpath_type_opt.Val = "/tmp/emp3r0r"
+		files, err := os.ReadDir(EmpWorkSpace)
+		if err != nil {
+			CliPrintWarning("Listing emp3r0r work directory: %v", err)
+		}
+		var listing []string
+		for _, f := range files {
+			if f.IsDir() {
+				continue
+			}
+			listing = append(listing, f.Name())
+		}
+		agentpath_type_opt.Vals = listing
+
 	default:
 		// custom modules
 		modconfig := ModuleConfigs[modName]
@@ -203,6 +225,10 @@ func ModuleRun() {
 				return
 			}
 			ModuleHelpers[emp3r0r_data.ModCMD_EXEC]()
+			return
+		}
+		if CurrentMod == emp3r0r_data.ModStager {
+			ModuleHelpers[emp3r0r_data.ModStager]()
 			return
 		}
 		CliPrintError("Target not specified")

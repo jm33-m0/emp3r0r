@@ -611,6 +611,8 @@ func listValChoices() func(string) []string {
 			ret := append(Options["listen_port"].Vals, Options["to"].Vals...)
 			ret = append(ret, Options["switch"].Vals...)
 			return ret
+		case emp3r0r_data.ModStager:
+			return append(Options["type"].Vals, Options["agent_path"].Vals...)
 		}
 
 		return nil

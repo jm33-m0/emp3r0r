@@ -115,8 +115,6 @@ func GenAgent() {
 	if err != nil {
 		CliPrintError("Failed to save final agent binary: %v", err)
 	}
-
-	GenStager(packed_file)
 }
 
 // PackAgentBinary pack agent ELF binary with Packer()
@@ -334,6 +332,7 @@ func InitConfigFile(cc_host string) (err error) {
 	RuntimeConfig.SSHDPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.ShadowsocksPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.KCPPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
+	RuntimeConfig.HTTPListenerPort = fmt.Sprintf("%v", util.RandInt(1026, 65534))
 	RuntimeConfig.Timeout = util.RandInt(10000, 20000)
 
 	// random strings
