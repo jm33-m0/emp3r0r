@@ -44,13 +44,13 @@ func SHA256SumRaw(data []byte) string {
 	return fmt.Sprintf("%x", sum)
 }
 
-// Base64Encode encode a string with base64
-func Base64Encode(text string) string {
+// Base64URLEncode encode a string with base64
+func Base64URLEncode(text string) string {
 	return base64.URLEncoding.EncodeToString([]byte(text))
 }
 
-// Base64Decode decode a base64 encoded string (to []byte)
-func Base64Decode(text string) []byte {
+// Base64URLDecode decode a base64 encoded string (to []byte)
+func Base64URLDecode(text string) []byte {
 	dec, err := base64.URLEncoding.DecodeString(text)
 	if err != nil {
 		log.Printf("Base64Decode: %v", err)

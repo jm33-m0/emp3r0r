@@ -130,3 +130,12 @@ func GenAESKey(seed string) []byte {
 	md5sum := MD5Sum(seed)
 	return []byte(md5sum)[:32]
 }
+
+// XOREncrypt
+func XOREncrypt(key []byte, plaintext []byte) []byte {
+	ciphertext := make([]byte, len(plaintext))
+	for i := 0; i < len(plaintext); i++ {
+		ciphertext[i] = plaintext[i] ^ key[i%len(key)]
+	}
+	return ciphertext
+}
