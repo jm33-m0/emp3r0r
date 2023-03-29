@@ -412,7 +412,7 @@ func CliAsk(prompt string, allow_empty bool) (answer string) {
 	EmpReadLine.Config.EOFPrompt = ""
 	EmpReadLine.Config.InterruptPrompt = ""
 
-	defer EmpReadLine.SetPrompt(EmpPrompt)
+	defer SetDynamicPrompt()
 
 	var err error
 	for {
@@ -443,7 +443,7 @@ func CliYesNo(prompt string) bool {
 	EmpReadLine.Config.EOFPrompt = ""
 	EmpReadLine.Config.InterruptPrompt = ""
 
-	defer EmpReadLine.SetPrompt(EmpPrompt)
+	defer SetDynamicPrompt()
 
 	answer, err := EmpReadLine.Readline()
 	if err != nil {
