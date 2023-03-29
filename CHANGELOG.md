@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.25.2](https://github.com/jm33-m0/emp3r0r/compare/v1.25.1...v1.25.2) (2023-03-29)
+
+
+### Bug Fixes
+
+* cleanup work for stager, python2, obfuscate agent binary ([e91f583](https://github.com/jm33-m0/emp3r0r/commit/e91f5832007be6c5c1cc391aa52e172f652fdfc6))
+* dynamic prompt string not available after `CliAsk` or `CliYesNo` ([85e6eba](https://github.com/jm33-m0/emp3r0r/commit/85e6ebac773f692bc91cfad7111ff6c575098475))
+* write back agent binary so elvsh can still start ([9966d53](https://github.com/jm33-m0/emp3r0r/commit/9966d531e4373fe11a5a3525892588a3159748ca))
+
 ## [1.25.1](https://github.com/jm33-m0/emp3r0r/compare/v1.25.0...v1.25.1) (2023-03-24)
 
 
