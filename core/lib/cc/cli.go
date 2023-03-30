@@ -8,6 +8,8 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 
@@ -754,4 +756,36 @@ func setDebugLevel(cmd string) {
 	} else {
 		log.SetFlags(log.Ldate | log.Ltime | log.LstdFlags)
 	}
+}
+
+// CopyToClipboard copy data to clipboard using xsel -b
+func CopyToClipboard(data []byte) {
+	exe := "xsel"
+	cmd := exec.Command("xsel", "-bi")
+	if os.Getenv("WAYLAND_DISPLAY") != "" {
+		exe = "wl-copy"
+		cmd = exec.Command("wl-copy")
+	} else if os.Getenv("DISPLAY") == "" {
+		CliPrintWarning("Neither Wayland nor X11 is running, CopyToClipboard will abort")
+		return
+	}
+	if !util.IsCommandExist(exe) {
+		CliPrintWarning("%s not installed", exe)
+		return
+	}
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		CliPrintWarning("CopyToClipboard read stdin: %v", err)
+		return
+	}
+	go func() {
+		defer stdin.Close()
+		_, _ = stdin.Write(data)
+	}()
+
+	err = cmd.Run()
+	if err != nil {
+		CliPrintWarning("CopyToClipboard: %v", err)
+	}
+	CliPrintInfo("Copied to clipboard")
 }

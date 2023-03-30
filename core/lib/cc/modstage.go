@@ -7,19 +7,20 @@ import (
 	"os"
 	"strings"
 
+	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 )
 
 var Stagers = []string{
+	// for Linux
+	"linux/bash",
+
 	// generic
 	"java",
 	"php",
 	"python",
 	"python3",
 	"perl",
-
-	// for Linux
-	"linux/bash",
 
 	// for Windows
 	"windows/powershell",
@@ -54,7 +55,9 @@ func modStager() {
 			CliPrintError("Failed to save stager data: %v", err)
 			return
 		}
-		CliPrintSuccess("Stager saved as %s:\n%s", stager_filename, stager_data)
+		CliPrintSuccess("Stager saved as %s:\n%s",
+			stager_filename, color.MagentaString("%s", stager_data))
+		CopyToClipboard(stager_data)
 
 		// base64 encode agent binary
 		agent_bin_data, err := os.ReadFile(agent_bin_path)
@@ -80,7 +83,9 @@ func modStager() {
 			CliPrintError("Failed to save stager data: %v", err)
 			return
 		} else {
-			CliPrintSuccess("Stager saved as %s:\n%s", stager_filename, stager_data)
+			CliPrintSuccess("Stager saved as %s:\n%s",
+				stager_filename, color.MagentaString("%s", stager_data))
+			CopyToClipboard(stager_data)
 
 			// serve agent binary
 			tun.ServeFileHTTP(enc_agent_bin_path, RuntimeConfig.HTTPListenerPort, tun.Stager_Ctx, tun.Stager_Cancel)
