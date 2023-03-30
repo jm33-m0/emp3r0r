@@ -124,7 +124,7 @@ func GetHostID(fallbackUUID string) (id string) {
 	}
 	name = fmt.Sprintf("%s\\%s", name, GetUsername()) // hostname\\username
 	id = fmt.Sprintf("%s_%s-agent", name, shortID)
-	productInfo, err := ghw.Product()
+	productInfo, err := ghw.Product(ghw.WithDisableWarnings())
 	if err != nil {
 		log.Printf("GetHostID: %v", err)
 		return
