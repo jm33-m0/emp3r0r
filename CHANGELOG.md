@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.25.4](https://github.com/jm33-m0/emp3r0r/compare/v1.25.3...v1.25.4) (2023-03-30)
+
+
+### Bug Fixes
+
+* disable agent logging by default ([687230c](https://github.com/jm33-m0/emp3r0r/commit/687230c260b958c05e214f6452ccec6dbd00dc77))
+* run modules without specifying target ([8630a24](https://github.com/jm33-m0/emp3r0r/commit/8630a24adce278853cff2a01657c19c37dfb4c58))
+* stager content should be copied to clipboard automatically when possible ([0425501](https://github.com/jm33-m0/emp3r0r/commit/04255015505c7e8c17b84c92758b0d95db6a985f))
+
 ## [1.25.3](https://github.com/jm33-m0/emp3r0r/compare/v1.25.2...v1.25.3) (2023-03-30)
 
 
