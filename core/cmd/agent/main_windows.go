@@ -36,7 +36,7 @@ func main() {
 	cdnProxy := flag.String("cdnproxy", "", "CDN proxy for emp3r0r agent's C2 communication")
 	doh := flag.String("doh", "", "DNS over HTTPS server for CDN proxy's DNS requests")
 	replace := flag.Bool("replace", false, "Replace existing agent process")
-	silent := flag.Bool("silent", false, "Suppress output")
+	verbose := flag.Bool("verbose", false, "Enable logging")
 	daemon := flag.Bool("daemon", false, "Daemonize")
 	version := flag.Bool("version", false, "Show version info")
 	flag.Parse()
@@ -49,6 +49,14 @@ func main() {
 			prog.Composite(
 				&buildinfo.Program{}, &lsp.Program{},
 				&shell.Program{})))
+	}
+
+	// silent switch
+	log.SetOutput(ioutil.Discard)
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
+	if *verbose {
+		fmt.Println("emp3r0r agent has started")
+		log.SetOutput(os.Stderr)
 	}
 
 	// applyRuntimeConfig
@@ -66,14 +74,6 @@ func main() {
 
 	// don't be hasty
 	time.Sleep(time.Duration(util.RandInt(3, 10)) * time.Second)
-
-	// silent switch
-	log.SetOutput(ioutil.Discard)
-	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
-	if !*silent {
-		fmt.Println("emp3r0r agent has started")
-		log.SetOutput(os.Stderr)
-	}
 
 	// PATH
 	os.Setenv("PATH", fmt.Sprintf(`%s;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Windows\System32\OpenSSH\`, agent.RuntimeConfig.UtilsPath))
