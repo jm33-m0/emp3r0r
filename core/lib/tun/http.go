@@ -1,18 +1,33 @@
 package tun
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 )
 
-func ServeFileHTTP(file_path string, port string) (err error) {
-	server := func(w http.ResponseWriter, r *http.Request) {
+var (
+	Stager_HTTP_Server http.Server
+	Stager_Ctx         context.Context
+	Stager_Cancel      context.CancelFunc
+)
+
+func ServeFileHTTP(file_path, port string, ctx context.Context, cancel context.CancelFunc) (err error) {
+	file_handler := func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, file_path)
 	}
+	Stager_HTTP_Server = http.Server{
+		Addr:    fmt.Sprintf(":%s", port),
+		Handler: http.HandlerFunc(file_handler),
+	}
 
-	urlpath := "/jquery.js.gz"
-	http.HandleFunc(urlpath, server)
-	Info("Serving %s on http://localhost:%s%s Please reverse proxy this URL", file_path, port, urlpath)
+	go func() {
+		LogInfo("Serving %s on http://localhost:%s Please reverse proxy this URL", file_path, port)
+		err = Stager_HTTP_Server.ListenAndServe()
+		if err == http.ErrServerClosed {
+			LogInfo("Stager HTTP server is shutdown")
+		}
+	}()
 
-	return http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
+	return
 }

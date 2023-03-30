@@ -1,6 +1,7 @@
 package cc
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"os"
@@ -33,6 +34,17 @@ func modStager() {
 	enc_agent_bin_path := fmt.Sprintf("%s.enc", agent_bin_path)
 	var enc_agent_bin_data []byte
 
+	// stop stager HTTP server when needed
+	if tun.Stager_Ctx != nil {
+		CliPrintInfo("Looks like stager HTTP server is already running on port %s, we will shut it down", RuntimeConfig.HTTPListenerPort)
+		tun.Stager_Cancel()
+		// shutdown server if needed
+		if err = tun.Stager_HTTP_Server.Shutdown(tun.Stager_Ctx); err != nil {
+			CliPrintError("Error shutting down stager HTTP server: %v", err)
+		}
+	}
+	tun.Stager_Ctx, tun.Stager_Cancel = context.WithCancel(context.Background())
+
 	switch chosen_stager {
 	case "linux/bash":
 		url := CliAsk("Give me an HTTP download URL for agent binary (stager will try downloading from this URL): ", false)
@@ -56,7 +68,7 @@ func modStager() {
 			CliPrintError("Write base64 encoded agent binary: %v", err)
 			return
 		} else {
-			go tun.ServeFileHTTP(enc_agent_bin_path, RuntimeConfig.HTTPListenerPort)
+			tun.ServeFileHTTP(enc_agent_bin_path, RuntimeConfig.HTTPListenerPort, tun.Stager_Ctx, tun.Stager_Cancel)
 		}
 
 		// serve agent binary
@@ -71,7 +83,7 @@ func modStager() {
 			CliPrintSuccess("Stager saved as %s:\n%s", stager_filename, stager_data)
 
 			// serve agent binary
-			go tun.ServeFileHTTP(enc_agent_bin_path, RuntimeConfig.HTTPListenerPort)
+			tun.ServeFileHTTP(enc_agent_bin_path, RuntimeConfig.HTTPListenerPort, tun.Stager_Ctx, tun.Stager_Cancel)
 		}
 
 	case "python3":

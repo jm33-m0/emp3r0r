@@ -29,7 +29,7 @@ func EmpHTTPClient(proxyServer string) *http.Client {
 
 	// add our cert
 	if ok := rootCAs.AppendCertsFromPEM(CACrt); !ok {
-		FatalError("No CA certs appended")
+		LogFatalError("No CA certs appended")
 	}
 
 	// Trust the augmented cert pool in our TLS client
@@ -48,26 +48,32 @@ func EmpHTTPClient(proxyServer string) *http.Client {
 	if proxyServer != "" {
 		proxyUrl, err := url.Parse(proxyServer)
 		if err != nil {
-			FatalError("Invalid proxy: %v", err)
+			LogFatalError("Invalid proxy: %v", err)
 		}
 		tr.Proxy = http.ProxyURL(proxyUrl)
 	}
 	err := http2.ConfigureTransport(tr) // upgrade to HTTP2, while keeping http.Transport
 	if err != nil {
-		FatalError("Cannot switch to HTTP2: %v", err)
+		LogFatalError("Cannot switch to HTTP2: %v", err)
 	}
 
 	return &http.Client{Transport: tr}
 }
 
-// FatalError print log in red, and exit
-func FatalError(format string, a ...interface{}) {
+// LogFatalError print log in red, and exit
+func LogFatalError(format string, a ...interface{}) {
 	errorColor := color.New(color.Bold, color.FgHiRed)
 	log.Fatal(errorColor.Sprintf(format, a...))
 }
 
-// Info print log in blue
-func Info(format string, a ...interface{}) {
+// LogInfo print log in blue
+func LogInfo(format string, a ...interface{}) {
 	infoColor := color.New(color.FgHiBlue)
 	log.Print(infoColor.Sprintf(format, a...))
+}
+
+// LogError print log in red, and exit
+func LogError(format string, a ...interface{}) {
+	errorColor := color.New(color.Bold, color.FgHiRed)
+	log.Printf(errorColor.Sprintf(format, a...))
 }
