@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.25.3](https://github.com/jm33-m0/emp3r0r/compare/v1.25.2...v1.25.3) (2023-03-30)
+
+
+### Bug Fixes
+
+* existing stager HTTP server should shutdown gracefully when a new stager is requested ([54005d8](https://github.com/jm33-m0/emp3r0r/commit/54005d866dd53e85c799ce9c0008dba1b34e568e))
+* python stager not working and not secure ([4962cd8](https://github.com/jm33-m0/emp3r0r/commit/4962cd872a27fbd1dedb5484ec9d7b697d398241))
+
 ## [1.25.2](https://github.com/jm33-m0/emp3r0r/compare/v1.25.1...v1.25.2) (2023-03-29)
 
 
