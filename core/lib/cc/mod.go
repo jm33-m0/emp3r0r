@@ -218,19 +218,19 @@ func UpdateOptions(modName string) (exist bool) {
 
 // ModuleRun run current module
 func ModuleRun() {
+	if CurrentMod == emp3r0r_data.ModCMD_EXEC {
+		if !CliYesNo("Run on all targets") {
+			CliPrintError("Target not specified")
+			return
+		}
+		ModuleHelpers[emp3r0r_data.ModCMD_EXEC]()
+		return
+	}
+	if CurrentMod == emp3r0r_data.ModStager {
+		ModuleHelpers[emp3r0r_data.ModStager]()
+		return
+	}
 	if CurrentTarget == nil {
-		if CurrentMod == emp3r0r_data.ModCMD_EXEC {
-			if !CliYesNo("Run on all targets") {
-				CliPrintError("Target not specified")
-				return
-			}
-			ModuleHelpers[emp3r0r_data.ModCMD_EXEC]()
-			return
-		}
-		if CurrentMod == emp3r0r_data.ModStager {
-			ModuleHelpers[emp3r0r_data.ModStager]()
-			return
-		}
 		CliPrintError("Target not specified")
 		return
 	}
