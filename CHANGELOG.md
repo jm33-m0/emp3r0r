@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.25.5](https://github.com/jm33-m0/emp3r0r/compare/v1.25.4...v1.25.5) (2023-03-31)
+
+
+### Bug Fixes
+
+* disable sysinfo warnings ([e7e07a2](https://github.com/jm33-m0/emp3r0r/commit/e7e07a2c86fcb84c500b0575f8551bf0ee907d88))
+* log requests to stager HTTP server ([787344d](https://github.com/jm33-m0/emp3r0r/commit/787344ddf4f14a222f8437b60b08572285bf0be4))
+* no need to remove in python stager ([09c1c03](https://github.com/jm33-m0/emp3r0r/commit/09c1c03f464961673d3a06ab82e16c5491fe8144))
+* unable to read mac addr in kvm machines (virtio NIC) ([58ed35a](https://github.com/jm33-m0/emp3r0r/commit/58ed35a412a6357d949963333ae332584d871ea1))
+
 ## [1.25.4](https://github.com/jm33-m0/emp3r0r/compare/v1.25.3...v1.25.4) (2023-03-30)
 
 
