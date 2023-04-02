@@ -233,8 +233,14 @@ func PromptForConfig(isAgent bool) (err error) {
 		if err != nil {
 			return fmt.Errorf("GenAgent: failed to generate certs: %v", err)
 		}
-		CliPrintWarning("You will need to restart emp3r0r C2 server to apply name '%s'",
-			RuntimeConfig.CCHost)
+		err = EmpTLSServer.Shutdown(EmpTLSServerCtx)
+		if err != nil {
+			CliPrintError("%v. You will need to restart emp3r0r C2 server to apply name '%s'",
+				err, RuntimeConfig.CCHost)
+		} else {
+			CliPrintWarning("Restarting C2 TLS service at port %s to apply new server cert", RuntimeConfig.CCPort)
+			go TLSServer()
+		}
 	}
 
 	// if building CC, we can safely ignore varibles below
