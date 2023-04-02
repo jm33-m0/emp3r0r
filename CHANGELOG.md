@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.6](https://github.com/jm33-m0/emp3r0r/compare/v1.25.5...v1.25.6) (2023-04-02)
+
+
+### Bug Fixes
+
+* c2 server no longer needs to be manually restarted when new c2 name is added ([8d9a81b](https://github.com/jm33-m0/emp3r0r/commit/8d9a81b8c7caebe44530f950e53182a353796955))
+
 ## [1.25.5](https://github.com/jm33-m0/emp3r0r/compare/v1.25.4...v1.25.5) (2023-03-31)
 
 
