@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.25.7](https://github.com/jm33-m0/emp3r0r/compare/v1.25.6...v1.25.7) (2023-04-03)
+
+
+### Bug Fixes
+
+* disable console resizing for windows due to bugs ([19e7a88](https://github.com/jm33-m0/emp3r0r/commit/19e7a887e9ae91c1690e895f7cfcab184afbad76))
+* improve file downloading feature ([2ec7f02](https://github.com/jm33-m0/emp3r0r/commit/2ec7f0233868f181dbd819bd91323934475e4039))
+
 ## [1.25.6](https://github.com/jm33-m0/emp3r0r/compare/v1.25.5...v1.25.6) (2023-04-02)
 
 
