@@ -201,7 +201,7 @@ func setCurrentTarget(cmd string) {
 			CliPrintInfo("Updating sftp window")
 			err = AgentSFTPPane.KillPane()
 			if err != nil {
-				CliPrintInfo("Updating sftp window: %v", err)
+				CliPrintWarning("Updating sftp window: %v", err)
 			}
 			AgentSFTPPane = nil
 		}
@@ -209,7 +209,7 @@ func setCurrentTarget(cmd string) {
 			CliPrintInfo("Updating shell window")
 			err = AgentShellPane.KillPane()
 			if err != nil {
-				CliPrintInfo("Updating shell window: %v", err)
+				CliPrintWarning("Updating shell window: %v", err)
 			}
 			AgentShellPane = nil
 		}

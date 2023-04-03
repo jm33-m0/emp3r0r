@@ -30,5 +30,5 @@ func moduleInjector() {
 		CliPrintError("Could not send command to agent: %v", err)
 		return
 	}
-	CliPrintInfo("Please wait...")
+	CliMsg("Please wait...")
 }

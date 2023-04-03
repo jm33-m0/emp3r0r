@@ -267,11 +267,15 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 
 	// log progress instead of showing the actual progressbar
 	go func() {
-		for state := bar.State(); state.CurrentPercent < 1; time.Sleep(time.Second) {
+		for state := bar.State(); nowSize/targetSize < 1; time.Sleep(5 * time.Second) {
 			state = bar.State()
-			CliPrintInfo("%.2f%% downloaded at %.2fKB/s, %.2fs passed, %.2fs left",
-				state.CurrentPercent*100, state.KBsPerSecond, state.SecondsSince, state.SecondsLeft)
+			CliPrintInfo("%.2f%% (%d of %d bytes) downloaded at %.2fKB/s, %.2fs passed, %.2fs left",
+				state.CurrentPercent*100, nowSize, targetSize, state.KBsPerSecond, state.SecondsSince, state.SecondsLeft)
 		}
+		// now we should be reaching at 100%
+		state := bar.State()
+		CliPrintInfo("%.2f%% (%d of %d bytes) downloaded at %.2fKB/s, %.2fs passed, %.2fs left",
+			state.CurrentPercent*100, nowSize, targetSize, state.KBsPerSecond, state.SecondsSince, state.SecondsLeft)
 	}()
 
 	// on exit
@@ -312,11 +316,12 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 			CliPrintError("Downloaded (%d of %d bytes), WTF?", nowSize, targetSize)
 			return
 		}
-		CliPrintWarning("Incomplete download (%d of %d bytes), will continue if you run GET again", nowSize, targetSize)
+		CliPrintWarning("Incomplete download at %.2f%% (%d of %d bytes), will continue if you run GET again",
+			float64(nowSize)/float64(targetSize), nowSize, targetSize)
 	}()
 
 	// read filedata
-	for sh.H2x.Ctx.Err() == nil {
+	for sh.H2x.Ctx.Err() == nil && nowSize/targetSize < 1 {
 		data := make([]byte, sh.BufSize)
 		n, err := sh.H2x.Conn.Read(data)
 		if err != nil {
@@ -328,14 +333,15 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 		}
 
 		// write the file
-		_, err = f.Write(data)
+		n, err = f.Write(data)
 		if err != nil {
 			CliPrintError("ftpHandler failed to save file: %v", err)
 			return
 		}
 
 		// progress
-		bar.Add(sh.BufSize)
+		nowSize += int64(n)
+		bar.Add64(int64(n))
 	}
 }
 

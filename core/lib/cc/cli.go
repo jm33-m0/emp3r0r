@@ -569,7 +569,7 @@ func CliPrettyPrint(header1, header2 string, map2write *map[string]string) {
 	table.Render()
 	out := tableString.String()
 	AdaptiveTable(out)
-	CliPrintInfo("\n%s", out)
+	CliMsg("\n%s", out)
 }
 
 // encoded logo of emp3r0r

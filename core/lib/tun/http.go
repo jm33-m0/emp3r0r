@@ -14,7 +14,7 @@ var (
 
 func ServeFileHTTP(file_path, port string, ctx context.Context, cancel context.CancelFunc) (err error) {
 	file_handler := func(w http.ResponseWriter, r *http.Request) {
-		LogInfo("Got request from %s for %s", r.RemoteAddr, r.URL)
+		LogInfo("Got stager request from %s for %s", r.RemoteAddr, r.URL)
 		http.ServeFile(w, r, file_path)
 	}
 	Stager_HTTP_Server = http.Server{

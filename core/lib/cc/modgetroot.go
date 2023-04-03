@@ -48,5 +48,5 @@ func moduleGetRoot() {
 		CliPrintError("SendCmd: %v", err)
 		return
 	}
-	CliPrintInfo("Please wait for agent's response...")
+	CliMsg("Please wait for agent's response...")
 }

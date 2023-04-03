@@ -181,7 +181,7 @@ func PromptForConfig(isAgent bool) (err error) {
 		if CliYesNo(
 			fmt.Sprintf("Use cached %s (%s)",
 				strconv.Quote(config_key), val)) {
-			CliPrintInfo("Using cached '%s' for %s", val, strconv.Quote(config_key))
+			CliMsg("Using cached '%s' for %s", val, strconv.Quote(config_key))
 			return
 		}
 		CliPrintInfo("You have chosen NO")
@@ -191,7 +191,7 @@ func PromptForConfig(isAgent bool) (err error) {
 	ask := func(prompt, config_key string) (answer interface{}) {
 		val, err := read_from_cached(config_key, false)
 		if err != nil {
-			CliPrintInfo("Read from cached %s: %v", EmpConfigFile, err)
+			CliPrintWarning("Read from cached %s: %v", EmpConfigFile, err)
 		} else if val != nil {
 			answer = val
 			return
