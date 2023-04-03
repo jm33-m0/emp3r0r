@@ -6,6 +6,7 @@ package agent
 import (
 	"fmt"
 	"log"
+	"syscall"
 	"unsafe"
 
 	"github.com/gonutz/w32/v2"
@@ -18,6 +19,10 @@ var (
 	Kernel32DLL        = windows.NewLazyDLL("kernel32.dll")
 	ConsoleExtraWidth  = 0 // scroll bar, etc
 	ConsoleExtraHeight = 0 // title bar
+)
+
+const (
+	STD_OUTPUT_HANDLE = uintptr(^uint32(11) + 1)
 )
 
 // IsMainWindow returns true if a window with the specified handle is a main window.
@@ -139,7 +144,7 @@ func SetCosoleWinsize(pid, w, h int) {
 		// in pixels
 		default_w_px := default_width * font_size / 2
 		default_h_px := default_height * font_size
-		log.Printf("Default window (client rectangle) is %dx%d (chars) or %dx%d (pixels)",
+		log.Printf("Default window (client rectangle, excluding frames) is %dx%d (chars) or %dx%d (pixels)",
 			default_width, default_height,
 			default_w_px, default_h_px)
 		// window size in pixels, including title bar and frame
@@ -150,13 +155,17 @@ func SetCosoleWinsize(pid, w, h int) {
 			log.Printf("Now window (normal rectangle) size is %dx%d, aborting", now_w_px, now_h_px)
 			return
 		}
+		log.Printf("Current window (normal rectangle, including frames) is %dx%d (pixels)",
+			now_w_px, now_h_px)
 		// calculate extra width and height
 		ConsoleExtraHeight = now_h_px - default_h_px
 		ConsoleExtraWidth = now_w_px - default_w_px
 		if ConsoleExtraWidth <= 0 || ConsoleExtraHeight <= 0 {
-			log.Printf("Extra width %d, extra height %d, aborting", ConsoleExtraWidth, ConsoleExtraHeight)
+			log.Printf("Extra width %d pixels, extra height %d pixels, aborting", ConsoleExtraWidth, ConsoleExtraHeight)
 			return
 		}
+		log.Printf("Frame (excluding window content) is %d(w), %d(h) (pixels)",
+			ConsoleExtraWidth, ConsoleExtraHeight)
 
 	}
 	w_px = w_px + ConsoleExtraWidth
@@ -164,26 +173,34 @@ func SetCosoleWinsize(pid, w, h int) {
 
 	// set window size in pixels
 	if w32.SetWindowPos(whandle, whandle, 0, 0, w_px, h_px, w32.SWP_NOMOVE|w32.SWP_NOZORDER) {
-		log.Printf("Window (0x%x) of %d has been resized to %dx%d (chars) or %dx%d (pixels)",
+		log.Printf("Window (0x%x) of %d is being resized to %dx%d (chars) or %dx%d (pixels)",
 			whandle, pid, w, h, w_px, h_px)
+	}
+
+	// check window size
+	now_rect := w32.GetWindowRect(whandle)
+	now_w_px := int(now_rect.Width())
+	now_h_px := int(now_rect.Height())
+	if now_w_px != w_px || now_h_px != h_px {
+		log.Printf("Resizing failed, actual window size is now %dx%d pixels", now_w_px, now_h_px)
 	}
 }
 
-func SetConsoleBufferSize(pid, w, h int) {
+func SetConsoleBufferSize(w, h int) {
 	coord := w32.COORD{
 		X: int16(w),
 		Y: int16(h),
 	}
-	set_console_buffer_size := Kernel32DLL.NewProc("SetConsoleScreenBufferSize")
-	var console_output_handle windows.Handle
 
-	// TODO obtain handle of console buffer output
+	kernel32 := syscall.NewLazyDLL("kernel32.dll")
+	getStdHandle := kernel32.NewProc("GetStdHandle")
+	setConsoleScreenBufferSize := kernel32.NewProc("SetConsoleScreenBufferSize")
 
-	_, _, err := set_console_buffer_size.Call(
-		uintptr(unsafe.Pointer(&console_output_handle)),
-		uintptr(unsafe.Pointer(&coord)))
-
-	if err != nil {
-		log.Printf("SetConsoleBufferSize failed: %v", err)
+	hStdOut, _, _ := getStdHandle.Call(STD_OUTPUT_HANDLE)
+	bResult, _, err := setConsoleScreenBufferSize.Call(hStdOut, *(*uintptr)(unsafe.Pointer(&coord)))
+	if bResult != 0 {
+		log.Printf("Console buffer size set to %dx%d\n", coord.X, coord.Y)
+	} else {
+		log.Printf("SetConsoleBufferSize: %v\n", err)
 	}
 }

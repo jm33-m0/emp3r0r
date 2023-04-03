@@ -74,8 +74,8 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 
 		// ConPTY
 		cmd.SysProcAttr = &syscall.SysProcAttr{
-			HideWindow:    true,
-			CreationFlags: windows.CREATE_NEW_CONSOLE,
+			HideWindow: true,
+			// CreationFlags: windows.CREATE_NEW_CONSOLE,
 		}
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -134,7 +134,8 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 							log.Printf("conhost.exe (%d) has no shell spawned", conhost_pid)
 							return
 						}
-						SetCosoleWinsize(int(shell_proc.Pid), win.Width, win.Height)
+						// FIXME resizing won't work properly, disabled
+						// SetCosoleWinsize(int(shell_proc.Pid), win.Width, win.Height)
 					}
 					util.TakeABlink()
 				}
