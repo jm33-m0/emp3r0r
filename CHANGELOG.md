@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.8](https://github.com/jm33-m0/emp3r0r/compare/v1.25.7...v1.25.8) (2023-04-04)
+
+
+### Bug Fixes
+
+* file downloading progress might stuck at 100% when connection is interrupted ([37eabb2](https://github.com/jm33-m0/emp3r0r/commit/37eabb2c51df158c5b42de37f90403e6be6cf912))
+
 ## [1.25.7](https://github.com/jm33-m0/emp3r0r/compare/v1.25.6...v1.25.7) (2023-04-03)
 
 
