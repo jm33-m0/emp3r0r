@@ -267,8 +267,12 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 
 	// log progress instead of showing the actual progressbar
 	go func() {
-		for state := bar.State(); nowSize/targetSize < 1; time.Sleep(5 * time.Second) {
+		for state := bar.State(); nowSize/targetSize < 1 && state.CurrentPercent < 1; time.Sleep(5 * time.Second) {
 			state = bar.State()
+			// progress may reach 100% when downloading is incomplete
+			if nowSize/targetSize < 1 && state.CurrentPercent == 1 {
+				return
+			}
 			CliPrintInfo("%.2f%% (%d of %d bytes) downloaded at %.2fKB/s, %.2fs passed, %.2fs left",
 				state.CurrentPercent*100, nowSize, targetSize, state.KBsPerSecond, state.SecondsSince, state.SecondsLeft)
 		}
