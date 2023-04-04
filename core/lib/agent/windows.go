@@ -21,9 +21,25 @@ var (
 	ConsoleExtraHeight = 0 // title bar
 )
 
-const (
-	STD_OUTPUT_HANDLE = uintptr(^uint32(11) + 1)
-)
+type coord struct {
+	x int16
+	y int16
+}
+
+type smallRect struct {
+	left   int16
+	top    int16
+	right  int16
+	bottom int16
+}
+
+type consoleScreenBufferInfo struct {
+	size              coord
+	cursorPosition    coord
+	attributes        uint16
+	window            smallRect
+	maximumWindowSize coord
+}
 
 // IsMainWindow returns true if a window with the specified handle is a main window.
 func IsMainWindow(hwnd w32.HWND) bool {
@@ -187,20 +203,17 @@ func SetCosoleWinsize(pid, w, h int) {
 }
 
 func SetConsoleBufferSize(w, h int) {
-	coord := w32.COORD{
-		X: int16(w),
-		Y: int16(h),
+	procSetConsoleScreenBufferSize := Kernel32DLL.NewProc("SetConsoleScreenBufferSize")
+	// Get the handle for the console screen buffer
+	stdout, err := syscall.GetStdHandle(syscall.STD_OUTPUT_HANDLE)
+	if err != nil {
+		log.Println("Error getting stdout handle:", err)
+		return
 	}
 
-	kernel32 := syscall.NewLazyDLL("kernel32.dll")
-	getStdHandle := kernel32.NewProc("GetStdHandle")
-	setConsoleScreenBufferSize := kernel32.NewProc("SetConsoleScreenBufferSize")
-
-	hStdOut, _, _ := getStdHandle.Call(STD_OUTPUT_HANDLE)
-	bResult, _, err := setConsoleScreenBufferSize.Call(hStdOut, *(*uintptr)(unsafe.Pointer(&coord)))
-	if bResult != 0 {
-		log.Printf("Console buffer size set to %dx%d\n", coord.X, coord.Y)
-	} else {
-		log.Printf("SetConsoleBufferSize: %v\n", err)
+	size := coord{int16(w), int16(h)}
+	ret, _, err := procSetConsoleScreenBufferSize.Call(uintptr(stdout), uintptr(unsafe.Pointer(&size)))
+	if ret == 0 {
+		log.Printf("Error resizing console buffer: %v", err)
 	}
 }

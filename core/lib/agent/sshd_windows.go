@@ -74,8 +74,8 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 
 		// ConPTY
 		cmd.SysProcAttr = &syscall.SysProcAttr{
-			HideWindow: true,
-			// CreationFlags: windows.CREATE_NEW_CONSOLE,
+			HideWindow:    true,
+			CreationFlags: windows.CREATE_NEW_CONSOLE,
 		}
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
