@@ -320,8 +320,8 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 			CliPrintError("Downloaded (%d of %d bytes), WTF?", nowSize, targetSize)
 			return
 		}
-		CliPrintWarning("Incomplete download at %.2f%% (%d of %d bytes), will continue if you run GET again",
-			float64(nowSize)/float64(targetSize), nowSize, targetSize)
+		CliPrintWarning("Incomplete download at %.4f%% (%d of %d bytes), will continue if you run GET again",
+			float64(nowSize)/float64(targetSize)*100, nowSize, targetSize)
 	}()
 
 	// read filedata
