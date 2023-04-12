@@ -165,6 +165,11 @@ func CmdHelp(mod string) {
 			if !exists {
 				help = map[string]string{"<N/A>": modhelp}
 			}
+			for m, h := range emp3r0r_data.ModuleComments {
+				if m == mod {
+					CliMsg("\n%s", h)
+				}
+			}
 			CliPrettyPrint("Option", "Help", &help)
 			return
 		}
