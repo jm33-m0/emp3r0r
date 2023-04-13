@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.26.0](https://github.com/jm33-m0/emp3r0r/compare/v1.25.8...v1.26.0) (2023-04-13)
+
+
+### Features
+
+* multi-arch support ([40bc0fe](https://github.com/jm33-m0/emp3r0r/commit/40bc0fe9e123eac5842a32c6af5d3facc56c0ebf))
+
+
+### Bug Fixes
+
+* confusion on `reverse_proxy` feature, see [#190](https://github.com/jm33-m0/emp3r0r/issues/190) ([b6425f0](https://github.com/jm33-m0/emp3r0r/commit/b6425f0b7a4dea1ac25b46055325c6f32d620c49))
+* incomplete file download percentage ([b4e120e](https://github.com/jm33-m0/emp3r0r/commit/b4e120ef7650bbb2fa90df2aa617df8a48a06eea))
+* syscall.Dup2 not ready for multi-arch support ([13826d2](https://github.com/jm33-m0/emp3r0r/commit/13826d23693bcf3d445a6c96cd49f956ae71df90))
+
 ## [1.25.8](https://github.com/jm33-m0/emp3r0r/compare/v1.25.7...v1.25.8) (2023-04-04)
 
 
