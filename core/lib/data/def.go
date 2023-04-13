@@ -113,7 +113,7 @@ var ModuleComments = map[string]string{
 	ModVACCINE:      "Vaccine helps you install additional tools on target system",
 	ModINJECTOR:     "Inject shellcode/loader.so into a running process",
 	ModGET_ROOT:     "Try some built-in LPE exploits",
-	ModREVERSEPROXY: "Manually proxy agents who are unable to use our forward proxy",
+	ModREVERSEPROXY: "Bring a target host to CC by connecting to it first (target host must have agent installed)",
 	ModGDB:          "Remote gdbserver, debug anything",
 	ModStager:       "Generate a stager for staged payload delivering",
 }
