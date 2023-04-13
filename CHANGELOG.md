@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.26.1](https://github.com/jm33-m0/emp3r0r/compare/v1.26.0...v1.26.1) (2023-04-13)
+
+
+### Bug Fixes
+
+* mips builds missing ([dd9eed5](https://github.com/jm33-m0/emp3r0r/commit/dd9eed5922f0620069a2dc467f4a5e6075fa93b6))
+* multi-arch build, cc crash on start ([fb04c2c](https://github.com/jm33-m0/emp3r0r/commit/fb04c2cbe6b5800477bfa1c9a1bcfe40aa39951b))
+
 ## [1.26.0](https://github.com/jm33-m0/emp3r0r/compare/v1.25.8...v1.26.0) (2023-04-13)
 
 
