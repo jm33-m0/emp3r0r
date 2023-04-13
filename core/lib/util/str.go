@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"strings"
 	"time"
@@ -112,7 +113,7 @@ func RandInt(min, max int) int {
 // RandStr random string
 func RandStr(n int) string {
 	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	rand.Seed(int64(RandInt(0xff, 0xffffffff)))
+	rand.Seed(int64(RandInt(0xff, math.MaxInt)))
 	b := make([]rune, n)
 	for i := range b {
 		b[i] = letters[int64(RandInt(0, len(letters)))]
@@ -129,7 +130,7 @@ func RandBytes(n int) []byte {
 		}
 		all_bytes = append(all_bytes, byte(b))
 	}
-	rand.Seed(int64(RandInt(0xff, 0xffffffff)))
+	rand.Seed(int64(RandInt(0xff, math.MaxInt)))
 	rand_bytes := make([]byte, n)
 	for i := range rand_bytes {
 		rand_bytes[i] = all_bytes[int64(RandInt(0, len(all_bytes)))]

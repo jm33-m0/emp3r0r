@@ -151,6 +151,12 @@ func Copy(src, dst string) error {
 		}
 	}
 
+	// if destination is a directory
+	f, err := os.Stat(dst)
+	if f.IsDir() {
+		dst = FileBaseName(src)
+	}
+
 	return ioutil.WriteFile(dst, in, 0755)
 }
 

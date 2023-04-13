@@ -6,10 +6,8 @@ package util
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"syscall"
@@ -99,73 +97,4 @@ func MemFDWrite(data []byte) int {
 		return -1
 	}
 	return int(fd)
-}
-
-func MemfdExec(procName string, env []string, buffer []byte) (pid int) {
-	fdName := "" // *string cannot be initialized
-
-	fd, _, _ := syscall.Syscall(memfdCreateX64, uintptr(unsafe.Pointer(&fdName)), uintptr(mfdCloexec), 0)
-	_, _ = syscall.Write(int(fd), buffer)
-
-	fdPath := fmt.Sprintf("/proc/self/fd/%d", fd)
-
-	switch child, _, _ := syscall.Syscall(fork, 0, 0, 0); child {
-	case 0:
-		break
-	case 1:
-		// Fork failed!
-		log.Print("fork failed")
-		return
-	default:
-	}
-
-	_ = syscall.Umask(0)
-	_, _ = syscall.Setsid()
-	_ = syscall.Chdir("/")
-
-	file, _ := os.OpenFile("/dev/null", os.O_RDWR, 0)
-	err := syscall.Dup2(int(file.Fd()), int(os.Stdin.Fd()))
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	file.Close()
-
-	progWithArgs := append([]string{procName}, os.Args[1:]...)
-	err = syscall.Exec(fdPath, progWithArgs, env)
-	if err == nil {
-		log.Println("agent started from memory using memfd_create")
-		return
-	}
-
-	// older kernel
-	log.Printf("memfd_create failed: %v, trying shm_open", err)
-	shmPath := "/dev/shm/.../"
-	if _, err := os.Stat(shmPath); os.IsNotExist(err) {
-		err = os.Mkdir(shmPath, 0700)
-		if err != nil {
-			log.Print(err)
-			return
-		}
-	}
-	err = ioutil.WriteFile(shmPath+procName, buffer, 0755)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	err = os.Chdir(shmPath)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	cmd := exec.Command(procName, os.Args[1:]...)
-	cmd.Env = env
-	err = cmd.Start()
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	pid = cmd.Process.Pid
-
-	return
 }

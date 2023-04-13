@@ -24,25 +24,47 @@ const (
 	ServerKeyFile = "emp3r0r-key.pem"
 )
 
-func GenAgent() {
-	now := time.Now()
-	stubFile := emp3r0r_data.Stub_Linux
-	outfile := fmt.Sprintf("%s/agent_linux_%d-%d-%d_%d-%d-%d",
-		EmpWorkSpace,
-		now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
+var Arch_List = []string{
+	"386",
+	"amd64",
+	"arm",
+	"arm64",
+	"mips",
+	"mips64",
+	"riscv64",
+}
 
+func GenAgent() {
+	var (
+		outfile     string           // write agent binary to this path
+		arch_choice string = "amd64" // CPU architecture
+	)
+	now := time.Now()
+	stubFile := fmt.Sprintf("%s-%s", emp3r0r_data.Stub_Linux, arch_choice)
 	os_choice := CliAsk("Generate agent for (1) Linux, (2) Windows: ", false)
 	is_win := os_choice == "2"
 	is_linux := os_choice == "1"
 	if is_linux {
 		CliPrintInfo("You chose Linux")
+		for n, arch := range Arch_List {
+			CliPrint("[%d] %s", n, arch)
+		}
+		arch_choice = CliAsk("Generate for: ", false)
+		CliPrintInfo("Generating agent for %s platform", arch_choice)
+		stubFile = fmt.Sprintf("%s-%s", emp3r0r_data.Stub_Linux, arch_choice)
+		outfile = fmt.Sprintf("%s/agent_linux_%s_%d-%d-%d_%d-%d-%d",
+			EmpWorkSpace, arch_choice,
+			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 	}
 	if is_win {
-		stubFile = emp3r0r_data.Stub_Windows
-		outfile = fmt.Sprintf("%s/agent_windows_%d-%d-%d_%d-%d-%d.exe",
-			EmpWorkSpace,
-			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 		CliPrintInfo("You chose Windows")
+		if CliYesNo("Generate for 32 bit Windows") {
+			arch_choice = "386"
+		}
+		stubFile = fmt.Sprintf("%s-%s", emp3r0r_data.Stub_Windows, arch_choice)
+		outfile = fmt.Sprintf("%s/agent_windows_%s_%d-%d-%d_%d-%d-%d.exe",
+			EmpWorkSpace, arch_choice,
+			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 	}
 
 	if !util.IsFileExist(stubFile) {

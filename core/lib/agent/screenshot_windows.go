@@ -1,4 +1,7 @@
-package util
+//go:build windows
+// +build windows
+
+package agent
 
 import (
 	"fmt"
@@ -12,7 +15,7 @@ import (
 	"github.com/mholt/archiver"
 )
 
-// Screenshot take a screenshot in a cross-platform way
+// Screenshot take a screenshot
 // returns path of taken screenshot
 func Screenshot() (path string, err error) {
 	n := screenshot.NumActiveDisplays()

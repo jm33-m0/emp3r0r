@@ -63,16 +63,44 @@ build() {
         cd "$pwd/cmd/cat" && go build -o "$temp/cat.exe" -ldflags="$ldflags"
     } || error "build cat"
 
+    # Linux
     info "Building agent stub"
     {
         cd "$pwd/cmd/agent" &&
-            sh -c "$gobuild_cmd $build_opt -o \"$temp/stub.exe\" -ldflags=\"$ldflags\""
+            sh -c "$gobuild_cmd $build_opt -o \"$temp/stub-amd64\" -ldflags=\"$ldflags\""
     } || error "build agent stub"
+    info "Building agent 386 stub"
+    {
+        cd "$pwd/cmd/agent" &&
+            GOARCH=386 sh -c "$gobuild_cmd $build_opt -o \"$temp/stub-386\" -ldflags=\"$ldflags\""
+    } || error "build agent stub-386"
+    info "Building agent-arm stub"
+    {
+        cd "$pwd/cmd/agent" &&
+            GOARCH=arm sh -c "$gobuild_cmd $build_opt -o \"$temp/stub-arm\" -ldflags=\"$ldflags\""
+    } || error "build agent-arm stub"
+    info "Building agent-arm64 stub"
+    {
+        cd "$pwd/cmd/agent" &&
+            GOARCH=arm64 sh -c "$gobuild_cmd $build_opt -o \"$temp/stub-arm64\" -ldflags=\"$ldflags\""
+    } || error "build agent-arm64 stub"
+    info "Building agent-riscv64 stub"
+    {
+        cd "$pwd/cmd/agent" &&
+            GOARCH=riscv64 sh -c "$gobuild_cmd $build_opt -o \"$temp/stub-riscv64\" -ldflags=\"$ldflags\""
+    } || error "build agent-riscv64 stub"
+
+    # Windows
     info "Building agent stub for Windows"
     {
         cd "$pwd/cmd/agent" &&
-            GOOS=windows sh -c "$gobuild_cmd $build_opt -o \"$temp/stub-win.exe\" -ldflags=\"$ldflags\""
+            GOOS=windows sh -c "$gobuild_cmd $build_opt -o \"$temp/stub-win-amd64\" -ldflags=\"$ldflags\""
     } || error "build stub-win"
+    info "Building agent stub for Windows 386"
+    {
+        cd "$pwd/cmd/agent" &&
+            GOOS=windows GOARCH=386 sh -c "$gobuild_cmd $build_opt -o \"$temp/stub-win-386\" -ldflags=\"$ldflags\""
+    } || error "build stub-win-386"
 }
 
 install() {
@@ -81,8 +109,7 @@ install() {
     mkdir -p "$build_dir" || error "Failed to mkdir $build_dir"
     cp -avR tmux "$data_dir" || error "tmux"
     cp -avR modules "$data_dir" || error "modules"
-    cp -avR stub.exe "$build_dir/stub.exe" || error "stub"
-    cp -avR stub-win.exe "$build_dir/stub-win.exe" || error "stub-win"
+    cp -avR stub* "$build_dir" || error "stub"
 
     # emp3r0r binaries
     chmod 755 "$0" cc.exe cat.exe
