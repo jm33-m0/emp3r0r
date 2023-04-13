@@ -14,7 +14,6 @@ import (
 	"os/exec"
 	"os/user"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,6 +23,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 	"github.com/ncruces/go-dns"
+	"golang.org/x/sys/unix"
 	"src.elv.sh/pkg/buildinfo"
 	"src.elv.sh/pkg/lsp"
 	"src.elv.sh/pkg/prog"
@@ -58,7 +58,7 @@ func main() {
 		} else {
 			log.SetOutput(f)
 			defer f.Close()
-			err = syscall.Dup2(int(f.Fd()), int(os.Stderr.Fd()))
+			err = unix.Dup2(int(f.Fd()), int(os.Stderr.Fd()))
 			if err != nil {
 				log.Fatalf("Cannot redirect stderr to log file: %v", err)
 			}
