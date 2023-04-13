@@ -42,19 +42,19 @@ var (
 
 	// ModuleHelpers a map of module helpers
 	ModuleHelpers = map[string]func(){
-		emp3r0r_data.ModCMD_EXEC:     moduleCmd,
-		emp3r0r_data.ModSHELL:        moduleShell,
-		emp3r0r_data.ModPROXY:        moduleProxy,
-		emp3r0r_data.ModPORT_FWD:     modulePortFwd,
-		emp3r0r_data.ModLPE_SUGGEST:  moduleLPE,
-		emp3r0r_data.ModGET_ROOT:     moduleGetRoot,
-		emp3r0r_data.ModCLEAN_LOG:    moduleLogCleaner,
-		emp3r0r_data.ModPERSISTENCE:  modulePersistence,
-		emp3r0r_data.ModVACCINE:      moduleVaccine,
-		emp3r0r_data.ModINJECTOR:     moduleInjector,
-		emp3r0r_data.ModREVERSEPROXY: moduleReverseProxy,
-		emp3r0r_data.ModGDB:          moduleGDB,
-		emp3r0r_data.ModStager:       modStager,
+		emp3r0r_data.ModCMD_EXEC:    moduleCmd,
+		emp3r0r_data.ModSHELL:       moduleShell,
+		emp3r0r_data.ModPROXY:       moduleProxy,
+		emp3r0r_data.ModPORT_FWD:    modulePortFwd,
+		emp3r0r_data.ModLPE_SUGGEST: moduleLPE,
+		emp3r0r_data.ModGET_ROOT:    moduleGetRoot,
+		emp3r0r_data.ModCLEAN_LOG:   moduleLogCleaner,
+		emp3r0r_data.ModPERSISTENCE: modulePersistence,
+		emp3r0r_data.ModVACCINE:     moduleVaccine,
+		emp3r0r_data.ModINJECTOR:    moduleInjector,
+		emp3r0r_data.ModBring2CC:    moduleBring2CC,
+		emp3r0r_data.ModGDB:         moduleGDB,
+		emp3r0r_data.ModStager:      modStager,
 	}
 )
 
@@ -167,7 +167,7 @@ func UpdateOptions(modName string) (exist bool) {
 		methodOpt.Vals = []string{"gdb_loader", "inject_shellcode", "inject_loader"}
 		methodOpt.Val = "inject_shellcode"
 
-	case modName == emp3r0r_data.ModREVERSEPROXY:
+	case modName == emp3r0r_data.ModBring2CC:
 		addrOpt := addIfNotFound("addr")
 		addrOpt.Vals = []string{"127.0.0.1"}
 		addrOpt.Val = "<blank>"

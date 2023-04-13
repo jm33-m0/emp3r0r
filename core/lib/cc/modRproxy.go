@@ -6,7 +6,7 @@ import (
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 )
 
-func moduleReverseProxy() {
+func moduleBring2CC() {
 	addr := Options["addr"].Val
 	cmd := fmt.Sprintf("%s %s", emp3r0r_data.C2CmdReverseProxy, addr)
 	err := SendCmd(cmd, "", CurrentTarget)

