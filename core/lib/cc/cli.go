@@ -288,6 +288,29 @@ func CliPrintWarning(format string, a ...interface{}) {
 	}
 }
 
+// CliPrint print in bold cyan without logging prefix, regardless of debug level
+func CliPrint(format string, a ...interface{}) {
+	msg_color := color.New(color.Bold, color.FgCyan)
+	fmt.Println(msg_color.Sprintf(format, a...))
+	if IsAPIEnabled {
+		// send to socket
+		var resp APIResponse
+		msg := GetDateTime() + " PRINT: " + fmt.Sprintf(format, a...)
+		resp.MsgData = []byte(msg)
+		resp.Alert = false
+		resp.MsgType = LOG
+		data, err := json.Marshal(resp)
+		if err != nil {
+			log.Printf("CliPrint: %v", err)
+			return
+		}
+		_, err = APIConn.Write([]byte(data))
+		if err != nil {
+			log.Printf("CliPrint: %v", err)
+		}
+	}
+}
+
 // CliMsg print log in bold cyan, regardless of debug level
 func CliMsg(format string, a ...interface{}) {
 	msg_color := color.New(color.Bold, color.FgCyan)

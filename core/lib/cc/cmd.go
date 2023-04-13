@@ -167,7 +167,7 @@ func CmdHelp(mod string) {
 			}
 			for m, h := range emp3r0r_data.ModuleComments {
 				if m == mod {
-					CliMsg("\n%s", h)
+					CliPrint("\n%s", h)
 				}
 			}
 			CliPrettyPrint("Option", "Help", &help)
