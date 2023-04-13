@@ -84,6 +84,16 @@ build() {
         cd "$pwd/cmd/agent" &&
             GOARCH=arm64 sh -c "$gobuild_cmd $build_opt -o \"$temp/stub-arm64\" -ldflags=\"$ldflags\""
     } || error "build agent-arm64 stub"
+    info "Building agent-mips stub"
+    {
+        cd "$pwd/cmd/agent" &&
+            GOARCH=mips sh -c "$gobuild_cmd $build_opt -o \"$temp/stub-mips\" -ldflags=\"$ldflags\""
+    } || error "build agent-mips stub"
+    info "Building agent-mips64 stub"
+    {
+        cd "$pwd/cmd/agent" &&
+            GOARCH=mips64 sh -c "$gobuild_cmd $build_opt -o \"$temp/stub-mips64\" -ldflags=\"$ldflags\""
+    } || error "build agent-mips64 stub"
     info "Building agent-riscv64 stub"
     {
         cd "$pwd/cmd/agent" &&
