@@ -331,7 +331,7 @@ func labelAgents() {
 		old           []LabeledAgent
 	)
 	// what if emp3r0r_data.json already have some records
-	if util.IsFileExist(AgentsJSON) {
+	if util.IsExist(AgentsJSON) {
 		data, err := ioutil.ReadFile(AgentsJSON)
 		if err != nil {
 			CliPrintWarning("Reading labeled agents: %v", err)
@@ -443,10 +443,10 @@ func DirSetup() (err error) {
 	EmpBuildDir = EmpDataDir + "/build"
 	CAT = EmpDataDir + "/emp3r0r-cat"
 
-	if !util.IsFileExist(EmpDataDir) {
+	if !util.IsExist(EmpDataDir) {
 		return fmt.Errorf("emp3r0r is not installed correctly: %s not found", EmpDataDir)
 	}
-	if !util.IsFileExist(CAT) {
+	if !util.IsExist(CAT) {
 		return fmt.Errorf("emp3r0r is not installed correctly: %s not found", CAT)
 	}
 
@@ -456,14 +456,14 @@ func DirSetup() (err error) {
 		return fmt.Errorf("Get current user: %v", err)
 	}
 	EmpWorkSpace = fmt.Sprintf("%s/.emp3r0r", u.HomeDir)
-	if !util.IsFileExist(EmpWorkSpace) {
-		err = os.MkdirAll(EmpWorkSpace, 0700)
+	FileGetDir = EmpWorkSpace + "/file-get/"
+	EmpConfigFile = EmpWorkSpace + "/emp3r0r.json"
+	if !util.IsDirExist(EmpWorkSpace) {
+		err = os.MkdirAll(FileGetDir, 0700)
 		if err != nil {
 			return fmt.Errorf("mkdir %s: %v", EmpWorkSpace, err)
 		}
 	}
-	FileGetDir = EmpWorkSpace + "/file-get/"
-	EmpConfigFile = EmpWorkSpace + "/emp3r0r.json"
 
 	// binaries
 	emp3r0r_data.Stub_Linux = EmpWorkSpace + "/stub"

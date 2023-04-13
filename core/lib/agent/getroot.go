@@ -23,7 +23,7 @@ func CopySelfTo(dest_path string) (err error) {
 	}
 
 	// overwrite
-	if util.IsFileExist(dest_path) {
+	if util.IsExist(dest_path) {
 		os.RemoveAll(dest_path)
 	}
 

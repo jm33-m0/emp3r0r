@@ -14,7 +14,7 @@ import (
 
 // ExtractBash extract embedded bash binary and configure our bash shell
 func ExtractBash() error {
-	if !util.IsFileExist(RuntimeConfig.UtilsPath) {
+	if !util.IsExist(RuntimeConfig.UtilsPath) {
 		err := os.MkdirAll(RuntimeConfig.UtilsPath, 0700)
 		if err != nil {
 			log.Fatalf("[-] Cannot mkdir %s: %v", RuntimeConfig.AgentRoot, err)

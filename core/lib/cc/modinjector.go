@@ -17,7 +17,7 @@ func moduleInjector() {
 
 	// shellcode.txt
 	pid := Options["pid"].Val
-	if !util.IsFileExist(WWWRoot + "shellcode.txt") {
+	if !util.IsExist(WWWRoot + "shellcode.txt") {
 		CliPrintWarning("%sshellcode.txt does not exist", WWWRoot)
 	}
 	// choose a shellcode loader

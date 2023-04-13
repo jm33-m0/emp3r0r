@@ -5,6 +5,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -58,11 +59,22 @@ func init_magic_str() {
 	emp3r0r_data.OneTimeMagicBytes = util.RandBytes(len(default_magic_str))
 
 	// update binaries
-	err := util.ReplaceBytesInFile(emp3r0r_data.Stub_Linux, []byte(default_magic_str), []byte(emp3r0r_data.OneTimeMagicBytes))
+	files, err := os.ReadDir(cc.EmpWorkSpace)
 	if err != nil {
-		cc.CliPrintError("init_magic_str %v", err)
+		cc.CliFatalError("init_magic_str: %v", err)
 	}
-	util.ReplaceBytesInFile(emp3r0r_data.Stub_Windows, []byte(default_magic_str), []byte(emp3r0r_data.OneTimeMagicBytes))
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+		if strings.HasPrefix(f.Name(), "stub-") {
+			err = util.ReplaceBytesInFile(fmt.Sprintf("%s/%s", cc.EmpWorkSpace, f.Name()),
+				[]byte(default_magic_str), []byte(emp3r0r_data.OneTimeMagicBytes))
+			if err != nil {
+				cc.CliPrintError("init_magic_str %v", err)
+			}
+		}
+	}
 }
 
 func main() {

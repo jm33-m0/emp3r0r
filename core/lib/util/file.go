@@ -70,10 +70,38 @@ func IsCommandExist(exe string) bool {
 
 // IsFileExist check if a file exists
 func IsFileExist(path string) bool {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	f, err := os.Stat(path)
+	if os.IsNotExist(err) {
 		return false
 	}
+	if err == nil {
+		return !f.IsDir()
+	}
+
 	return true
+}
+
+// IsExist check if a path exists
+func IsExist(path string) bool {
+	_, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false
+	}
+
+	return true
+}
+
+// IsDirExist check if a directory exists
+func IsDirExist(path string) bool {
+	f, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false
+	}
+	if err == nil {
+		return f.IsDir()
+	}
+
+	return false
 }
 
 // RemoveDupsFromArray remove duplicated items from string slice
@@ -144,17 +172,21 @@ func Copy(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	if IsFileExist(dst) {
-		err = os.RemoveAll(dst)
-		if err != nil {
-			log.Printf("Copy: %s exists and cannot be removed", dst)
-		}
-	}
 
 	// if destination is a directory
 	f, err := os.Stat(dst)
-	if f.IsDir() {
-		dst = FileBaseName(src)
+	if err == nil {
+		if f.IsDir() {
+			dst = fmt.Sprintf("%s/%s", dst, FileBaseName(src))
+		}
+	}
+
+	// if dst is a file and exists
+	if IsFileExist(dst) {
+		err = os.RemoveAll(dst)
+		if err != nil {
+			log.Printf("Copy: %s exists and cannot be removed: %v", dst, err)
+		}
 	}
 
 	return ioutil.WriteFile(dst, in, 0755)
@@ -172,7 +204,7 @@ func FileBaseName(filepath string) (filename string) {
 
 // FileAllocate allocate n bytes for a file, will delete the target file if already exists
 func FileAllocate(filepath string, n int64) (err error) {
-	if IsFileExist(filepath) {
+	if IsExist(filepath) {
 		err = os.Remove(filepath)
 		if err != nil {
 			return
@@ -202,7 +234,7 @@ func TarBz2(dir, outfile string) error {
 	// remove outfile
 	os.RemoveAll(outfile)
 
-	if !IsFileExist(dir) {
+	if !IsExist(dir) {
 		return fmt.Errorf("%s does not exist", dir)
 	}
 

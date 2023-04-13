@@ -40,7 +40,7 @@ func APIMain() {
 // using a console
 func APIListen() {
 	// if socket file exists
-	if util.IsFileExist(SocketName) {
+	if util.IsExist(SocketName) {
 		err := os.Remove(SocketName)
 		if err != nil {
 			CliPrintError("Failed to delete socket: %v", err)

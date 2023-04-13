@@ -19,18 +19,19 @@ import (
 
 // ModConfig config.json of a module
 // Example
-// {
-//     "name": "LES",
-//     "exec": "les.sh",
-//     "platform": "Linux",
-//     "interactive": false,
-//     "author": "jm33-ng",
-//     "date": "2022-01-12",
-//     "comment": "https://github.com/mzet-/linux-exploit-suggester",
-//     "options": {
-//         "args": ["--checksec", "run les.sh with this commandline arg"]
-//     }
-// }
+//
+//	{
+//	    "name": "LES",
+//	    "exec": "les.sh",
+//	    "platform": "Linux",
+//	    "interactive": false,
+//	    "author": "jm33-ng",
+//	    "date": "2022-01-12",
+//	    "comment": "https://github.com/mzet-/linux-exploit-suggester",
+//	    "options": {
+//	        "args": ["--checksec", "run les.sh with this commandline arg"]
+//	    }
+//	}
 type ModConfig struct {
 	Name          string `json:"name"`        // Display as this name
 	Exec          string `json:"exec"`        // Run this executable file
@@ -179,12 +180,12 @@ func ModuleDetails(modName string) {
 // scan custom modules in ModuleDir,
 // and update ModuleHelpers, ModuleDocs
 func InitModules() {
-	if !util.IsFileExist(WWWRoot) {
+	if !util.IsExist(WWWRoot) {
 		os.MkdirAll(WWWRoot, 0700)
 	}
 
 	// get vaccine ready
-	if !util.IsFileExist(UtilsArchive) {
+	if !util.IsExist(UtilsArchive) {
 		err = CreateVaccineArchive()
 		if err != nil {
 			CliPrintWarning("CreateVaccineArchive: %v", err)
@@ -193,7 +194,7 @@ func InitModules() {
 
 	load_mod := func(mod_dir string) {
 		// don't bother if module dir not found
-		if !util.IsFileExist(mod_dir) {
+		if !util.IsExist(mod_dir) {
 			return
 		}
 		CliPrintInfo("Scanning %s for modules", mod_dir)
@@ -207,7 +208,7 @@ func InitModules() {
 				continue
 			}
 			config_file := fmt.Sprintf("%s/%s/config.json", mod_dir, dir.Name())
-			if !util.IsFileExist(config_file) {
+			if !util.IsExist(config_file) {
 				continue
 			}
 			config, err := readModCondig(config_file)

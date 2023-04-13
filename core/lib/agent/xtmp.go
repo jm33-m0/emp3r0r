@@ -69,7 +69,7 @@ func deleteXtmpEntry(keyword string) (err error) {
 	err = nil
 	xtmpFiles := []string{"/var/log/wtmp", "/var/log/btmp", "/var/log/utmp"}
 	for _, xtmp := range xtmpFiles {
-		if util.IsFileExist(xtmp) {
+		if util.IsExist(xtmp) {
 			e := delete(xtmp)
 			if e != nil {
 				if err != nil {

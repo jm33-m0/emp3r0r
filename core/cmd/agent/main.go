@@ -101,7 +101,7 @@ func main() {
 	// mkdir -p UtilsPath
 	// use absolute path
 	// TODO find a better location for temp files
-	if !util.IsFileExist(agent.RuntimeConfig.UtilsPath) {
+	if !util.IsExist(agent.RuntimeConfig.UtilsPath) {
 		err = os.MkdirAll(agent.RuntimeConfig.UtilsPath, 0700)
 		if err != nil {
 			log.Fatalf("[-] Cannot mkdir %s: %v", agent.RuntimeConfig.AgentRoot, err)
@@ -124,7 +124,7 @@ func main() {
 	if err != nil {
 		log.Printf("[-] Cannot extract bash: %v", err)
 	}
-	if !util.IsFileExist(emp3r0r_data.DefaultShell) {
+	if !util.IsExist(emp3r0r_data.DefaultShell) {
 		emp3r0r_data.DefaultShell = "/bin/sh"
 	}
 
@@ -248,7 +248,7 @@ test_agent:
 	}
 
 	// agent root
-	if !util.IsFileExist(agent.RuntimeConfig.AgentRoot) {
+	if !util.IsExist(agent.RuntimeConfig.AgentRoot) {
 		err = os.MkdirAll(agent.RuntimeConfig.AgentRoot, 0700)
 		if err != nil {
 			log.Printf("MkdirAll %s: %v", agent.RuntimeConfig.AgentRoot, err)
@@ -361,7 +361,7 @@ connect:
 // listen on a unix socket, used to check if agent is responsive
 func socketListen() {
 	// if socket file exists
-	if util.IsFileExist(agent.RuntimeConfig.SocketName) {
+	if util.IsExist(agent.RuntimeConfig.SocketName) {
 		log.Printf("%s exists, testing connection...", agent.RuntimeConfig.SocketName)
 		if isAgentAlive() {
 			log.Fatalf("%s exists, and agent is alive, aborting", agent.RuntimeConfig.SocketName)

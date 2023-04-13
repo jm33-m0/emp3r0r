@@ -97,7 +97,7 @@ func TmuxInitWindows() (err error) {
 	// we don't want the tmux pane be killed
 	// so easily. Yes, fuck /bin/cat, we use our own cat
 	cat := CAT
-	if !util.IsFileExist(cat) {
+	if !util.IsExist(cat) {
 		pwd, e := os.Getwd()
 		if e != nil {
 			pwd = e.Error()

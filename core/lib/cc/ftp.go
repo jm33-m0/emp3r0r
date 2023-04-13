@@ -81,7 +81,7 @@ func PutFile(lpath, rpath string, a *emp3r0r_data.AgentSystemInfo) error {
 
 // GetFile get file from agent
 func GetFile(filepath string, a *emp3r0r_data.AgentSystemInfo) error {
-	if !util.IsFileExist(FileGetDir) {
+	if !util.IsExist(FileGetDir) {
 		err := os.MkdirAll(FileGetDir, 0700)
 		if err != nil {
 			return fmt.Errorf("GetFile mkdir %s: %v", FileGetDir, err)
@@ -93,7 +93,7 @@ func GetFile(filepath string, a *emp3r0r_data.AgentSystemInfo) error {
 	lock := filename + ".lock"                           // don't try to duplicate the task
 
 	// is this file already being downloaded?
-	if util.IsFileExist(lock) {
+	if util.IsExist(lock) {
 		return fmt.Errorf("%s is already being downloaded", filename)
 	}
 
@@ -112,7 +112,7 @@ func GetFile(filepath string, a *emp3r0r_data.AgentSystemInfo) error {
 
 	// what if we have downloaded part of the file
 	var offset int64 = 0
-	if util.IsFileExist(tempname) {
+	if util.IsExist(tempname) {
 		fiHave := util.FileSize(tempname)
 		offset = fiHave
 	}

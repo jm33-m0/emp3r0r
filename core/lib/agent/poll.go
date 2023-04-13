@@ -252,7 +252,7 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 		if err != nil {
 			log.Printf("Updating agent sysinfo: %v", err)
 		}
-		if !util.IsFileExist(RuntimeConfig.UtilsPath + "/python") {
+		if !util.IsExist(RuntimeConfig.UtilsPath + "/python") {
 			if runtime.GOOS == "linux" {
 				go VaccineHandler()
 			}

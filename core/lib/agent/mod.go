@@ -65,7 +65,7 @@ func moduleHandler(modName, checksum string) (out string) {
 	}
 	for _, f := range files {
 		os.Chmod(f.Name(), 0700)
-		if util.IsFileExist(libs_tarball) {
+		if util.IsExist(libs_tarball) {
 			os.RemoveAll("libs")
 			err = archiver.Unarchive(libs_tarball, "./")
 			if err != nil {

@@ -42,12 +42,12 @@ func processScreenshot(out string, target *emp3r0r_data.AgentSystemInfo) (err er
 
 	// be sure we have downloaded the file
 	is_download_completed := func() bool {
-		return !util.IsFileExist(FileGetDir+path+".downloading") &&
-			util.IsFileExist(FileGetDir+path)
+		return !util.IsExist(FileGetDir+path+".downloading") &&
+			util.IsExist(FileGetDir+path)
 	}
 
 	is_download_corrupted := func() bool {
-		return !is_download_completed() && !util.IsFileExist(FileGetDir+path+".lock")
+		return !is_download_completed() && !util.IsExist(FileGetDir+path+".lock")
 	}
 	for {
 		time.Sleep(100 * time.Millisecond)

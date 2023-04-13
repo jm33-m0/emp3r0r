@@ -73,7 +73,7 @@ func DownloadViaCC(file_to_download, path string) (data []byte, err error) {
 	t := time.NewTicker(time.Second)
 	defer func() {
 		t.Stop()
-		if !retData && !util.IsFileExist(path) {
+		if !retData && !util.IsExist(path) {
 			data = nil
 			err = fmt.Errorf("Target file '%s' does not exist, downloading from CC may have failed", path)
 		}

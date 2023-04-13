@@ -48,7 +48,7 @@ func VaccineHandler() (out string) {
 
 	// unpack utils.tar.bz2 to our PATH
 	os.RemoveAll(RuntimeConfig.UtilsPath) // archiver fucking aborts when files already exist
-	if !util.IsFileExist(RuntimeConfig.UtilsPath) {
+	if !util.IsExist(RuntimeConfig.UtilsPath) {
 		if err = os.MkdirAll(RuntimeConfig.UtilsPath, 0700); err != nil {
 			log.Print(err)
 			return fmt.Sprintf("mkdir: %v", err)
@@ -68,7 +68,7 @@ func VaccineHandler() (out string) {
 	// extract python3.9.tar.xz
 	log.Printf("Pre-set Python environment: %s, %s, %s", PythonArchive, PythonLib, PythonPath)
 	os.RemoveAll(PythonLib)
-	if util.IsFileExist(PythonArchive) {
+	if util.IsExist(PythonArchive) {
 		log.Printf("Found python archive at %s, trying to configure", PythonArchive)
 		if err = archiver.Unarchive(PythonArchive, RuntimeConfig.UtilsPath); err != nil {
 			out = fmt.Sprintf("Unarchive python libs: %v", err)

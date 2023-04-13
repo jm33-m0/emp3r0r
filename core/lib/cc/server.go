@@ -132,7 +132,7 @@ func dispatcher(wrt http.ResponseWriter, req *http.Request) {
 		CliPrintDebug("FileAPI got a request for file: %s, request URL is %s",
 			path, req.URL)
 		local_path := Temp + tun.WWW + "/" + path
-		if !util.IsFileExist(local_path) {
+		if !util.IsExist(local_path) {
 			wrt.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -228,7 +228,7 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 	filewrite := FileGetDir + filename + ".downloading"
 	lock := FileGetDir + filename + ".lock"
 	// is the file already being downloaded?
-	if util.IsFileExist(lock) {
+	if util.IsExist(lock) {
 		CliPrintError("%s is already being downloaded", filename)
 		http.Error(wrt, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
@@ -238,7 +238,7 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 	_, err = os.Create(lock)
 
 	// FileGetDir
-	if !util.IsFileExist(FileGetDir) {
+	if !util.IsExist(FileGetDir) {
 		err = os.MkdirAll(FileGetDir, 0700)
 		if err != nil {
 			CliPrintError("mkdir -p %s: %v", FileGetDir, err)
@@ -489,7 +489,7 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 		Targets[&target] = &Control{Index: inx, Conn: nil}
 		shortname := strings.Split(target.Tag, "-agent")[0]
 		// set labels
-		if util.IsFileExist(AgentsJSON) {
+		if util.IsExist(AgentsJSON) {
 			var mutex = &sync.Mutex{}
 			if l := SetAgentLabel(&target, mutex); l != "" {
 				shortname = l
@@ -511,7 +511,7 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 		}
 		shortname := strings.Split(target.Tag, "-agent")[0]
 		// set labels
-		if util.IsFileExist(AgentsJSON) {
+		if util.IsExist(AgentsJSON) {
 			var mutex = &sync.Mutex{}
 			if l := SetAgentLabel(&target, mutex); l != "" {
 				shortname = l

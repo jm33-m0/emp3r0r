@@ -49,7 +49,12 @@ func GenAgent() {
 		for n, arch := range Arch_List {
 			CliPrint("[%d] %s", n, arch)
 		}
-		arch_choice = CliAsk("Generate for: ", false)
+		arch_choice_index, err := strconv.Atoi(CliAsk("Generate for: ", false))
+		if err != nil {
+			CliPrintError("Invalid index number: %v", err)
+			return
+		}
+		arch_choice = Arch_List[arch_choice_index]
 		CliPrintInfo("Generating agent for %s platform", arch_choice)
 		stubFile = fmt.Sprintf("%s-%s", emp3r0r_data.Stub_Linux, arch_choice)
 		outfile = fmt.Sprintf("%s/agent_linux_%s_%d-%d-%d_%d-%d-%d",
@@ -67,7 +72,7 @@ func GenAgent() {
 			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 	}
 
-	if !util.IsFileExist(stubFile) {
+	if !util.IsExist(stubFile) {
 		CliPrintError("%s not found, build it first", stubFile)
 		return
 	}
@@ -159,7 +164,7 @@ func PackAgentBinary() {
 }
 
 func UpgradeAgent() {
-	if !util.IsFileExist(WWWRoot + "agent") {
+	if !util.IsExist(WWWRoot + "agent") {
 		CliPrintError("Make sure %s/agent exists", WWWRoot)
 		return
 	}
@@ -175,7 +180,7 @@ func PromptForConfig(isAgent bool) (err error) {
 		jsonData   []byte
 		config_map map[string]interface{}
 	)
-	if util.IsFileExist(EmpConfigFile) {
+	if util.IsExist(EmpConfigFile) {
 		CliPrintInfo("Reading config from existing %s", EmpConfigFile)
 		jsonData, err = ioutil.ReadFile(EmpConfigFile)
 		if err != nil {
@@ -325,13 +330,13 @@ func PromptForConfig(isAgent bool) (err error) {
 
 // GenC2Certs generate certificates for CA and emp3r0r C2 server
 func GenC2Certs(hosts []string) (err error) {
-	if !util.IsFileExist(CAKeyFile) || !util.IsFileExist(CACrtFile) {
+	if !util.IsExist(CAKeyFile) || !util.IsExist(CACrtFile) {
 		err = tun.GenCerts(nil, "", true)
 		if err != nil {
 			return fmt.Errorf("Generate CA: %v", err)
 		}
 	}
-	if !util.IsFileExist(CAKeyFile) || !util.IsFileExist(CACrtFile) {
+	if !util.IsExist(CAKeyFile) || !util.IsExist(CACrtFile) {
 		return fmt.Errorf("%s or %s still not found", CAKeyFile, CACrtFile)
 	}
 
