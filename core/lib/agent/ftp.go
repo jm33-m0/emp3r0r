@@ -54,6 +54,16 @@ func DownloadViaCC(file_to_download, path string) (data []byte, err error) {
 		retData = true
 		log.Printf("No path specified, will return []byte")
 	}
+	lock := fmt.Sprintf("%s.downloading", path)
+	if util.IsFileExist(lock) {
+		err = fmt.Errorf("%s already being downloaded", url)
+		return
+	}
+
+	// create file.downloading to prevent racing downloads
+	if !retData {
+		os.Create(lock)
+	}
 
 	// use EmpHTTPClient
 	client := grab.NewClient()
@@ -70,13 +80,14 @@ func DownloadViaCC(file_to_download, path string) (data []byte, err error) {
 	}
 
 	// progress
-	t := time.NewTicker(time.Second)
+	t := time.NewTicker(10 * time.Second)
 	defer func() {
 		t.Stop()
 		if !retData && !util.IsExist(path) {
 			data = nil
 			err = fmt.Errorf("Target file '%s' does not exist, downloading from CC may have failed", path)
 		}
+		os.RemoveAll(lock)
 	}()
 	for !resp.IsComplete() {
 		select {
