@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.26.2](https://github.com/jm33-m0/emp3r0r/compare/v1.26.1...v1.26.2) (2023-04-14)
+
+
+### Bug Fixes
+
+* [#196](https://github.com/jm33-m0/emp3r0r/issues/196) ([1ec35ca](https://github.com/jm33-m0/emp3r0r/commit/1ec35ca4f6e3d54800832199e2bb3b8b806f93b4))
+* `elvsh` shell cant start due to missing agent binary ([c090e08](https://github.com/jm33-m0/emp3r0r/commit/c090e0854e4ccfeb462728e54dd1ef73e186ad50))
+* DownloadViaCC has racing issue ([0d96ca8](https://github.com/jm33-m0/emp3r0r/commit/0d96ca811de660b54a2379f8fa165984b29e18c6))
+* timeout kill should not happen with cmds like `get` ([9ddf659](https://github.com/jm33-m0/emp3r0r/commit/9ddf659d9989ecfd6b01329253987ab3ca88b384))
+
 ## [1.26.1](https://github.com/jm33-m0/emp3r0r/compare/v1.26.0...v1.26.1) (2023-04-13)
 
 
