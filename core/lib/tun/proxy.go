@@ -137,8 +137,8 @@ func FwdToDport(ctx context.Context, cancel context.CancelFunc,
 	for ctx.Err() == nil {
 		time.Sleep(500 * time.Millisecond)
 	}
-	_, _ = h2.Write([]byte("exit\n"))
-	_, _ = dest.Write([]byte("exit\n"))
+	// _, _ = h2.Write([]byte("exit\n"))
+	// _, _ = dest.Write([]byte("exit\n"))
 }
 
 // TCPConnJoin join two TCP connections
