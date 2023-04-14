@@ -393,7 +393,7 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 	// check if session ID exists in the map,
 	pf, exist := PortFwds[sessionID.String()]
 	if !exist {
-		CliPrintError("Unknown ID: %s", sessionID.String())
+		CliPrintError("Port mapping session (%s) unknown, is it dead?", sessionID.String())
 		return
 	}
 	pf.Sh = make(map[string]*StreamHandler)
