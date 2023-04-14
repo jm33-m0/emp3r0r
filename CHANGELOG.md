@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.2](https://github.com/jm33-m0/emp3r0r/compare/v1.26.1...v1.26.2) (2023-04-14)
+
+
+### Bug Fixes
+
+* timeout kill should not happen with cmds like `get` ([9ddf659](https://github.com/jm33-m0/emp3r0r/commit/9ddf659d9989ecfd6b01329253987ab3ca88b384))
+
 ## [1.26.1](https://github.com/jm33-m0/emp3r0r/compare/v1.26.0...v1.26.1) (2023-04-13)
 
 
