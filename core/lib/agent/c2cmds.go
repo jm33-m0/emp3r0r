@@ -100,6 +100,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		return
 
 		// proxy server
+		// !proxy on 0.0.0.0:12345
 	case emp3r0r_data.C2CmdProxy:
 		if len(cmdSlice) != 3 {
 			out = fmt.Sprintf("args error: %v", cmdSlice)

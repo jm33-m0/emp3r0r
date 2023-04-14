@@ -325,7 +325,7 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 	}()
 
 	// read filedata
-	for sh.H2x.Ctx.Err() == nil && nowSize/targetSize < 1 {
+	for nowSize/targetSize < 1 {
 		data := make([]byte, sh.BufSize)
 		n, err := sh.H2x.Conn.Read(data)
 		if err != nil {
@@ -443,7 +443,7 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 		CliPrintWarning("portFwdHandler: closed portFwd connection from %s", req.RemoteAddr)
 	}()
 
-	for ctx.Err() == nil && pf.Ctx.Err() == nil {
+	for pf.Ctx.Err() == nil {
 		_, exist = PortFwds[sessionID.String()]
 		if !exist {
 			CliPrintWarning("Disconnected: portFwdHandler: port mapping not found")
