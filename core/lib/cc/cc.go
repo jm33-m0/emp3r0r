@@ -189,6 +189,12 @@ func ListTargets() {
 	AgentListPane.Printf(true, "\n\033[0m%s\n\n", tableString.String())
 }
 
+// Update agent list, then switch to its tmux window
+func ls_targets() {
+	ListTargets()
+	TmuxSwitchWindow(AgentListPane.WindowID)
+}
+
 func GetTargetDetails(target *emp3r0r_data.AgentSystemInfo) {
 	// exists?
 	if !IsAgentExist(target) {

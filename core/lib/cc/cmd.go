@@ -44,7 +44,7 @@ var CommandHelp = map[string]string{
 
 // CmdFuncs holds a map of helper functions
 var CmdFuncs = map[string]func(){
-	"ls_targets":    ListTargets,
+	"ls_targets":    ls_targets,
 	"ls_modules":    ListModules,
 	"ls_port_fwds":  ListPortFwds,
 	"info":          CliListOptions,
