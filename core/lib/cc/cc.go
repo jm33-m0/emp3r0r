@@ -468,8 +468,6 @@ func DirSetup() (err error) {
 	// binaries
 	emp3r0r_data.Stub_Linux = EmpWorkSpace + "/stub"
 	emp3r0r_data.Stub_Windows = EmpWorkSpace + "/stub-win"
-	emp3r0r_data.Packer_Stub = EmpWorkSpace + "/packer_stub.exe"
-	emp3r0r_data.Packer_Stub_Windows = EmpWorkSpace + "/packer_stub-win.exe"
 
 	// copy stub binaries to ~/.emp3r0r
 	for _, arch := range Arch_List {
