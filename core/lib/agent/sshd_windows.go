@@ -6,6 +6,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -46,12 +47,20 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		cmd := exec.Command(exe, args...)
 		if IsConPTYSupported() {
 			log.Print("ConPTY supported, the shell will be interactive")
+			conhost_exe := `c:\windows\system32\conhost.exe`
+			if !util.IsFileExist(conhost_exe) {
+				io.WriteString(s,
+					fmt.Sprintf("conhost.exe not found at %s, PATH=%s\n",
+						conhost_exe,
+						os.Getenv("PATH")))
+				return
+			}
 			if len(args) > 0 {
 				args = append([]string{exe}, args...)
 			} else {
 				args = []string{exe}
 			}
-			cmd = exec.Command("conhost.exe", args...) // shell command
+			cmd = exec.Command(conhost_exe, args...) // shell command
 		}
 		cmd.Env = os.Environ()
 		cmd.Stderr = s

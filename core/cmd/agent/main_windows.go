@@ -76,7 +76,7 @@ func main() {
 	time.Sleep(time.Duration(util.RandInt(3, 10)) * time.Second)
 
 	// PATH
-	os.Setenv("PATH", fmt.Sprintf(`%s;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Windows\System32\OpenSSH\`, agent.RuntimeConfig.UtilsPath))
+	agent.SetPath()
 
 	// HOME
 	os.Setenv("HOME", os.Getenv("USERPROFILE"))
