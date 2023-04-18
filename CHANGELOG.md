@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.26.5](https://github.com/jm33-m0/emp3r0r/compare/v1.26.4...v1.26.5) (2023-04-18)
+
+
+### Bug Fixes
+
+* auto-resize console buffer on elvsh start, to match C2 terminal size ([71167e4](https://github.com/jm33-m0/emp3r0r/commit/71167e487ecccbf84522b73c430e4271a5afc847))
+* improve `PATH` handling on Windows/Linux ([dfcf572](https://github.com/jm33-m0/emp3r0r/commit/dfcf572e07e0fd0b2fd5150959ec819be7a529e9))
+
 ## [1.26.4](https://github.com/jm33-m0/emp3r0r/compare/v1.26.3...v1.26.4) (2023-04-14)
 
 
