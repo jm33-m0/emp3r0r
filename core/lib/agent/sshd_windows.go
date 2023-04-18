@@ -101,7 +101,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		log.Printf("sshd execute: %v, args(%d)=%v, env=%s",
 			cmd, len(cmd.Args), cmd.Args, cmd.Env)
 
-		if IsConPTYSupported() {
+		if IsConPTYSupported() && isPTY {
 			win := <-winCh
 			if win.Width <= 0 || win.Height <= 0 {
 				log.Printf("w/h is 0, aborting")
