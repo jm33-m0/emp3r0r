@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strconv"
@@ -268,6 +269,11 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 	// log progress instead of showing the actual progressbar
 	go func() {
 		for state := bar.State(); nowSize/targetSize < 1 && state.CurrentPercent < 1; time.Sleep(5 * time.Second) {
+			// read file size
+			nowSize = util.FileSize(filewrite)
+			// progress
+			bar.Set64(nowSize)
+
 			state = bar.State()
 			// progress may reach 100% when downloading is incomplete
 			if nowSize/targetSize < 1 && state.CurrentPercent == 1 {
@@ -325,27 +331,10 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 	}()
 
 	// read filedata
-	for nowSize/targetSize < 1 {
-		data := make([]byte, sh.BufSize)
-		n, err := sh.H2x.Conn.Read(data)
-		if err != nil {
-			CliPrintWarning("Disconnected: ftpHandler read: %v", err)
-			return
-		}
-		if n < sh.BufSize {
-			data = data[:n]
-		}
-
-		// write the file
-		n, err = f.Write(data)
-		if err != nil {
-			CliPrintError("ftpHandler failed to save file: %v", err)
-			return
-		}
-
-		// progress
-		nowSize += int64(n)
-		bar.Add64(int64(n))
+	n, err := io.Copy(f, sh.H2x.Conn)
+	if err != nil {
+		CliPrintWarning("ftpHandler failed to save file: %v. %d bytes has been saved", err, n)
+		return
 	}
 }
 
