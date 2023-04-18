@@ -6,7 +6,10 @@ package agent
 import (
 	"fmt"
 	"log"
-	"syscall"
+	"os"
+	"os/exec"
+	"strconv"
+	"strings"
 	"unsafe"
 
 	"github.com/gonutz/w32/v2"
@@ -203,17 +206,40 @@ func SetCosoleWinsize(pid, w, h int) {
 }
 
 func SetConsoleBufferSize(w, h int) {
-	procSetConsoleScreenBufferSize := Kernel32DLL.NewProc("SetConsoleScreenBufferSize")
-	// Get the handle for the console screen buffer
-	stdout, err := syscall.GetStdHandle(syscall.STD_OUTPUT_HANDLE)
+	mod_cmd := fmt.Sprintf("mode con:cols=%d lines=%d", w, h)
+
+	cmd := exec.Command("cmd.exe", "/C", mod_cmd)
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Println("Error getting stdout handle:", err)
+		log.Printf("SetConsoleBufferSize: %s, %v", out, err)
+		return
+	}
+	log.Printf("SetConsoleBufferSize: set buffer size to %dx%d", w, h)
+}
+
+func AutoSetConsoleBufferSize() {
+	size := os.Getenv("TERM_SIZE")
+	if size == "" {
+		log.Printf("AutoSetConsoleBufferSize: no size specified")
 		return
 	}
 
-	size := coord{int16(w), int16(h)}
-	ret, _, err := procSetConsoleScreenBufferSize.Call(uintptr(stdout), uintptr(unsafe.Pointer(&size)))
-	if ret == 0 {
-		log.Printf("Error resizing console buffer: %v", err)
+	wh := strings.Split(size, "x")
+	if len(wh) < 2 {
+		log.Printf("AutoSetConsoleBufferSize: Incorrect size")
+		return
 	}
+
+	w, err := strconv.Atoi(wh[0])
+	if err != nil {
+		log.Printf("AutoSetConsoleBufferSize: Incorrect width")
+		return
+	}
+	h, err := strconv.Atoi(wh[1])
+	if err != nil {
+		log.Printf("AutoSetConsoleBufferSize: Incorrect height")
+		return
+	}
+
+	SetConsoleBufferSize(w, h)
 }

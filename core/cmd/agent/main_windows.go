@@ -43,12 +43,16 @@ func main() {
 
 	// run as elvish shell
 	runElvsh := os.Getenv("ELVSH") == "TRUE"
+
 	if runElvsh {
+		osArgs := []string{os.Args[0]} // we don't need it to execute elvsh scripts
+		agent.AutoSetConsoleBufferSize()
 		os.Exit(prog.Run(
-			[3]*os.File{os.Stdin, os.Stdout, os.Stderr}, os.Args,
+			[3]*os.File{os.Stdin, os.Stdout, os.Stderr}, osArgs,
 			prog.Composite(
 				&buildinfo.Program{}, &lsp.Program{},
 				&shell.Program{})))
+
 	}
 
 	// silent switch
