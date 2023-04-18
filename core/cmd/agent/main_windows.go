@@ -43,7 +43,6 @@ func main() {
 
 	// run as elvish shell
 	runElvsh := os.Getenv("ELVSH") == "TRUE"
-
 	if runElvsh {
 		osArgs := []string{os.Args[0]} // we don't need it to execute elvsh scripts
 		agent.AutoSetConsoleBufferSize()

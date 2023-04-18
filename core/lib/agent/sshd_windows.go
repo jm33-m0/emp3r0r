@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -44,13 +45,12 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 
 	ssh_server.Handle(func(s ssh.Session) {
 		cmd := exec.Command(exe, args...)
-		if IsConPTYSupported() {
+		if IsConPTYSupported() && runtime.GOARCH == "amd64" {
 			log.Print("ConPTY supported, the shell will be interactive")
-			conhost_exe := `c:\windows\system32\conhost.exe`
-			if !util.IsFileExist(conhost_exe) {
+			conhost_exe, err := exec.LookPath("conhost.exe")
+			if err != nil {
 				io.WriteString(s,
-					fmt.Sprintf("conhost.exe not found at %s, PATH=%s\n",
-						conhost_exe,
+					fmt.Sprintf("conhost.exe not found, PATH=%s\n",
 						os.Getenv("PATH")))
 				return
 			}
