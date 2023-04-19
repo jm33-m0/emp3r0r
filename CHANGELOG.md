@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.26.7](https://github.com/jm33-m0/emp3r0r/compare/v1.26.6...v1.26.7) (2023-04-19)
+
+
+### Bug Fixes
+
+* [#201](https://github.com/jm33-m0/emp3r0r/issues/201), use winpty to support ConPTY shell on all Windows versions ([dfc54c0](https://github.com/jm33-m0/emp3r0r/commit/dfc54c0a11f8a976928b2e39f8369f954d688e2d))
+* upgrade dependencies ([069484a](https://github.com/jm33-m0/emp3r0r/commit/069484a7faf0b21f3e8d83717367115cc6ef87f9))
+
 ## [1.26.6](https://github.com/jm33-m0/emp3r0r/compare/v1.26.5...v1.26.6) (2023-04-18)
 
 
