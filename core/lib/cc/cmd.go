@@ -119,6 +119,10 @@ func CmdHandler(cmd string) (err error) {
 				UpdateOptions(CurrentMod)
 				CliPrintInfo("Using module %s", strconv.Quote(CurrentMod))
 				ModuleDetails(CurrentMod)
+				description, exists := emp3r0r_data.ModuleComments[CurrentMod]
+				if exists {
+					CliPrint("%s", description)
+				}
 				CliListOptions()
 
 				return

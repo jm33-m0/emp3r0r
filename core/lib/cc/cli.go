@@ -498,7 +498,42 @@ func CliListOptions() {
 		opts[k] = v.Val
 	}
 
-	CliPrettyPrint("Option", "Value", &opts)
+	// build table
+	tdata := [][]string{}
+	tableString := &strings.Builder{}
+	table := tablewriter.NewWriter(tableString)
+	table.SetHeader([]string{"Option", "Help", "Value"})
+	table.SetBorder(true)
+	table.SetRowLine(true)
+	table.SetAutoWrapText(true)
+	table.SetColWidth(20)
+
+	// color
+	table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor})
+	table.SetColumnColor(tablewriter.Colors{tablewriter.FgHiBlueColor},
+		tablewriter.Colors{tablewriter.FgBlueColor},
+		tablewriter.Colors{tablewriter.FgBlueColor})
+
+	// fill table
+	module_help, is_help_exist := emp3r0r_data.ModuleHelp[CurrentMod]
+	for k, v := range opts {
+		help := "N/A"
+		if is_help_exist {
+			help = module_help[k]
+		}
+
+		tdata = append(tdata,
+			[]string{util.SplitLongLine(k, 20),
+				util.SplitLongLine(help, 20),
+				util.SplitLongLine(v, 20)})
+	}
+	table.AppendBulk(tdata)
+	table.Render()
+	out := tableString.String()
+	AdaptiveTable(out)
+	CliPrint("\n%s", out)
 }
 
 // CliListCmds list all commands in tree format
@@ -592,7 +627,7 @@ func CliPrettyPrint(header1, header2 string, map2write *map[string]string) {
 	table.Render()
 	out := tableString.String()
 	AdaptiveTable(out)
-	CliMsg("\n%s", out)
+	CliPrint("\n%s", out)
 }
 
 // encoded logo of emp3r0r
