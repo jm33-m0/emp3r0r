@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.26.8](https://github.com/jm33-m0/emp3r0r/compare/v1.26.7...v1.26.8) (2023-04-21)
+
+
+### Bug Fixes
+
+* `use` command should show more info about the selected module ([e04dc5b](https://github.com/jm33-m0/emp3r0r/commit/e04dc5b246b822fc9fb8b9b5ab82ba4d15d37275))
+* agent side SOCKS5 server lacks authentication ([67cba96](https://github.com/jm33-m0/emp3r0r/commit/67cba9613a95b1181de439adfbad39eb9b9f9f20))
+
 ## [1.26.7](https://github.com/jm33-m0/emp3r0r/compare/v1.26.6...v1.26.7) (2023-04-19)
 
 
