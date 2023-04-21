@@ -25,20 +25,11 @@ func StartSocks5Proxy(addr, doh string, proxyserver *socks5.Server) (err error) 
 		}
 	}
 
-	if proxyserver == nil {
-		socks5.Debug = true
-		proxyserver, err = socks5.NewClassicServer(addr, "", "", "", 10, 10)
-		if err != nil {
-			return
-		}
-	} else {
-		return fmt.Errorf("Socks5Proxy is already running on %s", proxyserver.ServerAddr.String())
-	}
-
+	socks5.Debug = true
 	log.Printf("Socks5Proxy started on %s", addr)
 	err = proxyserver.ListenAndServe(nil)
 	if err != nil {
-		return
+		return fmt.Errorf("Socks5Proxy listen: %v", err)
 	}
 	log.Printf("Socks5Proxy stopped (%s)", addr)
 

@@ -181,7 +181,10 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 		time.Sleep(time.Duration(util.RandInt(RuntimeConfig.BroadcastIntervalMin, RuntimeConfig.BroadcastIntervalMax)) * time.Second)
 		ips := tun.IPaddr()
 		for _, netip := range ips {
-			proxyMsg := fmt.Sprintf("socks5://%s:%s", netip.IP.String(), RuntimeConfig.AutoProxyPort)
+			proxyMsg := fmt.Sprintf("socks5://%s:%s@%s:%s",
+				RuntimeConfig.ShadowsocksPort,
+				RuntimeConfig.ShadowsocksPassword,
+				netip.IP.String(), RuntimeConfig.AutoProxyPort)
 			broadcastAddr := tun.IPbroadcastAddr(netip)
 			if broadcastAddr == "" {
 				continue
