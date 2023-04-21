@@ -520,8 +520,17 @@ func CliListOptions() {
 	module_help, is_help_exist := emp3r0r_data.ModuleHelp[CurrentMod]
 	for k, v := range opts {
 		help := "N/A"
+		if k == "module" {
+			help = "Selected module"
+		}
+		if k == "target" {
+			help = "Selected target"
+		}
 		if is_help_exist {
-			help = module_help[k]
+			h, ok := module_help[k]
+			if ok {
+				help = h
+			}
 		}
 
 		tdata = append(tdata,
