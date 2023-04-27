@@ -44,6 +44,8 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 	out := strings.Join(payloadSplit[2:len(payloadSplit)-1], " ")
 	// outLines := strings.Split(out, "\n")
 
+	is_builtin_cmd := strings.HasPrefix(cmd, "!")
+
 	// time spent on this cmd
 	cmd_id := payloadSplit[len(payloadSplit)-1]
 	// cache this cmd response
@@ -55,7 +57,11 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 		CliPrintWarning("Parsing timestamp '%s': %v", CmdTime[cmd_id], err)
 	} else {
 		time_spent := time.Since(start_time)
-		CliPrintInfo("Command %s took %s", strconv.Quote(cmd), time_spent)
+		if is_builtin_cmd {
+			CliPrintDebug("Command %s took %s", strconv.Quote(cmd), time_spent)
+		} else {
+			CliPrintInfo("Command %s took %s", strconv.Quote(cmd), time_spent)
+		}
 	}
 
 	// headless mode
