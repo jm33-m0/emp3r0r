@@ -61,10 +61,18 @@ func moduleProxy() {
 	status := Options["status"].Val
 
 	// port-fwd
-	var pf PortFwdSession
+	var pf = new(PortFwdSession)
 	pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
 	pf.Lport, pf.To = port, "127.0.0.1:"+RuntimeConfig.AutoProxyPort
-	pf.Description = fmt.Sprintf("Agent Proxy:\n%s (Local) -> %s (Agent)", pf.Lport, pf.To)
+	pf.Description = fmt.Sprintf("Agent Proxy (TCP):\n%s (Local) -> %s (Agent)", pf.Lport, pf.To)
+	pf.Protocol = "tcp"
+
+	// udp port fwd
+	var pfu = new(PortFwdSession)
+	pfu.Ctx, pfu.Cancel = context.WithCancel(context.Background())
+	pfu.Lport, pfu.To = port, "127.0.0.1:"+RuntimeConfig.AutoProxyPort
+	pfu.Description = fmt.Sprintf("Agent Proxy (UDP):\n%s (Local) -> %s (Agent)", pfu.Lport, pfu.To)
+	pfu.Protocol = "udp"
 
 	switch status {
 	case "on":
@@ -92,9 +100,16 @@ func moduleProxy() {
 			go func() {
 				err := pf.RunPortFwd()
 				if err != nil {
-					CliPrintError("PortFwd failed: %v", err)
+					CliPrintError("PortFwd (TCP) failed: %v", err)
 				}
 			}()
+			// // UDP forwarding
+			// go func() {
+			// 	err := pfu.RunPortFwd()
+			// 	if err != nil {
+			// 		CliPrintError("PortFwd (UDP) failed: %v", err)
+			// 	}
+			// }()
 		}
 	case "off":
 		for id, session := range PortFwds {

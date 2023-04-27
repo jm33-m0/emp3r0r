@@ -75,7 +75,7 @@ func isPortFwdExist(addr string) bool {
 
 // PortFwd port mapping, receive request data then send it to target port on remote address
 // addr: when reversed, addr should be port
-func PortFwd(addr, sessionID string, reverse bool) (err error) {
+func PortFwd(addr, sessionID, protocol string, reverse bool) (err error) {
 	var (
 		session PortFwdSession
 
@@ -97,8 +97,8 @@ func PortFwd(addr, sessionID string, reverse bool) (err error) {
 		go listenAndFwd(ctx, cancel, addr, sessionID) // here addr is a port number to listen on
 	} else {
 		conn, ctx, cancel, err = ConnectCC(url)
-		log.Printf("PortFwd started: %s (%s)", addr, sessionID)
-		go tun.FwdToDport(ctx, cancel, addr, sessionID, conn)
+		log.Printf("PortFwd (%s) started: %s (%s)", protocol, addr, sessionID)
+		go tun.FwdToDport(ctx, cancel, addr, sessionID, protocol, conn)
 	}
 
 	// remember to cleanup
