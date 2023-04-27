@@ -314,7 +314,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 	case "tcp":
 		// TCP listener
 		tcp_listener, err = net.Listen("tcp", ":"+listenPort)
-		if err != nil && pf.Protocol != "udp" {
+		if err != nil {
 			return fmt.Errorf("RunPortFwd listen TCP: %v", err)
 		}
 	case "udp":
@@ -392,10 +392,11 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 				err = fmt.Errorf("UDP Listener: %v", err)
 				return
 			}
+			client_tag := strings.ReplaceAll(udp_client_addr.String(), ":", "-")
 			CliPrintDebug("UDP listener read %d bytes from %s", n, udp_client_addr.String())
 
 			// create port mapping for each client connection
-			shID := fmt.Sprintf("%s_%s", fwdID, udp_client_addr.String())
+			shID := fmt.Sprintf("%s_%s", fwdID, client_tag)
 			cmd = fmt.Sprintf("%s %s %s %s",
 				emp3r0r_data.C2CmdPortFwd, toAddr, shID, pf.Protocol)
 			err = SendCmd(cmd, "", pf.Agent)

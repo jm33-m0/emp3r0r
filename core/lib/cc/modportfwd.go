@@ -96,24 +96,28 @@ func moduleProxy() {
 			CliPrintError("Timeout waiting for agent to start SOCKS5 proxy")
 			return
 		} else {
-			// port mapping of default socks5 proxy
+			// TCP forwarding
 			go func() {
 				err := pf.RunPortFwd()
 				if err != nil {
 					CliPrintError("PortFwd (TCP) failed: %v", err)
 				}
 			}()
-			// // UDP forwarding
-			// go func() {
-			// 	err := pfu.RunPortFwd()
-			// 	if err != nil {
-			// 		CliPrintError("PortFwd (UDP) failed: %v", err)
-			// 	}
-			// }()
+			// UDP forwarding
+			go func() {
+				for pf.Sh == nil {
+					util.TakeABlink()
+				}
+				err := pfu.RunPortFwd()
+				if err != nil {
+					CliPrintError("PortFwd (UDP) failed: %v", err)
+				}
+			}()
 		}
 	case "off":
 		for id, session := range PortFwds {
-			if session.Description == pf.Description {
+			if session.Description == pf.Description ||
+				session.Description == pfu.Description {
 				session.Cancel() // cancel the PortFwd session
 
 				// tell the agent to close connection
