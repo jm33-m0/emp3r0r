@@ -98,10 +98,10 @@ func FwdToDport(ctx context.Context, cancel context.CancelFunc,
 	// connect to target port
 	dest, err := net.Dial(protocol, to)
 	defer func() {
-		cancel()
 		if dest != nil {
 			dest.Close()
 		}
+		cancel()
 		log.Printf("FwdToDport %s (%s) exited", to, protocol)
 	}()
 	if err != nil {
@@ -117,15 +117,9 @@ func FwdToDport(ctx context.Context, cancel context.CancelFunc,
 			return
 		}
 	}()
-	go func() {
-		_, err = io.Copy(h2, dest)
-		if err != nil {
-			log.Printf("FwdToDport %s (%s): dest -> h2: %v", protocol, sessionID, err)
-			return
-		}
-	}()
-
-	for ctx.Err() == nil {
-		time.Sleep(500 * time.Millisecond)
+	_, err = io.Copy(h2, dest)
+	if err != nil {
+		log.Printf("FwdToDport %s (%s): dest -> h2: %v", protocol, sessionID, err)
+		return
 	}
 }
