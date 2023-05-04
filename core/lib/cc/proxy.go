@@ -384,7 +384,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		CliPrintDebug("UDP listener read %d bytes from %s", n, udp_client_addr.String())
 
 		// create port mapping for each client connection
-		shID := fmt.Sprintf("%s_%s-udp", fwdID, client_tag)
+		shID := fmt.Sprintf("%s_%s", fwdID, client_tag)
 		cmd = fmt.Sprintf("%s %s %s %s %d",
 			emp3r0r_data.C2CmdPortFwd, toAddr, shID, pf.Protocol, pf.Timeout)
 		err = SendCmd(cmd, "", pf.Agent)

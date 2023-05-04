@@ -138,6 +138,10 @@ func UpdateOptions(modName string) (exist bool) {
 		switchOpt := addIfNotFound("switch")
 		switchOpt.Vals = []string{"on", "off", "reverse"}
 		switchOpt.Val = "on"
+		// protocol
+		protOpt := addIfNotFound("protocol")
+		protOpt.Vals = []string{"tcp", "udp"}
+		protOpt.Val = "tcp"
 
 	case modName == emp3r0r_data.ModCLEAN_LOG:
 		// keyword to clean

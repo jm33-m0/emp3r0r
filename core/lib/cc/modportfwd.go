@@ -46,6 +46,7 @@ func modulePortFwd() {
 		var pf PortFwdSession
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
 		pf.Lport, pf.To = Options["listen_port"].Val, Options["to"].Val
+		pf.Protocol = Options["protocol"].Val
 		go func() {
 			err := pf.RunPortFwd()
 			if err != nil {

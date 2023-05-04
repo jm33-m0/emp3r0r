@@ -679,6 +679,7 @@ func listValChoices() func(string) []string {
 		case emp3r0r_data.ModPORT_FWD:
 			ret := append(Options["listen_port"].Vals, Options["to"].Vals...)
 			ret = append(ret, Options["switch"].Vals...)
+			ret = append(ret, Options["protocol"].Vals...)
 			return ret
 		case emp3r0r_data.ModStager:
 			return append(Options["type"].Vals, Options["agent_path"].Vals...)
