@@ -40,6 +40,7 @@ func ReadJSONConfig(jsonData []byte, config_to_write *Config) (err error) {
 type Config struct {
 	CCPort               string `json:"cc_port"`                // CC service port, TLS enabled
 	AutoProxyPort        string `json:"autoproxy_port"`         // Socks proxy port for auto proxy feature
+	AutoProxyTimeout     int    `json:"autoproxy_timeout"`      // timeout (in seconds) for agent side Socks5 server
 	HTTPListenerPort     string `json:"http_listner_port"`      // For stager HTTP server
 	ShadowsocksPassword  string `json:"shadowsocks_password"`   // password of shadowsocks proxy server
 	ShadowsocksPort      string `json:"shadowsocks_port"`       // server port of shadowsocks proxy server

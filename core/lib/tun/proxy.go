@@ -91,7 +91,7 @@ func TCPFwd(addr, port string, ctx context.Context, cancel context.CancelFunc) (
 
 // FwdToDport forward request to agent-side destination, h2 <-> tcp/udp
 func FwdToDport(ctx context.Context, cancel context.CancelFunc,
-	to, sessionID, protocol string, h2 *h2conn.Conn) {
+	to, sessionID, protocol string, h2 *h2conn.Conn, timeout int) {
 
 	var err error
 
@@ -108,6 +108,10 @@ func FwdToDport(ctx context.Context, cancel context.CancelFunc,
 		log.Printf("FwdToDport %s (%s): %v", to, protocol, err)
 		return
 	}
+
+	// 10s timeout, in case we open too many connections
+	dest.SetDeadline(time.Now().Add(time.Duration(timeout) * time.Second))
+	log.Printf("FwdToDport: connected to %s (%s)", to, protocol)
 
 	// io.Copy
 	go func() {

