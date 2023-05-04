@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -355,6 +356,31 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 	sh.H2x.Ctx = ctx
 	sh.H2x.Cancel = cancel
 
+	udp_packet_handler := func(dst_addr string, listener *net.UDPConn) {
+		buf := make([]byte, 1024)
+		// H2 back to UDP client
+		n, err := sh.H2x.Conn.Read(buf)
+		if err != nil {
+			CliPrintError("Read from H2: %v", err)
+		}
+		CliPrintDebug("Received %d bytes from H2", n)
+		udp_client_addr, err := net.ResolveUDPAddr("udp4", dst_addr)
+		if err != nil {
+			CliPrintWarning("%s: %v", dst_addr, err)
+		}
+
+		if listener == nil {
+			CliPrintWarning("UDP listener is nil: %s", dst_addr)
+			return
+		}
+		_, err = listener.WriteToUDP(buf[0:n], udp_client_addr)
+		if err != nil {
+			CliPrintError("Write back to UDP client %s: %v",
+				udp_client_addr.String(), err)
+		}
+		CliPrintDebug("Wrote %d bytes to %s", n, udp_client_addr.String())
+	}
+
 	// save sh
 	shCopy := *sh
 
@@ -401,6 +427,10 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 			}
 		} else {
 			CliPrintDebug("Got a portFwd sub-connection (%s) from %s", string(origToken), req.RemoteAddr)
+			if strings.HasSuffix(origToken, "-udp") {
+				dst_addr := strings.Split(origToken, "-")[0]
+				go udp_packet_handler(dst_addr, pf.Listener)
+			}
 		}
 	}
 
@@ -439,7 +469,7 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 			return
 		}
 
-		time.Sleep(200 * time.Millisecond)
+		util.TakeASnap()
 	}
 }
 

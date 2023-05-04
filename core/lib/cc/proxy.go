@@ -20,11 +20,13 @@ import (
 
 // PortFwdSession holds controller interface of a port-fwd session
 type PortFwdSession struct {
-	Protocol    string // TCP or UDP
-	Lport       string // listen_port
-	To          string // to address
-	Description string // fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, to_addr)
-	Reverse     bool   // from agent to cc or cc to agent
+	Protocol    string       // TCP or UDP
+	Lport       string       // listen_port
+	To          string       // to address
+	Description string       // fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, to_addr)
+	Reverse     bool         // from agent to cc or cc to agent
+	Listener    *net.UDPConn // if mapping is UDP, we need its listener
+	Timeout     int          // timeout in seconds
 
 	Agent  *emp3r0r_data.AgentSystemInfo // agent who holds this port mapping session
 	Sh     map[string]*StreamHandler     // related to HTTP handler
@@ -33,9 +35,9 @@ type PortFwdSession struct {
 }
 
 type port_mapping struct {
-	Id          string `json:"id"`    // portfwd id
-	Agent       string `json:"agent"` // agent tag
-	Reverse     bool   `json:"reverse"`
+	Id          string `json:"id"`          // portfwd id
+	Agent       string `json:"agent"`       // agent tag
+	Reverse     bool   `json:"reverse"`     // map (TCP) port from CC to agent
 	Description string `json:"description"` // details
 }
 
@@ -327,6 +329,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		if err != nil {
 			return fmt.Errorf("RunPortFwd Listen UDP: %v", err)
 		}
+		pf.Listener = udp_listener // will be used in portFwdHandler
 	}
 
 	// send command to agent, with session ID
@@ -373,6 +376,62 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 	}()
 
 	defer cleanup()
+
+	handleUDPPacket := func() {
+		// read UDP to this buffer
+		buf := make([]byte, 1024)
+		n, udp_client_addr, e := udp_listener.ReadFromUDP(buf)
+		if e != nil {
+			CliPrintError("UDP Listener: %v", err)
+			return
+		}
+		if n == 0 {
+			return
+		}
+		client_tag := udp_client_addr.String()
+		CliPrintDebug("UDP listener read %d bytes from %s", n, udp_client_addr.String())
+
+		// create port mapping for each client connection
+		shID := fmt.Sprintf("%s_%s-udp", fwdID, client_tag)
+		cmd = fmt.Sprintf("%s %s %s %s %d",
+			emp3r0r_data.C2CmdPortFwd, toAddr, shID, pf.Protocol, pf.Timeout)
+		err = SendCmd(cmd, "", pf.Agent)
+		if err != nil {
+			CliPrintError("SendCmd: %v", err)
+			return
+		}
+
+		// forward data from local UDP client to H2 connection
+		var (
+			sh    *StreamHandler
+			exist bool
+		)
+		// wait for agent to connect
+		for i := 0; i < 10000; i++ {
+			util.TakeABlink()
+			sh, exist = pf.Sh[shID]
+			if exist {
+				break
+			}
+		}
+		if !exist {
+			err = fmt.Errorf("UDP forwarding: timeout waiting for agent connection: %s", udp_client_addr.String())
+			return
+		}
+
+		// forward data between UDP client and H2
+		// UDP client to H2
+		buf = buf[0:n]
+		n, err = sh.H2x.Conn.Write(buf)
+		if err != nil {
+			CliPrintError("Write to H2: %v", err)
+		}
+		CliPrintDebug("%s sent %d bytes to H2", udp_client_addr.String(), n)
+
+	}
+
+	// receive TCP/UDP packets from local port
+	// and forward them to H2
 	for ctx.Err() == nil {
 		p, exist := PortFwds[fwdID]
 		if !exist {
@@ -385,63 +444,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 
 		switch pf.Protocol {
 		case "udp":
-			// read UDP to this buffer
-			buf := make([]byte, 1024)
-			n, udp_client_addr, e := udp_listener.ReadFromUDP(buf)
-			if e != nil {
-				err = fmt.Errorf("UDP Listener: %v", err)
-				return
-			}
-			client_tag := strings.ReplaceAll(udp_client_addr.String(), ":", "-")
-			CliPrintDebug("UDP listener read %d bytes from %s", n, udp_client_addr.String())
-
-			// create port mapping for each client connection
-			shID := fmt.Sprintf("%s_%s", fwdID, client_tag)
-			cmd = fmt.Sprintf("%s %s %s %s",
-				emp3r0r_data.C2CmdPortFwd, toAddr, shID, pf.Protocol)
-			err = SendCmd(cmd, "", pf.Agent)
-			if err != nil {
-				CliPrintError("SendCmd: %v", err)
-				return
-			}
-
-			// forward data from local UDP client to H2 connection
-			var (
-				sh    *StreamHandler
-				exist bool
-			)
-			// wait for agent to connect
-			for i := 0; i < 1e5; i++ {
-				time.Sleep(time.Millisecond)
-				sh, exist = pf.Sh[fwdID]
-				if exist {
-					break
-				}
-			}
-			if !exist {
-				err = fmt.Errorf("UDP forwarding timeout: %s", udp_client_addr.String())
-				return
-			}
-
-			// forward data between UDP client and H2
-
-			// UDP client to H2
-			n, err = sh.H2x.Conn.Write(buf[0:n])
-			if err != nil {
-				return fmt.Errorf("Write to H2: %v", err)
-			}
-
-			// H2 back to UDP client
-			n, err = sh.H2x.Conn.Read(buf)
-			if err != nil {
-				return fmt.Errorf("Read from H2: %v", err)
-			}
-			_, err = udp_listener.WriteToUDP(buf[0:n], udp_client_addr)
-			if err != nil {
-				return fmt.Errorf("Write back to UDP client %s: %v",
-					udp_client_addr.String(), err)
-			}
-
+			handleUDPPacket()
 		case "tcp":
 			// listen
 			conn, e := tcp_listener.Accept()
@@ -454,8 +457,8 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 			go func() {
 				// sub-session (streamHandler) ID
 				shID := fmt.Sprintf("%s_%s", fwdID, srcPort)
-				cmd = fmt.Sprintf("%s %s %s %s",
-					emp3r0r_data.C2CmdPortFwd, toAddr, shID, pf.Protocol)
+				cmd = fmt.Sprintf("%s %s %s %s %d",
+					emp3r0r_data.C2CmdPortFwd, toAddr, shID, pf.Protocol, pf.Timeout)
 				err = SendCmd(cmd, "", pf.Agent)
 				if err != nil {
 					CliPrintError("SendCmd: %v", err)
