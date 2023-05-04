@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.27.0](https://github.com/jm33-m0/emp3r0r/compare/v1.26.8...v1.27.0) (2023-05-04)
+
+
+### Features
+
+* UDP port mapping ([c2b6b32](https://github.com/jm33-m0/emp3r0r/commit/c2b6b32b2f0b8ee19d7ea7fce5fe199fdac94711))
+
+
+### Bug Fixes
+
+* command time msg should exclude built-in cmds ([e6a5d2d](https://github.com/jm33-m0/emp3r0r/commit/e6a5d2d3c34beb5330522f5dfe2419d862b413dd))
+* portfwd timeout implementation ([b22e91d](https://github.com/jm33-m0/emp3r0r/commit/b22e91d7898530197bdd1602235d5728ef6ea3da))
+* reduce noisy logging for debug level 2 ([56b3d9a](https://github.com/jm33-m0/emp3r0r/commit/56b3d9a94a02c957d796d43d1e04e4456742373f))
+* remove redundant cmdline args ([a2ee4f1](https://github.com/jm33-m0/emp3r0r/commit/a2ee4f1251185c700df0556091fc88555cd5ae0f))
+* timeout connections for socks5 proxy ([1b4c6ca](https://github.com/jm33-m0/emp3r0r/commit/1b4c6ca3ddac4d03206cbb536af9cec8a7e6f76c))
+
 ## [1.26.8](https://github.com/jm33-m0/emp3r0r/compare/v1.26.7...v1.26.8) (2023-04-21)
 
 
