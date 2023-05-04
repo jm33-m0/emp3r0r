@@ -256,15 +256,12 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 			return
 		}
 
-		connCtx, connCancel := context.WithCancel(context.Background())
-
 		// clean up all goroutines
 		cleanup := func() {
 			_, _ = conn.Write([]byte("exit"))
 			conn.Close()
 			sh.H2x.Conn.Close()
 			CliPrintDebug("handlePerConn: %s finished", conn.RemoteAddr().String())
-			connCancel()
 		}
 
 		// io.Copy
@@ -275,19 +272,14 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 				return
 			}
 		}()
-		go func() {
-			_, err = io.Copy(conn, sh.H2x.Conn)
-			if err != nil {
-				CliPrintDebug("handlePerConn: h2 -> conn: %v", err)
-				return
-			}
-		}()
+		_, err = io.Copy(conn, sh.H2x.Conn)
+		if err != nil {
+			CliPrintDebug("handlePerConn: h2 -> conn: %v", err)
+			return
+		}
 
 		// keep running until context is canceled
 		defer cleanup()
-		for connCtx.Err() == nil && sh.H2x.Ctx.Err() == nil {
-			time.Sleep(10 * time.Millisecond)
-		}
 	}
 
 	/*
