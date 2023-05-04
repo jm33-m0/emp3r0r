@@ -366,11 +366,12 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 		CliPrintDebug("Received %d bytes from H2", n)
 		udp_client_addr, err := net.ResolveUDPAddr("udp4", dst_addr)
 		if err != nil {
-			CliPrintWarning("%s: %v", dst_addr, err)
+			CliPrintError("%s (%s): %v", dst_addr, udp_client_addr.String(), err)
+			return
 		}
 
 		if listener == nil {
-			CliPrintWarning("UDP listener is nil: %s", dst_addr)
+			CliPrintError("UDP listener is nil: %s", dst_addr)
 			return
 		}
 		_, err = listener.WriteToUDP(buf[0:n], udp_client_addr)
@@ -427,8 +428,11 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 			}
 		} else {
 			CliPrintDebug("Got a portFwd sub-connection (%s) from %s", string(origToken), req.RemoteAddr)
-			if strings.HasSuffix(origToken, "-udp") {
-				dst_addr := strings.Split(origToken, "-")[0]
+			// 486e64d7-59e0-483f-adb1-6700305a74db_127.0.0.1:49972
+			// for UDP port mapping there is always a `:`,
+			// for TCP there is only port number
+			if strings.HasSuffix(origToken, ":") {
+				dst_addr := strings.Split(origToken, "_")[1]
 				go udp_packet_handler(dst_addr, pf.Listener)
 			}
 		}
@@ -482,7 +486,9 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			CliPrintWarning("checkinHandler close connection: %v", err)
 		}
-		CliPrintDebug("checkinHandler finished")
+		if DebugLevel >= 4 {
+			CliPrintDebug("checkinHandler finished")
+		}
 	}()
 	if err != nil {
 		CliPrintError("checkinHandler: failed creating connection from %s: %s", req.RemoteAddr, err)
@@ -536,10 +542,12 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 				shortname = l
 			}
 		}
-		CliPrintDebug("Refreshing sysinfo\n%s from %s, "+
-			"running %s\n",
-			shortname, fmt.Sprintf("%s - %s", target.From, target.Transport),
-			strconv.Quote(target.OS))
+		if DebugLevel >= 4 {
+			CliPrintDebug("Refreshing sysinfo\n%s from %s, "+
+				"running %s\n",
+				shortname, fmt.Sprintf("%s - %s", target.From, target.Transport),
+				strconv.Quote(target.OS))
+		}
 	}
 }
 
