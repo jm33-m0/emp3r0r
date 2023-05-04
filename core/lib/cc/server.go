@@ -641,7 +641,9 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 		if agent_by_conn != nil {
 			name = agent_by_conn.Name
 		}
-		CliPrintDebug("Last handshake from agent '%s': %v ago", name, since_last_handshake)
+		if DebugLevel >= 4 { // otherwise it will be too noisy
+			CliPrintDebug("Last handshake from agent '%s': %v ago", name, since_last_handshake)
+		}
 		if since_last_handshake > 2*time.Minute {
 			CliPrintDebug("msgTunHandler: timeout, "+
 				"hanging up agent (%v)'s C&C connection",

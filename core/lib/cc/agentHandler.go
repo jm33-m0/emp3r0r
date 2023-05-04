@@ -195,10 +195,16 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 	}
 
 	// Command output
+	if DebugLevel < 3 {
+		// ignore some cmds
+		if strings.HasPrefix(cmd, "!port_fwd") ||
+			strings.HasPrefix(cmd, "!sshd") {
+			return
+		}
+	}
 	AgentOutputPane.Printf(false,
 		"\n[%s] %s:\n%s\n\n",
 		color.CyanString("%d", contrlIf.Index),
 		color.HiMagentaString(cmd),
 		color.HiWhiteString(out))
-
 }
