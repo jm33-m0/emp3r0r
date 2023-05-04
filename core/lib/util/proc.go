@@ -163,8 +163,8 @@ func TakeASnap() {
 	time.Sleep(interval * time.Millisecond)
 }
 
-// sleep for a random interval between 120ms to 2s
+// sleep for a random interval between 5ms to 100ms
 func TakeABlink() {
-	interval := time.Duration(RandInt(120, 2000))
+	interval := time.Duration(RandInt(5, 100))
 	time.Sleep(interval * time.Millisecond)
 }
