@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.27.1](https://github.com/jm33-m0/emp3r0r/compare/v1.27.0...v1.27.1) (2023-05-04)
+
+
+### Bug Fixes
+
+* UDP forwarding ([c462312](https://github.com/jm33-m0/emp3r0r/commit/c462312a1db770707b103ae5419d4a6cd6e5ba2c))
+
 ## [1.27.0](https://github.com/jm33-m0/emp3r0r/compare/v1.26.8...v1.27.0) (2023-05-04)
 
 
