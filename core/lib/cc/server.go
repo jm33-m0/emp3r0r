@@ -357,29 +357,32 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 	sh.H2x.Cancel = cancel
 
 	udp_packet_handler := func(dst_addr string, listener *net.UDPConn) {
-		buf := make([]byte, 1024)
-		// H2 back to UDP client
-		n, err := sh.H2x.Conn.Read(buf)
-		if err != nil {
-			CliPrintError("Read from H2: %v", err)
-		}
-		CliPrintDebug("Received %d bytes from H2", n)
-		udp_client_addr, err := net.ResolveUDPAddr("udp4", dst_addr)
-		if err != nil {
-			CliPrintError("%s (%s): %v", dst_addr, udp_client_addr.String(), err)
-			return
-		}
+		CliPrintDebug("portFwdHandler: handling UDP packet from %s", dst_addr)
+		for sh.H2x.Ctx.Err() == nil {
+			buf := make([]byte, 1024)
+			// H2 back to UDP client
+			n, err := sh.H2x.Conn.Read(buf)
+			if err != nil {
+				CliPrintError("Read from H2: %v", err)
+			}
+			CliPrintDebug("Received %d bytes from H2", n)
+			udp_client_addr, err := net.ResolveUDPAddr("udp4", dst_addr)
+			if err != nil {
+				CliPrintError("%s (%s): %v", dst_addr, udp_client_addr.String(), err)
+				return
+			}
 
-		if listener == nil {
-			CliPrintError("UDP listener is nil: %s", dst_addr)
-			return
+			if listener == nil {
+				CliPrintError("UDP listener is nil: %s", dst_addr)
+				return
+			}
+			_, err = listener.WriteToUDP(buf[0:n], udp_client_addr)
+			if err != nil {
+				CliPrintError("Write back to UDP client %s: %v",
+					udp_client_addr.String(), err)
+			}
+			CliPrintDebug("Wrote %d bytes to %s", n, udp_client_addr.String())
 		}
-		_, err = listener.WriteToUDP(buf[0:n], udp_client_addr)
-		if err != nil {
-			CliPrintError("Write back to UDP client %s: %v",
-				udp_client_addr.String(), err)
-		}
-		CliPrintDebug("Wrote %d bytes to %s", n, udp_client_addr.String())
 	}
 
 	// save sh
@@ -429,10 +432,8 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 		} else {
 			CliPrintDebug("Got a portFwd sub-connection (%s) from %s", string(origToken), req.RemoteAddr)
 			// 486e64d7-59e0-483f-adb1-6700305a74db_127.0.0.1:49972
-			// for UDP port mapping there is always a `:`,
-			// for TCP there is only port number
-			if strings.HasSuffix(origToken, ":") {
-				dst_addr := strings.Split(origToken, "_")[1]
+			if strings.HasSuffix(origToken, "-udp") {
+				dst_addr := strings.Split(strings.Split(origToken, "_")[1], "-udp")[0]
 				go udp_packet_handler(dst_addr, pf.Listener)
 			}
 		}
