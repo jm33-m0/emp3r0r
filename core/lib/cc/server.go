@@ -358,7 +358,7 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 
 	udp_packet_handler := func(dst_addr string, listener *net.UDPConn) {
 		CliPrintDebug("portFwdHandler: handling UDP packet from %s", dst_addr)
-		for sh.H2x.Ctx.Err() == nil {
+		for ctx.Err() == nil {
 			buf := make([]byte, 1024)
 			// H2 back to UDP client
 			n, err := sh.H2x.Conn.Read(buf)
