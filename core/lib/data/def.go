@@ -172,7 +172,7 @@ const (
 	C2CmdProxy         = "!proxy"
 	C2CmdSSHD          = "!sshd"
 	C2CmdLPE           = "!lpe"
-	C2CmdReverseProxy  = "!" + ModBring2CC
+	C2CmdBring2CC      = "!" + ModBring2CC
 	C2CmdStat          = "!stat"
 )
 

