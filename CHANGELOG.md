@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.27.2](https://github.com/jm33-m0/emp3r0r/compare/v1.27.1...v1.27.2) (2023-05-05)
+
+
+### Bug Fixes
+
+* improve `upgrade_agent` ([a80f30b](https://github.com/jm33-m0/emp3r0r/commit/a80f30b626c155735a9fcdda3c1a01dd06ce9474))
+* panic: nil ref when UDP port_fwd session dies ([0cd3746](https://github.com/jm33-m0/emp3r0r/commit/0cd3746e9eba734f0e87d7a84e9317142f9036a3))
+
 ## [1.27.1](https://github.com/jm33-m0/emp3r0r/compare/v1.27.0...v1.27.1) (2023-05-04)
 
 
