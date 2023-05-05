@@ -52,7 +52,7 @@ var CmdFuncs = map[string]func(){
 	"screenshot":    TakeScreenshot,
 	"file_manager":  OpenFileManager,
 	"upgrade_agent": UpgradeAgent,
-	"gen_agent":     GenAgent,
+	"gen_agent":     genAgentWrapper,
 	"suicide":       Suicide,
 }
 

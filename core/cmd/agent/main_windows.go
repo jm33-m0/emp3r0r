@@ -37,6 +37,11 @@ func main() {
 	version := flag.Bool("version", false, "Show version info")
 	flag.Parse()
 
+	// -replace specified in environment variable
+	if os.Getenv("REPLACE_AGENT") != "" {
+		replace_agent = true
+	}
+
 	// version
 	if *version {
 		fmt.Printf("emp3r0r agent (%s)\n", emp3r0r_data.Version)
@@ -54,7 +59,6 @@ func main() {
 			prog.Composite(
 				&buildinfo.Program{}, &lsp.Program{},
 				&shell.Program{})))
-
 	}
 
 	// silent switch

