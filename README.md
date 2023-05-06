@@ -43,49 +43,51 @@ In fact, emp3r0r has complete [python3.9 support](https://github.com/jm33-m0/emp
 ----------
 
 ## Features
+
 * Beautiful Terminal UI
-  * Use [tmux](https://github.com/tmux/tmux) for window management
+    * Use [tmux](https://github.com/tmux/tmux) for window management
 * Stealth
-  * Automatically changes `argv` so you won't notice it in `ps` listing
-  * Built-in [**Elvish Shell**](https://elv.sh/) with the same disguise as main process
-  * Stealth Connection
-  * All of these in HTTP2
-  * Painlessly encapsulated in Shadowsocks and KCP
-  * Able to encapsulate in any external proxies such as [**TOR** and **CDN**s](https://github.com/jm33-m0/emp3r0r/raw/master/img/c2transports.png)
+    * Automatically changes `argv` so you won't notice it in `ps` listing
+    * Built-in [**Elvish Shell**](https://elv.sh/) with the same disguise as main process
+    * All C2 communication made in HTTP2/TLS
+    * Painlessly encapsulated in Shadowsocks and KCP
+    * Able to encapsulate in any external proxies such as [**TOR** and **CDN**s](https://github.com/jm33-m0/emp3r0r/raw/master/img/c2transports.png)
 * Multi-Tasking
   * Don't have to wait for any commands to finish
 * Module Support
-  * Provides [**python3.9** environment](https://github.com/jm33-m0/emp3r0r/releases/tag/v1.3.10) that can easily run your exploits/tools on any Linux host
-  * [Custom Modules](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r)
+    * Provides [**python3.9** environment](https://github.com/jm33-m0/emp3r0r/releases/tag/v1.3.10) that can easily run your exploits/tools on any Linux host
+    * [Custom Modules](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r)
 * Perfect Shell Experience via SSH
-  * Compatible with any SSH client and available for Windows
+    * Compatible with any SSH client and available for Windows
 * [Bettercap](https://github.com/bettercap/bettercap)
 * Auto persistence via various methods
 * [Post-exploitation Tools](https://github.com/jm33-m0/emp3r0r/tree/master/core/modules/vaccine)
-  * Nmap, Socat, Ncat, Bettercap, etc
+    * Nmap, Socat, Ncat, Bettercap, etc
 * Credential Harvesting (WIP)
 * [Process Injection](https://jm33.me/emp3r0r-injection.html)
 * [Shellcode Injection](https://jm33.me/process-injection-on-linux.html)
 * ELF Patcher (WIP)
 * [Packer](https://github.com/jm33-m0/emp3r0r/tree/master/packer)
-  * Encrypts and compresses agent binary and runs agent in a covert way
+    * Encrypts and compresses agent binary and runs agent in a covert way
 * Hide processes and files (WIP)
-* Port Mapping
-  * From C2 side to agent side, and vice versa
-* Agent Side: Socks5 Proxy
+* Networking
+    * Port Mapping
+        * From C2 side to agent side, and vice versa
+        * TCP/UDP both supported
+    * Agent Side Socks5 Proxy with UDP support
 * [Auto Root](https://github.com/jm33-m0/go-lpe)
 * LPE Suggest
 * System Info Collect
 * File Management
-  * Enables resumable downloads/uploads
-  * SFTP support: browse remote files with any SFTP client, [including your local **GUI file manager**](https://github.com/jm33-m0/emp3r0r/releases/tag/v1.22.3)
+    * Enables resumable downloads/uploads
+    * SFTP support: browse remote files with any SFTP client, [including your local **GUI file manager**](https://github.com/jm33-m0/emp3r0r/releases/tag/v1.22.3)
 * Log Cleaner
 * Screenshot
 * Anti-Antivirus
 * Internet Access Checker
-* Autoproxy
-  * For semi-isolated networks
-* Reverse Proxy
-  * To bring every host online
+* Automatically bridge agents from internal networks to C2
+    * For semi-isolated networks
+* Proxy via agent to agent SSH connection
+    * To bring any targets you can reach to C2
 * [Interoperability with Metasploit/Cobalt Strike](https://github.com/jm33-m0/emp3r0r/wiki/Interoperability-with-metasploit-and-other-C2-frameworks)
 * and many more :)
