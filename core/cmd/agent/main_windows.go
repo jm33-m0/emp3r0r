@@ -163,22 +163,6 @@ test_agent:
 		agent.RuntimeConfig.C2TransportProxy = cdnproxyAddr
 	}
 
-	// socks5 proxy
-	go func() {
-		// start a socks5 proxy
-		err := agent.Socks5Proxy("on", "0.0.0.0:"+agent.RuntimeConfig.AutoProxyPort)
-		if err != nil {
-			log.Printf("Socks5Proxy on %s: %v", agent.RuntimeConfig.AutoProxyPort, err)
-			return
-		}
-		defer func() {
-			err := agent.Socks5Proxy("off", "0.0.0.0:"+agent.RuntimeConfig.AutoProxyPort)
-			if err != nil {
-				log.Printf("Socks5Proxy off (%s): %v", agent.RuntimeConfig.AutoProxyPort, err)
-			}
-		}()
-	}()
-
 	// do we have internet?
 	checkInternet := func(cnt *int) bool {
 		if tun.HasInternetAccess() {
