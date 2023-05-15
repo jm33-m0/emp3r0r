@@ -31,14 +31,14 @@ build() {
 
 package() {
     cd /tmp/emp3r0r-build/
-	mkdir -p "$pkgdir/usr/local/lib/emp3r0r/build" || error "Failed to mkdir $build_dir"
-    cp -avR tmux "$pkgdir/usr/local/lib/emp3r0r" || error "tmux"
-    cp -avR modules "$pkgdir/usr/local/lib/emp3r0r" || error "modules"
-    cp -avR stub* "$pkgdir/usr/local/lib/emp3r0r/build" || error "stub"
+	mkdir -p "$pkgdir/usr/lib/emp3r0r/build" || error "Failed to mkdir $build_dir"
+    cp -avR tmux "$pkgdir/usr/lib/emp3r0r" || error "tmux"
+    cp -avR modules "$pkgdir/usr/lib/emp3r0r" || error "modules"
+    cp -avR stub* "$pkgdir/usr/lib/emp3r0r/build" || error "stub"
     # emp3r0r binaries
     chmod 755 "emp3r0r" cc.exe cat.exe
-    mkdir -p "$pkgdir/usr/local/bin/"
-    cp -avR "emp3r0r" "$pkgdir/usr/local/bin/emp3r0r" || error "$0"
-    cp -avR cc.exe "$pkgdir/usr/local/lib/emp3r0r/emp3r0r-cc" || error "emp3r0r-cc"
-    cp -avR cat.exe "$pkgdir/usr/local/lib/emp3r0r/emp3r0r-cat" || error "emp3r0r-cat"
+    mkdir -p "$pkgdir/usr/bin/"
+    cp -avR "emp3r0r" "$pkgdir/usr/bin/emp3r0r" || error "$0"
+    cp -avR cc.exe "$pkgdir/usr/lib/emp3r0r/emp3r0r-cc" || error "emp3r0r-cc"
+    cp -avR cat.exe "$pkgdir/usr/lib/emp3r0r/emp3r0r-cat" || error "emp3r0r-cat"
 }
