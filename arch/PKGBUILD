@@ -2,7 +2,7 @@
 # See COPYING for license details.
 
 pkgname=emp3r0r
-pkgver=v1.10.4
+pkgver=v1.27.2.r1.gfb2d678
 pkgrel=1
 pkgdesc='Linux post-exploitation framework made by linux user.'
 arch=('x86_64')
@@ -20,36 +20,25 @@ pkgver() {
     git describe --long --tags | sed 's/\([^-]*-g\)/r\1/;s/-/./g'
 }
 
-build_cmd() {
-    cd core &&
-        go mod tidy &&
-        cd "cmd/$1" &&
-        CGO_ENABLED=0 go build -o "../../../$2" -ldflags='-s -w -v'
-}
-
 build() {
-    cd $pkgname
-    (build_cmd 'cc' emp3r0r-cc) &&
-        (build_cmd 'cat' emp3r0r-cat) &&
-        (build_cmd 'agent' stub.exe) &&
-        (build_cmd 'packer_stub' packer_stub.exe) &&
-        (GOOS=windows build_cmd 'agent' stub-win.exe)
+    cd $pkgname/core
+    ./emp3r0r --build
+    cp ./emp3r0r /tmp/emp3r0r-build/
+    cp -r ./tmux /tmp/emp3r0r-build/
+    cp -r ./modules /tmp/emp3r0r-build/
+    
 }
 
 package() {
-    cd $pkgname
-
-    mkdir -p "$pkgdir/usr/lib/$pkgname/build"
-    install -Dm 755 emp3r0r-cc "$pkgdir/usr/lib/$pkgname"
-    install -Dm 755 emp3r0r-cat "$pkgdir/usr/lib/$pkgname"
-    install -Dm 755 ./*.exe "$pkgdir/usr/lib/$pkgname/build"
-    install -Dm 755 "./core/$pkgname" "$pkgdir/usr/bin/$pkgname"
-    install -Dm 644 -t "$pkgdir/usr/share/doc/$pkgname/" README.md
-    # Only install license if required according to
-    # https://wiki.archlinux.org/index.php/PKGBUILD#license
-    install -Dm 644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
-
-    # extra files
-    cp -r ./core/tmux "$pkgdir/usr/lib/$pkgname"
-    cp -r ./core/modules "$pkgdir/usr/lib/$pkgname"
+    cd /tmp/emp3r0r-build/
+	mkdir -p "$pkgdir/usr/lib/emp3r0r/build" || error "Failed to mkdir $build_dir"
+    cp -avR tmux "$pkgdir/usr/lib/emp3r0r" || error "tmux"
+    cp -avR modules "$pkgdir/usr/lib/emp3r0r" || error "modules"
+    cp -avR stub* "$pkgdir/usr/lib/emp3r0r/build" || error "stub"
+    # emp3r0r binaries
+    chmod 755 "emp3r0r" cc.exe cat.exe
+    mkdir -p "$pkgdir/usr/bin/"
+    cp -avR "emp3r0r" "$pkgdir/usr/bin/emp3r0r" || error "$0"
+    cp -avR cc.exe "$pkgdir/usr/lib/emp3r0r/emp3r0r-cc" || error "emp3r0r-cc"
+    cp -avR cat.exe "$pkgdir/usr/lib/emp3r0r/emp3r0r-cat" || error "emp3r0r-cat"
 }
