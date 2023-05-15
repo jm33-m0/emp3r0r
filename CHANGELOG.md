@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.27.3](https://github.com/jm33-m0/emp3r0r/compare/v1.27.2...v1.27.3) (2023-05-15)
+
+
+### Bug Fixes
+
+* [#210](https://github.com/jm33-m0/emp3r0r/issues/210) ([f926d83](https://github.com/jm33-m0/emp3r0r/commit/f926d830ed1719827e1a3c0f919d5d12a05f791d))
+* BlackArch PKGBUILD ([5cc5d1f](https://github.com/jm33-m0/emp3r0r/commit/5cc5d1ff1a42cd92d85307abc098e4fb7e931128))
+
 ## [1.27.2](https://github.com/jm33-m0/emp3r0r/compare/v1.27.1...v1.27.2) (2023-05-05)
 
 
