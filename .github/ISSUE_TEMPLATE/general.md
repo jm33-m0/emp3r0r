@@ -1,10 +1,9 @@
 ---
 name: General
 about: Filter out low quality issues
-title: ''
-labels: ''
-assignees: ''
-
+title: ""
+labels: ""
+assignees: ""
 ---
 
 # What did you do? (required)
@@ -20,7 +19,7 @@ assignees: ''
 <!-- Give me the exact output of the program, do not edit it or adapt it in any way. Put it in the code block below. -->
 
 <details>
-<summary><code>Your command</code>Output:</summary><br>
+<summary><code>Replace me with the actual command you executed</code>Output:</summary><br>
 <pre>
 Fill this section with command output
 </pre>
@@ -30,7 +29,7 @@ Fill this section with command output
 
 ## CC
 
-Linux distro name and version
+Linux distro name and version, use `cat /etc/*release*` to view, paste the result below
 
 ```bash
 # cat /etc/*release*
