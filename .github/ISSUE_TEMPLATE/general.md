@@ -27,6 +27,18 @@ Fill this section with command output
 
 # Your environment
 
+## `emp3r0r.json`
+
+I suggest that you format your JSON with an online JSON formatter,
+for example [https://codebeautify.org/jsonviewer](https://codebeautify.org/jsonviewer)
+
+<details>
+<summary><code>emp3r0r.json</code>:</summary><br>
+<pre>
+Paste emp3r0r.json here, you can redact sensitive information
+</pre>
+</details>
+
 ## CC
 
 Linux distro name and version, use `cat /etc/*release*` to view, paste the result below
