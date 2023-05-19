@@ -1,10 +1,9 @@
 ---
 name: General
-about: Filter out low quality issues
-title: ''
-labels: ''
-assignees: ''
-
+about: For non-bug and non-feature-request reports
+title: ""
+labels: ""
+assignees: ""
 ---
 
 # What did you do? (required)
