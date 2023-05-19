@@ -1,9 +1,10 @@
 ---
 name: General
 about: Filter out low quality issues
-title: ""
-labels: ""
-assignees: ""
+title: ''
+labels: ''
+assignees: ''
+
 ---
 
 # What did you do? (required)
