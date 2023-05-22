@@ -195,7 +195,7 @@ func injector() (err error) {
 			}
 			log.Printf("Injecting to %s (%d)...", util.ProcCmdline(pid), pid)
 
-			e := GDBInjectSO(pid)
+			e := GDBInjectLoader(pid)
 			if e != nil {
 				err = fmt.Errorf("%v, %v", err, e)
 			}
