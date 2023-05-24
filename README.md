@@ -12,7 +12,11 @@ A post-exploitation framework for Linux/Windows
 
 
 
-https://user-images.githubusercontent.com/10167884/193377873-05bcda35-fa36-48db-93a0-4bdb73e44402.mp4
+
+https://github.com/jm33-m0/emp3r0r/assets/10167884/c7532c4d-8a6f-4a91-b52c-d7df4c80ba63
+
+
+
 
 
 
