@@ -23,7 +23,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 	"github.com/ncruces/go-dns"
-	"golang.org/x/sys/unix"
 	"src.elv.sh/pkg/buildinfo"
 	"src.elv.sh/pkg/lsp"
 	"src.elv.sh/pkg/prog"
@@ -57,21 +56,6 @@ func main() {
 	if *verbose {
 		fmt.Println("emp3r0r agent has started")
 		log.SetOutput(os.Stderr)
-
-		// redirect everything to log file
-		f, err := os.OpenFile(fmt.Sprintf("%s/emp3r0r.log",
-			agent.RuntimeConfig.AgentRoot),
-			os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
-		if err != nil {
-			log.Printf("error opening emp3r0r.log: %v", err)
-		} else {
-			log.SetOutput(f)
-			defer f.Close()
-			err = unix.Dup2(int(f.Fd()), int(os.Stderr.Fd()))
-			if err != nil {
-				log.Fatalf("Cannot redirect stderr to log file: %v", err)
-			}
-		}
 	}
 
 	// rename our agent process to make it less suspecious
