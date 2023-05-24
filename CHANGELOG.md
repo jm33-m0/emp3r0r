@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.28.0](https://github.com/jm33-m0/emp3r0r/compare/v1.27.3...v1.28.0) (2023-05-24)
+
+
+### Features
+
+* add `ssh_harvester` ([6a557e1](https://github.com/jm33-m0/emp3r0r/commit/6a557e192c45799a6b0f84795119e3fd18e4ac9b))
+* inject arbitrary shared lib ([f4a0c1c](https://github.com/jm33-m0/emp3r0r/commit/f4a0c1c85ddec6f47c5f64dda5183c6dac1edba0))
+
+
+### Bug Fixes
+
+* unable to log to file ([55c4f7b](https://github.com/jm33-m0/emp3r0r/commit/55c4f7b84d3ef7708fc2e144a87c2d92605cf2b0))
+
 ## [1.27.3](https://github.com/jm33-m0/emp3r0r/compare/v1.27.2...v1.27.3) (2023-05-15)
 
 
