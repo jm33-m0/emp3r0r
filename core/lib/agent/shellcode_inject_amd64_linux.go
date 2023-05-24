@@ -31,6 +31,9 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 		return fmt.Errorf("Decode shellcode: %v", err)
 	}
 
+	// save shellcode to a binary file for debugging purposes
+	// os.WriteFile("/tmp/sc.bin", sc, 0644)
+
 	// inject to an existing process or start a new one
 	// check /proc/sys/kernel/yama/ptrace_scope if you cant inject to existing processes
 	if pid == 0 {
@@ -106,12 +109,14 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 	log.Printf("Peeked %d bytes of shellcode: %x at RIP (0x%x)", n, peekWord, origRip)
 
 	// continue and wait
+	log.Printf("Continuing process %d", pid)
 	err = syscall.PtraceCont(pid, 0)
 	if err != nil {
 		return fmt.Errorf("Continue: %v", err)
 	}
-	var ws syscall.WaitStatus
-	_, err = syscall.Wait4(pid, &ws, 0, nil)
+	log.Printf("Waiting process %d", pid)
+	ws := new(syscall.WaitStatus)
+	_, err = syscall.Wait4(pid, ws, 0, nil)
 	if err != nil {
 		return fmt.Errorf("continue: wait4: %v", err)
 	}
@@ -119,6 +124,7 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 	// what happened to our child?
 	switch {
 	case ws.Continued():
+		log.Printf("Continued %d", pid)
 		return nil
 	case ws.CoreDump():
 		err = syscall.PtraceGetRegs(pid, origRegs)
@@ -127,6 +133,7 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 		}
 		return fmt.Errorf("continue: core dumped: RIP at 0x%x", origRegs.Rip)
 	case ws.Exited():
+		log.Printf("Exited %d", pid)
 		return nil
 	case ws.Signaled():
 		err = syscall.PtraceGetRegs(pid, origRegs)

