@@ -76,19 +76,20 @@ const (
 
 // built-in module names
 const (
-	ModCMD_EXEC    = "cmd_exec"
-	ModCLEAN_LOG   = "clean_log"
-	ModLPE_SUGGEST = "lpe_suggest"
-	ModPERSISTENCE = "get_persistence"
-	ModPROXY       = "run_proxy"
-	ModPORT_FWD    = "port_fwd"
-	ModSHELL       = "interactive_shell"
-	ModVACCINE     = "vaccine"
-	ModINJECTOR    = "injector"
-	ModGET_ROOT    = "get_root"
-	ModBring2CC    = "bring2cc"
-	ModGDB         = "gdbserver"
-	ModStager      = "stager"
+	ModCMD_EXEC     = "cmd_exec"
+	ModCLEAN_LOG    = "clean_log"
+	ModLPE_SUGGEST  = "lpe_suggest"
+	ModPERSISTENCE  = "get_persistence"
+	ModPROXY        = "run_proxy"
+	ModPORT_FWD     = "port_fwd"
+	ModSHELL        = "interactive_shell"
+	ModVACCINE      = "vaccine"
+	ModINJECTOR     = "injector"
+	ModGET_ROOT     = "get_root"
+	ModBring2CC     = "bring2cc"
+	ModGDB          = "gdbserver"
+	ModStager       = "stager"
+	ModSSHHarvester = "ssh_harvester"
 )
 
 // PersistMethods CC calls one of these methods to get persistence, or all of them at once
@@ -103,19 +104,20 @@ var PersistMethods = map[string]string{
 
 // Module help info, ls_modules shows this
 var ModuleComments = map[string]string{
-	ModCMD_EXEC:    "Run a single command on a target",
-	ModCLEAN_LOG:   "Delete lines containing keyword from *tmp logs",
-	ModLPE_SUGGEST: "Run linux-smart-enumeration or linux exploit suggester",
-	ModPERSISTENCE: "Get persistence via built-in methods",
-	ModPROXY:       "Start a socks proxy on target host, and use it locally on C2 side, so you can access network resources on agent side",
-	ModPORT_FWD:    "Port mapping from agent to CC (or vice versa), via HTTP2 (or other) tunnel",
-	ModSHELL:       "Run custom bash on target, a perfect reverse shell",
-	ModVACCINE:     "Vaccine helps you install additional tools on target system",
-	ModINJECTOR:    "Inject shellcode/loader.so into a running process",
-	ModGET_ROOT:    "Try some built-in LPE exploits",
-	ModBring2CC:    "Bring a target host to CC by connecting to it first (target host must have agent installed)",
-	ModGDB:         "Remote gdbserver, debug anything",
-	ModStager:      "Generate a stager for staged payload delivering",
+	ModCMD_EXEC:     "Run a single command on a target",
+	ModCLEAN_LOG:    "Delete lines containing keyword from *tmp logs",
+	ModLPE_SUGGEST:  "Run linux-smart-enumeration or linux exploit suggester",
+	ModPERSISTENCE:  "Get persistence via built-in methods",
+	ModPROXY:        "Start a socks proxy on target host, and use it locally on C2 side, so you can access network resources on agent side",
+	ModPORT_FWD:     "Port mapping from agent to CC (or vice versa), via HTTP2 (or other) tunnel",
+	ModSHELL:        "Run custom bash on target, a perfect reverse shell",
+	ModVACCINE:      "Vaccine helps you install additional tools on target system",
+	ModINJECTOR:     "Inject shellcode/loader.so into a running process",
+	ModGET_ROOT:     "Try some built-in LPE exploits",
+	ModBring2CC:     "Bring a target host to CC by connecting to it first (target host must have agent installed)",
+	ModGDB:          "Remote gdbserver, debug anything",
+	ModStager:       "Generate a stager for staged payload delivering",
+	ModSSHHarvester: "Harvest cleartext password automatically from OpenSSH server process",
 }
 
 // Module help for options, does not include every module since not all modules need args
@@ -171,6 +173,7 @@ const (
 	C2CmdPortFwd       = "!port_fwd"
 	C2CmdProxy         = "!proxy"
 	C2CmdSSHD          = "!sshd"
+	C2CmdSSHHarvester  = "!ssh_harvester"
 	C2CmdLPE           = "!lpe"
 	C2CmdBring2CC      = "!" + ModBring2CC
 	C2CmdStat          = "!stat"

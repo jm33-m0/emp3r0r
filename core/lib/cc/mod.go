@@ -42,19 +42,20 @@ var (
 
 	// ModuleHelpers a map of module helpers
 	ModuleHelpers = map[string]func(){
-		emp3r0r_data.ModCMD_EXEC:    moduleCmd,
-		emp3r0r_data.ModSHELL:       moduleShell,
-		emp3r0r_data.ModPROXY:       moduleProxy,
-		emp3r0r_data.ModPORT_FWD:    modulePortFwd,
-		emp3r0r_data.ModLPE_SUGGEST: moduleLPE,
-		emp3r0r_data.ModGET_ROOT:    moduleGetRoot,
-		emp3r0r_data.ModCLEAN_LOG:   moduleLogCleaner,
-		emp3r0r_data.ModPERSISTENCE: modulePersistence,
-		emp3r0r_data.ModVACCINE:     moduleVaccine,
-		emp3r0r_data.ModINJECTOR:    moduleInjector,
-		emp3r0r_data.ModBring2CC:    moduleBring2CC,
-		emp3r0r_data.ModGDB:         moduleGDB,
-		emp3r0r_data.ModStager:      modStager,
+		emp3r0r_data.ModCMD_EXEC:     moduleCmd,
+		emp3r0r_data.ModSHELL:        moduleShell,
+		emp3r0r_data.ModPROXY:        moduleProxy,
+		emp3r0r_data.ModPORT_FWD:     modulePortFwd,
+		emp3r0r_data.ModLPE_SUGGEST:  moduleLPE,
+		emp3r0r_data.ModGET_ROOT:     moduleGetRoot,
+		emp3r0r_data.ModCLEAN_LOG:    moduleLogCleaner,
+		emp3r0r_data.ModPERSISTENCE:  modulePersistence,
+		emp3r0r_data.ModVACCINE:      moduleVaccine,
+		emp3r0r_data.ModINJECTOR:     moduleInjector,
+		emp3r0r_data.ModBring2CC:     moduleBring2CC,
+		emp3r0r_data.ModGDB:          moduleGDB,
+		emp3r0r_data.ModStager:       modStager,
+		emp3r0r_data.ModSSHHarvester: module_ssh_harvester,
 	}
 )
 
@@ -168,7 +169,11 @@ func UpdateOptions(modName string) (exist bool) {
 		pidOpt.Vals = []string{"0"}
 		pidOpt.Val = "0"
 		methodOpt := addIfNotFound("method")
-		methodOpt.Vals = []string{"gdb_loader", "inject_shellcode", "inject_loader", "shared_library"}
+		methodOpt.Vals = []string{"gdb_loader",
+			"inject_shellcode",
+			"inject_loader",
+			"gdb_shared_lib",
+			"shared_library"}
 		methodOpt.Val = "shared_library"
 
 	case modName == emp3r0r_data.ModBring2CC:

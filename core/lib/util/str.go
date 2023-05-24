@@ -8,6 +8,7 @@ import (
 	"log"
 	"math"
 	"math/rand"
+	"os"
 	"strings"
 	"time"
 
@@ -145,4 +146,18 @@ func HexEncode(s string) (result string) {
 		result = fmt.Sprintf("%s\\x%x", result, c)
 	}
 	return
+}
+
+func LogFilePrintf(filepath, format string, v ...any) {
+	logf, err := os.OpenFile(filepath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
+	defer logf.Close()
+	if err != nil {
+		log.Printf("LogFilePrintf: %v", err)
+		return
+	}
+	log.Printf(format, v...)
+
+	fmt.Fprintf(logf, "%v\n", time.Now().String())
+	fmt.Fprintf(logf, format, v...)
+	fmt.Fprintf(logf, "\n")
 }
