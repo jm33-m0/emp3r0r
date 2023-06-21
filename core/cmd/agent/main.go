@@ -283,7 +283,7 @@ test_agent:
 	}
 
 	// apply whatever proxy setting we have just added
-	emp3r0r_data.HTTPClient = tun.EmpHTTPClient(agent.RuntimeConfig.C2TransportProxy)
+	emp3r0r_data.HTTPClient = tun.EmpHTTPClient(emp3r0r_data.CCAddress, agent.RuntimeConfig.C2TransportProxy)
 	if agent.RuntimeConfig.C2TransportProxy != "" {
 		log.Printf("Using proxy: %s", agent.RuntimeConfig.C2TransportProxy)
 	} else {

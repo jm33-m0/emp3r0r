@@ -68,7 +68,7 @@ func DownloadViaCC(file_to_download, path string) (data []byte, err error) {
 
 	// use EmpHTTPClient
 	client := grab.NewClient()
-	client.HTTPClient = tun.EmpHTTPClient(RuntimeConfig.C2TransportProxy)
+	client.HTTPClient = tun.EmpHTTPClient(emp3r0r_data.CCAddress, RuntimeConfig.C2TransportProxy)
 
 	req, err := grab.NewRequest(path, url)
 	if err != nil {

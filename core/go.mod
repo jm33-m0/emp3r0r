@@ -27,6 +27,7 @@ require (
 	github.com/otiai10/copy v1.10.0
 	github.com/pkg/sftp v1.13.5
 	github.com/posener/h2conn v0.0.0-20180911140238-13e7df33ed15
+	github.com/refraction-networking/utls v1.3.2
 	github.com/schollz/progressbar/v3 v3.13.1
 	github.com/shadowsocks/go-shadowsocks2 v0.1.5
 	github.com/shirou/gopsutil/v3 v3.23.3
@@ -47,6 +48,7 @@ require (
 	github.com/chzyer/test v1.0.0 // indirect
 	github.com/dsnet/compress v0.0.2-0.20210315054119-f66993602bf5 // indirect
 	github.com/frankban/quicktest v1.14.3 // indirect
+	github.com/gaukas/godicttls v0.0.3 // indirect
 	github.com/gen2brain/shm v0.0.0-20221026125803-c33c9e32b1c8 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect

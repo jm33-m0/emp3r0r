@@ -39,7 +39,7 @@ var (
 	GuardianAgentPath = "[persistence_agent_path]"
 
 	// will be updated by ReadJSONConfig
-	CCAddress    = ""
+	CCAddress    = "" // in form https://host:port
 	LibPath      = ""
 	DefaultShell = ""
 
