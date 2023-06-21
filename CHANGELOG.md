@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.29.0](https://github.com/jm33-m0/emp3r0r/compare/v1.28.0...v1.29.0) (2023-06-21)
+
+
+### Features
+
+* switch to utls to defeat JA3 fingerprinting ([b9bf54f](https://github.com/jm33-m0/emp3r0r/commit/b9bf54f1a33389d64e658c73e04af5a4412b1da6))
+
 ## [1.28.0](https://github.com/jm33-m0/emp3r0r/compare/v1.27.3...v1.28.0) (2023-05-24)
 
 
