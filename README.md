@@ -46,8 +46,9 @@ In fact, emp3r0r has complete [python3.9 support](https://github.com/jm33-m0/emp
 -   Stealth
     -   Automatically changes `argv` so you won't notice it in `ps` listing
     -   Built-in [**Elvish Shell**](https://elv.sh/) with the same disguise as main process
-    -   All C2 communication made in HTTP2/TLS
-    -   Painlessly encapsulated in Shadowsocks and KCP
+    -   All C2 communications made in HTTP2/TLS
+    -   Defeat [**JA3**](https://github.com/salesforce/ja3) fingerprinting with [**UTLS**](https://github.com/refraction-networking/utls)
+    -   Painlessly encapsulated in **Shadowsocks** and KCP
     -   Able to encapsulate in any external proxies such as [**TOR** and **CDN**s](https://github.com/jm33-m0/emp3r0r/raw/master/img/c2transports.png)
 -   Multi-Tasking
     -   Don't have to wait for any commands to finish
