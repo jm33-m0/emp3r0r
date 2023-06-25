@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.29.1](https://github.com/jm33-m0/emp3r0r/compare/v1.29.0...v1.29.1) (2023-06-25)
+
+
+### Bug Fixes
+
+* [#219](https://github.com/jm33-m0/emp3r0r/issues/219) ([f0b414a](https://github.com/jm33-m0/emp3r0r/commit/f0b414a2147037ab3c248934dc5c3c5b9904949a))
+* `get_persistence` causes unalias error ([43dc8ee](https://github.com/jm33-m0/emp3r0r/commit/43dc8ee181e5194b07454b466a48c49abae2b494))
+* `get_persistence` result readability issue ([438289f](https://github.com/jm33-m0/emp3r0r/commit/438289f6cb7081860f26a76ade301b48a1e76d03))
+* damonize and be silent when started by persistence script ([e14f3eb](https://github.com/jm33-m0/emp3r0r/commit/e14f3eb94f81ddb24fbb3e268c5f7dfc66a9630e))
+
 ## [1.29.0](https://github.com/jm33-m0/emp3r0r/compare/v1.28.0...v1.29.0) (2023-06-21)
 
 
