@@ -29,6 +29,7 @@ require (
 	github.com/posener/h2conn v0.0.0-20180911140238-13e7df33ed15
 	github.com/refraction-networking/utls v1.3.2
 	github.com/schollz/progressbar/v3 v3.13.1
+	github.com/sevlyar/go-daemon v0.1.6
 	github.com/shadowsocks/go-shadowsocks2 v0.1.5
 	github.com/shirou/gopsutil/v3 v3.23.3
 	github.com/txthinking/socks5 v0.0.0-20230325130024-4230056ae301
@@ -81,7 +82,6 @@ require (
 	github.com/riobard/go-bloom v0.0.0-20200614022211-cdc8013cb5b3 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/runletapp/go-console v0.0.0-20211204140000-27323a28410a // indirect
-	github.com/sevlyar/go-daemon v0.1.6 // indirect
 	github.com/shoenig/go-m1cpu v0.1.5 // indirect
 	github.com/sourcegraph/go-lsp v0.0.0-20200429204803-219e11d77f5d // indirect
 	github.com/sourcegraph/jsonrpc2 v0.2.0 // indirect
