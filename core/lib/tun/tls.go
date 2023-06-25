@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/fatih/color"
 	utls "github.com/refraction-networking/utls"
@@ -59,15 +60,19 @@ func EmpHTTPClient(c2_addr, proxyServer string) *http.Client {
 	}
 
 	// transport of our http client, with configured TLS client
+	try := 0
+init_transport:
 	tr, err := makeTransport(c2url, clientHelloIDMap["hellorandomizedalpn"], config, proxyDialer)
+	try++
 	if err != nil {
-		LogFatalError("makeRoundTripper: %v", err)
+		if proxyServer != "" && try < 5 {
+			time.Sleep(3 * time.Second)
+			log.Printf("Proxy server down, retrying (%d)...", try)
+			goto init_transport
+		} else {
+			LogFatalError("makeRoundTripper: %v", err)
+		}
 	}
-
-	// err = http2.ConfigureTransport(tr) // upgrade to HTTP2, while keeping http.Transport
-	// if err != nil {
-	// 	LogFatalError("Cannot switch to HTTP2: %v", err)
-	// }
 
 	return &http.Client{Transport: tr}
 }
