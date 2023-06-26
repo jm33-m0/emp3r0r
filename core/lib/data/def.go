@@ -122,7 +122,7 @@ var ModuleComments = map[string]string{
 // help module shows this
 var ModuleHelp = map[string]map[string]string{
 	ModPERSISTENCE: {
-		"method": "Method to get persistence, or all of them at once. Available methods: " + PersistMethods["profiles"] + ", " + PersistMethods["injector"] + ", " + PersistMethods["cron"] + ", " + PersistMethods["patcher"],
+		"method": "Method to get persistence, or all of them at once (not recommended). Available methods: " + PersistMethods["profiles"] + ", " + PersistMethods["injector"] + ", " + PersistMethods["cron"] + ", " + PersistMethods["patcher"],
 	},
 	ModCMD_EXEC: {
 		"cmd_to_exec": "Press TAB for some hints",
