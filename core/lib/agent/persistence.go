@@ -83,7 +83,6 @@ func installToRandomLocation() (target string, err error) {
 
 // PersistAllInOne run all persistence method at once
 func PersistAllInOne() (final_err error) {
-	installToAllLocations()
 	for k, method := range PersistMethods {
 		res := "succeeded"
 		method_err := method()
