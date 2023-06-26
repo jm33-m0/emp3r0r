@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.29.2](https://github.com/jm33-m0/emp3r0r/compare/v1.29.1...v1.29.2) (2023-06-26)
+
+
+### Bug Fixes
+
+* `get_persistence`: fix `profiles` method ([7a1858e](https://github.com/jm33-m0/emp3r0r/commit/7a1858e4a848d97153d0d4bc80ab6638f1dcd4cf))
+* add help to `get_persistence` ([a5a9879](https://github.com/jm33-m0/emp3r0r/commit/a5a98794c0955f44568e9e68806db123b49603de))
+* argv spoofing only works with long argv0 ([0f322bf](https://github.com/jm33-m0/emp3r0r/commit/0f322bf12f3a9ff84f311bc46964ba29303ce3a9))
+* cleanup queue when there are too many waiting ([3933766](https://github.com/jm33-m0/emp3r0r/commit/39337667d7557ab4905ae63947626635e479c3ff))
+* daemonizing issues (argv modification fails) ([d005862](https://github.com/jm33-m0/emp3r0r/commit/d00586280befe80f007b749bb68362018a1848e8))
+* don't install to all locations at once ([87f1ebb](https://github.com/jm33-m0/emp3r0r/commit/87f1ebb7db801139dabf73cf2381a07fc7b6ebe3))
+* inject_loader ([694fa31](https://github.com/jm33-m0/emp3r0r/commit/694fa31148a970dc14859fbeb8386a5749ab4ca2))
+
 ## [1.29.1](https://github.com/jm33-m0/emp3r0r/compare/v1.29.0...v1.29.1) (2023-06-25)
 
 
