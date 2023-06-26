@@ -94,12 +94,10 @@ const (
 
 // PersistMethods CC calls one of these methods to get persistence, or all of them at once
 var PersistMethods = map[string]string{
-	"ld_preload": "ldPreload",
-	"profiles":   "profiles",
-	"service":    "service",
-	"injector":   "injector",
-	"cron":       "cronJob",
-	"patcher":    "patcher",
+	"profiles": "Add some aliases to shell profiles",
+	"injector": "Inject loader.so to some processes",
+	"cron":     "Add a cronjob",
+	"patcher":  "Patch some ELFs",
 }
 
 // Module help info, ls_modules shows this
@@ -123,6 +121,9 @@ var ModuleComments = map[string]string{
 // Module help for options, does not include every module since not all modules need args
 // help module shows this
 var ModuleHelp = map[string]map[string]string{
+	ModPERSISTENCE: {
+		"method": "Method to get persistence, or all of them at once. Available methods: " + PersistMethods["profiles"] + ", " + PersistMethods["injector"] + ", " + PersistMethods["cron"] + ", " + PersistMethods["patcher"],
+	},
 	ModCMD_EXEC: {
 		"cmd_to_exec": "Press TAB for some hints",
 	},
