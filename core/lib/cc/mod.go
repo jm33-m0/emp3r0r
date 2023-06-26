@@ -190,7 +190,7 @@ func UpdateOptions(modName string) (exist bool) {
 			i++
 		}
 		currentOpt.Vals = methods
-		currentOpt.Val = "all"
+		currentOpt.Val = "patcher"
 
 	case modName == emp3r0r_data.ModStager:
 		stager_type_opt := addIfNotFound("type")
