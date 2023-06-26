@@ -55,28 +55,29 @@ typedef Elf64_Word Elf_Word;
 #endif
 
 struct ATENTRY {
-    size_t id;
-    size_t value;
+  size_t id;
+  size_t value;
 } __attribute__((packed));
 
 /*!
  * \brief Find ELF section by name.
  */
-Elf_Shdr* elf_get_section(char* name, void* elf_start);
+Elf_Shdr *elf_get_section(char *name, void *elf_start);
 
 /*!
  * \brief Find ELF symbol by name.
  */
-void* elf_get_symbol(void* elf_start, char* sym_name);
+void *elf_get_symbol(void *elf_start, char *sym_name);
 
 /*!
  * \brief Map the ELF into memory.
  */
-void elf_load(char* elf_start, void* stack, int stack_size, size_t* base_addr, size_t* entry);
+void elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
+              size_t *entry);
 
 /*!
  * \brief Map the ELF into memory and run it with the provided arguments.
  */
-void elf_run(void* buf, char** argv, char** env);
+void elf_run(void *buf, char **argv, char **env);
 
 #endif // _ELF_LOADER_H_

