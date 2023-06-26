@@ -29,7 +29,6 @@ require (
 	github.com/posener/h2conn v0.0.0-20180911140238-13e7df33ed15
 	github.com/refraction-networking/utls v1.3.2
 	github.com/schollz/progressbar/v3 v3.13.1
-	github.com/sevlyar/go-daemon v0.1.6
 	github.com/shadowsocks/go-shadowsocks2 v0.1.5
 	github.com/shirou/gopsutil/v3 v3.23.3
 	github.com/txthinking/socks5 v0.0.0-20230325130024-4230056ae301
@@ -58,7 +57,6 @@ require (
 	github.com/iamacarpet/go-winpty v1.0.4 // indirect
 	github.com/jaypipes/pcidb v1.0.0 // indirect
 	github.com/jezek/xgb v1.1.0 // indirect
-	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
 	github.com/klauspost/compress v1.16.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.4 // indirect
 	github.com/klauspost/pgzip v1.2.5 // indirect
