@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.29.3](https://github.com/jm33-m0/emp3r0r/compare/v1.29.2...v1.29.3) (2023-06-27)
+
+
+### Bug Fixes
+
+* `inject_loader` fails to launch agent ([77c445b](https://github.com/jm33-m0/emp3r0r/commit/77c445b6b07d0a2cacda0c672388d0830a620d70))
+
 ## [1.29.2](https://github.com/jm33-m0/emp3r0r/compare/v1.29.1...v1.29.2) (2023-06-26)
 
 
