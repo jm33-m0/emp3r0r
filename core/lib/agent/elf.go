@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 )
@@ -68,4 +69,12 @@ func GetLibc(pid int) (path string, addr, offset int64) {
 		break
 	}
 	return
+}
+
+// AddNeededLib: Add a needed library to an ELF file, lib_file needs to be full path
+func AddNeededLib(elf_file, lib_file string) (err error) {
+	// patchelf cmd
+	cmd := fmt.Sprintf("%s/patchelf --add-needed %s %s",
+		RuntimeConfig.UtilsPath, lib_file, elf_file)
+	return exec.Command("sh", "-c", cmd).Run()
 }

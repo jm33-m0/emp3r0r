@@ -225,6 +225,7 @@ func injector() (err error) {
 	return
 }
 
+// patch ELF file so it automatically loads and runs loader.so
 func patcher() (err error) {
 	return
 }

