@@ -29,7 +29,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		return
 	}
 	if shell == "elvsh" {
-		exe = util.ProcExe(os.Getpid())
+		exe = util.ProcExePath(os.Getpid())
 	}
 
 	// ssh server
