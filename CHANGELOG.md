@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.29.4](https://github.com/jm33-m0/emp3r0r/compare/v1.29.3...v1.29.4) (2023-06-27)
+
+
+### Bug Fixes
+
+* build issue ([67eb322](https://github.com/jm33-m0/emp3r0r/commit/67eb3222530d94b80340efae2b0db50f1d82031e))
+* loader.so extraction error ([03fde3d](https://github.com/jm33-m0/emp3r0r/commit/03fde3d51e2c0c00631f35fc21ed17a7820c9d6f))
+
 ## [1.29.3](https://github.com/jm33-m0/emp3r0r/compare/v1.29.2...v1.29.3) (2023-06-27)
 
 
