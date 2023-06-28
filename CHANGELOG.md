@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.29.5](https://github.com/jm33-m0/emp3r0r/compare/v1.29.4...v1.29.5) (2023-06-28)
+
+
+### Bug Fixes
+
+* change process name affects loader.so ([83c1109](https://github.com/jm33-m0/emp3r0r/commit/83c1109adea87c8732d4bdfd637b6e13c193096b))
+* elf loader unable to run emp3r0r ([d534359](https://github.com/jm33-m0/emp3r0r/commit/d534359bfff417a04053ef0499f46d6a6d14c0e0))
+* outdated loader.so ([3ee239e](https://github.com/jm33-m0/emp3r0r/commit/3ee239e560aeac6f7a07f20d719f05a939f98d05))
+* process renaming can't start new process ([2ca3fc1](https://github.com/jm33-m0/emp3r0r/commit/2ca3fc1c0714fceb28da7712ec6f6c51034a12ee))
+
 ## [1.29.4](https://github.com/jm33-m0/emp3r0r/compare/v1.29.3...v1.29.4) (2023-06-27)
 
 
