@@ -76,5 +76,9 @@ func AddNeededLib(elf_file, lib_file string) (err error) {
 	// patchelf cmd
 	cmd := fmt.Sprintf("%s/patchelf --add-needed %s %s",
 		RuntimeConfig.UtilsPath, lib_file, elf_file)
-	return exec.Command("sh", "-c", cmd).Run()
+	out, err := exec.Command("sh", "-c", cmd).CombinedOutput()
+	if err != nil {
+		err = fmt.Errorf("patchelf: %v, %s", err, out)
+	}
+	return
 }

