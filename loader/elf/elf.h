@@ -72,12 +72,12 @@ void *elf_get_symbol(void *elf_start, char *sym_name);
 /*!
  * \brief Map the ELF into memory.
  */
-void elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
-              size_t *entry);
+int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
+             size_t *entry);
 
 /*!
  * \brief Map the ELF into memory and run it with the provided arguments.
  */
-void elf_run(void *buf, char **argv, char **env);
+int elf_run(void *buf, char **argv, char **env);
 
 #endif // _ELF_LOADER_H_

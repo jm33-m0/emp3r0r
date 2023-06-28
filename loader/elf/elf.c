@@ -3,6 +3,7 @@
 #include <system/syscall.h>
 #else
 #include <fcntl.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -85,8 +86,8 @@ void *elf_sym(void *elf_start, char *sym_name) {
   return NULL;
 }
 
-void elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
-              size_t *entry) {
+int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
+             size_t *entry) {
   Elf_Ehdr *hdr;
   Elf_Phdr *phdr;
 
@@ -142,8 +143,10 @@ void elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
 
     int map_size = ROUND_UP(phdr[x].p_memsz + round_down_size, PAGE_SIZE);
 
-    mmap(base + map_start, map_size, PROT_READ | PROT_WRITE,
-         MAP_PRIVATE | MAP_ANON | MAP_FIXED, -1, 0);
+    void *m = mmap(base + map_start, map_size, PROT_READ | PROT_WRITE,
+                   MAP_PRIVATE | MAP_ANON | MAP_FIXED, -1, 0);
+    if (m == NULL)
+      return -1;
     memcpy((void *)base + phdr[x].p_vaddr, elf_start + phdr[x].p_offset,
            phdr[x].p_filesz);
 
@@ -173,9 +176,11 @@ void elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
         (*base_addr == -1 || *base_addr > (size_t)(base + map_start)))
       *base_addr = (size_t)(base + map_start);
   }
+
+  return 0;
 }
 
-void elf_run(void *buf, char **argv, char **env) {
+int elf_run(void *buf, char **argv, char **env) {
   int x;
   int str_len;
   int str_ptr = 0;
@@ -210,7 +215,8 @@ void elf_run(void *buf, char **argv, char **env) {
                      MAP_PRIVATE | MAP_ANON, -1, 0);
 
   // Map the ELF in memory
-  elf_load(buf, stack, STACK_SIZE, &elf_base, &elf_entry);
+  if (elf_load(buf, stack, STACK_SIZE, &elf_base, &elf_entry) < 0)
+    return -1;
 
   // Check for the existence of a dynamic loader
   char *interp_name = _get_interp(buf);
@@ -354,5 +360,5 @@ void elf_run(void *buf, char **argv, char **env) {
     jump_start(stack_storage, (void *)_exit_func, (void *)elf_entry);
 
   // Shouldn't be reached, but just in case
-  exit(1234);
+  return -1;
 }

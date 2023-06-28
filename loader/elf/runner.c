@@ -5,8 +5,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "elf.h"
-
 void __attribute__((constructor)) initLibrary(void) {
   pid_t child = fork();
   if (child == 0) {
@@ -34,26 +32,12 @@ void __attribute__((constructor)) initLibrary(void) {
       snprintf(elf_path, 1024, "%s/_%s", cwd, exe_name);
     }
 
-    // read it
-    FILE *f = fopen(elf_path, "rb");
-    if (f == NULL) {
-      perror("fopen");
-      return;
-    }
-    fseek(f, 0, SEEK_END);
-    int size = ftell(f);
-    fseek(f, 0L, SEEK_SET);
-    char *buf = malloc(size);
-    fread(buf, size, 1, f);
-    fclose(f);
-
     // Run the ELF
-    char *argv[] = {elf_path, NULL};
+    char *argv[] = {exe, NULL};
     char *envv[] = {"PATH=/bin:/usr/bin:/sbin:/usr/sbin", "HOME=/tmp", NULL};
-    if (elf_run(buf, argv, envv) < 0) {
-      if (execve(elf_path, argv, envv) < 0) {
-        perror("execve");
-      }
+    printf("Exec: %s\n", elf_path);
+    if (execve(elf_path, argv, envv) < 0) {
+      perror("execve");
     }
   }
 }
