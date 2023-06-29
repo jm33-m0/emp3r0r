@@ -35,12 +35,11 @@ func main() {
 
 	replace := flag.Bool("replace", false, "Replace existing agent process")
 	replace_agent := *replace == true
-	verbose := flag.Bool("verbose", false, "Enable logging")
 	version := flag.Bool("version", false, "Show version info")
 	flag.Parse()
 
 	// accept env vars
-	*verbose = os.Getenv("VERBOSE") == "true"
+	verbose := os.Getenv("VERBOSE") == "true"
 	replace_agent = os.Getenv("REPLACE_AGENT") == "true"
 
 	// run as elvish shell
@@ -85,7 +84,7 @@ func main() {
 
 	if !runElvsh {
 		// always daemonize unless verbose is specified
-		run_as_daemon := !*verbose &&
+		run_as_daemon := !verbose &&
 			// don't daemonize if we're already daemonized
 			os.Getenv("DAEMON") != "true"
 
@@ -100,7 +99,7 @@ func main() {
 		}
 
 		// verbose or not
-		if *verbose {
+		if verbose {
 			log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
 			fmt.Println("emp3r0r agent has started")
 			log.SetOutput(os.Stderr)
