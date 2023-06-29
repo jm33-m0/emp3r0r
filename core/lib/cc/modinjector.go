@@ -22,14 +22,15 @@ func moduleInjector() {
 	// shellcode.txt
 	pid := Options["pid"].Val
 	if method == "inject_shellcode" && !util.IsExist(WWWRoot+shellcode_file) {
-		CliPrintError("%s%s does not exist", WWWRoot, shellcode_file)
-		return
+		CliPrintWarning("%s%s does not exist, will inject guardian shellcode", WWWRoot, shellcode_file)
 	}
 
 	// to_inject.so
 	if method == "shared_library" && !util.IsExist(WWWRoot+so_file) {
-		CliPrintError("%s%s does not exist", WWWRoot, so_file)
-		return
+		CliPrintWarning("%s%s does not exist", WWWRoot, so_file)
+		if CliYesNo("Inject loader.so instead?") {
+			method = "inject_loader"
+		}
 	}
 
 	// injector cmd
