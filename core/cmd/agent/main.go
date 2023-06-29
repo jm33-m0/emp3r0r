@@ -39,6 +39,10 @@ func main() {
 	version := flag.Bool("version", false, "Show version info")
 	flag.Parse()
 
+	// accept env vars
+	*verbose = os.Getenv("VERBOSE") == "true"
+	replace_agent = os.Getenv("REPLACE_AGENT") == "true"
+
 	// run as elvish shell
 	runElvsh := os.Getenv("ELVSH") == "TRUE"
 	// do not self delete
