@@ -169,11 +169,9 @@ func UpdateOptions(modName string) (exist bool) {
 		pidOpt.Vals = []string{"0"}
 		pidOpt.Val = "0"
 		methodOpt := addIfNotFound("method")
-		methodOpt.Vals = []string{"gdb_loader",
-			"inject_shellcode",
-			"inject_loader",
-			"gdb_shared_lib",
-			"shared_library"}
+		for k := range emp3r0r_data.InjectorMethods {
+			methodOpt.Vals = append(methodOpt.Vals, k)
+		}
 		methodOpt.Val = "shared_library"
 
 	case modName == emp3r0r_data.ModBring2CC:
@@ -183,13 +181,9 @@ func UpdateOptions(modName string) (exist bool) {
 
 	case modName == emp3r0r_data.ModPERSISTENCE:
 		currentOpt = addIfNotFound("method")
-		methods := make([]string, len(emp3r0r_data.PersistMethods))
-		i := 0
 		for k := range emp3r0r_data.PersistMethods {
-			methods[i] = k
-			i++
+			currentOpt.Vals = append(currentOpt.Vals, k)
 		}
-		currentOpt.Vals = methods
 		currentOpt.Val = "patcher"
 
 	case modName == emp3r0r_data.ModStager:

