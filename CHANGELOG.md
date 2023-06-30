@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.29.7](https://github.com/jm33-m0/emp3r0r/compare/v1.29.6...v1.29.7) (2023-06-30)
+
+
+### Bug Fixes
+
+* agent wait queue ([f4e45f7](https://github.com/jm33-m0/emp3r0r/commit/f4e45f7bd5b6d482c57fade7bfe3404773fc3255))
+
 ## [1.29.6](https://github.com/jm33-m0/emp3r0r/compare/v1.29.5...v1.29.6) (2023-06-30)
 
 
