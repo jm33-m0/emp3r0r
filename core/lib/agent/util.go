@@ -30,6 +30,7 @@ func IsAgentAlive(c net.Conn) bool {
 		for {
 			n, err := r.Read(buf[:])
 			if err != nil {
+				log.Printf("Read error: %v, guess agent is dead", err)
 				return
 			}
 			replyFromAgent <- string(buf[0:n])
@@ -43,10 +44,11 @@ func IsAgentAlive(c net.Conn) bool {
 	for {
 		_, err := c.Write([]byte(fmt.Sprintf("%d", os.Getpid())))
 		if err != nil {
-			log.Print("write error:", err)
+			log.Printf("Write error: %v, agent is likely to be dead", err)
 			break
 		}
 		if strings.Contains(<-replyFromAgent, "kill yourself") {
+			log.Printf("Agent told me to kill myself (%d)", os.Getpid())
 			os.Exit(0)
 		}
 		if strings.Contains(<-replyFromAgent, "emp3r0r") {
