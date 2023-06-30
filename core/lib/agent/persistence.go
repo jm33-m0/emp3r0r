@@ -21,7 +21,6 @@ var (
 	// look at emp3r0r_data.PersistMethods too
 	PersistMethods = map[string]func() error{
 		"profiles": profiles,
-		"injector": injector,
 		"cron":     cronJob,
 		"patcher":  patcher,
 	}
