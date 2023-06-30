@@ -168,7 +168,7 @@ func IsStrInFile(text, filepath string) bool {
 
 // Copy copy file from src to dst
 func Copy(src, dst string) error {
-	in, err := ioutil.ReadFile(src)
+	in, err := os.ReadFile(src)
 	if err != nil {
 		return err
 	}
@@ -189,7 +189,7 @@ func Copy(src, dst string) error {
 		}
 	}
 
-	return ioutil.WriteFile(dst, in, 0755)
+	return os.WriteFile(dst, in, 0755)
 }
 
 // FileBaseName /path/to/foo -> foo
