@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.29.6](https://github.com/jm33-m0/emp3r0r/compare/v1.29.5...v1.29.6) (2023-06-30)
+
+
+### Bug Fixes
+
+* `IsAgentAlive` stuck ([2792bf3](https://github.com/jm33-m0/emp3r0r/commit/2792bf33124d573f95c91a73e27a6aa9e69a389e))
+* `profiles` persistence method ([6321b3c](https://github.com/jm33-m0/emp3r0r/commit/6321b3cc27e3efe32442a68b67fadd89b67dae24))
+* guadian shellcode unable to start agent ([9b81317](https://github.com/jm33-m0/emp3r0r/commit/9b81317e8fedce49f562ea348386d07cd1121159))
+* guardian shellcode: restore original binary ([a07b280](https://github.com/jm33-m0/emp3r0r/commit/a07b28012cf82690a5000ab48ad7a1de990a51e4))
+* let user choose to inject existing lib/sc ([47fd9e6](https://github.com/jm33-m0/emp3r0r/commit/47fd9e6439a99b4d01bb24ccf859a101b5b7cfd7))
+* optimize `profiles` persistence ([963ba13](https://github.com/jm33-m0/emp3r0r/commit/963ba13e04f0c1a8f97d985f25c82bb9443dfbcf))
+* remove `injector` in `get_persistence`, etc ([f7e04b1](https://github.com/jm33-m0/emp3r0r/commit/f7e04b17e307c936108cc1820fe0f1bf4991b585))
+* unable to restore binary ([d2196c9](https://github.com/jm33-m0/emp3r0r/commit/d2196c953365fc2d0ec7de1bfd1857218ee36368))
+
 ## [1.29.5](https://github.com/jm33-m0/emp3r0r/compare/v1.29.4...v1.29.5) (2023-06-28)
 
 
