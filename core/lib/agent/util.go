@@ -52,7 +52,7 @@ func IsAgentAlive(c net.Conn) bool {
 		}
 		resp := <-replyFromAgent
 		if strings.Contains(resp, "kill yourself") {
-			log.Printf("Agent told me to kill myself (%d)", os.Getpid())
+			log.Printf("Agent told me to die (%d)", os.Getpid())
 			os.Exit(0)
 		}
 		if strings.Contains(resp, "emp3r0r") {

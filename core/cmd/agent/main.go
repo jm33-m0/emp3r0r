@@ -446,9 +446,11 @@ func socketListen() {
 	}
 }
 
+// how many agents are waiting to run
+var AgentWaitQueue []string
+
 // handle connections to our socket: tell them my PID
 func server(c net.Conn) {
-	var wait_queue []string
 	for {
 		buf := make([]byte, 512)
 		nr, err := c.Read(buf)
@@ -458,11 +460,11 @@ func server(c net.Conn) {
 
 		data := buf[0:nr]
 		log.Println("emp3r0r instance got ping from PID: " + string(data))
-		wait_queue = append(wait_queue, string(data))
-		wait_queue = util.RemoveDupsFromArray(wait_queue)
+		AgentWaitQueue = append(AgentWaitQueue, string(data))
+		AgentWaitQueue = util.RemoveDupsFromArray(AgentWaitQueue)
 		reply := fmt.Sprintf("emp3r0r running on PID %d", os.Getpid())
-		log.Printf("We have %d agents in wait queue", len(wait_queue))
-		if len(wait_queue) > 3 {
+		log.Printf("We have %d agents in wait queue", len(AgentWaitQueue))
+		if len(AgentWaitQueue) > 3 {
 			log.Println("Too many agents waiting, will start to kill...")
 			reply = "emp3r0r wants you to kill yourself"
 		}
