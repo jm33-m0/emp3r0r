@@ -461,6 +461,7 @@ func server(c net.Conn) {
 		wait_queue = append(wait_queue, string(data))
 		wait_queue = util.RemoveDupsFromArray(wait_queue)
 		reply := fmt.Sprintf("emp3r0r running on PID %d", os.Getpid())
+		log.Printf("We have %d agents in wait queue", len(wait_queue))
 		if len(wait_queue) > 3 {
 			log.Println("Too many agents waiting, will start to kill...")
 			reply = "emp3r0r wants you to kill yourself"
