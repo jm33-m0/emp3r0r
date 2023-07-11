@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.0](https://github.com/jm33-m0/emp3r0r/compare/v1.29.7...v1.30.0) (2023-07-11)
+
+
+### Features
+
+* reduce size of `vaccine` ([c560dbb](https://github.com/jm33-m0/emp3r0r/commit/c560dbb5c93bfda418b8e07baf514c788b4919de))
+
 ## [1.29.7](https://github.com/jm33-m0/emp3r0r/compare/v1.29.6...v1.29.7) (2023-06-30)
 
 
