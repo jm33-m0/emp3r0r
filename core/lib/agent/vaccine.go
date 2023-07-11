@@ -25,8 +25,10 @@ func VaccineHandler() (out string) {
 	}
 
 	var (
-		PythonLib  = RuntimeConfig.UtilsPath + "/python3.11"
-		PythonPath = fmt.Sprintf("%s:%s:%s", PythonLib, PythonLib+"/lib-dynload", PythonLib+"/site-packages")
+		LibPath       = RuntimeConfig.UtilsPath + "/lib"
+		PythonArchive = RuntimeConfig.UtilsPath + "/python3.tar.xz"
+		PythonLib     = RuntimeConfig.UtilsPath + "/python3.11"
+		PythonPath    = fmt.Sprintf("%s:%s:%s", PythonLib, PythonLib+"/lib-dynload", PythonLib+"/site-packages")
 
 		// run python scripts with this command
 		// LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/u/alpine/lib PYTHONPATH="/tmp/python3.9:/tmp/python3.9/site-packages:/tmp/python3.9/lib-dynload" /tmp/python3
@@ -58,12 +60,33 @@ func VaccineHandler() (out string) {
 		}
 	}
 
-	if err = archiver.Unarchive(RuntimeConfig.AgentRoot+"/utils.tar.bz2", RuntimeConfig.UtilsPath); err != nil {
+	if err = archiver.Unarchive(RuntimeConfig.AgentRoot+"/utils.tar.bz2",
+		RuntimeConfig.UtilsPath); err != nil {
 		log.Printf("Unarchive: %v", err)
 		return fmt.Sprintf("Unarchive: %v", err)
 	}
 
-	// python3 environment
+	// libs
+	os.RemoveAll(LibPath) // archiver fucking aborts when files already exist
+	if err = archiver.Unarchive(RuntimeConfig.UtilsPath+"/libs.tar.xz",
+		RuntimeConfig.AgentRoot); err != nil {
+		log.Printf("Unarchive: %v", err)
+		out = fmt.Sprintf("Unarchive libs: %v", err)
+	}
+	log.Println("Libs configured")
+	defer os.Remove(RuntimeConfig.UtilsPath + "/libs.tar.xz")
+
+	// extract python3.9.tar.xz
+	log.Printf("Pre-set Python environment: %s, %s, %s", PythonArchive, PythonLib, PythonPath)
+	os.RemoveAll(PythonLib)
+	log.Printf("Found python archive at %s, trying to configure", PythonArchive)
+	if err = archiver.Unarchive(PythonArchive, RuntimeConfig.UtilsPath); err != nil {
+		out = fmt.Sprintf("Unarchive python libs: %v", err)
+		log.Print(out)
+		return
+	}
+	defer os.Remove(PythonArchive)
+
 	// create launchers
 	err = ioutil.WriteFile(RuntimeConfig.UtilsPath+"/python", []byte(PythonLauncher), 0755)
 	if err != nil {
