@@ -53,7 +53,7 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
 - Multi-Tasking
   - Don't have to wait for any commands to finish
 - Module Support
-  - Provides [**python3.9** environment](https://github.com/jm33-m0/emp3r0r/releases/tag/v1.3.10) that can easily run your exploits/tools on any Linux host
+  - Provides [**python3** environment](https://github.com/jm33-m0/emp3r0r/releases/tag/v1.3.10) that can easily run your exploits/tools on any Linux host
   - [Custom Modules](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r)
 - Perfect Shell Experience via **SSH with PTY support**
   - Compatible with any SSH client and **available for Windows**
