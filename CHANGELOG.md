@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.30.1](https://github.com/jm33-m0/emp3r0r/compare/v1.30.0...v1.30.1) (2023-07-11)
+
+
+### Bug Fixes
+
+* add `libexpat.so.1` as python needs it ([76a9acf](https://github.com/jm33-m0/emp3r0r/commit/76a9acf00c2391735313f57808a85673bd2a22fb))
+* too many python files, and libs not added ([7757097](https://github.com/jm33-m0/emp3r0r/commit/775709722719ed84ccee0604a6be624a27d94416))
+
 ## [1.30.0](https://github.com/jm33-m0/emp3r0r/compare/v1.29.7...v1.30.0) (2023-07-11)
 
 
