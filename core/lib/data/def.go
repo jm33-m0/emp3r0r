@@ -41,7 +41,6 @@ var (
 
 	// will be updated by ReadJSONConfig
 	CCAddress    = "" // in form https://host:port
-	LibPath      = ""
 	DefaultShell = ""
 
 	// AESKey generated from Tag -> md5sum, type: []byte

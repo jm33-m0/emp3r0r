@@ -29,7 +29,6 @@ func ReadJSONConfig(jsonData []byte, config_to_write *Config) (err error) {
 
 	// these variables are decided by other variables
 	CCAddress = fmt.Sprintf("https://%s", config_to_write.CCHost)
-	LibPath = config_to_write.AgentRoot + "/lib"
 	DefaultShell = config_to_write.UtilsPath + "/bash"
 	AESKey = GenAESKey("Your Pre Shared AES Key: " + MagicString)
 

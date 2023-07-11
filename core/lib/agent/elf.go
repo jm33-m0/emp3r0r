@@ -82,3 +82,50 @@ func AddNeededLib(elf_file, lib_file string) (err error) {
 	}
 	return
 }
+
+// IsELF: Check if a file is ELF
+func IsELF(file string) bool {
+	f, err := os.Open(file)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	_, err = elf.NewFile(f)
+	if err != nil {
+		return false
+	}
+	return true
+}
+
+// FixELF: Replace ld and add rpath
+func FixELF(elf_path string) (err error) {
+	pwd, _ := os.Getwd()
+	err = os.Chdir(RuntimeConfig.UtilsPath)
+	if err != nil {
+		return
+	}
+	defer os.Chdir(pwd)
+
+	// paths
+	rpath := fmt.Sprintf("%s/lib/", RuntimeConfig.UtilsPath)
+	patchelf := fmt.Sprintf("%s/patchelf", RuntimeConfig.UtilsPath)
+	ld_path := fmt.Sprintf("%s/ld-musl-x86_64.so.1", rpath)
+	log.Printf("rpath: %s, patchelf: %s, ld_path: %s", rpath, patchelf, ld_path)
+
+	// remove rpath
+	cmd := fmt.Sprintf("%s --remove-rpath", patchelf)
+	out, err := exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
+	if err != nil {
+		err = fmt.Errorf("patchelf remove rpath: %v, %s", err, out)
+	}
+
+	// patchelf cmd
+	cmd = fmt.Sprintf("%s --set-interpreter %s --set-rpath %s %s",
+		patchelf, ld_path, rpath, elf_path)
+
+	out, err = exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
+	if err != nil {
+		err = fmt.Errorf("patchelf: %v, %s", err, out)
+	}
+	return
+}
