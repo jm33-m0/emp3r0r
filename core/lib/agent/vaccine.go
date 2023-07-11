@@ -22,9 +22,8 @@ func VaccineHandler() (out string) {
 	}
 
 	var (
-		PythonArchive = RuntimeConfig.UtilsPath + "/python3.9.tar.xz"
-		PythonLib     = RuntimeConfig.UtilsPath + "/python3.9"
-		PythonPath    = fmt.Sprintf("%s:%s:%s", PythonLib, PythonLib+"/lib-dynload", PythonLib+"/site-packages")
+		PythonLib  = RuntimeConfig.UtilsPath + "/python3.11"
+		PythonPath = fmt.Sprintf("%s:%s:%s", PythonLib, PythonLib+"/lib-dynload", PythonLib+"/site-packages")
 
 		// run python scripts with this command
 		// LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/u/alpine/lib PYTHONPATH="/tmp/python3.9:/tmp/python3.9/site-packages:/tmp/python3.9/lib-dynload" /tmp/python3
@@ -59,29 +58,14 @@ func VaccineHandler() (out string) {
 		log.Printf("Unarchive: %v", err)
 		return fmt.Sprintf("Unarchive: %v", err)
 	}
-	os.RemoveAll(emp3r0r_data.LibPath) // archiver fucking aborts when files already exist
-	if err = archiver.Unarchive(RuntimeConfig.UtilsPath+"/libs.tar.xz", RuntimeConfig.AgentRoot); err != nil {
-		log.Printf("Unarchive: %v", err)
-		out = fmt.Sprintf("Unarchive libs: %v", err)
-	}
 
-	// extract python3.9.tar.xz
-	log.Printf("Pre-set Python environment: %s, %s, %s", PythonArchive, PythonLib, PythonPath)
-	os.RemoveAll(PythonLib)
-	if util.IsExist(PythonArchive) {
-		log.Printf("Found python archive at %s, trying to configure", PythonArchive)
-		if err = archiver.Unarchive(PythonArchive, RuntimeConfig.UtilsPath); err != nil {
-			out = fmt.Sprintf("Unarchive python libs: %v", err)
-			log.Print(out)
-			return
-		}
-		// create launchers
-		err = ioutil.WriteFile(RuntimeConfig.UtilsPath+"/python", []byte(PythonLauncher), 0755)
-		if err != nil {
-			out = fmt.Sprintf("Write python launcher: %v", err)
-		}
-		log.Println("Python configured")
+	// python3 environment
+	// create launchers
+	err = ioutil.WriteFile(RuntimeConfig.UtilsPath+"/python", []byte(PythonLauncher), 0755)
+	if err != nil {
+		out = fmt.Sprintf("Write python launcher: %v", err)
 	}
+	log.Println("Python configured")
 	os.Remove(RuntimeConfig.AgentRoot + "/utils.tar.bz2")
 
 	return
