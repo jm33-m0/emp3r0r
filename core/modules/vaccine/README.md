@@ -40,6 +40,10 @@ pack_python() {
 	mv "$python_ver" python3
 	cp -r "/usr/lib/$python_ver/" .
 
+	# libexpat.so.1
+	libexpat="$(readlink -f /usr/lib/libexpat.so.1)"
+	cp -v "$libexpat" lib/libexpat.so.1
+
 	# remove python cache
 	(
 		cd "$python_ver" && {
@@ -47,6 +51,7 @@ pack_python() {
 			find . -name "*.pyc" -type f -exec rm -rf {} \;
 		}
 	)
+
 }
 
 [[ -e build ]] && rm -rf build
@@ -60,11 +65,20 @@ patchelf
 socat
 rg" >bins.txt
 
+		# pack bins
 		while read -r bin; do
 			pack_bin "$(which "$bin")"
 		done <bins.txt &&
 			rm bins.txt &&
-			pack_python &&
-			tar -cJvpf ../vaccine.tar.xz .
+			pack_python
+
+		# pack python and libs
+		tar -cJvpf "python3.tar.xz" "$python_ver" &&
+			rm -rf "$python_ver"
+		tar -cJvpf libs.tar.xz lib &&
+			rm -rf lib
+
+		# pack vaccine
+		tar -cJvpf ../vaccine.tar.xz .
 	)
 ```
