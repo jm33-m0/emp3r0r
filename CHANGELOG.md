@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.2](https://github.com/jm33-m0/emp3r0r/compare/v1.30.1...v1.30.2) (2023-07-12)
+
+
+### Bug Fixes
+
+* run path error ([773ee53](https://github.com/jm33-m0/emp3r0r/commit/773ee530f3a24868e964a56adff5e347d50da2b9))
+
 ## [1.30.1](https://github.com/jm33-m0/emp3r0r/compare/v1.30.0...v1.30.1) (2023-07-11)
 
 
