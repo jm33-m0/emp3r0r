@@ -14,13 +14,13 @@ import (
 )
 
 func moduleHandler(modName, checksum string) (out string) {
-	tarball := RuntimeConfig.AgentRoot + "/" + modName + ".tar.bz2"
+	tarball := RuntimeConfig.AgentRoot + "/" + modName + ".tar.xz"
 	modDir := RuntimeConfig.AgentRoot + "/" + modName
 	start_sh := modDir + "/start.sh"
 
 	// if we have already downloaded the module, dont bother downloading again
 	if tun.SHA256SumFile(tarball) != checksum {
-		_, err := DownloadViaCC(modName+".tar.bz2",
+		_, err := DownloadViaCC(modName+".tar.xz",
 			tarball)
 		if err != nil {
 			return err.Error()
