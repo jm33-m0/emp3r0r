@@ -102,14 +102,34 @@ func VaccineHandler() (out string) {
 	}
 	for _, f := range files {
 		fpath := fmt.Sprintf("%s/%s", RuntimeConfig.UtilsPath, f.Name())
-		if !IsELF(fpath) || f.Name() == "patchelf" {
+		if !IsELF(fpath) || IsStaticELF(fpath) {
 			continue
 		}
+		// patch patchelf itself
+		old_path := fpath // save original path
+		if f.Name() == "patchelf" {
+			new_path := fmt.Sprintf("%s/%s.tmp", RuntimeConfig.UtilsPath, f.Name())
+			err = util.Copy(fpath, new_path)
+			if err != nil {
+				continue
+			}
+			fpath = new_path
+		}
+
 		err = FixELF(fpath)
 		if err != nil {
 			out = fmt.Sprintf("%s, %s: %v", out, fpath, err)
 		}
+
+		// remove tmp file
+		if f.Name() == "patchelf" {
+			err = os.Rename(fpath, old_path)
+			if err != nil {
+				out = fmt.Sprintf("%s, %s: %v", out, fpath, err)
+			}
+		}
 	}
+
 	log.Println("ELFs configured")
 
 	return
