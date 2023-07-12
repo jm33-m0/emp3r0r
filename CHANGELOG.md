@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.30.3](https://github.com/jm33-m0/emp3r0r/compare/v1.30.2...v1.30.3) (2023-07-12)
+
+
+### Bug Fixes
+
+* check if an ELF is static ([d574330](https://github.com/jm33-m0/emp3r0r/commit/d574330c7d212a634de1e24ac29702a4df2e26cd))
+* module unpack using xz ([177eaa2](https://github.com/jm33-m0/emp3r0r/commit/177eaa2d6a70a62ad9055c9f925a71b03afc7eb2))
+* pack modules with xz, reduce size even more ([955b6bd](https://github.com/jm33-m0/emp3r0r/commit/955b6bdabef121266befe952e0b3e143b6273a58))
+* patch static ELFs and `patchelf` itself ([286ddfb](https://github.com/jm33-m0/emp3r0r/commit/286ddfbabd076e91b398d02429a10a5fe5d34d2f))
+
 ## [1.30.2](https://github.com/jm33-m0/emp3r0r/compare/v1.30.1...v1.30.2) (2023-07-12)
 
 
