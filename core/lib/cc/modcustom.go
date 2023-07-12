@@ -93,6 +93,8 @@ func moduleCustom() {
 			CliPrintError("Compressing %s: %v", CurrentMod, err)
 			return
 		}
+		CliPrintInfo("Created %.2fMB archive (%s) for module '%s'",
+			float64(util.FileSize(tarball))/1024/1024, tarball, CurrentMod)
 
 		// tell agent to download and execute this module
 		checksum := tun.SHA256SumFile(tarball)
