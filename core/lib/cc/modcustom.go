@@ -85,10 +85,10 @@ func moduleCustom() {
 		}
 
 		// compress module files
-		tarball := WWWRoot + CurrentMod + ".tar.bz2"
-		CliPrintInfo("Compressing %s with bz2...", CurrentMod)
+		tarball := WWWRoot + CurrentMod + ".tar.xz"
+		CliPrintInfo("Compressing %s with xz...", CurrentMod)
 		path := fmt.Sprintf("%s/%s", config.Path, CurrentMod)
-		err = util.TarBz2(path, tarball)
+		err = util.TarXZ(path, tarball)
 		if err != nil {
 			CliPrintError("Compressing %s: %v", CurrentMod, err)
 			return

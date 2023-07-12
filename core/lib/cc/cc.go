@@ -54,8 +54,8 @@ const (
 	// WWWRoot host static files for agent
 	WWWRoot = Temp + "www/"
 
-	// UtilsArchive host utils.tar.bz2 for agent
-	UtilsArchive = WWWRoot + "utils.tar.bz2"
+	// UtilsArchive host utils.tar.xz for agent
+	UtilsArchive = WWWRoot + "utils.tar.xz"
 )
 
 // Control controller interface of a target

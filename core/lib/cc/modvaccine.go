@@ -34,7 +34,7 @@ func CreateVaccineArchive() (err error) {
 		CliPrintInfo("Created %.2fMB archive (%s) for module vaccine", float64(util.FileSize(UtilsArchive))/1024/1024, UtilsArchive)
 		os.Chdir(EmpWorkSpace)
 	}()
-	err = util.TarBz2(".", UtilsArchive)
+	err = util.TarXZ(".", UtilsArchive)
 	if err != nil {
 		return fmt.Errorf("Creating vaccine archive: %v", err)
 	}
