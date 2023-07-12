@@ -69,7 +69,7 @@ func VaccineHandler() (out string) {
 	// libs
 	os.RemoveAll(LibPath) // archiver fucking aborts when files already exist
 	if err = archiver.Unarchive(RuntimeConfig.UtilsPath+"/libs.tar.xz",
-		RuntimeConfig.AgentRoot); err != nil {
+		RuntimeConfig.UtilsPath); err != nil {
 		log.Printf("Unarchive: %v", err)
 		out = fmt.Sprintf("Unarchive libs: %v", err)
 	}
