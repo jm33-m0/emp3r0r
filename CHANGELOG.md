@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.4](https://github.com/jm33-m0/emp3r0r/compare/v1.30.3...v1.30.4) (2023-07-15)
+
+
+### Bug Fixes
+
+* add option to uninstall ([e1a4e0d](https://github.com/jm33-m0/emp3r0r/commit/e1a4e0d92aa9a7a9727bf0b5df741869e959c301))
+
 ## [1.30.3](https://github.com/jm33-m0/emp3r0r/compare/v1.30.2...v1.30.3) (2023-07-12)
 
 
