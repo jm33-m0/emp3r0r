@@ -23,6 +23,8 @@ var CmdResultsMutex = &sync.Mutex{}
 
 // processAgentData deal with data from agent side
 func processAgentData(data *emp3r0r_data.MsgTunData) {
+	TargetsMutex.RLock()
+	defer TargetsMutex.RUnlock()
 	payloadSplit := strings.Split(data.Payload, emp3r0r_data.MagicString)
 	op := payloadSplit[0]
 

@@ -45,7 +45,7 @@ var (
 
 	// Targets target list, with control (tun) interface
 	Targets      = make(map[*emp3r0r_data.AgentSystemInfo]*Control)
-	TargetsMutex = sync.Mutex{}
+	TargetsMutex = sync.RWMutex{}
 )
 
 const (
@@ -70,6 +70,8 @@ type Control struct {
 
 // send JSON encoded target list to frontend
 func headlessListTargets() (err error) {
+	TargetsMutex.RLock()
+	defer TargetsMutex.RUnlock()
 	var targets []emp3r0r_data.AgentSystemInfo
 	for target := range Targets {
 		targets = append(targets, *target)
@@ -93,6 +95,8 @@ func headlessListTargets() (err error) {
 
 // ListTargets list currently connected agents
 func ListTargets() {
+	TargetsMutex.RLock()
+	defer TargetsMutex.RUnlock()
 	// return JSON data to APIConn in headless mode
 	if IsAPIEnabled {
 		if err := headlessListTargets(); err != nil {
@@ -197,6 +201,8 @@ func ls_targets() {
 }
 
 func GetTargetDetails(target *emp3r0r_data.AgentSystemInfo) {
+	TargetsMutex.RLock()
+	defer TargetsMutex.RUnlock()
 	// exists?
 	if !IsAgentExist(target) {
 		CliPrintError("Target does not exist")
@@ -293,6 +299,8 @@ func GetTargetDetails(target *emp3r0r_data.AgentSystemInfo) {
 
 // GetTargetFromIndex find target from Targets via control index, return nil if not found
 func GetTargetFromIndex(index int) (target *emp3r0r_data.AgentSystemInfo) {
+	TargetsMutex.RLock()
+	defer TargetsMutex.RUnlock()
 	for t, ctl := range Targets {
 		if ctl.Index == index {
 			target = t
@@ -304,6 +312,8 @@ func GetTargetFromIndex(index int) (target *emp3r0r_data.AgentSystemInfo) {
 
 // GetTargetFromTag find target from Targets via tag, return nil if not found
 func GetTargetFromTag(tag string) (target *emp3r0r_data.AgentSystemInfo) {
+	TargetsMutex.RLock()
+	defer TargetsMutex.RUnlock()
 	for t := range Targets {
 		if t.Tag == tag {
 			target = t
@@ -315,6 +325,8 @@ func GetTargetFromTag(tag string) (target *emp3r0r_data.AgentSystemInfo) {
 
 // GetTargetFromH2Conn find target from Targets via HTTP2 connection ID, return nil if not found
 func GetTargetFromH2Conn(conn *h2conn.Conn) (target *emp3r0r_data.AgentSystemInfo) {
+	TargetsMutex.RLock()
+	defer TargetsMutex.RUnlock()
 	for t, ctrl := range Targets {
 		if conn == ctrl.Conn {
 			target = t
@@ -391,8 +403,8 @@ outter:
 
 // SetAgentLabel if an agent is already labeled, we can set its label in later sessions
 func SetAgentLabel(a *emp3r0r_data.AgentSystemInfo) (label string) {
-	TargetsMutex.Lock()
-	defer TargetsMutex.Unlock()
+	TargetsMutex.RLock()
+	defer TargetsMutex.RUnlock()
 	data, err := ioutil.ReadFile(AgentsJSON)
 	if err != nil {
 		CliPrintWarning("SetAgentLabel: %v", err)
@@ -425,6 +437,8 @@ func ListModules() {
 
 // Send2Agent send MsgTunData to agent
 func Send2Agent(data *emp3r0r_data.MsgTunData, agent *emp3r0r_data.AgentSystemInfo) (err error) {
+	TargetsMutex.RLock()
+	defer TargetsMutex.RUnlock()
 	ctrl := Targets[agent]
 	if ctrl == nil {
 		return fmt.Errorf("Send2Agent (%s): Target is not connected", data.Payload)

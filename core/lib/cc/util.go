@@ -225,8 +225,8 @@ func IsAgentExist(t *emp3r0r_data.AgentSystemInfo) bool {
 
 // assignTargetIndex assign an index number to new agent
 func assignTargetIndex() (index int) {
-	TargetsMutex.Lock()
-	defer TargetsMutex.Unlock()
+	TargetsMutex.RLock()
+	defer TargetsMutex.RUnlock()
 	index_list := make([]int, 0)
 	for _, c := range Targets {
 		index_list = append(index_list, c.Index)

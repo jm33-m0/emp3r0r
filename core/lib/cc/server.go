@@ -512,9 +512,9 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 
 	if !IsAgentExist(&target) {
 		inx := assignTargetIndex()
-		TargetsMutex.Lock()
+		TargetsMutex.RLock()
 		Targets[&target] = &Control{Index: inx, Conn: nil}
-		TargetsMutex.Unlock()
+		TargetsMutex.RUnlock()
 		shortname := strings.Split(target.Tag, "-agent")[0]
 		// set labels
 		if util.IsExist(AgentsJSON) {
@@ -571,7 +571,9 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 		CliPrintDebug("msgTunHandler exiting")
 		for t, c := range Targets {
 			if c.Conn == conn {
+				TargetsMutex.RLock()
 				delete(Targets, t)
+				TargetsMutex.RUnlock()
 				SetDynamicPrompt()
 				CliAlert(color.FgHiRed, "[%d] Agent dies", c.Index)
 				CliMsg("[%d] agent %s disconnected\n", c.Index, strconv.Quote(t.Tag))

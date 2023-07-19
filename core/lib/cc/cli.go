@@ -484,6 +484,8 @@ func CliYesNo(prompt string) bool {
 
 // CliListOptions list currently available options for `set`
 func CliListOptions() {
+	TargetsMutex.RLock()
+	defer TargetsMutex.RUnlock()
 	opts := make(map[string]string)
 	opts["module"] = CurrentMod
 	_, exist := Targets[CurrentTarget]
