@@ -250,7 +250,7 @@ func setCurrentTarget(cmd string) {
 func setTargetLabel(cmd string) {
 	cmdSplit := strings.Fields(cmd)
 	if len(cmdSplit) < 2 {
-		CliPrintError("Invalid command %s, usage: 'label <target tag/index> <label>'", strconv.Quote(cmd))
+		CliPrintError("Invalid command %s, usage: 'label <tag/index> <label>'", strconv.Quote(cmd))
 		return
 	}
 	target := new(emp3r0r_data.AgentSystemInfo)
@@ -259,18 +259,19 @@ func setTargetLabel(cmd string) {
 	// select by tag or index
 	index, e := strconv.Atoi(cmdSplit[1])
 	if e != nil {
+		// try by tag
 		target = GetTargetFromTag(cmdSplit[1])
-		if target != nil {
-			Targets[target].Label = label // set label
-			labelAgents()
-			CliPrintSuccess("%s has been labeled as %s", target.Tag, label)
-		} else {
-			CliPrintError("cannot set target label by index: %v", e)
+		if target == nil {
+			// cannot parse
+			CliPrintError("Cannot set target label by index: %v", e)
 			return
 		}
+	} else {
+		// try by index
+		target = GetTargetFromIndex(index)
 	}
-	// by index
-	target = GetTargetFromIndex(index)
+
+	// target exists?
 	if target == nil {
 		CliPrintError("Target does not exist")
 		return
