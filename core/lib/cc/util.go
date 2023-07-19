@@ -246,8 +246,19 @@ func assignTargetIndex() (index int) {
 	// sort
 	sort.Ints(index_list)
 
-	// increase index number by 1
-	return index_list[len(index_list)-1] + 1
+	// find available numbers
+	available_indexes := make([]int, 0)
+	for i := 0; i < len(index_list); i++ {
+		if index_list[i] != i {
+			available_indexes = append(available_indexes, i)
+		}
+	}
+	if len(available_indexes) == 0 {
+		return len(index_list)
+	}
+
+	// use the smallest available number
+	return available_indexes[0]
 }
 
 // TermClear clear screen
