@@ -203,6 +203,8 @@ func OpenInNewTerminalWindow(name, cmd string) error {
 
 // IsAgentExistByTag is agent already in target list?
 func IsAgentExistByTag(tag string) bool {
+	TargetsMutex.RLock()
+	defer TargetsMutex.RUnlock()
 	for a := range Targets {
 		if a.Tag == tag {
 			return true
@@ -214,6 +216,8 @@ func IsAgentExistByTag(tag string) bool {
 
 // IsAgentExist is agent already in target list?
 func IsAgentExist(t *emp3r0r_data.AgentSystemInfo) bool {
+	TargetsMutex.RLock()
+	defer TargetsMutex.RUnlock()
 	for a := range Targets {
 		if a.Tag == t.Tag {
 			return true
@@ -227,10 +231,18 @@ func IsAgentExist(t *emp3r0r_data.AgentSystemInfo) bool {
 func assignTargetIndex() (index int) {
 	TargetsMutex.RLock()
 	defer TargetsMutex.RUnlock()
+
+	// index is 0 for the first agent
+	if len(Targets) == 0 {
+		return 0
+	}
+
+	// loop thru agent list and get all index numbers
 	index_list := make([]int, 0)
 	for _, c := range Targets {
 		index_list = append(index_list, c.Index)
 	}
+
 	// sort
 	sort.Ints(index_list)
 
