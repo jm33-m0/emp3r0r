@@ -230,7 +230,7 @@ func FileSize(path string) (size int64) {
 	return
 }
 
-func TarBz2(dir, outfile string) error {
+func TarXZ(dir, outfile string) error {
 	// remove outfile
 	os.RemoveAll(outfile)
 
@@ -251,21 +251,21 @@ func TarBz2(dir, outfile string) error {
 	}
 
 	// create the output file we'll write to
-	out, err := os.Create(outfile)
+	outf, err := os.Create(outfile)
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer outf.Close()
 
 	// we can use the CompressedArchive type to gzip a tarball
 	// (compression is not required; you could use Tar directly)
 	format := archiver.CompressedArchive{
-		Compression: archiver.Bz2{},
+		Compression: archiver.Xz{},
 		Archival:    archiver.Tar{},
 	}
 
 	// create the archive
-	err = format.Archive(context.Background(), out, files)
+	err = format.Archive(context.Background(), outf, files)
 	if err != nil {
 		return err
 	}

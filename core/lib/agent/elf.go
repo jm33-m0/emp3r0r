@@ -129,3 +129,23 @@ func FixELF(elf_path string) (err error) {
 	}
 	return
 }
+
+func IsStaticELF(file_path string) bool {
+	f, err := elf.Open(file_path)
+	if err != nil {
+		fmt.Println("Error opening ELF file:", err)
+		os.Exit(1)
+
+	}
+	defer f.Close()
+
+	// Check if the ELF file is statically linked
+	isStaticallyLinked := true
+	for _, phdr := range f.Progs {
+		if phdr.Type == elf.PT_DYNAMIC {
+			isStaticallyLinked = false
+			break
+		}
+	}
+	return isStaticallyLinked
+}
