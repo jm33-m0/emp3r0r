@@ -512,12 +512,13 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 
 	if !IsAgentExist(&target) {
 		inx := assignTargetIndex()
+		TargetsMutex.Lock()
 		Targets[&target] = &Control{Index: inx, Conn: nil}
+		TargetsMutex.Unlock()
 		shortname := strings.Split(target.Tag, "-agent")[0]
 		// set labels
 		if util.IsExist(AgentsJSON) {
-			var mutex = &sync.Mutex{}
-			if l := SetAgentLabel(&target, mutex); l != "" {
+			if l := SetAgentLabel(&target); l != "" {
 				shortname = l
 			}
 		}
@@ -538,8 +539,7 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 		shortname := strings.Split(target.Tag, "-agent")[0]
 		// set labels
 		if util.IsExist(AgentsJSON) {
-			var mutex = &sync.Mutex{}
-			if l := SetAgentLabel(&target, mutex); l != "" {
+			if l := SetAgentLabel(&target); l != "" {
 				shortname = l
 			}
 		}

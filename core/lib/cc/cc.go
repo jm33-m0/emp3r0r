@@ -44,7 +44,8 @@ var (
 	EmpConfigFile = ""
 
 	// Targets target list, with control (tun) interface
-	Targets = make(map[*emp3r0r_data.AgentSystemInfo]*Control)
+	Targets      = make(map[*emp3r0r_data.AgentSystemInfo]*Control)
+	TargetsMutex = sync.Mutex{}
 )
 
 const (
@@ -389,7 +390,9 @@ outter:
 }
 
 // SetAgentLabel if an agent is already labeled, we can set its label in later sessions
-func SetAgentLabel(a *emp3r0r_data.AgentSystemInfo, mutex *sync.Mutex) (label string) {
+func SetAgentLabel(a *emp3r0r_data.AgentSystemInfo) (label string) {
+	TargetsMutex.Lock()
+	defer TargetsMutex.Unlock()
 	data, err := ioutil.ReadFile(AgentsJSON)
 	if err != nil {
 		CliPrintWarning("SetAgentLabel: %v", err)
@@ -404,8 +407,6 @@ func SetAgentLabel(a *emp3r0r_data.AgentSystemInfo, mutex *sync.Mutex) (label st
 
 	for _, labeled := range labeledAgents {
 		if a.Tag == labeled.Tag {
-			mutex.Lock()
-			defer mutex.Unlock()
 			if Targets[a] != nil {
 				Targets[a].Label = labeled.Label
 			}

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -224,13 +225,17 @@ func IsAgentExist(t *emp3r0r_data.AgentSystemInfo) bool {
 
 // assignTargetIndex assign an index number to new agent
 func assignTargetIndex() (index int) {
+	TargetsMutex.Lock()
+	defer TargetsMutex.Unlock()
+	index_list := make([]int, 0)
 	for _, c := range Targets {
-		if index == c.Index {
-			index++
-		}
+		index_list = append(index_list, c.Index)
 	}
+	// sort
+	sort.Ints(index_list)
 
-	return
+	// increase index number by 1
+	return index_list[len(index_list)-1] + 1
 }
 
 // TermClear clear screen
