@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.30.5](https://github.com/jm33-m0/emp3r0r/compare/v1.30.4...v1.30.5) (2023-07-19)
+
+
+### Bug Fixes
+
+* [#236](https://github.com/jm33-m0/emp3r0r/issues/236) ([84e1fda](https://github.com/jm33-m0/emp3r0r/commit/84e1fdacb0320d7c83cec7dea1a604749919c82f))
+* `label` by tag not working ([131d84e](https://github.com/jm33-m0/emp3r0r/commit/131d84e1f1aa2e888978adaedd6876b61cd9e2ce))
+* UUID is all zero for Windows ([fd487d6](https://github.com/jm33-m0/emp3r0r/commit/fd487d615c60b65b98b7c62f12994d497c24b9ff))
+
 ## [1.30.4](https://github.com/jm33-m0/emp3r0r/compare/v1.30.3...v1.30.4) (2023-07-15)
 
 
