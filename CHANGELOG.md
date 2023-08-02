@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.0](https://github.com/jm33-m0/emp3r0r/compare/v1.30.5...v1.31.0) (2023-08-02)
+
+
+### Features
+
+* hide PIDs and files using loader.so ([c54c5f5](https://github.com/jm33-m0/emp3r0r/commit/c54c5f53522c5c93270c5189d6f54d30ee9a050c))
+
 ## [1.30.5](https://github.com/jm33-m0/emp3r0r/compare/v1.30.4...v1.30.5) (2023-07-19)
 
 
