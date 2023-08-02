@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.31.1](https://github.com/jm33-m0/emp3r0r/compare/v1.31.0...v1.31.1) (2023-08-02)
+
+
+### Bug Fixes
+
+* `VERBOSE=true` not working ([b7894c4](https://github.com/jm33-m0/emp3r0r/commit/b7894c463e7a178ebc6b8cc51f116a4e0afa594d))
+* auto-updating hide_pid list ([7a2d822](https://github.com/jm33-m0/emp3r0r/commit/7a2d8227f23a81558f82c345a5f1e4ceeb21d5b9))
+* be silent when started by loader.so ([4113d3d](https://github.com/jm33-m0/emp3r0r/commit/4113d3d675669be21fa5d3c7a54523f36ffd6d6a))
+* do not overwrite backup ([ef0b058](https://github.com/jm33-m0/emp3r0r/commit/ef0b05808e7f7cfaac51ceeb41575dadbcdad0dd))
+* hidden_pids list gets overwritten ([fbf7c9c](https://github.com/jm33-m0/emp3r0r/commit/fbf7c9c7b0963611d20b66481d8ad46b5337c0d0))
+* sort hidden_pids list ([a63dcef](https://github.com/jm33-m0/emp3r0r/commit/a63dcef6cd3db73d09d5d4a2e431221aafdae808))
+* unable to read config when started by loader.so ([9074fc4](https://github.com/jm33-m0/emp3r0r/commit/9074fc4ddc8ea90851acdad8833f0007a9cc92b2))
+
 ## [1.31.0](https://github.com/jm33-m0/emp3r0r/compare/v1.30.5...v1.31.0) (2023-08-02)
 
 
