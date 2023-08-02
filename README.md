@@ -45,6 +45,7 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
   - Use [tmux](https://github.com/tmux/tmux) for window management
 - Stealth
   - Automatically changes `argv` so you won't notice it in `ps` listing
+  - Hide files and PIDs via Glibc hijacking (`patcher` in `get_persistence`)
   - Built-in [**Elvish Shell**](https://elv.sh/) with the same disguise as main process
   - All C2 communications made in HTTP2/TLS
   - Defeat [**JA3**](https://github.com/salesforce/ja3) fingerprinting with [**UTLS**](https://github.com/refraction-networking/utls)
