@@ -77,7 +77,9 @@ func GetLibc(pid int) (path string, addr, offset int64) {
 func AddNeededLib(elf_file, lib_file string) (err error) {
 	// backup
 	bak := fmt.Sprintf("%s/%s.bak", RuntimeConfig.AgentRoot, elf_file)
-	util.Copy(elf_file, bak)
+	if !util.IsFileExist(bak) {
+		util.Copy(elf_file, bak)
+	}
 
 	// patchelf cmd
 	cmd := fmt.Sprintf("%s/patchelf --add-needed %s %s",
