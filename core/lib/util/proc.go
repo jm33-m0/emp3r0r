@@ -171,6 +171,40 @@ func PidOf(name string) []int {
 	return pids
 }
 
+// Get children processes of a process
+func GetChildren(pid int) (children []int, err error) {
+	d, err := os.ReadDir(fmt.Sprintf("/proc/%d/task", pid))
+	if err != nil {
+		log.Printf("GetChildren: %v", err)
+		return
+	}
+	threads := make([]int, 0)
+	for _, thread := range d {
+		tid, err := strconv.Atoi(thread.Name())
+		if err != nil {
+			continue
+		}
+		threads = append(threads, tid)
+	}
+	for _, tid := range threads {
+		children_file := fmt.Sprintf("/proc/%d/task/%d/children", pid, tid)
+		data, err := os.ReadFile(children_file)
+		if err != nil {
+			log.Printf("GetChildren: %v", err)
+			return nil, err
+		}
+		children_str := strings.Fields(strings.TrimSpace(string(data)))
+		for _, child := range children_str {
+			child_pid, err := strconv.Atoi(child)
+			if err != nil {
+				continue
+			}
+			children = append(children, child_pid)
+		}
+	}
+	return
+}
+
 // sleep for a random interval between 120ms to 1min
 func TakeASnap() {
 	interval := time.Duration(RandInt(120, 60000))

