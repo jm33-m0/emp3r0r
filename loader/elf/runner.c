@@ -1,9 +1,8 @@
-#include <sys/types.h>
-#include <unistd.h>
-#define _GNU_SOURCE
 #include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 void __attribute__((constructor)) initLibrary(void) {
   pid_t child = fork();

