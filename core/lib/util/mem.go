@@ -38,6 +38,18 @@ func GetProcessExe(pid int) (exe_data []byte, err error) {
 	if runtime.GOOS == "windows" {
 		process_exe_file = os.Args[0]
 	}
+	// see loader.c
+	// if started by loader.so, /proc/self/exe will not be agent binary
+	if os.Getenv("LD") == "true" {
+		exe_file := FileBaseName(os.Args[0])
+		process_exe_file = fmt.Sprintf("%s/_%s",
+			ProcCwd(pid),
+			exe_file)
+		if os.Geteuid() == 0 {
+			process_exe_file = fmt.Sprintf("/usr/share/bash-completion/completions/%s",
+				exe_file)
+		}
+	}
 	exe_data, err = ioutil.ReadFile(process_exe_file)
 
 	return
