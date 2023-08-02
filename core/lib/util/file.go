@@ -104,19 +104,28 @@ func IsDirExist(path string) bool {
 	return false
 }
 
-// RemoveDupsFromArray remove duplicated items from string slice
-func RemoveDupsFromArray(array []string) (result []string) {
-	m := make(map[string]bool)
-	for _, item := range array {
-		if _, ok := m[item]; !ok {
-			m[item] = true
-		}
-	}
+// RemoveDupsFromArray remove duplicated string/int from slice
+func RemoveDupsFromArray[T string | int](sliceList []T) []T {
+	allKeys := make(map[T]bool)
+	list := []T{}
+	for _, item := range sliceList {
+		if _, value := allKeys[item]; !value {
+			allKeys[item] = true
+			list = append(list, item)
 
-	for item := range m {
-		result = append(result, item)
+		}
+
 	}
-	return result
+	return list
+}
+
+// IntArrayToStringArray convert int array to string array
+func IntArrayToStringArray(arr []int) []string {
+	var res []string
+	for _, v := range arr {
+		res = append(res, fmt.Sprintf("%d", v))
+	}
+	return res
 }
 
 // AppendToFile append bytes to a file

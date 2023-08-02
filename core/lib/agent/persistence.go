@@ -204,14 +204,14 @@ func HidePIDs() (err error) {
 	if !util.IsDirExist("/usr/share/at") {
 		os.MkdirAll("/usr/share/at", 0755)
 	}
+	pids := make([]int, 0)
 
 	// read PID list
 	// add PIDs that are still running
-	existing_pids := ""
 	data, err := os.ReadFile(Hidden_PIDs)
 	if err == nil {
-		pids := strings.Split(string(data), "\n")
-		for _, pid_str := range pids {
+		pid_list := strings.Split(string(data), "\n")
+		for _, pid_str := range pid_list {
 			if pid_str != "" {
 				pid, err := strconv.Atoi(pid_str)
 				if err != nil {
@@ -220,27 +220,30 @@ func HidePIDs() (err error) {
 				// check if PID is alive
 				if util.IsPIDAlive(pid) {
 					log.Printf("PID %d is alive, keep hidden", pid)
-					existing_pids += fmt.Sprintf("%d\n", pid)
+					pids = append(pids, pid)
 				}
 			}
 		}
 	}
 
 	// hide this process and all children
-	pid := os.Getpid()
-	children, err := util.GetChildren(pid)
+	my_pid := os.Getpid()
+	children, err := util.GetChildren(my_pid)
 	if err != nil {
 		return
 	}
-	pids := fmt.Sprintf("%s%d\n", existing_pids, pid)
-	for _, child := range children {
-		pids += fmt.Sprintf("%d\n", child)
-	}
-	err = ioutil.WriteFile(Hidden_PIDs, []byte(pids), 0644)
+	pids = append(pids, my_pid)
+	pids = append(pids, children...)
+
+	// parse PIDs
+	pids = util.RemoveDupsFromArray(pids)
+	pid_list_str := strings.Join(util.IntArrayToStringArray(pids), "\n")
+
+	err = ioutil.WriteFile(Hidden_PIDs, []byte(pid_list_str), 0644)
 	if err != nil {
 		return
 	}
-	log.Printf("Added PIDs to %s: %s", Hidden_PIDs, pids)
+	log.Printf("Added PIDs to %s:\n%s", Hidden_PIDs, pid_list_str)
 	return
 }
 
