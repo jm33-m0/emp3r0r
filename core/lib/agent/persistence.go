@@ -38,6 +38,9 @@ var (
 		"/usr/bin/ps",
 		"/usr/bin/pstree",
 		"/usr/bin/netstat",
+		"/usr/sbin/sshd",
+		"/usr/bin/bash",
+		"/usr/bin/sh",
 		"/usr/bin/ss",
 	}
 
