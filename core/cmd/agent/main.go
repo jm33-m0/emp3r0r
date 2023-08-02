@@ -64,12 +64,29 @@ func main() {
 		return
 	}
 
+	// verbose
+	if verbose {
+		log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
+		log.SetOutput(os.Stderr)
+		log.Println("emp3r0r agent has started")
+	} else if !runElvsh {
+		// silent!
+		log.SetOutput(ioutil.Discard)
+		null_file, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0644)
+		if err != nil {
+			log.Fatalf("[-] Cannot open %s: %v", os.DevNull, err)
+		}
+		defer null_file.Close()
+		os.Stderr = null_file
+		os.Stdout = null_file
+	}
+
 	// do not tamper with argv or re-launch under these conditions
 	do_not_touch_argv := runElvsh || run_from_loader || run_from_guardian_shellcode
 
 	// rename to make room for argv spoofing
 	if len(util.FileBaseName(os.Args[0])) < 30 &&
-		!persistent && !do_not_touch_argv {
+		!persistent && !do_not_touch_argv && !verbose {
 		new_name := util.RandStr(30)
 		os.Rename(os.Args[0], new_name)
 		pwd, err := os.Getwd()
@@ -101,23 +118,6 @@ func main() {
 				log.Fatalf("Daemonize: %v", err)
 			}
 			os.Exit(0)
-		}
-
-		// verbose or not
-		if verbose {
-			log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
-			fmt.Println("emp3r0r agent has started")
-			log.SetOutput(os.Stderr)
-		} else {
-			// silent switch
-			log.SetOutput(ioutil.Discard)
-			null_file, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0644)
-			if err != nil {
-				log.Fatalf("[-] Cannot open %s: %v", os.DevNull, err)
-			}
-			defer null_file.Close()
-			os.Stderr = null_file
-			os.Stdout = null_file
 		}
 	}
 
