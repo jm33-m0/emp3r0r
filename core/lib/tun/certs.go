@@ -139,7 +139,7 @@ func GenCerts(hosts []string, outname string, isCA bool) (err error) {
 
 // NamesInCert find domain names and IPs in server certificate
 func NamesInCert(cert_file string) (names []string) {
-	cert, err := ParseCert(cert_file)
+	cert, err := ParseCertPemFile(cert_file)
 	if err != nil {
 		log.Printf("ParseCert %s: %v", cert_file, err)
 		return
@@ -155,24 +155,27 @@ func NamesInCert(cert_file string) (names []string) {
 	return
 }
 
-// ParseCert read from PEM file and return parsed cert
-func ParseCert(cert_file string) (cert *x509.Certificate, err error) {
+func ParsePem(data []byte) (*x509.Certificate, error) {
+	block, _ := pem.Decode(data)
+	return x509.ParseCertificate(block.Bytes)
+}
+
+// ParseCertPemFile read from PEM file and return parsed cert
+func ParseCertPemFile(cert_file string) (cert *x509.Certificate, err error) {
 	cert_data, err := ioutil.ReadFile(cert_file)
 	if err != nil {
 		err = fmt.Errorf("Read ca-cert.pem: %v", err)
 		return
 	}
-	block, _ := pem.Decode(cert_data)
-	return x509.ParseCertificate(block.Bytes)
+	return ParsePem(cert_data)
 }
 
 // GetFingerprint return SHA256 fingerprint of a cert
-func GetFingerprint(cert_file string) (fingerprint string) {
-	cert, err := ParseCert(cert_file)
+func GetFingerprint(cert_file string) string {
+	cert, err := ParseCertPemFile(cert_file)
 	if err != nil {
-		log.Printf("ParseCert %s: %v", cert_file, err)
-		return
+		log.Printf("GetFingerprint: ParseCert %s: %v", cert_file, err)
+		return ""
 	}
-	fingerprint = SHA256SumRaw(cert.Raw)
-	return
+	return SHA256SumRaw(cert.Raw)
 }

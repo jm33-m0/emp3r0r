@@ -2,7 +2,6 @@ package tun
 
 import (
 	"crypto/x509"
-	"encoding/pem"
 	"log"
 	"net/http"
 	"net/url"
@@ -47,8 +46,7 @@ func EmpHTTPClient(c2_addr, proxyServer string) *http.Client {
 	}
 
 	// fingerprint of CA
-	block, _ := pem.Decode(CACrt)
-	ca_crt, _ := x509.ParseCertificate(block.Bytes)
+	ca_crt, _ := ParsePem(CACrt)
 	log.Printf("CA cert fingerprint: %s", SHA256SumRaw(ca_crt.Raw))
 
 	// set proxyURL to nil to use direct connection for C2 transport

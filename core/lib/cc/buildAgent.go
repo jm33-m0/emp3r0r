@@ -345,6 +345,7 @@ func GenC2Certs(hosts []string) (err error) {
 		if err != nil {
 			return fmt.Errorf("Generate CA: %v", err)
 		}
+		CliPrintInfo("CA fingerprint: %s", RuntimeConfig.CAFingerprint)
 	}
 	if !util.IsFileExist(CAKeyFile) || !util.IsFileExist(CACrtFile) {
 		return fmt.Errorf("%s or %s still not found, CA cert generation failed", CAKeyFile, CACrtFile)
@@ -358,6 +359,7 @@ func GenC2Certs(hosts []string) (err error) {
 
 	// generate server cert
 	CliPrint("Server cert not found, generating...")
+	CliPrintInfo("Server cert fingerprint: %s", tun.GetFingerprint(ServerCrtFile))
 	return tun.GenCerts(hosts, "emp3r0r", false)
 }
 
@@ -370,6 +372,7 @@ func save_config_json() (err error) {
 	if err != nil {
 		return fmt.Errorf("Saving %s: %v", EmpConfigFile, err)
 	}
+
 	return ioutil.WriteFile(EmpConfigFile, w_data, 0600)
 }
 
@@ -417,6 +420,5 @@ func LoadCACrt() error {
 	tun.CACrt = ca_data
 	RuntimeConfig.CAPEM = string(tun.CACrt)
 	RuntimeConfig.CAFingerprint = tun.GetFingerprint(CACrtFile)
-	CliPrintInfo("CA fingerprint: %s", RuntimeConfig.CAFingerprint)
 	return nil
 }
