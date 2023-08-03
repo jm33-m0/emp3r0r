@@ -132,5 +132,11 @@ func VaccineHandler() (out string) {
 
 	log.Println("ELFs configured")
 
+	// set DefaultShell
+	custom_bash := fmt.Sprintf("%s/bash", RuntimeConfig.UtilsPath)
+	if util.IsFileExist(custom_bash) {
+		emp3r0r_data.DefaultShell = custom_bash
+	}
+
 	return
 }

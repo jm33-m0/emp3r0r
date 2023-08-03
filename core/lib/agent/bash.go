@@ -21,19 +21,16 @@ func ExtractBash() error {
 		}
 	}
 
-	// bashData := tun.Base64Decode(file.BashBinary)
-	// if bashData == nil {
-	// 	log.Printf("bash binary decode failed")
-	// }
-	// checksum := tun.SHA256SumRaw(bashData)
-	// if checksum != file.BashChecksum {
-	// 	return fmt.Errorf("bash checksum error")
-	// }
 	err := ioutil.WriteFile(RuntimeConfig.UtilsPath+"/.bashrc", []byte(file.BashRC), 0600)
 	if err != nil {
 		log.Printf("Write bashrc: %v", err)
 	}
 
 	// return ioutil.WriteFile(RuntimeConfig.UtilsPath+"/bash", bashData, 0755)
+	customBash := RuntimeConfig.UtilsPath + "/bash"
+	if !util.IsFileExist(customBash) {
+		log.Printf("Custom bash binary (%s) not found, maybe you need to run `vaccine`",
+			customBash)
+	}
 	return err
 }

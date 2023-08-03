@@ -203,8 +203,12 @@ func main() {
 	if err != nil {
 		log.Printf("[-] Cannot extract bash: %v", err)
 	}
-	if !util.IsExist(emp3r0r_data.DefaultShell) {
-		emp3r0r_data.DefaultShell = "/bin/sh"
+	emp3r0r_data.DefaultShell = fmt.Sprintf("%s/bash", agent.RuntimeConfig.UtilsPath)
+	if !util.IsFileExist(emp3r0r_data.DefaultShell) {
+		emp3r0r_data.DefaultShell = "/bin/bash"
+		if !util.IsFileExist(emp3r0r_data.DefaultShell) {
+			emp3r0r_data.DefaultShell = "/bin/sh"
+		}
 	}
 
 	// remove *.downloading files

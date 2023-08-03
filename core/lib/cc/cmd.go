@@ -1,6 +1,7 @@
 package cc
 
 import (
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -223,7 +224,11 @@ func setCurrentTarget(cmd string) {
 
 		// open a shell
 		CliPrintInfo("Opening Shell window")
-		err = SSHClient("elvsh", "", RuntimeConfig.SSHDPort, true)
+		shell := "elvsh"
+		if os.Getenv("LD") == "true" {
+			shell = "bash"
+		}
+		err = SSHClient(shell, "", RuntimeConfig.SSHDPort, true)
 		if err != nil {
 			CliPrintError("SSHClient: %v", err)
 		}
