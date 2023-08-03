@@ -134,9 +134,11 @@ func main() {
 	}
 
 	// hide agent process
-	err = agent.HidePIDs()
-	if err != nil {
-		log.Printf("Hiding PIDs: %v", err)
+	if agent.HasRoot() {
+		err = agent.HidePIDs()
+		if err != nil {
+			log.Printf("Hiding PIDs: %v", err)
+		}
 	}
 
 	// run as elvish shell
