@@ -97,7 +97,7 @@ const (
 var PersistMethods = map[string]string{
 	"profiles": "Add some aliases to shell profiles, will trigger when user logs in",
 	"cron":     "Add a cronjob",
-	"patcher":  "Patch some binaries (autostarting ones) so they load loader.so on startup",
+	"patcher":  "Patch binaries (ls, ps, pstree, sshd, bash, sh...) so they load loader.so on startup, it also make emp3r0r essentially invisible to those tools",
 }
 
 var InjectorMethods = map[string]string{
