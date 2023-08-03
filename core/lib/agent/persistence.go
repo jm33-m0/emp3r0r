@@ -216,14 +216,14 @@ func HidePIDs() (err error) {
 		pid_list := strings.Split(string(data), "\n")
 		for _, pid_str := range pid_list {
 			if pid_str != "" {
-				pid, err := strconv.Atoi(pid_str)
+				pid, err := strconv.ParseInt(pid_str, 10, 32)
 				if err != nil {
 					continue
 				}
 				// check if PID is alive
-				if util.IsPIDAlive(pid) {
+				if util.IsPIDAlive(int(pid)) {
 					log.Printf("PID %d is alive, keep hidden", pid)
-					pids = append(pids, pid)
+					pids = append(pids, int(pid))
 				}
 			}
 		}
