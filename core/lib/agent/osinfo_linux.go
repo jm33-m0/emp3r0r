@@ -12,7 +12,6 @@ package agent
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"regexp"
 	"strings"
@@ -162,11 +161,11 @@ func crossPlatformGetOSInfo() (osinfo *OSInfo) {
 }
 
 func GetKernelVersion() (uname string) {
-	release, err := ioutil.ReadFile("/proc/sys/kernel/osrelease")
+	release, err := os.ReadFile("/proc/sys/kernel/osrelease")
 	if err != nil {
 		release = []byte("unknown_release")
 	}
-	version, err := ioutil.ReadFile("/proc/sys/kernel/version")
+	version, err := os.ReadFile("/proc/sys/kernel/version")
 	if err != nil {
 		version = []byte("unknown_version")
 	}
@@ -176,7 +175,7 @@ func GetKernelVersion() (uname string) {
 
 // Read one-liner text files, strip newline.
 func slurpFile(path string) string {
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return ""
 	}
@@ -186,5 +185,5 @@ func slurpFile(path string) string {
 
 // Write one-liner text files, add newline, ignore errors (best effort).
 func spewFile(path string, data string, perm os.FileMode) {
-	_ = ioutil.WriteFile(path, []byte(data+"\n"), perm)
+	_ = os.WriteFile(path, []byte(data+"\n"), perm)
 }

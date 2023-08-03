@@ -4,15 +4,15 @@
 package agent
 
 import (
-	"io/ioutil"
 	"log"
+	"os"
 	"strings"
 )
 
 // CheckContainer are we in a container? what container is it?
 func crossPlatformCheckContainer() (product string) {
 	product = "None"
-	data, err := ioutil.ReadFile("/proc/1/cgroup")
+	data, err := os.ReadFile("/proc/1/cgroup")
 	if err != nil {
 		return
 	}

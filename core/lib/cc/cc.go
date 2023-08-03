@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/user"
 	"strings"
@@ -364,7 +363,7 @@ func labelAgents() {
 	)
 	// what if emp3r0r_data.json already have some records
 	if util.IsExist(AgentsJSON) {
-		data, err := ioutil.ReadFile(AgentsJSON)
+		data, err := os.ReadFile(AgentsJSON)
 		if err != nil {
 			CliPrintWarning("Reading labeled agents: %v", err)
 		}
@@ -408,7 +407,7 @@ outter:
 	}
 
 	// write file
-	err = ioutil.WriteFile(AgentsJSON, data, 0600)
+	err = os.WriteFile(AgentsJSON, data, 0600)
 	if err != nil {
 		CliPrintWarning("Saving labeled agents: %v", err)
 	}
@@ -418,7 +417,7 @@ outter:
 func SetAgentLabel(a *emp3r0r_data.AgentSystemInfo) (label string) {
 	TargetsMutex.RLock()
 	defer TargetsMutex.RUnlock()
-	data, err := ioutil.ReadFile(AgentsJSON)
+	data, err := os.ReadFile(AgentsJSON)
 	if err != nil {
 		CliPrintWarning("SetAgentLabel: %v", err)
 		return

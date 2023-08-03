@@ -1,7 +1,7 @@
 package tun
 
 import (
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -67,7 +67,7 @@ func HasInternetAccess() bool {
 	}
 	defer resp.Body.Close()
 
-	respData, err := ioutil.ReadAll(resp.Body)
+	respData, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return false
 	}
@@ -96,7 +96,7 @@ func IsProxyOK(proxy string) bool {
 	}
 	defer resp.Body.Close()
 
-	respData, err := ioutil.ReadAll(resp.Body)
+	respData, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return false
 	}

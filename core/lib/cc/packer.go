@@ -6,7 +6,6 @@ package cc
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 
@@ -22,7 +21,7 @@ func Packer(inputELF string) (err error) {
 	magic_str := emp3r0r_data.MagicString
 
 	// read file
-	elfBytes, err := ioutil.ReadFile(inputELF)
+	elfBytes, err := os.ReadFile(inputELF)
 	if err != nil {
 		return fmt.Errorf("Read %s: %v", inputELF, err)
 	}
@@ -54,12 +53,12 @@ func Packer(inputELF string) (err error) {
 	// append to stub
 	stub_file := emp3r0r_data.Packer_Stub
 	packed_file := fmt.Sprintf("%s.packed.exe", inputELF)
-	toWrite, err := ioutil.ReadFile(stub_file)
+	toWrite, err := os.ReadFile(stub_file)
 	if err != nil {
 		return fmt.Errorf("cannot read %s: %v", stub_file, err)
 	}
 	toWrite = append(toWrite, encELFBytes...)
-	err = ioutil.WriteFile(packed_file, toWrite, 0755)
+	err = os.WriteFile(packed_file, toWrite, 0755)
 	if err != nil {
 		return fmt.Errorf("write to packed file %s: %v", packed_file, err)
 	}

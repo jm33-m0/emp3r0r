@@ -3,7 +3,6 @@ package cc
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strconv"
@@ -267,7 +266,7 @@ func (pane *Emp3r0rPane) Printf(clear bool, format string, a ...interface{}) {
 	}
 
 	// print msg
-	err := ioutil.WriteFile(pane.TTY, []byte(msg), 0777)
+	err := os.WriteFile(pane.TTY, []byte(msg), 0777)
 	if err != nil {
 		CliPrintWarning("Cannot print on tmux window %s (%s): %v,\n"+
 			"printing to main window instead.\n\n",

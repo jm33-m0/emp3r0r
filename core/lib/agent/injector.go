@@ -5,7 +5,6 @@ package agent
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -96,7 +95,7 @@ func prepare_loader_so(pid int, bin string) (so_path string, err error) {
 		if err != nil {
 			return "", fmt.Errorf("Extract loader.so failed: %v", err)
 		}
-		err = ioutil.WriteFile(so_path, out, 0644)
+		err = os.WriteFile(so_path, out, 0644)
 		if err != nil {
 			return "", fmt.Errorf("Write loader.so failed: %v", err)
 		}

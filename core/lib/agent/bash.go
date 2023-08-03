@@ -4,7 +4,6 @@
 package agent
 
 import (
-	"io/ioutil"
 	"log"
 	"os"
 
@@ -21,7 +20,7 @@ func ExtractBash() error {
 		}
 	}
 
-	err := ioutil.WriteFile(RuntimeConfig.UtilsPath+"/.bashrc", []byte(file.BashRC), 0600)
+	err := os.WriteFile(RuntimeConfig.UtilsPath+"/.bashrc", []byte(file.BashRC), 0600)
 	if err != nil {
 		log.Printf("Write bashrc: %v", err)
 	}

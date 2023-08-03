@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -35,7 +34,7 @@ type FileStat struct {
 
 // LsPath ls path and return a json
 func LsPath(path string) (res string, err error) {
-	files, err := ioutil.ReadDir(path)
+	files, err := os.ReadDir(path)
 	if err != nil {
 		log.Printf("LsPath: %v", err)
 		return
@@ -44,15 +43,20 @@ func LsPath(path string) (res string, err error) {
 	// parse
 	var dents []Dentry
 	for _, f := range files {
+		info, err := f.Info()
+		if err != nil {
+			log.Printf("LsPath: %v", err)
+			continue
+		}
 		var dent Dentry
-		dent.Name = f.Name()
-		dent.Date = f.ModTime().String()
+		dent.Name = info.Name()
+		dent.Date = info.ModTime().String()
 		dent.Ftype = "file"
 		if f.IsDir() {
 			dent.Ftype = "dir"
 		}
-		dent.Permission = f.Mode().String()
-		dent.Size = fmt.Sprintf("%d bytes", f.Size())
+		dent.Permission = info.Mode().String()
+		dent.Size = fmt.Sprintf("%d bytes", info.Size())
 		dents = append(dents, dent)
 	}
 

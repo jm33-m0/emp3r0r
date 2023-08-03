@@ -9,7 +9,6 @@ install tools to RuntimeConfig.UtilsPath, for lateral movement
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"runtime"
@@ -89,7 +88,7 @@ func VaccineHandler() (out string) {
 	defer os.Remove(PythonArchive)
 
 	// create launchers
-	err = ioutil.WriteFile(RuntimeConfig.UtilsPath+"/python", []byte(PythonLauncher), 0755)
+	err = os.WriteFile(RuntimeConfig.UtilsPath+"/python", []byte(PythonLauncher), 0755)
 	if err != nil {
 		out = fmt.Sprintf("Write python launcher: %v", err)
 	}

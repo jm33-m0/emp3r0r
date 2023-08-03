@@ -2,7 +2,6 @@ package agent
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -59,7 +58,7 @@ func moduleHandler(modName, checksum string) (out string) {
 
 	// process files in module archive
 	libs_tarball := "libs.tar.xz"
-	files, err := ioutil.ReadDir("./")
+	files, err := os.ReadDir("./")
 	if err != nil {
 		return fmt.Sprintf("Processing module files: %v", err)
 	}
@@ -77,7 +76,7 @@ func moduleHandler(modName, checksum string) (out string) {
 	cmd := exec.Command(emp3r0r_data.DefaultShell, start_sh)
 
 	// debug
-	shdata, err := ioutil.ReadFile(start_sh)
+	shdata, err := os.ReadFile(start_sh)
 	if err != nil {
 		log.Printf("Read %s: %v", start_sh, err)
 	}

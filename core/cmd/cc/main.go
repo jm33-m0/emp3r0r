@@ -6,7 +6,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -20,7 +19,7 @@ import (
 
 func readJSONConfig(filename string) (err error) {
 	// read JSON
-	jsonData, err := ioutil.ReadFile(filename)
+	jsonData, err := os.ReadFile(filename)
 	if err != nil {
 		return
 	}
@@ -37,7 +36,7 @@ func unlock_downloads() bool {
 	}
 
 	// unlock downloads
-	files, err := ioutil.ReadDir(cc.FileGetDir)
+	files, err := os.ReadDir(cc.FileGetDir)
 	if err != nil {
 		return true
 	}

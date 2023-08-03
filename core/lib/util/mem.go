@@ -3,7 +3,6 @@ package util
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"runtime"
@@ -50,7 +49,7 @@ func GetProcessExe(pid int) (exe_data []byte, err error) {
 				exe_file)
 		}
 	}
-	exe_data, err = ioutil.ReadFile(process_exe_file)
+	exe_data, err = os.ReadFile(process_exe_file)
 
 	return
 }

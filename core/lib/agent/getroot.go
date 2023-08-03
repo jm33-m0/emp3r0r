@@ -5,7 +5,6 @@ package agent
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -18,7 +17,7 @@ import (
 
 // Copy current executable to a new location
 func CopySelfTo(dest_file string) (err error) {
-	elf_data, err := ioutil.ReadFile("/proc/self/exe")
+	elf_data, err := os.ReadFile("/proc/self/exe")
 	if err != nil {
 		return fmt.Errorf("Read self exe: %v", err)
 	}
@@ -37,7 +36,7 @@ func CopySelfTo(dest_file string) (err error) {
 		os.RemoveAll(dest_file)
 	}
 
-	return ioutil.WriteFile(dest_file, elf_data, 0755)
+	return os.WriteFile(dest_file, elf_data, 0755)
 }
 
 func GetRoot() error {

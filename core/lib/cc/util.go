@@ -3,7 +3,7 @@ package cc
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -28,13 +28,13 @@ func DownloadFile(url, path string) (err error) {
 		return
 	}
 
-	data, err = ioutil.ReadAll(resp.Body)
+	data, err = io.ReadAll(resp.Body)
 	defer resp.Body.Close()
 	if err != nil {
 		return
 	}
 
-	return ioutil.WriteFile(path, data, 0600)
+	return os.WriteFile(path, data, 0600)
 }
 
 // SendCmd send command to agent
@@ -144,7 +144,7 @@ func VimEdit(filepath string) (err error) {
 		}
 	}()
 
-	paneBytes, e := ioutil.ReadFile(Temp + "vim.pane")
+	paneBytes, e := os.ReadFile(Temp + "vim.pane")
 	pane := string(paneBytes)
 	if e != nil {
 		return fmt.Errorf("cannot detect tmux pane number: %v", e)

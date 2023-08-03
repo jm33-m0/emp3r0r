@@ -3,7 +3,6 @@ package agent
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 
 	"github.com/gliderlabs/ssh"
@@ -12,7 +11,7 @@ import (
 
 // SftpHandler handler for SFTP subsystem
 func SftpHandler(sess ssh.Session) {
-	debugStream := ioutil.Discard
+	debugStream := io.Discard
 	serverOptions := []sftp.ServerOption{
 		sftp.WithDebug(debugStream),
 	}
