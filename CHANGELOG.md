@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.31.2](https://github.com/jm33-m0/emp3r0r/compare/v1.31.1...v1.31.2) (2023-08-03)
+
+
+### Bug Fixes
+
+* do not attemp to hide without root ([b69f6b1](https://github.com/jm33-m0/emp3r0r/commit/b69f6b116edce85c6185b33ba578c4e43361f8e4))
+* loader.so unable to find exe due to malformed path name ([eec2dcc](https://github.com/jm33-m0/emp3r0r/commit/eec2dcc05adecdb89bcb9321b2a4df0778dc95f6))
+* sometimes CA cert is not added to agent config ([a003cd0](https://github.com/jm33-m0/emp3r0r/commit/a003cd07de64f9f22ebd8ddd49b3fcfdb88802d4))
+* use `bash` shell when started by loader.so ([d12bda5](https://github.com/jm33-m0/emp3r0r/commit/d12bda599bf01994ca2fd2e612511fb6b0a3fb8e))
+
 ## [1.31.1](https://github.com/jm33-m0/emp3r0r/compare/v1.31.0...v1.31.1) (2023-08-02)
 
 
