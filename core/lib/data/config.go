@@ -57,7 +57,8 @@ type Config struct {
 	IndicatorWaitMin     int    `json:"indicator_wait_min"`     // seconds
 	IndicatorWaitMax     int    `json:"indicator_wait_max"`     // seconds, set max to 0 to disable
 	CCIndicatorText      string `json:"indicator_text"`         // what to send in response when indicator URL is requested
-	CA                   string `json:"ca"`                     // CA cert from server side
+	CAPEM                string `json:"ca"`                     // CA cert from server side
+	CAFingerprint        string `json:"ca_fingerprint"`         // CA cert fingerprint
 	C2TransportProxy     string `json:"c2transport_proxy"`      // proxy for C2 transport
 	CDNProxy             string `json:"cdn_proxy"`              // websocket proxy, see go-cdn2proxy
 	DoHServer            string `json:"doh_server"`             // DNS over HTTPS server, for name resolving

@@ -165,3 +165,14 @@ func ParseCert(cert_file string) (cert *x509.Certificate, err error) {
 	block, _ := pem.Decode(cert_data)
 	return x509.ParseCertificate(block.Bytes)
 }
+
+// GetFingerprint return SHA256 fingerprint of a cert
+func GetFingerprint(cert_file string) (fingerprint string) {
+	cert, err := ParseCert(cert_file)
+	if err != nil {
+		log.Printf("ParseCert %s: %v", cert_file, err)
+		return
+	}
+	fingerprint = SHA256SumRaw(cert.Raw)
+	return
+}

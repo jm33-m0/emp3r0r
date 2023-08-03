@@ -46,6 +46,12 @@ var (
 	// Targets target list, with control (tun) interface
 	Targets      = make(map[*emp3r0r_data.AgentSystemInfo]*Control)
 	TargetsMutex = sync.RWMutex{}
+
+	// certs
+	CACrtFile     string
+	CAKeyFile     string
+	ServerCrtFile string
+	ServerKeyFile string
 )
 
 const (
@@ -521,6 +527,12 @@ func DirSetup() (err error) {
 
 	// Module directories
 	ModuleDirs = []string{EmpDataDir + "/modules", EmpWorkSpace + "/modules"}
+
+	// cert files
+	CACrtFile = EmpWorkSpace + "/ca-cert.pem"
+	CAKeyFile = EmpWorkSpace + "/ca-key.pem"
+	ServerCrtFile = EmpWorkSpace + "/emp3r0r-cert.pem"
+	ServerKeyFile = EmpWorkSpace + "/emp3r0r-key.pem"
 
 	return
 }

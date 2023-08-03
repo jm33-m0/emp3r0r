@@ -574,15 +574,30 @@ func CliBanner() error {
 	if err != nil {
 		log.Fatalf("CowSay: %v", err)
 	}
+
 	// C2 names
+	err = LoadCACrt()
+	if err != nil {
+		CliPrintWarning("Failed to parse CA cert: %v", err)
+	}
 	c2_names := tun.NamesInCert(ServerCrtFile)
 	if len(c2_names) <= 0 {
 		CliFatalError("C2 has no names?")
 	}
 	name_list := strings.Join(c2_names, ", ")
 
-	say, err := cow.Say(fmt.Sprintf("welcome! you are using version %s,\nC2 listening on *:%s,\nC2 names: %s",
-		emp3r0r_data.Version, RuntimeConfig.CCPort, name_list))
+	say, err := cow.Say(fmt.Sprintf("welcome! you are using version %s,\n"+
+		"C2 listening on *:%s,\n"+
+		"Shadowsocks port *:%s,\n"+
+		"KCP port *:%s,\n"+
+		"C2 names: %s\n"+
+		"CA fingerprint: %s",
+		emp3r0r_data.Version,
+		RuntimeConfig.CCPort,
+		RuntimeConfig.ShadowsocksPort,
+		RuntimeConfig.KCPPort,
+		name_list,
+		RuntimeConfig.CAFingerprint))
 	if err != nil {
 		log.Fatalf("CowSay: %v", err)
 	}

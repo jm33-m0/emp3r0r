@@ -17,13 +17,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-const (
-	CACrtFile     = "ca-cert.pem"
-	CAKeyFile     = "ca-key.pem"
-	ServerCrtFile = "emp3r0r-cert.pem"
-	ServerKeyFile = "emp3r0r-key.pem"
-)
-
 var Arch_List = []string{
 	"386",
 	"amd64",
@@ -346,22 +339,30 @@ func PromptForConfig(isAgent bool) (err error) {
 
 // GenC2Certs generate certificates for CA and emp3r0r C2 server
 func GenC2Certs(hosts []string) (err error) {
-	if !util.IsExist(CAKeyFile) || !util.IsExist(CACrtFile) {
+	if !util.IsFileExist(CAKeyFile) || !util.IsFileExist(CACrtFile) {
+		CliPrint("CA cert not found, generating...")
 		err = tun.GenCerts(nil, "", true)
 		if err != nil {
 			return fmt.Errorf("Generate CA: %v", err)
 		}
 	}
-	if !util.IsExist(CAKeyFile) || !util.IsExist(CACrtFile) {
-		return fmt.Errorf("%s or %s still not found", CAKeyFile, CACrtFile)
+	if !util.IsFileExist(CAKeyFile) || !util.IsFileExist(CACrtFile) {
+		return fmt.Errorf("%s or %s still not found, CA cert generation failed", CAKeyFile, CACrtFile)
+	}
+
+	// save CA cert to emp3r0r.json
+	err = LoadCACrt()
+	if err != nil {
+		return fmt.Errorf("GenC2Certs failed to load CA to RuntimeConfig: %v", err)
 	}
 
 	// generate server cert
+	CliPrint("Server cert not found, generating...")
 	return tun.GenCerts(hosts, "emp3r0r", false)
 }
 
 func save_config_json() (err error) {
-	err = loadCA()
+	err = LoadCACrt()
 	if err != nil {
 		return fmt.Errorf("save_config_json: %v", err)
 	}
@@ -406,13 +407,16 @@ func InitConfigFile(cc_host string) (err error) {
 	return save_config_json()
 }
 
-func loadCA() error {
+// LoadCACrt load CA cert from file
+func LoadCACrt() error {
 	// CA cert
 	ca_data, err := ioutil.ReadFile(CACrtFile)
 	if err != nil {
 		return fmt.Errorf("failed to read CA cert: %v", err)
 	}
 	tun.CACrt = ca_data
-	RuntimeConfig.CA = string(tun.CACrt)
+	RuntimeConfig.CAPEM = string(tun.CACrt)
+	RuntimeConfig.CAFingerprint = tun.GetFingerprint(CACrtFile)
+	CliPrintInfo("CA fingerprint: %s", RuntimeConfig.CAFingerprint)
 	return nil
 }

@@ -38,7 +38,7 @@ func ApplyRuntimeConfig() (err error) {
 	}
 
 	// CA
-	tun.CACrt = []byte(RuntimeConfig.CA)
+	tun.CACrt = []byte(RuntimeConfig.CAPEM)
 
 	// change agent root to /usr/share/bash-completion/completions/helpers
 	agent_root_base := util.FileBaseName(RuntimeConfig.AgentRoot)
