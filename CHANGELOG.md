@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.3](https://github.com/jm33-m0/emp3r0r/compare/v1.31.2...v1.31.3) (2023-08-04)
+
+
+### Bug Fixes
+
+* do not delay when started by loader.so ([ca596e9](https://github.com/jm33-m0/emp3r0r/commit/ca596e91ac4b8286bb9e7e0763b1deb785eae09e))
+
 ## [1.31.2](https://github.com/jm33-m0/emp3r0r/compare/v1.31.1...v1.31.2) (2023-08-03)
 
 
