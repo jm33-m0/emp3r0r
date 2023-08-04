@@ -12,7 +12,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"math/big"
 	"net"
@@ -93,7 +92,7 @@ func GenCerts(hosts []string, outname string, isCA bool) (err error) {
 		}
 
 		// ca key file
-		ca_data, err := ioutil.ReadFile("ca-key.pem")
+		ca_data, err := os.ReadFile("ca-key.pem")
 		if err != nil {
 			return fmt.Errorf("Read ca-key.pem: %v", err)
 		}
@@ -101,7 +100,7 @@ func GenCerts(hosts []string, outname string, isCA bool) (err error) {
 		cakey, _ = x509.ParseECPrivateKey(block.Bytes)
 
 		// ca cert file
-		ca_data, err = ioutil.ReadFile("ca-cert.pem")
+		ca_data, err = os.ReadFile("ca-cert.pem")
 		if err != nil {
 			return fmt.Errorf("Read ca-cert.pem: %v", err)
 		}
@@ -121,7 +120,7 @@ func GenCerts(hosts []string, outname string, isCA bool) (err error) {
 	outkey := fmt.Sprintf("%s-key.pem", outname)
 	// cert
 	pem.Encode(out, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
-	err = ioutil.WriteFile(outcert, out.Bytes(), 0600)
+	err = os.WriteFile(outcert, out.Bytes(), 0600)
 	if err != nil {
 		return fmt.Errorf("Write %s: %v", outcert, err)
 	}
@@ -129,7 +128,7 @@ func GenCerts(hosts []string, outname string, isCA bool) (err error) {
 
 	// key
 	pem.Encode(out, pemBlockForKey(priv))
-	err = ioutil.WriteFile(outkey, out.Bytes(), 0600)
+	err = os.WriteFile(outkey, out.Bytes(), 0600)
 	if err != nil {
 		return fmt.Errorf("Write %s: %v", outkey, err)
 	}
@@ -162,7 +161,7 @@ func ParsePem(data []byte) (*x509.Certificate, error) {
 
 // ParseCertPemFile read from PEM file and return parsed cert
 func ParseCertPemFile(cert_file string) (cert *x509.Certificate, err error) {
-	cert_data, err := ioutil.ReadFile(cert_file)
+	cert_data, err := os.ReadFile(cert_file)
 	if err != nil {
 		err = fmt.Errorf("Read ca-cert.pem: %v", err)
 		return

@@ -3,7 +3,6 @@ package cc
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -77,7 +76,7 @@ func moduleCustom() {
 		if config.IsInteractive {
 			// empty out start.sh
 			// we will run the module as shell
-			err = ioutil.WriteFile(start_sh, []byte("echo emp3r0r-interactive-module\n"), 0600)
+			err = os.WriteFile(start_sh, []byte("echo emp3r0r-interactive-module\n"), 0600)
 			if err != nil {
 				CliPrintError("write %s: %v", start_sh, err)
 				return
@@ -200,7 +199,7 @@ func InitModules() {
 			return
 		}
 		CliPrintInfo("Scanning %s for modules", mod_dir)
-		dirs, err := ioutil.ReadDir(mod_dir)
+		dirs, err := os.ReadDir(mod_dir)
 		if err != nil {
 			CliPrintError("Failed to scan custom modules: %v", err)
 			return
@@ -252,7 +251,7 @@ func InitModules() {
 // readModCondig read config.json of a module
 func readModCondig(file string) (pconfig *ModConfig, err error) {
 	// read JSON
-	jsonData, err := ioutil.ReadFile(file)
+	jsonData, err := os.ReadFile(file)
 	if err != nil {
 		return nil, fmt.Errorf("Read %s: %v", file, err)
 	}
@@ -276,7 +275,7 @@ func genStartScript(config *ModConfig, outfile string) (err error) {
 	data = fmt.Sprintf("%s ./%s ", data, config.Exec) // run with environment vars
 
 	// write config.json
-	return ioutil.WriteFile(outfile, []byte(data), 0600)
+	return os.WriteFile(outfile, []byte(data), 0600)
 }
 
 func updateModuleHelp(config *ModConfig) error {

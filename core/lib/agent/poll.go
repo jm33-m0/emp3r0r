@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -69,7 +69,7 @@ func IsCCOnline(proxy string) bool {
 		log.Printf("IsCCOnline: %s: %v", RuntimeConfig.CCIndicator, err)
 		return false
 	}
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Printf("IsCCOnline: %s: %v", RuntimeConfig.CCIndicator, err)
 		return false

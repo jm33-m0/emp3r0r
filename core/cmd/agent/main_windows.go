@@ -7,7 +7,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -73,7 +73,7 @@ func main() {
 			log.SetOutput(os.Stderr)
 		} else {
 			// silent switch
-			log.SetOutput(ioutil.Discard)
+			log.SetOutput(io.Discard)
 			null_file, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0644)
 			if err != nil {
 				log.Fatalf("[-] Cannot open %s: %v", os.DevNull, err)

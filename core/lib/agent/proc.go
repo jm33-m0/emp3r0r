@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"io/ioutil"
 	"log"
 	"os"
 	"strconv"
@@ -25,12 +24,12 @@ func CheckAgentProcess() *emp3r0r_data.AgentProcess {
 func IsAgentRunningPID() (bool, int) {
 	defer func() {
 		myPIDText := strconv.Itoa(os.Getpid())
-		if err := ioutil.WriteFile(RuntimeConfig.PIDFile, []byte(myPIDText), 0600); err != nil {
+		if err := os.WriteFile(RuntimeConfig.PIDFile, []byte(myPIDText), 0600); err != nil {
 			log.Printf("Write RuntimeConfig.PIDFile: %v", err)
 		}
 	}()
 
-	pidBytes, err := ioutil.ReadFile(RuntimeConfig.PIDFile)
+	pidBytes, err := os.ReadFile(RuntimeConfig.PIDFile)
 	if err != nil {
 		return false, -1
 	}

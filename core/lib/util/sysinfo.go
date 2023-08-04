@@ -3,7 +3,6 @@ package util
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -163,7 +162,7 @@ func ScanPATH() (exes []string) {
 
 	// scan paths
 	for _, path := range paths {
-		files, err := ioutil.ReadDir(path)
+		files, err := os.ReadDir(path)
 		if err != nil {
 			continue
 		}

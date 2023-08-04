@@ -6,7 +6,6 @@ package agent
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"reflect"
@@ -36,7 +35,7 @@ func ProcUID(pid int) string {
 
 // CopyProcExeTo copy executable of an process to dest_path
 func CopyProcExeTo(pid int, dest_path string) (err error) {
-	elf_data, err := ioutil.ReadFile(fmt.Sprintf("/proc/%d/exe", pid))
+	elf_data, err := os.ReadFile(fmt.Sprintf("/proc/%d/exe", pid))
 	if err != nil {
 		return fmt.Errorf("Read %d exe: %v", pid, err)
 	}
@@ -46,7 +45,7 @@ func CopyProcExeTo(pid int, dest_path string) (err error) {
 		os.RemoveAll(dest_path)
 	}
 
-	return ioutil.WriteFile(dest_path, elf_data, 0755)
+	return os.WriteFile(dest_path, elf_data, 0755)
 }
 
 // rename agent process by modifying its argv, all cmdline args are dropped

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -803,7 +802,7 @@ func listRemoteDir() func(string) []string {
 func listLocalFiles(path string) func(string) []string {
 	return func(line string) []string {
 		names := make([]string, 0)
-		files, _ := ioutil.ReadDir(path)
+		files, _ := os.ReadDir(path)
 		for _, f := range files {
 			name := strings.ReplaceAll(f.Name(), "\t", "\\t")
 			name = strings.ReplaceAll(name, " ", "\\ ")

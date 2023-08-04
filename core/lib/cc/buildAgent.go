@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -83,7 +82,7 @@ func GenAgent() (agent_binary_path string) {
 	}
 
 	// read file
-	jsonBytes, err := ioutil.ReadFile(EmpConfigFile)
+	jsonBytes, err := os.ReadFile(EmpConfigFile)
 	if err != nil {
 		CliPrintError("Parsing EmpConfigFile config file: %v", err)
 		return
@@ -98,7 +97,7 @@ func GenAgent() (agent_binary_path string) {
 	}
 
 	// write
-	toWrite, err := ioutil.ReadFile(stubFile)
+	toWrite, err := os.ReadFile(stubFile)
 	if err != nil {
 		CliPrintError("Read stub: %v", err)
 		return
@@ -109,7 +108,7 @@ func GenAgent() (agent_binary_path string) {
 	toWrite = append(toWrite, sep...)
 	toWrite = append(toWrite, encryptedJSONBytes...)
 	toWrite = append(toWrite, sep...)
-	err = ioutil.WriteFile(outfile, toWrite, 0755)
+	err = os.WriteFile(outfile, toWrite, 0755)
 	if err != nil {
 		CliPrintError("Save agent binary %s: %v", outfile, err)
 		return
@@ -191,7 +190,7 @@ func PromptForConfig(isAgent bool) (err error) {
 	)
 	if util.IsExist(EmpConfigFile) {
 		CliPrintInfo("Reading config from existing %s", EmpConfigFile)
-		jsonData, err = ioutil.ReadFile(EmpConfigFile)
+		jsonData, err = os.ReadFile(EmpConfigFile)
 		if err != nil {
 			CliPrintWarning("failed to read %s: %v", EmpConfigFile, err)
 		}
@@ -373,7 +372,7 @@ func save_config_json() (err error) {
 		return fmt.Errorf("Saving %s: %v", EmpConfigFile, err)
 	}
 
-	return ioutil.WriteFile(EmpConfigFile, w_data, 0600)
+	return os.WriteFile(EmpConfigFile, w_data, 0600)
 }
 
 func InitConfigFile(cc_host string) (err error) {
@@ -413,7 +412,7 @@ func InitConfigFile(cc_host string) (err error) {
 // LoadCACrt load CA cert from file
 func LoadCACrt() error {
 	// CA cert
-	ca_data, err := ioutil.ReadFile(CACrtFile)
+	ca_data, err := os.ReadFile(CACrtFile)
 	if err != nil {
 		return fmt.Errorf("failed to read CA cert: %v", err)
 	}
