@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.31.4](https://github.com/jm33-m0/emp3r0r/compare/v1.31.3...v1.31.4) (2023-08-04)
+
+
+### Bug Fixes
+
+* `run_as_daemon` should always be enabled ([11a3979](https://github.com/jm33-m0/emp3r0r/commit/11a39793e16564ced29907bf5439ebca723177fd))
+* loader.so should return error for non-`amd64` ([4170414](https://github.com/jm33-m0/emp3r0r/commit/41704149f3a511dda9beea668dc04968d7a9aa9c))
+
 ## [1.31.3](https://github.com/jm33-m0/emp3r0r/compare/v1.31.2...v1.31.3) (2023-08-04)
 
 
