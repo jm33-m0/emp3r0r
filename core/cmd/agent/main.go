@@ -104,21 +104,20 @@ func main() {
 		}
 	}
 
-	if !do_not_touch_argv {
-		// always daemonize unless verbose is specified
-		run_as_daemon := !verbose &&
-			// don't daemonize if we're already daemonized
-			os.Getenv("DAEMON") != "true"
-
-		if run_as_daemon {
-			os.Setenv("DAEMON", "true") // mark as daemonized
-			cmd := exec.Command(os.Args[0])
-			err = cmd.Start()
-			if err != nil {
-				log.Fatalf("Daemonize: %v", err)
-			}
-			os.Exit(0)
+	// always daemonize unless verbose is specified
+	run_as_daemon := !verbose &&
+		// don't daemonize if we're already daemonized
+		os.Getenv("DAEMON") != "true" &&
+		// argv has to stay untouched, otherwise we cannot start a new process
+		do_not_touch_argv
+	if run_as_daemon {
+		os.Setenv("DAEMON", "true") // mark as daemonized
+		cmd := exec.Command(os.Args[0])
+		err = cmd.Start()
+		if err != nil {
+			log.Fatalf("Daemonize: %v", err)
 		}
+		os.Exit(0)
 	}
 
 	osArgs := os.Args
