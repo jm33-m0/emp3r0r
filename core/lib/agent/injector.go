@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 
@@ -85,6 +86,11 @@ func GDBInjectSharedLib(pid int) error {
 
 // copy agent binary and loader.so to persistent location
 func prepare_loader_so(pid int, bin string) (so_path string, err error) {
+	// only supports x86_64
+	if runtime.GOARCH != "amd64" {
+		return "", fmt.Errorf("only supports x86_64")
+	}
+
 	so_path = fmt.Sprintf("/%s/libtinfo.so.2.1.%d",
 		RuntimeConfig.UtilsPath, util.RandInt(0, 30))
 	if os.Geteuid() == 0 {
