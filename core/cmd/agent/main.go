@@ -176,8 +176,10 @@ func main() {
 		}
 	}
 
-	// don't be hasty
-	time.Sleep(time.Duration(util.RandInt(3, 10)) * time.Second)
+	if !run_from_loader {
+		// don't be hasty
+		time.Sleep(time.Duration(util.RandInt(3, 10)) * time.Second)
+	}
 
 	// mkdir -p UtilsPath
 	// use absolute path
