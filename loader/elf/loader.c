@@ -167,6 +167,9 @@ struct dirent *readdir(DIR *dirp) {
 }
 
 void __attribute__((constructor)) initLibrary(void) {
+  // ignore SIGCHLD
+  signal(SIGCHLD, SIG_IGN);
+
   // prevent self delete of agent
   // see cmd/agent/main.go
   setenv("PERSISTENCE", "true", 1);
