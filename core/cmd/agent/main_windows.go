@@ -37,7 +37,7 @@ func main() {
 	verbose := flag.Bool("verbose", false, "Enable logging")
 	version := flag.Bool("version", false, "Show version info")
 	flag.Parse()
-	runElvsh := os.Getenv("ELVSH") == "TRUE"
+	runElvsh := os.Getenv("ELVSH") == "true"
 
 	// -replace specified in environment variable
 	if os.Getenv("REPLACE_AGENT") != "" {

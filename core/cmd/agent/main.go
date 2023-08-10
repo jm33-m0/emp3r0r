@@ -46,7 +46,7 @@ func main() {
 	verbose := os.Getenv("VERBOSE") == "true"
 	replace_agent = os.Getenv("REPLACE_AGENT") == "true"
 	// run as elvish shell
-	runElvsh := os.Getenv("ELVSH") == "TRUE"
+	runElvsh := os.Getenv("ELVSH") == "true"
 	// self delete or not
 	persistent := os.Getenv("PERSISTENCE") == "true"
 	// are we running from loader.so?

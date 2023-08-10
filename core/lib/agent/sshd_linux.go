@@ -80,7 +80,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		// we also have a more special Evlsh
 		if shell == "elvsh" {
 			cmd = exec.Command(exe)
-			cmd.Env = append(os.Environ(), "ELVSH=TRUE")
+			cmd.Env = append(os.Environ(), "ELVSH=true")
 		}
 
 		// remove empty arg in cmd.Args
