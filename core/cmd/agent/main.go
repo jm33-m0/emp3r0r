@@ -108,8 +108,8 @@ func main() {
 	run_as_daemon := !verbose &&
 		// don't daemonize if we're already daemonized
 		os.Getenv("DAEMON") != "true" &&
-		// argv has to stay untouched, otherwise we cannot start a new process
-		do_not_touch_argv
+		// do not daemonize if run as elvsh
+		!runElvsh
 	if run_as_daemon {
 		os.Setenv("DAEMON", "true") // mark as daemonized
 		cmd := exec.Command(os.Args[0])
