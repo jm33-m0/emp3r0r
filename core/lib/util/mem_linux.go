@@ -70,6 +70,7 @@ func crossPlatformDumpSelfMem() (memdata [][]byte, err error) {
 			log.Printf("%s: nothing read", line)
 			continue
 		}
+		log.Printf("%s: read %d bytes", line, n)
 		memdata = append(memdata, read_buf)
 	}
 
