@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.6](https://github.com/jm33-m0/emp3r0r/compare/v1.31.5...v1.31.6) (2023-09-03)
+
+
+### Bug Fixes
+
+* handle AES decryption panic ([48e362e](https://github.com/jm33-m0/emp3r0r/commit/48e362ef7de8c5d9a9c5bf80f2160921708ab059))
+
 ## [1.31.5](https://github.com/jm33-m0/emp3r0r/compare/v1.31.4...v1.31.5) (2023-08-10)
 
 
