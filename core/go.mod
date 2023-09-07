@@ -16,7 +16,7 @@ require (
 	github.com/jaypipes/ghw v0.10.0
 	github.com/jm33-m0/go-cdn2proxy v1.1.2
 	github.com/jm33-m0/go-console v1.0.0
-	github.com/jm33-m0/go-lpe v1.0.0
+	github.com/jm33-m0/go-lpe v1.0.1
 	github.com/kbinani/screenshot v0.0.0-20210720154843-7d3a670d8329
 	github.com/lithammer/fuzzysearch v1.1.5
 	github.com/mholt/archiver v3.1.1+incompatible
