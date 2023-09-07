@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.7](https://github.com/jm33-m0/emp3r0r/compare/v1.31.6...v1.31.7) (2023-09-07)
+
+
+### Bug Fixes
+
+* [#250](https://github.com/jm33-m0/emp3r0r/issues/250) ([99b2fb0](https://github.com/jm33-m0/emp3r0r/commit/99b2fb04bb33a0c4f62ac7a8d6dc08192259a0da))
+
 ## [1.31.6](https://github.com/jm33-m0/emp3r0r/compare/v1.31.5...v1.31.6) (2023-09-03)
 
 
