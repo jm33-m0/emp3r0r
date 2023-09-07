@@ -5,7 +5,7 @@
 
 ### Bug Fixes
 
-* [#5](https://github.com/jm33-m0/emp3r0r/issues/5)  `fork` not supported on `arm64` ([d962876](https://github.com/jm33-m0/emp3r0r/commit/d9628769f889c0ab8848f60daaf2c8b3065d0465))
+* [#250](https://github.com/jm33-m0/emp3r0r/issues/250)  `fork` not supported on `arm64` ([d962876](https://github.com/jm33-m0/emp3r0r/commit/d9628769f889c0ab8848f60daaf2c8b3065d0465))
 
 ## [1.31.7](https://github.com/jm33-m0/emp3r0r/compare/v1.31.6...v1.31.7) (2023-09-07)
 
