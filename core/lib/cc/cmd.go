@@ -223,16 +223,20 @@ func setCurrentTarget(cmd string) {
 		}
 
 		// open a shell
-		CliPrintInfo("Opening Shell window")
 		shell := "elvsh"
-		if os.Getenv("LD") == "true" {
-			shell = "bash"
+		if a.GOOS == "windows" {
+			CliPrintInfo("Please use `interactive_shell` module to open an shell")
+		} else {
+			if os.Getenv("LD") == "true" {
+				shell = "bash"
+			}
+			CliPrintInfo("Opening '%s' shell pane", shell)
+			err = SSHClient(shell, "", RuntimeConfig.SSHDPort, true)
+			if err != nil {
+				CliPrintError("SSHClient: %v", err)
+			}
 		}
-		err = SSHClient(shell, "", RuntimeConfig.SSHDPort, true)
-		if err != nil {
-			CliPrintError("SSHClient: %v", err)
-		}
-		CliPrintInfo("Opening SFTP window")
+		CliPrintInfo("Opening SFTP pane")
 		err = SSHClient("sftp", "", RuntimeConfig.SSHDPort, true)
 		if err != nil {
 			CliPrintError("SFTPClient: %v", err)
