@@ -443,9 +443,8 @@ func CliAsk(prompt string, allow_empty bool) (answer string) {
 		answer, err = EmpReadLine.Readline()
 		if err != nil {
 			if err == readline.ErrInterrupt || err == io.EOF {
-				continue
+				break
 			}
-			CliPrintError("CliAsk: %v", err)
 		}
 		answer = strings.TrimSpace(answer)
 		if answer != "" && !allow_empty {
