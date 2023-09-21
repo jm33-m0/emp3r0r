@@ -108,6 +108,17 @@ func IsDirExist(path string) bool {
 	return false
 }
 
+// RemoveItemFromArray remove string/int from slice
+func RemoveItemFromArray[T string | int](to_remove T, sliceList []T) []T {
+	list := []T{}
+	for _, item := range sliceList {
+		if item != to_remove {
+			list = append(list, item)
+		}
+	}
+	return list
+}
+
 // RemoveDupsFromArray remove duplicated string/int from slice
 func RemoveDupsFromArray[T string | int](sliceList []T) []T {
 	allKeys := make(map[T]bool)
@@ -116,9 +127,7 @@ func RemoveDupsFromArray[T string | int](sliceList []T) []T {
 		if _, value := allKeys[item]; !value {
 			allKeys[item] = true
 			list = append(list, item)
-
 		}
-
 	}
 	return list
 }
