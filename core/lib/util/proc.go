@@ -124,7 +124,7 @@ func IsPIDAlive(pid int) (alive bool) {
 		log.Printf("IsPIDAlive: %v", err)
 		return false
 	}
-	return
+	return alive
 }
 
 // IsProcAlive check if a process name exists, returns its process(es)

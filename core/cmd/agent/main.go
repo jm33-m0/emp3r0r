@@ -468,13 +468,13 @@ func server(c net.Conn) {
 		}
 
 		pid_data := buf[0:nr]
-		pid, err := strconv.Atoi(string(pid_data))
+		pid, err := strconv.ParseInt(string(pid_data), 10, 32)
 		if err != nil {
 			log.Printf("Invalid PID from ping: %v", err)
 			continue
 		}
 		log.Printf("emp3r0r instance got ping from PID: %d", pid)
-		AgentWaitQueue = append(AgentWaitQueue, pid)
+		AgentWaitQueue = append(AgentWaitQueue, int(pid))
 		AgentWaitQueue = util.RemoveDupsFromArray(AgentWaitQueue)
 		reply := fmt.Sprintf("emp3r0r running on PID %d", os.Getpid())
 		log.Printf("We have %d agents in wait queue", len(AgentWaitQueue))
@@ -484,8 +484,8 @@ func server(c net.Conn) {
 
 			// check if agent is still alive, if not, remove it from wait queue
 			util.TakeABlink()
-			if !util.IsPIDAlive(pid) {
-				util.RemoveItemFromArray(pid, AgentWaitQueue)
+			if !util.IsPIDAlive(int(pid)) {
+				util.RemoveItemFromArray(int(pid), AgentWaitQueue)
 			}
 		}
 
