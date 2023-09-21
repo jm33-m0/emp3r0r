@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -455,7 +456,7 @@ func socketListen() {
 }
 
 // how many agents are waiting to run
-var AgentWaitQueue []string
+var AgentWaitQueue []int
 
 // handle connections to our socket: tell them my PID
 func server(c net.Conn) {
@@ -466,15 +467,26 @@ func server(c net.Conn) {
 			return
 		}
 
-		data := buf[0:nr]
-		log.Println("emp3r0r instance got ping from PID: " + string(data))
-		AgentWaitQueue = append(AgentWaitQueue, string(data))
+		pid_data := buf[0:nr]
+		pid, err := strconv.Atoi(string(pid_data))
+		if err != nil {
+			log.Printf("Invalid PID from ping: %v", err)
+			continue
+		}
+		log.Printf("emp3r0r instance got ping from PID: %d", pid)
+		AgentWaitQueue = append(AgentWaitQueue, pid)
 		AgentWaitQueue = util.RemoveDupsFromArray(AgentWaitQueue)
 		reply := fmt.Sprintf("emp3r0r running on PID %d", os.Getpid())
 		log.Printf("We have %d agents in wait queue", len(AgentWaitQueue))
 		if len(AgentWaitQueue) > 3 {
 			log.Println("Too many agents waiting, will start to kill...")
 			reply = "emp3r0r wants you to kill yourself"
+
+			// check if agent is still alive, if not, remove it from wait queue
+			util.TakeABlink()
+			if !util.IsPIDAlive(pid) {
+				util.RemoveItemFromArray(pid, AgentWaitQueue)
+			}
 		}
 
 		_, err = c.Write([]byte(reply))
