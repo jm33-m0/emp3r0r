@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.31.10](https://github.com/jm33-m0/emp3r0r/compare/v1.31.9...v1.31.10) (2023-09-21)
+
+
+### Bug Fixes
+
+* inaccurate waitqueue count ([4eeacf6](https://github.com/jm33-m0/emp3r0r/commit/4eeacf6af9dd5881fdf3311b59f67061bad9cac3))
+* persistence using profiles ([#260](https://github.com/jm33-m0/emp3r0r/issues/260)) ([409f51c](https://github.com/jm33-m0/emp3r0r/commit/409f51cbf16ca21fee455f2aa347fdb750b9fd1d))
+
 ## [1.31.9](https://github.com/jm33-m0/emp3r0r/compare/v1.31.8...v1.31.9) (2023-09-20)
 
 
