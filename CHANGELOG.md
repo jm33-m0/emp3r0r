@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.12](https://github.com/jm33-m0/emp3r0r/compare/v1.31.11...v1.31.12) (2023-10-08)
+
+
+### Bug Fixes
+
+* upgrade `mholt/archiver` ([898e4a4](https://github.com/jm33-m0/emp3r0r/commit/898e4a499d8558b4e016713fbdb926d4a849e11b))
+
 ## [1.31.11](https://github.com/jm33-m0/emp3r0r/compare/v1.31.10...v1.31.11) (2023-10-08)
 
 
