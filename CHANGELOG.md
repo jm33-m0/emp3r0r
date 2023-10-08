@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.11](https://github.com/jm33-m0/emp3r0r/compare/v1.31.10...v1.31.11) (2023-10-08)
+
+
+### Bug Fixes
+
+* security issue in `archiver` ([ffd261e](https://github.com/jm33-m0/emp3r0r/commit/ffd261e610ddbc77fcaf9c197b5c5d8fc7d1f22f))
+
 ## [1.31.10](https://github.com/jm33-m0/emp3r0r/compare/v1.31.9...v1.31.10) (2023-09-21)
 
 
