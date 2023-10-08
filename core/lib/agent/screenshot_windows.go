@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/kbinani/screenshot"
-	"github.com/mholt/archiver"
+	"github.com/mholt/archiver/v3"
 )
 
 // Screenshot take a screenshot

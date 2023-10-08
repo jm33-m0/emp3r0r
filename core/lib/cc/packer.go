@@ -12,7 +12,7 @@ import (
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/mholt/archiver"
+	"github.com/mholt/archiver/v3"
 )
 
 // Packer compress and encrypt ELF, append it to packer_stub.exe

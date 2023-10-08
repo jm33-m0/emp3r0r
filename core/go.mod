@@ -19,7 +19,7 @@ require (
 	github.com/jm33-m0/go-lpe v1.0.4
 	github.com/kbinani/screenshot v0.0.0-20230812210009-b87d31814237
 	github.com/lithammer/fuzzysearch v1.1.8
-	github.com/mholt/archiver v3.1.1+incompatible
+	github.com/mholt/archiver/v3 v3.5.1
 	github.com/mholt/archiver/v4 v4.0.0-alpha.8
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/ncruces/go-dns v1.2.3
@@ -51,7 +51,6 @@ require (
 	github.com/chzyer/test v1.0.0 // indirect
 	github.com/cloudflare/circl v1.3.3 // indirect
 	github.com/dsnet/compress v0.0.2-0.20230904184137-39efe44ab707 // indirect
-	github.com/frankban/quicktest v1.14.3 // indirect
 	github.com/gaukas/godicttls v0.0.4 // indirect
 	github.com/gen2brain/shm v0.1.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
@@ -68,18 +67,17 @@ require (
 	github.com/klauspost/pgzip v1.2.6 // indirect
 	github.com/klauspost/reedsolomon v1.11.8 // indirect
 	github.com/kr/fs v0.1.0 // indirect
+	github.com/kr/pretty v0.3.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20230326075908-cb1d2100619a // indirect
 	github.com/lxn/win v0.0.0-20210218163916-a377121e959e // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
-	github.com/mholt/archiver/v3 v3.5.1 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/nwaples/rardecode v1.1.3 // indirect
 	github.com/nwaples/rardecode/v2 v2.0.0-beta.2 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
-	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/pierrec/lz4/v4 v4.1.18 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/power-devops/perfstat v0.0.0-20221212215047-62379fc7944b // indirect

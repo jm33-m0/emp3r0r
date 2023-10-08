@@ -10,7 +10,7 @@ import (
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/mholt/archiver"
+	"github.com/mholt/archiver/v3"
 )
 
 // TakeScreenshot take a screenshot of selected target, and download it
