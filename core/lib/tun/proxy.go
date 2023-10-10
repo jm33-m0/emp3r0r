@@ -109,7 +109,7 @@ func FwdToDport(ctx context.Context, cancel context.CancelFunc,
 		return
 	}
 
-	// 10s timeout, in case we open too many connections
+	// timeout, in case we open too many connections
 	if timeout != 0 {
 		dest.SetDeadline(time.Now().Add(time.Duration(timeout) * time.Second))
 	}
