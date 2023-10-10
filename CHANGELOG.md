@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.32.0](https://github.com/jm33-m0/emp3r0r/compare/v1.31.12...v1.32.0) (2023-10-10)
+
+
+### Features
+
+* upgrade tmux config ([d5fc0d0](https://github.com/jm33-m0/emp3r0r/commit/d5fc0d0edcf944c2089071b855f12d56b62edbe3))
+
+
+### Bug Fixes
+
+* [#264](https://github.com/jm33-m0/emp3r0r/issues/264) increase timeout to 2 minutes ([cc7034d](https://github.com/jm33-m0/emp3r0r/commit/cc7034d3914295ccf55fffa87e9269b7126b6d3d))
+
 ## [1.31.12](https://github.com/jm33-m0/emp3r0r/compare/v1.31.11...v1.31.12) (2023-10-08)
 
 
