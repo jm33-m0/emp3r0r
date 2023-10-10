@@ -320,6 +320,16 @@ func PromptForConfig(isAgent bool) (err error) {
 	} else {
 		RuntimeConfig.C2TransportProxy = ""
 	}
+	if CliYesNo("Set agent proxy timeout") {
+		timeout, ok := ask("Timeout (in seconds, set to 0 to disable)", "auto_proxy_timeout").(int)
+		if !ok {
+			CliPrintWarning("Invalid timeout, set to 0")
+			timeout = 0
+		}
+		RuntimeConfig.AutoProxyTimeout = timeout
+	} else {
+		RuntimeConfig.C2TransportProxy = ""
+	}
 	if CliYesNo("Enable DoH (DNS over HTTPS)") {
 		RuntimeConfig.DoHServer = fmt.Sprintf("%v",
 			ask("DoH server, eg. https://1.1.1.1/dns-query", "doh_server"))
