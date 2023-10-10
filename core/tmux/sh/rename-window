@@ -1,0 +1,27 @@
+#!/bin/bash
+
+[[ "$#" -eq 1 ]] || exit
+title="-"
+active_pid="$1"
+cwd=$(readlink "/proc/$active_pid/cwd")
+ps --ppid "$active_pid" >/dev/null 2>&1 || {
+	title="$cwd"
+}
+
+args="$(ps --ppid "$active_pid" -o args=)"
+exe="$(ps --ppid "$active_pid" -o exe=)"
+[[ "$exe" == *"/ssh" ]] && title=$(echo "$args" | awk '{print $NF}')
+[[ "$exe" == *"/nvim" ]] && title=$(echo "$args" | awk '{print $NF}')
+[[ "$exe" == *"/vim" ]] && title=$(echo "$args" | awk '{print $NF}')
+[[ "$exe" == *"/sudo" ]] && title=$(echo "$args" | awk '{for(i=2;i<=NF;i++) printf $i" "; print ""}')
+[[ "$exe" == *"/bash" ]] && title=$(echo "$args" | awk '{for(i=2;i<=NF;i++) printf $i" "; print ""}')
+[[ "$exe" == *"/python" ]] && title=$(echo "$args" | awk '{for(i=2;i<=NF;i++) printf $i" "; print ""}')
+
+user="$(ps --ppid "$active_pid" -o user=)"
+[[ "$user" == "root" ]] && title="$title ($user)"
+
+# debug
+# echo "$(date) $1 $(ps --ppid "$1" -o pid=,exe=,args=): '$title'" >>/tmp/tmux.log
+
+# set title
+echo -ne "$title"
