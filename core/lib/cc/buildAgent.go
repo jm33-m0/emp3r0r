@@ -214,9 +214,9 @@ func PromptForConfig(isAgent bool) (err error) {
 			return
 		}
 		if CliYesNo(
-			fmt.Sprintf("Use cached %s (%s)",
+			fmt.Sprintf("Use cached %s (%v)",
 				strconv.Quote(config_key), val)) {
-			CliMsg("Using cached '%s' for %s", val, strconv.Quote(config_key))
+			CliMsg("Using cached '%v' for %s", val, strconv.Quote(config_key))
 			return
 		}
 		CliPrintInfo("You have chosen NO")
@@ -233,7 +233,12 @@ func PromptForConfig(isAgent bool) (err error) {
 		}
 
 		// ask
-		return CliAsk(fmt.Sprintf("%s (%s): ", prompt, config_key), false)
+		answer = CliAsk(fmt.Sprintf("%s (%s): ", prompt, config_key), false)
+		ans_int, err := strconv.Atoi(answer.(string))
+		if err == nil {
+			answer = ans_int
+		}
+		return
 	}
 
 	// ask a few questions
@@ -321,7 +326,7 @@ func PromptForConfig(isAgent bool) (err error) {
 		RuntimeConfig.C2TransportProxy = ""
 	}
 	if CliYesNo("Set agent proxy timeout") {
-		timeout, ok := ask("Timeout (in seconds, set to 0 to disable)", "auto_proxy_timeout").(int)
+		timeout, ok := ask("Timeout (in seconds, set to 0 to disable)", "autoproxy_timeout").(int)
 		if !ok {
 			CliPrintWarning("Invalid timeout, set to 0")
 			timeout = 0
@@ -414,7 +419,7 @@ func InitConfigFile(cc_host string) (err error) {
 	RuntimeConfig.BroadcastIntervalMax = 130
 	RuntimeConfig.IndicatorWaitMin = 30
 	RuntimeConfig.IndicatorWaitMax = 130
-	RuntimeConfig.AutoProxyTimeout = 130 // increase timeout to address #264
+	RuntimeConfig.AutoProxyTimeout = 0 // disable timeout by default, leave it to the OS
 
 	return save_config_json()
 }

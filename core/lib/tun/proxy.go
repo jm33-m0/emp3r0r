@@ -108,11 +108,6 @@ func FwdToDport(ctx context.Context, cancel context.CancelFunc,
 		log.Printf("FwdToDport %s (%s): %v", to, protocol, err)
 		return
 	}
-
-	// timeout, in case we open too many connections
-	if timeout != 0 {
-		dest.SetDeadline(time.Now().Add(time.Duration(timeout) * time.Second))
-	}
 	log.Printf("FwdToDport: connected to %s (%s)", to, protocol)
 
 	// io.Copy
