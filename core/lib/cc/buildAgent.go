@@ -245,11 +245,9 @@ func PromptForConfig(isAgent bool) (err error) {
 	// CC names and certs
 	var ans string
 	if !isAgent {
-		ans = fmt.Sprintf("%v",
-			ask("CC host(s), can be one or more IPs or domain names, separate with space\n", "cc_host"))
+		ans = ask("CC host(s), can be one or more IPs or domain names, separate with space\n", "cc_host").(string)
 	} else {
-		ans = fmt.Sprintf("%v",
-			ask("CC host for agent to connect to, can be an IP or a domain name", "cc_host"))
+		ans = ask("CC host for agent to connect to, can be an IP or a domain name", "cc_host").(string)
 	}
 	cc_hosts := strings.Fields(ans)
 	RuntimeConfig.CCHost = cc_hosts[0]
@@ -288,10 +286,10 @@ func PromptForConfig(isAgent bool) (err error) {
 		return
 	}
 	if CliYesNo("Enable CC indicator") {
-		RuntimeConfig.CCIndicator = fmt.Sprintf("%v",
-			ask("Indicator URL, eg. https://example.com/ws/indicator.txt", "cc_indicator"))
-		RuntimeConfig.CCIndicatorText = fmt.Sprintf("%v",
-			ask("Indicator text, eg. 'emp3r0r c2 is online'", "indicator_text"))
+		RuntimeConfig.CCIndicator =
+			ask("Indicator URL, eg. https://example.com/ws/indicator.txt", "cc_indicator").(string)
+		RuntimeConfig.CCIndicatorText =
+			ask("Indicator text, eg. 'emp3r0r c2 is online'", "indicator_text").(string)
 		CliMsg("Remember to put text %s in your indicator response",
 			strconv.Quote(RuntimeConfig.CCIndicatorText))
 	} else {
@@ -300,8 +298,8 @@ func PromptForConfig(isAgent bool) (err error) {
 		RuntimeConfig.IndicatorWaitMax = 0
 	}
 	if CliYesNo("Enable CDN proxy") {
-		RuntimeConfig.CDNProxy = fmt.Sprintf("%v",
-			ask("CDN proxy, eg. wss://example.com/ws/path", "cdn_proxy"))
+		RuntimeConfig.CDNProxy =
+			ask("CDN proxy, eg. wss://example.com/ws/path", "cdn_proxy").(string)
 	} else {
 		RuntimeConfig.CDNProxy = ""
 	}
@@ -320,8 +318,8 @@ func PromptForConfig(isAgent bool) (err error) {
 		RuntimeConfig.UseKCP = false
 	}
 	if CliYesNo("Enable agent proxy (for C2 transport)") {
-		RuntimeConfig.C2TransportProxy = fmt.Sprintf("%v",
-			ask("Agent proxy, eg. socks5://127.0.0.1:1080", "agent_proxy"))
+		RuntimeConfig.C2TransportProxy =
+			ask("Agent proxy, eg. socks5://127.0.0.1:1080", "agent_proxy").(string)
 	} else {
 		RuntimeConfig.C2TransportProxy = ""
 	}
@@ -336,8 +334,8 @@ func PromptForConfig(isAgent bool) (err error) {
 		RuntimeConfig.C2TransportProxy = ""
 	}
 	if CliYesNo("Enable DoH (DNS over HTTPS)") {
-		RuntimeConfig.DoHServer = fmt.Sprintf("%v",
-			ask("DoH server, eg. https://1.1.1.1/dns-query", "doh_server"))
+		RuntimeConfig.DoHServer =
+			ask("DoH server, eg. https://1.1.1.1/dns-query", "doh_server").(string)
 	} else {
 		RuntimeConfig.DoHServer = ""
 	}
