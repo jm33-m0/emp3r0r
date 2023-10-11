@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.32.1](https://github.com/jm33-m0/emp3r0r/compare/v1.32.0...v1.32.1) (2023-10-11)
+
+
+### Bug Fixes
+
+* [#264](https://github.com/jm33-m0/emp3r0r/issues/264) add option to disable timeout in proxy altogether ([e8b31e5](https://github.com/jm33-m0/emp3r0r/commit/e8b31e59d5d439e1dff143a541e8c0a67d0141ec))
+* [#264](https://github.com/jm33-m0/emp3r0r/issues/264) disable timeout and leave cleanup job to the OS ([d3cea97](https://github.com/jm33-m0/emp3r0r/commit/d3cea97539474e779d1a03c1f7cd805c8e84893c))
+
 ## [1.32.0](https://github.com/jm33-m0/emp3r0r/compare/v1.31.12...v1.32.0) (2023-10-10)
 
 
