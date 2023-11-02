@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.32.2](https://github.com/jm33-m0/emp3r0r/compare/v1.32.1...v1.32.2) (2023-11-02)
+
+
+### Bug Fixes
+
+* `FileBaseName` needs to strip `/` ([4eca34b](https://github.com/jm33-m0/emp3r0r/commit/4eca34b651c01abf61c1b5a64221a78146516136))
+
 ## [1.32.1](https://github.com/jm33-m0/emp3r0r/compare/v1.32.0...v1.32.1) (2023-10-11)
 
 
