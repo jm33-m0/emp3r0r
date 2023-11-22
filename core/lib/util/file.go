@@ -305,3 +305,32 @@ func ReplaceBytesInFile(path string, old []byte, replace_with []byte) (err error
 	to_write := bytes.ReplaceAll(file_bytes, old, replace_with)
 	return os.WriteFile(path, to_write, 0644)
 }
+
+// FindHolesInBinary find holes in a binary file that are big enough for a payload
+func FindHolesInBinary(fdata []byte, size int64) (indexes []int64, err error) {
+	// find_hole finds a hole from start
+	find_hole := func(start int64) (end int64) {
+		for i := start; i < int64(len(fdata)); i++ {
+			if fdata[i] == 0 {
+				end = i
+			} else {
+				break
+			}
+		}
+		return
+	}
+
+	// find holes
+	for i := int64(0); i < int64(len(fdata)); i++ {
+		if fdata[i] == 0 {
+			end := find_hole(i)
+			// if hole is big enough
+			if end-i >= size {
+				indexes = append(indexes, i)
+			}
+			i = end
+		}
+	}
+
+	return
+}

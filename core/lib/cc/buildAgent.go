@@ -104,10 +104,15 @@ func GenAgent() (agent_binary_path string) {
 	}
 	sep := bytes.Repeat(emp3r0r_data.OneTimeMagicBytes, 3)
 
-	// wrap the config data with magic string
-	toWrite = append(toWrite, sep...)
-	toWrite = append(toWrite, encryptedJSONBytes...)
-	toWrite = append(toWrite, sep...)
+	// payload
+	config_payload := append(sep, encryptedJSONBytes...)
+	config_payload = append(config_payload, sep...)
+	// fill in
+	toWrite = bytes.Replace(toWrite,
+		bytes.Repeat([]byte{0}, len(config_payload)),
+		config_payload,
+		1)
+	// write
 	err = os.WriteFile(outfile, toWrite, 0755)
 	if err != nil {
 		CliPrintError("Save agent binary %s: %v", outfile, err)
