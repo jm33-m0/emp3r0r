@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.32.5](https://github.com/jm33-m0/emp3r0r/compare/v1.32.4...v1.32.5) (2023-12-22)
+
+
+### Bug Fixes
+
+* 1. option to disable NCSI check 2. upgrade deps ([5a14b7a](https://github.com/jm33-m0/emp3r0r/commit/5a14b7a741e905a64c3d3b05db0643bd2ce0b840))
+
 ## [1.32.4](https://github.com/jm33-m0/emp3r0r/compare/v1.32.3...v1.32.4) (2023-11-23)
 
 
