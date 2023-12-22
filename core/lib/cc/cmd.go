@@ -1,7 +1,6 @@
 package cc
 
 import (
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -223,19 +222,7 @@ func setCurrentTarget(cmd string) {
 		}
 
 		// open a shell
-		shell := "elvsh"
-		if a.GOOS == "windows" {
-			CliPrintInfo("Please use `interactive_shell` module to open an shell")
-		} else {
-			if os.Getenv("LD") == "true" {
-				shell = "bash"
-			}
-			CliPrintInfo("Opening '%s' shell pane", shell)
-			err = SSHClient(shell, "", RuntimeConfig.SSHDPort, true)
-			if err != nil {
-				CliPrintError("SSHClient: %v", err)
-			}
-		}
+		CliPrintInfo("Please `use interactive_shell` to open an shell")
 		CliPrintInfo("Opening SFTP pane")
 		err = SSHClient("sftp", "", RuntimeConfig.SSHDPort, true)
 		if err != nil {
