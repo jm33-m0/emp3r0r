@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.33.1](https://github.com/jm33-m0/emp3r0r/compare/v1.33.0...v1.33.1) (2023-12-22)
+
+
+### Bug Fixes
+
+* `lpe_linpeas` unable to run ([a32187f](https://github.com/jm33-m0/emp3r0r/commit/a32187f7bd776a7e364405330bfd304964cf1855))
+
 ## [1.33.0](https://github.com/jm33-m0/emp3r0r/compare/v1.32.5...v1.33.0) (2023-12-22)
 
 
