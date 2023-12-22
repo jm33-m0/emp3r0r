@@ -159,7 +159,7 @@ func UpdateOptions(modName string) (exist bool) {
 
 	case modName == emp3r0r_data.ModLPE_SUGGEST:
 		currentOpt = addIfNotFound("lpe_helper")
-		for name := range LPEHelpers {
+		for name := range LPEHelperURLs {
 			currentOpt.Vals = append(currentOpt.Vals, name)
 		}
 		currentOpt.Val = "lpe_les"

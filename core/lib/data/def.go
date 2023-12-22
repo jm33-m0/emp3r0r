@@ -136,7 +136,7 @@ var ModuleHelp = map[string]map[string]string{
 		"keyword": "Delete all log entries containing this keyword",
 	},
 	ModLPE_SUGGEST: {
-		"lpe_helper": "'linux-smart-enumeration' or 'linux-exploit-suggester'?",
+		"lpe_helper": "Which LPE helper to use, available helpers: lpe_les (Linux exploit suggester), lpe_lse (Linux smart enumeration), lpe_linpeas (PEASS-ng, works on Linux), lpe_winpeas (PEASS-ng, works on Windows",
 	},
 	ModPROXY: {
 		"port":   "Port of our local proxy server",
