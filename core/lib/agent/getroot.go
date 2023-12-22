@@ -4,7 +4,6 @@
 package agent
 
 import (
-	"encoding/base64"
 	"fmt"
 	"log"
 	"os"
@@ -54,21 +53,10 @@ func runLPEHelper(method string) (out string) {
 	if err != nil {
 		return "Download error: " + err.Error()
 	}
-	encoded_script := base64.StdEncoding.EncodeToString(scriptData)
 
 	// run the script
 	log.Printf("Running LPE helper %s", method)
-	args := ""
-	switch method {
-	case "lpe_les":
-	case "lpe_lse":
-		args = "-i"
-	case "lpe_linpeas":
-	case "lpe_winpeas":
-	}
-
-	// collect output
-	out, err = RunScript(encoded_script, args)
+	out, err = RunScript(scriptData)
 	if err != nil {
 		return "LPE error: " + string(out)
 	}
