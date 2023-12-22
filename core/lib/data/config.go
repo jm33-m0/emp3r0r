@@ -46,6 +46,7 @@ type Config struct {
 	KCPPort              string `json:"kcp_port"`               // server port of kcp server
 	UseShadowsocks       bool   `json:"use_shadowsocks"`        // enable shadowsocks proxy server for C2 transport
 	UseKCP               bool   `json:"use_kcp"`                // enable KCP for Shadowsocks C2 transport
+	DisableNCSI          bool   `json:"disable_ncsi"`           // disable NCSI connectivity checking, useful when C2 is reachable but NCSI is not
 	SSHProxyPort         string `json:"ssh_proxy_port"`         // Port of SSH proxy server, used to bring target host to C2, see Bring2CC
 	SSHDPort             string `json:"sshd_port"`              // ssh related services
 	BroadcastPort        string `json:"broadcast_port"`         // UDP port used for broadcasting msg

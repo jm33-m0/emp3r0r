@@ -302,6 +302,11 @@ func PromptForConfig(isAgent bool) (err error) {
 		RuntimeConfig.CCIndicatorText = ""
 		RuntimeConfig.IndicatorWaitMax = 0
 	}
+	if CliYesNo("Disable NCSI connectivity checking (useful when C2 is reachable but NCSI is not)") {
+		RuntimeConfig.DisableNCSI = true
+	} else {
+		RuntimeConfig.DisableNCSI = false
+	}
 	if CliYesNo("Enable CDN proxy") {
 		RuntimeConfig.CDNProxy =
 			ask("CDN proxy, eg. wss://example.com/ws/path", "cdn_proxy").(string)
