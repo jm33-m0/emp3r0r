@@ -135,6 +135,11 @@ install() {
 	cp -avR modules "$data_dir" || error "modules"
 	cp -avR stub* "$build_dir" || error "stub"
 
+	# fix tmux config
+	tmux_dir="$data_dir/tmux"
+	replace=$(echo -n "$tmux_dir/sh" | sed 's/\//\\\//g')
+	sed -i "s/~\/sh/$replace/g" "$tmux_dir/.tmux.conf"
+
 	# emp3r0r binaries
 	chmod 755 "$0" cc.exe cat.exe
 	cp -avR "$0" "$bin_dir/emp3r0r" || error "$0"
