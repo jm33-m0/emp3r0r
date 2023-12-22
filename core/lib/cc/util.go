@@ -3,8 +3,6 @@ package cc
 import (
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"sort"
@@ -12,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cavaliergopher/grab/v3"
 	"github.com/google/uuid"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -19,22 +18,9 @@ import (
 
 // DownloadFile download file using default http client
 func DownloadFile(url, path string) (err error) {
-	var (
-		resp *http.Response
-		data []byte
-	)
-	resp, err = http.Get(url)
-	if err != nil {
-		return
-	}
-
-	data, err = io.ReadAll(resp.Body)
-	defer resp.Body.Close()
-	if err != nil {
-		return
-	}
-
-	return os.WriteFile(path, data, 0600)
+	CliPrintDebug("Downloading '%s' to '%s'", url, path)
+	_, err = grab.Get(path, url)
+	return
 }
 
 // SendCmd send command to agent
