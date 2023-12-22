@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.33.0](https://github.com/jm33-m0/emp3r0r/compare/v1.32.5...v1.33.0) (2023-12-22)
+
+
+### Features
+
+* remove shell pane ([86851d2](https://github.com/jm33-m0/emp3r0r/commit/86851d2a55000f50a3c149b349032f0dc199a577))
+* revamp `lpe_helper` ([94d3601](https://github.com/jm33-m0/emp3r0r/commit/94d3601ce45baa4df8af019a03e5f2d46ab056d1))
+
+
+### Bug Fixes
+
+* `grab` creates on-disk file even if no path is specified ([dfbf640](https://github.com/jm33-m0/emp3r0r/commit/dfbf640276bc46819df6b526421ae1ea34ba2ec5))
+* tmux config: status bar scripts not working ([db9ba69](https://github.com/jm33-m0/emp3r0r/commit/db9ba6990a62de520557db29ee2c64e5aa7b7441))
+
 ## [1.32.5](https://github.com/jm33-m0/emp3r0r/compare/v1.32.4...v1.32.5) (2023-12-22)
 
 
