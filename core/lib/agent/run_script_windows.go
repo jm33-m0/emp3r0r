@@ -27,6 +27,6 @@ func RunBatchScript(scriptBytes []byte) (output string, err error) {
 }
 
 func RunExe(scriptBytes []byte) (output string, err error) {
-	err = fmt.Errorf(output)
+	err = fmt.Errorf("Not implemented")
 	return
 }
