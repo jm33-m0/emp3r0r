@@ -4,6 +4,7 @@
 package agent
 
 import (
+	"fmt"
 	"log"
 	"strings"
 
@@ -29,17 +30,17 @@ func runLPEHelper(method string) (out string) {
 	case "ps1":
 		out, err = RunPSScript(scriptData)
 		if err != nil {
-			return "LPE error: " + string(out)
+			return fmt.Sprintf("LPE error: %s\n%v", out, err)
 		}
 	case "bat":
 		out, err = RunBatchScript(scriptData)
 		if err != nil {
-			return "LPE error: " + string(out)
+			return fmt.Sprintf("LPE error: %s\n%v", out, err)
 		}
 	case "exe":
 		out, err = RunExe(scriptData)
 		if err != nil {
-			return "LPE error: " + string(out)
+			return fmt.Sprintf("LPE error: %s\n%v", out, err)
 		}
 	}
 
