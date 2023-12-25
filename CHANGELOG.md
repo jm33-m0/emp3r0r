@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.33.3](https://github.com/jm33-m0/emp3r0r/compare/v1.33.2...v1.33.3) (2023-12-25)
+
+
+### Bug Fixes
+
+* `go-console` fails to start winpty ([e7e2939](https://github.com/jm33-m0/emp3r0r/commit/e7e2939b572053e44d3b41c5cc6bd8635b7958f1))
+
 ## [1.33.2](https://github.com/jm33-m0/emp3r0r/compare/v1.33.1...v1.33.2) (2023-12-25)
 
 
