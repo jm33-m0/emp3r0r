@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.33.2](https://github.com/jm33-m0/emp3r0r/compare/v1.33.1...v1.33.2) (2023-12-25)
+
+
+### Bug Fixes
+
+* `lpe_winpeas` for Windows LPE ([a79f8a2](https://github.com/jm33-m0/emp3r0r/commit/a79f8a2b4e260dcbaa71465214acd5cd90c217af))
+* `split-window -l` needs `%` to specify percentage ([266f195](https://github.com/jm33-m0/emp3r0r/commit/266f195a6ac932ea9b3000b027dc668c3008160f))
+* `split-window -p &lt;size&gt;` has been deprecated in tmux newer versions ([d625d87](https://github.com/jm33-m0/emp3r0r/commit/d625d87d0ca2d2f7b4e0bf69e4decae06da037ec))
+* trying to obtain output ([b90975f](https://github.com/jm33-m0/emp3r0r/commit/b90975f3ef7ec71963b1e47134bc11b13710511b))
+
 ## [1.33.1](https://github.com/jm33-m0/emp3r0r/compare/v1.33.0...v1.33.1) (2023-12-22)
 
 
