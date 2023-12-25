@@ -3,7 +3,7 @@ package agent
 import (
 	"bytes"
 	"fmt"
-	"log"
+	"io"
 	"os/exec"
 )
 
@@ -19,14 +19,19 @@ func feedScriptToStdin(cmd *exec.Cmd, scriptBytes []byte) (output string, err er
 		err = fmt.Errorf("Error creating StdinPipe for Cmd %s: %s\n", shell, err)
 		return
 	}
-	if _, err = stdin.Write(scriptBytes); err != nil {
-		log.Printf("Error writing to stdin of Cmd %s: %s\n", shell, err)
+	if err = cmd.Start(); err != nil {
+		err = fmt.Errorf("Error starting Cmd %s: %s\n", shell, err)
 		return
 	}
-	if err = stdin.Close(); err != nil {
-		log.Printf("Error closing stdin of Cmd %s: %s\n", shell, err)
+	go func() {
+		io.Copy(stdin, bytes.NewReader(scriptBytes))
+		stdin.Close()
+	}()
+	if err = cmd.Wait(); err != nil {
+		err = fmt.Errorf("Error waiting for Cmd %s: %s\n", shell, err)
 		return
 	}
+
 	defer func() {
 		stdoutBytes := stdoutBuf.Bytes()
 		stderrBytes := stderrBuf.Bytes()
