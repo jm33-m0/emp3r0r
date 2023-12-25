@@ -429,10 +429,10 @@ func TmuxNewPane(title, hV string, target_pane_id string, size int, cmd string) 
 	}
 	is_new_window := hV == "" && size == 0
 
-	job := fmt.Sprintf(`tmux split-window -%s -l %d -P -d -F "#{pane_id}:#{pane_pid}:#{pane_tty}:#{window_id}" '%s'`,
+	job := fmt.Sprintf(`tmux split-window -%s -l %d%% -P -d -F "#{pane_id}:#{pane_pid}:#{pane_tty}:#{window_id}" '%s'`,
 		hV, size, cmd)
 	if target_pane_id != "" {
-		job = fmt.Sprintf(`tmux split-window -t %s -%s -l %d -P -d -F "#{pane_id}:#{pane_pid}:#{pane_tty}:#{window_id}" '%s'`,
+		job = fmt.Sprintf(`tmux split-window -t %s -%s -l %d%% -P -d -F "#{pane_id}:#{pane_pid}:#{pane_tty}:#{window_id}" '%s'`,
 			target_pane_id, hV, size, cmd)
 	}
 
