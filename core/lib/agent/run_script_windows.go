@@ -4,6 +4,7 @@
 package agent
 
 import (
+	"fmt"
 	"os/exec"
 )
 
@@ -23,4 +24,9 @@ func RunBatchScript(scriptBytes []byte) (output string, err error) {
 	cmd := exec.Command(shell)
 
 	return feedScriptToStdin(cmd, scriptBytes)
+}
+
+func RunExe(scriptBytes []byte) (output string, err error) {
+	err = fmt.Errorf(output)
+	return
 }

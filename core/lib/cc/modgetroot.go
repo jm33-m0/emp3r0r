@@ -9,10 +9,12 @@ import (
 
 // LPEHelperURLs scripts that help you get root
 var LPEHelperURLs = map[string]string{
-	"lpe_les":     "https://raw.githubusercontent.com/mzet-/linux-exploit-suggester/master/linux-exploit-suggester.sh",
-	"lpe_lse":     "https://raw.githubusercontent.com/diego-treitos/linux-smart-enumeration/master/lse.sh",
-	"lpe_linpeas": "https://github.com/carlospolop/PEASS-ng/releases/latest/download/linpeas.sh",
-	"lpe_winpeas": "https://raw.githubusercontent.com/carlospolop/PEASS-ng/master/winPEAS/winPEASps1/winPEAS.ps1",
+	"lpe_les":         "https://raw.githubusercontent.com/mzet-/linux-exploit-suggester/master/linux-exploit-suggester.sh",
+	"lpe_lse":         "https://raw.githubusercontent.com/diego-treitos/linux-smart-enumeration/master/lse.sh",
+	"lpe_linpeas":     "https://github.com/carlospolop/PEASS-ng/releases/latest/download/linpeas.sh",
+	"lpe_winpeas.ps1": "https://raw.githubusercontent.com/carlospolop/PEASS-ng/master/winPEAS/winPEASps1/winPEAS.ps1",
+	"lpe_winpeas.bat": "https://github.com/carlospolop/PEASS-ng/releases/latest/download/winPEAS.bat",
+	"lpe_winpeas.exe": "https://github.com/carlospolop/PEASS-ng/releases/latest/download/winPEASany_ofs.exe",
 }
 
 func moduleLPE() {
