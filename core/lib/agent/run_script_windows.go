@@ -4,19 +4,23 @@
 package agent
 
 import (
-	"fmt"
 	"os/exec"
 )
 
-// RunScript runs encoded powershell script on windows
-func RunScript(script string) (output string, err error) {
+// RunPSScript runs powershell script on windows
+func RunPSScript(scriptBytes []byte) (output string, err error) {
 	shell := "powershell.exe"
 
-	cmd := exec.Command(shell, "-EncodedCommand", script)
-	outBytes, err := cmd.CombinedOutput()
-	if err != nil {
-		err = fmt.Errorf("run script failed: %v, %s", err, outBytes)
-	}
-	output = string(outBytes)
-	return
+	cmd := exec.Command(shell, "-Command", "-")
+
+	return feedScriptToStdin(cmd, scriptBytes)
+}
+
+// RunBatchScript runs batch script on windows
+func RunBatchScript(scriptBytes []byte) (output string, err error) {
+	shell := "cmd.exe"
+
+	cmd := exec.Command(shell)
+
+	return feedScriptToStdin(cmd, scriptBytes)
 }
