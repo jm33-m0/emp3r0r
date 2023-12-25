@@ -56,7 +56,7 @@ func runLPEHelper(method string) (out string) {
 
 	// run the script
 	log.Printf("Running LPE helper %s", method)
-	out, err = RunScript(scriptData)
+	out, err = RunShellScript(scriptData)
 	if err != nil {
 		return "LPE error: " + string(out)
 	}
