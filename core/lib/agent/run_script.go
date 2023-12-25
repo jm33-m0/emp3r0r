@@ -27,12 +27,14 @@ func feedScriptToStdin(cmd *exec.Cmd, scriptBytes []byte) (output string, err er
 		log.Printf("Error closing stdin of Cmd %s: %s\n", shell, err)
 		return
 	}
-	stdoutBytes := stdoutBuf.Bytes()
-	stderrBytes := stderrBuf.Bytes()
-	output = string(stdoutBytes) + string(stderrBytes)
-	if len(stderrBytes) > 0 {
-		err = fmt.Errorf("Error output from Cmd %s: %s\n", shell, stderrBytes)
-		return
-	}
+	defer func() {
+		stdoutBytes := stdoutBuf.Bytes()
+		stderrBytes := stderrBuf.Bytes()
+		output = string(stdoutBytes) + string(stderrBytes)
+		if len(stderrBytes) > 0 {
+			err = fmt.Errorf("Error output from Cmd %s: %s\n", shell, stderrBytes)
+			return
+		}
+	}()
 	return
 }
