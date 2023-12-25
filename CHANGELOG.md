@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.33.4](https://github.com/jm33-m0/emp3r0r/compare/v1.33.3...v1.33.4) (2023-12-25)
+
+
+### Bug Fixes
+
+* no error reported when `lpe_helper` fails ([39284ab](https://github.com/jm33-m0/emp3r0r/commit/39284ab9645f8597d5962055d8a45e6ea198f751))
+* scripts unable to run ([32a808a](https://github.com/jm33-m0/emp3r0r/commit/32a808aa37a646b1a64e60fcfb347f892ccbd4fe))
+* tmux history length too small ([c15fe26](https://github.com/jm33-m0/emp3r0r/commit/c15fe26a0151adabb113ec73df05abd41b993302))
+* winpeas: support both ps1 and batch format ([0ebd71c](https://github.com/jm33-m0/emp3r0r/commit/0ebd71c0b5d89c01b1b7a3b86d36c0f28704063d))
+
 ## [1.33.3](https://github.com/jm33-m0/emp3r0r/compare/v1.33.2...v1.33.3) (2023-12-25)
 
 
