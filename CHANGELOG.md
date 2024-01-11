@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.33.5](https://github.com/jm33-m0/emp3r0r/compare/v1.33.4...v1.33.5) (2024-01-11)
+
+
+### Bug Fixes
+
+* bash stager unable to execute agent ([f406100](https://github.com/jm33-m0/emp3r0r/commit/f4061006fe50b79730e186e204cc2a20611416cc))
+* help user understand how stager URL works ([71905e5](https://github.com/jm33-m0/emp3r0r/commit/71905e57775d3c969cc6ce010aa9862af8610bc8))
+* prefer custom bash binary ([9c13feb](https://github.com/jm33-m0/emp3r0r/commit/9c13febeed5556691ca10b4d7d551110dfa302ad))
+* update deps ([2aabc1e](https://github.com/jm33-m0/emp3r0r/commit/2aabc1e3d70b9d5a37b3c80f0c3c452dcc44e947))
+* use base64 encoding for bash stager ([4d9657c](https://github.com/jm33-m0/emp3r0r/commit/4d9657c5edb22c6c5474d55d38ec365601396201))
+
 ## [1.33.4](https://github.com/jm33-m0/emp3r0r/compare/v1.33.3...v1.33.4) (2023-12-25)
 
 
