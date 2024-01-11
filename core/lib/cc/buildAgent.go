@@ -28,7 +28,8 @@ var Arch_List = []string{
 
 // a wrapper for CmdFuncs
 func genAgentWrapper() {
-	CliPrint("Generated agent binary: %s", GenAgent())
+	CliPrint("Generated agent binary: %s."+
+		"You can `use stager` to generate a one liner for your target host", GenAgent())
 }
 
 func GenAgent() (agent_binary_path string) {
