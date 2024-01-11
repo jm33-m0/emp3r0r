@@ -56,7 +56,7 @@ func modStager() {
 
 	switch chosen_stager {
 	case "linux/bash":
-		stager_data := bash_http_downloader(url)
+		stager_data := bash_http_b64_download_exec(url)
 		err = os.WriteFile(stager_filename, stager_data, 0600)
 		if err != nil {
 			CliPrintError("Failed to save stager data: %v", err)
@@ -83,7 +83,7 @@ func modStager() {
 
 		// serve agent binary
 	case "python":
-		stager_data := python_http_aes_download_exec(agent_bin_path, url)
+		stager_data := python_http_xor_download_exec(agent_bin_path, url)
 		err = os.WriteFile(stager_filename, stager_data, 0600)
 		if err != nil {
 			CliPrintError("Failed to save stager data: %v", err)

