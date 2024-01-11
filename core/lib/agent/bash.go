@@ -4,6 +4,7 @@
 package agent
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -28,8 +29,9 @@ func ExtractBash() error {
 	// return ioutil.WriteFile(RuntimeConfig.UtilsPath+"/bash", bashData, 0755)
 	customBash := RuntimeConfig.UtilsPath + "/bash"
 	if !util.IsFileExist(customBash) {
-		log.Printf("Custom bash binary (%s) not found, maybe you need to run `vaccine`",
+		err = fmt.Errorf("Custom bash binary (%s) not found, maybe you need to run `vaccine`",
 			customBash)
+		log.Print(err)
 	}
 	return err
 }

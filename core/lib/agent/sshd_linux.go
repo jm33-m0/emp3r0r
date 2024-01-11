@@ -30,7 +30,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 	run_from_loader := os.Getenv("LD") == "true"
 	if run_from_loader && shell == "elvsh" {
 		shell = "bash"
-		if util.IsCommandExist(shell) {
+		if !util.IsCommandExist(shell) {
 			shell = "sh"
 		}
 	}
@@ -66,6 +66,11 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 
 		// we have a special bashrc and we would like to apply it
 		if shell == "bash" {
+			custom_bash := RuntimeConfig.UtilsPath + "/bash"
+			if !util.IsFileExist(custom_bash) {
+				log.Printf("sshd: custom bash not found, downloading...")
+				VaccineHandler()
+			}
 			err = ExtractBash()
 			if err != nil {
 				log.Printf("sshd: extract built-in bash: %v", err)
