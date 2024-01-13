@@ -17,6 +17,8 @@ import (
 	"net"
 	"os"
 	"time"
+
+	"golang.org/x/crypto/ssh"
 )
 
 func publicKey(priv interface{}) interface{} {
@@ -203,6 +205,18 @@ func GenerateSSHKeyPair() (privateKey, publicKey []byte, err error) {
 	}
 	pem.Encode(pub_buf, &pem.Block{Type: "EC PUBLIC KEY", Bytes: pubBytes})
 	publicKey = pub_buf.Bytes()
+
+	return
+}
+
+// SSHPublicKey return ssh.PublicKey from PEM encoded private key
+func SSHPublicKey(privkey []byte) (pubkey ssh.PublicKey, err error) {
+	priv, err := ssh.ParsePrivateKey(privkey)
+	if err != nil {
+		err = fmt.Errorf("ParsePrivateKey: %v", err)
+		return
+	}
+	pubkey = priv.PublicKey()
 
 	return
 }

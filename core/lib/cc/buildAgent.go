@@ -412,7 +412,7 @@ func InitConfigFile(cc_host string) (err error) {
 	RuntimeConfig.Timeout = util.RandInt(10000, 20000)
 
 	// SSH host key
-	RuntimeConfig.SSHHostKey, RuntimeConfig.SSHHostPubKey, err = tun.GenerateSSHKeyPair()
+	RuntimeConfig.SSHHostKey, _, err = tun.GenerateSSHKeyPair()
 	if err != nil {
 		return fmt.Errorf("failed to generate SSH host key: %v", err)
 	}

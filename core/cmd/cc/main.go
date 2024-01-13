@@ -130,11 +130,15 @@ func main() {
 			cc.CliFatalError("Please specify -relayed_port")
 		}
 		ctx, cancel := context.WithCancel(context.Background())
-		var SSHConnections map[string]context.CancelFunc
 		go func() {
+			var SSHConnections = make(map[string]context.CancelFunc, 10)
+			pubkey, err := tun.SSHPublicKey(cc.RuntimeConfig.SSHHostKey)
+			if err != nil {
+				cc.CliFatalError("Parsing SSHPublicKey: %v", err)
+			}
 			err = tun.SSHRemoteFwdClient(*connect_relay_addr,
 				cc.RuntimeConfig.ShadowsocksPassword,
-				cc.RuntimeConfig.SSHHostPubKey,
+				pubkey,
 				*relayed_port,
 				&SSHConnections, ctx, cancel)
 			if err != nil {

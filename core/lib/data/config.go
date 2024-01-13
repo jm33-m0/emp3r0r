@@ -47,8 +47,7 @@ type Config struct {
 	UseShadowsocks       bool   `json:"use_shadowsocks"`        // enable shadowsocks proxy server for C2 transport
 	UseKCP               bool   `json:"use_kcp"`                // enable KCP for Shadowsocks C2 transport
 	DisableNCSI          bool   `json:"disable_ncsi"`           // disable NCSI connectivity checking, useful when C2 is reachable but NCSI is not
-	SSHHostKey           []byte `json:"ssh_host_key"`           // SSH host key (PEM string), used by remote forwarding server
-	SSHHostPubKey        []byte `json:"ssh_host_pubkey"`        // SSH host public key (PEM string), used by remote forwarding server
+	SSHHostKey           []byte `json:"ssh_host_key"`           // SSH host (private) key (PEM string), used by remote forwarding server
 	SSHProxyPort         string `json:"ssh_proxy_port"`         // Port of SSH proxy server, used to bring target host to C2, see Bring2CC
 	SSHDPort             string `json:"sshd_port"`              // ssh related services
 	BroadcastPort        string `json:"broadcast_port"`         // UDP port used for broadcasting msg

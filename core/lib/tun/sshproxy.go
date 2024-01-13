@@ -47,7 +47,7 @@ func SSHRemoteFwdServer(port, password string, hostkey []byte) (err error) {
 			"cancel-tcpip-forward": forwardHandler.HandleSSHRequest,
 		},
 	}
-	key, err := ssh.ParsePrivateKey([]byte(hostkey))
+	key, err := ssh.ParsePrivateKey(hostkey)
 	if err != nil {
 		return fmt.Errorf("failed to parse host key: %v", err)
 	}
@@ -58,7 +58,9 @@ func SSHRemoteFwdServer(port, password string, hostkey []byte) (err error) {
 
 // SSHReverseProxyClient dial SSHProxyServer, start a reverse proxy
 // serverAddr format: 127.0.0.1:22
-func SSHReverseProxyClient(ssh_serverAddr, password string, reverseConns *map[string]context.CancelFunc, ctx context.Context, cancel context.CancelFunc) (err error) {
+func SSHReverseProxyClient(ssh_serverAddr, password string,
+	reverseConns *map[string]context.CancelFunc,
+	ctx context.Context, cancel context.CancelFunc) (err error) {
 	// var hostKey ssh.PublicKey
 	config := &ssh.ClientConfig{
 		User: "root",
@@ -136,15 +138,12 @@ func SSHReverseProxyClient(ssh_serverAddr, password string, reverseConns *map[st
 
 // SSHRemoteFwdClient dial SSHRemoteFwdServer, forward local TCP port to remote server
 // serverAddr format: 127.0.0.1:22
+// hostkey is the ssh server public key
 func SSHRemoteFwdClient(ssh_serverAddr, password string,
-	pubkey []byte, // ssh server public key
+	hostkey ssh.PublicKey, // ssh server public key
 	local_port int, // local port to forward to remote
-	reverseConns *map[string]context.CancelFunc, // record this connection
+	conns *map[string]context.CancelFunc, // record this connection
 	ctx context.Context, cancel context.CancelFunc) (err error) {
-	hostkey, err := ssh.ParsePublicKey([]byte(pubkey))
-	if err != nil {
-		return fmt.Errorf("failed to parse host key: %v", err)
-	}
 	config := &ssh.ClientConfig{
 		User: "root",
 		Auth: []ssh.AuthMethod{
@@ -171,8 +170,8 @@ func SSHRemoteFwdClient(ssh_serverAddr, password string,
 	defer l.Close()
 	defer cancel()
 
-	reverseConnsList := *reverseConns
-	reverseConnsList[ssh_serverAddr] = cancel // record this connection
+	connsList := *conns
+	connsList[ssh_serverAddr] = cancel // record this connection
 	toAddr := fmt.Sprintf("127.0.0.1:%d", local_port)
 
 	// forward to target local port
