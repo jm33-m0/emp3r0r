@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"strconv"
 	"strings"
@@ -14,13 +13,24 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func SSHProxyServer(port string) (err error) {
-	log.Printf("starting ssh proxy server on port %s...", port)
+// SSHRemoteFwdServer start a ssh proxy server that forward to client side TCP port
+// port: binding port on server side, ssh client will try authentication with this port
+// password: ssh client will try authentication with this password.
+// We will always use RuntimeConfig.ShadowsocksPassword
+func SSHRemoteFwdServer(port, password string, hostkey []byte) (err error) {
+	LogInfo("Starting ssh remote forwarding server on port %s...", port)
 	forwardHandler := &gliderssh.ForwardedTCPHandler{}
-
 	server := gliderssh.Server{
+		PasswordHandler: func(ctx gliderssh.Context, pass string) bool {
+			LogInfo("ssh client try to authenticate with password %s", pass)
+			success := pass == password
+			if success {
+				LogInfo("ssh client authenticated")
+			}
+			return success
+		},
 		LocalPortForwardingCallback: gliderssh.LocalPortForwardingCallback(func(ctx gliderssh.Context, dhost string, dport uint32) bool {
-			log.Println("Accepted forward", dhost, dport)
+			LogInfo("Accepted forward %s %d", dhost, dport)
 			return true
 		}),
 		Addr: ":" + port,
@@ -29,7 +39,7 @@ func SSHProxyServer(port string) (err error) {
 			select {}
 		}),
 		ReversePortForwardingCallback: gliderssh.ReversePortForwardingCallback(func(ctx gliderssh.Context, host string, port uint32) bool {
-			log.Println("attempt to bind", host, port, "granted")
+			LogInfo("attempt to bind %s %d granted", host, port)
 			return true
 		}),
 		RequestHandlers: map[string]gliderssh.RequestHandler{
@@ -37,24 +47,30 @@ func SSHProxyServer(port string) (err error) {
 			"cancel-tcpip-forward": forwardHandler.HandleSSHRequest,
 		},
 	}
+	key, err := ssh.ParsePrivateKey([]byte(hostkey))
+	if err != nil {
+		return fmt.Errorf("failed to parse host key: %v", err)
+	}
+	server.AddHostKey(key)
 
 	return server.ListenAndServe()
 }
 
-// SSHProxyClient dial SSHProxyServer, start a reverse proxy
+// SSHReverseProxyClient dial SSHProxyServer, start a reverse proxy
 // serverAddr format: 127.0.0.1:22
-func SSHProxyClient(serverAddr string, reverseConns *map[string]context.CancelFunc, ctx context.Context, cancel context.CancelFunc) (err error) {
+func SSHReverseProxyClient(ssh_serverAddr, password string, reverseConns *map[string]context.CancelFunc, ctx context.Context, cancel context.CancelFunc) (err error) {
 	// var hostKey ssh.PublicKey
 	config := &ssh.ClientConfig{
 		User: "root",
 		Auth: []ssh.AuthMethod{
-			ssh.Password("toor"),
+			ssh.Password(password),
 		},
+		// ignore host key check, this communication happens between agents
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
 	// calculate ProxyPort
-	serverPort, err := strconv.Atoi(strings.Split(serverAddr, ":")[1])
+	serverPort, err := strconv.Atoi(strings.Split(ssh_serverAddr, ":")[1])
 	// this is the reverseProxyPort
 	if err != nil {
 		return fmt.Errorf("serverPort invalid: %v", err)
@@ -62,13 +78,13 @@ func SSHProxyClient(serverAddr string, reverseConns *map[string]context.CancelFu
 	proxyPort := strconv.Itoa((serverPort - 1)) // reverseProxyPort = proxyPort + 1
 
 	// Dial your ssh server.
-	conn, err := ssh.Dial("tcp", serverAddr, config)
+	conn, err := ssh.Dial("tcp", ssh_serverAddr, config)
 	if err != nil {
 		return fmt.Errorf("unable to connect: %v", err)
 	}
 	defer conn.Close()
 
-	// Request the remote side to open port 8080 on all interfaces.
+	// Request the remote side to open proxy port on all interfaces.
 	l, err := conn.Listen("tcp", "0.0.0.0:"+proxyPort)
 	if err != nil {
 		return fmt.Errorf("unable to register tcp forward: %v", err)
@@ -77,14 +93,14 @@ func SSHProxyClient(serverAddr string, reverseConns *map[string]context.CancelFu
 	defer cancel()
 
 	reverseConnsList := *reverseConns
-	reverseConnsList[serverAddr] = cancel // record this connection
+	reverseConnsList[ssh_serverAddr] = cancel // record this connection
 	toAddr := "127.0.0.1:" + proxyPort
 
 	// forward to socks5
 	serveConn := func(clientConn net.Conn) {
 		socksConn, err := net.Dial("tcp", toAddr)
 		if err != nil {
-			log.Printf("failed to connect to socks5 server: %v", err)
+			LogInfo("failed to connect to socks5 server: %v", err)
 			return
 		}
 		defer socksConn.Close()
@@ -92,14 +108,14 @@ func SSHProxyClient(serverAddr string, reverseConns *map[string]context.CancelFu
 			defer clientConn.Close()
 			_, err = io.Copy(clientConn, socksConn)
 			if err != nil {
-				log.Printf("clientConn <- socksConn: %v", err)
+				LogInfo("clientConn <- socksConn: %v", err)
 			}
 		}()
 		go func() {
 			defer clientConn.Close()
 			_, err = io.Copy(socksConn, clientConn)
 			if err != nil {
-				log.Printf("clientConn -> socksConn: %v", err)
+				LogInfo("clientConn -> socksConn: %v", err)
 			}
 		}()
 		for ctx.Err() == nil {
@@ -111,6 +127,85 @@ func SSHProxyClient(serverAddr string, reverseConns *map[string]context.CancelFu
 		inconn, err := l.Accept()
 		if err != nil {
 			return fmt.Errorf("SSHProxyClient finished: %v", err)
+		}
+		go serveConn(inconn)
+	}
+
+	return nil
+}
+
+// SSHRemoteFwdClient dial SSHRemoteFwdServer, forward local TCP port to remote server
+// serverAddr format: 127.0.0.1:22
+func SSHRemoteFwdClient(ssh_serverAddr, password string,
+	pubkey []byte, // ssh server public key
+	local_port int, // local port to forward to remote
+	reverseConns *map[string]context.CancelFunc, // record this connection
+	ctx context.Context, cancel context.CancelFunc) (err error) {
+	hostkey, err := ssh.ParsePublicKey([]byte(pubkey))
+	if err != nil {
+		return fmt.Errorf("failed to parse host key: %v", err)
+	}
+	config := &ssh.ClientConfig{
+		User: "root",
+		Auth: []ssh.AuthMethod{
+			ssh.Password(password),
+		},
+		// ignore host key check, this communication happens between agents
+		HostKeyCallback: ssh.FixedHostKey(hostkey),
+	}
+
+	// Dial your ssh server.
+	conn, err := ssh.Dial("tcp", ssh_serverAddr, config)
+	if err != nil {
+		return fmt.Errorf("unable to connect: %v", err)
+	}
+	defer conn.Close()
+	LogInfo("Connected to ssh server on %s", ssh_serverAddr)
+
+	// Request the remote side to open proxy port on all interfaces.
+	l, err := conn.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", local_port))
+	if err != nil {
+		return fmt.Errorf("unable to register tcp forward: %v", err)
+	}
+	LogInfo("Forwarding local port %d to remote", local_port)
+	defer l.Close()
+	defer cancel()
+
+	reverseConnsList := *reverseConns
+	reverseConnsList[ssh_serverAddr] = cancel // record this connection
+	toAddr := fmt.Sprintf("127.0.0.1:%d", local_port)
+
+	// forward to target local port
+	serveConn := func(conn net.Conn) {
+		targetConn, err := net.Dial("tcp", toAddr)
+		if err != nil {
+			LogInfo("failed to connect to %s: %v", toAddr, err)
+			return
+		}
+		defer targetConn.Close()
+		go func() {
+			defer conn.Close()
+			_, err = io.Copy(conn, targetConn)
+			if err != nil {
+				LogInfo("clientConn <- targetConn: %v", err)
+			}
+		}()
+		go func() {
+			defer conn.Close()
+			_, err = io.Copy(targetConn, conn)
+			if err != nil {
+				LogInfo("clientConn -> targetConn: %v", err)
+			}
+		}()
+		for ctx.Err() == nil {
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+
+	for ctx.Err() == nil {
+		inconn, err := l.Accept()
+		if err != nil {
+			return fmt.Errorf("SSH RemoteFwd (%s) finished: %v", toAddr, err)
 		}
 		go serveConn(inconn)
 	}

@@ -411,6 +411,12 @@ func InitConfigFile(cc_host string) (err error) {
 	RuntimeConfig.HTTPListenerPort = fmt.Sprintf("%v", util.RandInt(1026, 65534))
 	RuntimeConfig.Timeout = util.RandInt(10000, 20000)
 
+	// SSH host key
+	RuntimeConfig.SSHHostKey, RuntimeConfig.SSHHostPubKey, err = tun.GenerateSSHKeyPair()
+	if err != nil {
+		return fmt.Errorf("failed to generate SSH host key: %v", err)
+	}
+
 	// random strings
 	RuntimeConfig.AgentUUID = uuid.NewString()
 	agent_root := util.RandStr(util.RandInt(6, 20))

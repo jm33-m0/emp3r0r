@@ -178,3 +178,31 @@ func GetFingerprint(cert_file string) string {
 	}
 	return SHA256SumRaw(cert.Raw)
 }
+
+// Generate a new key pair for use with openssh
+func GenerateSSHKeyPair() (privateKey, publicKey []byte, err error) {
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		err = fmt.Errorf("GenerateKey: %v", err)
+		return
+
+	}
+	// pem encode
+	priv_buf := new(bytes.Buffer)
+	pem.Encode(priv_buf, pemBlockForKey(priv))
+	privateKey = priv_buf.Bytes()
+
+	// public
+	pub_buf := new(bytes.Buffer)
+	pub := &priv.PublicKey
+	pubBytes, err := x509.MarshalPKIXPublicKey(pub)
+	if err != nil {
+		err = fmt.Errorf("MarshalPKIXPublicKey: %v", err)
+		return
+
+	}
+	pem.Encode(pub_buf, &pem.Block{Type: "EC PUBLIC KEY", Bytes: pubBytes})
+	publicKey = pub_buf.Bytes()
+
+	return
+}

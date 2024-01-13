@@ -40,7 +40,9 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 	// reverseProxy listener
 	// ssh reverse proxy
 	go func() {
-		err = tun.SSHProxyServer(RuntimeConfig.SSHProxyPort)
+		err = tun.SSHRemoteFwdServer(RuntimeConfig.SSHProxyPort,
+			RuntimeConfig.ShadowsocksPassword,
+			RuntimeConfig.SSHHostKey)
 		if err != nil {
 			log.Printf("SSHProxyServer: %v", err)
 		}
