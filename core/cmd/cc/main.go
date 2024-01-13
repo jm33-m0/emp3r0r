@@ -112,6 +112,7 @@ func main() {
 		if err != nil {
 			cc.CliFatalError("Init %s: %v", cc.EmpConfigFile, err)
 		}
+		os.Exit(0)
 	}
 
 	// read config file
