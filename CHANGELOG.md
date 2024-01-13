@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.34.2](https://github.com/jm33-m0/emp3r0r/compare/v1.34.1...v1.34.2) (2024-01-13)
+
+
+### Bug Fixes
+
+* add instructions ([c051806](https://github.com/jm33-m0/emp3r0r/commit/c051806a6c042501658623b26ade3d7995b6baf0))
+* emp3r0r should exit after executing `-gencert` ([33edc36](https://github.com/jm33-m0/emp3r0r/commit/33edc36d40861324a1dac6d980978d4150ceaca1))
+
 ## [1.34.1](https://github.com/jm33-m0/emp3r0r/compare/v1.34.0...v1.34.1) (2024-01-13)
 
 
