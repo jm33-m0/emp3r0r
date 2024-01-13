@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.34.0](https://github.com/jm33-m0/emp3r0r/compare/v1.33.5...v1.34.0) (2024-01-13)
+
+
+### Features
+
+* C2 relay via SSH ([522b6b3](https://github.com/jm33-m0/emp3r0r/commit/522b6b37779d34d674ed4bc47842692ef944875f))
+
 ## [1.33.5](https://github.com/jm33-m0/emp3r0r/compare/v1.33.4...v1.33.5) (2024-01-11)
 
 
