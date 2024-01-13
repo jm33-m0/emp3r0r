@@ -226,6 +226,8 @@ case "$1" in
 		echo -ne "\e[36mCC names (can be IPs and/or domain names), separate with space:\n>>\e[0m "
 		read -r hosts
 		"$cc" -gencert "$hosts"
+		info "Generated certs, re-run $0"
+		exit
 	}
 
 	# Run C2 server with tmux UI
