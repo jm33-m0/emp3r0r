@@ -125,7 +125,12 @@ func main() {
 		if err != nil {
 			cc.CliFatalError("SSHRemoteFwdServer: %v", err)
 		}
-	} else if *connect_relay_addr != "" {
+	} else {
+		go cc.TLSServer()
+		go cc.ShadowsocksServer()
+		go cc.InitModules()
+	}
+	if *connect_relay_addr != "" {
 		if *relayed_port == 0 {
 			cc.CliFatalError("Please specify -relayed_port")
 		}
@@ -145,10 +150,6 @@ func main() {
 				cc.CliFatalError("SSHRemoteFwdClient: %v", err)
 			}
 		}()
-	} else {
-		go cc.TLSServer()
-		go cc.ShadowsocksServer()
-		go cc.InitModules()
 	}
 
 	if *cdnproxy != "" {
