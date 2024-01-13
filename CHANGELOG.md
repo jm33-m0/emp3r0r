@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.34.1](https://github.com/jm33-m0/emp3r0r/compare/v1.34.0...v1.34.1) (2024-01-13)
+
+
+### Bug Fixes
+
+* C2 relay client ([7e121d6](https://github.com/jm33-m0/emp3r0r/commit/7e121d664b2cc9eaaeb2cf4b316f11e7c25d29e1))
+* C2 relay: C2 service not running ([4a26931](https://github.com/jm33-m0/emp3r0r/commit/4a2693135df576c5b86f7c6c0197069d0c772d69))
+
 ## [1.34.0](https://github.com/jm33-m0/emp3r0r/compare/v1.33.5...v1.34.0) (2024-01-13)
 
 
