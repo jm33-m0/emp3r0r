@@ -72,7 +72,8 @@ init_transport:
 			log.Printf("Proxy server down, retrying (%d)...", try)
 			goto init_transport
 		} else {
-			LogFatalError("makeRoundTripper: %v", err)
+			LogError("makeRoundTripper: %v", err)
+			return nil
 		}
 	}
 
