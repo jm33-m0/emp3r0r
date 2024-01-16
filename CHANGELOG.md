@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.34.4](https://github.com/jm33-m0/emp3r0r/compare/v1.34.3...v1.34.4) (2024-01-16)
+
+
+### Bug Fixes
+
+* `-connect_relay` unable to recovery SSH session ([8bde2fb](https://github.com/jm33-m0/emp3r0r/commit/8bde2fbc7aa9b215e8b0cf8f3fc6a85f56b3e964))
+
 ## [1.34.3](https://github.com/jm33-m0/emp3r0r/compare/v1.34.2...v1.34.3) (2024-01-16)
 
 
