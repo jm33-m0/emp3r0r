@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.34.3](https://github.com/jm33-m0/emp3r0r/compare/v1.34.2...v1.34.3) (2024-01-16)
+
+
+### Bug Fixes
+
+* agent aborts connection (Windows) ([8c73193](https://github.com/jm33-m0/emp3r0r/commit/8c731935b440ff4828ed4aa23bc8ee8bd6148f31))
+* agent aborts connection when C2 is unreachable ([def1b2a](https://github.com/jm33-m0/emp3r0r/commit/def1b2a453931dc8e2490749b649720b6eedb289))
+* show C2 address in agent system info ([7032d34](https://github.com/jm33-m0/emp3r0r/commit/7032d34c0d546264335664048213d0a9767010ec))
+* ssh C2 relay client should retry connection until SSH session is established ([966147b](https://github.com/jm33-m0/emp3r0r/commit/966147b4f0199022576141aeef93c99bfff78972))
+
 ## [1.34.2](https://github.com/jm33-m0/emp3r0r/compare/v1.34.1...v1.34.2) (2024-01-13)
 
 
