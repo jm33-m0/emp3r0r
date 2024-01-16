@@ -377,7 +377,6 @@ test_agent:
 	}
 
 connect:
-
 	// apply whatever proxy setting we have just added
 	emp3r0r_data.HTTPClient = tun.EmpHTTPClient(emp3r0r_data.CCAddress, agent.RuntimeConfig.C2TransportProxy)
 	if emp3r0r_data.HTTPClient == nil {
