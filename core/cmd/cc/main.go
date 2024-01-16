@@ -141,6 +141,7 @@ func main() {
 		}
 		ctx, cancel := context.WithCancel(context.Background())
 		go func() {
+			defer cc.CliPrintError("session unexpectedly exited, please restart emp3r0r")
 			var SSHConnections = make(map[string]context.CancelFunc, 10)
 			pubkey, err := tun.SSHPublicKey(cc.RuntimeConfig.SSHHostKey)
 			if err != nil {
@@ -152,11 +153,12 @@ func main() {
 				pubkey,
 				*relayed_port,
 				&SSHConnections, ctx, cancel)
-			if err != nil {
-				cc.CliPrintWarning("SSHRemoteFwdClient: %v, retrying", err)
-				util.TakeABlink()
-				goto ssh_connect
+			if err == nil {
+				err = fmt.Errorf("session unexpectedly exited")
 			}
+			cc.CliPrintWarning("SSHRemoteFwdClient: %v, retrying", err)
+			util.TakeABlink()
+			goto ssh_connect
 		}()
 	}
 

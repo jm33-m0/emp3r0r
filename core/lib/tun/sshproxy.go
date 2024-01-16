@@ -39,7 +39,7 @@ func SSHRemoteFwdServer(port, password string, hostkey []byte) (err error) {
 			select {}
 		}),
 		ReversePortForwardingCallback: gliderssh.ReversePortForwardingCallback(func(ctx gliderssh.Context, host string, port uint32) bool {
-			LogInfo("attempt to bind %s %d granted", host, port)
+			LogInfo("Attempt to bind %s %d granted", host, port)
 			return true
 		}),
 		RequestHandlers: map[string]gliderssh.RequestHandler{
@@ -149,7 +149,7 @@ func SSHRemoteFwdClient(ssh_serverAddr, password string,
 		Auth: []ssh.AuthMethod{
 			ssh.Password(password),
 		},
-		// ignore host key check, this communication happens between agents
+		// enforce SSH host key verification
 		HostKeyCallback: ssh.FixedHostKey(hostkey),
 		Timeout:         10 * time.Second,
 	}
@@ -178,38 +178,36 @@ func SSHRemoteFwdClient(ssh_serverAddr, password string,
 
 	// forward to target local port
 	serveConn := func(conn net.Conn) {
-		targetConn, err := net.Dial("tcp", toAddr)
-		if err != nil {
-			LogInfo("failed to connect to %s: %v", toAddr, err)
+		targetConn, serveConn_error := net.Dial("tcp", toAddr)
+		if serveConn_error != nil {
+			LogWarn("failed to connect to %s: %v", toAddr, serveConn_error)
+			err = serveConn_error
 			return
 		}
 		defer targetConn.Close()
+		defer conn.Close()
+		defer LogWarn("%s <-> %s closed", conn.LocalAddr(), toAddr)
 		go func() {
-			defer conn.Close()
-			_, err = io.Copy(conn, targetConn)
-			if err != nil {
-				LogInfo("clientConn <- targetConn: %v", err)
+			_, serveConn_error = io.Copy(conn, targetConn)
+			if serveConn_error != nil {
+				LogWarn("clientConn <- targetConn: %v", serveConn_error)
+				err = serveConn_error
 			}
 		}()
-		go func() {
-			defer conn.Close()
-			_, err = io.Copy(targetConn, conn)
-			if err != nil {
-				LogInfo("clientConn -> targetConn: %v", err)
-			}
-		}()
-		for ctx.Err() == nil {
-			time.Sleep(20 * time.Millisecond)
+		_, serveConn_error = io.Copy(targetConn, conn)
+		if serveConn_error != nil {
+			LogWarn("clientConn -> targetConn: %v", serveConn_error)
+			err = serveConn_error
 		}
 	}
 
 	for ctx.Err() == nil {
-		inconn, err := l.Accept()
-		if err != nil {
-			return fmt.Errorf("SSH RemoteFwd (%s) finished with error: %v", toAddr, err)
+		inconn, l_err := l.Accept()
+		if l_err != nil {
+			return fmt.Errorf("SSH RemoteFwd (%s) finished with error: %v", toAddr, l_err)
 		}
 		go serveConn(inconn)
 	}
 
-	return
+	return fmt.Errorf("session unexpectedly exited")
 }
