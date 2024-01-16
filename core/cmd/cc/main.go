@@ -121,7 +121,7 @@ func main() {
 		cc.CliFatalError("Read %s: %v", *config, err)
 	} else if *ssh_relay_port != "" {
 		cc.CliMsg("Copy ~/.emp3r0r to client host, "+
-			"then run `emp3r0r -connect_relay relay_ip:%s -relayed_port [%s]` "+
+			"then run `emp3r0r -connect_relay relay_ip:%s -relayed_port %s` "+
 			"(C2 port, or Shadowsocks port %s if you are using it)",
 			*ssh_relay_port, cc.RuntimeConfig.CCPort, cc.RuntimeConfig.ShadowsocksPort)
 		err = tun.SSHRemoteFwdServer(*ssh_relay_port,
@@ -146,13 +146,16 @@ func main() {
 			if err != nil {
 				cc.CliFatalError("Parsing SSHPublicKey: %v", err)
 			}
+		ssh_connect:
 			err = tun.SSHRemoteFwdClient(*connect_relay_addr,
 				cc.RuntimeConfig.ShadowsocksPassword,
 				pubkey,
 				*relayed_port,
 				&SSHConnections, ctx, cancel)
 			if err != nil {
-				cc.CliFatalError("SSHRemoteFwdClient: %v", err)
+				cc.CliPrintWarning("SSHRemoteFwdClient: %v, retrying", err)
+				util.TakeABlink()
+				goto ssh_connect
 			}
 		}()
 	}

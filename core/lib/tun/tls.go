@@ -92,6 +92,12 @@ func LogInfo(format string, a ...interface{}) {
 	log.Print(infoColor.Sprintf(format, a...))
 }
 
+// LogWarn print log in yellow
+func LogWarn(format string, a ...interface{}) {
+	infoColor := color.New(color.FgHiYellow)
+	log.Print(infoColor.Sprintf(format, a...))
+}
+
 // LogError print log in red, and exit
 func LogError(format string, a ...interface{}) {
 	errorColor := color.New(color.Bold, color.FgHiRed)

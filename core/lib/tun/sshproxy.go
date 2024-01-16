@@ -151,6 +151,7 @@ func SSHRemoteFwdClient(ssh_serverAddr, password string,
 		},
 		// ignore host key check, this communication happens between agents
 		HostKeyCallback: ssh.FixedHostKey(hostkey),
+		Timeout:         10 * time.Second,
 	}
 
 	// Dial your ssh server.
@@ -173,6 +174,7 @@ func SSHRemoteFwdClient(ssh_serverAddr, password string,
 	connsList := *conns
 	connsList[ssh_serverAddr] = cancel // record this connection
 	toAddr := fmt.Sprintf("127.0.0.1:%d", local_port)
+	defer delete(connsList, ssh_serverAddr)
 
 	// forward to target local port
 	serveConn := func(conn net.Conn) {
@@ -204,10 +206,10 @@ func SSHRemoteFwdClient(ssh_serverAddr, password string,
 	for ctx.Err() == nil {
 		inconn, err := l.Accept()
 		if err != nil {
-			return fmt.Errorf("SSH RemoteFwd (%s) finished: %v", toAddr, err)
+			return fmt.Errorf("SSH RemoteFwd (%s) finished with error: %v", toAddr, err)
 		}
 		go serveConn(inconn)
 	}
 
-	return nil
+	return
 }
