@@ -270,18 +270,18 @@ func setC2Transport() {
 	if tun.IsTor(emp3r0r_data.CCAddress) {
 		emp3r0r_data.Transport = fmt.Sprintf("TOR (%s)", emp3r0r_data.CCAddress)
 		return
-	}
-	if RuntimeConfig.CDNProxy != "" {
+	} else if RuntimeConfig.CDNProxy != "" {
 		emp3r0r_data.Transport = fmt.Sprintf("CDN (%s)", RuntimeConfig.CDNProxy)
 		return
-	}
-
-	if RuntimeConfig.UseShadowsocks {
-		emp3r0r_data.Transport = fmt.Sprintf("Shadowsocks (*:%s)", RuntimeConfig.ShadowsocksPort)
+	} else if RuntimeConfig.UseShadowsocks {
+		emp3r0r_data.Transport = fmt.Sprintf("Shadowsocks (*:%s) to %s",
+			RuntimeConfig.ShadowsocksPort, emp3r0r_data.CCAddress)
 		// ss thru KCP
 		if RuntimeConfig.UseKCP {
-			emp3r0r_data.Transport = fmt.Sprintf("Shadowsocks (*:%s) in KCP (*:%s)",
-				RuntimeConfig.ShadowsocksPort, RuntimeConfig.KCPPort)
+			emp3r0r_data.Transport = fmt.Sprintf("Shadowsocks (*:%s) in KCP (*:%s) to %s",
+				RuntimeConfig.ShadowsocksPort, RuntimeConfig.KCPPort, emp3r0r_data.CCAddress)
 		}
+	} else {
+		emp3r0r_data.Transport = fmt.Sprintf("HTTP2 (%s)", emp3r0r_data.CCAddress)
 	}
 }

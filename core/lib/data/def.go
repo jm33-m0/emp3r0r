@@ -41,7 +41,8 @@ var (
 	GuardianAgentPath = "[persistence_agent_path]"
 
 	// will be updated by ReadJSONConfig
-	CCAddress    = "" // in form https://host:port
+	// in form https://host:port
+	CCAddress    = ""
 	DefaultShell = ""
 
 	// AESKey generated from Tag -> md5sum, type: []byte

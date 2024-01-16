@@ -382,6 +382,7 @@ func CliPrintSuccess(format string, a ...interface{}) {
 // CliFatalError print log in red, and exit
 func CliFatalError(format string, a ...interface{}) {
 	errorColor := color.New(color.Bold, color.FgHiRed)
+	CliMsg("Run 'tmux kill-session -t emp3r0r' to clean up dead emp3r0r windows")
 	log.Fatal(errorColor.Sprintf(format, a...))
 	if IsAPIEnabled {
 		// send to socket
