@@ -58,82 +58,18 @@ func SSHRemoteFwdServer(port, password string, hostkey []byte) (err error) {
 
 // SSHReverseProxyClient dial SSHProxyServer, start a reverse proxy
 // serverAddr format: 127.0.0.1:22
-func SSHReverseProxyClient(ssh_serverAddr, password string,
+func SSHReverseProxyClient(ssh_serverAddr, password string, hostkey ssh.PublicKey,
 	reverseConns *map[string]context.CancelFunc,
 	ctx context.Context, cancel context.CancelFunc) (err error) {
-	// var hostKey ssh.PublicKey
-	config := &ssh.ClientConfig{
-		User: "root",
-		Auth: []ssh.AuthMethod{
-			ssh.Password(password),
-		},
-		// ignore host key check, this communication happens between agents
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-	}
-
 	// calculate ProxyPort
 	serverPort, err := strconv.Atoi(strings.Split(ssh_serverAddr, ":")[1])
 	// this is the reverseProxyPort
 	if err != nil {
 		return fmt.Errorf("serverPort invalid: %v", err)
 	}
-	proxyPort := strconv.Itoa((serverPort - 1)) // reverseProxyPort = proxyPort + 1
-
-	// Dial your ssh server.
-	conn, err := ssh.Dial("tcp", ssh_serverAddr, config)
-	if err != nil {
-		return fmt.Errorf("unable to connect: %v", err)
-	}
-	defer conn.Close()
-
-	// Request the remote side to open proxy port on all interfaces.
-	l, err := conn.Listen("tcp", "0.0.0.0:"+proxyPort)
-	if err != nil {
-		return fmt.Errorf("unable to register tcp forward: %v", err)
-	}
-	defer l.Close()
-	defer cancel()
-
-	reverseConnsList := *reverseConns
-	reverseConnsList[ssh_serverAddr] = cancel // record this connection
-	toAddr := "127.0.0.1:" + proxyPort
-
-	// forward to socks5
-	serveConn := func(clientConn net.Conn) {
-		socksConn, err := net.Dial("tcp", toAddr)
-		if err != nil {
-			LogInfo("failed to connect to socks5 server: %v", err)
-			return
-		}
-		defer socksConn.Close()
-		go func() {
-			defer clientConn.Close()
-			_, err = io.Copy(clientConn, socksConn)
-			if err != nil {
-				LogInfo("clientConn <- socksConn: %v", err)
-			}
-		}()
-		go func() {
-			defer clientConn.Close()
-			_, err = io.Copy(socksConn, clientConn)
-			if err != nil {
-				LogInfo("clientConn -> socksConn: %v", err)
-			}
-		}()
-		for ctx.Err() == nil {
-			time.Sleep(20 * time.Millisecond)
-		}
-	}
-
-	for ctx.Err() == nil {
-		inconn, err := l.Accept()
-		if err != nil {
-			return fmt.Errorf("SSHProxyClient finished: %v", err)
-		}
-		go serveConn(inconn)
-	}
-
-	return nil
+	proxyPort := serverPort - 1 // reverseProxyPort = proxyPort + 1
+	return SSHRemoteFwdClient(ssh_serverAddr, password, hostkey,
+		proxyPort, reverseConns, ctx, cancel)
 }
 
 // SSHRemoteFwdClient dial SSHRemoteFwdServer, forward local TCP port to remote server
