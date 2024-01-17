@@ -101,6 +101,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 }
 
 // passProxy let other agents on our network use our RuntimeConfig.AgentProxy
+// FIXME proxy URL parsing is not working due to username/password
 func passProxy(ctx context.Context, cancel context.CancelFunc, count *int) {
 	// one time only
 	*count++
@@ -110,7 +111,7 @@ func passProxy(ctx context.Context, cancel context.CancelFunc, count *int) {
 	}
 
 	proxyAddr := RuntimeConfig.C2TransportProxy
-	sl := strings.Split(proxyAddr, "//")
+	sl := strings.Split(proxyAddr, "@") // socks5://user:pass@host:port
 	if len(sl) < 2 {
 		log.Printf("TCPFwd: invalid proxy addr: %s", proxyAddr)
 		return
