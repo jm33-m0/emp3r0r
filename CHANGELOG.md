@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.34.6](https://github.com/jm33-m0/emp3r0r/compare/v1.34.5...v1.34.6) (2024-01-17)
+
+
+### Bug Fixes
+
+* `passProxy` proxy URL parsing error ([957395e](https://github.com/jm33-m0/emp3r0r/commit/957395edc369dbf51463af11d061c2421a20343d))
+
 ## [1.34.5](https://github.com/jm33-m0/emp3r0r/compare/v1.34.4...v1.34.5) (2024-01-17)
 
 
