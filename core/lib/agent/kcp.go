@@ -50,7 +50,7 @@ func KCPClient() {
 		}()
 
 		// dial to C2 KCP server
-		key := pbkdf2.Key([]byte(RuntimeConfig.ShadowsocksPassword),
+		key := pbkdf2.Key([]byte(RuntimeConfig.Password),
 			[]byte(emp3r0r_data.MagicString), 1024, 32, sha256.New)
 		block, _ := kcp.NewAESBlockCrypt(key)
 

@@ -58,7 +58,7 @@ func SSHRemoteFwdServer(port, password string, hostkey []byte) (err error) {
 
 // SSHReverseProxyClient dial SSHProxyServer, start a reverse proxy
 // serverAddr format: 127.0.0.1:22
-func SSHReverseProxyClient(ssh_serverAddr, password string, hostkey ssh.PublicKey,
+func SSHReverseProxyClient(ssh_serverAddr, password string,
 	reverseConns *map[string]context.CancelFunc,
 	ctx context.Context, cancel context.CancelFunc) (err error) {
 	// calculate ProxyPort
@@ -68,7 +68,7 @@ func SSHReverseProxyClient(ssh_serverAddr, password string, hostkey ssh.PublicKe
 		return fmt.Errorf("serverPort invalid: %v", err)
 	}
 	proxyPort := serverPort - 1 // reverseProxyPort = proxyPort + 1
-	return SSHRemoteFwdClient(ssh_serverAddr, password, hostkey,
+	return SSHRemoteFwdClient(ssh_serverAddr, password, nil,
 		proxyPort, reverseConns, ctx, cancel)
 }
 
@@ -80,13 +80,17 @@ func SSHRemoteFwdClient(ssh_serverAddr, password string,
 	local_port int, // local port to forward to remote
 	conns *map[string]context.CancelFunc, // record this connection
 	ctx context.Context, cancel context.CancelFunc) (err error) {
+	hostkey_callback := ssh.InsecureIgnoreHostKey()
+	if hostkey != nil {
+		hostkey_callback = ssh.FixedHostKey(hostkey)
+	}
 	config := &ssh.ClientConfig{
 		User: "root",
 		Auth: []ssh.AuthMethod{
 			ssh.Password(password),
 		},
 		// enforce SSH host key verification
-		HostKeyCallback: ssh.FixedHostKey(hostkey),
+		HostKeyCallback: hostkey_callback,
 		Timeout:         10 * time.Second,
 	}
 

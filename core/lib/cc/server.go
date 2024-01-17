@@ -34,7 +34,7 @@ func ShadowsocksServer() {
 		ServerAddr:     "0.0.0.0:" + RuntimeConfig.ShadowsocksPort,
 		LocalSocksAddr: "",
 		Cipher:         ss.AEADCipher,
-		Password:       RuntimeConfig.ShadowsocksPassword,
+		Password:       RuntimeConfig.Password,
 		IsServer:       true,
 		Verbose:        false,
 		Ctx:            ctx,

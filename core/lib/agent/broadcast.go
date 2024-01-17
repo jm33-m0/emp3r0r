@@ -41,7 +41,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 	// ssh reverse proxy
 	go func() {
 		err = tun.SSHRemoteFwdServer(RuntimeConfig.SSHProxyPort,
-			RuntimeConfig.ShadowsocksPassword,
+			RuntimeConfig.Password,
 			RuntimeConfig.SSHHostKey)
 		if err != nil {
 			log.Printf("SSHProxyServer: %v", err)
@@ -185,7 +185,7 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 		for _, netip := range ips {
 			proxyMsg := fmt.Sprintf("socks5://%s:%s@%s:%s",
 				RuntimeConfig.ShadowsocksPort,
-				RuntimeConfig.ShadowsocksPassword,
+				RuntimeConfig.Password,
 				netip.IP.String(), RuntimeConfig.AutoProxyPort)
 			broadcastAddr := tun.IPbroadcastAddr(netip)
 			if broadcastAddr == "" {

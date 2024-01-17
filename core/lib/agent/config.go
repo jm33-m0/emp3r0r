@@ -54,7 +54,7 @@ func ApplyRuntimeConfig() (err error) {
 	// Socks5 proxy server
 	addr := fmt.Sprintf("0.0.0.0:%s", RuntimeConfig.AutoProxyPort)
 	emp3r0r_data.ProxyServer, err = socks5.NewClassicServer(addr, "",
-		RuntimeConfig.ShadowsocksPort, RuntimeConfig.ShadowsocksPassword,
+		RuntimeConfig.ShadowsocksPort, RuntimeConfig.Password,
 		RuntimeConfig.AutoProxyTimeout, RuntimeConfig.AutoProxyTimeout)
 	return
 }

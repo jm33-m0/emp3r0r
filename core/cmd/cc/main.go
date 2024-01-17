@@ -125,7 +125,7 @@ func main() {
 			"(C2 port, or Shadowsocks port %s if you are using it)",
 			*ssh_relay_port, cc.RuntimeConfig.CCPort, cc.RuntimeConfig.ShadowsocksPort)
 		err = tun.SSHRemoteFwdServer(*ssh_relay_port,
-			cc.RuntimeConfig.ShadowsocksPassword,
+			cc.RuntimeConfig.Password,
 			cc.RuntimeConfig.SSHHostKey)
 		if err != nil {
 			cc.CliFatalError("SSHRemoteFwdServer: %v", err)
@@ -149,8 +149,8 @@ func main() {
 		ssh_connect:
 			ctx, cancel := context.WithCancel(context.Background())
 			err = tun.SSHRemoteFwdClient(*connect_relay_addr,
-				cc.RuntimeConfig.ShadowsocksPassword,
-				pubkey,
+				cc.RuntimeConfig.Password,
+				pubkey, // enable host key verification
 				*relayed_port,
 				&SSHConnections, ctx, cancel)
 			if err == nil {

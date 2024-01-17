@@ -34,7 +34,7 @@ func ShadowsocksC2Client() {
 		ServerAddr:     server_addr,
 		LocalSocksAddr: local_socks_addr,
 		Cipher:         ss.AEADCipher,
-		Password:       RuntimeConfig.ShadowsocksPassword,
+		Password:       RuntimeConfig.Password,
 		IsServer:       false,
 		Verbose:        false,
 		Ctx:            SS_Ctx,

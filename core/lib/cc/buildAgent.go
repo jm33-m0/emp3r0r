@@ -427,7 +427,7 @@ func InitConfigFile(cc_host string) (err error) {
 	RuntimeConfig.SocketName = fmt.Sprintf("%s/%v", RuntimeConfig.AgentRoot, socket)
 	pid_file := util.RandStr(util.RandInt(3, 20))
 	RuntimeConfig.PIDFile = fmt.Sprintf("%s/%v", RuntimeConfig.AgentRoot, pid_file)
-	RuntimeConfig.ShadowsocksPassword = util.RandStr(20)
+	RuntimeConfig.Password = util.RandStr(20)
 
 	// time intervals
 	RuntimeConfig.BroadcastIntervalMin = 30

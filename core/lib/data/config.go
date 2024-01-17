@@ -41,7 +41,7 @@ type Config struct {
 	AutoProxyPort        string `json:"autoproxy_port"`         // Socks proxy port for auto proxy feature
 	AutoProxyTimeout     int    `json:"autoproxy_timeout"`      // timeout (in seconds) for agent side Socks5 server
 	HTTPListenerPort     string `json:"http_listner_port"`      // For stager HTTP server
-	ShadowsocksPassword  string `json:"shadowsocks_password"`   // password of shadowsocks proxy server
+	Password             string `json:"password"`               // password of shadowsocks, socks5 and SSH server
 	ShadowsocksPort      string `json:"shadowsocks_port"`       // server port of shadowsocks proxy server
 	KCPPort              string `json:"kcp_port"`               // server port of kcp server
 	UseShadowsocks       bool   `json:"use_shadowsocks"`        // enable shadowsocks proxy server for C2 transport
