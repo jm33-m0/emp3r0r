@@ -50,7 +50,10 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 	// monitor socks5://127.0.0.1:RuntimeConfig.ProxyPort until it works
 	go func() {
 		// does the proxy work?
-		rproxy := fmt.Sprintf("socks5://127.0.0.1:%s", RuntimeConfig.AutoProxyPort)
+		rproxy := fmt.Sprintf("socks5://%s:%s@127.0.0.1:%s",
+			RuntimeConfig.ShadowsocksPort,
+			RuntimeConfig.Password,
+			RuntimeConfig.AutoProxyPort)
 		for !tun.IsProxyOK(rproxy) {
 			time.Sleep(time.Second)
 		}

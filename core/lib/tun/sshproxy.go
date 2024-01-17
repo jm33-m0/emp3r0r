@@ -73,8 +73,8 @@ func SSHReverseProxyClient(ssh_serverAddr, password string,
 
 	// start SOCKS5 proxy
 	go func() {
-		err = StartSocks5Proxy(fmt.Sprintf("%d", proxyPort),
-			password, socks5proxy)
+		err = StartSocks5Proxy(fmt.Sprintf("0.0.0.0:%d", proxyPort),
+			"", socks5proxy)
 		if err != nil {
 			LogWarn("Failed to start SOCKS5 proxy server for SSH reverse proxy: %v", err)
 		}
