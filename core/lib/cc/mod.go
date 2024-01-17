@@ -124,9 +124,9 @@ func UpdateOptions(modName string) (exist bool) {
 		argsOpt.Val = ""
 		portOpt := addIfNotFound("port")
 		portOpt.Vals = []string{
-			RuntimeConfig.SSHDPort, "22222",
+			RuntimeConfig.SSHDShellPort, "22222",
 		}
-		portOpt.Val = RuntimeConfig.SSHDPort
+		portOpt.Val = RuntimeConfig.SSHDShellPort
 
 	case modName == emp3r0r_data.ModPORT_FWD:
 		// rport

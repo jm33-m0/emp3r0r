@@ -40,7 +40,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 		}
 	}
 	// we will open a elvsh shell automatically, which can be used for SFTP
-	is_new_port_needed := (port == RuntimeConfig.SSHDPort && shell != "elvsh")
+	is_new_port_needed := (port == RuntimeConfig.SSHDShellPort && shell != "elvsh")
 
 	if !util.IsCommandExist("ssh") {
 		err = fmt.Errorf("ssh must be installed")

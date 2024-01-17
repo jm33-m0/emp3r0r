@@ -405,7 +405,7 @@ func InitConfigFile(cc_host string) (err error) {
 	RuntimeConfig.CCPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.AutoProxyPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.BroadcastPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
-	RuntimeConfig.SSHDPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
+	RuntimeConfig.SSHDShellPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.ShadowsocksPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.KCPPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.HTTPListenerPort = fmt.Sprintf("%v", util.RandInt(1026, 65534))

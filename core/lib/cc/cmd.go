@@ -224,7 +224,7 @@ func setCurrentTarget(cmd string) {
 		// open a shell
 		CliPrintInfo("Please `use interactive_shell` to open an shell")
 		CliPrintInfo("Opening SFTP pane")
-		err = SSHClient("sftp", "", RuntimeConfig.SSHDPort, true)
+		err = SSHClient("sftp", "", RuntimeConfig.SSHDShellPort, true)
 		if err != nil {
 			CliPrintError("SFTPClient: %v", err)
 		}
