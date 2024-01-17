@@ -21,17 +21,17 @@ func StartSocks5Proxy(addr, doh string, proxyserver *socks5.Server) (err error) 
 			doh,
 			dns.DoHCache())
 		if err != nil {
-			return
+			return fmt.Errorf("Socks5Proxy DoHResolver: %v", err)
 		}
 	}
 
 	socks5.Debug = true
-	log.Printf("Socks5Proxy started on %s", addr)
+	LogInfo("Socks5Proxy started on %s", addr)
 	err = proxyserver.ListenAndServe(nil)
 	if err != nil {
 		return fmt.Errorf("Socks5Proxy listen: %v", err)
 	}
-	log.Printf("Socks5Proxy stopped (%s)", addr)
+	LogInfo("Socks5Proxy stopped (%s)", addr)
 
 	return
 }
