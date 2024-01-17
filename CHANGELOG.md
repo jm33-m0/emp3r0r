@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.34.5](https://github.com/jm33-m0/emp3r0r/compare/v1.34.4...v1.34.5) (2024-01-17)
+
+
+### Bug Fixes
+
+* `bring2cc` fails to connect configure SOCKS5 proxy ([d11c8f0](https://github.com/jm33-m0/emp3r0r/commit/d11c8f08c802d9a9662e603f6a6611e751c0d0a1))
+* `bring2cc` should start SOCKS5 server automatically ([48b7311](https://github.com/jm33-m0/emp3r0r/commit/48b7311dc3096e2cd9e3f9047cd64b3a03e1b48b))
+* auto proxy broken ([7b04571](https://github.com/jm33-m0/emp3r0r/commit/7b045715213229b2afb10d9ee71416bbefd29b31))
+
 ## [1.34.4](https://github.com/jm33-m0/emp3r0r/compare/v1.34.3...v1.34.4) (2024-01-16)
 
 
