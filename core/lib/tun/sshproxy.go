@@ -10,6 +10,7 @@ import (
 	"time"
 
 	gliderssh "github.com/gliderlabs/ssh"
+	"github.com/txthinking/socks5"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -21,9 +22,9 @@ func SSHRemoteFwdServer(port, password string, hostkey []byte) (err error) {
 	LogInfo("Starting ssh remote forwarding server on port %s...", port)
 	forwardHandler := &gliderssh.ForwardedTCPHandler{}
 	server := gliderssh.Server{
-		PasswordHandler: func(ctx gliderssh.Context, pass string) bool {
-			LogInfo("ssh client try to authenticate with password %s", pass)
-			success := pass == password
+		PasswordHandler: func(ctx gliderssh.Context, input_pass string) bool {
+			LogInfo("ssh client try to authenticate with password %s vs %s", input_pass, password)
+			success := input_pass == password
 			if success {
 				LogInfo("ssh client authenticated")
 			}
@@ -60,6 +61,7 @@ func SSHRemoteFwdServer(port, password string, hostkey []byte) (err error) {
 // serverAddr format: 127.0.0.1:22
 func SSHReverseProxyClient(ssh_serverAddr, password string,
 	reverseConns *map[string]context.CancelFunc,
+	socks5proxy *socks5.Server,
 	ctx context.Context, cancel context.CancelFunc) (err error) {
 	// calculate ProxyPort
 	serverPort, err := strconv.Atoi(strings.Split(ssh_serverAddr, ":")[1])
@@ -68,6 +70,16 @@ func SSHReverseProxyClient(ssh_serverAddr, password string,
 		return fmt.Errorf("serverPort invalid: %v", err)
 	}
 	proxyPort := serverPort - 1 // reverseProxyPort = proxyPort + 1
+
+	// start SOCKS5 proxy
+	go func() {
+		err = StartSocks5Proxy(fmt.Sprintf("%d", proxyPort),
+			password, socks5proxy)
+		if err != nil {
+			LogWarn("Failed to start SOCKS5 proxy server for SSH reverse proxy: %v", err)
+		}
+	}()
+
 	return SSHRemoteFwdClient(ssh_serverAddr, password, nil,
 		proxyPort, reverseConns, ctx, cancel)
 }

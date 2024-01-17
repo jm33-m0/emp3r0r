@@ -153,7 +153,7 @@ func BroadcastMsg(msg, dst string) (err error) {
 }
 
 func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.CancelFunc) {
-	// broadcast interval
+	// disable broadcasting when interval is 0
 	if RuntimeConfig.BroadcastIntervalMax == 0 {
 		log.Println("Broadcasting is turned off, aborting")
 		return

