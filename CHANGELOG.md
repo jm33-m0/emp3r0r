@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.34.7](https://github.com/jm33-m0/emp3r0r/compare/v1.34.6...v1.34.7) (2024-01-18)
+
+
+### Bug Fixes
+
+* connectivity check should connect to C2 using uTLS ([8b746c5](https://github.com/jm33-m0/emp3r0r/commit/8b746c5bf38e6300362e8b42f750c1f1e83e0fb9))
+
 ## [1.34.6](https://github.com/jm33-m0/emp3r0r/compare/v1.34.5...v1.34.6) (2024-01-17)
 
 
