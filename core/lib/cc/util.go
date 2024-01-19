@@ -268,10 +268,7 @@ func GetDateTime() (datetime string) {
 // IsCCRunning check if CC is already running
 func IsCCRunning() bool {
 	// it is running if we can connect to it
-	if tun.IsPortOpen("127.0.0.1", RuntimeConfig.CCPort) {
-		return true
-	}
-	return false
+	return tun.IsPortOpen("127.0.0.1", RuntimeConfig.CCPort)
 }
 
 // UnlockDownloads if there are incomplete file downloads that are "locked", unlock them
@@ -285,6 +282,7 @@ func UnlockDownloads() error {
 	for _, f := range files {
 		if strings.HasSuffix(f.Name(), ".lock") {
 			err = os.Remove(FileGetDir + f.Name())
+			CliPrintDebug("Unlocking download: %s", f.Name())
 			if err != nil {
 				return fmt.Errorf("Remove %s: %v", f.Name(), err)
 			}

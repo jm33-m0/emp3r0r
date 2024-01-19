@@ -464,8 +464,8 @@ func Send2Agent(data *emp3r0r_data.MsgTunData, agent *emp3r0r_data.AgentSystemIn
 	return
 }
 
-// DirSetup set workspace, module directories, etc
-func DirSetup() (err error) {
+// InitConfig set workspace, module directories, etc
+func InitConfig() (err error) {
 	// prefix
 	Prefix = os.Getenv("EMP3R0R_PREFIX")
 	if Prefix == "" {

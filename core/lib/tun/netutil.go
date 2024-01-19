@@ -17,7 +17,7 @@ const (
 
 // IsPortOpen is this TCP port open?
 func IsPortOpen(host string, port string) bool {
-	timeout := time.Second
+	timeout := 3 * time.Second
 	conn, err := net.DialTimeout("tcp", net.JoinHostPort(host, port), timeout)
 	if err != nil {
 		return false

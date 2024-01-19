@@ -52,19 +52,12 @@ func init_magic_str() {
 }
 
 func main() {
-	// abort if CC is already running
-	if cc.IsCCRunning() {
-		cc.CliFatalError("CC is already running")
-	}
-
-	// set up dirs
-	err := cc.DirSetup()
+	// set up dirs and default varaibles
+	// including config file location
+	err := cc.InitConfig()
 	if err != nil {
 		cc.CliFatalError("DirSetup: %v", err)
 	}
-
-	// set up magic string
-	init_magic_str()
 
 	cdnproxy := flag.String("cdn2proxy", "", "Start cdn2proxy server on this port")
 	config := flag.String("config", cc.EmpConfigFile, "Use this config file to update hardcoded variables")
@@ -75,6 +68,16 @@ func main() {
 	relayed_port := flag.Int("relayed_port", 0, "Relayed port, use with -connect_relay")
 	flag.Parse()
 
+	// read config file
+	err = readJSONConfig(*config)
+	if err != nil {
+		cc.CliFatalError("Failed to read config from '%s': %v", *config, err)
+	}
+
+	// set up magic string
+	init_magic_str()
+
+	// generate C2 TLS cert for given host names
 	if *names != "" {
 		hosts := strings.Fields(*names)
 		err := cc.GenC2Certs(hosts)
@@ -88,11 +91,14 @@ func main() {
 		os.Exit(0)
 	}
 
-	// read config file
-	err = readJSONConfig(*config)
-	if err != nil {
-		cc.CliFatalError("Read %s: %v", *config, err)
-	} else if *ssh_relay_port != "" {
+	// abort if CC is already running
+	if cc.IsCCRunning() {
+		cc.CliFatalError("CC is already running")
+	}
+
+	// run as relay server
+	// no need to start CC services
+	if *ssh_relay_port != "" {
 		cc.CliMsg("Copy ~/.emp3r0r to client host, "+
 			"then run `emp3r0r -connect_relay relay_ip:%s -relayed_port %s` "+
 			"(C2 port, or Shadowsocks port %s if you are using it)",
@@ -104,15 +110,13 @@ func main() {
 			cc.CliFatalError("SSHRemoteFwdServer: %v", err)
 		}
 	} else {
-		// unlock downloads
-		err = cc.UnlockDownloads()
-		if err != nil {
-			cc.CliPrintWarning("UnlockDownloads: %v", err)
-		}
+		// run as CC
 		go cc.TLSServer()
 		go cc.ShadowsocksServer()
 		go cc.InitModules()
 	}
+
+	// run as relay client
 	if *connect_relay_addr != "" {
 		if *relayed_port == 0 {
 			cc.CliFatalError("Please specify -relayed_port")
@@ -140,6 +144,7 @@ func main() {
 		}()
 	}
 
+	// start cdn2proxy server
 	if *cdnproxy != "" {
 		go func() {
 			logFile, err := os.OpenFile("/tmp/ws.log", os.O_CREATE|os.O_RDWR, 0600)
@@ -153,14 +158,23 @@ func main() {
 		}()
 	}
 
+	// print banner
 	err = cc.CliBanner()
 	if err != nil {
 		cc.CliFatalError("Banner: %v", err)
+	}
+
+	// unlock incomplete downloads
+	err = cc.UnlockDownloads()
+	if err != nil {
+		cc.CliPrintWarning("UnlockDownloads: %v", err)
 	}
 
 	// use emp3r0r in terminal or from other frontend
 	if *apiserver {
 		go cc.APIMain()
 	}
+
+	// run CLI
 	cc.CliMain()
 }
