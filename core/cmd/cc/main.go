@@ -27,31 +27,6 @@ func readJSONConfig(filename string) (err error) {
 	return emp3r0r_data.ReadJSONConfig(jsonData, cc.RuntimeConfig)
 }
 
-// unlock_downloads if there are incomplete file downloads that are "locked", unlock them
-// unless CC is actually running/downloading
-func unlock_downloads() bool {
-	// is cc currently running?
-	if tun.IsPortOpen("127.0.0.1", cc.RuntimeConfig.CCPort) {
-		return false
-	}
-
-	// unlock downloads
-	files, err := os.ReadDir(cc.FileGetDir)
-	if err != nil {
-		return true
-	}
-	for _, f := range files {
-		if strings.HasSuffix(f.Name(), ".lock") {
-			err = os.Remove(cc.FileGetDir + f.Name())
-			if err != nil {
-				cc.CliFatalError("Remove %s: %v", f.Name(), err)
-			}
-		}
-	}
-
-	return true
-}
-
 // re-generate a random magic string for this CC session
 func init_magic_str() {
 	default_magic_str := emp3r0r_data.OneTimeMagicBytes
@@ -77,15 +52,13 @@ func init_magic_str() {
 }
 
 func main() {
-	var err error
-
-	// cleanup or abort
-	if !unlock_downloads() {
+	// abort if CC is already running
+	if cc.IsCCRunning() {
 		cc.CliFatalError("CC is already running")
 	}
 
 	// set up dirs
-	err = cc.DirSetup()
+	err := cc.DirSetup()
 	if err != nil {
 		cc.CliFatalError("DirSetup: %v", err)
 	}
@@ -131,6 +104,11 @@ func main() {
 			cc.CliFatalError("SSHRemoteFwdServer: %v", err)
 		}
 	} else {
+		// unlock downloads
+		err = cc.UnlockDownloads()
+		if err != nil {
+			cc.CliPrintWarning("UnlockDownloads: %v", err)
+		}
 		go cc.TLSServer()
 		go cc.ShadowsocksServer()
 		go cc.InitModules()

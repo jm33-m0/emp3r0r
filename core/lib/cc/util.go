@@ -13,6 +13,7 @@ import (
 	"github.com/cavaliergopher/grab/v3"
 	"github.com/google/uuid"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -262,4 +263,33 @@ func GetDateTime() (datetime string) {
 	datetime = now.String()
 
 	return
+}
+
+// IsCCRunning check if CC is already running
+func IsCCRunning() bool {
+	// it is running if we can connect to it
+	if tun.IsPortOpen("127.0.0.1", RuntimeConfig.CCPort) {
+		return true
+	}
+	return false
+}
+
+// UnlockDownloads if there are incomplete file downloads that are "locked", unlock them
+// unless CC is actually running/downloading
+func UnlockDownloads() error {
+	// unlock downloads
+	files, err := os.ReadDir(FileGetDir)
+	if err != nil {
+		return err
+	}
+	for _, f := range files {
+		if strings.HasSuffix(f.Name(), ".lock") {
+			err = os.Remove(FileGetDir + f.Name())
+			if err != nil {
+				return fmt.Errorf("Remove %s: %v", f.Name(), err)
+			}
+		}
+	}
+
+	return nil
 }
