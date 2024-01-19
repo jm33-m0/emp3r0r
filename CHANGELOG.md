@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.34.8](https://github.com/jm33-m0/emp3r0r/compare/v1.34.7...v1.34.8) (2024-01-19)
+
+
+### Bug Fixes
+
+* CC unable to detect existing instance ([15e2940](https://github.com/jm33-m0/emp3r0r/commit/15e2940c1fd379eb2666bd82c2b69f44f2d78519))
+* incomplete downloads cannot be resumed ([bbd57f9](https://github.com/jm33-m0/emp3r0r/commit/bbd57f98e93fe44d37e339b0708e21742c8fa66d))
+
 ## [1.34.7](https://github.com/jm33-m0/emp3r0r/compare/v1.34.6...v1.34.7) (2024-01-18)
 
 
