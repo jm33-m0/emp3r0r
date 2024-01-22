@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.34.10](https://github.com/jm33-m0/emp3r0r/compare/v1.34.9...v1.34.10) (2024-01-22)
+
+
+### Bug Fixes
+
+* tmux keeps switching back to home window ([ad9d887](https://github.com/jm33-m0/emp3r0r/commit/ad9d887989890037f0b818d2c1a03b40af376c92))
+
 ## [1.34.9](https://github.com/jm33-m0/emp3r0r/compare/v1.34.8...v1.34.9) (2024-01-22)
 
 
