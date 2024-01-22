@@ -241,8 +241,8 @@ func GetTargetDetails(target *emp3r0r_data.AgentSystemInfo) {
 		userInfo = color.HiGreenString(target.User)
 	}
 	userInfo = util.SplitLongLine(userInfo, 20)
-	cpuinfo := color.HiMagentaString(target.CPU)
-	gpuinfo := color.HiMagentaString(target.GPU)
+	cpuinfo := target.CPU
+	gpuinfo := target.GPU
 	gpuinfo = util.SplitLongLine(gpuinfo, 20)
 
 	// agent process info
@@ -259,22 +259,22 @@ func GetTargetDetails(target *emp3r0r_data.AgentSystemInfo) {
 
 	// info map
 	infoMap := map[string]string{
-		"Version":   color.HiWhiteString(target.Version),
-		"Hostname":  util.SplitLongLine(color.HiCyanString(target.Hostname), 20),
-		"Process":   util.SplitLongLine(color.HiMagentaString(procInfo), 20),
+		"Version":   fmt.Sprintf(target.Version),
+		"Hostname":  util.SplitLongLine(fmt.Sprintf(target.Hostname), 20),
+		"Process":   util.SplitLongLine(fmt.Sprintf(procInfo), 20),
 		"User":      userInfo,
 		"Internet":  hasInternet,
 		"CPU":       cpuinfo,
 		"GPU":       gpuinfo,
 		"MEM":       target.Mem,
-		"Hardware":  util.SplitLongLine(color.HiCyanString(target.Hardware), 20),
-		"Serial":    util.SplitLongLine(color.HiCyanString(serial_no), 20),
+		"Hardware":  util.SplitLongLine(fmt.Sprintf(target.Hardware), 20),
+		"Serial":    util.SplitLongLine(fmt.Sprintf(serial_no), 20),
 		"Container": target.Container,
-		"OS":        util.SplitLongLine(color.HiWhiteString(target.OS), 20),
-		"Kernel":    util.SplitLongLine(color.HiBlueString(target.Kernel)+", "+color.HiWhiteString(target.Arch), 20),
-		"From":      util.SplitLongLine(color.HiYellowString(target.From)+fmt.Sprintf(" - %s", color.HiGreenString(target.Transport)), 20),
-		"IPs":       color.BlueString(ips),
-		"ARP":       color.HiWhiteString(arpTab),
+		"OS":        util.SplitLongLine(fmt.Sprintf(target.OS), 20),
+		"Kernel":    util.SplitLongLine(fmt.Sprintf(target.Kernel)+", "+fmt.Sprintf(target.Arch), 20),
+		"From":      util.SplitLongLine(fmt.Sprintf(target.From)+fmt.Sprintf(" - %s", fmt.Sprintf(target.Transport)), 20),
+		"IPs":       fmt.Sprintf(ips),
+		"ARP":       fmt.Sprintf(arpTab),
 	}
 
 	// print
@@ -303,7 +303,7 @@ func GetTargetDetails(target *emp3r0r_data.AgentSystemInfo) {
 	}
 	AgentInfoPane.ResizePane("y", num_of_lines)
 	AgentInfoPane.ResizePane("x", num_of_columns)
-	AgentInfoPane.Printf(true, "\n\033[0m%s\n\n", tableString.String())
+	AgentInfoPane.Printf(true, "\n%s\n\n", tableString.String())
 
 	// Update Agent list
 	ListTargets()
