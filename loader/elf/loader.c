@@ -37,8 +37,6 @@ int sigaction(int signum, const struct sigaction *act,
   return orig_sigaction(signum, act, oldact);
 }
 
-void signal_handler(int signo) {}
-
 int is_file_exist(const char *path) {
   if (access(path, F_OK) != -1) {
     return 1;
