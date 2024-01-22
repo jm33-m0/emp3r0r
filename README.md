@@ -51,6 +51,7 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
   - Defeat [**JA3**](https://github.com/salesforce/ja3) fingerprinting with [**UTLS**](https://github.com/refraction-networking/utls)
   - Painlessly encapsulated in **Shadowsocks** and KCP
   - Able to encapsulate in any external proxies such as [**TOR** and **CDN**s](https://github.com/jm33-m0/emp3r0r/raw/master/img/c2transports.png)
+  - [**C2 relaying**](https://github.com/jm33-m0/emp3r0r/wiki/C2-Relay) via SSH
 - Multi-Tasking
   - Don't have to wait for any commands to finish
 - Module Support
@@ -66,10 +67,10 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
   - [**OpenSSH password harvester**](https://github.com/jm33-m0/emp3r0r/blob/master/core/lib/agent/ssh_harvester_amd64_linux.go)
 - [Process Injection](https://jm33.me/emp3r0r-injection.html)
 - [Shellcode Injection](https://jm33.me/process-injection-on-linux.html)
-- ELF Patcher (WIP)
+- ELF Patcher for persistence
 - [Packer](https://github.com/jm33-m0/emp3r0r/tree/master/packer)
   - Encrypts and compresses agent binary and runs agent in a covert way
-- Hide processes and files (WIP)
+- Hide processes and files and get persistence via shared library injection
 - Networking
   - Port Mapping
     - From C2 side to agent side, and vice versa
@@ -79,7 +80,7 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
 - LPE Suggest
 - System Info Collect
 - File Management
-  - Enables resumable downloads/uploads
+  - Enables **resumable downloads/uploads
   - SFTP support: browse remote files with any SFTP client, [including your local **GUI file manager**](https://github.com/jm33-m0/emp3r0r/releases/tag/v1.22.3)
 - Log Cleaner
 - Screenshot
@@ -88,6 +89,6 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
 - Automatically bridge agents from internal networks to C2
   - For semi-isolated networks
 - Proxy via agent to agent SSH connection
-  - To bring any targets you can reach to C2
+  - To [bring any targets you can reach to C2](https://github.com/jm33-m0/emp3r0r/wiki/Getting-started#bring-agents-to-c2)
 - [Interoperability with Metasploit/Cobalt Strike](https://github.com/jm33-m0/emp3r0r/wiki/Interoperability-with-metasploit-and-other-C2-frameworks)
 - and many more :)
