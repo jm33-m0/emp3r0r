@@ -247,11 +247,6 @@ func (pane *Emp3r0rPane) Printf(clear bool, format string, a ...interface{}) {
 		}
 	}
 
-	if !TmuxSwitchWindow(pane.WindowID) {
-		CliPrintWarning("pane '%s' printf: unable to switch to tmux window '%s'",
-			pane.Title, pane.WindowID)
-	}
-	defer TmuxSwitchWindow(HomeWindow)
 	TmuxUpdatePane(pane)
 	id := pane.ID
 	if !pane.Alive {
