@@ -535,8 +535,11 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 				break
 			}
 		}
-		shortname := strings.Split(target.Tag, "-agent")[0]
+		// update system info of current agent
+		GetTargetDetails(CurrentTarget)
+
 		// set labels
+		shortname := strings.Split(target.Tag, "-agent")[0]
 		if util.IsExist(AgentsJSON) {
 			if l := SetAgentLabel(&target); l != "" {
 				shortname = l

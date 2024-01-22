@@ -206,6 +206,12 @@ func ls_targets() {
 }
 
 func GetTargetDetails(target *emp3r0r_data.AgentSystemInfo) {
+	// nil?
+	if target == nil {
+		CliPrintDebug("Target is nil")
+		return
+	}
+
 	TargetsMutex.RLock()
 	defer TargetsMutex.RUnlock()
 	// exists?
