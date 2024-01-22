@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.34.9](https://github.com/jm33-m0/emp3r0r/compare/v1.34.8...v1.34.9) (2024-01-22)
+
+
+### Bug Fixes
+
+* [#244](https://github.com/jm33-m0/emp3r0r/issues/244) ([50a0221](https://github.com/jm33-m0/emp3r0r/commit/50a0221c614c831f426086a5a15f914fcb70cee6))
+* agent system info pane not being updated ([5e9a8ab](https://github.com/jm33-m0/emp3r0r/commit/5e9a8abb2755076e2fdf80a62517ad2d933ab91a))
+* remove unnecessary colors in "system info" ([ca14ba1](https://github.com/jm33-m0/emp3r0r/commit/ca14ba1c11a572de354ca1a74ea7247a6e0db10f))
+* word wrapping issues ([9ab1786](https://github.com/jm33-m0/emp3r0r/commit/9ab178673b50af9595ab897b456d030919ae4726))
+
 ## [1.34.8](https://github.com/jm33-m0/emp3r0r/compare/v1.34.7...v1.34.8) (2024-01-19)
 
 
