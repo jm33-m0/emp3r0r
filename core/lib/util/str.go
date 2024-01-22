@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/muesli/reflow/wordwrap"
 )
 
 // ParseCmd parse commands containing whitespace
@@ -70,23 +71,7 @@ func ReverseString(s string) string {
 
 // Split long lines
 func SplitLongLine(line string, linelen int) (ret string) {
-	if len(line) < linelen {
-		return line
-	}
-	ret = line[:linelen]
-
-	temp := ""
-	for n, c := range line[linelen:] {
-		if n >= linelen && n%linelen == 0 {
-			ret = fmt.Sprintf("%s\n%s", ret, temp)
-			temp = ""
-		}
-		temp += string(c)
-	}
-	ret = fmt.Sprintf("%s\n%s", ret, temp)
-	temp = ""
-
-	return
+	return wordwrap.String(line, linelen)
 }
 
 // RandInt random int between given interval

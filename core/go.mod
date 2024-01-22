@@ -22,6 +22,7 @@ require (
 	github.com/mholt/archiver/v3 v3.5.1
 	github.com/mholt/archiver/v4 v4.0.0-alpha.8
 	github.com/mitchellh/go-ps v1.0.0
+	github.com/muesli/reflow v0.3.0
 	github.com/ncruces/go-dns v1.2.5
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/otiai10/copy v1.14.0
