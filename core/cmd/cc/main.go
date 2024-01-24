@@ -68,15 +68,6 @@ func main() {
 	relayed_port := flag.Int("relayed_port", 0, "Relayed port, use with -connect_relay")
 	flag.Parse()
 
-	// read config file
-	err = readJSONConfig(*config)
-	if err != nil {
-		cc.CliFatalError("Failed to read config from '%s': %v", *config, err)
-	}
-
-	// set up magic string
-	init_magic_str()
-
 	// generate C2 TLS cert for given host names
 	if *names != "" {
 		hosts := strings.Fields(*names)
@@ -90,6 +81,15 @@ func main() {
 		}
 		os.Exit(0)
 	}
+
+	// read config file
+	err = readJSONConfig(*config)
+	if err != nil {
+		cc.CliFatalError("Failed to read config from '%s': %v", *config, err)
+	}
+
+	// set up magic string
+	init_magic_str()
 
 	// abort if CC is already running
 	if cc.IsCCRunning() {
