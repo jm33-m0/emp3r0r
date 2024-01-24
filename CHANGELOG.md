@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.35.0](https://github.com/jm33-m0/emp3r0r/compare/v1.34.10...v1.35.0) (2024-01-24)
+
+
+### Features
+
+* support DLL agent stub (`amd64` only) ([eda0e94](https://github.com/jm33-m0/emp3r0r/commit/eda0e94cc30f82bc80b6e4dbbcddffded8da4265))
+
+
+### Bug Fixes
+
+* `-gencert` refuses to work when `emp3r0r.json` not found ([f100936](https://github.com/jm33-m0/emp3r0r/commit/f100936ef288eadb6045c67bc5d1c165fa0f9c5b))
+* refactor: merge Linux/Windows agent code ([db70d70](https://github.com/jm33-m0/emp3r0r/commit/db70d702dad6e7033310b9c7cbecd57a5bc2aed7))
+
 ## [1.34.10](https://github.com/jm33-m0/emp3r0r/compare/v1.34.9...v1.34.10) (2024-01-22)
 
 
