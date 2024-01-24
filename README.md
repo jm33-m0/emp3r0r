@@ -80,7 +80,7 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
 - LPE Suggest
 - System Info Collect
 - File Management
-  - Enables **resumable downloads/uploads
+  - Enables **resumable downloads/uploads**
   - SFTP support: browse remote files with any SFTP client, [including your local **GUI file manager**](https://github.com/jm33-m0/emp3r0r/releases/tag/v1.22.3)
 - Log Cleaner
 - Screenshot
