@@ -26,7 +26,6 @@ var Arch_List = []string{
 	"riscv64",
 }
 
-// a wrapper for CmdFuncs
 func genAgentWrapper() {
 	CliPrint("Generated agent binary: %s."+
 		"You can `use stager` to generate a one liner for your target host", GenAgent())
@@ -39,9 +38,10 @@ func GenAgent() (agent_binary_path string) {
 	)
 	now := time.Now()
 	stubFile := fmt.Sprintf("%s-%s", emp3r0r_data.Stub_Linux, arch_choice)
-	os_choice := CliAsk("Generate agent for (1) Linux, (2) Windows: ", false)
+	os_choice := CliAsk("Generate agent for (1) Linux, (2) Windows (3) Windows DLL: ", false)
 	is_win := os_choice == "2"
 	is_linux := os_choice == "1"
+	is_dll := os_choice == "3"
 	if is_linux {
 		CliPrintInfo("You chose Linux")
 		for n, arch := range Arch_List {
@@ -69,7 +69,15 @@ func GenAgent() (agent_binary_path string) {
 			EmpWorkSpace, arch_choice,
 			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 	}
+	if is_dll {
+		CliPrintInfo("You chose Windows DLL")
+		stubFile = fmt.Sprintf("%s-%s", emp3r0r_data.Stub_Windows_DLL, arch_choice)
+		outfile = fmt.Sprintf("%s/agent_windows_%s_%d-%d-%d_%d-%d-%d.dll",
+			EmpWorkSpace, arch_choice,
+			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
+	}
 
+	// is this stub file available?
 	if !util.IsExist(stubFile) {
 		CliPrintError("%s not found, build it first", stubFile)
 		return

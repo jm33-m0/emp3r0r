@@ -507,6 +507,7 @@ func InitConfig() (err error) {
 	// binaries
 	emp3r0r_data.Stub_Linux = EmpWorkSpace + "/stub"
 	emp3r0r_data.Stub_Windows = EmpWorkSpace + "/stub-win"
+	emp3r0r_data.Stub_Windows_DLL = EmpWorkSpace + "/stub-win-dll"
 
 	// copy stub binaries to ~/.emp3r0r
 	for _, arch := range Arch_List {
