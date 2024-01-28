@@ -1,75 +1,136 @@
-//go:build windows
-// +build windows
-
 package util
 
 import (
-	"bufio"
 	"fmt"
 	"log"
 	"os"
-	"strconv"
-	"strings"
+	"syscall"
+	"unsafe"
 )
 
-// DumpSelfMem dump everything (readable) from self process
-// will dump libraries as well, if any
-// Linux only
-func crossPlatformDumpSelfMem() (memdata [][]byte, err error) {
-	maps_file := fmt.Sprintf("/proc/%d/maps", os.Getpid())
-	mem_file := fmt.Sprintf("/proc/%d/mem", os.Getpid())
+var (
+	kernel32 = syscall.NewLazyDLL("kernel32.dll")
+	psapi    = syscall.NewLazyDLL("Psapi.dll")
 
-	// open memory
-	mem, err := os.Open(mem_file)
-	defer mem.Close()
+	procOpenProcess        = kernel32.NewProc("OpenProcess")
+	procReadProcessMemory  = kernel32.NewProc("ReadProcessMemory")
+	procWriteProcessMemory = kernel32.NewProc("WriteProcessMemory")
+	procVirtualQuery       = kernel32.NewProc("VirtualQuery")
+	procEnumProcessModules = psapi.NewProc("EnumProcessModulesEx")
+)
+
+const PROCESS_ALL_ACCESS = 0x1F0FFF
+
+func OpenProcess(pid int) uintptr {
+	handle, _, _ := procOpenProcess.Call(uintptr(PROCESS_ALL_ACCESS), uintptr(1), uintptr(pid))
+	return handle
+}
+
+func read_mem(hProcess uintptr, address, size uintptr) []byte {
+	var data = make([]byte, size)
+	var length uint32
+
+	procReadProcessMemory.Call(hProcess, address,
+		uintptr(unsafe.Pointer(&data[0])),
+		size, uintptr(unsafe.Pointer(&length)))
+
+	return data
+}
+
+const (
+	MEM_COMMIT  = 0x1000
+	MEM_RESERVE = 0x2000
+	MEM_FREE    = 0x10000
+)
+
+type MEMORY_BASIC_INFORMATION struct {
+	BaseAddress       uintptr
+	AllocationBase    uintptr
+	AllocationProtect uint32
+	RegionSize        uintptr
+	State             uint32
+	Protect           uint32
+	Type              uint32
+}
+
+func read_self_mem(hProcess uintptr) (mem_data [][]byte, bytes_read int, err error) {
+	// Start with an initial address of 0
+	address := uintptr(0)
+
+	// Loop through the memory regions and print information
+	for {
+		var mbi MEMORY_BASIC_INFORMATION
+		ret, _, _ := procVirtualQuery.Call(address, uintptr(unsafe.Pointer(&mbi)), unsafe.Sizeof(mbi))
+
+		// Check for the end of the memory regions
+		if ret == 0 {
+			break
+		}
+
+		// Move to the next memory region
+		address += mbi.RegionSize
+
+		// Print information about the memory region
+		// fmt.Printf("BaseAddress: 0x%x, RegionSize: 0x%x, State: %d, Protect: %d, Type: %d\n",
+		// 	mbi.BaseAddress, mbi.RegionSize, mbi.State, mbi.Protect, mbi.Type)
+
+		// if memory is not committed or is read-only, skip it
+		if mbi.State == MEM_COMMIT && mbi.Protect&syscall.PAGE_READONLY != 0 {
+			continue
+		}
+
+		// read data from this region
+		data_read := read_mem(hProcess, mbi.BaseAddress, mbi.RegionSize)
+		bytes_read += len(data_read)
+		mem_data = append(mem_data, data_read)
+	}
+
+	return
+}
+
+func write_mem(hProcess uintptr, lpBaseAddress, lpBuffer, nSize uintptr) (int, bool) {
+	var nBytesWritten int
+	ret, _, _ := procWriteProcessMemory.Call(
+		uintptr(hProcess),
+		lpBaseAddress,
+		lpBuffer,
+		nSize,
+		uintptr(unsafe.Pointer(&nBytesWritten)),
+	)
+
+	return nBytesWritten, ret != 0
+}
+
+func getBaseAddress(handle uintptr) uintptr {
+	modules := [1024]uint64{}
+	var needed uintptr
+	procEnumProcessModules.Call(
+		handle,
+		uintptr(unsafe.Pointer(&modules)),
+		uintptr(1024),
+		uintptr(unsafe.Pointer(&needed)),
+		uintptr(0x03),
+	)
+	for i := uintptr(0); i < needed/unsafe.Sizeof(modules[0]); i++ {
+		if i == 0 {
+			return uintptr(modules[i])
+		}
+	}
+	return 0
+}
+
+func crossPlatformDumpSelfMem() (mem_data [][]byte, err error) {
+	// open current process
+	pid := os.Getpid()
+	processHandle := OpenProcess(pid)
+
+	// read memory regions
+	bytes_read := 0
+	mem_data, bytes_read, err = read_self_mem(processHandle)
 	if err != nil {
-		return nil, fmt.Errorf("open %s: %v", mem_file, err)
+		return nil, fmt.Errorf("crossPlatformDumpSelfMem read_self_mem: %v", err)
 	}
-
-	// parse maps
-	maps, err := os.Open(maps_file)
-	if err != nil {
-		return
-	}
-	scanner := bufio.NewScanner(maps)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		lineSplit := strings.Fields(line)
-		if len(lineSplit) == 1 {
-			log.Printf("%s: failed to parse", line)
-			continue
-		}
-		if !strings.HasPrefix(lineSplit[1], "r") {
-			// if not readable
-			log.Printf("%s: not readable", line)
-			continue
-		}
-
-		// parse map line
-		start_end := strings.Split(lineSplit[0], "-")
-		if len(start_end) == 1 {
-			log.Printf("%s: failed to parse", line)
-			continue
-		}
-		start, err := strconv.ParseInt(start_end[0], 16, 64)
-		if err != nil {
-			log.Printf("%s: failed to parse start", line)
-		}
-		end, err := strconv.ParseInt(start_end[1], 16, 64)
-		if err != nil {
-			log.Printf("%s: failed to parse end", line)
-		}
-
-		// seek from memory
-		read_size := end - start
-		read_buf := make([]byte, read_size)
-		n, _ := mem.ReadAt(read_buf, start)
-		if n <= 0 {
-			log.Printf("%s: nothing read", line)
-			continue
-		}
-		memdata = append(memdata, read_buf)
-	}
-
+	log.Printf("crossPlatformDumpSelfMem: READ %d bytes from %d memory regions",
+		bytes_read, len(mem_data))
 	return
 }
