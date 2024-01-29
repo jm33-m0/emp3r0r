@@ -114,7 +114,7 @@ func GenAgent() (agent_binary_path string) {
 		CliPrintError("Read stub: %v", err)
 		return
 	}
-	sep := bytes.Repeat(emp3r0r_data.OneTimeMagicBytes, 3)
+	sep := bytes.Repeat(emp3r0r_data.OneTimeMagicBytes, 2)
 
 	// payload
 	config_payload := append(sep, encryptedJSONBytes...)

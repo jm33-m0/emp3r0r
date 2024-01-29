@@ -14,7 +14,7 @@ import (
 
 var (
 	// OneTimeMagicBytes as separator/password
-	OneTimeMagicBytes = []byte("c44ccf2a-c651-4cec-9f32-1ff9621b5518")
+	OneTimeMagicBytes = []byte("6byKQ3Hcidum0NCdvJGK0w==")
 
 	// Transport what transport is this agent using? (HTTP2 / CDN / TOR)
 	Transport = "HTTP2"
