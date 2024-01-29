@@ -75,6 +75,12 @@ func DigEmbeddedData(data []byte) (embedded_data []byte, err error) {
 	log.Printf("Digging with magic string '%x' (%d bytes)", magic_str, len(magic_str))
 	sep := bytes.Repeat(magic_str, 3)
 
+	if !bytes.Contains(data, sep) {
+		err = fmt.Errorf("Cannot locate magic string '%x' in %d bytes of given data",
+			magic_str, len(data))
+		return
+	}
+
 	// locate embedded_data
 	split := bytes.Split(data, sep)
 	if len(split) < 2 {
