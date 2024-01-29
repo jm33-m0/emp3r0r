@@ -3,7 +3,6 @@
 
 package cc
 
-
 import (
 	"bytes"
 	"encoding/json"
@@ -135,6 +134,7 @@ func GenAgent() (agent_binary_path string) {
 	// done
 	CliPrintSuccess("Generated %s from %s and %s, you can run %s on arbitrary target",
 		outfile, stubFile, EmpConfigFile, outfile)
+	CliPrintDebug("Magic string is %x", sep)
 	agent_binary_path = outfile
 
 	// pack it with upx
