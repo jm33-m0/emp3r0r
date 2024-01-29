@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.35.1](https://github.com/jm33-m0/emp3r0r/compare/v1.35.0...v1.35.1) (2024-01-29)
+
+
+### Bug Fixes
+
+* igonore cmdline args when run as DLL ([4dd830e](https://github.com/jm33-m0/emp3r0r/commit/4dd830e64920c9de9e35bff3e93e34cacd9b12f3))
+
 ## [1.35.0](https://github.com/jm33-m0/emp3r0r/compare/v1.34.10...v1.35.0) (2024-01-24)
 
 
