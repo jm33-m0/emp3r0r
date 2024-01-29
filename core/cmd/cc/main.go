@@ -43,7 +43,7 @@ func init_magic_str() {
 		}
 		if strings.HasPrefix(f.Name(), "stub-") {
 			err = util.ReplaceBytesInFile(fmt.Sprintf("%s/%s", cc.EmpWorkSpace, f.Name()),
-				[]byte(default_magic_str), []byte(emp3r0r_data.OneTimeMagicBytes))
+				default_magic_str, emp3r0r_data.OneTimeMagicBytes)
 			if err != nil {
 				cc.CliPrintError("init_magic_str %v", err)
 			}
