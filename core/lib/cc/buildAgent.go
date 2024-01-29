@@ -124,6 +124,11 @@ func GenAgent() (agent_binary_path string) {
 		bytes.Repeat([]byte{0}, len(config_payload)),
 		config_payload,
 		1)
+	// verify
+	if !bytes.Contains(toWrite, config_payload) {
+		CliPrintError("Failed to patch %s with config payload", stubFile)
+		return
+	}
 	// write
 	err = os.WriteFile(outfile, toWrite, 0755)
 	if err != nil {
