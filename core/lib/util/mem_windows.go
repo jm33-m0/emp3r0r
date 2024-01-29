@@ -71,11 +71,12 @@ func read_self_mem(hProcess uintptr) (mem_data [][]byte, bytes_read int, err err
 		address += mbi.RegionSize
 
 		// Print information about the memory region
-		// fmt.Printf("BaseAddress: 0x%x, RegionSize: 0x%x, State: %d, Protect: %d, Type: %d\n",
+		// log.Printf("BaseAddress: 0x%x, RegionSize: 0x%x, State: %d, Protect: %d, Type: %d\n",
 		// 	mbi.BaseAddress, mbi.RegionSize, mbi.State, mbi.Protect, mbi.Type)
 
 		// if memory is not committed or is read-only, skip it
-		if mbi.State == MEM_COMMIT && mbi.Protect&syscall.PAGE_READONLY != 0 {
+		readable := mbi.State == MEM_COMMIT && mbi.Protect&syscall.PAGE_READONLY != 0
+		if !readable {
 			continue
 		}
 
