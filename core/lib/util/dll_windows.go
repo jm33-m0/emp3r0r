@@ -20,7 +20,7 @@ func ReadDLL(moduleInfo *windows.ModuleInfo, fileName string) (dll_data []byte, 
 	// Allocate a buffer to hold the DLL content
 	dllContent := make([]byte, moduleInfo.SizeOfImage)
 
-	// Read the content of the DLL from memory without specifying a process handle
+	// Read the content of the DLL from memory
 	var bytes_read uintptr
 	err = windows.ReadProcessMemory(windows.CurrentProcess(), moduleInfo.BaseOfDll, &dllContent[0],
 		uintptr(moduleInfo.SizeOfImage), &bytes_read)
@@ -28,8 +28,6 @@ func ReadDLL(moduleInfo *windows.ModuleInfo, fileName string) (dll_data []byte, 
 		err = fmt.Errorf("failed to get module info of %s: %v", fileName, err)
 		return
 	}
-
-	// Print or process the DLL content as needed
 	dll_data = dllContent
 	return
 }
