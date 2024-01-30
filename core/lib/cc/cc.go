@@ -3,7 +3,6 @@
 
 package cc
 
-
 import (
 	"context"
 	"encoding/json"
@@ -224,6 +223,10 @@ func GetTargetDetails(target *emp3r0r_data.AgentSystemInfo) {
 		return
 	}
 	control := Targets[target]
+	if control == nil {
+		CliPrintError("Target control interface does not exist")
+		return
+	}
 
 	// build table
 	tdata := [][]string{}
