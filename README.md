@@ -52,6 +52,7 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
   - Painlessly encapsulated in **Shadowsocks** and KCP
   - Able to encapsulate in any external proxies such as [**TOR** and **CDN**s](https://github.com/jm33-m0/emp3r0r/raw/master/img/c2transports.png)
   - [**C2 relaying**](https://github.com/jm33-m0/emp3r0r/wiki/C2-Relay) via SSH
+  - [**DLL agent**](https://github.com/jm33-m0/emp3r0r/wiki/DLL-Agent)
 - Multi-Tasking
   - Don't have to wait for any commands to finish
 - Module Support
