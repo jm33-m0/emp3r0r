@@ -1,9 +1,10 @@
+//go:build windows
+// +build windows
+
 package util
 
 import (
-	"fmt"
 	"log"
-	"os"
 	"syscall"
 	"unsafe"
 )
@@ -16,6 +17,8 @@ var (
 	procReadProcessMemory  = kernel32.NewProc("ReadProcessMemory")
 	procWriteProcessMemory = kernel32.NewProc("WriteProcessMemory")
 	procVirtualQuery       = kernel32.NewProc("VirtualQuery")
+	procGetModuleFileName  = kernel32.NewProc("GetModuleFileNameW")
+	procGetModuleHandle    = kernel32.NewProc("GetModuleHandleW")
 	procEnumProcessModules = psapi.NewProc("EnumProcessModulesEx")
 )
 
@@ -121,17 +124,17 @@ func getBaseAddress(handle uintptr) uintptr {
 }
 
 func crossPlatformDumpSelfMem() (mem_data [][]byte, err error) {
-	// open current process
-	pid := os.Getpid()
-	processHandle := OpenProcess(pid)
-
-	// read memory regions
-	bytes_read := 0
-	mem_data, bytes_read, err = read_self_mem(processHandle)
+	dlls, err := GetAllDLLs()
 	if err != nil {
-		return nil, fmt.Errorf("crossPlatformDumpSelfMem read_self_mem: %v", err)
+		return
 	}
-	log.Printf("crossPlatformDumpSelfMem: READ %d bytes from %d memory regions",
-		bytes_read, len(mem_data))
-	return
+	for fileName, dll := range dlls {
+		dll_data, err := ReadDLL(dll, fileName)
+		if err != nil {
+			log.Printf("reading DLL %s: %v", fileName, err)
+			continue
+		}
+		mem_data = append(mem_data, dll_data)
+	}
+	return mem_data, err
 }
