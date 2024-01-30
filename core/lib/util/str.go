@@ -14,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/muesli/reflow/wordwrap"
+	"github.com/muesli/reflow/wrap"
 )
 
 // ParseCmd parse commands containing whitespace
@@ -71,7 +72,19 @@ func ReverseString(s string) string {
 
 // Split long lines
 func SplitLongLine(line string, linelen int) (ret string) {
-	return wordwrap.String(line, linelen)
+	ret = wordwrap.String(line, linelen)
+
+	// if any of the wrapped lines are still too long
+	// use unconditional wrap
+	lines := strings.Split(ret, "\n")
+	for _, wline := range lines {
+		line_len := len(wline)
+		if line_len > linelen {
+			ret = wrap.String(line, linelen)
+			break
+		}
+	}
+	return
 }
 
 // RandInt random int between given interval
