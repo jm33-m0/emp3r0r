@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.35.3](https://github.com/jm33-m0/emp3r0r/compare/v1.35.2...v1.35.3) (2024-01-30)
+
+
+### Bug Fixes
+
+* long lines in `System Info` pane ([ef6f1d9](https://github.com/jm33-m0/emp3r0r/commit/ef6f1d925abc8f2127c32f17b2d1ad3f68f6b32a))
+* panic on HTTP2 server ([45d0ff7](https://github.com/jm33-m0/emp3r0r/commit/45d0ff786581c8078db789c0b8493620131878ee))
+
 ## [1.35.2](https://github.com/jm33-m0/emp3r0r/compare/v1.35.1...v1.35.2) (2024-01-30)
 
 
