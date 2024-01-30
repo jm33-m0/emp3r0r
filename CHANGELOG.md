@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.35.2](https://github.com/jm33-m0/emp3r0r/compare/v1.35.1...v1.35.2) (2024-01-30)
+
+
+### Bug Fixes
+
+* [#292](https://github.com/jm33-m0/emp3r0r/issues/292) DLL agent ([dddd442](https://github.com/jm33-m0/emp3r0r/commit/dddd4421f9f103d31b2f80acb7ff4faf1fe76014))
+
 ## [1.35.1](https://github.com/jm33-m0/emp3r0r/compare/v1.35.0...v1.35.1) (2024-01-29)
 
 
