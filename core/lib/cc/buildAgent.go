@@ -212,7 +212,7 @@ func read_cached_config(config_key string) (val interface{}) {
 		config_map map[string]interface{}
 	)
 	if util.IsExist(EmpConfigFile) {
-		CliPrintInfo("Reading config from existing %s", EmpConfigFile)
+		CliPrintInfo("Reading config '%s' from existing %s", config_key, EmpConfigFile)
 		jsonData, err = os.ReadFile(EmpConfigFile)
 		if err != nil {
 			CliPrintWarning("failed to read %s: %v", EmpConfigFile, err)

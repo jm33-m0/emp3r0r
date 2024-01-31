@@ -130,6 +130,20 @@ var ModuleComments = map[string]string{
 // Module help for options, does not include every module since not all modules need args
 // help module shows this
 var ModuleHelp = map[string]map[string]string{
+	ModGenAgent: {
+		"os":                "Target OS, available OS: linux, windows, dll",
+		"arch":              "Target architecture, available arch: amd64, 386, arm, arm64, etc",
+		"cc_host":           "CC host (IP/domain name)",
+		"cc_indicator":      "CC indicator, eg. https://github.com/xxx/xxx/releases/download/xxx/xx.txt",
+		"indicator_text":    "Indicator text, eg. emp3r0r",
+		"ncsi":              "Use NCSI (Network Connectivity Status Indicator) to check internet access",
+		"cdn_proxy":         "Use CDN as C2 transport, eg. wss://yourcdn.com/yourpath",
+		"shadowsocks":       "Use shadowsocks as C2 transport, if you want to use KCP, please select with_kcp",
+		"c2transport_proxy": "Use a proxy for C2 transport, eg. socks5://127.0.0.1:9050",
+		"auto_proxy":        "Use auto proxy server for bring2cc and so on (will enable UDP broadcast)",
+		"autoproxy_timeout": "Auto proxy timeout in seconds",
+		"doh_server":        "Use DNS over HTTPS (DoH) for DNS, eg. https://dns.google/dns-query",
+	},
 	ModPERSISTENCE: {
 		"method": fmt.Sprintf("Persistence method: profiles: %s; cron: %s; patcher: %s", PersistMethods["profiles"], PersistMethods["cron"], PersistMethods["patcher"]),
 	},
