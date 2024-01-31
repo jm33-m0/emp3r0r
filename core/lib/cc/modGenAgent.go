@@ -228,8 +228,10 @@ func MakeConfig() (err error) {
 	// CC indicator
 	RuntimeConfig.CCIndicator = Options["cc_indicator"].Val
 	RuntimeConfig.CCIndicatorText = Options["indicator_text"].Val
-	CliMsg("Remember to put text %s in your indicator response",
-		strconv.Quote(RuntimeConfig.CCIndicatorText))
+	if RuntimeConfig.CCIndicatorText != "" {
+		CliMsg("Remember to put text %s in your indicator (%s) response",
+			strconv.Quote(RuntimeConfig.CCIndicatorText), RuntimeConfig.CCIndicator)
+	}
 
 	if Options["ncsi"].Val == "on" {
 		RuntimeConfig.DisableNCSI = true
