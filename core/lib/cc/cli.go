@@ -3,7 +3,6 @@
 
 package cc
 
-
 import (
 	"encoding/base64"
 	"encoding/json"
@@ -210,7 +209,8 @@ func SetDynamicPrompt() {
 	if CurrentMod == "<blank>" {
 		CurrentMod = "none" // if no module is selected
 	}
-	dynamicPrompt := fmt.Sprintf("%s @%s (%s) "+color.HiCyanString("> "),
+	dynamicPrompt := fmt.Sprintf("%s @%s (%s)\n"+
+		color.New(color.Bold, color.FgHiCyan).Sprintf("> "),
 		color.New(color.Bold, color.FgHiCyan).Sprint(PromptName),
 		color.New(color.FgCyan, color.Underline).Sprint(shortName),
 		color.New(color.FgHiBlue).Sprint(CurrentMod),
@@ -448,6 +448,7 @@ func CliAsk(prompt string, allow_empty bool) (answer string) {
 		answer, err = EmpReadLine.Readline()
 		if err != nil {
 			if err == readline.ErrInterrupt || err == io.EOF {
+				CliPrintWarning("Interrupted")
 				break
 			}
 		}
