@@ -204,6 +204,36 @@ func UpgradeAgent() {
 	SendCmdToCurrentTarget(fmt.Sprintf("%s %s", emp3r0r_data.C2CmdUpdateAgent, checksum), "")
 }
 
+// read config by key from emp3r0r.json
+func read_cached_config(config_key string) (val interface{}) {
+	// read existing config when possible
+	var (
+		jsonData   []byte
+		config_map map[string]interface{}
+	)
+	if util.IsExist(EmpConfigFile) {
+		CliPrintInfo("Reading config from existing %s", EmpConfigFile)
+		jsonData, err = os.ReadFile(EmpConfigFile)
+		if err != nil {
+			CliPrintWarning("failed to read %s: %v", EmpConfigFile, err)
+			return ""
+		}
+		// load to map
+		err = json.Unmarshal(jsonData, &config_map)
+		if err != nil {
+			CliPrintWarning("Parsing existing %s: %v", EmpConfigFile, err)
+			return ""
+		}
+	}
+	exists := false
+	val, exists = config_map[config_key]
+	if !exists {
+		err = fmt.Errorf("%s not found in JSON config", config_key)
+		return ""
+	}
+	return val
+}
+
 // PromptForConfig prompt user for emp3r0r config, and write emp3r0r.json
 // isAgent: whether we are building a agent binary
 func PromptForConfig(isAgent bool) (err error) {
