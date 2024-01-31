@@ -680,32 +680,11 @@ Cg==
 // autocomplete module options
 func listValChoices() func(string) []string {
 	return func(line string) []string {
-		switch CurrentMod {
-		case emp3r0r_data.ModCMD_EXEC:
-			return Options["cmd_to_exec"].Vals
-		case emp3r0r_data.ModSHELL:
-			ret := append(Options["shell"].Vals, Options["port"].Vals...)
-			return ret
-		case emp3r0r_data.ModCLEAN_LOG:
-			return Options["keyword"].Vals
-		case emp3r0r_data.ModLPE_SUGGEST:
-			return Options["lpe_helper"].Vals
-		case emp3r0r_data.ModPERSISTENCE:
-			return Options["method"].Vals
-		case emp3r0r_data.ModPROXY:
-			return append(Options["status"].Vals, Options["port"].Vals...)
-		case emp3r0r_data.ModINJECTOR:
-			return append(Options["pid"].Vals, Options["method"].Vals...)
-		case emp3r0r_data.ModPORT_FWD:
-			ret := append(Options["listen_port"].Vals, Options["to"].Vals...)
-			ret = append(ret, Options["switch"].Vals...)
-			ret = append(ret, Options["protocol"].Vals...)
-			return ret
-		case emp3r0r_data.ModStager:
-			return append(Options["type"].Vals, Options["agent_path"].Vals...)
+		ret := make([]string, 0)
+		for _, opt := range Options {
+			ret = append(ret, opt.Vals...)
 		}
-
-		return nil
+		return ret
 	}
 }
 
