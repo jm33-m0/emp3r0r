@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.36.0](https://github.com/jm33-m0/emp3r0r/compare/v1.35.3...v1.36.0) (2024-01-31)
+
+
+### Features
+
+* module help for `gen_agent` ([ea3cfe7](https://github.com/jm33-m0/emp3r0r/commit/ea3cfe7c7c8eac444d63662f894b9ef9c016f05b))
+
+
+### Bug Fixes
+
+* `gen_agent` should abort when OS choice is invalid ([a8c2142](https://github.com/jm33-m0/emp3r0r/commit/a8c21423e9d4ef672ac163575f17b2d54fde550b))
+* auto-complete `gen_agent` module options ([71e7d79](https://github.com/jm33-m0/emp3r0r/commit/71e7d79fc5621db731d53a6f205143d0ea889792))
+* do not prompt for indicator text when it's disabled ([f6e8c62](https://github.com/jm33-m0/emp3r0r/commit/f6e8c62b7f35e9cb90906be9c53b70cdb6be7186))
+* reduce CPU load ([2f5ed34](https://github.com/jm33-m0/emp3r0r/commit/2f5ed34f72ca41d44d2e08a8747307a9ba631fa3))
+
 ## [1.35.3](https://github.com/jm33-m0/emp3r0r/compare/v1.35.2...v1.35.3) (2024-01-30)
 
 
