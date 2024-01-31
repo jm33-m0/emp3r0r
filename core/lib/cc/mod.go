@@ -3,13 +3,13 @@
 
 package cc
 
-
 import (
 	"os"
 	"strconv"
 	"strings"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/lithammer/fuzzysearch/fuzzy"
 )
 
@@ -46,6 +46,7 @@ var (
 
 	// ModuleHelpers a map of module helpers
 	ModuleHelpers = map[string]func(){
+		emp3r0r_data.ModGenAgent:     modGenAgent,
 		emp3r0r_data.ModCMD_EXEC:     moduleCmd,
 		emp3r0r_data.ModSHELL:        moduleShell,
 		emp3r0r_data.ModPROXY:        moduleProxy,
@@ -210,6 +211,53 @@ func UpdateOptions(modName string) (exist bool) {
 		}
 		agentpath_type_opt.Vals = listing
 
+	case modName == emp3r0r_data.ModGenAgent:
+		// os
+		os := addIfNotFound("os")
+		os.Vals = []string{"linux", "windows", "dll"}
+		os.Val = "linux"
+		// arch
+		arch := addIfNotFound("arch")
+		arch.Vals = Arch_List
+		arch.Val = "amd64"
+		// cc host
+		existing_names := tun.NamesInCert(ServerCrtFile)
+		cc_host := addIfNotFound("cc_host")
+		cc_host.Vals = existing_names
+		cc_host.Val = read_cached_config("cc_host").(string)
+		// cc indicator
+		cc_indicator := addIfNotFound("cc_indicator")
+		cc_indicator.Val = read_cached_config("cc_indicator").(string)
+		// cc indicator value
+		cc_indicator_text := addIfNotFound("indicator_text")
+		cc_indicator_text.Val = read_cached_config("indicator_text").(string)
+		// NCSI switch
+		ncsi := addIfNotFound("ncsi")
+		ncsi.Vals = []string{"on", "off"}
+		ncsi.Val = "on"
+		// CDN proxy
+		cdn_proxy := addIfNotFound("cdn_proxy")
+		cdn_proxy.Val = read_cached_config("cdn_proxy").(string)
+		// shadowsocks switch
+		shadowsocks := addIfNotFound("shadowsocks")
+		shadowsocks.Vals = []string{"on", "off", "with_kcp"}
+		shadowsocks.Val = "off"
+		// agent proxy for c2 transport
+		c2transport_proxy := addIfNotFound("c2transport_proxy")
+		c2transport_proxy.Val = RuntimeConfig.C2TransportProxy
+		// agent proxy timeout
+		autoproxy_timeout := addIfNotFound("autoproxy_timeout")
+		timeout := read_cached_config("autoproxy_timeout").(float64)
+		autoproxy_timeout.Val = strconv.FormatFloat(timeout, 'f', -1, 64)
+		// DoH
+		doh := addIfNotFound("doh_server")
+		doh.Vals = []string{"https://1.1.1.1/dns-query", "https://dns.google/dns-query"}
+		doh.Val = read_cached_config("doh_server").(string)
+		// auto proxy, with UDP broadcasting
+		auto_proxy := addIfNotFound("auto_proxy")
+		auto_proxy.Vals = []string{"on", "off"}
+		auto_proxy.Val = "off"
+
 	default:
 		// custom modules
 		modconfig := ModuleConfigs[modName]
@@ -231,6 +279,10 @@ func ModuleRun() {
 			return
 		}
 		ModuleHelpers[emp3r0r_data.ModCMD_EXEC]()
+		return
+	}
+	if CurrentMod == emp3r0r_data.ModGenAgent {
+		ModuleHelpers[emp3r0r_data.ModGenAgent]()
 		return
 	}
 	if CurrentMod == emp3r0r_data.ModStager {

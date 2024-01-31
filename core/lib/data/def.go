@@ -79,6 +79,7 @@ const (
 
 // built-in module names
 const (
+	ModGenAgent     = "gen_agent"
 	ModCMD_EXEC     = "cmd_exec"
 	ModCLEAN_LOG    = "clean_log"
 	ModLPE_SUGGEST  = "lpe_suggest"
@@ -109,6 +110,7 @@ var InjectorMethods = map[string]string{
 
 // Module help info, ls_modules shows this
 var ModuleComments = map[string]string{
+	ModGenAgent:     "Build agent for different OS/arch with customized options",
 	ModCMD_EXEC:     "Run a single command on a target",
 	ModCLEAN_LOG:    "Delete lines containing keyword from *tmp logs",
 	ModLPE_SUGGEST:  "Run linux-smart-enumeration or linux exploit suggester",
