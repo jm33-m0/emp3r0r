@@ -61,8 +61,7 @@ func GenAgent() (agent_binary_path string) {
 		outfile = fmt.Sprintf("%s/agent_linux_%s_%d-%d-%d_%d-%d-%d",
 			EmpWorkSpace, arch_choice,
 			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
-	}
-	if is_win {
+	} else if is_win {
 		CliPrintInfo("You chose Windows")
 		if CliYesNo("Generate for 32 bit Windows") {
 			arch_choice = "386"
@@ -71,13 +70,15 @@ func GenAgent() (agent_binary_path string) {
 		outfile = fmt.Sprintf("%s/agent_windows_%s_%d-%d-%d_%d-%d-%d.exe",
 			EmpWorkSpace, arch_choice,
 			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
-	}
-	if is_dll {
+	} else if is_dll {
 		CliPrintInfo("You chose Windows DLL")
 		stubFile = fmt.Sprintf("%s-%s", emp3r0r_data.Stub_Windows_DLL, arch_choice)
 		outfile = fmt.Sprintf("%s/agent_windows_%s_%d-%d-%d_%d-%d-%d.dll",
 			EmpWorkSpace, arch_choice,
 			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
+	} else {
+		CliPrintError("Invalid choice")
+		return
 	}
 
 	// is this stub file available?
