@@ -74,6 +74,10 @@ func DownloadViaCC(file_to_download, path string) (data []byte, err error) {
 			err = fmt.Errorf("DownloadViaCC HTTP GET: %v", err)
 			return nil, err
 		}
+		if resp.StatusCode != 200 {
+			err = fmt.Errorf("DownloadViaCC HTTP GET: %s", resp.Status)
+			return nil, err
+		}
 		data, err := io.ReadAll(resp.Body)
 		if err != nil {
 			err = fmt.Errorf("DownloadViaCC read body: %v", err)
