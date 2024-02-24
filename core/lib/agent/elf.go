@@ -18,20 +18,21 @@ import (
 
 // GetSymFromLibc: Get pointer to a libc function
 // that is currently loaded in target process, ASLR-proof
-func GetSymFromLibc(pid int, sym string) (addr int64) {
-	libc_path, base, offset := GetLibc(pid)
-	if base == 0 {
+func GetSymFromLibc(pid int, sym string) (addr int64, err error) {
+	libc_path, base, offset, err := GetLibc(pid)
+	if base == 0 || err != nil {
+		err = fmt.Errorf("libc not found: %v", err)
 		return
 	}
 	elf_file, err := elf.Open(libc_path)
 	if err != nil {
-		log.Printf("ELF open: %v", err)
+		err = fmt.Errorf("ELF open: %v", err)
 		return
 	}
 	defer elf_file.Close()
-	syms, err := elf_file.DynamicSymbols()
+	syms, err := elf_file.Symbols()
 	if err != nil {
-		log.Printf("ELF symbols: %v", err)
+		err = fmt.Errorf("ELF symbols: %v", err)
 		return
 	}
 	for _, s := range syms {
@@ -40,6 +41,10 @@ func GetSymFromLibc(pid int, sym string) (addr int64) {
 			break
 		}
 	}
+	if addr == 0 {
+		err = fmt.Errorf("scanned %d symbols, symbol (addr 0x%x) %s not found", len(syms), addr, sym)
+		return
+	}
 	log.Printf("Address of %s is 0x%x", sym, addr)
 
 	return
@@ -47,18 +52,20 @@ func GetSymFromLibc(pid int, sym string) (addr int64) {
 
 // GetLibc get base address, ASLR offset value, and path of libc
 // by parsing /proc/pid/maps
-func GetLibc(pid int) (path string, addr, offset int64) {
+func GetLibc(pid int) (path string, addr, offset int64, err error) {
 	map_path := fmt.Sprintf("/proc/%d/maps", pid)
 
 	f, err := os.Open(map_path)
 	if err != nil {
+		err = fmt.Errorf("open %s: %v", map_path, err)
 		return
 	}
+	defer f.Close()
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if !strings.Contains(line, "libc-") ||
-			!strings.Contains(line, " r-xp ") {
+		isLibc := strings.Contains(line, "libc.so") && strings.Contains(line, " r-xp ")
+		if !isLibc {
 			continue
 		}
 		fields := strings.Fields(line)
@@ -70,6 +77,12 @@ func GetLibc(pid int) (path string, addr, offset int64) {
 			addr, offset, path)
 		break
 	}
+
+	// check if we got the right libc
+	if path == "" {
+		err = fmt.Errorf("scanned map file, libc not found")
+	}
+
 	return
 }
 
