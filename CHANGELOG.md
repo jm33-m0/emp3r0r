@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.37.0](https://github.com/jm33-m0/emp3r0r/compare/v1.36.0...v1.37.0) (2024-04-03)
+
+
+### Features
+
+* deprecate `gen_agent` cmd in favor of `use gen_agent` module ([add0a7e](https://github.com/jm33-m0/emp3r0r/commit/add0a7eb1b0a0ed916a4b298c4712661421783e9))
+
+
+### Bug Fixes
+
+* `__libc_dlopen_mode` not found ([322d071](https://github.com/jm33-m0/emp3r0r/commit/322d0719fcb9182b5f5a94e071ad367e9d585eec))
+* throw error if shellcode is empty ([06b6549](https://github.com/jm33-m0/emp3r0r/commit/06b654961829f8cd4924848ca8448e7129201000))
+
 ## [1.36.0](https://github.com/jm33-m0/emp3r0r/compare/v1.35.3...v1.36.0) (2024-01-31)
 
 
