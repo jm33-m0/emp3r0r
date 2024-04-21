@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.37.1](https://github.com/jm33-m0/emp3r0r/compare/v1.37.0...v1.37.1) (2024-04-21)
+
+
+### Bug Fixes
+
+* update deps ([f401df2](https://github.com/jm33-m0/emp3r0r/commit/f401df25736889402d66719b2bee6588e8faf168))
+
 ## [1.37.0](https://github.com/jm33-m0/emp3r0r/compare/v1.36.0...v1.37.0) (2024-04-03)
 
 
