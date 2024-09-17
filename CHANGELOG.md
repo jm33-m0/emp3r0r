@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.37.2](https://github.com/jm33-m0/emp3r0r/compare/v1.37.1...v1.37.2) (2024-09-17)
+
+
+### Bug Fixes
+
+* some crypto functions ([e425081](https://github.com/jm33-m0/emp3r0r/commit/e4250812b50ba6ce252a43dc405c529ff0584767))
+
 ## [1.37.1](https://github.com/jm33-m0/emp3r0r/compare/v1.37.0...v1.37.1) (2024-04-21)
 
 
