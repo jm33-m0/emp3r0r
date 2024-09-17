@@ -8,8 +8,10 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/pem"
 	"fmt"
 	"log"
@@ -19,6 +21,16 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
+)
+
+const (
+	CA_CERT_FILE = "ca-cert.pem"
+	CA_KEY_FILE  = "ca-key.pem"
+)
+
+var (
+	// PEM encoded server public key
+	ServerPubKey string
 )
 
 func publicKey(priv interface{}) interface{} {
@@ -51,10 +63,14 @@ func pemBlockForKey(priv interface{}) *pem.Block {
 // GenCerts generate a CA cert or a server cert signed by CA cert
 // if isCA is true, the outfile will be a CA cert/key named as ca-cert.pem/ca-key.pem
 // if isCA is false, the outfile will be named as is, for example, outfile-cert.pem, outfile-key.pem
-func GenCerts(hosts []string, outname string, isCA bool) (err error) {
+// Returns public key bytes
+func GenCerts(
+	hosts []string,
+	outname string,
+	isCA bool) ([]byte, error) {
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		return fmt.Errorf("GenerateKey: %v", err)
+		return nil, fmt.Errorf("GenerateKey: %v", err)
 	}
 	template := x509.Certificate{
 		SerialNumber: big.NewInt(1),
@@ -77,12 +93,15 @@ func GenCerts(hosts []string, outname string, isCA bool) (err error) {
 
 	// valid for these names
 	if isCA {
+		template.Subject = pkix.Name{
+			Organization: []string{"ACME CA Co"},
+		}
 		template.IsCA = true
 		template.KeyUsage |= x509.KeyUsageCertSign
 		outname = "ca"
 		derBytes, err = x509.CreateCertificate(rand.Reader, &template, &template, publicKey(priv), priv)
 		if err != nil {
-			return fmt.Errorf("Failed to create certificate: %v", err)
+			return nil, fmt.Errorf("failed to create certificate: %v", err)
 		}
 	} else {
 		for _, h := range hosts {
@@ -94,25 +113,25 @@ func GenCerts(hosts []string, outname string, isCA bool) (err error) {
 		}
 
 		// ca key file
-		ca_data, err := os.ReadFile("ca-key.pem")
+		ca_data, err := os.ReadFile(CA_KEY_FILE)
 		if err != nil {
-			return fmt.Errorf("Read ca-key.pem: %v", err)
+			return nil, fmt.Errorf("read %s: %v", CA_KEY_FILE, err)
 		}
 		block, _ := pem.Decode(ca_data)
 		cakey, _ = x509.ParseECPrivateKey(block.Bytes)
 
 		// ca cert file
-		ca_data, err = os.ReadFile("ca-cert.pem")
+		ca_data, err = os.ReadFile(CA_CERT_FILE)
 		if err != nil {
-			return fmt.Errorf("Read ca-cert.pem: %v", err)
+			return nil, fmt.Errorf("read %s: %v", CA_CERT_FILE, err)
 		}
 		block, _ = pem.Decode(ca_data)
 		cacrt, _ = x509.ParseCertificate(block.Bytes)
 
-		// generate C2 server certificate, signed by our CA
+		// generate server certificate, signed by our CA
 		derBytes, err = x509.CreateCertificate(rand.Reader, &template, cacrt, publicKey(priv), cakey)
 		if err != nil {
-			return fmt.Errorf("Failed to create certificate: %v", err)
+			return nil, fmt.Errorf("failed to create certificate: %v", err)
 		}
 	}
 
@@ -124,7 +143,7 @@ func GenCerts(hosts []string, outname string, isCA bool) (err error) {
 	pem.Encode(out, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 	err = os.WriteFile(outcert, out.Bytes(), 0600)
 	if err != nil {
-		return fmt.Errorf("Write %s: %v", outcert, err)
+		return nil, fmt.Errorf("write %s: %v", outcert, err)
 	}
 	out.Reset()
 
@@ -132,10 +151,22 @@ func GenCerts(hosts []string, outname string, isCA bool) (err error) {
 	pem.Encode(out, pemBlockForKey(priv))
 	err = os.WriteFile(outkey, out.Bytes(), 0600)
 	if err != nil {
-		return fmt.Errorf("Write %s: %v", outkey, err)
+		return nil, fmt.Errorf("write %s: %v", outkey, err)
 	}
 
-	return
+	// retrieve public key
+	pubkey := priv.PublicKey
+	// encode public key
+	pubkey_data, err := x509.MarshalPKIXPublicKey(&pubkey)
+	if err != nil {
+		log.Printf("EncodePublicKey: %v", err)
+		return nil, fmt.Errorf("encode public key: %v", err)
+	}
+	pubkey_out := &bytes.Buffer{}
+	err = pem.Encode(pubkey_out, &pem.Block{Type: "PUBLIC KEY", Bytes: pubkey_data})
+	pubkey_data = pubkey_out.Bytes()
+
+	return pubkey_data, err
 }
 
 // NamesInCert find domain names and IPs in server certificate
@@ -149,9 +180,7 @@ func NamesInCert(cert_file string) (names []string) {
 		ip := netip.String()
 		names = append(names, ip)
 	}
-	for _, domain := range cert.DNSNames {
-		names = append(names, domain)
-	}
+	names = append(names, cert.DNSNames...)
 
 	return
 }
@@ -161,11 +190,23 @@ func ParsePem(data []byte) (*x509.Certificate, error) {
 	return x509.ParseCertificate(block.Bytes)
 }
 
+// ParseKeyPemFile read from PEM file and return parsed cert
+func ParseKeyPemFile(key_file string) (cert *ecdsa.PrivateKey, err error) {
+	data, err := os.ReadFile(key_file)
+	if err != nil {
+		err = fmt.Errorf("read %s: %v", key_file, err)
+		return
+	}
+	block, _ := pem.Decode(data)
+
+	return x509.ParseECPrivateKey(block.Bytes)
+}
+
 // ParseCertPemFile read from PEM file and return parsed cert
 func ParseCertPemFile(cert_file string) (cert *x509.Certificate, err error) {
 	cert_data, err := os.ReadFile(cert_file)
 	if err != nil {
-		err = fmt.Errorf("Read ca-cert.pem: %v", err)
+		err = fmt.Errorf("read %s: %v", cert_file, err)
 		return
 	}
 	return ParsePem(cert_data)
@@ -219,4 +260,19 @@ func SSHPublicKey(privkey []byte) (pubkey ssh.PublicKey, err error) {
 	pubkey = priv.PublicKey()
 
 	return
+}
+
+// SignECDSA sign a message with ECDSA private key
+func SignECDSA(message []byte, privateKey *ecdsa.PrivateKey) ([]byte, error) {
+	hash := sha256.Sum256(message)
+	r, s, err := ecdsa.Sign(rand.Reader, privateKey, hash[:])
+	if err != nil {
+		return nil, err
+	}
+	// encode signature to ASN1 format
+	var sig struct {
+		R, S *big.Int
+	}
+	sig.R, sig.S = r, s
+	return asn1.Marshal(sig)
 }

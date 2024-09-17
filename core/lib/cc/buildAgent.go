@@ -87,7 +87,7 @@ func read_cached_config(config_key string) (val interface{}) {
 func GenC2Certs(hosts []string) (err error) {
 	if !util.IsFileExist(CAKeyFile) || !util.IsFileExist(CACrtFile) {
 		CliPrint("CA cert not found, generating...")
-		err = tun.GenCerts(nil, "", true)
+		_, err = tun.GenCerts(nil, "", true)
 		if err != nil {
 			return fmt.Errorf("Generate CA: %v", err)
 		}
@@ -106,7 +106,8 @@ func GenC2Certs(hosts []string) (err error) {
 	// generate server cert
 	CliPrint("Server cert not found, generating...")
 	CliPrintInfo("Server cert fingerprint: %s", tun.GetFingerprint(ServerCrtFile))
-	return tun.GenCerts(hosts, "emp3r0r", false)
+	_, err = tun.GenCerts(hosts, "emp3r0r", false)
+	return
 }
 
 func save_config_json() (err error) {
