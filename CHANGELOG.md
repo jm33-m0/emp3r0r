@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.37.3](https://github.com/jm33-m0/emp3r0r/compare/v1.37.2...v1.37.3) (2024-09-23)
+
+
+### Bug Fixes
+
+* AES encryption: use GCM for authentication ([e713898](https://github.com/jm33-m0/emp3r0r/commit/e713898da991df9306a1ac5ce133aa93f913b6e8))
+* agent authentication ([a2386e2](https://github.com/jm33-m0/emp3r0r/commit/a2386e2c0acc5305e4e65f0bcd244b12b15fc778))
+* typo ([326461c](https://github.com/jm33-m0/emp3r0r/commit/326461c3b2534adef93699cd52b71438cbf80fdc))
+
 ## [1.37.2](https://github.com/jm33-m0/emp3r0r/compare/v1.37.1...v1.37.2) (2024-09-17)
 
 
