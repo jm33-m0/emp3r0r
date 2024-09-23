@@ -4,6 +4,7 @@
 package cc
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -159,6 +160,14 @@ func InitConfigFile(cc_host string) (err error) {
 	RuntimeConfig.IndicatorWaitMin = 30
 	RuntimeConfig.IndicatorWaitMax = 130
 	RuntimeConfig.AutoProxyTimeout = 0 // disable timeout by default, leave it to the OS
+
+	// sign agent UUID
+	sig, err := tun.SignWithCAKey([]byte(RuntimeConfig.AgentUUID))
+	if err != nil {
+		return fmt.Errorf("failed to sign agent UUID: %v", err)
+	}
+	// base64 encode the sig
+	RuntimeConfig.AgentUUIDSig = base64.URLEncoding.EncodeToString(sig)
 
 	return save_config_json()
 }

