@@ -276,3 +276,85 @@ func SignECDSA(message []byte, privateKey *ecdsa.PrivateKey) ([]byte, error) {
 	sig.R, sig.S = r, s
 	return asn1.Marshal(sig)
 }
+
+// SignWithCAKey signs the given data using the CA's private key
+func SignWithCAKey(data []byte) ([]byte, error) {
+	// Read the CA private key from the file
+	caKeyData, err := os.ReadFile(CA_KEY_FILE)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %v", CA_KEY_FILE, err)
+	}
+
+	// Decode the PEM-encoded CA private key
+	block, _ := pem.Decode(caKeyData)
+	if block == nil {
+		return nil, fmt.Errorf("failed to parse CA key PEM")
+	}
+
+	// Parse the ECDSA private key
+	caPrivateKey, err := x509.ParseECPrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse EC private key: %v", err)
+	}
+
+	// Hash the input data
+	hash := sha256.Sum256(data)
+
+	// Sign the hash using ECDSA
+	r, s, err := ecdsa.Sign(rand.Reader, caPrivateKey, hash[:])
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign data: %v", err)
+	}
+
+	// Encode the signature in ASN.1 format
+	var signature struct {
+		R, S *big.Int
+	}
+	signature.R = r
+	signature.S = s
+
+	return asn1.Marshal(signature)
+}
+
+// VerifySignatureWithCA verifies the given signature against the data using the CA's public key
+func VerifySignatureWithCA(data []byte, signature []byte) (bool, error) {
+	// Read the CA certificate from the file
+	caCertData, err := os.ReadFile(CA_CERT_FILE)
+	if err != nil {
+		return false, fmt.Errorf("read %s: %v", CA_CERT_FILE, err)
+	}
+
+	// Decode the PEM-encoded CA certificate
+	block, _ := pem.Decode(caCertData)
+	if block == nil {
+		return false, fmt.Errorf("failed to parse CA cert PEM")
+	}
+
+	// Parse the X.509 certificate
+	caCert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse CA certificate: %v", err)
+	}
+
+	// Extract the public key from the certificate (ECDSA public key)
+	caPublicKey, ok := caCert.PublicKey.(*ecdsa.PublicKey)
+	if !ok {
+		return false, fmt.Errorf("public key is not ECDSA")
+	}
+
+	// Hash the input data
+	hash := sha256.Sum256(data)
+
+	// Decode the signature from ASN.1 format
+	var sig struct {
+		R, S *big.Int
+	}
+	_, err = asn1.Unmarshal(signature, &sig)
+	if err != nil {
+		return false, fmt.Errorf("failed to unmarshal signature: %v", err)
+	}
+
+	// Verify the signature using ECDSA
+	isValid := ecdsa.Verify(caPublicKey, hash[:], sig.R, sig.S)
+	return isValid, nil
+}
