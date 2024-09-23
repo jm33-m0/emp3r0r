@@ -103,3 +103,5 @@ require (
 	howett.net/plist v1.0.1 // indirect
 	pkg.nimblebun.works/go-lsp v1.1.0 // indirect
 )
+
+replace github.com/mholt/archiver/v3 => github.com/anchore/archiver/v3 v3.5.2
