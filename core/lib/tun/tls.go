@@ -26,7 +26,7 @@ func EmpHTTPClient(c2_addr, proxyServer string) *http.Client {
 	// C2 URL
 	c2url, err := url.Parse(c2_addr)
 	if err != nil {
-		LogFatalError("Erro parsing C2 address '%s': %v", c2_addr, err)
+		LogFatalError("Error parsing C2 address '%s': %v", c2_addr, err)
 	}
 
 	// add our cert
