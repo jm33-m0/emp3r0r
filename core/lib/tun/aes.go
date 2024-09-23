@@ -5,10 +5,11 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"encoding/base64"
+	"crypto/sha256"
 	"fmt"
 	"io"
-	"log"
+
+	"golang.org/x/crypto/pbkdf2"
 )
 
 // Go implementation of PKCS5Padding
@@ -23,126 +24,6 @@ func PKCS5Trimming(encrypt []byte) []byte {
 	return encrypt[:len(encrypt)-int(padding)]
 }
 
-// AESEncryptRaw encrypt bytes
-func AESEncryptRaw(key, plaintext []byte) []byte {
-	plaintext = PKCS5Padding(plaintext, aes.BlockSize)
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		log.Print(err)
-		return nil
-	}
-
-	// The IV needs to be unique, but not secure. Therefore it's common to
-	// include it at the beginning of the ciphertext.
-	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
-	iv := ciphertext[:aes.BlockSize]
-	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-		log.Print(err)
-		return nil
-	}
-
-	cbc := cipher.NewCBCEncrypter(block, iv)
-	cbc.CryptBlocks(ciphertext[aes.BlockSize:], plaintext)
-
-	return ciphertext
-}
-
-// AESDecryptRaw decrypt bytes
-func AESDecryptRaw(key, ciphertext []byte) []byte {
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		log.Print(err)
-		return nil
-	}
-
-	// The IV needs to be unique, but not secure. Therefore it's common to
-	// include it at the beginning of the ciphertext.
-	if len(ciphertext) < aes.BlockSize {
-		log.Print("ciphertext too short")
-		return nil
-	}
-	iv := ciphertext[:aes.BlockSize]
-	ciphertext = ciphertext[aes.BlockSize:]
-
-	// make sure the ciphertext is a multiple of the block size
-	if len(ciphertext)%aes.BlockSize != 0 {
-		log.Print("ciphertext is not a multiple of the block size")
-		return nil
-	}
-
-	cbc := cipher.NewCBCDecrypter(block, iv)
-
-	cbc.CryptBlocks(ciphertext, ciphertext)
-
-	return PKCS5Trimming(ciphertext)
-}
-
-// AESEncrypt string to base64 crypto using AES
-func AESEncrypt(key []byte, text string) string {
-	plaintext := []byte(text)
-	plaintext = PKCS5Padding([]byte(text), aes.BlockSize)
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		log.Print(err)
-		return ""
-	}
-
-	// The IV needs to be unique, but not secure. Therefore it's common to
-	// include it at the beginning of the ciphertext.
-	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
-	iv := ciphertext[:aes.BlockSize]
-	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-		log.Print(err)
-		return ""
-	}
-
-	cbc := cipher.NewCBCEncrypter(block, iv)
-	cbc.CryptBlocks(ciphertext[aes.BlockSize:], plaintext)
-
-	// convert to base64
-	return base64.URLEncoding.EncodeToString(ciphertext)
-}
-
-// AESDecrypt from base64 to decrypted string
-func AESDecrypt(key []byte, cryptoText string) string {
-	ciphertext, _ := base64.URLEncoding.DecodeString(cryptoText)
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		log.Print(err)
-		return ""
-	}
-
-	// The IV needs to be unique, but not secure. Therefore it's common to
-	// include it at the beginning of the ciphertext.
-	if len(ciphertext) < aes.BlockSize {
-		log.Print("ciphertext too short")
-		return ""
-	}
-	iv := ciphertext[:aes.BlockSize]
-	ciphertext = ciphertext[aes.BlockSize:]
-
-	// make sure the ciphertext is a multiple of the block size
-	if len(ciphertext)%aes.BlockSize != 0 {
-		log.Print("ciphertext is not a multiple of the block size")
-		return ""
-	}
-
-	cbc := cipher.NewCBCDecrypter(block, iv)
-
-	cbc.CryptBlocks(ciphertext, ciphertext)
-
-	return fmt.Sprintf("%s", PKCS5Trimming(ciphertext))
-}
-
-// GenAESKey generate AES key from any string
-func GenAESKey(seed string) []byte {
-	md5sum := MD5Sum(seed)
-	return []byte(md5sum)[:32]
-}
-
 // XOREncrypt
 func XOREncrypt(key []byte, plaintext []byte) []byte {
 	ciphertext := make([]byte, len(plaintext))
@@ -150,4 +31,86 @@ func XOREncrypt(key []byte, plaintext []byte) []byte {
 		ciphertext[i] = plaintext[i] ^ key[i%len(key)]
 	}
 	return ciphertext
+}
+
+const (
+	saltSize   = 16
+	keySize    = 32
+	nonceSize  = 12
+	iterations = 100000
+)
+
+func GenerateRandomBytes(size int) ([]byte, error) {
+	bytes := make([]byte, size)
+	_, err := io.ReadFull(rand.Reader, bytes)
+	return bytes, err
+}
+
+func DeriveKey(password, salt []byte) []byte {
+	return pbkdf2.Key(password, salt, iterations, keySize, sha256.New)
+}
+
+// AES_GCM_Encrypt encrypts plaintext with password using AES-GCM
+func AES_GCM_Encrypt(password, plaintext []byte) ([]byte, error) {
+	// Generate random salt and derive key using PBKDF2
+	salt, err := GenerateRandomBytes(saltSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate salt: %v", err)
+	}
+	key := DeriveKey(password, salt)
+
+	// Generate random nonce for AES-GCM
+	nonce, err := GenerateRandomBytes(nonceSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate nonce: %v", err)
+	}
+
+	// Create AES-GCM cipher
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create AES cipher: %v", err)
+	}
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GCM cipher: %v", err)
+	}
+
+	// Encrypt and append nonce and salt
+	ciphertext := aesgcm.Seal(nil, nonce, plaintext, nil)
+
+	// Concatenate salt, nonce, and ciphertext
+	buffer := bytes.NewBuffer(salt)
+	buffer.Write(nonce)
+	buffer.Write(ciphertext)
+
+	return buffer.Bytes(), nil
+}
+
+// AES_GCM_Decrypt decrypts ciphertext with password using AES-GCM
+func AES_GCM_Decrypt(password, ciphertext []byte) ([]byte, error) {
+	// Extract salt, nonce, and actual ciphertext
+	salt := ciphertext[:saltSize]
+	nonce := ciphertext[saltSize : saltSize+nonceSize]
+	encMessage := ciphertext[saltSize+nonceSize:]
+
+	// Derive key from password and salt
+	key := DeriveKey(password, salt)
+
+	// Create AES-GCM cipher
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create AES cipher: %v", err)
+	}
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GCM cipher: %v", err)
+	}
+
+	// Decrypt the ciphertext
+	plaintext, err := aesgcm.Open(nil, nonce, encMessage, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt: %v", err)
+	}
+
+	return plaintext, nil
 }
