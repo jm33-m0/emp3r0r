@@ -3,7 +3,6 @@
 
 package cc
 
-
 import (
 	"encoding/base64"
 	"fmt"

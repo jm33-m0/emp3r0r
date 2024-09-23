@@ -15,13 +15,13 @@ import (
 // ExtractBash extract embedded bash binary and configure our bash shell
 func ExtractBash() error {
 	if !util.IsExist(RuntimeConfig.UtilsPath) {
-		err := os.MkdirAll(RuntimeConfig.UtilsPath, 0700)
+		err := os.MkdirAll(RuntimeConfig.UtilsPath, 0o700)
 		if err != nil {
 			log.Fatalf("[-] Cannot mkdir %s: %v", RuntimeConfig.AgentRoot, err)
 		}
 	}
 
-	err := os.WriteFile(RuntimeConfig.UtilsPath+"/.bashrc", []byte(file.BashRC), 0600)
+	err := os.WriteFile(RuntimeConfig.UtilsPath+"/.bashrc", []byte(file.BashRC), 0o600)
 	if err != nil {
 		log.Printf("Write bashrc: %v", err)
 	}

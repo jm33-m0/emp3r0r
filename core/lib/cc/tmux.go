@@ -3,7 +3,6 @@
 
 package cc
 
-
 import (
 	"errors"
 	"fmt"
@@ -115,8 +114,8 @@ func TmuxInitWindows() (err error) {
 		place_holder,
 		direction,
 		from_pane string,
-		size_percentage int) (pane *Emp3r0rPane, err error) {
-
+		size_percentage int,
+	) (pane *Emp3r0rPane, err error) {
 		// system info of selected agent
 		pane, err = TmuxNewPane(title, direction, from_pane, size_percentage, cat)
 		if err != nil {
@@ -265,7 +264,7 @@ func (pane *Emp3r0rPane) Printf(clear bool, format string, a ...interface{}) {
 	}
 
 	// print msg
-	err := os.WriteFile(pane.TTY, []byte(msg), 0777)
+	err := os.WriteFile(pane.TTY, []byte(msg), 0o777)
 	if err != nil {
 		CliPrintWarning("Cannot print on tmux window %s (%s): %v,\n"+
 			"printing to main window instead.\n\n",
@@ -306,8 +305,8 @@ func (pane *Emp3r0rPane) PaneDetails() (
 	pid int,
 	cmd string,
 	width int,
-	height int) {
-
+	height int,
+) {
 	if pane.ID == "" {
 		return
 	}

@@ -3,7 +3,6 @@
 
 package cc
 
-
 import (
 	"context"
 	"encoding/base64"
@@ -61,7 +60,7 @@ func modStager() {
 	switch chosen_stager {
 	case "linux/bash":
 		stager_data := bash_http_b64_download_exec(url)
-		err = os.WriteFile(stager_filename, stager_data, 0600)
+		err = os.WriteFile(stager_filename, stager_data, 0o600)
 		if err != nil {
 			CliPrintError("Failed to save stager data: %v", err)
 			return
@@ -77,7 +76,7 @@ func modStager() {
 			return
 		}
 		enc_agent_bin_data = []byte(base64.StdEncoding.EncodeToString(agent_bin_data))
-		err = os.WriteFile(enc_agent_bin_path, enc_agent_bin_data, 0600)
+		err = os.WriteFile(enc_agent_bin_path, enc_agent_bin_data, 0o600)
 		if err != nil {
 			CliPrintError("Write base64 encoded agent binary: %v", err)
 			return
@@ -88,7 +87,7 @@ func modStager() {
 		// serve agent binary
 	case "python":
 		stager_data := python_http_xor_download_exec(agent_bin_path, url)
-		err = os.WriteFile(stager_filename, stager_data, 0600)
+		err = os.WriteFile(stager_filename, stager_data, 0o600)
 		if err != nil {
 			CliPrintError("Failed to save stager data: %v", err)
 			return

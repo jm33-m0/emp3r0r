@@ -54,7 +54,7 @@ func main() {
 	} else if !runElvsh {
 		// silent!
 		log.SetOutput(io.Discard)
-		null_file, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0644)
+		null_file, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0o644)
 		if err != nil {
 			log.Fatalf("[-] Cannot open %s: %v", os.DevNull, err)
 		}
@@ -166,7 +166,7 @@ func main() {
 	// use absolute path
 	// TODO find a better location for temp files
 	if !util.IsExist(agent.RuntimeConfig.UtilsPath) {
-		err = os.MkdirAll(agent.RuntimeConfig.UtilsPath, 0700)
+		err = os.MkdirAll(agent.RuntimeConfig.UtilsPath, 0o700)
 		if err != nil {
 			log.Fatalf("[-] Cannot mkdir %s: %v", agent.RuntimeConfig.AgentRoot, err)
 		}
@@ -306,7 +306,7 @@ test_agent:
 
 	// agent root
 	if !util.IsExist(agent.RuntimeConfig.AgentRoot) {
-		err = os.MkdirAll(agent.RuntimeConfig.AgentRoot, 0700)
+		err = os.MkdirAll(agent.RuntimeConfig.AgentRoot, 0o700)
 		if err != nil {
 			log.Printf("MkdirAll %s: %v", agent.RuntimeConfig.AgentRoot, err)
 		}

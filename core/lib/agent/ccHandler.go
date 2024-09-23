@@ -158,7 +158,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 		path := strings.Join(cmdSlice[1:], " ")
 		out = "Mkdir " + path
-		if err = os.MkdirAll(path, 0700); err != nil {
+		if err = os.MkdirAll(path, 0o700); err != nil {
 			out = fmt.Sprintf("Failed to mkdir %s: %v", path, err)
 		}
 		sendResponse(out)

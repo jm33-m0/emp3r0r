@@ -136,10 +136,9 @@ func PortFwd(addr, sessionID, protocol string, reverse bool, timeout int) (err e
 
 // start a local listener on agent, forward connections to CC
 func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
-	port, sessionID string) {
-	var (
-		err error
-	)
+	port, sessionID string,
+) {
+	var err error
 
 	// serve a TCP connection received on agent side
 	serveConn := func(conn net.Conn) {

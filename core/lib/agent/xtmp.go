@@ -51,7 +51,7 @@ func deleteXtmpEntry(keyword string) (err error) {
 		}
 
 		// save new file as xtmp.tmp, users need to rename it manually, in case the file is corrupted
-		newXtmp, err := os.OpenFile(path+".tmp", os.O_CREATE|os.O_RDWR, 0664)
+		newXtmp, err := os.OpenFile(path+".tmp", os.O_CREATE|os.O_RDWR, 0o664)
 		if err != nil {
 			return fmt.Errorf("Failed to open temp xtmp: %v", err)
 		}
@@ -100,5 +100,5 @@ func deleteAuthEntry(keyword string) (err error) {
 			new_content += line + "\n"
 		}
 	}
-	return os.WriteFile(path, []byte(new_content), 0644)
+	return os.WriteFile(path, []byte(new_content), 0o644)
 }

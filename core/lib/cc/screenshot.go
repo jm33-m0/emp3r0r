@@ -3,7 +3,6 @@
 
 package cc
 
-
 import (
 	"fmt"
 	"os"

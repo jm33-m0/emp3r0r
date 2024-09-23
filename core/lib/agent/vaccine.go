@@ -54,7 +54,7 @@ func VaccineHandler() (out string) {
 	// unpack utils.tar.xz to our PATH
 	os.RemoveAll(RuntimeConfig.UtilsPath) // archiver fucking aborts when files already exist
 	if !util.IsExist(RuntimeConfig.UtilsPath) {
-		if err = os.MkdirAll(RuntimeConfig.UtilsPath, 0700); err != nil {
+		if err = os.MkdirAll(RuntimeConfig.UtilsPath, 0o700); err != nil {
 			log.Print(err)
 			return fmt.Sprintf("mkdir: %v", err)
 		}
@@ -88,7 +88,7 @@ func VaccineHandler() (out string) {
 	defer os.Remove(PythonArchive)
 
 	// create launchers
-	err = os.WriteFile(RuntimeConfig.UtilsPath+"/python", []byte(PythonLauncher), 0755)
+	err = os.WriteFile(RuntimeConfig.UtilsPath+"/python", []byte(PythonLauncher), 0o755)
 	if err != nil {
 		out = fmt.Sprintf("Write python launcher: %v", err)
 	}

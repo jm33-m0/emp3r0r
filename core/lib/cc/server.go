@@ -34,7 +34,7 @@ import (
 // the same Shadowsocks server on any host that you find convenient
 func ShadowsocksServer() {
 	ctx, cancel := context.WithCancel(context.Background())
-	var ss_config = &ss.SSConfig{
+	ss_config := &ss.SSConfig{
 		ServerAddr:     "0.0.0.0:" + RuntimeConfig.ShadowsocksPort,
 		LocalSocksAddr: "",
 		Cipher:         ss.AEADCipher,
@@ -60,7 +60,7 @@ var (
 // TLSServer start HTTPS server
 func TLSServer() {
 	if _, err := os.Stat(Temp + tun.WWW); os.IsNotExist(err) {
-		err = os.MkdirAll(Temp+tun.WWW, 0700)
+		err = os.MkdirAll(Temp+tun.WWW, 0o700)
 		if err != nil {
 			CliFatalError("TLSServer: %v", err)
 		}
@@ -273,7 +273,7 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 
 	// FileGetDir
 	if !util.IsExist(FileGetDir) {
-		err = os.MkdirAll(FileGetDir, 0700)
+		err = os.MkdirAll(FileGetDir, 0o700)
 		if err != nil {
 			CliPrintError("mkdir -p %s: %v", FileGetDir, err)
 			return
@@ -286,7 +286,7 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 	nowSize := util.FileSize(filewrite)
 
 	// open file for writing
-	f, err := os.OpenFile(filewrite, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	f, err := os.OpenFile(filewrite, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)
 	if err != nil {
 		CliPrintError("ftpHandler write file: %v", err)
 	}
@@ -590,7 +590,7 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 // msgTunHandler JSON message based (C&C) tunnel between agent and cc
 func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 	// updated on each successful handshake
-	var last_handshake = time.Now()
+	last_handshake := time.Now()
 
 	// use h2conn
 	conn, err := h2conn.Accept(wrt, req)

@@ -62,7 +62,8 @@ func SSHRemoteFwdServer(port, password string, hostkey []byte) (err error) {
 func SSHReverseProxyClient(ssh_serverAddr, password string,
 	reverseConns *map[string]context.CancelFunc,
 	socks5proxy *socks5.Server,
-	ctx context.Context, cancel context.CancelFunc) (err error) {
+	ctx context.Context, cancel context.CancelFunc,
+) (err error) {
 	// calculate ProxyPort
 	serverPort, err := strconv.Atoi(strings.Split(ssh_serverAddr, ":")[1])
 	// this is the reverseProxyPort
@@ -91,7 +92,8 @@ func SSHRemoteFwdClient(ssh_serverAddr, password string,
 	hostkey ssh.PublicKey, // ssh server public key
 	local_port int, // local port to forward to remote
 	conns *map[string]context.CancelFunc, // record this connection
-	ctx context.Context, cancel context.CancelFunc) (err error) {
+	ctx context.Context, cancel context.CancelFunc,
+) (err error) {
 	hostkey_callback := ssh.InsecureIgnoreHostKey()
 	if hostkey != nil {
 		hostkey_callback = ssh.FixedHostKey(hostkey)

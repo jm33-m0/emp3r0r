@@ -3,7 +3,6 @@
 
 package cc
 
-
 import (
 	"context"
 	"errors"
@@ -26,7 +25,6 @@ var SSHShellPort = make(map[string]string)
 // shell: the executable to run, eg. bash, python
 // port: serve this shell on agent side 127.0.0.1:port
 func SSHClient(shell, args, port string, split bool) (err error) {
-
 	// check if sftp is requested
 	is_sftp := shell == "sftp"
 	ssh_prog := "ssh"

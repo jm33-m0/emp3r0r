@@ -63,7 +63,7 @@ func moduleHandler(modName, checksum string) (out string) {
 		return fmt.Sprintf("Processing module files: %v", err)
 	}
 	for _, f := range files {
-		os.Chmod(f.Name(), 0700)
+		os.Chmod(f.Name(), 0o700)
 		if util.IsExist(libs_tarball) {
 			os.RemoveAll("libs")
 			err = archiver.Unarchive(libs_tarball, "./")

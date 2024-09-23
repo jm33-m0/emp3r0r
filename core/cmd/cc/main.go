@@ -123,7 +123,7 @@ func main() {
 		}
 		go func() {
 			defer cc.CliPrintError("session unexpectedly exited, please restart emp3r0r")
-			var SSHConnections = make(map[string]context.CancelFunc, 10)
+			SSHConnections := make(map[string]context.CancelFunc, 10)
 			pubkey, err := tun.SSHPublicKey(cc.RuntimeConfig.SSHHostKey)
 			if err != nil {
 				cc.CliFatalError("Parsing SSHPublicKey: %v", err)
@@ -147,7 +147,7 @@ func main() {
 	// start cdn2proxy server
 	if *cdnproxy != "" {
 		go func() {
-			logFile, err := os.OpenFile("/tmp/ws.log", os.O_CREATE|os.O_RDWR, 0600)
+			logFile, err := os.OpenFile("/tmp/ws.log", os.O_CREATE|os.O_RDWR, 0o600)
 			if err != nil {
 				cc.CliFatalError("OpenFile: %v", err)
 			}

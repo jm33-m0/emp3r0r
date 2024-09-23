@@ -79,8 +79,10 @@ var CmdFuncsWithArgs = map[string]func(string){
 }
 
 // CmdTime Record the time spent on each command
-var CmdTime = make(map[string]string)
-var CmdTimeMutex = &sync.Mutex{}
+var (
+	CmdTime      = make(map[string]string)
+	CmdTimeMutex = &sync.Mutex{}
+)
 
 const HELP = "help" // fuck goconst
 

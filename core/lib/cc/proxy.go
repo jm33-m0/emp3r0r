@@ -3,7 +3,6 @@
 
 package cc
 
-
 import (
 	"context"
 	"encoding/json"
@@ -140,7 +139,8 @@ func ListPortFwds() {
 				to,
 				util.SplitLongLine(portmap.Agent.Tag, 10),
 				util.SplitLongLine(portmap.Description, 10),
-				util.SplitLongLine(id, 10)})
+				util.SplitLongLine(id, 10),
+			})
 	}
 
 	// rendor table
@@ -423,7 +423,6 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 			CliPrintError("Write to H2: %v", err)
 		}
 		CliPrintDebug("%s sent %d bytes to H2", udp_client_addr.String(), n)
-
 	}
 
 	// receive TCP/UDP packets from local port

@@ -3,7 +3,6 @@
 
 package cc
 
-
 import (
 	"encoding/json"
 	"fmt"
@@ -80,7 +79,7 @@ func moduleCustom() {
 		if config.IsInteractive {
 			// empty out start.sh
 			// we will run the module as shell
-			err = os.WriteFile(start_sh, []byte("echo emp3r0r-interactive-module\n"), 0600)
+			err = os.WriteFile(start_sh, []byte("echo emp3r0r-interactive-module\n"), 0o600)
 			if err != nil {
 				CliPrintError("write %s: %v", start_sh, err)
 				return
@@ -186,7 +185,7 @@ func ModuleDetails(modName string) {
 // and update ModuleHelpers, ModuleDocs
 func InitModules() {
 	if !util.IsExist(WWWRoot) {
-		os.MkdirAll(WWWRoot, 0700)
+		os.MkdirAll(WWWRoot, 0o700)
 	}
 
 	// get vaccine ready
@@ -241,7 +240,6 @@ func InitModules() {
 		for name, comment := range emp3r0r_data.ModuleComments {
 			ModuleNames = append(ModuleNames, fmt.Sprintf("%s: %s", color.HiBlueString(name), comment))
 		}
-
 	}
 
 	// read from every defined module dir
@@ -261,7 +259,7 @@ func readModCondig(file string) (pconfig *ModConfig, err error) {
 	}
 
 	// parse the json
-	var config = ModConfig{}
+	config := ModConfig{}
 	err = json.Unmarshal(jsonData, &config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal JSON config: %v", err)
@@ -279,7 +277,7 @@ func genStartScript(config *ModConfig, outfile string) (err error) {
 	data = fmt.Sprintf("%s ./%s ", data, config.Exec) // run with environment vars
 
 	// write config.json
-	return os.WriteFile(outfile, []byte(data), 0600)
+	return os.WriteFile(outfile, []byte(data), 0o600)
 }
 
 func updateModuleHelp(config *ModConfig) error {

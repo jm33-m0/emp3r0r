@@ -170,15 +170,19 @@ func ListTargets() {
 			"IPs":     ips,
 		}
 
-		var row = []string{index, label, util.SplitLongLine(target.Tag, 15),
-			infoMap["OS"], infoMap["Process"], infoMap["User"], infoMap["IPs"], infoMap["From"]}
+		row := []string{
+			index, label, util.SplitLongLine(target.Tag, 15),
+			infoMap["OS"], infoMap["Process"], infoMap["User"], infoMap["IPs"], infoMap["From"],
+		}
 
 		// is this agent currently selected?
 		if CurrentTarget != nil {
 			if CurrentTarget.Tag == target.Tag {
 				index = color.New(color.FgHiGreen, color.Bold).Sprintf("%d", control.Index)
-				row = []string{index, label, util.SplitLongLine(target.Tag, 15),
-					infoMap["OS"], infoMap["Process"], infoMap["User"], infoMap["IPs"], infoMap["From"]}
+				row = []string{
+					index, label, util.SplitLongLine(target.Tag, 15),
+					infoMap["OS"], infoMap["Process"], infoMap["User"], infoMap["IPs"], infoMap["From"],
+				}
 
 				// put this row at bottom, so it's always visible
 				tail = row
@@ -420,7 +424,7 @@ outter:
 	}
 
 	// write file
-	err = os.WriteFile(AgentsJSON, data, 0600)
+	err = os.WriteFile(AgentsJSON, data, 0o600)
 	if err != nil {
 		CliPrintWarning("Saving labeled agents: %v", err)
 	}
@@ -505,7 +509,7 @@ func InitConfig() (err error) {
 	FileGetDir = EmpWorkSpace + "/file-get/"
 	EmpConfigFile = EmpWorkSpace + "/emp3r0r.json"
 	if !util.IsDirExist(EmpWorkSpace) {
-		err = os.MkdirAll(FileGetDir, 0700)
+		err = os.MkdirAll(FileGetDir, 0o700)
 		if err != nil {
 			return fmt.Errorf("mkdir %s: %v", EmpWorkSpace, err)
 		}

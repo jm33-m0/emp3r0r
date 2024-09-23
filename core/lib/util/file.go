@@ -143,7 +143,7 @@ func IntArrayToStringArray(arr []int) []string {
 
 // AppendToFile append bytes to a file
 func AppendToFile(filename string, data []byte) (err error) {
-	f, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	f, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
 		return
 	}
@@ -157,7 +157,7 @@ func AppendToFile(filename string, data []byte) (err error) {
 
 // AppendTextToFile append text to a file
 func AppendTextToFile(filename string, text string) (err error) {
-	f, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	f, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
 		return
 	}
@@ -211,7 +211,7 @@ func Copy(src, dst string) error {
 		}
 	}
 
-	return os.WriteFile(dst, in, 0755)
+	return os.WriteFile(dst, in, 0o755)
 }
 
 // FileBaseName /path/to/foo -> foo
@@ -303,7 +303,7 @@ func ReplaceBytesInFile(path string, old []byte, replace_with []byte) (err error
 	}
 
 	to_write := bytes.ReplaceAll(file_bytes, old, replace_with)
-	return os.WriteFile(path, to_write, 0644)
+	return os.WriteFile(path, to_write, 0o644)
 }
 
 // FindHolesInBinary find holes in a binary file that are big enough for a payload

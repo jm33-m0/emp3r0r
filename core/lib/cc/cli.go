@@ -539,9 +539,11 @@ func CliListOptions() {
 		}
 
 		tdata = append(tdata,
-			[]string{util.SplitLongLine(k, 20),
+			[]string{
+				util.SplitLongLine(k, 20),
 				util.SplitLongLine(help, 20),
-				util.SplitLongLine(v, 20)})
+				util.SplitLongLine(v, 20),
+			})
 	}
 	table.AppendBulk(tdata)
 	table.Render()

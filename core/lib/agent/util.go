@@ -68,7 +68,7 @@ func IsAgentAlive(c net.Conn) bool {
 
 // Send2CC send TunData to CC
 func Send2CC(data *emp3r0r_data.MsgTunData) error {
-	var out = json.NewEncoder(emp3r0r_data.CCMsgConn)
+	out := json.NewEncoder(emp3r0r_data.CCMsgConn)
 
 	err := out.Encode(data)
 	if err != nil {
@@ -153,7 +153,7 @@ func Upgrade(checksum string) (out string) {
 	if checksum != download_checksum {
 		return fmt.Sprintf("Error: checksum mismatch: %s expected, got %s", checksum, download_checksum)
 	}
-	err = os.Chmod(tempfile, 0755)
+	err = os.Chmod(tempfile, 0o755)
 	if err != nil {
 		return fmt.Sprintf("Error: chmod %s: %v", tempfile, err)
 	}

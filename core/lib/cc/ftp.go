@@ -3,7 +3,6 @@
 
 package cc
 
-
 import (
 	"encoding/json"
 	"fmt"
@@ -86,7 +85,7 @@ func PutFile(lpath, rpath string, a *emp3r0r_data.AgentSystemInfo) error {
 // GetFile get file from agent
 func GetFile(filepath string, a *emp3r0r_data.AgentSystemInfo) error {
 	if !util.IsExist(FileGetDir) {
-		err := os.MkdirAll(FileGetDir, 0700)
+		err := os.MkdirAll(FileGetDir, 0o700)
 		if err != nil {
 			return fmt.Errorf("GetFile mkdir %s: %v", FileGetDir, err)
 		}

@@ -10,13 +10,10 @@ import (
 	utls "github.com/refraction-networking/utls"
 )
 
-var (
-
-	// CACrt for TLS server cert signing
-	CACrt = []byte(`
+// CACrt for TLS server cert signing
+var CACrt = []byte(`
 [emp3r0r_ca]
 		`)
-)
 
 // EmpHTTPClient add our CA to trusted CAs, while keeps TLS InsecureVerify on
 func EmpHTTPClient(c2_addr, proxyServer string) *http.Client {

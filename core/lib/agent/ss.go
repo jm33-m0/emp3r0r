@@ -30,7 +30,7 @@ func ShadowsocksC2Client() {
 	local_socks_addr := "127.0.0.1:" + RuntimeConfig.ShadowsocksPort
 
 	// start ss
-	var ss_config = &ss.SSConfig{
+	ss_config := &ss.SSConfig{
 		ServerAddr:     server_addr,
 		LocalSocksAddr: local_socks_addr,
 		Cipher:         ss.AEADCipher,

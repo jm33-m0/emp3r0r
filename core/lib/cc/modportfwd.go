@@ -3,7 +3,6 @@
 
 package cc
 
-
 import (
 	"context"
 	"fmt"
@@ -66,7 +65,7 @@ func moduleProxy() {
 	status := Options["status"].Val
 
 	// port-fwd
-	var pf = new(PortFwdSession)
+	pf := new(PortFwdSession)
 	pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
 	pf.Lport, pf.To = port, "127.0.0.1:"+RuntimeConfig.AutoProxyPort
 	pf.Description = fmt.Sprintf("Agent Proxy (TCP):\n%s (Local) -> %s (Agent)", pf.Lport, pf.To)
@@ -74,7 +73,7 @@ func moduleProxy() {
 	pf.Timeout = RuntimeConfig.AutoProxyTimeout
 
 	// udp port fwd
-	var pfu = new(PortFwdSession)
+	pfu := new(PortFwdSession)
 	pfu.Ctx, pfu.Cancel = context.WithCancel(context.Background())
 	pfu.Lport, pfu.To = port, "127.0.0.1:"+RuntimeConfig.AutoProxyPort
 	pfu.Description = fmt.Sprintf("Agent Proxy (UDP):\n%s (Local) -> %s (Agent)", pfu.Lport, pfu.To)

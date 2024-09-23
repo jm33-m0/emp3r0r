@@ -20,9 +20,8 @@ var ReverseConns = make(map[string]context.CancelFunc)
 // BroadcastServer listen on a UDP port for broadcasts
 // wait for some other agents to announce their internet proxy
 func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string) (err error) {
-	var (
-		passProxyCnt int // one time only
-	)
+	var passProxyCnt int // one time only
+
 	defer cancel()
 	bindaddr := ":" + port
 	if port == "" {

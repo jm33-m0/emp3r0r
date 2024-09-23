@@ -30,7 +30,7 @@ func OpenProcess(pid int) uintptr {
 }
 
 func read_mem(hProcess uintptr, address, size uintptr) []byte {
-	var data = make([]byte, size)
+	data := make([]byte, size)
 	var length uint32
 
 	procReadProcessMemory.Call(hProcess, address,

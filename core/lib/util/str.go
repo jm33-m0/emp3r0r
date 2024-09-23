@@ -111,7 +111,7 @@ func RandInt(min, max int) int {
 
 // RandStr random string
 func RandStr(n int) string {
-	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 	rand.Seed(int64(RandInt(0xff, math.MaxInt)))
 	b := make([]rune, n)
 	for i := range b {
@@ -147,7 +147,7 @@ func HexEncode(s string) (result string) {
 }
 
 func LogFilePrintf(filepath, format string, v ...any) {
-	logf, err := os.OpenFile(filepath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
+	logf, err := os.OpenFile(filepath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
 	defer logf.Close()
 	if err != nil {
 		log.Printf("LogFilePrintf: %v", err)

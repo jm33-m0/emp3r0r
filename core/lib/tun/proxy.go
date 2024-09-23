@@ -91,8 +91,8 @@ func TCPFwd(addr, port string, ctx context.Context, cancel context.CancelFunc) (
 
 // FwdToDport forward request to agent-side destination, h2 <-> tcp/udp
 func FwdToDport(ctx context.Context, cancel context.CancelFunc,
-	to, sessionID, protocol string, h2 *h2conn.Conn, timeout int) {
-
+	to, sessionID, protocol string, h2 *h2conn.Conn, timeout int,
+) {
 	var err error
 
 	// connect to target port

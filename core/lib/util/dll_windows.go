@@ -40,7 +40,7 @@ func GetAllDLLs() (modules map[string]*windows.ModuleInfo, err error) {
 	processHandle := windows.CurrentProcess()
 
 	// Enumerate the modules (DLLs) loaded in the current process
-	var moduleHandles = make([]windows.Handle, 1024)
+	moduleHandles := make([]windows.Handle, 1024)
 	var neededBytes uint32
 	err = windows.EnumProcessModules(processHandle, &moduleHandles[0], 1024, &neededBytes)
 	if err != nil {
@@ -54,7 +54,7 @@ func GetAllDLLs() (modules map[string]*windows.ModuleInfo, err error) {
 	// Print the file names of the loaded DLLs
 	for i := 0; i < numModules; i++ {
 		// Get the file name of the DLL
-		var fname16 = make([]uint16, windows.MAX_PATH)
+		fname16 := make([]uint16, windows.MAX_PATH)
 		_, err = windows.GetModuleFileName(moduleHandles[i], &fname16[0], windows.MAX_PATH)
 		if err != nil {
 			log.Printf("get module file name: %v", err)

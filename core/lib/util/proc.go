@@ -110,7 +110,6 @@ func ProcCmdline(pid int) string {
 		return "dead_process"
 	}
 	cmdline, err := proc.Cmdline()
-
 	if err != nil {
 		return fmt.Sprintf("err_%v", err)
 	}

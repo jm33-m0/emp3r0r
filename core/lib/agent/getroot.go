@@ -24,7 +24,7 @@ func CopySelfTo(dest_file string) (err error) {
 	// mkdir -p if directory not found
 	dest_dir := strings.Join(strings.Split(dest_file, "/")[:len(strings.Split(dest_file, "/"))-1], "/")
 	if !util.IsExist(dest_dir) {
-		err = os.MkdirAll(dest_dir, 0700)
+		err = os.MkdirAll(dest_dir, 0o700)
 		if err != nil {
 			return
 		}
@@ -35,7 +35,7 @@ func CopySelfTo(dest_file string) (err error) {
 		os.RemoveAll(dest_file)
 	}
 
-	return os.WriteFile(dest_file, elf_data, 0755)
+	return os.WriteFile(dest_file, elf_data, 0o755)
 }
 
 func GetRoot() error {

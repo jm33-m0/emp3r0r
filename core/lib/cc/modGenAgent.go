@@ -133,7 +133,7 @@ func modGenAgent() {
 		return
 	}
 	// write
-	err = os.WriteFile(outfile, toWrite, 0755)
+	err = os.WriteFile(outfile, toWrite, 0o755)
 	if err != nil {
 		CliPrintError("Save agent binary %s: %v", outfile, err)
 		return
@@ -162,7 +162,7 @@ func modGenAgent() {
 	toWrite = append(packed_bin_data, sep...)
 	toWrite = append(toWrite, encryptedJSONBytes...)
 	toWrite = append(toWrite, sep...)
-	err = os.WriteFile(packed_file, toWrite, 0755)
+	err = os.WriteFile(packed_file, toWrite, 0o755)
 	if err != nil {
 		CliPrintError("Failed to save final agent binary: %v", err)
 		return

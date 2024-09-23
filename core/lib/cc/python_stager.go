@@ -24,7 +24,7 @@ func python_http_xor_download_exec(agent_bin_path, url string) (ret []byte) {
 		return
 	}
 	enc_bin := tun.XOREncrypt(key, fdata)
-	err = os.WriteFile(fmt.Sprintf("%s.enc", agent_bin_path), enc_bin, 0600)
+	err = os.WriteFile(fmt.Sprintf("%s.enc", agent_bin_path), enc_bin, 0o600)
 	if err != nil {
 		CliPrintError("Saving XOR encryped agent binary: %v", err)
 		return

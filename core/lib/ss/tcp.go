@@ -15,7 +15,8 @@ import (
 
 // Create a SOCKS server listening on addr and proxy to server.
 func socksLocal(addr, server string, shadow func(net.Conn) net.Conn,
-	ctx context.Context, cancel context.CancelFunc) {
+	ctx context.Context, cancel context.CancelFunc,
+) {
 	logf("Shadowsocks local SOCKS proxy %s <-> %s", addr, server)
 	tcpLocal(addr, server, shadow,
 		func(c net.Conn) (socks.Addr, error) { return socks.Handshake(c) },
@@ -25,7 +26,8 @@ func socksLocal(addr, server string, shadow func(net.Conn) net.Conn,
 // Listen on addr and proxy to server to reach target from getAddr.
 func tcpLocal(addr, server string,
 	shadow func(net.Conn) net.Conn, getAddr func(net.Conn) (socks.Addr, error),
-	ctx context.Context, cancel context.CancelFunc) {
+	ctx context.Context, cancel context.CancelFunc,
+) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		logf("failed to listen on %s: %v", addr, err)
@@ -89,7 +91,8 @@ func tcpLocal(addr, server string,
 
 // Listen on addr for incoming connections.
 func tcpRemote(addr string, shadow func(net.Conn) net.Conn,
-	ctx context.Context, cancel context.CancelFunc) {
+	ctx context.Context, cancel context.CancelFunc,
+) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		logf("failed to listen on %s: %v", addr, err)
@@ -143,7 +146,7 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn,
 func relay(left, right net.Conn) error {
 	var err, err1 error
 	var wg sync.WaitGroup
-	var wait = 5 * time.Second
+	wait := 5 * time.Second
 	wg.Add(1)
 	go func() {
 		defer wg.Done()

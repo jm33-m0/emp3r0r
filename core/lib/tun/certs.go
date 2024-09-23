@@ -28,10 +28,8 @@ const (
 	CA_KEY_FILE  = "ca-key.pem"
 )
 
-var (
-	// PEM encoded server public key
-	ServerPubKey string
-)
+// PEM encoded server public key
+var ServerPubKey string
 
 func publicKey(priv interface{}) interface{} {
 	switch k := priv.(type) {
@@ -67,7 +65,8 @@ func pemBlockForKey(priv interface{}) *pem.Block {
 func GenCerts(
 	hosts []string,
 	outname string,
-	isCA bool) ([]byte, error) {
+	isCA bool,
+) ([]byte, error) {
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("GenerateKey: %v", err)
@@ -141,7 +140,7 @@ func GenCerts(
 	outkey := fmt.Sprintf("%s-key.pem", outname)
 	// cert
 	pem.Encode(out, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
-	err = os.WriteFile(outcert, out.Bytes(), 0600)
+	err = os.WriteFile(outcert, out.Bytes(), 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("write %s: %v", outcert, err)
 	}
@@ -149,7 +148,7 @@ func GenCerts(
 
 	// key
 	pem.Encode(out, pemBlockForKey(priv))
-	err = os.WriteFile(outkey, out.Bytes(), 0600)
+	err = os.WriteFile(outkey, out.Bytes(), 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("write %s: %v", outkey, err)
 	}

@@ -101,7 +101,7 @@ func save_config_json() (err error) {
 		return fmt.Errorf("Saving %s: %v", EmpConfigFile, err)
 	}
 
-	return os.WriteFile(EmpConfigFile, w_data, 0600)
+	return os.WriteFile(EmpConfigFile, w_data, 0o600)
 }
 
 func InitConfigFile(cc_host string) (err error) {

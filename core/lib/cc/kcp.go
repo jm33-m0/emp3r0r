@@ -3,7 +3,6 @@
 
 package cc
 
-
 import (
 	"crypto/sha256"
 	"fmt"

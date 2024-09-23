@@ -58,7 +58,7 @@ func genOSRelease() {
 	// CentOS 6.x
 	if release := slurpFile("/etc/centos-release"); release != "" {
 		if m := reCentOS6.FindStringSubmatch(release); m != nil {
-			spewFile(osReleaseFile, fmt.Sprintf(centOS6Template, m[1], m[1]), 0666)
+			spewFile(osReleaseFile, fmt.Sprintf(centOS6Template, m[1], m[1]), 0o666)
 			return
 		}
 	}
@@ -75,7 +75,7 @@ func genOSRelease() {
 			case 2:
 				version = m[1]
 			}
-			spewFile(osReleaseFile, fmt.Sprintf(redhat6Template, version, code_name, version, version), 0666)
+			spewFile(osReleaseFile, fmt.Sprintf(redhat6Template, version, code_name, version, version), 0o666)
 			return
 		}
 	}
