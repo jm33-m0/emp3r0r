@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/bettercap/readline"
 	"github.com/google/uuid"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -24,25 +23,6 @@ var Arch_List = []string{
 	"mips",
 	"mips64",
 	"riscv64",
-}
-
-// PackAgentBinary pack agent ELF binary with Packer()
-func PackAgentBinary() {
-	// completer
-	compls := []readline.PrefixCompleterInterface{
-		readline.PcItemDynamic(listLocalFiles("./"))}
-	CliCompleter.SetChildren(compls)
-	defer CliCompleter.SetChildren(CmdCompls)
-
-	// ask
-	answ := CliAsk("Path to agent binary: ", false)
-
-	go func() {
-		err := Packer(answ)
-		if err != nil {
-			CliPrintError("PackAgentBinary: %v", err)
-		}
-	}()
 }
 
 func UpgradeAgent() {
