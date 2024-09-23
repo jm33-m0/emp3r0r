@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.37.4](https://github.com/jm33-m0/emp3r0r/compare/v1.37.3...v1.37.4) (2024-09-23)
+
+
+### Bug Fixes
+
+* [#318](https://github.com/jm33-m0/emp3r0r/issues/318) ([ac2a682](https://github.com/jm33-m0/emp3r0r/commit/ac2a682b224d43382e7ac48320b7b3450547955c))
+* delete orphaned functions ([7b744c1](https://github.com/jm33-m0/emp3r0r/commit/7b744c11fb2151c27aa895bf650286aaf52a7aa1))
+
 ## [1.37.3](https://github.com/jm33-m0/emp3r0r/compare/v1.37.2...v1.37.3) (2024-09-23)
 
 
