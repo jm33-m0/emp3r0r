@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.37.5](https://github.com/jm33-m0/emp3r0r/compare/v1.37.4...v1.37.5) (2024-10-20)
+
+
+### Bug Fixes
+
+* req verification for `DownloadViaCC` ([e40db33](https://github.com/jm33-m0/emp3r0r/commit/e40db33f985beb572758a18a3b9d4d010bea6f64))
+
 ## [1.37.4](https://github.com/jm33-m0/emp3r0r/compare/v1.37.3...v1.37.4) (2024-09-23)
 
 
