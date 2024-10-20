@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.37.6](https://github.com/jm33-m0/emp3r0r/compare/v1.37.5...v1.37.6) (2024-10-20)
+
+
+### Bug Fixes
+
+* deprecate MS NCSI as it doesn't support HTTPS ([62f2115](https://github.com/jm33-m0/emp3r0r/commit/62f21154b29daddfb944670fd334a5b18ce2f9c6))
+
 ## [1.37.5](https://github.com/jm33-m0/emp3r0r/compare/v1.37.4...v1.37.5) (2024-10-20)
 
 
