@@ -11,8 +11,14 @@ import (
 )
 
 const (
+	// MicrosoftNCSIURL is the URL used by Microsoft to check internet connectivity
 	MicrosoftNCSIURL  = "http://www.msftncsi.com/ncsi.txt"
 	MicrosoftNCSIResp = "Microsoft NCSI"
+
+	// UbuntuConnectivityURL is the URL used by Ubuntu to check internet connectivity
+	UbuntuConnectivityURL = "https://connectivity-check.ubuntu.com"
+	// UbuntuConnectivityResp will be empty with 204 status code
+	UbuntuConnectivityResp = 204
 )
 
 // IsPortOpen is this TCP port open?
@@ -87,8 +93,15 @@ func HasInternetAccess(test_url string) bool {
 	if err != nil {
 		return false
 	}
+
+	// MicrosoftNCSIURL
 	if test_url == MicrosoftNCSIURL {
 		return string(respData) == MicrosoftNCSIResp
+	}
+
+	// UbuntuConnectivityURL
+	if test_url == UbuntuConnectivityURL {
+		return resp.StatusCode == UbuntuConnectivityResp
 	}
 	return true
 }
@@ -111,8 +124,15 @@ func IsProxyOK(proxy, test_url string) bool {
 		return false
 	}
 	log.Printf("IsProxyOK: testing proxy %s: %s", proxy, respData)
+
+	// MicrosoftNCSIURL
 	if test_url == MicrosoftNCSIURL {
 		return string(respData) == MicrosoftNCSIResp
+	}
+
+	// UbuntuConnectivityURL
+	if test_url == UbuntuConnectivityURL {
+		return resp.StatusCode == UbuntuConnectivityResp
 	}
 	return true
 }

@@ -24,7 +24,7 @@ func isAgentAlive() bool {
 
 func isC2Reachable() bool {
 	if !agent.RuntimeConfig.DisableNCSI {
-		return tun.HasInternetAccess(tun.MicrosoftNCSIURL)
+		return tun.HasInternetAccess(tun.UbuntuConnectivityURL)
 	}
 
 	log.Println("NCSI is disabled, trying direct C2 connection")

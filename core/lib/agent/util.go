@@ -129,7 +129,7 @@ func CollectSystemInfo() *emp3r0r_data.AgentSystemInfo {
 	info.HasTor = tun.IsTor(emp3r0r_data.CCAddress)
 
 	// has internet?
-	info.HasInternet = tun.HasInternetAccess(tun.MicrosoftNCSIURL)
+	info.HasInternet = tun.HasInternetAccess(tun.UbuntuConnectivityURL)
 
 	// IP address?
 	info.IPs = tun.IPa()
