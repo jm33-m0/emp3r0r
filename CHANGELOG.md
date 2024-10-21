@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.37.7](https://github.com/jm33-m0/emp3r0r/compare/v1.37.6...v1.37.7) (2024-10-21)
+
+
+### Bug Fixes
+
+* build: switch to `zstd` ([d7e1eeb](https://github.com/jm33-m0/emp3r0r/commit/d7e1eeb8d9b02c2a6e71cb8e4805e05fba8f657b))
+* update deps ([f4b177f](https://github.com/jm33-m0/emp3r0r/commit/f4b177fe287448df7e3bd4d403bc037e6510c4f3))
+* use trusted built-in CA pool ([8ae44f0](https://github.com/jm33-m0/emp3r0r/commit/8ae44f0eab5b1f9df8608da33861ddf4a711a0b6))
+
 ## [1.37.6](https://github.com/jm33-m0/emp3r0r/compare/v1.37.5...v1.37.6) (2024-10-20)
 
 
