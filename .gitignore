@@ -3,7 +3,7 @@
 *private*
 
 # binary release
-emp3r0r*.tar.xz
+emp3r0r*.tar.*
 
 # go.sum
 go.sum
