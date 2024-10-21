@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.37.8](https://github.com/jm33-m0/emp3r0r/compare/v1.37.7...v1.37.8) (2024-10-21)
+
+
+### Bug Fixes
+
+* release-please: switch to `tar.zst` ([d430c7d](https://github.com/jm33-m0/emp3r0r/commit/d430c7d2fe05f334c51af270280e99a2c9c624dd))
+
 ## [1.37.7](https://github.com/jm33-m0/emp3r0r/compare/v1.37.6...v1.37.7) (2024-10-21)
 
 
