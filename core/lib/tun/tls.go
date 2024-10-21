@@ -1,7 +1,6 @@
 package tun
 
 import (
-	"crypto/x509"
 	"log"
 	"net/http"
 	"net/url"
@@ -17,8 +16,11 @@ var CACrt = []byte(`
 
 // EmpHTTPClient add our CA to trusted CAs, while keeps TLS InsecureVerify on
 func EmpHTTPClient(c2_addr, proxyServer string) *http.Client {
-	// start with an empty pool
-	rootCAs := x509.NewCertPool()
+	// Extract CA bundle from built-in certs
+	rootCAs, err := ExtractCABundle()
+	if err != nil {
+		LogFatalError("ExtractCABundle: %v", err)
+	}
 
 	// C2 URL
 	c2url, err := url.Parse(c2_addr)
@@ -82,15 +84,7 @@ func HTTPClientWithEmpCA(target_url, proxy string) (client *http.Client) {
 	if client == nil {
 		return nil
 	}
+
 	client.Timeout = 5 * time.Second
-	rootCAs, err := x509.SystemCertPool()
-	if err != nil {
-		log.Printf("IsProxyOK system cert pool: %v", err)
-		rootCAs = x509.NewCertPool()
-	}
-	if ok := rootCAs.AppendCertsFromPEM(CACrt); !ok {
-		log.Printf("IsProxyOK: cannot append emp3r0r CA")
-		return nil
-	}
 	return
 }
