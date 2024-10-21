@@ -33,6 +33,6 @@ jobs:
           cd core || exit 1
           ls -lah
           bash ./emp3r0r --release || exit 2
-          mv emp3r0r.tar.xz emp3r0r-v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}.tar.xz || exit 3
+          mv emp3r0r.tar.zst emp3r0r-v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}.tar.zst || exit 3
           ls -lah
-          bash ./upload.sh github_api_token=${{ secrets.GITHUB_TOKEN }} owner=jm33-m0 repo=emp3r0r tag=v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }} filename=./emp3r0r-v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}.tar.xz
+          bash ./upload.sh github_api_token=${{ secrets.GITHUB_TOKEN }} owner=jm33-m0 repo=emp3r0r tag=v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }} filename=./emp3r0r-v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}.tar.zst
