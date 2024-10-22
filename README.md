@@ -5,7 +5,7 @@ A post-exploitation framework for Linux/Windows
 ## Status
 
 - emp3r0r C2 (Linux/Windows) is ready for testing. Please report bugs if you find any.
-- Read [wiki](https://github.com/jm33-m0/emp3r0r/wiki/Getting-started) / [中文](https://github.com/jm33-m0/emp3r0r/wiki/Getting-Started-(zh%E2%80%90CN)) to get started
+- Read [wiki](https://github.com/jm33-m0/emp3r0r/wiki/Getting-started) to get started ([中文](https://github.com/jm33-m0/emp3r0r/wiki/Getting-Started-(zh%E2%80%90CN)))
 - Download from [here](https://github.com/jm33-m0/emp3r0r/releases)
 - [Write modules](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r) for emp3r0r with your favorite languages
 - [SSH harvester](https://github.com/jm33-m0/emp3r0r/blob/master/core/lib/agent/ssh_harvester_amd64_linux.go) is ready for use
