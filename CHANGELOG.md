@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.38.0](https://github.com/jm33-m0/emp3r0r/compare/v1.37.8...v1.38.0) (2024-10-23)
+
+
+### Features
+
+* add mimikatz (no AV evasion) ([f1a44fc](https://github.com/jm33-m0/emp3r0r/commit/f1a44fcf74303d56fd89005e9233476807960d26))
+* support in-memory ps1 modules ([959517b](https://github.com/jm33-m0/emp3r0r/commit/959517bf43c547c9fdaad503a1ce81343048d017))
+
+
+### Bug Fixes
+
+* agent root naming in Windows ([ff6ee40](https://github.com/jm33-m0/emp3r0r/commit/ff6ee401658508b57e3daaf1b2059de295153757))
+* in-memory execution of ps1 modules ([d755ae6](https://github.com/jm33-m0/emp3r0r/commit/d755ae67e0f7748af754fa88654d485f3108c787))
+
 ## [1.37.8](https://github.com/jm33-m0/emp3r0r/compare/v1.37.7...v1.37.8) (2024-10-21)
 
 
