@@ -19,3 +19,8 @@ func RunShellScript(scriptBytes []byte) (output string, err error) {
 	cmd := exec.Command(shell)
 	return feedScriptToStdin(cmd, scriptBytes)
 }
+
+// RunModuleScript runs a module script on target, default to bash
+func RunModuleScript(scriptBytes []byte) (output string, err error) {
+	return RunShellScript(scriptBytes)
+}

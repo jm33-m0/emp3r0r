@@ -30,3 +30,8 @@ func RunExe(scriptBytes []byte) (output string, err error) {
 	err = fmt.Errorf("not implemented")
 	return
 }
+
+// RunModuleScript runs module script on windows using powershell
+func RunModuleScript(scriptBytes []byte) (output string, err error) {
+	return RunPSScript(scriptBytes)
+}

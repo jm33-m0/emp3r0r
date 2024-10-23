@@ -59,7 +59,10 @@ var ModuleNames = []string{}
 // moduleCustom run a custom module
 func moduleCustom() {
 	go func() {
-		start_sh := WWWRoot + CurrentMod + ".sh"
+		start_script := WWWRoot + CurrentMod + ".sh"
+		if CurrentTarget.GOOS == "windows" {
+			start_script = WWWRoot + CurrentMod + ".ps1"
+		}
 		config, exists := ModuleConfigs[CurrentMod]
 		if !exists {
 			CliPrintError("Config of %s does not exist", CurrentMod)
@@ -69,19 +72,19 @@ func moduleCustom() {
 			val[0] = Options[opt].Val
 		}
 
-		// most of the time, start.sh is the only file changing
+		// most of the time, start script is the only file changing
 		// and it's very small, so we host it for agents to download
-		err = genStartScript(&config, start_sh)
+		err = genStartScript(&config, start_script)
 		if err != nil {
-			CliPrintError("Generating start.sh: %v", err)
+			CliPrintError("Generating start script: %v", err)
 			return
 		}
 		if config.IsInteractive {
-			// empty out start.sh
+			// empty out start script
 			// we will run the module as shell
-			err = os.WriteFile(start_sh, []byte("echo emp3r0r-interactive-module\n"), 0o600)
+			err = os.WriteFile(start_script, []byte("echo emp3r0r-interactive-module\n"), 0o600)
 			if err != nil {
-				CliPrintError("write %s: %v", start_sh, err)
+				CliPrintError("write %s: %v", start_script, err)
 				return
 			}
 		}
@@ -90,6 +93,12 @@ func moduleCustom() {
 		tarball := WWWRoot + CurrentMod + ".tar.xz"
 		CliPrintInfo("Compressing %s with xz...", CurrentMod)
 		path := fmt.Sprintf("%s/%s", config.Path, CurrentMod)
+
+		// if it's a powershell script, we just append it to start.ps1
+		// and let agent download a dummy tarball
+		if strings.HasSuffix(config.Exec, ".ps1") {
+			path = fmt.Sprintf("%s/dummy", config.Path, CurrentMod)
+		}
 		err = util.TarXZ(path, tarball)
 		if err != nil {
 			CliPrintError("Compressing %s: %v", CurrentMod, err)
@@ -268,16 +277,41 @@ func readModCondig(file string) (pconfig *ModConfig, err error) {
 	return
 }
 
-// genStartScript read config.json of a module
-func genStartScript(config *ModConfig, outfile string) (err error) {
-	data := ""
-	for opt, val_help := range config.Options {
-		data = fmt.Sprintf("%s %s='%s' ", data, opt, val_help[0])
-	}
-	data = fmt.Sprintf("%s ./%s ", data, config.Exec) // run with environment vars
+// genStartScript reads config.json of a module
+func genStartScript(config *ModConfig, outfile string) error {
+	module_exec_path := fmt.Sprintf("%s/%s", config.Path, config.Exec)
+	var builder strings.Builder
 
-	// write config.json
-	return os.WriteFile(outfile, []byte(data), 0o600)
+	setEnvVar := func(opt, value string) {
+		if CurrentTarget.GOOS == "windows" {
+			fmt.Fprintf(&builder, "$env:%s='%s' ", opt, value)
+		} else {
+			fmt.Fprintf(&builder, "%s='%s' ", opt, value)
+		}
+	}
+
+	for opt, val_help := range config.Options {
+		setEnvVar(opt, val_help[0])
+	}
+
+	// Append execution command
+	if CurrentTarget.GOOS == "windows" {
+		// when it's not a powershell script, just run it
+		if !strings.HasSuffix(config.Exec, ".ps1") {
+			builder.WriteString(fmt.Sprintf("\n.\\%s", config.Exec))
+		}
+		// else we will append the script to start.ps1
+		mod_data, err := os.ReadFile(module_exec_path)
+		if err != nil {
+			return err
+		}
+		builder.WriteString(fmt.Sprintf("\n%s", mod_data))
+	} else {
+		builder.WriteString(fmt.Sprintf(" ./%s", config.Exec))
+	}
+
+	// Write to outfile
+	return os.WriteFile(outfile, []byte(builder.String()), 0o600)
 }
 
 func updateModuleHelp(config *ModConfig) error {

