@@ -3,6 +3,8 @@ package agent
 import (
 	"fmt"
 	"log"
+	"os"
+	"runtime"
 	"strings"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
@@ -41,13 +43,22 @@ func ApplyRuntimeConfig() (err error) {
 
 	// change agent root to /usr/share/bash-completion/completions/helpers
 	agent_root_base := util.FileBaseName(RuntimeConfig.AgentRoot)
-	if HasRoot() {
+	if runtime.GOOS == "windows" {
+		agent_root_base = strings.ReplaceAll(agent_root_base, "ssh-", "")
+	}
+	if HasRoot() && runtime.GOOS == "linux" {
 		prefix := "/usr/share/bash-completion/completions/helpers/"
 		RuntimeConfig.AgentRoot = fmt.Sprintf("%s/%s", prefix, agent_root_base)
 		RuntimeConfig.UtilsPath = strings.ReplaceAll(RuntimeConfig.UtilsPath, "/tmp/", prefix)
 		RuntimeConfig.SocketName = strings.ReplaceAll(RuntimeConfig.SocketName, "/tmp/", prefix)
 		RuntimeConfig.PIDFile = strings.ReplaceAll(RuntimeConfig.PIDFile, "/tmp/", prefix)
 		log.Printf("Agent root: %s", RuntimeConfig.AgentRoot)
+	} else {
+		prefix := os.TempDir()
+		RuntimeConfig.AgentRoot = fmt.Sprintf("%s/%s", prefix, agent_root_base)
+		RuntimeConfig.UtilsPath = strings.ReplaceAll(RuntimeConfig.UtilsPath, "/tmp/", prefix)
+		RuntimeConfig.SocketName = strings.ReplaceAll(RuntimeConfig.SocketName, "/tmp/", prefix)
+		RuntimeConfig.PIDFile = strings.ReplaceAll(RuntimeConfig.PIDFile, "/tmp/", prefix)
 	}
 
 	// Socks5 proxy server
