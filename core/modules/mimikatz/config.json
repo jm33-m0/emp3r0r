@@ -1,0 +1,16 @@
+{
+    "name": "mimikatz",
+    "exec": "mimikatz.ps1",
+    "in_memory": true,
+    "platform": "Windows",
+    "interactive": false,
+    "author": "jm33-ng",
+    "date": "2022-10-23",
+    "comment": "Run mimikatz as an interactive shell",
+    "options": {
+        "args": [
+            "--",
+            "run mimikatz with this commandline arg"
+        ]
+    }
+}

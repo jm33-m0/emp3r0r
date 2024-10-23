@@ -9,7 +9,7 @@ emp3r0r*.tar.*
 go.sum
 
 *.log
-*.json
+emp3r0r.json
 
 # certs
 *.pem
