@@ -222,16 +222,10 @@ func Copy(src, dst string) error {
 	return os.WriteFile(dst, in, 0o755)
 }
 
-// FileBaseName /path/to/foo -> foo
-func FileBaseName(filepath string) (filename string) {
-	sep := RandStr(10)
-	// we only need the filename
-	filepath = strings.ReplaceAll(filepath, "/", sep)  // DOS path symbol
-	filepath = strings.ReplaceAll(filepath, "\\", sep) // DOS path symbol
-	filepath = strings.ReplaceAll(filepath, "..", "")  // prevent directory traversal
-	filepathSplit := strings.Split(filepath, sep)
-	filename = filepathSplit[len(filepathSplit)-1]
-	return
+// FileBaseName extracts the base name of the file from a given path.
+func FileBaseName(path string) string {
+	// Use the standard library to safely get the base name
+	return filepath.Base(filepath.Clean(path))
 }
 
 // FileAllocate allocate n bytes for a file, will delete the target file if already exists
