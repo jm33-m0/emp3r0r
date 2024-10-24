@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.38.1](https://github.com/jm33-m0/emp3r0r/compare/v1.38.0...v1.38.1) (2024-10-24)
+
+
+### Bug Fixes
+
+* `unarchive` secure path validation ([ce61818](https://github.com/jm33-m0/emp3r0r/commit/ce618182704c3f0f92974163c9fba20f2927a119))
+* `Unarchive` with `archiver/v4` implementation ([fc96304](https://github.com/jm33-m0/emp3r0r/commit/fc96304c4524d14242bab9ac7c9251cbda8573f7))
+* add `config.json` for `mimikatz` module ([a99139c](https://github.com/jm33-m0/emp3r0r/commit/a99139cf819cad3709c46b93b2d499f2b7027849))
+* agent root directory missing `/` ([a3ef9b4](https://github.com/jm33-m0/emp3r0r/commit/a3ef9b49312b995b9576e9a60d4f91a6ba721e33))
+* make sure stdin closes ([a328ea8](https://github.com/jm33-m0/emp3r0r/commit/a328ea8cf1acbbfe67cd4874f570f2997725b64a))
+* mimikatz's documentation ([3741b36](https://github.com/jm33-m0/emp3r0r/commit/3741b362e9c73cac643a65eb65de54e13989843d))
+* permission error for Linux modules ([bf0ab59](https://github.com/jm33-m0/emp3r0r/commit/bf0ab5983dcada63541bccedddecb06a3095fcd5))
+* remove `archiver/v3` ([#318](https://github.com/jm33-m0/emp3r0r/issues/318)) ([03e6367](https://github.com/jm33-m0/emp3r0r/commit/03e6367988fd10369f8ddd4d8b0d8dffa82b3eec))
+* use Go's built-in filepath sanitization ([db76751](https://github.com/jm33-m0/emp3r0r/commit/db767513f4e9dbd2a12aa954e40e17426a0b58ad))
+* verbose ([9786e1f](https://github.com/jm33-m0/emp3r0r/commit/9786e1fdd452650f07971c45cc72344ec8c5b4e1))
+
 ## [1.38.0](https://github.com/jm33-m0/emp3r0r/compare/v1.37.8...v1.38.0) (2024-10-23)
 
 
