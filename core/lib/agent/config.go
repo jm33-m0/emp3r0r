@@ -54,7 +54,7 @@ func ApplyRuntimeConfig() (err error) {
 		RuntimeConfig.PIDFile = strings.ReplaceAll(RuntimeConfig.PIDFile, "/tmp/", prefix)
 		log.Printf("Agent root: %s", RuntimeConfig.AgentRoot)
 	} else {
-		prefix := os.TempDir()
+		prefix := os.TempDir() + "/" // /tmp/ on Linux and macOS, C:\Users\username\AppData\Local\Temp\ on Windows
 		RuntimeConfig.AgentRoot = fmt.Sprintf("%s/%s", prefix, agent_root_base)
 		RuntimeConfig.UtilsPath = strings.ReplaceAll(RuntimeConfig.UtilsPath, "/tmp/", prefix)
 		RuntimeConfig.SocketName = strings.ReplaceAll(RuntimeConfig.SocketName, "/tmp/", prefix)
