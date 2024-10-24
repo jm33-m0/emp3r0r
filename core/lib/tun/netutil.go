@@ -67,7 +67,7 @@ func IsTor(addr string) bool {
 
 // HasInternetAccess does this machine has internet access,
 // does NOT use any proxies
-func HasInternetAccess(test_url string) bool {
+func HasInternetAccess(test_url, proxy string) bool {
 	// use Microsoft NCSI as default
 	// NCSI is an HTTP service therefore we don't need
 	// uTLS to talk to it
@@ -76,7 +76,7 @@ func HasInternetAccess(test_url string) bool {
 	}
 	// if not using Microsoft NCSI, we need to use uTLS
 	if test_url != MicrosoftNCSIURL {
-		client = HTTPClientWithEmpCA(test_url, "")
+		client = HTTPClientWithEmpCA(test_url, proxy)
 		if client == nil {
 			log.Printf("HasInternetAccess: cannot create http client for %s", test_url)
 			return false
