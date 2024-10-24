@@ -320,6 +320,7 @@ func genStartScript(config *ModConfig, outfile string) error {
 	}
 
 	// compress start script with XZ
+	CliPrintInfo("Compressing start script with XZ...")
 	// wrap underlying writer w
 	w, err := os.Create(outfile)
 	compressor, err := archiver.Xz{}.OpenWriter(w)
