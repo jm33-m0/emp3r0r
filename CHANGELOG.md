@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.38.2](https://github.com/jm33-m0/emp3r0r/compare/v1.38.1...v1.38.2) (2024-10-24)
+
+
+### Bug Fixes
+
+* some traffic bypasses shadowsocks/kcp proxy ([a45b14c](https://github.com/jm33-m0/emp3r0r/commit/a45b14cc44e48ca0b50a3ee6b844167a8741f1fd))
+
 ## [1.38.1](https://github.com/jm33-m0/emp3r0r/compare/v1.38.0...v1.38.1) (2024-10-24)
 
 
