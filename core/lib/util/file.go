@@ -18,7 +18,7 @@ import (
 
 const (
 	dirPermissions  = 0o700 // Directory permissions
-	filePermissions = 0o600 // File permissions
+	filePermissions = 0o700 // File permissions
 )
 
 // Dentry Directory entry
