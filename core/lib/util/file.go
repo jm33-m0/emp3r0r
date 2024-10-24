@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/fs"
 	"log"
 	"os"
 	"os/exec"
@@ -338,44 +337,6 @@ func FindHolesInBinary(fdata []byte, size int64) (indexes []int64, err error) {
 	return
 }
 
-// Unarchive unarchives a tarball to a directory using the archiver FileSystem API.
-func Unarchive(tarball, dst string) error {
-	// Open the tarball as a filesystem
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	fsys, err := archiver.FileSystem(ctx, tarball)
-	if err != nil {
-		return fmt.Errorf("open tarball: %w", err)
-	}
-
-	// Ensure the destination directory exists
-	if err := createDir(dst); err != nil {
-		return fmt.Errorf("creating destination directory: %w", err)
-	}
-
-	// Extract the archive
-	return fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return fmt.Errorf("walk: %w", err)
-		}
-
-		// Validate and construct the destination path
-		dstPath, err := securePath(dst, path)
-		if err != nil {
-			return err
-		}
-
-		if d.IsDir() {
-			// Create the directory if it's a directory
-			return createDir(dstPath)
-		}
-
-		// Handle files (non-directory)
-		return handleFile(fsys, path, dstPath, d)
-	})
-}
-
 // securePath ensures the path is safely relative to the target directory.
 func securePath(basePath, relativePath string) (string, error) {
 	// Clean and ensure the relative path does not start with an absolute marker
@@ -400,19 +361,34 @@ func createDir(path string) error {
 	return nil
 }
 
-// handleFile handles the extraction of a file from the filesystem.
-func handleFile(fsys fs.FS, srcPath, dstPath string, d fs.DirEntry) error {
-	// Check for symlinks and skip if detected
-	if d.Type() == fs.ModeSymlink {
-		return fmt.Errorf("symlink detected, aborting: %s", srcPath)
+// handleFile handles the extraction of a file from the archive.
+func handleFile(f archiver.File, dst string) error {
+	// Validate and construct the destination path
+	dstPath, err := securePath(dst, f.NameInArchive)
+	if err != nil {
+		return err
 	}
 
-	// Open the source file
-	srcFile, err := fsys.Open(srcPath)
-	if err != nil {
-		return fmt.Errorf("open: %w", err)
+	// Ensure the parent directory exists
+	if err := createDir(filepath.Dir(dstPath)); err != nil {
+		return err
 	}
-	defer srcFile.Close()
+
+	// Check if the file is a directory
+	if f.IsDir() {
+		// If it's a directory, ensure it exists
+		if err := createDir(dstPath); err != nil {
+			return fmt.Errorf("creating directory: %w", err)
+		}
+		return nil
+	}
+
+	// Open the file for reading
+	reader, err := f.Open()
+	if err != nil {
+		return fmt.Errorf("open file: %w", err)
+	}
+	defer reader.Close()
 
 	// Create the destination file
 	dstFile, err := os.OpenFile(dstPath, os.O_CREATE|os.O_WRONLY, filePermissions)
@@ -422,8 +398,44 @@ func handleFile(fsys fs.FS, srcPath, dstPath string, d fs.DirEntry) error {
 	defer dstFile.Close()
 
 	// Copy the file contents
-	if _, err := io.Copy(dstFile, srcFile); err != nil {
+	if _, err := io.Copy(dstFile, reader); err != nil {
 		return fmt.Errorf("copy: %w", err)
 	}
+	return nil
+}
+
+// Unarchive unarchives a tarball to a directory using the official extraction method.
+func Unarchive(tarball, dst string) error {
+	f, err := os.Open(tarball)
+	if err != nil {
+		return fmt.Errorf("open tarball %s: %w", tarball, err)
+	}
+	// Identify the format and input stream for the archive
+	format, input, err := archiver.Identify(tarball, f)
+	if err != nil {
+		return fmt.Errorf("identify format: %w", err)
+	}
+
+	// Check if the format supports extraction
+	extractor, ok := format.(archiver.Extractor)
+	if !ok {
+		return fmt.Errorf("unsupported format for extraction")
+	}
+
+	// Ensure the destination directory exists
+	if err := createDir(dst); err != nil {
+		return fmt.Errorf("creating destination directory: %w", err)
+	}
+
+	// Extract files using the official handler
+	handler := func(ctx context.Context, f archiver.File) error {
+		return handleFile(f, dst)
+	}
+
+	// Use the extractor to process all files in the archive
+	if err := extractor.Extract(context.Background(), input, nil, handler); err != nil {
+		return fmt.Errorf("extracting files: %w", err)
+	}
+
 	return nil
 }
