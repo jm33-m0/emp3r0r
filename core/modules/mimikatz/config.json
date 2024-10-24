@@ -6,7 +6,7 @@
     "interactive": false,
     "author": "jm33-ng",
     "date": "2022-10-23",
-    "comment": "Run mimikatz as an interactive shell",
+    "comment": "Run mimikatz with Invoke-Mimikatz.ps1 (No AV bypass)",
     "options": {
         "args": [
             "--",
