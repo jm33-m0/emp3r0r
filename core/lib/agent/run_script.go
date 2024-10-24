@@ -25,7 +25,7 @@ func feedScriptToStdin(cmd *exec.Cmd, scriptBytes []byte) (output string, err er
 	}
 	go func() {
 		io.Copy(stdin, bytes.NewReader(scriptBytes))
-		stdin.Close()
+		defer stdin.Close()
 	}()
 	if err = cmd.Wait(); err != nil {
 		err = fmt.Errorf("error waiting for Cmd %s: %s", shell, err)
