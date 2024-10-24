@@ -355,6 +355,11 @@ func Unarchive(tarball, dst string) error {
 		return fmt.Errorf("open tarball: %w", err)
 	}
 
+	// Ensure the destination directory exists
+	if err := createDir(dst); err != nil {
+		return fmt.Errorf("creating destination directory: %w", err)
+	}
+
 	// Extract the archive
 	return fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -377,10 +382,17 @@ func Unarchive(tarball, dst string) error {
 	})
 }
 
-// securePath ensures the path does not escape the target directory.
+// securePath ensures the path is safely relative to the target directory.
 func securePath(basePath, relativePath string) (string, error) {
+	// Clean and ensure the relative path does not start with an absolute marker
+	relativePath = filepath.Clean("/" + relativePath)                         // Normalize path with a leading slash
+	relativePath = strings.TrimPrefix(relativePath, string(os.PathSeparator)) // Remove leading separator
+
+	// Join the cleaned relative path with the basePath
 	dstPath := filepath.Join(basePath, relativePath)
-	if !strings.HasPrefix(dstPath, filepath.Clean(basePath)+string(os.PathSeparator)) {
+
+	// Ensure the final destination path is within the basePath
+	if !strings.HasPrefix(filepath.Clean(dstPath)+string(os.PathSeparator), filepath.Clean(basePath)+string(os.PathSeparator)) {
 		return "", fmt.Errorf("illegal file path: %s", dstPath)
 	}
 	return dstPath, nil
