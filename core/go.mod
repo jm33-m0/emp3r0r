@@ -21,7 +21,6 @@ require (
 	github.com/jm33-m0/go-lpe v1.0.6
 	github.com/kbinani/screenshot v0.0.0-20240820160931-a8a2c5d0e191
 	github.com/lithammer/fuzzysearch v1.1.8
-	github.com/mholt/archiver/v3 v3.5.1
 	github.com/mholt/archiver/v4 v4.0.0-alpha.8
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/muesli/reflow v0.3.0
@@ -76,7 +75,6 @@ require (
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
-	github.com/nwaples/rardecode v1.1.3 // indirect
 	github.com/nwaples/rardecode/v2 v2.0.0-beta.3 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
@@ -95,7 +93,6 @@ require (
 	github.com/txthinking/runnergroup v0.0.0-20241009114647-a2ed56ecb960 // indirect
 	github.com/ulikunitz/xz v0.5.12 // indirect
 	github.com/vishvananda/netns v0.0.4 // indirect
-	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/sync v0.8.0 // indirect
@@ -105,5 +102,3 @@ require (
 	howett.net/plist v1.0.1 // indirect
 	pkg.nimblebun.works/go-lsp v1.1.0 // indirect
 )
-
-replace github.com/mholt/archiver/v3 => github.com/anchore/archiver/v3 v3.5.2

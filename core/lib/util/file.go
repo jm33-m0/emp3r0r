@@ -6,12 +6,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/fs"
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/mholt/archiver/v4"
+)
+
+const (
+	dirPermissions  = 0o700 // Directory permissions
+	filePermissions = 0o600 // File permissions
 )
 
 // Dentry Directory entry
@@ -254,6 +262,7 @@ func FileSize(path string) (size int64) {
 	return
 }
 
+// TarXZ tar a directory to tar.xz
 func TarXZ(dir, outfile string) error {
 	// remove outfile
 	os.RemoveAll(outfile)
@@ -333,4 +342,82 @@ func FindHolesInBinary(fdata []byte, size int64) (indexes []int64, err error) {
 	}
 
 	return
+}
+
+// Unarchive unarchives a tarball to a directory using the archiver FileSystem API.
+func Unarchive(tarball, dst string) error {
+	// Open the tarball as a filesystem
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	fsys, err := archiver.FileSystem(ctx, tarball)
+	if err != nil {
+		return fmt.Errorf("open tarball: %w", err)
+	}
+
+	// Extract the archive
+	return fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return fmt.Errorf("walk: %w", err)
+		}
+
+		// Validate and construct the destination path
+		dstPath, err := securePath(dst, path)
+		if err != nil {
+			return err
+		}
+
+		if d.IsDir() {
+			// Create the directory if it's a directory
+			return createDir(dstPath)
+		}
+
+		// Handle files (non-directory)
+		return handleFile(fsys, path, dstPath, d)
+	})
+}
+
+// securePath ensures the path does not escape the target directory.
+func securePath(basePath, relativePath string) (string, error) {
+	dstPath := filepath.Join(basePath, relativePath)
+	if !strings.HasPrefix(dstPath, filepath.Clean(basePath)+string(os.PathSeparator)) {
+		return "", fmt.Errorf("illegal file path: %s", dstPath)
+	}
+	return dstPath, nil
+}
+
+// createDir creates a directory with predefined permissions.
+func createDir(path string) error {
+	if err := os.MkdirAll(path, dirPermissions); err != nil {
+		return fmt.Errorf("mkdir: %w", err)
+	}
+	return nil
+}
+
+// handleFile handles the extraction of a file from the filesystem.
+func handleFile(fsys fs.FS, srcPath, dstPath string, d fs.DirEntry) error {
+	// Check for symlinks and skip if detected
+	if d.Type() == fs.ModeSymlink {
+		return fmt.Errorf("symlink detected, aborting: %s", srcPath)
+	}
+
+	// Open the source file
+	srcFile, err := fsys.Open(srcPath)
+	if err != nil {
+		return fmt.Errorf("open: %w", err)
+	}
+	defer srcFile.Close()
+
+	// Create the destination file
+	dstFile, err := os.OpenFile(dstPath, os.O_CREATE|os.O_WRONLY, filePermissions)
+	if err != nil {
+		return fmt.Errorf("create: %w", err)
+	}
+	defer dstFile.Close()
+
+	// Copy the file contents
+	if _, err := io.Copy(dstFile, srcFile); err != nil {
+		return fmt.Errorf("copy: %w", err)
+	}
+	return nil
 }

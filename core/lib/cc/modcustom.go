@@ -16,6 +16,7 @@ import (
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
+	"github.com/mholt/archiver/v4"
 	"github.com/olekukonko/tablewriter"
 )
 
@@ -318,8 +319,19 @@ func genStartScript(config *ModConfig, outfile string) error {
 		builder.WriteString(fmt.Sprintf(" ./%s", config.Exec))
 	}
 
-	// Write to outfile
-	return os.WriteFile(outfile, []byte(builder.String()), 0o600)
+	// compress start script with XZ
+	// wrap underlying writer w
+	w, err := os.Create(outfile)
+	compressor, err := archiver.Xz{}.OpenWriter(w)
+	if err != nil {
+		return err
+	}
+	defer compressor.Close()
+
+	// writes to compressor will be compressed
+	_, err = compressor.Write([]byte(builder.String()))
+
+	return err
 }
 
 func updateModuleHelp(config *ModConfig) error {

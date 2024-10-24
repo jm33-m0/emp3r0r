@@ -13,7 +13,6 @@ import (
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/mholt/archiver/v3"
 )
 
 // TakeScreenshot take a screenshot of selected target, and download it
@@ -66,7 +65,7 @@ func processScreenshot(out string, target *emp3r0r_data.AgentSystemInfo) (err er
 
 	// unzip if it's zip
 	if strings.HasSuffix(path, ".zip") {
-		err = archiver.Unarchive(FileGetDir+path, FileGetDir)
+		err = util.Unarchive(FileGetDir+path, FileGetDir)
 		if err != nil {
 			return fmt.Errorf("Unarchive screenshot zip: %v", err)
 		}
