@@ -1,8 +1,8 @@
 module github.com/jm33-m0/emp3r0r/core
 
-go 1.22.0
+go 1.22.3
 
-toolchain go1.22.2
+toolchain go1.22.7
 
 require (
 	github.com/Code-Hex/Neo-cowsay/v2 v2.0.4
@@ -10,7 +10,7 @@ require (
 	github.com/bettercap/readline v0.0.0-20210228151553-655e48bcb7bf
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/creack/pty v1.1.23
-	github.com/fatih/color v1.17.0
+	github.com/fatih/color v1.18.0
 	github.com/gliderlabs/ssh v0.3.7
 	github.com/gonutz/w32/v2 v2.11.1
 	github.com/google/uuid v1.6.0
@@ -27,6 +27,7 @@ require (
 	github.com/ncruces/go-dns v1.2.5
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/otiai10/copy v1.14.0
+	github.com/pkg/errors v0.9.1
 	github.com/pkg/sftp v1.13.6
 	github.com/posener/h2conn v0.0.0-20231204025407-3997deeca0f0
 	github.com/refraction-networking/utls v1.6.7
@@ -36,6 +37,10 @@ require (
 	github.com/txthinking/socks5 v0.0.0-20230325130024-4230056ae301
 	github.com/vishvananda/netlink v1.3.0
 	github.com/xtaci/kcp-go/v5 v5.6.18
+	github.com/xtaci/kcptun v0.0.0-20241023084417-003bd442cf5b
+	github.com/xtaci/qpp v1.1.17
+	github.com/xtaci/smux v1.5.31
+	github.com/xtaci/tcpraw v1.2.31
 	golang.org/x/crypto v0.28.0
 	golang.org/x/net v0.30.0
 	golang.org/x/sys v0.26.0
@@ -51,11 +56,13 @@ require (
 	github.com/bodgit/sevenzip v1.5.2 // indirect
 	github.com/bodgit/windows v1.0.1 // indirect
 	github.com/cloudflare/circl v1.5.0 // indirect
+	github.com/coreos/go-iptables v0.7.0 // indirect
 	github.com/dsnet/compress v0.0.2-0.20230904184137-39efe44ab707 // indirect
 	github.com/gen2brain/shm v0.1.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
+	github.com/google/gopacket v1.1.19 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
@@ -78,7 +85,6 @@ require (
 	github.com/nwaples/rardecode/v2 v2.0.0-beta.3 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/riobard/go-bloom v0.0.0-20200614022211-cdc8013cb5b3 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect

