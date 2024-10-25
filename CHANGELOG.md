@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.38.3](https://github.com/jm33-m0/emp3r0r/compare/v1.38.2...v1.38.3) (2024-10-25)
+
+
+### Bug Fixes
+
+* re-implement kcp C2 based on kcptun, use single UDP connection ([331b857](https://github.com/jm33-m0/emp3r0r/commit/331b8575dbd765d822021ec928489a1fae55f83e))
+
 ## [1.38.2](https://github.com/jm33-m0/emp3r0r/compare/v1.38.1...v1.38.2) (2024-10-24)
 
 
