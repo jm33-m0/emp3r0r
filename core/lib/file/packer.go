@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/mholt/archiver/v4"
+	"github.com/mholt/archives"
 )
 
 // Base64Encode encodes a byte slice to a base64 URL-encoded string
@@ -28,7 +28,7 @@ func Base64Decode(text string) []byte {
 func Bin2String(data []byte) (res string) {
 	var compressedBuf bytes.Buffer
 	// Wrap the underlying writer with BZ2 compressor
-	compressor, err := archiver.Bz2{}.OpenWriter(&compressedBuf)
+	compressor, err := archives.Bz2{}.OpenWriter(&compressedBuf)
 	if err != nil {
 		log.Printf("Bin2String: %v", err)
 		return
@@ -64,7 +64,7 @@ func ExtractFileFromString(data string) (out []byte, err error) {
 
 	var decompressBuf bytes.Buffer
 	// Wrap the underlying reader with BZ2 decompressor
-	decompressor, err := archiver.Bz2{}.OpenReader(bytes.NewReader(decoded))
+	decompressor, err := archives.Bz2{}.OpenReader(bytes.NewReader(decoded))
 	if err != nil {
 		return nil, fmt.Errorf("ExtractFileFromString: %v", err)
 	}

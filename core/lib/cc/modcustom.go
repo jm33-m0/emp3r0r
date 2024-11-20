@@ -16,7 +16,7 @@ import (
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/mholt/archiver/v4"
+	"github.com/mholt/archives"
 	"github.com/olekukonko/tablewriter"
 )
 
@@ -323,7 +323,7 @@ func genStartScript(config *ModConfig, outfile string) error {
 	CliPrintInfo("Compressing start script with XZ...")
 	// wrap underlying writer w
 	w, err := os.Create(outfile)
-	compressor, err := archiver.Xz{}.OpenWriter(w)
+	compressor, err := archives.Xz{}.OpenWriter(w)
 	if err != nil {
 		return err
 	}
