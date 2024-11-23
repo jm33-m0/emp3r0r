@@ -13,7 +13,6 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/google/uuid"
-	"github.com/jm33-m0/arc"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -286,7 +285,7 @@ func readModCondig(file string) (pconfig *ModConfig, err error) {
 	return
 }
 
-// genStartScript reads config.json of a module
+// genStartScript reads config.json of a module and generates a start script to invoke the module
 func genStartScript(config *ModConfig, outfile string) error {
 	module_exec_path := fmt.Sprintf("%s/%s/%s", config.Path, config.Name, config.Exec)
 	var builder strings.Builder
@@ -318,17 +317,11 @@ func genStartScript(config *ModConfig, outfile string) error {
 	} else {
 		builder.WriteString(fmt.Sprintf(" ./%s", config.Exec))
 	}
+	defer builder.Reset()
+	_ = os.WriteFile(outfile+".orig", []byte(builder.String()), 0o600)
 
-	// compress start script with XZ
-	CliPrintInfo("Compressing start script with XZ...")
-	// compress start script with XZ
-	compressedData, compressErr := arc.CompressXz([]byte(builder.String()))
-	if compressErr != nil {
-		return fmt.Errorf("CompressXz: %v", compressErr)
-	}
-
-	// write compressed data to file
-	return os.WriteFile(outfile, compressedData, 0o600)
+	// write to file
+	return os.WriteFile(outfile, []byte(builder.String()), 0o600)
 }
 
 func updateModuleHelp(config *ModConfig) error {
