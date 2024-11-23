@@ -13,10 +13,10 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/google/uuid"
+	"github.com/jm33-m0/arc"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/mholt/archives"
 	"github.com/olekukonko/tablewriter"
 )
 
@@ -147,11 +147,11 @@ func moduleCustom() {
 			}
 
 			// do it
-			err := SSHClient(fmt.Sprintf("%s/%s/%s",
+			sshErr := SSHClient(fmt.Sprintf("%s/%s/%s",
 				RuntimeConfig.AgentRoot, CurrentMod, config.Exec),
 				args, port, false)
-			if err != nil {
-				CliPrintError("module %s: %v", config.Name, err)
+			if sshErr != nil {
+				CliPrintError("module %s: %v", config.Name, sshErr)
 				return
 			}
 		}
@@ -220,9 +220,9 @@ func InitModules() {
 			return
 		}
 		CliPrintInfo("Scanning %s for modules", mod_dir)
-		dirs, err := os.ReadDir(mod_dir)
-		if err != nil {
-			CliPrintError("Failed to scan custom modules: %v", err)
+		dirs, readdirErr := os.ReadDir(mod_dir)
+		if readdirErr != nil {
+			CliPrintError("Failed to scan custom modules: %v", readdirErr)
 			return
 		}
 		for _, dir := range dirs {
@@ -233,9 +233,9 @@ func InitModules() {
 			if !util.IsExist(config_file) {
 				continue
 			}
-			config, err := readModCondig(config_file)
-			if err != nil {
-				CliPrintWarning("Reading config from %s: %v", dir.Name(), err)
+			config, readConfigErr := readModCondig(config_file)
+			if readConfigErr != nil {
+				CliPrintWarning("Reading config from %s: %v", dir.Name(), readConfigErr)
 				continue
 			}
 
@@ -245,9 +245,9 @@ func InitModules() {
 			ModuleHelpers[config.Name] = moduleCustom
 			emp3r0r_data.ModuleComments[config.Name] = config.Comment
 
-			err = updateModuleHelp(config)
-			if err != nil {
-				CliPrintWarning("Loading config from %s: %v", config.Name, err)
+			readConfigErr = updateModuleHelp(config)
+			if readConfigErr != nil {
+				CliPrintWarning("Loading config from %s: %v", config.Name, readConfigErr)
 				continue
 			}
 			ModuleConfigs[config.Name] = *config
@@ -310,9 +310,9 @@ func genStartScript(config *ModConfig, outfile string) error {
 			builder.WriteString(fmt.Sprintf("\n.\\%s", config.Exec))
 		}
 		// else we will append the script to start.ps1
-		mod_data, err := os.ReadFile(module_exec_path)
-		if err != nil {
-			return err
+		mod_data, readErr := os.ReadFile(module_exec_path)
+		if readErr != nil {
+			return readErr
 		}
 		builder.WriteString(fmt.Sprintf("\n%s", mod_data))
 	} else {
@@ -321,18 +321,14 @@ func genStartScript(config *ModConfig, outfile string) error {
 
 	// compress start script with XZ
 	CliPrintInfo("Compressing start script with XZ...")
-	// wrap underlying writer w
-	w, err := os.Create(outfile)
-	compressor, err := archives.Xz{}.OpenWriter(w)
-	if err != nil {
-		return err
+	// compress start script with XZ
+	compressedData, compressErr := arc.CompressXz([]byte(builder.String()))
+	if compressErr != nil {
+		return fmt.Errorf("CompressXz: %v", compressErr)
 	}
-	defer compressor.Close()
 
-	// writes to compressor will be compressed
-	_, err = compressor.Write([]byte(builder.String()))
-
-	return err
+	// write compressed data to file
+	return os.WriteFile(outfile, compressedData, 0o600)
 }
 
 func updateModuleHelp(config *ModConfig) error {

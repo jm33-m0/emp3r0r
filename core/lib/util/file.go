@@ -41,9 +41,9 @@ func LsPath(path string) (res string, err error) {
 	// parse
 	var dents []Dentry
 	for _, f := range files {
-		info, err := f.Info()
-		if err != nil {
-			log.Printf("LsPath: %v", err)
+		info, statErr := f.Info()
+		if statErr != nil {
+			log.Printf("LsPath: %v", statErr)
 			continue
 		}
 		var dent Dentry
@@ -85,12 +85,8 @@ func IsFileExist(path string) bool {
 
 // IsExist check if a path exists
 func IsExist(path string) bool {
-	_, err := os.Stat(path)
-	if os.IsNotExist(err) {
-		return false
-	}
-
-	return true
+	_, statErr := os.Stat(path)
+	return !os.IsNotExist(statErr)
 }
 
 // IsDirExist check if a directory exists

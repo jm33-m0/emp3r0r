@@ -19,9 +19,9 @@ import (
 // open the picture if possible
 func TakeScreenshot() {
 	// tell agent to take screenshot
-	err := SendCmdToCurrentTarget("screenshot", "")
-	if err != nil {
-		CliPrintError("send screenshot cmd: %v", err)
+	screenshotErr := SendCmdToCurrentTarget("screenshot", "")
+	if screenshotErr != nil {
+		CliPrintError("send screenshot cmd: %v", screenshotErr)
 		return
 	}
 

