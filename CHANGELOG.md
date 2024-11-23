@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.38.4](https://github.com/jm33-m0/emp3r0r/compare/v1.38.3...v1.38.4) (2024-11-23)
+
+
+### Bug Fixes
+
+* module start scripts don't need compression ([aa4869f](https://github.com/jm33-m0/emp3r0r/commit/aa4869f05573f1fba090a6134353e80a7963c517))
+* switch to `arc` as `archiver` is deprecated ([17ed290](https://github.com/jm33-m0/emp3r0r/commit/17ed290b4917f868c76a8fea4abb2efb9021cba5))
+* switch to `archives` as `archiver` is deprecated ([de0b493](https://github.com/jm33-m0/emp3r0r/commit/de0b4932338db2664b01938bd3b9a0ee4a4f3d66))
+
 ## [1.38.3](https://github.com/jm33-m0/emp3r0r/compare/v1.38.2...v1.38.3) (2024-10-25)
 
 
