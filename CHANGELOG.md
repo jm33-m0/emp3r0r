@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.39.0](https://github.com/jm33-m0/emp3r0r/compare/v1.38.4...v1.39.0) (2024-12-16)
+
+
+### Features
+
+* integrate donut (WIP) ([93c76f2](https://github.com/jm33-m0/emp3r0r/commit/93c76f24fbf6231f7d11f2229da3ef44cb9eac14))
+
+
+### Bug Fixes
+
+* possible crash ([e568438](https://github.com/jm33-m0/emp3r0r/commit/e56843899a3b086eddf670b9d50ea142fda95f65))
+
 ## [1.38.4](https://github.com/jm33-m0/emp3r0r/compare/v1.38.3...v1.38.4) (2024-11-23)
 
 
