@@ -30,7 +30,7 @@ func DownloadFile(url, path string) (err error) {
 // SendCmd send command to agent
 func SendCmd(cmd, cmd_id string, a *emp3r0r_data.AgentSystemInfo) error {
 	if a == nil {
-		return fmt.Errorf("SendCmd: agent '%s' not found", a.Tag)
+		return errors.New("SendCmd: agent not found")
 	}
 
 	var cmdData emp3r0r_data.MsgTunData

@@ -664,10 +664,6 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 				return
 			}
 			shortname := agent.Name
-			if agent == nil {
-				CliPrintWarning("msgTunHandler: agent not recognized")
-				return
-			}
 			if Targets[agent].Conn == nil {
 				CliAlert(color.FgHiGreen, "[%d] Knock.. Knock...", Targets[agent].Index)
 				CliAlert(color.FgHiGreen, "agent %s connected", strconv.Quote(shortname))
