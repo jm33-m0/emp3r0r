@@ -24,9 +24,9 @@ import (
 // the server binds local interface only
 func crossPlatformSSHD(shell, port string, args []string) (err error) {
 	exe, e := exec.LookPath(shell)
-	if err != nil {
-		err = fmt.Errorf("%s not found (%v)", shell, e)
-		log.Print(err)
+	if e != nil {
+		e = fmt.Errorf("%s not found (%v)", shell, e)
+		log.Print(e)
 		return
 	}
 	if shell == "elvsh" {

@@ -3,7 +3,7 @@
 
 package agent
 
-func crossPlatformSetProcName(name string) {
+func crossPlatformSetProcName(string) {
 	return
 }
 
