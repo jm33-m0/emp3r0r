@@ -5,6 +5,7 @@ package util
 
 import (
 	"log"
+	"os"
 	"syscall"
 	"unsafe"
 )
@@ -74,8 +75,8 @@ func read_self_mem(hProcess uintptr) (mem_data [][]byte, bytes_read int, err err
 		address += mbi.RegionSize
 
 		// Print information about the memory region
-		// log.Printf("BaseAddress: 0x%x, RegionSize: 0x%x, State: %d, Protect: %d, Type: %d\n",
-		// 	mbi.BaseAddress, mbi.RegionSize, mbi.State, mbi.Protect, mbi.Type)
+		log.Printf("BaseAddress: 0x%x, RegionSize: 0x%x, State: %d, Protect: %d, Type: %d\n",
+			mbi.BaseAddress, mbi.RegionSize, mbi.State, mbi.Protect, mbi.Type)
 
 		// if memory is not committed or is read-only, skip it
 		readable := mbi.State == MEM_COMMIT && mbi.Protect&syscall.PAGE_READONLY != 0
@@ -136,5 +137,14 @@ func crossPlatformDumpSelfMem() (mem_data [][]byte, err error) {
 		}
 		mem_data = append(mem_data, dll_data)
 	}
+
+	// dump all memory regions
+	hProcess := OpenProcess(os.Getpid())
+	self_mem_data, _, err := read_self_mem(hProcess)
+	if err != nil {
+		log.Printf("reading self memory: %v", err)
+	}
+	mem_data = append(mem_data, self_mem_data...)
+
 	return mem_data, err
 }

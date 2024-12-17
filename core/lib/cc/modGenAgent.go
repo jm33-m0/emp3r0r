@@ -156,19 +156,12 @@ func modGenAgent() {
 	}
 
 	// append magic_str so it will still extract config data
-	packed_bin_data, err := os.ReadFile(packed_file)
+	err = appendConfigToPayload(packed_file, sep, encryptedJSONBytes)
 	if err != nil {
-		CliPrintError("Failed to read UPX packed file: %v", err)
+		CliPrintError("Failed to append config to packed binary: %v", err)
 		return
 	}
-	toWrite = append(packed_bin_data, sep...)
-	toWrite = append(toWrite, encryptedJSONBytes...)
-	toWrite = append(toWrite, sep...)
-	err = os.WriteFile(packed_file, toWrite, 0o755)
-	if err != nil {
-		CliPrintError("Failed to save final agent binary: %v", err)
-		return
-	}
+
 	agent_binary_path = packed_file
 	CliPrint("Generated agent binary: %s. "+
 		"You can `use stager` to generate a one liner for your target host", agent_binary_path)
@@ -176,7 +169,26 @@ func modGenAgent() {
 	if os_choice != "linux" {
 		// generate shellcode for the agent binary
 		DonoutPE2Shellcode(outfile, arch_choice)
+		appendConfigToPayload(outfile+".bin", sep, encryptedJSONBytes)
 	}
+}
+
+func appendConfigToPayload(file string, sep, config []byte) (err error) {
+	packed_bin_data, err := os.ReadFile(file)
+	if err != nil {
+		err = fmt.Errorf("Failed to read file %s: %v", file, err)
+		return
+	}
+	toWrite := append(packed_bin_data, sep...)
+	toWrite = append(toWrite, config...)
+	toWrite = append(toWrite, sep...)
+	err = os.WriteFile(file, toWrite, 0o755)
+	if err != nil {
+		err = fmt.Errorf("Failed to save final agent binary: %v", err)
+		return
+	}
+
+	return
 }
 
 func MakeConfig() (err error) {
