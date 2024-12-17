@@ -2,7 +2,6 @@ package util
 
 import (
 	crypto_rand "crypto/rand"
-	"encoding/binary"
 	"encoding/csv"
 	"fmt"
 	"log"
@@ -105,14 +104,12 @@ func RandInt(min, max int) int {
 		log.Println("falling back to math/rand with time seed")
 		return rand.New(rand.NewSource(time.Now().UnixNano())).Intn(max-min) + min
 	}
-	rand.Seed(int64(binary.LittleEndian.Uint64(b[:])))
 	return min + rand.Intn(max-min)
 }
 
 // RandStr random string
 func RandStr(n int) string {
 	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	rand.Seed(int64(RandInt(0xff, math.MaxInt)))
 	b := make([]rune, n)
 	for i := range b {
 		b[i] = letters[int64(RandInt(0, len(letters)))]
