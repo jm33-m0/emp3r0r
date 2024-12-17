@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.39.2](https://github.com/jm33-m0/emp3r0r/compare/v1.39.1...v1.39.2) (2024-12-17)
+
+
+### Bug Fixes
+
+* unable to find config data in shellcode mode ([d99be9f](https://github.com/jm33-m0/emp3r0r/commit/d99be9ffb853b8d19b3ac36aa192dee8e7506613))
+
 ## [1.39.1](https://github.com/jm33-m0/emp3r0r/compare/v1.39.0...v1.39.1) (2024-12-17)
 
 
