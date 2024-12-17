@@ -3,7 +3,6 @@ module github.com/jm33-m0/emp3r0r/core
 go 1.23.3
 
 require (
-	github.com/Binject/go-donut v0.0.0-20220908180326-fcdcc35d591c
 	github.com/Code-Hex/Neo-cowsay/v2 v2.0.4
 	github.com/Microsoft/go-winio v0.6.2
 	github.com/bettercap/readline v0.0.0-20210228151553-655e48bcb7bf
@@ -36,7 +35,7 @@ require (
 	github.com/txthinking/socks5 v0.0.0-20230325130024-4230056ae301
 	github.com/vishvananda/netlink v1.3.0
 	github.com/xtaci/kcp-go/v5 v5.6.18
-	github.com/xtaci/kcptun v0.0.0-20241205080304-3584a4de9da9
+	github.com/xtaci/kcptun v0.0.0-20241216120818-6ebdb40f659b
 	github.com/xtaci/qpp v1.1.17
 	github.com/xtaci/smux v1.5.32
 	github.com/xtaci/tcpraw v1.2.31
@@ -47,7 +46,6 @@ require (
 )
 
 require (
-	github.com/Binject/debug v0.0.0-20230508195519-26db73212a7a // indirect
 	github.com/Code-Hex/go-wordwrap v1.0.0 // indirect
 	github.com/STARRY-S/zip v0.2.1 // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
@@ -104,9 +102,6 @@ require (
 	github.com/vishvananda/netns v0.0.5 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
-	golang.org/x/sync v0.10.0 // indirect
-	golang.org/x/term v0.27.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/term v0.27.0 // indirect
 	golang.org/x/text v0.21.0 // indirect

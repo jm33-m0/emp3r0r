@@ -49,7 +49,13 @@ func main() {
 	// verbose
 	if verbose {
 		log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
-		log.SetOutput(os.Stderr)
+		log_file := "emp3r0r.log"
+		f, err := os.OpenFile(log_file, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+		if err != nil {
+			log.Fatalf("[-] Cannot open %s: %v", log_file, err)
+		}
+		defer f.Close()
+		log.SetOutput(f)
 		log.Println("emp3r0r agent has started")
 	} else if !runElvsh {
 		// silent!

