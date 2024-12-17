@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.39.1](https://github.com/jm33-m0/emp3r0r/compare/v1.39.0...v1.39.1) (2024-12-17)
+
+
+### Bug Fixes
+
+* use donut from upstream to support compression and latest features ([a212200](https://github.com/jm33-m0/emp3r0r/commit/a2122004c6b25fffcc9aeb0dd99e380a60dc3add))
+
 ## [1.39.0](https://github.com/jm33-m0/emp3r0r/compare/v1.38.4...v1.39.0) (2024-12-16)
 
 
