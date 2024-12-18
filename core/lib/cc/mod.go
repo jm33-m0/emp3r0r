@@ -240,7 +240,7 @@ func UpdateOptions(modName string) (exist bool) {
 		cdn_proxy.Val = read_cached_config("cdn_proxy").(string)
 		// shadowsocks switch
 		shadowsocks := addIfNotFound("shadowsocks")
-		shadowsocks.Vals = []string{"on", "off", "with_kcp"}
+		shadowsocks.Vals = []string{"on", "off", "bare"}
 		shadowsocks.Val = "off"
 		// agent proxy for c2 transport
 		c2transport_proxy := addIfNotFound("c2transport_proxy")

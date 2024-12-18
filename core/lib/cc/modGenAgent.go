@@ -264,17 +264,8 @@ func MakeConfig() (err error) {
 	RuntimeConfig.CDNProxy = Options["cdn_proxy"].Val
 
 	// shadowsocks and kcp
-	if Options["shadowsocks"].Val == "on" ||
-		Options["shadowsocks"].Val == "with_kcp" {
-		RuntimeConfig.UseShadowsocks = true
-		if Options["shadowsocks"].Val == "with_kcp" {
-			RuntimeConfig.UseKCP = true
-		}
-		RuntimeConfig.UseShadowsocks = true
-	} else {
-		RuntimeConfig.UseShadowsocks = false
-		RuntimeConfig.UseKCP = false
-	}
+	RuntimeConfig.UseShadowsocks = Options["shadowsocks"].Val == "on" || Options["shadowsocks"].Val == "bare"
+	RuntimeConfig.UseKCP = Options["shadowsocks"].Val != "bare" && RuntimeConfig.UseShadowsocks
 
 	// agent proxy for c2 transport
 	RuntimeConfig.C2TransportProxy = Options["c2transport_proxy"].Val
