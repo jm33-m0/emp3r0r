@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.39.4](https://github.com/jm33-m0/emp3r0r/compare/v1.39.3...v1.39.4) (2024-12-18)
+
+
+### Bug Fixes
+
+* CC has no knowledge of agent root location, causing custom module to fail ([ca5f5da](https://github.com/jm33-m0/emp3r0r/commit/ca5f5da53e03d69b4cc7b584463d8af4ae94ba1d))
+* chdir error when running custom modules ([66a699f](https://github.com/jm33-m0/emp3r0r/commit/66a699f83bfb2994aa1a86635cd2bb664dfc3b90))
+* collect module output ([40fd645](https://github.com/jm33-m0/emp3r0r/commit/40fd6458173ddd815d617e06cf2e0b9ed9fd353b))
+* no need to compress module when it already exists ([54cdd18](https://github.com/jm33-m0/emp3r0r/commit/54cdd1877b86ceb57a7cc9e1ccc1d5dc3825c813))
+
 ## [1.39.3](https://github.com/jm33-m0/emp3r0r/compare/v1.39.2...v1.39.3) (2024-12-18)
 
 
