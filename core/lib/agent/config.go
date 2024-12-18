@@ -122,6 +122,7 @@ func GetRandomWritablePath() (string, error) {
 	}
 	if len(level3Paths) == 0 {
 		rand_path = just_get_one()
+		return rand_path, nil
 	}
 	rand_path = level3Paths[util.RandInt(0, len(level3Paths))]
 
