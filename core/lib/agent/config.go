@@ -114,16 +114,16 @@ func GetRandomWritablePath() (string, error) {
 
 	// Filter paths to ensure they are level 3 or above
 	var level3Paths []string
+	var rand_path string
 	for _, path := range paths {
 		if strings.Count(path, "/") >= 3 {
 			level3Paths = append(level3Paths, path)
 		}
 	}
-
-	rand_path := level3Paths[util.RandInt(0, len(level3Paths))]
 	if len(level3Paths) == 0 {
 		rand_path = just_get_one()
 	}
+	rand_path = level3Paths[util.RandInt(0, len(level3Paths))]
 
 	if !strings.HasSuffix(rand_path, "/") {
 		rand_path += "/"
