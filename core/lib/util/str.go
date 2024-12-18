@@ -1,11 +1,11 @@
 package util
 
 import (
+	"crypto/md5"
 	crypto_rand "crypto/rand"
 	"encoding/csv"
 	"fmt"
 	"log"
-	"math"
 	"math/rand"
 	"os"
 	"strings"
@@ -117,6 +117,12 @@ func RandStr(n int) string {
 	return string(b)
 }
 
+// RandMD5String random MD5 string for agent file names
+func RandMD5String() string {
+	rand_bytes := RandBytes(16)
+	return fmt.Sprintf("%x", md5.Sum(rand_bytes))
+}
+
 // Random bytes
 func RandBytes(n int) []byte {
 	var all_bytes []byte
@@ -126,7 +132,6 @@ func RandBytes(n int) []byte {
 		}
 		all_bytes = append(all_bytes, byte(b))
 	}
-	rand.Seed(int64(RandInt(0xff, math.MaxInt)))
 	rand_bytes := make([]byte, n)
 	for i := range rand_bytes {
 		rand_bytes[i] = all_bytes[int64(RandInt(0, len(all_bytes)))]

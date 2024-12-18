@@ -280,3 +280,58 @@ func FindHolesInBinary(fdata []byte, size int64) (indexes []int64, err error) {
 
 	return
 }
+
+// IsDirWritable check if a directory is writable
+func IsDirWritable(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	mode := info.Mode().Perm()
+	return mode&0200 != 0 // Check write permission for the owner
+}
+
+// GetWritablePaths get all writable paths in a directory up to a given depth
+func GetWritablePaths(root_path string, depth int) ([]string, error) {
+	if depth < 0 {
+		return nil, fmt.Errorf("Invalid depth: %d", depth)
+	}
+
+	var writablePaths []string
+	var searchPaths func(path string, currentDepth int) error
+
+	searchPaths = func(path string, currentDepth int) error {
+		if currentDepth > depth {
+			return nil
+		}
+
+		files, err := os.ReadDir(path)
+		if err != nil {
+			log.Printf("Skipping unreadable directory %s: %v", path, err)
+			return nil
+		}
+
+		for _, file := range files {
+			fullPath := filepath.Join(path, file.Name())
+			if file.IsDir() {
+				if IsDirWritable(fullPath) {
+					writablePaths = append(writablePaths, fullPath)
+				}
+				if err := searchPaths(fullPath, currentDepth+1); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+
+	if err := searchPaths(root_path, 0); err != nil {
+		return nil, err
+	}
+
+	if len(writablePaths) == 0 {
+		return nil, fmt.Errorf("No writable paths found in %s", root_path)
+	}
+
+	return writablePaths, nil
+}

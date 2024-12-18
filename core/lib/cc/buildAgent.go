@@ -124,13 +124,12 @@ func InitConfigFile(cc_host string) (err error) {
 
 	// random strings
 	RuntimeConfig.AgentUUID = uuid.NewString()
-	agent_root := util.RandStr(util.RandInt(6, 20))
-	RuntimeConfig.AgentRoot = fmt.Sprintf("/tmp/ssh-%v", agent_root)
-	utils_path := util.RandStr(util.RandInt(3, 20))
+	RuntimeConfig.AgentRoot = util.RandMD5String()
+	utils_path := util.RandMD5String()
 	RuntimeConfig.UtilsPath = fmt.Sprintf("%s/%v", RuntimeConfig.AgentRoot, utils_path)
-	socket := util.RandStr(util.RandInt(3, 20))
+	socket := util.RandMD5String()
 	RuntimeConfig.SocketName = fmt.Sprintf("%s/%v", RuntimeConfig.AgentRoot, socket)
-	pid_file := util.RandStr(util.RandInt(3, 20))
+	pid_file := util.RandMD5String()
 	RuntimeConfig.PIDFile = fmt.Sprintf("%s/%v", RuntimeConfig.AgentRoot, pid_file)
 	RuntimeConfig.Password = util.RandStr(20)
 
