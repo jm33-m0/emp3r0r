@@ -120,13 +120,13 @@ func main() {
 			util.RandInt(0, 6)))
 	}
 
-	// hide agent process
-	if agent.HasRoot() {
-		err = agent.HidePIDs()
-		if err != nil {
-			log.Printf("Hiding PIDs: %v", err)
-		}
-	}
+	// hide agent process: disabled for now
+	// if agent.HasRoot() {
+	// 	err = agent.HidePIDs()
+	// 	if err != nil {
+	// 		log.Printf("Hiding PIDs: %v", err)
+	// 	}
+	// }
 
 	// run as elvish shell
 	if runElvsh {
