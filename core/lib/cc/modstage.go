@@ -20,7 +20,7 @@ var Stagers = []string{
 	"python",
 	"python3",
 	"perl",
-	"powershell_dowdload_exec",
+	"powershell_download_exec",
 	"powershell_shellcode_in_mem",
 }
 
