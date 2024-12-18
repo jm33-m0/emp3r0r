@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.39.3](https://github.com/jm33-m0/emp3r0r/compare/v1.39.2...v1.39.3) (2024-12-18)
+
+
+### Bug Fixes
+
+* deprecated `rand.seed` ([1515072](https://github.com/jm33-m0/emp3r0r/commit/151507267235746bc937c2d16e9338126fbb3f36))
+* disable `HidePIDs` until we find a better way ([1fc1494](https://github.com/jm33-m0/emp3r0r/commit/1fc149475f69628935547c6164a2a1dbc63b3664))
+* do not create any files in Windows ([82975d7](https://github.com/jm33-m0/emp3r0r/commit/82975d785837f8339cd6e4ba53d582c67326b6a8))
+* dont use `.exe` for Linux agents ([1b55009](https://github.com/jm33-m0/emp3r0r/commit/1b55009649bf2a170304b55f1db246ffcc045d4f))
+* minor bugs and code optimization ([5e72139](https://github.com/jm33-m0/emp3r0r/commit/5e72139b4492e97a19bd94ee2ba2f1c2f3521bbe))
+* path searching: crash ([e982019](https://github.com/jm33-m0/emp3r0r/commit/e9820193796fbb4631b23bed9ac6d8deab1ab1b6))
+* path searching: crash ([24ff532](https://github.com/jm33-m0/emp3r0r/commit/24ff5328a7787371fc4dd713fde95c34ebc001ea))
+* randomize agent root even more (Linux) ([e96511c](https://github.com/jm33-m0/emp3r0r/commit/e96511ce17c1b9fda504c8869a07bfd14704c8f3))
+* simple stagers ([a6d191d](https://github.com/jm33-m0/emp3r0r/commit/a6d191df9f349accf91c92f0d1f083373b147a47))
+* typo in stager name ([442252d](https://github.com/jm33-m0/emp3r0r/commit/442252dd95dbfbf8566294e69aaf2ad0d3aa4d8f))
+* use shadowsocks with kcptun by default ([791736d](https://github.com/jm33-m0/emp3r0r/commit/791736de3f295d486f41896999103ff814dcbde5))
+
 ## [1.39.2](https://github.com/jm33-m0/emp3r0r/compare/v1.39.1...v1.39.2) (2024-12-17)
 
 
