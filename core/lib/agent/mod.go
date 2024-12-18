@@ -17,12 +17,10 @@ func moduleHandler(modName, checksum string) (out string) {
 	modDir := filepath.Join(RuntimeConfig.AgentRoot, modName)
 	startScript := fmt.Sprintf("%s.%s", modName, getScriptExtension())
 
+	var err error
+
 	// cd to module dir
-	cwd, err := os.Getwd()
-	if err != nil {
-		return fmt.Sprintf("getwd: %v", err)
-	}
-	defer os.Chdir(cwd)
+	defer os.Chdir(RuntimeConfig.AgentRoot)
 	os.Chdir(modDir)
 
 	// in memory execution?
@@ -100,11 +98,7 @@ func processModuleFiles(modDir string) error {
 
 func runStartScript(startScript, modDir string) (string, error) {
 	// cd to module dir
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("getwd: %w", err)
-	}
-	defer os.Chdir(cwd)
+	defer os.Chdir(RuntimeConfig.AgentRoot)
 	os.Chdir(modDir)
 
 	// Download the script payload
