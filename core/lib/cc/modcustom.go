@@ -105,15 +105,17 @@ func moduleCustom() {
 
 		// compress module files
 		tarball := WWWRoot + CurrentMod + ".tar.xz"
-		CliPrintInfo("Compressing %s with xz...", CurrentMod)
-		path := fmt.Sprintf("%s/%s", config.Path, CurrentMod)
-		err = util.TarXZ(path, tarball)
-		if err != nil {
-			CliPrintError("Compressing %s: %v", CurrentMod, err)
-			return
+		if !util.IsFileExist(tarball) {
+			CliPrintInfo("Compressing %s with xz...", CurrentMod)
+			path := fmt.Sprintf("%s/%s", config.Path, CurrentMod)
+			err = util.TarXZ(path, tarball)
+			if err != nil {
+				CliPrintError("Compressing %s: %v", CurrentMod, err)
+				return
+			}
+			CliPrintInfo("Created %.4fMB archive (%s) for module '%s'",
+				float64(util.FileSize(tarball))/1024/1024, tarball, CurrentMod)
 		}
-		CliPrintInfo("Created %.4fMB archive (%s) for module '%s'",
-			float64(util.FileSize(tarball))/1024/1024, tarball, CurrentMod)
 
 		// tell agent to download and execute this module
 		checksum := tun.SHA256SumFile(tarball)
