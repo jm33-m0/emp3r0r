@@ -146,7 +146,10 @@ func modGenAgent() {
 	CliPrintDebug("OneTimeMagicBytes is %x", emp3r0r_data.OneTimeMagicBytes)
 	agent_binary_path = outfile
 
-	packed_file := fmt.Sprintf("%s.packed.exe", outfile)
+	packed_file := fmt.Sprintf("%s.packed", outfile)
+	if os_choice == "windows" {
+		packed_file = fmt.Sprintf("%s.packed.exe", outfile)
+	}
 
 	// pack it with upx
 	err = upx(outfile, packed_file)
