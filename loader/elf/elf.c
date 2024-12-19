@@ -18,22 +18,26 @@
 // as some archs don't call it at all.
 static void _exit_func(int code) { exit(code); }
 
-static void _get_rand(char *buf, int size) {
+static void _get_rand(char *buf, int size)
+{
   int fd = open("/dev/urandom", O_RDONLY, 0);
 
   read(fd, (unsigned char *)buf, size);
   close(fd);
 }
 
-static char *_get_interp(char *buf) {
+static char *_get_interp(char *buf)
+{
   int x;
 
   // Check for the existence of a dynamic loader
   Elf_Ehdr *hdr = (Elf_Ehdr *)buf;
   Elf_Phdr *phdr = (Elf_Phdr *)(buf + hdr->e_phoff);
 
-  for (x = 0; x < hdr->e_phnum; x++) {
-    if (phdr[x].p_type == PT_INTERP) {
+  for (x = 0; x < hdr->e_phnum; x++)
+  {
+    if (phdr[x].p_type == PT_INTERP)
+    {
       // There is a dynamic loader present, so load it
       return buf + phdr[x].p_offset;
     }
@@ -42,7 +46,8 @@ static char *_get_interp(char *buf) {
   return NULL;
 }
 
-static Elf_Shdr *_get_section(char *name, void *elf_start) {
+static Elf_Shdr *_get_section(char *name, void *elf_start)
+{
   int x;
   Elf_Ehdr *ehdr = NULL;
   Elf_Shdr *shdr;
@@ -53,7 +58,8 @@ static Elf_Shdr *_get_section(char *name, void *elf_start) {
   Elf_Shdr *sh_strtab = &shdr[ehdr->e_shstrndx];
   char *sh_strtab_p = elf_start + sh_strtab->sh_offset;
 
-  for (x = 0; x < ehdr->e_shnum; x++) {
+  for (x = 0; x < ehdr->e_shnum; x++)
+  {
     // printf("%p %s\n", shdr[x].sh_addr, sh_strtab_p + shdr[x].sh_name);
 
     if (!strcmp(name, sh_strtab_p + shdr[x].sh_name))
@@ -63,18 +69,22 @@ static Elf_Shdr *_get_section(char *name, void *elf_start) {
   return NULL;
 }
 
-void *elf_sym(void *elf_start, char *sym_name) {
+void *elf_sym(void *elf_start, char *sym_name)
+{
   int x, y;
 
   Elf_Ehdr *hdr = (Elf_Ehdr *)elf_start;
   Elf_Shdr *shdr = (Elf_Shdr *)(elf_start + hdr->e_shoff);
 
-  for (x = 0; x < hdr->e_shnum; x++) {
-    if (shdr[x].sh_type == SHT_SYMTAB) {
+  for (x = 0; x < hdr->e_shnum; x++)
+  {
+    if (shdr[x].sh_type == SHT_SYMTAB)
+    {
       const char *strings = elf_start + shdr[shdr[x].sh_link].sh_offset;
       Elf_Sym *syms = (Elf_Sym *)(elf_start + shdr[x].sh_offset);
 
-      for (y = 0; y < shdr[x].sh_size / sizeof(Elf_Sym); y++) {
+      for (y = 0; y < shdr[x].sh_size / sizeof(Elf_Sym); y++)
+      {
         // printf("@name:%s\n", strings + syms[y].st_name);
 
         if (strcmp(sym_name, strings + syms[y].st_name) == 0)
@@ -87,7 +97,8 @@ void *elf_sym(void *elf_start, char *sym_name) {
 }
 
 int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
-             size_t *entry) {
+             size_t *entry)
+{
   Elf_Ehdr *hdr;
   Elf_Phdr *phdr;
 
@@ -99,13 +110,15 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
   hdr = (Elf_Ehdr *)elf_start;
   phdr = (Elf_Phdr *)(elf_start + hdr->e_phoff);
 
-  if (hdr->e_type == ET_DYN) {
+  if (hdr->e_type == ET_DYN)
+  {
     // If this is a DYNAMIC ELF (can be loaded anywhere), set a random base
     // address
     base = (size_t)mmap(0, 100 * PAGE_SIZE, PROT_READ | PROT_WRITE,
                         MAP_PRIVATE | MAP_ANON, -1, 0);
     munmap((void *)base, 100 * PAGE_SIZE);
-  } else
+  }
+  else
     base = 0;
 
   if (base_addr != NULL)
@@ -114,10 +127,12 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
   if (entry != NULL)
     *entry = base + hdr->e_entry;
 
-  for (x = 0; x < hdr->e_phnum; x++) {
+  for (x = 0; x < hdr->e_phnum; x++)
+  {
 #if !defined(OS_FREEBSD)
     // Get flags for the stack
-    if (stack != NULL && phdr[x].p_type == PT_GNU_STACK) {
+    if (stack != NULL && phdr[x].p_type == PT_GNU_STACK)
+    {
       if (phdr[x].p_flags & PF_R)
         stack_prot = PROT_READ;
 
@@ -180,7 +195,8 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
   return 0;
 }
 
-int elf_run(void *buf, char **argv, char **env) {
+int elf_run(void *buf, char **argv, char **env)
+{
   int x;
   int str_len;
   int str_ptr = 0;
@@ -221,7 +237,8 @@ int elf_run(void *buf, char **argv, char **env) {
   // Check for the existence of a dynamic loader
   char *interp_name = _get_interp(buf);
 
-  if (interp_name) {
+  if (interp_name)
+  {
     int f = open(interp_name, O_RDONLY, 0);
 
     // Find out the size of the file
@@ -251,7 +268,8 @@ int elf_run(void *buf, char **argv, char **env) {
   *s_argc = argc;
 
   // Setup argv
-  for (x = 0; x < argc; x++) {
+  for (x = 0; x < argc; x++)
+  {
     str_len = strlen(argv[x]) + 1;
 
     // Copy the string on to the stack inside the string storage area
@@ -269,7 +287,8 @@ int elf_run(void *buf, char **argv, char **env) {
 
   unsigned long *s_env = &stack_storage[stack_ptr];
 
-  for (x = 0; x < envc; x++) {
+  for (x = 0; x < envc; x++)
+  {
     str_len = strlen(env[x]) + 1;
 
     // Copy the string on to the stack inside the string storage area
@@ -290,19 +309,23 @@ int elf_run(void *buf, char **argv, char **env) {
   Elf_Shdr *init_array = _get_section(".init_array", buf);
 
   size_t base = 0;
-  if (hdr->e_type == ET_DYN) {
+  if (hdr->e_type == ET_DYN)
+  {
     // It's a PIC file, so make sure we add the base when we call the
     // constructors
     base = elf_base;
   }
 
-  if (init) {
+  if (init)
+  {
     ptr = (int (*)(int, char **, char **))base + init->sh_addr;
     ptr(argc, argv, env);
   }
 
-  if (init_array) {
-    for (x = 0; x < init_array->sh_size / sizeof(void *); x++) {
+  if (init_array)
+  {
+    for (x = 0; x < init_array->sh_size / sizeof(void *); x++)
+    {
       ptr = (int (*)(int, char **, char **))base +
             *((long *)(base + init_array->sh_addr + (x * sizeof(void *))));
       ptr(argc, argv, env);
