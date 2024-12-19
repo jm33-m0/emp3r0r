@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.39.5](https://github.com/jm33-m0/emp3r0r/compare/v1.39.4...v1.39.5) (2024-12-19)
+
+
+### Bug Fixes
+
+* `__libc_dlopen_mode` deprecated in favor of `dlopen` as libdl.so has been merged into libc.so ([5285b93](https://github.com/jm33-m0/emp3r0r/commit/5285b93d9fc3f63242c903d3e832ebee6f10ac28))
+* fatal error in unix socket listener ([1cd3065](https://github.com/jm33-m0/emp3r0r/commit/1cd3065f044eb281b7701e385b8b88ecc91721d1))
+* more randomized persistence (WIP) ([76686b1](https://github.com/jm33-m0/emp3r0r/commit/76686b1ecf35bfe50a5d0ae72d23b949739ee59f))
+* upgrade `golang.org/x/net` ([78ac77b](https://github.com/jm33-m0/emp3r0r/commit/78ac77bb0c0ef83c812bc980c01390f018d11489))
+
 ## [1.39.4](https://github.com/jm33-m0/emp3r0r/compare/v1.39.3...v1.39.4) (2024-12-18)
 
 
