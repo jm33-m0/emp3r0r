@@ -216,7 +216,11 @@ func InjectorHandler(pid int, method string) (err error) {
 func InjectSharedLib(so_path string, pid int) (err error) {
 	dlopen_addr, err := GetSymFromLibc(pid, "__libc_dlopen_mode")
 	if err != nil {
-		return fmt.Errorf("failed to get __libc_dlopen_mode address for %d: %v", pid, err)
+		log.Printf("failed to get __libc_dlopen_mode address for %d: %v, trying `dlopen`", pid, err)
+	}
+	dlopen_addr, err = GetSymFromLibc(pid, "dlopen")
+	if err != nil {
+		return fmt.Errorf("failed to get dlopen address for %d: %v", pid, err)
 	}
 	shellcode := gen_dlopen_shellcode(so_path, dlopen_addr)
 	if len(shellcode) == 0 {

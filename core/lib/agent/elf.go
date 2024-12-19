@@ -30,7 +30,7 @@ func GetSymFromLibc(pid int, sym string) (addr int64, err error) {
 		return
 	}
 	defer elf_file.Close()
-	syms, err := elf_file.Symbols()
+	syms, err := elf_file.DynamicSymbols()
 	if err != nil {
 		err = fmt.Errorf("ELF symbols: %v", err)
 		return
