@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.39.7](https://github.com/jm33-m0/emp3r0r/compare/v1.39.6...v1.39.7) (2024-12-20)
+
+
+### Bug Fixes
+
+* argv modification is not needed in Windows ([b5915c6](https://github.com/jm33-m0/emp3r0r/commit/b5915c6a1841edf3d475321229b436fb97e32190))
+
 ## [1.39.6](https://github.com/jm33-m0/emp3r0r/compare/v1.39.5...v1.39.6) (2024-12-20)
 
 
