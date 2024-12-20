@@ -327,7 +327,7 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 		if sh.H2x.Conn != nil {
 			err = sh.H2x.Conn.Close()
 			if err != nil {
-				CliPrintError("ftpHandler failed to close connection: " + err.Error())
+				CliPrintError("ftpHandler failed to close connection: %v", err)
 			}
 		}
 		sh.Token = ""
@@ -475,7 +475,7 @@ func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Reque
 		if sh.H2x.Conn != nil {
 			err = sh.H2x.Conn.Close()
 			if err != nil {
-				CliPrintError("portFwdHandler failed to close connection: " + err.Error())
+				CliPrintError("portFwdHandler failed to close connection: %v", err)
 			}
 		}
 
@@ -613,7 +613,7 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 				CliAlert(color.FgHiRed, "[%d] Agent dies", c.Index)
 				CliMsg("[%d] agent %s disconnected\n", c.Index, strconv.Quote(t.Tag))
 				ListTargets()
-				AgentInfoPane.Printf(true, color.HiYellowString("No agent selected"))
+				AgentInfoPane.Printf(true, "%s", color.HiYellowString("No agent selected"))
 				break
 			}
 		}

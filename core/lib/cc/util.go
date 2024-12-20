@@ -130,7 +130,7 @@ func VimEdit(filepath string) (err error) {
 	defer func() {
 		err = os.Remove(Temp + "vim.pane")
 		if err != nil {
-			CliPrintWarning(err.Error())
+			CliPrintWarning("%v", err)
 		}
 	}()
 
@@ -153,7 +153,7 @@ func VimEdit(filepath string) (err error) {
 				CliPrintSuccess("Vim has done editing")
 				return nil
 			}
-			CliPrintError(err.Error())
+			CliPrintError("%v", err)
 			break
 		}
 	}

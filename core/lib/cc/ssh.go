@@ -207,7 +207,7 @@ wait:
 	// if SFTP is requested, open in file manager with XDG-OPEN
 	if is_sftp {
 		// open in file manager
-		err = exec.Command("xdg-open", fmt.Sprintf("sftp://127.0.0.1"+":"+lport)).Start()
+		err = exec.Command("xdg-open", fmt.Sprintf("sftp://127.0.0.1: %s", lport)).Start()
 		return
 	}
 

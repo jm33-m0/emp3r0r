@@ -122,7 +122,7 @@ func TmuxInitWindows() (err error) {
 			return
 		}
 		TmuxPanes[pane.ID] = pane
-		pane.Printf(false, color.HiYellowString(place_holder))
+		pane.Printf(false, "%s", color.HiYellowString(place_holder))
 
 		pane.Name = title
 

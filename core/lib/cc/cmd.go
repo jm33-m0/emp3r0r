@@ -109,7 +109,7 @@ func CmdHandler(cmd string) (err error) {
 
 	case cmdSplit[0] == "use":
 		if len(cmdSplit) != 2 {
-			CliPrintError("use what? " + strconv.Quote(cmd))
+			CliPrintError("use what? %s", strconv.Quote(cmd))
 			return
 		}
 		defer SetDynamicPrompt()
@@ -185,7 +185,7 @@ func CmdHelp(mod string) {
 func setCurrentTarget(cmd string) {
 	cmdSplit := strings.Fields(cmd)
 	if len(cmdSplit) != 2 {
-		CliPrintError("set target to what? " + strconv.Quote(cmd))
+		CliPrintError("set target to what? %s", strconv.Quote(cmd))
 		return
 	}
 	defer SetDynamicPrompt()

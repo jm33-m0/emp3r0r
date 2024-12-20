@@ -276,22 +276,22 @@ func GetTargetDetails(target *emp3r0r_data.AgentSystemInfo) {
 
 	// info map
 	infoMap := map[string]string{
-		"Version":   fmt.Sprintf(target.Version),
-		"Hostname":  util.SplitLongLine(fmt.Sprintf(target.Hostname), 20),
-		"Process":   util.SplitLongLine(fmt.Sprintf(procInfo), 20),
+		"Version":   target.Version,
+		"Hostname":  util.SplitLongLine(target.Hostname, 20),
+		"Process":   util.SplitLongLine(procInfo, 20),
 		"User":      userInfo,
 		"Internet":  hasInternet,
 		"CPU":       cpuinfo,
 		"GPU":       gpuinfo,
 		"MEM":       target.Mem,
-		"Hardware":  util.SplitLongLine(fmt.Sprintf(target.Hardware), 20),
-		"Serial":    util.SplitLongLine(fmt.Sprintf(serial_no), 20),
+		"Hardware":  util.SplitLongLine(target.Hardware, 20),
+		"Serial":    util.SplitLongLine(serial_no, 20),
 		"Container": target.Container,
-		"OS":        util.SplitLongLine(fmt.Sprintf(target.OS), 20),
-		"Kernel":    util.SplitLongLine(fmt.Sprintf(target.Kernel)+", "+fmt.Sprintf(target.Arch), 20),
-		"From":      util.SplitLongLine(fmt.Sprintf(target.From)+fmt.Sprintf(" - %s", fmt.Sprintf(target.Transport)), 20),
-		"IPs":       fmt.Sprintf(ips),
-		"ARP":       fmt.Sprintf(arpTab),
+		"OS":        util.SplitLongLine(target.OS, 20),
+		"Kernel":    util.SplitLongLine(target.Kernel+", "+target.Arch, 20),
+		"From":      util.SplitLongLine(target.From+" - "+target.Transport, 20),
+		"IPs":       ips,
+		"ARP":       arpTab,
 	}
 
 	// print
@@ -505,7 +505,7 @@ func InitConfig() (err error) {
 	if err != nil {
 		return fmt.Errorf("Get current user: %v", err)
 	}
-	EmpWorkSpace = fmt.Sprintf("%s/.emp3r0r", u.HomeDir)
+	EmpWorkSpace = u.HomeDir + "/.emp3r0r"
 	FileGetDir = EmpWorkSpace + "/file-get/"
 	EmpConfigFile = EmpWorkSpace + "/emp3r0r.json"
 	if !util.IsDirExist(EmpWorkSpace) {
