@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.39.6](https://github.com/jm33-m0/emp3r0r/compare/v1.39.5...v1.39.6) (2024-12-20)
+
+
+### Bug Fixes
+
+* [#345](https://github.com/jm33-m0/emp3r0r/issues/345) ([b2ea89c](https://github.com/jm33-m0/emp3r0r/commit/b2ea89c91343c67344a7494603ee18a780b38fe9))
+* compressor issue in `arc`, sync with upstream ([2a18bf8](https://github.com/jm33-m0/emp3r0r/commit/2a18bf866a78333f49f78c7717faae25032e35b7))
+* restore patched ELF's timestamps (mtime, atime) ([8d7ac5e](https://github.com/jm33-m0/emp3r0r/commit/8d7ac5e368ae08060bbdfff9f57e7cac5e4d27e0))
+* update `loader.so` ([22eaf46](https://github.com/jm33-m0/emp3r0r/commit/22eaf46f22b6260f5ed3cbe4a61a6af8561621ab))
+
 ## [1.39.5](https://github.com/jm33-m0/emp3r0r/compare/v1.39.4...v1.39.5) (2024-12-19)
 
 
