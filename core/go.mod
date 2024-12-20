@@ -14,7 +14,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/jaypipes/ghw v0.13.0
-	github.com/jm33-m0/arc v0.0.0-20241123224808-40d34784d505
+	github.com/jm33-m0/arc v1.0.0
 	github.com/jm33-m0/go-cdn2proxy v1.1.2
 	github.com/jm33-m0/go-console v1.0.2
 	github.com/jm33-m0/go-lpe v1.0.7
@@ -22,7 +22,7 @@ require (
 	github.com/lithammer/fuzzysearch v1.1.8
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/muesli/reflow v0.3.0
-	github.com/ncruces/go-dns v1.2.5
+	github.com/ncruces/go-dns v1.2.6
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/otiai10/copy v1.14.0
 	github.com/pkg/errors v0.9.1
