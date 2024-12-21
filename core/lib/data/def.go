@@ -117,7 +117,7 @@ var ModuleComments = map[string]string{
 	ModPERSISTENCE:  "Get persistence via built-in methods",
 	ModPROXY:        "Start a socks proxy on target host, and use it locally on C2 side, so you can access network resources on agent side",
 	ModPORT_FWD:     "Port mapping from agent to CC (or vice versa), via HTTP2 (or other) tunnel",
-	ModSHELL:        "Run custom bash on target, a perfect reverse shell",
+	ModSHELL:        "Bring your own shell program to run on target, or run the existing shell program (not recommended)",
 	ModVACCINE:      "Vaccine helps you install additional tools on target system",
 	ModINJECTOR:     "Inject shellcode/loader.so into a running process",
 	ModGET_ROOT:     "Try some built-in LPE exploits",
