@@ -219,215 +219,81 @@ func SetDynamicPrompt() {
 	EmpReadLine.SetPrompt(dynamicPrompt)
 }
 
-// CliPrintDebug print log in blue
+func cliPrintHelper(format string, a []interface{}, colorAttr color.Attribute, logPrefix string, alert bool) {
+	msgColor := color.New(color.Bold, colorAttr)
+	logMsg := msgColor.Sprintf(format, a...)
+	log.Print(logMsg)
+
+	// Save log to file
+	logFile, err := os.OpenFile("emp3r0r.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Printf("cliPrintHelper: %v", err)
+		return
+	}
+	defer logFile.Close()
+	logger := log.New(logFile, "", log.LstdFlags)
+	logger.Print(logMsg)
+
+	if IsAPIEnabled {
+		var resp APIResponse
+		msg := GetDateTime() + " " + logPrefix + ": " + fmt.Sprintf(format, a...)
+		resp.MsgData = []byte(msg)
+		resp.Alert = alert
+		resp.MsgType = LOG
+		data, err := json.Marshal(resp)
+		if err != nil {
+			log.Printf("cliPrintHelper: %v", err)
+			return
+		}
+		_, err = APIConn.Write([]byte(data))
+		if err != nil {
+			log.Printf("cliPrintHelper: %v", err)
+		}
+	}
+}
+
 func CliPrintDebug(format string, a ...interface{}) {
 	if DebugLevel >= 3 {
-		log.Println(color.BlueString(format, a...))
-		if IsAPIEnabled {
-			// send to socket
-			var resp APIResponse
-			msg := GetDateTime() + " DEBUG: " + fmt.Sprintf(format, a...)
-			resp.MsgData = []byte(msg)
-			resp.Alert = false
-			resp.MsgType = LOG
-			data, err := json.Marshal(resp)
-			if err != nil {
-				log.Printf("CliPrintDebug: %v", err)
-				return
-			}
-			_, err = APIConn.Write([]byte(data))
-			if err != nil {
-				log.Printf("CliPrintDebug: %v", err)
-			}
-		}
+		cliPrintHelper(format, a, color.FgBlue, "DEBUG", false)
 	}
 }
 
-// CliPrintInfo print log in hiblue
 func CliPrintInfo(format string, a ...interface{}) {
 	if DebugLevel >= 2 {
-		log.Println(color.HiBlueString(format, a...))
-		if IsAPIEnabled {
-			// send to socket
-			var resp APIResponse
-			msg := GetDateTime() + " INFO: " + fmt.Sprintf(format, a...)
-			resp.MsgData = []byte(msg)
-			resp.Alert = false
-			resp.MsgType = LOG
-			data, err := json.Marshal(resp)
-			if err != nil {
-				log.Printf("CliPrintInfo: %v", err)
-				return
-			}
-			_, err = APIConn.Write([]byte(data))
-			if err != nil {
-				log.Printf("CliPrintInfo: %v", err)
-			}
-		}
+		cliPrintHelper(format, a, color.FgHiBlue, "INFO", false)
 	}
 }
 
-// CliPrintWarning print log in hiyellow
 func CliPrintWarning(format string, a ...interface{}) {
 	if DebugLevel >= 1 {
-		log.Println(color.HiYellowString(format, a...))
-		if IsAPIEnabled {
-			// send to socket
-			var resp APIResponse
-			msg := GetDateTime() + " WARN: " + fmt.Sprintf(format, a...)
-			resp.MsgData = []byte(msg)
-			resp.Alert = false
-			resp.MsgType = LOG
-			data, err := json.Marshal(resp)
-			if err != nil {
-				log.Printf("CliPrintWarning: %v", err)
-				return
-			}
-			_, err = APIConn.Write([]byte(data))
-			if err != nil {
-				log.Printf("CliPrintWarning: %v", err)
-			}
-		}
+		cliPrintHelper(format, a, color.FgHiYellow, "WARN", false)
 	}
 }
 
-// CliPrint print in bold cyan without logging prefix, regardless of debug level
 func CliPrint(format string, a ...interface{}) {
-	msg_color := color.New(color.Bold, color.FgCyan)
-	fmt.Println(msg_color.Sprintf(format, a...))
-	if IsAPIEnabled {
-		// send to socket
-		var resp APIResponse
-		msg := GetDateTime() + " PRINT: " + fmt.Sprintf(format, a...)
-		resp.MsgData = []byte(msg)
-		resp.Alert = false
-		resp.MsgType = LOG
-		data, err := json.Marshal(resp)
-		if err != nil {
-			log.Printf("CliPrint: %v", err)
-			return
-		}
-		_, err = APIConn.Write([]byte(data))
-		if err != nil {
-			log.Printf("CliPrint: %v", err)
-		}
-	}
+	cliPrintHelper(format, a, color.FgCyan, "PRINT", false)
 }
 
-// CliMsg print log in bold cyan, regardless of debug level
 func CliMsg(format string, a ...interface{}) {
-	msg_color := color.New(color.Bold, color.FgCyan)
-	log.Println(msg_color.Sprintf(format, a...))
-	if IsAPIEnabled {
-		// send to socket
-		var resp APIResponse
-		msg := GetDateTime() + " MSG: " + fmt.Sprintf(format, a...)
-		resp.MsgData = []byte(msg)
-		resp.Alert = false
-		resp.MsgType = LOG
-		data, err := json.Marshal(resp)
-		if err != nil {
-			log.Printf("CliMsg: %v", err)
-			return
-		}
-		_, err = APIConn.Write([]byte(data))
-		if err != nil {
-			log.Printf("CliMsg: %v", err)
-		}
-	}
+	cliPrintHelper(format, a, color.FgCyan, "MSG", false)
 }
 
-// CliAlert print log in blinking text
 func CliAlert(textColor color.Attribute, format string, a ...interface{}) {
-	alertColor := color.New(color.Bold, textColor, color.BlinkSlow)
-	log.Print(alertColor.Sprintf(format, a...))
-	if IsAPIEnabled {
-		// send to socket
-		var resp APIResponse
-		msg := GetDateTime() + " ALERT: " + fmt.Sprintf(format, a...)
-		resp.MsgData = []byte(msg)
-		resp.Alert = false
-		resp.MsgType = LOG
-		data, err := json.Marshal(resp)
-		if err != nil {
-			log.Printf("CliAlert: %v", err)
-			return
-		}
-		_, err = APIConn.Write([]byte(data))
-		if err != nil {
-			log.Printf("CliAlert: %v", err)
-		}
-	}
+	cliPrintHelper(format, a, textColor, "ALERT", false)
 }
 
-// CliPrintSuccess print log in green
 func CliPrintSuccess(format string, a ...interface{}) {
-	successColor := color.New(color.Bold, color.FgHiGreen)
-	log.Print(successColor.Sprintf(format, a...))
-	if IsAPIEnabled {
-		// send to socket
-		var resp APIResponse
-		msg := GetDateTime() + " SUCCESS: " + fmt.Sprintf(format, a...)
-		resp.MsgData = []byte(msg)
-		resp.Alert = true
-		resp.MsgType = LOG
-		data, err := json.Marshal(resp)
-		if err != nil {
-			log.Printf("CliPrintSuccess: %v", err)
-			return
-		}
-		_, err = APIConn.Write([]byte(data))
-		if err != nil {
-			log.Printf("CliPrintSuccess: %v", err)
-		}
-	}
+	cliPrintHelper(format, a, color.FgHiGreen, "SUCCESS", true)
 }
 
-// CliFatalError print log in red, and exit
 func CliFatalError(format string, a ...interface{}) {
-	errorColor := color.New(color.Bold, color.FgHiRed)
+	cliPrintHelper(format, a, color.FgHiRed, "ERROR", true)
 	CliMsg("Run 'tmux kill-session -t emp3r0r' to clean up dead emp3r0r windows")
-	log.Fatal(errorColor.Sprintf(format, a...))
-	if IsAPIEnabled {
-		// send to socket
-		var resp APIResponse
-		msg := GetDateTime() + " ERROR: " + fmt.Sprintf(format, a...)
-		resp.MsgData = []byte(msg)
-		resp.Alert = true
-		resp.MsgType = LOG
-		data, err := json.Marshal(resp)
-		if err != nil {
-			log.Printf("CliPrintError: %v", err)
-			return
-		}
-		_, err = APIConn.Write([]byte(data))
-		if err != nil {
-			log.Printf("CliPrintError: %v", err)
-		}
-	}
+	log.Fatal(color.New(color.Bold, color.FgHiRed).Sprintf(format, a...))
 }
 
-// CliPrintError print log in red
 func CliPrintError(format string, a ...interface{}) {
-	errorColor := color.New(color.Bold, color.FgHiRed)
-	log.Print(errorColor.Sprintf(format, a...))
-	if IsAPIEnabled {
-		// send to socket
-		var resp APIResponse
-		msg := GetDateTime() + " ERROR: " + fmt.Sprintf(format, a...)
-		resp.MsgData = []byte(msg)
-		resp.Alert = true
-		resp.MsgType = LOG
-		data, err := json.Marshal(resp)
-		if err != nil {
-			log.Printf("CliPrintError: %v", err)
-			return
-		}
-		_, err = APIConn.Write([]byte(data))
-		if err != nil {
-			log.Printf("CliPrintError: %v", err)
-		}
-	}
+	cliPrintHelper(format, a, color.FgHiRed, "ERROR", true)
 }
 
 // CliAsk prompt for an answer from user
@@ -487,20 +353,33 @@ func CliYesNo(prompt string) bool {
 
 // CliListOptions list currently available options for `set`
 func CliListOptions() {
+	if CurrentMod == "none" {
+		CliPrintWarning("No module selected")
+		return
+	}
 	TargetsMutex.RLock()
 	defer TargetsMutex.RUnlock()
 	opts := make(map[string]string)
+
 	opts["module"] = CurrentMod
-	_, exist := Targets[CurrentTarget]
-	if exist {
-		shortName := strings.Split(CurrentTarget.Tag, "-agent")[0]
-		opts["target"] = shortName
+	if CurrentTarget != nil {
+		_, exist := Targets[CurrentTarget]
+		if exist {
+			shortName := strings.Split(CurrentTarget.Tag, "-agent")[0]
+			opts["target"] = shortName
+		} else {
+			opts["target"] = "<blank>"
+		}
 	} else {
 		opts["target"] = "<blank>"
 	}
 
 	for k, v := range Options {
-		opts[k] = v.Val
+		if v != nil {
+			opts[k] = v.Val
+		} else {
+			opts[k] = "<nil>"
+		}
 	}
 
 	// build table
@@ -518,7 +397,6 @@ func CliListOptions() {
 		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
 		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor})
 	table.SetColumnColor(tablewriter.Colors{tablewriter.FgHiBlueColor},
-		tablewriter.Colors{tablewriter.FgBlueColor},
 		tablewriter.Colors{tablewriter.FgBlueColor})
 
 	// fill table
