@@ -66,7 +66,13 @@ func main() {
 	ssh_relay_port := flag.String("relay_server", "", "Act as SSH remote forwarding relay on this port")
 	connect_relay_addr := flag.String("connect_relay", "", "Connect to SSH remote forwarding relay (host:port)")
 	relayed_port := flag.Int("relayed_port", 0, "Relayed port, use with -connect_relay")
+	debug := flag.Bool("debug", false, "Do not kill tmux session when crashing, so you can see the crash log")
 	flag.Parse()
+
+	// do not kill tmux session when crashing
+	if *debug {
+		cc.EnableDebug = true
+	}
 
 	// generate C2 TLS cert for given host names
 	if *names != "" {

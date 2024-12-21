@@ -24,6 +24,9 @@ var (
 	// 3 (DEBUG) -> 2 (INFO) -> 1 (WARN)
 	DebugLevel = 2
 
+	// EnableDebug enable debug (-debug)
+	EnableDebug = false
+
 	// IsAPIEnabled Indicate whether we are in headless mode
 	IsAPIEnabled = false
 

@@ -389,6 +389,11 @@ func (pane *Emp3r0rPane) KillPane() (err error) {
 
 // TmuxDeinitWindows close previously opened tmux windows
 func TmuxDeinitWindows() {
+	// do not kill tmux windows if debug is enabled
+	if EnableDebug {
+		return
+	}
+
 	// kill session altogether
 	out, err := exec.Command("/bin/sh", "-c", "tmux kill-session -t emp3r0r").CombinedOutput()
 	if err != nil {
