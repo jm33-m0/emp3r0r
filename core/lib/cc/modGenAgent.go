@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
@@ -228,7 +229,7 @@ func MakeConfig() (err error) {
 	if !exists {
 		CliPrintWarning("Name '%s' is not covered by our server cert, re-generating",
 			RuntimeConfig.CCHost)
-		cc_hosts = append(cc_hosts, existing_names...) // append new name
+		cc_hosts = append(cc_hosts, RuntimeConfig.CCHost) // append new name
 		// remove old certs
 		os.RemoveAll(ServerCrtFile)
 		os.RemoveAll(ServerKeyFile)
@@ -242,6 +243,13 @@ func MakeConfig() (err error) {
 				err, RuntimeConfig.CCHost)
 		} else {
 			CliPrintWarning("Restarting C2 TLS service at port %s to apply new server cert", RuntimeConfig.CCPort)
+
+			c2_names := tun.NamesInCert(ServerCrtFile)
+			if len(c2_names) <= 0 {
+				CliFatalError("C2 has no names?")
+			}
+			name_list := strings.Join(c2_names, ", ")
+			CliPrintInfo("Updated C2 server names: %s", name_list)
 			go TLSServer()
 		}
 	}
