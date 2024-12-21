@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.39.8](https://github.com/jm33-m0/emp3r0r/compare/v1.39.7...v1.39.8) (2024-12-21)
+
+
+### Bug Fixes
+
+* crash when listing module options ([32cdc3d](https://github.com/jm33-m0/emp3r0r/commit/32cdc3dd91d013021282b3e8854fa6f9ad74d1ff))
+* crash when using `info` with no module selected ([a2706c9](https://github.com/jm33-m0/emp3r0r/commit/a2706c908f29113bb20b90b0e0ed6fb7054b295e))
+* do not open SFTP pane in Windows ([1e6342f](https://github.com/jm33-m0/emp3r0r/commit/1e6342f0f7ef52837819705cdc76617e34f10427))
+* only attemp SFTP on Linux ([fd36ff9](https://github.com/jm33-m0/emp3r0r/commit/fd36ff91c202497f0b0192111132b12ca08f8a04))
+* unable to view crash log in C2 client ([152ecf5](https://github.com/jm33-m0/emp3r0r/commit/152ecf52672e7a2d93c799261087321921a080a8))
+
 ## [1.39.7](https://github.com/jm33-m0/emp3r0r/compare/v1.39.6...v1.39.7) (2024-12-20)
 
 
