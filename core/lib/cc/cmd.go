@@ -4,6 +4,7 @@
 package cc
 
 import (
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -224,12 +225,13 @@ func setCurrentTarget(cmd string) {
 			AgentShellPane = nil
 		}
 
-		// open a shell
-		CliPrintInfo("Please `use interactive_shell` to open an shell")
-		CliPrintInfo("Opening SFTP pane")
-		err = SSHClient("sftp", "", RuntimeConfig.SSHDShellPort, true)
-		if err != nil {
-			CliPrintError("SFTPClient: %v", err)
+		// open sftp pane if on linux
+		if runtime.GOOS == "linux" {
+			CliPrintInfo("Opening SFTP pane")
+			err = SSHClient("sftp", "", RuntimeConfig.SSHDShellPort, true)
+			if err != nil {
+				CliPrintError("SFTPClient: %v", err)
+			}
 		}
 
 		updateAgentExes(target_to_set)
