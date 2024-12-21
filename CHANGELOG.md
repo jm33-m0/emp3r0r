@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.39.9](https://github.com/jm33-m0/emp3r0r/compare/v1.39.8...v1.39.9) (2024-12-21)
+
+
+### Bug Fixes
+
+* new `cc_host` not added to server cert, old names get repeated ([e3ef171](https://github.com/jm33-m0/emp3r0r/commit/e3ef1710fe8b2c679027984a30a98af9294ab687))
+
 ## [1.39.8](https://github.com/jm33-m0/emp3r0r/compare/v1.39.7...v1.39.8) (2024-12-21)
 
 
