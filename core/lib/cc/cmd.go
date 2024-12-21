@@ -4,7 +4,6 @@
 package cc
 
 import (
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -226,7 +225,7 @@ func setCurrentTarget(cmd string) {
 		}
 
 		// open sftp pane if on linux
-		if runtime.GOOS == "linux" {
+		if a.GOOS == "linux" {
 			CliPrintInfo("Opening SFTP pane")
 			err = SSHClient("sftp", "", RuntimeConfig.SSHDShellPort, true)
 			if err != nil {
