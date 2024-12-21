@@ -377,8 +377,6 @@ func CliListOptions() {
 	for k, v := range Options {
 		if v != nil {
 			opts[k] = v.Val
-		} else {
-			opts[k] = "<nil>"
 		}
 	}
 
@@ -397,6 +395,7 @@ func CliListOptions() {
 		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
 		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor})
 	table.SetColumnColor(tablewriter.Colors{tablewriter.FgHiBlueColor},
+		tablewriter.Colors{tablewriter.FgBlueColor},
 		tablewriter.Colors{tablewriter.FgBlueColor})
 
 	// fill table
