@@ -170,10 +170,14 @@ func modGenAgent() {
 	CliPrint("Generated agent binary: %s. "+
 		"You can `use stager` to generate a one liner for your target host", agent_binary_path)
 
-	if os_choice != "linux" {
+	if os_choice == "windows" {
 		// generate shellcode for the agent binary
 		DonoutPE2Shellcode(outfile, arch_choice)
 		appendConfigToPayload(outfile+".bin", sep, encryptedJSONBytes)
+	}
+	if os_choice == "linux" {
+		// tell user to use shared library stager
+		CliPrint("Navigate to `loader\\elf` and run `make stager_so` to generate shared library stager, don't forget to modify `stager.c` to fit your needs. You will need another stager to load the shared library.")
 	}
 }
 
