@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.40.0](https://github.com/jm33-m0/emp3r0r/compare/v1.39.9...v1.40.0) (2024-12-24)
+
+
+### Features
+
+* add http stager (with AES encryption) and independent HTTP listener ([66f4d8c](https://github.com/jm33-m0/emp3r0r/commit/66f4d8cc23a31381d57d93dec11478c7234fc87e))
+
 ## [1.39.9](https://github.com/jm33-m0/emp3r0r/compare/v1.39.8...v1.39.9) (2024-12-21)
 
 
