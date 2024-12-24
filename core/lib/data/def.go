@@ -110,21 +110,21 @@ var InjectorMethods = map[string]string{
 
 // Module help info, ls_modules shows this
 var ModuleComments = map[string]string{
-	ModGenAgent:     "Build agent for different OS/arch with customized options",
-	ModCMD_EXEC:     "Run a single command on a target",
+	ModGenAgent:     "Build agent for different OS/arch with customized options, will generate executables w/wo UPX packed, shellcode (Windows), or shared library (Linux)",
+	ModCMD_EXEC:     "Run a single command on one or more targets",
 	ModCLEAN_LOG:    "Delete lines containing keyword from *tmp logs",
 	ModLPE_SUGGEST:  "Run linux-smart-enumeration or linux exploit suggester",
-	ModPERSISTENCE:  "Get persistence via built-in methods",
+	ModPERSISTENCE:  "Get persistence via built-in methods (use with caution, choose one method that suits the target)",
 	ModPROXY:        "Start a socks proxy on target host, and use it locally on C2 side, so you can access network resources on agent side",
 	ModPORT_FWD:     "Port mapping from agent to CC (or vice versa), via HTTP2 (or other) tunnel",
-	ModSHELL:        "Bring your own shell program to run on target, or run the existing shell program (not recommended)",
+	ModSHELL:        "Bring your own shell program to run on target, or run the existing shell program (BAD OPSEC, please use custom shells)",
 	ModVACCINE:      "Vaccine helps you install additional tools on target system",
 	ModINJECTOR:     "Inject shellcode/loader.so into a running process",
 	ModGET_ROOT:     "Try some built-in LPE exploits",
-	ModBring2CC:     "Bring a target host to CC by connecting to it first (target host must have agent installed)",
+	ModBring2CC:     "Bring arbitrary agent to CC (through current target), useful when agent is unable to connect to CC directly",
 	ModGDB:          "Remote gdbserver, debug anything",
-	ModStager:       "Generate a stager for staged payload delivering",
-	ModSSHHarvester: "Harvest cleartext password automatically from OpenSSH server process",
+	ModStager:       "Generate a stager for staged payload delivering (BAD OPSEC, please use custom stagers with shellcode agent in Windows and shared library in Linux)",
+	ModSSHHarvester: "Harvest clear-text password automatically from OpenSSH server process",
 }
 
 // Module help for options, does not include every module since not all modules need args
