@@ -2,9 +2,9 @@
 # load (dummy) would be loaded onto the same offset => crash!
 #
 # run demo.exe and loader.so will be opened, put some binary called `emp3r0r` and it will be executed
-all: loader_so runner_so demo
+all: loader_so runner_so demo stager_so
 
-debug: loader_so_debug demo
+debug: loader_so_debug stager_so_debug demo
 
 runner_so:
 	${CC} -DOS_LINUX -DARCH_X86_64 runner.c -o runner.so -pie -fPIC -shared -nostdlib -nodefaultlibs -s
@@ -13,7 +13,13 @@ loader_so:
 	${CC} -DOS_LINUX -DARCH_X86_64 elf.c loader.c -o loader.so -pie -fPIC -shared -nostdlib -nodefaultlibs -s
 
 loader_so_debug:
-	${CC} -DOS_LINUX -DARCH_X86_64 elf.c loader.c -o loader.so -pie -fPIC -shared -nostdlib -nodefaultlibs -g
+	${CC} -DOS_LINUX -DARCH_X86_64 elf.c loader.c -o loader.so -pie -fPIC -shared -nostdlib -nodefaultlibs -g -DDEBUG
+
+stager_so:
+	${CC} -DOS_LINUX -DARCH_X86_64 stager.c elf.c -o stager.so -pie -fPIC -shared -ldl -nostdlib -nodefaultlibs -s
+
+stager_so_debug:
+	${CC} -DOS_LINUX -DARCH_X86_64 aes.c stager.c elf.c -o stager.so -pie -fPIC -shared -ldl -nostdlib -nodefaultlibs -g -DDEBUG
 
 demo:
 	${CC} demo.c -g -ldl -o demo.exe
