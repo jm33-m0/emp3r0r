@@ -251,3 +251,6 @@ cython_debug/
 
 # ctags
 tags
+
+# vscode
+.vscode/
