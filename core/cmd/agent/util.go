@@ -13,7 +13,8 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-func isAgentAlive() bool {
+func isAgentAliveSocket() bool {
+	log.Printf("Checking if agent is alive via socket %s", agent.RuntimeConfig.SocketName)
 	conn, err := net.Dial("unix", agent.RuntimeConfig.SocketName)
 	if err != nil {
 		log.Printf("Agent seems dead: %v", err)
@@ -33,6 +34,7 @@ func isC2Reachable() bool {
 
 // handle connections to our socket: tell them my PID
 func socket_server(c net.Conn) {
+	log.Printf("Got connection from %s", c.RemoteAddr().String())
 	// how many agents are waiting to run
 	var agent_wait_queue []int
 	for {
@@ -50,7 +52,9 @@ func socket_server(c net.Conn) {
 		}
 		log.Printf("emp3r0r instance got ping from PID: %d", pid)
 		agent_wait_queue = append(agent_wait_queue, int(pid))
+		log.Printf("current queue: %v", agent_wait_queue)
 		agent_wait_queue = util.RemoveDupsFromArray(agent_wait_queue)
+		log.Printf("current queue (sorted): %v", agent_wait_queue)
 		reply := fmt.Sprintf("emp3r0r running on PID %d", os.Getpid())
 		log.Printf("We have %d agents in wait queue", len(agent_wait_queue))
 		if len(agent_wait_queue) > 3 {
