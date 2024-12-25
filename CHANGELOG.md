@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.40.1](https://github.com/jm33-m0/emp3r0r/compare/v1.40.0...v1.40.1) (2024-12-25)
+
+
+### Bug Fixes
+
+* AES decryption in stager ([757a386](https://github.com/jm33-m0/emp3r0r/commit/757a386969f519c45fea5ec0802e6ea3fe0297ae))
+* disable damned `chunked encoding` ([b1b0a79](https://github.com/jm33-m0/emp3r0r/commit/b1b0a798f19621319f929684db5ed4fd6dd72f79))
+
 ## [1.40.0](https://github.com/jm33-m0/emp3r0r/compare/v1.39.9...v1.40.0) (2024-12-24)
 
 
