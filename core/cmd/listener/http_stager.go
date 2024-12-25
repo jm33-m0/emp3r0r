@@ -17,6 +17,9 @@ import (
 // encryptData encrypts the given data using the AES-128-CBC algorithm and the provided key.
 // The IV is prepended to the encrypted data.
 func encryptData(data []byte, key []byte) []byte {
+	if len(key) != 16 {
+		log.Fatalf("Key length must be 16 bytes for AES-128-CBC")
+	}
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		log.Fatalf("Failed to create AES cipher: %v", err)
@@ -44,7 +47,7 @@ func encryptData(data []byte, key []byte) []byte {
 	return append(iv, encrypted...)
 }
 
-// deriveKeyFromString derives a key from a string.
+// deriveKeyFromString derives a 16-byte key from a string.
 // The key is derived by XORing the characters of the string.
 func deriveKeyFromString(str string) []byte {
 	key := make([]uint32, 4)
@@ -58,7 +61,7 @@ func deriveKeyFromString(str string) []byte {
 		binary.LittleEndian.PutUint32(keyBytes[i*4:], v)
 	}
 	log.Printf("Derived key: %08x %08x %08x %08x\n", key[0], key[1], key[2], key[3])
-	return keyBytes
+	return keyBytes[:16] // Ensure the key is 16 bytes long
 }
 
 // ServeHTTPStager serves the encrypted stager file over HTTP.

