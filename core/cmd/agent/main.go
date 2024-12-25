@@ -98,7 +98,9 @@ func main() {
 		// don't daemonize if we're already daemonized
 		os.Getenv("DAEMON") != "true" &&
 		// do not daemonize if run as elvsh
-		!runElvsh
+		!runElvsh &&
+		// do not daemonize if run from loader.so
+		!run_from_loader
 	if run_as_daemon {
 		os.Setenv("DAEMON", "true") // mark as daemonized
 		cmd := exec.Command(os.Args[0])
