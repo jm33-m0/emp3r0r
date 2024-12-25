@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.40.2](https://github.com/jm33-m0/emp3r0r/compare/v1.40.1...v1.40.2) (2024-12-25)
+
+
+### Bug Fixes
+
+* agent dies on unix socket error ([f0757fe](https://github.com/jm33-m0/emp3r0r/commit/f0757fe9127a04be0c7ee3c7ef724757853f06e1))
+* agent wait queue ([28dadaa](https://github.com/jm33-m0/emp3r0r/commit/28dadaa76f4385bc13a52fdda0e9b5aad6782e73))
+* socket listener not running ([26802d0](https://github.com/jm33-m0/emp3r0r/commit/26802d0630be8b2e0cd366526325d739c73cc0d5))
+* unable to run from ELF loader if `VERBOSE` is `false` ([ad9aab2](https://github.com/jm33-m0/emp3r0r/commit/ad9aab27f463bd7bb7581c0f63e16d1479ac9709))
+
 ## [1.40.1](https://github.com/jm33-m0/emp3r0r/compare/v1.40.0...v1.40.1) (2024-12-25)
 
 
