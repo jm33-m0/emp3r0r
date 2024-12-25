@@ -26,8 +26,15 @@ func socketListen() {
 			log.Fatalf("Failed to delete socket: %v", err)
 		}
 	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Fatalf("Failed to get current working directory: %v", err)
+	}
+	os.Chdir(agent.RuntimeConfig.AgentRoot)
+	defer os.Chdir(cwd)
 
-	l, err := net.Listen("unix", agent.RuntimeConfig.SocketName)
+	// use basename to make sure the socket path is not too long (107), otherwise it will fail
+	l, err := net.Listen("unix", util.FileBaseName(agent.RuntimeConfig.SocketName))
 	if err != nil {
 		log.Fatalf("listen error: %v", err)
 	}
