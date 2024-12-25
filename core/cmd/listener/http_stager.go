@@ -66,6 +66,7 @@ func ServeHTTPStager(stager_enc []byte, port string) {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Received request from %s", r.RemoteAddr)
 		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(stager_enc)))
 		w.Write(stager_enc)
 		log.Printf("Served encrypted stager to %s", r.RemoteAddr)
 	})
