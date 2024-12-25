@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.40.3](https://github.com/jm33-m0/emp3r0r/compare/v1.40.2...v1.40.3) (2024-12-25)
+
+
+### Bug Fixes
+
+* unix socket listener may fail when path name is too long ([d7c0e98](https://github.com/jm33-m0/emp3r0r/commit/d7c0e98415eccd1d090f9ebf2d0675488e21fb00))
+
 ## [1.40.2](https://github.com/jm33-m0/emp3r0r/compare/v1.40.1...v1.40.2) (2024-12-25)
 
 
