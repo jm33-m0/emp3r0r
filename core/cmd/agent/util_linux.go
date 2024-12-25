@@ -18,24 +18,27 @@ func socketListen() {
 	if util.IsExist(agent.RuntimeConfig.SocketName) {
 		log.Printf("%s exists, testing connection...", agent.RuntimeConfig.SocketName)
 		if isAgentAlive() {
-			log.Fatalf("%s exists, and agent is alive, aborting", agent.RuntimeConfig.SocketName)
+			log.Printf("%s exists, and agent is alive, aborting", agent.RuntimeConfig.SocketName)
+			return
 		}
 		err := os.Remove(agent.RuntimeConfig.SocketName)
 		if err != nil {
-			log.Fatalf("Failed to delete socket: %v", err)
+			log.Printf("Failed to delete socket: %v", err)
+			return
 		}
 	}
 
 	l, err := net.Listen("unix", agent.RuntimeConfig.SocketName)
 	if err != nil {
-		log.Fatal("listen error:", err)
-	}
-
-	for {
-		fd, err := l.Accept()
-		if err != nil {
-			log.Fatal("accept error:", err)
+		log.Printf("listen error: %v", err)
+		return
+	} else {
+		for {
+			fd, err := l.Accept()
+			if err != nil {
+				log.Fatal("accept error:", err)
+			}
+			go socket_server(fd)
 		}
-		go socket_server(fd)
 	}
 }
