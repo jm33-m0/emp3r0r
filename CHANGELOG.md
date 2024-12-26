@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.41.0](https://github.com/jm33-m0/emp3r0r/compare/v1.40.3...v1.41.0) (2024-12-26)
+
+
+### Features
+
+* support payload compression in stager ([97b271a](https://github.com/jm33-m0/emp3r0r/commit/97b271a9774cac8a15de58dd26727ab17034ff26))
+
+
+### Bug Fixes
+
+* `stager.so` non-debug build lacks AES support ([679b755](https://github.com/jm33-m0/emp3r0r/commit/679b755a50350e8814bebae6dd4698ff0e8b7d5f))
+
 ## [1.40.3](https://github.com/jm33-m0/emp3r0r/compare/v1.40.2...v1.40.3) (2024-12-25)
 
 
