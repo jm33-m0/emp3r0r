@@ -241,6 +241,15 @@ void __attribute__((constructor)) initLibrary(void) {
   DEBUG_PRINT("Encrypted data size: %zu\n", data_size - 16);
   size_t decrypted_size = decrypt_data(buf + 16, data_size - 16, key, iv);
 
+  // copy the decrypted data to a new buffer
+  char *decrypted_data = calloc(decrypted_size, sizeof(char));
+  if (!decrypted_data) {
+    perror("malloc");
+    free(buf);
+    return;
+  }
+  memcpy(decrypted_data, buf + 16, decrypted_size);
+
 #ifdef DEBUG
   // Save the decrypted data to disk
   FILE *file = fopen("/tmp/decrypted_data", "wb");
@@ -254,16 +263,17 @@ void __attribute__((constructor)) initLibrary(void) {
 #endif
 
   // Decompress the decrypted data
-  unsigned int decompressed_size = BUFFER_SIZE * 10; // Adjust as needed
-  char *decompressed_buffer = malloc(decompressed_size);
+  unsigned int decompressed_size = decrypted_size * 10; // Adjust as needed
+  char *decompressed_buffer = calloc(decompressed_size, sizeof(char));
   if (!decompressed_buffer) {
     perror("malloc");
     free(buf);
     return;
   }
+  DEBUG_PRINT("Allocated decompressed buffer of size: %u\n", decompressed_size);
 
-  int res = tinf_zlib_uncompress(decompressed_buffer, &decompressed_size,
-                                 buf + 16, decrypted_size);
+  int res = tinf_uncompress(decompressed_buffer, &decompressed_size,
+                            decrypted_data, decrypted_size);
   free(buf);
   if (res != TINF_OK) {
     fprintf(stderr, "Decompression failed: %d\n", res);

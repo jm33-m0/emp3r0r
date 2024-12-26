@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"compress/zlib"
+	"compress/flate"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -43,11 +43,14 @@ func encryptData(data []byte, key []byte) []byte {
 	return append(iv, encrypted...)
 }
 
-// compressData compresses the given data using zlib.
+// compressData compresses the given data using raw deflate.
 func compressData(data []byte) []byte {
 	var b bytes.Buffer
-	w := zlib.NewWriter(&b)
-	_, err := w.Write(data)
+	w, err := flate.NewWriter(&b, flate.BestCompression)
+	if err != nil {
+		log.Fatalf("Failed to create deflate writer: %v", err)
+	}
+	_, err = w.Write(data)
 	if err != nil {
 		log.Fatalf("Failed to compress data: %v", err)
 	}
