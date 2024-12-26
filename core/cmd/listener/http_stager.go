@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -14,11 +13,11 @@ import (
 	"os"
 )
 
-// encryptData encrypts the given data using the AES-128-CBC algorithm and the provided key.
+// encryptData encrypts the given data using the AES-128-CTR algorithm and the provided key.
 // The IV is prepended to the encrypted data.
 func encryptData(data []byte, key []byte) []byte {
 	if len(key) != 16 {
-		log.Fatalf("Key length must be 16 bytes for AES-128-CBC")
+		log.Fatalf("Key length must be 16 bytes for AES-128-CTR")
 	}
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -32,16 +31,11 @@ func encryptData(data []byte, key []byte) []byte {
 	}
 	log.Printf("Generated IV: %s", hex.EncodeToString(iv))
 
-	// Use CBC mode for encryption
-	mode := cipher.NewCBCEncrypter(block, iv)
-
-	// Pad data to ensure its length is a multiple of the block size
-	padding := aes.BlockSize - len(data)%aes.BlockSize
-	padtext := bytes.Repeat([]byte{byte(padding)}, padding)
-	data = append(data, padtext...)
+	// Use CTR mode for encryption
+	stream := cipher.NewCTR(block, iv)
 
 	encrypted := make([]byte, len(data))
-	mode.CryptBlocks(encrypted, data)
+	stream.XORKeyStream(encrypted, data)
 
 	// Prepend the IV to the encrypted data
 	return append(iv, encrypted...)

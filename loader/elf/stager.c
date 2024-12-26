@@ -24,26 +24,20 @@
 #endif
 
 /**
- * Decrypts data using the AES-128-CBC algorithm and removes padding.
+ * Decrypts data using the AES-128-CTR algorithm.
  *
  * @param data The data to decrypt.
  * @param data_size The size of the data.
  * @param key The decryption key.
  * @param iv The initialization vector.
- * @return The size of the decrypted data without padding.
+ * @return The size of the decrypted data.
  */
 size_t decrypt_data(char *data, size_t data_size, const uint8_t *key,
                     const uint8_t *iv) {
   struct AES_ctx ctx;
   AES_init_ctx_iv(&ctx, key, iv);
-  AES_CBC_decrypt_buffer(&ctx, (uint8_t *)data, data_size);
-
-  // Remove padding
-  uint8_t padding = data[data_size - 1];
-  if (padding > AES_BLOCKLEN) {
-    return data_size; // Invalid padding
-  }
-  return data_size - padding;
+  AES_CTR_xcrypt_buffer(&ctx, (uint8_t *)data, data_size);
+  return data_size;
 }
 
 /**
