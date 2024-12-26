@@ -36,11 +36,11 @@ extern "C" {
 #define TINF_VER_STRING "1.2.1" /**< Version number as a string */
 
 #ifndef TINFCC
-#  ifdef __WATCOMC__
-#    define TINFCC __cdecl
-#  else
-#    define TINFCC
-#  endif
+#ifdef __WATCOMC__
+#define TINFCC __cdecl
+#else
+#define TINFCC
+#endif
 #endif
 
 /**
@@ -49,9 +49,9 @@ extern "C" {
  * @see tinf_uncompress, tinf_gzip_uncompress, tinf_zlib_uncompress
  */
 typedef enum {
-	TINF_OK         = 0,  /**< Success */
-	TINF_DATA_ERROR = -3, /**< Input error */
-	TINF_BUF_ERROR  = -5  /**< Not enough room for output */
+  TINF_OK = 0,          /**< Success */
+  TINF_DATA_ERROR = -3, /**< Input error */
+  TINF_BUF_ERROR = -5   /**< Not enough room for output */
 } tinf_error_code;
 
 /**

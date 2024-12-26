@@ -26,147 +26,140 @@
 #include "tinf.h"
 
 typedef enum {
-	FTEXT    = 1,
-	FHCRC    = 2,
-	FEXTRA   = 4,
-	FNAME    = 8,
-	FCOMMENT = 16
+  FTEXT = 1,
+  FHCRC = 2,
+  FEXTRA = 4,
+  FNAME = 8,
+  FCOMMENT = 16
 } tinf_gzip_flag;
 
-static unsigned int read_le16(const unsigned char *p)
-{
-	return ((unsigned int) p[0])
-	     | ((unsigned int) p[1] << 8);
+static unsigned int read_le16(const unsigned char *p) {
+  return ((unsigned int)p[0]) | ((unsigned int)p[1] << 8);
 }
 
-static unsigned int read_le32(const unsigned char *p)
-{
-	return ((unsigned int) p[0])
-	     | ((unsigned int) p[1] << 8)
-	     | ((unsigned int) p[2] << 16)
-	     | ((unsigned int) p[3] << 24);
+static unsigned int read_le32(const unsigned char *p) {
+  return ((unsigned int)p[0]) | ((unsigned int)p[1] << 8) |
+         ((unsigned int)p[2] << 16) | ((unsigned int)p[3] << 24);
 }
 
-int tinf_gzip_uncompress(void *dest, unsigned int *destLen,
-                         const void *source, unsigned int sourceLen)
-{
-	const unsigned char *src = (const unsigned char *) source;
-	unsigned char *dst = (unsigned char *) dest;
-	const unsigned char *start;
-	unsigned int dlen, crc32;
-	int res;
-	unsigned char flg;
+int tinf_gzip_uncompress(void *dest, unsigned int *destLen, const void *source,
+                         unsigned int sourceLen) {
+  const unsigned char *src = (const unsigned char *)source;
+  unsigned char *dst = (unsigned char *)dest;
+  const unsigned char *start;
+  unsigned int dlen, crc32;
+  int res;
+  unsigned char flg;
 
-	/* -- Check header -- */
+  /* -- Check header -- */
 
-	/* Check room for at least 10 byte header and 8 byte trailer */
-	if (sourceLen < 18) {
-		return TINF_DATA_ERROR;
-	}
+  /* Check room for at least 10 byte header and 8 byte trailer */
+  if (sourceLen < 18) {
+    return TINF_DATA_ERROR;
+  }
 
-	/* Check id bytes */
-	if (src[0] != 0x1F || src[1] != 0x8B) {
-		return TINF_DATA_ERROR;
-	}
+  /* Check id bytes */
+  if (src[0] != 0x1F || src[1] != 0x8B) {
+    return TINF_DATA_ERROR;
+  }
 
-	/* Check method is deflate */
-	if (src[2] != 8) {
-		return TINF_DATA_ERROR;
-	}
+  /* Check method is deflate */
+  if (src[2] != 8) {
+    return TINF_DATA_ERROR;
+  }
 
-	/* Get flag byte */
-	flg = src[3];
+  /* Get flag byte */
+  flg = src[3];
 
-	/* Check that reserved bits are zero */
-	if (flg & 0xE0) {
-		return TINF_DATA_ERROR;
-	}
+  /* Check that reserved bits are zero */
+  if (flg & 0xE0) {
+    return TINF_DATA_ERROR;
+  }
 
-	/* -- Find start of compressed data -- */
+  /* -- Find start of compressed data -- */
 
-	/* Skip base header of 10 bytes */
-	start = src + 10;
+  /* Skip base header of 10 bytes */
+  start = src + 10;
 
-	/* Skip extra data if present */
-	if (flg & FEXTRA) {
-		unsigned int xlen = read_le16(start);
+  /* Skip extra data if present */
+  if (flg & FEXTRA) {
+    unsigned int xlen = read_le16(start);
 
-		if (xlen > sourceLen - 12) {
-			return TINF_DATA_ERROR;
-		}
+    if (xlen > sourceLen - 12) {
+      return TINF_DATA_ERROR;
+    }
 
-		start += xlen + 2;
-	}
+    start += xlen + 2;
+  }
 
-	/* Skip file name if present */
-	if (flg & FNAME) {
-		do {
-			if (start - src >= sourceLen) {
-				return TINF_DATA_ERROR;
-			}
-		} while (*start++);
-	}
+  /* Skip file name if present */
+  if (flg & FNAME) {
+    do {
+      if (start - src >= sourceLen) {
+        return TINF_DATA_ERROR;
+      }
+    } while (*start++);
+  }
 
-	/* Skip file comment if present */
-	if (flg & FCOMMENT) {
-		do {
-			if (start - src >= sourceLen) {
-				return TINF_DATA_ERROR;
-			}
-		} while (*start++);
-	}
+  /* Skip file comment if present */
+  if (flg & FCOMMENT) {
+    do {
+      if (start - src >= sourceLen) {
+        return TINF_DATA_ERROR;
+      }
+    } while (*start++);
+  }
 
-	/* Check header crc if present */
-	if (flg & FHCRC) {
-		unsigned int hcrc;
+  /* Check header crc if present */
+  if (flg & FHCRC) {
+    unsigned int hcrc;
 
-		if (start - src > sourceLen - 2) {
-			return TINF_DATA_ERROR;
-		}
+    if (start - src > sourceLen - 2) {
+      return TINF_DATA_ERROR;
+    }
 
-		hcrc = read_le16(start);
+    hcrc = read_le16(start);
 
-		if (hcrc != (tinf_crc32(src, start - src) & 0x0000FFFF)) {
-			return TINF_DATA_ERROR;
-		}
+    if (hcrc != (tinf_crc32(src, start - src) & 0x0000FFFF)) {
+      return TINF_DATA_ERROR;
+    }
 
-		start += 2;
-	}
+    start += 2;
+  }
 
-	/* -- Get decompressed length -- */
+  /* -- Get decompressed length -- */
 
-	dlen = read_le32(&src[sourceLen - 4]);
+  dlen = read_le32(&src[sourceLen - 4]);
 
-	if (dlen > *destLen) {
-		return TINF_BUF_ERROR;
-	}
+  if (dlen > *destLen) {
+    return TINF_BUF_ERROR;
+  }
 
-	/* -- Get CRC32 checksum of original data -- */
+  /* -- Get CRC32 checksum of original data -- */
 
-	crc32 = read_le32(&src[sourceLen - 8]);
+  crc32 = read_le32(&src[sourceLen - 8]);
 
-	/* -- Decompress data -- */
+  /* -- Decompress data -- */
 
-	if ((src + sourceLen) - start < 8) {
-		return TINF_DATA_ERROR;
-	}
+  if ((src + sourceLen) - start < 8) {
+    return TINF_DATA_ERROR;
+  }
 
-	res = tinf_uncompress(dst, destLen, start,
-	                      (src + sourceLen) - start - 8);
+  res = tinf_uncompress(dst, destLen, start, (src + sourceLen) - start - 8);
 
-	if (res != TINF_OK) {
-		return TINF_DATA_ERROR;
-	}
+  if (res != TINF_OK) {
+    return TINF_DATA_ERROR;
+  }
 
-	if (*destLen != dlen) {
-		return TINF_DATA_ERROR;
-	}
+  if (*destLen != dlen) {
+    return TINF_DATA_ERROR;
+  }
 
-	/* -- Check CRC32 checksum -- */
+  /* -- Check CRC32 checksum -- */
 
-	if (crc32 != tinf_crc32(dst, dlen)) {
-		return TINF_DATA_ERROR;
-	}
+  if (crc32 != tinf_crc32(dst, dlen)) {
+    return TINF_DATA_ERROR;
+  }
 
-	return TINF_OK;
+  return TINF_OK;
 }
