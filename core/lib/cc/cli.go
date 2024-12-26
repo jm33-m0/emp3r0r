@@ -157,14 +157,14 @@ func CliMain() {
 start:
 	SetDynamicPrompt()
 	for {
-		line, err := EmpReadLine.Readline()
-		if err == readline.ErrInterrupt {
+		line, readlineErr := EmpReadLine.Readline()
+		if readlineErr == readline.ErrInterrupt {
 			if len(line) == 0 {
 				break
 			} else {
 				continue
 			}
-		} else if err == io.EOF {
+		} else if readlineErr == io.EOF {
 			break
 		}
 
@@ -182,9 +182,9 @@ start:
 
 		// process other commands
 		default:
-			err = CmdHandler(line)
-			if err != nil {
-				color.Red(err.Error())
+			readlineErr = CmdHandler(line)
+			if readlineErr != nil {
+				color.Red(readlineErr.Error())
 			}
 		}
 		fmt.Printf("\n")
@@ -220,14 +220,17 @@ func SetDynamicPrompt() {
 }
 
 func cliPrintHelper(format string, a []interface{}, colorAttr color.Attribute, logPrefix string, alert bool) {
-	msgColor := color.New(color.Bold, colorAttr)
+	msgColor := color.New(colorAttr)
+	if logPrefix == "ERROR" || logPrefix == "ALERT" || logPrefix == "SUCCESS" {
+		msgColor = color.New(colorAttr, color.Bold)
+	}
 	logMsg := msgColor.Sprintf(format, a...)
 	log.Print(logMsg)
 
 	// Save log to file
-	logFile, err := os.OpenFile("emp3r0r.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Printf("cliPrintHelper: %v", err)
+	logFile, logOpenErr := os.OpenFile("emp3r0r.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if logOpenErr != nil {
+		log.Printf("cliPrintHelper: %v", logOpenErr)
 		return
 	}
 	defer logFile.Close()
@@ -240,14 +243,14 @@ func cliPrintHelper(format string, a []interface{}, colorAttr color.Attribute, l
 		resp.MsgData = []byte(msg)
 		resp.Alert = alert
 		resp.MsgType = LOG
-		data, err := json.Marshal(resp)
-		if err != nil {
-			log.Printf("cliPrintHelper: %v", err)
+		data, jsonMarshalErr := json.Marshal(resp)
+		if jsonMarshalErr != nil {
+			log.Printf("cliPrintHelper: %v", jsonMarshalErr)
 			return
 		}
-		_, err = APIConn.Write([]byte(data))
-		if err != nil {
-			log.Printf("cliPrintHelper: %v", err)
+		_, jsonMarshalErr = APIConn.Write([]byte(data))
+		if jsonMarshalErr != nil {
+			log.Printf("cliPrintHelper: %v", jsonMarshalErr)
 		}
 	}
 }
@@ -309,11 +312,10 @@ func CliAsk(prompt string, allow_empty bool) (answer string) {
 
 	defer SetDynamicPrompt()
 
-	var err error
 	for {
-		answer, err = EmpReadLine.Readline()
-		if err != nil {
-			if err == readline.ErrInterrupt || err == io.EOF {
+		answer, readlineErr := EmpReadLine.Readline()
+		if readlineErr != nil {
+			if readlineErr == readline.ErrInterrupt || readlineErr == io.EOF {
 				break
 			}
 		}
@@ -339,12 +341,12 @@ func CliYesNo(prompt string) bool {
 
 	defer SetDynamicPrompt()
 
-	answer, err := EmpReadLine.Readline()
-	if err != nil {
-		if err == readline.ErrInterrupt || err == io.EOF {
+	answer, readlineErr := EmpReadLine.Readline()
+	if readlineErr != nil {
+		if readlineErr == readline.ErrInterrupt || readlineErr == io.EOF {
 			return false
 		}
-		color.Red(err.Error())
+		color.Red(readlineErr.Error())
 	}
 
 	answer = strings.ToLower(answer)
@@ -431,36 +433,36 @@ func CliListOptions() {
 
 // CliListCmds list all commands in tree format
 func CliListCmds(w io.Writer) {
-	_, err := io.WriteString(w, "Commands:\n")
-	if err != nil {
+	_, ioErr := io.WriteString(w, "Commands:\n")
+	if ioErr != nil {
 		return
 	}
-	_, err = io.WriteString(w, CliCompleter.Tree("    "))
-	if err != nil {
+	_, ioErr = io.WriteString(w, CliCompleter.Tree("    "))
+	if ioErr != nil {
 		return
 	}
 }
 
 // CliBanner prints banner
 func CliBanner() error {
-	data, err := base64.StdEncoding.DecodeString(cliBannerB64)
-	if err != nil {
-		return errors.New("Failed to print banner: " + err.Error())
+	data, encodingErr := base64.StdEncoding.DecodeString(cliBannerB64)
+	if encodingErr != nil {
+		return errors.New("Failed to print banner: " + encodingErr.Error())
 	}
 
 	color.Cyan(string(data))
-	cow, err := cowsay.New(
+	cow, encodingErr := cowsay.New(
 		cowsay.BallonWidth(40),
 		cowsay.Random(),
 	)
-	if err != nil {
-		log.Fatalf("CowSay: %v", err)
+	if encodingErr != nil {
+		log.Fatalf("CowSay: %v", encodingErr)
 	}
 
 	// C2 names
-	err = LoadCACrt()
-	if err != nil {
-		CliPrintWarning("Failed to parse CA cert: %v", err)
+	encodingErr = LoadCACrt()
+	if encodingErr != nil {
+		CliPrintWarning("Failed to parse CA cert: %v", encodingErr)
 	}
 	c2_names := tun.NamesInCert(ServerCrtFile)
 	if len(c2_names) <= 0 {
@@ -468,7 +470,7 @@ func CliBanner() error {
 	}
 	name_list := strings.Join(c2_names, ", ")
 
-	say, err := cow.Say(fmt.Sprintf("welcome! you are using version %s,\n"+
+	say, encodingErr := cow.Say(fmt.Sprintf("welcome! you are using version %s,\n"+
 		"C2 listening on *:%s,\n"+
 		"Shadowsocks port *:%s,\n"+
 		"KCP port *:%s,\n"+
@@ -480,8 +482,8 @@ func CliBanner() error {
 		RuntimeConfig.KCPPort,
 		name_list,
 		RuntimeConfig.CAFingerprint))
-	if err != nil {
-		log.Fatalf("CowSay: %v", err)
+	if encodingErr != nil {
+		log.Fatalf("CowSay: %v", encodingErr)
 	}
 	color.Cyan("%s\n\n", say)
 	return nil
@@ -492,20 +494,20 @@ func CliPrettyPrint(header1, header2 string, map2write *map[string]string) {
 	if IsAPIEnabled {
 		// send to socket
 		var resp APIResponse
-		msg, err := json.Marshal(map2write)
-		if err != nil {
-			log.Printf("CliPrettyPrint: %v", err)
+		msg, marshalErr := json.Marshal(map2write)
+		if marshalErr != nil {
+			log.Printf("CliPrettyPrint: %v", marshalErr)
 		}
 		resp.MsgData = msg
 		resp.Alert = false
 		resp.MsgType = JSON
-		data, err := json.Marshal(resp)
-		if err != nil {
-			log.Printf("CliPrettyPrint: %v", err)
+		data, marshalErr := json.Marshal(resp)
+		if marshalErr != nil {
+			log.Printf("CliPrettyPrint: %v", marshalErr)
 		}
-		_, err = APIConn.Write([]byte(data))
-		if err != nil {
-			log.Printf("CliPrettyPrint: %v", err)
+		_, marshalErr = APIConn.Write([]byte(data))
+		if marshalErr != nil {
+			log.Printf("CliPrettyPrint: %v", marshalErr)
 		}
 	}
 
