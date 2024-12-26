@@ -721,9 +721,9 @@ func CopyToClipboard(data []byte) {
 		CliPrintWarning("%s not installed", exe)
 		return
 	}
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		CliPrintWarning("CopyToClipboard read stdin: %v", err)
+	stdin, stdinErr := cmd.StdinPipe()
+	if stdinErr != nil {
+		CliPrintWarning("CopyToClipboard read stdin: %v", stdinErr)
 		return
 	}
 	go func() {
@@ -731,9 +731,9 @@ func CopyToClipboard(data []byte) {
 		_, _ = stdin.Write(data)
 	}()
 
-	err = cmd.Run()
-	if err != nil {
-		CliPrintWarning("CopyToClipboard: %v", err)
+	stdinErr = cmd.Run()
+	if stdinErr != nil {
+		CliPrintWarning("CopyToClipboard: %v", stdinErr)
 	}
 	CliPrintInfo("Copied to clipboard")
 }
