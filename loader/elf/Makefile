@@ -16,7 +16,7 @@ loader_so_debug:
 	${CC} -DOS_LINUX -DARCH_X86_64 elf.c loader.c -o loader.so -pie -fPIC -shared -nostdlib -nodefaultlibs -g -DDEBUG
 
 stager_so:
-	${CC} -DOS_LINUX -DARCH_X86_64 stager.c elf.c -o stager.so -pie -fPIC -shared -ldl -nostdlib -nodefaultlibs -s
+	${CC} -DOS_LINUX -DARCH_X86_64 aes.c stager.c elf.c -o stager.so -pie -fPIC -shared -ldl -nostdlib -nodefaultlibs -s
 
 stager_so_debug:
 	${CC} -DOS_LINUX -DARCH_X86_64 aes.c stager.c elf.c -o stager.so -pie -fPIC -shared -ldl -nostdlib -nodefaultlibs -g -DDEBUG
