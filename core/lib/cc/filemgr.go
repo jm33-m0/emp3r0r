@@ -15,12 +15,6 @@ var LsDir []string
 
 func FSCmdDst(cmd string) {
 	inputSlice := util.ParseCmd(cmd)
-	cmdname := inputSlice[0]
-
-	if cmdname == "kill" {
-		inputSlice[0] = "#kill"
-		cmd = strings.Join(inputSlice, " ")
-	}
 
 	args := strings.Join(inputSlice[1:], "' '")
 	executeCmd(fmt.Sprintf("%s --dst '%s'", inputSlice[0], args))
@@ -42,9 +36,6 @@ func FSCmdSrcDst(cmd string) {
 }
 
 func FSNoArgCmd(cmd string) {
-	if cmd == "ps" {
-		cmd = "#ps"
-	}
 	executeCmd(cmd)
 }
 

@@ -69,6 +69,7 @@ var CmdFuncsWithArgs = map[string]func(string){
 	"put":             UploadToAgent,
 	"get":             DownloadFromAgent,
 	"ps":              FSNoArgCmd,
+	"net_helper":      FSNoArgCmd,
 	"kill":            FSCmdDst,
 	"delete_port_fwd": DeletePortFwdSession,
 	"debug":           setDebugLevel,

