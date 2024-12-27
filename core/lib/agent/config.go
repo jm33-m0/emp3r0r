@@ -57,9 +57,9 @@ func ApplyRuntimeConfig() (err error) {
 		prefix = cwd
 	}
 	RuntimeConfig.AgentRoot = fmt.Sprintf("%s/%s", prefix, agent_root_base)
-	RuntimeConfig.UtilsPath = fmt.Sprintf("%s/%s", prefix, RuntimeConfig.UtilsPath)
-	RuntimeConfig.SocketName = fmt.Sprintf("%s/%s", prefix, RuntimeConfig.SocketName)
-	RuntimeConfig.PIDFile = fmt.Sprintf("%s/%s", prefix, RuntimeConfig.PIDFile)
+	RuntimeConfig.UtilsPath = fmt.Sprintf("%s/%s", RuntimeConfig.AgentRoot, RuntimeConfig.UtilsPath)
+	RuntimeConfig.SocketName = fmt.Sprintf("%s/%s", RuntimeConfig.AgentRoot, RuntimeConfig.SocketName)
+	RuntimeConfig.PIDFile = fmt.Sprintf("%s/%s", RuntimeConfig.AgentRoot, RuntimeConfig.PIDFile)
 	log.Printf("Agent root: %s", RuntimeConfig.AgentRoot)
 
 	// Socks5 proxy server
