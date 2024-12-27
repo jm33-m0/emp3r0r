@@ -102,6 +102,7 @@ func moduleProxy() {
 			CliPrintError("Timeout waiting for agent to start SOCKS5 proxy")
 			return
 		} else {
+			CliPrint("Agent started SOCKS5 proxy")
 			// TCP forwarding
 			go func() {
 				err := pf.RunPortFwd()
