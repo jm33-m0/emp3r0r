@@ -20,22 +20,30 @@ import (
 func ParseCmd(cmd string) (parsedCmd []string) {
 	isQuoted := strings.Contains(cmd, "'") && strings.Count(cmd, "'")%2 == 0 && !strings.Contains(cmd, "\\")
 	isEscaped := strings.Contains(cmd, "\\")
-	if !isEscaped && !isQuoted {
-		return strings.Fields(cmd)
-	}
+	isDoubleQuoted := strings.Contains(cmd, "\"") && strings.Count(cmd, "\"")%2 == 0
 
 	space := uuid.NewString()
 	tab := uuid.NewString()
+
+	if isEscaped && (isQuoted || isDoubleQuoted) {
+		cmd = strings.ReplaceAll(cmd, "\\ ", space)
+		cmd = strings.ReplaceAll(cmd, "\\t", tab)
+		parsedCmd = parseQuotedCmd(cmd)
+		for n, arg := range parsedCmd {
+			parsedCmd[n] = strings.ReplaceAll(strings.ReplaceAll(arg, space, " "), tab, "\t")
+		}
+		return
+	}
 
 	if isEscaped {
 		return parseEscapedCmd(cmd, space, tab)
 	}
 
-	if isQuoted {
+	if isQuoted || isDoubleQuoted {
 		return parseQuotedCmd(cmd)
 	}
 
-	return
+	return strings.Fields(cmd)
 }
 
 func parseEscapedCmd(cmd, space, tab string) (parsedCmd []string) {
