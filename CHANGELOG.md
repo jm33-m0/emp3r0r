@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.42.0](https://github.com/jm33-m0/emp3r0r/compare/v1.41.0...v1.42.0) (2024-12-27)
+
+
+### Features
+
+* agent side "listener" for lateral movement and payload delivery ([c4b40b8](https://github.com/jm33-m0/emp3r0r/commit/c4b40b82f25f590da11c53cbcc11b300a7698dab))
+
+
+### Bug Fixes
+
+* add some nil dereference check to improve stability ([6710ed7](https://github.com/jm33-m0/emp3r0r/commit/6710ed73f31fd58dba57af22733cad03ded32667))
+* agent path names ([2b2773a](https://github.com/jm33-m0/emp3r0r/commit/2b2773a084ced9ed172bee2426b9f1939486fffc))
+* c2 commands refactor ([fb46ae8](https://github.com/jm33-m0/emp3r0r/commit/fb46ae8a3f3042b354139f0b0d9d0528321cef7a))
+* fs commands ([4336af2](https://github.com/jm33-m0/emp3r0r/commit/4336af211d554edaf8644cc978b6167e442f12b6))
+* improve command parsing ([e5baccb](https://github.com/jm33-m0/emp3r0r/commit/e5baccb4ffd3d49dcee27b3c8434bcd538489dc3))
+* open sftp in new tmux window to save space ([c29b8c1](https://github.com/jm33-m0/emp3r0r/commit/c29b8c15115d8f53c42652ba743442c24c275bfe))
+* port_fwd should print some feedback ([1c6844f](https://github.com/jm33-m0/emp3r0r/commit/1c6844f53eeab5f81a95c8702060bd64dc180966))
+* UI adjustments and code refactor ([f6b2d00](https://github.com/jm33-m0/emp3r0r/commit/f6b2d00df39a06dbe23a911767bf6aa8ec3794cf))
+
 ## [1.41.0](https://github.com/jm33-m0/emp3r0r/compare/v1.40.3...v1.41.0) (2024-12-26)
 
 
