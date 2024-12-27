@@ -13,12 +13,32 @@ import (
 // LsDir cache items in current directory
 var LsDir []string
 
-func FSSingleArgCmd(cmd string) {
-	executeCmdWithArgs(cmd, 1)
+func FSCmdDst(cmd string) {
+	inputSlice := util.ParseCmd(cmd)
+	cmdname := inputSlice[0]
+
+	if cmdname == "kill" {
+		inputSlice[0] = "#kill"
+		cmd = strings.Join(inputSlice, " ")
+	}
+
+	args := strings.Join(inputSlice[1:], "' '")
+	executeCmd(fmt.Sprintf("%s --dst '%s'", inputSlice[0], args))
 }
 
-func FSDoubleArgCmd(cmd string) {
-	executeCmdWithArgs(cmd, 2)
+func FSCmdSrcDst(cmd string) {
+	inputSlice := util.ParseCmd(cmd)
+	cmdname := inputSlice[0]
+
+	if len(inputSlice) < 3 {
+		CliPrintError("%s requires source and destination arguments", cmdname)
+		return
+	}
+
+	src := inputSlice[1]
+	dst := inputSlice[2]
+
+	executeCmd(fmt.Sprintf("%s --src '%s' --dst '%s'", cmdname, src, dst))
 }
 
 func FSNoArgCmd(cmd string) {
@@ -65,23 +85,6 @@ func DownloadFromAgent(cmd string) {
 			CliPrintError("Cannot get %s: %v", inputSlice[1], err)
 		}
 	}()
-}
-
-func executeCmdWithArgs(cmd string, expectedArgs int) {
-	inputSlice := util.ParseCmd(cmd)
-	cmdname := inputSlice[0]
-	if len(inputSlice) < expectedArgs+1 {
-		CliPrintError("%s requires %d argument(s)", cmdname, expectedArgs)
-		return
-	}
-
-	if cmdname == "kill" && expectedArgs == 1 {
-		inputSlice[0] = "#kill"
-		cmd = strings.Join(inputSlice, " ")
-	}
-
-	args := strings.Join(inputSlice[1:], "' '")
-	executeCmd(fmt.Sprintf("%s '%s'", inputSlice[0], args))
 }
 
 func executeCmd(cmd string) {

