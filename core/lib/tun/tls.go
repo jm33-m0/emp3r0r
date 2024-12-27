@@ -10,9 +10,7 @@ import (
 )
 
 // CACrt for TLS server cert signing
-var CACrt = []byte(`
-[emp3r0r_ca]
-		`)
+var CACrt = []byte("")
 
 // EmpHTTPClient add our CA to trusted CAs, while keeps TLS InsecureVerify on
 func EmpHTTPClient(c2_addr, proxyServer string) *http.Client {

