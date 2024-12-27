@@ -12,7 +12,7 @@ import (
 )
 
 // moduleHandler downloads and runs modules from C2
-func moduleHandler(modName, checksum string) (out string) {
+func moduleHandler(modName, checksum string, inMem bool) (out string) {
 	tarball := filepath.Join(RuntimeConfig.AgentRoot, modName+".tar.xz")
 	modDir := filepath.Join(RuntimeConfig.AgentRoot, modName)
 	startScript := fmt.Sprintf("%s.%s", modName, getScriptExtension())
@@ -22,9 +22,6 @@ func moduleHandler(modName, checksum string) (out string) {
 	// cd to module dir
 	defer os.Chdir(RuntimeConfig.AgentRoot)
 	os.Chdir(modDir)
-
-	// in memory execution?
-	inMem := checksum == "in_mem"
 
 	if !inMem {
 		if downloadErr := downloadAndVerifyModule(tarball, checksum); downloadErr != nil {

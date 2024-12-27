@@ -11,7 +11,7 @@ import (
 )
 
 func modulePersistence() {
-	cmd := fmt.Sprintf("%s %s", emp3r0r_data.C2CmdPersistence, Options["method"].Val)
+	cmd := fmt.Sprintf("%s --method %s", emp3r0r_data.C2CmdPersistence, Options["method"].Val)
 	err := SendCmd(cmd, "", CurrentTarget)
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)
@@ -21,7 +21,7 @@ func modulePersistence() {
 }
 
 func moduleLogCleaner() {
-	cmd := fmt.Sprintf("%s %s", emp3r0r_data.C2CmdCleanLog, Options["keyword"].Val)
+	cmd := fmt.Sprintf("%s --keyword %s", emp3r0r_data.C2CmdCleanLog, Options["keyword"].Val)
 	err := SendCmd(cmd, "", CurrentTarget)
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)

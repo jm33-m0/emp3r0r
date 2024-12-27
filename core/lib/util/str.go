@@ -17,55 +17,58 @@ import (
 )
 
 // ParseCmd parse commands containing whitespace
-func ParseCmd(cmd string) (parsed_cmd []string) {
-	is_quoted := strings.Contains(cmd, "'") && strings.Count(cmd, "'")%2 == 0 && !strings.Contains(cmd, "\\")
-	is_escaped := strings.Contains(cmd, "\\")
-	if !is_escaped && !is_quoted {
+func ParseCmd(cmd string) (parsedCmd []string) {
+	isQuoted := strings.Contains(cmd, "'") && strings.Count(cmd, "'")%2 == 0 && !strings.Contains(cmd, "\\")
+	isEscaped := strings.Contains(cmd, "\\")
+	if !isEscaped && !isQuoted {
 		return strings.Fields(cmd)
 	}
+
 	space := uuid.NewString()
 	tab := uuid.NewString()
 
-	// process cmds that looks like: cat /tmp/name\ with\ spaces.bin
-	if is_escaped {
-		temp := strings.ReplaceAll(cmd, "\\ ", space)
-		temp = strings.ReplaceAll(temp, "\\t", tab)
-		parsed_cmd = strings.Fields(temp)
-		for n, arg := range parsed_cmd {
-			parsed_cmd[n] = strings.ReplaceAll(strings.ReplaceAll(arg, space, " "), tab, "\t")
-		}
-		return
+	if isEscaped {
+		return parseEscapedCmd(cmd, space, tab)
 	}
 
-	// process cmds that looks like: cat '/tmp/name with spaces.bin'
-	if is_quoted {
-		cmd = strings.ReplaceAll(cmd, "'", `"`) // use double quotes
-		r := csv.NewReader(strings.NewReader(cmd))
-		r.Comma = ' ' // space
-		r.LazyQuotes = true
-		fields, err := r.Read()
-		if err != nil {
-			log.Printf("ParseCmd: %v", err)
-			return
-		}
-		for _, f := range fields {
-			parsed_cmd = append(parsed_cmd, strings.TrimSpace(f))
-		}
-		return
+	if isQuoted {
+		return parseQuotedCmd(cmd)
 	}
 
+	return
+}
+
+func parseEscapedCmd(cmd, space, tab string) (parsedCmd []string) {
+	temp := strings.ReplaceAll(cmd, "\\ ", space)
+	temp = strings.ReplaceAll(temp, "\\t", tab)
+	parsedCmd = strings.Fields(temp)
+	for n, arg := range parsedCmd {
+		parsedCmd[n] = strings.ReplaceAll(strings.ReplaceAll(arg, space, " "), tab, "\t")
+	}
+	return
+}
+
+func parseQuotedCmd(cmd string) (parsedCmd []string) {
+	cmd = strings.ReplaceAll(cmd, "'", `"`) // use double quotes
+	r := csv.NewReader(strings.NewReader(cmd))
+	r.Comma = ' ' // space
+	r.LazyQuotes = true
+	fields, err := r.Read()
+	if err != nil {
+		log.Printf("ParseCmd: %v", err)
+		return
+	}
+	for _, f := range fields {
+		parsedCmd = append(parsedCmd, strings.TrimSpace(f))
+	}
 	return
 }
 
 func ReverseString(s string) string {
 	rns := []rune(s) // convert to rune
 	for i, j := 0, len(rns)-1; i < j; i, j = i+1, j-1 {
-		// swap the letters of the string,
-		// like first with last and so on.
 		rns[i], rns[j] = rns[j], rns[i]
 	}
-
-	// return the reversed string.
 	return string(rns)
 }
 
@@ -73,12 +76,9 @@ func ReverseString(s string) string {
 func SplitLongLine(line string, linelen int) (ret string) {
 	ret = wordwrap.String(line, linelen)
 
-	// if any of the wrapped lines are still too long
-	// use unconditional wrap
 	lines := strings.Split(ret, "\n")
 	for _, wline := range lines {
-		line_len := len(wline)
-		if line_len > linelen {
+		if len(wline) > linelen {
 			ret = wrap.String(line, linelen)
 			break
 		}
@@ -88,11 +88,7 @@ func SplitLongLine(line string, linelen int) (ret string) {
 
 // RandInt random int between given interval
 func RandInt(min, max int) int {
-	// if we get nonsense values
-	// give them random int anyway
-	if min > max ||
-		min < 0 ||
-		max < 0 {
+	if min > max || min < 0 || max < 0 {
 		min = RandInt(0, 100)
 		max = min + RandInt(0, 100)
 	}
@@ -119,25 +115,21 @@ func RandStr(n int) string {
 
 // RandMD5String random MD5 string for agent file names
 func RandMD5String() string {
-	rand_bytes := RandBytes(16)
-	return fmt.Sprintf("%x", md5.Sum(rand_bytes))
+	randBytes := RandBytes(16)
+	return fmt.Sprintf("%x", md5.Sum(randBytes))
 }
 
 // Random bytes
 func RandBytes(n int) []byte {
-	var all_bytes []byte
-	for b := 0; b <= 255; b++ {
-		if b == 0 {
-			continue
-		}
-		all_bytes = append(all_bytes, byte(b))
+	var allBytes []byte
+	for b := 1; b <= 255; b++ {
+		allBytes = append(allBytes, byte(b))
 	}
-	rand_bytes := make([]byte, n)
-	for i := range rand_bytes {
-		rand_bytes[i] = all_bytes[int64(RandInt(0, len(all_bytes)))]
+	randBytes := make([]byte, n)
+	for i := range randBytes {
+		randBytes[i] = allBytes[int64(RandInt(0, len(allBytes)))]
 	}
-
-	return rand_bytes
+	return randBytes
 }
 
 // HexEncode hex encode string, eg. "Hello" -> "\x48\x65\x6c\x6c\x6f"
