@@ -17,5 +17,5 @@ func main() {
 		log.Fatal("stager file path is required")
 	}
 
-	listener.HTTPListener(*stagerPath, *port, *keyStr) // Use the listener library function
+	listener.HTTPAESCompressedListener(*stagerPath, *port, *keyStr, true)
 }

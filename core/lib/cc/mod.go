@@ -258,6 +258,20 @@ func UpdateOptions(modName string) (exist bool) {
 		auto_proxy.Vals = []string{"on", "off"}
 		auto_proxy.Val = "off"
 
+	case modName == emp3r0r_data.ModListener:
+		listenerOpt := addIfNotFound("listener")
+		listenerOpt.Vals = []string{"http_aes_compressed", "http_bare"}
+		listenerOpt.Val = "http_aes_compressed"
+		portOpt := addIfNotFound("port")
+		portOpt.Val = "8080"
+		payloadOpt := addIfNotFound("payload")
+		payloadOpt.Val = "emp3r0r"
+		compressionOpt := addIfNotFound("compression")
+		compressionOpt.Vals = []string{"on", "off"}
+		compressionOpt.Val = "on"
+		passphraseOpt := addIfNotFound("passphrase")
+		passphraseOpt.Val = "my_secret_key"
+
 	default:
 		// custom modules
 		modconfig := ModuleConfigs[modName]

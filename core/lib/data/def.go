@@ -186,7 +186,7 @@ var ModuleHelp = map[string]map[string]string{
 	},
 	ModListener: {
 		"payload":  "The payload to serve, eg. ./stager",
-		"listener": "Listener type, eg. http_bare, http_aes_deflate",
+		"listener": "Listener type, eg. http_bare, http_aes_compressed",
 		"port":     "Port to listen on, eg. 8080",
 	},
 }

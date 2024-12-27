@@ -14,6 +14,8 @@ import (
 	"os"
 )
 
+var server *http.Server
+
 // encryptData encrypts the given data using the AES-128-CTR algorithm and the provided key.
 // The IV is prepended to the encrypted data.
 func encryptData(data []byte, key []byte) []byte {
@@ -75,33 +77,63 @@ func deriveKeyFromString(str string) []byte {
 }
 
 // serveStager serves the encrypted stager file over HTTP.
-func serveStager(stager_enc []byte, port string) {
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+func serveStager(stager_enc []byte, port string) error {
+	if server != nil {
+		log.Printf("Shutting down existing server on port %s", server.Addr)
+		if err := server.Shutdown(nil); err != nil {
+			log.Printf("Error shutting down server: %v", err)
+		}
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Received request from %s", r.RemoteAddr)
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(stager_enc)))
 		w.Write(stager_enc)
 		log.Printf("Served encrypted stager to %s", r.RemoteAddr)
 	})
+
+	server = &http.Server{
+		Addr:    fmt.Sprintf(":%s", port),
+		Handler: mux,
+	}
+
 	log.Printf("Starting HTTP server on port %s", port)
-	http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
+	return server.ListenAndServe()
 }
 
-// HTTPListener reads, compresses, encrypts the stager file and serves it over HTTP.
+// HTTPAESCompressedListener reads, compresses, encrypts the stager file and serves it over HTTP.
 // stagerPath: the path to the stager file to serve.
 // port: the port to serve the stager file on.
 // keyStr: the passpharase to encrypt the stager file.
-func HTTPListener(stagerPath string, port string, keyStr string) {
+func HTTPAESCompressedListener(stagerPath string, port string, keyStr string, compression bool) error {
 	stager, err := os.ReadFile(stagerPath)
 	if err != nil {
-		log.Fatalf("Failed to read stager file: %v", err)
+		return fmt.Errorf("Failed to read stager file: %v", err)
 	}
 
 	key := deriveKeyFromString(keyStr)
 
-	compressedStager := compressData(stager)
-	encryptedStager := encryptData(compressedStager, key)
+	var toEncrypt []byte
+	if compression {
+		toEncrypt = compressData(stager)
+	} else {
+		toEncrypt = stager
+	}
+	encryptedStager := encryptData(toEncrypt, key)
 
 	log.Printf("Serving encrypted stager file on port %s", port)
-	serveStager(encryptedStager, port)
+	return serveStager(encryptedStager, port)
+}
+
+// HTTPBareListener serves the stager file over HTTP without any encryption or compression.
+func HTTPBareListener(stagerPath string, port string) error {
+	stager, err := os.ReadFile(stagerPath)
+	if err != nil {
+		return fmt.Errorf("Failed to read stager file: %v", err)
+	}
+
+	log.Printf("Serving stager file on port %s", port)
+	return serveStager(stager, port)
 }
