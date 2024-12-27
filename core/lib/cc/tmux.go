@@ -13,7 +13,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"golang.org/x/crypto/ssh/terminal"
+	terminal "golang.org/x/term"
 )
 
 // Emp3r0rPane a tmux window/pane that makes emp3r0r CC's interface
@@ -152,16 +152,16 @@ func TmuxInitWindows() (err error) {
 	if AgentListPane == nil ||
 		AgentOutputPane == nil ||
 		AgentInfoPane == nil {
-		return fmt.Errorf("One or more tmux panes failed to initialize:\n%v", TmuxPanes)
+		return fmt.Errorf("one or more tmux panes failed to initialize:\n%v", TmuxPanes)
 	}
 
 	return
 }
 
 func TmuxDisplay(msg string) (res string) {
-	out, err := exec.Command("tmux", "display-message", "-p", msg).CombinedOutput()
-	if err != nil {
-		CliPrintWarning("TmuxDisplay: %v", err)
+	out, execErr := exec.Command("tmux", "display-message", "-p", msg).CombinedOutput()
+	if execErr != nil {
+		CliPrintWarning("TmuxDisplay: %v", execErr)
 		return
 	}
 
@@ -195,9 +195,9 @@ func TmuxWindowSize() (x, y int) {
 // returns the index of current pane
 // returns -1 when error occurs
 func TmuxCurrentPane() (pane_id string) {
-	out, err := exec.Command("tmux", "display-message", "-p", `'#{pane_id}'`).CombinedOutput()
-	if err != nil {
-		CliPrintWarning("TmuxCurrentPane: %v", err)
+	out, execErr := exec.Command("tmux", "display-message", "-p", `'#{pane_id}'`).CombinedOutput()
+	if execErr != nil {
+		CliPrintWarning("TmuxCurrentPane: %v", execErr)
 		return
 	}
 
@@ -206,9 +206,9 @@ func TmuxCurrentPane() (pane_id string) {
 }
 
 func TmuxSwitchWindow(window_id string) (res bool) {
-	out, err := exec.Command("/bin/sh", "-c", "tmux select-window -t "+window_id).CombinedOutput()
-	if err != nil {
-		CliPrintWarning("TmuxSwitchWindow: %v: %s", err, out)
+	out, cmdErr := exec.Command("/bin/sh", "-c", "tmux select-window -t "+window_id).CombinedOutput()
+	if cmdErr != nil {
+		CliPrintWarning("TmuxSwitchWindow: %v: %s", cmdErr, out)
 		return
 	}
 	return true
@@ -218,9 +218,9 @@ func TmuxSwitchWindow(window_id string) (res bool) {
 // returns the unique ID of the window
 // returns "" when error occurs
 func TmuxCurrentWindow() (id string) {
-	out, err := exec.Command("tmux", "display-message", "-p", `'#{window_id}'`).CombinedOutput()
-	if err != nil {
-		CliPrintWarning("TmuxCurrentWindow: %v", err)
+	out, cmdErr := exec.Command("tmux", "display-message", "-p", `'#{window_id}'`).CombinedOutput()
+	if cmdErr != nil {
+		CliPrintWarning("TmuxCurrentWindow: %v", cmdErr)
 		return
 	}
 
@@ -233,7 +233,7 @@ func (pane *Emp3r0rPane) Respawn() (err error) {
 	out, err := exec.Command("tmux", "respawn-pane",
 		"-t", pane.ID, CAT).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("Respawning pane (pane_id=%s): %s, %v", pane.ID, out, err)
+		return fmt.Errorf("respawning pane (pane_id=%s): %s, %v", pane.ID, out, err)
 	}
 
 	return
@@ -244,9 +244,9 @@ func (pane *Emp3r0rPane) Respawn() (err error) {
 func (pane *Emp3r0rPane) Printf(clear bool, format string, a ...interface{}) {
 	msg := fmt.Sprintf(format, a...)
 	if clear {
-		err := pane.ClearPane()
-		if err != nil {
-			CliPrintWarning("Clear pane failed: %v", err)
+		clearPaneErr := pane.ClearPane()
+		if clearPaneErr != nil {
+			CliPrintWarning("Clear pane failed: %v", clearPaneErr)
 		}
 	}
 
@@ -427,7 +427,7 @@ func TmuxNewPane(title, hV string, target_pane_id string, size int, cmd string) 
 	if os.Getenv("TMUX") == "" ||
 		!util.IsCommandExist("tmux") {
 
-		err = errors.New("You need to run emp3r0r under `tmux`")
+		err = errors.New("you need to run emp3r0r under `tmux`")
 		return
 	}
 	is_new_window := hV == "" && size == 0
@@ -501,7 +501,7 @@ func TmuxSetPaneTitle(title, pane_id string) error {
 func TmuxNewWindow(name, cmd string) error {
 	if os.Getenv("TMUX") == "" ||
 		!util.IsCommandExist("tmux") {
-		return errors.New("You need to run emp3r0r under `tmux`")
+		return errors.New("you need to run emp3r0r under `tmux`")
 	}
 
 	tmuxCmd := fmt.Sprintf("tmux new-window -n %s '%s || read'", name, cmd)
@@ -520,7 +520,7 @@ func TmuxSplit(hV, cmd string) error {
 		!util.IsCommandExist("tmux") ||
 		!util.IsCommandExist("less") {
 
-		return errors.New("You need to run emp3r0r under `tmux`, and make sure `less` is installed")
+		return errors.New("you need to run emp3r0r under `tmux`, and make sure `less` is installed")
 	}
 
 	job := fmt.Sprintf("tmux split-window -%s '%s || read'", hV, cmd)
