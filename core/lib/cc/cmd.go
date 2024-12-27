@@ -89,7 +89,7 @@ const HELP = "help" // fuck goconst
 // CmdHandler processes user commands
 func CmdHandler(cmd string) (err error) {
 	cmdSplit := util.ParseCmd(cmd)
-	if len(cmdSplit) < 0 {
+	if len(cmdSplit) == 0 {
 		return
 	}
 
@@ -224,15 +224,7 @@ func setCurrentTarget(cmd string) {
 			AgentShellPane = nil
 		}
 
-		// open sftp pane if on linux
-		if a.GOOS == "linux" {
-			CliPrintInfo("Opening SFTP pane")
-			err = SSHClient("sftp", "", RuntimeConfig.SSHDShellPort, false)
-			if err != nil {
-				CliPrintError("SFTPClient: %v", err)
-			}
-		}
-
+		CliPrint("Run `file_manager` to open a SFTP session")
 		updateAgentExes(target_to_set)
 	}
 

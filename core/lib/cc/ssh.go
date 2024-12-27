@@ -117,13 +117,13 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 						fmt.Sprintf("listen tcp 127.0.0.1:%s: bind: address already in use", port)) {
 					break
 				} else {
-					err = fmt.Errorf("Start sshd (%s) failed: %s", shell, res)
+					err = fmt.Errorf("start sshd (%s) failed: %s", shell, res)
 					return
 				}
 			}
 		}
 		if !is_response {
-			err = fmt.Errorf("Didn't get response from agent (%s), aborting", CurrentTarget.Tag)
+			err = fmt.Errorf("didn't get response from agent (%s), aborting", CurrentTarget.Tag)
 			return
 		}
 
@@ -162,7 +162,7 @@ wait:
 		}
 	}
 	if !exists {
-		err = errors.New("Port mapping unsuccessful")
+		err = errors.New("port mapping unsuccessful")
 		return
 	}
 
@@ -190,7 +190,7 @@ wait:
 	// if open in split tmux pane
 	if split {
 		if is_sftp {
-			AgentSFTPPane, err = TmuxNewPane("SFTP", "v", AgentOutputPane.ID, 30, sshCmd)
+			AgentSFTPPane, err = TmuxNewPane("SFTP", "v", AgentInfoPane.ID, 30, sshCmd)
 			TmuxPanes[AgentSFTPPane.ID] = AgentSFTPPane
 		} else {
 			AgentShellPane, err = TmuxNewPane("Shell", "v", CommandPane.ID, 30, sshCmd)
@@ -203,13 +203,6 @@ wait:
 	CliPrintInfo("\nOpening SSH (%s - %s) session for %s in Shell tab.\n"+
 		"If that fails, please execute command\n%s\nmanaully",
 		shell, port, CurrentTarget.Tag, sshCmd)
-
-	// if SFTP is requested, open in file manager with XDG-OPEN
-	if is_sftp {
-		// open in file manager
-		err = exec.Command("xdg-open", fmt.Sprintf("sftp://127.0.0.1: %s", lport)).Start()
-		return
-	}
 
 	// if a shell is wanted, just open in new tmux window, you will see a new tab
 	return TmuxNewWindow(fmt.Sprintf("shell/%s/%s-%s", name, shell, port), sshCmd)

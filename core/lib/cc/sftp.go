@@ -4,9 +4,8 @@
 package cc
 
 func OpenFileManager() {
-	err := SSHClient("sftp", "", RuntimeConfig.SSHDShellPort, false)
-	if err != nil {
-		CliPrintError("OpenFileManager: %v", err)
+	sshErr := SSHClient("sftp", "", RuntimeConfig.SSHDShellPort, false)
+	if sshErr != nil {
+		CliPrintError("openFileManager: %v", sshErr)
 	}
-	return
 }

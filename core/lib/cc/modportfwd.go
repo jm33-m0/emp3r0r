@@ -25,9 +25,9 @@ func modulePortFwd() {
 				// make sure handler returns
 				// cmd format: !port_fwd [to/listen] [shID] [operation]
 				cmd := fmt.Sprintf("%s %s stop stop", emp3r0r_data.C2CmdPortFwd, id)
-				err := SendCmd(cmd, "", CurrentTarget)
-				if err != nil {
-					CliPrintError("SendCmd: %v", err)
+				sendCMDerr := SendCmd(cmd, "", CurrentTarget)
+				if sendCMDerr != nil {
+					CliPrintError("SendCmd: %v", sendCMDerr)
 					return
 				}
 				return
@@ -40,9 +40,9 @@ func modulePortFwd() {
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
 		pf.Lport, pf.To = Options["listen_port"].Val, Options["to"].Val
 		go func() {
-			err := pf.InitReversedPortFwd()
-			if err != nil {
-				CliPrintError("PortFwd (reverse) failed: %v", err)
+			initErr := pf.InitReversedPortFwd()
+			if initErr != nil {
+				CliPrintError("PortFwd (reverse) failed: %v", initErr)
 			}
 		}()
 	case "on":
@@ -51,9 +51,9 @@ func modulePortFwd() {
 		pf.Lport, pf.To = Options["listen_port"].Val, Options["to"].Val
 		pf.Protocol = Options["protocol"].Val
 		go func() {
-			err := pf.RunPortFwd()
-			if err != nil {
-				CliPrintError("PortFwd failed: %v", err)
+			runErr := pf.RunPortFwd()
+			if runErr != nil {
+				CliPrintError("PortFwd failed: %v", runErr)
 			}
 		}()
 	default:

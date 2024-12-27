@@ -45,9 +45,9 @@ func TCPFwd(addr, port string, ctx context.Context, cancel context.CancelFunc) (
 		cancel()
 	}()
 	serveConn := func(conn net.Conn) {
-		dst, err := net.Dial("tcp", addr)
-		if err != nil {
-			log.Print(err)
+		dst, dialErr := net.Dial("tcp", addr)
+		if dialErr != nil {
+			log.Print(dialErr)
 			return
 		}
 		defer dst.Close()
@@ -55,15 +55,15 @@ func TCPFwd(addr, port string, ctx context.Context, cancel context.CancelFunc) (
 
 		// IO copy
 		go func() {
-			_, err = io.Copy(dst, conn)
-			if err != nil {
-				log.Print(err)
+			_, dialErr = io.Copy(dst, conn)
+			if dialErr != nil {
+				log.Print(dialErr)
 			}
 		}()
 		go func() {
-			_, err = io.Copy(conn, dst)
-			if err != nil {
-				log.Print(err)
+			_, dialErr = io.Copy(conn, dst)
+			if dialErr != nil {
+				log.Print(dialErr)
 			}
 		}()
 

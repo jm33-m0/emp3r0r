@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	cowsay "github.com/Code-Hex/Neo-cowsay/v2"
 	"github.com/bettercap/readline"
@@ -51,6 +52,23 @@ var (
 
 // CliMain launches the commandline UI
 func CliMain() {
+	// print banner
+	err = CliBanner()
+	if err != nil {
+		CliFatalError("Banner: %v", err)
+	} else {
+		// start all services
+		go TLSServer()
+		go ShadowsocksServer()
+		go InitModules()
+	}
+
+	// unlock incomplete downloads
+	err = UnlockDownloads()
+	if err != nil {
+		CliPrintWarning("UnlockDownloads: %v", err)
+	}
+
 	// completer
 	CmdCompls = []readline.PrefixCompleterInterface{
 		readline.PcItem("set",
@@ -447,12 +465,17 @@ func CliListCmds(w io.Writer) {
 func CliBanner() error {
 	data, encodingErr := base64.StdEncoding.DecodeString(cliBannerB64)
 	if encodingErr != nil {
-		return errors.New("Failed to print banner: " + encodingErr.Error())
+		return errors.New("failed to print banner: " + encodingErr.Error())
 	}
 
-	color.Cyan(string(data))
+	// print banner line by line
+	banner := strings.Split(string(data), "\n")
+	for _, line := range banner {
+		color.Cyan(line)
+		util.TakeABlink()
+	}
 	cow, encodingErr := cowsay.New(
-		cowsay.BallonWidth(40),
+		cowsay.BallonWidth(100),
 		cowsay.Random(),
 	)
 	if encodingErr != nil {
@@ -486,6 +509,7 @@ func CliBanner() error {
 		log.Fatalf("CowSay: %v", encodingErr)
 	}
 	color.Cyan("%s\n\n", say)
+	time.Sleep(1 * time.Second)
 	return nil
 }
 

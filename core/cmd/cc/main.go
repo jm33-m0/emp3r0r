@@ -71,19 +71,19 @@ func main() {
 
 	// do not kill tmux session when crashing
 	if *debug {
-		cc.EnableDebug = true
+		cc.TmuxPersistence = true
 	}
 
 	// generate C2 TLS cert for given host names
 	if *names != "" {
 		hosts := strings.Fields(*names)
-		err := cc.GenC2Certs(hosts)
-		if err != nil {
-			cc.CliFatalError("GenC2Certs: %v", err)
+		certErr := cc.GenC2Certs(hosts)
+		if certErr != nil {
+			cc.CliFatalError("GenC2Certs: %v", certErr)
 		}
-		err = cc.InitConfigFile(hosts[0])
-		if err != nil {
-			cc.CliFatalError("Init %s: %v", cc.EmpConfigFile, err)
+		certErr = cc.InitConfigFile(hosts[0])
+		if certErr != nil {
+			cc.CliFatalError("Init %s: %v", cc.EmpConfigFile, certErr)
 		}
 		os.Exit(0)
 	}
@@ -102,6 +102,53 @@ func main() {
 		cc.CliFatalError("CC is already running")
 	}
 
+	// run as relay client
+	if *connect_relay_addr != "" {
+		if *relayed_port == 0 {
+			cc.CliFatalError("Please specify -relayed_port")
+		}
+		go func() {
+			defer cc.CliPrintError("session unexpectedly exited, please restart emp3r0r")
+			SSHConnections := make(map[string]context.CancelFunc, 10)
+			pubkey, sshKeyErr := tun.SSHPublicKey(cc.RuntimeConfig.SSHHostKey)
+			if sshKeyErr != nil {
+				cc.CliFatalError("Parsing SSHPublicKey: %v", sshKeyErr)
+			}
+		ssh_connect:
+			ctx, cancel := context.WithCancel(context.Background())
+			sshKeyErr = tun.SSHRemoteFwdClient(*connect_relay_addr,
+				cc.RuntimeConfig.Password,
+				pubkey, // enable host key verification
+				*relayed_port,
+				&SSHConnections, ctx, cancel)
+			if sshKeyErr == nil {
+				sshKeyErr = fmt.Errorf("session unexpectedly exited")
+			}
+			cc.CliPrintWarning("SSHRemoteFwdClient: %v, retrying", sshKeyErr)
+			util.TakeABlink()
+			goto ssh_connect
+		}()
+	}
+
+	// start cdn2proxy server
+	if *cdnproxy != "" {
+		go func() {
+			logFile, openErr := os.OpenFile("/tmp/ws.log", os.O_CREATE|os.O_RDWR, 0o600)
+			if openErr != nil {
+				cc.CliFatalError("OpenFile: %v", openErr)
+			}
+			openErr = cdn2proxy.StartServer(*cdnproxy, "127.0.0.1:"+cc.RuntimeConfig.CCPort, "ws", logFile)
+			if openErr != nil {
+				cc.CliFatalError("CDN StartServer: %v", openErr)
+			}
+		}()
+	}
+
+	// use emp3r0r in terminal or from other frontend
+	if *apiserver {
+		go cc.APIMain()
+	}
+
 	// run as relay server
 	// no need to start CC services
 	if *ssh_relay_port != "" {
@@ -116,71 +163,7 @@ func main() {
 			cc.CliFatalError("SSHRemoteFwdServer: %v", err)
 		}
 	} else {
-		// run as CC
-		go cc.TLSServer()
-		go cc.ShadowsocksServer()
-		go cc.InitModules()
+		// run CLI
+		cc.CliMain()
 	}
-
-	// run as relay client
-	if *connect_relay_addr != "" {
-		if *relayed_port == 0 {
-			cc.CliFatalError("Please specify -relayed_port")
-		}
-		go func() {
-			defer cc.CliPrintError("session unexpectedly exited, please restart emp3r0r")
-			SSHConnections := make(map[string]context.CancelFunc, 10)
-			pubkey, err := tun.SSHPublicKey(cc.RuntimeConfig.SSHHostKey)
-			if err != nil {
-				cc.CliFatalError("Parsing SSHPublicKey: %v", err)
-			}
-		ssh_connect:
-			ctx, cancel := context.WithCancel(context.Background())
-			err = tun.SSHRemoteFwdClient(*connect_relay_addr,
-				cc.RuntimeConfig.Password,
-				pubkey, // enable host key verification
-				*relayed_port,
-				&SSHConnections, ctx, cancel)
-			if err == nil {
-				err = fmt.Errorf("session unexpectedly exited")
-			}
-			cc.CliPrintWarning("SSHRemoteFwdClient: %v, retrying", err)
-			util.TakeABlink()
-			goto ssh_connect
-		}()
-	}
-
-	// start cdn2proxy server
-	if *cdnproxy != "" {
-		go func() {
-			logFile, err := os.OpenFile("/tmp/ws.log", os.O_CREATE|os.O_RDWR, 0o600)
-			if err != nil {
-				cc.CliFatalError("OpenFile: %v", err)
-			}
-			err = cdn2proxy.StartServer(*cdnproxy, "127.0.0.1:"+cc.RuntimeConfig.CCPort, "ws", logFile)
-			if err != nil {
-				cc.CliFatalError("CDN StartServer: %v", err)
-			}
-		}()
-	}
-
-	// print banner
-	err = cc.CliBanner()
-	if err != nil {
-		cc.CliFatalError("Banner: %v", err)
-	}
-
-	// unlock incomplete downloads
-	err = cc.UnlockDownloads()
-	if err != nil {
-		cc.CliPrintWarning("UnlockDownloads: %v", err)
-	}
-
-	// use emp3r0r in terminal or from other frontend
-	if *apiserver {
-		go cc.APIMain()
-	}
-
-	// run CLI
-	cc.CliMain()
 }

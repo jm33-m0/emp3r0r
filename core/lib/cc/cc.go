@@ -24,8 +24,8 @@ var (
 	// 3 (DEBUG) -> 2 (INFO) -> 1 (WARN)
 	DebugLevel = 2
 
-	// EnableDebug enable debug (-debug)
-	EnableDebug = false
+	// TmuxPersistence enable debug (-debug)
+	TmuxPersistence = false
 
 	// IsAPIEnabled Indicate whether we are in headless mode
 	IsAPIEnabled = false
@@ -110,8 +110,8 @@ func ListTargets() {
 	defer TargetsMutex.RUnlock()
 	// return JSON data to APIConn in headless mode
 	if IsAPIEnabled {
-		if err := headlessListTargets(); err != nil {
-			CliPrintError("ls_targets: %v", err)
+		if listErr := headlessListTargets(); listErr != nil {
+			CliPrintError("ls_targets: %v", listErr)
 		}
 	}
 
@@ -315,13 +315,11 @@ func GetTargetDetails(target *emp3r0r_data.AgentSystemInfo) {
 	// rendor table
 	table.AppendBulk(tdata)
 	table.Render()
-	num_of_lines := len(strings.Split(tableString.String(), "\n"))
 	num_of_columns := len(strings.Split(tableString.String(), "\n")[0])
 	if AgentInfoPane == nil {
 		CliPrintError("AgentInfoPane doesn't exist")
 		return
 	}
-	AgentInfoPane.ResizePane("y", num_of_lines)
 	AgentInfoPane.ResizePane("x", num_of_columns)
 	AgentInfoPane.Printf(true, "\n%s\n\n", tableString.String())
 
@@ -506,7 +504,7 @@ func InitConfig() (err error) {
 	// set workspace to ~/.emp3r0r
 	u, err := user.Current()
 	if err != nil {
-		return fmt.Errorf("Get current user: %v", err)
+		return fmt.Errorf("get current user: %v", err)
 	}
 	EmpWorkSpace = u.HomeDir + "/.emp3r0r"
 	FileGetDir = EmpWorkSpace + "/file-get/"
@@ -525,9 +523,9 @@ func InitConfig() (err error) {
 
 	// copy stub binaries to ~/.emp3r0r
 	for _, arch := range Arch_List {
-		err := util.Copy(fmt.Sprintf("%s/stub-%s", EmpBuildDir, arch), EmpWorkSpace)
-		if err != nil {
-			CliPrintWarning("Agent stubs: %v", err)
+		copyErr := util.Copy(fmt.Sprintf("%s/stub-%s", EmpBuildDir, arch), EmpWorkSpace)
+		if copyErr != nil {
+			CliPrintWarning("Agent stubs: %v", copyErr)
 		}
 	}
 	err = util.Copy(fmt.Sprintf("%s/stub-win-%s", EmpBuildDir, "amd64"), EmpWorkSpace)

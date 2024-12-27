@@ -136,7 +136,7 @@ func TmuxInitWindows() (err error) {
 	}
 
 	// Agent output
-	AgentOutputPane, err = new_pane("Agent Handler", "Command results go below...\n", "h", "", 33)
+	AgentOutputPane, err = new_pane("Agent Handler", "Command results go below...\n", "v", "", 33)
 	if err != nil {
 		return
 	}
@@ -264,13 +264,13 @@ func (pane *Emp3r0rPane) Printf(clear bool, format string, a ...interface{}) {
 	}
 
 	// print msg
-	err := os.WriteFile(pane.TTY, []byte(msg), 0o777)
-	if err != nil {
+	werr := os.WriteFile(pane.TTY, []byte(msg), 0o777)
+	if werr != nil {
 		CliPrintWarning("Cannot print on tmux window %s (%s): %v,\n"+
 			"printing to main window instead.\n\n",
 			id,
 			pane.Title,
-			err)
+			werr)
 		CliPrintWarning(format, a...)
 	}
 }
@@ -390,7 +390,7 @@ func (pane *Emp3r0rPane) KillPane() (err error) {
 // TmuxDeinitWindows close previously opened tmux windows
 func TmuxDeinitWindows() {
 	// do not kill tmux windows if debug is enabled
-	if EnableDebug {
+	if TmuxPersistence {
 		return
 	}
 
