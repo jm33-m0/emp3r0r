@@ -167,8 +167,7 @@ func modGenAgent() {
 	}
 
 	agent_binary_path = packed_file
-	CliPrint("Generated agent binary: %s. "+
-		"You can `use stager` to generate a one liner for your target host", agent_binary_path)
+	CliPrint("Generated agent binary: %s.", agent_binary_path)
 
 	if os_choice == "windows" {
 		// generate shellcode for the agent binary
