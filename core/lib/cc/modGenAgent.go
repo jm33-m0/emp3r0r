@@ -36,7 +36,7 @@ func modGenAgent() {
 		agent_binary_path string
 	)
 	now := time.Now()
-	stubFile := fmt.Sprintf("%s-%s", emp3r0r_data.Stub_Linux, arch_choice)
+	stubFile := ""
 	os_choice := Options["os"].Val
 	arch_choice = Options["arch"].Val
 	is_arch_valid := func(arch string) bool {
@@ -177,14 +177,14 @@ func modGenAgent() {
 	}
 	if os_choice == "linux" {
 		// tell user to use shared library stager
-		CliPrint("Navigate to `loader\\elf` and run `make stager_so` to generate shared library stager, don't forget to modify `stager.c` to fit your needs. You will need another stager to load the shared library.")
+		CliPrint("Navigate to `loader/elf` and run `make stager_so` to generate shared library stager, don't forget to modify `stager.c` to fit your needs. You will need another stager to load the shared library.")
 	}
 }
 
 func appendConfigToPayload(file string, sep, config []byte) (err error) {
 	packed_bin_data, err := os.ReadFile(file)
 	if err != nil {
-		err = fmt.Errorf("Failed to read file %s: %v", file, err)
+		err = fmt.Errorf("failed to read file %s: %v", file, err)
 		return
 	}
 	toWrite := append(packed_bin_data, sep...)
@@ -192,7 +192,7 @@ func appendConfigToPayload(file string, sep, config []byte) (err error) {
 	toWrite = append(toWrite, sep...)
 	err = os.WriteFile(file, toWrite, 0o755)
 	if err != nil {
-		err = fmt.Errorf("Failed to save final agent binary: %v", err)
+		err = fmt.Errorf("failed to save final agent binary: %v", err)
 		return
 	}
 
