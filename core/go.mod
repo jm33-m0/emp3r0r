@@ -42,6 +42,7 @@ require (
 	golang.org/x/crypto v0.31.0
 	golang.org/x/net v0.33.0
 	golang.org/x/sys v0.28.0
+	golang.org/x/term v0.27.0
 	src.elv.sh v0.21.0
 )
 
@@ -103,7 +104,6 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/sync v0.10.0 // indirect
-	golang.org/x/term v0.27.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	howett.net/plist v1.0.1 // indirect
