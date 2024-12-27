@@ -227,7 +227,7 @@ func setCurrentTarget(cmd string) {
 		// open sftp pane if on linux
 		if a.GOOS == "linux" {
 			CliPrintInfo("Opening SFTP pane")
-			err = SSHClient("sftp", "", RuntimeConfig.SSHDShellPort, true)
+			err = SSHClient("sftp", "", RuntimeConfig.SSHDShellPort, false)
 			if err != nil {
 				CliPrintError("SFTPClient: %v", err)
 			}
