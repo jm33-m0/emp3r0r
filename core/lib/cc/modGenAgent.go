@@ -266,9 +266,9 @@ func MakeConfig() (err error) {
 	}
 
 	if Options["ncsi"].Val == "on" {
-		RuntimeConfig.DisableNCSI = true
-	} else {
 		RuntimeConfig.DisableNCSI = false
+	} else {
+		RuntimeConfig.DisableNCSI = true
 	}
 
 	// CDN proxy
