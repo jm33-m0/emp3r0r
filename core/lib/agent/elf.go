@@ -118,7 +118,7 @@ func IsELF(file string) bool {
 	return true
 }
 
-// FixELF: Replace ld and add rpath
+// FixELF: Replace ld and add rpath to use musl libc
 func FixELF(elf_path string) (err error) {
 	pwd, _ := os.Getwd()
 	err = os.Chdir(RuntimeConfig.UtilsPath)

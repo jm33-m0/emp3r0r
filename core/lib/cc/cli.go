@@ -14,7 +14,6 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"time"
 
 	cowsay "github.com/Code-Hex/Neo-cowsay/v2"
 	"github.com/bettercap/readline"
@@ -509,7 +508,7 @@ func CliBanner() error {
 		log.Fatalf("CowSay: %v", encodingErr)
 	}
 	color.Cyan("%s\n\n", say)
-	time.Sleep(1 * time.Second)
+	util.TakeABlink()
 	return nil
 }
 

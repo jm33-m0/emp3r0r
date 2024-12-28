@@ -236,7 +236,6 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 	if pf.Protocol == "" {
 		pf.Protocol = "tcp"
 	}
-	CliPrintInfo("RunPortFwd: %s -> %s (%s)", pf.Lport, pf.To, pf.Protocol)
 
 	handleTCPConn := func(conn net.Conn, fwdID string) {
 		/*

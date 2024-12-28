@@ -31,7 +31,8 @@ func ExtractBash() error {
 	if !util.IsFileExist(customBash) {
 		err = fmt.Errorf("Custom bash binary (%s) not found, maybe you need to run `vaccine`",
 			customBash)
-		log.Print(err)
+		return err
 	}
+
 	return err
 }

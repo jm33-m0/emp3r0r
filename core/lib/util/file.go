@@ -287,8 +287,18 @@ func IsDirWritable(path string) bool {
 	if err != nil {
 		return false
 	}
-	mode := info.Mode().Perm()
-	return mode&0200 != 0 // Check write permission for the owner
+	if !info.IsDir() {
+		return false
+	}
+	// Check if the current user can write to the directory
+	testFile := filepath.Join(path, fmt.Sprintf("%s", RandMD5String()))
+	file, err := os.Create(testFile)
+	if err != nil {
+		return false
+	}
+	file.Close()
+	os.Remove(testFile)
+	return true
 }
 
 // GetWritablePaths get all writable paths in a directory up to a given depth

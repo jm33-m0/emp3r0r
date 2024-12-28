@@ -40,6 +40,7 @@ func modulePortFwd() {
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
 		pf.Lport, pf.To = Options["listen_port"].Val, Options["to"].Val
 		go func() {
+			CliPrint("RunReversedPortFwd: %s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.Lport, pf.To, pf.Protocol)
 			initErr := pf.InitReversedPortFwd()
 			if initErr != nil {
 				CliPrintError("PortFwd (reverse) failed: %v", initErr)
@@ -51,6 +52,7 @@ func modulePortFwd() {
 		pf.Lport, pf.To = Options["listen_port"].Val, Options["to"].Val
 		pf.Protocol = Options["protocol"].Val
 		go func() {
+			CliPrint("RunPortFwd: %s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.Lport, pf.To, pf.Protocol)
 			runErr := pf.RunPortFwd()
 			if runErr != nil {
 				CliPrintError("PortFwd failed: %v", runErr)

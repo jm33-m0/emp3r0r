@@ -37,13 +37,11 @@ func UpgradeAgent() {
 // read config by key from emp3r0r.json
 func read_cached_config(config_key string) (val interface{}) {
 	// read existing config when possible
-	var (
-		jsonData   []byte
-		config_map map[string]interface{}
-	)
+	var config_map map[string]interface{}
+
 	if util.IsExist(EmpConfigFile) {
 		CliPrintInfo("Reading config '%s' from existing %s", config_key, EmpConfigFile)
-		jsonData, err = os.ReadFile(EmpConfigFile)
+		jsonData, err := os.ReadFile(EmpConfigFile)
 		if err != nil {
 			CliPrintWarning("failed to read %s: %v", EmpConfigFile, err)
 			return ""
@@ -55,10 +53,9 @@ func read_cached_config(config_key string) (val interface{}) {
 			return ""
 		}
 	}
-	exists := false
-	val, exists = config_map[config_key]
+	val, exists := config_map[config_key]
 	if !exists {
-		err = fmt.Errorf("%s not found in JSON config", config_key)
+		CliPrintWarning("%s not found in JSON config", config_key)
 		return ""
 	}
 	return val
@@ -73,9 +70,6 @@ func GenC2Certs(hosts []string) (err error) {
 			return fmt.Errorf("Generate CA: %v", err)
 		}
 		CliPrintInfo("CA fingerprint: %s", RuntimeConfig.CAFingerprint)
-	}
-	if !util.IsFileExist(CAKeyFile) || !util.IsFileExist(CACrtFile) {
-		return fmt.Errorf("%s or %s still not found, CA cert generation failed", CAKeyFile, CACrtFile)
 	}
 
 	// save CA cert to emp3r0r.json
@@ -125,12 +119,9 @@ func InitConfigFile(cc_host string) (err error) {
 	// random strings
 	RuntimeConfig.AgentUUID = uuid.NewString()
 	RuntimeConfig.AgentRoot = util.RandMD5String()
-	utils_path := util.RandMD5String()
-	RuntimeConfig.UtilsPath = fmt.Sprintf("%s/%v", RuntimeConfig.AgentRoot, utils_path)
-	socket := util.RandMD5String()
-	RuntimeConfig.SocketName = fmt.Sprintf("%s/%v", RuntimeConfig.AgentRoot, socket)
-	pid_file := util.RandMD5String()
-	RuntimeConfig.PIDFile = fmt.Sprintf("%s/%v", RuntimeConfig.AgentRoot, pid_file)
+	RuntimeConfig.UtilsPath = util.RandMD5String()
+	RuntimeConfig.SocketName = util.RandMD5String()
+	RuntimeConfig.PIDFile = util.RandMD5String()
 	RuntimeConfig.Password = util.RandStr(20)
 
 	// time intervals
