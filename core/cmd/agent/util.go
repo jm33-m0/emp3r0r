@@ -17,7 +17,11 @@ func isAgentAliveSocket() bool {
 	log.Printf("Checking if agent is alive via socket %s", agent.RuntimeConfig.SocketName)
 	conn, err := net.Dial("unix", agent.RuntimeConfig.SocketName)
 	if err != nil {
-		log.Printf("Agent seems dead: %v", err)
+		log.Printf("Agent seems dead: %v, removing socket to bind", err)
+		err = os.RemoveAll(agent.RuntimeConfig.SocketName)
+		if err != nil {
+			log.Printf("Failed to remove socket: %v", err)
+		}
 		return false
 	}
 	return agent.IsAgentAlive(conn)
