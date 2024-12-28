@@ -152,7 +152,7 @@ func BroadcastMsg(msg, dst string) (err error) {
 	}
 
 	_, err = pc.WriteTo([]byte(encMsg), addr)
-	log.Printf("BroadcastMsg: sent %s (%s) to %s", encMsg, msg, dst)
+	log.Printf("BroadcastMsg: sent %x (%s) to %s", encMsg, msg, dst)
 	return
 }
 
