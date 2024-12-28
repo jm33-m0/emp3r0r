@@ -32,11 +32,13 @@ func socketListen() {
 	}
 	os.Chdir(agent.RuntimeConfig.AgentRoot)
 	defer os.Chdir(cwd)
+	log.Printf("Cd to %s", agent.RuntimeConfig.AgentRoot)
 
 	// use basename to make sure the socket path is not too long (107), otherwise it will fail
-	l, err := net.Listen("unix", util.FileBaseName(agent.RuntimeConfig.SocketName))
+	socket_name := util.FileBaseName(agent.RuntimeConfig.SocketName)
+	l, err := net.Listen("unix", socket_name)
 	if err != nil {
-		log.Fatalf("listen error: %v", err)
+		log.Fatalf("failed to bind unix socket %s: %v", socket_name, err)
 	}
 	for {
 		fd, err := l.Accept()
