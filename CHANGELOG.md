@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.42.1](https://github.com/jm33-m0/emp3r0r/compare/v1.42.0...v1.42.1) (2024-12-28)
+
+
+### Bug Fixes
+
+* `ps` command output not parsed ([7ace03c](https://github.com/jm33-m0/emp3r0r/commit/7ace03c4d882db7980e63df0879f9daf8290d81f))
+* agent root path searching ([aa0941c](https://github.com/jm33-m0/emp3r0r/commit/aa0941cc90ee4021d603c8aa75cbd3c55b44c022))
+
 ## [1.42.0](https://github.com/jm33-m0/emp3r0r/compare/v1.41.0...v1.42.0) (2024-12-27)
 
 
