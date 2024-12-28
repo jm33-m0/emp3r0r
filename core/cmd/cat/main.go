@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 func main() {
@@ -21,7 +22,7 @@ func main() {
 			// ignore any signals except SIGTERM
 			// (and SIGKILL that cannot be ignored)
 			if s == syscall.SIGTERM {
-				log.Fatal("Terminated")
+				log.Fatal("emp3r0r-cat: Terminated")
 			}
 		}
 	}()
@@ -33,7 +34,8 @@ func main() {
 		// io.Copy aborts on EOF
 		_, err := io.Copy(os.Stdin, os.Stdout)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("emp3r0r-cat: %v", err)
 		}
+		time.Sleep(10 * time.Millisecond) // Add a small delay to reduce CPU usage
 	}
 }
