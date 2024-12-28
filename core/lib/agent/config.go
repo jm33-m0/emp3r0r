@@ -105,7 +105,9 @@ func GetRandomWritablePath() (string, error) {
 	for _, path := range paths {
 		if util.FileBaseName(path) == RuntimeConfig.AgentRoot {
 			// just use it
-			return filepath.Dir(path), nil // return parent dir of path
+			path = filepath.Dir(path)
+			log.Printf("Using existing agent root: %s", path)
+			return path, nil // return parent dir of path
 		}
 	}
 

