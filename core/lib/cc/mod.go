@@ -234,7 +234,7 @@ func UpdateOptions(modName string) (exist bool) {
 		// NCSI switch
 		ncsi := addIfNotFound("ncsi")
 		ncsi.Vals = []string{"on", "off"}
-		ncsi.Val = "on"
+		ncsi.Val = "off"
 		// CDN proxy
 		cdn_proxy := addIfNotFound("cdn_proxy")
 		cdn_proxy.Val = read_cached_config("cdn_proxy").(string)
