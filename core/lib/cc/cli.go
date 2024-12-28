@@ -236,16 +236,12 @@ func SetDynamicPrompt() {
 	EmpReadLine.SetPrompt(dynamicPrompt)
 }
 
-func cliPrintHelper(format string, a []interface{}, colorAttr color.Attribute, logPrefix string, alert bool) {
-	msgColor := color.New(colorAttr)
-	if logPrefix == "ERROR" || logPrefix == "ALERT" || logPrefix == "SUCCESS" {
-		msgColor = color.New(colorAttr, color.Bold)
-	}
+func cliPrintHelper(format string, a []interface{}, msgColor *color.Color, logPrefix string, alert bool) {
 	logMsg := msgColor.Sprintf(format, a...)
 	log.Print(logMsg)
 
 	// Save log to file
-	logFile, logOpenErr := os.OpenFile("emp3r0r.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	logFile, logOpenErr := os.OpenFile("emp3r0r-cli.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if logOpenErr != nil {
 		log.Printf("cliPrintHelper: %v", logOpenErr)
 		return
@@ -274,46 +270,46 @@ func cliPrintHelper(format string, a []interface{}, colorAttr color.Attribute, l
 
 func CliPrintDebug(format string, a ...interface{}) {
 	if DebugLevel >= 3 {
-		cliPrintHelper(format, a, color.FgBlue, "DEBUG", false)
+		cliPrintHelper(format, a, color.New(color.FgBlue, color.Italic), "DEBUG", false)
 	}
 }
 
 func CliPrintInfo(format string, a ...interface{}) {
 	if DebugLevel >= 2 {
-		cliPrintHelper(format, a, color.FgHiBlue, "INFO", false)
+		cliPrintHelper(format, a, color.New(color.FgHiBlue), "INFO", false)
 	}
 }
 
 func CliPrintWarning(format string, a ...interface{}) {
 	if DebugLevel >= 1 {
-		cliPrintHelper(format, a, color.FgHiYellow, "WARN", false)
+		cliPrintHelper(format, a, color.New(color.FgHiYellow), "WARN", false)
 	}
 }
 
 func CliPrint(format string, a ...interface{}) {
-	cliPrintHelper(format, a, color.FgCyan, "PRINT", false)
+	cliPrintHelper(format, a, color.New(color.FgHiCyan), "PRINT", false)
 }
 
 func CliMsg(format string, a ...interface{}) {
-	cliPrintHelper(format, a, color.FgCyan, "MSG", false)
+	cliPrintHelper(format, a, color.New(color.FgHiCyan), "MSG", false)
 }
 
 func CliAlert(textColor color.Attribute, format string, a ...interface{}) {
-	cliPrintHelper(format, a, textColor, "ALERT", false)
+	cliPrintHelper(format, a, color.New(textColor, color.Bold), "ALERT", false)
 }
 
 func CliPrintSuccess(format string, a ...interface{}) {
-	cliPrintHelper(format, a, color.FgHiGreen, "SUCCESS", true)
+	cliPrintHelper(format, a, color.New(color.FgHiGreen, color.Bold), "SUCCESS", true)
 }
 
 func CliFatalError(format string, a ...interface{}) {
-	cliPrintHelper(format, a, color.FgHiRed, "ERROR", true)
+	cliPrintHelper(format, a, color.New(color.FgHiRed, color.Bold, color.Italic), "ERROR", true)
 	CliMsg("Run 'tmux kill-session -t emp3r0r' to clean up dead emp3r0r windows")
 	log.Fatal(color.New(color.Bold, color.FgHiRed).Sprintf(format, a...))
 }
 
 func CliPrintError(format string, a ...interface{}) {
-	cliPrintHelper(format, a, color.FgHiRed, "ERROR", true)
+	cliPrintHelper(format, a, color.New(color.FgHiRed, color.Bold), "ERROR", true)
 }
 
 // CliAsk prompt for an answer from user
