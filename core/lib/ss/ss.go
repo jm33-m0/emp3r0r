@@ -66,7 +66,7 @@ func SSMain(ss_config *SSConfig) (err error) {
 
 	// ss:// URL as server address
 	if strings.HasPrefix(ss_config.ServerAddr, "ss://") {
-		ss_config.ServerAddr, ss_config.Cipher, ss_config.Password, err = parseURL(ss_config.ServerAddr)
+		ss_config.ServerAddr, ss_config.Cipher, ss_config.Password, err = ParseSSURL(ss_config.ServerAddr)
 		if err != nil {
 			return
 		}
@@ -106,7 +106,8 @@ func SSMain(ss_config *SSConfig) (err error) {
 	return
 }
 
-func parseURL(s string) (addr, cipher, password string, err error) {
+// ParseSSURL parse ss:// URL, eg. ss://AEAD_CHACHA20_POLY1305:your-password@[server_address]:8488
+func ParseSSURL(s string) (addr, cipher, password string, err error) {
 	u, err := url.Parse(s)
 	if err != nil {
 		return

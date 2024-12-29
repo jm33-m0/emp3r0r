@@ -63,7 +63,7 @@ init_transport:
 	if err != nil {
 		if proxyServer != "" && try < 5 {
 			time.Sleep(3 * time.Second)
-			log.Printf("Proxy server down, retrying (%d)...", try)
+			log.Printf("Proxy server (%s) down, retrying (%d)...", proxyServer, try)
 			goto init_transport
 		} else {
 			log.Printf("Initializing transport (%s): makeRoundTripper: %v", c2url, err)

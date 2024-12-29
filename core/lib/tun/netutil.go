@@ -108,6 +108,7 @@ func HasInternetAccess(test_url, proxy string) bool {
 
 // IsProxyOK test if the proxy works against the test URL
 func IsProxyOK(proxy, test_url string) bool {
+	log.Printf("IsProxyOK: testing proxy %s with %s", proxy, test_url)
 	client := HTTPClientWithEmpCA(test_url, proxy)
 	if client == nil {
 		log.Printf("IsProxyOK: cannot create http client")
