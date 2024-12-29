@@ -40,10 +40,10 @@ type Config struct {
 	CCPort                    string `json:"cc_port"`                      // CC service port, TLS enabled
 	Emp3r0rProxyServerPort    string `json:"emp3r0r_proxy_port"`           // Socks5 proxy server port
 	AutoProxyTimeout          int    `json:"autoproxy_timeout"`            // timeout (in seconds) for agent side Socks5 server
-	HTTPListenerPort          string `json:"http_listner_port"`            // For stager HTTP server
+	StagerHTTPListenerPort    string `json:"http_listner_port"`            // For stager HTTP server
 	Password                  string `json:"password"`                     // password of shadowsocks, socks5 and SSH server
 	ShadowsocksLocalSocksPort string `json:"shadowsocks_local_socks_port"` // socks5 port of shadowsocks
-	ShadowsocksServerPort     string `json:"shadowsocks_server_port"`      // server port of shadowsocks proxy server
+	ShadowsocksServerPort     string `json:"shadowsocks_server_port"`      // server port of shadowsocks proxy server, can run on CC and agent
 	KCPPort                   string `json:"kcp_port"`                     // server port of kcp server
 	UseShadowsocks            bool   `json:"use_shadowsocks"`              // enable shadowsocks proxy server for C2 transport
 	UseKCP                    bool   `json:"use_kcp"`                      // enable KCP for Shadowsocks C2 transport

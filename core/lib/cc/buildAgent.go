@@ -108,7 +108,7 @@ func InitConfigFile(cc_host string) (err error) {
 	RuntimeConfig.ShadowsocksLocalSocksPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.ShadowsocksServerPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.KCPPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
-	RuntimeConfig.HTTPListenerPort = fmt.Sprintf("%v", util.RandInt(1026, 65534))
+	RuntimeConfig.StagerHTTPListenerPort = fmt.Sprintf("%v", util.RandInt(1026, 65534))
 	RuntimeConfig.Timeout = util.RandInt(10000, 20000)
 
 	// SSH host key
