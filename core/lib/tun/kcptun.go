@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"math/big"
 	"net"
 	"net/http"
@@ -20,7 +19,6 @@ import (
 
 	"golang.org/x/crypto/pbkdf2"
 
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	kcp "github.com/xtaci/kcp-go/v5"
 	"github.com/xtaci/kcptun/std"
@@ -164,58 +162,58 @@ func KCPTunClient(remote_addr, port, password, salt string) error {
 		checkError(err)
 	}
 
-	LogInfo("smux version:", config.SmuxVer)
-	LogInfo("listening on:", listener.Addr())
-	LogInfo("encryption:", config.Crypt)
-	LogInfo("QPP:", config.QPP)
-	LogInfo("QPP Count:", config.QPPCount)
-	LogInfo("nodelay parameters:", config.NoDelay, config.Interval, config.Resend, config.NoCongestion)
-	LogInfo("remote address:", config.RemoteAddr)
-	LogInfo("sndwnd:", config.SndWnd, "rcvwnd:", config.RcvWnd)
-	LogInfo("compression:", !config.NoComp)
-	LogInfo("mtu:", config.MTU)
-	LogInfo("datashard:", config.DataShard, "parityshard:", config.ParityShard)
-	LogInfo("acknodelay:", config.AckNodelay)
-	LogInfo("dscp:", config.DSCP)
-	LogInfo("sockbuf:", config.SockBuf)
-	LogInfo("smuxbuf:", config.SmuxBuf)
-	LogInfo("streambuf:", config.StreamBuf)
-	LogInfo("keepalive:", config.KeepAlive)
-	LogInfo("conn:", config.Conn)
-	LogInfo("autoexpire:", config.AutoExpire)
-	LogInfo("scavengettl:", config.ScavengeTTL)
-	LogInfo("snmplog:", config.SnmpLog)
-	LogInfo("snmpperiod:", config.SnmpPeriod)
-	LogInfo("quiet:", config.Quiet)
-	LogInfo("tcp:", config.TCP)
-	LogInfo("pprof:", config.Pprof)
+	LogInfo("smux version: %d", config.SmuxVer)
+	LogInfo("listening on: %s", listener.Addr())
+	LogInfo("encryption: %s", config.Crypt)
+	LogInfo("QPP: %t", config.QPP)
+	LogInfo("QPP Count: %d", config.QPPCount)
+	LogInfo("nodelay parameters: %d %d %d %d", config.NoDelay, config.Interval, config.Resend, config.NoCongestion)
+	LogInfo("remote address: %s", config.RemoteAddr)
+	LogInfo("sndwnd: %d rcvwnd: %d", config.SndWnd, config.RcvWnd)
+	LogInfo("compression: %t", !config.NoComp)
+	LogInfo("mtu: %d", config.MTU)
+	LogInfo("datashard: %d parityshard: %d", config.DataShard, config.ParityShard)
+	LogInfo("acknodelay: %t", config.AckNodelay)
+	LogInfo("dscp: %d", config.DSCP)
+	LogInfo("sockbuf: %d", config.SockBuf)
+	LogInfo("smuxbuf: %d", config.SmuxBuf)
+	LogInfo("streambuf: %d", config.StreamBuf)
+	LogInfo("keepalive: %d", config.KeepAlive)
+	LogInfo("conn: %d", config.Conn)
+	LogInfo("autoexpire: %d", config.AutoExpire)
+	LogInfo("scavengettl: %d", config.ScavengeTTL)
+	LogInfo("snmplog: %s", config.SnmpLog)
+	LogInfo("snmpperiod: %d", config.SnmpPeriod)
+	LogInfo("quiet: %t", config.Quiet)
+	LogInfo("tcp: %t", config.TCP)
+	LogInfo("pprof: %t", config.Pprof)
 
 	// QPP parameters check
 	if config.QPP {
 		minSeedLength := qpp.QPPMinimumSeedLength(8)
 		if len(config.Key) < minSeedLength {
-			color.Red("QPP Warning: 'key' has size of %d bytes, required %d bytes at least", len(config.Key), minSeedLength)
+			LogWarn("QPP Warning: 'key' has size of %d bytes, required %d bytes at least", len(config.Key), minSeedLength)
 		}
 
 		minPads := qpp.QPPMinimumPads(8)
 		if config.QPPCount < minPads {
-			color.Red("QPP Warning: QPPCount %d, required %d at least", config.QPPCount, minPads)
+			LogWarn("QPP Warning: QPPCount %d, required %d at least", config.QPPCount, minPads)
 		}
 
 		if new(big.Int).GCD(nil, nil, big.NewInt(int64(config.QPPCount)), big.NewInt(8)).Int64() != 1 {
-			color.Red("QPP Warning: QPPCount %d, choose a prime number for security", config.QPPCount)
+			LogWarn("QPP Warning: QPPCount %d, choose a prime number for security", config.QPPCount)
 		}
 	}
 
 	// Scavenge parameters check
 	if config.AutoExpire != 0 && config.ScavengeTTL > config.AutoExpire {
-		color.Red("WARNING: scavengettl is bigger than autoexpire, connections may race hard to use bandwidth.")
-		color.Red("Try limiting scavengettl to a smaller value.")
+		LogWarn("WARNING: scavengettl is bigger than autoexpire, connections may race hard to use bandwidth.")
+		LogWarn("Try limiting scavengettl to a smaller value.")
 	}
 
 	// SMUX Version check
 	if config.SmuxVer > maxSmuxVer {
-		log.Fatal("unsupported smux version:", config.SmuxVer)
+		return fmt.Errorf("unsupported smux version: %d", config.SmuxVer)
 	}
 
 	LogInfo("initiating key derivation")
@@ -267,15 +265,15 @@ func KCPTunClient(remote_addr, port, password, salt string) error {
 		kcpconn.SetACKNoDelay(config.AckNodelay)
 
 		if err := kcpconn.SetDSCP(config.DSCP); err != nil {
-			LogInfo("SetDSCP:", err)
+			LogWarn("SetDSCP: %v", err)
 		}
 		if err := kcpconn.SetReadBuffer(config.SockBuf); err != nil {
-			LogInfo("SetReadBuffer:", err)
+			LogWarn("SetReadBuffer: %v", err)
 		}
 		if err := kcpconn.SetWriteBuffer(config.SockBuf); err != nil {
-			LogInfo("SetWriteBuffer:", err)
+			LogWarn("SetWriteBuffer: %v", err)
 		}
-		LogInfo("smux version:", config.SmuxVer, "on connection:", kcpconn.LocalAddr(), "->", kcpconn.RemoteAddr())
+		LogInfo("smux version: %d on connection: %s -> %s", config.SmuxVer, kcpconn.LocalAddr(), kcpconn.RemoteAddr())
 		smuxConfig := smux.DefaultConfig()
 		smuxConfig.Version = config.SmuxVer
 		smuxConfig.MaxReceiveBuffer = config.SmuxBuf
@@ -283,7 +281,7 @@ func KCPTunClient(remote_addr, port, password, salt string) error {
 		smuxConfig.KeepAliveInterval = time.Duration(config.KeepAlive) * time.Second
 
 		if err := smux.VerifyConfig(smuxConfig); err != nil {
-			log.Fatalf("%+v", err)
+			return nil, fmt.Errorf("%+v", err)
 		}
 
 		// stream multiplex
@@ -305,7 +303,7 @@ func KCPTunClient(remote_addr, port, password, salt string) error {
 			if session, err := createConn(); err == nil {
 				return session
 			} else {
-				LogInfo("re-connecting:", err)
+				LogInfo("re-connecting: %v", err)
 				time.Sleep(time.Second)
 			}
 		}
@@ -339,7 +337,7 @@ func KCPTunClient(remote_addr, port, password, salt string) error {
 	for {
 		p1, err := listener.Accept()
 		if err != nil {
-			log.Fatalf("%+v", err)
+			return fmt.Errorf("%+v", err)
 		}
 		idx := rr % numconn
 
@@ -362,7 +360,7 @@ func KCPTunClient(remote_addr, port, password, salt string) error {
 func clientHandleConn(_Q_ *qpp.QuantumPermutationPad, seed []byte, session *smux.Session, p1 net.Conn, quiet bool, closeWait int) {
 	logln := func(v ...interface{}) {
 		if !quiet {
-			log.Print(v...)
+			LogInfo("%v", v...)
 		}
 	}
 
@@ -420,10 +418,10 @@ func scavenger(ch chan timedSession, config *Config) {
 			for k := range sessionList {
 				s := sessionList[k]
 				if s.session.IsClosed() {
-					LogInfo("scavenger: session normally closed:", s.session.LocalAddr())
+					LogInfo("scavenger: session normally closed: %s", s.session.LocalAddr())
 				} else if time.Now().After(s.expiryDate) {
 					s.session.Close()
-					LogInfo("scavenger: session closed due to ttl:", s.session.LocalAddr())
+					LogInfo("scavenger: session closed due to ttl: %s", s.session.LocalAddr())
 				} else {
 					newList = append(newList, sessionList[k])
 				}
@@ -492,7 +490,7 @@ func KCPTunServer(target, port, password, salt string) error {
 	}
 	// parameters check
 	if config.SmuxVer > maxSmuxVer {
-		return fmt.Errorf("unsupported smux version:", config.SmuxVer)
+		return fmt.Errorf("unsupported smux version: %d", config.SmuxVer)
 	}
 
 	pass := pbkdf2.Key([]byte(config.Key), []byte(salt), 4096, 32, sha1.New)
@@ -545,18 +543,18 @@ func KCPTunServer(target, port, password, salt string) error {
 	loop := func(lis *kcp.Listener) {
 		defer wg.Done()
 		if err := lis.SetDSCP(config.DSCP); err != nil {
-			LogInfo("SetDSCP:", err)
+			LogInfo("SetDSCP: %v", err)
 		}
 		if err := lis.SetReadBuffer(config.SockBuf); err != nil {
-			LogInfo("SetReadBuffer:", err)
+			LogInfo("SetReadBuffer: %v", err)
 		}
 		if err := lis.SetWriteBuffer(config.SockBuf); err != nil {
-			LogInfo("SetWriteBuffer:", err)
+			LogInfo("SetWriteBuffer: %v", err)
 		}
 
 		for {
 			if conn, err := lis.AcceptKCP(); err == nil {
-				LogInfo("remote address:", conn.RemoteAddr())
+				LogInfo("remote address: %s", conn.RemoteAddr())
 				conn.SetStreamMode(true)
 				conn.SetWriteDelay(false)
 				conn.SetNoDelay(config.NoDelay, config.Interval, config.Resend, config.NoCongestion)
@@ -614,7 +612,7 @@ func handleMux(_Q_ *qpp.QuantumPermutationPad, conn net.Conn, config *Config) {
 	if _, _, err := net.SplitHostPort(config.Target); err != nil {
 		targetType = TGT_UNIX
 	}
-	LogInfo("smux version:", config.SmuxVer, "on connection:", conn.LocalAddr(), "->", conn.RemoteAddr())
+	LogInfo("smux version: %d on connection: %s -> %s", config.SmuxVer, conn.LocalAddr(), conn.RemoteAddr())
 
 	// stream multiplex
 	smuxConfig := smux.DefaultConfig()
@@ -667,7 +665,7 @@ func handleMux(_Q_ *qpp.QuantumPermutationPad, conn net.Conn, config *Config) {
 func handleClient(_Q_ *qpp.QuantumPermutationPad, seed []byte, p1 *smux.Stream, p2 net.Conn, quiet bool, closeWait int) {
 	logln := func(v ...interface{}) {
 		if !quiet {
-			log.Print(v...)
+			LogInfo("%v", v...)
 		}
 	}
 
@@ -699,6 +697,5 @@ func handleClient(_Q_ *qpp.QuantumPermutationPad, seed []byte, p1 *smux.Stream, 
 func checkError(err error) {
 	if err != nil {
 		LogError("%+v\n", err)
-		os.Exit(-1)
 	}
 }

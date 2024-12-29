@@ -27,5 +27,6 @@ func LogWarn(format string, a ...interface{}) {
 // LogError print log in red, and exit
 func LogError(format string, a ...interface{}) {
 	errorColor := color.New(color.Bold, color.FgHiRed)
-	log.Printf(errorColor.Sprintf(format, a...))
+	msg := errorColor.Sprintf(format, a...)
+	log.Print(msg)
 }
