@@ -49,10 +49,6 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 
 	// monitor until it works
 	go func() {
-		if tun.IsProxyOK(RuntimeConfig.C2TransportProxy, emp3r0r_data.CCAddress) {
-			log.Printf("BroadcastServer: %s is already working, no need to wait", RuntimeConfig.C2TransportProxy)
-			return
-		}
 		// does the proxy work?
 		rproxy := fmt.Sprintf("socks5://%s:%s@127.0.0.1:%s",
 			RuntimeConfig.ShadowsocksLocalSocksPort, // user name of socks5 proxy
@@ -62,7 +58,16 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 			RuntimeConfig.Emp3r0rProxyServerPort) // port of socks5 proxy
 
 		// wait for the proxy to work
-		for !tun.IsProxyOK(rproxy, emp3r0r_data.CCAddress) {
+		for {
+			if RuntimeConfig.C2TransportProxy != "" {
+				if tun.IsProxyOK(RuntimeConfig.C2TransportProxy, emp3r0r_data.CCAddress) {
+					log.Printf("BroadcastServer: proxy '%s' is already working", RuntimeConfig.C2TransportProxy)
+					continue
+				}
+			}
+			if tun.IsProxyOK(rproxy, emp3r0r_data.CCAddress) {
+				break
+			}
 			time.Sleep(time.Second)
 		}
 		RuntimeConfig.C2TransportProxy = rproxy
