@@ -65,7 +65,7 @@ const (
 
 	// Version hardcoded version string
 	// see https://github.com/googleapis/release-please/blob/f398bdffdae69772c61a82cd7158cca3478c2110/src/updaters/generic.ts#L30
-	Version = "v1.42.1" // x-release-please-version
+	Version = "v1.43.0" // x-release-please-version
 
 	// RShellBufSize buffer size of reverse shell stream
 	RShellBufSize = 128

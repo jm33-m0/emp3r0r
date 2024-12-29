@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.43.0](https://github.com/jm33-m0/emp3r0r/compare/v1.42.1...v1.43.0) (2024-12-29)
+
+
+### Features
+
+* add Shadowsocks TCP tunnel support, can be used for port_fwd, C2 transport relaying ([bdf9f56](https://github.com/jm33-m0/emp3r0r/commit/bdf9f5680bb6fd40251400ebf021b60e1f378878))
+* broadcasted auto_proxy is now using shadowsocks ([b31562b](https://github.com/jm33-m0/emp3r0r/commit/b31562b3eeea756679712a63e048725a795ad9eb))
+
+
+### Bug Fixes
+
+* add plain HTTP listener ([a480f30](https://github.com/jm33-m0/emp3r0r/commit/a480f306611afdaf10f114a84da4909c7f4e81e2))
+* adjust logging text colors ([ba1c133](https://github.com/jm33-m0/emp3r0r/commit/ba1c133dfaf732a81cc8b49695744dfb1ca63d37))
+* dont print binary data to the terminal ([f3603a2](https://github.com/jm33-m0/emp3r0r/commit/f3603a2008cad27480d0871b028c2104206f4869))
+* exec system commands with args ([e41875f](https://github.com/jm33-m0/emp3r0r/commit/e41875f63ae11b56091d5028c9f78bc1e30a4665))
+* high CPU usage by emp3r0r-cat (probably related to [#315](https://github.com/jm33-m0/emp3r0r/issues/315)) ([7854a07](https://github.com/jm33-m0/emp3r0r/commit/7854a070d9bccd6eec582d7ea716e497a993a455))
+* messy logging in kcptun ([ea2aa88](https://github.com/jm33-m0/emp3r0r/commit/ea2aa885718ab3fa0388ba37164651a8723ac2d2))
+* ncsi switch broken ([90fe415](https://github.com/jm33-m0/emp3r0r/commit/90fe415433a7e27700c7c05c0d6652f84d8d2757))
+* no need to keep validating the reverse proxy when a working proxy is configured ([144ca1e](https://github.com/jm33-m0/emp3r0r/commit/144ca1e61fd0ede635cdedddfa7804419c85996b))
+* turn off NCSI by default ([b4c4940](https://github.com/jm33-m0/emp3r0r/commit/b4c4940f640a6cf31bf04c99ea414131bec830ae))
+* unix socket not set up ([313b4c9](https://github.com/jm33-m0/emp3r0r/commit/313b4c92538a200b2a21645813d69eab2cb0b22b))
+* unix socket path not match ([3e67009](https://github.com/jm33-m0/emp3r0r/commit/3e67009dcbb23f3fb10825a1095837934c32a27c))
+
 ## [1.42.1](https://github.com/jm33-m0/emp3r0r/compare/v1.42.0...v1.42.1) (2024-12-28)
 
 
