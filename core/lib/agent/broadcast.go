@@ -127,13 +127,14 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 
 		if is_proxy_ok {
 			RuntimeConfig.C2TransportProxy = proxy_url
+			log.Printf("[+] Thank you! Proxy '%s' usable!", proxy_url)
 			log.Printf("BroadcastServer: %s set as RuntimeConfig.AgentProxy\n", RuntimeConfig.C2TransportProxy)
 
 			// pass the proxy to others
 			go passProxy(ctx, cancel, &passProxyCnt)
 
 		} else {
-			log.Printf("Oh crap! %s doen't work, we have to wait for a reverse proxy", proxy_url)
+			log.Printf("[-] Oh crap! %s doen't work, we have to wait for a usable proxy", proxy_url)
 		}
 	}
 	return
