@@ -2,6 +2,7 @@ package ss
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"strings"
 	"time"
@@ -40,12 +41,17 @@ var flags struct {
 
 // SSConfig start ss server/client with this config
 type SSConfig struct {
-	ServerAddr     string
-	LocalSocksAddr string
-	Cipher         string
-	Password       string
-	IsServer       bool
-	Verbose        bool
+	ServerAddr     string // ss server address
+	LocalSocksAddr string // ss client local socks address, leave empty to disable
+	Cipher         string // ss cipher, AEAD_CHACHA20_POLY1305
+	Password       string // ss password
+	IsServer       bool   // is ss server or client or tunnel
+	Verbose        bool   // verbose logging
+
+	// Tunnels: eg. :8053=8.8.8.8:53,:8054=8.8.4.4:53
+	// (client-only) tunnel (local_addr1=remote_addr1,local_addr2=remote_addr2,...)
+	TCPTun string
+	UDPTun string
 
 	// used as switch
 	Ctx    context.Context
@@ -72,12 +78,29 @@ func SSMain(ss_config *SSConfig) (err error) {
 	if err != nil {
 		return
 	}
+
+	// Start shadowsocks server / client / TCP tunnel / UDP tunnel
 	if ss_config.IsServer {
+		// go-shadowsocks2 -s 'ss://AEAD_CHACHA20_POLY1305:your-password@:8488' -verbose
 		go tcpRemote(ss_config.ServerAddr, ciph.StreamConn, ss_config.Ctx, ss_config.Cancel)
-	} else {
+	} else if ss_config.LocalSocksAddr != "" {
+		// go-shadowsocks2 -c 'ss://AEAD_CHACHA20_POLY1305:your-password@[server_address]:8488'
+		// -verbose -socks :1080 -u -udptun :8053=8.8.8.8:53,:8054=8.8.4.4:53
+		//                          -tcptun :8053=8.8.8.8:53,:8054=8.8.4.4:53
 		go socksLocal(ss_config.LocalSocksAddr, ss_config.ServerAddr,
 			ciph.StreamConn,
 			ss_config.Ctx, ss_config.Cancel)
+	} else if ss_config.TCPTun != "" {
+		// support multiple TCP tunnels
+		for _, tun := range strings.Split(ss_config.TCPTun, ",") {
+			p := strings.Split(tun, "=")
+			server := ss_config.ServerAddr
+			go tcpTun(p[0], server, p[1], ciph.StreamConn, ss_config.Ctx, ss_config.Cancel)
+		}
+	} else if ss_config.UDPTun != "" {
+		return fmt.Errorf("UDP tunnel not implemented yet")
+	} else {
+		err = fmt.Errorf("invalid ss config")
 	}
 
 	return

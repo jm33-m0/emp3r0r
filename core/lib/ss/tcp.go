@@ -13,6 +13,21 @@ import (
 	"github.com/shadowsocks/go-shadowsocks2/socks"
 )
 
+// Create a TCP tunnel from addr to target via server.
+// addr: local address to listen on
+// server: remote server address
+// target: target address to connect to
+// shadow: shadowsocks encryption function
+func tcpTun(addr, server, target string, shadow func(net.Conn) net.Conn, ctx context.Context, cancel context.CancelFunc) {
+	tgt := socks.ParseAddr(target)
+	if tgt == nil {
+		logf("invalid target address %q", target)
+		return
+	}
+	logf("TCP tunnel %s <-> %s <-> %s", addr, server, target)
+	tcpLocal(addr, server, shadow, func(net.Conn) (socks.Addr, error) { return tgt, nil }, ctx, cancel)
+}
+
 // Create a SOCKS server listening on addr and proxy to server.
 func socksLocal(addr, server string, shadow func(net.Conn) net.Conn,
 	ctx context.Context, cancel context.CancelFunc,
