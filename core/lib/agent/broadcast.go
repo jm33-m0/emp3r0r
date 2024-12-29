@@ -68,7 +68,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 			if tun.IsProxyOK(rproxy, emp3r0r_data.CCAddress) {
 				break
 			}
-			time.Sleep(time.Second)
+			util.TakeASnap()
 		}
 		RuntimeConfig.C2TransportProxy = rproxy
 		log.Printf("[+] Reverse proxy configured to %s", rproxy)
