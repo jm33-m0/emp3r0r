@@ -10,6 +10,6 @@ import (
 
 // KCPListenAndServe KCP server for Shadowsocks
 func KCPListenAndServe() {
-	tun.KCPTunServer("127.0.0.1:"+RuntimeConfig.ShadowsocksPort,
+	tun.KCPTunServer("127.0.0.1:"+RuntimeConfig.ShadowsocksLocalSocksPort,
 		RuntimeConfig.KCPPort, RuntimeConfig.Password, emp3r0r_data.MagicString)
 }

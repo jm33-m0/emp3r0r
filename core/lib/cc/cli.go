@@ -490,13 +490,13 @@ func CliBanner() error {
 
 	say, encodingErr := cow.Say(fmt.Sprintf("welcome! you are using version %s,\n"+
 		"C2 listening on *:%s,\n"+
-		"Shadowsocks port *:%s,\n"+
+		"Shadowsocks server port *:%s,\n"+
 		"KCP port *:%s,\n"+
 		"C2 names: %s\n"+
 		"CA fingerprint: %s",
 		emp3r0r_data.Version,
 		RuntimeConfig.CCPort,
-		RuntimeConfig.ShadowsocksPort,
+		RuntimeConfig.ShadowsocksServerPort,
 		RuntimeConfig.KCPPort,
 		name_list,
 		RuntimeConfig.CAFingerprint))

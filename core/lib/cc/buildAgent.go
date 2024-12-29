@@ -102,10 +102,11 @@ func InitConfigFile(cc_host string) (err error) {
 	// random ports
 	RuntimeConfig.CCHost = cc_host
 	RuntimeConfig.CCPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
-	RuntimeConfig.AutoProxyPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
+	RuntimeConfig.Emp3r0rProxyServerPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.BroadcastPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.SSHDShellPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
-	RuntimeConfig.ShadowsocksPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
+	RuntimeConfig.ShadowsocksLocalSocksPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
+	RuntimeConfig.ShadowsocksServerPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.KCPPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.HTTPListenerPort = fmt.Sprintf("%v", util.RandInt(1026, 65534))
 	RuntimeConfig.Timeout = util.RandInt(10000, 20000)

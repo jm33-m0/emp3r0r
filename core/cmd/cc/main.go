@@ -155,7 +155,7 @@ func main() {
 		cc.CliMsg("Copy ~/.emp3r0r to client host, "+
 			"then run `emp3r0r -connect_relay relay_ip:%s -relayed_port %s` "+
 			"(C2 port, or Shadowsocks port %s if you are using it)",
-			*ssh_relay_port, cc.RuntimeConfig.CCPort, cc.RuntimeConfig.ShadowsocksPort)
+			*ssh_relay_port, cc.RuntimeConfig.CCPort, cc.RuntimeConfig.ShadowsocksLocalSocksPort)
 		err = tun.SSHRemoteFwdServer(*ssh_relay_port,
 			cc.RuntimeConfig.Password,
 			cc.RuntimeConfig.SSHHostKey)

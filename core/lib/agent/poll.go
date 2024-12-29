@@ -278,11 +278,11 @@ func setC2Transport() {
 		return
 	} else if RuntimeConfig.UseShadowsocks {
 		emp3r0r_data.Transport = fmt.Sprintf("Shadowsocks (*:%s) to %s",
-			RuntimeConfig.ShadowsocksPort, emp3r0r_data.CCAddress)
+			RuntimeConfig.ShadowsocksServerPort, emp3r0r_data.CCAddress)
 		// ss thru KCP
 		if RuntimeConfig.UseKCP {
 			emp3r0r_data.Transport = fmt.Sprintf("Shadowsocks (*:%s) in KCP (*:%s) to %s",
-				RuntimeConfig.ShadowsocksPort, RuntimeConfig.KCPPort, emp3r0r_data.CCAddress)
+				RuntimeConfig.ShadowsocksServerPort, RuntimeConfig.KCPPort, emp3r0r_data.CCAddress)
 		}
 	} else {
 		emp3r0r_data.Transport = fmt.Sprintf("HTTP2 (%s)", emp3r0r_data.CCAddress)

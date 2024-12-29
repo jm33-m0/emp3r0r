@@ -64,10 +64,13 @@ func ApplyRuntimeConfig() (err error) {
 	log.Printf("Agent root: %s", RuntimeConfig.AgentRoot)
 
 	// Socks5 proxy server
-	addr := fmt.Sprintf("0.0.0.0:%s", RuntimeConfig.AutoProxyPort)
-	emp3r0r_data.ProxyServer, err = socks5.NewClassicServer(addr, "",
-		RuntimeConfig.ShadowsocksPort, RuntimeConfig.Password,
-		RuntimeConfig.AutoProxyTimeout, RuntimeConfig.AutoProxyTimeout)
+	addr := fmt.Sprintf("0.0.0.0:%s", RuntimeConfig.Emp3r0rProxyServerPort)
+	emp3r0r_data.ProxyServer, err = socks5.NewClassicServer(
+		addr, "", // listen on emp3r0r_proxy_port
+		RuntimeConfig.ShadowsocksLocalSocksPort, // used as socks5 username
+		RuntimeConfig.Password,                  // socks5 password
+		RuntimeConfig.AutoProxyTimeout,
+		RuntimeConfig.AutoProxyTimeout)
 	return
 }
 

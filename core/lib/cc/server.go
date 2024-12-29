@@ -35,7 +35,7 @@ import (
 func ShadowsocksServer() {
 	ctx, cancel := context.WithCancel(context.Background())
 	ss_config := &ss.SSConfig{
-		ServerAddr:     "0.0.0.0:" + RuntimeConfig.ShadowsocksPort,
+		ServerAddr:     "0.0.0.0:" + RuntimeConfig.ShadowsocksServerPort,
 		LocalSocksAddr: "",
 		Cipher:         ss.AEADCipher,
 		Password:       RuntimeConfig.Password,
