@@ -152,14 +152,22 @@ func KCPTunClient(remote_addr, port, password, salt string) error {
 	}
 	if isUnix {
 		addr, err := net.ResolveUnixAddr("unix", config.LocalAddr)
-		checkError(err)
+		if err := checkError(err); err != nil {
+			return err
+		}
 		listener, err = net.ListenUnix("unix", addr)
-		checkError(err)
+		if err := checkError(err); err != nil {
+			return err
+		}
 	} else {
 		addr, err := net.ResolveTCPAddr("tcp", config.LocalAddr)
-		checkError(err)
+		if err := checkError(err); err != nil {
+			return err
+		}
 		listener, err = net.ListenTCP("tcp", addr)
-		checkError(err)
+		if err := checkError(err); err != nil {
+			return err
+		}
 	}
 
 	LogInfo("smux version: %d", config.SmuxVer)
@@ -585,7 +593,9 @@ func KCPTunServer(target, port, password, salt string) error {
 			if conn, err := tcpraw.Listen("tcp", listenAddr); err == nil {
 				LogInfo("Listening on: %v/tcp", listenAddr)
 				lis, err := kcp.ServeConn(block, config.DataShard, config.ParityShard, conn)
-				checkError(err)
+				if err := checkError(err); err != nil {
+					return err
+				}
 				wg.Add(1)
 				go loop(lis)
 			} else {
@@ -596,7 +606,9 @@ func KCPTunServer(target, port, password, salt string) error {
 		// udp stack
 		LogInfo("Listening on: %v/udp", listenAddr)
 		lis, err := kcp.ListenWithOptions(listenAddr, block, config.DataShard, config.ParityShard)
-		checkError(err)
+		if err := checkError(err); err != nil {
+			return err
+		}
 		wg.Add(1)
 		go loop(lis)
 	}
@@ -694,8 +706,10 @@ func handleClient(_Q_ *qpp.QuantumPermutationPad, seed []byte, p1 *smux.Stream, 
 	}
 }
 
-func checkError(err error) {
+func checkError(err error) error {
 	if err != nil {
 		LogError("%+v\n", err)
+		return err
 	}
+	return nil
 }
