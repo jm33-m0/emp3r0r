@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"strconv"
-	"strings"
 	"time"
 
 	gliderssh "github.com/gliderlabs/ssh"
@@ -59,19 +57,14 @@ func SSHRemoteFwdServer(port, password string, hostkey []byte) (err error) {
 
 // SSHReverseProxyClient dial SSHProxyServer, start a reverse proxy
 // serverAddr format: 127.0.0.1:22
-func SSHReverseProxyClient(ssh_serverAddr, password string,
+// FIXME: when using KCP, port number calculation is wrong
+func SSHReverseProxyClient(ssh_serverAddr string, // SSH server address:port
+	password string, // SSH authentication password
+	proxyPort int, // local port to forward to remote, in here it should be Emp3r0rProxyPort
 	reverseConns *map[string]context.CancelFunc,
 	socks5proxy *socks5.Server,
 	ctx context.Context, cancel context.CancelFunc,
 ) (err error) {
-	// calculate ProxyPort
-	serverPort, err := strconv.Atoi(strings.Split(ssh_serverAddr, ":")[1])
-	// this is the reverseProxyPort
-	if err != nil {
-		return fmt.Errorf("serverPort invalid: %v", err)
-	}
-	proxyPort := serverPort - 1 // reverseProxyPort = proxyPort + 1
-
 	LogInfo("Starting SSH reverse proxy client on %s, proxy port %d", ssh_serverAddr, proxyPort)
 
 	// start SOCKS5 proxy
