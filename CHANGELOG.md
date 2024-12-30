@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.43.1](https://github.com/jm33-m0/emp3r0r/compare/v1.43.0...v1.43.1) (2024-12-30)
+
+
+### Bug Fixes
+
+* `bring2cc` accidentally disabled ([ec11524](https://github.com/jm33-m0/emp3r0r/commit/ec115249ff8b53499dc97010220eda577b78e81c))
+* should report C2 transport proxy if it's used ([4519725](https://github.com/jm33-m0/emp3r0r/commit/45197252ee8b4c3f76dfed743f40c120c5f92767))
+* ssh reverse proxy in KCP mode: client port should be renewed with each session ([e8b2649](https://github.com/jm33-m0/emp3r0r/commit/e8b26490e81dcf61968eaf1fb8c9bcae78188c99))
+* ssh reverse proxy in KCP tunnel now working ([30935fc](https://github.com/jm33-m0/emp3r0r/commit/30935fc71b5440c4330f617f8ab3c12118a1264a))
+
 ## [1.43.0](https://github.com/jm33-m0/emp3r0r/compare/v1.42.1...v1.43.0) (2024-12-29)
 
 
