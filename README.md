@@ -2,15 +2,6 @@
 
 A post-exploitation framework for Linux/Windows
 
-## Status
-
-- emp3r0r C2 (Linux/Windows) is ready for testing. Please report bugs if you find any.
-- Read [wiki](https://github.com/jm33-m0/emp3r0r/wiki/Getting-started) to get started ([中文](https://github.com/jm33-m0/emp3r0r/wiki/Getting-Started-(zh%E2%80%90CN)))
-- Download from [here](https://github.com/jm33-m0/emp3r0r/releases)
-- [Write modules](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r) for emp3r0r with your favorite languages
-- [SSH harvester](https://github.com/jm33-m0/emp3r0r/blob/master/core/lib/agent/ssh_harvester_amd64_linux.go) is ready for use
-- Windows support is ready with fully-interactive shell
-
 https://github.com/jm33-m0/emp3r0r/assets/10167884/c7532c4d-8a6f-4a91-b52c-d7df4c80ba63
 
 <details><summary> MORE screenshots</summary>
@@ -47,12 +38,19 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
   - Automatically changes `argv` so you won't notice it in `ps` listing
   - Hide files and PIDs via Glibc hijacking (`patcher` in `get_persistence`)
   - Built-in [**Elvish Shell**](https://elv.sh/) with the same disguise as main process
+  - [**Bring Your Own Shell**]() or any interactive programs via [custom modules such as bettercap](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r#module-metadata)
   - All C2 communications made in HTTP2/TLS
   - Defeat [**JA3**](https://github.com/salesforce/ja3) fingerprinting with [**UTLS**](https://github.com/refraction-networking/utls)
   - Painlessly encapsulated in **Shadowsocks** and KCP
   - Able to encapsulate in any external proxies such as [**TOR** and **CDN**s](https://github.com/jm33-m0/emp3r0r/raw/master/img/c2transports.png)
   - [**C2 relaying**](https://github.com/jm33-m0/emp3r0r/wiki/C2-Relay) via SSH
   - [**DLL agent**](https://github.com/jm33-m0/emp3r0r/wiki/DLL-Agent)
+  - [**Shellcode agent**](https://github.com/jm33-m0/emp3r0r/wiki/Shellcode-Agent-for-Windows) for Windows targets and [**Shared Library stager**](https://github.com/jm33-m0/emp3r0r/wiki/Shared-Library-Stager-for-Linux) for Linux
+- Automatically bridge agents from internal networks to C2 using [**Shadowsocks proxy chain**]
+  - For semi-isolated networks, where agents can negotiate and form a proxy chain
+- Any reachable targets can be (reverse) proxied out via SSH and stealth KCP tunnel
+  - [**Bring any targets you can reach to C2**](https://github.com/jm33-m0/emp3r0r/wiki/Getting-started#bring-agents-to-c2)
+  - Useful when targets can't establish outgoing connections but can accept incoming requests
 - Multi-Tasking
   - Don't have to wait for any commands to finish
 - Module Support
@@ -87,9 +85,4 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
 - Screenshot
 - Anti-Antivirus
 - Internet Access Checker
-- Automatically bridge agents from internal networks to C2
-  - For semi-isolated networks
-- Proxy via agent to agent SSH connection
-  - To [bring any targets you can reach to C2](https://github.com/jm33-m0/emp3r0r/wiki/Getting-started#bring-agents-to-c2)
-- [Interoperability with Metasploit/Cobalt Strike](https://github.com/jm33-m0/emp3r0r/wiki/Interoperability-with-metasploit-and-other-C2-frameworks)
 - and many more :)
