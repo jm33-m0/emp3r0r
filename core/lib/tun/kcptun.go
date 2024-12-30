@@ -3,6 +3,7 @@ package tun
 // Modified from xtaci/kcptun/client
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha1"
 	"encoding/binary"
@@ -146,7 +147,7 @@ func NewConfig(remote_addr, target, port, password, salt string) *Config {
 // kcp_listen_port: KCP client listen port
 // password: Runtime password
 // salt: emp3r0r_data.MagicString
-func KCPTunClient(remote_kcp_addr, kcp_listen_port, password, salt string) error {
+func KCPTunClient(remote_kcp_addr, kcp_listen_port, password, salt string, ctx context.Context, cancel context.CancelFunc) error {
 	config := NewConfig(remote_kcp_addr, "", kcp_listen_port, password, salt)
 	var listener net.Listener
 	var isUnix bool
@@ -345,7 +346,7 @@ func KCPTunClient(remote_kcp_addr, kcp_listen_port, password, salt string) error
 		_Q_ = qpp.NewQPP([]byte(config.Key), uint16(config.QPPCount))
 	}
 
-	for {
+	for ctx.Err() == nil {
 		p1, err := listener.Accept()
 		if err != nil {
 			return fmt.Errorf("%+v", err)
@@ -365,6 +366,8 @@ func KCPTunClient(remote_kcp_addr, kcp_listen_port, password, salt string) error
 		go clientHandleConn(_Q_, []byte(config.Key), muxes[idx].session, p1, config.Quiet, config.CloseWait)
 		rr++
 	}
+
+	return ctx.Err()
 }
 
 // clientHandleConn aggregates connection p1 on mux

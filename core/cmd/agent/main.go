@@ -323,7 +323,7 @@ test_agent:
 
 		// run ss w/wo KCP
 		go agent.ShadowsocksC2Client()
-		go agent.KCPClient() // KCP client will run when UseKCP is set
+		go agent.KCPC2Client() // KCP client will run when UseKCP is set
 	}
 
 	// do we have internet?
