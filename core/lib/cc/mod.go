@@ -185,7 +185,7 @@ func UpdateOptions(modName string) (exist bool) {
 		addrOpt.Vals = []string{"127.0.0.1"}
 		addrOpt.Val = "<blank>"
 		kcpOpt.Vals = []string{"on", "off"}
-		kcpOpt.Val = "off"
+		kcpOpt.Val = "on"
 
 	case modName == emp3r0r_data.ModPERSISTENCE:
 		currentOpt = addIfNotFound("method")
