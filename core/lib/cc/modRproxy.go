@@ -11,7 +11,8 @@ import (
 
 func moduleBring2CC() {
 	addr := Options["addr"].Val
-	cmd := fmt.Sprintf("%s --addr %s", emp3r0r_data.C2CmdBring2CC, addr)
+	use_kcp := Options["kcp"].Val
+	cmd := fmt.Sprintf("%s --addr %s --kcp %s", emp3r0r_data.C2CmdBring2CC, addr, use_kcp)
 	err := SendCmd(cmd, "", CurrentTarget)
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)

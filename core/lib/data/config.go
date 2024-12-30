@@ -44,7 +44,8 @@ type Config struct {
 	Password                  string `json:"password"`                     // password of shadowsocks, socks5 and SSH server
 	ShadowsocksLocalSocksPort string `json:"shadowsocks_local_socks_port"` // socks5 port of shadowsocks
 	ShadowsocksServerPort     string `json:"shadowsocks_server_port"`      // server port of shadowsocks proxy server, can run on CC and agent
-	KCPPort                   string `json:"kcp_port"`                     // server port of kcp server
+	KCPServerPort             string `json:"kcp_server_port"`              // server port of kcp server
+	KCPClientPort             string `json:"kcp_client_port"`              // client port of kcp
 	UseShadowsocks            bool   `json:"use_shadowsocks"`              // enable shadowsocks proxy server for C2 transport
 	UseKCP                    bool   `json:"use_kcp"`                      // enable KCP for Shadowsocks C2 transport
 	DisableNCSI               bool   `json:"disable_ncsi"`                 // disable NCSI connectivity checking, useful when C2 is reachable but NCSI is not

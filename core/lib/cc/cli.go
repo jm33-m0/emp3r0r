@@ -497,7 +497,7 @@ func CliBanner() error {
 		emp3r0r_data.Version,
 		RuntimeConfig.CCPort,
 		RuntimeConfig.ShadowsocksServerPort,
-		RuntimeConfig.KCPPort,
+		RuntimeConfig.KCPServerPort,
 		name_list,
 		RuntimeConfig.CAFingerprint))
 	if encodingErr != nil {

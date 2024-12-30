@@ -84,6 +84,9 @@ func parseJSONConfig(config *Config, path string) error {
 	return json.NewDecoder(file).Decode(config)
 }
 
+// remote_addr: KCP server address (host)
+// target: forward to this address, leave empty for client
+// port: KCP listen port on client, server listen port on server
 func NewConfig(remote_addr, target, port, password, salt string) *Config {
 	config := Config{}
 	config.LocalAddr = fmt.Sprintf("127.0.0.1:%s", port) // client local listen address for incming connections
@@ -91,7 +94,7 @@ func NewConfig(remote_addr, target, port, password, salt string) *Config {
 
 	// if target is empty, then it is a client
 	if target == "" {
-		config.RemoteAddr = fmt.Sprintf("%s:%s", remote_addr, port)
+		config.RemoteAddr = remote_addr // KCP server address:port
 	} else {
 		config.Target = target
 	}
@@ -139,12 +142,12 @@ func NewConfig(remote_addr, target, port, password, salt string) *Config {
 }
 
 // main function for KCP tunneling using smux
-// remote_addr: KCP server address
-// port: KCP server listen port Runtime.KCPPort
+// remote_kcp_addr: KCP server address (host:port)
+// kcp_listen_port: KCP client listen port
 // password: Runtime password
 // salt: emp3r0r_data.MagicString
-func KCPTunClient(remote_addr, port, password, salt string) error {
-	config := NewConfig(remote_addr, "", port, password, salt)
+func KCPTunClient(remote_kcp_addr, kcp_listen_port, password, salt string) error {
+	config := NewConfig(remote_kcp_addr, "", kcp_listen_port, password, salt)
 	var listener net.Listener
 	var isUnix bool
 	if _, _, err := net.SplitHostPort(config.LocalAddr); err != nil {
@@ -475,12 +478,12 @@ func dial(config *Config, block kcp.BlockCrypt) (*kcp.UDPSession, error) {
 	return kcp.DialWithOptions(remoteAddr, block, config.DataShard, config.ParityShard)
 }
 
-// target: target address (shadowsocks server port)
-// port: KCP server listen port
+// target: target address (host:port)
+// kcp_server_port: KCP server listen port
 // password: Runtime password
 // salt: emp3r0r_data.MagicString
-func KCPTunServer(target, port, password, salt string) error {
-	config := NewConfig("", target, port, password, salt)
+func KCPTunServer(target, kcp_server_port, password, salt string) error {
+	config := NewConfig("", target, kcp_server_port, password, salt)
 	if config.QPP {
 		minSeedLength := qpp.QPPMinimumSeedLength(8)
 		if len(config.Key) < minSeedLength {
