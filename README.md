@@ -38,7 +38,7 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
   - Automatically changes `argv` so you won't notice it in `ps` listing
   - Hide files and PIDs via Glibc hijacking (`patcher` in `get_persistence`)
   - Built-in [**Elvish Shell**](https://elv.sh/) with the same disguise as main process
-  - [**Bring Your Own Shell**]() or any interactive programs via [custom modules such as bettercap](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r#module-metadata)
+  - [**Bring Your Own Shell**](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r#vaccine) or any interactive programs via [custom modules such as bettercap](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r#module-metadata)
   - All C2 communications made in HTTP2/TLS
   - Defeat [**JA3**](https://github.com/salesforce/ja3) fingerprinting with [**UTLS**](https://github.com/refraction-networking/utls)
   - Painlessly encapsulated in **Shadowsocks** and KCP
