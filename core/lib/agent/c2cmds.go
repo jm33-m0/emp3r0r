@@ -60,7 +60,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		addr := flags.StringP("addr", "a", "", "Target agent IP address")
 		flags.Parse(cmdSlice[1:])
 		if *addr == "" {
-			out = fmt.Sprintf("Error args error: %v", cmdSlice)
+			out = fmt.Sprintf("Error no address: %v", cmdSlice)
 			return
 		}
 		out = fmt.Sprintf("Bring2CC: Reverse proxy for %s finished", *addr)

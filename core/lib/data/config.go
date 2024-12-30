@@ -17,7 +17,7 @@ func ReadJSONConfig(jsonData []byte, config_to_write *Config) (err error) {
 	calculateReverseProxyPort := func() string {
 		p, err := strconv.Atoi(config_to_write.Emp3r0rProxyServerPort)
 		if err != nil {
-			log.Printf("WTF? ProxyPort %s: %v", config_to_write.Emp3r0rProxyServerPort, err)
+			log.Printf("WTF? Emp3r0rProxyPort %s: %v. Invalid JSON config, perhaps start over with a new config file?", config_to_write.Emp3r0rProxyServerPort, err)
 			return "22222"
 		}
 
