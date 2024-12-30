@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	utls "github.com/refraction-networking/utls"
 )
 
@@ -62,7 +63,7 @@ init_transport:
 	try++
 	if err != nil {
 		if proxyServer != "" && try < 5 {
-			time.Sleep(3 * time.Second)
+			util.TakeABlink()
 			log.Printf("Proxy server (%s) down, retrying (%d)...", proxyServer, try)
 			goto init_transport
 		} else {
