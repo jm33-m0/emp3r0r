@@ -44,8 +44,9 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
   - Painlessly encapsulated in **Shadowsocks** and KCP
   - Able to encapsulate in any external proxies such as [**TOR** and **CDN**s](https://github.com/jm33-m0/emp3r0r/raw/master/img/c2transports.png)
   - [**C2 relaying**](https://github.com/jm33-m0/emp3r0r/wiki/C2-Relay) via SSH
-  - [**DLL agent**](https://github.com/jm33-m0/emp3r0r/wiki/DLL-Agent)
-  - [**Shellcode agent**](https://github.com/jm33-m0/emp3r0r/wiki/Shellcode-Agent-for-Windows) for Windows targets and [**Shared Library stager**](https://github.com/jm33-m0/emp3r0r/wiki/Shared-Library-Stager-for-Linux) for Linux
+- Staged Payload Delivery for both Linux and Windows
+  - [HTTP Listener with AES and compression](https://github.com/jm33-m0/emp3r0r/wiki/Listener)
+  - [**DLL agent**](https://github.com/jm33-m0/emp3r0r/wiki/DLL-Agent), [**Shellcode agent**](https://github.com/jm33-m0/emp3r0r/wiki/Shellcode-Agent-for-Windows) for Windows targets and [**Shared Library stager**](https://github.com/jm33-m0/emp3r0r/wiki/Shared-Library-Stager-for-Linux) for Linux
 - Automatically bridge agents from internal networks to C2 using [**Shadowsocks proxy chain**]
   - For semi-isolated networks, where agents can negotiate and form a proxy chain
 - Any reachable targets can be (reverse) proxied out via SSH and stealth KCP tunnel
