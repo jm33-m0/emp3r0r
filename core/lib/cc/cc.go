@@ -226,7 +226,7 @@ func GetTargetDetails(target *emp3r0r_data.AgentSystemInfo) {
 	defer TargetsMutex.RUnlock()
 	// exists?
 	if !IsAgentExist(target) {
-		CliPrintError("Target does not exist")
+		CliPrintError("Failed to get system info: target does not exist")
 		return
 	}
 	control := Targets[target]
