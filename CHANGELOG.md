@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.43.2](https://github.com/jm33-m0/emp3r0r/compare/v1.43.1...v1.43.2) (2024-12-31)
+
+
+### Bug Fixes
+
+* `makeTransport` takes forever to fail, let's make it 10s top ([7ccb64b](https://github.com/jm33-m0/emp3r0r/commit/7ccb64b6db7b5b09b0b42ba91e8a08a8804a461b))
+* KCPClient should exit when reverse proxy session ends ([51d02e4](https://github.com/jm33-m0/emp3r0r/commit/51d02e4e0f8a64b3b5639d201a747a15cf36c550))
+* randomize proxyDialer sleep time ([aa212d5](https://github.com/jm33-m0/emp3r0r/commit/aa212d5610e5c23a31d4a175a2451a34246e6006))
+
 ## [1.43.1](https://github.com/jm33-m0/emp3r0r/compare/v1.43.0...v1.43.1) (2024-12-30)
 
 
