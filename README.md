@@ -47,7 +47,7 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
 - Staged Payload Delivery for both Linux and Windows
   - [HTTP Listener with AES and compression](https://github.com/jm33-m0/emp3r0r/wiki/Listener)
   - [**DLL agent**](https://github.com/jm33-m0/emp3r0r/wiki/DLL-Agent), [**Shellcode agent**](https://github.com/jm33-m0/emp3r0r/wiki/Shellcode-Agent-for-Windows) for Windows targets and [**Shared Library stager**](https://github.com/jm33-m0/emp3r0r/wiki/Shared-Library-Stager-for-Linux) for Linux
-- Automatically bridge agents from internal networks to C2 using [**Shadowsocks proxy chain**]
+- Automatically bridge agents from internal networks to C2 using **Shadowsocks proxy chain**
   - For semi-isolated networks, where agents can negotiate and form a proxy chain
 - Any reachable targets can be (reverse) proxied out via SSH and stealth KCP tunnel
   - [**Bring any targets you can reach to C2**](https://github.com/jm33-m0/emp3r0r/wiki/Getting-started#bring-agents-to-c2)
