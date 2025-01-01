@@ -2,7 +2,9 @@
 
 A post-exploitation framework for Linux/Windows
 
-https://github.com/user-attachments/assets/70076b47-044b-4f83-87f9-9a7996f32025
+<https://github.com/user-attachments/assets/70076b47-044b-4f83-87f9-9a7996f32025>
+
+[More Screenshots and videos](./Screenshots.md)
 
 ---
 
