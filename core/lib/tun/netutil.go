@@ -65,9 +65,9 @@ func IsTor(addr string) bool {
 	return fields[len(fields)-1] == "onion"
 }
 
-// HasInternetAccess does this machine has internet access,
+// TestConnectivity does this machine has internet access,
 // does NOT use any proxies
-func HasInternetAccess(test_url, proxy string) bool {
+func TestConnectivity(test_url, proxy string) bool {
 	// use Microsoft NCSI as default
 	// NCSI is an HTTP service therefore we don't need
 	// uTLS to talk to it

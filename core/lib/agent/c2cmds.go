@@ -69,7 +69,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 
 		out = fmt.Sprintf("Bring2CC: Reverse proxy for %s finished", *addr)
 
-		hasInternet := tun.HasInternetAccess(emp3r0r_data.CCAddress, RuntimeConfig.C2TransportProxy)
+		hasInternet := tun.TestConnectivity(emp3r0r_data.CCAddress, RuntimeConfig.C2TransportProxy)
 		isProxyOK := tun.IsProxyOK(RuntimeConfig.C2TransportProxy, emp3r0r_data.CCAddress)
 		if !hasInternet && !isProxyOK {
 			out = "Error: We don't have any internet to share"

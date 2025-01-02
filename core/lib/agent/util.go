@@ -46,7 +46,7 @@ func IsAgentAlive(c net.Conn) bool {
 
 	// send hello to agent
 	for ctx.Err() == nil {
-		_, err := c.Write([]byte(fmt.Sprintf("%d", os.Getpid())))
+		_, err := fmt.Fprintf(c, "%d", os.Getpid())
 		if err != nil {
 			log.Printf("Write error: %v, agent is likely to be dead", err)
 			break
@@ -130,7 +130,7 @@ func CollectSystemInfo() *emp3r0r_data.AgentSystemInfo {
 
 	// has internet?
 	if !RuntimeConfig.DisableNCSI {
-		info.HasInternet = tun.HasInternetAccess(tun.UbuntuConnectivityURL, RuntimeConfig.C2TransportProxy)
+		info.HasInternet = tun.TestConnectivity(tun.UbuntuConnectivityURL, RuntimeConfig.C2TransportProxy)
 	} else {
 		info.HasInternet = false
 	}
