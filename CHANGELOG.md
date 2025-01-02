@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.43.4](https://github.com/jm33-m0/emp3r0r/compare/v1.43.3...v1.43.4) (2025-01-02)
+
+
+### Bug Fixes
+
+* critical bug: NCSI checking prevents proxied agents from getting online ([eaede74](https://github.com/jm33-m0/emp3r0r/commit/eaede74882b7e7694709bca940671104ddfb7003))
+
 ## [1.43.3](https://github.com/jm33-m0/emp3r0r/compare/v1.43.2...v1.43.3) (2025-01-02)
 
 
