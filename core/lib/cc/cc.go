@@ -254,7 +254,7 @@ func GetTargetDetails(target *emp3r0r_data.AgentSystemInfo) {
 		hasInternet = color.HiGreenString("YES")
 	}
 	if !target.NCSIEnabled {
-		hasInternet = color.RedString("Untested")
+		hasInternet = color.YellowString("UNTESTED")
 	}
 
 	arpTab := strings.Join(target.ARP, ",\n")
@@ -421,16 +421,16 @@ outter:
 	if len(labeledAgents) == 0 {
 		return
 	}
-	data, err := json.Marshal(labeledAgents)
-	if err != nil {
-		CliPrintWarning("Saving labeled agents: %v", err)
+	data, marshalErr := json.Marshal(labeledAgents)
+	if marshalErr != nil {
+		CliPrintWarning("Saving labeled agents: %v", marshalErr)
 		return
 	}
 
 	// write file
-	err = os.WriteFile(AgentsJSON, data, 0o600)
-	if err != nil {
-		CliPrintWarning("Saving labeled agents: %v", err)
+	marshalErr = os.WriteFile(AgentsJSON, data, 0o600)
+	if marshalErr != nil {
+		CliPrintWarning("Saving labeled agents: %v", marshalErr)
 	}
 }
 
