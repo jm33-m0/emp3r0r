@@ -3,7 +3,6 @@ package file
 import (
 	"encoding/base64"
 	"fmt"
-	"log"
 
 	"github.com/jm33-m0/arc"
 )
@@ -14,28 +13,28 @@ func Base64Encode(data []byte) string {
 }
 
 // Base64Decode decodes a base64 URL-encoded string to a byte slice
-func Base64Decode(text string) []byte {
+func Base64Decode(text string) ([]byte, error) {
 	dec, err := base64.URLEncoding.DecodeString(text)
 	if err != nil {
-		log.Printf("Base64Decode: %v", err)
-		return nil
+		err = fmt.Errorf("Base64Decode: %v", err)
+		return nil, err
 	}
-	return dec
+	return dec, nil
 }
 
 // Bin2String compresses a binary file and encodes it with base64
-func Bin2String(data []byte) (res string) {
+func Bin2String(data []byte) (res string, err error) {
 	// Get the compressed binary data
 	compressedBin, err := arc.CompressBz2(data)
 	if err != nil {
-		log.Printf("Bin2String: %v", err)
+		err = fmt.Errorf("Bin2String: %v", err)
 		return
 	}
 
 	// Encode the compressed data to base64
 	res = Base64Encode(compressedBin)
 	if res == "" {
-		log.Println("Bin2String failed, empty string generated")
+		err = fmt.Errorf("Bin2String failed, empty string generated")
 	}
 
 	return
@@ -44,9 +43,9 @@ func Bin2String(data []byte) (res string) {
 // ExtractFileFromString base64 decodes and decompresses using BZ2
 func ExtractFileFromString(data string) ([]byte, error) {
 	// Decode base64
-	decoded := Base64Decode(data)
-	if len(decoded) == 0 {
-		return nil, fmt.Errorf("ExtractFileFromString: Failed to decode")
+	decoded, err := Base64Decode(data)
+	if err != nil {
+		return nil, fmt.Errorf("ExtractFileFromString: %v", err)
 	}
 
 	// Get the decompressed data
