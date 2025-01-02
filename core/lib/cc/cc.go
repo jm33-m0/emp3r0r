@@ -253,6 +253,9 @@ func GetTargetDetails(target *emp3r0r_data.AgentSystemInfo) {
 	if target.HasInternet {
 		hasInternet = color.HiGreenString("YES")
 	}
+	if !target.NCSIEnabled {
+		hasInternet = color.RedString("Untested")
+	}
 
 	arpTab := strings.Join(target.ARP, ",\n")
 	ips := strings.Join(target.IPs, ",\n")
@@ -381,13 +384,13 @@ func labelAgents() {
 	)
 	// what if emp3r0r_data.json already have some records
 	if util.IsExist(AgentsJSON) {
-		data, err := os.ReadFile(AgentsJSON)
-		if err != nil {
-			CliPrintWarning("Reading labeled agents: %v", err)
+		data, readErr := os.ReadFile(AgentsJSON)
+		if readErr != nil {
+			CliPrintWarning("Reading labeled agents: %v", readErr)
 		}
-		err = json.Unmarshal(data, &old)
-		if err != nil {
-			CliPrintWarning("Reading labeled agents: %v", err)
+		readErr = json.Unmarshal(data, &old)
+		if readErr != nil {
+			CliPrintWarning("Reading labeled agents: %v", readErr)
 		}
 	}
 
