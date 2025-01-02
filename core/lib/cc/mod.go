@@ -52,7 +52,6 @@ var (
 		emp3r0r_data.ModPROXY:        moduleProxy,
 		emp3r0r_data.ModPORT_FWD:     modulePortFwd,
 		emp3r0r_data.ModLPE_SUGGEST:  moduleLPE,
-		emp3r0r_data.ModGET_ROOT:     moduleGetRoot,
 		emp3r0r_data.ModCLEAN_LOG:    moduleLogCleaner,
 		emp3r0r_data.ModPERSISTENCE:  modulePersistence,
 		emp3r0r_data.ModVACCINE:      moduleVaccine,

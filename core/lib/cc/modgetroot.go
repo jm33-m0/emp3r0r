@@ -48,12 +48,3 @@ func moduleLPE() {
 		}
 	}()
 }
-
-func moduleGetRoot() {
-	err := SendCmdToCurrentTarget(emp3r0r_data.C2CmdGetRoot, "")
-	if err != nil {
-		CliPrintError("SendCmd: %v", err)
-		return
-	}
-	CliMsg("Please wait for agent's response...")
-}

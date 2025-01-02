@@ -11,7 +11,6 @@ import (
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	golpe "github.com/jm33-m0/go-lpe"
 )
 
 // Copy current executable to a new location
@@ -36,13 +35,6 @@ func CopySelfTo(dest_file string) (err error) {
 	}
 
 	return os.WriteFile(dest_file, elf_data, 0o755)
-}
-
-func GetRoot() error {
-	if err := CopySelfTo("./emp3r0r"); err != nil {
-		return fmt.Errorf("Self copy failed: %v", err)
-	}
-	return golpe.RunAll()
 }
 
 // runLPEHelper runs helper scripts to give you hints on how to escalate privilege

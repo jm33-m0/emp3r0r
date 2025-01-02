@@ -17,7 +17,6 @@ require (
 	github.com/jm33-m0/arc v1.0.0
 	github.com/jm33-m0/go-cdn2proxy v1.1.2
 	github.com/jm33-m0/go-console v1.0.2
-	github.com/jm33-m0/go-lpe v1.0.7
 	github.com/kbinani/screenshot v0.0.0-20240820160931-a8a2c5d0e191
 	github.com/lithammer/fuzzysearch v1.1.8
 	github.com/mitchellh/go-ps v1.0.0

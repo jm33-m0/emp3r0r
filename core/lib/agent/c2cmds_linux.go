@@ -104,11 +104,7 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 		if os.Geteuid() == 0 {
 			out = "Warning: You already have root!"
 		} else {
-			err = GetRoot()
-			out = fmt.Sprintf("Error: LPE exploit failed:\n%v", err)
-			if err == nil {
-				out = "If you see agent goes online again, you got root!"
-			}
+			out = fmt.Sprintf("Deprecated")
 		}
 		return
 

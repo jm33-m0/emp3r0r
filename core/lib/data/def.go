@@ -89,7 +89,6 @@ const (
 	ModSHELL        = "interactive_shell"
 	ModVACCINE      = "vaccine"
 	ModINJECTOR     = "injector"
-	ModGET_ROOT     = "get_root"
 	ModBring2CC     = "bring2cc"
 	ModGDB          = "gdbserver"
 	ModStager       = "stager"
@@ -121,7 +120,6 @@ var ModuleComments = map[string]string{
 	ModSHELL:        "Bring your own shell program to run on target, or run the existing shell program (BAD OPSEC, please use custom shells)",
 	ModVACCINE:      "Vaccine helps you install additional tools on target system",
 	ModINJECTOR:     "Inject shellcode/loader.so into a running process",
-	ModGET_ROOT:     "Try some built-in LPE exploits",
 	ModBring2CC:     "Bring arbitrary agent to CC (through current target), useful when agent is unable to connect to CC directly",
 	ModGDB:          "Remote gdbserver, debug anything",
 	ModStager:       "Generate a stager for staged payload delivering (BAD OPSEC, please use custom stagers with shellcode agent in Windows and shared library in Linux)",
