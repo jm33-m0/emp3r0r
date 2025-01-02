@@ -120,7 +120,7 @@ func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, cancel conte
 		// Check server status code
 		if resp != nil {
 			if resp.StatusCode != http.StatusOK {
-				err = fmt.Errorf("Bad status code: %d", resp.StatusCode)
+				err = fmt.Errorf("bad status code: %d", resp.StatusCode)
 				return
 			}
 		}
