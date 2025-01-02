@@ -20,8 +20,11 @@ func ExtractBash() error {
 			log.Fatalf("[-] Cannot mkdir %s: %v", RuntimeConfig.AgentRoot, err)
 		}
 	}
-
-	err := os.WriteFile(RuntimeConfig.UtilsPath+"/.bashrc", []byte(file.BashRC), 0o600)
+	bashrcData, err := file.ExtractFileFromString(file.BashRC)
+	if err != nil {
+		return fmt.Errorf("extract bashrc: %v", err)
+	}
+	err = os.WriteFile(RuntimeConfig.UtilsPath+"/.bashrc", bashrcData, 0o600)
 	if err != nil {
 		log.Printf("Write bashrc: %v", err)
 	}
@@ -29,7 +32,7 @@ func ExtractBash() error {
 	// return ioutil.WriteFile(RuntimeConfig.UtilsPath+"/bash", bashData, 0755)
 	customBash := RuntimeConfig.UtilsPath + "/bash"
 	if !util.IsFileExist(customBash) {
-		err = fmt.Errorf("Custom bash binary (%s) not found, maybe you need to run `vaccine`",
+		err = fmt.Errorf("custom bash binary (%s) not found, maybe you need to run `vaccine`",
 			customBash)
 		return err
 	}
