@@ -30,6 +30,7 @@ var CommandHelp = map[string]string{
 	"mkdir":           "Create new directory on selected agent",
 	"pwd":             "Current working directory of selected agent",
 	"ps":              "Process list of selected agent",
+	"net_helper":      "Network helper: ip addr, ip route, ip neigh",
 	"kill":            "Terminate a process on selected agent: eg. `kill <pid>`",
 	"get":             "Download a file from selected agent",
 	"put":             "Upload a file to selected agent",

@@ -124,6 +124,7 @@ func CliMain() {
 			cmd == "target" ||
 			cmd == "label" ||
 			cmd == "delete_port_fwd" ||
+			cmd == "net_helper" ||
 			cmd == "rm" ||
 			cmd == "mv" ||
 			cmd == "ls" ||
