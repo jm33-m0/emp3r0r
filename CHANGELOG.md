@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.43.3](https://github.com/jm33-m0/emp3r0r/compare/v1.43.2...v1.43.3) (2025-01-02)
+
+
+### Bug Fixes
+
+* auto completion fix ([571fd0c](https://github.com/jm33-m0/emp3r0r/commit/571fd0c65d03971bc6645f40eb348965d7798287))
+* reduce embeded file size using xz ([79f76e1](https://github.com/jm33-m0/emp3r0r/commit/79f76e17a677a7e632d904aa4d3a26d55c10e6e9))
+* remove `go-lpe` as it's not very useful ([756d4ed](https://github.com/jm33-m0/emp3r0r/commit/756d4eddc43469c5f79e9aacce60c41eb03149bf))
+
 ## [1.43.2](https://github.com/jm33-m0/emp3r0r/compare/v1.43.1...v1.43.2) (2024-12-31)
 
 
