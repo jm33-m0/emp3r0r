@@ -31,7 +31,7 @@ func UpgradeAgent() {
 		return
 	}
 	checksum := tun.SHA256SumFile(WWWRoot + "agent")
-	SendCmdToCurrentTarget(fmt.Sprintf("%s %s", emp3r0r_data.C2CmdUpdateAgent, checksum), "")
+	SendCmdToCurrentTarget(fmt.Sprintf("%s --checksum %s", emp3r0r_data.C2CmdUpdateAgent, checksum), "")
 }
 
 // read config by key from emp3r0r.json

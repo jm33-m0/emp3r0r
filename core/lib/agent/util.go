@@ -164,7 +164,7 @@ func Upgrade(checksum string) (out string) {
 		return fmt.Sprintf("Error: chmod %s: %v", tempfile, err)
 	}
 	cmd := exec.Command(tempfile)
-	cmd.Env = append(os.Environ(), "REPLACE_AGENT=1")
+	cmd.Env = append(os.Environ(), "REPLACE_AGENT=true")
 	err = cmd.Start()
 	if err != nil {
 		return fmt.Sprintf("Error: %v", err)
