@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.44.1](https://github.com/jm33-m0/emp3r0r/compare/v1.44.0...v1.44.1) (2025-01-03)
+
+
+### Bug Fixes
+
+* cli crash ([d65907a](https://github.com/jm33-m0/emp3r0r/commit/d65907aef1a5d31d95645cf80e5cde58789bc23e))
+* upload checksum file to release ([8d49717](https://github.com/jm33-m0/emp3r0r/commit/8d4971750473e6a4d04e59636d379e8f73559b99))
+
 ## [1.44.0](https://github.com/jm33-m0/emp3r0r/compare/v1.43.4...v1.44.0) (2025-01-03)
 
 
