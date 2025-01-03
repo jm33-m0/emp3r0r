@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.44.3](https://github.com/jm33-m0/emp3r0r/compare/v1.44.2...v1.44.3) (2025-01-03)
+
+
+### Bug Fixes
+
+* `upgrade_agent` not working ([ab296aa](https://github.com/jm33-m0/emp3r0r/commit/ab296aa6f1e639c33fc36b75c3de23d015a26c20))
+
 ## [1.44.2](https://github.com/jm33-m0/emp3r0r/compare/v1.44.1...v1.44.2) (2025-01-03)
 
 
