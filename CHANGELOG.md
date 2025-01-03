@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.44.0](https://github.com/jm33-m0/emp3r0r/compare/v1.43.4...v1.44.0) (2025-01-03)
+
+
+### Features
+
+* enable `upgrade_cc` command (WIP) ([63b2384](https://github.com/jm33-m0/emp3r0r/commit/63b23847233c0f1dbf501add32d46f5c26b3bccb))
+
 ## [1.43.4](https://github.com/jm33-m0/emp3r0r/compare/v1.43.3...v1.43.4) (2025-01-02)
 
 
