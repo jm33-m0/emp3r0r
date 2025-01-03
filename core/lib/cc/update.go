@@ -112,6 +112,7 @@ func UpdateCC() (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to update emp3r0r: %v", err)
 	}
+	defer TmuxDeinitWindows()
 
 	return nil
 }
