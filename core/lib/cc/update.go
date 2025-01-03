@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"time"
 
 	"github.com/cavaliergopher/grab/v3"
@@ -47,6 +48,7 @@ func GetTarballURL() (string, error) {
 }
 
 func UpdateCC() (err error) {
+	CliPrintInfo("Requesting latest emp3r0r release from GitHub...")
 	// get latest release
 	tarballURL, err := GetTarballURL()
 	if err != nil {
@@ -56,6 +58,14 @@ func UpdateCC() (err error) {
 	// download path
 	path := "/tmp/emp3r0r.tar.zst"
 	lock := fmt.Sprintf("%s.downloading", path)
+
+	// check if lock exists
+	if util.IsFileExist(lock) {
+		err = fmt.Errorf("lock file %s exists, another download is in progress, if it's not the case, manually remove the lock", lock)
+		return
+	}
+
+	// create lock file
 	os.Create(lock)
 	defer os.Remove(lock)
 
@@ -70,10 +80,11 @@ func UpdateCC() (err error) {
 		err = fmt.Errorf("create grab request: %v", err)
 		return
 	}
+	CliPrint("Downloading %s to %s...", tarballURL, path)
 	resp := client.Do(req)
 
 	// progress
-	t := time.NewTicker(10 * time.Second)
+	t := time.NewTicker(5 * time.Second)
 	defer func() {
 		t.Stop()
 		if !util.IsExist(path) {
@@ -89,12 +100,18 @@ func UpdateCC() (err error) {
 				return
 			}
 			CliPrintSuccess("Saved %s to %s (%d bytes)", tarballURL, path, resp.Size())
-			return
 		case <-t.C:
-			CliPrintInfo("%.02f%% complete", resp.Progress()*100)
+			CliPrintInfo("%.02f%% complete at %.02f KB/s", resp.Progress()*100, resp.BytesPerSecond()/1024)
 		}
 	}
+	CliPrintInfo("Download complete, installing emp3r0r...")
 
-	// open new tmux window and run update script
-	return TmuxNewWindow("emp3r0r update", fmt.Sprintf("bash -c 'tar -I zstd -xvf %s -C /tmp && cd /tmp/emp3r0r-build && sudo ./emp3r0r --install'", path))
+	install_cmd := fmt.Sprintf("bash -c 'tar -I zstd -xvf %s -C /tmp && cd /tmp/emp3r0r-build && sudo ./emp3r0r --install; sleep 5'", path)
+	CliPrint("Running installer command: %s", install_cmd)
+	err = exec.Command("x-terminal-emulator", "-e", install_cmd).Run()
+	if err != nil {
+		return fmt.Errorf("failed to update emp3r0r: %v", err)
+	}
+
+	return nil
 }

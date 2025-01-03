@@ -497,7 +497,7 @@ func TmuxSetPaneTitle(title, pane_id string) error {
 	return err
 }
 
-// TmuxNewWindow split tmux window, and run command in the new pane
+// TmuxNewWindow run command in a new window
 func TmuxNewWindow(name, cmd string) error {
 	if os.Getenv("TMUX") == "" ||
 		!util.IsCommandExist("tmux") {

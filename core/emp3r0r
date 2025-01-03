@@ -130,6 +130,16 @@ uninstall() {
 install() {
     [[ "$EUID" -eq 0 ]] || error "You must be root to install emp3r0r"
     info "emp3r0r will be installed to $prefix"
+
+    # check if tmux is installed
+    if ! command -v tmux >/dev/null 2>&1; then
+        error "tmux not found"
+    fi
+
+    # check if emp3r0r is running
+    if tmux has-session -t emp3r0r 2>/dev/null; then
+        tmux kill-session -t emp3r0r || error "Failed to kill emp3r0r"
+    fi
     mkdir -p "$build_dir" || error "Failed to mkdir $build_dir"
     cp -avR tmux "$data_dir" || error "tmux"
     cp -avR modules "$data_dir" || error "modules"

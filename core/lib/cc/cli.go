@@ -201,7 +201,7 @@ start:
 		default:
 			readlineErr = CmdHandler(line)
 			if readlineErr != nil {
-				color.Red(readlineErr.Error())
+				CliPrintError(readlineErr.Error())
 			}
 		}
 		fmt.Printf("\n")

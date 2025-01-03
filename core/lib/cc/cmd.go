@@ -103,7 +103,6 @@ func CmdHandler(cmd string) (err error) {
 	case cmd == "upgrade_cc":
 		err = UpdateCC()
 		if err != nil {
-			CliPrintError("Failed to update emp3r0r: %v", err)
 			return
 		}
 
