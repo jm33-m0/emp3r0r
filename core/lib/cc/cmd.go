@@ -22,7 +22,7 @@ var CommandHelp = map[string]string{
 	"use":             "Use a module. eg. `use <module_name>`",
 	"run":             "Run selected module, make sure you have set required options",
 	"info":            "What options do we have?",
-	"upgrade_agent":   "Upgrade agent on selected target",
+	"upgrade_agent":   "Upgrade agent on selected target, put agent binary in /tmp/emp3r0r/www/agent first",
 	"upgrade_cc":      "Upgrade emp3r0r from GitHub",
 	"ls":              "List current directory of selected agent",
 	"mv":              "Move a file to another location on selected target",
