@@ -174,6 +174,10 @@ func CliMain() {
 start:
 	SetDynamicPrompt()
 	for {
+		if EmpReadLine == nil {
+			CliPrintError("EmpReadLine is nil, aborting")
+			return
+		}
 		line, readlineErr := EmpReadLine.Readline()
 		if readlineErr == readline.ErrInterrupt {
 			if len(line) == 0 {
@@ -209,7 +213,6 @@ start:
 
 	// ask the user if they really want to leave
 	if CliYesNo("Are you sure you want to leave") {
-		// os.Exit(0)
 		return
 	}
 
