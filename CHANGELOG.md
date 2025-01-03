@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.44.2](https://github.com/jm33-m0/emp3r0r/compare/v1.44.1...v1.44.2) (2025-01-03)
+
+
+### Bug Fixes
+
+* check if local version is already the latest ([0abb4a0](https://github.com/jm33-m0/emp3r0r/commit/0abb4a06a2bf7b2691d8b42836493b1feac321ca))
+* installer not run when updating CC ([b0f25de](https://github.com/jm33-m0/emp3r0r/commit/b0f25de2deefd6ac440b0774d86a4ebcfd373699))
+
 ## [1.44.1](https://github.com/jm33-m0/emp3r0r/compare/v1.44.0...v1.44.1) (2025-01-03)
 
 
