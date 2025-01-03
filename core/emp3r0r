@@ -140,6 +140,8 @@ install() {
     if tmux has-session -t emp3r0r 2>/dev/null; then
         tmux kill-session -t emp3r0r || error "Failed to kill emp3r0r"
     fi
+
+    # create directories
     mkdir -p "$build_dir" || error "Failed to mkdir $build_dir"
     cp -avR tmux "$data_dir" || error "tmux"
     cp -avR modules "$data_dir" || error "modules"
