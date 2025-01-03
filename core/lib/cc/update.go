@@ -7,9 +7,12 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/cavaliergopher/grab/v3"
+	version "github.com/hashicorp/go-version"
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -18,7 +21,7 @@ const (
 	LatestRelease = "https://api.github.com/repos/jm33-m0/emp3r0r/releases/latest"
 )
 
-func GetTarballURL() (url, checksum string, err error) {
+func GetTarballURL(force bool) (url, checksum string, err error) {
 	// get latest release
 	resp, err := http.Get(LatestRelease)
 	if err != nil {
@@ -33,11 +36,18 @@ func GetTarballURL() (url, checksum string, err error) {
 	}
 
 	var release struct {
-		Assets []struct {
+		TagName string `json:"tag_name"`
+		Assets  []struct {
 			BrowserDownloadURL string `json:"browser_download_url"`
 		} `json:"assets"`
 	}
 	if err = json.Unmarshal(body, &release); err != nil {
+		return
+	}
+
+	// check if the release is newer
+	if !isNewerVersion(release.TagName, emp3r0r_data.Version) && !force {
+		err = fmt.Errorf("no newer version available")
 		return
 	}
 
@@ -71,12 +81,37 @@ func GetTarballURL() (url, checksum string, err error) {
 	return
 }
 
-func UpdateCC() (err error) {
+func isNewerVersion(newVersion, currentVersion string) bool {
+	// strip 'v' prefix
+	newVersion = strings.TrimPrefix(newVersion, "v")
+	currentVersion = strings.TrimPrefix(currentVersion, "v")
+
+	// parse and compare
+	newV, err := version.NewVersion(newVersion)
+	if err != nil {
+		return false
+	}
+	currentV, err := version.NewVersion(currentVersion)
+	if err != nil {
+		return false
+	}
+
+	return newV.GreaterThan(currentV)
+}
+
+// UpdateCC updates emp3r0r C2 server to the latest version
+// force: force update even if the latest version is the same as the current one
+func UpdateCC(force bool) (err error) {
 	CliPrintInfo("Requesting latest emp3r0r release from GitHub...")
 	// get latest release
-	tarballURL, checksum, err := GetTarballURL()
+	tarballURL, checksum, err := GetTarballURL(force)
 	if err != nil {
 		return err
+	}
+
+	// force update
+	if force {
+		CliPrintWarning("Force update is enabled, updating to the latest version regardless of the current version")
 	}
 
 	// checksum

@@ -13,6 +13,7 @@ require (
 	github.com/gonutz/w32/v2 v2.11.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
+	github.com/hashicorp/go-version v1.7.0
 	github.com/jaypipes/ghw v0.13.0
 	github.com/jm33-m0/arc v1.0.0
 	github.com/jm33-m0/go-cdn2proxy v1.1.2

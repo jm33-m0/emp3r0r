@@ -100,8 +100,12 @@ func CmdHandler(cmd string) (err error) {
 	case cmd == "":
 		return
 
-	case cmd == "upgrade_cc":
-		err = UpdateCC()
+	case cmdSplit[0] == "upgrade_cc":
+		force := false
+		if len(cmdSplit) == 2 {
+			force = cmdSplit[1] == "-f"
+		}
+		err = UpdateCC(force)
 		if err != nil {
 			return
 		}
