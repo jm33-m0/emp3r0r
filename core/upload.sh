@@ -68,3 +68,9 @@ echo "Uploading asset... "
 GH_ASSET="https://uploads.github.com/repos/$owner/$repo/releases/$id/assets?name=$(basename $filename)"
 
 curl "$GITHUB_OAUTH_BASIC" --data-binary @"$filename" -H "Authorization: token $github_api_token" -H "Content-Type: application/octet-stream" $GH_ASSET
+
+# Upload checksum of asset
+checksum=$(sha256sum $filename | cut -d ' ' -f 1)
+echo "Uploading checksum... "
+GH_ASSET="https://uploads.github.com/repos/$owner/$repo/releases/$id/assets?name=$(basename $filename).sha256"
+curl "$GITHUB_OAUTH_BASIC" --data-binary @"$filename.sha256" -H "Authorization: token $github_api_token" -H "Content-Type: application/octet-stream" $GH_ASSET
