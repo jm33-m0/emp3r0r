@@ -22,6 +22,7 @@ var CommandHelp = map[string]string{
 	"run":             "Run selected module, make sure you have set required options",
 	"info":            "What options do we have?",
 	"upgrade_agent":   "Upgrade agent on selected target",
+	"upgrade_cc":      "Upgrade emp3r0r from GitHub",
 	"ls":              "List current directory of selected agent",
 	"mv":              "Move a file to another location on selected target",
 	"cp":              "Copy a file to another location on selected target",
@@ -98,6 +99,13 @@ func CmdHandler(cmd string) (err error) {
 	switch {
 	case cmd == "":
 		return
+
+	case cmd == "upgrade_cc":
+		err = UpdateCC()
+		if err != nil {
+			return
+		}
+
 	case cmdSplit[0] == HELP:
 		if len(cmdSplit) > 2 {
 			CliPrintError("WTF?")

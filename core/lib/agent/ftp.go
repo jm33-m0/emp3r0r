@@ -137,7 +137,7 @@ func DownloadViaCC(file_to_download, path string) (data []byte, err error) {
 			log.Printf("DownloadViaCC: saved %s to %s (%d bytes)", url, path, resp.Size())
 			return
 		case <-t.C:
-			log.Printf("%.02f%% complete\n", resp.Progress()*100)
+			log.Printf("%.02f%% complete", resp.Progress()*100)
 		}
 	}
 
