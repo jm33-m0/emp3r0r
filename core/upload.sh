@@ -62,7 +62,7 @@ eval $(echo "$response" | grep -m 1 "id.:" | grep -w id | tr : = | tr -cd '[[:al
 }
 
 # Upload asset
-echo "Uploading asset... "
+echo -e "\n[*] Uploading asset... "
 
 # Construct url
 GH_ASSET="https://uploads.github.com/repos/$owner/$repo/releases/$id/assets?name=$(basename $filename)"
@@ -70,7 +70,8 @@ GH_ASSET="https://uploads.github.com/repos/$owner/$repo/releases/$id/assets?name
 curl "$GITHUB_OAUTH_BASIC" --data-binary @"$filename" -H "Authorization: token $github_api_token" -H "Content-Type: application/octet-stream" $GH_ASSET
 
 # Upload checksum of asset
+echo -e "\n[*] Uploading checksum... "
 checksum=$(sha256sum $filename | cut -d ' ' -f 1)
-echo "Uploading checksum... "
+echo -n "$checksum" >"$filename.sha256"
 GH_ASSET="https://uploads.github.com/repos/$owner/$repo/releases/$id/assets?name=$(basename $filename).sha256"
 curl "$GITHUB_OAUTH_BASIC" --data-binary @"$filename.sha256" -H "Authorization: token $github_api_token" -H "Content-Type: application/octet-stream" $GH_ASSET
