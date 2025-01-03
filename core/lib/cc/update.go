@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/cavaliergopher/grab/v3"
@@ -201,16 +202,16 @@ func UpdateCC(force bool) (err error) {
 	install_cmd := fmt.Sprintf("bash -c 'tar -I zstd -xvf %s -C /tmp && cd /tmp/emp3r0r-build && sudo ./emp3r0r --install; sleep 5'", path)
 	CliPrint("Running installer command: %s. Please run `tmux kill-session -t emp3r0r` after installing", install_cmd)
 
-	// find x-terminal-emulator, it should be available on most Linux distros, tested on Kali
-	x_terminal_emulator, err := exec.LookPath("x-terminal-emulator")
+	wrapper, err := exec.LookPath("x-terminal-emulator")
 	if err != nil {
-		return fmt.Errorf("failed to find x-terminal-emulator: %v. your distribution is unsupported", err)
+		return fmt.Errorf("%v. your distribution is unsupported", err)
 	}
-	err = exec.Command(x_terminal_emulator, "-e", install_cmd).Run()
+	cmd := exec.Command(wrapper, "-e", install_cmd)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to update emp3r0r: %v", err)
+		return fmt.Errorf("failed to update emp3r0r: %v: %s", err, out)
 	}
-	defer TmuxDeinitWindows()
 
 	return nil
 }

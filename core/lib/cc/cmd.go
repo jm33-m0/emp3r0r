@@ -4,6 +4,7 @@
 package cc
 
 import (
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -109,6 +110,8 @@ func CmdHandler(cmd string) (err error) {
 		if err != nil {
 			return
 		}
+		TmuxDeinitWindows()
+		os.Exit(0)
 
 	case cmdSplit[0] == HELP:
 		if len(cmdSplit) > 2 {
