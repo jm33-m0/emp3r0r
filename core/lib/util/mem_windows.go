@@ -25,12 +25,14 @@ var (
 
 const PROCESS_ALL_ACCESS = 0x1F0FFF
 
+// OpenProcess opens a Windows process, returns a handle
 func OpenProcess(pid int) uintptr {
 	handle, _, _ := procOpenProcess.Call(uintptr(PROCESS_ALL_ACCESS), uintptr(1), uintptr(pid))
 	return handle
 }
 
-func read_mem(hProcess uintptr, address, size uintptr) []byte {
+// ReadMemoryRegion reads memory region from a process
+func ReadMemoryRegion(hProcess uintptr, address, size uintptr) []byte {
 	data := make([]byte, size)
 	var length uint32
 
@@ -57,9 +59,12 @@ type MEMORY_BASIC_INFORMATION struct {
 	Type              uint32
 }
 
-func read_self_mem(hProcess uintptr) (mem_data [][]byte, bytes_read int, err error) {
+// DumpProcessMem dumps all memory regions of a process
+func DumpProcessMem(hProcess uintptr) (mem_data map[int64][]byte, bytes_read int, err error) {
 	// Start with an initial address of 0
 	address := uintptr(0)
+
+	mem_data = make(map[int64][]byte)
 
 	// Loop through the memory regions and print information
 	for {
@@ -85,9 +90,9 @@ func read_self_mem(hProcess uintptr) (mem_data [][]byte, bytes_read int, err err
 		}
 
 		// read data from this region
-		data_read := read_mem(hProcess, mbi.BaseAddress, mbi.RegionSize)
+		data_read := ReadMemoryRegion(hProcess, mbi.BaseAddress, mbi.RegionSize)
 		bytes_read += len(data_read)
-		mem_data = append(mem_data, data_read)
+		mem_data[int64(mbi.BaseAddress)] = data_read
 	}
 
 	return
@@ -124,7 +129,8 @@ func getBaseAddress(handle uintptr) uintptr {
 	return 0
 }
 
-func crossPlatformDumpSelfMem() (mem_data [][]byte, err error) {
+func crossPlatformDumpSelfMem() (mem_data map[int64][]byte, err error) {
+	mem_data = make(map[int64][]byte)
 	dlls, err := GetAllDLLs()
 	if err != nil {
 		return
@@ -135,16 +141,18 @@ func crossPlatformDumpSelfMem() (mem_data [][]byte, err error) {
 			log.Printf("reading DLL %s: %v", fileName, err)
 			continue
 		}
-		mem_data = append(mem_data, dll_data)
+		mem_data[int64(dll.BaseOfDll)] = dll_data
 	}
 
 	// dump all memory regions
 	hProcess := OpenProcess(os.Getpid())
-	self_mem_data, _, err := read_self_mem(hProcess)
+	self_mem_data, _, err := DumpProcessMem(hProcess)
 	if err != nil {
 		log.Printf("reading self memory: %v", err)
 	}
-	mem_data = append(mem_data, self_mem_data...)
+	for base, data := range self_mem_data {
+		mem_data[base] = data
+	}
 
 	return mem_data, err
 }

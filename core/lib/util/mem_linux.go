@@ -14,12 +14,27 @@ import (
 	"unsafe"
 )
 
-// DumpSelfMem dump everything (readable) from self process
-// will dump libraries as well, if any
-// Linux only
-func crossPlatformDumpSelfMem() (memdata [][]byte, err error) {
+// ReadMemoryRegion reads a specified memory region from the given process handle
+// hProcess is the file descriptor of open file /proc/pid/mem
+// address is the starting address of the memory region
+// size is the size of the memory region to read
+func ReadMemoryRegion(hProcess uintptr, address, size uintptr) ([]byte, error) {
+	mem := os.NewFile(hProcess, "mem")
+	read_buf := make([]byte, size)
+	n, err := mem.ReadAt(read_buf, int64(address))
+	if err != nil || n <= 0 {
+		return nil, fmt.Errorf("failed to read memory region: %v", err)
+	}
+	return read_buf, nil
+}
+
+// crossPlatformDumpSelfMem dumps everything (readable) from the self process
+// It will dump libraries as well, if any
+// This function is Linux only
+func crossPlatformDumpSelfMem() (memdata map[int64][]byte, err error) {
 	maps_file := fmt.Sprintf("/proc/%d/maps", os.Getpid())
 	mem_file := fmt.Sprintf("/proc/%d/mem", os.Getpid())
+	memdata = make(map[int64][]byte)
 
 	// open memory
 	mem, err := os.Open(mem_file)
@@ -62,16 +77,14 @@ func crossPlatformDumpSelfMem() (memdata [][]byte, err error) {
 			log.Printf("%s: failed to parse end", line)
 		}
 
-		// seek from memory
-		read_size := end - start
-		read_buf := make([]byte, read_size)
-		n, _ := mem.ReadAt(read_buf, start)
-		if n <= 0 {
-			log.Printf("%s: nothing read", line)
+		// read memory region
+		read_buf, err := ReadMemoryRegion(mem.Fd(), uintptr(start), uintptr(end-start))
+		if err != nil {
+			log.Printf("%s: %v", line, err)
 			continue
 		}
-		log.Printf("%s: read %d bytes", line, n)
-		memdata = append(memdata, read_buf)
+		log.Printf("%s: read %d bytes", line, len(read_buf))
+		memdata[start] = read_buf
 	}
 
 	return
@@ -83,8 +96,8 @@ const (
 	fork           = 57
 )
 
-// MemFDWrite create a memfd and write data to it
-// returns the fd
+// MemFDWrite creates a memfd and writes data to it
+// It returns the file descriptor of the created memfd
 func MemFDWrite(data []byte) int {
 	mem_name := ""
 	fd, _, errno := syscall.Syscall(memfdCreateX64, uintptr(unsafe.Pointer(&mem_name)), uintptr(0), 0)
