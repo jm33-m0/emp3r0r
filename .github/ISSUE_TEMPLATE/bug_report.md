@@ -27,23 +27,25 @@ Steps to reproduce the behavior:
 
 <!-- If applicable, add screenshots to help explain your problem. -->
 
+
 # Your environment
 
 ## `emp3r0r.json`
 
-I suggest that you format your JSON with an online JSON formatter,
-for example [https://codebeautify.org/jsonviewer](https://codebeautify.org/jsonviewer)
+<!-- I suggest that you format your JSON with an online JSON formatter, for example https://codebeautify.org/jsonviewer -->
+
+<!-- Redact sensitive information before pasting it. -->
 
 <details>
 <summary><code>emp3r0r.json</code>:</summary><br>
 <pre>
-Paste emp3r0r.json here, you can redact sensitive information
+Paste emp3r0r.json here
 </pre>
 </details>
 
 ## CC
 
-Linux distro name and version, use `cat /etc/*release*` to view, paste the result below
+Linux distro name and version, use `cat /etc/*release*` to view, paste the result in the code block:
 
 ```bash
 # cat /etc/*release*
@@ -58,6 +60,7 @@ Linux distro name and version, use `cat /etc/*release*` to view, paste the resul
 -   [ ] TOR
 -   [ ] Other proxies
 -   [ ] None of the above (Please specify blow)
+-   [ ] Generic
 
 ## Agent
 
@@ -65,6 +68,7 @@ Linux distro name and version, use `cat /etc/*release*` to view, paste the resul
 
 -   [ ] Linux
 -   [ ] Windows
+-   [ ] Generic
 
 ### CPU architecture
 
@@ -75,6 +79,7 @@ Linux distro name and version, use `cat /etc/*release*` to view, paste the resul
 -   [ ] mips
 -   [ ] mips64
 -   [ ] riscv64
+-   [ ] generic
 
 # Additional context
 
