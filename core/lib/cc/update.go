@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -88,12 +89,14 @@ func isNewerVersion(newVersion, currentVersion string) bool {
 	currentVersion = strings.TrimPrefix(currentVersion, "v")
 
 	// parse and compare
-	newV, err := version.NewVersion(newVersion)
-	if err != nil {
+	newV, versionErr := version.NewVersion(newVersion)
+	if versionErr != nil {
+		CliPrintDebug("Parsing %s: %v", strconv.Quote(newVersion), versionErr)
 		return false
 	}
-	currentV, err := version.NewVersion(currentVersion)
-	if err != nil {
+	currentV, versionErr := version.NewVersion(currentVersion)
+	if versionErr != nil {
+		CliPrintDebug("Parsing %s: %v", strconv.Quote(currentVersion), versionErr)
 		return false
 	}
 
