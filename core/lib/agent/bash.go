@@ -12,8 +12,8 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// ExtractBash extract embedded bash binary and configure our bash shell
-func ExtractBash() error {
+// ExtractBashRC extract embedded bashrc and configure our bash shell
+func ExtractBashRC() error {
 	if !util.IsExist(RuntimeConfig.UtilsPath) {
 		err := os.MkdirAll(RuntimeConfig.UtilsPath, 0o700)
 		if err != nil {

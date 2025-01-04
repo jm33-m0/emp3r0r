@@ -119,10 +119,10 @@ func UpdateOptions(modName string) (exist bool) {
 	case modName == emp3r0r_data.ModSHELL:
 		shellOpt := addIfNotFound("shell")
 		shellOpt.Vals = []string{
-			"bash", "zsh", "sh", "python", "python3",
-			"cmd.exe", "powershell.exe",
+			"/bin/bash", "/bin/zsh", "/bin/sh", "python", "python3",
+			"cmd.exe", "powershell.exe", "elvish",
 		}
-		shellOpt.Val = "elvsh"
+		shellOpt.Val = "bash"
 
 		argsOpt := addIfNotFound("args")
 		argsOpt.Val = ""

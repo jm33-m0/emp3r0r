@@ -30,7 +30,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 	ssh_prog := "ssh"
 	if is_sftp {
 		ssh_prog = "sftp"
-		shell = "elvsh"
+		shell = "elvish"
 	}
 
 	// if shell/sftp pane already exists, abort
@@ -41,8 +41,8 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 			}
 		}
 	}
-	// we will open a elvsh shell automatically, which can be used for SFTP
-	is_new_port_needed := (port == RuntimeConfig.SSHDShellPort && shell != "elvsh")
+	// we will open a elvish shell automatically, which can be used for SFTP
+	is_new_port_needed := (port == RuntimeConfig.SSHDShellPort && shell != "elvish")
 
 	if !util.IsCommandExist("ssh") {
 		err = fmt.Errorf("ssh must be installed")

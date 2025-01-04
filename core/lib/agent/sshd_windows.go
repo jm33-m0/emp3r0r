@@ -29,7 +29,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		log.Print(e)
 		return
 	}
-	if shell == "elvsh" {
+	if shell == "elvish" {
 		exe = util.ProcExePath(os.Getpid())
 	}
 
@@ -47,8 +47,8 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		cmd := exec.Command(exe, args...)
 
 		// Evlsh
-		if shell == "elvsh" {
-			os.Setenv("ELVSH", "true")
+		if shell == "elvish" {
+			os.Setenv("ELVISH", "true")
 		}
 
 		// remove empty arg in cmd.Args
