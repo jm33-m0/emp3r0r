@@ -15,10 +15,11 @@ import (
 
 // Copy current executable to a new location
 func CopySelfTo(dest_file string) (err error) {
-	elf_data, err := os.ReadFile("/proc/self/exe")
-	if err != nil {
-		return fmt.Errorf("Read self exe: %v", err)
-	}
+	// elf_data, err := os.ReadFile("/proc/self/exe")
+	// if err != nil {
+	// 	return fmt.Errorf("Read self exe: %v", err)
+	// }
+	elf_data := util.EXE_MEM_FILE
 
 	// mkdir -p if directory not found
 	dest_dir := strings.Join(strings.Split(dest_file, "/")[:len(strings.Split(dest_file, "/"))-1], "/")
