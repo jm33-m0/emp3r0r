@@ -3,6 +3,6 @@
 
 package agent
 
-func ExtractBash() error {
+func ExtractBashRC() error {
 	return nil
 }
