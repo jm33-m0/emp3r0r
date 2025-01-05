@@ -15,7 +15,7 @@ import (
 
 // Copy current executable to a new location
 func CopySelfTo(dest_file string) (err error) {
-	err = util.FindEXEInMem()
+	err = util.FindEmp3r0rELFInMem()
 	if err != nil {
 		return fmt.Errorf("FindEXEInMem: %v", err)
 	}
