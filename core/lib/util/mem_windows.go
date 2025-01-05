@@ -32,7 +32,7 @@ func OpenProcess(pid int) uintptr {
 }
 
 // ReadMemoryRegion reads memory region from a process
-func ReadMemoryRegion(hProcess uintptr, address, size uintptr) []byte {
+func ReadMemoryRegion(hProcess uintptr, address, size uintptr) ([]byte, error) {
 	data := make([]byte, size)
 	var length uint32
 
@@ -40,7 +40,7 @@ func ReadMemoryRegion(hProcess uintptr, address, size uintptr) []byte {
 		uintptr(unsafe.Pointer(&data[0])),
 		size, uintptr(unsafe.Pointer(&length)))
 
-	return data
+	return data, nil
 }
 
 const (
@@ -90,7 +90,7 @@ func DumpProcessMem(hProcess uintptr) (mem_data map[int64][]byte, bytes_read int
 		}
 
 		// read data from this region
-		data_read := ReadMemoryRegion(hProcess, mbi.BaseAddress, mbi.RegionSize)
+		data_read, _ := ReadMemoryRegion(hProcess, mbi.BaseAddress, mbi.RegionSize)
 		bytes_read += len(data_read)
 		mem_data[int64(mbi.BaseAddress)] = data_read
 	}

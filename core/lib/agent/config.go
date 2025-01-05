@@ -20,16 +20,9 @@ var RuntimeConfig = &emp3r0r_data.Config{}
 var WritableLocations = []string{}
 
 func ApplyRuntimeConfig() (err error) {
-	readJsonData, err := util.ExtractData()
+	jsonData, err := util.ExtractData()
 	if err != nil {
 		return fmt.Errorf("read config: %v", err)
-	}
-
-	// decrypt attached JSON file
-	jsonData, err := tun.AES_GCM_Decrypt(emp3r0r_data.OneTimeMagicBytes, readJsonData)
-	if err != nil {
-		err = fmt.Errorf("Decrypt config JSON failed (%v), invalid config data?", err)
-		return
 	}
 
 	// parse JSON

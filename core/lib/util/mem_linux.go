@@ -15,11 +15,18 @@ import (
 )
 
 // ReadMemoryRegion reads a specified memory region from the given process handle
-// hProcess is the file descriptor of open file /proc/pid/mem
+// hProcess is the file descriptor of open file /proc/pid/mem, or 0 for current process
 // address is the starting address of the memory region
 // size is the size of the memory region to read
-func ReadMemoryRegion(hProcess uintptr, address, size uintptr) ([]byte, error) {
+func ReadMemoryRegion(hProcess uintptr, address, size uintptr) (data []byte, err error) {
 	mem := os.NewFile(hProcess, "mem")
+	if hProcess == 0 {
+		mem, err = os.Open(fmt.Sprintf("/proc/%d/mem", os.Getpid()))
+		if err != nil {
+			return nil, fmt.Errorf("failed to open /proc/%d/mem: %v", os.Getpid(), err)
+		}
+		defer mem.Close()
+	}
 	read_buf := make([]byte, size)
 	n, err := mem.ReadAt(read_buf, int64(address))
 	if err != nil || n <= 0 {
@@ -78,7 +85,7 @@ func crossPlatformDumpSelfMem() (memdata map[int64][]byte, err error) {
 		}
 
 		// read memory region
-		read_buf, err := ReadMemoryRegion(mem.Fd(), uintptr(start), uintptr(end-start))
+		read_buf, err := ReadMemoryRegion(0, uintptr(start), uintptr(end-start))
 		if err != nil {
 			log.Printf("%s: %v", line, err)
 			continue
