@@ -39,6 +39,17 @@ type ELF64Header struct {
 	Shstrndx  uint16
 }
 
+// Print prints the ELF64 header information.
+func (h *ELF64Header) Print() {
+	log.Printf("ELF64 Header:")
+	log.Printf("  Entry Point:       0x%x", h.Entry)
+	log.Printf("  Program Header Off: %d", h.Phoff)
+	log.Printf("  Section Header Off: %d", h.Shoff)
+	log.Printf("  Number of PH:      %d", h.Phnum)
+	log.Printf("  Number of SH:      %d", h.Shnum)
+	log.Printf("  Size of PH Entry:  %d", h.Phentsize)
+}
+
 // ELF32Header represents the ELF header for 32-bit binaries.
 type ELF32Header struct {
 	Ident     [16]byte
@@ -55,6 +66,59 @@ type ELF32Header struct {
 	Shentsize uint16
 	Shnum     uint16
 	Shstrndx  uint16
+}
+
+// Print prints the ELF32 header information.
+func (h *ELF32Header) Print() {
+	log.Printf("ELF32 Header:")
+	log.Printf("  Entry Point:       0x%x", h.Entry)
+	log.Printf("  Program Header Off: %d", h.Phoff)
+	log.Printf("  Section Header Off: %d", h.Shoff)
+	log.Printf("  Number of PH:      %d", h.Phnum)
+	log.Printf("  Number of SH:      %d", h.Shnum)
+	log.Printf("  Size of PH Entry:  %d", h.Phentsize)
+}
+
+// ProgHeader64 represents a 64-bit ELF program header.
+type ProgHeader64 struct {
+	Type   uint32
+	Flags  uint32
+	Off    uint64
+	Vaddr  uint64
+	Paddr  uint64
+	Filesz uint64
+	Memsz  uint64
+	Align  uint64
+}
+
+// ProgHeader32 represents a 32-bit ELF program header.
+type ProgHeader32 struct {
+	Type   uint32
+	Off    uint32
+	Vaddr  uint32
+	Paddr  uint32
+	Filesz uint32
+	Memsz  uint32
+	Flags  uint32
+	Align  uint32
+}
+
+// ProgramHeader represents a generic ELF program header.
+type ProgramHeader struct {
+	Type   uint32
+	Flags  uint32
+	Off    uint64
+	Vaddr  uint64
+	Paddr  uint64
+	Filesz uint64
+	Memsz  uint64
+	Align  uint64
+}
+
+// Print prints the program header information.
+func (ph *ProgramHeader) Print(index int) {
+	log.Printf("  [%d] Type: 0x%x, Offset: 0x%x, VAddr: 0x%x, PAddr: 0x%x", index, ph.Type, ph.Off, ph.Vaddr, ph.Paddr)
+	log.Printf("      File Size: %d, Mem Size: %d, Flags: 0x%x, Align: %d", ph.Filesz, ph.Memsz, ph.Flags, ph.Align)
 }
 
 // GetSymFromLibc gets the pointer to a libc function that is currently loaded in the target process, ASLR-proof.
@@ -208,17 +272,16 @@ func ParseELF64(reader *bytes.Reader, ident [16]byte) (*ELF64Header, error) {
 		return nil, err
 	}
 
-	log.Printf("ELF64 Header:")
-	log.Printf("  Entry Point:       0x%x", header.Entry)
-	log.Printf("  Program Header Off: %d", header.Phoff)
-	log.Printf("  Section Header Off: %d", header.Shoff)
-	log.Printf("  Number of PH:      %d", header.Phnum)
-	log.Printf("  Number of SH:      %d", header.Shnum)
-	log.Printf("  Size of PH Entry:  %d", header.Phentsize)
+	header.Print()
 
 	// Read program headers
-	if err := parseProgramHeaders(reader, int64(header.Phoff), int(header.Phnum), int(header.Phentsize), ELFCLASS64); err != nil {
+	headers, err := parseProgramHeaders(reader, int64(header.Phoff), int(header.Phnum), ELFCLASS64)
+	if err != nil {
 		return nil, err
+	}
+
+	for i, ph := range headers {
+		ph.Print(i)
 	}
 
 	return &header, nil
@@ -236,17 +299,16 @@ func ParseELF32(reader *bytes.Reader, ident [16]byte) (*ELF32Header, error) {
 		return nil, err
 	}
 
-	log.Printf("ELF32 Header:")
-	log.Printf("  Entry Point:       0x%x", header.Entry)
-	log.Printf("  Program Header Off: %d", header.Phoff)
-	log.Printf("  Section Header Off: %d", header.Shoff)
-	log.Printf("  Number of PH:      %d", header.Phnum)
-	log.Printf("  Number of SH:      %d", header.Shnum)
-	log.Printf("  Size of PH Entry:  %d", header.Phentsize)
+	header.Print()
 
 	// Read program headers
-	if err := parseProgramHeaders(reader, int64(header.Phoff), int(header.Phnum), int(header.Phentsize), ELFCLASS32); err != nil {
+	headers, err := parseProgramHeaders(reader, int64(header.Phoff), int(header.Phnum), ELFCLASS32)
+	if err != nil {
 		return nil, err
+	}
+
+	for i, ph := range headers {
+		ph.Print(i)
 	}
 
 	return &header, nil
@@ -258,53 +320,49 @@ func ParseELF32(reader *bytes.Reader, ident [16]byte) (*ELF32Header, error) {
 // - phOff: Offset to the program headers.
 // - phNum: Number of program headers.
 // - elfClass: ELF class (32-bit or 64-bit).
-func parseProgramHeaders(reader *bytes.Reader, phOff int64, phNum, _ int, elfClass byte) error {
+func parseProgramHeaders(reader *bytes.Reader, phOff int64, phNum int, elfClass byte) ([]ProgramHeader, error) {
 	if _, err := reader.Seek(phOff, 0); err != nil {
 		log.Printf("Failed to seek to program headers: %v", err)
-		return err
+		return nil, err
 	}
 
-	log.Printf("Program Headers:")
+	var headers []ProgramHeader
 	for i := 0; i < phNum; i++ {
+		var ph ProgramHeader
 		if elfClass == ELFCLASS64 {
-			type ProgHeader64 struct {
-				Type   uint32
-				Flags  uint32
-				Off    uint64
-				Vaddr  uint64
-				Paddr  uint64
-				Filesz uint64
-				Memsz  uint64
-				Align  uint64
-			}
-
-			var ph ProgHeader64
-			if err := binary.Read(reader, binary.LittleEndian, &ph); err != nil {
+			var ph64 ProgHeader64
+			if err := binary.Read(reader, binary.LittleEndian, &ph64); err != nil {
 				log.Printf("Failed to read program header: %v", err)
-				return err
+				return nil, err
 			}
-			log.Printf("  [%d] Type: 0x%x, Offset: 0x%x, VAddr: 0x%x, PAddr: 0x%x", i, ph.Type, ph.Off, ph.Vaddr, ph.Paddr)
-			log.Printf("      File Size: %d, Mem Size: %d, Flags: 0x%x, Align: %d", ph.Filesz, ph.Memsz, ph.Flags, ph.Align)
+			ph = ProgramHeader{
+				Type:   ph64.Type,
+				Flags:  ph64.Flags,
+				Off:    ph64.Off,
+				Vaddr:  ph64.Vaddr,
+				Paddr:  ph64.Paddr,
+				Filesz: ph64.Filesz,
+				Memsz:  ph64.Memsz,
+				Align:  ph64.Align,
+			}
 		} else {
-			type ProgHeader32 struct {
-				Type   uint32
-				Off    uint32
-				Vaddr  uint32
-				Paddr  uint32
-				Filesz uint32
-				Memsz  uint32
-				Flags  uint32
-				Align  uint32
-			}
-
-			var ph ProgHeader32
-			if err := binary.Read(reader, binary.LittleEndian, &ph); err != nil {
+			var ph32 ProgHeader32
+			if err := binary.Read(reader, binary.LittleEndian, &ph32); err != nil {
 				log.Printf("Failed to read program header: %v", err)
-				return err
+				return nil, err
 			}
-			log.Printf("  [%d] Type: 0x%x, Offset: 0x%x, VAddr: 0x%x, PAddr: 0x%x", i, ph.Type, ph.Off, ph.Vaddr, ph.Paddr)
-			log.Printf("      File Size: %d, Mem Size: %d, Flags: 0x%x, Align: %d", ph.Filesz, ph.Memsz, ph.Flags, ph.Align)
+			ph = ProgramHeader{
+				Type:   ph32.Type,
+				Flags:  ph32.Flags,
+				Off:    uint64(ph32.Off),
+				Vaddr:  uint64(ph32.Vaddr),
+				Paddr:  uint64(ph32.Paddr),
+				Filesz: uint64(ph32.Filesz),
+				Memsz:  uint64(ph32.Memsz),
+				Align:  uint64(ph32.Align),
+			}
 		}
+		headers = append(headers, ph)
 	}
-	return nil
+	return headers, nil
 }
