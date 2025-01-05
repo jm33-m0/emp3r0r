@@ -79,9 +79,17 @@ func crossPlatformDumpSelfMem() (memdata map[int64][]byte, err error) {
 		if err != nil {
 			log.Printf("%s: failed to parse start", line)
 		}
+		if start < 0 || start > int64(^uintptr(0)) {
+			log.Printf("%s: start address out of bounds", line)
+			continue
+		}
 		end, err := strconv.ParseInt(start_end[1], 16, 64)
 		if err != nil {
 			log.Printf("%s: failed to parse end", line)
+		}
+		if end < 0 || end > int64(^uintptr(0)) {
+			log.Printf("%s: end address out of bounds", line)
+			continue
 		}
 
 		// read memory region
