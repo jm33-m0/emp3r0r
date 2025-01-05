@@ -21,6 +21,8 @@ const (
 	ELFCLASS64 = 2
 )
 
+var ELFMAGIC = []byte{0x7f, 'E', 'L', 'F'}
+
 // ELFHeader represents the ELF header for both 32-bit and 64-bit binaries.
 type ELFHeader struct {
 	Ident          [16]byte
@@ -218,7 +220,7 @@ func ParseELFHeaders(data []byte) (*ELFHeader, error) {
 	if _, err := reader.Read(ident[:]); err != nil {
 		return nil, err
 	}
-	if !bytes.Equal(ident[:4], []byte{0x7f, 'E', 'L', 'F'}) {
+	if !bytes.Equal(ident[:4], ELFMAGIC) {
 		return nil, fmt.Errorf("invalid ELF magic number")
 	}
 

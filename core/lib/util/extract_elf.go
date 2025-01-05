@@ -22,9 +22,25 @@ func FindEmp3r0rELFInMem() (err error) {
 		return
 	}
 
-	elf_magic := []byte{0x7f, 0x45, 0x4c, 0x46}
+	parseMemRegions := func(mem_region []byte, base int64) (start, end int64, err error) {
+		// parse ELF headers
+		header, err := exe_utils.ParseELFHeaders(mem_region)
+		if err != nil {
+			log.Printf("Parse ELF headers: %v", err)
+			return
+		}
+		for _, p := range header.ProgramHeaders {
+			if p.Vaddr == uint64(base) {
+				start = int64(p.Vaddr)
+				end = start + int64(p.Filesz)
+				break
+			}
+		}
+		return
+	}
+
 	for base, mem_region := range mem_regions {
-		if bytes.Contains(mem_region, elf_magic) && bytes.Contains(mem_region, emp3r0r_data.OneTimeMagicBytes) {
+		if bytes.Contains(mem_region, exe_utils.ELFMAGIC) && bytes.Contains(mem_region, emp3r0r_data.OneTimeMagicBytes) {
 			if base != 0x400000 {
 				log.Printf("Found magic string in memory region 0x%x, but unlikely to contain our ELF", base)
 				continue
@@ -51,26 +67,45 @@ func FindEmp3r0rELFInMem() (err error) {
 			current_region := mem_regions[base]
 			start_of_current_region := base // current pointer
 			end_of_current_region := start_of_current_region + int64(len(current_region))
-			log.Printf("Saving %d bytes from memory region 0x%x - 0x%x", len(current_region), start_of_current_region, end_of_current_region)
-
-			// trim junk data before ELF magic bytes
-			elf_data := mem_region[bytes.Index(mem_region, elf_magic):]
+			// refine the start/end of current region using program headers
+			start, end, err := parseMemRegions(current_region, start_of_current_region)
+			if err != nil {
+				log.Printf("parseMemRegions: %v", err)
+				continue
+			}
+			log.Printf("Parsing memory region 0x%x - 0x%x", start_of_current_region, end_of_current_region)
+			log.Printf("Saving %d bytes from memory region 0x%x - 0x%x", end-start, start, end)
+			elf_data := current_region[start-start_of_current_region : end-start_of_current_region]
 			os.WriteFile("/tmp/emp3r0r.restored.1", elf_data, 0o755)
 
 			// read on
 			start_of_current_region = end_of_current_region
 			current_region = mem_regions[start_of_current_region]
 			end_of_current_region = start_of_current_region + int64(len(current_region))
-			log.Printf("Saving %d bytes from memory region 0x%x - 0x%x", len(current_region), start_of_current_region, end_of_current_region)
-			elf_data = append(elf_data, current_region...)
+			// refine the start/end of current region using program headers
+			start, end, err = parseMemRegions(current_region, start_of_current_region)
+			if err != nil {
+				log.Printf("parseMemRegions: %v", err)
+				continue
+			}
+			log.Printf("Parsing memory region 0x%x - 0x%x", start_of_current_region, end_of_current_region)
+			log.Printf("Saving %d bytes from memory region 0x%x - 0x%x", end-start, start, end)
+			elf_data = append(elf_data, current_region[start-start_of_current_region:end-start_of_current_region]...)
 			os.WriteFile("/tmp/emp3r0r.restored.2", current_region, 0o755)
 
 			// read on, it doesn't matter if we read too much, the ELF will still run
 			start_of_current_region = end_of_current_region
 			current_region = mem_regions[start_of_current_region]
 			end_of_current_region = start_of_current_region + int64(len(current_region))
-			log.Printf("Saving %d bytes from memory region 0x%x - 0x%x", len(current_region), start_of_current_region, end_of_current_region)
-			elf_data = append(elf_data, current_region...)
+			// refine the start/end of current region using program headers
+			start, end, err = parseMemRegions(current_region, start_of_current_region)
+			if err != nil {
+				log.Printf("parseMemRegions: %v", err)
+				continue
+			}
+			log.Printf("Parsing memory region 0x%x - 0x%x", start_of_current_region, end_of_current_region)
+			log.Printf("Saving %d bytes from memory region 0x%x - 0x%x", end-start, start, end)
+			elf_data = append(elf_data, current_region[start-start_of_current_region:end-start_of_current_region]...)
 
 			log.Printf("Saved %d bytes to EXE_MEM_FILE", len(elf_data))
 			EXE_MEM_FILE = elf_data
