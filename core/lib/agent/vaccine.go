@@ -14,6 +14,7 @@ import (
 	"runtime"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	exe_utils "github.com/jm33-m0/emp3r0r/core/lib/exe"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -93,7 +94,7 @@ func VaccineHandler() (out string) {
 	}
 	for _, f := range files {
 		fpath := fmt.Sprintf("%s/%s", RuntimeConfig.UtilsPath, f.Name())
-		if !IsELF(fpath) || IsStaticELF(fpath) {
+		if !exe_utils.IsELF(fpath) || exe_utils.IsStaticELF(fpath) {
 			continue
 		}
 		// patch patchelf itself
