@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.44.4](https://github.com/jm33-m0/emp3r0r/compare/v1.44.3...v1.44.4) (2025-01-05)
+
+
+### Bug Fixes
+
+* disable automatic `vaccine` download, it should be run when needed ([20037a4](https://github.com/jm33-m0/emp3r0r/commit/20037a40368efde4fce8d6686284062d6fbd76a0))
+* ELF header parser ([c037902](https://github.com/jm33-m0/emp3r0r/commit/c0379023ad40f6b633600f7465034fd12de3b195))
+* program header parser should run only once ([7c8940a](https://github.com/jm33-m0/emp3r0r/commit/7c8940af4e24505a7c612ba6ee9cf6b78f088e6b))
+* unable to find agent executable file when run from loaders (eg. shared lib) ([1140a3b](https://github.com/jm33-m0/emp3r0r/commit/1140a3bc56e08c41f66b30eb9383138b6a6d5af1))
+* verify encrypted config data before using ([f716bc6](https://github.com/jm33-m0/emp3r0r/commit/f716bc689cdbdf5f7fdcc23c47c1bb12b364a8b6))
+
 ## [1.44.3](https://github.com/jm33-m0/emp3r0r/compare/v1.44.2...v1.44.3) (2025-01-03)
 
 
