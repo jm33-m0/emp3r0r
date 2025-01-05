@@ -272,8 +272,6 @@ func ParseELF64(reader *bytes.Reader, ident [16]byte) (*ELF64Header, error) {
 		return nil, err
 	}
 
-	header.Print()
-
 	// Read program headers
 	headers, err := parseProgramHeaders(reader, int64(header.Phoff), int(header.Phnum), ELFCLASS64)
 	if err != nil {
@@ -298,8 +296,6 @@ func ParseELF32(reader *bytes.Reader, ident [16]byte) (*ELF32Header, error) {
 		log.Printf("Failed to read ELF32 header: %v", err)
 		return nil, err
 	}
-
-	header.Print()
 
 	// Read program headers
 	headers, err := parseProgramHeaders(reader, int64(header.Phoff), int(header.Phnum), ELFCLASS32)
