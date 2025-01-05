@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -79,7 +80,7 @@ func crossPlatformDumpSelfMem() (memdata map[int64][]byte, err error) {
 		if err != nil {
 			log.Printf("%s: failed to parse start", line)
 		}
-		if start < 0 || start > int64(^uintptr(0)) {
+		if start < 0 || start > int64(^uint64(0)>>1) {
 			log.Printf("%s: start address out of bounds", line)
 			continue
 		}
@@ -87,7 +88,7 @@ func crossPlatformDumpSelfMem() (memdata map[int64][]byte, err error) {
 		if err != nil {
 			log.Printf("%s: failed to parse end", line)
 		}
-		if end < 0 || end > int64(^uintptr(0)) {
+		if end < 0 || end > math.MaxInt64 {
 			log.Printf("%s: end address out of bounds", line)
 			continue
 		}
