@@ -45,14 +45,7 @@ func FindEmp3r0rELFInMem() (err error) {
 				log.Printf("Parse ELF headers: %v", err)
 				continue
 			}
-			elf64Header := new(exe_utils.ELF64Header)
-			ok := false
-			if elf64Header, ok = header.(*exe_utils.ELF64Header); ok {
-				log.Printf("Found ELF64 header: %v", elf64Header)
-			} else if elf32Header, ok := header.(*exe_utils.ELF32Header); ok {
-				log.Printf("Found ELF32 header: %v, not supported, aborting", elf32Header)
-				return fmt.Errorf("ELF32 not supported")
-			}
+			header.Print()
 
 			// start_of_current_region reading from base
 			current_region := mem_regions[base]

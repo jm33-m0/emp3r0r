@@ -12,13 +12,11 @@ func main() {
 		panic(err)
 	}
 
-	headers, err := exe_utils.ParseELFHeaders(elf_data)
+	h, err := exe_utils.ParseELFHeaders(elf_data)
 	if err != nil {
 		panic(err)
 	}
 
 	// Print ELF headers
-	if h, ok := headers.(*exe_utils.ELF64Header); ok {
-		h.Print()
-	}
+	h.Print()
 }

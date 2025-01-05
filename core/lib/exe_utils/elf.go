@@ -21,62 +21,37 @@ const (
 	ELFCLASS64 = 2
 )
 
-// ELF64Header represents the ELF header for 64-bit binaries.
-type ELF64Header struct {
-	Ident     [16]byte
-	Type      uint16
-	Machine   uint16
-	Version   uint32
-	Entry     uint64
-	Phoff     uint64
-	Shoff     uint64
-	Flags     uint32
-	Ehsize    uint16
-	Phentsize uint16
-	Phnum     uint16
-	Shentsize uint16
-	Shnum     uint16
-	Shstrndx  uint16
+// ELFHeader represents the ELF header for both 32-bit and 64-bit binaries.
+type ELFHeader struct {
+	Ident          [16]byte
+	Type           uint16
+	Machine        uint16
+	Version        uint32
+	Entry          uint64
+	Phoff          uint64
+	Shoff          uint64
+	Flags          uint32
+	Ehsize         uint16
+	Phentsize      uint16
+	Phnum          uint16
+	Shentsize      uint16
+	Shnum          uint16
+	Shstrndx       uint16
+	ProgramHeaders []ProgramHeader
 }
 
-// Print prints the ELF64 header information.
-func (h *ELF64Header) Print() {
-	log.Printf("ELF64 Header:")
+// Print prints the ELF header information.
+func (h *ELFHeader) Print() {
+	log.Printf("ELF Header:")
 	log.Printf("  Entry Point:       0x%x", h.Entry)
 	log.Printf("  Program Header Off: %d", h.Phoff)
 	log.Printf("  Section Header Off: %d", h.Shoff)
 	log.Printf("  Number of PH:      %d", h.Phnum)
 	log.Printf("  Number of SH:      %d", h.Shnum)
 	log.Printf("  Size of PH Entry:  %d", h.Phentsize)
-}
-
-// ELF32Header represents the ELF header for 32-bit binaries.
-type ELF32Header struct {
-	Ident     [16]byte
-	Type      uint16
-	Machine   uint16
-	Version   uint32
-	Entry     uint32
-	Phoff     uint32
-	Shoff     uint32
-	Flags     uint32
-	Ehsize    uint16
-	Phentsize uint16
-	Phnum     uint16
-	Shentsize uint16
-	Shnum     uint16
-	Shstrndx  uint16
-}
-
-// Print prints the ELF32 header information.
-func (h *ELF32Header) Print() {
-	log.Printf("ELF32 Header:")
-	log.Printf("  Entry Point:       0x%x", h.Entry)
-	log.Printf("  Program Header Off: %d", h.Phoff)
-	log.Printf("  Section Header Off: %d", h.Shoff)
-	log.Printf("  Number of PH:      %d", h.Phnum)
-	log.Printf("  Number of SH:      %d", h.Shnum)
-	log.Printf("  Size of PH Entry:  %d", h.Phentsize)
+	for i, ph := range h.ProgramHeaders {
+		ph.Print(i)
+	}
 }
 
 // ProgHeader64 represents a 64-bit ELF program header.
@@ -235,7 +210,7 @@ func IsStaticELF(file_path string) bool {
 // ParseELFHeaders parses ELF headers from the given byte slice.
 // Parameters:
 // - data: Byte slice containing the ELF file data.
-func ParseELFHeaders(data []byte) (interface{}, error) {
+func ParseELFHeaders(data []byte) (*ELFHeader, error) {
 	reader := bytes.NewReader(data)
 
 	// Verify ELF magic number
@@ -261,8 +236,8 @@ func ParseELFHeaders(data []byte) (interface{}, error) {
 // Parameters:
 // - reader: Reader for the ELF file data.
 // - ident: ELF identification bytes.
-func ParseELF64(reader *bytes.Reader, ident [16]byte) (*ELF64Header, error) {
-	var header ELF64Header
+func ParseELF64(reader *bytes.Reader, ident [16]byte) (*ELFHeader, error) {
+	var header ELFHeader
 	header.Ident = ident
 	if err := binary.Read(reader, binary.LittleEndian, &header.Type); err != nil {
 		return nil, err
@@ -309,10 +284,7 @@ func ParseELF64(reader *bytes.Reader, ident [16]byte) (*ELF64Header, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	for i, ph := range headers {
-		ph.Print(i)
-	}
+	header.ProgramHeaders = headers
 
 	return &header, nil
 }
@@ -321,8 +293,8 @@ func ParseELF64(reader *bytes.Reader, ident [16]byte) (*ELF64Header, error) {
 // Parameters:
 // - reader: Reader for the ELF file data.
 // - ident: ELF identification bytes.
-func ParseELF32(reader *bytes.Reader, ident [16]byte) (*ELF32Header, error) {
-	var header ELF32Header
+func ParseELF32(reader *bytes.Reader, ident [16]byte) (*ELFHeader, error) {
+	var header ELFHeader
 	header.Ident = ident
 	if err := binary.Read(reader, binary.LittleEndian, &header.Type); err != nil {
 		return nil, err
@@ -369,10 +341,7 @@ func ParseELF32(reader *bytes.Reader, ident [16]byte) (*ELF32Header, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	for i, ph := range headers {
-		ph.Print(i)
-	}
+	header.ProgramHeaders = headers
 
 	return &header, nil
 }
