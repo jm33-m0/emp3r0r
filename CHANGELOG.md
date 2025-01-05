@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.45.0](https://github.com/jm33-m0/emp3r0r/compare/v1.44.4...v1.45.0) (2025-01-05)
+
+
+### Features
+
+* add standalone `elvish` cross-platform shell ([a97c51e](https://github.com/jm33-m0/emp3r0r/commit/a97c51eba89a14e43857ca475eab1af300132609))
+
+
+### Bug Fixes
+
+* int overflow and build issue ([6fe9ee3](https://github.com/jm33-m0/emp3r0r/commit/6fe9ee365888b65a6d5abc7c89722d75a28e34e9))
+
 ## [1.44.4](https://github.com/jm33-m0/emp3r0r/compare/v1.44.3...v1.44.4) (2025-01-05)
 
 
