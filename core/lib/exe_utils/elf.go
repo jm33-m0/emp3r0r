@@ -241,11 +241,9 @@ func ParseELFHeaders(data []byte) (interface{}, error) {
 	// Verify ELF magic number
 	var ident [16]byte
 	if _, err := reader.Read(ident[:]); err != nil {
-		log.Printf("Failed to read ELF identification: %v", err)
 		return nil, err
 	}
 	if !bytes.Equal(ident[:4], []byte{0x7f, 'E', 'L', 'F'}) {
-		log.Printf("Not an ELF file (invalid magic number)")
 		return nil, fmt.Errorf("invalid ELF magic number")
 	}
 
@@ -256,7 +254,6 @@ func ParseELFHeaders(data []byte) (interface{}, error) {
 	} else if class == ELFCLASS32 {
 		return ParseELF32(reader, ident)
 	}
-	log.Printf("Unsupported ELF class: %v", class)
 	return nil, fmt.Errorf("unsupported ELF class: %v", class)
 }
 
@@ -268,7 +265,42 @@ func ParseELF64(reader *bytes.Reader, ident [16]byte) (*ELF64Header, error) {
 	var header ELF64Header
 	header.Ident = ident
 	if err := binary.Read(reader, binary.LittleEndian, &header.Type); err != nil {
-		log.Printf("Failed to read ELF64 header: %v", err)
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Machine); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Version); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Entry); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Phoff); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Shoff); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Flags); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Ehsize); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Phentsize); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Phnum); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Shentsize); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Shnum); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Shstrndx); err != nil {
 		return nil, err
 	}
 
@@ -293,7 +325,42 @@ func ParseELF32(reader *bytes.Reader, ident [16]byte) (*ELF32Header, error) {
 	var header ELF32Header
 	header.Ident = ident
 	if err := binary.Read(reader, binary.LittleEndian, &header.Type); err != nil {
-		log.Printf("Failed to read ELF32 header: %v", err)
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Machine); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Version); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Entry); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Phoff); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Shoff); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Flags); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Ehsize); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Phentsize); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Phnum); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Shentsize); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Shnum); err != nil {
+		return nil, err
+	}
+	if err := binary.Read(reader, binary.LittleEndian, &header.Shstrndx); err != nil {
 		return nil, err
 	}
 
@@ -318,7 +385,6 @@ func ParseELF32(reader *bytes.Reader, ident [16]byte) (*ELF32Header, error) {
 // - elfClass: ELF class (32-bit or 64-bit).
 func parseProgramHeaders(reader *bytes.Reader, phOff int64, phNum int, elfClass byte) ([]ProgramHeader, error) {
 	if _, err := reader.Seek(phOff, 0); err != nil {
-		log.Printf("Failed to seek to program headers: %v", err)
 		return nil, err
 	}
 
@@ -328,7 +394,6 @@ func parseProgramHeaders(reader *bytes.Reader, phOff int64, phNum int, elfClass 
 		if elfClass == ELFCLASS64 {
 			var ph64 ProgHeader64
 			if err := binary.Read(reader, binary.LittleEndian, &ph64); err != nil {
-				log.Printf("Failed to read program header: %v", err)
 				return nil, err
 			}
 			ph = ProgramHeader{
@@ -344,7 +409,6 @@ func parseProgramHeaders(reader *bytes.Reader, phOff int64, phNum int, elfClass 
 		} else {
 			var ph32 ProgHeader32
 			if err := binary.Read(reader, binary.LittleEndian, &ph32); err != nil {
-				log.Printf("Failed to read program header: %v", err)
 				return nil, err
 			}
 			ph = ProgramHeader{
