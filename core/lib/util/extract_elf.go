@@ -21,15 +21,10 @@ func FindEmp3r0rELFInMem() (err error) {
 		err = fmt.Errorf("cannot dump self memory: %v", err)
 		return
 	}
+	elf_header := new(exe_utils.ELFHeader)
 
-	parseMemRegions := func(mem_region []byte, base int64) (start, end int64, err error) {
-		// parse ELF headers
-		header, err := exe_utils.ParseELFHeaders(mem_region)
-		if err != nil {
-			log.Printf("Parse ELF headers: %v", err)
-			return
-		}
-		for _, p := range header.ProgramHeaders {
+	parseMemRegions := func(base int64) (start, end int64, err error) {
+		for _, p := range elf_header.ProgramHeaders {
 			if p.Vaddr == uint64(base) {
 				start = int64(p.Vaddr)
 				end = start + int64(p.Filesz)
@@ -56,19 +51,19 @@ func FindEmp3r0rELFInMem() (err error) {
 			log.Printf("Found emp3r0r ELF in memory region 0x%x", base)
 
 			// parse ELF headers
-			header, err := exe_utils.ParseELFHeaders(mem_region)
+			elf_header, err = exe_utils.ParseELFHeaders(mem_region)
 			if err != nil {
 				log.Printf("Parse ELF headers: %v", err)
 				continue
 			}
-			header.Print()
+			elf_header.Print()
 
 			// start_of_current_region reading from base
 			current_region := mem_regions[base]
 			start_of_current_region := base // current pointer
 			end_of_current_region := start_of_current_region + int64(len(current_region))
 			// refine the start/end of current region using program headers
-			start, end, err := parseMemRegions(current_region, start_of_current_region)
+			start, end, err := parseMemRegions(start_of_current_region)
 			if err != nil {
 				log.Printf("parseMemRegions: %v", err)
 				continue
@@ -83,7 +78,7 @@ func FindEmp3r0rELFInMem() (err error) {
 			current_region = mem_regions[start_of_current_region]
 			end_of_current_region = start_of_current_region + int64(len(current_region))
 			// refine the start/end of current region using program headers
-			start, end, err = parseMemRegions(current_region, start_of_current_region)
+			start, end, err = parseMemRegions(start_of_current_region)
 			if err != nil {
 				log.Printf("parseMemRegions: %v", err)
 				continue
@@ -98,7 +93,7 @@ func FindEmp3r0rELFInMem() (err error) {
 			current_region = mem_regions[start_of_current_region]
 			end_of_current_region = start_of_current_region + int64(len(current_region))
 			// refine the start/end of current region using program headers
-			start, end, err = parseMemRegions(current_region, start_of_current_region)
+			start, end, err = parseMemRegions(start_of_current_region)
 			if err != nil {
 				log.Printf("parseMemRegions: %v", err)
 				continue
