@@ -1,0 +1,15 @@
+{
+    "name": "elvish",
+    "exec": "elvish",
+    "platform": "Linux",
+    "interactive": true,
+    "author": "jm33-ng",
+    "date": "2025-01-06",
+    "comment": "Run Elvish cross-platform interactive shell",
+    "options": {
+        "args": [
+            "--",
+            "run elvish with this commandline arg"
+        ]
+    }
+}
