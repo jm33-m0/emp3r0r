@@ -406,7 +406,7 @@ func CliListOptions() {
 	table.SetBorder(true)
 	table.SetRowLine(true)
 	table.SetAutoWrapText(true)
-	table.SetColWidth(20)
+	table.SetColWidth(50)
 
 	// color
 	table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
@@ -417,27 +417,22 @@ func CliListOptions() {
 		tablewriter.Colors{tablewriter.FgBlueColor})
 
 	// fill table
-	module_help, is_help_exist := emp3r0r_data.ModuleHelp[CurrentMod]
+	module_obj := emp3r0r_data.Modules[CurrentMod]
 	for k, v := range opts {
 		help := "N/A"
 		if k == "module" {
 			help = "Selected module"
-		}
-		if k == "target" {
+		} else if k == "target" {
 			help = "Selected target"
-		}
-		if is_help_exist {
-			h, ok := module_help[k]
-			if ok {
-				help = h
-			}
+		} else if len(module_obj.Options) > 0 {
+			help = strings.Join(module_obj.Options[k], " ")
 		}
 
 		tdata = append(tdata,
 			[]string{
-				util.SplitLongLine(k, 20),
-				util.SplitLongLine(help, 20),
-				util.SplitLongLine(v, 20),
+				util.SplitLongLine(k, 50),
+				util.SplitLongLine(help, 50),
+				util.SplitLongLine(v, 50),
 			})
 	}
 	table.AppendBulk(tdata)
@@ -541,19 +536,19 @@ func CliPrettyPrint(header1, header2 string, map2write *map[string]string) {
 	table.SetBorder(true)
 	table.SetRowLine(true)
 	table.SetAutoWrapText(true)
-	table.SetColWidth(20)
+	table.SetColWidth(50)
 
 	// color
 	table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
 		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor})
 
-	table.SetColumnColor(tablewriter.Colors{tablewriter.FgHiBlueColor},
+	table.SetColumnColor(tablewriter.Colors{tablewriter.FgBlueColor},
 		tablewriter.Colors{tablewriter.FgBlueColor})
 
 	// fill table
 	for c1, c2 := range *map2write {
 		tdata = append(tdata,
-			[]string{util.SplitLongLine(c1, 20), util.SplitLongLine(c2, 20)})
+			[]string{util.SplitLongLine(c1, 50), util.SplitLongLine(c2, 50)})
 	}
 	table.AppendBulk(tdata)
 	table.Render()

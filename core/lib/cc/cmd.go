@@ -139,9 +139,9 @@ func CmdHandler(cmd string) (err error) {
 				UpdateOptions(CurrentMod)
 				CliPrintInfo("Using module %s", strconv.Quote(CurrentMod))
 				ModuleDetails(CurrentMod)
-				description, exists := emp3r0r_data.ModuleComments[CurrentMod]
+				mod, exists := emp3r0r_data.Modules[CurrentMod]
 				if exists {
-					CliPrint("%s", description)
+					CliPrint("%s", mod.Comment)
 				}
 				CliListOptions()
 
@@ -180,18 +180,16 @@ func CmdHelp(mod string) {
 		return
 	}
 
-	for modname, modhelp := range emp3r0r_data.ModuleComments {
-		if mod == modname {
-			exists := false
-			help, exists = emp3r0r_data.ModuleHelp[modname]
-			if !exists {
-				help = map[string]string{"<N/A>": modhelp}
-			}
-			for m, h := range emp3r0r_data.ModuleComments {
-				if m == mod {
-					CliPrint("\n%s", h)
+	for modname, modObj := range emp3r0r_data.Modules {
+		if mod == modObj.Name {
+			if len(modObj.Options) > 0 {
+				for opt, val_help := range modObj.Options {
+					help[opt] = strings.Join(val_help, " ")
 				}
+			} else {
+				help[modname] = "No options"
 			}
+			CliPrint("\n%s", modObj.Comment)
 			CliPrettyPrint("Option", "Help", &help)
 			return
 		}

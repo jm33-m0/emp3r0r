@@ -108,84 +108,208 @@ var InjectorMethods = map[string]string{
 	"shared_library": "Inject a shared library, if no library is specified, it will inject loader.so (ELF loader that runs emp3r0r agent)",
 }
 
-// Module help info, ls_modules shows this
-var ModuleComments = map[string]string{
-	ModGenAgent:     "Build agent for different OS/arch with customized options, will generate executables w/wo UPX packed, shellcode (Windows), or shared library (Linux)",
-	ModCMD_EXEC:     "Run a single command on one or more targets",
-	ModCLEAN_LOG:    "Delete lines containing keyword from *tmp logs",
-	ModLPE_SUGGEST:  "Run linux-smart-enumeration or linux exploit suggester",
-	ModPERSISTENCE:  "Get persistence via built-in methods (use with caution, choose one method that suits the target)",
-	ModPROXY:        "Start a socks proxy on target host, and use it locally on C2 side, so you can access network resources on agent side",
-	ModPORT_FWD:     "Port mapping from agent to CC (or vice versa), via HTTP2 (or other) tunnel",
-	ModSHELL:        "Bring your own shell program to run on target, or run the existing shell program (BAD OPSEC, please use custom shells)",
-	ModVACCINE:      "Vaccine helps you install additional tools on target system",
-	ModINJECTOR:     "Inject shellcode/loader.so into a running process",
-	ModBring2CC:     "Bring arbitrary agent to CC (through current target), useful when agent is unable to connect to CC directly",
-	ModGDB:          "Remote gdbserver, debug anything",
-	ModStager:       "Generate a stager for staged payload delivering (BAD OPSEC, please use custom stagers with shellcode agent in Windows and shared library in Linux)",
-	ModSSHHarvester: "Harvest clear-text password automatically from OpenSSH server process",
-	ModListener:     "Start a listener to serve stagers or regular files, useful when you have a foothold on a machine and want to deliver a payload to other targets in the same network",
+// ModConfig stores module config data
+type ModConfig struct {
+	Name          string `json:"name"`        // Display as this name
+	Exec          string `json:"exec"`        // Run this executable file
+	InMemory      bool   `json:"in_memory"`   // run this module in memory (for now ps1 is supported)
+	Platform      string `json:"platform"`    // targeting which OS? Linux/Windows
+	IsInteractive bool   `json:"interactive"` // whether run as a shell or not, eg. python, bettercap
+	Author        string `json:"author"`      // by whom
+	Date          string `json:"date"`        // when did you write it
+	Comment       string `json:"comment"`     // describe your module in one line
+	Path          string `json:"path"`        // where is this module stored? eg. ~/.emp3r0r/modules
+
+	// option: [value, help]
+	// eg.
+	// "option you see in emp3r0r console": ["a parameter of your module", "describe how to use this parameter"]
+	Options map[string][]string `json:"options"`
 }
 
-// Module help for options, does not include every module since not all modules need args
-// help module shows this
-var ModuleHelp = map[string]map[string]string{
+// Module help info and options
+var Modules = map[string]*ModConfig{
 	ModGenAgent: {
-		"os":                "Target OS, available OS: linux, windows, dll",
-		"arch":              "Target architecture, available arch: amd64, 386, arm, arm64, etc",
-		"cc_host":           "CC host (IP/domain name)",
-		"cc_indicator":      "CC indicator, eg. https://github.com/xxx/xxx/releases/download/xxx/xx.txt",
-		"indicator_text":    "Indicator text, eg. emp3r0r",
-		"ncsi":              "Use NCSI (Network Connectivity Status Indicator) to check internet access",
-		"cdn_proxy":         "Use CDN as C2 transport, eg. wss://yourcdn.com/yourpath",
-		"shadowsocks":       "Use shadowsocks as C2 transport, if you want to use KCP, please select with_kcp",
-		"c2transport_proxy": "Use a proxy for C2 transport, eg. socks5://127.0.0.1:9050",
-		"auto_proxy":        "Use auto proxy server for bring2cc and so on (will enable UDP broadcast)",
-		"autoproxy_timeout": "Auto proxy timeout in seconds",
-		"doh_server":        "Use DNS over HTTPS (DoH) for DNS, eg. https://dns.google/dns-query",
-	},
-	ModPERSISTENCE: {
-		"method": fmt.Sprintf("Persistence method: profiles: %s; cron: %s; patcher: %s", PersistMethods["profiles"], PersistMethods["cron"], PersistMethods["patcher"]),
+		Name:          "gen_agent",
+		Exec:          "built-in",
+		Platform:      "Generic",
+		IsInteractive: false,
+		Author:        "jm33-ng",
+		Date:          "2020-01-25",
+		Comment:       "Build agent for different OS/arch with customized options",
+		Options: map[string][]string{
+			"os":                {"Target OS, available OS: linux, windows, dll"},
+			"arch":              {"Target architecture, available arch: amd64, 386, arm, arm64, etc"},
+			"cc_host":           {"CC host (IP/domain name)"},
+			"cc_indicator":      {"CC indicator, eg. https://github.com/xxx/xxx/releases/download/xxx/xx.txt"},
+			"indicator_text":    {"Indicator text, eg. emp3r0r"},
+			"ncsi":              {"Use NCSI (Network Connectivity Status Indicator) to check internet access"},
+			"cdn_proxy":         {"Use CDN as C2 transport, eg. wss://yourcdn.com/yourpath"},
+			"shadowsocks":       {"Use shadowsocks as C2 transport, if you want to use KCP, please select with_kcp"},
+			"c2transport_proxy": {"Use a proxy for C2 transport, eg. socks5://127.0.0.1:9050"},
+			"auto_proxy":        {"Use auto proxy server for bring2cc and so on (will enable UDP broadcast)"},
+			"autoproxy_timeout": {"Auto proxy timeout in seconds"},
+			"doh_server":        {"Use DNS over HTTPS (DoH) for DNS, eg. https://dns.google/dns-query"},
+		},
 	},
 	ModCMD_EXEC: {
-		"cmd_to_exec": "Press TAB for some hints",
+		Name:          "cmd_exec",
+		Exec:          "built-in",
+		Platform:      "Generic",
+		IsInteractive: false,
+		Author:        "jm33-ng",
+		Date:          "2020-01-25",
+		Comment:       "Run a single command on one or more targets",
+		Options: map[string][]string{
+			"cmd_to_exec": {"Press TAB for some hints"},
+		},
 	},
 	ModCLEAN_LOG: {
-		"keyword": "Delete all log entries containing this keyword",
+		Name:          "clean_log",
+		Exec:          "built-in",
+		Platform:      "Linux",
+		IsInteractive: false,
+		Author:        "jm33-ng",
+		Date:          "2020-01-25",
+		Comment:       "Delete lines containing keyword from xtmp logs",
+		Options: map[string][]string{
+			"keyword": {"Delete all log entries containing this keyword"},
+		},
 	},
 	ModLPE_SUGGEST: {
-		"lpe_helper": "Which LPE helper to use, available helpers: lpe_les (Linux exploit suggester), lpe_lse (Linux smart enumeration), lpe_linpeas (PEASS-ng, works on Linux), lpe_winpeas (PEASS-ng, works on Windows",
+		Name:          "lpe_suggest",
+		Exec:          "built-in",
+		Platform:      "Generic",
+		IsInteractive: false,
+		Author:        "jm33-ng",
+		Date:          "2020-01-25",
+		Comment:       "Run linux-smart-enumeration or linux exploit suggester",
+		Options: map[string][]string{
+			"lpe_helper": {"Which LPE helper to use, available helpers: lpe_les (Linux exploit suggester), lpe_lse (Linux smart enumeration), lpe_linpeas (PEASS-ng, works on Linux), lpe_winpeas (PEASS-ng, works on Windows"},
+		},
+	},
+	ModPERSISTENCE: {
+		Name:          "get_persistence",
+		Exec:          "built-in",
+		Platform:      "Linux",
+		IsInteractive: false,
+		Author:        "jm33-ng",
+		Date:          "2020-01-25",
+		Comment:       "Get persistence via built-in methods",
+		Options: map[string][]string{
+			"method": {fmt.Sprintf("Persistence method: profiles: %s; cron: %s; patcher: %s", PersistMethods["profiles"], PersistMethods["cron"], PersistMethods["patcher"])},
+		},
 	},
 	ModPROXY: {
-		"port":   "Port of our local proxy server",
-		"status": "Turn proxy on/off",
+		Name:          "run_proxy",
+		Exec:          "built-in",
+		Platform:      "Generic",
+		IsInteractive: false,
+		Author:        "jm33-ng",
+		Date:          "2020-01-25",
+		Comment:       "Start a socks proxy on target host",
+		Options: map[string][]string{
+			"port":   {"Port of our local proxy server"},
+			"status": {"Turn proxy on/off"},
+		},
 	},
 	ModPORT_FWD: {
-		"to":          "Address:Port (to forward to) on agent/CC side",
-		"listen_port": "Listen port on CC/agent side",
-		"switch":      "Turn port mapping on/off, or use `reverse` mapping",
-		"protocol":    "Forward to TCP or UDP port on agent side",
+		Name:          "port_fwd",
+		Exec:          "built-in",
+		Platform:      "Generic",
+		IsInteractive: false,
+		Author:        "jm33-ng",
+		Date:          "2020-01-25",
+		Comment:       "Port mapping from agent to CC",
+		Options: map[string][]string{
+			"to":          {"Address:Port (to forward to) on agent/CC side"},
+			"listen_port": {"Listen port on CC/agent side"},
+			"switch":      {"Turn port mapping on/off, or use `reverse` mapping"},
+			"protocol":    {"Forward to TCP or UDP port on agent side"},
+		},
 	},
 	ModSHELL: {
-		"shell": "Shell program to run",
-		"args":  "Command line args of the shell program",
-		"port":  "The (sshd) port that our shell will be using",
+		Name:          "interactive_shell",
+		Exec:          "built-in",
+		Platform:      "Generic",
+		IsInteractive: true,
+		Author:        "jm33-ng",
+		Date:          "2020-01-25",
+		Comment:       "Bring your own shell program to run on target",
+		Options: map[string][]string{
+			"shell": {"Shell program to run, eg. /bin/bash. Please use `elvish` module or upload a custom shell for opsec reasons. Default `bash` shell can be installed via module `vaccine`"},
+			"args":  {"Command line args of the shell program"},
+			"port":  {"The (sshd) port that our shell will be using"},
+		},
 	},
 	ModINJECTOR: {
-		"pid":    "Target process PID, set to 0 to start a new process (sleep)",
-		"method": fmt.Sprintf("Injection method, available methods: shellcode: %s; shared_library: %s", InjectorMethods["shellcode"], InjectorMethods["shared_library"]),
+		Name:          "injector",
+		Exec:          "built-in",
+		Platform:      "Linux",
+		IsInteractive: false,
+		Author:        "jm33-ng",
+		Date:          "2020-01-25",
+		Comment:       "Inject shellcode/loader.so into a running process",
+		Options: map[string][]string{
+			"pid":    {"Target process PID, set to 0 to start a new process (sleep)"},
+			"method": {fmt.Sprintf("Injection method, available methods: shellcode: %s; shared_library: %s", InjectorMethods["shellcode"], InjectorMethods["shared_library"])},
+		},
 	},
 	ModBring2CC: {
-		"addr": "Target host to proxy, we will connect to it and proxy it out",
+		Name:          "bring2cc",
+		Exec:          "built-in",
+		Platform:      "Generic",
+		IsInteractive: false,
+		Author:        "jm33-ng",
+		Date:          "2020-01-25",
+		Comment:       "Bring arbitrary agent to CC",
+		Options: map[string][]string{
+			"addr": {"Target host to proxy, we will connect to it and proxy it out"},
+		},
 	},
 	ModStager: {
-		"type":       "Stager format, eg. bash script",
-		"agent_path": "Path to the agent binary that will be downloaded and executed on target hosts",
+		Name:          "stager",
+		Exec:          "built-in",
+		Platform:      "Generic",
+		IsInteractive: false,
+		Author:        "jm33-ng",
+		Date:          "2020-01-25",
+		Comment:       "Generate a stager for staged payload delivering",
+		Options: map[string][]string{
+			"type":       {"Stager format, eg. bash script"},
+			"agent_path": {"Path to the agent binary that will be downloaded and executed on target hosts"},
+		},
 	},
 	ModListener: {
-		"payload":  "The payload to serve, eg. ./stager",
-		"listener": "Listener type, eg. http_bare, http_aes_compressed",
-		"port":     "Port to listen on, eg. 8080",
+		Name:          "listener",
+		Exec:          "built-in",
+		Platform:      "Generic",
+		IsInteractive: false,
+		Author:        "jm33-ng",
+		Date:          "2020-01-25",
+		Comment:       "Start a listener to serve stagers or regular files",
+		Options: map[string][]string{
+			"payload":  {"The payload to serve, eg. ./stager"},
+			"listener": {"Listener type, eg. http_bare, http_aes_compressed"},
+			"port":     {"Port to listen on, eg. 8080"},
+		},
+	},
+	ModSSHHarvester: {
+		Name:          "ssh_harvester",
+		Exec:          "built-in",
+		Platform:      "Linux",
+		IsInteractive: false,
+		Author:        "jm33-ng",
+		Date:          "2020-01-25",
+		Comment:       "Harvest clear-text password automatically from OpenSSH server process",
+	},
+	ModGDB: {
+		Name:          "gdbserver",
+		Exec:          "built-in",
+		Platform:      "Linux",
+		IsInteractive: false,
+		Author:        "jm33-ng",
+		Date:          "2020-01-25",
+		Comment:       "Remote gdbserver",
 	},
 }
 

@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fatih/color"
 	"github.com/google/uuid"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -34,28 +33,12 @@ import (
 //	        "args": ["--checksec", "run les.sh with this commandline arg"]
 //	    }
 //	}
-type ModConfig struct {
-	Name          string `json:"name"`        // Display as this name
-	Exec          string `json:"exec"`        // Run this executable file
-	InMemory      bool   `json:"in_memory"`   // run this module in memory (for now ps1 is supported)
-	Platform      string `json:"platform"`    // targeting which OS? Linux/Windows
-	IsInteractive bool   `json:"interactive"` // whether run as a shell or not, eg. python, bettercap
-	Author        string `json:"author"`      // by whom
-	Date          string `json:"date"`        // when did you write it
-	Comment       string `json:"comment"`     // describe your module in one line
-	Path          string `json:"path"`        // where is this module stored? eg. ~/.emp3r0r/modules
-
-	// option: [value, help]
-	// eg.
-	// "option you see in emp3r0r console": ["a parameter of your module", "describe how to use this parameter"]
-	Options map[string][]string `json:"options"`
-}
 
 // stores module configs
-var ModuleConfigs = make(map[string]ModConfig, 1)
+var ModuleConfigs = make(map[string]emp3r0r_data.ModConfig, 1)
 
-// stores module names
-var ModuleNames = []string{}
+// stores module names for fuzzy search
+var ModuleNames = make(map[string]string)
 
 // moduleCustom run a custom module
 func moduleCustom() {
@@ -243,8 +226,11 @@ func InitModules() {
 			// module path, eg. ~/.emp3r0r/modules
 			config.Path = mod_dir
 
+			// add to module helpers
 			ModuleHelpers[config.Name] = moduleCustom
-			emp3r0r_data.ModuleComments[config.Name] = config.Comment
+
+			// add module meta data
+			emp3r0r_data.Modules[config.Name] = config
 
 			readConfigErr = updateModuleHelp(config)
 			if readConfigErr != nil {
@@ -256,8 +242,8 @@ func InitModules() {
 		}
 
 		// make []string for fuzzysearch
-		for name, comment := range emp3r0r_data.ModuleComments {
-			ModuleNames = append(ModuleNames, fmt.Sprintf("%s: %s", color.HiBlueString(name), comment))
+		for name, modObj := range emp3r0r_data.Modules {
+			ModuleNames[name] = modObj.Comment
 		}
 	}
 
@@ -270,7 +256,7 @@ func InitModules() {
 }
 
 // readModCondig read config.json of a module
-func readModCondig(file string) (pconfig *ModConfig, err error) {
+func readModCondig(file string) (pconfig *emp3r0r_data.ModConfig, err error) {
 	// read JSON
 	jsonData, err := os.ReadFile(file)
 	if err != nil {
@@ -278,7 +264,7 @@ func readModCondig(file string) (pconfig *ModConfig, err error) {
 	}
 
 	// parse the json
-	config := ModConfig{}
+	config := emp3r0r_data.ModConfig{}
 	err = json.Unmarshal(jsonData, &config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal JSON config: %v", err)
@@ -288,7 +274,7 @@ func readModCondig(file string) (pconfig *ModConfig, err error) {
 }
 
 // genStartScript reads config.json of a module and generates a start script to invoke the module
-func genStartScript(config *ModConfig, outfile string) error {
+func genStartScript(config *emp3r0r_data.ModConfig, outfile string) error {
 	module_exec_path := fmt.Sprintf("%s/%s/%s", config.Path, config.Name, config.Exec)
 	var builder strings.Builder
 
@@ -326,14 +312,14 @@ func genStartScript(config *ModConfig, outfile string) error {
 	return os.WriteFile(outfile, []byte(builder.String()), 0o600)
 }
 
-func updateModuleHelp(config *ModConfig) error {
-	help_map := make(map[string]string)
+func updateModuleHelp(config *emp3r0r_data.ModConfig) error {
+	help_map := make(map[string][]string)
 	for opt, val_help := range config.Options {
 		if len(val_help) < 2 {
 			return fmt.Errorf("%s config error: %s incomplete", config.Name, opt)
 		}
-		help_map[opt] = val_help[1]
-		emp3r0r_data.ModuleHelp[config.Name] = help_map
+		help_map[opt] = val_help
+		emp3r0r_data.Modules[config.Name].Options = help_map
 	}
 	return nil
 }

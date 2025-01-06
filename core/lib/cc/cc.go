@@ -465,7 +465,11 @@ func SetAgentLabel(a *emp3r0r_data.AgentSystemInfo) (label string) {
 
 // ListModules list all available modules
 func ListModules() {
-	CliPrettyPrint("Module Name", "Help", &emp3r0r_data.ModuleComments)
+	mod_comment_map := make(map[string]string)
+	for mod_name, mod := range emp3r0r_data.Modules {
+		mod_comment_map[mod_name] = mod.Comment
+	}
+	CliPrettyPrint("Module Name", "Help", &mod_comment_map)
 }
 
 // Send2Agent send MsgTunData to agent

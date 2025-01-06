@@ -4,6 +4,7 @@
 package cc
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -353,6 +354,19 @@ func ModuleSearch(cmd string) {
 		return
 	}
 	query := strings.Join(cmdSplit[1:], " ")
-	result := fuzzy.Find(query, ModuleNames)
-	CliPrintInfo("\n%s\n", strings.Join(result, "\n"))
+	search_targets := new([]string)
+	for name, comment := range ModuleNames {
+		*search_targets = append(*search_targets, fmt.Sprintf("%s: %s", name, comment))
+	}
+	result := fuzzy.Find(query, *search_targets)
+
+	// render results
+	search_results := make(map[string]string)
+	for _, r := range result {
+		r_split := strings.Split(r, ": ")
+		if len(r_split) == 2 {
+			search_results[r_split[0]] = r_split[1]
+		}
+	}
+	CliPrettyPrint("Module", "Comment", &search_results)
 }
