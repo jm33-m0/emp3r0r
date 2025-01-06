@@ -290,6 +290,20 @@ func UpdateOptions(modName string) (exist bool) {
 
 // ModuleRun run current module
 func ModuleRun() {
+	modObj := emp3r0r_data.Modules[CurrentMod]
+	if modObj == nil {
+		CliPrintError("ModuleRun: module %s not found", strconv.Quote(CurrentMod))
+		return
+	}
+	if CurrentTarget != nil {
+		target_os := CurrentTarget.GOOS
+		mod_os := strings.ToLower(modObj.Platform)
+		if mod_os != "generic" && target_os != mod_os {
+			CliPrintError("ModuleRun: module %s does not support %s", strconv.Quote(CurrentMod), target_os)
+			return
+		}
+	}
+
 	if CurrentMod == emp3r0r_data.ModCMD_EXEC {
 		if !CliYesNo("Run on all targets") {
 			CliPrintError("Target not specified")
