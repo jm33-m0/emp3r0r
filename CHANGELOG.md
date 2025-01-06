@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.45.1](https://github.com/jm33-m0/emp3r0r/compare/v1.45.0...v1.45.1) (2025-01-06)
+
+
+### Bug Fixes
+
+* check target OS compatibility before running modules ([aac0b85](https://github.com/jm33-m0/emp3r0r/commit/aac0b85b8771a4774dfc645efec10383c9645adf))
+* improve module management and code refactoring ([656a652](https://github.com/jm33-m0/emp3r0r/commit/656a652b7c4e5776bbcf0cc4a06f3d80491cef0e))
+* update `gen_agent` help ([5db7099](https://github.com/jm33-m0/emp3r0r/commit/5db7099eb6ee8530ac7a2ac44242e474611ea6a9))
+
 ## [1.45.0](https://github.com/jm33-m0/emp3r0r/compare/v1.44.4...v1.45.0) (2025-01-05)
 
 
