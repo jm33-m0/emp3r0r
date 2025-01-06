@@ -17,9 +17,16 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
+type SSH_SHELL_Mapping struct {
+	Shell   string                        // the shell to run, eg. bash, python
+	Agent   *emp3r0r_data.AgentSystemInfo // the agent this shell is connected to
+	PortFwd *PortFwdSession               // the port mapping for this shell session
+	ToPort  string                        // the port to connect to on the agent side, always the same as PortFwd.To's port
+}
+
 // shell - port mapping
 // one port for one shell
-var SSHShellPort = make(map[string]string)
+var SSHShellPort = make(map[string]*SSH_SHELL_Mapping)
 
 // SSHClient ssh to sshd server, with shell access in a new tmux window
 // shell: the executable to run, eg. bash, python
@@ -41,8 +48,16 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 			}
 		}
 	}
-	// we will open a elvish shell automatically, which can be used for SFTP
-	is_new_port_needed := (port == RuntimeConfig.SSHDShellPort && shell != "elvish")
+
+	// SSHDShellPort is reserved
+	is_new_port_needed := (port == RuntimeConfig.SSHDShellPort)
+	// check if port mapping is already open, if yes, use it
+	for s, mapping := range SSHShellPort {
+		if s == shell && mapping.Agent == CurrentTarget {
+			port = mapping.ToPort
+			is_new_port_needed = false
+		}
+	}
 
 	if !util.IsCommandExist("ssh") {
 		err = fmt.Errorf("ssh must be installed")
@@ -60,19 +75,19 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 		if !is_sftp {
 			SetOption([]string{"port", new_port})
 		}
-		CliPrintWarning("Switching to a new port %s since we are requesting a new shell (%s)", port, shell)
+		CliPrintWarning("Switching to a new port %s for shell (%s)", port, shell)
 	}
 	to := "127.0.0.1:" + port // decide what port/shell to connect to
 
 	// is port mapping already done?
-	exists := false
+	port_mapping_exists := false
 	for _, p := range PortFwds {
 		if p.Agent == CurrentTarget && p.To == to {
-			exists = true
-			for s, p := range SSHShellPort {
+			port_mapping_exists = true
+			for s, ssh_mapping := range SSHShellPort {
 				// one port for one shell
 				// if trying to open a different shell on the same port, change to a new port
-				if s != shell && p == port {
+				if s != shell && ssh_mapping.ToPort == port {
 					new_port := strconv.Itoa(util.RandInt(2048, 65535))
 					CliPrintWarning("Port %s has %s shell on it, restarting with a different port %s", port, s, new_port)
 					SetOption([]string{"port", new_port})
@@ -87,7 +102,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 		}
 	}
 
-	if !exists {
+	if !port_mapping_exists {
 		// start sshd server on target
 		cmd_id := uuid.NewString()
 		if args == "" {
@@ -134,6 +149,13 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
 		pf.Lport, pf.To = lport, to
 		go func() {
+			// remember the port mapping and shell and agent
+			SSHShellPort[shell] = &SSH_SHELL_Mapping{
+				Shell:   shell,
+				Agent:   CurrentTarget,
+				PortFwd: pf,
+				ToPort:  port,
+			}
 			err = pf.RunPortFwd()
 			if err != nil {
 				err = fmt.Errorf("PortFwd failed: %v", err)
@@ -147,21 +169,21 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 	}
 
 	// wait until the port mapping is ready
-	exists = false
+	port_mapping_exists = false
 wait:
 	for i := 0; i < 100; i++ {
-		if exists {
+		if port_mapping_exists {
 			break
 		}
 		time.Sleep(100 * time.Millisecond)
 		for _, p := range PortFwds {
 			if p.Agent == CurrentTarget && p.To == to {
-				exists = true
+				port_mapping_exists = true
 				break wait
 			}
 		}
 	}
-	if !exists {
+	if !port_mapping_exists {
 		err = errors.New("port mapping unsuccessful")
 		return
 	}
@@ -185,8 +207,6 @@ wait:
 		name = label
 	}
 
-	// remeber shell-port mapping
-	SSHShellPort[shell] = port
 	// if open in split tmux pane
 	if split {
 		if is_sftp {
