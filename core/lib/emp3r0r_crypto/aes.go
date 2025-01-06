@@ -1,4 +1,4 @@
-package crypto
+package emp3r0r_crypto
 
 import (
 	"bytes"

