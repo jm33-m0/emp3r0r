@@ -49,7 +49,7 @@ func getScriptExtension() string {
 
 func downloadAndVerifyModule(tarball, checksum string) error {
 	if tun.SHA256SumFile(tarball) != checksum {
-		if _, err := DownloadViaCC(tarball, tarball); err != nil {
+		if _, err := SmartDownload(tarball, tarball); err != nil {
 			return err
 		}
 	}
@@ -99,7 +99,7 @@ func runStartScript(startScript, modDir string) (string, error) {
 	os.Chdir(modDir)
 
 	// Download the script payload
-	payload, err := DownloadViaCC(startScript, "")
+	payload, err := SmartDownload(startScript, "")
 	if err != nil {
 		return "", fmt.Errorf("downloading %s: %w", startScript, err)
 	}
