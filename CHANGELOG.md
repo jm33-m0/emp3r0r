@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.45.2](https://github.com/jm33-m0/emp3r0r/compare/v1.45.1...v1.45.2) (2025-01-06)
+
+
+### Bug Fixes
+
+* improve downloading from C2, add checksum verification ([459bdab](https://github.com/jm33-m0/emp3r0r/commit/459bdabbc25187704f1be880f814a2087f5824d1))
+* redundant port mappings for SSH shells ([7c0da2b](https://github.com/jm33-m0/emp3r0r/commit/7c0da2b864356d853bf84880213c5cf7e2ee5df0))
+
 ## [1.45.1](https://github.com/jm33-m0/emp3r0r/compare/v1.45.0...v1.45.1) (2025-01-06)
 
 
