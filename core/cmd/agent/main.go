@@ -184,11 +184,6 @@ func main() {
 			os.Setenv("HOME", u.HomeDir)
 		}
 
-		// extract bash
-		err = agent.ExtractBashRC()
-		if err != nil {
-			log.Printf("[-] Cannot extract bash: %v", err)
-		}
 		emp3r0r_data.DefaultShell = fmt.Sprintf("%s/bash", agent.RuntimeConfig.UtilsPath)
 		if runtime.GOOS == "windows" {
 			emp3r0r_data.DefaultShell = "elvish"
