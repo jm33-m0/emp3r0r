@@ -49,13 +49,14 @@ func getScriptExtension() string {
 
 func downloadAndVerifyModule(tarball, checksum, download_addr string) error {
 	if tun.SHA256SumFile(tarball) != checksum {
-		if _, err := SmartDownload(download_addr, tarball, tarball, checksum); err != nil {
+		if _, err := SmartDownload(download_addr, util.FileBaseName(tarball), tarball, checksum); err != nil {
 			return err
 		}
 	}
 
 	if tun.SHA256SumFile(tarball) != checksum {
 		log.Print("Checksum failed, restarting...")
+		util.TakeABlink()
 		os.RemoveAll(tarball)
 		return downloadAndVerifyModule(tarball, checksum, download_addr) // Recursive call
 	}
