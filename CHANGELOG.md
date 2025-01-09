@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.46.0](https://github.com/jm33-m0/emp3r0r/compare/v1.45.2...v1.46.0) (2025-01-09)
+
+
+### Features
+
+* `file_downloader` that downloads files from agent hosted HTTP server, for data exfiltration, with checksum support ([969f153](https://github.com/jm33-m0/emp3r0r/commit/969f153ce72b6e4533d4f7cc682ff847887f5309))
+* `file_server` for file transfer between agents ([ad83344](https://github.com/jm33-m0/emp3r0r/commit/ad833443cca7314be2980edd9e7a46427fb644c2))
+
+
+### Bug Fixes
+
+* only extract `bashrc` when needed ([d51e78c](https://github.com/jm33-m0/emp3r0r/commit/d51e78c8d4b96748417c271c9abb23b0742985da))
+
 ## [1.45.2](https://github.com/jm33-m0/emp3r0r/compare/v1.45.1...v1.45.2) (2025-01-06)
 
 
