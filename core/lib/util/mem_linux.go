@@ -36,10 +36,10 @@ func ReadMemoryRegion(hProcess uintptr, address, size uintptr) (data []byte, err
 	return read_buf, nil
 }
 
-// crossPlatformDumpSelfMem dumps everything (readable) from the self process
+// DumpCurrentProcMem dumps everything (readable) from the self process
 // It will dump libraries as well, if any
 // This function is Linux only
-func crossPlatformDumpSelfMem() (memdata map[int64][]byte, err error) {
+func DumpCurrentProcMem() (memdata map[int64][]byte, err error) {
 	maps_file := fmt.Sprintf("/proc/%d/maps", os.Getpid())
 	mem_file := fmt.Sprintf("/proc/%d/mem", os.Getpid())
 	memdata = make(map[int64][]byte)

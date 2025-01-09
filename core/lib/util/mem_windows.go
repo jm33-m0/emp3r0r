@@ -129,7 +129,7 @@ func getBaseAddress(handle uintptr) uintptr {
 	return 0
 }
 
-func crossPlatformDumpSelfMem() (mem_data map[int64][]byte, err error) {
+func DumpCurrentProcMem() (mem_data map[int64][]byte, err error) {
 	mem_data = make(map[int64][]byte)
 	dlls, err := GetAllDLLs()
 	if err != nil {

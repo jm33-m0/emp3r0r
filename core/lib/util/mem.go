@@ -11,9 +11,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_crypto"
 )
 
-// EXE_MEM_FILE save the whole executable
-var EXE_MEM_FILE = make([]byte, 0)
-
 // ExtractData extract embedded data from args[0] or process memory
 func ExtractData() (data []byte, err error) {
 	data, err = DigEmbeddedDataFromExe()
@@ -136,5 +133,5 @@ func DigEmbededDataFromMem() (data []byte, err error) {
 
 // DumpSelfMem dump all mapped memory regions of current process
 func DumpSelfMem() (map[int64][]byte, error) {
-	return crossPlatformDumpSelfMem()
+	return DumpCurrentProcMem()
 }
