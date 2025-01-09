@@ -339,7 +339,7 @@ var Modules = map[string]*ModConfig{
 		Options: map[string][]string{
 			"download_addr": {"Download address, eg 10.1.1.1:8000"},
 			"path":          {"Path to the file (on server) to download, eg. /tmp/agent.exe"},
-			"checksum":      {"SHA256 checksum of the file, used to verify integrity"},
+			"checksum":      {"SHA256 checksum of the file, used to verify integrity, wont't check if empty"},
 		},
 	},
 }

