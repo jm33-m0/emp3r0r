@@ -209,7 +209,8 @@ func FileServer(port int, ctx context.Context, cancel context.CancelFunc) (err e
 	defer cancel()
 
 	// start HTTP server on local interface on port-1
-	listen_addr := fmt.Sprintf("127.0.0.1:%d", port-1)
+	http_port := util.RandInt(10000, 60000)
+	listen_addr := fmt.Sprintf("127.0.0.1:%d", http_port)
 	http.HandleFunc("/", handleClient)
 	server := &http.Server{Addr: listen_addr}
 
