@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.46.1](https://github.com/jm33-m0/emp3r0r/compare/v1.46.0...v1.46.1) (2025-01-09)
+
+
+### Bug Fixes
+
+* make it possible to download modules from specified agent file server ([4f178b5](https://github.com/jm33-m0/emp3r0r/commit/4f178b5f11b6c150498e26aa730302a3de3275b6))
+
 ## [1.46.0](https://github.com/jm33-m0/emp3r0r/compare/v1.45.2...v1.46.0) (2025-01-09)
 
 
