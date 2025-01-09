@@ -18,7 +18,12 @@ func moduleCmd() {
 			CliPrintError("moduleCmd: agent %s is not connected", target.Tag)
 			return
 		}
-		err := SendCmd(Options["cmd_to_exec"].Val, "", target)
+		cmdOpt, ok := Options["cmd_to_exec"]
+		if !ok {
+			CliPrintError("Option 'cmd_to_exec' not found")
+			return
+		}
+		err := SendCmd(cmdOpt.Val, "", target)
 		if err != nil {
 			CliPrintError("moduleCmd: %v", err)
 		}
@@ -63,9 +68,26 @@ func moduleShell() {
 	}
 
 	// options
-	shell := Options["shell"].Val
-	args := Options["args"].Val
-	port := Options["port"].Val
+	shellOpt, ok := Options["shell"]
+	if !ok {
+		CliPrintError("Option 'shell' not found")
+		return
+	}
+	shell := shellOpt.Val
+
+	argsOpt, ok := Options["args"]
+	if !ok {
+		CliPrintError("Option 'args' not found")
+		return
+	}
+	args := argsOpt.Val
+
+	portOpt, ok := Options["port"]
+	if !ok {
+		CliPrintError("Option 'port' not found")
+		return
+	}
+	port := portOpt.Val
 
 	// run
 	err := SSHClient(shell, args, port, false)

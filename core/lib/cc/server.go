@@ -48,7 +48,7 @@ func ShadowsocksServer() {
 	if err != nil {
 		CliFatalError("ShadowsocksServer: %v", err)
 	}
-	go KCPListenAndServe()
+	go KCPSSListenAndServe()
 }
 
 var (

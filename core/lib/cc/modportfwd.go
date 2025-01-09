@@ -13,11 +13,26 @@ import (
 )
 
 func modulePortFwd() {
-	switch Options["switch"].Val {
+	switchOpt, ok := Options["switch"]
+	if !ok {
+		CliPrintError("Option 'switch' not found")
+		return
+	}
+	switch switchOpt.Val {
 	case "off":
 		// ugly, i know, it will delete port mappings matching current lport-to combination
 		for id, session := range PortFwds {
-			if session.To == Options["to"].Val && session.Lport == Options["listen_port"].Val {
+			toOpt, ok := Options["to"]
+			if !ok {
+				CliPrintError("Option 'to' not found")
+				return
+			}
+			listenPortOpt, ok := Options["listen_port"]
+			if !ok {
+				CliPrintError("Option 'listen_port' not found")
+				return
+			}
+			if session.To == toOpt.Val && session.Lport == listenPortOpt.Val {
 				session.Cancel()     // cancel the PortFwd session
 				delete(PortFwds, id) // remove from port mapping list
 
@@ -33,7 +48,7 @@ func modulePortFwd() {
 				return
 			}
 			CliPrintError("Could not find port mapping (to %s, listening on %s)",
-				Options["to"].Val, Options["listen_port"].Val)
+				toOpt.Val, listenPortOpt.Val)
 		}
 	case "reverse": // expose a dest from CC to agent
 		var pf PortFwdSession
@@ -63,8 +78,19 @@ func modulePortFwd() {
 }
 
 func moduleProxy() {
-	port := Options["port"].Val
-	status := Options["status"].Val
+	portOpt, ok := Options["port"]
+	if !ok {
+		CliPrintError("Option 'port' not found")
+		return
+	}
+	port := portOpt.Val
+
+	statusOpt, ok := Options["status"]
+	if !ok {
+		CliPrintError("Option 'status' not found")
+		return
+	}
+	status := statusOpt.Val
 
 	// port-fwd
 	pf := new(PortFwdSession)

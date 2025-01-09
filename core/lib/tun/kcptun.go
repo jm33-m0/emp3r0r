@@ -485,7 +485,7 @@ func dial(config *Config, block kcp.BlockCrypt) (*kcp.UDPSession, error) {
 // kcp_server_port: KCP server listen port
 // password: Runtime password
 // salt: emp3r0r_data.MagicString
-func KCPTunServer(target, kcp_server_port, password, salt string) error {
+func KCPTunServer(target, kcp_server_port, password, salt string, ctx context.Context, cancel context.CancelFunc) error {
 	config := NewConfig("", target, kcp_server_port, password, salt)
 	if config.QPP {
 		minSeedLength := qpp.QPPMinimumSeedLength(8)
@@ -567,22 +567,28 @@ func KCPTunServer(target, kcp_server_port, password, salt string) error {
 		}
 
 		for {
-			if conn, err := lis.AcceptKCP(); err == nil {
-				LogInfo("remote address: %s", conn.RemoteAddr())
-				conn.SetStreamMode(true)
-				conn.SetWriteDelay(false)
-				conn.SetNoDelay(config.NoDelay, config.Interval, config.Resend, config.NoCongestion)
-				conn.SetMtu(config.MTU)
-				conn.SetWindowSize(config.SndWnd, config.RcvWnd)
-				conn.SetACKNoDelay(config.AckNodelay)
+			select {
+			case <-ctx.Done():
+				LogInfo("context cancelled, exiting listener loop")
+				return
+			default:
+				if conn, err := lis.AcceptKCP(); err == nil {
+					LogInfo("remote address: %s", conn.RemoteAddr())
+					conn.SetStreamMode(true)
+					conn.SetWriteDelay(false)
+					conn.SetNoDelay(config.NoDelay, config.Interval, config.Resend, config.NoCongestion)
+					conn.SetMtu(config.MTU)
+					conn.SetWindowSize(config.SndWnd, config.RcvWnd)
+					conn.SetACKNoDelay(config.AckNodelay)
 
-				if config.NoComp {
-					go handleMux(_Q_, conn, config)
+					if config.NoComp {
+						go handleMux(_Q_, conn, config)
+					} else {
+						go handleMux(_Q_, std.NewCompStream(conn), config)
+					}
 				} else {
-					go handleMux(_Q_, std.NewCompStream(conn), config)
+					LogError("%+v", err)
 				}
-			} else {
-				LogError("%+v", err)
 			}
 		}
 	}
@@ -620,7 +626,7 @@ func KCPTunServer(target, kcp_server_port, password, salt string) error {
 	}
 
 	wg.Wait()
-	return nil
+	return ctx.Err()
 }
 
 // handle multiplex-ed connection

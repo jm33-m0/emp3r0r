@@ -54,8 +54,13 @@ func moduleCustom() {
 			CliPrintError("Config of %s does not exist", CurrentMod)
 			return
 		}
-		for opt, val := range config.Options {
-			val[0] = Options[opt].Val
+		for opt := range config.Options {
+			option, ok := Options[opt]
+			if !ok {
+				CliPrintError("Option '%s' not found", opt)
+				return
+			}
+			config.Options[opt][0] = option.Val
 		}
 
 		// most of the time, start script is the only file changing

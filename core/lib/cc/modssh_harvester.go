@@ -6,6 +6,10 @@ package cc
 import emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 
 func module_ssh_harvester() {
+	if CurrentTarget == nil {
+		CliPrintError("CurrentTarget is nil")
+		return
+	}
 	err := SendCmdToCurrentTarget(emp3r0r_data.C2CmdSSHHarvester, "")
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)

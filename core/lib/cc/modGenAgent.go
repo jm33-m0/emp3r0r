@@ -37,8 +37,19 @@ func modGenAgent() {
 	)
 	now := time.Now()
 	stubFile := ""
-	os_choice := Options["os"].Val
-	arch_choice = Options["arch"].Val
+	osOpt, ok := Options["os"]
+	if !ok {
+		CliPrintError("Option 'os' not found")
+		return
+	}
+	os_choice := osOpt.Val
+
+	archOpt, ok := Options["arch"]
+	if !ok {
+		CliPrintError("Option 'arch' not found")
+		return
+	}
+	arch_choice = archOpt.Val
 	is_arch_valid := func(arch string) bool {
 		list := Arch_List_All
 		if os_choice == "windows" {
@@ -218,7 +229,12 @@ func MakeConfig() (err error) {
 	}
 
 	// CC names and certs
-	RuntimeConfig.CCHost = Options["cc_host"].Val
+	ccHostOpt, ok := Options["cc_host"]
+	if !ok {
+		CliPrintError("Option 'cc_host' not found")
+		return fmt.Errorf("Option 'cc_host' not found")
+	}
+	RuntimeConfig.CCHost = ccHostOpt.Val
 	existing_names := tun.NamesInCert(ServerCrtFile)
 	cc_hosts := existing_names
 	exists := false
@@ -258,14 +274,30 @@ func MakeConfig() (err error) {
 	}
 
 	// CC indicator
-	RuntimeConfig.CCIndicator = Options["cc_indicator"].Val
-	RuntimeConfig.CCIndicatorText = Options["indicator_text"].Val
+	ccIndicatorOpt, ok := Options["cc_indicator"]
+	if !ok {
+		CliPrintError("Option 'cc_indicator' not found")
+		return fmt.Errorf("Option 'cc_indicator' not found")
+	}
+	RuntimeConfig.CCIndicator = ccIndicatorOpt.Val
+
+	indicatorTextOpt, ok := Options["indicator_text"]
+	if !ok {
+		CliPrintError("Option 'indicator_text' not found")
+		return fmt.Errorf("Option 'indicator_text' not found")
+	}
+	RuntimeConfig.CCIndicatorText = indicatorTextOpt.Val
 	if RuntimeConfig.CCIndicatorText != "" {
 		CliMsg("Remember to put text %s in your indicator (%s) response",
 			strconv.Quote(RuntimeConfig.CCIndicatorText), RuntimeConfig.CCIndicator)
 	}
 
-	if Options["ncsi"].Val == "on" {
+	ncsiOpt, ok := Options["ncsi"]
+	if !ok {
+		CliPrintError("Option 'ncsi' not found")
+		return fmt.Errorf("Option 'ncsi' not found")
+	}
+	if ncsiOpt.Val == "on" {
 		RuntimeConfig.DisableNCSI = false
 	} else {
 		RuntimeConfig.DisableNCSI = true

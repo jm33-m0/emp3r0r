@@ -237,12 +237,13 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		path := flags.StringP("path", "p", "", "Destination path")
 		size := flags.Int64P("size", "s", 0, "Size of the file")
 		orig_checksum := flags.StringP("checksum", "c", "", "Checksum of the file")
+		download_addr := flags.StringP("addr", "h", "", "Agent to download from")
 		flags.Parse(cmdSlice[1:])
 		if *file_to_download == "" || *path == "" || *size == 0 {
 			out = fmt.Sprintf("args error: %v", cmdSlice)
 			return
 		}
-		_, err = SmartDownload(*file_to_download, *path, *orig_checksum)
+		_, err = SmartDownload(*download_addr, *file_to_download, *path, *orig_checksum)
 		if err != nil {
 			out = fmt.Sprintf("processCCData: cant download %s: %v", *file_to_download, err)
 			return

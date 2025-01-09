@@ -8,6 +8,6 @@ import (
 	"runtime"
 )
 
-func VaccineHandler(checksum string) string {
+func VaccineHandler(_, _ string) string {
 	return fmt.Sprintf("Not supported on %s platform", runtime.GOARCH)
 }

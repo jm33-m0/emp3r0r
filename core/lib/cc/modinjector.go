@@ -18,6 +18,10 @@ func moduleInjector() {
 		CliPrintError("Target not exist")
 		return
 	}
+	if Options["method"] == nil || Options["pid"] == nil {
+		CliPrintError("One or more required options are nil")
+		return
+	}
 	method := Options["method"].Val
 
 	checksum := ""

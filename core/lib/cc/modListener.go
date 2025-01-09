@@ -8,6 +8,10 @@ import (
 )
 
 func modListener() {
+	if Options["listener"] == nil || Options["port"] == nil || Options["payload"] == nil || Options["compression"] == nil || Options["passphrase"] == nil {
+		CliPrintError("One or more required options are nil")
+		return
+	}
 	cmd := fmt.Sprintf("%s --listener %s --port %s --payload %s --compression %s --passphrase %s",
 		emp3r0r_data.C2CmdListener,
 		Options["listener"].Val,

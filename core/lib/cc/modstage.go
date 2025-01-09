@@ -26,8 +26,20 @@ var Stagers = []string{
 
 // modStager generate a stager (to download the actual agent binary and execute it)
 func modStager() {
-	chosen_stager := Options["type"].Val
-	agent_bin_path := Options["agent_path"].Val
+	chosenStagerOpt, ok := Options["type"]
+	if !ok {
+		CliPrintError("Option 'type' not found")
+		return
+	}
+	chosen_stager := chosenStagerOpt.Val
+
+	agentPathOpt, ok := Options["agent_path"]
+	if !ok {
+		CliPrintError("Option 'agent_path' not found")
+		return
+	}
+	agent_bin_path := agentPathOpt.Val
+
 	stager_filename := fmt.Sprintf("%s.%s.stager", agent_bin_path, strings.ReplaceAll(chosen_stager, "/", "-"))
 	enc_agent_bin_path := fmt.Sprintf("%s.enc", agent_bin_path)
 
