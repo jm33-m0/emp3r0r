@@ -235,15 +235,17 @@ func handleClient(w http.ResponseWriter, r *http.Request) {
 	file_path := r.URL.Query().Get("file_path")
 	checksum := r.URL.Query().Get("checksum")
 
+	download_path := fmt.Sprintf("%s/%s", RuntimeConfig.AgentRoot, util.FileBaseName(file_path))
 	// if file does not exist, download it from CC
 	if !util.IsFileExist(file_path) {
 		log.Printf("handleClient: file %s (%s) does not exist, downloading from CC", file_path, checksum)
-		_, err := DownloadViaC2(file_path, file_path, checksum)
+		_, err := DownloadViaC2(file_path, download_path, checksum)
 		if err != nil {
 			log.Printf("handleClient: failed to download file from CC: %v", err)
 			http.Error(w, "Failed to download file from CC", http.StatusInternalServerError)
 			return
 		}
+		file_path = download_path // should serve the downloaded file
 	}
 
 	// serve the file

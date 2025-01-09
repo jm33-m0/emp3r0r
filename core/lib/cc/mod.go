@@ -289,7 +289,7 @@ func UpdateOptions(modName string) (exist bool) {
 
 	case modName == emp3r0r_data.ModDownloader:
 		// download_addr
-		download_addr := addIfNotFound("download_url")
+		download_addr := addIfNotFound("download_addr")
 		download_addr.Val = ""
 		file_path := addIfNotFound("path")
 		file_path.Val = ""
@@ -304,6 +304,8 @@ func UpdateOptions(modName string) (exist bool) {
 
 			argOpt.Val = val_help[0]
 		}
+		download_addr := addIfNotFound("download_addr")
+		download_addr.Val = ""
 	}
 
 	return

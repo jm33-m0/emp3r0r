@@ -324,7 +324,8 @@ var Modules = map[string]*ModConfig{
 		Date:          "2020-01-25",
 		Comment:       "Start a secure file server on target host for data exfiltration and module file caching",
 		Options: map[string][]string{
-			"port": {"Port to listen on"},
+			"port":   {"Port to listen on"},
+			"switch": {"Turn file server on/off"},
 		},
 	},
 	ModDownloader: {
@@ -336,9 +337,9 @@ var Modules = map[string]*ModConfig{
 		Date:          "2020-01-25",
 		Comment:       "Download and decrypt a file from other agents, run `file_server` first",
 		Options: map[string][]string{
-			"download_url": {"Download address, eg 10.1.1.1:8000"},
-			"path":         {"Path to the file (on server) to download, eg. /tmp/agent.exe"},
-			"checksum":     {"SHA256 checksum of the file, used to verify integrity"},
+			"download_addr": {"Download address, eg 10.1.1.1:8000"},
+			"path":          {"Path to the file (on server) to download, eg. /tmp/agent.exe"},
+			"checksum":      {"SHA256 checksum of the file, used to verify integrity"},
 		},
 	},
 }

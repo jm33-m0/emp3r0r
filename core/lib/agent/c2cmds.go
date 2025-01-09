@@ -341,7 +341,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 
 	case emp3r0r_data.C2CmdFileDownloader:
 		// !file_downloader --url <url> --path <path> --checksum <checksum>
-		url := flags.StringP("download_url", "u", "", "URL to download")
+		url := flags.StringP("download_addr", "u", "", "URL to download")
 		path := flags.StringP("path", "p", "", "Path to save")
 		checksum := flags.StringP("checksum", "c", "", "Checksum")
 		flags.Parse(cmdSlice[1:])

