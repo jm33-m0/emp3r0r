@@ -36,12 +36,12 @@ func ReadMemoryRegion(hProcess uintptr, address, size uintptr) (data []byte, err
 	return read_buf, nil
 }
 
-// DumpCurrentProcMem dumps everything (readable) from the self process
+// DumpProcMem dumps everything (readable) from the specified process
 // It will dump libraries as well, if any
 // This function is Linux only
-func DumpCurrentProcMem() (memdata map[int64][]byte, err error) {
-	maps_file := fmt.Sprintf("/proc/%d/maps", os.Getpid())
-	mem_file := fmt.Sprintf("/proc/%d/mem", os.Getpid())
+func DumpProcMem(pid int) (memdata map[int64][]byte, err error) {
+	maps_file := fmt.Sprintf("/proc/%d/maps", pid)
+	mem_file := fmt.Sprintf("/proc/%d/mem", pid)
 	memdata = make(map[int64][]byte)
 
 	// open memory
@@ -104,6 +104,13 @@ func DumpCurrentProcMem() (memdata map[int64][]byte, err error) {
 	}
 
 	return
+}
+
+// DumpCurrentProcMem dumps everything (readable) from the self process
+// It will dump libraries as well, if any
+// This function is Linux only
+func DumpCurrentProcMem() (memdata map[int64][]byte, err error) {
+	return DumpProcMem(os.Getpid())
 }
 
 const (

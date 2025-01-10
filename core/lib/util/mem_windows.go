@@ -129,6 +129,20 @@ func getBaseAddress(handle uintptr) uintptr {
 	return 0
 }
 
+// DumpProcMem dumps all memory regions of a process given its PID
+func DumpProcMem(pid int) (mem_data map[int64][]byte, err error) {
+	hProcess := OpenProcess(pid)
+	if hProcess == 0 {
+		err = syscall.GetLastError()
+		return
+	}
+	defer syscall.CloseHandle(syscall.Handle(hProcess))
+
+	mem_data, _, err = DumpProcessMem(hProcess)
+	return
+}
+
+// DumpCurrentProcMem dumps all memory regions of the current process
 func DumpCurrentProcMem() (mem_data map[int64][]byte, err error) {
 	mem_data = make(map[int64][]byte)
 	dlls, err := GetAllDLLs()
@@ -145,8 +159,7 @@ func DumpCurrentProcMem() (mem_data map[int64][]byte, err error) {
 	}
 
 	// dump all memory regions
-	hProcess := OpenProcess(os.Getpid())
-	self_mem_data, _, err := DumpProcessMem(hProcess)
+	self_mem_data, err := DumpProcMem(os.Getpid())
 	if err != nil {
 		log.Printf("reading self memory: %v", err)
 	}

@@ -63,6 +63,7 @@ var (
 		emp3r0r_data.ModSSHHarvester: module_ssh_harvester,
 		emp3r0r_data.ModDownloader:   moduleDownloader,
 		emp3r0r_data.ModFileServer:   moduleFileServer,
+		emp3r0r_data.ModMemDump:      moduleMemDump,
 	}
 )
 
@@ -295,6 +296,11 @@ func UpdateOptions(modName string) (exist bool) {
 		file_path.Val = ""
 		checksum := addIfNotFound("checksum")
 		checksum.Val = ""
+
+	case modName == emp3r0r_data.ModMemDump:
+		// dump all memory regions
+		pid := addIfNotFound("pid")
+		pid.Val = ""
 
 	default:
 		// custom modules
