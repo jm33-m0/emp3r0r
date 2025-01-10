@@ -8,6 +8,10 @@ A post-exploitation framework for Linux/Windows
 
 ---
 
+## How to use
+
+Read the [wiki](https://github.com/jm33-m0/emp3r0r/wiki/Getting-started) to get started. Please also consider contributing your own documentation there to help others.
+
 ## Motivation
 
 Initially, emp3r0r was developed as one of my weaponizing experiments. It was a learning process for me trying to implement common Linux adversary techniques and some of my original ideas.
