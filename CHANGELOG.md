@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.47.0](https://github.com/jm33-m0/emp3r0r/compare/v1.46.1...v1.47.0) (2025-01-10)
+
+
+### Features
+
+* process `mem_dump` for Linux and Windows ([b8a9822](https://github.com/jm33-m0/emp3r0r/commit/b8a98229b697104c2a95921375c2170c6c494aaf))
+
+
+### Bug Fixes
+
+* `file_downloader` should have an option to opt out of checksum verification ([27529ff](https://github.com/jm33-m0/emp3r0r/commit/27529ff4ce4d9ec6089098ac07721142de73f12a))
+* `file_server` http port should be random ([b570cd0](https://github.com/jm33-m0/emp3r0r/commit/b570cd0e5427a0c569a1c16964449e9a8da0033b))
+* do not request full path to download ([55c463e](https://github.com/jm33-m0/emp3r0r/commit/55c463e028f0b283f81e2fe86e7449f206a7977e))
+
 ## [1.46.1](https://github.com/jm33-m0/emp3r0r/compare/v1.46.0...v1.46.1) (2025-01-09)
 
 
