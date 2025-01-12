@@ -100,67 +100,6 @@ func SendCmdToCurrentTarget(cmd, cmd_id string) error {
 	return SendCmd(cmd, cmd_id, target)
 }
 
-// VimEdit launch local vim to edit files
-func VimEdit(filepath string) (err error) {
-	if os.Getenv("TMUX") == "" ||
-		!util.IsCommandExist("tmux") ||
-		!util.IsCommandExist("vim") {
-
-		return errors.New("You need to run emp3r0r under tmux, and make sure vim is installed")
-	}
-
-	// split tmux window, remember pane number
-	vimjob := fmt.Sprintf("tmux split-window 'echo -n $TMUX_PANE>%svim.pane;vim %s'", Temp, filepath)
-	cmd := exec.Command("/bin/sh", "-c", vimjob)
-	err = cmd.Run()
-	if err != nil {
-		return
-	}
-
-	// index of our tmux pane
-	for {
-		if _, err = os.Stat(Temp + "vim.pane"); os.IsNotExist(err) {
-			time.Sleep(200 * time.Millisecond)
-		} else {
-			break
-		}
-	}
-
-	// remove vim.pane eventually
-	defer func() {
-		err = os.Remove(Temp + "vim.pane")
-		if err != nil {
-			CliPrintWarning("%v", err)
-		}
-	}()
-
-	paneBytes, e := os.ReadFile(Temp + "vim.pane")
-	pane := string(paneBytes)
-	if e != nil {
-		return fmt.Errorf("cannot detect tmux pane number: %v", e)
-	}
-
-	// loop until vim exits
-	for {
-		time.Sleep(1 * time.Second)
-
-		// check if our tmux pane exists, ie. the user hasn't done editing
-		checkPaneCmd := exec.Command("tmux", "display-message", "-p", "-t", pane)
-		out, err := checkPaneCmd.CombinedOutput()
-		if err != nil {
-			tmuxout := string(out)
-			if strings.Contains(tmuxout, "can't find") {
-				CliPrintSuccess("Vim has done editing")
-				return nil
-			}
-			CliPrintError("%v", err)
-			break
-		}
-	}
-
-	return errors.New("don't know if vim has done editing")
-}
-
 // get available terminal emulator on current system
 func getTerminalEmulator() (res string) {
 	terms := []string{"gnome-terminal", "xfce4-terminal", "xterm"}
