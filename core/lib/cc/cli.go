@@ -224,7 +224,7 @@ start:
 func SetDynamicPrompt() {
 	shortName := "local" // if no target is selected
 	prompt_arrow := color.New(color.Bold, color.FgHiCyan).Sprintf("$ ")
-	prompt_name := color.New(color.Bold, color.FgHiCyan).Sprint(PromptName)
+	prompt_name := color.New(color.Bold, color.FgBlack, color.BgHiWhite).Sprint(PromptName)
 
 	if CurrentTarget != nil && IsAgentExist(CurrentTarget) {
 		shortName = strings.Split(CurrentTarget.Tag, "-agent")[0]
