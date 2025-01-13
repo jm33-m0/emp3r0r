@@ -559,5 +559,8 @@ func InitConfig() (err error) {
 	ServerCrtFile = EmpWorkSpace + "/emp3r0r-cert.pem"
 	ServerKeyFile = EmpWorkSpace + "/emp3r0r-key.pem"
 
+	// log files
+	CommandOuputLogs = fmt.Sprintf("%s/agents-output-%s.log", EmpWorkSpace, GetDateTime())
+
 	return
 }

@@ -32,7 +32,7 @@ const (
 
 var (
 	// Store agents' output
-	CommandOuputLogs = fmt.Sprintf("%s/agents-output-%s.log", EmpWorkSpace, GetDateTime())
+	CommandOuputLogs = ""
 
 	// CliCompleter holds all command completions
 	CliCompleter = readline.NewPrefixCompleter()
