@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -209,9 +210,16 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 			return
 		}
 	}
-	AgentOutputPane.Printf(false,
-		"\n[%s] %s:\n%s\n\n",
+	agent_output := fmt.Sprintf("\n[%s] %s:\n%s\n\n",
 		color.CyanString("%d", contrlIf.Index),
 		color.HiMagentaString(cmd),
 		color.HiWhiteString(out))
+	AgentOutputPane.Printf(false, "%s", agent_output)
+	logf, err := os.OpenFile(CommandOuputLogs, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		CliPrintError("Failed to open agent log file: %v", err)
+		return
+	}
+	defer logf.Close()
+	logf.WriteString(agent_output)
 }

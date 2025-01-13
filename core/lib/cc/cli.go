@@ -31,6 +31,9 @@ const (
 )
 
 var (
+	// Store agents' output
+	CommandOuputLogs = fmt.Sprintf("%s/agents-output-%s.log", EmpWorkSpace, GetDateTime())
+
 	// CliCompleter holds all command completions
 	CliCompleter = readline.NewPrefixCompleter()
 
@@ -251,18 +254,6 @@ func SetDynamicPrompt() {
 func cliPrintHelper(format string, a []interface{}, msgColor *color.Color, logPrefix string, alert bool) {
 	logMsg := msgColor.Sprintf(format, a...)
 	log.Print(logMsg)
-
-	log_path := fmt.Sprintf("%s/%s.log", EmpWorkSpace, GetDateTime())
-
-	// Save log to file
-	logFile, logOpenErr := os.OpenFile(log_path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if logOpenErr != nil {
-		log.Printf("cliPrintHelper: %v", logOpenErr)
-		return
-	}
-	defer logFile.Close()
-	logger := log.New(logFile, "", log.LstdFlags)
-	logger.Print(logMsg)
 
 	if IsAPIEnabled {
 		var resp APIResponse
