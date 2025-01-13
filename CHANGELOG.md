@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.47.1](https://github.com/jm33-m0/emp3r0r/compare/v1.47.0...v1.47.1) (2025-01-13)
+
+
+### Bug Fixes
+
+* C2 CLI log is written to unexpected location ([332a96b](https://github.com/jm33-m0/emp3r0r/commit/332a96b91fc84ab03b7be5273ac5eec221d7cd5d))
+* change prompt style when having root access ([3a46fd6](https://github.com/jm33-m0/emp3r0r/commit/3a46fd6db3002a840c6aceaf62508d0326a8fcee))
+* distinguish types of modules for better handling ([4daebde](https://github.com/jm33-m0/emp3r0r/commit/4daebde60ffa41519680c763adf53363eb46d4ed))
+* handling of compression of in-mem modules ([47c20ae](https://github.com/jm33-m0/emp3r0r/commit/47c20ae849619a703e9d95c815f8c7aece278113))
+* handling of in-memory script modules ([f22163a](https://github.com/jm33-m0/emp3r0r/commit/f22163a524dd16d9b1abe404fdc73b6a7aacc2f5))
+* optimize custom module handler ([e27a6df](https://github.com/jm33-m0/emp3r0r/commit/e27a6df8ae38bebdba2302cbdb352dd6fef08f82))
+* python modules broken ([11995cb](https://github.com/jm33-m0/emp3r0r/commit/11995cb593051387f173fe256d7fd21282ff0897))
+* use `tmux-256color` as recommended by tmux documentation ([08da828](https://github.com/jm33-m0/emp3r0r/commit/08da828726c7620eeaa1e6b9ca74755482c90eff))
+
 ## [1.47.0](https://github.com/jm33-m0/emp3r0r/compare/v1.46.1...v1.47.0) (2025-01-10)
 
 
