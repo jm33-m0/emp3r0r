@@ -20,6 +20,7 @@ require (
 	github.com/jm33-m0/go-console v1.0.2
 	github.com/kbinani/screenshot v0.0.0-20240820160931-a8a2c5d0e191
 	github.com/lithammer/fuzzysearch v1.1.8
+	github.com/mholt/archives v0.0.0-20241216060121-23e0af8fe73d
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/muesli/reflow v0.3.0
 	github.com/ncruces/go-dns v1.2.6
@@ -82,7 +83,6 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
-	github.com/mholt/archives v0.0.0-20241216060121-23e0af8fe73d // indirect
 	github.com/miekg/dns v1.1.61 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect

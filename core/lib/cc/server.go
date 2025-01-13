@@ -24,6 +24,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/ss"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
+	"github.com/mholt/archives"
 	"github.com/posener/h2conn"
 	"github.com/schollz/progressbar/v3"
 )
@@ -363,8 +364,16 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 			float64(nowSize)/float64(targetSize)*100, nowSize, targetSize)
 	}()
 
+	// decompressor
+	decompressor, err := archives.Zstd{}.OpenReader(sh.H2x.Conn)
+	if err != nil {
+		CliPrintError("ftpHandler failed to open decompressor: %v", err)
+		return
+	}
+	defer decompressor.Close()
+
 	// read filedata
-	n, err := io.Copy(f, sh.H2x.Conn)
+	n, err := io.Copy(f, decompressor)
 	if err != nil {
 		CliPrintWarning("ftpHandler failed to save file: %v. %d bytes has been saved", err, n)
 		return
