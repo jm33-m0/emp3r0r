@@ -2,6 +2,7 @@
     "name": "py_info",
     "exec": "run.py",
     "type": "python",
+    "in_memory": true,
     "platform": "Linux",
     "interactive": false,
     "author": "jm33-ng",

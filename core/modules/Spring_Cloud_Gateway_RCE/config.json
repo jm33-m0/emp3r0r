@@ -2,6 +2,7 @@
     "name": "Spring_Cloud_Gateway_RCE",
     "exec": "CVE-2022-22947.py",
     "type": "python",
+    "in_memory": true,
     "platform": "Linux",
     "interactive": false,
     "author": "Axx8",
