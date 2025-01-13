@@ -1,6 +1,7 @@
 {
     "name": "mimikatz",
     "exec": "mimikatz.ps1",
+    "type": "powershell",
     "in_memory": true,
     "platform": "Windows",
     "interactive": false,

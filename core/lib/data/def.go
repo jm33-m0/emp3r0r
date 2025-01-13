@@ -115,6 +115,7 @@ type ModConfig struct {
 	Name          string `json:"name"`        // Display as this name
 	Exec          string `json:"exec"`        // Run this executable file
 	InMemory      bool   `json:"in_memory"`   // run this module in memory (for now ps1 is supported)
+	Type          string `json:"type"`        // "go", "python", "powershell", "bash", "exe", "elf", "dll", "so"
 	Platform      string `json:"platform"`    // targeting which OS? Linux/Windows
 	IsInteractive bool   `json:"interactive"` // whether run as a shell or not, eg. python, bettercap
 	Author        string `json:"author"`      // by whom
@@ -133,6 +134,7 @@ var Modules = map[string]*ModConfig{
 	ModVACCINE: {
 		Name:          ModVACCINE,
 		Exec:          "built-in",
+		Type:          "go",
 		Platform:      "Linux",
 		IsInteractive: false,
 		Author:        "jm33-ng",
@@ -145,6 +147,7 @@ var Modules = map[string]*ModConfig{
 	ModGenAgent: {
 		Name:          ModGenAgent,
 		Exec:          "built-in",
+		Type:          "go",
 		Platform:      "Generic",
 		IsInteractive: false,
 		Author:        "jm33-ng",
@@ -168,6 +171,7 @@ var Modules = map[string]*ModConfig{
 	ModCMD_EXEC: {
 		Name:          ModCMD_EXEC,
 		Exec:          "built-in",
+		Type:          "go",
 		Platform:      "Generic",
 		IsInteractive: false,
 		Author:        "jm33-ng",
@@ -180,6 +184,7 @@ var Modules = map[string]*ModConfig{
 	ModCLEAN_LOG: {
 		Name:          ModCLEAN_LOG,
 		Exec:          "built-in",
+		Type:          "go",
 		Platform:      "Linux",
 		IsInteractive: false,
 		Author:        "jm33-ng",
@@ -192,6 +197,7 @@ var Modules = map[string]*ModConfig{
 	ModLPE_SUGGEST: {
 		Name:          ModLPE_SUGGEST,
 		Exec:          "built-in",
+		Type:          "go",
 		Platform:      "Generic",
 		IsInteractive: false,
 		Author:        "jm33-ng",
@@ -204,6 +210,7 @@ var Modules = map[string]*ModConfig{
 	ModPERSISTENCE: {
 		Name:          ModPERSISTENCE,
 		Exec:          "built-in",
+		Type:          "go",
 		Platform:      "Linux",
 		IsInteractive: false,
 		Author:        "jm33-ng",
@@ -216,6 +223,7 @@ var Modules = map[string]*ModConfig{
 	ModPROXY: {
 		Name:          ModPROXY,
 		Exec:          "built-in",
+		Type:          "go",
 		Platform:      "Generic",
 		IsInteractive: false,
 		Author:        "jm33-ng",
@@ -229,6 +237,7 @@ var Modules = map[string]*ModConfig{
 	ModPORT_FWD: {
 		Name:          ModPORT_FWD,
 		Exec:          "built-in",
+		Type:          "go",
 		Platform:      "Generic",
 		IsInteractive: false,
 		Author:        "jm33-ng",
@@ -244,6 +253,7 @@ var Modules = map[string]*ModConfig{
 	ModSHELL: {
 		Name:          ModSHELL,
 		Exec:          "built-in",
+		Type:          "go",
 		Platform:      "Generic",
 		IsInteractive: true,
 		Author:        "jm33-ng",
@@ -258,6 +268,7 @@ var Modules = map[string]*ModConfig{
 	ModINJECTOR: {
 		Name:          ModINJECTOR,
 		Exec:          "built-in",
+		Type:          "go",
 		Platform:      "Linux",
 		IsInteractive: false,
 		Author:        "jm33-ng",
@@ -271,6 +282,7 @@ var Modules = map[string]*ModConfig{
 	ModBring2CC: {
 		Name:          ModBring2CC,
 		Exec:          "built-in",
+		Type:          "go",
 		Platform:      "Generic",
 		IsInteractive: false,
 		Author:        "jm33-ng",
@@ -283,6 +295,7 @@ var Modules = map[string]*ModConfig{
 	ModStager: {
 		Name:          ModStager,
 		Exec:          "built-in",
+		Type:          "go",
 		Platform:      "Generic",
 		IsInteractive: false,
 		Author:        "jm33-ng",
@@ -296,6 +309,7 @@ var Modules = map[string]*ModConfig{
 	ModListener: {
 		Name:          ModListener,
 		Exec:          "built-in",
+		Type:          "go",
 		Platform:      "Generic",
 		IsInteractive: false,
 		Author:        "jm33-ng",
@@ -310,6 +324,7 @@ var Modules = map[string]*ModConfig{
 	ModSSHHarvester: {
 		Name:          ModSSHHarvester,
 		Exec:          "built-in",
+		Type:          "go",
 		Platform:      "Linux",
 		IsInteractive: false,
 		Author:        "jm33-ng",
@@ -319,6 +334,7 @@ var Modules = map[string]*ModConfig{
 	ModFileServer: {
 		Name:          ModFileServer,
 		Exec:          "built-in",
+		Type:          "go",
 		Platform:      "Generic",
 		IsInteractive: false,
 		Author:        "jm33-ng",
@@ -332,6 +348,7 @@ var Modules = map[string]*ModConfig{
 	ModDownloader: {
 		Name:          ModDownloader,
 		Exec:          "built-in",
+		Type:          "go",
 		Platform:      "Generic",
 		IsInteractive: false,
 		Author:        "jm33-ng",
@@ -346,6 +363,7 @@ var Modules = map[string]*ModConfig{
 	ModMemDump: {
 		Name:          ModMemDump,
 		Exec:          "built-in",
+		Type:          "go",
 		Platform:      "Generic",
 		IsInteractive: false,
 		Author:        "jm33-ng",

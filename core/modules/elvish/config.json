@@ -1,6 +1,7 @@
 {
     "name": "elvish",
     "exec": "elvish",
+    "type": "elf",
     "platform": "Linux",
     "interactive": true,
     "author": "jm33-ng",

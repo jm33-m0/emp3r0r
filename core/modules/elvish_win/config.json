@@ -1,6 +1,7 @@
 {
     "name": "elvish_win",
     "exec": "elvish.exe",
+    "type": "exe",
     "platform": "Windows",
     "interactive": true,
     "author": "jm33-ng",
