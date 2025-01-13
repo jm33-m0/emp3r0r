@@ -20,18 +20,22 @@ func moduleHandler(download_addr, modName, checksum, exec_cmd string, env []stri
 	tarball := filepath.Join(RuntimeConfig.AgentRoot, modName+".tar.xz")
 	modDir := filepath.Join(RuntimeConfig.AgentRoot, modName)
 
-	// cd to module dir
-	defer os.Chdir(RuntimeConfig.AgentRoot)
-	os.Chdir(modDir)
-
+	// download and extract module file
 	if !inMem {
 		if downloadErr := downloadAndVerifyModule(tarball, checksum, download_addr); downloadErr != nil {
 			return downloadErr.Error()
 		}
 
-		if extractErr := extractAndRunModule(modDir, tarball); extractErr != nil {
+		if extractErr := extractModule(modDir, tarball); extractErr != nil {
 			return extractErr.Error()
 		}
+	}
+
+	// cd to module dir
+	defer os.Chdir(RuntimeConfig.AgentRoot)
+	err := os.Chdir(modDir)
+	if err != nil {
+		return fmt.Sprintf("cd to %s: %v", modDir, err)
 	}
 
 	// construct command
@@ -39,10 +43,15 @@ func moduleHandler(download_addr, modName, checksum, exec_cmd string, env []stri
 	if len(fields) == 0 {
 		return fmt.Sprintf("empty exec_cmd: %s (env: %v)", strconv.Quote(exec_cmd), env)
 	}
-	cmd := exec.Command(fields[0])
-	if len(fields) > 1 {
-		cmd = exec.Command(fields[0], fields[1:]...)
+	executable := fields[0]
+	args := []string{}
+	if strings.HasSuffix(fields[0], ".py") {
+		executable = "python"
+		args = []string{exec_cmd}
+	} else {
+		args = fields[1:]
 	}
+	cmd := exec.Command(executable, args...)
 	cmd.Env = env
 	log.Printf("Running %v (%v)", cmd.Args, cmd.Env)
 	outBytes, err := cmd.CombinedOutput()
@@ -77,7 +86,7 @@ func downloadAndVerifyModule(tarball, checksum, download_addr string) error {
 	return nil
 }
 
-func extractAndRunModule(modDir, tarball string) error {
+func extractModule(modDir, tarball string) error {
 	os.RemoveAll(modDir)
 	if err := util.Unarchive(tarball, RuntimeConfig.AgentRoot); err != nil {
 		return fmt.Errorf("unarchive module tarball: %v", err)
@@ -106,20 +115,4 @@ func processModuleFiles(modDir string) error {
 		}
 	}
 	return nil
-}
-
-func runStartScript(startScript, modDir, checksum string) (string, error) {
-	// cd to module dir
-	defer os.Chdir(RuntimeConfig.AgentRoot)
-	os.Chdir(modDir)
-
-	// Download the script payload
-	payload, err := SmartDownload("", startScript, "", checksum)
-	if err != nil {
-		return "", fmt.Errorf("downloading %s: %w", startScript, err)
-	}
-	scriptData := payload
-
-	log.Printf("Running %s:\n%s...", startScript, scriptData[:100])
-	return RunModuleScript(scriptData)
 }

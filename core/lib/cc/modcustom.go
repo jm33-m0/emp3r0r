@@ -278,7 +278,7 @@ func readModCondig(file string) (pconfig *emp3r0r_data.ModConfig, err error) {
 
 // genModStartCmd reads config.json of a module and generates env string (VAR=value,VAR2=value2 ...)
 func genModStartCmd(config *emp3r0r_data.ModConfig) (exec_path, envStr string, err error) {
-	exec_path = fmt.Sprintf("%s/%s/%s", config.Path, config.Name, config.Exec)
+	exec_path = config.Exec
 	var builder strings.Builder
 
 	setEnvVar := func(opt, value string) {
