@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.48.0](https://github.com/jm33-m0/emp3r0r/compare/v1.47.1...v1.48.0) (2025-01-13)
+
+
+### Features
+
+* transparent zstd compression for file downloading from agents ([e4144c5](https://github.com/jm33-m0/emp3r0r/commit/e4144c5f543e9642411888169b76972143be8605))
+
+
+### Bug Fixes
+
+* log filename ([8dff46a](https://github.com/jm33-m0/emp3r0r/commit/8dff46aa369092b8f20f7ad03aaf8950ab8adaf4))
+* save agents' output to a log file ([d1b19f7](https://github.com/jm33-m0/emp3r0r/commit/d1b19f7115b3381221fb265be2618962e4c227a0))
+
 ## [1.47.1](https://github.com/jm33-m0/emp3r0r/compare/v1.47.0...v1.47.1) (2025-01-13)
 
 
