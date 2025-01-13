@@ -31,11 +31,12 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
   - Hide files and PIDs via Glibc hijacking (`patcher` in `get_persistence`)
   - Built-in [**Elvish Shell**](https://elv.sh/) with the same disguise as main process
   - [**Bring Your Own Shell**](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r#vaccine) or any interactive programs via [custom modules such as bettercap](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r#module-metadata)
-  - All C2 communications made in HTTP2/TLS
+- All C2 communications made in HTTP2/TLS
   - Defeat [**JA3**](https://github.com/salesforce/ja3) fingerprinting with [**UTLS**](https://github.com/refraction-networking/utls)
   - Painlessly encapsulated in **Shadowsocks** and KCP
   - Able to encapsulate in any external proxies such as [**TOR** and **CDN**s](https://github.com/jm33-m0/emp3r0r/raw/master/img/c2transports.png)
   - [**C2 relaying**](https://github.com/jm33-m0/emp3r0r/wiki/C2-Relay) via SSH
+- Cross-platform memory dumping
 - Staged Payload Delivery for both Linux and Windows
   - [HTTP Listener with AES and compression](https://github.com/jm33-m0/emp3r0r/wiki/Listener)
   - [**DLL agent**](https://github.com/jm33-m0/emp3r0r/wiki/DLL-Agent), [**Shellcode agent**](https://github.com/jm33-m0/emp3r0r/wiki/Shellcode-Agent-for-Windows) for Windows targets and [**Shared Library stager**](https://github.com/jm33-m0/emp3r0r/wiki/Shared-Library-Stager-for-Linux) for Linux
@@ -49,6 +50,9 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
 - Module Support
   - Provides [**python3** environment](https://github.com/jm33-m0/emp3r0r/releases/tag/v1.3.10) that can easily run your exploits/tools on any Linux host
   - [Custom Modules](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r)
+  - Supports various modules formats: `exe`, `elf`, `python`, `powershell`, `bash`, `dll`, and `so`
+  - Ability to run a module as an interactive shell, eg. `bettercap`, `elvish`.
+  - **In-memory** execution for modules
 - Perfect Shell Experience via **SSH with PTY support**
   - Compatible with any SSH client and **available for Windows**
 - [Bettercap](https://github.com/bettercap/bettercap)
@@ -73,6 +77,7 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
 - System Info Collect
 - File Management
   - Enables **resumable downloads/uploads**
+  - Transparent **`zstd` compression** for data exfiltration
   - SFTP support: browse remote files with any SFTP client, [including your local **GUI file manager**](https://github.com/jm33-m0/emp3r0r/releases/tag/v1.22.3)
 - Log Cleaner
 - Screenshot
