@@ -223,17 +223,26 @@ start:
 // SetDynamicPrompt set prompt with module and target info
 func SetDynamicPrompt() {
 	shortName := "local" // if no target is selected
+	prompt_arrow := color.New(color.Bold, color.FgHiCyan).Sprintf("$ ")
+	prompt_name := color.New(color.Bold, color.FgHiCyan).Sprint(PromptName)
+
 	if CurrentTarget != nil && IsAgentExist(CurrentTarget) {
 		shortName = strings.Split(CurrentTarget.Tag, "-agent")[0]
+		if CurrentTarget.HasRoot {
+			prompt_arrow = color.New(color.Bold, color.FgHiGreen).Sprint("# ")
+			prompt_name = color.New(color.Bold, color.FgBlack, color.BgHiGreen).Sprint(PromptName)
+		}
 	}
 	if CurrentMod == "<blank>" {
 		CurrentMod = "none" // if no module is selected
 	}
-	dynamicPrompt := fmt.Sprintf("%s @%s (%s) "+
-		color.New(color.Bold, color.FgHiCyan).Sprintf("> "),
-		color.New(color.Bold, color.FgHiCyan).Sprint(PromptName),
-		color.New(color.FgCyan, color.Underline).Sprint(shortName),
-		color.New(color.FgHiBlue).Sprint(CurrentMod),
+	agent_name := color.New(color.FgCyan, color.Underline).Sprint(shortName)
+	mod_name := color.New(color.FgHiBlue).Sprint(CurrentMod)
+
+	dynamicPrompt := fmt.Sprintf("%s @%s (%s) "+prompt_arrow,
+		prompt_name,
+		agent_name,
+		mod_name,
 	)
 	EmpReadLine.Config.Prompt = dynamicPrompt
 	EmpReadLine.SetPrompt(dynamicPrompt)
