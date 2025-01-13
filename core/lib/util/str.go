@@ -161,3 +161,22 @@ func LogFilePrintf(filepath, format string, v ...any) {
 	fmt.Fprintf(logf, format, v...)
 	fmt.Fprintf(logf, "\n")
 }
+
+// ParseEnvStr parses a string of environment variables in the format "VAR1=VAL1,VAR2=VAL2"
+// and returns a map where the keys are the variable names and the values are the variable values.
+func ParseEnvStr(envStr string) (envMap map[string]string) {
+	envMap = make(map[string]string)
+	lines := strings.Split(envStr, ",")
+	for _, line := range lines {
+		if strings.Contains(line, "=") {
+			parts := strings.SplitN(line, "=", 2)
+			key := strings.TrimSpace(parts[0])
+			value := ""
+			if len(parts) > 1 {
+				value = strings.TrimSpace(parts[1])
+			}
+			envMap[key] = value
+		}
+	}
+	return
+}
