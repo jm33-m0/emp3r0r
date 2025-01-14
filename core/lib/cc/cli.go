@@ -281,7 +281,7 @@ func CliPrintDebug(format string, a ...interface{}) {
 
 func CliPrintInfo(format string, a ...interface{}) {
 	if DebugLevel >= 2 {
-		cliPrintHelper(format, a, color.New(color.FgHiBlue), "INFO", false)
+		cliPrintHelper(format, a, color.New(color.FgBlue), "INFO", false)
 	}
 }
 

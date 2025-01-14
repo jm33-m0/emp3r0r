@@ -107,23 +107,18 @@ func DownloadFromAgent(cmd string) {
 
 		// download files
 		files := strings.Split(result, "\n")
-		for _, file := range files {
-			if file == "" {
-				continue
+		CliPrintInfo("Downloading %d files", len(files))
+		for n, file := range files {
+			CliPrint("Downloading %d/%d: %s", n+1, len(files), file)
+			if err := GetFile(file, target); err != nil {
+				CliPrintError("Cannot get %s: %v", file, err)
 			}
-			go func() {
-				if err := GetFile(file, target); err != nil {
-					CliPrintError("Cannot get %s: %v", file, err)
-				}
-			}()
+			util.TakeABlink() // without this there seems to be racing? files are downloaded but not shown in logs
 		}
-		CliPrintInfo("Downloaded %d files", len(files))
 	} else {
-		go func() {
-			if err := GetFile(fileToGet, target); err != nil {
-				CliPrintError("Cannot get %s: %v", inputSlice[1], err)
-			}
-		}()
+		if err := GetFile(fileToGet, target); err != nil {
+			CliPrintError("Cannot get %s: %v", inputSlice[1], err)
+		}
 	}
 }
 
