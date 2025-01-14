@@ -338,15 +338,15 @@ func ModuleRun() {
 			CliPrintError("Target not specified")
 			return
 		}
-		ModuleHelpers[emp3r0r_data.ModCMD_EXEC]()
+		go ModuleHelpers[emp3r0r_data.ModCMD_EXEC]()
 		return
 	}
 	if CurrentMod == emp3r0r_data.ModGenAgent {
-		ModuleHelpers[emp3r0r_data.ModGenAgent]()
+		go ModuleHelpers[emp3r0r_data.ModGenAgent]()
 		return
 	}
 	if CurrentMod == emp3r0r_data.ModStager {
-		ModuleHelpers[emp3r0r_data.ModStager]()
+		go ModuleHelpers[emp3r0r_data.ModStager]()
 		return
 	}
 	if CurrentTarget == nil {
@@ -360,7 +360,7 @@ func ModuleRun() {
 
 	mod := ModuleHelpers[CurrentMod]
 	if mod != nil {
-		mod()
+		go mod()
 	} else {
 		CliPrintError("Module %s not found", strconv.Quote(CurrentMod))
 	}
