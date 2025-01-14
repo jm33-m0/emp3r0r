@@ -109,14 +109,24 @@ func DownloadFromAgent(cmd string) {
 		files := strings.Split(result, "\n")
 		CliPrintInfo("Downloading %d files", len(files))
 		for n, file := range files {
-			CliPrint("Downloading %d/%d: %s", n+1, len(files), file)
-			if err := GetFile(file, target); err != nil {
+			ftpSh, err := GetFile(file, target)
+			if err != nil {
 				CliPrintError("Cannot get %s: %v", file, err)
 			}
-			util.TakeABlink() // without this there seems to be racing? files are downloaded but not shown in logs
+
+			CliPrint("Downloading %d/%d: %s", n+1, len(files), file)
+			// wait for file to be downloaded
+			for {
+				if sh, ok := FTPStreams[file]; ok {
+					if ftpSh.Token == sh.Token {
+						util.TakeABlink()
+					}
+				}
+				break
+			}
 		}
 	} else {
-		if err := GetFile(fileToGet, target); err != nil {
+		if _, err := GetFile(fileToGet, target); err != nil {
 			CliPrintError("Cannot get %s: %v", inputSlice[1], err)
 		}
 	}

@@ -244,7 +244,7 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 		CliPrintError("Invalid ftp token '%s vs %s'", token, sh.Token)
 		return
 	}
-	CliPrintInfo("Got a ftp connection (%s) from %s", sh.Token, req.RemoteAddr)
+	CliPrintDebug("Got a ftp connection (%s) from %s", sh.Token, req.RemoteAddr)
 
 	// save the file
 	filename := ""
@@ -300,30 +300,8 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 	bar.Add64(nowSize) // downloads are resumable
 	defer bar.Close()
 
-	// log progress instead of showing the actual progressbar
-	go func() {
-		for state := bar.State(); nowSize/targetSize < 1 && state.CurrentPercent < 1; time.Sleep(5 * time.Second) {
-			// read file size
-			nowSize = util.FileSize(filewrite)
-			// progress
-			bar.Set64(nowSize)
-
-			state = bar.State()
-			// progress may reach 100% when downloading is incomplete
-			if nowSize/targetSize < 1 && state.CurrentPercent == 1 {
-				return
-			}
-			CliPrintInfo("%.2f%% (%d of %d bytes) downloaded at %.2fKB/s, %.2fs passed, %.2fs left",
-				state.CurrentPercent*100, nowSize, targetSize, state.KBsPerSecond, state.SecondsSince, state.SecondsLeft)
-		}
-		// now we should be reaching at 100%
-		state := bar.State()
-		CliPrintInfo("%.2f%% (%d of %d bytes) downloaded at %.2fKB/s, %.2fs passed, %.2fs left",
-			state.CurrentPercent*100, nowSize, targetSize, state.KBsPerSecond, state.SecondsSince, state.SecondsLeft)
-	}()
-
 	// on exit
-	defer func() {
+	cleanup := func() {
 		// cleanup
 		if sh.H2x.Conn != nil {
 			err = sh.H2x.Conn.Close()
@@ -331,10 +309,9 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 				CliPrintError("ftpHandler failed to close connection: %v", err)
 			}
 		}
-		sh.Token = ""
 		sh.H2x.Cancel()
 		FTPMutex.Lock()
-		delete(FTPStreams, filename)
+		delete(FTPStreams, sh.Token)
 		FTPMutex.Unlock()
 		CliPrintWarning("Closed ftp connection from %s", req.RemoteAddr)
 
@@ -353,7 +330,11 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 				CliPrintError("Failed to save downloaded file %s: %v", targetFile, err)
 			}
 			checksum := tun.SHA256SumFile(targetFile)
-			CliPrintSuccess("Downloaded %d bytes to %s (%s)", nowSize, targetFile, checksum)
+			if checksum == sh.Token {
+				CliPrintSuccess("Downloaded %d bytes to %s (%s)", nowSize, targetFile, checksum)
+				return
+			}
+			CliPrintError("%s downloaded, but checksum mismatch: %s vs %s", targetFile, checksum, sh.Token)
 			return
 		}
 		if nowSize > targetSize {
@@ -362,8 +343,14 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 		}
 		CliPrintWarning("Incomplete download at %.4f%% (%d of %d bytes), will continue if you run GET again",
 			float64(nowSize)/float64(targetSize)*100, nowSize, targetSize)
-	}()
+	}
+	defer cleanup()
+	if targetSize == 0 {
+		CliPrintWarning("ftpHandler: targetSize is 0")
+		return
+	}
 
+	// read compressed file data and decompress transparently into file
 	// decompressor
 	decompressor, err := archives.Zstd{}.OpenReader(sh.H2x.Conn)
 	if err != nil {
@@ -371,13 +358,39 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 		return
 	}
 	defer decompressor.Close()
-
-	// read filedata
 	n, err := io.Copy(f, decompressor)
 	if err != nil {
 		CliPrintWarning("ftpHandler failed to save file: %v. %d bytes has been saved", err, n)
 		return
 	}
+
+	// progress
+	go func() {
+		for state := bar.State(); nowSize/targetSize < 1 && state.CurrentPercent < 1; time.Sleep(5 * time.Second) {
+			if util.IsFileExist(filewrite) {
+				// read file size
+				nowSize = util.FileSize(filewrite)
+			} else {
+				nowSize = util.FileSize(targetFile)
+			}
+			// progress
+			bar.Set64(nowSize)
+
+			state = bar.State()
+			// progress may reach 100% when downloading is incomplete
+			if nowSize/targetSize < 1 && state.CurrentPercent == 1 {
+				return
+			}
+			CliPrintInfo("%s: %.2f%% (%d of %d bytes) downloaded at %.2fKB/s, %.2fs passed, %.2fs left",
+				strconv.Quote(filename),
+				state.CurrentPercent*100, nowSize, targetSize, state.KBsPerSecond, state.SecondsSince, state.SecondsLeft)
+		}
+		// now we should be reaching at 100%
+		state := bar.State()
+		CliPrintInfo("%s: %.2f%% (%d of %d bytes) downloaded at %.2fKB/s, %.2fs passed, %.2fs left",
+			strconv.Quote(filename),
+			state.CurrentPercent*100, nowSize, targetSize, state.KBsPerSecond, state.SecondsSince, state.SecondsLeft)
+	}()
 }
 
 // portFwdHandler handles proxy/port forwarding

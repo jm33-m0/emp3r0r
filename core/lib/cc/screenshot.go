@@ -33,7 +33,7 @@ func processScreenshot(out string, target *emp3r0r_data.AgentSystemInfo) (err er
 		return fmt.Errorf("%s", out)
 	}
 	CliPrintInfo("We will get %s screenshot file for you, wait", strconv.Quote(out))
-	err = GetFile(out, target)
+	_, err = GetFile(out, target)
 	if err != nil {
 		err = fmt.Errorf("Get screenshot: %v", err)
 		return
