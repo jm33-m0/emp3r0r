@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.48.2](https://github.com/jm33-m0/emp3r0r/compare/v1.48.1...v1.48.2) (2025-01-14)
+
+
+### Bug Fixes
+
+* interactive modules not opening ([7ccbefb](https://github.com/jm33-m0/emp3r0r/commit/7ccbefbcc978d6c1b7e3cd709063492766c339a2))
+
 ## [1.48.1](https://github.com/jm33-m0/emp3r0r/compare/v1.48.0...v1.48.1) (2025-01-14)
 
 
