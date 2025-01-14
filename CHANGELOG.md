@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.48.1](https://github.com/jm33-m0/emp3r0r/compare/v1.48.0...v1.48.1) (2025-01-14)
+
+
+### Bug Fixes
+
+* agents get removed because commands timeout ([7fc8a23](https://github.com/jm33-m0/emp3r0r/commit/7fc8a236f9b2c4ab7708b0c1bdd8ffb7b7f08ec1))
+* eliminate wait for all commands ([2d004fd](https://github.com/jm33-m0/emp3r0r/commit/2d004fdf47924af7bb0c926ce7310fd1c86c0fa3))
+* modules should not block ([1655958](https://github.com/jm33-m0/emp3r0r/commit/16559587f1678467a82a5f689a2a33c8961876c7))
+* recursive `get`, useful when downloading a directory on a target ([36696e5](https://github.com/jm33-m0/emp3r0r/commit/36696e55e4dda23433d7310a92f04465ac687ae9))
+* sometimes agent can't send back response ([d1a0388](https://github.com/jm33-m0/emp3r0r/commit/d1a03883ef1cc9c026d73740928a271cc62070ee))
+
 ## [1.48.0](https://github.com/jm33-m0/emp3r0r/compare/v1.47.1...v1.48.0) (2025-01-13)
 
 
