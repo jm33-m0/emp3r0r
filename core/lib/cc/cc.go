@@ -231,7 +231,6 @@ func GetTargetDetails(target *emp3r0r_data.AgentSystemInfo) {
 	}
 	control := Targets[target]
 	if control == nil {
-		CliPrintError("Target control interface does not exist")
 		return
 	}
 

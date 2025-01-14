@@ -72,12 +72,11 @@ func wait_for_cmd_response(cmd, cmd_id string, agent *emp3r0r_data.AgentSystemIn
 			return
 		}
 		wait_time := time.Since(now)
-		if wait_time > 1*time.Minute && !waitNeeded(cmd) {
-			CliPrintError("Executing %s on %s: unresponsive for %v, removing agent from list",
+		if wait_time > 90*time.Second && !waitNeeded(cmd) {
+			CliPrintWarning("Executing %s on %s: unresponsive for %v",
 				strconv.Quote(cmd),
 				strconv.Quote(agent.Name),
 				wait_time)
-			ctrl.Cancel()
 			return
 		}
 		util.TakeABlink()
@@ -85,7 +84,7 @@ func wait_for_cmd_response(cmd, cmd_id string, agent *emp3r0r_data.AgentSystemIn
 }
 
 func waitNeeded(cmd string) bool {
-	return strings.HasPrefix(cmd, "!") || strings.HasPrefix(cmd, "#get") || strings.HasPrefix(cmd, "put ")
+	return strings.HasPrefix(cmd, "!") || strings.HasPrefix(cmd, "get") || strings.HasPrefix(cmd, "put ")
 }
 
 // SendCmdToCurrentTarget send a command to currently selected agent
