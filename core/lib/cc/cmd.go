@@ -153,7 +153,7 @@ func CmdHandler(cmd string) (err error) {
 	default:
 		helper := CmdFuncs[cmd]
 		if helper != nil {
-			helper()
+			go helper()
 			return
 		}
 		helper_w_arg := CmdFuncsWithArgs[cmdSplit[0]]
@@ -165,8 +165,9 @@ func CmdHandler(cmd string) (err error) {
 		if CurrentTarget == nil && helper_w_arg == nil {
 			CliPrintError("No agent selected, try `target <index>`")
 			return
+		} else {
+			go helper_w_arg(cmd)
 		}
-		helper_w_arg(cmd)
 	}
 	return
 }
