@@ -56,6 +56,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		if err = Send2CC(&data2send); err != nil {
 			log.Println(err)
 		}
+		log.Printf("Response sent: %s", resp)
 	}
 	out = "Command failed"
 
@@ -117,6 +118,10 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 			})
 			if err != nil {
 				out = fmt.Sprintf("Error: failed to walk directory %s: %v", *file_path, err)
+				return
+			}
+			if len(file_list) == 0 {
+				out = fmt.Sprintf("Error: no files found in %s", *file_path)
 				return
 			}
 			out = strings.Join(file_list, "\n")

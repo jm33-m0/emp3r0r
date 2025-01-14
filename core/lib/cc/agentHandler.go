@@ -48,7 +48,6 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 	cmd := payloadSplit[1]
 	cmd_slice := util.ParseCmd(cmd)
 	out := strings.Join(payloadSplit[2:len(payloadSplit)-1], " ")
-	// outLines := strings.Split(out, "\n")
 
 	is_builtin_cmd := strings.HasPrefix(cmd, "!")
 
