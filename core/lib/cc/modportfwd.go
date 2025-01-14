@@ -121,6 +121,9 @@ func moduleProxy() {
 		for i := 0; i < 120; i++ {
 			_, ok = CmdResults[cmd_id]
 			if ok {
+				CmdResultsMutex.Lock()
+				delete(CmdResults, cmd_id)
+				CmdResultsMutex.Unlock()
 				break
 			}
 			util.TakeABlink()

@@ -201,8 +201,9 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 	}
 
 	// Command output
-	is_critical := strings.Contains(out, "Error") ||
-		strings.Contains(out, "Warning")
+	msg := strings.ToLower(out)
+	is_critical := strings.Contains(msg, "error") ||
+		strings.Contains(msg, "warning") || strings.Contains(msg, "fail") || strings.Contains(msg, "success")
 	if DebugLevel < 3 && !is_critical {
 		// ignore some cmds
 		if strings.HasPrefix(cmd, "!port_fwd") ||

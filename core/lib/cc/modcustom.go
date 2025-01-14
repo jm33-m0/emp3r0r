@@ -163,6 +163,9 @@ func handleInteractiveModule(config emp3r0r_data.ModConfig, cmd_id string) {
 
 	for i := 0; i < 10; i++ {
 		if strings.Contains(CmdResults[cmd_id], "emp3r0r-interactive-module") {
+			CmdResultsMutex.Lock()
+			delete(CmdResults, cmd_id)
+			CmdResultsMutex.Unlock()
 			break
 		}
 		time.Sleep(time.Second)

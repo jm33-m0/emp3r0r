@@ -134,7 +134,7 @@ func GetFile(filepath string, a *emp3r0r_data.AgentSystemInfo) error {
 	ftpSh.H2x = new(emp3r0r_data.H2Conn)
 
 	// cmd
-	cmd := fmt.Sprintf("get --filepath '%s' --offset %d --token '%s'", filepath, offset, ftpSh.Token)
+	cmd := fmt.Sprintf("get --file_path '%s' --offset %d --token '%s'", filepath, offset, ftpSh.Token)
 	err = SendCmd(cmd, "", a)
 	if err != nil {
 		CliPrintError("GetFile send command: %v", err)
