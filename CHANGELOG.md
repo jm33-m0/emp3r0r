@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.48.3](https://github.com/jm33-m0/emp3r0r/compare/v1.48.2...v1.48.3) (2025-01-14)
+
+
+### Bug Fixes
+
+* restrict to 1 task per download for recursive downloads, enforce checksum verification ([7f66130](https://github.com/jm33-m0/emp3r0r/commit/7f661306352711898fb655b187f034e1435aae59))
+
 ## [1.48.2](https://github.com/jm33-m0/emp3r0r/compare/v1.48.1...v1.48.2) (2025-01-14)
 
 
