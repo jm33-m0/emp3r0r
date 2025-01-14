@@ -65,10 +65,8 @@ func wait_for_cmd_response(cmd, cmd_id string, agent *emp3r0r_data.AgentSystemIn
 	}
 	now := time.Now()
 	for ctrl.Ctx.Err() == nil {
-		if _, exists := CmdResults[cmd_id]; exists {
-			CmdResultsMutex.Lock()
-			delete(CmdResults, cmd_id)
-			CmdResultsMutex.Unlock()
+		if resp, exists := CmdResults[cmd_id]; exists {
+			CliPrintDebug("Got response for %s from %s: %s", strconv.Quote(cmd), strconv.Quote(agent.Name), resp)
 			return
 		}
 		wait_time := time.Since(now)
