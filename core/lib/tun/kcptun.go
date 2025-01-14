@@ -148,6 +148,10 @@ func NewConfig(remote_addr, target, port, password, salt string) *Config {
 // password: Runtime password
 // salt: emp3r0r_data.MagicString
 func KCPTunClient(remote_kcp_addr, kcp_listen_port, password, salt string, ctx context.Context, cancel context.CancelFunc) error {
+	defer func() {
+		LogInfo("KCPTunClient exited")
+		cancel()
+	}()
 	config := NewConfig(remote_kcp_addr, "", kcp_listen_port, password, salt)
 	var listener net.Listener
 	var isUnix bool
