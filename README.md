@@ -76,9 +76,10 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
 - LPE Suggest
 - System Info Collect
 - File Management
-  - Enables **resumable downloads/uploads**
-  - Transparent **`zstd` compression** for data exfiltration
-  - SFTP support: browse remote files with any SFTP client, [including your local **GUI file manager**](https://github.com/jm33-m0/emp3r0r/releases/tag/v1.22.3)
+  - **Resumable** downloads/uploads with **integrity** verification
+  - **Recursive** downloads with **regex filter** support
+  - **Transparent `zstd` compression** for data exfiltration
+  - **SFTP** support: browse remote files with any SFTP client, [including your local **GUI file manager**](https://github.com/jm33-m0/emp3r0r/releases/tag/v1.22.3)
 - Log Cleaner
 - Screenshot
 - Anti-Antivirus
