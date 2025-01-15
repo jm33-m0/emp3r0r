@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.48.6](https://github.com/jm33-m0/emp3r0r/compare/v1.48.5...v1.48.6) (2025-01-15)
+
+
+### Bug Fixes
+
+* make prompt string more informative ([7e432d2](https://github.com/jm33-m0/emp3r0r/commit/7e432d260f28c26896f750648a343cec4857bdca))
+
 ## [1.48.5](https://github.com/jm33-m0/emp3r0r/compare/v1.48.4...v1.48.5) (2025-01-15)
 
 
