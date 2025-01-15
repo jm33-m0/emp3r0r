@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/arc"
@@ -167,11 +166,7 @@ func handleInteractiveModule(config emp3r0r_data.ModConfig, cmd_id string) {
 		if strings.Contains(CmdResults[cmd_id], "emp3r0r-interactive-module") {
 			break
 		}
-		time.Sleep(time.Second)
-	}
-	if !strings.Contains(CmdResults[cmd_id], "emp3r0r-interactive-module") {
-		CliPrintError("%s failed to upload", CurrentMod)
-		return
+		util.TakeABlink()
 	}
 	defer func() {
 		CmdResultsMutex.Lock()
