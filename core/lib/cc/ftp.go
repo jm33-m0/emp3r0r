@@ -84,6 +84,16 @@ func PutFile(lpath, rpath string, a *emp3r0r_data.AgentSystemInfo) error {
 	return nil
 }
 
+// generateGetFilePaths generates paths and filenames for GetFile
+func generateGetFilePaths(file_path string) (write_dir, save_to_file, tempname, lock string) {
+	file_path = filepath.Clean(file_path)
+	write_dir = fmt.Sprintf("%s%s", FileGetDir, filepath.Dir(file_path))
+	save_to_file = fmt.Sprintf("%s/%s", write_dir, util.FileBaseName(file_path))
+	tempname = save_to_file + ".downloading"
+	lock = save_to_file + ".lock"
+	return
+}
+
 // GetFile get file from agent
 func GetFile(file_path string, a *emp3r0r_data.AgentSystemInfo) (ftpSh *StreamHandler, err error) {
 	if !util.IsExist(FileGetDir) {
@@ -94,11 +104,8 @@ func GetFile(file_path string, a *emp3r0r_data.AgentSystemInfo) (ftpSh *StreamHa
 		}
 	}
 	CliPrintInfo("Waiting for response from agent %s", a.Tag)
-	file_path = filepath.Clean(file_path)
-	write_dir := fmt.Sprintf("%s%s", FileGetDir, filepath.Dir(file_path))
-	save_to_file := fmt.Sprintf("%s/%s", write_dir, util.FileBaseName(file_path)) // will copy the downloaded file here when we are done
-	tempname := save_to_file + ".downloading"                                     // will be writing to this file
-	lock := save_to_file + ".lock"                                                // don't try to duplicate the task
+
+	write_dir, save_to_file, tempname, lock := generateGetFilePaths(file_path)
 	CliPrintDebug("Get file: %s, save to: %s, tempname: %s, lock: %s", file_path, save_to_file, tempname, lock)
 
 	// create directories
@@ -142,7 +149,7 @@ func GetFile(file_path string, a *emp3r0r_data.AgentSystemInfo) (ftpSh *StreamHa
 	// mark this file transfer stream
 	ftpSh = &StreamHandler{}
 	// tell agent where to seek the left bytes
-	ftpSh.Token = fileinfo.Checksum
+	ftpSh.Token = fmt.Sprintf("%s-%s", util.RandMD5String(), fileinfo.Checksum)
 	ftpSh.Buf = make(chan []byte)
 	ftpSh.BufSize = 1024 * 8
 	FTPMutex.Lock()

@@ -5,6 +5,7 @@ package cc
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -107,19 +108,39 @@ func DownloadFromAgent(cmd string) {
 
 		// download files
 		files := strings.Split(result, "\n")
+		failed_files := []string{}
+		defer func() {
+			CliPrint("Checking %d downloads...", len(files))
+			// check if downloads are successful
+			for _, file := range files {
+				// filenames
+				_, target_file, tempname, lock := generateGetFilePaths(file)
+				// check if download is successful
+				if util.IsFileExist(tempname) || util.IsFileExist(lock) || !util.IsFileExist(target_file) {
+					CliPrintWarning("%s: download seems unsuccessful", file)
+					failed_files = append(failed_files, file)
+				}
+			}
+			if len(failed_files) > 0 {
+				CliPrintError("Failed to download %d files: %s", len(failed_files), strings.Join(failed_files, ", "))
+			}
+		}()
 		CliPrintInfo("Downloading %d files", len(files))
 		for n, file := range files {
 			ftpSh, err := GetFile(file, target)
 			if err != nil {
-				CliPrintError("Cannot get %s: %v", file, err)
+				CliPrintWarning("Cannot get %s: %v", file, err)
+				continue
 			}
 
 			CliPrint("Downloading %d/%d: %s", n+1, len(files), file)
+
 			// wait for file to be downloaded
 			for {
 				if sh, ok := FTPStreams[file]; ok {
 					if ftpSh.Token == sh.Token {
 						util.TakeABlink()
+						continue
 					}
 				}
 				break
@@ -127,7 +148,7 @@ func DownloadFromAgent(cmd string) {
 		}
 	} else {
 		if _, err := GetFile(fileToGet, target); err != nil {
-			CliPrintError("Cannot get %s: %v", inputSlice[1], err)
+			CliPrintError("Cannot get %s: %v", strconv.Quote(fileToGet), err)
 		}
 	}
 }

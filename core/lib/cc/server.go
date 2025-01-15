@@ -249,6 +249,14 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 	}
 	CliPrintDebug("Got a ftp connection (%s) from %s", sh.Token, req.RemoteAddr)
 
+	// file checksum
+	tokenSplit := strings.Split(token, "-")
+	if len(tokenSplit) != 2 {
+		CliPrintError("Invalid token: %s", token)
+		return
+	}
+	must_have_checksum := tokenSplit[1]
+
 	// save the file
 	filename := ""
 	for fname, persh := range FTPStreams {
@@ -262,13 +270,10 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 		CliPrintError("%s failed to parse filename", sh.Token)
 		return
 	}
-	filename = filepath.Clean(filename)                     // sanitize the filename
-	file_dir := filepath.Dir(filename)                      // parent directory
-	filename = util.FileBaseName(filename)                  // the base name
-	write_dir := fmt.Sprintf("%s%s", FileGetDir, file_dir)  // where to save the file
-	targetFile := fmt.Sprintf("%s/%s", write_dir, filename) // move to this file when download is done
-	filewrite := fmt.Sprintf("%s/%s.downloading", write_dir, filename)
-	lock := FileGetDir + filename + ".lock"
+	map_key := filename
+	write_dir, targetFile, filewrite, lock := generateGetFilePaths(filename)
+	filename = filepath.Clean(filename)    // sanitize the filename
+	filename = util.FileBaseName(filename) // the base name
 	CliPrintDebug("ftpHandler: downloading to %s, saving to %s, lock file %s", filewrite, targetFile, lock)
 	if !util.IsDirExist(write_dir) {
 		CliPrintDebug("ftpHandler: mkdir -p %s", write_dir)
@@ -328,7 +333,7 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 		}
 		sh.H2x.Cancel()
 		FTPMutex.Lock()
-		delete(FTPStreams, sh.Token)
+		delete(FTPStreams, map_key)
 		FTPMutex.Unlock()
 		CliPrintWarning("Closed ftp connection from %s", req.RemoteAddr)
 
@@ -347,11 +352,11 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 				CliPrintError("Failed to save downloaded file %s: %v", targetFile, err)
 			}
 			checksum := tun.SHA256SumFile(targetFile)
-			if checksum == sh.Token {
+			if checksum == must_have_checksum {
 				CliPrintSuccess("Downloaded %d bytes to %s (%s)", nowSize, targetFile, checksum)
 				return
 			}
-			CliPrintError("%s downloaded, but checksum mismatch: %s vs %s", targetFile, checksum, sh.Token)
+			CliPrintError("%s downloaded, but checksum mismatch: %s vs %s", targetFile, checksum, must_have_checksum)
 			return
 		}
 		if nowSize > targetSize {
