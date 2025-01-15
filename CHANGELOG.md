@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.48.4](https://github.com/jm33-m0/emp3r0r/compare/v1.48.3...v1.48.4) (2025-01-15)
+
+
+### Bug Fixes
+
+* recursive dowloads should retain directory structure ([20d8bda](https://github.com/jm33-m0/emp3r0r/commit/20d8bda469ec138a7bb15c27e943ec17e97c7869))
+* should check if any files fail to download in recursive downloads ([08427dd](https://github.com/jm33-m0/emp3r0r/commit/08427dd67e26df19734503bdaaf7b839b4854dd5))
+
 ## [1.48.3](https://github.com/jm33-m0/emp3r0r/compare/v1.48.2...v1.48.3) (2025-01-14)
 
 
