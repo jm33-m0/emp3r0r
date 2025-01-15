@@ -132,6 +132,17 @@ func GetFile(file_path string, a *emp3r0r_data.AgentSystemInfo) (ftpSh *StreamHa
 	}
 	fileinfo := *fi
 	filesize := fileinfo.Size
+	// check if file exists
+	if util.IsExist(save_to_file) {
+		checksum := tun.SHA256SumFile(save_to_file)
+		if checksum == fileinfo.Checksum {
+			CliPrintSuccess("%s already exists, checksum matched", save_to_file)
+			return
+		} else {
+			CliPrintWarning("%s already exists, but checksum mismatched", save_to_file)
+		}
+	}
+
 	err = util.FileAllocate(save_to_file, filesize)
 	if err != nil {
 		err = fmt.Errorf("GetFile: %s allocate file: %v", file_path, err)
