@@ -322,6 +322,38 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 	defer bar.Close()
 	CliPrintDebug("ftpHandler: initial target size %d, now size %d", targetSize, nowSize)
 
+	// start progress bar goroutine immediately
+	go func() {
+		if targetSize == 0 {
+			CliPrintWarning("ftpHandler: targetSize is 0")
+			return
+		}
+		for state := bar.State(); nowSize/targetSize < 1 && state.CurrentPercent < 1; time.Sleep(5 * time.Second) {
+			if util.IsFileExist(filewrite) {
+				// read file size
+				nowSize = util.FileSize(filewrite)
+			} else {
+				nowSize = util.FileSize(targetFile)
+			}
+			// progress
+			bar.Set64(nowSize)
+
+			state = bar.State()
+			// progress may reach 100% when downloading is incomplete
+			if nowSize/targetSize < 1 && state.CurrentPercent == 1 {
+				return
+			}
+			CliPrintInfo("%s: %.2f%% (%d of %d bytes) downloaded at %.2fKB/s, %.2fs passed, %.2fs left",
+				strconv.Quote(targetFile),
+				state.CurrentPercent*100, nowSize, targetSize, state.KBsPerSecond, state.SecondsSince, state.SecondsLeft)
+		}
+		// now we should be reaching at 100%
+		state := bar.State()
+		CliPrintInfo("%s: %.2f%% (%d of %d bytes) downloaded at %.2fKB/s, %.2fs passed, %.2fs left",
+			strconv.Quote(targetFile),
+			state.CurrentPercent*100, nowSize, targetSize, state.KBsPerSecond, state.SecondsSince, state.SecondsLeft)
+	}()
+
 	// on exit
 	cleanup := func() {
 		// cleanup
