@@ -228,6 +228,7 @@ func SetDynamicPrompt() {
 	shortName := "local" // if no target is selected
 	prompt_arrow := color.New(color.Bold, color.FgHiCyan).Sprintf("$ ")
 	prompt_name := color.New(color.Bold, color.FgBlack, color.BgHiWhite).Sprint(PromptName)
+	transport := color.New(color.FgRed).Sprint("local")
 
 	if CurrentTarget != nil && IsAgentExist(CurrentTarget) {
 		shortName = strings.Split(CurrentTarget.Tag, "-agent")[0]
@@ -235,6 +236,7 @@ func SetDynamicPrompt() {
 			prompt_arrow = color.New(color.Bold, color.FgHiGreen).Sprint("# ")
 			prompt_name = color.New(color.Bold, color.FgBlack, color.BgHiGreen).Sprint(PromptName)
 		}
+		transport = getTransportString(CurrentTarget.Transport)
 	}
 	if CurrentMod == "<blank>" {
 		CurrentMod = "none" // if no module is selected
@@ -242,13 +244,39 @@ func SetDynamicPrompt() {
 	agent_name := color.New(color.FgCyan, color.Underline).Sprint(shortName)
 	mod_name := color.New(color.FgHiBlue).Sprint(CurrentMod)
 
-	dynamicPrompt := fmt.Sprintf("%s @%s (%s) "+prompt_arrow,
+	dynamicPrompt := fmt.Sprintf("%s - %s @%s (%s) "+prompt_arrow,
 		prompt_name,
+		transport,
 		agent_name,
 		mod_name,
 	)
 	EmpReadLine.Config.Prompt = dynamicPrompt
 	EmpReadLine.SetPrompt(dynamicPrompt)
+}
+
+func getTransportString(transportStr string) string {
+	transportStr = strings.ToLower(transportStr)
+	switch {
+	case strings.Contains(transportStr, "http2"):
+		return color.New(color.FgHiBlue).Sprint("http2")
+	case strings.Contains(transportStr, "shadowsocks"):
+		if strings.Contains(transportStr, "kcp") {
+			return color.New(color.FgHiMagenta).Sprint("kcp")
+		}
+		return color.New(color.FgHiMagenta).Sprint("ss")
+	case strings.Contains(transportStr, "tor"):
+		return color.New(color.FgHiGreen).Sprint("tor")
+	case strings.Contains(transportStr, "cdn"):
+		return color.New(color.FgGreen).Sprint("cdn")
+	case strings.Contains(transportStr, "reverse proxy"):
+		return color.New(color.FgHiCyan).Sprint("rproxy")
+	case strings.Contains(transportStr, "auto proxy"):
+		return color.New(color.FgHiYellow).Sprint("aproxy")
+	case strings.Contains(transportStr, "proxy"):
+		return color.New(color.FgHiYellow).Sprint("proxy")
+	default:
+		return color.New(color.FgHiWhite).Sprint("unknown")
+	}
 }
 
 func cliPrintHelper(format string, a []interface{}, msgColor *color.Color, logPrefix string, alert bool) {
