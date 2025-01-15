@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -92,13 +94,26 @@ func GetFile(file_path string, a *emp3r0r_data.AgentSystemInfo) (ftpSh *StreamHa
 		}
 	}
 	CliPrintInfo("Waiting for response from agent %s", a.Tag)
-	filename := FileGetDir + util.FileBaseName(file_path) // will copy the downloaded file here when we are done
-	tempname := filename + ".downloading"                 // will be writing to this file
-	lock := filename + ".lock"                            // don't try to duplicate the task
+	file_path = filepath.Clean(file_path)
+	write_dir := fmt.Sprintf("%s%s", FileGetDir, filepath.Dir(file_path))
+	save_to_file := fmt.Sprintf("%s/%s", write_dir, util.FileBaseName(file_path)) // will copy the downloaded file here when we are done
+	tempname := save_to_file + ".downloading"                                     // will be writing to this file
+	lock := save_to_file + ".lock"                                                // don't try to duplicate the task
+	CliPrintDebug("Get file: %s, save to: %s, tempname: %s, lock: %s", file_path, save_to_file, tempname, lock)
+
+	// create directories
+	if !util.IsDirExist(write_dir) {
+		CliPrintInfo("Creating directory: %s", strconv.Quote(write_dir))
+		err = os.MkdirAll(write_dir, 0o700)
+		if err != nil {
+			err = fmt.Errorf("GetFile mkdir %s: %v", write_dir, err)
+			return
+		}
+	}
 
 	// is this file already being downloaded?
 	if util.IsExist(lock) {
-		err = fmt.Errorf("%s is already being downloaded", filename)
+		err = fmt.Errorf("%s is already being downloaded", save_to_file)
 		return
 	}
 
@@ -110,7 +125,7 @@ func GetFile(file_path string, a *emp3r0r_data.AgentSystemInfo) (ftpSh *StreamHa
 	}
 	fileinfo := *fi
 	filesize := fileinfo.Size
-	err = util.FileAllocate(filename, filesize)
+	err = util.FileAllocate(save_to_file, filesize)
 	if err != nil {
 		err = fmt.Errorf("GetFile: %s allocate file: %v", file_path, err)
 		return
