@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.48.5](https://github.com/jm33-m0/emp3r0r/compare/v1.48.4...v1.48.5) (2025-01-15)
+
+
+### Bug Fixes
+
+* do not download again if already downloaded and checksum matched ([aa9ec97](https://github.com/jm33-m0/emp3r0r/commit/aa9ec976838e1693edc18f9548b4d464767efee8))
+* regex filter for recursive downloads ([1443b01](https://github.com/jm33-m0/emp3r0r/commit/1443b0144fb6eadef89b385f57ca44ac86a4a3a8))
+
 ## [1.48.4](https://github.com/jm33-m0/emp3r0r/compare/v1.48.3...v1.48.4) (2025-01-15)
 
 
