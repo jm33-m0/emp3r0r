@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.48.7](https://github.com/jm33-m0/emp3r0r/compare/v1.48.6...v1.48.7) (2025-01-15)
+
+
+### Bug Fixes
+
+* interactive modules "failed to upload" ([924dbca](https://github.com/jm33-m0/emp3r0r/commit/924dbcaaea0217f095bada162171473d7842cbae))
+
 ## [1.48.6](https://github.com/jm33-m0/emp3r0r/compare/v1.48.5...v1.48.6) (2025-01-15)
 
 
