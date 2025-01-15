@@ -33,7 +33,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 	}
 
 	exe, err := exec.LookPath(shell)
-	if err != nil {
+	if err != nil && shell != "sftp" {
 		res := fmt.Sprintf("%s not found (%v), aborting", shell, err)
 		log.Print(res)
 		return

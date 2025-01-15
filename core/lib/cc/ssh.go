@@ -37,7 +37,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 	ssh_prog := "ssh"
 	if is_sftp {
 		ssh_prog = "sftp"
-		shell = "elvish"
+		shell = "sftp"
 	}
 
 	// if shell/sftp pane already exists, abort
@@ -50,7 +50,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 	}
 
 	// SSHDShellPort is reserved
-	is_new_port_needed := (port == RuntimeConfig.SSHDShellPort)
+	is_new_port_needed := (port == RuntimeConfig.SSHDShellPort && shell != "sftp")
 	// check if port mapping is already open, if yes, use it
 	for s, mapping := range SSHShellPort {
 		if s == shell && mapping.Agent == CurrentTarget {
