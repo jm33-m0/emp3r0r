@@ -45,6 +45,9 @@ var (
 	// InitCmdCompls initial completions for readline, so we can roll back
 	InitCmdCompls []readline.PrefixCompleterInterface
 
+	// CLICommands holds all commands
+	CLICommands []string
+
 	// EmpReadLine : our commandline
 	EmpReadLine *readline.Instance
 
@@ -56,7 +59,17 @@ var (
 
 func init_completion() {
 	// completer
-	CmdCompls = []readline.PrefixCompleterInterface{
+	// skip commands that require arguments
+	for cmd_name, cmd := range CommandMap {
+		CLICommands = append(CLICommands, cmd_name)
+		if cmd.HasArg {
+			CliPrintDebug("Skipping %s", strconv.Quote(cmd_name))
+			continue
+		}
+		CmdCompls = append(CmdCompls, readline.PcItem(cmd_name))
+	}
+
+	subcmds_completion := []readline.PrefixCompleterInterface{
 		readline.PcItem("rm",
 			readline.PcItemDynamic(listRemoteDir())),
 
@@ -100,14 +113,7 @@ func init_completion() {
 		readline.PcItem("delete_port_fwd",
 			readline.PcItemDynamic(listPortMappings())),
 	}
-
-	// skip commands that require arguments
-	for cmd_name, cmd := range CommandMap {
-		if cmd.HasArg {
-			continue
-		}
-		CmdCompls = append(CmdCompls, readline.PcItem(cmd_name))
-	}
+	CmdCompls = append(CmdCompls, subcmds_completion...)
 	CliCompleter.SetChildren(CmdCompls)
 	// remember initial CmdCompls
 	InitCmdCompls = CmdCompls
@@ -661,7 +667,7 @@ func listOptions() func(string) []string {
 
 // remote autocomplete items in $PATH
 func listAgentExes(agent *emp3r0r_data.AgentSystemInfo) []string {
-	CliPrintDebug("listing exes in PATH")
+	CliPrintDebug("Listing agent %s's exes in PATH", agent.Tag)
 	exes := make([]string, 0)
 	if agent == nil {
 		CliPrintDebug("No valid target selected so no autocompletion for exes")
@@ -678,11 +684,24 @@ func listAgentExes(agent *emp3r0r_data.AgentSystemInfo) []string {
 }
 
 // when a target is selected, update CmdCompls with PATH items
-func updateAgentExes(agent *emp3r0r_data.AgentSystemInfo) {
+func autoCompleteAgentExes(agent *emp3r0r_data.AgentSystemInfo) {
 	exes := listAgentExes(agent)
 	temp_CmdCompls := InitCmdCompls
 
+	is_exe_same_as_cmd := func(exe string) bool {
+		for _, cmd := range CLICommands {
+			if exe == cmd {
+				return true
+			}
+		}
+		return false
+	}
+
 	for _, exe := range exes {
+		if is_exe_same_as_cmd(exe) {
+			CliPrintDebug("Exe %s exists in CLI commands, skipping", strconv.Quote(exe))
+			continue
+		}
 		temp_CmdCompls = append(temp_CmdCompls, readline.PcItem(exe))
 	}
 

@@ -41,7 +41,7 @@ var CommandMap = map[string]Command{
 	},
 	"set": {
 		Name:   "set",
-		Help:   "Set an option. eg. `set <option> <val>`",
+		Help:   "Set an option. eg. `set <option> <value>`",
 		Func:   setOptVal,
 		HasArg: true,
 	},
@@ -359,7 +359,7 @@ func setCurrentTarget(cmd string) {
 		}
 
 		CliPrint("Run `file_manager` to open a SFTP session")
-		updateAgentExes(target_to_set)
+		autoCompleteAgentExes(target_to_set)
 	}
 
 	if target_to_set == nil {
