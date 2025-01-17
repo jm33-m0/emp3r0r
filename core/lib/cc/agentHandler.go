@@ -191,12 +191,9 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 	}
 
 	// Command output
-	msg := strings.ToLower(out)
-	is_critical := strings.Contains(msg, "error") ||
-		strings.Contains(msg, "warning") || strings.Contains(msg, "fail") || strings.Contains(msg, "success")
-	no_need_to_show := strings.HasPrefix(cmd, "!port_fwd") ||
-		strings.HasPrefix(cmd, "!sshd") || strings.HasPrefix(cmd, "!ls_dir")
-	if DebugLevel < 3 && !is_critical {
+	no_need_to_show := strings.HasPrefix(cmd, emp3r0r_data.C2CmdPortFwd) ||
+		strings.HasPrefix(cmd, emp3r0r_data.C2CmdSSHD) || strings.HasPrefix(cmd, emp3r0r_data.C2CmdListDir)
+	if DebugLevel < 3 {
 		// ignore some cmds
 		if no_need_to_show {
 			return
