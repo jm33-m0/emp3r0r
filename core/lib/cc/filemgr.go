@@ -14,9 +14,6 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// LsDir cache items in current directory
-var LsDir []string
-
 func FSCmdDst(cmd string) {
 	inputSlice := util.ParseCmd(cmd)
 

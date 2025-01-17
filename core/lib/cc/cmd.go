@@ -13,73 +13,187 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// CommandHelp holds all commands and their help string, command: help
-var CommandHelp = map[string]string{
-	HELP:              "Print this help, 'help <module>' gives help for a module",
-	"target":          "Set target. eg. `target <index>`",
-	"file_manager":    "Browse remote files in your local file manager with SFTP protocol",
-	"set":             "Set an option. eg. `set <option> <val>`",
-	"use":             "Use a module. eg. `use <module_name>`",
-	"run":             "Run selected module, make sure you have set required options",
-	"info":            "What options do we have?",
-	"upgrade_agent":   "Upgrade agent on selected target, put agent binary in /tmp/emp3r0r/www/agent first",
-	"upgrade_cc":      "Upgrade emp3r0r from GitHub",
-	"ls":              "List current directory of selected agent",
-	"mv":              "Move a file to another location on selected target",
-	"cp":              "Copy a file to another location on selected target",
-	"cd":              "Change current working directory of selected agent",
-	"rm":              "Delete a file/directory on selected agent",
-	"mkdir":           "Create new directory on selected agent",
-	"pwd":             "Current working directory of selected agent",
-	"ps":              "Process list of selected agent",
-	"net_helper":      "Network helper: ip addr, ip route, ip neigh",
-	"kill":            "Terminate a process on selected agent: eg. `kill <pid>`",
-	"get":             "Download a file from selected agent",
-	"put":             "Upload a file to selected agent",
-	"screenshot":      "Take a screenshot of selected agent",
-	"suicide":         "Kill agent process, delete agent root directory",
-	"ls_targets":      "List all targets",
-	"ls_modules":      "List all modules",
-	"search":          "Search modules",
-	"ls_port_fwds":    "List all port mappings",
-	"debug":           "Set debug level: -1 (least verbose) to 1 (most verbose)",
-	"delete_port_fwd": "Delete a port mapping",
-	"exit":            "Exit",
+type Command struct {
+	Name   string
+	Help   string
+	Func   interface{}
+	HasArg bool
 }
 
-// CmdFuncs holds a map of helper functions
-var CmdFuncs = map[string]func(){
-	"ls_targets":    ls_targets,
-	"ls_modules":    ListModules,
-	"ls_port_fwds":  ListPortFwds,
-	"info":          CliListOptions,
-	"run":           ModuleRun,
-	"screenshot":    TakeScreenshot,
-	"file_manager":  OpenFileManager,
-	"upgrade_agent": UpgradeAgent,
-	"suicide":       Suicide,
-}
-
-// CmdFuncsWithArgs commands that accept a single string parameter
-var CmdFuncsWithArgs = map[string]func(string){
-	"ls":              FSNoArgCmd,
-	"pwd":             FSNoArgCmd,
-	"cd":              FSCmdDst,
-	"rm":              FSCmdDst,
-	"mkdir":           FSCmdDst,
-	"mv":              FSCmdSrcDst,
-	"cp":              FSCmdSrcDst,
-	"put":             UploadToAgent,
-	"get":             DownloadFromAgent,
-	"ps":              FSNoArgCmd,
-	"net_helper":      FSNoArgCmd,
-	"kill":            FSCmdDst,
-	"delete_port_fwd": DeletePortFwdSession,
-	"debug":           setDebugLevel,
-	"search":          ModuleSearch,
-	"set":             setOptVal,
-	"label":           setTargetLabel,
-	"target":          setCurrentTarget,
+// CommandMap holds all commands
+var CommandMap = map[string]Command{
+	HELP: {
+		Name: HELP,
+		Help: "Print this help, 'help <module>' gives help for a module",
+		Func: nil,
+	},
+	"target": {
+		Name:   "target",
+		Help:   "Set target. eg. `target <index>`",
+		Func:   setCurrentTarget,
+		HasArg: true,
+	},
+	"file_manager": {
+		Name: "file_manager",
+		Help: "Browse remote files in your local file manager with SFTP protocol",
+		Func: OpenFileManager,
+	},
+	"set": {
+		Name:   "set",
+		Help:   "Set an option. eg. `set <option> <val>`",
+		Func:   setOptVal,
+		HasArg: true,
+	},
+	"use": {
+		Name:   "use",
+		Help:   "Use a module. eg. `use <module_name>`",
+		Func:   useModule,
+		HasArg: true,
+	},
+	"run": {
+		Name: "run",
+		Help: "Run selected module, make sure you have set required options",
+		Func: ModuleRun,
+	},
+	"info": {
+		Name: "info",
+		Help: "What options do we have?",
+		Func: CliListOptions,
+	},
+	"upgrade_agent": {
+		Name: "upgrade_agent",
+		Help: "Upgrade agent on selected target, put agent binary in /tmp/emp3r0r/www/agent first",
+		Func: UpgradeAgent,
+	},
+	"upgrade_cc": {
+		Name: "upgrade_cc",
+		Help: "Upgrade emp3r0r from GitHub",
+	},
+	"ls": {
+		Name:   "ls",
+		Help:   "List current directory of selected agent",
+		Func:   FSNoArgCmd,
+		HasArg: true,
+	},
+	"mv": {
+		Name:   "mv",
+		Help:   "Move a file to another location on selected target",
+		Func:   FSCmdSrcDst,
+		HasArg: true,
+	},
+	"cp": {
+		Name:   "cp",
+		Help:   "Copy a file to another location on selected target",
+		Func:   FSCmdSrcDst,
+		HasArg: true,
+	},
+	"cd": {
+		Name:   "cd",
+		Help:   "Change current working directory of selected agent",
+		Func:   FSCmdDst,
+		HasArg: true,
+	},
+	"rm": {
+		Name:   "rm",
+		Help:   "Delete a file/directory on selected agent",
+		Func:   FSCmdDst,
+		HasArg: true,
+	},
+	"mkdir": {
+		Name:   "mkdir",
+		Help:   "Create new directory on selected agent",
+		Func:   FSCmdDst,
+		HasArg: true,
+	},
+	"pwd": {
+		Name:   "pwd",
+		Help:   "Current working directory of selected agent",
+		Func:   FSNoArgCmd,
+		HasArg: true,
+	},
+	"ps": {
+		Name:   "ps",
+		Help:   "Process list of selected agent",
+		Func:   FSNoArgCmd,
+		HasArg: true,
+	},
+	"net_helper": {
+		Name:   "net_helper",
+		Help:   "Network helper: ip addr, ip route, ip neigh",
+		Func:   FSNoArgCmd,
+		HasArg: true,
+	},
+	"kill": {
+		Name:   "kill",
+		Help:   "Terminate a process on selected agent: eg. `kill <pid>`",
+		Func:   FSCmdDst,
+		HasArg: true,
+	},
+	"get": {
+		Name:   "get",
+		Help:   "Download a file from selected agent",
+		Func:   DownloadFromAgent,
+		HasArg: true,
+	},
+	"put": {
+		Name:   "put",
+		Help:   "Upload a file to selected agent",
+		Func:   UploadToAgent,
+		HasArg: true,
+	},
+	"screenshot": {
+		Name: "screenshot",
+		Help: "Take a screenshot of selected agent",
+		Func: TakeScreenshot,
+	},
+	"suicide": {
+		Name: "suicide",
+		Help: "Kill agent process, delete agent root directory",
+		Func: Suicide,
+	},
+	"ls_targets": {
+		Name: "ls_targets",
+		Help: "List all targets",
+		Func: ls_targets,
+	},
+	"ls_modules": {
+		Name: "ls_modules",
+		Help: "List all modules",
+		Func: ListModules,
+	},
+	"search": {
+		Name:   "search",
+		Help:   "Search modules",
+		Func:   ModuleSearch,
+		HasArg: true,
+	},
+	"ls_port_fwds": {
+		Name: "ls_port_fwds",
+		Help: "List all port mappings",
+		Func: ListPortFwds,
+	},
+	"debug": {
+		Name:   "debug",
+		Help:   "Set debug level: -1 (least verbose) to 1 (most verbose)",
+		Func:   setDebugLevel,
+		HasArg: true,
+	},
+	"delete_port_fwd": {
+		Name:   "delete_port_fwd",
+		Help:   "Delete a port mapping",
+		Func:   DeletePortFwdSession,
+		HasArg: true,
+	},
+	"exit": {
+		Name: "exit",
+		Help: "Exit",
+	},
+	"label": {
+		Name:   "label",
+		Help:   "Set a label for a target",
+		Func:   setTargetLabel,
+		HasArg: true,
+	},
 }
 
 // CmdTime Record the time spent on each command
@@ -124,52 +238,52 @@ func CmdHandler(cmd string) (err error) {
 		}
 		CmdHelp(cmdSplit[1])
 
-	case cmdSplit[0] == "use":
-		if len(cmdSplit) != 2 {
-			CliPrintError("use what? %s", strconv.Quote(cmd))
-			return
-		}
-		defer SetDynamicPrompt()
-		for mod := range ModuleHelpers {
-			if mod == cmdSplit[1] {
-				CurrentMod = cmdSplit[1]
-				for k := range Options {
-					delete(Options, k)
-				}
-				UpdateOptions(CurrentMod)
-				CliPrintInfo("Using module %s", strconv.Quote(CurrentMod))
-				ModuleDetails(CurrentMod)
-				mod, exists := emp3r0r_data.Modules[CurrentMod]
-				if exists {
-					CliPrint("%s", mod.Comment)
-				}
-				CliListOptions()
-
+	default:
+		command, exists := CommandMap[cmdSplit[0]]
+		if !exists {
+			if CurrentTarget != nil {
+				CliPrintWarning("Exec: %s on %s", strconv.Quote(cmd), strconv.Quote(CurrentTarget.Tag))
+				SendCmdToCurrentTarget(cmd, "")
 				return
 			}
-		}
-		CliPrintError("No such module: %s", strconv.Quote(cmdSplit[1]))
-
-	default:
-		helper := CmdFuncs[cmd]
-		if helper != nil {
-			go helper()
-			return
-		}
-		helper_w_arg := CmdFuncsWithArgs[cmdSplit[0]]
-		if helper_w_arg == nil && CurrentTarget != nil {
-			CliPrintWarning("Exec: %s on %s", strconv.Quote(cmd), strconv.Quote(CurrentTarget.Tag))
-			SendCmdToCurrentTarget(cmd, "")
-			return
-		}
-		if CurrentTarget == nil && helper_w_arg == nil {
 			CliPrintError("No agent selected, try `target <index>`")
 			return
+		}
+		if command.HasArg {
+			command.Func.(func(string))(cmd)
 		} else {
-			go helper_w_arg(cmd)
+			command.Func.(func())()
 		}
 	}
 	return
+}
+
+func useModule(cmd string) {
+	cmdSplit := strings.Fields(cmd)
+	if len(cmdSplit) != 2 {
+		CliPrintError("use what? %s", strconv.Quote(cmd))
+		return
+	}
+	defer SetDynamicPrompt()
+	for mod := range ModuleHelpers {
+		if mod == cmdSplit[1] {
+			CurrentMod = cmdSplit[1]
+			for k := range Options {
+				delete(Options, k)
+			}
+			UpdateOptions(CurrentMod)
+			CliPrintInfo("Using module %s", strconv.Quote(CurrentMod))
+			ModuleDetails(CurrentMod)
+			mod, exists := emp3r0r_data.Modules[CurrentMod]
+			if exists {
+				CliPrint("%s", mod.Comment)
+			}
+			CliListOptions()
+
+			return
+		}
+	}
+	CliPrintError("No such module: %s", strconv.Quote(cmdSplit[1]))
 }
 
 // CmdHelp prints help in two columns
@@ -177,7 +291,10 @@ func CmdHandler(cmd string) (err error) {
 func CmdHelp(mod string) {
 	help := make(map[string]string)
 	if mod == "" {
-		CliPrettyPrint("Command", "Help", &CommandHelp)
+		for cmd, cmdObj := range CommandMap {
+			help[cmd] = cmdObj.Help
+		}
+		CliPrettyPrint("Command", "Help", &help)
 		return
 	}
 

@@ -151,8 +151,6 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 			return
 		}
 
-		LsDir = nil // clear cache
-
 		// build table
 		tdata := [][]string{}
 		tableString := &strings.Builder{}
@@ -180,13 +178,6 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 		for _, d := range dents {
 			dname := util.SplitLongLine(d.Name, 20)
 			tdata = append(tdata, []string{dname, d.Ftype, d.Size, d.Date, d.Permission})
-			if len(cmd_slice) == 1 {
-				if d.Ftype == "file" {
-					LsDir = append(LsDir, d.Name)
-				} else {
-					LsDir = append(LsDir, d.Name+"/")
-				}
-			}
 		}
 
 		// print table
@@ -203,10 +194,11 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 	msg := strings.ToLower(out)
 	is_critical := strings.Contains(msg, "error") ||
 		strings.Contains(msg, "warning") || strings.Contains(msg, "fail") || strings.Contains(msg, "success")
+	no_need_to_show := strings.HasPrefix(cmd, "!port_fwd") ||
+		strings.HasPrefix(cmd, "!sshd") || strings.HasPrefix(cmd, "!ls_dir")
 	if DebugLevel < 3 && !is_critical {
 		// ignore some cmds
-		if strings.HasPrefix(cmd, "!port_fwd") ||
-			strings.HasPrefix(cmd, "!sshd") {
+		if no_need_to_show {
 			return
 		}
 	}

@@ -14,10 +14,12 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	cowsay "github.com/Code-Hex/Neo-cowsay/v2"
 	"github.com/bettercap/readline"
 	"github.com/fatih/color"
+	"github.com/google/uuid"
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	"github.com/jm33-m0/emp3r0r/core/lib/ss"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -117,24 +119,12 @@ func CliMain() {
 			readline.PcItemDynamic(listPortMappings())),
 	}
 
-	for cmd := range CommandHelp {
-		if cmd == "set" ||
-			cmd == "use" ||
-			cmd == "get" ||
-			cmd == "put" ||
-			cmd == "cp" ||
-			cmd == "mkdir" ||
-			cmd == "target" ||
-			cmd == "label" ||
-			cmd == "delete_port_fwd" ||
-			cmd == "rm" ||
-			cmd == "mv" ||
-			cmd == "ls" ||
-			cmd == "cd" ||
-			cmd == HELP {
+	// skip commands that require arguments
+	for cmd_name, cmd := range CommandMap {
+		if cmd.HasArg {
 			continue
 		}
-		CmdCompls = append(CmdCompls, readline.PcItem(cmd))
+		CmdCompls = append(CmdCompls, readline.PcItem(cmd_name))
 	}
 	CliCompleter.SetChildren(CmdCompls)
 	// remember initial CmdCompls
@@ -153,7 +143,7 @@ func CliMain() {
 	// set up readline instance
 	EmpReadLine, err = readline.NewEx(&readline.Config{
 		Prompt:          EmpPrompt,
-		HistoryFile:     "./.emp3r0r.history",
+		HistoryFile:     fmt.Sprintf("%s/emp3r0r.history", EmpWorkSpace),
 		AutoComplete:    CliCompleter,
 		InterruptPrompt: "^C\nExiting...\n",
 		EOFPrompt:       "^D\nExiting...\n",
@@ -169,7 +159,7 @@ func CliMain() {
 
 	err = TmuxInitWindows()
 	if err != nil {
-		log.Fatalf("Fatal TMUX error: %v, please run `tmux kill-server` and re-run emp3r0r", err)
+		log.Fatalf("Fatal TMUX error: %v, please run `tmux kill-session -t emp3r0r` and re-run emp3r0r", err)
 	}
 
 	defer TmuxDeinitWindows()
@@ -178,7 +168,7 @@ start:
 	SetDynamicPrompt()
 	for {
 		if EmpReadLine == nil {
-			CliPrintError("EmpReadLine is nil, aborting")
+			CliPrintError("Readline broken, aborting")
 			return
 		}
 		line, readlineErr := EmpReadLine.Readline()
@@ -699,7 +689,33 @@ func updateAgentExes(agent *emp3r0r_data.AgentSystemInfo) {
 func listRemoteDir() func(string) []string {
 	return func(line string) []string {
 		names := make([]string, 0)
-		for _, name := range LsDir {
+		cmd := fmt.Sprintf("%s --path .", emp3r0r_data.C2CmdListDir)
+		cmd_id := uuid.NewString()
+		err := SendCmdToCurrentTarget(cmd, cmd_id)
+		if err != nil {
+			CliPrintDebug("Cannot list remote directory: %v", err)
+			return names
+		}
+		remote_entries := []string{}
+		for i := 0; i < 100; i++ {
+			if res, exists := CmdResults[cmd_id]; exists {
+				remote_entries = strings.Split(res, "\n")
+				CmdResultsMutex.Lock()
+				delete(CmdResults, cmd_id)
+				CmdResultsMutex.Unlock()
+				break
+			}
+			time.Sleep(100 * time.Millisecond)
+			if i == 99 {
+				CliPrintDebug("Timeout listing remote directory")
+				return names
+			}
+		}
+		if len(remote_entries) == 0 {
+			CliPrintDebug("Nothing in remote directory")
+			return names
+		}
+		for _, name := range remote_entries {
 			name = strings.ReplaceAll(name, "\t", "\\t")
 			name = strings.ReplaceAll(name, " ", "\\ ")
 			names = append(names, name)
