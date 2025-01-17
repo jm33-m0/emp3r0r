@@ -28,7 +28,7 @@ func TakeScreenshot() {
 	// then we handle the cmd output in agentHandler
 }
 
-func processScreenshot(out string, target *emp3r0r_data.AgentSystemInfo) (err error) {
+func processScreenshot(out string, target *emp3r0r_data.Emp3r0rAgent) (err error) {
 	if strings.Contains(out, "Error") {
 		return fmt.Errorf("%s", out)
 	}

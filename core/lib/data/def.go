@@ -399,8 +399,8 @@ const (
 	C2CmdMemDump        = "!mem_dump"
 )
 
-// AgentSystemInfo agent properties
-type AgentSystemInfo struct {
+// Emp3r0rAgent agent properties
+type Emp3r0rAgent struct {
 	Tag         string           `json:"Tag"`          // identifier of the agent
 	Name        string           `json:"Name"`         // short name of the agent
 	Version     string           `json:"Version"`      // agent version

@@ -18,10 +18,10 @@ import (
 )
 
 type SSH_SHELL_Mapping struct {
-	Shell   string                        // the shell to run, eg. bash, python
-	Agent   *emp3r0r_data.AgentSystemInfo // the agent this shell is connected to
-	PortFwd *PortFwdSession               // the port mapping for this shell session
-	ToPort  string                        // the port to connect to on the agent side, always the same as PortFwd.To's port
+	Shell   string                     // the shell to run, eg. bash, python
+	Agent   *emp3r0r_data.Emp3r0rAgent // the agent this shell is connected to
+	PortFwd *PortFwdSession            // the port mapping for this shell session
+	ToPort  string                     // the port to connect to on the agent side, always the same as PortFwd.To's port
 }
 
 // shell - port mapping

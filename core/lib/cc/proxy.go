@@ -31,10 +31,10 @@ type PortFwdSession struct {
 	Listener    *net.UDPConn // if mapping is UDP, we need its listener
 	Timeout     int          // timeout in seconds
 
-	Agent  *emp3r0r_data.AgentSystemInfo // agent who holds this port mapping session
-	Sh     map[string]*StreamHandler     // related to HTTP handler
-	Ctx    context.Context               // PortFwd context
-	Cancel context.CancelFunc            // PortFwd cancel
+	Agent  *emp3r0r_data.Emp3r0rAgent // agent who holds this port mapping session
+	Sh     map[string]*StreamHandler  // related to HTTP handler
+	Ctx    context.Context            // PortFwd context
+	Cancel context.CancelFunc         // PortFwd cancel
 }
 
 type port_mapping struct {

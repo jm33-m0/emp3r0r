@@ -323,7 +323,7 @@ func setCurrentTarget(cmd string) {
 		return
 	}
 	defer SetDynamicPrompt()
-	var target_to_set *emp3r0r_data.AgentSystemInfo
+	var target_to_set *emp3r0r_data.Emp3r0rAgent
 
 	// select by tag or index
 	target_to_set = GetTargetFromTag(strings.Join(cmdSplit[1:], " "))
@@ -334,7 +334,7 @@ func setCurrentTarget(cmd string) {
 		}
 	}
 
-	select_agent := func(a *emp3r0r_data.AgentSystemInfo) {
+	select_agent := func(a *emp3r0r_data.Emp3r0rAgent) {
 		CurrentTarget = a
 		GetTargetDetails(CurrentTarget)
 		CliPrintSuccess("Now targeting %s", CurrentTarget.Tag)
@@ -379,7 +379,7 @@ func setTargetLabel(cmd string) {
 		CliPrintError("Invalid command %s, usage: 'label <tag/index> <label>'", strconv.Quote(cmd))
 		return
 	}
-	target := new(emp3r0r_data.AgentSystemInfo)
+	target := new(emp3r0r_data.Emp3r0rAgent)
 	label := strings.Join(cmdSplit[2:], " ")
 
 	// select by tag or index

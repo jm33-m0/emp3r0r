@@ -49,7 +49,7 @@ var (
 	EmpConfigFile = ""
 
 	// Targets target list, with control (tun) interface
-	Targets      = make(map[*emp3r0r_data.AgentSystemInfo]*Control)
+	Targets      = make(map[*emp3r0r_data.Emp3r0rAgent]*Control)
 	TargetsMutex = sync.RWMutex{}
 
 	// certs
@@ -83,7 +83,7 @@ type Control struct {
 func headlessListTargets() (err error) {
 	TargetsMutex.RLock()
 	defer TargetsMutex.RUnlock()
-	var targets []emp3r0r_data.AgentSystemInfo
+	var targets []emp3r0r_data.Emp3r0rAgent
 	for target := range Targets {
 		targets = append(targets, *target)
 	}
@@ -215,7 +215,7 @@ func ls_targets() {
 	TmuxSwitchWindow(AgentListPane.WindowID)
 }
 
-func GetTargetDetails(target *emp3r0r_data.AgentSystemInfo) {
+func GetTargetDetails(target *emp3r0r_data.Emp3r0rAgent) {
 	// nil?
 	if target == nil {
 		CliPrintDebug("Target is nil")
@@ -330,7 +330,7 @@ func GetTargetDetails(target *emp3r0r_data.AgentSystemInfo) {
 }
 
 // GetTargetFromIndex find target from Targets via control index, return nil if not found
-func GetTargetFromIndex(index int) (target *emp3r0r_data.AgentSystemInfo) {
+func GetTargetFromIndex(index int) (target *emp3r0r_data.Emp3r0rAgent) {
 	TargetsMutex.RLock()
 	defer TargetsMutex.RUnlock()
 	for t, ctl := range Targets {
@@ -343,7 +343,7 @@ func GetTargetFromIndex(index int) (target *emp3r0r_data.AgentSystemInfo) {
 }
 
 // GetTargetFromTag find target from Targets via tag, return nil if not found
-func GetTargetFromTag(tag string) (target *emp3r0r_data.AgentSystemInfo) {
+func GetTargetFromTag(tag string) (target *emp3r0r_data.Emp3r0rAgent) {
 	TargetsMutex.RLock()
 	defer TargetsMutex.RUnlock()
 	for t := range Targets {
@@ -356,7 +356,7 @@ func GetTargetFromTag(tag string) (target *emp3r0r_data.AgentSystemInfo) {
 }
 
 // GetTargetFromH2Conn find target from Targets via HTTP2 connection ID, return nil if not found
-func GetTargetFromH2Conn(conn *h2conn.Conn) (target *emp3r0r_data.AgentSystemInfo) {
+func GetTargetFromH2Conn(conn *h2conn.Conn) (target *emp3r0r_data.Emp3r0rAgent) {
 	TargetsMutex.RLock()
 	defer TargetsMutex.RUnlock()
 	for t, ctrl := range Targets {
@@ -434,7 +434,7 @@ outter:
 }
 
 // SetAgentLabel if an agent is already labeled, we can set its label in later sessions
-func SetAgentLabel(a *emp3r0r_data.AgentSystemInfo) (label string) {
+func SetAgentLabel(a *emp3r0r_data.Emp3r0rAgent) (label string) {
 	TargetsMutex.RLock()
 	defer TargetsMutex.RUnlock()
 	data, err := os.ReadFile(AgentsJSON)
@@ -472,7 +472,7 @@ func ListModules() {
 }
 
 // Send2Agent send MsgTunData to agent
-func Send2Agent(data *emp3r0r_data.MsgTunData, agent *emp3r0r_data.AgentSystemInfo) (err error) {
+func Send2Agent(data *emp3r0r_data.MsgTunData, agent *emp3r0r_data.Emp3r0rAgent) (err error) {
 	TargetsMutex.RLock()
 	defer TargetsMutex.RUnlock()
 	ctrl := Targets[agent]

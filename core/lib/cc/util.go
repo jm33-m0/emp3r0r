@@ -28,7 +28,7 @@ func DownloadFile(url, path string) (err error) {
 }
 
 // SendCmd send command to agent
-func SendCmd(cmd, cmd_id string, a *emp3r0r_data.AgentSystemInfo) error {
+func SendCmd(cmd, cmd_id string, a *emp3r0r_data.Emp3r0rAgent) error {
 	if a == nil {
 		return errors.New("SendCmd: agent not found")
 	}
@@ -57,7 +57,7 @@ func SendCmd(cmd, cmd_id string, a *emp3r0r_data.AgentSystemInfo) error {
 	return Send2Agent(&cmdData, a)
 }
 
-func wait_for_cmd_response(cmd, cmd_id string, agent *emp3r0r_data.AgentSystemInfo) {
+func wait_for_cmd_response(cmd, cmd_id string, agent *emp3r0r_data.Emp3r0rAgent) {
 	ctrl, exists := Targets[agent]
 	if !exists || agent == nil {
 		CliPrintWarning("SendCmd: agent '%s' not connected", agent.Tag)
@@ -141,7 +141,7 @@ func IsAgentExistByTag(tag string) bool {
 }
 
 // IsAgentExist is agent already in target list?
-func IsAgentExist(t *emp3r0r_data.AgentSystemInfo) bool {
+func IsAgentExist(t *emp3r0r_data.Emp3r0rAgent) bool {
 	TargetsMutex.RLock()
 	defer TargetsMutex.RUnlock()
 	for a := range Targets {

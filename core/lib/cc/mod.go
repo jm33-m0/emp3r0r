@@ -29,7 +29,7 @@ var (
 	CurrentMod = "<blank>"
 
 	// CurrentTarget selected target
-	CurrentTarget *emp3r0r_data.AgentSystemInfo
+	CurrentTarget *emp3r0r_data.Emp3r0rAgent
 
 	// Options currently available options for `set`
 	Options = make(map[string]*Option)
@@ -367,7 +367,7 @@ func ModuleRun() {
 }
 
 // SelectCurrentTarget check if current target is set and alive
-func SelectCurrentTarget() (target *emp3r0r_data.AgentSystemInfo) {
+func SelectCurrentTarget() (target *emp3r0r_data.Emp3r0rAgent) {
 	// find target
 	target = CurrentTarget
 	if target == nil {

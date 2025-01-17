@@ -18,7 +18,7 @@ import (
 )
 
 // StatFile Get stat info of a file on agent
-func StatFile(filepath string, a *emp3r0r_data.AgentSystemInfo) (fi *util.FileStat, err error) {
+func StatFile(filepath string, a *emp3r0r_data.Emp3r0rAgent) (fi *util.FileStat, err error) {
 	cmd_id := uuid.NewString()
 	cmd := fmt.Sprintf("%s --path '%s'", emp3r0r_data.C2CmdStat, filepath)
 	err = SendCmd(cmd, cmd_id, a)
@@ -50,7 +50,7 @@ func StatFile(filepath string, a *emp3r0r_data.AgentSystemInfo) (fi *util.FileSt
 }
 
 // PutFile put file to agent
-func PutFile(lpath, rpath string, a *emp3r0r_data.AgentSystemInfo) error {
+func PutFile(lpath, rpath string, a *emp3r0r_data.Emp3r0rAgent) error {
 	// file sha256sum
 	CliPrintInfo("Calculating sha256sum of '%s'", lpath)
 	sum := tun.SHA256SumFile(lpath)
@@ -95,7 +95,7 @@ func generateGetFilePaths(file_path string) (write_dir, save_to_file, tempname, 
 }
 
 // GetFile get file from agent
-func GetFile(file_path string, a *emp3r0r_data.AgentSystemInfo) (ftpSh *StreamHandler, err error) {
+func GetFile(file_path string, a *emp3r0r_data.Emp3r0rAgent) (ftpSh *StreamHandler, err error) {
 	if !util.IsExist(FileGetDir) {
 		err = os.MkdirAll(FileGetDir, 0o700)
 		if err != nil {

@@ -666,7 +666,7 @@ func listOptions() func(string) []string {
 }
 
 // remote autocomplete items in $PATH
-func listAgentExes(agent *emp3r0r_data.AgentSystemInfo) []string {
+func listAgentExes(agent *emp3r0r_data.Emp3r0rAgent) []string {
 	CliPrintDebug("Listing agent %s's exes in PATH", agent.Tag)
 	exes := make([]string, 0)
 	if agent == nil {
@@ -684,7 +684,7 @@ func listAgentExes(agent *emp3r0r_data.AgentSystemInfo) []string {
 }
 
 // when a target is selected, update CmdCompls with PATH items
-func autoCompleteAgentExes(agent *emp3r0r_data.AgentSystemInfo) {
+func autoCompleteAgentExes(agent *emp3r0r_data.Emp3r0rAgent) {
 	exes := listAgentExes(agent)
 	temp_CmdCompls := InitCmdCompls
 

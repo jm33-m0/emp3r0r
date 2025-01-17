@@ -13,7 +13,7 @@ var RShellStatus = make(map[string]error)
 // moduleCmd exec cmd on target
 func moduleCmd() {
 	// send command
-	execOnTarget := func(target *emp3r0r_data.AgentSystemInfo) {
+	execOnTarget := func(target *emp3r0r_data.Emp3r0rAgent) {
 		if Targets[target].Conn == nil {
 			CliPrintError("moduleCmd: agent %s is not connected", target.Tag)
 			return

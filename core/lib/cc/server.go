@@ -605,7 +605,7 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 	var (
-		target emp3r0r_data.AgentSystemInfo
+		target emp3r0r_data.Emp3r0rAgent
 		in     = json.NewDecoder(conn)
 	)
 
