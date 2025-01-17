@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.48.8](https://github.com/jm33-m0/emp3r0r/compare/v1.48.7...v1.48.8) (2025-01-17)
+
+
+### Bug Fixes
+
+* CLI commands handling refactored ([394e5e4](https://github.com/jm33-m0/emp3r0r/commit/394e5e42d03c449c94235145bd419db410aeecfa))
+* command auto-completion broken after selecting a target ([8583b2c](https://github.com/jm33-m0/emp3r0r/commit/8583b2ce1e61994b5bf08c94195bc3f1e7be85fe))
+* display `cd` errors ([59d5682](https://github.com/jm33-m0/emp3r0r/commit/59d568245bc9ad395d1ca397dc3904959dce5d62))
+
 ## [1.48.7](https://github.com/jm33-m0/emp3r0r/compare/v1.48.6...v1.48.7) (2025-01-15)
 
 
