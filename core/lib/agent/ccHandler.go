@@ -271,10 +271,11 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 			out = fmt.Sprintf("args error: %v", cmdSlice)
 			break
 		}
-		if os.Chdir(*path) == nil {
-			out = "changed directory to " + strconv.Quote(*path)
+		err = os.Chdir(*path)
+		if err != nil {
+			out = fmt.Sprintf("cd failed: %v", err)
 		} else {
-			out = "cd failed"
+			out = "changed directory to " + strconv.Quote(*path)
 		}
 		break
 	case "pwd":

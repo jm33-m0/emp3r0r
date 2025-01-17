@@ -23,9 +23,10 @@ type Command struct {
 // CommandMap holds all commands
 var CommandMap = map[string]Command{
 	HELP: {
-		Name: HELP,
-		Help: "Print this help, 'help <module>' gives help for a module",
-		Func: nil,
+		Name:   HELP,
+		Help:   "Print this help, 'help <module>' gives help for a module",
+		Func:   nil,
+		HasArg: true,
 	},
 	"target": {
 		Name:   "target",

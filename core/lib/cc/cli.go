@@ -54,34 +54,9 @@ var (
 	err error
 )
 
-// CliMain launches the commandline UI
-func CliMain() {
-	// print banner
-	err = CliBanner()
-	if err != nil {
-		CliFatalError("Banner: %v", err)
-	} else {
-		// start all services
-		go TLSServer()
-		go ShadowsocksServer()
-		go InitModules()
-	}
-
-	// unlock incomplete downloads
-	err = UnlockDownloads()
-	if err != nil {
-		CliPrintWarning("UnlockDownloads: %v", err)
-	}
-
+func init_completion() {
 	// completer
 	CmdCompls = []readline.PrefixCompleterInterface{
-		readline.PcItem("set",
-			readline.PcItemDynamic(listOptions(),
-				readline.PcItemDynamic(listValChoices()))),
-
-		readline.PcItem("use",
-			readline.PcItemDynamic(listMods())),
-
 		readline.PcItem("rm",
 			readline.PcItemDynamic(listRemoteDir())),
 
@@ -109,11 +84,18 @@ func CliMain() {
 		readline.PcItem(HELP,
 			readline.PcItemDynamic(listMods())),
 
+		readline.PcItem("use",
+			readline.PcItemDynamic(listMods())),
+
 		readline.PcItem("target",
 			readline.PcItemDynamic(listTargetIndexTags())),
 
 		readline.PcItem("label",
 			readline.PcItemDynamic(listTargetIndexTags())),
+
+		readline.PcItem("set",
+			readline.PcItemDynamic(listOptions(),
+				readline.PcItemDynamic(listValChoices()))),
 
 		readline.PcItem("delete_port_fwd",
 			readline.PcItemDynamic(listPortMappings())),
@@ -129,6 +111,29 @@ func CliMain() {
 	CliCompleter.SetChildren(CmdCompls)
 	// remember initial CmdCompls
 	InitCmdCompls = CmdCompls
+}
+
+// CliMain launches the commandline UI
+func CliMain() {
+	// print banner
+	err = CliBanner()
+	if err != nil {
+		CliFatalError("Banner: %v", err)
+	} else {
+		// start all services
+		go TLSServer()
+		go ShadowsocksServer()
+		go InitModules()
+	}
+
+	// unlock incomplete downloads
+	err = UnlockDownloads()
+	if err != nil {
+		CliPrintWarning("UnlockDownloads: %v", err)
+	}
+
+	// set up autocompletion
+	init_completion()
 
 	// prompt setup
 	filterInput := func(r rune) (rune, bool) {
