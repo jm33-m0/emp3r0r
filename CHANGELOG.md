@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.48.9](https://github.com/jm33-m0/emp3r0r/compare/v1.48.8...v1.48.9) (2025-01-18)
+
+
+### Bug Fixes
+
+* `elvish_win` not working ([2c3ef0d](https://github.com/jm33-m0/emp3r0r/commit/2c3ef0dfa9963e7abc1040d699d5cde8f6c530c3))
+* `mem_dump` should download dumped mem file ([3221840](https://github.com/jm33-m0/emp3r0r/commit/32218402e6d53bbcb68ef2efb346076aeca22230))
+* agent response too noisy ([123258a](https://github.com/jm33-m0/emp3r0r/commit/123258aef2b0bb2e46956d90339fe35ce2a9ce2a))
+* interactive modules file not found in Windows ([7d2e4c8](https://github.com/jm33-m0/emp3r0r/commit/7d2e4c82e20484a7edc30f7b7d0f73e2ed6e5fb4))
+* randomize `MagicString` ([4bf2f96](https://github.com/jm33-m0/emp3r0r/commit/4bf2f9666f443b1bc8503fdf8ad00a43b8286245))
+
 ## [1.48.8](https://github.com/jm33-m0/emp3r0r/compare/v1.48.7...v1.48.8) (2025-01-17)
 
 
