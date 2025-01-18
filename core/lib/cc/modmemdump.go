@@ -5,6 +5,7 @@ package cc
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -40,8 +41,8 @@ func moduleMemDump() {
 		time.Sleep(100 * time.Millisecond)
 	}
 	path := cmd_res
-	if path == "" {
-		CliPrintError("Failed to get memdump file path: empty response")
+	if path == "" || strings.HasPrefix(path, "Error") {
+		CliPrintError("Failed to get memdump file path: invalid response")
 		return
 	}
 
