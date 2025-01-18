@@ -9,7 +9,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/creack/pty"
@@ -30,11 +29,6 @@ func setWinsize(f *os.File, w, h int) {
 // SSHD start a ssh server to provide shell access for clients
 // the server binds local interface only
 func crossPlatformSSHD(shell, port string, args []string) (err error) {
-	// CC doesn't know where the agent root is, so we need to prepend it
-	if strings.HasPrefix(shell, util.FileBaseName(RuntimeConfig.AgentRoot)) {
-		shell = fmt.Sprintf("%s/%s", filepath.Dir(RuntimeConfig.AgentRoot), shell)
-	}
-
 	exe, err := exec.LookPath(shell)
 	if err != nil && shell != "sftp" {
 		res := fmt.Sprintf("%s not found (%v), aborting", shell, err)
