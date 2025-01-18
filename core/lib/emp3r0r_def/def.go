@@ -39,14 +39,15 @@ var (
 	HIDE_PIDS = []string{strconv.Itoa(os.Getpid())}
 
 	// GuardianShellcode inject into a process to gain persistence
-	GuardianShellcode = `[persistence_shellcode]`
-
-	// GuardianAgentPath where the agent binary is stored
-	GuardianAgentPath = "[persistence_agent_path]"
+	GuardianShellcode = ""
 
 	// will be updated by ReadJSONConfig
+
+	// CCAddress is the address of the CC server
 	// in form https://host:port
-	CCAddress    = ""
+	CCAddress = ""
+
+	// DefaultShell is the default shell to use, will use custom bash if vaccine is installed
 	DefaultShell = ""
 
 	// AESKey generated from Tag -> md5sum, type: []byte

