@@ -8,6 +8,6 @@ import (
 	"runtime"
 )
 
-func sshd_monitor(password_file string) (err error) {
+func sshd_monitor(_ string) (err error) {
 	return fmt.Errorf("not supported on %s platform", runtime.GOARCH)
 }

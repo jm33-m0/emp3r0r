@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"runtime"
 
 	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
 	exe_utils "github.com/jm33-m0/emp3r0r/core/lib/exe_utils"
@@ -20,10 +19,6 @@ import (
 )
 
 func VaccineHandler(download_addr, checksum string) (out string) {
-	if runtime.GOOS != "linux" {
-		return "Only supported in Linux"
-	}
-
 	const UtilsArchive = "utils.tar.xz"
 	var (
 		PythonArchive = RuntimeConfig.UtilsPath + "/python3.tar.xz"
