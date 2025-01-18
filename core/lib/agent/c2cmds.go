@@ -180,6 +180,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		err = Socks5Proxy(*mode, *addr)
 		if err != nil {
 			out = fmt.Sprintf("Error: Failed to start Socks5Proxy: %v", err)
+			return
 		}
 		out = fmt.Sprintf("Socks5Proxy server ready with username %s and password %s",
 			RuntimeConfig.ShadowsocksLocalSocksPort,

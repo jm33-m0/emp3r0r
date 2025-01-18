@@ -74,6 +74,7 @@ func moduleHandler(download_addr, file_to_download, payload_type, modName, check
 		return out
 	case "bash":
 		executable = emp3r0r_data.DefaultShell
+		log.Printf("shell executable: %s", executable)
 		out, err := RunShellScript(payload_data)
 		if err != nil {
 			return fmt.Sprintf("running shell script: %s (%v)", out, err)

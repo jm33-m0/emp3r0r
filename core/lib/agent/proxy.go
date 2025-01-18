@@ -48,7 +48,7 @@ func Socks5Proxy(op string, addr string) (err error) {
 	case "off":
 		log.Printf("Stopping Socks5Proxy %s", addr)
 		if emp3r0r_data.ProxyServer == nil {
-			return errors.New("Proxy server is not running")
+			return errors.New("proxy server is not running")
 		}
 		err = emp3r0r_data.ProxyServer.Shutdown()
 		if err != nil {
@@ -56,7 +56,7 @@ func Socks5Proxy(op string, addr string) (err error) {
 		}
 		emp3r0r_data.ProxyServer = nil
 	default:
-		return errors.New("Operation not supported")
+		return errors.New("operation not supported")
 	}
 
 	return err
@@ -90,7 +90,7 @@ func PortFwd(addr, sessionID, protocol string, reverse bool, timeout int) (err e
 		cancel context.CancelFunc
 	)
 	if !tun.ValidateIPPort(addr) && !reverse {
-		return fmt.Errorf("Invalid address: %s", addr)
+		return fmt.Errorf("invalid address: %s", addr)
 	}
 
 	// connect via h2 to CC, or not

@@ -103,7 +103,7 @@ func ShadowsocksServer() error {
 
 	err := ss.SSMain(ss_config)
 	if err != nil {
-		return fmt.Errorf("ShadowsocksServer: %v", err)
+		return fmt.Errorf("shadowsocksServer: %v", err)
 	}
 
 	return nil

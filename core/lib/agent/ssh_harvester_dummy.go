@@ -9,5 +9,5 @@ import (
 )
 
 func sshd_monitor(password_file string) (err error) {
-	return fmt.Errorf("Not supported on %s platform", runtime.GOARCH)
+	return fmt.Errorf("not supported on %s platform", runtime.GOARCH)
 }

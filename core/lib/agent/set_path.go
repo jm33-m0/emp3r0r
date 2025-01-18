@@ -14,7 +14,8 @@ func SetPath() {
 	common_paths := []string{}
 	current_paths := os.Getenv("PATH")
 	path_delimiter := ":"
-	if runtime.GOOS == "windows" {
+	switch runtime.GOOS {
+	case "windows":
 		common_paths = []string{
 			`c:\windows\system32`,
 			`c:\windows`,
@@ -30,7 +31,7 @@ func SetPath() {
 		}
 		current_paths = strings.Join(temp, path_delimiter)
 
-	} else if runtime.GOOS == "linux" {
+	case "linux":
 		common_paths = []string{
 			"/bin",
 			"/sbin",

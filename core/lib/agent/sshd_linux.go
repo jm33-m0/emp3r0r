@@ -95,7 +95,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		}
 		f, err := pty.Start(cmd)
 		if err != nil {
-			err = fmt.Errorf("Start shell with PTY failed: %v\n", err)
+			err = fmt.Errorf("start shell with PTY failed: %v", err)
 			io.WriteString(s, err.Error())
 			log.Print(err)
 			return
@@ -118,19 +118,19 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			}()
 			_, err = io.Copy(f, s) // stdin
 			if err != nil {
-				err = fmt.Errorf("error: IO copy from SSH to PTY: %v\n", err)
+				err = fmt.Errorf("error: IO copy from SSH to PTY: %v", err)
 				log.Print(err)
 				io.WriteString(s, err.Error())
 			}
 		}()
 		if !util.IsPIDAlive(cmd.Process.Pid) {
-			err = fmt.Errorf("PTY process %d died prematurely\n", cmd.Process.Pid)
+			err = fmt.Errorf("PTY process %d died prematurely", cmd.Process.Pid)
 			log.Print(err)
 			io.WriteString(s, err.Error())
 		}
 		_, err = io.Copy(s, f) // stdout
 		if err != nil {
-			err = fmt.Errorf("error: IO copy from PTY to SSH: %v\n", err)
+			err = fmt.Errorf("error: IO copy from PTY to SSH: %v", err)
 			log.Print(err)
 			io.WriteString(s, err.Error())
 		}

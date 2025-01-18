@@ -157,7 +157,7 @@ func (pf *PortFwdSession) InitReversedPortFwd() (err error) {
 
 	_, e2 := strconv.Atoi(listenPort)
 	if !tun.ValidateIPPort(toAddr) || e2 != nil {
-		return fmt.Errorf("Invalid address/port: %s (to), %v (listen_port)", toAddr, e2)
+		return fmt.Errorf("invalid address/port: %s (to), %v (listen_port)", toAddr, e2)
 	}
 
 	// mark this session, save to PortFwds
@@ -300,7 +300,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 
 	_, e2 := strconv.Atoi(listenPort)
 	if !tun.ValidateIPPort(toAddr) || e2 != nil {
-		return fmt.Errorf("Invalid address/port: %s (to), %v (listen_port)", toAddr, e2)
+		return fmt.Errorf("invalid address/port: %s (to), %v (listen_port)", toAddr, e2)
 	}
 
 	var (

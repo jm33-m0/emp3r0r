@@ -292,6 +292,11 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 
 	// create lock file
 	_, err = os.Create(lock)
+	if err != nil {
+		CliPrintError("ftpHandler create lock file: %v", err)
+		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
 
 	// FileGetDir
 	if !util.IsExist(FileGetDir) {
@@ -303,8 +308,10 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 	}
 
 	// file
-	targetSize := util.FileSize(targetFile)
-	nowSize := util.FileSize(filewrite)
+	var (
+		targetSize int64
+		nowSize    int64
+	)
 
 	// open file for writing
 	f, err := os.OpenFile(filewrite, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)

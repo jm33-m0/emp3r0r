@@ -181,10 +181,7 @@ func IsELF(file string) bool {
 	}
 	defer f.Close()
 	_, err = elf.NewFile(f)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
 
 // IsStaticELF checks if the given ELF file is statically linked.
@@ -226,9 +223,10 @@ func ParseELFHeaders(data []byte) (*ELFHeader, error) {
 
 	// Determine ELF class (32-bit or 64-bit)
 	class := ident[4]
-	if class == ELFCLASS64 {
+	switch class {
+	case ELFCLASS64:
 		return ParseELF64(reader, ident)
-	} else if class == ELFCLASS32 {
+	case ELFCLASS32:
 		return ParseELF32(reader, ident)
 	}
 	return nil, fmt.Errorf("unsupported ELF class: %v", class)
@@ -367,16 +365,7 @@ func parseProgramHeaders(reader *bytes.Reader, phOff int64, phNum int, elfClass 
 			if err := binary.Read(reader, binary.LittleEndian, &ph64); err != nil {
 				return nil, err
 			}
-			ph = ProgramHeader{
-				Type:   ph64.Type,
-				Flags:  ph64.Flags,
-				Off:    ph64.Off,
-				Vaddr:  ph64.Vaddr,
-				Paddr:  ph64.Paddr,
-				Filesz: ph64.Filesz,
-				Memsz:  ph64.Memsz,
-				Align:  ph64.Align,
-			}
+			ph = ProgramHeader(ph64)
 		} else {
 			var ph32 ProgHeader32
 			if err := binary.Read(reader, binary.LittleEndian, &ph32); err != nil {

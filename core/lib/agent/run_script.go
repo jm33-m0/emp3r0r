@@ -86,7 +86,7 @@ func RunExe(scriptBytes []byte) (output string, err error) {
 func RunShellScript(scriptBytes []byte) (output string, err error) {
 	shell := emp3r0r_data.DefaultShell
 	if !util.IsFileExist(shell) {
-		return "", fmt.Errorf("Shell not found: %s", shell)
+		return "", fmt.Errorf("shell not found: %s", shell)
 	}
 
 	cmd := exec.Command(shell)

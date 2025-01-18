@@ -291,7 +291,7 @@ func IsDirWritable(path string) bool {
 		return false
 	}
 	// Check if the current user can write to the directory
-	testFile := filepath.Join(path, fmt.Sprintf("%s", RandMD5String()))
+	testFile := filepath.Join(path, RandMD5String())
 	file, err := os.Create(testFile)
 	if err != nil {
 		return false
@@ -304,7 +304,7 @@ func IsDirWritable(path string) bool {
 // GetWritablePaths get all writable paths in a directory up to a given depth
 func GetWritablePaths(root_path string, depth int) ([]string, error) {
 	if depth < 0 {
-		return nil, fmt.Errorf("Invalid depth: %d", depth)
+		return nil, fmt.Errorf("invalid depth: %d", depth)
 	}
 
 	var writablePaths []string
@@ -340,7 +340,7 @@ func GetWritablePaths(root_path string, depth int) ([]string, error) {
 	}
 
 	if len(writablePaths) == 0 {
-		return nil, fmt.Errorf("No writable paths found in %s", root_path)
+		return nil, fmt.Errorf("no writable paths found in %s", root_path)
 	}
 
 	return writablePaths, nil

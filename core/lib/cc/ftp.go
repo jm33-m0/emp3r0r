@@ -71,7 +71,7 @@ func PutFile(lpath, rpath string, a *emp3r0r_data.Emp3r0rAgent) error {
 	CliPrintInfo("Copy %s to %s", lpath, WWWRoot+util.FileBaseName(lpath))
 	err := util.Copy(lpath, WWWRoot+util.FileBaseName(lpath))
 	if err != nil {
-		return fmt.Errorf("Copy %s to %s: %v", lpath, WWWRoot+util.FileBaseName(lpath), err)
+		return fmt.Errorf("copy %s to %s: %v", lpath, WWWRoot+util.FileBaseName(lpath), err)
 	}
 
 	// send cmd

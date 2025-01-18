@@ -68,7 +68,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		// use winpty PTY implementation if ConPTY is unsupported
 		winpty_shell_proc, err := console.New(80, 20)
 		if err != nil {
-			err = fmt.Errorf("Creating new winpty console: %v\n", err)
+			err = fmt.Errorf("creating new winpty console: %v", err)
 			io.WriteString(s, err.Error())
 			return
 		}
@@ -96,7 +96,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		// start shell
 		err = winpty_shell_proc.Start(cmd.Args)
 		if err != nil {
-			err = fmt.Errorf("start SSH shell %v: %v\n", cmd.Args, err)
+			err = fmt.Errorf("start SSH shell %v: %v", cmd.Args, err)
 			io.WriteString(s, err.Error())
 			return
 		} else {
@@ -111,14 +111,14 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		go func() {
 			_, err = io.Copy(winpty_shell_proc, s)
 			if err != nil {
-				err = fmt.Errorf("io copy to winpty: %v\n", err)
+				err = fmt.Errorf("io copy to winpty: %v", err)
 				io.WriteString(s, err.Error())
 				return
 			}
 		}()
 		_, err = io.Copy(s, winpty_shell_proc)
 		if err != nil {
-			err = fmt.Errorf("io copy to SSH: %v\n", err)
+			err = fmt.Errorf("io copy to SSH: %v", err)
 			io.WriteString(s, err.Error())
 			return
 		}
@@ -126,7 +126,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		// wait shell process so we can clean it up
 		_, err = winpty_shell_proc.Wait()
 		if err != nil {
-			err = fmt.Errorf("Wait winpty shell: %v\n", err)
+			err = fmt.Errorf("wait winpty shell: %v", err)
 			io.WriteString(s, err.Error())
 			return
 		}

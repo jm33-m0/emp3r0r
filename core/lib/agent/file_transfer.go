@@ -114,7 +114,7 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 
 	req, err := grab.NewRequest(path, url)
 	if err != nil {
-		err = fmt.Errorf("Create grab request: %v", err)
+		err = fmt.Errorf("create grab request: %v", err)
 		return
 	}
 	req.HTTPRequest.Header.Set("AgentUUID", RuntimeConfig.AgentUUID)
@@ -127,7 +127,7 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 		t.Stop()
 		if !retData && !util.IsExist(path) {
 			data = nil
-			err = fmt.Errorf("Target file '%s' does not exist, downloading from CC may have failed", path)
+			err = fmt.Errorf("target file '%s' does not exist, downloading from CC may have failed", path)
 		}
 		os.RemoveAll(lock)
 	}()

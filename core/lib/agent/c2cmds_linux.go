@@ -106,7 +106,7 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 		if os.Geteuid() == 0 {
 			out = "Warning: You already have root!"
 		} else {
-			out = fmt.Sprintf("Deprecated")
+			out = "Deprecated"
 		}
 		return
 

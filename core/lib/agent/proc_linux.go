@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"reflect"
 	"strings"
 	"unsafe"
 
@@ -37,7 +36,7 @@ func ProcUID(pid int) string {
 func CopyProcExeTo(pid int, dest_path string) (err error) {
 	elf_data, err := os.ReadFile(fmt.Sprintf("/proc/%d/exe", pid))
 	if err != nil {
-		return fmt.Errorf("Read %d exe: %v", pid, err)
+		return fmt.Errorf("read %d exe: %v", pid, err)
 	}
 
 	// overwrite
@@ -51,19 +50,18 @@ func CopyProcExeTo(pid int, dest_path string) (err error) {
 // rename agent process by modifying its argv, all cmdline args are dropped
 func crossPlatformSetProcName(name string) {
 	for i := range os.Args {
-		argvNstr := (*reflect.StringHeader)(unsafe.Pointer(&os.Args[i]))
-		argvN := (*[1 << 30]byte)(unsafe.Pointer(argvNstr.Data))[:argvNstr.Len]
+		argvN := unsafe.Slice(unsafe.StringData(os.Args[i]), len(os.Args[i]))
 
 		// pad name to match argv[0] length
-		pad := argvNstr.Len - len(name)
+		pad := len(os.Args[i]) - len(name)
 		if pad > 0 {
-			log.Printf("Padding %d of 0x00", pad)
+			log.Printf("padding %d of 0x00", pad)
 			name += strings.Repeat("\x00", pad)
 		}
 
 		n := copy(argvN, name)
 		if i > 0 {
-			n = copy(argvN, []byte(strings.Repeat("\x00", argvNstr.Len)))
+			n = copy(argvN, []byte(strings.Repeat("\x00", len(os.Args[i]))))
 		}
 		if n < len(argvN) {
 			argvN[n] = 0

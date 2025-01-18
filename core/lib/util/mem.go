@@ -18,7 +18,7 @@ func ExtractData() (data []byte, err error) {
 		log.Printf("Extract data from executable: %v", err)
 		data, err = DigEmbededDataFromMem()
 		if err != nil {
-			err = fmt.Errorf("Extract data from memory: %v", err)
+			err = fmt.Errorf("extract data from memory: %v", err)
 			return
 		}
 		log.Printf("Found %d bytes in memory", len(data))
@@ -27,7 +27,7 @@ func ExtractData() (data []byte, err error) {
 	}
 
 	if len(data) <= 0 {
-		err = fmt.Errorf("No data extracted")
+		err = fmt.Errorf("no data extracted")
 	}
 
 	return
@@ -37,7 +37,7 @@ func VerifyConfigData(data []byte) (jsonData []byte, err error) {
 	// decrypt attached JSON file
 	jsonData, err = emp3r0r_crypto.AES_GCM_Decrypt(emp3r0r_data.OneTimeMagicBytes, data)
 	if err != nil {
-		err = fmt.Errorf("Decrypt config JSON failed (%v), invalid config data?", err)
+		err = fmt.Errorf("decrypt config JSON failed (%v), invalid config data?", err)
 		return
 	}
 
@@ -78,7 +78,7 @@ func DigEmbeddedData(data []byte, base int64) (embedded_data []byte, err error) 
 	sep := bytes.Repeat(magic_str, 2)
 
 	if !bytes.Contains(data, sep) {
-		err = fmt.Errorf("Cannot locate magic string '%x' in %d bytes of given data",
+		err = fmt.Errorf("cannot locate magic string '%x' in %d bytes of given data",
 			magic_str, len(data))
 		return
 	}
@@ -86,19 +86,19 @@ func DigEmbeddedData(data []byte, base int64) (embedded_data []byte, err error) 
 	// locate embedded_data
 	split := bytes.Split(data, sep)
 	if len(split) < 2 {
-		err = fmt.Errorf("Cannot locate embeded data from %d of given data", len(data))
+		err = fmt.Errorf("cannot locate embeded data from %d of given data", len(data))
 		return
 	}
 	embedded_data = split[1]
 	if len(embedded_data) <= 0 {
-		err = fmt.Errorf("Digged nothing from %d of given data", len(data))
+		err = fmt.Errorf("digged nothing from %d of given data", len(data))
 		return
 	}
 
 	// found and verify
 	embedded_data, err = VerifyConfigData(embedded_data)
 	if err != nil {
-		err = fmt.Errorf("Verify config data: %v", err)
+		err = fmt.Errorf("verify config data: %v", err)
 		return
 	}
 
@@ -112,7 +112,7 @@ func DigEmbeddedData(data []byte, base int64) (embedded_data []byte, err error) 
 func DigEmbededDataFromMem() (data []byte, err error) {
 	mem_regions, err := DumpSelfMem()
 	if err != nil {
-		err = fmt.Errorf("Cannot dump self memory: %v", err)
+		err = fmt.Errorf("cannot dump self memory: %v", err)
 		return
 	}
 
@@ -125,7 +125,7 @@ func DigEmbededDataFromMem() (data []byte, err error) {
 		break
 	}
 	if len(data) <= 0 {
-		return nil, fmt.Errorf("No data found in memory")
+		return nil, fmt.Errorf("no data found in memory")
 	}
 
 	return

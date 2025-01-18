@@ -3,6 +3,7 @@ package listener
 import (
 	"bytes"
 	"compress/flate"
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -80,7 +81,7 @@ func deriveKeyFromString(str string) []byte {
 func serveStager(stager_enc []byte, port string) error {
 	if server != nil {
 		log.Printf("Shutting down existing server on port %s", server.Addr)
-		if err := server.Shutdown(nil); err != nil {
+		if err := server.Shutdown(context.TODO()); err != nil {
 			log.Printf("Error shutting down server: %v", err)
 		}
 	}
@@ -110,7 +111,7 @@ func serveStager(stager_enc []byte, port string) error {
 func HTTPAESCompressedListener(stagerPath string, port string, keyStr string, compression bool) error {
 	stager, err := os.ReadFile(stagerPath)
 	if err != nil {
-		return fmt.Errorf("Failed to read stager file: %v", err)
+		return fmt.Errorf("failed to read stager file: %v", err)
 	}
 
 	key := deriveKeyFromString(keyStr)
@@ -131,7 +132,7 @@ func HTTPAESCompressedListener(stagerPath string, port string, keyStr string, co
 func HTTPBareListener(stagerPath string, port string) error {
 	stager, err := os.ReadFile(stagerPath)
 	if err != nil {
-		return fmt.Errorf("Failed to read stager file: %v", err)
+		return fmt.Errorf("failed to read stager file: %v", err)
 	}
 
 	log.Printf("Serving stager file on port %s", port)

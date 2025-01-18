@@ -54,7 +54,7 @@ func IsCCOnline(proxy string) bool {
 	if proxy != "" && strings.HasPrefix(emp3r0r_data.Transport, "HTTP2") {
 		proxyUrl, err := url.Parse(proxy)
 		if err != nil {
-			log.Fatalf("Invalid proxy: %v", err)
+			log.Fatalf("invalid proxy: %v", err)
 		}
 		t.Proxy = http.ProxyURL(proxyUrl)
 		log.Printf("IsCCOnline: using proxy %s", proxy)
@@ -93,7 +93,7 @@ func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, cancel conte
 	var resp *http.Response
 	defer func() {
 		if conn == nil {
-			err = fmt.Errorf("ConnectCC at %s failed", url)
+			err = fmt.Errorf("connectCC at %s failed", url)
 			cancel()
 		}
 	}()
@@ -112,7 +112,7 @@ func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, cancel conte
 	go func() {
 		conn, resp, err = h2.Connect(ctx, url)
 		if err != nil {
-			err = fmt.Errorf("ConnectCC: initiate h2 conn: %s", err)
+			err = fmt.Errorf("connectCC: initiate h2 conn: %s", err)
 			log.Print(err)
 			cancel()
 		}
@@ -283,7 +283,7 @@ func setC2Transport() {
 		// parse proxy url
 		proxyURL, err := url.Parse(RuntimeConfig.C2TransportProxy)
 		if err != nil {
-			log.Printf("Invalid proxy URL: %v", err)
+			log.Printf("invalid proxy URL: %v", err)
 		}
 
 		// if the proxy port is emp3r0r proxy server's port

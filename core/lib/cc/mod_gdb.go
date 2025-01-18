@@ -57,7 +57,7 @@ func moduleGDB() {
 	if label != "nolabel" && label != "-" {
 		name = label
 	}
-	gdb_cmd := fmt.Sprintf("gdb")
+	gdb_cmd := "gdb"
 	CliPrintInfo("Launching gdb session, please type `target extended-remote 127.0.0.1:%d` to get started", port)
 	TmuxNewWindow(fmt.Sprintf("emp3r0r_gdb-%d/%s", port, name), gdb_cmd)
 }

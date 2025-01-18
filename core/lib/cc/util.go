@@ -90,7 +90,7 @@ func SendCmdToCurrentTarget(cmd, cmd_id string) error {
 	// target
 	target := SelectCurrentTarget()
 	if target == nil {
-		return fmt.Errorf("You have to select a target first")
+		return fmt.Errorf("you have to select a target first")
 	}
 
 	// send cmd
@@ -113,7 +113,7 @@ func getTerminalEmulator() (res string) {
 func OpenInNewTerminalWindow(name, cmd string) error {
 	terminal := getTerminalEmulator()
 	if terminal == "" {
-		return fmt.Errorf("No available terminal emulator")
+		return fmt.Errorf("no available terminal emulator")
 	}
 
 	// works fine for gnome-terminal and xfce4-terminal
@@ -223,7 +223,7 @@ func UnlockDownloads() error {
 			err = os.Remove(FileGetDir + f.Name())
 			CliPrintDebug("Unlocking download: %s", f.Name())
 			if err != nil {
-				return fmt.Errorf("Remove %s: %v", f.Name(), err)
+				return fmt.Errorf("remove %s: %v", f.Name(), err)
 			}
 		}
 	}

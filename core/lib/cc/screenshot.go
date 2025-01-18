@@ -35,7 +35,7 @@ func processScreenshot(out string, target *emp3r0r_data.Emp3r0rAgent) (err error
 	CliPrintInfo("We will get %s screenshot file for you, wait", strconv.Quote(out))
 	_, err = GetFile(out, target)
 	if err != nil {
-		err = fmt.Errorf("Get screenshot: %v", err)
+		err = fmt.Errorf("get screenshot: %v", err)
 		return
 	}
 
@@ -67,7 +67,7 @@ func processScreenshot(out string, target *emp3r0r_data.Emp3r0rAgent) (err error
 	if strings.HasSuffix(path, ".zip") {
 		err = util.Unarchive(FileGetDir+path, FileGetDir)
 		if err != nil {
-			return fmt.Errorf("Unarchive screenshot zip: %v", err)
+			return fmt.Errorf("unarchive screenshot zip: %v", err)
 		}
 		CliPrintWarning("Multiple screenshots extracted to %s", FileGetDir)
 		return
@@ -81,7 +81,7 @@ func processScreenshot(out string, target *emp3r0r_data.Emp3r0rAgent) (err error
 		cmd := exec.Command("xdg-open", FileGetDir+path)
 		err = cmd.Start()
 		if err != nil {
-			return fmt.Errorf("Crap, we cannot open the picture: %v", err)
+			return fmt.Errorf("crap, we cannot open the picture: %v", err)
 		}
 	}
 

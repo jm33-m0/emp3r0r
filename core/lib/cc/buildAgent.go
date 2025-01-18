@@ -67,7 +67,7 @@ func GenC2Certs(hosts []string) (err error) {
 		CliPrint("CA cert not found, generating...")
 		_, err = tun.GenCerts(nil, "", true)
 		if err != nil {
-			return fmt.Errorf("Generate CA: %v", err)
+			return fmt.Errorf("generate CA: %v", err)
 		}
 		CliPrintInfo("CA fingerprint: %s", RuntimeConfig.CAFingerprint)
 	}
@@ -92,7 +92,7 @@ func save_config_json() (err error) {
 	}
 	w_data, err := json.Marshal(RuntimeConfig)
 	if err != nil {
-		return fmt.Errorf("Saving %s: %v", EmpConfigFile, err)
+		return fmt.Errorf("saving %s: %v", EmpConfigFile, err)
 	}
 
 	return os.WriteFile(EmpConfigFile, w_data, 0o600)

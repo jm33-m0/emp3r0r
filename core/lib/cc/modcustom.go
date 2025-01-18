@@ -300,7 +300,7 @@ func readModCondig(file string) (pconfig *emp3r0r_data.ModConfig, err error) {
 	// read JSON
 	jsonData, err := os.ReadFile(file)
 	if err != nil {
-		return nil, fmt.Errorf("Read %s: %v", file, err)
+		return nil, fmt.Errorf("read %s: %v", file, err)
 	}
 
 	// parse the json
