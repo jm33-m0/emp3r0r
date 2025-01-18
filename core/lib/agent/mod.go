@@ -23,6 +23,13 @@ func moduleHandler(download_addr, file_to_download, payload_type, modName, check
 	modDir := filepath.Join(RuntimeConfig.AgentRoot, modName)
 	var err error
 
+	// Create agent root if not exist
+	if !util.IsDirExist(RuntimeConfig.AgentRoot) {
+		if err := os.MkdirAll(RuntimeConfig.AgentRoot, 0o700); err != nil {
+			return fmt.Sprintf("creating %s: %v", RuntimeConfig.AgentRoot, err)
+		}
+	}
+
 	// download and extract module file
 	payload_data_downloaded, downloadErr := downloadAndVerifyModule(file_to_download, checksum, download_addr)
 	if downloadErr != nil {
