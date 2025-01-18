@@ -60,11 +60,11 @@ build() {
   if [[ "$1" = "--debug" ]]; then
     gobuild_cmd="go"
     build_opt="build"
-    ldflags="-v -ldflags=\"-X 'github.com/jm33-m0/emp3r0r/lib/emp3r0r_data.MagicString=$magic_str'\""
+    ldflags="-v -ldflags=\"-X 'github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def.MagicString=$magic_str'\""
   else
     gobuild_cmd="go"
     build_opt="build"
-    ldflags="-s -w -v -X 'github.com/jm33-m0/emp3r0r/lib/emp3r0r_data.MagicString=$magic_str'"
+    ldflags="-s -w -v -X 'github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def.MagicString=$magic_str'"
     # info "Setting up garble"
     # go install mvdan.cc/garble@latest || error "Failed to install garble"
   fi
