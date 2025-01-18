@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.48.10](https://github.com/jm33-m0/emp3r0r/compare/v1.48.9...v1.48.10) (2025-01-18)
+
+
+### Bug Fixes
+
+* `AddNeededLib` no longer depends on `patchelf` program ([5983def](https://github.com/jm33-m0/emp3r0r/commit/5983def174945d7204b79b9d8eb87a0f71bbe244))
+* do not download file when memdump fails ([2445006](https://github.com/jm33-m0/emp3r0r/commit/244500618e1a60da8865b0f4bf2e6bdf3d41de73))
+
 ## [1.48.9](https://github.com/jm33-m0/emp3r0r/compare/v1.48.8...v1.48.9) (2025-01-18)
 
 
