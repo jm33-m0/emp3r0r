@@ -28,7 +28,7 @@ func readJSONConfig(filename string) (err error) {
 }
 
 // re-generate a random magic string for this CC session
-func init_magic_str() {
+func init_magic_agent_one_time_bytes() {
 	default_magic_str := emp3r0r_data.OneTimeMagicBytes
 	emp3r0r_data.OneTimeMagicBytes = util.RandBytes(len(default_magic_str))
 
@@ -95,7 +95,7 @@ func main() {
 	}
 
 	// set up magic string
-	init_magic_str()
+	init_magic_agent_one_time_bytes()
 
 	// abort if CC is already running
 	if cc.IsCCRunning() {

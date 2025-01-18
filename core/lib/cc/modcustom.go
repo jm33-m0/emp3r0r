@@ -61,7 +61,7 @@ func moduleCustom() {
 		}
 
 		if config.IsInteractive {
-			exec_cmd = "echo 'emp3r0r-interactive-module'"
+			exec_cmd = fmt.Sprintf("echo %s", strconv.Quote(tun.SHA256SumRaw([]byte(emp3r0r_data.MagicString))))
 		}
 
 		if config.InMemory {
@@ -161,9 +161,10 @@ func handleInteractiveModule(config emp3r0r_data.ModConfig, cmd_id string) {
 	}
 	args := opt[0]
 	port := strconv.Itoa(util.RandInt(1024, 65535))
+	look_for := tun.SHA256SumRaw([]byte(emp3r0r_data.MagicString))
 
 	for i := 0; i < 10; i++ {
-		if strings.Contains(CmdResults[cmd_id], "emp3r0r-interactive-module") {
+		if strings.Contains(CmdResults[cmd_id], look_for) {
 			break
 		}
 		util.TakeABlink()

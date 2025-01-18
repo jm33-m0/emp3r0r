@@ -13,7 +13,11 @@ import (
 )
 
 var (
-	// OneTimeMagicBytes as separator/password
+	// Magic String, this is decided at build time
+	// use: C2 message construction and encryption
+	MagicString = "64781530-1475-4cf8-950c-dcdf4c619dbc"
+
+	// OneTimeMagicBytes as separator/password, generated at runtime, only used by agent program
 	OneTimeMagicBytes = []byte("6byKQ3Hcidum0NCdvJGK0w==")
 
 	// Transport what transport is this agent using? (HTTP2 / CDN / TOR)
@@ -60,9 +64,6 @@ var (
 )
 
 const (
-	// Magic String
-	MagicString = "06c1ae26-8b34-11ed-9866-000c29d9ff59"
-
 	// Version hardcoded version string
 	// see https://github.com/googleapis/release-please/blob/f398bdffdae69772c61a82cd7158cca3478c2110/src/updaters/generic.ts#L30
 	Version = "v1.48.8" // x-release-please-version
