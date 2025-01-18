@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/olekukonko/tablewriter"
@@ -31,10 +31,10 @@ type PortFwdSession struct {
 	Listener    *net.UDPConn // if mapping is UDP, we need its listener
 	Timeout     int          // timeout in seconds
 
-	Agent  *emp3r0r_data.Emp3r0rAgent // agent who holds this port mapping session
-	Sh     map[string]*StreamHandler  // related to HTTP handler
-	Ctx    context.Context            // PortFwd context
-	Cancel context.CancelFunc         // PortFwd cancel
+	Agent  *emp3r0r_def.Emp3r0rAgent // agent who holds this port mapping session
+	Sh     map[string]*StreamHandler // related to HTTP handler
+	Ctx    context.Context           // PortFwd context
+	Cancel context.CancelFunc        // PortFwd cancel
 }
 
 type port_mapping struct {
@@ -78,7 +78,7 @@ func DeletePortFwdSession(cmd string) {
 	defer PortFwdsMutex.Unlock()
 	for id, session := range PortFwds {
 		if id == sessionID {
-			err := SendCmd(fmt.Sprintf("%s --id %s", emp3r0r_data.C2CmdDeletePortFwd, id), "", session.Agent)
+			err := SendCmd(fmt.Sprintf("%s --id %s", emp3r0r_def.C2CmdDeletePortFwd, id), "", session.Agent)
 			if err != nil {
 				CliPrintWarning("Tell agent %s to delete port mapping %s: %v", session.Agent.Tag, sessionID, err)
 			}
@@ -173,7 +173,7 @@ func (pf *PortFwdSession) InitReversedPortFwd() (err error) {
 	PortFwdsMutex.Unlock()
 
 	// tell agent to start this mapping
-	cmd := fmt.Sprintf("%s --to %s --shID %s --operation reverse", emp3r0r_data.C2CmdPortFwd, listenPort, fwdID)
+	cmd := fmt.Sprintf("%s --to %s --shID %s --operation reverse", emp3r0r_def.C2CmdPortFwd, listenPort, fwdID)
 	err = SendCmd(cmd, "", CurrentTarget)
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)
@@ -330,7 +330,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 
 	// send command to agent, with session ID
 	fwdID := uuid.New().String()
-	cmd := fmt.Sprintf("%s --to %s --shID %s --operation %s", emp3r0r_data.C2CmdPortFwd, toAddr, fwdID, pf.Protocol)
+	cmd := fmt.Sprintf("%s --to %s --shID %s --operation %s", emp3r0r_def.C2CmdPortFwd, toAddr, fwdID, pf.Protocol)
 	err = SendCmdToCurrentTarget(cmd, "")
 	if err != nil {
 		return fmt.Errorf("SendCmd: %v", err)
@@ -390,7 +390,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		// create port mapping for each client connection
 		shID := fmt.Sprintf("%s_%s-udp", fwdID, client_tag)
 		cmd = fmt.Sprintf("%s --to %s --shID %s --operation %s --timeout %d",
-			emp3r0r_data.C2CmdPortFwd, toAddr, shID, pf.Protocol, pf.Timeout)
+			emp3r0r_def.C2CmdPortFwd, toAddr, shID, pf.Protocol, pf.Timeout)
 		err = SendCmd(cmd, "", pf.Agent)
 		if err != nil {
 			CliPrintError("SendCmd: %v", err)
@@ -453,7 +453,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 				// sub-session (streamHandler) ID
 				shID := fmt.Sprintf("%s_%s", fwdID, srcPort)
 				cmd = fmt.Sprintf("%s --to %s --shID %s --operation %s --timeout %d",
-					emp3r0r_data.C2CmdPortFwd, toAddr, shID, pf.Protocol, pf.Timeout)
+					emp3r0r_def.C2CmdPortFwd, toAddr, shID, pf.Protocol, pf.Timeout)
 				err = SendCmd(cmd, "", pf.Agent)
 				if err != nil {
 					CliPrintError("SendCmd: %v", err)

@@ -13,7 +13,7 @@ import (
 	"sync"
 
 	"github.com/fatih/color"
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/olekukonko/tablewriter"
 	"github.com/posener/h2conn"
@@ -49,7 +49,7 @@ var (
 	EmpConfigFile = ""
 
 	// Targets target list, with control (tun) interface
-	Targets      = make(map[*emp3r0r_data.Emp3r0rAgent]*Control)
+	Targets      = make(map[*emp3r0r_def.Emp3r0rAgent]*Control)
 	TargetsMutex = sync.RWMutex{}
 
 	// certs
@@ -83,7 +83,7 @@ type Control struct {
 func headlessListTargets() (err error) {
 	TargetsMutex.RLock()
 	defer TargetsMutex.RUnlock()
-	var targets []emp3r0r_data.Emp3r0rAgent
+	var targets []emp3r0r_def.Emp3r0rAgent
 	for target := range Targets {
 		targets = append(targets, *target)
 	}
@@ -215,7 +215,7 @@ func ls_targets() {
 	TmuxSwitchWindow(AgentListPane.WindowID)
 }
 
-func GetTargetDetails(target *emp3r0r_data.Emp3r0rAgent) {
+func GetTargetDetails(target *emp3r0r_def.Emp3r0rAgent) {
 	// nil?
 	if target == nil {
 		CliPrintDebug("Target is nil")
@@ -330,7 +330,7 @@ func GetTargetDetails(target *emp3r0r_data.Emp3r0rAgent) {
 }
 
 // GetTargetFromIndex find target from Targets via control index, return nil if not found
-func GetTargetFromIndex(index int) (target *emp3r0r_data.Emp3r0rAgent) {
+func GetTargetFromIndex(index int) (target *emp3r0r_def.Emp3r0rAgent) {
 	TargetsMutex.RLock()
 	defer TargetsMutex.RUnlock()
 	for t, ctl := range Targets {
@@ -343,7 +343,7 @@ func GetTargetFromIndex(index int) (target *emp3r0r_data.Emp3r0rAgent) {
 }
 
 // GetTargetFromTag find target from Targets via tag, return nil if not found
-func GetTargetFromTag(tag string) (target *emp3r0r_data.Emp3r0rAgent) {
+func GetTargetFromTag(tag string) (target *emp3r0r_def.Emp3r0rAgent) {
 	TargetsMutex.RLock()
 	defer TargetsMutex.RUnlock()
 	for t := range Targets {
@@ -356,7 +356,7 @@ func GetTargetFromTag(tag string) (target *emp3r0r_data.Emp3r0rAgent) {
 }
 
 // GetTargetFromH2Conn find target from Targets via HTTP2 connection ID, return nil if not found
-func GetTargetFromH2Conn(conn *h2conn.Conn) (target *emp3r0r_data.Emp3r0rAgent) {
+func GetTargetFromH2Conn(conn *h2conn.Conn) (target *emp3r0r_def.Emp3r0rAgent) {
 	TargetsMutex.RLock()
 	defer TargetsMutex.RUnlock()
 	for t, ctrl := range Targets {
@@ -381,7 +381,7 @@ func labelAgents() {
 		labeledAgents []LabeledAgent
 		old           []LabeledAgent
 	)
-	// what if emp3r0r_data.json already have some records
+	// what if emp3r0r_def.json already have some records
 	if util.IsExist(AgentsJSON) {
 		data, readErr := os.ReadFile(AgentsJSON)
 		if readErr != nil {
@@ -434,7 +434,7 @@ outter:
 }
 
 // SetAgentLabel if an agent is already labeled, we can set its label in later sessions
-func SetAgentLabel(a *emp3r0r_data.Emp3r0rAgent) (label string) {
+func SetAgentLabel(a *emp3r0r_def.Emp3r0rAgent) (label string) {
 	TargetsMutex.RLock()
 	defer TargetsMutex.RUnlock()
 	data, err := os.ReadFile(AgentsJSON)
@@ -465,14 +465,14 @@ func SetAgentLabel(a *emp3r0r_data.Emp3r0rAgent) (label string) {
 // ListModules list all available modules
 func ListModules() {
 	mod_comment_map := make(map[string]string)
-	for mod_name, mod := range emp3r0r_data.Modules {
+	for mod_name, mod := range emp3r0r_def.Modules {
 		mod_comment_map[mod_name] = mod.Comment
 	}
 	CliPrettyPrint("Module Name", "Help", &mod_comment_map)
 }
 
 // Send2Agent send MsgTunData to agent
-func Send2Agent(data *emp3r0r_data.MsgTunData, agent *emp3r0r_data.Emp3r0rAgent) (err error) {
+func Send2Agent(data *emp3r0r_def.MsgTunData, agent *emp3r0r_def.Emp3r0rAgent) (err error) {
 	TargetsMutex.RLock()
 	defer TargetsMutex.RUnlock()
 	ctrl := Targets[agent]
@@ -523,9 +523,9 @@ func InitConfig() (err error) {
 	}
 
 	// binaries
-	emp3r0r_data.Stub_Linux = EmpWorkSpace + "/stub"
-	emp3r0r_data.Stub_Windows = EmpWorkSpace + "/stub-win"
-	emp3r0r_data.Stub_Windows_DLL = EmpWorkSpace + "/stub-win-dll"
+	emp3r0r_def.Stub_Linux = EmpWorkSpace + "/stub"
+	emp3r0r_def.Stub_Windows = EmpWorkSpace + "/stub-win"
+	emp3r0r_def.Stub_Windows_DLL = EmpWorkSpace + "/stub-win-dll"
 
 	// copy stub binaries to ~/.emp3r0r
 	for _, arch := range Arch_List {

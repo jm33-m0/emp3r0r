@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/fatih/color"
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 )
 
 func modulePersistence() {
@@ -16,7 +16,7 @@ func modulePersistence() {
 		CliPrintError("Option 'method' not found")
 		return
 	}
-	cmd := fmt.Sprintf("%s --method %s", emp3r0r_data.C2CmdPersistence, methodOpt.Val)
+	cmd := fmt.Sprintf("%s --method %s", emp3r0r_def.C2CmdPersistence, methodOpt.Val)
 	err := SendCmd(cmd, "", CurrentTarget)
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)
@@ -31,7 +31,7 @@ func moduleLogCleaner() {
 		CliPrintError("Option 'keyword' not found")
 		return
 	}
-	cmd := fmt.Sprintf("%s --keyword %s", emp3r0r_data.C2CmdCleanLog, keywordOpt.Val)
+	cmd := fmt.Sprintf("%s --keyword %s", emp3r0r_def.C2CmdCleanLog, keywordOpt.Val)
 	err := SendCmd(cmd, "", CurrentTarget)
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)

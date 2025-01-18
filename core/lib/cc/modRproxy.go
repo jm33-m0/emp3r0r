@@ -6,7 +6,7 @@ package cc
 import (
 	"fmt"
 
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 )
 
 func moduleBring2CC() {
@@ -24,7 +24,7 @@ func moduleBring2CC() {
 	}
 	use_kcp := kcpOpt.Val
 
-	cmd := fmt.Sprintf("%s --addr %s --kcp %s", emp3r0r_data.C2CmdBring2CC, addr, use_kcp)
+	cmd := fmt.Sprintf("%s --addr %s --kcp %s", emp3r0r_def.C2CmdBring2CC, addr, use_kcp)
 	err := SendCmd(cmd, "", CurrentTarget)
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -28,7 +28,7 @@ func moduleVaccine() {
 		}
 		download_addr := downloadOpt.Val
 		checksum := tun.SHA256SumFile(UtilsArchive)
-		err = SendCmd(fmt.Sprintf("%s --checksum %s --download_addr %s", emp3r0r_data.C2CmdUtils, checksum, download_addr), "", CurrentTarget)
+		err = SendCmd(fmt.Sprintf("%s --checksum %s --download_addr %s", emp3r0r_def.C2CmdUtils, checksum, download_addr), "", CurrentTarget)
 		if err != nil {
 			CliPrintError("SendCmd failed: %v", err)
 		}

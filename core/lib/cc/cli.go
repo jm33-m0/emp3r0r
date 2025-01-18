@@ -20,7 +20,7 @@ import (
 	"github.com/bettercap/readline"
 	"github.com/fatih/color"
 	"github.com/google/uuid"
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/ss"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -448,7 +448,7 @@ func CliListOptions() {
 		tablewriter.Colors{tablewriter.FgBlueColor})
 
 	// fill table
-	module_obj := emp3r0r_data.Modules[CurrentMod]
+	module_obj := emp3r0r_def.Modules[CurrentMod]
 	for k, v := range opts {
 		help := "N/A"
 		if k == "module" {
@@ -523,7 +523,7 @@ func CliBanner() error {
 		"KCP port *:%s,\n"+
 		"C2 names: %s\n"+
 		"CA fingerprint: %s",
-		emp3r0r_data.Version,
+		emp3r0r_def.Version,
 		RuntimeConfig.CCPort,
 		RuntimeConfig.ShadowsocksServerPort,
 		RuntimeConfig.KCPServerPort,
@@ -666,7 +666,7 @@ func listOptions() func(string) []string {
 }
 
 // remote autocomplete items in $PATH
-func listAgentExes(agent *emp3r0r_data.Emp3r0rAgent) []string {
+func listAgentExes(agent *emp3r0r_def.Emp3r0rAgent) []string {
 	CliPrintDebug("Listing agent %s's exes in PATH", agent.Tag)
 	exes := make([]string, 0)
 	if agent == nil {
@@ -684,7 +684,7 @@ func listAgentExes(agent *emp3r0r_data.Emp3r0rAgent) []string {
 }
 
 // when a target is selected, update CmdCompls with PATH items
-func autoCompleteAgentExes(agent *emp3r0r_data.Emp3r0rAgent) {
+func autoCompleteAgentExes(agent *emp3r0r_def.Emp3r0rAgent) {
 	exes := listAgentExes(agent)
 	temp_CmdCompls := InitCmdCompls
 
@@ -713,7 +713,7 @@ func autoCompleteAgentExes(agent *emp3r0r_data.Emp3r0rAgent) {
 func listRemoteDir() func(string) []string {
 	return func(line string) []string {
 		names := make([]string, 0)
-		cmd := fmt.Sprintf("%s --path .", emp3r0r_data.C2CmdListDir)
+		cmd := fmt.Sprintf("%s --path .", emp3r0r_def.C2CmdListDir)
 		cmd_id := uuid.NewString()
 		err := SendCmdToCurrentTarget(cmd, cmd_id)
 		if err != nil {

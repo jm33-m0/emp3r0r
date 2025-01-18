@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/cc"
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
@@ -24,13 +24,13 @@ func readJSONConfig(filename string) (err error) {
 		return
 	}
 
-	return emp3r0r_data.ReadJSONConfig(jsonData, cc.RuntimeConfig)
+	return emp3r0r_def.ReadJSONConfig(jsonData, cc.RuntimeConfig)
 }
 
 // re-generate a random magic string for this CC session
 func init_magic_agent_one_time_bytes() {
-	default_magic_str := emp3r0r_data.OneTimeMagicBytes
-	emp3r0r_data.OneTimeMagicBytes = util.RandBytes(len(default_magic_str))
+	default_magic_str := emp3r0r_def.OneTimeMagicBytes
+	emp3r0r_def.OneTimeMagicBytes = util.RandBytes(len(default_magic_str))
 
 	// update binaries
 	files, err := os.ReadDir(cc.EmpWorkSpace)
@@ -43,7 +43,7 @@ func init_magic_agent_one_time_bytes() {
 		}
 		if strings.HasPrefix(f.Name(), "stub-") {
 			err = util.ReplaceBytesInFile(fmt.Sprintf("%s/%s", cc.EmpWorkSpace, f.Name()),
-				default_magic_str, emp3r0r_data.OneTimeMagicBytes)
+				default_magic_str, emp3r0r_def.OneTimeMagicBytes)
 			if err != nil {
 				cc.CliPrintError("init_magic_str %v", err)
 			}

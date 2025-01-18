@@ -13,13 +13,13 @@ import (
 	"strconv"
 	"strings"
 
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 var (
 	// PersistMethods CC calls one of these methods to get persistence, or all of them at once
-	// look at emp3r0r_data.PersistMethods too
+	// look at emp3r0r_def.PersistMethods too
 	PersistMethods = map[string]func() error{
 		"profiles": profiles,
 		"cron":     cronJob,
@@ -48,7 +48,7 @@ var (
 // Configure install locations
 func getInstallLocations() (locations []string) {
 	for _, loc := range WritableLocations {
-		fname := emp3r0r_data.CommonFilenames[util.RandInt(0, len(emp3r0r_data.CommonFilenames))]
+		fname := emp3r0r_def.CommonFilenames[util.RandInt(0, len(emp3r0r_def.CommonFilenames))]
 		locations = append(locations, loc+"/"+fname)
 	}
 	return

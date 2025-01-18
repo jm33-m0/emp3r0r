@@ -21,7 +21,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/ss"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -103,7 +103,7 @@ func dispatcher(wrt http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 
 	// H2Conn for reverse shell and proxy
-	var rshellConn, proxyConn emp3r0r_data.H2Conn
+	var rshellConn, proxyConn emp3r0r_def.H2Conn
 	RShellStream.H2x = &rshellConn
 	ProxyStream.H2x = &proxyConn
 
@@ -183,18 +183,18 @@ func dispatcher(wrt http.ResponseWriter, req *http.Request) {
 
 // StreamHandler allow the http handler to use H2Conn
 type StreamHandler struct {
-	H2x     *emp3r0r_data.H2Conn // h2conn with context
-	Buf     chan []byte          // buffer for receiving data
-	Token   string               // token string, for agent auth
-	BufSize int                  // buffer size for reverse shell should be 1
+	H2x     *emp3r0r_def.H2Conn // h2conn with context
+	Buf     chan []byte         // buffer for receiving data
+	Token   string              // token string, for agent auth
+	BufSize int                 // buffer size for reverse shell should be 1
 }
 
 var (
 	// RShellStream reverse shell handler
-	RShellStream = &StreamHandler{H2x: nil, BufSize: emp3r0r_data.RShellBufSize, Buf: make(chan []byte)}
+	RShellStream = &StreamHandler{H2x: nil, BufSize: emp3r0r_def.RShellBufSize, Buf: make(chan []byte)}
 
 	// ProxyStream proxy handler
-	ProxyStream = &StreamHandler{H2x: nil, BufSize: emp3r0r_data.ProxyBufSize, Buf: make(chan []byte)}
+	ProxyStream = &StreamHandler{H2x: nil, BufSize: emp3r0r_def.ProxyBufSize, Buf: make(chan []byte)}
 
 	// FTPStreams file transfer handlers
 	FTPStreams = make(map[string]*StreamHandler)
@@ -227,7 +227,7 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 	}
 
 	var err error
-	sh.H2x = &emp3r0r_data.H2Conn{}
+	sh.H2x = &emp3r0r_def.H2Conn{}
 	// use h2conn
 	sh.H2x.Conn, err = h2conn.Accept(wrt, req)
 	if err != nil {
@@ -458,7 +458,7 @@ func (sh *StreamHandler) ftpHandler(wrt http.ResponseWriter, req *http.Request) 
 func (sh *StreamHandler) portFwdHandler(wrt http.ResponseWriter, req *http.Request) {
 	var (
 		err error
-		h2x emp3r0r_data.H2Conn
+		h2x emp3r0r_def.H2Conn
 	)
 	sh.H2x = &h2x
 	sh.H2x.Conn, err = h2conn.Accept(wrt, req)
@@ -612,7 +612,7 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 	var (
-		target emp3r0r_data.Emp3r0rAgent
+		target emp3r0r_def.Emp3r0rAgent
 		in     = json.NewDecoder(conn)
 	)
 
@@ -711,7 +711,7 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 	var (
 		in  = json.NewDecoder(conn)
 		out = json.NewEncoder(conn)
-		msg emp3r0r_data.MsgTunData
+		msg emp3r0r_def.MsgTunData
 	)
 
 	// Loop forever until the client hangs the connection, in which there will be an error
@@ -762,7 +762,7 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 	for ctx.Err() == nil {
 		since_last_handshake := time.Since(last_handshake)
 		agent_by_conn := GetTargetFromH2Conn(conn)
-		name := emp3r0r_data.Unknown
+		name := emp3r0r_def.Unknown
 		if agent_by_conn != nil {
 			name = agent_by_conn.Name
 		}

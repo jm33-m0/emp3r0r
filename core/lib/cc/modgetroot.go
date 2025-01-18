@@ -6,7 +6,7 @@ package cc
 import (
 	"fmt"
 
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 )
 
@@ -45,7 +45,7 @@ func moduleLPE() {
 
 		// exec
 		CliMsg("This can take some time, please be patient")
-		cmd := fmt.Sprintf("%s --script_name %s", emp3r0r_data.C2CmdLPE, helperName)
+		cmd := fmt.Sprintf("%s --script_name %s", emp3r0r_def.C2CmdLPE, helperName)
 		CliPrintInfo("Running %s", cmd)
 		err = SendCmd(cmd, "", target)
 		if err != nil {

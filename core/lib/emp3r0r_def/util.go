@@ -1,4 +1,4 @@
-package emp3r0r_data
+package emp3r0r_def
 
 import (
 	"crypto/md5"

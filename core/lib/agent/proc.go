@@ -5,13 +5,13 @@ import (
 	"os"
 	"strconv"
 
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// CheckAgentProcess fill up info.emp3r0r_data.AgentProcess
-func CheckAgentProcess() *emp3r0r_data.AgentProcess {
-	p := &emp3r0r_data.AgentProcess{}
+// CheckAgentProcess fill up info.emp3r0r_def.AgentProcess
+func CheckAgentProcess() *emp3r0r_def.AgentProcess {
+	p := &emp3r0r_def.AgentProcess{}
 	p.PID = os.Getpid()
 	p.PPID = os.Getppid()
 	p.Cmdline = util.ProcCmdline(p.PID)

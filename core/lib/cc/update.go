@@ -17,7 +17,7 @@ import (
 
 	"github.com/cavaliergopher/grab/v3"
 	version "github.com/hashicorp/go-version"
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -51,7 +51,7 @@ func GetTarballURL(force bool) (url, checksum string, err error) {
 	}
 
 	// check if the release is newer
-	if !isNewerVersion(release.TagName, emp3r0r_data.Version) && !force {
+	if !isNewerVersion(release.TagName, emp3r0r_def.Version) && !force {
 		err = fmt.Errorf("no newer version available")
 		return
 	}

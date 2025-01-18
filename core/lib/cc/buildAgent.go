@@ -10,7 +10,7 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -31,7 +31,7 @@ func UpgradeAgent() {
 		return
 	}
 	checksum := tun.SHA256SumFile(WWWRoot + "agent")
-	SendCmdToCurrentTarget(fmt.Sprintf("%s --checksum %s", emp3r0r_data.C2CmdUpdateAgent, checksum), "")
+	SendCmdToCurrentTarget(fmt.Sprintf("%s --checksum %s", emp3r0r_def.C2CmdUpdateAgent, checksum), "")
 }
 
 // read config by key from emp3r0r.json

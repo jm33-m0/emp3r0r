@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/jm33-m0/arc"
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -65,7 +65,7 @@ func moduleHandler(download_addr, file_to_download, payload_type, modName, check
 		}
 		return out
 	case "bash":
-		executable = emp3r0r_data.DefaultShell
+		executable = emp3r0r_def.DefaultShell
 		log.Printf("shell executable: %s", executable)
 		out, err := RunShellScript(payload_data)
 		if err != nil {
@@ -89,7 +89,7 @@ func moduleHandler(download_addr, file_to_download, payload_type, modName, check
 
 	// interactive modules
 	if executable == "echo" {
-		out = tun.SHA256SumRaw([]byte(emp3r0r_data.MagicString))
+		out = tun.SHA256SumRaw([]byte(emp3r0r_def.MagicString))
 		log.Printf("echo: %s", out)
 		return
 	}

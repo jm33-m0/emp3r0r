@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"log"
 
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/spf13/pflag"
 )
 
@@ -17,7 +17,7 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 	flags.Parse(cmdSlice[1:])
 
 	switch cmdSlice[0] {
-	case emp3r0r_data.C2CmdLPE:
+	case emp3r0r_def.C2CmdLPE:
 		// LPE helper
 		// !lpe --script_name script_name
 		scriptName := flags.StringP("script_name", "s", "", "Script name")

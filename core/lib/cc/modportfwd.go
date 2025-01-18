@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -39,7 +39,7 @@ func modulePortFwd() {
 				// tell the agent to close connection
 				// make sure handler returns
 				// cmd format: !port_fwd [to/listen] [shID] [operation]
-				cmd := fmt.Sprintf("%s --shID %s --operation stop", emp3r0r_data.C2CmdPortFwd, id)
+				cmd := fmt.Sprintf("%s --shID %s --operation stop", emp3r0r_def.C2CmdPortFwd, id)
 				sendCMDerr := SendCmd(cmd, "", CurrentTarget)
 				if sendCMDerr != nil {
 					CliPrintError("SendCmd: %v", sendCMDerr)
@@ -160,7 +160,7 @@ func moduleProxy() {
 
 				// tell the agent to close connection
 				// make sure handler returns
-				cmd := fmt.Sprintf("%s --id %s", emp3r0r_data.C2CmdDeletePortFwd, id)
+				cmd := fmt.Sprintf("%s --id %s", emp3r0r_def.C2CmdDeletePortFwd, id)
 				err := SendCmd(cmd, "", session.Agent)
 				if err != nil {
 					CliPrintError("SendCmd: %v", err)

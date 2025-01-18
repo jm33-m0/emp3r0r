@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/olekukonko/tablewriter"
 )
@@ -26,10 +26,10 @@ var CmdResults = make(map[string]string)
 var CmdResultsMutex = &sync.Mutex{}
 
 // processAgentData deal with data from agent side
-func processAgentData(data *emp3r0r_data.MsgTunData) {
+func processAgentData(data *emp3r0r_def.MsgTunData) {
 	TargetsMutex.RLock()
 	defer TargetsMutex.RUnlock()
-	payloadSplit := strings.Split(data.Payload, emp3r0r_data.MagicString)
+	payloadSplit := strings.Split(data.Payload, emp3r0r_def.MagicString)
 	op := payloadSplit[0]
 
 	target := GetTargetFromTag(data.Tag)
@@ -191,8 +191,8 @@ func processAgentData(data *emp3r0r_data.MsgTunData) {
 	}
 
 	// Command output
-	no_need_to_show := strings.HasPrefix(cmd, emp3r0r_data.C2CmdPortFwd) ||
-		strings.HasPrefix(cmd, emp3r0r_data.C2CmdSSHD) || strings.HasPrefix(cmd, emp3r0r_data.C2CmdListDir)
+	no_need_to_show := strings.HasPrefix(cmd, emp3r0r_def.C2CmdPortFwd) ||
+		strings.HasPrefix(cmd, emp3r0r_def.C2CmdSSHD) || strings.HasPrefix(cmd, emp3r0r_def.C2CmdListDir)
 	if DebugLevel < 3 {
 		// ignore some cmds
 		if no_need_to_show {

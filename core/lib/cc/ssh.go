@@ -13,15 +13,15 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 type SSH_SHELL_Mapping struct {
-	Shell   string                     // the shell to run, eg. bash, python
-	Agent   *emp3r0r_data.Emp3r0rAgent // the agent this shell is connected to
-	PortFwd *PortFwdSession            // the port mapping for this shell session
-	ToPort  string                     // the port to connect to on the agent side, always the same as PortFwd.To's port
+	Shell   string                    // the shell to run, eg. bash, python
+	Agent   *emp3r0r_def.Emp3r0rAgent // the agent this shell is connected to
+	PortFwd *PortFwdSession           // the port mapping for this shell session
+	ToPort  string                    // the port to connect to on the agent side, always the same as PortFwd.To's port
 }
 
 // shell - port mapping
@@ -108,7 +108,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 		if args == "" {
 			args = "--"
 		}
-		cmd := fmt.Sprintf("%s --shell %s --port %s --args %s", emp3r0r_data.C2CmdSSHD, shell, port, args)
+		cmd := fmt.Sprintf("%s --shell %s --port %s --args %s", emp3r0r_def.C2CmdSSHD, shell, port, args)
 		err = SendCmdToCurrentTarget(cmd, cmd_id)
 		if err != nil {
 			return

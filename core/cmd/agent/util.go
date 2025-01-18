@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -33,7 +33,7 @@ func isC2Reachable() bool {
 	}
 
 	log.Println("NCSI is disabled, trying direct C2 connection")
-	return tun.TestConnectivity(emp3r0r_data.CCAddress, agent.RuntimeConfig.C2TransportProxy)
+	return tun.TestConnectivity(emp3r0r_def.CCAddress, agent.RuntimeConfig.C2TransportProxy)
 }
 
 // AgentWaitQueue list of agents waiting to run

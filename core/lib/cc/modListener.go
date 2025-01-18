@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/fatih/color"
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 )
 
 func modListener() {
@@ -16,7 +16,7 @@ func modListener() {
 		return
 	}
 	cmd := fmt.Sprintf("%s --listener %s --port %s --payload %s --compression %s --passphrase %s",
-		emp3r0r_data.C2CmdListener,
+		emp3r0r_def.C2CmdListener,
 		Options["listener"].Val,
 		Options["port"].Val,
 		Options["payload"].Val,

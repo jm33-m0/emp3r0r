@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	emp3r0r_data "github.com/jm33-m0/emp3r0r/core/lib/data"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -28,7 +28,7 @@ func TakeScreenshot() {
 	// then we handle the cmd output in agentHandler
 }
 
-func processScreenshot(out string, target *emp3r0r_data.Emp3r0rAgent) (err error) {
+func processScreenshot(out string, target *emp3r0r_def.Emp3r0rAgent) (err error) {
 	if strings.Contains(out, "Error") {
 		return fmt.Errorf("%s", out)
 	}
