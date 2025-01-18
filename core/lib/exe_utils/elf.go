@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -97,6 +99,63 @@ func (ph *ProgramHeader) Print(index int) {
 	log.Printf("  [%d] Type: 0x%x, Offset: 0x%x, VAddr: 0x%x, PAddr: 0x%x", index, ph.Type, ph.Off, ph.Vaddr, ph.Paddr)
 	log.Printf("      File Size: %d, Mem Size: %d, Flags: 0x%x, Align: %d", ph.Filesz, ph.Memsz, ph.Flags, ph.Align)
 }
+
+// SectionHeader32 represents a 32-bit ELF section header.
+type SectionHeader32 struct {
+	Name      uint32
+	Type      uint32
+	Flags     uint32
+	Addr      uint32
+	Offset    uint32
+	Size      uint32
+	Link      uint32
+	Info      uint32
+	Addralign uint32
+	Entsize   uint32
+}
+
+// Dynamic32 represents a 32-bit ELF dynamic entry.
+type Dynamic32 struct {
+	Tag int32
+	Val uint32
+}
+
+// SectionHeader represents an ELF section header.
+type SectionHeader struct {
+	Name      uint32
+	Type      uint32
+	Flags     uint64
+	Addr      uint64
+	Offset    uint64
+	Size      uint64
+	Link      uint32
+	Info      uint32
+	Addralign uint64
+	Entsize   uint64
+}
+
+// Dynamic represents an ELF dynamic entry.
+type Dynamic struct {
+	Tag int64
+	Val uint64
+}
+
+// ELF section types
+const (
+	SHT_DYNAMIC = 6
+	SHT_STRTAB  = 3
+)
+
+// ELF section flags
+const (
+	SHF_ALLOC = 0x2
+)
+
+// ELF dynamic tags
+const (
+	DT_NULL   = 0
+	DT_NEEDED = 1
+)
 
 // GetSymFromLibc gets the pointer to a libc function that is currently loaded in the target process, ASLR-proof.
 // Parameters:
@@ -385,4 +444,264 @@ func parseProgramHeaders(reader *bytes.Reader, phOff int64, phNum int, elfClass 
 		headers = append(headers, ph)
 	}
 	return headers, nil
+}
+
+// AddDTNeeded adds a specified library to the DT_NEEDED entries of an ELF file.
+// Parameters:
+// - filePath: Path to the ELF file to modify.
+// - libName: Name of the library to add.
+func AddDTNeeded(filePath, libName string) error {
+	f, err := os.OpenFile(filePath, os.O_RDWR, 0)
+	if err != nil {
+		return fmt.Errorf("error opening ELF file: %v", err)
+	}
+	defer f.Close()
+
+	// Read the ELF file header
+	var ident [16]byte
+	if _, err := f.Read(ident[:]); err != nil {
+		return fmt.Errorf("error reading ELF identification: %v", err)
+	}
+	if !bytes.Equal(ident[:4], ELFMAGIC) {
+		return fmt.Errorf("invalid ELF magic number")
+	}
+
+	// Determine ELF class (32-bit or 64-bit)
+	class := ident[4]
+	var header *ELFHeader
+	elf_bytes, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("error reading ELF file: %v", err)
+	}
+	header, err = ParseELFHeaders(elf_bytes)
+	if err != nil {
+		return fmt.Errorf("error parsing ELF header: %v", err)
+	}
+
+	// Read the section headers
+	sectionHeaders, err := parseSectionHeaders(f, header.Shoff, int(header.Shnum), class)
+	if err != nil {
+		return fmt.Errorf("error parsing section headers: %v", err)
+	}
+
+	// Find the dynamic section and string table
+	var dynSection, strTabSection *SectionHeader
+	for i := range sectionHeaders {
+		if sectionHeaders[i].Type == SHT_DYNAMIC {
+			dynSection = &sectionHeaders[i]
+		}
+		if sectionHeaders[i].Type == SHT_STRTAB && sectionHeaders[i].Flags&SHF_ALLOC != 0 {
+			strTabSection = &sectionHeaders[i]
+		}
+	}
+	if dynSection == nil {
+		return fmt.Errorf("dynamic section not found")
+	}
+	if strTabSection == nil {
+		return fmt.Errorf("string table not found")
+	}
+
+	// Read the dynamic entries
+	dynEntries, err := parseDynamicEntries(f, dynSection.Offset, dynSection.Size, class)
+	if err != nil {
+		return fmt.Errorf("error parsing dynamic entries: %v", err)
+	}
+
+	// Read the string table
+	strTabData, err := readSectionData(f, strTabSection.Offset, strTabSection.Size)
+	if err != nil {
+		return fmt.Errorf("error reading string table: %v", err)
+	}
+
+	// Add the new library to the string table
+	newStrTabData := append(strTabData, []byte(libName)...)
+	newStrTabData = append(newStrTabData, 0) // Null-terminate the string
+
+	// Update the dynamic entries
+	for i := range dynEntries {
+		if dynEntries[i].Tag == DT_NULL {
+			dynEntries[i].Tag = DT_NEEDED
+			dynEntries[i].Val = uint64(len(strTabData))
+			break
+		}
+	}
+
+	// Write the updated string table back to the file
+	if err := writeSectionData(f, strTabSection.Offset, newStrTabData); err != nil {
+		return fmt.Errorf("error writing string table: %v", err)
+	}
+
+	// Write the updated dynamic entries back to the file
+	if err := writeDynamicEntries(f, dynSection.Offset, dynEntries, class); err != nil {
+		return fmt.Errorf("error writing dynamic entries: %v", err)
+	}
+
+	return nil
+}
+
+// parseSectionHeaders parses the section headers from the given file.
+// Parameters:
+// - f: File containing the ELF data.
+// - shOff: Offset to the section headers.
+// - shNum: Number of section headers.
+// - elfClass: ELF class (32-bit or 64-bit).
+func parseSectionHeaders(f *os.File, shOff uint64, shNum int, elfClass byte) ([]SectionHeader, error) {
+	if _, err := f.Seek(int64(shOff), 0); err != nil {
+		return nil, err
+	}
+
+	var headers []SectionHeader
+	for i := 0; i < shNum; i++ {
+		var sh SectionHeader
+		if elfClass == ELFCLASS64 {
+			if err := binary.Read(f, binary.LittleEndian, &sh); err != nil {
+				return nil, err
+			}
+		} else {
+			var sh32 SectionHeader32
+			if err := binary.Read(f, binary.LittleEndian, &sh32); err != nil {
+				return nil, err
+			}
+			sh = SectionHeader{
+				Name:      sh32.Name,
+				Type:      sh32.Type,
+				Flags:     uint64(sh32.Flags),
+				Addr:      uint64(sh32.Addr),
+				Offset:    uint64(sh32.Offset),
+				Size:      uint64(sh32.Size),
+				Link:      sh32.Link,
+				Info:      sh32.Info,
+				Addralign: uint64(sh32.Addralign),
+				Entsize:   uint64(sh32.Entsize),
+			}
+		}
+		headers = append(headers, sh)
+	}
+	return headers, nil
+}
+
+// parseDynamicEntries parses the dynamic entries from the given file.
+// Parameters:
+// - f: File containing the ELF data.
+// - dynOff: Offset to the dynamic entries.
+// - dynSize: Size of the dynamic entries.
+// - elfClass: ELF class (32-bit or 64-bit).
+func parseDynamicEntries(f *os.File, dynOff uint64, dynSize uint64, elfClass byte) ([]Dynamic, error) {
+	if _, err := f.Seek(int64(dynOff), 0); err != nil {
+		return nil, err
+	}
+
+	var entries []Dynamic
+	for i := uint64(0); i < dynSize/uint64(binary.Size(Dynamic{})); i++ {
+		var dyn Dynamic
+		if elfClass == ELFCLASS64 {
+			if err := binary.Read(f, binary.LittleEndian, &dyn); err != nil {
+				return nil, err
+			}
+		} else {
+			var dyn32 Dynamic32
+			if err := binary.Read(f, binary.LittleEndian, &dyn32); err != nil {
+				return nil, err
+			}
+			dyn = Dynamic{
+				Tag: int64(dyn32.Tag),
+				Val: uint64(dyn32.Val),
+			}
+		}
+		entries = append(entries, dyn)
+	}
+	return entries, nil
+}
+
+// readSectionData reads the data of a section from the given file.
+// Parameters:
+// - f: File containing the ELF data.
+// - offset: Offset to the section data.
+// - size: Size of the section data.
+func readSectionData(f *os.File, offset uint64, size uint64) ([]byte, error) {
+	if _, err := f.Seek(int64(offset), 0); err != nil {
+		return nil, err
+	}
+	data := make([]byte, size)
+	if _, err := f.Read(data); err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+// writeSectionData writes the data to a section in the given file.
+// Parameters:
+// - f: File containing the ELF data.
+// - offset: Offset to the section data.
+// - data: Data to write to the section.
+func writeSectionData(f *os.File, offset uint64, data []byte) error {
+	if _, err := f.Seek(int64(offset), 0); err != nil {
+		return err
+	}
+	if _, err := f.Write(data); err != nil {
+		return err
+	}
+	return nil
+}
+
+// writeDynamicEntries writes the dynamic entries to the given file.
+// Parameters:
+// - f: File containing the ELF data.
+// - offset: Offset to the dynamic entries.
+// - entries: Dynamic entries to write.
+// - elfClass: ELF class (32-bit or 64-bit).
+func writeDynamicEntries(f *os.File, offset uint64, entries []Dynamic, elfClass byte) error {
+	if _, err := f.Seek(int64(offset), 0); err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if elfClass == ELFCLASS64 {
+			if err := binary.Write(f, binary.LittleEndian, entry); err != nil {
+				return err
+			}
+		} else {
+			entry32 := Dynamic32{
+				Tag: int32(entry.Tag),
+				Val: uint32(entry.Val),
+			}
+			if err := binary.Write(f, binary.LittleEndian, entry32); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// FixELF replaces ld and adds rpath to use musl libc.
+// Parameters:
+// - elf_path: Path to the ELF file to fix.
+func FixELF(elf_path, rpath, ld_path string) (err error) {
+	utils_path := filepath.Dir(rpath)
+	pwd, _ := os.Getwd()
+	err = os.Chdir(utils_path)
+	if err != nil {
+		return
+	}
+	defer os.Chdir(pwd)
+
+	// paths
+	patchelf := fmt.Sprintf("%s/patchelf", utils_path)
+	log.Printf("rpath: %s, patchelf: %s, ld_path: %s", rpath, patchelf, ld_path)
+
+	// remove rpath
+	cmd := fmt.Sprintf("%s --remove-rpath", patchelf)
+	out, err := exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
+	if err != nil {
+		err = fmt.Errorf("patchelf remove rpath: %v, %s", err, out)
+	}
+
+	// patchelf cmd
+	cmd = fmt.Sprintf("%s --set-interpreter %s --set-rpath %s %s",
+		patchelf, ld_path, rpath, elf_path)
+
+	out, err = exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
+	if err != nil {
+		err = fmt.Errorf("patchelf: %v, %s", err, out)
+	}
+	return
 }

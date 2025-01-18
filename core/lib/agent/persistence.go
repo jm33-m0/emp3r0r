@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
+	"github.com/jm33-m0/emp3r0r/core/lib/exe_utils"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -262,9 +263,9 @@ func patcher() (err error) {
 		if err != nil {
 			return err
 		}
-		e := AddNeededLib(file, so_path)
-		if e != nil {
-			err_list = append(err_list, e)
+		addLibErr := exe_utils.AddDTNeeded(file, so_path)
+		if addLibErr != nil {
+			err_list = append(err_list, addLibErr)
 		}
 
 		// Restore the original file timestamps
