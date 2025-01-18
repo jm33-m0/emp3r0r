@@ -95,7 +95,7 @@ func generateGetFilePaths(file_path string) (write_dir, save_to_file, tempname, 
 }
 
 // GetFile get file from agent
-func GetFile(file_path string, a *emp3r0r_data.Emp3r0rAgent) (ftpSh *StreamHandler, err error) {
+func GetFile(file_path string, agent *emp3r0r_data.Emp3r0rAgent) (ftpSh *StreamHandler, err error) {
 	if !util.IsExist(FileGetDir) {
 		err = os.MkdirAll(FileGetDir, 0o700)
 		if err != nil {
@@ -103,7 +103,7 @@ func GetFile(file_path string, a *emp3r0r_data.Emp3r0rAgent) (ftpSh *StreamHandl
 			return
 		}
 	}
-	CliPrintInfo("Waiting for response from agent %s", a.Tag)
+	CliPrintInfo("Waiting for response from agent %s", agent.Tag)
 
 	write_dir, save_to_file, tempname, lock := generateGetFilePaths(file_path)
 	CliPrintDebug("Get file: %s, save to: %s, tempname: %s, lock: %s", file_path, save_to_file, tempname, lock)
@@ -125,7 +125,7 @@ func GetFile(file_path string, a *emp3r0r_data.Emp3r0rAgent) (ftpSh *StreamHandl
 	}
 
 	// stat target file, know its size, and allocate the file on disk
-	fi, err := StatFile(file_path, a)
+	fi, err := StatFile(file_path, agent)
 	if err != nil {
 		err = fmt.Errorf("GetFile: failed to stat %s: %v", file_path, err)
 		return
@@ -172,7 +172,7 @@ func GetFile(file_path string, a *emp3r0r_data.Emp3r0rAgent) (ftpSh *StreamHandl
 
 	// cmd
 	cmd := fmt.Sprintf("get --file_path '%s' --offset %d --token '%s'", file_path, offset, ftpSh.Token)
-	err = SendCmd(cmd, "", a)
+	err = SendCmd(cmd, "", agent)
 	if err != nil {
 		CliPrintError("GetFile send command: %v", err)
 		return nil, err

