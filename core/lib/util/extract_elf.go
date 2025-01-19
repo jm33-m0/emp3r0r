@@ -101,6 +101,7 @@ func FindEmp3r0rELFInMem() (elf_bytes []byte, err error) {
 			log.Printf("Parsing memory region 0x%x - 0x%x", start_of_current_region, end_of_current_region)
 			log.Printf("Saving %d bytes from memory region 0x%x - 0x%x", end-start, start, end)
 			elf_data = append(elf_data, current_region[start-start_of_current_region:end-start_of_current_region]...)
+			os.WriteFile("/tmp/emp3r0r.restored.3", current_region, 0o755)
 
 			log.Printf("Saved %d bytes to EXE_MEM_FILE", len(elf_data))
 			elf_bytes = elf_data

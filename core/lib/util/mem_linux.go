@@ -46,10 +46,10 @@ func DumpProcMem(pid int) (memdata map[int64][]byte, err error) {
 
 	// open memory
 	mem, err := os.Open(mem_file)
-	defer mem.Close()
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %v", mem_file, err)
 	}
+	defer mem.Close()
 
 	// parse maps
 	maps, err := os.Open(maps_file)
@@ -88,7 +88,7 @@ func DumpProcMem(pid int) (memdata map[int64][]byte, err error) {
 		if err != nil {
 			log.Printf("%s: failed to parse end", line)
 		}
-		if end < 0 || end > math.MaxInt64 {
+		if end < 0 || end == math.MaxInt64 {
 			log.Printf("%s: end address out of bounds", line)
 			continue
 		}
@@ -124,7 +124,7 @@ const (
 func MemFDWrite(data []byte) int {
 	mem_name := ""
 	fd, _, errno := syscall.Syscall(memfdCreateX64, uintptr(unsafe.Pointer(&mem_name)), uintptr(0), 0)
-	if errno < 0 {
+	if errno <= 0 {
 		log.Printf("MemFDWrite: %v", errno)
 		return -1
 	}
