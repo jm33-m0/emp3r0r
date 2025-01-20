@@ -1,5 +1,5 @@
-//go:build !cgo
-// +build !cgo
+//go:build cgo
+// +build cgo
 
 package main
 
@@ -30,6 +30,9 @@ import (
 	"src.elv.sh/pkg/shell"
 )
 
+import "C"
+
+//export main
 func main() {
 	var err error
 	replace_agent := false
