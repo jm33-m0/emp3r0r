@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.49.1](https://github.com/jm33-m0/emp3r0r/compare/v1.49.0...v1.49.1) (2025-01-20)
+
+
+### Bug Fixes
+
+* disable `daemonizae` in Windows ([0902b70](https://github.com/jm33-m0/emp3r0r/commit/0902b70acc643e1b2c879d7e19b4e49d4065b177))
+
 ## [1.49.0](https://github.com/jm33-m0/emp3r0r/compare/v1.48.10...v1.49.0) (2025-01-20)
 
 
