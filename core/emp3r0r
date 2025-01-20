@@ -34,6 +34,21 @@ magic_str="$(head -c 32 </dev/urandom | sha256sum | awk '{print $1}')"
 [[ -z "$GOPATH" ]] && export GOPATH="$HOME/go"
 export PATH="$GOPATH/bin:$PATH"
 
+check_zig() {
+  if ! command -v zig >/dev/null 2>&1; then
+    info "zig not found, installing zig to /usr/local/bin ..."
+    {
+      (test -e zig-linux-x86_64-0.13.0.tar.xz ||
+        wget https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz) &&
+        tar -xpf zig-linux-x86_64-0.13.0.tar.xz &&
+        sudo cp -aR ./zig-linux-x86_64-0.13.0 /usr/local/lib/zig &&
+        sudo ln -sf /usr/local/lib/zig/zig /usr/local/bin/zig
+    } || error "Failed to install zig"
+  else
+    info "zig is already installed"
+  fi
+}
+
 build_agent_stub() {
   local arch=$1
   local os=$2
@@ -52,15 +67,41 @@ build_shared_object() {
   local os=$2
   local output=$3
   info "Building shared object for $os $arch"
-  if [[ "$os" == "windows" ]]; then
-    if [[ "$arch" == "386" ]]; then
-      local build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86-windows-gnu\" CXX=\"zig c++ -target x86-windows-gnu\" GOOS=$os GOARCH=$arch go build -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
-    else
-      local build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86_64-windows-gnu\" CXX=\"zig c++ -target x86_64-windows-gnu\" GOOS=$os GOARCH=$arch go build -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
-    fi
-  else
-    local build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86_64-linux-gnu\" GOARCH=$arch go build -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
-  fi
+  local build_cmd
+  case "$os" in
+  windows)
+    case "$arch" in
+    386)
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86-windows-gnu\" CXX=\"zig c++ -target x86-windows-gnu\" GOOS=$os GOARCH=$arch go build -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
+      ;;
+    amd64)
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86_64-windows-gnu\" CXX=\"zig c++ -target x86_64-windows-gnu\" GOOS=$os GOARCH=$arch go build -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
+      ;;
+    arm64)
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target aarch64-windows-gnu\" CXX=\"zig c++ -target aarch64-windows-gnu\" GOOS=$os GOARCH=$arch go build -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
+      ;;
+    esac
+    ;;
+  linux)
+    case "$arch" in
+    386)
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86-linux-musl\" GOARCH=$arch go build -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
+      ;;
+    amd64)
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86_64-linux-musl\" GOARCH=$arch go build -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
+      ;;
+    arm)
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target arm-linux-musleabi\" GOARCH=$arch go build -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
+      ;;
+    arm64)
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target aarch64-linux-musl\" GOARCH=$arch go build -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
+      ;;
+    riscv64)
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target riscv64-linux-musl\" GOARCH=$arch go build -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
+      ;;
+    esac
+    ;;
+  esac
   echo "Running: $build_cmd"
   {
     cd "$pwd/cmd/agent" &&
@@ -75,6 +116,9 @@ build() {
     error "You need to set up Go first"
   }
   go mod tidy || error "go mod tidy"
+
+  # Check for zig installation
+  check_zig
 
   if [[ "$1" = "--debug" ]]; then
     gobuild_cmd="go"
@@ -105,15 +149,24 @@ build() {
   build_agent_stub "mips" "linux" "stub-mips"
   build_agent_stub "mips64" "linux" "stub-mips64"
   build_agent_stub "riscv64" "linux" "stub-riscv64"
+  build_agent_stub "ppc64" "linux" "stub-ppc64"
 
   # Windows
   build_agent_stub "amd64" "windows" "stub-win-amd64"
   build_agent_stub "386" "windows" "stub-win-386"
+  build_agent_stub "arm64" "windows" "stub-win-arm64"
 
   # Shared Objects
   build_shared_object "amd64" "windows" "stub-win-amd64.dll"
   build_shared_object "386" "windows" "stub-win-386.dll"
+  build_shared_object "arm64" "windows" "stub-win-arm64.dll"
   build_shared_object "amd64" "linux" "stub-amd64.so"
+  build_shared_object "386" "linux" "stub-386.so"
+  build_shared_object "riscv64" "linux" "stub-riscv64.so"
+  build_shared_object "arm" "linux" "stub-arm.so"
+
+  # error: https://github.com/golang/go/issues/22040
+  # build_shared_object "arm64" "linux" "stub-arm64.so"
 }
 
 uninstall() {
