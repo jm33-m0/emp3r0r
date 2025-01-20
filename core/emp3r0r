@@ -39,7 +39,7 @@ build_agent_stub() {
   local os=$2
   local output=$3
   info "Building agent stub for $os $arch"
-  local build_cmd="GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -tags netgo -o \\\"$temp/$output\\\" -ldflags=\\\"$ldflags\\\"\""
+  local build_cmd="CGO_ENABLED=0 GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -tags netgo -o \\\"$temp/$output\\\" -ldflags=\\\"$ldflags\\\"\""
   echo "Running: $build_cmd"
   {
     cd "$pwd/cmd/agent" &&
@@ -54,12 +54,12 @@ build_shared_object() {
   info "Building shared object for $os $arch"
   if [[ "$os" == "windows" ]]; then
     if [[ "$arch" == "386" ]]; then
-      local build_cmd="CGO_ENABLED=1 CC=/usr/bin/i686-w64-mingw32-gcc CXX=/usr/bin/i686-w64-mingw32-g++ GOOS=$os GOARCH=$arch go build -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
+      local build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86-windows-gnu\" CXX=\"zig c++ -target x86-windows-gnu\" GOOS=$os GOARCH=$arch go build -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
     else
-      local build_cmd="CGO_ENABLED=1 CC=/usr/bin/x86_64-w64-mingw32-gcc CXX=/usr/bin/x86_64-w64-mingw32-g++ GOOS=$os GOARCH=$arch go build -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
+      local build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86_64-windows-gnu\" CXX=\"zig c++ -target x86_64-windows-gnu\" GOOS=$os GOARCH=$arch go build -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
     fi
   else
-    local build_cmd="CGO_ENABLED=1 GOARCH=$arch go build -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-nostdlib -static'\""
+    local build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86_64-linux-gnu\" GOARCH=$arch go build -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
   fi
   echo "Running: $build_cmd"
   {
@@ -76,8 +76,6 @@ build() {
   }
   go mod tidy || error "go mod tidy"
 
-  # no fucking glibc!
-  export CGO_ENABLED=0
   if [[ "$1" = "--debug" ]]; then
     gobuild_cmd="go"
     build_opt="build"
@@ -115,7 +113,6 @@ build() {
   # Shared Objects
   build_shared_object "amd64" "windows" "stub-win-amd64.dll"
   build_shared_object "386" "windows" "stub-win-386.dll"
-  build_shared_object "386" "linux" "stub-386.so"
   build_shared_object "amd64" "linux" "stub-amd64.so"
 }
 
