@@ -84,7 +84,7 @@ func SetOption(args []string) {
 	CurrentModuleOptions[opt].Val = strings.Join(val, " ")
 }
 
-// UpdateOptions add new options according to current module
+// UpdateOptions reads options from modules config, and set default values
 func UpdateOptions(modName string) (exist bool) {
 	// filter user supplied option
 	for mod := range ModuleHelpers {
@@ -107,8 +107,10 @@ func UpdateOptions(modName string) (exist bool) {
 	}
 
 	switch modName {
+
+	// need to read cached values from `emp3r0r.json`
+	// these values are set when on the first run of emp3r0r
 	case emp3r0r_def.ModGenAgent:
-		CliPrint("Generating preset options")
 		// payload type
 		payload_type := addIfNotFound("type")
 		payload_type.Vals = []string{PayloadTypeLinuxExecutable, PayloadTypeWindowsExecutable, PayloadTypeLinuxSO, PayloadTypeWindowsDLL}
