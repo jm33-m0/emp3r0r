@@ -45,7 +45,6 @@ require (
 	golang.org/x/net v0.33.0
 	golang.org/x/sys v0.28.0
 	golang.org/x/term v0.27.0
-	src.elv.sh v0.21.0
 )
 
 require (
@@ -95,7 +94,6 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/sorairolake/lzip-go v0.3.5 // indirect
-	github.com/sourcegraph/jsonrpc2 v0.2.0 // indirect
 	github.com/templexxx/cpu v0.1.1 // indirect
 	github.com/templexxx/xorsimd v0.4.3 // indirect
 	github.com/therootcompany/xz v1.0.1 // indirect
@@ -113,5 +111,4 @@ require (
 	golang.org/x/tools v0.28.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	howett.net/plist v1.0.1 // indirect
-	pkg.nimblebun.works/go-lsp v1.1.0 // indirect
 )

