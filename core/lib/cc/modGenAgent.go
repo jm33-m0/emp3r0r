@@ -24,6 +24,13 @@ const (
 	PayloadTypeLinuxSO           = "linux_so"
 )
 
+var PayloadTypeList = []string{
+	PayloadTypeLinuxExecutable,
+	PayloadTypeLinuxSO,
+	PayloadTypeWindowsExecutable,
+	PayloadTypeWindowsDLL,
+}
+
 var Arch_List_Windows = []string{
 	"386",
 	"amd64",
@@ -57,7 +64,7 @@ func modGenAgent() {
 	)
 	now := time.Now()
 	stubFile := ""
-	payloadTypeOpt, ok := CurrentModuleOptions["type"]
+	payloadTypeOpt, ok := CurrentModuleOptions["payload_type"]
 	if !ok {
 		CliPrintError("Option 'type' not found")
 		return
@@ -270,7 +277,7 @@ func MakeConfig() (err error) {
 	ccHostOpt, ok := CurrentModuleOptions["cc_host"]
 	if !ok {
 		CliPrintError("Option 'cc_host' not found")
-		return fmt.Errorf("Option 'cc_host' not found")
+		return fmt.Errorf("option 'cc_host' not found")
 	}
 	RuntimeConfig.CCHost = ccHostOpt.Val
 	existing_names := tun.NamesInCert(ServerCrtFile)
@@ -315,14 +322,14 @@ func MakeConfig() (err error) {
 	ccIndicatorOpt, ok := CurrentModuleOptions["cc_indicator"]
 	if !ok {
 		CliPrintError("Option 'cc_indicator' not found")
-		return fmt.Errorf("Option 'cc_indicator' not found")
+		return fmt.Errorf("option 'cc_indicator' not found")
 	}
 	RuntimeConfig.CCIndicator = ccIndicatorOpt.Val
 
 	indicatorTextOpt, ok := CurrentModuleOptions["indicator_text"]
 	if !ok {
 		CliPrintError("Option 'indicator_text' not found")
-		return fmt.Errorf("Option 'indicator_text' not found")
+		return fmt.Errorf("option 'indicator_text' not found")
 	}
 	RuntimeConfig.CCIndicatorText = indicatorTextOpt.Val
 	if RuntimeConfig.CCIndicatorText != "" {
@@ -333,7 +340,7 @@ func MakeConfig() (err error) {
 	ncsiOpt, ok := CurrentModuleOptions["ncsi"]
 	if !ok {
 		CliPrintError("Option 'ncsi' not found")
-		return fmt.Errorf("Option 'ncsi' not found")
+		return fmt.Errorf("option 'ncsi' not found")
 	}
 	if ncsiOpt.Val == "on" {
 		RuntimeConfig.DisableNCSI = false

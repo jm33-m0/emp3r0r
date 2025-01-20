@@ -112,8 +112,8 @@ func UpdateOptions(modName string) (exist bool) {
 	// these values are set when on the first run of emp3r0r
 	case emp3r0r_def.ModGenAgent:
 		// payload type
-		payload_type := addIfNotFound("type")
-		payload_type.Vals = []string{PayloadTypeLinuxExecutable, PayloadTypeWindowsExecutable, PayloadTypeLinuxSO, PayloadTypeWindowsDLL}
+		payload_type := addIfNotFound("payload_type")
+		payload_type.Vals = PayloadTypeList
 		payload_type.Val = PayloadTypeLinuxExecutable
 		// arch
 		arch := addIfNotFound("arch")
@@ -158,7 +158,7 @@ func UpdateOptions(modName string) (exist bool) {
 		auto_proxy.Val = "off"
 
 	default:
-		// custom modules
+		// other modules
 		modconfig := emp3r0r_def.Modules[modName]
 		for optName, option := range modconfig.Options {
 			argOpt := addIfNotFound(optName)

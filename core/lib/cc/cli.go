@@ -459,9 +459,10 @@ func CliListOptions() {
 			continue
 		}
 		help = opt_obj.OptDesc
-		if opt_name == "module" {
+		switch opt_name {
+		case "module":
 			help = "Selected module"
-		} else if opt_name == "target" {
+		case "target":
 			help = "Selected target"
 		}
 		val := ""

