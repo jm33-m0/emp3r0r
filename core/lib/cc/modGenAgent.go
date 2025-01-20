@@ -34,15 +34,20 @@ var PayloadTypeList = []string{
 var Arch_List_Windows = []string{
 	"386",
 	"amd64",
+	"arm64",
 }
 
 var Arch_List_Windows_DLL = []string{
 	"386",
 	"amd64",
+	"arm64",
 }
 
 var Arch_List_Linux_SO = []string{
 	"amd64",
+	"386",
+	"arm",
+	"riscv64",
 }
 
 var Arch_List_All = []string{
@@ -120,8 +125,13 @@ func modGenAgent() {
 		1)
 	// verify
 	if !bytes.Contains(toWrite, config_payload) {
-		CliPrintError("Failed to patch %s with config payload", stubFile)
-		return
+		CliPrintWarning("Failed to patch %s with config payload, config data not found, append it to the file instead", stubFile)
+		// append config to the end of the file
+		err = appendConfigToPayload(stubFile, sep, encryptedJSONBytes)
+		if err != nil {
+			CliPrintError("Failed to append config to payload: %v", err)
+			return
+		}
 	}
 	// write
 	if err = os.WriteFile(outfile, toWrite, 0o755); err != nil {
