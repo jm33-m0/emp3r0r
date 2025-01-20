@@ -88,19 +88,20 @@ build_shared_object() {
   linux)
     case "$arch" in
     386)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86-linux-musl\" GOARCH=$arch go build -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86-linux-gnu\" GOARCH=$arch go build -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-s -nolibc -nostdlib -nodefaultlibs -static'\""
       ;;
     amd64)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86_64-linux-musl\" GOARCH=$arch go build -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86_64-linux-gnu\" GOARCH=$arch go build -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-s -nolibc -nostdlib -nodefaultlibs -static'\""
       ;;
     arm)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target arm-linux-musleabi\" GOARCH=$arch go build -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target arm-linux-gnueabi\" GOARCH=$arch go build -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-s -nostdlib -nodefaultlibs -static'\""
       ;;
     arm64)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target aarch64-linux-musl\" GOARCH=$arch go build -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target aarch64-linux-gnu\" GOARCH=$arch go build -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-s -nostdlib -nodefaultlibs -static'\""
       ;;
     riscv64)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target riscv64-linux-musl\" GOARCH=$arch go build -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
+      # the built shared object is untested
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target riscv64-linux-musl\" GOARCH=$arch go build -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-s -nostdlib -nodefaultlibs -static'\""
       ;;
     esac
     ;;
@@ -165,8 +166,8 @@ build() {
   build_shared_object "arm64" "windows" "stub-win-arm64.dll"
   build_shared_object "amd64" "linux" "stub-amd64.so"
   build_shared_object "386" "linux" "stub-386.so"
-  build_shared_object "riscv64" "linux" "stub-riscv64.so"
   build_shared_object "arm" "linux" "stub-arm.so"
+  build_shared_object "riscv64" "linux" "stub-riscv64.so"
 
   # error: https://github.com/golang/go/issues/22040
   # build_shared_object "arm64" "linux" "stub-arm64.so"
