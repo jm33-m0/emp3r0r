@@ -13,7 +13,7 @@ import (
 )
 
 func moduleMemDump() {
-	pidOpt, ok := Options["pid"]
+	pidOpt, ok := CurrentModuleOptions["pid"]
 	if !ok {
 		CliPrintError("Option 'pid' not found")
 		return

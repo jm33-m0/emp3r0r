@@ -10,14 +10,14 @@ import (
 )
 
 func moduleBring2CC() {
-	addrOpt, ok := Options["addr"]
+	addrOpt, ok := CurrentModuleOptions["addr"]
 	if !ok {
 		CliPrintError("Option 'addr' not found")
 		return
 	}
 	addr := addrOpt.Val
 
-	kcpOpt, ok := Options["kcp"]
+	kcpOpt, ok := CurrentModuleOptions["kcp"]
 	if !ok {
 		CliPrintError("Option 'kcp' not found")
 		return

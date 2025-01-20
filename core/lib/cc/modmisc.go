@@ -11,7 +11,7 @@ import (
 )
 
 func modulePersistence() {
-	methodOpt, ok := Options["method"]
+	methodOpt, ok := CurrentModuleOptions["method"]
 	if !ok {
 		CliPrintError("Option 'method' not found")
 		return
@@ -26,7 +26,7 @@ func modulePersistence() {
 }
 
 func moduleLogCleaner() {
-	keywordOpt, ok := Options["keyword"]
+	keywordOpt, ok := CurrentModuleOptions["keyword"]
 	if !ok {
 		CliPrintError("Option 'keyword' not found")
 		return

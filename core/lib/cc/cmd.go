@@ -269,8 +269,8 @@ func useModule(cmd string) {
 	for mod := range ModuleHelpers {
 		if mod == cmdSplit[1] {
 			CurrentMod = cmdSplit[1]
-			for k := range Options {
-				delete(Options, k)
+			for k := range CurrentModuleOptions {
+				delete(CurrentModuleOptions, k)
 			}
 			UpdateOptions(CurrentMod)
 			CliPrintInfo("Using module %s", strconv.Quote(CurrentMod))
@@ -302,8 +302,8 @@ func CmdHelp(mod string) {
 	for modname, modObj := range emp3r0r_def.Modules {
 		if mod == modObj.Name {
 			if len(modObj.Options) > 0 {
-				for opt, val_help := range modObj.Options {
-					help[opt] = strings.Join(val_help, " ")
+				for opt_name, opt_obj := range modObj.Options {
+					help[opt_name] = opt_obj.OptDesc
 				}
 			} else {
 				help[modname] = "No options"

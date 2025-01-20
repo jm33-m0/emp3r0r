@@ -74,18 +74,18 @@ func moduleCustom() {
 }
 
 func updateModuleOptions(config *emp3r0r_def.ModConfig) {
-	for opt := range config.Options {
-		option, ok := Options[opt]
+	for opt, modOption := range config.Options {
+		option, ok := CurrentModuleOptions[opt]
 		if !ok {
 			CliPrintError("Option '%s' not found", opt)
 			return
 		}
-		config.Options[opt][0] = option.Val
+		modOption.OptVal = option.Val
 	}
 }
 
 func getDownloadAddr() string {
-	download_url_opt, ok := Options["download_addr"]
+	download_url_opt, ok := CurrentModuleOptions["download_addr"]
 	if ok {
 		return download_url_opt.Val
 	}
@@ -157,9 +157,14 @@ func handleCompressedModule(config emp3r0r_def.ModConfig, payload_type, exec_cmd
 func handleInteractiveModule(config emp3r0r_def.ModConfig, cmd_id string) {
 	opt, exists := config.Options["args"]
 	if !exists {
-		config.Options["args"] = []string{"--", "No args"}
+		config.Options["args"] = &emp3r0r_def.ModOption{
+			OptName: "args",
+			OptDesc: "run this command with these arguments",
+			OptVal:  "",
+			OptVals: []string{},
+		}
 	}
-	args := opt[0]
+	args := opt.OptVal
 	port := strconv.Itoa(util.RandInt(1024, 65535))
 	look_for := tun.SHA256SumRaw([]byte(emp3r0r_def.MagicString))
 
@@ -323,8 +328,8 @@ func genModStartCmd(config *emp3r0r_def.ModConfig) (payload_type, exec_path, env
 	setEnvVar := func(opt, value string) {
 		fmt.Fprintf(&builder, "%s=%s ", opt, value)
 	}
-	for opt, val_help := range config.Options {
-		setEnvVar(opt, val_help[0])
+	for opt, modOption := range config.Options {
+		setEnvVar(opt, modOption.OptVal)
 	}
 
 	envStr = builder.String()
@@ -333,12 +338,12 @@ func genModStartCmd(config *emp3r0r_def.ModConfig) (payload_type, exec_path, env
 }
 
 func updateModuleHelp(config *emp3r0r_def.ModConfig) error {
-	help_map := make(map[string][]string)
-	for opt, val_help := range config.Options {
-		if len(val_help) < 2 {
+	help_map := make(map[string]*emp3r0r_def.ModOption)
+	for opt, modOption := range config.Options {
+		if modOption.OptDesc == "" {
 			return fmt.Errorf("%s config error: %s incomplete", config.Name, opt)
 		}
-		help_map[opt] = val_help
+		help_map[opt] = modOption
 		emp3r0r_def.Modules[config.Name].Options = help_map
 	}
 	return nil

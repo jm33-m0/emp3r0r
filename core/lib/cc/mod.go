@@ -5,7 +5,6 @@ package cc
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
@@ -14,8 +13,8 @@ import (
 	"github.com/lithammer/fuzzysearch/fuzzy"
 )
 
-// Option all necessary info of an option
-type Option struct {
+// CurrentOption all necessary info of an option
+type CurrentOption struct {
 	Name string   // like `module`, `target`, `cmd_to_exec`
 	Val  string   // the value to use
 	Vals []string // possible values
@@ -31,8 +30,8 @@ var (
 	// CurrentTarget selected target
 	CurrentTarget *emp3r0r_def.Emp3r0rAgent
 
-	// Options currently available options for `set`
-	Options = make(map[string]*Option)
+	// CurrentModuleOptions currently available options for `set`
+	CurrentModuleOptions = make(map[string]*CurrentOption)
 
 	// ShellHelpInfo provide utilities like ps, kill, etc
 	// deprecated
@@ -58,7 +57,6 @@ var (
 		emp3r0r_def.ModVACCINE:      moduleVaccine,
 		emp3r0r_def.ModINJECTOR:     moduleInjector,
 		emp3r0r_def.ModBring2CC:     moduleBring2CC,
-		emp3r0r_def.ModStager:       modStager,
 		emp3r0r_def.ModListener:     modListener,
 		emp3r0r_def.ModSSHHarvester: module_ssh_harvester,
 		emp3r0r_def.ModDownloader:   moduleDownloader,
@@ -70,20 +68,20 @@ var (
 // SetOption set an option to value, `set` command
 func SetOption(args []string) {
 	opt := args[0]
-	if _, exist := Options[opt]; !exist {
+	if _, exist := CurrentModuleOptions[opt]; !exist {
 		CliPrintError("No such option: %s", strconv.Quote(opt))
 		return
 	}
 	if len(args) < 2 {
 		// clear value
-		Options[opt].Val = ""
+		CurrentModuleOptions[opt].Val = ""
 		return
 	}
 
 	val := args[1:] // in case val contains spaces
 
 	// set
-	Options[opt].Val = strings.Join(val, " ")
+	CurrentModuleOptions[opt].Val = strings.Join(val, " ")
 }
 
 // UpdateOptions add new options according to current module
@@ -101,122 +99,16 @@ func UpdateOptions(modName string) (exist bool) {
 	}
 
 	// help us add new Option to Options, if exists, return the *Option
-	addIfNotFound := func(key string) *Option {
-		if _, exist := Options[key]; !exist {
-			Options[key] = &Option{Name: key, Val: "<blank>", Vals: []string{}}
+	addIfNotFound := func(key string) *CurrentOption {
+		if _, exist := CurrentModuleOptions[key]; !exist {
+			CurrentModuleOptions[key] = &CurrentOption{Name: key, Val: "<blank>", Vals: []string{}}
 		}
-		return Options[key]
+		return CurrentModuleOptions[key]
 	}
 
-	var currentOpt *Option
 	switch modName {
-	case emp3r0r_def.ModCMD_EXEC:
-		currentOpt = addIfNotFound("cmd_to_exec")
-		currentOpt.Vals = []string{
-			"id", "whoami", "ifconfig",
-			"ip a", "arp -a",
-			"ps -ef", "lsmod", "ss -antup",
-			"netstat -antup", "uname -a",
-		}
-
-	case emp3r0r_def.ModSHELL:
-		shellOpt := addIfNotFound("shell")
-		shellOpt.Vals = []string{
-			"/bin/bash", "/bin/zsh", "/bin/sh", "python", "python3",
-			"cmd.exe", "powershell.exe", "elvish",
-		}
-		shellOpt.Val = "bash"
-
-		argsOpt := addIfNotFound("args")
-		argsOpt.Val = ""
-		portOpt := addIfNotFound("port")
-		portOpt.Vals = []string{
-			RuntimeConfig.SSHDShellPort, "22222",
-		}
-		portOpt.Val = RuntimeConfig.SSHDShellPort
-
-	case emp3r0r_def.ModPORT_FWD:
-		// rport
-		portOpt := addIfNotFound("to")
-		portOpt.Vals = []string{"127.0.0.1:22", "127.0.0.1:8080"}
-		// listen on port
-		lportOpt := addIfNotFound("listen_port")
-		lportOpt.Vals = []string{"8080", "1080", "22", "23", "21"}
-		// on/off
-		switchOpt := addIfNotFound("switch")
-		switchOpt.Vals = []string{"on", "off", "reverse"}
-		switchOpt.Val = "on"
-		// protocol
-		protOpt := addIfNotFound("protocol")
-		protOpt.Vals = []string{"tcp", "udp"}
-		protOpt.Val = "tcp"
-
-	case emp3r0r_def.ModCLEAN_LOG:
-		// keyword to clean
-		keywordOpt := addIfNotFound("keyword")
-		keywordOpt.Vals = []string{"root", "admin"}
-
-	case emp3r0r_def.ModPROXY:
-		portOpt := addIfNotFound("port")
-		portOpt.Vals = []string{"1080", "8080", "10800", "10888"}
-		portOpt.Val = "8080"
-		statusOpt := addIfNotFound("status")
-		statusOpt.Vals = []string{"on", "off", "reverse"}
-		statusOpt.Val = "on"
-
-	case emp3r0r_def.ModLPE_SUGGEST:
-		currentOpt = addIfNotFound("lpe_helper")
-		for name := range LPEHelperURLs {
-			currentOpt.Vals = append(currentOpt.Vals, name)
-		}
-		currentOpt.Val = "lpe_les"
-
-	case emp3r0r_def.ModINJECTOR:
-		pidOpt := addIfNotFound("pid")
-		pidOpt.Vals = []string{"0"}
-		pidOpt.Val = "0"
-		methodOpt := addIfNotFound("method")
-		for k := range emp3r0r_def.InjectorMethods {
-			methodOpt.Vals = append(methodOpt.Vals, k)
-		}
-		methodOpt.Val = "shared_library"
-
-	case emp3r0r_def.ModBring2CC:
-		addrOpt := addIfNotFound("addr")
-		kcpOpt := addIfNotFound("kcp")
-		addrOpt.Vals = []string{"127.0.0.1"}
-		addrOpt.Val = "<blank>"
-		kcpOpt.Vals = []string{"on", "off"}
-		kcpOpt.Val = "on"
-
-	case emp3r0r_def.ModPERSISTENCE:
-		currentOpt = addIfNotFound("method")
-		for k := range emp3r0r_def.PersistMethods {
-			currentOpt.Vals = append(currentOpt.Vals, k)
-		}
-		currentOpt.Val = "profiles"
-
-	case emp3r0r_def.ModStager:
-		stager_type_opt := addIfNotFound("type")
-		stager_type_opt.Val = Stagers[0]
-		stager_type_opt.Vals = Stagers
-
-		agentpath_type_opt := addIfNotFound("agent_path")
-		agentpath_type_opt.Val = "/tmp/emp3r0r"
-		files, err := os.ReadDir(EmpWorkSpace)
-		if err != nil {
-			CliPrintWarning("Listing emp3r0r work directory: %v", err)
-		}
-		var listing []string
-		for _, f := range files {
-			if f.IsDir() {
-				continue
-			}
-			listing = append(listing, f.Name())
-		}
-		agentpath_type_opt.Vals = listing
-
 	case emp3r0r_def.ModGenAgent:
+		CliPrint("Generating preset options")
 		// payload type
 		payload_type := addIfNotFound("type")
 		payload_type.Vals = []string{PayloadTypeLinuxExecutable, PayloadTypeWindowsExecutable, PayloadTypeLinuxSO, PayloadTypeWindowsDLL}
@@ -263,45 +155,6 @@ func UpdateOptions(modName string) (exist bool) {
 		auto_proxy.Vals = []string{"on", "off"}
 		auto_proxy.Val = "off"
 
-	case emp3r0r_def.ModListener:
-		listenerOpt := addIfNotFound("listener")
-		listenerOpt.Vals = []string{"http_aes_compressed", "http_bare"}
-		listenerOpt.Val = "http_aes_compressed"
-		portOpt := addIfNotFound("port")
-		portOpt.Val = "8080"
-		payloadOpt := addIfNotFound("payload")
-		payloadOpt.Val = "emp3r0r"
-		compressionOpt := addIfNotFound("compression")
-		compressionOpt.Vals = []string{"on", "off"}
-		compressionOpt.Val = "on"
-		passphraseOpt := addIfNotFound("passphrase")
-		passphraseOpt.Val = "my_secret_key"
-
-	case emp3r0r_def.ModFileServer:
-		portOpt := addIfNotFound("port")
-		portOpt.Val = "8000"
-		switchOpt := addIfNotFound("switch")
-		switchOpt.Val = "on"
-
-	case emp3r0r_def.ModVACCINE:
-		// download_addr
-		download_addr := addIfNotFound("download_addr")
-		download_addr.Val = ""
-
-	case emp3r0r_def.ModDownloader:
-		// download_addr
-		download_addr := addIfNotFound("download_addr")
-		download_addr.Val = ""
-		file_path := addIfNotFound("path")
-		file_path.Val = ""
-		checksum := addIfNotFound("checksum")
-		checksum.Val = ""
-
-	case emp3r0r_def.ModMemDump:
-		// dump all memory regions
-		pid := addIfNotFound("pid")
-		pid.Val = ""
-
 	default:
 		// custom modules
 		modconfig := emp3r0r_def.Modules[modName]
@@ -310,7 +163,7 @@ func UpdateOptions(modName string) (exist bool) {
 
 			argOpt.Val = option.OptVal
 		}
-		if modconfig.Type != "built-in" {
+		if strings.ToLower(modconfig.Exec) != "built-in" {
 			download_addr := addIfNotFound("download_addr")
 			download_addr.Val = ""
 		}
@@ -345,10 +198,6 @@ func ModuleRun() {
 	}
 	if CurrentMod == emp3r0r_def.ModGenAgent {
 		go ModuleHelpers[emp3r0r_def.ModGenAgent]()
-		return
-	}
-	if CurrentMod == emp3r0r_def.ModStager {
-		go ModuleHelpers[emp3r0r_def.ModStager]()
 		return
 	}
 	if CurrentTarget == nil {

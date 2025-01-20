@@ -57,14 +57,14 @@ func modGenAgent() {
 	)
 	now := time.Now()
 	stubFile := ""
-	payloadTypeOpt, ok := Options["type"]
+	payloadTypeOpt, ok := CurrentModuleOptions["type"]
 	if !ok {
 		CliPrintError("Option 'type' not found")
 		return
 	}
 	payload_type := payloadTypeOpt.Val
 
-	archOpt, ok := Options["arch"]
+	archOpt, ok := CurrentModuleOptions["arch"]
 	if !ok {
 		CliPrintError("Option 'arch' not found")
 		return
@@ -217,13 +217,13 @@ func readAndEncryptConfig() ([]byte, error) {
 	// read file
 	jsonBytes, err := os.ReadFile(EmpConfigFile)
 	if err != nil {
-		return nil, fmt.Errorf("Parsing EmpConfigFile config file: %v", err)
+		return nil, fmt.Errorf("parsing EmpConfigFile config file: %v", err)
 	}
 
 	// encrypt
 	encryptedJSONBytes, err := tun.AES_GCM_Encrypt(emp3r0r_def.OneTimeMagicBytes, jsonBytes)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to encrypt %s: %v", EmpConfigFile, err)
+		return nil, fmt.Errorf("failed to encrypt %s: %v", EmpConfigFile, err)
 	}
 
 	return encryptedJSONBytes, nil
@@ -267,7 +267,7 @@ func MakeConfig() (err error) {
 	}
 
 	// CC names and certs
-	ccHostOpt, ok := Options["cc_host"]
+	ccHostOpt, ok := CurrentModuleOptions["cc_host"]
 	if !ok {
 		CliPrintError("Option 'cc_host' not found")
 		return fmt.Errorf("Option 'cc_host' not found")
@@ -312,14 +312,14 @@ func MakeConfig() (err error) {
 	}
 
 	// CC indicator
-	ccIndicatorOpt, ok := Options["cc_indicator"]
+	ccIndicatorOpt, ok := CurrentModuleOptions["cc_indicator"]
 	if !ok {
 		CliPrintError("Option 'cc_indicator' not found")
 		return fmt.Errorf("Option 'cc_indicator' not found")
 	}
 	RuntimeConfig.CCIndicator = ccIndicatorOpt.Val
 
-	indicatorTextOpt, ok := Options["indicator_text"]
+	indicatorTextOpt, ok := CurrentModuleOptions["indicator_text"]
 	if !ok {
 		CliPrintError("Option 'indicator_text' not found")
 		return fmt.Errorf("Option 'indicator_text' not found")
@@ -330,7 +330,7 @@ func MakeConfig() (err error) {
 			strconv.Quote(RuntimeConfig.CCIndicatorText), RuntimeConfig.CCIndicator)
 	}
 
-	ncsiOpt, ok := Options["ncsi"]
+	ncsiOpt, ok := CurrentModuleOptions["ncsi"]
 	if !ok {
 		CliPrintError("Option 'ncsi' not found")
 		return fmt.Errorf("Option 'ncsi' not found")
@@ -342,21 +342,21 @@ func MakeConfig() (err error) {
 	}
 
 	// CDN proxy
-	RuntimeConfig.CDNProxy = Options["cdn_proxy"].Val
+	RuntimeConfig.CDNProxy = CurrentModuleOptions["cdn_proxy"].Val
 
 	// shadowsocks and kcp
-	RuntimeConfig.UseShadowsocks = Options["shadowsocks"].Val == "on" || Options["shadowsocks"].Val == "bare"
-	RuntimeConfig.UseKCP = Options["shadowsocks"].Val != "bare" && RuntimeConfig.UseShadowsocks
+	RuntimeConfig.UseShadowsocks = CurrentModuleOptions["shadowsocks"].Val == "on" || CurrentModuleOptions["shadowsocks"].Val == "bare"
+	RuntimeConfig.UseKCP = CurrentModuleOptions["shadowsocks"].Val != "bare" && RuntimeConfig.UseShadowsocks
 
 	// agent proxy for c2 transport
-	RuntimeConfig.C2TransportProxy = Options["c2transport_proxy"].Val
-	RuntimeConfig.AutoProxyTimeout, err = strconv.Atoi(Options["autoproxy_timeout"].Val)
+	RuntimeConfig.C2TransportProxy = CurrentModuleOptions["c2transport_proxy"].Val
+	RuntimeConfig.AutoProxyTimeout, err = strconv.Atoi(CurrentModuleOptions["autoproxy_timeout"].Val)
 	if err != nil {
 		CliPrintWarning("Parsing autoproxy_timeout: %v. Setting to 0.", err)
 		RuntimeConfig.AutoProxyTimeout = 0
 	}
-	RuntimeConfig.DoHServer = Options["doh_server"].Val
-	if Options["auto_proxy"].Val == "on" {
+	RuntimeConfig.DoHServer = CurrentModuleOptions["doh_server"].Val
+	if CurrentModuleOptions["auto_proxy"].Val == "on" {
 		RuntimeConfig.BroadcastIntervalMax = 120
 	} else {
 		RuntimeConfig.BroadcastIntervalMax = 0

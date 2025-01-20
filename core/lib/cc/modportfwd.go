@@ -13,7 +13,7 @@ import (
 )
 
 func modulePortFwd() {
-	switchOpt, ok := Options["switch"]
+	switchOpt, ok := CurrentModuleOptions["switch"]
 	if !ok {
 		CliPrintError("Option 'switch' not found")
 		return
@@ -22,12 +22,12 @@ func modulePortFwd() {
 	case "off":
 		// ugly, i know, it will delete port mappings matching current lport-to combination
 		for id, session := range PortFwds {
-			toOpt, ok := Options["to"]
+			toOpt, ok := CurrentModuleOptions["to"]
 			if !ok {
 				CliPrintError("Option 'to' not found")
 				return
 			}
-			listenPortOpt, ok := Options["listen_port"]
+			listenPortOpt, ok := CurrentModuleOptions["listen_port"]
 			if !ok {
 				CliPrintError("Option 'listen_port' not found")
 				return
@@ -53,7 +53,7 @@ func modulePortFwd() {
 	case "reverse": // expose a dest from CC to agent
 		var pf PortFwdSession
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
-		pf.Lport, pf.To = Options["listen_port"].Val, Options["to"].Val
+		pf.Lport, pf.To = CurrentModuleOptions["listen_port"].Val, CurrentModuleOptions["to"].Val
 		go func() {
 			CliPrint("RunReversedPortFwd: %s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.Lport, pf.To, pf.Protocol)
 			initErr := pf.InitReversedPortFwd()
@@ -64,8 +64,8 @@ func modulePortFwd() {
 	case "on":
 		var pf PortFwdSession
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
-		pf.Lport, pf.To = Options["listen_port"].Val, Options["to"].Val
-		pf.Protocol = Options["protocol"].Val
+		pf.Lport, pf.To = CurrentModuleOptions["listen_port"].Val, CurrentModuleOptions["to"].Val
+		pf.Protocol = CurrentModuleOptions["protocol"].Val
 		go func() {
 			CliPrint("RunPortFwd: %s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.Lport, pf.To, pf.Protocol)
 			runErr := pf.RunPortFwd()
@@ -78,14 +78,14 @@ func modulePortFwd() {
 }
 
 func moduleProxy() {
-	portOpt, ok := Options["port"]
+	portOpt, ok := CurrentModuleOptions["port"]
 	if !ok {
 		CliPrintError("Option 'port' not found")
 		return
 	}
 	port := portOpt.Val
 
-	statusOpt, ok := Options["status"]
+	statusOpt, ok := CurrentModuleOptions["status"]
 	if !ok {
 		CliPrintError("Option 'status' not found")
 		return

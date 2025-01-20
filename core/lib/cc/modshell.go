@@ -18,7 +18,7 @@ func moduleCmd() {
 			CliPrintError("moduleCmd: agent %s is not connected", target.Tag)
 			return
 		}
-		cmdOpt, ok := Options["cmd_to_exec"]
+		cmdOpt, ok := CurrentModuleOptions["cmd_to_exec"]
 		if !ok {
 			CliPrintError("Option 'cmd_to_exec' not found")
 			return
@@ -32,7 +32,7 @@ func moduleCmd() {
 	// find target
 	target := CurrentTarget
 	if target == nil {
-		CliPrintWarning("emp3r0r will execute `%s` on all targets this time", Options["cmd_to_exec"].Val)
+		CliPrintWarning("emp3r0r will execute `%s` on all targets this time", CurrentModuleOptions["cmd_to_exec"].Val)
 		for per_target := range Targets {
 			execOnTarget(per_target)
 		}
@@ -68,21 +68,21 @@ func moduleShell() {
 	}
 
 	// options
-	shellOpt, ok := Options["shell"]
+	shellOpt, ok := CurrentModuleOptions["shell"]
 	if !ok {
 		CliPrintError("Option 'shell' not found")
 		return
 	}
 	shell := shellOpt.Val
 
-	argsOpt, ok := Options["args"]
+	argsOpt, ok := CurrentModuleOptions["args"]
 	if !ok {
 		CliPrintError("Option 'args' not found")
 		return
 	}
 	args := argsOpt.Val
 
-	portOpt, ok := Options["port"]
+	portOpt, ok := CurrentModuleOptions["port"]
 	if !ok {
 		CliPrintError("Option 'port' not found")
 		return

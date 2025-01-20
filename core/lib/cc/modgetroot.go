@@ -28,7 +28,7 @@ func moduleLPE() {
 			CliPrintError("Target not exist")
 			return
 		}
-		helperOpt, ok := Options["lpe_helper"]
+		helperOpt, ok := CurrentModuleOptions["lpe_helper"]
 		if !ok {
 			CliPrintError("Option 'lpe_helper' not found")
 			return

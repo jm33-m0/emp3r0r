@@ -21,7 +21,7 @@ func moduleVaccine() {
 			CliPrintError("CreateVaccineArchive: %v", err)
 			return
 		}
-		downloadOpt, ok := Options["download_addr"]
+		downloadOpt, ok := CurrentModuleOptions["download_addr"]
 		if !ok {
 			CliPrintError("Option 'download_addr' not found")
 			return

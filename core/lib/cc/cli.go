@@ -423,9 +423,9 @@ func CliListOptions() {
 		opts["target"] = "<blank>"
 	}
 
-	for k, v := range Options {
-		if v != nil {
-			opts[k] = v.Val
+	for opt_name, opt := range CurrentModuleOptions {
+		if opt != nil {
+			opts[opt_name] = opt.Name
 		}
 	}
 
@@ -449,21 +449,32 @@ func CliListOptions() {
 
 	// fill table
 	module_obj := emp3r0r_def.Modules[CurrentMod]
-	for k, v := range opts {
+	if module_obj == nil {
+		CliPrintError("Module %s not found", CurrentMod)
+		return
+	}
+	for opt_name, opt_obj := range module_obj.Options {
 		help := "N/A"
-		if k == "module" {
+		if opt_obj == nil {
+			continue
+		}
+		help = opt_obj.OptDesc
+		if opt_name == "module" {
 			help = "Selected module"
-		} else if k == "target" {
+		} else if opt_name == "target" {
 			help = "Selected target"
-		} else if len(module_obj.Options) > 0 {
-			help = strings.Join(module_obj.Options[k], " ")
+		}
+		val := ""
+		currentOpt, ok := CurrentModuleOptions[opt_name]
+		if ok {
+			val = currentOpt.Val
 		}
 
 		tdata = append(tdata,
 			[]string{
-				util.SplitLongLine(k, 50),
+				util.SplitLongLine(opt_name, 50),
 				util.SplitLongLine(help, 50),
-				util.SplitLongLine(v, 50),
+				util.SplitLongLine(val, 50),
 			})
 	}
 	table.AppendBulk(tdata)
@@ -610,7 +621,7 @@ Cg==
 func listValChoices() func(string) []string {
 	return func(line string) []string {
 		ret := make([]string, 0)
-		for _, opt := range Options {
+		for _, opt := range CurrentModuleOptions {
 			ret = append(ret, opt.Vals...)
 		}
 		return ret
@@ -658,7 +669,7 @@ func listOptions() func(string) []string {
 	return func(line string) []string {
 		names := make([]string, 0)
 
-		for opt := range Options {
+		for opt := range CurrentModuleOptions {
 			names = append(names, opt)
 		}
 		return names
