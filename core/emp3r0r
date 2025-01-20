@@ -39,12 +39,33 @@ build_agent_stub() {
   local os=$2
   local output=$3
   info "Building agent stub for $os $arch"
-  local build_cmd="GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -o \\\"$temp/$output\\\" -ldflags=\\\"$ldflags\\\"\""
+  local build_cmd="GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -tags netgo -o \\\"$temp/$output\\\" -ldflags=\\\"$ldflags\\\"\""
   echo "Running: $build_cmd"
   {
     cd "$pwd/cmd/agent" &&
       eval "$build_cmd"
   } || error "build agent stub for $os $arch"
+}
+
+build_shared_object() {
+  local arch=$1
+  local os=$2
+  local output=$3
+  info "Building shared object for $os $arch"
+  if [[ "$os" == "windows" ]]; then
+    if [[ "$arch" == "386" ]]; then
+      local build_cmd="CGO_ENABLED=1 CC=/usr/bin/i686-w64-mingw32-gcc CXX=/usr/bin/i686-w64-mingw32-g++ GOOS=$os GOARCH=$arch go build -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
+    else
+      local build_cmd="CGO_ENABLED=1 CC=/usr/bin/x86_64-w64-mingw32-gcc CXX=/usr/bin/x86_64-w64-mingw32-g++ GOOS=$os GOARCH=$arch go build -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
+    fi
+  else
+    local build_cmd="CGO_ENABLED=1 GOARCH=$arch go build -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-nostdlib -static'\""
+  fi
+  echo "Running: $build_cmd"
+  {
+    cd "$pwd/cmd/agent" &&
+      eval "$build_cmd"
+  } || error "build shared object for $os $arch"
 }
 
 build() {
@@ -90,6 +111,12 @@ build() {
   # Windows
   build_agent_stub "amd64" "windows" "stub-win-amd64"
   build_agent_stub "386" "windows" "stub-win-386"
+
+  # Shared Objects
+  build_shared_object "amd64" "windows" "stub-win-amd64.dll"
+  build_shared_object "386" "windows" "stub-win-386.dll"
+  build_shared_object "386" "linux" "stub-386.so"
+  build_shared_object "amd64" "linux" "stub-amd64.so"
 }
 
 uninstall() {

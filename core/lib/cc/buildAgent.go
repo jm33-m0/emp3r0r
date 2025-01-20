@@ -15,16 +15,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-var Arch_List = []string{
-	"386",
-	"amd64",
-	"arm",
-	"arm64",
-	"mips",
-	"mips64",
-	"riscv64",
-}
-
 func UpgradeAgent() {
 	if !util.IsExist(WWWRoot + "agent") {
 		CliPrintError("%s/agent not found, build one with `use gen_agent` first", WWWRoot)

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"os/user"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -522,25 +523,20 @@ func InitConfig() (err error) {
 		}
 	}
 
-	// binaries
+	// prefixes for stubs
 	emp3r0r_def.Stub_Linux = EmpWorkSpace + "/stub"
 	emp3r0r_def.Stub_Windows = EmpWorkSpace + "/stub-win"
-	emp3r0r_def.Stub_Windows_DLL = EmpWorkSpace + "/stub-win-dll"
 
 	// copy stub binaries to ~/.emp3r0r
-	for _, arch := range Arch_List {
-		copyErr := util.Copy(fmt.Sprintf("%s/stub-%s", EmpBuildDir, arch), EmpWorkSpace)
+	stubFiles, err := filepath.Glob(fmt.Sprintf("%s/stub*", EmpBuildDir))
+	if err != nil {
+		CliPrintWarning("Agent stubs: %v", err)
+	}
+	for _, stubFile := range stubFiles {
+		copyErr := util.Copy(stubFile, EmpWorkSpace)
 		if copyErr != nil {
 			CliPrintWarning("Agent stubs: %v", copyErr)
 		}
-	}
-	err = util.Copy(fmt.Sprintf("%s/stub-win-%s", EmpBuildDir, "amd64"), EmpWorkSpace)
-	if err != nil {
-		CliPrintWarning("Agent stubs: %v", err)
-	}
-	err = util.Copy(fmt.Sprintf("%s/stub-win-%s", EmpBuildDir, "386"), EmpWorkSpace)
-	if err != nil {
-		CliPrintWarning("Agent stubs: %v", err)
 	}
 
 	// cd to workspace

@@ -57,11 +57,8 @@ var (
 // Build
 var (
 	// to be updated by DirSetup
-	Stub_Linux          = ""
-	Stub_Windows        = ""
-	Stub_Windows_DLL    = ""
-	Packer_Stub         = ""
-	Packer_Stub_Windows = ""
+	Stub_Linux   = ""
+	Stub_Windows = ""
 )
 
 const (
