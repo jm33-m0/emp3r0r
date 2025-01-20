@@ -55,6 +55,9 @@ build_agent_stub() {
   local output=$3
   info "Building agent stub for $os $arch"
   local build_cmd="CGO_ENABLED=0 GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -tags netgo -o \\\"$temp/$output\\\" -ldflags=\\\"$ldflags\\\"\""
+  if [[ "$os" = "windows" ]]; then
+    build_cmd="CGO_ENABLED=0 GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -tags netgo -o \\\"$temp/$output\\\" -ldflags=\\\"-H=windowsgui $ldflags\\\"\""
+  fi
   echo "Running: $build_cmd"
   {
     cd "$pwd/cmd/agent" &&
@@ -72,13 +75,13 @@ build_shared_object() {
   windows)
     case "$arch" in
     386)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86-windows-gnu\" CXX=\"zig c++ -target x86-windows-gnu\" GOOS=$os GOARCH=$arch go build -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86-windows-gnu\" CXX=\"zig c++ -target x86-windows-gnu\" GOOS=$os GOARCH=$arch go build -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -H=windowsgui -linkmode external -extldflags '-static'\""
       ;;
     amd64)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86_64-windows-gnu\" CXX=\"zig c++ -target x86_64-windows-gnu\" GOOS=$os GOARCH=$arch go build -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86_64-windows-gnu\" CXX=\"zig c++ -target x86_64-windows-gnu\" GOOS=$os GOARCH=$arch go build -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -H=windowsgui -linkmode external -extldflags '-static'\""
       ;;
     arm64)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target aarch64-windows-gnu\" CXX=\"zig c++ -target aarch64-windows-gnu\" GOOS=$os GOARCH=$arch go build -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '-static'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target aarch64-windows-gnu\" CXX=\"zig c++ -target aarch64-windows-gnu\" GOOS=$os GOARCH=$arch go build -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -H=windowsgui -linkmode external -extldflags '-static'\""
       ;;
     esac
     ;;
