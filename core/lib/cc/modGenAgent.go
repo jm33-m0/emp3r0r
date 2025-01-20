@@ -42,7 +42,6 @@ var Arch_List_Windows_DLL = []string{
 }
 
 var Arch_List_Linux_SO = []string{
-	"386",
 	"amd64",
 }
 
@@ -58,9 +57,8 @@ var Arch_List_All = []string{
 
 func modGenAgent() {
 	var (
-		outfile           string // write agent binary to this path
-		arch_choice       string // CPU architecture
-		agent_binary_path string
+		outfile     string // write agent binary to this path
+		arch_choice string // CPU architecture
 	)
 	now := time.Now()
 	stubFile := ""
@@ -135,32 +133,10 @@ func modGenAgent() {
 	CliPrintSuccess("Generated %s from %s and %s, you can run %s on arbitrary target",
 		outfile, stubFile, EmpConfigFile, outfile)
 	CliPrintDebug("OneTimeMagicBytes is %x", emp3r0r_def.OneTimeMagicBytes)
-	agent_binary_path = outfile
-
-	packed_file := fmt.Sprintf("%s.packed", outfile)
-	if payload_type == PayloadTypeWindowsExecutable {
-		packed_file = fmt.Sprintf("%s.packed.exe", outfile)
-	}
-
-	// pack it with upx
-	if err = upx(outfile, packed_file); err != nil {
-		CliPrintWarning("UPX: %v", err)
-		return
-	}
-
-	// append magic_str so it will still extract config data
-	if err = appendConfigToPayload(packed_file, sep, encryptedJSONBytes); err != nil {
-		CliPrintError("Failed to append config to packed binary: %v", err)
-		return
-	}
-
-	agent_binary_path = packed_file
-	CliPrint("Generated agent binary: %s.", agent_binary_path)
 
 	if payload_type == PayloadTypeWindowsExecutable {
 		// generate shellcode for the agent binary
 		DonoutPE2Shellcode(outfile, arch_choice)
-		appendConfigToPayload(outfile+".bin", sep, encryptedJSONBytes)
 	}
 	if payload_type == PayloadTypeLinuxExecutable {
 		// tell user to use shared library stager
