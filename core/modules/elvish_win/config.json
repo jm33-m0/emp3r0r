@@ -8,9 +8,11 @@
     "date": "2025-01-06",
     "comment": "Run Elvish cross-platform interactive shell",
     "options": {
-        "args": [
-            "--",
-            "run elvish with this commandline arg"
-        ]
+        "args": {
+            "opt_name": "args",
+            "opt_desc": "run elvish with this commandline arg",
+            "opt_val": "--",
+            "opt_vals": []
+        }
     }
 }

@@ -9,13 +9,17 @@
     "date": "2022-03-03",
     "comment": "CVE-2022-22947, see https://github.com/Axx8/CVE-2022-22947_Rce_Exp",
     "options": {
-        "TARGET_URL": [
-            "http://11.11.11.11:8080",
-            "Target URL"
-        ],
-        "CMD_EXEC": [
-            "whoami",
-            "Command to execute on target server"
-        ]
+        "TARGET_URL": {
+            "opt_name": "TARGET_URL",
+            "opt_desc": "Target URL",
+            "opt_val": "http://11.11.11.11:8080",
+            "opt_vals": []
+        },
+        "CMD_EXEC": {
+            "opt_name": "CMD_EXEC",
+            "opt_desc": "Command to execute on target server",
+            "opt_val": "whoami",
+            "opt_vals": []
+        }
     }
 }

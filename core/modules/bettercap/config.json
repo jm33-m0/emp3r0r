@@ -8,9 +8,13 @@
     "date": "2022-03-09",
     "comment": "Run bettercap as an interactive shell",
     "options": {
-        "args": [
-            "--",
-            "run bettercap with this commandline arg"
-        ]
+        "args": {
+            "opt_name": "args",
+            "opt_desc": "run bettercap with this commandline arg",
+            "opt_val": "",
+            "opt_vals": [
+                "--"
+            ]
+        }
     }
 }

@@ -304,14 +304,16 @@ func UpdateOptions(modName string) (exist bool) {
 
 	default:
 		// custom modules
-		modconfig := ModuleConfigs[modName]
-		for opt, val_help := range modconfig.Options {
-			argOpt := addIfNotFound(opt)
+		modconfig := emp3r0r_def.Modules[modName]
+		for optName, option := range modconfig.Options {
+			argOpt := addIfNotFound(optName)
 
-			argOpt.Val = val_help[0]
+			argOpt.Val = option.OptVal
 		}
-		download_addr := addIfNotFound("download_addr")
-		download_addr.Val = ""
+		if modconfig.Type != "built-in" {
+			download_addr := addIfNotFound("download_addr")
+			download_addr.Val = ""
+		}
 	}
 
 	return

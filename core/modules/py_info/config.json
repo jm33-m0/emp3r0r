@@ -9,9 +9,11 @@
     "date": "2022-03-12",
     "comment": "Check basic python info",
     "options": {
-        "NA": [
-            "--",
-            "Not available"
-        ]
+        "NA": {
+            "opt_name": "NA",
+            "opt_desc": "Not available",
+            "opt_val": "--",
+            "opt_vals": []
+        }
     }
 }
