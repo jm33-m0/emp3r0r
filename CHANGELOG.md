@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.49.0](https://github.com/jm33-m0/emp3r0r/compare/v1.48.10...v1.49.0) (2025-01-20)
+
+
+### Features
+
+* support DLL/SO payload types ([d8a1c04](https://github.com/jm33-m0/emp3r0r/commit/d8a1c0403c19d2e0aa21210eb55f80b8fb6ec7ae))
+
+
+### Bug Fixes
+
+* `gen_agent` module initialization ([d652b0e](https://github.com/jm33-m0/emp3r0r/commit/d652b0e48d85f14bbe1e1a5445322a425458a826))
+* build as `windowsgui` if target is Windows ([33ca2f6](https://github.com/jm33-m0/emp3r0r/commit/33ca2f6444ec6e99ab0b8486705167ee1133e41b))
+* copilot deleted my code, fucking retard! ([4548470](https://github.com/jm33-m0/emp3r0r/commit/4548470b772de423f97bdb1fe97c58af91c5c3bd))
+* create `CGO`-enabled agent for DLL/SO types ([cd1ad3b](https://github.com/jm33-m0/emp3r0r/commit/cd1ad3b3523002d865822cfe059c8a7184c94f8a))
+* deprecate `upx`, users should deliver compressed payloads by themselves ([d10a2f8](https://github.com/jm33-m0/emp3r0r/commit/d10a2f812743bb29cf41688ee28d34d8e60b7ad4))
+* go-console fails to build for arm64 ([5faa4fc](https://github.com/jm33-m0/emp3r0r/commit/5faa4fcd78257448012ba18e4fdce5980767f4ce))
+* redesign modules and fix errors ([c90ed00](https://github.com/jm33-m0/emp3r0r/commit/c90ed0013105eed9f360466fca3e0f1a8823c9d4))
+* refactor module config structure ([bf38b05](https://github.com/jm33-m0/emp3r0r/commit/bf38b05e6e7a3c4d244f61ad591fc46b25e2e796))
+* support more arch for shared obj building ([dd16baa](https://github.com/jm33-m0/emp3r0r/commit/dd16baa2b2dc75979689d1daefe6f3e23bcbd3c8))
+* support more arch when building `linux_so` ([9a39895](https://github.com/jm33-m0/emp3r0r/commit/9a39895797f9e3c4f20a14cb129fb7c14ccadc40))
+* use `zig` to avoid cross-compiling nightmare ([a919132](https://github.com/jm33-m0/emp3r0r/commit/a919132a8c71eaf24bb6512106f0fc79b73cc11d))
+
 ## [1.48.10](https://github.com/jm33-m0/emp3r0r/compare/v1.48.9...v1.48.10) (2025-01-18)
 
 
