@@ -17,7 +17,7 @@ require (
 	github.com/jaypipes/ghw v0.13.0
 	github.com/jm33-m0/arc v1.0.0
 	github.com/jm33-m0/go-cdn2proxy v1.1.2
-	github.com/jm33-m0/go-console v1.0.2
+	github.com/jm33-m0/go-console v1.0.4
 	github.com/kbinani/screenshot v0.0.0-20240820160931-a8a2c5d0e191
 	github.com/lithammer/fuzzysearch v1.1.8
 	github.com/mholt/archives v0.0.0-20241216060121-23e0af8fe73d
