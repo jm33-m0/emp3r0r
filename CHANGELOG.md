@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.49.2](https://github.com/jm33-m0/emp3r0r/compare/v1.49.1...v1.49.2) (2025-01-21)
+
+
+### Bug Fixes
+
+* `--debug` build fails ([0eac8a0](https://github.com/jm33-m0/emp3r0r/commit/0eac8a0e8aaf4c030f6e64bc068aec2716993223))
+* drop `-s` when building debug version ([20e11e5](https://github.com/jm33-m0/emp3r0r/commit/20e11e51f76e505d93ac57eaffcea4b23f7ab8b6))
+* linux shared libs linked with musl seems broken ([360efe8](https://github.com/jm33-m0/emp3r0r/commit/360efe8fbe98075496a7add013b660c0732af9d6))
+* logging not working ([6fc43f1](https://github.com/jm33-m0/emp3r0r/commit/6fc43f1ae441f79bac72e6138ed962aae9fa8efd))
+
 ## [1.49.1](https://github.com/jm33-m0/emp3r0r/compare/v1.49.0...v1.49.1) (2025-01-20)
 
 
