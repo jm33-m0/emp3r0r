@@ -223,12 +223,12 @@ func readAndEncryptConfig() ([]byte, error) {
 }
 
 func appendConfigToPayload(file string, sep, config []byte) (err error) {
-	packed_bin_data, err := os.ReadFile(file)
+	bin_data, err := os.ReadFile(file)
 	if err != nil {
 		err = fmt.Errorf("failed to read file %s: %v", file, err)
 		return
 	}
-	toWrite := append(packed_bin_data, sep...)
+	toWrite := append(bin_data, sep...)
 	toWrite = append(toWrite, config...)
 	toWrite = append(toWrite, sep...)
 	err = os.WriteFile(file, toWrite, 0o755)
