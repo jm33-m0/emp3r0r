@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.49.4](https://github.com/jm33-m0/emp3r0r/compare/v1.49.3...v1.49.4) (2025-01-22)
+
+
+### Bug Fixes
+
+* need a reliable way to check if the agent is run as DLL ([330a0b6](https://github.com/jm33-m0/emp3r0r/commit/330a0b6a4db441b20d0fc1f171260e792138eb2c))
+
 ## [1.49.3](https://github.com/jm33-m0/emp3r0r/compare/v1.49.2...v1.49.3) (2025-01-22)
 
 
