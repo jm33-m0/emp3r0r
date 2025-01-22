@@ -13,6 +13,7 @@ import (
 var (
 	kernel32 = syscall.NewLazyDLL("kernel32.dll")
 	psapi    = syscall.NewLazyDLL("Psapi.dll")
+	dbghelp  = syscall.NewLazyDLL("Dbghelp.dll")
 
 	procOpenProcess        = kernel32.NewProc("OpenProcess")
 	procReadProcessMemory  = kernel32.NewProc("ReadProcessMemory")
@@ -21,9 +22,13 @@ var (
 	procGetModuleFileName  = kernel32.NewProc("GetModuleFileNameW")
 	procGetModuleHandle    = kernel32.NewProc("GetModuleHandleW")
 	procEnumProcessModules = psapi.NewProc("EnumProcessModulesEx")
+	procMiniDumpWriteDump  = dbghelp.NewProc("MiniDumpWriteDump")
 )
 
-const PROCESS_ALL_ACCESS = 0x1F0FFF
+const (
+	PROCESS_ALL_ACCESS     = 0x1F0FFF
+	MiniDumpWithFullMemory = 0x00000002
+)
 
 // OpenProcess opens a Windows process, returns a handle
 func OpenProcess(pid int) uintptr {
@@ -168,4 +173,38 @@ func DumpCurrentProcMem() (mem_data map[int64][]byte, err error) {
 	}
 
 	return mem_data, err
+}
+
+// MiniDumpProcess creates a minidump of the given process
+func MiniDumpProcess(pid int, dumpFile string) error {
+	var err error
+	hProcess := OpenProcess(pid)
+	if hProcess == 0 {
+		err = syscall.GetLastError()
+		return err
+	}
+	defer syscall.CloseHandle(syscall.Handle(hProcess))
+	file, err := os.Create(dumpFile)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	hFile := syscall.Handle(file.Fd())
+	ret, _, _ := procMiniDumpWriteDump.Call(
+		uintptr(hProcess),
+		uintptr(pid),
+		uintptr(hFile),
+		uintptr(MiniDumpWithFullMemory),
+		0,
+		0,
+		0,
+	)
+
+	if ret == 0 {
+		err = syscall.GetLastError()
+		return err
+	}
+
+	return nil
 }
