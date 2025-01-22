@@ -118,9 +118,18 @@ func modGenAgent() {
 	// payload
 	config_payload := append(sep, encryptedJSONBytes...)
 	config_payload = append(config_payload, sep...)
+	// binary patching, we need to patch the stub file at emp3r0r_def.AgentConfig, which is 4096 bytes long
+	if len(config_payload) < len(emp3r0r_def.AgentConfig) {
+		// pad with 0x00
+		config_payload = append(config_payload, bytes.Repeat([]byte{0x00}, len(emp3r0r_def.AgentConfig)-len(config_payload))...)
+	} else if len(config_payload) > len(emp3r0r_def.AgentConfig) {
+		CliPrintError("Config payload is too large, %d bytes, max %d bytes", len(config_payload), len(emp3r0r_def.AgentConfig))
+		return
+	}
 	// fill in
 	toWrite = bytes.Replace(toWrite,
-		bytes.Repeat([]byte{0}, len(config_payload)),
+		// by now config_payload should be 4096 bytes long
+		bytes.Repeat([]byte{0xff}, len(config_payload)),
 		config_payload,
 		1)
 	// verify

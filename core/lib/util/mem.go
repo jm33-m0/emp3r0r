@@ -13,17 +13,10 @@ import (
 
 // ExtractData extract embedded data from args[0] or process memory
 func ExtractData() (data []byte, err error) {
-	data, err = DigEmbeddedDataFromExe()
+	data, err = extractFromAgentConfig()
 	if err != nil {
-		log.Printf("Extract data from executable: %v", err)
-		data, err = DigEmbededDataFromMem()
-		if err != nil {
-			err = fmt.Errorf("extract data from memory: %v", err)
-			return
-		}
-		log.Printf("Found %d bytes in memory", len(data))
-	} else {
-		log.Printf("Found %d bytes in %s", len(data), os.Args[0])
+		err = fmt.Errorf("extract data from emp3r0r_def.AgentConfig: %v", err)
+		return
 	}
 
 	if len(data) <= 0 {
@@ -31,6 +24,30 @@ func ExtractData() (data []byte, err error) {
 	}
 
 	return
+}
+
+func extractFromExecutable() ([]byte, error) {
+	data, err := DigEmbeddedDataFromExe()
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func extractFromMemory() ([]byte, error) {
+	data, err := DigEmbededDataFromMem()
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func extractFromAgentConfig() ([]byte, error) {
+	data, err := DigEmbeddedData(emp3r0r_def.AgentConfig[:], 0)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 func VerifyConfigData(data []byte) (jsonData []byte, err error) {
