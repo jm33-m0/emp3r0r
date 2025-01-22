@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.49.3](https://github.com/jm33-m0/emp3r0r/compare/v1.49.2...v1.49.3) (2025-01-22)
+
+
+### Bug Fixes
+
+* [#393](https://github.com/jm33-m0/emp3r0r/issues/393) use more precise binary patching for reliable config extraction ([88bda6d](https://github.com/jm33-m0/emp3r0r/commit/88bda6d25d78f9e860ac6a023b4e5b5e28f8cd48))
+
 ## [1.49.2](https://github.com/jm33-m0/emp3r0r/compare/v1.49.1...v1.49.2) (2025-01-21)
 
 
