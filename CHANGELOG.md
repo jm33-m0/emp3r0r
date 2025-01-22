@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.49.5](https://github.com/jm33-m0/emp3r0r/compare/v1.49.4...v1.49.5) (2025-01-22)
+
+
+### Bug Fixes
+
+* use minidump on Windows to be more useful ([e5f7ae2](https://github.com/jm33-m0/emp3r0r/commit/e5f7ae296b0526343fef0bb69218d36a853d9af4))
+
 ## [1.49.4](https://github.com/jm33-m0/emp3r0r/compare/v1.49.3...v1.49.4) (2025-01-22)
 
 
