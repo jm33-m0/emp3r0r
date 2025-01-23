@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.50.0](https://github.com/jm33-m0/emp3r0r/compare/v1.49.5...v1.50.0) (2025-01-23)
+
+
+### Features
+
+* add ELF in-mem loader for Linux modules (WIP) ([5b62db8](https://github.com/jm33-m0/emp3r0r/commit/5b62db85f75f3b479153daf933a98f409a7bb47f))
+* go_lpe ([fd524d0](https://github.com/jm33-m0/emp3r0r/commit/fd524d071dd0a2817f3abe2b73ee4b2fddf49273))
+
+
+### Bug Fixes
+
+* consider `darwin` even we are not supporting it ([4a736e2](https://github.com/jm33-m0/emp3r0r/commit/4a736e2e6ce63cabb4c57985d0292247bac9b5d4))
+* no CGO when building executables ([4d73434](https://github.com/jm33-m0/emp3r0r/commit/4d73434a0dc66d61f47a5ba9565438fad7edf80d))
+* run ELF in subroutine ([91279bf](https://github.com/jm33-m0/emp3r0r/commit/91279bff261857c28ac9321dc3bbcbbfbd3164d4))
+
 ## [1.49.5](https://github.com/jm33-m0/emp3r0r/compare/v1.49.4...v1.49.5) (2025-01-22)
 
 
