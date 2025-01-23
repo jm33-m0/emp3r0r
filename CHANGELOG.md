@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.50.1](https://github.com/jm33-m0/emp3r0r/compare/v1.50.0...v1.50.1) (2025-01-23)
+
+
+### Bug Fixes
+
+* `go_lpe` takes too long ([fdd23b1](https://github.com/jm33-m0/emp3r0r/commit/fdd23b14c39064ccd0d010bcd928da2aa5aed6a6))
+* return process output of in-memory ELF modules ([63cd991](https://github.com/jm33-m0/emp3r0r/commit/63cd9914d9d01485c1a1bb6d8bd1352a83f8a3c8))
+
 ## [1.50.0](https://github.com/jm33-m0/emp3r0r/compare/v1.49.5...v1.50.0) (2025-01-23)
 
 
