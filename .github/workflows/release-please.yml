@@ -12,7 +12,7 @@ jobs:
         with:
           release-type: go
           package-name: release-please-action
-          extra-files: core/lib/data/def.go
+          extra-files: core/lib/emp3r0r_def/def.go
 
       - uses: actions/checkout@v2
         if: ${{ steps.release.outputs.release_created }}
