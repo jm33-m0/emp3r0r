@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.50.2](https://github.com/jm33-m0/emp3r0r/compare/v1.50.1...v1.50.2) (2025-01-23)
+
+
+### Bug Fixes
+
+* version number not updating ([5732f25](https://github.com/jm33-m0/emp3r0r/commit/5732f253782a08f71b12cc8355bff5ecc8295e07))
+
 ## [1.50.1](https://github.com/jm33-m0/emp3r0r/compare/v1.50.0...v1.50.1) (2025-01-23)
 
 
