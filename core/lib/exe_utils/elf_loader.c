@@ -15,10 +15,7 @@
 #include "elf_loader.h"
 
 // Declare the jump_start function for all architectures
-#if defined(GOARCH_amd64) || defined(GOARCH_386) || defined(GOARCH_arm64) ||   \
-    defined(GOARCH_ppc64)
 void jump_start(void *init, void *exit_func, void *entry);
-#endif
 
 #if defined(GOARCH_amd64)
 void jump_start(void *init, void *exit_func, void *entry) {
