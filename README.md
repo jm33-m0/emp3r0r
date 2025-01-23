@@ -10,6 +10,10 @@ A post-exploitation framework for Linux/Windows
 
 ## How to use
 
+```bash
+curl -sSL https://raw.githubusercontent.com/jm33-m0/emp3r0r/refs/heads/master/install.sh | bash
+```
+
 Read the [wiki](https://github.com/jm33-m0/emp3r0r/wiki/Getting-started) to get started. Please also consider contributing your own documentation there to help others.
 
 ## Motivation
