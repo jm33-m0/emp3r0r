@@ -140,11 +140,11 @@ build() {
 
   info "Building CC"
   {
-    cd cmd/cc && go build -o "$temp/cc.exe" -ldflags="$ldflags"
+    cd cmd/cc && CGO_ENABLED=0 go build -o "$temp/cc.exe" -ldflags="$ldflags"
   } || error "build cc"
   info "Building cat"
   {
-    cd "$pwd/cmd/cat" && go build -o "$temp/cat.exe" -ldflags="$ldflags"
+    cd "$pwd/cmd/cat" && CGO_ENABLED=0 go build -o "$temp/cat.exe" -ldflags="$ldflags"
   } || error "build cat"
 
   # Linux
