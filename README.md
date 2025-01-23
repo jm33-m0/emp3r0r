@@ -52,7 +52,7 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
   - [Custom Modules](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r)
   - Supports various modules formats: `exe`, `elf`, `python`, `powershell`, `bash`, `dll`, and `so`
   - Ability to run a module as an interactive shell, eg. `bettercap`, `elvish`.
-  - **In-memory** execution for modules
+  - **In-memory** execution for modules: `bash`, `powershell`, `python`, and even ELF executables (`CGO` ELF loader)
 - Perfect Shell Experience via **SSH with PTY support**
   - Compatible with any SSH client and **available for Windows**
 - [Bettercap](https://github.com/bettercap/bettercap)
