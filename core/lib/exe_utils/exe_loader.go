@@ -36,15 +36,13 @@ func InMemExeRun(elf_data []byte, args []string, env []string) error {
 
 	// Call the C function
 	ret := C.elf_fork_run(unsafe.Pointer(&elf_data[0]), &c_args[0], &c_env[0])
-	defer func() {
-		// Free the C strings
-		for _, arg := range c_args {
-			C.free(unsafe.Pointer(arg))
-		}
-		for _, e := range c_env {
-			C.free(unsafe.Pointer(e))
-		}
-	}()
+	// Free the C strings
+	for _, arg := range c_args {
+		C.free(unsafe.Pointer(arg))
+	}
+	for _, e := range c_env {
+		C.free(unsafe.Pointer(e))
+	}
 
 	if ret != 0 {
 		return fmt.Errorf("elf_run failed")

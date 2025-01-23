@@ -19,22 +19,6 @@ import (
 	"github.com/olekukonko/tablewriter"
 )
 
-// ModConfig config.json of a module
-// Example
-//
-//	{
-//	    "name": "LES",
-//	    "exec": "les.sh",
-//	    "platform": "Linux",
-//	    "interactive": false,
-//	    "author": "jm33-ng",
-//	    "date": "2022-01-12",
-//	    "comment": "https://github.com/mzet-/linux-exploit-suggester",
-//	    "options": {
-//	        "args": ["--checksec", "run les.sh with this commandline arg"]
-//	    }
-//	}
-
 // stores module configs
 var ModuleConfigs = make(map[string]emp3r0r_def.ModConfig, 1)
 
