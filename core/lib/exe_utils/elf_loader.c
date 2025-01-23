@@ -420,4 +420,17 @@ int elf_run(void *buf, char **argv, char **env) {
   // Shouldn't be reached, but just in case
   return -1;
 }
+
+// Fork and run the ELF in the child process memory
+// This is a safer approach since it doesn't overwrite the current process
+int elf_fork_run(void *buf, char **argv, char **env) {
+  int pid = fork();
+
+  if (pid == 0) {
+    // Child
+    return elf_run(buf, argv, env);
+  }
+
+  return pid;
+}
 #endif // __linux__

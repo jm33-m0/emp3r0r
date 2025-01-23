@@ -20,8 +20,8 @@ import (
 */
 import "C"
 
-// ELFRun runs an ELF binary with the given arguments and environment variables, completely in memory.
-func ELFRun(elf_data []byte, args []string, env []string) error {
+// InMemExeRun runs an ELF binary with the given arguments and environment variables, completely in memory.
+func InMemExeRun(elf_data []byte, args []string, env []string) error {
 	// Convert args and env to C strings
 	c_args := make([]*C.char, len(args)+1)
 	for i, arg := range args {
@@ -35,7 +35,7 @@ func ELFRun(elf_data []byte, args []string, env []string) error {
 	c_env[len(env)] = nil
 
 	// Call the C function
-	ret := C.elf_run(unsafe.Pointer(&elf_data[0]), &c_args[0], &c_env[0])
+	ret := C.elf_fork_run(unsafe.Pointer(&elf_data[0]), &c_args[0], &c_env[0])
 	defer func() {
 		// Free the C strings
 		for _, arg := range c_args {
