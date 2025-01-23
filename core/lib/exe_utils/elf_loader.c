@@ -1,3 +1,6 @@
+/*
+ * adapted from https://github.com/malisal/loaders
+ * */
 #ifdef __linux__
 #if defined(NAKED)
 #include "utils.h"
@@ -10,6 +13,8 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/user.h>
+#include <sys/wait.h>
+#include <unistd.h>
 #endif
 
 #include "elf_loader.h"
@@ -71,7 +76,10 @@ void jump_start(void *init, void *exit_func, void *entry) {
 
 // Default function called upon exit() in the ELF. Depends on the architecture,
 // as some archs don't call it at all.
-static void _exit_func(int code) { exit(code); }
+static void _exit_func(int code) {
+  fprintf(stderr, "ELF exited with code: %d\n", code);
+  exit(code);
+}
 
 static void _get_rand(char *buf, int size) {
   int fd = open("/dev/urandom", O_RDONLY, 0);
@@ -420,14 +428,77 @@ int elf_run(void *buf, char **argv, char **env) {
 
 // Fork and run the ELF in the child process memory
 // This is a safer approach since it doesn't overwrite the current process
-int elf_fork_run(void *buf, char **argv, char **env) {
-  int pid = fork();
-
-  if (pid == 0) {
-    // Child
-    return elf_run(buf, argv, env);
+// Returns the output of the child process
+char *elf_fork_run(void *buf, char **argv, char **env) {
+  // Create a pipe
+  int pipefd[2];
+  if (pipe(pipefd) == -1) {
+    perror("pipe");
+    return "pipe failed";
   }
 
-  return pid;
+  int pid = fork();
+  if (pid == -1) {
+    perror("fork");
+    return "fork failed";
+  }
+
+  // Child
+  if (pid == 0) {
+    // Close the read end of the pipe
+    close(pipefd[0]);
+    // Redirect stdout and stderr to the write end of the pipe
+    dup2(pipefd[1], STDOUT_FILENO);
+    dup2(pipefd[1], STDERR_FILENO);
+    // Close the write end of the pipe (it's now duplicated to stdout and
+    // stderr)
+    close(pipefd[1]);
+    // int res = execve(path, argv, env);
+    int res = elf_run(buf, argv, env);
+    perror("elf_run");
+    exit(EXIT_FAILURE);
+  }
+
+  // Close the write end of the pipe
+  close(pipefd[1]);
+
+  // Allocate a buffer to accumulate the output
+  size_t buffer_size = 4096;
+  size_t total_size = 0;
+  char *buffer = malloc(buffer_size);
+  if (!buffer) {
+    perror("malloc");
+    close(pipefd[0]);
+    return "malloc failed";
+  }
+
+  // Read the output from the read end of the pipe
+  ssize_t count;
+  while ((count = read(pipefd[0], buffer + total_size,
+                       buffer_size - total_size - 1)) > 0) {
+    total_size += count;
+    // Reallocate buffer if necessary
+    if (total_size >= buffer_size - 1) {
+      buffer_size *= 2;
+      buffer = realloc(buffer, buffer_size);
+      if (!buffer) {
+        perror("realloc");
+        close(pipefd[0]);
+        return "realloc failed";
+      }
+    }
+  }
+
+  // Null-terminate the buffer
+  buffer[total_size] = '\0';
+
+  // Close the read end of the pipe
+  close(pipefd[0]);
+
+  // Wait for the child process to finish
+  int status;
+  waitpid(pid, &status, 0);
+
+  return buffer;
 }
 #endif // __linux__

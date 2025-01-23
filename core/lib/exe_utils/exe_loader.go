@@ -4,7 +4,6 @@
 package exe_utils
 
 import (
-	"fmt"
 	"unsafe"
 )
 
@@ -21,7 +20,7 @@ import (
 import "C"
 
 // InMemExeRun runs an ELF binary with the given arguments and environment variables, completely in memory.
-func InMemExeRun(elf_data []byte, args []string, env []string) error {
+func InMemExeRun(elf_data []byte, args []string, env []string) (output string, err error) {
 	// Convert args and env to C strings
 	c_args := make([]*C.char, len(args)+1)
 	for i, arg := range args {
@@ -44,8 +43,9 @@ func InMemExeRun(elf_data []byte, args []string, env []string) error {
 		C.free(unsafe.Pointer(e))
 	}
 
-	if ret != 0 {
-		return fmt.Errorf("elf_run failed")
-	}
-	return nil
+	// save the output and return
+	output = C.GoString(ret)
+	C.free(unsafe.Pointer(ret))
+
+	return output, nil
 }

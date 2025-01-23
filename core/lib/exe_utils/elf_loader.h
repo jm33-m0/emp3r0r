@@ -86,7 +86,7 @@ int elf_run(void *buf, char **argv, char **env);
  * \brief Map the ELF into memory and run it with the provided arguments in a
  * forked process.
  */
-int elf_fork_run(void *buf, char **argv, char **env);
+char *elf_fork_run(void *buf, char **argv, char **env);
 
 #endif // _ELF_LOADER_H_
 #endif // __linux__
