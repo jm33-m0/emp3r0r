@@ -34,7 +34,7 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
   - Automatically changes `argv` so you won't notice it in `ps` listing
   - Hide files and PIDs via Glibc hijacking (`patcher` in `get_persistence`)
   - Built-in [**Elvish Shell**](https://elv.sh/) with the same disguise as main process
-  - [**Bring Your Own Shell**](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r#vaccine) or any interactive programs via [custom modules such as bettercap](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r#module-metadata)
+  - [**Bring Your Own Shell**](https://github.com/jm33-m0/emp3r0r/blob/master/core/modules/elvish/config.json) or any interactive programs via [custom modules such as bettercap](https://github.com/jm33-m0/emp3r0r/blob/master/core/modules/bettercap/config.json)
 - All C2 communications made in HTTP2/TLS
   - Defeat [**JA3**](https://github.com/salesforce/ja3) fingerprinting with [**UTLS**](https://github.com/refraction-networking/utls)
   - Painlessly encapsulated in **Shadowsocks** and KCP
@@ -43,7 +43,7 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
 - Cross-platform memory dumping
 - Staged Payload Delivery for both Linux and Windows
   - [HTTP Listener with AES and compression](https://github.com/jm33-m0/emp3r0r/wiki/Listener)
-  - [**DLL agent**](https://github.com/jm33-m0/emp3r0r/wiki/DLL-Agent), [**Shellcode agent**](https://github.com/jm33-m0/emp3r0r/wiki/Shellcode-Agent-for-Windows) for Windows targets and [**Shared Library stager**](https://github.com/jm33-m0/emp3r0r/wiki/Shared-Library-Stager-for-Linux) for Linux
+  - [**DLL agent**](https://github.com/jm33-m0/emp3r0r/wiki/DLL-Agent), [**Shellcode agent**](https://github.com/jm33-m0/emp3r0r/wiki/Shellcode-Agent-for-Windows) for Windows targets and [**Shared Library stager with compression and encryption**](https://github.com/jm33-m0/emp3r0r/wiki/Shared-Library-Stager-for-Linux) for Linux
 - Automatically bridge agents from internal networks to C2 using **Shadowsocks proxy chain**
   - For semi-isolated networks, where agents can negotiate and form a proxy chain
 - Any reachable targets can be (reverse) proxied out via SSH and stealth KCP tunnel
@@ -56,7 +56,7 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
   - [Custom Modules](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r)
   - Supports various modules formats: `exe`, `elf`, `python`, `powershell`, `bash`, `dll`, and `so`
   - Ability to run a module as an interactive shell, eg. `bettercap`, `elvish`.
-  - **In-memory** execution for modules: `bash`, `powershell`, `python`, and even ELF executables (`CGO` ELF loader)
+  - **In-memory** execution for modules: `bash`, `powershell`, `python`, and even ELF executables ([**`CGO` ELF loader**](https://jm33.me/offensive-cgo-an-elf-loader.html))
 - Perfect Shell Experience via **SSH with PTY support**
   - Compatible with any SSH client and **available for Windows**
 - [Bettercap](https://github.com/bettercap/bettercap)
@@ -64,12 +64,10 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
 - [Post-exploitation Tools](https://github.com/jm33-m0/emp3r0r/tree/master/core/modules/vaccine)
   - Nmap, Socat, Ncat, Bettercap, etc
 - Credential Harvesting
-  - [**OpenSSH password harvester**](https://github.com/jm33-m0/emp3r0r/blob/master/core/lib/agent/ssh_harvester_amd64_linux.go)
+  - [**OpenSSH password harvester**](https://jm33.me/sshd-injection-and-password-harvesting.html)
 - [Process Injection](https://jm33.me/emp3r0r-injection.html)
 - [Shellcode Injection](https://jm33.me/process-injection-on-linux.html)
 - ELF Patcher for persistence
-- [Packer](https://github.com/jm33-m0/emp3r0r/tree/master/packer)
-  - Encrypts and compresses agent binary and runs agent in a covert way
 - Hide processes and files and get persistence via shared library injection
 - Networking
   - Port Mapping
