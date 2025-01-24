@@ -19,7 +19,12 @@ warn() {
 
 # Function to check if a command exists
 check_command() {
-  command -v "$1" >/dev/null || error "$1 is required"
+  command -v apt >/dev/null || error "This script is only for Kali/Ubuntu/Debian"
+  (
+    command -v "$1" >/dev/null || {
+      sudo apt update && sudo apt install -y "$1"
+    }
+  ) || error "Failed to install $1"
 }
 
 # Function to download a file
@@ -33,8 +38,10 @@ download_file() {
 verify_checksum() {
   local file=$1
   local checksum_file=$2
-  local expected_checksum=$(cat "$checksum_file")
-  local actual_checksum=$(sha256sum "$file" | awk '{ print $1 }')
+  local expected_checksum
+  expected_checksum=$(cat "$checksum_file")
+  local actual_checksum
+  actual_checksum=$(sha256sum "$file" | awk '{ print $1 }')
 
   if [ "$expected_checksum" != "$actual_checksum" ]; then
     error "SHA256 verification failed"
