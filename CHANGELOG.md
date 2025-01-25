@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.50.3](https://github.com/jm33-m0/emp3r0r/compare/v1.50.2...v1.50.3) (2025-01-25)
+
+
+### Bug Fixes
+
+* update deps, remove deprecated `go-ps` ([94812c3](https://github.com/jm33-m0/emp3r0r/commit/94812c372c5298234f7b5c677825050a13e8d00f))
+
 ## [1.50.2](https://github.com/jm33-m0/emp3r0r/compare/v1.50.1...v1.50.2) (2025-01-23)
 
 
