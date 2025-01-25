@@ -150,7 +150,12 @@ func HexEncode(s string) (result string) {
 
 func LogFilePrintf(filepath, format string, v ...any) {
 	logf, err := os.OpenFile(filepath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
-	defer logf.Close()
+	defer func() {
+		logfErr := logf.Close()
+		if logfErr != nil {
+			log.Printf("LogFilePrintf: %v", logfErr)
+		}
+	}()
 	if err != nil {
 		log.Printf("LogFilePrintf: %v", err)
 		return

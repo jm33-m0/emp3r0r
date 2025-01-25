@@ -85,7 +85,7 @@ func macUint64() uint64 {
 	}
 
 	for _, i := range interfaces {
-		if i.Flags&net.FlagUp != 0 && bytes.Compare(i.HardwareAddr, nil) != 0 {
+		if i.Flags&net.FlagUp != 0 && bytes.Equal(i.HardwareAddr, nil) {
 
 			var mac uint64
 			for j, b := range i.HardwareAddr {
@@ -125,7 +125,6 @@ func GetHostID(info *ghw.ProductInfo, fallbackUUID string) (id string) {
 		return
 	}
 	name = fmt.Sprintf("%s\\%s", name, GetUsername()) // hostname\\username
-	id = fmt.Sprintf("%s_%s-agent", name, shortID)
 	fallback := false
 	product_uuid, err := uuid.Parse(info.UUID)
 	if err != nil {

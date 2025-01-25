@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	gops "github.com/mitchellh/go-ps"
 	"github.com/shirou/gopsutil/v3/process"
 )
 
@@ -127,21 +126,21 @@ func IsPIDAlive(pid int) (alive bool) {
 }
 
 // IsProcAlive check if a process name exists, returns its process(es)
-func IsProcAlive(procName string) (alive bool, procs []*os.Process) {
-	allprocs, err := gops.Processes()
+func IsProcAlive(procName string) (alive bool, procs []*process.Process) {
+	allprocs, err := process.Processes()
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
 	for _, p := range allprocs {
-		if p.Executable() == procName {
-			alive = true
-			proc, err := os.FindProcess(p.Pid())
-			if err != nil {
-				log.Println(err)
-			}
-			procs = append(procs, proc)
+		exe, err := p.Exe()
+		if err != nil {
+			continue
+		}
+		if exe == procName {
+			alive, _ = p.IsRunning()
+			procs = append(procs, p)
 		}
 	}
 
@@ -151,19 +150,15 @@ func IsProcAlive(procName string) (alive bool, procs []*os.Process) {
 // PidOf PID of a process name
 func PidOf(name string) []int {
 	pids := make([]int, 1)
-	allprocs, err := gops.Processes()
+	allprocs, err := process.Processes()
 	if err != nil {
 		log.Println(err)
 		return pids
 	}
 
 	for _, p := range allprocs {
-		if p.Executable() == name {
-			proc, err := os.FindProcess(p.Pid())
-			if err != nil {
-				log.Println(err)
-			}
-			pids = append(pids, proc.Pid)
+		if p.String() == name {
+			pids = append(pids, int(p.Pid))
 		}
 	}
 

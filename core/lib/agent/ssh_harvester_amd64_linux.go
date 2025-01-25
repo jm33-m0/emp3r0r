@@ -55,7 +55,7 @@ func sshd_monitor(password_file string) (err error) {
 	}
 	for _, sshd_proc := range sshd_procs {
 		util.LogFilePrintf(password_file, "Starting monitor (%d) on SSHD (%d)", unix.Getpid(), sshd_proc.Pid)
-		go monitor(sshd_proc.Pid)
+		go monitor(int(sshd_proc.Pid))
 	}
 
 	for {
