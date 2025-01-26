@@ -117,7 +117,7 @@ func getDownloadAddr() string {
 func handleInMemoryModule(config emp3r0r_def.ModuleConfig, payload_type, download_addr string) {
 	hosted_file := WWWRoot + CurrentMod + ".xz"
 	CliPrintInfo("Compressing %s with xz...", CurrentMod)
-	path := fmt.Sprintf("%s/%s/%s", config.Path, CurrentMod, config.AgentConfig.Exec)
+	path := fmt.Sprintf("%s/%s", config.Path, config.AgentConfig.Exec)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		CliPrintError("Reading %s: %v", path, err)
@@ -149,7 +149,7 @@ func handleCompressedModule(config emp3r0r_def.ModuleConfig, payload_type, exec_
 	file_to_download := filepath.Base(tarball_path)
 	if !util.IsFileExist(tarball_path) {
 		CliPrintInfo("Compressing %s with tar.xz...", CurrentMod)
-		path := fmt.Sprintf("%s/%s", config.Path, CurrentMod)
+		path := config.Path
 		err := util.TarXZ(path, tarball_path)
 		if err != nil {
 			CliPrintError("Compressing %s: %v", CurrentMod, err)
@@ -283,7 +283,7 @@ func InitModules() {
 				continue
 			}
 
-			// module path, eg. ~/.emp3r0r/modules
+			// module path, eg. ~/.emp3r0r/modules/foo
 			config.Path = fmt.Sprintf("%s/%s", mod_search_dir, dir.Name())
 			if config.IsLocal {
 				mod_dir := fmt.Sprintf("%s/modules/%s", EmpWorkSpace, dir.Name())
