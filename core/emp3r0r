@@ -146,6 +146,10 @@ build() {
   {
     cd "$pwd/cmd/cat" && CGO_ENABLED=0 go build -o "$temp/cat.exe" -ldflags="$ldflags"
   } || error "build cat"
+  info "Building listener"
+  {
+    cd "$pwd/cmd/listener" && CGO_ENABLED=0 go build -o "$temp/listener.exe" -ldflags="$ldflags"
+  } || error "build listener"
 
   # Linux
   build_agent_stub "amd64" "linux" "stub-amd64"
@@ -216,7 +220,8 @@ install() {
 
   # emp3r0r binaries
   chmod 755 "$0" cc.exe cat.exe
-  cp -avR "$0" "$bin_dir/emp3r0r" || error "$0"
+  cp -avR emp3r0r "$bin_dir/emp3r0r" || error "emp3r0r-main"
+  cp -avR listener.exe "$bin_dir/emp3r0r-listener" || error "emp3r0r-listener"
   cp -avR cc.exe "$data_dir/emp3r0r-cc" || error "emp3r0r-cc"
   cp -avR cat.exe "$data_dir/emp3r0r-cat" || error "emp3r0r-cat"
 
