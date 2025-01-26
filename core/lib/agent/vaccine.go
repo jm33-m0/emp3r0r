@@ -106,7 +106,7 @@ func VaccineHandler(download_addr, checksum string) (out string) {
 		ld_path := fmt.Sprintf("%s/ld-musl-x86_64.so.1", rpath)
 		err = exe_utils.FixELF(fpath, rpath, ld_path)
 		if err != nil {
-			out = fmt.Sprintf("%s, %s: %v", out, fpath, err)
+			out = fmt.Sprintf("%s\n%s: %v", out, fpath, err)
 		}
 
 		// remove tmp file

@@ -676,7 +676,8 @@ func writeDynamicEntries(f *os.File, offset uint64, entries []Dynamic, elfClass 
 // Parameters:
 // - elf_path: Path to the ELF file to fix.
 func FixELF(elf_path, rpath, ld_path string) (err error) {
-	utils_path := filepath.Dir(rpath)
+	// see module vaccine's directory structure
+	utils_path := filepath.Dir(filepath.Dir(rpath))
 	pwd, _ := os.Getwd()
 	err = os.Chdir(utils_path)
 	if err != nil {
