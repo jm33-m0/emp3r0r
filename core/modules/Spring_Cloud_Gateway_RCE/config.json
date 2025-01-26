@@ -1,13 +1,12 @@
 {
     "name": "Spring_Cloud_Gateway_RCE",
-    "exec": "CVE-2022-22947.py",
-    "type": "python",
-    "in_memory": true,
-    "platform": "Linux",
-    "interactive": false,
+    "build": "",
     "author": "Axx8",
     "date": "2022-03-03",
     "comment": "CVE-2022-22947, see https://github.com/Axx8/CVE-2022-22947_Rce_Exp",
+    "is_plugin": false,
+    "platform": "Linux",
+    "path": "",
     "options": {
         "TARGET_URL": {
             "opt_name": "TARGET_URL",
@@ -21,5 +20,14 @@
             "opt_val": "whoami",
             "opt_vals": []
         }
+    },
+    "agent_config": {
+        "exec": "CVE-2022-22947.py",
+        "files": [
+            "CVE-2022-22947.py"
+        ],
+        "in_memory": true,
+        "type": "python",
+        "interactive": false
     }
 }

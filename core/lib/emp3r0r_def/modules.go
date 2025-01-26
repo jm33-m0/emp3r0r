@@ -45,32 +45,40 @@ type ModOption struct {
 // ModOptions represents multiple module options
 type ModOptions map[string]*ModOption
 
-// ModConfig stores module config data
-type ModConfig struct {
-	Name          string     `json:"name"`        // Display as this name
-	Exec          string     `json:"exec"`        // Run this executable file
-	Path          string     `json:"path"`        // Path to the module
-	InMemory      bool       `json:"in_memory"`   // run this module in memory (for now ps1 is supported)
-	Type          string     `json:"type"`        // "go", "python", "powershell", "bash", "exe", "elf", "dll", "so"
-	Platform      string     `json:"platform"`    // targeting which OS? Linux/Windows
-	IsInteractive bool       `json:"interactive"` // whether run as a shell or not, eg. python, bettercap
-	Author        string     `json:"author"`      // by whom
-	Date          string     `json:"date"`        // when did you write it
-	Comment       string     `json:"comment"`     // describe your module in one line
-	Options       ModOptions `json:"options"`     // module options
+// AgentModuleConfig stores configuration data for the agent side
+type AgentModuleConfig struct {
+	Exec          string   `json:"exec"`        // Run this executable file on agent
+	Files         []string `json:"files"`       // Files to be uploaded to agent
+	InMemory      bool     `json:"in_memory"`   // run this module in memory
+	Type          string   `json:"type"`        // "go", "python", "powershell", "bash", "exe", "elf", "dll", "so"
+	IsInteractive bool     `json:"interactive"` // whether run as a shell or not, eg. python, bettercap
+}
+
+// ModuleConfig stores the complete module config data
+type ModuleConfig struct {
+	Name        string            `json:"name"`         // Display as this name
+	Build       string            `json:"build"`        // Command to build this module on C2 before sending it to agents
+	Author      string            `json:"author"`       // by whom
+	Date        string            `json:"date"`         // when did you write it
+	Comment     string            `json:"comment"`      // describe your module in one line
+	IsPlugin    bool              `json:"is_plugin"`    // If true, this module is a C2 plugin and doesn't run on agent
+	Platform    string            `json:"platform"`     // targeting which OS? Linux/Windows
+	Path        string            `json:"path"`         // Path to the module, module's root directory
+	Options     ModOptions        `json:"options"`      // module options
+	AgentConfig AgentModuleConfig `json:"agent_config"` // Configuration for agent side
 }
 
 // Module help info and options
-var Modules = map[string]*ModConfig{
+var Modules = map[string]*ModuleConfig{
 	ModVACCINE: {
-		Name:          ModVACCINE,
-		Exec:          "built-in",
-		Type:          "go",
-		Platform:      "Linux",
-		IsInteractive: false,
-		Author:        "jm33-ng",
-		Date:          "2020-01-25",
-		Comment:       "Install tools to RuntimeConfig.UtilsPath, for lateral movement",
+		Name:     ModVACCINE,
+		Build:    "",
+		Author:   "jm33-ng",
+		Date:     "2020-01-25",
+		Comment:  "Install tools to RuntimeConfig.UtilsPath, for lateral movement",
+		IsPlugin: false,
+		Platform: "Linux",
+		Path:     "",
 		Options: ModOptions{
 			"download_addr": &ModOption{
 				OptName: "download_addr",
@@ -78,16 +86,23 @@ var Modules = map[string]*ModConfig{
 				OptVal:  "",
 			},
 		},
+		AgentConfig: AgentModuleConfig{
+			Exec:          "built-in",
+			Files:         []string{},
+			InMemory:      false,
+			Type:          "go",
+			IsInteractive: false,
+		},
 	},
 	ModGenAgent: {
-		Name:          ModGenAgent,
-		Exec:          "built-in",
-		Type:          "go",
-		Platform:      "Generic",
-		IsInteractive: false,
-		Author:        "jm33-ng",
-		Date:          "2020-01-25",
-		Comment:       "Build agent for different OS/arch with customized options",
+		Name:     ModGenAgent,
+		Build:    "",
+		Author:   "jm33-ng",
+		Date:     "2020-01-25",
+		Comment:  "Build agent for different OS/arch with customized options",
+		IsPlugin: false,
+		Platform: "Generic",
+		Path:     "",
 		Options: ModOptions{
 			"payload_type": &ModOption{
 				OptName: "payload_type",
@@ -146,16 +161,23 @@ var Modules = map[string]*ModConfig{
 				OptVals: []string{"https://1.1.1.1/dns-query"},
 			},
 		},
+		AgentConfig: AgentModuleConfig{
+			Exec:          "built-in",
+			Files:         []string{},
+			InMemory:      false,
+			Type:          "go",
+			IsInteractive: false,
+		},
 	},
 	ModCMD_EXEC: {
-		Name:          ModCMD_EXEC,
-		Exec:          "built-in",
-		Type:          "go",
-		Platform:      "Generic",
-		IsInteractive: false,
-		Author:        "jm33-ng",
-		Date:          "2020-01-25",
-		Comment:       "Run a single command on one or more targets",
+		Name:     ModCMD_EXEC,
+		Build:    "",
+		Author:   "jm33-ng",
+		Date:     "2020-01-25",
+		Comment:  "Run a single command on one or more targets",
+		IsPlugin: false,
+		Platform: "Generic",
+		Path:     "",
 		Options: ModOptions{
 			"cmd_to_exec": &ModOption{
 				OptName: "cmd_to_exec",
@@ -168,16 +190,23 @@ var Modules = map[string]*ModConfig{
 				},
 			},
 		},
+		AgentConfig: AgentModuleConfig{
+			Exec:          "built-in",
+			Files:         []string{},
+			InMemory:      false,
+			Type:          "go",
+			IsInteractive: false,
+		},
 	},
 	ModCLEAN_LOG: {
-		Name:          ModCLEAN_LOG,
-		Exec:          "built-in",
-		Type:          "go",
-		Platform:      "Linux",
-		IsInteractive: false,
-		Author:        "jm33-ng",
-		Date:          "2020-01-25",
-		Comment:       "Delete lines containing keyword from xtmp logs",
+		Name:     ModCLEAN_LOG,
+		Build:    "",
+		Author:   "jm33-ng",
+		Date:     "2020-01-25",
+		Comment:  "Delete lines containing keyword from xtmp logs",
+		IsPlugin: false,
+		Platform: "Linux",
+		Path:     "",
 		Options: ModOptions{
 			"keyword": &ModOption{
 				OptName: "keyword",
@@ -186,16 +215,23 @@ var Modules = map[string]*ModConfig{
 				OptVal:  "root",
 			},
 		},
+		AgentConfig: AgentModuleConfig{
+			Exec:          "built-in",
+			Files:         []string{},
+			InMemory:      false,
+			Type:          "go",
+			IsInteractive: false,
+		},
 	},
 	ModLPE_SUGGEST: {
-		Name:          ModLPE_SUGGEST,
-		Exec:          "built-in",
-		Type:          "go",
-		Platform:      "Generic",
-		IsInteractive: false,
-		Author:        "jm33-ng",
-		Date:          "2020-01-25",
-		Comment:       "Run linux-smart-enumeration or linux exploit suggester",
+		Name:     ModLPE_SUGGEST,
+		Build:    "",
+		Author:   "jm33-ng",
+		Date:     "2020-01-25",
+		Comment:  "Run linux-smart-enumeration or linux exploit suggester",
+		IsPlugin: false,
+		Platform: "Generic",
+		Path:     "",
 		Options: ModOptions{
 			"lpe_helper": &ModOption{
 				OptName: "lpe_helper",
@@ -204,16 +240,23 @@ var Modules = map[string]*ModConfig{
 				OptVal:  "lpe_les",
 			},
 		},
+		AgentConfig: AgentModuleConfig{
+			Exec:          "built-in",
+			Files:         []string{},
+			InMemory:      false,
+			Type:          "go",
+			IsInteractive: false,
+		},
 	},
 	ModPERSISTENCE: {
-		Name:          ModPERSISTENCE,
-		Exec:          "built-in",
-		Type:          "go",
-		Platform:      "Linux",
-		IsInteractive: false,
-		Author:        "jm33-ng",
-		Date:          "2020-01-25",
-		Comment:       "Get persistence via built-in methods",
+		Name:     ModPERSISTENCE,
+		Build:    "",
+		Author:   "jm33-ng",
+		Date:     "2020-01-25",
+		Comment:  "Get persistence via built-in methods",
+		IsPlugin: false,
+		Platform: "Linux",
+		Path:     "",
 		Options: ModOptions{
 			"method": &ModOption{
 				OptName: "method",
@@ -222,16 +265,23 @@ var Modules = map[string]*ModConfig{
 				OptVal:  "patcher",
 			},
 		},
+		AgentConfig: AgentModuleConfig{
+			Exec:          "built-in",
+			Files:         []string{},
+			InMemory:      false,
+			Type:          "go",
+			IsInteractive: false,
+		},
 	},
 	ModPROXY: {
-		Name:          ModPROXY,
-		Exec:          "built-in",
-		Type:          "go",
-		Platform:      "Generic",
-		IsInteractive: false,
-		Author:        "jm33-ng",
-		Date:          "2020-01-25",
-		Comment:       "Start a socks proxy on target host",
+		Name:     ModPROXY,
+		Build:    "",
+		Author:   "jm33-ng",
+		Date:     "2020-01-25",
+		Comment:  "Start a socks proxy on target host",
+		IsPlugin: false,
+		Platform: "Generic",
+		Path:     "",
 		Options: ModOptions{
 			"port": &ModOption{
 				OptName: "port",
@@ -246,16 +296,23 @@ var Modules = map[string]*ModConfig{
 				OptVal:  "on",
 			},
 		},
+		AgentConfig: AgentModuleConfig{
+			Exec:          "built-in",
+			Files:         []string{},
+			InMemory:      false,
+			Type:          "go",
+			IsInteractive: false,
+		},
 	},
 	ModPORT_FWD: {
-		Name:          ModPORT_FWD,
-		Exec:          "built-in",
-		Type:          "go",
-		Platform:      "Generic",
-		IsInteractive: false,
-		Author:        "jm33-ng",
-		Date:          "2020-01-25",
-		Comment:       "Port mapping from agent to CC",
+		Name:     ModPORT_FWD,
+		Build:    "",
+		Author:   "jm33-ng",
+		Date:     "2020-01-25",
+		Comment:  "Port mapping from agent to CC",
+		IsPlugin: false,
+		Platform: "Generic",
+		Path:     "",
 		Options: ModOptions{
 			"to": &ModOption{
 				OptName: "to",
@@ -280,16 +337,23 @@ var Modules = map[string]*ModConfig{
 				OptVal:  "tcp",
 			},
 		},
+		AgentConfig: AgentModuleConfig{
+			Exec:          "built-in",
+			Files:         []string{},
+			InMemory:      false,
+			Type:          "go",
+			IsInteractive: false,
+		},
 	},
 	ModSHELL: {
-		Name:          ModSHELL,
-		Exec:          "built-in",
-		Type:          "go",
-		Platform:      "Generic",
-		IsInteractive: true,
-		Author:        "jm33-ng",
-		Date:          "2020-01-25",
-		Comment:       "Bring your own shell program to run on target",
+		Name:     ModSHELL,
+		Build:    "",
+		Author:   "jm33-ng",
+		Date:     "2020-01-25",
+		Comment:  "Bring your own shell program to run on target",
+		IsPlugin: false,
+		Platform: "Generic",
+		Path:     "",
 		Options: ModOptions{
 			"shell": &ModOption{
 				OptName: "shell",
@@ -314,16 +378,23 @@ var Modules = map[string]*ModConfig{
 				OptVal: "22222",
 			},
 		},
+		AgentConfig: AgentModuleConfig{
+			Exec:          "built-in",
+			Files:         []string{},
+			InMemory:      false,
+			Type:          "go",
+			IsInteractive: true,
+		},
 	},
 	ModINJECTOR: {
-		Name:          ModINJECTOR,
-		Exec:          "built-in",
-		Type:          "go",
-		Platform:      "Linux",
-		IsInteractive: false,
-		Author:        "jm33-ng",
-		Date:          "2020-01-25",
-		Comment:       "Inject shellcode/loader.so into a running process",
+		Name:     ModINJECTOR,
+		Build:    "",
+		Author:   "jm33-ng",
+		Date:     "2020-01-25",
+		Comment:  "Inject shellcode/loader.so into a running process",
+		IsPlugin: false,
+		Platform: "Linux",
+		Path:     "",
 		Options: ModOptions{
 			"pid": &ModOption{
 				OptName: "pid",
@@ -338,16 +409,23 @@ var Modules = map[string]*ModConfig{
 				OptVal:  "shared_library",
 			},
 		},
+		AgentConfig: AgentModuleConfig{
+			Exec:          "built-in",
+			Files:         []string{},
+			InMemory:      false,
+			Type:          "go",
+			IsInteractive: false,
+		},
 	},
 	ModBring2CC: {
-		Name:          ModBring2CC,
-		Exec:          "built-in",
-		Type:          "go",
-		Platform:      "Generic",
-		IsInteractive: false,
-		Author:        "jm33-ng",
-		Date:          "2020-01-25",
-		Comment:       "Bring arbitrary agent to CC",
+		Name:     ModBring2CC,
+		Build:    "",
+		Author:   "jm33-ng",
+		Date:     "2020-01-25",
+		Comment:  "Bring arbitrary agent to CC",
+		IsPlugin: false,
+		Platform: "Generic",
+		Path:     "",
 		Options: ModOptions{
 			"addr": &ModOption{
 				OptName: "addr",
@@ -362,16 +440,23 @@ var Modules = map[string]*ModConfig{
 				OptVal:  "on",
 			},
 		},
+		AgentConfig: AgentModuleConfig{
+			Exec:          "built-in",
+			Files:         []string{},
+			InMemory:      false,
+			Type:          "go",
+			IsInteractive: false,
+		},
 	},
 	ModListener: {
-		Name:          ModListener,
-		Exec:          "built-in",
-		Type:          "go",
-		Platform:      "Generic",
-		IsInteractive: false,
-		Author:        "jm33-ng",
-		Date:          "2020-01-25",
-		Comment:       "Start a listener to serve stagers or regular files",
+		Name:     ModListener,
+		Build:    "",
+		Author:   "jm33-ng",
+		Date:     "2020-01-25",
+		Comment:  "Start a listener to serve stagers or regular files",
+		IsPlugin: false,
+		Platform: "Generic",
+		Path:     "",
 		Options: ModOptions{
 			"payload": &ModOption{
 				OptName: "payload",
@@ -386,26 +471,41 @@ var Modules = map[string]*ModConfig{
 				OptDesc: "Port to listen on, eg. 8080",
 			},
 		},
+		AgentConfig: AgentModuleConfig{
+			Exec:          "built-in",
+			Files:         []string{},
+			InMemory:      false,
+			Type:          "go",
+			IsInteractive: false,
+		},
 	},
 	ModSSHHarvester: {
-		Name:          ModSSHHarvester,
-		Exec:          "built-in",
-		Type:          "go",
-		Platform:      "Linux",
-		IsInteractive: false,
-		Author:        "jm33-ng",
-		Date:          "2020-01-25",
-		Comment:       "Harvest clear-text password automatically from OpenSSH server process",
+		Name:     ModSSHHarvester,
+		Build:    "",
+		Author:   "jm33-ng",
+		Date:     "2020-01-25",
+		Comment:  "Harvest clear-text password automatically from OpenSSH server process",
+		IsPlugin: false,
+		Platform: "Linux",
+		Path:     "",
+		Options:  ModOptions{},
+		AgentConfig: AgentModuleConfig{
+			Exec:          "built-in",
+			Files:         []string{},
+			InMemory:      false,
+			Type:          "go",
+			IsInteractive: false,
+		},
 	},
 	ModFileServer: {
-		Name:          ModFileServer,
-		Exec:          "built-in",
-		Type:          "go",
-		Platform:      "Generic",
-		IsInteractive: false,
-		Author:        "jm33-ng",
-		Date:          "2020-01-25",
-		Comment:       "Start a secure file server on target host for data exfiltration and module file caching",
+		Name:     ModFileServer,
+		Build:    "",
+		Author:   "jm33-ng",
+		Date:     "2020-01-25",
+		Comment:  "Start a secure file server on target host for data exfiltration and module file caching",
+		IsPlugin: false,
+		Platform: "Generic",
+		Path:     "",
 		Options: ModOptions{
 			"port": &ModOption{
 				OptName: "port",
@@ -418,16 +518,23 @@ var Modules = map[string]*ModConfig{
 				OptVal:  "on",
 			},
 		},
+		AgentConfig: AgentModuleConfig{
+			Exec:          "built-in",
+			Files:         []string{},
+			InMemory:      false,
+			Type:          "go",
+			IsInteractive: false,
+		},
 	},
 	ModDownloader: {
-		Name:          ModDownloader,
-		Exec:          "built-in",
-		Type:          "go",
-		Platform:      "Generic",
-		IsInteractive: false,
-		Author:        "jm33-ng",
-		Date:          "2020-01-25",
-		Comment:       "Download and decrypt a file from other agents, run `file_server` first",
+		Name:     ModDownloader,
+		Build:    "",
+		Author:   "jm33-ng",
+		Date:     "2020-01-25",
+		Comment:  "Download and decrypt a file from other agents, run `file_server` first",
+		IsPlugin: false,
+		Platform: "Generic",
+		Path:     "",
 		Options: ModOptions{
 			"download_addr": &ModOption{
 				OptName: "download_addr",
@@ -445,22 +552,36 @@ var Modules = map[string]*ModConfig{
 				OptVal:  "",
 			},
 		},
+		AgentConfig: AgentModuleConfig{
+			Exec:          "built-in",
+			Files:         []string{},
+			InMemory:      false,
+			Type:          "go",
+			IsInteractive: false,
+		},
 	},
 	ModMemDump: {
-		Name:          ModMemDump,
-		Exec:          "built-in",
-		Type:          "go",
-		Platform:      "Generic",
-		IsInteractive: false,
-		Author:        "jm33-ng",
-		Date:          "2020-01-25",
-		Comment:       "Dump memory regions of a process",
+		Name:     ModMemDump,
+		Build:    "",
+		Author:   "jm33-ng",
+		Date:     "2020-01-25",
+		Comment:  "Dump memory regions of a process",
+		IsPlugin: false,
+		Platform: "Generic",
+		Path:     "",
 		Options: ModOptions{
 			"pid": &ModOption{
 				OptName: "pid",
 				OptDesc: "PID of the target process",
 				OptVal:  "",
 			},
+		},
+		AgentConfig: AgentModuleConfig{
+			Exec:          "built-in",
+			Files:         []string{},
+			InMemory:      false,
+			Type:          "go",
+			IsInteractive: false,
 		},
 	},
 }

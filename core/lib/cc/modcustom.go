@@ -20,7 +20,7 @@ import (
 )
 
 // stores module configs
-var ModuleConfigs = make(map[string]emp3r0r_def.ModConfig, 1)
+var ModuleConfigs = make(map[string]emp3r0r_def.ModuleConfig, 1)
 
 // stores module names for fuzzy search
 var ModuleNames = make(map[string]string)
@@ -44,11 +44,11 @@ func moduleCustom() {
 			return
 		}
 
-		if config.IsInteractive {
+		if config.AgentConfig.IsInteractive {
 			exec_cmd = fmt.Sprintf("echo %s", strconv.Quote(tun.SHA256SumRaw([]byte(emp3r0r_def.MagicString))))
 		}
 
-		if config.InMemory {
+		if config.AgentConfig.InMemory {
 			handleInMemoryModule(config, payload_type, download_addr)
 			return
 		}
@@ -57,7 +57,7 @@ func moduleCustom() {
 	}()
 }
 
-func updateModuleOptions(config *emp3r0r_def.ModConfig) {
+func updateModuleOptions(config *emp3r0r_def.ModuleConfig) {
 	for opt, modOption := range config.Options {
 		option, ok := CurrentModuleOptions[opt]
 		if !ok {
@@ -76,10 +76,10 @@ func getDownloadAddr() string {
 	return ""
 }
 
-func handleInMemoryModule(config emp3r0r_def.ModConfig, payload_type, download_addr string) {
+func handleInMemoryModule(config emp3r0r_def.ModuleConfig, payload_type, download_addr string) {
 	hosted_file := WWWRoot + CurrentMod + ".xz"
 	CliPrintInfo("Compressing %s with xz...", CurrentMod)
-	path := fmt.Sprintf("%s/%s/%s", config.Path, CurrentMod, config.Exec)
+	path := fmt.Sprintf("%s/%s/%s", config.Path, CurrentMod, config.AgentConfig.Exec)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		CliPrintError("Reading %s: %v", path, err)
@@ -106,7 +106,7 @@ func handleInMemoryModule(config emp3r0r_def.ModConfig, payload_type, download_a
 	}
 }
 
-func handleCompressedModule(config emp3r0r_def.ModConfig, payload_type, exec_cmd, envStr, download_addr string) {
+func handleCompressedModule(config emp3r0r_def.ModuleConfig, payload_type, exec_cmd, envStr, download_addr string) {
 	tarball_path := WWWRoot + CurrentMod + ".tar.xz"
 	file_to_download := filepath.Base(tarball_path)
 	if !util.IsFileExist(tarball_path) {
@@ -133,12 +133,12 @@ func handleCompressedModule(config emp3r0r_def.ModConfig, payload_type, exec_cmd
 		CliPrintError("Sending command %s to %s: %v", cmd, CurrentTarget.Tag, err)
 	}
 
-	if config.IsInteractive {
+	if config.AgentConfig.IsInteractive {
 		handleInteractiveModule(config, cmd_id)
 	}
 }
 
-func handleInteractiveModule(config emp3r0r_def.ModConfig, cmd_id string) {
+func handleInteractiveModule(config emp3r0r_def.ModuleConfig, cmd_id string) {
 	opt, exists := config.Options["args"]
 	if !exists {
 		config.Options["args"] = &emp3r0r_def.ModOption{
@@ -165,7 +165,7 @@ func handleInteractiveModule(config emp3r0r_def.ModConfig, cmd_id string) {
 	}()
 
 	sshErr := SSHClient(fmt.Sprintf("%s/%s/%s",
-		RuntimeConfig.AgentRoot, CurrentMod, config.Exec),
+		RuntimeConfig.AgentRoot, CurrentMod, config.AgentConfig.Exec),
 		args, port, false)
 	if sshErr != nil {
 		CliPrintError("module %s: %v", config.Name, sshErr)
@@ -205,7 +205,7 @@ func ModuleDetails(modName string) {
 		tablewriter.Colors{tablewriter.FgBlueColor})
 
 	// fill table
-	tdata = append(tdata, []string{config.Name, config.Exec, config.Platform, config.Author, config.Date, config.Comment})
+	tdata = append(tdata, []string{config.Name, config.AgentConfig.Exec, config.Platform, config.Author, config.Date, config.Comment})
 	table.AppendBulk(tdata)
 	table.Render()
 	out := tableString.String()
@@ -286,7 +286,7 @@ func InitModules() {
 }
 
 // readModCondig read config.json of a module
-func readModCondig(file string) (pconfig *emp3r0r_def.ModConfig, err error) {
+func readModCondig(file string) (pconfig *emp3r0r_def.ModuleConfig, err error) {
 	// read JSON
 	jsonData, err := os.ReadFile(file)
 	if err != nil {
@@ -294,7 +294,7 @@ func readModCondig(file string) (pconfig *emp3r0r_def.ModConfig, err error) {
 	}
 
 	// parse the json
-	config := emp3r0r_def.ModConfig{}
+	config := emp3r0r_def.ModuleConfig{}
 	err = json.Unmarshal(jsonData, &config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal JSON config: %v", err)
@@ -304,9 +304,9 @@ func readModCondig(file string) (pconfig *emp3r0r_def.ModConfig, err error) {
 }
 
 // genModStartCmd reads config.json of a module and generates env string (VAR=value,VAR2=value2 ...)
-func genModStartCmd(config *emp3r0r_def.ModConfig) (payload_type, exec_path, envStr string, err error) {
-	exec_path = config.Exec
-	payload_type = config.Type
+func genModStartCmd(config *emp3r0r_def.ModuleConfig) (payload_type, exec_path, envStr string, err error) {
+	exec_path = config.AgentConfig.Exec
+	payload_type = config.AgentConfig.Type
 	var builder strings.Builder
 
 	setEnvVar := func(opt, value string) {
@@ -321,7 +321,7 @@ func genModStartCmd(config *emp3r0r_def.ModConfig) (payload_type, exec_path, env
 	return
 }
 
-func updateModuleHelp(config *emp3r0r_def.ModConfig) error {
+func updateModuleHelp(config *emp3r0r_def.ModuleConfig) error {
 	help_map := make(map[string]*emp3r0r_def.ModOption)
 	for opt, modOption := range config.Options {
 		if modOption.OptDesc == "" {

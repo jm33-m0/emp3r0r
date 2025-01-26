@@ -1,13 +1,12 @@
 {
     "name": "py_info",
-    "exec": "run.py",
-    "type": "python",
-    "in_memory": true,
-    "platform": "Linux",
-    "interactive": false,
+    "build": "",
     "author": "jm33-ng",
     "date": "2022-03-12",
     "comment": "Check basic python info",
+    "is_plugin": false,
+    "platform": "Linux",
+    "path": "",
     "options": {
         "NA": {
             "opt_name": "NA",
@@ -15,5 +14,14 @@
             "opt_val": "--",
             "opt_vals": []
         }
+    },
+    "agent_config": {
+        "exec": "run.py",
+        "files": [
+            "run.py"
+        ],
+        "in_memory": true,
+        "type": "python",
+        "interactive": false
     }
 }

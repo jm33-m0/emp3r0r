@@ -1,13 +1,12 @@
 {
     "name": "mimikatz",
-    "exec": "mimikatz.ps1",
-    "type": "powershell",
-    "in_memory": true,
-    "platform": "Windows",
-    "interactive": false,
+    "build": "",
     "author": "jm33-ng",
     "date": "2022-10-23",
     "comment": "Run mimikatz with Invoke-Mimikatz.ps1 (No AV bypass)",
+    "is_plugin": false,
+    "platform": "Windows",
+    "path": "",
     "options": {
         "args": {
             "opt_name": "args",
@@ -15,5 +14,14 @@
             "opt_val": "--",
             "opt_vals": []
         }
+    },
+    "agent_config": {
+        "exec": "mimikatz.ps1",
+        "files": [
+            "mimikatz.ps1"
+        ],
+        "in_memory": true,
+        "type": "powershell",
+        "interactive": false
     }
 }

@@ -1,12 +1,12 @@
 {
     "name": "elvish_win",
-    "exec": "elvish.exe",
-    "type": "exe",
-    "platform": "Windows",
-    "interactive": true,
+    "build": "",
     "author": "jm33-ng",
     "date": "2025-01-06",
     "comment": "Run Elvish cross-platform interactive shell",
+    "is_plugin": false,
+    "platform": "Windows",
+    "path": "",
     "options": {
         "args": {
             "opt_name": "args",
@@ -14,5 +14,14 @@
             "opt_val": "--",
             "opt_vals": []
         }
+    },
+    "agent_config": {
+        "exec": "elvish.exe",
+        "files": [
+            "elvish.exe"
+        ],
+        "in_memory": false,
+        "type": "exe",
+        "interactive": true
     }
 }

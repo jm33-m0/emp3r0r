@@ -1,12 +1,12 @@
 {
     "name": "bettercap",
-    "exec": "bettercap",
-    "type": "elf",
-    "platform": "Linux",
-    "interactive": true,
+    "build": "",
     "author": "jm33-ng",
     "date": "2022-03-09",
     "comment": "Run bettercap as an interactive shell",
+    "is_plugin": false,
+    "platform": "Linux",
+    "path": "",
     "options": {
         "args": {
             "opt_name": "args",
@@ -16,5 +16,14 @@
                 "--"
             ]
         }
+    },
+    "agent_config": {
+        "exec": "bettercap",
+        "files": [
+            "bettercap"
+        ],
+        "in_memory": false,
+        "type": "elf",
+        "interactive": true
     }
 }

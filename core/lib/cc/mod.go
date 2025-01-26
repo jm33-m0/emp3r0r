@@ -165,7 +165,7 @@ func UpdateOptions(modName string) (exist bool) {
 
 			argOpt.Val = option.OptVal
 		}
-		if strings.ToLower(modconfig.Exec) != "built-in" {
+		if strings.ToLower(modconfig.AgentConfig.Exec) != "built-in" {
 			download_addr := addIfNotFound("download_addr")
 			download_addr.Val = ""
 		}
