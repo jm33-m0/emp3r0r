@@ -1,0 +1,21 @@
+{
+  "name": "stager",
+  "exec": "",
+  "build": "make stager_so",
+  "in_memory": false,
+  "type": "elf",
+  "platform": "Linux",
+  "interactive": false,
+  "author": "jm33-ng",
+  "date": "2025-01-23",
+  "comment": "See https://github.com/jm33-m0/go-lpe, it will invoke ./emp3r0r when successful",
+  "options": {
+    "N/A": {
+      "opt_name": "N/A",
+      "opt_desc": "No options required",
+      "opt_val": "",
+      "opt_vals": []
+    }
+  }
+}
+
