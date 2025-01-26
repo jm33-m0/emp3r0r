@@ -64,7 +64,7 @@ type ModuleConfig struct {
 	IsPlugin    bool              `json:"is_plugin"`    // If true, this module is a C2 plugin and doesn't run on agent
 	Platform    string            `json:"platform"`     // targeting which OS? Linux/Windows
 	Path        string            `json:"path"`         // Path to the module, module's root directory
-	Options     ModOptions        `json:"options"`      // module options
+	Options     ModOptions        `json:"options"`      // module options, will be passed as environment variables to the module, either on C2 or agent side
 	AgentConfig AgentModuleConfig `json:"agent_config"` // Configuration for agent side
 }
 
