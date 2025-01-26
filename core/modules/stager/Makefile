@@ -9,6 +9,8 @@ CFLAGS += -DDOWNLOAD_HOST=\"$(DOWNLOAD_HOST)\" -DDOWNLOAD_PORT=\"$(DOWNLOAD_PORT
 
 stager_so:
 	${CC} -DOS_LINUX -DARCH_X86_64 $(SRC) -o stager.so -fPIC -shared -ldl -nostdlib -nodefaultlibs -s
+	@echo "Stager shared object compiled successfully at ${PWD}/stager.so"
 
 stager_so_debug:
 	${CC} -DOS_LINUX -DARCH_X86_64 $(SRC) -o stager.so -pie -fPIC -shared -ldl -nostdlib -nodefaultlibs -g -DDEBUG
+	@echo "Stager shared object (with debug) compiled successfully at ${PWD}/stager.so"
