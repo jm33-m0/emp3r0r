@@ -1,5 +1,5 @@
 #define _GNU_SOURCE
-#include "elf.h"
+#include "elf_loader.h"
 #include <dirent.h>
 #include <dlfcn.h>
 #include <fcntl.h>

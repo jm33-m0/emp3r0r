@@ -1,6 +1,8 @@
 #ifndef _ELF_LOADER_H_
 #define _ELF_LOADER_H_
 
+#if defined(__linux__)
+
 #if defined(NAKED)
 #include <system/syscall.h>
 #else
@@ -80,4 +82,11 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
  */
 int elf_run(void *buf, char **argv, char **env);
 
+/*!
+ * \brief Map the ELF into memory and run it with the provided arguments in a
+ * forked process.
+ */
+char *elf_fork_run(void *buf, char **argv, char **env);
+
 #endif // _ELF_LOADER_H_
+#endif // __linux__

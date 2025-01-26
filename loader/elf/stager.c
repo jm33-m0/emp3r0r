@@ -1,6 +1,6 @@
 #define _GNU_SOURCE
 #include "aes.h"
-#include "elf.h"
+#include "elf_loader.h"
 #include "tinf.h"
 #include <dirent.h>
 #include <dlfcn.h>
