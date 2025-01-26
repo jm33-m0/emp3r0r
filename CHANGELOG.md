@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.51.0](https://github.com/jm33-m0/emp3r0r/compare/v1.50.3...v1.51.0) (2025-01-26)
+
+
+### Features
+
+* improve module config structure ([e5dea79](https://github.com/jm33-m0/emp3r0r/commit/e5dea792a0df6f808349caa63ebca8dd774149c0))
+* include listener in releases ([f96226d](https://github.com/jm33-m0/emp3r0r/commit/f96226d21d4f8c3bbacff2c1dfde95c3323c3787))
+* support C2 plugins and module builder ([8eba6f5](https://github.com/jm33-m0/emp3r0r/commit/8eba6f5291108d0ad0883837de0980fc07506944))
+
+
+### Bug Fixes
+
+* `stager` module should be able to read configurations from env vars ([ce22a03](https://github.com/jm33-m0/emp3r0r/commit/ce22a03682cf40a8aaaf808313ef32184865defe))
+* crash when using local modules ([490f309](https://github.com/jm33-m0/emp3r0r/commit/490f309d6178be4c0676cfb77b915098babc7e5f))
+* make use of `is_local` attribute ([2a80931](https://github.com/jm33-m0/emp3r0r/commit/2a809310863443a037da6cea1d84d8cf93d0b260))
+* module builder ([2751c49](https://github.com/jm33-m0/emp3r0r/commit/2751c499a08ceac6cb96f8f1d85556391e9a713b))
+* module path handling ([0a375c8](https://github.com/jm33-m0/emp3r0r/commit/0a375c8d1e36d5f36003d1e2440a621e957c4d65))
+* no output from `stager` ([51a99ff](https://github.com/jm33-m0/emp3r0r/commit/51a99ff33db81914671e9a0233f3f21d82e08e8c))
+* refactor C code, integrate `stager` into one of the modules ([a53f78c](https://github.com/jm33-m0/emp3r0r/commit/a53f78cd310eb0f1e10b0976d715f76d063f60ad))
+* set env vars for module builder ([ba3a10a](https://github.com/jm33-m0/emp3r0r/commit/ba3a10a84b36a75afed49bc6534732948ffe2434))
+
 ## [1.50.3](https://github.com/jm33-m0/emp3r0r/compare/v1.50.2...v1.50.3) (2025-01-25)
 
 
