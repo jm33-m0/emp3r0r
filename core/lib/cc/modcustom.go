@@ -37,11 +37,12 @@ func moduleCustom() {
 	updateModuleOptions(&config)
 
 	// build module on C2
-	err := build_module(&config)
+	out, err := build_module(&config)
 	if err != nil {
 		CliPrintError("Build module %s: %v", config.Name, err)
 		return
 	}
+	CliPrint("Module output:\n%s", out)
 
 	// if module is a plugin, no need to upload and execute files on target
 	if config.IsLocal {
@@ -72,18 +73,26 @@ func moduleCustom() {
 	handleCompressedModule(config, payload_type, exec_cmd, envStr, download_addr)
 }
 
-func build_module(config *emp3r0r_def.ModuleConfig) error {
-	// build module
-	if config.Build != "" {
-		CliPrintInfo("Building %s...", config.Name)
-		out, err := exec.Command("sh", "-c", config.Build).Output()
-		if err != nil {
-			err = fmt.Errorf("building %s: %s (%v)", config.Name, out, err)
-			return err
-		}
+func build_module(config *emp3r0r_def.ModuleConfig) (out []byte, err error) {
+	if config.Build == "" {
+		return
 	}
 
-	return nil
+	err = os.Chdir(config.Path)
+	if err != nil {
+		return
+	}
+	defer os.Chdir(EmpWorkSpace)
+
+	// build module
+	CliPrintInfo("Building %s...", config.Name)
+	out, err = exec.Command("sh", "-c", config.Build).CombinedOutput()
+	if err != nil {
+		err = fmt.Errorf("%s (%v)", out, err)
+		return
+	}
+
+	return
 }
 
 func updateModuleOptions(config *emp3r0r_def.ModuleConfig) {
@@ -249,13 +258,13 @@ func InitModules() {
 		os.MkdirAll(WWWRoot, 0o700)
 	}
 
-	load_mod := func(mod_dir string) {
+	load_mod := func(mod_search_dir string) {
 		// don't bother if module dir not found
-		if !util.IsExist(mod_dir) {
+		if !util.IsExist(mod_search_dir) {
 			return
 		}
-		CliPrintInfo("Scanning %s for modules", mod_dir)
-		dirs, readdirErr := os.ReadDir(mod_dir)
+		CliPrintInfo("Scanning %s for modules", mod_search_dir)
+		dirs, readdirErr := os.ReadDir(mod_search_dir)
 		if readdirErr != nil {
 			CliPrintError("Failed to scan custom modules: %v", readdirErr)
 			return
@@ -264,7 +273,7 @@ func InitModules() {
 			if !dir.IsDir() {
 				continue
 			}
-			config_file := fmt.Sprintf("%s/%s/config.json", mod_dir, dir.Name())
+			config_file := fmt.Sprintf("%s/%s/config.json", mod_search_dir, dir.Name())
 			if !util.IsExist(config_file) {
 				continue
 			}
@@ -275,7 +284,21 @@ func InitModules() {
 			}
 
 			// module path, eg. ~/.emp3r0r/modules
-			config.Path = mod_dir
+			config.Path = fmt.Sprintf("%s/%s", mod_search_dir, dir.Name())
+			if config.IsLocal {
+				mod_dir := fmt.Sprintf("%s/modules/%s", EmpWorkSpace, dir.Name())
+				err = os.MkdirAll(mod_dir, 0o700)
+				if err != nil {
+					CliPrintWarning("Failed to create %s: %v", mod_dir, err)
+					continue
+				}
+				err = util.Copy(config.Path, mod_dir)
+				if err != nil {
+					CliPrintWarning("Copying %s to %s: %v", config.Path, mod_dir, err)
+					continue
+				}
+				config.Path = mod_dir
+			}
 
 			// add to module helpers
 			ModuleHelpers[config.Name] = moduleCustom
@@ -299,8 +322,8 @@ func InitModules() {
 	}
 
 	// read from every defined module dir
-	for _, mod_dir := range ModuleDirs {
-		load_mod(mod_dir)
+	for _, mod_search_dir := range ModuleDirs {
+		load_mod(mod_search_dir)
 	}
 
 	CliPrintInfo("Loaded %d modules", len(ModuleHelpers))

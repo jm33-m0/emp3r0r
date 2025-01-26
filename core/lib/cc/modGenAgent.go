@@ -159,7 +159,7 @@ func modGenAgent() {
 	}
 	if payload_type == PayloadTypeLinuxExecutable {
 		// tell user to use shared library stager
-		CliPrint("Navigate to `loader/elf` and run `make stager_so` to generate shared library stager, don't forget to modify `stager.c` to fit your needs. You will need another stager to load the shared library.")
+		CliPrint("Use `stager` module to create a shared library that delivers the agent with encryption and compression. You will need another stager to load the shared library.")
 	}
 }
 

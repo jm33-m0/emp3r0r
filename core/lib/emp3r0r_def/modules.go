@@ -63,7 +63,7 @@ type ModuleConfig struct {
 	Comment     string            `json:"comment"`      // describe your module in one line
 	IsLocal     bool              `json:"is_local"`     // If true, this module is a C2 plugin and doesn't run on agent, use `Build` to specify the command to run
 	Platform    string            `json:"platform"`     // targeting which OS? Linux/Windows
-	Path        string            `json:"path"`         // Path to the module, module's root directory
+	Path        string            `json:"path"`         // Path to the module directory
 	Options     ModOptions        `json:"options"`      // module options, will be passed as environment variables to the module, either on C2 or agent side
 	AgentConfig AgentModuleConfig `json:"agent_config"` // Configuration for agent side
 }

@@ -182,8 +182,20 @@ func IsStrInFile(text, filepath string) bool {
 	return false
 }
 
-// Copy copy file from src to dst
+// Copy copy file or directory from src to dst
 func Copy(src, dst string) error {
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	if srcInfo.IsDir() {
+		return copyDir(src, dst)
+	}
+	return copyFile(src, dst)
+}
+
+func copyFile(src, dst string) error {
 	in, err := os.ReadFile(src)
 	if err != nil {
 		return err
@@ -193,7 +205,7 @@ func Copy(src, dst string) error {
 	f, err := os.Stat(dst)
 	if err == nil {
 		if f.IsDir() {
-			dst = fmt.Sprintf("%s/%s", dst, FileBaseName(src))
+			dst = filepath.Join(dst, filepath.Base(src))
 		}
 	}
 
@@ -206,6 +218,27 @@ func Copy(src, dst string) error {
 	}
 
 	return os.WriteFile(dst, in, 0o755)
+}
+
+func copyDir(src, dst string) error {
+	return filepath.WalkDir(src, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		relPath, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+
+		targetPath := filepath.Join(dst, relPath)
+
+		if d.IsDir() {
+			return os.MkdirAll(targetPath, d.Type().Perm())
+		}
+
+		return copyFile(path, targetPath)
+	})
 }
 
 // FileBaseName extracts the base name of the file from a given path.
