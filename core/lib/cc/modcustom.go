@@ -44,7 +44,7 @@ func moduleCustom() {
 	}
 
 	// if module is a plugin, no need to upload and execute files on target
-	if config.IsPlugin {
+	if config.IsLocal {
 		CliPrint("%s will run as a plugin on C2, no files will be executed on target", config.Name)
 		return
 	}
@@ -247,14 +247,6 @@ func ModuleDetails(modName string) {
 func InitModules() {
 	if !util.IsExist(WWWRoot) {
 		os.MkdirAll(WWWRoot, 0o700)
-	}
-
-	// get vaccine ready
-	if !util.IsExist(UtilsArchive) {
-		err = CreateVaccineArchive()
-		if err != nil {
-			CliPrintWarning("CreateVaccineArchive: %v", err)
-		}
 	}
 
 	load_mod := func(mod_dir string) {

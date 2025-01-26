@@ -1,27 +1,26 @@
 {
-    "name": "elvish_win",
-    "build": "",
-    "author": "jm33-ng",
-    "date": "2025-01-06",
-    "comment": "Run Elvish cross-platform interactive shell",
-    "is_plugin": false,
-    "platform": "Windows",
-    "path": "",
-    "options": {
-        "args": {
-            "opt_name": "args",
-            "opt_desc": "run elvish with this commandline arg",
-            "opt_val": "--",
-            "opt_vals": []
-        }
-    },
-    "agent_config": {
-        "exec": "elvish.exe",
-        "files": [
-            "elvish.exe"
-        ],
-        "in_memory": false,
-        "type": "exe",
-        "interactive": true
+  "name": "elvish_win",
+  "build": "",
+  "author": "jm33-ng",
+  "date": "2025-01-06",
+  "comment": "Run Elvish cross-platform interactive shell",
+  "is_local": false,
+  "platform": "Windows",
+  "path": "",
+  "options": {
+    "args": {
+      "opt_name": "args",
+      "opt_desc": "run elvish with this commandline arg",
+      "opt_val": "--",
+      "opt_vals": []
     }
+  },
+  "agent_config": {
+    "exec": "elvish.exe",
+    "files": ["elvish.exe"],
+    "in_memory": false,
+    "type": "exe",
+    "interactive": true
+  }
 }
+

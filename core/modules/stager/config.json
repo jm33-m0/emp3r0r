@@ -4,7 +4,7 @@
   "author": "jm33-ng",
   "date": "2025-01-26",
   "comment": "A Linux stager that supports payload delivery via HTTP with encryption and compression. Use with emp3r0r-listener",
-  "is_plugin": true,
+  "is_local": true,
   "platform": "Linux",
   "path": "",
   "options": {
@@ -41,3 +41,4 @@
     "interactive": false
   }
 }
+

@@ -1,27 +1,26 @@
 {
-    "name": "go_lpe",
-    "build": "",
-    "author": "jm33-ng",
-    "date": "2025-01-23",
-    "comment": "See https://github.com/jm33-m0/go-lpe, it will invoke ./emp3r0r when successful",
-    "is_plugin": false,
-    "platform": "Linux",
-    "path": "",
-    "options": {
-        "N/A": {
-            "opt_name": "N/A",
-            "opt_desc": "No options required",
-            "opt_val": "",
-            "opt_vals": []
-        }
-    },
-    "agent_config": {
-        "exec": "go_lpe",
-        "files": [
-            "go_lpe"
-        ],
-        "in_memory": true,
-        "type": "elf",
-        "interactive": false
+  "name": "go_lpe",
+  "build": "",
+  "author": "jm33-ng",
+  "date": "2025-01-23",
+  "comment": "See https://github.com/jm33-m0/go-lpe, it will invoke ./emp3r0r when successful",
+  "is_local": false,
+  "platform": "Linux",
+  "path": "",
+  "options": {
+    "N/A": {
+      "opt_name": "N/A",
+      "opt_desc": "No options required",
+      "opt_val": "",
+      "opt_vals": []
     }
+  },
+  "agent_config": {
+    "exec": "go_lpe",
+    "files": ["go_lpe"],
+    "in_memory": true,
+    "type": "elf",
+    "interactive": false
+  }
 }
+

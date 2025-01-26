@@ -190,6 +190,7 @@ func ModuleRun() {
 		}
 	}
 
+	// broadcast to all targets?
 	if CurrentMod == emp3r0r_def.ModCMD_EXEC {
 		if !CliYesNo("Run on all targets") {
 			CliPrintError("Target not specified")
@@ -198,19 +199,20 @@ func ModuleRun() {
 		go ModuleHelpers[emp3r0r_def.ModCMD_EXEC]()
 		return
 	}
-	if CurrentMod == emp3r0r_def.ModGenAgent {
-		go ModuleHelpers[emp3r0r_def.ModGenAgent]()
-		return
-	}
-	if CurrentTarget == nil {
+
+	// is a target needed?
+	if CurrentTarget == nil && !modObj.IsLocal {
 		CliPrintError("Target not specified")
 		return
 	}
+
+	// check if target exists
 	if Targets[CurrentTarget] == nil {
 		CliPrintError("Target (%s) does not exist", CurrentTarget.Tag)
 		return
 	}
 
+	// run module
 	mod := ModuleHelpers[CurrentMod]
 	if mod != nil {
 		go mod()

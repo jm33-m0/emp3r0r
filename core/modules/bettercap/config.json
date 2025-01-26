@@ -1,29 +1,26 @@
 {
-    "name": "bettercap",
-    "build": "",
-    "author": "jm33-ng",
-    "date": "2022-03-09",
-    "comment": "Run bettercap as an interactive shell",
-    "is_plugin": false,
-    "platform": "Linux",
-    "path": "",
-    "options": {
-        "args": {
-            "opt_name": "args",
-            "opt_desc": "run bettercap with this commandline arg",
-            "opt_val": "",
-            "opt_vals": [
-                "--"
-            ]
-        }
-    },
-    "agent_config": {
-        "exec": "bettercap",
-        "files": [
-            "bettercap"
-        ],
-        "in_memory": false,
-        "type": "elf",
-        "interactive": true
+  "name": "bettercap",
+  "build": "",
+  "author": "jm33-ng",
+  "date": "2022-03-09",
+  "comment": "Run bettercap as an interactive shell",
+  "is_local": false,
+  "platform": "Linux",
+  "path": "",
+  "options": {
+    "args": {
+      "opt_name": "args",
+      "opt_desc": "run bettercap with this commandline arg",
+      "opt_val": "",
+      "opt_vals": ["--"]
     }
+  },
+  "agent_config": {
+    "exec": "bettercap",
+    "files": ["bettercap"],
+    "in_memory": false,
+    "type": "elf",
+    "interactive": true
+  }
 }
+

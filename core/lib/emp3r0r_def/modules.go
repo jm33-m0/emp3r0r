@@ -61,7 +61,7 @@ type ModuleConfig struct {
 	Author      string            `json:"author"`       // by whom
 	Date        string            `json:"date"`         // when did you write it
 	Comment     string            `json:"comment"`      // describe your module in one line
-	IsPlugin    bool              `json:"is_plugin"`    // If true, this module is a C2 plugin and doesn't run on agent, use `Build` to specify the command to run
+	IsLocal     bool              `json:"is_local"`     // If true, this module is a C2 plugin and doesn't run on agent, use `Build` to specify the command to run
 	Platform    string            `json:"platform"`     // targeting which OS? Linux/Windows
 	Path        string            `json:"path"`         // Path to the module, module's root directory
 	Options     ModOptions        `json:"options"`      // module options, will be passed as environment variables to the module, either on C2 or agent side
@@ -76,7 +76,7 @@ var Modules = map[string]*ModuleConfig{
 		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Install tools to RuntimeConfig.UtilsPath, for lateral movement",
-		IsPlugin: false,
+		IsLocal:  false,
 		Platform: "Linux",
 		Path:     "",
 		Options: ModOptions{
@@ -100,7 +100,7 @@ var Modules = map[string]*ModuleConfig{
 		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Build agent for different OS/arch with customized options",
-		IsPlugin: false,
+		IsLocal:  true,
 		Platform: "Generic",
 		Path:     "",
 		Options: ModOptions{
@@ -175,7 +175,7 @@ var Modules = map[string]*ModuleConfig{
 		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Run a single command on one or more targets",
-		IsPlugin: false,
+		IsLocal:  false,
 		Platform: "Generic",
 		Path:     "",
 		Options: ModOptions{
@@ -204,7 +204,7 @@ var Modules = map[string]*ModuleConfig{
 		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Delete lines containing keyword from xtmp logs",
-		IsPlugin: false,
+		IsLocal:  false,
 		Platform: "Linux",
 		Path:     "",
 		Options: ModOptions{
@@ -229,7 +229,7 @@ var Modules = map[string]*ModuleConfig{
 		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Run linux-smart-enumeration or linux exploit suggester",
-		IsPlugin: false,
+		IsLocal:  false,
 		Platform: "Generic",
 		Path:     "",
 		Options: ModOptions{
@@ -254,7 +254,7 @@ var Modules = map[string]*ModuleConfig{
 		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Get persistence via built-in methods",
-		IsPlugin: false,
+		IsLocal:  false,
 		Platform: "Linux",
 		Path:     "",
 		Options: ModOptions{
@@ -279,7 +279,7 @@ var Modules = map[string]*ModuleConfig{
 		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Start a socks proxy on target host",
-		IsPlugin: false,
+		IsLocal:  false,
 		Platform: "Generic",
 		Path:     "",
 		Options: ModOptions{
@@ -310,7 +310,7 @@ var Modules = map[string]*ModuleConfig{
 		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Port mapping from agent to CC",
-		IsPlugin: false,
+		IsLocal:  false,
 		Platform: "Generic",
 		Path:     "",
 		Options: ModOptions{
@@ -351,7 +351,7 @@ var Modules = map[string]*ModuleConfig{
 		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Bring your own shell program to run on target",
-		IsPlugin: false,
+		IsLocal:  false,
 		Platform: "Generic",
 		Path:     "",
 		Options: ModOptions{
@@ -392,7 +392,7 @@ var Modules = map[string]*ModuleConfig{
 		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Inject shellcode/loader.so into a running process",
-		IsPlugin: false,
+		IsLocal:  false,
 		Platform: "Linux",
 		Path:     "",
 		Options: ModOptions{
@@ -423,7 +423,7 @@ var Modules = map[string]*ModuleConfig{
 		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Bring arbitrary agent to CC",
-		IsPlugin: false,
+		IsLocal:  false,
 		Platform: "Generic",
 		Path:     "",
 		Options: ModOptions{
@@ -454,7 +454,7 @@ var Modules = map[string]*ModuleConfig{
 		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Start a listener to serve stagers or regular files",
-		IsPlugin: false,
+		IsLocal:  false,
 		Platform: "Generic",
 		Path:     "",
 		Options: ModOptions{
@@ -485,7 +485,7 @@ var Modules = map[string]*ModuleConfig{
 		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Harvest clear-text password automatically from OpenSSH server process",
-		IsPlugin: false,
+		IsLocal:  false,
 		Platform: "Linux",
 		Path:     "",
 		Options:  ModOptions{},
@@ -503,7 +503,7 @@ var Modules = map[string]*ModuleConfig{
 		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Start a secure file server on target host for data exfiltration and module file caching",
-		IsPlugin: false,
+		IsLocal:  false,
 		Platform: "Generic",
 		Path:     "",
 		Options: ModOptions{
@@ -532,7 +532,7 @@ var Modules = map[string]*ModuleConfig{
 		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Download and decrypt a file from other agents, run `file_server` first",
-		IsPlugin: false,
+		IsLocal:  false,
 		Platform: "Generic",
 		Path:     "",
 		Options: ModOptions{
@@ -566,7 +566,7 @@ var Modules = map[string]*ModuleConfig{
 		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Dump memory regions of a process",
-		IsPlugin: false,
+		IsLocal:  false,
 		Platform: "Generic",
 		Path:     "",
 		Options: ModOptions{
