@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.51.1](https://github.com/jm33-m0/emp3r0r/compare/v1.51.0...v1.51.1) (2025-01-26)
+
+
+### Bug Fixes
+
+* `vaccine` installation fails: `patchelf` not found ([315ec2b](https://github.com/jm33-m0/emp3r0r/commit/315ec2b38ba9f085ec1803989e6d79d966f315f7))
+
 ## [1.51.0](https://github.com/jm33-m0/emp3r0r/compare/v1.50.3...v1.51.0) (2025-01-26)
 
 
