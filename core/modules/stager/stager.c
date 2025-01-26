@@ -17,10 +17,18 @@
 #include <unistd.h>
 
 /* Configurable Options */
+#ifndef DOWNLOAD_HOST
 #define DOWNLOAD_HOST ""
+#endif /* ifndef MACRO */
+#ifndef DOWNLOAD_PORT
 #define DOWNLOAD_PORT ""
+#endif /* ifndef MACRO */
+#ifndef DOWNLOAD_PATH
 #define DOWNLOAD_PATH ""
+#endif /* ifndef MACRO */
+#ifndef DOWNLOAD_KEY
 #define DOWNLOAD_KEY ""
+#endif /* ifndef MACRO */
 
 #define BUFFER_SIZE 1024
 

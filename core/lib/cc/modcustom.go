@@ -84,6 +84,14 @@ func build_module(config *emp3r0r_def.ModuleConfig) (out []byte, err error) {
 	}
 	defer os.Chdir(EmpWorkSpace)
 
+	for _, opt := range CurrentModuleOptions {
+		if opt == nil {
+			continue
+		}
+		// Environment variables need to be in uppercase
+		os.Setenv(opt.Name, opt.Val)
+	}
+
 	// build module
 	CliPrintInfo("Building %s...", config.Name)
 	out, err = exec.Command("sh", "-c", config.Build).CombinedOutput()

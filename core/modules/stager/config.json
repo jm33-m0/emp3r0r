@@ -8,26 +8,26 @@
   "platform": "Linux",
   "path": "",
   "options": {
-    "download_host": {
-      "opt_name": "download_host",
+    "DOWNLOAD_HOST": {
+      "opt_name": "DOWNLOAD_HOST",
       "opt_desc": "The host to download the payload from, eg. 192.168.0.1",
       "opt_val": "",
       "opt_vals": []
     },
-    "download_port": {
-      "opt_name": "download_port",
+    "DOWNLOAD_PORT": {
+      "opt_name": "DOWNLOAD_PORT",
       "opt_desc": "The port to download the payload from, eg. 80",
       "opt_val": "8000",
       "opt_vals": []
     },
-    "download_path": {
-      "opt_name": "download_path",
+    "DOWNLOAD_PATH": {
+      "opt_name": "DOWNLOAD_PATH",
       "opt_desc": "The path to download the payload from, eg. /payload",
       "opt_val": "/",
       "opt_vals": []
     },
-    "download_key": {
-      "opt_name": "download_key",
+    "DOWNLOAD_KEY": {
+      "opt_name": "DOWNLOAD_KEY",
       "opt_desc": "The key to decrypt the payload",
       "opt_val": "",
       "opt_vals": []
@@ -41,4 +41,3 @@
     "interactive": false
   }
 }
-
