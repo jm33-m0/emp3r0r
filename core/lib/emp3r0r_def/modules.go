@@ -57,11 +57,11 @@ type AgentModuleConfig struct {
 // ModuleConfig stores the complete module config data
 type ModuleConfig struct {
 	Name        string            `json:"name"`         // Display as this name
-	Build       string            `json:"build"`        // Command to build this module on C2 before sending it to agents
+	Build       string            `json:"build"`        // Command to run on C2, you can use it to build module
 	Author      string            `json:"author"`       // by whom
 	Date        string            `json:"date"`         // when did you write it
 	Comment     string            `json:"comment"`      // describe your module in one line
-	IsPlugin    bool              `json:"is_plugin"`    // If true, this module is a C2 plugin and doesn't run on agent
+	IsPlugin    bool              `json:"is_plugin"`    // If true, this module is a C2 plugin and doesn't run on agent, use `Build` to specify the command to run
 	Platform    string            `json:"platform"`     // targeting which OS? Linux/Windows
 	Path        string            `json:"path"`         // Path to the module, module's root directory
 	Options     ModOptions        `json:"options"`      // module options, will be passed as environment variables to the module, either on C2 or agent side

