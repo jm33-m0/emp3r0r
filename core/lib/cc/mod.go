@@ -207,7 +207,7 @@ func ModuleRun() {
 	}
 
 	// check if target exists
-	if Targets[CurrentTarget] == nil {
+	if Targets[CurrentTarget] == nil && CurrentTarget != nil {
 		CliPrintError("Target (%s) does not exist", CurrentTarget.Tag)
 		return
 	}
