@@ -178,7 +178,7 @@ func TmuxWindowSize() (x, y int) {
 	tmux_display := func(msg string) (res int) {
 		out_str := strings.TrimSpace(TmuxDisplay(msg))
 		out_str = strings.ReplaceAll(out_str, "'", "") // we get '123' so we have to remove the quotes
-		res, err = strconv.Atoi(out_str)
+		res, err := strconv.Atoi(out_str)
 		if err != nil {
 			CliPrintDebug("Unable to get %s (%s): %v", msg, out_str, err)
 			return -1 // returns -1 if fail to parse as int
@@ -254,7 +254,7 @@ func (pane *Emp3r0rPane) Printf(clear bool, format string, a ...interface{}) {
 	id := pane.ID
 	if !pane.Alive {
 		CliPrintWarning("Tmux window %s (%s) is dead/gone, respawning...", id, pane.Title)
-		err = pane.Respawn()
+		err := pane.Respawn()
 		if err == nil {
 			pane.Printf(clear, format, a...)
 		} else {

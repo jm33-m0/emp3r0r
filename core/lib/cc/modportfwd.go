@@ -112,7 +112,7 @@ func moduleProxy() {
 	case "on":
 		// tell agent to start local socks5 proxy
 		cmd_id := uuid.NewString()
-		err = SendCmdToCurrentTarget("!proxy --mode on --addr 0.0.0.0:"+RuntimeConfig.Emp3r0rProxyServerPort, cmd_id)
+		err := SendCmdToCurrentTarget("!proxy --mode on --addr 0.0.0.0:"+RuntimeConfig.Emp3r0rProxyServerPort, cmd_id)
 		if err != nil {
 			CliPrintError("Starting SOCKS5 proxy on target failed: %v", err)
 			return

@@ -490,8 +490,8 @@ func Send2Agent(data *emp3r0r_def.MsgTunData, agent *emp3r0r_def.Emp3r0rAgent) (
 	return
 }
 
-// InitConfig set workspace, module directories, etc
-func InitConfig() (err error) {
+// InitC2 set workspace, module directories, etc
+func InitC2() (err error) {
 	// prefix
 	Prefix = os.Getenv("EMP3R0R_PREFIX")
 	if Prefix == "" {
@@ -523,6 +523,7 @@ func InitConfig() (err error) {
 			return fmt.Errorf("mkdir %s: %v", EmpWorkSpace, err)
 		}
 	}
+	ConsoleLogFile = EmpWorkSpace + "/emp3r0r.log"
 
 	// prefixes for stubs
 	emp3r0r_def.Stub_Linux = EmpWorkSpace + "/stub"
@@ -556,7 +557,7 @@ func InitConfig() (err error) {
 	ServerKeyFile = EmpWorkSpace + "/emp3r0r-key.pem"
 
 	// log files
-	CommandOuputLogs = fmt.Sprintf("%s/agents-output-%s.log", EmpWorkSpace, GetDateTime())
+	AgentOuputLogFile = fmt.Sprintf("%s/agent_output.log", EmpWorkSpace)
 
 	return
 }

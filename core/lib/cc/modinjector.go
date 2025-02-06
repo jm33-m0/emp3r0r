@@ -47,7 +47,7 @@ func moduleInjector() {
 	cmd := fmt.Sprintf("%s --method %s --pid %s --checksum %s", emp3r0r_def.C2CmdInject, method, pid, checksum)
 
 	// tell agent to inject
-	err = SendCmd(cmd, "", target)
+	err := SendCmd(cmd, "", target)
 	if err != nil {
 		CliPrintError("Could not send command (%s) to agent: %v", cmd, err)
 		return

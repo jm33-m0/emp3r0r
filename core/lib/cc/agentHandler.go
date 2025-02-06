@@ -204,7 +204,7 @@ func processAgentData(data *emp3r0r_def.MsgTunData) {
 		color.HiMagentaString(cmd),
 		color.HiWhiteString(out))
 	AgentOutputPane.Printf(false, "%s", agent_output)
-	logf, err := os.OpenFile(CommandOuputLogs, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	logf, err := os.OpenFile(AgentOuputLogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		CliPrintError("Failed to open agent log file: %v", err)
 		return

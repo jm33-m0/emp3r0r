@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	cowsay "github.com/Code-Hex/Neo-cowsay/v2"
@@ -34,15 +35,13 @@ const (
 
 var (
 	// Store agents' output
-	CommandOuputLogs = ""
+	AgentOuputLogFile = ""
+
+	// ConsoleLogFile : log to console
+	ConsoleLogFile = ""
 
 	// Emp3r0rConsole: the main console interface
 	Emp3r0rConsole = console.New(AppName)
-
-	// EmpPrompt : the prompt string
-	EmpPrompt = color.HiCyanString(AppName + " > ")
-
-	err error
 )
 
 // CliMain launches the commandline UI
@@ -53,12 +52,13 @@ func CliMain() {
 	go InitModules()
 
 	// unlock incomplete downloads
-	err = UnlockDownloads()
+	err := UnlockDownloads()
 	if err != nil {
 		CliPrintDebug("UnlockDownloads: %v", err)
 	}
 	mainMenu := Emp3r0rConsole.NewMenu("")
 	Emp3r0rConsole.SetPrintLogo(CliBanner)
+	go goRoutineLogHelper(Emp3r0rConsole)
 
 	// History
 	histFile := fmt.Sprintf("%s/%s.history", AppName, EmpWorkSpace)
@@ -114,7 +114,7 @@ func SetDynamicPrompt() string {
 			prompt_arrow = color.New(color.Bold, color.FgHiGreen).Sprint("\n# ")
 			prompt_name = color.New(color.Bold, color.FgBlack, color.BgHiGreen).Sprint(AppName)
 		}
-		transport = getTransportString(CurrentTarget.Transport)
+		transport = getTransport(CurrentTarget.Transport)
 	}
 	if CurrentMod == "<blank>" {
 		CurrentMod = "none" // if no module is selected
@@ -131,7 +131,7 @@ func SetDynamicPrompt() string {
 	return dynamicPrompt
 }
 
-func getTransportString(transportStr string) string {
+func getTransport(transportStr string) string {
 	transportStr = strings.ToLower(transportStr)
 	switch {
 	case strings.Contains(transportStr, "http2"):
@@ -156,28 +156,28 @@ func getTransportString(transportStr string) string {
 	}
 }
 
-func cliPrintHelper(format string, a []interface{}, msgColor *color.Color, logPrefix string, alert bool) {
+func cliPrintHelper(format string, a []interface{}, msgColor *color.Color, _ string, _ bool) {
 	logMsg := msgColor.Sprintf(format, a...)
-	if alert {
-		Emp3r0rConsole.Printf("%s\n", logMsg)
-	} else {
-		Emp3r0rConsole.TransientPrintf("%s\n", logMsg)
-	}
+	AsyncLogMutex.Lock()
+	defer AsyncLogMutex.Unlock()
+	AsyncLogChan <- logMsg
+}
 
-	if IsAPIEnabled {
-		var resp APIResponse
-		msg := GetDateTime() + " " + logPrefix + ": " + fmt.Sprintf(format, a...)
-		resp.MsgData = []byte(msg)
-		resp.Alert = alert
-		resp.MsgType = LOG
-		data, jsonMarshalErr := json.Marshal(resp)
-		if jsonMarshalErr != nil {
-			Emp3r0rConsole.Printf("cliPrintHelper: %v\n", jsonMarshalErr)
-			return
-		}
-		_, jsonMarshalErr = APIConn.Write([]byte(data))
-		if jsonMarshalErr != nil {
-			Emp3r0rConsole.Printf("cliPrintHelper: %v\n", jsonMarshalErr)
+var (
+	AsyncLogChan  = make(chan string, 100)
+	AsyncLogMutex = new(sync.Mutex)
+)
+
+func goRoutineLogHelper(console *console.Console) {
+	for {
+		AsyncLogMutex.Lock()
+		logMsg := <-AsyncLogChan
+		AsyncLogMutex.Unlock()
+		console.TransientPrintf("%s\n", logMsg)
+		// log to file
+		logf, err := os.OpenFile(ConsoleLogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err == nil {
+			fmt.Fprintf(logf, "%s\n", logMsg)
 		}
 	}
 }

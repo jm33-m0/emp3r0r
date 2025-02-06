@@ -54,7 +54,7 @@ func init_magic_agent_one_time_bytes() {
 func main() {
 	// set up dirs and default varaibles
 	// including config file location
-	err := cc.InitConfig()
+	err := cc.InitC2()
 	if err != nil {
 		cc.CliFatalError("DirSetup: %v", err)
 	}

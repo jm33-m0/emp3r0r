@@ -162,7 +162,7 @@ func UpdateOptions(modName string) (exist bool) {
 }
 
 // ModuleRun run current module
-func ModuleRun(cmd *cobra.Command, args []string) {
+func ModuleRun(_ *cobra.Command, _ []string) {
 	modObj := emp3r0r_def.Modules[CurrentMod]
 	if modObj == nil {
 		CliPrintError("ModuleRun: module %s not found", strconv.Quote(CurrentMod))
