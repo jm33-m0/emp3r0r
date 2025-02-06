@@ -187,15 +187,6 @@ func assignTargetIndex() (index int) {
 	return available_indexes[0]
 }
 
-// TermClear clear screen
-func TermClear() {
-	os.Stdout.WriteString(ClearTerm)
-	err := CliBanner()
-	if err != nil {
-		CliPrintError("%v", err)
-	}
-}
-
 // GetDateTime get current date and time, for logging
 func GetDateTime() (datetime string) {
 	now := time.Now()

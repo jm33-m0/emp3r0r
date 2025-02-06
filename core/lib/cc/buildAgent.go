@@ -13,9 +13,10 @@ import (
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
+	"github.com/spf13/cobra"
 )
 
-func UpgradeAgent() {
+func UpgradeAgent(cmd *cobra.Command, args []string) {
 	if !util.IsExist(WWWRoot + "agent") {
 		CliPrintError("%s/agent not found, build one with `use gen_agent` first", WWWRoot)
 		return

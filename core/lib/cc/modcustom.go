@@ -271,7 +271,7 @@ func InitModules() {
 		if !util.IsExist(mod_search_dir) {
 			return
 		}
-		CliPrintInfo("Scanning %s for modules", mod_search_dir)
+		CliPrintDebug("Scanning %s for modules", mod_search_dir)
 		dirs, readdirErr := os.ReadDir(mod_search_dir)
 		if readdirErr != nil {
 			CliPrintError("Failed to scan custom modules: %v", readdirErr)
@@ -320,7 +320,7 @@ func InitModules() {
 				continue
 			}
 			ModuleConfigs[config.Name] = *config
-			CliPrintInfo("Loaded module %s", strconv.Quote(config.Name))
+			CliPrintDebug("Loaded module %s", strconv.Quote(config.Name))
 		}
 
 		// make []string for fuzzysearch
@@ -334,7 +334,7 @@ func InitModules() {
 		load_mod(mod_search_dir)
 	}
 
-	CliPrintInfo("Loaded %d modules", len(ModuleHelpers))
+	CliPrintDebug("Loaded %d modules", len(ModuleHelpers))
 }
 
 // readModCondig read config.json of a module

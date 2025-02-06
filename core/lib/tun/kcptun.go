@@ -620,7 +620,6 @@ func KCPTunServer(target, kcp_server_port, password, salt string, ctx context.Co
 		}
 
 		// udp stack
-		LogInfo("KCP Server listening on: %v/udp, forwarding to %s", listenAddr, target)
 		lis, err := kcp.ListenWithOptions(listenAddr, block, config.DataShard, config.ParityShard)
 		if err := checkError(err); err != nil {
 			return err

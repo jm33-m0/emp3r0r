@@ -78,9 +78,9 @@ func processCCData(data *emp3r0r_def.MsgTunData) {
 			break
 		}
 	case "kill":
-		// Usage: kill --dst <pid>...
+		// Usage: kill --pid <pid>...
 		// Kills the specified processes.
-		out, err = shellKill(cmdSlice[2:]) // skip "kill" and "--dst"
+		out, err = shellKill(cmdSlice[2:]) // skip "kill" and "--pid"
 		if err != nil {
 			out = fmt.Sprintf("Failed to kill: %v", err)
 			break

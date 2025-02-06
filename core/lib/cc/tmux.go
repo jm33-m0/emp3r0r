@@ -107,7 +107,7 @@ func TmuxInitWindows() (err error) {
 		err = fmt.Errorf("PWD=%s, check if %s exists. If not, build it", pwd, cat)
 		return
 	}
-	CliPrintInfo("Using %s", cat)
+	CliPrintDebug("Using %s", cat)
 
 	new_pane := func(
 		title,

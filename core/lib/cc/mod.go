@@ -11,6 +11,7 @@ import (
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/lithammer/fuzzysearch/fuzzy"
+	"github.com/spf13/cobra"
 )
 
 // CurrentOption all necessary info of an option
@@ -36,7 +37,6 @@ var (
 	// ShellHelpInfo provide utilities like ps, kill, etc
 	// deprecated
 	ShellHelpInfo = map[string]string{
-		HELP:    "Display this help",
 		"#ps":   "List processes: `ps`",
 		"#kill": "Kill process: `kill <PID>`",
 		"#net":  "Show network info",
@@ -66,22 +66,9 @@ var (
 )
 
 // SetOption set an option to value, `set` command
-func SetOption(args []string) {
-	opt := args[0]
-	if _, exist := CurrentModuleOptions[opt]; !exist {
-		CliPrintError("No such option: %s", strconv.Quote(opt))
-		return
-	}
-	if len(args) < 2 {
-		// clear value
-		CurrentModuleOptions[opt].Val = ""
-		return
-	}
-
-	val := args[1:] // in case val contains spaces
-
+func SetOption(opt, val string) {
 	// set
-	CurrentModuleOptions[opt].Val = strings.Join(val, " ")
+	CurrentModuleOptions[opt].Val = val
 }
 
 // UpdateOptions reads options from modules config, and set default values
@@ -175,7 +162,7 @@ func UpdateOptions(modName string) (exist bool) {
 }
 
 // ModuleRun run current module
-func ModuleRun() {
+func ModuleRun(cmd *cobra.Command, args []string) {
 	modObj := emp3r0r_def.Modules[CurrentMod]
 	if modObj == nil {
 		CliPrintError("ModuleRun: module %s not found", strconv.Quote(CurrentMod))
@@ -188,16 +175,6 @@ func ModuleRun() {
 			CliPrintError("ModuleRun: module %s does not support %s", strconv.Quote(CurrentMod), target_os)
 			return
 		}
-	}
-
-	// broadcast to all targets?
-	if CurrentMod == emp3r0r_def.ModCMD_EXEC {
-		if !CliYesNo("Run on all targets") {
-			CliPrintError("Target not specified")
-			return
-		}
-		go ModuleHelpers[emp3r0r_def.ModCMD_EXEC]()
-		return
 	}
 
 	// is a target needed?
@@ -245,18 +222,21 @@ func SelectCurrentTarget() (target *emp3r0r_def.Emp3r0rAgent) {
 }
 
 // search modules, powered by fuzzysearch
-func ModuleSearch(cmd string) {
-	cmdSplit := strings.Fields(cmd)
-	if len(cmdSplit) < 2 {
-		CliPrintError("search <module keywords>")
+func ModuleSearch(cmd *cobra.Command, args []string) {
+	keyword, err := cmd.Flags().GetString("keyword")
+	if err != nil {
+		CliPrintError("ModuleSearch: %v", err)
 		return
 	}
-	query := strings.Join(cmdSplit[1:], " ")
+	if keyword == "" {
+		CliPrintError("ModuleSearch: no keyword provided")
+		return
+	}
 	search_targets := new([]string)
 	for name, comment := range ModuleNames {
 		*search_targets = append(*search_targets, fmt.Sprintf("%s: %s", name, comment))
 	}
-	result := fuzzy.Find(query, *search_targets)
+	result := fuzzy.Find(keyword, *search_targets)
 
 	// render results
 	search_results := make(map[string]string)

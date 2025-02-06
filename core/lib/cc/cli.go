@@ -6,7 +6,6 @@ package cc
 import (
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -17,7 +16,7 @@ import (
 	"time"
 
 	cowsay "github.com/Code-Hex/Neo-cowsay/v2"
-	"github.com/bettercap/readline"
+	"github.com/alecthomas/chroma/quick"
 	"github.com/fatih/color"
 	"github.com/google/uuid"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
@@ -25,217 +24,95 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/olekukonko/tablewriter"
+	"github.com/reeflective/console"
+	"github.com/spf13/cobra"
 )
 
 const (
-	PromptName = "emp3r0r"
-	ClearTerm  = "\033[2J"
+	AppName = "emp3r0r"
 )
 
 var (
 	// Store agents' output
 	CommandOuputLogs = ""
 
-	// CliCompleter holds all command completions
-	CliCompleter = readline.NewPrefixCompleter()
-
-	// CmdCompls completions for readline
-	CmdCompls []readline.PrefixCompleterInterface
-
-	// InitCmdCompls initial completions for readline, so we can roll back
-	InitCmdCompls []readline.PrefixCompleterInterface
-
-	// CLICommands holds all commands
-	CLICommands []string
-
-	// EmpReadLine : our commandline
-	EmpReadLine *readline.Instance
+	// Emp3r0rConsole: the main console interface
+	Emp3r0rConsole = console.New(AppName)
 
 	// EmpPrompt : the prompt string
-	EmpPrompt = color.HiCyanString(PromptName + " > ")
+	EmpPrompt = color.HiCyanString(AppName + " > ")
 
 	err error
 )
 
-func init_completion() {
-	// completer
-	// skip commands that require arguments
-	for cmd_name, cmd := range CommandMap {
-		CLICommands = append(CLICommands, cmd_name)
-		if cmd.HasArg {
-			CliPrintDebug("Skipping %s", strconv.Quote(cmd_name))
-			continue
-		}
-		CmdCompls = append(CmdCompls, readline.PcItem(cmd_name))
-	}
-
-	subcmds_completion := []readline.PrefixCompleterInterface{
-		readline.PcItem("rm",
-			readline.PcItemDynamic(listRemoteDir())),
-
-		readline.PcItem("mv",
-			readline.PcItemDynamic(listRemoteDir())),
-
-		readline.PcItem("mkdir",
-			readline.PcItemDynamic(listRemoteDir())),
-
-		readline.PcItem("ls",
-			readline.PcItemDynamic(listRemoteDir())),
-
-		readline.PcItem("cp",
-			readline.PcItemDynamic(listRemoteDir())),
-
-		readline.PcItem("cd",
-			readline.PcItemDynamic(listRemoteDir())),
-
-		readline.PcItem("get",
-			readline.PcItemDynamic(listRemoteDir())),
-
-		readline.PcItem("put",
-			readline.PcItemDynamic(listLocalFiles("./"))),
-
-		readline.PcItem(HELP,
-			readline.PcItemDynamic(listMods())),
-
-		readline.PcItem("use",
-			readline.PcItemDynamic(listMods())),
-
-		readline.PcItem("target",
-			readline.PcItemDynamic(listTargetIndexTags())),
-
-		readline.PcItem("label",
-			readline.PcItemDynamic(listTargetIndexTags())),
-
-		readline.PcItem("set",
-			readline.PcItemDynamic(listOptions(),
-				readline.PcItemDynamic(listValChoices()))),
-
-		readline.PcItem("delete_port_fwd",
-			readline.PcItemDynamic(listPortMappings())),
-	}
-	CmdCompls = append(CmdCompls, subcmds_completion...)
-	CliCompleter.SetChildren(CmdCompls)
-	// remember initial CmdCompls
-	InitCmdCompls = CmdCompls
-}
-
 // CliMain launches the commandline UI
 func CliMain() {
-	// print banner
-	err = CliBanner()
-	if err != nil {
-		CliFatalError("Banner: %v", err)
-	} else {
-		// start all services
-		go TLSServer()
-		go ShadowsocksServer()
-		go InitModules()
-	}
+	// start all services
+	go TLSServer()
+	go ShadowsocksServer()
+	go InitModules()
 
 	// unlock incomplete downloads
 	err = UnlockDownloads()
 	if err != nil {
-		CliPrintWarning("UnlockDownloads: %v", err)
+		CliPrintDebug("UnlockDownloads: %v", err)
 	}
+	mainMenu := Emp3r0rConsole.NewMenu("")
+	Emp3r0rConsole.SetPrintLogo(CliBanner)
 
-	// set up autocompletion
-	init_completion()
+	// History
+	histFile := fmt.Sprintf("%s/%s.history", AppName, EmpWorkSpace)
+	mainMenu.AddHistorySourceFile(AppName, histFile)
 
-	// prompt setup
-	filterInput := func(r rune) (rune, bool) {
-		switch r {
-		// block CtrlZ feature
-		case readline.CharCtrlZ:
-			return r, false
-		}
-		return r, true
-	}
+	// Commands
+	mainMenu.SetCommands(Emp3r0rCommands(Emp3r0rConsole))
 
-	// set up readline instance
-	EmpReadLine, err = readline.NewEx(&readline.Config{
-		Prompt:          EmpPrompt,
-		HistoryFile:     fmt.Sprintf("%s/emp3r0r.history", EmpWorkSpace),
-		AutoComplete:    CliCompleter,
-		InterruptPrompt: "^C\nExiting...\n",
-		EOFPrompt:       "^D\nExiting...\n",
+	// Interrupts
+	mainMenu.AddInterrupt(io.EOF, exitEmp3r0r)
 
-		HistorySearchFold:   true,
-		FuncFilterInputRune: filterInput,
-	})
-	if err != nil {
-		panic(err)
-	}
-	defer EmpReadLine.Close()
-	log.SetOutput(EmpReadLine.Stderr())
+	// prompt
+	prompt := mainMenu.Prompt()
+	prompt.Primary = SetDynamicPrompt
+	prompt.Secondary = func() string { return ">" }
+	prompt.Right = func() string { return fmt.Sprint(time.Now().Format("03:04:05")) }
+	prompt.Transient = func() string { return ">>>" }
 
+	// Syntax highlighting
+	Emp3r0rConsole.Shell().SyntaxHighlighter = highLighter
+
+	// Tmux setup
 	err = TmuxInitWindows()
 	if err != nil {
 		log.Fatalf("Fatal TMUX error: %v, please run `tmux kill-session -t emp3r0r` and re-run emp3r0r", err)
 	}
-
 	defer TmuxDeinitWindows()
 
-start:
-	SetDynamicPrompt()
-	for {
-		if EmpReadLine == nil {
-			CliPrintError("Readline broken, aborting")
-			return
-		}
-		line, readlineErr := EmpReadLine.Readline()
-		if readlineErr == readline.ErrInterrupt {
-			if len(line) == 0 {
-				break
-			} else {
-				continue
-			}
-		} else if readlineErr == io.EOF {
-			break
-		}
+	// Run the console
+	Emp3r0rConsole.Start()
+}
 
-		line = strings.TrimSpace(line)
-		// readline-related commands
-		switch line {
-		case "commands":
-			CliListCmds(EmpReadLine.Stderr())
-		case "exit":
-			return
-		case "quit":
-			return
-		case "q":
-			return
-
-		// process other commands
-		default:
-			readlineErr = CmdHandler(line)
-			if readlineErr != nil {
-				CliPrintError(readlineErr.Error())
-			}
-		}
-		fmt.Printf("\n")
+func highLighter(line []rune) string {
+	var highlightedStr strings.Builder
+	err := quick.Highlight(&highlightedStr, string(line), "shell", "terminal256", "monokai")
+	if err != nil {
+		return string(line)
 	}
 
-	// ask the user if they really want to leave
-	if CliYesNo("Are you sure you want to leave") {
-		return
-	}
-
-	fmt.Printf("\n")
-	goto start
+	return highlightedStr.String()
 }
 
 // SetDynamicPrompt set prompt with module and target info
-func SetDynamicPrompt() {
+func SetDynamicPrompt() string {
 	shortName := "local" // if no target is selected
-	prompt_arrow := color.New(color.Bold, color.FgHiCyan).Sprintf("$ ")
-	prompt_name := color.New(color.Bold, color.FgBlack, color.BgHiWhite).Sprint(PromptName)
+	prompt_arrow := color.New(color.Bold, color.FgHiCyan).Sprintf("\n$ ")
+	prompt_name := color.New(color.Bold, color.FgBlack, color.BgHiWhite).Sprint(AppName)
 	transport := color.New(color.FgRed).Sprint("local")
 
 	if CurrentTarget != nil && IsAgentExist(CurrentTarget) {
 		shortName = strings.Split(CurrentTarget.Tag, "-agent")[0]
 		if CurrentTarget.HasRoot {
-			prompt_arrow = color.New(color.Bold, color.FgHiGreen).Sprint("# ")
-			prompt_name = color.New(color.Bold, color.FgBlack, color.BgHiGreen).Sprint(PromptName)
+			prompt_arrow = color.New(color.Bold, color.FgHiGreen).Sprint("\n# ")
+			prompt_name = color.New(color.Bold, color.FgBlack, color.BgHiGreen).Sprint(AppName)
 		}
 		transport = getTransportString(CurrentTarget.Transport)
 	}
@@ -245,14 +122,13 @@ func SetDynamicPrompt() {
 	agent_name := color.New(color.FgCyan, color.Underline).Sprint(shortName)
 	mod_name := color.New(color.FgHiBlue).Sprint(CurrentMod)
 
-	dynamicPrompt := fmt.Sprintf("%s - %s @%s (%s) "+prompt_arrow,
+	dynamicPrompt := fmt.Sprintf("\n%s - %s @%s (%s) "+prompt_arrow,
 		prompt_name,
 		transport,
 		agent_name,
 		mod_name,
 	)
-	EmpReadLine.Config.Prompt = dynamicPrompt
-	EmpReadLine.SetPrompt(dynamicPrompt)
+	return dynamicPrompt
 }
 
 func getTransportString(transportStr string) string {
@@ -282,7 +158,11 @@ func getTransportString(transportStr string) string {
 
 func cliPrintHelper(format string, a []interface{}, msgColor *color.Color, logPrefix string, alert bool) {
 	logMsg := msgColor.Sprintf(format, a...)
-	log.Print(logMsg)
+	if alert {
+		Emp3r0rConsole.Printf("%s\n", logMsg)
+	} else {
+		Emp3r0rConsole.TransientPrintf("%s\n", logMsg)
+	}
 
 	if IsAPIEnabled {
 		var resp APIResponse
@@ -292,12 +172,12 @@ func cliPrintHelper(format string, a []interface{}, msgColor *color.Color, logPr
 		resp.MsgType = LOG
 		data, jsonMarshalErr := json.Marshal(resp)
 		if jsonMarshalErr != nil {
-			log.Printf("cliPrintHelper: %v", jsonMarshalErr)
+			Emp3r0rConsole.Printf("cliPrintHelper: %v\n", jsonMarshalErr)
 			return
 		}
 		_, jsonMarshalErr = APIConn.Write([]byte(data))
 		if jsonMarshalErr != nil {
-			log.Printf("cliPrintHelper: %v", jsonMarshalErr)
+			Emp3r0rConsole.Printf("cliPrintHelper: %v\n", jsonMarshalErr)
 		}
 	}
 }
@@ -346,62 +226,8 @@ func CliPrintError(format string, a ...interface{}) {
 	cliPrintHelper(format, a, color.New(color.FgHiRed, color.Bold), "ERROR", true)
 }
 
-// CliAsk prompt for an answer from user
-func CliAsk(prompt string, allow_empty bool) (answer string) {
-	// if there's no way to show prompt
-	if IsAPIEnabled {
-		return "No terminal available"
-	}
-
-	EmpReadLine.SetPrompt(color.HiMagentaString(prompt))
-	EmpReadLine.Config.EOFPrompt = ""
-	EmpReadLine.Config.InterruptPrompt = ""
-
-	defer SetDynamicPrompt()
-
-	for {
-		answer, readlineErr := EmpReadLine.Readline()
-		if readlineErr != nil {
-			if readlineErr == readline.ErrInterrupt || readlineErr == io.EOF {
-				break
-			}
-		}
-		answer = strings.TrimSpace(answer)
-		if answer != "" && !allow_empty {
-			break
-		}
-	}
-
-	return
-}
-
-// CliYesNo prompt for a y/n answer from user
-func CliYesNo(prompt string) bool {
-	// always return true if there's no way to show prompt
-	if IsAPIEnabled {
-		return true
-	}
-
-	EmpReadLine.SetPrompt(color.HiMagentaString(prompt + "? [y/N] "))
-	EmpReadLine.Config.EOFPrompt = ""
-	EmpReadLine.Config.InterruptPrompt = ""
-
-	defer SetDynamicPrompt()
-
-	answer, readlineErr := EmpReadLine.Readline()
-	if readlineErr != nil {
-		if readlineErr == readline.ErrInterrupt || readlineErr == io.EOF {
-			return false
-		}
-		color.Red(readlineErr.Error())
-	}
-
-	answer = strings.ToLower(answer)
-	return answer == "y"
-}
-
 // CliListOptions list currently available options for `set`
-func CliListOptions() {
+func CliListOptions(cmd *cobra.Command, args []string) {
 	if CurrentMod == "none" {
 		CliPrintWarning("No module selected")
 		return
@@ -485,31 +311,16 @@ func CliListOptions() {
 	CliPrint("\n%s", out)
 }
 
-// CliListCmds list all commands in tree format
-func CliListCmds(w io.Writer) {
-	_, ioErr := io.WriteString(w, "Commands:\n")
-	if ioErr != nil {
-		return
-	}
-	_, ioErr = io.WriteString(w, CliCompleter.Tree("    "))
-	if ioErr != nil {
-		return
-	}
-}
-
 // CliBanner prints banner
-func CliBanner() error {
+func CliBanner(console *console.Console) {
 	data, encodingErr := base64.StdEncoding.DecodeString(cliBannerB64)
 	if encodingErr != nil {
-		return errors.New("failed to print banner: " + encodingErr.Error())
+		log.Fatalf("failed to print banner: %v", encodingErr.Error())
 	}
+	banner := strings.Builder{}
+	banner.Write(data)
 
 	// print banner line by line
-	banner := strings.Split(string(data), "\n")
-	for _, line := range banner {
-		color.Cyan(line)
-		util.TakeABlink()
-	}
 	cow, encodingErr := cowsay.New(
 		cowsay.BallonWidth(100),
 		cowsay.Random(),
@@ -521,11 +332,11 @@ func CliBanner() error {
 	// C2 names
 	encodingErr = LoadCACrt()
 	if encodingErr != nil {
-		CliPrintWarning("Failed to parse CA cert: %v", encodingErr)
+		log.Fatalf("Failed to parse CA cert: %v", encodingErr)
 	}
 	c2_names := tun.NamesInCert(ServerCrtFile)
 	if len(c2_names) <= 0 {
-		CliFatalError("C2 has no names?")
+		log.Fatalf("C2 has no names?")
 	}
 	name_list := strings.Join(c2_names, ", ")
 
@@ -544,9 +355,8 @@ func CliBanner() error {
 	if encodingErr != nil {
 		log.Fatalf("CowSay: %v", encodingErr)
 	}
-	color.Cyan("%s\n\n", say)
-	util.TakeABlink()
-	return nil
+	banner.WriteString(color.CyanString("%s\n\n", say))
+	fmt.Print(banner.String())
 }
 
 // CliPrettyPrint prints two-column help info
@@ -556,18 +366,18 @@ func CliPrettyPrint(header1, header2 string, map2write *map[string]string) {
 		var resp APIResponse
 		msg, marshalErr := json.Marshal(map2write)
 		if marshalErr != nil {
-			log.Printf("CliPrettyPrint: %v", marshalErr)
+			Emp3r0rConsole.Printf("CliPrettyPrint: %v\n", marshalErr)
 		}
 		resp.MsgData = msg
 		resp.Alert = false
 		resp.MsgType = JSON
 		data, marshalErr := json.Marshal(resp)
 		if marshalErr != nil {
-			log.Printf("CliPrettyPrint: %v", marshalErr)
+			Emp3r0rConsole.Printf("CliPrettyPrint: %v\n", marshalErr)
 		}
 		_, marshalErr = APIConn.Write([]byte(data))
 		if marshalErr != nil {
-			log.Printf("CliPrettyPrint: %v", marshalErr)
+			Emp3r0rConsole.Printf("CliPrettyPrint: %v\n", marshalErr)
 		}
 	}
 
@@ -697,28 +507,28 @@ func listAgentExes(agent *emp3r0r_def.Emp3r0rAgent) []string {
 
 // when a target is selected, update CmdCompls with PATH items
 func autoCompleteAgentExes(agent *emp3r0r_def.Emp3r0rAgent) {
-	exes := listAgentExes(agent)
-	temp_CmdCompls := InitCmdCompls
-
-	is_exe_same_as_cmd := func(exe string) bool {
-		for _, cmd := range CLICommands {
-			if exe == cmd {
-				return true
-			}
-		}
-		return false
-	}
-
-	for _, exe := range exes {
-		if is_exe_same_as_cmd(exe) {
-			CliPrintDebug("Exe %s exists in CLI commands, skipping", strconv.Quote(exe))
-			continue
-		}
-		temp_CmdCompls = append(temp_CmdCompls, readline.PcItem(exe))
-	}
-
-	CmdCompls = temp_CmdCompls
-	CliCompleter.SetChildren(CmdCompls)
+	// exes := listAgentExes(agent)
+	// temp_CmdCompls := InitCmdCompls
+	//
+	// is_exe_same_as_cmd := func(exe string) bool {
+	// 	for _, cmd := range CLICommands {
+	// 		if exe == cmd {
+	// 			return true
+	// 		}
+	// 	}
+	// 	return false
+	// }
+	//
+	// for _, exe := range exes {
+	// 	if is_exe_same_as_cmd(exe) {
+	// 		CliPrintDebug("Exe %s exists in CLI commands, skipping", strconv.Quote(exe))
+	// 		continue
+	// 	}
+	// 	temp_CmdCompls = append(temp_CmdCompls, readline.PcItem(exe))
+	// }
+	//
+	// CmdCompls = temp_CmdCompls
+	// CliCompleter.SetChildren(CmdCompls)
 }
 
 // remote ls autocomplete items in current directory
@@ -785,14 +595,9 @@ func AdaptiveTable(tableString string) {
 	}
 }
 
-func setDebugLevel(cmd string) {
-	cmdSplit := strings.Fields(cmd)
-	if len(cmdSplit) != 2 {
-		CliPrintError("debug <0, 1, 2, 3>")
-		return
-	}
-	level, e := strconv.Atoi(cmdSplit[1])
-	if e != nil {
+func setDebugLevel(cmd *cobra.Command, args []string) {
+	level, err := cmd.Flags().GetInt("level")
+	if err != nil {
 		CliPrintError("Invalid debug level: %v", err)
 		return
 	}

@@ -73,7 +73,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 		// if sftp is requested, we are not using `interactive_shell` module
 		// so no options to set
 		if !is_sftp {
-			SetOption([]string{"port", new_port})
+			SetOption("port", new_port)
 		}
 		CliPrintWarning("Switching to a new port %s for shell (%s)", port, shell)
 	}
@@ -90,7 +90,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 				if s != shell && ssh_mapping.ToPort == port {
 					new_port := strconv.Itoa(util.RandInt(2048, 65535))
 					CliPrintWarning("Port %s has %s shell on it, restarting with a different port %s", port, s, new_port)
-					SetOption([]string{"port", new_port})
+					SetOption("port", new_port)
 					err = SSHClient(shell, args, new_port, split)
 					return err
 				}

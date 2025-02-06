@@ -19,6 +19,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/olekukonko/tablewriter"
+	"github.com/spf13/cobra"
 )
 
 // PortFwdSession holds controller interface of a port-fwd session
@@ -67,13 +68,16 @@ func headlessListPortFwds() (err error) {
 }
 
 // DeletePortFwdSession delete a port mapping session by ID
-func DeletePortFwdSession(cmd string) {
-	cmdSplit := strings.Fields(cmd)
-	if len(cmdSplit) != 2 {
-		CliPrintError("delete_port_fwd <mapping id>")
+func DeletePortFwdSession(cmd *cobra.Command, args []string) {
+	sessionID, err := cmd.Flags().GetString("id")
+	if err != nil {
+		CliPrintError("DeletePortFwdSession: %v", err)
 		return
 	}
-	sessionID := cmdSplit[1]
+	if sessionID == "" {
+		CliPrintError("DeletePortFwdSession: no session ID provided")
+		return
+	}
 	PortFwdsMutex.Lock()
 	defer PortFwdsMutex.Unlock()
 	for id, session := range PortFwds {
@@ -89,7 +93,7 @@ func DeletePortFwdSession(cmd string) {
 }
 
 // ListPortFwds list currently active port mappings
-func ListPortFwds() {
+func ListPortFwds(cmd *cobra.Command, args []string) {
 	if IsAPIEnabled {
 		err := headlessListPortFwds()
 		if err != nil {

@@ -18,6 +18,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/olekukonko/tablewriter"
 	"github.com/posener/h2conn"
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -211,7 +212,7 @@ func ListTargets() {
 }
 
 // Update agent list, then switch to its tmux window
-func ls_targets() {
+func ls_targets(cmd *cobra.Command, args []string) {
 	ListTargets()
 	TmuxSwitchWindow(AgentListPane.WindowID)
 }

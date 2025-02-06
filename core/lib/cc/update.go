@@ -20,6 +20,7 @@ import (
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
+	"github.com/spf13/cobra"
 )
 
 const (
@@ -108,12 +109,14 @@ func isNewerVersion(newVersion, currentVersion string) bool {
 
 // UpdateCC updates emp3r0r C2 server to the latest version
 // force: force update even if the latest version is the same as the current one
-func UpdateCC(force bool) (err error) {
+func UpdateCC(cmd *cobra.Command, args []string) {
+	force, _ := cmd.Flags().GetBool("force")
 	CliPrintInfo("Requesting latest emp3r0r release from GitHub...")
 	// get latest release
 	tarballURL, checksum, err := GetTarballURL(force)
 	if err != nil {
-		return err
+		CliPrintError("Failed to get latest release: %v", err)
+		return
 	}
 
 	// force update
@@ -130,7 +133,7 @@ func UpdateCC(force bool) (err error) {
 
 	// check if lock exists
 	if util.IsFileExist(lock) {
-		err = fmt.Errorf("lock file %s exists, another download is in progress, if it's not the case, manually remove the lock", lock)
+		CliPrintError("lock file %s exists, another download is in progress, if it's not the case, manually remove the lock", lock)
 		return
 	}
 	os.Remove(lock)
@@ -166,13 +169,13 @@ func UpdateCC(force bool) (err error) {
 		// download tarball using grab
 		client := grab.NewClient()
 		if client.HTTPClient == nil {
-			err = fmt.Errorf("failed to initialize HTTP client")
-			return err
+			CliPrintError("failed to initialize HTTP client")
+			return
 		}
 		req, downloadErr := grab.NewRequest(path, tarballURL)
 		if downloadErr != nil {
-			downloadErr = fmt.Errorf("create grab request: %v", downloadErr)
-			return downloadErr
+			CliPrintError("create grab request: %v", downloadErr)
+			return
 		}
 		CliPrint("Downloading %s to %s...", tarballURL, path)
 		resp := client.Do(req)
@@ -190,12 +193,12 @@ func UpdateCC(force bool) (err error) {
 			case <-resp.Done:
 				downloadErr = resp.Err()
 				if downloadErr != nil {
-					downloadErr = fmt.Errorf("download finished with error: %v", downloadErr)
-					return downloadErr
+					CliPrintError("download finished with error: %v", downloadErr)
+					return
 				}
 				if !verify_checksum() {
-					err = fmt.Errorf("checksum verification failed")
-					return err
+					CliPrintError("checksum verification failed")
+					return
 				}
 				CliPrintSuccess("Saved %s to %s (%d bytes)", tarballURL, path, resp.Size())
 			case <-t.C:
@@ -210,14 +213,13 @@ func UpdateCC(force bool) (err error) {
 
 	wrapper, err := exec.LookPath("x-terminal-emulator")
 	if err != nil {
-		return fmt.Errorf("%v. your distribution is unsupported", err)
+		CliPrintError("%v. your distribution is unsupported", err)
+		return
 	}
-	cmd := exec.Command(wrapper, "-e", install_cmd)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	out, err := cmd.CombinedOutput()
+	exec_cmd := exec.Command(wrapper, "-e", install_cmd)
+	exec_cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	out, err := exec_cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to update emp3r0r: %v: %s", err, out)
+		CliPrintError("failed to update emp3r0r: %v: %s", err, out)
 	}
-
-	return nil
 }

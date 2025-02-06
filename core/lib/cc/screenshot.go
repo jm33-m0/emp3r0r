@@ -13,11 +13,12 @@ import (
 
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
+	"github.com/spf13/cobra"
 )
 
 // TakeScreenshot take a screenshot of selected target, and download it
 // open the picture if possible
-func TakeScreenshot() {
+func TakeScreenshot(cmd *cobra.Command, args []string) {
 	// tell agent to take screenshot
 	screenshotErr := SendCmdToCurrentTarget("screenshot", "")
 	if screenshotErr != nil {
