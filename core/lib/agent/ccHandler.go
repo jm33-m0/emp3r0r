@@ -259,15 +259,21 @@ func processCCData(data *emp3r0r_def.MsgTunData) {
 		// Changes the current working directory to the specified path.
 		path := flags.StringP("dst", "d", "", "Path to change to")
 		flags.Parse(cmdSlice[1:])
+		out = "cd error: no path specified"
 		if *path == "" {
 			out = fmt.Sprintf("args error: %v", cmdSlice)
 			break
 		}
-		err = os.Chdir(*path)
+		cdPath, err := filepath.Abs(*path)
 		if err != nil {
-			out = fmt.Sprintf("cd failed: %v", err)
+			out = fmt.Sprintf("cd error: %v", err)
+			break
+		}
+		err = os.Chdir(cdPath)
+		if err != nil {
+			out = fmt.Sprintf("cd error: %v", err)
 		} else {
-			out = "changed directory to " + strconv.Quote(*path)
+			out = cdPath
 		}
 	case "pwd":
 		// Usage: pwd

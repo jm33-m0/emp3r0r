@@ -4,9 +4,15 @@
 package cc
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
+
+	"github.com/google/uuid"
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 )
 
 // autocomplete module options
@@ -78,42 +84,70 @@ func listAgentExes() []string {
 	return exes
 }
 
-// remote ls autocomplete items in current directory
+// Cache for remote directory listing
+// cwd: listing
+var (
+	RemoteDirListing      = make(map[string][]string)
+	RemoteDirListingMutex = new(sync.RWMutex)
+)
+
+// autocomplete items in current remote directory
 func listRemoteDir() []string {
-	return []string{}
-	// names := make([]string, 0)
-	// cmd := fmt.Sprintf("%s --path .", emp3r0r_def.C2CmdListDir)
-	// cmd_id := uuid.NewString()
-	// err := SendCmdToCurrentTarget(cmd, cmd_id)
-	// if err != nil {
-	// 	LogDebug("Cannot list remote directory: %v", err)
-	// 	return names
-	// }
-	// remote_entries := []string{}
-	// for i := 0; i < 100; i++ {
-	// 	if res, exists := CmdResults[cmd_id]; exists {
-	// 		remote_entries = strings.Split(res, "\n")
-	// 		CmdResultsMutex.Lock()
-	// 		delete(CmdResults, cmd_id)
-	// 		CmdResultsMutex.Unlock()
-	// 		break
-	// 	}
-	// 	time.Sleep(100 * time.Millisecond)
-	// 	if i == 99 {
-	// 		LogDebug("Timeout listing remote directory")
-	// 		return names
-	// 	}
-	// }
-	// if len(remote_entries) == 0 {
-	// 	LogDebug("Nothing in remote directory")
-	// 	return names
-	// }
-	// for _, name := range remote_entries {
-	// 	name = strings.ReplaceAll(name, "\t", "\\t")
-	// 	name = strings.ReplaceAll(name, " ", "\\ ")
-	// 	names = append(names, name)
-	// }
-	// return names
+	activeAgent := ValidateActiveTarget()
+	if activeAgent == nil {
+		LogDebug("No valid target selected so no autocompletion for remote directory")
+		return []string{}
+	}
+
+	// if we have the listing in cache, return it
+	// otherwise caparace will run it too many times to slow down the console
+	RemoteDirListingMutex.RLock()
+	if names, exists := RemoteDirListing[activeAgent.CWD]; exists {
+		RemoteDirListingMutex.RUnlock()
+		LogDebug("Listing remote directory %s from cache", activeAgent.CWD)
+		return names
+	}
+	RemoteDirListingMutex.RUnlock()
+
+	names := make([]string, 0) // listing to return
+	cmd := fmt.Sprintf("%s --path %s", emp3r0r_def.C2CmdListDir, activeAgent.CWD)
+	cmd_id := uuid.NewString()
+	err := SendCmdToCurrentTarget(cmd, cmd_id)
+	if err != nil {
+		LogDebug("Cannot list remote directory: %v", err)
+		return names
+	}
+	remote_entries := []string{}
+	for i := 0; i < 100; i++ {
+		if res, exists := CmdResults[cmd_id]; exists {
+			remote_entries = strings.Split(res, "\n")
+			CmdResultsMutex.Lock()
+			delete(CmdResults, cmd_id)
+			CmdResultsMutex.Unlock()
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+		if i == 99 {
+			LogDebug("Timeout listing remote directory")
+			return names
+		}
+	}
+	if len(remote_entries) == 0 {
+		LogDebug("Nothing in remote directory")
+		return names
+	}
+	for n, name := range remote_entries {
+		if n == 0 {
+			continue // this is the cwd
+		}
+		name = strings.ReplaceAll(name, "\t", "\\t")
+		name = strings.ReplaceAll(name, " ", "\\ ")
+		names = append(names, name)
+	}
+	RemoteDirListingMutex.Lock()
+	defer RemoteDirListingMutex.Unlock()
+	RemoteDirListing[remote_entries[0]] = names
+	return names
 }
 
 // Function constructor - constructs new function for listing given directory

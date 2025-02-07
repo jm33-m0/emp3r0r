@@ -28,8 +28,32 @@ func pwd(cmd *cobra.Command, args []string) {
 }
 
 func cd(cmd *cobra.Command, args []string) {
+	activeAgent := ValidateActiveTarget()
+	if activeAgent == nil {
+		LogError("cd: no active target")
+		return
+	}
+
 	dst := args[0]
-	FSCmdDst("cd", dst)
+	activeAgent.CWD = dst
+	cmd_id := uuid.NewString()
+	err := SendCmdToCurrentTarget(fmt.Sprintf("cd --dst %s", dst), cmd_id)
+	if err != nil {
+		LogError("Cannot cd to %s: %v", dst, err)
+		return
+	}
+	// wait for response, max 10s
+	for i := 0; i < 100; i++ {
+		time.Sleep(100 * time.Millisecond)
+		res, exists := CmdResults[cmd_id]
+		if exists {
+			if !strings.Contains(res, "error") {
+				LogInfo("cd: %s", res)
+				activeAgent.CWD = res // update CWD to absolute path
+			}
+			break
+		}
+	}
 }
 
 func cp(cmd *cobra.Command, args []string) {
@@ -204,6 +228,11 @@ func DownloadFromAgent(cmd *cobra.Command, args []string) {
 }
 
 func executeCmd(cmd string) {
+	activeAgent := ValidateActiveTarget()
+	if activeAgent == nil {
+		LogError("%s: no active target", cmd)
+		return
+	}
 	err := SendCmdToCurrentTarget(cmd, "")
 	if err != nil {
 		LogError("%s failed: %v", cmd, err)

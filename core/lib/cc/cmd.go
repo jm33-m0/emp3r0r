@@ -44,6 +44,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 
 		exitCmd := &cobra.Command{
 			Use:     "exit",
+			Aliases: []string{"quit", "q", "bye", "logout", "shutdown", "stop"},
 			GroupID: "core",
 			Short:   "Exit emp3r0r",
 			Args:    cobra.NoArgs,

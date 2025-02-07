@@ -33,6 +33,7 @@ type Emp3r0rAgent struct {
 	NCSIEnabled bool             `json:"NCSI_Enabled"` // NCSI (or similar services) enabled
 	Process     *AgentProcess    `json:"Process"`      // agent's process
 	Exes        []string         `json:"Exes"`         // executables found in agent's $PATH
+	CWD         string           `json:"CWD"`          // current working directory
 	Product     *ghw.ProductInfo `json:"Product"`      // product info
 }
 

