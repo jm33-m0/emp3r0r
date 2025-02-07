@@ -4,7 +4,6 @@
 package cc
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -158,31 +157,15 @@ func getTransport(transportStr string) string {
 
 // CliBanner prints banner
 func CliBanner(console *console.Console) {
-	// encoded logo of emp3r0r
-	const cliBannerB64 string = `
-CuKWkeKWkeKWkeKWkeKWkeKWkeKWkSDilpHilpHilpEgICAg4paR4paR4paRIOKWkeKWkeKWkeKW
-keKWkeKWkSAg4paR4paR4paR4paR4paR4paRICDilpHilpHilpHilpHilpHilpEgICDilpHilpHi
-lpHilpHilpHilpEgIOKWkeKWkeKWkeKWkeKWkeKWkQrilpLilpIgICAgICDilpLilpLilpLilpIg
-IOKWkuKWkuKWkuKWkiDilpLilpIgICDilpLilpIgICAgICDilpLilpIg4paS4paSICAg4paS4paS
-IOKWkuKWkiAg4paS4paS4paS4paSIOKWkuKWkiAgIOKWkuKWkgrilpLilpLilpLilpLilpIgICDi
-lpLilpIg4paS4paS4paS4paSIOKWkuKWkiDilpLilpLilpLilpLilpLilpIgICDilpLilpLilpLi
-lpLilpIgIOKWkuKWkuKWkuKWkuKWkuKWkiAg4paS4paSIOKWkuKWkiDilpLilpIg4paS4paS4paS
-4paS4paS4paSCuKWk+KWkyAgICAgIOKWk+KWkyAg4paT4paTICDilpPilpMg4paT4paTICAgICAg
-ICAgICDilpPilpMg4paT4paTICAg4paT4paTIOKWk+KWk+KWk+KWkyAg4paT4paTIOKWk+KWkyAg
-IOKWk+KWkwrilojilojilojilojilojilojilogg4paI4paIICAgICAg4paI4paIIOKWiOKWiCAg
-ICAgIOKWiOKWiOKWiOKWiOKWiOKWiCAg4paI4paIICAg4paI4paIICDilojilojilojilojiloji
-loggIOKWiOKWiCAgIOKWiOKWiAoKCmEgbGludXggcG9zdC1leHBsb2l0YXRpb24gZnJhbWV3b3Jr
-IG1hZGUgYnkgbGludXggdXNlcgoKaHR0cHM6Ly9naXRodWIuY29tL2ptMzMtbTAvZW1wM3IwcgoK
-Cg==
+	const logo string = `
+  ______  ______  ______  ______  ______
+ /      \/      \/      \/      \/      \
+|  e   m |  p   3 |  r   0 |  r    |      |
+ \______/ \______/ \______/ \______/ \______/
+        A Linux C2 made by a Linux user
 `
-	data, encodingErr := base64.StdEncoding.DecodeString(cliBannerB64)
-	if encodingErr != nil {
-		Logger.Fatal("failed to print banner: %v", encodingErr.Error())
-	}
 	banner := strings.Builder{}
-	banner.WriteString(color.CyanString("%s", data))
-
-	// print banner line by line
+	banner.WriteString(color.CyanString("%s", logo))
 	cow, encodingErr := cowsay.New(
 		cowsay.BallonWidth(100),
 		cowsay.Random(),
@@ -203,17 +186,15 @@ Cg==
 	name_list := strings.Join(c2_names, ", ")
 
 	say, encodingErr := cow.Say(fmt.Sprintf("welcome! you are using version %s,\n"+
-		"C2 listening on *:%s,\n"+
-		"Shadowsocks server port *:%s,\n"+
-		"KCP port *:%s,\n"+
-		"C2 names: %s\n"+
-		"CA fingerprint: %s",
+		"C2 listening on: *:%s,\n"+
+		"Shadowsocks: *:%s,\n"+
+		"KCP: *:%s,\n"+
+		"C2 names: %s\n",
 		emp3r0r_def.Version,
 		RuntimeConfig.CCPort,
 		RuntimeConfig.ShadowsocksServerPort,
 		RuntimeConfig.KCPServerPort,
-		name_list,
-		RuntimeConfig.CAFingerprint))
+		name_list))
 	if encodingErr != nil {
 		Logger.Fatal("CowSay: %v", encodingErr)
 	}
