@@ -52,12 +52,12 @@ func StatFile(filepath string, a *emp3r0r_def.Emp3r0rAgent) (fi *util.FileStat, 
 // PutFile put file to agent
 func PutFile(lpath, rpath string, a *emp3r0r_def.Emp3r0rAgent) error {
 	// file sha256sum
-	CliPrintInfo("Calculating sha256sum of '%s'", lpath)
+	LogInfo("Calculating sha256sum of '%s'", lpath)
 	sum := tun.SHA256SumFile(lpath)
 	// file size
 	size := util.FileSize(lpath)
 	sizemB := float32(size) / 1024 / 1024
-	CliMsg("\nPutFile:\nUploading '%s' to\n'%s' "+
+	LogMsg("\nPutFile:\nUploading '%s' to\n'%s' "+
 		"on %s, agent [%d]\n"+
 		"size: %d bytes (%.2fMB)\n"+
 		"sha256sum: %s",
@@ -68,7 +68,7 @@ func PutFile(lpath, rpath string, a *emp3r0r_def.Emp3r0rAgent) error {
 	)
 
 	// move file to wwwroot, then move it back when we are done with it
-	CliPrintInfo("Copy %s to %s", lpath, WWWRoot+util.FileBaseName(lpath))
+	LogInfo("Copy %s to %s", lpath, WWWRoot+util.FileBaseName(lpath))
 	err := util.Copy(lpath, WWWRoot+util.FileBaseName(lpath))
 	if err != nil {
 		return fmt.Errorf("copy %s to %s: %v", lpath, WWWRoot+util.FileBaseName(lpath), err)
@@ -80,7 +80,7 @@ func PutFile(lpath, rpath string, a *emp3r0r_def.Emp3r0rAgent) error {
 	if err != nil {
 		return fmt.Errorf("PutFile send command: %v", err)
 	}
-	CliPrintInfo("Waiting for response from agent %s", a.Tag)
+	LogInfo("Waiting for response from agent %s", a.Tag)
 	return nil
 }
 
@@ -103,14 +103,14 @@ func GetFile(file_path string, agent *emp3r0r_def.Emp3r0rAgent) (ftpSh *StreamHa
 			return
 		}
 	}
-	CliPrintInfo("Waiting for response from agent %s", agent.Tag)
+	LogInfo("Waiting for response from agent %s", agent.Tag)
 
 	write_dir, save_to_file, tempname, lock := generateGetFilePaths(file_path)
-	CliPrintDebug("Get file: %s, save to: %s, tempname: %s, lock: %s", file_path, save_to_file, tempname, lock)
+	LogDebug("Get file: %s, save to: %s, tempname: %s, lock: %s", file_path, save_to_file, tempname, lock)
 
 	// create directories
 	if !util.IsDirExist(write_dir) {
-		CliPrintInfo("Creating directory: %s", strconv.Quote(write_dir))
+		LogInfo("Creating directory: %s", strconv.Quote(write_dir))
 		err = os.MkdirAll(write_dir, 0o700)
 		if err != nil {
 			err = fmt.Errorf("GetFile mkdir %s: %v", write_dir, err)
@@ -136,10 +136,10 @@ func GetFile(file_path string, agent *emp3r0r_def.Emp3r0rAgent) (ftpSh *StreamHa
 	if util.IsExist(save_to_file) {
 		checksum := tun.SHA256SumFile(save_to_file)
 		if checksum == fileinfo.Checksum {
-			CliPrintSuccess("%s already exists, checksum matched", save_to_file)
+			LogSuccess("%s already exists, checksum matched", save_to_file)
 			return
 		} else {
-			CliPrintWarning("%s already exists, but checksum mismatched", save_to_file)
+			LogWarning("%s already exists, but checksum mismatched", save_to_file)
 		}
 	}
 
@@ -148,7 +148,7 @@ func GetFile(file_path string, agent *emp3r0r_def.Emp3r0rAgent) (ftpSh *StreamHa
 		err = fmt.Errorf("GetFile: %s allocate file: %v", file_path, err)
 		return
 	}
-	CliMsg("We will be downloading %s, %d bytes in total (%s)", file_path, filesize, fileinfo.Checksum)
+	LogMsg("We will be downloading %s, %d bytes in total (%s)", file_path, filesize, fileinfo.Checksum)
 
 	// what if we have downloaded part of the file
 	var offset int64 = 0
@@ -174,7 +174,7 @@ func GetFile(file_path string, agent *emp3r0r_def.Emp3r0rAgent) (ftpSh *StreamHa
 	cmd := fmt.Sprintf("get --file_path '%s' --offset %d --token '%s'", file_path, offset, ftpSh.Token)
 	err = SendCmd(cmd, "", agent)
 	if err != nil {
-		CliPrintError("GetFile send command: %v", err)
+		LogError("GetFile send command: %v", err)
 		return nil, err
 	}
 

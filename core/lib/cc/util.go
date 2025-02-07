@@ -23,7 +23,7 @@ import (
 
 // DownloadFile download file using default http client
 func DownloadFile(url, path string) (err error) {
-	CliPrintDebug("Downloading '%s' to '%s'", url, path)
+	LogDebug("Downloading '%s' to '%s'", url, path)
 	_, err = grab.Get(path, url)
 	return
 }
@@ -61,18 +61,18 @@ func SendCmd(cmd, cmd_id string, a *emp3r0r_def.Emp3r0rAgent) error {
 func wait_for_cmd_response(cmd, cmd_id string, agent *emp3r0r_def.Emp3r0rAgent) {
 	ctrl, exists := Targets[agent]
 	if !exists || agent == nil {
-		CliPrintWarning("SendCmd: agent '%s' not connected", agent.Tag)
+		LogWarning("SendCmd: agent '%s' not connected", agent.Tag)
 		return
 	}
 	now := time.Now()
 	for ctrl.Ctx.Err() == nil {
 		if resp, exists := CmdResults[cmd_id]; exists {
-			CliPrintDebug("Got response for %s from %s: %s", strconv.Quote(cmd), strconv.Quote(agent.Name), resp)
+			LogDebug("Got response for %s from %s: %s", strconv.Quote(cmd), strconv.Quote(agent.Name), resp)
 			return
 		}
 		wait_time := time.Since(now)
 		if wait_time > 90*time.Second && !waitNeeded(cmd) {
-			CliPrintWarning("Executing %s on %s: unresponsive for %v",
+			LogWarning("Executing %s on %s: unresponsive for %v",
 				strconv.Quote(cmd),
 				strconv.Quote(agent.Name),
 				wait_time)
@@ -213,7 +213,7 @@ func UnlockDownloads() error {
 	for _, f := range files {
 		if strings.HasSuffix(f.Name(), ".lock") {
 			err = os.Remove(FileGetDir + f.Name())
-			CliPrintDebug("Unlocking download: %s", f.Name())
+			LogDebug("Unlocking download: %s", f.Name())
 			if err != nil {
 				return fmt.Errorf("remove %s: %v", f.Name(), err)
 			}
@@ -231,16 +231,16 @@ func CopyToClipboard(data []byte) {
 		exe = "wl-copy"
 		cmd = exec.Command("wl-copy")
 	} else if os.Getenv("DISPLAY") == "" {
-		CliPrintWarning("Neither Wayland nor X11 is running, CopyToClipboard will abort")
+		LogWarning("Neither Wayland nor X11 is running, CopyToClipboard will abort")
 		return
 	}
 	if !util.IsCommandExist(exe) {
-		CliPrintWarning("%s not installed", exe)
+		LogWarning("%s not installed", exe)
 		return
 	}
 	stdin, stdinErr := cmd.StdinPipe()
 	if stdinErr != nil {
-		CliPrintWarning("CopyToClipboard read stdin: %v", stdinErr)
+		LogWarning("CopyToClipboard read stdin: %v", stdinErr)
 		return
 	}
 	go func() {
@@ -250,25 +250,25 @@ func CopyToClipboard(data []byte) {
 
 	stdinErr = cmd.Run()
 	if stdinErr != nil {
-		CliPrintWarning("CopyToClipboard: %v", stdinErr)
+		LogWarning("CopyToClipboard: %v", stdinErr)
 	}
-	CliPrintInfo("Copied to clipboard")
+	LogInfo("Copied to clipboard")
 }
 
 func setTargetLabel(cmd *cobra.Command, args []string) {
 	label, err := cmd.Flags().GetString("label")
 	if err != nil {
-		CliPrintError("set target label: %v", err)
+		LogError("set target label: %v", err)
 		return
 	}
 	agent_id, err := cmd.Flags().GetString("id")
 	if err != nil {
-		CliPrintError("set target label: %v", err)
+		LogError("set target label: %v", err)
 		return
 	}
 
 	if agent_id == "" || label == "" {
-		CliPrintError(cmd.UsageString())
+		LogError(cmd.UsageString())
 		return
 	}
 
@@ -281,7 +281,7 @@ func setTargetLabel(cmd *cobra.Command, args []string) {
 		target = GetTargetFromTag(agent_id)
 		if target == nil {
 			// cannot parse
-			CliPrintError("Cannot set target label by index: %v", e)
+			LogError("Cannot set target label by index: %v", e)
 			return
 		}
 	} else {
@@ -291,11 +291,11 @@ func setTargetLabel(cmd *cobra.Command, args []string) {
 
 	// target exists?
 	if target == nil {
-		CliPrintError("Target does not exist")
+		LogError("Target does not exist")
 		return
 	}
 	Targets[target].Label = label // set label
 	labelAgents()
-	CliPrintSuccess("%s has been labeled as %s", target.Tag, label)
+	LogSuccess("%s has been labeled as %s", target.Tag, label)
 	ListTargets() // update agent list
 }

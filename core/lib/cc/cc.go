@@ -114,7 +114,7 @@ func ListTargets() {
 	// return JSON data to APIConn in headless mode
 	if IsAPIEnabled {
 		if listErr := headlessListTargets(); listErr != nil {
-			CliPrintError("ls_targets: %v", listErr)
+			LogError("ls_targets: %v", listErr)
 		}
 	}
 
@@ -206,7 +206,7 @@ func ListTargets() {
 	table.Render()
 
 	if AgentListPane == nil {
-		CliPrintError("AgentListPane doesn't exist")
+		LogError("AgentListPane doesn't exist")
 		return
 	}
 	AgentListPane.Printf(true, "\n\033[0m%s\n\n", tableString.String())
@@ -221,7 +221,7 @@ func ls_targets(cmd *cobra.Command, args []string) {
 func GetTargetDetails(target *emp3r0r_def.Emp3r0rAgent) {
 	// nil?
 	if target == nil {
-		CliPrintDebug("Target is nil")
+		LogDebug("Target is nil")
 		return
 	}
 
@@ -229,7 +229,7 @@ func GetTargetDetails(target *emp3r0r_def.Emp3r0rAgent) {
 	defer TargetsMutex.RUnlock()
 	// exists?
 	if !IsAgentExist(target) {
-		CliPrintError("Failed to get system info: target does not exist")
+		LogError("Failed to get system info: target does not exist")
 		return
 	}
 	control := Targets[target]
@@ -322,7 +322,7 @@ func GetTargetDetails(target *emp3r0r_def.Emp3r0rAgent) {
 	table.Render()
 	num_of_columns := len(strings.Split(tableString.String(), "\n")[0])
 	if AgentInfoPane == nil {
-		CliPrintError("AgentInfoPane doesn't exist")
+		LogError("AgentInfoPane doesn't exist")
 		return
 	}
 	AgentInfoPane.ResizePane("x", num_of_columns)
@@ -388,11 +388,11 @@ func labelAgents() {
 	if util.IsExist(AgentsJSON) {
 		data, readErr := os.ReadFile(AgentsJSON)
 		if readErr != nil {
-			CliPrintWarning("Reading labeled agents: %v", readErr)
+			LogWarning("Reading labeled agents: %v", readErr)
 		}
 		readErr = json.Unmarshal(data, &old)
 		if readErr != nil {
-			CliPrintWarning("Reading labeled agents: %v", readErr)
+			LogWarning("Reading labeled agents: %v", readErr)
 		}
 	}
 
@@ -425,14 +425,14 @@ outter:
 	}
 	data, marshalErr := json.Marshal(labeledAgents)
 	if marshalErr != nil {
-		CliPrintWarning("Saving labeled agents: %v", marshalErr)
+		LogWarning("Saving labeled agents: %v", marshalErr)
 		return
 	}
 
 	// write file
 	marshalErr = os.WriteFile(AgentsJSON, data, 0o600)
 	if marshalErr != nil {
-		CliPrintWarning("Saving labeled agents: %v", marshalErr)
+		LogWarning("Saving labeled agents: %v", marshalErr)
 	}
 }
 
@@ -442,13 +442,13 @@ func SetAgentLabel(a *emp3r0r_def.Emp3r0rAgent) (label string) {
 	defer TargetsMutex.RUnlock()
 	data, err := os.ReadFile(AgentsJSON)
 	if err != nil {
-		CliPrintWarning("SetAgentLabel: %v", err)
+		LogWarning("SetAgentLabel: %v", err)
 		return
 	}
 	var labeledAgents []LabeledAgent
 	err = json.Unmarshal(data, &labeledAgents)
 	if err != nil {
-		CliPrintWarning("SetAgentLabel: %v", err)
+		LogWarning("SetAgentLabel: %v", err)
 		return
 	}
 
@@ -524,7 +524,6 @@ func InitC2() (err error) {
 			return fmt.Errorf("mkdir %s: %v", EmpWorkSpace, err)
 		}
 	}
-	ConsoleLogFile = EmpWorkSpace + "/emp3r0r.log"
 
 	// prefixes for stubs
 	emp3r0r_def.Stub_Linux = EmpWorkSpace + "/stub"
@@ -533,12 +532,12 @@ func InitC2() (err error) {
 	// copy stub binaries to ~/.emp3r0r
 	stubFiles, err := filepath.Glob(fmt.Sprintf("%s/stub*", EmpBuildDir))
 	if err != nil {
-		CliPrintWarning("Agent stubs: %v", err)
+		LogWarning("Agent stubs: %v", err)
 	}
 	for _, stubFile := range stubFiles {
 		copyErr := util.Copy(stubFile, EmpWorkSpace)
 		if copyErr != nil {
-			CliPrintWarning("Agent stubs: %v", copyErr)
+			LogWarning("Agent stubs: %v", copyErr)
 		}
 	}
 
@@ -566,7 +565,7 @@ func InitC2() (err error) {
 func setActiveTarget(cmd *cobra.Command, args []string) {
 	target, err := cmd.Flags().GetString("id")
 	if err != nil {
-		CliPrintError("set target: %v", err)
+		LogError("set target: %v", err)
 		return
 	}
 	var target_to_set *emp3r0r_def.Emp3r0rAgent
@@ -583,33 +582,33 @@ func setActiveTarget(cmd *cobra.Command, args []string) {
 	select_agent := func(a *emp3r0r_def.Emp3r0rAgent) {
 		CurrentTarget = a
 		GetTargetDetails(CurrentTarget)
-		CliPrintSuccess("Now targeting %s", CurrentTarget.Tag)
+		LogSuccess("Now targeting %s", CurrentTarget.Tag)
 
 		// kill shell and sftp window
 		if AgentSFTPPane != nil {
-			CliPrintInfo("Updating sftp window")
+			LogInfo("Updating sftp window")
 			err = AgentSFTPPane.KillPane()
 			if err != nil {
-				CliPrintWarning("Updating sftp window: %v", err)
+				LogWarning("Updating sftp window: %v", err)
 			}
 			AgentSFTPPane = nil
 		}
 		if AgentShellPane != nil {
-			CliPrintInfo("Updating shell window")
+			LogInfo("Updating shell window")
 			err = AgentShellPane.KillPane()
 			if err != nil {
-				CliPrintWarning("Updating shell window: %v", err)
+				LogWarning("Updating shell window: %v", err)
 			}
 			AgentShellPane = nil
 		}
 
-		CliPrint("Run `file_manager` to open a SFTP session")
+		LogMsg("Run `file_manager` to open a SFTP session")
 		autoCompleteAgentExes(target_to_set)
 	}
 
 	if target_to_set == nil {
 		// if still nothing
-		CliPrintError("Target does not exist, no target has been selected")
+		LogError("Target does not exist, no target has been selected")
 		return
 
 	} else {

@@ -17,7 +17,7 @@ import (
 func ls(cmd *cobra.Command, args []string) {
 	dst, err := cmd.Flags().GetString("path")
 	if err != nil {
-		CliPrintError("ls: %v", err)
+		LogError("ls: %v", err)
 		return
 	}
 	if dst == "" {
@@ -34,7 +34,7 @@ func pwd(cmd *cobra.Command, args []string) {
 func cd(cmd *cobra.Command, args []string) {
 	dst, err := cmd.Flags().GetString("path")
 	if err != nil {
-		CliPrintError("cd: %v", err)
+		LogError("cd: %v", err)
 		return
 	}
 	if dst == "" {
@@ -47,16 +47,16 @@ func cd(cmd *cobra.Command, args []string) {
 func cp(cmd *cobra.Command, args []string) {
 	src, err := cmd.Flags().GetString("src")
 	if err != nil {
-		CliPrintError("cp: %v", err)
+		LogError("cp: %v", err)
 		return
 	}
 	dst, err := cmd.Flags().GetString("dst")
 	if err != nil {
-		CliPrintError("cp: %v", err)
+		LogError("cp: %v", err)
 		return
 	}
 	if src == "" || dst == "" {
-		CliPrintError("cp: src and dst are required")
+		LogError("cp: src and dst are required")
 		return
 	}
 
@@ -66,11 +66,11 @@ func cp(cmd *cobra.Command, args []string) {
 func rm(cmd *cobra.Command, args []string) {
 	dst, err := cmd.Flags().GetString("path")
 	if err != nil {
-		CliPrintError("rm: %v", err)
+		LogError("rm: %v", err)
 		return
 	}
 	if dst == "" {
-		CliPrintError("rm: path is required")
+		LogError("rm: path is required")
 		return
 	}
 	FSCmdDst("rm", dst)
@@ -79,11 +79,11 @@ func rm(cmd *cobra.Command, args []string) {
 func mkdir(cmd *cobra.Command, args []string) {
 	dst, err := cmd.Flags().GetString("path")
 	if err != nil {
-		CliPrintError("mkdir: %v", err)
+		LogError("mkdir: %v", err)
 		return
 	}
 	if dst == "" {
-		CliPrintError("mkdir: path is required")
+		LogError("mkdir: path is required")
 		return
 	}
 	FSCmdDst("mkdir", dst)
@@ -92,16 +92,16 @@ func mkdir(cmd *cobra.Command, args []string) {
 func mv(cmd *cobra.Command, args []string) {
 	src, err := cmd.Flags().GetString("src")
 	if err != nil {
-		CliPrintError("mv: %v", err)
+		LogError("mv: %v", err)
 		return
 	}
 	dst, err := cmd.Flags().GetString("dst")
 	if err != nil {
-		CliPrintError("mv: %v", err)
+		LogError("mv: %v", err)
 		return
 	}
 	if src == "" || dst == "" {
-		CliPrintError("mv: src and dst are required")
+		LogError("mv: src and dst are required")
 		return
 	}
 	FSCmdSrcDst("mv", src, dst)
@@ -122,11 +122,11 @@ func suicide(cmd *cobra.Command, args []string) {
 func kill(cmd *cobra.Command, args []string) {
 	pid, err := cmd.Flags().GetInt("pid")
 	if err != nil {
-		CliPrintError("kill: %v", err)
+		LogError("kill: %v", err)
 		return
 	}
 	if pid == 0 {
-		CliPrintError("kill: pid is required")
+		LogError("kill: pid is required")
 		return
 	}
 	executeCmd(fmt.Sprintf("kill --pid %d", pid))
@@ -143,35 +143,35 @@ func FSCmdSrcDst(cmd, src, dst string) {
 func UploadToAgent(cmd *cobra.Command, args []string) {
 	target := SelectCurrentTarget()
 	if target == nil {
-		CliPrintError("You have to select a target first")
+		LogError("You have to select a target first")
 		return
 	}
 
 	src, err := cmd.Flags().GetString("src")
 	if err != nil {
-		CliPrintError("UploadToAgent: %v", err)
+		LogError("UploadToAgent: %v", err)
 		return
 	}
 	dst, err := cmd.Flags().GetString("dst")
 	if err != nil {
-		CliPrintError("UploadToAgent: %v", err)
+		LogError("UploadToAgent: %v", err)
 		return
 	}
 
 	if src == "" || dst == "" {
-		CliPrintError(cmd.UsageString())
+		LogError(cmd.UsageString())
 		return
 	}
 
 	if err := PutFile(src, dst, target); err != nil {
-		CliPrintError("Cannot put %s: %v", src, err)
+		LogError("Cannot put %s: %v", src, err)
 	}
 }
 
 func DownloadFromAgent(cmd *cobra.Command, args []string) {
 	target := SelectCurrentTarget()
 	if target == nil {
-		CliPrintError("You have to select a target first")
+		LogError("You have to select a target first")
 		return
 	}
 	// parse command-line arguments using pflag
@@ -180,11 +180,11 @@ func DownloadFromAgent(cmd *cobra.Command, args []string) {
 
 	file_path, err := cmd.Flags().GetString("file_path")
 	if err != nil {
-		CliPrintError("download: %v", err)
+		LogError("download: %v", err)
 		return
 	}
 	if file_path == "" {
-		CliPrintError("download: file_path is required")
+		LogError("download: file_path is required")
 		return
 	}
 
@@ -192,58 +192,58 @@ func DownloadFromAgent(cmd *cobra.Command, args []string) {
 		cmd_id := uuid.NewString()
 		err = SendCmdToCurrentTarget(fmt.Sprintf("get --file_path %s --filter %s --offset 0 --token %s", file_path, strconv.Quote(filter), uuid.NewString()), cmd_id)
 		if err != nil {
-			CliPrintError("Cannot get %v+: %v", args, err)
+			LogError("Cannot get %v+: %v", args, err)
 			return
 		}
-		CliPrintInfo("Waiting for response from agent %s", target.Tag)
+		LogInfo("Waiting for response from agent %s", target.Tag)
 		var result string
 		var exists bool
 		for i := 0; i < 10; i++ {
 			result, exists = CmdResults[cmd_id]
 			if exists {
-				CliPrintInfo("Got file list from %s", target.Tag)
+				LogInfo("Got file list from %s", target.Tag)
 				CmdResultsMutex.Lock()
 				delete(CmdResults, cmd_id)
 				CmdResultsMutex.Unlock()
 				if result == "" {
-					CliPrintError("Cannot get %s: empty file list in directory", file_path)
+					LogError("Cannot get %s: empty file list in directory", file_path)
 				}
 				break
 			}
 			time.Sleep(1 * time.Second)
 		}
-		CliPrintDebug("Got file list: %s", result)
+		LogDebug("Got file list: %s", result)
 
 		// download files
 		files := strings.Split(result, "\n")
 		failed_files := []string{}
 		defer func() {
-			CliPrint("Checking %d downloads...", len(files))
+			LogMsg("Checking %d downloads...", len(files))
 			// check if downloads are successful
 			for _, file := range files {
 				// filenames
 				_, target_file, tempname, lock := generateGetFilePaths(file)
 				// check if download is successful
 				if util.IsFileExist(tempname) || util.IsFileExist(lock) || !util.IsFileExist(target_file) {
-					CliPrintWarning("%s: download seems unsuccessful", file)
+					LogWarning("%s: download seems unsuccessful", file)
 					failed_files = append(failed_files, file)
 				}
 			}
 			if len(failed_files) > 0 {
-				CliPrintError("Failed to download %d files: %s", len(failed_files), strings.Join(failed_files, ", "))
+				LogError("Failed to download %d files: %s", len(failed_files), strings.Join(failed_files, ", "))
 			} else {
-				CliPrintSuccess("All %d files downloaded successfully", len(files))
+				LogSuccess("All %d files downloaded successfully", len(files))
 			}
 		}()
-		CliPrintInfo("Downloading %d files", len(files))
+		LogInfo("Downloading %d files", len(files))
 		for n, file := range files {
 			ftpSh, err := GetFile(file, target)
 			if err != nil {
-				CliPrintWarning("Cannot get %s: %v", file, err)
+				LogWarning("Cannot get %s: %v", file, err)
 				continue
 			}
 
-			CliPrint("Downloading %d/%d: %s", n+1, len(files), file)
+			LogMsg("Downloading %d/%d: %s", n+1, len(files), file)
 
 			// wait for file to be downloaded
 			for {
@@ -258,7 +258,7 @@ func DownloadFromAgent(cmd *cobra.Command, args []string) {
 		}
 	} else {
 		if _, err := GetFile(file_path, target); err != nil {
-			CliPrintError("Cannot get %s: %v", strconv.Quote(file_path), err)
+			LogError("Cannot get %s: %v", strconv.Quote(file_path), err)
 		}
 	}
 }
@@ -266,6 +266,6 @@ func DownloadFromAgent(cmd *cobra.Command, args []string) {
 func executeCmd(cmd string) {
 	err := SendCmdToCurrentTarget(cmd, "")
 	if err != nil {
-		CliPrintError("%s failed: %v", cmd, err)
+		LogError("%s failed: %v", cmd, err)
 	}
 }

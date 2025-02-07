@@ -46,21 +46,21 @@ func APIListen() {
 	if util.IsExist(SocketName) {
 		err := os.Remove(SocketName)
 		if err != nil {
-			CliPrintError("Failed to delete socket: %v", err)
+			LogError("Failed to delete socket: %v", err)
 			return
 		}
 	}
 
 	l, err := net.Listen("unix", SocketName)
 	if err != nil {
-		CliPrintError("listen error: %v", err)
+		LogError("listen error: %v", err)
 		return
 	}
 
 	for {
 		conn, err := l.Accept()
 		if err != nil {
-			CliPrintError("emp3r0r API: accept error: %v", err)
+			LogError("emp3r0r API: accept error: %v", err)
 			return
 		}
 		APIConn = conn
@@ -84,6 +84,6 @@ func processAPIReq(c net.Conn) {
 		// deal with the command
 		cmd := string(data)
 		cmd = strings.TrimSpace(cmd)
-		CliPrintInfo("emp3r0r received %s", strconv.Quote(cmd))
+		LogInfo("emp3r0r received %s", strconv.Quote(cmd))
 	}
 }

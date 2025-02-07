@@ -15,7 +15,7 @@ import (
 func modulePortFwd() {
 	switchOpt, ok := CurrentModuleOptions["switch"]
 	if !ok {
-		CliPrintError("Option 'switch' not found")
+		LogError("Option 'switch' not found")
 		return
 	}
 	switch switchOpt.Val {
@@ -24,12 +24,12 @@ func modulePortFwd() {
 		for id, session := range PortFwds {
 			toOpt, ok := CurrentModuleOptions["to"]
 			if !ok {
-				CliPrintError("Option 'to' not found")
+				LogError("Option 'to' not found")
 				return
 			}
 			listenPortOpt, ok := CurrentModuleOptions["listen_port"]
 			if !ok {
-				CliPrintError("Option 'listen_port' not found")
+				LogError("Option 'listen_port' not found")
 				return
 			}
 			if session.To == toOpt.Val && session.Lport == listenPortOpt.Val {
@@ -42,12 +42,12 @@ func modulePortFwd() {
 				cmd := fmt.Sprintf("%s --shID %s --operation stop", emp3r0r_def.C2CmdPortFwd, id)
 				sendCMDerr := SendCmd(cmd, "", CurrentTarget)
 				if sendCMDerr != nil {
-					CliPrintError("SendCmd: %v", sendCMDerr)
+					LogError("SendCmd: %v", sendCMDerr)
 					return
 				}
 				return
 			}
-			CliPrintError("Could not find port mapping (to %s, listening on %s)",
+			LogError("Could not find port mapping (to %s, listening on %s)",
 				toOpt.Val, listenPortOpt.Val)
 		}
 	case "reverse": // expose a dest from CC to agent
@@ -55,10 +55,10 @@ func modulePortFwd() {
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
 		pf.Lport, pf.To = CurrentModuleOptions["listen_port"].Val, CurrentModuleOptions["to"].Val
 		go func() {
-			CliPrint("RunReversedPortFwd: %s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.Lport, pf.To, pf.Protocol)
+			LogMsg("RunReversedPortFwd: %s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.Lport, pf.To, pf.Protocol)
 			initErr := pf.InitReversedPortFwd()
 			if initErr != nil {
-				CliPrintError("PortFwd (reverse) failed: %v", initErr)
+				LogError("PortFwd (reverse) failed: %v", initErr)
 			}
 		}()
 	case "on":
@@ -67,10 +67,10 @@ func modulePortFwd() {
 		pf.Lport, pf.To = CurrentModuleOptions["listen_port"].Val, CurrentModuleOptions["to"].Val
 		pf.Protocol = CurrentModuleOptions["protocol"].Val
 		go func() {
-			CliPrint("RunPortFwd: %s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.Lport, pf.To, pf.Protocol)
+			LogMsg("RunPortFwd: %s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.Lport, pf.To, pf.Protocol)
 			runErr := pf.RunPortFwd()
 			if runErr != nil {
-				CliPrintError("PortFwd failed: %v", runErr)
+				LogError("PortFwd failed: %v", runErr)
 			}
 		}()
 	default:
@@ -80,14 +80,14 @@ func modulePortFwd() {
 func moduleProxy() {
 	portOpt, ok := CurrentModuleOptions["port"]
 	if !ok {
-		CliPrintError("Option 'port' not found")
+		LogError("Option 'port' not found")
 		return
 	}
 	port := portOpt.Val
 
 	statusOpt, ok := CurrentModuleOptions["status"]
 	if !ok {
-		CliPrintError("Option 'status' not found")
+		LogError("Option 'status' not found")
 		return
 	}
 	status := statusOpt.Val
@@ -114,7 +114,7 @@ func moduleProxy() {
 		cmd_id := uuid.NewString()
 		err := SendCmdToCurrentTarget("!proxy --mode on --addr 0.0.0.0:"+RuntimeConfig.Emp3r0rProxyServerPort, cmd_id)
 		if err != nil {
-			CliPrintError("Starting SOCKS5 proxy on target failed: %v", err)
+			LogError("Starting SOCKS5 proxy on target failed: %v", err)
 			return
 		}
 		var ok bool
@@ -130,15 +130,15 @@ func moduleProxy() {
 		}
 
 		if !ok {
-			CliPrintError("Timeout waiting for agent to start SOCKS5 proxy")
+			LogError("Timeout waiting for agent to start SOCKS5 proxy")
 			return
 		} else {
-			CliPrint("Agent started SOCKS5 proxy")
+			LogMsg("Agent started SOCKS5 proxy")
 			// TCP forwarding
 			go func() {
 				err := pf.RunPortFwd()
 				if err != nil {
-					CliPrintError("PortFwd (TCP) failed: %v", err)
+					LogError("PortFwd (TCP) failed: %v", err)
 				}
 			}()
 			// UDP forwarding
@@ -148,7 +148,7 @@ func moduleProxy() {
 				}
 				err := pfu.RunPortFwd()
 				if err != nil {
-					CliPrintError("PortFwd (UDP) failed: %v", err)
+					LogError("PortFwd (UDP) failed: %v", err)
 				}
 			}()
 		}
@@ -163,12 +163,12 @@ func moduleProxy() {
 				cmd := fmt.Sprintf("%s --id %s", emp3r0r_def.C2CmdDeletePortFwd, id)
 				err := SendCmd(cmd, "", session.Agent)
 				if err != nil {
-					CliPrintError("SendCmd: %v", err)
+					LogError("SendCmd: %v", err)
 					return
 				}
 			}
 		}
 	default:
-		CliPrintError("Unknown operation '%s'", status)
+		LogError("Unknown operation '%s'", status)
 	}
 }

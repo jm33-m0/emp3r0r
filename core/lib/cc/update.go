@@ -95,12 +95,12 @@ func isNewerVersion(newVersion, currentVersion string) bool {
 	// parse and compare
 	newV, versionErr := version.NewVersion(newVersion)
 	if versionErr != nil {
-		CliPrintDebug("Parsing %s: %v", strconv.Quote(newVersion), versionErr)
+		LogDebug("Parsing %s: %v", strconv.Quote(newVersion), versionErr)
 		return false
 	}
 	currentV, versionErr := version.NewVersion(currentVersion)
 	if versionErr != nil {
-		CliPrintDebug("Parsing %s: %v", strconv.Quote(currentVersion), versionErr)
+		LogDebug("Parsing %s: %v", strconv.Quote(currentVersion), versionErr)
 		return false
 	}
 
@@ -111,21 +111,21 @@ func isNewerVersion(newVersion, currentVersion string) bool {
 // force: force update even if the latest version is the same as the current one
 func UpdateCC(cmd *cobra.Command, args []string) {
 	force, _ := cmd.Flags().GetBool("force")
-	CliPrintInfo("Requesting latest emp3r0r release from GitHub...")
+	LogInfo("Requesting latest emp3r0r release from GitHub...")
 	// get latest release
 	tarballURL, checksum, err := GetTarballURL(force)
 	if err != nil {
-		CliPrintError("Failed to get latest release: %v", err)
+		LogError("Failed to get latest release: %v", err)
 		return
 	}
 
 	// force update
 	if force {
-		CliPrintWarning("Force update is enabled, updating to the latest version regardless of the current version")
+		LogWarning("Force update is enabled, updating to the latest version regardless of the current version")
 	}
 
 	// checksum
-	CliPrintInfo("Checksum: %s", checksum)
+	LogInfo("Checksum: %s", checksum)
 
 	// download path
 	path := "/tmp/emp3r0r.tar.zst"
@@ -133,7 +133,7 @@ func UpdateCC(cmd *cobra.Command, args []string) {
 
 	// check if lock exists
 	if util.IsFileExist(lock) {
-		CliPrintError("lock file %s exists, another download is in progress, if it's not the case, manually remove the lock", lock)
+		LogError("lock file %s exists, another download is in progress, if it's not the case, manually remove the lock", lock)
 		return
 	}
 	os.Remove(lock)
@@ -147,14 +147,14 @@ func UpdateCC(cmd *cobra.Command, args []string) {
 	// check if target file exists
 	if util.IsFileExist(path) {
 		// verify checksum
-		CliPrintInfo("The tarball is already downloaded, verifying checksum...")
+		LogInfo("The tarball is already downloaded, verifying checksum...")
 		if !verify_checksum() {
-			CliPrintWarning("Checksum verification failed, redownloading...")
+			LogWarning("Checksum verification failed, redownloading...")
 			need_download = true
 			os.RemoveAll(path)
 			os.RemoveAll("/tmp/emp3r0r-build")
 		} else {
-			CliPrint("Checksum verification passed, installing...")
+			LogMsg("Checksum verification passed, installing...")
 		}
 	} else {
 		need_download = true
@@ -169,15 +169,15 @@ func UpdateCC(cmd *cobra.Command, args []string) {
 		// download tarball using grab
 		client := grab.NewClient()
 		if client.HTTPClient == nil {
-			CliPrintError("failed to initialize HTTP client")
+			LogError("failed to initialize HTTP client")
 			return
 		}
 		req, downloadErr := grab.NewRequest(path, tarballURL)
 		if downloadErr != nil {
-			CliPrintError("create grab request: %v", downloadErr)
+			LogError("create grab request: %v", downloadErr)
 			return
 		}
-		CliPrint("Downloading %s to %s...", tarballURL, path)
+		LogMsg("Downloading %s to %s...", tarballURL, path)
 		resp := client.Do(req)
 
 		// progress
@@ -193,33 +193,33 @@ func UpdateCC(cmd *cobra.Command, args []string) {
 			case <-resp.Done:
 				downloadErr = resp.Err()
 				if downloadErr != nil {
-					CliPrintError("download finished with error: %v", downloadErr)
+					LogError("download finished with error: %v", downloadErr)
 					return
 				}
 				if !verify_checksum() {
-					CliPrintError("checksum verification failed")
+					LogError("checksum verification failed")
 					return
 				}
-				CliPrintSuccess("Saved %s to %s (%d bytes)", tarballURL, path, resp.Size())
+				LogSuccess("Saved %s to %s (%d bytes)", tarballURL, path, resp.Size())
 			case <-t.C:
-				CliPrintInfo("%.02f%% complete at %.02f KB/s", resp.Progress()*100, resp.BytesPerSecond()/1024)
+				LogInfo("%.02f%% complete at %.02f KB/s", resp.Progress()*100, resp.BytesPerSecond()/1024)
 			}
 		}
 	}
 
-	CliPrintInfo("Installing emp3r0r...")
+	LogInfo("Installing emp3r0r...")
 	install_cmd := fmt.Sprintf("bash -c 'tar -I zstd -xvf %s -C /tmp && cd /tmp/emp3r0r-build && sudo ./emp3r0r --install; sleep 5'", path)
-	CliPrint("Running installer command: %s. Please run `tmux kill-session -t emp3r0r` after installing", install_cmd)
+	LogMsg("Running installer command: %s. Please run `tmux kill-session -t emp3r0r` after installing", install_cmd)
 
 	wrapper, err := exec.LookPath("x-terminal-emulator")
 	if err != nil {
-		CliPrintError("%v. your distribution is unsupported", err)
+		LogError("%v. your distribution is unsupported", err)
 		return
 	}
 	exec_cmd := exec.Command(wrapper, "-e", install_cmd)
 	exec_cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	out, err := exec_cmd.CombinedOutput()
 	if err != nil {
-		CliPrintError("failed to update emp3r0r: %v: %s", err, out)
+		LogError("failed to update emp3r0r: %v: %s", err, out)
 	}
 }

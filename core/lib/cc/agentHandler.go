@@ -35,7 +35,7 @@ func processAgentData(data *emp3r0r_def.MsgTunData) {
 	target := GetTargetFromTag(data.Tag)
 	contrlIf := Targets[target]
 	if target == nil || contrlIf == nil {
-		CliPrintError("Target %s cannot be found, however, it left a message saying:\n%v",
+		LogError("Target %s cannot be found, however, it left a message saying:\n%v",
 			data.Tag, payloadSplit)
 		return
 	}
@@ -59,13 +59,13 @@ func processAgentData(data *emp3r0r_def.MsgTunData) {
 	CmdResultsMutex.Unlock()
 	start_time, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", CmdTime[cmd_id])
 	if err != nil {
-		CliPrintWarning("Parsing timestamp '%s': %v", CmdTime[cmd_id], err)
+		LogWarning("Parsing timestamp '%s': %v", CmdTime[cmd_id], err)
 	} else {
 		time_spent := time.Since(start_time)
 		if is_builtin_cmd {
-			CliPrintDebug("Command %s took %s", strconv.Quote(cmd), time_spent)
+			LogDebug("Command %s took %s", strconv.Quote(cmd), time_spent)
 		} else {
-			CliPrintInfo("Command %s took %s", strconv.Quote(cmd), time_spent)
+			LogInfo("Command %s took %s", strconv.Quote(cmd), time_spent)
 		}
 	}
 
@@ -95,7 +95,7 @@ func processAgentData(data *emp3r0r_def.MsgTunData) {
 		go func() {
 			err = processScreenshot(out, target)
 			if err != nil {
-				CliPrintError("%v", err)
+				LogError("%v", err)
 			}
 		}()
 
@@ -104,7 +104,7 @@ func processAgentData(data *emp3r0r_def.MsgTunData) {
 		var procs []util.ProcEntry
 		err = json.Unmarshal([]byte(out), &procs)
 		if err != nil {
-			CliPrintError("ps: %v:\n%s", err, out)
+			LogError("ps: %v:\n%s", err, out)
 			return
 		}
 
@@ -147,7 +147,7 @@ func processAgentData(data *emp3r0r_def.MsgTunData) {
 		var dents []util.Dentry
 		err = json.Unmarshal([]byte(out), &dents)
 		if err != nil {
-			CliPrintError("ls: %v:\n%s", err, out)
+			LogError("ls: %v:\n%s", err, out)
 			return
 		}
 
@@ -206,7 +206,7 @@ func processAgentData(data *emp3r0r_def.MsgTunData) {
 	AgentOutputPane.Printf(false, "%s", agent_output)
 	logf, err := os.OpenFile(AgentOuputLogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		CliPrintError("Failed to open agent log file: %v", err)
+		LogError("Failed to open agent log file: %v", err)
 		return
 	}
 	defer logf.Close()

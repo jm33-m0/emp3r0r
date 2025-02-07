@@ -349,12 +349,12 @@ var (
 func CmdHelp(cmd *cobra.Command, args []string) {
 	mod, err := cmd.Flags().GetString("module")
 	if err != nil {
-		CliPrintError("Error getting module name: %v", err)
+		LogError("Error getting module name: %v", err)
 		return
 	}
 	help := make(map[string]string)
 	if mod == "" {
-		CliPrintError("No module specified")
+		LogError("No module specified")
 		return
 	}
 
@@ -367,10 +367,10 @@ func CmdHelp(cmd *cobra.Command, args []string) {
 			} else {
 				help[modname] = "No options"
 			}
-			CliPrint("\n%s", modObj.Comment)
+			LogMsg("\n%s", modObj.Comment)
 			CliPrettyPrint("Option", "Help", &help)
 			return
 		}
 	}
-	CliPrintError("Help yourself")
+	LogError("Help yourself")
 }

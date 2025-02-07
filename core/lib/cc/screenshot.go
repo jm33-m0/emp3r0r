@@ -22,7 +22,7 @@ func TakeScreenshot(cmd *cobra.Command, args []string) {
 	// tell agent to take screenshot
 	screenshotErr := SendCmdToCurrentTarget("screenshot", "")
 	if screenshotErr != nil {
-		CliPrintError("send screenshot cmd: %v", screenshotErr)
+		LogError("send screenshot cmd: %v", screenshotErr)
 		return
 	}
 
@@ -33,7 +33,7 @@ func processScreenshot(out string, target *emp3r0r_def.Emp3r0rAgent) (err error)
 	if strings.Contains(out, "Error") {
 		return fmt.Errorf("%s", out)
 	}
-	CliPrintInfo("We will get %s screenshot file for you, wait", strconv.Quote(out))
+	LogInfo("We will get %s screenshot file for you, wait", strconv.Quote(out))
 	_, err = GetFile(out, target)
 	if err != nil {
 		err = fmt.Errorf("get screenshot: %v", err)
@@ -58,7 +58,7 @@ func processScreenshot(out string, target *emp3r0r_def.Emp3r0rAgent) (err error)
 			break
 		}
 		if is_download_corrupted() {
-			CliPrintWarning("Processing screenshot %s: incomplete download detected, retrying...",
+			LogWarning("Processing screenshot %s: incomplete download detected, retrying...",
 				strconv.Quote(out))
 			return processScreenshot(out, target)
 		}
@@ -70,14 +70,14 @@ func processScreenshot(out string, target *emp3r0r_def.Emp3r0rAgent) (err error)
 		if err != nil {
 			return fmt.Errorf("unarchive screenshot zip: %v", err)
 		}
-		CliPrintWarning("Multiple screenshots extracted to %s", FileGetDir)
+		LogWarning("Multiple screenshots extracted to %s", FileGetDir)
 		return
 	}
 
 	// open it if possible
 	if util.IsCommandExist("xdg-open") &&
 		os.Getenv("DISPLAY") != "" {
-		CliPrintInfo("Seems like we can open the picture (%s) for you to view, hold on",
+		LogInfo("Seems like we can open the picture (%s) for you to view, hold on",
 			FileGetDir+path)
 		cmd := exec.Command("xdg-open", FileGetDir+path)
 		err = cmd.Start()
@@ -89,7 +89,7 @@ func processScreenshot(out string, target *emp3r0r_def.Emp3r0rAgent) (err error)
 	// tell agent to delete the remote file
 	err = SendCmd("rm --path"+out, "", target)
 	if err != nil {
-		CliPrintWarning("Failed to delete remote file %s: %v", strconv.Quote(out), err)
+		LogWarning("Failed to delete remote file %s: %v", strconv.Quote(out), err)
 	}
 
 	return

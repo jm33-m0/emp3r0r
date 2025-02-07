@@ -7,15 +7,19 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/cc"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 )
+
+var Logger = logging.NewLogger(2)
 
 func readJSONConfig(filename string) (err error) {
 	// read JSON
@@ -35,7 +39,7 @@ func init_magic_agent_one_time_bytes() {
 	// update binaries
 	files, err := os.ReadDir(cc.EmpWorkSpace)
 	if err != nil {
-		cc.CliFatalError("init_magic_str: %v", err)
+		Logger.Fatal("init_magic_str: %v", err)
 	}
 	for _, f := range files {
 		if f.IsDir() {
@@ -45,7 +49,7 @@ func init_magic_agent_one_time_bytes() {
 			err = util.ReplaceBytesInFile(fmt.Sprintf("%s/%s", cc.EmpWorkSpace, f.Name()),
 				default_magic_str, emp3r0r_def.OneTimeMagicBytes)
 			if err != nil {
-				cc.CliPrintError("init_magic_str %v", err)
+				Logger.Error("init_magic_str %v", err)
 			}
 		}
 	}
@@ -56,9 +60,13 @@ func main() {
 	// including config file location
 	err := cc.InitC2()
 	if err != nil {
-		cc.CliFatalError("DirSetup: %v", err)
+		log.Fatalf("DirSetup: %v", err)
 	}
 
+	// set up logger
+	Logger = logging.NewLogger(2)
+
+	// command line arguments
 	cdnproxy := flag.String("cdn2proxy", "", "Start cdn2proxy server on this port")
 	config := flag.String("config", cc.EmpConfigFile, "Use this config file to update hardcoded variables")
 	names := flag.String("gencert", "", "Generate C2 server cert with these host names")
@@ -79,11 +87,11 @@ func main() {
 		hosts := strings.Fields(*names)
 		certErr := cc.GenC2Certs(hosts)
 		if certErr != nil {
-			cc.CliFatalError("GenC2Certs: %v", certErr)
+			Logger.Fatal("GenC2Certs: %v", certErr)
 		}
 		certErr = cc.InitConfigFile(hosts[0])
 		if certErr != nil {
-			cc.CliFatalError("Init %s: %v", cc.EmpConfigFile, certErr)
+			Logger.Fatal("Init %s: %v", cc.EmpConfigFile, certErr)
 		}
 		os.Exit(0)
 	}
@@ -91,7 +99,7 @@ func main() {
 	// read config file
 	err = readJSONConfig(*config)
 	if err != nil {
-		cc.CliFatalError("Failed to read config from '%s': %v", *config, err)
+		Logger.Fatal("Failed to read config from '%s': %v", *config, err)
 	}
 
 	// set up magic string
@@ -99,20 +107,20 @@ func main() {
 
 	// abort if CC is already running
 	if cc.IsCCRunning() {
-		cc.CliFatalError("CC is already running")
+		Logger.Fatal("CC is already running")
 	}
 
 	// run as relay client
 	if *connect_relay_addr != "" {
 		if *relayed_port == 0 {
-			cc.CliFatalError("Please specify -relayed_port")
+			Logger.Fatal("Please specify -relayed_port")
 		}
 		go func() {
-			defer cc.CliPrintError("session unexpectedly exited, please restart emp3r0r")
+			defer Logger.Error("session unexpectedly exited, please restart emp3r0r")
 			SSHConnections := make(map[string]context.CancelFunc, 10)
 			pubkey, sshKeyErr := tun.SSHPublicKey(cc.RuntimeConfig.SSHHostKey)
 			if sshKeyErr != nil {
-				cc.CliFatalError("Parsing SSHPublicKey: %v", sshKeyErr)
+				Logger.Fatal("Parsing SSHPublicKey: %v", sshKeyErr)
 			}
 		ssh_connect:
 			ctx, cancel := context.WithCancel(context.Background())
@@ -124,7 +132,7 @@ func main() {
 			if sshKeyErr == nil {
 				sshKeyErr = fmt.Errorf("session unexpectedly exited")
 			}
-			cc.CliPrintWarning("SSHRemoteFwdClient: %v, retrying", sshKeyErr)
+			Logger.Warning("SSHRemoteFwdClient: %v, retrying", sshKeyErr)
 			util.TakeABlink()
 			goto ssh_connect
 		}()
@@ -135,11 +143,11 @@ func main() {
 		go func() {
 			logFile, openErr := os.OpenFile("/tmp/ws.log", os.O_CREATE|os.O_RDWR, 0o600)
 			if openErr != nil {
-				cc.CliFatalError("OpenFile: %v", openErr)
+				Logger.Fatal("OpenFile: %v", openErr)
 			}
 			openErr = cdn2proxy.StartServer(*cdnproxy, "127.0.0.1:"+cc.RuntimeConfig.CCPort, "ws", logFile)
 			if openErr != nil {
-				cc.CliFatalError("CDN StartServer: %v", openErr)
+				Logger.Fatal("CDN StartServer: %v", openErr)
 			}
 		}()
 	}
@@ -152,7 +160,7 @@ func main() {
 	// run as relay server
 	// no need to start CC services
 	if *ssh_relay_port != "" {
-		cc.CliMsg("Copy ~/.emp3r0r to client host, "+
+		Logger.Msg("Copy ~/.emp3r0r to client host, "+
 			"then run `emp3r0r -connect_relay relay_ip:%s -relayed_port %s` "+
 			"(C2 port, or Shadowsocks port %s if you are using it)",
 			*ssh_relay_port, cc.RuntimeConfig.CCPort, cc.RuntimeConfig.ShadowsocksLocalSocksPort)
@@ -160,7 +168,7 @@ func main() {
 			cc.RuntimeConfig.Password,
 			cc.RuntimeConfig.SSHHostKey)
 		if err != nil {
-			cc.CliFatalError("SSHRemoteFwdServer: %v", err)
+			Logger.Fatal("SSHRemoteFwdServer: %v", err)
 		}
 	} else {
 		// run CLI

@@ -18,7 +18,7 @@ import (
 
 func UpgradeAgent(cmd *cobra.Command, args []string) {
 	if !util.IsExist(WWWRoot + "agent") {
-		CliPrintError("%s/agent not found, build one with `use gen_agent` first", WWWRoot)
+		LogError("%s/agent not found, build one with `use gen_agent` first", WWWRoot)
 		return
 	}
 	checksum := tun.SHA256SumFile(WWWRoot + "agent")
@@ -31,22 +31,22 @@ func read_cached_config(config_key string) (val interface{}) {
 	var config_map map[string]interface{}
 
 	if util.IsExist(EmpConfigFile) {
-		CliPrintDebug("Reading config '%s' from existing %s", config_key, EmpConfigFile)
+		LogDebug("Reading config '%s' from existing %s", config_key, EmpConfigFile)
 		jsonData, err := os.ReadFile(EmpConfigFile)
 		if err != nil {
-			CliPrintWarning("failed to read %s: %v", EmpConfigFile, err)
+			LogWarning("failed to read %s: %v", EmpConfigFile, err)
 			return ""
 		}
 		// load to map
 		err = json.Unmarshal(jsonData, &config_map)
 		if err != nil {
-			CliPrintWarning("Parsing existing %s: %v", EmpConfigFile, err)
+			LogWarning("Parsing existing %s: %v", EmpConfigFile, err)
 			return ""
 		}
 	}
 	val, exists := config_map[config_key]
 	if !exists {
-		CliPrintWarning("%s not found in JSON config", config_key)
+		LogWarning("%s not found in JSON config", config_key)
 		return ""
 	}
 	return val
@@ -55,12 +55,12 @@ func read_cached_config(config_key string) (val interface{}) {
 // GenC2Certs generate certificates for CA and emp3r0r C2 server
 func GenC2Certs(hosts []string) (err error) {
 	if !util.IsFileExist(CAKeyFile) || !util.IsFileExist(CACrtFile) {
-		CliPrint("CA cert not found, generating...")
+		LogMsg("CA cert not found, generating...")
 		_, err = tun.GenCerts(nil, "", true)
 		if err != nil {
 			return fmt.Errorf("generate CA: %v", err)
 		}
-		CliPrintInfo("CA fingerprint: %s", RuntimeConfig.CAFingerprint)
+		LogInfo("CA fingerprint: %s", RuntimeConfig.CAFingerprint)
 	}
 
 	// save CA cert to emp3r0r.json
@@ -70,8 +70,8 @@ func GenC2Certs(hosts []string) (err error) {
 	}
 
 	// generate server cert
-	CliPrint("Server cert not found, generating...")
-	CliPrintInfo("Server cert fingerprint: %s", tun.GetFingerprint(ServerCrtFile))
+	LogMsg("Server cert not found, generating...")
+	LogInfo("Server cert fingerprint: %s", tun.GetFingerprint(ServerCrtFile))
 	_, err = tun.GenCerts(hosts, "emp3r0r", false)
 	return
 }

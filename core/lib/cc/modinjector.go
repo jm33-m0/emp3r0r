@@ -15,11 +15,11 @@ func moduleInjector() {
 	// target
 	target := CurrentTarget
 	if target == nil {
-		CliPrintError("Target not exist")
+		LogError("Target not exist")
 		return
 	}
 	if CurrentModuleOptions["method"] == nil || CurrentModuleOptions["pid"] == nil {
-		CliPrintError("One or more required options are nil")
+		LogError("One or more required options are nil")
 		return
 	}
 	method := CurrentModuleOptions["method"].Val
@@ -31,14 +31,14 @@ func moduleInjector() {
 	// shellcode.txt
 	pid := CurrentModuleOptions["pid"].Val
 	if method == "shellcode" && !util.IsExist(WWWRoot+shellcode_file) {
-		CliPrintWarning("Custom shellcode '%s%s' does not exist, will inject guardian shellcode", WWWRoot, shellcode_file)
+		LogWarning("Custom shellcode '%s%s' does not exist, will inject guardian shellcode", WWWRoot, shellcode_file)
 	} else {
 		checksum = tun.SHA256SumFile(WWWRoot + shellcode_file)
 	}
 
 	// to_inject.so
 	if method == "shared_library" && !util.IsExist(WWWRoot+so_file) {
-		CliPrintWarning("Custom library '%s%s' does not exist, will inject loader.so instead", WWWRoot, so_file)
+		LogWarning("Custom library '%s%s' does not exist, will inject loader.so instead", WWWRoot, so_file)
 	} else {
 		checksum = tun.SHA256SumFile(WWWRoot + so_file)
 	}
@@ -49,8 +49,8 @@ func moduleInjector() {
 	// tell agent to inject
 	err := SendCmd(cmd, "", target)
 	if err != nil {
-		CliPrintError("Could not send command (%s) to agent: %v", cmd, err)
+		LogError("Could not send command (%s) to agent: %v", cmd, err)
 		return
 	}
-	CliMsg("Please wait...")
+	LogMsg("Please wait...")
 }

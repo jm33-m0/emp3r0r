@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"strings"
 	"time"
 
@@ -30,9 +29,6 @@ var (
 	// Store agents' output
 	AgentOuputLogFile = ""
 
-	// ConsoleLogFile : log to console
-	ConsoleLogFile = ""
-
 	// Emp3r0rConsole: the main console interface
 	Emp3r0rConsole = console.New(AppName)
 )
@@ -47,11 +43,11 @@ func CliMain() {
 	// unlock incomplete downloads
 	err := UnlockDownloads()
 	if err != nil {
-		CliPrintDebug("UnlockDownloads: %v", err)
+		LogDebug("UnlockDownloads: %v", err)
 	}
 	mainMenu := Emp3r0rConsole.NewMenu("")
 	Emp3r0rConsole.SetPrintLogo(CliBanner)
-	go goRoutineLogHelper(Emp3r0rConsole)
+	go Logger.Start()
 
 	// History
 	histFile := fmt.Sprintf("%s/%s.history", AppName, EmpWorkSpace)
@@ -79,7 +75,7 @@ func CliMain() {
 	// Tmux setup
 	err = TmuxInitWindows()
 	if err != nil {
-		log.Fatalf("Fatal TMUX error: %v, please run `tmux kill-session -t emp3r0r` and re-run emp3r0r", err)
+		Logger.Fatal("Fatal TMUX error: %v, please run `tmux kill-session -t emp3r0r` and re-run emp3r0r", err)
 	}
 	defer TmuxDeinitWindows()
 
@@ -156,7 +152,7 @@ func getTransport(transportStr string) string {
 func CliBanner(console *console.Console) {
 	data, encodingErr := base64.StdEncoding.DecodeString(cliBannerB64)
 	if encodingErr != nil {
-		log.Fatalf("failed to print banner: %v", encodingErr.Error())
+		Logger.Fatal("failed to print banner: %v", encodingErr.Error())
 	}
 	banner := strings.Builder{}
 	banner.Write(data)
@@ -167,17 +163,17 @@ func CliBanner(console *console.Console) {
 		cowsay.Random(),
 	)
 	if encodingErr != nil {
-		log.Fatalf("CowSay: %v", encodingErr)
+		Logger.Fatal("CowSay: %v", encodingErr)
 	}
 
 	// C2 names
 	encodingErr = LoadCACrt()
 	if encodingErr != nil {
-		log.Fatalf("Failed to parse CA cert: %v", encodingErr)
+		Logger.Fatal("Failed to parse CA cert: %v", encodingErr)
 	}
 	c2_names := tun.NamesInCert(ServerCrtFile)
 	if len(c2_names) <= 0 {
-		log.Fatalf("C2 has no names?")
+		Logger.Fatal("C2 has no names?")
 	}
 	name_list := strings.Join(c2_names, ", ")
 
@@ -194,7 +190,7 @@ func CliBanner(console *console.Console) {
 		name_list,
 		RuntimeConfig.CAFingerprint))
 	if encodingErr != nil {
-		log.Fatalf("CowSay: %v", encodingErr)
+		Logger.Fatal("CowSay: %v", encodingErr)
 	}
 	banner.WriteString(color.CyanString("%s\n\n", say))
 	fmt.Print(banner.String())
@@ -248,7 +244,7 @@ func CliPrettyPrint(header1, header2 string, map2write *map[string]string) {
 	table.Render()
 	out := tableString.String()
 	AdaptiveTable(out)
-	CliPrint("\n%s", out)
+	LogMsg("\n%s", out)
 }
 
 // encoded logo of emp3r0r
@@ -274,7 +270,7 @@ func AdaptiveTable(tableString string) {
 	TmuxUpdatePanes()
 	row_len := len(strings.Split(tableString, "\n")[0])
 	if CommandPane.Width < row_len {
-		CliPrintDebug("Command Pane %d vs %d table width, resizing", CommandPane.Width, row_len)
+		LogDebug("Command Pane %d vs %d table width, resizing", CommandPane.Width, row_len)
 		CommandPane.ResizePane("x", row_len)
 	}
 }

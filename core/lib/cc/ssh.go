@@ -75,7 +75,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 		if !is_sftp {
 			SetOption("port", new_port)
 		}
-		CliPrintWarning("Switching to a new port %s for shell (%s)", port, shell)
+		LogWarning("Switching to a new port %s for shell (%s)", port, shell)
 	}
 	to := "127.0.0.1:" + port // decide what port/shell to connect to
 
@@ -89,14 +89,14 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 				// if trying to open a different shell on the same port, change to a new port
 				if s != shell && ssh_mapping.ToPort == port {
 					new_port := strconv.Itoa(util.RandInt(2048, 65535))
-					CliPrintWarning("Port %s has %s shell on it, restarting with a different port %s", port, s, new_port)
+					LogWarning("Port %s has %s shell on it, restarting with a different port %s", port, s, new_port)
 					SetOption("port", new_port)
 					err = SSHClient(shell, args, new_port, split)
 					return err
 				}
 			}
 			// if a shell is already open, use it
-			CliPrintWarning("Using existing port mapping %s -> remote:%s for shell %s", p.Lport, port, shell)
+			LogWarning("Using existing port mapping %s -> remote:%s for shell %s", p.Lport, port, shell)
 			lport = p.Lport // use the correct port
 			break
 		}
@@ -113,7 +113,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 		if err != nil {
 			return
 		}
-		CliPrintInfo("Waiting for sshd (%s) on target %s", shell, strconv.Quote(CurrentTarget.Tag))
+		LogInfo("Waiting for sshd (%s) on target %s", shell, strconv.Quote(CurrentTarget.Tag))
 
 		// wait until sshd is up
 		defer func() {
@@ -143,7 +143,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 		}
 
 		// set up port mapping for the ssh session
-		CliPrintInfo("Setting up port mapping (local %s -> remote %s) for sshd (%s)", lport, to, shell)
+		LogInfo("Setting up port mapping (local %s -> remote %s) for sshd (%s)", lport, to, shell)
 		pf := &PortFwdSession{}
 		pf.Description = fmt.Sprintf("ssh shell (%s)", shell)
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
@@ -159,10 +159,10 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 			err = pf.RunPortFwd()
 			if err != nil {
 				err = fmt.Errorf("PortFwd failed: %v", err)
-				CliPrintError("Start port mapping for sshd (%s): %v", shell, err)
+				LogError("Start port mapping for sshd (%s): %v", shell, err)
 			}
 		}()
-		CliPrintInfo("Waiting for response from %s", CurrentTarget.Tag)
+		LogInfo("Waiting for response from %s", CurrentTarget.Tag)
 		if err != nil {
 			return
 		}
@@ -191,7 +191,7 @@ wait:
 	// let's do the ssh
 	sshPath, err := exec.LookPath(ssh_prog)
 	if err != nil {
-		CliPrintError("%s not found, please install it first: %v", ssh_prog, err)
+		LogError("%s not found, please install it first: %v", ssh_prog, err)
 	}
 	sshCmd := fmt.Sprintf("%s -p %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 127.0.0.1",
 		sshPath, lport)
@@ -220,7 +220,7 @@ wait:
 	}
 
 	// if open in new tmux window
-	CliPrintInfo("\nOpening SSH (%s - %s) session for %s in Shell tab.\n"+
+	LogInfo("\nOpening SSH (%s - %s) session for %s in Shell tab.\n"+
 		"If that fails, please execute command\n%s\nmanaully",
 		shell, port, CurrentTarget.Tag, sshCmd)
 

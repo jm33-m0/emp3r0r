@@ -13,13 +13,13 @@ import (
 func modulePersistence() {
 	methodOpt, ok := CurrentModuleOptions["method"]
 	if !ok {
-		CliPrintError("Option 'method' not found")
+		LogError("Option 'method' not found")
 		return
 	}
 	cmd := fmt.Sprintf("%s --method %s", emp3r0r_def.C2CmdPersistence, methodOpt.Val)
 	err := SendCmd(cmd, "", CurrentTarget)
 	if err != nil {
-		CliPrintError("SendCmd: %v", err)
+		LogError("SendCmd: %v", err)
 		return
 	}
 	color.HiMagenta("Please wait for agent's response...")
@@ -28,13 +28,13 @@ func modulePersistence() {
 func moduleLogCleaner() {
 	keywordOpt, ok := CurrentModuleOptions["keyword"]
 	if !ok {
-		CliPrintError("Option 'keyword' not found")
+		LogError("Option 'keyword' not found")
 		return
 	}
 	cmd := fmt.Sprintf("%s --keyword %s", emp3r0r_def.C2CmdCleanLog, keywordOpt.Val)
 	err := SendCmd(cmd, "", CurrentTarget)
 	if err != nil {
-		CliPrintError("SendCmd: %v", err)
+		LogError("SendCmd: %v", err)
 		return
 	}
 	color.HiMagenta("Please wait for agent's response...")

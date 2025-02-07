@@ -11,14 +11,14 @@ import (
 
 // DonoutPE2Shellcode generates shellcode using donut for the executable files
 func DonoutPE2Shellcode(executable_file, arch_choice string) {
-	CliPrintInfo("Generating shellcode for: %s", executable_file)
+	LogInfo("Generating shellcode for: %s", executable_file)
 	outfile := fmt.Sprintf("%s.bin", executable_file)
 	out, err := DonutShellcodeFromFile(executable_file, outfile, arch_choice, false, "", "", "")
 	if err != nil {
-		CliPrintError("Donut: %s: %v", out, err)
+		LogError("Donut: %s: %v", out, err)
 		return
 	}
-	CliPrint("Generated shellcode:\n%s", out)
+	LogMsg("Generated shellcode:\n%s", out)
 }
 
 // DonutShellcodeFromFile returns a Donut shellcode for the given PE file

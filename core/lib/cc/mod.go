@@ -83,7 +83,7 @@ func UpdateOptions(modName string) (exist bool) {
 		}
 	}
 	if !exist {
-		CliPrintError("UpdateOptions: no such module: %s", modName)
+		LogError("UpdateOptions: no such module: %s", modName)
 		return
 	}
 
@@ -167,27 +167,27 @@ func UpdateOptions(modName string) (exist bool) {
 func ModuleRun(_ *cobra.Command, _ []string) {
 	modObj := emp3r0r_def.Modules[CurrentMod]
 	if modObj == nil {
-		CliPrintError("ModuleRun: module %s not found", strconv.Quote(CurrentMod))
+		LogError("ModuleRun: module %s not found", strconv.Quote(CurrentMod))
 		return
 	}
 	if CurrentTarget != nil {
 		target_os := CurrentTarget.GOOS
 		mod_os := strings.ToLower(modObj.Platform)
 		if mod_os != "generic" && target_os != mod_os {
-			CliPrintError("ModuleRun: module %s does not support %s", strconv.Quote(CurrentMod), target_os)
+			LogError("ModuleRun: module %s does not support %s", strconv.Quote(CurrentMod), target_os)
 			return
 		}
 	}
 
 	// is a target needed?
 	if CurrentTarget == nil && !modObj.IsLocal {
-		CliPrintError("Target not specified")
+		LogError("Target not specified")
 		return
 	}
 
 	// check if target exists
 	if Targets[CurrentTarget] == nil && CurrentTarget != nil {
-		CliPrintError("Target (%s) does not exist", CurrentTarget.Tag)
+		LogError("Target (%s) does not exist", CurrentTarget.Tag)
 		return
 	}
 
@@ -196,7 +196,7 @@ func ModuleRun(_ *cobra.Command, _ []string) {
 	if mod != nil {
 		go mod()
 	} else {
-		CliPrintError("Module %s not found", strconv.Quote(CurrentMod))
+		LogError("Module %s not found", strconv.Quote(CurrentMod))
 	}
 }
 
@@ -205,18 +205,18 @@ func SelectCurrentTarget() (target *emp3r0r_def.Emp3r0rAgent) {
 	// find target
 	target = CurrentTarget
 	if target == nil {
-		CliPrintError("SelectCurrentTarget: Target does not exist")
+		LogError("SelectCurrentTarget: Target does not exist")
 		return nil
 	}
 
 	// write to given target's connection
 	tControl := Targets[target]
 	if tControl == nil {
-		CliPrintError("SelectCurrentTarget: agent control interface not found")
+		LogError("SelectCurrentTarget: agent control interface not found")
 		return nil
 	}
 	if tControl.Conn == nil {
-		CliPrintError("SelectCurrentTarget: agent is not connected")
+		LogError("SelectCurrentTarget: agent is not connected")
 		return nil
 	}
 
@@ -227,11 +227,11 @@ func SelectCurrentTarget() (target *emp3r0r_def.Emp3r0rAgent) {
 func ModuleSearch(cmd *cobra.Command, args []string) {
 	keyword, err := cmd.Flags().GetString("keyword")
 	if err != nil {
-		CliPrintError("ModuleSearch: %v", err)
+		LogError("ModuleSearch: %v", err)
 		return
 	}
 	if keyword == "" {
-		CliPrintError("ModuleSearch: no keyword provided")
+		LogError("ModuleSearch: no keyword provided")
 		return
 	}
 	search_targets := new([]string)
@@ -254,7 +254,7 @@ func ModuleSearch(cmd *cobra.Command, args []string) {
 // listModOptionsTable list currently available options for `set`
 func listModOptionsTable(_ *cobra.Command, _ []string) {
 	if CurrentMod == "none" {
-		CliPrintWarning("No module selected")
+		LogWarning("No module selected")
 		return
 	}
 	TargetsMutex.RLock()
@@ -301,7 +301,7 @@ func listModOptionsTable(_ *cobra.Command, _ []string) {
 	// fill table
 	module_obj := emp3r0r_def.Modules[CurrentMod]
 	if module_obj == nil {
-		CliPrintError("Module %s not found", CurrentMod)
+		LogError("Module %s not found", CurrentMod)
 		return
 	}
 	for opt_name, opt_obj := range module_obj.Options {
@@ -333,22 +333,22 @@ func listModOptionsTable(_ *cobra.Command, _ []string) {
 	table.Render()
 	out := tableString.String()
 	AdaptiveTable(out)
-	CliPrint("\n%s", out)
+	LogMsg("\n%s", out)
 }
 
 func setOptValCmd(cmd *cobra.Command, args []string) {
 	opt, err := cmd.Flags().GetString("option")
 	if err != nil {
-		CliPrintError("set option: %v", err)
+		LogError("set option: %v", err)
 		return
 	}
 	val, err := cmd.Flags().GetString("value")
 	if err != nil {
-		CliPrintError("set option: %v", err)
+		LogError("set option: %v", err)
 		return
 	}
 	if opt == "" || val == "" {
-		CliPrintError(cmd.UsageString())
+		LogError(cmd.UsageString())
 		return
 	}
 	// hand to SetOption helper
@@ -359,7 +359,7 @@ func setOptValCmd(cmd *cobra.Command, args []string) {
 func setActiveModule(cmd *cobra.Command, args []string) {
 	modName, err := cmd.Flags().GetString("module")
 	if err != nil {
-		CliPrintError(cmd.UsageString())
+		LogError(cmd.UsageString())
 		return
 	}
 	for mod := range ModuleHelpers {
@@ -369,16 +369,16 @@ func setActiveModule(cmd *cobra.Command, args []string) {
 				delete(CurrentModuleOptions, k)
 			}
 			UpdateOptions(CurrentMod)
-			CliPrintInfo("Using module %s", strconv.Quote(CurrentMod))
+			LogInfo("Using module %s", strconv.Quote(CurrentMod))
 			ModuleDetails(CurrentMod)
 			mod, exists := emp3r0r_def.Modules[CurrentMod]
 			if exists {
-				CliPrint("%s", mod.Comment)
+				LogMsg("%s", mod.Comment)
 			}
 			listModOptionsTable(cmd, args)
 
 			return
 		}
 	}
-	CliPrintError("No such module: %s", strconv.Quote(modName))
+	LogError("No such module: %s", strconv.Quote(modName))
 }

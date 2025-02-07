@@ -8,6 +8,6 @@ import "github.com/spf13/cobra"
 func OpenFileManager(cmd *cobra.Command, args []string) {
 	sshErr := SSHClient("sftp", "", RuntimeConfig.SSHDShellPort, false)
 	if sshErr != nil {
-		CliPrintError("openFileManager: %v", sshErr)
+		LogError("openFileManager: %v", sshErr)
 	}
 }

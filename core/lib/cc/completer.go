@@ -75,10 +75,10 @@ func listOptions() func(string) []string {
 
 // remote autocomplete items in $PATH
 func listAgentExes(agent *emp3r0r_def.Emp3r0rAgent) []string {
-	CliPrintDebug("Listing agent %s's exes in PATH", agent.Tag)
+	LogDebug("Listing agent %s's exes in PATH", agent.Tag)
 	exes := make([]string, 0)
 	if agent == nil {
-		CliPrintDebug("No valid target selected so no autocompletion for exes")
+		LogDebug("No valid target selected so no autocompletion for exes")
 		return exes
 	}
 	for _, exe := range agent.Exes {
@@ -86,7 +86,7 @@ func listAgentExes(agent *emp3r0r_def.Emp3r0rAgent) []string {
 		exe = strings.ReplaceAll(exe, " ", "\\ ")
 		exes = append(exes, exe)
 	}
-	CliPrintDebug("Exes found on agent '%s':\n%v",
+	LogDebug("Exes found on agent '%s':\n%v",
 		agent.Tag, exes)
 	return exes
 }
@@ -125,7 +125,7 @@ func listRemoteDir() func(string) []string {
 		cmd_id := uuid.NewString()
 		err := SendCmdToCurrentTarget(cmd, cmd_id)
 		if err != nil {
-			CliPrintDebug("Cannot list remote directory: %v", err)
+			LogDebug("Cannot list remote directory: %v", err)
 			return names
 		}
 		remote_entries := []string{}
@@ -139,12 +139,12 @@ func listRemoteDir() func(string) []string {
 			}
 			time.Sleep(100 * time.Millisecond)
 			if i == 99 {
-				CliPrintDebug("Timeout listing remote directory")
+				LogDebug("Timeout listing remote directory")
 				return names
 			}
 		}
 		if len(remote_entries) == 0 {
-			CliPrintDebug("Nothing in remote directory")
+			LogDebug("Nothing in remote directory")
 			return names
 		}
 		for _, name := range remote_entries {

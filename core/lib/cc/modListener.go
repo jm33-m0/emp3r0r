@@ -12,7 +12,7 @@ import (
 
 func modListener() {
 	if CurrentModuleOptions["listener"] == nil || CurrentModuleOptions["port"] == nil || CurrentModuleOptions["payload"] == nil || CurrentModuleOptions["compression"] == nil || CurrentModuleOptions["passphrase"] == nil {
-		CliPrintError("One or more required options are nil")
+		LogError("One or more required options are nil")
 		return
 	}
 	cmd := fmt.Sprintf("%s --listener %s --port %s --payload %s --compression %s --passphrase %s",
@@ -24,7 +24,7 @@ func modListener() {
 		CurrentModuleOptions["passphrase"].Val)
 	err := SendCmd(cmd, "", CurrentTarget)
 	if err != nil {
-		CliPrintError("SendCmd: %v", err)
+		LogError("SendCmd: %v", err)
 		return
 	}
 	color.HiMagenta("Please wait for agent's response...")
