@@ -218,120 +218,6 @@ func ls_targets(cmd *cobra.Command, args []string) {
 	TmuxSwitchWindow(AgentListPane.WindowID)
 }
 
-func GetTargetDetails(target *emp3r0r_def.Emp3r0rAgent) {
-	// nil?
-	if target == nil {
-		LogDebug("Target is nil")
-		return
-	}
-
-	TargetsMutex.RLock()
-	defer TargetsMutex.RUnlock()
-	// exists?
-	if !IsAgentExist(target) {
-		LogError("Failed to get system info: target does not exist")
-		return
-	}
-	control := Targets[target]
-	if control == nil {
-		return
-	}
-
-	// build table
-	tdata := [][]string{}
-	tableString := &strings.Builder{}
-	table := tablewriter.NewWriter(tableString)
-	table.SetHeader([]string{"Property", "Value"})
-	table.SetBorder(true)
-	table.SetRowLine(true)
-	table.SetAutoWrapText(true)
-	table.SetColWidth(20)
-
-	// color
-	table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiCyanColor},
-		tablewriter.Colors{tablewriter.Bold, tablewriter.FgHiCyanColor})
-
-	hasInternet := color.HiRedString("NO")
-	if target.HasInternet {
-		hasInternet = color.HiGreenString("YES")
-	}
-	if !target.NCSIEnabled {
-		hasInternet = color.YellowString("UNTESTED")
-	}
-
-	arpTab := strings.Join(target.ARP, ",\n")
-	ips := strings.Join(target.IPs, ",\n")
-	userInfo := color.HiRedString(target.User)
-	if target.HasRoot {
-		userInfo = color.HiGreenString(target.User)
-	}
-	userInfo = util.SplitLongLine(userInfo, 20)
-	cpuinfo := target.CPU
-	gpuinfo := target.GPU
-	gpuinfo = util.SplitLongLine(gpuinfo, 20)
-
-	// agent process info
-	agentProc := *target.Process
-	procInfo := fmt.Sprintf("%s (%d)\n<- %s (%d)",
-		agentProc.Cmdline, agentProc.PID, agentProc.Parent, agentProc.PPID)
-	procInfo = util.SplitLongLine(procInfo, 20)
-
-	// serial number
-	serial_no := "N/A"
-	if target.Product != nil {
-		serial_no = target.Product.SerialNumber
-	}
-
-	// info map
-	infoMap := map[string]string{
-		"Version":   target.Version,
-		"Hostname":  util.SplitLongLine(target.Hostname, 20),
-		"Process":   util.SplitLongLine(procInfo, 20),
-		"User":      userInfo,
-		"Internet":  hasInternet,
-		"CPU":       cpuinfo,
-		"GPU":       gpuinfo,
-		"MEM":       target.Mem,
-		"Hardware":  util.SplitLongLine(target.Hardware, 20),
-		"Serial":    util.SplitLongLine(serial_no, 20),
-		"Container": target.Container,
-		"OS":        util.SplitLongLine(target.OS, 20),
-		"Kernel":    util.SplitLongLine(target.Kernel+", "+target.Arch, 20),
-		"From":      util.SplitLongLine(target.From+" - "+target.Transport, 20),
-		"IPs":       ips,
-		"ARP":       arpTab,
-	}
-
-	// print
-	if control.Label == "" {
-		control.Label = "nolabel"
-	}
-
-	indexRow := []string{"Index", color.HiMagentaString("%d", control.Index)}
-	labelRow := []string{"Label", color.HiCyanString(control.Label)}
-	tagRow := []string{"Tag", color.CyanString(util.SplitLongLine(target.Tag, 20))}
-	tdata = append(tdata, indexRow)
-	tdata = append(tdata, labelRow)
-	tdata = append(tdata, tagRow)
-	for key, val := range infoMap {
-		tdata = append(tdata, []string{key, val})
-	}
-
-	// rendor table
-	table.AppendBulk(tdata)
-	table.Render()
-	num_of_columns := len(strings.Split(tableString.String(), "\n")[0])
-	if AgentInfoPane == nil {
-		LogError("AgentInfoPane doesn't exist")
-		return
-	}
-	AgentInfoPane.ResizePane("x", num_of_columns)
-	AgentInfoPane.Printf(true, "\n%s\n\n", tableString.String())
-
-	// Update Agent list
-	ListTargets()
-}
-
 // GetTargetFromIndex find target from Targets via control index, return nil if not found
 func GetTargetFromIndex(index int) (target *emp3r0r_def.Emp3r0rAgent) {
 	TargetsMutex.RLock()
@@ -581,27 +467,7 @@ func setActiveTarget(cmd *cobra.Command, args []string) {
 
 	select_agent := func(a *emp3r0r_def.Emp3r0rAgent) {
 		CurrentTarget = a
-		GetTargetDetails(CurrentTarget)
 		LogSuccess("Now targeting %s", CurrentTarget.Tag)
-
-		// kill shell and sftp window
-		if AgentSFTPPane != nil {
-			LogInfo("Updating sftp window")
-			err = AgentSFTPPane.KillPane()
-			if err != nil {
-				LogWarning("Updating sftp window: %v", err)
-			}
-			AgentSFTPPane = nil
-		}
-		if AgentShellPane != nil {
-			LogInfo("Updating shell window")
-			err = AgentShellPane.KillPane()
-			if err != nil {
-				LogWarning("Updating shell window: %v", err)
-			}
-			AgentShellPane = nil
-		}
-
 		LogMsg("Run `file_manager` to open a SFTP session")
 		autoCompleteAgentExes(target_to_set)
 	}

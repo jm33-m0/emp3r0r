@@ -651,8 +651,6 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 				break
 			}
 		}
-		// update system info of current agent
-		GetTargetDetails(CurrentTarget)
 
 		// set labels
 		shortname := strings.Split(target.Tag, "-agent")[0]
@@ -695,7 +693,6 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 				LogAlert(color.FgHiRed, "[%d] Agent dies", c.Index)
 				LogMsg("[%d] agent %s disconnected\n", c.Index, strconv.Quote(t.Tag))
 				ListTargets()
-				AgentInfoPane.Printf(true, "%s", color.HiYellowString("No agent selected"))
 				break
 			}
 		}

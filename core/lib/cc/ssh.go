@@ -209,13 +209,8 @@ wait:
 
 	// if open in split tmux pane
 	if split {
-		if is_sftp {
-			AgentSFTPPane, err = TmuxNewPane("SFTP", "v", AgentInfoPane.ID, 30, sshCmd)
-			TmuxPanes[AgentSFTPPane.ID] = AgentSFTPPane
-		} else {
-			AgentShellPane, err = TmuxNewPane("Shell", "v", CommandPane.ID, 30, sshCmd)
-			TmuxPanes[AgentShellPane.ID] = AgentShellPane
-		}
+		AgentShellPane, err = TmuxNewPane("Shell", "v", CommandPane.ID, 30, sshCmd)
+		TmuxPanes[AgentShellPane.ID] = AgentShellPane
 		return err
 	}
 

@@ -16,8 +16,8 @@ import (
 	terminal "golang.org/x/term"
 )
 
-// Emp3r0rPane a tmux window/pane that makes emp3r0r CC's interface
-type Emp3r0rPane struct {
+// TmuxPane a tmux window/pane that makes emp3r0r CC's interface
+type TmuxPane struct {
 	Alive    bool   // indicates that pane is not dead
 	ID       string // tmux pane unique ID
 	WindowID string // tmux window unique ID, indicates the window that the pane lives in
@@ -41,25 +41,22 @@ var (
 	HomeWindow string
 
 	// Console titled "Command"
-	CommandPane *Emp3r0rPane
-
-	// Displays system info of selected agent
-	AgentInfoPane *Emp3r0rPane
+	CommandPane *TmuxPane
 
 	// Displays agent output, separated from logs
-	AgentOutputPane *Emp3r0rPane
+	AgentRespPane *TmuxPane
 
 	// Displays agent list
-	AgentListPane *Emp3r0rPane
+	AgentListPane *TmuxPane
 
 	// Displays bash shell for selected agent
-	AgentShellPane *Emp3r0rPane
+	AgentShellPane *TmuxPane
 
 	// SFTP shell for selected agent
-	AgentSFTPPane *Emp3r0rPane
+	AgentSFTPPane *TmuxPane
 
 	// Put all windows in this map
-	TmuxPanes = make(map[string]*Emp3r0rPane)
+	TmuxPanes = make(map[string]*TmuxPane)
 
 	// CAT use this cat to replace /bin/cat
 	CAT = "emp3r0r-cat"
@@ -77,7 +74,7 @@ func TmuxInitWindows() (err error) {
 	TmuxSetOpt(HomeWindow, "remain-on-exit on")
 
 	// main window
-	CommandPane = &Emp3r0rPane{}
+	CommandPane = &TmuxPane{}
 	CommandPane.Name = "Emp3r0r Console"
 	CommandPane.ID = TmuxCurrentPane()
 	CommandPane.WindowID = TmuxCurrentWindow()
@@ -115,7 +112,7 @@ func TmuxInitWindows() (err error) {
 		direction,
 		from_pane string,
 		size_percentage int,
-	) (pane *Emp3r0rPane, err error) {
+	) (pane *TmuxPane, err error) {
 		// system info of selected agent
 		pane, err = TmuxNewPane(title, direction, from_pane, size_percentage, cat)
 		if err != nil {
@@ -129,14 +126,8 @@ func TmuxInitWindows() (err error) {
 		return
 	}
 
-	// system info of selected agent
-	AgentInfoPane, err = new_pane("Agent System Info", "Try `target 0`?", "h", "", 24)
-	if err != nil {
-		return
-	}
-
 	// Agent output
-	AgentOutputPane, err = new_pane("Agent Handler", "Command results go below...\n", "v", "", 33)
+	AgentRespPane, err = new_pane("Agent Handler", "Agent responses go below...\n", "h", "", 33)
 	if err != nil {
 		return
 	}
@@ -150,8 +141,7 @@ func TmuxInitWindows() (err error) {
 
 	// check panes
 	if AgentListPane == nil ||
-		AgentOutputPane == nil ||
-		AgentInfoPane == nil {
+		AgentRespPane == nil {
 		return fmt.Errorf("one or more tmux panes failed to initialize:\n%v", TmuxPanes)
 	}
 
@@ -228,7 +218,7 @@ func TmuxCurrentWindow() (id string) {
 	return
 }
 
-func (pane *Emp3r0rPane) Respawn() (err error) {
+func (pane *TmuxPane) Respawn() (err error) {
 	defer TmuxUpdatePane(pane)
 	out, err := exec.Command("tmux", "respawn-pane",
 		"-t", pane.ID, CAT).CombinedOutput()
@@ -241,7 +231,7 @@ func (pane *Emp3r0rPane) Respawn() (err error) {
 
 // Printf like printf, but prints to a tmux pane/window
 // id: pane unique id
-func (pane *Emp3r0rPane) Printf(clear bool, format string, a ...interface{}) {
+func (pane *TmuxPane) Printf(clear bool, format string, a ...interface{}) {
 	msg := fmt.Sprintf(format, a...)
 	if clear {
 		clearPaneErr := pane.ClearPane()
@@ -275,7 +265,7 @@ func (pane *Emp3r0rPane) Printf(clear bool, format string, a ...interface{}) {
 	}
 }
 
-func (pane *Emp3r0rPane) ClearPane() (err error) {
+func (pane *TmuxPane) ClearPane() (err error) {
 	id := pane.ID
 
 	job := fmt.Sprintf("tmux respawn-pane -t %s -k %s", id, pane.Cmd)
@@ -298,7 +288,7 @@ func (pane *Emp3r0rPane) ClearPane() (err error) {
 }
 
 // PaneDetails Get details of a tmux pane
-func (pane *Emp3r0rPane) PaneDetails() (
+func (pane *TmuxPane) PaneDetails() (
 	is_alive bool,
 	title string,
 	tty string,
@@ -356,7 +346,7 @@ func (pane *Emp3r0rPane) PaneDetails() (
 }
 
 // ResizePane resize pane in x/y to number of lines
-func (pane *Emp3r0rPane) ResizePane(direction string, lines int) (err error) {
+func (pane *TmuxPane) ResizePane(direction string, lines int) (err error) {
 	id := pane.ID
 	job := fmt.Sprintf("tmux resize-pane -t %s -%s %d", id, direction, lines)
 	LogDebug("Resizing pane %s: %s", pane.Title, job)
@@ -376,7 +366,7 @@ func TmuxKillWindow(id string) (err error) {
 	return
 }
 
-func (pane *Emp3r0rPane) KillPane() (err error) {
+func (pane *TmuxPane) KillPane() (err error) {
 	id := pane.ID
 	job := fmt.Sprintf("tmux kill-pane -t %s", id)
 	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
@@ -423,7 +413,7 @@ func TmuxSetOpt(index, opt string) (err error) {
 // hV: horizontal or vertical split
 // target_pane: target_pane tmux index, split this pane
 // size: percentage, do not append %
-func TmuxNewPane(title, hV string, target_pane_id string, size int, cmd string) (pane *Emp3r0rPane, err error) {
+func TmuxNewPane(title, hV string, target_pane_id string, size int, cmd string) (pane *TmuxPane, err error) {
 	if os.Getenv("TMUX") == "" ||
 		!util.IsCommandExist("tmux") {
 
@@ -458,7 +448,7 @@ func TmuxNewPane(title, hV string, target_pane_id string, size int, cmd string) 
 		return
 	}
 
-	pane = &Emp3r0rPane{}
+	pane = &TmuxPane{}
 	pane.ID = tmux_res_split[0]
 	pane.PID, err = strconv.Atoi(tmux_res_split[1])
 	if err != nil {
@@ -474,7 +464,7 @@ func TmuxNewPane(title, hV string, target_pane_id string, size int, cmd string) 
 }
 
 // Sync changes of a pane
-func TmuxUpdatePane(pane *Emp3r0rPane) {
+func TmuxUpdatePane(pane *TmuxPane) {
 	if pane == nil {
 		LogWarning("UpdatePane: no pane to update")
 		return
@@ -541,7 +531,7 @@ func FitPanes(output_pane_x int) {
 	defer TmuxUpdatePanes()
 
 	// in this case no need to resize
-	if output_pane_x <= AgentOutputPane.Width {
+	if output_pane_x <= AgentRespPane.Width {
 		LogDebug("No need to fit panes")
 		return
 	}
@@ -559,15 +549,13 @@ func FitPanes(output_pane_x int) {
 	}
 
 	// resize
-	target_width := output_pane_x - AgentOutputPane.Width
+	target_width := output_pane_x - AgentRespPane.Width
 	CommandPane.ResizePane("L", target_width)
 	LogDebug("Resizing agent handler pane %d-%d=%d chars to the left",
-		output_pane_x, AgentOutputPane.Width, target_width)
-	AgentInfoPane.ResizePane("x", AgentInfoPane.Width)
+		output_pane_x, AgentRespPane.Width, target_width)
 }
 
 func TmuxUpdatePanes() {
 	TmuxUpdatePane(CommandPane)
-	TmuxUpdatePane(AgentOutputPane)
-	TmuxUpdatePane(AgentInfoPane)
+	TmuxUpdatePane(AgentRespPane)
 }
