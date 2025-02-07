@@ -150,18 +150,18 @@ func ValidateActiveTarget() (target *emp3r0r_def.Emp3r0rAgent) {
 	// find target
 	target = CurrentTarget
 	if target == nil {
-		LogError("Target does not exist")
+		LogDebug("Validate active target: target does not exist")
 		return nil
 	}
 
 	// write to given target's connection
 	tControl := Targets[target]
 	if tControl == nil {
-		LogError("Agent control interface not found")
+		LogDebug("Validate active target: agent control interface not found")
 		return nil
 	}
 	if tControl.Conn == nil {
-		LogError("Agent is not connected")
+		LogDebug("Validate active target: agent is not connected")
 		return nil
 	}
 
@@ -282,31 +282,15 @@ func listModOptionsTable(_ *cobra.Command, _ []string) {
 }
 
 func setOptValCmd(cmd *cobra.Command, args []string) {
-	opt, err := cmd.Flags().GetString("option")
-	if err != nil {
-		LogError("set option: %v", err)
-		return
-	}
-	val, err := cmd.Flags().GetString("value")
-	if err != nil {
-		LogError("set option: %v", err)
-		return
-	}
-	if opt == "" || val == "" {
-		LogError(cmd.UsageString())
-		return
-	}
+	opt := args[0]
+	val := args[1]
 	// hand to SetOption helper
 	SetOption(opt, val)
 	listModOptionsTable(cmd, args)
 }
 
 func setActiveModule(cmd *cobra.Command, args []string) {
-	modName, err := cmd.Flags().GetString("module")
-	if err != nil {
-		LogError(cmd.UsageString())
-		return
-	}
+	modName := args[0]
 	for mod := range ModuleHelpers {
 		if mod == modName {
 			CurrentMod = modName

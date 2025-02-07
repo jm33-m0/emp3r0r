@@ -15,11 +15,7 @@ import (
 )
 
 func ls(cmd *cobra.Command, args []string) {
-	dst, err := cmd.Flags().GetString("path")
-	if err != nil {
-		LogError("ls: %v", err)
-		return
-	}
+	dst := args[0]
 	if dst == "" {
 		dst = "."
 	}
@@ -32,78 +28,30 @@ func pwd(cmd *cobra.Command, args []string) {
 }
 
 func cd(cmd *cobra.Command, args []string) {
-	dst, err := cmd.Flags().GetString("path")
-	if err != nil {
-		LogError("cd: %v", err)
-		return
-	}
-	if dst == "" {
-		dst = "/"
-		return
-	}
+	dst := args[0]
 	FSCmdDst("cd", dst)
 }
 
 func cp(cmd *cobra.Command, args []string) {
-	src, err := cmd.Flags().GetString("src")
-	if err != nil {
-		LogError("cp: %v", err)
-		return
-	}
-	dst, err := cmd.Flags().GetString("dst")
-	if err != nil {
-		LogError("cp: %v", err)
-		return
-	}
-	if src == "" || dst == "" {
-		LogError("cp: src and dst are required")
-		return
-	}
+	src := args[0]
+	dst := args[1]
 
 	FSCmdSrcDst("cp", src, dst)
 }
 
 func rm(cmd *cobra.Command, args []string) {
-	dst, err := cmd.Flags().GetString("path")
-	if err != nil {
-		LogError("rm: %v", err)
-		return
-	}
-	if dst == "" {
-		LogError("rm: path is required")
-		return
-	}
+	dst := args[0]
 	FSCmdDst("rm", dst)
 }
 
 func mkdir(cmd *cobra.Command, args []string) {
-	dst, err := cmd.Flags().GetString("path")
-	if err != nil {
-		LogError("mkdir: %v", err)
-		return
-	}
-	if dst == "" {
-		LogError("mkdir: path is required")
-		return
-	}
+	dst := args[0]
 	FSCmdDst("mkdir", dst)
 }
 
 func mv(cmd *cobra.Command, args []string) {
-	src, err := cmd.Flags().GetString("src")
-	if err != nil {
-		LogError("mv: %v", err)
-		return
-	}
-	dst, err := cmd.Flags().GetString("dst")
-	if err != nil {
-		LogError("mv: %v", err)
-		return
-	}
-	if src == "" || dst == "" {
-		LogError("mv: src and dst are required")
-		return
-	}
+	src := args[0]
+	dst := args[1]
 	FSCmdSrcDst("mv", src, dst)
 }
 
@@ -120,16 +68,8 @@ func suicide(cmd *cobra.Command, args []string) {
 }
 
 func kill(cmd *cobra.Command, args []string) {
-	pid, err := cmd.Flags().GetInt("pid")
-	if err != nil {
-		LogError("kill: %v", err)
-		return
-	}
-	if pid == 0 {
-		LogError("kill: pid is required")
-		return
-	}
-	executeCmd(fmt.Sprintf("kill --pid %d", pid))
+	pid := args[0:]
+	executeCmd(fmt.Sprintf("kill --pid %v+", strings.Join(pid, " ")))
 }
 
 func FSCmdDst(cmd, dst string) {

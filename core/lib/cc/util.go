@@ -291,7 +291,7 @@ func setTargetLabel(cmd *cobra.Command, args []string) {
 
 	// target exists?
 	if target == nil {
-		LogError("Target does not exist")
+		LogError("Failed to label agent: target does not exist")
 		return
 	}
 	Targets[target].Label = label // set label

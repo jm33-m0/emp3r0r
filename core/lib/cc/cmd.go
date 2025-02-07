@@ -13,6 +13,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/reeflective/console"
 	"github.com/reeflective/console/commands/readline"
+	"github.com/rsteube/carapace"
 	"github.com/spf13/cobra"
 )
 
@@ -45,6 +46,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Use:     "exit",
 			GroupID: "core",
 			Short:   "Exit emp3r0r",
+			Args:    cobra.NoArgs,
 			Run: func(cmd *cobra.Command, args []string) {
 				exitEmp3r0r(app)
 			},
@@ -58,11 +60,12 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Use:     "help",
 			GroupID: "core",
 			Short:   "Display help for a module",
-			Example: "help --module gen_agent",
+			Example: "help bring2cc",
+			Args:    cobra.ExactArgs(1),
 			Run:     CmdHelp,
 		}
-		helpCmd.Flags().StringP("module", "m", "", "Module name")
 		rootCmd.AddCommand(helpCmd)
+		carapace.Gen(helpCmd).PositionalCompletion(carapace.ActionValues(listMods()...))
 
 		setDebuglevelCmd := &cobra.Command{
 			Use:     "debug",
@@ -73,21 +76,26 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		}
 		setDebuglevelCmd.Flags().IntP("level", "l", 0, "Debug level")
 		rootCmd.AddCommand(setDebuglevelCmd)
+		carapace.Gen(setDebuglevelCmd).FlagCompletion(carapace.ActionMap{
+			"level": carapace.ActionValues("0", "1", "2", "3"),
+		})
 
 		useModuleCmd := &cobra.Command{
 			Use:     "use",
 			GroupID: "module",
 			Short:   "Use a module",
-			Example: "use --module gen_agent",
+			Example: "use bring2cc",
+			Args:    cobra.ExactArgs(1),
 			Run:     setActiveModule,
 		}
-		useModuleCmd.Flags().StringP("module", "m", "", "Module name")
 		rootCmd.AddCommand(useModuleCmd)
+		carapace.Gen(useModuleCmd).PositionalCompletion(carapace.ActionValues(listMods()...))
 
 		infoCmd := &cobra.Command{
 			Use:     "info",
 			GroupID: "module",
 			Short:   "What options do we have?",
+			Args:    cobra.NoArgs,
 			Run:     listModOptionsTable,
 		}
 		rootCmd.AddCommand(infoCmd)
@@ -96,17 +104,20 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Use:     "set",
 			GroupID: "module",
 			Short:   "Set an option of the current module",
-			Example: "set --option cc_host --value emp3r0r.com",
+			Example: "set cc_host emp3r0r.com",
+			Args:    cobra.ExactArgs(2),
 			Run:     setOptValCmd,
 		}
-		setCmd.Flags().StringP("option", "o", "", "Option name")
-		setCmd.Flags().StringP("value", "v", "", "Option value")
 		rootCmd.AddCommand(setCmd)
+		carapace.Gen(setCmd).PositionalCompletion(
+			carapace.ActionValues(listOptions()...),
+			carapace.ActionValues(listValChoices()...))
 
 		runCmd := &cobra.Command{
 			Use:     "run",
 			GroupID: "module",
 			Short:   "Run the current module",
+			Args:    cobra.NoArgs,
 			Run:     ModuleRun,
 		}
 		rootCmd.AddCommand(runCmd)
@@ -115,17 +126,19 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Use:     "target",
 			GroupID: "agent",
 			Short:   "Set active target",
-			Example: "target --id 0",
+			Example: "target 0",
+			Args:    cobra.ExactArgs(1),
 			Run:     setActiveTarget,
 		}
-		targetCmd.Flags().StringP("id", "i", "", "Target ID")
 		rootCmd.AddCommand(targetCmd)
+		carapace.Gen(targetCmd).PositionalCompletion(carapace.ActionValues(listTargetIndexTags()...))
 
 		upgradeAgentCmd := &cobra.Command{
 			Use:     "upgrade_agent",
 			GroupID: "agent",
 			Short:   "Upgrade agent on selected target, put agent binary in /tmp/emp3r0r/www/agent first",
 			Run:     UpgradeAgent,
+			Args:    cobra.NoArgs,
 		}
 		rootCmd.AddCommand(upgradeAgentCmd)
 
@@ -136,12 +149,14 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Example: "upgrade_cc [--force]",
 			Run:     UpdateCC,
 		}
+		upgradeCCCmd.Flags().BoolP("force", "f", false, "Force upgrade")
 		rootCmd.AddCommand(upgradeCCCmd)
 
 		fileManagerCmd := &cobra.Command{
 			Use:     "file_manager",
 			GroupID: "filesystem",
 			Short:   "Browse remote files in your local file manager with SFTP protocol",
+			Args:    cobra.NoArgs,
 			Run:     OpenFileManager,
 		}
 		rootCmd.AddCommand(fileManagerCmd)
@@ -150,67 +165,74 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Use:     "ls",
 			GroupID: "filesystem",
 			Short:   "List a directory of selected agent, without argument it lists current directory",
-			Example: "ls --path /tmp",
+			Example: "ls /tmp",
+			Args:    cobra.MaximumNArgs(1),
 			Run:     ls,
 		}
-		lsCmd.Flags().StringP("path", "p", "", "Path to list")
 		rootCmd.AddCommand(lsCmd)
+		carapace.Gen(lsCmd).PositionalCompletion(carapace.ActionValues(listRemoteDir()...))
 
 		cdCmd := &cobra.Command{
 			Use:     "cd",
 			GroupID: "filesystem",
 			Short:   "Change current working directory of selected agent",
+			Args:    cobra.ExactArgs(1),
 			Run:     cd,
 		}
-		cdCmd.Flags().StringP("path", "p", "", "Path to change to")
 		rootCmd.AddCommand(cdCmd)
+		carapace.Gen(cdCmd).PositionalCompletion(carapace.ActionValues(listRemoteDir()...))
 
 		cpCmd := &cobra.Command{
 			Use:     "cp",
 			GroupID: "filesystem",
 			Short:   "Copy a file to another location on selected target",
-			Example: "cp --src /tmp/1.txt --dst /tmp/2.txt",
+			Example: "cp /tmp/1.txt /tmp/2.txt",
+			Args:    cobra.ExactArgs(2),
 			Run:     cp,
 		}
-		cpCmd.Flags().StringP("src", "s", "", "Source file")
-		cpCmd.Flags().StringP("dst", "d", "", "Destination file")
 		rootCmd.AddCommand(cpCmd)
+		carapace.Gen(cpCmd).PositionalCompletion(carapace.ActionValues(listRemoteDir()...),
+			carapace.ActionValues(listRemoteDir()...))
 
 		mvCmd := &cobra.Command{
 			Use:     "mv",
 			GroupID: "filesystem",
 			Short:   "Move a file to another location on selected target",
-			Example: "mv --src /tmp/1.txt --dst /tmp/2.txt",
+			Example: "mv /tmp/1.txt /tmp/2.txt",
+			Args:    cobra.ExactArgs(2),
 			Run:     mv,
 		}
-		mvCmd.Flags().StringP("src", "s", "", "Source file")
-		mvCmd.Flags().StringP("dst", "d", "", "Destination file")
 		rootCmd.AddCommand(mvCmd)
+		carapace.Gen(mvCmd).PositionalCompletion(carapace.ActionValues(listRemoteDir()...),
+			carapace.ActionValues(listRemoteDir()...))
 
 		rmCmd := &cobra.Command{
 			Use:     "rm",
 			GroupID: "filesystem",
 			Short:   "Delete a file/directory on selected agent",
-			Example: "rm --path /tmp/1.txt",
+			Example: "rm /tmp/1.txt",
+			Args:    cobra.ExactArgs(1),
 			Run:     rm,
 		}
-		rmCmd.Flags().StringP("path", "p", "", "Path to delete")
 		rootCmd.AddCommand(rmCmd)
+		carapace.Gen(rmCmd).PositionalCompletion(carapace.ActionValues(listRemoteDir()...))
 
 		mkdirCmd := &cobra.Command{
 			Use:     "mkdir",
 			GroupID: "filesystem",
 			Short:   "Create new directory on selected agent",
 			Example: "mkdir --path /tmp/newdir",
+			Args:    cobra.ExactArgs(1),
 			Run:     mkdir,
 		}
-		mkdirCmd.Flags().StringP("path", "p", "", "Path to create")
 		rootCmd.AddCommand(mkdirCmd)
+		carapace.Gen(mkdirCmd).PositionalCompletion(carapace.ActionValues(listRemoteDir()...))
 
 		pwdCmd := &cobra.Command{
 			Use:     "pwd",
 			GroupID: "filesystem",
 			Short:   "Current working directory of selected agent",
+			Args:    cobra.NoArgs,
 			Run:     pwd,
 		}
 		rootCmd.AddCommand(pwdCmd)
@@ -219,6 +241,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Use:     "ps",
 			GroupID: "filesystem",
 			Short:   "Process list of selected agent",
+			Args:    cobra.NoArgs,
 			Run:     ps,
 		}
 		rootCmd.AddCommand(psCmd)
@@ -227,6 +250,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Use:     "net_helper",
 			GroupID: "network",
 			Short:   "Network helper: ip addr, ip route, ip neigh",
+			Args:    cobra.NoArgs,
 			Run:     net_helper,
 		}
 		rootCmd.AddCommand(netHelperCmd)
@@ -235,10 +259,10 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Use:     "kill",
 			GroupID: "util",
 			Short:   "Terminate a process on selected agent",
-			Example: "kill --pid 1234",
+			Example: "kill 1234 5678",
+			Args:    cobra.MinimumNArgs(1),
 			Run:     kill,
 		}
-		killCmd.Flags().IntP("pid", "p", 0, "Process ID")
 		rootCmd.AddCommand(killCmd)
 
 		getCmd := &cobra.Command{
@@ -252,6 +276,10 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		getCmd.Flags().StringP("path", "f", "", "Path to download")
 		getCmd.Flags().StringP("regex", "e", "", "Regex to match files")
 		rootCmd.AddCommand(getCmd)
+		carapace.Gen(getCmd).FlagCompletion(carapace.ActionMap{
+			"regex": carapace.ActionValues(listRemoteDir()...),
+			"path":  carapace.ActionValues(listRemoteDir()...),
+		})
 
 		putCmd := &cobra.Command{
 			Use:     "put",
@@ -263,11 +291,16 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		putCmd.Flags().StringP("src", "s", "", "Source file")
 		putCmd.Flags().StringP("dst", "d", "", "Destination file")
 		rootCmd.AddCommand(putCmd)
+		carapace.Gen(putCmd).FlagCompletion(carapace.ActionMap{
+			"src": carapace.ActionFiles(),
+			"dst": carapace.ActionValues(listRemoteDir()...),
+		})
 
 		screenshotCmd := &cobra.Command{
 			Use:     "screenshot",
 			GroupID: "util",
 			Short:   "Take a screenshot of selected agent",
+			Args:    cobra.NoArgs,
 			Run:     TakeScreenshot,
 		}
 		rootCmd.AddCommand(screenshotCmd)
@@ -284,6 +317,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Use:     "ls_modules",
 			GroupID: "module",
 			Short:   "List all modules",
+			Args:    cobra.NoArgs,
 			Run:     ListModules,
 		}
 		rootCmd.AddCommand(lsModCmd)
@@ -292,6 +326,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Use:     "ls_targets",
 			GroupID: "agent",
 			Short:   "List connected agents",
+			Args:    cobra.NoArgs,
 			Run:     ls_targets,
 		}
 		rootCmd.AddCommand(lsTargetCmd)
@@ -323,6 +358,9 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		}
 		rmPortMappingCmd.Flags().StringP("id", "", "", "Port mapping ID")
 		rootCmd.AddCommand(rmPortMappingCmd)
+		carapace.Gen(rmPortMappingCmd).FlagCompletion(carapace.ActionMap{
+			"id": carapace.ActionValues(listPortMappings()...),
+		})
 
 		labelAgentCmd := &cobra.Command{
 			Use:     "label",
@@ -334,8 +372,38 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		labelAgentCmd.Flags().StringP("id", "", "0", "Agent ID")
 		labelAgentCmd.Flags().StringP("label", "", "no-label", "Custom name")
 		rootCmd.AddCommand(labelAgentCmd)
+		carapace.Gen(labelAgentCmd).FlagCompletion(carapace.ActionMap{
+			"id":    carapace.ActionValues(listTargetIndexTags()...),
+			"label": carapace.ActionValues("no-label", "linux", "windows", "workstation", "server", "dev", "prod", "test", "honeypot"),
+		})
+
+		execCmd := &cobra.Command{
+			Use:     "exec",
+			GroupID: "util",
+			Short:   "Execute a command on selected agent",
+			Example: "exec --cmd 'ls -la'",
+			Run:     execCmd,
+		}
+		execCmd.Flags().StringP("cmd", "c", "", "Command to execute on agent")
+		carapace.Gen(execCmd).FlagCompletion(carapace.ActionMap{
+			"cmd": carapace.ActionValues(listAgentExes()...),
+		})
 
 		return rootCmd
+	}
+}
+
+func execCmd(cmd *cobra.Command, args []string) {
+	// get command to execute
+	cmdStr, err := cmd.Flags().GetString("cmd")
+	if err != nil {
+		LogError("Error getting command: %v", err)
+		return
+	}
+	// execute command
+	err = SendCmdToCurrentTarget(cmdStr, "")
+	if err != nil {
+		LogError("Error executing command: %v", err)
 	}
 }
 
@@ -353,11 +421,7 @@ var (
 // CmdHelp prints help in two columns
 // print help for modules
 func CmdHelp(cmd *cobra.Command, args []string) {
-	mod, err := cmd.Flags().GetString("module")
-	if err != nil {
-		LogError("Error getting module name: %v", err)
-		return
-	}
+	mod := args[0]
 	help := make(map[string]string)
 	if mod == "" {
 		LogError("No module specified")
@@ -406,5 +470,15 @@ func gen_agent_cmd() *cobra.Command {
 	genAgentCmd.Flags().IntP("proxychain-wait-min", "", util.RandInt(30, 120), "How many minimum seconds to wait before sending each broadcast packet to negotiate proxy chain")
 	genAgentCmd.Flags().IntP("proxychain-wait-max", "", 0, "How many maximum seconds to wait before sending each broadcast packet to negotiate proxy chain")
 
+	// completers
+	carapace.Gen(genAgentCmd).FlagCompletion(carapace.ActionMap{
+		"type":      carapace.ActionValues(PayloadTypeList...),
+		"arch":      carapace.ActionValues(Arch_List_All...),
+		"cc":        carapace.ActionValues(cc_hosts...),
+		"cdn":       carapace.ActionValues("wss://", "ws://"),
+		"doh":       carapace.ActionValues("https://1.1.1.1/dns-query", "https://8.8.8.8/dns-query", "https://9.9.9.9/dns-query"),
+		"proxy":     carapace.ActionValues("socks5://127.0.0.1:9050", "socks5://"),
+		"indicator": carapace.ActionValues("https://", "http://"),
+	})
 	return genAgentCmd
 }

@@ -449,11 +449,7 @@ func InitC2() (err error) {
 }
 
 func setActiveTarget(cmd *cobra.Command, args []string) {
-	target, err := cmd.Flags().GetString("id")
-	if err != nil {
-		LogError("set target: %v", err)
-		return
-	}
+	target := args[0]
 	var target_to_set *emp3r0r_def.Emp3r0rAgent
 
 	// select by tag or index
@@ -469,7 +465,7 @@ func setActiveTarget(cmd *cobra.Command, args []string) {
 		CurrentTarget = a
 		LogSuccess("Now targeting %s", CurrentTarget.Tag)
 		LogMsg("Run `file_manager` to open a SFTP session")
-		autoCompleteAgentExes(target_to_set)
+		// autoCompleteAgentExes(target_to_set)
 	}
 
 	if target_to_set == nil {

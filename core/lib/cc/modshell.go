@@ -52,7 +52,7 @@ func moduleShell() {
 	// find target
 	target := CurrentTarget
 	if target == nil {
-		LogError("moduleShell: Target does not exist")
+		LogError("Module shell: target does not exist")
 		return
 	}
 

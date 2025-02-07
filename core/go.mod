@@ -30,6 +30,7 @@ require (
 	github.com/posener/h2conn v0.0.0-20231204025407-3997deeca0f0
 	github.com/reeflective/console v0.1.20
 	github.com/refraction-networking/utls v1.6.7
+	github.com/rsteube/carapace v0.46.3-0.20231214181515-27e49f3c3b69
 	github.com/schollz/progressbar/v3 v3.18.0
 	github.com/shadowsocks/go-shadowsocks2 v0.1.5
 	github.com/shirou/gopsutil/v3 v3.24.5
@@ -95,7 +96,6 @@ require (
 	github.com/reeflective/readline v1.0.15 // indirect
 	github.com/riobard/go-bloom v0.0.0-20200614022211-cdc8013cb5b3 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/rsteube/carapace v0.46.3-0.20231214181515-27e49f3c3b69 // indirect
 	github.com/rsteube/carapace-shlex v0.1.1 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/sorairolake/lzip-go v0.3.5 // indirect
