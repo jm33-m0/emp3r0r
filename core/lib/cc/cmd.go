@@ -335,9 +335,9 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			GroupID: "module",
 			Short:   "Search for a module",
 			Example: "search shell",
+			Args:    cobra.ExactArgs(1),
 			Run:     ModuleSearch,
 		}
-		searchCmd.Flags().StringP("keyword", "q", "", "Keyword to search")
 		rootCmd.AddCommand(searchCmd)
 
 		lsPortMapppingsCmd := &cobra.Command{

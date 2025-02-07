@@ -170,15 +170,7 @@ func ValidateActiveTarget() (target *emp3r0r_def.Emp3r0rAgent) {
 
 // search modules, powered by fuzzysearch
 func ModuleSearch(cmd *cobra.Command, args []string) {
-	keyword, err := cmd.Flags().GetString("keyword")
-	if err != nil {
-		LogError("ModuleSearch: %v", err)
-		return
-	}
-	if keyword == "" {
-		LogError("ModuleSearch: no keyword provided")
-		return
-	}
+	keyword := args[0]
 	search_targets := new([]string)
 	for name, comment := range ModuleNames {
 		*search_targets = append(*search_targets, fmt.Sprintf("%s: %s", name, comment))
