@@ -173,33 +173,30 @@ func isArchValid(payload_type, arch_choice string) bool {
 }
 
 func generateFilePaths(payload_type, arch_choice string, now time.Time) (stubFile, outfile string) {
+	LogInfo("Generating '%s'", PayloadTypeLinuxExecutable)
 	switch payload_type {
 	case PayloadTypeLinuxExecutable:
-		LogInfo("You chose Linux Executable")
 		stubFile = fmt.Sprintf("stub-%s", arch_choice)
 		outfile = fmt.Sprintf("%s/agent_linux_%s_%d-%d-%d_%d-%d-%d",
 			EmpWorkSpace, arch_choice,
 			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 	case PayloadTypeWindowsExecutable:
-		LogInfo("You chose Windows Executable")
 		stubFile = fmt.Sprintf("stub-win-%s", arch_choice)
 		outfile = fmt.Sprintf("%s/agent_windows_%s_%d-%d-%d_%d-%d-%d.exe",
 			EmpWorkSpace, arch_choice,
 			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 	case PayloadTypeWindowsDLL:
-		LogInfo("You chose Windows DLL")
 		stubFile = fmt.Sprintf("stub-win-%s.dll", arch_choice)
 		outfile = fmt.Sprintf("%s/agent_windows_%s_%d-%d-%d_%d-%d-%d.dll",
 			EmpWorkSpace, arch_choice,
 			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 	case PayloadTypeLinuxSO:
-		LogInfo("You chose Linux SO")
 		stubFile = fmt.Sprintf("stub-%s.so", arch_choice)
 		outfile = fmt.Sprintf("%s/agent_linux_so_%s_%d-%d-%d_%d-%d-%d.so",
 			EmpWorkSpace, arch_choice,
 			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 	default:
-		LogError("Unsupported: %s", payload_type)
+		LogError("Unsupported: '%s'", payload_type)
 	}
 	return
 }

@@ -90,7 +90,7 @@ func (l *Logger) Warning(format string, a ...interface{}) {
 }
 
 func (logger *Logger) Msg(format string, a ...interface{}) {
-	logger.helper(format, a, color.New(color.FgHiCyan), "MSG", false)
+	logger.helper(format, a, nil, "MSG", false)
 }
 
 func (l *Logger) Alert(textColor color.Attribute, format string, a ...interface{}) {
