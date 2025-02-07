@@ -118,13 +118,13 @@ func DownloadFromAgent(cmd *cobra.Command, args []string) {
 	isRecursive, _ := cmd.Flags().GetBool("recursive")
 	filter, _ := cmd.Flags().GetString("regex")
 
-	file_path, err := cmd.Flags().GetString("file_path")
+	file_path, err := cmd.Flags().GetString("path")
 	if err != nil {
 		LogError("download: %v", err)
 		return
 	}
 	if file_path == "" {
-		LogError("download: file_path is required")
+		LogError("download: path is required")
 		return
 	}
 

@@ -277,15 +277,14 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		getCmd.Flags().StringP("regex", "e", "", "Regex to match files")
 		rootCmd.AddCommand(getCmd)
 		carapace.Gen(getCmd).FlagCompletion(carapace.ActionMap{
-			"regex": carapace.ActionValues(listRemoteDir()...),
-			"path":  carapace.ActionValues(listRemoteDir()...),
+			"path": carapace.ActionValues(listRemoteDir()...),
 		})
 
 		putCmd := &cobra.Command{
 			Use:     "put",
 			GroupID: "filesystem",
 			Short:   "Upload a file to selected agent",
-			Example: "put --src /tmp/1.txt --dst /tmp/2.txt",
+			Example: "put /tmp/1.txt /tmp/2.txt",
 			Run:     UploadToAgent,
 		}
 		putCmd.Flags().StringP("src", "s", "", "Source file")
@@ -293,7 +292,6 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		rootCmd.AddCommand(putCmd)
 		carapace.Gen(putCmd).FlagCompletion(carapace.ActionMap{
 			"src": carapace.ActionFiles(),
-			"dst": carapace.ActionValues(listRemoteDir()...),
 		})
 
 		screenshotCmd := &cobra.Command{
@@ -385,6 +383,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run:     execCmd,
 		}
 		execCmd.Flags().StringP("cmd", "c", "", "Command to execute on agent")
+		rootCmd.AddCommand(execCmd)
 		carapace.Gen(execCmd).FlagCompletion(carapace.ActionMap{
 			"cmd": carapace.ActionValues(listAgentExes()...),
 		})
