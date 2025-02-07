@@ -445,7 +445,8 @@ func InitC2() (err error) {
 }
 
 func setActiveTarget(cmd *cobra.Command, args []string) {
-	target := args[0]
+	parsedArgs := util.ParseCmd(args[0])
+	target := parsedArgs[0]
 	var target_to_set *emp3r0r_def.Emp3r0rAgent
 
 	// select by tag or index

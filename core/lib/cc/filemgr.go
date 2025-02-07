@@ -15,9 +15,9 @@ import (
 )
 
 func ls(cmd *cobra.Command, args []string) {
-	dst := args[0]
-	if dst == "" {
-		dst = "."
+	dst := "."
+	if len(args) != 0 {
+		dst = args[0]
 	}
 
 	FSCmdDst("ls", dst)

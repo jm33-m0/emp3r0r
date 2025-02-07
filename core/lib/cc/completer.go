@@ -4,14 +4,9 @@
 package cc
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/google/uuid"
-	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 )
 
 // autocomplete module options
@@ -47,6 +42,7 @@ func listTargetIndexTags() []string {
 	for t, c := range Targets {
 		idx := c.Index
 		tag := t.Tag
+		tag = strconv.Quote(tag) // escape special characters
 		names = append(names, strconv.Itoa(idx))
 		names = append(names, tag)
 	}
@@ -84,39 +80,40 @@ func listAgentExes() []string {
 
 // remote ls autocomplete items in current directory
 func listRemoteDir() []string {
-	names := make([]string, 0)
-	cmd := fmt.Sprintf("%s --path .", emp3r0r_def.C2CmdListDir)
-	cmd_id := uuid.NewString()
-	err := SendCmdToCurrentTarget(cmd, cmd_id)
-	if err != nil {
-		LogDebug("Cannot list remote directory: %v", err)
-		return names
-	}
-	remote_entries := []string{}
-	for i := 0; i < 100; i++ {
-		if res, exists := CmdResults[cmd_id]; exists {
-			remote_entries = strings.Split(res, "\n")
-			CmdResultsMutex.Lock()
-			delete(CmdResults, cmd_id)
-			CmdResultsMutex.Unlock()
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-		if i == 99 {
-			LogDebug("Timeout listing remote directory")
-			return names
-		}
-	}
-	if len(remote_entries) == 0 {
-		LogDebug("Nothing in remote directory")
-		return names
-	}
-	for _, name := range remote_entries {
-		name = strings.ReplaceAll(name, "\t", "\\t")
-		name = strings.ReplaceAll(name, " ", "\\ ")
-		names = append(names, name)
-	}
-	return names
+	return []string{}
+	// names := make([]string, 0)
+	// cmd := fmt.Sprintf("%s --path .", emp3r0r_def.C2CmdListDir)
+	// cmd_id := uuid.NewString()
+	// err := SendCmdToCurrentTarget(cmd, cmd_id)
+	// if err != nil {
+	// 	LogDebug("Cannot list remote directory: %v", err)
+	// 	return names
+	// }
+	// remote_entries := []string{}
+	// for i := 0; i < 100; i++ {
+	// 	if res, exists := CmdResults[cmd_id]; exists {
+	// 		remote_entries = strings.Split(res, "\n")
+	// 		CmdResultsMutex.Lock()
+	// 		delete(CmdResults, cmd_id)
+	// 		CmdResultsMutex.Unlock()
+	// 		break
+	// 	}
+	// 	time.Sleep(100 * time.Millisecond)
+	// 	if i == 99 {
+	// 		LogDebug("Timeout listing remote directory")
+	// 		return names
+	// 	}
+	// }
+	// if len(remote_entries) == 0 {
+	// 	LogDebug("Nothing in remote directory")
+	// 	return names
+	// }
+	// for _, name := range remote_entries {
+	// 	name = strings.ReplaceAll(name, "\t", "\\t")
+	// 	name = strings.ReplaceAll(name, " ", "\\ ")
+	// 	names = append(names, name)
+	// }
+	// return names
 }
 
 // Function constructor - constructs new function for listing given directory
