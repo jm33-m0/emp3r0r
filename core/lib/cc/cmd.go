@@ -4,10 +4,13 @@
 package cc
 
 import (
+	"fmt"
 	"os"
 	"sync"
 
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
+	"github.com/jm33-m0/emp3r0r/core/lib/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/reeflective/console"
 	"github.com/reeflective/console/commands/readline"
 	"github.com/spf13/cobra"
@@ -47,6 +50,9 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			},
 		}
 		rootCmd.AddCommand(exitCmd)
+
+		// this command will be used to generate an agent binary
+		rootCmd.AddCommand(gen_agent_cmd())
 
 		helpCmd := &cobra.Command{
 			Use:     "help",
@@ -319,7 +325,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		rootCmd.AddCommand(rmPortMappingCmd)
 
 		labelAgentCmd := &cobra.Command{
-			Use:     "lable",
+			Use:     "label",
 			GroupID: "agent",
 			Short:   "Label an agent with custom name",
 			Example: "label --id <agent_id> --label <custom_name>",
@@ -373,4 +379,32 @@ func CmdHelp(cmd *cobra.Command, args []string) {
 		}
 	}
 	LogError("Help yourself")
+}
+
+func gen_agent_cmd() *cobra.Command {
+	genAgentCmd := &cobra.Command{
+		Use:     "generate",
+		GroupID: "agent",
+		Short:   "Generate an agent binary or implant",
+		Example: "generate --type linux_executable --arch amd64",
+		Run:     GenerateAgent,
+	}
+	genAgentCmd.Flags().StringP("type", "t", PayloadTypeLinuxExecutable, fmt.Sprintf("Payload type, available: %v+", PayloadTypeList))
+	genAgentCmd.Flags().StringP("arch", "a", "amd64", fmt.Sprintf("Target architecture, available: %v+", Arch_List_All))
+	cc_hosts := tun.NamesInCert(ServerCrtFile)
+	genAgentCmd.Flags().StringP("cc", "", cc_hosts[0], "C2 server address")
+	genAgentCmd.Flags().StringP("cdn", "", "", "CDN proxy to reach C2, leave empty to disable. Example: wss://cdn.example.com/ws")
+	genAgentCmd.Flags().StringP("doh", "", "", "DNS over HTTPS server to use for DNS resolution, leave empty to disable. Example: https://1.1.1.1/dns-query")
+	genAgentCmd.Flags().StringP("proxy", "", "", "Hard coded proxy URL for agent's C2 transport, leave empty to disable. Example: socks5://127.0.0.1:9050")
+	genAgentCmd.Flags().StringP("indicator", "", "", "URL to check for conditional C2 connection, leave empty to disable")
+	genAgentCmd.Flags().IntP("indicator-wait-min", "", util.RandInt(30, 120), "How many minimum seconds to wait before checking the indicator URL again")
+	genAgentCmd.Flags().IntP("indicator-wait-max", "", 0, "How many maximum seconds to wait before checking the indicator URL again, set to 0 to disable")
+	genAgentCmd.Flags().BoolP("shadowsocks", "", false, "Use shadowsocks to connect to C2")
+	genAgentCmd.Flags().BoolP("kcp", "", false, "Use shadowsocks with KCP (secure UDP multiplexed tunnel), will enable shadowsocks automatically.")
+	genAgentCmd.Flags().BoolP("NCSI", "", false, "Use NCSI to check for Internet connectivity before connecting to C2")
+	genAgentCmd.Flags().BoolP("proxychain", "", false, "Enable auto proxy chain, agents will negotiate and form a Shadowsocks proxy chain to reach C2")
+	genAgentCmd.Flags().IntP("proxychain-wait-min", "", util.RandInt(30, 120), "How many minimum seconds to wait before sending each broadcast packet to negotiate proxy chain")
+	genAgentCmd.Flags().IntP("proxychain-wait-max", "", 0, "How many maximum seconds to wait before sending each broadcast packet to negotiate proxy chain")
+
+	return genAgentCmd
 }

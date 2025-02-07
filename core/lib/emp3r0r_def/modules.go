@@ -4,7 +4,6 @@ import "fmt"
 
 // built-in module names
 const (
-	ModGenAgent     = "gen_agent"
 	ModCMD_EXEC     = "cmd_exec"
 	ModCLEAN_LOG    = "clean_log"
 	ModLPE_SUGGEST  = "lpe_suggest"
@@ -84,81 +83,6 @@ var Modules = map[string]*ModuleConfig{
 				OptName: "download_addr",
 				OptDesc: "Download address, useful if you want to download from other agents, use `file_server` first, eg. 10.1.1.1:8000",
 				OptVal:  "",
-			},
-		},
-		AgentConfig: AgentModuleConfig{
-			Exec:          "built-in",
-			Files:         []string{},
-			InMemory:      false,
-			Type:          "go",
-			IsInteractive: false,
-		},
-	},
-	ModGenAgent: {
-		Name:     ModGenAgent,
-		Build:    "",
-		Author:   "jm33-ng",
-		Date:     "2020-01-25",
-		Comment:  "Build agent for different OS/arch with customized options",
-		IsLocal:  true,
-		Platform: "Generic",
-		Path:     "",
-		Options: ModOptions{
-			"payload_type": &ModOption{
-				OptName: "payload_type",
-				OptDesc: `Target OS and payload_type, eg. "linux_executable", "windows_dll", "windows_exeuatable", "linux_so"`,
-				OptVals: []string{"linux_executable", "windows_dll", "windows_exeuatable", "linux_so"},
-				OptVal:  "linux_executable",
-			},
-			"arch": &ModOption{
-				OptName: "arch",
-				OptDesc: "Target architecture, available arch: amd64, 386, arm, arm64, etc",
-				OptVal:  "amd64",
-			},
-			"cc_host": &ModOption{
-				OptName: "cc_host",
-				OptDesc: "CC host (IP/domain name)",
-			},
-			"cc_indicator": &ModOption{
-				OptName: "cc_indicator",
-				OptDesc: "Agents will check this URL before making connection to CC server, eg. https://github.com/xxx/xxx/releases/download/xxx/xx.txt",
-			},
-			"indicator_text": &ModOption{
-				OptName: "indicator_text",
-				OptDesc: "Text to check, eg. emp3r0r",
-			},
-			"ncsi": &ModOption{
-				OptName: "ncsi",
-				OptDesc: "Use NCSI (Network Connectivity Status Indicator) to check internet access",
-			},
-			"cdn_proxy": &ModOption{
-				OptName: "cdn_proxy",
-				OptDesc: "Use CDN as C2 transport, eg. wss://yourcdn.com/yourpath",
-			},
-			"shadowsocks": &ModOption{
-				OptName: "shadowsocks",
-				OptDesc: "Use shadowsocks as C2 transport, KCP (fast UDP tunnel) is enabled by default",
-				OptVal:  "on",
-				OptVals: []string{"on", "bare", "off"},
-			},
-			"c2transport_proxy": &ModOption{
-				OptName: "c2transport_proxy",
-				OptDesc: "Use a proxy for C2 transport, eg. socks5://127.0.0.1:9050",
-			},
-			"auto_proxy": &ModOption{
-				OptName: "auto_proxy",
-				OptDesc: "Use auto proxy server: enable UDP broadcast to form a Shadowsocks proxy chain to automatically bring agents to CC",
-			},
-			"autoproxy_timeout": &ModOption{
-				OptName: "autoproxy_timeout",
-				OptDesc: "Auto proxy timeout in seconds",
-				OptVal:  "0",
-			},
-			"doh_server": &ModOption{
-				OptName: "doh_server",
-				OptDesc: "Use DNS over HTTPS (DoH) for DNS, eg. https://1.1.1.1/dns-query",
-				OptVal:  "",
-				OptVals: []string{"https://1.1.1.1/dns-query"},
 			},
 		},
 		AgentConfig: AgentModuleConfig{

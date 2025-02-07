@@ -93,7 +93,7 @@ func InitConfigFile(cc_host string) (err error) {
 	// random ports
 	RuntimeConfig.CCHost = cc_host
 	RuntimeConfig.CCPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
-	RuntimeConfig.Emp3r0rProxyServerPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
+	RuntimeConfig.AgentSocksServerPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.BroadcastPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.SSHDShellPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.ShadowsocksLocalSocksPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
@@ -101,7 +101,7 @@ func InitConfigFile(cc_host string) (err error) {
 	RuntimeConfig.KCPServerPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.KCPClientPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.StagerHTTPListenerPort = fmt.Sprintf("%v", util.RandInt(1026, 65534))
-	RuntimeConfig.Timeout = util.RandInt(10000, 20000)
+	RuntimeConfig.CCTimeout = util.RandInt(10000, 20000)
 
 	// SSH host key
 	RuntimeConfig.SSHHostKey, _, err = tun.GenerateSSHKeyPair()
@@ -122,7 +122,7 @@ func InitConfigFile(cc_host string) (err error) {
 	RuntimeConfig.BroadcastIntervalMax = 130
 	RuntimeConfig.IndicatorWaitMin = 30
 	RuntimeConfig.IndicatorWaitMax = 130
-	RuntimeConfig.AutoProxyTimeout = 0 // disable timeout by default, leave it to the OS
+	RuntimeConfig.AgentSocksTimeout = 0 // disable timeout by default, leave it to the OS
 
 	// sign agent UUID
 	sig, err := tun.SignWithCAKey([]byte(RuntimeConfig.AgentUUID))

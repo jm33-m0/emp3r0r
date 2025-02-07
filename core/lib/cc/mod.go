@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/lithammer/fuzzysearch/fuzzy"
 	"github.com/olekukonko/tablewriter"
@@ -48,7 +47,6 @@ var (
 
 	// ModuleHelpers a map of module helpers
 	ModuleHelpers = map[string]func(){
-		emp3r0r_def.ModGenAgent:     modGenAgent,
 		emp3r0r_def.ModCMD_EXEC:     moduleCmd,
 		emp3r0r_def.ModSHELL:        moduleShell,
 		emp3r0r_def.ModPROXY:        moduleProxy,
@@ -95,69 +93,16 @@ func UpdateOptions(modName string) (exist bool) {
 		return CurrentModuleOptions[key]
 	}
 
-	switch modName {
+	// other modules
+	modconfig := emp3r0r_def.Modules[modName]
+	for optName, option := range modconfig.Options {
+		argOpt := addIfNotFound(optName)
 
-	// need to read cached values from `emp3r0r.json`
-	// these values are set when on the first run of emp3r0r
-	case emp3r0r_def.ModGenAgent:
-		// payload type
-		payload_type := addIfNotFound("payload_type")
-		payload_type.Vals = PayloadTypeList
-		payload_type.Val = PayloadTypeLinuxExecutable
-		// arch
-		arch := addIfNotFound("arch")
-		arch.Vals = Arch_List_All
-		arch.Val = "amd64"
-		// cc host
-		existing_names := tun.NamesInCert(ServerCrtFile)
-		cc_host := addIfNotFound("cc_host")
-		cc_host.Vals = existing_names
-		cc_host.Val = read_cached_config("cc_host").(string)
-		// cc indicator
-		cc_indicator := addIfNotFound("cc_indicator")
-		cc_indicator.Val = read_cached_config("cc_indicator").(string)
-		// cc indicator value
-		cc_indicator_text := addIfNotFound("indicator_text")
-		cc_indicator_text.Val = read_cached_config("indicator_text").(string)
-		// NCSI switch
-		ncsi := addIfNotFound("ncsi")
-		ncsi.Vals = []string{"on", "off"}
-		ncsi.Val = "off"
-		// CDN proxy
-		cdn_proxy := addIfNotFound("cdn_proxy")
-		cdn_proxy.Val = read_cached_config("cdn_proxy").(string)
-		// shadowsocks switch
-		shadowsocks := addIfNotFound("shadowsocks")
-		shadowsocks.Vals = []string{"on", "off", "bare"}
-		shadowsocks.Val = "off"
-		// agent proxy for c2 transport
-		c2transport_proxy := addIfNotFound("c2transport_proxy")
-		c2transport_proxy.Val = RuntimeConfig.C2TransportProxy
-		// agent proxy timeout
-		autoproxy_timeout := addIfNotFound("autoproxy_timeout")
-		timeout := read_cached_config("autoproxy_timeout").(float64)
-		autoproxy_timeout.Val = strconv.FormatFloat(timeout, 'f', -1, 64)
-		// DoH
-		doh := addIfNotFound("doh_server")
-		doh.Vals = []string{"https://1.1.1.1/dns-query", "https://dns.google/dns-query"}
-		doh.Val = read_cached_config("doh_server").(string)
-		// auto proxy, with UDP broadcasting
-		auto_proxy := addIfNotFound("auto_proxy")
-		auto_proxy.Vals = []string{"on", "off"}
-		auto_proxy.Val = "off"
-
-	default:
-		// other modules
-		modconfig := emp3r0r_def.Modules[modName]
-		for optName, option := range modconfig.Options {
-			argOpt := addIfNotFound(optName)
-
-			argOpt.Val = option.OptVal
-		}
-		if strings.ToLower(modconfig.AgentConfig.Exec) != "built-in" {
-			download_addr := addIfNotFound("download_addr")
-			download_addr.Val = ""
-		}
+		argOpt.Val = option.OptVal
+	}
+	if strings.ToLower(modconfig.AgentConfig.Exec) != "built-in" {
+		download_addr := addIfNotFound("download_addr")
+		download_addr.Val = ""
 	}
 
 	return

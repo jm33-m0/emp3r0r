@@ -129,7 +129,7 @@ func CollectSystemInfo() *emp3r0r_def.Emp3r0rAgent {
 	info.HasTor = tun.IsTor(emp3r0r_def.CCAddress)
 
 	// has internet?
-	if !RuntimeConfig.DisableNCSI {
+	if RuntimeConfig.EnableNCSI {
 		info.HasInternet = tun.TestConnectivity(tun.UbuntuConnectivityURL, RuntimeConfig.C2TransportProxy)
 		info.NCSIEnabled = true
 	} else {

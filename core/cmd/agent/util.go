@@ -28,7 +28,7 @@ func isAgentAliveSocket() bool {
 }
 
 func isC2Reachable() bool {
-	if !agent.RuntimeConfig.DisableNCSI {
+	if agent.RuntimeConfig.EnableNCSI {
 		return tun.TestConnectivity(tun.UbuntuConnectivityURL, agent.RuntimeConfig.C2TransportProxy)
 	}
 

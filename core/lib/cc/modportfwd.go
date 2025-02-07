@@ -95,24 +95,24 @@ func moduleProxy() {
 	// port-fwd
 	pf := new(PortFwdSession)
 	pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
-	pf.Lport, pf.To = port, "127.0.0.1:"+RuntimeConfig.Emp3r0rProxyServerPort
+	pf.Lport, pf.To = port, "127.0.0.1:"+RuntimeConfig.AgentSocksServerPort
 	pf.Description = fmt.Sprintf("Agent Proxy (TCP):\n%s (Local) -> %s (Agent)", pf.Lport, pf.To)
 	pf.Protocol = "tcp"
-	pf.Timeout = RuntimeConfig.AutoProxyTimeout
+	pf.Timeout = RuntimeConfig.AgentSocksTimeout
 
 	// udp port fwd
 	pfu := new(PortFwdSession)
 	pfu.Ctx, pfu.Cancel = context.WithCancel(context.Background())
-	pfu.Lport, pfu.To = port, "127.0.0.1:"+RuntimeConfig.Emp3r0rProxyServerPort
+	pfu.Lport, pfu.To = port, "127.0.0.1:"+RuntimeConfig.AgentSocksServerPort
 	pfu.Description = fmt.Sprintf("Agent Proxy (UDP):\n%s (Local) -> %s (Agent)", pfu.Lport, pfu.To)
 	pfu.Protocol = "udp"
-	pfu.Timeout = RuntimeConfig.AutoProxyTimeout
+	pfu.Timeout = RuntimeConfig.AgentSocksTimeout
 
 	switch status {
 	case "on":
 		// tell agent to start local socks5 proxy
 		cmd_id := uuid.NewString()
-		err := SendCmdToCurrentTarget("!proxy --mode on --addr 0.0.0.0:"+RuntimeConfig.Emp3r0rProxyServerPort, cmd_id)
+		err := SendCmdToCurrentTarget("!proxy --mode on --addr 0.0.0.0:"+RuntimeConfig.AgentSocksServerPort, cmd_id)
 		if err != nil {
 			LogError("Starting SOCKS5 proxy on target failed: %v", err)
 			return

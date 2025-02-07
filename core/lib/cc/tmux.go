@@ -127,7 +127,7 @@ func TmuxInitWindows() (err error) {
 	}
 
 	// Agent output
-	OutputPane, err = new_pane("Output", "Output\n", "h", "", 50)
+	OutputPane, err = new_pane("Output", "Saving to emp3r0r.log...\n", "h", "", 50)
 	if err != nil {
 		return
 	}

