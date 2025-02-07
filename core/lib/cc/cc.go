@@ -352,7 +352,7 @@ func SetAgentLabel(a *emp3r0r_def.Emp3r0rAgent) (label string) {
 }
 
 // ListModules list all available modules
-func ListModules() {
+func ListModules(_ *cobra.Command, _ []string) {
 	mod_comment_map := make(map[string]string)
 	for mod_name, mod := range emp3r0r_def.Modules {
 		mod_comment_map[mod_name] = mod.Comment

@@ -283,8 +283,8 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		lsModCmd := &cobra.Command{
 			Use:     "ls_modules",
 			GroupID: "module",
-			Short:   "Kill agent process, delete agent root directory",
-			Run:     suicide,
+			Short:   "List all modules",
+			Run:     ListModules,
 		}
 		rootCmd.AddCommand(lsModCmd)
 

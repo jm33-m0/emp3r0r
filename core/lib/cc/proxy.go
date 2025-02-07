@@ -151,7 +151,7 @@ func ListPortFwds(cmd *cobra.Command, args []string) {
 	table.AppendBulk(tdata)
 	table.Render()
 	AdaptiveTable(tableString.String())
-	fmt.Printf("\n\033[0m%s\n\n", tableString.String())
+	LogInfo("\n\033[0m%s\n\n", tableString.String())
 }
 
 // InitReversedPortFwd send portfwd command to agent and set up a reverse port mapping
