@@ -692,7 +692,6 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 				TargetsMutex.RLock()
 				delete(Targets, t)
 				TargetsMutex.RUnlock()
-				SetDynamicPrompt()
 				CliAlert(color.FgHiRed, "[%d] Agent dies", c.Index)
 				CliMsg("[%d] agent %s disconnected\n", c.Index, strconv.Quote(t.Tag))
 				ListTargets()

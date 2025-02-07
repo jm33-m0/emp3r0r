@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -560,4 +561,59 @@ func InitC2() (err error) {
 	AgentOuputLogFile = fmt.Sprintf("%s/agent_output.log", EmpWorkSpace)
 
 	return
+}
+
+func setActiveTarget(cmd *cobra.Command, args []string) {
+	target, err := cmd.Flags().GetString("id")
+	if err != nil {
+		CliPrintError("set target: %v", err)
+		return
+	}
+	var target_to_set *emp3r0r_def.Emp3r0rAgent
+
+	// select by tag or index
+	target_to_set = GetTargetFromTag(target)
+	if target_to_set == nil {
+		index, e := strconv.Atoi(target)
+		if e == nil {
+			target_to_set = GetTargetFromIndex(index)
+		}
+	}
+
+	select_agent := func(a *emp3r0r_def.Emp3r0rAgent) {
+		CurrentTarget = a
+		GetTargetDetails(CurrentTarget)
+		CliPrintSuccess("Now targeting %s", CurrentTarget.Tag)
+
+		// kill shell and sftp window
+		if AgentSFTPPane != nil {
+			CliPrintInfo("Updating sftp window")
+			err = AgentSFTPPane.KillPane()
+			if err != nil {
+				CliPrintWarning("Updating sftp window: %v", err)
+			}
+			AgentSFTPPane = nil
+		}
+		if AgentShellPane != nil {
+			CliPrintInfo("Updating shell window")
+			err = AgentShellPane.KillPane()
+			if err != nil {
+				CliPrintWarning("Updating shell window: %v", err)
+			}
+			AgentShellPane = nil
+		}
+
+		CliPrint("Run `file_manager` to open a SFTP session")
+		autoCompleteAgentExes(target_to_set)
+	}
+
+	if target_to_set == nil {
+		// if still nothing
+		CliPrintError("Target does not exist, no target has been selected")
+		return
+
+	} else {
+		// lets start the bash shell
+		go select_agent(target_to_set)
+	}
 }

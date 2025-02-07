@@ -9,24 +9,17 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
-	"os/exec"
-	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	cowsay "github.com/Code-Hex/Neo-cowsay/v2"
 	"github.com/alecthomas/chroma/quick"
 	"github.com/fatih/color"
-	"github.com/google/uuid"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/lib/ss"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/olekukonko/tablewriter"
 	"github.com/reeflective/console"
-	"github.com/spf13/cobra"
 )
 
 const (
@@ -74,8 +67,11 @@ func CliMain() {
 	prompt := mainMenu.Prompt()
 	prompt.Primary = SetDynamicPrompt
 	prompt.Secondary = func() string { return ">" }
-	prompt.Right = func() string { return fmt.Sprint(time.Now().Format("03:04:05")) }
+	prompt.Right = func() string { return color.CyanString(time.Now().Format("03:04:05")) }
 	prompt.Transient = func() string { return ">>>" }
+	Emp3r0rConsole.NewlineBefore = true
+	Emp3r0rConsole.NewlineAfter = true
+	Emp3r0rConsole.NewlineWhenEmpty = true
 
 	// Syntax highlighting
 	Emp3r0rConsole.Shell().SyntaxHighlighter = highLighter
@@ -122,7 +118,7 @@ func SetDynamicPrompt() string {
 	agent_name := color.New(color.FgCyan, color.Underline).Sprint(shortName)
 	mod_name := color.New(color.FgHiBlue).Sprint(CurrentMod)
 
-	dynamicPrompt := fmt.Sprintf("\n%s - %s @%s (%s) "+prompt_arrow,
+	dynamicPrompt := fmt.Sprintf("%s - %s @%s (%s) "+prompt_arrow,
 		prompt_name,
 		transport,
 		agent_name,
@@ -154,161 +150,6 @@ func getTransport(transportStr string) string {
 	default:
 		return color.New(color.FgHiWhite).Sprint("unknown")
 	}
-}
-
-func cliPrintHelper(format string, a []interface{}, msgColor *color.Color, _ string, _ bool) {
-	logMsg := msgColor.Sprintf(format, a...)
-	AsyncLogMutex.Lock()
-	defer AsyncLogMutex.Unlock()
-	AsyncLogChan <- logMsg
-}
-
-var (
-	AsyncLogChan  = make(chan string, 100)
-	AsyncLogMutex = new(sync.Mutex)
-)
-
-func goRoutineLogHelper(console *console.Console) {
-	for {
-		AsyncLogMutex.Lock()
-		logMsg := <-AsyncLogChan
-		AsyncLogMutex.Unlock()
-		console.TransientPrintf("%s\n", logMsg)
-		// log to file
-		logf, err := os.OpenFile(ConsoleLogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err == nil {
-			fmt.Fprintf(logf, "%s\n", logMsg)
-		}
-	}
-}
-
-func CliPrintDebug(format string, a ...interface{}) {
-	if DebugLevel >= 3 {
-		cliPrintHelper(format, a, color.New(color.FgBlue, color.Italic), "DEBUG", false)
-	}
-}
-
-func CliPrintInfo(format string, a ...interface{}) {
-	if DebugLevel >= 2 {
-		cliPrintHelper(format, a, color.New(color.FgBlue), "INFO", false)
-	}
-}
-
-func CliPrintWarning(format string, a ...interface{}) {
-	if DebugLevel >= 1 {
-		cliPrintHelper(format, a, color.New(color.FgHiYellow), "WARN", false)
-	}
-}
-
-func CliPrint(format string, a ...interface{}) {
-	cliPrintHelper(format, a, color.New(color.FgHiCyan), "PRINT", false)
-}
-
-func CliMsg(format string, a ...interface{}) {
-	cliPrintHelper(format, a, color.New(color.FgHiCyan), "MSG", false)
-}
-
-func CliAlert(textColor color.Attribute, format string, a ...interface{}) {
-	cliPrintHelper(format, a, color.New(textColor, color.Bold), "ALERT", false)
-}
-
-func CliPrintSuccess(format string, a ...interface{}) {
-	cliPrintHelper(format, a, color.New(color.FgHiGreen, color.Bold), "SUCCESS", true)
-}
-
-func CliFatalError(format string, a ...interface{}) {
-	cliPrintHelper(format, a, color.New(color.FgHiRed, color.Bold, color.Italic), "ERROR", true)
-	CliMsg("Run 'tmux kill-session -t emp3r0r' to clean up dead emp3r0r windows")
-	log.Fatal(color.New(color.Bold, color.FgHiRed).Sprintf(format, a...))
-}
-
-func CliPrintError(format string, a ...interface{}) {
-	cliPrintHelper(format, a, color.New(color.FgHiRed, color.Bold), "ERROR", true)
-}
-
-// CliListOptions list currently available options for `set`
-func CliListOptions(cmd *cobra.Command, args []string) {
-	if CurrentMod == "none" {
-		CliPrintWarning("No module selected")
-		return
-	}
-	TargetsMutex.RLock()
-	defer TargetsMutex.RUnlock()
-	opts := make(map[string]string)
-
-	opts["module"] = CurrentMod
-	if CurrentTarget != nil {
-		_, exist := Targets[CurrentTarget]
-		if exist {
-			shortName := strings.Split(CurrentTarget.Tag, "-agent")[0]
-			opts["target"] = shortName
-		} else {
-			opts["target"] = "<blank>"
-		}
-	} else {
-		opts["target"] = "<blank>"
-	}
-
-	for opt_name, opt := range CurrentModuleOptions {
-		if opt != nil {
-			opts[opt_name] = opt.Name
-		}
-	}
-
-	// build table
-	tdata := [][]string{}
-	tableString := &strings.Builder{}
-	table := tablewriter.NewWriter(tableString)
-	table.SetHeader([]string{"Option", "Help", "Value"})
-	table.SetBorder(true)
-	table.SetRowLine(true)
-	table.SetAutoWrapText(true)
-	table.SetColWidth(50)
-
-	// color
-	table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
-		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
-		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor})
-	table.SetColumnColor(tablewriter.Colors{tablewriter.FgHiBlueColor},
-		tablewriter.Colors{tablewriter.FgBlueColor},
-		tablewriter.Colors{tablewriter.FgBlueColor})
-
-	// fill table
-	module_obj := emp3r0r_def.Modules[CurrentMod]
-	if module_obj == nil {
-		CliPrintError("Module %s not found", CurrentMod)
-		return
-	}
-	for opt_name, opt_obj := range module_obj.Options {
-		help := "N/A"
-		if opt_obj == nil {
-			continue
-		}
-		help = opt_obj.OptDesc
-		switch opt_name {
-		case "module":
-			help = "Selected module"
-		case "target":
-			help = "Selected target"
-		}
-		val := ""
-		currentOpt, ok := CurrentModuleOptions[opt_name]
-		if ok {
-			val = currentOpt.Val
-		}
-
-		tdata = append(tdata,
-			[]string{
-				util.SplitLongLine(opt_name, 50),
-				util.SplitLongLine(help, 50),
-				util.SplitLongLine(val, 50),
-			})
-	}
-	table.AppendBulk(tdata)
-	table.Render()
-	out := tableString.String()
-	AdaptiveTable(out)
-	CliPrint("\n%s", out)
 }
 
 // CliBanner prints banner
@@ -428,163 +269,6 @@ IG1hZGUgYnkgbGludXggdXNlcgoKaHR0cHM6Ly9naXRodWIuY29tL2ptMzMtbTAvZW1wM3IwcgoK
 Cg==
 `
 
-// autocomplete module options
-func listValChoices() func(string) []string {
-	return func(line string) []string {
-		ret := make([]string, 0)
-		for _, opt := range CurrentModuleOptions {
-			ret = append(ret, opt.Vals...)
-		}
-		return ret
-	}
-}
-
-// autocomplete modules names
-func listMods() func(string) []string {
-	return func(line string) []string {
-		names := make([]string, 0)
-		for mod := range ModuleHelpers {
-			names = append(names, mod)
-		}
-		return names
-	}
-}
-
-// autocomplete portfwd session IDs
-func listPortMappings() func(string) []string {
-	return func(line string) []string {
-		ids := make([]string, 0)
-		for id := range PortFwds {
-			ids = append(ids, id)
-		}
-		return ids
-	}
-}
-
-// autocomplete target index and tags
-func listTargetIndexTags() func(string) []string {
-	return func(line string) []string {
-		names := make([]string, 0)
-		for t, c := range Targets {
-			idx := c.Index
-			tag := t.Tag
-			names = append(names, strconv.Itoa(idx))
-			names = append(names, tag)
-		}
-		return names
-	}
-}
-
-// autocomplete option names
-func listOptions() func(string) []string {
-	return func(line string) []string {
-		names := make([]string, 0)
-
-		for opt := range CurrentModuleOptions {
-			names = append(names, opt)
-		}
-		return names
-	}
-}
-
-// remote autocomplete items in $PATH
-func listAgentExes(agent *emp3r0r_def.Emp3r0rAgent) []string {
-	CliPrintDebug("Listing agent %s's exes in PATH", agent.Tag)
-	exes := make([]string, 0)
-	if agent == nil {
-		CliPrintDebug("No valid target selected so no autocompletion for exes")
-		return exes
-	}
-	for _, exe := range agent.Exes {
-		exe = strings.ReplaceAll(exe, "\t", "\\t")
-		exe = strings.ReplaceAll(exe, " ", "\\ ")
-		exes = append(exes, exe)
-	}
-	CliPrintDebug("Exes found on agent '%s':\n%v",
-		agent.Tag, exes)
-	return exes
-}
-
-// when a target is selected, update CmdCompls with PATH items
-func autoCompleteAgentExes(agent *emp3r0r_def.Emp3r0rAgent) {
-	// exes := listAgentExes(agent)
-	// temp_CmdCompls := InitCmdCompls
-	//
-	// is_exe_same_as_cmd := func(exe string) bool {
-	// 	for _, cmd := range CLICommands {
-	// 		if exe == cmd {
-	// 			return true
-	// 		}
-	// 	}
-	// 	return false
-	// }
-	//
-	// for _, exe := range exes {
-	// 	if is_exe_same_as_cmd(exe) {
-	// 		CliPrintDebug("Exe %s exists in CLI commands, skipping", strconv.Quote(exe))
-	// 		continue
-	// 	}
-	// 	temp_CmdCompls = append(temp_CmdCompls, readline.PcItem(exe))
-	// }
-	//
-	// CmdCompls = temp_CmdCompls
-	// CliCompleter.SetChildren(CmdCompls)
-}
-
-// remote ls autocomplete items in current directory
-func listRemoteDir() func(string) []string {
-	return func(line string) []string {
-		names := make([]string, 0)
-		cmd := fmt.Sprintf("%s --path .", emp3r0r_def.C2CmdListDir)
-		cmd_id := uuid.NewString()
-		err := SendCmdToCurrentTarget(cmd, cmd_id)
-		if err != nil {
-			CliPrintDebug("Cannot list remote directory: %v", err)
-			return names
-		}
-		remote_entries := []string{}
-		for i := 0; i < 100; i++ {
-			if res, exists := CmdResults[cmd_id]; exists {
-				remote_entries = strings.Split(res, "\n")
-				CmdResultsMutex.Lock()
-				delete(CmdResults, cmd_id)
-				CmdResultsMutex.Unlock()
-				break
-			}
-			time.Sleep(100 * time.Millisecond)
-			if i == 99 {
-				CliPrintDebug("Timeout listing remote directory")
-				return names
-			}
-		}
-		if len(remote_entries) == 0 {
-			CliPrintDebug("Nothing in remote directory")
-			return names
-		}
-		for _, name := range remote_entries {
-			name = strings.ReplaceAll(name, "\t", "\\t")
-			name = strings.ReplaceAll(name, " ", "\\ ")
-			names = append(names, name)
-		}
-		return names
-	}
-}
-
-// Function constructor - constructs new function for listing given directory
-// local ls
-func listLocalFiles(path string) func(string) []string {
-	return func(line string) []string {
-		names := make([]string, 0)
-		files, _ := os.ReadDir(path)
-		for _, f := range files {
-			name := strings.ReplaceAll(f.Name(), "\t", "\\t")
-			name = strings.ReplaceAll(name, " ", "\\ ")
-			names = append(names, name)
-		}
-		return names
-	}
-}
-
 // automatically resize CommandPane according to table width
 func AdaptiveTable(tableString string) {
 	TmuxUpdatePanes()
@@ -593,51 +277,4 @@ func AdaptiveTable(tableString string) {
 		CliPrintDebug("Command Pane %d vs %d table width, resizing", CommandPane.Width, row_len)
 		CommandPane.ResizePane("x", row_len)
 	}
-}
-
-func setDebugLevel(cmd *cobra.Command, args []string) {
-	level, err := cmd.Flags().GetInt("level")
-	if err != nil {
-		CliPrintError("Invalid debug level: %v", err)
-		return
-	}
-	DebugLevel = level
-	if DebugLevel > 2 {
-		log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lmsgprefix)
-		ss.ServerConfig.Verbose = true
-	} else {
-		log.SetFlags(log.Ldate | log.Ltime | log.LstdFlags)
-	}
-}
-
-// CopyToClipboard copy data to clipboard using xsel -b
-func CopyToClipboard(data []byte) {
-	exe := "xsel"
-	cmd := exec.Command("xsel", "-bi")
-	if os.Getenv("WAYLAND_DISPLAY") != "" {
-		exe = "wl-copy"
-		cmd = exec.Command("wl-copy")
-	} else if os.Getenv("DISPLAY") == "" {
-		CliPrintWarning("Neither Wayland nor X11 is running, CopyToClipboard will abort")
-		return
-	}
-	if !util.IsCommandExist(exe) {
-		CliPrintWarning("%s not installed", exe)
-		return
-	}
-	stdin, stdinErr := cmd.StdinPipe()
-	if stdinErr != nil {
-		CliPrintWarning("CopyToClipboard read stdin: %v", stdinErr)
-		return
-	}
-	go func() {
-		defer stdin.Close()
-		_, _ = stdin.Write(data)
-	}()
-
-	stdinErr = cmd.Run()
-	if stdinErr != nil {
-		CliPrintWarning("CopyToClipboard: %v", stdinErr)
-	}
-	CliPrintInfo("Copied to clipboard")
 }

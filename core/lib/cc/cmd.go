@@ -5,7 +5,6 @@ package cc
 
 import (
 	"os"
-	"strconv"
 	"sync"
 
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
@@ -74,7 +73,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			GroupID: "module",
 			Short:   "Use a module",
 			Example: "use --module gen_agent",
-			Run:     useModule,
+			Run:     setActiveModule,
 		}
 		useModuleCmd.Flags().StringP("module", "m", "", "Module name")
 		rootCmd.AddCommand(useModuleCmd)
@@ -83,7 +82,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Use:     "info",
 			GroupID: "module",
 			Short:   "What options do we have?",
-			Run:     CliListOptions,
+			Run:     listModOptionsTable,
 		}
 		rootCmd.AddCommand(infoCmd)
 
@@ -92,7 +91,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			GroupID: "module",
 			Short:   "Set an option of the current module",
 			Example: "set --option cc_host --value emp3r0r.com",
-			Run:     setOptVal,
+			Run:     setOptValCmd,
 		}
 		setCmd.Flags().StringP("option", "o", "", "Option name")
 		setCmd.Flags().StringP("value", "v", "", "Option value")
@@ -111,7 +110,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			GroupID: "agent",
 			Short:   "Set active target",
 			Example: "target --id 0",
-			Run:     setCurrentTarget,
+			Run:     setActiveTarget,
 		}
 		targetCmd.Flags().StringP("id", "i", "", "Target ID")
 		rootCmd.AddCommand(targetCmd)
@@ -345,34 +344,6 @@ var (
 	CmdTimeMutex = &sync.Mutex{}
 )
 
-func useModule(cmd *cobra.Command, args []string) {
-	modName, err := cmd.Flags().GetString("module")
-	if err != nil {
-		CliPrintError(cmd.UsageString())
-		return
-	}
-	defer SetDynamicPrompt()
-	for mod := range ModuleHelpers {
-		if mod == modName {
-			CurrentMod = modName
-			for k := range CurrentModuleOptions {
-				delete(CurrentModuleOptions, k)
-			}
-			UpdateOptions(CurrentMod)
-			CliPrintInfo("Using module %s", strconv.Quote(CurrentMod))
-			ModuleDetails(CurrentMod)
-			mod, exists := emp3r0r_def.Modules[CurrentMod]
-			if exists {
-				CliPrint("%s", mod.Comment)
-			}
-			CliListOptions(cmd, args)
-
-			return
-		}
-	}
-	CliPrintError("No such module: %s", strconv.Quote(modName))
-}
-
 // CmdHelp prints help in two columns
 // print help for modules
 func CmdHelp(cmd *cobra.Command, args []string) {
@@ -402,126 +373,4 @@ func CmdHelp(cmd *cobra.Command, args []string) {
 		}
 	}
 	CliPrintError("Help yourself")
-}
-
-func setCurrentTarget(cmd *cobra.Command, args []string) {
-	target, err := cmd.Flags().GetString("id")
-	if err != nil {
-		CliPrintError("set target: %v", err)
-		return
-	}
-	defer SetDynamicPrompt()
-	var target_to_set *emp3r0r_def.Emp3r0rAgent
-
-	// select by tag or index
-	target_to_set = GetTargetFromTag(target)
-	if target_to_set == nil {
-		index, e := strconv.Atoi(target)
-		if e == nil {
-			target_to_set = GetTargetFromIndex(index)
-		}
-	}
-
-	select_agent := func(a *emp3r0r_def.Emp3r0rAgent) {
-		CurrentTarget = a
-		GetTargetDetails(CurrentTarget)
-		CliPrintSuccess("Now targeting %s", CurrentTarget.Tag)
-		SetDynamicPrompt()
-
-		// kill shell and sftp window
-		if AgentSFTPPane != nil {
-			CliPrintInfo("Updating sftp window")
-			err = AgentSFTPPane.KillPane()
-			if err != nil {
-				CliPrintWarning("Updating sftp window: %v", err)
-			}
-			AgentSFTPPane = nil
-		}
-		if AgentShellPane != nil {
-			CliPrintInfo("Updating shell window")
-			err = AgentShellPane.KillPane()
-			if err != nil {
-				CliPrintWarning("Updating shell window: %v", err)
-			}
-			AgentShellPane = nil
-		}
-
-		CliPrint("Run `file_manager` to open a SFTP session")
-		autoCompleteAgentExes(target_to_set)
-	}
-
-	if target_to_set == nil {
-		// if still nothing
-		CliPrintError("Target does not exist, no target has been selected")
-		return
-
-	} else {
-		// lets start the bash shell
-		go select_agent(target_to_set)
-	}
-}
-
-func setOptVal(cmd *cobra.Command, args []string) {
-	opt, err := cmd.Flags().GetString("option")
-	if err != nil {
-		CliPrintError("set option: %v", err)
-		return
-	}
-	val, err := cmd.Flags().GetString("value")
-	if err != nil {
-		CliPrintError("set option: %v", err)
-		return
-	}
-	if opt == "" || val == "" {
-		CliPrintError(cmd.UsageString())
-		return
-	}
-	// hand to SetOption helper
-	SetOption(opt, val)
-	CliListOptions(cmd, args)
-}
-
-func setTargetLabel(cmd *cobra.Command, args []string) {
-	label, err := cmd.Flags().GetString("label")
-	if err != nil {
-		CliPrintError("set target label: %v", err)
-		return
-	}
-	agent_id, err := cmd.Flags().GetString("id")
-	if err != nil {
-		CliPrintError("set target label: %v", err)
-		return
-	}
-
-	if agent_id == "" || label == "" {
-		CliPrintError(cmd.UsageString())
-		return
-	}
-
-	target := new(emp3r0r_def.Emp3r0rAgent)
-
-	// select by tag or index
-	index, e := strconv.Atoi(agent_id)
-	if e != nil {
-		// try by tag
-		target = GetTargetFromTag(agent_id)
-		if target == nil {
-			// cannot parse
-			CliPrintError("Cannot set target label by index: %v", e)
-			return
-		}
-	} else {
-		// try by index
-		target = GetTargetFromIndex(index)
-	}
-
-	// target exists?
-	if target == nil {
-		CliPrintError("Target does not exist")
-		return
-	}
-	Targets[target].Label = label // set label
-	labelAgents()
-	CliPrintSuccess("%s has been labeled as %s", target.Tag, label)
-	ListTargets() // update agent list
 }

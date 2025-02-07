@@ -18,6 +18,7 @@ import (
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
+	"github.com/spf13/cobra"
 )
 
 // DownloadFile download file using default http client
@@ -220,4 +221,81 @@ func UnlockDownloads() error {
 	}
 
 	return nil
+}
+
+// CopyToClipboard copy data to clipboard using xsel -b
+func CopyToClipboard(data []byte) {
+	exe := "xsel"
+	cmd := exec.Command("xsel", "-bi")
+	if os.Getenv("WAYLAND_DISPLAY") != "" {
+		exe = "wl-copy"
+		cmd = exec.Command("wl-copy")
+	} else if os.Getenv("DISPLAY") == "" {
+		CliPrintWarning("Neither Wayland nor X11 is running, CopyToClipboard will abort")
+		return
+	}
+	if !util.IsCommandExist(exe) {
+		CliPrintWarning("%s not installed", exe)
+		return
+	}
+	stdin, stdinErr := cmd.StdinPipe()
+	if stdinErr != nil {
+		CliPrintWarning("CopyToClipboard read stdin: %v", stdinErr)
+		return
+	}
+	go func() {
+		defer stdin.Close()
+		_, _ = stdin.Write(data)
+	}()
+
+	stdinErr = cmd.Run()
+	if stdinErr != nil {
+		CliPrintWarning("CopyToClipboard: %v", stdinErr)
+	}
+	CliPrintInfo("Copied to clipboard")
+}
+
+func setTargetLabel(cmd *cobra.Command, args []string) {
+	label, err := cmd.Flags().GetString("label")
+	if err != nil {
+		CliPrintError("set target label: %v", err)
+		return
+	}
+	agent_id, err := cmd.Flags().GetString("id")
+	if err != nil {
+		CliPrintError("set target label: %v", err)
+		return
+	}
+
+	if agent_id == "" || label == "" {
+		CliPrintError(cmd.UsageString())
+		return
+	}
+
+	target := new(emp3r0r_def.Emp3r0rAgent)
+
+	// select by tag or index
+	index, e := strconv.Atoi(agent_id)
+	if e != nil {
+		// try by tag
+		target = GetTargetFromTag(agent_id)
+		if target == nil {
+			// cannot parse
+			CliPrintError("Cannot set target label by index: %v", e)
+			return
+		}
+	} else {
+		// try by index
+		target = GetTargetFromIndex(index)
+	}
+
+	// target exists?
+	if target == nil {
+		CliPrintError("Target does not exist")
+		return
+	}
+	Targets[target].Label = label // set label
+	labelAgents()
+	CliPrintSuccess("%s has been labeled as %s", target.Tag, label)
+	ListTargets() // update agent list
 }

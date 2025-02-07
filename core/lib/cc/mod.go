@@ -10,7 +10,9 @@ import (
 
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/lithammer/fuzzysearch/fuzzy"
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
 
@@ -247,4 +249,136 @@ func ModuleSearch(cmd *cobra.Command, args []string) {
 		}
 	}
 	CliPrettyPrint("Module", "Comment", &search_results)
+}
+
+// listModOptionsTable list currently available options for `set`
+func listModOptionsTable(_ *cobra.Command, _ []string) {
+	if CurrentMod == "none" {
+		CliPrintWarning("No module selected")
+		return
+	}
+	TargetsMutex.RLock()
+	defer TargetsMutex.RUnlock()
+	opts := make(map[string]string)
+
+	opts["module"] = CurrentMod
+	if CurrentTarget != nil {
+		_, exist := Targets[CurrentTarget]
+		if exist {
+			shortName := strings.Split(CurrentTarget.Tag, "-agent")[0]
+			opts["target"] = shortName
+		} else {
+			opts["target"] = "<blank>"
+		}
+	} else {
+		opts["target"] = "<blank>"
+	}
+
+	for opt_name, opt := range CurrentModuleOptions {
+		if opt != nil {
+			opts[opt_name] = opt.Name
+		}
+	}
+
+	// build table
+	tdata := [][]string{}
+	tableString := &strings.Builder{}
+	table := tablewriter.NewWriter(tableString)
+	table.SetHeader([]string{"Option", "Help", "Value"})
+	table.SetBorder(true)
+	table.SetRowLine(true)
+	table.SetAutoWrapText(true)
+	table.SetColWidth(50)
+
+	// color
+	table.SetHeaderColor(tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor},
+		tablewriter.Colors{tablewriter.Bold, tablewriter.FgCyanColor})
+	table.SetColumnColor(tablewriter.Colors{tablewriter.FgHiBlueColor},
+		tablewriter.Colors{tablewriter.FgBlueColor},
+		tablewriter.Colors{tablewriter.FgBlueColor})
+
+	// fill table
+	module_obj := emp3r0r_def.Modules[CurrentMod]
+	if module_obj == nil {
+		CliPrintError("Module %s not found", CurrentMod)
+		return
+	}
+	for opt_name, opt_obj := range module_obj.Options {
+		help := "N/A"
+		if opt_obj == nil {
+			continue
+		}
+		help = opt_obj.OptDesc
+		switch opt_name {
+		case "module":
+			help = "Selected module"
+		case "target":
+			help = "Selected target"
+		}
+		val := ""
+		currentOpt, ok := CurrentModuleOptions[opt_name]
+		if ok {
+			val = currentOpt.Val
+		}
+
+		tdata = append(tdata,
+			[]string{
+				util.SplitLongLine(opt_name, 50),
+				util.SplitLongLine(help, 50),
+				util.SplitLongLine(val, 50),
+			})
+	}
+	table.AppendBulk(tdata)
+	table.Render()
+	out := tableString.String()
+	AdaptiveTable(out)
+	CliPrint("\n%s", out)
+}
+
+func setOptValCmd(cmd *cobra.Command, args []string) {
+	opt, err := cmd.Flags().GetString("option")
+	if err != nil {
+		CliPrintError("set option: %v", err)
+		return
+	}
+	val, err := cmd.Flags().GetString("value")
+	if err != nil {
+		CliPrintError("set option: %v", err)
+		return
+	}
+	if opt == "" || val == "" {
+		CliPrintError(cmd.UsageString())
+		return
+	}
+	// hand to SetOption helper
+	SetOption(opt, val)
+	listModOptionsTable(cmd, args)
+}
+
+func setActiveModule(cmd *cobra.Command, args []string) {
+	modName, err := cmd.Flags().GetString("module")
+	if err != nil {
+		CliPrintError(cmd.UsageString())
+		return
+	}
+	for mod := range ModuleHelpers {
+		if mod == modName {
+			CurrentMod = modName
+			for k := range CurrentModuleOptions {
+				delete(CurrentModuleOptions, k)
+			}
+			UpdateOptions(CurrentMod)
+			CliPrintInfo("Using module %s", strconv.Quote(CurrentMod))
+			ModuleDetails(CurrentMod)
+			mod, exists := emp3r0r_def.Modules[CurrentMod]
+			if exists {
+				CliPrint("%s", mod.Comment)
+			}
+			listModOptionsTable(cmd, args)
+
+			return
+		}
+	}
+	CliPrintError("No such module: %s", strconv.Quote(modName))
 }
