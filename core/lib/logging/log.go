@@ -22,7 +22,7 @@ func (l *Logger) helper(format string, a []interface{}, msgColor *color.Color, _
 	l.logChan <- logMsg
 }
 
-// NewLogger creates a new logger with log level, log will be written to both stderr and file ~/.emp3r0r/emp3r0r.log
+// NewLogger creates a new logger with log level, log will be written to file ~/.emp3r0r/emp3r0r.log
 func NewLogger(level int) *Logger {
 	// The log file is always located at ~/.emp3r0r/emp3r0r.log, ensure the directory exists
 	home, err := os.UserHomeDir()
@@ -39,7 +39,7 @@ func NewLogger(level int) *Logger {
 	if err != nil {
 		log.Fatalf("error opening file: %v", err)
 	}
-	writer := io.MultiWriter(os.Stderr, logf)
+	writer := io.MultiWriter(logf)
 
 	logger := &Logger{
 		Level:  level,
@@ -49,6 +49,11 @@ func NewLogger(level int) *Logger {
 	logger.logChan = make(chan string, 4096)
 
 	return logger
+}
+
+// AddWriter adds a new writer to logger, for example os.Stdout
+func (l *Logger) AddWriter(w io.Writer) {
+	l.writer = io.MultiWriter(l.writer, w)
 }
 
 // Start starts the logger and listens for log messages, then print them to console and log file
