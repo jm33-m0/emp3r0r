@@ -1,5 +1,36 @@
 # Changelog
 
+## [2.0.0](https://github.com/jm33-m0/emp3r0r/compare/v1.51.1...v2.0.0) (2025-02-07)
+
+
+### ⚠ BREAKING CHANGES
+
+* v2 branch, re-designed command line and infrastructure
+
+### Features
+
+* `generate` command ([1e1e49d](https://github.com/jm33-m0/emp3r0r/commit/1e1e49d84b5af057f4f8d6b08a9ff89922d5397f))
+* command completers ([775b1c2](https://github.com/jm33-m0/emp3r0r/commit/775b1c21d0f1dcbfef16025cbbf5ad4e123b2f6a))
+* re-design console logging (WIP) ([aadd158](https://github.com/jm33-m0/emp3r0r/commit/aadd158a9ee6bc33ba4757428fe5ee8026cabb5e))
+* remove agent system info pane ([4677a80](https://github.com/jm33-m0/emp3r0r/commit/4677a8000436869554b3b39d242106fd9c11eefd))
+* switching to https://github.com/reeflective/console ([619ea45](https://github.com/jm33-m0/emp3r0r/commit/619ea450f348594086a570b446f5f821b71a3ee5))
+* unify C2 logging ([9cd6284](https://github.com/jm33-m0/emp3r0r/commit/9cd62845843d6f1852ce9a7ebcbcbb9128bc5351))
+* v2 branch, re-designed command line and infrastructure ([3b3f111](https://github.com/jm33-m0/emp3r0r/commit/3b3f11153c903814f027e041587083d4d15d9c48))
+
+
+### Bug Fixes
+
+* `ls_modules`, `ls_port_fwds` commands ([abd58b5](https://github.com/jm33-m0/emp3r0r/commit/abd58b5e24970db44044f78292601c8490438e96))
+* `search` command ([10210e0](https://github.com/jm33-m0/emp3r0r/commit/10210e00f4ec0823cd016dd2278ad664be3b94f9))
+* carapace calls `listRemoteDir` too often ([7a01328](https://github.com/jm33-m0/emp3r0r/commit/7a01328941ef732a3a310787504ed063125b2211))
+* command parsing errors ([f1c22c6](https://github.com/jm33-m0/emp3r0r/commit/f1c22c67eb00d7912697fc35299dfc503b122d90))
+* log file path ([709c32f](https://github.com/jm33-m0/emp3r0r/commit/709c32f051c2fe0bb88ee19a4d3ee285a0adf62c))
+* log msg format ([04b95fc](https://github.com/jm33-m0/emp3r0r/commit/04b95fca10cdeacd8c630070a4b97b82b76c35ef))
+* logging level ([56fe118](https://github.com/jm33-m0/emp3r0r/commit/56fe118c59b74ed8257ea597b67c6233b7488621))
+* mismatched args ([dd9d6fb](https://github.com/jm33-m0/emp3r0r/commit/dd9d6fb186d1fb5e92bd1bf2914b33d1c54b92b6))
+* resize tmux pane to fit table output ([f74d434](https://github.com/jm33-m0/emp3r0r/commit/f74d4346612014be5c232c484ac1c303805d1998))
+* tmux init ([c79cce5](https://github.com/jm33-m0/emp3r0r/commit/c79cce542c575c28205ff40b887f8e2e3ccc7cca))
+
 ## [1.51.1](https://github.com/jm33-m0/emp3r0r/compare/v1.51.0...v1.51.1) (2025-01-26)
 
 
