@@ -1,6 +1,3 @@
-//go:build linux
-// +build linux
-
 package logging
 
 import (
@@ -32,13 +29,13 @@ func NewLogger(level int) *Logger {
 	if err != nil {
 		log.Fatalf("error getting user home directory: %v", err)
 	}
-	logFilePath := fmt.Sprintf("%s/.emp3r0r/emp3r0r.log", home)
+	logFilePath := fmt.Sprintf("%s/.emp3r0r", home)
 	if _, err := os.Stat(logFilePath); os.IsNotExist(err) {
 		os.MkdirAll(logFilePath, 0755)
 	}
 
 	// open log file
-	logf, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
+	logf, err := os.OpenFile(fmt.Sprintf("%s/emp3r0r.log", logFilePath), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
 	if err != nil {
 		log.Fatalf("error opening file: %v", err)
 	}
@@ -57,11 +54,11 @@ func NewLogger(level int) *Logger {
 // Start starts the logger and listens for log messages, then print them to console and log file
 func (l *Logger) Start() {
 	for {
-		logMsg := <-l.logChan
-		fmt.Printf("%s\n", logMsg)
+		msg := fmt.Sprintf("%s\n", <-l.logChan)
 
 		// log to console and file
-		l.writer.Write([]byte(logMsg + "\n"))
+		log.SetOutput(l.writer)
+		log.Print(msg)
 		util.TakeABlink()
 	}
 }
