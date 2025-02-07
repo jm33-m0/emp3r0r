@@ -165,7 +165,7 @@ func CliBanner(console *console.Console) {
         A Linux C2 made by a Linux user
 `
 	banner := strings.Builder{}
-	banner.WriteString(color.CyanString("%s", logo))
+	banner.WriteString(color.RedString("%s", logo))
 	cow, encodingErr := cowsay.New(
 		cowsay.BallonWidth(100),
 		cowsay.Random(),
@@ -198,7 +198,7 @@ func CliBanner(console *console.Console) {
 	if encodingErr != nil {
 		Logger.Fatal("CowSay: %v", encodingErr)
 	}
-	banner.WriteString(color.CyanString("%s\n\n", say))
+	banner.WriteString(color.BlueString("%s\n\n", say))
 	fmt.Print(banner.String())
 }
 

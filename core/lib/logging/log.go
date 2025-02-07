@@ -17,11 +17,6 @@ type Logger struct {
 	writer  io.Writer
 }
 
-func (l *Logger) helper(format string, a []interface{}, msgColor *color.Color, _ string, _ bool) {
-	logMsg := msgColor.Sprintf(format, a...)
-	l.logChan <- logMsg
-}
-
 // NewLogger creates a new logger with log level, log will be written to file ~/.emp3r0r/emp3r0r.log
 func NewLogger(level int) *Logger {
 	// The log file is always located at ~/.emp3r0r/emp3r0r.log, ensure the directory exists
@@ -68,15 +63,23 @@ func (l *Logger) Start() {
 	}
 }
 
+func (l *Logger) helper(format string, a []interface{}, msgColor *color.Color, _ string, _ bool) {
+	logMsg := fmt.Sprintf(format, a...)
+	if msgColor != nil {
+		logMsg = msgColor.Sprintf(format, a...)
+	}
+	l.logChan <- logMsg
+}
+
 func (l *Logger) Debug(format string, a ...interface{}) {
 	if l.Level >= 3 {
-		l.helper(format, a, color.New(color.FgBlue, color.Italic), "DEBUG", false)
+		l.helper(format, a, nil, "DEBUG", false)
 	}
 }
 
 func (l *Logger) Info(format string, a ...interface{}) {
 	if l.Level >= 2 {
-		l.helper(format, a, color.New(color.FgBlue), "INFO", false)
+		l.helper(format, a, nil, "INFO", false)
 	}
 }
 
