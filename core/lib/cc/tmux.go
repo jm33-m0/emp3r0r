@@ -44,7 +44,7 @@ var (
 	CommandPane *TmuxPane
 
 	// Displays agent output, separated from logs
-	AgentRespPane *TmuxPane
+	OutputPane *TmuxPane
 
 	// Displays agent list
 	AgentListPane *TmuxPane
@@ -127,7 +127,7 @@ func TmuxInitWindows() (err error) {
 	}
 
 	// Agent output
-	AgentRespPane, err = new_pane("Agent Handler", "Agent responses go below...\n", "h", "", 33)
+	OutputPane, err = new_pane("Output", "Output\n", "h", "", 77)
 	if err != nil {
 		return
 	}
@@ -141,7 +141,7 @@ func TmuxInitWindows() (err error) {
 
 	// check panes
 	if AgentListPane == nil ||
-		AgentRespPane == nil {
+		OutputPane == nil {
 		return fmt.Errorf("one or more tmux panes failed to initialize:\n%v", TmuxPanes)
 	}
 
@@ -531,7 +531,7 @@ func FitPanes(output_pane_x int) {
 	defer TmuxUpdatePanes()
 
 	// in this case no need to resize
-	if output_pane_x <= AgentRespPane.Width {
+	if output_pane_x <= OutputPane.Width {
 		LogDebug("No need to fit panes")
 		return
 	}
@@ -549,13 +549,13 @@ func FitPanes(output_pane_x int) {
 	}
 
 	// resize
-	target_width := output_pane_x - AgentRespPane.Width
+	target_width := output_pane_x - OutputPane.Width
 	CommandPane.ResizePane("L", target_width)
 	LogDebug("Resizing agent handler pane %d-%d=%d chars to the left",
-		output_pane_x, AgentRespPane.Width, target_width)
+		output_pane_x, OutputPane.Width, target_width)
 }
 
 func TmuxUpdatePanes() {
 	TmuxUpdatePane(CommandPane)
-	TmuxUpdatePane(AgentRespPane)
+	TmuxUpdatePane(OutputPane)
 }

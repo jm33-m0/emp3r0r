@@ -80,7 +80,7 @@ func CliMain() {
 	defer TmuxDeinitWindows()
 
 	// Redirect logs to agent response pane
-	agent_resp_pane_tty, err := os.OpenFile(AgentRespPane.TTY, os.O_RDWR, 0)
+	agent_resp_pane_tty, err := os.OpenFile(OutputPane.TTY, os.O_RDWR, 0)
 	if err != nil {
 		Logger.Fatal("Failed to open agent response pane: %v", err)
 	}
@@ -158,12 +158,29 @@ func getTransport(transportStr string) string {
 
 // CliBanner prints banner
 func CliBanner(console *console.Console) {
+	// encoded logo of emp3r0r
+	const cliBannerB64 string = `
+CuKWkeKWkeKWkeKWkeKWkeKWkeKWkSDilpHilpHilpEgICAg4paR4paR4paRIOKWkeKWkeKWkeKW
+keKWkeKWkSAg4paR4paR4paR4paR4paR4paRICDilpHilpHilpHilpHilpHilpEgICDilpHilpHi
+lpHilpHilpHilpEgIOKWkeKWkeKWkeKWkeKWkeKWkQrilpLilpIgICAgICDilpLilpLilpLilpIg
+IOKWkuKWkuKWkuKWkiDilpLilpIgICDilpLilpIgICAgICDilpLilpIg4paS4paSICAg4paS4paS
+IOKWkuKWkiAg4paS4paS4paS4paSIOKWkuKWkiAgIOKWkuKWkgrilpLilpLilpLilpLilpIgICDi
+lpLilpIg4paS4paS4paS4paSIOKWkuKWkiDilpLilpLilpLilpLilpLilpIgICDilpLilpLilpLi
+lpLilpIgIOKWkuKWkuKWkuKWkuKWkuKWkiAg4paS4paSIOKWkuKWkiDilpLilpIg4paS4paS4paS
+4paS4paS4paSCuKWk+KWkyAgICAgIOKWk+KWkyAg4paT4paTICDilpPilpMg4paT4paTICAgICAg
+ICAgICDilpPilpMg4paT4paTICAg4paT4paTIOKWk+KWk+KWk+KWkyAg4paT4paTIOKWk+KWkyAg
+IOKWk+KWkwrilojilojilojilojilojilojilogg4paI4paIICAgICAg4paI4paIIOKWiOKWiCAg
+ICAgIOKWiOKWiOKWiOKWiOKWiOKWiCAg4paI4paIICAg4paI4paIICDilojilojilojilojiloji
+loggIOKWiOKWiCAgIOKWiOKWiAoKCmEgbGludXggcG9zdC1leHBsb2l0YXRpb24gZnJhbWV3b3Jr
+IG1hZGUgYnkgbGludXggdXNlcgoKaHR0cHM6Ly9naXRodWIuY29tL2ptMzMtbTAvZW1wM3IwcgoK
+Cg==
+`
 	data, encodingErr := base64.StdEncoding.DecodeString(cliBannerB64)
 	if encodingErr != nil {
 		Logger.Fatal("failed to print banner: %v", encodingErr.Error())
 	}
 	banner := strings.Builder{}
-	banner.Write(data)
+	banner.WriteString(color.CyanString("%s", data))
 
 	// print banner line by line
 	cow, encodingErr := cowsay.New(
@@ -255,30 +272,12 @@ func CliPrettyPrint(header1, header2 string, map2write *map[string]string) {
 	LogMsg("\n%s", out)
 }
 
-// encoded logo of emp3r0r
-const cliBannerB64 string = `
-CuKWkeKWkeKWkeKWkeKWkeKWkeKWkSDilpHilpHilpEgICAg4paR4paR4paRIOKWkeKWkeKWkeKW
-keKWkeKWkSAg4paR4paR4paR4paR4paR4paRICDilpHilpHilpHilpHilpHilpEgICDilpHilpHi
-lpHilpHilpHilpEgIOKWkeKWkeKWkeKWkeKWkeKWkQrilpLilpIgICAgICDilpLilpLilpLilpIg
-IOKWkuKWkuKWkuKWkiDilpLilpIgICDilpLilpIgICAgICDilpLilpIg4paS4paSICAg4paS4paS
-IOKWkuKWkiAg4paS4paS4paS4paSIOKWkuKWkiAgIOKWkuKWkgrilpLilpLilpLilpLilpIgICDi
-lpLilpIg4paS4paS4paS4paSIOKWkuKWkiDilpLilpLilpLilpLilpLilpIgICDilpLilpLilpLi
-lpLilpIgIOKWkuKWkuKWkuKWkuKWkuKWkiAg4paS4paSIOKWkuKWkiDilpLilpIg4paS4paS4paS
-4paS4paS4paSCuKWk+KWkyAgICAgIOKWk+KWkyAg4paT4paTICDilpPilpMg4paT4paTICAgICAg
-ICAgICDilpPilpMg4paT4paTICAg4paT4paTIOKWk+KWk+KWk+KWkyAg4paT4paTIOKWk+KWkyAg
-IOKWk+KWkwrilojilojilojilojilojilojilogg4paI4paIICAgICAg4paI4paIIOKWiOKWiCAg
-ICAgIOKWiOKWiOKWiOKWiOKWiOKWiCAg4paI4paIICAg4paI4paIICDilojilojilojilojiloji
-loggIOKWiOKWiCAgIOKWiOKWiAoKCmEgbGludXggcG9zdC1leHBsb2l0YXRpb24gZnJhbWV3b3Jr
-IG1hZGUgYnkgbGludXggdXNlcgoKaHR0cHM6Ly9naXRodWIuY29tL2ptMzMtbTAvZW1wM3IwcgoK
-Cg==
-`
-
 // automatically resize CommandPane according to table width
 func AdaptiveTable(tableString string) {
 	TmuxUpdatePanes()
 	row_len := len(strings.Split(tableString, "\n")[0])
-	if AgentRespPane.Width < row_len {
+	if OutputPane.Width < row_len {
 		LogDebug("Command Pane %d vs %d table width, resizing", CommandPane.Width, row_len)
-		AgentRespPane.ResizePane("x", row_len)
+		OutputPane.ResizePane("x", row_len)
 	}
 }
