@@ -602,7 +602,7 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			LogWarning("checkinHandler close connection: %v", err)
 		}
-		if DebugLevel >= 4 {
+		if Logger.Level >= 4 {
 			LogDebug("checkinHandler finished")
 		}
 	}()
@@ -659,7 +659,7 @@ func checkinHandler(wrt http.ResponseWriter, req *http.Request) {
 				shortname = l
 			}
 		}
-		if DebugLevel >= 4 {
+		if Logger.Level >= 4 {
 			LogDebug("Refreshing sysinfo\n%s from %s, "+
 				"running %s\n",
 				shortname, fmt.Sprintf("%s - %s", target.From, target.Transport),
@@ -762,7 +762,7 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 		if agent_by_conn != nil {
 			name = agent_by_conn.Name
 		}
-		if DebugLevel >= 4 { // otherwise it will be too noisy
+		if Logger.Level >= 4 { // otherwise it will be too noisy
 			LogDebug("Last handshake from agent '%s': %v ago", name, since_last_handshake)
 		}
 		if since_last_handshake > 2*time.Minute {

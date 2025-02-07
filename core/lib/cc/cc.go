@@ -23,10 +23,6 @@ import (
 )
 
 var (
-	// DebugLevel what kind fof logs do we want to see
-	// 3 (DEBUG) -> 2 (INFO) -> 1 (WARN)
-	DebugLevel = 2
-
 	// TmuxPersistence enable debug (-debug)
 	TmuxPersistence = false
 

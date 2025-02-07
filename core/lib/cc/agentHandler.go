@@ -193,7 +193,7 @@ func processAgentData(data *emp3r0r_def.MsgTunData) {
 	// Command output
 	no_need_to_show := strings.HasPrefix(cmd, emp3r0r_def.C2CmdPortFwd) ||
 		strings.HasPrefix(cmd, emp3r0r_def.C2CmdSSHD) || strings.HasPrefix(cmd, emp3r0r_def.C2CmdListDir)
-	if DebugLevel < 3 {
+	if Logger.Level < 3 {
 		// ignore some cmds
 		if no_need_to_show {
 			return
