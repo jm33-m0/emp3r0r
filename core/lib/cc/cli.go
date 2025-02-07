@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -47,7 +48,6 @@ func CliMain() {
 	}
 	mainMenu := Emp3r0rConsole.NewMenu("")
 	Emp3r0rConsole.SetPrintLogo(CliBanner)
-	go Logger.Start()
 
 	// History
 	histFile := fmt.Sprintf("%s/%s.history", AppName, EmpWorkSpace)
@@ -78,6 +78,14 @@ func CliMain() {
 		Logger.Fatal("Fatal TMUX error: %v, please run `tmux kill-session -t emp3r0r` and re-run emp3r0r", err)
 	}
 	defer TmuxDeinitWindows()
+
+	// Redirect logs to agent response pane
+	agent_resp_pane_tty, err := os.OpenFile(AgentRespPane.TTY, os.O_RDWR, 0)
+	if err != nil {
+		Logger.Fatal("Failed to open agent response pane: %v", err)
+	}
+	Logger.AddWriter(agent_resp_pane_tty)
+	go Logger.Start()
 
 	// Run the console
 	Emp3r0rConsole.Start()
