@@ -89,7 +89,7 @@ func waitNeeded(cmd string) bool {
 // SendCmdToCurrentTarget send a command to currently selected agent
 func SendCmdToCurrentTarget(cmd, cmd_id string) error {
 	// target
-	target := SelectCurrentTarget()
+	target := ValidateActiveTarget()
 	if target == nil {
 		return fmt.Errorf("you have to select a target first")
 	}

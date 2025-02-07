@@ -277,8 +277,8 @@ Cg==
 func AdaptiveTable(tableString string) {
 	TmuxUpdatePanes()
 	row_len := len(strings.Split(tableString, "\n")[0])
-	if CommandPane.Width < row_len {
+	if AgentRespPane.Width < row_len {
 		LogDebug("Command Pane %d vs %d table width, resizing", CommandPane.Width, row_len)
-		CommandPane.ResizePane("x", row_len)
+		AgentRespPane.ResizePane("x", row_len)
 	}
 }

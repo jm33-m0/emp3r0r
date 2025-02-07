@@ -200,23 +200,23 @@ func ModuleRun(_ *cobra.Command, _ []string) {
 	}
 }
 
-// SelectCurrentTarget check if current target is set and alive
-func SelectCurrentTarget() (target *emp3r0r_def.Emp3r0rAgent) {
+// ValidateActiveTarget check if current target is set and alive
+func ValidateActiveTarget() (target *emp3r0r_def.Emp3r0rAgent) {
 	// find target
 	target = CurrentTarget
 	if target == nil {
-		LogError("SelectCurrentTarget: Target does not exist")
+		LogError("Target does not exist")
 		return nil
 	}
 
 	// write to given target's connection
 	tControl := Targets[target]
 	if tControl == nil {
-		LogError("SelectCurrentTarget: agent control interface not found")
+		LogError("Agent control interface not found")
 		return nil
 	}
 	if tControl.Conn == nil {
-		LogError("SelectCurrentTarget: agent is not connected")
+		LogError("Agent is not connected")
 		return nil
 	}
 

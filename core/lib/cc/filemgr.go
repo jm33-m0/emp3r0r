@@ -141,7 +141,7 @@ func FSCmdSrcDst(cmd, src, dst string) {
 }
 
 func UploadToAgent(cmd *cobra.Command, args []string) {
-	target := SelectCurrentTarget()
+	target := ValidateActiveTarget()
 	if target == nil {
 		LogError("You have to select a target first")
 		return
@@ -169,7 +169,7 @@ func UploadToAgent(cmd *cobra.Command, args []string) {
 }
 
 func DownloadFromAgent(cmd *cobra.Command, args []string) {
-	target := SelectCurrentTarget()
+	target := ValidateActiveTarget()
 	if target == nil {
 		LogError("You have to select a target first")
 		return
