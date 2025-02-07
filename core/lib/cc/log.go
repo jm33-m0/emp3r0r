@@ -16,31 +16,31 @@ func LogDebug(format string, a ...interface{}) {
 }
 
 func LogInfo(format string, a ...interface{}) {
-	Logger.Info(format, a, color.New(color.FgBlue), "INFO", false)
+	Logger.Info(format, a...)
 }
 
 func LogWarning(format string, a ...interface{}) {
-	Logger.Warning(format, a, color.New(color.FgHiYellow), "WARN", false)
+	Logger.Warning(format, a...)
 }
 
 func LogMsg(format string, a ...interface{}) {
-	Logger.Msg(format, a, color.New(color.FgHiCyan), "MSG", false)
+	Logger.Msg(format, a...)
 }
 
 func LogAlert(textColor color.Attribute, format string, a ...interface{}) {
-	Logger.Alert(textColor, format, a, "ALERT", false)
+	Logger.Alert(textColor, format, a...)
 }
 
 func LogSuccess(format string, a ...interface{}) {
-	Logger.Success(format, a, color.New(color.FgHiGreen, color.Bold), "SUCCESS", true)
+	Logger.Success(format, a...)
 }
 
 func LogFatal(format string, a ...interface{}) {
-	Logger.Fatal(format, a, color.New(color.FgHiRed, color.Bold, color.Italic), "ERROR", true)
+	Logger.Fatal(format, a...)
 }
 
 func LogError(format string, a ...interface{}) {
-	Logger.Error(format, a, color.New(color.FgHiRed, color.Bold), "ERROR", true)
+	Logger.Error(format, a...)
 }
 
 func setDebugLevel(cmd *cobra.Command, args []string) {
