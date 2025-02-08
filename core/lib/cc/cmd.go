@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"sync"
 
-	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/reeflective/console"
@@ -29,7 +28,10 @@ type Command struct {
 func Emp3r0rCommands(app *console.Console) console.Commands {
 	return func() *cobra.Command {
 		rootCmd := &cobra.Command{}
+		rootCmd.Use = "" // this is the root command
 		rootCmd.Short = "Emp3r0r Console"
+		rootCmd.Args = cobra.MinimumNArgs(1)
+		rootCmd.DisableSuggestions = true
 
 		rootCmd.AddGroup(
 			&cobra.Group{ID: "core", Title: "Core Commands"},
@@ -54,20 +56,8 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			},
 		}
 		rootCmd.AddCommand(exitCmd)
-
 		// this command will be used to generate an agent binary
 		rootCmd.AddCommand(gen_agent_cmd())
-
-		helpCmd := &cobra.Command{
-			Use:     "help module",
-			GroupID: "core",
-			Short:   "Display help for a module",
-			Example: "help bring2cc",
-			Args:    cobra.ExactArgs(1),
-			Run:     CmdHelp,
-		}
-		rootCmd.AddCommand(helpCmd)
-		carapace.Gen(helpCmd).PositionalCompletion(carapace.ActionValues(listMods()...))
 
 		setDebuglevelCmd := &cobra.Command{
 			Use:     "debug",
@@ -442,33 +432,6 @@ var (
 	CmdTime      = make(map[string]string)
 	CmdTimeMutex = &sync.Mutex{}
 )
-
-// CmdHelp prints help in two columns
-// print help for modules
-func CmdHelp(cmd *cobra.Command, args []string) {
-	mod := args[0]
-	help := make(map[string]string)
-	if mod == "" {
-		LogError("No module specified")
-		return
-	}
-
-	for modname, modObj := range emp3r0r_def.Modules {
-		if mod == modObj.Name {
-			if len(modObj.Options) > 0 {
-				for opt_name, opt_obj := range modObj.Options {
-					help[opt_name] = opt_obj.OptDesc
-				}
-			} else {
-				help[modname] = "No options"
-			}
-			LogMsg("\n%s", modObj.Comment)
-			CliPrettyPrint("Option", "Help", &help)
-			return
-		}
-	}
-	LogError("Help yourself")
-}
 
 func gen_agent_cmd() *cobra.Command {
 	genAgentCmd := &cobra.Command{
