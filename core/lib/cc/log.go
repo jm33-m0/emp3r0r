@@ -49,5 +49,9 @@ func setDebugLevel(cmd *cobra.Command, args []string) {
 		LogError("Invalid debug level: %v", err)
 		return
 	}
+	if level > 4 || level < 0 {
+		LogError("Invalid debug level: %d", level)
+		return
+	}
 	Logger.SetDebugLevel(level)
 }

@@ -59,7 +59,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		rootCmd.AddCommand(gen_agent_cmd())
 
 		helpCmd := &cobra.Command{
-			Use:     "help",
+			Use:     "help module",
 			GroupID: "core",
 			Short:   "Display help for a module",
 			Example: "help bring2cc",
@@ -72,18 +72,18 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		setDebuglevelCmd := &cobra.Command{
 			Use:     "debug",
 			GroupID: "core",
-			Short:   "Set debug level: 0 (least verbose) to 3 (most verbose)",
+			Short:   "Set debug level: 0 (least verbose) to 3 (most verbose), default is 2 (info)",
 			Example: "debug --level 3",
 			Run:     setDebugLevel,
 		}
-		setDebuglevelCmd.Flags().IntP("level", "l", 0, "Debug level")
+		setDebuglevelCmd.Flags().IntP("level", "l", -1, "Debug level")
 		rootCmd.AddCommand(setDebuglevelCmd)
 		carapace.Gen(setDebuglevelCmd).FlagCompletion(carapace.ActionMap{
 			"level": carapace.ActionValues("0", "1", "2", "3"),
 		})
 
 		useModuleCmd := &cobra.Command{
-			Use:     "use",
+			Use:     "use module",
 			GroupID: "module",
 			Short:   "Use a module",
 			Example: "use bring2cc",
@@ -103,7 +103,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		rootCmd.AddCommand(infoCmd)
 
 		setCmd := &cobra.Command{
-			Use:     "set",
+			Use:     "set option value",
 			GroupID: "module",
 			Short:   "Set an option of the current module",
 			Example: "set cc_host emp3r0r.com",
@@ -125,7 +125,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		rootCmd.AddCommand(runCmd)
 
 		targetCmd := &cobra.Command{
-			Use:     "target",
+			Use:     "target (agent_id | agent_tag)",
 			GroupID: "agent",
 			Short:   "Set active target",
 			Example: "target 0",
@@ -164,7 +164,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		rootCmd.AddCommand(fileManagerCmd)
 
 		lsCmd := &cobra.Command{
-			Use:     "ls",
+			Use:     "ls [dir]",
 			GroupID: "filesystem",
 			Short:   "List a directory of selected agent, without argument it lists current directory",
 			Example: "ls /tmp",
@@ -175,7 +175,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		carapace.Gen(lsCmd).PositionalCompletion(carapace.ActionValues(listRemoteDir()...))
 
 		cdCmd := &cobra.Command{
-			Use:     "cd",
+			Use:     "cd dir",
 			GroupID: "filesystem",
 			Short:   "Change current working directory of selected agent",
 			Args:    cobra.ExactArgs(1),
@@ -185,7 +185,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		carapace.Gen(cdCmd).PositionalCompletion(carapace.ActionValues(listRemoteDir()...))
 
 		cpCmd := &cobra.Command{
-			Use:     "cp",
+			Use:     "cp src dst",
 			GroupID: "filesystem",
 			Short:   "Copy a file to another location on selected target",
 			Example: "cp /tmp/1.txt /tmp/2.txt",
@@ -197,7 +197,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			carapace.ActionValues(listRemoteDir()...))
 
 		mvCmd := &cobra.Command{
-			Use:     "mv",
+			Use:     "mv src dst",
 			GroupID: "filesystem",
 			Short:   "Move a file to another location on selected target",
 			Example: "mv /tmp/1.txt /tmp/2.txt",
@@ -209,7 +209,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			carapace.ActionValues(listRemoteDir()...))
 
 		rmCmd := &cobra.Command{
-			Use:     "rm",
+			Use:     "rm file",
 			GroupID: "filesystem",
 			Short:   "Delete a file/directory on selected agent",
 			Example: "rm /tmp/1.txt",
@@ -220,7 +220,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		carapace.Gen(rmCmd).PositionalCompletion(carapace.ActionValues(listRemoteDir()...))
 
 		catCmd := &cobra.Command{
-			Use:     "cat",
+			Use:     "cat file",
 			GroupID: "filesystem",
 			Short:   "Print file content on selected agent",
 			Example: "cat /tmp/file",
@@ -231,7 +231,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		carapace.Gen(catCmd).PositionalCompletion(carapace.ActionValues(listRemoteDir()...))
 
 		mkdirCmd := &cobra.Command{
-			Use:     "mkdir",
+			Use:     "mkdir dir",
 			GroupID: "filesystem",
 			Short:   "Create new directory on selected agent",
 			Example: "mkdir /tmp/newdir",
@@ -272,7 +272,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		rootCmd.AddCommand(netHelperCmd)
 
 		killCmd := &cobra.Command{
-			Use:     "kill",
+			Use:     "kill pid [pid...]",
 			GroupID: "util",
 			Short:   "Terminate a process on selected agent",
 			Example: "kill 1234 5678",
@@ -282,7 +282,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		rootCmd.AddCommand(killCmd)
 
 		getCmd := &cobra.Command{
-			Use:     "get",
+			Use:     "get [--recursive] [--regex regex_str] --path /path/to/file",
 			GroupID: "filesystem",
 			Short:   "Download a file from selected agent",
 			Example: "get [--recursive] [--regex '*.pdf'] --path /tmp/1.txt",
@@ -297,10 +297,10 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		})
 
 		putCmd := &cobra.Command{
-			Use:     "put",
+			Use:     "put --src /path/to/local_file --dst /path/to/remote_file",
 			GroupID: "filesystem",
 			Short:   "Upload a file to selected agent",
-			Example: "put /tmp/1.txt /tmp/2.txt",
+			Example: "put --src /tmp/1.txt --dst /tmp/2.txt",
 			Run:     UploadToAgent,
 		}
 		putCmd.Flags().StringP("src", "s", "", "Source file")
@@ -346,7 +346,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		rootCmd.AddCommand(lsTargetCmd)
 
 		searchCmd := &cobra.Command{
-			Use:     "search",
+			Use:     "search module",
 			GroupID: "module",
 			Short:   "Search for a module",
 			Example: "search shell",
@@ -364,7 +364,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		rootCmd.AddCommand(lsPortMapppingsCmd)
 
 		rmPortMappingCmd := &cobra.Command{
-			Use:     "delete_port_fwd",
+			Use:     "delete_port_fwd port_mapping_id",
 			GroupID: "network",
 			Short:   "Delete a port mapping session",
 			Example: "delete_port_fwd --id <session_id>",
@@ -377,7 +377,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		})
 
 		labelAgentCmd := &cobra.Command{
-			Use:     "label",
+			Use:     "label --id agent_id --label custom_name",
 			GroupID: "agent",
 			Short:   "Label an agent with custom name",
 			Example: "label --id <agent_id> --label <custom_name>",
@@ -392,7 +392,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		})
 
 		execCmd := &cobra.Command{
-			Use:     "exec",
+			Use:     "exec --cmd 'command'",
 			GroupID: "util",
 			Short:   "Execute a command on selected agent",
 			Example: "exec --cmd 'ls -la'",

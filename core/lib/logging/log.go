@@ -88,18 +88,22 @@ func (l *Logger) Warning(format string, a ...interface{}) {
 	}
 }
 
+// Msg prints a message to console and log file, regardless of log level
 func (logger *Logger) Msg(format string, a ...interface{}) {
 	logger.helper(format, a, nil, "MSG", false)
 }
 
+// Alert prints an alert message with custom color in bold font to console and log file, regardless of log level
 func (l *Logger) Alert(textColor color.Attribute, format string, a ...interface{}) {
 	l.helper(format, a, color.New(textColor, color.Bold), "ALERT", false)
 }
 
+// Success prints a success message in green and bold font to console and log file, regardless of log level
 func (l *Logger) Success(format string, a ...interface{}) {
 	l.helper(format, a, color.New(color.FgHiGreen, color.Bold), "SUCCESS", true)
 }
 
+// Fatal prints a fatal error message in red, bold and italic font to console and log file, then exits the program
 func (l *Logger) Fatal(format string, a ...interface{}) {
 	l.helper(format, a, color.New(color.FgHiRed, color.Bold, color.Italic), "ERROR", true)
 	l.Msg("Run 'tmux kill-session -t emp3r0r' to clean up dead emp3r0r windows")
@@ -107,6 +111,7 @@ func (l *Logger) Fatal(format string, a ...interface{}) {
 	log.Fatal(color.New(color.Bold, color.FgHiRed).Sprintf(format, a...))
 }
 
+// Error prints an error message in red and bold font to console and log file, regardless of log level
 func (l *Logger) Error(format string, a ...interface{}) {
 	l.helper(format, a, color.New(color.FgHiRed, color.Bold), "ERROR", true)
 }
