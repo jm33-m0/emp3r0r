@@ -77,17 +77,21 @@ func CliMain() {
 		Logger.Fatal("Fatal TMUX error: %v, please run `tmux kill-session -t emp3r0r` and re-run emp3r0r", err)
 	}
 	defer TmuxDeinitWindows()
+	go setupLogger()
 
+	// Run the console
+	Emp3r0rConsole.Start()
+}
+
+func setupLogger() {
 	// Redirect logs to agent response pane
 	agent_resp_pane_tty, err := os.OpenFile(OutputPane.TTY, os.O_RDWR, 0)
 	if err != nil {
 		Logger.Fatal("Failed to open agent response pane: %v", err)
 	}
 	Logger.AddWriter(agent_resp_pane_tty)
-	go Logger.Start()
-
-	// Run the console
-	Emp3r0rConsole.Start()
+	tun.Logger = Logger
+	Logger.Start()
 }
 
 func highLighter(line []rune) string {

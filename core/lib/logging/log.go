@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/fatih/color"
-	"github.com/jm33-m0/emp3r0r/core/lib/ss"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -115,7 +114,6 @@ func (l *Logger) SetDebugLevel(level int) {
 	l.Level = level
 	if level > 2 {
 		log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lmsgprefix)
-		ss.ServerConfig.Verbose = true
 	} else {
 		log.SetFlags(log.Ldate | log.Ltime | log.LstdFlags)
 	}

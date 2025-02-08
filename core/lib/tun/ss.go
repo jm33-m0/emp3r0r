@@ -1,4 +1,4 @@
-package ss
+package tun
 
 import (
 	"context"
@@ -11,13 +11,13 @@ import (
 )
 
 // controls ss server
-var ServerConfig struct {
+var SSServerConfig struct {
 	Verbose    bool
 	UDPTimeout time.Duration
 	TCPCork    bool // coalesce writing first few packets
 }
 
-const AEADCipher = "AEAD_CHACHA20_POLY1305"
+const SSAEADCipher = "AEAD_CHACHA20_POLY1305"
 
 // shadowsocks config options
 var flags struct {
@@ -62,7 +62,7 @@ type SSConfig struct {
 // server_addr: addr of shadowsocks server
 // socks_addr: addr of the local socks5 proxy started by shadowsocks client
 func SSMain(ss_config *SSConfig) (err error) {
-	ServerConfig.Verbose = ss_config.Verbose // verbose logging
+	SSServerConfig.Verbose = ss_config.Verbose // verbose logging
 
 	// ss:// URL as server address
 	if strings.HasPrefix(ss_config.ServerAddr, "ss://") {

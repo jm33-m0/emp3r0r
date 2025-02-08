@@ -22,7 +22,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/lib/ss"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/mholt/archives"
@@ -36,17 +35,17 @@ import (
 // the same Shadowsocks server on any host that you find convenient
 func ShadowsocksServer() {
 	ctx, cancel := context.WithCancel(context.Background())
-	ss_config := &ss.SSConfig{
+	ss_config := &tun.SSConfig{
 		ServerAddr:     "0.0.0.0:" + RuntimeConfig.ShadowsocksServerPort,
 		LocalSocksAddr: "",
-		Cipher:         ss.AEADCipher,
+		Cipher:         tun.SSAEADCipher,
 		Password:       RuntimeConfig.Password,
 		IsServer:       true,
 		Verbose:        false,
 		Ctx:            ctx,
 		Cancel:         cancel,
 	}
-	err := ss.SSMain(ss_config)
+	err := tun.SSMain(ss_config)
 	if err != nil {
 		LogFatal("ShadowsocksServer: %v", err)
 	}

@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/ss"
+	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 )
 
 // SS_Ctx, SS_Cancel context for Shadowsocks client, call SS_Cancel() to stop existing Shadowsocks client
@@ -14,7 +14,7 @@ var SS_Ctx, SS_Cancel = context.WithCancel(context.Background())
 
 func startShadowsocksClient(ss_serverAddr, localSocksAddr, tcptun string) {
 	ss_config := createSSConfig(ss_serverAddr, localSocksAddr, tcptun, false)
-	err := ss.SSMain(ss_config)
+	err := tun.SSMain(ss_config)
 	if err != nil {
 		log.Printf("ShadowsocksProxy failed to start: %v", err)
 		return
@@ -30,11 +30,11 @@ func startShadowsocksClient(ss_serverAddr, localSocksAddr, tcptun string) {
 	}
 }
 
-func createSSConfig(serverAddr, localSocksAddr, tcptun string, isServer bool) *ss.SSConfig {
-	return &ss.SSConfig{
+func createSSConfig(serverAddr, localSocksAddr, tcptun string, isServer bool) *tun.SSConfig {
+	return &tun.SSConfig{
 		ServerAddr:     serverAddr,
 		LocalSocksAddr: localSocksAddr,
-		Cipher:         ss.AEADCipher,
+		Cipher:         tun.SSAEADCipher,
 		Password:       RuntimeConfig.Password,
 		IsServer:       isServer,
 		Verbose:        false,
@@ -101,7 +101,7 @@ func ShadowsocksServer() error {
 	// start server
 	log.Printf("Shadowsocks Server: %v", ss_config)
 
-	err := ss.SSMain(ss_config)
+	err := tun.SSMain(ss_config)
 	if err != nil {
 		return fmt.Errorf("shadowsocksServer: %v", err)
 	}

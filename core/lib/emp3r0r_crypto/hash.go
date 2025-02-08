@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"log"
 	"os"
 )
 
@@ -53,7 +52,6 @@ func Base64URLEncode(text string) string {
 func Base64URLDecode(text string) []byte {
 	dec, err := base64.URLEncoding.DecodeString(text)
 	if err != nil {
-		log.Printf("Base64Decode: %v", err)
 		return nil
 	}
 	return dec

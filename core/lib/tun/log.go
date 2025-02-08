@@ -6,22 +6,27 @@ import (
 
 var Logger = logging.NewLogger(2)
 
-// LogFatalError print log in red, and exit
+// LogFatalError print error, and exit
 func LogFatalError(format string, a ...interface{}) {
 	Logger.Fatal(format, a...)
 }
 
-// LogInfo print log in blue
+// LogInfo print normal logs
 func LogInfo(format string, a ...interface{}) {
 	Logger.Info(format, a...)
 }
 
-// LogWarn print log in yellow
+// LogDebug print least important logs
+func LogDebug(format string, a ...interface{}) {
+	Logger.Debug(format, a...)
+}
+
+// LogWarn print warning logs
 func LogWarn(format string, a ...interface{}) {
 	Logger.Warning(format, a...)
 }
 
-// LogError print log in red, and exit
+// LogError print log errors
 func LogError(format string, a ...interface{}) {
 	Logger.Error(format, a...)
 }

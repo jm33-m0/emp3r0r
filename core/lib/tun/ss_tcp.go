@@ -1,4 +1,4 @@
-package ss
+package tun
 
 import (
 	"bufio"
@@ -21,10 +21,10 @@ import (
 func tcpTun(addr, server, target string, shadow func(net.Conn) net.Conn, ctx context.Context, cancel context.CancelFunc) {
 	tgt := socks.ParseAddr(target)
 	if tgt == nil {
-		logf("invalid target address %q", target)
+		LogError("ss: invalid target address %q", target)
 		return
 	}
-	logf("TCP tunnel %s <-> %s <-> %s", addr, server, target)
+	LogDebug("TCP tunnel %s <-> %s <-> %s", addr, server, target)
 	tcpLocal(addr, server, shadow, func(net.Conn) (socks.Addr, error) { return tgt, nil }, ctx, cancel)
 }
 
@@ -32,7 +32,7 @@ func tcpTun(addr, server, target string, shadow func(net.Conn) net.Conn, ctx con
 func socksLocal(addr, server string, shadow func(net.Conn) net.Conn,
 	ctx context.Context, cancel context.CancelFunc,
 ) {
-	logf("Shadowsocks local SOCKS proxy %s <-> %s", addr, server)
+	LogDebug("Shadowsocks local SOCKS proxy %s <-> %s", addr, server)
 	tcpLocal(addr, server, shadow,
 		func(c net.Conn) (socks.Addr, error) { return socks.Handshake(c) },
 		ctx, cancel)
@@ -45,7 +45,7 @@ func tcpLocal(addr, server string,
 ) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
-		logf("failed to listen on %s: %v", addr, err)
+		LogError("ss: failed to listen on %s: %v", addr, err)
 		return
 	}
 	defer cancel()
@@ -53,7 +53,7 @@ func tcpLocal(addr, server string,
 	for ctx.Err() == nil {
 		c, err := l.Accept()
 		if err != nil {
-			logf("failed to accept: %s", err)
+			LogError("ss: failed to accept: %s", err)
 			continue
 		}
 
@@ -71,34 +71,34 @@ func tcpLocal(addr, server string,
 						if err, ok := err.(net.Error); ok && err.Timeout() {
 							continue
 						}
-						logf("UDP Associate End.")
+						LogError("ss: UDP Associate End.")
 						return
 					}
 				}
 
-				logf("failed to get target address: %v", err)
+				LogError("ss: failed to get target address: %v", err)
 				return
 			}
 
 			rc, err := net.Dial("tcp", server)
 			if err != nil {
-				logf("failed to connect to server %v: %v", server, err)
+				LogError("ss: failed to connect to server %v: %v", server, err)
 				return
 			}
 			defer rc.Close()
-			if ServerConfig.TCPCork {
+			if SSServerConfig.TCPCork {
 				rc = timedCork(rc, 10*time.Millisecond, 1280)
 			}
 			rc = shadow(rc)
 
 			if _, err = rc.Write(tgt); err != nil {
-				logf("failed to send target address: %v", err)
+				LogError("ss: failed to send target address: %v", err)
 				return
 			}
 
-			logf("proxy %s <-> %s <-> %s", c.RemoteAddr(), server, tgt)
+			LogDebug("proxy %s <-> %s <-> %s", c.RemoteAddr(), server, tgt)
 			if err = relay(rc, c); err != nil {
-				logf("relay error: %v", err)
+				LogWarn("ss: relay error: %v", err)
 			}
 		}()
 	}
@@ -110,48 +110,48 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn,
 ) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
-		logf("failed to listen on %s: %v", addr, err)
+		LogError("ss: failed to listen on %s: %v", addr, err)
 		return
 	}
 	defer cancel()
 
-	logf("listening TCP on %s", addr)
+	LogDebug("listening TCP on %s", addr)
 	for ctx.Err() == nil {
 		c, err := l.Accept()
 		if err != nil {
-			logf("failed to accept: %v", err)
+			LogError("ss: failed to accept: %v", err)
 			continue
 		}
 
 		go func() {
 			defer c.Close()
-			if ServerConfig.TCPCork {
+			if SSServerConfig.TCPCork {
 				c = timedCork(c, 10*time.Millisecond, 1280)
 			}
 			sc := shadow(c)
 
 			tgt, err := socks.ReadAddr(sc)
 			if err != nil {
-				logf("failed to get target address from %v: %v", c.RemoteAddr(), err)
+				LogError("ss: failed to get target address from %v: %v", c.RemoteAddr(), err)
 				// drain c to avoid leaking server behavioral features
 				// see https://www.ndss-symposium.org/ndss-paper/detecting-probe-resistant-proxies/
 				_, err = io.Copy(io.Discard, c)
 				if err != nil {
-					logf("discard error: %v", err)
+					LogError("ss: discard error: %v", err)
 				}
 				return
 			}
 
 			rc, err := net.Dial("tcp", tgt.String())
 			if err != nil {
-				logf("failed to connect to target: %v", err)
+				LogError("ss: failed to connect to target: %v", err)
 				return
 			}
 			defer rc.Close()
 
-			logf("proxy %s <-> %s", c.RemoteAddr(), tgt)
+			LogDebug("proxy %s <-> %s", c.RemoteAddr(), tgt)
 			if err = relay(sc, rc); err != nil {
-				logf("relay error: %v", err)
+				LogError("ss: relay error: %v", err)
 			}
 		}()
 	}
