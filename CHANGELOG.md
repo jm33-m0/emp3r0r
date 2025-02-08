@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.1](https://github.com/jm33-m0/emp3r0r/compare/v2.2.0...v2.2.1) (2025-02-08)
+
+
+### Bug Fixes
+
+* `ssh_harvester` unable to find `sshd` process ([5c1de64](https://github.com/jm33-m0/emp3r0r/commit/5c1de643ae5fa9e70cb585f050a81f35e6a58da1))
+
 ## [2.2.0](https://github.com/jm33-m0/emp3r0r/compare/v2.1.0...v2.2.0) (2025-02-08)
 
 
