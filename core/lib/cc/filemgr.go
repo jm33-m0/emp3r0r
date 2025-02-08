@@ -85,7 +85,25 @@ func mv(cmd *cobra.Command, args []string) {
 }
 
 func ps(cmd *cobra.Command, args []string) {
-	executeCmd("ps")
+	pid, _ := cmd.Flags().GetInt("pid")
+	user, _ := cmd.Flags().GetString("user")
+	name, _ := cmd.Flags().GetString("name")
+	cmdLine, _ := cmd.Flags().GetString("cmdline")
+
+	cmdArgs := "ps"
+	if pid != 0 {
+		cmdArgs = fmt.Sprintf("%s --pid %d", cmdArgs, pid)
+	}
+	if user != "" {
+		cmdArgs = fmt.Sprintf("%s --user %s", cmdArgs, user)
+	}
+	if name != "" {
+		cmdArgs = fmt.Sprintf("%s --name %s", cmdArgs, name)
+	}
+	if cmdLine != "" {
+		cmdArgs = fmt.Sprintf("%s --cmdline %s", cmdArgs, cmdLine)
+	}
+	executeCmd(cmdArgs)
 }
 
 func net_helper(cmd *cobra.Command, args []string) {

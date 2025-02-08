@@ -76,7 +76,12 @@ func processCCData(data *emp3r0r_def.MsgTunData) {
 	case "ps":
 		// Usage: ps
 		// Lists all running processes.
-		out, err = shellPs()
+		pid := flags.IntP("pid", "p", 0, "PID to check")
+		name := flags.StringP("name", "n", "", "Process name to check")
+		user := flags.StringP("user", "u", "", "User to check")
+		cmdLine := flags.StringP("cmdline", "c", "", "Command line to check")
+		flags.Parse(cmdSlice[1:])
+		out, err = ps(*pid, *user, *name, *cmdLine)
 		if err != nil {
 			out = fmt.Sprintf("Failed to ps: %v", err)
 			break

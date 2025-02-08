@@ -13,15 +13,15 @@ import (
 
 // ProcEntry a process entry of a process list
 type ProcEntry struct {
-	Name    string `json:"name"`
-	Cmdline string `json:"cmdline"`
-	Token   string `json:"token"`
-	PID     int    `json:"pid"`
-	PPID    int    `json:"ppid"`
+	Name    string `json:"name"`    // process name
+	Cmdline string `json:"cmdline"` // process cmdline
+	Token   string `json:"token"`   // process token/username
+	PID     int    `json:"pid"`     // process ID
+	PPID    int    `json:"ppid"`    // parent process ID
 }
 
-// ProcessList a list of current processes
-func ProcessList() (list []ProcEntry) {
+// ProcessList a list of current processes with filters
+func ProcessList(pid int, username, command, commandLine string) (list []ProcEntry) {
 	var (
 		err error
 		p   ProcEntry
@@ -67,7 +67,13 @@ func ProcessList() (list []ProcEntry) {
 			}
 		}
 
-		list = append(list, p)
+		// Apply filters
+		if (pid == 0 || p.PID == pid) &&
+			(username == "" || p.Token == username) &&
+			(command == "" || strings.Contains(p.Name, command)) &&
+			(commandLine == "" || strings.Contains(p.Cmdline, commandLine)) {
+			list = append(list, p)
+		}
 	}
 	return
 }

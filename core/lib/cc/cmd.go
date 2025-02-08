@@ -253,9 +253,12 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Use:     "ps",
 			GroupID: "filesystem",
 			Short:   "Process list of selected agent",
-			Args:    cobra.NoArgs,
 			Run:     ps,
 		}
+		psCmd.Flags().IntP("pid", "p", 0, "Filter by PID")
+		psCmd.Flags().StringP("user", "u", "", "Filter by user name")
+		psCmd.Flags().StringP("name", "n", "", "Filter by command name (without arguments)")
+		psCmd.Flags().StringP("cmdline", "c", "", "Filter by command line")
 		rootCmd.AddCommand(psCmd)
 
 		netHelperCmd := &cobra.Command{

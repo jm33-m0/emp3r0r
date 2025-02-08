@@ -54,9 +54,9 @@ func shellKill(args []string) (out string, err error) {
 	return
 }
 
-func shellPs() (out string, err error) {
+func ps(pid int, user, name, cmdLine string) (out string, err error) {
 	out = "Failed to get process list"
-	procs := util.ProcessList()
+	procs := util.ProcessList(pid, user, name, cmdLine)
 	if procs == nil {
 		return out, fmt.Errorf("error: %s", out)
 	}

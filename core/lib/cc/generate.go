@@ -148,7 +148,7 @@ func GenerateAgent(cmd *cobra.Command, args []string) {
 	}
 	if payload_type == PayloadTypeLinuxExecutable {
 		// tell user to use shared library stager
-		LogMsg("Use `stager` module to create a shared library that delivers the agent with encryption and compression. You will need another stager to load the shared library.")
+		LogMsg("Use `stager` module to create a shared library stager that delivers the agent with encryption and compression. You will need another stager to load the shared library.")
 	}
 }
 
