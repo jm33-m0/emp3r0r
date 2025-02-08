@@ -178,32 +178,33 @@ func KCPTunClient(remote_kcp_addr, kcp_listen_port, password, salt string, ctx c
 		}
 	}
 
-	LogInfo("smux version: %d", config.SmuxVer)
-	LogInfo("listening on: %s", listener.Addr())
-	LogInfo("encryption: %s", config.Crypt)
-	LogInfo("QPP: %t", config.QPP)
-	LogInfo("QPP Count: %d", config.QPPCount)
-	LogInfo("nodelay parameters: %d %d %d %d", config.NoDelay, config.Interval, config.Resend, config.NoCongestion)
-	LogInfo("remote address: %s", config.RemoteAddr)
-	LogInfo("sndwnd: %d rcvwnd: %d", config.SndWnd, config.RcvWnd)
-	LogInfo("compression: %t", !config.NoComp)
-	LogInfo("mtu: %d", config.MTU)
-	LogInfo("datashard: %d parityshard: %d", config.DataShard, config.ParityShard)
-	LogInfo("acknodelay: %t", config.AckNodelay)
-	LogInfo("dscp: %d", config.DSCP)
-	LogInfo("sockbuf: %d", config.SockBuf)
-	LogInfo("smuxbuf: %d", config.SmuxBuf)
-	LogInfo("streambuf: %d", config.StreamBuf)
-	LogInfo("keepalive: %d", config.KeepAlive)
-	LogInfo("conn: %d", config.Conn)
-	LogInfo("autoexpire: %d", config.AutoExpire)
-	LogInfo("scavengettl: %d", config.ScavengeTTL)
-	LogInfo("snmplog: %s", config.SnmpLog)
-	LogInfo("snmpperiod: %d", config.SnmpPeriod)
-	LogInfo("quiet: %t", config.Quiet)
-	LogInfo("tcp: %t", config.TCP)
-	LogInfo("pprof: %t", config.Pprof)
+	LogDebug("smux version: %d", config.SmuxVer)
+	LogDebug("listening on: %s", listener.Addr())
+	LogDebug("encryption: %s", config.Crypt)
+	LogDebug("QPP: %t", config.QPP)
+	LogDebug("QPP Count: %d", config.QPPCount)
+	LogDebug("nodelay parameters: %d %d %d %d", config.NoDelay, config.Interval, config.Resend, config.NoCongestion)
+	LogDebug("remote address: %s", config.RemoteAddr)
+	LogDebug("sndwnd: %d rcvwnd: %d", config.SndWnd, config.RcvWnd)
+	LogDebug("compression: %t", !config.NoComp)
+	LogDebug("mtu: %d", config.MTU)
+	LogDebug("datashard: %d parityshard: %d", config.DataShard, config.ParityShard)
+	LogDebug("acknodelay: %t", config.AckNodelay)
+	LogDebug("dscp: %d", config.DSCP)
+	LogDebug("sockbuf: %d", config.SockBuf)
+	LogDebug("smuxbuf: %d", config.SmuxBuf)
+	LogDebug("streambuf: %d", config.StreamBuf)
+	LogDebug("keepalive: %d", config.KeepAlive)
+	LogDebug("conn: %d", config.Conn)
+	LogDebug("autoexpire: %d", config.AutoExpire)
+	LogDebug("scavengettl: %d", config.ScavengeTTL)
+	LogDebug("snmplog: %s", config.SnmpLog)
+	LogDebug("snmpperiod: %d", config.SnmpPeriod)
+	LogDebug("quiet: %t", config.Quiet)
+	LogDebug("tcp: %t", config.TCP)
+	LogDebug("pprof: %t", config.Pprof)
 
+	LogInfo("KCPTunClient started on %s, server: %s", listener.Addr(), config.RemoteAddr)
 	// QPP parameters check
 	if config.QPP {
 		minSeedLength := qpp.QPPMinimumSeedLength(8)
@@ -232,9 +233,9 @@ func KCPTunClient(remote_kcp_addr, kcp_listen_port, password, salt string, ctx c
 		return fmt.Errorf("unsupported smux version: %d", config.SmuxVer)
 	}
 
-	LogInfo("initiating key derivation")
+	LogDebug("initiating key derivation")
 	pass := pbkdf2.Key([]byte(config.Key), []byte(salt), 4096, 32, sha1.New)
-	LogInfo("key derivation done")
+	LogDebug("key derivation done")
 	var block kcp.BlockCrypt
 	switch config.Crypt {
 	case "null":
@@ -289,7 +290,7 @@ func KCPTunClient(remote_kcp_addr, kcp_listen_port, password, salt string, ctx c
 		if err := kcpconn.SetWriteBuffer(config.SockBuf); err != nil {
 			LogWarn("SetWriteBuffer: %v", err)
 		}
-		LogInfo("smux version: %d on connection: %s -> %s", config.SmuxVer, kcpconn.LocalAddr(), kcpconn.RemoteAddr())
+		LogDebug("smux version: %d on connection: %s -> %s", config.SmuxVer, kcpconn.LocalAddr(), kcpconn.RemoteAddr())
 		smuxConfig := smux.DefaultConfig()
 		smuxConfig.Version = config.SmuxVer
 		smuxConfig.MaxReceiveBuffer = config.SmuxBuf
@@ -319,7 +320,7 @@ func KCPTunClient(remote_kcp_addr, kcp_listen_port, password, salt string, ctx c
 			if session, err := createConn(); err == nil {
 				return session
 			} else {
-				LogInfo("re-connecting: %v", err)
+				LogDebug("re-connecting: %v", err)
 				time.Sleep(time.Second)
 			}
 		}
@@ -370,7 +371,6 @@ func KCPTunClient(remote_kcp_addr, kcp_listen_port, password, salt string, ctx c
 		go clientHandleConn(_Q_, []byte(config.Key), muxes[idx].session, p1, config.Quiet, config.CloseWait)
 		rr++
 	}
-
 	return ctx.Err()
 }
 
@@ -378,7 +378,7 @@ func KCPTunClient(remote_kcp_addr, kcp_listen_port, password, salt string, ctx c
 func clientHandleConn(_Q_ *qpp.QuantumPermutationPad, seed []byte, session *smux.Session, p1 net.Conn, quiet bool, closeWait int) {
 	logln := func(v ...interface{}) {
 		if !quiet {
-			LogInfo("%v", v...)
+			LogDebug("%v", v...)
 		}
 	}
 
@@ -436,10 +436,10 @@ func scavenger(ch chan timedSession, config *Config) {
 			for k := range sessionList {
 				s := sessionList[k]
 				if s.session.IsClosed() {
-					LogInfo("scavenger: session normally closed: %s", s.session.LocalAddr())
+					LogDebug("scavenger: session normally closed: %s", s.session.LocalAddr())
 				} else if time.Now().After(s.expiryDate) {
 					s.session.Close()
-					LogInfo("scavenger: session closed due to ttl: %s", s.session.LocalAddr())
+					LogDebug("scavenger: session closed due to ttl: %s", s.session.LocalAddr())
 				} else {
 					newList = append(newList, sessionList[k])
 				}
@@ -545,6 +545,8 @@ func KCPTunServer(target, kcp_server_port, password, salt string, ctx context.Co
 		block, _ = kcp.NewAESBlockCrypt(pass)
 	}
 
+	LogInfo("KCPTunServer started on %s, target: %s", config.Listen, config.Target)
+
 	go std.SnmpLogger(config.SnmpLog, config.SnmpPeriod)
 	if config.Pprof {
 		go http.ListenAndServe(":6060", nil)
@@ -561,23 +563,23 @@ func KCPTunServer(target, kcp_server_port, password, salt string, ctx context.Co
 	loop := func(lis *kcp.Listener) {
 		defer wg.Done()
 		if err := lis.SetDSCP(config.DSCP); err != nil {
-			LogInfo("SetDSCP: %v", err)
+			LogDebug("SetDSCP: %v", err)
 		}
 		if err := lis.SetReadBuffer(config.SockBuf); err != nil {
-			LogInfo("SetReadBuffer: %v", err)
+			LogDebug("SetReadBuffer: %v", err)
 		}
 		if err := lis.SetWriteBuffer(config.SockBuf); err != nil {
-			LogInfo("SetWriteBuffer: %v", err)
+			LogDebug("SetWriteBuffer: %v", err)
 		}
 
 		for {
 			select {
 			case <-ctx.Done():
-				LogInfo("context cancelled, exiting listener loop")
+				LogDebug("context cancelled, exiting listener loop")
 				return
 			default:
 				if conn, err := lis.AcceptKCP(); err == nil {
-					LogInfo("remote address: %s", conn.RemoteAddr())
+					LogDebug("remote address: %s", conn.RemoteAddr())
 					conn.SetStreamMode(true)
 					conn.SetWriteDelay(false)
 					conn.SetNoDelay(config.NoDelay, config.Interval, config.Resend, config.NoCongestion)
@@ -607,7 +609,7 @@ func KCPTunServer(target, kcp_server_port, password, salt string, ctx context.Co
 		listenAddr := fmt.Sprintf("%v:%v", mp.Host, port)
 		if config.TCP { // tcp dual stack
 			if conn, err := tcpraw.Listen("tcp", listenAddr); err == nil {
-				LogInfo("Listening on: %v/tcp", listenAddr)
+				LogDebug("Listening on: %v/tcp", listenAddr)
 				lis, err := kcp.ServeConn(block, config.DataShard, config.ParityShard, conn)
 				if err := checkError(err); err != nil {
 					return err
@@ -639,7 +641,7 @@ func handleMux(_Q_ *qpp.QuantumPermutationPad, conn net.Conn, config *Config) {
 	if _, _, err := net.SplitHostPort(config.Target); err != nil {
 		targetType = TGT_UNIX
 	}
-	LogInfo("smux version: %d on connection: %s -> %s", config.SmuxVer, conn.LocalAddr(), conn.RemoteAddr())
+	LogDebug("smux version: %d on connection: %s -> %s", config.SmuxVer, conn.LocalAddr(), conn.RemoteAddr())
 
 	// stream multiplex
 	smuxConfig := smux.DefaultConfig()
@@ -692,7 +694,7 @@ func handleMux(_Q_ *qpp.QuantumPermutationPad, conn net.Conn, config *Config) {
 func handleClient(_Q_ *qpp.QuantumPermutationPad, seed []byte, p1 *smux.Stream, p2 net.Conn, quiet bool, closeWait int) {
 	logln := func(v ...interface{}) {
 		if !quiet {
-			LogInfo("%v", v...)
+			LogDebug("%v", v...)
 		}
 	}
 
