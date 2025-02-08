@@ -4,7 +4,6 @@
 package cc
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -210,23 +209,8 @@ func CliBanner(console *console.Console) {
 // CliPrettyPrint prints two-column help info
 func CliPrettyPrint(header1, header2 string, map2write *map[string]string) {
 	if IsAPIEnabled {
-		// send to socket
-		var resp APIResponse
-		msg, marshalErr := json.Marshal(map2write)
-		if marshalErr != nil {
-			Emp3r0rConsole.Printf("CliPrettyPrint: %v\n", marshalErr)
-		}
-		resp.MsgData = msg
-		resp.Alert = false
-		resp.MsgType = JSON
-		data, marshalErr := json.Marshal(resp)
-		if marshalErr != nil {
-			Emp3r0rConsole.Printf("CliPrettyPrint: %v\n", marshalErr)
-		}
-		_, marshalErr = APIConn.Write([]byte(data))
-		if marshalErr != nil {
-			Emp3r0rConsole.Printf("CliPrettyPrint: %v\n", marshalErr)
-		}
+		// TODO: Implement API
+		return
 	}
 
 	// build table

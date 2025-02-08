@@ -6,7 +6,6 @@ package cc
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -58,22 +57,8 @@ func processAgentData(data *emp3r0r_def.MsgTunData) {
 
 	// headless mode
 	if IsAPIEnabled {
-		// send to socket
-		var resp APIResponse
-		msg := fmt.Sprintf("%s:\n%s", cmd, out)
-		resp.Cmd = cmd
-		resp.MsgData = []byte(msg)
-		resp.Alert = false
-		resp.MsgType = CMD
-		data, err := json.Marshal(resp)
-		if err != nil {
-			log.Printf("processAgentData cmd output: %v", err)
-			return
-		}
-		_, err = APIConn.Write([]byte(data))
-		if err != nil {
-			log.Printf("processAgentData cmd output: %v", err)
-		}
+		// TODO: API
+		return
 	}
 
 	switch cmd_slice[0] {

@@ -86,20 +86,8 @@ func headlessListTargets() (err error) {
 	for target := range Targets {
 		targets = append(targets, *target)
 	}
-	data, err := json.Marshal(targets)
-	if err != nil {
-		return
-	}
-	var resp APIResponse
-	resp.Cmd = "ls_targets"
-	resp.MsgData = data
-	resp.MsgType = JSON
-	resp.Alert = false
-	respdata, err := json.Marshal(resp)
-	if err != nil {
-		return
-	}
-	_, err = APIConn.Write([]byte(respdata))
+	// TODO: API
+	LogInfo("headlessListTargets: %v", targets)
 	return
 }
 

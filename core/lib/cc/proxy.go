@@ -5,7 +5,6 @@ package cc
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -59,11 +58,8 @@ func headlessListPortFwds() (err error) {
 		permapping.Reverse = portmap.Reverse
 		mappings = append(mappings, permapping)
 	}
-	data, err := json.Marshal(mappings)
-	if err != nil {
-		return
-	}
-	_, err = APIConn.Write([]byte(data))
+	// TODO: send to API
+	LogMsg("headlessListPortFwds: %v", mappings)
 	return
 }
 

@@ -154,7 +154,8 @@ func main() {
 
 	// use emp3r0r in terminal or from other frontend
 	if *apiserver {
-		go cc.APIMain()
+		// TODO: implement API main
+		Logger.Fatal("API server is not implemented yet")
 	}
 
 	// run as relay server
