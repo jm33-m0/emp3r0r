@@ -400,6 +400,11 @@ func execCmd(cmd *cobra.Command, args []string) {
 		LogError("Error getting command: %v", err)
 		return
 	}
+	if cmdStr == "" {
+		LogError("No command specified")
+		return
+	}
+
 	// execute command
 	err = SendCmdToCurrentTarget(cmdStr, "")
 	if err != nil {
