@@ -55,10 +55,16 @@ func shellKill(args []string) (out string, err error) {
 }
 
 func ps(pid int, user, name, cmdLine string) (out string, err error) {
-	out = "Failed to get process list"
+	empty_proc := &util.ProcEntry{
+		Name:    "N/A",
+		Cmdline: "N/A",
+		Token:   "N/A",
+		PID:     0,
+		PPID:    0,
+	}
 	procs := util.ProcessList(pid, user, name, cmdLine)
-	if procs == nil {
-		return out, fmt.Errorf("error: %s", out)
+	if len(procs) == 0 || procs == nil {
+		procs = []util.ProcEntry{*empty_proc}
 	}
 
 	data, err := json.Marshal(procs)
