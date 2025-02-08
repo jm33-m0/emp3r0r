@@ -56,6 +56,11 @@ func cd(cmd *cobra.Command, args []string) {
 	}
 }
 
+func cat(_ *cobra.Command, args []string) {
+	dst := args[0]
+	FSCmdDst("cat", dst)
+}
+
 func cp(cmd *cobra.Command, args []string) {
 	src := args[0]
 	dst := args[1]

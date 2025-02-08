@@ -218,11 +218,22 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		rootCmd.AddCommand(rmCmd)
 		carapace.Gen(rmCmd).PositionalCompletion(carapace.ActionValues(listRemoteDir()...))
 
+		catCmd := &cobra.Command{
+			Use:     "cat",
+			GroupID: "filesystem",
+			Short:   "Print file content on selected agent",
+			Example: "cat /tmp/file",
+			Args:    cobra.ExactArgs(1),
+			Run:     cat,
+		}
+		rootCmd.AddCommand(catCmd)
+		carapace.Gen(catCmd).PositionalCompletion(carapace.ActionValues(listRemoteDir()...))
+
 		mkdirCmd := &cobra.Command{
 			Use:     "mkdir",
 			GroupID: "filesystem",
 			Short:   "Create new directory on selected agent",
-			Example: "mkdir --path /tmp/newdir",
+			Example: "mkdir /tmp/newdir",
 			Args:    cobra.ExactArgs(1),
 			Run:     mkdir,
 		}

