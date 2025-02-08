@@ -5,9 +5,9 @@ import (
 	"io"
 	"log"
 	"os"
+	"time"
 
 	"github.com/fatih/color"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 type Logger struct {
@@ -52,13 +52,13 @@ func (l *Logger) AddWriter(w io.Writer) {
 
 // Start starts the logger and listens for log messages, then print them to console and log file
 func (l *Logger) Start() {
+	log.SetOutput(l.writer)
 	for {
 		msg := fmt.Sprintf("%s\n", <-l.logChan)
 
 		// log to console and file
-		log.SetOutput(l.writer)
 		log.Print(msg)
-		util.TakeABlink()
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
