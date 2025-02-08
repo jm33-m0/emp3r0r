@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.1.0](https://github.com/jm33-m0/emp3r0r/compare/v2.0.0...v2.1.0) (2025-02-08)
+
+
+### Features
+
+* `cat` command to dump file content in text or hex mode ([a995042](https://github.com/jm33-m0/emp3r0r/commit/a99504207b4123d83fd37e71d6e542ae5b0996e0))
+* integrate `ss` package logging to C2 console ([aa26a49](https://github.com/jm33-m0/emp3r0r/commit/aa26a49e14318d9cad1cf0f930ded91d129f4c59))
+* integrate `util` logs ([dfc3257](https://github.com/jm33-m0/emp3r0r/commit/dfc3257e135bd005ee5c10a064f996867f18b9fa))
+* move command time to prompt ([30fa524](https://github.com/jm33-m0/emp3r0r/commit/30fa524bdff700b5c28ffae6774bb2ccb746eacf))
+* unify logging in C2 ([790653c](https://github.com/jm33-m0/emp3r0r/commit/790653c64fbfed82a581ba40545b3ef19c79fb48))
+
+
+### Bug Fixes
+
+* `emp3r0r.json` keys should match those in Go source code ([a7a04e7](https://github.com/jm33-m0/emp3r0r/commit/a7a04e7c90ff5bdb90a08e9478de957202bcb571))
+* `exec` should complain when no command is specified ([9381998](https://github.com/jm33-m0/emp3r0r/commit/93819986d0392cc5f72120fd5fb9154cfd6aa684))
+* agent crashes on command parsing error ([d17dc89](https://github.com/jm33-m0/emp3r0r/commit/d17dc89356ea5800db6fffcd9133d4755fce4805))
+* conditional C2 connection should wait in seconds not minutes ([874dab1](https://github.com/jm33-m0/emp3r0r/commit/874dab1827619f0d7baf179c5e0a030d78566b91))
+* import cycle ([2e8ed9d](https://github.com/jm33-m0/emp3r0r/commit/2e8ed9dbec7aba2a369e0ff56f012a2062118c5d))
+* no time to read fatal error messages ([b8ddd50](https://github.com/jm33-m0/emp3r0r/commit/b8ddd50bad247cb9c04321fc9f307659de381530))
+
 ## [2.0.0](https://github.com/jm33-m0/emp3r0r/compare/v1.51.1...v2.0.0) (2025-02-07)
 
 
