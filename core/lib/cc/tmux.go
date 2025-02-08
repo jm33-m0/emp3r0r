@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -384,6 +385,7 @@ func TmuxDeinitWindows() {
 		return
 	}
 
+	time.Sleep(3 * time.Second)
 	// kill session altogether
 	out, err := exec.Command("/bin/sh", "-c", "tmux kill-session -t emp3r0r").CombinedOutput()
 	if err != nil {

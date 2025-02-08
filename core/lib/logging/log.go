@@ -103,6 +103,7 @@ func (l *Logger) Success(format string, a ...interface{}) {
 func (l *Logger) Fatal(format string, a ...interface{}) {
 	l.helper(format, a, color.New(color.FgHiRed, color.Bold, color.Italic), "ERROR", true)
 	l.Msg("Run 'tmux kill-session -t emp3r0r' to clean up dead emp3r0r windows")
+	time.Sleep(2 * time.Second) // give user some time to read the error message
 	log.Fatal(color.New(color.Bold, color.FgHiRed).Sprintf(format, a...))
 }
 

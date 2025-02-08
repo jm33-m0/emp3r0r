@@ -49,7 +49,7 @@ func CliMain() {
 	Emp3r0rConsole.SetPrintLogo(CliBanner)
 
 	// History
-	histFile := fmt.Sprintf("%s/%s.history", AppName, EmpWorkSpace)
+	histFile := fmt.Sprintf("%s/%s.history", EmpWorkSpace, AppName)
 	mainMenu.AddHistorySourceFile(AppName, histFile)
 
 	// Commands

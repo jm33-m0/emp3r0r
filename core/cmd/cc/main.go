@@ -60,7 +60,7 @@ func main() {
 	// including config file location
 	err := cc.InitC2()
 	if err != nil {
-		log.Fatalf("DirSetup: %v", err)
+		log.Fatalf("C2 directory setup: %v", err)
 	}
 
 	// set up logger
