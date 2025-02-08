@@ -413,6 +413,11 @@ func execCmd(cmd *cobra.Command, args []string) {
 }
 
 func exitEmp3r0r(_ *console.Console) {
+	LogWarning("Exiting emp3r0r... Goodbye!")
+	if RuntimeConfig.CCIndicatorURL != "" {
+		LogWarning("Remember to remove the conditional C2 indicator URL from your server or agents will make too much noise: %s",
+			RuntimeConfig.CCIndicatorURL)
+	}
 	TmuxDeinitWindows()
 	os.Exit(0)
 }

