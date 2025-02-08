@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.2.0](https://github.com/jm33-m0/emp3r0r/compare/v2.1.0...v2.2.0) (2025-02-08)
+
+
+### Features
+
+* `ps` with filters ([9a6c428](https://github.com/jm33-m0/emp3r0r/commit/9a6c428e33661316426d76e921239a12efd84dff))
+
+
+### Bug Fixes
+
+* `exec` command conflicts with built-in commands such as `ls` ([bbc9361](https://github.com/jm33-m0/emp3r0r/commit/bbc93619e9929d9bf6777e2508f5adc1ae34e003))
+* return an empty process list if none matches the filter ([9403915](https://github.com/jm33-m0/emp3r0r/commit/9403915f0f8e162ff3e45cae8fefbb76e7637e69))
+* self purging doesn't need to notify CC ([ba11ec7](https://github.com/jm33-m0/emp3r0r/commit/ba11ec7e1ce6fdf52396735f8b0c03d1b3503078))
+
 ## [2.1.0](https://github.com/jm33-m0/emp3r0r/compare/v2.0.0...v2.1.0) (2025-02-08)
 
 
