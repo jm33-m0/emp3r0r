@@ -41,6 +41,10 @@ func processCCData(data *emp3r0r_def.MsgTunData) {
 	keep_running := strings.HasSuffix(payloadSplit[1], "&") // ./program & means keep running in background
 	cmd_str := strings.TrimSuffix(payloadSplit[1], "&")
 	cmdSlice := util.ParseCmd(cmd_str)
+	if len(cmdSlice) == 0 {
+		log.Printf("Cannot parse CC command: %s", strconv.Quote(cmd_str))
+		return
+	}
 
 	// parse command-line arguments using pflag
 	flags := pflag.NewFlagSet(cmdSlice[0], pflag.ContinueOnError)
