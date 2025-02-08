@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -34,7 +33,7 @@ type FileStat struct {
 func LsPath(path string) (res string, err error) {
 	files, err := os.ReadDir(path)
 	if err != nil {
-		log.Printf("LsPath: %v", err)
+		LogDebug("LsPath: %v", err)
 		return
 	}
 
@@ -43,7 +42,7 @@ func LsPath(path string) (res string, err error) {
 	for _, f := range files {
 		info, statErr := f.Info()
 		if statErr != nil {
-			log.Printf("LsPath: %v", statErr)
+			LogDebug("LsPath: %v", statErr)
 			continue
 		}
 		var dent Dentry
@@ -167,7 +166,7 @@ func AppendTextToFile(filename string, text string) (err error) {
 func IsStrInFile(text, filepath string) bool {
 	f, err := os.Open(filepath)
 	if err != nil {
-		log.Printf("IsStrInFile: %v", err)
+		LogDebug("IsStrInFile: %v", err)
 		return false
 	}
 	defer f.Close()
@@ -213,7 +212,7 @@ func copyFile(src, dst string) error {
 	if IsFileExist(dst) {
 		err = os.RemoveAll(dst)
 		if err != nil {
-			log.Printf("Copy: %s exists and cannot be removed: %v", dst, err)
+			LogDebug("Copy: %s exists and cannot be removed: %v", dst, err)
 		}
 	}
 
@@ -350,7 +349,7 @@ func GetWritablePaths(root_path string, depth int) ([]string, error) {
 
 		files, err := os.ReadDir(path)
 		if err != nil {
-			log.Printf("Skipping unreadable directory %s: %v", path, err)
+			LogDebug("Skipping unreadable directory %s: %v", path, err)
 			return nil
 		}
 

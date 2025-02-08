@@ -3,7 +3,6 @@ package util
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"os/user"
@@ -17,7 +16,7 @@ import (
 func GetMemSize() int {
 	memInfo, err := ghw.Memory(ghw.WithDisableWarnings())
 	if err != nil {
-		log.Printf("GetMemSize error: %v", err)
+		LogDebug("GetMemSize error: %v", err)
 		return -1
 	}
 
@@ -69,7 +68,7 @@ func GetUsername() string {
 	// user account info
 	u, err := user.Current()
 	if err != nil {
-		log.Printf("GetUsername: %v", err)
+		LogDebug("GetUsername: %v", err)
 		return "unknown_user"
 	}
 	return u.Username
@@ -80,7 +79,7 @@ func GetUsername() string {
 func macUint64() uint64 {
 	interfaces, err := net.Interfaces()
 	if err != nil {
-		log.Printf("macUint64: %v", err)
+		LogDebug("macUint64: %v", err)
 		return uint64(0)
 	}
 
@@ -121,14 +120,14 @@ func GetHostID(info *ghw.ProductInfo, fallbackUUID string) (id string) {
 	id = fmt.Sprintf("unknown_hostname_%s-agent", shortID)
 	name, err := os.Hostname()
 	if err != nil {
-		log.Printf("GetHostID: %v", err)
+		LogDebug("GetHostID: %v", err)
 		return
 	}
 	name = fmt.Sprintf("%s\\%s", name, GetUsername()) // hostname\\username
 	fallback := false
 	product_uuid, err := uuid.Parse(info.UUID)
 	if err != nil {
-		log.Printf("GetHostID: %v", err)
+		LogDebug("GetHostID: %v", err)
 		fallback = true
 	}
 	if product_uuid.ID() == 0 {
@@ -155,7 +154,7 @@ func ScanPATH() (exes []string) {
 	paths := strings.Split(path_str, sep)
 	if len(paths) < 1 {
 		exes = []string{""}
-		log.Printf("Empty PATH: %s", path_str)
+		LogDebug("Empty PATH: %s", path_str)
 		return
 	}
 
@@ -169,14 +168,14 @@ func ScanPATH() (exes []string) {
 			exes = append(exes, f.Name())
 		}
 	}
-	log.Printf("Found %d executables from PATH (%s)", len(exes), path_str)
+	LogDebug("Found %d executables from PATH (%s)", len(exes), path_str)
 	return
 }
 
 func GetProductInfo() (product *ghw.ProductInfo, err error) {
 	product, err = ghw.Product(ghw.WithDisableWarnings())
 	if err != nil {
-		log.Printf("GetProductInfo: %v", err)
+		LogDebug("GetProductInfo: %v", err)
 		return
 	}
 

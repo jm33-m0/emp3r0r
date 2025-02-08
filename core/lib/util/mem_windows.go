@@ -4,7 +4,6 @@
 package util
 
 import (
-	"log"
 	"os"
 	"syscall"
 	"unsafe"
@@ -85,7 +84,7 @@ func DumpProcessMem(hProcess uintptr) (mem_data map[int64][]byte, bytes_read int
 		address += mbi.RegionSize
 
 		// Print information about the memory region
-		log.Printf("BaseAddress: 0x%x, RegionSize: 0x%x, State: %d, Protect: %d, Type: %d\n",
+		LogDebug("BaseAddress: 0x%x, RegionSize: 0x%x, State: %d, Protect: %d, Type: %d\n",
 			mbi.BaseAddress, mbi.RegionSize, mbi.State, mbi.Protect, mbi.Type)
 
 		// if memory is not committed or is read-only, skip it
@@ -157,7 +156,7 @@ func DumpCurrentProcMem() (mem_data map[int64][]byte, err error) {
 	for fileName, dll := range dlls {
 		dll_data, err := ReadDLL(dll, fileName)
 		if err != nil {
-			log.Printf("reading DLL %s: %v", fileName, err)
+			LogDebug("reading DLL %s: %v", fileName, err)
 			continue
 		}
 		mem_data[int64(dll.BaseOfDll)] = dll_data
@@ -166,7 +165,7 @@ func DumpCurrentProcMem() (mem_data map[int64][]byte, err error) {
 	// dump all memory regions
 	self_mem_data, err := DumpProcMem(os.Getpid())
 	if err != nil {
-		log.Printf("reading self memory: %v", err)
+		LogDebug("reading self memory: %v", err)
 	}
 	for base, data := range self_mem_data {
 		mem_data[base] = data

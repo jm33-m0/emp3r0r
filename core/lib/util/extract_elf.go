@@ -6,7 +6,6 @@ package util
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"os"
 
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
@@ -37,23 +36,23 @@ func FindEmp3r0rELFInMem() (elf_bytes []byte, err error) {
 	for base, mem_region := range mem_regions {
 		if bytes.Contains(mem_region, exe_utils.ELFMAGIC) && bytes.Contains(mem_region, emp3r0r_def.OneTimeMagicBytes) {
 			if base != 0x400000 {
-				log.Printf("Found magic string in memory region 0x%x, but unlikely to contain our ELF", base)
+				LogDebug("Found magic string in memory region 0x%x, but unlikely to contain our ELF", base)
 				continue
 			}
-			log.Printf("Found magic string in memory region 0x%x", base)
+			LogDebug("Found magic string in memory region 0x%x", base)
 
 			// verify if it's a valid config data and thus the emp3r0r ELF
 			_, err := DigEmbeddedData(mem_region, base)
 			if err != nil {
-				log.Printf("Verify config data: %v", err)
+				LogDebug("Verify config data: %v", err)
 				continue
 			}
-			log.Printf("Found emp3r0r ELF in memory region 0x%x", base)
+			LogDebug("Found emp3r0r ELF in memory region 0x%x", base)
 
 			// parse ELF headers
 			elf_header, err = exe_utils.ParseELFHeaders(mem_region)
 			if err != nil {
-				log.Printf("Parse ELF headers: %v", err)
+				LogDebug("Parse ELF headers: %v", err)
 				continue
 			}
 			elf_header.Print()
@@ -65,11 +64,11 @@ func FindEmp3r0rELFInMem() (elf_bytes []byte, err error) {
 			// refine the start/end of current region using program headers
 			start, end, err := parseMemRegions(start_of_current_region)
 			if err != nil {
-				log.Printf("parseMemRegions: %v", err)
+				LogDebug("parseMemRegions: %v", err)
 				continue
 			}
-			log.Printf("Parsing memory region 0x%x - 0x%x", start_of_current_region, end_of_current_region)
-			log.Printf("Saving %d bytes from memory region 0x%x - 0x%x", end-start, start, end)
+			LogDebug("Parsing memory region 0x%x - 0x%x", start_of_current_region, end_of_current_region)
+			LogDebug("Saving %d bytes from memory region 0x%x - 0x%x", end-start, start, end)
 			elf_data := current_region[start-start_of_current_region : end-start_of_current_region]
 			os.WriteFile("/tmp/emp3r0r.restored.1", elf_data, 0o755)
 
@@ -80,11 +79,11 @@ func FindEmp3r0rELFInMem() (elf_bytes []byte, err error) {
 			// refine the start/end of current region using program headers
 			start, end, err = parseMemRegions(start_of_current_region)
 			if err != nil {
-				log.Printf("parseMemRegions: %v", err)
+				LogDebug("parseMemRegions: %v", err)
 				continue
 			}
-			log.Printf("Parsing memory region 0x%x - 0x%x", start_of_current_region, end_of_current_region)
-			log.Printf("Saving %d bytes from memory region 0x%x - 0x%x", end-start, start, end)
+			LogDebug("Parsing memory region 0x%x - 0x%x", start_of_current_region, end_of_current_region)
+			LogDebug("Saving %d bytes from memory region 0x%x - 0x%x", end-start, start, end)
 			elf_data = append(elf_data, current_region[start-start_of_current_region:end-start_of_current_region]...)
 			os.WriteFile("/tmp/emp3r0r.restored.2", current_region, 0o755)
 
@@ -95,15 +94,15 @@ func FindEmp3r0rELFInMem() (elf_bytes []byte, err error) {
 			// refine the start/end of current region using program headers
 			start, end, err = parseMemRegions(start_of_current_region)
 			if err != nil {
-				log.Printf("parseMemRegions: %v", err)
+				LogDebug("parseMemRegions: %v", err)
 				continue
 			}
-			log.Printf("Parsing memory region 0x%x - 0x%x", start_of_current_region, end_of_current_region)
-			log.Printf("Saving %d bytes from memory region 0x%x - 0x%x", end-start, start, end)
+			LogDebug("Parsing memory region 0x%x - 0x%x", start_of_current_region, end_of_current_region)
+			LogDebug("Saving %d bytes from memory region 0x%x - 0x%x", end-start, start, end)
 			elf_data = append(elf_data, current_region[start-start_of_current_region:end-start_of_current_region]...)
 			os.WriteFile("/tmp/emp3r0r.restored.3", current_region, 0o755)
 
-			log.Printf("Saved %d bytes to EXE_MEM_FILE", len(elf_data))
+			LogDebug("Saved %d bytes to EXE_MEM_FILE", len(elf_data))
 			elf_bytes = elf_data
 			break
 		}

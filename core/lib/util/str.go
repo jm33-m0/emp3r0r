@@ -63,7 +63,7 @@ func parseQuotedCmd(cmd string) (parsedCmd []string) {
 	r.LazyQuotes = true
 	fields, err := r.Read()
 	if err != nil {
-		log.Printf("ParseCmd: %v", err)
+		LogDebug("ParseCmd: %v", err)
 		return
 	}
 	for _, f := range fields {
@@ -153,14 +153,14 @@ func LogFilePrintf(filepath, format string, v ...any) {
 	defer func() {
 		logfErr := logf.Close()
 		if logfErr != nil {
-			log.Printf("LogFilePrintf: %v", logfErr)
+			LogDebug("LogFilePrintf: %v", logfErr)
 		}
 	}()
 	if err != nil {
-		log.Printf("LogFilePrintf: %v", err)
+		LogDebug("LogFilePrintf: %v", err)
 		return
 	}
-	log.Printf(format, v...)
+	LogDebug(format, v...)
 
 	fmt.Fprintf(logf, "%v\n", time.Now().String())
 	fmt.Fprintf(logf, format, v...)

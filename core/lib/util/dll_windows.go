@@ -5,7 +5,6 @@ package util
 
 import (
 	"fmt"
-	"log"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -57,7 +56,7 @@ func GetAllDLLs() (modules map[string]*windows.ModuleInfo, err error) {
 		fname16 := make([]uint16, windows.MAX_PATH)
 		_, err = windows.GetModuleFileName(moduleHandles[i], &fname16[0], windows.MAX_PATH)
 		if err != nil {
-			log.Printf("get module file name: %v", err)
+			LogDebug("get module file name: %v", err)
 			continue
 		}
 		// Convert the UTF-16 encoded file name to a Go string
@@ -68,7 +67,7 @@ func GetAllDLLs() (modules map[string]*windows.ModuleInfo, err error) {
 		cb := uint32(unsafe.Sizeof(*modinfo))
 		err = windows.GetModuleInformation(processHandle, moduleHandles[i], modinfo, cb)
 		if err != nil {
-			log.Printf("get modinfo of %s: %v", fileName, err)
+			LogDebug("get modinfo of %s: %v", fileName, err)
 			continue
 		}
 		modules[fileName] = modinfo
