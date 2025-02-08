@@ -65,7 +65,7 @@ func processAgentData(data *emp3r0r_def.MsgTunData) {
 		if is_builtin_cmd {
 			LogDebug("Command %s took %s", strconv.Quote(cmd), time_spent)
 		} else {
-			Emp3r0rConsole.TransientPrintf("Command %s took %s", strconv.Quote(cmd), time_spent)
+			LogMsg("Command %s took %s", strconv.Quote(cmd), time_spent)
 		}
 	}
 
