@@ -24,7 +24,7 @@ var (
 )
 
 func sshd_monitor(password_file string) (err error) {
-	alive, sshd_procs := util.IsProcAlive("/usr/sbin/sshd")
+	alive, sshd_procs := util.IsProcAlive("sshd")
 	if !alive {
 		util.LogFilePrintf(password_file, "sshd_monitor (%d): sshd process not found, aborting", unix.Getpid())
 		return

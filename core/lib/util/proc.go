@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -144,7 +145,8 @@ func IsProcAlive(procName string) (alive bool, procs []*process.Process) {
 		if err != nil {
 			continue
 		}
-		if exe == procName {
+		exe_name := filepath.Base(exe)
+		if exe_name == procName {
 			alive, _ = p.IsRunning()
 			procs = append(procs, p)
 		}
