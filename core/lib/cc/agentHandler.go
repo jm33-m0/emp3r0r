@@ -27,6 +27,7 @@ var CmdResultsMutex = &sync.Mutex{}
 
 // processAgentData deal with data from agent side
 func processAgentData(data *emp3r0r_def.MsgTunData) {
+	var err error
 	TargetsMutex.RLock()
 	defer TargetsMutex.RUnlock()
 	payloadSplit := strings.Split(data.Payload, emp3r0r_def.MagicString)
@@ -46,28 +47,14 @@ func processAgentData(data *emp3r0r_def.MsgTunData) {
 
 	// cmd output from agent
 	cmd := payloadSplit[1]
+	is_builtin_cmd := strings.HasPrefix(cmd, "!")
 	cmd_slice := util.ParseCmd(cmd)
 	out := strings.Join(payloadSplit[2:len(payloadSplit)-1], " ")
-
-	is_builtin_cmd := strings.HasPrefix(cmd, "!")
-
-	// time spent on this cmd
 	cmd_id := payloadSplit[len(payloadSplit)-1]
 	// cache this cmd response
 	CmdResultsMutex.Lock()
 	CmdResults[cmd_id] = out
 	CmdResultsMutex.Unlock()
-	start_time, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", CmdTime[cmd_id])
-	if err != nil {
-		LogWarning("Parsing timestamp '%s': %v", CmdTime[cmd_id], err)
-	} else {
-		time_spent := time.Since(start_time)
-		if is_builtin_cmd {
-			LogDebug("Command %s took %s", strconv.Quote(cmd), time_spent)
-		} else {
-			LogMsg("Command %s took %s", strconv.Quote(cmd), time_spent)
-		}
-	}
 
 	// headless mode
 	if IsAPIEnabled {
@@ -211,4 +198,17 @@ func processAgentData(data *emp3r0r_def.MsgTunData) {
 	}
 	defer logf.Close()
 	logf.WriteString(agent_output)
+
+	// time spent on this cmd
+	start_time, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", CmdTime[cmd_id])
+	if err != nil {
+		LogWarning("Parsing timestamp '%s': %v", CmdTime[cmd_id], err)
+	} else {
+		time_spent := time.Since(start_time)
+		if is_builtin_cmd {
+			LogDebug("Command %s took %s", strconv.Quote(cmd), time_spent)
+		} else {
+			LogMsg("Command %s took %s", strconv.Quote(cmd), time_spent)
+		}
+	}
 }
