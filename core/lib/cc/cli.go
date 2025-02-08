@@ -91,6 +91,7 @@ func setupLogger() {
 	}
 	Logger.AddWriter(agent_resp_pane_tty)
 	tun.Logger = Logger
+	util.Logger = Logger
 	Logger.Start()
 }
 
