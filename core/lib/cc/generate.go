@@ -307,10 +307,10 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 	// CC indicator
 	RuntimeConfig.CCIndicatorURL = indicator_url
 	if RuntimeConfig.CCIndicatorURL != "" {
-		RuntimeConfig.IndicatorWaitMin = indicator_wait_min
-		RuntimeConfig.IndicatorWaitMax = indicator_wait_max
+		RuntimeConfig.CCIndicatorWaitMin = indicator_wait_min
+		RuntimeConfig.CCIndicatorWaitMax = indicator_wait_max
 		LogMsg("Remember to enable your indicator at %s. Agents will wait between %d to %d seconds for conditional C2 connection",
-			RuntimeConfig.CCIndicatorURL, RuntimeConfig.IndicatorWaitMin, RuntimeConfig.IndicatorWaitMax)
+			RuntimeConfig.CCIndicatorURL, RuntimeConfig.CCIndicatorWaitMin, RuntimeConfig.CCIndicatorWaitMax)
 	}
 
 	// Internet check
@@ -347,7 +347,7 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 		LogMsg("Using DoH server %s", RuntimeConfig.DoHServer)
 	}
 	if !proxy_chain {
-		RuntimeConfig.BroadcastIntervalMax = 0
+		RuntimeConfig.ProxyChainBroadcastIntervalMax = 0
 		LogMsg("Proxy chain is disabled")
 	}
 

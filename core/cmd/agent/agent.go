@@ -283,14 +283,14 @@ connect:
 	}
 
 	// check preset CC status URL, if CC is supposed to be offline, take a nap
-	if agent.RuntimeConfig.IndicatorWaitMax > 0 &&
+	if agent.RuntimeConfig.CCIndicatorWaitMax > 0 &&
 		agent.RuntimeConfig.CCIndicatorURL != "" { // check indicator URL or not
 		if !agent.ConditionalC2Yes(agent.RuntimeConfig.C2TransportProxy) {
 			log.Println("Conditional C2 check failed, sleeping, will retry later")
 			time.Sleep(time.Duration(
 				util.RandInt(
-					agent.RuntimeConfig.IndicatorWaitMin,
-					agent.RuntimeConfig.IndicatorWaitMax)) * time.Second)
+					agent.RuntimeConfig.CCIndicatorWaitMin,
+					agent.RuntimeConfig.CCIndicatorWaitMax)) * time.Second)
 			goto connect
 		}
 	}

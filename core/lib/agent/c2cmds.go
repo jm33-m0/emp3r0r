@@ -120,7 +120,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 			}
 		}
 
-		targetAddrWithPort := fmt.Sprintf("%s:%s", *addr, RuntimeConfig.ReverseProxyPort)
+		targetAddrWithPort := fmt.Sprintf("%s:%s", *addr, RuntimeConfig.Bring2CCReverseProxyPort)
 		ctx, cancel := context.WithCancel(context.Background())
 
 		// start a KCP tunnel to encapsulate the SSH reverse proxy
