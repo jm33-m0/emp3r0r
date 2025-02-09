@@ -13,23 +13,23 @@ import (
 
 func moduleInjector() {
 	// target
-	target := CurrentTarget
+	target := ActiveAgent
 	if target == nil {
 		LogError("Target not exist")
 		return
 	}
-	if CurrentModuleOptions["method"] == nil || CurrentModuleOptions["pid"] == nil {
+	if AvailableModuleOptions["method"] == nil || AvailableModuleOptions["pid"] == nil {
 		LogError("One or more required options are nil")
 		return
 	}
-	method := CurrentModuleOptions["method"].Val
+	method := AvailableModuleOptions["method"].Val
 
 	checksum := ""
 	shellcode_file := "shellcode.txt"
 	so_file := "to_inject.so"
 
 	// shellcode.txt
-	pid := CurrentModuleOptions["pid"].Val
+	pid := AvailableModuleOptions["pid"].Val
 	if method == "shellcode" && !util.IsExist(WWWRoot+shellcode_file) {
 		LogWarning("Custom shellcode '%s%s' does not exist, will inject guardian shellcode", WWWRoot, shellcode_file)
 	} else {

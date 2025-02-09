@@ -167,14 +167,14 @@ func (pf *PortFwdSession) InitReversedPortFwd() (err error) {
 		pf.Description = "Reverse mapping"
 	}
 	pf.Reverse = true
-	pf.Agent = CurrentTarget
+	pf.Agent = ActiveAgent
 	PortFwdsMutex.Lock()
 	PortFwds[fwdID] = pf
 	PortFwdsMutex.Unlock()
 
 	// tell agent to start this mapping
 	cmd := fmt.Sprintf("%s --to %s --shID %s --operation reverse", emp3r0r_def.C2CmdPortFwd, listenPort, fwdID)
-	err = SendCmd(cmd, "", CurrentTarget)
+	err = SendCmd(cmd, "", ActiveAgent)
 	if err != nil {
 		LogError("SendCmd: %v", err)
 		return
@@ -202,7 +202,7 @@ func (pf *PortFwdSession) RunReversedPortFwd(sh *StreamHandler) (err error) {
 	}
 
 	// remember the agent
-	pf.Agent = CurrentTarget
+	pf.Agent = ActiveAgent
 	pf.Reverse = true
 
 	// io.Copy
@@ -296,7 +296,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 	listenPort := pf.Lport
 
 	// remember the agent
-	pf.Agent = CurrentTarget
+	pf.Agent = ActiveAgent
 
 	_, e2 := strconv.Atoi(listenPort)
 	if !tun.ValidateIPPort(toAddr) || e2 != nil {

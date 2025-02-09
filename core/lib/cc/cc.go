@@ -166,8 +166,8 @@ func ListTargets() {
 		}
 
 		// is this agent currently selected?
-		if CurrentTarget != nil {
-			if CurrentTarget.Tag == target.Tag {
+		if ActiveAgent != nil {
+			if ActiveAgent.Tag == target.Tag {
 				index = color.New(color.FgHiGreen, color.Bold).Sprintf("%d", control.Index)
 				row = []string{
 					index, label, util.SplitLongLine(target.Tag, 15),
@@ -444,8 +444,8 @@ func setActiveTarget(cmd *cobra.Command, args []string) {
 	}
 
 	select_agent := func(a *emp3r0r_def.Emp3r0rAgent) {
-		CurrentTarget = a
-		LogSuccess("Now targeting %s", CurrentTarget.Tag)
+		ActiveAgent = a
+		LogSuccess("Now targeting %s", ActiveAgent.Tag)
 		LogMsg("Run `file_manager` to open a SFTP session")
 		// autoCompleteAgentExes(target_to_set)
 	}

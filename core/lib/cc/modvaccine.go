@@ -21,14 +21,14 @@ func moduleVaccine() {
 			LogError("CreateVaccineArchive: %v", err)
 			return
 		}
-		downloadOpt, ok := CurrentModuleOptions["download_addr"]
+		downloadOpt, ok := AvailableModuleOptions["download_addr"]
 		if !ok {
 			LogError("Option 'download_addr' not found")
 			return
 		}
 		download_addr := downloadOpt.Val
 		checksum := tun.SHA256SumFile(UtilsArchive)
-		err = SendCmd(fmt.Sprintf("%s --checksum %s --download_addr %s", emp3r0r_def.C2CmdUtils, checksum, download_addr), "", CurrentTarget)
+		err = SendCmd(fmt.Sprintf("%s --checksum %s --download_addr %s", emp3r0r_def.C2CmdUtils, checksum, download_addr), "", ActiveAgent)
 		if err != nil {
 			LogError("SendCmd failed: %v", err)
 		}

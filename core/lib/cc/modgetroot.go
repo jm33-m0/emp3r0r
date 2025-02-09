@@ -23,12 +23,12 @@ var LPEHelperURLs = map[string]string{
 func moduleLPE() {
 	go func() {
 		// target
-		target := CurrentTarget
+		target := ActiveAgent
 		if target == nil {
 			LogError("Target not exist")
 			return
 		}
-		helperOpt, ok := CurrentModuleOptions["lpe_helper"]
+		helperOpt, ok := AvailableModuleOptions["lpe_helper"]
 		if !ok {
 			LogError("Option 'lpe_helper' not found")
 			return

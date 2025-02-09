@@ -13,14 +13,14 @@ import (
 )
 
 func moduleMemDump() {
-	pidOpt, ok := CurrentModuleOptions["pid"]
+	pidOpt, ok := AvailableModuleOptions["pid"]
 	if !ok {
 		LogError("Option 'pid' not found")
 		return
 	}
 	cmd := fmt.Sprintf("%s --pid %s", emp3r0r_def.C2CmdMemDump, pidOpt.Val)
 	cmd_id := uuid.NewString()
-	err := SendCmd(cmd, cmd_id, CurrentTarget)
+	err := SendCmd(cmd, cmd_id, ActiveAgent)
 	if err != nil {
 		LogError("SendCmd: %v", err)
 		return
@@ -46,7 +46,7 @@ func moduleMemDump() {
 		return
 	}
 
-	_, err = GetFile(path, CurrentTarget)
+	_, err = GetFile(path, ActiveAgent)
 	if err != nil {
 		LogError("GetFile: %v", err)
 		return

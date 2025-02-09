@@ -13,7 +13,7 @@ import (
 )
 
 func modulePortFwd() {
-	switchOpt, ok := CurrentModuleOptions["switch"]
+	switchOpt, ok := AvailableModuleOptions["switch"]
 	if !ok {
 		LogError("Option 'switch' not found")
 		return
@@ -22,12 +22,12 @@ func modulePortFwd() {
 	case "off":
 		// ugly, i know, it will delete port mappings matching current lport-to combination
 		for id, session := range PortFwds {
-			toOpt, ok := CurrentModuleOptions["to"]
+			toOpt, ok := AvailableModuleOptions["to"]
 			if !ok {
 				LogError("Option 'to' not found")
 				return
 			}
-			listenPortOpt, ok := CurrentModuleOptions["listen_port"]
+			listenPortOpt, ok := AvailableModuleOptions["listen_port"]
 			if !ok {
 				LogError("Option 'listen_port' not found")
 				return
@@ -40,7 +40,7 @@ func modulePortFwd() {
 				// make sure handler returns
 				// cmd format: !port_fwd [to/listen] [shID] [operation]
 				cmd := fmt.Sprintf("%s --shID %s --operation stop", emp3r0r_def.C2CmdPortFwd, id)
-				sendCMDerr := SendCmd(cmd, "", CurrentTarget)
+				sendCMDerr := SendCmd(cmd, "", ActiveAgent)
 				if sendCMDerr != nil {
 					LogError("SendCmd: %v", sendCMDerr)
 					return
@@ -53,7 +53,7 @@ func modulePortFwd() {
 	case "reverse": // expose a dest from CC to agent
 		var pf PortFwdSession
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
-		pf.Lport, pf.To = CurrentModuleOptions["listen_port"].Val, CurrentModuleOptions["to"].Val
+		pf.Lport, pf.To = AvailableModuleOptions["listen_port"].Val, AvailableModuleOptions["to"].Val
 		go func() {
 			LogMsg("RunReversedPortFwd: %s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.Lport, pf.To, pf.Protocol)
 			initErr := pf.InitReversedPortFwd()
@@ -64,8 +64,8 @@ func modulePortFwd() {
 	case "on":
 		var pf PortFwdSession
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
-		pf.Lport, pf.To = CurrentModuleOptions["listen_port"].Val, CurrentModuleOptions["to"].Val
-		pf.Protocol = CurrentModuleOptions["protocol"].Val
+		pf.Lport, pf.To = AvailableModuleOptions["listen_port"].Val, AvailableModuleOptions["to"].Val
+		pf.Protocol = AvailableModuleOptions["protocol"].Val
 		go func() {
 			LogMsg("RunPortFwd: %s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.Lport, pf.To, pf.Protocol)
 			runErr := pf.RunPortFwd()
@@ -78,14 +78,14 @@ func modulePortFwd() {
 }
 
 func moduleProxy() {
-	portOpt, ok := CurrentModuleOptions["port"]
+	portOpt, ok := AvailableModuleOptions["port"]
 	if !ok {
 		LogError("Option 'port' not found")
 		return
 	}
 	port := portOpt.Val
 
-	statusOpt, ok := CurrentModuleOptions["status"]
+	statusOpt, ok := AvailableModuleOptions["status"]
 	if !ok {
 		LogError("Option 'status' not found")
 		return

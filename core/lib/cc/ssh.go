@@ -53,7 +53,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 	is_new_port_needed := (port == RuntimeConfig.SSHDShellPort && shell != "sftp")
 	// check if port mapping is already open, if yes, use it
 	for s, mapping := range SSHShellPort {
-		if s == shell && mapping.Agent == CurrentTarget {
+		if s == shell && mapping.Agent == ActiveAgent {
 			port = mapping.ToPort
 			is_new_port_needed = false
 		}
@@ -82,7 +82,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 	// is port mapping already done?
 	port_mapping_exists := false
 	for _, p := range PortFwds {
-		if p.Agent == CurrentTarget && p.To == to {
+		if p.Agent == ActiveAgent && p.To == to {
 			port_mapping_exists = true
 			for s, ssh_mapping := range SSHShellPort {
 				// one port for one shell
@@ -113,7 +113,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 		if err != nil {
 			return
 		}
-		LogInfo("Waiting for sshd (%s) on target %s", shell, strconv.Quote(CurrentTarget.Tag))
+		LogInfo("Waiting for sshd (%s) on target %s", shell, strconv.Quote(ActiveAgent.Tag))
 
 		// wait until sshd is up
 		defer func() {
@@ -138,7 +138,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 			}
 		}
 		if !is_response {
-			err = fmt.Errorf("didn't get response from agent (%s), aborting", CurrentTarget.Tag)
+			err = fmt.Errorf("didn't get response from agent (%s), aborting", ActiveAgent.Tag)
 			return
 		}
 
@@ -152,7 +152,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 			// remember the port mapping and shell and agent
 			SSHShellPort[shell] = &SSH_SHELL_Mapping{
 				Shell:   shell,
-				Agent:   CurrentTarget,
+				Agent:   ActiveAgent,
 				PortFwd: pf,
 				ToPort:  port,
 			}
@@ -162,7 +162,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 				LogError("Start port mapping for sshd (%s): %v", shell, err)
 			}
 		}()
-		LogInfo("Waiting for response from %s", CurrentTarget.Tag)
+		LogInfo("Waiting for response from %s", ActiveAgent.Tag)
 		if err != nil {
 			return
 		}
@@ -177,7 +177,7 @@ wait:
 		}
 		time.Sleep(100 * time.Millisecond)
 		for _, p := range PortFwds {
-			if p.Agent == CurrentTarget && p.To == to {
+			if p.Agent == ActiveAgent && p.To == to {
 				port_mapping_exists = true
 				break wait
 			}
@@ -201,8 +201,8 @@ wait:
 	}
 
 	// agent name
-	name := CurrentTarget.Hostname
-	label := Targets[CurrentTarget].Label
+	name := ActiveAgent.Hostname
+	label := Targets[ActiveAgent].Label
 	if label != "nolabel" && label != "-" {
 		name = label
 	}
@@ -217,7 +217,7 @@ wait:
 	// if open in new tmux window
 	LogInfo("\nOpening SSH (%s - %s) session for %s in Shell tab.\n"+
 		"If that fails, please execute command\n%s\nmanaully",
-		shell, port, CurrentTarget.Tag, sshCmd)
+		shell, port, ActiveAgent.Tag, sshCmd)
 
 	// if a shell is wanted, just open in new tmux window, you will see a new tab
 	return TmuxNewWindow(fmt.Sprintf("shell/%s/%s-%s", name, shell, port), sshCmd)

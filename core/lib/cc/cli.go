@@ -104,19 +104,19 @@ func SetDynamicPrompt() string {
 	prompt_name := color.New(color.Bold, color.FgBlack, color.BgHiWhite).Sprint(AppName)
 	transport := color.New(color.FgRed).Sprint("local")
 
-	if CurrentTarget != nil && IsAgentExist(CurrentTarget) {
-		shortName = strings.Split(CurrentTarget.Tag, "-agent")[0]
-		if CurrentTarget.HasRoot {
+	if ActiveAgent != nil && IsAgentExist(ActiveAgent) {
+		shortName = strings.Split(ActiveAgent.Tag, "-agent")[0]
+		if ActiveAgent.HasRoot {
 			prompt_arrow = color.New(color.Bold, color.FgHiGreen).Sprint("\n# ")
 			prompt_name = color.New(color.Bold, color.FgBlack, color.BgHiGreen).Sprint(AppName)
 		}
-		transport = getTransport(CurrentTarget.Transport)
+		transport = getTransport(ActiveAgent.Transport)
 	}
-	if CurrentMod == "<blank>" {
-		CurrentMod = "none" // if no module is selected
+	if ActiveModule == "<blank>" {
+		ActiveModule = "none" // if no module is selected
 	}
 	agent_name := color.New(color.FgCyan, color.Underline).Sprint(shortName)
-	mod_name := color.New(color.FgHiBlue).Sprint(CurrentMod)
+	mod_name := color.New(color.FgHiBlue).Sprint(ActiveModule)
 
 	dynamicPrompt := fmt.Sprintf("%s - %s @%s (%s) "+prompt_arrow,
 		prompt_name,

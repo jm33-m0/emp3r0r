@@ -18,7 +18,7 @@ func moduleCmd() {
 			LogError("moduleCmd: agent %s is not connected", target.Tag)
 			return
 		}
-		cmdOpt, ok := CurrentModuleOptions["cmd_to_exec"]
+		cmdOpt, ok := AvailableModuleOptions["cmd_to_exec"]
 		if !ok {
 			LogError("Option 'cmd_to_exec' not found")
 			return
@@ -30,9 +30,9 @@ func moduleCmd() {
 	}
 
 	// find target
-	target := CurrentTarget
+	target := ActiveAgent
 	if target == nil {
-		LogWarning("emp3r0r will execute `%s` on all targets this time", CurrentModuleOptions["cmd_to_exec"].Val)
+		LogWarning("emp3r0r will execute `%s` on all targets this time", AvailableModuleOptions["cmd_to_exec"].Val)
 		for per_target := range Targets {
 			execOnTarget(per_target)
 		}
@@ -50,7 +50,7 @@ func moduleCmd() {
 // moduleShell set up an ssh session
 func moduleShell() {
 	// find target
-	target := CurrentTarget
+	target := ActiveAgent
 	if target == nil {
 		LogError("Module shell: target does not exist")
 		return
@@ -68,21 +68,21 @@ func moduleShell() {
 	}
 
 	// options
-	shellOpt, ok := CurrentModuleOptions["shell"]
+	shellOpt, ok := AvailableModuleOptions["shell"]
 	if !ok {
 		LogError("Option 'shell' not found")
 		return
 	}
 	shell := shellOpt.Val
 
-	argsOpt, ok := CurrentModuleOptions["args"]
+	argsOpt, ok := AvailableModuleOptions["args"]
 	if !ok {
 		LogError("Option 'args' not found")
 		return
 	}
 	args := argsOpt.Val
 
-	portOpt, ok := CurrentModuleOptions["port"]
+	portOpt, ok := AvailableModuleOptions["port"]
 	if !ok {
 		LogError("Option 'port' not found")
 		return

@@ -11,18 +11,18 @@ import (
 )
 
 func modListener() {
-	if CurrentModuleOptions["listener"] == nil || CurrentModuleOptions["port"] == nil || CurrentModuleOptions["payload"] == nil || CurrentModuleOptions["compression"] == nil || CurrentModuleOptions["passphrase"] == nil {
+	if AvailableModuleOptions["listener"] == nil || AvailableModuleOptions["port"] == nil || AvailableModuleOptions["payload"] == nil || AvailableModuleOptions["compression"] == nil || AvailableModuleOptions["passphrase"] == nil {
 		LogError("One or more required options are nil")
 		return
 	}
 	cmd := fmt.Sprintf("%s --listener %s --port %s --payload %s --compression %s --passphrase %s",
 		emp3r0r_def.C2CmdListener,
-		CurrentModuleOptions["listener"].Val,
-		CurrentModuleOptions["port"].Val,
-		CurrentModuleOptions["payload"].Val,
-		CurrentModuleOptions["compression"].Val,
-		CurrentModuleOptions["passphrase"].Val)
-	err := SendCmd(cmd, "", CurrentTarget)
+		AvailableModuleOptions["listener"].Val,
+		AvailableModuleOptions["port"].Val,
+		AvailableModuleOptions["payload"].Val,
+		AvailableModuleOptions["compression"].Val,
+		AvailableModuleOptions["passphrase"].Val)
+	err := SendCmd(cmd, "", ActiveAgent)
 	if err != nil {
 		LogError("SendCmd: %v", err)
 		return

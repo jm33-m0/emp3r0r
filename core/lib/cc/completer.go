@@ -18,7 +18,7 @@ import (
 // autocomplete module options
 func listValChoices() []string {
 	ret := make([]string, 0)
-	for _, opt := range CurrentModuleOptions {
+	for _, opt := range AvailableModuleOptions {
 		ret = append(ret, opt.Vals...)
 	}
 	return ret
@@ -59,7 +59,7 @@ func listTargetIndexTags() []string {
 func listOptions() []string {
 	names := make([]string, 0)
 
-	for opt := range CurrentModuleOptions {
+	for opt := range AvailableModuleOptions {
 		names = append(names, opt)
 	}
 	return names
