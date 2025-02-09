@@ -1,6 +1,7 @@
 package util
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"unicode"
@@ -140,6 +141,9 @@ func isPrintable(b byte) bool {
 
 // AreBytesPrintable checks if the given bytes are printable.
 func AreBytesPrintable(s []byte) bool {
+	// Remove everything after the first null byte
+	// We want a C string
+	s = bytes.Split(s, []byte("\x00"))[0]
 	for i := 0; i < len(s); i++ {
 		if !isPrintable(s[i]) {
 			return false

