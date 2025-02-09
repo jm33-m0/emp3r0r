@@ -368,29 +368,29 @@ func read_reg_val(pid int, reg_name string, log_stream chan string) (val []byte)
 	}
 	switch reg_name {
 	case "RAX":
-		val = peek_text(pid, uintptr(regs.Rax), log_stream)
+		val = peek_text(pid, uintptr(regs.Rax), log_stream, true)
 	case "RDI":
-		val = peek_text(pid, uintptr(regs.Rdi), log_stream)
+		val = peek_text(pid, uintptr(regs.Rdi), log_stream, true)
 	case "RSI":
-		val = peek_text(pid, uintptr(regs.Rsi), log_stream)
+		val = peek_text(pid, uintptr(regs.Rsi), log_stream, true)
 	case "RDX":
-		val = peek_text(pid, uintptr(regs.Rdx), log_stream)
+		val = peek_text(pid, uintptr(regs.Rdx), log_stream, true)
 	case "RCX":
-		val = peek_text(pid, uintptr(regs.Rcx), log_stream)
+		val = peek_text(pid, uintptr(regs.Rcx), log_stream, true)
 	case "R8":
-		val = peek_text(pid, uintptr(regs.R8), log_stream)
+		val = peek_text(pid, uintptr(regs.R8), log_stream, true)
 	case "R9":
-		val = peek_text(pid, uintptr(regs.R9), log_stream)
+		val = peek_text(pid, uintptr(regs.R9), log_stream, true)
 	case "RBP":
-		val = peek_text(pid, uintptr(regs.Rbp), log_stream)
+		val = peek_text(pid, uintptr(regs.Rbp), log_stream, true)
 	case "RSP":
-		val = peek_text(pid, uintptr(regs.Rsp), log_stream)
+		val = peek_text(pid, uintptr(regs.Rsp), log_stream, true)
 	}
 	return
 }
 
 // read memory at addr and check if it's printable, 24 bytes at most
-func peek_text(pid int, addr uintptr, log_stream chan string) (read_bytes []byte) {
+func peek_text(pid int, addr uintptr, log_stream chan string, ensure_printable bool) (read_bytes []byte) {
 	if addr == 0 {
 		util.LogStreamPrintf(log_stream, "Invalid address 0x%x", addr)
 		return
@@ -399,6 +399,9 @@ func peek_text(pid int, addr uintptr, log_stream chan string) (read_bytes []byte
 	_, err := unix.PtracePeekText(pid, addr, read_bytes)
 	if err != nil {
 		util.LogStreamPrintf(log_stream, "PEEKTEXT: %v", err)
+		return
+	}
+	if !ensure_printable {
 		return
 	}
 	if util.AreBytesPrintable(read_bytes) {
@@ -410,7 +413,7 @@ func peek_text(pid int, addr uintptr, log_stream chan string) (read_bytes []byte
 }
 
 func dump_code(pid int, addr uintptr, log_stream chan string) {
-	code_bytes := peek_text(pid, addr, log_stream)
+	code_bytes := peek_text(pid, addr, log_stream, false)
 	if len(code_bytes) == 0 {
 		return
 	}
