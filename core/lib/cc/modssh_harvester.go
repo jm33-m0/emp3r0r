@@ -38,5 +38,4 @@ func module_ssh_harvester() {
 		LogError("SendCmd: %v", err)
 		return
 	}
-	LogMsg("Passwords will show up in the file path given by agent")
 }
