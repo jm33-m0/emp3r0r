@@ -130,10 +130,16 @@ build() {
     gobuild_cmd="go"
     build_opt="build"
     ldflags="-v -X 'github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def.MagicString=$magic_str'"
+    if ! is_in_github_runner; then
+      ldflags+=" -X 'github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def.Version=$(get_version)-debug'"
+    fi
   else
     gobuild_cmd="go"
     build_opt="build"
     ldflags="-s -w -v -X 'github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def.MagicString=$magic_str'"
+    if ! is_in_github_runner; then
+      ldflags+=" -X 'github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def.Version=$(get_version)'"
+    fi
     # info "Setting up garble"
     # go install mvdan.cc/garble@latest || error "Failed to install garble"
   fi
@@ -232,6 +238,29 @@ create_tar() {
   info "Creating archive..."
   tar --zstd -cpf "$pwd/emp3r0r.tar.zst" ./emp3r0r-build || error "failed to create archive"
   success "Packaged emp3r0r"
+}
+
+# do not generate version string if in github runner, release-please will do it
+is_in_github_runner() {
+  [[ -n "$GITHUB_WORKSPACE" ]] && [[ -n "$GITHUB_REPOSITORY" ]]
+}
+
+get_git_version() {
+  local version
+  version=$(git describe --tags --always 2>/dev/null)
+  [[ -z "$version" ]] && version="unknown"
+  echo "$version"
+}
+
+get_version() {
+  local version
+  local build_time
+  build_time=$(date +"%y%m%d%H%M")
+  version=$(get_git_version)
+  if [[ "$version" = "unknown" ]]; then
+    version=$(grep -oP 'Version = "\K[^"]+' ./lib/emp3r0r_def/def.go)
+  fi
+  echo "$version-$build_time"
 }
 
 # release or debug
