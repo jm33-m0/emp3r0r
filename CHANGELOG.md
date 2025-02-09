@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.4](https://github.com/jm33-m0/emp3r0r/compare/v2.2.3...v2.2.4) (2025-02-09)
+
+
+### Bug Fixes
+
+* `peek_text` not returning code ([80d5ca8](https://github.com/jm33-m0/emp3r0r/commit/80d5ca8baacadd036c57bb8d2218cc64bbcf5017))
+* `ssh_harvester` crashes sshd-session ([0c3a82d](https://github.com/jm33-m0/emp3r0r/commit/0c3a82d53b53c07489092a67a35379e66644fd51))
+
 ## [2.2.3](https://github.com/jm33-m0/emp3r0r/compare/v2.2.2...v2.2.3) (2025-02-09)
 
 
