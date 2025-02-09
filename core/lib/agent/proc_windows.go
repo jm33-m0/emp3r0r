@@ -4,7 +4,6 @@
 package agent
 
 func crossPlatformSetProcName(string) {
-	return
 }
 
 func ProcUID(int) string {

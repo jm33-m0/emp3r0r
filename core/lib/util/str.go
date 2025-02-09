@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"os"
 	"strings"
 	"time"
 
@@ -148,23 +147,11 @@ func HexEncode(s string) (result string) {
 	return
 }
 
-func LogFilePrintf(filepath, format string, v ...any) {
-	logf, err := os.OpenFile(filepath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
-	defer func() {
-		logfErr := logf.Close()
-		if logfErr != nil {
-			LogDebug("LogFilePrintf: %v", logfErr)
-		}
-	}()
-	if err != nil {
-		LogDebug("LogFilePrintf: %v", err)
-		return
-	}
+// LogStreamPrintf logs a message to the console and sends it to a log stream channel.
+// Useful when agent wants to send back responses in real-time.
+func LogStreamPrintf(logStream chan string, format string, v ...any) {
 	LogDebug(format, v...)
-
-	fmt.Fprintf(logf, "%v\n", time.Now().String())
-	fmt.Fprintf(logf, format, v...)
-	fmt.Fprintf(logf, "\n")
+	logStream <- fmt.Sprintf(format, v...)
 }
 
 // ParseEnvStr parses a string of environment variables in the format "VAR1=VAL1,VAR2=VAL2"

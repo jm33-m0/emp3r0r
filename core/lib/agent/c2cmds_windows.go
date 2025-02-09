@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-func platformC2CommandsHandler(cmdSlice []string) (out string) {
+func platformC2CommandsHandler(cmdSlice []string, _ string) (out string) {
 	// parse command-line arguments using pflag
 	flags := pflag.NewFlagSet(cmdSlice[0], pflag.ContinueOnError)
 	flags.Parse(cmdSlice[1:])
