@@ -169,7 +169,7 @@ func C2CommandsHandler(cmdSlice []string, cmd_id string) (out string) {
 
 		// wait for SSHD to start
 		for !tun.IsPortOpen("127.0.0.1", *port) {
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(50 * time.Millisecond)
 		}
 
 		select {
