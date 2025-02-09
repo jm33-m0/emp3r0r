@@ -8,6 +8,6 @@ import (
 	"runtime"
 )
 
-func sshd_monitor(_ chan string, _ []byte) (err error) {
+func sshd_monitor(_ chan string, _ []byte, _ string) (err error) {
 	return fmt.Errorf("not supported on %s platform", runtime.GOARCH)
 }

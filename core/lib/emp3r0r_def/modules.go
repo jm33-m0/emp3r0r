@@ -415,8 +415,14 @@ var Modules = map[string]*ModuleConfig{
 		Options: ModOptions{
 			"code_pattern": &ModOption{
 				OptName: "code_pattern",
-				OptDesc: "Code pattern to set breakpoint, eg. 4883c4080fb6c021, big-endian",
+				OptDesc: "Code pattern to set breakpoint, big-endian. emp3r0r will stop there and dump password, and check RAX to make sure password is valid",
 				OptVal:  "4883c4080fb6c021",
+			},
+			"reg_name": &ModOption{
+				OptName: "reg_name",
+				OptDesc: "Register name that stores password, eg. RDI",
+				OptVal:  "RSI",
+				OptVals: []string{"RDI", "RSI", "RDX", "RCX", "R8", "R9", "RAX", "RBX", "RBP", "RSP", "RIP"},
 			},
 		},
 		AgentConfig: AgentModuleConfig{
