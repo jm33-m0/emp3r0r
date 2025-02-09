@@ -256,7 +256,7 @@ func ModuleDetails(modName string) {
 	table.Render()
 	out := tableString.String()
 	AdaptiveTable(out)
-	LogInfo("Module details:\n%s", out)
+	LogMsg("Module details:\n%s", out)
 }
 
 // scan custom modules in ModuleDir,
