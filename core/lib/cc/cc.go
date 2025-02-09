@@ -426,9 +426,6 @@ func InitC2() (err error) {
 	ServerCrtFile = EmpWorkSpace + "/emp3r0r-cert.pem"
 	ServerKeyFile = EmpWorkSpace + "/emp3r0r-key.pem"
 
-	// log files
-	AgentOuputLogFile = fmt.Sprintf("%s/agent_output.log", EmpWorkSpace)
-
 	return
 }
 

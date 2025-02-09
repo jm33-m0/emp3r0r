@@ -6,7 +6,6 @@ package cc
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -175,14 +174,7 @@ func processAgentData(data *emp3r0r_def.MsgTunData) {
 		color.CyanString("%d", contrlIf.Index),
 		color.HiMagentaString(cmd),
 		color.HiWhiteString(out))
-	OutputPane.Printf(false, "%s", agent_output)
-	logf, err := os.OpenFile(AgentOuputLogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		LogError("Failed to open agent log file: %v", err)
-		return
-	}
-	defer logf.Close()
-	logf.WriteString(agent_output)
+	LogMsg(agent_output)
 
 	// time spent on this cmd
 	start_time, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", CmdTime[cmd_id])

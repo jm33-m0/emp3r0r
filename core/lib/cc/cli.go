@@ -20,17 +20,10 @@ import (
 	"github.com/reeflective/console"
 )
 
-const (
-	AppName = "emp3r0r"
-)
+const AppName = "emp3r0r"
 
-var (
-	// Store agents' output
-	AgentOuputLogFile = ""
-
-	// Emp3r0rConsole: the main console interface
-	Emp3r0rConsole = console.New(AppName)
-)
+// Emp3r0rConsole: the main console interface
+var Emp3r0rConsole = console.New(AppName)
 
 // CliMain launches the commandline UI
 func CliMain() {
