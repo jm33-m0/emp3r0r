@@ -5,6 +5,7 @@ package agent
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -21,6 +22,10 @@ import (
 var (
 	traced_pids     = make(map[int]bool)
 	traced_pids_mut = &sync.RWMutex{}
+
+	// provide a way to stop the harvester
+	SshHarvesterCtx    context.Context
+	SshHarvesterCancel context.CancelFunc
 )
 
 func sshd_monitor(logStream chan string, code_pattern []byte, reg_name string) (err error) {
@@ -33,7 +38,7 @@ func sshd_monitor(logStream chan string, code_pattern []byte, reg_name string) (
 	util.LogStreamPrintf(logStream, "sshd_monitor started (%d)", unix.Getpid())
 	monitor := func(sshd_pid int) {
 		util.LogStreamPrintf(logStream, "Started monitor (%d) on SSHD (%d)", unix.Getpid(), sshd_pid)
-		for {
+		for SshHarvesterCtx.Err() == nil {
 			util.TakeABlink()
 			children_file := fmt.Sprintf("/proc/%d/task/%d/children", sshd_pid, sshd_pid)
 			children_data, err := os.ReadFile(children_file)
@@ -54,13 +59,17 @@ func sshd_monitor(logStream chan string, code_pattern []byte, reg_name string) (
 		}
 	}
 	for _, sshd_proc := range sshd_procs {
-		util.LogStreamPrintf(logStream, "Starting monitor (%d) on SSHD (%d)", unix.Getpid(), sshd_proc.Pid)
-		go monitor(int(sshd_proc.Pid))
+		if SshHarvesterCtx.Err() == nil {
+			util.LogStreamPrintf(logStream, "Starting monitor (%d) on SSHD (%d)", unix.Getpid(), sshd_proc.Pid)
+			go monitor(int(sshd_proc.Pid))
+		}
 	}
 
-	for {
+	for SshHarvesterCtx.Err() == nil {
 		util.TakeASnap()
 	}
+
+	return
 }
 
 func sshd_harvester(pid int, logStream chan string, code_pattern []byte, reg_name string) {

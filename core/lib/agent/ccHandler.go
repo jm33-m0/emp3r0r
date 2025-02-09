@@ -52,7 +52,7 @@ func processCCData(data *emp3r0r_def.MsgTunData) {
 
 	if strings.HasPrefix(cmdSlice[0], "!") {
 		out = C2CommandsHandler(cmdSlice, cmd_id)
-		sendResponse(out, cmd_id, cmdSlice)
+		SendCmdRespToCC(out, cmd_id, cmdSlice)
 		return
 	}
 
@@ -357,7 +357,7 @@ func processCCData(data *emp3r0r_def.MsgTunData) {
 					err = cmd.Process.Kill()
 					out = fmt.Sprintf("Killing %d, which has been running for more than 10s, status %v",
 						cmd.Process.Pid, err)
-					sendResponse(out, cmd_id, cmdSlice)
+					SendCmdRespToCC(out, cmd_id, cmdSlice)
 					return
 				}
 			}()
@@ -370,11 +370,11 @@ func processCCData(data *emp3r0r_def.MsgTunData) {
 	default:
 	}
 
-	defer sendResponse(out, cmd_id, cmdSlice)
+	defer SendCmdRespToCC(out, cmd_id, cmdSlice)
 }
 
 // send response to CC
-func sendResponse(resp, cmd_id string, cmdSlice []string) {
+func SendCmdRespToCC(resp, cmd_id string, cmdSlice []string) {
 	data2send := emp3r0r_def.MsgTunData{
 		Tag: RuntimeConfig.AgentTag,
 	}

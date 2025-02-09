@@ -4,8 +4,15 @@
 package agent
 
 import (
+	"context"
 	"fmt"
 	"runtime"
+)
+
+var (
+	// provide a way to stop the harvester
+	SshHarvesterCtx    context.Context
+	SshHarvesterCancel context.CancelFunc
 )
 
 func sshd_monitor(_ chan string, _ []byte, _ string) (err error) {

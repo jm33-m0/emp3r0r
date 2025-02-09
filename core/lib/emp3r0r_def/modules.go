@@ -424,6 +424,12 @@ var Modules = map[string]*ModuleConfig{
 				OptVal:  "RSI",
 				OptVals: []string{"RDI", "RSI", "RDX", "RCX", "R8", "R9", "RAX", "RBX", "RBP", "RSP", "RIP"},
 			},
+			"stop": &ModOption{
+				OptName: "stop",
+				OptDesc: "Stop the harvester: no, yes",
+				OptVal:  "no",
+				OptVals: []string{"no", "yes"},
+			},
 		},
 		AgentConfig: AgentModuleConfig{
 			Exec:          "built-in",
