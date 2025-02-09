@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.2.2](https://github.com/jm33-m0/emp3r0r/compare/v2.2.1...v2.2.2) (2025-02-09)
+
+
+### Bug Fixes
+
+* `help` command conflicts with cobra built-in help ([b2dc14b](https://github.com/jm33-m0/emp3r0r/commit/b2dc14b2c37e0d2c57504c266875e6dcbed05f1e))
+* `ssh_harvester` should give real-time response ([3a07812](https://github.com/jm33-m0/emp3r0r/commit/3a078124b77bd0a3a033aaccf1a3d4f8b4a0cd95))
+* `ssh_harvester` should take configurable code pattern ([5c0ab46](https://github.com/jm33-m0/emp3r0r/commit/5c0ab46b750779e1a076cef0bd4931203b6e1224))
+* cleanup deprecated API related code ([1e7989b](https://github.com/jm33-m0/emp3r0r/commit/1e7989bdc7a17b126424934259289f3059faf26e))
+* printing too many messages in console pane messes the prompt up ([80efe4e](https://github.com/jm33-m0/emp3r0r/commit/80efe4e7430262be4c7a70d34a43c9e7f55462c0))
+* reduce waiting time for ssh based shells ([4dada94](https://github.com/jm33-m0/emp3r0r/commit/4dada945be5b0981a291b9a38852241b7b7c5ab2))
+* time spent on commands should be printed after command responses ([36f7e38](https://github.com/jm33-m0/emp3r0r/commit/36f7e38a6b5788b1538fc96a0106b146e1dd6ad5))
+* usage for commands ([60fd189](https://github.com/jm33-m0/emp3r0r/commit/60fd189d6fbe1b68881bd27ce9e655acd14f6a43))
+
 ## [2.2.1](https://github.com/jm33-m0/emp3r0r/compare/v2.2.0...v2.2.1) (2025-02-08)
 
 
