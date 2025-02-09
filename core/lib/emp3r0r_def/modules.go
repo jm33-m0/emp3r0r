@@ -412,7 +412,13 @@ var Modules = map[string]*ModuleConfig{
 		IsLocal:  false,
 		Platform: "Linux",
 		Path:     "",
-		Options:  ModOptions{},
+		Options: ModOptions{
+			"code_pattern": &ModOption{
+				OptName: "code_pattern",
+				OptDesc: "Code pattern to set breakpoint, eg. 4883c4080fb6c021, big-endian",
+				OptVal:  "4883c4080fb6c021",
+			},
+		},
 		AgentConfig: AgentModuleConfig{
 			Exec:          "built-in",
 			Files:         []string{},

