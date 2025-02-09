@@ -133,3 +133,17 @@ func readTextFile(filename string) (string, error) {
 
 	return string(buffer[:n]), nil
 }
+
+func isPrintable(b byte) bool {
+	return b >= 32 && b <= 126
+}
+
+// AreBytesPrintable checks if the given bytes are printable.
+func AreBytesPrintable(s []byte) bool {
+	for i := 0; i < len(s); i++ {
+		if !isPrintable(s[i]) {
+			return false
+		}
+	}
+	return true
+}
