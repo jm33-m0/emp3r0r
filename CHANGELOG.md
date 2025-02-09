@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.2.3](https://github.com/jm33-m0/emp3r0r/compare/v2.2.2...v2.2.3) (2025-02-09)
+
+
+### Bug Fixes
+
+* `ssh_harvester` should have a stop switch ([ea0d254](https://github.com/jm33-m0/emp3r0r/commit/ea0d254cd01f7d8e47925ef35754d8eaab20f2d3))
+* `ssh_harvester` should print passwords at the end of debugging session ([a05f281](https://github.com/jm33-m0/emp3r0r/commit/a05f281f4554711c58d151a99fe5bf1d08a212de))
+* only print printable bytes ([76f248f](https://github.com/jm33-m0/emp3r0r/commit/76f248fcaea3b129a7c176f2f1f77da7dd996bfb))
+* specify the register to read password from ([09c44ad](https://github.com/jm33-m0/emp3r0r/commit/09c44ad9e3904b5784a9b3e453fb6648f1a8ed8e))
+* unify logging ([b073c38](https://github.com/jm33-m0/emp3r0r/commit/b073c3822c0116f6b113e722b4d91c3bf7567b87))
+
 ## [2.2.2](https://github.com/jm33-m0/emp3r0r/compare/v2.2.1...v2.2.2) (2025-02-09)
 
 
