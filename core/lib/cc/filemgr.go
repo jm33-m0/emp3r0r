@@ -155,7 +155,12 @@ func UploadToAgent(cmd *cobra.Command, args []string) {
 	}
 }
 
+// let it run in the background
 func DownloadFromAgent(cmd *cobra.Command, args []string) {
+	go downloadFromAgent(cmd, args)
+}
+
+func downloadFromAgent(cmd *cobra.Command, args []string) {
 	target := ValidateActiveTarget()
 	if target == nil {
 		LogError("You have to select a target first")
