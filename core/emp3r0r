@@ -222,12 +222,17 @@ install() {
 
   # emp3r0r binaries
   chmod 755 "$0" cc.exe cat.exe
-  cp -avR emp3r0r "$bin_dir/emp3r0r" || error "emp3r0r-main"
-  cp -avR listener.exe "$bin_dir/emp3r0r-listener" || error "emp3r0r-listener"
-  cp -avR cc.exe "$data_dir/emp3r0r-cc" || error "emp3r0r-cc"
-  cp -avR cat.exe "$data_dir/emp3r0r-cat" || error "emp3r0r-cat"
+  cp -avfR emp3r0r "$bin_dir/emp3r0r" || error "emp3r0r-main"
+  cp -avfR listener.exe "$bin_dir/emp3r0r-listener" || error "emp3r0r-listener"
+  cp -avfR cc.exe "$data_dir/emp3r0r-cc" || error "emp3r0r-cc"
+  cp -avfR cat.exe "$data_dir/emp3r0r-cat" || error "emp3r0r-cat"
 
   success "Installed emp3r0r, please check"
+  if tmux has-session -t emp3r0r 2>/dev/null; then
+    warn "emp3r0r is still running, stopping it in 3 seconds"
+    sleep 3
+    tmux kill-session -t emp3r0r || error "Failed to kill emp3r0r"
+  fi
 }
 
 create_tar() {

@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/cavaliergopher/grab/v3"
@@ -208,18 +207,12 @@ func UpdateCC(cmd *cobra.Command, args []string) {
 	}
 
 	LogInfo("Installing emp3r0r...")
-	install_cmd := fmt.Sprintf("bash -c 'tar -I zstd -xvf %s -C /tmp && cd /tmp/emp3r0r-build && sudo ./emp3r0r --install; sleep 5'", path)
+	install_cmd := fmt.Sprintf("bash -c 'tar -I zstd -xvf %s -C /tmp && cd /tmp/emp3r0r-build && sudo ./emp3r0r --install'", path)
 	LogMsg("Running installer command: %s. Please run `tmux kill-session -t emp3r0r` after installing", install_cmd)
 
-	wrapper, err := exec.LookPath("x-terminal-emulator")
+	out, err := exec.Command("bash", "-c", install_cmd).CombinedOutput()
 	if err != nil {
-		LogError("%v. your distribution is unsupported", err)
-		return
+		LogError("failed to update emp3r0r: %s (%v)", out, err)
 	}
-	exec_cmd := exec.Command(wrapper, "-e", install_cmd)
-	exec_cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	out, err := exec_cmd.CombinedOutput()
-	if err != nil {
-		LogError("failed to update emp3r0r: %v: %s", err, out)
-	}
+	LogMsg("%s", out)
 }
