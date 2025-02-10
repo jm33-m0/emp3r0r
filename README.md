@@ -2,7 +2,7 @@
 
 A post-exploitation framework for Linux/Windows
 
-https://github.com/user-attachments/assets/bc4a25d2-16b3-4e9e-a335-efb359a539d4
+<https://github.com/user-attachments/assets/bc4a25d2-16b3-4e9e-a335-efb359a539d4>
 
 [More Screenshots and videos](./Screenshots.md)
 
@@ -28,19 +28,20 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
 
 ## Features
 
-- Beautiful Terminal UI
-  - Use [tmux](https://github.com/tmux/tmux) for window management
+- Feature-Rich CLI
+  - [console](https://github.com/reeflective/console) and [cobra](https://github.com/spf13/cobra) for CLI infrastructure
+  - Auto-completion for commands and arguments, with syntax highlighting
+  - Multi-Tasking support provided by [tmux](https://github.com/tmux/tmux)
 - Stealth
-  - Automatically changes `argv` so you won't notice it in `ps` listing
+  - Automatically change `argv` so you won't notice it in `ps` listing
   - Hide files and PIDs via Glibc hijacking (`patcher` in `get_persistence`)
-  - Built-in [**Elvish Shell**](https://elv.sh/) with the same disguise as main process
-  - [**Bring Your Own Shell**](https://github.com/jm33-m0/emp3r0r/blob/master/core/modules/elvish/config.json) or any interactive programs via [custom modules such as bettercap](https://github.com/jm33-m0/emp3r0r/blob/master/core/modules/bettercap/config.json)
+  - [**Bring Your Own Shell**](https://github.com/jm33-m0/emp3r0r/blob/master/core/modules/elvish/config.json) such as [`elvish`](https://elv.sh) or any interactive programs via [custom modules such as bettercap](https://github.com/jm33-m0/emp3r0r/blob/master/core/modules/bettercap/config.json)
 - All C2 communications made in HTTP2/TLS
   - Defeat [**JA3**](https://github.com/salesforce/ja3) fingerprinting with [**UTLS**](https://github.com/refraction-networking/utls)
   - Painlessly encapsulated in **Shadowsocks** and KCP
   - Able to encapsulate in any external proxies such as [**TOR** and **CDN**s](https://github.com/jm33-m0/emp3r0r/raw/master/img/c2transports.png)
   - [**C2 relaying**](https://github.com/jm33-m0/emp3r0r/wiki/C2-Relay) via SSH
-- Cross-platform memory dumping
+- Cross-platform memory dumping, dumping mini-dumps from Windows to be compatible with [pypykatz](https://github.com/skelsec/pypykatz)
 - Staged Payload Delivery for both Linux and Windows
   - [HTTP Listener with AES and compression](https://github.com/jm33-m0/emp3r0r/wiki/Listener)
   - [**DLL agent**](https://github.com/jm33-m0/emp3r0r/wiki/DLL-Agent), [**Shellcode agent**](https://github.com/jm33-m0/emp3r0r/wiki/Shellcode-Agent-for-Windows) for Windows targets and [**Shared Library stager with compression and encryption**](https://github.com/jm33-m0/emp3r0r/wiki/Shared-Library-Stager-for-Linux) for Linux
