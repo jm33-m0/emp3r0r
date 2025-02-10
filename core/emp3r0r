@@ -236,10 +236,17 @@ create_tar() {
   success "Packaged emp3r0r"
 }
 
+is_in_github_runner() {
+  [[ -n "$GITHUB_WORKFLOW" ]] && [[ -n "$GITHUB_ACTION" ]]
+}
+
 get_git_version() {
   local version
   version=$(git describe --tags --always 2>/dev/null)
   [[ -z "$version" ]] && version="unknown"
+  if is_in_github_runner; then
+    version="$TAG" # from github actions, see release-please.yml
+  fi
   echo "$version"
 }
 
