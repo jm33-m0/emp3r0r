@@ -215,4 +215,6 @@ func UpdateCC(cmd *cobra.Command, args []string) {
 		LogError("failed to update emp3r0r: %s (%v)", out, err)
 	}
 	LogMsg("%s", out)
+	LogWarning("emp3r0r will stop in 2 seconds. Start it again to use the new version")
+	TmuxDeinitWindows()
 }
