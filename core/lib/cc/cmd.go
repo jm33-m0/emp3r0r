@@ -67,6 +67,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run:     setDebugLevel,
 		}
 		setDebuglevelCmd.Flags().IntP("level", "l", -1, "Debug level")
+		setDebuglevelCmd.MarkFlagRequired("level")
 		rootCmd.AddCommand(setDebuglevelCmd)
 		carapace.Gen(setDebuglevelCmd).FlagCompletion(carapace.ActionMap{
 			"level": carapace.ActionValues("0", "1", "2", "3"),
@@ -281,6 +282,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		getCmd.Flags().BoolP("recursive", "r", false, "Download recursively")
 		getCmd.Flags().StringP("path", "f", "", "Path to download")
 		getCmd.Flags().StringP("regex", "e", "", "Regex to match files")
+		getCmd.MarkFlagRequired("path")
 		rootCmd.AddCommand(getCmd)
 		carapace.Gen(getCmd).FlagCompletion(carapace.ActionMap{
 			"path": carapace.ActionValues(listRemoteDir()...),
@@ -295,6 +297,8 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		}
 		putCmd.Flags().StringP("src", "s", "", "Source file")
 		putCmd.Flags().StringP("dst", "d", "", "Destination file")
+		putCmd.MarkFlagRequired("src")
+		putCmd.MarkFlagRequired("dst")
 		rootCmd.AddCommand(putCmd)
 		carapace.Gen(putCmd).FlagCompletion(carapace.ActionMap{
 			"src": carapace.ActionFiles(),
@@ -361,6 +365,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run:     DeletePortFwdSession,
 		}
 		rmPortMappingCmd.Flags().StringP("id", "", "", "Port mapping ID")
+		rmPortMappingCmd.MarkFlagRequired("id")
 		rootCmd.AddCommand(rmPortMappingCmd)
 		carapace.Gen(rmPortMappingCmd).FlagCompletion(carapace.ActionMap{
 			"id": carapace.ActionValues(listPortMappings()...),
@@ -375,6 +380,8 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		}
 		labelAgentCmd.Flags().StringP("id", "", "0", "Agent ID")
 		labelAgentCmd.Flags().StringP("label", "", "no-label", "Custom name")
+		labelAgentCmd.MarkFlagRequired("id")
+		labelAgentCmd.MarkFlagRequired("label")
 		rootCmd.AddCommand(labelAgentCmd)
 		carapace.Gen(labelAgentCmd).FlagCompletion(carapace.ActionMap{
 			"id":    carapace.ActionValues(listTargetIndexTags()...),
@@ -389,6 +396,8 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run:     execCmd,
 		}
 		execCmd.Flags().StringP("cmd", "c", "", "Command to execute on agent")
+		execCmd.MarkFlagRequired("cmd")
+
 		rootCmd.AddCommand(execCmd)
 		carapace.Gen(execCmd).FlagCompletion(carapace.ActionMap{
 			"cmd": carapace.ActionValues(listAgentExes()...),
