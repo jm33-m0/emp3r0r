@@ -51,6 +51,7 @@ verify_checksum() {
 # Check if required commands are available
 check_command curl
 check_command jq
+check_command tmux
 
 # Get the latest version tag from GitHub API
 ver=$(curl -sSL https://api.github.com/repos/jm33-m0/emp3r0r/releases/latest | jq -r .tag_name)
