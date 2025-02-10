@@ -88,7 +88,7 @@ func UpdateOptions(modName string) (exist bool) {
 	// help us add new Option to Options, if exists, return the *Option
 	addIfNotFound := func(key string) *AvailableOptions {
 		if _, exist := AvailableModuleOptions[key]; !exist {
-			AvailableModuleOptions[key] = &AvailableOptions{Name: key, Val: "<blank>", Vals: []string{}}
+			AvailableModuleOptions[key] = &AvailableOptions{Name: key, Val: "", Vals: []string{""}}
 		}
 		return AvailableModuleOptions[key]
 	}
@@ -97,8 +97,11 @@ func UpdateOptions(modName string) (exist bool) {
 	modconfig := emp3r0r_def.Modules[modName]
 	for optName, option := range modconfig.Options {
 		argOpt := addIfNotFound(optName)
-
-		argOpt.Val = option.OptVal
+		argOpt.Val = option.OptVal   // default value
+		argOpt.Vals = option.OptVals // values auto-completion
+		if len(option.OptVals) == 0 && option.OptVal != "" {
+			argOpt.Vals = []string{option.OptVal}
+		}
 	}
 	if strings.ToLower(modconfig.AgentConfig.Exec) != "built-in" {
 		download_addr := addIfNotFound("download_addr")

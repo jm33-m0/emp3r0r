@@ -104,7 +104,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		rootCmd.AddCommand(setCmd)
 		carapace.Gen(setCmd).PositionalCompletion(
 			carapace.ActionValues(listOptions()...),
-			carapace.ActionValues(listValChoices()...))
+			carapace.ActionCallback(listValChoices))
 
 		runCmd := &cobra.Command{
 			Use:     "run",

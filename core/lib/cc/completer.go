@@ -13,15 +13,21 @@ import (
 
 	"github.com/google/uuid"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
+	"github.com/rsteube/carapace"
 )
 
 // autocomplete module options
-func listValChoices() []string {
+func listValChoices(ctx carapace.Context) carapace.Action {
 	ret := make([]string, 0)
+	argc := len(ctx.Args)
+	prev_word := ctx.Args[argc-1]
 	for _, opt := range AvailableModuleOptions {
-		ret = append(ret, opt.Vals...)
+		if prev_word == opt.Name {
+			ret = append(ret, opt.Vals...)
+			break
+		}
 	}
-	return ret
+	return carapace.ActionValues(ret...)
 }
 
 // autocomplete modules names

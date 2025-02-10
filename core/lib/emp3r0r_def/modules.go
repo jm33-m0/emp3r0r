@@ -296,10 +296,7 @@ var Modules = map[string]*ModuleConfig{
 			"port": &ModOption{
 				OptName: "port",
 				OptDesc: "The (sshd) port that our shell will be using",
-				OptVals: []string{
-					"22222",
-				},
-				OptVal: "22222",
+				OptVal:  "22222",
 			},
 		},
 		AgentConfig: AgentModuleConfig{
@@ -355,7 +352,7 @@ var Modules = map[string]*ModuleConfig{
 				OptName: "addr",
 				OptDesc: "Target host to proxy, we will connect to it and proxy it out",
 				OptVals: []string{"127.0.0.1"},
-				OptVal:  "<blank>",
+				OptVal:  "",
 			},
 			"kcp": &ModOption{
 				OptName: "kcp",
