@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.2.5](https://github.com/jm33-m0/emp3r0r/compare/v2.2.4...v2.2.5) (2025-02-10)
+
+
+### Bug Fixes
+
+* `emp3r0r` builder should generate a version number to mark custom builds ([79493b8](https://github.com/jm33-m0/emp3r0r/commit/79493b832c5deaecc355f8eeb7bad6f0633a4085))
+* `get` command blocks shell ([6a11b8a](https://github.com/jm33-m0/emp3r0r/commit/6a11b8aa5a691fa02f468f557cd6e23edae20369))
+* `set` command auto-complete `val` ([ad831dc](https://github.com/jm33-m0/emp3r0r/commit/ad831dcbee71f4e484cb0c6fe9945804cdfc77f5))
+* always print module details ([d9203c9](https://github.com/jm33-m0/emp3r0r/commit/d9203c97b83439b9711b5686efc29891c24c7ee9))
+* deprecated package option of release-please ([ef82c2e](https://github.com/jm33-m0/emp3r0r/commit/ef82c2efebd5c29c4be0c30db037fa2e7a19aa7d))
+* module configurable options incomplete when listed ([0d51615](https://github.com/jm33-m0/emp3r0r/commit/0d51615d618ca67bc6e65afd42f54effeef264c1))
+* module management should load all modules into one map ([62c4adf](https://github.com/jm33-m0/emp3r0r/commit/62c4adfd5471db88c6ca726c5abb6e639ec82809))
+* release-please not updating version number ([ce078b3](https://github.com/jm33-m0/emp3r0r/commit/ce078b3d787075a47b6809908d159710ec060345))
+* some flags should be marked as required ([4813b5f](https://github.com/jm33-m0/emp3r0r/commit/4813b5ff3da354a151bf10d3e9edf11849931695))
+
 ## [2.2.4](https://github.com/jm33-m0/emp3r0r/compare/v2.2.3...v2.2.4) (2025-02-09)
 
 
