@@ -175,8 +175,8 @@ func ValidateActiveTarget() (target *emp3r0r_def.Emp3r0rAgent) {
 func ModuleSearch(cmd *cobra.Command, args []string) {
 	keyword := args[0]
 	search_targets := new([]string)
-	for name, comment := range ModuleNames {
-		*search_targets = append(*search_targets, fmt.Sprintf("%s: %s", name, comment))
+	for name, mod_config := range emp3r0r_def.Modules {
+		*search_targets = append(*search_targets, fmt.Sprintf("%s: %s", name, mod_config.Comment))
 	}
 	result := fuzzy.Find(keyword, *search_targets)
 

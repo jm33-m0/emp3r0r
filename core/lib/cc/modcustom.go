@@ -20,24 +20,18 @@ import (
 	"github.com/olekukonko/tablewriter"
 )
 
-// stores module configs
-var ModuleConfigs = make(map[string]emp3r0r_def.ModuleConfig, 1)
-
-// stores module names for fuzzy search
-var ModuleNames = make(map[string]string)
-
 // moduleCustom run a custom module
 func moduleCustom() {
-	config, exists := ModuleConfigs[ActiveModule]
+	config, exists := emp3r0r_def.Modules[ActiveModule]
 	if !exists {
 		LogError("Config of %s does not exist", ActiveModule)
 		return
 	}
 
-	updateModuleOptions(&config)
+	updateModuleOptions(config)
 
 	// build module on C2
-	out, err := build_module(&config)
+	out, err := build_module(config)
 	if err != nil {
 		LogError("Build module %s: %v", config.Name, err)
 		return
@@ -54,7 +48,7 @@ func moduleCustom() {
 	download_addr := getDownloadAddr()
 
 	// agent side configs
-	payload_type, exec_cmd, envStr, err := genModStartCmd(&config)
+	payload_type, exec_cmd, envStr, err := genModStartCmd(config)
 	if err != nil {
 		LogError("Parsing module config: %v", err)
 		return
@@ -66,11 +60,11 @@ func moduleCustom() {
 	}
 
 	if config.AgentConfig.InMemory {
-		handleInMemoryModule(config, payload_type, download_addr)
+		handleInMemoryModule(*config, payload_type, download_addr)
 		return
 	}
 
-	handleCompressedModule(config, payload_type, exec_cmd, envStr, download_addr)
+	handleCompressedModule(*config, payload_type, exec_cmd, envStr, download_addr)
 }
 
 func build_module(config *emp3r0r_def.ModuleConfig) (out []byte, err error) {
@@ -220,7 +214,7 @@ func handleInteractiveModule(config emp3r0r_def.ModuleConfig, cmd_id string) {
 
 // Print module meta data
 func ModuleDetails(modName string) {
-	config, exists := ModuleConfigs[modName]
+	config, exists := emp3r0r_def.Modules[modName]
 	if !exists {
 		return
 	}
@@ -319,13 +313,8 @@ func InitModules() {
 				LogWarning("Loading config from %s: %v", config.Name, readConfigErr)
 				continue
 			}
-			ModuleConfigs[config.Name] = *config
+			emp3r0r_def.Modules[config.Name] = config
 			LogDebug("Loaded module %s", strconv.Quote(config.Name))
-		}
-
-		// make []string for fuzzysearch
-		for name, modObj := range emp3r0r_def.Modules {
-			ModuleNames[name] = modObj.Comment
 		}
 	}
 
@@ -334,7 +323,7 @@ func InitModules() {
 		load_mod(mod_search_dir)
 	}
 
-	LogDebug("Loaded %d modules", len(ModuleHelpers))
+	LogMsg("Loaded %d modules", len(emp3r0r_def.Modules))
 }
 
 // readModCondig read config.json of a module
