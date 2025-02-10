@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.9](https://github.com/jm33-m0/emp3r0r/compare/v2.2.8...v2.2.9) (2025-02-10)
+
+
+### Bug Fixes
+
+* automatically stop existing emp3r0r instance and prompt user to reopen after updating ([c23bab6](https://github.com/jm33-m0/emp3r0r/commit/c23bab6bf5977aa04dacdbaca81ffd861059b043))
+
 ## [2.2.8](https://github.com/jm33-m0/emp3r0r/compare/v2.2.7...v2.2.8) (2025-02-10)
 
 
