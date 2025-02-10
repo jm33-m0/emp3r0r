@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.6](https://github.com/jm33-m0/emp3r0r/compare/v2.2.5...v2.2.6) (2025-02-10)
+
+
+### Bug Fixes
+
+* fuck release-please ([f33992b](https://github.com/jm33-m0/emp3r0r/commit/f33992b55e10a75bcc7f2b1ae392f61bf7401fd9))
+
 ## [2.2.5](https://github.com/jm33-m0/emp3r0r/compare/v2.2.4...v2.2.5) (2025-02-10)
 
 
