@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.8](https://github.com/jm33-m0/emp3r0r/compare/v2.2.7...v2.2.8) (2025-02-10)
+
+
+### Bug Fixes
+
+* `upgrade_cc` fails to run in tmux ([1d13a2a](https://github.com/jm33-m0/emp3r0r/commit/1d13a2a6e8dc5bcdf403fe7e403de143c447a143))
+* add `tmux` as dependency ([82ceb3e](https://github.com/jm33-m0/emp3r0r/commit/82ceb3eaf88e46864a14e47e2d14c944cce265ad))
+
 ## [2.2.7](https://github.com/jm33-m0/emp3r0r/compare/v2.2.6...v2.2.7) (2025-02-10)
 
 
