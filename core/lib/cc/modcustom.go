@@ -104,7 +104,7 @@ func updateModuleOptions(config *emp3r0r_def.ModuleConfig) {
 			LogError("Option '%s' not found", opt)
 			return
 		}
-		modOption.OptVal = option.Val
+		modOption.Val = option.Val
 	}
 }
 
@@ -182,13 +182,13 @@ func handleInteractiveModule(config emp3r0r_def.ModuleConfig, cmd_id string) {
 	opt, exists := config.Options["args"]
 	if !exists {
 		config.Options["args"] = &emp3r0r_def.ModOption{
-			OptName: "args",
-			OptDesc: "run this command with these arguments",
-			OptVal:  "",
-			OptVals: []string{},
+			Name: "args",
+			Desc: "run this command with these arguments",
+			Val:  "",
+			Vals: []string{},
 		}
 	}
-	args := opt.OptVal
+	args := opt.Val
 	port := strconv.Itoa(util.RandInt(1024, 65535))
 	look_for := tun.SHA256SumRaw([]byte(emp3r0r_def.MagicString))
 
@@ -354,7 +354,7 @@ func genModStartCmd(config *emp3r0r_def.ModuleConfig) (payload_type, exec_path, 
 		fmt.Fprintf(&builder, "%s=%s ", opt, value)
 	}
 	for opt, modOption := range config.Options {
-		setEnvVar(opt, modOption.OptVal)
+		setEnvVar(opt, modOption.Val)
 	}
 
 	envStr = builder.String()
@@ -365,7 +365,7 @@ func genModStartCmd(config *emp3r0r_def.ModuleConfig) (payload_type, exec_path, 
 func updateModuleHelp(config *emp3r0r_def.ModuleConfig) error {
 	help_map := make(map[string]*emp3r0r_def.ModOption)
 	for opt, modOption := range config.Options {
-		if modOption.OptDesc == "" {
+		if modOption.Desc == "" {
 			return fmt.Errorf("%s config error: %s incomplete", config.Name, opt)
 		}
 		help_map[opt] = modOption

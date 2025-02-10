@@ -35,10 +35,10 @@ var InjectorMethods = map[string]string{
 
 // ModOption represents module options
 type ModOption struct {
-	OptName string   `json:"opt_name"` // option name
-	OptDesc string   `json:"opt_desc"` // option description
-	OptVal  string   `json:"opt_val"`  // option value
-	OptVals []string `json:"opt_vals"` // option value candidates
+	Name string   `json:"opt_name"` // option name
+	Desc string   `json:"opt_desc"` // option description
+	Val  string   `json:"opt_val"`  // option value
+	Vals []string `json:"opt_vals"` // option value candidates
 }
 
 // ModOptions represents multiple module options
@@ -80,9 +80,9 @@ var Modules = map[string]*ModuleConfig{
 		Path:     "",
 		Options: ModOptions{
 			"download_addr": &ModOption{
-				OptName: "download_addr",
-				OptDesc: "Download address, useful if you want to download from other agents, use `file_server` first, eg. 10.1.1.1:8000",
-				OptVal:  "",
+				Name: "download_addr",
+				Desc: "Download address, useful if you want to download from other agents, use `file_server` first, eg. 10.1.1.1:8000",
+				Val:  "",
 			},
 		},
 		AgentConfig: AgentModuleConfig{
@@ -104,9 +104,9 @@ var Modules = map[string]*ModuleConfig{
 		Path:     "",
 		Options: ModOptions{
 			"cmd_to_exec": &ModOption{
-				OptName: "cmd_to_exec",
-				OptDesc: "Press TAB for some hints",
-				OptVals: []string{
+				Name: "cmd_to_exec",
+				Desc: "Press TAB for some hints",
+				Vals: []string{
 					"id", "whoami", "ifconfig",
 					"ip a", "arp -a",
 					"ps -ef", "lsmod", "ss -antup",
@@ -133,10 +133,10 @@ var Modules = map[string]*ModuleConfig{
 		Path:     "",
 		Options: ModOptions{
 			"keyword": &ModOption{
-				OptName: "keyword",
-				OptDesc: "Delete all log entries containing this keyword",
-				OptVals: []string{"root", "admin"},
-				OptVal:  "root",
+				Name: "keyword",
+				Desc: "Delete all log entries containing this keyword",
+				Vals: []string{"root", "admin"},
+				Val:  "root",
 			},
 		},
 		AgentConfig: AgentModuleConfig{
@@ -158,10 +158,10 @@ var Modules = map[string]*ModuleConfig{
 		Path:     "",
 		Options: ModOptions{
 			"lpe_helper": &ModOption{
-				OptName: "lpe_helper",
-				OptDesc: "Which LPE helper to use, available helpers: lpe_les (Linux exploit suggester), lpe_lse (Linux smart enumeration), lpe_linpeas (PEASS-ng, works on Linux), lpe_winpeas (PEASS-ng, works on Windows",
-				OptVals: []string{"lpe_les", "lpe_lse", "lpe_linpeas", "lpe_winpeas"},
-				OptVal:  "lpe_les",
+				Name: "lpe_helper",
+				Desc: "Which LPE helper to use, available helpers: lpe_les (Linux exploit suggester), lpe_lse (Linux smart enumeration), lpe_linpeas (PEASS-ng, works on Linux), lpe_winpeas (PEASS-ng, works on Windows",
+				Vals: []string{"lpe_les", "lpe_lse", "lpe_linpeas", "lpe_winpeas"},
+				Val:  "lpe_les",
 			},
 		},
 		AgentConfig: AgentModuleConfig{
@@ -183,10 +183,10 @@ var Modules = map[string]*ModuleConfig{
 		Path:     "",
 		Options: ModOptions{
 			"method": &ModOption{
-				OptName: "method",
-				OptDesc: fmt.Sprintf("Persistence method: profiles: %s; cron: %s; patcher: %s", PersistMethods["profiles"], PersistMethods["cron"], PersistMethods["patcher"]),
-				OptVals: []string{"profiles", "cron", "patcher"},
-				OptVal:  "patcher",
+				Name: "method",
+				Desc: fmt.Sprintf("Persistence method: profiles: %s; cron: %s; patcher: %s", PersistMethods["profiles"], PersistMethods["cron"], PersistMethods["patcher"]),
+				Vals: []string{"profiles", "cron", "patcher"},
+				Val:  "patcher",
 			},
 		},
 		AgentConfig: AgentModuleConfig{
@@ -208,16 +208,16 @@ var Modules = map[string]*ModuleConfig{
 		Path:     "",
 		Options: ModOptions{
 			"port": &ModOption{
-				OptName: "port",
-				OptDesc: "Port of our local proxy server",
-				OptVals: []string{"1080", "8080", "10800", "10888"},
-				OptVal:  "8080",
+				Name: "port",
+				Desc: "Port of our local proxy server",
+				Vals: []string{"1080", "8080", "10800", "10888"},
+				Val:  "8080",
 			},
 			"status": &ModOption{
-				OptName: "status",
-				OptDesc: "Turn proxy on/off",
-				OptVals: []string{"on", "off", "reverse"},
-				OptVal:  "on",
+				Name: "status",
+				Desc: "Turn proxy on/off",
+				Vals: []string{"on", "off", "reverse"},
+				Val:  "on",
 			},
 		},
 		AgentConfig: AgentModuleConfig{
@@ -239,26 +239,26 @@ var Modules = map[string]*ModuleConfig{
 		Path:     "",
 		Options: ModOptions{
 			"to": &ModOption{
-				OptName: "to",
-				OptDesc: "Address:Port (to forward to) on agent/CC side",
-				OptVals: []string{"127.0.0.1:22", "127.0.0.1:8080"},
+				Name: "to",
+				Desc: "Address:Port (to forward to) on agent/CC side",
+				Vals: []string{"127.0.0.1:22", "127.0.0.1:8080"},
 			},
 			"listen_port": &ModOption{
-				OptName: "listen_port",
-				OptDesc: "Listen port on CC/agent side",
-				OptVals: []string{"8080", "1080", "22", "23", "21"},
+				Name: "listen_port",
+				Desc: "Listen port on CC/agent side",
+				Vals: []string{"8080", "1080", "22", "23", "21"},
 			},
 			"switch": &ModOption{
-				OptName: "switch",
-				OptDesc: "Turn port mapping on/off, or use `reverse` mapping",
-				OptVals: []string{"on", "off", "reverse"},
-				OptVal:  "on",
+				Name: "switch",
+				Desc: "Turn port mapping on/off, or use `reverse` mapping",
+				Vals: []string{"on", "off", "reverse"},
+				Val:  "on",
 			},
 			"protocol": &ModOption{
-				OptName: "protocol",
-				OptDesc: "Forward to TCP or UDP port on agent side",
-				OptVals: []string{"tcp", "udp"},
-				OptVal:  "tcp",
+				Name: "protocol",
+				Desc: "Forward to TCP or UDP port on agent side",
+				Vals: []string{"tcp", "udp"},
+				Val:  "tcp",
 			},
 		},
 		AgentConfig: AgentModuleConfig{
@@ -280,23 +280,23 @@ var Modules = map[string]*ModuleConfig{
 		Path:     "",
 		Options: ModOptions{
 			"shell": &ModOption{
-				OptName: "shell",
-				OptDesc: "Shell program to run, eg. /bin/bash. Please use `elvish` module or upload a custom shell for opsec reasons. Default `bash` shell can be installed via module `vaccine`",
-				OptVals: []string{
+				Name: "shell",
+				Desc: "Shell program to run, eg. /bin/bash. Please use `elvish` module or upload a custom shell for opsec reasons. Default `bash` shell can be installed via module `vaccine`",
+				Vals: []string{
 					"/bin/bash", "/bin/zsh", "/bin/sh", "python", "python3",
 					"cmd.exe", "powershell.exe", "elvish",
 				},
-				OptVal: "bash",
+				Val: "bash",
 			},
 			"args": &ModOption{
-				OptName: "args",
-				OptDesc: "Command line args of the shell program",
-				OptVal:  "",
+				Name: "args",
+				Desc: "Command line args of the shell program",
+				Val:  "",
 			},
 			"port": &ModOption{
-				OptName: "port",
-				OptDesc: "The (sshd) port that our shell will be using",
-				OptVal:  "22222",
+				Name: "port",
+				Desc: "The (sshd) port that our shell will be using",
+				Val:  "22222",
 			},
 		},
 		AgentConfig: AgentModuleConfig{
@@ -318,16 +318,16 @@ var Modules = map[string]*ModuleConfig{
 		Path:     "",
 		Options: ModOptions{
 			"pid": &ModOption{
-				OptName: "pid",
-				OptDesc: "Target process PID, set to 0 to start a new process (sleep)",
-				OptVals: []string{"0"},
-				OptVal:  "0",
+				Name: "pid",
+				Desc: "Target process PID, set to 0 to start a new process (sleep)",
+				Vals: []string{"0"},
+				Val:  "0",
 			},
 			"method": &ModOption{
-				OptName: "method",
-				OptDesc: fmt.Sprintf("Injection method, available methods: shellcode: %s; shared_library: %s", InjectorMethods["shellcode"], InjectorMethods["shared_library"]),
-				OptVals: []string{"shellcode", "shared_library"},
-				OptVal:  "shared_library",
+				Name: "method",
+				Desc: fmt.Sprintf("Injection method, available methods: shellcode: %s; shared_library: %s", InjectorMethods["shellcode"], InjectorMethods["shared_library"]),
+				Vals: []string{"shellcode", "shared_library"},
+				Val:  "shared_library",
 			},
 		},
 		AgentConfig: AgentModuleConfig{
@@ -349,16 +349,16 @@ var Modules = map[string]*ModuleConfig{
 		Path:     "",
 		Options: ModOptions{
 			"addr": &ModOption{
-				OptName: "addr",
-				OptDesc: "Target host to proxy, we will connect to it and proxy it out",
-				OptVals: []string{"127.0.0.1"},
-				OptVal:  "",
+				Name: "addr",
+				Desc: "Target host to proxy, we will connect to it and proxy it out",
+				Vals: []string{"127.0.0.1"},
+				Val:  "",
 			},
 			"kcp": &ModOption{
-				OptName: "kcp",
-				OptDesc: "Use KCP (fast UDP tunnel) for proxy",
-				OptVals: []string{"on", "off"},
-				OptVal:  "on",
+				Name: "kcp",
+				Desc: "Use KCP (fast UDP tunnel) for proxy",
+				Vals: []string{"on", "off"},
+				Val:  "on",
 			},
 		},
 		AgentConfig: AgentModuleConfig{
@@ -380,16 +380,16 @@ var Modules = map[string]*ModuleConfig{
 		Path:     "",
 		Options: ModOptions{
 			"payload": &ModOption{
-				OptName: "payload",
-				OptDesc: "The payload to serve, eg. ./stager",
+				Name: "payload",
+				Desc: "The payload to serve, eg. ./stager",
 			},
 			"listener": &ModOption{
-				OptName: "listener",
-				OptDesc: "Listener type, eg. http_bare, http_aes_compressed",
+				Name: "listener",
+				Desc: "Listener type, eg. http_bare, http_aes_compressed",
 			},
 			"port": &ModOption{
-				OptName: "port",
-				OptDesc: "Port to listen on, eg. 8080",
+				Name: "port",
+				Desc: "Port to listen on, eg. 8080",
 			},
 		},
 		AgentConfig: AgentModuleConfig{
@@ -411,21 +411,21 @@ var Modules = map[string]*ModuleConfig{
 		Path:     "",
 		Options: ModOptions{
 			"code_pattern": &ModOption{
-				OptName: "code_pattern",
-				OptDesc: "Code pattern to set breakpoint, big-endian. emp3r0r will stop there and dump password, and check RAX to make sure password is valid",
-				OptVal:  "4883c4080fb6c021",
+				Name: "code_pattern",
+				Desc: "Code pattern to set breakpoint, big-endian. emp3r0r will stop there and dump password, and check RAX to make sure password is valid",
+				Val:  "4883c4080fb6c021",
 			},
 			"reg_name": &ModOption{
-				OptName: "reg_name",
-				OptDesc: "Register name that stores password, eg. RDI",
-				OptVal:  "RSI",
-				OptVals: []string{"RDI", "RSI", "RDX", "RCX", "R8", "R9", "RAX", "RBX", "RBP", "RSP", "RIP"},
+				Name: "reg_name",
+				Desc: "Register name that stores password, eg. RDI",
+				Val:  "RSI",
+				Vals: []string{"RDI", "RSI", "RDX", "RCX", "R8", "R9", "RAX", "RBX", "RBP", "RSP", "RIP"},
 			},
 			"stop": &ModOption{
-				OptName: "stop",
-				OptDesc: "Stop the harvester: no, yes",
-				OptVal:  "no",
-				OptVals: []string{"no", "yes"},
+				Name: "stop",
+				Desc: "Stop the harvester: no, yes",
+				Val:  "no",
+				Vals: []string{"no", "yes"},
 			},
 		},
 		AgentConfig: AgentModuleConfig{
@@ -447,14 +447,14 @@ var Modules = map[string]*ModuleConfig{
 		Path:     "",
 		Options: ModOptions{
 			"port": &ModOption{
-				OptName: "port",
-				OptDesc: "Port to listen on",
-				OptVal:  "8000",
+				Name: "port",
+				Desc: "Port to listen on",
+				Val:  "8000",
 			},
 			"switch": &ModOption{
-				OptName: "switch",
-				OptDesc: "Turn file server on/off",
-				OptVal:  "on",
+				Name: "switch",
+				Desc: "Turn file server on/off",
+				Val:  "on",
 			},
 		},
 		AgentConfig: AgentModuleConfig{
@@ -476,19 +476,19 @@ var Modules = map[string]*ModuleConfig{
 		Path:     "",
 		Options: ModOptions{
 			"download_addr": &ModOption{
-				OptName: "download_addr",
-				OptDesc: "Download address, eg 10.1.1.1:8000",
-				OptVal:  "",
+				Name: "download_addr",
+				Desc: "Download address, eg 10.1.1.1:8000",
+				Val:  "",
 			},
 			"path": &ModOption{
-				OptName: "path",
-				OptDesc: "Path to the file (on server) to download, eg. /tmp/agent.exe",
-				OptVal:  "",
+				Name: "path",
+				Desc: "Path to the file (on server) to download, eg. /tmp/agent.exe",
+				Val:  "",
 			},
 			"checksum": &ModOption{
-				OptName: "checksum",
-				OptDesc: "SHA256 checksum of the file, used to verify integrity, wont't check if empty",
-				OptVal:  "",
+				Name: "checksum",
+				Desc: "SHA256 checksum of the file, used to verify integrity, wont't check if empty",
+				Val:  "",
 			},
 		},
 		AgentConfig: AgentModuleConfig{
@@ -510,9 +510,9 @@ var Modules = map[string]*ModuleConfig{
 		Path:     "",
 		Options: ModOptions{
 			"pid": &ModOption{
-				OptName: "pid",
-				OptDesc: "PID of the target process",
-				OptVal:  "",
+				Name: "pid",
+				Desc: "PID of the target process",
+				Val:  "",
 			},
 		},
 		AgentConfig: AgentModuleConfig{

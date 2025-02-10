@@ -15,13 +15,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// AvailableOptions all necessary info of an option
-type AvailableOptions struct {
-	Name string   // like `module`, `target`, `cmd_to_exec`
-	Val  string   // the value to use
-	Vals []string // possible values
-}
-
 var (
 	// ModuleDir stores modules
 	ModuleDirs []string
@@ -33,7 +26,7 @@ var (
 	ActiveAgent *emp3r0r_def.Emp3r0rAgent
 
 	// AvailableModuleOptions currently available options for `set`
-	AvailableModuleOptions = make(map[string]*AvailableOptions)
+	AvailableModuleOptions = make(map[string]*emp3r0r_def.ModOption)
 
 	// ShellHelpInfo provide utilities like ps, kill, etc
 	// deprecated
@@ -85,27 +78,31 @@ func UpdateOptions(modName string) (exist bool) {
 		return
 	}
 
-	// help us add new Option to Options, if exists, return the *Option
-	addIfNotFound := func(key string) *AvailableOptions {
-		if _, exist := AvailableModuleOptions[key]; !exist {
-			AvailableModuleOptions[key] = &AvailableOptions{Name: key, Val: "", Vals: []string{""}}
+	// help us add new options
+	addIfNotFound := func(modOpt *emp3r0r_def.ModOption) {
+		if _, exist := AvailableModuleOptions[modOpt.Name]; !exist {
+			LogDebug("UpdateOptions: adding %s", modOpt.Name)
+			AvailableModuleOptions[modOpt.Name] = modOpt
 		}
-		return AvailableModuleOptions[key]
 	}
 
-	// other modules
 	modconfig := emp3r0r_def.Modules[modName]
 	for optName, option := range modconfig.Options {
-		argOpt := addIfNotFound(optName)
-		argOpt.Val = option.OptVal   // default value
-		argOpt.Vals = option.OptVals // values auto-completion
-		if len(option.OptVals) == 0 && option.OptVal != "" {
-			argOpt.Vals = []string{option.OptVal}
+		argOpt := modconfig.Options[optName]
+		if len(option.Vals) == 0 && option.Val != "" {
+			argOpt.Vals = []string{option.Val}
 		}
+		addIfNotFound(argOpt)
 	}
 	if strings.ToLower(modconfig.AgentConfig.Exec) != "built-in" {
-		download_addr := addIfNotFound("download_addr")
-		download_addr.Val = ""
+		LogDebug("UpdateOptions: module %s is not built-in, adding download_addr", modName)
+		download_addr := &emp3r0r_def.ModOption{
+			Name: "download_addr",
+			Desc: "Download URL for this module, useful when you want to use an agent as caching server",
+			Val:  "",
+			Vals: []string{},
+		}
+		addIfNotFound(download_addr)
 	}
 
 	return
@@ -244,12 +241,12 @@ func listModOptionsTable(_ *cobra.Command, _ []string) {
 		LogError("Module %s not found", ActiveModule)
 		return
 	}
-	for opt_name, opt_obj := range module_obj.Options {
+	for opt_name, opt_obj := range AvailableModuleOptions {
 		help := "N/A"
 		if opt_obj == nil {
 			continue
 		}
-		help = opt_obj.OptDesc
+		help = opt_obj.Desc
 		switch opt_name {
 		case "module":
 			help = "Selected module"
