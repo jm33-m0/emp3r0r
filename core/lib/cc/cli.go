@@ -186,12 +186,15 @@ func CliBanner(console *console.Console) {
 		"C2 listening on: *:%s,\n"+
 		"Shadowsocks: *:%s,\n"+
 		"KCP: *:%s,\n"+
-		"C2 names: %s\n",
+		"C2 names: %s\n"+
+		"CA Fingerprint: %s",
 		emp3r0r_def.Version,
 		RuntimeConfig.CCPort,
 		RuntimeConfig.ShadowsocksServerPort,
 		RuntimeConfig.KCPServerPort,
-		name_list))
+		name_list,
+		RuntimeConfig.CAFingerprint,
+	))
 	if encodingErr != nil {
 		Logger.Fatal("CowSay: %v", encodingErr)
 	}
