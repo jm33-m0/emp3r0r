@@ -12,7 +12,6 @@ jobs:
         with:
           release-type: go
           target-branch: ${{ github.ref_name }}
-          $.extra-files: core/lib/emp3r0r_def/def.go
 
       - uses: actions/checkout@v2
         if: ${{ steps.release.outputs.release_created }}

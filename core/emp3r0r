@@ -130,16 +130,12 @@ build() {
     gobuild_cmd="go"
     build_opt="build"
     ldflags="-v -X 'github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def.MagicString=$magic_str'"
-    if ! is_in_github_runner; then
-      ldflags+=" -X 'github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def.Version=$(get_version)-debug'"
-    fi
+    ldflags+=" -X 'github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def.Version=$(get_version)-debug'"
   else
     gobuild_cmd="go"
     build_opt="build"
     ldflags="-s -w -v -X 'github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def.MagicString=$magic_str'"
-    if ! is_in_github_runner; then
-      ldflags+=" -X 'github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def.Version=$(get_version)'"
-    fi
+    ldflags+=" -X 'github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def.Version=$(get_version)'"
     # info "Setting up garble"
     # go install mvdan.cc/garble@latest || error "Failed to install garble"
   fi
@@ -238,11 +234,6 @@ create_tar() {
   info "Creating archive..."
   tar --zstd -cpf "$pwd/emp3r0r.tar.zst" ./emp3r0r-build || error "failed to create archive"
   success "Packaged emp3r0r"
-}
-
-# do not generate version string if in github runner, release-please will do it
-is_in_github_runner() {
-  [[ -n "$GITHUB_WORKSPACE" ]] && [[ -n "$GITHUB_REPOSITORY" ]]
 }
 
 get_git_version() {
