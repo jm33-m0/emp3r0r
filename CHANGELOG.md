@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.7](https://github.com/jm33-m0/emp3r0r/compare/v2.2.6...v2.2.7) (2025-02-10)
+
+
+### Bug Fixes
+
+* `git` unable to get tag name in github action environment ([07b8a32](https://github.com/jm33-m0/emp3r0r/commit/07b8a32901fbc64943a6e6ddf5711c282e8fe673))
+
 ## [2.2.6](https://github.com/jm33-m0/emp3r0r/compare/v2.2.5...v2.2.6) (2025-02-10)
 
 
