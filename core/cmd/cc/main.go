@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/cc"
@@ -110,7 +111,7 @@ func main() {
 		Logger.Fatal("CC is already running")
 	}
 
-	// run as relay client
+	// run as relay client, connect to relay server via SSH
 	if *connect_relay_addr != "" {
 		if *relayed_port == 0 {
 			Logger.Fatal("Please specify -relayed_port")
@@ -122,10 +123,13 @@ func main() {
 			if sshKeyErr != nil {
 				Logger.Fatal("Parsing SSHPublicKey: %v", sshKeyErr)
 			}
+			ssh_password := new(string)
+			fmt.Printf("Enter SSH password: ")
+			fmt.Scanln(ssh_password)
 		ssh_connect:
 			ctx, cancel := context.WithCancel(context.Background())
 			sshKeyErr = tun.SSHRemoteFwdClient(*connect_relay_addr,
-				cc.RuntimeConfig.Password,
+				*ssh_password,
 				pubkey, // enable host key verification
 				*relayed_port,
 				&SSHConnections, ctx, cancel)
@@ -161,12 +165,13 @@ func main() {
 	// run as relay server
 	// no need to start CC services
 	if *ssh_relay_port != "" {
-		Logger.Msg("Copy ~/.emp3r0r to client host, "+
+		ssh_password := util.RandMD5String()
+		Logger.Msg("SSH password is %s. Copy ~/.emp3r0r to client host, "+
 			"then run `emp3r0r -connect_relay relay_ip:%s -relayed_port %s` "+
 			"(C2 port, or Shadowsocks port %s if you are using it)",
-			*ssh_relay_port, cc.RuntimeConfig.CCPort, cc.RuntimeConfig.ShadowsocksLocalSocksPort)
+			strconv.Quote(ssh_password), *ssh_relay_port, cc.RuntimeConfig.CCPort, cc.RuntimeConfig.ShadowsocksLocalSocksPort)
 		err = tun.SSHRemoteFwdServer(*ssh_relay_port,
-			cc.RuntimeConfig.Password,
+			ssh_password,
 			cc.RuntimeConfig.SSHHostKey)
 		if err != nil {
 			Logger.Fatal("SSHRemoteFwdServer: %v", err)
