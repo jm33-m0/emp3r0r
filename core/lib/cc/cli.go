@@ -179,7 +179,7 @@ func CliBanner(console *console.Console) {
 	}
 	name_list := strings.Join(c2_names, ", ")
 
-	say, encodingErr := cow.Say(fmt.Sprintf("welcome! you are using version %s,\n"+
+	say, encodingErr := cow.Say(fmt.Sprintf("Welcome! you are using emp3r0r %s,\n"+
 		"C2 listening on: *:%s,\n"+
 		"KCP: *:%s,\n"+
 		"C2 names: %s\n"+

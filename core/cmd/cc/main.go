@@ -116,30 +116,32 @@ func main() {
 		if *relayed_port == 0 {
 			Logger.Fatal("Please specify -relayed_port")
 		}
-		go func() {
+		ssh_password := new(string)
+		fmt.Printf("Enter SSH password: ")
+		fmt.Scanln(ssh_password)
+		go func(ssh_password string) {
 			defer Logger.Error("session unexpectedly exited, please restart emp3r0r")
 			SSHConnections := make(map[string]context.CancelFunc, 10)
 			pubkey, sshKeyErr := tun.SSHPublicKey(cc.RuntimeConfig.SSHHostKey)
 			if sshKeyErr != nil {
 				Logger.Fatal("Parsing SSHPublicKey: %v", sshKeyErr)
 			}
-			ssh_password := new(string)
-			fmt.Printf("Enter SSH password: ")
-			fmt.Scanln(ssh_password)
 		ssh_connect:
 			ctx, cancel := context.WithCancel(context.Background())
 			sshKeyErr = tun.SSHRemoteFwdClient(*connect_relay_addr,
-				*ssh_password,
+				ssh_password,
 				pubkey, // enable host key verification
 				*relayed_port,
 				&SSHConnections, ctx, cancel)
 			if sshKeyErr == nil {
 				sshKeyErr = fmt.Errorf("session unexpectedly exited")
+				Logger.Warning("SSHRemoteFwdClient: %v, retrying", sshKeyErr)
 			}
-			Logger.Warning("SSHRemoteFwdClient: %v, retrying", sshKeyErr)
-			util.TakeABlink()
+			for ctx.Err() == nil {
+				util.TakeABlink()
+			}
 			goto ssh_connect
-		}()
+		}(*ssh_password)
 	}
 
 	// start cdn2proxy server
@@ -166,7 +168,7 @@ func main() {
 	// no need to start CC services
 	if *ssh_relay_port != "" {
 		ssh_password := util.RandMD5String()
-		Logger.Msg("SSH password is %s. Copy ~/.emp3r0r to client host, "+
+		log.Printf("SSH password is %s. Copy ~/.emp3r0r to client host, "+
 			"then run `emp3r0r -connect_relay relay_ip:%s -relayed_port %s` "+
 			"(C2 port, or Shadowsocks port %s if you are using it)",
 			strconv.Quote(ssh_password), *ssh_relay_port, cc.RuntimeConfig.CCPort, cc.RuntimeConfig.ShadowsocksLocalSocksPort)
@@ -174,7 +176,7 @@ func main() {
 			ssh_password,
 			cc.RuntimeConfig.SSHHostKey)
 		if err != nil {
-			Logger.Fatal("SSHRemoteFwdServer: %v", err)
+			log.Fatalf("SSHRemoteFwdServer: %v", err)
 		}
 	} else {
 		// run CLI
