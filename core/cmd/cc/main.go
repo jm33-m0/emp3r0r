@@ -170,8 +170,8 @@ func main() {
 		ssh_password := util.RandMD5String()
 		log.Printf("SSH password is %s. Copy ~/.emp3r0r to client host, "+
 			"then run `emp3r0r -connect_relay relay_ip:%s -relayed_port %s` "+
-			"(C2 port, or Shadowsocks port %s if you are using it)",
-			strconv.Quote(ssh_password), *ssh_relay_port, cc.RuntimeConfig.CCPort, cc.RuntimeConfig.ShadowsocksLocalSocksPort)
+			"(C2 port, or KCP port %s if you are using it)",
+			strconv.Quote(ssh_password), *ssh_relay_port, cc.RuntimeConfig.CCPort, cc.RuntimeConfig.KCPServerPort)
 		err = tun.SSHRemoteFwdServer(*ssh_relay_port,
 			ssh_password,
 			cc.RuntimeConfig.SSHHostKey)
