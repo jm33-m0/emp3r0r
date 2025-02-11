@@ -82,7 +82,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run:     setActiveModule,
 		}
 		rootCmd.AddCommand(useModuleCmd)
-		carapace.Gen(useModuleCmd).PositionalCompletion(carapace.ActionValues(listMods()...))
+		carapace.Gen(useModuleCmd).PositionalCompletion(carapace.ActionCallback(listMods))
 
 		infoCmd := &cobra.Command{
 			Use:     "info",
@@ -103,7 +103,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		}
 		rootCmd.AddCommand(setCmd)
 		carapace.Gen(setCmd).PositionalCompletion(
-			carapace.ActionValues(listOptions()...),
+			carapace.ActionCallback(listOptions),
 			carapace.ActionCallback(listValChoices))
 
 		runCmd := &cobra.Command{
@@ -124,7 +124,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run:     setActiveTarget,
 		}
 		rootCmd.AddCommand(targetCmd)
-		carapace.Gen(targetCmd).PositionalCompletion(carapace.ActionValues(listTargetIndexTags()...))
+		carapace.Gen(targetCmd).PositionalCompletion(carapace.ActionCallback(listTargetIndexTags))
 
 		upgradeAgentCmd := &cobra.Command{
 			Use:     "upgrade_agent",
@@ -163,7 +163,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run:     ls,
 		}
 		rootCmd.AddCommand(lsCmd)
-		carapace.Gen(lsCmd).PositionalCompletion(carapace.ActionValues(listRemoteDir()...))
+		carapace.Gen(lsCmd).PositionalCompletion(carapace.ActionCallback(listRemoteDir))
 
 		cdCmd := &cobra.Command{
 			Use:     "cd dir",
@@ -173,7 +173,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run:     cd,
 		}
 		rootCmd.AddCommand(cdCmd)
-		carapace.Gen(cdCmd).PositionalCompletion(carapace.ActionValues(listRemoteDir()...))
+		carapace.Gen(cdCmd).PositionalCompletion(carapace.ActionCallback(listRemoteDir))
 
 		cpCmd := &cobra.Command{
 			Use:     "cp src dst",
@@ -184,8 +184,8 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run:     cp,
 		}
 		rootCmd.AddCommand(cpCmd)
-		carapace.Gen(cpCmd).PositionalCompletion(carapace.ActionValues(listRemoteDir()...),
-			carapace.ActionValues(listRemoteDir()...))
+		carapace.Gen(cpCmd).PositionalCompletion(carapace.ActionCallback(listRemoteDir),
+			carapace.ActionCallback(listRemoteDir))
 
 		mvCmd := &cobra.Command{
 			Use:     "mv src dst",
@@ -196,8 +196,8 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run:     mv,
 		}
 		rootCmd.AddCommand(mvCmd)
-		carapace.Gen(mvCmd).PositionalCompletion(carapace.ActionValues(listRemoteDir()...),
-			carapace.ActionValues(listRemoteDir()...))
+		carapace.Gen(mvCmd).PositionalCompletion(carapace.ActionCallback(listRemoteDir),
+			carapace.ActionCallback(listRemoteDir))
 
 		rmCmd := &cobra.Command{
 			Use:     "rm file",
@@ -208,7 +208,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run:     rm,
 		}
 		rootCmd.AddCommand(rmCmd)
-		carapace.Gen(rmCmd).PositionalCompletion(carapace.ActionValues(listRemoteDir()...))
+		carapace.Gen(rmCmd).PositionalCompletion(carapace.ActionCallback(listRemoteDir))
 
 		catCmd := &cobra.Command{
 			Use:     "cat file",
@@ -219,7 +219,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run:     cat,
 		}
 		rootCmd.AddCommand(catCmd)
-		carapace.Gen(catCmd).PositionalCompletion(carapace.ActionValues(listRemoteDir()...))
+		carapace.Gen(catCmd).PositionalCompletion(carapace.ActionCallback(listRemoteDir))
 
 		mkdirCmd := &cobra.Command{
 			Use:     "mkdir dir",
@@ -230,7 +230,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run:     mkdir,
 		}
 		rootCmd.AddCommand(mkdirCmd)
-		carapace.Gen(mkdirCmd).PositionalCompletion(carapace.ActionValues(listRemoteDir()...))
+		carapace.Gen(mkdirCmd).PositionalCompletion(carapace.ActionCallback(listRemoteDir))
 
 		pwdCmd := &cobra.Command{
 			Use:     "pwd",
@@ -285,7 +285,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		getCmd.MarkFlagRequired("path")
 		rootCmd.AddCommand(getCmd)
 		carapace.Gen(getCmd).FlagCompletion(carapace.ActionMap{
-			"path": carapace.ActionValues(listRemoteDir()...),
+			"path": carapace.ActionCallback(listRemoteDir),
 		})
 
 		putCmd := &cobra.Command{
@@ -368,7 +368,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		rmPortMappingCmd.MarkFlagRequired("id")
 		rootCmd.AddCommand(rmPortMappingCmd)
 		carapace.Gen(rmPortMappingCmd).FlagCompletion(carapace.ActionMap{
-			"id": carapace.ActionValues(listPortMappings()...),
+			"id": carapace.ActionCallback(listPortMappings),
 		})
 
 		labelAgentCmd := &cobra.Command{
@@ -384,7 +384,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		labelAgentCmd.MarkFlagRequired("label")
 		rootCmd.AddCommand(labelAgentCmd)
 		carapace.Gen(labelAgentCmd).FlagCompletion(carapace.ActionMap{
-			"id":    carapace.ActionValues(listTargetIndexTags()...),
+			"id":    carapace.ActionCallback(listTargetIndexTags),
 			"label": carapace.ActionValues("no-label", "linux", "windows", "workstation", "server", "dev", "prod", "test", "honeypot"),
 		})
 
@@ -400,7 +400,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 
 		rootCmd.AddCommand(execCmd)
 		carapace.Gen(execCmd).FlagCompletion(carapace.ActionMap{
-			"cmd": carapace.ActionValues(listAgentExes()...),
+			"cmd": carapace.ActionCallback(listAgentExes),
 		})
 
 		return rootCmd
