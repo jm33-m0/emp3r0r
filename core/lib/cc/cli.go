@@ -29,7 +29,7 @@ var Emp3r0rConsole = console.New(AppName)
 func CliMain() {
 	// start all services
 	go TLSServer()
-	go ShadowsocksServer()
+	go KCPC2ListenAndServe()
 	go InitModules()
 
 	// unlock incomplete downloads
@@ -184,13 +184,11 @@ func CliBanner(console *console.Console) {
 
 	say, encodingErr := cow.Say(fmt.Sprintf("welcome! you are using version %s,\n"+
 		"C2 listening on: *:%s,\n"+
-		"Shadowsocks: *:%s,\n"+
 		"KCP: *:%s,\n"+
 		"C2 names: %s\n"+
 		"CA Fingerprint: %s",
 		emp3r0r_def.Version,
 		RuntimeConfig.CCPort,
-		RuntimeConfig.ShadowsocksServerPort,
 		RuntimeConfig.KCPServerPort,
 		name_list,
 		RuntimeConfig.CAFingerprint,

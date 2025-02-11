@@ -29,29 +29,6 @@ import (
 	"github.com/schollz/progressbar/v3"
 )
 
-// Start Shadowsocks proxy server with a random password (RuntimeConfig.ShadowsocksPassword),
-// listening on RuntimeConfig.ShadowsocksPort
-// You can use the offical Shadowsocks program to start
-// the same Shadowsocks server on any host that you find convenient
-func ShadowsocksServer() {
-	ctx, cancel := context.WithCancel(context.Background())
-	ss_config := &tun.SSConfig{
-		ServerAddr:     "0.0.0.0:" + RuntimeConfig.ShadowsocksServerPort,
-		LocalSocksAddr: "",
-		Cipher:         tun.SSAEADCipher,
-		Password:       RuntimeConfig.Password,
-		IsServer:       true,
-		Verbose:        false,
-		Ctx:            ctx,
-		Cancel:         cancel,
-	}
-	err := tun.SSMain(ss_config)
-	if err != nil {
-		LogFatal("ShadowsocksServer: %v", err)
-	}
-	go KCPSSListenAndServe()
-}
-
 var (
 	EmpTLSServer       *http.Server
 	EmpTLSServerCtx    context.Context

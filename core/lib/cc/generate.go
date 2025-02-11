@@ -245,7 +245,6 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 	doh_server, _ := cmd.Flags().GetString("doh")
 	proxy_chain, _ := cmd.Flags().GetBool("proxychain")
 	ncsi, _ := cmd.Flags().GetBool("ncsi")
-	shadowsocks, _ := cmd.Flags().GetBool("shadowsocks")
 	kcp, _ := cmd.Flags().GetBool("kcp")
 
 	// read existing config when possible
@@ -325,14 +324,8 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 		LogMsg("Using CDN proxy %s", RuntimeConfig.CDNProxy)
 	}
 
-	// shadowsocks and kcp
-	RuntimeConfig.UseShadowsocks = shadowsocks
-	if shadowsocks {
-		LogMsg("Using Shadowsocks")
-	}
 	RuntimeConfig.UseKCP = kcp
 	if kcp {
-		RuntimeConfig.UseShadowsocks = true
 		LogMsg("Using KCP")
 	}
 

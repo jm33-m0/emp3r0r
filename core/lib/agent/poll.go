@@ -269,14 +269,9 @@ func setC2Transport() {
 	} else if RuntimeConfig.CDNProxy != "" {
 		emp3r0r_def.Transport = fmt.Sprintf("CDN (%s)", RuntimeConfig.CDNProxy)
 		return
-	} else if RuntimeConfig.UseShadowsocks {
-		emp3r0r_def.Transport = fmt.Sprintf("Shadowsocks (*:%s) to %s",
-			RuntimeConfig.ShadowsocksServerPort, emp3r0r_def.CCAddress)
-		// ss thru KCP
-		if RuntimeConfig.UseKCP {
-			emp3r0r_def.Transport = fmt.Sprintf("Shadowsocks (*:%s) in KCP (*:%s) to %s",
-				RuntimeConfig.ShadowsocksServerPort, RuntimeConfig.KCPServerPort, emp3r0r_def.CCAddress)
-		}
+	} else if RuntimeConfig.UseKCP {
+		emp3r0r_def.Transport = fmt.Sprintf("KCP (%s)",
+			emp3r0r_def.CCAddress)
 		return
 	} else if RuntimeConfig.C2TransportProxy != "" {
 		// parse proxy url

