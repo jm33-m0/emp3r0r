@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.10](https://github.com/jm33-m0/emp3r0r/compare/v2.2.9...v2.2.10) (2025-02-11)
+
+
+### Bug Fixes
+
+* c2 relay via SSH should use a different random password ([28ba2e4](https://github.com/jm33-m0/emp3r0r/commit/28ba2e4be2cf48a1edd109b18a586c0535302f5e))
+* remove shadowsocks c2 transport ([22cba84](https://github.com/jm33-m0/emp3r0r/commit/22cba84bb9013517cb5e6ea0768d3702ade58fa1))
+
 ## [2.2.9](https://github.com/jm33-m0/emp3r0r/compare/v2.2.8...v2.2.9) (2025-02-10)
 
 
