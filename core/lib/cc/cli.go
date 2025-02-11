@@ -132,11 +132,8 @@ func getTransport(transportStr string) string {
 	switch {
 	case strings.Contains(transportStr, "http2"):
 		return color.New(color.FgHiBlue).Sprint("http2")
-	case strings.Contains(transportStr, "shadowsocks"):
-		if strings.Contains(transportStr, "kcp") {
-			return color.New(color.FgHiMagenta).Sprint("kcp")
-		}
-		return color.New(color.FgHiMagenta).Sprint("ss")
+	case strings.Contains(transportStr, "kcp"):
+		return color.New(color.FgHiMagenta).Sprint("kcp")
 	case strings.Contains(transportStr, "tor"):
 		return color.New(color.FgHiGreen).Sprint("tor")
 	case strings.Contains(transportStr, "cdn"):
