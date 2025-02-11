@@ -38,7 +38,7 @@ To support third-party modules, emp3r0r has complete [python3 support](https://g
   - [**Bring Your Own Shell**](https://github.com/jm33-m0/emp3r0r/blob/master/core/modules/elvish/config.json) such as [`elvish`](https://elv.sh) or any interactive programs via [custom modules such as bettercap](https://github.com/jm33-m0/emp3r0r/blob/master/core/modules/bettercap/config.json)
 - All C2 communications made in HTTP2/TLS
   - Defeat [**JA3**](https://github.com/salesforce/ja3) fingerprinting with [**UTLS**](https://github.com/refraction-networking/utls)
-  - Painlessly encapsulated in **Shadowsocks** and KCP
+  - Painlessly encapsulated in **KCP** fast multiplexed UDP tunnel
   - Able to encapsulate in any external proxies such as [**TOR** and **CDN**s](https://github.com/jm33-m0/emp3r0r/raw/master/img/c2transports.png)
   - [**C2 relaying**](https://github.com/jm33-m0/emp3r0r/wiki/C2-Relay) via SSH
 - Cross-platform memory dumping, dumping mini-dumps from Windows to be compatible with [pypykatz](https://github.com/skelsec/pypykatz)
