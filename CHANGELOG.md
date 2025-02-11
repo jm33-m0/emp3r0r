@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.11](https://github.com/jm33-m0/emp3r0r/compare/v2.2.10...v2.2.11) (2025-02-11)
+
+
+### Bug Fixes
+
+* ask for SSH password to use the relayed C2 ([66af346](https://github.com/jm33-m0/emp3r0r/commit/66af3466d38f2757a0de233017cf34628c0678a9))
+* transport string for kcp incorrect ([890d126](https://github.com/jm33-m0/emp3r0r/commit/890d126f2f975f8f508b6273b7f0c81016c2f11b))
+
 ## [2.2.10](https://github.com/jm33-m0/emp3r0r/compare/v2.2.9...v2.2.10) (2025-02-11)
 
 
