@@ -1,6 +1,6 @@
 module github.com/jm33-m0/emp3r0r/core
 
-go 1.23.3
+go 1.23.6
 
 require (
 	github.com/Code-Hex/Neo-cowsay/v2 v2.0.4
@@ -44,7 +44,7 @@ require (
 	github.com/xtaci/tcpraw v1.2.31
 	golang.org/x/crypto v0.32.0
 	golang.org/x/net v0.34.0
-	golang.org/x/sys v0.29.0
+	golang.org/x/sys v0.30.0
 	golang.org/x/term v0.28.0
 )
 
@@ -92,7 +92,7 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
-	github.com/reeflective/readline v1.0.15 // indirect
+	github.com/reeflective/readline v1.1.2 // indirect
 	github.com/riobard/go-bloom v0.0.0-20200614022211-cdc8013cb5b3 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rsteube/carapace-shlex v0.1.1 // indirect
