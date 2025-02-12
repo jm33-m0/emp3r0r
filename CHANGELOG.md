@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.0](https://github.com/jm33-m0/emp3r0r/compare/v2.2.12...v2.3.0) (2025-02-12)
+
+
+### Features
+
+* auto-complete remote path names ([87c9225](https://github.com/jm33-m0/emp3r0r/commit/87c9225e4d57c36457fbc4075a639f3406608b1c))
+
 ## [2.2.12](https://github.com/jm33-m0/emp3r0r/compare/v2.2.11...v2.2.12) (2025-02-12)
 
 
