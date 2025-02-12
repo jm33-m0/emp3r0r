@@ -170,13 +170,13 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 				log.Print("Check CC response: JSON msg decode: ", err)
 				break
 			}
-			payload := msg.Payload
-			if strings.HasPrefix(payload, "hello") {
-				log.Printf("Hello (%s) received", payload)
+			resp := msg.Response
+			if strings.HasPrefix(resp, "hello") {
+				log.Printf("Hello (%s) received", resp)
 				// mark the hello as success
 				for hello := range HandShakes {
-					if strings.HasPrefix(payload, hello) {
-						log.Printf("Hello (%s) acknowledged", payload)
+					if msg.CmdID == hello {
+						log.Printf("Hello (%s) acknowledged", resp)
 						HandShakesMutex.Lock()
 						HandShakes[hello] = true
 						HandShakesMutex.Unlock()
@@ -192,26 +192,26 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 		log.Println("Check CC response: exited")
 	}()
 
-	wait_hello := func(hello string) bool {
+	wait_hello := func(hello_id string) bool {
 		// delete key, forget about this hello when we are done
 		defer func() {
 			HandShakesMutex.Lock()
-			delete(HandShakes, hello)
+			delete(HandShakes, hello_id)
 			HandShakesMutex.Unlock()
 		}()
 		// wait until timeout or success
 		for i := 0; i < RuntimeConfig.CCTimeout; i++ {
 			// if hello marked as success, return true
 			HandShakesMutex.RLock()
-			isSuccess := HandShakes[hello]
+			isSuccess := HandShakes[hello_id]
 			HandShakesMutex.RUnlock()
 			if isSuccess {
-				log.Printf("Hello (%s) done", hello)
+				log.Printf("Hello (%s) done", hello_id)
 				return true
 			}
 			time.Sleep(time.Millisecond)
 		}
-		log.Printf("Hello (%s) timeout", hello)
+		log.Printf("Hello (%s) timeout", hello_id)
 		return false
 	}
 
@@ -222,7 +222,8 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 			cnt-- // consume cnt
 
 			// send hello
-			hello_msg.Payload = "hello" + util.RandStr(util.RandInt(1, 100))
+			hello_msg.CmdSlice = []string{"hello" + util.RandStr(util.RandInt(1, 100))}
+			hello_msg.CmdID = uuid.NewString()
 			hello_msg.Tag = RuntimeConfig.AgentTag
 			err = out.Encode(hello_msg)
 			if err != nil {
@@ -231,10 +232,10 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 				continue
 			}
 			HandShakesMutex.Lock()
-			HandShakes[hello_msg.Payload] = false
+			HandShakes[hello_msg.CmdID] = false
 			HandShakesMutex.Unlock()
-			log.Printf("Hello (%s) sent", hello_msg.Payload)
-			if !wait_hello(hello_msg.Payload) {
+			log.Printf("Hello (%v) sent", hello_msg.CmdSlice)
+			if !wait_hello(hello_msg.CmdID) {
 				cancel()
 				break
 			}

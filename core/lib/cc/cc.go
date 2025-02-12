@@ -350,10 +350,10 @@ func Send2Agent(data *emp3r0r_def.MsgTunData, agent *emp3r0r_def.Emp3r0rAgent) (
 	defer TargetsMutex.RUnlock()
 	ctrl := Targets[agent]
 	if ctrl == nil {
-		return fmt.Errorf("Send2Agent (%s): Target is not connected", data.Payload)
+		return fmt.Errorf("Send2Agent (%s): Target is not connected", data.CmdSlice)
 	}
 	if ctrl.Conn == nil {
-		return fmt.Errorf("Send2Agent (%s): Target is not connected", data.Payload)
+		return fmt.Errorf("Send2Agent (%s): Target is not connected", data.CmdSlice)
 	}
 	out := json.NewEncoder(ctrl.Conn)
 

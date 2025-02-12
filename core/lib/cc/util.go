@@ -40,10 +40,12 @@ func SendCmd(cmd, cmd_id string, a *emp3r0r_def.Emp3r0rAgent) error {
 	if cmd_id == "" {
 		cmd_id = uuid.New().String()
 	}
-	cmdData.Payload = fmt.Sprintf("cmd%s%s%s%s",
-		emp3r0r_def.MagicString, cmd,
-		emp3r0r_def.MagicString, cmd_id)
+
+	// parse command
+	cmdSlice := util.ParseCmd(cmd)
+	cmdData.CmdSlice = cmdSlice
 	cmdData.Tag = a.Tag
+	cmdData.CmdID = cmd_id
 
 	// timestamp
 	cmdData.Time = time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST")

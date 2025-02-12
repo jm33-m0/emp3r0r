@@ -696,21 +696,27 @@ func msgTunHandler(wrt http.ResponseWriter, req *http.Request) {
 			if err != nil {
 				return
 			}
-			// read hello from agent, set its Conn if needed, and hello back
-			// close connection if agent is not responsive
-			if strings.HasPrefix(msg.Payload, "hello") {
+			cmd := ""
+			if len(msg.CmdSlice) != 0 {
+				cmd = msg.CmdSlice[0]
+			}
+			if strings.HasPrefix(cmd, "hello") {
+				// read hello from agent, set its Conn if needed, and hello back
+				// close connection if agent is not responsive
 				reply_msg := msg
-				reply_msg.Payload = msg.Payload + util.RandStr(util.RandInt(1, 10))
+				reply_msg.CmdSlice = msg.CmdSlice
+				reply_msg.CmdID = msg.CmdID
+				reply_msg.Response = cmd + util.RandStr(util.RandInt(1, 10))
 				err = out.Encode(reply_msg)
 				if err != nil {
 					LogWarning("msgTunHandler cannot answer hello to agent %s", msg.Tag)
 					return
 				}
-				last_handshake = time.Now()
+				last_handshake = time.Now() // update last handshake time
+			} else {
+				// process command response from agent
+				processAgentData(&msg)
 			}
-
-			// process json tundata from agent
-			processAgentData(&msg)
 
 			// assign this Conn to a known agent
 			agent := GetTargetFromTag(msg.Tag)

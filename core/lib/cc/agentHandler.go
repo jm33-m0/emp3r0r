@@ -28,27 +28,21 @@ func processAgentData(data *emp3r0r_def.MsgTunData) {
 	var err error
 	TargetsMutex.RLock()
 	defer TargetsMutex.RUnlock()
-	payloadSplit := strings.Split(data.Payload, emp3r0r_def.MagicString)
-	op := payloadSplit[0]
 
 	target := GetTargetFromTag(data.Tag)
 	contrlIf := Targets[target]
 	if target == nil || contrlIf == nil {
 		LogError("Target %s cannot be found, however, it left a message saying:\n%v",
-			data.Tag, payloadSplit)
-		return
-	}
-
-	if op != "cmd" {
+			data.Tag, data.CmdSlice)
 		return
 	}
 
 	// cmd output from agent
-	cmd := payloadSplit[1]
+	cmd := data.CmdSlice[0]
 	is_builtin_cmd := strings.HasPrefix(cmd, "!")
-	cmd_slice := util.ParseCmd(cmd)
-	out := strings.Join(payloadSplit[2:len(payloadSplit)-1], " ")
-	cmd_id := payloadSplit[len(payloadSplit)-1]
+	cmd_slice := data.CmdSlice
+	out := data.Response
+	cmd_id := data.CmdID
 	// cache this cmd response
 	CmdResultsMutex.Lock()
 	CmdResults[cmd_id] = out

