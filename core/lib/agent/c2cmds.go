@@ -59,8 +59,12 @@ func C2CommandsHandler(cmdSlice []string, cmd_id string) (out string) {
 			out = fmt.Sprintf("Error: cant read dir %s: %v", listPath, err)
 			return
 		}
-		out = listPath
+		out = listPath // first line is the current path, used to cache the listing
 		for _, entry := range entries {
+			if entry.IsDir() {
+				out += fmt.Sprintf("\n%s/", entry.Name())
+				continue
+			}
 			out += fmt.Sprintf("\n%s", entry.Name())
 		}
 		return
