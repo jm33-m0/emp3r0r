@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.4.0](https://github.com/jm33-m0/emp3r0r/compare/v2.3.0...v2.4.0) (2025-02-12)
+
+
+### Features
+
+* agent command structure, improve maintainability and readability ([494dbfa](https://github.com/jm33-m0/emp3r0r/commit/494dbfa1917132de0b5b0145f9f655d22cc4f209))
+
+
+### Bug Fixes
+
+* `ls` error handling ([a20b025](https://github.com/jm33-m0/emp3r0r/commit/a20b0256eba255be57b2b4f3a38a18da9beb6529))
+
 ## [2.3.0](https://github.com/jm33-m0/emp3r0r/compare/v2.2.12...v2.3.0) (2025-02-12)
 
 
