@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.2.12](https://github.com/jm33-m0/emp3r0r/compare/v2.2.11...v2.2.12) (2025-02-12)
+
+
+### Bug Fixes
+
+* `put` sends empty checksum ([716f61b](https://github.com/jm33-m0/emp3r0r/commit/716f61b35d37c923eb687c63ceae7bd88bc351df))
+* agent lost when C2 is re-built ([51c3ae2](https://github.com/jm33-m0/emp3r0r/commit/51c3ae2788e4d07bef347a41b8436835fa82f347))
+* all completers are run at once ([56403d0](https://github.com/jm33-m0/emp3r0r/commit/56403d0b18f6d629095a5c028831aff6e8eb0d80))
+
 ## [2.2.11](https://github.com/jm33-m0/emp3r0r/compare/v2.2.10...v2.2.11) (2025-02-11)
 
 
