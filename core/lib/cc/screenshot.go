@@ -20,7 +20,7 @@ import (
 // open the picture if possible
 func TakeScreenshot(cmd *cobra.Command, args []string) {
 	// tell agent to take screenshot
-	screenshotErr := SendCmdToCurrentTarget("screenshot", "")
+	screenshotErr := SendCmdToCurrentTarget(emp3r0r_def.C2CmdScreenshot, "")
 	if screenshotErr != nil {
 		LogError("send screenshot cmd: %v", screenshotErr)
 		return

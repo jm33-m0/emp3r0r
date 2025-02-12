@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -163,13 +162,6 @@ func prepareModuleOnDisk(tarball, modDir string, payload_data []byte) error {
 	}
 
 	return nil
-}
-
-func getScriptExtension() string {
-	if runtime.GOOS == "windows" {
-		return "ps1"
-	}
-	return "sh"
 }
 
 func downloadAndVerifyModule(file_to_download, checksum, download_addr string) (data []byte, err error) {
