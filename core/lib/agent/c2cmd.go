@@ -5,8 +5,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// C2AgentCommands returns a root cobra.Command for C2 commands.
-func C2AgentCommands() *cobra.Command {
+// C2Commands returns a root cobra.Command for C2 commands.
+func C2Commands() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Short: "emp3r0r C2 commands",
 	}
@@ -17,6 +17,7 @@ func C2AgentCommands() *cobra.Command {
 		&cobra.Group{ID: "linux", Title: "Linux Commands"},
 		&cobra.Group{ID: "windows", Title: "Windows Commands"},
 	)
+	rootCmd.PersistentFlags().StringP("cmd_id", "", "", "Command ID")
 
 	// Generic commands group
 	lsCmd := &cobra.Command{

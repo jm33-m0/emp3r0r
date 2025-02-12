@@ -35,7 +35,6 @@ require (
 	github.com/shadowsocks/go-shadowsocks2 v0.1.5
 	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/spf13/cobra v1.8.1
-	github.com/spf13/pflag v1.0.5
 	github.com/txthinking/socks5 v0.0.0-20230325130024-4230056ae301
 	github.com/vishvananda/netlink v1.3.0
 	github.com/xtaci/kcp-go/v5 v5.6.18
@@ -99,6 +98,7 @@ require (
 	github.com/rsteube/carapace-shlex v0.1.1 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/sorairolake/lzip-go v0.3.5 // indirect
+	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/templexxx/cpu v0.1.1 // indirect
 	github.com/templexxx/xorsimd v0.4.3 // indirect
 	github.com/therootcompany/xz v1.0.1 // indirect

@@ -2,9 +2,9 @@ package agent
 
 import "github.com/spf13/cobra"
 
-func AgentCommands() *cobra.Command {
+func CoreCommands() *cobra.Command {
 	rootCmd := &cobra.Command{
-		Short: "emp3r0r agent",
+		Short: "emp3r0r agent core commands",
 	}
 	// Define groups sorted by name
 	rootCmd.AddGroup(
@@ -14,6 +14,7 @@ func AgentCommands() *cobra.Command {
 		&cobra.Group{ID: "network", Title: "Network Commands"},
 		&cobra.Group{ID: "process", Title: "Process Commands"},
 	)
+	rootCmd.PersistentFlags().StringP("cmd_id", "", "", "Command ID")
 
 	// Filesystem commands
 	lsCmd := &cobra.Command{
@@ -164,9 +165,6 @@ func AgentCommands() *cobra.Command {
 	putCmd.Flags().StringP("checksum", "c", "", "File checksum")
 	putCmd.Flags().StringP("addr", "h", "", "Download address")
 	rootCmd.AddCommand(putCmd)
-
-	// Add built-in commands
-	rootCmd.AddCommand(C2AgentCommands())
 
 	return rootCmd
 }

