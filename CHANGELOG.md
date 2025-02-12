@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.1](https://github.com/jm33-m0/emp3r0r/compare/v2.3.0...v2.3.1) (2025-02-12)
+
+
+### Bug Fixes
+
+* `ls` error handling ([a20b025](https://github.com/jm33-m0/emp3r0r/commit/a20b0256eba255be57b2b4f3a38a18da9beb6529))
+
 ## [2.3.0](https://github.com/jm33-m0/emp3r0r/compare/v2.2.12...v2.3.0) (2025-02-12)
 
 
