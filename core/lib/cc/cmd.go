@@ -163,7 +163,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run:     ls,
 		}
 		rootCmd.AddCommand(lsCmd)
-		carapace.Gen(lsCmd).PositionalCompletion(carapace.ActionCallback(listRemoteDir))
+		carapace.Gen(lsCmd).PositionalCompletion(carapace.ActionMultiParts("/", listRemoteDir))
 
 		cdCmd := &cobra.Command{
 			Use:     "cd dir",
@@ -173,7 +173,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run:     cd,
 		}
 		rootCmd.AddCommand(cdCmd)
-		carapace.Gen(cdCmd).PositionalCompletion(carapace.ActionCallback(listRemoteDir))
+		carapace.Gen(cdCmd).PositionalCompletion(carapace.ActionMultiParts("/", listRemoteDir))
 
 		cpCmd := &cobra.Command{
 			Use:     "cp src dst",
@@ -184,8 +184,8 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run:     cp,
 		}
 		rootCmd.AddCommand(cpCmd)
-		carapace.Gen(cpCmd).PositionalCompletion(carapace.ActionCallback(listRemoteDir),
-			carapace.ActionCallback(listRemoteDir))
+		carapace.Gen(cpCmd).PositionalCompletion(carapace.ActionMultiParts("/", listRemoteDir),
+			carapace.ActionMultiParts("/", listRemoteDir))
 
 		mvCmd := &cobra.Command{
 			Use:     "mv src dst",
@@ -196,8 +196,8 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run:     mv,
 		}
 		rootCmd.AddCommand(mvCmd)
-		carapace.Gen(mvCmd).PositionalCompletion(carapace.ActionCallback(listRemoteDir),
-			carapace.ActionCallback(listRemoteDir))
+		carapace.Gen(mvCmd).PositionalCompletion(carapace.ActionMultiParts("/", listRemoteDir),
+			carapace.ActionMultiParts("/", listRemoteDir))
 
 		rmCmd := &cobra.Command{
 			Use:     "rm file",
@@ -208,7 +208,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run:     rm,
 		}
 		rootCmd.AddCommand(rmCmd)
-		carapace.Gen(rmCmd).PositionalCompletion(carapace.ActionCallback(listRemoteDir))
+		carapace.Gen(rmCmd).PositionalCompletion(carapace.ActionMultiParts("/", listRemoteDir))
 
 		catCmd := &cobra.Command{
 			Use:     "cat file",
@@ -219,7 +219,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run:     cat,
 		}
 		rootCmd.AddCommand(catCmd)
-		carapace.Gen(catCmd).PositionalCompletion(carapace.ActionCallback(listRemoteDir))
+		carapace.Gen(catCmd).PositionalCompletion(carapace.ActionMultiParts("/", listRemoteDir))
 
 		mkdirCmd := &cobra.Command{
 			Use:     "mkdir dir",
@@ -230,7 +230,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run:     mkdir,
 		}
 		rootCmd.AddCommand(mkdirCmd)
-		carapace.Gen(mkdirCmd).PositionalCompletion(carapace.ActionCallback(listRemoteDir))
+		carapace.Gen(mkdirCmd).PositionalCompletion(carapace.ActionMultiParts("", listRemoteDir))
 
 		pwdCmd := &cobra.Command{
 			Use:     "pwd",
@@ -285,7 +285,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		getCmd.MarkFlagRequired("path")
 		rootCmd.AddCommand(getCmd)
 		carapace.Gen(getCmd).FlagCompletion(carapace.ActionMap{
-			"path": carapace.ActionCallback(listRemoteDir),
+			"path": carapace.ActionMultiParts("/", listRemoteDir),
 		})
 
 		putCmd := &cobra.Command{

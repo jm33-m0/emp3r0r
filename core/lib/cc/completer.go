@@ -108,47 +108,56 @@ var (
 func listRemoteDir(ctx carapace.Context) carapace.Action {
 	activeAgent := ValidateActiveTarget()
 	if activeAgent == nil {
-		LogDebug("No valid target selected so no autocompletion for remote directory")
+		LogDebug("No valid target selected so no auto-completion for remote directory")
 		return carapace.ActionValues()
 	}
 
-	// if we have the listing in cache, return it
-	// otherwise caparace will run it too many times to slow down the console
-	RemoteDirListingMutex.RLock()
-	if cache, exists := RemoteDirListing[activeAgent.CWD]; exists {
-		RemoteDirListingMutex.RUnlock()
-		LogDebug("Listing remote directory %s from cache", activeAgent.CWD)
-		return carapace.ActionValues(cache.Listing...)
+	// what dir to list
+	dir_to_list := strings.Join(ctx.Parts, "/")
+	if dir_to_list == "" {
+		// what if the user wants to complete / ?
+		dir_to_list = "/"
 	}
-	RemoteDirListingMutex.RUnlock()
 
-	names := make([]string, 0) // listing to return
-	cmd := fmt.Sprintf("%s --path %s", emp3r0r_def.C2CmdListDir, activeAgent.CWD)
+	cwd, listing := listRemoteDirWorker(dir_to_list)
+	cache := &RemoteDirListingCache{
+		CWD:     cwd,
+		Listing: listing,
+	}
+	cache.Ctx, cache.Cancel = context.WithTimeout(context.Background(), 2*time.Minute)
+	RemoteDirListing[cache.CWD] = cache
+
+	return carapace.ActionValues(listing...)
+}
+
+func listRemoteDirWorker(path_to_list string) (cwd string, names []string) {
+	names = make([]string, 0) // listing to return
+	cmd := fmt.Sprintf("%s --path %s", emp3r0r_def.C2CmdListDir, path_to_list)
 	cmd_id := uuid.NewString()
 	err := SendCmdToCurrentTarget(cmd, cmd_id)
 	if err != nil {
 		LogDebug("Cannot list remote directory: %v", err)
-		return carapace.ActionValues()
+		return
 	}
 	remote_entries := []string{}
-	for i := 0; i < 100; i++ {
+	listingCtx, listingCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer listingCancel()
+	for listingCtx.Err() == nil {
 		if res, exists := CmdResults[cmd_id]; exists {
 			remote_entries = strings.Split(res, "\n")
 			CmdResultsMutex.Lock()
 			delete(CmdResults, cmd_id)
 			CmdResultsMutex.Unlock()
+			listingCancel()
 			break
 		}
-		time.Sleep(100 * time.Millisecond)
-		if i == 99 {
-			LogDebug("Timeout listing remote directory")
-			return carapace.ActionValues()
-		}
+		time.Sleep(50 * time.Millisecond)
 	}
 	if len(remote_entries) == 0 {
 		LogDebug("Nothing in remote directory")
-		return carapace.ActionValues()
+		return
 	}
+	cwd = remote_entries[0]
 	for n, name := range remote_entries {
 		if n == 0 {
 			continue // this is the cwd
@@ -157,14 +166,5 @@ func listRemoteDir(ctx carapace.Context) carapace.Action {
 		name = strings.ReplaceAll(name, " ", "\\ ")
 		names = append(names, name)
 	}
-	RemoteDirListingMutex.Lock()
-	defer RemoteDirListingMutex.Unlock()
-	cache := &RemoteDirListingCache{
-		CWD:     remote_entries[0],
-		Listing: names,
-	}
-	cache.Ctx, cache.Cancel = context.WithTimeout(context.Background(), 2*time.Minute)
-	RemoteDirListing[remote_entries[0]] = cache
-
-	return carapace.ActionValues(names...)
+	return
 }
