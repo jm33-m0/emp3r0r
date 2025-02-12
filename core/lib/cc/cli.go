@@ -60,8 +60,14 @@ func CliMain() {
 	Emp3r0rConsole.NewlineAfter = true
 	Emp3r0rConsole.NewlineWhenEmpty = true
 
-	// Syntax highlighting
+	// Shell features
 	Emp3r0rConsole.Shell().SyntaxHighlighter = highLighter
+	Emp3r0rConsole.Shell().Config.Set("history-autosuggest", true)
+	Emp3r0rConsole.Shell().Config.Set("autopairs", true)
+	Emp3r0rConsole.Shell().Config.Set("colored-completion-prefix", true)
+	Emp3r0rConsole.Shell().Config.Set("colored-stats", true)
+	Emp3r0rConsole.Shell().Config.Set("completion-ignore-case", true)
+	Emp3r0rConsole.Shell().Config.Set("usage-hint-always", true)
 
 	// Tmux setup
 	err = TmuxInitWindows()
