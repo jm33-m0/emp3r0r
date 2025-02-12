@@ -75,7 +75,7 @@ func PutFile(lpath, rpath string, a *emp3r0r_def.Emp3r0rAgent) error {
 	}
 
 	// send cmd
-	cmd := fmt.Sprintf("put --file '%s' --path '%s' --size %d", lpath, rpath, size)
+	cmd := fmt.Sprintf("put --file '%s' --path '%s' --checksum %s --size %d", lpath, rpath, sum, size)
 	err = SendCmd(cmd, "", a)
 	if err != nil {
 		return fmt.Errorf("PutFile send command: %v", err)
