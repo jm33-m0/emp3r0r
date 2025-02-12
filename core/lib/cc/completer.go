@@ -112,6 +112,8 @@ func listRemoteDir(ctx carapace.Context) carapace.Action {
 		return carapace.ActionValues()
 	}
 
+	// TODO: implement cache
+
 	// what dir to list
 	dir_to_list := strings.Join(ctx.Parts, "/")
 	if dir_to_list == "" {

@@ -69,7 +69,8 @@ func processAgentData(data *emp3r0r_def.MsgTunData) {
 		var procs []util.ProcEntry
 		err = json.Unmarshal([]byte(out), &procs)
 		if err != nil {
-			LogError("ps: %v:\n%s", err, out)
+			LogDebug("ps: %v", err)
+			LogError("ps: %s", err, out)
 			return
 		}
 
@@ -112,7 +113,8 @@ func processAgentData(data *emp3r0r_def.MsgTunData) {
 		var dents []util.Dentry
 		err = json.Unmarshal([]byte(out), &dents)
 		if err != nil {
-			LogError("ls: %v:\n%s", err, out)
+			LogDebug("ls: %v", err)
+			LogError("ls: %s", out)
 			return
 		}
 

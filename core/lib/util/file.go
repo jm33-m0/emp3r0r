@@ -30,11 +30,35 @@ type FileStat struct {
 }
 
 // LsPath ls path and return a json
-func LsPath(path string) (res string, err error) {
+func LsPath(path string) (string, error) {
+	parse_fileInfo := func(info os.FileInfo) (dent Dentry) {
+		dent.Name = info.Name()
+		dent.Date = info.ModTime().String()
+		dent.Ftype = "file"
+		dent.Permission = info.Mode().String()
+		dent.Size = fmt.Sprintf("%d bytes", info.Size())
+		return dent
+	}
+	// if it's a file, return its info
+	if IsFileExist(path) {
+		info, statErr := os.Stat(path)
+		if statErr != nil {
+			LogDebug("LsPath: %v", statErr)
+			return "", statErr
+		}
+		dents := []Dentry{parse_fileInfo(info)}
+		jsonData, err := json.Marshal(dents)
+		if err != nil {
+			LogDebug("LsPath: %v", err)
+			return "", err
+		}
+		return string(jsonData), nil
+	}
+
 	files, err := os.ReadDir(path)
 	if err != nil {
 		LogDebug("LsPath: %v", err)
-		return
+		return "", err
 	}
 
 	// parse
@@ -45,22 +69,12 @@ func LsPath(path string) (res string, err error) {
 			LogDebug("LsPath: %v", statErr)
 			continue
 		}
-		var dent Dentry
-		dent.Name = info.Name()
-		dent.Date = info.ModTime().String()
-		dent.Ftype = "file"
-		if f.IsDir() {
-			dent.Ftype = "dir"
-		}
-		dent.Permission = info.Mode().String()
-		dent.Size = fmt.Sprintf("%d bytes", info.Size())
-		dents = append(dents, dent)
+		dents = append(dents, parse_fileInfo(info))
 	}
 
 	// json
 	jsonData, err := json.Marshal(dents)
-	res = string(jsonData)
-	return
+	return string(jsonData), err
 }
 
 // IsCommandExist check if an executable is in $PATH
