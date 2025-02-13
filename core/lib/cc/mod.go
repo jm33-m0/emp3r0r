@@ -61,7 +61,12 @@ var (
 // SetOption set an option to value, `set` command
 func SetOption(opt, val string) {
 	// set
-	AvailableModuleOptions[opt].Val = val
+	optObj, ok := AvailableModuleOptions[opt]
+	if !ok {
+		LogError("option %s not found", strconv.Quote(opt))
+		return
+	}
+	optObj.Val = val
 }
 
 // UpdateOptions reads options from modules config, and set default values
