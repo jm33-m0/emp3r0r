@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.4.1](https://github.com/jm33-m0/emp3r0r/compare/v2.4.0...v2.4.1) (2025-02-13)
+
+
+### Bug Fixes
+
+* `ssh_harvester` can't be restarted ([ee4dfde](https://github.com/jm33-m0/emp3r0r/commit/ee4dfde790c8fb9bfe6e44bbf0efe9e9d74c730f))
+* crash when `set` an unknown option ([5e8ebf4](https://github.com/jm33-m0/emp3r0r/commit/5e8ebf4fca6d3e9592ebf9639857da7cdab940fc))
+* display full command in cmd response ([2e1d51b](https://github.com/jm33-m0/emp3r0r/commit/2e1d51bf43f44315c5e9bbb6cb29dc8f5861f765))
+* duplicated items in history search ([f2db9da](https://github.com/jm33-m0/emp3r0r/commit/f2db9da2bba4c450416ee6eb0f655f0d1d6aa180))
+* lack of some useful readline features ([dac383f](https://github.com/jm33-m0/emp3r0r/commit/dac383f6a3c59e86a1310e93707d646ba67458d6))
+* some agent commands have no runners ([6575f5c](https://github.com/jm33-m0/emp3r0r/commit/6575f5cbcd935c9455600d1e95ee00186705a17a))
+
 ## [2.4.0](https://github.com/jm33-m0/emp3r0r/compare/v2.3.0...v2.4.0) (2025-02-12)
 
 
