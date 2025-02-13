@@ -168,7 +168,7 @@ func processAgentData(data *emp3r0r_def.MsgTunData) {
 	}
 	agent_output := fmt.Sprintf("\n[%s] %s:\n%s\n\n",
 		color.CyanString("%d", contrlIf.Index),
-		color.HiMagentaString(cmd),
+		color.HiMagentaString("%s", cmd_slice),
 		color.HiWhiteString(out))
 	LogMsg(agent_output)
 
