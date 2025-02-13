@@ -29,6 +29,8 @@ var (
 )
 
 func sshd_monitor(logStream chan string, code_pattern []byte, reg_name string) (err error) {
+	defer util.LogStreamPrintf(logStream, "SSH Harvester main process (%d): done", unix.Getpid())
+
 	alive, sshd_procs := util.IsProcAlive("sshd")
 	if !alive {
 		util.LogStreamPrintf(logStream, "sshd_monitor (%d): sshd process not found, aborting", unix.Getpid())
@@ -38,6 +40,7 @@ func sshd_monitor(logStream chan string, code_pattern []byte, reg_name string) (
 	util.LogStreamPrintf(logStream, "sshd_monitor started (%d)", unix.Getpid())
 	monitor := func(sshd_pid int) {
 		util.LogStreamPrintf(logStream, "Started monitor (%d) on SSHD (%d)", unix.Getpid(), sshd_pid)
+		defer util.LogStreamPrintf(logStream, "Monitor for %d done", sshd_pid)
 		for SshHarvesterCtx.Err() == nil {
 			util.TakeABlink()
 			children_file := fmt.Sprintf("/proc/%d/task/%d/children", sshd_pid, sshd_pid)
@@ -73,6 +76,8 @@ func sshd_monitor(logStream chan string, code_pattern []byte, reg_name string) (
 }
 
 func sshd_harvester(pid int, logStream chan string, code_pattern []byte, reg_name string) {
+	defer util.LogStreamPrintf(logStream, "SSH harvester for sshd session %d done", pid)
+
 	// remember pid
 	traced_pids_mut.Lock()
 	traced_pids[pid] = true

