@@ -56,6 +56,46 @@ func init_magic_agent_one_time_bytes() {
 	}
 }
 
+// Options struct to hold flag values
+type Options struct {
+	cdnProxy         string
+	config           string
+	names            string
+	apiServer        bool
+	sshRelayPort     string
+	connectRelayAddr string
+	relayedPort      int
+	debug            bool
+}
+
+func parseFlags() *Options {
+	opts := &Options{}
+	flag.StringVar(&opts.cdnProxy, "cdn2proxy", "", "Start cdn2proxy server on this port")
+	flag.StringVar(&opts.config, "config", cc.EmpConfigFile, "Use this config file to update hardcoded variables")
+	flag.StringVar(&opts.names, "gencert", "", "Generate C2 server cert with these host names")
+	flag.BoolVar(&opts.apiServer, "api", false, "Run API server in background, you can send commands to /tmp/emp3r0r.socket")
+	flag.StringVar(&opts.sshRelayPort, "relay_server", "", "Act as SSH remote forwarding relay on this port")
+	flag.StringVar(&opts.connectRelayAddr, "connect_relay", "", "Connect to SSH remote forwarding relay (host:port)")
+	flag.IntVar(&opts.relayedPort, "relayed_port", 0, "Relayed port, use with -connect_relay")
+	flag.BoolVar(&opts.debug, "debug", false, "Do not kill tmux session when crashing, so you can see the crash log")
+	flag.Parse()
+	return opts
+}
+
+// New helper function to start the cdn2proxy server
+func startCDN2Proxy(opts *Options) {
+	go func() {
+		logFile, openErr := os.OpenFile("/tmp/ws.log", os.O_CREATE|os.O_RDWR, 0o600)
+		if openErr != nil {
+			Logger.Fatal("OpenFile: %v", openErr)
+		}
+		openErr = cdn2proxy.StartServer(opts.cdnProxy, "127.0.0.1:"+cc.RuntimeConfig.CCPort, "ws", logFile)
+		if openErr != nil {
+			Logger.Fatal("CDN StartServer: %v", openErr)
+		}
+	}()
+}
+
 func main() {
 	// set up dirs and default varaibles
 	// including config file location
@@ -67,25 +107,17 @@ func main() {
 	// set up logger
 	Logger = logging.NewLogger(2)
 
-	// command line arguments
-	cdnproxy := flag.String("cdn2proxy", "", "Start cdn2proxy server on this port")
-	config := flag.String("config", cc.EmpConfigFile, "Use this config file to update hardcoded variables")
-	names := flag.String("gencert", "", "Generate C2 server cert with these host names")
-	apiserver := flag.Bool("api", false, "Run API server in background, you can send commands to /tmp/emp3r0r.socket")
-	ssh_relay_port := flag.String("relay_server", "", "Act as SSH remote forwarding relay on this port")
-	connect_relay_addr := flag.String("connect_relay", "", "Connect to SSH remote forwarding relay (host:port)")
-	relayed_port := flag.Int("relayed_port", 0, "Relayed port, use with -connect_relay")
-	debug := flag.Bool("debug", false, "Do not kill tmux session when crashing, so you can see the crash log")
-	flag.Parse()
+	// Parse command-line flags
+	opts := parseFlags()
 
 	// do not kill tmux session when crashing
-	if *debug {
+	if opts.debug {
 		cc.TmuxPersistence = true
 	}
 
 	// generate C2 TLS cert for given host names
-	if *names != "" {
-		hosts := strings.Fields(*names)
+	if opts.names != "" {
+		hosts := strings.Fields(opts.names)
 		certErr := cc.GenC2Certs(hosts)
 		if certErr != nil {
 			Logger.Fatal("GenC2Certs: %v", certErr)
@@ -98,9 +130,9 @@ func main() {
 	}
 
 	// read config file
-	err = readJSONConfig(*config)
+	err = readJSONConfig(opts.config)
 	if err != nil {
-		Logger.Fatal("Failed to read config from '%s': %v", *config, err)
+		Logger.Fatal("Failed to read config from '%s': %v", opts.config, err)
 	}
 
 	// set up magic string
@@ -111,75 +143,73 @@ func main() {
 		Logger.Fatal("CC is already running")
 	}
 
-	// run as relay client, connect to relay server via SSH
-	if *connect_relay_addr != "" {
-		if *relayed_port == 0 {
+	// Run as SSH relay client if requested
+	if opts.connectRelayAddr != "" {
+		if opts.relayedPort == 0 {
 			Logger.Fatal("Please specify -relayed_port")
 		}
-		ssh_password := new(string)
-		fmt.Printf("Enter SSH password: ")
-		fmt.Scanln(ssh_password)
-		go func(ssh_password string) {
-			defer Logger.Error("session unexpectedly exited, please restart emp3r0r")
-			SSHConnections := make(map[string]context.CancelFunc, 10)
-			pubkey, sshKeyErr := tun.SSHPublicKey(cc.RuntimeConfig.SSHHostKey)
-			if sshKeyErr != nil {
-				Logger.Fatal("Parsing SSHPublicKey: %v", sshKeyErr)
-			}
-		ssh_connect:
-			ctx, cancel := context.WithCancel(context.Background())
-			sshKeyErr = tun.SSHRemoteFwdClient(*connect_relay_addr,
-				ssh_password,
-				pubkey, // enable host key verification
-				*relayed_port,
-				&SSHConnections, ctx, cancel)
-			if sshKeyErr == nil {
-				sshKeyErr = fmt.Errorf("session unexpectedly exited")
-				Logger.Warning("SSHRemoteFwdClient: %v, retrying", sshKeyErr)
-			}
-			for ctx.Err() == nil {
-				util.TakeABlink()
-			}
-			goto ssh_connect
-		}(*ssh_password)
+		runSSHRelayClient(opts)
 	}
 
-	// start cdn2proxy server
-	if *cdnproxy != "" {
-		go func() {
-			logFile, openErr := os.OpenFile("/tmp/ws.log", os.O_CREATE|os.O_RDWR, 0o600)
-			if openErr != nil {
-				Logger.Fatal("OpenFile: %v", openErr)
-			}
-			openErr = cdn2proxy.StartServer(*cdnproxy, "127.0.0.1:"+cc.RuntimeConfig.CCPort, "ws", logFile)
-			if openErr != nil {
-				Logger.Fatal("CDN StartServer: %v", openErr)
-			}
-		}()
+	// Start cdn2proxy server if specified
+	if opts.cdnProxy != "" {
+		startCDN2Proxy(opts)
 	}
 
 	// use emp3r0r in terminal or from other frontend
-	if *apiserver {
+	if opts.apiServer {
 		// TODO: implement API main
 		Logger.Fatal("API server is not implemented yet")
 	}
 
-	// run as relay server
-	// no need to start CC services
-	if *ssh_relay_port != "" {
-		ssh_password := util.RandMD5String()
-		log.Printf("SSH password is %s. Copy ~/.emp3r0r to client host, "+
-			"then run `emp3r0r -connect_relay relay_ip:%s -relayed_port %s` "+
-			"(C2 port, or KCP port %s if you are using it)",
-			strconv.Quote(ssh_password), *ssh_relay_port, cc.RuntimeConfig.CCPort, cc.RuntimeConfig.KCPServerPort)
-		err = tun.SSHRemoteFwdServer(*ssh_relay_port,
-			ssh_password,
-			cc.RuntimeConfig.SSHHostKey)
-		if err != nil {
-			log.Fatalf("SSHRemoteFwdServer: %v", err)
-		}
+	// Run as SSH relay server if specified; otherwise run CLI
+	if opts.sshRelayPort != "" {
+		runSSHRelayServer(opts)
 	} else {
-		// run CLI
 		cc.CliMain()
+	}
+}
+
+// handle SSH relay client logic
+func runSSHRelayClient(opts *Options) {
+	sshPassword := new(string)
+	fmt.Printf("Enter SSH password: ")
+	fmt.Scanln(sshPassword)
+	go func(pass string) {
+		defer Logger.Error("session unexpectedly exited, please restart emp3r0r")
+		SSHConnections := make(map[string]context.CancelFunc, 10)
+		pubkey, sshKeyErr := tun.SSHPublicKey(cc.RuntimeConfig.SSHHostKey)
+		if sshKeyErr != nil {
+			Logger.Fatal("Parsing SSHPublicKey: %v", sshKeyErr)
+		}
+	ssh_connect:
+		ctx, cancel := context.WithCancel(context.Background())
+		sshKeyErr = tun.SSHRemoteFwdClient(opts.connectRelayAddr,
+			pass,
+			pubkey, // enable host key verification
+			opts.relayedPort,
+			&SSHConnections, ctx, cancel)
+		if sshKeyErr == nil {
+			sshKeyErr = fmt.Errorf("session unexpectedly exited")
+			Logger.Warning("SSHRemoteFwdClient: %v, retrying", sshKeyErr)
+		}
+		for ctx.Err() == nil {
+			util.TakeABlink()
+		}
+		goto ssh_connect
+	}(*sshPassword)
+}
+
+// handle SSH relay server logic
+func runSSHRelayServer(opts *Options) {
+	sshPassword := util.RandMD5String()
+	log.Printf("SSH password is %s. Copy ~/.emp3r0r to client host, "+
+		"then run `emp3r0r -connect_relay relay_ip:%s -relayed_port %s` "+
+		"(C2 port, or KCP port %s if you are using it)",
+		strconv.Quote(sshPassword), opts.sshRelayPort, cc.RuntimeConfig.CCPort, cc.RuntimeConfig.KCPServerPort)
+	if err := tun.SSHRemoteFwdServer(opts.sshRelayPort,
+		sshPassword,
+		cc.RuntimeConfig.SSHHostKey); err != nil {
+		log.Fatalf("SSHRemoteFwdServer: %v", err)
 	}
 }
