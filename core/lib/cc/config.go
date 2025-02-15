@@ -201,6 +201,8 @@ func init_certs_config() error {
 			return fmt.Errorf("invalid host names")
 		}
 		hosts = strings.Fields(input)
+		hosts = append(hosts, "127.0.0.1") // sometimes we need to connect to a relay that listens on localhost
+		hosts = append(hosts, "localhost") // sometimes we need to connect to a relay that listens on localhost
 		_, certErr := tun.GenCerts(hosts, ServerCrtFile, ServerKeyFile, false)
 		if certErr != nil {
 			return certErr
