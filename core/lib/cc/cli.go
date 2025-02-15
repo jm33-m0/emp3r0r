@@ -175,7 +175,7 @@ func CliBanner(console *console.Console) {
 	}
 
 	// C2 names
-	encodingErr = LoadCACrt()
+	encodingErr = LoadCACrt2RuntimeConfig()
 	if encodingErr != nil {
 		Logger.Fatal("Failed to parse CA cert: %v", encodingErr)
 	}

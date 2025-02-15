@@ -23,14 +23,6 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-const (
-	CA_CERT_FILE = "ca-cert.pem"
-	CA_KEY_FILE  = "ca-key.pem"
-)
-
-// PEM encoded server public key
-var ServerPubKey string
-
 func publicKey(priv interface{}) interface{} {
 	switch k := priv.(type) {
 	case *rsa.PrivateKey:
@@ -64,7 +56,8 @@ func pemBlockForKey(priv interface{}) *pem.Block {
 // Returns public key bytes
 func GenCerts(
 	hosts []string,
-	outname string,
+	outcert string,
+	outkey string,
 	isCA bool,
 ) ([]byte, error) {
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -97,7 +90,6 @@ func GenCerts(
 		}
 		template.IsCA = true
 		template.KeyUsage |= x509.KeyUsageCertSign
-		outname = "ca"
 		derBytes, err = x509.CreateCertificate(rand.Reader, &template, &template, publicKey(priv), priv)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create certificate: %v", err)
@@ -136,8 +128,6 @@ func GenCerts(
 
 	// output to pem files
 	out := &bytes.Buffer{}
-	outcert := fmt.Sprintf("%s-cert.pem", outname)
-	outkey := fmt.Sprintf("%s-key.pem", outname)
 	// cert
 	pem.Encode(out, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 	err = os.WriteFile(outcert, out.Bytes(), 0o600)

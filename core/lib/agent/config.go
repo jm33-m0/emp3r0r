@@ -36,7 +36,7 @@ func ApplyRuntimeConfig() (err error) {
 	}
 
 	// CA
-	tun.CACrt = []byte(RuntimeConfig.CAPEM)
+	tun.CACrtPEM = []byte(RuntimeConfig.CAPEM)
 
 	// pwd
 	cwd, err := os.Getwd()

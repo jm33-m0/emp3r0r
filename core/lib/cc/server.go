@@ -46,7 +46,7 @@ func TLSServer() {
 	r := mux.NewRouter()
 
 	// Load CA
-	tun.CACrt = []byte(RuntimeConfig.CAPEM)
+	tun.CACrtPEM = []byte(RuntimeConfig.CAPEM)
 
 	// handlers
 	r.HandleFunc(fmt.Sprintf("/%s/{api}/{token}", tun.WebRoot), dispatcher)

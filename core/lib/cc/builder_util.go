@@ -56,7 +56,7 @@ func read_cached_config(config_key string) (val interface{}) {
 func GenC2Certs(hosts []string) (err error) {
 	if !util.IsFileExist(CAKeyFile) || !util.IsFileExist(CACrtFile) {
 		LogMsg("CA cert not found, generating...")
-		_, err = tun.GenCerts(nil, "", true)
+		_, err = tun.GenCerts(nil, CACrtFile, CAKeyFile, true)
 		if err != nil {
 			return fmt.Errorf("generate CA: %v", err)
 		}
@@ -64,7 +64,7 @@ func GenC2Certs(hosts []string) (err error) {
 	}
 
 	// save CA cert to emp3r0r.json
-	err = LoadCACrt()
+	err = LoadCACrt2RuntimeConfig()
 	if err != nil {
 		return fmt.Errorf("GenC2Certs failed to load CA to RuntimeConfig: %v", err)
 	}
@@ -72,12 +72,12 @@ func GenC2Certs(hosts []string) (err error) {
 	// generate server cert
 	LogMsg("Server cert not found, generating...")
 	LogInfo("Server cert fingerprint: %s", tun.GetFingerprint(ServerCrtFile))
-	_, err = tun.GenCerts(hosts, "emp3r0r", false)
+	_, err = tun.GenCerts(hosts, ServerCrtFile, ServerKeyFile, false)
 	return
 }
 
 func save_config_json() (err error) {
-	err = LoadCACrt()
+	err = LoadCACrt2RuntimeConfig()
 	if err != nil {
 		return fmt.Errorf("save_config_json: %v", err)
 	}
@@ -135,15 +135,9 @@ func InitConfigFile(cc_host string) (err error) {
 	return save_config_json()
 }
 
-// LoadCACrt load CA cert from file
-func LoadCACrt() error {
-	// CA cert
-	ca_data, err := os.ReadFile(CACrtFile)
-	if err != nil {
-		return fmt.Errorf("failed to read CA cert: %v", err)
-	}
-	tun.CACrt = ca_data
-	RuntimeConfig.CAPEM = string(tun.CACrt)
+// LoadCACrt2RuntimeConfig CA cert to runtime config
+func LoadCACrt2RuntimeConfig() error {
+	RuntimeConfig.CAPEM = string(tun.CACrtPEM)
 	RuntimeConfig.CAFingerprint = tun.GetFingerprint(CACrtFile)
 	return nil
 }
