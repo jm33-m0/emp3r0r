@@ -99,7 +99,7 @@ func UpdateOptions(modName string) (exist bool) {
 		}
 		addIfNotFound(argOpt)
 	}
-	if strings.ToLower(modconfig.AgentConfig.Exec) != "built-in" {
+	if strings.ToLower(modconfig.AgentConfig.Exec) != "built-in" && !modconfig.IsLocal {
 		LogDebug("UpdateOptions: module %s is not built-in, adding download_addr", modName)
 		download_addr := &emp3r0r_def.ModOption{
 			Name: "download_addr",
