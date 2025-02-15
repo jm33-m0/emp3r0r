@@ -10,20 +10,9 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/spf13/cobra"
 )
-
-func UpgradeAgent(cmd *cobra.Command, args []string) {
-	if !util.IsExist(WWWRoot + "agent") {
-		LogError("%s/agent not found, build one with `use gen_agent` first", WWWRoot)
-		return
-	}
-	checksum := tun.SHA256SumFile(WWWRoot + "agent")
-	SendCmdToCurrentTarget(fmt.Sprintf("%s --checksum %s", emp3r0r_def.C2CmdUpdateAgent, checksum), "")
-}
 
 // read config by key from emp3r0r.json
 func read_cached_config(config_key string) (val interface{}) {
@@ -52,35 +41,7 @@ func read_cached_config(config_key string) (val interface{}) {
 	return val
 }
 
-// GenC2Certs generate certificates for CA and emp3r0r C2 server
-func GenC2Certs(hosts []string) (err error) {
-	if !util.IsFileExist(CAKeyFile) || !util.IsFileExist(CACrtFile) {
-		LogMsg("CA cert not found, generating...")
-		_, err = tun.GenCerts(nil, "", true)
-		if err != nil {
-			return fmt.Errorf("generate CA: %v", err)
-		}
-		LogInfo("CA fingerprint: %s", RuntimeConfig.CAFingerprint)
-	}
-
-	// save CA cert to emp3r0r.json
-	err = LoadCACrt()
-	if err != nil {
-		return fmt.Errorf("GenC2Certs failed to load CA to RuntimeConfig: %v", err)
-	}
-
-	// generate server cert
-	LogMsg("Server cert not found, generating...")
-	LogInfo("Server cert fingerprint: %s", tun.GetFingerprint(ServerCrtFile))
-	_, err = tun.GenCerts(hosts, "emp3r0r", false)
-	return
-}
-
 func save_config_json() (err error) {
-	err = LoadCACrt()
-	if err != nil {
-		return fmt.Errorf("save_config_json: %v", err)
-	}
 	w_data, err := json.Marshal(RuntimeConfig)
 	if err != nil {
 		return fmt.Errorf("saving %s: %v", EmpConfigFile, err)
@@ -89,6 +50,7 @@ func save_config_json() (err error) {
 	return os.WriteFile(EmpConfigFile, w_data, 0o600)
 }
 
+// InitConfigFile generate a new emp3r0r.json
 func InitConfigFile(cc_host string) (err error) {
 	// random ports
 	RuntimeConfig.CCHost = cc_host
@@ -135,15 +97,13 @@ func InitConfigFile(cc_host string) (err error) {
 	return save_config_json()
 }
 
-// LoadCACrt load CA cert from file
-func LoadCACrt() error {
-	// CA cert
-	ca_data, err := os.ReadFile(CACrtFile)
+// LoadCACrt2RuntimeConfig CA cert to runtime config
+func LoadCACrt2RuntimeConfig() error {
+	err := tun.LoadCACrt()
 	if err != nil {
-		return fmt.Errorf("failed to read CA cert: %v", err)
+		return err
 	}
-	tun.CACrt = ca_data
-	RuntimeConfig.CAPEM = string(tun.CACrt)
+	RuntimeConfig.CAPEM = string(tun.CACrtPEM)
 	RuntimeConfig.CAFingerprint = tun.GetFingerprint(CACrtFile)
 	return nil
 }

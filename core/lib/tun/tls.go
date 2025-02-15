@@ -10,9 +10,6 @@ import (
 	utls "github.com/refraction-networking/utls"
 )
 
-// CACrt for TLS server cert signing
-var CACrt = []byte("")
-
 // EmpHTTPClient add our CA to trusted CAs, while keeps TLS InsecureVerify on
 func EmpHTTPClient(c2_addr, proxyServer string) *http.Client {
 	// Extract CA bundle from built-in certs
@@ -28,7 +25,7 @@ func EmpHTTPClient(c2_addr, proxyServer string) *http.Client {
 	}
 
 	// add our cert
-	if ok := rootCAs.AppendCertsFromPEM(CACrt); !ok {
+	if ok := rootCAs.AppendCertsFromPEM(CACrtPEM); !ok {
 		LogFatalError("No CA certs appended")
 	}
 
@@ -41,7 +38,7 @@ func EmpHTTPClient(c2_addr, proxyServer string) *http.Client {
 	}
 
 	// fingerprint of CA
-	ca_crt, _ := ParsePem(CACrt)
+	ca_crt, _ := ParsePem(CACrtPEM)
 	log.Printf("CA cert fingerprint: %s, now making proxy dialer", SHA256SumRaw(ca_crt.Raw))
 
 	// set proxyURL to nil to use direct connection for C2 transport

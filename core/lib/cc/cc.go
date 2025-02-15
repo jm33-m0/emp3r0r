@@ -8,11 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/user"
-	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/fatih/color"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
@@ -20,53 +17,6 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/posener/h2conn"
 	"github.com/spf13/cobra"
-)
-
-var (
-	// TmuxPersistence enable debug (-debug)
-	TmuxPersistence = false
-
-	// IsAPIEnabled Indicate whether we are in headless mode
-	IsAPIEnabled = false
-
-	// Prefix /usr or /usr/local, can be set through $EMP3R0R_PREFIX
-	Prefix = ""
-
-	// EmpWorkSpace workspace directory of emp3r0r
-	EmpWorkSpace = ""
-
-	// EmpDataDir prefix/lib/emp3r0r
-	EmpDataDir = ""
-
-	// EmpBuildDir prefix/lib/emp3r0r/build
-	EmpBuildDir = ""
-
-	// FileGetDir where we save #get files
-	FileGetDir = ""
-
-	// EmpConfigFile emp3r0r.json
-	EmpConfigFile = ""
-
-	// Targets target list, with control (tun) interface
-	Targets      = make(map[*emp3r0r_def.Emp3r0rAgent]*Control)
-	TargetsMutex = sync.RWMutex{}
-
-	// certs
-	CACrtFile     string
-	CAKeyFile     string
-	ServerCrtFile string
-	ServerKeyFile string
-)
-
-const (
-	// Temp where we save temp files
-	Temp = "/tmp/emp3r0r/"
-
-	// WWWRoot host static files for agent
-	WWWRoot = Temp + "www/"
-
-	// UtilsArchive host utils.tar.xz for agent
-	UtilsArchive = WWWRoot + "utils.tar.xz"
 )
 
 // Control controller interface of a target
@@ -95,12 +45,6 @@ func headlessListTargets() (err error) {
 func ListTargets() {
 	TargetsMutex.RLock()
 	defer TargetsMutex.RUnlock()
-	// return JSON data to APIConn in headless mode
-	if IsAPIEnabled {
-		if listErr := headlessListTargets(); listErr != nil {
-			LogError("ls_targets: %v", listErr)
-		}
-	}
 
 	// build table
 	tdata := [][]string{}
@@ -358,74 +302,6 @@ func Send2Agent(data *emp3r0r_def.MsgTunData, agent *emp3r0r_def.Emp3r0rAgent) (
 	out := json.NewEncoder(ctrl.Conn)
 
 	err = out.Encode(data)
-	return
-}
-
-// InitC2 set workspace, module directories, etc
-func InitC2() (err error) {
-	// prefix
-	Prefix = os.Getenv("EMP3R0R_PREFIX")
-	if Prefix == "" {
-		Prefix = "/usr/local"
-	}
-	// eg. /usr/local/lib/emp3r0r
-	EmpDataDir = Prefix + "/lib/emp3r0r"
-	EmpBuildDir = EmpDataDir + "/build"
-	CAT = EmpDataDir + "/emp3r0r-cat"
-
-	if !util.IsExist(EmpDataDir) {
-		return fmt.Errorf("emp3r0r is not installed correctly: %s not found", EmpDataDir)
-	}
-	if !util.IsExist(CAT) {
-		return fmt.Errorf("emp3r0r is not installed correctly: %s not found", CAT)
-	}
-
-	// set workspace to ~/.emp3r0r
-	u, err := user.Current()
-	if err != nil {
-		return fmt.Errorf("get current user: %v", err)
-	}
-	EmpWorkSpace = u.HomeDir + "/.emp3r0r"
-	FileGetDir = EmpWorkSpace + "/file-get/"
-	EmpConfigFile = EmpWorkSpace + "/emp3r0r.json"
-	if !util.IsDirExist(EmpWorkSpace) {
-		err = os.MkdirAll(FileGetDir, 0o700)
-		if err != nil {
-			return fmt.Errorf("mkdir %s: %v", EmpWorkSpace, err)
-		}
-	}
-
-	// prefixes for stubs
-	emp3r0r_def.Stub_Linux = EmpWorkSpace + "/stub"
-	emp3r0r_def.Stub_Windows = EmpWorkSpace + "/stub-win"
-
-	// copy stub binaries to ~/.emp3r0r
-	stubFiles, err := filepath.Glob(fmt.Sprintf("%s/stub*", EmpBuildDir))
-	if err != nil {
-		LogWarning("Agent stubs: %v", err)
-	}
-	for _, stubFile := range stubFiles {
-		copyErr := util.Copy(stubFile, EmpWorkSpace)
-		if copyErr != nil {
-			LogWarning("Agent stubs: %v", copyErr)
-		}
-	}
-
-	// cd to workspace
-	err = os.Chdir(EmpWorkSpace)
-	if err != nil {
-		return fmt.Errorf("cd to workspace %s: %v", EmpWorkSpace, err)
-	}
-
-	// Module directories
-	ModuleDirs = []string{EmpDataDir + "/modules", EmpWorkSpace + "/modules"}
-
-	// cert files
-	CACrtFile = EmpWorkSpace + "/ca-cert.pem"
-	CAKeyFile = EmpWorkSpace + "/ca-key.pem"
-	ServerCrtFile = EmpWorkSpace + "/emp3r0r-cert.pem"
-	ServerKeyFile = EmpWorkSpace + "/emp3r0r-key.pem"
-
 	return
 }
 

@@ -23,14 +23,6 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-const (
-	CA_CERT_FILE = "ca-cert.pem"
-	CA_KEY_FILE  = "ca-key.pem"
-)
-
-// PEM encoded server public key
-var ServerPubKey string
-
 func publicKey(priv interface{}) interface{} {
 	switch k := priv.(type) {
 	case *rsa.PrivateKey:
@@ -64,7 +56,8 @@ func pemBlockForKey(priv interface{}) *pem.Block {
 // Returns public key bytes
 func GenCerts(
 	hosts []string,
-	outname string,
+	outcert string,
+	outkey string,
 	isCA bool,
 ) ([]byte, error) {
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -90,19 +83,21 @@ func GenCerts(
 		derBytes []byte
 	)
 
-	// valid for these names
 	if isCA {
+		LogInfo("Generating CA cert")
+		// generate CA cert
 		template.Subject = pkix.Name{
 			Organization: []string{"ACME CA Co"},
 		}
 		template.IsCA = true
 		template.KeyUsage |= x509.KeyUsageCertSign
-		outname = "ca"
 		derBytes, err = x509.CreateCertificate(rand.Reader, &template, &template, publicKey(priv), priv)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create certificate: %v", err)
 		}
 	} else {
+		// valid for these names
+		LogInfo("Generating TLS cert for %v", hosts)
 		for _, h := range hosts {
 			if ip := net.ParseIP(h); ip != nil {
 				template.IPAddresses = append(template.IPAddresses, ip)
@@ -135,9 +130,8 @@ func GenCerts(
 	}
 
 	// output to pem files
+	LogInfo("Writing cert to %s, key to %s", outcert, outkey)
 	out := &bytes.Buffer{}
-	outcert := fmt.Sprintf("%s-cert.pem", outname)
-	outkey := fmt.Sprintf("%s-key.pem", outname)
 	// cert
 	pem.Encode(out, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 	err = os.WriteFile(outcert, out.Bytes(), 0o600)
@@ -145,7 +139,6 @@ func GenCerts(
 		return nil, fmt.Errorf("write %s: %v", outcert, err)
 	}
 	out.Reset()
-
 	// key
 	pem.Encode(out, pemBlockForKey(priv))
 	err = os.WriteFile(outkey, out.Bytes(), 0o600)

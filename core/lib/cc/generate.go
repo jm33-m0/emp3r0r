@@ -138,8 +138,8 @@ func GenerateAgent(cmd *cobra.Command, args []string) {
 	}
 
 	// done
-	LogSuccess("Generated %s from %s and %s, you can run %s on arbitrary target",
-		outfile, stubFile, EmpConfigFile, outfile)
+	LogSuccess("Generated %s from %s and %s",
+		outfile, stubFile, EmpConfigFile)
 	LogDebug("OneTimeMagicBytes is %x", emp3r0r_def.OneTimeMagicBytes)
 
 	if payload_type == PayloadTypeWindowsExecutable {
@@ -148,7 +148,7 @@ func GenerateAgent(cmd *cobra.Command, args []string) {
 	}
 	if payload_type == PayloadTypeLinuxExecutable {
 		// tell user to use shared library stager
-		LogMsg("Use `stager` module to create a shared library stager that delivers the agent with encryption and compression. You will need another stager to load the shared library.")
+		LogMsg("Use stager module to create a shared library stager that delivers the agent with encryption and compression. You will need another stager to load the shared library (or use LD_PRELOAD)")
 	}
 }
 
@@ -282,7 +282,7 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 		// remove old certs
 		os.RemoveAll(ServerCrtFile)
 		os.RemoveAll(ServerKeyFile)
-		err = GenC2Certs(cc_hosts)
+		_, err = tun.GenCerts(cc_hosts, ServerCrtFile, ServerKeyFile, false)
 		if err != nil {
 			return fmt.Errorf("failed to generate certs: %v", err)
 		}

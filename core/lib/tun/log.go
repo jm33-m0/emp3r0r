@@ -4,7 +4,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
-var Logger = logging.NewLogger(2)
+var Logger *logging.Logger
 
 // LogFatalError print error, and exit
 func LogFatalError(format string, a ...interface{}) {

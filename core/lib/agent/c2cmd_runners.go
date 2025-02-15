@@ -290,11 +290,12 @@ func runListener(cmd *cobra.Command, args []string) {
 	}
 	log.Printf("Got listener request: %v", args)
 	errChan := make(chan error)
-	if listenerType == "http_aes_compressed" {
+	switch listenerType {
+	case "http_aes_compressed":
 		go func() {
 			errChan <- listener.HTTPAESCompressedListener(payload, port, passphrase, compression == "on")
 		}()
-	} else if listenerType == "http_bare" {
+	case "http_bare":
 		go func() {
 			errChan <- listener.HTTPBareListener(payload, port)
 		}()

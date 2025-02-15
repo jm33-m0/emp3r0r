@@ -72,6 +72,13 @@ void jump_start(void *init, void *exit_func, void *entry) {
 
   __asm__ __volatile__("jalr %0, 0(%1)\n" : : "r"(entry), "r"(a0), "r"(a1) :);
 }
+#else
+void jump_start(void *init, void *exit_func, void *entry) {
+  register long rsp __asm__("rsp") = (long)init;
+  register long rdx __asm__("rdx") = (long)exit_func;
+
+  __asm__ __volatile__("jmp *%0\n" : : "r"(entry), "r"(rsp), "r"(rdx) :);
+}
 #endif
 
 // Default function called upon exit() in the ELF. Depends on the architecture,

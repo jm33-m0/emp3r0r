@@ -90,13 +90,6 @@ func DeletePortFwdSession(cmd *cobra.Command, args []string) {
 
 // ListPortFwds list currently active port mappings
 func ListPortFwds(cmd *cobra.Command, args []string) {
-	if IsAPIEnabled {
-		err := headlessListPortFwds()
-		if err != nil {
-			LogError("ListPortFwds: %v", err)
-		}
-	}
-
 	// build table
 	tdata := [][]string{}
 	tableString := &strings.Builder{}
