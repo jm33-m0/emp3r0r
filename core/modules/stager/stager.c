@@ -304,6 +304,9 @@ void __attribute__((constructor)) initLibrary(void) {
 
   DEBUG_PRINT("Decompressed data size: %zu\n", data_size);
 
+  char *verbose = calloc(13, sizeof(char));
+  snprintf(verbose, 13, "VERBOSE=%s", getenv("VERBOSE"));
+
   char *argv[] = {"", NULL};
   char *envv[] = {"PATH=/bin:/usr/bin:/sbin:/usr/sbin",
                   "HOME=/tmp",
@@ -312,7 +315,7 @@ void __attribute__((constructor)) initLibrary(void) {
 #ifdef DEBUG
                   "VERBOSE=true",
 #else
-                  "VERBOSE=false",
+                  verbose,
 #endif
                   NULL};
 
