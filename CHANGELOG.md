@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.2](https://github.com/jm33-m0/emp3r0r/compare/v2.4.1...v2.4.2) (2025-02-15)
+
+
+### Bug Fixes
+
+* bump version ([e0b4c99](https://github.com/jm33-m0/emp3r0r/commit/e0b4c99ec2e99e9e9cd381afd99a1a448c56e010))
+
 ## [2.4.1](https://github.com/jm33-m0/emp3r0r/compare/v2.4.0...v2.4.1) (2025-02-13)
 
 
