@@ -106,9 +106,6 @@ func SetDynamicPrompt() string {
 		}
 		transport = getTransport(ActiveAgent.Transport)
 	}
-	if ActiveModule == "<blank>" {
-		ActiveModule = "none" // if no module is selected
-	}
 	agent_name := color.New(color.FgCyan, color.Underline).Sprint(shortName)
 	mod_name := color.New(color.FgHiBlue).Sprint(ActiveModule)
 

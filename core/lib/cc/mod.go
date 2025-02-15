@@ -20,7 +20,7 @@ var (
 	ModuleDirs []string
 
 	// ActiveModule selected module
-	ActiveModule = "<blank>"
+	ActiveModule = "none"
 
 	// ActiveAgent selected target
 	ActiveAgent *emp3r0r_def.Emp3r0rAgent
