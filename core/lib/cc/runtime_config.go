@@ -10,20 +10,9 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/spf13/cobra"
 )
-
-func UpgradeAgent(cmd *cobra.Command, args []string) {
-	if !util.IsExist(WWWRoot + "agent") {
-		LogError("%s/agent not found, build one with `use gen_agent` first", WWWRoot)
-		return
-	}
-	checksum := tun.SHA256SumFile(WWWRoot + "agent")
-	SendCmdToCurrentTarget(fmt.Sprintf("%s --checksum %s", emp3r0r_def.C2CmdUpdateAgent, checksum), "")
-}
 
 // read config by key from emp3r0r.json
 func read_cached_config(config_key string) (val interface{}) {
