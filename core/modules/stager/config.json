@@ -8,6 +8,18 @@
   "platform": "Linux",
   "path": "",
   "options": {
+    "BUILD_EXE": {
+      "opt_name": "BUILD_EXE",
+      "opt_desc": "Build stager as an executable, otherwise a shared object will be built",
+      "opt_val": "no",
+      "opt_vals": ["yes", "no"]
+    },
+    "ARCH": {
+      "opt_name": "ARCH",
+      "opt_desc": "The architecture of the target system, use GOARCH values",
+      "opt_val": "amd64",
+      "opt_vals": ["amd4", "386", "arm", "riscv64"]
+    },
     "DOWNLOAD_HOST": {
       "opt_name": "DOWNLOAD_HOST",
       "opt_desc": "The host to download the payload from, eg. 192.168.0.1",
