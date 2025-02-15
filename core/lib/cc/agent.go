@@ -48,12 +48,6 @@ func processAgentData(data *emp3r0r_def.MsgTunData) {
 	CmdResults[cmd_id] = out
 	CmdResultsMutex.Unlock()
 
-	// headless mode
-	if IsAPIEnabled {
-		// TODO: API
-		return
-	}
-
 	switch cmd_slice[0] {
 	// screenshot command
 	case "screenshot":

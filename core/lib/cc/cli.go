@@ -205,11 +205,6 @@ func CliBanner(console *console.Console) {
 
 // CliPrettyPrint prints two-column help info
 func CliPrettyPrint(header1, header2 string, map2write *map[string]string) {
-	if IsAPIEnabled {
-		// TODO: Implement API
-		return
-	}
-
 	// build table
 	tdata := [][]string{}
 	tableString := &strings.Builder{}

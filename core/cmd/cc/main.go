@@ -96,7 +96,7 @@ func startCDN2Proxy(opts *Options) {
 	}()
 }
 
-func main() {
+func init() {
 	// set up dirs and default varaibles
 	// including config file location
 	err := cc.InitC2()
@@ -107,6 +107,17 @@ func main() {
 	// set up logger
 	Logger = logging.NewLogger(2)
 
+	// read config file
+	err = readJSONConfig(cc.EmpConfigFile)
+	if err != nil {
+		Logger.Fatal("Failed to read config from '%s': %v", cc.EmpConfigFile, err)
+	}
+
+	// set up magic string
+	init_magic_agent_one_time_bytes()
+}
+
+func main() {
 	// Parse command-line flags
 	opts := parseFlags()
 
@@ -129,15 +140,6 @@ func main() {
 		os.Exit(0)
 	}
 
-	// read config file
-	err = readJSONConfig(opts.config)
-	if err != nil {
-		Logger.Fatal("Failed to read config from '%s': %v", opts.config, err)
-	}
-
-	// set up magic string
-	init_magic_agent_one_time_bytes()
-
 	// abort if CC is already running
 	if cc.IsCCRunning() {
 		Logger.Fatal("CC is already running")
@@ -154,12 +156,6 @@ func main() {
 	// Start cdn2proxy server if specified
 	if opts.cdnProxy != "" {
 		startCDN2Proxy(opts)
-	}
-
-	// use emp3r0r in terminal or from other frontend
-	if opts.apiServer {
-		// TODO: implement API main
-		Logger.Fatal("API server is not implemented yet")
 	}
 
 	// Run as SSH relay server if specified; otherwise run CLI

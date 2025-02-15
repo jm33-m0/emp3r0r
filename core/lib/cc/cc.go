@@ -26,9 +26,6 @@ var (
 	// TmuxPersistence enable debug (-debug)
 	TmuxPersistence = false
 
-	// IsAPIEnabled Indicate whether we are in headless mode
-	IsAPIEnabled = false
-
 	// Prefix /usr or /usr/local, can be set through $EMP3R0R_PREFIX
 	Prefix = ""
 
@@ -95,12 +92,6 @@ func headlessListTargets() (err error) {
 func ListTargets() {
 	TargetsMutex.RLock()
 	defer TargetsMutex.RUnlock()
-	// return JSON data to APIConn in headless mode
-	if IsAPIEnabled {
-		if listErr := headlessListTargets(); listErr != nil {
-			LogError("ls_targets: %v", listErr)
-		}
-	}
 
 	// build table
 	tdata := [][]string{}
