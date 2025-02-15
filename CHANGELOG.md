@@ -6,6 +6,14 @@
 ### Bug Fixes
 
 * bump version ([e0b4c99](https://github.com/jm33-m0/emp3r0r/commit/e0b4c99ec2e99e9e9cd381afd99a1a448c56e010))
+* add crypto auth helpers
+* refactor: use `init` to centralize initialization
+* refactor: unify file paths initialization for both `tun` and `cc`
+* refactor: a lot of rewriting
+* fix: `stager` module macro
+* fix: KCP transport needs `127.0.0.1` to be a valid common name in server cert
+* fix: daemonize is not needed when run from `stager.so`
+* fix: do not add cached download option for local modules
 
 ## [2.4.1](https://github.com/jm33-m0/emp3r0r/compare/v2.4.0...v2.4.1) (2025-02-13)
 
