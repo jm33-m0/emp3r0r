@@ -10,7 +10,6 @@ import (
 	"log"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/cc"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -19,7 +18,7 @@ import (
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 )
 
-var Logger = logging.NewLogger(2)
+var Logger *logging.Logger
 
 // Options struct to hold flag values
 type Options struct {
@@ -49,13 +48,16 @@ func parseFlags() *Options {
 func init() {
 	// set up dirs and default varaibles
 	// including config file location
-	err := cc.InitFilePaths()
+	err := cc.InitCC()
 	if err != nil {
 		log.Fatalf("C2 file paths setup: %v", err)
 	}
 
 	// set up logger
-	Logger = logging.NewLogger(2)
+	Logger, err = logging.NewLogger(cc.EmpLogFile, 2)
+	if err != nil {
+		log.Fatalf("cc: failed to set up logger: %v", err)
+	}
 
 	// read config file
 	err = cc.ReadJSONConfig()
@@ -74,20 +76,6 @@ func main() {
 	// do not kill tmux session when crashing
 	if opts.debug {
 		cc.TmuxPersistence = true
-	}
-
-	// generate C2 TLS cert for given host names
-	if opts.names != "" {
-		hosts := strings.Fields(opts.names)
-		certErr := cc.GenC2Certs(hosts)
-		if certErr != nil {
-			Logger.Fatal("GenC2Certs: %v", certErr)
-		}
-		certErr = cc.InitConfigFile(hosts[0])
-		if certErr != nil {
-			Logger.Fatal("Init %s: %v", cc.EmpConfigFile, certErr)
-		}
-		os.Exit(0)
 	}
 
 	// abort if CC is already running

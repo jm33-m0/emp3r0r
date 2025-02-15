@@ -334,16 +334,6 @@ case "$1" in
   [[ -d "$workspace" ]] || mkdir -p "$workspace"
   cd "$workspace" || error "Failed to enter $workspace"
 
-  # Generate certs
-  # --------------
-  { [[ -f "$workspace/emp3r0r-cert.pem" ]] && [[ -f "$workspace/emp3r0r-key.pem" ]]; } || {
-    echo -ne "\e[36mCC names (can be IPs and/or domain names), separate with space:\n>>\e[0m "
-    read -r hosts
-    "$cc" -gencert "$hosts"
-    info "Generated certs, re-run $0"
-    exit
-  }
-
   # Run C2 server with tmux UI
   # --------------------------
   if ! command -v tmux >/dev/null 2>&1; then

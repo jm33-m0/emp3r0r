@@ -83,8 +83,9 @@ func GenCerts(
 		derBytes []byte
 	)
 
-	// valid for these names
 	if isCA {
+		LogInfo("Generating CA cert")
+		// generate CA cert
 		template.Subject = pkix.Name{
 			Organization: []string{"ACME CA Co"},
 		}
@@ -95,6 +96,8 @@ func GenCerts(
 			return nil, fmt.Errorf("failed to create certificate: %v", err)
 		}
 	} else {
+		// valid for these names
+		LogInfo("Generating TLS cert for %v", hosts)
 		for _, h := range hosts {
 			if ip := net.ParseIP(h); ip != nil {
 				template.IPAddresses = append(template.IPAddresses, ip)
@@ -127,6 +130,7 @@ func GenCerts(
 	}
 
 	// output to pem files
+	LogInfo("Writing cert to %s, key to %s", outcert, outkey)
 	out := &bytes.Buffer{}
 	// cert
 	pem.Encode(out, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
@@ -135,7 +139,6 @@ func GenCerts(
 		return nil, fmt.Errorf("write %s: %v", outcert, err)
 	}
 	out.Reset()
-
 	// key
 	pem.Encode(out, pemBlockForKey(priv))
 	err = os.WriteFile(outkey, out.Bytes(), 0o600)

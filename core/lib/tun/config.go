@@ -2,6 +2,7 @@ package tun
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -18,8 +19,12 @@ var (
 )
 
 func init() {
+	var err error
 	// set up logger
-	Logger = logging.NewLogger(2)
+	Logger, err = logging.NewLogger("", 2)
+	if err != nil {
+		log.Fatalf("tun init: failed to set up logger: %v", err)
+	}
 
 	// Paths
 	EmpWorkSpace = fmt.Sprintf("%s/.emp3r0r", os.Getenv("HOME"))
@@ -27,20 +32,16 @@ func init() {
 	CA_KEY_FILE = fmt.Sprintf("%s/ca-key.pem", EmpWorkSpace)
 	ServerCrtFile = fmt.Sprintf("%s/server-cert.pem", EmpWorkSpace)
 	ServerKeyFile = fmt.Sprintf("%s/server-key.pem", EmpWorkSpace)
-
-	err := LoadCACrt()
-	if err != nil {
-		LogFatalError("Failed to load CA cert: %v", err)
-	}
 }
 
 // LoadCACrt load CA cert from file
 func LoadCACrt() error {
-	// CA cert
+	LogDebug("Loading CA cert from %s", CA_CERT_FILE)
 	ca_data, err := os.ReadFile(CA_CERT_FILE)
 	if err != nil {
-		return fmt.Errorf("failed to read CA cert: %v", err)
+		return err
 	}
 	CACrtPEM = ca_data
+	LogDebug("CA cert loaded, fingerprint: %s", GetFingerprint(CA_CERT_FILE))
 	return nil
 }

@@ -6,7 +6,6 @@ package cc
 import (
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"time"
 
@@ -69,28 +68,17 @@ func CliMain() {
 	Emp3r0rConsole.Shell().Config.Set("completion-ignore-case", true)
 	Emp3r0rConsole.Shell().Config.Set("usage-hint-always", true)
 
-	// Tmux setup
+	// Tmux setup, we will need to log to tmux window
 	err = TmuxInitWindows()
 	if err != nil {
-		Logger.Fatal("Fatal TMUX error: %v, please run `tmux kill-session -t emp3r0r` and re-run emp3r0r", err)
+		LogFatal("Fatal TMUX error: %v, please run `tmux kill-session -t emp3r0r` and re-run emp3r0r", err)
 	}
+
+	// when the console is closed, deinit tmux windows
 	defer TmuxDeinitWindows()
-	go setupLogger()
 
 	// Run the console
 	Emp3r0rConsole.Start()
-}
-
-func setupLogger() {
-	// Redirect logs to agent response pane
-	agent_resp_pane_tty, err := os.OpenFile(OutputPane.TTY, os.O_RDWR, 0)
-	if err != nil {
-		Logger.Fatal("Failed to open agent response pane: %v", err)
-	}
-	Logger.AddWriter(agent_resp_pane_tty)
-	tun.Logger = Logger
-	util.Logger = Logger
-	Logger.Start()
 }
 
 func highLighter(line []rune) string {
@@ -175,10 +163,6 @@ func CliBanner(console *console.Console) {
 	}
 
 	// C2 names
-	encodingErr = LoadCACrt2RuntimeConfig()
-	if encodingErr != nil {
-		Logger.Fatal("Failed to parse CA cert: %v", encodingErr)
-	}
 	c2_names := tun.NamesInCert(ServerCrtFile)
 	if len(c2_names) <= 0 {
 		Logger.Fatal("C2 has no names?")

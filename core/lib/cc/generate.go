@@ -282,7 +282,7 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 		// remove old certs
 		os.RemoveAll(ServerCrtFile)
 		os.RemoveAll(ServerKeyFile)
-		err = GenC2Certs(cc_hosts)
+		_, err = tun.GenCerts(cc_hosts, ServerCrtFile, ServerKeyFile, false)
 		if err != nil {
 			return fmt.Errorf("failed to generate certs: %v", err)
 		}

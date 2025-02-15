@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/fatih/color"
@@ -16,24 +17,23 @@ type Logger struct {
 	writer  io.Writer
 }
 
-// NewLogger creates a new logger with log level, log will be written to file ~/.emp3r0r/emp3r0r.log
-func NewLogger(level int) *Logger {
-	// The log file is always located at ~/.emp3r0r/emp3r0r.log, ensure the directory exists
-	home, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatalf("error getting user home directory: %v", err)
+// NewLogger creates a new logger with log level, by default it writes to stderr, if logFilePath is not empty, it will write to log file instead
+func NewLogger(logFilePath string, level int) (*Logger, error) {
+	writer := io.MultiWriter(os.Stderr)
+	if logFilePath != "" {
+		if _, err := os.Stat(logFilePath); os.IsNotExist(err) {
+			err = os.MkdirAll(filepath.Dir(logFilePath), 0755)
+			if err != nil {
+				return nil, err
+			}
+		}
+		// open log file
+		logf, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
+		if err != nil {
+			return nil, fmt.Errorf("error opening file: %v", err)
+		}
+		writer = io.MultiWriter(logf)
 	}
-	logFilePath := fmt.Sprintf("%s/.emp3r0r", home)
-	if _, err := os.Stat(logFilePath); os.IsNotExist(err) {
-		os.MkdirAll(logFilePath, 0755)
-	}
-
-	// open log file
-	logf, err := os.OpenFile(fmt.Sprintf("%s/emp3r0r.log", logFilePath), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
-	if err != nil {
-		log.Fatalf("error opening file: %v", err)
-	}
-	writer := io.MultiWriter(logf)
 
 	logger := &Logger{
 		Level:  level,
@@ -42,7 +42,7 @@ func NewLogger(level int) *Logger {
 	logger.SetDebugLevel(level)
 	logger.logChan = make(chan string, 4096)
 
-	return logger
+	return logger, nil
 }
 
 // AddWriter adds a new writer to logger, for example os.Stdout

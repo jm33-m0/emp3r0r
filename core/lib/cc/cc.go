@@ -10,7 +10,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/fatih/color"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
@@ -18,50 +17,6 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/posener/h2conn"
 	"github.com/spf13/cobra"
-)
-
-var (
-	// TmuxPersistence enable debug (-debug)
-	TmuxPersistence = false
-
-	// Prefix /usr or /usr/local, can be set through $EMP3R0R_PREFIX
-	Prefix = ""
-
-	// EmpWorkSpace workspace directory of emp3r0r
-	EmpWorkSpace = ""
-
-	// EmpDataDir prefix/lib/emp3r0r
-	EmpDataDir = ""
-
-	// EmpBuildDir prefix/lib/emp3r0r/build
-	EmpBuildDir = ""
-
-	// FileGetDir where we save #get files
-	FileGetDir = ""
-
-	// EmpConfigFile emp3r0r.json
-	EmpConfigFile = ""
-
-	// Targets target list, with control (tun) interface
-	Targets      = make(map[*emp3r0r_def.Emp3r0rAgent]*Control)
-	TargetsMutex = sync.RWMutex{}
-
-	// certs
-	CACrtFile     string
-	CAKeyFile     string
-	ServerCrtFile string
-	ServerKeyFile string
-)
-
-const (
-	// Temp where we save temp files
-	Temp = "/tmp/emp3r0r/"
-
-	// WWWRoot host static files for agent
-	WWWRoot = Temp + "www/"
-
-	// UtilsArchive host utils.tar.xz for agent
-	UtilsArchive = WWWRoot + "utils.tar.xz"
 )
 
 // Control controller interface of a target

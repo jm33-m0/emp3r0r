@@ -4,12 +4,17 @@
 package cc
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/tun"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
 )
 
-var Logger = logging.NewLogger(2)
+var Logger *logging.Logger
 
 func LogDebug(format string, a ...interface{}) {
 	Logger.Debug(format, a...)
@@ -54,4 +59,35 @@ func setDebugLevel(cmd *cobra.Command, args []string) {
 		return
 	}
 	Logger.SetDebugLevel(level)
+}
+
+// SetupLoggers set up logger with log file and agent response pane
+func SetupLoggers(logfile string) (err error) {
+	// set up logger with log file
+	Logger, err = logging.NewLogger(logfile, 2)
+	if err != nil {
+		return fmt.Errorf("failed to create logger: %v", err)
+	}
+
+	for OutputPane == nil {
+		// wait for OutputPane to be initialized
+		util.TakeABlink()
+	}
+
+	// Redirect logs to agent response pane
+	agent_resp_pane_tty, err := os.OpenFile(OutputPane.TTY, os.O_RDWR, 0)
+	if err != nil {
+		return fmt.Errorf("logger failed to open agent response pane: %v", err)
+	}
+	Logger.AddWriter(agent_resp_pane_tty)
+
+	// set up logger for multiple packages and unify log output
+	tun.Logger = Logger
+	util.Logger = Logger
+
+	// Start logger
+	Logger.Start()
+
+	// shouldn't reach here
+	return fmt.Errorf("logger exited")
 }

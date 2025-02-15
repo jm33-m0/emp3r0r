@@ -5,20 +5,68 @@ package cc
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
+	"sync"
 
+	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-var RuntimeConfig = &emp3r0r_def.Config{}
+var (
+	// Save the configuration of the current session
+	RuntimeConfig = &emp3r0r_def.Config{}
+	// TmuxPersistence enable debug (-debug)
+	TmuxPersistence = false
+	// Prefix /usr or /usr/local, can be set through $EMP3R0R_PREFIX
+	Prefix = ""
+	// EmpWorkSpace workspace directory of emp3r0r
+	EmpWorkSpace = ""
+	// EmpDataDir prefix/lib/emp3r0r
+	EmpDataDir = ""
+	// EmpBuildDir prefix/lib/emp3r0r/build
+	EmpBuildDir = ""
+	// FileGetDir where we save #get files
+	FileGetDir = ""
+	// EmpConfigFile emp3r0r.json
+	EmpConfigFile = ""
+	// EmpLogFile emp3r0r.log
+	EmpLogFile = ""
+	// Targets target list, with control (tun) interface
+	Targets      = make(map[*emp3r0r_def.Emp3r0rAgent]*Control)
+	TargetsMutex = sync.RWMutex{}
 
-// InitFilePaths set workspace, module directories, etc
-func InitFilePaths() (err error) {
+	// certs
+	CACrtFile     string
+	CAKeyFile     string
+	ServerCrtFile string
+	ServerKeyFile string
+)
+
+const (
+	// Temp where we save temp files
+	Temp = "/tmp/emp3r0r/"
+
+	// WWWRoot host static files for agent
+	WWWRoot = Temp + "www/"
+
+	// UtilsArchive host utils.tar.xz for agent
+	UtilsArchive = WWWRoot + "utils.tar.xz"
+)
+
+// InitCC set workspace, module directories, certs etc
+func InitCC() (err error) {
+	Logger, err = logging.NewLogger("", 2)
+	if err != nil {
+		return fmt.Errorf("setting up CC basic logger: %v", err)
+	}
+
 	// prefix
 	Prefix = os.Getenv("EMP3R0R_PREFIX")
 	if Prefix == "" {
@@ -44,6 +92,7 @@ func InitFilePaths() (err error) {
 	EmpWorkSpace = u.HomeDir + "/.emp3r0r"
 	FileGetDir = EmpWorkSpace + "/file-get/"
 	EmpConfigFile = EmpWorkSpace + "/emp3r0r.json"
+	EmpLogFile = EmpWorkSpace + "/emp3r0r.log"
 	if !util.IsDirExist(EmpWorkSpace) {
 		err = os.MkdirAll(FileGetDir, 0o700)
 		if err != nil {
@@ -58,12 +107,12 @@ func InitFilePaths() (err error) {
 	// copy stub binaries to ~/.emp3r0r
 	stubFiles, err := filepath.Glob(fmt.Sprintf("%s/stub*", EmpBuildDir))
 	if err != nil {
-		LogWarning("Agent stubs: %v", err)
+		return fmt.Errorf("finding agent stubs: %v", err)
 	}
 	for _, stubFile := range stubFiles {
 		copyErr := util.Copy(stubFile, EmpWorkSpace)
 		if copyErr != nil {
-			LogWarning("Agent stubs: %v", copyErr)
+			return fmt.Errorf("copying agent stubs: %v", copyErr)
 		}
 	}
 
@@ -81,6 +130,20 @@ func InitFilePaths() (err error) {
 	CAKeyFile = tun.CA_KEY_FILE
 	ServerCrtFile = tun.ServerCrtFile
 	ServerKeyFile = tun.ServerKeyFile
+
+	// certs
+	err = init_certs_config()
+	if err != nil {
+		return fmt.Errorf("init_certs_config: %v", err)
+	}
+
+	go func() {
+		// set up logger for multiple packages and unify log output
+		err = SetupLoggers(EmpLogFile)
+		if err != nil {
+			log.Fatalf("SetupLoggers: %v", err)
+		}
+	}()
 
 	return
 }
@@ -103,7 +166,7 @@ func InitMagicAgentOneTimeBytes() {
 	// update binaries
 	files, err := os.ReadDir(EmpWorkSpace)
 	if err != nil {
-		Logger.Fatal("init_magic_str: %v", err)
+		LogFatal("init_magic_str: %v", err)
 	}
 	for _, f := range files {
 		if f.IsDir() {
@@ -113,8 +176,51 @@ func InitMagicAgentOneTimeBytes() {
 			err = util.ReplaceBytesInFile(fmt.Sprintf("%s/%s", EmpWorkSpace, f.Name()),
 				default_magic_str, emp3r0r_def.OneTimeMagicBytes)
 			if err != nil {
-				Logger.Error("init_magic_str %v", err)
+				LogFatal("init_magic_str: %v", err)
 			}
 		}
 	}
+}
+
+// init_certs_config generate certs if not found
+func init_certs_config() error {
+	if _, err := os.Stat(CACrtFile); os.IsNotExist(err) {
+		LogWarning("CA cert not found, generating a new one")
+		_, err := tun.GenCerts(nil, CACrtFile, CAKeyFile, true)
+		if err != nil {
+			return fmt.Errorf("GenCerts: %v", err)
+		}
+	}
+
+	// generate C2 TLS cert for given host names
+	var hosts []string
+	if _, err := os.Stat(ServerKeyFile); os.IsNotExist(err) {
+		LogWarning("C2 TLS cert not found, generating a new one")
+		input := cli.Prompt("Generate C2 TLS cert for host IPs or names (space separated)")
+		if strings.Contains(input, "/") || strings.Contains(input, "\\") {
+			return fmt.Errorf("invalid host names")
+		}
+		hosts = strings.Fields(input)
+		_, certErr := tun.GenCerts(hosts, ServerCrtFile, ServerKeyFile, false)
+		if certErr != nil {
+			return certErr
+		}
+	} else {
+		hosts = tun.NamesInCert(ServerCrtFile)
+	}
+	if len(hosts) == 0 {
+		return fmt.Errorf("no host names found in C2 TLS cert")
+	}
+
+	err := LoadCACrt2RuntimeConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load CA to RuntimeConfig: %v", err)
+	}
+
+	// init config file using the first host name
+	certErr := InitConfigFile(hosts[0])
+	if certErr != nil {
+		return fmt.Errorf("%s: %v", EmpConfigFile, certErr)
+	}
+	return nil
 }
