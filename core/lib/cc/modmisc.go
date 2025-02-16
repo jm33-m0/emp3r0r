@@ -6,7 +6,6 @@ package cc
 import (
 	"fmt"
 
-	"github.com/fatih/color"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 )
 
@@ -22,7 +21,6 @@ func modulePersistence() {
 		LogError("SendCmd: %v", err)
 		return
 	}
-	color.HiMagenta("Please wait for agent's response...")
 }
 
 func moduleLogCleaner() {
@@ -37,5 +35,4 @@ func moduleLogCleaner() {
 		LogError("SendCmd: %v", err)
 		return
 	}
-	color.HiMagenta("Please wait for agent's response...")
 }
