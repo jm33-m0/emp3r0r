@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -335,4 +336,64 @@ func setActiveTarget(cmd *cobra.Command, args []string) {
 		// lets start the bash shell
 		go select_agent(target_to_set)
 	}
+}
+
+// IsAgentExistByTag is agent already in target list?
+func IsAgentExistByTag(tag string) bool {
+	TargetsMutex.RLock()
+	defer TargetsMutex.RUnlock()
+	for a := range Targets {
+		if a.Tag == tag {
+			return true
+		}
+	}
+
+	return false
+}
+
+// IsAgentExist is agent already in target list?
+func IsAgentExist(t *emp3r0r_def.Emp3r0rAgent) bool {
+	TargetsMutex.RLock()
+	defer TargetsMutex.RUnlock()
+	for a := range Targets {
+		if a.Tag == t.Tag {
+			return true
+		}
+	}
+
+	return false
+}
+
+// assignTargetIndex assign an index number to new agent
+func assignTargetIndex() (index int) {
+	TargetsMutex.RLock()
+	defer TargetsMutex.RUnlock()
+
+	// index is 0 for the first agent
+	if len(Targets) == 0 {
+		return 0
+	}
+
+	// loop thru agent list and get all index numbers
+	index_list := make([]int, 0)
+	for _, c := range Targets {
+		index_list = append(index_list, c.Index)
+	}
+
+	// sort
+	sort.Ints(index_list)
+
+	// find available numbers
+	available_indexes := make([]int, 0)
+	for i := 0; i < len(index_list); i++ {
+		if index_list[i] != i {
+			available_indexes = append(available_indexes, i)
+		}
+	}
+	if len(available_indexes) == 0 {
+		return len(index_list)
+	}
+
+	// use the smallest available number
+	return available_indexes[0]
 }
