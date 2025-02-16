@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.3](https://github.com/jm33-m0/emp3r0r/compare/v2.4.2...v2.4.3) (2025-02-16)
+
+
+### Bug Fixes
+
+* passing args to modules ([e08222c](https://github.com/jm33-m0/emp3r0r/commit/e08222c96fbb4aa7cdf2cf430f0a64759f420f07))
+
 ## [2.4.2](https://github.com/jm33-m0/emp3r0r/compare/v2.4.1...v2.4.2) (2025-02-15)
 
 
