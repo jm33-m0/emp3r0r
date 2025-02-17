@@ -34,32 +34,6 @@ type PortFwdSession struct {
 	Cancel context.CancelFunc        // PortFwd cancel
 }
 
-type port_mapping struct {
-	Id          string `json:"id"`          // portfwd id
-	Agent       string `json:"agent"`       // agent tag
-	Reverse     bool   `json:"reverse"`     // map (TCP) port from CC to agent
-	Description string `json:"description"` // details
-}
-
-func headlessListPortFwds() (err error) {
-	var mappings []port_mapping
-	for id, portmap := range PortFwds {
-		if portmap.Sh == nil {
-			portmap.Cancel()
-			continue
-		}
-		var permapping port_mapping
-		permapping.Id = id
-		permapping.Description = portmap.Description
-		permapping.Agent = portmap.Agent.Tag
-		permapping.Reverse = portmap.Reverse
-		mappings = append(mappings, permapping)
-	}
-	// TODO: send to API
-	LogMsg("headlessListPortFwds: %v", mappings)
-	return
-}
-
 // DeletePortFwdSession delete a port mapping session by ID
 func DeletePortFwdSession(cmd *cobra.Command, args []string) {
 	sessionID, err := cmd.Flags().GetString("id")

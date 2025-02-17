@@ -11,33 +11,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// read config by key from emp3r0r.json
-func read_cached_config(config_key string) (val interface{}) {
-	// read existing config when possible
-	var config_map map[string]interface{}
-
-	if util.IsExist(EmpConfigFile) {
-		LogDebug("Reading config '%s' from existing %s", config_key, EmpConfigFile)
-		jsonData, err := os.ReadFile(EmpConfigFile)
-		if err != nil {
-			LogWarning("failed to read %s: %v", EmpConfigFile, err)
-			return ""
-		}
-		// load to map
-		err = json.Unmarshal(jsonData, &config_map)
-		if err != nil {
-			LogWarning("Parsing existing %s: %v", EmpConfigFile, err)
-			return ""
-		}
-	}
-	val, exists := config_map[config_key]
-	if !exists {
-		LogWarning("%s not found in JSON config", config_key)
-		return ""
-	}
-	return val
-}
-
 func save_config_json() (err error) {
 	w_data, err := json.Marshal(RuntimeConfig)
 	if err != nil {

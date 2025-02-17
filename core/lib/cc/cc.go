@@ -26,19 +26,6 @@ type Control struct {
 	Cancel context.CancelFunc
 }
 
-// send JSON encoded target list to frontend
-func headlessListTargets() (err error) {
-	TargetsMutex.RLock()
-	defer TargetsMutex.RUnlock()
-	var targets []emp3r0r_def.Emp3r0rAgent
-	for target := range Targets {
-		targets = append(targets, *target)
-	}
-	// TODO: API
-	LogInfo("headlessListTargets: %v", targets)
-	return
-}
-
 // ListTargets list currently connected agents
 func ListTargets() {
 	TargetsMutex.RLock()
