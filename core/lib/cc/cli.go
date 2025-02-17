@@ -27,7 +27,7 @@ var Emp3r0rConsole = console.New(AppName)
 // CliMain launches the commandline UI
 func CliMain() {
 	// start all services
-	go TLSServer()
+	go StartTLSServer()
 	go KCPC2ListenAndServe()
 	go InitModules()
 

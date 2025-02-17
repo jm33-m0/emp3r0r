@@ -299,7 +299,7 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 			}
 			name_list := strings.Join(c2_names, ", ")
 			LogInfo("Updated C2 server names: %s", name_list)
-			go TLSServer()
+			go StartTLSServer()
 		}
 	}
 
