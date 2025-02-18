@@ -22,7 +22,7 @@ import (
 type SSH_SHELL_Mapping struct {
 	Shell   string                    // the shell to run, eg. bash, python
 	Agent   *emp3r0r_def.Emp3r0rAgent // the agent this shell is connected to
-	PortFwd *PortFwdSession           // the port mapping for this shell session
+	PortFwd *server.PortFwdSession    // the port mapping for this shell session
 	ToPort  string                    // the port to connect to on the agent side, always the same as PortFwd.To's port
 }
 
@@ -44,8 +44,8 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 
 	// if shell/sftp pane already exists, abort
 	if split {
-		if AgentShellPane != nil {
-			if !is_sftp && AgentSFTPPane != nil {
+		if cli.AgentShellPane != nil {
+			if !is_sftp && cli.AgentSFTPPane != nil {
 				return
 			}
 		}
@@ -75,7 +75,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 		// if sftp is requested, we are not using `interactive_shell` module
 		// so no options to set
 		if !is_sftp {
-			SetOption("port", new_port)
+			def.SetOption("port", new_port)
 		}
 		logging.Warningf("Switching to a new port %s for shell (%s)", port, shell)
 	}
@@ -92,7 +92,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 				if s != shell && ssh_mapping.ToPort == port {
 					new_port := strconv.Itoa(util.RandInt(2048, 65535))
 					logging.Warningf("Port %s has %s shell on it, restarting with a different port %s", port, s, new_port)
-					SetOption("port", new_port)
+					def.SetOption("port", new_port)
 					err = SSHClient(shell, args, new_port, split)
 					return err
 				}
@@ -178,7 +178,7 @@ wait:
 			break
 		}
 		time.Sleep(100 * time.Millisecond)
-		for _, p := range server.server.PortFwds {
+		for _, p := range server.PortFwds {
 			if p.Agent == def.ActiveAgent && p.To == to {
 				port_mapping_exists = true
 				break wait

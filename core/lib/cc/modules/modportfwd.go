@@ -14,7 +14,7 @@ import (
 )
 
 func modulePortFwd() {
-	switchOpt, ok := AvailableModuleOptions["switch"]
+	switchOpt, ok := def.AvailableModuleOptions["switch"]
 	if !ok {
 		logging.Errorf("Option 'switch' not found")
 		return
@@ -23,12 +23,12 @@ func modulePortFwd() {
 	case "off":
 		// ugly, i know, it will delete port mappings matching current lport-to combination
 		for id, session := range server.PortFwds {
-			toOpt, ok := AvailableModuleOptions["to"]
+			toOpt, ok := def.AvailableModuleOptions["to"]
 			if !ok {
 				logging.Errorf("Option 'to' not found")
 				return
 			}
-			listenPortOpt, ok := AvailableModuleOptions["listen_port"]
+			listenPortOpt, ok := def.AvailableModuleOptions["listen_port"]
 			if !ok {
 				logging.Errorf("Option 'listen_port' not found")
 				return
@@ -52,9 +52,9 @@ func modulePortFwd() {
 				toOpt.Val, listenPortOpt.Val)
 		}
 	case "reverse": // expose a dest from CC to agent
-		var pf PortFwdSession
+		var pf server.PortFwdSession
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
-		pf.Lport, pf.To = AvailableModuleOptions["listen_port"].Val, AvailableModuleOptions["to"].Val
+		pf.Lport, pf.To = def.AvailableModuleOptions["listen_port"].Val, def.AvailableModuleOptions["to"].Val
 		go func() {
 			logging.Printf("RunReversedPortFwd: %s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.Lport, pf.To, pf.Protocol)
 			initErr := pf.InitReversedPortFwd()
@@ -63,10 +63,10 @@ func modulePortFwd() {
 			}
 		}()
 	case "on":
-		var pf PortFwdSession
+		var pf server.PortFwdSession
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
-		pf.Lport, pf.To = AvailableModuleOptions["listen_port"].Val, AvailableModuleOptions["to"].Val
-		pf.Protocol = AvailableModuleOptions["protocol"].Val
+		pf.Lport, pf.To = def.AvailableModuleOptions["listen_port"].Val, def.AvailableModuleOptions["to"].Val
+		pf.Protocol = def.AvailableModuleOptions["protocol"].Val
 		go func() {
 			logging.Printf("RunPortFwd: %s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.Lport, pf.To, pf.Protocol)
 			runErr := pf.RunPortFwd()
@@ -79,14 +79,14 @@ func modulePortFwd() {
 }
 
 func moduleProxy() {
-	portOpt, ok := AvailableModuleOptions["port"]
+	portOpt, ok := def.AvailableModuleOptions["port"]
 	if !ok {
 		logging.Errorf("Option 'port' not found")
 		return
 	}
 	port := portOpt.Val
 
-	statusOpt, ok := AvailableModuleOptions["status"]
+	statusOpt, ok := def.AvailableModuleOptions["status"]
 	if !ok {
 		logging.Errorf("Option 'status' not found")
 		return
@@ -94,7 +94,7 @@ func moduleProxy() {
 	status := statusOpt.Val
 
 	// port-fwd
-	pf := new(PortFwdSession)
+	pf := new(server.PortFwdSession)
 	pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
 	pf.Lport, pf.To = port, "127.0.0.1:"+def.RuntimeConfig.AgentSocksServerPort
 	pf.Description = fmt.Sprintf("Agent Proxy (TCP):\n%s (Local) -> %s (Agent)", pf.Lport, pf.To)
@@ -102,7 +102,7 @@ func moduleProxy() {
 	pf.Timeout = def.RuntimeConfig.AgentSocksTimeout
 
 	// udp port fwd
-	pfu := new(PortFwdSession)
+	pfu := new(server.PortFwdSession)
 	pfu.Ctx, pfu.Cancel = context.WithCancel(context.Background())
 	pfu.Lport, pfu.To = port, "127.0.0.1:"+def.RuntimeConfig.AgentSocksServerPort
 	pfu.Description = fmt.Sprintf("Agent Proxy (UDP):\n%s (Local) -> %s (Agent)", pfu.Lport, pfu.To)

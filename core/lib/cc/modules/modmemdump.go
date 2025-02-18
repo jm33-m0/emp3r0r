@@ -8,12 +8,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/server"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 func moduleMemDump() {
-	pidOpt, ok := AvailableModuleOptions["pid"]
+	pidOpt, ok := def.AvailableModuleOptions["pid"]
 	if !ok {
 		logging.Errorf("Option 'pid' not found")
 		return
@@ -46,7 +47,7 @@ func moduleMemDump() {
 		return
 	}
 
-	_, err = GetFile(path, def.ActiveAgent)
+	_, err = server.GetFile(path, def.ActiveAgent)
 	if err != nil {
 		logging.Errorf("GetFile: %v", err)
 		return

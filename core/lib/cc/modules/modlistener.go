@@ -11,17 +11,17 @@ import (
 )
 
 func modListener() {
-	if AvailableModuleOptions["listener"] == nil || AvailableModuleOptions["port"] == nil || AvailableModuleOptions["payload"] == nil || AvailableModuleOptions["compression"] == nil || AvailableModuleOptions["passphrase"] == nil {
+	if def.AvailableModuleOptions["listener"] == nil || def.AvailableModuleOptions["port"] == nil || def.AvailableModuleOptions["payload"] == nil || def.AvailableModuleOptions["compression"] == nil || def.AvailableModuleOptions["passphrase"] == nil {
 		logging.Errorf("One or more required options are nil")
 		return
 	}
 	cmd := fmt.Sprintf("%s --listener %s --port %s --payload %s --compression %s --passphrase %s",
 		emp3r0r_def.C2CmdListener,
-		AvailableModuleOptions["listener"].Val,
-		AvailableModuleOptions["port"].Val,
-		AvailableModuleOptions["payload"].Val,
-		AvailableModuleOptions["compression"].Val,
-		AvailableModuleOptions["passphrase"].Val)
+		def.AvailableModuleOptions["listener"].Val,
+		def.AvailableModuleOptions["port"].Val,
+		def.AvailableModuleOptions["payload"].Val,
+		def.AvailableModuleOptions["compression"].Val,
+		def.AvailableModuleOptions["passphrase"].Val)
 	err := agent_util.SendCmd(cmd, "", def.ActiveAgent)
 	if err != nil {
 		logging.Errorf("SendCmd: %v", err)

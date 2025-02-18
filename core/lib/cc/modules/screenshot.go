@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/server"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -33,7 +35,7 @@ func processScreenshot(out string, target *emp3r0r_def.Emp3r0rAgent) (err error)
 		return fmt.Errorf("%s", out)
 	}
 	logging.Infof("We will get %s screenshot file for you, wait", strconv.Quote(out))
-	_, err = GetFile(out, target)
+	_, err = server.GetFile(out, target)
 	if err != nil {
 		err = fmt.Errorf("get screenshot: %v", err)
 		return
@@ -44,12 +46,12 @@ func processScreenshot(out string, target *emp3r0r_def.Emp3r0rAgent) (err error)
 
 	// be sure we have downloaded the file
 	is_download_completed := func() bool {
-		return !util.IsExist(FileGetDir+path+".downloading") &&
-			util.IsExist(FileGetDir+path)
+		return !util.IsExist(def.FileGetDir+path+".downloading") &&
+			util.IsExist(def.FileGetDir+path)
 	}
 
 	is_download_corrupted := func() bool {
-		return !is_download_completed() && !util.IsExist(FileGetDir+path+".lock")
+		return !is_download_completed() && !util.IsExist(def.FileGetDir+path+".lock")
 	}
 	for {
 		time.Sleep(100 * time.Millisecond)
@@ -65,11 +67,11 @@ func processScreenshot(out string, target *emp3r0r_def.Emp3r0rAgent) (err error)
 
 	// unzip if it's zip
 	if strings.HasSuffix(path, ".zip") {
-		err = util.Unarchive(FileGetDir+path, FileGetDir)
+		err = util.Unarchive(def.FileGetDir+path, def.FileGetDir)
 		if err != nil {
 			return fmt.Errorf("unarchive screenshot zip: %v", err)
 		}
-		logging.Warningf("Multiple screenshots extracted to %s", FileGetDir)
+		logging.Warningf("Multiple screenshots extracted to %s", def.FileGetDir)
 		return
 	}
 
@@ -77,8 +79,8 @@ func processScreenshot(out string, target *emp3r0r_def.Emp3r0rAgent) (err error)
 	if util.IsCommandExist("xdg-open") &&
 		os.Getenv("DISPLAY") != "" {
 		logging.Infof("Seems like we can open the picture (%s) for you to view, hold on",
-			FileGetDir+path)
-		cmd := exec.Command("xdg-open", FileGetDir+path)
+			def.FileGetDir+path)
+		cmd := exec.Command("xdg-open", def.FileGetDir+path)
 		err = cmd.Start()
 		if err != nil {
 			return fmt.Errorf("crap, we cannot open the picture: %v", err)

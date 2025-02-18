@@ -12,6 +12,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jm33-m0/arc"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/cli"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/core"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -75,9 +77,9 @@ func build_module(config *emp3r0r_def.ModuleConfig) (out []byte, err error) {
 	if err != nil {
 		return
 	}
-	defer os.Chdir(EmpWorkSpace)
+	defer os.Chdir(def.EmpWorkSpace)
 
-	for _, opt := range AvailableModuleOptions {
+	for _, opt := range def.AvailableModuleOptions {
 		if opt == nil {
 			continue
 		}
@@ -96,7 +98,7 @@ func build_module(config *emp3r0r_def.ModuleConfig) (out []byte, err error) {
 }
 
 func getDownloadAddr() string {
-	download_url_opt, ok := AvailableModuleOptions["download_addr"]
+	download_url_opt, ok := def.AvailableModuleOptions["download_addr"]
 	if ok {
 		return download_url_opt.Val
 	}
@@ -197,7 +199,7 @@ func handleInteractiveModule(config emp3r0r_def.ModuleConfig, cmd_id string) {
 		def.CmdResultsMutex.Unlock()
 	}()
 
-	sshErr := SSHClient(fmt.Sprintf("%s/%s/%s",
+	sshErr := core.SSHClient(fmt.Sprintf("%s/%s/%s",
 		def.RuntimeConfig.AgentRoot, def.ActiveModule, config.AgentConfig.Exec),
 		args, port, false)
 	if sshErr != nil {
@@ -242,7 +244,7 @@ func ModuleDetails(modName string) {
 	table.AppendBulk(tdata)
 	table.Render()
 	out := tableString.String()
-	AdaptiveTable(out)
+	cli.AdaptiveTable(out)
 	logging.Printf("Module details:\n%s", out)
 }
 
@@ -281,7 +283,7 @@ func InitModules() {
 			// module path, eg. ~/.emp3r0r/modules/foo
 			config.Path = fmt.Sprintf("%s/%s", mod_search_dir, dir.Name())
 			if config.IsLocal {
-				mod_dir := fmt.Sprintf("%s/modules/%s", EmpWorkSpace, dir.Name())
+				mod_dir := fmt.Sprintf("%s/modules/%s", def.EmpWorkSpace, dir.Name())
 				err := os.MkdirAll(mod_dir, 0o700)
 				if err != nil {
 					logging.Warningf("Failed to create %s: %v", mod_dir, err)
@@ -312,7 +314,7 @@ func InitModules() {
 	}
 
 	// read from every defined module dir
-	for _, mod_search_dir := range ModuleDirs {
+	for _, mod_search_dir := range def.ModuleDirs {
 		load_mod(mod_search_dir)
 	}
 

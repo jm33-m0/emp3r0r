@@ -5,6 +5,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/tools"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -28,7 +29,7 @@ func moduleLPE() {
 			logging.Errorf("Target not exist")
 			return
 		}
-		helperOpt, ok := AvailableModuleOptions["lpe_helper"]
+		helperOpt, ok := def.AvailableModuleOptions["lpe_helper"]
 		if !ok {
 			logging.Errorf("Option 'lpe_helper' not found")
 			return
@@ -37,7 +38,7 @@ func moduleLPE() {
 
 		// download third-party LPE helper
 		logging.Infof("Updating local LPE helper...")
-		err := DownloadFile(LPEHelperURLs[helperName], Temp+tun.WWW+helperName)
+		err := tools.DownloadFile(LPEHelperURLs[helperName], def.Temp+tun.WWW+helperName)
 		if err != nil {
 			logging.Errorf("Failed to download %s: %v", helperName, err)
 			return

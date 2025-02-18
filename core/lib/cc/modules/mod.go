@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -45,17 +46,6 @@ var (
 	}
 )
 
-// SetOption set an option to value, `set` command
-func SetOption(opt, val string) {
-	// set
-	optObj, ok := AvailableModuleOptions[opt]
-	if !ok {
-		logging.Errorf("option %s not found", strconv.Quote(opt))
-		return
-	}
-	optObj.Val = val
-}
-
 // UpdateOptions reads options from modules config, and set default values
 func UpdateOptions(modName string) (exist bool) {
 	// filter user supplied option
@@ -72,9 +62,9 @@ func UpdateOptions(modName string) (exist bool) {
 
 	// help us add new options
 	addIfNotFound := func(modOpt *emp3r0r_def.ModOption) {
-		if _, exist := AvailableModuleOptions[modOpt.Name]; !exist {
+		if _, exist := def.AvailableModuleOptions[modOpt.Name]; !exist {
 			logging.Debugf("UpdateOptions: adding %s", modOpt.Name)
-			AvailableModuleOptions[modOpt.Name] = modOpt
+			def.AvailableModuleOptions[modOpt.Name] = modOpt
 		}
 	}
 
@@ -180,7 +170,7 @@ func CmdListModOptionsTable(_ *cobra.Command, _ []string) {
 		opts["target"] = "<blank>"
 	}
 
-	for opt_name, opt := range AvailableModuleOptions {
+	for opt_name, opt := range def.AvailableModuleOptions {
 		if opt != nil {
 			opts[opt_name] = opt.Name
 		}
@@ -210,7 +200,7 @@ func CmdListModOptionsTable(_ *cobra.Command, _ []string) {
 		logging.Errorf("Module %s not found", def.ActiveModule)
 		return
 	}
-	for opt_name, opt_obj := range AvailableModuleOptions {
+	for opt_name, opt_obj := range def.AvailableModuleOptions {
 		help := "N/A"
 		if opt_obj == nil {
 			continue
@@ -223,7 +213,7 @@ func CmdListModOptionsTable(_ *cobra.Command, _ []string) {
 			help = "Selected target"
 		}
 		val := ""
-		currentOpt, ok := AvailableModuleOptions[opt_name]
+		currentOpt, ok := def.AvailableModuleOptions[opt_name]
 		if ok {
 			val = currentOpt.Val
 		}
@@ -238,7 +228,7 @@ func CmdListModOptionsTable(_ *cobra.Command, _ []string) {
 	table.AppendBulk(tdata)
 	table.Render()
 	out := tableString.String()
-	AdaptiveTable(out)
+	cli.AdaptiveTable(out)
 	logging.Printf("\n%s", out)
 }
 
@@ -247,7 +237,7 @@ func CmdSetOptVal(cmd *cobra.Command, args []string) {
 	opt := args[0]
 	val := args[1]
 	// hand to SetOption helper
-	SetOption(opt, val)
+	def.SetOption(opt, val)
 	CmdListModOptionsTable(cmd, args)
 }
 
@@ -257,8 +247,8 @@ func CmdSetActiveModule(cmd *cobra.Command, args []string) {
 	for mod := range ModuleHelpers {
 		if mod == modName {
 			def.ActiveModule = modName
-			for k := range AvailableModuleOptions {
-				delete(AvailableModuleOptions, k)
+			for k := range def.AvailableModuleOptions {
+				delete(def.AvailableModuleOptions, k)
 			}
 			UpdateOptions(def.ActiveModule)
 			logging.Infof("Using module %s", strconv.Quote(def.ActiveModule))

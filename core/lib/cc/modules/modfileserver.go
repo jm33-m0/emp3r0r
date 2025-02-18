@@ -10,14 +10,14 @@ import (
 )
 
 func moduleFileServer() {
-	switchOpt, ok := AvailableModuleOptions["switch"]
+	switchOpt, ok := def.AvailableModuleOptions["switch"]
 	if !ok {
 		logging.Errorf("Option 'switch' not found")
 		return
 	}
 	server_switch := switchOpt.Val
 
-	portOpt, ok := AvailableModuleOptions["port"]
+	portOpt, ok := def.AvailableModuleOptions["port"]
 	if !ok {
 		logging.Errorf("Option 'port' not found")
 		return
@@ -34,15 +34,15 @@ func moduleFileServer() {
 func moduleDownloader() {
 	requiredOptions := []string{"download_addr", "checksum", "path"}
 	for _, opt := range requiredOptions {
-		if _, ok := AvailableModuleOptions[opt]; !ok {
+		if _, ok := def.AvailableModuleOptions[opt]; !ok {
 			logging.Errorf("Option '%s' not found", opt)
 			return
 		}
 	}
 
-	download_addr := AvailableModuleOptions["download_addr"].Val
-	checksum := AvailableModuleOptions["checksum"].Val
-	path := AvailableModuleOptions["path"].Val
+	download_addr := def.AvailableModuleOptions["download_addr"].Val
+	checksum := def.AvailableModuleOptions["checksum"].Val
+	path := def.AvailableModuleOptions["path"].Val
 
 	cmd := fmt.Sprintf("%s --download_addr %s --checksum %s --path %s", emp3r0r_def.C2CmdFileDownloader, download_addr, checksum, path)
 	err := agent_util.SendCmdToCurrentTarget(cmd, "")

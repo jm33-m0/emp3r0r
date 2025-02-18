@@ -13,6 +13,7 @@ import (
 
 	"github.com/cavaliergopher/grab/v3"
 	version "github.com/hashicorp/go-version"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/cli"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -214,5 +215,5 @@ func UpdateCC(cmd *cobra.Command, args []string) {
 	}
 	logging.Printf("%s", out)
 	logging.Warningf("emp3r0r will stop in 2 seconds. Start it again to use the new version")
-	TmuxDeinitWindows()
+	cli.TmuxDeinitWindows()
 }
