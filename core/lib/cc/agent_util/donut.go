@@ -1,8 +1,9 @@
-package donut
+package agent_util
 
 import (
 	"fmt"
 
+	"github.com/jm33-m0/emp3r0r/core/lib/donut"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
@@ -20,10 +21,10 @@ func DonoutPE2Shellcode(executable_file, arch_choice string) {
 
 // DonutShellcodeFromFile returns a Donut shellcode for the given PE file
 func DonutShellcodeFromFile(filePath string, outfile string, arch string, dotnet bool, params string, className string, method string) (out string, err error) {
-	donutOps := DonutOptions{
+	donutOps := donut.DonutOptions{
 		InputPath:   filePath,
 		OutputPath:  outfile,
-		Arch:        DonutArchMap[arch],
+		Arch:        donut.DonutArchMap[arch],
 		BypassAMSI:  3,
 		Compression: 2,
 		Class:       className,
@@ -36,5 +37,5 @@ func DonutShellcodeFromFile(filePath string, outfile string, arch string, dotnet
 		UnicodeArgs: false,
 		ExitOption:  1,
 	}
-	return ExecuteDonut(filePath, donutOps)
+	return donut.ExecuteDonut(filePath, donutOps)
 }
