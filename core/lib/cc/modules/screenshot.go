@@ -30,7 +30,8 @@ func TakeScreenshot(cmd *cobra.Command, args []string) {
 	// then we handle the cmd output in agentHandler
 }
 
-func processScreenshot(out string, target *emp3r0r_def.Emp3r0rAgent) (err error) {
+// ProcessScreenshot download and process screenshot
+func ProcessScreenshot(out string, target *emp3r0r_def.Emp3r0rAgent) (err error) {
 	if strings.Contains(out, "Error") {
 		return fmt.Errorf("%s", out)
 	}
@@ -61,7 +62,7 @@ func processScreenshot(out string, target *emp3r0r_def.Emp3r0rAgent) (err error)
 		if is_download_corrupted() {
 			logging.Warningf("Processing screenshot %s: incomplete download detected, retrying...",
 				strconv.Quote(out))
-			return processScreenshot(out, target)
+			return ProcessScreenshot(out, target)
 		}
 	}
 
