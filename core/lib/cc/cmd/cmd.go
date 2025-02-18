@@ -342,7 +342,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			GroupID: "agent",
 			Short:   "List connected agents",
 			Args:    cobra.NoArgs,
-			Run:     cmdLsTargets,
+			Run:     agent_util.CmdLsTargets,
 		}
 		rootCmd.AddCommand(lsTargetCmd)
 

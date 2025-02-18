@@ -1,11 +1,10 @@
-package cmd
+package agent_util
 
 import (
 	"fmt"
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
@@ -66,7 +65,7 @@ func RenderAgentTable(agents []*emp3r0r_def.Emp3r0rAgent) string {
 
 // ListConnectedAgents renders and prints the table of connected agents.
 func ListConnectedAgents() {
-	agents := agent_util.GetConnectedAgents()
+	agents := GetConnectedAgents()
 	tableOutput := RenderAgentTable(agents)
 	if cli.AgentListPane == nil {
 		logging.Errorf("AgentListPane doesn't exist")
@@ -76,7 +75,7 @@ func ListConnectedAgents() {
 }
 
 // Update agent list, then switch to its tmux window
-func cmdLsTargets(cmd *cobra.Command, args []string) {
+func CmdLsTargets(cmd *cobra.Command, args []string) {
 	ListConnectedAgents()
 	cli.TmuxSwitchWindow(cli.AgentListPane.WindowID)
 }
