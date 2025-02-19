@@ -8,8 +8,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/fs"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/generate"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/server"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/tools"
@@ -157,7 +155,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			GroupID: "filesystem",
 			Short:   "Browse remote files in your local file manager with SFTP protocol",
 			Args:    cobra.NoArgs,
-			Run:     tools.OpenFileManager,
+			Run:     modules.CmdOpenFileManager,
 		}
 		rootCmd.AddCommand(fileManagerCmd)
 
@@ -167,7 +165,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Short:   "List a directory of selected agent, without argument it lists current directory",
 			Example: "ls /tmp",
 			Args:    cobra.MaximumNArgs(1),
-			Run:     fs.CmdLs,
+			Run:     CmdLs,
 		}
 		rootCmd.AddCommand(lsCmd)
 		carapace.Gen(lsCmd).PositionalCompletion(carapace.ActionMultiParts("/", listRemoteDir))
@@ -177,7 +175,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			GroupID: "filesystem",
 			Short:   "Change current working directory of selected agent",
 			Args:    cobra.ExactArgs(1),
-			Run:     fs.CmdCd,
+			Run:     CmdCd,
 		}
 		rootCmd.AddCommand(cdCmd)
 		carapace.Gen(cdCmd).PositionalCompletion(carapace.ActionMultiParts("/", listRemoteDir))
@@ -188,7 +186,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Short:   "Copy a file to another location on selected target",
 			Example: "cp /tmp/1.txt /tmp/2.txt",
 			Args:    cobra.ExactArgs(2),
-			Run:     fs.CmdCp,
+			Run:     CmdCp,
 		}
 		rootCmd.AddCommand(cpCmd)
 		carapace.Gen(cpCmd).PositionalCompletion(carapace.ActionMultiParts("/", listRemoteDir),
@@ -200,7 +198,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Short:   "Move a file to another location on selected target",
 			Example: "mv /tmp/1.txt /tmp/2.txt",
 			Args:    cobra.ExactArgs(2),
-			Run:     fs.CmdMv,
+			Run:     CmdMv,
 		}
 		rootCmd.AddCommand(mvCmd)
 		carapace.Gen(mvCmd).PositionalCompletion(carapace.ActionMultiParts("/", listRemoteDir),
@@ -212,7 +210,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Short:   "Delete a file/directory on selected agent",
 			Example: "rm /tmp/1.txt",
 			Args:    cobra.ExactArgs(1),
-			Run:     fs.CmdRm,
+			Run:     CmdRm,
 		}
 		rootCmd.AddCommand(rmCmd)
 		carapace.Gen(rmCmd).PositionalCompletion(carapace.ActionMultiParts("/", listRemoteDir))
@@ -223,7 +221,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Short:   "Print file content on selected agent",
 			Example: "cat /tmp/file",
 			Args:    cobra.ExactArgs(1),
-			Run:     fs.CmdCat,
+			Run:     CmdCat,
 		}
 		rootCmd.AddCommand(catCmd)
 		carapace.Gen(catCmd).PositionalCompletion(carapace.ActionMultiParts("/", listRemoteDir))
@@ -234,7 +232,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Short:   "Create new directory on selected agent",
 			Example: "mkdir /tmp/newdir",
 			Args:    cobra.ExactArgs(1),
-			Run:     fs.CmdMkdir,
+			Run:     CmdMkdir,
 		}
 		rootCmd.AddCommand(mkdirCmd)
 		carapace.Gen(mkdirCmd).PositionalCompletion(carapace.ActionMultiParts("", listRemoteDir))
@@ -244,7 +242,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			GroupID: "filesystem",
 			Short:   "Current working directory of selected agent",
 			Args:    cobra.NoArgs,
-			Run:     fs.CmdPwd,
+			Run:     CmdPwd,
 		}
 		rootCmd.AddCommand(pwdCmd)
 
@@ -252,7 +250,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Use:     "ps",
 			GroupID: "filesystem",
 			Short:   "Process list of selected agent",
-			Run:     fs.CmdPs,
+			Run:     CmdPs,
 		}
 		psCmd.Flags().IntP("pid", "p", 0, "Filter by PID")
 		psCmd.Flags().StringP("user", "u", "", "Filter by user name")
@@ -265,7 +263,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			GroupID: "network",
 			Short:   "Network helper: ip addr, ip route, ip neigh",
 			Args:    cobra.NoArgs,
-			Run:     fs.CmdNetHelper,
+			Run:     CmdNetHelper,
 		}
 		rootCmd.AddCommand(netHelperCmd)
 
@@ -275,7 +273,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Short:   "Terminate a process on selected agent",
 			Example: "kill 1234 5678",
 			Args:    cobra.MinimumNArgs(1),
-			Run:     fs.CmdKill,
+			Run:     CmdKill,
 		}
 		rootCmd.AddCommand(killCmd)
 
@@ -324,7 +322,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Use:     "suicide",
 			GroupID: "agent",
 			Short:   "Kill agent process, delete agent root directory",
-			Run:     fs.CmdSuicide,
+			Run:     CmdSuicide,
 		}
 		rootCmd.AddCommand(suicideCmd)
 
@@ -449,10 +447,10 @@ func gen_agent_cmd() *cobra.Command {
 		GroupID: "agent",
 		Short:   "Generate an agent binary or implant",
 		Example: "generate --type linux_executable --arch amd64",
-		Run:     generate.GenerateAgent,
+		Run:     CmdGenerateAgent,
 	}
-	genAgentCmd.Flags().StringP("type", "t", generate.PayloadTypeLinuxExecutable, fmt.Sprintf("Payload type, available: %v+", generate.PayloadTypeList))
-	genAgentCmd.Flags().StringP("arch", "a", "amd64", fmt.Sprintf("Target architecture, available: %v+", generate.Arch_List_All))
+	genAgentCmd.Flags().StringP("type", "t", PayloadTypeLinuxExecutable, fmt.Sprintf("Payload type, available: %v+", PayloadTypeList))
+	genAgentCmd.Flags().StringP("arch", "a", "amd64", fmt.Sprintf("Target architecture, available: %v+", Arch_List_All))
 	cc_hosts := tun.NamesInCert(def.ServerCrtFile)
 	genAgentCmd.Flags().StringP("cc", "", cc_hosts[0], "C2 server address")
 	genAgentCmd.Flags().StringP("cdn", "", "", "CDN proxy to reach C2, leave empty to disable. Example: wss://cdn.example.com/ws")
@@ -469,8 +467,8 @@ func gen_agent_cmd() *cobra.Command {
 
 	// completers
 	carapace.Gen(genAgentCmd).FlagCompletion(carapace.ActionMap{
-		"type":      carapace.ActionValues(generate.PayloadTypeList...),
-		"arch":      carapace.ActionValues(generate.Arch_List_All...),
+		"type":      carapace.ActionValues(PayloadTypeList...),
+		"arch":      carapace.ActionValues(Arch_List_All...),
 		"cc":        carapace.ActionValues(cc_hosts...),
 		"cdn":       carapace.ActionValues("wss://", "ws://"),
 		"doh":       carapace.ActionValues("https://1.1.1.1/dns-query", "https://8.8.8.8/dns-query", "https://9.9.9.9/dns-query"),

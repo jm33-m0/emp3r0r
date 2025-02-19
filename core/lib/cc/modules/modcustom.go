@@ -14,7 +14,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/tools"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -199,7 +198,7 @@ func handleInteractiveModule(config emp3r0r_def.ModuleConfig, cmd_id string) {
 		def.CmdResultsMutex.Unlock()
 	}()
 
-	sshErr := tools.SSHClient(fmt.Sprintf("%s/%s/%s",
+	sshErr := SSHClient(fmt.Sprintf("%s/%s/%s",
 		def.RuntimeConfig.AgentRoot, def.ActiveModule, config.AgentConfig.Exec),
 		args, port, false)
 	if sshErr != nil {

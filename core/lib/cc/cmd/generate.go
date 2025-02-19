@@ -1,4 +1,4 @@
-package generate
+package cmd
 
 import (
 	"bytes"
@@ -61,7 +61,8 @@ var Arch_List_All = []string{
 	"riscv64",
 }
 
-func GenerateAgent(cmd *cobra.Command, args []string) {
+// CmdGenerateAgent generates agent binary
+func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 	var outfile string // write agent binary to this path
 
 	// check if we have all required options
