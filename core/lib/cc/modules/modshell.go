@@ -2,8 +2,8 @@ package modules
 
 import (
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/core"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/tools"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
@@ -91,7 +91,7 @@ func moduleShell() {
 	port := portOpt.Val
 
 	// run
-	err := core.SSHClient(shell, args, port, false)
+	err := tools.SSHClient(shell, args, port, false)
 	if err != nil {
 		logging.Errorf("moduleShell: %v", err)
 	}

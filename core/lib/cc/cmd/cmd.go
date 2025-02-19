@@ -7,12 +7,12 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/cli"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/core"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/fs"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/generate"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/server"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/tools"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -147,7 +147,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			GroupID: "c2",
 			Short:   "Upgrade emp3r0r from GitHub",
 			Example: "upgrade_cc [--force]",
-			Run:     core.UpdateCC,
+			Run:     tools.UpdateCC,
 		}
 		upgradeCCCmd.Flags().BoolP("force", "f", false, "Force upgrade")
 		rootCmd.AddCommand(upgradeCCCmd)
@@ -157,7 +157,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			GroupID: "filesystem",
 			Short:   "Browse remote files in your local file manager with SFTP protocol",
 			Args:    cobra.NoArgs,
-			Run:     core.OpenFileManager,
+			Run:     tools.OpenFileManager,
 		}
 		rootCmd.AddCommand(fileManagerCmd)
 

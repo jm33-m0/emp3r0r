@@ -11,10 +11,10 @@ import (
 	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/cli"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/core"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/server"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/tools"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -34,7 +34,7 @@ func CliMain() {
 	go modules.InitModules()
 
 	// unlock incomplete downloads
-	err := core.UnlockDownloads()
+	err := tools.UnlockDownloads()
 	if err != nil {
 		logging.Debugf("UnlockDownloads: %v", err)
 	}
