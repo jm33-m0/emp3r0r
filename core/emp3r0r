@@ -261,7 +261,7 @@ get_version() {
   build_time=$(date +"%y%m%d%H%M")
   version=$(get_git_version)
   if [[ "$version" = "unknown" ]]; then
-    version=$(grep -oP 'Version = "\K[^"]+' ./lib/emp3r0r_def/def.go)
+    version=$(grep -oP 'Version = "\K[^"]+' ./internal/def/def.go)
   fi
   echo "$version-$build_time"
 }
