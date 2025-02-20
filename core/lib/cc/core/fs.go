@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/agents"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/spf13/cobra"
 )
@@ -26,7 +26,7 @@ func CmdPwd(_ *cobra.Command, _ []string) {
 }
 
 func CmdCd(_ *cobra.Command, args []string) {
-	activeAgent := agent_util.MustGetActiveAgent()
+	activeAgent := agents.MustGetActiveAgent()
 	if activeAgent == nil {
 		logging.Errorf("cd: no active target")
 		return
@@ -35,7 +35,7 @@ func CmdCd(_ *cobra.Command, args []string) {
 	dst := args[0]
 	activeAgent.CWD = dst
 	cmd_id := uuid.NewString()
-	err := agent_util.SendCmdToCurrentTarget(fmt.Sprintf("cd --dst %s", dst), cmd_id)
+	err := agents.SendCmdToCurrentTarget(fmt.Sprintf("cd --dst %s", dst), cmd_id)
 	if err != nil {
 		logging.Errorf("Cannot cd to %s: %v", dst, err)
 		return
@@ -126,12 +126,12 @@ func CmdFSCmdSrcDst(cmd, src, dst string) {
 }
 
 func executeCmd(cmd string) {
-	activeAgent := agent_util.MustGetActiveAgent()
+	activeAgent := agents.MustGetActiveAgent()
 	if activeAgent == nil {
 		logging.Errorf("%s: no active target", cmd)
 		return
 	}
-	err := agent_util.SendCmdToCurrentTarget(cmd, "")
+	err := agents.SendCmdToCurrentTarget(cmd, "")
 	if err != nil {
 		logging.Errorf("%s failed: %v", cmd, err)
 	}

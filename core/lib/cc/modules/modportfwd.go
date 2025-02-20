@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/network"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/agents"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/network"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -41,7 +41,7 @@ func modulePortFwd() {
 				// make sure handler returns
 				// cmd format: !port_fwd [to/listen] [shID] [operation]
 				cmd := fmt.Sprintf("%s --shID %s --operation stop", emp3r0r_def.C2CmdPortFwd, id)
-				sendCMDerr := agent_util.SendCmd(cmd, "", def.ActiveAgent)
+				sendCMDerr := agents.SendCmd(cmd, "", def.ActiveAgent)
 				if sendCMDerr != nil {
 					logging.Errorf("SendCmd: %v", sendCMDerr)
 					return
@@ -113,7 +113,7 @@ func moduleProxy() {
 	case "on":
 		// tell agent to start local socks5 proxy
 		cmd_id := uuid.NewString()
-		err := agent_util.SendCmdToCurrentTarget("!proxy --mode on --addr 0.0.0.0:"+def.RuntimeConfig.AgentSocksServerPort, cmd_id)
+		err := agents.SendCmdToCurrentTarget("!proxy --mode on --addr 0.0.0.0:"+def.RuntimeConfig.AgentSocksServerPort, cmd_id)
 		if err != nil {
 			logging.Errorf("Starting SOCKS4 proxy on target failed: %v", err)
 			return
@@ -162,7 +162,7 @@ func moduleProxy() {
 				// tell the agent to close connection
 				// make sure handler returns
 				cmd := fmt.Sprintf("%s --id %s", emp3r0r_def.C2CmdDeletePortFwd, id)
-				err := agent_util.SendCmd(cmd, "", session.Agent)
+				err := agents.SendCmd(cmd, "", session.Agent)
 				if err != nil {
 					logging.Errorf("SendCmd: %v", err)
 					return

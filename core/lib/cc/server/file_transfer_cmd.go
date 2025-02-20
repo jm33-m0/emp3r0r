@@ -7,16 +7,16 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/network"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/agents"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/network"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
 )
 
 func CmdUploadToAgent(cmd *cobra.Command, args []string) {
-	target := agent_util.MustGetActiveAgent()
+	target := agents.MustGetActiveAgent()
 	if target == nil {
 		logging.Errorf("You have to select a target first")
 		return
@@ -49,7 +49,7 @@ func CmdDownloadFromAgent(cmd *cobra.Command, args []string) {
 }
 
 func downloadFromAgent(cmd *cobra.Command, args []string) {
-	target := agent_util.MustGetActiveAgent()
+	target := agents.MustGetActiveAgent()
 	if target == nil {
 		logging.Errorf("You have to select a target first")
 		return
@@ -70,7 +70,7 @@ func downloadFromAgent(cmd *cobra.Command, args []string) {
 
 	if isRecursive {
 		cmd_id := uuid.NewString()
-		err = agent_util.SendCmdToCurrentTarget(fmt.Sprintf("get --file_path %s --filter %s --offset 0 --token %s", file_path, strconv.Quote(filter), uuid.NewString()), cmd_id)
+		err = agents.SendCmdToCurrentTarget(fmt.Sprintf("get --file_path %s --filter %s --offset 0 --token %s", file_path, strconv.Quote(filter), uuid.NewString()), cmd_id)
 		if err != nil {
 			logging.Errorf("Cannot get %v+: %v", args, err)
 			return

@@ -1,8 +1,8 @@
 package modules
 
 import (
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/agents"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/def"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
@@ -23,7 +23,7 @@ func moduleCmd() {
 			logging.Errorf("Option 'cmd_to_exec' not found")
 			return
 		}
-		err := agent_util.SendCmd(cmdOpt.Val, "", target)
+		err := agents.SendCmd(cmdOpt.Val, "", target)
 		if err != nil {
 			logging.Errorf("moduleCmd: %v", err)
 		}

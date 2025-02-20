@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/network"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/network"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/server"
 	"github.com/jm33-m0/emp3r0r/core/lib/donut"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"

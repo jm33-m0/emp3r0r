@@ -11,9 +11,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/arc"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/cli"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/agents"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/cli"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/def"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -134,7 +134,7 @@ func handleInMemoryModule(config emp3r0r_def.ModuleConfig, payload_type, envStr,
 		emp3r0r_def.C2CmdCustomModule, def.ActiveModule, payload_type, util.FileBaseName(hosted_file), tun.SHA256SumFile(hosted_file), download_addr, envStr)
 	cmd_id := uuid.NewString()
 	logging.Debugf("Sending command %s to %s", cmd, def.ActiveAgent.Tag)
-	err = agent_util.SendCmdToCurrentTarget(cmd, cmd_id)
+	err = agents.SendCmdToCurrentTarget(cmd, cmd_id)
 	if err != nil {
 		logging.Errorf("Sending command %s to %s: %v", cmd, def.ActiveAgent.Tag, err)
 	}
@@ -162,7 +162,7 @@ func handleCompressedModule(config emp3r0r_def.ModuleConfig, payload_type, exec_
 		emp3r0r_def.C2CmdCustomModule,
 		def.ActiveModule, checksum, envStr, download_addr, payload_type, file_to_download, exec_cmd)
 	cmd_id := uuid.NewString()
-	err := agent_util.SendCmdToCurrentTarget(cmd, cmd_id)
+	err := agents.SendCmdToCurrentTarget(cmd, cmd_id)
 	if err != nil {
 		logging.Errorf("Sending command %s to %s: %v", cmd, def.ActiveAgent.Tag, err)
 	}

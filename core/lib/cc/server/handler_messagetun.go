@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/agents"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/def"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -35,7 +35,7 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 				def.AgentControlMapMutex.RUnlock()
 				logging.Errorf("[%d] Agent dies", c.Index)
 				logging.Printf("[%d] agent %s disconnected", c.Index, strconv.Quote(t.Tag))
-				agent_util.ListConnectedAgents()
+				agents.ListConnectedAgents()
 				break
 			}
 		}
@@ -71,7 +71,7 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 			} else {
 				processAgentData(&msg)
 			}
-			agent := agent_util.GetAgentByTag(msg.Tag)
+			agent := agents.GetAgentByTag(msg.Tag)
 			if agent == nil {
 				logging.Errorf("No agent found for message: %v", msg)
 				return

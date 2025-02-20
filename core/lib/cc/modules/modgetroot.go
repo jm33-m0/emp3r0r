@@ -3,9 +3,9 @@ package modules
 import (
 	"fmt"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/tools"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/agents"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/tools"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -48,7 +48,7 @@ func moduleLPE() {
 		logging.Printf("This can take some time, please be patient")
 		cmd := fmt.Sprintf("%s --script_name %s", emp3r0r_def.C2CmdLPE, helperName)
 		logging.Infof("Running %s", cmd)
-		err = agent_util.SendCmd(cmd, "", target)
+		err = agents.SendCmd(cmd, "", target)
 		if err != nil {
 			logging.Errorf("Run %s: %v", cmd, err)
 		}

@@ -9,12 +9,12 @@ import (
 	cowsay "github.com/Code-Hex/Neo-cowsay/v2"
 	"github.com/alecthomas/chroma/quick"
 	"github.com/fatih/color"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/cli"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/agents"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/cli"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/tools"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/server"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/tools"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -100,7 +100,7 @@ func SetDynamicPrompt() string {
 	prompt_name := color.New(color.Bold, color.FgBlack, color.BgHiWhite).Sprint(AppName)
 	transport := color.New(color.FgRed).Sprint("local")
 
-	if def.ActiveAgent != nil && agent_util.IsAgentExist(def.ActiveAgent) {
+	if def.ActiveAgent != nil && agents.IsAgentExist(def.ActiveAgent) {
 		shortName = strings.Split(def.ActiveAgent.Tag, "-agent")[0]
 		if def.ActiveAgent.HasRoot {
 			prompt_arrow = color.New(color.Bold, color.FgHiGreen).Sprint("\n# ")

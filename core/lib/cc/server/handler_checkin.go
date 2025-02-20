@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/agents"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/def"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -37,19 +37,19 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 	target.From = req.RemoteAddr
-	if !agent_util.IsAgentExist(&target) {
-		inx := agent_util.AssignAgentIndex()
+	if !agents.IsAgentExist(&target) {
+		inx := agents.AssignAgentIndex()
 		def.AgentControlMapMutex.RLock()
 		def.AgentControlMap[&target] = &def.AgentControl{Index: inx, Conn: nil}
 		def.AgentControlMapMutex.RUnlock()
 		shortname := strings.Split(target.Tag, "-agent")[0]
-		if util.IsExist(agent_util.AgentsJSON) {
-			if l := agent_util.RefreshAgentLabel(&target); l != "" {
+		if util.IsExist(agents.AgentsJSON) {
+			if l := agents.RefreshAgentLabel(&target); l != "" {
 				shortname = l
 			}
 		}
 		logging.Printf("Checked in: %s from %s, running %s", strconv.Quote(shortname), fmt.Sprintf("'%s - %s'", target.From, target.Transport), strconv.Quote(target.OS))
-		agent_util.ListConnectedAgents()
+		agents.ListConnectedAgents()
 	} else {
 		for a := range def.AgentControlMap {
 			if a.Tag == target.Tag {
@@ -58,8 +58,8 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 			}
 		}
 		shortname := strings.Split(target.Tag, "-agent")[0]
-		if util.IsExist(agent_util.AgentsJSON) {
-			if l := agent_util.RefreshAgentLabel(&target); l != "" {
+		if util.IsExist(agents.AgentsJSON) {
+			if l := agents.RefreshAgentLabel(&target); l != "" {
 				shortname = l
 			}
 		}

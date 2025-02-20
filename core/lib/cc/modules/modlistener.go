@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/fatih/color"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/agents"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/def"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
@@ -22,7 +22,7 @@ func modListener() {
 		def.AvailableModuleOptions["payload"].Val,
 		def.AvailableModuleOptions["compression"].Val,
 		def.AvailableModuleOptions["passphrase"].Val)
-	err := agent_util.SendCmd(cmd, "", def.ActiveAgent)
+	err := agents.SendCmd(cmd, "", def.ActiveAgent)
 	if err != nil {
 		logging.Errorf("SendCmd: %v", err)
 		return

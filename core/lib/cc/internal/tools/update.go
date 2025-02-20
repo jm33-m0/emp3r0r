@@ -13,7 +13,7 @@ import (
 
 	"github.com/cavaliergopher/grab/v3"
 	version "github.com/hashicorp/go-version"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/cli"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/cli"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"

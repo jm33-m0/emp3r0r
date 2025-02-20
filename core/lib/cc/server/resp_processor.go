@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/cli"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/agents"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/cli"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/def"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -23,7 +23,7 @@ func processAgentData(data *emp3r0r_def.MsgTunData) {
 	def.AgentControlMapMutex.RLock()
 	defer def.AgentControlMapMutex.RUnlock()
 
-	target := agent_util.GetAgentByTag(data.Tag)
+	target := agents.GetAgentByTag(data.Tag)
 	contrlIf := def.AgentControlMap[target]
 	if target == nil || contrlIf == nil {
 		logging.Errorf("Target %s cannot be found, however, it left a message saying:\n%v",

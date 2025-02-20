@@ -3,8 +3,8 @@ package modules
 import (
 	"fmt"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/agents"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/def"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
@@ -23,7 +23,7 @@ func moduleFileServer() {
 		return
 	}
 	cmd := fmt.Sprintf("%s --port %s --switch %s", emp3r0r_def.C2CmdFileServer, portOpt.Val, server_switch)
-	err := agent_util.SendCmd(cmd, "", def.ActiveAgent)
+	err := agents.SendCmd(cmd, "", def.ActiveAgent)
 	if err != nil {
 		logging.Errorf("SendCmd: %v", err)
 		return
@@ -45,7 +45,7 @@ func moduleDownloader() {
 	path := def.AvailableModuleOptions["path"].Val
 
 	cmd := fmt.Sprintf("%s --download_addr %s --checksum %s --path %s", emp3r0r_def.C2CmdFileDownloader, download_addr, checksum, path)
-	err := agent_util.SendCmdToCurrentTarget(cmd, "")
+	err := agents.SendCmdToCurrentTarget(cmd, "")
 	if err != nil {
 		logging.Errorf("SendCmd: %v", err)
 		return

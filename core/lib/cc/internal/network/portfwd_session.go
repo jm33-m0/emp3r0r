@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/agents"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/def"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -57,7 +57,7 @@ func (pf *PortFwdSession) InitReversedPortFwd() (err error) {
 	PortFwdsMutex.Unlock()
 
 	cmd := fmt.Sprintf("%s --to %s --shID %s --operation reverse", emp3r0r_def.C2CmdPortFwd, listenPort, fwdID)
-	err = agent_util.SendCmd(cmd, "", def.ActiveAgent)
+	err = agents.SendCmd(cmd, "", def.ActiveAgent)
 	if err != nil {
 		logging.Errorf("SendCmd: %v", err)
 		return
@@ -193,7 +193,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 
 	fwdID := uuid.New().String()
 	cmd := fmt.Sprintf("%s --to %s --shID %s --operation %s", emp3r0r_def.C2CmdPortFwd, toAddr, fwdID, pf.Protocol)
-	err = agent_util.SendCmdToCurrentTarget(cmd, "")
+	err = agents.SendCmdToCurrentTarget(cmd, "")
 	if err != nil {
 		return fmt.Errorf("SendCmd: %v", err)
 	}
@@ -248,7 +248,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		shID := fmt.Sprintf("%s_%s-udp", fwdID, client_tag)
 		cmd = fmt.Sprintf("%s --to %s --shID %s --operation %s --timeout %d",
 			emp3r0r_def.C2CmdPortFwd, toAddr, shID, pf.Protocol, pf.Timeout)
-		err = agent_util.SendCmd(cmd, "", pf.Agent)
+		err = agents.SendCmd(cmd, "", pf.Agent)
 		if err != nil {
 			logging.Errorf("SendCmd: %v", err)
 			return
@@ -302,7 +302,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 				shID := fmt.Sprintf("%s_%s", fwdID, srcPort)
 				cmd = fmt.Sprintf("%s --to %s --shID %s --operation %s --timeout %d",
 					emp3r0r_def.C2CmdPortFwd, toAddr, shID, pf.Protocol, pf.Timeout)
-				err = agent_util.SendCmd(cmd, "", pf.Agent)
+				err = agents.SendCmd(cmd, "", pf.Agent)
 				if err != nil {
 					logging.Errorf("SendCmd: %v", err)
 					return

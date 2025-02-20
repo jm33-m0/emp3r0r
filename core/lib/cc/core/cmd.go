@@ -5,12 +5,12 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/cli"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/agents"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/cli"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/tools"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/server"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/tools"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -124,7 +124,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Short:   "Set active target",
 			Example: "target 0",
 			Args:    cobra.ExactArgs(1),
-			Run:     agent_util.CmdSetActiveAgent,
+			Run:     agents.CmdSetActiveAgent,
 		}
 		rootCmd.AddCommand(targetCmd)
 		carapace.Gen(targetCmd).PositionalCompletion(carapace.ActionCallback(listTargetIndexTags))
@@ -340,7 +340,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			GroupID: "agent",
 			Short:   "List connected agents",
 			Args:    cobra.NoArgs,
-			Run:     agent_util.CmdLsTargets,
+			Run:     agents.CmdLsTargets,
 		}
 		rootCmd.AddCommand(lsTargetCmd)
 
@@ -381,7 +381,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			GroupID: "agent",
 			Short:   "Label an agent with custom name",
 			Example: "label --id <agent_id> --label <custom_name>",
-			Run:     agent_util.CmdSetAgentLabel,
+			Run:     agents.CmdSetAgentLabel,
 		}
 		labelAgentCmd.Flags().StringP("id", "", "0", "Agent ID")
 		labelAgentCmd.Flags().StringP("label", "", "no-label", "Custom name")
@@ -425,7 +425,7 @@ func execCmd(cmd *cobra.Command, args []string) {
 	}
 
 	// execute command
-	err = agent_util.SendCmdToCurrentTarget(fmt.Sprintf("exec --cmd %s", strconv.Quote(cmdStr)), "")
+	err = agents.SendCmdToCurrentTarget(fmt.Sprintf("exec --cmd %s", strconv.Quote(cmdStr)), "")
 	if err != nil {
 		logging.Errorf("Error executing command: %v", err)
 	}

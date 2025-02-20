@@ -5,9 +5,9 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/network"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/agents"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/network"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -64,7 +64,7 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 		}
 		wrt.WriteHeader(http.StatusBadRequest)
 	case tun.FileAPI:
-		if !agent_util.IsAgentExistByTag(token) {
+		if !agents.IsAgentExistByTag(token) {
 			wrt.WriteHeader(http.StatusBadRequest)
 			return
 		}

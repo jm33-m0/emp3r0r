@@ -3,8 +3,8 @@ package modules
 import (
 	"fmt"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/agents"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/def"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -47,7 +47,7 @@ func moduleInjector() {
 	cmd := fmt.Sprintf("%s --method %s --pid %s --checksum %s", emp3r0r_def.C2CmdInject, method, pid, checksum)
 
 	// tell agent to inject
-	err := agent_util.SendCmd(cmd, "", target)
+	err := agents.SendCmd(cmd, "", target)
 	if err != nil {
 		logging.Errorf("Could not send command (%s) to agent: %v", cmd, err)
 		return

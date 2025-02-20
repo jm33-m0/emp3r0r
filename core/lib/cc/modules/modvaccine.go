@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/agents"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/def"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -28,7 +28,7 @@ func moduleVaccine() {
 		}
 		download_addr := downloadOpt.Val
 		checksum := tun.SHA256SumFile(def.UtilsArchive)
-		err = agent_util.SendCmd(fmt.Sprintf("%s --checksum %s --download_addr %s", emp3r0r_def.C2CmdUtils, checksum, download_addr), "", def.ActiveAgent)
+		err = agents.SendCmd(fmt.Sprintf("%s --checksum %s --download_addr %s", emp3r0r_def.C2CmdUtils, checksum, download_addr), "", def.ActiveAgent)
 		if err != nil {
 			logging.Errorf("SendCmd failed: %v", err)
 		}

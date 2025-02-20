@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/network"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/agents"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/network"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -22,7 +22,7 @@ import (
 func StatFile(filepath string, a *emp3r0r_def.Emp3r0rAgent) (fi *util.FileStat, err error) {
 	cmd_id := uuid.NewString()
 	cmd := fmt.Sprintf("%s --path '%s'", emp3r0r_def.C2CmdStat, filepath)
-	err = agent_util.SendCmd(cmd, cmd_id, a)
+	err = agents.SendCmd(cmd, cmd_id, a)
 	if err != nil {
 		return
 	}
@@ -77,7 +77,7 @@ func PutFile(lpath, rpath string, a *emp3r0r_def.Emp3r0rAgent) error {
 
 	// send cmd
 	cmd := fmt.Sprintf("put --file '%s' --path '%s' --checksum %s --size %d", lpath, rpath, sum, size)
-	err = agent_util.SendCmd(cmd, "", a)
+	err = agents.SendCmd(cmd, "", a)
 	if err != nil {
 		return fmt.Errorf("PutFile send command: %v", err)
 	}
@@ -166,7 +166,7 @@ func GetFile(file_path string, agent *emp3r0r_def.Emp3r0rAgent) (ftpSh *network.
 
 	// cmd
 	cmd := fmt.Sprintf("get --file_path '%s' --offset %d --token '%s'", file_path, offset, ftpSh.Token)
-	err = agent_util.SendCmd(cmd, "", agent)
+	err = agents.SendCmd(cmd, "", agent)
 	if err != nil {
 		logging.Errorf("GetFile send command: %v", err)
 		return nil, err

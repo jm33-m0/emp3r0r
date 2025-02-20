@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/agents"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/internal/network"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/modules"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/network"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/rsteube/carapace"
@@ -75,7 +75,7 @@ func listOptions(ctx carapace.Context) carapace.Action {
 
 // remote autocomplete items in $PATH
 func listAgentExes(ctx carapace.Context) carapace.Action {
-	agent := agent_util.MustGetActiveAgent()
+	agent := agents.MustGetActiveAgent()
 	if agent == nil {
 		logging.Debugf("No valid target selected so no autocompletion for exes")
 		return carapace.ActionValues()
@@ -108,7 +108,7 @@ var (
 
 // autocomplete items in current remote directory
 func listRemoteDir(ctx carapace.Context) carapace.Action {
-	activeAgent := agent_util.MustGetActiveAgent()
+	activeAgent := agents.MustGetActiveAgent()
 	if activeAgent == nil {
 		logging.Debugf("No valid target selected so no auto-completion for remote directory")
 		return carapace.ActionValues()
@@ -138,7 +138,7 @@ func listRemoteDirWorker(path_to_list string) (cwd string, names []string) {
 	names = make([]string, 0) // listing to return
 	cmd := fmt.Sprintf("%s --path %s", emp3r0r_def.C2CmdListDir, path_to_list)
 	cmd_id := uuid.NewString()
-	err := agent_util.SendCmdToCurrentTarget(cmd, cmd_id)
+	err := agents.SendCmdToCurrentTarget(cmd, cmd_id)
 	if err != nil {
 		logging.Debugf("Cannot list remote directory: %v", err)
 		return
