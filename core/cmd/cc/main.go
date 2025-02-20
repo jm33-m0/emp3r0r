@@ -13,11 +13,11 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/core"
-	"github.com/jm33-m0/emp3r0r/core/internal/cli"
-	"github.com/jm33-m0/emp3r0r/core/internal/logging"
-	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
+	"github.com/jm33-m0/emp3r0r/core/lib/cli"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 )
 
@@ -51,26 +51,26 @@ func parseFlags() *Options {
 func init() {
 	// set up dirs and default varaibles
 	// including config file location
-	runtime_def.Prompt = cli.Prompt // implement prompt_func
-	err := runtime_def.InitCC()
+	live.Prompt = cli.Prompt // implement prompt_func
+	err := live.InitCC()
 	if err != nil {
 		log.Fatalf("C2 file paths setup: %v", err)
 	}
 
 	// set up logger
-	Logger, err = logging.NewLogger(runtime_def.EmpLogFile, 2)
+	Logger, err = logging.NewLogger(live.EmpLogFile, 2)
 	if err != nil {
 		log.Fatalf("cc: failed to set up logger: %v", err)
 	}
 
 	// read config file
-	err = runtime_def.ReadJSONConfig()
+	err = live.ReadJSONConfig()
 	if err != nil {
 		Logger.Fatal("Failed to read config: %v", err)
 	}
 
 	// set up magic string
-	runtime_def.InitMagicAgentOneTimeBytes()
+	live.InitMagicAgentOneTimeBytes()
 }
 
 func main() {
@@ -79,7 +79,7 @@ func main() {
 
 	// do not kill tmux session when crashing
 	if opts.debug {
-		runtime_def.TmuxPersistence = true
+		live.TmuxPersistence = true
 	}
 
 	// abort if CC is already running
@@ -116,13 +116,13 @@ func runSSHRelayClient(opts *Options) {
 	go func(pass string) {
 		defer Logger.Error("session unexpectedly exited, please restart emp3r0r")
 		SSHConnections := make(map[string]context.CancelFunc, 10)
-		pubkey, sshKeyErr := tun.SSHPublicKey(runtime_def.RuntimeConfig.SSHHostKey)
+		pubkey, sshKeyErr := transport.SSHPublicKey(live.RuntimeConfig.SSHHostKey)
 		if sshKeyErr != nil {
 			Logger.Fatal("Parsing SSHPublicKey: %v", sshKeyErr)
 		}
 	ssh_connect:
 		ctx, cancel := context.WithCancel(context.Background())
-		sshKeyErr = tun.SSHRemoteFwdClient(opts.connectRelayAddr,
+		sshKeyErr = transport.SSHRemoteFwdClient(opts.connectRelayAddr,
 			pass,
 			pubkey, // enable host key verification
 			opts.relayedPort,
@@ -144,10 +144,10 @@ func runSSHRelayServer(opts *Options) {
 	log.Printf("SSH password is %s. Copy ~/.emp3r0r to client host, "+
 		"then run `emp3r0r -connect_relay relay_ip:%s -relayed_port %s` "+
 		"(C2 port, or KCP port %s if you are using it)",
-		strconv.Quote(sshPassword), opts.sshRelayPort, runtime_def.RuntimeConfig.CCPort, runtime_def.RuntimeConfig.KCPServerPort)
-	if err := tun.SSHRemoteFwdServer(opts.sshRelayPort,
+		strconv.Quote(sshPassword), opts.sshRelayPort, live.RuntimeConfig.CCPort, live.RuntimeConfig.KCPServerPort)
+	if err := transport.SSHRemoteFwdServer(opts.sshRelayPort,
 		sshPassword,
-		runtime_def.RuntimeConfig.SSHHostKey); err != nil {
+		live.RuntimeConfig.SSHHostKey); err != nil {
 		log.Fatalf("SSHRemoteFwdServer: %v", err)
 	}
 }
@@ -159,7 +159,7 @@ func startCDN2Proxy(opts *Options) {
 		if openErr != nil {
 			Logger.Fatal("OpenFile: %v", openErr)
 		}
-		openErr = cdn2proxy.StartServer(opts.cdnProxy, "127.0.0.1:"+runtime_def.RuntimeConfig.CCPort, "ws", logFile)
+		openErr = cdn2proxy.StartServer(opts.cdnProxy, "127.0.0.1:"+live.RuntimeConfig.CCPort, "ws", logFile)
 		if openErr != nil {
 			Logger.Fatal("CDN StartServer: %v", openErr)
 		}

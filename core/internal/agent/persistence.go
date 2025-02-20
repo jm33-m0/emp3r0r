@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/exe_utils"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/exe_utils"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -49,7 +49,7 @@ var (
 // Configure install locations
 func getInstallLocations() (locations []string) {
 	for _, loc := range WritableLocations {
-		fname := emp3r0r_def.CommonFilenames[util.RandInt(0, len(emp3r0r_def.CommonFilenames))]
+		fname := def.CommonFilenames[util.RandInt(0, len(def.CommonFilenames))]
 		locations = append(locations, loc+"/"+fname)
 	}
 	return

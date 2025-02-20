@@ -8,7 +8,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/external_file"
+	"github.com/jm33-m0/emp3r0r/core/lib/external_file"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 

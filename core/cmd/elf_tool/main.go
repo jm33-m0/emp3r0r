@@ -8,7 +8,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/exe_utils"
+	"github.com/jm33-m0/emp3r0r/core/lib/exe_utils"
 )
 
 func main() {
