@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func SSHD(shell, port string, args []string) (err error) {

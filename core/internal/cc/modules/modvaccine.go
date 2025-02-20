@@ -6,10 +6,10 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/logging"
 	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_crypto"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // upload a zip file that packs several lateral-movement tools
@@ -27,7 +27,7 @@ func moduleVaccine() {
 			return
 		}
 		download_addr := downloadOpt.Val
-		checksum := tun.SHA256SumFile(runtime_def.UtilsArchive)
+		checksum := emp3r0r_crypto.SHA256SumFile(runtime_def.UtilsArchive)
 		err = agents.SendCmd(fmt.Sprintf("%s --checksum %s --download_addr %s", emp3r0r_def.C2CmdUtils, checksum, download_addr), "", runtime_def.ActiveAgent)
 		if err != nil {
 			logging.Errorf("SendCmd failed: %v", err)

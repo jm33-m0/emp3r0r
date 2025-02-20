@@ -3,8 +3,8 @@ package modules
 import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/logging"
 	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 // RShellStatus stores errors from reverseBash

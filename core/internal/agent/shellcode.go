@@ -10,7 +10,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 var (

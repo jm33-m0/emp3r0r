@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"unicode"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 const (
@@ -61,7 +63,7 @@ func DumpFile(filename string) (string, error) {
 	}
 
 	if fileInfo.Size() > maxFileSize {
-		LogDebug("Warning: File exceeds limit. Output truncated.\n")
+		logging.Debugf("Warning: File exceeds limit. Output truncated.\n")
 	}
 
 	offset := 0

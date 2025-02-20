@@ -14,7 +14,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // ShellcodeInjector inject shellcode to arbitrary running process

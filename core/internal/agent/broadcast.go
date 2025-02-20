@@ -11,7 +11,8 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/tun"
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_crypto"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // ReverseConns record ssh reverse proxy sessions
@@ -103,7 +104,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 		}
 
 		// decrypt broadcast message
-		decBytes, err := tun.AES_GCM_Decrypt(emp3r0r_def.AESKey, buf[:n])
+		decBytes, err := emp3r0r_crypto.AES_GCM_Decrypt(emp3r0r_def.AESKey, buf[:n])
 		if err != nil {
 			log.Printf("BroadcastServer: %v", err)
 		}
@@ -201,7 +202,7 @@ func BroadcastMsg(msg, dst string) (err error) {
 	}
 
 	// encrypt message
-	encMsg, err := tun.AES_GCM_Encrypt(emp3r0r_def.AESKey, []byte(msg))
+	encMsg, err := emp3r0r_crypto.AES_GCM_Encrypt(emp3r0r_def.AESKey, []byte(msg))
 	if err != nil {
 		return fmt.Errorf("failed to encrypt %s", msg)
 	}

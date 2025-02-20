@@ -9,7 +9,7 @@ import (
 	"os"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/external_file"
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // ExtractBashRC extract embedded bashrc and configure our bash shell

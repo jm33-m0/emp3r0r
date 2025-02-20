@@ -12,6 +12,8 @@ import (
 	"strings"
 	"syscall"
 	"unsafe"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 // ReadMemoryRegion reads a specified memory region from the given process handle
@@ -60,45 +62,45 @@ func DumpProcMem(pid int) (memdata map[int64][]byte, err error) {
 		line := strings.TrimSpace(scanner.Text())
 		lineSplit := strings.Fields(line)
 		if len(lineSplit) == 1 {
-			LogDebug("%s: failed to parse", line)
+			logging.Debugf("%s: failed to parse", line)
 			continue
 		}
 		if !strings.HasPrefix(lineSplit[1], "r") {
 			// if not readable
-			LogDebug("%s: not readable", line)
+			logging.Debugf("%s: not readable", line)
 			continue
 		}
 
 		// parse map line
 		start_end := strings.Split(lineSplit[0], "-")
 		if len(start_end) == 1 {
-			LogDebug("%s: failed to parse", line)
+			logging.Debugf("%s: failed to parse", line)
 			continue
 		}
 		start, err := strconv.ParseInt(start_end[0], 16, 64)
 		if err != nil {
-			LogDebug("%s: failed to parse start", line)
+			logging.Debugf("%s: failed to parse start", line)
 		}
 		if start < 0 || start > int64(^uint64(0)>>1) {
-			LogDebug("%s: start address out of bounds", line)
+			logging.Debugf("%s: start address out of bounds", line)
 			continue
 		}
 		end, err := strconv.ParseInt(start_end[1], 16, 64)
 		if err != nil {
-			LogDebug("%s: failed to parse end", line)
+			logging.Debugf("%s: failed to parse end", line)
 		}
 		if end < 0 || end == math.MaxInt64 {
-			LogDebug("%s: end address out of bounds", line)
+			logging.Debugf("%s: end address out of bounds", line)
 			continue
 		}
 
 		// read memory region
 		read_buf, err := ReadMemoryRegion(0, uintptr(start), uintptr(end-start))
 		if err != nil {
-			LogDebug("%s: %v", line, err)
+			logging.Debugf("%s: %v", line, err)
 			continue
 		}
-		LogDebug("%s: read %d bytes", line, len(read_buf))
+		logging.Debugf("%s: read %d bytes", line, len(read_buf))
 		memdata[start] = read_buf
 	}
 
@@ -124,12 +126,12 @@ func MemFDWrite(data []byte) int {
 	mem_name := ""
 	fd, _, errno := syscall.Syscall(memfdCreateX64, uintptr(unsafe.Pointer(&mem_name)), uintptr(0), 0)
 	if errno <= 0 {
-		LogDebug("MemFDWrite: %v", errno)
+		logging.Debugf("MemFDWrite: %v", errno)
 		return -1
 	}
 	_, err := syscall.Write(int(fd), data)
 	if err != nil {
-		LogDebug("MemFDWrite: %v", err)
+		logging.Debugf("MemFDWrite: %v", err)
 		return -1
 	}
 	return int(fd)

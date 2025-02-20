@@ -13,9 +13,10 @@ import (
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/listener"
 	"github.com/jm33-m0/emp3r0r/core/internal/tun"
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_crypto"
+	"github.com/jm33-m0/emp3r0r/core/lib/listener"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
 )
 
@@ -74,7 +75,7 @@ func runStat(cmd *cobra.Command, args []string) {
 	fstat := &util.FileStat{
 		Name:       util.FileBaseName(path),
 		Size:       fi.Size(),
-		Checksum:   tun.SHA256SumFile(path),
+		Checksum:   emp3r0r_crypto.SHA256SumFile(path),
 		Permission: fi.Mode().String(),
 	}
 	data, err := json.Marshal(fstat)

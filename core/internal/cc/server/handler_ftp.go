@@ -13,10 +13,10 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/logging"
 	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_crypto"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/mholt/archives"
 	"github.com/posener/h2conn"
 	"github.com/schollz/progressbar/v3"
@@ -172,7 +172,7 @@ func handleFTPTransfer(wrt http.ResponseWriter, req *http.Request) {
 			if err != nil {
 				logging.Errorf("Rename file error %s: %v", targetFile, err)
 			}
-			checksum := tun.SHA256SumFile(targetFile)
+			checksum := emp3r0r_crypto.SHA256SumFile(targetFile)
 			if checksum == mustHaveChecksum {
 				logging.Successf("Downloaded %d bytes to %s (%s)", nowSize, targetFile, checksum)
 				return

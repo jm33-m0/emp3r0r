@@ -6,9 +6,9 @@ import (
 	"strconv"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/logging"
 	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
 )
 

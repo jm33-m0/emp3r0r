@@ -20,6 +20,7 @@ import (
 
 	"golang.org/x/crypto/pbkdf2"
 
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/pkg/errors"
 	kcp "github.com/xtaci/kcp-go/v5"
 	"github.com/xtaci/kcptun/std"
@@ -149,7 +150,7 @@ func NewConfig(remote_addr, target, port, password, salt string) *Config {
 // salt: emp3r0r_def.MagicString
 func KCPTunClient(remote_kcp_addr, kcp_listen_port, password, salt string, ctx context.Context, cancel context.CancelFunc) error {
 	defer func() {
-		LogInfo("KCPTunClient exited")
+		logging.Infof("KCPTunClient exited")
 		cancel()
 	}()
 	config := NewConfig(remote_kcp_addr, "", kcp_listen_port, password, salt)
@@ -178,54 +179,54 @@ func KCPTunClient(remote_kcp_addr, kcp_listen_port, password, salt string, ctx c
 		}
 	}
 
-	LogDebug("smux version: %d", config.SmuxVer)
-	LogDebug("listening on: %s", listener.Addr())
-	LogDebug("encryption: %s", config.Crypt)
-	LogDebug("QPP: %t", config.QPP)
-	LogDebug("QPP Count: %d", config.QPPCount)
-	LogDebug("nodelay parameters: %d %d %d %d", config.NoDelay, config.Interval, config.Resend, config.NoCongestion)
-	LogDebug("remote address: %s", config.RemoteAddr)
-	LogDebug("sndwnd: %d rcvwnd: %d", config.SndWnd, config.RcvWnd)
-	LogDebug("compression: %t", !config.NoComp)
-	LogDebug("mtu: %d", config.MTU)
-	LogDebug("datashard: %d parityshard: %d", config.DataShard, config.ParityShard)
-	LogDebug("acknodelay: %t", config.AckNodelay)
-	LogDebug("dscp: %d", config.DSCP)
-	LogDebug("sockbuf: %d", config.SockBuf)
-	LogDebug("smuxbuf: %d", config.SmuxBuf)
-	LogDebug("streambuf: %d", config.StreamBuf)
-	LogDebug("keepalive: %d", config.KeepAlive)
-	LogDebug("conn: %d", config.Conn)
-	LogDebug("autoexpire: %d", config.AutoExpire)
-	LogDebug("scavengettl: %d", config.ScavengeTTL)
-	LogDebug("snmplog: %s", config.SnmpLog)
-	LogDebug("snmpperiod: %d", config.SnmpPeriod)
-	LogDebug("quiet: %t", config.Quiet)
-	LogDebug("tcp: %t", config.TCP)
-	LogDebug("pprof: %t", config.Pprof)
+	logging.Debugf("smux version: %d", config.SmuxVer)
+	logging.Debugf("listening on: %s", listener.Addr())
+	logging.Debugf("encryption: %s", config.Crypt)
+	logging.Debugf("QPP: %t", config.QPP)
+	logging.Debugf("QPP Count: %d", config.QPPCount)
+	logging.Debugf("nodelay parameters: %d %d %d %d", config.NoDelay, config.Interval, config.Resend, config.NoCongestion)
+	logging.Debugf("remote address: %s", config.RemoteAddr)
+	logging.Debugf("sndwnd: %d rcvwnd: %d", config.SndWnd, config.RcvWnd)
+	logging.Debugf("compression: %t", !config.NoComp)
+	logging.Debugf("mtu: %d", config.MTU)
+	logging.Debugf("datashard: %d parityshard: %d", config.DataShard, config.ParityShard)
+	logging.Debugf("acknodelay: %t", config.AckNodelay)
+	logging.Debugf("dscp: %d", config.DSCP)
+	logging.Debugf("sockbuf: %d", config.SockBuf)
+	logging.Debugf("smuxbuf: %d", config.SmuxBuf)
+	logging.Debugf("streambuf: %d", config.StreamBuf)
+	logging.Debugf("keepalive: %d", config.KeepAlive)
+	logging.Debugf("conn: %d", config.Conn)
+	logging.Debugf("autoexpire: %d", config.AutoExpire)
+	logging.Debugf("scavengettl: %d", config.ScavengeTTL)
+	logging.Debugf("snmplog: %s", config.SnmpLog)
+	logging.Debugf("snmpperiod: %d", config.SnmpPeriod)
+	logging.Debugf("quiet: %t", config.Quiet)
+	logging.Debugf("tcp: %t", config.TCP)
+	logging.Debugf("pprof: %t", config.Pprof)
 
-	LogInfo("KCPTunClient started on %s, server: %s", listener.Addr(), config.RemoteAddr)
+	logging.Infof("KCPTunClient started on %s, server: %s", listener.Addr(), config.RemoteAddr)
 	// QPP parameters check
 	if config.QPP {
 		minSeedLength := qpp.QPPMinimumSeedLength(8)
 		if len(config.Key) < minSeedLength {
-			LogWarn("QPP Warning: 'key' has size of %d bytes, required %d bytes at least", len(config.Key), minSeedLength)
+			logging.Warningf("QPP Warning: 'key' has size of %d bytes, required %d bytes at least", len(config.Key), minSeedLength)
 		}
 
 		minPads := qpp.QPPMinimumPads(8)
 		if config.QPPCount < minPads {
-			LogWarn("QPP Warning: QPPCount %d, required %d at least", config.QPPCount, minPads)
+			logging.Warningf("QPP Warning: QPPCount %d, required %d at least", config.QPPCount, minPads)
 		}
 
 		if new(big.Int).GCD(nil, nil, big.NewInt(int64(config.QPPCount)), big.NewInt(8)).Int64() != 1 {
-			LogWarn("QPP Warning: QPPCount %d, choose a prime number for security", config.QPPCount)
+			logging.Warningf("QPP Warning: QPPCount %d, choose a prime number for security", config.QPPCount)
 		}
 	}
 
 	// Scavenge parameters check
 	if config.AutoExpire != 0 && config.ScavengeTTL > config.AutoExpire {
-		LogWarn("WARNING: scavengettl is bigger than autoexpire, connections may race hard to use bandwidth.")
-		LogWarn("Try limiting scavengettl to a smaller value.")
+		logging.Warningf("WARNING: scavengettl is bigger than autoexpire, connections may race hard to use bandwidth.")
+		logging.Warningf("Try limiting scavengettl to a smaller value.")
 	}
 
 	// SMUX Version check
@@ -233,9 +234,9 @@ func KCPTunClient(remote_kcp_addr, kcp_listen_port, password, salt string, ctx c
 		return fmt.Errorf("unsupported smux version: %d", config.SmuxVer)
 	}
 
-	LogDebug("initiating key derivation")
+	logging.Debugf("initiating key derivation")
 	pass := pbkdf2.Key([]byte(config.Key), []byte(salt), 4096, 32, sha1.New)
-	LogDebug("key derivation done")
+	logging.Debugf("key derivation done")
 	var block kcp.BlockCrypt
 	switch config.Crypt {
 	case "null":
@@ -282,15 +283,15 @@ func KCPTunClient(remote_kcp_addr, kcp_listen_port, password, salt string, ctx c
 		kcpconn.SetACKNoDelay(config.AckNodelay)
 
 		if err := kcpconn.SetDSCP(config.DSCP); err != nil {
-			LogWarn("SetDSCP: %v", err)
+			logging.Warningf("SetDSCP: %v", err)
 		}
 		if err := kcpconn.SetReadBuffer(config.SockBuf); err != nil {
-			LogWarn("SetReadBuffer: %v", err)
+			logging.Warningf("SetReadBuffer: %v", err)
 		}
 		if err := kcpconn.SetWriteBuffer(config.SockBuf); err != nil {
-			LogWarn("SetWriteBuffer: %v", err)
+			logging.Warningf("SetWriteBuffer: %v", err)
 		}
-		LogDebug("smux version: %d on connection: %s -> %s", config.SmuxVer, kcpconn.LocalAddr(), kcpconn.RemoteAddr())
+		logging.Debugf("smux version: %d on connection: %s -> %s", config.SmuxVer, kcpconn.LocalAddr(), kcpconn.RemoteAddr())
 		smuxConfig := smux.DefaultConfig()
 		smuxConfig.Version = config.SmuxVer
 		smuxConfig.MaxReceiveBuffer = config.SmuxBuf
@@ -320,7 +321,7 @@ func KCPTunClient(remote_kcp_addr, kcp_listen_port, password, salt string, ctx c
 			if session, err := createConn(); err == nil {
 				return session
 			} else {
-				LogDebug("re-connecting: %v", err)
+				logging.Debugf("re-connecting: %v", err)
 				time.Sleep(time.Second)
 			}
 		}
@@ -378,7 +379,7 @@ func KCPTunClient(remote_kcp_addr, kcp_listen_port, password, salt string, ctx c
 func clientHandleConn(_Q_ *qpp.QuantumPermutationPad, seed []byte, session *smux.Session, p1 net.Conn, quiet bool, closeWait int) {
 	logln := func(v ...interface{}) {
 		if !quiet {
-			LogDebug("%v", v...)
+			logging.Debugf("%v", v...)
 		}
 	}
 
@@ -436,10 +437,10 @@ func scavenger(ch chan timedSession, config *Config) {
 			for k := range sessionList {
 				s := sessionList[k]
 				if s.session.IsClosed() {
-					LogDebug("scavenger: session normally closed: %s", s.session.LocalAddr())
+					logging.Debugf("scavenger: session normally closed: %s", s.session.LocalAddr())
 				} else if time.Now().After(s.expiryDate) {
 					s.session.Close()
-					LogDebug("scavenger: session closed due to ttl: %s", s.session.LocalAddr())
+					logging.Debugf("scavenger: session closed due to ttl: %s", s.session.LocalAddr())
 				} else {
 					newList = append(newList, sessionList[k])
 				}
@@ -494,16 +495,16 @@ func KCPTunServer(target, kcp_server_port, password, salt string, ctx context.Co
 	if config.QPP {
 		minSeedLength := qpp.QPPMinimumSeedLength(8)
 		if len(config.Key) < minSeedLength {
-			LogWarn("QPP Warning: 'key' has size of %d bytes, required %d bytes at least", len(config.Key), minSeedLength)
+			logging.Warningf("QPP Warning: 'key' has size of %d bytes, required %d bytes at least", len(config.Key), minSeedLength)
 		}
 
 		minPads := qpp.QPPMinimumPads(8)
 		if config.QPPCount < minPads {
-			LogWarn("QPP Warning: QPPCount %d, required %d at least", config.QPPCount, minPads)
+			logging.Warningf("QPP Warning: QPPCount %d, required %d at least", config.QPPCount, minPads)
 		}
 
 		if new(big.Int).GCD(nil, nil, big.NewInt(int64(config.QPPCount)), big.NewInt(8)).Int64() != 1 {
-			LogWarn("QPP Warning: QPPCount %d, choose a prime number for security", config.QPPCount)
+			logging.Warningf("QPP Warning: QPPCount %d, choose a prime number for security", config.QPPCount)
 		}
 	}
 	// parameters check
@@ -545,7 +546,7 @@ func KCPTunServer(target, kcp_server_port, password, salt string, ctx context.Co
 		block, _ = kcp.NewAESBlockCrypt(pass)
 	}
 
-	LogInfo("KCPTunServer started on %s, target: %s", config.Listen, config.Target)
+	logging.Infof("KCPTunServer started on %s, target: %s", config.Listen, config.Target)
 
 	go std.SnmpLogger(config.SnmpLog, config.SnmpPeriod)
 	if config.Pprof {
@@ -563,23 +564,23 @@ func KCPTunServer(target, kcp_server_port, password, salt string, ctx context.Co
 	loop := func(lis *kcp.Listener) {
 		defer wg.Done()
 		if err := lis.SetDSCP(config.DSCP); err != nil {
-			LogDebug("SetDSCP: %v", err)
+			logging.Debugf("SetDSCP: %v", err)
 		}
 		if err := lis.SetReadBuffer(config.SockBuf); err != nil {
-			LogDebug("SetReadBuffer: %v", err)
+			logging.Debugf("SetReadBuffer: %v", err)
 		}
 		if err := lis.SetWriteBuffer(config.SockBuf); err != nil {
-			LogDebug("SetWriteBuffer: %v", err)
+			logging.Debugf("SetWriteBuffer: %v", err)
 		}
 
 		for {
 			select {
 			case <-ctx.Done():
-				LogDebug("context cancelled, exiting listener loop")
+				logging.Debugf("context cancelled, exiting listener loop")
 				return
 			default:
 				if conn, err := lis.AcceptKCP(); err == nil {
-					LogDebug("remote address: %s", conn.RemoteAddr())
+					logging.Debugf("remote address: %s", conn.RemoteAddr())
 					conn.SetStreamMode(true)
 					conn.SetWriteDelay(false)
 					conn.SetNoDelay(config.NoDelay, config.Interval, config.Resend, config.NoCongestion)
@@ -593,7 +594,7 @@ func KCPTunServer(target, kcp_server_port, password, salt string, ctx context.Co
 						go handleMux(_Q_, std.NewCompStream(conn), config)
 					}
 				} else {
-					LogError("%+v", err)
+					logging.Errorf("%+v", err)
 				}
 			}
 		}
@@ -609,7 +610,7 @@ func KCPTunServer(target, kcp_server_port, password, salt string, ctx context.Co
 		listenAddr := fmt.Sprintf("%v:%v", mp.Host, port)
 		if config.TCP { // tcp dual stack
 			if conn, err := tcpraw.Listen("tcp", listenAddr); err == nil {
-				LogDebug("Listening on: %v/tcp", listenAddr)
+				logging.Debugf("Listening on: %v/tcp", listenAddr)
 				lis, err := kcp.ServeConn(block, config.DataShard, config.ParityShard, conn)
 				if err := checkError(err); err != nil {
 					return err
@@ -617,7 +618,7 @@ func KCPTunServer(target, kcp_server_port, password, salt string, ctx context.Co
 				wg.Add(1)
 				go loop(lis)
 			} else {
-				LogError("%v", err)
+				logging.Errorf("%v", err)
 			}
 		}
 
@@ -641,7 +642,7 @@ func handleMux(_Q_ *qpp.QuantumPermutationPad, conn net.Conn, config *Config) {
 	if _, _, err := net.SplitHostPort(config.Target); err != nil {
 		targetType = TGT_UNIX
 	}
-	LogDebug("smux version: %d on connection: %s -> %s", config.SmuxVer, conn.LocalAddr(), conn.RemoteAddr())
+	logging.Debugf("smux version: %d on connection: %s -> %s", config.SmuxVer, conn.LocalAddr(), conn.RemoteAddr())
 
 	// stream multiplex
 	smuxConfig := smux.DefaultConfig()
@@ -652,7 +653,7 @@ func handleMux(_Q_ *qpp.QuantumPermutationPad, conn net.Conn, config *Config) {
 
 	mux, err := smux.Server(conn, smuxConfig)
 	if err != nil {
-		LogWarn("%v", err)
+		logging.Warningf("%v", err)
 		return
 	}
 	defer mux.Close()
@@ -660,7 +661,7 @@ func handleMux(_Q_ *qpp.QuantumPermutationPad, conn net.Conn, config *Config) {
 	for {
 		stream, err := mux.AcceptStream()
 		if err != nil {
-			LogWarn("%v", err)
+			logging.Warningf("%v", err)
 			return
 		}
 
@@ -672,7 +673,7 @@ func handleMux(_Q_ *qpp.QuantumPermutationPad, conn net.Conn, config *Config) {
 			case TGT_TCP:
 				p2, err = net.Dial("tcp", config.Target)
 				if err != nil {
-					LogWarn("%v", err)
+					logging.Warningf("%v", err)
 					p1.Close()
 					return
 				}
@@ -680,7 +681,7 @@ func handleMux(_Q_ *qpp.QuantumPermutationPad, conn net.Conn, config *Config) {
 			case TGT_UNIX:
 				p2, err = net.Dial("unix", config.Target)
 				if err != nil {
-					LogWarn("%v", err)
+					logging.Warningf("%v", err)
 					p1.Close()
 					return
 				}
@@ -694,7 +695,7 @@ func handleMux(_Q_ *qpp.QuantumPermutationPad, conn net.Conn, config *Config) {
 func handleClient(_Q_ *qpp.QuantumPermutationPad, seed []byte, p1 *smux.Stream, p2 net.Conn, quiet bool, closeWait int) {
 	logln := func(v ...interface{}) {
 		if !quiet {
-			LogDebug("%v", v...)
+			logging.Debugf("%v", v...)
 		}
 	}
 
@@ -725,7 +726,7 @@ func handleClient(_Q_ *qpp.QuantumPermutationPad, seed []byte, p1 *smux.Stream, 
 
 func checkError(err error) error {
 	if err != nil {
-		LogError("%+v\n", err)
+		logging.Errorf("%+v\n", err)
 		return err
 	}
 	return nil

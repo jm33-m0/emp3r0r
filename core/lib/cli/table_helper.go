@@ -3,8 +3,8 @@ package cli
 import (
 	"strings"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/logging"
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/olekukonko/tablewriter"
 )
 

@@ -14,8 +14,8 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
 	exe_utils "github.com/jm33-m0/emp3r0r/core/internal/exe_utils"
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_crypto"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func VaccineHandler(download_addr, checksum string) (out string) {
@@ -33,7 +33,7 @@ func VaccineHandler(download_addr, checksum string) (out string) {
 	)
 
 	// do not download if already downloaded
-	if util.IsFileExist(UtilsArchivePath) && tun.SHA256SumFile(UtilsArchivePath) == checksum {
+	if util.IsFileExist(UtilsArchivePath) && emp3r0r_crypto.SHA256SumFile(UtilsArchivePath) == checksum {
 		log.Printf("%s already exists, skipping download", UtilsArchivePath)
 	}
 

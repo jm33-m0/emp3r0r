@@ -1,8 +1,8 @@
 package core
 
 import (
-	"github.com/jm33-m0/emp3r0r/core/internal/cli"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/spf13/cobra"
 )
 

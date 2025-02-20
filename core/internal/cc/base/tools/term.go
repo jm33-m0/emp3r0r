@@ -6,8 +6,8 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/logging"
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // get available terminal emulator on current system

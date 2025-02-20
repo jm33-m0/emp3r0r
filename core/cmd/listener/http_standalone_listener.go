@@ -4,7 +4,7 @@ import (
 	"flag"
 	"log"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/listener"
+	"github.com/jm33-m0/emp3r0r/core/lib/listener"
 )
 
 func main() {

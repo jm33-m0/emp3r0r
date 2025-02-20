@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // SetPath get current PATH variable and append it with common paths, then remove duplicates

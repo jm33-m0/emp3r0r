@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/tun"
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // SaveConfigJSON save runtime config to emp3r0r.json

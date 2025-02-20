@@ -7,11 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/cli"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/logging"
 	"github.com/jm33-m0/emp3r0r/core/internal/tun"
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 var (
@@ -181,7 +180,7 @@ func init_certs_config() error {
 	var hosts []string
 	if _, err := os.Stat(ServerKeyFile); os.IsNotExist(err) {
 		logging.Warningf("C2 TLS cert not found, generating a new one")
-		input := cli.Prompt("Generate C2 TLS cert for host IPs or names (space separated)")
+		input := Prompt("Generate C2 TLS cert for host IPs or names (space separated)")
 		if strings.Contains(input, "/") || strings.Contains(input, "\\") {
 			return fmt.Errorf("invalid host names")
 		}

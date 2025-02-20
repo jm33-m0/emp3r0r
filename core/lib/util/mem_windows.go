@@ -7,6 +7,8 @@ import (
 	"os"
 	"syscall"
 	"unsafe"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 var (
@@ -84,7 +86,7 @@ func DumpProcessMem(hProcess uintptr) (mem_data map[int64][]byte, bytes_read int
 		address += mbi.RegionSize
 
 		// Print information about the memory region
-		LogDebug("BaseAddress: 0x%x, RegionSize: 0x%x, State: %d, Protect: %d, Type: %d\n",
+		logging.Debugf("BaseAddress: 0x%x, RegionSize: 0x%x, State: %d, Protect: %d, Type: %d\n",
 			mbi.BaseAddress, mbi.RegionSize, mbi.State, mbi.Protect, mbi.Type)
 
 		// if memory is not committed or is read-only, skip it
@@ -156,7 +158,7 @@ func DumpCurrentProcMem() (mem_data map[int64][]byte, err error) {
 	for fileName, dll := range dlls {
 		dll_data, err := ReadDLL(dll, fileName)
 		if err != nil {
-			LogDebug("reading DLL %s: %v", fileName, err)
+			logging.Debugf("reading DLL %s: %v", fileName, err)
 			continue
 		}
 		mem_data[int64(dll.BaseOfDll)] = dll_data
@@ -165,7 +167,7 @@ func DumpCurrentProcMem() (mem_data map[int64][]byte, err error) {
 	// dump all memory regions
 	self_mem_data, err := DumpProcMem(os.Getpid())
 	if err != nil {
-		LogDebug("reading self memory: %v", err)
+		logging.Debugf("reading self memory: %v", err)
 	}
 	for base, data := range self_mem_data {
 		mem_data[base] = data

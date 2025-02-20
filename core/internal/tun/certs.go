@@ -84,7 +84,6 @@ func GenCerts(
 	)
 
 	if isCA {
-		LogInfo("Generating CA cert")
 		// generate CA cert
 		template.Subject = pkix.Name{
 			Organization: []string{"ACME CA Co"},
@@ -97,7 +96,6 @@ func GenCerts(
 		}
 	} else {
 		// valid for these names
-		LogInfo("Generating TLS cert for %v", hosts)
 		for _, h := range hosts {
 			if ip := net.ParseIP(h); ip != nil {
 				template.IPAddresses = append(template.IPAddresses, ip)
@@ -130,7 +128,6 @@ func GenCerts(
 	}
 
 	// output to pem files
-	LogInfo("Writing cert to %s, key to %s", outcert, outkey)
 	out := &bytes.Buffer{}
 	// cert
 	pem.Encode(out, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
@@ -202,16 +199,6 @@ func ParseCertPemFile(cert_file string) (cert *x509.Certificate, err error) {
 		return
 	}
 	return ParsePem(cert_data)
-}
-
-// GetFingerprint return SHA256 fingerprint of a cert
-func GetFingerprint(cert_file string) string {
-	cert, err := ParseCertPemFile(cert_file)
-	if err != nil {
-		log.Printf("GetFingerprint: ParseCert %s: %v", cert_file, err)
-		return ""
-	}
-	return SHA256SumRaw(cert.Raw)
 }
 
 // Generate a new key pair for use with openssh
@@ -349,4 +336,14 @@ func VerifySignatureWithCA(data []byte, signature []byte) (bool, error) {
 	// Verify the signature using ECDSA
 	isValid := ecdsa.Verify(caPublicKey, hash[:], sig.R, sig.S)
 	return isValid, nil
+}
+
+// GetFingerprint return SHA256 fingerprint of a cert
+func GetFingerprint(cert_file string) string {
+	cert, err := ParseCertPemFile(cert_file)
+	if err != nil {
+		log.Printf("GetFingerprint: ParseCert %s: %v", cert_file, err)
+		return ""
+	}
+	return sha256SumRaw(cert.Raw)
 }

@@ -13,7 +13,7 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/gliderlabs/ssh"
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func setWinsize(f *os.File, w, h int) {

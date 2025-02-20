@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
 	"golang.org/x/sys/unix"
 )

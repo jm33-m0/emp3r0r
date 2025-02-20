@@ -4,7 +4,7 @@ import (
 	"strconv"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 var (

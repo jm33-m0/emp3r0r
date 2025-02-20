@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_crypto"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
 )
 
@@ -81,7 +81,7 @@ func putCmdRun(cmd *cobra.Command, args []string) {
 		C2RespPrintf(cmd, "%s", fmt.Sprintf("put: failed to download %s: %v", fileName, err))
 		return
 	}
-	checksum := tun.SHA256SumFile(destPath)
+	checksum := emp3r0r_crypto.SHA256SumFile(destPath)
 	downloadedSize := util.FileSize(destPath)
 	resp := fmt.Sprintf("%s uploaded, sha256sum: %s", destPath, checksum)
 	if downloadedSize < size {

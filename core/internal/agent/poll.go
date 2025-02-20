@@ -18,7 +18,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/tun"
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/posener/h2conn"
 )
 

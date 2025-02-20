@@ -8,6 +8,7 @@ import (
 	"time"
 
 	gliderssh "github.com/gliderlabs/ssh"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/txthinking/socks5"
 	"golang.org/x/crypto/ssh"
 )
@@ -17,19 +18,19 @@ import (
 // password: ssh client will try authentication with this password.
 // We will always use RuntimeConfig.ShadowsocksPassword
 func SSHRemoteFwdServer(port, password string, hostkey []byte) (err error) {
-	LogInfo("Starting ssh remote forwarding server on port %s...", port)
+	logging.Infof("Starting ssh remote forwarding server on port %s...", port)
 	forwardHandler := &gliderssh.ForwardedTCPHandler{}
 	server := gliderssh.Server{
 		PasswordHandler: func(ctx gliderssh.Context, input_pass string) bool {
-			LogInfo("ssh client try to authenticate with password %s vs %s", input_pass, password)
+			logging.Infof("ssh client try to authenticate with password %s vs %s", input_pass, password)
 			success := input_pass == password
 			if success {
-				LogInfo("ssh client authenticated")
+				logging.Infof("ssh client authenticated")
 			}
 			return success
 		},
 		LocalPortForwardingCallback: gliderssh.LocalPortForwardingCallback(func(ctx gliderssh.Context, dhost string, dport uint32) bool {
-			LogInfo("Accepted forward %s %d", dhost, dport)
+			logging.Infof("Accepted forward %s %d", dhost, dport)
 			return true
 		}),
 		Addr: ":" + port,
@@ -38,7 +39,7 @@ func SSHRemoteFwdServer(port, password string, hostkey []byte) (err error) {
 			select {}
 		}),
 		ReversePortForwardingCallback: gliderssh.ReversePortForwardingCallback(func(ctx gliderssh.Context, host string, port uint32) bool {
-			LogInfo("Attempt to bind %s %d granted", host, port)
+			logging.Infof("Attempt to bind %s %d granted", host, port)
 			return true
 		}),
 		RequestHandlers: map[string]gliderssh.RequestHandler{
@@ -65,14 +66,14 @@ func SSHReverseProxyClient(ssh_serverAddr string, // SSH server address:port
 	socks5proxy *socks5.Server,
 	ctx context.Context, cancel context.CancelFunc,
 ) (err error) {
-	LogInfo("Starting SSH reverse proxy client on %s, proxy port %d", ssh_serverAddr, proxyPort)
+	logging.Infof("Starting SSH reverse proxy client on %s, proxy port %d", ssh_serverAddr, proxyPort)
 
 	// start SOCKS5 proxy
 	go func() {
 		err = StartSocks5Proxy(fmt.Sprintf("0.0.0.0:%d", proxyPort),
 			"", socks5proxy)
 		if err != nil {
-			LogWarn("Failed to start SOCKS5 proxy server for SSH reverse proxy: %v", err)
+			logging.Warningf("Failed to start SOCKS5 proxy server for SSH reverse proxy: %v", err)
 		}
 	}()
 
@@ -109,14 +110,14 @@ func SSHRemoteFwdClient(ssh_serverAddr, password string,
 		return fmt.Errorf("unable to connect: %v", err)
 	}
 	defer conn.Close()
-	LogInfo("Connected to ssh server on %s", ssh_serverAddr)
+	logging.Infof("Connected to ssh server on %s", ssh_serverAddr)
 
 	// Request the remote side to open proxy port on all interfaces.
 	l, err := conn.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", local_port))
 	if err != nil {
 		return fmt.Errorf("unable to register tcp forward: %v", err)
 	}
-	LogInfo("Forwarding local port %d to remote", local_port)
+	logging.Infof("Forwarding local port %d to remote", local_port)
 	defer l.Close()
 	defer cancel()
 
@@ -129,23 +130,23 @@ func SSHRemoteFwdClient(ssh_serverAddr, password string,
 	serveConn := func(conn net.Conn) {
 		targetConn, serveConn_error := net.Dial("tcp", toAddr)
 		if serveConn_error != nil {
-			LogWarn("failed to connect to %s: %v", toAddr, serveConn_error)
+			logging.Warningf("failed to connect to %s: %v", toAddr, serveConn_error)
 			err = serveConn_error
 			return
 		}
 		defer targetConn.Close()
 		defer conn.Close()
-		defer LogWarn("%s <-> %s closed", conn.LocalAddr(), toAddr)
+		defer logging.Warningf("%s <-> %s closed", conn.LocalAddr(), toAddr)
 		go func() {
 			_, serveConn_error = io.Copy(conn, targetConn)
 			if serveConn_error != nil {
-				LogWarn("clientConn <- targetConn: %v", serveConn_error)
+				logging.Warningf("clientConn <- targetConn: %v", serveConn_error)
 				err = serveConn_error
 			}
 		}()
 		_, serveConn_error = io.Copy(targetConn, conn)
 		if serveConn_error != nil {
-			LogWarn("clientConn -> targetConn: %v", serveConn_error)
+			logging.Warningf("clientConn -> targetConn: %v", serveConn_error)
 			err = serveConn_error
 		}
 	}

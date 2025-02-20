@@ -11,12 +11,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jaypipes/ghw"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 func GetMemSize() int {
 	memInfo, err := ghw.Memory(ghw.WithDisableWarnings())
 	if err != nil {
-		LogDebug("GetMemSize error: %v", err)
+		logging.Debugf("GetMemSize error: %v", err)
 		return -1
 	}
 
@@ -68,7 +69,7 @@ func GetUsername() string {
 	// user account info
 	u, err := user.Current()
 	if err != nil {
-		LogDebug("GetUsername: %v", err)
+		logging.Debugf("GetUsername: %v", err)
 		return "unknown_user"
 	}
 	return u.Username
@@ -79,7 +80,7 @@ func GetUsername() string {
 func macUint64() uint64 {
 	interfaces, err := net.Interfaces()
 	if err != nil {
-		LogDebug("macUint64: %v", err)
+		logging.Debugf("macUint64: %v", err)
 		return uint64(0)
 	}
 
@@ -120,14 +121,14 @@ func GetHostID(info *ghw.ProductInfo, fallbackUUID string) (id string) {
 	id = fmt.Sprintf("unknown_hostname_%s-agent", shortID)
 	name, err := os.Hostname()
 	if err != nil {
-		LogDebug("GetHostID: %v", err)
+		logging.Debugf("GetHostID: %v", err)
 		return
 	}
 	name = fmt.Sprintf("%s\\%s", name, GetUsername()) // hostname\\username
 	fallback := false
 	product_uuid, err := uuid.Parse(info.UUID)
 	if err != nil {
-		LogDebug("GetHostID: %v", err)
+		logging.Debugf("GetHostID: %v", err)
 		fallback = true
 	}
 	if product_uuid.ID() == 0 {
@@ -154,7 +155,7 @@ func ScanPATH() (exes []string) {
 	paths := strings.Split(path_str, sep)
 	if len(paths) < 1 {
 		exes = []string{""}
-		LogDebug("Empty PATH: %s", path_str)
+		logging.Debugf("Empty PATH: %s", path_str)
 		return
 	}
 
@@ -168,14 +169,14 @@ func ScanPATH() (exes []string) {
 			exes = append(exes, f.Name())
 		}
 	}
-	LogDebug("Found %d executables from PATH (%s)", len(exes), path_str)
+	logging.Debugf("Found %d executables from PATH (%s)", len(exes), path_str)
 	return
 }
 
 func GetProductInfo() (product *ghw.ProductInfo, err error) {
 	product, err = ghw.Product(ghw.WithDisableWarnings())
 	if err != nil {
-		LogDebug("GetProductInfo: %v", err)
+		logging.Debugf("GetProductInfo: %v", err)
 		return
 	}
 

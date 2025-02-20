@@ -13,6 +13,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/core"
+	"github.com/jm33-m0/emp3r0r/core/internal/cli"
 	"github.com/jm33-m0/emp3r0r/core/internal/logging"
 	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/tun"
@@ -50,6 +51,7 @@ func parseFlags() *Options {
 func init() {
 	// set up dirs and default varaibles
 	// including config file location
+	runtime_def.Prompt = cli.Prompt // implement prompt_func
 	err := runtime_def.InitCC()
 	if err != nil {
 		log.Fatalf("C2 file paths setup: %v", err)

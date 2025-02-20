@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/shirou/gopsutil/v3/process"
 )
 
@@ -30,7 +31,7 @@ func ProcessList(pid int, username, command, commandLine string) (list []ProcEnt
 
 	procs, err := process.Processes()
 	if err != nil {
-		LogDebug("ProcessList: %v", err)
+		logging.Debugf("ProcessList: %v", err)
 		return nil
 	}
 
@@ -38,24 +39,24 @@ func ProcessList(pid int, username, command, commandLine string) (list []ProcEnt
 	for _, proc := range procs {
 		p.Cmdline, err = proc.Cmdline()
 		if err != nil {
-			LogDebug("proc cmdline: %v", err)
+			logging.Debugf("proc cmdline: %v", err)
 			p.Cmdline = "unknown_cmdline"
 		}
 		p.Name, err = proc.Name()
 		if err != nil {
-			LogDebug("proc name: %v", err)
+			logging.Debugf("proc name: %v", err)
 			p.Name = "unknown_proc"
 		}
 		p.PID = int(proc.Pid)
 		i, err := proc.Ppid()
 		p.PPID = int(i)
 		if err != nil {
-			LogDebug("proc ppid: %v", err)
+			logging.Debugf("proc ppid: %v", err)
 			p.PPID = 0
 		}
 		p.Token, err = proc.Username()
 		if err != nil {
-			LogDebug("proc token: %v", err)
+			logging.Debugf("proc token: %v", err)
 			uids, err := proc.Uids()
 			if err != nil {
 				p.Token = "unknown_user"
@@ -83,7 +84,7 @@ func ProcessList(pid int, username, command, commandLine string) (list []ProcEnt
 func ProcExePath(pid int) string {
 	proc, err := process.NewProcess(int32(pid))
 	if err != nil || proc == nil {
-		LogDebug("No such process (%d): %v", pid, err)
+		logging.Debugf("No such process (%d): %v", pid, err)
 		return "dead_process"
 	}
 	exe, err := proc.Exe()
@@ -98,7 +99,7 @@ func ProcExePath(pid int) string {
 func ProcCwd(pid int) string {
 	proc, err := process.NewProcess(int32(pid))
 	if err != nil || proc == nil {
-		LogDebug("No such process (%d): %v", pid, err)
+		logging.Debugf("No such process (%d): %v", pid, err)
 		return "dead_process"
 	}
 	cwd, err := proc.Cwd()
@@ -112,7 +113,7 @@ func ProcCwd(pid int) string {
 func ProcCmdline(pid int) string {
 	proc, err := process.NewProcess(int32(pid))
 	if err != nil || proc == nil {
-		LogDebug("No such process (%d): %v", pid, err)
+		logging.Debugf("No such process (%d): %v", pid, err)
 		return "dead_process"
 	}
 	cmdline, err := proc.Cmdline()
@@ -126,7 +127,7 @@ func ProcCmdline(pid int) string {
 func IsPIDAlive(pid int) (alive bool) {
 	alive, err := process.PidExists(int32(pid))
 	if err != nil {
-		LogDebug("IsPIDAlive: %v", err)
+		logging.Debugf("IsPIDAlive: %v", err)
 		return false
 	}
 	return alive
@@ -177,7 +178,7 @@ func PidOf(name string) []int {
 func GetChildren(pid int) (children []int, err error) {
 	d, err := os.ReadDir(fmt.Sprintf("/proc/%d/task", pid))
 	if err != nil {
-		LogDebug("GetChildren: %v", err)
+		logging.Debugf("GetChildren: %v", err)
 		return
 	}
 	threads := make([]int, 0)
@@ -192,7 +193,7 @@ func GetChildren(pid int) (children []int, err error) {
 		children_file := fmt.Sprintf("/proc/%d/task/%d/children", pid, tid)
 		data, err := os.ReadFile(children_file)
 		if err != nil {
-			LogDebug("GetChildren: %v", err)
+			logging.Debugf("GetChildren: %v", err)
 			return nil, err
 		}
 		children_str := strings.Fields(strings.TrimSpace(string(data)))

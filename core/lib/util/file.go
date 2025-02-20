@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 // Dentry Directory entry
@@ -43,13 +45,13 @@ func LsPath(path string) (string, error) {
 	if IsFileExist(path) {
 		info, statErr := os.Stat(path)
 		if statErr != nil {
-			LogDebug("LsPath: %v", statErr)
+			logging.Debugf("LsPath: %v", statErr)
 			return "", statErr
 		}
 		dents := []Dentry{parse_fileInfo(info)}
 		jsonData, err := json.Marshal(dents)
 		if err != nil {
-			LogDebug("LsPath: %v", err)
+			logging.Debugf("LsPath: %v", err)
 			return "", err
 		}
 		return string(jsonData), nil
@@ -57,7 +59,7 @@ func LsPath(path string) (string, error) {
 
 	files, err := os.ReadDir(path)
 	if err != nil {
-		LogDebug("LsPath: %v", err)
+		logging.Debugf("LsPath: %v", err)
 		return "", err
 	}
 
@@ -66,7 +68,7 @@ func LsPath(path string) (string, error) {
 	for _, f := range files {
 		info, statErr := f.Info()
 		if statErr != nil {
-			LogDebug("LsPath: %v", statErr)
+			logging.Debugf("LsPath: %v", statErr)
 			continue
 		}
 		dents = append(dents, parse_fileInfo(info))
@@ -180,7 +182,7 @@ func AppendTextToFile(filename string, text string) (err error) {
 func IsStrInFile(text, filepath string) bool {
 	f, err := os.Open(filepath)
 	if err != nil {
-		LogDebug("IsStrInFile: %v", err)
+		logging.Debugf("IsStrInFile: %v", err)
 		return false
 	}
 	defer f.Close()
@@ -226,7 +228,7 @@ func copyFile(src, dst string) error {
 	if IsFileExist(dst) {
 		err = os.RemoveAll(dst)
 		if err != nil {
-			LogDebug("Copy: %s exists and cannot be removed: %v", dst, err)
+			logging.Debugf("Copy: %s exists and cannot be removed: %v", dst, err)
 		}
 	}
 
@@ -363,7 +365,7 @@ func GetWritablePaths(root_path string, depth int) ([]string, error) {
 
 		files, err := os.ReadDir(path)
 		if err != nil {
-			LogDebug("Skipping unreadable directory %s: %v", path, err)
+			logging.Debugf("Skipping unreadable directory %s: %v", path, err)
 			return nil
 		}
 

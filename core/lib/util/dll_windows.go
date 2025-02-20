@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"unsafe"
 
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"golang.org/x/sys/windows"
 )
 
@@ -56,7 +57,7 @@ func GetAllDLLs() (modules map[string]*windows.ModuleInfo, err error) {
 		fname16 := make([]uint16, windows.MAX_PATH)
 		_, err = windows.GetModuleFileName(moduleHandles[i], &fname16[0], windows.MAX_PATH)
 		if err != nil {
-			LogDebug("get module file name: %v", err)
+			logging.Debugf("get module file name: %v", err)
 			continue
 		}
 		// Convert the UTF-16 encoded file name to a Go string
@@ -67,7 +68,7 @@ func GetAllDLLs() (modules map[string]*windows.ModuleInfo, err error) {
 		cb := uint32(unsafe.Sizeof(*modinfo))
 		err = windows.GetModuleInformation(processHandle, moduleHandles[i], modinfo, cb)
 		if err != nil {
-			LogDebug("get modinfo of %s: %v", fileName, err)
+			logging.Debugf("get modinfo of %s: %v", fileName, err)
 			continue
 		}
 		modules[fileName] = modinfo

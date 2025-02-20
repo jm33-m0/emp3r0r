@@ -3,17 +3,10 @@ package tun
 import (
 	"crypto/x509"
 	"fmt"
-
-	"github.com/jm33-m0/emp3r0r/core/internal/external_file"
 )
 
 // ExtractCABundle extracts built-in Ubuntu CA bundle
-func ExtractCABundle() (*x509.CertPool, error) {
-	ca_pem, err := external_file.ExtractFileFromString(external_file.CA_BUNDLE)
-	if err != nil {
-		return nil, fmt.Errorf("extractCABundle: %v", err)
-	}
-
+func ExtractCABundle(ca_pem []byte) (*x509.CertPool, error) {
 	// import CA bundle
 	rootCAs := x509.NewCertPool()
 	if ok := rootCAs.AppendCertsFromPEM(ca_pem); !ok {

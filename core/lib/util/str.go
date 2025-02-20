@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/muesli/reflow/wordwrap"
 	"github.com/muesli/reflow/wrap"
 )
@@ -62,7 +63,7 @@ func parseQuotedCmd(cmd string) (parsedCmd []string) {
 	r.LazyQuotes = true
 	fields, err := r.Read()
 	if err != nil {
-		LogDebug("ParseCmd: %v", err)
+		logging.Debugf("ParseCmd: %v", err)
 		return
 	}
 	for _, f := range fields {
@@ -150,7 +151,7 @@ func HexEncode(s string) (result string) {
 // LogStreamPrintf logs a message to the console and sends it to a log stream channel.
 // Useful when agent wants to send back responses in real-time.
 func LogStreamPrintf(logStream chan string, format string, v ...any) {
-	LogDebug(format, v...)
+	logging.Debugf(format, v...)
 	logStream <- fmt.Sprintf(format, v...)
 }
 
