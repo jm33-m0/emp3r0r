@@ -12,8 +12,8 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/rsteube/carapace"
 )
@@ -23,7 +23,7 @@ func listValChoices(ctx carapace.Context) carapace.Action {
 	ret := make([]string, 0)
 	argc := len(ctx.Args)
 	prev_word := ctx.Args[argc-1]
-	for _, opt := range runtime_def.AvailableModuleOptions {
+	for _, opt := range live.AvailableModuleOptions {
 		if prev_word == opt.Name {
 			ret = append(ret, opt.Vals...)
 			break
@@ -53,7 +53,7 @@ func listPortMappings(ctx carapace.Context) carapace.Action {
 // autocomplete target index and tags
 func listTargetIndexTags(ctx carapace.Context) carapace.Action {
 	names := make([]string, 0)
-	for t, c := range runtime_def.AgentControlMap {
+	for t, c := range live.AgentControlMap {
 		idx := c.Index
 		tag := t.Tag
 		tag = strconv.Quote(tag) // escape special characters
@@ -67,7 +67,7 @@ func listTargetIndexTags(ctx carapace.Context) carapace.Action {
 func listOptions(ctx carapace.Context) carapace.Action {
 	names := make([]string, 0)
 
-	for opt := range runtime_def.AvailableModuleOptions {
+	for opt := range live.AvailableModuleOptions {
 		names = append(names, opt)
 	}
 	return carapace.ActionValues(names...)
@@ -136,7 +136,7 @@ func listRemoteDir(ctx carapace.Context) carapace.Action {
 
 func listRemoteDirWorker(path_to_list string) (cwd string, names []string) {
 	names = make([]string, 0) // listing to return
-	cmd := fmt.Sprintf("%s --path %s", emp3r0r_def.C2CmdListDir, path_to_list)
+	cmd := fmt.Sprintf("%s --path %s", def.C2CmdListDir, path_to_list)
 	cmd_id := uuid.NewString()
 	err := agents.SendCmdToCurrentAgent(cmd, cmd_id)
 	if err != nil {
@@ -147,11 +147,11 @@ func listRemoteDirWorker(path_to_list string) (cwd string, names []string) {
 	listingCtx, listingCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer listingCancel()
 	for listingCtx.Err() == nil {
-		if res, exists := runtime_def.CmdResults[cmd_id]; exists {
+		if res, exists := live.CmdResults[cmd_id]; exists {
 			remote_entries = strings.Split(res, "\n")
-			runtime_def.CmdResultsMutex.Lock()
-			delete(runtime_def.CmdResults, cmd_id)
-			runtime_def.CmdResultsMutex.Unlock()
+			live.CmdResultsMutex.Lock()
+			delete(live.CmdResults, cmd_id)
+			live.CmdResultsMutex.Unlock()
 			listingCancel()
 			break
 		}

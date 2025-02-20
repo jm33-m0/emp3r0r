@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 )
@@ -74,7 +74,7 @@ func getOSName() string {
 
 func GetKernelVersion() (ver string) {
 	log.Println("Reading kernel version...")
-	ver = emp3r0r_def.Unknown
+	ver = def.Unknown
 	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows NT\CurrentVersion`, registry.QUERY_VALUE)
 	if err != nil {
 		log.Print(err)

@@ -9,8 +9,8 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
-	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -433,9 +433,9 @@ func execCmd(cmd *cobra.Command, args []string) {
 
 func exitEmp3r0r(_ *console.Console) {
 	logging.Warningf("Exiting emp3r0r... Goodbye!")
-	if runtime_def.RuntimeConfig.CCIndicatorURL != "" {
+	if live.RuntimeConfig.CCIndicatorURL != "" {
 		logging.Warningf("Remember to remove the conditional C2 indicator URL from your server or agents will make too much noise: %s",
-			runtime_def.RuntimeConfig.CCIndicatorURL)
+			live.RuntimeConfig.CCIndicatorURL)
 	}
 	cli.TmuxDeinitWindows()
 	os.Exit(0)
@@ -451,7 +451,7 @@ func gen_agent_cmd() *cobra.Command {
 	}
 	genAgentCmd.Flags().StringP("type", "t", PayloadTypeLinuxExecutable, fmt.Sprintf("Payload type, available: %v+", PayloadTypeList))
 	genAgentCmd.Flags().StringP("arch", "a", "amd64", fmt.Sprintf("Target architecture, available: %v+", Arch_List_All))
-	cc_hosts := tun.NamesInCert(runtime_def.ServerCrtFile)
+	cc_hosts := transport.NamesInCert(live.ServerCrtFile)
 	genAgentCmd.Flags().StringP("cc", "", cc_hosts[0], "C2 server address")
 	genAgentCmd.Flags().StringP("cdn", "", "", "CDN proxy to reach C2, leave empty to disable. Example: wss://cdn.example.com/ws")
 	genAgentCmd.Flags().StringP("doh", "", "", "DNS over HTTPS server to use for DNS resolution, leave empty to disable. Example: https://1.1.1.1/dns-query")

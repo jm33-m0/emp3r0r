@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -14,13 +14,13 @@ import (
 )
 
 // RenderAgentTable builds and returns a table string for the given agents.
-func RenderAgentTable(agents []*emp3r0r_def.Emp3r0rAgent) string {
+func RenderAgentTable(agents []*def.Emp3r0rAgent) string {
 	// build table data
 	tdata := [][]string{}
 	var tail []string
 
 	for _, target := range agents {
-		ctrl := runtime_def.AgentControlMap[target]
+		ctrl := live.AgentControlMap[target]
 		if ctrl == nil {
 			continue
 		}
@@ -44,7 +44,7 @@ func RenderAgentTable(agents []*emp3r0r_def.Emp3r0rAgent) string {
 			index, label, util.SplitLongLine(target.Tag, 15),
 			infoMap["OS"], infoMap["Process"], infoMap["User"], infoMap["IPs"], infoMap["From"],
 		}
-		if runtime_def.ActiveAgent != nil && runtime_def.ActiveAgent.Tag == target.Tag {
+		if live.ActiveAgent != nil && live.ActiveAgent.Tag == target.Tag {
 			index = color.New(color.FgHiGreen, color.Bold).Sprintf("%d", ctrl.Index)
 			row = []string{
 				index, label, util.SplitLongLine(target.Tag, 15),

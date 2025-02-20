@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/posener/h2conn"
@@ -28,11 +28,11 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		logging.Debugf("handleMessageTunnel exiting")
-		for t, c := range runtime_def.AgentControlMap {
+		for t, c := range live.AgentControlMap {
 			if c.Conn == conn {
-				runtime_def.AgentControlMapMutex.RLock()
-				delete(runtime_def.AgentControlMap, t)
-				runtime_def.AgentControlMapMutex.RUnlock()
+				live.AgentControlMapMutex.RLock()
+				delete(live.AgentControlMap, t)
+				live.AgentControlMapMutex.RUnlock()
 				logging.Errorf("[%d] Agent dies", c.Index)
 				logging.Printf("[%d] agent %s disconnected", c.Index, strconv.Quote(t.Tag))
 				agents.ListConnectedAgents()
@@ -45,7 +45,7 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 	}()
 	in := json.NewDecoder(conn)
 	out := json.NewEncoder(conn)
-	var msg emp3r0r_def.MsgTunData
+	var msg def.MsgTunData
 	go func() {
 		defer cancel()
 		for ctx.Err() == nil {
@@ -77,13 +77,13 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 				return
 			}
 			shortname := agent.Name
-			if runtime_def.AgentControlMap[agent].Conn == nil {
-				logging.Successf("[%d] Knock.. Knock...", runtime_def.AgentControlMap[agent].Index)
+			if live.AgentControlMap[agent].Conn == nil {
+				logging.Successf("[%d] Knock.. Knock...", live.AgentControlMap[agent].Index)
 				logging.Successf("agent %s connected", strconv.Quote(shortname))
 			}
-			runtime_def.AgentControlMap[agent].Conn = conn
-			runtime_def.AgentControlMap[agent].Ctx = ctx
-			runtime_def.AgentControlMap[agent].Cancel = cancel
+			live.AgentControlMap[agent].Conn = conn
+			live.AgentControlMap[agent].Ctx = ctx
+			live.AgentControlMap[agent].Cancel = cancel
 		}
 	}()
 	for ctx.Err() == nil {

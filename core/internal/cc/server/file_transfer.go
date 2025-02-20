@@ -11,17 +11,17 @@ import (
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
-	"github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_crypto"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // StatFile Get stat info of a file on agent
-func StatFile(filepath string, a *emp3r0r_def.Emp3r0rAgent) (fi *util.FileStat, err error) {
+func StatFile(filepath string, a *def.Emp3r0rAgent) (fi *util.FileStat, err error) {
 	cmd_id := uuid.NewString()
-	cmd := fmt.Sprintf("%s --path '%s'", emp3r0r_def.C2CmdStat, filepath)
+	cmd := fmt.Sprintf("%s --path '%s'", def.C2CmdStat, filepath)
 	err = agents.SendCmd(cmd, cmd_id, a)
 	if err != nil {
 		return
@@ -29,14 +29,14 @@ func StatFile(filepath string, a *emp3r0r_def.Emp3r0rAgent) (fi *util.FileStat, 
 	var fileinfo util.FileStat
 
 	defer func() {
-		runtime_def.CmdResultsMutex.Lock()
-		delete(runtime_def.CmdResults, cmd_id)
-		runtime_def.CmdResultsMutex.Unlock()
+		live.CmdResultsMutex.Lock()
+		delete(live.CmdResults, cmd_id)
+		live.CmdResultsMutex.Unlock()
 	}()
 
 	for {
 		time.Sleep(100 * time.Millisecond)
-		res, exists := runtime_def.CmdResults[cmd_id]
+		res, exists := live.CmdResults[cmd_id]
 		if exists {
 			err = json.Unmarshal([]byte(res), &fileinfo)
 			if err != nil {
@@ -51,10 +51,10 @@ func StatFile(filepath string, a *emp3r0r_def.Emp3r0rAgent) (fi *util.FileStat, 
 }
 
 // PutFile put file to agent
-func PutFile(lpath, rpath string, a *emp3r0r_def.Emp3r0rAgent) error {
+func PutFile(lpath, rpath string, a *def.Emp3r0rAgent) error {
 	// file sha256sum
 	logging.Infof("Calculating sha256sum of '%s'", lpath)
-	sum := emp3r0r_crypto.SHA256SumFile(lpath)
+	sum := crypto.SHA256SumFile(lpath)
 	// file size
 	size := util.FileSize(lpath)
 	sizemB := float32(size) / 1024 / 1024
@@ -63,16 +63,16 @@ func PutFile(lpath, rpath string, a *emp3r0r_def.Emp3r0rAgent) error {
 		"size: %d bytes (%.2fMB)\n"+
 		"sha256sum: %s",
 		lpath, rpath,
-		a.From, runtime_def.AgentControlMap[a].Index,
+		a.From, live.AgentControlMap[a].Index,
 		size, sizemB,
 		sum,
 	)
 
 	// move file to wwwroot, then move it back when we are done with it
-	logging.Infof("Copy %s to %s", lpath, runtime_def.WWWRoot+util.FileBaseName(lpath))
-	err := util.Copy(lpath, runtime_def.WWWRoot+util.FileBaseName(lpath))
+	logging.Infof("Copy %s to %s", lpath, live.WWWRoot+util.FileBaseName(lpath))
+	err := util.Copy(lpath, live.WWWRoot+util.FileBaseName(lpath))
 	if err != nil {
-		return fmt.Errorf("copy %s to %s: %v", lpath, runtime_def.WWWRoot+util.FileBaseName(lpath), err)
+		return fmt.Errorf("copy %s to %s: %v", lpath, live.WWWRoot+util.FileBaseName(lpath), err)
 	}
 
 	// send cmd
@@ -88,7 +88,7 @@ func PutFile(lpath, rpath string, a *emp3r0r_def.Emp3r0rAgent) error {
 // generateGetFilePaths generates paths and filenames for GetFile
 func generateGetFilePaths(file_path string) (write_dir, save_to_file, tempname, lock string) {
 	file_path = filepath.Clean(file_path)
-	write_dir = fmt.Sprintf("%s%s", runtime_def.FileGetDir, filepath.Dir(file_path))
+	write_dir = fmt.Sprintf("%s%s", live.FileGetDir, filepath.Dir(file_path))
 	save_to_file = fmt.Sprintf("%s/%s", write_dir, util.FileBaseName(file_path))
 	tempname = save_to_file + ".downloading"
 	lock = save_to_file + ".lock"
@@ -96,7 +96,7 @@ func generateGetFilePaths(file_path string) (write_dir, save_to_file, tempname, 
 }
 
 // GetFile get file from agent
-func GetFile(file_path string, agent *emp3r0r_def.Emp3r0rAgent) (ftpSh *network.StreamHandler, err error) {
+func GetFile(file_path string, agent *def.Emp3r0rAgent) (ftpSh *network.StreamHandler, err error) {
 	logging.Infof("Waiting for response from agent %s", agent.Tag)
 
 	write_dir, save_to_file, tempname, lock := generateGetFilePaths(file_path)
@@ -128,7 +128,7 @@ func GetFile(file_path string, agent *emp3r0r_def.Emp3r0rAgent) (ftpSh *network.
 	filesize := fileinfo.Size
 	// check if file exists
 	if util.IsExist(save_to_file) {
-		checksum := emp3r0r_crypto.SHA256SumFile(save_to_file)
+		checksum := crypto.SHA256SumFile(save_to_file)
 		if checksum == fileinfo.Checksum {
 			logging.Successf("%s already exists, checksum matched", save_to_file)
 			return
@@ -162,7 +162,7 @@ func GetFile(file_path string, agent *emp3r0r_def.Emp3r0rAgent) (ftpSh *network.
 	network.FTPMutex.Unlock()
 
 	// h2x
-	ftpSh.H2x = new(emp3r0r_def.H2Conn)
+	ftpSh.H2x = new(def.H2Conn)
 
 	// cmd
 	cmd := fmt.Sprintf("get --file_path '%s' --offset %d --token '%s'", file_path, offset, ftpSh.Token)

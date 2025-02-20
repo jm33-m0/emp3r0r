@@ -10,8 +10,8 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
@@ -21,7 +21,7 @@ import (
 // open the picture if possible
 func TakeScreenshot(cmd *cobra.Command, args []string) {
 	// tell agent to take screenshot
-	screenshotErr := agents.SendCmdToCurrentAgent(emp3r0r_def.C2CmdScreenshot, "")
+	screenshotErr := agents.SendCmdToCurrentAgent(def.C2CmdScreenshot, "")
 	if screenshotErr != nil {
 		logging.Errorf("send screenshot cmd: %v", screenshotErr)
 		return
@@ -31,7 +31,7 @@ func TakeScreenshot(cmd *cobra.Command, args []string) {
 }
 
 // ProcessScreenshot download and process screenshot
-func ProcessScreenshot(out string, target *emp3r0r_def.Emp3r0rAgent) (err error) {
+func ProcessScreenshot(out string, target *def.Emp3r0rAgent) (err error) {
 	if strings.Contains(out, "Error") {
 		return fmt.Errorf("%s", out)
 	}
@@ -47,12 +47,12 @@ func ProcessScreenshot(out string, target *emp3r0r_def.Emp3r0rAgent) (err error)
 
 	// be sure we have downloaded the file
 	is_download_completed := func() bool {
-		return !util.IsExist(runtime_def.FileGetDir+path+".downloading") &&
-			util.IsExist(runtime_def.FileGetDir+path)
+		return !util.IsExist(live.FileGetDir+path+".downloading") &&
+			util.IsExist(live.FileGetDir+path)
 	}
 
 	is_download_corrupted := func() bool {
-		return !is_download_completed() && !util.IsExist(runtime_def.FileGetDir+path+".lock")
+		return !is_download_completed() && !util.IsExist(live.FileGetDir+path+".lock")
 	}
 	for {
 		time.Sleep(100 * time.Millisecond)
@@ -68,11 +68,11 @@ func ProcessScreenshot(out string, target *emp3r0r_def.Emp3r0rAgent) (err error)
 
 	// unzip if it's zip
 	if strings.HasSuffix(path, ".zip") {
-		err = util.Unarchive(runtime_def.FileGetDir+path, runtime_def.FileGetDir)
+		err = util.Unarchive(live.FileGetDir+path, live.FileGetDir)
 		if err != nil {
 			return fmt.Errorf("unarchive screenshot zip: %v", err)
 		}
-		logging.Warningf("Multiple screenshots extracted to %s", runtime_def.FileGetDir)
+		logging.Warningf("Multiple screenshots extracted to %s", live.FileGetDir)
 		return
 	}
 
@@ -80,8 +80,8 @@ func ProcessScreenshot(out string, target *emp3r0r_def.Emp3r0rAgent) (err error)
 	if util.IsCommandExist("xdg-open") &&
 		os.Getenv("DISPLAY") != "" {
 		logging.Infof("Seems like we can open the picture (%s) for you to view, hold on",
-			runtime_def.FileGetDir+path)
-		cmd := exec.Command("xdg-open", runtime_def.FileGetDir+path)
+			live.FileGetDir+path)
+		cmd := exec.Command("xdg-open", live.FileGetDir+path)
 		err = cmd.Start()
 		if err != nil {
 			return fmt.Errorf("crap, we cannot open the picture: %v", err)

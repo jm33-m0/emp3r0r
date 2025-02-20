@@ -5,8 +5,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
@@ -38,7 +38,7 @@ func PersistLabeledAgentsToFile() {
 		}
 	}
 outter:
-	for t, c := range runtime_def.AgentControlMap {
+	for t, c := range live.AgentControlMap {
 		if c.Label == "" {
 			continue
 		}
@@ -71,7 +71,7 @@ outter:
 }
 
 // RefreshAgentLabel sets the label for an agent based on saved labels in JSON file.
-func RefreshAgentLabel(a *emp3r0r_def.Emp3r0rAgent) (label string) {
+func RefreshAgentLabel(a *def.Emp3r0rAgent) (label string) {
 	data, err := os.ReadFile(AgentsJSON)
 	if err != nil {
 		logging.Warningf("Updating agent label: %v", err)
@@ -85,8 +85,8 @@ func RefreshAgentLabel(a *emp3r0r_def.Emp3r0rAgent) (label string) {
 	}
 	for _, labeled := range labeledAgents {
 		if a.Tag == labeled.Tag {
-			if runtime_def.AgentControlMap[a] != nil {
-				runtime_def.AgentControlMap[a].Label = labeled.Label
+			if live.AgentControlMap[a] != nil {
+				live.AgentControlMap[a].Label = labeled.Label
 			}
 			return labeled.Label
 		}
@@ -111,7 +111,7 @@ func CmdSetAgentLabel(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	target := new(emp3r0r_def.Emp3r0rAgent)
+	target := new(def.Emp3r0rAgent)
 
 	// select by tag or index
 	index, e := strconv.Atoi(agent_id)
@@ -133,7 +133,7 @@ func CmdSetAgentLabel(cmd *cobra.Command, args []string) {
 		logging.Errorf("Failed to label agent: target does not exist")
 		return
 	}
-	runtime_def.AgentControlMap[target].Label = label // set label
+	live.AgentControlMap[target].Label = label // set label
 	PersistLabeledAgentsToFile()
 	logging.Successf("%s has been labeled as %s", target.Tag, label)
 }

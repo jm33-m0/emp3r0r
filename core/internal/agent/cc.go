@@ -5,12 +5,12 @@ import (
 	"log"
 	"strings"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/spf13/cobra"
 )
 
 // exec cmd from C2 server
-func handleC2Command(cmdData *emp3r0r_def.MsgTunData) {
+func handleC2Command(cmdData *def.MsgTunData) {
 	cmd_id := cmdData.CmdID
 	cmd_argc := len(cmdData.CmdSlice)
 	cmdSlice := append(cmdData.CmdSlice, []string{"--cmd_id", cmd_id}...)
@@ -32,7 +32,7 @@ func handleC2Command(cmdData *emp3r0r_def.MsgTunData) {
 }
 
 func C2RespPrintf(cmd *cobra.Command, format string, args ...interface{}) {
-	msg := emp3r0r_def.MsgTunData{
+	msg := def.MsgTunData{
 		Tag: RuntimeConfig.AgentTag,
 	}
 	cmd_id, _ := cmd.Flags().GetString("cmd_id")

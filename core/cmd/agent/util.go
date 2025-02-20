@@ -8,8 +8,8 @@ import (
 	"strconv"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent"
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -29,11 +29,11 @@ func isAgentAliveSocket() bool {
 
 func isC2Reachable() bool {
 	if agent.RuntimeConfig.EnableNCSI {
-		return tun.TestConnectivity(tun.UbuntuConnectivityURL, agent.RuntimeConfig.C2TransportProxy)
+		return transport.TestConnectivity(transport.UbuntuConnectivityURL, agent.RuntimeConfig.C2TransportProxy)
 	}
 
 	log.Println("NCSI is disabled, trying direct C2 connection")
-	return tun.TestConnectivity(emp3r0r_def.CCAddress, agent.RuntimeConfig.C2TransportProxy)
+	return transport.TestConnectivity(def.CCAddress, agent.RuntimeConfig.C2TransportProxy)
 }
 
 // AgentWaitQueue list of agents waiting to run

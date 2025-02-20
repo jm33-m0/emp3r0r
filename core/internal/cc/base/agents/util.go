@@ -8,19 +8,19 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // SendCmd send command to agent
-func SendCmd(cmd, cmd_id string, a *emp3r0r_def.Emp3r0rAgent) error {
+func SendCmd(cmd, cmd_id string, a *def.Emp3r0rAgent) error {
 	if a == nil {
 		return errors.New("SendCmd: agent not found")
 	}
 
-	var cmdData emp3r0r_def.MsgTunData
+	var cmdData def.MsgTunData
 
 	// add UUID to each command for tracking
 	if cmd_id == "" {
@@ -35,9 +35,9 @@ func SendCmd(cmd, cmd_id string, a *emp3r0r_def.Emp3r0rAgent) error {
 
 	// timestamp
 	cmdData.Time = time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST")
-	runtime_def.CmdTimeMutex.Lock()
-	runtime_def.CmdTime[cmd_id] = cmdData.Time
-	runtime_def.CmdTimeMutex.Unlock()
+	live.CmdTimeMutex.Lock()
+	live.CmdTime[cmd_id] = cmdData.Time
+	live.CmdTimeMutex.Unlock()
 
 	if !strings.HasPrefix(cmd, "!") {
 		go wait_for_cmd_response(cmd, cmd_id, a)
@@ -46,15 +46,15 @@ func SendCmd(cmd, cmd_id string, a *emp3r0r_def.Emp3r0rAgent) error {
 	return SendMessageToAgent(&cmdData, a)
 }
 
-func wait_for_cmd_response(cmd, cmd_id string, agent *emp3r0r_def.Emp3r0rAgent) {
-	ctrl, exists := runtime_def.AgentControlMap[agent]
+func wait_for_cmd_response(cmd, cmd_id string, agent *def.Emp3r0rAgent) {
+	ctrl, exists := live.AgentControlMap[agent]
 	if !exists || agent == nil {
 		logging.Warningf("SendCmd: agent '%s' not connected", agent.Tag)
 		return
 	}
 	now := time.Now()
 	for ctrl.Ctx.Err() == nil {
-		if resp, exists := runtime_def.CmdResults[cmd_id]; exists {
+		if resp, exists := live.CmdResults[cmd_id]; exists {
 			logging.Debugf("Got response for %s from %s: %s", strconv.Quote(cmd), strconv.Quote(agent.Name), resp)
 			return
 		}
@@ -87,16 +87,16 @@ func SendCmdToCurrentAgent(cmd, cmd_id string) error {
 }
 
 // MustGetActiveAgent check if current target is set and alive
-func MustGetActiveAgent() (target *emp3r0r_def.Emp3r0rAgent) {
+func MustGetActiveAgent() (target *def.Emp3r0rAgent) {
 	// find target
-	target = runtime_def.ActiveAgent
+	target = live.ActiveAgent
 	if target == nil {
 		logging.Debugf("Validate active target: target does not exist")
 		return nil
 	}
 
 	// write to given target's connection
-	tControl := runtime_def.AgentControlMap[target]
+	tControl := live.AgentControlMap[target]
 	if tControl == nil {
 		logging.Debugf("Validate active target: agent control interface not found")
 		return nil

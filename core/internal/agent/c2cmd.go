@@ -1,7 +1,7 @@
 package agent
 
 import (
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +21,7 @@ func C2Commands() *cobra.Command {
 
 	// Generic commands group
 	lsCmd := &cobra.Command{
-		Use:     emp3r0r_def.C2CmdListDir,
+		Use:     def.C2CmdListDir,
 		Short:   "List directory entries",
 		Example: "!ls --path <path>",
 		GroupID: "generic",
@@ -32,7 +32,7 @@ func C2Commands() *cobra.Command {
 
 	// C2 Stat command
 	statCmd := &cobra.Command{
-		Use:     emp3r0r_def.C2CmdStat,
+		Use:     def.C2CmdStat,
 		Short:   "Retrieve file statistics",
 		Example: "!stat --path <path>",
 		GroupID: "generic",
@@ -43,7 +43,7 @@ func C2Commands() *cobra.Command {
 
 	// C2 Bring2CC command
 	bring2ccCmd := &cobra.Command{
-		Use:     emp3r0r_def.C2CmdBring2CC,
+		Use:     def.C2CmdBring2CC,
 		Short:   "Setup reverse proxy",
 		Example: "!bring2cc --addr <target> --kcp <on/off>",
 		GroupID: "generic",
@@ -55,7 +55,7 @@ func C2Commands() *cobra.Command {
 
 	// C2 SSHD command
 	sshdCmd := &cobra.Command{
-		Use:     emp3r0r_def.C2CmdSSHD,
+		Use:     def.C2CmdSSHD,
 		Short:   "Start an SSHD server",
 		Example: "!sshd --shell <shell> --port <port> --args <args>",
 		GroupID: "generic",
@@ -68,7 +68,7 @@ func C2Commands() *cobra.Command {
 
 	// C2 Proxy command
 	proxyCmd := &cobra.Command{
-		Use:     emp3r0r_def.C2CmdProxy,
+		Use:     def.C2CmdProxy,
 		Short:   "Start a Socks5 proxy",
 		Example: "!proxy --mode <mode> --addr <address>",
 		GroupID: "generic",
@@ -80,7 +80,7 @@ func C2Commands() *cobra.Command {
 
 	// C2 Port Forwarding command
 	portFwdCmd := &cobra.Command{
-		Use:     emp3r0r_def.C2CmdPortFwd,
+		Use:     def.C2CmdPortFwd,
 		Short:   "Setup port forwarding",
 		Example: "!port_fwd --to <target> --shID <session_id> --operation <operation> --timeout <timeout>",
 		GroupID: "generic",
@@ -94,7 +94,7 @@ func C2Commands() *cobra.Command {
 
 	// C2 Delete Port Forwarding command
 	deletePortFwdCmd := &cobra.Command{
-		Use:     emp3r0r_def.C2CmdDeletePortFwd,
+		Use:     def.C2CmdDeletePortFwd,
 		Short:   "Delete port forwarding session",
 		Example: "!delete_portfwd --id <session_id>",
 		GroupID: "generic",
@@ -105,7 +105,7 @@ func C2Commands() *cobra.Command {
 
 	// C2 Utils command
 	utilsCmd := &cobra.Command{
-		Use:     emp3r0r_def.C2CmdUtils,
+		Use:     def.C2CmdUtils,
 		Short:   "Run utility functions",
 		Example: "!utils --checksum <checksum> --download_addr <download_addr>",
 		GroupID: "generic",
@@ -117,7 +117,7 @@ func C2Commands() *cobra.Command {
 
 	// C2 Custom Module command
 	customModuleCmd := &cobra.Command{
-		Use:     emp3r0r_def.C2CmdCustomModule,
+		Use:     def.C2CmdCustomModule,
 		Short:   "Load a custom module",
 		Example: "!custom_module --mod_name <name> --exec <command> --env <env> --checksum <checksum> --in_mem <bool> --type <payload_type> --file_to_download <file> --download_addr <addr>",
 		GroupID: "generic",
@@ -135,7 +135,7 @@ func C2Commands() *cobra.Command {
 
 	// C2 Upgrade Agent command
 	updateAgentCmd := &cobra.Command{
-		Use:     emp3r0r_def.C2CmdUpdateAgent,
+		Use:     def.C2CmdUpdateAgent,
 		Short:   "Upgrade agent",
 		Example: "!upgrade_agent --checksum <checksum>",
 		GroupID: "generic",
@@ -146,7 +146,7 @@ func C2Commands() *cobra.Command {
 
 	// C2 Listener command
 	listenerCmd := &cobra.Command{
-		Use:     emp3r0r_def.C2CmdListener,
+		Use:     def.C2CmdListener,
 		Short:   "Start a listener",
 		Example: "!listener --listener <listener> --port <port> --payload <payload> --compression <on/off> --passphrase <passphrase>",
 		GroupID: "generic",
@@ -161,7 +161,7 @@ func C2Commands() *cobra.Command {
 
 	// C2 File Server command
 	fileServerCmd := &cobra.Command{
-		Use:     emp3r0r_def.C2CmdFileServer,
+		Use:     def.C2CmdFileServer,
 		Short:   "Start file server",
 		Example: "!file_server --port <port> --switch <on/off>",
 		GroupID: "generic",
@@ -173,7 +173,7 @@ func C2Commands() *cobra.Command {
 
 	// C2 File Downloader command
 	fileDownloaderCmd := &cobra.Command{
-		Use:     emp3r0r_def.C2CmdFileDownloader,
+		Use:     def.C2CmdFileDownloader,
 		Short:   "Download file",
 		Example: "!file_downloader --download_addr <url> --path <path> --checksum <checksum>",
 		GroupID: "generic",
@@ -186,7 +186,7 @@ func C2Commands() *cobra.Command {
 
 	// C2 Memory Dump command
 	memDumpCmd := &cobra.Command{
-		Use:     emp3r0r_def.C2CmdMemDump,
+		Use:     def.C2CmdMemDump,
 		Short:   "Memory dump",
 		Example: "!mem_dump --pid <pid>",
 		GroupID: "generic",
@@ -197,7 +197,7 @@ func C2Commands() *cobra.Command {
 
 	// !lpe --script_name <script_name> --checksum <checksum>
 	lpeCmd := &cobra.Command{
-		Use:     emp3r0r_def.C2CmdLPE,
+		Use:     def.C2CmdLPE,
 		Short:   "Run LPE script",
 		Example: "!lpe --script_name <script_name> --checksum <checksum>",
 		GroupID: "generic",
@@ -209,7 +209,7 @@ func C2Commands() *cobra.Command {
 
 	// !ssh_harvester --code_pattern <hex> --reg_name <register> --stop <bool>
 	sshHarvesterCmd := &cobra.Command{
-		Use:     emp3r0r_def.C2CmdSSHHarvester,
+		Use:     def.C2CmdSSHHarvester,
 		Short:   "Start SSH harvester",
 		Example: "!ssh_harvester --code_pattern <hex> --reg_name <reg> --stop <bool>",
 		GroupID: "generic",
@@ -222,7 +222,7 @@ func C2Commands() *cobra.Command {
 
 	// !inject --method <method> --pid <pid> --checksum <checksum>
 	injectCmd := &cobra.Command{
-		Use:     emp3r0r_def.C2CmdInject,
+		Use:     def.C2CmdInject,
 		Short:   "Inject code",
 		Example: "!inject --method <method> --pid <pid> --checksum <checksum>",
 		GroupID: "linux",
@@ -235,7 +235,7 @@ func C2Commands() *cobra.Command {
 
 	// !persistence --method <method>
 	persistenceCmd := &cobra.Command{
-		Use:     emp3r0r_def.C2CmdPersistence,
+		Use:     def.C2CmdPersistence,
 		Short:   "Set up persistence",
 		Example: "!persistence --method <method>",
 		GroupID: "linux",
@@ -245,7 +245,7 @@ func C2Commands() *cobra.Command {
 
 	// !get_root (no flags)
 	getRootCmd := &cobra.Command{
-		Use:     emp3r0r_def.C2CmdGetRoot,
+		Use:     def.C2CmdGetRoot,
 		Short:   "Attempt to gain root privileges",
 		Example: "!get_root",
 		GroupID: "linux",
@@ -255,7 +255,7 @@ func C2Commands() *cobra.Command {
 
 	// !clean_log --keyword <keyword>
 	cleanLogCmd := &cobra.Command{
-		Use:     emp3r0r_def.C2CmdCleanLog,
+		Use:     def.C2CmdCleanLog,
 		Short:   "Clean logs",
 		Example: "!clean_log --keyword <keyword>",
 		GroupID: "linux",
@@ -265,7 +265,7 @@ func C2Commands() *cobra.Command {
 	rootCmd.AddCommand(cleanLogCmd)
 
 	screenshotCmd := &cobra.Command{
-		Use:     emp3r0r_def.C2CmdScreenshot,
+		Use:     def.C2CmdScreenshot,
 		Short:   "Take screenshot",
 		GroupID: "generic",
 		Run:     screenshotCmdRun,

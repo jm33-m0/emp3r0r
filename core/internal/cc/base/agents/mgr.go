@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/posener/h2conn"
@@ -15,21 +15,21 @@ import (
 )
 
 // GetConnectedAgents returns a slice of connected emp3r0r agents.
-func GetConnectedAgents() []*emp3r0r_def.Emp3r0rAgent {
-	runtime_def.AgentControlMapMutex.RLock()
-	defer runtime_def.AgentControlMapMutex.RUnlock()
-	agents := make([]*emp3r0r_def.Emp3r0rAgent, 0, len(runtime_def.AgentControlMap))
-	for agent := range runtime_def.AgentControlMap {
+func GetConnectedAgents() []*def.Emp3r0rAgent {
+	live.AgentControlMapMutex.RLock()
+	defer live.AgentControlMapMutex.RUnlock()
+	agents := make([]*def.Emp3r0rAgent, 0, len(live.AgentControlMap))
+	for agent := range live.AgentControlMap {
 		agents = append(agents, agent)
 	}
 	return agents
 }
 
 // GetAgentByIndex find target from def.AgentControlMap via control index, return nil if not found
-func GetAgentByIndex(index int) (target *emp3r0r_def.Emp3r0rAgent) {
-	runtime_def.AgentControlMapMutex.RLock()
-	defer runtime_def.AgentControlMapMutex.RUnlock()
-	for t, ctl := range runtime_def.AgentControlMap {
+func GetAgentByIndex(index int) (target *def.Emp3r0rAgent) {
+	live.AgentControlMapMutex.RLock()
+	defer live.AgentControlMapMutex.RUnlock()
+	for t, ctl := range live.AgentControlMap {
 		if ctl.Index == index {
 			target = t
 			break
@@ -39,10 +39,10 @@ func GetAgentByIndex(index int) (target *emp3r0r_def.Emp3r0rAgent) {
 }
 
 // GetAgentByTag find target from def.AgentControlMap via tag, return nil if not found
-func GetAgentByTag(tag string) (target *emp3r0r_def.Emp3r0rAgent) {
-	runtime_def.AgentControlMapMutex.RLock()
-	defer runtime_def.AgentControlMapMutex.RUnlock()
-	for t := range runtime_def.AgentControlMap {
+func GetAgentByTag(tag string) (target *def.Emp3r0rAgent) {
+	live.AgentControlMapMutex.RLock()
+	defer live.AgentControlMapMutex.RUnlock()
+	for t := range live.AgentControlMap {
 		if t.Tag == tag {
 			target = t
 			break
@@ -52,10 +52,10 @@ func GetAgentByTag(tag string) (target *emp3r0r_def.Emp3r0rAgent) {
 }
 
 // GetTargetFromH2Conn find target from def.AgentControlMap via HTTP2 connection ID, return nil if not found
-func GetTargetFromH2Conn(conn *h2conn.Conn) (target *emp3r0r_def.Emp3r0rAgent) {
-	runtime_def.AgentControlMapMutex.RLock()
-	defer runtime_def.AgentControlMapMutex.RUnlock()
-	for t, ctrl := range runtime_def.AgentControlMap {
+func GetTargetFromH2Conn(conn *h2conn.Conn) (target *def.Emp3r0rAgent) {
+	live.AgentControlMapMutex.RLock()
+	defer live.AgentControlMapMutex.RUnlock()
+	for t, ctrl := range live.AgentControlMap {
 		if conn == ctrl.Conn {
 			target = t
 			break
@@ -65,10 +65,10 @@ func GetTargetFromH2Conn(conn *h2conn.Conn) (target *emp3r0r_def.Emp3r0rAgent) {
 }
 
 // SendMessageToAgent send MsgTunData to agent
-func SendMessageToAgent(msg_data *emp3r0r_def.MsgTunData, agent *emp3r0r_def.Emp3r0rAgent) (err error) {
-	runtime_def.AgentControlMapMutex.RLock()
-	defer runtime_def.AgentControlMapMutex.RUnlock()
-	ctrl := runtime_def.AgentControlMap[agent]
+func SendMessageToAgent(msg_data *def.MsgTunData, agent *def.Emp3r0rAgent) (err error) {
+	live.AgentControlMapMutex.RLock()
+	defer live.AgentControlMapMutex.RUnlock()
+	ctrl := live.AgentControlMap[agent]
 	if ctrl == nil {
 		return fmt.Errorf("Send2Agent (%s): Target is not connected", msg_data.CmdSlice)
 	}
@@ -85,7 +85,7 @@ func SendMessageToAgent(msg_data *emp3r0r_def.MsgTunData, agent *emp3r0r_def.Emp
 func CmdSetActiveAgent(cmd *cobra.Command, args []string) {
 	parsedArgs := util.ParseCmd(args[0])
 	target := parsedArgs[0]
-	var target_to_set *emp3r0r_def.Emp3r0rAgent
+	var target_to_set *def.Emp3r0rAgent
 
 	// select by tag or index
 	target_to_set = GetAgentByTag(target)
@@ -96,9 +96,9 @@ func CmdSetActiveAgent(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	select_agent := func(a *emp3r0r_def.Emp3r0rAgent) {
-		runtime_def.ActiveAgent = a
-		logging.Successf("Now targeting %s", runtime_def.ActiveAgent.Tag)
+	select_agent := func(a *def.Emp3r0rAgent) {
+		live.ActiveAgent = a
+		logging.Successf("Now targeting %s", live.ActiveAgent.Tag)
 		logging.Printf("Run `file_manager` to open a SFTP session")
 		// autoCompleteAgentExes(target_to_set)
 	}
@@ -116,9 +116,9 @@ func CmdSetActiveAgent(cmd *cobra.Command, args []string) {
 
 // IsAgentExistByTag is agent already in target list?
 func IsAgentExistByTag(tag string) bool {
-	runtime_def.AgentControlMapMutex.RLock()
-	defer runtime_def.AgentControlMapMutex.RUnlock()
-	for a := range runtime_def.AgentControlMap {
+	live.AgentControlMapMutex.RLock()
+	defer live.AgentControlMapMutex.RUnlock()
+	for a := range live.AgentControlMap {
 		if a.Tag == tag {
 			return true
 		}
@@ -128,10 +128,10 @@ func IsAgentExistByTag(tag string) bool {
 }
 
 // IsAgentExist is agent already in target list?
-func IsAgentExist(t *emp3r0r_def.Emp3r0rAgent) bool {
-	runtime_def.AgentControlMapMutex.RLock()
-	defer runtime_def.AgentControlMapMutex.RUnlock()
-	for a := range runtime_def.AgentControlMap {
+func IsAgentExist(t *def.Emp3r0rAgent) bool {
+	live.AgentControlMapMutex.RLock()
+	defer live.AgentControlMapMutex.RUnlock()
+	for a := range live.AgentControlMap {
 		if a.Tag == t.Tag {
 			return true
 		}
@@ -142,17 +142,17 @@ func IsAgentExist(t *emp3r0r_def.Emp3r0rAgent) bool {
 
 // AssignAgentIndex assign an index number to new agent
 func AssignAgentIndex() (index int) {
-	runtime_def.AgentControlMapMutex.RLock()
-	defer runtime_def.AgentControlMapMutex.RUnlock()
+	live.AgentControlMapMutex.RLock()
+	defer live.AgentControlMapMutex.RUnlock()
 
 	// index is 0 for the first agent
-	if len(runtime_def.AgentControlMap) == 0 {
+	if len(live.AgentControlMap) == 0 {
 		return 0
 	}
 
 	// loop thru agent list and get all index numbers
 	index_list := make([]int, 0)
-	for _, c := range runtime_def.AgentControlMap {
+	for _, c := range live.AgentControlMap {
 		index_list = append(index_list, c.Index)
 	}
 

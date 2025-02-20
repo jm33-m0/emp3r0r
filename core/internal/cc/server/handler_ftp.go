@@ -12,9 +12,9 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
-	"github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_crypto"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/mholt/archives"
@@ -61,7 +61,7 @@ func handleFTPTransfer(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 	var err error
-	sh.H2x = &emp3r0r_def.H2Conn{}
+	sh.H2x = &def.H2Conn{}
 	sh.H2x.Conn, err = h2conn.Accept(wrt, req)
 	if err != nil {
 		logging.Errorf("handleFTPTransfer: failed connection from %s: %s", req.RemoteAddr, err)
@@ -121,10 +121,10 @@ func handleFTPTransfer(wrt http.ResponseWriter, req *http.Request) {
 		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	if !util.IsExist(runtime_def.FileGetDir) {
-		err = os.MkdirAll(runtime_def.FileGetDir, 0o700)
+	if !util.IsExist(live.FileGetDir) {
+		err = os.MkdirAll(live.FileGetDir, 0o700)
 		if err != nil {
-			logging.Errorf("Mkdir FileGetDir %s: %v", runtime_def.FileGetDir, err)
+			logging.Errorf("Mkdir FileGetDir %s: %v", live.FileGetDir, err)
 			return
 		}
 	}
@@ -172,7 +172,7 @@ func handleFTPTransfer(wrt http.ResponseWriter, req *http.Request) {
 			if err != nil {
 				logging.Errorf("Rename file error %s: %v", targetFile, err)
 			}
-			checksum := emp3r0r_crypto.SHA256SumFile(targetFile)
+			checksum := crypto.SHA256SumFile(targetFile)
 			if checksum == mustHaveChecksum {
 				logging.Successf("Downloaded %d bytes to %s (%s)", nowSize, targetFile, checksum)
 				return

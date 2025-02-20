@@ -13,9 +13,9 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
-	"github.com/jm33-m0/emp3r0r/core/internal/tun"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/reeflective/console"
@@ -42,7 +42,7 @@ func CliMain() {
 	Emp3r0rConsole.SetPrintLogo(CliBanner)
 
 	// History
-	histFile := fmt.Sprintf("%s/%s.history", runtime_def.EmpWorkSpace, AppName)
+	histFile := fmt.Sprintf("%s/%s.history", live.EmpWorkSpace, AppName)
 	mainMenu.AddHistorySourceFile(AppName, histFile)
 
 	// Commands
@@ -100,16 +100,16 @@ func SetDynamicPrompt() string {
 	prompt_name := color.New(color.Bold, color.FgBlack, color.BgHiWhite).Sprint(AppName)
 	transport := color.New(color.FgRed).Sprint("local")
 
-	if runtime_def.ActiveAgent != nil && agents.IsAgentExist(runtime_def.ActiveAgent) {
-		shortName = strings.Split(runtime_def.ActiveAgent.Tag, "-agent")[0]
-		if runtime_def.ActiveAgent.HasRoot {
+	if live.ActiveAgent != nil && agents.IsAgentExist(live.ActiveAgent) {
+		shortName = strings.Split(live.ActiveAgent.Tag, "-agent")[0]
+		if live.ActiveAgent.HasRoot {
 			prompt_arrow = color.New(color.Bold, color.FgHiGreen).Sprint("\n# ")
 			prompt_name = color.New(color.Bold, color.FgBlack, color.BgHiGreen).Sprint(AppName)
 		}
-		transport = getTransport(runtime_def.ActiveAgent.Transport)
+		transport = getTransport(live.ActiveAgent.Transport)
 	}
 	agent_name := color.New(color.FgCyan, color.Underline).Sprint(shortName)
-	mod_name := color.New(color.FgHiBlue).Sprint(runtime_def.ActiveModule)
+	mod_name := color.New(color.FgHiBlue).Sprint(live.ActiveModule)
 
 	dynamicPrompt := fmt.Sprintf("%s - %s @%s (%s) "+prompt_arrow,
 		prompt_name,
@@ -162,7 +162,7 @@ func CliBanner(console *console.Console) {
 	}
 
 	// C2 names
-	c2_names := tun.NamesInCert(runtime_def.ServerCrtFile)
+	c2_names := transport.NamesInCert(live.ServerCrtFile)
 	if len(c2_names) <= 0 {
 		logging.Fatalf("C2 has no names?")
 	}
@@ -173,11 +173,11 @@ func CliBanner(console *console.Console) {
 		"KCP: *:%s,\n"+
 		"C2 names: %s\n"+
 		"CA Fingerprint: %s",
-		emp3r0r_def.Version,
-		runtime_def.RuntimeConfig.CCPort,
-		runtime_def.RuntimeConfig.KCPServerPort,
+		def.Version,
+		live.RuntimeConfig.CCPort,
+		live.RuntimeConfig.KCPServerPort,
 		name_list,
-		runtime_def.RuntimeConfig.CAFingerprint,
+		live.RuntimeConfig.CAFingerprint,
 	))
 	if encodingErr != nil {
 		logging.Fatalf("CowSay: %v", encodingErr)

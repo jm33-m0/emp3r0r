@@ -13,9 +13,9 @@ import (
 
 	"github.com/cavaliergopher/grab/v3"
 	version "github.com/hashicorp/go-version"
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
-	"github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_crypto"
+	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
@@ -50,7 +50,7 @@ func GetTarballURL(force bool) (url, checksum string, err error) {
 	}
 
 	// check if the release is newer
-	if !isNewerVersion(release.TagName, emp3r0r_def.Version) && !force {
+	if !isNewerVersion(release.TagName, def.Version) && !force {
 		err = fmt.Errorf("no newer version available")
 		return
 	}
@@ -137,7 +137,7 @@ func UpdateCC(cmd *cobra.Command, args []string) {
 	os.Remove(lock)
 
 	verify_checksum := func() bool {
-		file_checksum := emp3r0r_crypto.SHA256SumFile(path)
+		file_checksum := crypto.SHA256SumFile(path)
 		return file_checksum == checksum
 	}
 	need_download := false

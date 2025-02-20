@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
-	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/posener/h2conn"
@@ -18,7 +18,7 @@ import (
 // handlePortForwarding handles proxy/port forwarding.
 func handlePortForwarding(wrt http.ResponseWriter, req *http.Request) {
 	var err error
-	var h2x emp3r0r_def.H2Conn
+	var h2x def.H2Conn
 	sh := new(network.StreamHandler)
 	sh.H2x = &h2x
 	sh.H2x.Conn, err = h2conn.Accept(wrt, req)
