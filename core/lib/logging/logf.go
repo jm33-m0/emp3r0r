@@ -1,6 +1,10 @@
 package logging
 
-import "github.com/spf13/cobra"
+import (
+	"io"
+
+	"github.com/spf13/cobra"
+)
 
 var logger *Logger
 
@@ -43,6 +47,11 @@ func CmdSetDebugLevel(cmd *cobra.Command, args []string) {
 		return
 	}
 	logger.SetDebugLevel(level)
+}
+
+// SetOutput set a new writer to logging package, for example os.Stdout
+func SetOutput(w io.Writer) {
+	logger.writer = w
 }
 
 func init() {
