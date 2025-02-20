@@ -6,12 +6,12 @@ import (
 	"strconv"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/runtime_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
 	"github.com/jm33-m0/emp3r0r/core/internal/cli"
 	"github.com/jm33-m0/emp3r0r/core/internal/logging"
+	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/tun"
 	"github.com/jm33-m0/emp3r0r/core/internal/util"
 	"github.com/reeflective/console"
