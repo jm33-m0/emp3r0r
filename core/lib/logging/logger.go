@@ -123,6 +123,7 @@ func (l *Logger) Error(format string, a ...interface{}) {
 
 func (l *Logger) SetDebugLevel(level int) {
 	l.Level = level
+	Level = level
 	if level > 2 {
 		log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lmsgprefix)
 	} else {

@@ -72,17 +72,18 @@ func CliMain() {
 	Emp3r0rConsole.Shell().Config.Set("usage-hint-always", true)
 
 	// Tmux setup, we will need to log to tmux window
+	cli.CAT = live.CAT // emp3r0r-cat is set up in internal/live/config.go
 	err = cli.TmuxInitWindows()
 	if err != nil {
 		logging.Fatalf("Fatal TMUX error: %v, please run `tmux kill-session -t emp3r0r` and re-run emp3r0r", err)
 	}
 
 	// Log to tmux window and log file
-	f, err := os.OpenFile(cli.OutputPane.TTY, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	f, err := os.OpenFile(cli.OutputPane.TTY, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
 	if err != nil {
 		logging.Fatalf("Failed to open tmux pane: %v", err)
 	}
-	logf, err := os.OpenFile(live.EmpLogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	logf, err := os.OpenFile(live.EmpLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
 	if err != nil {
 		logging.Fatalf("Failed to open log file: %v", err)
 	}
