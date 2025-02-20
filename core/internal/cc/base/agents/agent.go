@@ -63,8 +63,8 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) string {
 	return cli.BuildTable(header, tdata)
 }
 
-// ListConnectedAgents renders and prints the table of connected agents.
-func ListConnectedAgents() {
+// RefreshConnectedAgents renders and prints the table of connected agents.
+func RefreshConnectedAgents() {
 	agents := GetConnectedAgents()
 	tableOutput := RenderAgentTable(agents)
 	if cli.AgentListPane == nil {
@@ -76,6 +76,6 @@ func ListConnectedAgents() {
 
 // Update agent list, then switch to its tmux window
 func CmdLsTargets(cmd *cobra.Command, args []string) {
-	ListConnectedAgents()
+	RefreshConnectedAgents()
 	cli.TmuxSwitchWindow(cli.AgentListPane.WindowID)
 }

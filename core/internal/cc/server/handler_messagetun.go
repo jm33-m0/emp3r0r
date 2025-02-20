@@ -35,7 +35,7 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 				live.AgentControlMapMutex.RUnlock()
 				logging.Errorf("[%d] Agent dies", c.Index)
 				logging.Printf("[%d] agent %s disconnected", c.Index, strconv.Quote(t.Tag))
-				agents.ListConnectedAgents()
+				agents.RefreshConnectedAgents()
 				break
 			}
 		}

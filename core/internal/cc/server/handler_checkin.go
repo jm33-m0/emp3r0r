@@ -49,7 +49,7 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 			}
 		}
 		logging.Printf("Checked in: %s from %s, running %s", strconv.Quote(shortname), fmt.Sprintf("'%s - %s'", target.From, target.Transport), strconv.Quote(target.OS))
-		agents.ListConnectedAgents()
+		agents.RefreshConnectedAgents()
 	} else {
 		for a := range live.AgentControlMap {
 			if a.Tag == target.Tag {
