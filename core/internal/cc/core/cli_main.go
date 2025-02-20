@@ -78,16 +78,12 @@ func CliMain() {
 		logging.Fatalf("Fatal TMUX error: %v, please run `tmux kill-session -t emp3r0r` and re-run emp3r0r", err)
 	}
 
-	// Log to tmux window and log file
+	// Log to tmux window as well
 	f, err := os.OpenFile(cli.OutputPane.TTY, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
 	if err != nil {
 		logging.Fatalf("Failed to open tmux pane: %v", err)
 	}
-	logf, err := os.OpenFile(live.EmpLogFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
-	if err != nil {
-		logging.Fatalf("Failed to open log file: %v", err)
-	}
-	logging.SetOutput(io.MultiWriter(f, logf))
+	logging.AddWriter(f)
 
 	// when the console is closed, deinit tmux windows
 	defer cli.TmuxDeinitWindows()

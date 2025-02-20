@@ -54,6 +54,11 @@ func SetOutput(w io.Writer) {
 	logger.writer = w
 }
 
+// AddWriter add a new writer to logging package, for example os.Stdout
+func AddWriter(w io.Writer) {
+	logger.AddWriter(w)
+}
+
 func init() {
 	var err error
 	logger, err = NewLogger("", 2)
