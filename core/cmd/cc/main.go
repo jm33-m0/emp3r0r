@@ -21,8 +21,6 @@ import (
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 )
 
-var Logger *logging.Logger
-
 // Options struct to hold flag values
 type Options struct {
 	cdnProxy         string
@@ -57,16 +55,10 @@ func init() {
 		log.Fatalf("C2 file paths setup: %v", err)
 	}
 
-	// set up logger
-	Logger, err = logging.NewLogger(live.EmpLogFile, 2)
-	if err != nil {
-		log.Fatalf("cc: failed to set up logger: %v", err)
-	}
-
 	// read config file
 	err = live.ReadJSONConfig()
 	if err != nil {
-		Logger.Fatal("Failed to read config: %v", err)
+		logging.Fatalf("Failed to read config: %v", err)
 	}
 
 	// set up magic string
@@ -84,13 +76,13 @@ func main() {
 
 	// abort if CC is already running
 	if tools.IsCCRunning() {
-		Logger.Fatal("CC is already running")
+		logging.Fatalf("CC is already running")
 	}
 
 	// Run as SSH relay client if requested
 	if opts.connectRelayAddr != "" {
 		if opts.relayedPort == 0 {
-			Logger.Fatal("Please specify -relayed_port")
+			logging.Fatalf("Please specify -relayed_port")
 		}
 		runSSHRelayClient(opts)
 	}
@@ -114,11 +106,11 @@ func runSSHRelayClient(opts *Options) {
 	fmt.Printf("Enter SSH password: ")
 	fmt.Scanln(sshPassword)
 	go func(pass string) {
-		defer Logger.Error("session unexpectedly exited, please restart emp3r0r")
+		defer logging.Errorf("session unexpectedly exited, please restart emp3r0r")
 		SSHConnections := make(map[string]context.CancelFunc, 10)
 		pubkey, sshKeyErr := transport.SSHPublicKey(live.RuntimeConfig.SSHHostKey)
 		if sshKeyErr != nil {
-			Logger.Fatal("Parsing SSHPublicKey: %v", sshKeyErr)
+			logging.Fatalf("Parsing SSHPublicKey: %v", sshKeyErr)
 		}
 	ssh_connect:
 		ctx, cancel := context.WithCancel(context.Background())
@@ -129,7 +121,7 @@ func runSSHRelayClient(opts *Options) {
 			&SSHConnections, ctx, cancel)
 		if sshKeyErr == nil {
 			sshKeyErr = fmt.Errorf("session unexpectedly exited")
-			Logger.Warning("SSHRemoteFwdClient: %v, retrying", sshKeyErr)
+			logging.Warningf("SSHRemoteFwdClient: %v, retrying", sshKeyErr)
 		}
 		for ctx.Err() == nil {
 			util.TakeABlink()
@@ -157,11 +149,11 @@ func startCDN2Proxy(opts *Options) {
 	go func() {
 		logFile, openErr := os.OpenFile("/tmp/ws.log", os.O_CREATE|os.O_RDWR, 0o600)
 		if openErr != nil {
-			Logger.Fatal("OpenFile: %v", openErr)
+			logging.Fatalf("OpenFile: %v", openErr)
 		}
 		openErr = cdn2proxy.StartServer(opts.cdnProxy, "127.0.0.1:"+live.RuntimeConfig.CCPort, "ws", logFile)
 		if openErr != nil {
-			Logger.Fatal("CDN StartServer: %v", openErr)
+			logging.Fatalf("CDN StartServer: %v", openErr)
 		}
 	}()
 }
