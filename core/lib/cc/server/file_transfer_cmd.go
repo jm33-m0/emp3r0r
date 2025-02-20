@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/network"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
@@ -126,7 +127,7 @@ func downloadFromAgent(cmd *cobra.Command, args []string) {
 
 			// wait for file to be downloaded
 			for {
-				if sh, ok := FTPStreams[file]; ok {
+				if sh, ok := network.FTPStreams[file]; ok {
 					if ftpSh.Token == sh.Token {
 						util.TakeABlink()
 						continue

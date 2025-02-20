@@ -8,6 +8,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/network"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
 )
@@ -23,16 +24,16 @@ func StartTLSServer() {
 	r := mux.NewRouter()
 	tun.CACrtPEM = []byte(def.RuntimeConfig.CAPEM)
 	r.HandleFunc(fmt.Sprintf("/%s/{api}/{token}", tun.WebRoot), apiDispatcher)
-	if EmpTLSServer != nil {
-		EmpTLSServer.Shutdown(EmpTLSServerCtx)
+	if network.EmpTLSServer != nil {
+		network.EmpTLSServer.Shutdown(network.EmpTLSServerCtx)
 	}
-	EmpTLSServer = &http.Server{
+	network.EmpTLSServer = &http.Server{
 		Addr:    fmt.Sprintf(":%s", def.RuntimeConfig.CCPort),
 		Handler: r,
 	}
-	EmpTLSServerCtx, EmpTLSServerCancel = context.WithCancel(context.Background())
+	network.EmpTLSServerCtx, network.EmpTLSServerCancel = context.WithCancel(context.Background())
 	logging.Debugf("Starting C2 TLS service at port %s", def.RuntimeConfig.CCPort)
-	err := EmpTLSServer.ListenAndServeTLS(def.ServerCrtFile, def.ServerKeyFile)
+	err := network.EmpTLSServer.ListenAndServeTLS(def.ServerCrtFile, def.ServerKeyFile)
 	if err != nil {
 		if err == http.ErrServerClosed {
 			logging.Warningf("C2 TLS service is shutdown")

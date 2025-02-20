@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/server"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/network"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -22,7 +22,7 @@ func modulePortFwd() {
 	switch switchOpt.Val {
 	case "off":
 		// ugly, i know, it will delete port mappings matching current lport-to combination
-		for id, session := range server.PortFwds {
+		for id, session := range network.PortFwds {
 			toOpt, ok := def.AvailableModuleOptions["to"]
 			if !ok {
 				logging.Errorf("Option 'to' not found")
@@ -34,8 +34,8 @@ func modulePortFwd() {
 				return
 			}
 			if session.To == toOpt.Val && session.Lport == listenPortOpt.Val {
-				session.Cancel()            // cancel the PortFwd session
-				delete(server.PortFwds, id) // remove from port mapping list
+				session.Cancel()             // cancel the PortFwd session
+				delete(network.PortFwds, id) // remove from port mapping list
 
 				// tell the agent to close connection
 				// make sure handler returns
@@ -52,7 +52,7 @@ func modulePortFwd() {
 				toOpt.Val, listenPortOpt.Val)
 		}
 	case "reverse": // expose a dest from CC to agent
-		var pf server.PortFwdSession
+		var pf network.PortFwdSession
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
 		pf.Lport, pf.To = def.AvailableModuleOptions["listen_port"].Val, def.AvailableModuleOptions["to"].Val
 		go func() {
@@ -63,7 +63,7 @@ func modulePortFwd() {
 			}
 		}()
 	case "on":
-		var pf server.PortFwdSession
+		var pf network.PortFwdSession
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
 		pf.Lport, pf.To = def.AvailableModuleOptions["listen_port"].Val, def.AvailableModuleOptions["to"].Val
 		pf.Protocol = def.AvailableModuleOptions["protocol"].Val
@@ -94,7 +94,7 @@ func moduleProxy() {
 	status := statusOpt.Val
 
 	// port-fwd
-	pf := new(server.PortFwdSession)
+	pf := new(network.PortFwdSession)
 	pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
 	pf.Lport, pf.To = port, "127.0.0.1:"+def.RuntimeConfig.AgentSocksServerPort
 	pf.Description = fmt.Sprintf("Agent Proxy (TCP):\n%s (Local) -> %s (Agent)", pf.Lport, pf.To)
@@ -102,7 +102,7 @@ func moduleProxy() {
 	pf.Timeout = def.RuntimeConfig.AgentSocksTimeout
 
 	// udp port fwd
-	pfu := new(server.PortFwdSession)
+	pfu := new(network.PortFwdSession)
 	pfu.Ctx, pfu.Cancel = context.WithCancel(context.Background())
 	pfu.Lport, pfu.To = port, "127.0.0.1:"+def.RuntimeConfig.AgentSocksServerPort
 	pfu.Description = fmt.Sprintf("Agent Proxy (UDP):\n%s (Local) -> %s (Agent)", pfu.Lport, pfu.To)
@@ -154,7 +154,7 @@ func moduleProxy() {
 			}()
 		}
 	case "off":
-		for id, session := range server.PortFwds {
+		for id, session := range network.PortFwds {
 			if session.Description == pf.Description ||
 				session.Description == pfu.Description {
 				session.Cancel() // cancel the PortFwd session

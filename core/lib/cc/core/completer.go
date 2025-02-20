@@ -12,7 +12,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/modules"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/server"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/network"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/rsteube/carapace"
@@ -44,7 +44,7 @@ func listMods(ctx carapace.Context) carapace.Action {
 // autocomplete portfwd session IDs
 func listPortMappings(ctx carapace.Context) carapace.Action {
 	ids := make([]string, 0)
-	for id := range server.PortFwds {
+	for id := range network.PortFwds {
 		ids = append(ids, id)
 	}
 	return carapace.ActionValues(ids...)

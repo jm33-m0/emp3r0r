@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/network"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -18,7 +19,7 @@ import (
 func handlePortForwarding(wrt http.ResponseWriter, req *http.Request) {
 	var err error
 	var h2x emp3r0r_def.H2Conn
-	sh := new(StreamHandler)
+	sh := new(network.StreamHandler)
 	sh.H2x = &h2x
 	sh.H2x.Conn, err = h2conn.Accept(wrt, req)
 	if err != nil {
@@ -66,12 +67,12 @@ func handlePortForwarding(wrt http.ResponseWriter, req *http.Request) {
 		logging.Errorf("Parse UUID failed from %s: %v", req.RemoteAddr, err)
 		return
 	}
-	pf, exist := PortFwds[sessionID.String()]
+	pf, exist := network.PortFwds[sessionID.String()]
 	if !exist {
 		logging.Errorf("Port mapping session %s unknown", sessionID.String())
 		return
 	}
-	pf.Sh = make(map[string]*StreamHandler)
+	pf.Sh = make(map[string]*network.StreamHandler)
 	if !isSubSession {
 		pf.Sh[sessionID.String()] = sh
 		logging.Debugf("Port forwarding connection (%s) from %s", sessionID.String(), req.RemoteAddr)
@@ -100,7 +101,7 @@ func handlePortForwarding(wrt http.ResponseWriter, req *http.Request) {
 			logging.Debugf("Closed sub-connection %s", origToken)
 			return
 		}
-		if pf, exist = PortFwds[sessionID.String()]; exist {
+		if pf, exist = network.PortFwds[sessionID.String()]; exist {
 			pf.Cancel()
 		} else {
 			logging.Warningf("Port mapping %s not found", sessionID.String())
@@ -109,7 +110,7 @@ func handlePortForwarding(wrt http.ResponseWriter, req *http.Request) {
 		logging.Warningf("Closed port forwarding connection from %s", req.RemoteAddr)
 	}()
 	for pf.Ctx.Err() == nil {
-		if _, exist := PortFwds[sessionID.String()]; !exist {
+		if _, exist := network.PortFwds[sessionID.String()]; !exist {
 			logging.Warningf("Port mapping %s disconnected", sessionID.String())
 			return
 		}

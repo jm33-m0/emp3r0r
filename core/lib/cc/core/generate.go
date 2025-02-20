@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/network"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/server"
 	"github.com/jm33-m0/emp3r0r/core/lib/donut"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
@@ -288,7 +289,7 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 		if err != nil {
 			return fmt.Errorf("failed to generate certs: %v", err)
 		}
-		err = server.EmpTLSServer.Shutdown(server.EmpTLSServerCtx)
+		err = network.EmpTLSServer.Shutdown(network.EmpTLSServerCtx)
 		if err != nil {
 			return fmt.Errorf("%v. You will need to restart emp3r0r C2 server to apply name '%s'",
 				err, def.RuntimeConfig.CCHost)

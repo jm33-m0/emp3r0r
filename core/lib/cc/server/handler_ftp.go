@@ -12,6 +12,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/network"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -53,7 +54,7 @@ func handleFTPTransfer(wrt http.ResponseWriter, req *http.Request) {
 	token := vars["token"]
 
 	// Check connection occupancy and accept connection via H2Conn.
-	var sh *StreamHandler = FTPStreams[token] // assume FTPStreams token mapping exists
+	var sh *network.StreamHandler = network.FTPStreams[token] // assume FTPStreams token mapping exists
 	if sh.H2x != nil && (sh.H2x.Ctx != nil || sh.H2x.Cancel != nil || sh.H2x.Conn != nil) {
 		logging.Errorf("handleFTPTransfer: connection occupied")
 		http.Error(wrt, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
@@ -86,7 +87,7 @@ func handleFTPTransfer(wrt http.ResponseWriter, req *http.Request) {
 
 	// Determine file paths.
 	filename := ""
-	for fname, persh := range FTPStreams {
+	for fname, persh := range network.FTPStreams {
 		if sh.Token == persh.Token {
 			filename = fname
 			break
@@ -156,9 +157,9 @@ func handleFTPTransfer(wrt http.ResponseWriter, req *http.Request) {
 			}
 		}
 		sh.H2x.Cancel()
-		FTPMutex.Lock()
-		delete(FTPStreams, mapKey)
-		FTPMutex.Unlock()
+		network.FTPMutex.Lock()
+		delete(network.FTPStreams, mapKey)
+		network.FTPMutex.Unlock()
 		logging.Warningf("Closed FTP connection from %s", req.RemoteAddr)
 		err = os.Remove(lock)
 		if err != nil {

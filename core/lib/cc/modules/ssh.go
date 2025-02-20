@@ -13,7 +13,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
-	"github.com/jm33-m0/emp3r0r/core/lib/cc/server"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/network"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -22,7 +22,7 @@ import (
 type SSH_SHELL_Mapping struct {
 	Shell   string                    // the shell to run, eg. bash, python
 	Agent   *emp3r0r_def.Emp3r0rAgent // the agent this shell is connected to
-	PortFwd *server.PortFwdSession    // the port mapping for this shell session
+	PortFwd *network.PortFwdSession   // the port mapping for this shell session
 	ToPort  string                    // the port to connect to on the agent side, always the same as PortFwd.To's port
 }
 
@@ -83,7 +83,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 
 	// is port mapping already done?
 	port_mapping_exists := false
-	for _, p := range server.PortFwds {
+	for _, p := range network.PortFwds {
 		if p.Agent == def.ActiveAgent && p.To == to {
 			port_mapping_exists = true
 			for s, ssh_mapping := range SSHShellPort {
@@ -146,7 +146,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 
 		// set up port mapping for the ssh session
 		logging.Infof("Setting up port mapping (local %s -> remote %s) for sshd (%s)", lport, to, shell)
-		pf := &server.PortFwdSession{}
+		pf := &network.PortFwdSession{}
 		pf.Description = fmt.Sprintf("ssh shell (%s)", shell)
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
 		pf.Lport, pf.To = lport, to
@@ -178,7 +178,7 @@ wait:
 			break
 		}
 		time.Sleep(100 * time.Millisecond)
-		for _, p := range server.PortFwds {
+		for _, p := range network.PortFwds {
 			if p.Agent == def.ActiveAgent && p.To == to {
 				port_mapping_exists = true
 				break wait

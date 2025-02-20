@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/network"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -18,8 +19,8 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	// Setup H2Conn for reverse shell and proxy.
 	var rshellConn, proxyConn emp3r0r_def.H2Conn
-	RShellStream.H2x = &rshellConn
-	ProxyStream.H2x = &proxyConn
+	network.RShellStream.H2x = &rshellConn
+	network.ProxyStream.H2x = &proxyConn
 
 	if vars["api"] == "" || vars["token"] == "" {
 		logging.Debugf("Invalid request: %v, missing api/token", req)
@@ -55,7 +56,7 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 	case tun.MsgAPI:
 		handleMessageTunnel(wrt, req)
 	case tun.FTPAPI:
-		for _, sh := range FTPStreams {
+		for _, sh := range network.FTPStreams {
 			if token == sh.Token {
 				handleFTPTransfer(wrt, req)
 				return

@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/agent_util"
 	"github.com/jm33-m0/emp3r0r/core/lib/cc/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/cc/network"
 	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/tun"
@@ -95,7 +96,7 @@ func generateGetFilePaths(file_path string) (write_dir, save_to_file, tempname, 
 }
 
 // GetFile get file from agent
-func GetFile(file_path string, agent *emp3r0r_def.Emp3r0rAgent) (ftpSh *StreamHandler, err error) {
+func GetFile(file_path string, agent *emp3r0r_def.Emp3r0rAgent) (ftpSh *network.StreamHandler, err error) {
 	logging.Infof("Waiting for response from agent %s", agent.Tag)
 
 	write_dir, save_to_file, tempname, lock := generateGetFilePaths(file_path)
@@ -151,14 +152,14 @@ func GetFile(file_path string, agent *emp3r0r_def.Emp3r0rAgent) (ftpSh *StreamHa
 	}
 
 	// mark this file transfer stream
-	ftpSh = &StreamHandler{}
+	ftpSh = &network.StreamHandler{}
 	// tell agent where to seek the left bytes
 	ftpSh.Token = fmt.Sprintf("%s-%s", util.RandMD5String(), fileinfo.Checksum)
 	ftpSh.Buf = make(chan []byte)
 	ftpSh.BufSize = 1024 * 8
-	FTPMutex.Lock()
-	FTPStreams[file_path] = ftpSh
-	FTPMutex.Unlock()
+	network.FTPMutex.Lock()
+	network.FTPStreams[file_path] = ftpSh
+	network.FTPMutex.Unlock()
 
 	// h2x
 	ftpSh.H2x = new(emp3r0r_def.H2Conn)
