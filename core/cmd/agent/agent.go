@@ -15,10 +15,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
-	emp3r0r_def "github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def"
-	"github.com/jm33-m0/emp3r0r/core/lib/tun"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent"
+	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
+	"github.com/jm33-m0/emp3r0r/core/internal/tun"
+	"github.com/jm33-m0/emp3r0r/core/internal/util"
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 	"github.com/ncruces/go-dns"
 )

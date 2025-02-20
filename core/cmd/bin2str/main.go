@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/file"
+	"github.com/jm33-m0/emp3r0r/core/internal/external_file"
 )
 
 func main() {
@@ -20,7 +20,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to read file: %v", err)
 	}
-	compressedBin, err := file.Bin2String(data)
+	compressedBin, err := external_file.Bin2String(data)
 	if err != nil {
 		log.Fatalf("Failed to compress: %v", err)
 	}

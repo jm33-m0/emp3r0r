@@ -9,8 +9,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/agent"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent"
+	"github.com/jm33-m0/emp3r0r/core/internal/util"
 )
 
 // listen on a unix socket, used to check if agent is responsive
