@@ -6,15 +6,15 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/runtime_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/logging"
 	"github.com/jm33-m0/emp3r0r/core/internal/util"
 )
 
 func modulePortFwd() {
-	switchOpt, ok := def.AvailableModuleOptions["switch"]
+	switchOpt, ok := runtime_def.AvailableModuleOptions["switch"]
 	if !ok {
 		logging.Errorf("Option 'switch' not found")
 		return
@@ -23,12 +23,12 @@ func modulePortFwd() {
 	case "off":
 		// ugly, i know, it will delete port mappings matching current lport-to combination
 		for id, session := range network.PortFwds {
-			toOpt, ok := def.AvailableModuleOptions["to"]
+			toOpt, ok := runtime_def.AvailableModuleOptions["to"]
 			if !ok {
 				logging.Errorf("Option 'to' not found")
 				return
 			}
-			listenPortOpt, ok := def.AvailableModuleOptions["listen_port"]
+			listenPortOpt, ok := runtime_def.AvailableModuleOptions["listen_port"]
 			if !ok {
 				logging.Errorf("Option 'listen_port' not found")
 				return
@@ -41,7 +41,7 @@ func modulePortFwd() {
 				// make sure handler returns
 				// cmd format: !port_fwd [to/listen] [shID] [operation]
 				cmd := fmt.Sprintf("%s --shID %s --operation stop", emp3r0r_def.C2CmdPortFwd, id)
-				sendCMDerr := agents.SendCmd(cmd, "", def.ActiveAgent)
+				sendCMDerr := agents.SendCmd(cmd, "", runtime_def.ActiveAgent)
 				if sendCMDerr != nil {
 					logging.Errorf("SendCmd: %v", sendCMDerr)
 					return
@@ -54,7 +54,7 @@ func modulePortFwd() {
 	case "reverse": // expose a dest from CC to agent
 		var pf network.PortFwdSession
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
-		pf.Lport, pf.To = def.AvailableModuleOptions["listen_port"].Val, def.AvailableModuleOptions["to"].Val
+		pf.Lport, pf.To = runtime_def.AvailableModuleOptions["listen_port"].Val, runtime_def.AvailableModuleOptions["to"].Val
 		go func() {
 			logging.Printf("RunReversedPortFwd: %s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.Lport, pf.To, pf.Protocol)
 			initErr := pf.InitReversedPortFwd()
@@ -65,8 +65,8 @@ func modulePortFwd() {
 	case "on":
 		var pf network.PortFwdSession
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
-		pf.Lport, pf.To = def.AvailableModuleOptions["listen_port"].Val, def.AvailableModuleOptions["to"].Val
-		pf.Protocol = def.AvailableModuleOptions["protocol"].Val
+		pf.Lport, pf.To = runtime_def.AvailableModuleOptions["listen_port"].Val, runtime_def.AvailableModuleOptions["to"].Val
+		pf.Protocol = runtime_def.AvailableModuleOptions["protocol"].Val
 		go func() {
 			logging.Printf("RunPortFwd: %s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.Lport, pf.To, pf.Protocol)
 			runErr := pf.RunPortFwd()
@@ -79,14 +79,14 @@ func modulePortFwd() {
 }
 
 func moduleProxy() {
-	portOpt, ok := def.AvailableModuleOptions["port"]
+	portOpt, ok := runtime_def.AvailableModuleOptions["port"]
 	if !ok {
 		logging.Errorf("Option 'port' not found")
 		return
 	}
 	port := portOpt.Val
 
-	statusOpt, ok := def.AvailableModuleOptions["status"]
+	statusOpt, ok := runtime_def.AvailableModuleOptions["status"]
 	if !ok {
 		logging.Errorf("Option 'status' not found")
 		return
@@ -96,35 +96,35 @@ func moduleProxy() {
 	// port-fwd
 	pf := new(network.PortFwdSession)
 	pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
-	pf.Lport, pf.To = port, "127.0.0.1:"+def.RuntimeConfig.AgentSocksServerPort
+	pf.Lport, pf.To = port, "127.0.0.1:"+runtime_def.RuntimeConfig.AgentSocksServerPort
 	pf.Description = fmt.Sprintf("Agent Proxy (TCP):\n%s (Local) -> %s (Agent)", pf.Lport, pf.To)
 	pf.Protocol = "tcp"
-	pf.Timeout = def.RuntimeConfig.AgentSocksTimeout
+	pf.Timeout = runtime_def.RuntimeConfig.AgentSocksTimeout
 
 	// udp port fwd
 	pfu := new(network.PortFwdSession)
 	pfu.Ctx, pfu.Cancel = context.WithCancel(context.Background())
-	pfu.Lport, pfu.To = port, "127.0.0.1:"+def.RuntimeConfig.AgentSocksServerPort
+	pfu.Lport, pfu.To = port, "127.0.0.1:"+runtime_def.RuntimeConfig.AgentSocksServerPort
 	pfu.Description = fmt.Sprintf("Agent Proxy (UDP):\n%s (Local) -> %s (Agent)", pfu.Lport, pfu.To)
 	pfu.Protocol = "udp"
-	pfu.Timeout = def.RuntimeConfig.AgentSocksTimeout
+	pfu.Timeout = runtime_def.RuntimeConfig.AgentSocksTimeout
 
 	switch status {
 	case "on":
 		// tell agent to start local socks5 proxy
 		cmd_id := uuid.NewString()
-		err := agents.SendCmdToCurrentTarget("!proxy --mode on --addr 0.0.0.0:"+def.RuntimeConfig.AgentSocksServerPort, cmd_id)
+		err := agents.SendCmdToCurrentTarget("!proxy --mode on --addr 0.0.0.0:"+runtime_def.RuntimeConfig.AgentSocksServerPort, cmd_id)
 		if err != nil {
 			logging.Errorf("Starting SOCKS4 proxy on target failed: %v", err)
 			return
 		}
 		var ok bool
 		for i := 0; i < 120; i++ {
-			_, ok = def.CmdResults[cmd_id]
+			_, ok = runtime_def.CmdResults[cmd_id]
 			if ok {
-				def.CmdResultsMutex.Lock()
-				delete(def.CmdResults, cmd_id)
-				def.CmdResultsMutex.Unlock()
+				runtime_def.CmdResultsMutex.Lock()
+				delete(runtime_def.CmdResults, cmd_id)
+				runtime_def.CmdResultsMutex.Unlock()
 				break
 			}
 			util.TakeABlink()

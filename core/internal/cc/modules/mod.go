@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/cli"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/runtime_def"
+	"github.com/jm33-m0/emp3r0r/core/internal/cli"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/logging"
 	"github.com/jm33-m0/emp3r0r/core/internal/util"
@@ -62,9 +62,9 @@ func UpdateOptions(modName string) (exist bool) {
 
 	// help us add new options
 	addIfNotFound := func(modOpt *emp3r0r_def.ModOption) {
-		if _, exist := def.AvailableModuleOptions[modOpt.Name]; !exist {
+		if _, exist := runtime_def.AvailableModuleOptions[modOpt.Name]; !exist {
 			logging.Debugf("UpdateOptions: adding %s", modOpt.Name)
-			def.AvailableModuleOptions[modOpt.Name] = modOpt
+			runtime_def.AvailableModuleOptions[modOpt.Name] = modOpt
 		}
 	}
 
@@ -92,38 +92,38 @@ func UpdateOptions(modName string) (exist bool) {
 
 // ModuleRun run current module
 func ModuleRun(_ *cobra.Command, _ []string) {
-	modObj := emp3r0r_def.Modules[def.ActiveModule]
+	modObj := emp3r0r_def.Modules[runtime_def.ActiveModule]
 	if modObj == nil {
-		logging.Errorf("ModuleRun: module %s not found", strconv.Quote(def.ActiveModule))
+		logging.Errorf("ModuleRun: module %s not found", strconv.Quote(runtime_def.ActiveModule))
 		return
 	}
-	if def.ActiveAgent != nil {
-		target_os := def.ActiveAgent.GOOS
+	if runtime_def.ActiveAgent != nil {
+		target_os := runtime_def.ActiveAgent.GOOS
 		mod_os := strings.ToLower(modObj.Platform)
 		if mod_os != "generic" && target_os != mod_os {
-			logging.Errorf("ModuleRun: module %s does not support %s", strconv.Quote(def.ActiveModule), target_os)
+			logging.Errorf("ModuleRun: module %s does not support %s", strconv.Quote(runtime_def.ActiveModule), target_os)
 			return
 		}
 	}
 
 	// is a target needed?
-	if def.ActiveAgent == nil && !modObj.IsLocal {
+	if runtime_def.ActiveAgent == nil && !modObj.IsLocal {
 		logging.Errorf("Target not specified")
 		return
 	}
 
 	// check if target exists
-	if def.AgentControlMap[def.ActiveAgent] == nil && def.ActiveAgent != nil {
-		logging.Errorf("Target (%s) does not exist", def.ActiveAgent.Tag)
+	if runtime_def.AgentControlMap[runtime_def.ActiveAgent] == nil && runtime_def.ActiveAgent != nil {
+		logging.Errorf("Target (%s) does not exist", runtime_def.ActiveAgent.Tag)
 		return
 	}
 
 	// run module
-	mod := ModuleHelpers[def.ActiveModule]
+	mod := ModuleHelpers[runtime_def.ActiveModule]
 	if mod != nil {
 		go mod()
 	} else {
-		logging.Errorf("Module %s not found", strconv.Quote(def.ActiveModule))
+		logging.Errorf("Module %s not found", strconv.Quote(runtime_def.ActiveModule))
 	}
 }
 
@@ -149,19 +149,19 @@ func ModuleSearch(cmd *cobra.Command, args []string) {
 
 // CmdListModOptionsTable list currently available options for `set`, in a table
 func CmdListModOptionsTable(_ *cobra.Command, _ []string) {
-	if def.ActiveModule == "none" {
+	if runtime_def.ActiveModule == "none" {
 		logging.Warningf("No module selected")
 		return
 	}
-	def.AgentControlMapMutex.RLock()
-	defer def.AgentControlMapMutex.RUnlock()
+	runtime_def.AgentControlMapMutex.RLock()
+	defer runtime_def.AgentControlMapMutex.RUnlock()
 	opts := make(map[string]string)
 
-	opts["module"] = def.ActiveModule
-	if def.ActiveAgent != nil {
-		_, exist := def.AgentControlMap[def.ActiveAgent]
+	opts["module"] = runtime_def.ActiveModule
+	if runtime_def.ActiveAgent != nil {
+		_, exist := runtime_def.AgentControlMap[runtime_def.ActiveAgent]
 		if exist {
-			shortName := strings.Split(def.ActiveAgent.Tag, "-agent")[0]
+			shortName := strings.Split(runtime_def.ActiveAgent.Tag, "-agent")[0]
 			opts["target"] = shortName
 		} else {
 			opts["target"] = "<blank>"
@@ -170,7 +170,7 @@ func CmdListModOptionsTable(_ *cobra.Command, _ []string) {
 		opts["target"] = "<blank>"
 	}
 
-	for opt_name, opt := range def.AvailableModuleOptions {
+	for opt_name, opt := range runtime_def.AvailableModuleOptions {
 		if opt != nil {
 			opts[opt_name] = opt.Name
 		}
@@ -195,12 +195,12 @@ func CmdListModOptionsTable(_ *cobra.Command, _ []string) {
 		tablewriter.Colors{tablewriter.FgBlueColor})
 
 	// fill table
-	module_obj := emp3r0r_def.Modules[def.ActiveModule]
+	module_obj := emp3r0r_def.Modules[runtime_def.ActiveModule]
 	if module_obj == nil {
-		logging.Errorf("Module %s not found", def.ActiveModule)
+		logging.Errorf("Module %s not found", runtime_def.ActiveModule)
 		return
 	}
-	for opt_name, opt_obj := range def.AvailableModuleOptions {
+	for opt_name, opt_obj := range runtime_def.AvailableModuleOptions {
 		help := "N/A"
 		if opt_obj == nil {
 			continue
@@ -213,7 +213,7 @@ func CmdListModOptionsTable(_ *cobra.Command, _ []string) {
 			help = "Selected target"
 		}
 		val := ""
-		currentOpt, ok := def.AvailableModuleOptions[opt_name]
+		currentOpt, ok := runtime_def.AvailableModuleOptions[opt_name]
 		if ok {
 			val = currentOpt.Val
 		}
@@ -237,7 +237,7 @@ func CmdSetOptVal(cmd *cobra.Command, args []string) {
 	opt := args[0]
 	val := args[1]
 	// hand to SetOption helper
-	def.SetOption(opt, val)
+	runtime_def.SetOption(opt, val)
 	CmdListModOptionsTable(cmd, args)
 }
 
@@ -246,14 +246,14 @@ func CmdSetActiveModule(cmd *cobra.Command, args []string) {
 	modName := args[0]
 	for mod := range ModuleHelpers {
 		if mod == modName {
-			def.ActiveModule = modName
-			for k := range def.AvailableModuleOptions {
-				delete(def.AvailableModuleOptions, k)
+			runtime_def.ActiveModule = modName
+			for k := range runtime_def.AvailableModuleOptions {
+				delete(runtime_def.AvailableModuleOptions, k)
 			}
-			UpdateOptions(def.ActiveModule)
-			logging.Infof("Using module %s", strconv.Quote(def.ActiveModule))
-			ModuleDetails(def.ActiveModule)
-			mod, exists := emp3r0r_def.Modules[def.ActiveModule]
+			UpdateOptions(runtime_def.ActiveModule)
+			logging.Infof("Using module %s", strconv.Quote(runtime_def.ActiveModule))
+			ModuleDetails(runtime_def.ActiveModule)
+			mod, exists := emp3r0r_def.Modules[runtime_def.ActiveModule]
 			if exists {
 				logging.Printf("%s", mod.Comment)
 			}

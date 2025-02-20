@@ -11,7 +11,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/runtime_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/core"
 	"github.com/jm33-m0/emp3r0r/core/internal/logging"
@@ -50,25 +50,25 @@ func parseFlags() *Options {
 func init() {
 	// set up dirs and default varaibles
 	// including config file location
-	err := def.InitCC()
+	err := runtime_def.InitCC()
 	if err != nil {
 		log.Fatalf("C2 file paths setup: %v", err)
 	}
 
 	// set up logger
-	Logger, err = logging.NewLogger(def.EmpLogFile, 2)
+	Logger, err = logging.NewLogger(runtime_def.EmpLogFile, 2)
 	if err != nil {
 		log.Fatalf("cc: failed to set up logger: %v", err)
 	}
 
 	// read config file
-	err = def.ReadJSONConfig()
+	err = runtime_def.ReadJSONConfig()
 	if err != nil {
 		Logger.Fatal("Failed to read config: %v", err)
 	}
 
 	// set up magic string
-	def.InitMagicAgentOneTimeBytes()
+	runtime_def.InitMagicAgentOneTimeBytes()
 }
 
 func main() {
@@ -77,7 +77,7 @@ func main() {
 
 	// do not kill tmux session when crashing
 	if opts.debug {
-		def.TmuxPersistence = true
+		runtime_def.TmuxPersistence = true
 	}
 
 	// abort if CC is already running
@@ -114,7 +114,7 @@ func runSSHRelayClient(opts *Options) {
 	go func(pass string) {
 		defer Logger.Error("session unexpectedly exited, please restart emp3r0r")
 		SSHConnections := make(map[string]context.CancelFunc, 10)
-		pubkey, sshKeyErr := tun.SSHPublicKey(def.RuntimeConfig.SSHHostKey)
+		pubkey, sshKeyErr := tun.SSHPublicKey(runtime_def.RuntimeConfig.SSHHostKey)
 		if sshKeyErr != nil {
 			Logger.Fatal("Parsing SSHPublicKey: %v", sshKeyErr)
 		}
@@ -142,10 +142,10 @@ func runSSHRelayServer(opts *Options) {
 	log.Printf("SSH password is %s. Copy ~/.emp3r0r to client host, "+
 		"then run `emp3r0r -connect_relay relay_ip:%s -relayed_port %s` "+
 		"(C2 port, or KCP port %s if you are using it)",
-		strconv.Quote(sshPassword), opts.sshRelayPort, def.RuntimeConfig.CCPort, def.RuntimeConfig.KCPServerPort)
+		strconv.Quote(sshPassword), opts.sshRelayPort, runtime_def.RuntimeConfig.CCPort, runtime_def.RuntimeConfig.KCPServerPort)
 	if err := tun.SSHRemoteFwdServer(opts.sshRelayPort,
 		sshPassword,
-		def.RuntimeConfig.SSHHostKey); err != nil {
+		runtime_def.RuntimeConfig.SSHHostKey); err != nil {
 		log.Fatalf("SSHRemoteFwdServer: %v", err)
 	}
 }
@@ -157,7 +157,7 @@ func startCDN2Proxy(opts *Options) {
 		if openErr != nil {
 			Logger.Fatal("OpenFile: %v", openErr)
 		}
-		openErr = cdn2proxy.StartServer(opts.cdnProxy, "127.0.0.1:"+def.RuntimeConfig.CCPort, "ws", logFile)
+		openErr = cdn2proxy.StartServer(opts.cdnProxy, "127.0.0.1:"+runtime_def.RuntimeConfig.CCPort, "ws", logFile)
 		if openErr != nil {
 			Logger.Fatal("CDN StartServer: %v", openErr)
 		}

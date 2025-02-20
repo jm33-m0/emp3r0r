@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/runtime_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/logging"
@@ -47,12 +47,12 @@ func ProcessScreenshot(out string, target *emp3r0r_def.Emp3r0rAgent) (err error)
 
 	// be sure we have downloaded the file
 	is_download_completed := func() bool {
-		return !util.IsExist(def.FileGetDir+path+".downloading") &&
-			util.IsExist(def.FileGetDir+path)
+		return !util.IsExist(runtime_def.FileGetDir+path+".downloading") &&
+			util.IsExist(runtime_def.FileGetDir+path)
 	}
 
 	is_download_corrupted := func() bool {
-		return !is_download_completed() && !util.IsExist(def.FileGetDir+path+".lock")
+		return !is_download_completed() && !util.IsExist(runtime_def.FileGetDir+path+".lock")
 	}
 	for {
 		time.Sleep(100 * time.Millisecond)
@@ -68,11 +68,11 @@ func ProcessScreenshot(out string, target *emp3r0r_def.Emp3r0rAgent) (err error)
 
 	// unzip if it's zip
 	if strings.HasSuffix(path, ".zip") {
-		err = util.Unarchive(def.FileGetDir+path, def.FileGetDir)
+		err = util.Unarchive(runtime_def.FileGetDir+path, runtime_def.FileGetDir)
 		if err != nil {
 			return fmt.Errorf("unarchive screenshot zip: %v", err)
 		}
-		logging.Warningf("Multiple screenshots extracted to %s", def.FileGetDir)
+		logging.Warningf("Multiple screenshots extracted to %s", runtime_def.FileGetDir)
 		return
 	}
 
@@ -80,8 +80,8 @@ func ProcessScreenshot(out string, target *emp3r0r_def.Emp3r0rAgent) (err error)
 	if util.IsCommandExist("xdg-open") &&
 		os.Getenv("DISPLAY") != "" {
 		logging.Infof("Seems like we can open the picture (%s) for you to view, hold on",
-			def.FileGetDir+path)
-		cmd := exec.Command("xdg-open", def.FileGetDir+path)
+			runtime_def.FileGetDir+path)
+		cmd := exec.Command("xdg-open", runtime_def.FileGetDir+path)
 		err = cmd.Start()
 		if err != nil {
 			return fmt.Errorf("crap, we cannot open the picture: %v", err)

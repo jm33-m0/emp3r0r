@@ -9,8 +9,8 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/cli"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/runtime_def"
+	"github.com/jm33-m0/emp3r0r/core/internal/cli"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/logging"
 	"github.com/jm33-m0/emp3r0r/core/internal/util"
@@ -20,11 +20,11 @@ import (
 // processAgentData deal with data from agent side
 func processAgentData(data *emp3r0r_def.MsgTunData) {
 	var err error
-	def.AgentControlMapMutex.RLock()
-	defer def.AgentControlMapMutex.RUnlock()
+	runtime_def.AgentControlMapMutex.RLock()
+	defer runtime_def.AgentControlMapMutex.RUnlock()
 
 	target := agents.GetAgentByTag(data.Tag)
-	contrlIf := def.AgentControlMap[target]
+	contrlIf := runtime_def.AgentControlMap[target]
 	if target == nil || contrlIf == nil {
 		logging.Errorf("Target %s cannot be found, however, it left a message saying:\n%v",
 			data.Tag, data.CmdSlice)
@@ -38,9 +38,9 @@ func processAgentData(data *emp3r0r_def.MsgTunData) {
 	out := data.Response
 	cmd_id := data.CmdID
 	// cache this cmd response
-	def.CmdResultsMutex.Lock()
-	def.CmdResults[cmd_id] = out
-	def.CmdResultsMutex.Unlock()
+	runtime_def.CmdResultsMutex.Lock()
+	runtime_def.CmdResults[cmd_id] = out
+	runtime_def.CmdResultsMutex.Unlock()
 
 	switch cmd_slice[0] {
 	// screenshot command
@@ -162,9 +162,9 @@ func processAgentData(data *emp3r0r_def.MsgTunData) {
 	logging.Printf(agent_output)
 
 	// time spent on this cmd
-	start_time, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", def.CmdTime[cmd_id])
+	start_time, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", runtime_def.CmdTime[cmd_id])
 	if err != nil {
-		logging.Warningf("Parsing timestamp '%s': %v", def.CmdTime[cmd_id], err)
+		logging.Warningf("Parsing timestamp '%s': %v", runtime_def.CmdTime[cmd_id], err)
 	} else {
 		time_spent := time.Since(start_time)
 		if is_builtin_cmd {

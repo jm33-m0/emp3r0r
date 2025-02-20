@@ -12,7 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/runtime_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/logging"
 	"github.com/jm33-m0/emp3r0r/core/internal/tun"
@@ -51,13 +51,13 @@ func (pf *PortFwdSession) InitReversedPortFwd() (err error) {
 		pf.Description = "Reverse mapping"
 	}
 	pf.Reverse = true
-	pf.Agent = def.ActiveAgent
+	pf.Agent = runtime_def.ActiveAgent
 	PortFwdsMutex.Lock()
 	PortFwds[fwdID] = pf
 	PortFwdsMutex.Unlock()
 
 	cmd := fmt.Sprintf("%s --to %s --shID %s --operation reverse", emp3r0r_def.C2CmdPortFwd, listenPort, fwdID)
-	err = agents.SendCmd(cmd, "", def.ActiveAgent)
+	err = agents.SendCmd(cmd, "", runtime_def.ActiveAgent)
 	if err != nil {
 		logging.Errorf("SendCmd: %v", err)
 		return
@@ -82,7 +82,7 @@ func (pf *PortFwdSession) RunReversedPortFwd(sh *StreamHandler) (err error) {
 		sh.H2x.Cancel()
 	}
 
-	pf.Agent = def.ActiveAgent
+	pf.Agent = runtime_def.ActiveAgent
 	pf.Reverse = true
 
 	go func() {
@@ -161,7 +161,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 	toAddr := pf.To
 	listenPort := pf.Lport
 
-	pf.Agent = def.ActiveAgent
+	pf.Agent = runtime_def.ActiveAgent
 
 	_, e2 := strconv.Atoi(listenPort)
 	if !tun.ValidateIPPort(toAddr) || e2 != nil {

@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/runtime_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/logging"
@@ -23,7 +23,7 @@ func listValChoices(ctx carapace.Context) carapace.Action {
 	ret := make([]string, 0)
 	argc := len(ctx.Args)
 	prev_word := ctx.Args[argc-1]
-	for _, opt := range def.AvailableModuleOptions {
+	for _, opt := range runtime_def.AvailableModuleOptions {
 		if prev_word == opt.Name {
 			ret = append(ret, opt.Vals...)
 			break
@@ -53,7 +53,7 @@ func listPortMappings(ctx carapace.Context) carapace.Action {
 // autocomplete target index and tags
 func listTargetIndexTags(ctx carapace.Context) carapace.Action {
 	names := make([]string, 0)
-	for t, c := range def.AgentControlMap {
+	for t, c := range runtime_def.AgentControlMap {
 		idx := c.Index
 		tag := t.Tag
 		tag = strconv.Quote(tag) // escape special characters
@@ -67,7 +67,7 @@ func listTargetIndexTags(ctx carapace.Context) carapace.Action {
 func listOptions(ctx carapace.Context) carapace.Action {
 	names := make([]string, 0)
 
-	for opt := range def.AvailableModuleOptions {
+	for opt := range runtime_def.AvailableModuleOptions {
 		names = append(names, opt)
 	}
 	return carapace.ActionValues(names...)
@@ -147,11 +147,11 @@ func listRemoteDirWorker(path_to_list string) (cwd string, names []string) {
 	listingCtx, listingCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer listingCancel()
 	for listingCtx.Err() == nil {
-		if res, exists := def.CmdResults[cmd_id]; exists {
+		if res, exists := runtime_def.CmdResults[cmd_id]; exists {
 			remote_entries = strings.Split(res, "\n")
-			def.CmdResultsMutex.Lock()
-			delete(def.CmdResults, cmd_id)
-			def.CmdResultsMutex.Unlock()
+			runtime_def.CmdResultsMutex.Lock()
+			delete(runtime_def.CmdResults, cmd_id)
+			runtime_def.CmdResultsMutex.Unlock()
 			listingCancel()
 			break
 		}

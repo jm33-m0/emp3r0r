@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/runtime_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/logging"
 	"github.com/jm33-m0/emp3r0r/core/internal/tun"
@@ -121,10 +121,10 @@ func handleFTPTransfer(wrt http.ResponseWriter, req *http.Request) {
 		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	if !util.IsExist(def.FileGetDir) {
-		err = os.MkdirAll(def.FileGetDir, 0o700)
+	if !util.IsExist(runtime_def.FileGetDir) {
+		err = os.MkdirAll(runtime_def.FileGetDir, 0o700)
 		if err != nil {
-			logging.Errorf("Mkdir FileGetDir %s: %v", def.FileGetDir, err)
+			logging.Errorf("Mkdir FileGetDir %s: %v", runtime_def.FileGetDir, err)
 			return
 		}
 	}

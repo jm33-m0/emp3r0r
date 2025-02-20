@@ -10,11 +10,11 @@ import (
 	"github.com/alecthomas/chroma/quick"
 	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/cli"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/runtime_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
+	"github.com/jm33-m0/emp3r0r/core/internal/cli"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/logging"
 	"github.com/jm33-m0/emp3r0r/core/internal/tun"
@@ -42,7 +42,7 @@ func CliMain() {
 	Emp3r0rConsole.SetPrintLogo(CliBanner)
 
 	// History
-	histFile := fmt.Sprintf("%s/%s.history", def.EmpWorkSpace, AppName)
+	histFile := fmt.Sprintf("%s/%s.history", runtime_def.EmpWorkSpace, AppName)
 	mainMenu.AddHistorySourceFile(AppName, histFile)
 
 	// Commands
@@ -100,16 +100,16 @@ func SetDynamicPrompt() string {
 	prompt_name := color.New(color.Bold, color.FgBlack, color.BgHiWhite).Sprint(AppName)
 	transport := color.New(color.FgRed).Sprint("local")
 
-	if def.ActiveAgent != nil && agents.IsAgentExist(def.ActiveAgent) {
-		shortName = strings.Split(def.ActiveAgent.Tag, "-agent")[0]
-		if def.ActiveAgent.HasRoot {
+	if runtime_def.ActiveAgent != nil && agents.IsAgentExist(runtime_def.ActiveAgent) {
+		shortName = strings.Split(runtime_def.ActiveAgent.Tag, "-agent")[0]
+		if runtime_def.ActiveAgent.HasRoot {
 			prompt_arrow = color.New(color.Bold, color.FgHiGreen).Sprint("\n# ")
 			prompt_name = color.New(color.Bold, color.FgBlack, color.BgHiGreen).Sprint(AppName)
 		}
-		transport = getTransport(def.ActiveAgent.Transport)
+		transport = getTransport(runtime_def.ActiveAgent.Transport)
 	}
 	agent_name := color.New(color.FgCyan, color.Underline).Sprint(shortName)
-	mod_name := color.New(color.FgHiBlue).Sprint(def.ActiveModule)
+	mod_name := color.New(color.FgHiBlue).Sprint(runtime_def.ActiveModule)
 
 	dynamicPrompt := fmt.Sprintf("%s - %s @%s (%s) "+prompt_arrow,
 		prompt_name,
@@ -162,7 +162,7 @@ func CliBanner(console *console.Console) {
 	}
 
 	// C2 names
-	c2_names := tun.NamesInCert(def.ServerCrtFile)
+	c2_names := tun.NamesInCert(runtime_def.ServerCrtFile)
 	if len(c2_names) <= 0 {
 		logging.Fatalf("C2 has no names?")
 	}
@@ -174,10 +174,10 @@ func CliBanner(console *console.Console) {
 		"C2 names: %s\n"+
 		"CA Fingerprint: %s",
 		emp3r0r_def.Version,
-		def.RuntimeConfig.CCPort,
-		def.RuntimeConfig.KCPServerPort,
+		runtime_def.RuntimeConfig.CCPort,
+		runtime_def.RuntimeConfig.KCPServerPort,
 		name_list,
-		def.RuntimeConfig.CAFingerprint,
+		runtime_def.RuntimeConfig.CAFingerprint,
 	))
 	if encodingErr != nil {
 		logging.Fatalf("CowSay: %v", encodingErr)

@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/runtime_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/logging"
 	"github.com/jm33-m0/emp3r0r/core/internal/util"
 	"github.com/spf13/cobra"
@@ -79,12 +79,12 @@ func downloadFromAgent(cmd *cobra.Command, args []string) {
 		var result string
 		var exists bool
 		for i := 0; i < 10; i++ {
-			result, exists = def.CmdResults[cmd_id]
+			result, exists = runtime_def.CmdResults[cmd_id]
 			if exists {
 				logging.Infof("Got file list from %s", target.Tag)
-				def.CmdResultsMutex.Lock()
-				delete(def.CmdResults, cmd_id)
-				def.CmdResultsMutex.Unlock()
+				runtime_def.CmdResultsMutex.Lock()
+				delete(runtime_def.CmdResults, cmd_id)
+				runtime_def.CmdResultsMutex.Unlock()
 				if result == "" {
 					logging.Errorf("Cannot get %s: empty file list in directory", file_path)
 				}

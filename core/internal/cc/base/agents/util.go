@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/runtime_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/logging"
 	"github.com/jm33-m0/emp3r0r/core/internal/util"
@@ -35,9 +35,9 @@ func SendCmd(cmd, cmd_id string, a *emp3r0r_def.Emp3r0rAgent) error {
 
 	// timestamp
 	cmdData.Time = time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST")
-	def.CmdTimeMutex.Lock()
-	def.CmdTime[cmd_id] = cmdData.Time
-	def.CmdTimeMutex.Unlock()
+	runtime_def.CmdTimeMutex.Lock()
+	runtime_def.CmdTime[cmd_id] = cmdData.Time
+	runtime_def.CmdTimeMutex.Unlock()
 
 	if !strings.HasPrefix(cmd, "!") {
 		go wait_for_cmd_response(cmd, cmd_id, a)
@@ -47,14 +47,14 @@ func SendCmd(cmd, cmd_id string, a *emp3r0r_def.Emp3r0rAgent) error {
 }
 
 func wait_for_cmd_response(cmd, cmd_id string, agent *emp3r0r_def.Emp3r0rAgent) {
-	ctrl, exists := def.AgentControlMap[agent]
+	ctrl, exists := runtime_def.AgentControlMap[agent]
 	if !exists || agent == nil {
 		logging.Warningf("SendCmd: agent '%s' not connected", agent.Tag)
 		return
 	}
 	now := time.Now()
 	for ctrl.Ctx.Err() == nil {
-		if resp, exists := def.CmdResults[cmd_id]; exists {
+		if resp, exists := runtime_def.CmdResults[cmd_id]; exists {
 			logging.Debugf("Got response for %s from %s: %s", strconv.Quote(cmd), strconv.Quote(agent.Name), resp)
 			return
 		}
@@ -89,14 +89,14 @@ func SendCmdToCurrentTarget(cmd, cmd_id string) error {
 // MustGetActiveAgent check if current target is set and alive
 func MustGetActiveAgent() (target *emp3r0r_def.Emp3r0rAgent) {
 	// find target
-	target = def.ActiveAgent
+	target = runtime_def.ActiveAgent
 	if target == nil {
 		logging.Debugf("Validate active target: target does not exist")
 		return nil
 	}
 
 	// write to given target's connection
-	tControl := def.AgentControlMap[target]
+	tControl := runtime_def.AgentControlMap[target]
 	if tControl == nil {
 		logging.Debugf("Validate active target: agent control interface not found")
 		return nil

@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/runtime_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/logging"
 	"github.com/spf13/cobra"
 )
@@ -43,7 +43,7 @@ func CmdCd(_ *cobra.Command, args []string) {
 	// wait for response, max 10s
 	for i := 0; i < 100; i++ {
 		time.Sleep(100 * time.Millisecond)
-		res, exists := def.CmdResults[cmd_id]
+		res, exists := runtime_def.CmdResults[cmd_id]
 		if exists {
 			if !strings.Contains(res, "error") {
 				logging.Infof("cd: %s", res)

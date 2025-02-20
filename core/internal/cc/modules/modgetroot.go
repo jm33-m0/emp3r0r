@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/runtime_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/logging"
@@ -24,12 +24,12 @@ var LPEHelperURLs = map[string]string{
 func moduleLPE() {
 	go func() {
 		// target
-		target := def.ActiveAgent
+		target := runtime_def.ActiveAgent
 		if target == nil {
 			logging.Errorf("Target not exist")
 			return
 		}
-		helperOpt, ok := def.AvailableModuleOptions["lpe_helper"]
+		helperOpt, ok := runtime_def.AvailableModuleOptions["lpe_helper"]
 		if !ok {
 			logging.Errorf("Option 'lpe_helper' not found")
 			return
@@ -38,7 +38,7 @@ func moduleLPE() {
 
 		// download third-party LPE helper
 		logging.Infof("Updating local LPE helper...")
-		err := tools.DownloadFile(LPEHelperURLs[helperName], def.Temp+tun.WWW+helperName)
+		err := tools.DownloadFile(LPEHelperURLs[helperName], runtime_def.Temp+tun.WWW+helperName)
 		if err != nil {
 			logging.Errorf("Failed to download %s: %v", helperName, err)
 			return

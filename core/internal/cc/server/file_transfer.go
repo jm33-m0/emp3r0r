@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/runtime_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/logging"
 	"github.com/jm33-m0/emp3r0r/core/internal/tun"
@@ -29,14 +29,14 @@ func StatFile(filepath string, a *emp3r0r_def.Emp3r0rAgent) (fi *util.FileStat, 
 	var fileinfo util.FileStat
 
 	defer func() {
-		def.CmdResultsMutex.Lock()
-		delete(def.CmdResults, cmd_id)
-		def.CmdResultsMutex.Unlock()
+		runtime_def.CmdResultsMutex.Lock()
+		delete(runtime_def.CmdResults, cmd_id)
+		runtime_def.CmdResultsMutex.Unlock()
 	}()
 
 	for {
 		time.Sleep(100 * time.Millisecond)
-		res, exists := def.CmdResults[cmd_id]
+		res, exists := runtime_def.CmdResults[cmd_id]
 		if exists {
 			err = json.Unmarshal([]byte(res), &fileinfo)
 			if err != nil {
@@ -63,16 +63,16 @@ func PutFile(lpath, rpath string, a *emp3r0r_def.Emp3r0rAgent) error {
 		"size: %d bytes (%.2fMB)\n"+
 		"sha256sum: %s",
 		lpath, rpath,
-		a.From, def.AgentControlMap[a].Index,
+		a.From, runtime_def.AgentControlMap[a].Index,
 		size, sizemB,
 		sum,
 	)
 
 	// move file to wwwroot, then move it back when we are done with it
-	logging.Infof("Copy %s to %s", lpath, def.WWWRoot+util.FileBaseName(lpath))
-	err := util.Copy(lpath, def.WWWRoot+util.FileBaseName(lpath))
+	logging.Infof("Copy %s to %s", lpath, runtime_def.WWWRoot+util.FileBaseName(lpath))
+	err := util.Copy(lpath, runtime_def.WWWRoot+util.FileBaseName(lpath))
 	if err != nil {
-		return fmt.Errorf("copy %s to %s: %v", lpath, def.WWWRoot+util.FileBaseName(lpath), err)
+		return fmt.Errorf("copy %s to %s: %v", lpath, runtime_def.WWWRoot+util.FileBaseName(lpath), err)
 	}
 
 	// send cmd
@@ -88,7 +88,7 @@ func PutFile(lpath, rpath string, a *emp3r0r_def.Emp3r0rAgent) error {
 // generateGetFilePaths generates paths and filenames for GetFile
 func generateGetFilePaths(file_path string) (write_dir, save_to_file, tempname, lock string) {
 	file_path = filepath.Clean(file_path)
-	write_dir = fmt.Sprintf("%s%s", def.FileGetDir, filepath.Dir(file_path))
+	write_dir = fmt.Sprintf("%s%s", runtime_def.FileGetDir, filepath.Dir(file_path))
 	save_to_file = fmt.Sprintf("%s/%s", write_dir, util.FileBaseName(file_path))
 	tempname = save_to_file + ".downloading"
 	lock = save_to_file + ".lock"
