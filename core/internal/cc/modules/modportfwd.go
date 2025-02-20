@@ -55,6 +55,7 @@ func modulePortFwd() {
 		var pf network.PortFwdSession
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
 		pf.Lport, pf.To = runtime_def.AvailableModuleOptions["listen_port"].Val, runtime_def.AvailableModuleOptions["to"].Val
+		pf.SendCmdFunc = agents.SendCmd
 		go func() {
 			logging.Printf("RunReversedPortFwd: %s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.Lport, pf.To, pf.Protocol)
 			initErr := pf.InitReversedPortFwd()
@@ -66,6 +67,7 @@ func modulePortFwd() {
 		var pf network.PortFwdSession
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
 		pf.Lport, pf.To = runtime_def.AvailableModuleOptions["listen_port"].Val, runtime_def.AvailableModuleOptions["to"].Val
+		pf.SendCmdFunc = agents.SendCmd
 		pf.Protocol = runtime_def.AvailableModuleOptions["protocol"].Val
 		go func() {
 			logging.Printf("RunPortFwd: %s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.Lport, pf.To, pf.Protocol)
@@ -97,6 +99,7 @@ func moduleProxy() {
 	pf := new(network.PortFwdSession)
 	pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
 	pf.Lport, pf.To = port, "127.0.0.1:"+runtime_def.RuntimeConfig.AgentSocksServerPort
+	pf.SendCmdFunc = agents.SendCmd
 	pf.Description = fmt.Sprintf("Agent Proxy (TCP):\n%s (Local) -> %s (Agent)", pf.Lport, pf.To)
 	pf.Protocol = "tcp"
 	pf.Timeout = runtime_def.RuntimeConfig.AgentSocksTimeout
@@ -108,12 +111,13 @@ func moduleProxy() {
 	pfu.Description = fmt.Sprintf("Agent Proxy (UDP):\n%s (Local) -> %s (Agent)", pfu.Lport, pfu.To)
 	pfu.Protocol = "udp"
 	pfu.Timeout = runtime_def.RuntimeConfig.AgentSocksTimeout
+	pf.SendCmdFunc = agents.SendCmd
 
 	switch status {
 	case "on":
 		// tell agent to start local socks5 proxy
 		cmd_id := uuid.NewString()
-		err := agents.SendCmdToCurrentTarget("!proxy --mode on --addr 0.0.0.0:"+runtime_def.RuntimeConfig.AgentSocksServerPort, cmd_id)
+		err := agents.SendCmdToCurrentAgent("!proxy --mode on --addr 0.0.0.0:"+runtime_def.RuntimeConfig.AgentSocksServerPort, cmd_id)
 		if err != nil {
 			logging.Errorf("Starting SOCKS4 proxy on target failed: %v", err)
 			return

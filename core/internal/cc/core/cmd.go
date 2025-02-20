@@ -425,7 +425,7 @@ func execCmd(cmd *cobra.Command, args []string) {
 	}
 
 	// execute command
-	err = agents.SendCmdToCurrentTarget(fmt.Sprintf("exec --cmd %s", strconv.Quote(cmdStr)), "")
+	err = agents.SendCmdToCurrentAgent(fmt.Sprintf("exec --cmd %s", strconv.Quote(cmdStr)), "")
 	if err != nil {
 		logging.Errorf("Error executing command: %v", err)
 	}

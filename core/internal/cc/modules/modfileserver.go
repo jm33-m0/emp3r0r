@@ -45,7 +45,7 @@ func moduleDownloader() {
 	path := runtime_def.AvailableModuleOptions["path"].Val
 
 	cmd := fmt.Sprintf("%s --download_addr %s --checksum %s --path %s", emp3r0r_def.C2CmdFileDownloader, download_addr, checksum, path)
-	err := agents.SendCmdToCurrentTarget(cmd, "")
+	err := agents.SendCmdToCurrentAgent(cmd, "")
 	if err != nil {
 		logging.Errorf("SendCmd: %v", err)
 		return

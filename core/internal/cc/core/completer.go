@@ -138,7 +138,7 @@ func listRemoteDirWorker(path_to_list string) (cwd string, names []string) {
 	names = make([]string, 0) // listing to return
 	cmd := fmt.Sprintf("%s --path %s", emp3r0r_def.C2CmdListDir, path_to_list)
 	cmd_id := uuid.NewString()
-	err := agents.SendCmdToCurrentTarget(cmd, cmd_id)
+	err := agents.SendCmdToCurrentAgent(cmd, cmd_id)
 	if err != nil {
 		logging.Debugf("Cannot list remote directory: %v", err)
 		return

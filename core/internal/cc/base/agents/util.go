@@ -74,8 +74,8 @@ func waitNeeded(cmd string) bool {
 	return strings.HasPrefix(cmd, "!") || strings.HasPrefix(cmd, "get") || strings.HasPrefix(cmd, "put ")
 }
 
-// SendCmdToCurrentTarget send a command to currently selected agent
-func SendCmdToCurrentTarget(cmd, cmd_id string) error {
+// SendCmdToCurrentAgent send a command to currently selected agent
+func SendCmdToCurrentAgent(cmd, cmd_id string) error {
 	// target
 	target := MustGetActiveAgent()
 	if target == nil {

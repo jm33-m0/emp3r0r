@@ -134,7 +134,7 @@ func handleInMemoryModule(config emp3r0r_def.ModuleConfig, payload_type, envStr,
 		emp3r0r_def.C2CmdCustomModule, runtime_def.ActiveModule, payload_type, util.FileBaseName(hosted_file), tun.SHA256SumFile(hosted_file), download_addr, envStr)
 	cmd_id := uuid.NewString()
 	logging.Debugf("Sending command %s to %s", cmd, runtime_def.ActiveAgent.Tag)
-	err = agents.SendCmdToCurrentTarget(cmd, cmd_id)
+	err = agents.SendCmdToCurrentAgent(cmd, cmd_id)
 	if err != nil {
 		logging.Errorf("Sending command %s to %s: %v", cmd, runtime_def.ActiveAgent.Tag, err)
 	}
@@ -162,7 +162,7 @@ func handleCompressedModule(config emp3r0r_def.ModuleConfig, payload_type, exec_
 		emp3r0r_def.C2CmdCustomModule,
 		runtime_def.ActiveModule, checksum, envStr, download_addr, payload_type, file_to_download, exec_cmd)
 	cmd_id := uuid.NewString()
-	err := agents.SendCmdToCurrentTarget(cmd, cmd_id)
+	err := agents.SendCmdToCurrentAgent(cmd, cmd_id)
 	if err != nil {
 		logging.Errorf("Sending command %s to %s: %v", cmd, runtime_def.ActiveAgent.Tag, err)
 	}

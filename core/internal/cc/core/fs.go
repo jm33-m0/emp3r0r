@@ -35,7 +35,7 @@ func CmdCd(_ *cobra.Command, args []string) {
 	dst := args[0]
 	activeAgent.CWD = dst
 	cmd_id := uuid.NewString()
-	err := agents.SendCmdToCurrentTarget(fmt.Sprintf("cd --dst %s", dst), cmd_id)
+	err := agents.SendCmdToCurrentAgent(fmt.Sprintf("cd --dst %s", dst), cmd_id)
 	if err != nil {
 		logging.Errorf("Cannot cd to %s: %v", dst, err)
 		return
@@ -131,7 +131,7 @@ func executeCmd(cmd string) {
 		logging.Errorf("%s: no active target", cmd)
 		return
 	}
-	err := agents.SendCmdToCurrentTarget(cmd, "")
+	err := agents.SendCmdToCurrentAgent(cmd, "")
 	if err != nil {
 		logging.Errorf("%s failed: %v", cmd, err)
 	}
