@@ -1,7 +1,7 @@
 //go:build cgo && linux
 // +build cgo,linux
 
-package exe_utils
+package exeutil
 
 import (
 	"unsafe"

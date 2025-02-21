@@ -1,7 +1,7 @@
 //go:build windows && cgo
 // +build windows,cgo
 
-package exe_utils
+package exeutil
 
 import "fmt"
 
