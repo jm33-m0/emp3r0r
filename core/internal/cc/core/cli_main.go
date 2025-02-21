@@ -94,7 +94,7 @@ func CliMain() {
 
 func highLighter(line []rune) string {
 	var highlightedStr strings.Builder
-	err := quick.Highlight(&highlightedStr, string(line), "shell", "terminal256", "monokai")
+	err := quick.Highlight(&highlightedStr, string(line), "fish", "terminal256", "tokyonight-moon")
 	if err != nil {
 		return string(line)
 	}
