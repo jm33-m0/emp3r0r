@@ -1,7 +1,9 @@
 package logging
 
 import (
+	"fmt"
 	"io"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -51,18 +53,23 @@ func CmdSetDebugLevel(cmd *cobra.Command, args []string) {
 
 // SetOutput set a new writer to logging package, for example os.Stdout
 func SetOutput(w io.Writer) {
-	logger.writer = w
+	logger.SetOutput(w)
+	logger.Start()
 }
 
 // AddWriter add a new writer to logging package, for example os.Stdout
 func AddWriter(w io.Writer) {
 	logger.AddWriter(w)
+	logger.Start()
 }
 
+// initialize logger, write log to ~/.emp3r0r/emp3r0r.log
 func init() {
 	var err error
-	logger, err = NewLogger("", 2)
+	log_file := fmt.Sprintf("%s/.emp3r0r/emp3r0r.log", os.Getenv("HOME"))
+	logger, err = NewLogger(log_file, 2)
 	if err != nil {
 		panic(err)
 	}
+	logger.Start()
 }

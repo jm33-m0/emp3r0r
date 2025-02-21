@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -15,6 +16,8 @@ type Logger struct {
 	Level   int
 	logChan chan string
 	writer  io.Writer
+	ctx     context.Context
+	cancel  context.CancelFunc
 }
 
 var (
@@ -46,25 +49,59 @@ func NewLogger(logFilePath string, level int) (*Logger, error) {
 	}
 	logger.SetDebugLevel(level)
 	logger.logChan = make(chan string, 4096)
+	logger.ctx, logger.cancel = context.WithCancel(context.Background())
 
 	return logger, nil
 }
 
 // AddWriter adds a new writer to logger, for example os.Stdout
 func (l *Logger) AddWriter(w io.Writer) {
-	l.writer = io.MultiWriter(l.writer, w)
+	if l.writer == nil {
+		l.writer = w
+	} else {
+		l.writer = io.MultiWriter(l.writer, w)
+	}
 }
 
-// Start starts the logger and listens for log messages, then print them to console and log file
-func (l *Logger) Start() {
-	log.SetOutput(l.writer)
-	for {
-		msg := fmt.Sprintf("%s\n", <-l.logChan)
+// SetOutput set logger writer, for example os.Stdout
+func (l *Logger) SetOutput(w io.Writer) {
+	l.writer = w
+}
 
-		// log to console and file
-		log.Print(msg)
-		time.Sleep(10 * time.Millisecond)
+// Start starts the logger, it listens for log messages and writes to the writer
+func (l *Logger) Start() {
+	// Cancel the previous logger if applicable
+	if l.cancel != nil {
+		l.cancel()
 	}
+
+	// Create a new logger
+	newLogger, err := NewLogger("", 2)
+	if err != nil {
+		panic(err)
+	}
+	newLogger.SetOutput(l.writer)
+
+	// Ensure the new logger is properly referenced
+	*l = *newLogger
+
+	// Start logging
+	log.SetOutput(l.writer)
+
+	// Listen for log messages without blocking
+	go func() {
+		for {
+			select {
+			case msg, ok := <-l.logChan:
+				if !ok {
+					return // Channel closed, exit goroutine
+				}
+				log.Print(msg)
+			case <-l.ctx.Done():
+				return // Stop logging when context is canceled
+			}
+		}
+	}()
 }
 
 func (l *Logger) helper(format string, a []interface{}, msgColor *color.Color, _ string, _ bool) {

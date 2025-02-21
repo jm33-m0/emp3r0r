@@ -74,12 +74,6 @@ func main() {
 		live.TmuxPersistence = true
 	}
 
-	logf, err := os.OpenFile(live.EmpLogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
-	if err != nil {
-		logging.Fatalf("Failed to open log file: %v", err)
-	}
-	logging.SetOutput(logf)
-
 	// abort if CC is already running
 	if tools.IsCCRunning() {
 		logging.Fatalf("CC is already running")

@@ -33,7 +33,7 @@ var (
 	FileGetDir = ""
 	// EmpConfigFile emp3r0r.json
 	EmpConfigFile = ""
-	// EmpLogFile emp3r0r.log
+	// EmpLogFile ~/.emp3r0r/emp3r0r.log, initialized in logging package
 	EmpLogFile = ""
 
 	// emp3r0r-cat

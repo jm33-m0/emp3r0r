@@ -79,7 +79,7 @@ func CliMain() {
 	}
 
 	// Log to tmux window as well
-	f, err := os.OpenFile(cli.OutputPane.TTY, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
+	f, err := os.OpenFile(cli.OutputPane.TTY, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
 	if err != nil {
 		logging.Fatalf("Failed to open tmux pane: %v", err)
 	}
