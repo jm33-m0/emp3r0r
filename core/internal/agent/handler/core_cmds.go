@@ -162,11 +162,11 @@ func CoreCommands() *cobra.Command {
 		Run:     putCmdRun,
 		GroupID: "file_transfer",
 	}
-	putCmd.Flags().StringP("file", "f", "", "File to upload")
-	putCmd.Flags().StringP("path", "p", "", "Destination path")
-	putCmd.Flags().Int64P("size", "s", 0, "Size of file")
-	putCmd.Flags().StringP("checksum", "c", "", "File checksum")
-	putCmd.Flags().StringP("addr", "h", "", "Download address")
+	putCmd.Flags().StringP("file", "", "", "File to upload")
+	putCmd.Flags().StringP("path", "", "", "Destination path")
+	putCmd.Flags().Int64P("size", "", 0, "Size of file")
+	putCmd.Flags().StringP("checksum", "", "", "File checksum")
+	putCmd.Flags().StringP("addr", "", "", "Download address")
 	rootCmd.AddCommand(putCmd)
 
 	return rootCmd
