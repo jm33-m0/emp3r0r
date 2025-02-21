@@ -1,9 +1,10 @@
 //go:build windows
 // +build windows
 
-package agentutils
+package util
 
-func crossPlatformSetProcName(string) {
+// Dummy implementation for windows
+func SetProcName(string) {
 }
 
 func ProcUID(int) string {

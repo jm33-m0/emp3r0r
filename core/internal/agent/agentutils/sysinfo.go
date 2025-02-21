@@ -1,4 +1,4 @@
-package c2transport
+package agentutils
 
 import (
 	"fmt"
@@ -9,11 +9,10 @@ import (
 	"strings"
 
 	"github.com/jaypipes/ghw"
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/sysinfo"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
+	"github.com/jm33-m0/emp3r0r/core/lib/sysinfo"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -53,8 +52,8 @@ func CollectSystemInfo() *def.Emp3r0rAgent {
 	info.Mem = fmt.Sprintf("%d MB", util.GetMemSize())
 	info.Hardware = util.CheckProduct(info.Product)
 	info.Container = sysinfo.CheckContainer()
-	agentutils.SetC2Transport()
-	info.Transport = def.Transport
+	info.Transport = GenC2TransportString()
+	def.Transport = info.Transport
 
 	// have root?
 	info.HasRoot = sysinfo.HasRoot()

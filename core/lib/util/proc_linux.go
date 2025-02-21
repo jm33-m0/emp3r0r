@@ -1,7 +1,7 @@
 //go:build linux
 // +build linux
 
-package agentutils
+package util
 
 import (
 	"bufio"
@@ -10,8 +10,6 @@ import (
 	"os"
 	"strings"
 	"unsafe"
-
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // ProcUID get euid of a process
@@ -40,7 +38,7 @@ func CopyProcExeTo(pid int, dest_path string) (err error) {
 	}
 
 	// overwrite
-	if util.IsExist(dest_path) {
+	if IsExist(dest_path) {
 		os.RemoveAll(dest_path)
 	}
 
@@ -48,7 +46,7 @@ func CopyProcExeTo(pid int, dest_path string) (err error) {
 }
 
 // rename agent process by modifying its argv, all cmdline args are dropped
-func crossPlatformSetProcName(name string) {
+func SetProcName(name string) {
 	for i := range os.Args {
 		argvN := unsafe.Slice(unsafe.StringData(os.Args[i]), len(os.Args[i]))
 

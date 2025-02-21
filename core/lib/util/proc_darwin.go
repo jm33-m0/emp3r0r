@@ -1,7 +1,7 @@
 //go:build darwin
 // +build darwin
 
-package agentutils
+package util
 
 import (
 	"errors"
@@ -17,6 +17,7 @@ func CopyProcExeTo(pid int, dest_path string) error {
 	return errors.New("CopyProcExeTo not implemented on darwin")
 }
 
-func crossPlatformSetProcName(name string) {
-	// dummy implementation does nothing on darwin
+// SetProcName set process name
+// dummy implementation does nothing on darwin
+func SetProcName(name string) {
 }

