@@ -111,7 +111,7 @@ func moduleProxy() {
 	pfu.Description = fmt.Sprintf("Agent Proxy (UDP):\n%s (Local) -> %s (Agent)", pfu.Lport, pfu.To)
 	pfu.Protocol = "udp"
 	pfu.Timeout = live.RuntimeConfig.AgentSocksTimeout
-	pf.SendCmdFunc = agents.SendCmd
+	pfu.SendCmdFunc = agents.SendCmd
 
 	switch status {
 	case "on":
