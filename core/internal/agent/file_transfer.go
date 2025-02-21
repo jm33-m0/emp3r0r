@@ -35,7 +35,7 @@ func SmartDownload(download_addr, file_to_download, path, checksum string) (data
 	// if download_host is given, download from the specified agent
 	if download_addr != "" {
 		// download from other agent
-		err = RequestAndDownloadFile(download_addr, file_to_download, path, checksum)
+		err = DownloadFromPeerKCP(download_addr, file_to_download, path, checksum)
 		if util.IsFileExist(path) {
 			// checksum
 			if crypto.SHA256SumFile(path) == checksum {
@@ -264,8 +264,8 @@ func handleClient(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, file_path)
 }
 
-// RequestAndDownloadFile requests and downloads a file from an HTTP server to a specified path
-func RequestAndDownloadFile(address, filepath, path, checksum string) (err error) {
+// DownloadFromPeerKCP requests and downloads a file from an HTTP server to a specified path
+func DownloadFromPeerKCP(address, filepath, path, checksum string) (err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

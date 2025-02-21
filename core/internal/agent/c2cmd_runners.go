@@ -347,7 +347,7 @@ func runFileDownloader(cmd *cobra.Command, args []string) {
 		return
 	}
 	downloadPath := fmt.Sprintf("%s/%s", RuntimeConfig.AgentRoot, util.FileBaseName(path))
-	err := RequestAndDownloadFile(url, path, downloadPath, checksum)
+	err := DownloadFromPeerKCP(url, path, downloadPath, checksum)
 	if err != nil {
 		C2RespPrintf(cmd, "Error: %v\n", err)
 		return
