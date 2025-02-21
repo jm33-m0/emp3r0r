@@ -102,9 +102,7 @@ func main() {
 
 // handle SSH relay client logic
 func runSSHRelayClient(opts *Options) {
-	sshPassword := new(string)
-	fmt.Printf("Enter SSH password: ")
-	fmt.Scanln(sshPassword)
+	sshPassword := cli.Prompt("Enter SSH password: ")
 	go func(pass string) {
 		defer logging.Errorf("session unexpectedly exited, please restart emp3r0r")
 		SSHConnections := make(map[string]context.CancelFunc, 10)
@@ -113,11 +111,15 @@ func runSSHRelayClient(opts *Options) {
 			logging.Fatalf("Parsing SSHPublicKey: %v", sshKeyErr)
 		}
 	ssh_connect:
+		ccport, err := strconv.Atoi(live.RuntimeConfig.CCPort)
+		if err != nil {
+			logging.Fatalf("Invalid CC port: %v", err)
+		}
 		ctx, cancel := context.WithCancel(context.Background())
 		sshKeyErr = transport.SSHRemoteFwdClient(opts.connectRelayAddr,
 			pass,
 			pubkey, // enable host key verification
-			opts.relayedPort,
+			ccport, // connect to C2 port
 			&SSHConnections, ctx, cancel)
 		if sshKeyErr == nil {
 			sshKeyErr = fmt.Errorf("session unexpectedly exited")
@@ -127,16 +129,16 @@ func runSSHRelayClient(opts *Options) {
 			util.TakeABlink()
 		}
 		goto ssh_connect
-	}(*sshPassword)
+	}(sshPassword)
 }
 
 // handle SSH relay server logic
 func runSSHRelayServer(opts *Options) {
 	sshPassword := util.RandMD5String()
-	log.Printf("SSH password is %s. Copy ~/.emp3r0r to client host, "+
-		"then run `emp3r0r -connect_relay relay_ip:%s -relayed_port %s` "+
-		"(C2 port, or KCP port %s if you are using it)",
-		strconv.Quote(sshPassword), opts.sshRelayPort, live.RuntimeConfig.CCPort, live.RuntimeConfig.KCPServerPort)
+	log.Printf("SSH password is %s.\nCopy ~/.emp3r0r to client host, "+
+		"then run\nemp3r0r -connect_relay relay_ip:%s\n"+
+		"to connect to this relay server. C2 port %s will be relayed to client host.",
+		strconv.Quote(sshPassword), opts.sshRelayPort, live.RuntimeConfig.CCPort)
 	if err := transport.SSHRemoteFwdServer(opts.sshRelayPort,
 		sshPassword,
 		live.RuntimeConfig.SSHHostKey); err != nil {
