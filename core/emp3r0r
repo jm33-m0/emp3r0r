@@ -126,16 +126,15 @@ build() {
   # Check for zig installation
   check_zig
 
+  ldflags="-v -X 'github.com/jm33-m0/emp3r0r/core/internal/def.MagicString=$magic_str'"
+  ldflags+=" -X 'github.com/jm33-m0/emp3r0r/core/internal/def.Version=$(get_version)'"
   if [[ "$1" = "--debug" ]]; then
     gobuild_cmd="go"
     build_opt="build"
-    ldflags="-v -X 'github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def.MagicString=$magic_str'"
-    ldflags+=" -X 'github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def.Version=$(get_version)-debug'"
   else
     gobuild_cmd="go"
     build_opt="build"
-    ldflags="-s -w -v -X 'github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def.MagicString=$magic_str'"
-    ldflags+=" -X 'github.com/jm33-m0/emp3r0r/core/lib/emp3r0r_def.Version=$(get_version)'"
+    ldflags+=" -s -w"
     # info "Setting up garble"
     # go install mvdan.cc/garble@latest || error "Failed to install garble"
   fi
