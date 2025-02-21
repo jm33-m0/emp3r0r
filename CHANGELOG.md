@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.4.3](https://github.com/jm33-m0/emp3r0r/compare/v2.4.2...v2.4.3) (2025-02-21)
+
+
+### Bug Fixes
+
+* `-h` not allowed ([a9cc467](https://github.com/jm33-m0/emp3r0r/commit/a9cc4675b5358ed569ac51441d85c18aa0a08f0e))
+* `ftp` token check ([ef15f7d](https://github.com/jm33-m0/emp3r0r/commit/ef15f7dcc4891124bb2591b54de45f9eb14adeb2))
+* `get` was messed up ([348819b](https://github.com/jm33-m0/emp3r0r/commit/348819bdad5a15ad74396ad1e040f05a3a7942a0))
+* download from peer should be disabled when address is empty ([86b5659](https://github.com/jm33-m0/emp3r0r/commit/86b5659244a276d242d2d486a2a1478221e6c4ea))
+* high CPU usage when searching for agent root path ([462d6f9](https://github.com/jm33-m0/emp3r0r/commit/462d6f9d8f795e41070d641a9b0f757035c48b00))
+* log to `emp3r0r.log` and tmux window ([f902ed5](https://github.com/jm33-m0/emp3r0r/commit/f902ed5ea4f2fb427b924551e363b3a96d2fd9a7))
+* passing args to modules ([e08222c](https://github.com/jm33-m0/emp3r0r/commit/e08222c96fbb4aa7cdf2cf430f0a64759f420f07))
+* port mapping crash ([af550a6](https://github.com/jm33-m0/emp3r0r/commit/af550a6986135adcde10e246b6d02947dcf2c95c))
+* syntax highlighting of emp3r0r console ([e7ffe1a](https://github.com/jm33-m0/emp3r0r/commit/e7ffe1abc7903f57a5582102f73d216407e32c9d))
+* update version number ([25e518b](https://github.com/jm33-m0/emp3r0r/commit/25e518bebf022604fffc5d360167c8d9a549a718))
+* version number ([355aca8](https://github.com/jm33-m0/emp3r0r/commit/355aca85b6fe865ba02018c8e50b839ade7e2c37))
+
 ## [2.4.2](https://github.com/jm33-m0/emp3r0r/compare/v2.4.1...v2.4.2) (2025-02-15)
 
 
