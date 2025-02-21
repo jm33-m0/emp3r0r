@@ -6,8 +6,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// ListModules list all available modules
-func ListModules(_ *cobra.Command, _ []string) {
+// CmdLsModules list all available modules
+func CmdLsModules(_ *cobra.Command, _ []string) {
 	mod_comment_map := make(map[string]string)
 	for mod_name, mod := range def.Modules {
 		mod_comment_map[mod_name] = mod.Comment

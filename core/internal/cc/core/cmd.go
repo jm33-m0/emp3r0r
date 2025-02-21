@@ -307,6 +307,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		rootCmd.AddCommand(putCmd)
 		carapace.Gen(putCmd).FlagCompletion(carapace.ActionMap{
 			"src": carapace.ActionFiles(),
+			"dst": carapace.ActionMultiParts("/", listRemoteDir),
 		})
 
 		screenshotCmd := &cobra.Command{
@@ -331,7 +332,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			GroupID: "module",
 			Short:   "List all modules",
 			Args:    cobra.NoArgs,
-			Run:     ListModules,
+			Run:     CmdLsModules,
 		}
 		rootCmd.AddCommand(lsModCmd)
 

@@ -99,8 +99,6 @@ func CmdSetActiveAgent(cmd *cobra.Command, args []string) {
 	select_agent := func(a *def.Emp3r0rAgent) {
 		live.ActiveAgent = a
 		logging.Successf("Now targeting %s", live.ActiveAgent.Tag)
-		logging.Printf("Run `file_manager` to open a SFTP session")
-		// autoCompleteAgentExes(target_to_set)
 	}
 
 	if target_to_set == nil {
