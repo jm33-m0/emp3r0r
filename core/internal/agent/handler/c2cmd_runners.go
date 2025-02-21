@@ -22,6 +22,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/listener"
+	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
 )
@@ -151,7 +152,7 @@ func runSSHD(cmd *cobra.Command, args []string) {
 	go func() {
 		errChan <- ssh.SSHD(shell, port, sshdArgs)
 	}()
-	for !transport.IsPortOpen("127.0.0.1", port) {
+	for !netutil.IsPortOpen("127.0.0.1", port) {
 		time.Sleep(50 * time.Millisecond)
 	}
 	select {

@@ -1,4 +1,4 @@
-package agentutils
+package shellhelper
 
 import (
 	"encoding/json"
@@ -7,14 +7,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/transport"
+	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func CmdNetHelper() (out string) {
-	ipa := transport.IPa()
-	ipneigh := transport.IPNeigh()
-	ipr := transport.IPr()
+	ipa := netutil.IPa()
+	ipneigh := netutil.IPNeigh()
+	ipr := netutil.IPr()
 
 	out = fmt.Sprintf("[*] ip addr:\n    %s"+
 		"\n\n[*] ip route:\n    %s"+

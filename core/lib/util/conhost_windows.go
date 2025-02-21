@@ -1,7 +1,7 @@
 //go:build windows
 // +build windows
 
-package agentutils
+package util
 
 import (
 	"fmt"

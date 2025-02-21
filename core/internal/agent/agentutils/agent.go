@@ -14,8 +14,8 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
-	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
+	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -92,7 +92,7 @@ func Upgrade(checksum string) (out string) {
 
 // set C2Transport string
 func GenC2TransportString() (transport_str string) {
-	if transport.IsTor(def.CCAddress) {
+	if netutil.IsTor(def.CCAddress) {
 		return fmt.Sprintf("TOR (%s)", def.CCAddress)
 	} else if common.RuntimeConfig.CDNProxy != "" {
 		return fmt.Sprintf("CDN (%s)", common.RuntimeConfig.CDNProxy)

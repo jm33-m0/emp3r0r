@@ -15,6 +15,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
+	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -244,13 +245,13 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 	for ctx.Err() == nil {
 		log.Print("Broadcasting our proxy...")
 		time.Sleep(time.Duration(util.RandInt(common.RuntimeConfig.ProxyChainBroadcastIntervalMin, common.RuntimeConfig.ProxyChainBroadcastIntervalMax)) * time.Second)
-		ips := transport.IPaddr()
+		ips := netutil.IPaddr()
 		for _, netip := range ips {
 			proxyMsg := fmt.Sprintf("socks5://%s:%s@%s:%s",
 				common.RuntimeConfig.ShadowsocksLocalSocksPort,
 				common.RuntimeConfig.Password,
 				netip.IP.String(), common.RuntimeConfig.AgentSocksServerPort)
-			broadcastAddr := transport.IPbroadcastAddr(netip)
+			broadcastAddr := netutil.IPbroadcastAddr(netip)
 			if broadcastAddr == "" {
 				continue
 			}

@@ -13,8 +13,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
-	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -41,7 +41,7 @@ func (pf *PortFwdSession) InitReversedPortFwd() (err error) {
 	listenPort := pf.Lport
 
 	_, e2 := strconv.Atoi(listenPort)
-	if !transport.ValidateIPPort(toAddr) || e2 != nil {
+	if !netutil.ValidateIPPort(toAddr) || e2 != nil {
 		return fmt.Errorf("invalid address/port: %s (to), %v (listen_port)", toAddr, e2)
 	}
 
@@ -163,7 +163,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 	pf.Agent = live.ActiveAgent
 
 	_, e2 := strconv.Atoi(listenPort)
-	if !transport.ValidateIPPort(toAddr) || e2 != nil {
+	if !netutil.ValidateIPPort(toAddr) || e2 != nil {
 		return fmt.Errorf("invalid address/port: %s (to), %v (listen_port)", toAddr, e2)
 	}
 

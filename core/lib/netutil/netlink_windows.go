@@ -1,7 +1,7 @@
 //go:build windows
 // +build windows
 
-package transport
+package netutil
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-func crossPlatformIPNeigh() (table []string) {
+func IPNeigh() (table []string) {
 	data, err := exec.Command("arp", "-a").Output()
 	if err != nil {
 		return nil
@@ -48,6 +48,6 @@ func crossPlatformIPNeigh() (table []string) {
 	return table
 }
 
-func crossPlatformIPr() (routes []string) {
+func IPr() (routes []string) {
 	return
 }
