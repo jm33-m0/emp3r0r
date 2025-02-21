@@ -2,7 +2,9 @@ package server
 
 import (
 	"encoding/base64"
+	"fmt"
 	"net/http"
+	"path/filepath"
 
 	"github.com/gorilla/mux"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
@@ -69,9 +71,10 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 			wrt.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		path := util.FileBaseName(req.URL.Query().Get("file_to_download"))
+		path := filepath.Clean(req.URL.Query().Get("file_to_download"))
+		path = filepath.Base(path)
 		logging.Debugf("FileAPI request for file: %s, URL: %s", path, req.URL)
-		local_path := live.Temp + transport.WWW + "/" + path
+		local_path := fmt.Sprintf("%s/%s/%s", live.Temp, transport.WWW, path)
 		if !util.IsExist(local_path) {
 			wrt.WriteHeader(http.StatusNotFound)
 			return
