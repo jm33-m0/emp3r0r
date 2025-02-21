@@ -4,7 +4,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/c2transport"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 )
 

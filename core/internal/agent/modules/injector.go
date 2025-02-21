@@ -10,8 +10,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/c2transport"
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/exeutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/external_file"

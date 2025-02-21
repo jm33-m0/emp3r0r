@@ -8,7 +8,7 @@ import (
 	"log"
 
 	"github.com/Microsoft/go-winio"
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 )
 
 func socketListen() {

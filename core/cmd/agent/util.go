@@ -7,8 +7,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/agentutils"
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
