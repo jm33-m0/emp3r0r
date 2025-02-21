@@ -22,7 +22,9 @@ Initially, emp3r0r was developed as one of my weaponizing experiments. It was a 
 
 **So, what makes emp3r0r different?** First of all, it is the first C2 framework that targets Linux platform including the capability of using any other tools through it. Take a look at the [features](#features) for more valid reasons to use it.
 
-To support third-party modules, emp3r0r has complete [python3 support](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r#python), included in [`vaccine`](./core/modules/vaccine) module, 15MB in total, with necessary third party packages such as `Impacket`, `Requests` and `MySQL`.
+To support third-party modules, emp3r0r has complete [python3 support](https://github.com/jm33-m0/emp3r0r/wiki/Write-modules-for-emp3r0r#python), included in [`vaccine`](./core/modules/vaccine) module, 15MB in total, with necessary third party packages such as `Impacket`, `Requests` and `MySQL`. emp3r0r also supports `bash`, `powershell`, `python`, `dll`, `so`, and `exe` modules.
+
+Currently, emp3r0r is a single-user C2 framework, but you can leverage the SSH C2-Relay feature if you wish to separate C2 server and operator.
 
 ---
 
