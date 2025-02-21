@@ -16,11 +16,10 @@ import (
 )
 
 // handlePortForwarding handles proxy/port forwarding.
-func handlePortForwarding(wrt http.ResponseWriter, req *http.Request) {
+func handlePortForwarding(sh *network.StreamHandler, wrt http.ResponseWriter, req *http.Request) {
 	var err error
-	var h2x def.H2Conn
-	sh := new(network.StreamHandler)
-	sh.H2x = &h2x
+	h2x := new(def.H2Conn)
+	sh.H2x = h2x
 	sh.H2x.Conn, err = h2conn.Accept(wrt, req)
 	if err != nil {
 		logging.Errorf("handlePortForwarding: connection failed from %s: %s", req.RemoteAddr, err)

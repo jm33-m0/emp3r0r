@@ -18,9 +18,10 @@ import (
 func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	// Setup H2Conn for reverse shell and proxy.
-	var rshellConn, proxyConn def.H2Conn
-	network.RShellStream.H2x = &rshellConn
-	network.ProxyStream.H2x = &proxyConn
+	rshellConn := new(def.H2Conn)
+	proxyConn := new(def.H2Conn)
+	network.RShellStream.H2x = rshellConn
+	network.ProxyStream.H2x = proxyConn
 
 	if vars["api"] == "" || vars["token"] == "" {
 		logging.Debugf("Invalid request: %v, missing api/token", req)
@@ -58,7 +59,7 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 	case transport.FTPAPI:
 		for _, sh := range network.FTPStreams {
 			if token == sh.Token {
-				handleFTPTransfer(wrt, req)
+				handleFTPTransfer(sh, wrt, req)
 				return
 			}
 		}
@@ -77,7 +78,7 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 		}
 		http.ServeFile(wrt, req, local_path)
 	case transport.ProxyAPI:
-		handlePortForwarding(wrt, req)
+		handlePortForwarding(network.ProxyStream, wrt, req)
 	default:
 		wrt.WriteHeader(http.StatusBadRequest)
 	}

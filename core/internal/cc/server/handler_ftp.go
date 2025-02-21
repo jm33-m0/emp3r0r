@@ -49,17 +49,11 @@ func progressMonitor(bar *progressbar.ProgressBar, filewrite, targetFile string,
 }
 
 // handleFTPTransfer processes file transfer requests.
-func handleFTPTransfer(wrt http.ResponseWriter, req *http.Request) {
+func handleFTPTransfer(sh *network.StreamHandler, wrt http.ResponseWriter, req *http.Request) {
 	vars := mux.Vars(req)
 	token := vars["token"]
 
 	// Check connection occupancy and accept connection via H2Conn.
-	sh, ok := network.FTPStreams[token] // assume FTPStreams token mapping exists
-	if !ok {
-		logging.Errorf("handleFTPTransfer: token %s not found", token)
-		http.Error(wrt, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-		return
-	}
 	if sh.H2x != nil && (sh.H2x.Ctx != nil || sh.H2x.Cancel != nil || sh.H2x.Conn != nil) {
 		logging.Errorf("handleFTPTransfer: connection occupied")
 		http.Error(wrt, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
