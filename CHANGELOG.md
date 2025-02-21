@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.4.4](https://github.com/jm33-m0/emp3r0r/compare/v2.4.3...v2.4.4) (2025-02-21)
+
+
+### Bug Fixes
+
+* `put --dst` auto-complete ([f6e9f5a](https://github.com/jm33-m0/emp3r0r/commit/f6e9f5a0bf0e59741b5f5cda7fbcd77046bcddbd))
+* simplify ssh c2 relay ([f280459](https://github.com/jm33-m0/emp3r0r/commit/f28045920152b7dab28d2ea2c0dc7eddf7580289))
+
 ## [2.4.2](https://github.com/jm33-m0/emp3r0r/compare/v2.4.1...v2.4.2) (2025-02-15)
 
 
