@@ -54,7 +54,12 @@ func handleFTPTransfer(wrt http.ResponseWriter, req *http.Request) {
 	token := vars["token"]
 
 	// Check connection occupancy and accept connection via H2Conn.
-	var sh *network.StreamHandler = network.FTPStreams[token] // assume FTPStreams token mapping exists
+	sh, ok := network.FTPStreams[token] // assume FTPStreams token mapping exists
+	if !ok {
+		logging.Errorf("handleFTPTransfer: token %s not found", token)
+		http.Error(wrt, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
+	}
 	if sh.H2x != nil && (sh.H2x.Ctx != nil || sh.H2x.Cancel != nil || sh.H2x.Conn != nil) {
 		logging.Errorf("handleFTPTransfer: connection occupied")
 		http.Error(wrt, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
