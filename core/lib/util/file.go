@@ -350,7 +350,7 @@ func IsDirWritable(path string) bool {
 }
 
 // GetWritablePaths get all writable paths in a directory up to a given depth
-func GetWritablePaths(root_path string, depth int) ([]string, error) {
+func GetWritablePaths(root_path string, depth, max int) ([]string, error) {
 	if depth < 0 {
 		return nil, fmt.Errorf("invalid depth: %d", depth)
 	}
@@ -375,6 +375,10 @@ func GetWritablePaths(root_path string, depth int) ([]string, error) {
 				if IsDirWritable(fullPath) {
 					writablePaths = append(writablePaths, fullPath)
 				}
+				if len(writablePaths) >= max {
+					return nil
+				}
+				TakeABlink() // avoid being too fast and causing high CPU usage
 				if err := searchPaths(fullPath, currentDepth+1); err != nil {
 					return err
 				}

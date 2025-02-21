@@ -83,7 +83,7 @@ func GetRandomWritablePath() (string, error) {
 
 	// Helper function to append writable paths
 	appendWritablePaths := func(basePath string) {
-		writablePaths, err := util.GetWritablePaths(basePath, 4)
+		writablePaths, err := util.GetWritablePaths(basePath, 4, 100)
 		if err == nil {
 			paths = append(paths, writablePaths...)
 		}
