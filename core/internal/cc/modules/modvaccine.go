@@ -28,7 +28,11 @@ func moduleVaccine() {
 		}
 		download_addr := downloadOpt.Val
 		checksum := crypto.SHA256SumFile(live.UtilsArchive)
-		err = agents.SendCmd(fmt.Sprintf("%s --checksum %s --download_addr %s", def.C2CmdUtils, checksum, download_addr), "", live.ActiveAgent)
+		cmd := fmt.Sprintf("%s --checksum %s --download_addr %s", def.C2CmdUtils, checksum, download_addr)
+		if downloadOpt.Val == "" {
+			cmd = fmt.Sprintf("%s --checksum %s", def.C2CmdUtils, checksum)
+		}
+		err = agents.SendCmd(cmd, "", live.ActiveAgent)
 		if err != nil {
 			logging.Errorf("SendCmd failed: %v", err)
 		}

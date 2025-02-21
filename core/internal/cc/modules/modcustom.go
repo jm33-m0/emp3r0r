@@ -130,8 +130,11 @@ func handleInMemoryModule(config def.ModuleConfig, payload_type, envStr, downloa
 		logging.Errorf("Writing %s: %v", hosted_file, err)
 		return
 	}
-	cmd := fmt.Sprintf("%s --mod_name %s --type %s --file_to_download %s --checksum %s --in_mem --download_addr %s --env \"%s\"",
-		def.C2CmdCustomModule, live.ActiveModule, payload_type, util.FileBaseName(hosted_file), crypto.SHA256SumFile(hosted_file), download_addr, envStr)
+	cmd := fmt.Sprintf("%s --mod_name %s --type %s --file_to_download %s --checksum %s --in_mem --env \"%s\"",
+		def.C2CmdCustomModule, live.ActiveModule, payload_type, util.FileBaseName(hosted_file), crypto.SHA256SumFile(hosted_file), envStr)
+	if download_addr != "" {
+		cmd += fmt.Sprintf(" --download_addr %s", strconv.Quote(download_addr))
+	}
 	cmd_id := uuid.NewString()
 	logging.Debugf("Sending command %s to %s", cmd, live.ActiveAgent.Tag)
 	err = agents.SendCmdToCurrentAgent(cmd, cmd_id)
@@ -158,9 +161,12 @@ func handleCompressedModule(config def.ModuleConfig, payload_type, exec_cmd, env
 	}
 
 	checksum := crypto.SHA256SumFile(tarball_path)
-	cmd := fmt.Sprintf("%s --mod_name %s --checksum %s --env \"%s\" --download_addr %s --type %s --file_to_download %s --exec \"%s\"",
+	cmd := fmt.Sprintf("%s --mod_name %s --checksum %s --env \"%s\" --type %s --file_to_download %s --exec \"%s\"",
 		def.C2CmdCustomModule,
-		live.ActiveModule, checksum, envStr, download_addr, payload_type, file_to_download, exec_cmd)
+		live.ActiveModule, checksum, envStr, payload_type, file_to_download, exec_cmd)
+	if download_addr != "" {
+		cmd += fmt.Sprintf(" --download_addr %s", strconv.Quote(download_addr))
+	}
 	cmd_id := uuid.NewString()
 	err := agents.SendCmdToCurrentAgent(cmd, cmd_id)
 	if err != nil {
