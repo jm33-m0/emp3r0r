@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/fs"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/shellhelper"
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +23,7 @@ func CoreCommands() *cobra.Command {
 	lsCmd := &cobra.Command{
 		Use:     "ls",
 		Short:   "List files in a directory",
-		Run:     fs.LsCmdRun,
+		Run:     shellhelper.LsCmdRun,
 		GroupID: "filesystem",
 	}
 	lsCmd.Flags().StringP("dst", "d", ".", "Directory to list files")
@@ -32,7 +32,7 @@ func CoreCommands() *cobra.Command {
 	catCmd := &cobra.Command{
 		Use:     "cat",
 		Short:   "Read file content",
-		Run:     fs.CatCmdRun,
+		Run:     shellhelper.CatCmdRun,
 		GroupID: "filesystem",
 	}
 	catCmd.Flags().StringP("dst", "d", "", "File to read")
@@ -41,7 +41,7 @@ func CoreCommands() *cobra.Command {
 	rmCmd := &cobra.Command{
 		Use:     "rm",
 		Short:   "Remove file or directory",
-		Run:     fs.RmCmdRun,
+		Run:     shellhelper.RmCmdRun,
 		GroupID: "filesystem",
 	}
 	rmCmd.Flags().StringP("dst", "d", "", "Path to remove")
@@ -50,7 +50,7 @@ func CoreCommands() *cobra.Command {
 	mkdirCmd := &cobra.Command{
 		Use:     "mkdir",
 		Short:   "Create directory",
-		Run:     fs.MkdirCmdRun,
+		Run:     shellhelper.MkdirCmdRun,
 		GroupID: "filesystem",
 	}
 	mkdirCmd.Flags().StringP("dst", "d", "", "Directory to create")
@@ -59,7 +59,7 @@ func CoreCommands() *cobra.Command {
 	cpCmd := &cobra.Command{
 		Use:     "cp",
 		Short:   "Copy file or directory",
-		Run:     fs.CpCmdRun,
+		Run:     shellhelper.CpCmdRun,
 		GroupID: "filesystem",
 	}
 	cpCmd.Flags().StringP("src", "s", "", "Source path")
@@ -69,7 +69,7 @@ func CoreCommands() *cobra.Command {
 	mvCmd := &cobra.Command{
 		Use:     "mv",
 		Short:   "Move file or directory",
-		Run:     fs.MvCmdRun,
+		Run:     shellhelper.MvCmdRun,
 		GroupID: "filesystem",
 	}
 	mvCmd.Flags().StringP("src", "s", "", "Source path")
@@ -79,7 +79,7 @@ func CoreCommands() *cobra.Command {
 	cdCmd := &cobra.Command{
 		Use:     "cd",
 		Short:   "Change directory",
-		Run:     fs.CdCmdRun,
+		Run:     shellhelper.CdCmdRun,
 		GroupID: "filesystem",
 	}
 	cdCmd.Flags().StringP("dst", "d", "", "Target directory")
@@ -88,7 +88,7 @@ func CoreCommands() *cobra.Command {
 	pwdCmd := &cobra.Command{
 		Use:     "pwd",
 		Short:   "Print working directory",
-		Run:     fs.PwdCmdRun,
+		Run:     shellhelper.PwdCmdRun,
 		GroupID: "filesystem",
 	}
 	rootCmd.AddCommand(pwdCmd)
@@ -97,7 +97,7 @@ func CoreCommands() *cobra.Command {
 	psCmd := &cobra.Command{
 		Use:     "ps",
 		Short:   "List processes",
-		Run:     fs.PsCmdRun,
+		Run:     shellhelper.PsCmdRun,
 		GroupID: "process",
 	}
 	psCmd.Flags().IntP("pid", "p", 0, "Process ID")
