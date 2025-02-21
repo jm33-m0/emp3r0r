@@ -8,7 +8,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/exe_utils"
+	"github.com/jm33-m0/emp3r0r/core/lib/exeutil"
 )
 
 func main() {
@@ -26,7 +26,7 @@ func main() {
 		log.Fatalf("Error reading ELF file: %v", err)
 	}
 
-	h, err := exe_utils.ParseELFHeaders(elf_data)
+	h, err := exeutil.ParseELFHeaders(elf_data)
 	if err != nil {
 		log.Fatalf("Error parsing ELF headers: %v", err)
 	}
@@ -36,7 +36,7 @@ func main() {
 
 	// Add a specified library to the DT_NEEDED entries
 	if *libName != "" {
-		err = exe_utils.AddDTNeeded(*elfFilePath, *libName)
+		err = exeutil.AddDTNeeded(*elfFilePath, *libName)
 		if err != nil {
 			log.Fatalf("Error adding library to DT_NEEDED entries: %v", err)
 		}

@@ -1,7 +1,7 @@
 //go:build !cgo
 // +build !cgo
 
-package exe_utils
+package exeutil
 
 import "fmt"
 

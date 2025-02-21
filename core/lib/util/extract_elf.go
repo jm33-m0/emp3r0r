@@ -9,7 +9,7 @@ import (
 	"os"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
-	"github.com/jm33-m0/emp3r0r/core/lib/exe_utils"
+	"github.com/jm33-m0/emp3r0r/core/lib/exeutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
@@ -21,7 +21,7 @@ func FindEmp3r0rELFInMem() (elf_bytes []byte, err error) {
 		err = fmt.Errorf("cannot dump self memory: %v", err)
 		return
 	}
-	elf_header := new(exe_utils.ELFHeader)
+	elf_header := new(exeutil.ELFHeader)
 
 	parseMemRegions := func(base int64) (start, end int64, err error) {
 		for _, p := range elf_header.ProgramHeaders {
@@ -35,7 +35,7 @@ func FindEmp3r0rELFInMem() (elf_bytes []byte, err error) {
 	}
 
 	for base, mem_region := range mem_regions {
-		if bytes.Contains(mem_region, exe_utils.ELFMAGIC) && bytes.Contains(mem_region, def.OneTimeMagicBytes) {
+		if bytes.Contains(mem_region, exeutil.ELFMAGIC) && bytes.Contains(mem_region, def.OneTimeMagicBytes) {
 			if base != 0x400000 {
 				logging.Debugf("Found magic string in memory region 0x%x, but unlikely to contain our ELF", base)
 				continue
@@ -51,7 +51,7 @@ func FindEmp3r0rELFInMem() (elf_bytes []byte, err error) {
 			logging.Debugf("Found emp3r0r ELF in memory region 0x%x", base)
 
 			// parse ELF headers
-			elf_header, err = exe_utils.ParseELFHeaders(mem_region)
+			elf_header, err = exeutil.ParseELFHeaders(mem_region)
 			if err != nil {
 				logging.Debugf("Parse ELF headers: %v", err)
 				continue

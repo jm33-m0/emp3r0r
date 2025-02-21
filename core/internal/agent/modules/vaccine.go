@@ -16,7 +16,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
-	"github.com/jm33-m0/emp3r0r/core/lib/exe_utils"
+	"github.com/jm33-m0/emp3r0r/core/lib/exeutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -90,7 +90,7 @@ func VaccineHandler(download_addr, checksum string) (out string) {
 	}
 	for _, f := range files {
 		fpath := fmt.Sprintf("%s/%s", common.RuntimeConfig.UtilsPath, f.Name())
-		if !exe_utils.IsELF(fpath) || exe_utils.IsStaticELF(fpath) {
+		if !exeutil.IsELF(fpath) || exeutil.IsStaticELF(fpath) {
 			continue
 		}
 		// patch patchelf itself
@@ -106,7 +106,7 @@ func VaccineHandler(download_addr, checksum string) (out string) {
 
 		rpath := fmt.Sprintf("%s/lib/", common.RuntimeConfig.UtilsPath)
 		ld_path := fmt.Sprintf("%s/ld-musl-x86_64.so.1", rpath)
-		err = exe_utils.FixELF(fpath, rpath, ld_path)
+		err = exeutil.FixELF(fpath, rpath, ld_path)
 		if err != nil {
 			out = fmt.Sprintf("%s\n%s: %v", out, fpath, err)
 		}
