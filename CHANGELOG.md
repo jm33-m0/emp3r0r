@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.4.3](https://github.com/jm33-m0/emp3r0r/compare/v2.4.2...v2.4.3) (2025-02-21)
+
+
+### Bug Fixes
+
+* download from peer should be disabled when address is empty ([86b5659](https://github.com/jm33-m0/emp3r0r/commit/86b5659244a276d242d2d486a2a1478221e6c4ea))
+* log to `emp3r0r.log` and tmux window ([f902ed5](https://github.com/jm33-m0/emp3r0r/commit/f902ed5ea4f2fb427b924551e363b3a96d2fd9a7))
+* passing args to modules ([e08222c](https://github.com/jm33-m0/emp3r0r/commit/e08222c96fbb4aa7cdf2cf430f0a64759f420f07))
+* update version number ([25e518b](https://github.com/jm33-m0/emp3r0r/commit/25e518bebf022604fffc5d360167c8d9a549a718))
+* version number ([355aca8](https://github.com/jm33-m0/emp3r0r/commit/355aca85b6fe865ba02018c8e50b839ade7e2c37))
+
 ## [2.4.2](https://github.com/jm33-m0/emp3r0r/compare/v2.4.1...v2.4.2) (2025-02-15)
 
 
