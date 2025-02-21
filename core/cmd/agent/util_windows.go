@@ -8,7 +8,7 @@ import (
 	"log"
 
 	"github.com/Microsoft/go-winio"
-	"github.com/jm33-m0/emp3r0r/core/internal/agent"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
 )
 
 func socketListen() {
@@ -19,10 +19,10 @@ func socketListen() {
 		OutputBufferSize:   1024,
 	}
 	ln, err := winio.ListenPipe(
-		fmt.Sprintf(`\\.\pipe\%s`, agent.RuntimeConfig.SocketName),
+		fmt.Sprintf(`\\.\pipe\%s`, common.RuntimeConfig.SocketName),
 		pipe_config)
 	if err != nil {
-		log.Fatalf("Listen on %s: %v", agent.RuntimeConfig.SocketName, err)
+		log.Fatalf("Listen on %s: %v", common.RuntimeConfig.SocketName, err)
 	}
 
 	for {

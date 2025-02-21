@@ -7,33 +7,34 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/agent"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/agentutils"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func isAgentAliveSocket() bool {
-	log.Printf("Checking if agent is alive via socket %s", agent.RuntimeConfig.SocketName)
-	conn, err := net.Dial("unix", agent.RuntimeConfig.SocketName)
+	log.Printf("Checking if agent is alive via socket %s", common.RuntimeConfig.SocketName)
+	conn, err := net.Dial("unix", common.RuntimeConfig.SocketName)
 	if err != nil {
 		log.Printf("Agent seems dead: %v, removing socket to bind", err)
-		err = os.RemoveAll(agent.RuntimeConfig.SocketName)
+		err = os.RemoveAll(common.RuntimeConfig.SocketName)
 		if err != nil {
 			log.Printf("Failed to remove socket: %v", err)
 		}
 		return false
 	}
-	return agent.IsAgentAlive(conn)
+	return agentutils.IsAgentAlive(conn)
 }
 
 func isC2Reachable() bool {
-	if agent.RuntimeConfig.EnableNCSI {
-		return transport.TestConnectivity(transport.UbuntuConnectivityURL, agent.RuntimeConfig.C2TransportProxy)
+	if common.RuntimeConfig.EnableNCSI {
+		return transport.TestConnectivity(transport.UbuntuConnectivityURL, common.RuntimeConfig.C2TransportProxy)
 	}
 
 	log.Println("NCSI is disabled, trying direct C2 connection")
-	return transport.TestConnectivity(def.CCAddress, agent.RuntimeConfig.C2TransportProxy)
+	return transport.TestConnectivity(def.CCAddress, common.RuntimeConfig.C2TransportProxy)
 }
 
 // AgentWaitQueue list of agents waiting to run
