@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.0.0](https://github.com/jm33-m0/emp3r0r/compare/v2.4.3...v3.0.0) (2025-02-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* separate `core` and `server`, adopting operator-server mode (WIP)
+
+### Bug Fixes
+
+* `put --dst` auto-complete ([f6e9f5a](https://github.com/jm33-m0/emp3r0r/commit/f6e9f5a0bf0e59741b5f5cda7fbcd77046bcddbd))
+* simplify ssh c2 relay ([f280459](https://github.com/jm33-m0/emp3r0r/commit/f28045920152b7dab28d2ea2c0dc7eddf7580289))
+
+
+### Code Refactoring
+
+* separate `core` and `server`, adopting operator-server mode (WIP) ([d4d52b1](https://github.com/jm33-m0/emp3r0r/commit/d4d52b1372122fd6bf9847349f09ddf8c2ef1de5))
+
 ## [2.4.2](https://github.com/jm33-m0/emp3r0r/compare/v2.4.1...v2.4.2) (2025-02-15)
 
 
