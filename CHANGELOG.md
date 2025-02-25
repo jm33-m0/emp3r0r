@@ -1,5 +1,30 @@
 # Changelog
 
+## [3.0.0](https://github.com/jm33-m0/emp3r0r/compare/v2.4.3...v3.0.0) (2025-02-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* separate `core` and `server`, adopting operator-server mode (WIP)
+
+### Features
+
+* tar config dir for operator to use when server starts ([4c38418](https://github.com/jm33-m0/emp3r0r/commit/4c3841844070ab825dd5ace3f6f6113ca7d60866))
+
+
+### Bug Fixes
+
+* `put --dst` auto-complete ([f6e9f5a](https://github.com/jm33-m0/emp3r0r/commit/f6e9f5a0bf0e59741b5f5cda7fbcd77046bcddbd))
+* critical bug: `emp3r0r.json` gets overwritten every time `cc` starts ([8259507](https://github.com/jm33-m0/emp3r0r/commit/825950737b5a90a029d7ce97cb9a1d4a3e15f701))
+* do not log if run as agent ([6325a67](https://github.com/jm33-m0/emp3r0r/commit/6325a67597fec882832350694432beb2cc415c62))
+* search `c:\` when run as priviliged user ([4cc1dc0](https://github.com/jm33-m0/emp3r0r/commit/4cc1dc0e8546be469f1eaf21efcc28937a4b3f15))
+* simplify ssh c2 relay ([f280459](https://github.com/jm33-m0/emp3r0r/commit/f28045920152b7dab28d2ea2c0dc7eddf7580289))
+
+
+### Code Refactoring
+
+* separate `core` and `server`, adopting operator-server mode (WIP) ([d4d52b1](https://github.com/jm33-m0/emp3r0r/commit/d4d52b1372122fd6bf9847349f09ddf8c2ef1de5))
+
 ## [2.4.2](https://github.com/jm33-m0/emp3r0r/compare/v2.4.1...v2.4.2) (2025-02-15)
 
 
