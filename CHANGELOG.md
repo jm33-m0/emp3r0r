@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.4.4](https://github.com/jm33-m0/emp3r0r/compare/v2.4.3...v2.4.4) (2025-02-25)
+
+
+### Bug Fixes
+
+* `put --dst` auto-complete ([f6e9f5a](https://github.com/jm33-m0/emp3r0r/commit/f6e9f5a0bf0e59741b5f5cda7fbcd77046bcddbd))
+* do not log if run as agent ([fa0ee58](https://github.com/jm33-m0/emp3r0r/commit/fa0ee580056f90f1f33a1d2e59aa729205db17fc))
+* logging on cc ([b008dfe](https://github.com/jm33-m0/emp3r0r/commit/b008dfe26104e7565c46bca2970da76700063fcf))
+* search `c:\` when run as priviliged user ([cbe3acc](https://github.com/jm33-m0/emp3r0r/commit/cbe3accb0cd7ff84866cf40efc7c15b66f642325))
+* simplify ssh c2 relay ([f280459](https://github.com/jm33-m0/emp3r0r/commit/f28045920152b7dab28d2ea2c0dc7eddf7580289))
+
 ## [2.4.2](https://github.com/jm33-m0/emp3r0r/compare/v2.4.1...v2.4.2) (2025-02-15)
 
 
