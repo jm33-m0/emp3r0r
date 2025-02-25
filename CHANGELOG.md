@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.5](https://github.com/jm33-m0/emp3r0r/compare/v2.4.4...v2.4.5) (2025-02-25)
+
+
+### Bug Fixes
+
+* critical bug: `emp3r0r.json` gets overwritten every time `cc` starts ([f8189b2](https://github.com/jm33-m0/emp3r0r/commit/f8189b29ea086e791e1ec5139e74570c1bf246bd))
+
 ## [2.4.4](https://github.com/jm33-m0/emp3r0r/compare/v2.4.3...v2.4.4) (2025-02-25)
 
 
