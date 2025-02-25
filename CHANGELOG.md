@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.6](https://github.com/jm33-m0/emp3r0r/compare/v2.4.5...v2.4.6) (2025-02-25)
+
+
+### Bug Fixes
+
+* unify server response to unauthorized requests ([631522e](https://github.com/jm33-m0/emp3r0r/commit/631522e141dd4dbb01cb6bc99c30ae6fc461cadf))
+
 ## [2.4.5](https://github.com/jm33-m0/emp3r0r/compare/v2.4.4...v2.4.5) (2025-02-25)
 
 
