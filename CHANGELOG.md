@@ -1,5 +1,37 @@
 # Changelog
 
+## [3.0.0](https://github.com/jm33-m0/emp3r0r/compare/v2.4.3...v3.0.0) (2025-02-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* separate `core` and `server`, adopting operator-server mode (WIP)
+
+### Features
+
+* assign `cap_net_admin` to `emp3r0r-cc` when installing ([18db26c](https://github.com/jm33-m0/emp3r0r/commit/18db26c4ebb716988fd019d494a31cd81d4404a8))
+* relay file transfer requests to operator ([012884e](https://github.com/jm33-m0/emp3r0r/commit/012884e63f23b3d33b6b8f7df2aa6e7a59fa573e))
+* relay message tunnel to operator ([eb3ac70](https://github.com/jm33-m0/emp3r0r/commit/eb3ac702b7758175ff26acb33505098c1b2a18df))
+* tar config dir for operator to use when server starts ([4c38418](https://github.com/jm33-m0/emp3r0r/commit/4c3841844070ab825dd5ace3f6f6113ca7d60866))
+* wireguard operator ([a2016cf](https://github.com/jm33-m0/emp3r0r/commit/a2016cf24f3c00c45704b5a35b886c89e81cde4c))
+* wireguard operator management ([8d09db0](https://github.com/jm33-m0/emp3r0r/commit/8d09db09cd6f17ef2fed0051dde9f14bfdcaca5b))
+* wireguard-go ([ea73568](https://github.com/jm33-m0/emp3r0r/commit/ea73568e54fc388c4e6fd1954a90e40032cff425))
+
+
+### Bug Fixes
+
+* `put --dst` auto-complete ([f6e9f5a](https://github.com/jm33-m0/emp3r0r/commit/f6e9f5a0bf0e59741b5f5cda7fbcd77046bcddbd))
+* critical bug: `emp3r0r.json` gets overwritten every time `cc` starts ([8259507](https://github.com/jm33-m0/emp3r0r/commit/825950737b5a90a029d7ce97cb9a1d4a3e15f701))
+* do not log if run as agent ([6325a67](https://github.com/jm33-m0/emp3r0r/commit/6325a67597fec882832350694432beb2cc415c62))
+* search `c:\` when run as priviliged user ([4cc1dc0](https://github.com/jm33-m0/emp3r0r/commit/4cc1dc0e8546be469f1eaf21efcc28937a4b3f15))
+* simplify ssh c2 relay ([f280459](https://github.com/jm33-m0/emp3r0r/commit/f28045920152b7dab28d2ea2c0dc7eddf7580289))
+* unify server response to unauthorized requests ([1146adc](https://github.com/jm33-m0/emp3r0r/commit/1146adcd634946a48e5371dcbb7f4810dc040094))
+
+
+### Code Refactoring
+
+* separate `core` and `server`, adopting operator-server mode (WIP) ([d4d52b1](https://github.com/jm33-m0/emp3r0r/commit/d4d52b1372122fd6bf9847349f09ddf8c2ef1de5))
+
 ## [2.4.2](https://github.com/jm33-m0/emp3r0r/compare/v2.4.1...v2.4.2) (2025-02-15)
 
 
