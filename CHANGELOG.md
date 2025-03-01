@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.1](https://github.com/jm33-m0/emp3r0r/compare/v3.0.0...v3.0.1) (2025-03-01)
+
+
+### Bug Fixes
+
+* `get` and `put` file transfer features ([5bcb259](https://github.com/jm33-m0/emp3r0r/commit/5bcb259643b7958e0c629c6b886d0bbb0b444480))
+
 ## [3.0.0](https://github.com/jm33-m0/emp3r0r/compare/v2.4.3...v3.0.0) (2025-02-28)
 
 
