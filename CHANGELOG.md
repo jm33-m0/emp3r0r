@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.1.1](https://github.com/jm33-m0/emp3r0r/compare/v3.1.0...v3.1.1) (2025-03-02)
+
+
+### Bug Fixes
+
+* `cd` ([1a674e4](https://github.com/jm33-m0/emp3r0r/commit/1a674e40c2a295ca16ff7b4bf308eabec0be6e1f))
+* auto-complete agent names ([4280495](https://github.com/jm33-m0/emp3r0r/commit/4280495db6e97c971f3a9be93e4432dbcf1f0e95))
+* auto-complete remote dir ([23f3774](https://github.com/jm33-m0/emp3r0r/commit/23f3774a8b852df3cd4a7a32e95382c3cba062d4))
+* command sender in `ftp` package ([6d3a96f](https://github.com/jm33-m0/emp3r0r/commit/6d3a96f2ace89e4a995cb8d4adbc164e68802940))
+* command time tracking ([030639d](https://github.com/jm33-m0/emp3r0r/commit/030639d45a6ee439a5cad67ec7178d4f78f8c466))
+* crash ([4d3df48](https://github.com/jm33-m0/emp3r0r/commit/4d3df48c757415eddf4ae9102340559c3cbfb5ec))
+* make sure commands have UUID for tracking ([08b89b0](https://github.com/jm33-m0/emp3r0r/commit/08b89b0b319d079854b05e64ab9231feceec940c))
+
 ## [3.1.0](https://github.com/jm33-m0/emp3r0r/compare/v3.0.0...v3.1.0) (2025-03-02)
 
 
