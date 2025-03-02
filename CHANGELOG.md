@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.1.0](https://github.com/jm33-m0/emp3r0r/compare/v3.0.0...v3.1.0) (2025-03-02)
+
+
+### Features
+
+* operator can pull config tarball from server via wireguard ([d872e59](https://github.com/jm33-m0/emp3r0r/commit/d872e59a96b24df97d96abf883163672f07ac316))
+* wireguard auto-config as operator transport ([27c93ab](https://github.com/jm33-m0/emp3r0r/commit/27c93ab7475a9c302999ae7c48af90b086b28ca0))
+
+
+### Bug Fixes
+
+* `get` and `put` file transfer features ([5bcb259](https://github.com/jm33-m0/emp3r0r/commit/5bcb259643b7958e0c629c6b886d0bbb0b444480))
+* set active agent (WIP) ([01b9840](https://github.com/jm33-m0/emp3r0r/commit/01b98408caae14f9ffb6a527a75ede7f7ca5e227))
+
 ## [3.0.0](https://github.com/jm33-m0/emp3r0r/compare/v2.4.3...v3.0.0) (2025-02-28)
 
 
