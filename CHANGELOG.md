@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.2](https://github.com/jm33-m0/emp3r0r/compare/v3.1.1...v3.1.2) (2025-03-03)
+
+
+### Bug Fixes
+
+* modules should be able to run from operator ([a837e4f](https://github.com/jm33-m0/emp3r0r/commit/a837e4fb7351a3c4d812c74209783ef683b878f2))
+
 ## [3.1.1](https://github.com/jm33-m0/emp3r0r/compare/v3.1.0...v3.1.1) (2025-03-02)
 
 
