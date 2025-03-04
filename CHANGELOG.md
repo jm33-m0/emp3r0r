@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.1.2](https://github.com/jm33-m0/emp3r0r/compare/v3.1.1...v3.1.2) (2025-03-04)
+
+
+### Bug Fixes
+
+* `ssh` shells and port mapping ([4bcd79f](https://github.com/jm33-m0/emp3r0r/commit/4bcd79fb79bb463870b9f076c844524d534d7e40))
+* modules should be able to run from operator ([a837e4f](https://github.com/jm33-m0/emp3r0r/commit/a837e4fb7351a3c4d812c74209783ef683b878f2))
+* refactor cmd line usage ([84ec8c3](https://github.com/jm33-m0/emp3r0r/commit/84ec8c3314baa5e06b62cf28922d05aac4e32cc0))
+
 ## [3.1.1](https://github.com/jm33-m0/emp3r0r/compare/v3.1.0...v3.1.1) (2025-03-02)
 
 
