@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.1.3](https://github.com/jm33-m0/emp3r0r/compare/v3.1.2...v3.1.3) (2025-03-04)
+
+
+### Bug Fixes
+
+* existing config file causes operator to fail ([4bea0ef](https://github.com/jm33-m0/emp3r0r/commit/4bea0efe074355b3fd5f813625292bf37eb48cbd))
+* run jobs in the background to prevent blocking ([317be9c](https://github.com/jm33-m0/emp3r0r/commit/317be9cf63c7c2f4f64369e390204500d6b8182a))
+* screenshot ([45d7eaf](https://github.com/jm33-m0/emp3r0r/commit/45d7eafd8375664a3c860ec56dc6163746cfce0e))
+
 ## [3.1.2](https://github.com/jm33-m0/emp3r0r/compare/v3.1.1...v3.1.2) (2025-03-04)
 
 
