@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.1.4](https://github.com/jm33-m0/emp3r0r/compare/v3.1.3...v3.1.4) (2025-03-05)
+
+
+### Bug Fixes
+
+* optimize HTTP2 connections ([91fcd5a](https://github.com/jm33-m0/emp3r0r/commit/91fcd5ac584c4761fb71f650083de8179a7f9fb9))
+* simplify agent binary patching ([8f3e9a1](https://github.com/jm33-m0/emp3r0r/commit/8f3e9a1d1438d2fc56403862816cc64a563fe068))
+
 ## [3.1.3](https://github.com/jm33-m0/emp3r0r/compare/v3.1.2...v3.1.3) (2025-03-04)
 
 
