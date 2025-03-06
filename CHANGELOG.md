@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.2.0](https://github.com/jm33-m0/emp3r0r/compare/v3.1.4...v3.2.0) (2025-03-06)
+
+
+### Features
+
+* set up auto-completion during installation ([8d3553a](https://github.com/jm33-m0/emp3r0r/commit/8d3553a521f4773485d42f57dc035654966eb137))
+* support multiple operators ([99123f1](https://github.com/jm33-m0/emp3r0r/commit/99123f137c41bb6731790139bbb9fed0d395b7a7))
+
+
+### Bug Fixes
+
+* `copy_stub` is slow, move it out of `init` ([dc9bc84](https://github.com/jm33-m0/emp3r0r/commit/dc9bc84d5f410d082b0424143e1ad0c9caa3808b))
+* unable to get `SUDO_USER` when installing ([743fffe](https://github.com/jm33-m0/emp3r0r/commit/743fffe8fde7b86e7a43339cf20a706cb8a41d30))
+* uninstall shell completion files as well ([2e1a7c1](https://github.com/jm33-m0/emp3r0r/commit/2e1a7c12cfdaea180f4ab6b7a7e60c255d75e788))
+* UX in starting server ([3408aa7](https://github.com/jm33-m0/emp3r0r/commit/3408aa7001f46eac7e90e0d2055c9d6e271aee3a))
+* wg IPs not random ([19684f7](https://github.com/jm33-m0/emp3r0r/commit/19684f7b6e4df8a91143b1784382e6567ecbcdca))
+
 ## [3.1.4](https://github.com/jm33-m0/emp3r0r/compare/v3.1.3...v3.1.4) (2025-03-05)
 
 
