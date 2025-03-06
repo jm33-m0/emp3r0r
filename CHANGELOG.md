@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.2.1](https://github.com/jm33-m0/emp3r0r/compare/v3.2.0...v3.2.1) (2025-03-06)
+
+
+### Bug Fixes
+
+* upgrade `github.com/jm33-m0/arc` to `v2` ([3a12a5d](https://github.com/jm33-m0/emp3r0r/commit/3a12a5d376fc470daf6220669a097aa4d2093e0b))
+
 ## [3.2.0](https://github.com/jm33-m0/emp3r0r/compare/v3.1.4...v3.2.0) (2025-03-06)
 
 
