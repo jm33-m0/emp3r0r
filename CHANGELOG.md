@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.2.2](https://github.com/jm33-m0/emp3r0r/compare/v3.2.1...v3.2.2) (2025-03-12)
+
+
+### Bug Fixes
+
+* update deps ([cfaac67](https://github.com/jm33-m0/emp3r0r/commit/cfaac675bde3aca7e46b4c113d0d3e64b3eedbe0))
+
 ## [3.2.1](https://github.com/jm33-m0/emp3r0r/compare/v3.2.0...v3.2.1) (2025-03-06)
 
 
