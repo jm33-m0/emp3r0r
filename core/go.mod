@@ -42,10 +42,10 @@ require (
 	github.com/xtaci/qpp v1.1.18
 	github.com/xtaci/smux v1.5.33
 	github.com/xtaci/tcpraw v1.2.31
-	golang.org/x/crypto v0.32.0
-	golang.org/x/net v0.34.0
+	golang.org/x/crypto v0.35.0
+	golang.org/x/net v0.36.0
 	golang.org/x/sys v0.30.0
-	golang.org/x/term v0.28.0
+	golang.org/x/term v0.29.0
 	golang.zx2c4.com/wireguard v0.0.0-20231211153847-12269c276173
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20241231184526-a9ab2273dd10
 )
