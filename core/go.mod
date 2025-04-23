@@ -1,6 +1,7 @@
 module github.com/jm33-m0/emp3r0r/core
 
 go 1.23.6
+toolchain go1.24.1
 
 require (
 	github.com/Code-Hex/Neo-cowsay/v2 v2.0.4
@@ -29,7 +30,7 @@ require (
 	github.com/pkg/sftp v1.13.8
 	github.com/posener/h2conn v0.0.0-20231204025407-3997deeca0f0
 	github.com/reeflective/console v0.1.22
-	github.com/refraction-networking/utls v1.6.7
+	github.com/refraction-networking/utls v1.7.0
 	github.com/rsteube/carapace v0.50.2
 	github.com/schollz/progressbar/v3 v3.18.0
 	github.com/shadowsocks/go-shadowsocks2 v0.1.5
