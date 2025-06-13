@@ -3,6 +3,9 @@ on:
     branches:
       - v3
 name: release-please
+permissions:
+  contents: read
+  packages: write
 jobs:
   release-please:
     runs-on: ubuntu-latest
