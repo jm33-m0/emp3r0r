@@ -1,5 +1,20 @@
 # Changelog
 
+## [3.3.0](https://github.com/jm33-m0/emp3r0r/compare/v3.2.2...v3.3.0) (2025-06-13)
+
+
+### Features
+
+* **generate:** enhance payload type descriptions for CGO support [#473](https://github.com/jm33-m0/emp3r0r/issues/473) ([fdb6d33](https://github.com/jm33-m0/emp3r0r/commit/fdb6d33f692370c47f53660da941db2304c2b4be))
+* **kill:** enhance process killing functionality with improved error handling and support for multiple PIDs [#468](https://github.com/jm33-m0/emp3r0r/issues/468) ([ddf0560](https://github.com/jm33-m0/emp3r0r/commit/ddf05607bc250ff5e3a1be4da0a3d055cbdeb9b7))
+* **release:** update permissions and enhance upload script with response handling ([6feaaff](https://github.com/jm33-m0/emp3r0r/commit/6feaaff18d5800f7641243418c8e28289697f32c))
+
+
+### Bug Fixes
+
+* 468 ([36d0457](https://github.com/jm33-m0/emp3r0r/commit/36d045786c1f11feea9d3e91300062f613676847))
+* **moduleCmd:** improve error handling for ActiveModule and command execution [#474](https://github.com/jm33-m0/emp3r0r/issues/474) ([06c0c5e](https://github.com/jm33-m0/emp3r0r/commit/06c0c5e65a2e4a2f4b9b02edc7a42c708252f27f))
+
 ## [3.2.2](https://github.com/jm33-m0/emp3r0r/compare/v3.2.1...v3.2.2) (2025-03-12)
 
 
