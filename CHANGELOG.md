@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.3.1](https://github.com/jm33-m0/emp3r0r/compare/v3.3.0...v3.3.1) (2025-06-14)
+
+
+### Bug Fixes
+
+* clarify error message for missing C2 server IP in WireGuard connection ([0dcf091](https://github.com/jm33-m0/emp3r0r/commit/0dcf091a5704547f3eee86a25f489520b380b2a9))
+* do not validate upload response ([d06922a](https://github.com/jm33-m0/emp3r0r/commit/d06922ab29aecd453b29ab1b4a201ab1d9545dde))
+* remove unused dependencies and simplify line wrapping functionality ([71db5e3](https://github.com/jm33-m0/emp3r0r/commit/71db5e346b8040001b2c12144248015aaa856262))
+* **server:** add command generation for client connections and improve usage instructions ([c5437c2](https://github.com/jm33-m0/emp3r0r/commit/c5437c2bfb53e1ca6de31c90a90e424cab336f02))
+* simplify table rendering and add reset layout command ([ca5c066](https://github.com/jm33-m0/emp3r0r/commit/ca5c0669a6e469cbcd2d669e2af050379c5c16d8))
+* **tmux:** add pane layout reset functionality and improve pane size constraints ([a9b8c23](https://github.com/jm33-m0/emp3r0r/commit/a9b8c23b8e1bcda367d2a8f7a31b1c30894bdc09))
+* update carapace dependency and remove obsolete references ([bfcf031](https://github.com/jm33-m0/emp3r0r/commit/bfcf0319ebb7205e7c0b4ab8a9f9eada9aa5c43e))
+* update command formatting for client connection commands and improve readability ([679b312](https://github.com/jm33-m0/emp3r0r/commit/679b312b7cd57e36122d6e8f31bfd9a4651f4b73))
+
 ## [3.3.0](https://github.com/jm33-m0/emp3r0r/compare/v3.2.2...v3.3.0) (2025-06-13)
 
 
