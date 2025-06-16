@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.3.2](https://github.com/jm33-m0/emp3r0r/compare/v3.3.1...v3.3.2) (2025-06-16)
+
+
+### Bug Fixes
+
+* add `!elf_patch` command to patch ELF files and load shared libraries, replacing `get_persistence` ([bf113f3](https://github.com/jm33-m0/emp3r0r/commit/bf113f38188a5b944b401ac062b432da3be48803))
+
 ## [3.3.1](https://github.com/jm33-m0/emp3r0r/compare/v3.3.0...v3.3.1) (2025-06-14)
 
 
