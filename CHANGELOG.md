@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.4.0](https://github.com/jm33-m0/emp3r0r/compare/v3.3.2...v3.4.0) (2025-06-17)
+
+
+### Features
+
+* add bind address option for port forwarding sessions, closes [#476](https://github.com/jm33-m0/emp3r0r/issues/476) ([c4374aa](https://github.com/jm33-m0/emp3r0r/commit/c4374aaf170faa1988dcd3bd9583c118349d485a))
+
 ## [3.3.2](https://github.com/jm33-m0/emp3r0r/compare/v3.3.1...v3.3.2) (2025-06-16)
 
 
