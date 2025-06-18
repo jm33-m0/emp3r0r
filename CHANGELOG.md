@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.4.1](https://github.com/jm33-m0/emp3r0r/compare/v3.4.0...v3.4.1) (2025-06-18)
+
+
+### Bug Fixes
+
+* add target_path option to elf_patch command for custom library loading location ([dc2b009](https://github.com/jm33-m0/emp3r0r/commit/dc2b009ecd4c1b807d7f575ddba286479e663fdd))
+* copy timestamps from ELF file to SO file in ElfPatcher function ([4b6fdb8](https://github.com/jm33-m0/emp3r0r/commit/4b6fdb8eddea662aaf7a1a6c62214089036c7c51))
+
 ## [3.4.0](https://github.com/jm33-m0/emp3r0r/compare/v3.3.2...v3.4.0) (2025-06-17)
 
 
