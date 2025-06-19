@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.4.2](https://github.com/jm33-m0/emp3r0r/compare/v3.4.1...v3.4.2) (2025-06-19)
+
+
+### Bug Fixes
+
+* enhance logging messages for server startup with success indicators ([f26796d](https://github.com/jm33-m0/emp3r0r/commit/f26796d232862ac333d426687e9d9f7347eeae45))
+* ensure tmux title truncation to 10 characters ([d5e819b](https://github.com/jm33-m0/emp3r0r/commit/d5e819bf708cd59771ae4456a2a863e11357397e))
+
 ## [3.4.1](https://github.com/jm33-m0/emp3r0r/compare/v3.4.0...v3.4.1) (2025-06-18)
 
 
