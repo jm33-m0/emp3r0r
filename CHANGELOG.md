@@ -1,5 +1,25 @@
 # Changelog
 
+## [3.5.0](https://github.com/jm33-m0/emp3r0r/compare/v3.4.2...v3.5.0) (2025-12-11)
+
+
+### Features
+
+* add `Fileless` property to modules, warn users if there will be file dropping on the target ([c552e4a](https://github.com/jm33-m0/emp3r0r/commit/c552e4ad98399f01e4d5271e5a2418331f0afe67))
+* remove `AgentRoot` auto-creation ([eeddd07](https://github.com/jm33-m0/emp3r0r/commit/eeddd0726e643e9d6bce74d18d403d4f5027e7d6))
+* unify file operations in agent for future anti-detection features ([ebdf490](https://github.com/jm33-m0/emp3r0r/commit/ebdf490a078854c798803fa90e96add1a7378c7f))
+
+
+### Bug Fixes
+
+* change file name suffix for better stealth ([3231f3d](https://github.com/jm33-m0/emp3r0r/commit/3231f3deef7dde081eb9be28f1e97b842686ea6c))
+* copy new builder script when packaging ([7df846b](https://github.com/jm33-m0/emp3r0r/commit/7df846b95bdee2cfea4fbf1584c7f316333a32f6))
+* improve launcher UX ([7dc08c4](https://github.com/jm33-m0/emp3r0r/commit/7dc08c485131f1060fe768b901d6f583d76d0c2a))
+* refactor `emp3r0r` script to separate builder and launcher ([e681e0d](https://github.com/jm33-m0/emp3r0r/commit/e681e0d088c367e848acc9a6359928a4341f5224))
+* refactor `screenshot` to make it a module ([05c4bde](https://github.com/jm33-m0/emp3r0r/commit/05c4bde3e9d5badff10906a46457b93cc163352b))
+* some OPSEC improvements for the Linux stager ([df5ef29](https://github.com/jm33-m0/emp3r0r/commit/df5ef29aabaf00dcb517bba7e0c81665b7041f18))
+* update deps ([0d6c93c](https://github.com/jm33-m0/emp3r0r/commit/0d6c93ceec5190b1ceb99df41d5a90151946cd3d))
+
 ## [3.4.2](https://github.com/jm33-m0/emp3r0r/compare/v3.4.1...v3.4.2) (2025-06-19)
 
 
