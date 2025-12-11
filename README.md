@@ -100,6 +100,16 @@ Use the `generate` command from within the emp3r0r shell interface to create cus
   - Windows compatibility with standard OpenSSH clients.
   - SFTP integration for efficient remote file operations.
 
+- **File Transfer System**
+  - **Bidirectional Transfer**: Upload files to agents (`put`) and download from agents (`get`) with intuitive commands.
+  - **Recursive Downloads**: Download entire directories with `--recursive` flag and filter files using regex patterns (`--regex`).
+  - **Smart Transfer Strategy**: Agents can fetch files from peer agents via encrypted KCP tunnels before falling back to C2, improving speed and stealth.
+  - **Integrity & Reliability**: SHA256 checksum verification ensures file integrity; resume support allows interrupted transfers to continue from the last offset.
+  - **Real-Time Monitoring**: Progress bars display transfer speed, completion percentage, and estimated time remaining.
+  - **Compression**: Zstandard compression reduces bandwidth usage and accelerates transfers.
+  - **FileServer Module**: Agents can host an encrypted HTTP server to share files with other agents, enabling peer-to-peer distribution.
+  - **Security**: All transfers occur over HTTP2/TLS connections with lock file protection to prevent concurrent access.
+
 ### Network Pivoting
 
 - **Intelligent Network Traversal**
