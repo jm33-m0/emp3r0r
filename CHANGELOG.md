@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.5.1](https://github.com/jm33-m0/emp3r0r/compare/v3.5.0...v3.5.1) (2025-12-11)
+
+
+### Bug Fixes
+
+* downloader file name messed up ([8ba18d6](https://github.com/jm33-m0/emp3r0r/commit/8ba18d65990306e2a399f2619f8d4f6ae2215e12))
+* prompt doesn't work, and local modules don't need prompts ([0406a3a](https://github.com/jm33-m0/emp3r0r/commit/0406a3a7c305bde46814a749a58b9ae03b5cb547))
+
 ## [3.5.0](https://github.com/jm33-m0/emp3r0r/compare/v3.4.2...v3.5.0) (2025-12-11)
 
 
