@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.7.1](https://github.com/jm33-m0/emp3r0r/compare/v3.7.0...v3.7.1) (2025-12-12)
+
+
+### Bug Fixes
+
+* remove unnecessary rwx when mapping stack ([77126cb](https://github.com/jm33-m0/emp3r0r/commit/77126cbc84634f35d825dd13fc8e4ed3aba1ad68))
+
 ## [3.7.0](https://github.com/jm33-m0/emp3r0r/compare/v3.6.0...v3.7.0) (2025-12-12)
 
 
