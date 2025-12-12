@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.7.2](https://github.com/jm33-m0/emp3r0r/compare/v3.7.1...v3.7.2) (2025-12-12)
+
+
+### Bug Fixes
+
+* add timeout to HTTP client and requests for improved reliability ([dcfc8b7](https://github.com/jm33-m0/emp3r0r/commit/dcfc8b736268bba2b3a20a78010f2762eaebe033))
+* implement exponential backoff for agent list refresh and message tunnel connection ([3de26b6](https://github.com/jm33-m0/emp3r0r/commit/3de26b671545ee2fc9733ec08f523c03579adc22))
+* increase message channel buffer and implement read timeout for message tunnel ([bda78e5](https://github.com/jm33-m0/emp3r0r/commit/bda78e5b7408a4a0997e0d00cab3f01b55f261ec))
+
 ## [3.7.1](https://github.com/jm33-m0/emp3r0r/compare/v3.7.0...v3.7.1) (2025-12-12)
 
 
