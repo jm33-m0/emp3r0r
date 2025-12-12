@@ -1,5 +1,24 @@
 # Changelog
 
+## [3.6.0](https://github.com/jm33-m0/emp3r0r/compare/v3.5.1...v3.6.0) (2025-12-12)
+
+
+### Features
+
+* build Linux stager as executable ([2b8c404](https://github.com/jm33-m0/emp3r0r/commit/2b8c40450f6af41f26cf9b47d79efa91442dc690))
+* use linux stager as orchestrator and ensure emp3r0r agent payload stay encrypted in memory when idle ([013d95c](https://github.com/jm33-m0/emp3r0r/commit/013d95cfc7f558c5a56d8bd7eb84a0cc11df0b48))
+
+
+### Bug Fixes
+
+* ensure conditional c2 check happens before anything else ([347818e](https://github.com/jm33-m0/emp3r0r/commit/347818e20e8da03d6cf4f664cf08c0e532ba420a))
+* garbage charaters being printed in tmux ([3ebdbb7](https://github.com/jm33-m0/emp3r0r/commit/3ebdbb76bac0644ffa5129f3db73ddbb74a7b4a6))
+* improve conditionalC2FailNotify to ensure it only acts when started by a stager ([7d43afc](https://github.com/jm33-m0/emp3r0r/commit/7d43afc64b642b72007a5610b0b296c1eb9a48dd))
+* inconsistency in wg/mtls operator connections ([dda9332](https://github.com/jm33-m0/emp3r0r/commit/dda9332a5ccf13c2c854693ff61b2aa8c4410149))
+* update connection error handling to signal parent and exit instead of retrying ([c812887](https://github.com/jm33-m0/emp3r0r/commit/c8128879bedb9da15898c9a4d9347c8ef953543a))
+* update DownloadExtractConfig to use client-specific config path when not running as server ([e2a9fc3](https://github.com/jm33-m0/emp3r0r/commit/e2a9fc3f1deafe351020999e337167019a599d25))
+* update stager executable build to use musl-gcc with static linking ([1a2cec6](https://github.com/jm33-m0/emp3r0r/commit/1a2cec6f11e696ecd2a7505e3650f09ebb45c9bf))
+
 ## [3.5.1](https://github.com/jm33-m0/emp3r0r/compare/v3.5.0...v3.5.1) (2025-12-11)
 
 
