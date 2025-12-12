@@ -1,5 +1,20 @@
 # Changelog
 
+## [3.7.0](https://github.com/jm33-m0/emp3r0r/compare/v3.6.0...v3.7.0) (2025-12-12)
+
+
+### Features
+
+* implement TCP and UDP listener support and enhance download functionality ([c6ff3cc](https://github.com/jm33-m0/emp3r0r/commit/c6ff3ccc42375304660990819522fa5b977aa45e))
+* implement XOR encoding for configuration strings and enhance security ([e78c2c6](https://github.com/jm33-m0/emp3r0r/commit/e78c2c67f926d150ad8586bb9faa0508d51690ef))
+
+
+### Bug Fixes
+
+* enhance stager configuration to support multiple listener types and update documentation ([7ec4fe0](https://github.com/jm33-m0/emp3r0r/commit/7ec4fe0494275719ccd4315776ba89a9148ce0e0))
+* replace /dev/urandom with getrandom() syscall for improved randomness retrieval ([e2c9fa9](https://github.com/jm33-m0/emp3r0r/commit/e2c9fa9d7e6dcac4e1a2edf99e895405c6caae16))
+* streamline agent and stager code by removing unused persistence logic and enhancing debug error handling ([ada195a](https://github.com/jm33-m0/emp3r0r/commit/ada195a9b79ab2f81da5a00bfbdc3bebdf5878a1))
+
 ## [3.6.0](https://github.com/jm33-m0/emp3r0r/compare/v3.5.1...v3.6.0) (2025-12-12)
 
 
