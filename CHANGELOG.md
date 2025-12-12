@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.6.0](https://github.com/jm33-m0/emp3r0r/compare/v3.5.1...v3.6.0) (2025-12-12)
+
+
+### Features
+
+* build Linux stager as executable ([2b8c404](https://github.com/jm33-m0/emp3r0r/commit/2b8c40450f6af41f26cf9b47d79efa91442dc690))
+
+
+### Bug Fixes
+
+* garbage charaters being printed in tmux ([3ebdbb7](https://github.com/jm33-m0/emp3r0r/commit/3ebdbb76bac0644ffa5129f3db73ddbb74a7b4a6))
+* inconsistency in wg/mtls operator connections ([dda9332](https://github.com/jm33-m0/emp3r0r/commit/dda9332a5ccf13c2c854693ff61b2aa8c4410149))
+* update stager executable build to use musl-gcc with static linking ([1a2cec6](https://github.com/jm33-m0/emp3r0r/commit/1a2cec6f11e696ecd2a7505e3650f09ebb45c9bf))
+
 ## [3.5.1](https://github.com/jm33-m0/emp3r0r/compare/v3.5.0...v3.5.1) (2025-12-11)
 
 
