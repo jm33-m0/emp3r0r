@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.7.3](https://github.com/jm33-m0/emp3r0r/compare/v3.7.2...v3.7.3) (2025-12-13)
+
+
+### Bug Fixes
+
+* data loss during transmission in UDP stager ([540a477](https://github.com/jm33-m0/emp3r0r/commit/540a4771950cff9d572273f78bbb9fcdd054afd0))
+* wipe ELF header in memory if it's in the segment ([b200021](https://github.com/jm33-m0/emp3r0r/commit/b200021178f06360c0143e2d888efa1ef4c16aff))
+
 ## [3.7.2](https://github.com/jm33-m0/emp3r0r/compare/v3.7.1...v3.7.2) (2025-12-12)
 
 
