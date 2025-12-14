@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.7.4](https://github.com/jm33-m0/emp3r0r/compare/v3.7.3...v3.7.4) (2025-12-14)
+
+
+### Bug Fixes
+
+* add ReadIdleTimeout and PingTimeout to HTTP/2 transport for improved connection handling ([e5efd88](https://github.com/jm33-m0/emp3r0r/commit/e5efd8885a82aa0ef2ce0769492ba42ffeb94d24))
+* remove read timeout from message tunnel handler, it shouldn't disconnect just because of inactivity ([e39b35f](https://github.com/jm33-m0/emp3r0r/commit/e39b35fb393dafd6346ee0356e5011ea0f35dca7))
+
 ## [3.7.3](https://github.com/jm33-m0/emp3r0r/compare/v3.7.2...v3.7.3) (2025-12-13)
 
 
