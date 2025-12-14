@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.8.0](https://github.com/jm33-m0/emp3r0r/compare/v3.7.4...v3.8.0) (2025-12-14)
+
+
+### Features
+
+* sRDI-like stager ([ff8fcd6](https://github.com/jm33-m0/emp3r0r/commit/ff8fcd6f7563af1ed322394414d17df7e91f0f96))
+
+
+### Bug Fixes
+
+* disable damonisation to accomodate shellcode and libc stagers ([21de9b3](https://github.com/jm33-m0/emp3r0r/commit/21de9b3ba15af95e975b0153f957dfd610ab0eba))
+* ensure build flags can be passed on to `make` ([3de8a46](https://github.com/jm33-m0/emp3r0r/commit/3de8a467003d03a6ddaa68e2dcb563c14bb5af0b))
+* update jump_start function to use correct register and improve memory management in malloc and free ([2045f66](https://github.com/jm33-m0/emp3r0r/commit/2045f6689b30601be758331ed8a839cf4bd8d564))
+
 ## [3.7.4](https://github.com/jm33-m0/emp3r0r/compare/v3.7.3...v3.7.4) (2025-12-14)
 
 
