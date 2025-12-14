@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.8.1](https://github.com/jm33-m0/emp3r0r/compare/v3.8.0...v3.8.1) (2025-12-14)
+
+
+### Bug Fixes
+
+* replace memset with _get_rand for secure memory wiping in elf_load ([e8d1064](https://github.com/jm33-m0/emp3r0r/commit/e8d1064bcbfa5da2aaeacbc9f3c22472bb7561dc))
+
 ## [3.8.0](https://github.com/jm33-m0/emp3r0r/compare/v3.7.4...v3.8.0) (2025-12-14)
 
 
