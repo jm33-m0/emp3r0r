@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.8.2](https://github.com/jm33-m0/emp3r0r/compare/v3.8.1...v3.8.2) (2025-12-14)
+
+
+### Bug Fixes
+
+* update subproject commit reference in emp3r0r.wiki ([329de86](https://github.com/jm33-m0/emp3r0r/commit/329de86fb91da519fb6b97e666a15bb363a30913))
+
 ## [3.8.1](https://github.com/jm33-m0/emp3r0r/compare/v3.8.0...v3.8.1) (2025-12-14)
 
 
