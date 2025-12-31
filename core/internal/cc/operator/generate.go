@@ -240,6 +240,8 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 	c2transport_proxy, _ := cmd.Flags().GetString("proxy")
 	doh_server, _ := cmd.Flags().GetString("doh")
 	proxy_chain, _ := cmd.Flags().GetBool("proxychain")
+	proxy_chain_min, _ := cmd.Flags().GetInt("proxychain-wait-min")
+	proxy_chain_max, _ := cmd.Flags().GetInt("proxychain-wait-max")
 	ncsi, _ := cmd.Flags().GetBool("ncsi")
 	kcp, _ := cmd.Flags().GetBool("kcp")
 
@@ -337,7 +339,21 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 	if live.RuntimeConfig.DoHServer != "" {
 		logging.Printf("Using DoH server %s", live.RuntimeConfig.DoHServer)
 	}
-	if !proxy_chain {
+	if proxy_chain {
+		if !cmd.Flags().Changed("proxychain-wait-min") {
+			proxy_chain_min = util.RandInt(30, 120)
+		}
+		live.RuntimeConfig.ProxyChainBroadcastIntervalMin = proxy_chain_min
+
+		if !cmd.Flags().Changed("proxychain-wait-max") {
+			live.RuntimeConfig.ProxyChainBroadcastIntervalMax = util.RandInt(proxy_chain_min+10, proxy_chain_min+100)
+		} else {
+			live.RuntimeConfig.ProxyChainBroadcastIntervalMax = proxy_chain_max
+		}
+		logging.Printf("Proxy chain is enabled with broadcast interval %d-%d",
+			live.RuntimeConfig.ProxyChainBroadcastIntervalMin,
+			live.RuntimeConfig.ProxyChainBroadcastIntervalMax)
+	} else {
 		live.RuntimeConfig.ProxyChainBroadcastIntervalMax = 0
 		logging.Printf("Proxy chain is disabled")
 	}
