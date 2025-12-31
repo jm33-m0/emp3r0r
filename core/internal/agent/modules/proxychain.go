@@ -111,8 +111,13 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 					continue
 				}
 			}
-			if transport.IsProxyOK(rproxy, def.CCAddress) {
-				break
+
+			// Optimization: Don't check connectivity if the local port isn't even open
+			// This avoids spamming logs when no reverse proxy is connected
+			if netutil.IsPortOpen("127.0.0.1", common.RuntimeConfig.AgentSocksServerPort) {
+				if transport.IsProxyOK(rproxy, def.CCAddress) {
+					break
+				}
 			}
 			util.TakeASnap()
 		}
