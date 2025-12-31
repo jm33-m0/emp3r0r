@@ -27,6 +27,8 @@ emp3r0r is a comprehensive post-exploitation framework that stands out as one of
 - **Universal Module Support**: Execute Bash, PowerShell, Python, DLL, SO, and EXE modules seamlessly across platforms.
 - **Advanced Stealth**: Dynamic process obfuscation, file concealment, time-stomping, and **lazy initialization** (filesystem modifications only on demand).
 - **Modern Infrastructure**: WireGuard + mTLS operator authentication, HTTP2/TLS with JA3 evasion, KCP-based UDP tunneling.
+- **APT-Grade Connectivity**: **Auto-Proxy Chain** creates a resilient, automatic P2P mesh network. Agents in air-gapped or isolated segments autonomously discover and piggyback on internet-connected peers to reach the C2, ensuring long-term survival in hardened environments.
+- **Bring2CC**: Reverse proxy any target port to the C2 server, enabling direct access to internal resources even when agents cannot make outbound connections.
 
 ---
 
@@ -118,9 +120,9 @@ Use the `generate` command from within the emp3r0r shell interface to create cus
 
 #### Intelligent Network Traversal
 
-- Auto-bridge agents with Shadowsocks chains to reach isolated segments.
-- Reverse proxies over SSH/KCP (`bring2cc`) open paths to otherwise unreachable hosts.
-- Bi-directional TCP/UDP port mapping and agent-side Socks5 (with UDP) for flexible pivoting.
+- **Automatic P2P Mesh**: Agents autonomously form a mesh network using UDP broadcasts and rolling tags. Agents in air-gapped or isolated networks automatically find and tunnel through internet-connected peers (via Shadowsocks), creating a resilient, self-healing command path typical of advanced APT implants.
+- **Bring2CC**: A reverse proxy mechanism (SSH + KCP) that tunnels any port from the agent (or its network) back to the C2 server. This beats the isolation where agents cannot make outbound connections, effectively "bringing" the target to the Command & Control server.
+- **Flexible Pivoting**: Bi-directional TCP/UDP port mapping and agent-side Socks5 (with UDP) support.
 
 ### Payload Delivery
 
