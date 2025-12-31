@@ -1,5 +1,25 @@
 # Changelog
 
+## [3.9.0](https://github.com/jm33-m0/emp3r0r/compare/v3.8.1...v3.9.0) (2025-12-31)
+
+
+### Features
+
+* enhance proxy broadcasting with time-based validation and dynamic payloads ([4e97253](https://github.com/jm33-m0/emp3r0r/commit/4e97253d15237a6ea8e7c911a58de1d1a294af77))
+* implement mutex for managing reverse connections in SSH proxy ([43bb247](https://github.com/jm33-m0/emp3r0r/commit/43bb247c58a7f9287451e46b1380915128804019))
+
+
+### Bug Fixes
+
+* always start proxychain when C2 is accessible ([799ec89](https://github.com/jm33-m0/emp3r0r/commit/799ec89907b68e8cf0ec04aebdfde3d639e481af))
+* enhance README with new features for APT-grade connectivity and automatic P2P mesh networking ([8817614](https://github.com/jm33-m0/emp3r0r/commit/8817614f0b1df787223070daae7b03156b0ed3ef))
+* enhance tag validation in BroadcastServer to include future time slot ([1176e51](https://github.com/jm33-m0/emp3r0r/commit/1176e51f82a315038c865eb7a5f7c3e7599a5380))
+* improve proxy handling in BroadcastServer to ensure Shadowsocks is restarted if not working ([d69ec1f](https://github.com/jm33-m0/emp3r0r/commit/d69ec1fdbeacb1d6f59ec070086b6c71cdfa1866))
+* make sure shadowsocks is started before validating the broadcasted proxy ([49ba075](https://github.com/jm33-m0/emp3r0r/commit/49ba0752b0b5e153497502bbb4724617c7b1ee15))
+* optimize connectivity check in BroadcastServer to reduce log spam when no reverse proxy is connected ([59446ee](https://github.com/jm33-m0/emp3r0r/commit/59446ee788ff88a6a04bd34c29aa6d71398db6b8))
+* proxychain is disabled even when `--proxychain` is specified ([f46ce3c](https://github.com/jm33-m0/emp3r0r/commit/f46ce3c5d8d4cca4d8776a5c34a7017caa2dba77))
+* update subproject commit reference in emp3r0r.wiki ([329de86](https://github.com/jm33-m0/emp3r0r/commit/329de86fb91da519fb6b97e666a15bb363a30913))
+
 ## [3.8.1](https://github.com/jm33-m0/emp3r0r/compare/v3.8.0...v3.8.1) (2025-12-14)
 
 
