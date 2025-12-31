@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
@@ -20,7 +21,10 @@ import (
 )
 
 // ReverseConns record ssh reverse proxy sessions
-var ReverseConns = make(map[string]context.CancelFunc)
+var (
+	ReverseConns      = make(map[string]context.CancelFunc)
+	ReverseConnsMutex = &sync.Mutex{}
+)
 
 // getRollingTag generates a time-based token (TOTP style)
 // It creates a unique 4-byte signature for the given time slot.
