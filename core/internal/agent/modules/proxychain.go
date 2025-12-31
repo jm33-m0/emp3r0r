@@ -141,15 +141,18 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 		now := time.Now().Unix()
 		currentSlot := now / 30
 		prevSlot := currentSlot - 1 // Allow 30s drift
+		nextSlot := currentSlot + 1 // Allow 30s ahead
 
 		// Generate valid tags for Now and (Now - 30s)
 		validTagCurrent := getRollingTag(currentSlot)
 		validTagPrev := getRollingTag(prevSlot)
+		validTagNext := getRollingTag(nextSlot)
 
 		// Validate: Does the packet header match either valid tag?
 		payload := buf[:4]
-		if !bytes.Equal(payload, validTagCurrent) && !bytes.Equal(payload, validTagPrev) {
-			continue // Invalid or expired tag (Ignore silently)
+		if !bytes.Equal(payload, validTagCurrent) && !bytes.Equal(payload, validTagPrev) && !bytes.Equal(payload, validTagNext) {
+			log.Printf("BroadcastServer: dropped packet from %s due to invalid tag", addr)
+			continue // Invalid or expired tag
 		}
 
 		// Extract Source IP
