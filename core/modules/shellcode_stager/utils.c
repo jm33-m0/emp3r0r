@@ -151,6 +151,7 @@ char *strstr(const char *haystack, const char *needle) {
   return NULL;
 }
 
+/*
 // Minimal snprintf (only supports %s and %d)
 int snprintf(char *str, size_t size, const char *format, ...) {
   va_list args;
@@ -209,6 +210,7 @@ int snprintf(char *str, size_t size, const char *format, ...) {
   va_end(args);
   return out - str;
 }
+*/
 
 #ifdef DEBUG
 void debug_print(const char *format, ...) {
