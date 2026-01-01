@@ -59,6 +59,35 @@ struct timeval {
   long tv_usec;
 };
 
+struct timespec {
+  long tv_sec;
+  long tv_nsec;
+};
+
+#define WNOHANG 1
+
+// Signal
+#define SIGTRAP 5
+#define SIGKILL 9
+#define SIG_DFL ((void (*)(int))0)
+#define SIG_IGN ((void (*)(int))1)
+#define NSIG 64
+#define _NSIG_BPW 64
+#define _NSIG_WORDS (NSIG / _NSIG_BPW)
+
+typedef unsigned long old_sigset_t;
+
+typedef struct {
+  unsigned long sig[_NSIG_WORDS];
+} sigset_t;
+
+struct sigaction {
+  void (*sa_handler)(int);
+  unsigned long sa_flags;
+  void (*sa_restorer)(void);
+  sigset_t sa_mask;
+};
+
 // Libc replacements
 void *malloc(size_t size);
 void free(void *ptr);
@@ -99,6 +128,11 @@ long getuid(void);
 long geteuid(void);
 long getgid(void);
 long getegid(void);
+long kill(int pid, int sig);
+long nanosleep(const struct timespec *req, struct timespec *rem);
+int sigaction(int signum, const struct sigaction *act,
+              struct sigaction *oldact);
+int sigemptyset(sigset_t *set);
 
 // Socket wrappers
 int socket(int domain, int type, int protocol);

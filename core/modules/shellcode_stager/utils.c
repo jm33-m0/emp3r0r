@@ -395,6 +395,26 @@ long getgid(void) { return syscall0(SYS_getgid); }
 
 long getegid(void) { return syscall0(SYS_getegid); }
 
+long kill(int pid, int sig) { return syscall2(SYS_kill, pid, sig); }
+
+long nanosleep(const struct timespec *req, struct timespec *rem) {
+  return syscall2(SYS_nanosleep, (long)req, (long)rem);
+}
+
+int sigaction(int signum, const struct sigaction *act,
+              struct sigaction *oldact) {
+  // rt_sigaction takes size of sigset_t as 4th argument
+  return syscall4(SYS_rt_sigaction, signum, (long)act, (long)oldact,
+                  sizeof(sigset_t));
+}
+
+int sigemptyset(sigset_t *set) {
+  if (set == NULL)
+    return -1;
+  memset(set, 0, sizeof(sigset_t));
+  return 0;
+}
+
 // -----------------------------------------------------------------------------
 // Socket Wrappers
 // -----------------------------------------------------------------------------
