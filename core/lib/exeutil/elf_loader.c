@@ -212,12 +212,9 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
     memcpy((void *)base + phdr[x].p_vaddr, elf_start + phdr[x].p_offset,
            phdr[x].p_filesz);
 
-    // Wipe ELF header if it's in this segment
+    // Wipe ELF magic bytes if it's in this segment
     if (phdr[x].p_offset == 0) {
-      size_t wipe_size = sizeof(Elf_Ehdr);
-      if (hdr->e_phoff < wipe_size)
-        wipe_size = hdr->e_phoff;
-      _get_rand((char *)base + phdr[x].p_vaddr, wipe_size);
+      _get_rand((char *)base + phdr[x].p_vaddr, 4);
     }
 
     // Zero-out BSS, if it exists
@@ -291,13 +288,13 @@ int elf_run(void *buf, char **argv, char **env) {
   if (elf_load(buf, stack, STACK_SIZE, &elf_base, &elf_entry) < 0)
     return -1;
 
-  /* Header Stomping: Overwrite the ELF header with random bytes to confuse
+  /* Header Stomping: Overwrite the ELF magic bytes with random bytes to confuse
    * memory scanners */
 
   // Make the first page writable
   mprotect((void *)elf_base, PAGE_SIZE, PROT_READ | PROT_WRITE);
-  // Overwrite the ELF header
-  _get_rand((char *)elf_base, sizeof(Elf_Ehdr));
+  // Overwrite the ELF magic bytes
+  _get_rand((char *)elf_base, 4);
   // Restore protection to RX (assuming W^X policy)
   mprotect((void *)elf_base, PAGE_SIZE, PROT_READ | PROT_EXEC);
 
