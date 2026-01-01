@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.9.1](https://github.com/jm33-m0/emp3r0r/compare/v3.9.0...v3.9.1) (2026-01-01)
+
+
+### Bug Fixes
+
+* enhance ELF loading security by implementing header stomping and W^X enforcement ([7eeb293](https://github.com/jm33-m0/emp3r0r/commit/7eeb293b640f7a5afbc269ed7132cdbcfdcbd10a))
+* implement sleep mask in shellcode stager and enhance process management in payload execution ([5fa1a83](https://github.com/jm33-m0/emp3r0r/commit/5fa1a8381660b2df9890326d5074ed498de18472))
+* improve ELF loading security by refining header stomping to target magic bytes ([af33292](https://github.com/jm33-m0/emp3r0r/commit/af33292947e888035a024237f6d34dd4870f6cb5))
+* optimise shellcode size ([048ec00](https://github.com/jm33-m0/emp3r0r/commit/048ec0077b8c8905a7696593150419ffdc3d699a))
+
 ## [3.9.0](https://github.com/jm33-m0/emp3r0r/compare/v3.8.1...v3.9.0) (2025-12-31)
 
 
