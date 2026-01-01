@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/random.h>
 #include <sys/types.h>
 #include <sys/user.h>
 #include <sys/wait.h>
@@ -82,11 +83,8 @@ static void _exit_func(int code) {
 }
 
 static void _get_rand(char *buf, int size) {
-  int fd = open("/dev/urandom", O_RDONLY, 0);
-
-  ssize_t result = read(fd, (unsigned char *)buf, size);
+  ssize_t result = getrandom(buf, size, 0);
   (void)result; // Suppress unused result warning
-  close(fd);
 }
 
 static char *_get_interp(char *buf) {
@@ -214,6 +212,14 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
     memcpy((void *)base + phdr[x].p_vaddr, elf_start + phdr[x].p_offset,
            phdr[x].p_filesz);
 
+    // Wipe ELF header if it's in this segment
+    if (phdr[x].p_offset == 0) {
+      size_t wipe_size = sizeof(Elf_Ehdr);
+      if (hdr->e_phoff < wipe_size)
+        wipe_size = hdr->e_phoff;
+      _get_rand((char *)base + phdr[x].p_vaddr, wipe_size);
+    }
+
     // Zero-out BSS, if it exists
     if (phdr[x].p_memsz > phdr[x].p_filesz)
       memset((void *)(base + phdr[x].p_vaddr + phdr[x].p_filesz), 0,
@@ -226,8 +232,11 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
     if (phdr[x].p_flags & PF_W)
       elf_prot |= PROT_WRITE;
 
-    if (phdr[x].p_flags & PF_X)
+    if (phdr[x].p_flags & PF_X) {
       elf_prot |= PROT_EXEC;
+      // Enforce W^X: If executable, remove write permission
+      elf_prot &= ~PROT_WRITE;
+    }
 
     mprotect((unsigned char *)(base + map_start), map_size, elf_prot);
 
@@ -281,6 +290,16 @@ int elf_run(void *buf, char **argv, char **env) {
   // Map the ELF in memory
   if (elf_load(buf, stack, STACK_SIZE, &elf_base, &elf_entry) < 0)
     return -1;
+
+  /* Header Stomping: Overwrite the ELF header with random bytes to confuse
+   * memory scanners */
+
+  // Make the first page writable
+  mprotect((void *)elf_base, PAGE_SIZE, PROT_READ | PROT_WRITE);
+  // Overwrite the ELF header
+  _get_rand((char *)elf_base, sizeof(Elf_Ehdr));
+  // Restore protection to RX (assuming W^X policy)
+  mprotect((void *)elf_base, PAGE_SIZE, PROT_READ | PROT_EXEC);
 
   // Check for the existence of a dynamic loader
   char *interp_name = _get_interp(buf);
