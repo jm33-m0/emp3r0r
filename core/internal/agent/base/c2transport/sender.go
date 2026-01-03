@@ -6,14 +6,30 @@ import (
 	"fmt"
 	"log"
 
+	"io"
+
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/spf13/cobra"
 )
 
+// Connection is the connection to CC, can be mocked for testing
+var Connection io.Writer
+
 // Send2CC send TunData to CC
 func Send2CC(data *def.MsgTunData) error {
-	out := json.NewEncoder(def.CCMsgConn)
+	var writer io.Writer = def.CCMsgConn
+	if Connection != nil {
+		writer = Connection
+	}
+	if writer == nil {
+		// If no connection is available, just log it and return nil to avoid crashing
+		// This happens when running tests or when C2 is not connected
+		log.Printf("Send2CC: no connection to C2, dropping message: %v", data)
+		return nil
+	}
+
+	out := json.NewEncoder(writer)
 
 	err := out.Encode(data)
 	if err != nil {
