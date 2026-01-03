@@ -29,8 +29,9 @@ func TestKillCmdRun(t *testing.T) {
 	c2transport.Connection = &mockConn
 	defer func() { c2transport.Connection = nil }()
 
-	// Start a dummy process
-	cmd := exec.Command("sleep", "100")
+	// Start a dummy process using the test binary itself
+	cmd := exec.Command(os.Args[0], "-test.run=TestHelperProcess")
+	cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("Failed to start dummy process: %v", err)
 	}
@@ -420,6 +421,9 @@ func TestProxyCmd(t *testing.T) {
 	}
 	mockConn.Reset()
 
+	// Wait for connections to settle before shutting down to avoid race in socks5 library
+	time.Sleep(1 * time.Second)
+
 	// Test Proxy Off
 	rootCmd.SetArgs([]string{def.C2CmdProxy, "--mode", "off", "--addr", addr})
 	if err := rootCmd.Execute(); err != nil {
@@ -469,4 +473,13 @@ func TestPortFwdCmd(t *testing.T) {
 	if !strings.Contains(output, "stopped") {
 		t.Errorf("Expected 'stopped', got '%s'", output)
 	}
+}
+
+// Helper process for TestKillCmdRun
+func TestHelperProcess(t *testing.T) {
+	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
+		return
+	}
+	time.Sleep(100 * time.Second)
+	os.Exit(0)
 }

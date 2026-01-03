@@ -1,18 +1,18 @@
 package live
 
 import (
-	"archive/tar"
-	"compress/gzip"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/jm33-m0/arc/v2"
 )
 
 func TestDownloadExtractConfig(t *testing.T) {
 	// 1. Setup environment
 	tmpDir := t.TempDir()
-	
+
 	// Mock HOME
 	originalHome := os.Getenv("HOME")
 	defer os.Setenv("HOME", originalHome)
@@ -45,38 +45,23 @@ func TestDownloadExtractConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// 2. Create a dummy tarball
-	tarPath := filepath.Join(tmpDir, "config.tar.gz")
-	tarFile, err := os.Create(tarPath)
-	if err != nil {
+	// 2. Create a dummy tarball using system tar command (to support xz)
+	tarSrcDir := filepath.Join(tmpDir, "tar_src")
+	if err := os.MkdirAll(tarSrcDir, 0700); err != nil {
 		t.Fatal(err)
 	}
-	
-	gw := gzip.NewWriter(tarFile)
-	tw := tar.NewWriter(gw)
 
 	testFileName := "test_config_file.txt"
 	testFileContent := "hello world"
-
-	hdr := &tar.Header{
-		Name: testFileName,
-		Mode: 0600,
-		Size: int64(len(testFileContent)),
-	}
-	if err := tw.WriteHeader(hdr); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := tw.Write([]byte(testFileContent)); err != nil {
+	if err := os.WriteFile(filepath.Join(tarSrcDir, testFileName), []byte(testFileContent), 0600); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := tw.Close(); err != nil {
-		t.Fatal(err)
+	tarPath := filepath.Join(tmpDir, "config.tar.xz")
+	// Create .tar.xz using arc library (cross-platform)
+	if err := arc.Archive(filepath.Join(tarSrcDir, testFileName), tarPath, arc.CompressionMap["xz"], arc.ArchivalMap["tar"]); err != nil {
+		t.Fatalf("Failed to create tar.xz: %v", err)
 	}
-	if err := gw.Close(); err != nil {
-		t.Fatal(err)
-	}
-	tarFile.Close()
 
 	// 3. Mock downloader
 	downloader := func(url, dest string) error {
@@ -102,11 +87,11 @@ func TestDownloadExtractConfig(t *testing.T) {
 	// But SetupFilePaths is called inside DownloadExtractConfig.
 	// However, DownloadExtractConfig uses EmpConfigTar BEFORE calling SetupFilePaths if IsServer is true.
 	// If IsServer is false (default), it uses a different path.
-	
+
 	// Let's ensure IsServer is false
 	IsServer = false
 
-	err = DownloadExtractConfig("http://dummy/url", downloader)
+	err := DownloadExtractConfig("http://dummy/url", downloader)
 	if err != nil {
 		t.Fatalf("DownloadExtractConfig failed: %v", err)
 	}
