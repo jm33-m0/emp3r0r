@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.9.2](https://github.com/jm33-m0/emp3r0r/compare/v3.9.1...v3.9.2) (2026-01-03)
+
+
+### Bug Fixes
+
+* data race found in tests ([9db1f78](https://github.com/jm33-m0/emp3r0r/commit/9db1f78ef4fa5da8793b954a6beff6599a0176b1))
+
 ## [3.9.1](https://github.com/jm33-m0/emp3r0r/compare/v3.9.0...v3.9.1) (2026-01-01)
 
 
