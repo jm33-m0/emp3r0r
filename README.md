@@ -10,7 +10,7 @@
 [![GitHub Sponsors](https://img.shields.io/badge/GitHub-Sponsor-ff69b4?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sponsors/jm33-m0)
 [![Screenshots](https://img.shields.io/badge/View-Screenshots-blue?style=for-the-badge)](./Screenshots.md)
 
-[![Go Report Card](https://goreportcard.com/badge/gojp/goreportcard)](https://goreportcard.com/report/jm33-m0/emp3r0r/core)
+[![Go Report Card](https://goreportcard.com/badge/gojp/goreportcard)](https://goreportcard.com/report/github.com/jm33-m0/emp3r0r/core)
 [![Build Status](https://github.com/jm33-m0/emp3r0r/actions/workflows/release-please.yml/badge.svg)](https://github.com/jm33-m0/emp3r0r/actions/workflows/release-please.yml)
 [![Tests](https://github.com/jm33-m0/emp3r0r/actions/workflows/test.yml/badge.svg)](https://github.com/jm33-m0/emp3r0r/actions/workflows/test.yml)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/jm33-m0/emp3r0r?filename=core/go.mod)](https://github.com/jm33-m0/emp3r0r/blob/master/core/go.mod)
