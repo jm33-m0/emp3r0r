@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.9.4](https://github.com/jm33-m0/emp3r0r/compare/v3.9.3...v3.9.4) (2026-01-03)
+
+
+### Bug Fixes
+
+* enhance Socks5Proxy implementation with listener management and synchronization ([cb2047b](https://github.com/jm33-m0/emp3r0r/commit/cb2047bbc4d8b74530f5a91ad6a01b81be2e13cd))
+
 ## [3.9.3](https://github.com/jm33-m0/emp3r0r/compare/v3.9.2...v3.9.3) (2026-01-03)
 
 
