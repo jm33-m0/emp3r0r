@@ -46,7 +46,7 @@ jobs:
         if: runner.os == 'Linux'
         working-directory: ./core
         run: |
-          go test -v -race -coverprofile=coverage.txt -covermode=atomic ./lib/util/... ./lib/crypto/... ./lib/sysinfo/... ./lib/testutil/...
+          go test -v -race -coverprofile=coverage.txt -covermode=atomic ./lib/util/... ./lib/crypto/... ./lib/sysinfo/... ./lib/testutil/... ./lib/cli/... ./lib/netutil/... ./internal/def/...
 
       - name: Run tests (Windows)
         if: runner.os == 'Windows'

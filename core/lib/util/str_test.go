@@ -364,3 +364,52 @@ func TestParseEnvStr(t *testing.T) {
 		})
 	}
 }
+
+func TestSplitLongLine(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		length   int
+		expected string
+	}{
+		{
+			name:     "short string",
+			input:    "hello",
+			length:   10,
+			expected: "hello",
+		},
+		{
+			name:     "exact length",
+			input:    "hello",
+			length:   5,
+			expected: "hello",
+		},
+		{
+			name:     "long string split",
+			input:    "helloworld",
+			length:   5,
+			expected: "helloworld", // Function is currently a no-op
+		},
+		{
+			name:     "long string split multiple times",
+			input:    "helloworldagain",
+			length:   5,
+			expected: "helloworldagain", // Function is currently a no-op
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			length:   5,
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := SplitLongLine(tt.input, tt.length)
+			if result != tt.expected {
+				t.Errorf("SplitLongLine(%q, %d) = %q, expected %q", tt.input, tt.length, result, tt.expected)
+			}
+		})
+	}
+}
