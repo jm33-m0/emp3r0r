@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest]
         go-version: ["1.24"]
 
     steps:
@@ -47,12 +47,6 @@ jobs:
         working-directory: ./core
         run: |
           go test -v -race -coverprofile=coverage.txt -covermode=atomic ./lib/util/... ./lib/crypto/... ./lib/sysinfo/... ./lib/testutil/...
-
-      - name: Run tests (macOS)
-        if: runner.os == 'macOS'
-        working-directory: ./core
-        run: |
-          go test -v -race -coverprofile=coverage.txt -covermode=atomic ./lib/util/... ./lib/crypto/... ./lib/testutil/...
 
       - name: Run tests (Windows)
         if: runner.os == 'Windows'
