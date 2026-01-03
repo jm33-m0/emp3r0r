@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"os/user"
@@ -32,27 +31,13 @@ func agent_main() {
 	replace_agent := false
 
 	// accept env vars
-	verbose := os.Getenv("VERBOSE") == "true"
-	if verbose {
-		log_file := "emp3r0r.log"
-		f, err := util.OpenFileAgent(log_file, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-		if err != nil {
-			logging.Fatalf("%s: %v", log_file, err)
-		}
-		defer f.Close()
-		logging.SetOutput(f)
-		logging.Println("emp3r0r agent has started")
-	} else {
-		logging.SetOutput(io.Discard)
-		logging.SetOutput(io.Discard)
-		null_file, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0o644)
-		if err != nil {
-			logging.Fatalf("%s: %v", os.DevNull, err)
-		}
-		defer null_file.Close()
-		os.Stderr = null_file
-		os.Stdout = null_file
+	null_file, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0o644)
+	if err != nil {
+		logging.Fatalf("%s: %v", os.DevNull, err)
 	}
+	defer null_file.Close()
+	os.Stderr = null_file
+	os.Stdout = null_file
 
 	replace_agent = os.Getenv("REPLACE_AGENT") == "true"
 	// Check if we're running as a library (CGO build)
