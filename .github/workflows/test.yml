@@ -18,6 +18,11 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         go-version: ["1.24"]
+        include:
+          - os: ubuntu-latest
+            packages: ./lib/util/... ./lib/crypto/... ./lib/sysinfo/... ./lib/testutil/... ./lib/cli/... ./lib/netutil/... ./internal/def/... ./internal/transport/... ./internal/live/... ./internal/agent/handler/... ./internal/agent/base/c2transport/...
+          - os: windows-latest
+            packages: ./lib/util/... ./lib/crypto/... ./lib/testutil/...
 
     steps:
       - name: Checkout code
@@ -42,50 +47,22 @@ jobs:
         working-directory: ./core
         run: go mod tidy
 
-      - name: Run tests (Linux)
+      - name: Run tests
+        working-directory: ./core
+        run: |
+          go test -v -race "-coverprofile=coverage.txt" -covermode=atomic ${{ matrix.packages }}
+
+      - name: Display coverage summary
         if: runner.os == 'Linux'
         working-directory: ./core
         run: |
-          go test -v -race -coverprofile=coverage.txt -covermode=atomic ./lib/util/... ./lib/crypto/... ./lib/sysinfo/... ./lib/testutil/... ./lib/cli/... ./lib/netutil/... ./internal/def/... ./internal/transport/... ./internal/live/... ./internal/agent/handler/... ./internal/agent/base/c2transport/...
-
-      - name: Run tests (Windows)
-        if: runner.os == 'Windows'
-        working-directory: ./core
-        run: |
-          go test -v -race "-coverprofile=coverage.txt" -covermode=atomic ./lib/util/... ./lib/crypto/... ./lib/testutil/...
+          go tool cover -func=coverage.txt
 
       - name: Upload coverage to Codecov
-        if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.24'
+        if: matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@v4
         with:
           file: ./core/coverage.txt
           flags: unittests
           name: codecov-umbrella
           fail_ci_if_error: false
-
-  test-linux-only:
-    name: Linux-only tests with Go 1.24
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.24"
-
-      - name: Install dependencies
-        working-directory: ./core
-        run: go mod tidy
-
-      - name: Run Linux-specific tests
-        working-directory: ./core
-        run: |
-          go test -v -tags linux -coverprofile=coverage-linux.txt -covermode=atomic ./lib/sysinfo/...
-
-      - name: Display coverage summary
-        working-directory: ./core
-        run: |
-          go tool cover -func=coverage-linux.txt
