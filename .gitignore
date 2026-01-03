@@ -150,6 +150,11 @@ coverage.xml
 .pytest_cache/
 cover/
 
+# Go test coverage
+coverage.out
+coverage.txt
+*.test
+
 # Translations
 *.mo
 *.pot
