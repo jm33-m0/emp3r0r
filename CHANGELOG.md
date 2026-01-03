@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.9.3](https://github.com/jm33-m0/emp3r0r/compare/v3.9.2...v3.9.3) (2026-01-03)
+
+
+### Bug Fixes
+
+* replace standard log package with custom logging package to eliminate logging strings in agent ([cae377b](https://github.com/jm33-m0/emp3r0r/commit/cae377b97c7d3d49f4b28381f4d48ee75f0f153c))
+
 ## [3.9.2](https://github.com/jm33-m0/emp3r0r/compare/v3.9.1...v3.9.2) (2026-01-03)
 
 
