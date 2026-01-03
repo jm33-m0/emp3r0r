@@ -13,6 +13,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/txthinking/socks5"
 )
 
 func TestKillCmdRun(t *testing.T) {
@@ -360,5 +361,92 @@ func TestGetCmdRun_Dir(t *testing.T) {
 	// The output is JSON stringified in the "data" field.
 	if !strings.Contains(output, f1) || !strings.Contains(output, f2) {
 		t.Errorf("Expected output to contain file paths %s and %s, got: %s", f1, f2, output)
+	}
+}
+
+func TestProxyCmd(t *testing.T) {
+	if common.RuntimeConfig == nil {
+		common.RuntimeConfig = &def.Config{}
+	}
+	common.RuntimeConfig.ShadowsocksLocalSocksPort = "1080"
+	common.RuntimeConfig.Password = "password"
+
+	var mockConn bytes.Buffer
+	c2transport.Connection = &mockConn
+	defer func() { c2transport.Connection = nil }()
+
+	rootCmd := C2Commands()
+
+	// Initialize def.ProxyServer
+	// Use a random port to avoid conflicts
+	port := "54321"
+	addr := "127.0.0.1:" + port
+	var err error
+	def.ProxyServer, err = socks5.NewClassicServer(addr, "", "", "", 0, 0)
+	if err != nil {
+		t.Fatalf("Failed to create mock socks5 server: %v", err)
+	}
+
+	// Test Proxy On
+	rootCmd.SetArgs([]string{def.C2CmdProxy, "--mode", "on", "--addr", addr})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("Failed to execute proxy command: %v", err)
+	}
+
+	// Wait for goroutine to start
+	time.Sleep(100 * time.Millisecond)
+
+	output := mockConn.String()
+	if !strings.Contains(output, "Socks5Proxy server ready") {
+		t.Errorf("Expected 'Socks5Proxy server ready', got '%s'", output)
+	}
+	mockConn.Reset()
+
+	// Test Proxy Off
+	rootCmd.SetArgs([]string{def.C2CmdProxy, "--mode", "off", "--addr", addr})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("Failed to execute proxy command: %v", err)
+	}
+
+	output = mockConn.String()
+	if !strings.Contains(output, "Socks5Proxy server ready") {
+		t.Errorf("Expected 'Socks5Proxy server ready' (stopping), got '%s'", output)
+	}
+}
+
+func TestPortFwdCmd(t *testing.T) {
+	if common.RuntimeConfig == nil {
+		common.RuntimeConfig = &def.Config{}
+	}
+
+	var mockConn bytes.Buffer
+	c2transport.Connection = &mockConn
+	defer func() { c2transport.Connection = nil }()
+
+	rootCmd := C2Commands()
+
+	// Test PortFwd Reverse
+	port := "54322"
+	rootCmd.SetArgs([]string{def.C2CmdPortFwd, "--to", port, "--shID", "test-session", "--operation", "reverse"})
+
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("Failed to execute port_fwd command: %v", err)
+	}
+
+	output := mockConn.String()
+	if !strings.Contains(output, "Port forwarding started successfully") {
+		t.Errorf("Expected 'Port forwarding started successfully', got '%s'", output)
+	}
+	mockConn.Reset()
+
+	// Stop it
+	rootCmd.SetArgs([]string{def.C2CmdPortFwd, "--to", port, "--shID", "test-session", "--operation", "stop"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("Failed to execute port_fwd stop command: %v", err)
+	}
+
+	output = mockConn.String()
+	if !strings.Contains(output, "stopped") {
+		t.Errorf("Expected 'stopped', got '%s'", output)
 	}
 }
