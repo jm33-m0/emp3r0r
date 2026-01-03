@@ -61,7 +61,7 @@ jobs:
           go test -v -race "-coverprofile=coverage.txt" -covermode=atomic ./lib/util/... ./lib/crypto/... ./lib/testutil/...
 
       - name: Upload coverage to Codecov
-        if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.23'
+        if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.24'
         uses: codecov/codecov-action@v4
         with:
           file: ./core/coverage.txt
@@ -70,7 +70,7 @@ jobs:
           fail_ci_if_error: false
 
   test-linux-only:
-    name: Linux-only tests with Go 1.23
+    name: Linux-only tests with Go 1.24
     runs-on: ubuntu-latest
 
     steps:
@@ -80,7 +80,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.24"
 
       - name: Install dependencies
         working-directory: ./core
@@ -107,7 +107,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.24"
 
       - name: Install dependencies
         working-directory: ./core
