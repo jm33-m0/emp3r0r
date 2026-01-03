@@ -11,9 +11,9 @@
 [![Screenshots](https://img.shields.io/badge/View-Screenshots-blue?style=for-the-badge)](./Screenshots.md)
 
 [![Go Report Card](https://goreportcard.com/badge/gojp/goreportcard)](https://goreportcard.com/report/github.com/jm33-m0/emp3r0r/core)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/jm33-m0/emp3r0r?filename=core/go.mod)](https://github.com/jm33-m0/emp3r0r/blob/v3/core/go.mod)
 [![Build Status](https://github.com/jm33-m0/emp3r0r/actions/workflows/release-please.yml/badge.svg)](https://github.com/jm33-m0/emp3r0r/actions/workflows/release-please.yml)
 [![Tests](https://github.com/jm33-m0/emp3r0r/actions/workflows/test.yml/badge.svg)](https://github.com/jm33-m0/emp3r0r/actions/workflows/test.yml)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/jm33-m0/emp3r0r?filename=core/go.mod)](https://github.com/jm33-m0/emp3r0r/blob/v3/core/go.mod)
 [![License](https://img.shields.io/github/license/jm33-m0/emp3r0r.svg)](https://github.com/jm33-m0/emp3r0r/blob/v3/LICENSE)
 [![GitHub release](https://img.shields.io/github/release/jm33-m0/emp3r0r.svg)](https://github.com/jm33-m0/emp3r0r/releases)
 
