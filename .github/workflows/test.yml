@@ -40,7 +40,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./core
-        run: go mod download
+        run: go mod tidy
 
       - name: Run tests (Linux)
         if: runner.os == 'Linux'
@@ -58,7 +58,7 @@ jobs:
         if: runner.os == 'Windows'
         working-directory: ./core
         run: |
-          go test -v -race -coverprofile=coverage.txt -covermode=atomic ./lib/util/... ./lib/crypto/... ./lib/testutil/...
+          go test -v -race "-coverprofile=coverage.txt" -covermode=atomic ./lib/util/... ./lib/crypto/... ./lib/testutil/...
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.23'
@@ -84,7 +84,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./core
-        run: go mod download
+        run: go mod tidy
 
       - name: Run Linux-specific tests
         working-directory: ./core
@@ -108,6 +108,10 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.23"
+
+      - name: Install dependencies
+        working-directory: ./core
+        run: go mod tidy
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v4
