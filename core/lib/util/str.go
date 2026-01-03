@@ -5,7 +5,6 @@ import (
 	crypto_rand "crypto/rand"
 	"encoding/csv"
 	"fmt"
-	"log"
 	"math/rand"
 	"strings"
 	"time"
@@ -94,8 +93,8 @@ func RandInt(min, max int) int {
 	var b [8]byte
 	_, err := crypto_rand.Read(b[:])
 	if err != nil {
-		log.Println("cannot seed math/rand package with cryptographically secure random number generator")
-		log.Println("falling back to math/rand with time seed")
+		logging.Println("cannot seed math/rand package with cryptographically secure random number generator")
+		logging.Println("falling back to math/rand with time seed")
 		return rand.New(rand.NewSource(time.Now().UnixNano())).Intn(max-min) + min
 	}
 	return min + rand.Intn(max-min)

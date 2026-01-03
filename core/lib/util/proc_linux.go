@@ -6,7 +6,7 @@ package util
 import (
 	"bufio"
 	"fmt"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"strings"
 	"unsafe"
@@ -53,7 +53,7 @@ func SetProcName(name string) {
 		// pad name to match argv[0] length
 		pad := len(os.Args[i]) - len(name)
 		if pad > 0 {
-			log.Printf("padding %d of 0x00", pad)
+			logging.Printf("padding %d of 0x00", pad)
 			name += strings.Repeat("\x00", pad)
 		}
 

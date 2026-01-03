@@ -2,7 +2,6 @@ package util
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -137,7 +136,7 @@ func IsPIDAlive(pid int) (alive bool) {
 func IsProcAlive(procName string) (alive bool, procs []*process.Process) {
 	allprocs, err := process.Processes()
 	if err != nil {
-		log.Println(err)
+		logging.Println(err)
 		return
 	}
 
@@ -161,7 +160,7 @@ func PidOf(name string) []int {
 	pids := make([]int, 1)
 	allprocs, err := process.Processes()
 	if err != nil {
-		log.Println(err)
+		logging.Println(err)
 		return pids
 	}
 

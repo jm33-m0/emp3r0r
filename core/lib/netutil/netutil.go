@@ -2,7 +2,7 @@ package netutil
 
 import (
 	"fmt"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"math/rand"
 	"net"
 	"regexp"
@@ -156,7 +156,7 @@ func IPaddr() (ips []IPWithMask) {
 func IPIfaces() (ifaces []net.Interface) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		log.Printf("IPIfaces: %v", err)
+		logging.Printf("IPIfaces: %v", err)
 		return nil
 	}
 	return
@@ -169,7 +169,7 @@ func IPbroadcastAddr(ipMask IPWithMask) string {
 
 	// check if IP is a valid IPv4 address
 	if ip.To4() == nil {
-		log.Printf("%s is not a valid IPv4 address", ip.String())
+		logging.Printf("%s is not a valid IPv4 address", ip.String())
 		return ""
 	}
 

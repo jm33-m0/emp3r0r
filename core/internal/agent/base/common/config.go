@@ -2,7 +2,7 @@ package common
 
 import (
 	"fmt"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -47,14 +47,14 @@ func ApplyRuntimeConfig() (err error) {
 	agent_root_base := util.FileBaseName(RuntimeConfig.AgentRoot)
 	prefix, err := GetRandomWritablePath()
 	if err != nil {
-		log.Printf("GetRandomWritablePath: %v, falling back to current directory", err)
+		logging.Printf("GetRandomWritablePath: %v, falling back to current directory", err)
 		prefix = cwd
 	}
 	RuntimeConfig.AgentRoot = fmt.Sprintf("%s/%s", prefix, agent_root_base)
 	RuntimeConfig.UtilsPath = fmt.Sprintf("%s/%s", RuntimeConfig.AgentRoot, RuntimeConfig.UtilsPath)
 	RuntimeConfig.SocketName = fmt.Sprintf("%s/%s", RuntimeConfig.AgentRoot, RuntimeConfig.SocketName)
 	RuntimeConfig.PIDFile = fmt.Sprintf("%s/%s", RuntimeConfig.AgentRoot, RuntimeConfig.PIDFile)
-	log.Printf("Agent root: %s", RuntimeConfig.AgentRoot)
+	logging.Printf("Agent root: %s", RuntimeConfig.AgentRoot)
 
 	// Socks5 proxy server
 	addr := fmt.Sprintf("0.0.0.0:%s", RuntimeConfig.AgentSocksServerPort)
@@ -105,7 +105,7 @@ func GetRandomWritablePath() (string, error) {
 		if util.FileBaseName(path) == RuntimeConfig.AgentRoot {
 			// just use it
 			path = filepath.Dir(path)
-			log.Printf("Using existing agent root: %s", path)
+			logging.Printf("Using existing agent root: %s", path)
 			return path, nil // return parent dir of path
 		}
 	}
@@ -180,13 +180,13 @@ func NameTheLibrary() string {
 		return nil
 	})
 	if err != nil {
-		log.Println("Error scanning for .so files:", err)
+		logging.Println("Error scanning for .so files:", err)
 		return ""
 	}
 
 	// Check if any .so files were found
 	if len(soFiles) == 0 {
-		log.Println("No .so files found")
+		logging.Println("No .so files found")
 		return ""
 	}
 

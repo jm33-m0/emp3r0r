@@ -5,7 +5,7 @@ package netutil
 
 import (
 	"fmt"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"strings"
 
 	"github.com/vishvananda/netlink"
@@ -24,7 +24,7 @@ func IPr() (routes []string) {
 		}
 		r, err := netlink.RouteList(link, netlink.FAMILY_ALL)
 		if err != nil {
-			log.Printf("cannot get route list from %d: %v", link.Attrs().Index, err)
+			logging.Printf("cannot get route list from %d: %v", link.Attrs().Index, err)
 			continue
 		}
 		for _, route := range r {
@@ -49,7 +49,7 @@ func IPr() (routes []string) {
 func IPLink() (links []netlink.Link) {
 	links, err := netlink.LinkList()
 	if err != nil {
-		log.Printf("Failed to get network interfaces: %v", err)
+		logging.Printf("Failed to get network interfaces: %v", err)
 		return nil
 	}
 
@@ -59,7 +59,7 @@ func IPLink() (links []netlink.Link) {
 func linkIdx2Name(index int) (name string) {
 	link, err := netlink.LinkByIndex(index)
 	if err != nil {
-		log.Printf("Cannot read name from interface %d: %v", index, err)
+		logging.Printf("Cannot read name from interface %d: %v", index, err)
 		return "N/A"
 	}
 
@@ -81,7 +81,7 @@ func IPNeigh() []string {
 		l, err := netlink.NeighList(ifIdx, netlink.FAMILY_ALL)
 		neighList = append(neighList, l...)
 		if err != nil {
-			log.Printf("Cannot get neigh list on interface %d: %v", ifIdx, err)
+			logging.Printf("Cannot get neigh list on interface %d: %v", ifIdx, err)
 			continue
 		}
 	}

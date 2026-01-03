@@ -5,7 +5,7 @@ package external_file
 
 import (
 	"fmt"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -19,7 +19,7 @@ func ExtractBashRC(bash, bashrc string) error {
 	}
 	err = os.WriteFile(bashrc, bashrcData, 0o600)
 	if err != nil {
-		log.Printf("Write bashrc: %v", err)
+		logging.Printf("Write bashrc: %v", err)
 	}
 
 	if !util.IsFileExist(bash) {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -154,7 +154,7 @@ func runSSHD(cmd *cobra.Command, args []string) {
 		c2transport.C2RespPrintf(cmd, "Error: args error\n")
 		return
 	}
-	log.Printf("Got sshd request: %v", args)
+	logging.Printf("Got sshd request: %v", args)
 	errChan := make(chan error)
 	go func() {
 		errChan <- ssh.SSHD(shell, port, sshdArgs)
@@ -182,7 +182,7 @@ func runProxy(cmd *cobra.Command, args []string) {
 		c2transport.C2RespPrintf(cmd, "Error: args error\n")
 		return
 	}
-	log.Printf("Got proxy request: %v", args)
+	logging.Printf("Got proxy request: %v", args)
 	err := modules.Socks5Proxy(mode, addr)
 	if err != nil {
 		c2transport.C2RespPrintf(cmd, "Error: Failed to start Socks5Proxy: %v\n", err)
@@ -306,7 +306,7 @@ func runListener(cmd *cobra.Command, args []string) {
 		c2transport.C2RespPrintf(cmd, "Error: payload not specified\n")
 		return
 	}
-	log.Printf("Got listener request: %v", args)
+	logging.Printf("Got listener request: %v", args)
 	errChan := make(chan error)
 	switch listenerType {
 	case "http_aes_compressed":

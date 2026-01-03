@@ -5,7 +5,7 @@ package main
 
 import (
 	"flag"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/exeutil"
@@ -18,17 +18,17 @@ func main() {
 	flag.Parse()
 
 	if *elfFilePath == "" {
-		log.Fatal("ELF file path is required")
+		logging.Fatal("ELF file path is required")
 	}
 
 	elf_data, err := os.ReadFile(*elfFilePath)
 	if err != nil {
-		log.Fatalf("Error reading ELF file: %v", err)
+		logging.Fatalf("Error reading ELF file: %v", err)
 	}
 
 	h, err := exeutil.ParseELFHeaders(elf_data)
 	if err != nil {
-		log.Fatalf("Error parsing ELF headers: %v", err)
+		logging.Fatalf("Error parsing ELF headers: %v", err)
 	}
 
 	// Print ELF headers
@@ -38,8 +38,8 @@ func main() {
 	if *libName != "" {
 		err = exeutil.AddDTNeeded(*elfFilePath, *libName)
 		if err != nil {
-			log.Fatalf("Error adding library to DT_NEEDED entries: %v", err)
+			logging.Fatalf("Error adding library to DT_NEEDED entries: %v", err)
 		}
-		log.Printf("Added %s to DT_NEEDED entries", *libName)
+		logging.Printf("Added %s to DT_NEEDED entries", *libName)
 	}
 }

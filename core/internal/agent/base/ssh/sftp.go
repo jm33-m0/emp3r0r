@@ -3,7 +3,7 @@ package ssh
 import (
 	"fmt"
 	"io"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/gliderlabs/ssh"
 	"github.com/pkg/sftp"
@@ -20,7 +20,7 @@ func SftpHandler(sess ssh.Session) {
 		serverOptions...,
 	)
 	if err != nil {
-		log.Printf("sftp server init error: %s", err)
+		logging.Printf("sftp server init error: %s", err)
 		return
 	}
 	if err := server.Serve(); err == io.EOF {

@@ -1,6 +1,10 @@
+//go:build !release
+// +build !release
+
 package logging
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -8,8 +12,24 @@ import (
 
 var logger *Logger
 
+func Print(a ...interface{}) {
+	logger.Msg("%v", fmt.Sprint(a...))
+}
+
+func Println(a ...interface{}) {
+	logger.Msg("%v", fmt.Sprint(a...))
+}
+
 func Printf(format string, a ...interface{}) {
 	logger.Msg(format, a...)
+}
+
+func Writer() io.Writer {
+	return logger.writer
+}
+
+func Sprintf(format string, a ...interface{}) string {
+	return fmt.Sprintf(format, a...)
 }
 
 func Successf(format string, a ...interface{}) {
@@ -34,6 +54,10 @@ func Errorf(format string, a ...interface{}) {
 
 func Fatalf(format string, a ...interface{}) {
 	logger.Fatal(format, a...)
+}
+
+func Fatal(a ...interface{}) {
+	logger.Msg("%v", fmt.Sprint(a...))
 }
 
 func CmdSetDebugLevel(cmd *cobra.Command, args []string) {

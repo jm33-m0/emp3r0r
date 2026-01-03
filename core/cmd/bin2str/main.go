@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/external_file"
@@ -18,11 +18,11 @@ func main() {
 	}
 	data, err := os.ReadFile(*file_path)
 	if err != nil {
-		log.Fatalf("Failed to read file: %v", err)
+		logging.Fatalf("Failed to read file: %v", err)
 	}
 	compressedBin, err := external_file.Bin2String(data)
 	if err != nil {
-		log.Fatalf("Failed to compress: %v", err)
+		logging.Fatalf("Failed to compress: %v", err)
 	}
 	fmt.Println(compressedBin)
 }

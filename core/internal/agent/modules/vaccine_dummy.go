@@ -4,10 +4,11 @@
 package modules
 
 import (
-	"fmt"
 	"runtime"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 func VaccineHandler(_, _ string) string {
-	return fmt.Sprintf("Not supported on %s platform", runtime.GOARCH)
+	return logging.Sprintf("Not supported on %s platform", runtime.GOARCH)
 }

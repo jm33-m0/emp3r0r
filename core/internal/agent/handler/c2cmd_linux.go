@@ -6,7 +6,7 @@ package handler
 import (
 	"encoding/hex"
 	"fmt"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"strconv"
 
@@ -26,7 +26,7 @@ func runInjectLinux(cmd *cobra.Command, args []string) {
 	}
 	pidInt, err := strconv.ParseInt(pid, 10, 32)
 	if err != nil {
-		log.Println("Invalid pid")
+		logging.Println("Invalid pid")
 		c2transport.C2RespPrintf(cmd, "%s", "Error: invalid pid")
 		return
 	}
@@ -48,7 +48,7 @@ func runPersistenceLinux(cmd *cobra.Command, _ []string) {
 	if method == "all" {
 		err := modules.PersistAllInOne()
 		if err != nil {
-			log.Println(err)
+			logging.Println(err)
 			c2transport.C2RespPrintf(cmd, "%s", "Some has failed: "+err.Error())
 		} else {
 			c2transport.C2RespPrintf(cmd, "%s", "Success")
@@ -58,7 +58,7 @@ func runPersistenceLinux(cmd *cobra.Command, _ []string) {
 		if persistMethod, exists := modules.PersistMethods[method]; exists {
 			err := persistMethod()
 			if err != nil {
-				log.Println(err)
+				logging.Println(err)
 				c2transport.C2RespPrintf(cmd, "%s", "Error: "+err.Error())
 			} else {
 				c2transport.C2RespPrintf(cmd, "%s", "Success")

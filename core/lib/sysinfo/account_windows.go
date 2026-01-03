@@ -4,7 +4,7 @@
 package sysinfo
 
 import (
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"golang.org/x/sys/windows"
 )
@@ -31,12 +31,12 @@ func IsUserPrivileged(token windows.Token) (result bool) {
 		0, 0, 0, 0, 0, 0,
 		&sid)
 	if err != nil {
-		log.Printf("SID Error: %s", err)
+		logging.Printf("SID Error: %s", err)
 		return false
 	}
 	result, err = token.IsMember(sid)
 	if err != nil {
-		log.Printf("Token Membership Error: %s", err)
+		logging.Printf("Token Membership Error: %s", err)
 		return
 	}
 

@@ -5,7 +5,7 @@ package sysinfo
 
 import (
 	"fmt"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"runtime"
 	"strings"
 	"time"
@@ -30,7 +30,7 @@ func GetOSInfo() *OSInfo {
 	)
 	err := windows.IsWow64Process(handle, &isWoW64)
 	if err != nil {
-		log.Printf("isWow64Process: %v", err)
+		logging.Printf("isWow64Process: %v", err)
 		return &osinfo
 	}
 
@@ -49,22 +49,22 @@ func GetOSInfo() *OSInfo {
 func getOSName() string {
 	current_ver_key, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows NT\CurrentVersion`, registry.QUERY_VALUE)
 	if err != nil {
-		log.Printf("getOSRelease: open key: %v", err)
+		logging.Printf("getOSRelease: open key: %v", err)
 	}
 	defer current_ver_key.Close()
 	product_name, _, err := current_ver_key.GetStringValue(`ProductName`)
 	if err != nil {
-		log.Printf("product name: %v", err)
+		logging.Printf("product name: %v", err)
 		product_name = "Unknown_Product"
 	}
 	owner, _, err := current_ver_key.GetStringValue(`RegisteredOwner`)
 	if err != nil {
-		log.Printf("registered owner: %v", err)
+		logging.Printf("registered owner: %v", err)
 		product_name = "Unknown_Owner"
 	}
 	install_date_unix, _, err := current_ver_key.GetIntegerValue(`InstallDate`)
 	if err != nil {
-		log.Printf("install date: %v", err)
+		logging.Printf("install date: %v", err)
 		install_date_unix = 0
 	}
 	install_time := time.Unix(int64(install_date_unix), 0)
@@ -73,44 +73,44 @@ func getOSName() string {
 }
 
 func GetKernelVersion() (ver string) {
-	log.Println("Reading kernel version...")
+	logging.Println("Reading kernel version...")
 	ver = def.Unknown
 	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows NT\CurrentVersion`, registry.QUERY_VALUE)
 	if err != nil {
-		log.Print(err)
+		logging.Print(err)
 		return
 	}
 	defer k.Close()
 
 	cv, _, err := k.GetStringValue("CurrentVersion")
 	if err != nil {
-		log.Print(err)
+		logging.Print(err)
 		return
 	}
 	ver = cv
 
 	maj, _, err := k.GetIntegerValue("CurrentMajorVersionNumber")
 	if err != nil {
-		log.Print(err)
+		logging.Print(err)
 		return
 	}
 	ver = fmt.Sprintf("%s, NT %d", ver, maj)
 
 	min, _, err := k.GetIntegerValue("CurrentMinorVersionNumber")
 	if err != nil {
-		log.Print(err)
+		logging.Print(err)
 		return
 	}
 	ver = fmt.Sprintf("%s.%d", ver, min)
 
 	cb, _, err := k.GetStringValue("CurrentBuild")
 	if err != nil {
-		log.Print(err)
+		logging.Print(err)
 		return
 	}
 	buildlab_ex, _, err := k.GetStringValue("BuildLabEx")
 	if err != nil {
-		log.Printf("buildLabEx: %v", err)
+		logging.Printf("buildLabEx: %v", err)
 		buildlab_ex = cb
 	}
 

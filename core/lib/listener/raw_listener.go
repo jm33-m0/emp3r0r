@@ -3,7 +3,7 @@ package listener
 import (
 	"encoding/binary"
 	"fmt"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"net"
 	"os"
 	"sync"
@@ -42,12 +42,12 @@ func TCPAESCompressedListener(stagerPath string, port string, keyStr string, com
 	}
 	defer listener.Close()
 
-	log.Printf("TCP listener started on port %s", port)
+	logging.Printf("TCP listener started on port %s", port)
 
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Printf("Failed to accept connection: %v", err)
+			logging.Printf("Failed to accept connection: %v", err)
 			continue
 		}
 
@@ -57,16 +57,16 @@ func TCPAESCompressedListener(stagerPath string, port string, keyStr string, com
 
 func handleTCPConnection(conn net.Conn, data []byte) {
 	defer conn.Close()
-	log.Printf("TCP connection from %s", conn.RemoteAddr())
+	logging.Printf("TCP connection from %s", conn.RemoteAddr())
 
 	// Send the encrypted data
 	_, err := conn.Write(data)
 	if err != nil {
-		log.Printf("Failed to send data to %s: %v", conn.RemoteAddr(), err)
+		logging.Printf("Failed to send data to %s: %v", conn.RemoteAddr(), err)
 		return
 	}
 
-	log.Printf("Sent %d bytes to %s", len(data), conn.RemoteAddr())
+	logging.Printf("Sent %d bytes to %s", len(data), conn.RemoteAddr())
 }
 
 // TCPBareListener serves the stager file over raw TCP without encryption or compression.
@@ -82,12 +82,12 @@ func TCPBareListener(stagerPath string, port string) error {
 	}
 	defer listener.Close()
 
-	log.Printf("TCP listener (bare) started on port %s", port)
+	logging.Printf("TCP listener (bare) started on port %s", port)
 
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Printf("Failed to accept connection: %v", err)
+			logging.Printf("Failed to accept connection: %v", err)
 			continue
 		}
 
@@ -127,7 +127,7 @@ func UDPAESCompressedListener(stagerPath string, port string, keyStr string, com
 	}
 	defer conn.Close()
 
-	log.Printf("UDP listener started on port %s", port)
+	logging.Printf("UDP listener started on port %s", port)
 
 	// Calculate key hash for authentication
 	keyHash := uint32(0)
@@ -139,7 +139,7 @@ func UDPAESCompressedListener(stagerPath string, port string, keyStr string, com
 	for {
 		n, remoteAddr, err := conn.ReadFromUDP(buffer)
 		if err != nil {
-			log.Printf("Failed to read from UDP: %v", err)
+			logging.Printf("Failed to read from UDP: %v", err)
 			continue
 		}
 
@@ -156,7 +156,7 @@ func UDPAESCompressedListener(stagerPath string, port string, keyStr string, com
 			}
 			receivedHash := binary.LittleEndian.Uint32(payload[:4])
 			if receivedHash == keyHash {
-				log.Printf("Authenticated request from %s", remoteAddr)
+				logging.Printf("Authenticated request from %s", remoteAddr)
 
 				udpSessionsMutex.Lock()
 				if _, exists := udpSessions[remoteAddr.String()]; !exists {
@@ -166,7 +166,7 @@ func UDPAESCompressedListener(stagerPath string, port string, keyStr string, com
 				}
 				udpSessionsMutex.Unlock()
 			} else {
-				log.Printf("Authentication failed from %s (hash mismatch)", remoteAddr)
+				logging.Printf("Authentication failed from %s (hash mismatch)", remoteAddr)
 			}
 		} else if packetType == 0x01 { // ACK
 			if len(payload) < 4 {
@@ -219,7 +219,7 @@ func handleUDPConnection(conn *net.UDPConn, addr *net.UDPAddr, data []byte, ackC
 		for retryCount < maxRetries {
 			_, err := conn.WriteToUDP(packet, addr)
 			if err != nil {
-				log.Printf("Failed to send UDP chunk to %s: %v", addr, err)
+				logging.Printf("Failed to send UDP chunk to %s: %v", addr, err)
 				return
 			}
 
@@ -236,7 +236,7 @@ func handleUDPConnection(conn *net.UDPConn, addr *net.UDPAddr, data []byte, ackC
 				retryCount++
 			}
 		}
-		log.Printf("Max retries reached for packet %d to %s", i, addr)
+		logging.Printf("Max retries reached for packet %d to %s", i, addr)
 		return
 
 	NextPacket:
@@ -254,7 +254,7 @@ func handleUDPConnection(conn *net.UDPConn, addr *net.UDPAddr, data []byte, ackC
 		case ackSeq := <-ackChan:
 			if ackSeq == uint32(totalPackets) {
 				timeout.Stop()
-				log.Printf("Sent %d bytes to %s (Completed)", len(data), addr)
+				logging.Printf("Sent %d bytes to %s (Completed)", len(data), addr)
 				return
 			}
 		case <-timeout.C:

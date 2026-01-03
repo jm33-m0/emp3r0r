@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/listener"
 )
@@ -15,7 +15,7 @@ func main() {
 	flag.Parse()
 
 	if *stagerPath == "" {
-		log.Fatal("stager file path is required")
+		logging.Fatal("stager file path is required")
 	}
 
 	switch *listenerType {
@@ -26,6 +26,6 @@ func main() {
 	case "udp":
 		listener.UDPAESCompressedListener(*stagerPath, *port, *keyStr, true)
 	default:
-		log.Fatalf("Unknown listener type: %s (supported: http, tcp, udp)", *listenerType)
+		logging.Fatalf("Unknown listener type: %s (supported: http, tcp, udp)", *listenerType)
 	}
 }

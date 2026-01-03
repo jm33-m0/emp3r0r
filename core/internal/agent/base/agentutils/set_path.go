@@ -1,7 +1,7 @@
 package agentutils
 
 import (
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"runtime"
 	"strings"
@@ -62,5 +62,5 @@ func SetPath() {
 	}
 
 	os.Setenv("PATH", path_str)
-	log.Printf("PATH=%s", path_str)
+	logging.Printf("PATH=%s", path_str)
 }

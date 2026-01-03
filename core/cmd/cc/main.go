@@ -5,7 +5,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -43,7 +42,7 @@ const (
 func setupLogging() {
 	logf, err := os.OpenFile(live.EmpLogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
-		log.Fatalf("Failed to open log file: %v", err)
+		logging.Fatalf("Failed to open log file: %v", err)
 	}
 	logging.SetOutput(logf)
 }
@@ -55,7 +54,7 @@ func init() {
 	// setup file path names
 	err := live.SetupFilePaths()
 	if err != nil {
-		log.Fatalf("Failed to setup file paths: %v", err)
+		logging.Fatalf("Failed to setup file paths: %v", err)
 	}
 
 	// log to file
@@ -151,7 +150,7 @@ Zsh:
 	}
 
 	if err := rootCmd.Execute(); err != nil {
-		log.Fatalf("Error executing command: %v", err)
+		logging.Fatalf("Error executing command: %v", err)
 	}
 }
 
@@ -254,7 +253,7 @@ func connectWg(opts *Options) {
 
 	_, err := netutil.PublicKeyFromPrivate(wg_key)
 	if err != nil {
-		log.Fatalf("Invalid key: %v", err)
+		logging.Fatalf("Invalid key: %v", err)
 	}
 	wgConfig := netutil.WireGuardConfig{
 		PrivateKey: wg_key,

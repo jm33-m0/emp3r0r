@@ -5,7 +5,7 @@ package sysinfo
 
 import (
 	"bufio"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"strings"
 )
@@ -22,7 +22,7 @@ func CheckAccount(username string) (accountInfo map[string]string, err error) {
 	// parse /etc/passwd
 	passwdFile, err := os.Open("/etc/passwd")
 	if err != nil {
-		log.Println(err)
+		logging.Println(err)
 		return nil, err
 	}
 	scanner := bufio.NewScanner(passwdFile)

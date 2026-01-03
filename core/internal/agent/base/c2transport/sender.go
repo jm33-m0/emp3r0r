@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"io"
 
@@ -25,7 +25,7 @@ func Send2CC(data *def.MsgTunData) error {
 	if writer == nil {
 		// If no connection is available, just log it and return nil to avoid crashing
 		// This happens when running tests or when C2 is not connected
-		log.Printf("Send2CC: no connection to C2, dropping message: %v", data)
+		logging.Printf("Send2CC: no connection to C2, dropping message: %v", data)
 		return nil
 	}
 
@@ -49,7 +49,7 @@ func C2RespPrintf(cmd *cobra.Command, format string, args ...interface{}) {
 	msg.CmdSlice = cmdSlice
 	msg.Response = fmt.Sprintf(format, args...)
 	if err := Send2CC(&msg); err != nil {
-		log.Println(err)
+		logging.Println(err)
 	}
-	log.Printf("Response sent: %s", msg.Response)
+	logging.Printf("Response sent: %s", msg.Response)
 }

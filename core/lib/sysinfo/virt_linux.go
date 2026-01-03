@@ -4,7 +4,7 @@
 package sysinfo
 
 import (
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"strings"
 )
@@ -23,7 +23,7 @@ func CheckContainer() (product string) {
 			if len(fields) > 1 &&
 				fields[len(fields)-1] != "/" {
 				product = strings.Split(fields[2], "/")[1]
-				log.Println("Inside a container: ", product)
+				logging.Println("Inside a container: ", product)
 				return
 			}
 		}

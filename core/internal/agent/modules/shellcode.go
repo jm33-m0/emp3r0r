@@ -7,7 +7,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -81,12 +81,12 @@ var (
 func gen_guardian_shellcode(path string) (shellcode string) {
 	push_filename_hex := push_filename_asm(path)
 	if push_filename_hex == "" {
-		log.Printf("push_filename_asm failed")
+		logging.Printf("push_filename_asm failed")
 		return
 	}
 
 	shellcode = strings.ReplaceAll(guardian_shellcode, "filename", push_filename_hex)
-	log.Printf("gen_guardian_shellcode:\n%s", shellcode)
+	logging.Printf("gen_guardian_shellcode:\n%s", shellcode)
 
 	return
 }
@@ -99,13 +99,13 @@ func gen_dlopen_shellcode(path string, dlopen_addr int64) (shellcode string) {
 	dlopen_addr_hex := hex.EncodeToString(b)
 	push_filename_hex := push_filename_asm(path)
 	if push_filename_hex == "" {
-		log.Printf("push_filename_asm failed")
+		logging.Printf("push_filename_asm failed")
 		return
 	}
 
 	s1 := strings.ReplaceAll(dlopen_shellcode, "filename", push_filename_hex)
 	shellcode = strings.ReplaceAll(s1, "30d9320c047f0000", dlopen_addr_hex)
-	log.Printf("gen_dlopen_shellcode:\n%s", shellcode)
+	logging.Printf("gen_dlopen_shellcode:\n%s", shellcode)
 
 	return
 }

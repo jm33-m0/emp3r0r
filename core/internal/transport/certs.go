@@ -14,7 +14,7 @@ import (
 	"encoding/asn1"
 	"encoding/pem"
 	"fmt"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"math/big"
 	"net"
 	"os"
@@ -150,7 +150,7 @@ func GenCerts(
 	// encode public key
 	pubkey_data, err := x509.MarshalPKIXPublicKey(&pubkey)
 	if err != nil {
-		log.Printf("EncodePublicKey: %v", err)
+		logging.Printf("EncodePublicKey: %v", err)
 		return nil, fmt.Errorf("encode public key: %v", err)
 	}
 	pubkey_out := &bytes.Buffer{}
@@ -164,7 +164,7 @@ func GenCerts(
 func NamesInCert(cert_file string) (names []string) {
 	cert, err := ParseCertPemFile(cert_file)
 	if err != nil {
-		log.Printf("ParseCert %s: %v", cert_file, err)
+		logging.Printf("ParseCert %s: %v", cert_file, err)
 		return
 	}
 	for _, netip := range cert.IPAddresses {
@@ -344,7 +344,7 @@ func VerifySignatureWithCA(data []byte, signature []byte) (bool, error) {
 func GetFingerprint(cert_file string) string {
 	cert, err := ParseCertPemFile(cert_file)
 	if err != nil {
-		log.Printf("GetFingerprint: ParseCert %s: %v", cert_file, err)
+		logging.Printf("GetFingerprint: ParseCert %s: %v", cert_file, err)
 		return ""
 	}
 	return sha256SumRaw(cert.Raw)

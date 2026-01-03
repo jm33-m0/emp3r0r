@@ -65,7 +65,6 @@ type Config struct {
 	SmuxBuf      int    `json:"smuxbuf"`     // Overall de-mux buffer size (in bytes), e.g., 4194304
 	StreamBuf    int    `json:"streambuf"`   // Per-stream receive buffer size (in bytes) for Smux v2+, e.g., 2097152
 	KeepAlive    int    `json:"keepalive"`   // NAT keep-alive interval in seconds
-	Log          string `json:"log"`         // Path to the log file, default is empty (logs to stderr)
 	SnmpLog      string `json:"snmplog"`     // Path to collect SNMP logs, follows Go time format e.g., "./snmp-20060102.log"
 	SnmpPeriod   int    `json:"snmpperiod"`  // SNMP collection period in seconds
 	Quiet        bool   `json:"quiet"`       // Suppress 'stream open/close' messages if set to true
@@ -126,7 +125,7 @@ func NewConfig(remote_addr, target, port, password, salt string) *Config {
 	config.StreamBuf = 2097152 // stream buffer size in bytes
 	config.KeepAlive = 10      // nat keepalive interval in seconds
 	config.CloseWait = 0       // time to wait before tearing down a connection
-	config.Log = ""            // log to stderr
+	// config.Log = ""            // log to stderr
 	config.Quiet = true        // suppress 'stream open/close' messages
 	config.TCP = false         // emulate a TCP connection (Linux only), requires root
 

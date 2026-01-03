@@ -1,7 +1,6 @@
 package transport
 
 import (
-	"log"
 	"net/http"
 	"net/url"
 
@@ -41,12 +40,12 @@ func CreateEmp3r0rHTTPClient(c2_addr, proxyServer string) *http.Client {
 
 	// fingerprint of CA
 	ca_crt, _ := ParsePem(CACrtPEM)
-	log.Printf("CA cert fingerprint: %s, now making proxy dialer", sha256SumRaw(ca_crt.Raw))
+	logging.Printf("CA cert fingerprint: %s, now making proxy dialer", sha256SumRaw(ca_crt.Raw))
 
 	// set proxyURL to nil to use direct connection for C2 transport
 	proxyDialer, _ := makeProxyDialer(nil, config, clientHelloIDMap["hellorandomizedalpn"])
 	if proxyServer != "" {
-		log.Printf("Using proxy server: %s", proxyServer)
+		logging.Printf("Using proxy server: %s", proxyServer)
 		// use a proxy for our HTTP client
 		proxyUrl, e := url.Parse(proxyServer)
 		if err != nil {
@@ -59,20 +58,20 @@ func CreateEmp3r0rHTTPClient(c2_addr, proxyServer string) *http.Client {
 	// transport of our http client, with configured TLS client
 	try := 0
 init_transport:
-	log.Printf("Initializing transport (%s)...", c2url)
+	logging.Printf("Initializing transport (%s)...", c2url)
 	tr, err := makeTransport(c2url, clientHelloIDMap["hellorandomizedalpn"], config, proxyDialer)
 	try++
 	if err != nil {
 		if proxyServer != "" && try < 5 {
-			log.Printf("Proxy server (%s) down, retrying (%d)...", proxyServer, try)
+			logging.Printf("Proxy server (%s) down, retrying (%d)...", proxyServer, try)
 			util.TakeASnap()
 			goto init_transport
 		} else {
-			log.Printf("Error initializing transport (%s): makeRoundTripper: %v", c2url, err)
+			logging.Printf("Error initializing transport (%s): makeRoundTripper: %v", c2url, err)
 			return nil
 		}
 	}
 
-	log.Printf("Transport initialized (%s)", c2url)
+	logging.Printf("Transport initialized (%s)", c2url)
 	return &http.Client{Transport: tr}
 }

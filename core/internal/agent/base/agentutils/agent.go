@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"net"
 	"net/url"
 	"os"
@@ -22,7 +22,7 @@ import (
 // is the agent alive?
 // connect to emp3r0r_def.SocketName, send a message, see if we get a reply
 func IsAgentAlive(c net.Conn) bool {
-	log.Println("Testing if agent is alive...")
+	logging.Println("Testing if agent is alive...")
 	defer c.Close()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -33,7 +33,7 @@ func IsAgentAlive(c net.Conn) bool {
 		for ctx.Err() == nil {
 			n, err := r.Read(buf[:])
 			if err != nil {
-				log.Printf("Read error: %v", err)
+				logging.Printf("Read error: %v", err)
 				cancel()
 			}
 			replyFromAgent <- string(buf[0:n])
@@ -47,16 +47,16 @@ func IsAgentAlive(c net.Conn) bool {
 	for ctx.Err() == nil {
 		_, err := fmt.Fprintf(c, "%d", os.Getpid())
 		if err != nil {
-			log.Printf("Write error: %v, agent is likely to be dead", err)
+			logging.Printf("Write error: %v, agent is likely to be dead", err)
 			break
 		}
 		resp := <-replyFromAgent
 		if strings.Contains(resp, "kill yourself") {
-			log.Printf("Agent told me to die (%d)", os.Getpid())
+			logging.Printf("Agent told me to die (%d)", os.Getpid())
 			os.Exit(0)
 		}
 		if strings.Contains(resp, "emp3r0r") {
-			log.Println("Yes it's alive")
+			logging.Println("Yes it's alive")
 			return true
 		}
 		util.TakeASnap()
@@ -103,7 +103,7 @@ func GenC2TransportString() (transport_str string) {
 		// parse proxy url
 		proxyURL, err := url.Parse(common.RuntimeConfig.C2TransportProxy)
 		if err != nil {
-			log.Printf("invalid proxy URL: %v", err)
+			logging.Printf("invalid proxy URL: %v", err)
 		}
 
 		// if the proxy port is emp3r0r proxy server's port

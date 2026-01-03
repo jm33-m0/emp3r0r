@@ -54,9 +54,10 @@ build_agent_stub() {
   local os=$2
   local output=$3
   info "Building agent stub for $os $arch"
-  local build_cmd="CGO_ENABLED=0 GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -tags netgo -o \\\"$temp/$output\\\" -ldflags=\\\"$ldflags\\\"\""
+  local build_cmd="CGO_ENABLED=0 GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -tags 'netgo release' -o \\\"$temp/$output\\\" -ldflags=\\\"$ldflags\\\"\""
   if [[ "$os" = "windows" ]]; then
-    build_cmd="CGO_ENABLED=0 GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -tags netgo -o \\\"$temp/$output\\\" -ldflags=\\\"-H=windowsgui $ldflags\\\"\""
+    # Windows builds also need the release tag
+    build_cmd="CGO_ENABLED=0 GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -tags 'netgo release' -o \\\"$temp/$output\\\" -ldflags=\\\"-H=windowsgui $ldflags\\\"\""
   fi
   echo "Running: $build_cmd"
   {

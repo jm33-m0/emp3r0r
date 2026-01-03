@@ -2,7 +2,7 @@ package transport
 
 import (
 	"encoding/binary"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"net"
 )
 
@@ -10,7 +10,7 @@ import (
 func IPinCIDR(port, cidr string) (ips []string) {
 	_, subnet, err := net.ParseCIDR(cidr)
 	if err != nil {
-		log.Print(err)
+		logging.Print(err)
 		return nil
 	}
 	// convert IPNet struct mask and address to uint32

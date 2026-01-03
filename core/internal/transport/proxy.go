@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"time"
 
@@ -42,13 +41,13 @@ func StartSocks5Proxy(addr, doh string, proxyserver *socks5.Server) (err error) 
 // port: listen on this port
 func TCPFwd(addr, port string, ctx context.Context, cancel context.CancelFunc) (err error) {
 	defer func() {
-		log.Printf("%s <- 0.0.0.0:%s exited", addr, port)
+		logging.Printf("%s <- 0.0.0.0:%s exited", addr, port)
 		cancel()
 	}()
 	serveConn := func(conn net.Conn) {
 		dst, dialErr := net.Dial("tcp", addr)
 		if dialErr != nil {
-			log.Print(dialErr)
+			logging.Print(dialErr)
 			return
 		}
 		defer dst.Close()
@@ -58,13 +57,13 @@ func TCPFwd(addr, port string, ctx context.Context, cancel context.CancelFunc) (
 		go func() {
 			_, dialErr = io.Copy(dst, conn)
 			if dialErr != nil {
-				log.Print(dialErr)
+				logging.Print(dialErr)
 			}
 		}()
 		go func() {
 			_, dialErr = io.Copy(conn, dst)
 			if dialErr != nil {
-				log.Print(dialErr)
+				logging.Print(dialErr)
 			}
 		}()
 
@@ -73,16 +72,16 @@ func TCPFwd(addr, port string, ctx context.Context, cancel context.CancelFunc) (
 			time.Sleep(time.Duration(20) * time.Millisecond)
 		}
 	}
-	log.Printf("[+] Serving %s on 0.0.0.0:%s...", addr, port)
+	logging.Printf("[+] Serving %s on 0.0.0.0:%s...", addr, port)
 	l, err := net.Listen("tcp", "0.0.0.0:"+port)
 	if err != nil {
-		log.Printf("unable to listen on 0.0.0.0:%s: %v", port, err)
+		logging.Printf("unable to listen on 0.0.0.0:%s: %v", port, err)
 		return
 	}
 	for ctx.Err() == nil {
 		lconn, err := l.Accept()
 		if err != nil {
-			log.Print(err)
+			logging.Print(err)
 			continue
 		}
 		go serveConn(lconn)
@@ -103,25 +102,25 @@ func FwdToDport(ctx context.Context, cancel context.CancelFunc,
 			dest.Close()
 		}
 		cancel()
-		log.Printf("FwdToDport %s (%s) exited", to, protocol)
+		logging.Printf("FwdToDport %s (%s) exited", to, protocol)
 	}()
 	if err != nil {
-		log.Printf("FwdToDport %s (%s): %v", to, protocol, err)
+		logging.Printf("FwdToDport %s (%s): %v", to, protocol, err)
 		return
 	}
-	log.Printf("FwdToDport: connected to %s (%s)", to, protocol)
+	logging.Printf("FwdToDport: connected to %s (%s)", to, protocol)
 
 	// io.Copy
 	go func() {
 		_, err = io.Copy(dest, h2)
 		if err != nil {
-			log.Printf("FwdToDport %s (%s): h2 -> dest: %v", protocol, sessionID, err)
+			logging.Printf("FwdToDport %s (%s): h2 -> dest: %v", protocol, sessionID, err)
 			return
 		}
 	}()
 	_, err = io.Copy(h2, dest)
 	if err != nil {
-		log.Printf("FwdToDport %s (%s): dest -> h2: %v", protocol, sessionID, err)
+		logging.Printf("FwdToDport %s (%s): dest -> h2: %v", protocol, sessionID, err)
 		return
 	}
 }

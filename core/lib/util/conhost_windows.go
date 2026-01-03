@@ -5,7 +5,7 @@ package util
 
 import (
 	"fmt"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"os/exec"
 	"strconv"
@@ -63,7 +63,7 @@ func GetWindowHandleByPID(pid int, allowOwnConsole bool) (w32.HWND, error) {
 		if int(currentPid) == pid && IsMainWindow(hwnd) {
 			wnd = hwnd
 			// Stop enumerating.
-			log.Printf("GetWindowHandleByPID: %d matches", currentPid)
+			logging.Printf("GetWindowHandleByPID: %d matches", currentPid)
 			return false
 		}
 		// Continue enumerating.
@@ -128,23 +128,23 @@ func GetConsolePids(pidsLen int) ([]uint32, error) {
 func SetCosoleWinsize(pid, w, h int) {
 	whandle, err := GetWindowHandleByPID(pid, true)
 	if err != nil {
-		log.Printf("SetWinsize: %v", err)
+		logging.Printf("SetWinsize: %v", err)
 		return
 	}
 	// read default font size from registry
 	console_reg_key, err := registry.OpenKey(registry.CURRENT_USER, "Console", registry.QUERY_VALUE)
 	if err != nil {
-		log.Printf("SetCosoleWinsize: %v", err)
+		logging.Printf("SetCosoleWinsize: %v", err)
 		return
 	}
 	defer console_reg_key.Close()
 	font_size_val, _, err := console_reg_key.GetIntegerValue("FontSize")
 	if err != nil {
-		log.Printf("SetConsoleWinSize: query fontsize: %v", err)
+		logging.Printf("SetConsoleWinSize: query fontsize: %v", err)
 		return
 	}
 	font_size := int(font_size_val >> 16) // font height in pixels, width = h/2
-	log.Printf("Default font size of console host is %d (0x%x), parsed from 0x%x",
+	logging.Printf("Default font size of console host is %d (0x%x), parsed from 0x%x",
 		font_size, font_size, font_size_val)
 	// what size in pixels we need
 	w_px := w * font_size / 2
@@ -154,7 +154,7 @@ func SetCosoleWinsize(pid, w, h int) {
 		// Get default window size
 		now_size, _, err := console_reg_key.GetIntegerValue("WindowSize")
 		if err != nil {
-			log.Printf("window size: %v", err)
+			logging.Printf("window size: %v", err)
 			return
 		}
 		// in chars
@@ -163,7 +163,7 @@ func SetCosoleWinsize(pid, w, h int) {
 		// in pixels
 		default_w_px := default_width * font_size / 2
 		default_h_px := default_height * font_size
-		log.Printf("Default window (client rectangle, excluding frames) is %dx%d (chars) or %dx%d (pixels)",
+		logging.Printf("Default window (client rectangle, excluding frames) is %dx%d (chars) or %dx%d (pixels)",
 			default_width, default_height,
 			default_w_px, default_h_px)
 		// window size in pixels, including title bar and frame
@@ -171,19 +171,19 @@ func SetCosoleWinsize(pid, w, h int) {
 		now_w_px := int(now_rect.Width())
 		now_h_px := int(now_rect.Height())
 		if now_h_px <= 0 || now_w_px <= 0 {
-			log.Printf("Now window (normal rectangle) size is %dx%d, aborting", now_w_px, now_h_px)
+			logging.Printf("Now window (normal rectangle) size is %dx%d, aborting", now_w_px, now_h_px)
 			return
 		}
-		log.Printf("Current window (normal rectangle, including frames) is %dx%d (pixels)",
+		logging.Printf("Current window (normal rectangle, including frames) is %dx%d (pixels)",
 			now_w_px, now_h_px)
 		// calculate extra width and height
 		ConsoleExtraHeight = now_h_px - default_h_px
 		ConsoleExtraWidth = now_w_px - default_w_px
 		if ConsoleExtraWidth <= 0 || ConsoleExtraHeight <= 0 {
-			log.Printf("Extra width %d pixels, extra height %d pixels, aborting", ConsoleExtraWidth, ConsoleExtraHeight)
+			logging.Printf("Extra width %d pixels, extra height %d pixels, aborting", ConsoleExtraWidth, ConsoleExtraHeight)
 			return
 		}
-		log.Printf("Frame (excluding window content) is %d(w), %d(h) (pixels)",
+		logging.Printf("Frame (excluding window content) is %d(w), %d(h) (pixels)",
 			ConsoleExtraWidth, ConsoleExtraHeight)
 
 	}
@@ -192,7 +192,7 @@ func SetCosoleWinsize(pid, w, h int) {
 
 	// set window size in pixels
 	if w32.SetWindowPos(whandle, whandle, 0, 0, w_px, h_px, w32.SWP_NOMOVE|w32.SWP_NOZORDER) {
-		log.Printf("Window (0x%x) of %d is being resized to %dx%d (chars) or %dx%d (pixels)",
+		logging.Printf("Window (0x%x) of %d is being resized to %dx%d (chars) or %dx%d (pixels)",
 			whandle, pid, w, h, w_px, h_px)
 	}
 
@@ -201,7 +201,7 @@ func SetCosoleWinsize(pid, w, h int) {
 	now_w_px := int(now_rect.Width())
 	now_h_px := int(now_rect.Height())
 	if now_w_px != w_px || now_h_px != h_px {
-		log.Printf("Resizing failed, actual window size is now %dx%d pixels", now_w_px, now_h_px)
+		logging.Printf("Resizing failed, actual window size is now %dx%d pixels", now_w_px, now_h_px)
 	}
 }
 
@@ -211,33 +211,33 @@ func SetConsoleBufferSize(w, h int) {
 	cmd := exec.Command("cmd.exe", "/C", mod_cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Printf("SetConsoleBufferSize: %s, %v", out, err)
+		logging.Printf("SetConsoleBufferSize: %s, %v", out, err)
 		return
 	}
-	log.Printf("SetConsoleBufferSize: set buffer size to %dx%d", w, h)
+	logging.Printf("SetConsoleBufferSize: set buffer size to %dx%d", w, h)
 }
 
 func AutoSetConsoleBufferSize() {
 	size := os.Getenv("TERM_SIZE")
 	if size == "" {
-		log.Printf("AutoSetConsoleBufferSize: no size specified")
+		logging.Printf("AutoSetConsoleBufferSize: no size specified")
 		return
 	}
 
 	wh := strings.Split(size, "x")
 	if len(wh) < 2 {
-		log.Printf("AutoSetConsoleBufferSize: Incorrect size")
+		logging.Printf("AutoSetConsoleBufferSize: Incorrect size")
 		return
 	}
 
 	w, err := strconv.Atoi(wh[0])
 	if err != nil {
-		log.Printf("AutoSetConsoleBufferSize: Incorrect width")
+		logging.Printf("AutoSetConsoleBufferSize: Incorrect width")
 		return
 	}
 	h, err := strconv.Atoi(wh[1])
 	if err != nil {
-		log.Printf("AutoSetConsoleBufferSize: Incorrect height")
+		logging.Printf("AutoSetConsoleBufferSize: Incorrect height")
 		return
 	}
 

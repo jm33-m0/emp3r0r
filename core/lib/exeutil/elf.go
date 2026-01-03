@@ -9,7 +9,7 @@ import (
 	"debug/elf"
 	"encoding/binary"
 	"fmt"
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -46,13 +46,13 @@ type ELFHeader struct {
 
 // Print prints the ELF header information.
 func (h *ELFHeader) Print() {
-	log.Printf("ELF Header:")
-	log.Printf("  Entry Point:       0x%x", h.Entry)
-	log.Printf("  Program Header Off: %d", h.Phoff)
-	log.Printf("  Section Header Off: %d", h.Shoff)
-	log.Printf("  Number of PH:      %d", h.Phnum)
-	log.Printf("  Number of SH:      %d", h.Shnum)
-	log.Printf("  Size of PH Entry:  %d", h.Phentsize)
+	logging.Printf("ELF Header:")
+	logging.Printf("  Entry Point:       0x%x", h.Entry)
+	logging.Printf("  Program Header Off: %d", h.Phoff)
+	logging.Printf("  Section Header Off: %d", h.Shoff)
+	logging.Printf("  Number of PH:      %d", h.Phnum)
+	logging.Printf("  Number of SH:      %d", h.Shnum)
+	logging.Printf("  Size of PH Entry:  %d", h.Phentsize)
 	for i, ph := range h.ProgramHeaders {
 		ph.Print(i)
 	}
@@ -96,8 +96,8 @@ type ProgramHeader struct {
 
 // Print prints the program header information.
 func (ph *ProgramHeader) Print(index int) {
-	log.Printf("  [%d] Type: 0x%x, Offset: 0x%x, VAddr: 0x%x, PAddr: 0x%x", index, ph.Type, ph.Off, ph.Vaddr, ph.Paddr)
-	log.Printf("      File Size: %d, Mem Size: %d, Flags: 0x%x, Align: %d", ph.Filesz, ph.Memsz, ph.Flags, ph.Align)
+	logging.Printf("  [%d] Type: 0x%x, Offset: 0x%x, VAddr: 0x%x, PAddr: 0x%x", index, ph.Type, ph.Off, ph.Vaddr, ph.Paddr)
+	logging.Printf("      File Size: %d, Mem Size: %d, Flags: 0x%x, Align: %d", ph.Filesz, ph.Memsz, ph.Flags, ph.Align)
 }
 
 // SectionHeader32 represents a 32-bit ELF section header.
@@ -188,7 +188,7 @@ func GetSymFromLibc(pid int, sym string) (addr int64, err error) {
 		err = fmt.Errorf("scanned %d symbols, symbol (addr 0x%x) %s not found", len(syms), addr, sym)
 		return
 	}
-	log.Printf("Address of %s is 0x%x", sym, addr)
+	logging.Printf("Address of %s is 0x%x", sym, addr)
 
 	return
 }
@@ -217,7 +217,7 @@ func GetLibc(pid int) (path string, addr, offset int64, err error) {
 		offset, _ = strconv.ParseInt(fields[2], 16, 64)
 
 		path = fields[len(fields)-1]
-		log.Printf("libc base addr is 0x%x, offset is 0x%x, path is %s",
+		logging.Printf("libc base addr is 0x%x, offset is 0x%x, path is %s",
 			addr, offset, path)
 		break
 	}
@@ -249,7 +249,7 @@ func IsELF(file string) bool {
 func IsStaticELF(file_path string) bool {
 	f, err := elf.Open(file_path)
 	if err != nil {
-		log.Printf("Error opening ELF file: %v", err)
+		logging.Printf("Error opening ELF file: %v", err)
 		return false
 	}
 	defer f.Close()
@@ -687,7 +687,7 @@ func FixELF(elf_path, rpath, ld_path string) (err error) {
 
 	// paths
 	patchelf := fmt.Sprintf("%s/patchelf", utils_path)
-	log.Printf("rpath: %s, patchelf: %s, ld_path: %s", rpath, patchelf, ld_path)
+	logging.Printf("rpath: %s, patchelf: %s, ld_path: %s", rpath, patchelf, ld_path)
 
 	// remove rpath
 	cmd := fmt.Sprintf("%s --remove-rpath", patchelf)

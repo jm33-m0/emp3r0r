@@ -1,7 +1,7 @@
 package agentutils
 
 import (
-	"log"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"strconv"
 
@@ -26,7 +26,7 @@ func IsAgentRunningPID() (bool, int) {
 	defer func() {
 		myPIDText := strconv.Itoa(os.Getpid())
 		if err := util.WriteFileAgent(common.RuntimeConfig.PIDFile, []byte(myPIDText), 0o600); err != nil {
-			log.Printf("write common.RuntimeConfig.PIDFile: %v", err)
+			logging.Printf("write common.RuntimeConfig.PIDFile: %v", err)
 		}
 	}()
 
