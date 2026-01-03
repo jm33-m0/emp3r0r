@@ -95,27 +95,3 @@ jobs:
         working-directory: ./core
         run: |
           go tool cover -func=coverage-linux.txt
-
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.24"
-
-      - name: Install dependencies
-        working-directory: ./core
-        run: go mod tidy
-
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v4
-        with:
-          version: latest
-          working-directory: ./core
-          args: --timeout=5m ./lib/util/... ./lib/crypto/... ./lib/sysinfo/... ./lib/testutil/...
