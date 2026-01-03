@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -393,8 +394,15 @@ func TestProxyCmd(t *testing.T) {
 		t.Fatalf("Failed to execute proxy command: %v", err)
 	}
 
-	// Wait for goroutine to start
-	time.Sleep(100 * time.Millisecond)
+	// Wait for goroutine to start and port to be open
+	for i := 0; i < 20; i++ {
+		conn, err := net.Dial("tcp", addr)
+		if err == nil {
+			conn.Close()
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 
 	output := mockConn.String()
 	if !strings.Contains(output, "Socks5Proxy server ready") {
@@ -407,6 +415,8 @@ func TestProxyCmd(t *testing.T) {
 	if err := rootCmd.Execute(); err != nil {
 		t.Fatalf("Failed to execute proxy command: %v", err)
 	}
+	// Wait for server to shutdown
+	time.Sleep(1 * time.Second)
 
 	output = mockConn.String()
 	if !strings.Contains(output, "Socks5Proxy server ready") {

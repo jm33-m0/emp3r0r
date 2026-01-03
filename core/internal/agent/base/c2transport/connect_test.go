@@ -92,6 +92,7 @@ func TestConnectCC(t *testing.T) {
 
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
+	transport.OperatorCaCrtFile = caCertFile // Set OperatorCaCrtFile for apiDispatcher
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
 	transport.EmpWorkSpace = tmpDir
