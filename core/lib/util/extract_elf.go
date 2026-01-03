@@ -72,7 +72,7 @@ func FindEmp3r0rELFInMem() (elf_bytes []byte, err error) {
 			logging.Debugf("Parsing memory region 0x%x - 0x%x", start_of_current_region, end_of_current_region)
 			logging.Debugf("Saving %d bytes from memory region 0x%x - 0x%x", end-start, start, end)
 			elf_data := current_region[start-start_of_current_region : end-start_of_current_region]
-			os.WriteFile("/tmp/emp3r0r.restored.1", elf_data, 0o755)
+			_ = os.WriteFile("/tmp/emp3r0r.restored.1", elf_data, 0o755)
 
 			// read on
 			start_of_current_region = end_of_current_region
@@ -87,7 +87,7 @@ func FindEmp3r0rELFInMem() (elf_bytes []byte, err error) {
 			logging.Debugf("Parsing memory region 0x%x - 0x%x", start_of_current_region, end_of_current_region)
 			logging.Debugf("Saving %d bytes from memory region 0x%x - 0x%x", end-start, start, end)
 			elf_data = append(elf_data, current_region[start-start_of_current_region:end-start_of_current_region]...)
-			os.WriteFile("/tmp/emp3r0r.restored.2", current_region, 0o755)
+			_ = os.WriteFile("/tmp/emp3r0r.restored.2", current_region, 0o755)
 
 			// read on, it doesn't matter if we read too much, the ELF will still run
 			start_of_current_region = end_of_current_region
@@ -102,7 +102,7 @@ func FindEmp3r0rELFInMem() (elf_bytes []byte, err error) {
 			logging.Debugf("Parsing memory region 0x%x - 0x%x", start_of_current_region, end_of_current_region)
 			logging.Debugf("Saving %d bytes from memory region 0x%x - 0x%x", end-start, start, end)
 			elf_data = append(elf_data, current_region[start-start_of_current_region:end-start_of_current_region]...)
-			os.WriteFile("/tmp/emp3r0r.restored.3", current_region, 0o755)
+			_ = os.WriteFile("/tmp/emp3r0r.restored.3", current_region, 0o755)
 
 			logging.Debugf("Saved %d bytes to EXE_MEM_FILE", len(elf_data))
 			elf_bytes = elf_data

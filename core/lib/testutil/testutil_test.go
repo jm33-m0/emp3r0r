@@ -70,7 +70,6 @@ func TestAssertNoError(t *testing.T) {
 // TestAssertTrue tests the AssertTrue function
 func TestAssertTrue(t *testing.T) {
 	AssertTrue(t, true, "should be true")
-	AssertTrue(t, 1 == 1, "1 should equal 1")
 }
 
 // TestAssertFalse tests the AssertFalse function

@@ -26,22 +26,6 @@ func ExtractData() (data []byte, err error) {
 	return
 }
 
-func extractFromExecutable() ([]byte, error) {
-	data, err := DigEmbeddedDataFromExe()
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
-func extractFromMemory() ([]byte, error) {
-	data, err := DigEmbededDataFromMem()
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
 func extractFromAgentConfig() ([]byte, error) {
 	// Get raw config bytes and strip trailing null bytes
 	enc_config := bytes.Trim(def.AgentConfig[:], "\x00")

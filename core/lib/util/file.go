@@ -275,7 +275,7 @@ func FileAllocate(filepath string, n int64) (err error) {
 		return
 	}
 	defer f.Close()
-	f.Truncate(n)
+	_ = f.Truncate(n)
 
 	return
 }
