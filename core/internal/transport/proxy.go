@@ -14,7 +14,7 @@ import (
 )
 
 // StartSocks5Proxy sock5 proxy server on agent, listening on addr
-func StartSocks5Proxy(addr, doh string, proxyserver *socks5.Server) (err error) {
+func StartSocks5Proxy(addr, doh string, proxyserver *socks5.Server, onListen func(net.Listener)) (err error) {
 	if doh != "" {
 		// use DoH resolver
 		net.DefaultResolver, err = dns.NewDoHResolver(
@@ -27,13 +27,33 @@ func StartSocks5Proxy(addr, doh string, proxyserver *socks5.Server) (err error) 
 
 	socks5.Debug = true
 	logging.Infof("Socks5Proxy started on %s", addr)
-	err = proxyserver.ListenAndServe(nil)
+	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("Socks5Proxy listen: %v", err)
 	}
-	logging.Infof("Socks5Proxy stopped (%s)", addr)
+	if onListen != nil {
+		onListen(l)
+	}
 
-	return
+	for {
+		c, err := l.Accept()
+		if err != nil {
+			return fmt.Errorf("Socks5Proxy accept: %v", err)
+		}
+		go func(c net.Conn) {
+			defer c.Close()
+			if err := proxyserver.Negotiate(c); err != nil {
+				return
+			}
+			r, err := proxyserver.GetRequest(c)
+			if err != nil {
+				return
+			}
+			if err := proxyserver.Handle.TCPHandle(proxyserver, c.(*net.TCPConn), r); err != nil {
+				logging.Debugf("Socks5Proxy handle: %v", err)
+			}
+		}(c)
+	}
 }
 
 // TCPFwd listen on a TCP port and forward to another TCP address
