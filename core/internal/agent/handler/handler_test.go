@@ -231,6 +231,10 @@ func TestCdPwdCmds(t *testing.T) {
 	// Create temp dir
 	tmpDir := t.TempDir()
 
+	// Save current WD and restore it after test
+	wd, _ := os.Getwd()
+	defer os.Chdir(wd)
+
 	// Get the root command
 	rootCmd := CoreCommands()
 
@@ -261,7 +265,10 @@ func TestCdPwdCmds(t *testing.T) {
 	// Check if new pwd contains tmpDir
 	// Note: /tmp might be a symlink, so we use EvalSymlinks
 	realTmpDir, _ := filepath.EvalSymlinks(tmpDir)
-	if !strings.Contains(newPwd, realTmpDir) && !strings.Contains(newPwd, tmpDir) {
+	// Escape backslashes for Windows paths in JSON
+	escapedTmpDir := strings.ReplaceAll(tmpDir, "\\", "\\\\")
+	escapedRealTmpDir := strings.ReplaceAll(realTmpDir, "\\", "\\\\")
+	if !strings.Contains(newPwd, escapedRealTmpDir) && !strings.Contains(newPwd, escapedTmpDir) {
 		t.Errorf("PWD did not change to %s. Got: %s", tmpDir, newPwd)
 	}
 }
@@ -360,7 +367,10 @@ func TestGetCmdRun_Dir(t *testing.T) {
 
 	// Expect file list
 	// The output is JSON stringified in the "data" field.
-	if !strings.Contains(output, f1) || !strings.Contains(output, f2) {
+	// Escape backslashes for Windows paths in JSON
+	escapedF1 := strings.ReplaceAll(f1, "\\", "\\\\")
+	escapedF2 := strings.ReplaceAll(f2, "\\", "\\\\")
+	if !strings.Contains(output, escapedF1) || !strings.Contains(output, escapedF2) {
 		t.Errorf("Expected output to contain file paths %s and %s, got: %s", f1, f2, output)
 	}
 }
