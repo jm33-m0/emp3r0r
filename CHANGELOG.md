@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.9.5](https://github.com/jm33-m0/emp3r0r/compare/v3.9.4...v3.9.5) (2026-01-04)
+
+
+### Bug Fixes
+
+* improve last handshake management in handleMessageTunnel ([a7bcb42](https://github.com/jm33-m0/emp3r0r/commit/a7bcb429693ca3222311a99d8c0b792b6c989555))
+
 ## [3.9.4](https://github.com/jm33-m0/emp3r0r/compare/v3.9.3...v3.9.4) (2026-01-03)
 
 
