@@ -69,14 +69,6 @@ build_agent_stub() {
     cd "$pwd/cmd/agent" &&
       eval "$build_cmd"
   } || error "build agent stub for $os $arch"
-
-  if command -v objcopy >/dev/null 2>&1; then
-    info "Stripping .go.buildinfo from $output"
-    # -R removes the named section
-    objcopy -R .go.buildinfo "$temp/$output" || true
-  else
-    warn "objcopy not found; .go.buildinfo (module list) will remain in the binary."
-  fi
 }
 
 build_shared_object() {
@@ -146,8 +138,8 @@ build() {
     gobuild_cmd="go"
     build_opt="build"
   else
-    gobuild_cmd="go"
-    build_opt="build"
+    gobuild_cmd="garble"
+    build_opt="-tiny -seed=random build"
     ldflags+=" -s -w"
     # info "Setting up garble"
     # go install mvdan.cc/garble@latest || error "Failed to install garble"
