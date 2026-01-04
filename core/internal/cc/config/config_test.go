@@ -1,4 +1,4 @@
-package live
+package config
 
 import (
 	"crypto/ecdsa"
@@ -12,13 +12,14 @@ import (
 	"testing"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 )
 
 func TestInitConfigFile(t *testing.T) {
 	// Initialize RuntimeConfig if it's nil
-	if RuntimeConfig == nil {
-		RuntimeConfig = &def.Config{}
+	if live.RuntimeConfig == nil {
+		live.RuntimeConfig = &def.Config{}
 	}
 
 	// Setup temp file for config
@@ -30,9 +31,9 @@ func TestInitConfigFile(t *testing.T) {
 	tmpConfigFile.Close()
 
 	// Save original EmpConfigFile and restore it after test
-	originalEmpConfigFile := EmpConfigFile
-	defer func() { EmpConfigFile = originalEmpConfigFile }()
-	EmpConfigFile = tmpConfigFile.Name()
+	originalEmpConfigFile := live.EmpConfigFile
+	defer func() { live.EmpConfigFile = originalEmpConfigFile }()
+	live.EmpConfigFile = tmpConfigFile.Name()
 
 	// Setup temp file for CA Key
 	tmpKeyFile, err := os.CreateTemp("", "ca-key.pem")
@@ -68,8 +69,8 @@ func TestInitConfigFile(t *testing.T) {
 	}
 
 	// Verify fields
-	if RuntimeConfig.CCAddress != ccHost {
-		t.Errorf("Expected CCAddress %s, got %s", ccHost, RuntimeConfig.CCAddress)
+	if live.RuntimeConfig.CCAddress != ccHost {
+		t.Errorf("Expected CCAddress %s, got %s", ccHost, live.RuntimeConfig.CCAddress)
 	}
 
 	// Check if ports are valid integers
@@ -84,22 +85,22 @@ func TestInitConfigFile(t *testing.T) {
 		}
 	}
 
-	checkPort("CCPort", RuntimeConfig.CCPort)
-	checkPort("AgentSocksServerPort", RuntimeConfig.AgentSocksServerPort)
-	checkPort("SSHDShellPort", RuntimeConfig.SSHDShellPort)
+	checkPort("CCPort", live.RuntimeConfig.CCPort)
+	checkPort("AgentSocksServerPort", live.RuntimeConfig.AgentSocksServerPort)
+	checkPort("SSHDShellPort", live.RuntimeConfig.SSHDShellPort)
 
 	// Check if UUID is set
-	if RuntimeConfig.AgentUUID == "" {
+	if live.RuntimeConfig.AgentUUID == "" {
 		t.Error("AgentUUID is empty")
 	}
 
 	// Check if SSHHostKey is generated
-	if len(RuntimeConfig.SSHHostKey) == 0 {
+	if len(live.RuntimeConfig.SSHHostKey) == 0 {
 		t.Error("SSHHostKey is empty")
 	}
 	
 	// Check if AgentUUIDSig is set
-	if RuntimeConfig.AgentUUIDSig == "" {
+	if live.RuntimeConfig.AgentUUIDSig == "" {
 		t.Error("AgentUUIDSig is empty")
 	}
 }
@@ -114,15 +115,16 @@ func TestSaveConfigJSON(t *testing.T) {
 	tmpFile.Close()
 
 	// Save original EmpConfigFile and restore it after test
-	originalEmpConfigFile := EmpConfigFile
-	defer func() { EmpConfigFile = originalEmpConfigFile }()
+	originalEmpConfigFile := live.EmpConfigFile
+	defer func() { live.EmpConfigFile = originalEmpConfigFile }()
 
-	EmpConfigFile = tmpFile.Name()
+	live.EmpConfigFile = tmpFile.Name()
 
 	// Setup a dummy RuntimeConfig
-	RuntimeConfig = &def.Config{
-		CCAddress: "test.example.com",
-		CCPort:    "9999",
+	live.RuntimeConfig = &def.Config{
+		CCAddress:            "test.example.com",
+		CCPort:               "9999",
+		AgentSocksServerPort: "1080",
 	}
 
 	// Test SaveConfigJSON
@@ -132,15 +134,15 @@ func TestSaveConfigJSON(t *testing.T) {
 	}
 
 	// Read back the file
-	data, err := os.ReadFile(EmpConfigFile)
+	data, err := os.ReadFile(live.EmpConfigFile)
 	if err != nil {
 		t.Fatalf("Failed to read saved config file: %v", err)
 	}
 
 	var loadedConfig def.Config
-	err = json.Unmarshal(data, &loadedConfig)
+	err = readJSONConfig(data, &loadedConfig)
 	if err != nil {
-		t.Fatalf("Failed to unmarshal saved config: %v", err)
+		t.Fatalf("Failed to read saved config: %v", err)
 	}
 
 	if loadedConfig.CCAddress != "test.example.com" {
@@ -148,5 +150,49 @@ func TestSaveConfigJSON(t *testing.T) {
 	}
 	if loadedConfig.CCPort != "9999" {
 		t.Errorf("Loaded config mismatch. Expected CCPort '9999', got '%s'", loadedConfig.CCPort)
+	}
+}
+
+func TestSaveAndLoadConfigJSON(t *testing.T) {
+	// Initialize RuntimeConfig
+	live.RuntimeConfig = &def.Config{
+		CCAddress:            "5.6.7.8",
+		CCPort:               "5678",
+		AgentSocksServerPort: "9090",
+		Password:             "another_secret",
+	}
+
+	// Mock EmpConfigFile
+	tmpFile, err := os.CreateTemp("", "emp3r0r_save_test_*.json")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	live.EmpConfigFile = tmpFile.Name()
+
+	// Save config
+	err = SaveConfigJSON()
+	if err != nil {
+		t.Fatalf("SaveConfigJSON failed: %v", err)
+	}
+
+	// Read the file content to check format (should be snake_case)
+	content, err := os.ReadFile(live.EmpConfigFile)
+	if err != nil {
+		t.Fatalf("Failed to read saved config: %v", err)
+	}
+
+	// Check if keys are snake_case
+	var raw map[string]interface{}
+	err = json.Unmarshal(content, &raw)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal saved JSON: %v", err)
+	}
+
+	if _, ok := raw["cc_address"]; !ok {
+		t.Errorf("Saved JSON does not contain 'cc_address' key. Content: %s", string(content))
+	}
+	if _, ok := raw["CCAddress"]; ok {
+		t.Errorf("Saved JSON contains 'CCAddress' key (should be snake_case). Content: %s", string(content))
 	}
 }

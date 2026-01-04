@@ -7,6 +7,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/fxamacker/cbor/v2"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -204,13 +206,25 @@ func readAndEncryptConfig() ([]byte, error) {
 		return nil, fmt.Errorf("parsing def.EmpConfigFile config file: %v", err)
 	}
 
-	// encrypt
-	encryptedJSONBytes, err := crypto.AES_GCM_Encrypt([]byte(def.MagicString), jsonBytes)
+	// convert JSON to CBOR
+	var configMap map[string]interface{}
+	err = json.Unmarshal(jsonBytes, &configMap)
 	if err != nil {
-		return nil, fmt.Errorf("failed to encrypt %s: %v", live.EmpConfigFile, err)
+		return nil, fmt.Errorf("failed to unmarshal JSON config: %v", err)
 	}
 
-	return encryptedJSONBytes, nil
+	cborBytes, err := cbor.Marshal(configMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal config to CBOR: %v", err)
+	}
+
+	// encrypt
+	encryptedBytes, err := crypto.AES_GCM_Encrypt([]byte(def.MagicString), cborBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encrypt config: %v", err)
+	}
+
+	return encryptedBytes, nil
 }
 
 func appendConfigToPayload(file string, sep, config []byte) (err error) {
@@ -359,5 +373,5 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 	}
 
 	// save emp3r0r.json
-	return live.SaveConfigJSON()
+	return config.SaveConfigJSON()
 }

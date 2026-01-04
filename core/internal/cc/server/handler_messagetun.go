@@ -62,7 +62,7 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 				reply := msg
 				reply.CmdSlice = msg.CmdSlice
 				reply.CmdID = msg.CmdID
-				reply.Response = cmd + util.RandStr(util.RandInt(1, 10))
+				reply.Response = []byte(cmd + util.RandStr(util.RandInt(1, 10)))
 				err = out.Encode(reply)
 				if err != nil {
 					logging.Warningf("Failed to answer hello to agent %s", msg.Tag)
@@ -115,7 +115,7 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 func operatorBroadcastPrintf(msg_type, format string, a ...any) (err error) {
 	msgTunData := def.MsgTunData{
 		Tag:      msg_type,                  // tell operator about the message type: INFO, WARN, ERROR, SUCCESS
-		Response: fmt.Sprintf(format, a...), // message content
+		Response: []byte(fmt.Sprintf(format, a...)), // message content
 		CmdID:    "",
 		CmdSlice: []string{},
 	}

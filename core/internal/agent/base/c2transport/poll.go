@@ -124,7 +124,7 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 				break
 			}
 			resp := msg.Response
-			if strings.HasPrefix(resp, def.TransportString) {
+			if strings.HasPrefix(string(resp), def.TransportString) {
 				logging.Printf("Hello (%s) received", resp)
 				// mark the hello as success
 				for hello := range HandShakes {

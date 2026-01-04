@@ -11,9 +11,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/txthinking/socks5"
 )
 
@@ -137,11 +139,30 @@ func TestPsCmdRun(t *testing.T) {
 	}
 
 	// Verify response
-	output := mockConn.String()
-	t.Logf("C2 Output: %s", output)
-	// Check for common process columns or current process
-	if !strings.Contains(output, "\\\"pid\\\":") {
-		t.Errorf("Output does not contain pid field: %s", output)
+	var msg def.MsgTunData
+	if err := cbor.Unmarshal(mockConn.Bytes(), &msg); err != nil {
+		t.Fatalf("Failed to unmarshal CBOR response: %v", err)
+	}
+
+	// Decode the inner response (which is also CBOR encoded list of processes)
+	var procs []util.ProcEntry
+	if err := cbor.Unmarshal([]byte(msg.Response), &procs); err != nil {
+		t.Fatalf("Failed to unmarshal inner CBOR response: %v", err)
+	}
+
+	if len(procs) == 0 {
+		t.Errorf("No processes returned")
+	}
+
+	found := false
+	for _, p := range procs {
+		if p.PID > 0 {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("No valid PID found in process list")
 	}
 }
 
@@ -290,16 +311,26 @@ func TestNetHelperCmdRun(t *testing.T) {
 	}
 
 	// Check output
-	output := buf.String()
-	t.Logf("C2 Output: %s", output)
-
-	// We expect some JSON output with "cmd_slice": ["net_helper"]
-	if !strings.Contains(output, `"cmd_slice":["net_helper"]`) {
-		t.Errorf("Expected output to contain '\"cmd_slice\":[\"net_helper\"]', got: %s", output)
+	var msg def.MsgTunData
+	if err := cbor.Unmarshal(buf.Bytes(), &msg); err != nil {
+		t.Fatalf("Failed to unmarshal CBOR response: %v", err)
 	}
+
+	// Check cmd_slice
+	found := false
+	for _, cmd := range msg.CmdSlice {
+		if cmd == "net_helper" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Expected CmdSlice to contain 'net_helper', got: %v", msg.CmdSlice)
+	}
+
 	// And some network info, e.g. "ip addr"
-	if !strings.Contains(output, "ip addr") {
-		t.Errorf("Expected output to contain 'ip addr', got: %s", output)
+	if !strings.Contains(string(msg.Response), "ip addr") {
+		t.Errorf("Expected output to contain 'ip addr', got: %s", msg.Response)
 	}
 }
 
@@ -321,16 +352,25 @@ func TestExecCmdRun(t *testing.T) {
 	}
 
 	// Check output
-	output := buf.String()
-	t.Logf("C2 Output: %s", output)
+	var msg def.MsgTunData
+	if err := cbor.Unmarshal(buf.Bytes(), &msg); err != nil {
+		t.Fatalf("Failed to unmarshal CBOR response: %v", err)
+	}
 
-	if !strings.Contains(output, `"cmd_slice":["exec"]`) {
-		t.Errorf("Expected output to contain '\"cmd_slice\":[\"exec\"]', got: %s", output)
+	found := false
+	for _, cmd := range msg.CmdSlice {
+		if cmd == "exec" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Expected CmdSlice to contain 'exec', got: %v", msg.CmdSlice)
 	}
 
 	// The output of echo hello should be in the response data
-	if !strings.Contains(output, "hello") {
-		t.Errorf("Expected output to contain 'hello', got: %s", output)
+	if !strings.Contains(string(msg.Response), "hello") {
+		t.Errorf("Expected output to contain 'hello', got: %s", msg.Response)
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/ftp"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/operator"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -194,7 +195,7 @@ func runClientMode(opts *Options) {
 	if err != nil {
 		logging.Fatalf("Failed to extract config: %v", err)
 	}
-	err = live.LoadConfig()
+	err = config.LoadConfig()
 	if err != nil {
 		logging.Fatalf("Failed to load config: %v", err)
 	}
@@ -216,11 +217,11 @@ func runServerMode(opts *Options) {
 		startCDN2Proxy(opts)
 	}
 
-	err = live.InitCertsAndConfig()
+	err = config.InitCertsAndConfig()
 	if err != nil {
 		logging.Fatalf("Failed to init certs and config: %v", err)
 	}
-	err = live.LoadConfig()
+	err = config.LoadConfig()
 	if err != nil {
 		logging.Fatalf("Failed to load config: %v", err)
 	}

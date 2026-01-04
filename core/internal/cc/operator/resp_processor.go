@@ -54,14 +54,14 @@ func processAgentData(data *def.MsgTunData) {
 	cmd_id := data.CmdID
 	// cache this cmd response
 	live.CmdResultsMutex.Lock()
-	live.CmdResults[cmd_id] = out
+	live.CmdResults[cmd_id] = string(out)
 	live.CmdResultsMutex.Unlock()
 
 	switch cmd_slice[0] {
 	// screenshot command
 	case "screenshot":
 		go func() {
-			err = modules.ProcessScreenshot(out, target)
+			err = modules.ProcessScreenshot(string(out), target)
 			if err != nil {
 				logging.Errorf("%v", err)
 			}
@@ -85,10 +85,10 @@ func processAgentData(data *def.MsgTunData) {
 		}
 
 		// Use BuildTable instead of manual tablewriter creation
-		out = cli.BuildTable([]string{"Name", "PID", "PPID", "User"}, tdata)
+		out = []byte(cli.BuildTable([]string{"Name", "PID", "PPID", "User"}, tdata))
 
 		// Use AdaptiveTable instead of FitPanes
-		cli.AdaptiveTable(out)
+		cli.AdaptiveTable(string(out))
 
 		// ls command
 	case "ls":
@@ -108,10 +108,10 @@ func processAgentData(data *def.MsgTunData) {
 		}
 
 		// Use BuildTable instead of manual tablewriter creation
-		out = cli.BuildTable([]string{"Name", "Type", "Size", "Time", "Permission"}, tdata)
+		out = []byte(cli.BuildTable([]string{"Name", "Type", "Size", "Time", "Permission"}, tdata))
 
 		// Use AdaptiveTable instead of FitPanes
-		cli.AdaptiveTable(out)
+		cli.AdaptiveTable(string(out))
 	}
 
 	// Command output
@@ -126,7 +126,7 @@ func processAgentData(data *def.MsgTunData) {
 	agent_output := fmt.Sprintf("\n[%s] %s:\n%s\n\n",
 		color.CyanString("%s", target.Name),
 		color.HiMagentaString("%s", cmd),
-		color.HiWhiteString(out))
+		color.HiWhiteString(string(out)))
 	logging.Printf(agent_output)
 
 	// time spent on this cmd

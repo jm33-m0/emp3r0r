@@ -50,7 +50,7 @@ type AgentProcess struct {
 type MsgTunData struct {
 	CmdID		string		`cbor:"1,keyasint"`	// command ID, to retrieve the response, or empty if not a command
 	CmdSlice	[]string	`cbor:"2,keyasint"`	// command args, [0] is the command, or empty if not a command
-	Response	string		`cbor:"3,keyasint"`	// response from the agent, or message to operator
+	Response	[]byte		`cbor:"3,keyasint"`	// response from the agent, or message to operator
 	Tag		string		`cbor:"4,keyasint"`	// tag of the agent, or message type if sent to operator
 	Time		string		`cbor:"5,keyasint"`	// timestamp
 }

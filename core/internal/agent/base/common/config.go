@@ -21,19 +21,19 @@ var RuntimeConfig = &def.Config{}
 var WritableLocations = []string{}
 
 func InitConfig() (err error) {
-	jsonData, err := util.ExtractData()
+	configData, err := util.ExtractData()
 	if err != nil {
 		return fmt.Errorf("read config: %v", err)
 	}
 
-	// parse JSON
-	err = def.ReadJSONConfig(jsonData, RuntimeConfig)
+	// parse CBOR
+	err = def.ReadCBORConfig(configData, RuntimeConfig)
 	if err != nil {
-		short_view := jsonData
-		if len(jsonData) > 100 {
-			short_view = jsonData[:100]
+		short_view := configData
+		if len(configData) > 100 {
+			short_view = configData[:100]
 		}
-		return fmt.Errorf("parsing %d bytes of JSON data (%s...): %v", len(jsonData), short_view, err)
+		return fmt.Errorf("parsing %d bytes of CBOR data (%s...): %v", len(configData), short_view, err)
 	}
 
 	// CA

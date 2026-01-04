@@ -11,6 +11,7 @@ import (
 
 	"github.com/jm33-m0/arc/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/relay"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -199,7 +200,7 @@ func wg(wg_port int, numOperators int) {
 }
 
 func tarConfig(hosts string) {
-	err := live.GenC2Certs(hosts)
+	err := config.GenC2Certs(hosts)
 	if err != nil {
 		logging.Fatalf("Failed to generate C2 certs: %v", err)
 	}
