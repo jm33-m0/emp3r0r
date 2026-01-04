@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
@@ -19,7 +20,8 @@ import (
 
 // handleMessageTunnel processes JSON C&C tunnel connections.
 func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
-	lastHandshake := time.Now()
+	var lastHandshake int64
+	atomic.StoreInt64(&lastHandshake, time.Now().Unix())
 	conn, err := h2conn.Accept(wrt, req)
 	if err != nil {
 		logging.Errorf("handleMessageTunnel: connection failed from %s: %s", req.RemoteAddr, err)
@@ -66,7 +68,7 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 					logging.Warningf("Failed to answer hello to agent %s", msg.Tag)
 					return
 				}
-				lastHandshake = time.Now()
+				atomic.StoreInt64(&lastHandshake, time.Now().Unix())
 			} else {
 				// forward message to operators
 				err = fwdMsg2Operators(msg)
@@ -94,7 +96,8 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 		}
 	}()
 	for ctx.Err() == nil {
-		if time.Since(lastHandshake) > 2*time.Minute {
+		lastHandshakeTime := time.Unix(atomic.LoadInt64(&lastHandshake), 0)
+		if time.Since(lastHandshakeTime) > 2*time.Minute {
 			operatorBroadcastPrintf(logging.WARN, "handleMessageTunnel: timeout for agent (%s)", msg.Tag)
 			return
 		}
