@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.10.0](https://github.com/jm33-m0/emp3r0r/compare/v3.9.6...v3.10.0) (2026-01-04)
+
+
+### Features
+
+* update build command to use garble ([ff14c16](https://github.com/jm33-m0/emp3r0r/commit/ff14c16fd69e117aee779a5e7460582d4cf4c486))
+
 ## [3.9.6](https://github.com/jm33-m0/emp3r0r/compare/v3.9.5...v3.9.6) (2026-01-04)
 
 
