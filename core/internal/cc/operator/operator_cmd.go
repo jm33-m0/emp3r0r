@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -179,7 +180,7 @@ func msgTunHandler() {
 			continue
 		}
 
-		decoder := json.NewDecoder(bufio.NewReader(conn))
+		decoder := cbor.NewDecoder(bufio.NewReader(conn))
 
 		// Channel to receive decode results
 		msgCh := make(chan *def.MsgTunData, 10)
@@ -203,7 +204,7 @@ func msgTunHandler() {
 		for ctx.Err() == nil {
 			select {
 			case msg := <-msgCh:
-				logging.Debugf("Message tunnel got: %v", *msg)
+				// logging.Debugf("Message tunnel got: %v", *msg)
 				processAgentData(msg)
 				// Reset retry delay on successful message
 				retryDelay = 5 * time.Second

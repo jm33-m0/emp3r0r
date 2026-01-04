@@ -73,7 +73,7 @@ func processAgentData(data *def.MsgTunData) {
 		err = cbor.Unmarshal([]byte(out), &procs)
 		if err != nil {
 			logging.Debugf("ps: %v", err)
-			logging.Errorf("ps: %s", err, out)
+			logging.Errorf("ps: %v", err)
 			return
 		}
 
@@ -96,7 +96,7 @@ func processAgentData(data *def.MsgTunData) {
 		err = cbor.Unmarshal([]byte(out), &dents)
 		if err != nil {
 			logging.Debugf("ls: %v", err)
-			logging.Errorf("ls: %s", out)
+			logging.Errorf("ls: %v", err)
 			return
 		}
 
