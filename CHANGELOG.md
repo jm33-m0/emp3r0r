@@ -1,5 +1,20 @@
 # Changelog
 
+## [3.10.2](https://github.com/jm33-m0/emp3r0r/compare/v3.10.1...v3.10.2) (2026-01-04)
+
+
+### Bug Fixes
+
+* **config:** enhance CCAddress handling for Tor and KCP configurations, add comprehensive tests ([723a2c2](https://github.com/jm33-m0/emp3r0r/commit/723a2c20c782c1cbce0a5a29da287e392154ef5b))
+* **config:** implement default values for missing critical fields and add tests for config flow ([c8ebd85](https://github.com/jm33-m0/emp3r0r/commit/c8ebd85d9dad17a97218ba6bdff951701869d1df))
+* **config:** Refactor configuration management to use CBOR format ([0814d66](https://github.com/jm33-m0/emp3r0r/commit/0814d66e18ee86fef0a8c2b54f265fb6d793bf32))
+* enhance JSON config handling with safe extraction methods and add tests ([23a7ee1](https://github.com/jm33-m0/emp3r0r/commit/23a7ee10fefacf1b0438ed565df788f67ef6a5da))
+* **ftp:** switch from JSON to CBOR for file stat handling and add corresponding test ([1417c21](https://github.com/jm33-m0/emp3r0r/commit/1417c21f5f44f7754aec562f94fdaa0347cdfeeb))
+* **operator:** switch JSON decoder to CBOR in msgTunHandler and add CBOR decoding tests ([8febb75](https://github.com/jm33-m0/emp3r0r/commit/8febb754ae0cf4c118300f3aaeb802f9125d442e))
+* switch to CBOR to avoid JSON key strings ([79c6738](https://github.com/jm33-m0/emp3r0r/commit/79c6738fd1f26b408709cc9efe5840a2716ecb82))
+* **tls:** TLS configuration for C2 agent server and add tests ([26e1f90](https://github.com/jm33-m0/emp3r0r/commit/26e1f90cd29a9065ec57c0b59de1d5ca7bf2771b))
+* update configuration keys in module to use new naming conventions ([a5ef670](https://github.com/jm33-m0/emp3r0r/commit/a5ef670e2458d433ce5845a66bce660f16ba5e26))
+
 ## [3.10.1](https://github.com/jm33-m0/emp3r0r/compare/v3.10.0...v3.10.1) (2026-01-04)
 
 
