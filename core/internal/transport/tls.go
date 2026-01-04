@@ -48,7 +48,7 @@ func CreateEmp3r0rHTTPClient(c2_addr, proxyServer string) *http.Client {
 		logging.Printf("Using proxy server: %s", proxyServer)
 		// use a proxy for our HTTP client
 		proxyUrl, e := url.Parse(proxyServer)
-		if err != nil {
+		if e != nil {
 			logging.Fatalf("Invalid proxy: %v", e)
 		}
 

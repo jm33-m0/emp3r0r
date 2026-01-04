@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"os"
@@ -30,6 +31,13 @@ func StartC2AgentTLSServer() {
 	network.EmpTLSServer = &http.Server{
 		Addr:    fmt.Sprintf(":%s", live.RuntimeConfig.CCPort),
 		Handler: r,
+		TLSConfig: &tls.Config{
+			CurvePreferences: []tls.CurveID{
+				tls.CurveP256,
+				tls.X25519,
+			},
+			MinVersion: tls.VersionTLS12,
+		},
 	}
 	network.EmpTLSServerCtx, network.EmpTLSServerCancel = context.WithCancel(context.Background())
 	logging.Successf("🚀 Starting C2 agent listener service with TLS at port %s", live.RuntimeConfig.CCPort)
