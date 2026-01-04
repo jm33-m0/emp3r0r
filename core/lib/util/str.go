@@ -85,9 +85,9 @@ func SplitLongLine(line string, linelen int) (ret string) {
 
 // RandInt random int between given interval
 func RandInt(min, max int) int {
-	if min > max || min < 0 || max < 0 {
+	if min >= max || min < 0 || max < 0 {
 		min = RandInt(0, 100)
-		max = min + RandInt(0, 100)
+		max = min + RandInt(1, 100)
 	}
 
 	var b [8]byte
