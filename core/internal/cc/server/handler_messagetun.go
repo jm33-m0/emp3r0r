@@ -58,7 +58,7 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 			if len(msg.CmdSlice) != 0 {
 				cmd = msg.CmdSlice[0]
 			}
-			if strings.HasPrefix(cmd, "hello") {
+			if strings.HasPrefix(cmd, def.TransportString) {
 				reply := msg
 				reply.CmdSlice = msg.CmdSlice
 				reply.CmdID = msg.CmdID

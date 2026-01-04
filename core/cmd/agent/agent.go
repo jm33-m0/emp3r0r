@@ -66,7 +66,7 @@ func agent_main() {
 		cleanUpDownloadingFiles()
 
 		if is_dll {
-			logging.Printf("emp3r0r %d is invoked by DLL in %d",
+			logging.Printf("%d is invoked by DLL in %d",
 				os.Getpid(), os.Getppid())
 		}
 	}
@@ -101,7 +101,7 @@ test_agent:
 		if proc.Pid != os.Getpid() {
 			err = proc.Kill()
 			if err != nil {
-				logging.Printf("Failed to kill existing emp3r0r agent: %v", err)
+				logging.Printf("Failed to kill existing agent: %v", err)
 			}
 		}
 	} else {

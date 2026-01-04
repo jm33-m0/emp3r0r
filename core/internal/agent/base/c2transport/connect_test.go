@@ -60,7 +60,7 @@ func signUUID(uuid string, keyFile string) (string, error) {
 
 func TestConnectCC(t *testing.T) {
 	// Setup temp dir for certs
-	tmpDir, err := os.MkdirTemp("", "emp3r0r_test")
+	tmpDir, err := os.MkdirTemp("", "agent_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}

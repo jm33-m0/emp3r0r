@@ -7,7 +7,7 @@ import (
 
 func CoreCommands() *cobra.Command {
 	rootCmd := &cobra.Command{
-		Short: "emp3r0r agent core commands",
+		Short: "agent core commands",
 	}
 	// Define groups sorted by name
 	rootCmd.AddGroup(

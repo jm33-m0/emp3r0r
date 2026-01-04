@@ -16,6 +16,9 @@ var (
 	// use: C2 message construction and encryption
 	MagicString = "64781530-1475-4cf8-950c-dcdf4c619dbc"
 
+	// TransportString is the keyword used in handshake
+	TransportString = "hello"
+
 	// Transport what transport is this agent using? (HTTP2 / CDN / TOR)
 	Transport = "HTTP2"
 

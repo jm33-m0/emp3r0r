@@ -6,13 +6,14 @@ package modules
 import (
 	"errors"
 	"fmt"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
@@ -59,7 +60,7 @@ func getInstallLocations() (locations []string) {
 	return
 }
 
-// installToAllLocations copy emp3r0r to multiple locations
+// installToAllLocations copy agent to multiple locations
 func installToAllLocations() []string {
 	locations := getInstallLocations()
 	for _, path := range locations {
@@ -73,7 +74,7 @@ func installToAllLocations() []string {
 	return locations
 }
 
-// installToRandomLocation copy emp3r0r to a random location
+// installToRandomLocation copy agent to a random location
 func installToRandomLocation() (target string, err error) {
 	locations := getInstallLocations()
 	target = locations[util.RandInt(0, len(locations))]

