@@ -1,11 +1,11 @@
 package agents
 
 import (
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -82,7 +82,7 @@ func SendMessageToAgent(msg_data *def.MsgTunData, agent *def.Emp3r0rAgent) (err 
 	if ctrl.Conn == nil {
 		return fmt.Errorf("Send2Agent (%s): Target is not connected", msg_data.CmdSlice)
 	}
-	out := json.NewEncoder(ctrl.Conn)
+	out := cbor.NewEncoder(ctrl.Conn)
 
 	err = out.Encode(msg_data)
 	return

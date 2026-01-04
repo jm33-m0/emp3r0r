@@ -1,10 +1,10 @@
 package c2transport
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"io"
@@ -30,7 +30,7 @@ func send2CC(data *def.MsgTunData) error {
 		return nil
 	}
 
-	out := json.NewEncoder(writer)
+	out := cbor.NewEncoder(writer)
 
 	err := out.Encode(data)
 	if err != nil {

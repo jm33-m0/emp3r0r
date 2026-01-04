@@ -1,12 +1,12 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -30,7 +30,7 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 	var target def.Emp3r0rAgent
-	in := json.NewDecoder(conn)
+	in := cbor.NewDecoder(conn)
 	err = in.Decode(&target)
 	if err != nil {
 		logging.Warningf("handleAgentCheckIn decode error: %v", err)

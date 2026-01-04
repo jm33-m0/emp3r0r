@@ -1,13 +1,13 @@
 package operator
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/fatih/color"
+	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -70,7 +70,7 @@ func processAgentData(data *def.MsgTunData) {
 		// ps command
 	case "ps":
 		var procs []util.ProcEntry
-		err = json.Unmarshal([]byte(out), &procs)
+		err = cbor.Unmarshal([]byte(out), &procs)
 		if err != nil {
 			logging.Debugf("ps: %v", err)
 			logging.Errorf("ps: %s", err, out)
@@ -93,7 +93,7 @@ func processAgentData(data *def.MsgTunData) {
 		// ls command
 	case "ls":
 		var dents []util.Dentry
-		err = json.Unmarshal([]byte(out), &dents)
+		err = cbor.Unmarshal([]byte(out), &dents)
 		if err != nil {
 			logging.Debugf("ls: %v", err)
 			logging.Errorf("ls: %s", out)

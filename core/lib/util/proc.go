@@ -14,11 +14,11 @@ import (
 
 // ProcEntry a process entry of a process list
 type ProcEntry struct {
-	Name    string `json:"name"`    // process name
-	Cmdline string `json:"cmdline"` // process cmdline
-	Token   string `json:"token"`   // process token/username
-	PID     int    `json:"pid"`     // process ID
-	PPID    int    `json:"ppid"`    // parent process ID
+	Name    string `json:"name" cbor:"1,keyasint"`    // process name
+	Cmdline string `json:"cmdline" cbor:"2,keyasint"` // process cmdline
+	Token   string `json:"token" cbor:"3,keyasint"`   // process token/username
+	PID     int    `json:"pid" cbor:"4,keyasint"`     // process ID
+	PPID    int    `json:"ppid" cbor:"5,keyasint"`    // parent process ID
 }
 
 // ProcessList a list of current processes with filters

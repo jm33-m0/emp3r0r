@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
@@ -85,7 +85,7 @@ func runStat(cmd *cobra.Command, args []string) {
 		Checksum:   crypto.SHA256SumFile(path),
 		Permission: fi.Mode().String(),
 	}
-	data, err := json.Marshal(fstat)
+	data, err := cbor.Marshal(fstat)
 	if err != nil {
 		c2transport.NotifyC2(cmd, "Error: cant marshal file info %s: %v\n", path, err)
 		return

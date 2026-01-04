@@ -1,12 +1,12 @@
 package shellhelper
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -98,7 +98,7 @@ func CmdPS(pid int, user, name, cmdLine string) (out string, err error) {
 		procs = []util.ProcEntry{*empty_proc}
 	}
 
-	data, err := json.Marshal(procs)
+	data, err := cbor.Marshal(procs)
 	if err != nil {
 		return
 	}

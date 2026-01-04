@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -10,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -18,7 +18,7 @@ import (
 	"github.com/posener/h2conn"
 )
 
-// handleMessageTunnel processes JSON C&C tunnel connections.
+// handleMessageTunnel processes CBOR C&C tunnel connections.
 func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 	var lastHandshake int64
 	atomic.StoreInt64(&lastHandshake, time.Now().Unix())
@@ -44,8 +44,8 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 		cancel()
 		logging.Debugf("handleMessageTunnel exited")
 	}()
-	in := json.NewDecoder(conn)
-	out := json.NewEncoder(conn)
+	in := cbor.NewDecoder(conn)
+	out := cbor.NewEncoder(conn)
 	var msg def.MsgTunData
 	go func() {
 		defer cancel()
@@ -130,7 +130,7 @@ func fwdMsg2Operators(msg def.MsgTunData) (err error) {
 		if operator.conn == nil {
 			continue
 		}
-		encoder := json.NewEncoder(operator.conn)
+		encoder := cbor.NewEncoder(operator.conn)
 		err = encoder.Encode(msg)
 		if err != nil {
 			logging.Errorf("Failed to forward message to operator: %v", err)

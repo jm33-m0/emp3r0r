@@ -3,32 +3,32 @@ package util
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 // Dentry Directory entry
 type Dentry struct {
-	Name       string `json:"name"`  // filename
-	Ftype      string `json:"ftype"` // file/dir
-	Size       string `json:"size"`  // 100
-	Date       string `json:"date"`  // 2021-01-01
-	Owner      string `json:"owner"` // jm33
-	Permission string `json:"perm"`  // -rwxr-xr-x
+	Name       string `json:"name" cbor:"1,keyasint"`  // filename
+	Ftype      string `json:"ftype" cbor:"2,keyasint"` // file/dir
+	Size       string `json:"size" cbor:"3,keyasint"`  // 100
+	Date       string `json:"date" cbor:"4,keyasint"`  // 2021-01-01
+	Owner      string `json:"owner" cbor:"5,keyasint"` // jm33
+	Permission string `json:"perm" cbor:"6,keyasint"`  // -rwxr-xr-x
 }
 
 // FileStat stat info of a file
 type FileStat struct {
-	Name       string `json:"name"`
-	Permission string `json:"permission"`
-	Checksum   string `json:"checksum"`
-	Size       int64  `json:"size"`
+	Name       string `json:"name" cbor:"1,keyasint"`
+	Permission string `json:"permission" cbor:"2,keyasint"`
+	Checksum   string `json:"checksum" cbor:"3,keyasint"`
+	Size       int64  `json:"size" cbor:"4,keyasint"`
 }
 
 // LsPath ls path and return a json
@@ -49,7 +49,7 @@ func LsPath(path string) (string, error) {
 			return "", statErr
 		}
 		dents := []Dentry{parse_fileInfo(info)}
-		jsonData, err := json.Marshal(dents)
+		jsonData, err := cbor.Marshal(dents)
 		if err != nil {
 			logging.Debugf("LsPath: %v", err)
 			return "", err
@@ -75,7 +75,7 @@ func LsPath(path string) (string, error) {
 	}
 
 	// json
-	jsonData, err := json.Marshal(dents)
+	jsonData, err := cbor.Marshal(dents)
 	return string(jsonData), err
 }
 
