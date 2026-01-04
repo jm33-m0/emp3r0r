@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.9.6](https://github.com/jm33-m0/emp3r0r/compare/v3.9.5...v3.9.6) (2026-01-04)
+
+
+### Bug Fixes
+
+* correct RandInt parameter validation and ensure proper range ([7c4c0bf](https://github.com/jm33-m0/emp3r0r/commit/7c4c0bf1cda295171058d86d785a3f7b86c24547))
+
 ## [3.9.5](https://github.com/jm33-m0/emp3r0r/compare/v3.9.4...v3.9.5) (2026-01-04)
 
 
