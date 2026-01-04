@@ -260,3 +260,6 @@ tags
 
 # vscode
 .vscode/
+
+# garble
+.h
