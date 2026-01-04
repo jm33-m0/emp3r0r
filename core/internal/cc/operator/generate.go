@@ -207,13 +207,13 @@ func readAndEncryptConfig() ([]byte, error) {
 	}
 
 	// convert JSON to CBOR
-	var configMap map[string]interface{}
-	err = json.Unmarshal(jsonBytes, &configMap)
+	var configStruct def.Config
+	err = config.ReadJSONConfig(jsonBytes, &configStruct)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal JSON config: %v", err)
 	}
 
-	cborBytes, err := cbor.Marshal(configMap)
+	cborBytes, err := cbor.Marshal(configStruct)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal config to CBOR: %v", err)
 	}

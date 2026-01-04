@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -132,14 +133,20 @@ func LoadCACrt2RuntimeConfig() error {
 	return nil
 }
 
-func ReadJSONConfig() (err error) {
-	// read JSON
-	jsonData, err := os.ReadFile(live.EmpConfigFile)
-	if err != nil {
-		return
+func ReadJSONConfig(jsonData []byte, config_to_write *def.Config) error {
+	if jsonData == nil {
+		// read JSON
+		var err error
+		jsonData, err = os.ReadFile(live.EmpConfigFile)
+		if err != nil {
+			return err
+		}
+	}
+	if config_to_write == nil {
+		config_to_write = live.RuntimeConfig
 	}
 
-	return readJSONConfig(jsonData, live.RuntimeConfig)
+	return readJSONConfig(jsonData, config_to_write)
 }
 
 // InitCertsAndConfig generate certs if not found, then generate config file
@@ -224,7 +231,7 @@ func LoadConfig() error {
 	}
 
 	if util.IsFileExist(live.EmpConfigFile) {
-		return ReadJSONConfig()
+		return ReadJSONConfig(nil, nil)
 	}
 	// init config file using the first host name
 	return InitConfigFile("127.0.0.1")

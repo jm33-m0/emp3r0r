@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // readJSONConfig read runtime variables from JSON, and apply them
@@ -64,7 +66,11 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 	config_to_write.ProxyChainBroadcastPort = getString("proxy_chain_broadcast_port")
 	config_to_write.ProxyChainBroadcastIntervalMin = getInt("proxy_chain_broadcast_interval_min")
 	config_to_write.ProxyChainBroadcastIntervalMax = getInt("proxy_chain_broadcast_interval_max")
-	config_to_write.PIDFile = getString("pid_file")
+	if val := getString("pid_file"); val != "" {
+		config_to_write.PIDFile = val
+	} else {
+		config_to_write.PIDFile = util.RandMD5String()
+	}
 	config_to_write.CCIndicatorURL = getString("cc_indicator_url")
 	config_to_write.CCIndicatorWaitMin = getInt("cc_indicator_wait_min")
 	config_to_write.CCIndicatorWaitMax = getInt("cc_indicator_wait_max")
@@ -73,10 +79,26 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 	config_to_write.C2TransportProxy = getString("c2_transport_proxy")
 	config_to_write.CDNProxy = getString("cdn_proxy")
 	config_to_write.DoHServer = getString("doh_server")
-	config_to_write.SocketName = getString("socket_name")
-	config_to_write.AgentRoot = getString("agent_root")
-	config_to_write.UtilsPath = getString("utils_path")
-	config_to_write.AgentUUID = getString("agent_uuid")
+	if val := getString("socket_name"); val != "" {
+		config_to_write.SocketName = val
+	} else {
+		config_to_write.SocketName = util.RandMD5String()
+	}
+	if val := getString("agent_root"); val != "" {
+		config_to_write.AgentRoot = val
+	} else {
+		config_to_write.AgentRoot = util.RandMD5String()
+	}
+	if val := getString("utils_path"); val != "" {
+		config_to_write.UtilsPath = val
+	} else {
+		config_to_write.UtilsPath = util.RandMD5String()
+	}
+	if val := getString("agent_uuid"); val != "" {
+		config_to_write.AgentUUID = val
+	} else {
+		config_to_write.AgentUUID = uuid.NewString()
+	}
 	config_to_write.AgentUUIDSig = getString("agent_uuid_sig")
 	config_to_write.AgentTag = getString("agent_tag")
 	config_to_write.CCTimeout = getInt("cc_timeout")
