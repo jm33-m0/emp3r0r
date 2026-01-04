@@ -1,7 +1,6 @@
 package ftp
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -44,7 +44,7 @@ func StatFile(filepath string, a *def.Emp3r0rAgent) (fi *util.FileStat, err erro
 		time.Sleep(100 * time.Millisecond)
 		res, exists := live.CmdResults[cmd_id]
 		if exists {
-			err = json.Unmarshal([]byte(res), &fileinfo)
+			err = cbor.Unmarshal([]byte(res), &fileinfo)
 			if err != nil {
 				return
 			}
