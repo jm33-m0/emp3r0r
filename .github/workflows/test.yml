@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        go-version: ["1.24"]
+        go-version: ["1.25"]
         include:
           - os: ubuntu-latest
             packages: ./lib/util/... ./lib/crypto/... ./lib/sysinfo/... ./lib/testutil/... ./lib/cli/... ./lib/netutil/... ./internal/def/... ./internal/transport/... ./internal/live/... ./internal/agent/handler/... ./internal/agent/base/c2transport/...
