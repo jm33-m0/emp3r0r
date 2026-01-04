@@ -314,11 +314,78 @@ func readModCondig(file string) (pconfig *def.ModuleConfig, err error) {
 	}
 
 	// parse the json
-	config := def.ModuleConfig{}
-	err = json.Unmarshal(jsonData, &config)
+	var raw map[string]interface{}
+	err = json.Unmarshal(jsonData, &raw)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal JSON config: %v", err)
 	}
+
+	config := def.ModuleConfig{}
+
+	// Helper to safely extract string
+	getString := func(m map[string]interface{}, key string) string {
+		if val, ok := m[key].(string); ok {
+			return val
+		}
+		return ""
+	}
+
+	// Helper to safely extract bool
+	getBool := func(m map[string]interface{}, key string) bool {
+		if val, ok := m[key].(bool); ok {
+			return val
+		}
+		return false
+	}
+
+	// Helper to safely extract string slice
+	getStringSlice := func(m map[string]interface{}, key string) []string {
+		if val, ok := m[key].([]interface{}); ok {
+			var res []string
+			for _, v := range val {
+				if s, ok := v.(string); ok {
+					res = append(res, s)
+				}
+			}
+			return res
+		}
+		return []string{}
+	}
+
+	config.Name = getString(raw, "name")
+	config.Build = getString(raw, "build")
+	config.Author = getString(raw, "author")
+	config.Date = getString(raw, "date")
+	config.Comment = getString(raw, "comment")
+	config.IsLocal = getBool(raw, "is_local")
+	config.Platform = getString(raw, "platform")
+	config.Path = getString(raw, "path")
+	config.Fileless = getBool(raw, "fileless")
+
+	// AgentConfig
+	if agentConfigMap, ok := raw["agent_config"].(map[string]interface{}); ok {
+		config.AgentConfig.Exec = getString(agentConfigMap, "exec")
+		config.AgentConfig.Files = getStringSlice(agentConfigMap, "files")
+		config.AgentConfig.InMemory = getBool(agentConfigMap, "in_memory")
+		config.AgentConfig.Type = getString(agentConfigMap, "type")
+		config.AgentConfig.IsInteractive = getBool(agentConfigMap, "is_interactive")
+	}
+
+	// Options
+	config.Options = make(def.ModOptions)
+	if optionsMap, ok := raw["options"].(map[string]interface{}); ok {
+		for key, val := range optionsMap {
+			if optMap, ok := val.(map[string]interface{}); ok {
+				opt := &def.ModOption{}
+				opt.Name = getString(optMap, "name")
+				opt.Desc = getString(optMap, "desc")
+				opt.Val = getString(optMap, "val")
+				opt.Vals = getStringSlice(optMap, "vals")
+				config.Options[key] = opt
+			}
+		}
+	}
+
 	pconfig = &config
 	return
 }

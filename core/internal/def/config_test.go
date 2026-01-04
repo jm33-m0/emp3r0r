@@ -6,21 +6,18 @@ import (
 )
 
 func TestReadJSONConfig(t *testing.T) {
-	// 1. Test with valid JSON
-	validConfig := Config{
-		CCAddress:            "127.0.0.1:8080",
-		CCHost:               "localhost",
-		CCPort:               "8080",
-		AgentSocksServerPort: "1080",
-		UtilsPath:            "/tmp/agent",
-	}
-	jsonData, err := json.Marshal(validConfig)
-	if err != nil {
-		t.Fatalf("Failed to marshal valid config: %v", err)
-	}
+	// 1. Test with valid JSON (using snake_case keys as expected in config.json)
+	jsonStr := `{
+		"cc_address": "127.0.0.1:8080",
+		"cc_host": "localhost",
+		"cc_port": "8080",
+		"agent_socks_server_port": "1080",
+		"utils_path": "/tmp/agent"
+	}`
+	jsonData := []byte(jsonStr)
 
 	var config Config
-	err = ReadJSONConfig(jsonData, &config)
+	err := ReadJSONConfig(jsonData, &config)
 	if err != nil {
 		t.Errorf("ReadJSONConfig failed with valid JSON: %v", err)
 	}
