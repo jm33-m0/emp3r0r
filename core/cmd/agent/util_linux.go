@@ -4,10 +4,11 @@
 package main
 
 import (
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"net"
 	"os"
 	"path/filepath"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
@@ -63,5 +64,5 @@ func isAgentAliveSocket() bool {
 		return false
 	}
 	defer conn.Close()
-	return agentutils.IsAgentAlive(conn)
+	return agentutils.CheckAgentAlive(conn)
 }

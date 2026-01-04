@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"io"
@@ -16,8 +17,8 @@ import (
 // Connection is the connection to CC, can be mocked for testing
 var Connection io.Writer
 
-// Send2CC send TunData to CC
-func Send2CC(data *def.MsgTunData) error {
+// send2CC send TunData to CC
+func send2CC(data *def.MsgTunData) error {
 	var writer io.Writer = def.CCMsgConn
 	if Connection != nil {
 		writer = Connection
@@ -38,8 +39,8 @@ func Send2CC(data *def.MsgTunData) error {
 	return nil
 }
 
-// C2RespPrintf send response to a cobra command to CC, like fmt.Printf
-func C2RespPrintf(cmd *cobra.Command, format string, args ...interface{}) {
+// NotifyC2 send response to a cobra command to CC, like fmt.Printf
+func NotifyC2(cmd *cobra.Command, format string, args ...interface{}) {
 	msg := def.MsgTunData{
 		Tag: common.RuntimeConfig.AgentTag,
 	}
@@ -48,7 +49,7 @@ func C2RespPrintf(cmd *cobra.Command, format string, args ...interface{}) {
 	msg.CmdID = cmd_id
 	msg.CmdSlice = cmdSlice
 	msg.Response = fmt.Sprintf(format, args...)
-	if err := Send2CC(&msg); err != nil {
+	if err := send2CC(&msg); err != nil {
 		logging.Println(err)
 	}
 	logging.Printf("Response sent: %s", msg.Response)

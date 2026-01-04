@@ -7,8 +7,8 @@ import (
 	"os"
 )
 
-// RestoreFileTimes restores the modification and change times of a file
-func RestoreFileTimes(file string) error {
+// TouchFile restores the modification and change times of a file
+func TouchFile(file string) error {
 	// Get the original file timestamps
 	fileInfo, err := os.Stat(file)
 	if err != nil {

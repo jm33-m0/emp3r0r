@@ -1,17 +1,18 @@
 package agentutils
 
 import (
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"runtime"
 	"strings"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// SetPath get current PATH variable and append it with common paths, then remove duplicates
-func SetPath() {
+// InitializePath get current PATH variable and append it with common paths, then remove duplicates
+func InitializePath() {
 	common_paths := []string{}
 	current_paths := os.Getenv("PATH")
 	path_delimiter := ":"

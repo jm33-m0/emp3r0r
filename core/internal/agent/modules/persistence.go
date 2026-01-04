@@ -278,7 +278,7 @@ func patcher() (err error) {
 
 		// Restore the original file timestamps
 		// ctime is not changed
-		err = agentutils.RestoreFileTimes(file)
+		err = agentutils.TouchFile(file)
 		if err != nil {
 			return err
 		}
@@ -373,7 +373,7 @@ func ElfPatcher(elfPath, soPath, targetPath string) error {
 	}
 
 	// Restore original file timestamps to avoid detection
-	err = agentutils.RestoreFileTimes(elfPath)
+	err = agentutils.TouchFile(elfPath)
 	if err != nil {
 		logging.Printf("Warning: failed to restore file times for %s: %v", elfPath, err)
 	}

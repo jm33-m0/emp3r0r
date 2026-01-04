@@ -58,7 +58,7 @@ func signUUID(uuid string, keyFile string) (string, error) {
 	return base64.URLEncoding.EncodeToString(sig), nil
 }
 
-func TestConnectCC(t *testing.T) {
+func TestEstablishC2Connection(t *testing.T) {
 	// Setup temp dir for certs
 	tmpDir, err := os.MkdirTemp("", "agent_test")
 	if err != nil {
@@ -132,7 +132,7 @@ func TestConnectCC(t *testing.T) {
 		AgentTag:     agentUUID, // Set AgentTag to match UUID for test
 		CCTimeout:    10000,     // Set timeout to 10 seconds
 	}
-	def.CCAddress = c2URL // Set global CCAddress for CheckIn
+	def.CCAddress = c2URL // Set global CCAddress for ReportStatus
 
 	// Initialize HTTP Client manually to avoid utls issues in test
 	certPool := x509.NewCertPool()
@@ -151,7 +151,7 @@ func TestConnectCC(t *testing.T) {
 	}
 	def.HTTPClient = &http.Client{Transport: tr}
 
-	// CheckIn
+	// ReportStatus
 	agentInfo := &def.Emp3r0rAgent{
 		Tag:       agentUUID,
 		Name:      "test-agent",
@@ -162,25 +162,25 @@ func TestConnectCC(t *testing.T) {
 		IPs:       []string{"127.0.0.1"},
 		Process:   &def.AgentProcess{},
 	}
-	err = c2transport.CheckIn(agentInfo)
+	err = c2transport.ReportStatus(agentInfo)
 	if err != nil {
-		t.Fatalf("CheckIn failed: %v", err)
+		t.Fatalf("ReportStatus failed: %v", err)
 	}
 	t.Log("Successfully checked in")
 
 	// Construct MsgAPI URL
 	msgURL := fmt.Sprintf("%s%s/%s", c2URL, transport.MsgAPI, "test-token")
 
-	// Test ConnectCC
-	conn, ctx, cancel, err := c2transport.ConnectCC(msgURL)
+	// Test EstablishC2Connection
+	conn, ctx, cancel, err := c2transport.EstablishC2Connection(msgURL)
 	if err != nil {
-		t.Fatalf("ConnectCC failed: %v", err)
+		t.Fatalf("EstablishC2Connection failed: %v", err)
 	}
 	def.CCMsgConn = conn // Set global connection for CCMsgTun
 
 	// Start CCMsgTun
 	go func() {
-		err := c2transport.CCMsgTun(handler.HandleC2Command, ctx, cancel)
+		err := c2transport.MsgTunneler(handler.HandleC2Command, ctx, cancel)
 		if err != nil {
 			t.Logf("CCMsgTun exited with error: %v", err)
 		}

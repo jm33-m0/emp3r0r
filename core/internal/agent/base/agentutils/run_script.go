@@ -53,15 +53,15 @@ func feedScriptToStdin(cmd *exec.Cmd, scriptBytes []byte) (output string, err er
 	return
 }
 
-// RunPythonScript runs a Python script in memory and returns the output.
-func RunPythonScript(scriptBytes []byte, args []string) (output string, err error) {
+// ExecutePython runs a Python script in memory and returns the output.
+func ExecutePython(scriptBytes []byte, args []string) (output string, err error) {
 	cmd := exec.Command("python")
 	cmd.Env = args
 	return feedScriptToStdin(cmd, scriptBytes)
 }
 
-// RunPSScript runs powershell script on windows
-func RunPSScript(scriptBytes []byte, args []string) (output string, err error) {
+// ExecutePowerShell runs powershell script on windows
+func ExecutePowerShell(scriptBytes []byte, args []string) (output string, err error) {
 	shell := "powershell.exe"
 
 	cmd := exec.Command(shell, "-Command", "-")
@@ -70,8 +70,8 @@ func RunPSScript(scriptBytes []byte, args []string) (output string, err error) {
 	return feedScriptToStdin(cmd, scriptBytes)
 }
 
-// RunBatchScript runs batch script on windows
-func RunBatchScript(scriptBytes []byte, args []string) (output string, err error) {
+// ExecuteBatch runs batch script on windows
+func ExecuteBatch(scriptBytes []byte, args []string) (output string, err error) {
 	shell := "cmd.exe"
 
 	cmd := exec.Command(shell)
@@ -80,8 +80,8 @@ func RunBatchScript(scriptBytes []byte, args []string) (output string, err error
 	return feedScriptToStdin(cmd, scriptBytes)
 }
 
-// RunShellScript runs a bash script on target
-func RunShellScript(scriptBytes []byte, args []string) (output string, err error) {
+// ExecuteShell runs a bash script on target
+func ExecuteShell(scriptBytes []byte, args []string) (output string, err error) {
 	shell := def.DefaultShell
 	if !util.IsFileExist(shell) {
 		return "", fmt.Errorf("shell not found: %s", shell)

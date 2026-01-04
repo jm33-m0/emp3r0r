@@ -11,7 +11,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-func CmdNetHelper() (out string) {
+func GetNetworkDetails() (out string) {
 	ipa := netutil.IPa()
 	ipneigh := netutil.IPNeigh()
 	ipr := netutil.IPr()
@@ -26,7 +26,7 @@ func CmdNetHelper() (out string) {
 	return
 }
 
-func CmdKill(args []string) (out string, err error) {
+func killProcess(args []string) (out string, err error) {
 	if len(args) == 0 {
 		return "", fmt.Errorf("no PID specified")
 	}

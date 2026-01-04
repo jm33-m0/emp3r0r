@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/Microsoft/go-winio"
@@ -45,5 +46,5 @@ func isAgentAliveSocket() bool {
 		return false
 	}
 	defer conn.Close()
-	return agentutils.IsAgentAlive(conn)
+	return agentutils.CheckAgentAlive(conn)
 }

