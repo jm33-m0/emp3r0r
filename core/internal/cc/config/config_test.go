@@ -98,7 +98,7 @@ func TestInitConfigFile(t *testing.T) {
 	if len(live.RuntimeConfig.SSHHostKey) == 0 {
 		t.Error("SSHHostKey is empty")
 	}
-	
+
 	// Check if AgentUUIDSig is set
 	if live.RuntimeConfig.AgentUUIDSig == "" {
 		t.Error("AgentUUIDSig is empty")
