@@ -141,8 +141,8 @@ build() {
     gobuild_cmd="garble"
     build_opt="-tiny -seed=random build"
     ldflags+=" -s -w"
-    # info "Setting up garble"
-    # go install mvdan.cc/garble@latest || error "Failed to install garble"
+    info "Setting up garble"
+    go install mvdan.cc/garble@latest || error "Failed to install garble"
   fi
 
   info "Building CC"
