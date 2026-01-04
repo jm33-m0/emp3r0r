@@ -1,6 +1,7 @@
 package ftp
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -27,15 +28,13 @@ func TestStatFile(t *testing.T) {
 				t.Errorf("Failed to marshal fstat: %v", err)
 				return
 			}
-			live.CmdResultsMutex.Lock()
-			live.CmdResults[cmd_id] = string(data)
-			live.CmdResultsMutex.Unlock()
+			live.CmdResults.Store(cmd_id, string(data))
 		}()
 		return nil
 	}
 
 	// Initialize live.CmdResults
-	live.CmdResults = make(map[string]string)
+	live.CmdResults = sync.Map{}
 
 	agent := &def.Emp3r0rAgent{
 		Tag: "test-agent",

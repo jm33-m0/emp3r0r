@@ -10,8 +10,7 @@ import (
 
 var (
 	// CmdResults receive response from agent and cache them
-	CmdResults      = make(map[string]string)
-	CmdResultsMutex = &sync.Mutex{}
+	CmdResults = sync.Map{}
 
 	// CmdTime store command time
 	CmdTime      = make(map[string]string)

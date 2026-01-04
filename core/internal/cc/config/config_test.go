@@ -1,12 +1,7 @@
 package config
 
 import (
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
 	"os"
 	"strconv"
 	"testing"
@@ -40,27 +35,32 @@ func TestInitConfigFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	tmpKeyFile.Close()
 	defer os.Remove(tmpKeyFile.Name())
 
-	// Generate a dummy CA key
-	privKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	// Create temp file for CA cert
+	tmpCrtFile, err := os.CreateTemp("", "emp3r0r-ca-crt-*.pem")
 	if err != nil {
 		t.Fatal(err)
 	}
-	privKeyBytes, err := x509.MarshalECPrivateKey(privKey)
+	tmpCrtFile.Close()
+	defer os.Remove(tmpCrtFile.Name())
+
+	// Generate CA cert and key using transport.GenCerts
+	_, err = transport.GenCerts(nil, tmpCrtFile.Name(), tmpKeyFile.Name(), "", "", true)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("GenCerts failed: %v", err)
 	}
-	pemBlock := &pem.Block{Type: "EC PRIVATE KEY", Bytes: privKeyBytes}
-	if err := pem.Encode(tmpKeyFile, pemBlock); err != nil {
-		t.Fatal(err)
-	}
-	tmpKeyFile.Close()
 
 	// Save original CaKeyFile and restore it after test
 	originalCaKeyFile := transport.CaKeyFile
 	defer func() { transport.CaKeyFile = originalCaKeyFile }()
 	transport.CaKeyFile = tmpKeyFile.Name()
+
+	// Save original CaCrtFile and restore it after test
+	originalCaCrtFile := transport.CaCrtFile
+	defer func() { transport.CaCrtFile = originalCaCrtFile }()
+	transport.CaCrtFile = tmpCrtFile.Name()
 
 	ccHost := "127.0.0.1"
 	err = InitConfigFile(ccHost)

@@ -123,15 +123,18 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 
 		// wait until sshd is up
 		defer func() {
-			live.CmdResultsMutex.Lock()
-			delete(live.CmdResults, cmd_id)
-			live.CmdResultsMutex.Unlock()
+			live.CmdResults.Delete(cmd_id)
 		}()
 		is_response := false
 		res := ""
 		for i := 0; i < 100; i++ {
 			time.Sleep(100 * time.Millisecond)
-			res, is_response = live.CmdResults[cmd_id]
+			if val, ok := live.CmdResults.Load(cmd_id); ok {
+				res = val.(string)
+				is_response = true
+			} else {
+				is_response = false
+			}
 			if is_response {
 				if strings.Contains(res, "success") ||
 					strings.Contains(res,

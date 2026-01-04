@@ -82,14 +82,12 @@ func downloadFromAgent(cmd *cobra.Command, args []string) {
 		}
 		logging.Infof("Waiting for response from agent %s", target.Tag)
 		var result string
-		var exists bool
 		for i := 0; i < 10; i++ {
-			result, exists = live.CmdResults[cmd_id]
-			if exists {
+			res, ok := live.CmdResults.Load(cmd_id)
+			if ok {
+				result = res.(string)
 				logging.Infof("Got file list from %s", target.Tag)
-				live.CmdResultsMutex.Lock()
-				delete(live.CmdResults, cmd_id)
-				live.CmdResultsMutex.Unlock()
+				live.CmdResults.Delete(cmd_id)
 				if result == "" {
 					logging.Errorf("Cannot get %s: empty file list in directory", file_path)
 				}

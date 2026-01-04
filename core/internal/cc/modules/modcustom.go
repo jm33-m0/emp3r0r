@@ -195,15 +195,15 @@ func handleInteractiveModule(config def.ModuleConfig, cmd_id string) {
 	look_for := crypto.SHA256SumRaw([]byte(def.MagicString))
 
 	for i := 0; i < 10; i++ {
-		if strings.Contains(live.CmdResults[cmd_id], look_for) {
-			break
+		if res, ok := live.CmdResults.Load(cmd_id); ok {
+			if strings.Contains(res.(string), look_for) {
+				break
+			}
 		}
 		util.TakeABlink()
 	}
 	defer func() {
-		live.CmdResultsMutex.Lock()
-		delete(live.CmdResults, cmd_id)
-		live.CmdResultsMutex.Unlock()
+		live.CmdResults.Delete(cmd_id)
 	}()
 
 	sshErr := SSHClient(fmt.Sprintf("%s/%s/%s",

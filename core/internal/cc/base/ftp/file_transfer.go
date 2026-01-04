@@ -35,16 +35,14 @@ func StatFile(filepath string, a *def.Emp3r0rAgent) (fi *util.FileStat, err erro
 	var fileinfo util.FileStat
 
 	defer func() {
-		live.CmdResultsMutex.Lock()
-		delete(live.CmdResults, cmd_id)
-		live.CmdResultsMutex.Unlock()
+		live.CmdResults.Delete(cmd_id)
 	}()
 
 	for {
 		time.Sleep(100 * time.Millisecond)
-		res, exists := live.CmdResults[cmd_id]
+		res, exists := live.CmdResults.Load(cmd_id)
 		if exists {
-			err = cbor.Unmarshal([]byte(res), &fileinfo)
+			err = cbor.Unmarshal([]byte(res.(string)), &fileinfo)
 			if err != nil {
 				return
 			}

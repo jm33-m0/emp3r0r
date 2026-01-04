@@ -30,12 +30,10 @@ func moduleMemDump() {
 	var cmd_res string
 	for i := 0; i < 100; i++ {
 		// check if the command has finished
-		res, ok := live.CmdResults[cmd_id] // check if the command has finished
+		res, ok := live.CmdResults.Load(cmd_id) // check if the command has finished
 		if ok {
-			cmd_res = res
-			live.CmdResultsMutex.Lock()
-			delete(live.CmdResults, cmd_id)
-			live.CmdResultsMutex.Unlock()
+			cmd_res = res.(string)
+			live.CmdResults.Delete(cmd_id)
 			break
 		}
 		time.Sleep(100 * time.Millisecond)

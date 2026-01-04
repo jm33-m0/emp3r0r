@@ -168,11 +168,9 @@ func moduleProxy() {
 		}
 		var ok bool
 		for i := 0; i < 120; i++ {
-			_, ok = live.CmdResults[cmd_id]
+			_, ok = live.CmdResults.Load(cmd_id)
 			if ok {
-				live.CmdResultsMutex.Lock()
-				delete(live.CmdResults, cmd_id)
-				live.CmdResultsMutex.Unlock()
+				live.CmdResults.Delete(cmd_id)
 				break
 			}
 			util.TakeABlink()

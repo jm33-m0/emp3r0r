@@ -142,11 +142,9 @@ func listRemoteDirWorker(path_to_list, agent_tag string) (cwd string, names []st
 	listingCtx, listingCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer listingCancel()
 	for listingCtx.Err() == nil {
-		if res, exists := live.CmdResults[cmd_id]; exists {
-			remote_entries = strings.Split(res, "\n")
-			live.CmdResultsMutex.Lock()
-			delete(live.CmdResults, cmd_id)
-			live.CmdResultsMutex.Unlock()
+		if res, exists := live.CmdResults.Load(cmd_id); exists {
+			remote_entries = strings.Split(res.(string), "\n")
+			live.CmdResults.Delete(cmd_id)
 			listingCancel()
 			break
 		}

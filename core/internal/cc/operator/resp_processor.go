@@ -53,9 +53,7 @@ func processAgentData(data *def.MsgTunData) {
 	out := data.Response
 	cmd_id := data.CmdID
 	// cache this cmd response
-	live.CmdResultsMutex.Lock()
-	live.CmdResults[cmd_id] = string(out)
-	live.CmdResultsMutex.Unlock()
+	live.CmdResults.Store(cmd_id, string(out))
 
 	switch cmd_slice[0] {
 	// screenshot command
