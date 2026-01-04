@@ -56,8 +56,8 @@ build_agent_stub() {
   local output=$3
   info "Building agent stub for $os $arch"
 
-  local tags="netgo"
-  [[ "$arg1" != "--debug" ]] && tags="netgo release"
+  local tags="netgo agent"
+  [[ "$arg1" != "--debug" ]] && tags="netgo release agent"
 
   local build_cmd="CGO_ENABLED=0 GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -trimpath -buildvcs=false -tags '$tags' -o \\\"$temp/$output\\\" -ldflags=\\\"$ldflags\\\"\""
 

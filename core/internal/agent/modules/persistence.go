@@ -49,6 +49,9 @@ var (
 		"/usr/bin/sh",
 		"/usr/bin/ss",
 	}
+
+	// PersistFile file to run for persistence
+	PersistFile = ""
 )
 
 // Configure install locations

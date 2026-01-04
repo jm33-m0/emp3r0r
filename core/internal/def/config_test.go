@@ -12,7 +12,7 @@ func TestReadJSONConfig(t *testing.T) {
 		CCHost:               "localhost",
 		CCPort:               "8080",
 		AgentSocksServerPort: "1080",
-		UtilsPath:            "/tmp/emp3r0r",
+		UtilsPath:            "/tmp/agent",
 	}
 	jsonData, err := json.Marshal(validConfig)
 	if err != nil {
@@ -36,7 +36,7 @@ func TestReadJSONConfig(t *testing.T) {
 		t.Errorf("Expected CCAddress global to be %s, got %s", expectedCCAddress, CCAddress)
 	}
 
-	expectedDefaultShell := "/tmp/emp3r0r/bash"
+	expectedDefaultShell := "/tmp/agent/bash"
 	if DefaultShell != expectedDefaultShell {
 		t.Errorf("Expected DefaultShell global to be %s, got %s", expectedDefaultShell, DefaultShell)
 	}

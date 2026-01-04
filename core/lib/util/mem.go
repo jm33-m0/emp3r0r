@@ -15,7 +15,7 @@ import (
 func ExtractData() (data []byte, err error) {
 	data, err = extractFromAgentConfig()
 	if err != nil {
-		err = fmt.Errorf("extract data from emp3r0r_def.AgentConfig: %v", err)
+		err = fmt.Errorf("extract data from agent config: %v", err)
 		return
 	}
 

