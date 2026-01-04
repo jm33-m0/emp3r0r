@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.10.1](https://github.com/jm33-m0/emp3r0r/compare/v3.10.0...v3.10.1) (2026-01-04)
+
+
+### Bug Fixes
+
+* improve agent existence checks and message handling ([2b5ca49](https://github.com/jm33-m0/emp3r0r/commit/2b5ca498659bc6ac3a8883c9ddd39c3288fb8988))
+* remove identifiable strings from agent code base ([e63b3de](https://github.com/jm33-m0/emp3r0r/commit/e63b3dec88299c3ad0b434c9f4b526ea90665819))
+* sanitise strings ([4dde815](https://github.com/jm33-m0/emp3r0r/commit/4dde8157ad7e7e5308afe0f2ac60e0865a608f90))
+* unexport functions for garble ([b311c96](https://github.com/jm33-m0/emp3r0r/commit/b311c96d0a0053407721b5566ca2bdce053ffdaa))
+
 ## [3.10.0](https://github.com/jm33-m0/emp3r0r/compare/v3.9.6...v3.10.0) (2026-01-04)
 
 
