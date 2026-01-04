@@ -77,7 +77,14 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 					return
 				}
 			}
-			agent := agents.GetAgentByTag(msg.Tag)
+			var agent *def.Emp3r0rAgent
+			for i := 0; i < 5; i++ {
+				agent = agents.GetAgentByTag(msg.Tag)
+				if agent != nil {
+					break
+				}
+				time.Sleep(100 * time.Millisecond)
+			}
 			if agent == nil {
 				logging.Errorf("No agent found for message: %v", msg)
 				return

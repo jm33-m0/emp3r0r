@@ -175,7 +175,7 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 			cnt-- // consume cnt
 
 			// send hello
-			hello_msg.CmdSlice = []string{"hello" + util.RandStr(util.RandInt(1, 100))}
+			hello_msg.CmdSlice = []string{def.TransportString + util.RandStr(util.RandInt(1, 100))}
 			hello_msg.CmdID = uuid.NewString()
 			hello_msg.Tag = common.RuntimeConfig.AgentTag
 			err = out.Encode(hello_msg)

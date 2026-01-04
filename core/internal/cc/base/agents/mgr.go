@@ -129,12 +129,16 @@ func IsAgentExistByTag(tag string) bool {
 func IsAgentExist(t *def.Emp3r0rAgent) bool {
 	live.AgentControlMapMutex.RLock()
 	defer live.AgentControlMapMutex.RUnlock()
+	return IsAgentExistLocked(t)
+}
+
+// IsAgentExistLocked checks if agent exists (caller must hold lock)
+func IsAgentExistLocked(t *def.Emp3r0rAgent) bool {
 	for a := range live.AgentControlMap {
 		if a.Tag == t.Tag {
 			return true
 		}
 	}
-
 	return false
 }
 
@@ -142,7 +146,11 @@ func IsAgentExist(t *def.Emp3r0rAgent) bool {
 func AssignAgentIndex() (index int) {
 	live.AgentControlMapMutex.RLock()
 	defer live.AgentControlMapMutex.RUnlock()
+	return AssignAgentIndexLocked()
+}
 
+// AssignAgentIndexLocked assigns index (caller must hold lock)
+func AssignAgentIndexLocked() (index int) {
 	// index is 0 for the first agent
 	if len(live.AgentControlMap) == 0 {
 		return 0

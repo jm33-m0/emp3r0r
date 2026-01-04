@@ -37,31 +37,36 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 	target.From = req.RemoteAddr
-	if !agents.IsAgentExist(&target) {
-		inx := agents.AssignAgentIndex()
-		live.AgentControlMapMutex.RLock()
+	live.AgentControlMapMutex.Lock()
+	if !agents.IsAgentExistLocked(&target) {
+		inx := agents.AssignAgentIndexLocked()
 		live.AgentControlMap[&target] = &live.AgentControl{Index: inx, Conn: nil}
-		live.AgentControlMapMutex.RUnlock()
 		shortname := strings.Split(target.Tag, "-agent")[0]
 		if util.IsExist(agents.AgentsJSON) {
 			if l := agents.RefreshAgentLabel(&target); l != "" {
 				shortname = l
 			}
 		}
+		live.AgentControlMapMutex.Unlock()
 		logging.Printf("Checked in: %s from %s, running %s", strconv.Quote(shortname), fmt.Sprintf("'%s - %s'", target.From, target.Transport), strconv.Quote(target.OS))
 	} else {
+		var existingKey *def.Emp3r0rAgent
 		for a := range live.AgentControlMap {
 			if a.Tag == target.Tag {
-				a = &target
+				*a = target
+				existingKey = a
 				break
 			}
 		}
 		shortname := strings.Split(target.Tag, "-agent")[0]
 		if util.IsExist(agents.AgentsJSON) {
-			if l := agents.RefreshAgentLabel(&target); l != "" {
-				shortname = l
+			if existingKey != nil {
+				if l := agents.RefreshAgentLabel(existingKey); l != "" {
+					shortname = l
+				}
 			}
 		}
+		live.AgentControlMapMutex.Unlock()
 		if logging.Level >= 4 {
 			logging.Debugf("Refreshing sysinfo for %s from %s, running %s", shortname, fmt.Sprintf("%s - %s", target.From, target.Transport), strconv.Quote(target.OS))
 		}
