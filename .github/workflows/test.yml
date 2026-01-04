@@ -18,11 +18,6 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         go-version: ["1.25"]
-        include:
-          - os: ubuntu-latest
-            packages: ./lib/util/... ./lib/crypto/... ./lib/sysinfo/... ./lib/testutil/... ./lib/cli/... ./lib/netutil/... ./internal/def/... ./internal/transport/... ./internal/live/... ./internal/agent/handler/... ./internal/agent/base/c2transport/... ./internal/cc/modules/... ./internal/cc/config/... ./internal/cc/base/ftp/... ./internal/cc/operator/...
-          - os: windows-latest
-            packages: ./lib/util/... ./lib/crypto/... ./lib/sysinfo/... ./lib/testutil/... ./lib/cli/... ./lib/netutil/... ./internal/def/... ./internal/transport/... ./internal/live/... ./internal/agent/handler/... ./internal/agent/base/c2transport/... ./internal/cc/modules/... ./internal/cc/config/... ./internal/cc/base/ftp/... ./internal/cc/operator/...
 
     steps:
       - name: Checkout code
@@ -41,7 +36,7 @@ jobs:
       - name: Run tests
         working-directory: ./core
         run: |
-          go test -v -race "-coverprofile=coverage.txt" -covermode=atomic ${{ matrix.packages }}
+          go test -v -race "-coverprofile=coverage.txt" -covermode=atomic ./...
 
       - name: Display coverage summary
         if: runner.os == 'Linux'
