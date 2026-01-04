@@ -30,14 +30,14 @@ func TestReadModConfig(t *testing.T) {
 			"files": ["file1", "file2"],
 			"in_memory": true,
 			"type": "go",
-			"is_interactive": false
+			"interactive": false
 		},
 		"options": {
 			"option1": {
-				"name": "option1",
-				"desc": "Description 1",
-				"val": "value1",
-				"vals": ["value1", "value2"]
+				"opt_name": "option1",
+				"opt_desc": "Description 1",
+				"opt_val": "value1",
+				"opt_vals": ["value1", "value2"]
 			}
 		}
 	}`

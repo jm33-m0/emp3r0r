@@ -368,7 +368,7 @@ func readModCondig(file string) (pconfig *def.ModuleConfig, err error) {
 		config.AgentConfig.Files = getStringSlice(agentConfigMap, "files")
 		config.AgentConfig.InMemory = getBool(agentConfigMap, "in_memory")
 		config.AgentConfig.Type = getString(agentConfigMap, "type")
-		config.AgentConfig.IsInteractive = getBool(agentConfigMap, "is_interactive")
+		config.AgentConfig.IsInteractive = getBool(agentConfigMap, "interactive")
 	}
 
 	// Options
@@ -377,10 +377,10 @@ func readModCondig(file string) (pconfig *def.ModuleConfig, err error) {
 		for key, val := range optionsMap {
 			if optMap, ok := val.(map[string]interface{}); ok {
 				opt := &def.ModOption{}
-				opt.Name = getString(optMap, "name")
-				opt.Desc = getString(optMap, "desc")
-				opt.Val = getString(optMap, "val")
-				opt.Vals = getStringSlice(optMap, "vals")
+				opt.Name = getString(optMap, "opt_name")
+				opt.Desc = getString(optMap, "opt_desc")
+				opt.Val = getString(optMap, "opt_val")
+				opt.Vals = getStringSlice(optMap, "opt_vals")
 				config.Options[key] = opt
 			}
 		}
