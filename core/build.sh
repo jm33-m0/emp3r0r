@@ -54,16 +54,29 @@ build_agent_stub() {
   local os=$2
   local output=$3
   info "Building agent stub for $os $arch"
-  local build_cmd="CGO_ENABLED=0 GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -tags 'netgo release' -o \\\"$temp/$output\\\" -ldflags=\\\"$ldflags\\\"\""
+
+  local tags="netgo"
+  [[ "$arg1" != "--debug" ]] && tags="netgo release"
+
+  local build_cmd="CGO_ENABLED=0 GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -trimpath -buildvcs=false -tags '$tags' -o \\\"$temp/$output\\\" -ldflags=\\\"$ldflags\\\"\""
+
   if [[ "$os" = "windows" ]]; then
     # Windows builds also need the release tag
-    build_cmd="CGO_ENABLED=0 GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -tags 'netgo release' -o \\\"$temp/$output\\\" -ldflags=\\\"-H=windowsgui $ldflags\\\"\""
+    build_cmd="CGO_ENABLED=0 GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -trimpath -buildvcs=false -tags '$tags' -o \\\"$temp/$output\\\" -ldflags=\\\"-H=windowsgui $ldflags\\\"\""
   fi
   echo "Running: $build_cmd"
   {
     cd "$pwd/cmd/agent" &&
       eval "$build_cmd"
   } || error "build agent stub for $os $arch"
+
+  if command -v objcopy >/dev/null 2>&1; then
+    info "Stripping .go.buildinfo from $output"
+    # -R removes the named section
+    objcopy -R .go.buildinfo "$temp/$output" || true
+  else
+    warn "objcopy not found; .go.buildinfo (module list) will remain in the binary."
+  fi
 }
 
 build_shared_object() {

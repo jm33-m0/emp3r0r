@@ -26,6 +26,12 @@ jobs:
         with:
           go-version: "^1.23"
 
+      - name: Install dependencies
+        if: ${{ steps.release.outputs.release_created }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binutils
+
       - name: Upload URL
         if: ${{ steps.release.outputs.release_created }}
         run: |
