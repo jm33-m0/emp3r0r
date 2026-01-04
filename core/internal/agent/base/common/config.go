@@ -11,6 +11,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
+	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/txthinking/socks5"
 )
@@ -49,6 +50,41 @@ func InitConfig() (err error) {
 	}
 	if RuntimeConfig.PIDFile == "" {
 		RuntimeConfig.PIDFile = util.RandMD5String()
+	}
+
+	// CC Address
+	def.CCAddress = RuntimeConfig.CCAddress
+	isTor := netutil.IsTor(def.CCAddress)
+	if !isTor {
+		// check if it is an onion address without scheme
+		host := def.CCAddress
+		if strings.Contains(host, ":") {
+			host = strings.Split(host, ":")[0]
+		}
+		if strings.HasSuffix(host, ".onion") {
+			isTor = true
+		}
+	}
+
+	if isTor {
+		// if scheme is missing, add http
+		if !strings.HasPrefix(def.CCAddress, "http") {
+			def.CCAddress = fmt.Sprintf("http://%s", def.CCAddress)
+		}
+		// if port is missing, add 80? No, Tor handles it.
+		// just ensure trailing slash
+		if !strings.HasSuffix(def.CCAddress, "/") {
+			def.CCAddress = fmt.Sprintf("%s/", def.CCAddress)
+		}
+
+		if RuntimeConfig.C2TransportProxy == "" {
+			RuntimeConfig.C2TransportProxy = "socks5://127.0.0.1:9050"
+		}
+	} else if RuntimeConfig.UseKCP {
+		RuntimeConfig.CCPort = RuntimeConfig.KCPClientPort
+		def.CCAddress = fmt.Sprintf("https://127.0.0.1:%s/", RuntimeConfig.CCPort)
+	} else {
+		def.CCAddress = fmt.Sprintf("https://%s:%s/", def.CCAddress, RuntimeConfig.CCPort)
 	}
 
 	// CA

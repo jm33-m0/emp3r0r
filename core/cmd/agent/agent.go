@@ -111,26 +111,11 @@ test_agent:
 	// Construct CC address
 	// if CC is behind tor, a proxy is needed
 	if netutil.IsTor(def.CCAddress) {
-		// if CC is on Tor, CCPort won't be used since Tor handles forwarding
-		// by default we use 443, so configure your torrc accordingly
-		def.CCAddress = fmt.Sprintf("%s/", def.CCAddress)
 		logging.Printf("CC is on TOR: %s", def.CCAddress)
-		if common.RuntimeConfig.C2TransportProxy == "" {
-			common.RuntimeConfig.C2TransportProxy = "socks5://127.0.0.1:9050"
-		}
 		logging.Printf("CC is on TOR (%s), using %s as TOR proxy", def.CCAddress, common.RuntimeConfig.C2TransportProxy)
 	} else if common.RuntimeConfig.UseKCP {
-		// enable kcp multiplexing tunnel
-		// KCP tunnel connects to C2 server, so we need to set CCPort to KCPClientPort
-		common.RuntimeConfig.CCPort = common.RuntimeConfig.KCPClientPort
-		def.CCAddress = fmt.Sprintf("https://127.0.0.1:%s/", common.RuntimeConfig.CCPort)
-
 		// run KCP
 		go c2transport.RunKCPClient() // KCP client will run when UseKCP is set
-	} else {
-		// parse C2 address
-		// append CCPort to CCAddress
-		def.CCAddress = fmt.Sprintf("%s:%s/", def.CCAddress, common.RuntimeConfig.CCPort)
 	}
 	logging.Printf("CCAddress is: %s", def.CCAddress)
 
