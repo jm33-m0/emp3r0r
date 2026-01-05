@@ -108,7 +108,11 @@ func TestLsCmdRun(t *testing.T) {
 	}
 
 	// Verify response
-	output := mockConn.String()
+	var msg def.MsgTunData
+	if err := cbor.Unmarshal(mockConn.Bytes(), &msg); err != nil {
+		t.Fatalf("Failed to unmarshal CBOR response: %v", err)
+	}
+	output := string(msg.Response)
 	t.Logf("C2 Output: %s", output)
 	if !strings.Contains(output, filepath.Base(f.Name())) {
 		t.Errorf("Output does not contain created file: %s", output)
@@ -265,7 +269,11 @@ func TestCdPwdCmds(t *testing.T) {
 	if err := rootCmd.Execute(); err != nil {
 		t.Fatalf("Failed to execute pwd command: %v", err)
 	}
-	initialPwd := mockConn.String()
+	var msg def.MsgTunData
+	if err := cbor.Unmarshal(mockConn.Bytes(), &msg); err != nil {
+		t.Fatalf("Failed to unmarshal CBOR response: %v", err)
+	}
+	initialPwd := string(msg.Response)
 	t.Logf("Initial PWD: %s", initialPwd)
 	mockConn.Reset()
 
@@ -281,7 +289,10 @@ func TestCdPwdCmds(t *testing.T) {
 	if err := rootCmd.Execute(); err != nil {
 		t.Fatalf("Failed to execute pwd command: %v", err)
 	}
-	newPwd := mockConn.String()
+	if err := cbor.Unmarshal(mockConn.Bytes(), &msg); err != nil {
+		t.Fatalf("Failed to unmarshal CBOR response: %v", err)
+	}
+	newPwd := string(msg.Response)
 	t.Logf("New PWD: %s", newPwd)
 
 	// Check if new pwd contains tmpDir
@@ -403,7 +414,11 @@ func TestGetCmdRun_Dir(t *testing.T) {
 	}
 
 	// Check output
-	output := buf.String()
+	var msg def.MsgTunData
+	if err := cbor.Unmarshal(buf.Bytes(), &msg); err != nil {
+		t.Fatalf("Failed to unmarshal CBOR response: %v", err)
+	}
+	output := string(msg.Response)
 	t.Logf("C2 Output: %s", output)
 
 	// Expect file list
