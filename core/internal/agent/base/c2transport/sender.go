@@ -3,11 +3,11 @@ package c2transport
 import (
 	"errors"
 	"fmt"
+	"io"
+	"unicode"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
-
-	"io"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -52,5 +52,18 @@ func NotifyC2(cmd *cobra.Command, format string, args ...interface{}) {
 	if err := send2CC(&msg); err != nil {
 		logging.Println(err)
 	}
-	logging.Printf("Response sent: %s", msg.Response)
+	// Check if response is printable
+	isPrintable := true
+	for _, r := range string(msg.Response) {
+		if !unicode.IsPrint(r) && r != '\n' && r != '\t' && r != '\r' {
+			isPrintable = false
+			break
+		}
+	}
+
+	if isPrintable {
+		logging.Printf("Response sent: %s", msg.Response)
+	} else {
+		logging.Printf("Response sent: <Binary Data, length %d>", len(msg.Response))
+	}
 }

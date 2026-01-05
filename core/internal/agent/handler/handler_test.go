@@ -470,7 +470,11 @@ func TestProxyCmd(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	output := mockConn.String()
+	var msg def.MsgTunData
+	if err := cbor.Unmarshal(mockConn.Bytes(), &msg); err != nil {
+		t.Fatalf("Failed to unmarshal CBOR response: %v", err)
+	}
+	output := string(msg.Response)
 	if !strings.Contains(output, "Socks5Proxy server ready") {
 		t.Errorf("Expected 'Socks5Proxy server ready', got '%s'", output)
 	}
@@ -487,7 +491,10 @@ func TestProxyCmd(t *testing.T) {
 	// Wait for server to shutdown
 	time.Sleep(1 * time.Second)
 
-	output = mockConn.String()
+	if err := cbor.Unmarshal(mockConn.Bytes(), &msg); err != nil {
+		t.Fatalf("Failed to unmarshal CBOR response: %v", err)
+	}
+	output = string(msg.Response)
 	if !strings.Contains(output, "Socks5Proxy server ready") {
 		t.Errorf("Expected 'Socks5Proxy server ready' (stopping), got '%s'", output)
 	}
@@ -512,7 +519,11 @@ func TestPortFwdCmd(t *testing.T) {
 		t.Fatalf("Failed to execute port_fwd command: %v", err)
 	}
 
-	output := mockConn.String()
+	var msg def.MsgTunData
+	if err := cbor.Unmarshal(mockConn.Bytes(), &msg); err != nil {
+		t.Fatalf("Failed to unmarshal CBOR response: %v", err)
+	}
+	output := string(msg.Response)
 	if !strings.Contains(output, "Port forwarding started successfully") {
 		t.Errorf("Expected 'Port forwarding started successfully', got '%s'", output)
 	}
@@ -524,7 +535,10 @@ func TestPortFwdCmd(t *testing.T) {
 		t.Fatalf("Failed to execute port_fwd stop command: %v", err)
 	}
 
-	output = mockConn.String()
+	if err := cbor.Unmarshal(mockConn.Bytes(), &msg); err != nil {
+		t.Fatalf("Failed to unmarshal CBOR response: %v", err)
+	}
+	output = string(msg.Response)
 	if !strings.Contains(output, "stopped") {
 		t.Errorf("Expected 'stopped', got '%s'", output)
 	}
