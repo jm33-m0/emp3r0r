@@ -298,10 +298,7 @@ func TestCdPwdCmds(t *testing.T) {
 	// Check if new pwd contains tmpDir
 	// Note: /tmp might be a symlink, so we use EvalSymlinks
 	realTmpDir, _ := filepath.EvalSymlinks(tmpDir)
-	// Escape backslashes for Windows paths in JSON
-	escapedTmpDir := strings.ReplaceAll(tmpDir, "\\", "\\\\")
-	escapedRealTmpDir := strings.ReplaceAll(realTmpDir, "\\", "\\\\")
-	if !strings.Contains(newPwd, escapedRealTmpDir) && !strings.Contains(newPwd, escapedTmpDir) {
+	if !strings.Contains(newPwd, realTmpDir) && !strings.Contains(newPwd, tmpDir) {
 		t.Errorf("PWD did not change to %s. Got: %s", tmpDir, newPwd)
 	}
 }
@@ -422,11 +419,7 @@ func TestGetCmdRun_Dir(t *testing.T) {
 	t.Logf("C2 Output: %s", output)
 
 	// Expect file list
-	// The output is JSON stringified in the "data" field.
-	// Escape backslashes for Windows paths in JSON
-	escapedF1 := strings.ReplaceAll(f1, "\\", "\\\\")
-	escapedF2 := strings.ReplaceAll(f2, "\\", "\\\\")
-	if !strings.Contains(output, escapedF1) || !strings.Contains(output, escapedF2) {
+	if !strings.Contains(output, f1) || !strings.Contains(output, f2) {
 		t.Errorf("Expected output to contain file paths %s and %s, got: %s", f1, f2, output)
 	}
 }
