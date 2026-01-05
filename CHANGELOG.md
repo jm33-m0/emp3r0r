@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.10.3](https://github.com/jm33-m0/emp3r0r/compare/v3.10.2...v3.10.3) (2026-01-05)
+
+
+### Bug Fixes
+
+* bump version ([d66b9c8](https://github.com/jm33-m0/emp3r0r/commit/d66b9c89d8a4394531d041d9d005ee1ee39e0b5d))
+
 ## [3.10.2](https://github.com/jm33-m0/emp3r0r/compare/v3.10.1...v3.10.2) (2026-01-04)
 
 
