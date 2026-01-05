@@ -389,10 +389,3 @@
 ### Code Refactoring
 
 * separate `core` and `server`, adopting operator-server mode (WIP) ([d4d52b1](https://github.com/jm33-m0/emp3r0r/commit/d4d52b1372122fd6bf9847349f09ddf8c2ef1de5))
-
-
-
-## Older Versions
-
-* [v2 Changelog](CHANGELOG-v2.md)
-* [v1 Changelog](CHANGELOG-v1.md)
