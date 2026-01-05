@@ -13,7 +13,7 @@ import (
 )
 
 // SendCmd send command to agent
-func SendCmd(cmd, cmd_id string, a *def.Emp3r0rAgent) error {
+var SendCmd = func(cmd, cmd_id string, a *def.Emp3r0rAgent) error {
 	if a == nil {
 		return errors.New("SendCmd: agent not found")
 	}

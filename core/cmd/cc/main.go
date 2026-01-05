@@ -51,7 +51,9 @@ func setupLogging() {
 func init() {
 	// inject prompt function
 	live.Prompt = cli.Prompt
+}
 
+func main() {
 	// setup file path names
 	err := live.SetupFilePaths()
 	if err != nil {
@@ -60,9 +62,7 @@ func init() {
 
 	// log to file
 	setupLogging()
-}
 
-func main() {
 	opts := &Options{}
 
 	// Root command
