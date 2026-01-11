@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -99,8 +98,12 @@ func HandleFTPTransfer(sh *network.StreamHandler, wrt http.ResponseWriter, req *
 	mapKey := filename
 	// Prepare file paths. targetFile is the final destination, filewrite is the temp file that we write to, it will be renamed to targetFile when done.
 	writeDir, targetFile, filewrite, lock := GenerateGetFilePaths(filename)
-	filename = filepath.Clean(filename)
-	filename = util.FileBaseName(filename)
+	localized, err := util.SecureLocalPath(filename)
+	if err != nil {
+		logging.Errorf("Invalid filename %q: %v", filename, err)
+		return
+	}
+	filename = util.FileBaseName(localized)
 	logging.Debugf("Downloading to %s, saving to %s, using lock file %s", filewrite, targetFile, lock)
 	if !util.IsDirExist(writeDir) {
 		logging.Debugf("Creating directory: %s", writeDir)

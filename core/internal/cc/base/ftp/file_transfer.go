@@ -91,9 +91,13 @@ func PutFile(lpath, rpath string, a *def.Emp3r0rAgent) error {
 
 // GenerateGetFilePaths generates paths and filenames for GetFile
 func GenerateGetFilePaths(file_path string) (write_dir, save_to_file, tempname, lock string) {
-	file_path = filepath.Clean(file_path)
-	write_dir = fmt.Sprintf("%s%s", live.FileGetDir, filepath.Dir(file_path))
-	save_to_file = fmt.Sprintf("%s/%s", write_dir, util.FileBaseName(file_path))
+	localized, err := util.SecureLocalPath(file_path)
+	if err != nil {
+		logging.Debugf("GenerateGetFilePaths: unsafe path %q: %v", file_path, err)
+		localized = ""
+	}
+	write_dir = fmt.Sprintf("%s%s", live.FileGetDir, filepath.Dir(localized))
+	save_to_file = fmt.Sprintf("%s/%s", write_dir, util.FileBaseName(localized))
 	tempname = save_to_file + ".tmp"
 	lock = save_to_file + ".lock"
 	return

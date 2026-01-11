@@ -53,8 +53,14 @@ func dispatcher(wrt http.ResponseWriter, req *http.Request) {
 		logging.Debugf("FTP stream not found: %s", token)
 		wrt.WriteHeader(http.StatusNotFound)
 	case transport.DownloadFile2AgentAPI:
-		path := filepath.Clean(req.URL.Query().Get("file_to_download"))
-		path = filepath.Base(path)
+		rawPath := req.URL.Query().Get("file_to_download")
+		localized, err := util.SecureLocalPath(rawPath)
+		if err != nil {
+			logging.Warningf("Invalid download path %q: %v", rawPath, err)
+			wrt.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		path := filepath.Base(localized)
 		logging.Infof("PUT: got request for file: %s, URL: %s", path, req.URL)
 		local_path := fmt.Sprintf("%s%s", live.WWWRoot, path)
 		if !util.IsExist(local_path) {

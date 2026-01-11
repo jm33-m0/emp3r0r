@@ -256,10 +256,32 @@ func copyDir(src, dst string) error {
 	})
 }
 
-// FileBaseName extracts the base name of the file from a given path.
+// SecureLocalPath normalizes a path and rejects ones that are not local to avoid traversal.
+func SecureLocalPath(path string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("empty path")
+	}
+
+	localized, err := filepath.Localize(path)
+	if err != nil {
+		return "", fmt.Errorf("localize %q: %w", path, err)
+	}
+
+	if !filepath.IsLocal(localized) {
+		return "", fmt.Errorf("unsafe path %q", localized)
+	}
+
+	return localized, nil
+}
+
+// FileBaseName extracts the base name of the file from a given path while enforcing locality.
 func FileBaseName(path string) string {
-	// Use the standard library to safely get the base name
-	return filepath.Base(filepath.Clean(path))
+	sanitized, err := SecureLocalPath(path)
+	if err != nil {
+		logging.Debugf("FileBaseName: %v", err)
+		return ""
+	}
+	return filepath.Base(sanitized)
 }
 
 // FileAllocate allocate n bytes for a file, will delete the target file if already exists
