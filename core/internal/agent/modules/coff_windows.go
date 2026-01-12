@@ -78,6 +78,12 @@ func normalizeCoffValue(arg def.ResolvedCoffArg) (string, error) {
 		}
 	case "DWORD", "QWORD", "SIZE_T", "HANDLE", "UINT", "INT", "PORT":
 		switch v := val.(type) {
+		case int:
+			return "i" + strconv.FormatInt(int64(v), 10), nil
+		case int32:
+			return "i" + strconv.FormatInt(int64(v), 10), nil
+		case int64:
+			return "i" + strconv.FormatInt(v, 10), nil
 		case float64:
 			return "i" + strconv.FormatFloat(v, 'f', -1, 64), nil
 		case string:

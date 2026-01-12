@@ -3,6 +3,7 @@ package modules
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -20,6 +21,9 @@ func TestModuleHandlerCOFFMustBeInMem(t *testing.T) {
 }
 
 func TestProcessModuleFilesSetsExecPerms(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod semantics differ on Windows")
+	}
 	modDir, err := os.MkdirTemp("", "mod-files-*")
 	if err != nil {
 		t.Fatalf("temp dir: %v", err)
@@ -71,6 +75,9 @@ func TestExtractModule(t *testing.T) {
 }
 
 func TestPrepareModuleOnDisk(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("chmod semantics differ on Windows")
+	}
 	root := t.TempDir()
 	modDir := filepath.Join(root, "mod")
 	srcDir := modDir
@@ -133,6 +140,9 @@ func TestDownloadAndVerifyModuleSuccessLocal(t *testing.T) {
 }
 
 func TestModuleHandlerSuccessOnDisk(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX shell script execution not applicable on Windows")
+	}
 	root := t.TempDir()
 	common.RuntimeConfig.AgentRoot = root
 

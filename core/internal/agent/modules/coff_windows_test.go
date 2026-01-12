@@ -60,6 +60,14 @@ func TestNormalizeCoffValuePrefixes(t *testing.T) {
 		t.Fatalf("expected int prefix 'i', got %q", val)
 	}
 
+	val, err = normalizeCoffValue(def.ResolvedCoffArg{WireType: "BOOL", Value: true})
+	if err != nil {
+		t.Fatalf("normalizeCoffValue bool: %v", err)
+	}
+	if !strings.HasPrefix(val, "i") {
+		t.Fatalf("expected bool prefix 'i', got %q", val)
+	}
+
 	val, err = normalizeCoffValue(def.ResolvedCoffArg{WireType: "LPSTR", Value: "hi"})
 	if err != nil {
 		t.Fatalf("normalizeCoffValue string: %v", err)
@@ -68,12 +76,28 @@ func TestNormalizeCoffValuePrefixes(t *testing.T) {
 		t.Fatalf("expected string prefix 'z', got %q", val)
 	}
 
+	val, err = normalizeCoffValue(def.ResolvedCoffArg{WireType: "LPWSTR", Value: "wide"})
+	if err != nil {
+		t.Fatalf("normalizeCoffValue wstring: %v", err)
+	}
+	if !strings.HasPrefix(val, "z") {
+		t.Fatalf("expected wstring prefix 'z', got %q", val)
+	}
+
 	val, err = normalizeCoffValue(def.ResolvedCoffArg{WireType: "BINARY", Value: []byte{0x01, 0x02}})
 	if err != nil {
 		t.Fatalf("normalizeCoffValue binary: %v", err)
 	}
 	if !strings.HasPrefix(val, "b") {
 		t.Fatalf("expected binary prefix 'b', got %q", val)
+	}
+
+	val, err = normalizeCoffValue(def.ResolvedCoffArg{WireType: "BINARY", Value: "AQID"})
+	if err != nil {
+		t.Fatalf("normalizeCoffValue binary string b64: %v", err)
+	}
+	if !strings.HasPrefix(val, "b") {
+		t.Fatalf("expected binary prefix 'b' for string input, got %q", val)
 	}
 }
 
