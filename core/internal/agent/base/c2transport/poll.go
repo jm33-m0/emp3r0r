@@ -88,10 +88,7 @@ func catchInterruptAndExit(cancel context.CancelFunc) {
 }
 
 // HandShakes record each hello message and C2's reply
-var (
-	HandShakes      = make(map[string]bool)
-	HandShakesMutex = &sync.RWMutex{}
-)
+var HandShakes sync.Map // map[string]bool
 
 // MsgTunneler use the connection (CCConn)
 func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel context.CancelFunc) (err error) {
@@ -127,12 +124,10 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 			if strings.HasPrefix(string(resp), def.TransportString) {
 				logging.Printf("Hello (%s) received", resp)
 				// mark the hello as success
-				HandShakesMutex.Lock()
-				if _, ok := HandShakes[msg.CmdID]; ok {
+				if _, ok := HandShakes.Load(msg.CmdID); ok {
 					logging.Printf("Hello (%s) acknowledged", resp)
-					HandShakes[msg.CmdID] = true
+					HandShakes.Store(msg.CmdID, true)
 				}
-				HandShakesMutex.Unlock()
 				continue
 			}
 
@@ -144,17 +139,12 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 
 	wait_hello := func(hello_id string) bool {
 		// delete key, forget about this hello when we are done
-		defer func() {
-			HandShakesMutex.Lock()
-			delete(HandShakes, hello_id)
-			HandShakesMutex.Unlock()
-		}()
+		defer HandShakes.Delete(hello_id)
 		// wait until timeout or success
 		for range common.RuntimeConfig.CCTimeout {
 			// if hello marked as success, return true
-			HandShakesMutex.RLock()
-			isSuccess := HandShakes[hello_id]
-			HandShakesMutex.RUnlock()
+			isSuccessAny, _ := HandShakes.Load(hello_id)
+			isSuccess, _ := isSuccessAny.(bool)
 			if isSuccess {
 				logging.Printf("Hello (%s) done", hello_id)
 				return true
@@ -181,9 +171,7 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 				util.TakeABlink()
 				continue
 			}
-			HandShakesMutex.Lock()
-			HandShakes[hello_msg.CmdID] = false
-			HandShakesMutex.Unlock()
+			HandShakes.Store(hello_msg.CmdID, false)
 			logging.Printf("Hello (%v) sent", hello_msg.CmdSlice)
 			if !wait_hello(hello_msg.CmdID) {
 				cancel()
