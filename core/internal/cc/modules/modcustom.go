@@ -279,7 +279,7 @@ func InitModules() {
 			// module path, eg. ~/.emp3r0r/modules/foo
 			config.Path = fmt.Sprintf("%s/%s", mod_search_dir, dir.Name())
 			if config.IsLocal {
-				mod_dir := fmt.Sprintf("%s/modules/%s", live.EmpWorkSpace, dir.Name())
+				mod_dir := filepath.Join(live.EmpWorkSpace, "modules", dir.Name())
 				err := os.MkdirAll(mod_dir, 0o700)
 				if err != nil {
 					logging.Warningf("Failed to create %s: %v", mod_dir, err)
