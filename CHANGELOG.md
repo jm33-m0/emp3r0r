@@ -1,5 +1,24 @@
 # Changelog
 
+## [3.11.0](https://github.com/jm33-m0/emp3r0r/compare/v3.10.3...v3.11.0) (2026-01-12)
+
+
+### Features
+
+* add `process_list_handles` COFF module for testing ([538eca8](https://github.com/jm33-m0/emp3r0r/commit/538eca89af26fa16edf8d4b6763e7ac0f83caec9))
+* add COFF module support ([1524961](https://github.com/jm33-m0/emp3r0r/commit/1524961f115ed39233c83a84e337adf19d061a51))
+* refactor module configuration and invocation handling ([55277dc](https://github.com/jm33-m0/emp3r0r/commit/55277dc5e84c92258b81d3cec3df4ef43ce95afa))
+
+
+### Bug Fixes
+
+* enhance COFF value normalization to support additional integer types and improve test coverage ([22ca47b](https://github.com/jm33-m0/emp3r0r/commit/22ca47b646941cd7a8a997aac27bb984dbb8ae52))
+* handle panic in `runCOFFModule` to improve stability ([0e6f368](https://github.com/jm33-m0/emp3r0r/commit/0e6f3688159893124ab7421fca23325c80f088f0))
+* improve agent config extraction logic to handle raw bytes and legacy padded blobs ([26ab5e6](https://github.com/jm33-m0/emp3r0r/commit/26ab5e64475a9cb9e31ae5826ce5166fc0ab7466))
+* optimize hello message acknowledgment logic in MsgTunneler ([c069335](https://github.com/jm33-m0/emp3r0r/commit/c0693357279073631d8e5f8a690d065f8d4da586))
+* update COFF value normalization to include prefixes for types ([576b625](https://github.com/jm33-m0/emp3r0r/commit/576b62548014a5c4711a005f3587a26603e09a5b))
+* update Windows build support with conditional GUI flag so `debug` mode can work ([58aa91c](https://github.com/jm33-m0/emp3r0r/commit/58aa91c8ceb02fa27148b65a8857662b33418322))
+
 ## [3.10.3](https://github.com/jm33-m0/emp3r0r/compare/v3.10.2...v3.10.3) (2026-01-05)
 
 
