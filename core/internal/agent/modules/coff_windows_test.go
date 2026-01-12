@@ -6,7 +6,6 @@ package modules
 import (
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 
@@ -101,14 +100,6 @@ func TestNormalizeCoffValuePrefixes(t *testing.T) {
 }
 
 func TestRunCOFFModuleWithRealBOF(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skip BOF integration in short mode")
-	}
-
-	if os.Getenv("EMP3R0R_RUN_REAL_BOF") != "1" {
-		t.Skip("set EMP3R0R_RUN_REAL_BOF=1 to run BOF integration (requires working goffloader + admin)")
-	}
-
 	// Non-privileged BOF to avoid admin requirement
 	const url = "https://github.com/praetorian-inc/goffloader/raw/refs/heads/main/cmd/bof_example/whoami.x64.o"
 	resp, err := http.Get(url)
