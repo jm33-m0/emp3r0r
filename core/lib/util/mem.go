@@ -27,11 +27,14 @@ func ExtractData() (data []byte, err error) {
 }
 
 func extractFromAgentConfig() ([]byte, error) {
-	// Get raw config bytes and strip trailing null bytes
-	enc_config := bytes.Trim(def.AgentConfig[:], "\x00")
+	// Try raw bytes first; some payloads legitimately end with 0x00.
+	if data, err := VerifyConfigData(def.AgentConfig); err == nil {
+		return data, nil
+	}
 
-	// decrypt and verify
-	return VerifyConfigData(enc_config)
+	// Fallback: trim trailing zeros for legacy padded blobs.
+	encConfig := bytes.TrimRight(def.AgentConfig, "\x00")
+	return VerifyConfigData(encConfig)
 }
 
 func VerifyConfigData(data []byte) (jsonData []byte, err error) {
