@@ -33,10 +33,29 @@ jobs:
         working-directory: ./core
         run: go mod tidy
 
-      - name: Run tests
+      - name: Run tests (Linux, with race & coverage)
+        if: runner.os == 'Linux'
         working-directory: ./core
+        env:
+          EMP3R0R_RACE_ON: "1"
         run: |
           go test -v -race "-coverprofile=coverage.txt" -covermode=atomic ./...
+
+      - name: Run tests (Windows, with race)
+        if: runner.os == 'Windows'
+        working-directory: ./core
+        env:
+          EMP3R0R_RACE_ON: "1"
+        run: |
+          go test -v -race ./...
+
+      - name: Run BOF integration without race (Windows only)
+        if: runner.os == 'Windows'
+        working-directory: ./core
+        env:
+          EMP3R0R_RACE_ON: "0"
+        run: |
+          go test -v ./internal/agent/modules -run TestRunCOFFModuleWithRealBOF
 
       - name: Display coverage summary
         if: runner.os == 'Linux'

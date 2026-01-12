@@ -6,6 +6,7 @@ package modules
 import (
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 
@@ -100,6 +101,10 @@ func TestNormalizeCoffValuePrefixes(t *testing.T) {
 }
 
 func TestRunCOFFModuleWithRealBOF(t *testing.T) {
+	if os.Getenv("EMP3R0R_RACE_ON") == "1" {
+		t.Skip("skipped under race run (EMP3R0R_RACE_ON=1)")
+	}
+
 	// Non-privileged BOF to avoid admin requirement
 	const url = "https://github.com/praetorian-inc/goffloader/raw/refs/heads/main/cmd/bof_example/whoami.x64.o"
 	resp, err := http.Get(url)
