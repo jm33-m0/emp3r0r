@@ -59,11 +59,14 @@ build_agent_stub() {
   local tags="netgo agent"
   [[ "$arg1" != "--debug" ]] && tags="netgo release agent"
 
+  local win_gui_flag=""
+  [[ "$arg1" != "--debug" ]] && win_gui_flag="-H=windowsgui "
+
   local build_cmd="CGO_ENABLED=0 GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -trimpath -buildvcs=false -tags '$tags' -o \\\"$temp/$output\\\" -ldflags=\\\"$ldflags\\\"\""
 
   if [[ "$os" = "windows" ]]; then
     # Windows builds also need the release tag
-    build_cmd="CGO_ENABLED=0 GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -trimpath -buildvcs=false -tags '$tags' -o \\\"$temp/$output\\\" -ldflags=\\\"-H=windowsgui $ldflags\\\"\""
+    build_cmd="CGO_ENABLED=0 GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -trimpath -buildvcs=false -tags '$tags' -o \\\"$temp/$output\\\" -ldflags=\\\"${win_gui_flag}${ldflags}\\\"\""
   fi
   echo "Running: $build_cmd"
   {
@@ -80,17 +83,19 @@ build_shared_object() {
   local build_cmd
   local extldflags="-nostdlib -nodefaultlibs -static"
   [[ "$arg1" != "--debug" ]] && extldflags="-s $extldflags"
+  local win_gui_flag=""
+  [[ "$arg1" != "--debug" ]] && win_gui_flag="-H=windowsgui "
   case "$os" in
   windows)
     case "$arch" in
     386)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86-windows-gnu\" CXX=\"zig c++ -target x86-windows-gnu\" GOOS=$os GOARCH=$arch $gobuild_cmd $build_opt -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -H=windowsgui -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86-windows-gnu\" CXX=\"zig c++ -target x86-windows-gnu\" GOOS=$os GOARCH=$arch $gobuild_cmd $build_opt -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"${win_gui_flag}$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     amd64)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86_64-windows-gnu\" CXX=\"zig c++ -target x86_64-windows-gnu\" GOOS=$os GOARCH=$arch $gobuild_cmd $build_opt -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -H=windowsgui -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86_64-windows-gnu\" CXX=\"zig c++ -target x86_64-windows-gnu\" GOOS=$os GOARCH=$arch $gobuild_cmd $build_opt -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"${win_gui_flag}$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     arm64)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target aarch64-windows-gnu\" CXX=\"zig c++ -target aarch64-windows-gnu\" GOOS=$os GOARCH=$arch $gobuild_cmd $build_opt -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -H=windowsgui -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target aarch64-windows-gnu\" CXX=\"zig c++ -target aarch64-windows-gnu\" GOOS=$os GOARCH=$arch $gobuild_cmd $build_opt -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"${win_gui_flag}$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     esac
     ;;
