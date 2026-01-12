@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 )
 
 func TestReadModConfig(t *testing.T) {
@@ -189,5 +190,232 @@ func TestResolveInvocationMissingRequired(t *testing.T) {
 
 	if _, err := resolveInvocation(config, nil); err == nil {
 		t.Fatalf("expected error for missing required option")
+	}
+}
+
+func TestReadModConfigFullInvocationAndAgentConfig(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "emp3r0r-full")
+	if err != nil {
+		t.Fatalf("temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	jsonConfig := `{
+		"name": "coff_mod",
+		"build": "make",
+		"author": "tester",
+		"date": "2025-01-01",
+		"comment": "full coverage",
+		"is_local": false,
+		"platform": "Windows",
+		"path": "",
+		"fileless": true,
+		"agent_config": {
+			"exec": "mod.exe",
+			"files": ["mod.exe"],
+			"in_memory": false,
+			"type": "coff",
+			"interactive": false,
+			"work_dir": "C:/tmp",
+			"needs_root": true
+		},
+		"parameters": [
+			{
+				"name": "flagged",
+				"description": "flag option",
+				"default": "on",
+				"choices": ["on", "off"],
+				"type": "enum",
+				"required": true,
+				"pattern": "on|off",
+				"encoding": "utf8",
+				"secret": false,
+				"min": 0,
+				"max": 1
+			}
+		],
+		"invocation": {
+			"argv": [
+				{"literal": "runner"},
+				{"flag": "-o", "param": "flagged"}
+			],
+			"stdin_param": "flagged",
+			"timeout_seconds": 42,
+			"coff": {
+				"export": "Run",
+				"args": [{"param": "flagged", "literal": "on", "wire_type": "LPSTR", "encoding": "utf8"}]
+			}
+		}
+	}`
+
+	configFile := filepath.Join(tmpDir, "config.json")
+	if err := os.WriteFile(configFile, []byte(jsonConfig), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	config, err := readModCondig(configFile)
+	if err != nil {
+		t.Fatalf("readModCondig: %v", err)
+	}
+
+	if got := config.Invocation.TimeoutSeconds; got != 42 {
+		t.Fatalf("timeout mismatch: %d", got)
+	}
+	if config.Invocation.StdinParam != "flagged" {
+		t.Fatalf("stdin param mismatch: %s", config.Invocation.StdinParam)
+	}
+	if config.Invocation.Coff == nil || config.Invocation.Coff.Export != "Run" || len(config.Invocation.Coff.Args) != 1 {
+		t.Fatalf("coff invocation parsed incorrectly: %+v", config.Invocation.Coff)
+	}
+	opt := config.Options["flagged"]
+	if opt == nil || opt.Required != true || opt.Pattern == "" || opt.Encoding != "utf8" || opt.Min == nil || opt.Max == nil {
+		t.Fatalf("option metadata missing: %+v", opt)
+	}
+	if config.AgentConfig.WorkDir != "C:/tmp" || !config.AgentConfig.NeedsRoot {
+		t.Fatalf("agent config fields not parsed: %+v", config.AgentConfig)
+	}
+}
+
+func TestReadModConfigLegacyOptions(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "emp3r0r-legacy")
+	if err != nil {
+		t.Fatalf("temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	jsonConfig := `{
+		"name": "legacy_mod",
+		"options": {
+			"old": {"opt_name": "old", "opt_desc": "legacy", "opt_val": "x", "opt_vals": ["x"]}
+		},
+		"parameters": [],
+		"invocation": {"argv": []}
+	}`
+	configFile := filepath.Join(tmpDir, "config.json")
+	if err := os.WriteFile(configFile, []byte(jsonConfig), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	config, err := readModCondig(configFile)
+	if err != nil {
+		t.Fatalf("readModCondig: %v", err)
+	}
+
+	opt := config.Options["old"]
+	if opt == nil || opt.Val != "x" || opt.Type != "string" {
+		t.Fatalf("legacy option not parsed: %+v", opt)
+	}
+}
+
+func TestUpdateModuleHelp(t *testing.T) {
+	modName := "help_mod"
+	config := &def.ModuleConfig{
+		Name: modName,
+		Options: def.ModOptions{
+			"foo": {Name: "foo", Desc: "bar"},
+		},
+	}
+	def.Modules[modName] = config
+	defer delete(def.Modules, modName)
+
+	if err := updateModuleHelp(config); err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if def.Modules[modName].Options["foo"].Desc != "bar" {
+		t.Fatalf("help map not applied")
+	}
+
+	config.Options["foo"].Desc = ""
+	if err := updateModuleHelp(config); err == nil {
+		t.Fatalf("expected error when desc missing")
+	}
+}
+
+func TestInitModulesLoadsLocalModule(t *testing.T) {
+	tmpRoot, err := os.MkdirTemp("", "emp3r0r-init")
+	if err != nil {
+		t.Fatalf("temp root: %v", err)
+	}
+	defer os.RemoveAll(tmpRoot)
+
+	moduleDir := filepath.Join(tmpRoot, "mods")
+	if err := os.MkdirAll(filepath.Join(moduleDir, "foo"), 0o755); err != nil {
+		t.Fatalf("mkdir module: %v", err)
+	}
+
+	jsonConfig := `{
+		"name": "foo",
+		"is_local": true,
+		"agent_config": {"exec": "foo.sh", "type": "bash"},
+		"invocation": {"argv": []}
+	}`
+	configFile := filepath.Join(moduleDir, "foo", "config.json")
+	if err := os.WriteFile(configFile, []byte(jsonConfig), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	origModules := len(def.Modules)
+	origRunners := ModuleRunners
+	origModuleDirs := live.ModuleDirs
+	origWorkspace := live.EmpWorkSpace
+	ModuleRunners = make(map[string]func())
+	for k, v := range origRunners {
+		ModuleRunners[k] = v
+	}
+	defer func() {
+		for k := range ModuleRunners {
+			delete(ModuleRunners, k)
+		}
+		for k, v := range origRunners {
+			ModuleRunners[k] = v
+		}
+		delete(def.Modules, "foo")
+		live.ModuleDirs = origModuleDirs
+		live.EmpWorkSpace = origWorkspace
+	}()
+
+	live.EmpWorkSpace = filepath.Join(tmpRoot, "workspace")
+	live.ModuleDirs = []string{moduleDir}
+
+	InitModules()
+
+	if len(def.Modules) != origModules+1 {
+		t.Fatalf("module not loaded")
+	}
+	if _, ok := ModuleRunners["foo"]; !ok {
+		t.Fatalf("custom runner not registered")
+	}
+	loaded, ok := def.Modules["foo"]
+	if !ok {
+		t.Fatalf("module not stored")
+	}
+	expectedPath := filepath.Join(live.EmpWorkSpace, "modules", "foo")
+	if loaded.Path != expectedPath {
+		t.Fatalf("path not rewritten for local module: %s", loaded.Path)
+	}
+}
+
+func TestUpdateOptionsAddsDownloadAddr(t *testing.T) {
+	modName := "dl_mod"
+	def.Modules[modName] = &def.ModuleConfig{
+		Name:        modName,
+		IsLocal:     false,
+		AgentConfig: def.AgentModuleConfig{Exec: "custom"},
+	}
+	defer delete(def.Modules, modName)
+
+	ModuleRunners[modName] = func() {}
+	defer delete(ModuleRunners, modName)
+
+	live.ActiveModule = &def.ModuleConfig{Name: modName, Options: def.ModOptions{}}
+	if !UpdateOptions(modName) {
+		t.Fatalf("expected module to exist")
+	}
+	if _, ok := live.ActiveModule.Options["download_addr"]; !ok {
+		t.Fatalf("download_addr not injected")
+	}
+
+	if UpdateOptions("missing") {
+		t.Fatalf("expected missing module to return false")
 	}
 }
