@@ -1,0 +1,41 @@
+{
+  "name": "process_list_handles",
+  "build": "",
+  "author": "jm33-ng",
+  "date": "2025-12-12",
+  "comment": "A BOF for test",
+  "is_local": false,
+  "platform": "Windows",
+  "path": "",
+  "fileless": true,
+  "parameters": [
+    {
+      "name": "pid",
+      "description": "Process ID to enumerate",
+      "default": "",
+      "type": "int",
+      "required": true
+    }
+  ],
+  "agent_config": {
+    "exec": "",
+    "files": [
+      "ProcessListHandles.x64.o"
+    ],
+    "in_memory": true,
+    "type": "coff",
+    "interactive": false
+  },
+  "invocation": {
+    "argv": [],
+    "coff": {
+      "export": "go",
+      "args": [
+        {
+          "param": "pid",
+          "wire_type": "INT"
+        }
+      ]
+    }
+  }
+}
