@@ -127,15 +127,12 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 			if strings.HasPrefix(string(resp), def.TransportString) {
 				logging.Printf("Hello (%s) received", resp)
 				// mark the hello as success
-				for hello := range HandShakes {
-					if msg.CmdID == hello {
-						logging.Printf("Hello (%s) acknowledged", resp)
-						HandShakesMutex.Lock()
-						HandShakes[hello] = true
-						HandShakesMutex.Unlock()
-						break
-					}
+				HandShakesMutex.Lock()
+				if _, ok := HandShakes[msg.CmdID]; ok {
+					logging.Printf("Hello (%s) acknowledged", resp)
+					HandShakes[msg.CmdID] = true
 				}
+				HandShakesMutex.Unlock()
 				continue
 			}
 
