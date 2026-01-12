@@ -51,6 +51,32 @@ func TestRunCOFFModuleInvalidPayload(t *testing.T) {
 	}
 }
 
+func TestNormalizeCoffValuePrefixes(t *testing.T) {
+	val, err := normalizeCoffValue(def.ResolvedCoffArg{WireType: "INT", Value: 123})
+	if err != nil {
+		t.Fatalf("normalizeCoffValue int: %v", err)
+	}
+	if !strings.HasPrefix(val, "i") {
+		t.Fatalf("expected int prefix 'i', got %q", val)
+	}
+
+	val, err = normalizeCoffValue(def.ResolvedCoffArg{WireType: "LPSTR", Value: "hi"})
+	if err != nil {
+		t.Fatalf("normalizeCoffValue string: %v", err)
+	}
+	if !strings.HasPrefix(val, "z") {
+		t.Fatalf("expected string prefix 'z', got %q", val)
+	}
+
+	val, err = normalizeCoffValue(def.ResolvedCoffArg{WireType: "BINARY", Value: []byte{0x01, 0x02}})
+	if err != nil {
+		t.Fatalf("normalizeCoffValue binary: %v", err)
+	}
+	if !strings.HasPrefix(val, "b") {
+		t.Fatalf("expected binary prefix 'b', got %q", val)
+	}
+}
+
 func TestRunCOFFModuleWithRealBOF(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skip BOF integration in short mode")

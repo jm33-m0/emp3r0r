@@ -55,40 +55,40 @@ func normalizeCoffValue(arg def.ResolvedCoffArg) (string, error) {
 
 	switch wireType {
 	case "LPWSTR", "LPSTR":
-		return fmt.Sprint(val), nil
+		return "z" + fmt.Sprint(val), nil
 	case "BOOL":
 		switch v := val.(type) {
 		case bool:
-			return strconv.FormatBool(v), nil
+			return "i" + strconv.FormatBool(v), nil
 		case string:
 			b, err := strconv.ParseBool(v)
 			if err != nil {
 				return "", fmt.Errorf("invalid bool value %q", v)
 			}
-			return strconv.FormatBool(b), nil
+			return "i" + strconv.FormatBool(b), nil
 		case float64:
-			return strconv.FormatBool(v != 0), nil
+			return "i" + strconv.FormatBool(v != 0), nil
 		}
 	case "DWORD", "QWORD", "SIZE_T", "HANDLE", "UINT", "INT", "PORT":
 		switch v := val.(type) {
 		case float64:
-			return strconv.FormatFloat(v, 'f', -1, 64), nil
+			return "i" + strconv.FormatFloat(v, 'f', -1, 64), nil
 		case string:
 			num, err := strconv.ParseFloat(v, 64)
 			if err != nil {
 				return "", fmt.Errorf("invalid numeric value %q", v)
 			}
-			return strconv.FormatFloat(num, 'f', -1, 64), nil
+			return "i" + strconv.FormatFloat(num, 'f', -1, 64), nil
 		}
 	case "BINARY":
 		switch v := val.(type) {
 		case string:
 			if decoded, err := base64.StdEncoding.DecodeString(v); err == nil {
-				return base64.StdEncoding.EncodeToString(decoded), nil
+				return "b" + base64.StdEncoding.EncodeToString(decoded), nil
 			}
-			return base64.StdEncoding.EncodeToString([]byte(v)), nil
+			return "b" + base64.StdEncoding.EncodeToString([]byte(v)), nil
 		case []byte:
-			return base64.StdEncoding.EncodeToString(v), nil
+			return "b" + base64.StdEncoding.EncodeToString(v), nil
 		case []interface{}:
 			buf := make([]byte, 0, len(v))
 			for _, b := range v {
@@ -96,7 +96,7 @@ func normalizeCoffValue(arg def.ResolvedCoffArg) (string, error) {
 					buf = append(buf, byte(num))
 				}
 			}
-			return base64.StdEncoding.EncodeToString(buf), nil
+			return "b" + base64.StdEncoding.EncodeToString(buf), nil
 		}
 	}
 

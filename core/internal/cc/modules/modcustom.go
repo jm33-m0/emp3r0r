@@ -143,8 +143,9 @@ func handleInMemoryModule(config def.ModuleConfig, payload_type, invocationB64, 
 		logging.Errorf("Writing %s: %v", hosted_file, err)
 		return
 	}
+	fileToDownload := filepath.Base(hosted_file)
 	cmd := fmt.Sprintf("%s --mod_name %s --type %s --file_to_download %s --checksum %s --in_mem --invocation %s",
-		def.C2CmdCustomModule, live.ActiveModule.Name, payload_type, util.FileBaseName(hosted_file), crypto.SHA256SumFile(hosted_file), strconv.Quote(invocationB64))
+		def.C2CmdCustomModule, live.ActiveModule.Name, payload_type, fileToDownload, crypto.SHA256SumFile(hosted_file), strconv.Quote(invocationB64))
 	if download_addr != "" {
 		cmd += fmt.Sprintf(" --download_addr %s", strconv.Quote(download_addr))
 	}

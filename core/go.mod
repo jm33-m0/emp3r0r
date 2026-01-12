@@ -22,7 +22,6 @@ require (
 	github.com/jm33-m0/arc/v2 v2.0.1
 	github.com/jm33-m0/go-cdn2proxy v1.1.2
 	github.com/jm33-m0/go-console v1.0.4
-	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/kbinani/screenshot v0.0.0-20250624051815-089614a94018
 	github.com/lithammer/fuzzysearch v1.1.8
 	github.com/mholt/archives v0.1.5
@@ -80,6 +79,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jaypipes/pcidb v1.1.1 // indirect
 	github.com/jezek/xgb v1.2.0 // indirect
+	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/klauspost/compress v1.18.2 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/klauspost/pgzip v1.2.6 // indirect
