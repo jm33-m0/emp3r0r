@@ -36,6 +36,7 @@ emp3r0r is a comprehensive post-exploitation framework that stands out as one of
 - **Universal Module Support**: Execute Bash, PowerShell, Python, DLL, SO, and EXE modules seamlessly across platforms.
 - **Advanced Stealth**: Dynamic process obfuscation, file concealment, time-stomping, and **lazy initialization** (filesystem modifications only on demand).
 - **Modern Infrastructure**: WireGuard + mTLS operator authentication, HTTP2/TLS with JA3 evasion, KCP-based UDP tunneling.
+- **COFF/BOF Loader**: Native BOF execution on Windows agents with typed argument packing (LPSTR/LPWSTR/INT/BOOL/BINARY), powered by [praetorian-inc/goffloader](https://github.com/praetorian-inc/goffloader), and integration-friendly module schema.
 - **APT-Grade Connectivity**: **Auto-Proxy Chain** creates a resilient, automatic P2P mesh network. Agents in air-gapped or isolated segments autonomously discover and piggyback on internet-connected peers to reach the C2, ensuring long-term survival in hardened environments.
 - **Bring2CC**: Reverse proxy any target port to the C2 server, enabling direct access to internal resources even when agents cannot make outbound connections.
 
@@ -190,6 +191,7 @@ Join our [Discord server](https://discord.gg/vU98aQtk9f) for real-time discussio
 - 📋 [Features Overview](./FEATURES.md)
 - 📝 [Security Policy](./SECURITY.md)
 - 📜 [Changelog](./CHANGELOG.md)
+- 📦 [Module Development (including COFF/BOF)](./emp3r0r.wiki/Modules.md)
 
 ### Troubleshooting
 
