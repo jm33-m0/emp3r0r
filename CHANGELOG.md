@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.11.1](https://github.com/jm33-m0/emp3r0r/compare/v3.11.0...v3.11.1) (2026-01-12)
+
+
+### Bug Fixes
+
+* replace HandShakes map with sync.Map for concurrent access ([5661133](https://github.com/jm33-m0/emp3r0r/commit/56611331072d4fb584c0009d01d63e589f0c3f0e))
+
 ## [3.11.0](https://github.com/jm33-m0/emp3r0r/compare/v3.10.3...v3.11.0) (2026-01-12)
 
 
