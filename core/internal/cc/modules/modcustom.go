@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -52,25 +53,35 @@ func moduleCustom() {
 	download_addr := getDownloadAddr()
 
 	// agent side configs
-	payload_type, exec_cmd, envStr, err := genModStartCmd(config)
+	payload_type := config.AgentConfig.Type
+	invocation, err := resolveInvocation(config, live.ActiveModule.Options)
 	if err != nil {
-		logging.Errorf("Parsing module config: %v", err)
+		logging.Errorf("Parsing module invocation: %v", err)
 		return
 	}
 
-	// instead of capturing the output of the command, we use ssh to access the interactive shell provided by the module
+	// interactive modules rely on echo handshake before SSH handoff
 	if config.AgentConfig.IsInteractive {
-		exec_cmd = fmt.Sprintf("echo %s", strconv.Quote(crypto.SHA256SumRaw([]byte(def.MagicString))))
+		invocation.Argv = []string{"echo", crypto.SHA256SumRaw([]byte(def.MagicString))}
+		invocation.Stdin = ""
+		invocation.Coff = nil
 	}
+
+	invBytes, err := json.Marshal(invocation)
+	if err != nil {
+		logging.Errorf("Encoding invocation: %v", err)
+		return
+	}
+	invB64 := base64.StdEncoding.EncodeToString(invBytes)
 
 	// if in-memory module
 	if config.AgentConfig.InMemory {
-		handleInMemoryModule(*config, payload_type, envStr, download_addr)
+		handleInMemoryModule(*config, payload_type, invB64, download_addr)
 		return
 	}
 
 	// other modules that need to be saved to disk
-	handleCompressedModule(*config, payload_type, exec_cmd, envStr, download_addr)
+	handleCompressedModule(*config, payload_type, invB64, download_addr)
 }
 
 func build_module(config *def.ModuleConfig) (out []byte, err error) {
@@ -106,7 +117,7 @@ func getDownloadAddr() string {
 	return ""
 }
 
-func handleInMemoryModule(config def.ModuleConfig, payload_type, envStr, download_addr string) {
+func handleInMemoryModule(config def.ModuleConfig, payload_type, invocationB64, download_addr string) {
 	hosted_file := live.WWWRoot + live.ActiveModule.Name + ".xz"
 	logging.Infof("Compressing %s with xz...", live.ActiveModule.Name)
 
@@ -132,8 +143,8 @@ func handleInMemoryModule(config def.ModuleConfig, payload_type, envStr, downloa
 		logging.Errorf("Writing %s: %v", hosted_file, err)
 		return
 	}
-	cmd := fmt.Sprintf("%s --mod_name %s --type %s --file_to_download %s --checksum %s --in_mem --env \"%s\"",
-		def.C2CmdCustomModule, live.ActiveModule.Name, payload_type, util.FileBaseName(hosted_file), crypto.SHA256SumFile(hosted_file), envStr)
+	cmd := fmt.Sprintf("%s --mod_name %s --type %s --file_to_download %s --checksum %s --in_mem --invocation %s",
+		def.C2CmdCustomModule, live.ActiveModule.Name, payload_type, util.FileBaseName(hosted_file), crypto.SHA256SumFile(hosted_file), strconv.Quote(invocationB64))
 	if download_addr != "" {
 		cmd += fmt.Sprintf(" --download_addr %s", strconv.Quote(download_addr))
 	}
@@ -145,7 +156,7 @@ func handleInMemoryModule(config def.ModuleConfig, payload_type, envStr, downloa
 	}
 }
 
-func handleCompressedModule(config def.ModuleConfig, payload_type, exec_cmd, envStr, download_addr string) {
+func handleCompressedModule(config def.ModuleConfig, payload_type, invocationB64, download_addr string) {
 	tarball_path := live.WWWRoot + live.ActiveModule.Name + ".tar.xz"
 	file_to_download := filepath.Base(tarball_path)
 	if !util.IsFileExist(tarball_path) {
@@ -163,9 +174,9 @@ func handleCompressedModule(config def.ModuleConfig, payload_type, exec_cmd, env
 	}
 
 	checksum := crypto.SHA256SumFile(tarball_path)
-	cmd := fmt.Sprintf("%s --mod_name %s --checksum %s --env \"%s\" --type %s --file_to_download %s --exec \"%s\"",
+	cmd := fmt.Sprintf("%s --mod_name %s --checksum %s --invocation %s --type %s --file_to_download %s",
 		def.C2CmdCustomModule,
-		live.ActiveModule.Name, checksum, envStr, payload_type, file_to_download, exec_cmd)
+		live.ActiveModule.Name, checksum, strconv.Quote(invocationB64), payload_type, file_to_download)
 	if download_addr != "" {
 		cmd += fmt.Sprintf(" --download_addr %s", strconv.Quote(download_addr))
 	}
@@ -307,104 +318,165 @@ func InitModules() {
 
 // readModCondig read config.json of a module
 func readModCondig(file string) (pconfig *def.ModuleConfig, err error) {
-	// read JSON
+	type legacyOption struct {
+		OptName string   `json:"opt_name"`
+		OptDesc string   `json:"opt_desc"`
+		OptVal  string   `json:"opt_val"`
+		OptVals []string `json:"opt_vals"`
+	}
+
+	type optionJSON struct {
+		Name     string   `json:"name"`
+		Desc     string   `json:"description"`
+		Val      string   `json:"default"`
+		Vals     []string `json:"choices"`
+		Type     string   `json:"type"`
+		Required bool     `json:"required"`
+		Pattern  string   `json:"pattern"`
+		Encoding string   `json:"encoding"`
+		Secret   bool     `json:"secret"`
+		Min      *float64 `json:"min"`
+		Max      *float64 `json:"max"`
+	}
+
+	type invocationArgJSON struct {
+		Literal string      `json:"literal"`
+		Flag    string      `json:"flag"`
+		Param   string      `json:"param"`
+		Value   interface{} `json:"value"`
+	}
+
+	type coffArgJSON struct {
+		Param    string      `json:"param"`
+		Literal  interface{} `json:"literal"`
+		WireType string      `json:"wire_type"`
+		Encoding string      `json:"encoding"`
+	}
+
+	type coffJSON struct {
+		Export string        `json:"export"`
+		Args   []coffArgJSON `json:"args"`
+	}
+
+	type invocationJSON struct {
+		Argv           []invocationArgJSON `json:"argv"`
+		StdinParam     string              `json:"stdin_param"`
+		TimeoutSeconds int                 `json:"timeout_seconds"`
+		Coff           *coffJSON           `json:"coff"`
+	}
+
+	type agentConfigJSON struct {
+		Exec          string   `json:"exec"`
+		Files         []string `json:"files"`
+		InMemory      bool     `json:"in_memory"`
+		Type          string   `json:"type"`
+		IsInteractive bool     `json:"interactive"`
+		WorkDir       string   `json:"work_dir"`
+		NeedsRoot     bool     `json:"needs_root"`
+	}
+
+	type moduleConfigJSON struct {
+		Name        string                  `json:"name"`
+		Build       string                  `json:"build"`
+		Author      string                  `json:"author"`
+		Date        string                  `json:"date"`
+		Comment     string                  `json:"comment"`
+		IsLocal     bool                    `json:"is_local"`
+		Platform    string                  `json:"platform"`
+		Path        string                  `json:"path"`
+		Fileless    bool                    `json:"fileless"`
+		AgentConfig agentConfigJSON         `json:"agent_config"`
+		Parameters  []optionJSON            `json:"parameters"`
+		LegacyOpts  map[string]legacyOption `json:"options"`
+		Invocation  invocationJSON          `json:"invocation"`
+	}
+
 	jsonData, err := os.ReadFile(file)
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %v", file, err)
 	}
 
-	// parse the json
-	var raw map[string]interface{}
-	err = json.Unmarshal(jsonData, &raw)
-	if err != nil {
+	var raw moduleConfigJSON
+	if err = json.Unmarshal(jsonData, &raw); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal JSON config: %v", err)
 	}
 
-	config := def.ModuleConfig{}
+	config := def.ModuleConfig{
+		Name:     raw.Name,
+		Build:    raw.Build,
+		Author:   raw.Author,
+		Date:     raw.Date,
+		Comment:  raw.Comment,
+		IsLocal:  raw.IsLocal,
+		Platform: raw.Platform,
+		Path:     raw.Path,
+		Fileless: raw.Fileless,
+		Options:  def.ModOptions{},
+		AgentConfig: def.AgentModuleConfig{
+			Exec:          raw.AgentConfig.Exec,
+			Files:         raw.AgentConfig.Files,
+			InMemory:      raw.AgentConfig.InMemory,
+			Type:          raw.AgentConfig.Type,
+			IsInteractive: raw.AgentConfig.IsInteractive,
+			WorkDir:       raw.AgentConfig.WorkDir,
+			NeedsRoot:     raw.AgentConfig.NeedsRoot,
+		},
+	}
 
-	// Helper to safely extract string
-	getString := func(m map[string]interface{}, key string) string {
-		if val, ok := m[key].(string); ok {
-			return val
+	config.Invocation.TimeoutSeconds = raw.Invocation.TimeoutSeconds
+	config.Invocation.StdinParam = raw.Invocation.StdinParam
+	for _, arg := range raw.Invocation.Argv {
+		config.Invocation.Argv = append(config.Invocation.Argv, def.InvocationArg{
+			Literal: arg.Literal,
+			Flag:    arg.Flag,
+			Param:   arg.Param,
+		})
+	}
+	if raw.Invocation.Coff != nil {
+		coff := def.CoffInvocation{Export: raw.Invocation.Coff.Export}
+		for _, arg := range raw.Invocation.Coff.Args {
+			coff.Args = append(coff.Args, def.CoffArgSpec{
+				Param:    arg.Param,
+				Literal:  arg.Literal,
+				WireType: arg.WireType,
+				Encoding: arg.Encoding,
+			})
 		}
-		return ""
+		config.Invocation.Coff = &coff
 	}
 
-	// Helper to safely extract bool
-	getBool := func(m map[string]interface{}, key string) bool {
-		if val, ok := m[key].(bool); ok {
-			return val
+	for _, p := range raw.Parameters {
+		if p.Name == "" {
+			continue
 		}
-		return false
-	}
-
-	// Helper to safely extract string slice
-	getStringSlice := func(m map[string]interface{}, key string) []string {
-		if val, ok := m[key].([]interface{}); ok {
-			var res []string
-			for _, v := range val {
-				if s, ok := v.(string); ok {
-					res = append(res, s)
-				}
-			}
-			return res
+		config.Options[p.Name] = &def.ModOption{
+			Name:     p.Name,
+			Desc:     p.Desc,
+			Val:      p.Val,
+			Vals:     p.Vals,
+			Type:     p.Type,
+			Required: p.Required,
+			Pattern:  p.Pattern,
+			Encoding: p.Encoding,
+			Secret:   p.Secret,
+			Min:      p.Min,
+			Max:      p.Max,
 		}
-		return []string{}
 	}
 
-	config.Name = getString(raw, "name")
-	config.Build = getString(raw, "build")
-	config.Author = getString(raw, "author")
-	config.Date = getString(raw, "date")
-	config.Comment = getString(raw, "comment")
-	config.IsLocal = getBool(raw, "is_local")
-	config.Platform = getString(raw, "platform")
-	config.Path = getString(raw, "path")
-	config.Fileless = getBool(raw, "fileless")
-
-	// AgentConfig
-	if agentConfigMap, ok := raw["agent_config"].(map[string]interface{}); ok {
-		config.AgentConfig.Exec = getString(agentConfigMap, "exec")
-		config.AgentConfig.Files = getStringSlice(agentConfigMap, "files")
-		config.AgentConfig.InMemory = getBool(agentConfigMap, "in_memory")
-		config.AgentConfig.Type = getString(agentConfigMap, "type")
-		config.AgentConfig.IsInteractive = getBool(agentConfigMap, "interactive")
-	}
-
-	// Options
-	config.Options = make(def.ModOptions)
-	if optionsMap, ok := raw["options"].(map[string]interface{}); ok {
-		for key, val := range optionsMap {
-			if optMap, ok := val.(map[string]interface{}); ok {
-				opt := &def.ModOption{}
-				opt.Name = getString(optMap, "opt_name")
-				opt.Desc = getString(optMap, "opt_desc")
-				opt.Val = getString(optMap, "opt_val")
-				opt.Vals = getStringSlice(optMap, "opt_vals")
-				config.Options[key] = opt
+	if len(config.Options) == 0 && len(raw.LegacyOpts) > 0 {
+		for key, opt := range raw.LegacyOpts {
+			config.Options[key] = &def.ModOption{
+				Name: opt.OptName,
+				Desc: opt.OptDesc,
+				Val:  opt.OptVal,
+				Vals: opt.OptVals,
+				Type: "string",
 			}
 		}
 	}
 
 	pconfig = &config
-	return
-}
-
-// genModStartCmd reads config.json of a module and generates env string (VAR=value,VAR2=value2 ...)
-func genModStartCmd(config *def.ModuleConfig) (payload_type, exec_path, envStr string, err error) {
-	exec_path = config.AgentConfig.Exec
-	payload_type = config.AgentConfig.Type
-	var builder strings.Builder
-
-	setEnvVar := func(opt, value string) {
-		fmt.Fprintf(&builder, "%s=%s,", opt, value)
-	}
-	for opt, modOption := range config.Options {
-		setEnvVar(opt, modOption.Val)
-	}
-
-	envStr = builder.String()
-
 	return
 }
 
@@ -418,4 +490,145 @@ func updateModuleHelp(config *def.ModuleConfig) error {
 		def.Modules[config.Name].Options = help_map
 	}
 	return nil
+}
+
+// resolveInvocation renders an invocation with concrete values from module options
+func resolveInvocation(config *def.ModuleConfig, userOpts def.ModOptions) (def.ResolvedInvocation, error) {
+	resolved := def.ResolvedInvocation{TimeoutSeconds: config.Invocation.TimeoutSeconds}
+
+	lookupOpt := func(name string) (*def.ModOption, error) {
+		if userOpts != nil {
+			if opt, ok := userOpts[name]; ok && opt != nil {
+				return opt, nil
+			}
+		}
+		if config.Options != nil {
+			if opt, ok := config.Options[name]; ok && opt != nil {
+				return opt, nil
+			}
+		}
+		return nil, fmt.Errorf("option %s not provided", name)
+	}
+
+	coerceVal := func(name string) (string, interface{}, error) {
+		opt, err := lookupOpt(name)
+		if err != nil {
+			return "", nil, err
+		}
+		return renderOptionValue(opt)
+	}
+
+	for _, arg := range config.Invocation.Argv {
+		switch {
+		case arg.Literal != "":
+			resolved.Argv = append(resolved.Argv, arg.Literal)
+		case arg.Flag != "" && arg.Param != "":
+			strVal, _, err := coerceVal(arg.Param)
+			if err != nil {
+				return resolved, err
+			}
+			if strVal == "" {
+				continue
+			}
+			resolved.Argv = append(resolved.Argv, arg.Flag, strVal)
+		case arg.Param != "":
+			strVal, _, err := coerceVal(arg.Param)
+			if err != nil {
+				return resolved, err
+			}
+			if strVal == "" {
+				continue
+			}
+			resolved.Argv = append(resolved.Argv, strVal)
+		}
+	}
+
+	if config.Invocation.StdinParam != "" {
+		stdinVal, _, err := coerceVal(config.Invocation.StdinParam)
+		if err != nil {
+			return resolved, err
+		}
+		resolved.Stdin = stdinVal
+	}
+
+	if config.Invocation.Coff != nil {
+		coffInv := &def.ResolvedCoffInvocation{Export: config.Invocation.Coff.Export}
+		for _, arg := range config.Invocation.Coff.Args {
+			var (
+				typed interface{}
+				err   error
+			)
+			if arg.Param != "" {
+				_, typed, err = coerceVal(arg.Param)
+			} else {
+				typed = arg.Literal
+			}
+			if err != nil {
+				return resolved, err
+			}
+			coffInv.Args = append(coffInv.Args, def.ResolvedCoffArg{WireType: arg.WireType, Value: typed, Encoding: arg.Encoding})
+		}
+		resolved.Coff = coffInv
+	}
+
+	return resolved, nil
+}
+
+// renderOptionValue validates and returns both string and typed representations
+func renderOptionValue(opt *def.ModOption) (string, interface{}, error) {
+	val := strings.TrimSpace(opt.Val)
+	if val == "" {
+		if opt.Required {
+			return "", nil, fmt.Errorf("option %s is required", opt.Name)
+		}
+		return "", "", nil
+	}
+
+	if len(opt.Vals) > 0 {
+		found := false
+		for _, v := range opt.Vals {
+			if v == val {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return "", nil, fmt.Errorf("option %s must be one of %v", opt.Name, opt.Vals)
+		}
+	}
+
+	switch strings.ToLower(opt.Type) {
+	case "bool":
+		b, err := strconv.ParseBool(val)
+		if err != nil {
+			return "", nil, fmt.Errorf("option %s expects bool: %w", opt.Name, err)
+		}
+		return strconv.FormatBool(b), b, nil
+	case "int":
+		num, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return "", nil, fmt.Errorf("option %s expects int: %w", opt.Name, err)
+		}
+		if opt.Min != nil && float64(num) < *opt.Min {
+			return "", nil, fmt.Errorf("option %s below min", opt.Name)
+		}
+		if opt.Max != nil && float64(num) > *opt.Max {
+			return "", nil, fmt.Errorf("option %s above max", opt.Name)
+		}
+		return fmt.Sprintf("%d", num), float64(num), nil
+	case "uint", "port":
+		num, err := strconv.ParseUint(val, 10, 64)
+		if err != nil {
+			return "", nil, fmt.Errorf("option %s expects uint: %w", opt.Name, err)
+		}
+		if opt.Min != nil && float64(num) < *opt.Min {
+			return "", nil, fmt.Errorf("option %s below min", opt.Name)
+		}
+		if opt.Max != nil && float64(num) > *opt.Max {
+			return "", nil, fmt.Errorf("option %s above max", opt.Name)
+		}
+		return fmt.Sprintf("%d", num), float64(num), nil
+	default:
+		return val, val, nil
+	}
 }

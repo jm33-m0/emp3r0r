@@ -7,20 +7,21 @@
   "is_local": false,
   "platform": "Linux",
   "path": "",
-  "options": {
-    "N/A": {
-      "opt_name": "N/A",
-      "opt_desc": "No options required",
-      "opt_val": "",
-      "opt_vals": []
-    }
-  },
+  "parameters": [],
   "agent_config": {
     "exec": "go_lpe",
-    "files": ["go_lpe"],
+    "files": [
+      "go_lpe"
+    ],
     "in_memory": true,
     "type": "elf",
     "interactive": false
+  },
+  "invocation": {
+    "argv": [
+      {
+        "literal": "go_lpe"
+      }
+    ]
   }
 }
-

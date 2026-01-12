@@ -7,47 +7,52 @@
   "is_local": true,
   "platform": "Linux",
   "path": "",
-  "options": {
-    "LISTENER_TYPE": {
-      "opt_name": "LISTENER_TYPE",
-      "opt_desc": "Listener protocol type: HTTP, TCP, or UDP",
-      "opt_val": "HTTP",
-      "opt_vals": [
+  "parameters": [
+    {
+      "name": "LISTENER_TYPE",
+      "description": "Listener protocol type: HTTP, TCP, or UDP",
+      "default": "HTTP",
+      "choices": [
         "HTTP",
         "TCP",
         "UDP"
-      ]
+      ],
+      "type": "enum"
     },
-    "DOWNLOAD_HOST": {
-      "opt_name": "DOWNLOAD_HOST",
-      "opt_desc": "The host to download the payload from, eg. 192.168.0.1",
-      "opt_val": "",
-      "opt_vals": []
+    {
+      "name": "DOWNLOAD_HOST",
+      "description": "The host to download the payload from, eg. 192.168.0.1",
+      "default": "",
+      "type": "string"
     },
-    "DOWNLOAD_PORT": {
-      "opt_name": "DOWNLOAD_PORT",
-      "opt_desc": "The port to download the payload from, eg. 8000",
-      "opt_val": "8000",
-      "opt_vals": []
+    {
+      "name": "DOWNLOAD_PORT",
+      "description": "The port to download the payload from, eg. 8000",
+      "default": "8000",
+      "type": "uint"
     },
-    "DOWNLOAD_PATH": {
-      "opt_name": "DOWNLOAD_PATH",
-      "opt_desc": "The path to download the payload from (HTTP only), eg. /payload",
-      "opt_val": "/",
-      "opt_vals": []
+    {
+      "name": "DOWNLOAD_PATH",
+      "description": "The path to download the payload from (HTTP only), eg. /payload",
+      "default": "/",
+      "type": "string"
     },
-    "DOWNLOAD_KEY": {
-      "opt_name": "DOWNLOAD_KEY",
-      "opt_desc": "The key to decrypt the payload",
-      "opt_val": "",
-      "opt_vals": []
+    {
+      "name": "DOWNLOAD_KEY",
+      "description": "The key to decrypt the payload",
+      "default": "",
+      "type": "string",
+      "secret": true
     }
-  },
+  ],
   "agent_config": {
     "exec": "",
     "files": [],
     "in_memory": false,
     "type": "",
     "interactive": false
+  },
+  "invocation": {
+    "argv": []
   }
 }

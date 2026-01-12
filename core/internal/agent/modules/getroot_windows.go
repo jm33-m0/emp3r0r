@@ -31,12 +31,12 @@ func runLPEHelper(method, checksum string) (out string) {
 	file_type := strings.Split(method, ".")[len(strings.Split(method, "."))-1]
 	switch file_type {
 	case "ps1":
-		out, err = agentutils.ExecutePowerShell(scriptData, os.Environ())
+		out, err = agentutils.ExecutePowerShell(scriptData, nil, os.Environ())
 		if err != nil {
 			return logging.Sprintf("LPE error: %s\n%v", out, err)
 		}
 	case "bat":
-		out, err = agentutils.ExecuteBatch(scriptData, os.Environ())
+		out, err = agentutils.ExecuteBatch(scriptData, nil, os.Environ())
 		if err != nil {
 			return logging.Sprintf("LPE error: %s\n%v", out, err)
 		}

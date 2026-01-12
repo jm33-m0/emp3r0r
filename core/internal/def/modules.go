@@ -35,16 +35,73 @@ var InjectorMethods = map[string]string{
 	"shared_library": "Inject a shared library, if no library is specified, it will inject loader.so (ELF loader that runs agent agent)",
 }
 
-// ModOption represents module options
+// ModOption represents module options with typing metadata
 type ModOption struct {
-	Name string   `cbor:"1,keyasint"` // option name
-	Desc string   `cbor:"2,keyasint"` // option description
-	Val  string   `cbor:"3,keyasint"` // option value
-	Vals []string `cbor:"4,keyasint"` // option value candidates
+	Name     string   `cbor:"1,keyasint"`  // option name
+	Desc     string   `cbor:"2,keyasint"`  // option description
+	Val      string   `cbor:"3,keyasint"`  // option value (current / default)
+	Vals     []string `cbor:"4,keyasint"`  // allowed values for enum-like options
+	Type     string   `cbor:"5,keyasint"`  // string,int,uint,bool,enum,base64,duration,port
+	Required bool     `cbor:"6,keyasint"`  // whether the option is required
+	Pattern  string   `cbor:"7,keyasint"`  // optional regex validation for strings
+	Encoding string   `cbor:"8,keyasint"`  // encoding hint (utf8/utf16le) for string/binary
+	Secret   bool     `cbor:"9,keyasint"`  // mark sensitive values (avoid logging)
+	Min      *float64 `cbor:"10,keyasint"` // numeric lower bound
+	Max      *float64 `cbor:"11,keyasint"` // numeric upper bound
 }
 
 // ModOptions represents multiple module options
 type ModOptions map[string]*ModOption
+
+// InvocationArg models a single argv element
+type InvocationArg struct {
+	Literal string // raw value
+	Flag    string // flag prefix, eg. -I
+	Param   string // reference to option name
+}
+
+// CoffArgSpec defines a COFF argument and its wire type
+type CoffArgSpec struct {
+	Param    string
+	Literal  interface{}
+	WireType string
+	Encoding string
+}
+
+// CoffInvocation defines how to invoke a COFF/BOF export
+type CoffInvocation struct {
+	Export string
+	Args   []CoffArgSpec
+}
+
+// InvocationSpec defines how to run a module
+type InvocationSpec struct {
+	Argv           []InvocationArg
+	StdinParam     string
+	TimeoutSeconds int
+	Coff           *CoffInvocation
+}
+
+// ResolvedInvocation is the rendered form sent to the agent
+type ResolvedInvocation struct {
+	Argv           []string
+	Stdin          string
+	TimeoutSeconds int
+	Coff           *ResolvedCoffInvocation
+}
+
+// ResolvedCoffInvocation contains packed COFF args with concrete values
+type ResolvedCoffInvocation struct {
+	Export string
+	Args   []ResolvedCoffArg
+}
+
+// ResolvedCoffArg holds a typed value to be packed by lighthouse
+type ResolvedCoffArg struct {
+	WireType string
+	Value    interface{}
+	Encoding string
+}
 
 // AgentModuleConfig stores configuration data for the agent side
 type AgentModuleConfig struct {
@@ -53,6 +110,8 @@ type AgentModuleConfig struct {
 	InMemory      bool     `cbor:"3,keyasint"` // run this module in memory
 	Type          string   `cbor:"4,keyasint"` // "go", "python", "powershell", "bash", "exe", "elf", "dll", "so", "coff"
 	IsInteractive bool     `cbor:"5,keyasint"` // whether run as a shell or not, eg. python, bettercap
+	WorkDir       string   `cbor:"6,keyasint"` // optional working directory
+	NeedsRoot     bool     `cbor:"7,keyasint"` // hint for privilege requirements
 }
 
 // ModuleConfig stores the complete module config data
@@ -68,6 +127,7 @@ type ModuleConfig struct {
 	Fileless    bool              `cbor:"9,keyasint"`  // If true, this module doesn't drop files to disk
 	Options     ModOptions        `cbor:"10,keyasint"` // module options, will be passed as environment variables to the module, either on C2 or agent side
 	AgentConfig AgentModuleConfig `cbor:"11,keyasint"` // Configuration for agent side
+	Invocation  InvocationSpec    `cbor:"12,keyasint"` // how to run the module without run.sh/env
 }
 
 // Module help info and options

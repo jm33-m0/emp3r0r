@@ -7,20 +7,28 @@
   "is_local": false,
   "platform": "Windows",
   "path": "",
-  "options": {
-    "args": {
-      "opt_name": "args",
-      "opt_desc": "run mimikatz with this commandline arg",
-      "opt_val": "--",
-      "opt_vals": []
+  "parameters": [
+    {
+      "name": "args",
+      "description": "run mimikatz with this commandline arg",
+      "default": "--",
+      "type": "string"
     }
-  },
+  ],
   "agent_config": {
     "exec": "mimikatz.ps1",
-    "files": ["mimikatz.ps1"],
+    "files": [
+      "mimikatz.ps1"
+    ],
     "in_memory": true,
     "type": "powershell",
     "interactive": false
+  },
+  "invocation": {
+    "argv": [
+      {
+        "param": "args"
+      }
+    ]
   }
 }
-

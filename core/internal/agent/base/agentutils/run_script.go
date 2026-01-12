@@ -54,40 +54,51 @@ func feedScriptToStdin(cmd *exec.Cmd, scriptBytes []byte) (output string, err er
 }
 
 // ExecutePython runs a Python script in memory and returns the output.
-func ExecutePython(scriptBytes []byte, args []string) (output string, err error) {
+func ExecutePython(scriptBytes []byte, argv []string, env []string) (output string, err error) {
 	cmd := exec.Command("python")
-	cmd.Env = args
+	if len(argv) > 0 {
+		cmd.Args = append(cmd.Args, argv...)
+	}
+	if len(env) > 0 {
+		cmd.Env = env
+	}
 	return feedScriptToStdin(cmd, scriptBytes)
 }
 
 // ExecutePowerShell runs powershell script on windows
-func ExecutePowerShell(scriptBytes []byte, args []string) (output string, err error) {
+func ExecutePowerShell(scriptBytes []byte, argv []string, env []string) (output string, err error) {
 	shell := "powershell.exe"
 
-	cmd := exec.Command(shell, "-Command", "-")
-	cmd.Env = args
+	cmd := exec.Command(shell, append([]string{"-Command", "-"}, argv...)...)
+	if len(env) > 0 {
+		cmd.Env = env
+	}
 
 	return feedScriptToStdin(cmd, scriptBytes)
 }
 
 // ExecuteBatch runs batch script on windows
-func ExecuteBatch(scriptBytes []byte, args []string) (output string, err error) {
+func ExecuteBatch(scriptBytes []byte, argv []string, env []string) (output string, err error) {
 	shell := "cmd.exe"
 
-	cmd := exec.Command(shell)
-	cmd.Env = args
+	cmd := exec.Command(shell, argv...)
+	if len(env) > 0 {
+		cmd.Env = env
+	}
 
 	return feedScriptToStdin(cmd, scriptBytes)
 }
 
 // ExecuteShell runs a bash script on target
-func ExecuteShell(scriptBytes []byte, args []string) (output string, err error) {
+func ExecuteShell(scriptBytes []byte, argv []string, env []string) (output string, err error) {
 	shell := def.DefaultShell
 	if !util.IsFileExist(shell) {
 		return "", fmt.Errorf("shell not found: %s", shell)
 	}
 
-	cmd := exec.Command(shell)
-	cmd.Env = args
+	cmd := exec.Command(shell, argv...)
+	if len(env) > 0 {
+		cmd.Env = env
+	}
 	return feedScriptToStdin(cmd, scriptBytes)
 }

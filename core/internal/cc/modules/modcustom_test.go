@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
 )
 
 func TestReadModConfig(t *testing.T) {
@@ -32,19 +34,27 @@ func TestReadModConfig(t *testing.T) {
 			"type": "go",
 			"interactive": false
 		},
-		"options": {
-			"option1": {
-				"opt_name": "option1",
-				"opt_desc": "Description 1",
-				"opt_val": "value1",
-				"opt_vals": ["value1", "value2"]
+		"parameters": [
+			{
+				"name": "option1",
+				"description": "Description 1",
+				"default": "value1",
+				"choices": ["value1", "value2"],
+				"type": "string",
+				"required": true
 			}
+		],
+		"invocation": {
+			"argv": [
+				{"literal": "test_exec"},
+				{"param": "option1"}
+			]
 		}
 	}`
 
 	// Write the config to a file
 	configFile := filepath.Join(tmpDir, "config.json")
-	err = os.WriteFile(configFile, []byte(jsonConfig), 0644)
+	err = os.WriteFile(configFile, []byte(jsonConfig), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
@@ -97,12 +107,14 @@ func TestReadModConfigPartial(t *testing.T) {
 
 	// Define a sample JSON config with missing fields
 	jsonConfig := `{
-		"name": "test_module_partial"
+		"name": "test_module_partial",
+		"parameters": [],
+		"invocation": {"argv": []}
 	}`
 
 	// Write the config to a file
 	configFile := filepath.Join(tmpDir, "config.json")
-	err = os.WriteFile(configFile, []byte(jsonConfig), 0644)
+	err = os.WriteFile(configFile, []byte(jsonConfig), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
@@ -122,5 +134,60 @@ func TestReadModConfigPartial(t *testing.T) {
 	}
 	if config.IsLocal {
 		t.Errorf("Expected IsLocal false, got true")
+	}
+}
+
+func TestResolveInvocation(t *testing.T) {
+	config := &def.ModuleConfig{
+		AgentConfig: def.AgentModuleConfig{Type: "coff"},
+		Invocation: def.InvocationSpec{
+			Argv: []def.InvocationArg{
+				{Literal: "runner"},
+				{Flag: "-p", Param: "port"},
+			},
+			StdinParam: "message",
+			Coff: &def.CoffInvocation{
+				Export: "Run",
+				Args:   []def.CoffArgSpec{{Param: "port", WireType: "DWORD"}},
+			},
+		},
+		Options: def.ModOptions{
+			"port":    {Name: "port", Val: "8080", Type: "uint", Required: true},
+			"message": {Name: "message", Val: "hello", Type: "string"},
+		},
+	}
+
+	inv, err := resolveInvocation(config, nil)
+	if err != nil {
+		t.Fatalf("resolveInvocation: %v", err)
+	}
+
+	if len(inv.Argv) != 3 || inv.Argv[0] != "runner" || inv.Argv[1] != "-p" || inv.Argv[2] != "8080" {
+		t.Fatalf("unexpected argv: %v", inv.Argv)
+	}
+
+	if inv.Stdin != "hello" {
+		t.Fatalf("stdin mismatch: %q", inv.Stdin)
+	}
+
+	if inv.Coff == nil || len(inv.Coff.Args) != 1 {
+		t.Fatalf("expected one COFF arg")
+	}
+	if inv.Coff.Args[0].WireType != "DWORD" {
+		t.Fatalf("wire type mismatch: %s", inv.Coff.Args[0].WireType)
+	}
+}
+
+func TestResolveInvocationMissingRequired(t *testing.T) {
+	config := &def.ModuleConfig{
+		AgentConfig: def.AgentModuleConfig{Type: "elf"},
+		Invocation:  def.InvocationSpec{Argv: []def.InvocationArg{{Param: "must"}}},
+		Options: def.ModOptions{
+			"must": {Name: "must", Type: "string", Required: true, Val: ""},
+		},
+	}
+
+	if _, err := resolveInvocation(config, nil); err == nil {
+		t.Fatalf("expected error for missing required option")
 	}
 }

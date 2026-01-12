@@ -7,20 +7,31 @@
   "is_local": false,
   "platform": "Linux",
   "path": "",
-  "options": {
-    "args": {
-      "opt_name": "args",
-      "opt_desc": "run elvish with this commandline arg",
-      "opt_val": "--",
-      "opt_vals": []
+  "parameters": [
+    {
+      "name": "args",
+      "description": "run elvish with this commandline arg",
+      "default": "--",
+      "type": "string"
     }
-  },
+  ],
   "agent_config": {
     "exec": "elvish",
-    "files": ["elvish"],
+    "files": [
+      "elvish"
+    ],
     "in_memory": false,
     "type": "elf",
     "interactive": true
+  },
+  "invocation": {
+    "argv": [
+      {
+        "literal": "elvish"
+      },
+      {
+        "param": "args"
+      }
+    ]
   }
 }
-

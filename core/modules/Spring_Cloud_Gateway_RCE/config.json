@@ -7,26 +7,44 @@
   "is_local": false,
   "platform": "Linux",
   "path": "",
-  "options": {
-    "TARGET_URL": {
-      "opt_name": "TARGET_URL",
-      "opt_desc": "Target URL",
-      "opt_val": "http://11.11.11.11:8080",
-      "opt_vals": []
+  "parameters": [
+    {
+      "name": "TARGET_URL",
+      "description": "Target URL",
+      "default": "http://11.11.11.11:8080",
+      "type": "string",
+      "required": true
     },
-    "CMD_EXEC": {
-      "opt_name": "CMD_EXEC",
-      "opt_desc": "Command to execute on target server",
-      "opt_val": "whoami",
-      "opt_vals": []
+    {
+      "name": "CMD_EXEC",
+      "description": "Command to execute on target server",
+      "default": "whoami",
+      "type": "string",
+      "required": true
     }
-  },
+  ],
   "agent_config": {
     "exec": "CVE-2022-22947.py",
-    "files": ["CVE-2022-22947.py"],
+    "files": [
+      "CVE-2022-22947.py"
+    ],
     "in_memory": true,
     "type": "python",
     "interactive": false
+  },
+  "invocation": {
+    "argv": [
+      {
+        "literal": "-"
+      },
+      {
+        "flag": "--url",
+        "param": "TARGET_URL"
+      },
+      {
+        "flag": "--cmd",
+        "param": "CMD_EXEC"
+      }
+    ]
   }
 }
-

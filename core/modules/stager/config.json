@@ -7,31 +7,33 @@
   "is_local": true,
   "platform": "Linux",
   "path": "",
-  "options": {
-    "BUILD_EXE": {
-      "opt_name": "BUILD_EXE",
-      "opt_desc": "Build stager as an executable, otherwise a shared object will be built",
-      "opt_val": "no",
-      "opt_vals": [
+  "parameters": [
+    {
+      "name": "BUILD_EXE",
+      "description": "Build stager as an executable, otherwise a shared object will be built",
+      "default": "no",
+      "choices": [
         "yes",
         "no"
-      ]
+      ],
+      "type": "enum"
     },
-    "LISTENER_TYPE": {
-      "opt_name": "LISTENER_TYPE",
-      "opt_desc": "Listener protocol type: HTTP, TCP, or UDP",
-      "opt_val": "HTTP",
-      "opt_vals": [
+    {
+      "name": "LISTENER_TYPE",
+      "description": "Listener protocol type: HTTP, TCP, or UDP",
+      "default": "HTTP",
+      "choices": [
         "HTTP",
         "TCP",
         "UDP"
-      ]
+      ],
+      "type": "enum"
     },
-    "ARCH": {
-      "opt_name": "ARCH",
-      "opt_desc": "The architecture of the target system, use GOARCH values",
-      "opt_val": "amd64",
-      "opt_vals": [
+    {
+      "name": "ARCH",
+      "description": "The architecture of the target system, use GOARCH values",
+      "default": "amd64",
+      "choices": [
         "amd64",
         "386",
         "arm",
@@ -40,38 +42,43 @@
         "mips",
         "mips64",
         "ppc64"
-      ]
+      ],
+      "type": "enum"
     },
-    "DOWNLOAD_HOST": {
-      "opt_name": "DOWNLOAD_HOST",
-      "opt_desc": "The host to download the payload from, eg. 192.168.0.1",
-      "opt_val": "",
-      "opt_vals": []
+    {
+      "name": "DOWNLOAD_HOST",
+      "description": "The host to download the payload from, eg. 192.168.0.1",
+      "default": "",
+      "type": "string"
     },
-    "DOWNLOAD_PORT": {
-      "opt_name": "DOWNLOAD_PORT",
-      "opt_desc": "The port to download the payload from, eg. 8000",
-      "opt_val": "8000",
-      "opt_vals": []
+    {
+      "name": "DOWNLOAD_PORT",
+      "description": "The port to download the payload from, eg. 8000",
+      "default": "8000",
+      "type": "uint"
     },
-    "DOWNLOAD_PATH": {
-      "opt_name": "DOWNLOAD_PATH",
-      "opt_desc": "The path to download the payload from (HTTP only), eg. /payload",
-      "opt_val": "/",
-      "opt_vals": []
+    {
+      "name": "DOWNLOAD_PATH",
+      "description": "The path to download the payload from (HTTP only), eg. /payload",
+      "default": "/",
+      "type": "string"
     },
-    "DOWNLOAD_KEY": {
-      "opt_name": "DOWNLOAD_KEY",
-      "opt_desc": "The key to decrypt the payload",
-      "opt_val": "",
-      "opt_vals": []
+    {
+      "name": "DOWNLOAD_KEY",
+      "description": "The key to decrypt the payload",
+      "default": "",
+      "type": "string",
+      "secret": true
     }
-  },
+  ],
   "agent_config": {
     "exec": "",
     "files": [],
     "in_memory": false,
     "type": "",
     "interactive": false
+  },
+  "invocation": {
+    "argv": []
   }
 }

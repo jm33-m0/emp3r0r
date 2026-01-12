@@ -3,27 +3,17 @@ package modules
 import (
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-func TestNormalizeEnv(t *testing.T) {
-	input := []string{"  a=1", "", " ", "b=2  ", "c=3", "  "}
-	want := []string{"a=1", "b=2", "c=3"}
-
-	got := normalizeEnv(input)
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("normalizeEnv mismatch: got %v want %v", got, want)
-	}
-}
-
 func TestModuleHandlerCOFFMustBeInMem(t *testing.T) {
-	out := ModuleHandler("", "", "coff", "dummy", "", "", nil, false)
+	out := ModuleHandler("", "", "coff", "dummy", "", def.ResolvedInvocation{}, false)
 	if out == "" || !strings.Contains(out, "in memory") {
 		t.Fatalf("expected in-memory requirement error, got %q", out)
 	}
@@ -165,7 +155,8 @@ func TestModuleHandlerSuccessOnDisk(t *testing.T) {
 	checksum := crypto.SHA256SumFile(tarPath)
 
 	// run ModuleHandler with on-disk execution
-	out := ModuleHandler("", tarPath, "other", modName, checksum, "./run.sh", nil, false)
+	inv := def.ResolvedInvocation{Argv: []string{"./run.sh"}}
+	out := ModuleHandler("", tarPath, "other", modName, checksum, inv, false)
 	if !strings.Contains(out, "hello-module") {
 		t.Fatalf("expected module output, got %q", out)
 	}

