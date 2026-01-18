@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build !windows && !linux
 
 package modules
 
@@ -9,5 +9,5 @@ import (
 )
 
 func runCOFFModule(_ []byte, _ def.ResolvedInvocation) (string, error) {
-	return "", fmt.Errorf("COFF modules are only supported on Windows agents")
+	return "", fmt.Errorf("COFF modules are supported on Windows or Linux agents")
 }

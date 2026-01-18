@@ -81,6 +81,23 @@ func normalizeCoffValue(arg CoffArg) (string, error) {
 			}
 			return "i" + strconv.FormatFloat(num, 'f', -1, 64), nil
 		}
+	case "SHORT", "WORD", "INT16":
+		switch v := val.(type) {
+		case int:
+			return "s" + strconv.FormatInt(int64(v), 10), nil
+		case int32:
+			return "s" + strconv.FormatInt(int64(v), 10), nil
+		case int64:
+			return "s" + strconv.FormatInt(v, 10), nil
+		case float64:
+			return "s" + strconv.FormatFloat(v, 'f', -1, 64), nil
+		case string:
+			num, err := strconv.ParseFloat(v, 64)
+			if err != nil {
+				return "", fmt.Errorf("invalid numeric value %q", v)
+			}
+			return "s" + strconv.FormatFloat(num, 'f', -1, 64), nil
+		}
 	case "BINARY":
 		switch v := val.(type) {
 		case string:

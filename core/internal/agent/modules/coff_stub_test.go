@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build !windows && !linux
 
 package modules
 
@@ -14,7 +14,7 @@ func TestRunCOFFModuleNotSupported(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected not supported error on non-Windows")
 	}
-	if !strings.Contains(err.Error(), "only supported on Windows") {
+	if !strings.Contains(err.Error(), "supported on Windows or Linux") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
