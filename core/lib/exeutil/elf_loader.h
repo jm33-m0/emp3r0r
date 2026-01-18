@@ -40,7 +40,7 @@ typedef Elf64_Word Elf_Word;
 #define ELF_R_SYM(x) ELF64_R_SYM(x)
 #define ELF_R_TYPE(x) ELF64_R_TYPE(x)
 #else
-#error("Are you a wizard?")
+#error ("Are you a wizard?")
 #endif
 #endif
 
@@ -86,7 +86,8 @@ int elf_run(void *buf, char **argv, char **env);
  * \brief Map the ELF into memory and run it with the provided arguments in a
  * forked process.
  */
-char *elf_fork_run(void *buf, char **argv, char **env);
+__attribute__((visibility("default"))) char *
+elf_fork_run(void *buf, char **argv, char **env);
 
 #endif // _ELF_LOADER_H_
 #endif // __linux__

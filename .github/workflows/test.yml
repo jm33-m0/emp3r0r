@@ -49,6 +49,14 @@ jobs:
         run: |
           go test -v ./lib/coffloader -run TestRunLinuxCOFFWithInlineBOF -count=1
 
+      - name: Run exeutil ELF loader test (cgo)
+        if: runner.os == 'Linux'
+        working-directory: ./core
+        env:
+          CGO_ENABLED: 1
+        run: |
+          go test -v ./lib/exeutil -run TestParseELFHeaders -count=1
+
       - name: Run tests (Windows, with race)
         if: runner.os == 'Windows'
         working-directory: ./core
