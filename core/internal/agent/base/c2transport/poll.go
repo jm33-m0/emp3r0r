@@ -91,17 +91,15 @@ func catchInterruptAndExit(cancel context.CancelFunc) {
 var HandShakes sync.Map // map[string]bool
 
 // MsgTunneler use the connection (CCConn)
-func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel context.CancelFunc) (err error) {
+func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel context.CancelFunc) error {
 	var (
 		in  = cbor.NewDecoder(def.CCMsgConn)
 		out = cbor.NewEncoder(def.CCMsgConn)
-		msg def.MsgTunData // data being exchanged in the tunnel
 	)
 	go catchInterruptAndExit(cancel)
 	defer func() {
-		err = def.CCMsgConn.Close()
-		if err != nil {
-			logging.Print("MsgTunneler closing: ", err)
+		if closeErr := def.CCMsgConn.Close(); closeErr != nil {
+			logging.Print("MsgTunneler closing: ", closeErr)
 		}
 
 		cancel()
@@ -115,9 +113,9 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 		defer cancel()
 		for ctx.Err() == nil {
 			// read response
-			err = in.Decode(&msg)
-			if err != nil {
-				logging.Print("Check CC response: CBOR msg decode: ", err)
+			var msg def.MsgTunData // data being exchanged in the tunnel
+			if decodeErr := in.Decode(&msg); decodeErr != nil {
+				logging.Print("Check CC response: CBOR msg decode: ", decodeErr)
 				break
 			}
 			resp := msg.Response
@@ -131,8 +129,9 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 				continue
 			}
 
-			// process CC data
-			go callback(&msg)
+			// process CC data; copy to avoid concurrent reuse of msg in next loop
+			msgCopy := msg
+			go callback(&msgCopy)
 		}
 		logging.Println("Check CC response: exited")
 	}()
@@ -165,9 +164,8 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 			hello_msg.CmdSlice = []string{def.TransportString + util.RandStr(util.RandInt(1, 100))}
 			hello_msg.CmdID = uuid.NewString()
 			hello_msg.Tag = common.RuntimeConfig.AgentTag
-			err = out.Encode(hello_msg)
-			if err != nil {
-				logging.Printf("agent cannot connect to cc: %v", err)
+			if encodeErr := out.Encode(hello_msg); encodeErr != nil {
+				logging.Printf("agent cannot connect to cc: %v", encodeErr)
 				util.TakeABlink()
 				continue
 			}
@@ -188,9 +186,6 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 		if !sendHello(util.RandInt(1, 10)) {
 			logging.Print("sendHello failed")
 			break
-		}
-		if err != nil {
-			logging.Printf("Updating agent sysinfo: %v", err)
 		}
 		logging.Println("Hearbeat ends")
 		util.TakeASnap()

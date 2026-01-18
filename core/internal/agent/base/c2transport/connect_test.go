@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -179,9 +180,11 @@ func TestEstablishC2Connection(t *testing.T) {
 	def.CCMsgConn = conn // Set global connection for CCMsgTun
 
 	// Start CCMsgTun
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
-		err := c2transport.MsgTunneler(handler.HandleC2Command, ctx, cancel)
-		if err != nil {
+		defer wg.Done()
+		if err := c2transport.MsgTunneler(handler.HandleC2Command, ctx, cancel); err != nil {
 			t.Logf("CCMsgTun exited with error: %v", err)
 		}
 	}()
@@ -215,4 +218,5 @@ func TestEstablishC2Connection(t *testing.T) {
 	// Clean up
 	cancel()
 	conn.Close()
+	wg.Wait()
 }
