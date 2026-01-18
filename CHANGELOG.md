@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.12.0](https://github.com/jm33-m0/emp3r0r/compare/v3.11.1...v3.12.0) (2026-01-18)
+
+
+### Features
+
+* add Linux BOF loader support with tests and argument handling ([01e76ab](https://github.com/jm33-m0/emp3r0r/commit/01e76abfccc486546a213dbb34a6dbd7839a89ce))
+
 ## [3.11.1](https://github.com/jm33-m0/emp3r0r/compare/v3.11.0...v3.11.1) (2026-01-12)
 
 
