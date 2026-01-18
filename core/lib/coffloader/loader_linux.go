@@ -4,10 +4,12 @@
 package coffloader
 
 /*
+#cgo linux CFLAGS: -fPIC -fvisibility=hidden
 #cgo linux LDFLAGS: -ldl
 #include <stdlib.h>
+__attribute__((visibility("default")))
 int bof_run(const unsigned char *obj_buf, size_t object_size, const char *func_name,
-            const unsigned char *args_buf, int args_len, char **out_buf, char **err_buf);
+			const unsigned char *args_buf, int args_len, char **out_buf, char **err_buf);
 */
 import "C"
 

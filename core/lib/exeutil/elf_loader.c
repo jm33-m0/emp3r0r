@@ -18,6 +18,8 @@
 #include <unistd.h>
 #endif
 
+#pragma GCC visibility push(hidden)
+
 #include "elf_loader.h"
 
 // Declare the jump_start function for all architectures
@@ -447,7 +449,8 @@ int elf_run(void *buf, char **argv, char **env) {
 // Fork and run the ELF in the child process memory
 // This is a safer approach since it doesn't overwrite the current process
 // Returns the output of the child process
-char *elf_fork_run(void *buf, char **argv, char **env) {
+__attribute__((visibility("default"))) char *
+elf_fork_run(void *buf, char **argv, char **env) {
   // Create a pipe
   int pipefd[2];
   if (pipe(pipefd) == -1) {
@@ -519,4 +522,6 @@ char *elf_fork_run(void *buf, char **argv, char **env) {
 
   return buffer;
 }
+
+#pragma GCC visibility pop
 #endif // __linux__

@@ -8,6 +8,8 @@
 #include <string.h>
 #include <sys/mman.h>
 
+#pragma GCC visibility push(hidden)
+
 static int set_err(char **err_out, const char *msg) {
   if (!err_out || *err_out) {
     return -1;
@@ -54,9 +56,9 @@ static uint64_t align_up(uint64_t val, uint64_t align) {
 }
 
 // bof_run loads an x86_64 ELF ET_REL object and executes the requested symbol.
-int bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
-            const uint8_t *args_buf, int args_len, char **out_buf,
-            char **err_buf) {
+__attribute__((visibility("default"))) int
+bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
+        const uint8_t *args_buf, int args_len, char **out_buf, char **err_buf) {
   if (!obj_buf || object_size < sizeof(Elf64_Ehdr)) {
     return set_err(err_buf, "invalid object buffer");
   }
@@ -256,3 +258,5 @@ int bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
   free(sec_offsets);
   return 0;
 }
+
+#pragma GCC visibility pop
