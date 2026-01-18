@@ -3,10 +3,12 @@ package modules
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func TestReadModConfig(t *testing.T) {
@@ -392,6 +394,99 @@ func TestInitModulesLoadsLocalModule(t *testing.T) {
 	expectedPath := filepath.Join(live.EmpWorkSpace, "modules", "foo")
 	if loaded.Path != expectedPath {
 		t.Fatalf("path not rewritten for local module: %s", loaded.Path)
+	}
+}
+
+func TestInitModulesLoadsRepoModules(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("module pack only exists for *nix layout")
+	}
+
+	findRepoRoot := func(start string) string {
+		dir := filepath.Dir(start)
+		for {
+			if util.IsExist(filepath.Join(dir, "go.mod")) {
+				return dir
+			}
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				t.Fatalf("go.mod not found from %s", start)
+			}
+			dir = parent
+		}
+	}
+
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatalf("unable to resolve caller path")
+	}
+	repoRoot := findRepoRoot(thisFile)
+	modulesRoot := filepath.Join(repoRoot, "modules")
+
+	configFiles, err := filepath.Glob(filepath.Join(modulesRoot, "*", "config.json"))
+	if err != nil {
+		t.Fatalf("glob configs: %v", err)
+	}
+	if len(configFiles) == 0 {
+		t.Fatalf("no module configs found under %s", modulesRoot)
+	}
+
+	expected := make(map[string]string, len(configFiles))
+	for _, cfg := range configFiles {
+		modName := filepath.Base(filepath.Dir(cfg))
+		expected[modName] = cfg
+	}
+
+	tmpWorkspace, err := os.MkdirTemp("", "emp3r0r-modules")
+	if err != nil {
+		t.Fatalf("temp workspace: %v", err)
+	}
+
+	origModules := def.Modules
+	origRunners := ModuleRunners
+	origModuleDirs := live.ModuleDirs
+	origWorkspace := live.EmpWorkSpace
+
+	def.Modules = make(map[string]*def.ModuleConfig, len(origModules))
+	for k, v := range origModules {
+		def.Modules[k] = v
+	}
+	ModuleRunners = make(map[string]func(), len(origRunners))
+	for k, v := range origRunners {
+		ModuleRunners[k] = v
+	}
+	live.ModuleDirs = []string{modulesRoot}
+	live.EmpWorkSpace = tmpWorkspace
+
+	defer func() {
+		def.Modules = origModules
+		ModuleRunners = origRunners
+		live.ModuleDirs = origModuleDirs
+		live.EmpWorkSpace = origWorkspace
+		_ = os.RemoveAll(tmpWorkspace)
+	}()
+
+	InitModules()
+
+	for modName := range expected {
+		mod, ok := def.Modules[modName]
+		if !ok {
+			t.Fatalf("module %s not loaded", modName)
+		}
+		if _, ok := ModuleRunners[modName]; !ok {
+			t.Fatalf("runner not registered for %s", modName)
+		}
+
+		expectedPath := filepath.Join(modulesRoot, modName)
+		if mod.IsLocal {
+			expectedPath = filepath.Join(tmpWorkspace, "modules", modName)
+		}
+		if mod.Path != expectedPath {
+			t.Fatalf("module %s path mismatch: got %s want %s", modName, mod.Path, expectedPath)
+		}
+		if !util.IsDirExist(mod.Path) {
+			t.Fatalf("module path missing on disk for %s: %s", modName, mod.Path)
+		}
 	}
 }
 

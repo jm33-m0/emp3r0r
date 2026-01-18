@@ -3,8 +3,12 @@ name: Tests
 on:
   push:
     branches: [v3]
+    paths:
+      - "core/**"
   pull_request:
     branches: [v3]
+    paths:
+      - "core/**"
 
 permissions:
   contents: read
