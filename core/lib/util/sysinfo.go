@@ -1,12 +1,14 @@
 package util
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"net"
 	"os"
 	"os/user"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -22,6 +24,37 @@ func GetMemSize() int {
 	}
 
 	return int(float32(memInfo.TotalUsableBytes) / 1024 / 1024)
+}
+
+// GetMemAvailable returns available memory in bytes
+// It tries to read /proc/meminfo on Linux
+func GetMemAvailable() int64 {
+	if runtime.GOOS == "linux" {
+		f, err := os.Open("/proc/meminfo")
+		if err != nil {
+			return -1
+		}
+		defer f.Close()
+
+		s := bufio.NewScanner(f)
+		for s.Scan() {
+			line := s.Text()
+			// Look for MemAvailable
+			if strings.HasPrefix(line, "MemAvailable:") {
+				parts := strings.Fields(line)
+				if len(parts) < 2 {
+					return -1
+				}
+				kb, err := strconv.ParseInt(parts[1], 10, 64)
+				if err != nil {
+					return -1
+				}
+				return kb * 1024
+			}
+		}
+	}
+	// Fallback or other OS
+	return -1
 }
 
 func GetGPUInfo() (info string) {

