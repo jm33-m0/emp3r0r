@@ -132,17 +132,6 @@ func C2Commands() *cobra.Command {
 	customModuleCmd.Flags().StringP("download_addr", "d", "", "Download address")
 	rootCmd.AddCommand(customModuleCmd)
 
-	// C2 Upgrade Agent command
-	updateAgentCmd := &cobra.Command{
-		Use:     def.C2CmdUpdateAgent,
-		Short:   "Upgrade agent",
-		Example: "!upgrade_agent --checksum <checksum>",
-		GroupID: "generic",
-		Run:     runUpdateAgent,
-	}
-	updateAgentCmd.Flags().StringP("checksum", "c", "", "Checksum")
-	rootCmd.AddCommand(updateAgentCmd)
-
 	// C2 Listener command
 	listenerCmd := &cobra.Command{
 		Use:     def.C2CmdListener,

@@ -15,7 +15,6 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/ssh"
@@ -303,17 +302,6 @@ func decodeInvocation(b64 string) (def.ResolvedInvocation, error) {
 		return inv, err
 	}
 	return inv, nil
-}
-
-// runUpdateAgent implements !upgrade_agent --checksum <checksum>
-func runUpdateAgent(cmd *cobra.Command, args []string) {
-	checksum, _ := cmd.Flags().GetString("checksum")
-	if checksum == "" {
-		c2transport.NotifyC2(cmd, "Error: args error\n")
-		return
-	}
-	out := agentutils.AgentUpdate(checksum)
-	c2transport.NotifyC2(cmd, "%s\n", out)
 }
 
 // runListener implements !listener --listener <listener> --port <port> --payload <payload> --compression <on/off> --passphrase <passphrase>

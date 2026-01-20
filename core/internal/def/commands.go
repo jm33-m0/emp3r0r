@@ -4,7 +4,6 @@ package def
 const (
 	C2CmdListDir        = "!ls_dir"
 	C2CmdCleanLog       = "!clean_log"
-	C2CmdUpdateAgent    = "!upgrade_agent"
 	C2CmdGetRoot        = "!get_root"
 	C2CmdPersistence    = "!persistence"
 	C2CmdCustomModule   = "!custom_module"

