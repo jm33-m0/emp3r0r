@@ -94,7 +94,7 @@ Use the `generate` command from within the emp3r0r shell interface to create cus
 - **Obfuscated processes** and hidden helpers to lower visibility.
 - **Anti-debug/analysis** measures to make inspection harder.
 - **sRDI-like Shellcode Stager**: Load ELF binaries from memory without touching disk, similar to sRDI for Windows.
-- **Memory-backed Filesystem** (`MemFileMap` in `core/lib/util/file.go`): In-memory file storage with automatic encrypted disk spillover (AES-GCM). Three storage strategies (Auto/Memory/Disk) with dynamic limits (up to 1/10 free RAM, max 100MB). Transparent encryption for all non-executable files with unified interface for memory/disk operations.
+- **Memory-backed Filesystem**: In-memory file storage with automatic encrypted disk spillover (AES-GCM). Three storage strategies (Auto/Memory/Disk) with dynamic limits (up to 1/10 free RAM, max 100MB). Transparent encryption for all non-executable files.
 
 #### Secure Command & Control
 
