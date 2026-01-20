@@ -103,18 +103,6 @@ func C2Commands() *cobra.Command {
 	deletePortFwdCmd.Flags().StringP("id", "i", "", "Session ID")
 	rootCmd.AddCommand(deletePortFwdCmd)
 
-	// C2 Utils command
-	utilsCmd := &cobra.Command{
-		Use:     def.C2CmdUtils,
-		Short:   "Run utility functions",
-		Example: "!utils --checksum <checksum> --download_addr <download_addr>",
-		GroupID: "generic",
-		Run:     runUtils,
-	}
-	utilsCmd.Flags().StringP("checksum", "c", "", "Checksum")
-	utilsCmd.Flags().StringP("download_addr", "d", "", "Download address")
-	rootCmd.AddCommand(utilsCmd)
-
 	// C2 Custom Module command
 	customModuleCmd := &cobra.Command{
 		Use:     def.C2CmdCustomModule,
@@ -208,30 +196,6 @@ func C2Commands() *cobra.Command {
 	sshHarvesterCmd.Flags().BoolP("stop", "s", false, "Stop the harvester")
 	rootCmd.AddCommand(sshHarvesterCmd)
 
-	// !inject --method <method> --pid <pid> --checksum <checksum>
-	injectCmd := &cobra.Command{
-		Use:     def.C2CmdInject,
-		Short:   "Inject code",
-		Example: "!inject --method <method> --pid <pid> --checksum <checksum>",
-		GroupID: "linux",
-		Run:     runInjectLinux,
-	}
-	injectCmd.Flags().StringP("method", "m", "", "Injection method")
-	injectCmd.Flags().StringP("pid", "p", "", "Process ID")
-	injectCmd.Flags().StringP("checksum", "c", "", "Checksum")
-	rootCmd.AddCommand(injectCmd)
-
-	// !persistence --method <method>
-	persistenceCmd := &cobra.Command{
-		Use:     def.C2CmdPersistence,
-		Short:   "Set up persistence",
-		Example: "!persistence --method <method>",
-		GroupID: "linux",
-		Run:     runPersistenceLinux,
-	}
-	persistenceCmd.Flags().StringP("method", "m", "", "Persistence method")
-	rootCmd.AddCommand(persistenceCmd)
-
 	// !get_root (no flags)
 	getRootCmd := &cobra.Command{
 		Use:     def.C2CmdGetRoot,
@@ -260,19 +224,6 @@ func C2Commands() *cobra.Command {
 		Run:     screenshotCmdRun,
 	}
 	rootCmd.AddCommand(screenshotCmd)
-
-	// !elf_patch --elf_path <path> --so_path <so_path> [--target_path <target_path>]
-	elfPatchCmd := &cobra.Command{
-		Use:     def.C2CmdElfPatch,
-		Short:   "Patch ELF file to load SO library",
-		Example: "!elf_patch --elf_path <path> --so_path <so_path> [--target_path <target_path>]",
-		GroupID: "linux",
-		Run:     runElfPatchLinux,
-	}
-	elfPatchCmd.Flags().StringP("elf_path", "e", "", "Path to ELF file to patch")
-	elfPatchCmd.Flags().StringP("so_path", "s", "", "Path to SO file to inject (will be uploaded)")
-	elfPatchCmd.Flags().StringP("target_path", "t", "", "Target path where the library should be loaded (including filename). If empty, uses random path and filename")
-	rootCmd.AddCommand(elfPatchCmd)
 
 	return rootCmd
 }

