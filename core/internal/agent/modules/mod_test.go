@@ -80,15 +80,20 @@ func TestPrepareModuleOnDisk(t *testing.T) {
 	}
 	root := t.TempDir()
 	modDir := filepath.Join(root, "mod")
-	srcDir := modDir
-	if err := os.MkdirAll(srcDir, 0o700); err != nil {
-		t.Fatalf("mkdir srcDir: %v", err)
+
+	// Create a temporary source directory for the tarball
+	tempSrc := t.TempDir()
+	srcModDir := filepath.Join(tempSrc, "mod")
+	if err := os.MkdirAll(srcModDir, 0o700); err != nil {
+		t.Fatalf("mkdir srcModDir: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(srcDir, "b.txt"), []byte("hi"), 0o600); err != nil {
+	// Use 0o700 to force WriteFileAgent (used in TarXZ/Archive) to write to disk
+	// instead of memory, because our stat check later relies on the file being on disk.
+	if err := os.WriteFile(filepath.Join(srcModDir, "b.txt"), []byte("hi"), 0o700); err != nil {
 		t.Fatalf("write src file: %v", err)
 	}
 	tarPath := filepath.Join(t.TempDir(), "mod.tar.xz")
-	if err := util.TarXZ(srcDir, tarPath); err != nil {
+	if err := util.TarXZ(srcModDir, tarPath); err != nil {
 		t.Fatalf("TarXZ: %v", err)
 	}
 	data, err := os.ReadFile(tarPath)
