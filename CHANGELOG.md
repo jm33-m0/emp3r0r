@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.13.1](https://github.com/jm33-m0/emp3r0r/compare/v3.13.0...v3.13.1) (2026-01-20)
+
+
+### Bug Fixes
+
+* sanitize path names in archive extraction and P2P file serving. ([a793882](https://github.com/jm33-m0/emp3r0r/commit/a7938824d9ba4d270594b7e38d7b3a3fa8db9868))
+
 ## [3.13.0](https://github.com/jm33-m0/emp3r0r/compare/v3.12.0...v3.13.0) (2026-01-20)
 
 
