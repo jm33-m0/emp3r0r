@@ -5,38 +5,13 @@ package modules
 
 import (
 	"os"
-	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
-
-// Copy current executable to a new location
-func CopySelfTo(dest_file string) (err error) {
-	// mkdir -p if directory not found
-	dest_dir := strings.Join(strings.Split(dest_file, "/")[:len(strings.Split(dest_file, "/"))-1], "/")
-	if !util.IsExist(dest_dir) {
-		err = os.MkdirAll(dest_dir, 0o700)
-		if err != nil {
-			return
-		}
-	}
-
-	// overwrite
-	if util.IsExist(dest_file) {
-		os.RemoveAll(dest_file)
-	}
-
-	if PersistFile != "" {
-		return util.Copy(PersistFile, dest_file)
-	}
-
-	return util.Copy(os.Args[0], dest_file)
-}
 
 // RunLPEHelper runs helper scripts to give you hints on how to escalate privilege
 func RunLPEHelper(method, checksum string) (out string) {

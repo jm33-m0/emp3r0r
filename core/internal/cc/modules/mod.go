@@ -31,9 +31,7 @@ var (
 		def.ModPORT_FWD:    modulePortFwd,
 		def.ModLPE_SUGGEST: moduleLPE,
 		def.ModCLEAN_LOG:   moduleLogCleaner,
-		// def.ModPERSISTENCE:  modulePersistence, // DISABLED: buggy module
-		def.ModVACCINE:      moduleVaccine,
-		def.ModINJECTOR:     moduleInjector,
+
 		def.ModBring2CC:     moduleBring2CC,
 		def.ModListener:     modListener,
 		def.ModSSHHarvester: module_ssh_harvester,

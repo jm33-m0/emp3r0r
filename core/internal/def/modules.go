@@ -1,19 +1,14 @@
 package def
 
-import "fmt"
-
 // built-in module names
 const (
 	ModCMD_EXEC     = "cmd_exec"
 	ModCLEAN_LOG    = "clean_log"
 	ModLPE_SUGGEST  = "lpe_suggest"
-	ModPERSISTENCE  = "get_persistence"
 	ModELF_PATCH    = "elf_patch"
 	ModPROXY        = "run_proxy"
 	ModPORT_FWD     = "port_fwd"
 	ModSHELL        = "interactive_shell"
-	ModVACCINE      = "vaccine"
-	ModINJECTOR     = "injector"
 	ModBring2CC     = "bring2cc"
 	ModListener     = "listener"
 	ModSSHHarvester = "ssh_harvester"
@@ -22,18 +17,6 @@ const (
 	ModMemDump      = "mem_dump"
 	ModSCREENSHOT   = "screenshot"
 )
-
-// PersistMethods CC calls one of these methods to get persistence, or all of them at once
-var PersistMethods = map[string]string{
-	"profiles": "Add some aliases to shell profiles, will trigger when user logs in",
-	"cron":     "Add a cronjob",
-	"patcher":  "Patch binaries (ls, ps, pstree, sshd, bash, sh...) so they load loader.so on startup, it also make agent essentially invisible to those tools",
-}
-
-var InjectorMethods = map[string]string{
-	"shellcode":      "Inject shellcode (see wiki), if no shellcode is specified, it will inject guardian.asm (runs agent as child process)",
-	"shared_library": "Inject a shared library, if no library is specified, it will inject loader.so (ELF loader that runs agent agent)",
-}
 
 // ModOption represents module options with typing metadata
 type ModOption struct {
@@ -132,30 +115,7 @@ type ModuleConfig struct {
 
 // Module help info and options
 var Modules = map[string]*ModuleConfig{
-	ModVACCINE: {
-		Name:     ModVACCINE,
-		Build:    "",
-		Date:     "2020-01-25",
-		Comment:  "Install tools to RuntimeConfig.UtilsPath, for lateral movement",
-		IsLocal:  false,
-		Platform: "Linux",
-		Path:     "",
-		Fileless: false,
-		Options: ModOptions{
-			"download_addr": &ModOption{
-				Name: "download_addr",
-				Desc: "Download address, useful if you want to download from other agents, use `file_server` first, eg. 10.1.1.1:8000",
-				Val:  "",
-			},
-		},
-		AgentConfig: AgentModuleConfig{
-			Exec:          "built-in",
-			Files:         []string{},
-			InMemory:      false,
-			Type:          "go",
-			IsInteractive: false,
-		},
-	},
+
 	ModCMD_EXEC: {
 		Name:     ModCMD_EXEC,
 		Build:    "",
@@ -235,30 +195,7 @@ var Modules = map[string]*ModuleConfig{
 			IsInteractive: false,
 		},
 	},
-	ModPERSISTENCE: {
-		Name:     ModPERSISTENCE,
-		Build:    "",
-		Date:     "2020-01-25",
-		Comment:  "Get persistence via built-in methods",
-		IsLocal:  false,
-		Platform: "Linux",
-		Path:     "",
-		Options: ModOptions{
-			"method": &ModOption{
-				Name: "method",
-				Desc: fmt.Sprintf("Persistence method: profiles: %s; cron: %s; patcher: %s", PersistMethods["profiles"], PersistMethods["cron"], PersistMethods["patcher"]),
-				Vals: []string{"profiles", "cron", "patcher"},
-				Val:  "patcher",
-			},
-		},
-		AgentConfig: AgentModuleConfig{
-			Exec:          "built-in",
-			Files:         []string{},
-			InMemory:      false,
-			Type:          "go",
-			IsInteractive: false,
-		},
-	},
+
 	ModELF_PATCH: {
 		Name:     ModELF_PATCH,
 		Build:    "",
@@ -415,37 +352,7 @@ var Modules = map[string]*ModuleConfig{
 			IsInteractive: true,
 		},
 	},
-	ModINJECTOR: {
-		Name:     ModINJECTOR,
-		Build:    "",
-		Date:     "2020-01-25",
-		Comment:  "Inject shellcode/loader.so into a running process",
-		IsLocal:  false,
-		Platform: "Linux",
-		Path:     "",
-		Fileless: false,
-		Options: ModOptions{
-			"pid": &ModOption{
-				Name: "pid",
-				Desc: "Target process PID, set to 0 to start a new process (sleep)",
-				Vals: []string{"0"},
-				Val:  "0",
-			},
-			"method": &ModOption{
-				Name: "method",
-				Desc: fmt.Sprintf("Injection method, available methods: shellcode: %s; shared_library: %s", InjectorMethods["shellcode"], InjectorMethods["shared_library"]),
-				Vals: []string{"shellcode", "shared_library"},
-				Val:  "shared_library",
-			},
-		},
-		AgentConfig: AgentModuleConfig{
-			Exec:          "built-in",
-			Files:         []string{},
-			InMemory:      false,
-			Type:          "go",
-			IsInteractive: false,
-		},
-	},
+
 	ModBring2CC: {
 		Name:     ModBring2CC,
 		Build:    "",
