@@ -35,6 +35,8 @@ type Emp3r0rAgent struct {
 	Exes		[]string		`cbor:"24,keyasint"`	// executables found in agent's $PATH
 	CWD		string			`cbor:"25,keyasint"`	// current working directory
 	Product		*ghw.ProductInfo	`cbor:"26,keyasint"`	// product info
+	UUID		string			`cbor:"27,keyasint"`	// agent UUID, specific to the agent binary
+	UUIDSig		string			`cbor:"28,keyasint"`	// signature of UUID, signed by CA
 }
 
 // AgentProcess process info of our agent

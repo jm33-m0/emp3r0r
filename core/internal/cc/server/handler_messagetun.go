@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/posener/h2conn"
@@ -59,10 +61,32 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 				cmd = msg.CmdSlice[0]
 			}
 			if strings.HasPrefix(cmd, def.TransportString) {
+				// verify hello
+				if len(msg.CmdSlice) < 3 {
+					logging.Warningf("Invalid hello from %s: missing UUID/Sig", msg.Tag)
+					return
+				}
+				agent_uuid := msg.CmdSlice[1]
+				agent_sig_str := msg.CmdSlice[2]
+				agent_sig, err := base64.URLEncoding.DecodeString(agent_sig_str)
+				if err != nil {
+					logging.Warningf("Failed to decode agent sig: %v", err)
+					return
+				}
+				isValid, err := transport.VerifySignatureWithCA([]byte(agent_uuid), agent_sig)
+				if err != nil {
+					logging.Warningf("Failed to verify agent uuid: %v", err)
+					return
+				}
+				if !isValid {
+					logging.Warningf("Invalid agent uuid, refusing request")
+					return
+				}
+
 				reply := msg
 				reply.CmdSlice = msg.CmdSlice
 				reply.CmdID = msg.CmdID
-				reply.Response = []byte(cmd + util.RandStr(util.RandInt(1, 10)))
+				reply.Response = []byte(def.TransportString + util.RandStr(util.RandInt(1, 10)))
 				err = out.Encode(reply)
 				if err != nil {
 					logging.Warningf("Failed to answer hello to agent %s", msg.Tag)
@@ -114,7 +138,7 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 
 func operatorBroadcastPrintf(msg_type, format string, a ...any) (err error) {
 	msgTunData := def.MsgTunData{
-		Tag:      msg_type,                  // tell operator about the message type: INFO, WARN, ERROR, SUCCESS
+		Tag:      msg_type,                          // tell operator about the message type: INFO, WARN, ERROR, SUCCESS
 		Response: []byte(fmt.Sprintf(format, a...)), // message content
 		CmdID:    "",
 		CmdSlice: []string{},

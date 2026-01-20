@@ -87,8 +87,7 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 			err = fmt.Errorf("DownloadViaCC HTTP GET failed to create request: %v", err)
 			return nil, err
 		}
-		req.Header.Set("AgentUUID", common.RuntimeConfig.AgentUUID)
-		req.Header.Set("AgentUUIDSig", common.RuntimeConfig.AgentUUIDSig)
+
 		resp, err := client.Do(req)
 		if err != nil {
 			err = fmt.Errorf("DownloadViaCC HTTP GET: %v", err)
@@ -124,8 +123,7 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 		err = fmt.Errorf("create grab request: %v", err)
 		return
 	}
-	req.HTTPRequest.Header.Set("AgentUUID", common.RuntimeConfig.AgentUUID)
-	req.HTTPRequest.Header.Set("AgentUUIDSig", common.RuntimeConfig.AgentUUIDSig)
+
 	resp := client.Do(req)
 
 	// progress

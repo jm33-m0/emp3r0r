@@ -3,7 +3,6 @@ package server
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/http/httputil"
@@ -26,27 +25,7 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	agent_uuid := req.Header.Get("AgentUUID")
-	agent_sig, err := base64.URLEncoding.DecodeString(req.Header.Get("AgentUUIDSig"))
-	if err != nil {
-		logging.Debugf("Failed to decode agent sig: %v", err)
-		wrt.WriteHeader(http.StatusNotFound)
-		return
-	}
-	isValid, err := transport.VerifySignatureWithCA([]byte(agent_uuid), agent_sig)
-	if err != nil {
-		logging.Debugf("Failed to verify agent uuid: %v", err)
-		wrt.WriteHeader(http.StatusNotFound)
-		return
-	}
-	if !isValid {
-		logging.Debugf("Invalid agent uuid, refusing request")
-		wrt.WriteHeader(http.StatusNotFound)
-		return
-	}
-	logging.Debugf("Header: %v", req.Header)
-	logging.Debugf("Got a request: api=%s, token=%s, agent_uuid=%s, sig=%x",
-		vars["api"], vars["token"], agent_uuid, agent_sig)
+	logging.Debugf("Got a request: api=%s, token=%s", vars["api"], vars["token"])
 
 	// forward to operator
 	api := transport.WebRoot + "/" + vars["api"]

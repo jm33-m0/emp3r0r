@@ -162,6 +162,8 @@ func TestEstablishC2Connection(t *testing.T) {
 		GOOS:      "linux",
 		IPs:       []string{"127.0.0.1"},
 		Process:   &def.AgentProcess{},
+		UUID:      agentUUID,
+		UUIDSig:   agentSig,
 	}
 	err = c2transport.ReportStatus(agentInfo)
 	if err != nil {

@@ -44,6 +44,8 @@ func GatherSystemDetails() *def.Emp3r0rAgent {
 
 	common.RuntimeConfig.AgentTag = util.GetHostID(info.Product, common.RuntimeConfig.AgentUUID)
 	info.Tag = common.RuntimeConfig.AgentTag // use hostid
+	info.UUID = common.RuntimeConfig.AgentUUID
+	info.UUIDSig = common.RuntimeConfig.AgentUUIDSig
 	info.Hostname = hostname
 	info.Name = strings.Split(info.Tag, "-agent")[0]
 	info.Version = def.Version

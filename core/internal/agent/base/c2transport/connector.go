@@ -8,7 +8,6 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/posener/h2conn"
 )
@@ -20,10 +19,6 @@ func EstablishC2Connection(url string) (conn *h2conn.Conn, ctx context.Context, 
 
 	h2 := h2conn.Client{
 		Client: def.HTTPClient,
-		Header: http.Header{
-			"AgentUUID":    {common.RuntimeConfig.AgentUUID},
-			"AgentUUIDSig": {common.RuntimeConfig.AgentUUIDSig},
-		},
 	}
 	logging.Printf("EstablishC2Connection: connecting to %s", url)
 

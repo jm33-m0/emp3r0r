@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/posener/h2conn"
@@ -34,6 +36,23 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 	err = in.Decode(&target)
 	if err != nil {
 		logging.Warningf("handleAgentCheckIn decode error: %v", err)
+		return
+	}
+
+	// verify agent identification
+	// timestamp is already checked in transport.VerifySignatureWithCA
+	agent_sig, err := base64.URLEncoding.DecodeString(target.UUIDSig)
+	if err != nil {
+		logging.Debugf("Failed to decode agent sig: %v", err)
+		return
+	}
+	isValid, err := transport.VerifySignatureWithCA([]byte(target.UUID), agent_sig)
+	if err != nil {
+		logging.Debugf("Failed to verify agent uuid: %v", err)
+		return
+	}
+	if !isValid {
+		logging.Debugf("Invalid agent uuid, refusing request")
 		return
 	}
 	target.From = req.RemoteAddr
