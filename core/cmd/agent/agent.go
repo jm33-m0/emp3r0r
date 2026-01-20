@@ -190,7 +190,6 @@ test_agent:
 		}
 		time.Sleep(time.Duration(util.RandInt(3, 20)) * time.Second)
 	}
-	go c2transport.RunSSServer() // start shadowsocks server for lateral movement
 
 connect:
 	// check preset CC status URL, if CC is supposed to be offline, take a nap

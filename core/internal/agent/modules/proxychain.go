@@ -79,6 +79,8 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 		}
 	}()
 
+	go c2transport.RunSSServer() // start shadowsocks server for proxy chaining
+
 	// kcp server that forwards to ssh reverse proxy
 	go func() {
 		ctx, cancel := context.WithCancel(context.Background())
