@@ -49,6 +49,7 @@ func agent_main() {
 	if err != nil {
 		logging.Fatalf("ApplyRuntimeConfig: %v", err)
 	}
+	util.SetFileCryptoKey([]byte(common.RuntimeConfig.Password))
 
 	if !is_dll {
 		// don't be hasty

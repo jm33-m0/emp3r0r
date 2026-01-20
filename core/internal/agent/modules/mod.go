@@ -160,7 +160,7 @@ func downloadAndVerifyModule(file_to_download, checksum, download_addr string) (
 		}
 	} else {
 		// checksum already matches local file; read it so callers can run in-memory flows
-		if data, err = os.ReadFile(file_to_download); err != nil {
+		if data, err = util.ReadFileAgent(file_to_download); err != nil {
 			return nil, fmt.Errorf("reading %s: %v", file_to_download, err)
 		}
 	}
@@ -176,7 +176,7 @@ func downloadAndVerifyModule(file_to_download, checksum, download_addr string) (
 
 func extractModule(modDir, tarball string) error {
 	os.RemoveAll(modDir)
-	if err := util.Unarchive(tarball, common.RuntimeConfig.AgentRoot); err != nil {
+	if err := util.UnarchiveAgent(tarball, common.RuntimeConfig.AgentRoot); err != nil {
 		return fmt.Errorf("unarchive module tarball: %v", err)
 	}
 
@@ -197,7 +197,7 @@ func processModuleFiles(modDir string) error {
 		libsTarball := filepath.Join(modDir, "libs.tar.xz")
 		if util.IsExist(libsTarball) {
 			os.RemoveAll(filepath.Join(modDir, "libs"))
-			if err := util.Unarchive(libsTarball, modDir); err != nil {
+			if err := util.UnarchiveAgent(libsTarball, modDir); err != nil {
 				return fmt.Errorf("unarchive %s: %v", libsTarball, err)
 			}
 		}

