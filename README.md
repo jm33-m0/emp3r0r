@@ -35,7 +35,7 @@ emp3r0r is a comprehensive post-exploitation framework that stands out as one of
 - **Extensible Python Environment**: Deploy a complete Python3 runtime with Impacket, Requests, and MySQL libraries via the `vaccine` module.
 - **Universal Module Support**: Execute Bash, PowerShell, Python, DLL, SO, and EXE modules seamlessly across platforms.
 - **Advanced Stealth**: Dynamic process obfuscation, file concealment, time-stomping, and **memory-backed file system** with transparent encryption and intelligent storage strategies.
-- **Modern Infrastructure**: WireGuard + mTLS operator authentication, HTTP2/TLS with fingerprint-resistant implementations, KCP-based UDP tunneling.
+- **Modern Infrastructure**: WireGuard + mTLS operator authentication, HTTP2/TLS communications, KCP-based UDP tunneling with anti-fingerprinting measures.
 - **COFF/BOF Loader**: Native BOF execution on Windows agents with typed argument packing (LPSTR/LPWSTR/INT/BOOL/BINARY), powered by [praetorian-inc/goffloader](https://github.com/praetorian-inc/goffloader), and integration-friendly module schema; on Linux you can load ELF object files in-memory to achieve the same effect.
 - **APT-Grade Connectivity**: **Auto-Proxy Chain** creates a resilient, automatic P2P mesh network. Agents in air-gapped or isolated segments autonomously discover and piggyback on internet-connected peers to reach the C2, ensuring long-term survival in hardened environments.
 - **Bring2CC**: Reverse proxy any target port to the C2 server, enabling direct access to internal resources even when agents cannot make outbound connections.
@@ -87,7 +87,7 @@ Use the `generate` command from within the emp3r0r shell interface to create cus
 - **Memory-First Storage**: Intelligent in-memory file system that stores operational files in RAM, automatically spilling to encrypted disk only when necessary.
 - **Transparent Encryption**: All non-executable files are automatically encrypted (AES-GCM) whether stored in memory or on disk, ensuring operational security.
 - **Dynamic Storage Strategies**: Three configurable modes (Auto, Memory, Disk) with automatic size-based decisions and adaptive limits up to 1/10 of available free memory.
-- **Warn-Before-Write**: OpSec-safe prompts before disk operations to avoid noisy actions and maintain minimal footprint.
+- **Minimal Disk Footprint**: Non-fileless modules display warnings, and the memory-backed system reduces disk writes to essential operations only.
 - **Unified File Interface**: Transparent read/write operations across memory and disk storage with automatic cleanup and integrity verification.
 
 #### Advanced Process Hiding
@@ -98,8 +98,9 @@ Use the `generate` command from within the emp3r0r shell interface to create cus
 
 #### Secure Command & Control
 
-- **Encrypted Transports**: HTTP2/TLS with custom fingerprint-resistant implementations, WireGuard tunneling with mTLS operator authentication.
+- **Encrypted Transports**: HTTP2/TLS communications, WireGuard tunneling with mTLS operator authentication, and custom TLS configurations.
 - **Alternative Channels**: KCP for speed and resilience in high-latency environments; TOR/CDN support for additional operational cover.
+- **Proxy Anti-Fingerprinting**: Randomized packet sizes (32-256 bytes) in proxy chain communications to avoid network fingerprinting.
 
 ### Operator Experience
 
