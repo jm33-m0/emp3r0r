@@ -1,5 +1,25 @@
 # Changelog
 
+## [3.13.0](https://github.com/jm33-m0/emp3r0r/compare/v3.12.0...v3.13.0) (2026-01-20)
+
+
+### Features
+
+* add memory-backed file storage and configurable storage strategies for agent files, including C2 commands and tests. ([34d8aeb](https://github.com/jm33-m0/emp3r0r/commit/34d8aeb9a96164c6b09b34588bb892174463241c))
+* implement in-memory file storage with unified encryption, dynamic sizing, and special handling for executables. ([9e48a52](https://github.com/jm33-m0/emp3r0r/commit/9e48a528942ede40f2a296f564edea6810ab270c))
+* implement transparent file encryption for agent-side file operations. ([c258a4a](https://github.com/jm33-m0/emp3r0r/commit/c258a4a42517f7a180385ff2dc94a81fd46c900e))
+
+
+### Bug Fixes
+
+* implement agent UUID signature verification during check-in and message tunnel hello. ([c8d0db2](https://github.com/jm33-m0/emp3r0r/commit/c8d0db249085dab746579e7f749b4072a669aa67))
+* improve RandInt security by using crypto/rand.Int with math/big. ([a60eed0](https://github.com/jm33-m0/emp3r0r/commit/a60eed0706026effcdc1b9d3bc47b3e20de9c46b))
+* introduce `!sysinfo` command for comprehensive system details and optimize agent startup with minimal info collection. ([b0e0d6c](https://github.com/jm33-m0/emp3r0r/commit/b0e0d6c74738da694a9c16d5fdcbbf9d0e6665e8))
+* relocate Shadowsocks server initialization to the proxychain module. only run it on demand. ([bd99fc1](https://github.com/jm33-m0/emp3r0r/commit/bd99fc1bd0b45af9efebb89e2e944a5b970cbfe6))
+* remove injector, persistence, vaccine modules. BOF modules planned. ([58d6a1e](https://github.com/jm33-m0/emp3r0r/commit/58d6a1e841fe1f4592e5a4b6c7f216ac29799c73))
+* remove noisy agent upgrade command and its associated functionality. ([d889590](https://github.com/jm33-m0/emp3r0r/commit/d889590e9326c6fd6bc279cc32aeae5e1145bfe1))
+* remove vaccine, injector, and persistence modules along with their associated files and configurations. ([61d8b34](https://github.com/jm33-m0/emp3r0r/commit/61d8b34311ab4763eaa94ea3768826e12e6ffd26))
+
 ## [3.12.0](https://github.com/jm33-m0/emp3r0r/compare/v3.11.1...v3.12.0) (2026-01-18)
 
 
