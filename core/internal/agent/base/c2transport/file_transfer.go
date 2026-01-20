@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -267,17 +268,26 @@ func handleClient(w http.ResponseWriter, r *http.Request) {
 	file_path := r.URL.Query().Get("file_path")
 	checksum := r.URL.Query().Get("checksum")
 
-	download_path := fmt.Sprintf("%s/%s", common.RuntimeConfig.AgentRoot, util.FileBaseName(file_path))
+	// sanitize path to prevent traversal
+	basename := util.FileBaseName(file_path)
+	if basename == "" {
+		http.Error(w, "Invalid file path", http.StatusBadRequest)
+		return
+	}
+	safe_path := filepath.Join(common.RuntimeConfig.AgentRoot, basename)
+
 	// if file does not exist, download it from CC
-	if !util.IsFileExist(file_path) {
-		logging.Printf("handleClient: file %s (%s) does not exist, downloading from CC", file_path, checksum)
-		_, err := DownloadViaC2(file_path, download_path, checksum)
+	if !util.IsFileExist(safe_path) {
+		logging.Printf("handleClient: file %s (%s) does not exist, downloading from CC", safe_path, checksum)
+		_, err := DownloadViaC2(file_path, safe_path, checksum)
 		if err != nil {
 			logging.Printf("handleClient: failed to download file from CC: %v", err)
 			http.Error(w, "Failed to download file from CC", http.StatusInternalServerError)
 			return
 		}
-		file_path = download_path // should serve the downloaded file
+		file_path = safe_path // should serve the downloaded file
+	} else {
+		file_path = safe_path
 	}
 
 	// serve the file

@@ -884,6 +884,10 @@ func UnarchiveAgent(tarball, dst string) error {
 			return fmt.Errorf("next tar header: %v", err)
 		}
 
+		// Check for Zip Slip (path traversal)
+		if !filepath.IsLocal(header.Name) {
+			return fmt.Errorf("unsafe tar header name: %s", header.Name)
+		}
 		targetPath := filepath.Join(dst, header.Name)
 		info := header.FileInfo()
 
