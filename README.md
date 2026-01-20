@@ -34,8 +34,8 @@ emp3r0r is a comprehensive post-exploitation framework that stands out as one of
 - **Linux-Native Architecture**: Built from the ground up for Linux targets with full Windows compatibility.
 - **Extensible Python Environment**: Deploy a complete Python3 runtime with Impacket, Requests, and MySQL libraries via the `vaccine` module.
 - **Universal Module Support**: Execute Bash, PowerShell, Python, DLL, SO, and EXE modules seamlessly across platforms.
-- **Advanced Stealth**: Dynamic process obfuscation, file concealment, time-stomping, and **memory-backed file system** with transparent encryption and intelligent storage strategies.
-- **Modern Infrastructure**: WireGuard + mTLS operator authentication, HTTP2/TLS communications, KCP-based UDP tunneling with anti-fingerprinting measures.
+- **Advanced Stealth**: Dynamic process obfuscation, file concealment, time-stomping, **memory-backed file system** with transparent AES-GCM encryption and intelligent storage strategies (auto/memory/disk modes with dynamic RAM limits).
+- **Modern Infrastructure**: WireGuard + mTLS operator authentication, HTTP2/TLS with **JA3 fingerprinting evasion** (randomized Client Hello via uTLS), KCP-based UDP tunneling.
 - **COFF/BOF Loader**: Native BOF execution on Windows agents with typed argument packing (LPSTR/LPWSTR/INT/BOOL/BINARY), powered by [praetorian-inc/goffloader](https://github.com/praetorian-inc/goffloader), and integration-friendly module schema; on Linux you can load ELF object files in-memory to achieve the same effect.
 - **APT-Grade Connectivity**: **Auto-Proxy Chain** creates a resilient, automatic P2P mesh network. Agents in air-gapped or isolated segments autonomously discover and piggyback on internet-connected peers to reach the C2, ensuring long-term survival in hardened environments.
 - **Bring2CC**: Reverse proxy any target port to the C2 server, enabling direct access to internal resources even when agents cannot make outbound connections.
@@ -82,25 +82,24 @@ Use the `generate` command from within the emp3r0r shell interface to create cus
 
 ### Stealth & Evasion
 
-#### OpSec Safety & Memory-Backed File System
+#### OpSec Safety & File Operations
 
-- **Memory-First Storage**: Intelligent in-memory file system that stores operational files in RAM, automatically spilling to encrypted disk only when necessary.
-- **Transparent Encryption**: All non-executable files are automatically encrypted (AES-GCM) whether stored in memory or on disk, ensuring operational security.
-- **Dynamic Storage Strategies**: Three configurable modes (Auto, Memory, Disk) with automatic size-based decisions and adaptive limits up to 1/10 of available free memory.
-- **Minimal Disk Footprint**: Non-fileless modules display warnings, and the memory-backed system reduces disk writes to essential operations only.
-- **Unified File Interface**: Transparent read/write operations across memory and disk storage with automatic cleanup and integrity verification.
+- **Warn-before-write** to avoid noisy actions on disk.
+- **Minimal footprint** until work begins, keeping hosts clean.
+- **Consistent artifacts** via uniform file handling for predictable, low-profile drops.
+- **Generic temps** to blend into the system.
 
 #### Advanced Process Hiding
 
-- **Process Name Obfuscation**: Dynamic process names and hidden helper processes to reduce detection surface.
-- **Anti-Debug Measures**: Built-in protections against debugging and analysis tools.
-- **sRDI-like Shellcode Stager**: Load ELF binaries directly from memory without touching disk, similar to sRDI for Windows, maintaining operational stealth.
+- **Obfuscated processes** and hidden helpers to lower visibility.
+- **Anti-debug/analysis** measures to make inspection harder.
+- **sRDI-like Shellcode Stager**: Load ELF binaries from memory without touching disk, similar to sRDI for Windows.
+- **Memory-backed Filesystem** (`MemFileMap` in `core/lib/util/file.go`): In-memory file storage with automatic encrypted disk spillover (AES-GCM). Three storage strategies (Auto/Memory/Disk) with dynamic limits (up to 1/10 free RAM, max 100MB). Transparent encryption for all non-executable files with unified interface for memory/disk operations.
 
 #### Secure Command & Control
 
-- **Encrypted Transports**: HTTP2/TLS communications, WireGuard tunneling with mTLS operator authentication, and custom TLS configurations.
-- **Alternative Channels**: KCP for speed and resilience in high-latency environments; TOR/CDN support for additional operational cover.
-- **Proxy Anti-Fingerprinting**: Randomized packet sizes (32-256 bytes) in proxy chain communications to avoid network fingerprinting.
+- **JA3-evasive HTTP2/TLS** ([uTLS](https://github.com/refraction-networking/utls) with `HelloRandomizedALPN`): Randomizes TLS Client Hello fingerprints to evade JA3-based detection systems; **WireGuard+mTLS** for secure operator access.
+- **KCP** for speed and resilience in high-latency environments; **TOR/CDN** support for additional operational cover.
 
 ### Operator Experience
 
@@ -120,7 +119,6 @@ Use the `generate` command from within the emp3r0r shell interface to create cus
 #### File Transfer System
 
 - **Bidirectional Transfer**: Upload files to agents (`put`) and download from agents (`get`) with intuitive commands.
-- **Memory-Backed Storage**: Files can be stored in-memory with transparent encryption, minimizing disk footprint during operations.
 - **Recursive Downloads**: Download entire directories with `--recursive` flag and filter files using regex patterns (`--regex`).
 - **Smart Transfer Strategy**: Agents can fetch files from peer agents via encrypted KCP tunnels before falling back to C2, improving speed and stealth.
 - **Integrity & Reliability**: SHA256 verification plus **resumable uploads/downloads** so interrupted transfers continue from the last offset.
@@ -160,10 +158,9 @@ Use the `generate` command from within the emp3r0r shell interface to create cus
 
 #### In-Memory Execution
 
-- **Memory-Backed File System**: Store and execute operational files directly from RAM with transparent encryption, avoiding disk writes for maximum stealth.
 - Run Bash, PowerShell, Python, and native ELF modules straight from memory.
 - Execute ELF objects (.o) or executables entirely in memory on Linux targets without writing to disk.
-- Memory-only loaders and injection paths keep disk footprint low while maintaining operational flexibility.
+- Memory-only loaders and injection paths keep disk footprint low.
 - ELF patcher module lets you graft the agent into existing binaries when needed.
 
 ### Post-Exploitation Arsenal
