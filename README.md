@@ -32,10 +32,9 @@ emp3r0r is a comprehensive post-exploitation framework that stands out as one of
 ### Why emp3r0r?
 
 - **Linux-Native Architecture**: Built from the ground up for Linux targets with full Windows compatibility.
-- **Extensible Python Environment**: Deploy a complete Python3 runtime with Impacket, Requests, and MySQL libraries via the `vaccine` module.
 - **Universal Module Support**: Execute Bash, PowerShell, Python, DLL, SO, and EXE modules seamlessly across platforms.
-- **Advanced Stealth**: Dynamic process obfuscation, file concealment, time-stomping, and **lazy initialization** (filesystem modifications only on demand).
-- **Modern Infrastructure**: WireGuard + mTLS operator authentication, HTTP2/TLS with JA3 evasion, KCP-based UDP tunneling.
+- **Advanced Stealth**: Dynamic process obfuscation, file concealment, time-stomping, **memory-backed file system** with transparent AES-GCM encryption and intelligent storage strategies (auto/memory/disk modes with dynamic RAM limits).
+- **Modern Infrastructure**: WireGuard + mTLS operator authentication, HTTP2/TLS with **JA3 fingerprinting evasion**, KCP-based UDP tunneling.
 - **COFF/BOF Loader**: Native BOF execution on Windows agents with typed argument packing (LPSTR/LPWSTR/INT/BOOL/BINARY), powered by [praetorian-inc/goffloader](https://github.com/praetorian-inc/goffloader), and integration-friendly module schema; on Linux you can load ELF object files in-memory to achieve the same effect.
 - **APT-Grade Connectivity**: **Auto-Proxy Chain** creates a resilient, automatic P2P mesh network. Agents in air-gapped or isolated segments autonomously discover and piggyback on internet-connected peers to reach the C2, ensuring long-term survival in hardened environments.
 - **Bring2CC**: Reverse proxy any target port to the C2 server, enabling direct access to internal resources even when agents cannot make outbound connections.
@@ -94,11 +93,14 @@ Use the `generate` command from within the emp3r0r shell interface to create cus
 - **Obfuscated processes** and hidden helpers to lower visibility.
 - **Anti-debug/analysis** measures to make inspection harder.
 - **sRDI-like Shellcode Stager**: Load ELF binaries from memory without touching disk, similar to sRDI for Windows.
+- **Memory-backed Filesystem**: In-memory file storage with automatic encrypted disk spillover (AES-GCM). Three storage strategies (Auto/Memory/Disk) with dynamic limits (up to 1/10 free RAM, max 100MB). Transparent encryption for all non-executable files.
 
 #### Secure Command & Control
 
-- **JA3-evasive HTTP2/TLS + WireGuard+mTLS** keeps operator access locked down.
-- **KCP for speed/resilience**; **TOR/CDN** for extra cover.
+- **JA3-evasive HTTP2/TLS** ([uTLS](https://github.com/refraction-networking/utls): Randomizes TLS Client Hello fingerprints to evade JA3-based detection systems
+- **WireGuard+mTLS** for secure operator access.
+- **KCP** for speed and resilience in high-latency environments
+- **TOR/CDN** support for additional operational cover.
 
 ### Operator Experience
 
@@ -173,8 +175,6 @@ Use the `generate` command from within the emp3r0r shell interface to create cus
 #### Additional Capabilities
 
 - **Screenshot**: Fully integrated module for capturing target screens.
-- **Vaccine**: Deploy a complete Python3 runtime, nmap, socat, and other tools.
-- **Persistence**: Multiple mechanisms including cron jobs, shell profiles, and binary patching.
 - **LPE**: Privilege escalation tools with automated suggestions (`lpe_suggest`).
 - **Log Sanitization**: `clean_log` module for anti-forensics.
 
