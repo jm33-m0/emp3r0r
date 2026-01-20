@@ -306,18 +306,22 @@ func copyDir(src, dst string) error {
 }
 
 // SecureLocalPath normalizes a path and rejects ones that are not local to avoid traversal.
+// It supports both '/' and OS-specific separators (like '\' on Windows).
 func SecureLocalPath(path string) (string, error) {
 	if path == "" {
 		return "", fmt.Errorf("empty path")
 	}
 
-	localized, err := filepath.Localize(path)
-	if err != nil {
-		return "", fmt.Errorf("localize %q: %w", path, err)
+	// filepath.IsLocal expects '/' as a separator and will reject backslashes.
+	// We convert it to slash-separated format for the safety check.
+	slashedPath := filepath.ToSlash(path)
+	if !filepath.IsLocal(slashedPath) {
+		return "", fmt.Errorf("unsafe path %q", path)
 	}
 
-	if !filepath.IsLocal(localized) {
-		return "", fmt.Errorf("unsafe path %q", localized)
+	localized, err := filepath.Localize(slashedPath)
+	if err != nil {
+		return "", fmt.Errorf("localize %q: %w", path, err)
 	}
 
 	return localized, nil
@@ -700,9 +704,7 @@ func SaveFileAgent(filename string, data []byte, perm os.FileMode, strategy Stor
 	// For larger files, fallback to disk (Encrypted info is already in 'data')
 	// Ensure we clean up memory if it was there
 	MemFileLock.Lock()
-	if _, ok := MemFileMap[filename]; ok {
-		delete(MemFileMap, filename)
-	}
+	delete(MemFileMap, filename)
 	MemFileLock.Unlock()
 
 	logging.Debugf("Agent: Writing %d bytes (encrypted) to %s with permissions %o", len(data), filename, perm)

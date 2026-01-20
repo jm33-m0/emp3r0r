@@ -100,34 +100,19 @@ func GenerateGetFilePaths(file_path string) (write_dir, save_to_file, tempname, 
 	// So we treat the remote absolute path as relative.
 
 	// properties of the remote path
-	cleanPath := filepath.Clean(file_path)
-	if filepath.IsAbs(cleanPath) {
-		// strip root
-		_, err := filepath.Rel(filepath.Dir(cleanPath), cleanPath)
-		if err == nil {
-			// This is just filename. Rel of /a/b/c from /a/b is c.
-			// We want the whole path structure relative to root?
-			// e.g. /home/kali/foo -> home/kali/foo
+	// Use ToSlash to ensure consistent handling of separators
+	cleanPath := filepath.ToSlash(filepath.Clean(file_path))
 
-			// Simple way: trim leading separator
-			// But windows/unix diffs.
-			// Let's just use the logic: join(FileGetDir, cleanPath) but cleanPath absolute?
-			// filepath.Join ignores previous absolute path elements?
-			// No, filepath.Join("/a", "/b") -> "/b".
-		}
-	}
-
-	// Manual stripping of root
-	// On linux, just remove leading /
+	// Strip absolute parts (drive letter and/or leading slash)
+	// We want to treat the remote path as relative to our download directory
 	relPath := cleanPath
-	if filepath.IsAbs(cleanPath) {
-		relPath = cleanPath[1:] // simple strip /
-		// Recheck if it's cleaner?
+	if vol := filepath.VolumeName(cleanPath); vol != "" {
+		relPath = cleanPath[len(vol):]
 	}
-	// For robustness:
-	relPath = strings.TrimLeft(cleanPath, "/\\")
+	relPath = strings.TrimLeft(relPath, "/")
 
-	// Now check if it's safe (no ../)
+	// Use SecureLocalPath to ensure the path is safe (no ../)
+	// It now supports native paths and internally handles separator normalization
 	localized, err := util.SecureLocalPath(relPath)
 	if err != nil {
 		logging.Debugf("GenerateGetFilePaths: unsafe path %q: %v. Using basename only.", file_path, err)
