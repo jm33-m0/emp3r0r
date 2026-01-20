@@ -171,52 +171,6 @@ func C2Commands() *cobra.Command {
 	memDumpCmd.Flags().IntP("pid", "p", 0, "PID of target process")
 	rootCmd.AddCommand(memDumpCmd)
 
-	// !lpe --script_name <script_name> --checksum <checksum>
-	lpeCmd := &cobra.Command{
-		Use:     def.C2CmdLPE,
-		Short:   "Run LPE script",
-		Example: "!lpe --script_name <script_name> --checksum <checksum>",
-		GroupID: "generic",
-		Run:     runLPELinux,
-	}
-	lpeCmd.Flags().StringP("script_name", "s", "", "Script name")
-	lpeCmd.Flags().StringP("checksum", "c", "", "Checksum")
-	rootCmd.AddCommand(lpeCmd)
-
-	// !ssh_harvester --code_pattern <hex> --reg_name <register> --stop <bool>
-	sshHarvesterCmd := &cobra.Command{
-		Use:     def.C2CmdSSHHarvester,
-		Short:   "Start SSH harvester",
-		Example: "!ssh_harvester --code_pattern <hex> --reg_name <reg> --stop <bool>",
-		GroupID: "generic",
-		Run:     runSSHHarvesterLinux,
-	}
-	sshHarvesterCmd.Flags().StringP("code_pattern", "p", "", "Code pattern")
-	sshHarvesterCmd.Flags().StringP("reg_name", "r", "RBP", "Register name")
-	sshHarvesterCmd.Flags().BoolP("stop", "s", false, "Stop the harvester")
-	rootCmd.AddCommand(sshHarvesterCmd)
-
-	// !get_root (no flags)
-	getRootCmd := &cobra.Command{
-		Use:     def.C2CmdGetRoot,
-		Short:   "Attempt to gain root privileges",
-		Example: "!get_root",
-		GroupID: "linux",
-		Run:     runGetRootLinux,
-	}
-	rootCmd.AddCommand(getRootCmd)
-
-	// !clean_log --keyword <keyword>
-	cleanLogCmd := &cobra.Command{
-		Use:     def.C2CmdCleanLog,
-		Short:   "Clean logs",
-		Example: "!clean_log --keyword <keyword>",
-		GroupID: "linux",
-		Run:     runCleanLogLinux,
-	}
-	cleanLogCmd.Flags().StringP("keyword", "k", "", "Keyword to clean logs")
-	rootCmd.AddCommand(cleanLogCmd)
-
 	screenshotCmd := &cobra.Command{
 		Use:     def.C2CmdScreenshot,
 		Short:   "Take screenshot",
@@ -225,5 +179,8 @@ func C2Commands() *cobra.Command {
 	}
 	rootCmd.AddCommand(screenshotCmd)
 
+	platformCommands(rootCmd)
+
 	return rootCmd
+
 }

