@@ -120,10 +120,8 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 			}
 			resp := msg.Response
 			if strings.HasPrefix(string(resp), def.TransportString) {
-				logging.Printf("Hello (%s) received", resp)
 				// mark the hello as success
 				if _, ok := HandShakes.Load(msg.CmdID); ok {
-					logging.Printf("Hello (%s) acknowledged", resp)
 					HandShakes.Store(msg.CmdID, true)
 				}
 				continue
@@ -145,12 +143,11 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 			isSuccessAny, _ := HandShakes.Load(hello_id)
 			isSuccess, _ := isSuccessAny.(bool)
 			if isSuccess {
-				logging.Printf("Hello (%s) done", hello_id)
 				return true
 			}
 			time.Sleep(time.Millisecond)
 		}
-		logging.Printf("Hello (%s) timeout", hello_id)
+		logging.Errorf("Hello (%s) timeout", hello_id)
 		return false
 	}
 
@@ -165,12 +162,11 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 			hello_msg.CmdID = uuid.NewString()
 			hello_msg.Tag = common.RuntimeConfig.AgentTag
 			if encodeErr := out.Encode(hello_msg); encodeErr != nil {
-				logging.Printf("agent cannot connect to cc: %v", encodeErr)
+				logging.Errorf("agent cannot connect to cc: %v", encodeErr)
 				util.TakeABlink()
 				continue
 			}
 			HandShakes.Store(hello_msg.CmdID, false)
-			logging.Printf("Hello (%v) sent", hello_msg.CmdSlice)
 			if !wait_hello(hello_msg.CmdID) {
 				cancel()
 				break
@@ -182,12 +178,10 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 
 	// keep connected
 	for ctx.Err() == nil {
-		logging.Println("Hearbeat begins")
 		if !sendHello(util.RandInt(1, 10)) {
-			logging.Print("sendHello failed")
+			logging.Errorf("sendHello failed")
 			break
 		}
-		logging.Println("Hearbeat ends")
 		util.TakeASnap()
 	}
 
