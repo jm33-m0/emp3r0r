@@ -179,6 +179,14 @@ func C2Commands() *cobra.Command {
 	}
 	rootCmd.AddCommand(screenshotCmd)
 
+	sysInfoCmd := &cobra.Command{
+		Use:     def.C2CmdSysInfo,
+		Short:   "Collect full system info",
+		GroupID: "generic",
+		Run:     runSysInfo,
+	}
+	rootCmd.AddCommand(sysInfoCmd)
+
 	platformCommands(rootCmd)
 
 	return rootCmd

