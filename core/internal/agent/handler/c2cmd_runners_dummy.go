@@ -10,16 +10,6 @@ import (
 
 const NotSupportedMsg = "not supported"
 
-// runInjectLinux - dummy runner for non-linux targets.
-func runInjectLinux(cmd *cobra.Command, args []string) {
-	c2transport.NotifyC2(cmd, "%s", NotSupportedMsg)
-}
-
-// runPersistenceLinux - dummy runner for non-linux targets.
-func runPersistenceLinux(cmd *cobra.Command, args []string) {
-	c2transport.NotifyC2(cmd, "%s", NotSupportedMsg)
-}
-
 // runGetRootLinux - dummy runner for non-linux targets.
 func runGetRootLinux(cmd *cobra.Command, args []string) {
 	c2transport.NotifyC2(cmd, "%s", NotSupportedMsg)
@@ -37,10 +27,5 @@ func runLPELinux(cmd *cobra.Command, args []string) {
 
 // runSSHHarvesterLinux - dummy runner for non-linux targets.
 func runSSHHarvesterLinux(cmd *cobra.Command, args []string) {
-	c2transport.NotifyC2(cmd, "%s", NotSupportedMsg)
-}
-
-// runElfPatchLinux - dummy runner for non-linux targets.
-func runElfPatchLinux(cmd *cobra.Command, args []string) {
 	c2transport.NotifyC2(cmd, "%s", NotSupportedMsg)
 }

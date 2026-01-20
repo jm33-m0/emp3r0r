@@ -2,10 +2,10 @@ package def
 
 // built-in module names
 const (
-	ModCMD_EXEC     = "cmd_exec"
-	ModCLEAN_LOG    = "clean_log"
-	ModLPE_SUGGEST  = "lpe_suggest"
-	ModELF_PATCH    = "elf_patch"
+	ModCMD_EXEC    = "cmd_exec"
+	ModCLEAN_LOG   = "clean_log"
+	ModLPE_SUGGEST = "lpe_suggest"
+
 	ModPROXY        = "run_proxy"
 	ModPORT_FWD     = "port_fwd"
 	ModSHELL        = "interactive_shell"
@@ -196,40 +196,6 @@ var Modules = map[string]*ModuleConfig{
 		},
 	},
 
-	ModELF_PATCH: {
-		Name:     ModELF_PATCH,
-		Build:    "",
-		Date:     "2024-12-19",
-		Comment:  "Patch an ELF binary to load a specified shared library on startup",
-		IsLocal:  false,
-		Platform: "Linux",
-		Path:     "",
-		Fileless: false,
-		Options: ModOptions{
-			"elf_path": &ModOption{
-				Name: "elf_path",
-				Desc: "Path to the ELF binary to patch",
-				Val:  "/bin/ls",
-			},
-			"so_path": &ModOption{
-				Name: "so_path",
-				Desc: "Path to the shared library (.so) file to inject (use 'put' command to upload first)",
-				Val:  "",
-			},
-			"target_path": &ModOption{
-				Name: "target_path",
-				Desc: "Target path where the library should be loaded on the target system (including filename). If empty, uses random path and filename",
-				Val:  "",
-			},
-		},
-		AgentConfig: AgentModuleConfig{
-			Exec:          "built-in",
-			Files:         []string{},
-			InMemory:      false,
-			Type:          "go",
-			IsInteractive: false,
-		},
-	},
 	ModPROXY: {
 		Name:     ModPROXY,
 		Build:    "",

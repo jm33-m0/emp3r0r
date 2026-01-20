@@ -38,8 +38,8 @@ var (
 		def.ModDownloader:   moduleDownloader,
 		def.ModFileServer:   moduleFileServer,
 		def.ModMemDump:      moduleMemDump,
-		def.ModELF_PATCH:    moduleElfPatch,
-		def.ModSCREENSHOT:   moduleScreenshot,
+
+		def.ModSCREENSHOT: moduleScreenshot,
 	}
 )
 
