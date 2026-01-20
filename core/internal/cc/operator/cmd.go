@@ -308,12 +308,13 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		putCmd := &cobra.Command{
 			Use:     "put --src /path/to/local_file --dst /path/to/remote_file",
 			GroupID: "filesystem",
-			Short:   "Upload a file to selected agent",
+			Short:   "Upload a file to selected agent. Use --mem to upload to memory",
 			Example: "put --src /tmp/1.txt --dst /tmp/2.txt",
 			Run:     ftp.CmdUploadToAgent,
 		}
 		putCmd.Flags().StringP("src", "s", "", "Source file")
 		putCmd.Flags().StringP("dst", "d", "", "Destination file")
+		putCmd.Flags().BoolP("mem", "m", false, "Save to memory on agent")
 		putCmd.MarkFlagRequired("src")
 		putCmd.MarkFlagRequired("dst")
 		rootCmd.AddCommand(putCmd)

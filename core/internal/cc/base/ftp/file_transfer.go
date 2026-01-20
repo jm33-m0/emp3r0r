@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
@@ -55,7 +56,7 @@ func StatFile(filepath string, a *def.Emp3r0rAgent) (fi *util.FileStat, err erro
 }
 
 // PutFile put file to agent
-func PutFile(lpath, rpath string, a *def.Emp3r0rAgent) error {
+func PutFile(lpath, rpath string, a *def.Emp3r0rAgent, saveToMemory bool) error {
 	// file sha256sum
 	logging.Infof("Calculating sha256sum of '%s'", lpath)
 	sum := crypto.SHA256SumFile(lpath)
@@ -81,6 +82,9 @@ func PutFile(lpath, rpath string, a *def.Emp3r0rAgent) error {
 
 	// send cmd
 	cmd := fmt.Sprintf("put --file '%s' --path '%s' --checksum %s --size %d", lpath, rpath, sum, size)
+	if saveToMemory {
+		cmd += " --mem"
+	}
 	err = ExecCmd(cmd, "", a.Tag)
 	if err != nil {
 		return fmt.Errorf("PutFile send command: %v", err)
@@ -91,13 +95,47 @@ func PutFile(lpath, rpath string, a *def.Emp3r0rAgent) error {
 
 // GenerateGetFilePaths generates paths and filenames for GetFile
 func GenerateGetFilePaths(file_path string) (write_dir, save_to_file, tempname, lock string) {
-	localized, err := util.SecureLocalPath(file_path)
-	if err != nil {
-		logging.Debugf("GenerateGetFilePaths: unsafe path %q: %v", file_path, err)
-		localized = ""
+	// We want to mirror the remote path structure locally.
+	// But we must ensure it doesn't escape FileGetDir.
+	// So we treat the remote absolute path as relative.
+
+	// properties of the remote path
+	cleanPath := filepath.Clean(file_path)
+	if filepath.IsAbs(cleanPath) {
+		// strip root
+		_, err := filepath.Rel(filepath.Dir(cleanPath), cleanPath)
+		if err == nil {
+			// This is just filename. Rel of /a/b/c from /a/b is c.
+			// We want the whole path structure relative to root?
+			// e.g. /home/kali/foo -> home/kali/foo
+
+			// Simple way: trim leading separator
+			// But windows/unix diffs.
+			// Let's just use the logic: join(FileGetDir, cleanPath) but cleanPath absolute?
+			// filepath.Join ignores previous absolute path elements?
+			// No, filepath.Join("/a", "/b") -> "/b".
+		}
 	}
-	write_dir = fmt.Sprintf("%s%s", live.FileGetDir, filepath.Dir(localized))
-	save_to_file = fmt.Sprintf("%s/%s", write_dir, util.FileBaseName(localized))
+
+	// Manual stripping of root
+	// On linux, just remove leading /
+	relPath := cleanPath
+	if filepath.IsAbs(cleanPath) {
+		relPath = cleanPath[1:] // simple strip /
+		// Recheck if it's cleaner?
+	}
+	// For robustness:
+	relPath = strings.TrimLeft(cleanPath, "/\\")
+
+	// Now check if it's safe (no ../)
+	localized, err := util.SecureLocalPath(relPath)
+	if err != nil {
+		logging.Debugf("GenerateGetFilePaths: unsafe path %q: %v. Using basename only.", file_path, err)
+		localized = filepath.Base(cleanPath) // fallback to just filename
+	}
+
+	write_dir = filepath.Join(live.FileGetDir, filepath.Dir(localized))
+	save_to_file = filepath.Join(write_dir, filepath.Base(localized))
 	tempname = save_to_file + ".tmp"
 	lock = save_to_file + ".lock"
 	return

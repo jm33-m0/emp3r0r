@@ -6,7 +6,6 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/otiai10/copy"
 	"github.com/spf13/cobra"
 )
 
@@ -61,7 +60,7 @@ func RmCmdRun(cmd *cobra.Command, args []string) {
 		c2transport.NotifyC2(cmd, "args error: %v", args)
 		return
 	}
-	if err := os.RemoveAll(path); err != nil {
+	if err := util.RemoveFileAgent(path); err != nil {
 		c2transport.NotifyC2(cmd, "Failed to delete %s: %v", path, err)
 		return
 	}
@@ -90,7 +89,7 @@ func CpCmdRun(cmd *cobra.Command, args []string) {
 		c2transport.NotifyC2(cmd, "args error: %v", args)
 		return
 	}
-	if err := copy.Copy(src, dst); err != nil {
+	if err := util.CopyAgent(src, dst); err != nil {
 		c2transport.NotifyC2(cmd, "Failed to copy %s to %s: %v", src, dst, err)
 		return
 	}
@@ -105,8 +104,12 @@ func MvCmdRun(cmd *cobra.Command, args []string) {
 		c2transport.NotifyC2(cmd, "args error: %v", args)
 		return
 	}
-	if err := os.Rename(src, dst); err != nil {
-		c2transport.NotifyC2(cmd, "Failed to move %s to %s: %v", src, dst, err)
+	if err := util.CopyAgent(src, dst); err != nil {
+		c2transport.NotifyC2(cmd, "Failed to move (copy) %s to %s: %v", src, dst, err)
+		return
+	}
+	if err := util.RemoveFileAgent(src); err != nil {
+		c2transport.NotifyC2(cmd, "Failed to move (rm) %s: %v", src, err)
 		return
 	}
 	c2transport.NotifyC2(cmd, "%s has been moved to %s", src, dst)

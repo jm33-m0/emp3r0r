@@ -26,7 +26,6 @@ require (
 	github.com/lithammer/fuzzysearch v1.1.8
 	github.com/mholt/archives v0.1.5
 	github.com/ncruces/go-dns v1.2.7
-	github.com/otiai10/copy v1.14.1
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/sftp v1.13.10
 	github.com/posener/h2conn v0.0.0-20231204025407-3997deeca0f0
@@ -97,7 +96,6 @@ require (
 	github.com/minio/minlz v1.0.1 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/nwaples/rardecode/v2 v2.2.2 // indirect
-	github.com/otiai10/mint v1.6.3 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect

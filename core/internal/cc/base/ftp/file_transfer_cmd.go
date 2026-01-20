@@ -42,7 +42,9 @@ func uploadToAgent(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	if err := PutFile(src, dst, target); err != nil {
+	saveToMem, _ := cmd.Flags().GetBool("mem")
+
+	if err := PutFile(src, dst, target, saveToMem); err != nil {
 		logging.Errorf("Cannot put %s: %v", src, err)
 	}
 }

@@ -281,7 +281,16 @@ func handleClient(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// serve the file
-	http.ServeFile(w, r, file_path)
+	// http.ServeFile(w, r, file_path)
+	// We use ReadFileAgent to support memory files and transparent encryption
+	data, err := util.ReadFileAgent(file_path)
+	if err != nil {
+		logging.Printf("handleClient: failed to read file %s: %v", file_path, err)
+		http.Error(w, "Failed to read file", http.StatusInternalServerError)
+		return
+	}
+	// ServeContent handles Range requests etc.
+	http.ServeContent(w, r, util.FileBaseName(file_path), time.Now(), bytes.NewReader(data))
 }
 
 // FetchFileKCP requests and downloads a file from an HTTP server to a specified path

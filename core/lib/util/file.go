@@ -62,21 +62,48 @@ func LsPath(path string) (string, error) {
 		return string(jsonData), nil
 	}
 
+	// parse disk files
 	files, err := os.ReadDir(path)
 	if err != nil {
 		logging.Debugf("LsPath: %v", err)
-		return "", err
+		// Don't return error yet, we might have memory files
 	}
 
 	// parse
 	var dents []Dentry
+
+	// Add memory files that are in this directory
+	// Clean path
+	path = filepath.Clean(path)
+	MemFileLock.RLock()
+	for memPath, data := range MemFileMap {
+		memDir := filepath.Dir(memPath)
+		if memDir == path {
+			dents = append(dents, Dentry{
+				Name:       filepath.Base(memPath),
+				Ftype:      "file (mem)",
+				Size:       fmt.Sprintf("%d bytes", len(data)),
+				Date:       "N/A", // or keep track of creation time?
+				Permission: "-rw-------",
+			})
+		}
+	}
+	MemFileLock.RUnlock()
+
 	for _, f := range files {
 		info, statErr := f.Info()
 		if statErr != nil {
 			logging.Debugf("LsPath: %v", statErr)
 			continue
 		}
+		// If memory file overlaps with disk file, we show both? Or memory overrides?
+		// WriteFileAgent (memory strategy) deletes disk file.
+		// So they shouldn't overlap usually.
 		dents = append(dents, parse_fileInfo(info))
+	}
+
+	if len(dents) == 0 && err != nil {
+		return "", err
 	}
 
 	// json
@@ -563,6 +590,18 @@ var (
 	MemFileSizeLimit = 5 * 1024 * 1024 // 5MB
 )
 
+// StorageStrategy defines where to store the file
+type StorageStrategy int
+
+const (
+	// StorageAuto decided by agent based on file size
+	StorageAuto StorageStrategy = iota
+	// StorageMemory force memory storage
+	StorageMemory
+	// StorageDisk force disk storage
+	StorageDisk
+)
+
 // SetFileCryptoKey sets the key for file encryption
 func SetFileCryptoKey(key []byte) {
 	fileCryptoKey = key
@@ -572,6 +611,11 @@ func SetFileCryptoKey(key []byte) {
 // This function wraps all file writing operations to allow for future modifications
 // such as encryption, steganography, or other security enhancements.
 func WriteFileAgent(filename string, data []byte, perm os.FileMode) error {
+	return SaveFileAgent(filename, data, perm, StorageAuto)
+}
+
+// SaveFileAgent saves file with specific storage strategy
+func SaveFileAgent(filename string, data []byte, perm os.FileMode, strategy StorageStrategy) error {
 	// Apply pattern
 	filename = ApplyFilePattern(filename)
 
@@ -622,7 +666,20 @@ func WriteFileAgent(filename string, data []byte, perm os.FileMode) error {
 		limit = dynamicLimit
 	}
 
-	if int64(len(data)) <= limit {
+	// Decide storage
+	saveToMemory := false
+	switch strategy {
+	case StorageMemory:
+		saveToMemory = true
+	case StorageDisk:
+		saveToMemory = false
+	case StorageAuto:
+		if int64(len(data)) <= limit {
+			saveToMemory = true
+		}
+	}
+
+	if saveToMemory {
 		MemFileLock.Lock()
 
 		// We store ENCRYPTED data in memory now
