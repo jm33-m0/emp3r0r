@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.13.2](https://github.com/jm33-m0/emp3r0r/compare/v3.13.1...v3.13.2) (2026-01-20)
+
+
+### Bug Fixes
+
+* Improve path sanitization in `SecureLocalPath` to correctly handle Windows paths and apply robust path processing to file transfers. ([3c0c0ca](https://github.com/jm33-m0/emp3r0r/commit/3c0c0ca0beb0394fb4478402ec7d62e0434a11fd))
+
 ## [3.13.1](https://github.com/jm33-m0/emp3r0r/compare/v3.13.0...v3.13.1) (2026-01-20)
 
 
