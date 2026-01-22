@@ -241,11 +241,6 @@ func makeTransport(url *url.URL, clientHelloID *utls.ClientHelloID, cfg *utls.Co
 	// With http.Transport, copy important default fields from
 	// http.DefaultTransport, such as TLSHandshakeTimeout and
 	// IdleConnTimeout, before overriding DialTLS.
-	// tr := httpRoundTripper.Clone()
-	// tr.TLSHandshakeTimeout = time.Duration(10 * time.Second)
-	// tr.ForceAttemptHTTP2 = true
-	// tr.DialTLS = dialTLS
-	// return tr, nil
 	return &http2.Transport{
 		DialTLS: func(network, addr string, _ *tls.Config) (net.Conn, error) {
 			// Ignore the *tls.Config parameter; use our

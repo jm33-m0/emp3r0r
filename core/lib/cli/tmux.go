@@ -357,14 +357,6 @@ func (pane *TmuxPane) ResizePane(direction string, lines int) (err error) {
 	return
 }
 
-func TmuxKillWindow(id string) (err error) {
-	out, err := exec.Command("tmux", "kill-window", "-t", id).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%s\n%v", out, err)
-	}
-	return
-}
-
 func (pane *TmuxPane) KillPane() (err error) {
 	id := pane.ID
 	job := fmt.Sprintf("tmux kill-pane -t %s", id)

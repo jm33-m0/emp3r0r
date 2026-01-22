@@ -372,16 +372,6 @@ func FileSize(path string) (size int64) {
 	return
 }
 
-func ReplaceBytesInFile(path string, old []byte, replace_with []byte) (err error) {
-	file_bytes, err := os.ReadFile(path)
-	if err != nil {
-		return
-	}
-
-	to_write := bytes.ReplaceAll(file_bytes, old, replace_with)
-	return os.WriteFile(path, to_write, 0o644)
-}
-
 // FindHolesInBinary find holes in a binary file that are big enough for a payload
 func FindHolesInBinary(fdata []byte, size int64) (indexes []int64, err error) {
 	// find_hole finds a hole from start

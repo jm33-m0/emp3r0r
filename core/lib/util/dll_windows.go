@@ -11,11 +11,6 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-func IsRunningInDLL() bool {
-	modHandle, _, _ := procGetModuleHandle.Call(0)
-	return modHandle != 0
-}
-
 func ReadDLL(moduleInfo *windows.ModuleInfo, fileName string) (dll_data []byte, err error) {
 	// Allocate a buffer to hold the DLL content
 	dllContent := make([]byte, moduleInfo.SizeOfImage)
