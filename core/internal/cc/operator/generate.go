@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
@@ -254,6 +255,7 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 
 	// CC names and certs
 	live.RuntimeConfig.CCAddress = cc_host
+	live.RuntimeConfig.CCAddress = strings.TrimSuffix(live.RuntimeConfig.CCAddress, "/")
 	logging.Printf("C2 server name: %s", live.RuntimeConfig.CCAddress)
 	existing_names := transport.NamesInCert(transport.ServerCrtFile)
 	cc_hosts := existing_names
