@@ -250,7 +250,16 @@ void debug_print(const char *format, ...) {
         // Simple hex/decimal support
         unsigned long u = 0;
         int is_hex = (*fmt == 'x' || *fmt == 'p');
-        int is_signed = (*fmt == 'd' && !(*(fmt - 1) == 'l' || *(fmt - 2) == 'l'));
+        int is_signed = (*fmt == 'd');
+        if (is_signed) {
+            // check for %lld or %ld
+            if (fmt > format && *(fmt - 1) == 'l') {
+                is_signed = 0; // treat as unsigned for simplification or add long support
+                if (fmt > format + 1 && *(fmt - 2) == 'l') {
+                    // %lld
+                }
+            }
+        }
         
         if (*fmt == 'p')
           u = (unsigned long)va_arg(args, void *);

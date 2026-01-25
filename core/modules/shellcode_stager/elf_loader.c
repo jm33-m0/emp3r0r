@@ -122,30 +122,34 @@ static void _relocate(size_t base, Elf_Ehdr *hdr, Elf_Phdr *phdr) {
   }
 
   if (rela && relaent) {
-    DEBUG_PRINT("Applying %d RELATIVE relocations\n", (int)(relasz / relaent));
+    DEBUG_PRINT("Applying %d RELATIVE relocations (RELA)\n", (int)(relasz / relaent));
     for (x = 0; x < relasz / relaent; x++) {
       if (ELF_R_TYPE(rela[x].r_info) == R_X86_64_RELATIVE) {
         size_t *ptr = (size_t *)(base + rela[x].r_offset);
         *ptr = base + rela[x].r_addend;
-      } else {
-        // Try to find symbol name
-        size_t sym_idx = ELF_R_SYM(rela[x].r_info);
-        const char *name = "unknown";
-        
-        // Find .dynsym/SHT_DYNSYM section to resolve sym_idx
-        Elf_Ehdr *ehdr = (Elf_Ehdr *)hdr;
-        Elf_Shdr *shdr = (Elf_Shdr *)((char *)ehdr + ehdr->e_shoff);
-        for (int i = 0; i < ehdr->e_shnum; i++) {
-            if (shdr[i].sh_type == SHT_DYNSYM) {
-                Elf_Sym *syms = (Elf_Sym *)((char *)ehdr + shdr[i].sh_offset);
-                const char *strings = (char *)ehdr + shdr[shdr[i].sh_link].sh_offset;
-                name = strings + syms[sym_idx].st_name;
-                break;
-            }
-        }
+      }
+    }
+  }
 
-        DEBUG_PRINT("Unhandled relocation type %d at offset 0x%lx (sym: %s)\n", 
-                    (int)ELF_R_TYPE(rela[x].r_info), (unsigned long)rela[x].r_offset, name);
+  // Also check for DT_REL
+  Elf_Rel *rel = NULL;
+  size_t relsz = 0;
+  size_t relent = 0;
+  for (x = 0; dyn[x].d_tag != DT_NULL; x++) {
+    if (dyn[x].d_tag == DT_REL)
+      rel = (Elf_Rel *)(base + dyn[x].d_un.d_ptr);
+    if (dyn[x].d_tag == DT_RELSZ)
+      relsz = dyn[x].d_un.d_val;
+    if (dyn[x].d_tag == DT_RELENT)
+      relent = dyn[x].d_un.d_val;
+  }
+
+  if (rel && relent) {
+    DEBUG_PRINT("Applying %d RELATIVE relocations (REL)\n", (int)(relsz / relent));
+    for (x = 0; x < relsz / relent; x++) {
+      if (ELF_R_TYPE(rel[x].r_info) == R_X86_64_RELATIVE) {
+        size_t *ptr = (size_t *)(base + rel[x].r_offset);
+        *ptr += base;
       }
     }
   }
@@ -259,14 +263,15 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
     DEBUG_PRINT("Entry point set to 0x%lx\n", *entry);
   }
 
+  // Use a fixed size array to avoid VLA issues
   struct {
     void *m;
     size_t size;
     int prot;
-  } segments[hdr->e_phnum];
+  } segments[64];
   int seg_count = 0;
 
-  for (x = 0; x < hdr->e_phnum; x++) {
+  for (x = 0; x < hdr->e_phnum && seg_count < 64; x++) {
     if (phdr[x].p_type != PT_LOAD || !phdr[x].p_memsz)
       continue;
 
@@ -392,11 +397,11 @@ int elf_run(void *buf, char **argv, char **env) {
     }
   }
 
-  // Zero out the whole stack, Justin Case
-  memset(stack, 0, STACK_STORAGE_SIZE);
-
   unsigned long *stack_storage =
       stack + STACK_SIZE - STACK_STORAGE_SIZE - STACK_STRING_SIZE;
+
+  // Zero out the whole stack storage area
+  memset(stack_storage, 0, STACK_STORAGE_SIZE);
   char *string_storage = stack + STACK_SIZE - STACK_STRING_SIZE;
 
   unsigned long *s_argc = stack_storage;
@@ -452,23 +457,7 @@ int elf_run(void *buf, char **argv, char **env) {
     base = elf_base;
   }
 
-  if (init) {
-    DEBUG_PRINT("Running .init constructor at 0x%lx\n", base + init->sh_addr);
-    ptr = (int (*)(int, char **, char **))(base + init->sh_addr);
-    ptr(argc, argv, env);
-    DEBUG_PRINT(".init constructor finished\n");
-  }
 
-  if (init_array) {
-    DEBUG_PRINT("Running %d .init_array constructors\n", (int)(init_array->sh_size / sizeof(void *)));
-    for (x = 0; x < init_array->sh_size / sizeof(void *); x++) {
-      size_t func_addr = *((size_t *)(base + init_array->sh_addr + (x * sizeof(void *))));
-      DEBUG_PRINT("Running .init_array[%d] at 0x%lx\n", (int)x, func_addr);
-      ptr = (int (*)(int, char **, char **))func_addr;
-      ptr(argc, argv, env);
-    }
-    DEBUG_PRINT(".init_array constructors finished\n");
-  }
 
 
   struct ATENTRY *at = (struct ATENTRY *)&stack_storage[stack_ptr];
@@ -506,6 +495,36 @@ int elf_run(void *buf, char **argv, char **env) {
   // AT_EGID
   at[cnt].id = AT_EGID;
   at[cnt++].value = getegid();
+  // AT_HWCAP
+  at[cnt].id = AT_HWCAP;
+  at[cnt++].value = 0;
+  // AT_HWCAP2
+  at[cnt].id = AT_HWCAP2;
+  at[cnt++].value = 0;
+  // AT_CLKTCK
+  at[cnt].id = AT_CLKTCK;
+  at[cnt++].value = 100;
+
+  // Try to find AT_SYSINFO_EHDR from our own environment
+  // This is passed to us by the loader
+  unsigned long *sp_ptr = (unsigned long *)argv;
+  // Walk past argc, argv, envp to find auxv
+  unsigned int p_argc = *--sp_ptr;
+  sp_ptr++; // argc
+  sp_ptr += p_argc + 1; // skip argv
+  while (*sp_ptr++) ; // skip envp
+  
+  // Now we are at auxv
+  struct ATENTRY *p_at = (struct ATENTRY *)sp_ptr;
+  for (; p_at->id != AT_NULL; p_at++) {
+      if (p_at->id == 33) { // AT_SYSINFO_EHDR
+          at[cnt].id = 33;
+          at[cnt++].value = p_at->value;
+          DEBUG_PRINT("Found and forwarded VDSO (AT_SYSINFO_EHDR) at 0x%lx\n", p_at->value);
+          break;
+      }
+  }
+
   // AT_SECURE (0 = not setuid/setgid)
   at[cnt].id = AT_SECURE;
   at[cnt++].value = 0;
@@ -525,6 +544,13 @@ int elf_run(void *buf, char **argv, char **env) {
   at[cnt].id = AT_NULL;
   at[cnt++].value = 0;
 
+  // Run constructors (Disabled again as they cause SIGSEGV with dynamic payloads)
+  /*
+  if (init || init_array) {
+    ...
+  }
+  */
+
   DEBUG_PRINT("Stack setup complete, jumping to entry point\n");
   DEBUG_PRINT("Stack storage: 0x%lx\n", (unsigned long)stack_storage);
   DEBUG_PRINT("Entry point: 0x%lx\n", (unsigned long)(interp_entry ? interp_entry : elf_entry));
@@ -534,21 +560,26 @@ int elf_run(void *buf, char **argv, char **env) {
   if (is_shared_object && main_addr != 0) {
     DEBUG_PRINT("Calling main() at 0x%lx for shared object\n", main_addr);
     
-    // Switch to our prepared stack before calling main
-    // This is crucial for Go runtime to find AuxV
+    // Ensure stack is 16-byte aligned and has space for return address
+    // stack_storage is 16-byte aligned at the start of s_argc.
+    // Linux ABI: (%rsp + 8) should be 16-aligned when entering main?
+    // Actually, for main(int argc, char **argv), it follows standard call ABI.
+    
     int ret;
     __asm__ __volatile__(
-        "mov %%rsp, %%r15\n" // Save current sp
-        "mov %1, %%rsp\n"    // Switch to new sp
-        "mov %2, %%rdi\n"    // argc
-        "mov %3, %%rsi\n"    // argv
-        "mov %4, %%rdx\n"    // envp
-        "call *%5\n"         // Call main
-        "mov %%r15, %%rsp\n" // Restore sp
-        "mov %%eax, %0\n"    // Get return value
+        "mov %%rsp, %%r13\n"     // Save current stack
+        "andq $-16, %1\n"        // Align new stack down to 16 bytes
+        "mov %1, %%rsp\n"        // Switch to new stack
+        "subq $8, %%rsp\n"       // Adjust for call alignment
+        "mov %2, %%rdi\n"        // argc
+        "mov %3, %%rsi\n"        // argv
+        "mov %4, %%rdx\n"        // envp
+        "call *%5\n"             // Call main
+        "mov %%r13, %%rsp\n"     // Restore old stack
+        "mov %%eax, %0\n"
         : "=r"(ret)
-        : "r"(stack_storage), "r"((long)argc), "r"(argv), "r"(env), "r"(main_addr)
-        : "r15", "rax", "rdi", "rsi", "rdx", "memory"
+        : "r"(stack_storage), "r"((long)argc), "r"(s_argv), "r"(s_env), "r"(main_addr)
+        : "r13", "rax", "rdi", "rsi", "rdx", "memory"
     );
     
     DEBUG_PRINT("main() returned %d\n", ret);

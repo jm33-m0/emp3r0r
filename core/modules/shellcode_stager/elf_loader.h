@@ -60,6 +60,16 @@ typedef Elf64_Word Elf_Word;
 #define AT_SECURE 23
 #endif
 
+#ifndef AT_CLKTCK
+#define AT_CLKTCK 17
+#endif
+#ifndef AT_HWCAP
+#define AT_HWCAP 16
+#endif
+#ifndef AT_HWCAP2
+#define AT_HWCAP2 26
+#endif
+
 struct ATENTRY {
   size_t id;
   size_t value;
