@@ -198,8 +198,8 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 	// Side Effect Verification
 
 	// 1. def.CCAddress construction (Standard case)
-	// Should be https://<CCAddress>:<CCPort>/
-	expectedCCAddr := fmt.Sprintf("https://%s:%s/", originalCfg.CCAddress, originalCfg.CCPort)
+	// Should be https://<CCAddress>:<CCPort>
+	expectedCCAddr := fmt.Sprintf("https://%s:%s", originalCfg.CCAddress, originalCfg.CCPort)
 	if def.CCAddress != expectedCCAddr {
 		t.Errorf("def.CCAddress mismatch (Standard): got %s, want %s", def.CCAddress, expectedCCAddr)
 	}
@@ -235,8 +235,8 @@ func TestInitConfig_Tor(t *testing.T) {
 	}
 
 	// Verify Tor logic
-	// def.CCAddress should be http://<onion>/
-	expectedCCAddr := "http://abcdefghijklmnop.onion/"
+	// def.CCAddress should be http://<onion>
+	expectedCCAddr := "http://abcdefghijklmnop.onion"
 	if def.CCAddress != expectedCCAddr {
 		t.Errorf("Tor def.CCAddress mismatch: got %s, want %s", def.CCAddress, expectedCCAddr)
 	}
@@ -277,8 +277,8 @@ func TestInitConfig_KCP(t *testing.T) {
 	if RuntimeConfig.CCPort != "9999" {
 		t.Errorf("KCP CCPort mismatch: got %s, want 9999", RuntimeConfig.CCPort)
 	}
-	// def.CCAddress should be https://127.0.0.1:<KCPClientPort>/
-	expectedCCAddr := "https://127.0.0.1:9999/"
+	// def.CCAddress should be https://127.0.0.1:<KCPClientPort>
+	expectedCCAddr := "https://127.0.0.1:9999"
 	if def.CCAddress != expectedCCAddr {
 		t.Errorf("KCP def.CCAddress mismatch: got %s, want %s", def.CCAddress, expectedCCAddr)
 	}
