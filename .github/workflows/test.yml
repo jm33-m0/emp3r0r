@@ -59,7 +59,7 @@ jobs:
         env:
           CGO_ENABLED: 1
         run: |
-          go test -v ./lib/exeutil -run TestParseELFHeaders -count=1
+          go test -v ./lib/exeutil -run TestInMemExeRun -count=1
 
       - name: Run tests (Windows, with race)
         if: runner.os == 'Windows'
