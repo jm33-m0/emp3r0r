@@ -162,3 +162,12 @@ func ParseEnvStr(envStr string) (envMap map[string]string) {
 	}
 	return
 }
+
+// LimitString limits the length of a string
+// It returns the string truncated to length n if it's longer than n
+func LimitString(s string, n int) string {
+	if len(s) > n {
+		return s[:n]
+	}
+	return s
+}

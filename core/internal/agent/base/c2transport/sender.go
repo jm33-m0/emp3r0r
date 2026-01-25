@@ -11,6 +11,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
 )
 
@@ -62,7 +63,7 @@ func NotifyC2(cmd *cobra.Command, format string, args ...interface{}) {
 	}
 
 	if isPrintable {
-		logging.Printf("Response sent: %s", msg.Response)
+		logging.Printf("Response sent: %s", util.LimitString(string(msg.Response), 20))
 	} else {
 		logging.Printf("Response sent: <Binary Data, length %d>", len(msg.Response))
 	}
