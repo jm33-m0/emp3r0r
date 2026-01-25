@@ -1,5 +1,25 @@
 # Changelog
 
+## [3.14.0](https://github.com/jm33-m0/emp3r0r/compare/v3.13.2...v3.14.0) (2026-01-25)
+
+
+### Features
+
+* Implement in-memory ELF execution with PTY support and streamline agent operations by removing dedicated agent root, PID file, and socket-based liveness checks. ([c528a94](https://github.com/jm33-m0/emp3r0r/commit/c528a94330a633a5738b13218956d171ef653340))
+
+
+### Bug Fixes
+
+* add retry logic to config download and WireGuard file server startup, alongside a new test for config download retries. ([2776b2e](https://github.com/jm33-m0/emp3r0r/commit/2776b2e8f6e7c22e42087e9c306f2ac4ee1d5a53))
+* auto-completion for memory backed file system ([35455fd](https://github.com/jm33-m0/emp3r0r/commit/35455fd6a208e88c593e7577448d21c15be6c3db))
+* clean up bettercap, elvish, and go_lpe modules along with the go-winio dependency. ([4f9fab5](https://github.com/jm33-m0/emp3r0r/commit/4f9fab5591dd0a175fb94f56b34db22616305bef))
+* Implement agent-side file decryption command and refine `mem://` path descriptions for clarity. ([345ea1c](https://github.com/jm33-m0/emp3r0r/commit/345ea1c7dc4c5e13fa3c39cca700c901c7496b6e))
+* introduce `netutil.JoinURL` for robust and consistent URL construction throughout the agent. ([38404ae](https://github.com/jm33-m0/emp3r0r/commit/38404ae5cca9892845018e43d778dee8d4b405a7))
+* refactor memory-backed file system with `mem://` prefix for agent file storage and operations. ([72d5026](https://github.com/jm33-m0/emp3r0r/commit/72d5026ba213f03cc823d31ff10bde24f218fc1d))
+* simplify agent logging ([80d2f3c](https://github.com/jm33-m0/emp3r0r/commit/80d2f3cddf4d79b6f7d2ad58db8f5746718d1ae3))
+* simplify module handling by enforcing in-memory execution and removing on-disk support. ([6494d33](https://github.com/jm33-m0/emp3r0r/commit/6494d33a7638e1670ad052af84f8939f48b8355a))
+* use the current process name for in-memory ELF execution. ([e41d0aa](https://github.com/jm33-m0/emp3r0r/commit/e41d0aa84e02c4c08218bc763c84fa1a1ee58169))
+
 ## [3.13.2](https://github.com/jm33-m0/emp3r0r/compare/v3.13.1...v3.13.2) (2026-01-20)
 
 
