@@ -248,30 +248,33 @@ void debug_print(const char *format, ...) {
         }
       } else if (*fmt == 'd' || *fmt == 'x' || *fmt == 'p') {
         // Simple hex/decimal support
-        long d = 0;
+        unsigned long u = 0;
         int is_hex = (*fmt == 'x' || *fmt == 'p');
+        int is_signed = (*fmt == 'd' && !(*(fmt - 1) == 'l' || *(fmt - 2) == 'l'));
+        
         if (*fmt == 'p')
-          d = (long)va_arg(args, void *);
+          u = (unsigned long)va_arg(args, void *);
+        else if (*(fmt-1) == 'l')
+          u = va_arg(args, unsigned long);
         else
-          d = va_arg(args, int);
+          u = (unsigned long)va_arg(args, unsigned int);
 
         char num_buf[32];
         int i = 0;
 
-        if (d == 0) {
+        if (u == 0) {
           num_buf[i++] = '0';
         } else {
-          unsigned long u = d;
-          if (!is_hex && d < 0) {
+          if (is_signed && (long)u < 0) {
             if (remaining > 1) {
               *out++ = '-';
               remaining--;
             }
-            u = -d;
+            u = (unsigned long)(-(long)u);
           }
 
           while (u > 0) {
-            int digit = u % (is_hex ? 16 : 10);
+            unsigned long digit = u % (is_hex ? 16 : 10);
             num_buf[i++] = (digit < 10) ? (digit + '0') : (digit - 10 + 'a');
             u /= (is_hex ? 16 : 10);
           }

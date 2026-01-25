@@ -1,7 +1,7 @@
 CC = gcc
 # Add -ffunction-sections -fdata-sections
 CFLAGS = -Wall -Wextra -Os -fno-builtin -fno-stack-protector -fPIC -nostdlib -I. \
-         -fno-toplevel-reorder -s -fno-ident -ffunction-sections -fdata-sections
+         -fno-toplevel-reorder -s -fno-ident -ffunction-sections -fdata-sections -DDEBUG
 
 # Add -Wl,--gc-sections
 LDFLAGS = -nostdlib -static -Wl,-Ttext-segment=0x10000000 -s -Wl,--gc-sections

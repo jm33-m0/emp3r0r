@@ -90,6 +90,67 @@ static void _get_rand(char *buf, int size) {
   (void)result; // Suppress unused result warning
 }
 
+#ifndef R_X86_64_RELATIVE
+#define R_X86_64_RELATIVE 8
+#endif
+
+static void _relocate(size_t base, Elf_Ehdr *hdr, Elf_Phdr *phdr) {
+  Elf_Dyn *dyn = NULL;
+  size_t x;
+
+  for (x = 0; x < hdr->e_phnum; x++) {
+    if (phdr[x].p_type == PT_DYNAMIC) {
+      dyn = (Elf_Dyn *)(base + phdr[x].p_vaddr);
+      break;
+    }
+  }
+
+  if (!dyn)
+    return;
+
+  Elf_Rela *rela = NULL;
+  size_t relasz = 0;
+  size_t relaent = 0;
+
+  for (x = 0; dyn[x].d_tag != DT_NULL; x++) {
+    if (dyn[x].d_tag == DT_RELA)
+      rela = (Elf_Rela *)(base + dyn[x].d_un.d_ptr);
+    if (dyn[x].d_tag == DT_RELASZ)
+      relasz = dyn[x].d_un.d_val;
+    if (dyn[x].d_tag == DT_RELAENT)
+      relaent = dyn[x].d_un.d_val;
+  }
+
+  if (rela && relaent) {
+    DEBUG_PRINT("Applying %d RELATIVE relocations\n", (int)(relasz / relaent));
+    for (x = 0; x < relasz / relaent; x++) {
+      if (ELF_R_TYPE(rela[x].r_info) == R_X86_64_RELATIVE) {
+        size_t *ptr = (size_t *)(base + rela[x].r_offset);
+        *ptr = base + rela[x].r_addend;
+      } else {
+        // Try to find symbol name
+        size_t sym_idx = ELF_R_SYM(rela[x].r_info);
+        const char *name = "unknown";
+        
+        // Find .dynsym/SHT_DYNSYM section to resolve sym_idx
+        Elf_Ehdr *ehdr = (Elf_Ehdr *)hdr;
+        Elf_Shdr *shdr = (Elf_Shdr *)((char *)ehdr + ehdr->e_shoff);
+        for (int i = 0; i < ehdr->e_shnum; i++) {
+            if (shdr[i].sh_type == SHT_DYNSYM) {
+                Elf_Sym *syms = (Elf_Sym *)((char *)ehdr + shdr[i].sh_offset);
+                const char *strings = (char *)ehdr + shdr[shdr[i].sh_link].sh_offset;
+                name = strings + syms[sym_idx].st_name;
+                break;
+            }
+        }
+
+        DEBUG_PRINT("Unhandled relocation type %d at offset 0x%lx (sym: %s)\n", 
+                    (int)ELF_R_TYPE(rela[x].r_info), (unsigned long)rela[x].r_offset, name);
+      }
+    }
+  }
+}
+
 static Elf_Shdr *_get_section(char *name, void *elf_start) {
   int x;
   Elf_Ehdr *ehdr = NULL;
@@ -117,8 +178,9 @@ void *elf_sym(void *elf_start, char *sym_name) {
   Elf_Ehdr *hdr = (Elf_Ehdr *)elf_start;
   Elf_Shdr *shdr = (Elf_Shdr *)(elf_start + hdr->e_shoff);
 
+  // Try both SHT_SYMTAB and SHT_DYNSYM
   for (x = 0; x < hdr->e_shnum; x++) {
-    if (shdr[x].sh_type == SHT_SYMTAB) {
+    if (shdr[x].sh_type == SHT_SYMTAB || shdr[x].sh_type == SHT_DYNSYM) {
       const char *strings = elf_start + shdr[shdr[x].sh_link].sh_offset;
       Elf_Sym *syms = (Elf_Sym *)(elf_start + shdr[x].sh_offset);
 
@@ -149,12 +211,41 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
   phdr = (Elf_Phdr *)(elf_start + hdr->e_phoff);
 
   if (hdr->e_type == ET_DYN) {
-    // If this is a DYNAMIC ELF (can be loaded anywhere), set a random base
-    // address
-    base = (size_t)mmap(0, 100 * PAGE_SIZE, PROT_READ | PROT_WRITE,
-                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    munmap((void *)base, 100 * PAGE_SIZE);
-    DEBUG_PRINT("Dynamic ELF, base set to 0x%lx\n", base);
+    // If this is a DYNAMIC ELF (can be loaded anywhere), calculate total span
+    size_t min_vaddr = (size_t)-1;
+    size_t max_vaddr = 0;
+    for (x = 0; x < hdr->e_phnum; x++) {
+      if (phdr[x].p_type == PT_LOAD && phdr[x].p_memsz > 0) {
+        if (phdr[x].p_vaddr < min_vaddr)
+          min_vaddr = phdr[x].p_vaddr;
+        if (phdr[x].p_vaddr + phdr[x].p_memsz > max_vaddr)
+          max_vaddr = phdr[x].p_vaddr + phdr[x].p_memsz;
+      }
+    }
+
+    if (min_vaddr == (size_t)-1) {
+      DEBUG_PRINT("No loadable segments found\n");
+      return -1;
+    }
+
+    size_t total_span = ROUND_UP(max_vaddr, PAGE_SIZE) - ROUND_DOWN(min_vaddr, PAGE_SIZE);
+    DEBUG_PRINT("Calculating total ELF span: min=0x%lx, max=0x%lx, span=%d\n", min_vaddr, max_vaddr, (int)total_span);
+
+    // Reserve the entire range to find a suitable base
+    base = (size_t)mmap(0, total_span, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if ((long)base < 0) {
+        DEBUG_PRINT("Failed to reserve memory for ELF span\n");
+        return -1;
+    }
+    // Optimization: we don't strictly need to munmap if we use MAP_FIXED later, 
+    // but it's cleaner to know it's a hole. Actually, keeping it mapped PROT_NONE 
+    // and using MAP_FIXED overwrite is safer on some systems.
+    munmap((void *)base, total_span);
+    
+    // adjust base relative to min_vaddr if min_vaddr is not 0
+    base -= ROUND_DOWN(min_vaddr, PAGE_SIZE);
+
+    DEBUG_PRINT("Dynamic ELF, base set to 0x%lx (reserved span)\n", base);
   } else {
     base = 0;
     DEBUG_PRINT("Static ELF, base set to 0\n");
@@ -168,91 +259,63 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
     DEBUG_PRINT("Entry point set to 0x%lx\n", *entry);
   }
 
+  struct {
+    void *m;
+    size_t size;
+    int prot;
+  } segments[hdr->e_phnum];
+  int seg_count = 0;
+
   for (x = 0; x < hdr->e_phnum; x++) {
-    // Reset elf_prot for the current segment
-    elf_prot = 0;
-
-#if !defined(OS_FREEBSD)
-    // Get flags for the stack
-    if (stack != NULL && phdr[x].p_type == PT_GNU_STACK) {
-      if (phdr[x].p_flags & PF_R)
-        stack_prot = PROT_READ;
-
-      if (phdr[x].p_flags & PF_W)
-        stack_prot |= PROT_WRITE;
-
-      if (phdr[x].p_flags & PF_X)
-        stack_prot |= PROT_EXEC;
-
-      // Set stack protection
-      mprotect((unsigned char *)stack, stack_size, stack_prot);
-      DEBUG_PRINT("Stack protection set to %d\n", stack_prot);
-    }
-#endif
-
-    if (phdr[x].p_type != PT_LOAD)
-      continue;
-
-    if (!phdr[x].p_filesz)
+    if (phdr[x].p_type != PT_LOAD || !phdr[x].p_memsz)
       continue;
 
     void *map_start = (void *)ROUND_DOWN(phdr[x].p_vaddr, PAGE_SIZE);
     int round_down_size = (void *)phdr[x].p_vaddr - map_start;
-
     int map_size = ROUND_UP(phdr[x].p_memsz + round_down_size, PAGE_SIZE);
+    int elf_prot = 0;
 
-    DEBUG_PRINT(
-        "Mapping segment %d: vaddr 0x%lx, map_start 0x%lx, map_size %d\n", x,
-        phdr[x].p_vaddr, map_start, map_size);
+    if (phdr[x].p_flags & PF_R) elf_prot |= PROT_READ;
+    if (phdr[x].p_flags & PF_W) elf_prot |= PROT_WRITE;
+    if (phdr[x].p_flags & PF_X) elf_prot |= PROT_EXEC;
 
-    void *m = (void *)mmap((void *)(base + map_start), map_size,
-                           PROT_READ | PROT_WRITE,
+    DEBUG_PRINT("Mapping segment %d: vaddr 0x%lx, map_size %d, flags=%u\n", x,
+                phdr[x].p_vaddr, map_size, phdr[x].p_flags);
+
+    void *m = (void *)mmap((void *)(base + (size_t)map_start), map_size,
+                           PROT_READ | PROT_WRITE, // Map RW for loading/relocation
                            MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
     if ((long)m < 0) {
-      DEBUG_PRINT("mmap failed for segment %d\n", x);
+      DEBUG_PRINT("mmap failed for segment %d at %p\n", x, (void*)(base + (size_t)map_start));
       return -1;
     }
 
-    memcpy((void *)base + phdr[x].p_vaddr, elf_start + phdr[x].p_offset,
-           phdr[x].p_filesz);
+    memcpy((void *)base + phdr[x].p_vaddr, elf_start + phdr[x].p_offset, phdr[x].p_filesz);
 
-    // Wipe ELF header if it's in this segment
-    if (phdr[x].p_offset == 0) {
-      size_t wipe_size = sizeof(Elf_Ehdr);
-      if (hdr->e_phoff < wipe_size)
-        wipe_size = hdr->e_phoff;
-      _get_rand((char *)base + phdr[x].p_vaddr, wipe_size);
-    }
-
-    // Zero-out BSS, if it exists
+    // Zero-out BSS
     if (phdr[x].p_memsz > phdr[x].p_filesz)
       memset((void *)(base + phdr[x].p_vaddr + phdr[x].p_filesz), 0,
              phdr[x].p_memsz - phdr[x].p_filesz);
 
-    // Set proper protection on the area
-    if (phdr[x].p_flags & PF_R)
-      elf_prot |= PROT_READ;
+    segments[seg_count].m = m;
+    segments[seg_count].size = map_size;
+    segments[seg_count].prot = elf_prot;
+    seg_count++;
 
-    if (phdr[x].p_flags & PF_W)
-      elf_prot |= PROT_WRITE;
+    if (base_addr != NULL && (*base_addr == (size_t)-1 || *base_addr > (size_t)m))
+      *base_addr = (size_t)m;
+  }
 
-    if (phdr[x].p_flags & PF_X)
-      elf_prot |= PROT_EXEC;
+  // Apply relocations while memory is still RW
+  if (hdr->e_type == ET_DYN) {
+    _relocate(base, hdr, phdr);
+  }
 
-    if (mprotect((unsigned char *)(base + map_start), map_size, elf_prot) < 0) {
-      DEBUG_PRINT("mprotect failed for segment %d\n", x);
-    } else {
-      DEBUG_PRINT("mprotect success for segment %d, prot %d\n", x, elf_prot);
+  // Set proper protection on all sections
+  for (int i = 0; i < seg_count; i++) {
+    if (mprotect(segments[i].m, segments[i].size, segments[i].prot) < 0) {
+      DEBUG_PRINT("mprotect failed for segment %d\n", i);
     }
-
-    // Clear cache on this area
-    // cacheflush(base + map_start, (size_t)(map_start + map_size), 0);
-
-    // Is this the lowest memory area we saw. That is, is this the ELF base
-    // address?
-    if (base_addr != NULL &&
-        (*base_addr == (size_t)-1 || *base_addr > (size_t)(base + map_start)))
-      *base_addr = (size_t)(base + map_start);
   }
 
   DEBUG_PRINT("elf_load finished\n");
@@ -283,20 +346,29 @@ int elf_run(void *buf, char **argv, char **env) {
   int (*ptr)(int, char **, char **);
 
   // First, let's count arguments...
-  while (argv[argc])
-    argc++;
+  DEBUG_PRINT("Counting arguments, argv=%p, env=%p\n", argv, env);
+  if (argv != NULL) {
+    while (argv[argc])
+      argc++;
+  }
+  DEBUG_PRINT("argc=%d\n", (int)argc);
 
   // ...and envs
-  while (env[envc])
-    envc++;
+  if (env != NULL) {
+    while (env[envc])
+      envc++;
+  }
+  DEBUG_PRINT("envc=%d\n", (int)envc);
 
   // Allocate some stack space
+  DEBUG_PRINT("Allocating stack...\n");
   void *stack = (void *)mmap(0, STACK_SIZE, PROT_READ | PROT_WRITE,
                              MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if ((long)stack < 0) {
     DEBUG_PRINT("Failed to allocate stack\n");
     return -1;
   }
+  DEBUG_PRINT("Stack allocated at %p\n", stack);
 
   // Map the ELF in memory
   if (elf_load(buf, stack, STACK_SIZE, &elf_base, &elf_entry) < 0) {
@@ -304,6 +376,21 @@ int elf_run(void *buf, char **argv, char **env) {
     return -1;
   }
   DEBUG_PRINT("ELF loaded at 0x%lx, entry 0x%lx\n", elf_base, elf_entry);
+
+  // Check if this is a shared object and find main symbol
+  int is_shared_object = 0;
+  size_t main_addr = 0;
+  
+  if (hdr->e_type == ET_DYN) {
+    // For shared objects, try to find the main symbol
+    void *main_sym = elf_sym(buf, "main");
+    if (main_sym != NULL) {
+      is_shared_object = 1;
+      main_addr = elf_base + (size_t)main_sym;
+      DEBUG_PRINT("Found main symbol at 0x%lx (base + 0x%lx)\n", 
+                  main_addr, (size_t)main_sym);
+    }
+  }
 
   // Zero out the whole stack, Justin Case
   memset(stack, 0, STACK_STORAGE_SIZE);
@@ -316,6 +403,7 @@ int elf_run(void *buf, char **argv, char **env) {
   unsigned long *s_argv = &stack_storage[1];
 
   // Setup argc
+  DEBUG_PRINT("Setting up stackargc=%d at %p\n", (int)argc, s_argc);
   *s_argc = argc;
 
   // Setup argv
@@ -365,17 +453,23 @@ int elf_run(void *buf, char **argv, char **env) {
   }
 
   if (init) {
-    ptr = (int (*)(int, char **, char **))base + init->sh_addr;
+    DEBUG_PRINT("Running .init constructor at 0x%lx\n", base + init->sh_addr);
+    ptr = (int (*)(int, char **, char **))(base + init->sh_addr);
     ptr(argc, argv, env);
+    DEBUG_PRINT(".init constructor finished\n");
   }
 
   if (init_array) {
+    DEBUG_PRINT("Running %d .init_array constructors\n", (int)(init_array->sh_size / sizeof(void *)));
     for (x = 0; x < init_array->sh_size / sizeof(void *); x++) {
-      ptr = (int (*)(int, char **, char **))base +
-            *((long *)(base + init_array->sh_addr + (x * sizeof(void *))));
+      size_t func_addr = *((size_t *)(base + init_array->sh_addr + (x * sizeof(void *))));
+      DEBUG_PRINT("Running .init_array[%d] at 0x%lx\n", (int)x, func_addr);
+      ptr = (int (*)(int, char **, char **))func_addr;
       ptr(argc, argv, env);
     }
+    DEBUG_PRINT(".init_array constructors finished\n");
   }
+
 
   struct ATENTRY *at = (struct ATENTRY *)&stack_storage[stack_ptr];
 
@@ -432,8 +526,34 @@ int elf_run(void *buf, char **argv, char **env) {
   at[cnt++].value = 0;
 
   DEBUG_PRINT("Stack setup complete, jumping to entry point\n");
-  DEBUG_PRINT("Stack storage: 0x%lx\n", (size_t)stack_storage);
-  DEBUG_PRINT("Entry point: 0x%lx\n", interp_entry ? interp_entry : elf_entry);
+  DEBUG_PRINT("Stack storage: 0x%lx\n", (unsigned long)stack_storage);
+  DEBUG_PRINT("Entry point: 0x%lx\n", (unsigned long)(interp_entry ? interp_entry : elf_entry));
+  DEBUG_PRINT("Is shared object: %d, Main addr: 0x%lx\n", is_shared_object, main_addr);
+
+  // For shared objects with main symbol, call main() directly
+  if (is_shared_object && main_addr != 0) {
+    DEBUG_PRINT("Calling main() at 0x%lx for shared object\n", main_addr);
+    
+    // Switch to our prepared stack before calling main
+    // This is crucial for Go runtime to find AuxV
+    int ret;
+    __asm__ __volatile__(
+        "mov %%rsp, %%r15\n" // Save current sp
+        "mov %1, %%rsp\n"    // Switch to new sp
+        "mov %2, %%rdi\n"    // argc
+        "mov %3, %%rsi\n"    // argv
+        "mov %4, %%rdx\n"    // envp
+        "call *%5\n"         // Call main
+        "mov %%r15, %%rsp\n" // Restore sp
+        "mov %%eax, %0\n"    // Get return value
+        : "=r"(ret)
+        : "r"(stack_storage), "r"((long)argc), "r"(argv), "r"(env), "r"(main_addr)
+        : "r15", "rax", "rdi", "rsi", "rdx", "memory"
+    );
+    
+    DEBUG_PRINT("main() returned %d\n", ret);
+    exit(ret);
+  }
 
   //
   // Architecture and OS dependant init-reg-and-jump-to-start trampoline
