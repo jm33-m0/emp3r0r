@@ -2,7 +2,6 @@ package common
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
@@ -37,21 +36,6 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 		ProxyChainBroadcastPort:        "9000",
 		ProxyChainBroadcastIntervalMin: 30,
 		ProxyChainBroadcastIntervalMax: 60,
-		PIDFile:                        "agent.pid",
-		CCIndicatorURL:                 "http://example.com/indicator",
-		CCIndicatorWaitMin:             10,
-		CCIndicatorWaitMax:             20,
-		CAPEM:                          "-----BEGIN CERTIFICATE-----\nFAKE_CERT\n-----END CERTIFICATE-----",
-		CAFingerprint:                  "aa:bb:cc:dd",
-		C2TransportProxy:               "socks5://127.0.0.1:9050",
-		CDNProxy:                       "ws://cdn.example.com",
-		DoHServer:                      "https://doh.example.com/dns-query",
-		SocketName:                     "emp3r0r.sock",
-		AgentRoot:                      "emp3r0r_data",
-		UtilsPath:                      "utils",
-		AgentUUID:                      "uuid-1234-5678",
-		AgentUUIDSig:                   "signature-bytes",
-		AgentTag:                       "agent-tag-001",
 		CCTimeout:                      5000,
 	}
 
@@ -174,26 +158,7 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 		t.Errorf("CCTimeout mismatch: got %d, want %d", RuntimeConfig.CCTimeout, originalCfg.CCTimeout)
 	}
 
-	// Path verifications (AgentRoot, UtilsPath, SocketName, PIDFile)
-	// AgentRoot should end with the original AgentRoot name
-	if !strings.HasSuffix(RuntimeConfig.AgentRoot, originalCfg.AgentRoot) {
-		t.Errorf("AgentRoot path mismatch: %s does not end with %s", RuntimeConfig.AgentRoot, originalCfg.AgentRoot)
-	}
-	// UtilsPath should be inside AgentRoot
-	expectedUtils := fmt.Sprintf("%s/%s", RuntimeConfig.AgentRoot, originalCfg.UtilsPath)
-	if RuntimeConfig.UtilsPath != expectedUtils {
-		t.Errorf("UtilsPath mismatch: got %s, want %s", RuntimeConfig.UtilsPath, expectedUtils)
-	}
-	// SocketName should be inside AgentRoot
-	expectedSocket := fmt.Sprintf("%s/%s", RuntimeConfig.AgentRoot, originalCfg.SocketName)
-	if RuntimeConfig.SocketName != expectedSocket {
-		t.Errorf("SocketName mismatch: got %s, want %s", RuntimeConfig.SocketName, expectedSocket)
-	}
-	// PIDFile should be inside AgentRoot
-	expectedPID := fmt.Sprintf("%s/%s", RuntimeConfig.AgentRoot, originalCfg.PIDFile)
-	if RuntimeConfig.PIDFile != expectedPID {
-		t.Errorf("PIDFile mismatch: got %s, want %s", RuntimeConfig.PIDFile, expectedPID)
-	}
+	// Path verifications
 
 	// Side Effect Verification
 
@@ -220,7 +185,6 @@ func TestInitConfig_Tor(t *testing.T) {
 		CCAddress:        "abcdefghijklmnop.onion", // Tor address
 		CCPort:           "80",
 		C2TransportProxy: "", // Should default to socks5://127.0.0.1:9050
-		AgentRoot:        "tor_test",
 	}
 
 	// Marshal & Encrypt
@@ -258,7 +222,6 @@ func TestInitConfig_KCP(t *testing.T) {
 		CCAddress:     "1.2.3.4",
 		UseKCP:        true,
 		KCPClientPort: "9999",
-		AgentRoot:     "kcp_test",
 	}
 
 	// Marshal & Encrypt

@@ -37,20 +37,7 @@ func InitConfig() (err error) {
 		return fmt.Errorf("parsing %d bytes of CBOR data (%s...): %v", len(configData), short_view, err)
 	}
 
-	// Fallback for critical fields if they are missing/empty
-	if RuntimeConfig.AgentRoot == "" {
-		RuntimeConfig.AgentRoot = util.RandMD5String()
-		logging.Printf("AgentRoot was empty, generated random: %s", RuntimeConfig.AgentRoot)
-	}
-	if RuntimeConfig.UtilsPath == "" {
-		RuntimeConfig.UtilsPath = util.RandMD5String()
-	}
-	if RuntimeConfig.SocketName == "" {
-		RuntimeConfig.SocketName = util.RandMD5String()
-	}
-	if RuntimeConfig.PIDFile == "" {
-		RuntimeConfig.PIDFile = util.RandMD5String()
-	}
+	// Deprecated: AgentRoot and UtilsPath are no longer used
 
 	// CC Address
 	def.CCAddress = RuntimeConfig.CCAddress
@@ -88,23 +75,11 @@ func InitConfig() (err error) {
 	// CA
 	transport.CACrtPEM = []byte(RuntimeConfig.CAPEM)
 
-	// pwd
-	cwd, err := os.Getwd()
+	// find a writable location for other uses if any
+	_, err = GetRandomWritablePath()
 	if err != nil {
-		return fmt.Errorf("os.Getwd: %v", err)
+		logging.Printf("GetRandomWritablePath: %v", err)
 	}
-
-	agent_root_base := util.FileBaseName(RuntimeConfig.AgentRoot)
-	prefix, err := GetRandomWritablePath()
-	if err != nil {
-		logging.Printf("GetRandomWritablePath: %v, falling back to current directory", err)
-		prefix = cwd
-	}
-	RuntimeConfig.AgentRoot = fmt.Sprintf("%s/%s", prefix, agent_root_base)
-	RuntimeConfig.UtilsPath = fmt.Sprintf("%s/%s", RuntimeConfig.AgentRoot, RuntimeConfig.UtilsPath)
-	RuntimeConfig.SocketName = fmt.Sprintf("%s/%s", RuntimeConfig.AgentRoot, RuntimeConfig.SocketName)
-	RuntimeConfig.PIDFile = fmt.Sprintf("%s/%s", RuntimeConfig.AgentRoot, RuntimeConfig.PIDFile)
-	logging.Printf("Agent root: %s", RuntimeConfig.AgentRoot)
 
 	// Socks5 proxy server
 	addr := fmt.Sprintf("0.0.0.0:%s", RuntimeConfig.AgentSocksServerPort)
@@ -150,15 +125,7 @@ func GetRandomWritablePath() (string, error) {
 	}
 	WritableLocations = paths // remember writable locations
 
-	// if emp3r0r's agent root already exists?
-	for _, path := range paths {
-		if util.FileBaseName(path) == RuntimeConfig.AgentRoot {
-			// just use it
-			path = filepath.Dir(path)
-			logging.Printf("Using existing agent root: %s", path)
-			return path, nil // return parent dir of path
-		}
-	}
+	// find a writable location to use as agent root
 
 	just_get_one := func() (string, error) {
 		rand_common_path := def.CommonFilenames[util.RandInt(0, len(def.CommonFilenames))]

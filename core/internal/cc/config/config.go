@@ -39,7 +39,6 @@ func SaveConfigJSON() (err error) {
 		"proxy_chain_broadcast_port":         live.RuntimeConfig.ProxyChainBroadcastPort,
 		"proxy_chain_broadcast_interval_min": live.RuntimeConfig.ProxyChainBroadcastIntervalMin,
 		"proxy_chain_broadcast_interval_max": live.RuntimeConfig.ProxyChainBroadcastIntervalMax,
-		"pid_file":                           live.RuntimeConfig.PIDFile,
 		"cc_indicator_url":                   live.RuntimeConfig.CCIndicatorURL,
 		"cc_indicator_wait_min":              live.RuntimeConfig.CCIndicatorWaitMin,
 		"cc_indicator_wait_max":              live.RuntimeConfig.CCIndicatorWaitMax,
@@ -48,9 +47,6 @@ func SaveConfigJSON() (err error) {
 		"c2_transport_proxy":                 live.RuntimeConfig.C2TransportProxy,
 		"cdn_proxy":                          live.RuntimeConfig.CDNProxy,
 		"doh_server":                         live.RuntimeConfig.DoHServer,
-		"socket_name":                        live.RuntimeConfig.SocketName,
-		"agent_root":                         live.RuntimeConfig.AgentRoot,
-		"utils_path":                         live.RuntimeConfig.UtilsPath,
 		"agent_uuid":                         live.RuntimeConfig.AgentUUID,
 		"agent_uuid_sig":                     live.RuntimeConfig.AgentUUIDSig,
 		"agent_tag":                          live.RuntimeConfig.AgentTag,
@@ -87,12 +83,7 @@ func InitConfigFile(cc_host string) (err error) {
 		return fmt.Errorf("failed to generate SSH host key: %v", err)
 	}
 
-	// random strings
 	live.RuntimeConfig.AgentUUID = uuid.NewString()
-	live.RuntimeConfig.AgentRoot = util.RandMD5String()
-	live.RuntimeConfig.UtilsPath = util.RandMD5String()
-	live.RuntimeConfig.SocketName = util.RandMD5String()
-	live.RuntimeConfig.PIDFile = util.RandMD5String()
 	live.RuntimeConfig.Password = util.RandStr(20)
 
 	// time intervals

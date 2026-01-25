@@ -2,11 +2,7 @@ package agentutils
 
 import (
 	"os"
-	"strconv"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
-
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -23,25 +19,9 @@ func getAgentProcess() *def.AgentProcess {
 }
 
 // CheckExistingInstance is there any emp3r0r agent already running?
+// Deprecated: No longer using PID files
 func CheckExistingInstance() (bool, int) {
-	defer func() {
-		myPIDText := strconv.Itoa(os.Getpid())
-		if err := util.WriteFileAgent(common.RuntimeConfig.PIDFile, []byte(myPIDText), 0o600); err != nil {
-			logging.Printf("write common.RuntimeConfig.PIDFile: %v", err)
-		}
-	}()
-
-	pidBytes, err := os.ReadFile(common.RuntimeConfig.PIDFile)
-	if err != nil {
-		return false, -1
-	}
-	pid, err := strconv.Atoi(string(pidBytes))
-	if err != nil {
-		return false, -1
-	}
-
-	_, err = os.FindProcess(pid)
-	return err == nil, pid
+	return false, -1
 }
 
 // SetProcessName rename agent process by modifying its argv, all cmdline args are dropped

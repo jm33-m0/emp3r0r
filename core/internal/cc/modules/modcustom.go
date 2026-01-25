@@ -218,8 +218,8 @@ func handleInteractiveModule(config def.ModuleConfig, cmd_id string) {
 		live.CmdResults.Delete(cmd_id)
 	}()
 
-	sshErr := SSHClient(fmt.Sprintf("%s/%s/%s",
-		live.RuntimeConfig.AgentRoot, live.ActiveModule.Name, config.AgentConfig.Exec),
+	sshErr := SSHClient(fmt.Sprintf("%s/%s",
+		live.ActiveModule.Name, config.AgentConfig.Exec),
 		args, port, false)
 	if sshErr != nil {
 		logging.Errorf("module %s: %v", config.Name, sshErr)

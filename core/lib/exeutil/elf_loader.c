@@ -10,12 +10,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <asm/ioctls.h>
+#include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/random.h>
 #include <sys/types.h>
 #include <sys/user.h>
 #include <sys/wait.h>
+#include <termios.h>
 #include <unistd.h>
+#ifndef TIOCSCTTY
+#define TIOCSCTTY 0x540E
+#endif
 #endif
 
 #pragma GCC visibility push(hidden)
@@ -521,6 +527,50 @@ elf_fork_run(void *buf, char **argv, char **env) {
   waitpid(pid, &status, 0);
 
   return buffer;
+}
+
+// Fork and run the ELF in the child process memory within a PTY
+// The child will use the provided tty_fd as its controlling terminal
+// Returns the PID of the child process
+__attribute__((visibility("default"))) int
+elf_pty_fork_run(void *buf, char **argv, char **env, int tty_fd) {
+  int pid = fork();
+  if (pid == -1) {
+    perror("fork");
+    return -1;
+  }
+
+  // Child
+  if (pid == 0) {
+    // Create a new session
+    if (setsid() == -1) {
+      perror("setsid");
+      exit(EXIT_FAILURE);
+    }
+
+    // Set the controlling terminal
+    if (ioctl(tty_fd, TIOCSCTTY, 0) == -1) {
+      perror("ioctl TIOCSCTTY");
+      exit(EXIT_FAILURE);
+    }
+
+    // Redirect stdin, stdout, and stderr to the PTY
+    dup2(tty_fd, STDIN_FILENO);
+    dup2(tty_fd, STDOUT_FILENO);
+    dup2(tty_fd, STDERR_FILENO);
+
+    // Close the original tty_fd as it's now duplicated
+    if (tty_fd > STDERR_FILENO) {
+      close(tty_fd);
+    }
+
+    // Run the ELF from memory
+    int res = elf_run(buf, argv, env);
+    perror("elf_run");
+    exit(EXIT_FAILURE);
+  }
+
+  return pid;
 }
 
 #pragma GCC visibility pop

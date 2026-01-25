@@ -2,11 +2,7 @@ package ssh
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
-
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func SSHD(shell, port string, args []string) (err error) {
@@ -17,10 +13,7 @@ func SSHD(shell, port string, args []string) (err error) {
 		args = []string{""}
 	}
 
-	// CC doesn't know where the agent root is, so we need to prepend it
-	if strings.HasPrefix(shell, util.FileBaseName(common.RuntimeConfig.AgentRoot)) {
-		shell = fmt.Sprintf("%s/%s", filepath.Dir(common.RuntimeConfig.AgentRoot), shell)
-	}
+	// No need to prepend AgentRoot anymore, it's deprecated
 
 	return crossPlatformSSHD(shell, port, args)
 }

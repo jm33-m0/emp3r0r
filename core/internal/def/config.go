@@ -34,7 +34,6 @@ type Config struct {
 	ProxyChainBroadcastPort        string `cbor:"17,keyasint"` // UDP port used for broadcasting msg, used by auto proxy chain
 	ProxyChainBroadcastIntervalMin int    `cbor:"18,keyasint"` // seconds, set max to 0 to disable
 	ProxyChainBroadcastIntervalMax int    `cbor:"19,keyasint"` // seconds, set max to 0 to disable
-	PIDFile                        string `cbor:"20,keyasint"` // PID of agent process
 	CCIndicatorURL                 string `cbor:"21,keyasint"` // URL of conditional C2 connection, CC indicator
 	CCIndicatorWaitMin             int    `cbor:"22,keyasint"` // seconds
 	CCIndicatorWaitMax             int    `cbor:"23,keyasint"` // seconds, set max to 0 to disable
@@ -43,13 +42,11 @@ type Config struct {
 	C2TransportProxy               string `cbor:"26,keyasint"` // proxy for C2 transport
 	CDNProxy                       string `cbor:"27,keyasint"` // websocket proxy, see go-cdn2proxy
 	DoHServer                      string `cbor:"28,keyasint"` // DNS over HTTPS server, for name resolving
-	SocketName                     string `cbor:"29,keyasint"` // agent socket, use this to check agent status
-	AgentRoot                      string `cbor:"30,keyasint"` // Where to store agent runtime files, default to /tmp
-	UtilsPath                      string `cbor:"31,keyasint"` // where to store `vaccine` files
-	AgentUUID                      string `cbor:"32,keyasint"` // UUID of agent, used to verify agent
-	AgentUUIDSig                   string `cbor:"33,keyasint"` // UUID of agent signed by CA
-	AgentTag                       string `cbor:"34,keyasint"` // generated from UUID, will be used to identidy agents
-	CCTimeout                      int    `cbor:"35,keyasint"` // wait until this amount of milliseconds to re-connect to C2
+	// These were deprecated and removed
+	AgentUUID    string `cbor:"32,keyasint"` // UUID of agent, used to verify agent
+	AgentUUIDSig string `cbor:"33,keyasint"` // UUID of agent signed by CA
+	AgentTag     string `cbor:"34,keyasint"` // generated from UUID, will be used to identidy agents
+	CCTimeout    int    `cbor:"35,keyasint"` // wait until this amount of milliseconds to re-connect to C2
 }
 
 // This will be patched by the builder

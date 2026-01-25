@@ -14,25 +14,26 @@ import (
 )
 
 func TestHandleClient_PathTraversal(t *testing.T) {
-	// Setup AgentRoot
-	tmpDir, err := os.MkdirTemp("", "agent_root")
+	// Use os.TempDir for the "safe" directory
+	tmpDir, err := os.MkdirTemp(os.TempDir(), "agent_root")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
-	common.RuntimeConfig = &def.Config{
-		AgentRoot: tmpDir,
-	}
+	common.RuntimeConfig = &def.Config{}
 
-	// Create a safe file in AgentRoot
-	safeFile := filepath.Join(tmpDir, "safe.txt")
+	// In the actual code, handleClient uses os.TempDir() as the safe root now
+	// so we need to make sure our "safe" file is in os.TempDir()
+	// or update the test to reflect the new behavior.
+	// Since handleClient uses os.TempDir(), we should use it too.
+	safeFile := filepath.Join(os.TempDir(), "safe.txt")
 	err = util.WriteFileAgent(safeFile, []byte("safe content"), 0600)
 	if err != nil {
 		t.Fatalf("Failed to create safe file: %v", err)
 	}
 
-	// Create a file outside AgentRoot
+	// Create a file outside safe directory
 	outsideDir, err := os.MkdirTemp("", "outside_root")
 	if err != nil {
 		t.Fatalf("Failed to create outside temp dir: %v", err)

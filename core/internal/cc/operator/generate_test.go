@@ -23,7 +23,7 @@ func TestAgentConfigFlow(t *testing.T) {
 	live.EmpConfigFile = tmpFile.Name()
 
 	// Write partial config (CC side)
-	// Missing: pid_file, socket_name, agent_root, utils_path, agent_uuid
+	// Missing: pid_file, socket_name, agent_uuid
 	partialConfig := map[string]interface{}{
 		"cc_address":              "127.0.0.1",
 		"agent_socks_server_port": "1080",
@@ -36,14 +36,6 @@ func TestAgentConfigFlow(t *testing.T) {
 	err = config.ReadJSONConfig(data, &ccConfig)
 	if err != nil {
 		t.Fatalf("ReadJSONConfig failed: %v", err)
-	}
-
-	// Verify defaults are populated
-	if ccConfig.PIDFile == "" {
-		t.Error("PIDFile is empty after ReadJSONConfig")
-	}
-	if ccConfig.AgentRoot == "" {
-		t.Error("AgentRoot is empty after ReadJSONConfig")
 	}
 
 	// 3. Marshal to CBOR (CC side)
@@ -81,13 +73,7 @@ func TestAgentConfigFlow(t *testing.T) {
 	if agentConfig.AgentSocksServerPort != "1080" {
 		t.Errorf("Agent AgentSocksServerPort mismatch. Got %s, expected 1080", agentConfig.AgentSocksServerPort)
 	}
-	if agentConfig.PIDFile == "" {
-		t.Error("Agent PIDFile is empty")
-	}
-	if agentConfig.AgentRoot == "" {
-		t.Error("Agent AgentRoot is empty")
-	}
-	if agentConfig.PIDFile != ccConfig.PIDFile {
-		t.Errorf("PIDFile mismatch between CC and Agent. CC: %s, Agent: %s", ccConfig.PIDFile, agentConfig.PIDFile)
+	if agentConfig.AgentSocksServerPort != "1080" {
+		t.Errorf("Agent AgentSocksServerPort mismatch. Got %s, expected 1080", agentConfig.AgentSocksServerPort)
 	}
 }

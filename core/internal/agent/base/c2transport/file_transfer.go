@@ -271,7 +271,7 @@ func handleClient(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid file path", http.StatusBadRequest)
 		return
 	}
-	safe_path := filepath.Join(common.RuntimeConfig.AgentRoot, basename)
+	safe_path := filepath.Join(os.TempDir(), basename)
 
 	// if file does not exist, download it from CC
 	if !util.IsFileExist(safe_path) {

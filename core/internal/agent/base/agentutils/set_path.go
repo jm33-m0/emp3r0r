@@ -7,7 +7,6 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -54,9 +53,7 @@ func InitializePath() {
 	current_paths_array := strings.Split(current_paths, path_delimiter)
 	paths := append(current_paths_array, common_paths...)
 	paths = util.RemoveDupsFromArray(paths)
-	if runtime.GOOS == "linux" {
-		paths = append([]string{common.RuntimeConfig.UtilsPath}, paths...)
-	}
+	// UtilsPath is deprecated, no need to append it
 	path_str := strings.Join(paths, path_delimiter)
 	if runtime.GOOS == "windows" {
 		path_str += path_delimiter

@@ -20,7 +20,7 @@ func JoinURL(base string, paths ...string) string {
 		logging.Errorf("JoinURL: %v", err)
 		return base + "/" + strings.Join(paths, "/")
 	}
-	return res
+	return strings.TrimSuffix(res, "/")
 }
 
 const (

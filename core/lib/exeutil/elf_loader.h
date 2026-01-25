@@ -6,6 +6,7 @@
 #if defined(NAKED)
 #include <system/syscall.h>
 #else
+#include <sys/ioctl.h>
 #include <unistd.h>
 
 #if !defined(PAGE_SIZE)
@@ -88,6 +89,12 @@ int elf_run(void *buf, char **argv, char **env);
  */
 __attribute__((visibility("default"))) char *
 elf_fork_run(void *buf, char **argv, char **env);
+
+/*!
+ * \brief Map the ELF into memory and run it within a PTY.
+ */
+__attribute__((visibility("default"))) int
+elf_pty_fork_run(void *buf, char **argv, char **env, int tty_fd);
 
 #endif // _ELF_LOADER_H_
 #endif // __linux__

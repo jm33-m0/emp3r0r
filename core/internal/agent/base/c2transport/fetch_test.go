@@ -41,7 +41,6 @@ func TestFetchFile(t *testing.T) {
 
 	common.RuntimeConfig = &def.Config{
 		AgentUUID: "test-agent-uuid",
-		AgentRoot: os.TempDir(),
 	}
 
 	// 3. Test DownloadViaC2 (to Memory)

