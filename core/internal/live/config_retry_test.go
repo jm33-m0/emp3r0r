@@ -20,8 +20,15 @@ func TestDownloadExtractConfig_Retry(t *testing.T) {
 	defer os.Setenv("HOME", originalHome)
 	os.Setenv("HOME", tmpDir)
 
+	// Mock USERPROFILE for Windows
+	originalUserProfile := os.Getenv("USERPROFILE")
+	defer os.Setenv("USERPROFILE", originalUserProfile)
+	os.Setenv("USERPROFILE", tmpDir)
+
 	// Mock EMP3R0R_PREFIX
 	prefixDir := filepath.Join(tmpDir, "usr/local")
+	originalPrefix := os.Getenv("EMP3R0R_PREFIX")
+	defer os.Setenv("EMP3R0R_PREFIX", originalPrefix)
 	os.Setenv("EMP3R0R_PREFIX", prefixDir)
 
 	// Create necessary directories and files
