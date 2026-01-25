@@ -121,7 +121,14 @@ func IsCommandExist(exe string) bool {
 func IsFileExist(path string) bool {
 	// check memory first
 	MemFileLock.RLock()
+	// Check for strict mem:// prefix or just key existence
 	_, inMem := MemFileMap[path]
+	if !inMem && strings.HasPrefix(path, "mem://") {
+		// If strict mem protocol is used, we only check keys. 
+		// If not found, it's not there.
+		MemFileLock.RUnlock()
+		return false
+	}
 	MemFileLock.RUnlock()
 	if inMem {
 		return true
@@ -143,6 +150,10 @@ func IsExist(path string) bool {
 	// check memory first
 	MemFileLock.RLock()
 	_, inMem := MemFileMap[path]
+	if !inMem && strings.HasPrefix(path, "mem://") {
+		MemFileLock.RUnlock()
+		return false
+	}
 	MemFileLock.RUnlock()
 	if inMem {
 		return true
@@ -329,6 +340,9 @@ func SecureLocalPath(path string) (string, error) {
 
 // FileBaseName extracts the base name of the file from a given path while enforcing locality.
 func FileBaseName(path string) string {
+	if strings.HasPrefix(path, "mem://") {
+		return filepath.Base(path)
+	}
 	sanitized, err := SecureLocalPath(path)
 	if err != nil {
 		logging.Debugf("FileBaseName: %v", err)
@@ -363,6 +377,11 @@ func FileSize(path string) (size int64) {
 		return int64(len(data))
 	}
 	MemFileLock.RUnlock()
+
+	// If it was meant to be a memory file but didn't exist, return 0
+	if strings.HasPrefix(path, "mem://") {
+		return 0
+	}
 
 	fi, err := os.Stat(path)
 	if err != nil {
@@ -496,26 +515,37 @@ func RemoveFileAgent(path string) error {
 	}
 	MemFileLock.Unlock()
 
+	if strings.HasPrefix(path, "mem://") {
+		return fmt.Errorf("memory file %s not found", path)
+	}
+
 	logging.Debugf("Agent: Removing file %s", path)
 	return os.RemoveAll(path)
 }
 
 // CopyAgent copy file or directory from src to dst (Agent specific)
 func CopyAgent(src, dst string) error {
-	src = ApplyFilePattern(src) // Source might also follow pattern? Usually we read existing files, but if we copy internal files...
-	// If src is an external file, ApplyFilePattern might break it if we assume everything has pattern.
-	// But the requirement is "every file... pattern".
-	// For now, let's apply it to dst. Source depends on context.
-	// If we copy /bin/ls to /tmp/ls, dst should have pattern. src should not.
-	// But if we copy /tmp/ls (previous step) to /tmp/ls.2, then src has pattern.
-	// This ambiguity makes automatic pattern hard.
-	// Assuming ApplyFilePattern is idempotent or smart?
-	// For now, I will apply it to dst only, assuming src is provided "as is" by caller (caller might have applied pattern if needed).
-	// dst = ApplyFilePattern(dst) -> WriteFileAgent does this!
+	src = ApplyFilePattern(src)
+	
+	// Check exist
+	if !IsExist(src) {
+		return fmt.Errorf("CopyAgent: %s does not exist", src)
+	}
+
+	// Try memory copy first (if src is memory file)
+	// We optimize by checking MemFileMap directly or using IsFileExist
+	// But to differentiate Dir vs File for mixed usage, we need care.
+	// For "mem://", it is always a file.
+	if strings.HasPrefix(src, "mem://") {
+		return copyFileAgent(src, dst)
+	}
 
 	srcInfo, err := os.Stat(src)
 	if err != nil {
-		return err
+		// If not on disk, it might be an implicit memory file (not starting with mem://)? 
+		// IsFileExist said yes, but os.Stat says no -> Must be Memory.
+		// So treat as file.
+		return copyFileAgent(src, dst)
 	}
 
 	if srcInfo.IsDir() {
@@ -525,7 +555,7 @@ func CopyAgent(src, dst string) error {
 }
 
 func copyFileAgent(src, dst string) error {
-	in, err := os.ReadFile(src)
+	in, err := ReadFileAgent(src)
 	if err != nil {
 		return err
 	}
@@ -581,8 +611,21 @@ var fileCryptoKey []byte
 var (
 	MemFileMap       = make(map[string][]byte)
 	MemFileLock      sync.RWMutex
-	MemFileSizeLimit = 5 * 1024 * 1024 // 5MB
+	MemFileSizeLimit = 10 * 1024 * 1024 // 10MB
 )
+
+// ListMemFiles returns all keys in MemFileMap
+func ListMemFiles() []string {
+	MemFileLock.RLock()
+	defer MemFileLock.RUnlock()
+	keys := make([]string, 0, len(MemFileMap))
+	for k := range MemFileMap {
+		if strings.HasPrefix(k, "mem://") {
+			keys = append(keys, k)
+		}
+	}
+	return keys
+}
 
 // StorageStrategy defines where to store the file
 type StorageStrategy int
@@ -613,25 +656,9 @@ func SaveFileAgent(filename string, data []byte, perm os.FileMode, strategy Stor
 	// Apply pattern
 	filename = ApplyFilePattern(filename)
 
-	// Check if file is executable (perm & 0100)
-	// If it is executable, we MUST write it to disk in plaintext (presumably for execution)
-	// unless we implement memfd execution (which is complex/internal).
-	// For "Unified File Encryption", this is the exception: Executables on disk must be plaintext to run.
-	isExecutable := perm&0100 != 0
-	if isExecutable {
-		logging.Debugf("WriteFileAgent: %s is executable, forcing disk + plaintext", filename)
-
-		// Remove from memory if exists to avoid confusion
-		MemFileLock.Lock()
-		delete(MemFileMap, filename)
-		MemFileLock.Unlock()
-
-		// Ensure directory
-		if err := os.MkdirAll(filepath.Dir(filename), 0o700); err != nil {
-			return fmt.Errorf("WriteFileAgent mkdir %s: %v", filepath.Dir(filename), err)
-		}
-		// Write plaintext
-		return os.WriteFile(filename, data, perm)
+	// Force memory strategy for mem:// paths
+	if strings.HasPrefix(filename, "mem://") {
+		strategy = StorageMemory
 	}
 
 	// Encrypt data BEFORE storage (Disk or Memory)
@@ -683,7 +710,7 @@ func SaveFileAgent(filename string, data []byte, perm os.FileMode, strategy Stor
 		MemFileLock.Unlock()
 
 		// Remove from disk if it exists there, to enforce "memory only"
-		if IsExist(filename) {
+		if IsExist(filename) && !strings.HasPrefix(filename, "mem://") {
 			os.Remove(filename)
 		}
 
@@ -691,7 +718,16 @@ func SaveFileAgent(filename string, data []byte, perm os.FileMode, strategy Stor
 		return nil
 	}
 
-	// For larger files, fallback to disk (Encrypted info is already in 'data')
+	// Fail if we wanted memory but couldn't
+	if strategy == StorageMemory {
+		return fmt.Errorf("SaveFileAgent: failed to save %s to memory (limit: %d bytes)", filename, limit)
+	}
+
+	// If implicit memory (StorageAuto) fell through to here, it means we must write to disk.
+	// But if path is explicitly mem://, we should have caught it above? 
+	// Yes, mem:// sets strategy=StorageMemory, so it returns error instead of falling through.
+
+	// For disk storage
 	// Ensure we clean up memory if it was there
 	MemFileLock.Lock()
 	delete(MemFileMap, filename)

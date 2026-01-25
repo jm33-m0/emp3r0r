@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"strings"
+
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
 )
 
@@ -28,6 +31,7 @@ func C2Commands() *cobra.Command {
 		Run:     runListDir,
 	}
 	lsCmd.Flags().StringP("path", "p", "", "Path to list")
+	lsCmd.RegisterFlagCompletionFunc("path", memFileCompletion)
 	rootCmd.AddCommand(lsCmd)
 
 	// C2 Stat command
@@ -39,6 +43,7 @@ func C2Commands() *cobra.Command {
 		Run:     runStat,
 	}
 	statCmd.Flags().StringP("path", "p", "", "Path to stat")
+	statCmd.RegisterFlagCompletionFunc("path", memFileCompletion)
 	rootCmd.AddCommand(statCmd)
 
 	// C2 Bring2CC command
@@ -77,6 +82,21 @@ func C2Commands() *cobra.Command {
 	proxyCmd.Flags().StringP("mode", "m", "", "Proxy mode")
 	proxyCmd.Flags().StringP("addr", "a", "", "Address to bind")
 	rootCmd.AddCommand(proxyCmd)
+
+	// C2 Put command
+	putCmd := &cobra.Command{
+		Use:     "put",
+		Short:   "Upload file to agent",
+		Example: "!put --path <path> --addr <url> --mem <bool> --force <bool>",
+		GroupID: "generic",
+		Run:     putCmdRun,
+	}
+	putCmd.Flags().StringP("path", "p", "", "Path to save file on agent")
+	putCmd.Flags().StringP("addr", "", "", "Download address")
+	putCmd.Flags().BoolP("mem", "m", false, "Save file to memory")
+	putCmd.Flags().BoolP("force", "", false, "Force write to disk if memory is unavailable")
+	putCmd.RegisterFlagCompletionFunc("path", memFileCompletion)
+	rootCmd.AddCommand(putCmd)
 
 	// C2 Port Forwarding command
 	portFwdCmd := &cobra.Command{
@@ -117,6 +137,7 @@ func C2Commands() *cobra.Command {
 	customModuleCmd.Flags().BoolP("in_mem", "i", false, "Load module in memory")
 	customModuleCmd.Flags().StringP("type", "t", "", "Payload type")
 	customModuleCmd.Flags().StringP("file_to_download", "f", "", "File to download")
+	customModuleCmd.RegisterFlagCompletionFunc("file_to_download", memFileCompletion)
 	customModuleCmd.Flags().StringP("download_addr", "d", "", "Download address")
 	rootCmd.AddCommand(customModuleCmd)
 
@@ -157,6 +178,7 @@ func C2Commands() *cobra.Command {
 	}
 	fileDownloaderCmd.Flags().StringP("download_addr", "u", "", "URL to download")
 	fileDownloaderCmd.Flags().StringP("path", "p", "", "Path to save")
+	fileDownloaderCmd.RegisterFlagCompletionFunc("path", memFileCompletion)
 	fileDownloaderCmd.Flags().StringP("checksum", "c", "", "Checksum")
 	rootCmd.AddCommand(fileDownloaderCmd)
 
@@ -190,5 +212,12 @@ func C2Commands() *cobra.Command {
 	platformCommands(rootCmd)
 
 	return rootCmd
+}
 
+// memFileCompletion completes mem:// paths
+func memFileCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	if strings.HasPrefix(toComplete, "mem://") {
+		return util.ListMemFiles(), cobra.ShellCompDirectiveNoFileComp
+	}
+	return nil, cobra.ShellCompDirectiveDefault
 }

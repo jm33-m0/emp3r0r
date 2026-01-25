@@ -27,6 +27,7 @@ func CoreCommands() *cobra.Command {
 		GroupID: "filesystem",
 	}
 	lsCmd.Flags().StringP("dst", "d", ".", "Directory to list files")
+	lsCmd.RegisterFlagCompletionFunc("dst", memFileCompletion)
 	rootCmd.AddCommand(lsCmd)
 
 	catCmd := &cobra.Command{
@@ -36,6 +37,7 @@ func CoreCommands() *cobra.Command {
 		GroupID: "filesystem",
 	}
 	catCmd.Flags().StringP("dst", "d", "", "File to read")
+	catCmd.RegisterFlagCompletionFunc("dst", memFileCompletion)
 	rootCmd.AddCommand(catCmd)
 
 	rmCmd := &cobra.Command{
@@ -45,6 +47,7 @@ func CoreCommands() *cobra.Command {
 		GroupID: "filesystem",
 	}
 	rmCmd.Flags().StringP("dst", "d", "", "Path to remove")
+	rmCmd.RegisterFlagCompletionFunc("dst", memFileCompletion)
 	rootCmd.AddCommand(rmCmd)
 
 	mkdirCmd := &cobra.Command{
@@ -63,7 +66,9 @@ func CoreCommands() *cobra.Command {
 		GroupID: "filesystem",
 	}
 	cpCmd.Flags().StringP("src", "s", "", "Source path")
+	cpCmd.RegisterFlagCompletionFunc("src", memFileCompletion)
 	cpCmd.Flags().StringP("dst", "d", "", "Destination path")
+	cpCmd.RegisterFlagCompletionFunc("dst", memFileCompletion)
 	rootCmd.AddCommand(cpCmd)
 
 	mvCmd := &cobra.Command{
@@ -73,7 +78,9 @@ func CoreCommands() *cobra.Command {
 		GroupID: "filesystem",
 	}
 	mvCmd.Flags().StringP("src", "s", "", "Source path")
+	mvCmd.RegisterFlagCompletionFunc("src", memFileCompletion)
 	mvCmd.Flags().StringP("dst", "d", "", "Destination path")
+	mvCmd.RegisterFlagCompletionFunc("dst", memFileCompletion)
 	rootCmd.AddCommand(mvCmd)
 
 	cdCmd := &cobra.Command{
@@ -153,6 +160,7 @@ func CoreCommands() *cobra.Command {
 		GroupID: "file_transfer",
 	}
 	getCmd.Flags().StringP("file_path", "f", "", "File or directory to download")
+	getCmd.RegisterFlagCompletionFunc("file_path", memFileCompletion)
 	getCmd.Flags().StringP("filter", "r", "", "Regex filter for files")
 	getCmd.Flags().Int64P("offset", "o", 0, "Download offset")
 	getCmd.Flags().StringP("token", "t", "", "Download token")
@@ -166,6 +174,7 @@ func CoreCommands() *cobra.Command {
 	}
 	putCmd.Flags().StringP("file", "", "", "File to upload")
 	putCmd.Flags().StringP("path", "", "", "Destination path")
+	putCmd.RegisterFlagCompletionFunc("path", memFileCompletion)
 	putCmd.Flags().Int64P("size", "", 0, "Size of file")
 	putCmd.Flags().StringP("checksum", "", "", "File checksum")
 	putCmd.Flags().StringP("addr", "", "", "Download address")

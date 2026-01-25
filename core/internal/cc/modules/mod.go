@@ -19,7 +19,7 @@ var (
 		"#ps":   "List processes: `ps`",
 		"#kill": "Kill process: `kill <PID>`",
 		"#net":  "Show network info",
-		"put":   "Put a file from CC to agent: `put <local file> <remote path>`",
+		"put":   "Put a file from CC to agent: `put <local file> <remote path>`\nPath starting with `mem://` enforces memory storage. Otherwise smart selection is used.\nUse --force to write to disk if memory fails.",
 		"get":   "Get a file from agent: `get <remote file>`",
 	}
 
