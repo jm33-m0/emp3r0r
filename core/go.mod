@@ -6,7 +6,6 @@ toolchain go1.25.6
 
 require (
 	github.com/Code-Hex/Neo-cowsay/v2 v2.0.4
-	github.com/Microsoft/go-winio v0.6.2
 	github.com/alecthomas/chroma v0.10.0
 	github.com/carapace-sh/carapace v1.10.3
 	github.com/cavaliergopher/grab/v3 v3.0.1
