@@ -90,70 +90,7 @@ static void _get_rand(char *buf, int size) {
   (void)result; // Suppress unused result warning
 }
 
-#ifndef R_X86_64_RELATIVE
-#define R_X86_64_RELATIVE 8
-#endif
 
-static void _relocate(size_t base, Elf_Ehdr *hdr, Elf_Phdr *phdr) {
-  Elf_Dyn *dyn = NULL;
-  size_t x;
-
-  for (x = 0; x < hdr->e_phnum; x++) {
-    if (phdr[x].p_type == PT_DYNAMIC) {
-      dyn = (Elf_Dyn *)(base + phdr[x].p_vaddr);
-      break;
-    }
-  }
-
-  if (!dyn)
-    return;
-
-  Elf_Rela *rela = NULL;
-  size_t relasz = 0;
-  size_t relaent = 0;
-
-  for (x = 0; dyn[x].d_tag != DT_NULL; x++) {
-    if (dyn[x].d_tag == DT_RELA)
-      rela = (Elf_Rela *)(base + dyn[x].d_un.d_ptr);
-    if (dyn[x].d_tag == DT_RELASZ)
-      relasz = dyn[x].d_un.d_val;
-    if (dyn[x].d_tag == DT_RELAENT)
-      relaent = dyn[x].d_un.d_val;
-  }
-
-  if (rela && relaent) {
-    DEBUG_PRINT("Applying %d RELATIVE relocations (RELA)\n", (int)(relasz / relaent));
-    for (x = 0; x < relasz / relaent; x++) {
-      if (ELF_R_TYPE(rela[x].r_info) == R_X86_64_RELATIVE) {
-        size_t *ptr = (size_t *)(base + rela[x].r_offset);
-        *ptr = base + rela[x].r_addend;
-      }
-    }
-  }
-
-  // Also check for DT_REL
-  Elf_Rel *rel = NULL;
-  size_t relsz = 0;
-  size_t relent = 0;
-  for (x = 0; dyn[x].d_tag != DT_NULL; x++) {
-    if (dyn[x].d_tag == DT_REL)
-      rel = (Elf_Rel *)(base + dyn[x].d_un.d_ptr);
-    if (dyn[x].d_tag == DT_RELSZ)
-      relsz = dyn[x].d_un.d_val;
-    if (dyn[x].d_tag == DT_RELENT)
-      relent = dyn[x].d_un.d_val;
-  }
-
-  if (rel && relent) {
-    DEBUG_PRINT("Applying %d RELATIVE relocations (REL)\n", (int)(relsz / relent));
-    for (x = 0; x < relsz / relent; x++) {
-      if (ELF_R_TYPE(rel[x].r_info) == R_X86_64_RELATIVE) {
-        size_t *ptr = (size_t *)(base + rel[x].r_offset);
-        *ptr += base;
-      }
-    }
-  }
-}
 
 static Elf_Shdr *_get_section(char *name, void *elf_start) {
   int x;
@@ -176,29 +113,7 @@ static Elf_Shdr *_get_section(char *name, void *elf_start) {
   return NULL;
 }
 
-void *elf_sym(void *elf_start, char *sym_name) {
-  size_t x, y;
 
-  Elf_Ehdr *hdr = (Elf_Ehdr *)elf_start;
-  Elf_Shdr *shdr = (Elf_Shdr *)(elf_start + hdr->e_shoff);
-
-  // Try both SHT_SYMTAB and SHT_DYNSYM
-  for (x = 0; x < hdr->e_shnum; x++) {
-    if (shdr[x].sh_type == SHT_SYMTAB || shdr[x].sh_type == SHT_DYNSYM) {
-      const char *strings = elf_start + shdr[shdr[x].sh_link].sh_offset;
-      Elf_Sym *syms = (Elf_Sym *)(elf_start + shdr[x].sh_offset);
-
-      for (y = 0; y < shdr[x].sh_size / sizeof(Elf_Sym); y++) {
-        // printf("@name:%s\n", strings + syms[y].st_name);
-
-        if (strcmp(sym_name, strings + syms[y].st_name) == 0)
-          return (void *)syms[y].st_value;
-      }
-    }
-  }
-
-  return NULL;
-}
 
 int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
              size_t *entry) {
@@ -215,41 +130,10 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
   phdr = (Elf_Phdr *)(elf_start + hdr->e_phoff);
 
   if (hdr->e_type == ET_DYN) {
-    // If this is a DYNAMIC ELF (can be loaded anywhere), calculate total span
-    size_t min_vaddr = (size_t)-1;
-    size_t max_vaddr = 0;
-    for (x = 0; x < hdr->e_phnum; x++) {
-      if (phdr[x].p_type == PT_LOAD && phdr[x].p_memsz > 0) {
-        if (phdr[x].p_vaddr < min_vaddr)
-          min_vaddr = phdr[x].p_vaddr;
-        if (phdr[x].p_vaddr + phdr[x].p_memsz > max_vaddr)
-          max_vaddr = phdr[x].p_vaddr + phdr[x].p_memsz;
-      }
-    }
-
-    if (min_vaddr == (size_t)-1) {
-      DEBUG_PRINT("No loadable segments found\n");
-      return -1;
-    }
-
-    size_t total_span = ROUND_UP(max_vaddr, PAGE_SIZE) - ROUND_DOWN(min_vaddr, PAGE_SIZE);
-    DEBUG_PRINT("Calculating total ELF span: min=0x%lx, max=0x%lx, span=%d\n", min_vaddr, max_vaddr, (int)total_span);
-
-    // Reserve the entire range to find a suitable base
-    base = (size_t)mmap(0, total_span, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if ((long)base < 0) {
-        DEBUG_PRINT("Failed to reserve memory for ELF span\n");
-        return -1;
-    }
-    // Optimization: we don't strictly need to munmap if we use MAP_FIXED later, 
-    // but it's cleaner to know it's a hole. Actually, keeping it mapped PROT_NONE 
-    // and using MAP_FIXED overwrite is safer on some systems.
-    munmap((void *)base, total_span);
-    
-    // adjust base relative to min_vaddr if min_vaddr is not 0
-    base -= ROUND_DOWN(min_vaddr, PAGE_SIZE);
-
-    DEBUG_PRINT("Dynamic ELF, base set to 0x%lx (reserved span)\n", base);
+    // We do NOT support ET_DYN (Shared Objects / PIE) anymore in this stager
+    // because providing a correct environment (libc, loader) is too complex.
+    DEBUG_PRINT("Error: ET_DYN not supported. Please use static ELF executable.\n");
+    return -1;
   } else {
     base = 0;
     DEBUG_PRINT("Static ELF, base set to 0\n");
@@ -311,10 +195,7 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
       *base_addr = (size_t)m;
   }
 
-  // Apply relocations while memory is still RW
-  if (hdr->e_type == ET_DYN) {
-    _relocate(base, hdr, phdr);
-  }
+
 
   // Set proper protection on all sections
   for (int i = 0; i < seg_count; i++) {
@@ -348,7 +229,7 @@ int elf_run(void *buf, char **argv, char **env) {
   // Fill in 16 random bytes for the loader below
   _get_rand(rand_bytes, 16);
 
-  int (*ptr)(int, char **, char **);
+
 
   // First, let's count arguments...
   DEBUG_PRINT("Counting arguments, argv=%p, env=%p\n", argv, env);
@@ -383,18 +264,11 @@ int elf_run(void *buf, char **argv, char **env) {
   DEBUG_PRINT("ELF loaded at 0x%lx, entry 0x%lx\n", elf_base, elf_entry);
 
   // Check if this is a shared object and find main symbol
-  int is_shared_object = 0;
-  size_t main_addr = 0;
-  
+
+
   if (hdr->e_type == ET_DYN) {
-    // For shared objects, try to find the main symbol
-    void *main_sym = elf_sym(buf, "main");
-    if (main_sym != NULL) {
-      is_shared_object = 1;
-      main_addr = elf_base + (size_t)main_sym;
-      DEBUG_PRINT("Found main symbol at 0x%lx (base + 0x%lx)\n", 
-                  main_addr, (size_t)main_sym);
-    }
+      DEBUG_PRINT("Error: Shared Objects not supported.\n");
+      return -1;
   }
 
   unsigned long *stack_storage =
@@ -447,15 +321,9 @@ int elf_run(void *buf, char **argv, char **env) {
   stack_storage[stack_ptr++] = 0;
 
   // Let's run the constructors
-  Elf_Shdr *init = _get_section(".init", buf);
-  Elf_Shdr *init_array = _get_section(".init_array", buf);
+
 
   size_t base = 0;
-  if (hdr->e_type == ET_DYN) {
-    // It's a PIC file, so make sure we add the base when we call the
-    // constructors
-    base = elf_base;
-  }
 
 
 
@@ -554,37 +422,9 @@ int elf_run(void *buf, char **argv, char **env) {
   DEBUG_PRINT("Stack setup complete, jumping to entry point\n");
   DEBUG_PRINT("Stack storage: 0x%lx\n", (unsigned long)stack_storage);
   DEBUG_PRINT("Entry point: 0x%lx\n", (unsigned long)(interp_entry ? interp_entry : elf_entry));
-  DEBUG_PRINT("Is shared object: %d, Main addr: 0x%lx\n", is_shared_object, main_addr);
 
-  // For shared objects with main symbol, call main() directly
-  if (is_shared_object && main_addr != 0) {
-    DEBUG_PRINT("Calling main() at 0x%lx for shared object\n", main_addr);
-    
-    // Ensure stack is 16-byte aligned and has space for return address
-    // stack_storage is 16-byte aligned at the start of s_argc.
-    // Linux ABI: (%rsp + 8) should be 16-aligned when entering main?
-    // Actually, for main(int argc, char **argv), it follows standard call ABI.
-    
-    int ret;
-    __asm__ __volatile__(
-        "mov %%rsp, %%r13\n"     // Save current stack
-        "andq $-16, %1\n"        // Align new stack down to 16 bytes
-        "mov %1, %%rsp\n"        // Switch to new stack
-        "subq $8, %%rsp\n"       // Adjust for call alignment
-        "mov %2, %%rdi\n"        // argc
-        "mov %3, %%rsi\n"        // argv
-        "mov %4, %%rdx\n"        // envp
-        "call *%5\n"             // Call main
-        "mov %%r13, %%rsp\n"     // Restore old stack
-        "mov %%eax, %0\n"
-        : "=r"(ret)
-        : "r"(stack_storage), "r"((long)argc), "r"(s_argv), "r"(s_env), "r"(main_addr)
-        : "r13", "rax", "rdi", "rsi", "rdx", "memory"
-    );
-    
-    DEBUG_PRINT("main() returned %d\n", ret);
-    exit(ret);
-  }
+
+
 
   //
   // Architecture and OS dependant init-reg-and-jump-to-start trampoline
