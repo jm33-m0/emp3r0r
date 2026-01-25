@@ -33,7 +33,7 @@ emp3r0r is a comprehensive post-exploitation framework that stands out as one of
 
 - **Linux-Native Architecture**: Built from the ground up for Linux targets with full Windows compatibility.
 - **Universal Module Support**: Execute Bash, PowerShell, Python, DLL, SO, and EXE modules seamlessly across platforms.
-- **Advanced Stealth**: Dynamic process obfuscation, file concealment, time-stomping, **memory-backed file system** with transparent AES-GCM encryption and intelligent storage strategies (auto/memory/disk modes with dynamic RAM limits).
+- **Advanced Stealth**: **Memory-backed agent file system** with transparent encryption, in-memory module execution, BOF-like modules on both Windows and Linux, advanced Linux stagers, and DLL/Shellcode agents for flexible deployment.
 - **Modern Infrastructure**: WireGuard + mTLS operator authentication, HTTP2/TLS with **JA3 fingerprinting evasion**, KCP-based UDP tunneling.
 - **COFF/BOF Loader**: Native BOF execution on Windows agents with typed argument packing (LPSTR/LPWSTR/INT/BOOL/BINARY), powered by [praetorian-inc/goffloader](https://github.com/praetorian-inc/goffloader), and integration-friendly module schema; on Linux you can load ELF object files in-memory to achieve the same effect.
 - **APT-Grade Connectivity**: **Auto-Proxy Chain** creates a resilient, automatic P2P mesh network. Agents in air-gapped or isolated segments autonomously discover and piggyback on internet-connected peers to reach the C2, ensuring long-term survival in hardened environments.
@@ -83,17 +83,17 @@ Use the `generate` command from within the emp3r0r shell interface to create cus
 
 #### OpSec Safety & File Operations
 
-- **Warn-before-write** to avoid noisy actions on disk.
-- **Minimal footprint** until work begins, keeping hosts clean.
-- **Consistent artifacts** via uniform file handling for predictable, low-profile drops.
-- **Generic temps** to blend into the system.
+- **Memory-first approach** with intelligent storage management to minimize disk presence.
+- **Minimal footprint** with no dedicated agent directories or persistent files.
+- **Warn-before-write** for operations that touch disk, keeping hosts clean.
+- **Consistent artifacts** via uniform file handling for predictable, low-profile operations.
 
 #### Advanced Process Hiding
 
 - **Obfuscated processes** and hidden helpers to lower visibility.
 - **Anti-debug/analysis** measures to make inspection harder.
 - **sRDI-like Shellcode Stager**: Load ELF binaries from memory without touching disk, similar to sRDI for Windows.
-- **Memory-backed Filesystem**: In-memory file storage with automatic encrypted disk spillover (AES-GCM). Three storage strategies (Auto/Memory/Disk) with dynamic limits (up to 1/10 free RAM, max 100MB). Transparent encryption for all non-executable files.
+- **Memory-backed Agent Filesystem**: Agents use an in-memory file system with transparent encryption for file operations. Large files automatically spill to encrypted disk storage when memory limits are reached, balancing stealth with resource efficiency.
 
 #### Secure Command & Control
 
@@ -159,9 +159,9 @@ Use the `generate` command from within the emp3r0r shell interface to create cus
 
 #### In-Memory Execution
 
-- Run Bash, PowerShell, Python, and native ELF modules straight from memory.
-- Execute ELF objects (.o) or executables entirely in memory on Linux targets without writing to disk.
-- Memory-only loaders and injection paths keep disk footprint low.
+- **All modules execute in-memory** - Bash, PowerShell, Python, and native ELF modules run directly from the agent's memory-backed file system.
+- Execute ELF objects (.o) or executables entirely in memory on Linux targets.
+- Memory-only loaders and injection paths eliminate disk artifacts.
 - ELF patcher module lets you graft the agent into existing binaries when needed.
 
 ### Post-Exploitation Arsenal
