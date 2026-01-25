@@ -195,7 +195,7 @@ func TestFsCmds(t *testing.T) {
 		t.Fatalf("Failed to execute mkdir command: %v", err)
 	}
 	// Verify directory exists
-	if _, err := os.Stat(newDir); os.IsNotExist(err) {
+	if !util.IsDirExist(newDir) {
 		t.Errorf("Directory %s was not created", newDir)
 	}
 	mockConn.Reset()
@@ -211,7 +211,7 @@ func TestFsCmds(t *testing.T) {
 		t.Fatalf("Failed to execute cp command: %v", err)
 	}
 	// Verify file exists
-	if _, err := os.Stat(dstFile); os.IsNotExist(err) {
+	if !util.IsFileExist(dstFile) {
 		t.Errorf("File %s was not copied", dstFile)
 	}
 	mockConn.Reset()
@@ -223,10 +223,11 @@ func TestFsCmds(t *testing.T) {
 		t.Fatalf("Failed to execute mv command: %v", err)
 	}
 	// Verify file moved
-	if _, err := os.Stat(movedFile); os.IsNotExist(err) {
+	if !util.IsFileExist(movedFile) {
 		t.Errorf("File %s was not moved", movedFile)
 	}
-	if _, err := os.Stat(dstFile); !os.IsNotExist(err) {
+	// dstFile should be gone
+	if util.IsFileExist(dstFile) {
 		t.Errorf("File %s still exists after move", dstFile)
 	}
 	mockConn.Reset()
@@ -237,7 +238,7 @@ func TestFsCmds(t *testing.T) {
 		t.Fatalf("Failed to execute rm command: %v", err)
 	}
 	// Verify file removed
-	if _, err := os.Stat(movedFile); !os.IsNotExist(err) {
+	if util.IsFileExist(movedFile) {
 		t.Errorf("File %s still exists after rm", movedFile)
 	}
 }

