@@ -412,9 +412,21 @@ int elf_run(void *buf, char **argv, char **env) {
   // AT_EGID
   at[cnt].id = AT_EGID;
   at[cnt++].value = getegid();
+  // AT_SECURE (0 = not setuid/setgid)
+  at[cnt].id = AT_SECURE;
+  at[cnt++].value = 0;
+  // AT_PLATFORM (architecture string)
+  const char *platform = "x86_64";
+  memcpy(&string_storage[str_ptr], platform, 7);
+  at[cnt].id = AT_PLATFORM;
+  at[cnt++].value = (size_t)&string_storage[str_ptr];
+  str_ptr += 7;
   // AT_RANDOM (address of 16 random bytes)
+  // Store random bytes in string storage so they persist
+  memcpy(&string_storage[str_ptr], rand_bytes, 16);
   at[cnt].id = AT_RANDOM;
-  at[cnt++].value = (size_t)rand_bytes;
+  at[cnt++].value = (size_t)&string_storage[str_ptr];
+  str_ptr += 16;
   // AT_NULL
   at[cnt].id = AT_NULL;
   at[cnt++].value = 0;

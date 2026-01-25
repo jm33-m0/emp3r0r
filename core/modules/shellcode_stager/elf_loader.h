@@ -45,9 +45,15 @@ typedef Elf64_Word Elf_Word;
 #define ROUND_UP(v, s) ((v + s - 1) & -s)
 #define ROUND_DOWN(v, s) (v & -s)
 
-// Not all archs have this one defined
+// Not all archs have these defined
 #ifndef AT_RANDOM
 #define AT_RANDOM 25
+#endif
+#ifndef AT_PLATFORM
+#define AT_PLATFORM 15
+#endif
+#ifndef AT_SECURE
+#define AT_SECURE 23
 #endif
 
 struct ATENTRY {
