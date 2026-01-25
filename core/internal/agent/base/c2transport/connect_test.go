@@ -27,6 +27,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
+	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 )
 
 func signUUID(uuid string, keyFile string) (string, error) {
@@ -221,4 +222,30 @@ func TestEstablishC2Connection(t *testing.T) {
 	cancel()
 	conn.Close()
 	wg.Wait()
+}
+
+func TestURLConstruction(t *testing.T) {
+	// Simulated CC addresses
+	ccAddresses := []string{
+		"https://10.3.0.106:42933",
+		"https://10.3.0.106:42933/",
+	}
+
+	token := "test-token"
+
+	for _, ccAddr := range ccAddresses {
+		// This is what failed in agent.go
+		msgURL := netutil.JoinURL(ccAddr, transport.MsgAPI, token)
+		expected := "https://10.3.0.106:42933/api/msg/" + token
+		if msgURL != expected {
+			t.Errorf("For CCAddress %q, got msgURL %q, want %q", ccAddr, msgURL, expected)
+		}
+
+		// This is what failed in reportStatus
+		reportURL := netutil.JoinURL(ccAddr, transport.CheckInAPI, "some-uuid")
+		expectedReport := "https://10.3.0.106:42933/api/checkin/some-uuid"
+		if reportURL != expectedReport {
+			t.Errorf("For CCAddress %q, got reportURL %q, want %q", ccAddr, reportURL, expectedReport)
+		}
+	}
 }

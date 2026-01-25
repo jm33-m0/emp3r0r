@@ -2,14 +2,26 @@ package netutil
 
 import (
 	"fmt"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"math/rand"
 	"net"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
+
+// JoinURL joins base URL and path segments, ensuring correct slash usage.
+func JoinURL(base string, paths ...string) string {
+	res, err := url.JoinPath(base, paths...)
+	if err != nil {
+		logging.Errorf("JoinURL: %v", err)
+		return base + "/" + strings.Join(paths, "/")
+	}
+	return res
+}
 
 const (
 	// MicrosoftNCSIURL is the URL used by Microsoft to check internet connectivity
