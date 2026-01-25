@@ -79,8 +79,21 @@ func dispatcher(wrt http.ResponseWriter, req *http.Request) {
 
 // WgFileServer serves a file over HTTP on WireGuard interface
 func WgFileServer(path_to_file string) (err error) {
-	http.HandleFunc("/", func(wrt http.ResponseWriter, req *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(wrt http.ResponseWriter, req *http.Request) {
 		http.ServeFile(wrt, req, path_to_file)
 	})
-	return http.ListenAndServe(fmt.Sprintf("%s:%d", netutil.WgServerIP, netutil.WgFileServerPort), nil)
+	listenAddr := fmt.Sprintf("%s:%d", netutil.WgServerIP, netutil.WgFileServerPort)
+
+	// retry until we can bind to the address (WireGuard interface might be slow to come up)
+	for range 100 {
+		err = http.ListenAndServe(listenAddr, mux)
+		if err != nil {
+			logging.Warningf("WgFileServer: failed to listen on %s, retrying: %v", listenAddr, err)
+			time.Sleep(time.Second)
+			continue
+		}
+	}
+
+	return fmt.Errorf("WgFileServer: failed to listen on %s after 100 attempts: %v", listenAddr, err)
 }

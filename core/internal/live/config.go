@@ -6,6 +6,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/jm33-m0/arc/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -86,11 +87,19 @@ func DownloadExtractConfig(url string, downloader func(string, string) error) (e
 	}
 
 	logging.Infof("Downloading and extracting config from %s to %s", url, configTarPath)
-	// download config tarball from server
-	err = downloader(url, configTarPath)
-	if err != nil {
-		return
+	// download config tarball from server, retry up to 10 times
+	for i := range 10 {
+		err = downloader(url, configTarPath)
+		if err == nil {
+			break
+		}
+		logging.Warningf("Failed to download config (attempt %d/10): %v", i+1, err)
+		time.Sleep(time.Second)
 	}
+	if err != nil {
+		return fmt.Errorf("failed to download config after 10 attempts: %v", err)
+	}
+
 	// remove existing config files for a clean start
 	err = cleanupConfig()
 	if err != nil {
