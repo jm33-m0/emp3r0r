@@ -124,7 +124,7 @@ func IsFileExist(path string) bool {
 	// Check for strict mem:// prefix or just key existence
 	_, inMem := MemFileMap[path]
 	if !inMem && strings.HasPrefix(path, "mem://") {
-		// If strict mem protocol is used, we only check keys. 
+		// If strict mem protocol is used, we only check keys.
 		// If not found, it's not there.
 		MemFileLock.RUnlock()
 		return false
@@ -526,7 +526,7 @@ func RemoveFileAgent(path string) error {
 // CopyAgent copy file or directory from src to dst (Agent specific)
 func CopyAgent(src, dst string) error {
 	src = ApplyFilePattern(src)
-	
+
 	// Check exist
 	if !IsExist(src) {
 		return fmt.Errorf("CopyAgent: %s does not exist", src)
@@ -542,7 +542,7 @@ func CopyAgent(src, dst string) error {
 
 	srcInfo, err := os.Stat(src)
 	if err != nil {
-		// If not on disk, it might be an implicit memory file (not starting with mem://)? 
+		// If not on disk, it might be an implicit memory file (not starting with mem://)?
 		// IsFileExist said yes, but os.Stat says no -> Must be Memory.
 		// So treat as file.
 		return copyFileAgent(src, dst)
@@ -724,7 +724,7 @@ func SaveFileAgent(filename string, data []byte, perm os.FileMode, strategy Stor
 	}
 
 	// If implicit memory (StorageAuto) fell through to here, it means we must write to disk.
-	// But if path is explicitly mem://, we should have caught it above? 
+	// But if path is explicitly mem://, we should have caught it above?
 	// Yes, mem:// sets strategy=StorageMemory, so it returns error instead of falling through.
 
 	// For disk storage

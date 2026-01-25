@@ -308,19 +308,42 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		putCmd := &cobra.Command{
 			Use:     "put --src /path/to/local_file --dst /path/to/remote_file",
 			GroupID: "filesystem",
-			Short:   "Upload a file to selected agent. Supports mem:// paths.",
+			Short:   "Upload a file to selected agent. Supports mem:///path/to/file paths.",
 			Example: "put --src /tmp/1.txt --dst /tmp/2.txt\nput --src /tmp/loader.so --dst mem:///tmp/loader.so",
 			Run:     ftp.CmdUploadToAgent,
 		}
 		putCmd.Flags().StringP("src", "s", "", "Local source file path")
-		putCmd.Flags().StringP("dst", "d", "", "Destination file path (mem:// will save to memory)")
-		putCmd.Flags().BoolP("mem", "m", false, "Save to memory on agent (optional if dst is mem://)")
+		putCmd.Flags().StringP("dst", "d", "", "Destination file path (mem:///path/to/file will save to memory)")
+		putCmd.Flags().BoolP("mem", "m", false, "Save to memory on agent (optional if dst is mem:///path/to/file)")
 		putCmd.MarkFlagRequired("src")
 		putCmd.MarkFlagRequired("dst")
 		rootCmd.AddCommand(putCmd)
 		carapace.Gen(putCmd).FlagCompletion(carapace.ActionMap{
 			"src": carapace.ActionFiles(),
 			"dst": carapace.ActionMultiParts("/", listRemoteDir),
+		})
+
+		decryptCmd := &cobra.Command{
+			Use:     "decrypt --path /path/to/file [--out /path/to/plaintext]",
+			GroupID: "filesystem",
+			Short:   "Decrypt a file on the agent and save it to disk (default: <path>.dec)",
+			Run: func(cmd *cobra.Command, args []string) {
+				path, _ := cmd.Flags().GetString("path")
+				out, _ := cmd.Flags().GetString("out")
+				cmdStr := fmt.Sprintf("decrypt --path '%s'", path)
+				if out != "" {
+					cmdStr += fmt.Sprintf(" --out '%s'", out)
+				}
+				executeCmd(cmdStr) // Helper to send command
+			},
+		}
+		decryptCmd.Flags().StringP("path", "p", "", "File path to decrypt")
+		decryptCmd.Flags().StringP("out", "o", "", "Output path for plaintext file")
+		decryptCmd.MarkFlagRequired("path")
+		rootCmd.AddCommand(decryptCmd)
+		carapace.Gen(decryptCmd).FlagCompletion(carapace.ActionMap{
+			"path": carapace.ActionMultiParts("/", listRemoteDir),
+			"out":  carapace.ActionMultiParts("/", listRemoteDir),
 		})
 
 		suicideCmd := &cobra.Command{

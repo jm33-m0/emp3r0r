@@ -181,5 +181,17 @@ func CoreCommands() *cobra.Command {
 	putCmd.Flags().BoolP("mem", "m", false, "Save file to memory")
 	rootCmd.AddCommand(putCmd)
 
+	decryptCmd := &cobra.Command{
+		Use:     "decrypt",
+		Short:   "Decrypt a file on the agent",
+		Run:     decryptCmdRun,
+		GroupID: "filesystem",
+	}
+	decryptCmd.Flags().StringP("path", "p", "", "File to decrypt")
+	decryptCmd.RegisterFlagCompletionFunc("path", memFileCompletion)
+	decryptCmd.Flags().StringP("out", "o", "", "Output path (default: <path>.dec)")
+	decryptCmd.RegisterFlagCompletionFunc("out", memFileCompletion)
+	rootCmd.AddCommand(decryptCmd)
+
 	return rootCmd
 }
