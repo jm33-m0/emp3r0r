@@ -125,7 +125,7 @@ func TestEstablishC2Connection(t *testing.T) {
 		t.Fatalf("Failed to sign UUID: %v", err)
 	}
 
-	c2URL := fmt.Sprintf("https://127.0.0.1:%d/", port)
+	c2URL := fmt.Sprintf("https://127.0.0.1:%d", port)
 	common.RuntimeConfig = &def.Config{
 		CCAddress:    c2URL,
 		AgentUUID:    agentUUID,
@@ -172,7 +172,7 @@ func TestEstablishC2Connection(t *testing.T) {
 	t.Log("Successfully checked in")
 
 	// Construct MsgAPI URL
-	msgURL := fmt.Sprintf("%s%s/%s", c2URL, transport.MsgAPI, "test-token")
+	msgURL := fmt.Sprintf("%s/%s/%s", c2URL, transport.MsgAPI, "test-token")
 
 	// Test EstablishC2Connection
 	conn, ctx, cancel, err := c2transport.EstablishC2Connection(msgURL)
