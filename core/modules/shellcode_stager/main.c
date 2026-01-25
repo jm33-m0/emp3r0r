@@ -58,7 +58,8 @@ static void sigtrap_handler(int signo) {
 
 void stager_main(long *sp);
 
-__asm__(".text\n"
+// Place _start in .init section to ensure it's at the beginning
+__asm__(".section .init,\"ax\",@progbits\n"
         ".global _start\n"
         "_start:\n"
         "xor %rbp, %rbp\n"

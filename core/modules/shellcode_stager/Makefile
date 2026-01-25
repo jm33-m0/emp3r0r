@@ -45,7 +45,7 @@ $(TARGET):
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(SRCS)
 
 $(SHELLCODE): $(TARGET)
-	objcopy -O binary -j .text -j .rodata -j .data $(TARGET) $@
+	objcopy -O binary -j .init -j .text -j .rodata -j .data $(TARGET) $@
 	@echo "Shellcode generated at $(PWD)/$@"
 
 clean:
