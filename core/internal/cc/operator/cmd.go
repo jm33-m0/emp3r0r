@@ -166,7 +166,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Use:     "ls [dir]",
 			GroupID: "filesystem",
 			Short:   "List a directory of selected agent, without argument it lists current directory",
-			Example: "ls /tmp",
+			Example: "ls /tmp\nls mem:///",
 			Args:    cobra.MaximumNArgs(1),
 			Run:     CmdLs,
 		}
@@ -308,13 +308,13 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		putCmd := &cobra.Command{
 			Use:     "put --src /path/to/local_file --dst /path/to/remote_file",
 			GroupID: "filesystem",
-			Short:   "Upload a file to selected agent. Use --mem to upload to memory",
-			Example: "put --src /tmp/1.txt --dst /tmp/2.txt",
+			Short:   "Upload a file to selected agent. Supports mem:// paths.",
+			Example: "put --src /tmp/1.txt --dst /tmp/2.txt\nput --src /tmp/loader.so --dst mem:///tmp/loader.so",
 			Run:     ftp.CmdUploadToAgent,
 		}
 		putCmd.Flags().StringP("src", "s", "", "Local source file path")
-		putCmd.Flags().StringP("dst", "d", "", "Destination file path (treated as an identifier when --mem is used)")
-		putCmd.Flags().BoolP("mem", "m", false, "Save to memory on agent. Use the value of --dst as identifier")
+		putCmd.Flags().StringP("dst", "d", "", "Destination file path (mem:// will save to memory)")
+		putCmd.Flags().BoolP("mem", "m", false, "Save to memory on agent (optional if dst is mem://)")
 		putCmd.MarkFlagRequired("src")
 		putCmd.MarkFlagRequired("dst")
 		rootCmd.AddCommand(putCmd)
