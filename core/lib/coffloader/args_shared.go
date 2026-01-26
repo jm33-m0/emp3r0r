@@ -49,8 +49,10 @@ func normalizeCoffValue(arg CoffArg) (string, error) {
 	val := arg.Value
 
 	switch wireType {
-	case "LPWSTR", "LPSTR":
+	case "LPWSTR":
 		return "z" + fmt.Sprint(val), nil
+	case "LPSTR", "S":
+		return "S" + fmt.Sprint(val), nil
 	case "BOOL":
 		switch v := val.(type) {
 		case bool:

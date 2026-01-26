@@ -18,6 +18,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"runtime"
 	"strconv"
 	"unicode/utf16"
 	"unsafe"
@@ -25,6 +26,10 @@ import (
 
 // RunLinuxCOFF executes an x86_64 ELF BOF payload on Linux using the Beacon arg format.
 func RunLinuxCOFF(payload []byte, export string, args []CoffArg) (string, error) {
+	// Lock OS thread for safety with signal handling (setjmp/longjmp)
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
 	if len(payload) == 0 {
 		return "", fmt.Errorf("empty payload")
 	}
@@ -119,11 +124,13 @@ func packLinuxArgs(args []string) ([]byte, error) {
 			}
 		case 'z':
 			u := utf16.Encode([]rune(arg[1:] + "\x00"))
-			if err := binary.Write(&body, binary.LittleEndian, uint32(len(u))); err != nil {
+			if err := binary.Write(&body, binary.LittleEndian, uint32(len(u)*2)); err != nil {
 				return nil, err
 			}
 			for _, r := range u {
-				body.WriteByte(byte(r))
+				if err := binary.Write(&body, binary.LittleEndian, r); err != nil {
+					return nil, err
+				}
 			}
 		case 'Z':
 			u := utf16.Encode([]rune(arg[1:]))
@@ -136,6 +143,14 @@ func packLinuxArgs(args []string) ([]byte, error) {
 				return nil, err
 			}
 			body.Write(buf)
+		case 'S':
+			// UTF-8 string (null terminated for convenience)
+			b := []byte(arg[1:])
+			b = append(b, 0)
+			if err := binary.Write(&body, binary.LittleEndian, uint32(len(b))); err != nil {
+				return nil, err
+			}
+			body.Write(b)
 		default:
 			return nil, fmt.Errorf("unknown arg prefix %q", arg[0])
 		}
