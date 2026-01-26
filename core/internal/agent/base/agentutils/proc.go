@@ -17,14 +17,3 @@ func getAgentProcess() *def.AgentProcess {
 
 	return p
 }
-
-// CheckExistingInstance is there any emp3r0r agent already running?
-// Deprecated: No longer using PID files
-func CheckExistingInstance() (bool, int) {
-	return false, -1
-}
-
-// SetProcessName rename agent process by modifying its argv, all cmdline args are dropped
-func SetProcessName(name string) {
-	util.SetProcName(name)
-}

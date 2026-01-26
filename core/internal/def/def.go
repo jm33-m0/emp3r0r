@@ -3,8 +3,6 @@ package def
 import (
 	"net"
 	"net/http"
-	"os"
-	"strconv"
 	"sync"
 
 	"github.com/posener/h2conn"
@@ -42,12 +40,6 @@ var (
 
 	// ProxyDone channel to signal proxy server exit
 	ProxyDone chan struct{}
-
-	// HIDE_PIDS all the processes
-	HIDE_PIDS = []string{strconv.Itoa(os.Getpid())}
-
-	// GuardianShellcode inject into a process to gain persistence
-	GuardianShellcode = ""
 
 	// will be updated by ReadJSONConfig
 
