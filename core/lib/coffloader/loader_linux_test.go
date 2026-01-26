@@ -4,6 +4,7 @@
 package coffloader
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -63,4 +64,132 @@ char *go(char *args, int size) { datap p; BeaconDataParse(&p, args, size); int i
 	if !strings.Contains(out, "Hello, Alice (25)!") || !strings.Contains(out, "[1337]") {
 		t.Fatalf("unexpected output: %q", out)
 	}
+}
+
+func TestHelloLinuxBOF(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		t.Skip("linux BOF loader test only supports amd64")
+	}
+
+	// Paths relative to core/lib/coffloader
+	moduleDir := "../../modules/hello_linux"
+	commonDir := "../../modules/bof_common"
+	srcPath := filepath.Join(moduleDir, "hello_linux.c")
+
+	if _, err := os.Stat(srcPath); os.IsNotExist(err) {
+		t.Skipf("hello_linux module source not found at %s", srcPath)
+	}
+
+	tmpDir := t.TempDir()
+	objPath := filepath.Join(tmpDir, "hello_linux.o")
+
+	// Use gcc for tests as zig cc generates problematic code for the loader
+	compiler := "gcc"
+	args := []string{}
+	if _, err := exec.LookPath("gcc"); err != nil {
+		t.Skip("gcc not found")
+	}
+
+	args = append(args, "-fPIC", "-c", "-I"+commonDir, "-fno-stack-protector", "-fvisibility=hidden")
+	args = append(args, srcPath, "-o", objPath)
+
+	cmd := exec.Command(compiler, args...)
+	cmd.Env = os.Environ()
+	t.Logf("Compiling with: %s %v", compiler, args)
+
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Skipf("Compilation failed: %v\nOutput: %s", err, string(out))
+	}
+
+	payload, err := os.ReadFile(objPath)
+	if err != nil {
+		t.Fatalf("read compiled object: %v", err)
+	}
+
+	// Test case: Hello with Name
+	t.Run("Greeting", func(t *testing.T) {
+		args := []CoffArg{
+			{WireType: "S", Value: "Unit Tester"},
+		}
+		out, err := RunLinuxCOFF(payload, "go", args)
+		if err != nil {
+			t.Fatalf("RunLinuxCOFF failed: %v", err)
+		}
+		t.Logf("Output: %s", out)
+		if !strings.Contains(out, "Hello Unit Tester!") {
+			t.Errorf("Unexpected output: %q", out)
+		}
+	})
+
+	// Test case: Empty
+	t.Run("Empty", func(t *testing.T) {
+		args := []CoffArg{
+			{WireType: "S", Value: ""},
+		}
+		out, err := RunLinuxCOFF(payload, "go", args)
+		if err != nil {
+			t.Fatalf("RunLinuxCOFF failed: %v", err)
+		}
+		t.Logf("Output: %s", out)
+		if !strings.Contains(out, "Hello World!") {
+			t.Errorf("Expected Hello World for empty input, got: %q", out)
+		}
+	})
+}
+
+func TestProcessListHandlesBOF(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		t.Skip("linux BOF loader test only supports amd64")
+	}
+
+	// Paths relative to core/lib/coffloader
+	moduleDir := "../../modules/process_list_handles_linux"
+	commonDir := "../../modules/bof_common"
+	srcPath := filepath.Join(moduleDir, "process_list_handles_linux.c")
+
+	if _, err := os.Stat(srcPath); os.IsNotExist(err) {
+		t.Skipf("process_list_handles_linux module source not found at %s", srcPath)
+	}
+
+	tmpDir := t.TempDir()
+	objPath := filepath.Join(tmpDir, "process_list_handles_linux.o")
+
+	// Use gcc
+	compiler := "gcc"
+	args := []string{"-fPIC", "-c", "-I" + commonDir, "-fno-stack-protector", "-fvisibility=hidden", srcPath, "-o", objPath}
+
+	cmd := exec.Command(compiler, args...)
+	cmd.Env = os.Environ()
+	t.Logf("Compiling with: %s %v", compiler, args)
+
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Skipf("Compilation failed: %v\nOutput: %s", err, string(out))
+	}
+
+	payload, err := os.ReadFile(objPath)
+	if err != nil {
+		t.Fatalf("read compiled object: %v", err)
+	}
+
+	// Test case: List handles for current process
+	t.Run("CurrentProcess", func(t *testing.T) {
+		pid := os.Getpid()
+		args := []CoffArg{
+			{WireType: "INT", Value: pid},
+		}
+		out, err := RunLinuxCOFF(payload, "go", args)
+		if err != nil {
+			t.Fatalf("RunLinuxCOFF failed: %v", err)
+		}
+		t.Logf("Output: %s", out)
+
+		expectedHeader := fmt.Sprintf("Listing handles for PID %d", pid)
+		if !strings.Contains(out, expectedHeader) {
+			t.Errorf("Output missing expected header: %q", out)
+		}
+		// Expect to see some file descriptors, e.g., "0 ->", "1 ->", "2 ->"
+		if !strings.Contains(out, " -> ") {
+			t.Errorf("Output missing handle list: %q", out)
+		}
+	})
 }
