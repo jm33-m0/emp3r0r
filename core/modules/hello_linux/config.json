@@ -1,0 +1,41 @@
+{
+    "name": "hello_linux",
+    "build": "make",
+    "author": "jm33-ng",
+    "date": "2026-01-26",
+    "comment": "Linux BOF Hello World",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+        {
+            "name": "who",
+            "description": "Who to greet",
+            "default": "World",
+            "type": "string",
+            "required": false
+        }
+    ],
+    "agent_config": {
+        "exec": "",
+        "files": [
+            "hello_linux.o"
+        ],
+        "in_memory": true,
+        "type": "coff",
+        "interactive": false
+    },
+    "invocation": {
+        "argv": [],
+        "coff": {
+            "export": "go",
+            "args": [
+                {
+                    "param": "who",
+                    "wire_type": "S"
+                }
+            ]
+        }
+    }
+}
