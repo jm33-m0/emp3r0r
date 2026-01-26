@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -209,6 +210,10 @@ func readAndEncryptConfig() ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal JSON config: %v", err)
 	}
+
+	// generate a random UUID for the agent
+	configStruct.AgentUUID = uuid.NewString()
+	logging.Infof("Generated agent UUID: %s", configStruct.AgentUUID)
 
 	cborBytes, err := cbor.Marshal(configStruct)
 	if err != nil {
