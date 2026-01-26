@@ -506,7 +506,14 @@ func TestPortFwdCmd(t *testing.T) {
 	rootCmd := C2Commands()
 
 	// Test PortFwd Reverse
-	port := "54322"
+	// Get a random port
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Failed to listen: %v", err)
+	}
+	port := fmt.Sprintf("%d", ln.Addr().(*net.TCPAddr).Port)
+	ln.Close()
+
 	rootCmd.SetArgs([]string{def.C2CmdPortFwd, "--to", port, "--shID", "test-session", "--operation", "reverse"})
 
 	if err := rootCmd.Execute(); err != nil {

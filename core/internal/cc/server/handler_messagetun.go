@@ -46,10 +46,10 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 		logging.Debugf("handleMessageTunnel exited")
 	}()
 	in := cbor.NewDecoder(conn)
-	var msg def.MsgTunData
 	go func() {
 		defer cancel()
 		for ctx.Err() == nil {
+			var msg def.MsgTunData
 			err = in.Decode(&msg)
 			if err != nil {
 				return
@@ -128,7 +128,7 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 	for ctx.Err() == nil {
 		lastHandshakeTime := time.Unix(atomic.LoadInt64(&lastHandshake), 0)
 		if time.Since(lastHandshakeTime) > 2*time.Minute {
-			operatorBroadcastPrintf(logging.WARN, "handleMessageTunnel: timeout for agent (%s)", msg.Tag)
+			operatorBroadcastPrintf(logging.WARN, "handleMessageTunnel: timeout for agent")
 			return
 		}
 		util.TakeABlink()

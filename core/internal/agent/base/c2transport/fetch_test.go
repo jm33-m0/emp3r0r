@@ -44,8 +44,9 @@ func TestFetchFile(t *testing.T) {
 	}
 
 	// 3. Test DownloadViaC2 (to Memory)
+	config := common.RuntimeConfig
 	t.Run("DownloadViaC2_Memory", func(t *testing.T) {
-		data, err := DownloadViaC2("test_file.txt", "", checksum)
+		data, err := DownloadViaC2(config, "test_file.txt", "", checksum)
 		if err != nil {
 			t.Fatalf("DownloadViaC2 failed: %v", err)
 		}
@@ -59,7 +60,7 @@ func TestFetchFile(t *testing.T) {
 		tmpFile := filepath.Join(os.TempDir(), "test_download.txt")
 		defer os.Remove(tmpFile)
 
-		_, err := DownloadViaC2("test_file.txt", tmpFile, checksum)
+		_, err := DownloadViaC2(config, "test_file.txt", tmpFile, checksum)
 		if err != nil {
 			t.Fatalf("DownloadViaC2 to disk failed: %v", err)
 		}
@@ -91,7 +92,7 @@ func TestFetchFile(t *testing.T) {
 		defer util.RemoveFileAgent(localPath)
 
 		// FetchFile should prefer local file if checksum matches
-		data, err := FetchFile("", "remote_name_ignored.txt", localPath, checksum)
+		data, err := FetchFile(config, "", "remote_name_ignored.txt", localPath, checksum)
 		if err != nil {
 			t.Fatalf("FetchFile local cache failed: %v", err)
 		}
@@ -103,7 +104,7 @@ func TestFetchFile(t *testing.T) {
 	// Test FetchFile fallback to C2
 	t.Run("FetchFile_Fallback_C2", func(t *testing.T) {
 		// No address -> fallback to DownloadViaC2
-		data, err := FetchFile("", "test_file.txt", "", checksum)
+		data, err := FetchFile(config, "", "test_file.txt", "", checksum)
 		if err != nil {
 			t.Fatalf("FetchFile fallback failed: %v", err)
 		}

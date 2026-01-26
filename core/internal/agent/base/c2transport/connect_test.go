@@ -168,7 +168,8 @@ func TestEstablishC2Connection(t *testing.T) {
 		UUID:      agentUUID,
 		UUIDSig:   agentSig,
 	}
-	err = c2transport.ReportStatus(agentInfo)
+	config := common.RuntimeConfig
+	err = c2transport.ReportStatus(config, agentInfo)
 	if err != nil {
 		t.Fatalf("ReportStatus failed: %v", err)
 	}
@@ -189,7 +190,7 @@ func TestEstablishC2Connection(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := c2transport.MsgTunneler(handler.HandleC2Command, ctx, cancel); err != nil {
+		if err := c2transport.MsgTunneler(conn, config, handler.HandleC2Command, ctx, cancel); err != nil {
 			t.Logf("CCMsgTun exited with error: %v", err)
 		}
 	}()
@@ -348,7 +349,8 @@ func TestDuplicatedCheckin(t *testing.T) {
 		UUID:    agentUUID,
 		UUIDSig: agentSig,
 	}
-	err = c2transport.ReportStatus(agentInfo)
+	config := common.RuntimeConfig
+	err = c2transport.ReportStatus(config, agentInfo)
 	if err != nil {
 		t.Fatalf("First ReportStatus failed: %v", err)
 	}
@@ -364,13 +366,14 @@ func TestDuplicatedCheckin(t *testing.T) {
 	defer cancel()
 
 	// Start MsgTun for the first agent so CC knows it has a non-nil Conn
-	go c2transport.MsgTunneler(func(data *def.MsgTunData) {}, ctx, cancel)
+	go c2transport.MsgTunneler(conn, config, func(data *def.MsgTunData) {}, ctx, cancel)
 
 	// Wait for CC to process the connection
 	time.Sleep(2 * time.Second)
 
 	// Second agent (same Tag) attempts to check in
-	err = c2transport.ReportStatus(agentInfo)
+	configDupe := common.RuntimeConfig
+	err = c2transport.ReportStatus(configDupe, agentInfo)
 	if err == nil {
 		t.Fatalf("Second ReportStatus should have failed")
 	}
@@ -473,7 +476,8 @@ func TestBackslashTag(t *testing.T) {
 		UUID:    agentUUID,
 		UUIDSig: agentSig,
 	}
-	err = c2transport.ReportStatus(agentInfo)
+	config := common.RuntimeConfig
+	err = c2transport.ReportStatus(config, agentInfo)
 	if err != nil {
 		t.Fatalf("ReportStatus failed with backslash tag: %v", err)
 	}
@@ -575,7 +579,8 @@ func TestEmptyUUID(t *testing.T) {
 		UUID:    agentUUID,
 		UUIDSig: agentSig,
 	}
-	err = c2transport.ReportStatus(agentInfo)
+	config := common.RuntimeConfig
+	err = c2transport.ReportStatus(config, agentInfo)
 	if err == nil {
 		t.Fatalf("ReportStatus matched with empty UUID??")
 	}
@@ -677,7 +682,8 @@ func TestNewAgentCheckin(t *testing.T) {
 		UUID:    agentUUID,
 		UUIDSig: agentSig,
 	}
-	err = c2transport.ReportStatus(agentInfo)
+	config := common.RuntimeConfig
+	err = c2transport.ReportStatus(config, agentInfo)
 	if err != nil {
 		t.Fatalf("ReportStatus failed for new agent: %v", err)
 	}

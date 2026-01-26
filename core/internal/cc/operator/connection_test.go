@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
@@ -64,7 +65,12 @@ func TestOperatorConnection(t *testing.T) {
 	}
 
 	// Pick a random port
-	port := 54321
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Failed to listen: %v", err)
+	}
+	port := ln.Addr().(*net.TCPAddr).Port
+	ln.Close()
 	OPERATOR_PORT = port
 
 	// Start Operator mTLS Server

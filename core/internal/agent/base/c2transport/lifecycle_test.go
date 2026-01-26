@@ -126,7 +126,9 @@ func TestFullAgentLifecycle(t *testing.T) {
 		UUID:      agentUUID,
 		UUIDSig:   agentSig,
 	}
-	err = c2transport.ReportStatus(agentInfo)
+	// Check-in
+	config := common.RuntimeConfig
+	err = c2transport.ReportStatus(config, agentInfo)
 	if err != nil {
 		t.Fatalf("ReportStatus failed: %v", err)
 	}
@@ -154,7 +156,7 @@ func TestFullAgentLifecycle(t *testing.T) {
 
 	// We'll wrap MsgTunneler to count success responses in def.HandShakes
 	go func() {
-		if err := c2transport.MsgTunneler(mockCallback, ctx, cancel); err != nil {
+		if err := c2transport.MsgTunneler(conn, config, mockCallback, ctx, cancel); err != nil {
 			if !strings.Contains(err.Error(), "context canceled") {
 				t.Errorf("MsgTunneler exited with unexpected error: %v", err)
 			}

