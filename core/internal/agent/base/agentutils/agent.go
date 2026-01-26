@@ -43,7 +43,8 @@ func CheckAgentAlive(c net.Conn) bool {
 
 	// send hello to agent
 	for ctx.Err() == nil {
-		_, err := fmt.Fprintf(c, "%d", os.Getpid())
+		reply := fmt.Sprintf("ALIVE running on PID %d", os.Getpid())
+		_, err := fmt.Fprintf(c, "%s", reply)
 		if err != nil {
 			logging.Printf("Write error: %v, agent is likely to be dead", err)
 			break
@@ -53,7 +54,7 @@ func CheckAgentAlive(c net.Conn) bool {
 			logging.Printf("Agent told me to die (%d)", os.Getpid())
 			os.Exit(0)
 		}
-		if strings.Contains(resp, def.TransportString) {
+		if strings.Contains(resp, "ALIVE") {
 			logging.Println("Yes it's alive")
 			return true
 		}

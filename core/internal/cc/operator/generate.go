@@ -310,6 +310,30 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 	if live.RuntimeConfig.DoHServer != "" {
 		logging.Printf("Using DoH server %s", live.RuntimeConfig.DoHServer)
 	}
+
+	// malleable C2
+	if live.RuntimeConfig.C2Prefix == "" {
+		live.RuntimeConfig.C2Prefix = util.RandStr(util.RandInt(3, 10))
+	}
+	if live.RuntimeConfig.CheckInPath == "" {
+		live.RuntimeConfig.CheckInPath = util.RandStr(util.RandInt(5, 15))
+	}
+	if live.RuntimeConfig.MsgPath == "" {
+		live.RuntimeConfig.MsgPath = util.RandStr(util.RandInt(5, 15))
+	}
+	if live.RuntimeConfig.UserAgent == "" {
+		live.RuntimeConfig.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.3"
+	}
+	if live.RuntimeConfig.PaddingMin == 0 {
+		live.RuntimeConfig.PaddingMin = 1024
+	}
+	if live.RuntimeConfig.PaddingMax == 0 {
+		live.RuntimeConfig.PaddingMax = 10240
+	}
+	if live.RuntimeConfig.Jitter == 0 {
+		live.RuntimeConfig.Jitter = 20
+	}
+
 	if proxy_chain {
 		if !cmd.Flags().Changed("proxychain-wait-min") {
 			proxy_chain_min = util.RandInt(30, 120)

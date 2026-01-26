@@ -52,7 +52,7 @@ func socket_server(c net.Conn) {
 			}
 		}
 
-		reply := fmt.Sprintf("%s running on PID %d", def.TransportString, os.Getpid())
+		reply := fmt.Sprintf("ALIVE running on PID %d", os.Getpid())
 		if len(AgentWaitQueue) > 3 {
 			logging.Printf("Wait queue (sorted): %v", AgentWaitQueue)
 			logging.Println("Too many agents waiting, will start to kill...")

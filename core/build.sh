@@ -28,7 +28,7 @@ build_dir="$data_dir/build"
 temp=/tmp/emp3r0r-build
 [[ -d "$temp" ]] || mkdir -p "$temp"
 magic_str="$(head -c 32 </dev/urandom | sha256sum | awk '{print $1}')"
-transport_str="$(head -c 32 </dev/urandom | sha256sum | awk '{print $1}')"
+magic_str="$(head -c 32 </dev/urandom | sha256sum | awk '{print $1}')"
 
 # GOPATH
 [[ -z "$GOPATH" ]] && export GOPATH="$HOME/go"
@@ -177,7 +177,6 @@ build() {
   check_zig
 
   ldflags="-v -X 'github.com/jm33-m0/emp3r0r/core/internal/def.MagicString=$magic_str'"
-  ldflags+=" -X 'github.com/jm33-m0/emp3r0r/core/internal/def.TransportString=$transport_str'"
   ldflags+=" -X 'github.com/jm33-m0/emp3r0r/core/internal/def.Version=$(get_version)'"
   if [[ "$1" = "--debug" ]]; then
     gobuild_cmd="go"

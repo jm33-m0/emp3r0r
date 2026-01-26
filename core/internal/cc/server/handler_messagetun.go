@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -47,7 +46,6 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 		logging.Debugf("handleMessageTunnel exited")
 	}()
 	in := cbor.NewDecoder(conn)
-	out := cbor.NewEncoder(conn)
 	var msg def.MsgTunData
 	go func() {
 		defer cancel()
@@ -56,69 +54,7 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 			if err != nil {
 				return
 			}
-			cmd := ""
-			if len(msg.CmdSlice) != 0 {
-				cmd = msg.CmdSlice[0]
-			}
-			if strings.HasPrefix(cmd, def.TransportString) {
-				// verify hello
-				if len(msg.CmdSlice) < 3 {
-					logging.Warningf("Invalid hello from %s: missing UUID/Sig", msg.Tag)
-					return
-				}
-				agent_uuid := msg.CmdSlice[1]
-				agent_sig_str := msg.CmdSlice[2]
-				agent_sig, err := base64.URLEncoding.DecodeString(agent_sig_str)
-				if err != nil {
-					logging.Warningf("Failed to decode agent sig: %v", err)
-					return
-				}
-				isValid, err := transport.VerifySignatureWithCA([]byte(agent_uuid), agent_sig)
-				if err != nil {
-					logging.Warningf("Failed to verify agent uuid: %v", err)
-					return
-				}
-				if !isValid {
-					logging.Warningf("Invalid agent uuid, refusing request")
-					return
-				}
-
-				reply := msg
-				reply.CmdSlice = msg.CmdSlice
-				reply.CmdID = msg.CmdID
-				reply.Response = []byte(def.TransportString + util.RandStr(util.RandInt(1, 10)))
-				err = out.Encode(reply)
-				if err != nil {
-					logging.Warningf("Failed to answer hello to agent %s", msg.Tag)
-					return
-				}
-				atomic.StoreInt64(&lastHandshake, time.Now().Unix())
-			} else {
-				// if it's not a hello, check if it's an outdated agent with wrong prefix
-				// a hello message has 4 elements in CmdSlice
-				if len(msg.CmdSlice) == 4 {
-					agent_uuid := msg.CmdSlice[1]
-					agent_sig_str := msg.CmdSlice[2]
-					agent_sig, err := base64.URLEncoding.DecodeString(agent_sig_str)
-					if err == nil {
-						isValid, _ := transport.VerifySignatureWithCA([]byte(agent_uuid), agent_sig)
-						if isValid {
-							operatorBroadcastPrintf(logging.WARN,
-								"Handshake failed for %s: prefix mismatch (expected %q, got %q). The agent binary might be outdated.",
-								strconv.Quote(msg.Tag), def.TransportString, cmd)
-							logging.Warningf("Handshake failed for %s: prefix mismatch (expected %q, got %q). The agent binary might be outdated.",
-								msg.Tag, def.TransportString, cmd)
-						}
-					}
-				}
-
-				// forward message to operators
-				err = fwdMsg2Operators(msg)
-				if err != nil {
-					logging.Errorf("Failed to forward message to operator: %v", err)
-					return
-				}
-			}
+			// find agent
 			var agent *def.Emp3r0rAgent
 			for i := 0; i < 5; i++ {
 				agent = agents.GetAgentByTag(msg.Tag)
@@ -142,6 +78,36 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 			live.AgentControlMap[agent].Ctx = ctx
 			live.AgentControlMap[agent].Cancel = cancel
 			live.AgentControlMapMutex.Unlock()
+
+			// check if it is a hello message
+			if len(msg.CmdSlice) >= 2 { // A hello message should at least contain UUID and signature
+				agent_uuid := msg.CmdSlice[0]
+				agent_sig_str := msg.CmdSlice[1]
+				agent_sig, err := base64.URLEncoding.DecodeString(agent_sig_str)
+				if err == nil {
+					isValid, _ := transport.VerifySignatureWithCA([]byte(agent_uuid), agent_sig)
+					if isValid {
+						// verify hello
+						logging.Debugf("Handshake from %s successful", msg.Tag)
+						// respond with random data, encoded in CBOR
+						reply := util.RandBytes(util.RandInt(10, 100))
+						encoder := cbor.NewEncoder(wrt)
+						err = encoder.Encode(reply)
+						if err != nil {
+							logging.Warningf("handleMessageTunnel: %v", err)
+						}
+						atomic.StoreInt64(&lastHandshake, time.Now().Unix())
+						continue // Handshake handled, next message
+					}
+				}
+			}
+
+			// if not a handshake, forward message to operators
+			err = fwdMsg2Operators(msg)
+			if err != nil {
+				logging.Warningf("handleMessageTunnel: %v", err)
+				return
+			}
 		}
 	}()
 	for ctx.Err() == nil {

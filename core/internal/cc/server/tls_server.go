@@ -24,7 +24,11 @@ func StartC2AgentTLSServer() {
 	}
 	r := mux.NewRouter()
 	transport.CACrtPEM = []byte(live.RuntimeConfig.CAPEM)
-	r.HandleFunc(fmt.Sprintf("/%s/{api}/{token}", transport.WebRoot), apiDispatcher)
+	prefix := live.RuntimeConfig.C2Prefix
+	if prefix == "" {
+		prefix = transport.WebRoot
+	}
+	r.HandleFunc(fmt.Sprintf("/%s/{api}/{token}", prefix), apiDispatcher)
 	if network.EmpTLSServer != nil {
 		network.EmpTLSServer.Shutdown(network.EmpTLSServerCtx)
 	}

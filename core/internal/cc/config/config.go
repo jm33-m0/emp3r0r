@@ -51,6 +51,14 @@ func SaveConfigJSON() (err error) {
 		"agent_uuid_sig":                     live.RuntimeConfig.AgentUUIDSig,
 		"agent_tag":                          live.RuntimeConfig.AgentTag,
 		"cc_timeout":                         live.RuntimeConfig.CCTimeout,
+		"c2_prefix":                          live.RuntimeConfig.C2Prefix,
+		"checkin_path":                       live.RuntimeConfig.CheckInPath,
+		"msg_path":                           live.RuntimeConfig.MsgPath,
+		"user_agent":                         live.RuntimeConfig.UserAgent,
+		"c2_headers":                         live.RuntimeConfig.C2Headers,
+		"padding_min":                        live.RuntimeConfig.PaddingMin,
+		"padding_max":                        live.RuntimeConfig.PaddingMax,
+		"jitter":                             live.RuntimeConfig.Jitter,
 	}
 
 	w_data, err := json.MarshalIndent(configMap, "", "  ")
@@ -108,6 +116,29 @@ func InitConfigFile(cc_host string) (err error) {
 	}
 	live.RuntimeConfig.AgentUUIDSig = base64.URLEncoding.EncodeToString(sig)
 	live.RuntimeConfig.AgentTag = live.RuntimeConfig.AgentUUID
+
+	// malleable C2
+	if live.RuntimeConfig.C2Prefix == "" {
+		live.RuntimeConfig.C2Prefix = util.RandStr(util.RandInt(3, 10))
+	}
+	if live.RuntimeConfig.CheckInPath == "" {
+		live.RuntimeConfig.CheckInPath = util.RandStr(util.RandInt(5, 15))
+	}
+	if live.RuntimeConfig.MsgPath == "" {
+		live.RuntimeConfig.MsgPath = util.RandStr(util.RandInt(5, 15))
+	}
+	if live.RuntimeConfig.UserAgent == "" {
+		live.RuntimeConfig.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.3"
+	}
+	if live.RuntimeConfig.PaddingMin == 0 {
+		live.RuntimeConfig.PaddingMin = 1024
+	}
+	if live.RuntimeConfig.PaddingMax == 0 {
+		live.RuntimeConfig.PaddingMax = 10240
+	}
+	if live.RuntimeConfig.Jitter == 0 {
+		live.RuntimeConfig.Jitter = 20
+	}
 
 	// save
 	return SaveConfigJSON()

