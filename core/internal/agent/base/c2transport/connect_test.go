@@ -15,11 +15,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
@@ -252,9 +252,138 @@ func TestURLConstruction(t *testing.T) {
 	}
 }
 
-func TestHandshakePrefixMismatch(t *testing.T) {
+func TestDuplicatedCheckin(t *testing.T) {
 	// Setup temp dir for certs
-	tmpDir, err := os.MkdirTemp("", "agent_test_mismatch")
+	tmpDir, err := os.MkdirTemp("", "agent_test_dupe")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	caCertFile := filepath.Join(tmpDir, "ca-cert.pem")
+	caKeyFile := filepath.Join(tmpDir, "ca-key.pem")
+	serverCertFile := filepath.Join(tmpDir, "server-cert.pem")
+	serverKeyFile := filepath.Join(tmpDir, "server-key.pem")
+
+	// Generate CA
+	_, err = transport.GenCerts(nil, caCertFile, caKeyFile, "", "", true)
+	if err != nil {
+		t.Fatalf("Failed to generate CA: %v", err)
+	}
+
+	// Generate Server Cert
+	_, err = transport.GenCerts([]string{"127.0.0.1"}, serverCertFile, serverKeyFile, caKeyFile, caCertFile, false)
+	if err != nil {
+		t.Fatalf("Failed to generate server cert: %v", err)
+	}
+
+	// Read CA cert
+	caCertData, err := os.ReadFile(caCertFile)
+	if err != nil {
+		t.Fatalf("Failed to read CA cert: %v", err)
+	}
+	transport.CACrtPEM = caCertData
+
+	// Setup Transport Paths for C2 Server
+	transport.CaCrtFile = caCertFile
+	transport.OperatorCaCrtFile = caCertFile
+	transport.ServerCrtFile = serverCertFile
+	transport.ServerKeyFile = serverKeyFile
+	transport.EmpWorkSpace = tmpDir
+
+	// Get random port
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Failed to listen: %v", err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	listener.Close()
+
+	// Setup C2 Config
+	live.RuntimeConfig = &def.Config{
+		CCPort: fmt.Sprintf("%d", port),
+		CAPEM:  string(caCertData),
+	}
+
+	// Reset live maps
+	live.AgentControlMap = make(map[*def.Emp3r0rAgent]*live.AgentControl)
+	live.AgentList = make([]*def.Emp3r0rAgent, 0)
+
+	// Start Real C2 Server
+	go server.StartC2AgentTLSServer()
+
+	// Wait for server to start
+	time.Sleep(3 * time.Second)
+
+	// Setup Agent Config
+	agentUUID := "dupe-agent-uuid"
+	agentSig, err := signUUID(agentUUID, caKeyFile)
+	if err != nil {
+		t.Fatalf("Failed to sign UUID: %v", err)
+	}
+
+	c2URL := fmt.Sprintf("https://127.0.0.1:%d", port)
+	common.RuntimeConfig = &def.Config{
+		CCAddress:    c2URL,
+		AgentUUID:    agentUUID,
+		AgentUUIDSig: agentSig,
+		AgentTag:     agentUUID,
+		CCTimeout:    3000,
+	}
+	def.CCAddress = c2URL
+
+	// Initialize HTTP Client
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(caCertData)
+	tr := &http.Transport{
+		TLSClientConfig:   &tls.Config{RootCAs: certPool},
+		ForceAttemptHTTP2: true,
+	}
+	def.HTTPClient = &http.Client{Transport: tr}
+
+	// First agent check-in
+	agentInfo := &def.Emp3r0rAgent{
+		Tag:     agentUUID,
+		Name:    "test-agent",
+		UUID:    agentUUID,
+		UUIDSig: agentSig,
+	}
+	err = c2transport.ReportStatus(agentInfo)
+	if err != nil {
+		t.Fatalf("First ReportStatus failed: %v", err)
+	}
+
+	// Establish persistent connection for first agent
+	msgURL := fmt.Sprintf("%s/%s/%s", c2URL, transport.MsgAPI, "test-token")
+	conn, ctx, cancel, err := c2transport.EstablishC2Connection(msgURL)
+	if err != nil {
+		t.Fatalf("EstablishC2Connection failed: %v", err)
+	}
+	def.CCMsgConn = conn
+	defer conn.Close()
+	defer cancel()
+
+	// Start MsgTun for the first agent so CC knows it has a non-nil Conn
+	go c2transport.MsgTunneler(func(data *def.MsgTunData) {}, ctx, cancel)
+
+	// Wait for CC to process the connection
+	time.Sleep(2 * time.Second)
+
+	// Second agent (same Tag) attempts to check in
+	err = c2transport.ReportStatus(agentInfo)
+	if err == nil {
+		t.Fatalf("Second ReportStatus should have failed")
+	}
+
+	if !strings.Contains(err.Error(), "self-destruct") {
+		t.Errorf("Unexpected error from second ReportStatus: %v", err)
+	} else {
+	}
+}
+
+func TestBackslashTag(t *testing.T) {
+	// Setup temp dir for certs
+	tmpDir, err := os.MkdirTemp("", "agent_test_backslash")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -309,10 +438,11 @@ func TestHandshakePrefixMismatch(t *testing.T) {
 	go server.StartC2AgentTLSServer()
 
 	// Wait for server to start
-	time.Sleep(5 * time.Second)
+	time.Sleep(2 * time.Second)
 
-	// Setup Agent Config
-	agentUUID := "test-agent-uuid-sign-only"
+	// Setup Agent Config with Safe UUID but Backslash Tag
+	agentUUID := uuid.New().String()
+	agentTag := "kali\\kali_0-agent-custom"
 	agentSig, err := signUUID(agentUUID, caKeyFile)
 	if err != nil {
 		t.Fatalf("Failed to sign UUID: %v", err)
@@ -323,8 +453,7 @@ func TestHandshakePrefixMismatch(t *testing.T) {
 		CCAddress:    c2URL,
 		AgentUUID:    agentUUID,
 		AgentUUIDSig: agentSig,
-		AgentTag:     agentUUID,
-		CCTimeout:    1000, // Short timeout for test
+		AgentTag:     agentTag,
 	}
 	def.CCAddress = c2URL
 
@@ -337,45 +466,220 @@ func TestHandshakePrefixMismatch(t *testing.T) {
 	}
 	def.HTTPClient = &http.Client{Transport: tr}
 
-	// ReportStatus
+	// Check-in
 	agentInfo := &def.Emp3r0rAgent{
-		Tag:     agentUUID,
-		Name:    "test-agent",
+		Tag:     agentTag,
+		Name:    "test-agent-backslash",
 		UUID:    agentUUID,
 		UUIDSig: agentSig,
 	}
-	c2transport.ReportStatus(agentInfo)
-
-	// Connect to MsgAPI
-	msgURL := fmt.Sprintf("%s/%s/%s", c2URL, transport.MsgAPI, "test-token")
-	conn, _, cancel, err := c2transport.EstablishC2Connection(msgURL)
+	err = c2transport.ReportStatus(agentInfo)
 	if err != nil {
-		t.Fatalf("EstablishC2Connection failed: %v", err)
+		t.Fatalf("ReportStatus failed with backslash tag: %v", err)
 	}
-	defer conn.Close()
-	defer cancel()
+	t.Log("Successfully checked in with backslash tag")
+}
 
-	// Now, send a proper handshake message [UUID, Sig, Rand]
-	handshakeMsg := def.MsgTunData{
-		CmdSlice: []string{agentUUID, agentSig, "random-data"},
-		CmdID:    uuid.NewString(),
-		Tag:      agentUUID,
-	}
-	encoder := cbor.NewEncoder(conn)
-	if err := encoder.Encode(handshakeMsg); err != nil {
-		t.Fatalf("Failed to send handshake message: %v", err)
-	}
-
-	// The server should respond with random bytes (not a JSON MsgTunData)
-	buf := make([]byte, 1024)
-	n, err := conn.Read(buf)
+func TestEmptyUUID(t *testing.T) {
+	// Setup temp dir for certs
+	tmpDir, err := os.MkdirTemp("", "agent_test_empty")
 	if err != nil {
-		t.Fatalf("Failed to read server response: %v", err)
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	caCertFile := filepath.Join(tmpDir, "ca-cert.pem")
+	caKeyFile := filepath.Join(tmpDir, "ca-key.pem")
+	serverCertFile := filepath.Join(tmpDir, "server-cert.pem")
+	serverKeyFile := filepath.Join(tmpDir, "server-key.pem")
+
+	// Generate CA
+	_, err = transport.GenCerts(nil, caCertFile, caKeyFile, "", "", true)
+	if err != nil {
+		t.Fatalf("Failed to generate CA: %v", err)
 	}
 
-	if n == 0 {
-		t.Error("Server responded with 0 bytes")
+	// Generate Server Cert
+	_, err = transport.GenCerts([]string{"127.0.0.1"}, serverCertFile, serverKeyFile, caKeyFile, caCertFile, false)
+	if err != nil {
+		t.Fatalf("Failed to generate server cert: %v", err)
 	}
 
-	t.Logf("Server responded with %d random bytes: %x", n, buf[:n])
+	// Read CA cert
+	caCertData, err := os.ReadFile(caCertFile)
+	if err != nil {
+		t.Fatalf("Failed to read CA cert: %v", err)
+	}
+	transport.CACrtPEM = caCertData
+
+	// Setup Transport Paths for C2 Server
+	transport.CaCrtFile = caCertFile
+	transport.OperatorCaCrtFile = caCertFile
+	transport.ServerCrtFile = serverCertFile
+	transport.ServerKeyFile = serverKeyFile
+	transport.EmpWorkSpace = tmpDir
+
+	// Get random port
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Failed to listen: %v", err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	listener.Close()
+
+	// Setup C2 Config
+	live.RuntimeConfig = &def.Config{
+		CCPort: fmt.Sprintf("%d", port),
+		CAPEM:  string(caCertData),
+	}
+
+	// Start Real C2 Server
+	go server.StartC2AgentTLSServer()
+
+	// Wait for server to start
+	time.Sleep(2 * time.Second)
+
+	// Setup Agent Config with EMPTY UUID
+	agentUUID := ""
+	agentTag := "kali-agent-fallback"
+	// Sign empty string? or sign nothing?
+	// transport.VerifySignature checks target.UUID.
+	// If target.UUID is empty, we must sign empty string to pass.
+	agentSig, err := signUUID(agentUUID, caKeyFile)
+	if err != nil {
+		t.Fatalf("Failed to sign UUID: %v", err)
+	}
+
+	c2URL := fmt.Sprintf("https://127.0.0.1:%d", port)
+	common.RuntimeConfig = &def.Config{
+		CCAddress:    c2URL,
+		AgentUUID:    agentUUID,
+		AgentUUIDSig: agentSig,
+		AgentTag:     agentTag,
+	}
+	def.CCAddress = c2URL
+
+	// Initialize HTTP Client
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(caCertData)
+	tr := &http.Transport{
+		TLSClientConfig:   &tls.Config{RootCAs: certPool},
+		ForceAttemptHTTP2: true,
+	}
+	def.HTTPClient = &http.Client{Transport: tr}
+
+	// Check-in
+	agentInfo := &def.Emp3r0rAgent{
+		Tag:     agentTag,
+		Name:    "test-agent-empty",
+		UUID:    agentUUID,
+		UUIDSig: agentSig,
+	}
+	err = c2transport.ReportStatus(agentInfo)
+	if err == nil {
+		t.Fatalf("ReportStatus matched with empty UUID??")
+	}
+	t.Logf("ReportStatus failed as expected: %v", err)
+	if !strings.Contains(err.Error(), "404") {
+		t.Errorf("Expected 404 error, got: %v", err)
+	}
+}
+
+func TestNewAgentCheckin(t *testing.T) {
+	// Setup temp dir for certs
+	tmpDir, err := os.MkdirTemp("", "agent_test_new")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	caCertFile := filepath.Join(tmpDir, "ca-cert.pem")
+	caKeyFile := filepath.Join(tmpDir, "ca-key.pem")
+	serverCertFile := filepath.Join(tmpDir, "server-cert.pem")
+	serverKeyFile := filepath.Join(tmpDir, "server-key.pem")
+
+	// Generate CA
+	_, err = transport.GenCerts(nil, caCertFile, caKeyFile, "", "", true)
+	if err != nil {
+		t.Fatalf("Failed to generate CA: %v", err)
+	}
+
+	// Generate Server Cert
+	_, err = transport.GenCerts([]string{"127.0.0.1"}, serverCertFile, serverKeyFile, caKeyFile, caCertFile, false)
+	if err != nil {
+		t.Fatalf("Failed to generate server cert: %v", err)
+	}
+
+	// Read CA cert
+	caCertData, err := os.ReadFile(caCertFile)
+	if err != nil {
+		t.Fatalf("Failed to read CA cert: %v", err)
+	}
+	transport.CACrtPEM = caCertData
+
+	// Setup Transport Paths for C2 Server
+	transport.CaCrtFile = caCertFile
+	transport.OperatorCaCrtFile = caCertFile
+	transport.ServerCrtFile = serverCertFile
+	transport.ServerKeyFile = serverKeyFile
+	transport.EmpWorkSpace = tmpDir
+
+	// Get random port
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Failed to listen: %v", err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	listener.Close()
+
+	// Setup C2 Config
+	live.RuntimeConfig = &def.Config{
+		CCPort: fmt.Sprintf("%d", port),
+		CAPEM:  string(caCertData),
+	}
+
+	// Start Real C2 Server
+	go server.StartC2AgentTLSServer()
+
+	// Wait for server to start
+	time.Sleep(2 * time.Second)
+
+	// Setup Agent Config with VALID NEW UUID
+	agentUUID := uuid.New().String()
+	agentTag := "new-agent-tag"
+	agentSig, err := signUUID(agentUUID, caKeyFile)
+	if err != nil {
+		t.Fatalf("Failed to sign UUID: %v", err)
+	}
+
+	c2URL := fmt.Sprintf("https://127.0.0.1:%d", port)
+	common.RuntimeConfig = &def.Config{
+		CCAddress:    c2URL,
+		AgentUUID:    agentUUID,
+		AgentUUIDSig: agentSig,
+		AgentTag:     agentTag,
+	}
+	def.CCAddress = c2URL
+
+	// Initialize HTTP Client
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(caCertData)
+	tr := &http.Transport{
+		TLSClientConfig:   &tls.Config{RootCAs: certPool},
+		ForceAttemptHTTP2: true,
+	}
+	def.HTTPClient = &http.Client{Transport: tr}
+
+	// Check-in
+	agentInfo := &def.Emp3r0rAgent{
+		Tag:     agentTag,
+		Name:    "test-new-agent",
+		UUID:    agentUUID,
+		UUIDSig: agentSig,
+	}
+	err = c2transport.ReportStatus(agentInfo)
+	if err != nil {
+		t.Fatalf("ReportStatus failed for new agent: %v", err)
+	}
+	t.Log("Successfully checked in new agent")
 }

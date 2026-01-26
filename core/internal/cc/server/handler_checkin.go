@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/gorilla/mux"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -19,6 +20,25 @@ import (
 
 // handleAgentCheckIn processes agent check-in requests.
 func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
+	// check if agent is already connected (duplicated checkin)
+	// strictly by tag (token in URL)
+	vars := mux.Vars(req)
+	token := vars["token"]
+	if token != "" && agents.IsAgentExistByUUID(token) {
+		agent := agents.GetAgentByUUID(token)
+		if agent != nil {
+			live.AgentControlMapMutex.RLock()
+			ctrl := live.AgentControlMap[agent]
+			if ctrl != nil && ctrl.Conn != nil {
+				logging.Warningf("handleAgentCheckIn: %s already connected, refusing duplicated checkin", token)
+				wrt.WriteHeader(http.StatusForbidden)
+				live.AgentControlMapMutex.RUnlock()
+				return
+			}
+			live.AgentControlMapMutex.RUnlock()
+		}
+	}
+
 	conn, err := h2conn.Accept(wrt, req)
 	defer func() {
 		_ = conn.Close()
@@ -70,8 +90,13 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 		logging.Printf("Checked in: %s from %s, running %s", strconv.Quote(shortname), fmt.Sprintf("'%s - %s'", target.From, target.Transport), strconv.Quote(target.OS))
 	} else {
 		var existingKey *def.Emp3r0rAgent
-		for a := range live.AgentControlMap {
+		for a, ctrl := range live.AgentControlMap {
 			if a.Tag == target.Tag {
+				// if agent is already connected, it must be the same instance
+				// because we already checked for duplications
+				if ctrl.Conn != nil {
+					logging.Warningf("handleAgentCheckIn: %s just connected, but state says it is already connected. This implies a race condition or logic error.", target.Tag)
+				}
 				*a = target
 				existingKey = a
 				break

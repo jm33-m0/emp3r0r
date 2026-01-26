@@ -1,68 +1,15 @@
 package agentutils
 
 import (
-	"context"
 	"fmt"
-	"io"
-	"net"
 	"net/url"
-	"os"
-	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
-
-// CheckAgentAlive is the agent alive?
-// connect to emp3r0r_def.SocketName, send a message, see if we get a reply
-func CheckAgentAlive(c net.Conn) bool {
-	logging.Println("Testing if agent is alive...")
-	defer c.Close()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	replyFromAgent := make(chan string, 1)
-	reader := func(r io.Reader) {
-		buf := make([]byte, 1024)
-		for ctx.Err() == nil {
-			n, err := r.Read(buf[:])
-			if err != nil {
-				logging.Printf("Read error: %v", err)
-				cancel()
-			}
-			replyFromAgent <- string(buf[0:n])
-		}
-	}
-
-	// listen for reply from agent
-	go reader(c)
-
-	// send hello to agent
-	for ctx.Err() == nil {
-		reply := fmt.Sprintf("ALIVE running on PID %d", os.Getpid())
-		_, err := fmt.Fprintf(c, "%s", reply)
-		if err != nil {
-			logging.Printf("Write error: %v, agent is likely to be dead", err)
-			break
-		}
-		resp := <-replyFromAgent
-		if strings.Contains(resp, "kill yourself") {
-			logging.Printf("Agent told me to die (%d)", os.Getpid())
-			os.Exit(0)
-		}
-		if strings.Contains(resp, "ALIVE") {
-			logging.Println("Yes it's alive")
-			return true
-		}
-		util.TakeASnap()
-	}
-
-	return false
-}
 
 // set C2Transport string
 func genC2TransportString() (transport_str string) {

