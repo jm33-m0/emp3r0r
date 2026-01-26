@@ -1,5 +1,5 @@
-//go:build cgo
-// +build cgo
+//go:build cgo && emp3r0r_so
+// +build cgo,emp3r0r_so
 
 package main
 

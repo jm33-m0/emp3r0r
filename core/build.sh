@@ -1,21 +1,20 @@
 #!/bin/bash
 
 success() {
-  echo -e "\n\e[32m[SUCCESS] $1\e[0m\n"
+  printf "\n\e[32m[SUCCESS] %s\e[0m\n\n" "$1"
 }
 
 info() {
-  echo -e "\e[34m[INFO] $1\e[0m"
+  printf "\e[34m[INFO] %s\e[0m\n" "$1"
 }
 
 error() {
-  echo -e "\n\e[31m[ERROR] $1\e[0m\n"
-
+  printf "\n\e[31m[ERROR] %s\e[0m\n\n" "$1"
   exit 1
 }
 
 warn() {
-  echo -e "\e[33m[WARN] $1\e[0m"
+  printf "\e[33m[WARN] %s\e[0m\n" "$1"
 }
 
 pwd="$(pwd)"
@@ -62,12 +61,37 @@ build_agent_stub() {
   local win_gui_flag=""
   [[ "$arg1" != "--debug" ]] && win_gui_flag="-H=windowsgui "
 
+  # Default build command (CGO_ENABLED=0)
   local build_cmd="CGO_ENABLED=0 GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -trimpath -buildvcs=false -tags '$tags' -o \\\"$temp/$output\\\" -ldflags=\\\"$ldflags\\\"\""
 
-  if [[ "$os" = "windows" ]]; then
+  if [[ "$os" == "windows" ]]; then
     # Windows builds also need the release tag
     build_cmd="CGO_ENABLED=0 GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -trimpath -buildvcs=false -tags '$tags' -o \\\"$temp/$output\\\" -ldflags=\\\"${win_gui_flag}${ldflags}\\\"\""
   fi
+
+  if [[ "$os" == "linux" ]] && [[ "$arch" != "arm" ]]; then
+    # Linux builds now use Zig + CGO + Static Linking
+    local cc_cmd="zig cc -target"
+    case "$arch" in
+    "amd64") cc_cmd="$cc_cmd x86_64-linux-musl" ;;
+    "386") cc_cmd="$cc_cmd x86-linux-musl" ;; # Zig might use i386-linux-musl
+    "arm64") cc_cmd="$cc_cmd aarch64-linux-musl" ;;
+    "riscv64") cc_cmd="$cc_cmd riscv64-linux-musl" ;;
+    *) cc_cmd="musl-gcc" ;; # Fallback if specific arc not strictly handled or just generic
+    esac
+
+    # Zig target adjustment for 386 if needed
+    if [[ "$arch" == "386" ]]; then cc_cmd="zig cc -target x86-linux-musl"; fi
+
+    # We need to tell Go to use this CC
+    # And we add external linker flags for static build
+    # Also add -s to extldflags if not debugging, to ensure the binary is stripped
+    local extldflags="-static"
+    [[ "$arg1" != "--debug" ]] && extldflags="-static -s"
+
+    build_cmd="CGO_ENABLED=1 CC=\"$cc_cmd\" GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -trimpath -buildvcs=false -tags '$tags' -o \\\"$temp/$output\\\" -ldflags=\\\"$ldflags -linkmode external -extldflags '$extldflags'\\\"\""
+  fi
+
   echo "Running: $build_cmd"
   {
     cd "$pwd/cmd/agent" &&
@@ -89,33 +113,33 @@ build_shared_object() {
   windows)
     case "$arch" in
     386)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86-windows-gnu\" CXX=\"zig c++ -target x86-windows-gnu\" GOOS=$os GOARCH=$arch $gobuild_cmd $build_opt -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"${win_gui_flag}$ldflags -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86-windows-gnu\" CXX=\"zig c++ -target x86-windows-gnu\" GOOS=$os GOARCH=$arch $gobuild_cmd $build_opt -tags \"netgo emp3r0r_so\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"${win_gui_flag}$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     amd64)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86_64-windows-gnu\" CXX=\"zig c++ -target x86_64-windows-gnu\" GOOS=$os GOARCH=$arch $gobuild_cmd $build_opt -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"${win_gui_flag}$ldflags -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86_64-windows-gnu\" CXX=\"zig c++ -target x86_64-windows-gnu\" GOOS=$os GOARCH=$arch $gobuild_cmd $build_opt -tags \"netgo emp3r0r_so\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"${win_gui_flag}$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     arm64)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target aarch64-windows-gnu\" CXX=\"zig c++ -target aarch64-windows-gnu\" GOOS=$os GOARCH=$arch $gobuild_cmd $build_opt -tags netgo -o \"$temp/$output\" -buildmode c-shared -ldflags=\"${win_gui_flag}$ldflags -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target aarch64-windows-gnu\" CXX=\"zig c++ -target aarch64-windows-gnu\" GOOS=$os GOARCH=$arch $gobuild_cmd $build_opt -tags \"netgo emp3r0r_so\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"${win_gui_flag}$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     esac
     ;;
   linux)
     case "$arch" in
     386)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86-linux-gnu\" GOARCH=$arch $gobuild_cmd $build_opt -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86-linux-gnu\" GOARCH=$arch $gobuild_cmd $build_opt -tags emp3r0r_so -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     amd64)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86_64-linux-gnu\" GOARCH=$arch $gobuild_cmd $build_opt -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86_64-linux-gnu\" GOARCH=$arch $gobuild_cmd $build_opt -tags emp3r0r_so -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     arm)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target arm-linux-gnueabi\" GOARCH=$arch $gobuild_cmd $build_opt -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target arm-linux-gnueabi\" GOARCH=$arch $gobuild_cmd $build_opt -tags emp3r0r_so -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     arm64)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target aarch64-linux-gnu\" GOARCH=$arch $gobuild_cmd $build_opt -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target aarch64-linux-gnu\" GOARCH=$arch $gobuild_cmd $build_opt -tags emp3r0r_so -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     riscv64)
       # the built shared object is untested
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target riscv64-linux-musl\" GOARCH=$arch $gobuild_cmd $build_opt -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target riscv64-linux-musl\" GOARCH=$arch $gobuild_cmd $build_opt -tags emp3r0r_so -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     esac
     ;;
@@ -295,6 +319,7 @@ install() {
   else
     warn "No suitable Zsh completion directory found"
     warn "You can manually set up Zsh completion by adding this to your ~/.zshrc:"
+    # shellcheck disable=SC2154
     warn "  fpath=(/path/to/dir/with/completion $fpath)"
     warn "  autoload -Uz compinit && compinit"
   fi
