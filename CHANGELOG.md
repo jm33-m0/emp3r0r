@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.14.1](https://github.com/jm33-m0/emp3r0r/compare/v3.14.0...v3.14.1) (2026-01-26)
+
+
+### Bug Fixes
+
+* build linux agents with `CGO` when possible ([c0d9146](https://github.com/jm33-m0/emp3r0r/commit/c0d9146d5f4cea0cd253589f06bf9f59669bb0ef))
+* enhance dynamic ELF loading with relocation support and refined memory mapping in shellcode stager ([e89834d](https://github.com/jm33-m0/emp3r0r/commit/e89834d8e927cd7c73f046ead9eabeb97fd7b0d2))
+* enhance ELF loader compatibility by improving auxv setup, relocation handling ([73a264a](https://github.com/jm33-m0/emp3r0r/commit/73a264af2b58800899544f96f3ed5f75d1c9ff98))
+* ensure `_start` is placed in the `.init` section and included in the stager shellcode binary. ([08967b7](https://github.com/jm33-m0/emp3r0r/commit/08967b7a59d165b657dc29e1079f09041bdaec52))
+* extend ELF loader auxiliary vector with AT_PLATFORM, AT_SECURE, and persistent AT_RANDOM. ([3bf3e5d](https://github.com/jm33-m0/emp3r0r/commit/3bf3e5dc3b50152576f0d17640b8615d20a84e4d))
+
 ## [3.14.0](https://github.com/jm33-m0/emp3r0r/compare/v3.13.2...v3.14.0) (2026-01-25)
 
 
