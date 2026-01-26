@@ -49,11 +49,11 @@ check_zig() {
   fi
 }
 
-build_agent_stub() {
+build_agent_pure() {
   local arch=$1
   local os=$2
   local output=$3
-  info "Building agent stub for $os $arch"
+  info "Building pure agent stub for $os $arch"
 
   local tags="netgo agent"
   [[ "$arg1" != "--debug" ]] && tags="netgo release agent"
@@ -69,34 +69,48 @@ build_agent_stub() {
     build_cmd="CGO_ENABLED=0 GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -trimpath -buildvcs=false -tags '$tags' -o \\\"$temp/$output\\\" -ldflags=\\\"${win_gui_flag}${ldflags}\\\"\""
   fi
 
-  if [[ "$os" == "linux" ]] && [[ "$arch" != "arm" ]]; then
-    # Linux builds now use Zig + CGO + Static Linking
-    local cc_cmd="zig cc -target"
-    case "$arch" in
-    "amd64") cc_cmd="$cc_cmd x86_64-linux-musl" ;;
-    "386") cc_cmd="$cc_cmd x86-linux-musl" ;; # Zig might use i386-linux-musl
-    "arm64") cc_cmd="$cc_cmd aarch64-linux-musl" ;;
-    "riscv64") cc_cmd="$cc_cmd riscv64-linux-musl" ;;
-    *) cc_cmd="musl-gcc" ;; # Fallback if specific arc not strictly handled or just generic
-    esac
+  echo "Running: $build_cmd"
+  {
+    cd "$pwd/cmd/agent" &&
+      eval "$build_cmd"
+  } || error "build pure agent stub for $os $arch"
+}
 
-    # Zig target adjustment for 386 if needed
-    if [[ "$arch" == "386" ]]; then cc_cmd="zig cc -target x86-linux-musl"; fi
+build_agent_cgo() {
+  local arch=$1
+  local os=$2
+  local output=$3
+  info "Building CGO agent stub for $os $arch"
 
-    # We need to tell Go to use this CC
-    # And we add external linker flags for static build
-    # Also add -s to extldflags if not debugging, to ensure the binary is stripped
-    local extldflags="-static"
-    [[ "$arg1" != "--debug" ]] && extldflags="-static -s"
+  local tags="netgo agent"
+  [[ "$arg1" != "--debug" ]] && tags="netgo release agent"
 
-    build_cmd="CGO_ENABLED=1 CC=\"$cc_cmd\" GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -trimpath -buildvcs=false -tags '$tags' -o \\\"$temp/$output\\\" -ldflags=\\\"$ldflags -linkmode external -extldflags '$extldflags'\\\"\""
-  fi
+  # Zig + CGO + Static Linking
+  local cc_cmd="zig cc -target"
+  case "$arch" in
+  "amd64") cc_cmd="$cc_cmd x86_64-linux-musl" ;;
+  "386") cc_cmd="$cc_cmd x86-linux-musl" ;; # Zig might use i386-linux-musl
+  "arm64") cc_cmd="$cc_cmd aarch64-linux-musl" ;;
+  "riscv64") cc_cmd="$cc_cmd riscv64-linux-musl" ;;
+  *) cc_cmd="musl-gcc" ;; # Fallback if specific arc not strictly handled or just generic
+  esac
+
+  # Zig target adjustment for 386 if needed
+  if [[ "$arch" == "386" ]]; then cc_cmd="zig cc -target x86-linux-musl"; fi
+
+  # We need to tell Go to use this CC
+  # And we add external linker flags for static build
+  # Also add -s to extldflags if not debugging, to ensure the binary is stripped
+  local extldflags="-static"
+  [[ "$arg1" != "--debug" ]] && extldflags="-static -s"
+
+  local build_cmd="CGO_ENABLED=1 CC=\"$cc_cmd\" GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -trimpath -buildvcs=false -tags '$tags' -o \\\"$temp/$output\\\" -ldflags=\\\"$ldflags -linkmode external -extldflags '$extldflags'\\\"\""
 
   echo "Running: $build_cmd"
   {
     cd "$pwd/cmd/agent" &&
       eval "$build_cmd"
-  } || error "build agent stub for $os $arch"
+  } || error "build CGO agent stub for $os $arch"
 }
 
 build_shared_object() {
@@ -190,19 +204,19 @@ build() {
   } || error "build listener"
 
   # Linux
-  build_agent_stub "amd64" "linux" "stub-amd64"
-  build_agent_stub "386" "linux" "stub-386"
-  build_agent_stub "arm" "linux" "stub-arm"
-  build_agent_stub "arm64" "linux" "stub-arm64"
-  build_agent_stub "mips" "linux" "stub-mips"
-  build_agent_stub "mips64" "linux" "stub-mips64"
-  build_agent_stub "riscv64" "linux" "stub-riscv64"
-  build_agent_stub "ppc64" "linux" "stub-ppc64"
+  build_agent_cgo "amd64" "linux" "stub-amd64"
+  build_agent_cgo "386" "linux" "stub-386"
+  build_agent_pure "arm" "linux" "stub-arm"
+  build_agent_cgo "arm64" "linux" "stub-arm64"
+  build_agent_pure "mips" "linux" "stub-mips"
+  build_agent_pure "mips64" "linux" "stub-mips64"
+  build_agent_cgo "riscv64" "linux" "stub-riscv64"
+  build_agent_pure "ppc64" "linux" "stub-ppc64"
 
   # Windows
-  build_agent_stub "amd64" "windows" "stub-win-amd64"
-  build_agent_stub "386" "windows" "stub-win-386"
-  build_agent_stub "arm64" "windows" "stub-win-arm64"
+  build_agent_pure "amd64" "windows" "stub-win-amd64"
+  build_agent_pure "386" "windows" "stub-win-386"
+  build_agent_pure "arm64" "windows" "stub-win-arm64"
 
   # Shared Objects
   build_shared_object "amd64" "windows" "stub-win-amd64.dll"
