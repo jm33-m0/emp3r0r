@@ -169,7 +169,7 @@ func IsAgentExist(t *def.Emp3r0rAgent) bool {
 // IsAgentExistLocked checks if agent exists (caller must hold lock)
 func IsAgentExistLocked(t *def.Emp3r0rAgent) bool {
 	for a := range live.AgentControlMap {
-		if a.Tag == t.Tag {
+		if a.UUID == t.UUID {
 			return true
 		}
 	}

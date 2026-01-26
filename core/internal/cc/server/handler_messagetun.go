@@ -57,7 +57,13 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 			// find agent
 			var agent *def.Emp3r0rAgent
 			for i := 0; i < 5; i++ {
-				agent = agents.GetAgentByTag(msg.Tag)
+				// prefer UUID
+				if msg.AgentUUID != "" {
+					agent = agents.GetAgentByUUID(msg.AgentUUID)
+				}
+				if agent == nil {
+					agent = agents.GetAgentByTag(msg.Tag)
+				}
 				if agent != nil {
 					break
 				}
@@ -98,7 +104,11 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 						}
 						atomic.StoreInt64(&lastHandshake, time.Now().Unix())
 						continue // Handshake handled, next message
+					} else {
+						logging.Warningf("Handshake from %s failed: invalid signature", msg.Tag)
 					}
+				} else {
+					logging.Warningf("Handshake from %s failed: invalid base64 signature", msg.Tag)
 				}
 			}
 

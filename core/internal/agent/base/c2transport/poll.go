@@ -169,7 +169,7 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 			}
 			time.Sleep(time.Millisecond)
 		}
-		logging.Errorf("Hello (%s) timeout. This could be due to a TransportString (prefix) mismatch between agent and CC server. Ensure your agent binary is up to date.", hello_id)
+		logging.Warningf("Hello (%s) timeout. Please check your network connection.", hello_id)
 		return false
 	}
 
@@ -183,6 +183,7 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 			hello_msg.CmdSlice = []string{common.RuntimeConfig.AgentUUID, common.RuntimeConfig.AgentUUIDSig, util.RandStr(util.RandInt(1, 100))}
 			hello_msg.CmdID = uuid.NewString()
 			hello_msg.Tag = common.RuntimeConfig.AgentTag
+			hello_msg.AgentUUID = common.RuntimeConfig.AgentUUID
 			if encodeErr := out.Encode(hello_msg); encodeErr != nil {
 				logging.Errorf("agent cannot connect to cc: %v", encodeErr)
 				util.TakeABlink()

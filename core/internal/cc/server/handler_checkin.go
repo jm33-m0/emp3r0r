@@ -91,7 +91,7 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 	} else {
 		var existingKey *def.Emp3r0rAgent
 		for a, ctrl := range live.AgentControlMap {
-			if a.Tag == target.Tag {
+			if a.UUID == target.UUID {
 				// if agent is already connected, it must be the same instance
 				// because we already checked for duplications
 				if ctrl.Conn != nil {
