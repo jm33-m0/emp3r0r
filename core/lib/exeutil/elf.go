@@ -9,12 +9,11 @@ import (
 	"debug/elf"
 	"encoding/binary"
 	"fmt"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 // ELF constants
@@ -670,39 +669,4 @@ func writeDynamicEntries(f *os.File, offset uint64, entries []Dynamic, elfClass 
 		}
 	}
 	return nil
-}
-
-// FixELF replaces ld and adds rpath to use musl libc.
-// Parameters:
-// - elf_path: Path to the ELF file to fix.
-func FixELF(elf_path, rpath, ld_path string) (err error) {
-	// see module vaccine's directory structure
-	utils_path := filepath.Dir(filepath.Dir(rpath))
-	pwd, _ := os.Getwd()
-	err = os.Chdir(utils_path)
-	if err != nil {
-		return
-	}
-	defer os.Chdir(pwd)
-
-	// paths
-	patchelf := fmt.Sprintf("%s/patchelf", utils_path)
-	logging.Printf("rpath: %s, patchelf: %s, ld_path: %s", rpath, patchelf, ld_path)
-
-	// remove rpath
-	cmd := fmt.Sprintf("%s --remove-rpath", patchelf)
-	out, err := exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
-	if err != nil {
-		err = fmt.Errorf("patchelf remove rpath: %v, %s", err, out)
-	}
-
-	// patchelf cmd
-	cmd = fmt.Sprintf("%s --set-interpreter %s --set-rpath %s %s",
-		patchelf, ld_path, rpath, elf_path)
-
-	out, err = exec.Command("/bin/sh", "-c", cmd).CombinedOutput()
-	if err != nil {
-		err = fmt.Errorf("patchelf: %v, %s", err, out)
-	}
-	return
 }
