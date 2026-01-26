@@ -124,29 +124,19 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 		defer cancel()
 		for ctx.Err() == nil {
 			// read response
-			// first, we need to handle the handshake response which is raw random bytes
-			// after that, it will be structured MsgTunData
-			var msgData []byte
-			if decodeErr := in.Decode(&msgData); decodeErr == nil {
-				// if it's a byte slice, it might be a handshake reply
-				// currently handshakes are the only raw byte replies
-				HandShakes.Range(func(key, value any) bool {
-					if isSuccess, ok := value.(bool); ok && !isSuccess {
-						HandShakes.Store(key, true)
-						return false // found one, stop iteration
-					}
-					return true
-				})
-				continue
-			}
-
-			// if it's not a byte slice, it should be MsgTunData
+			// all messages are now structured MsgTunData
 			var msg def.MsgTunData
 			if decodeErr := in.Decode(&msg); decodeErr != nil {
 				if !strings.Contains(decodeErr.Error(), "context canceled") && decodeErr != io.EOF {
 					logging.Print("Check CC response: CBOR msg decode: ", decodeErr)
 				}
 				break
+			}
+
+			// if it's a handshake reply
+			if msg.Tag == "handshake" {
+				HandShakes.Store(msg.CmdID, true)
+				continue
 			}
 
 			// process CC data; copy to avoid concurrent reuse of msg in next loop

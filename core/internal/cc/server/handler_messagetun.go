@@ -95,10 +95,15 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 					if isValid {
 						// verify hello
 						logging.Debugf("Handshake from %s successful", msg.Tag)
-						// respond with random data, encoded in CBOR
-						reply := util.RandBytes(util.RandInt(10, 100))
-						encoder := cbor.NewEncoder(wrt)
-						err = encoder.Encode(reply)
+						// respond with random data, wrapped in MsgTunData
+						replyData := util.RandBytes(util.RandInt(10, 100))
+						replyMsg := def.MsgTunData{
+							CmdID:    msg.CmdID,
+							Tag:      "handshake",
+							Response: replyData,
+						}
+						encoder := cbor.NewEncoder(conn)
+						err = encoder.Encode(replyMsg)
 						if err != nil {
 							logging.Warningf("handleMessageTunnel: %v", err)
 						}

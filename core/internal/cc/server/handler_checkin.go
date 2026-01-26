@@ -51,9 +51,9 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	var target def.Emp3r0rAgent
+	target := new(def.Emp3r0rAgent)
 	in := cbor.NewDecoder(conn)
-	err = in.Decode(&target)
+	err = in.Decode(target)
 	if err != nil {
 		logging.Warningf("handleAgentCheckIn decode error: %v", err)
 		return
@@ -77,12 +77,12 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 	}
 	target.From = req.RemoteAddr
 	live.AgentControlMapMutex.Lock()
-	if !agents.IsAgentExistLocked(&target) {
+	if !agents.IsAgentExistLocked(target) {
 		inx := agents.AssignAgentIndexLocked()
-		live.AgentControlMap[&target] = &live.AgentControl{Index: inx, Conn: nil}
+		live.AgentControlMap[target] = &live.AgentControl{Index: inx, Conn: nil}
 		shortname := strings.Split(target.Tag, "-agent")[0]
 		if util.IsExist(agents.AgentsJSON) {
-			if l := agents.RefreshAgentLabel(&target); l != "" {
+			if l := agents.RefreshAgentLabel(target); l != "" {
 				shortname = l
 			}
 		}
@@ -97,7 +97,7 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 				if ctrl.Conn != nil {
 					logging.Warningf("handleAgentCheckIn: %s just connected, but state says it is already connected. This implies a race condition or logic error.", target.Tag)
 				}
-				*a = target
+				*a = *target
 				existingKey = a
 				break
 			}
