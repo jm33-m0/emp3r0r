@@ -16,7 +16,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -186,10 +185,9 @@ func TestEstablishC2Connection(t *testing.T) {
 	def.CCMsgConn = conn // Set global connection for CCMsgTun
 
 	// Start CCMsgTun
-	var wg sync.WaitGroup
-	wg.Add(1)
+	tunDone := make(chan struct{})
 	go func() {
-		defer wg.Done()
+		defer close(tunDone)
 		if err := c2transport.MsgTunneler(conn, config, handler.HandleC2Command, ctx, cancel); err != nil {
 			t.Logf("CCMsgTun exited with error: %v", err)
 		}
@@ -223,8 +221,15 @@ func TestEstablishC2Connection(t *testing.T) {
 
 	// Clean up
 	cancel()
-	conn.Close()
-	wg.Wait()
+	go conn.Close()
+	// Clean up
+	cancel()
+	go conn.Close()
+	select {
+	case <-tunDone:
+	case <-time.After(1 * time.Second):
+		t.Log("MsgTunneler did not exit in time (pending I/O), forcing test completion")
+	}
 }
 
 func TestURLConstruction(t *testing.T) {
@@ -306,9 +311,11 @@ func TestDuplicatedCheckin(t *testing.T) {
 		CAPEM:  string(caCertData),
 	}
 
-	// Reset live maps
+	// Reset live maps with proper locking
+	live.AgentControlMapMutex.Lock()
 	live.AgentControlMap = make(map[*def.Emp3r0rAgent]*live.AgentControl)
 	live.AgentList = make([]*def.Emp3r0rAgent, 0)
+	live.AgentControlMapMutex.Unlock()
 
 	// Start Real C2 Server
 	go server.StartC2AgentTLSServer()
@@ -365,8 +372,12 @@ func TestDuplicatedCheckin(t *testing.T) {
 	defer conn.Close()
 	defer cancel()
 
-	// Start MsgTun for the first agent so CC knows it has a non-nil Conn
-	go c2transport.MsgTunneler(conn, config, func(data *def.MsgTunData) {}, ctx, cancel)
+	// Start MsgTun for the first agent
+	tunDone := make(chan struct{})
+	go func() {
+		defer close(tunDone)
+		c2transport.MsgTunneler(conn, config, func(data *def.MsgTunData) {}, ctx, cancel)
+	}()
 
 	// Wait for CC to process the connection
 	time.Sleep(2 * time.Second)
@@ -380,7 +391,18 @@ func TestDuplicatedCheckin(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "self-destruct") {
 		t.Errorf("Unexpected error from second ReportStatus: %v", err)
-	} else {
+	}
+
+	// Cleanup
+	cancel()
+	go conn.Close() // Close connection asynchronously to unblock MsgTunneler reads
+	// Cleanup
+	cancel()
+	go conn.Close() // Close connection asynchronously to unblock MsgTunneler reads
+	select {
+	case <-tunDone:
+	case <-time.After(1 * time.Second):
+		t.Log("MsgTunneler did not exit in time (pending I/O), forcing test completion")
 	}
 }
 

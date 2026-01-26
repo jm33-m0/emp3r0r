@@ -76,9 +76,11 @@ func TestFullAgentLifecycle(t *testing.T) {
 		CAPEM:  string(caCertData),
 	}
 
-	// Reset live maps
+	// Reset live maps with proper locking
+	live.AgentControlMapMutex.Lock()
 	live.AgentControlMap = make(map[*def.Emp3r0rAgent]*live.AgentControl)
 	live.AgentList = make([]*def.Emp3r0rAgent, 0)
+	live.AgentControlMapMutex.Unlock()
 
 	// Start Real C2 Server
 	go server.StartC2AgentTLSServer()
@@ -155,7 +157,9 @@ func TestFullAgentLifecycle(t *testing.T) {
 	}
 
 	// We'll wrap MsgTunneler to count success responses in def.HandShakes
+	tunDone := make(chan struct{})
 	go func() {
+		defer close(tunDone)
 		if err := c2transport.MsgTunneler(conn, config, mockCallback, ctx, cancel); err != nil {
 			if !strings.Contains(err.Error(), "context canceled") {
 				t.Errorf("MsgTunneler exited with unexpected error: %v", err)
@@ -200,4 +204,13 @@ func TestFullAgentLifecycle(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	t.Log("Full Agent Lifecycle Test Passed")
+
+	// Cleanup: cancel context to stop MsgTunneler, then wait for it to exit
+	cancel()
+	go conn.Close()
+	select {
+	case <-tunDone:
+	case <-time.After(1 * time.Second):
+		t.Log("MsgTunneler did not exit in time (pending I/O), forcing test completion")
+	}
 }

@@ -89,13 +89,18 @@ func CheckC2Condition(proxy string) bool {
 	return true
 }
 
-func catchInterruptAndExit(cancel context.CancelFunc) {
+func catchInterruptAndExit(ctx context.Context, cancel context.CancelFunc) {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
-	<-sig
-	logging.Println("Cancelling due to interrupt")
-	cancel()
-	os.Exit(0)
+	select {
+	case <-sig:
+		logging.Println("Cancelling due to interrupt")
+		cancel()
+		os.Exit(0)
+	case <-ctx.Done():
+		signal.Stop(sig)
+		return
+	}
 }
 
 // HandShakes record each hello message and C2's reply
@@ -107,11 +112,13 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 		in  = cbor.NewDecoder(conn)
 		out = cbor.NewEncoder(conn)
 	)
-	go catchInterruptAndExit(cancel)
+	go catchInterruptAndExit(ctx, cancel)
 	defer func() {
-		if closeErr := conn.Close(); closeErr != nil {
-			logging.Print("MsgTunneler closing: ", closeErr)
-		}
+		go func() {
+			if closeErr := conn.Close(); closeErr != nil {
+				logging.Print("MsgTunneler closing: ", closeErr)
+			}
+		}()
 
 		cancel()
 		def.KCPKeep = false // tell KCPClient to close this conn so we won't stuck
@@ -151,6 +158,9 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 		defer HandShakes.Delete(hello_id)
 		// wait until timeout or success
 		for range config.CCTimeout {
+			if ctx.Err() != nil {
+				return false
+			}
 			// if hello marked as success, return true
 			isSuccessAny, _ := HandShakes.Load(hello_id)
 			isSuccess, _ := isSuccessAny.(bool)
@@ -167,6 +177,9 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 		var hello_msg def.MsgTunData
 		// try cnt times then exit
 		for cnt > 0 {
+			if ctx.Err() != nil {
+				return false
+			}
 			cnt-- // consume cnt
 
 			// send hello
