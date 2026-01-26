@@ -1,0 +1,40 @@
+{
+  "name": "process_list_handles_linux",
+  "build": "make",
+  "author": "jm33-ng",
+  "date": "2026-01-26",
+  "comment": "Linux BOF module to list process handles",
+  "is_local": false,
+  "platform": "Linux",
+  "path": "",
+  "fileless": true,
+  "parameters": [
+    {
+      "name": "pid",
+      "description": "Process ID to enumerate",
+      "default": "",
+      "type": "int",
+      "required": true
+    }
+  ],
+  "agent_config": {
+    "exec": "",
+    "files": ["process_list_handles_linux.o"],
+    "in_memory": true,
+    "type": "coff",
+    "interactive": false
+  },
+  "invocation": {
+    "argv": [],
+    "coff": {
+      "export": "go",
+      "args": [
+        {
+          "param": "pid",
+          "wire_type": "INT"
+        }
+      ]
+    }
+  }
+}
+
