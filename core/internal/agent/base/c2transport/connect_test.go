@@ -19,6 +19,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fxamacker/cbor/v2"
+	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/handler"
@@ -248,4 +250,141 @@ func TestURLConstruction(t *testing.T) {
 			t.Errorf("For CCAddress %q, got reportURL %q, want %q", ccAddr, reportURL, expectedReport)
 		}
 	}
+}
+
+func TestHandshakePrefixMismatch(t *testing.T) {
+	// Setup temp dir for certs
+	tmpDir, err := os.MkdirTemp("", "agent_test_mismatch")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	caCertFile := filepath.Join(tmpDir, "ca-cert.pem")
+	caKeyFile := filepath.Join(tmpDir, "ca-key.pem")
+	serverCertFile := filepath.Join(tmpDir, "server-cert.pem")
+	serverKeyFile := filepath.Join(tmpDir, "server-key.pem")
+
+	// Generate CA
+	_, err = transport.GenCerts(nil, caCertFile, caKeyFile, "", "", true)
+	if err != nil {
+		t.Fatalf("Failed to generate CA: %v", err)
+	}
+
+	// Generate Server Cert
+	_, err = transport.GenCerts([]string{"127.0.0.1"}, serverCertFile, serverKeyFile, caKeyFile, caCertFile, false)
+	if err != nil {
+		t.Fatalf("Failed to generate server cert: %v", err)
+	}
+
+	// Read CA cert
+	caCertData, err := os.ReadFile(caCertFile)
+	if err != nil {
+		t.Fatalf("Failed to read CA cert: %v", err)
+	}
+	transport.CACrtPEM = caCertData
+
+	// Setup Transport Paths for C2 Server
+	transport.CaCrtFile = caCertFile
+	transport.OperatorCaCrtFile = caCertFile
+	transport.ServerCrtFile = serverCertFile
+	transport.ServerKeyFile = serverKeyFile
+	transport.EmpWorkSpace = tmpDir
+
+	// Get random port
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Failed to listen: %v", err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	listener.Close()
+
+	// Save original prefix
+	origPrefix := def.TransportString
+	defer func() { def.TransportString = origPrefix }()
+
+	// Server prefix
+	def.TransportString = "server-prefix"
+
+	// Setup C2 Config
+	live.RuntimeConfig = &def.Config{
+		CCPort: fmt.Sprintf("%d", port),
+		CAPEM:  string(caCertData),
+	}
+
+	// Start Real C2 Server
+	go server.StartC2AgentTLSServer()
+
+	// Wait for server to start
+	time.Sleep(5 * time.Second)
+
+	// Setup Agent Config
+	agentUUID := "test-agent-uuid-mismatch"
+	agentSig, err := signUUID(agentUUID, caKeyFile)
+	if err != nil {
+		t.Fatalf("Failed to sign UUID: %v", err)
+	}
+
+	c2URL := fmt.Sprintf("https://127.0.0.1:%d", port)
+	common.RuntimeConfig = &def.Config{
+		CCAddress:    c2URL,
+		AgentUUID:    agentUUID,
+		AgentUUIDSig: agentSig,
+		AgentTag:     agentUUID,
+		CCTimeout:    1000, // Short timeout for test
+	}
+	def.CCAddress = c2URL
+
+	// Agent explicitly uses a different prefix
+	// We need to override def.TransportString before calling MsgTunneler
+	// but after the server has started (it uses the same global)
+	// This is a bit tricky since they share the same memory in the test.
+	// In a real scenario, they are separate processes.
+
+	// For the sake of this test, we want to see the server's warning.
+	// We will manually construct a message with the wrong prefix but valid signature.
+
+	// Initialize HTTP Client
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(caCertData)
+	tr := &http.Transport{
+		TLSClientConfig:   &tls.Config{RootCAs: certPool},
+		ForceAttemptHTTP2: true,
+	}
+	def.HTTPClient = &http.Client{Transport: tr}
+
+	// ReportStatus (this should still work as it doesn't use the prefix)
+	agentInfo := &def.Emp3r0rAgent{
+		Tag:     agentUUID,
+		Name:    "test-agent",
+		UUID:    agentUUID,
+		UUIDSig: agentSig,
+	}
+	c2transport.ReportStatus(agentInfo)
+
+	// Connect to MsgAPI
+	msgURL := fmt.Sprintf("%s/%s/%s", c2URL, transport.MsgAPI, "test-token")
+	conn, _, cancel, err := c2transport.EstablishC2Connection(msgURL)
+	if err != nil {
+		t.Fatalf("EstablishC2Connection failed: %v", err)
+	}
+	defer conn.Close()
+	defer cancel()
+
+	// Now, manually send a message with a mismatched prefix
+	// The server's TransportString is currently "server-prefix"
+	mismatchedMsg := def.MsgTunData{
+		CmdSlice: []string{"mismatched-prefix", agentUUID, agentSig, "extra"},
+		CmdID:    uuid.NewString(),
+		Tag:      agentUUID,
+	}
+	encoder := cbor.NewEncoder(conn)
+	if err := encoder.Encode(mismatchedMsg); err != nil {
+		t.Fatalf("Failed to send mismatched message: %v", err)
+	}
+
+	// Wait for a bit for the server to process it
+	time.Sleep(1 * time.Second)
+
+	t.Log("Test finished, check logs for 'prefix mismatch' warning")
 }

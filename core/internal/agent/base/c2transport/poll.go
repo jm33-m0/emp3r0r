@@ -126,6 +126,10 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 					HandShakes.Store(msg.CmdID, true)
 				}
 				continue
+			} else if strings.HasPrefix(string(resp), "hello") || strings.HasPrefix(string(resp), "emp3r0r") {
+				// if we receive something that looks like a hello response but doesn't match our prefix
+				logging.Warningf("Received handshake response with mismatching prefix: %q (expected %q). Agent binary might be outdated.",
+					string(resp), def.TransportString)
 			}
 
 			// process CC data; copy to avoid concurrent reuse of msg in next loop
@@ -148,7 +152,7 @@ func MsgTunneler(callback func(*def.MsgTunData), ctx context.Context, cancel con
 			}
 			time.Sleep(time.Millisecond)
 		}
-		logging.Errorf("Hello (%s) timeout", hello_id)
+		logging.Errorf("Hello (%s) timeout. This could be due to a TransportString (prefix) mismatch between agent and CC server. Ensure your agent binary is up to date.", hello_id)
 		return false
 	}
 

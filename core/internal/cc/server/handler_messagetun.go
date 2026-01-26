@@ -94,6 +94,24 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 				}
 				atomic.StoreInt64(&lastHandshake, time.Now().Unix())
 			} else {
+				// if it's not a hello, check if it's an outdated agent with wrong prefix
+				// a hello message has 4 elements in CmdSlice
+				if len(msg.CmdSlice) == 4 {
+					agent_uuid := msg.CmdSlice[1]
+					agent_sig_str := msg.CmdSlice[2]
+					agent_sig, err := base64.URLEncoding.DecodeString(agent_sig_str)
+					if err == nil {
+						isValid, _ := transport.VerifySignatureWithCA([]byte(agent_uuid), agent_sig)
+						if isValid {
+							operatorBroadcastPrintf(logging.WARN,
+								"Handshake failed for %s: prefix mismatch (expected %q, got %q). The agent binary might be outdated.",
+								strconv.Quote(msg.Tag), def.TransportString, cmd)
+							logging.Warningf("Handshake failed for %s: prefix mismatch (expected %q, got %q). The agent binary might be outdated.",
+								msg.Tag, def.TransportString, cmd)
+						}
+					}
+				}
+
 				// forward message to operators
 				err = fwdMsg2Operators(msg)
 				if err != nil {
