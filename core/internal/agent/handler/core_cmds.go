@@ -143,6 +143,23 @@ func CoreCommands() *cobra.Command {
 	}
 	rootCmd.AddCommand(netHelperCmd)
 
+	// Sysinfo command
+	sysinfoCmd := &cobra.Command{
+		Use:     "sysinfo",
+		Short:   "Get system info",
+		Long:    "Get system info, supports granular control",
+		Example: "sysinfo --cpu --mem",
+		Run:     sysinfoCmdRun,
+		GroupID: "agent",
+	}
+	sysinfoCmd.Flags().BoolP("full", "f", false, "Get full system info")
+	sysinfoCmd.Flags().Bool("cpu", false, "Get CPU info")
+	sysinfoCmd.Flags().Bool("mem", false, "Get memory info")
+	sysinfoCmd.Flags().Bool("os", false, "Get OS info")
+	sysinfoCmd.Flags().Bool("net", false, "Get network info")
+	sysinfoCmd.Flags().Bool("user", false, "Get user info")
+	rootCmd.AddCommand(sysinfoCmd)
+
 	// Agent commands
 	suicideCmd := &cobra.Command{
 		Use:     "suicide",
