@@ -55,8 +55,8 @@ func TestNormalizeCoffValuePrefixes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("normalizeCoffValue string: %v", err)
 	}
-	if !strings.HasPrefix(val, "z") {
-		t.Fatalf("expected string prefix 'z', got %q", val)
+	if !strings.HasPrefix(val, "S") {
+		t.Fatalf("expected string prefix 'S', got %q", val)
 	}
 
 	val, err = normalizeCoffValue(CoffArg{WireType: "LPWSTR", Value: "wide"})
