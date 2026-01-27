@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.15.1](https://github.com/jm33-m0/emp3r0r/compare/v3.15.0...v3.15.1) (2026-01-27)
+
+
+### Bug Fixes
+
+* enhance agent identification and authentication by adding AgentUUIDSig to messages and verifying it on the C2. ([5e67ee0](https://github.com/jm33-m0/emp3r0r/commit/5e67ee0873204dd1048eeed420bad787a5941e71))
+
 ## [3.15.0](https://github.com/jm33-m0/emp3r0r/compare/v3.14.1...v3.15.0) (2026-01-27)
 
 
