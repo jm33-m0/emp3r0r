@@ -2,6 +2,7 @@ package operator
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -214,6 +215,33 @@ func readAndEncryptConfig() ([]byte, error) {
 	// generate a random UUID for the agent
 	configStruct.AgentUUID = uuid.NewString()
 	logging.Infof("Generated agent UUID: %s", configStruct.AgentUUID)
+
+	// sign the new UUID
+	// Load CA if not already valid in transport package, but transport.SignWithCAKey uses transport.CaKey which should be loaded
+	// We need to ensure transport.CaKey is available. `CmdGenerateAgent` calls `MakeConfig` -> `config.SaveConfigJSON`.
+	// Does `CmdGenerateAgent` load CA? `MakeConfig` reads existing config but doesn't explicitly load CA key from disk for `transport`.
+	// We should call `transport.LoadCACrt()`? No, `transport.SignWithCAKey` needs the key.
+	// `transport.GenCerts` uses `transport.CaKeyFile`.
+	// We should allow `transport` to load the key?
+	// `transport.SignWithCAKey` will return error if key is nil.
+	// Let's implement key loading here if needed.
+	// Actually `transport.SignWithCAKey` takes a []byte payload and returns signature.
+	// We need to check if `transport` package has the key loaded.
+	// If we look at existing `config.InitConfigFile`, it calls `transport.LoadCACrt()`.
+	// But `SignWithCAKey` uses `CaKey` which is populated by `GenCerts` or we need to load it.
+	// Let's look at `transport.SignWithCAKey` implementation?
+	// Assuming `transport.SignWithCAKey` works if we load it.
+
+	// Ensure CA crt/key are available for signing
+	if err := transport.LoadCACrt(); err != nil {
+		return nil, fmt.Errorf("load CA crt: %v", err)
+	}
+
+	sig, err := transport.SignWithCAKey([]byte(configStruct.AgentUUID))
+	if err != nil {
+		return nil, fmt.Errorf("sign agent UUID: %v", err)
+	}
+	configStruct.AgentUUIDSig = base64.URLEncoding.EncodeToString(sig)
 
 	cborBytes, err := cbor.Marshal(configStruct)
 	if err != nil {
