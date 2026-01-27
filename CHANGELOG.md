@@ -1,5 +1,30 @@
 # Changelog
 
+## [3.15.0](https://github.com/jm33-m0/emp3r0r/compare/v3.14.1...v3.15.0) (2026-01-27)
+
+
+### Features
+
+* `sysinfo` command ([ec82079](https://github.com/jm33-m0/emp3r0r/commit/ec820799f6cba39466124e75c20014d59fc8871e))
+* a "hello world" Linux BOF module for reference ([fdead6e](https://github.com/jm33-m0/emp3r0r/commit/fdead6e76623261187cd22bb03c8f3551c29b341))
+* add helper functions to aid syscall-based Linux BOF development ([b0388df](https://github.com/jm33-m0/emp3r0r/commit/b0388dfaee6bd4d16beff275fcd7e9ae20f71633))
+* Add syscall-based Linux BOF module to list file handles for a given process ID. ([9a50b4a](https://github.com/jm33-m0/emp3r0r/commit/9a50b4ae6b13c4217c30bb3e3476ec478f2aa817))
+* Implement malleable C2 with configurable paths, user-agents, data padding, and jitter, replacing the fixed transport string and simplify handshake. ([5b2b091](https://github.com/jm33-m0/emp3r0r/commit/5b2b09111510da64a3da2b496853b0d13486ed12))
+
+
+### Bug Fixes
+
+* Add handshake prefix mismatch detection and warnings to agent and server, and include a corresponding test. ([4e1929b](https://github.com/jm33-m0/emp3r0r/commit/4e1929b6d3a79049627246fcef09a4926ded6c7d))
+* checkin issue with random URL path ([5a4bd4a](https://github.com/jm33-m0/emp3r0r/commit/5a4bd4ad8c4c71f0e1b8845bedde54320bff31fb))
+* command has to be sent twice ([3960529](https://github.com/jm33-m0/emp3r0r/commit/39605293c4e15dddf986172082b0f3fb6a4fe7c8))
+* data race ([6ec3e19](https://github.com/jm33-m0/emp3r0r/commit/6ec3e190bd2b60cb8a0f835af49c90aebdf26b72))
+* generate a unique UUID for each agent config to avoid duplicated checkin error ([2555eda](https://github.com/jm33-m0/emp3r0r/commit/2555edae22d0bdc43fbc03221b1954ee846c77c4))
+* improve robustness of Linux BOF loader ([e214611](https://github.com/jm33-m0/emp3r0r/commit/e214611f5161d10ffaeddbe0996550e617a8da74))
+* including operator wg key in example commands to improve UX ([0ac63a6](https://github.com/jm33-m0/emp3r0r/commit/0ac63a68ef89fa0dd5453eddbfdb514274ba4ebc))
+* optimise handshake and checkin logic ([fe85d8a](https://github.com/jm33-m0/emp3r0r/commit/fe85d8a43af5db9c3dfd872ee724fc0620f70f1d))
+* sign agent UUIDs ([c6f1dfa](https://github.com/jm33-m0/emp3r0r/commit/c6f1dfa1a48dac5a7860f99e8b39889c796ac058))
+* unify the use agent UUID for primary identification and message routing. ([4a55d9f](https://github.com/jm33-m0/emp3r0r/commit/4a55d9f409d52044a911598d5c6218bb4cfe0ead))
+
 ## [3.14.1](https://github.com/jm33-m0/emp3r0r/compare/v3.14.0...v3.14.1) (2026-01-26)
 
 
