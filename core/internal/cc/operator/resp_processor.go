@@ -39,10 +39,17 @@ func processAgentData(data *def.MsgTunData) {
 		return
 	}
 
-	target := agents.GetAgentByTag(data.Tag)
+	var target *def.Emp3r0rAgent
+	if data.AgentUUID != "" {
+		target = agents.GetAgentByUUID(data.AgentUUID)
+	}
 	if target == nil {
-		logging.Errorf("Target %s cannot be found, however, it left a message saying:\n%v",
-			data.Tag, data.CmdSlice)
+		target = agents.GetAgentByTag(data.Tag)
+	}
+
+	if target == nil {
+		logging.Errorf("Target %s (%s) cannot be found, however, it left a message saying:\n%v",
+			data.Tag, data.AgentUUID, data.CmdSlice)
 		return
 	}
 

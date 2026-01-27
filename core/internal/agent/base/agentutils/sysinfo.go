@@ -119,8 +119,7 @@ func CollectFullSystemInfo() *def.Emp3r0rAgent {
 		info.CWD = "."
 	}
 
-	common.RuntimeConfig.AgentTag = util.GetHostID(info.Product, common.RuntimeConfig.AgentUUID)
-	info.Tag = common.RuntimeConfig.AgentTag // use hostid
+	info.Tag = common.RuntimeConfig.AgentTag
 	info.UUID = common.RuntimeConfig.AgentUUID
 	info.UUIDSig = common.RuntimeConfig.AgentUUIDSig
 	info.Hostname = hostname

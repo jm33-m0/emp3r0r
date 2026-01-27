@@ -50,12 +50,13 @@ type AgentProcess struct {
 // MsgTunData data to send in the tunnel, between C&C and agent
 // this can also be used for operator to CC communication
 type MsgTunData struct {
-	CmdID     string   `cbor:"1,keyasint"` // command ID, to retrieve the response, or empty if not a command
-	CmdSlice  []string `cbor:"2,keyasint"` // command args, [0] is the command, or empty if not a command
-	Response  []byte   `cbor:"3,keyasint"` // response from the agent, or message to operator
-	Tag       string   `cbor:"4,keyasint"` // tag of the agent, or message type if sent to operator
-	Time      string   `cbor:"5,keyasint"` // timestamp
-	AgentUUID string   `cbor:"6,keyasint"` // agent UUID for robust identification
+	CmdID        string   `cbor:"1,keyasint"` // command ID, to retrieve the response, or empty if not a command
+	CmdSlice     []string `cbor:"2,keyasint"` // command args, [0] is the command, or empty if not a command
+	Response     []byte   `cbor:"3,keyasint"` // response from the agent, or message to operator
+	Tag          string   `cbor:"4,keyasint"` // tag of the agent, or message type if sent to operator
+	Time         string   `cbor:"5,keyasint"` // timestamp
+	AgentUUID    string   `cbor:"6,keyasint"` // agent UUID for robust identification
+	AgentUUIDSig string   `cbor:"7,keyasint"` // agent UUID signature for verification
 }
 
 // H2Conn add context to h2conn.Conn

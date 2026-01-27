@@ -43,8 +43,9 @@ func send2CC(data *def.MsgTunData) error {
 // NotifyC2 send response to a cobra command to CC, like fmt.Printf
 func NotifyC2(cmd *cobra.Command, format string, args ...interface{}) {
 	msg := def.MsgTunData{
-		Tag:       common.RuntimeConfig.AgentTag,
-		AgentUUID: common.RuntimeConfig.AgentUUID,
+		Tag:          common.RuntimeConfig.AgentTag,
+		AgentUUID:    common.RuntimeConfig.AgentUUID,
+		AgentUUIDSig: common.RuntimeConfig.AgentUUIDSig,
 	}
 	cmd_id, _ := cmd.Flags().GetString("cmd_id")
 	cmdSlice := []string{cmd.Name()}

@@ -14,11 +14,12 @@ import (
 	"encoding/asn1"
 	"encoding/pem"
 	"fmt"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"math/big"
 	"net"
 	"os"
 	"time"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -299,10 +300,18 @@ func SignWithCAKey(data []byte) ([]byte, error) {
 
 // VerifySignatureWithCA verifies the given signature against the data using the CA's public key
 func VerifySignatureWithCA(data []byte, signature []byte) (bool, error) {
-	// Read the CA certificate from the file
-	caCertData, err := os.ReadFile(CaCrtFile)
-	if err != nil {
-		return false, fmt.Errorf("read %s: %v", CaCrtFile, err)
+	var caCertData []byte
+	var err error
+
+	// Use cached CA cert if available
+	if len(CACrtPEM) > 0 {
+		caCertData = CACrtPEM
+	} else {
+		// Read the CA certificate from the file
+		caCertData, err = os.ReadFile(CaCrtFile)
+		if err != nil {
+			return false, fmt.Errorf("read %s: %v", CaCrtFile, err)
+		}
 	}
 
 	// Decode the PEM-encoded CA certificate

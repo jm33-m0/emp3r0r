@@ -54,6 +54,19 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 			if err != nil {
 				return
 			}
+
+			// verify agent identification
+			agent_sig, err := base64.URLEncoding.DecodeString(msg.AgentUUIDSig)
+			if err != nil {
+				logging.Errorf("handleMessageTunnel: invalid signature encoding from %s: %v", msg.Tag, err)
+				return
+			}
+			isValid, err := transport.VerifySignatureWithCA([]byte(msg.AgentUUID), agent_sig)
+			if err != nil || !isValid {
+				logging.Errorf("handleMessageTunnel: invalid signature from %s: %v", msg.Tag, err)
+				return
+			}
+
 			// find agent
 			var agent *def.Emp3r0rAgent
 			for i := 0; i < 5; i++ {
@@ -85,36 +98,27 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 			live.AgentControlMap[agent].Cancel = cancel
 			live.AgentControlMapMutex.Unlock()
 
-			// check if it is a hello message
-			if len(msg.CmdSlice) >= 2 { // A hello message should at least contain UUID and signature
-				agent_uuid := msg.CmdSlice[0]
-				agent_sig_str := msg.CmdSlice[1]
-				agent_sig, err := base64.URLEncoding.DecodeString(agent_sig_str)
-				if err == nil {
-					isValid, _ := transport.VerifySignatureWithCA([]byte(agent_uuid), agent_sig)
-					if isValid {
-						// verify hello
-						logging.Debugf("Handshake from %s successful", msg.Tag)
-						// respond with random data, wrapped in MsgTunData
-						replyData := util.RandBytes(util.RandInt(10, 100))
-						replyMsg := def.MsgTunData{
-							CmdID:    msg.CmdID,
-							Tag:      "handshake",
-							Response: replyData,
-						}
-						encoder := cbor.NewEncoder(conn)
-						err = encoder.Encode(replyMsg)
-						if err != nil {
-							logging.Warningf("handleMessageTunnel: %v", err)
-						}
-						atomic.StoreInt64(&lastHandshake, time.Now().Unix())
-						continue // Handshake handled, next message
-					} else {
-						logging.Warningf("Handshake from %s failed: invalid signature", msg.Tag)
-					}
-				} else {
-					logging.Warningf("Handshake from %s failed: invalid base64 signature", msg.Tag)
+			// handshake (hello) message has empty CmdSlice or just random data
+			// but it's used to tell CC that agent is alive
+			// here we just respond to keep-alive if it matches any criteria
+			// or if it's explicitly a hello
+			if msg.Response == nil && len(msg.CmdSlice) > 0 {
+				// verify hello
+				logging.Debugf("Handshake from %s successful", msg.Tag)
+				// respond with random data, wrapped in MsgTunData
+				replyData := util.RandBytes(util.RandInt(10, 100))
+				replyMsg := def.MsgTunData{
+					CmdID:    msg.CmdID,
+					Tag:      "handshake",
+					Response: replyData,
 				}
+				encoder := cbor.NewEncoder(conn)
+				err = encoder.Encode(replyMsg)
+				if err != nil {
+					logging.Warningf("handleMessageTunnel: %v", err)
+				}
+				atomic.StoreInt64(&lastHandshake, time.Now().Unix())
+				continue // Handshake handled, next message
 			}
 
 			// if not a handshake, forward message to operators
