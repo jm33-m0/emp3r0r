@@ -106,6 +106,7 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 		logging.Debugf("Forwarding port mapping request to operator at %s", targetURL)
 		proxy.ServeHTTP(wrt, req)
 	default:
+		logging.Warningf("apiDispatcher: 404 for api=%s, token=%s (expected checkin=%s, msg=%s)", vars["api"], vars["token"], checkinPath, msgPath)
 		wrt.WriteHeader(http.StatusNotFound)
 	}
 }
