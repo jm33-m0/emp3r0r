@@ -88,13 +88,14 @@ void *elf_get_symbol(void *elf_start, char *sym_name);
 /*!
  * \brief Map the ELF into memory.
  */
-int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
-             size_t *entry);
+// Returns the required memory size and bounds for the ELF
+int elf_get_memory_bounds(char *elf_start, size_t *min_vaddr, size_t *max_vaddr);
 
-/*!
- * \brief Map the ELF into memory and run it with the provided arguments.
- */
-int elf_run(void *buf, char **argv, char **env);
+// pre_mapped: if true, assume memory at base_addr is already mapped and writable
+int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
+             size_t *entry, int pre_mapped);
+
+int elf_run(void *buf, char **argv, char **env, int pre_mapped);
 
 #endif // _ELF_LOADER_H_
 

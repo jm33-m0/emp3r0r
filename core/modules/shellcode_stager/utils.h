@@ -23,6 +23,22 @@ typedef long ssize_t;
 #define MAP_ANON MAP_ANONYMOUS
 #define MAP_FAILED ((void *)-1)
 
+// Waitpid options
+#ifndef WNOHANG
+#define WNOHANG 1
+#endif
+#ifndef WUNTRACED
+#define WUNTRACED 2
+#endif
+
+// Wait status macros
+#define WIFEXITED(status) (((status) & 0x7f) == 0)
+#define WIFSIGNALED(status) (((signed char) (((status) & 0x7f) + 1) >> 1) > 0)
+#define WIFSTOPPED(status) (((status) & 0xff) == 0x7f)
+#define WEXITSTATUS(status) (((status) & 0xff00) >> 8)
+#define WTERMSIG(status) ((status) & 0x7f)
+#define WSTOPSIG(status) (((status) & 0xff00) >> 8)
+
 // File descriptors
 #define STDIN_FILENO 0
 #define STDOUT_FILENO 1
@@ -70,6 +86,8 @@ struct timespec {
 // Signal
 #define SIGTRAP 5
 #define SIGKILL 9
+#define SIGSTOP 19
+#define SIGCONT 18
 #define SIG_DFL ((void (*)(int))0)
 #define SIG_IGN ((void (*)(int))1)
 #define NSIG 64

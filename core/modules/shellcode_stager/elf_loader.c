@@ -112,11 +112,39 @@ static Elf_Shdr *_get_section(char *name, void *elf_start) {
 
   return NULL;
 }
+// Returns the required memory size and bounds for the ELF
+// min_vaddr: lowest virtual address
+// max_vaddr: highest virtual address (exclusive)
+int elf_get_memory_bounds(char *elf_start, size_t *min_vaddr, size_t *max_vaddr) {
+  Elf_Ehdr *hdr = (Elf_Ehdr *)elf_start;
+  Elf_Phdr *phdr = (Elf_Phdr *)(elf_start + hdr->e_phoff);
+  size_t min = (size_t)-1;
+  size_t max = 0;
 
+  for (int x = 0; x < hdr->e_phnum; x++) {
+    if (phdr[x].p_type != PT_LOAD || !phdr[x].p_memsz)
+      continue;
+
+    void *map_start = (void *)ROUND_DOWN(phdr[x].p_vaddr, PAGE_SIZE);
+    int round_down_size = (void *)phdr[x].p_vaddr - map_start;
+    int map_size = ROUND_UP(phdr[x].p_memsz + round_down_size, PAGE_SIZE);
+
+    size_t start = (size_t)map_start;
+    size_t end = start + map_size;
+
+    if (start < min) min = start;
+    if (end > max) max = end;
+  }
+
+  if (min_vaddr) *min_vaddr = min;
+  if (max_vaddr) *max_vaddr = max;
+
+  return 0;
+}
 
 
 int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
-             size_t *entry) {
+             size_t *entry, int pre_mapped) {
   DEBUG_PRINT("elf_load started\n");
   Elf_Ehdr *hdr;
   Elf_Phdr *phdr;
@@ -171,12 +199,19 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
     DEBUG_PRINT("Mapping segment %d: vaddr 0x%lx, map_size %d, flags=%u\n", x,
                 phdr[x].p_vaddr, map_size, phdr[x].p_flags);
 
-    void *m = (void *)mmap((void *)(base + (size_t)map_start), map_size,
-                           PROT_READ | PROT_WRITE, // Map RW for loading/relocation
-                           MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
-    if ((long)m < 0) {
-      DEBUG_PRINT("mmap failed for segment %d at %p\n", x, (void*)(base + (size_t)map_start));
-      return -1;
+    void *m = NULL;
+    if (!pre_mapped) {
+        m = (void *)mmap((void *)(base + (size_t)map_start), map_size,
+                               PROT_READ | PROT_WRITE, // Map RW for loading/relocation
+                               MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+        if ((long)m < 0) {
+          DEBUG_PRINT("mmap failed for segment %d at %p\n", x, (void*)(base + (size_t)map_start));
+          return -1;
+        }
+    } else {
+        // Assume memory is already mapped at the desired location
+        m = (void *)(base + (size_t)map_start);
+        DEBUG_PRINT("Using pre-mapped memory at %p\n", m);
     }
 
     memcpy((void *)base + phdr[x].p_vaddr, elf_start + phdr[x].p_offset, phdr[x].p_filesz);
@@ -208,7 +243,7 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
   return 0;
 }
 
-int elf_run(void *buf, char **argv, char **env) {
+int elf_run(void *buf, char **argv, char **env, int pre_mapped) {
   DEBUG_PRINT("elf_run started\n");
   size_t x;
   int str_len;
@@ -257,7 +292,7 @@ int elf_run(void *buf, char **argv, char **env) {
   DEBUG_PRINT("Stack allocated at %p\n", stack);
 
   // Map the ELF in memory
-  if (elf_load(buf, stack, STACK_SIZE, &elf_base, &elf_entry) < 0) {
+  if (elf_load(buf, stack, STACK_SIZE, &elf_base, &elf_entry, pre_mapped) < 0) {
     DEBUG_PRINT("elf_load failed\n");
     return -1;
   }
