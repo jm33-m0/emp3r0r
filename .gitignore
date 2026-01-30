@@ -264,3 +264,6 @@ tags
 # garble
 .h
 tmp/
+
+# blob
+downloader_blob.h
