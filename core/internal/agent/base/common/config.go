@@ -75,12 +75,6 @@ func InitConfig() (err error) {
 	// CA
 	transport.CACrtPEM = []byte(RuntimeConfig.CAPEM)
 
-	// find a writable location for other uses if any
-	_, err = GetRandomWritablePath()
-	if err != nil {
-		logging.Printf("GetRandomWritablePath: %v", err)
-	}
-
 	// Socks5 proxy server
 	addr := fmt.Sprintf("0.0.0.0:%s", RuntimeConfig.AgentSocksServerPort)
 	def.ProxyServer, err = socks5.NewClassicServer(
