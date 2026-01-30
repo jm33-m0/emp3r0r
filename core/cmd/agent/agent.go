@@ -157,7 +157,7 @@ func agent_main() {
 			logging.Printf("[+] Thank you! We got a proxy: %s", common.RuntimeConfig.C2TransportProxy)
 			break
 		}
-		time.Sleep(time.Duration(util.RandInt(3, 20)) * time.Second)
+		util.TakeASnap()
 	}
 
 	isCheckedIn := false

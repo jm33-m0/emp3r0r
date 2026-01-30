@@ -92,26 +92,6 @@ static void _get_rand(char *buf, int size) {
 
 
 
-static Elf_Shdr *_get_section(char *name, void *elf_start) {
-  int x;
-  Elf_Ehdr *ehdr = NULL;
-  Elf_Shdr *shdr;
-
-  ehdr = (Elf_Ehdr *)elf_start;
-  shdr = (Elf_Shdr *)(elf_start + ehdr->e_shoff);
-
-  Elf_Shdr *sh_strtab = &shdr[ehdr->e_shstrndx];
-  char *sh_strtab_p = elf_start + sh_strtab->sh_offset;
-
-  for (x = 0; x < ehdr->e_shnum; x++) {
-    // printf("%p %s\n", shdr[x].sh_addr, sh_strtab_p + shdr[x].sh_name);
-
-    if (!strcmp(name, sh_strtab_p + shdr[x].sh_name))
-      return &shdr[x];
-  }
-
-  return NULL;
-}
 // Returns the required memory size and bounds for the ELF
 // min_vaddr: lowest virtual address
 // max_vaddr: highest virtual address (exclusive)
@@ -142,56 +122,86 @@ int elf_get_memory_bounds(char *elf_start, size_t *min_vaddr, size_t *max_vaddr)
   return 0;
 }
 
-// Handle relocations for ET_DYN (PIE) binaries
-// Currently only supports R_X86_64_RELATIVE for x86_64
+// Handle relocations for ET_DYN (PIE) binaries using PT_DYNAMIC
 static int elf_relocate(char *elf_start, size_t base_addr) {
   Elf_Ehdr *hdr = (Elf_Ehdr *)elf_start;
-  Elf_Shdr *shdr = (Elf_Shdr *)(elf_start + hdr->e_shoff);
-  
-  for (int i = 0; i < hdr->e_shnum; i++) {
-    if (shdr[i].sh_type == SHT_REL || shdr[i].sh_type == SHT_RELA) {
-      Elf_Shdr *rel_shdr = &shdr[i];
-      
-      // Determine if REL or RELA
-      int is_rela = (shdr[i].sh_type == SHT_RELA);
-      size_t ent_size = is_rela ? sizeof(Elf_Rela) : sizeof(Elf_Rel);
-      size_t count = rel_shdr->sh_size / ent_size;
-      
-      char *rel_addr = elf_start + rel_shdr->sh_offset;
-      
-      for (size_t j = 0; j < count; j++) {
-        size_t offset = 0;
-        size_t info = 0;
-        int64_t addend = 0;
-        
-        if (is_rela) {
-          Elf_Rela *rela = (Elf_Rela *)(rel_addr + j * sizeof(Elf_Rela));
-          offset = rela->r_offset;
-          info = rela->r_info;
-          addend = rela->r_addend;
-        } else {
-          Elf_Rel *rel = (Elf_Rel *)(rel_addr + j * sizeof(Elf_Rel));
-          offset = rel->r_offset;
-          info = rel->r_info;
-          addend = 0; // REL entries typically store addend in the target location
+  Elf_Phdr *phdr = (Elf_Phdr *)(elf_start + hdr->e_phoff);
+  Elf_Dyn *dyn = NULL;
+  size_t dyn_size = 0;
+
+  // Find PT_DYNAMIC
+  for (int i = 0; i < hdr->e_phnum; i++) {
+    if (phdr[i].p_type == PT_DYNAMIC) {
+      dyn = (Elf_Dyn *)(base_addr + phdr[i].p_vaddr);
+      dyn_size = phdr[i].p_memsz;
+      break;
+    }
+  }
+
+  if (!dyn) return 0; // Not dynamic
+
+  size_t rela = 0, relasz = 0, relaent = 0;
+  size_t rel = 0, relsz = 0, relent = 0;
+  size_t jmprel = 0, pltrelsz = 0;
+  int plt_is_rela = 0;
+
+  for (size_t i = 0; i < dyn_size / sizeof(Elf_Dyn); i++) {
+    if (dyn[i].d_tag == DT_NULL) break;
+    switch (dyn[i].d_tag) {
+      case DT_RELA: rela = dyn[i].d_un.d_ptr; break;
+      case DT_RELASZ: relasz = dyn[i].d_un.d_val; break;
+      case DT_RELAENT: relaent = dyn[i].d_un.d_val; break;
+      case DT_REL: rel = dyn[i].d_un.d_ptr; break;
+      case DT_RELSZ: relsz = dyn[i].d_un.d_val; break;
+      case DT_RELENT: relent = dyn[i].d_un.d_val; break;
+      case DT_JMPREL: jmprel = dyn[i].d_un.d_ptr; break;
+      case DT_PLTRELSZ: pltrelsz = dyn[i].d_un.d_val; break;
+      case DT_PLTREL: plt_is_rela = (dyn[i].d_un.d_val == DT_RELA); break;
+    }
+  }
+
+  // Apply RELA relocations
+  if (rela && relasz && relaent) {
+    for (size_t i = 0; i < relasz / relaent; i++) {
+      Elf_Rela *r = (Elf_Rela *)(base_addr + rela + i * relaent);
+      if (ELF_R_TYPE(r->r_info) == 8) { // R_X86_64_RELATIVE
+        size_t *target = (size_t *)(base_addr + r->r_offset);
+        *target = base_addr + r->r_addend;
+      }
+    }
+  }
+
+  // Apply REL relocations
+  if (rel && relsz && relent) {
+    for (size_t i = 0; i < relsz / relent; i++) {
+      Elf_Rel *r = (Elf_Rel *)(base_addr + rel + i * relent);
+      if (ELF_R_TYPE(r->r_info) == 8) { // R_X86_64_RELATIVE
+        size_t *target = (size_t *)(base_addr + r->r_offset);
+        *target = base_addr + *target;
+      }
+    }
+  }
+
+  // Apply PLT relocations
+  if (jmprel && pltrelsz) {
+    size_t ent = plt_is_rela ? (relaent ? relaent : sizeof(Elf_Rela)) : (relent ? relent : sizeof(Elf_Rel));
+    for (size_t i = 0; i < pltrelsz / ent; i++) {
+      if (plt_is_rela) {
+        Elf_Rela *r = (Elf_Rela *)(base_addr + jmprel + i * ent);
+        if (ELF_R_TYPE(r->r_info) == 8) {
+          size_t *target = (size_t *)(base_addr + r->r_offset);
+          *target = base_addr + r->r_addend;
         }
-        
-        int type = ELF_R_TYPE(info);
-        
-        // R_X86_64_RELATIVE = 8
-        if (type == 8) {
-             size_t *target = (size_t *)(base_addr + offset);
-             // For RELA, value = base + addend
-             // For REL, value = base + *target (addend in place)
-             if (is_rela) {
-                 *target = base_addr + addend;
-             } else {
-                 *target = base_addr + *target;
-             }
+      } else {
+        Elf_Rel *r = (Elf_Rel *)(base_addr + jmprel + i * ent);
+        if (ELF_R_TYPE(r->r_info) == 8) {
+          size_t *target = (size_t *)(base_addr + r->r_offset);
+          *target = base_addr + *target;
         }
       }
     }
   }
+
   return 0;
 }
 
@@ -206,7 +216,7 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
   size_t x;
   int elf_prot = 0;
   int stack_prot = 0;
-  size_t base;
+  size_t base = 0;
   size_t total_mapped_size = 0;
 
   hdr = (Elf_Ehdr *)elf_start;
@@ -216,10 +226,10 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
 
   if (hdr->e_type == ET_DYN) {
     DEBUG_PRINT("ET_DYN (PIE) detected.\n");
-    // For PIE, we need to decide where to load.
-    // If module_path is provided, we try to stomp.
-    
-    if (module_path && module_path[0] != '\0') {
+    if (pre_mapped && base_addr && *base_addr != 0) {
+        base = *base_addr;
+        mapped_mem = (void *)base;
+    } else if (module_path && module_path[0] != '\0') {
       DEBUG_PRINT("Attempting module stomping on %s\n", module_path);
       int fd = open(module_path, O_RDONLY, 0);
       if (fd >= 0) {
@@ -256,12 +266,6 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
                            // We will use this as base
                            base = (size_t)mapped_mem;
                            total_mapped_size = st_size;
-                           
-                           // We need to unmap it and remap? 
-                           // No, effectively we just overwrote the memory view with the file content, 
-                           // now we overwrite it with OUR content.
-                           // BUT we need to handle segments correctly.
-                           // Actually, we should just use this mapped region as the "heap" for our segments.
                       } else {
                            DEBUG_PRINT("mprotect RW failed\n");
                            munmap(mapped_mem, st_size);
@@ -278,17 +282,8 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
       }
     }
     
-    if (mapped_mem) {
-        // Stomping successful so far
-    } else {
+    if (!mapped_mem) {
         DEBUG_PRINT("Falling back to anonymous memory\n");
-        base = 0; // We will let the first segment mmap determine the base if not pre-calculated?
-        // For PIE in anonymous memory, we usually just mmap a big chunk or let the OS decide.
-        // However, the provided loader logic does per-segment mmap.
-        // If base is 0, we need to pick a base or let the first segment pick it.
-        // But headers usually have 0-based vaddrs for PIE.
-        // So we need to allocate a base region first.
-        
         // Let's just calculate total size and mmap a region
          size_t min_v = (size_t)-1, max_v = 0;
          for (int i=0; i<hdr->e_phnum; i++) {
@@ -317,11 +312,6 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
   if (base_addr != NULL)
     *base_addr = base; // Set base addr
 
-  if (entry != NULL) {
-    *entry = base + hdr->e_entry;
-    DEBUG_PRINT("Entry point set to 0x%lx\n", *entry);
-  }
-  
   if (mapped_size != NULL) {
       *mapped_size = total_mapped_size;
   }
@@ -416,7 +406,7 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
   return 0;
 }
 
-int elf_run(void *buf, char **argv, char **env, int pre_mapped, const char *module_path) {
+int elf_run(void *buf, char **argv, char **env, int pre_mapped, const char *module_path, size_t base_addr) {
   DEBUG_PRINT("elf_run started\n");
   size_t x;
   int str_len;
@@ -428,9 +418,8 @@ int elf_run(void *buf, char **argv, char **env, int pre_mapped, const char *modu
 
   Elf_Ehdr *hdr = (Elf_Ehdr *)buf;
 
-  size_t elf_base, elf_entry;
-  size_t interp_base = 0;
-  size_t interp_entry = 0;
+  size_t elf_base = base_addr;
+  size_t elf_entry = 0;
 
   char rand_bytes[16];
 
@@ -469,6 +458,7 @@ int elf_run(void *buf, char **argv, char **env, int pre_mapped, const char *modu
     DEBUG_PRINT("elf_load failed\n");
     return -1;
   }
+  elf_entry = elf_base + hdr->e_entry;
   DEBUG_PRINT("ELF loaded at 0x%lx, entry 0x%lx\n", elf_base, elf_entry);
 
   // Check if this is a shared object and find main symbol
@@ -528,14 +518,6 @@ int elf_run(void *buf, char **argv, char **env, int pre_mapped, const char *modu
   // End-of-env NULL
   stack_storage[stack_ptr++] = 0;
 
-  // Let's run the constructors
-
-
-  size_t base = 0;
-
-
-
-
   struct ATENTRY *at = (struct ATENTRY *)&stack_storage[stack_ptr];
 
   // AT_PHDR
@@ -552,7 +534,7 @@ int elf_run(void *buf, char **argv, char **env, int pre_mapped, const char *modu
   at[cnt++].value = PAGE_SIZE;
   // AT_BASE (base address where the interpreter is loaded at)
   at[cnt].id = AT_BASE;
-  at[cnt++].value = interp_base;
+  at[cnt++].value = 0;
   // AT_FLAGS
   at[cnt].id = AT_FLAGS;
   at[cnt++].value = 0;
@@ -634,13 +616,7 @@ int elf_run(void *buf, char **argv, char **env, int pre_mapped, const char *modu
 
 
 
-  //
-  // Architecture and OS dependant init-reg-and-jump-to-start trampoline
-  //
-  if (interp_entry)
-    jump_start(stack_storage, (void *)_exit_func, (void *)interp_entry);
-  else
-    jump_start(stack_storage, (void *)_exit_func, (void *)elf_entry);
+  jump_start(stack_storage, (void *)_exit_func, (void *)elf_entry);
 
   // Shouldn't be reached, but just in case
   return -1;

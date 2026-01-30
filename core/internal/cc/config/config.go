@@ -59,6 +59,7 @@ func SaveConfigJSON() (err error) {
 		"padding_min":                        live.RuntimeConfig.PaddingMin,
 		"padding_max":                        live.RuntimeConfig.PaddingMax,
 		"jitter":                             live.RuntimeConfig.Jitter,
+		"is_run_by_stager":                   live.RuntimeConfig.IsRunByStager,
 	}
 
 	w_data, err := json.MarshalIndent(configMap, "", "  ")

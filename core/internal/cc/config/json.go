@@ -91,6 +91,7 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 	config_to_write.PaddingMax = getInt("padding_max")
 	config_to_write.Jitter = getInt("jitter")
 	config_to_write.ModulePath = getString("module_path")
+	config_to_write.IsRunByStager = getBool("is_run_by_stager")
 
 	// C2 Headers
 	if val, ok := raw["c2_headers"].(map[string]interface{}); ok {
