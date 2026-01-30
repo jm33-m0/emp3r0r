@@ -8,6 +8,7 @@
 #include <elf.h>
 
 #ifdef DEBUG
+void debug_print(const char *format, ...);
 #define DEBUG_PRINT(fmt, args...) debug_print("ELF: " fmt, ##args)
 #else
 #define DEBUG_PRINT(fmt, args...)
@@ -611,7 +612,7 @@ int elf_run(void *buf, char **argv, char **env, int pre_mapped, const char *modu
 
   DEBUG_PRINT("Stack setup complete, jumping to entry point\n");
   DEBUG_PRINT("Stack storage: 0x%lx\n", (unsigned long)stack_storage);
-  DEBUG_PRINT("Entry point: 0x%lx\n", (unsigned long)(interp_entry ? interp_entry : elf_entry));
+  DEBUG_PRINT("Entry point: 0x%lx\n", (unsigned long)elf_entry);
 
 
 

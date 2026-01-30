@@ -61,6 +61,22 @@ jobs:
         run: |
           go test -v ./lib/exeutil -run TestInMemExeRun -count=1
 
+      - name: Install zig (for shellcode stager test)
+        if: runner.os == 'Linux'
+        run: |
+          wget -q https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz
+          tar -xf zig-linux-x86_64-0.13.0.tar.xz
+          sudo mv zig-linux-x86_64-0.13.0 /usr/local/zig
+          sudo ln -sf /usr/local/zig/zig /usr/local/bin/zig
+
+      - name: Run shellcode stager lifecycle test (cgo, no race)
+        if: runner.os == 'Linux'
+        working-directory: ./core/modules/shellcode_stager
+        env:
+          CGO_ENABLED: 1
+        run: |
+          cd test && go test -v -count=1 -timeout 3m -run TestShellcodeStagerLifecycle
+
       - name: Run tests (Windows, with race)
         if: runner.os == 'Windows'
         working-directory: ./core
