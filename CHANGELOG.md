@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.16.1](https://github.com/jm33-m0/emp3r0r/compare/v3.16.0...v3.16.1) (2026-01-30)
+
+
+### Bug Fixes
+
+* introduce stager mode for agents, to properly enforcing sleep mask ([3bf97dd](https://github.com/jm33-m0/emp3r0r/commit/3bf97ddad2cf9445b87ad5cdef3712d745f0c0df))
+* modify util.TakeASnap to accept a forceSleep argument so it doesn't kill the agent after checking in ([c13425b](https://github.com/jm33-m0/emp3r0r/commit/c13425b20476e774dec0960f13531f224877ffa6))
+* remove dead code and speed up agent ([ed3b914](https://github.com/jm33-m0/emp3r0r/commit/ed3b9148597f5c3ab5ee90d663fcd606c1197c6a))
+* reset agent check-in status on reconnect and adjust random sleep intervals. ([96e16ce](https://github.com/jm33-m0/emp3r0r/commit/96e16cec9da4deacbfd7d5ee43b09a910d736a14))
+
 ## [3.16.0](https://github.com/jm33-m0/emp3r0r/compare/v3.15.1...v3.16.0) (2026-01-30)
 
 
