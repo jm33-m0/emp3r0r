@@ -439,9 +439,9 @@ func TestDynamicPrefix(t *testing.T) {
 	t.Log("Successfully connected MsgTun with dynamic prefix")
 }
 
-func TestCheckinWithRandomPaths_DefaultFallback(t *testing.T) {
+func TestCheckinWithRandomPaths_Strict(t *testing.T) {
 	// Setup temp dir for certs
-	tmpDir, err := os.MkdirTemp("", "agent_test_random_lifecycle_fallback")
+	tmpDir, err := os.MkdirTemp("", "agent_test_random_lifecycle")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -489,7 +489,6 @@ func TestCheckinWithRandomPaths_DefaultFallback(t *testing.T) {
 	// CUSTOM PATHS on SERVER
 	c2Prefix := "custom_prefix"
 	checkInPath := "custom_checkin"
-	// But agent will use DEFAULT paths
 
 	// Setup C2 Config
 	live.RuntimeConfig = &def.Config{
@@ -520,7 +519,7 @@ func TestCheckinWithRandomPaths_DefaultFallback(t *testing.T) {
 		AgentUUIDSig: agentSig,
 		AgentTag:     agentTag,
 		C2Prefix:     c2Prefix,
-		// CheckInPath is NOT set, so agent defaults to "checkin"
+		CheckInPath:  checkInPath, // Agent MUST use the correct path now
 	}
 	def.CCAddress = c2URL
 
@@ -536,7 +535,7 @@ func TestCheckinWithRandomPaths_DefaultFallback(t *testing.T) {
 	// Check-in
 	agentInfo := &def.Emp3r0rAgent{
 		Tag:     agentTag,
-		Name:    "test-random-path-lifecycle-fallback",
+		Name:    "test-random-path-lifecycle",
 		UUID:    agentUUID,
 		UUIDSig: agentSig,
 	}
@@ -545,5 +544,5 @@ func TestCheckinWithRandomPaths_DefaultFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReportStatus failed with random paths: %v", err)
 	}
-	t.Log("Successfully checked in with random paths (fallback)")
+	t.Log("Successfully checked in with random paths")
 }

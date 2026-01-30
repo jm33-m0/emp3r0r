@@ -3,12 +3,14 @@ package operator
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
@@ -93,8 +95,27 @@ func TestMakeConfig_PreservesPaths(t *testing.T) {
 	expectedCheckin := "pre_existing_checkin"
 	expectedMsg := "pre_existing_msg"
 
+	// Mock Transport Paths to avoid permission issues or pollution
+	tmpDir, _ := os.MkdirTemp("", "emp3r0r_operator_test_gen")
+	defer os.RemoveAll(tmpDir)
+
+	transport.CaCrtFile = filepath.Join(tmpDir, "ca-cert.pem")
+	transport.CaKeyFile = filepath.Join(tmpDir, "ca-key.pem")
+	transport.ServerCrtFile = filepath.Join(tmpDir, "server-cert.pem")
+	transport.ServerKeyFile = filepath.Join(tmpDir, "server-key.pem")
+	transport.OperatorCaCrtFile = filepath.Join(tmpDir, "ca-cert.pem") // simplified
+	transport.OperatorServerCrtFile = filepath.Join(tmpDir, "server-cert.pem")
+	transport.OperatorServerKeyFile = filepath.Join(tmpDir, "server-key.pem")
+	transport.EmpWorkSpace = tmpDir
+
+	// Generate required certs
+	_, _ = transport.GenCerts(nil, transport.CaCrtFile, transport.CaKeyFile, "", "", true)
+	_, _ = transport.GenCerts([]string{"127.0.0.1"}, transport.ServerCrtFile, transport.ServerKeyFile, transport.CaKeyFile, transport.CaCrtFile, false)
+	_, _ = transport.GenCerts([]string{"127.0.0.1"}, transport.OperatorServerCrtFile, transport.OperatorServerKeyFile, transport.CaKeyFile, transport.CaCrtFile, false)
+
 	existingConfig := map[string]interface{}{
-		"cc_address":              "1.2.3.4",
+		"cc_address":              "127.0.0.1",
+		"cc_host":                 "127.0.0.1",
 		"agent_socks_server_port": "12345",
 		"c2_prefix":               expectedPrefix,
 		"checkin_path":            expectedCheckin,
@@ -108,6 +129,7 @@ func TestMakeConfig_PreservesPaths(t *testing.T) {
 
 	// Reset live.RuntimeConfig to empty state to simulate fresh run
 	live.RuntimeConfig = &def.Config{}
+	live.IsServer = true // ensure we don't skip cert logic if needed
 
 	// Run MakeConfig via CmdGenerateAgent logic (simulated)
 	// MakeConfig is in internal/cc/operator/generate.go
