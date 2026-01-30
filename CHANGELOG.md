@@ -1,5 +1,24 @@
 # Changelog
 
+## [3.16.0](https://github.com/jm33-m0/emp3r0r/compare/v3.15.1...v3.16.0) (2026-01-30)
+
+
+### Features
+
+* Add PIE (ET_DYN) ELF loading with relocation support and module stomping capabilities. ([c011cf1](https://github.com/jm33-m0/emp3r0r/commit/c011cf165a788c8e6cb8f00658681b4ebd2783b6))
+* configurable library stomping for intermediate stage loading. ([8bf778d](https://github.com/jm33-m0/emp3r0r/commit/8bf778d055b892e9c2acbdc087a6e5f59717a755))
+* Enable PIE builds for Linux agents ([c3c4f7f](https://github.com/jm33-m0/emp3r0r/commit/c3c4f7fd16a0384ea8e9130e4d8da750f4930b36))
+* Enhance ELF loader to stomp system libraries for temporary execution and restore original mappings. ([cd7fb66](https://github.com/jm33-m0/emp3r0r/commit/cd7fb66a56578912377371e2ea2897c09dc8b822))
+* implement agent self-suspension and stager-managed shared memory execution with process resumption. ([d76afe6](https://github.com/jm33-m0/emp3r0r/commit/d76afe6faf2a142f44d52eec5a893eaad21c342d))
+* Implement periodic XOR-based payload rotation to obfuscate the stager while idle. ([105d95d](https://github.com/jm33-m0/emp3r0r/commit/105d95d40de1457ec392cd9fae20c7ed8e153b82))
+* minimize stager logic by removing unneeded code after downloading ([f6b4f77](https://github.com/jm33-m0/emp3r0r/commit/f6b4f772857f7fdd2488f2308c82910b82f61e0f))
+
+
+### Bug Fixes
+
+* `generate` fails to patch agent with correct config from `emp3r0r.json` ([ec19251](https://github.com/jm33-m0/emp3r0r/commit/ec19251c53addc7cb7b87760ac7dbc7f946dbe8b))
+* server routing ([c138725](https://github.com/jm33-m0/emp3r0r/commit/c1387258509f91d8b92b17271c5b02271adada50))
+
 ## [3.15.1](https://github.com/jm33-m0/emp3r0r/compare/v3.15.0...v3.15.1) (2026-01-27)
 
 
