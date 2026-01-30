@@ -61,7 +61,7 @@ build_agent_pure() {
   [[ "$arg1" != "--debug" ]] && tags="netgo release agent"
 
   local win_gui_flag=""
-  [[ "$arg1" != "--debug" ]] && win_gui_flag="-H=windowsgui "
+  [[ "$arg1" != "--debug" ]] && [[ "$os" == "windows" ]] && win_gui_flag="-H=windowsgui "
   
   # Add extra extldflags if provided
   local current_ldflags="$ldflags"
@@ -132,7 +132,7 @@ build_shared_object() {
   local extldflags="-nostdlib -nodefaultlibs -static"
   [[ "$arg1" != "--debug" ]] && extldflags="-s $extldflags"
   local win_gui_flag=""
-  [[ "$arg1" != "--debug" ]] && win_gui_flag="-H=windowsgui "
+  [[ "$arg1" != "--debug" ]] && [[ "$os" == "windows" ]] && win_gui_flag="-H=windowsgui "
   case "$os" in
   windows)
     case "$arch" in
