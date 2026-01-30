@@ -17,6 +17,15 @@ void debug_print(const char *format, ...);
 // Declare the jump_start function for all architectures
 void jump_start(void *init, void *exit_func, void *entry);
 
+// Define RELATIVE constant based on arch
+#if defined(__x86_64__) || defined(__amd64__) || defined(__i386__)
+    #define REL_TYPE_RELATIVE 8
+#elif defined(__aarch64__)
+    #define REL_TYPE_RELATIVE 1027
+#else
+    #define REL_TYPE_RELATIVE 8 // Fallback
+#endif
+
 #if defined(GOARCH_amd64)
 void jump_start(void *init, void *exit_func, void *entry) {
   register long rsp __asm__("rsp") = (long)init;
@@ -165,7 +174,7 @@ static int elf_relocate(char *elf_start, size_t base_addr) {
   if (rela && relasz && relaent) {
     for (size_t i = 0; i < relasz / relaent; i++) {
       Elf_Rela *r = (Elf_Rela *)(base_addr + rela + i * relaent);
-      if (ELF_R_TYPE(r->r_info) == 8) { // R_X86_64_RELATIVE
+      if (ELF_R_TYPE(r->r_info) == REL_TYPE_RELATIVE) {
         size_t *target = (size_t *)(base_addr + r->r_offset);
         *target = base_addr + r->r_addend;
       }
@@ -176,7 +185,7 @@ static int elf_relocate(char *elf_start, size_t base_addr) {
   if (rel && relsz && relent) {
     for (size_t i = 0; i < relsz / relent; i++) {
       Elf_Rel *r = (Elf_Rel *)(base_addr + rel + i * relent);
-      if (ELF_R_TYPE(r->r_info) == 8) { // R_X86_64_RELATIVE
+      if (ELF_R_TYPE(r->r_info) == REL_TYPE_RELATIVE) {
         size_t *target = (size_t *)(base_addr + r->r_offset);
         *target = base_addr + *target;
       }
@@ -393,6 +402,12 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
   if (hdr->e_type == ET_DYN) {
       DEBUG_PRINT("Relocating...\n");
       elf_relocate(elf_start, base);
+
+      // Seal the memory before applying segment permissions.
+      // This ensures the "tail" (unused part of the stomped module) is not left RW.
+      if (mapped_mem) {
+          mprotect(mapped_mem, total_mapped_size, PROT_READ);
+      }
   }
 
   // Set proper protection on all sections

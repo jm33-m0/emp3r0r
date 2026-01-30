@@ -107,7 +107,10 @@ build_agent_cgo() {
   # And we add external linker flags for static build
   # Also add -s to extldflags if not debugging, to ensure the binary is stripped
   local extldflags="-static"
-  [[ "$arg1" != "--debug" ]] && extldflags="-static -s"
+  if [[ "$extra_extldflags" == *"-static-pie"* ]]; then
+    extldflags="-s"
+  fi
+  [[ "$arg1" != "--debug" ]] && extldflags="$extldflags -s"
   
   # Append extra extldflags if provided
   if [[ -n "$extra_extldflags" ]]; then
