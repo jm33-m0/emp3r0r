@@ -49,6 +49,12 @@
       "description": "Path to a writable and executable library on the target system to stomp (for PIE loading). Leave empty for anonymous memory loading.",
       "default": "",
       "type": "string"
+    },
+    {
+      "name": "DOWNLOADER_MODULE_PATH",
+      "description": "Path to a library to stomp for the downloader (intermediate stage). Leave empty for anonymous memory.",
+      "default": "/lib/x86_64-linux-gnu/libdl.so.2",
+      "type": "string"
     }
   ],
   "agent_config": {

