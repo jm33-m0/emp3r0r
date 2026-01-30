@@ -208,7 +208,7 @@ func GetChildren(pid int) (children []int, err error) {
 }
 
 // sleep for a random interval between 5s to 60s
-func TakeASnap() {
+var TakeASnap = func() {
 	interval := time.Duration(RandInt(5000, 60000))
 	time.Sleep(interval * time.Millisecond)
 }

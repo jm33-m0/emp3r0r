@@ -269,6 +269,7 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 	proxy_chain_max, _ := cmd.Flags().GetInt("proxychain-wait-max")
 	ncsi, _ := cmd.Flags().GetBool("ncsi")
 	kcp, _ := cmd.Flags().GetBool("kcp")
+	is_stager, _ := cmd.Flags().GetBool("stager")
 
 	// read existing config when possible
 	// read existing config when possible
@@ -383,6 +384,11 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 	} else {
 		live.RuntimeConfig.ProxyChainBroadcastIntervalMax = 0
 		logging.Printf("Proxy chain is disabled")
+	}
+
+	live.RuntimeConfig.IsRunByStager = is_stager
+	if is_stager {
+		logging.Printf("Agent is built for stager")
 	}
 
 	// save emp3r0r.json

@@ -48,6 +48,14 @@ func agent_main() {
 	}
 	util.SetFileCryptoKey([]byte(common.RuntimeConfig.Password))
 
+	// if run by stager, patch util.TakeASnap to trigger SIGSTOP
+	if common.RuntimeConfig.IsRunByStager {
+		logging.Println("Agent is run by a stager, patching util.TakeASnap to trigger SIGSTOP")
+		util.TakeASnap = func() {
+			conditionalC2FailNotify()
+		}
+	}
+
 	if !is_dll {
 		// don't be hasty
 		time.Sleep(time.Duration(util.RandInt(3, 10)) * time.Second)

@@ -514,6 +514,7 @@ func gen_agent_cmd() *cobra.Command {
 	genAgentCmd.Flags().BoolP("proxychain", "", false, "Enable auto proxy chain, agents will negotiate and form a Shadowsocks proxy chain to reach C2")
 	genAgentCmd.Flags().IntP("proxychain-wait-min", "", util.RandInt(30, 120), "How many minimum seconds to wait before sending each broadcast packet to negotiate proxy chain")
 	genAgentCmd.Flags().IntP("proxychain-wait-max", "", 0, "How many maximum seconds to wait before sending each broadcast packet to negotiate proxy chain")
+	genAgentCmd.Flags().BoolP("stager", "", false, "Whether the agent is intended to be delivered by a stager. This enables stealth features like memory encryption and suspension.")
 
 	// completers
 	carapace.Gen(genAgentCmd).FlagCompletion(carapace.ActionMap{
