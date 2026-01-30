@@ -196,8 +196,9 @@ static int elf_relocate(char *elf_start, size_t base_addr) {
 }
 
 
+// pre_mapped: if true, assume memory at base_addr is already mapped and writable
 int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
-             size_t *entry, int pre_mapped, const char *module_path) {
+             size_t *entry, size_t *mapped_size, int pre_mapped, const char *module_path) {
   DEBUG_PRINT("elf_load started\n");
   Elf_Ehdr *hdr;
   Elf_Phdr *phdr;
@@ -206,6 +207,7 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
   int elf_prot = 0;
   int stack_prot = 0;
   size_t base;
+  size_t total_mapped_size = 0;
 
   hdr = (Elf_Ehdr *)elf_start;
   phdr = (Elf_Phdr *)(elf_start + hdr->e_phoff);
@@ -231,7 +233,7 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
             // Calculate required size for our payload
             size_t required_size = 0;
              // We need to iterate PHDRs to find the total span
-             size_t min_v = -1, max_v = 0;
+             size_t min_v = (size_t)-1, max_v = 0;
              for (int i=0; i<hdr->e_phnum; i++) {
                  if (phdr[i].p_type == PT_LOAD && phdr[i].p_memsz > 0) {
                      size_t vstart = phdr[i].p_vaddr;
@@ -253,6 +255,7 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
                            DEBUG_PRINT("Stomping memory...\n");
                            // We will use this as base
                            base = (size_t)mapped_mem;
+                           total_mapped_size = st_size;
                            
                            // We need to unmap it and remap? 
                            // No, effectively we just overwrote the memory view with the file content, 
@@ -287,7 +290,7 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
         // So we need to allocate a base region first.
         
         // Let's just calculate total size and mmap a region
-         size_t min_v = -1, max_v = 0;
+         size_t min_v = (size_t)-1, max_v = 0;
          for (int i=0; i<hdr->e_phnum; i++) {
              if (phdr[i].p_type == PT_LOAD && phdr[i].p_memsz > 0) {
                  size_t vstart = phdr[i].p_vaddr;
@@ -303,6 +306,7 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
              return -1;
          }
          base = (size_t)mapped_mem;
+         total_mapped_size = total_size;
     }
 
   } else {
@@ -316,6 +320,10 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
   if (entry != NULL) {
     *entry = base + hdr->e_entry;
     DEBUG_PRINT("Entry point set to 0x%lx\n", *entry);
+  }
+  
+  if (mapped_size != NULL) {
+      *mapped_size = total_mapped_size;
   }
 
   // Use a fixed size array to avoid VLA issues
@@ -457,7 +465,7 @@ int elf_run(void *buf, char **argv, char **env, int pre_mapped, const char *modu
   DEBUG_PRINT("Stack allocated at %p\n", stack);
 
   // Map the ELF in memory
-  if (elf_load(buf, stack, STACK_SIZE, &elf_base, &elf_entry, pre_mapped, module_path) < 0) {
+  if (elf_load(buf, stack, STACK_SIZE, &elf_base, &elf_entry, NULL, pre_mapped, module_path) < 0) {
     DEBUG_PRINT("elf_load failed\n");
     return -1;
   }

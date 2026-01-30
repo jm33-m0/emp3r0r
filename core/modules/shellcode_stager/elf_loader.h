@@ -93,7 +93,7 @@ int elf_get_memory_bounds(char *elf_start, size_t *min_vaddr, size_t *max_vaddr)
 
 // pre_mapped: if true, assume memory at base_addr is already mapped and writable
 int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
-             size_t *entry, int pre_mapped, const char *module_path);
+             size_t *entry, size_t *mapped_size, int pre_mapped, const char *module_path);
 
 int elf_run(void *buf, char **argv, char **env, int pre_mapped, const char *module_path);
 
