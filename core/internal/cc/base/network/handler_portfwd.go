@@ -115,7 +115,7 @@ func HandlePortMapping(sh *StreamHandler, wrt http.ResponseWriter, req *http.Req
 			logging.Warningf("Port mapping %s disconnected", sessionID.String())
 			return
 		}
-		util.TakeASnap()
+		util.TakeASnap(false)
 	}
 }
 

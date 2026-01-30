@@ -213,7 +213,7 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 			logging.Errorf("sendHello failed")
 			break
 		}
-		util.TakeASnap()
+		util.TakeASnap(true)
 	}
 
 	return fmt.Errorf("MsgTunneler closed: %v", ctx.Err())

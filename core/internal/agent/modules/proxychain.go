@@ -110,7 +110,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 			if common.RuntimeConfig.C2TransportProxy != "" {
 				if transport.IsProxyOK(common.RuntimeConfig.C2TransportProxy, def.CCAddress) {
 					logging.Printf("BroadcastServer reverse proxy checker: proxy '%s' is already working", common.RuntimeConfig.C2TransportProxy)
-					util.TakeASnap()
+					util.TakeASnap(false)
 					continue
 				}
 			}
@@ -122,7 +122,7 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 					break
 				}
 			}
-			util.TakeASnap()
+			util.TakeASnap(false)
 		}
 		common.RuntimeConfig.C2TransportProxy = rproxy
 		logging.Printf("[+] Reverse proxy configured to %s", rproxy)
