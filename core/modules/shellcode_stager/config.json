@@ -43,6 +43,12 @@
       "default": "",
       "type": "string",
       "secret": true
+    },
+    {
+      "name": "MODULE_PATH",
+      "description": "Path to a writable and executable library on the target system to stomp (for PIE loading). Leave empty for anonymous memory loading.",
+      "default": "",
+      "type": "string"
     }
   ],
   "agent_config": {

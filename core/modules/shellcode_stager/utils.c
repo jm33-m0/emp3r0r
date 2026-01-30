@@ -372,6 +372,14 @@ long read(int fd, void *buf, size_t count) {
 
 long close(int fd) { return syscall1(SYS_close, fd); }
 
+long open(const char *pathname, int flags, int mode) {
+  return syscall3(SYS_open, (long)pathname, flags, mode);
+}
+
+long lseek(int fd, long offset, int whence) {
+  return syscall3(SYS_lseek, fd, offset, whence);
+}
+
 long exit(int error_code) { return syscall1(SYS_exit, error_code); }
 
 long mmap(void *addr, size_t length, int prot, int flags, int fd, long offset) {

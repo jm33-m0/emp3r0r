@@ -44,6 +44,16 @@ typedef long ssize_t;
 #define STDOUT_FILENO 1
 #define STDERR_FILENO 2
 
+// Open flags
+#define O_RDONLY 00
+#define O_WRONLY 01
+#define O_RDWR   02
+
+// Lseek whence
+#define SEEK_SET 0
+#define SEEK_CUR 1
+#define SEEK_END 2
+
 // Socket
 #define AF_INET 2
 #define SOCK_STREAM 1
@@ -135,6 +145,8 @@ long getrandom(void *buf, size_t buflen, unsigned int flags);
 long write(int fd, const void *buf, size_t count);
 long read(int fd, void *buf, size_t count);
 long close(int fd);
+long open(const char *pathname, int flags, int mode);
+long lseek(int fd, long offset, int whence);
 long exit(int error_code);
 long mmap(void *addr, size_t length, int prot, int flags, int fd, long offset);
 long munmap(void *addr, size_t length);

