@@ -21,7 +21,7 @@ import (
 func RelayHTTP2Server() {
 	time.Sleep(3 * time.Second)
 	r := mux.NewRouter()
-	r.HandleFunc(fmt.Sprintf("/%s/{api}/{token}", transport.WebRoot), dispatcher)
+	r.HandleFunc("/{prefix}/{api}/{token}", dispatcher)
 	listenAddr := fmt.Sprintf("%s:%d", netutil.WgOperatorIP, netutil.WgRelayedHTTPPort)
 	err := http.ListenAndServeTLS(listenAddr, transport.OperatorServerCrtFile, transport.OperatorServerKeyFile, r)
 	if err != nil {

