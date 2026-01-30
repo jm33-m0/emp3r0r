@@ -312,45 +312,6 @@ void perror(const char *s) { (void)s; }
 #endif
 
 // -----------------------------------------------------------------------------
-// Network / IP
-// -----------------------------------------------------------------------------
-
-unsigned short htons(unsigned short hostshort) {
-  return (hostshort << 8) | (hostshort >> 8);
-}
-
-unsigned int htonl(unsigned int hostlong) {
-  return ((hostlong & 0xFF000000) >> 24) | ((hostlong & 0x00FF0000) >> 8) |
-         ((hostlong & 0x0000FF00) << 8) | ((hostlong & 0x000000FF) << 24);
-}
-
-int inet_aton(const char *cp, struct in_addr *inp) {
-  unsigned int val = 0;
-  int part = 0;
-  int parts = 0;
-  char c;
-
-  while ((c = *cp++) != '\0') {
-    if (c >= '0' && c <= '9') {
-      part = part * 10 + (c - '0');
-    } else if (c == '.') {
-      if (part > 255)
-        return 0;
-      val = (val << 8) | part;
-      part = 0;
-      parts++;
-    } else {
-      return 0;
-    }
-  }
-  if (part > 255 || parts != 3)
-    return 0;
-  val = (val << 8) | part;
-  inp->s_addr = htonl(val);
-  return 1;
-}
-
-// -----------------------------------------------------------------------------
 // Random
 // -----------------------------------------------------------------------------
 
@@ -383,9 +344,6 @@ long lseek(int fd, long offset, int whence) {
 long exit(int error_code) { return syscall1(SYS_exit, error_code); }
 
 long mmap(void *addr, size_t length, int prot, int flags, int fd, long offset) {
-  // mmap arguments: addr, length, prot, flags, fd, offset
-  // syscall arguments: rdi, rsi, rdx, r10, r8, r9
-  // SYS_mmap is 9
   return syscall6(SYS_mmap, (long)addr, length, prot, flags, fd, offset);
 }
 
@@ -423,7 +381,6 @@ long nanosleep(const struct timespec *req, struct timespec *rem) {
 
 int sigaction(int signum, const struct sigaction *act,
               struct sigaction *oldact) {
-  // rt_sigaction takes size of sigset_t as 4th argument
   return syscall4(SYS_rt_sigaction, signum, (long)act, (long)oldact,
                   sizeof(sigset_t));
 }
@@ -433,42 +390,4 @@ int sigemptyset(sigset_t *set) {
     return -1;
   memset(set, 0, sizeof(sigset_t));
   return 0;
-}
-
-// -----------------------------------------------------------------------------
-// Socket Wrappers
-// -----------------------------------------------------------------------------
-
-int socket(int domain, int type, int protocol) {
-  return (int)syscall3(SYS_socket, domain, type, protocol);
-}
-
-int connect(int sockfd, const struct sockaddr *addr, unsigned int addrlen) {
-  return (int)syscall3(SYS_connect, sockfd, (long)addr, addrlen);
-}
-
-long send(int sockfd, const void *buf, size_t len, int flags) {
-  return syscall6(SYS_sendto, sockfd, (long)buf, len, flags, 0, 0);
-}
-
-long recv(int sockfd, void *buf, size_t len, int flags) {
-  return syscall6(SYS_recvfrom, sockfd, (long)buf, len, flags, 0, 0);
-}
-
-long sendto(int sockfd, const void *buf, size_t len, int flags,
-            const struct sockaddr *dest_addr, unsigned int addrlen) {
-  return syscall6(SYS_sendto, sockfd, (long)buf, len, flags, (long)dest_addr,
-                  addrlen);
-}
-
-long recvfrom(int sockfd, void *buf, size_t len, int flags,
-              struct sockaddr *src_addr, unsigned int *addrlen) {
-  return syscall6(SYS_recvfrom, sockfd, (long)buf, len, flags, (long)src_addr,
-                  (long)addrlen);
-}
-
-int setsockopt(int sockfd, int level, int optname, const void *optval,
-               unsigned int optlen) {
-  return (int)syscall5(SYS_setsockopt, sockfd, level, optname, (long)optval,
-                       optlen);
 }
