@@ -3,7 +3,6 @@ package operator
 import (
 	"bytes"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"os"
 	"slices"
@@ -272,15 +271,15 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 	kcp, _ := cmd.Flags().GetBool("kcp")
 
 	// read existing config when possible
-	var config_map map[string]interface{}
+	// read existing config when possible
 	if util.IsExist(live.EmpConfigFile) {
 		logging.Infof("Reading config from existing %s", live.EmpConfigFile)
 		jsonData, err := os.ReadFile(live.EmpConfigFile)
 		if err != nil {
 			return fmt.Errorf("failed to read %s: %v", live.EmpConfigFile, err)
 		}
-		// load to map
-		err = json.Unmarshal(jsonData, &config_map)
+		// load to live.RuntimeConfig
+		err = config.ReadJSONConfig(jsonData, live.RuntimeConfig)
 		if err != nil {
 			return fmt.Errorf("parsing existing %s: %v", live.EmpConfigFile, err)
 		}

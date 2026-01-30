@@ -438,3 +438,112 @@ func TestDynamicPrefix(t *testing.T) {
 	defer cancel()
 	t.Log("Successfully connected MsgTun with dynamic prefix")
 }
+
+func TestCheckinWithRandomPaths_DefaultFallback(t *testing.T) {
+	// Setup temp dir for certs
+	tmpDir, err := os.MkdirTemp("", "agent_test_random_lifecycle_fallback")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	caCertFile := filepath.Join(tmpDir, "ca-cert.pem")
+	caKeyFile := filepath.Join(tmpDir, "ca-key.pem")
+	serverCertFile := filepath.Join(tmpDir, "server-cert.pem")
+	serverKeyFile := filepath.Join(tmpDir, "server-key.pem")
+
+	// Generate CA
+	_, err = transport.GenCerts(nil, caCertFile, caKeyFile, "", "", true)
+	if err != nil {
+		t.Fatalf("Failed to generate CA: %v", err)
+	}
+
+	// Generate Server Cert
+	_, err = transport.GenCerts([]string{"127.0.0.1"}, serverCertFile, serverKeyFile, caKeyFile, caCertFile, false)
+	if err != nil {
+		t.Fatalf("Failed to generate server cert: %v", err)
+	}
+
+	// Read CA cert
+	caCertData, err := os.ReadFile(caCertFile)
+	if err != nil {
+		t.Fatalf("Failed to read CA cert: %v", err)
+	}
+	transport.CACrtPEM = caCertData
+
+	// Setup Transport Paths for C2 Server
+	transport.CaCrtFile = caCertFile
+	transport.OperatorCaCrtFile = caCertFile
+	transport.ServerCrtFile = serverCertFile
+	transport.ServerKeyFile = serverKeyFile
+	transport.EmpWorkSpace = tmpDir
+
+	// Get random port
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Failed to listen: %v", err)
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	listener.Close()
+
+	// CUSTOM PATHS on SERVER
+	c2Prefix := "custom_prefix"
+	checkInPath := "custom_checkin"
+	// But agent will use DEFAULT paths
+
+	// Setup C2 Config
+	live.RuntimeConfig = &def.Config{
+		CCPort:      fmt.Sprintf("%d", port),
+		CAPEM:       string(caCertData),
+		C2Prefix:    c2Prefix,
+		CheckInPath: checkInPath, // Server expects this
+	}
+
+	// Start Real C2 Server
+	go server.StartC2AgentTLSServer()
+
+	// Wait for server to start
+	time.Sleep(2 * time.Second)
+
+	// Setup Agent Config
+	agentUUID := uuid.New().String()
+	agentTag := "random-path-lifecycle-agent-start"
+	agentSig, err := signUUID(agentUUID, caKeyFile)
+	if err != nil {
+		t.Fatalf("Failed to sign UUID: %v", err)
+	}
+
+	c2URL := fmt.Sprintf("https://127.0.0.1:%d", port)
+	common.RuntimeConfig = &def.Config{
+		CCAddress:    c2URL,
+		AgentUUID:    agentUUID,
+		AgentUUIDSig: agentSig,
+		AgentTag:     agentTag,
+		C2Prefix:     c2Prefix,
+		// CheckInPath is NOT set, so agent defaults to "checkin"
+	}
+	def.CCAddress = c2URL
+
+	// Initialize HTTP Client
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(caCertData)
+	tr := &http.Transport{
+		TLSClientConfig:   &tls.Config{RootCAs: certPool},
+		ForceAttemptHTTP2: true,
+	}
+	def.HTTPClient = &http.Client{Transport: tr}
+
+	// Check-in
+	agentInfo := &def.Emp3r0rAgent{
+		Tag:     agentTag,
+		Name:    "test-random-path-lifecycle-fallback",
+		UUID:    agentUUID,
+		UUIDSig: agentSig,
+	}
+	config := common.RuntimeConfig
+	err = c2transport.ReportStatus(config, agentInfo)
+	if err != nil {
+		t.Fatalf("ReportStatus failed with random paths: %v", err)
+	}
+	t.Log("Successfully checked in with random paths (fallback)")
+}

