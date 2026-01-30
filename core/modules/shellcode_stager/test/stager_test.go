@@ -112,6 +112,27 @@ func TestShellcodeStagerLifecycle(t *testing.T) {
 
 	// Initialize live.EmpWorkSpace for C2 server
 	live.EmpWorkSpace = tmpDir
+	live.IsServer = true
+
+	// Update transport and live paths to use tmpDir
+	transport.EmpWorkSpace = tmpDir
+	transport.CaCrtFile = filepath.Join(tmpDir, "ca-cert.pem")
+	transport.CaKeyFile = filepath.Join(tmpDir, "ca-key.pem")
+	transport.ServerCrtFile = filepath.Join(tmpDir, "server-cert.pem")
+	transport.ServerKeyFile = filepath.Join(tmpDir, "server-key.pem")
+	transport.OperatorCaCrtFile = filepath.Join(tmpDir, "operator-ca-cert.pem")
+	transport.OperatorCaKeyFile = filepath.Join(tmpDir, "operator-ca-key.pem")
+	transport.OperatorServerCrtFile = filepath.Join(tmpDir, "operator-server-cert.pem")
+	transport.OperatorServerKeyFile = filepath.Join(tmpDir, "operator-server-key.pem")
+	transport.OperatorClientCrtFile = filepath.Join(tmpDir, "operator-client-cert.pem")
+	transport.OperatorClientKeyFile = filepath.Join(tmpDir, "operator-client-key.pem")
+	live.EmpConfigFile = filepath.Join(tmpDir, "emp3r0r.json")
+
+	// Generate CA certs first
+	err = config.InitCertsAndConfig()
+	if err != nil {
+		t.Fatalf("Failed to init certs and config: %v", err)
+	}
 
 	// Generate C2 certs using the real config package
 	err = config.GenC2Certs("127.0.0.1")
