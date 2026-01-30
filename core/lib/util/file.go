@@ -306,6 +306,11 @@ func copyDir(src, dst string) error {
 			return err
 		}
 
+		// Skip test directories to avoid permission errors when tests are running
+		if d.IsDir() && d.Name() == "test" {
+			return filepath.SkipDir
+		}
+
 		targetPath := filepath.Join(dst, relPath)
 
 		if d.IsDir() {
