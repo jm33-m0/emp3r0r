@@ -53,6 +53,8 @@ build_agent_pure() {
   local arch=$1
   local os=$2
   local output=$3
+  local extra_flags=$4
+  local extra_extldflags=$5
   info "Building pure agent stub for $os $arch"
 
   local tags="netgo agent"
@@ -60,14 +62,15 @@ build_agent_pure() {
 
   local win_gui_flag=""
   [[ "$arg1" != "--debug" ]] && win_gui_flag="-H=windowsgui "
+  
+  # Add extra extldflags if provided
+  local current_ldflags="$ldflags"
+  if [[ -n "$extra_extldflags" ]]; then
+    current_ldflags="$current_ldflags -extldflags '$extra_extldflags'"
+  fi
 
   # Default build command (CGO_ENABLED=0)
-  local build_cmd="CGO_ENABLED=0 GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -trimpath -buildvcs=false -tags '$tags' -o \\\"$temp/$output\\\" -ldflags=\\\"$ldflags\\\"\""
-
-  if [[ "$os" == "windows" ]]; then
-    # Windows builds also need the release tag
-    build_cmd="CGO_ENABLED=0 GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -trimpath -buildvcs=false -tags '$tags' -o \\\"$temp/$output\\\" -ldflags=\\\"${win_gui_flag}${ldflags}\\\"\""
-  fi
+  local build_cmd="CGO_ENABLED=0 GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt $extra_flags -trimpath -buildvcs=false -tags '$tags' -o \\\"$temp/$output\\\" -ldflags=\\\"${win_gui_flag}${current_ldflags}\\\"\""
 
   echo "Running: $build_cmd"
   {
@@ -80,6 +83,8 @@ build_agent_cgo() {
   local arch=$1
   local os=$2
   local output=$3
+  local extra_flags=$4
+  local extra_extldflags=$5
   info "Building CGO agent stub for $os $arch"
 
   local tags="netgo agent"
@@ -103,8 +108,13 @@ build_agent_cgo() {
   # Also add -s to extldflags if not debugging, to ensure the binary is stripped
   local extldflags="-static"
   [[ "$arg1" != "--debug" ]] && extldflags="-static -s"
+  
+  # Append extra extldflags if provided
+  if [[ -n "$extra_extldflags" ]]; then
+    extldflags="$extldflags $extra_extldflags"
+  fi
 
-  local build_cmd="CGO_ENABLED=1 CC=\"$cc_cmd\" GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt -trimpath -buildvcs=false -tags '$tags' -o \\\"$temp/$output\\\" -ldflags=\\\"$ldflags -linkmode external -extldflags '$extldflags'\\\"\""
+  local build_cmd="CGO_ENABLED=1 CC=\"$cc_cmd\" GOARCH=$arch GOOS=$os sh -c \"$gobuild_cmd $build_opt $extra_flags -trimpath -buildvcs=false -tags '$tags' -o \\\"$temp/$output\\\" -ldflags=\\\"$ldflags -linkmode external -extldflags '$extldflags'\\\"\""
 
   echo "Running: $build_cmd"
   {
@@ -203,13 +213,21 @@ build() {
   } || error "build listener"
 
   # Linux
-  build_agent_cgo "amd64" "linux" "stub-amd64"
-  build_agent_cgo "386" "linux" "stub-386"
+  # PIE builds for all architectures where supported
+  local pie_flags="-buildmode=pie"
+  local ext_pie="-static-pie"
+
+  # Standard Linux agents (PIE)
+  build_agent_cgo "amd64" "linux" "stub-amd64" "$pie_flags" "$ext_pie"
+  build_agent_cgo "386" "linux" "stub-386" "$pie_flags" "$ext_pie"
   build_agent_pure "arm" "linux" "stub-arm"
-  build_agent_cgo "arm64" "linux" "stub-arm64"
-  build_agent_pure "mips" "linux" "stub-mips"
+  build_agent_cgo "arm64" "linux" "stub-arm64" "$pie_flags" "$ext_pie"
+  
+  # MIPS often has issues with PIE, keep static for now unless explicitly requested or tested
+  build_agent_pure "mips" "linux" "stub-mips" 
   build_agent_pure "mips64" "linux" "stub-mips64"
-  build_agent_cgo "riscv64" "linux" "stub-riscv64"
+  
+  build_agent_cgo "riscv64" "linux" "stub-riscv64" "$pie_flags" "$ext_pie"
   build_agent_pure "ppc64" "linux" "stub-ppc64"
 
   # Windows
