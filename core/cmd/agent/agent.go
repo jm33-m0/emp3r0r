@@ -218,6 +218,7 @@ connect:
 	logging.Println("Connecting to message tunnel...")
 	c2transport.MsgTunneler(def.CCMsgConn, common.RuntimeConfig, handler.HandleC2Command, ctx, cancel)
 	logging.Printf("Message tunnel closed, reconnecting")
+	isCheckedIn = false // reset check-in status so we do a fresh check-in
 	goto connect
 }
 
