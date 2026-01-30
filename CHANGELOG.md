@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.16.2](https://github.com/jm33-m0/emp3r0r/compare/v3.16.1...v3.16.2) (2026-01-30)
+
+
+### Bug Fixes
+
+* adjust build script for static-pie builds, improved memory sealing. ([88aca84](https://github.com/jm33-m0/emp3r0r/commit/88aca8415332e033cb1046204af02d3e87270eee))
+
 ## [3.16.1](https://github.com/jm33-m0/emp3r0r/compare/v3.16.0...v3.16.1) (2026-01-30)
 
 
