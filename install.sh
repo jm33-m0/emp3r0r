@@ -82,7 +82,7 @@ cd /tmp/emp3r0r-build || error "Failed to cd to /tmp/emp3r0r-build"
 
 # Install emp3r0r
 warn "Installing emp3r0r"
-sudo ./build.sh --install || error "Failed to install emp3r0r"
+sudo ./build.sh --install-only || error "Failed to install emp3r0r"
 
 info "emp3r0r installed successfully"
 cd - || error "Failed to cd back"
