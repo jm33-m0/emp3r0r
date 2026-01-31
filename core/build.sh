@@ -251,7 +251,7 @@ build() {
   # build_shared_object "arm64" "linux" "stub-arm64.so"
 }
 
-uninstall() {
+do_uninstall() {
   [[ "$EUID" -eq 0 ]] || error "You must be root to uninstall emp3r0r"
   info "emp3r0r will be uninstalled from $prefix"
 
@@ -283,7 +283,7 @@ uninstall() {
   success "emp3r0r has been removed"
 }
 
-install() {
+do_install() {
   [[ "$EUID" -eq 0 ]] || error "You must be root to install emp3r0r"
   info "emp3r0r will be installed to $prefix"
 
@@ -301,7 +301,7 @@ install() {
   mkdir -p "$build_dir" || error "Failed to mkdir $build_dir"
   cp -avR tmux "$data_dir" || error "tmux"
   cp -avR modules "$data_dir" || error "modules"
-  cp -avR stub* "$build_dir" || error "stub"
+  cp -avR "$temp"/stub* "$build_dir" || error "stub"
 
   # fix tmux config
   tmux_dir="$data_dir/tmux"
@@ -309,11 +309,11 @@ install() {
   sed -i "s/~\/sh/$replace/g" "$tmux_dir/.tmux.conf"
 
   # emp3r0r binaries
-  chmod 755 "$0" cc.exe cat.exe
+  chmod 755 "$0" "$temp"/cc.exe "$temp"/cat.exe
   cp -avfR emp3r0r "$bin_dir/emp3r0r" || error "emp3r0r-main"
-  cp -avfR listener.exe "$bin_dir/emp3r0r-listener" || error "emp3r0r-listener"
-  cp -avfR cc.exe "$data_dir/emp3r0r-cc" || error "emp3r0r-cc"
-  cp -avfR cat.exe "$data_dir/emp3r0r-cat" || error "emp3r0r-cat"
+  cp -avfR "$temp"/listener.exe "$bin_dir/emp3r0r-listener" || error "emp3r0r-listener"
+  cp -avfR "$temp"/cc.exe "$data_dir/emp3r0r-cc" || error "emp3r0r-cc"
+  cp -avfR "$temp"/cat.exe "$data_dir/emp3r0r-cat" || error "emp3r0r-cat"
 
   # set capabilities for cc
   current_user="$SUDO_USER"
@@ -370,6 +370,22 @@ install() {
     warn "emp3r0r is still running, stopping it in 3 seconds"
     sleep 3
     tmux kill-session -t emp3r0r || error "Failed to kill emp3r0r"
+  fi
+}
+
+uninstall() {
+  if [[ "$EUID" -ne 0 ]]; then
+    sudo "$0" --uninstall-only
+  else
+    do_uninstall
+  fi
+}
+
+install() {
+  if [[ "$EUID" -ne 0 ]]; then
+    sudo "$0" --install-only
+  else
+    do_install
   fi
 }
 
@@ -447,8 +463,20 @@ case "$1" in
 
   ;;
 
+--install-only)
+  (do_install) || error "install failed"
+  exit 0
+
+  ;;
+
+--uninstall-only)
+  (do_uninstall) || error "uninstall failed"
+  exit 0
+
+  ;;
+
 --install)
-  (install) || error "install failed"
+  (build) && (install) || error "install failed"
   exit 0
 
   ;;
