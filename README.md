@@ -194,7 +194,7 @@ Join our [Discord server](https://discord.gg/vU98aQtk9f) for real-time discussio
 - 📋 [Features Overview](./FEATURES.md)
 - 📝 [Security Policy](./SECURITY.md)
 - 📜 [Changelog](./CHANGELOG.md)
-- 📦 [Module Development (including COFF/BOF)](./emp3r0r.wiki/Modules.md)
+- 📦 [Module Development (including COFF/BOF)](https://github.com/jm33-m0/emp3r0r/wiki/Modules)
 
 ### Troubleshooting
 
