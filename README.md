@@ -36,7 +36,7 @@ emp3r0r is a comprehensive post-exploitation framework that stands out as one of
 - **Advanced Stealth**: **Memory-backed agent file system** with transparent encryption, **configurable module stomping**, stager-managed **shared memory execution** with process resumption, native **Linux BOF support**, and **XOR-based payload rotation** for idle stagers.
 - **Modern Infrastructure**: WireGuard + mTLS operator authentication, HTTP2/TLS with **JA3 fingerprinting evasion**, KCP-based UDP tunneling, and **customizable C2 paths** (WebRoot, check-in, message paths).
 - **COFF/BOF Loader**: Native BOF execution on Windows agents with typed argument packing (LPSTR/LPWSTR/INT/BOOL/BINARY), and integration-friendly module schema; on Linux you can load ELF object files in-memory to achieve the same effect or execute full ELF binaries via the advanced stager.
-- **APT-Grade Connectivity**: **Auto-Proxy Chain** creates a resilient, automatic P2P mesh network. Agents in air-gapped or isolated segments autonomously discover and piggyback on internet-connected peers to reach the C2, ensuring long-term survival in hardened environments.
+- **APT-Grade Connectivity**: **Auto-Proxy Chain** creates a resilient, automatic P2P mesh network. Agents in isolated network segments autonomously discover and piggyback on internet-connected peers to reach the C2, ensuring long-term survival in hardened environments.
 - **Bring2CC**: Reverse proxy any target port to the C2 server, enabling direct access to internal resources even when agents cannot make outbound connections.
 
 ---
@@ -134,7 +134,7 @@ Use the `generate` command from within the emp3r0r shell interface to create cus
 
 #### Intelligent Network Traversal
 
-- **Automatic P2P Mesh**: Agents autonomously form a mesh network using UDP broadcasts and rolling tags. Agents in air-gapped or isolated networks automatically find and tunnel through internet-connected peers (via Shadowsocks), creating a resilient, self-healing command path typical of advanced APT implants.
+- **Automatic P2P Mesh**: Agents autonomously form a mesh network using UDP broadcasts and rolling tags. Agents in isolated networks (that have at least one passage for data transfer) automatically find and tunnel through internet-connected peers (via Shadowsocks), creating a resilient, self-healing command path typical of advanced APT implants.
 - **Bring2CC**: A reverse proxy mechanism (SSH + KCP) that tunnels any port from the agent (or its network) back to the C2 server. This beats the isolation where agents cannot make outbound connections, effectively "bringing" the target to the Command & Control server.
 - **Flexible Pivoting**: Bi-directional TCP/UDP port mapping and agent-side Socks5 (with UDP) support.
 
