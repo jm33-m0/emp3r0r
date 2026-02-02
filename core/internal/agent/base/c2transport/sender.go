@@ -1,6 +1,7 @@
 package c2transport
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -43,9 +45,16 @@ func send2CC(data *def.MsgTunData) error {
 // NotifyC2 send response to a cobra command to CC, like fmt.Printf
 func NotifyC2(cmd *cobra.Command, format string, args ...interface{}) {
 	msg := def.MsgTunData{
-		Tag:          common.RuntimeConfig.AgentTag,
-		AgentUUID:    common.RuntimeConfig.AgentUUID,
-		AgentUUIDSig: common.RuntimeConfig.AgentUUIDSig,
+		Tag:       common.RuntimeConfig.AgentTag,
+		AgentUUID: common.RuntimeConfig.AgentUUID,
+	}
+	// Sign UUID with Agent Key for session auth
+	sig, err := agentutils.SignWithAgentKey([]byte(msg.AgentUUID))
+	if err != nil {
+		logging.Errorf("NotifyC2 SignWithAgentKey: %v", err)
+		msg.AgentUUIDSig = common.RuntimeConfig.AgentUUIDSig // Fallback
+	} else {
+		msg.AgentUUIDSig = base64.URLEncoding.EncodeToString(sig)
 	}
 	cmd_id, _ := cmd.Flags().GetString("cmd_id")
 	cmdSlice := []string{cmd.Name()}

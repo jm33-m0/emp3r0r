@@ -358,3 +358,50 @@ func GetFingerprint(cert_file string) string {
 	}
 	return sha256SumRaw(cert.Raw)
 }
+
+// PublicKeyToPEM converts ECDSA public key to PEM format
+func PublicKeyToPEM(pub *ecdsa.PublicKey) ([]byte, error) {
+	if pub == nil {
+		return nil, fmt.Errorf("public key is nil")
+	}
+	x509Encoded, err := x509.MarshalPKIXPublicKey(pub)
+	if err != nil {
+		return nil, fmt.Errorf("marshal public key: %v", err)
+	}
+	pemEncoded := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: x509Encoded})
+	return pemEncoded, nil
+}
+
+// SignJSONWithKey signs data with the given private key
+func SignJSONWithKey(priv *ecdsa.PrivateKey, data []byte) ([]byte, error) {
+	if priv == nil {
+		return nil, fmt.Errorf("private key is nil")
+	}
+	return SignECDSA(data, priv)
+}
+
+// VerifySignatureWithPEM verifies signature using PEM encoded public key
+func VerifySignatureWithPEM(pubKPEM []byte, data []byte, sig []byte) (bool, error) {
+	block, _ := pem.Decode(pubKPEM)
+	if block == nil {
+		return false, fmt.Errorf("failed to parse PEM")
+	}
+	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return false, fmt.Errorf("parse public key: %v", err)
+	}
+	ecdsaPub, ok := pub.(*ecdsa.PublicKey)
+	if !ok {
+		return false, fmt.Errorf("not ecdsa key")
+	}
+
+	hash := sha256.Sum256(data)
+	var s struct {
+		R, S *big.Int
+	}
+	_, err = asn1.Unmarshal(sig, &s)
+	if err != nil {
+		return false, fmt.Errorf("unmarshal sig: %v", err)
+	}
+	return ecdsa.Verify(ecdsaPub, hash[:], s.R, s.S), nil
+}

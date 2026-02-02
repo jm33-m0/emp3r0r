@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/handler"
@@ -57,6 +58,7 @@ func TestFullAgentLifecycle(t *testing.T) {
 
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
+	transport.CaKeyFile = caKeyFile
 	transport.OperatorCaCrtFile = caCertFile
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
@@ -91,7 +93,18 @@ func TestFullAgentLifecycle(t *testing.T) {
 	// Setup Agent Config
 	agentUUID := uuid.New().String()
 	agentTag := "kali\\kali_0-agent-" + agentUUID
-	agentSig, err := signUUID(agentUUID, caKeyFile)
+	// Gen Agent Key (TOFU)
+	agentPriv, agentPub, err := genAgentKey()
+	if err != nil {
+		t.Fatalf("Failed to gen agent key: %v", err)
+	}
+	agentutils.AgentKey = agentPriv
+	// Sign with CA Key (Proof of Origin)
+	caKey, err := transport.ParseKeyPemFile(caKeyFile)
+	if err != nil {
+		t.Fatalf("Failed to parse CA key: %v", err)
+	}
+	agentSig, err := signUUID(agentUUID, caKey)
 	if err != nil {
 		t.Fatalf("Failed to sign UUID: %v", err)
 	}
@@ -127,6 +140,7 @@ func TestFullAgentLifecycle(t *testing.T) {
 		Process:   &def.AgentProcess{},
 		UUID:      agentUUID,
 		UUIDSig:   agentSig,
+		PublicKey: agentPub,
 	}
 	// Check-in
 	config := common.RuntimeConfig
@@ -249,6 +263,7 @@ func TestCheckinWithRandomPaths(t *testing.T) {
 
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
+	transport.CaKeyFile = caKeyFile
 	transport.OperatorCaCrtFile = caCertFile
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
@@ -283,7 +298,18 @@ func TestCheckinWithRandomPaths(t *testing.T) {
 	// Setup Agent Config
 	agentUUID := uuid.New().String()
 	agentTag := "random-path-lifecycle-agent"
-	agentSig, err := signUUID(agentUUID, caKeyFile)
+	// Gen Agent Key (TOFU)
+	agentPriv, agentPub, err := genAgentKey()
+	if err != nil {
+		t.Fatalf("Failed to gen agent key: %v", err)
+	}
+	agentutils.AgentKey = agentPriv
+	// Sign with CA Key (Proof of Origin)
+	caKey, err := transport.ParseKeyPemFile(caKeyFile)
+	if err != nil {
+		t.Fatalf("Failed to parse CA key: %v", err)
+	}
+	agentSig, err := signUUID(agentUUID, caKey)
 	if err != nil {
 		t.Fatalf("Failed to sign UUID: %v", err)
 	}
@@ -310,10 +336,11 @@ func TestCheckinWithRandomPaths(t *testing.T) {
 
 	// Check-in
 	agentInfo := &def.Emp3r0rAgent{
-		Tag:     agentTag,
-		Name:    "test-random-path-lifecycle",
-		UUID:    agentUUID,
-		UUIDSig: agentSig,
+		Tag:       agentTag,
+		Name:      "test-random-path-lifecycle",
+		UUID:      agentUUID,
+		UUIDSig:   agentSig,
+		PublicKey: agentPub,
 	}
 	config := common.RuntimeConfig
 	err = c2transport.ReportStatus(config, agentInfo)
@@ -357,6 +384,7 @@ func TestDynamicPrefix(t *testing.T) {
 
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
+	transport.CaKeyFile = caKeyFile
 	transport.OperatorCaCrtFile = caCertFile
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
@@ -385,7 +413,18 @@ func TestDynamicPrefix(t *testing.T) {
 
 	// Setup Agent Config with dynamic prefix
 	agentUUID := uuid.New().String()
-	agentSig, err := signUUID(agentUUID, caKeyFile)
+	// Gen Agent Key (TOFU)
+	agentPriv, agentPub, err := genAgentKey()
+	if err != nil {
+		t.Fatalf("Failed to gen agent key: %v", err)
+	}
+	agentutils.AgentKey = agentPriv
+	// Sign with CA Key (Proof of Origin)
+	caKey, err := transport.ParseKeyPemFile(caKeyFile)
+	if err != nil {
+		t.Fatalf("Failed to parse CA key: %v", err)
+	}
+	agentSig, err := signUUID(agentUUID, caKey)
 	if err != nil {
 		t.Fatalf("Failed to sign UUID: %v", err)
 	}
@@ -415,10 +454,11 @@ func TestDynamicPrefix(t *testing.T) {
 
 	// Check-in
 	agentInfo := &def.Emp3r0rAgent{
-		Tag:     agentUUID,
-		Name:    "test-agent-dynamic",
-		UUID:    agentUUID,
-		UUIDSig: agentSig,
+		Tag:       agentUUID,
+		Name:      "test-agent-dynamic",
+		UUID:      agentUUID,
+		UUIDSig:   agentSig,
+		PublicKey: agentPub,
 	}
 
 	t.Logf("Attempting checkin with prefix: %s", randomPrefix)
@@ -473,6 +513,7 @@ func TestCheckinWithRandomPaths_Strict(t *testing.T) {
 
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
+	transport.CaKeyFile = caKeyFile
 	transport.OperatorCaCrtFile = caCertFile
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
@@ -507,7 +548,18 @@ func TestCheckinWithRandomPaths_Strict(t *testing.T) {
 	// Setup Agent Config
 	agentUUID := uuid.New().String()
 	agentTag := "random-path-lifecycle-agent-start"
-	agentSig, err := signUUID(agentUUID, caKeyFile)
+	// Gen Agent Key (TOFU)
+	agentPriv, agentPub, err := genAgentKey()
+	if err != nil {
+		t.Fatalf("Failed to gen agent key: %v", err)
+	}
+	agentutils.AgentKey = agentPriv
+	// Sign with CA Key (Proof of Origin)
+	caKey, err := transport.ParseKeyPemFile(caKeyFile)
+	if err != nil {
+		t.Fatalf("Failed to parse CA key: %v", err)
+	}
+	agentSig, err := signUUID(agentUUID, caKey)
 	if err != nil {
 		t.Fatalf("Failed to sign UUID: %v", err)
 	}
@@ -534,10 +586,11 @@ func TestCheckinWithRandomPaths_Strict(t *testing.T) {
 
 	// Check-in
 	agentInfo := &def.Emp3r0rAgent{
-		Tag:     agentTag,
-		Name:    "test-random-path-lifecycle",
-		UUID:    agentUUID,
-		UUIDSig: agentSig,
+		Tag:       agentTag,
+		Name:      "test-random-path-lifecycle",
+		UUID:      agentUUID,
+		UUIDSig:   agentSig,
+		PublicKey: agentPub,
 	}
 	config := common.RuntimeConfig
 	err = c2transport.ReportStatus(config, agentInfo)

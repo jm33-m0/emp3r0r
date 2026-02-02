@@ -37,6 +37,7 @@ type Emp3r0rAgent struct {
 	Product     *ghw.ProductInfo `cbor:"26,keyasint"` // product info
 	UUID        string           `cbor:"27,keyasint"` // agent UUID, specific to the agent binary
 	UUIDSig     string           `cbor:"28,keyasint"` // signature of UUID, signed by CA
+	PublicKey   string           `cbor:"29,keyasint"` // agent's public key (PEM encoded) for TOFU
 }
 
 // AgentProcess process info of our agent

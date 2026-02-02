@@ -2,13 +2,13 @@ package c2transport_test
 
 import (
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/base64"
-	"encoding/pem"
 	"fmt"
 	"math/big"
 	"net"
@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/handler"
@@ -31,18 +32,19 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 )
 
-func signUUID(uuid string, keyFile string) (string, error) {
-	// Read private key
-	keyBytes, err := os.ReadFile(keyFile)
+func genAgentKey() (*ecdsa.PrivateKey, string, error) {
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		return "", err
+		return nil, "", err
 	}
-	block, _ := pem.Decode(keyBytes)
-	privKey, err := x509.ParseECPrivateKey(block.Bytes)
+	pubBytes, err := transport.PublicKeyToPEM(&priv.PublicKey)
 	if err != nil {
-		return "", err
+		return nil, "", err
 	}
+	return priv, string(pubBytes), nil
+}
 
+func signUUID(uuid string, privKey *ecdsa.PrivateKey) (string, error) {
 	// Hash UUID
 	hash := sha256.Sum256([]byte(uuid))
 
@@ -95,6 +97,7 @@ func TestEstablishC2Connection(t *testing.T) {
 
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
+	transport.CaKeyFile = caKeyFile
 	transport.OperatorCaCrtFile = caCertFile // Set OperatorCaCrtFile for apiDispatcher
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
@@ -122,7 +125,21 @@ func TestEstablishC2Connection(t *testing.T) {
 
 	// Setup Agent Config
 	agentUUID := "test-agent-uuid"
-	agentSig, err := signUUID(agentUUID, caKeyFile)
+
+	// Gen Agent Key (TOFU)
+	agentPriv, agentPub, err := genAgentKey()
+	if err != nil {
+		t.Fatalf("Failed to gen agent key: %v", err)
+	}
+	// SET GLOBAL AGENT KEY for MsgTunneler signing
+	agentutils.AgentKey = agentPriv
+
+	// Sign with CA Key (Proof of Origin)
+	caKey, err := transport.ParseKeyPemFile(caKeyFile)
+	if err != nil {
+		t.Fatalf("Failed to parse CA key: %v", err)
+	}
+	agentSig, err := signUUID(agentUUID, caKey)
 	if err != nil {
 		t.Fatalf("Failed to sign UUID: %v", err)
 	}
@@ -166,6 +183,7 @@ func TestEstablishC2Connection(t *testing.T) {
 		Process:   &def.AgentProcess{},
 		UUID:      agentUUID,
 		UUIDSig:   agentSig,
+		PublicKey: agentPub,
 	}
 	config := common.RuntimeConfig
 	err = c2transport.ReportStatus(config, agentInfo)
@@ -292,6 +310,7 @@ func TestDuplicatedCheckin(t *testing.T) {
 
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
+	transport.CaKeyFile = caKeyFile
 	transport.OperatorCaCrtFile = caCertFile
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
@@ -325,7 +344,18 @@ func TestDuplicatedCheckin(t *testing.T) {
 
 	// Setup Agent Config
 	agentUUID := "dupe-agent-uuid"
-	agentSig, err := signUUID(agentUUID, caKeyFile)
+	// Gen Agent Key (TOFU)
+	agentPriv, agentPub, err := genAgentKey()
+	if err != nil {
+		t.Fatalf("Failed to gen agent key: %v", err)
+	}
+	agentutils.AgentKey = agentPriv
+	// Sign with CA Key (Proof of Origin)
+	caKey, err := transport.ParseKeyPemFile(caKeyFile)
+	if err != nil {
+		t.Fatalf("Failed to parse CA key: %v", err)
+	}
+	agentSig, err := signUUID(agentUUID, caKey)
 	if err != nil {
 		t.Fatalf("Failed to sign UUID: %v", err)
 	}
@@ -351,10 +381,11 @@ func TestDuplicatedCheckin(t *testing.T) {
 
 	// First agent check-in
 	agentInfo := &def.Emp3r0rAgent{
-		Tag:     agentUUID,
-		Name:    "test-agent",
-		UUID:    agentUUID,
-		UUIDSig: agentSig,
+		Tag:       agentUUID,
+		Name:      "test-agent",
+		UUID:      agentUUID,
+		UUIDSig:   agentSig,
+		PublicKey: agentPub,
 	}
 	config := common.RuntimeConfig
 	err = c2transport.ReportStatus(config, agentInfo)
@@ -440,6 +471,7 @@ func TestBackslashTag(t *testing.T) {
 
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
+	transport.CaKeyFile = caKeyFile
 	transport.OperatorCaCrtFile = caCertFile
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
@@ -468,7 +500,18 @@ func TestBackslashTag(t *testing.T) {
 	// Setup Agent Config with Safe UUID but Backslash Tag
 	agentUUID := uuid.New().String()
 	agentTag := "kali\\kali_0-agent-custom"
-	agentSig, err := signUUID(agentUUID, caKeyFile)
+	// Gen Agent Key (TOFU)
+	agentPriv, agentPub, err := genAgentKey()
+	if err != nil {
+		t.Fatalf("Failed to gen agent key: %v", err)
+	}
+	agentutils.AgentKey = agentPriv
+	// Sign with CA Key (Proof of Origin)
+	caKey, err := transport.ParseKeyPemFile(caKeyFile)
+	if err != nil {
+		t.Fatalf("Failed to parse CA key: %v", err)
+	}
+	agentSig, err := signUUID(agentUUID, caKey)
 	if err != nil {
 		t.Fatalf("Failed to sign UUID: %v", err)
 	}
@@ -493,10 +536,11 @@ func TestBackslashTag(t *testing.T) {
 
 	// Check-in
 	agentInfo := &def.Emp3r0rAgent{
-		Tag:     agentTag,
-		Name:    "test-agent-backslash",
-		UUID:    agentUUID,
-		UUIDSig: agentSig,
+		Tag:       agentTag,
+		Name:      "test-agent-backslash",
+		UUID:      agentUUID,
+		UUIDSig:   agentSig,
+		PublicKey: agentPub,
 	}
 	config := common.RuntimeConfig
 	err = c2transport.ReportStatus(config, agentInfo)
@@ -540,6 +584,7 @@ func TestEmptyUUID(t *testing.T) {
 
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
+	transport.CaKeyFile = caKeyFile
 	transport.OperatorCaCrtFile = caCertFile
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
@@ -568,10 +613,18 @@ func TestEmptyUUID(t *testing.T) {
 	// Setup Agent Config with EMPTY UUID
 	agentUUID := ""
 	agentTag := "kali-agent-fallback"
-	// Sign empty string? or sign nothing?
-	// transport.VerifySignature checks target.UUID.
-	// If target.UUID is empty, we must sign empty string to pass.
-	agentSig, err := signUUID(agentUUID, caKeyFile)
+	// Gen Agent Key (TOFU)
+	agentPriv, agentPub, err := genAgentKey()
+	if err != nil {
+		t.Fatalf("Failed to gen agent key: %v", err)
+	}
+	agentutils.AgentKey = agentPriv
+	// Sign with CA Key (Proof of Origin)
+	caKey, err := transport.ParseKeyPemFile(caKeyFile)
+	if err != nil {
+		t.Fatalf("Failed to parse CA key: %v", err)
+	}
+	agentSig, err := signUUID(agentUUID, caKey)
 	if err != nil {
 		t.Fatalf("Failed to sign UUID: %v", err)
 	}
@@ -596,10 +649,11 @@ func TestEmptyUUID(t *testing.T) {
 
 	// Check-in
 	agentInfo := &def.Emp3r0rAgent{
-		Tag:     agentTag,
-		Name:    "test-agent-empty",
-		UUID:    agentUUID,
-		UUIDSig: agentSig,
+		Tag:       agentTag,
+		Name:      "test-agent-empty",
+		UUID:      agentUUID,
+		UUIDSig:   agentSig,
+		PublicKey: agentPub,
 	}
 	config := common.RuntimeConfig
 	err = c2transport.ReportStatus(config, agentInfo)
@@ -674,7 +728,13 @@ func TestNewAgentCheckin(t *testing.T) {
 	// Setup Agent Config with VALID NEW UUID
 	agentUUID := uuid.New().String()
 	agentTag := "new-agent-tag"
-	agentSig, err := signUUID(agentUUID, caKeyFile)
+	// Gen Agent Key (TOFU)
+	agentPriv, agentPub, err := genAgentKey()
+	if err != nil {
+		t.Fatalf("Failed to gen agent key: %v", err)
+	}
+	agentutils.AgentKey = agentPriv
+	agentSig, err := signUUID(agentUUID, agentPriv)
 	if err != nil {
 		t.Fatalf("Failed to sign UUID: %v", err)
 	}
@@ -699,10 +759,11 @@ func TestNewAgentCheckin(t *testing.T) {
 
 	// Check-in
 	agentInfo := &def.Emp3r0rAgent{
-		Tag:     agentTag,
-		Name:    "test-new-agent",
-		UUID:    agentUUID,
-		UUIDSig: agentSig,
+		Tag:       agentTag,
+		Name:      "test-new-agent",
+		UUID:      agentUUID,
+		UUIDSig:   agentSig,
+		PublicKey: agentPub,
 	}
 	config := common.RuntimeConfig
 	err = c2transport.ReportStatus(config, agentInfo)
