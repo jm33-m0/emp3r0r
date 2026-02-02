@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.17.0](https://github.com/jm33-m0/emp3r0r/compare/v3.16.2...v3.17.0) (2026-02-02)
+
+
+### Features
+
+* **C2 protocol revamp:** Implement agent identity with TOFU keys and platform-specific machine IDs ([a54bb23](https://github.com/jm33-m0/emp3r0r/commit/a54bb231c075e5da1c5c79ec7d89bf3a2cbc0608))
+
+
+### Bug Fixes
+
+* strip ANSI escape codes from agent output before printing to avoid unexpected behavior ([1528ca2](https://github.com/jm33-m0/emp3r0r/commit/1528ca2b4c7510bf0b358b728591d136f79fec3f))
+
 ## [3.16.2](https://github.com/jm33-m0/emp3r0r/compare/v3.16.1...v3.16.2) (2026-01-30)
 
 
