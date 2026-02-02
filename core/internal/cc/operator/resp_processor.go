@@ -2,6 +2,7 @@ package operator
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -128,10 +129,13 @@ func processAgentData(data *def.MsgTunData) {
 			return
 		}
 	}
+	// Strip ANSI escape codes using regex
+	ansi := regexp.MustCompile(`\x1b\[[0-9;]*m`)
+	stripped := ansi.ReplaceAllString(string(out), "")
 	agent_output := fmt.Sprintf("\n[%s] %s:\n%s\n\n",
 		color.CyanString("%s", target.Name),
 		color.HiMagentaString("%s", cmd),
-		color.HiWhiteString(string(out)))
+		color.HiWhiteString(stripped))
 	logging.Printf(agent_output)
 
 	// time spent on this cmd
