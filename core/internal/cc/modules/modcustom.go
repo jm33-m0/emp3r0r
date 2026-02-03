@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
 	"github.com/jm33-m0/arc/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -67,7 +68,7 @@ func moduleCustom() {
 		invocation.Coff = nil
 	}
 
-	invBytes, err := json.Marshal(invocation)
+	invBytes, err := cbor.Marshal(invocation)
 	if err != nil {
 		logging.Errorf("Encoding invocation: %v", err)
 		return

@@ -67,23 +67,23 @@ type InvocationSpec struct {
 
 // ResolvedInvocation is the rendered form sent to the agent
 type ResolvedInvocation struct {
-	Argv           []string
-	Stdin          string
-	TimeoutSeconds int
-	Coff           *ResolvedCoffInvocation
+	Argv           []string                `cbor:"1,keyasint"`
+	Stdin          string                  `cbor:"2,keyasint"`
+	TimeoutSeconds int                     `cbor:"3,keyasint"`
+	Coff           *ResolvedCoffInvocation `cbor:"4,keyasint"`
 }
 
 // ResolvedCoffInvocation contains packed COFF args with concrete values
 type ResolvedCoffInvocation struct {
-	Export string
-	Args   []ResolvedCoffArg
+	Export string            `cbor:"1,keyasint"`
+	Args   []ResolvedCoffArg `cbor:"2,keyasint"`
 }
 
 // ResolvedCoffArg holds a typed value to be packed by lighthouse
 type ResolvedCoffArg struct {
-	WireType string
-	Value    interface{}
-	Encoding string
+	WireType string      `cbor:"1,keyasint"`
+	Value    interface{} `cbor:"2,keyasint"`
+	Encoding string      `cbor:"3,keyasint"`
 }
 
 // AgentModuleConfig stores configuration data for the agent side

@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -304,7 +303,7 @@ func decodeInvocation(b64 string) (def.ResolvedInvocation, error) {
 	if err != nil {
 		return inv, err
 	}
-	if err := json.Unmarshal(raw, &inv); err != nil {
+	if err := cbor.Unmarshal(raw, &inv); err != nil {
 		return inv, err
 	}
 	return inv, nil
