@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.17.1](https://github.com/jm33-m0/emp3r0r/compare/v3.17.0...v3.17.1) (2026-02-03)
+
+
+### Bug Fixes
+
+* Migrate module invocation serialization to CBOR ([d799247](https://github.com/jm33-m0/emp3r0r/commit/d7992471b207cb5b570711ff97a5fef63c838d5b))
+
 ## [3.17.0](https://github.com/jm33-m0/emp3r0r/compare/v3.16.2...v3.17.0) (2026-02-02)
 
 
