@@ -37,7 +37,7 @@ emp3r0r is a comprehensive post-exploitation framework that stands out as one of
 - **Modern Infrastructure**: WireGuard + mTLS operator authentication, HTTP2/TLS with **JA3 fingerprinting evasion** + **Conditional C2 (Hybrid Mode)**, KCP-based UDP tunneling, and **customizable C2 paths** (WebRoot, check-in, message paths).
 - **COFF/BOF Loader**: Native BOF execution on Windows agents with typed argument packing (LPSTR/LPWSTR/INT/BOOL/BINARY), and integration-friendly module schema; on Linux you can load ELF object files in-memory to achieve the same effect or execute full ELF binaries via the advanced stager.
 - **APT-Grade Connectivity**: **Auto-Proxy Chain** creates a resilient, automatic P2P mesh network. Agents in isolated network segments autonomously discover and piggyback on internet-connected peers to reach the C2, ensuring long-term survival in hardened environments.
-- **Bring2CC**: Reverse proxy any target port to the C2 server, enabling direct access to internal resources even when agents cannot make outbound connections.
+- **Bring2CC**: Reverse proxy any target to the C2 server, enabling direct access to internal networks even when agents cannot make outbound connections.
 
 ---
 
