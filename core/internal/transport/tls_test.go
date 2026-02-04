@@ -170,3 +170,61 @@ func TestCreateEmp3r0rHTTPClient(t *testing.T) {
 		}
 	})
 }
+
+func TestCreatePreflightHTTPClient(t *testing.T) {
+	// Generate certs
+	caPEM, serverCert := generateCerts(t)
+
+	// Set global CACrtPEM so CreatePreflightHTTPClient picks it up
+	originalCACrtPEM := CACrtPEM
+	CACrtPEM = caPEM
+	defer func() { CACrtPEM = originalCACrtPEM }()
+
+	// Start Mock HTTPS Server
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("preflight ok"))
+	}))
+	server.TLS = &tls.Config{
+		Certificates: []tls.Certificate{serverCert},
+		NextProtos:   []string{"h2"},
+		CurvePreferences: []tls.CurveID{
+			tls.CurveP256,
+			tls.X25519,
+		},
+		MinVersion: tls.VersionTLS12,
+	}
+	server.StartTLS()
+	defer server.Close()
+
+	t.Run("Preflight Client", func(t *testing.T) {
+		client := CreatePreflightHTTPClient(server.URL)
+		if client == nil {
+			t.Fatal("CreatePreflightHTTPClient returned nil")
+		}
+
+		// Verify timeout is set
+		if client.Timeout != 30*time.Second {
+			t.Errorf("Expected timeout to be 30s, got %v", client.Timeout)
+		}
+
+		resp, err := client.Get(server.URL)
+		if err != nil {
+			t.Fatalf("Failed to make request: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatalf("Failed to read response body: %v", err)
+		}
+
+		if string(body) != "preflight ok" {
+			t.Errorf("Expected 'preflight ok', got '%s'", string(body))
+		}
+	})
+}

