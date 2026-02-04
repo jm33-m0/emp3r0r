@@ -85,9 +85,9 @@ init_transport:
 // CreatePreflightHTTPClient creates a lightweight HTTP client for preflight checks
 // Only adds C2's CA cert and uses utls with random JA3 fingerprint
 // This is suitable for preflight checks where we want minimal overhead
-func CreatePreflightHTTPClient(c2_addr string) *http.Client {
+func CreatePreflightHTTPClient(c2Addr string) *http.Client {
 	// C2 URL
-	addr := c2_addr
+	addr := c2Addr
 	if !strings.HasPrefix(addr, "http") {
 		addr = "https://" + addr
 	}
@@ -105,9 +105,9 @@ func CreatePreflightHTTPClient(c2_addr string) *http.Client {
 	}
 
 	// Trust only C2's CA cert in our TLS client
-	c2_host := c2url.Hostname()
+	c2Host := c2url.Hostname()
 	config := &utls.Config{
-		ServerName:         c2_host,
+		ServerName:         c2Host,
 		InsecureSkipVerify: false,
 		RootCAs:            rootCAs,
 	}
