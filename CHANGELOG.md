@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.18.0](https://github.com/jm33-m0/emp3r0r/compare/v3.17.1...v3.18.0) (2026-02-04)
+
+
+### Features
+
+* **C2 protocol revamp:** implement preflight checks and global encryption for C2 communications. ([6adafa5](https://github.com/jm33-m0/emp3r0r/commit/6adafa501af5073c283d069dc89231151f1ea974))
+* enable preflight by default, improve agent generation, and enhance server context management for KCP. ([f8b42f2](https://github.com/jm33-m0/emp3r0r/commit/f8b42f2da9bbba6015a8f85b3a1a2805f569e454))
+
+
+### Bug Fixes
+
+* enhance COFF loader with relocation overflow checks, `SHF_ALLOC` validation, and strip debug information from module compilation. ([58fbfd5](https://github.com/jm33-m0/emp3r0r/commit/58fbfd5d457597d12b2423e9463afa98756828c0))
+* Improve operator stability by adding panic recovery to critical functions, removing a duplicate proxy flag, optimizing module copying, and increasing stager test retries. ([4ff5d03](https://github.com/jm33-m0/emp3r0r/commit/4ff5d039dac1f8df1b020ab9bfe68eed4e1deadf))
+
 ## [3.17.1](https://github.com/jm33-m0/emp3r0r/compare/v3.17.0...v3.17.1) (2026-02-03)
 
 
