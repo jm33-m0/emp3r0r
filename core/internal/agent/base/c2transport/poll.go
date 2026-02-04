@@ -91,6 +91,7 @@ var HandShakes sync.Map // map[string]bool
 func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def.MsgTunData), ctx context.Context, cancel context.CancelFunc) error {
 	// Global Encryption: Wrap connection
 	secureConn := transport.NewSecureConn(conn)
+	def.CCMsgConn = secureConn
 
 	var (
 		in  = cbor.NewDecoder(secureConn)

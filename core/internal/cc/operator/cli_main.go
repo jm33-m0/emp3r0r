@@ -130,7 +130,7 @@ func CliMain(wg_server_ip string, wg_server_port int) {
 	logging.AddWriter(f)
 
 	// when the console is closed, deinit tmux windows
-	// defer cli.TmuxDeinitWindows()
+	defer cli.TmuxDeinitWindows()
 
 	// Background jobs
 	backgroundJobs()
