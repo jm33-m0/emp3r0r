@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -33,8 +34,11 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 	secureConn := transport.NewSecureConn(conn)
 
 	ctx, cancel := context.WithCancel(req.Context())
+	var wg sync.WaitGroup
 	defer func() {
 		logging.Debugf("handleMessageTunnel exiting")
+		cancel() // Signal goroutine to stop
+		wg.Wait() // Wait for goroutine to finish before returning
 		live.AgentControlMapMutex.Lock()
 		for t, c := range live.AgentControlMap {
 			if c.Conn == secureConn {
@@ -45,11 +49,12 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 		}
 		live.AgentControlMapMutex.Unlock()
 		_ = conn.Close()
-		cancel()
 		logging.Debugf("handleMessageTunnel exited")
 	}()
 	in := cbor.NewDecoder(secureConn)
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		defer cancel()
 		for ctx.Err() == nil {
 			var msg def.MsgTunData
@@ -120,6 +125,11 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 			// here we just respond to keep-alive if it matches any criteria
 			// or if it's explicitly a hello
 			if msg.Response == nil && len(msg.CmdSlice) > 0 {
+				// Check if context is still valid before writing
+				if ctx.Err() != nil {
+					logging.Debugf("Context cancelled, skipping handshake response")
+					return
+				}
 				// verify hello
 				logging.Debugf("Handshake from %s successful", msg.Tag)
 				// respond with random data, wrapped in MsgTunData
