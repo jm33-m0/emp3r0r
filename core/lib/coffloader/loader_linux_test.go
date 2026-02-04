@@ -137,6 +137,58 @@ func TestHelloLinuxBOF(t *testing.T) {
 	})
 }
 
+func TestZigCompiledBOF(t *testing.T) {
+	if runtime.GOARCH != "amd64" {
+		t.Skip("linux BOF loader test only supports amd64")
+	}
+
+	// Paths relative to core/lib/coffloader
+	moduleDir := "../../modules/hello_linux"
+	commonDir := "../../modules/bof_common"
+	srcPath := filepath.Join(moduleDir, "hello_linux.c")
+
+	if _, err := os.Stat(srcPath); os.IsNotExist(err) {
+		t.Skipf("hello_linux module source not found at %s", srcPath)
+	}
+
+	tmpDir := t.TempDir()
+	objPath := filepath.Join(tmpDir, "hello_linux_zig.o")
+
+	// Use zig cc
+	compiler := "zig"
+	args := []string{"cc", "-fPIC", "-c", "-I" + commonDir, "-fno-stack-protector", "-fvisibility=hidden", "-target", "x86_64-linux-musl", srcPath, "-o", objPath}
+
+	if _, err := exec.LookPath("zig"); err != nil {
+		t.Skip("zig not found")
+	}
+
+	cmd := exec.Command(compiler, args...)
+	cmd.Env = os.Environ()
+	t.Logf("Compiling with: %s %v", compiler, args)
+
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Skipf("Compilation failed: %v\nOutput: %s", err, string(out))
+	}
+
+	payload, err := os.ReadFile(objPath)
+	if err != nil {
+		t.Fatalf("read compiled object: %v", err)
+	}
+
+	// Run with the zig-compiled object
+	args_coff := []CoffArg{
+		{WireType: "S", Value: "Zig Tester"},
+	}
+	out, err := RunLinuxCOFF(payload, "go", args_coff)
+	if err != nil {
+		t.Fatalf("RunLinuxCOFF failed with Zig-compiled object: %v", err)
+	}
+	t.Logf("Output: %s", out)
+	if !strings.Contains(out, "Hello Zig Tester!") {
+		t.Errorf("Unexpected output: %q", out)
+	}
+}
+
 func TestProcessListHandlesBOF(t *testing.T) {
 	if runtime.GOARCH != "amd64" {
 		t.Skip("linux BOF loader test only supports amd64")

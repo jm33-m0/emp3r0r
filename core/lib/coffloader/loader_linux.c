@@ -205,6 +205,10 @@ bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
     }
 
     uintptr_t target_base_offset = sec_offsets[target_sec_idx];
+    if (!(shdrs[target_sec_idx].sh_flags & SHF_ALLOC)) {
+      continue;
+    }
+
     int num_rels = shdrs[i].sh_size / (int)sizeof(Elf64_Rela);
     Elf64_Rela *rels = (Elf64_Rela *)(obj_buf + shdrs[i].sh_offset);
 
@@ -225,15 +229,15 @@ bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
 
       Elf64_Sym sym = symtab[sym_idx];
       uintptr_t sym_addr = 0;
+      const char *sym_name = strtab + sym.st_name;
 
       if (sym.st_shndx == SHN_UNDEF) {
-        const char *name = strtab + sym.st_name;
-        void *handle = dlsym(RTLD_DEFAULT, name);
+        void *handle = dlsym(RTLD_DEFAULT, sym_name);
         if (!handle) {
           munmap(mem_base, total_size);
           free(sec_offsets);
           pthread_mutex_unlock(&bof_lock);
-          return set_errf(err_buf, "unresolved symbol: %s", name);
+          return set_errf(err_buf, "unresolved symbol: %s", sym_name);
         }
         sym_addr = (uintptr_t)handle;
       } else if (sym.st_shndx == SHN_ABS) {
@@ -256,6 +260,12 @@ bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
       case R_X86_64_PC32:
       case R_X86_64_PLT32: {
         int64_t val = (int64_t)sym_addr + rel.r_addend - (int64_t)patch_addr;
+        if (val > 2147483647L || val < -2147483648L) {
+             munmap(mem_base, total_size);
+             free(sec_offsets);
+             pthread_mutex_unlock(&bof_lock);
+             return set_errf(err_buf, "relocation overflow for symbol %s (type %u): distance %ld exceeds 32 bits", sym_name, type, val);
+        }
         *(uint32_t *)patch_addr = (uint32_t)val;
         break;
       }
@@ -263,7 +273,7 @@ bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
         munmap(mem_base, total_size);
         free(sec_offsets);
         pthread_mutex_unlock(&bof_lock);
-        return set_errf(err_buf, "unsupported relocation %u", type);
+        return set_errf(err_buf, "unsupported relocation %u for symbol %s", type, sym_name);
       }
     }
   }
