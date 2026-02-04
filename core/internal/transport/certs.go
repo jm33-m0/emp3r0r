@@ -304,8 +304,10 @@ func VerifySignatureWithCA(data []byte, signature []byte) (bool, error) {
 	var err error
 
 	// Use cached CA cert if available
-	if len(CACrtPEM) > 0 {
-		caCertData = CACrtPEM
+	// Use cached CA cert if available
+	pemData := GetCACrtPEM()
+	if len(pemData) > 0 {
+		caCertData = pemData
 	} else {
 		// Read the CA certificate from the file
 		caCertData, err = os.ReadFile(CaCrtFile)

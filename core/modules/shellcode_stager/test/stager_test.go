@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -283,8 +284,20 @@ func TestShellcodeStagerLifecycle(t *testing.T) {
 			log.Printf("Stager listener failed: %v", err)
 		}
 	}()
-	// Wait for stager listener
-	time.Sleep(5 * time.Second)
+	// Wait for stager listener to be ready
+	listenerReady := false
+	for i := 0; i < 10; i++ {
+		conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%s", stagerPortStr))
+		if err == nil {
+			conn.Close()
+			listenerReady = true
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	if !listenerReady {
+		t.Fatalf("Stager listener failed to start on port %s", stagerPortStr)
+	}
 
 	// Determine flags for stub.c
 	// We need the XOR mechanism as in the Makefile.

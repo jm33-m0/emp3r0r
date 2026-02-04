@@ -34,14 +34,21 @@ type Config struct {
 	ProxyChainBroadcastPort        string `cbor:"17,keyasint"` // UDP port used for broadcasting msg, used by auto proxy chain
 	ProxyChainBroadcastIntervalMin int    `cbor:"18,keyasint"` // seconds, set max to 0 to disable
 	ProxyChainBroadcastIntervalMax int    `cbor:"19,keyasint"` // seconds, set max to 0 to disable
-	CCIndicatorURL                 string `cbor:"21,keyasint"` // URL of conditional C2 connection, CC indicator
-	CCIndicatorWaitMin             int    `cbor:"22,keyasint"` // seconds
-	CCIndicatorWaitMax             int    `cbor:"23,keyasint"` // seconds, set max to 0 to disable
-	CAPEM                          string `cbor:"24,keyasint"` // CA cert from server side
-	CAFingerprint                  string `cbor:"25,keyasint"` // CA cert fingerprint
-	C2TransportProxy               string `cbor:"26,keyasint"` // proxy for C2 transport
-	CDNProxy                       string `cbor:"27,keyasint"` // websocket proxy, see go-cdn2proxy
-	DoHServer                      string `cbor:"28,keyasint"` // DNS over HTTPS server, for name resolving
+	// Preflight Config
+	PreflightEnabled bool              `cbor:"20,keyasint"` // Enable preflight check
+	PreflightURL     string            `cbor:"21,keyasint"` // URL for preflight check
+	PreflightMethod  string            `cbor:"22,keyasint"` // HTTP method (GET/POST) TODO: Implement method selection in client
+	PreflightHeaders map[string]string `cbor:"23,keyasint"` // Headers for preflight request
+	// Beacon interval for Hybrid Mode
+	PreflightIntervalMin int `cbor:"29,keyasint"` // seconds
+	PreflightIntervalMax int `cbor:"30,keyasint"` // seconds
+
+	CAPEM            string `cbor:"24,keyasint"` // CA cert from server side
+	CAFingerprint    string `cbor:"25,keyasint"` // CA cert fingerprint
+	C2TransportProxy string `cbor:"26,keyasint"` // proxy for C2 transport
+	CDNProxy         string `cbor:"27,keyasint"` // websocket proxy, see go-cdn2proxy
+	DoHServer        string `cbor:"28,keyasint"` // DNS over HTTPS server, for name resolving
+
 	// These were deprecated and removed
 	AgentUUID    string `cbor:"32,keyasint"` // UUID of agent, used to verify agent
 	AgentUUIDSig string `cbor:"33,keyasint"` // UUID of agent signed by CA

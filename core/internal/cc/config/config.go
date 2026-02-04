@@ -39,9 +39,10 @@ func SaveConfigJSON() (err error) {
 		"proxy_chain_broadcast_port":         live.RuntimeConfig.ProxyChainBroadcastPort,
 		"proxy_chain_broadcast_interval_min": live.RuntimeConfig.ProxyChainBroadcastIntervalMin,
 		"proxy_chain_broadcast_interval_max": live.RuntimeConfig.ProxyChainBroadcastIntervalMax,
-		"cc_indicator_url":                   live.RuntimeConfig.CCIndicatorURL,
-		"cc_indicator_wait_min":              live.RuntimeConfig.CCIndicatorWaitMin,
-		"cc_indicator_wait_max":              live.RuntimeConfig.CCIndicatorWaitMax,
+		"preflight_enabled":                  live.RuntimeConfig.PreflightEnabled,
+		"preflight_url":                      live.RuntimeConfig.PreflightURL,
+		"preflight_method":                   live.RuntimeConfig.PreflightMethod,
+		"preflight_headers":                  live.RuntimeConfig.PreflightHeaders,
 		"ca_pem":                             live.RuntimeConfig.CAPEM,
 		"ca_fingerprint":                     live.RuntimeConfig.CAFingerprint,
 		"c2_transport_proxy":                 live.RuntimeConfig.C2TransportProxy,
@@ -98,8 +99,10 @@ func InitConfigFile(cc_host string) (err error) {
 	// time intervals
 	live.RuntimeConfig.ProxyChainBroadcastIntervalMin = 30
 	live.RuntimeConfig.ProxyChainBroadcastIntervalMax = 130
-	live.RuntimeConfig.CCIndicatorWaitMin = 30
-	live.RuntimeConfig.CCIndicatorWaitMax = 130
+	// Preflight default
+	live.RuntimeConfig.PreflightEnabled = false
+	live.RuntimeConfig.PreflightURL = ""
+	live.RuntimeConfig.PreflightMethod = "POST"
 	live.RuntimeConfig.AgentSocksTimeout = 0 // disable timeout by default, leave it to the OS
 
 	// sign agent UUID

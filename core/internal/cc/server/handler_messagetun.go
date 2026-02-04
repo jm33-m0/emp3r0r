@@ -29,12 +29,15 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
+	// Global Encryption: Wrap connection
+	secureConn := transport.NewSecureConn(conn)
+
 	ctx, cancel := context.WithCancel(req.Context())
 	defer func() {
 		logging.Debugf("handleMessageTunnel exiting")
 		live.AgentControlMapMutex.Lock()
 		for t, c := range live.AgentControlMap {
-			if c.Conn == conn {
+			if c.Conn == secureConn {
 				delete(live.AgentControlMap, t)
 				operatorBroadcastPrintf(logging.ERROR, "Agent dies... %s is disconnected", strconv.Quote(t.Name))
 				break
@@ -45,7 +48,7 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 		cancel()
 		logging.Debugf("handleMessageTunnel exited")
 	}()
-	in := cbor.NewDecoder(conn)
+	in := cbor.NewDecoder(secureConn)
 	go func() {
 		defer cancel()
 		for ctx.Err() == nil {
@@ -107,7 +110,7 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 					"Knock.. Knock... Agent %s is connected",
 					strconv.Quote(shortname))
 			}
-			live.AgentControlMap[agent].Conn = conn
+			live.AgentControlMap[agent].Conn = secureConn
 			live.AgentControlMap[agent].Ctx = ctx
 			live.AgentControlMap[agent].Cancel = cancel
 			live.AgentControlMapMutex.Unlock()
@@ -126,7 +129,7 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 					Tag:      "handshake",
 					Response: replyData,
 				}
-				encoder := cbor.NewEncoder(conn)
+				encoder := cbor.NewEncoder(secureConn)
 				err = encoder.Encode(replyMsg)
 				if err != nil {
 					logging.Warningf("handleMessageTunnel: %v", err)

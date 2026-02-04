@@ -37,6 +37,12 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 		ProxyChainBroadcastIntervalMin: 30,
 		ProxyChainBroadcastIntervalMax: 60,
 		CCTimeout:                      5000,
+		PreflightEnabled:               true,
+		PreflightURL:                   "http://example.com",
+		PreflightMethod:                "GET",
+		PreflightHeaders:               map[string]string{"X-Test": "True"},
+		PreflightIntervalMin:           30,
+		PreflightIntervalMax:           120,
 	}
 
 	// 2. Marshal to CBOR
@@ -121,14 +127,23 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 	if RuntimeConfig.ProxyChainBroadcastIntervalMax != originalCfg.ProxyChainBroadcastIntervalMax {
 		t.Errorf("ProxyChainBroadcastIntervalMax mismatch: got %d, want %d", RuntimeConfig.ProxyChainBroadcastIntervalMax, originalCfg.ProxyChainBroadcastIntervalMax)
 	}
-	if RuntimeConfig.CCIndicatorURL != originalCfg.CCIndicatorURL {
-		t.Errorf("CCIndicatorURL mismatch: got %s, want %s", RuntimeConfig.CCIndicatorURL, originalCfg.CCIndicatorURL)
+	if RuntimeConfig.PreflightEnabled != originalCfg.PreflightEnabled {
+		t.Errorf("PreflightEnabled mismatch: got %v, want %v", RuntimeConfig.PreflightEnabled, originalCfg.PreflightEnabled)
 	}
-	if RuntimeConfig.CCIndicatorWaitMin != originalCfg.CCIndicatorWaitMin {
-		t.Errorf("CCIndicatorWaitMin mismatch: got %d, want %d", RuntimeConfig.CCIndicatorWaitMin, originalCfg.CCIndicatorWaitMin)
+	if RuntimeConfig.PreflightURL != originalCfg.PreflightURL {
+		t.Errorf("PreflightURL mismatch: got %s, want %s", RuntimeConfig.PreflightURL, originalCfg.PreflightURL)
 	}
-	if RuntimeConfig.CCIndicatorWaitMax != originalCfg.CCIndicatorWaitMax {
-		t.Errorf("CCIndicatorWaitMax mismatch: got %d, want %d", RuntimeConfig.CCIndicatorWaitMax, originalCfg.CCIndicatorWaitMax)
+	if RuntimeConfig.PreflightMethod != originalCfg.PreflightMethod {
+		t.Errorf("PreflightMethod mismatch: got %s, want %s", RuntimeConfig.PreflightMethod, originalCfg.PreflightMethod)
+	}
+	if RuntimeConfig.PreflightMethod != originalCfg.PreflightMethod {
+		t.Errorf("PreflightMethod mismatch: got %s, want %s", RuntimeConfig.PreflightMethod, originalCfg.PreflightMethod)
+	}
+	if RuntimeConfig.PreflightIntervalMin != originalCfg.PreflightIntervalMin {
+		t.Errorf("PreflightIntervalMin mismatch: got %d, want %d", RuntimeConfig.PreflightIntervalMin, originalCfg.PreflightIntervalMin)
+	}
+	if RuntimeConfig.PreflightIntervalMax != originalCfg.PreflightIntervalMax {
+		t.Errorf("PreflightIntervalMax mismatch: got %d, want %d", RuntimeConfig.PreflightIntervalMax, originalCfg.PreflightIntervalMax)
 	}
 	if RuntimeConfig.CAPEM != originalCfg.CAPEM {
 		t.Errorf("CAPEM mismatch: got %s, want %s", RuntimeConfig.CAPEM, originalCfg.CAPEM)

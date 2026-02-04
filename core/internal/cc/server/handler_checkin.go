@@ -51,8 +51,11 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
+	// Global Encryption: Wrap connection
+	secureConn := transport.NewSecureConn(conn)
+	// target is a pointer to Emp3r0rAgent
 	target := new(def.Emp3r0rAgent)
-	in := cbor.NewDecoder(conn)
+	in := cbor.NewDecoder(secureConn) // Use secureConn
 	err = in.Decode(target)
 	if err != nil {
 		logging.Warningf("handleAgentCheckIn decode error: %v", err)

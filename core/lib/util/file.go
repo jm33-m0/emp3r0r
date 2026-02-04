@@ -596,11 +596,6 @@ func copyDirAgent(src, dst string) error {
 		targetPath := filepath.Join(dst, relPath)
 
 		if d.IsDir() {
-			// creating dir: MkdirAll.
-			// WriteFileAgent doesn't create empty dirs.
-			// We should perhaps hook Mkdir?
-			// The user said "every file". Dirs are files.
-			// For now, let's just use os.MkdirAll for dirs as placeholders.
 			targetPath = ApplyFilePattern(targetPath)
 			return os.MkdirAll(targetPath, d.Type().Perm())
 		}

@@ -2,6 +2,7 @@ package transport
 
 import (
 	"os"
+	"sync"
 )
 
 var (
@@ -18,7 +19,22 @@ var (
 	OperatorClientKeyFile string // operator client mTLS key
 	EmpWorkSpace          string // Path to emp3r0r workspace
 	CACrtPEM              []byte // CA cert in PEM format
+	caCrtPEMMutex         sync.RWMutex
 )
+
+// SetCACrtPEM sets the CA cert PEM safely
+func SetCACrtPEM(pem []byte) {
+	caCrtPEMMutex.Lock()
+	defer caCrtPEMMutex.Unlock()
+	CACrtPEM = pem
+}
+
+// GetCACrtPEM gets the CA cert PEM safely
+func GetCACrtPEM() []byte {
+	caCrtPEMMutex.RLock()
+	defer caCrtPEMMutex.RUnlock()
+	return CACrtPEM
+}
 
 // LoadCACrt load CA cert from file
 func LoadCACrt() error {
@@ -26,6 +42,6 @@ func LoadCACrt() error {
 	if err != nil {
 		return err
 	}
-	CACrtPEM = ca_data
+	SetCACrtPEM(ca_data)
 	return nil
 }

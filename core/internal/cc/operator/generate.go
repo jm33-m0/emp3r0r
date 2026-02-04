@@ -258,9 +258,6 @@ func readAndEncryptConfig() ([]byte, error) {
 
 func MakeConfig(cmd *cobra.Command) (err error) {
 	cc_host, _ := cmd.Flags().GetString("cc")
-	indicator_url, _ := cmd.Flags().GetString("indicator")
-	indicator_wait_min, _ := cmd.Flags().GetInt("indicator-wait-min")
-	indicator_wait_max, _ := cmd.Flags().GetInt("indicator-wait-max")
 	cdn_proxy, _ := cmd.Flags().GetString("cdn")
 	c2transport_proxy, _ := cmd.Flags().GetString("proxy")
 	doh_server, _ := cmd.Flags().GetString("doh")
@@ -305,15 +302,6 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 		if err != nil {
 			return fmt.Errorf("failed to generate certs: %v", err)
 		}
-	}
-
-	// CC indicator
-	live.RuntimeConfig.CCIndicatorURL = indicator_url
-	if live.RuntimeConfig.CCIndicatorURL != "" {
-		live.RuntimeConfig.CCIndicatorWaitMin = indicator_wait_min
-		live.RuntimeConfig.CCIndicatorWaitMax = indicator_wait_max
-		logging.Printf("Remember to enable your indicator at %s. Agents will wait between %d to %d seconds for conditional C2 connection",
-			live.RuntimeConfig.CCIndicatorURL, live.RuntimeConfig.CCIndicatorWaitMin, live.RuntimeConfig.CCIndicatorWaitMax)
 	}
 
 	// Internet check
@@ -366,6 +354,18 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 	if live.RuntimeConfig.Jitter == 0 {
 		live.RuntimeConfig.Jitter = 20
 	}
+
+	// Preflight / Hybrid Mode intervals
+	if live.RuntimeConfig.PreflightIntervalMin == 0 {
+		// Default to a reasonably long beacon interval for stealth (e.g. 30s - 120s)
+		live.RuntimeConfig.PreflightIntervalMin = util.RandInt(30, 120)
+	}
+	if live.RuntimeConfig.PreflightIntervalMax == 0 {
+		// Max should be larger than min
+		live.RuntimeConfig.PreflightIntervalMax = live.RuntimeConfig.PreflightIntervalMin + util.RandInt(30, 300)
+	}
+	logging.Printf("Conditional C2 (Hybrid Mode) beacon interval: %d - %d seconds",
+		live.RuntimeConfig.PreflightIntervalMin, live.RuntimeConfig.PreflightIntervalMax)
 
 	if proxy_chain {
 		if !cmd.Flags().Changed("proxychain-wait-min") {

@@ -2,10 +2,10 @@ package live
 
 import (
 	"context"
+	"net"
 	"sync"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
-	"github.com/posener/h2conn"
 )
 
 var (
@@ -19,9 +19,9 @@ var (
 
 // AgentControl controller interface of a target
 type AgentControl struct {
-	Index  int          // index of a connected agent
-	Label  string       // custom label for an agent
-	Conn   *h2conn.Conn // h2 connection of an agent
+	Index  int      // index of a connected agent
+	Label  string   // custom label for an agent
+	Conn   net.Conn // h2 connection of an agent
 	Ctx    context.Context
 	Cancel context.CancelFunc
 }

