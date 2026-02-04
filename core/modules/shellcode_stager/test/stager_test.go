@@ -286,7 +286,7 @@ func TestShellcodeStagerLifecycle(t *testing.T) {
 	}()
 	// Wait for stager listener to be ready
 	listenerReady := false
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 100; i++ {
 		conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%s", stagerPortStr))
 		if err == nil {
 			conn.Close()

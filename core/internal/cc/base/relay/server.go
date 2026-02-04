@@ -19,6 +19,11 @@ import (
 
 // This server handles relayed HTTP requests from C2, it listens on WireGuard interface
 func RelayHTTP2Server() {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("RelayHTTP2Server panicked: %v", r)
+		}
+	}()
 	time.Sleep(3 * time.Second)
 	r := mux.NewRouter()
 	r.HandleFunc("/{prefix}/{api}/{token}", dispatcher)

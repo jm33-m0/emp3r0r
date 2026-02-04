@@ -163,6 +163,11 @@ func connectMsgTun() (conn *h2conn.Conn, ctx context.Context, cancel context.Can
 }
 
 func msgTunHandler() {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("msgTunHandler panicked: %v", r)
+		}
+	}()
 	time.Sleep(3 * time.Second)
 	retryDelay := 5 * time.Second
 	maxRetryDelay := 5 * time.Minute

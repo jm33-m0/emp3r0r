@@ -8,6 +8,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -56,6 +57,11 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 
 // AgentListRefresher refreshes agent list every 10 seconds
 func agentListRefresher() {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("agentListRefresher panicked: %v", r)
+		}
+	}()
 	retryCount := 0
 	maxRetries := 3
 	for {

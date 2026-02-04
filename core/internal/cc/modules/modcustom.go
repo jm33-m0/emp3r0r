@@ -281,6 +281,12 @@ func InitModules() {
 			config.Path = fmt.Sprintf("%s/%s", mod_search_dir, dir.Name())
 			if config.IsLocal {
 				mod_dir := filepath.Join(live.EmpWorkSpace, "modules", dir.Name())
+				absConfigPath, _ := filepath.Abs(config.Path)
+				absModDir, _ := filepath.Abs(mod_dir)
+				if absConfigPath == absModDir {
+					logging.Debugf("Module %s is already in workspace, skipping copy", config.Name)
+					continue
+				}
 				err := os.MkdirAll(mod_dir, 0o700)
 				if err != nil {
 					logging.Warningf("Failed to create %s: %v", mod_dir, err)

@@ -69,6 +69,12 @@ func backgroundJobs() {
 
 // CliMain launches the commandline UI
 func CliMain(wg_server_ip string, wg_server_port int) {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Fatalf("CliMain panicked: %v", r)
+		}
+		logging.Printf("CliMain resumed (or returned normally)")
+	}()
 	OPERATOR_PORT = wg_server_port + 1
 	SERVER_IP = wg_server_ip
 
@@ -124,7 +130,7 @@ func CliMain(wg_server_ip string, wg_server_port int) {
 	logging.AddWriter(f)
 
 	// when the console is closed, deinit tmux windows
-	defer cli.TmuxDeinitWindows()
+	// defer cli.TmuxDeinitWindows()
 
 	// Background jobs
 	backgroundJobs()
