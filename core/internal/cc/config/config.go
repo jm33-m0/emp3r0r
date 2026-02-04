@@ -100,8 +100,10 @@ func InitConfigFile(cc_host string) (err error) {
 	live.RuntimeConfig.ProxyChainBroadcastIntervalMin = 30
 	live.RuntimeConfig.ProxyChainBroadcastIntervalMax = 130
 	// Preflight default
-	live.RuntimeConfig.PreflightEnabled = false
-	live.RuntimeConfig.PreflightURL = ""
+	live.RuntimeConfig.PreflightEnabled = true
+	if live.RuntimeConfig.PreflightURL == "" {
+		live.RuntimeConfig.PreflightURL = fmt.Sprintf("http://%s/%s", cc_host, util.RandStr(util.RandInt(5, 10)))
+	}
 	live.RuntimeConfig.PreflightMethod = "POST"
 	live.RuntimeConfig.AgentSocksTimeout = 0 // disable timeout by default, leave it to the OS
 

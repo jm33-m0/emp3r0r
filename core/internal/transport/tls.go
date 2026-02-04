@@ -3,6 +3,7 @@ package transport
 import (
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -20,9 +21,13 @@ func CreateEmp3r0rHTTPClient(c2_addr, proxyServer string) *http.Client {
 	}
 
 	// C2 URL
-	c2url, err := url.Parse(c2_addr)
+	addr := c2_addr
+	if !strings.HasPrefix(addr, "http") {
+		addr = "https://" + addr
+	}
+	c2url, err := url.Parse(addr)
 	if err != nil {
-		logging.Fatalf("Error parsing C2 address '%s': %v", c2_addr, err)
+		logging.Fatalf("Error parsing C2 address '%s': %v", addr, err)
 	}
 
 	// add our cert

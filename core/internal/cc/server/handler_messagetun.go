@@ -139,6 +139,10 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 			}
 
 			// if not a handshake, forward message to operators
+			// also cache it for automated tests or local usage
+			if msg.CmdID != "" {
+				live.CmdResults.Store(msg.CmdID, string(msg.Response))
+			}
 			err = fwdMsg2Operators(msg)
 			if err != nil {
 				logging.Warningf("handleMessageTunnel: %v", err)

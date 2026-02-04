@@ -239,7 +239,9 @@ func setupEnvironment() {
 	if err != nil {
 		logging.Printf("Get user info: %v", err)
 	} else {
-		os.Setenv("HOME", u.HomeDir)
+		if os.Getenv("HOME") == "" {
+			os.Setenv("HOME", u.HomeDir)
+		}
 	}
 	def.DefaultShell = "/bin/bash"
 	if runtime.GOOS == "windows" {

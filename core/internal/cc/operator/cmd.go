@@ -13,6 +13,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -502,7 +503,19 @@ func gen_agent_cmd() *cobra.Command {
 	genAgentCmd.Flags().StringP("type", "t", PayloadTypeLinuxExecutable, fmt.Sprintf("Payload type, available: %v+ (linux_so and windows_dll support CGO)", PayloadTypeList))
 	genAgentCmd.Flags().StringP("arch", "a", "amd64", fmt.Sprintf("Target architecture, available: %v+", Arch_List_All))
 	cc_hosts := transport.NamesInCert(transport.ServerCrtFile)
-	genAgentCmd.Flags().StringP("cc", "", cc_hosts[0], "C2 server address")
+	default_cc := live.RuntimeConfig.CCAddress
+	if default_cc == "127.0.0.1" || default_cc == "localhost" {
+		default_cc = ""
+	}
+	if default_cc == "" {
+		for _, h := range cc_hosts {
+			if h != "127.0.0.1" && h != "localhost" {
+				default_cc = h
+				break
+			}
+		}
+	}
+	genAgentCmd.Flags().StringP("cc", "", default_cc, "C2 server address")
 	genAgentCmd.Flags().StringP("cdn", "", "", "CDN proxy to reach C2, leave empty to disable. Example: wss://cdn.example.com/ws")
 	genAgentCmd.Flags().StringP("doh", "", "", "DNS over HTTPS server to use for DNS resolution, leave empty to disable. Example: https://1.1.1.1/dns-query")
 	genAgentCmd.Flags().StringP("proxy", "", "", "Hard coded proxy URL for agent's C2 transport, leave empty to disable. Example: socks5://127.0.0.1:9050")
@@ -514,6 +527,9 @@ func gen_agent_cmd() *cobra.Command {
 	genAgentCmd.Flags().IntP("proxychain-wait-min", "", util.RandInt(30, 120), "How many minimum seconds to wait before sending each broadcast packet to negotiate proxy chain")
 	genAgentCmd.Flags().IntP("proxychain-wait-max", "", 0, "How many maximum seconds to wait before sending each broadcast packet to negotiate proxy chain")
 	genAgentCmd.Flags().BoolP("stager", "", false, "Whether the agent is intended to be delivered by a stager. This enables stealth features like memory encryption and suspension.")
+
+	// Force user to specify CC address
+	genAgentCmd.MarkFlagRequired("cc")
 
 	// completers
 	carapace.Gen(genAgentCmd).FlagCompletion(carapace.ActionMap{

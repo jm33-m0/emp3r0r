@@ -10,9 +10,10 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"net/http"
 	"os"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 var server *http.Server
@@ -137,4 +138,15 @@ func HTTPBareListener(stagerPath string, port string) error {
 
 	logging.Printf("Serving stager file on port %s", port)
 	return serveStager(stager, port)
+}
+
+// StopHTTP stops the HTTP server.
+func StopHTTP() {
+	if server != nil {
+		logging.Printf("Shutting down HTTP server on %s", server.Addr)
+		if err := server.Shutdown(context.TODO()); err != nil {
+			logging.Printf("Error shutting down HTTP server: %v", err)
+		}
+		server = nil
+	}
 }

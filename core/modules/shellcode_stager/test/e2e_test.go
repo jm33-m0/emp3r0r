@@ -5,6 +5,7 @@ package shellcode_stager
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/sha256"
@@ -24,6 +25,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
@@ -66,7 +68,7 @@ func signUUID(uuid string, keyFile string) (string, error) {
 	return base64.URLEncoding.EncodeToString(sig), nil
 }
 
-func TestShellcodeStagerLifecycle(t *testing.T) {
+func TestAgentEndToEndLifecycle(t *testing.T) {
 	// Skip if CGO is not enabled
 	if os.Getenv("CGO_ENABLED") != "1" {
 		t.Skip("Skipping test: CGO_ENABLED is not set to 1")
@@ -161,8 +163,11 @@ func TestShellcodeStagerLifecycle(t *testing.T) {
 
 	// Initialize live.RuntimeConfig for the C2 server
 	live.RuntimeConfig = &def.Config{
-		CCPort: c2PortStr,
-		CAPEM:  string(caCertData),
+		CCPort:           c2PortStr,
+		CAPEM:            string(caCertData),
+		PreflightEnabled: true,
+		PreflightURL:     fmt.Sprintf("https://127.0.0.1:%s/preflight-test", c2PortStr),
+		PreflightMethod:  "POST",
 	}
 
 	// Reset live agent maps
@@ -182,16 +187,19 @@ func TestShellcodeStagerLifecycle(t *testing.T) {
 
 	// Create agent config
 	cfg := &def.Config{
-		CCAddress:    "127.0.0.1",
-		CCPort:       c2PortStr,
-		CAPEM:        string(caCertData),
-		C2Prefix:     "api",
-		CheckInPath:  "checkin",
-		MsgPath:      "msg",
-		AgentUUID:    agentUUID,
-		AgentUUIDSig: agentSig,
-		AgentTag:     agentTag,
-		ModulePath:   "", // Empty for anonymous memory loading in test
+		CCAddress:        "127.0.0.1",
+		CCPort:           c2PortStr,
+		CAPEM:            string(caCertData),
+		C2Prefix:         "api",
+		CheckInPath:      "checkin",
+		MsgPath:          "msg",
+		AgentUUID:        agentUUID,
+		AgentUUIDSig:     agentSig,
+		AgentTag:         agentTag,
+		ModulePath:       "", // Empty for anonymous memory loading in test
+		CCTimeout:        1000,
+		PreflightEnabled: true,
+		PreflightURL:     fmt.Sprintf("https://127.0.0.1:%s/preflight-test", c2PortStr),
 	}
 
 	// Serialize to CBOR
@@ -236,6 +244,9 @@ func TestShellcodeStagerLifecycle(t *testing.T) {
 		t.Fatalf("Failed to write patched agent: %v", err)
 	}
 	log.Println("Mock agent patched with config")
+
+	// Dummy operator for preflight
+	server.OPERATORS["dummy"] = nil
 
 	// 4. Start Real C2 Server
 	// Shutdown any existing server first
@@ -370,6 +381,8 @@ func TestShellcodeStagerLifecycle(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	cmdLoader.Stdout = &stdout
 	cmdLoader.Stderr = &stderr
+	// Set HOME to tmpDir to isolate agent state (prevent reusing keys from ~/.emp3r0r)
+	cmdLoader.Env = append(os.Environ(), fmt.Sprintf("HOME=%s", tmpDir))
 
 	log.Println("Running loader...")
 	if err := cmdLoader.Start(); err != nil {
@@ -386,6 +399,7 @@ func TestShellcodeStagerLifecycle(t *testing.T) {
 	timeout := 45 * time.Second
 	// Wait for agent check-in by polling live.AgentList
 	start := time.Now()
+	var agent *def.Emp3r0rAgent
 	for {
 		if time.Since(start) > timeout {
 			log.Printf("Loader Stdout:\n%s", stdout.String())
@@ -393,13 +407,18 @@ func TestShellcodeStagerLifecycle(t *testing.T) {
 			t.Fatalf("Timeout waiting for agent checkin")
 		}
 
-		// Check if agent has checked in (added to AgentControlMap)
+		// Check if agent has checked in (added to AgentControlMap) AND has an active connection
 		live.AgentControlMapMutex.RLock()
-		agentCount := len(live.AgentControlMap)
+		for k, v := range live.AgentControlMap {
+			if k.Tag != "" && v.Conn != nil { // Wait for MsgTun connection
+				agent = k
+				break
+			}
+		}
 		live.AgentControlMapMutex.RUnlock()
 
-		if agentCount > 0 {
-			log.Println("SUCCESS: Agent checked in!")
+		if agent != nil {
+			log.Printf("SUCCESS: Agent checked in and connected! Tag: %s", agent.Tag)
 			break
 		}
 
@@ -417,6 +436,88 @@ func TestShellcodeStagerLifecycle(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 	}
 
+	// 7. Verify Command Execution (E2E)
+	log.Println("Verifying command execution...")
+	cmdID := uuid.NewString()
+	// Using "ls" command as it is ubiquitous and safer
+	err = agents.SendCmd("ls", cmdID, agent)
+	if err != nil {
+		t.Fatalf("Failed to send command to agent: %v", err)
+	}
+	log.Printf("Sent command 'ls' to agent %s", agent.Tag)
+
+	// Wait for output
+	log.Println("Waiting for command output...")
+
+	// Check if agent is still connected and verify output
+	outputReceived := false
+	for i := 0; i < 20; i++ {
+		// Check connection status
+		live.AgentControlMapMutex.RLock()
+		if a, ok := live.AgentControlMap[agent]; ok && a.Conn != nil {
+			// still connected
+		} else {
+			live.AgentControlMapMutex.RUnlock()
+			t.Fatalf("Agent disconnected while waiting for command output!")
+		}
+		live.AgentControlMapMutex.RUnlock()
+
+		// Check result
+		if res, ok := live.CmdResults.Load(cmdID); ok {
+			output := res.(string)
+			log.Printf("Command Output received: %s", output)
+			if output == "" {
+				// might be empty if dir is empty, but we expect agent_stub
+				// wait a bit more?
+			}
+			// basic check
+			if len(output) > 0 {
+				outputReceived = true
+				break
+			}
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	if !outputReceived {
+		t.Fatalf("Failed to receive command output")
+	}
+	log.Println("Command output verification passed.")
+
+	// Check loader status
+	select {
+	case err := <-doneChan:
+		log.Printf("Loader exited after command: %v", err)
+		log.Printf("Loader Stdout:\n%s", stdout.String())
+		log.Printf("Loader Stderr:\n%s", stderr.String())
+		t.Fatalf("Loader process died")
+	default:
+		log.Println("Loader process is still running.")
+	}
+
+	// Verify stager output log contains command execution trace if possible?
+	// The loader stdout captures agent stdout which is redirected to /dev/null by agent_main unless we change it.
+	// In agent_main: os.Stdout = null_file
+	// But logging goes to file? Or if we built with specific flags?
+	// We can't verify output easily, but stability check covers the "connection drop" bug.
+
+	log.Println("TestAgentEndToEndLifecycle PASSED")
+	log.Println("Cleaning up...")
 	// Cleanup
 	cmdLoader.Process.Kill()
+	log.Println("Loader process killed")
+	listener.StopHTTP()
+	log.Println("HTTP stager stopped")
+	if network.EmpTLSServer != nil {
+		// Use a context with timeout for shutdown
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		network.EmpTLSServer.Shutdown(ctx)
+		network.EmpTLSServerCancel()
+		log.Println("C2 TLS server stopped")
+	}
+	if network.EmpKCPCancel != nil {
+		network.EmpKCPCancel()
+		log.Println("C2 KCP server stopped")
+	}
 }

@@ -13,6 +13,8 @@ var (
 	EmpTLSServer       *http.Server
 	EmpTLSServerCtx    context.Context
 	EmpTLSServerCancel context.CancelFunc
+	EmpKCPCtx          context.Context
+	EmpKCPCancel       context.CancelFunc
 
 	// Shared stream handlers and maps
 	RShellStream  = &StreamHandler{H2x: nil, BufSize: def.RShellBufSize, Buf: make(chan []byte)}

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jm33-m0/arc/v2"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/relay"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -21,7 +23,8 @@ import (
 
 func ServerMain(wg_port int, hosts string, numOperators int) {
 	// start all services
-	go KCPC2ListenAndServe()
+	network.EmpKCPCtx, network.EmpKCPCancel = context.WithCancel(context.Background())
+	go KCPC2ListenAndServe(network.EmpKCPCtx, network.EmpKCPCancel)
 	go tarConfig(hosts)
 	wg(wg_port, numOperators)
 	time.Sleep(3 * time.Second)

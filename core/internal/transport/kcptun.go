@@ -126,8 +126,8 @@ func NewConfig(remote_addr, target, port, password, salt string) *Config {
 	config.KeepAlive = 10      // nat keepalive interval in seconds
 	config.CloseWait = 0       // time to wait before tearing down a connection
 	// config.Log = ""            // log to stderr
-	config.Quiet = true        // suppress 'stream open/close' messages
-	config.TCP = false         // emulate a TCP connection (Linux only), requires root
+	config.Quiet = true // suppress 'stream open/close' messages
+	config.TCP = false  // emulate a TCP connection (Linux only), requires root
 
 	switch config.Mode {
 	case "normal":
