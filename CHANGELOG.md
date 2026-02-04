@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.18.1](https://github.com/jm33-m0/emp3r0r/compare/v3.18.0...v3.18.1) (2026-02-04)
+
+
+### Bug Fixes
+
+* accidental C2 contact in `preflight` check ([1b448e5](https://github.com/jm33-m0/emp3r0r/commit/1b448e5cbbd1a794cceab33c4fff6a32459e12fa))
+
 ## [3.18.0](https://github.com/jm33-m0/emp3r0r/compare/v3.17.1...v3.18.0) (2026-02-04)
 
 
