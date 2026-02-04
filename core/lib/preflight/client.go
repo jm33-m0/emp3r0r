@@ -63,12 +63,11 @@ func Check(config *def.Config) bool {
 	}
 	req.Header.Set("Content-Type", "application/octet-stream") // Or malleable?
 
-	client := transport.CreateEmp3r0rHTTPClient(def.CCAddress, config.C2TransportProxy)
+	client := transport.CreatePreflightHTTPClient(config.PreflightURL)
 	if client == nil {
-		logging.Errorf("Preflight: failed to create HTTP client for %s", def.CCAddress)
+		logging.Errorf("Preflight: failed to create HTTP client for %s", config.PreflightURL)
 		return false
 	}
-	client.Timeout = 30 * time.Second
 
 	// 3. Send
 	resp, err := client.Do(req)
