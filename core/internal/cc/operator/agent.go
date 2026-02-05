@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
@@ -46,6 +47,20 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 	}
 	if tail != nil {
 		tdata = append(tdata, tail)
+	}
+
+	// Set tmux status with agent count and C2 status
+	color := "red"
+	if len(agents) > 0 {
+		color = "green"
+	}
+	c2_ip := common.RuntimeConfig.CCAddress
+	if live.ActiveAgent != nil {
+		c2_ip = live.ActiveAgent.C2Host
+	}
+	setStatusErr := cli.TmuxSetStatusRight("C2: #[fg=grey]%s #[fg=%s]%d #[fg=white]agents", c2_ip, color, len(agents))
+	if setStatusErr != nil {
+		logging.Warningf("Failed to set tmux status: %v", setStatusErr)
 	}
 
 	header := []string{"Tag", "OS", "Process", "User", "IPs", "From"}

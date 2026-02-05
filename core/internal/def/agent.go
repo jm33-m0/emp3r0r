@@ -38,6 +38,7 @@ type Emp3r0rAgent struct {
 	UUID        string           `cbor:"27,keyasint"` // agent UUID, specific to the agent binary
 	UUIDSig     string           `cbor:"28,keyasint"` // signature of UUID, signed by CA
 	PublicKey   string           `cbor:"29,keyasint"` // agent's public key (PEM encoded) for TOFU
+	C2Host      string           `cbor:"30,keyasint"` // C2 server's IP or domain name that the agent is connected to
 }
 
 // AgentProcess process info of our agent

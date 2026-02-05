@@ -111,6 +111,12 @@ func cmdSetActiveAgent(cmd *cobra.Command, args []string) {
 		return
 	}
 	logging.Successf("Now targeting %s", live.ActiveAgent.Tag)
+
+	// Update tmux window title to show active agent
+	setTitleErr := cli.TmuxSetWindowTitle(fmt.Sprintf("#[fg=cyan]%s", live.ActiveAgent.Name), cli.CommandPane.WindowID)
+	if setTitleErr != nil {
+		logging.Warningf("Failed to set tmux window title: %v", setTitleErr)
+	}
 }
 
 func cmdListAgents(_ *cobra.Command, _ []string) {

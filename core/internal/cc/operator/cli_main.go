@@ -136,7 +136,7 @@ func CliMain(wg_server_ip string, wg_server_port int) {
 	backgroundJobs()
 
 	// Run the console
-	EMP3R0R_CONSOLE.Start()
+	logging.Fatal(EMP3R0R_CONSOLE.Start())
 }
 
 func highLighter(line []rune) string {
