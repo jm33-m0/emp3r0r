@@ -522,7 +522,7 @@ func TmuxSetWindowTitle(title, window_id string) error {
 
 // TmuxSetStatusRight set tmux status right, which is the status shown on the right side of tmux status bar
 func TmuxSetStatusRight(format string, a ...any) error {
-	tmuxCmd := fmt.Sprintf("tmux set-option -g status-right ' #{?client_prefix,C-x,} %s'", fmt.Sprintf(format, a...))
+	tmuxCmd := fmt.Sprintf("tmux set-option -g status-right '#[fg=colour15,bg=colour233,bold] #{?client_prefix,C-x,} %s '", fmt.Sprintf(format, a...))
 	job := exec.Command("/bin/sh", "-c", tmuxCmd)
 	out, err := job.CombinedOutput()
 	if err != nil {
