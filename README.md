@@ -19,11 +19,7 @@
 
 ---
 
-## SSH Credential Harvesting in Action
-
-<https://github.com/user-attachments/assets/e735b325-d9ad-43bd-b34d-79f395cc4b8f>
-
----
+<img width="2560" height="1392" alt="image" src="https://github.com/user-attachments/assets/4ce74add-695f-4572-9a19-b6954856c73f" />
 
 ## What is emp3r0r?
 
