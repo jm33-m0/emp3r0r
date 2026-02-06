@@ -225,7 +225,6 @@ func msgTunHandler() {
 		for ctx.Err() == nil {
 			select {
 			case msg := <-msgCh:
-				// logging.Debugf("Message tunnel got: %v", *msg)
 				processAgentData(msg)
 				// Reset retry delay on successful message
 				retryDelay = 5 * time.Second

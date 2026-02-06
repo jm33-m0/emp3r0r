@@ -4,15 +4,49 @@ import (
 	"crypto/md5"
 	crypto_rand "crypto/rand"
 	"encoding/csv"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"math/rand"
+	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
+
+// StripANSI strips ANSI text escape codes from a string
+// It also enforces strict sanitization: only unicode graphic chars and whitespace are allowed.
+// If any other binary/control data is found, it appends the hex dump of the stripped data.
+func StripANSI(str string) string {
+	// 1. Strip ANSI escape codes
+	ansi := regexp.MustCompile(`\x1b\[[0-9;]*m`)
+	stripped := ansi.ReplaceAllString(str, "")
+
+	// 2. Check for non-graphic characters (allow whitespace like \n, \t, etc)
+	var builder strings.Builder
+	var strippedBuilder strings.Builder
+	hasBinary := false
+
+	for _, r := range stripped {
+		if unicode.IsGraphic(r) || unicode.IsSpace(r) {
+			builder.WriteRune(r)
+		} else {
+			hasBinary = true
+			strippedBuilder.WriteRune(r)
+		}
+	}
+
+	// 3. If binary data was stripped, append hex dump of the stripped data
+	if hasBinary {
+		return fmt.Sprintf("%s\n\n[Binary data stripped]:\n%s", builder.String(), hex.Dump([]byte(strippedBuilder.String())))
+	}
+
+	// 4. Otherwise return the sanitized string
+	return builder.String()
+}
 
 // ParseCmd parse commands containing whitespace
 func ParseCmd(cmd string) (parsedCmd []string) {

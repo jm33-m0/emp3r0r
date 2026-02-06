@@ -2,7 +2,6 @@ package operator
 
 import (
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -10,7 +9,6 @@ import (
 	"github.com/fatih/color"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
@@ -18,10 +16,63 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
+// CommandHandler handles specific command responses from agents
+type CommandHandler func(out string, target *def.Emp3r0rAgent)
+
+// CommandHandlers maps command names to their handlers
+var CommandHandlers = map[string]CommandHandler{
+	"ps": handlePS,
+	"ls": handleLS,
+}
+
+func handlePS(out string, target *def.Emp3r0rAgent) {
+	var procs []util.ProcEntry
+	err := cbor.Unmarshal([]byte(out), &procs)
+	if err != nil {
+		logging.Debugf("ps: %v", err)
+		logging.Errorf("ps: %v", err)
+		return
+	}
+
+	// Build table data
+	tdata := [][]string{}
+	for _, p := range procs {
+		pname := util.SplitLongLine(p.Name, 20)
+		tdata = append(tdata, []string{pname, strconv.Itoa(p.PID), strconv.Itoa(p.PPID), p.Token})
+	}
+
+	// Use BuildTable instead of manual tablewriter creation
+	outTable := cli.BuildTable([]string{"Name", "PID", "PPID", "User"}, tdata)
+
+	// Use AdaptiveTable instead of FitPanes
+	cli.AdaptiveTable(outTable)
+}
+
+func handleLS(out string, target *def.Emp3r0rAgent) {
+	var dents []util.Dentry
+	err := cbor.Unmarshal([]byte(out), &dents)
+	if err != nil {
+		logging.Debugf("ls: %v", err)
+		logging.Errorf("ls: %v", err)
+		return
+	}
+
+	// Build table data
+	tdata := [][]string{}
+	for _, d := range dents {
+		dname := util.SplitLongLine(d.Name, 20)
+		tdata = append(tdata, []string{dname, d.Ftype, d.Size, d.Date, d.Permission})
+	}
+
+	// Use BuildTable instead of manual tablewriter creation
+	outTable := cli.BuildTable([]string{"Name", "Type", "Size", "Time", "Permission"}, tdata)
+
+	// Use AdaptiveTable instead of FitPanes
+	cli.AdaptiveTable(outTable)
+}
+
 // processAgentData deal with data from agent side
 func processAgentData(data *def.MsgTunData) {
-	var err error
-
 	// what if this message is a broadcast from C2
 	switch data.Tag {
 	case logging.SUCCESS:
@@ -66,61 +117,10 @@ func processAgentData(data *def.MsgTunData) {
 	// cache this cmd response
 	live.CmdResults.Store(cmd_id, string(out))
 
-	switch cmd_slice[0] {
-	// screenshot command
-	case "screenshot":
-		go func() {
-			err = modules.ProcessScreenshot(string(out), target)
-			if err != nil {
-				logging.Errorf("%v", err)
-			}
-		}()
-
-		// ps command
-	case "ps":
-		var procs []util.ProcEntry
-		err = cbor.Unmarshal([]byte(out), &procs)
-		if err != nil {
-			logging.Debugf("ps: %v", err)
-			logging.Errorf("ps: %v", err)
-			return
-		}
-
-		// Build table data
-		tdata := [][]string{}
-		for _, p := range procs {
-			pname := util.SplitLongLine(p.Name, 20)
-			tdata = append(tdata, []string{pname, strconv.Itoa(p.PID), strconv.Itoa(p.PPID), p.Token})
-		}
-
-		// Use BuildTable instead of manual tablewriter creation
-		out = []byte(cli.BuildTable([]string{"Name", "PID", "PPID", "User"}, tdata))
-
-		// Use AdaptiveTable instead of FitPanes
-		cli.AdaptiveTable(string(out))
-
-		// ls command
-	case "ls":
-		var dents []util.Dentry
-		err = cbor.Unmarshal([]byte(out), &dents)
-		if err != nil {
-			logging.Debugf("ls: %v", err)
-			logging.Errorf("ls: %v", err)
-			return
-		}
-
-		// Build table data
-		tdata := [][]string{}
-		for _, d := range dents {
-			dname := util.SplitLongLine(d.Name, 20)
-			tdata = append(tdata, []string{dname, d.Ftype, d.Size, d.Date, d.Permission})
-		}
-
-		// Use BuildTable instead of manual tablewriter creation
-		out = []byte(cli.BuildTable([]string{"Name", "Type", "Size", "Time", "Permission"}, tdata))
-
-		// Use AdaptiveTable instead of FitPanes
-		cli.AdaptiveTable(string(out))
+	// Handle specific commands that need special processing
+	if handler, ok := CommandHandlers[cmd_slice[0]]; ok {
+		handler(string(out), target)
+		return
 	}
 
 	// Command output
@@ -132,9 +132,9 @@ func processAgentData(data *def.MsgTunData) {
 			return
 		}
 	}
-	// Strip ANSI escape codes using regex
-	ansi := regexp.MustCompile(`\x1b\[[0-9;]*m`)
-	stripped := ansi.ReplaceAllString(string(out), "")
+
+	// Strip ANSI escape codes using helper
+	stripped := util.StripANSI(string(out))
 	agent_output := fmt.Sprintf("\n[%s] %s:\n%s\n\n",
 		color.CyanString("%s", target.Name),
 		color.HiMagentaString("%s", cmd),

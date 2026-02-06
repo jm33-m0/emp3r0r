@@ -2,6 +2,7 @@ package util
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -181,7 +182,7 @@ func TestRandInt(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// For invalid ranges, RandInt adjusts them internally
 			result := RandInt(tt.min, tt.max)
-			
+
 			// Verify the result is an integer
 			if result < 0 && tt.min >= 0 && tt.max >= 0 {
 				t.Errorf("RandInt(%d, %d) returned negative value %d for non-negative inputs", tt.min, tt.max, result)
@@ -409,6 +410,67 @@ func TestSplitLongLine(t *testing.T) {
 			result := SplitLongLine(tt.input, tt.length)
 			if result != tt.expected {
 				t.Errorf("SplitLongLine(%q, %d) = %q, expected %q", tt.input, tt.length, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestStripANSI tests the StripANSI function
+func TestStripANSI(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+		checkSub string // check substring if exact match is hard due to hex dump formatting
+	}{
+		{
+			name:     "normal string",
+			input:    "hello world",
+			expected: "hello world",
+		},
+		{
+			name:     "string with ANSI codes",
+			input:    "\x1b[31mhello\x1b[0m world",
+			expected: "hello world",
+		},
+		{
+			name:     "string with newlines and tabs",
+			input:    "hello\n\tworld",
+			expected: "hello\n\tworld",
+		},
+		{
+			name:     "string with unicode",
+			input:    "hello 🌍 world",
+			expected: "hello 🌍 world",
+		},
+		{
+			name:     "string with binary data",
+			input:    "hello\x00world",
+			expected: "", // Will check substring
+			checkSub: "Binary data stripped",
+		},
+		{
+			name:     "binary data: check sanitized content",
+			input:    "hello\x00world",
+			expected: "",
+			checkSub: "helloworld", // The good parts should remain
+		},
+		{
+			name:     "mixed ANSI and binary",
+			input:    "\x1b[31mhello\x1b[0m\x00world",
+			expected: "",
+			checkSub: "helloworld",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := StripANSI(tt.input)
+			if tt.expected != "" && result != tt.expected {
+				t.Errorf("StripANSI(%q) = %q, expected %q", tt.input, result, tt.expected)
+			}
+			if tt.checkSub != "" && !strings.Contains(result, tt.checkSub) {
+				t.Errorf("StripANSI(%q) result %q does not contain expected substring %q", tt.input, result, tt.checkSub)
 			}
 		})
 	}
