@@ -1,7 +1,9 @@
 package server
 
 import (
+	"crypto/sha256"
 	"crypto/tls"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -49,7 +51,7 @@ func TestCompleteWorkflow_MultiOperator(t *testing.T) {
 	netutil.WgOperatorIP = "10.0.0.1"
 
 	// Generate operator server cert with multiple operator IPs in SANs
-	_, err = transport.GenCerts([]string{"10.0.0.1", "10.0.0.2"}, transport.OperatorServerCrtFile, transport.OperatorServerKeyFile, transport.OperatorCaKeyFile, transport.OperatorCaCrtFile, false)
+	_, err = transport.GenCerts([]string{"10.0.0.1", "10.0.0.2", "127.0.0.1"}, transport.OperatorServerCrtFile, transport.OperatorServerKeyFile, transport.OperatorCaKeyFile, transport.OperatorCaCrtFile, false)
 	if err != nil {
 		t.Fatalf("GenCerts (Op Server): %v", err)
 	}
@@ -90,22 +92,32 @@ func TestCompleteWorkflow_MultiOperator(t *testing.T) {
 	live.RuntimeConfig.MsgPath = "msg"
 
 	tests := []struct {
-		name     string
-		relay    *httptest.Server
-		fileName string
-		expected string
+		name         string
+		relay        *httptest.Server
+		fileName     string
+		remoteAddr   string // Optional override
+		setPrimaryIO string // Optional override for WgOperatorIP
+		expected     string
 	}{
 		{
-			name:     "Operator 1",
+			name:     "Operator 1 (Relayed)",
 			relay:    s1,
 			fileName: "file1.txt",
 			expected: "Hello from Operator 1",
 		},
 		{
-			name:     "Operator 2",
+			name:     "Operator 2 (Relayed)",
 			relay:    s2,
 			fileName: "file2.txt",
 			expected: "Hello from Operator 2",
+		},
+		{
+			name:         "Direct Agent (Fallback to Op 1)",
+			relay:        s1,
+			fileName:     "file1.txt",
+			remoteAddr:   "192.168.1.5:5555",
+			setPrimaryIO: "127.0.0.1", // Tell dispatcher Op 1 is at 127.0.0.1 (where s1 listens)
+			expected:     "Hello from Operator 1",
 		},
 	}
 
@@ -115,8 +127,21 @@ func TestCompleteWorkflow_MultiOperator(t *testing.T) {
 			netutil.WgRelayedHTTPPort = relayAddr.Port
 			relayIP := relayAddr.IP.String()
 
+			// Build request RemoteAddr
+			reqRemote := net.JoinHostPort(relayIP, "54321") // Default: simulate relayed from Relay IP
+			if tt.remoteAddr != "" {
+				reqRemote = tt.remoteAddr
+			}
+
+			// Setup WgOperatorIP
+			originalOpIP := netutil.WgOperatorIP
+			if tt.setPrimaryIO != "" {
+				netutil.WgOperatorIP = tt.setPrimaryIO
+			}
+			defer func() { netutil.WgOperatorIP = originalOpIP }()
+
 			req := httptest.NewRequest("GET", "/api/www/token123?file_to_download="+tt.fileName, nil)
-			req.RemoteAddr = net.JoinHostPort(relayIP, "54321")
+			req.RemoteAddr = reqRemote
 			req = mux.SetURLVars(req, map[string]string{
 				"prefix": "api",
 				"api":    "www",
@@ -131,9 +156,40 @@ func TestCompleteWorkflow_MultiOperator(t *testing.T) {
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("Expected OK, got %v: %s", resp.Status, string(body))
 			}
-			if string(body) != tt.expected {
-				t.Errorf("Expected %q, got %q", tt.expected, string(body))
+			// Simulate Client: Save downloaded content to a file
+			downloadedFile := filepath.Join(tempDir, "client_download_"+tt.name+".txt")
+			err = os.WriteFile(downloadedFile, body, 0600)
+			if err != nil {
+				t.Fatalf("Failed to save downloaded file: %v", err)
 			}
+
+			// Verify file integrity (SHA256)
+			// Calculate checksum of the original source file
+			// "Hello from Operator 1" -> 96a90f5d5d39a135d7a6f8048cc0b28183a91923f04cb7de00ea89793fbd7241
+			expectedChecksum := "96a90f5d5d39a135d7a6f8048cc0b28183a91923f04cb7de00ea89793fbd7241"
+			if tt.name == "Operator 2 (Relayed)" {
+				// "Hello from Operator 2" -> 769a895cd7699febb0a9f1e9137f99259bb18375480af52cbb41142be1681410
+				expectedChecksum = "769a895cd7699febb0a9f1e9137f99259bb18375480af52cbb41142be1681410"
+			}
+
+			// Calculate checksum of the downloaded file
+			// We can use crypto/sha256 directly or the util helper but let's stick to standard lib for test isolation if possible,
+			// or use sha256.Sum256(body) since we have body.
+			// Let's verify the file on disk to be true to "file validation"
+			downloadedContent, _ := os.ReadFile(downloadedFile)
+
+			// Verify Checksum
+			sum := sha256.Sum256(downloadedContent)
+			actualChecksum := fmt.Sprintf("%x", sum)
+			if actualChecksum != expectedChecksum {
+				t.Errorf("Checksum mismatch! Expected %s, got %s", expectedChecksum, actualChecksum)
+			}
+
+			// Simple content check first
+			if string(downloadedContent) != tt.expected {
+				t.Errorf("Content mismatch! Expected %q, got %q", tt.expected, string(downloadedContent))
+			}
+			t.Logf("Verified content of %s: %s (SHA256: %s)", downloadedFile, string(downloadedContent), actualChecksum)
 		})
 	}
 }
