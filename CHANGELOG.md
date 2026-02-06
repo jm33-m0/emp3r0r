@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.19.3](https://github.com/jm33-m0/emp3r0r/compare/v3.19.2...v3.19.3) (2026-02-06)
+
+
+### Bug Fixes
+
+* improve agent robustness ([481e847](https://github.com/jm33-m0/emp3r0r/commit/481e847f6888b434476a1dcd1cd7325c904cbda3))
+
 ## [3.19.2](https://github.com/jm33-m0/emp3r0r/compare/v3.19.1...v3.19.2) (2026-02-06)
 
 
