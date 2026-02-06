@@ -164,9 +164,10 @@ func CoreCommands() *cobra.Command {
 	sysinfoCmd.Flags().Bool("cpu", false, "Get CPU info")
 	sysinfoCmd.Flags().Bool("mem", false, "Get memory info")
 	sysinfoCmd.Flags().Bool("os", false, "Get OS info")
-	sysinfoCmd.Flags().Bool("net", false, "Get network info")
-	sysinfoCmd.Flags().Bool("user", false, "Get user info")
-	sysinfoCmd.Flags().Bool("container", false, "Get container info")
+	sysinfoCmd.Flags().Bool("net", false, "Networking info")
+	sysinfoCmd.Flags().Bool("user", false, "User info")
+	sysinfoCmd.Flags().Bool("container", false, "Container info")
+	sysinfoCmd.Flags().Bool("uptime", false, "Uptime info")
 	rootCmd.AddCommand(sysinfoCmd)
 
 	// Agent commands

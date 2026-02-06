@@ -19,6 +19,7 @@ func CmdSysinfo(cmd *cobra.Command, args []string) {
 	net, _ := cmd.Flags().GetBool("net")
 	user, _ := cmd.Flags().GetBool("user")
 	container, _ := cmd.Flags().GetBool("container")
+	uptime, _ := cmd.Flags().GetBool("uptime")
 
 	agent := agents.MustGetActiveAgent()
 	if agent == nil {
@@ -47,6 +48,9 @@ func CmdSysinfo(cmd *cobra.Command, args []string) {
 		}
 		if container {
 			cmdStr += " --container"
+		}
+		if uptime {
+			cmdStr += " --uptime"
 		}
 	}
 

@@ -212,3 +212,31 @@ func CollectFullSystemInfo() *def.Emp3r0rAgent {
 func GetContainerName() string {
 	return sysinfo.CheckContainer()
 }
+
+// GetUserAndGroups returns user and group info
+func GetUserAndGroups() (string, string) {
+	u, err := user.Current()
+	if err != nil {
+		logging.Println(err)
+		return "Not available", ""
+	}
+	userStr := fmt.Sprintf("%s (%s), uid=%s, gid=%s", u.Username, u.HomeDir, u.Uid, u.Gid)
+
+	gids, err := u.GroupIds()
+	if err != nil {
+		logging.Printf("GroupIds: %v", err)
+	}
+
+	var groupNames []string
+	for _, gid := range gids {
+		group, err := user.LookupGroupId(gid)
+		if err != nil {
+			groupNames = append(groupNames, gid) // Fallback to ID
+			continue
+		}
+		groupNames = append(groupNames, fmt.Sprintf("%s(%s)", group.Name, gid))
+	}
+	groupsStr := strings.Join(groupNames, ",")
+
+	return userStr, groupsStr
+}

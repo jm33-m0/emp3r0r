@@ -215,6 +215,7 @@ func C2Commands() *cobra.Command {
 	sysInfoCmd.Flags().Bool("net", false, "Get network info")
 	sysInfoCmd.Flags().Bool("user", false, "Get user info")
 	sysInfoCmd.Flags().Bool("container", false, "Get container info")
+	sysInfoCmd.Flags().Bool("uptime", false, "Uptime info")
 	rootCmd.AddCommand(sysInfoCmd)
 
 	platformCommands(rootCmd)
