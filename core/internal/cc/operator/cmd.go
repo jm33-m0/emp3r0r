@@ -283,6 +283,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		sysinfoCmd.Flags().Bool("os", false, "Get OS info")
 		sysinfoCmd.Flags().Bool("net", false, "Get network info")
 		sysinfoCmd.Flags().Bool("user", false, "Get user info")
+		sysinfoCmd.Flags().Bool("container", false, "Get container info")
 		rootCmd.AddCommand(sysinfoCmd)
 
 		killCmd := &cobra.Command{

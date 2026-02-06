@@ -18,6 +18,8 @@ type Emp3r0rAgent struct {
 	Hostname    string           `cbor:"5,keyasint"`  // Hostname and machine ID
 	Hardware    string           `cbor:"6,keyasint"`  // machine details and hypervisor
 	Container   string           `cbor:"7,keyasint"`  // container tech (if any)
+	Uptime      string           `cbor:"33,keyasint"` // System uptime
+	Groups      string           `cbor:"34,keyasint"` // User groups
 	CPU         string           `cbor:"8,keyasint"`  // CPU info
 	GPU         string           `cbor:"9,keyasint"`  // GPU info
 	Mem         string           `cbor:"10,keyasint"` // memory size

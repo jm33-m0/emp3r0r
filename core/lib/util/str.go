@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -29,13 +30,24 @@ func StripANSI(str string) string {
 	var strippedBuilder strings.Builder
 	hasBinary := false
 
-	for _, r := range stripped {
+	// Iterate over the string as UTF-8
+	for i := 0; i < len(stripped); {
+		r, width := utf8.DecodeRuneInString(stripped[i:])
+		if r == utf8.RuneError && width == 1 {
+			// Invalid UTF-8 byte
+			hasBinary = true
+			strippedBuilder.WriteByte(stripped[i])
+			i++
+			continue
+		}
+
 		if unicode.IsGraphic(r) || unicode.IsSpace(r) {
 			builder.WriteRune(r)
 		} else {
 			hasBinary = true
 			strippedBuilder.WriteRune(r)
 		}
+		i += width
 	}
 
 	// 3. If binary data was stripped, append hex dump (hex only) of the stripped data

@@ -210,3 +210,12 @@ func CheckProduct(info *ghw.ProductInfo) (product string) {
 
 	return
 }
+
+// FormatUptime converts seconds to human readable string (d h m s)
+func FormatUptime(seconds int64) string {
+	days := seconds / 86400
+	hours := (seconds % 86400) / 3600
+	minutes := (seconds % 3600) / 60
+	secs := seconds % 60
+	return fmt.Sprintf("%dd %dh %dm %ds", days, hours, minutes, secs)
+}

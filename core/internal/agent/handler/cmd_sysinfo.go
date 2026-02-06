@@ -19,12 +19,13 @@ func sysinfoCmdRun(cmd *cobra.Command, args []string) {
 	osInfo, _ := cmd.Flags().GetBool("os")
 	net, _ := cmd.Flags().GetBool("net")
 	user, _ := cmd.Flags().GetBool("user")
+	container, _ := cmd.Flags().GetBool("container")
 	full, _ := cmd.Flags().GetBool("full")
 
 	var info *def.Emp3r0rAgent
 
 	// Default to full if no specific flag is set
-	if full || (!cpu && !mem && !osInfo && !net && !user) {
+	if full || (!cpu && !mem && !osInfo && !net && !user && !container) {
 		info = agentutils.CollectFullSystemInfo()
 	} else {
 		info = &def.Emp3r0rAgent{}
@@ -51,6 +52,9 @@ func sysinfoCmdRun(cmd *cobra.Command, args []string) {
 			info.IPs = netutil.IPa()
 			info.ARP = netutil.IPNeigh()
 			info.Transport = def.Transport
+		}
+		if container {
+			info.Container = agentutils.GetContainerName()
 		}
 	}
 

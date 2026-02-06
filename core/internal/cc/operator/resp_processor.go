@@ -36,31 +36,39 @@ func handleSysInfo(out []byte, target *def.Emp3r0rAgent) string {
 		return ""
 	}
 
-	// Build table data
-	tdata := [][]string{}
+	// Build table headers and row
+	var headers []string
+	var row []string
+
 	addIfNotEmpty := func(name, value string) {
 		if value != "" && value != "[]" && value != "0" {
-			tdata = append(tdata, []string{name, value})
+			headers = append(headers, name)
+			row = append(row, value)
 		}
 	}
 
 	addIfNotEmpty("Hostname", info.Hostname)
+	addIfNotEmpty("Uptime", info.Uptime)
 	addIfNotEmpty("OS", info.OS)
 	addIfNotEmpty("Kernel", info.Kernel)
 	addIfNotEmpty("Arch", info.Arch)
 	addIfNotEmpty("CPU", info.CPU)
 	addIfNotEmpty("Mem", info.Mem)
 	addIfNotEmpty("User", info.User)
+	addIfNotEmpty("Groups", info.Groups)
 	addIfNotEmpty("IPs", fmt.Sprintf("%v", info.IPs))
-	addIfNotEmpty("ARP", fmt.Sprintf("%v", info.ARP))
+	if info.Container != "" && info.Container != "N/A" {
+		addIfNotEmpty("Container", info.Container)
+	}
+	// addIfNotEmpty("ARP", fmt.Sprintf("%v", info.ARP)) // ARP might be too long for horizontal table
 	if info.Process != nil {
 		addIfNotEmpty("Agent PID", strconv.Itoa(info.Process.PID))
 	}
 	addIfNotEmpty("CWD", info.CWD)
 	addIfNotEmpty("Transport", info.Transport)
 
-	// Use BuildTable
-	outTable := cli.BuildTable([]string{"Property", "Value"}, tdata)
+	// Use BuildTable with horizontal layout
+	outTable := cli.BuildTable(headers, [][]string{row})
 
 	// Use AdaptiveTable
 	cli.AdaptiveTable(outTable)
@@ -127,16 +135,17 @@ func handleStat(out []byte, target *def.Emp3r0rAgent) string {
 		return ""
 	}
 
-	// Build table data
-	tdata := [][]string{
-		{"Name", stat.Name},
-		{"Size", fmt.Sprintf("%d bytes", stat.Size)},
-		{"Permission", stat.Permission},
-		{"Checksum", stat.Checksum},
+	// Build table headers and row
+	headers := []string{"Name", "Size", "Perm", "Checksum"}
+	row := []string{
+		stat.Name,
+		fmt.Sprintf("%d", stat.Size),
+		stat.Permission,
+		stat.Checksum,
 	}
 
-	// Use BuildTable
-	outTable := cli.BuildTable([]string{"Property", "Value"}, tdata)
+	// Use BuildTable with horizontal layout
+	outTable := cli.BuildTable(headers, [][]string{row})
 
 	// Use AdaptiveTable
 	cli.AdaptiveTable(outTable)

