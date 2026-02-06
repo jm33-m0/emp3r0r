@@ -107,7 +107,6 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 		}()
 
 		cancel()
-		def.KCPKeep = false // tell KCPClient to close this conn so we won't stuck
 		logging.Print("MsgTunneler closed")
 	}()
 

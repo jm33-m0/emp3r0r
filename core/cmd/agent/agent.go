@@ -225,7 +225,6 @@ connect:
 		conditionalC2FailNotify()
 		goto connect
 	}
-	def.KCPKeep = true
 	logging.Println("Connecting to message tunnel...")
 	c2transport.MsgTunneler(def.CCMsgConn, common.RuntimeConfig, handler.HandleC2Command, ctx, cancel)
 	logging.Printf("Message tunnel closed, reconnecting")

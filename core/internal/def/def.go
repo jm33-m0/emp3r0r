@@ -23,9 +23,6 @@ var (
 	// CCMsgConn the connection to CC, for JSON message-based communication
 	CCMsgConn io.ReadWriteCloser
 
-	// KCPKeep: when disconnected from C2, KCP client should be notified
-	KCPKeep = true
-
 	// ProxyServer Socks5 proxy listening on agent
 	ProxyServer *socks5.Server
 
