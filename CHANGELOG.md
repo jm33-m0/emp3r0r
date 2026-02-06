@@ -1,5 +1,20 @@
 # Changelog
 
+## [3.19.1](https://github.com/jm33-m0/emp3r0r/compare/v3.19.0...v3.19.1) (2026-02-06)
+
+
+### Bug Fixes
+
+* `stat` result display ([b892854](https://github.com/jm33-m0/emp3r0r/commit/b892854779a32919a1399ed6e0fb0eb568f370e7))
+* add newline after `Latency` output ([c89e1b0](https://github.com/jm33-m0/emp3r0r/commit/c89e1b00dab552bb43b9f28924771db5bf3cd64d))
+* data race in unused code ([a4653bd](https://github.com/jm33-m0/emp3r0r/commit/a4653bdaa9088f521861a87080454157dcfe7be0))
+* enhance `sysinfo`, `ls`, `ps`, and `stat` commands to send and receive CBOR-encoded binary data. ([7cfc3f7](https://github.com/jm33-m0/emp3r0r/commit/7cfc3f73a2f899b3a51901d1d0abd9865d7b89bb))
+* malformed response from `!stat` ([cb82383](https://github.com/jm33-m0/emp3r0r/commit/cb82383e34f545d21551d8b5587f93a3e20a82e2))
+* remote path auto-completion ([69ad74f](https://github.com/jm33-m0/emp3r0r/commit/69ad74fbe505939682aac879b2617f3e08bb5cf9))
+* remove `screenshot` ([d97b6f1](https://github.com/jm33-m0/emp3r0r/commit/d97b6f108d8544bb804bd160b81c916a9ab674bd))
+* remove excessive logging ([8e8a506](https://github.com/jm33-m0/emp3r0r/commit/8e8a506e014cd2b24ea51c0bfc1c8e411ff02aa6))
+* sanitize agent responses further ([25fee57](https://github.com/jm33-m0/emp3r0r/commit/25fee57862b689a6c26c32cae5630491ef56765d))
+
 ## [3.19.0](https://github.com/jm33-m0/emp3r0r/compare/v3.18.1...v3.19.0) (2026-02-06)
 
 
