@@ -207,7 +207,7 @@ func processAgentData(data *def.MsgTunData) {
 
 	// Strip ANSI escape codes using helper
 	stripped := util.StripANSI(string(out))
-	agent_output := fmt.Sprintf("\n[%s] %s:\n%s\n\n",
+	agent_output := fmt.Sprintf("\n[%s] %s:\n%s\n",
 		color.CyanString("%s", target.Name),
 		color.HiMagentaString("%s", cmd),
 		color.HiWhiteString(stripped))
@@ -231,7 +231,7 @@ func processAgentData(data *def.MsgTunData) {
 			logging.Printf(agent_output)
 		} else {
 			// Append latency to output
-			agent_output = fmt.Sprintf("%s\n%s", agent_output, color.HiCyanString("Latency: %s", time_spent))
+			agent_output = fmt.Sprintf("%s\n%s", agent_output, color.HiCyanString("Latency: %s\n\n", time_spent))
 			logging.Printf(agent_output)
 		}
 	}
