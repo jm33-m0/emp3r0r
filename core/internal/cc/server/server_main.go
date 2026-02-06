@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/jm33-m0/arc/v2"
@@ -207,18 +206,54 @@ func tarConfig(hosts string) {
 	if err != nil {
 		logging.Fatalf("Failed to generate C2 certs: %v", err)
 	}
-	err = os.Chdir(live.EmpWorkSpace)
+	// create temp dir
+	tempDir, err := os.MkdirTemp("", "emp3r0r_config_")
 	if err != nil {
-		logging.Fatalf("Failed to change directory: %v", err)
+		logging.Fatalf("Failed to create temp dir: %v", err)
 	}
-	// tar all config files
-	filter := func(path string) bool {
-		return strings.HasSuffix(path, ".log") || strings.HasPrefix(path, "stub") || strings.HasSuffix(path, ".history")
-	}
-	os.Chdir(filepath.Dir(live.EmpWorkSpace))
-	defer os.Chdir(live.EmpWorkSpace)
+	defer os.RemoveAll(tempDir)
 
-	err = arc.ArchiveWithFilter(filepath.Base(live.EmpWorkSpace), live.EmpConfigTar, arc.CompressionMap["xz"], arc.ArchivalMap["tar"], filter)
+	// create .emp3r0r in temp dir
+	tempEmpDir := filepath.Join(tempDir, filepath.Base(live.EmpWorkSpace))
+	err = os.MkdirAll(tempEmpDir, 0700)
+	if err != nil {
+		logging.Fatalf("Failed to create temp .emp3r0r dir: %v", err)
+	}
+
+	// copy necessary files to temp dir
+	filesToCopy := []string{
+		"emp3r0r.json",
+		"wg_config.json", // in case it exists
+	}
+	// globs
+	pemFiles, _ := filepath.Glob(filepath.Join(live.EmpWorkSpace, "*.pem"))
+	for _, pem := range pemFiles {
+		filesToCopy = append(filesToCopy, filepath.Base(pem))
+	}
+
+	for _, file := range filesToCopy {
+		src := filepath.Join(live.EmpWorkSpace, file)
+		if !util.IsFileExist(src) {
+			continue
+		}
+		copyErr := util.Copy(src, tempEmpDir) // util.Copy handles dir dst
+		if copyErr != nil {
+			logging.Warningf("Failed to copy %s to temp dir: %v", src, copyErr)
+		}
+	}
+
+	// tar the temp dir
+	cwd, err := os.Getwd()
+	if err != nil {
+		logging.Warningf("Failed to get current directory: %v", err)
+	}
+	err = os.Chdir(tempDir)
+	if err != nil {
+		logging.Fatalf("Failed to change directory to temp dir: %v", err)
+	}
+	defer os.Chdir(cwd)
+
+	err = arc.Archive(filepath.Base(live.EmpWorkSpace), live.EmpConfigTar, arc.CompressionMap["xz"], arc.ArchivalMap["tar"])
 	if err != nil {
 		logging.Errorf("Failed to tar config files: %v", err)
 	}

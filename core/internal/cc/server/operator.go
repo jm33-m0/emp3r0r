@@ -2,10 +2,10 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"time"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -28,10 +28,10 @@ var (
 	SERVER_WG_CONFIG *netutil.WireGuardConfig
 )
 
-// DecodeJSONBody decodes JSON HTTP request body
-func DecodeJSONBody[T any](wrt http.ResponseWriter, req *http.Request) (*T, error) {
+// DecodeCBORBody decodes CBOR HTTP request body
+func DecodeCBORBody[T any](wrt http.ResponseWriter, req *http.Request) (*T, error) {
 	var dst T
-	if err := json.NewDecoder(req.Body).Decode(&dst); err != nil {
+	if err := cbor.NewDecoder(req.Body).Decode(&dst); err != nil {
 		http.Error(wrt, err.Error(), http.StatusBadRequest)
 		return nil, err
 	}
@@ -39,8 +39,8 @@ func DecodeJSONBody[T any](wrt http.ResponseWriter, req *http.Request) (*T, erro
 }
 
 func handleSetActiveAgent(wrt http.ResponseWriter, req *http.Request) {
-	// Decode JSON request body
-	operation, err := DecodeJSONBody[def.Operation](wrt, req)
+	// Decode CBOR request body
+	operation, err := DecodeCBORBody[def.Operation](wrt, req)
 	if err != nil {
 		return
 	}
@@ -49,14 +49,15 @@ func handleSetActiveAgent(wrt http.ResponseWriter, req *http.Request) {
 	agents.SetActiveAgent(operation.AgentTag)
 
 	// Return active agent
-	if err := json.NewEncoder(wrt).Encode(live.ActiveAgent); err != nil {
+	wrt.Header().Set("Content-Type", "application/cbor")
+	if err := cbor.NewEncoder(wrt).Encode(live.ActiveAgent); err != nil {
 		http.Error(wrt, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func handleSendCommand(wrt http.ResponseWriter, req *http.Request) {
-	// Decode JSON request body
-	operation, err := DecodeJSONBody[def.Operation](wrt, req)
+	// Decode CBOR request body
+	operation, err := DecodeCBORBody[def.Operation](wrt, req)
 	if err != nil {
 		return
 	}
@@ -83,10 +84,12 @@ func handleSendCommand(wrt http.ResponseWriter, req *http.Request) {
 	wrt.WriteHeader(http.StatusOK)
 }
 
-func handleListAgents(wrt http.ResponseWriter, _ *http.Request) {
+func handleListAgents(wrt http.ResponseWriter, req *http.Request) {
 	// Get all agents
 	agentsList := agents.GetConnectedAgents()
-	if err := json.NewEncoder(wrt).Encode(agentsList); err != nil {
+
+	wrt.Header().Set("Content-Type", "application/cbor")
+	if err := cbor.NewEncoder(wrt).Encode(agentsList); err != nil {
 		http.Error(wrt, err.Error(), http.StatusInternalServerError)
 	}
 }

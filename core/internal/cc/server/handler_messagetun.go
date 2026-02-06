@@ -37,7 +37,7 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 	var wg sync.WaitGroup
 	defer func() {
 		logging.Debugf("handleMessageTunnel exiting")
-		cancel() // Signal goroutine to stop
+		cancel()  // Signal goroutine to stop
 		wg.Wait() // Wait for goroutine to finish before returning
 		live.AgentControlMapMutex.Lock()
 		for t, c := range live.AgentControlMap {
@@ -120,6 +120,13 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 			live.AgentControlMap[agent].Cancel = cancel
 			live.AgentControlMapMutex.Unlock()
 
+			agent.LastSeen = time.Now()
+			if msg.Time != "" {
+				start_time, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", msg.Time)
+				if err == nil {
+					agent.LastSeenRTT = time.Since(start_time)
+				}
+			}
 			// handshake (hello) message has empty CmdSlice or just random data
 			// but it's used to tell CC that agent is alive
 			// here we just respond to keep-alive if it matches any criteria

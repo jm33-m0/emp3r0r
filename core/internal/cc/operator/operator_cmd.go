@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -22,9 +21,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func sendJSONRequest(url string, data any) ([]byte, error) {
-	// Encode data to JSON
-	jsonData, err := json.Marshal(data)
+func sendCBORRequest(url string, data any) ([]byte, error) {
+	// Encode data to CBOR
+	cborData, err := cbor.Marshal(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode data: %w", err)
 	}
@@ -34,11 +33,11 @@ func sendJSONRequest(url string, data any) ([]byte, error) {
 	defer cancel()
 
 	// Send HTTP request
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(cborData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/cbor")
 	req.Header.Add("operator_session", OPERATOR_SESSION)
 
 	resp, err := OperatorHTTPClient.Do(req)
@@ -48,7 +47,7 @@ func sendJSONRequest(url string, data any) ([]byte, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("request failed, status code: %d, url: %s, request body: %v", resp.StatusCode, url, data)
+		return nil, fmt.Errorf("request failed, status code: %d, url: %s", resp.StatusCode, url)
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -80,7 +79,7 @@ func operatorSendCommand2Agent(cmd, cmdID, agentTag string) error {
 	// Send command asynchronously to avoid blocking
 	go func() {
 		url := fmt.Sprintf("%s/%s", OperatorRootURL, transport.OperatorSendCommand)
-		_, err := sendJSONRequest(url, operation)
+		_, err := sendCBORRequest(url, operation)
 		if err != nil {
 			logging.Errorf("Failed to send command to agent %s: %v", agentTag, err)
 		}
@@ -96,21 +95,29 @@ func cmdSetActiveAgent(cmd *cobra.Command, args []string) {
 	}
 
 	url := fmt.Sprintf("%s/%s", OperatorRootURL, transport.OperatorSetActiveAgent)
-	resp, err := sendJSONRequest(url, operation)
+	body, err := sendCBORRequest(url, operation)
 	if err != nil {
 		logging.Errorf("Failed to set active agent: %v", err)
+		return
 	}
 
-	live.ActiveAgent = new(def.Emp3r0rAgent)
-	err = json.Unmarshal(resp, live.ActiveAgent)
-	if err != nil {
+	var agent *def.Emp3r0rAgent
+	if err := cbor.Unmarshal(body, &agent); err != nil {
 		logging.Errorf("Failed to unmarshal active agent: %v", err)
+		return
 	}
+	live.ActiveAgent = agent
 	if live.ActiveAgent.Tag == "" {
 		logging.Errorf("Failed to set active agent: empty data from server")
 		return
 	}
 	logging.Successf("Now targeting %s", live.ActiveAgent.Tag)
+
+	// Update tmux window title to show active agent
+	setTitleErr := cli.TmuxSetWindowTitle(fmt.Sprintf("#[fg=cyan]%s", live.ActiveAgent.Name), cli.CommandPane.WindowID)
+	if setTitleErr != nil {
+		logging.Warningf("Failed to set tmux window title: %v", setTitleErr)
+	}
 }
 
 func cmdListAgents(_ *cobra.Command, _ []string) {
@@ -124,16 +131,25 @@ func cmdListAgents(_ *cobra.Command, _ []string) {
 
 func getAgentListFromServer() error {
 	url := fmt.Sprintf("%s/%s", OperatorRootURL, transport.OperatorListConnectedAgents)
-	body, err := sendJSONRequest(url, nil)
+	body, err := sendCBORRequest(url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to list agents: %v", err)
 	}
 
 	var agents []*def.Emp3r0rAgent
-	if err := json.Unmarshal(body, &agents); err != nil {
+	if err := cbor.Unmarshal(body, &agents); err != nil {
 		return fmt.Errorf("failed to unmarshal agents: %v", err)
 	}
 	live.AgentList = agents
+	// Update active agent pointer to avoid staleness
+	if live.ActiveAgent != nil {
+		for _, a := range agents {
+			if a.UUID == live.ActiveAgent.UUID {
+				live.ActiveAgent = a
+				break
+			}
+		}
+	}
 
 	return nil
 }

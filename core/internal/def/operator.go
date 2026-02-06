@@ -2,13 +2,13 @@ package def
 
 // Operation is a command or module operation to be executed on C2 server
 type Operation struct {
-	AgentTag   string  `json:"agent_tag"`   // the target agent
-	Action     string  `json:"action"`      // the action to perform: "command" or "module"
-	Command    *string `json:"command"`     // the command to send to the agent (if action is "command")
-	CommandID  *string `json:"command_id"`  // the command ID (if action is "command")
-	ModuleName *string `json:"module_name"` // the module (if action is "module")
-	SetOption  *string `json:"set_option"`  // the option to set (if action is "module")
-	SetValue   *string `json:"set_value"`   // the value to set (if action is "module")
+	AgentTag   string  `cbor:"1,keyasint"` // the target agent
+	Action     string  `cbor:"2,keyasint"` // the action to perform: "command" or "module"
+	Command    *string `cbor:"3,keyasint"` // the command to send to the agent (if action is "command")
+	CommandID  *string `cbor:"4,keyasint"` // the command ID (if action is "command")
+	ModuleName *string `cbor:"5,keyasint"` // the module (if action is "module")
+	SetOption  *string `cbor:"6,keyasint"` // the option to set (if action is "module")
+	SetValue   *string `cbor:"7,keyasint"` // the value to set (if action is "module")
 }
 
 // IsOptionSet checks if a specific option is set

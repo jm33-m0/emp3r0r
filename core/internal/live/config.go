@@ -24,6 +24,12 @@ var (
 	// ActiveAgent selected target
 	ActiveAgent *def.Emp3r0rAgent
 
+	// WWWRoot host static files for agent
+	WWWRoot = Temp + "www/"
+
+	// UtilsArchive host utils.tar.xz for agent
+	UtilsArchive = WWWRoot + "utils.tar.xz"
+
 	// Save the configuration of the current session
 	RuntimeConfig = &def.Config{}
 	// TmuxPersistence enable debug (-debug)
@@ -53,12 +59,6 @@ var (
 const (
 	// Temp where we save temp files
 	Temp = "/tmp/emp3r0r/"
-
-	// WWWRoot host static files for agent
-	WWWRoot = Temp + "www/"
-
-	// UtilsArchive host utils.tar.xz for agent
-	UtilsArchive = WWWRoot + "utils.tar.xz"
 )
 
 func cleanupConfig() (err error) {

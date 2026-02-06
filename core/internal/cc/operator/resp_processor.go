@@ -54,6 +54,9 @@ func processAgentData(data *def.MsgTunData) {
 		return
 	}
 
+	// Update last seen
+	target.LastSeen = time.Now()
+
 	// cmd output from agent
 	cmd := data.CmdSlice[0]
 	is_builtin_cmd := strings.HasPrefix(cmd, "!")
@@ -136,23 +139,28 @@ func processAgentData(data *def.MsgTunData) {
 		color.CyanString("%s", target.Name),
 		color.HiMagentaString("%s", cmd),
 		color.HiWhiteString(stripped))
-	logging.Printf(agent_output)
-
 	// time spent on this cmd
 	cmdtime, ok := live.CmdTime[cmd_id]
 	if !ok {
 		logging.Warningf("No start time found for command %s", cmd)
+		logging.Printf(agent_output)
 		return
 	}
 	start_time, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", cmdtime)
 	if err != nil {
 		logging.Warningf("Parsing timestamp '%s': %v", live.CmdTime[cmd_id], err)
+		logging.Printf(agent_output)
 	} else {
 		time_spent := time.Since(start_time)
+		target.LastSeenRTT = time_spent
+		target.LastSeen = time.Now()
 		if is_builtin_cmd {
 			logging.Debugf("Command %s took %s", strconv.Quote(cmd), time_spent)
+			logging.Printf(agent_output)
 		} else {
-			logging.Printf("Command %s took %s", strconv.Quote(cmd), time_spent)
+			// Append latency to output
+			agent_output = fmt.Sprintf("%s\n%s", agent_output, color.HiCyanString("Latency: %s", time_spent))
+			logging.Printf(agent_output)
 		}
 	}
 }

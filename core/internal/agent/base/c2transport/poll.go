@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -172,6 +173,7 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 			hello_msg.CmdID = uuid.NewString()
 			hello_msg.Tag = config.AgentTag
 			hello_msg.AgentUUID = config.AgentUUID
+			hello_msg.Time = time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST")
 
 			// Dynamic TOFU: Sign UUID with Agent Key for session authentication
 			sig, err := agentutils.SignWithAgentKey([]byte(config.AgentUUID))

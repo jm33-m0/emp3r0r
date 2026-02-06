@@ -70,7 +70,9 @@ func TmuxInitWindows() (err error) {
 
 	// remain-on-exit for current tmux window
 	// "on" is necessary
-	TmuxSetOpt(HomeWindow, "remain-on-exit on")
+	if setoptErr := TmuxSetOpt(HomeWindow, "remain-on-exit on"); setoptErr != nil {
+		return fmt.Errorf("setting home window as persistent: %v", setoptErr)
+	}
 
 	// main window
 	CommandPane = &TmuxPane{}
@@ -80,16 +82,14 @@ func TmuxInitWindows() (err error) {
 	TmuxUpdatePane(CommandPane)
 
 	// pane title
-	TmuxSetPaneTitle("Emp3r0r Console", CommandPane.ID)
+	if setPaneTitleErr := CommandPane.SetTitle("Emp3r0r Console"); setPaneTitleErr != nil {
+		return fmt.Errorf("setting title for Emp3r0r Console pane: %v", setPaneTitleErr)
+	}
 
 	// check terminal size, prompt user to run emp3r0r C2 in a bigger window
 	TermWidth, TermHeight, err = TermSize()
 	if err != nil {
 		logging.Warningf("Get terminal size: %v", err)
-	}
-	if TermWidth < 180 || TermHeight < 40 {
-		logging.Warningf("I need a bigger window, make sure the window size is at least 180x40 (w*h)")
-		logging.Warningf("Please maximize the terminal window if possible")
 	}
 
 	// we don't want the tmux pane be killed
@@ -125,18 +125,36 @@ func TmuxInitWindows() (err error) {
 		return
 	}
 
+	// if window size is too small, use simplified layout
+	use_simplified_layout := false
+	if TermWidth < 180 || TermHeight < 40 {
+		logging.Warningf("Window size is too small, please resize the window to at least 180x40")
+		logging.Infof("Current size: %d x %d. Using simplified layout", TermWidth, TermHeight)
+		use_simplified_layout = true
+	}
+
 	// Agent output
 	OutputPane, err = new_pane("Output", "Saving to emp3r0r.log...\n", "h", "", 50)
 	if err != nil {
 		return
 	}
 
-	// Agent List
-	AgentListPane, err = new_pane("Agent List", "No agents connected", "", "", 0)
-	if err != nil {
-		return
+	if use_simplified_layout {
+		// Agent List
+		AgentListPane, err = new_pane("Agent List", "No agents connected", "", "", 0)
+		if err != nil {
+			return
+		}
+		if setOptErr := TmuxSetOpt(AgentListPane.WindowID, "remain-on-exit on"); setOptErr != nil {
+			return fmt.Errorf("TmuxSetOpt: %v", setOptErr)
+		}
+	} else {
+		// Agent List
+		AgentListPane, err = new_pane("Agent List", "No agents connected", "v", "", 40)
+		if err != nil {
+			return
+		}
 	}
-	TmuxSetOpt(AgentListPane.WindowID, "remain-on-exit on")
 
 	// check panes
 	if AgentListPane == nil ||
@@ -184,7 +202,7 @@ func TmuxWindowSize() (x, y int) {
 // returns the index of current pane
 // returns -1 when error occurs
 func TmuxCurrentPane() (pane_id string) {
-	out, execErr := exec.Command("tmux", "display-message", "-p", `'#{pane_id}'`).CombinedOutput()
+	out, execErr := exec.Command("tmux", "display-message", "-p", "#{pane_id}").CombinedOutput()
 	if execErr != nil {
 		logging.Warningf("TmuxCurrentPane: %v", execErr)
 		return
@@ -207,7 +225,7 @@ func TmuxSwitchWindow(window_id string) (res bool) {
 // returns the unique ID of the window
 // returns "" when error occurs
 func TmuxCurrentWindow() (id string) {
-	out, cmdErr := exec.Command("tmux", "display-message", "-p", `'#{window_id}'`).CombinedOutput()
+	out, cmdErr := exec.Command("tmux", "display-message", "-p", "#{window_id}").CombinedOutput()
 	if cmdErr != nil {
 		logging.Warningf("TmuxCurrentWindow: %v", cmdErr)
 		return
@@ -215,6 +233,28 @@ func TmuxCurrentWindow() (id string) {
 
 	id = strings.TrimSpace(string(out))
 	return
+}
+
+func (pane *TmuxPane) SetTitle(title string) (err error) {
+	list_panes := func() string {
+		tmuxCmd := []string{"list-panes"}
+		out, err := exec.Command("tmux", tmuxCmd...).CombinedOutput()
+		if err != nil {
+			return fmt.Sprintf("exec tmux list-panes: %s\n%v", out, err)
+		}
+		return string(out)
+	}
+
+	// set pane title
+	tmux_cmd := []string{"select-pane", "-t", pane.ID, "-T", title}
+
+	out, err := exec.Command("tmux", tmux_cmd...).CombinedOutput()
+	if err != nil {
+		err = fmt.Errorf("setting pane %s title to %s: %s (%v)\nCurrent panes:\n%s",
+			pane.ID, title, out, err, list_panes())
+	}
+
+	return err
 }
 
 func (pane *TmuxPane) Respawn() (err error) {
@@ -450,7 +490,7 @@ func TmuxNewPane(title, hV string, target_pane_id string, size int, cmd string) 
 	pane.TTY = strings.TrimSpace(tmux_res_split[2])
 	pane.WindowID = strings.TrimSpace(tmux_res_split[3])
 
-	err = TmuxSetPaneTitle(title, pane.ID)
+	err = pane.SetTitle(title)
 	TmuxUpdatePane(pane)
 	return
 }
@@ -467,9 +507,10 @@ func TmuxUpdatePane(pane *TmuxPane) {
 	}
 }
 
-func TmuxSetPaneTitle(title, pane_id string) error {
+// TmuxSetWindowTitle set tmux window title, which is the title shown in tmux status bar
+func TmuxSetWindowTitle(title, window_id string) error {
 	// set pane title
-	tmux_cmd := []string{"select-pane", "-t", pane_id, "-T", title}
+	tmux_cmd := []string{"rename-window", "-t", window_id, title}
 
 	out, err := exec.Command("tmux", tmux_cmd...).CombinedOutput()
 	if err != nil {
@@ -477,6 +518,30 @@ func TmuxSetPaneTitle(title, pane_id string) error {
 	}
 
 	return err
+}
+
+// TmuxSetStatusLeft set tmux status left
+func TmuxSetStatusLeft(format string, a ...any) error {
+	msg := fmt.Sprintf(format, a...)
+	tmuxCmd := fmt.Sprintf("tmux set-option -g status-left '%s'", msg)
+	job := exec.Command("/bin/sh", "-c", tmuxCmd)
+	out, err := job.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s\n%v", out, err)
+	}
+	return nil
+}
+
+// TmuxSetStatusRight set tmux status right
+func TmuxSetStatusRight(format string, a ...any) error {
+	msg := fmt.Sprintf(format, a...)
+	tmuxCmd := fmt.Sprintf("tmux set-option -g status-right '%s'", msg)
+	job := exec.Command("/bin/sh", "-c", tmuxCmd)
+	out, err := job.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s\n%v", out, err)
+	}
+	return nil
 }
 
 // TmuxNewWindow run command in a new window
@@ -499,10 +564,8 @@ func TmuxNewWindow(name, cmd string) error {
 // TmuxSplit split tmux window, and run command in the new pane
 func TmuxSplit(hV, cmd string) error {
 	if os.Getenv("TMUX") == "" ||
-		!util.IsCommandExist("tmux") ||
-		!util.IsCommandExist("less") {
-
-		return errors.New("you need to run emp3r0r under `tmux`, and make sure `less` is installed")
+		!util.IsCommandExist("tmux") {
+		return errors.New("you need to run emp3r0r under tmux")
 	}
 
 	job := fmt.Sprintf("tmux split-window -%s '%s || read'", hV, cmd)

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
@@ -47,6 +48,42 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 	if tail != nil {
 		tdata = append(tdata, tail)
 	}
+
+	// Set tmux status with agent count and C2 status
+	c2_ip := common.RuntimeConfig.CCAddress
+	transport_type := "[??]"
+	rtt := "⚡??ms"
+	idle := "Idle: ??s"
+	idle_color := "green"
+
+	if live.ActiveAgent != nil {
+		c2_ip = live.ActiveAgent.C2Host
+		transport_type = fmt.Sprintf("[%s]", live.ActiveAgent.Transport)
+		rtt = fmt.Sprintf("⚡%dms", live.ActiveAgent.LastSeenRTT.Milliseconds())
+
+		idle_time := time.Since(live.ActiveAgent.LastSeen).Seconds()
+		if live.ActiveAgent.LastSeen.IsZero() {
+			idle = "Idle: N/A"
+			idle_color = "red"
+		} else {
+			idle = fmt.Sprintf("Idle: %.0fs", idle_time)
+			if idle_time > 120 {
+				idle_color = "red"
+			} else if idle_time > 45 {
+				idle_color = "yellow"
+			}
+		}
+	}
+
+	// Status Left: [emp3r0r] 🛡️ AgentCount | 📡 C2Address
+	status_left := fmt.Sprintf("#[fg=colour15,bg=colour235,bold] [emp3r0r] #[fg=white,bg=colour235,nobold]🛡️ %d Agents | 📡 %s ",
+		len(agents), util.ShortenString(c2_ip, 20))
+	_ = cli.TmuxSetStatusLeft("%s", status_left)
+
+	// Status Right: Transport RTT | Idle: Time
+	status_right := fmt.Sprintf("#[fg=colour15,bg=colour235,bold] %s %s | #[fg=%s]%s ",
+		transport_type, rtt, idle_color, idle)
+	_ = cli.TmuxSetStatusRight("%s", status_right)
 
 	header := []string{"Tag", "OS", "Process", "User", "IPs", "From"}
 	tabStr := cli.BuildTable(header, tdata)

