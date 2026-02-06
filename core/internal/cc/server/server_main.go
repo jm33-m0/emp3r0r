@@ -213,7 +213,18 @@ func tarConfig(hosts string) {
 	}
 	// tar all config files
 	filter := func(path string) bool {
-		return strings.HasSuffix(path, ".log") || strings.HasPrefix(path, "stub") || strings.HasSuffix(path, ".history")
+		// exclude directories that are not needed or might have permission issues
+		if strings.HasPrefix(path, "modules/") ||
+			strings.HasPrefix(path, "downloads/") ||
+			strings.HasPrefix(path, "www/") ||
+			strings.HasPrefix(path, "agent/") {
+			return true
+		}
+
+		// exclude files that are not needed
+		return strings.HasSuffix(path, ".log") ||
+			strings.HasPrefix(path, "stub") ||
+			strings.HasSuffix(path, ".history")
 	}
 	os.Chdir(filepath.Dir(live.EmpWorkSpace))
 	defer os.Chdir(live.EmpWorkSpace)

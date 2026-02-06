@@ -91,10 +91,13 @@ func WgFileServer(path_to_file string) (err error) {
 	listenAddr := fmt.Sprintf("%s:%d", netutil.WgServerIP, netutil.WgFileServerPort)
 
 	// retry until we can bind to the address (WireGuard interface might be slow to come up)
-	for range 100 {
+	for i := range 100 {
 		err = http.ListenAndServe(listenAddr, mux)
 		if err != nil {
-			logging.Warningf("WgFileServer: failed to listen on %s, retrying: %v", listenAddr, err)
+			// suppress the error message for the first few seconds
+			if i > 5 {
+				logging.Warningf("WgFileServer: failed to listen on %s, retrying: %v", listenAddr, err)
+			}
 			time.Sleep(time.Second)
 			continue
 		}
