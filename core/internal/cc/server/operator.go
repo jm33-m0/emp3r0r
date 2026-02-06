@@ -84,7 +84,7 @@ func handleSendCommand(wrt http.ResponseWriter, req *http.Request) {
 	wrt.WriteHeader(http.StatusOK)
 }
 
-func handleListAgents(wrt http.ResponseWriter, req *http.Request) {
+func handleListAgents(wrt http.ResponseWriter, _ *http.Request) {
 	// Get all agents
 	agentsList := agents.GetConnectedAgents()
 

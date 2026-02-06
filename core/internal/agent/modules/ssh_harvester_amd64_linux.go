@@ -443,26 +443,3 @@ func dump_code(pid int, addr uintptr, cmd *cobra.Command) {
 	}
 	c2transport.NotifyC2(cmd, "Code at 0x%x: %x", addr, code_bytes)
 }
-
-func get_tracer_pid(pid int, cmd *cobra.Command) (tracer_pid int) {
-	// check tracer pid
-	proc_status, err := os.ReadFile(fmt.Sprintf("/proc/%d/status", pid))
-	if err != nil {
-		c2transport.NotifyC2(cmd, "get_tracer: %v", err)
-		return
-	}
-	lines := strings.Split(string(proc_status), "\n")
-	for _, line := range lines {
-		if strings.HasPrefix(line, "TracerPid:") {
-			tracer := strings.Fields(line)[1]
-			tracer_pid, err = strconv.Atoi(tracer)
-			if err != nil {
-				c2transport.NotifyC2(cmd, "Invalid tracer PID: %v", err)
-				return
-			}
-			break
-		}
-	}
-
-	return
-}

@@ -13,17 +13,12 @@ import (
 
 var (
 	kernel32 = syscall.NewLazyDLL("kernel32.dll")
-	psapi    = syscall.NewLazyDLL("Psapi.dll")
 	dbghelp  = syscall.NewLazyDLL("Dbghelp.dll")
 
-	procOpenProcess        = kernel32.NewProc("OpenProcess")
-	procReadProcessMemory  = kernel32.NewProc("ReadProcessMemory")
-	procWriteProcessMemory = kernel32.NewProc("WriteProcessMemory")
-	procVirtualQuery       = kernel32.NewProc("VirtualQuery")
-	procGetModuleFileName  = kernel32.NewProc("GetModuleFileNameW")
-	procGetModuleHandle    = kernel32.NewProc("GetModuleHandleW")
-	procEnumProcessModules = psapi.NewProc("EnumProcessModulesEx")
-	procMiniDumpWriteDump  = dbghelp.NewProc("MiniDumpWriteDump")
+	procOpenProcess       = kernel32.NewProc("OpenProcess")
+	procReadProcessMemory = kernel32.NewProc("ReadProcessMemory")
+	procVirtualQuery      = kernel32.NewProc("VirtualQuery")
+	procMiniDumpWriteDump = dbghelp.NewProc("MiniDumpWriteDump")
 )
 
 const (
@@ -102,37 +97,6 @@ func DumpProcessMem(hProcess uintptr) (mem_data map[int64][]byte, bytes_read int
 	}
 
 	return
-}
-
-func write_mem(hProcess uintptr, lpBaseAddress, lpBuffer, nSize uintptr) (int, bool) {
-	var nBytesWritten int
-	ret, _, _ := procWriteProcessMemory.Call(
-		uintptr(hProcess),
-		lpBaseAddress,
-		lpBuffer,
-		nSize,
-		uintptr(unsafe.Pointer(&nBytesWritten)),
-	)
-
-	return nBytesWritten, ret != 0
-}
-
-func getBaseAddress(handle uintptr) uintptr {
-	modules := [1024]uint64{}
-	var needed uintptr
-	procEnumProcessModules.Call(
-		handle,
-		uintptr(unsafe.Pointer(&modules)),
-		uintptr(1024),
-		uintptr(unsafe.Pointer(&needed)),
-		uintptr(0x03),
-	)
-	for i := uintptr(0); i < needed/unsafe.Sizeof(modules[0]); i++ {
-		if i == 0 {
-			return uintptr(modules[i])
-		}
-	}
-	return 0
 }
 
 // DumpProcMem dumps all memory regions of a process given its PID

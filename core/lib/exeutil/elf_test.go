@@ -83,9 +83,6 @@ void _start() {
 	if err != nil {
 		t.Fatalf("read elf: %v", err)
 	}
-	if err != nil {
-		t.Fatalf("read elf: %v", err)
-	}
 
 	out, err := InMemExeRun(elfData, []string{"elf_bin"}, os.Environ())
 	if err != nil {

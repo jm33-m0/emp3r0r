@@ -1,5 +1,5 @@
-//go:build !amd64 && linux
-// +build !amd64,linux
+//go:build !linux || !amd64
+// +build !linux !amd64
 
 package modules
 
@@ -7,21 +7,20 @@ import (
 	"context"
 	"fmt"
 	"runtime"
-	"sync"
 
 	"github.com/spf13/cobra"
 )
 
 var (
 	// harvester logging, to send back to C2
-	harvesterLogStream chan string
+	// harvesterLogStream chan string
 
 	// mark ssh harvester as running
 	SshHarvesterRunning bool
 
 	// record traced sshd sessions
-	traced_pids     = make(map[int]bool)
-	traced_pids_mut = &sync.RWMutex{}
+	// traced_pids     = make(map[int]bool)
+	// traced_pids_mut = &sync.RWMutex{}
 
 	// provide a way to stop the harvester
 	SshHarvesterCtx    context.Context

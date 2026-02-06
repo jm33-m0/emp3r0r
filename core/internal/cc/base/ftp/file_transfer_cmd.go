@@ -19,7 +19,7 @@ func CmdUploadToAgent(cmd *cobra.Command, args []string) {
 	go uploadToAgent(cmd, args)
 }
 
-func uploadToAgent(cmd *cobra.Command, args []string) {
+func uploadToAgent(cmd *cobra.Command, _ []string) {
 	target := agents.MustGetActiveAgent()
 	if target == nil {
 		logging.Errorf("You have to select a target first")

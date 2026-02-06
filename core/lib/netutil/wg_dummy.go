@@ -6,11 +6,6 @@ package netutil
 import (
 	"context"
 	"errors"
-	"net"
-	"os"
-
-	"golang.zx2c4.com/wireguard/device"
-	"golang.zx2c4.com/wireguard/tun"
 )
 
 // LogLevel specifies the verbosity of logging
@@ -72,11 +67,11 @@ type WireGuardDevice struct {
 	Cancel context.CancelFunc
 
 	// Underlying device objects
-	device   *device.Device
-	tun      tun.Device
-	uapi     net.Listener
-	uapiFile *os.File
-	logger   *device.Logger
+	// device   *device.Device
+	// tun      tun.Device
+	// uapi     net.Listener
+	// uapiFile *os.File
+	// logger   *device.Logger
 }
 
 // PeerConfig represents WireGuard peer configuration

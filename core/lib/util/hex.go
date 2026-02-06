@@ -104,18 +104,6 @@ func DumpFile(filename string) (string, error) {
 	return result, nil
 }
 
-// readTextFile returns the content of a text file as a string.
-func readTextFile(filename string) (string, error) {
-	data, err := ReadFileAgent(filename)
-	if err != nil {
-		return "", err
-	}
-	if len(data) > truncateLimit {
-		return string(data[:truncateLimit]), nil
-	}
-	return string(data), nil
-}
-
 // isTextFile checks if the file is likely a text file by scanning the first few bytes.
 func isTextFile(filename string) (bool, error) {
 	data, err := ReadFileAgent(filename)

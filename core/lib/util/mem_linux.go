@@ -115,9 +115,7 @@ func DumpCurrentProcMem() (memdata map[int64][]byte, err error) {
 }
 
 const (
-	mfdCloexec     = 0x0001
 	memfdCreateX64 = 319
-	fork           = 57
 )
 
 // MemFDWrite creates a memfd and writes data to it

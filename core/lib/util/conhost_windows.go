@@ -5,12 +5,13 @@ package util
 
 import (
 	"fmt"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"unsafe"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/gonutz/w32/v2"
 	"golang.org/x/sys/windows"
@@ -23,26 +24,6 @@ var (
 	ConsoleExtraWidth  = 0 // scroll bar, etc
 	ConsoleExtraHeight = 0 // title bar
 )
-
-type coord struct {
-	x int16
-	y int16
-}
-
-type smallRect struct {
-	left   int16
-	top    int16
-	right  int16
-	bottom int16
-}
-
-type consoleScreenBufferInfo struct {
-	size              coord
-	cursorPosition    coord
-	attributes        uint16
-	window            smallRect
-	maximumWindowSize coord
-}
 
 // IsMainWindow returns true if a window with the specified handle is a main window.
 func IsMainWindow(hwnd w32.HWND) bool {

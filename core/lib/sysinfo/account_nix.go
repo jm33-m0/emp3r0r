@@ -1,13 +1,14 @@
-//go:build !windows
-// +build !windows
+//go:build linux || darwin
+// +build linux darwin
 
 package sysinfo
 
 import (
 	"bufio"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"strings"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 func crossPlatformHasRoot() bool {
