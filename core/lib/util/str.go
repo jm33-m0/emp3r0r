@@ -4,7 +4,6 @@ import (
 	"crypto/md5"
 	crypto_rand "crypto/rand"
 	"encoding/csv"
-	"encoding/hex"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -39,9 +38,18 @@ func StripANSI(str string) string {
 		}
 	}
 
-	// 3. If binary data was stripped, append hex dump of the stripped data
+	// 3. If binary data was stripped, append hex dump (hex only) of the stripped data
 	if hasBinary {
-		return fmt.Sprintf("%s\n\n[Binary data stripped]:\n%s", builder.String(), hex.Dump([]byte(strippedBuilder.String())))
+		data := []byte(strippedBuilder.String())
+		var hexBuilder strings.Builder
+		for i := 0; i < len(data); i += 16 {
+			end := i + 16
+			if end > len(data) {
+				end = len(data)
+			}
+			hexBuilder.WriteString(fmt.Sprintf("%08x  % x\n", i, data[i:end]))
+		}
+		return fmt.Sprintf("%s\n\n[Binary data stripped]:\n%s", builder.String(), hexBuilder.String())
 	}
 
 	// 4. Otherwise return the sanitized string
