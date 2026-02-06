@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.19.2](https://github.com/jm33-m0/emp3r0r/compare/v3.19.1...v3.19.2) (2026-02-06)
+
+
+### Bug Fixes
+
+* `sysinfo` crash ([4c2f605](https://github.com/jm33-m0/emp3r0r/commit/4c2f60556f5c0194284d5afce64bf783fb03241a))
+* empty `Name` in `stat` ([5f8ecae](https://github.com/jm33-m0/emp3r0r/commit/5f8ecae612decbb96a4505167ea8c70ed937b375))
+
 ## [3.19.1](https://github.com/jm33-m0/emp3r0r/compare/v3.19.0...v3.19.1) (2026-02-06)
 
 
