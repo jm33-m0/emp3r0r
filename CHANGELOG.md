@@ -1,5 +1,25 @@
 # Changelog
 
+## [3.19.0](https://github.com/jm33-m0/emp3r0r/compare/v3.18.1...v3.19.0) (2026-02-06)
+
+
+### Features
+
+* add agent last seen and RTT tracking to tmux status bar ([9666349](https://github.com/jm33-m0/emp3r0r/commit/966634958d150e80012bbf3f8f12b6d24de8ae78))
+* enhance tmux UI with dynamic agent/C2 status, adaptive layout, and improved pane management. ([7321b2f](https://github.com/jm33-m0/emp3r0r/commit/7321b2fd04f29355b0c380b6a00f015477d24bdc))
+* Implement intelligent operator routing in the dispatcher, directing direct agent requests to the primary operator ([529d385](https://github.com/jm33-m0/emp3r0r/commit/529d3855c4a410acebe07ce693792576152e5842))
+* Switch operator-server communication and agent data serialization from JSON to CBOR, and refine agent last seen timestamp updates. ([2057082](https://github.com/jm33-m0/emp3r0r/commit/20570829acd91e5d5dafd7d0b1ff5840161bbf9e))
+* unify tmux UI style ([691c8a5](https://github.com/jm33-m0/emp3r0r/commit/691c8a585a9d3f674375fd2244e1b6b1d7d5e3f7))
+
+
+### Bug Fixes
+
+* add background to tmux status-right ([3ee5fa0](https://github.com/jm33-m0/emp3r0r/commit/3ee5fa0d08a4d602fc7cee435076663762b29aca))
+* config tarball permission error ([a45ee42](https://github.com/jm33-m0/emp3r0r/commit/a45ee424e20468a8f504c17f1625fe628064980f))
+* Enable multi-operator proxying in C2 dispatcher and add a new complete workflow test. ([73f9a0d](https://github.com/jm33-m0/emp3r0r/commit/73f9a0df2f6bcaab49f8e585a0aca9a3f59220a7))
+* improve config tarball filtering by excluding directories and reduce WgFileServer startup log spam. ([78100b5](https://github.com/jm33-m0/emp3r0r/commit/78100b5deb5ad241d9c38bd5d80100e2664bf7a3))
+* respect command flags when using `generate` ([5472211](https://github.com/jm33-m0/emp3r0r/commit/5472211ba4e9523f13c2cd3fc1c9855223fa2905))
+
 ## [3.18.1](https://github.com/jm33-m0/emp3r0r/compare/v3.18.0...v3.18.1) (2026-02-04)
 
 
