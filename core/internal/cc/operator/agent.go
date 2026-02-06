@@ -75,9 +75,15 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 		}
 	}
 
+	// Agent Count Color
+	agentCountColor := "red"
+	if len(agents) > 0 {
+		agentCountColor = "green"
+	}
+
 	// Status Left: [emp3r0r] 🛡️ AgentCount | 📡 C2Address
-	status_left := fmt.Sprintf("#[fg=colour15,bg=colour235,bold] [emp3r0r] #[fg=white,bg=colour235,nobold]🛡️ %d Agents | 📡 %s ",
-		len(agents), util.ShortenString(c2_ip, 20))
+	status_left := fmt.Sprintf("#[fg=colour15,bg=colour235,bold] [emp3r0r] #[fg=%s,bg=colour235,nobold]🛡️ %d Agents #[fg=white]| 📡 %s ",
+		agentCountColor, len(agents), util.ShortenString(c2_ip, 20))
 	_ = cli.TmuxSetStatusLeft("%s", status_left)
 
 	// Status Right: Transport RTT | Idle: Time
