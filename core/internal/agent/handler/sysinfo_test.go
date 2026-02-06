@@ -2,7 +2,6 @@ package handler
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
@@ -35,9 +34,15 @@ func TestSysinfoCmdRun(t *testing.T) {
 	if err := cbor.Unmarshal(mockConn.Bytes(), &msg); err != nil {
 		t.Fatalf("Failed to unmarshal CBOR response: %v", err)
 	}
-	output := string(msg.Response)
-	if !strings.Contains(output, "Hostname:") || !strings.Contains(output, "CPU:") {
-		t.Errorf("Expected full sysinfo, got: %s", output)
+
+	// Parse the Sysinfo response (it's also CBOR)
+	var info def.Emp3r0rAgent
+	if err := cbor.Unmarshal(msg.Response, &info); err != nil {
+		t.Fatalf("Failed to unmarshal sysinfo response: %v", err)
+	}
+
+	if info.Hostname == "" || info.CPU == "" {
+		t.Errorf("Expected full sysinfo (Hostname/CPU), got: %+v", info)
 	}
 	mockConn.Reset()
 
@@ -52,13 +57,20 @@ func TestSysinfoCmdRun(t *testing.T) {
 	if err := cbor.Unmarshal(mockConn.Bytes(), &msg); err != nil {
 		t.Fatalf("Failed to unmarshal CBOR response: %v", err)
 	}
-	output = string(msg.Response)
-	if !strings.Contains(output, "CPU:") {
-		t.Errorf("Expected CPU info, got: %s", output)
+
+	// Parse the Sysinfo response
+	var cpuInfo def.Emp3r0rAgent
+	if err := cbor.Unmarshal(msg.Response, &cpuInfo); err != nil {
+		t.Fatalf("Failed to unmarshal sysinfo response: %v", err)
 	}
-	// process info shouldn't be there (usually)
-	if strings.Contains(output, "Process:") {
-		t.Errorf("Did not expect Process info in granular output, got: %s", output)
+
+	if cpuInfo.CPU == "" {
+		t.Errorf("Expected CPU info, got empty string")
+	}
+
+	// process info shouldn't be set
+	if cpuInfo.Process != nil {
+		t.Errorf("Did not expect Process info in granular output, got: %+v", cpuInfo.Process)
 	}
 	mockConn.Reset()
 }
