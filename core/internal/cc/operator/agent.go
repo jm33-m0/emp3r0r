@@ -75,12 +75,15 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 		}
 	}
 
-	status_msg := fmt.Sprintf("%s %s | #[fg=%s]%s #[fg=white]| 🛡️ %d Agents | 📡 %s",
-		transport_type, rtt, idle_color, idle, len(agents), c2_ip)
-	setStatusErr := cli.TmuxSetStatusRight("%s", status_msg)
-	if setStatusErr != nil {
-		logging.Warningf("Failed to set tmux status: %v", setStatusErr)
-	}
+	// Status Left: [emp3r0r] 🛡️ AgentCount | 📡 C2Address
+	status_left := fmt.Sprintf("#[fg=colour15,bg=colour235,bold] [emp3r0r] #[fg=white,bg=colour235,nobold]🛡️ %d Agents | 📡 %s ",
+		len(agents), util.ShortenString(c2_ip, 20))
+	_ = cli.TmuxSetStatusLeft("%s", status_left)
+
+	// Status Right: Transport RTT | Idle: Time
+	status_right := fmt.Sprintf("#[fg=colour15,bg=colour235,bold] %s %s | #[fg=%s]%s ",
+		transport_type, rtt, idle_color, idle)
+	_ = cli.TmuxSetStatusRight("%s", status_right)
 
 	header := []string{"Tag", "OS", "Process", "User", "IPs", "From"}
 	tabStr := cli.BuildTable(header, tdata)

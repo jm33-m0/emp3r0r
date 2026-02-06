@@ -171,3 +171,11 @@ func LimitString(s string, n int) string {
 	}
 	return s
 }
+
+// ShortenString shortens a string to a maximum length, adding ellipsis if truncated
+func ShortenString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-3] + "..."
+}
