@@ -1,3 +1,10 @@
+/*
+Package handler defines the command handlers for the agent.
+
+This file (core_cmds.go) registers core commands intended for direct human interaction
+in the operator's shell. These commands usually return human-readable output
+and support interactive flags.
+*/
 package handler
 
 import (
@@ -5,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// CoreCommands returns a root cobra.Command for core commands.
 func CoreCommands() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Short: "agent core commands",

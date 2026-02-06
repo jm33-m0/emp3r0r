@@ -1,3 +1,11 @@
+/*
+Package handler defines the command handlers for the agent.
+
+This file (c2cmd.go) registers "C2 Commands" which are prefixed with "!".
+These are intended as internal APIs for the operator's background tasks
+(e.g., auto-completion, status checks, automated modules).
+They are NOT intended for direct human interaction.
+*/
 package handler
 
 import (
@@ -23,10 +31,11 @@ func C2Commands() *cobra.Command {
 	rootCmd.PersistentFlags().StringP("cmd_id", "", "", "Command ID")
 
 	// Generic commands group
+	// !ls_dir is an API for path auto-completion in the operator's shell
 	lsCmd := &cobra.Command{
 		Use:     def.C2CmdListDir,
 		Short:   "List directory entries",
-		Example: "!ls --path <path>",
+		Example: "!ls_dir --path <path>",
 		GroupID: "generic",
 		Run:     runListDir,
 	}
