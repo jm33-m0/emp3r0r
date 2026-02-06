@@ -88,6 +88,10 @@ func AES_GCM_Encrypt(password, plaintext []byte) ([]byte, error) {
 
 // AES_GCM_Decrypt decrypts ciphertext with password using AES-GCM
 func AES_GCM_Decrypt(password, ciphertext []byte) ([]byte, error) {
+	if len(ciphertext) < saltSize+nonceSize {
+		return nil, fmt.Errorf("ciphertext too short: %d < %d", len(ciphertext), saltSize+nonceSize)
+	}
+
 	// Extract salt, nonce, and actual ciphertext
 	salt := ciphertext[:saltSize]
 	nonce := ciphertext[saltSize : saltSize+nonceSize]

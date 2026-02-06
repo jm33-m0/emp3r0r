@@ -27,6 +27,11 @@ import (
 
 func agent_main() {
 	var err error
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Printf("agent_main recovered from panic: %v", r)
+		}
+	}()
 
 	// accept env vars
 	null_file, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0o644)

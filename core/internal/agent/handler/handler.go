@@ -1,8 +1,9 @@
 package handler
 
 import (
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"strings"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -10,6 +11,11 @@ import (
 
 // exec cmd from C2 server
 func HandleC2Command(cmdData *def.MsgTunData) {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Printf("HandleC2Command panic: %v", r)
+		}
+	}()
 	cmd_id := cmdData.CmdID
 	cmd_argc := len(cmdData.CmdSlice)
 	cmdSlice := append(cmdData.CmdSlice, []string{"--cmd_id", cmd_id}...)
