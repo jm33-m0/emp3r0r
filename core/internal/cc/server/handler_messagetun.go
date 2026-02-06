@@ -120,11 +120,17 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 			live.AgentControlMap[agent].Cancel = cancel
 			live.AgentControlMapMutex.Unlock()
 
+			agent.LastSeen = time.Now()
+			if msg.Time != "" {
+				start_time, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", msg.Time)
+				if err == nil {
+					agent.LastSeenRTT = time.Since(start_time)
+				}
+			}
 			// handshake (hello) message has empty CmdSlice or just random data
 			// but it's used to tell CC that agent is alive
 			// here we just respond to keep-alive if it matches any criteria
 			// or if it's explicitly a hello
-			agent.LastSeen = time.Now()
 			if msg.Response == nil && len(msg.CmdSlice) > 0 {
 				// Check if context is still valid before writing
 				if ctx.Err() != nil {
@@ -133,13 +139,6 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 				}
 				// verify hello
 				logging.Debugf("Handshake from %s successful", msg.Tag)
-				// update RTT
-				if msg.Time != "" {
-					start_time, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", msg.Time)
-					if err == nil {
-						agent.LastSeenRTT = time.Since(start_time)
-					}
-				}
 				// respond with random data, wrapped in MsgTunData
 				replyData := util.RandBytes(util.RandInt(10, 100))
 				replyMsg := def.MsgTunData{

@@ -54,6 +54,9 @@ func processAgentData(data *def.MsgTunData) {
 		return
 	}
 
+	// Update last seen
+	target.LastSeen = time.Now()
+
 	// cmd output from agent
 	cmd := data.CmdSlice[0]
 	is_builtin_cmd := strings.HasPrefix(cmd, "!")
