@@ -2,7 +2,6 @@ package operator
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -10,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
@@ -132,13 +132,13 @@ func TestOperatorConnection(t *testing.T) {
 		CommandID: &cmdID,
 	}
 
-	opData, err := json.Marshal(op)
+	opData, err := cbor.Marshal(op)
 	if err != nil {
 		t.Fatalf("Failed to marshal operation: %v", err)
 	}
 
 	url = fmt.Sprintf("https://127.0.0.1:%d/%s/%s", port, transport.OperatorRoot, "send_command")
-	resp, err = client.Post(url, "application/json", bytes.NewBuffer(opData))
+	resp, err = client.Post(url, "application/cbor", bytes.NewBuffer(opData))
 	if err != nil {
 		t.Fatalf("Failed to send command: %v", err)
 	}
