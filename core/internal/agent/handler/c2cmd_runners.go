@@ -100,7 +100,7 @@ func runStat(cmd *cobra.Command, args []string) {
 		return
 	}
 	fstat := &util.FileStat{
-		Name:       util.FileBaseName(path),
+		Name:       filepath.Base(path),
 		Size:       fi.Size(),
 		Checksum:   crypto.SHA256SumFile(path),
 		Permission: fi.Mode().String(),
