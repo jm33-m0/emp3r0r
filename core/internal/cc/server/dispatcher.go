@@ -45,7 +45,24 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 	// Create base target URL for operator proxying
 	// Use the remote address (operator's IP in the WireGuard network)
 	remoteIP, _, _ := net.SplitHostPort(req.RemoteAddr)
-	targetURL := fmt.Sprintf("https://%s:%d", remoteIP, netutil.WgRelayedHTTPPort)
+
+	// Determine target IP based on connection source
+	targetIP := netutil.WgOperatorIP // Default to primary operator (for direct agents)
+
+	// If request comes from a Relay (WG subnet) or Localhost, proxy back to it
+	ip := net.ParseIP(remoteIP)
+	if ip != nil {
+		if ip.IsLoopback() {
+			targetIP = remoteIP
+		} else {
+			_, subnet, _ := net.ParseCIDR(netutil.WgSubnet)
+			if subnet != nil && subnet.Contains(ip) {
+				targetIP = remoteIP
+			}
+		}
+	}
+
+	targetURL := fmt.Sprintf("https://%s:%d", targetIP, netutil.WgRelayedHTTPPort)
 	parsedURL, err := url.Parse(targetURL)
 	if err != nil {
 		logging.Errorf("apiDispatcher: parsedURL: %v", err)
