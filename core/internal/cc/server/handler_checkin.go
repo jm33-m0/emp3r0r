@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/gorilla/mux"
@@ -114,6 +115,7 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 	live.AgentControlMapMutex.Lock()
 	if !agents.IsAgentExistLocked(target) {
 		inx := agents.AssignAgentIndexLocked()
+		target.LastSeen = time.Now()
 		live.AgentControlMap[target] = &live.AgentControl{Index: inx, Conn: nil}
 		shortname := strings.Split(target.Tag, "-agent")[0]
 		if util.IsExist(agents.AgentsJSON) {
@@ -158,6 +160,7 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 				a.Exes = target.Exes
 				a.CWD = target.CWD
 				a.Product = target.Product
+				a.LastSeen = time.Now()
 				existingKey = a
 				break
 			}

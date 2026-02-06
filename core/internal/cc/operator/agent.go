@@ -50,15 +50,34 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 	}
 
 	// Set tmux status with agent count and C2 status
-	color := "red"
-	if len(agents) > 0 {
-		color = "green"
-	}
 	c2_ip := common.RuntimeConfig.CCAddress
+	transport_type := "[??]"
+	rtt := "⚡??ms"
+	idle := "Idle: ??s"
+	idle_color := "green"
+
 	if live.ActiveAgent != nil {
 		c2_ip = live.ActiveAgent.C2Host
+		transport_type = fmt.Sprintf("[%s]", live.ActiveAgent.Transport)
+		rtt = fmt.Sprintf("⚡%dms", live.ActiveAgent.LastSeenRTT.Milliseconds())
+
+		idle_time := time.Since(live.ActiveAgent.LastSeen).Seconds()
+		if live.ActiveAgent.LastSeen.IsZero() {
+			idle = "Idle: N/A"
+			idle_color = "red"
+		} else {
+			idle = fmt.Sprintf("Idle: %.0fs", idle_time)
+			if idle_time > 120 {
+				idle_color = "red"
+			} else if idle_time > 45 {
+				idle_color = "yellow"
+			}
+		}
 	}
-	setStatusErr := cli.TmuxSetStatusRight("C2: #[fg=grey]%s #[fg=%s]%d #[fg=white]agents", c2_ip, color, len(agents))
+
+	status_msg := fmt.Sprintf("%s %s | #[fg=%s]%s #[fg=white]| 🛡️ %d Agents | 📡 %s",
+		transport_type, rtt, idle_color, idle, len(agents), c2_ip)
+	setStatusErr := cli.TmuxSetStatusRight("%s", status_msg)
 	if setStatusErr != nil {
 		logging.Warningf("Failed to set tmux status: %v", setStatusErr)
 	}
