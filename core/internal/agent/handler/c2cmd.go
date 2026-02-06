@@ -193,14 +193,6 @@ func C2Commands() *cobra.Command {
 	memDumpCmd.Flags().IntP("pid", "p", 0, "PID of target process")
 	rootCmd.AddCommand(memDumpCmd)
 
-	screenshotCmd := &cobra.Command{
-		Use:     def.C2CmdScreenshot,
-		Short:   "Take screenshot",
-		GroupID: "generic",
-		Run:     screenshotCmdRun,
-	}
-	rootCmd.AddCommand(screenshotCmd)
-
 	sysInfoCmd := &cobra.Command{
 		Use:     def.C2CmdSysInfo,
 		Short:   "Collect full system info",

@@ -15,7 +15,6 @@ const (
 	ModFileServer   = "file_server"
 	ModDownloader   = "file_downloader"
 	ModMemDump      = "mem_dump"
-	ModSCREENSHOT   = "screenshot"
 )
 
 // ModOption represents module options with typing metadata
@@ -508,24 +507,6 @@ var Modules = map[string]*ModuleConfig{
 				Val:  "",
 			},
 		},
-		AgentConfig: AgentModuleConfig{
-			Exec:          "built-in",
-			Files:         []string{},
-			InMemory:      false,
-			Type:          "go",
-			IsInteractive: false,
-		},
-	},
-	ModSCREENSHOT: {
-		Name:     ModSCREENSHOT,
-		Build:    "",
-		Date:     "2020-01-25",
-		Comment:  "Take a screenshot of the agent's screen",
-		IsLocal:  false,
-		Platform: "Generic",
-		Path:     "",
-		Fileless: false,
-		Options:  ModOptions{},
 		AgentConfig: AgentModuleConfig{
 			Exec:          "built-in",
 			Files:         []string{},
