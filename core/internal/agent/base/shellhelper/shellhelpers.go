@@ -85,7 +85,7 @@ func killProcess(args []string) (out string, err error) {
 	return
 }
 
-func CmdPS(pid int, user, name, cmdLine string) (out string, err error) {
+func CmdPS(pid int, user, name, cmdLine string) (out []byte, err error) {
 	empty_proc := &util.ProcEntry{
 		Name:    "N/A",
 		Cmdline: "N/A",
@@ -98,11 +98,5 @@ func CmdPS(pid int, user, name, cmdLine string) (out string, err error) {
 		procs = []util.ProcEntry{*empty_proc}
 	}
 
-	data, err := cbor.Marshal(procs)
-	if err != nil {
-		return
-	}
-	out = string(data)
-
-	return
+	return cbor.Marshal(procs)
 }

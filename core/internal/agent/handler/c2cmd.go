@@ -197,8 +197,14 @@ func C2Commands() *cobra.Command {
 		Use:     def.C2CmdSysInfo,
 		Short:   "Collect full system info",
 		GroupID: "generic",
-		Run:     runSysInfo,
+		Run:     sysinfoCmdRun,
 	}
+	sysInfoCmd.Flags().BoolP("full", "f", false, "Get full system info")
+	sysInfoCmd.Flags().Bool("cpu", false, "Get CPU info")
+	sysInfoCmd.Flags().Bool("mem", false, "Get memory info")
+	sysInfoCmd.Flags().Bool("os", false, "Get OS info")
+	sysInfoCmd.Flags().Bool("net", false, "Get network info")
+	sysInfoCmd.Flags().Bool("user", false, "Get user info")
 	rootCmd.AddCommand(sysInfoCmd)
 
 	platformCommands(rootCmd)

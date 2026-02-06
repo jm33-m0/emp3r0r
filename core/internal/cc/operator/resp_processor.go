@@ -17,21 +17,64 @@ import (
 )
 
 // CommandHandler handles specific command responses from agents
-type CommandHandler func(out string, target *def.Emp3r0rAgent)
+type CommandHandler func(out []byte, target *def.Emp3r0rAgent) string
 
 // CommandHandlers maps command names to their handlers
 var CommandHandlers = map[string]CommandHandler{
-	"ps": handlePS,
-	"ls": handleLS,
+	"ps":      handlePS,
+	"ls":      handleLS,
+	"stat":    handleStat,
+	"sysinfo": handleSysInfo,
 }
 
-func handlePS(out string, target *def.Emp3r0rAgent) {
+func handleSysInfo(out []byte, target *def.Emp3r0rAgent) string {
+	var info def.Emp3r0rAgent
+	err := cbor.Unmarshal(out, &info)
+	if err != nil {
+		logging.Debugf("sysinfo: %v", err)
+		logging.Errorf("sysinfo: %v", err)
+		return ""
+	}
+
+	// Build table data
+	tdata := [][]string{}
+	addIfNotEmpty := func(name, value string) {
+		if value != "" && value != "[]" && value != "0" {
+			tdata = append(tdata, []string{name, value})
+		}
+	}
+
+	addIfNotEmpty("Hostname", info.Hostname)
+	addIfNotEmpty("OS", info.OS)
+	addIfNotEmpty("Kernel", info.Kernel)
+	addIfNotEmpty("Arch", info.Arch)
+	addIfNotEmpty("CPU", info.CPU)
+	addIfNotEmpty("Mem", info.Mem)
+	addIfNotEmpty("User", info.User)
+	addIfNotEmpty("IPs", fmt.Sprintf("%v", info.IPs))
+	addIfNotEmpty("ARP", fmt.Sprintf("%v", info.ARP))
+	if info.Process != nil {
+		addIfNotEmpty("Agent PID", strconv.Itoa(info.Process.PID))
+	}
+	addIfNotEmpty("CWD", info.CWD)
+	addIfNotEmpty("Transport", info.Transport)
+
+	// Use BuildTable
+	outTable := cli.BuildTable([]string{"Property", "Value"}, tdata)
+
+	// Use AdaptiveTable
+	cli.AdaptiveTable(outTable)
+
+	return outTable
+}
+
+func handlePS(out []byte, target *def.Emp3r0rAgent) string {
 	var procs []util.ProcEntry
-	err := cbor.Unmarshal([]byte(out), &procs)
+	err := cbor.Unmarshal(out, &procs)
 	if err != nil {
 		logging.Debugf("ps: %v", err)
 		logging.Errorf("ps: %v", err)
-		return
+		return ""
 	}
 
 	// Build table data
@@ -46,15 +89,17 @@ func handlePS(out string, target *def.Emp3r0rAgent) {
 
 	// Use AdaptiveTable instead of FitPanes
 	cli.AdaptiveTable(outTable)
+
+	return outTable
 }
 
-func handleLS(out string, target *def.Emp3r0rAgent) {
+func handleLS(out []byte, target *def.Emp3r0rAgent) string {
 	var dents []util.Dentry
-	err := cbor.Unmarshal([]byte(out), &dents)
+	err := cbor.Unmarshal(out, &dents)
 	if err != nil {
 		logging.Debugf("ls: %v", err)
 		logging.Errorf("ls: %v", err)
-		return
+		return ""
 	}
 
 	// Build table data
@@ -69,6 +114,34 @@ func handleLS(out string, target *def.Emp3r0rAgent) {
 
 	// Use AdaptiveTable instead of FitPanes
 	cli.AdaptiveTable(outTable)
+
+	return outTable
+}
+
+func handleStat(out []byte, target *def.Emp3r0rAgent) string {
+	var stat util.FileStat
+	err := cbor.Unmarshal(out, &stat)
+	if err != nil {
+		logging.Debugf("stat: %v", err)
+		logging.Errorf("stat: %v", err)
+		return ""
+	}
+
+	// Build table data
+	tdata := [][]string{
+		{"Name", stat.Name},
+		{"Size", fmt.Sprintf("%d bytes", stat.Size)},
+		{"Permission", stat.Permission},
+		{"Checksum", stat.Checksum},
+	}
+
+	// Use BuildTable
+	outTable := cli.BuildTable([]string{"Property", "Value"}, tdata)
+
+	// Use AdaptiveTable
+	cli.AdaptiveTable(outTable)
+
+	return outTable
 }
 
 // processAgentData deal with data from agent side
@@ -119,8 +192,7 @@ func processAgentData(data *def.MsgTunData) {
 
 	// Handle specific commands that need special processing
 	if handler, ok := CommandHandlers[cmd_slice[0]]; ok {
-		handler(string(out), target)
-		return
+		out = []byte(handler(out, target))
 	}
 
 	// Command output

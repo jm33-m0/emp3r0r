@@ -36,8 +36,8 @@ type FileStat struct {
 	Size       int64  `json:"size" cbor:"4,keyasint"`
 }
 
-// LsPath ls path and return a json
-func LsPath(path string) (string, error) {
+// LsPath ls path and return cbor data
+func LsPath(path string) ([]byte, error) {
 	parse_fileInfo := func(info os.FileInfo) (dent Dentry) {
 		dent.Name = info.Name()
 		dent.Date = info.ModTime().String()
@@ -51,15 +51,15 @@ func LsPath(path string) (string, error) {
 		info, statErr := os.Stat(path)
 		if statErr != nil {
 			logging.Debugf("LsPath: %v", statErr)
-			return "", statErr
+			return nil, statErr
 		}
 		dents := []Dentry{parse_fileInfo(info)}
 		jsonData, err := cbor.Marshal(dents)
 		if err != nil {
 			logging.Debugf("LsPath: %v", err)
-			return "", err
+			return nil, err
 		}
-		return string(jsonData), nil
+		return jsonData, nil
 	}
 
 	// parse disk files
@@ -103,12 +103,11 @@ func LsPath(path string) (string, error) {
 	}
 
 	if len(dents) == 0 && err != nil {
-		return "", err
+		return nil, err
 	}
 
-	// json
-	jsonData, err := cbor.Marshal(dents)
-	return string(jsonData), err
+	// cbor
+	return cbor.Marshal(dents)
 }
 
 // IsCommandExist check if an executable is in $PATH
