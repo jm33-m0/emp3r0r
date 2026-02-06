@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -42,7 +43,9 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 	}
 
 	// Create base target URL for operator proxying
-	targetURL := fmt.Sprintf("https://%s:%d", netutil.WgOperatorIP, netutil.WgRelayedHTTPPort)
+	// Use the remote address (operator's IP in the WireGuard network)
+	remoteIP, _, _ := net.SplitHostPort(req.RemoteAddr)
+	targetURL := fmt.Sprintf("https://%s:%d", remoteIP, netutil.WgRelayedHTTPPort)
 	parsedURL, err := url.Parse(targetURL)
 	if err != nil {
 		logging.Errorf("apiDispatcher: parsedURL: %v", err)
@@ -69,7 +72,7 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 	rootCAs.AppendCertsFromPEM([]byte(transport.CACrtPEM))
 	rootCAs.AppendCertsFromPEM(capem)
 	tlsConfig := &tls.Config{
-		ServerName:         parsedURL.Hostname(),
+		ServerName:         netutil.WgOperatorIP, // Use the first operator's IP as the SNI, as it is in the SAN list
 		InsecureSkipVerify: false,
 		RootCAs:            rootCAs,
 	}

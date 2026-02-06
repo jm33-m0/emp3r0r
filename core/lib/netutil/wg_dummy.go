@@ -24,17 +24,17 @@ const (
 
 	// WgFileServerPort port for file server
 	WgFileServerPort = 7000
-
-	// WgRelayedHTTPPort port for relayed HTTP server
-	WgRelayedHTTPPort = 1025
 )
 
 var (
 	WgSubnet     = "172.16.254.0/24" // WireGuard subnet
 	WgServerIP   = "172.16.254.1"    // server's static WireGuard IP
 	WgOperatorIP = "172.16.254.2"    // operator's static WireGuard IP
-	WgServer     *WireGuardDevice    // server's WireGuard device
-	WgOperator   *WireGuardDevice    // operator's WireGuard device
+
+	// WgRelayedHTTPPort port for relayed HTTP server
+	WgRelayedHTTPPort = 1025
+	WgServer          *WireGuardDevice // server's WireGuard device
+	WgOperator        *WireGuardDevice // operator's WireGuard device
 )
 
 type WireGuardConfig struct {
