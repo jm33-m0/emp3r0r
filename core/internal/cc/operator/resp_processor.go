@@ -191,7 +191,8 @@ func processAgentData(data *def.MsgTunData) {
 	live.CmdResults.Store(cmd_id, string(out))
 
 	// Handle specific commands that need special processing
-	if handler, ok := CommandHandlers[cmd_slice[0]]; ok {
+	lookup_cmd := strings.TrimPrefix(cmd_slice[0], "!")
+	if handler, ok := CommandHandlers[lookup_cmd]; ok {
 		out = []byte(handler(out, target))
 	}
 
