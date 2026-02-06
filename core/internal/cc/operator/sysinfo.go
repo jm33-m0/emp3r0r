@@ -51,6 +51,6 @@ func CmdSysinfo(cmd *cobra.Command, args []string) {
 	if err != nil {
 		logging.Errorf("Error executing command: %v", err)
 	} else {
-		logging.Successf("Command sent to %s: %s", agent.Tag, cmdStr)
+		logging.Debugf("Command sent to %s: %s", agent.Tag, cmdStr)
 	}
 }
