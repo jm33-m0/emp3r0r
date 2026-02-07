@@ -65,6 +65,7 @@ type MsgTunData struct {
 	Time         string   `cbor:"5,keyasint"` // timestamp
 	AgentUUID    string   `cbor:"6,keyasint"` // agent UUID for robust identification
 	AgentUUIDSig string   `cbor:"7,keyasint"` // agent UUID signature for verification
+	JobID        string   `cbor:"8,keyasint"` // Tags the output stream
 }
 
 // H2Conn add context to h2conn.Conn

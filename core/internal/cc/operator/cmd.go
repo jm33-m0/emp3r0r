@@ -46,10 +46,14 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			&cobra.Group{ID: "network", Title: "Network Commands"},
 			&cobra.Group{ID: "agent", Title: "Agent Commands"},
 			&cobra.Group{ID: "c2", Title: "C2 commands"},
+			&cobra.Group{ID: "job", Title: "Job commands"},
 			&cobra.Group{ID: "util", Title: "Miscellaneous utilities"},
 		)
 		// add readline commands to configure the shell
 		rootCmd.AddCommand(readline.Commands(app.Shell()))
+
+		// Jobs command
+		rootCmd.AddCommand(CmdJobs(app))
 
 		exitCmd := &cobra.Command{
 			Use:     "exit",

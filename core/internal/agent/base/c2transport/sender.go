@@ -59,6 +59,7 @@ func NotifyC2(cmd *cobra.Command, format string, args ...interface{}) {
 	cmd_id, _ := cmd.Flags().GetString("cmd_id")
 	cmdSlice := []string{cmd.Name()}
 	msg.CmdID = cmd_id
+	msg.JobID = cmd_id
 	msg.CmdSlice = cmdSlice
 	msg.Response = []byte(fmt.Sprintf(format, args...))
 	if err := send2CC(&msg); err != nil {

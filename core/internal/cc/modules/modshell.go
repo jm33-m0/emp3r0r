@@ -25,7 +25,11 @@ func ModuleCmd(ctx *c2context.C2Context) {
 			logging.Errorf("Option 'cmd_to_exec' not found")
 			return
 		}
-		err := CmdSender(cmdOpt, "", target.Tag)
+		jobID := ""
+		if ctx.Job != nil {
+			jobID = ctx.Job.ID
+		}
+		err := CmdSender(cmdOpt, jobID, target.Tag)
 		if err != nil {
 			logging.Errorf("ModuleCmd: %v", err)
 		}

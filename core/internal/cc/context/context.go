@@ -12,4 +12,6 @@ type C2Context struct {
 	OpSession string
 	// Flags are the runtime flags (replaces live.ActiveModule.Options)
 	Flags map[string]string
+	// Job is the job associated with this context
+	Job *def.Job
 }

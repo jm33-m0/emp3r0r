@@ -16,7 +16,10 @@ func HandleC2Command(cmdData *def.MsgTunData) {
 			logging.Printf("HandleC2Command panic: %v", r)
 		}
 	}()
-	cmd_id := cmdData.CmdID
+	cmd_id := cmdData.JobID
+	if cmd_id == "" {
+		cmd_id = cmdData.CmdID
+	}
 	cmd_argc := len(cmdData.CmdSlice)
 	cmdSlice := append(cmdData.CmdSlice, []string{"--cmd_id", cmd_id}...)
 	if cmd_argc < 0 {
