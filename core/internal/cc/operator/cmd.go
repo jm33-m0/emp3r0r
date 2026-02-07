@@ -6,12 +6,12 @@ import (
 	"strconv"
 
 	"github.com/carapace-sh/carapace"
-	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/ftp"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
+	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -403,7 +403,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Use:     "ls_port_fwds",
 			GroupID: "network",
 			Short:   "List active port mappings",
-			Run:     network.CmdListPortFwds,
+			Run:     CmdListPortFwdsModule,
 		}
 		rootCmd.AddCommand(lsPortMapppingsCmd)
 
@@ -459,6 +459,13 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 	}
 }
 
+func CmdListPortFwdsModule(cmd *cobra.Command, args []string) {
+	ctx := &c2context.C2Context{
+		Flags: map[string]string{"switch": "list"},
+	}
+	modules.ModulePortFwd(ctx)
+}
+
 func execCmd(cmd *cobra.Command, args []string) {
 	// get command to execute
 	cmdStr, err := cmd.Flags().GetString("cmd")
@@ -478,10 +485,13 @@ func execCmd(cmd *cobra.Command, args []string) {
 	}
 
 	// execute command
-	err = operatorSendCommand2Agent(fmt.Sprintf("exec --cmd %s", strconv.Quote(cmdStr)), uuid.NewString(), agent.Tag)
-	if err != nil {
-		logging.Errorf("Error executing command: %v", err)
+	ctx := &c2context.C2Context{
+		Target:    agent,
+		OpSession: OPERATOR_SESSION,
+		Flags:     make(map[string]string),
 	}
+	ctx.Flags["cmd_to_exec"] = fmt.Sprintf("exec --cmd %s", strconv.Quote(cmdStr))
+	modules.ModuleCmd(ctx)
 }
 
 func exitEmp3r0r(_ *console.Console) {

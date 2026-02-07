@@ -5,8 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
+	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/spf13/cobra"
@@ -136,8 +137,11 @@ func executeCmd(cmd string) {
 		logging.Errorf("%s: no active target", cmd)
 		return
 	}
-	err := operatorSendCommand2Agent(cmd, uuid.NewString(), activeAgent.Tag)
-	if err != nil {
-		logging.Errorf("Failed to send command %s to %s", strconv.Quote(cmd), activeAgent.Tag)
+	ctx := &c2context.C2Context{
+		Target:    activeAgent,
+		OpSession: OPERATOR_SESSION,
+		Flags:     make(map[string]string),
 	}
+	ctx.Flags["cmd_to_exec"] = cmd
+	modules.ModuleCmd(ctx)
 }

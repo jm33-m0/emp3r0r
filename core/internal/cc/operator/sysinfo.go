@@ -1,10 +1,9 @@
 package operator
 
 import (
-	"fmt"
-
-	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
+	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/spf13/cobra"
 )
@@ -55,10 +54,12 @@ func CmdSysinfo(cmd *cobra.Command, args []string) {
 	}
 
 	// Send command
-	err := operatorSendCommand2Agent(fmt.Sprintf("%s", cmdStr), uuid.NewString(), agent.Tag)
-	if err != nil {
-		logging.Errorf("Error executing command: %v", err)
-	} else {
-		logging.Debugf("Command sent to %s: %s", agent.Tag, cmdStr)
+	ctx := &c2context.C2Context{
+		Target:    agent,
+		OpSession: OPERATOR_SESSION,
+		Flags:     make(map[string]string),
 	}
+	ctx.Flags["cmd_to_exec"] = cmdStr
+	modules.ModuleCmd(ctx)
+	logging.Debugf("Command sent to %s: %s", agent.Tag, cmdStr)
 }

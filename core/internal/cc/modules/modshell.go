@@ -11,8 +11,8 @@ import (
 // RShellStatus stores errors from reverseBash
 var RShellStatus = make(map[string]error)
 
-// moduleCmd exec cmd on target
-func moduleCmd(ctx *c2context.C2Context) {
+// ModuleCmd exec cmd on target
+func ModuleCmd(ctx *c2context.C2Context) {
 	// check if ActiveModule and Options are valid
 	// In context-based approach, we check Flags
 	// but live.ActiveModule might still be used for static config if needed,
@@ -21,7 +21,7 @@ func moduleCmd(ctx *c2context.C2Context) {
 	// send command
 	execOnTarget := func(target *def.Emp3r0rAgent) {
 		if live.AgentControlMap[target] == nil || live.AgentControlMap[target].Conn == nil {
-			logging.Errorf("moduleCmd: agent %s is not connected", target.Tag)
+			logging.Errorf("ModuleCmd: agent %s is not connected", target.Tag)
 			return
 		}
 		cmdOpt, ok := ctx.Flags["cmd_to_exec"]
@@ -31,7 +31,7 @@ func moduleCmd(ctx *c2context.C2Context) {
 		}
 		err := CmdSender(cmdOpt, "", target.Tag)
 		if err != nil {
-			logging.Errorf("moduleCmd: %v", err)
+			logging.Errorf("ModuleCmd: %v", err)
 		}
 	}
 
@@ -54,8 +54,8 @@ func moduleCmd(ctx *c2context.C2Context) {
 	execOnTarget(target)
 }
 
-// moduleShell set up an ssh session
-func moduleShell(ctx *c2context.C2Context) {
+// ModuleShell set up an ssh session
+func ModuleShell(ctx *c2context.C2Context) {
 	// find target
 	target := ctx.Target
 	if target == nil {
