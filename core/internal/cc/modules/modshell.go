@@ -4,7 +4,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
-	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
@@ -20,10 +19,7 @@ func ModuleCmd(ctx *c2context.C2Context) {
 
 	// send command
 	execOnTarget := func(target *def.Emp3r0rAgent) {
-		if live.AgentControlMap[target] == nil || live.AgentControlMap[target].Conn == nil {
-			logging.Errorf("ModuleCmd: agent %s is not connected", target.Tag)
-			return
-		}
+
 		cmdOpt, ok := ctx.Flags["cmd_to_exec"]
 		if !ok {
 			logging.Errorf("Option 'cmd_to_exec' not found")

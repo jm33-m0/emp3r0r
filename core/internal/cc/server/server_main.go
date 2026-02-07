@@ -134,7 +134,7 @@ func wg(wg_port int, numOperators int) {
 		if err != nil {
 			logging.Fatalf("Failed to marshal WireGuard config: %v", err)
 		}
-		err = os.WriteFile(configFile, data, 0600)
+		err = os.WriteFile(configFile, data, 0o600)
 		if err != nil {
 			logging.Fatalf("Failed to save WireGuard config: %v", err)
 		}
@@ -197,11 +197,6 @@ func wg(wg_port int, numOperators int) {
 	logging.Successf("\n══════════════════ WireGuard Server Configuration ════════════════════════════\n\n%s\n", serverTableStr)
 	logging.Successf("\n══════════════════ Provisioned Access Keys (Redundancy) ════════════════════════════\n\n%s\n", operatorsTableStr)
 
-	// Add a clear disclaimer
-	logging.Warningf("⚠️  NOTE: These keys are for REDUNDANCY (Backup Access) ONLY.")
-	logging.Warningf("   emp3r0r is designed as a strict Single-Operator C2.")
-	logging.Errorf("⛔  Concurrent usage by multiple operators is PROHIBITED and will be blocked.")
-
 	// Generate and display client connection commands
 	generateConnectionCommands(wg_port, server_pubkey, operators)
 }
@@ -220,7 +215,7 @@ func tarConfig(hosts string) {
 
 	// create .emp3r0r in temp dir
 	tempEmpDir := filepath.Join(tempDir, filepath.Base(live.EmpWorkSpace))
-	err = os.MkdirAll(tempEmpDir, 0700)
+	err = os.MkdirAll(tempEmpDir, 0o700)
 	if err != nil {
 		logging.Fatalf("Failed to create temp .emp3r0r dir: %v", err)
 	}
