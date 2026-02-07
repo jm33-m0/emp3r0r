@@ -14,6 +14,10 @@ import (
 )
 
 func moduleMemDump(ctx *c2context.C2Context) {
+	if ctx.Target == nil {
+		logging.Errorf("No active agent")
+		return
+	}
 	pidOpt, ok := ctx.Flags["pid"]
 	if !ok {
 		logging.Errorf("Option 'pid' not found")

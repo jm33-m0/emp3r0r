@@ -10,6 +10,10 @@ import (
 )
 
 func modListener(ctx *c2context.C2Context) {
+	if ctx.Target == nil {
+		logging.Errorf("No active agent")
+		return
+	}
 	required := []string{"listener", "port", "payload", "compression", "passphrase"}
 	for _, opt := range required {
 		if _, ok := ctx.Flags[opt]; !ok {

@@ -9,6 +9,10 @@ import (
 )
 
 func moduleFileServer(ctx *c2context.C2Context) {
+	if ctx.Target == nil {
+		logging.Errorf("No active agent")
+		return
+	}
 	switchOpt, ok := ctx.Flags["switch"]
 	if !ok {
 		logging.Errorf("Option 'switch' not found")
@@ -31,6 +35,10 @@ func moduleFileServer(ctx *c2context.C2Context) {
 }
 
 func moduleDownloader(ctx *c2context.C2Context) {
+	if ctx.Target == nil {
+		logging.Errorf("No active agent")
+		return
+	}
 	requiredOptions := []string{"download_addr", "checksum", "path"}
 	for _, opt := range requiredOptions {
 		if _, ok := ctx.Flags[opt]; !ok {

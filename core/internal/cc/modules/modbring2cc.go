@@ -9,6 +9,10 @@ import (
 )
 
 func moduleBring2CC(ctx *c2context.C2Context) {
+	if ctx.Target == nil {
+		logging.Errorf("No active agent")
+		return
+	}
 	addrOpt, ok := ctx.Flags["addr"]
 	if !ok {
 		logging.Errorf("Option 'addr' not found")

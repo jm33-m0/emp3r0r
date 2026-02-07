@@ -15,16 +15,52 @@ import (
 )
 
 func ModulePortFwd(ctx *c2context.C2Context) {
-	activeAgent := ctx.Target
-	if activeAgent == nil {
-		logging.Errorf("No active agent")
-		return
-	}
 	switchOpt, ok := ctx.Flags["switch"]
 	if !ok {
 		logging.Errorf("Option 'switch' not found")
 		return
 	}
+
+	// list command does not require active agent
+	if switchOpt == "list" {
+		tdata := [][]string{}
+		for id, portmap := range network.PortFwds {
+			if portmap.Sh == nil {
+				portmap.Cancel()
+				continue
+			}
+			bindAddr := portmap.BindAddr
+			if bindAddr == "" {
+				bindAddr = "127.0.0.1"
+			}
+			to := portmap.To + " (Agent) "
+			lport := bindAddr + ":" + portmap.Lport + " (CC) "
+			if portmap.Reverse {
+				to = portmap.To + " (CC) "
+				lport = portmap.Lport + " (Agent) "
+			}
+			tdata = append(tdata,
+				[]string{
+					lport,
+					to,
+					util.SplitLongLine(portmap.Agent.Tag, 10),
+					util.SplitLongLine(portmap.Description, 10),
+					util.SplitLongLine(id, 10),
+				})
+		}
+		header := []string{"Local Port", "To", "Agent", "Description", "ID"}
+		tableStr := cli.BuildTable(header, tdata)
+		cli.AdaptiveTable(tableStr)
+		logging.Infof("\n\033[0m%s\n\n", tableStr)
+		return
+	}
+
+	activeAgent := ctx.Target
+	if activeAgent == nil {
+		logging.Errorf("No active agent")
+		return
+	}
+
 	switch switchOpt {
 	case "off":
 		// ugly, i know, it will delete port mappings matching current lport-to combination
@@ -102,36 +138,6 @@ func ModulePortFwd(ctx *c2context.C2Context) {
 				logging.Errorf("PortFwd failed: %v", runErr)
 			}
 		}()
-	case "list":
-		tdata := [][]string{}
-		for id, portmap := range network.PortFwds {
-			if portmap.Sh == nil {
-				portmap.Cancel()
-				continue
-			}
-			bindAddr := portmap.BindAddr
-			if bindAddr == "" {
-				bindAddr = "127.0.0.1"
-			}
-			to := portmap.To + " (Agent) "
-			lport := bindAddr + ":" + portmap.Lport + " (CC) "
-			if portmap.Reverse {
-				to = portmap.To + " (CC) "
-				lport = portmap.Lport + " (Agent) "
-			}
-			tdata = append(tdata,
-				[]string{
-					lport,
-					to,
-					util.SplitLongLine(portmap.Agent.Tag, 10),
-					util.SplitLongLine(portmap.Description, 10),
-					util.SplitLongLine(id, 10),
-				})
-		}
-		header := []string{"Local Port", "To", "Agent", "Description", "ID"}
-		tableStr := cli.BuildTable(header, tdata)
-		cli.AdaptiveTable(tableStr)
-		logging.Infof("\n\033[0m%s\n\n", tableStr)
 	default:
 	}
 }

@@ -27,6 +27,10 @@ import (
 func moduleCustom(ctx *c2context.C2Context) {
 	// We might still need live.ActiveModule for metadata like Name
 	// But Options come from ctx.Flags
+	if ctx.Target == nil {
+		logging.Errorf("No active agent")
+		return
+	}
 	if live.ActiveModule == nil {
 		logging.Warningf("No module selected")
 		return
