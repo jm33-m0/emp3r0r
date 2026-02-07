@@ -38,6 +38,9 @@ var (
 	OPERATOR_PORT int
 	// OPERATOR_SESSION is the session ID for this operator
 	OPERATOR_SESSION = uuid.NewString()
+
+	// AgentRefreshCh triggers agent list refresh
+	AgentRefreshCh = make(chan struct{}, 1)
 )
 
 func backgroundJobs() {

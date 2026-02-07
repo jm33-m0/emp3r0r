@@ -105,22 +105,15 @@ func agentListRefresher() {
 			logging.Errorf("agentListRefresher panicked: %v", r)
 		}
 	}()
-	retryCount := 0
-	maxRetries := 3
+	refreshAgentList() // refresh immediately
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
 	for {
-		err := refreshAgentList()
-		if err != nil {
-			retryCount++
-			if retryCount >= maxRetries {
-				// Sleep longer on repeated failures to avoid CPU spinning
-				time.Sleep(30 * time.Second)
-				retryCount = 0
-			} else {
-				time.Sleep(10 * time.Second)
-			}
-		} else {
-			retryCount = 0
-			time.Sleep(10 * time.Second)
+		select {
+		case <-AgentRefreshCh:
+			refreshAgentList()
+		case <-ticker.C:
+			refreshAgentList()
 		}
 	}
 }
