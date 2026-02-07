@@ -195,7 +195,12 @@ func wg(wg_port int, numOperators int) {
 
 	// Print the tables with titles
 	logging.Successf("\n══════════════════ WireGuard Server Configuration ════════════════════════════\n\n%s\n", serverTableStr)
-	logging.Successf("\n══════════════════ WireGuard Operator Configurations ════════════════════════════\n\n%s\n", operatorsTableStr)
+	logging.Successf("\n══════════════════ Provisioned Access Keys (Redundancy) ════════════════════════════\n\n%s\n", operatorsTableStr)
+
+	// Add a clear disclaimer
+	logging.Warningf("⚠️  NOTE: These keys are for REDUNDANCY (Backup Access) ONLY.")
+	logging.Warningf("   emp3r0r is designed as a strict Single-Operator C2.")
+	logging.Errorf("⛔  Concurrent usage by multiple operators is PROHIBITED and will be blocked.")
 
 	// Generate and display client connection commands
 	generateConnectionCommands(wg_port, server_pubkey, operators)

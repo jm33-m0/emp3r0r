@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -102,6 +103,30 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 	operator_session := req.Header.Get("operator_session")
+
+	// Check if other operators are already connected
+	activeSessionCount := len(OPERATORS)
+	if activeSessionCount > 0 {
+		logging.Warningf("⚠️  New operator %s connecting while %d session(s) active!", operator_session, activeSessionCount)
+
+		// Construct a warning message
+		warningMsg := def.MsgTunData{
+			Tag: "ERROR", // "ERROR" tag triggers red text in your UI
+			Response: []byte(fmt.Sprintf(
+				"\n\n⛔  ERROR: %d other operator session(s) are currently active!\n"+
+					"   Concurrent usage is PROHIBITED to prevent state corruption.\n"+
+					"   Closing connection... Please retry when the other session is closed.\n", activeSessionCount)),
+		}
+
+		// Send the warning immediately upon connection
+		encoder := cbor.NewEncoder(conn)
+		if err := encoder.Encode(warningMsg); err != nil {
+			logging.Errorf("Failed to send concurrency warning: %v", err)
+		}
+		time.Sleep(100 * time.Millisecond) // Ensure the message is sent
+		conn.Close()
+		return
+	}
 	logging.Infof("Operator %s connected to message tunnel from %s", operator_session, req.RemoteAddr)
 	operator, ok := OPERATORS[operator_session]
 	if !ok {
