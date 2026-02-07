@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
+	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -77,7 +78,19 @@ func cmdModuleRun(cmd *cobra.Command, _ []string) {
 	}
 
 	// Send command to module
-	modules.ModuleRun()
+	target := agents.MustGetActiveAgent()
+	flags := make(map[string]string)
+	for k, v := range live.ActiveModule.Options {
+		if v != nil {
+			flags[k] = v.Val
+		}
+	}
+	ctx := &c2context.C2Context{
+		Target:    target,
+		Flags:     flags,
+		OpSession: "operator", // TODO: Get actual session ID if available
+	}
+	modules.ModuleRun(ctx)
 }
 
 func cmdSetOptVal(cmd *cobra.Command, args []string) {

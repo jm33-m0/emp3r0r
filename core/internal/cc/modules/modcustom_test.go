@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -160,7 +161,7 @@ func TestResolveInvocation(t *testing.T) {
 		},
 	}
 
-	inv, err := resolveInvocation(config, nil)
+	inv, err := resolveInvocation(config, map[string]string{})
 	if err != nil {
 		t.Fatalf("resolveInvocation: %v", err)
 	}
@@ -190,7 +191,7 @@ func TestResolveInvocationMissingRequired(t *testing.T) {
 		},
 	}
 
-	if _, err := resolveInvocation(config, nil); err == nil {
+	if _, err := resolveInvocation(config, map[string]string{}); err == nil {
 		t.Fatalf("expected error for missing required option")
 	}
 }
@@ -360,7 +361,7 @@ func TestInitModulesLoadsLocalModule(t *testing.T) {
 	origRunners := ModuleRunners
 	origModuleDirs := live.ModuleDirs
 	origWorkspace := live.EmpWorkSpace
-	ModuleRunners = make(map[string]func())
+	ModuleRunners = make(map[string]func(ctx *context.C2Context))
 	for k, v := range origRunners {
 		ModuleRunners[k] = v
 	}
@@ -451,7 +452,7 @@ func TestInitModulesLoadsRepoModules(t *testing.T) {
 	for k, v := range origModules {
 		def.Modules[k] = v
 	}
-	ModuleRunners = make(map[string]func(), len(origRunners))
+	ModuleRunners = make(map[string]func(ctx *context.C2Context), len(origRunners))
 	for k, v := range origRunners {
 		ModuleRunners[k] = v
 	}
@@ -499,7 +500,7 @@ func TestUpdateOptionsAddsDownloadAddr(t *testing.T) {
 	}
 	defer delete(def.Modules, modName)
 
-	ModuleRunners[modName] = func() {}
+	ModuleRunners[modName] = func(ctx *context.C2Context) {}
 	defer delete(ModuleRunners, modName)
 
 	live.ActiveModule = &def.ModuleConfig{Name: modName, Options: def.ModOptions{}}

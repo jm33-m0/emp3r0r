@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
+	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -20,20 +21,20 @@ var LPEHelperURLs = map[string]string{
 	"lpe_winpeas.exe": "https://github.com/carlospolop/PEASS-ng/releases/latest/download/winPEASany_ofs.exe",
 }
 
-func moduleLPE() {
+func moduleLPE(ctx *c2context.C2Context) {
 	go func() {
 		// target
-		target := live.ActiveAgent
+		target := ctx.Target
 		if target == nil {
 			logging.Errorf("Target not exist")
 			return
 		}
-		helperOpt, ok := live.ActiveModule.Options["lpe_helper"]
+		helperOpt, ok := ctx.Flags["lpe_helper"]
 		if !ok {
 			logging.Errorf("Option 'lpe_helper' not found")
 			return
 		}
-		helperName := helperOpt.Val
+		helperName := helperOpt
 
 		// download third-party LPE helper
 		logging.Infof("Updating local LPE helper...")

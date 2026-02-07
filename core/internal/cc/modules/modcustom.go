@@ -13,6 +13,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
 	"github.com/jm33-m0/arc/v2"
+	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
@@ -22,21 +23,24 @@ import (
 )
 
 // moduleCustom run a custom module
-func moduleCustom() {
+// moduleCustom run a custom module
+func moduleCustom(ctx *c2context.C2Context) {
+	// We might still need live.ActiveModule for metadata like Name
+	// But Options come from ctx.Flags
 	if live.ActiveModule == nil {
 		logging.Warningf("No module selected")
 		return
 	}
 	config, exists := def.Modules[live.ActiveModule.Name]
 	if !exists {
-		logging.Errorf("Config of %s does not exist", live.ActiveModule)
+		logging.Errorf("Config of %s does not exist", live.ActiveModule.Name)
 		return
 	}
 
 	// build module on C2
 	if config.Build != "" {
 		logging.Printf("Building %s...", config.Name)
-		out, err := build_module(config)
+		out, err := build_module(config, ctx.Flags)
 		if err != nil {
 			logging.Errorf("Build module %s: %v", config.Name, err)
 			return
@@ -51,11 +55,11 @@ func moduleCustom() {
 	}
 
 	// where to download the module, can be from C2 or other agents, see `listener`
-	download_addr := getDownloadAddr()
+	download_addr := getDownloadAddr(ctx.Flags)
 
 	// agent side configs
 	payload_type := config.AgentConfig.Type
-	invocation, err := resolveInvocation(config, live.ActiveModule.Options)
+	invocation, err := resolveInvocation(config, ctx.Flags)
 	if err != nil {
 		logging.Errorf("Parsing module invocation: %v", err)
 		return
@@ -77,27 +81,24 @@ func moduleCustom() {
 
 	// if in-memory module
 	if config.AgentConfig.InMemory {
-		handleInMemoryModule(*config, payload_type, invB64, download_addr)
+		handleInMemoryModule(ctx, *config, payload_type, invB64, download_addr)
 		return
 	}
 
 	// other modules that need to be saved to disk
-	handleCompressedModule(*config, payload_type, invB64, download_addr)
+	handleCompressedModule(ctx, *config, payload_type, invB64, download_addr)
 }
 
-func build_module(config *def.ModuleConfig) (out []byte, err error) {
+func build_module(config *def.ModuleConfig, flags map[string]string) (out []byte, err error) {
 	err = os.Chdir(config.Path)
 	if err != nil {
 		return
 	}
 	defer os.Chdir(live.EmpWorkSpace)
 
-	for _, opt := range live.ActiveModule.Options {
-		if opt == nil {
-			continue
-		}
+	for name, val := range flags {
 		// Environment variables need to be in uppercase
-		os.Setenv(opt.Name, opt.Val)
+		os.Setenv(strings.ToUpper(name), val)
 	}
 
 	// build module
@@ -110,15 +111,14 @@ func build_module(config *def.ModuleConfig) (out []byte, err error) {
 	return
 }
 
-func getDownloadAddr() string {
-	download_url_opt, ok := live.ActiveModule.Options["download_addr"]
-	if ok {
-		return download_url_opt.Val
+func getDownloadAddr(flags map[string]string) string {
+	if val, ok := flags["download_addr"]; ok {
+		return val
 	}
 	return ""
 }
 
-func handleInMemoryModule(config def.ModuleConfig, payload_type, invocationB64, download_addr string) {
+func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, payload_type, invocationB64, download_addr string) {
 	hosted_file := live.WWWRoot + live.ActiveModule.Name + ".xz"
 	logging.Infof("Compressing %s with xz...", live.ActiveModule.Name)
 
@@ -151,14 +151,14 @@ func handleInMemoryModule(config def.ModuleConfig, payload_type, invocationB64, 
 		cmd += fmt.Sprintf(" --download_addr %s", strconv.Quote(download_addr))
 	}
 	cmd_id := uuid.NewString()
-	logging.Debugf("Sending command %s to %s", cmd, live.ActiveAgent.Tag)
-	err = CmdSender(cmd, cmd_id, live.ActiveAgent.Tag)
+	logging.Debugf("Sending command %s to %s", cmd, ctx.Target.Tag)
+	err = CmdSender(cmd, cmd_id, ctx.Target.Tag)
 	if err != nil {
-		logging.Errorf("Sending command %s to %s: %v", cmd, live.ActiveAgent.Tag, err)
+		logging.Errorf("Sending command %s to %s: %v", cmd, ctx.Target.Tag, err)
 	}
 }
 
-func handleCompressedModule(config def.ModuleConfig, payload_type, invocationB64, download_addr string) {
+func handleCompressedModule(ctx *c2context.C2Context, config def.ModuleConfig, payload_type, invocationB64, download_addr string) {
 	tarball_path := live.WWWRoot + live.ActiveModule.Name + ".tar.xz"
 	file_to_download := filepath.Base(tarball_path)
 	if !util.IsFileExist(tarball_path) {
@@ -183,9 +183,9 @@ func handleCompressedModule(config def.ModuleConfig, payload_type, invocationB64
 		cmd += fmt.Sprintf(" --download_addr %s", strconv.Quote(download_addr))
 	}
 	cmd_id := uuid.NewString()
-	err := CmdSender(cmd, cmd_id, live.ActiveAgent.Tag)
+	err := CmdSender(cmd, cmd_id, ctx.Target.Tag)
 	if err != nil {
-		logging.Errorf("Sending command %s to %s: %v", cmd, live.ActiveAgent.Tag, err)
+		logging.Errorf("Sending command %s to %s: %v", cmd, ctx.Target.Tag, err)
 	}
 
 	if config.AgentConfig.IsInteractive {
@@ -501,29 +501,30 @@ func updateModuleHelp(config *def.ModuleConfig) error {
 }
 
 // resolveInvocation renders an invocation with concrete values from module options
-func resolveInvocation(config *def.ModuleConfig, userOpts def.ModOptions) (def.ResolvedInvocation, error) {
+func resolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.ResolvedInvocation, error) {
 	resolved := def.ResolvedInvocation{TimeoutSeconds: config.Invocation.TimeoutSeconds}
 
-	lookupOpt := func(name string) (*def.ModOption, error) {
-		if userOpts != nil {
-			if opt, ok := userOpts[name]; ok && opt != nil {
-				return opt, nil
-			}
-		}
+	lookupOpt := func(name string) (*def.ModOption, string, error) {
+		// look for option definition
 		if config.Options != nil {
 			if opt, ok := config.Options[name]; ok && opt != nil {
-				return opt, nil
+				// if flag is provided, use it
+				if val, ok := flags[name]; ok {
+					return opt, val, nil
+				}
+				// otherwise use default
+				return opt, opt.Val, nil
 			}
 		}
-		return nil, fmt.Errorf("option %s not provided", name)
+		return nil, "", fmt.Errorf("option %s not defined", name)
 	}
 
 	coerceVal := func(name string) (string, interface{}, error) {
-		opt, err := lookupOpt(name)
+		opt, val, err := lookupOpt(name)
 		if err != nil {
 			return "", nil, err
 		}
-		return renderOptionValue(opt)
+		return renderOptionValue(opt, val)
 	}
 
 	for _, arg := range config.Invocation.Argv {
@@ -583,8 +584,8 @@ func resolveInvocation(config *def.ModuleConfig, userOpts def.ModOptions) (def.R
 }
 
 // renderOptionValue validates and returns both string and typed representations
-func renderOptionValue(opt *def.ModOption) (string, interface{}, error) {
-	val := strings.TrimSpace(opt.Val)
+func renderOptionValue(opt *def.ModOption, val string) (string, interface{}, error) {
+	val = strings.TrimSpace(val)
 	if val == "" {
 		if opt.Required {
 			return "", nil, fmt.Errorf("option %s is required", opt.Name)
@@ -637,6 +638,10 @@ func renderOptionValue(opt *def.ModOption) (string, interface{}, error) {
 		}
 		return fmt.Sprintf("%d", num), float64(num), nil
 	default:
+		// Check regex pattern if present
+		if opt.Pattern != "" {
+			// TODO: Implement regex check if needed, though it wasn't there before
+		}
 		return val, val, nil
 	}
 }

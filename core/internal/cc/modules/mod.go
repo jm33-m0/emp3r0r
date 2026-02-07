@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -24,7 +25,7 @@ var (
 	}
 
 	// ModuleRunners a map of module helpers
-	ModuleRunners = map[string]func(){
+	ModuleRunners = map[string]func(ctx *context.C2Context){
 		def.ModCMD_EXEC:    moduleCmd,
 		def.ModSHELL:       moduleShell,
 		def.ModPROXY:       moduleProxy,
@@ -84,7 +85,7 @@ func UpdateOptions(modName string) (exist bool) {
 }
 
 // ModuleRun run current module
-func ModuleRun() {
+func ModuleRun(ctx *context.C2Context) {
 	if live.ActiveModule == nil {
 		logging.Errorf("No active module")
 		return
@@ -107,7 +108,7 @@ func ModuleRun() {
 	// run module
 	mod := ModuleRunners[live.ActiveModule.Name]
 	if mod != nil {
-		go mod()
+		go mod(ctx)
 	} else {
 		logging.Errorf("Module %s has no runner", strconv.Quote(live.ActiveModule.Name))
 	}

