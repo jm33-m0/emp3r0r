@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.20.1](https://github.com/jm33-m0/emp3r0r/compare/v3.20.0...v3.20.1) (2026-02-08)
+
+
+### Bug Fixes
+
+* suppress non-fileless OPSEC warning for local modules. ([4b07229](https://github.com/jm33-m0/emp3r0r/commit/4b07229c7b2191c8e7a3218b61ae7cb101ef6941))
+* version number unknown when installed with `install.sh` ([7e9e3c3](https://github.com/jm33-m0/emp3r0r/commit/7e9e3c378623d8866f06566e7761ae5fc6500f68))
+
 ## [3.20.0](https://github.com/jm33-m0/emp3r0r/compare/v3.19.4...v3.20.0) (2026-02-08)
 
 
