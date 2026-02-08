@@ -71,6 +71,11 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 	// reverseProxy listener
 	// ssh reverse proxy
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logging.Errorf("BroadcastServer SSHRemoteFwdServer panic: %v\n%s", r, util.CallStack())
+			}
+		}()
 		err = transport.SSHRemoteFwdServer(common.RuntimeConfig.Bring2CCReverseProxyPort,
 			common.RuntimeConfig.Password,
 			common.RuntimeConfig.SSHHostKey)
@@ -83,6 +88,11 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 
 	// kcp server that forwards to ssh reverse proxy
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logging.Errorf("BroadcastServer KCPTunServer panic: %v\n%s", r, util.CallStack())
+			}
+		}()
 		ctx, cancel := context.WithCancel(context.Background())
 		err = transport.KCPTunServer(
 			fmt.Sprintf("127.0.0.1:%s", common.RuntimeConfig.Bring2CCReverseProxyPort), // forward to ssh reverse proxy
@@ -97,6 +107,11 @@ func BroadcastServer(ctx context.Context, cancel context.CancelFunc, port string
 
 	// monitor until it works
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logging.Errorf("BroadcastServer monitor panic: %v\n%s", r, util.CallStack())
+			}
+		}()
 		// does the proxy work?
 		rproxy := fmt.Sprintf("socks5://%s:%s@127.0.0.1:%s",
 			common.RuntimeConfig.ShadowsocksLocalSocksPort, // user name of socks5 proxy
@@ -255,6 +270,11 @@ func passProxy(ctx context.Context, cancel context.CancelFunc, count *int) {
 		return
 	}
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logging.Errorf("passProxy panic: %v\n%s", r, util.CallStack())
+			}
+		}()
 		if parsed_url.Hostname() == "127.0.0.1" {
 			logging.Printf("common.RuntimeConfig.AgentProxy is %s, we are already serving the proxy, let's start broadcasting right away", proxyAddr)
 			return

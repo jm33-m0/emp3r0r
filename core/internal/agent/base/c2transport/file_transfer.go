@@ -248,6 +248,11 @@ func FileServer(port int, ctx context.Context, cancel context.CancelFunc) (err e
 	go transport.KCPTunServer(listen_addr, portstr, common.RuntimeConfig.Password, def.MagicString, ctx, cancel)
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logging.Errorf("FileServer panic: %v\n%s", r, util.CallStack())
+			}
+		}()
 		<-ctx.Done()
 		server.Close()
 	}()

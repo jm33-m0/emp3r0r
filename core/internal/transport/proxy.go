@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/ncruces/go-dns"
 	"github.com/posener/h2conn"
 	"github.com/txthinking/socks5"
@@ -42,6 +43,17 @@ func StartSocks5Proxy(addr, doh string, proxyserver *socks5.Server, onListen fun
 		}
 		go func(c net.Conn) {
 			defer c.Close()
+			defer func() {
+				if r := recover(); r != nil {
+					logging.Errorf("StartSocks5Proxy panic: %v\n%s", r, util.CallStack())
+				}
+			}()
+
+			if proxyserver == nil || proxyserver.Handle == nil {
+				logging.Errorf("StartSocks5Proxy: proxyserver or proxyserver.Handle is nil")
+				return
+			}
+
 			if err := proxyserver.Negotiate(c); err != nil {
 				return
 			}

@@ -29,7 +29,7 @@ func agent_main() {
 	var err error
 	defer func() {
 		if r := recover(); r != nil {
-			logging.Printf("agent_main recovered from panic: %v", r)
+			logging.Errorf("agent_main recovered from panic: %v\n%s", r, util.CallStack())
 		}
 	}()
 

@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"math/rand"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 	"unicode"
@@ -232,4 +233,11 @@ func ShortenString(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen-3] + "..."
+}
+
+// CallStack returns the stack trace of the caller
+func CallStack() string {
+	buf := make([]byte, 1024)
+	n := runtime.Stack(buf, false)
+	return string(buf[:n])
 }

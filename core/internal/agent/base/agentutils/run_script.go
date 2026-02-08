@@ -7,6 +7,7 @@ import (
 	"os/exec"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -42,6 +43,11 @@ func feedScriptToStdin(cmd *exec.Cmd, scriptBytes []byte) (output string, err er
 	}
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logging.Errorf("feedScriptToStdin panic: %v\n%s", r, util.CallStack())
+			}
+		}()
 		io.Copy(stdin, bytes.NewReader(scriptBytes))
 		defer stdin.Close()
 	}()

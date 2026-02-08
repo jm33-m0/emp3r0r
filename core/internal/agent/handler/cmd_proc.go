@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
 )
@@ -125,6 +126,11 @@ func execCmdRun(cmd *cobra.Command, args []string) {
 	if !keepRunning {
 		execCmd.Wait()
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logging.Errorf("execCmdRun killer panic: %v\n%s", r, util.CallStack())
+				}
+			}()
 			// kill after 10 seconds if still alive
 			time.Sleep(10 * time.Second)
 			if util.IsPIDAlive(execCmd.Process.Pid) {
