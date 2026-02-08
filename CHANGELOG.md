@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.20.0](https://github.com/jm33-m0/emp3r0r/compare/v3.19.4...v3.20.0) (2026-02-08)
+
+
+### Features
+
+* Add OPSEC warnings for various agent operations and module characteristics. ([98ee175](https://github.com/jm33-m0/emp3r0r/commit/98ee175f3418e0246ba6622dd21455e24817b041))
+* Remove C2 self-update functionality, stop uploading release assets in CI, and update the install script to build from source. ([6581c67](https://github.com/jm33-m0/emp3r0r/commit/6581c679f8495da9b5b63a572fe8903a2a25d2a2))
+
 ## [3.19.4](https://github.com/jm33-m0/emp3r0r/compare/v3.19.3...v3.19.4) (2026-02-08)
 
 
