@@ -14,7 +14,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
-	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -30,13 +29,14 @@ type SSH_SHELL_Mapping struct {
 // one port for one shell
 var SSHShellPort = make(map[string]*SSH_SHELL_Mapping)
 
-// SSHClient ssh to sshd server, with shell access in a new tmux window
+// SSHClient ssh to sshd server, returns the SSH connection command string
 // shell: the executable to run, eg. bash, python
 // port: serve this shell on agent side 127.0.0.1:port
-func SSHClient(shell, args, port string, split bool) (err error) {
+// Returns: (connectionString, error)
+func SSHClient(shell, args, port string) (string, error) {
 	target := agents.MustGetActiveAgent()
 	if target == nil {
-		return errors.New("no active agent")
+		return "", errors.New("no active agent")
 	}
 	// check if sftp is requested
 	is_sftp := shell == "sftp"
@@ -44,15 +44,6 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 	if is_sftp {
 		ssh_prog = "sftp"
 		shell = "sftp"
-	}
-
-	// if shell/sftp pane already exists, abort
-	if split {
-		if cli.AgentShellPane != nil {
-			if !is_sftp && cli.AgentSFTPPane != nil {
-				return
-			}
-		}
 	}
 
 	// SSHDShellPort is reserved
@@ -66,8 +57,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 	}
 
 	if !util.IsCommandExist("ssh") {
-		err = fmt.Errorf("ssh must be installed")
-		return
+		return "", fmt.Errorf("ssh must be installed")
 	}
 
 	// check if we need a new (SSH) port (on the agent side, for new shell)
@@ -97,8 +87,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 					new_port := strconv.Itoa(util.RandInt(2048, 65535))
 					logging.Warningf("Port %s has %s shell on it, restarting with a different port %s", port, s, new_port)
 					live.SetOption("port", new_port)
-					err = SSHClient(shell, args, new_port, split)
-					return err
+					return SSHClient(shell, args, new_port)
 				}
 			}
 			// if a shell is already open, use it
@@ -115,9 +104,9 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 			args = "--"
 		}
 		cmd := fmt.Sprintf("%s --shell %s --port %s --args %s", def.C2CmdSSHD, shell, port, args)
-		err = CmdSender(cmd, job_id, target.Tag)
+		err := CmdSender(cmd, job_id, target.Tag)
 		if err != nil {
-			return
+			return "", err
 		}
 		logging.Infof("Waiting for sshd (%s) on target %s", shell, strconv.Quote(target.Tag))
 
@@ -129,8 +118,7 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 		for range 100 {
 			time.Sleep(100 * time.Millisecond)
 			if ctx.Err() != nil {
-				err = fmt.Errorf("didn't get response from agent (%s), aborting", target.Tag)
-				return
+				return "", fmt.Errorf("didn't get response from agent (%s), aborting", target.Tag)
 			}
 
 			if val, ok := live.CmdResults.Load(job_id); ok {
@@ -146,12 +134,10 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 				strings.Contains(res, fmt.Sprintf("listen tcp 127.0.0.1:%s: bind: address already in use", port)) {
 				// success
 			} else {
-				err = fmt.Errorf("start sshd (%s) failed: %s", shell, res)
-				return
+				return "", fmt.Errorf("start sshd (%s) failed: %s", shell, res)
 			}
 		} else {
-			err = fmt.Errorf("didn't get response from agent (%s), aborting", target.Tag)
-			return
+			return "", fmt.Errorf("didn't get response from agent (%s), aborting", target.Tag)
 		}
 
 		// set up port mapping for the ssh session
@@ -171,13 +157,12 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 			}
 			err = pf.RunPortFwd()
 			if err != nil {
-				err = fmt.Errorf("PortFwd failed: %v", err)
 				logging.Errorf("Start port mapping for sshd (%s): %v", shell, err)
 			}
 		}()
 		logging.Infof("Waiting for response from %s", target.Tag)
 		if err != nil {
-			return
+			return "", err
 		}
 	}
 
@@ -197,14 +182,13 @@ wait:
 		}
 	}
 	if !port_mapping_exists {
-		err = errors.New("port mapping unsuccessful")
-		return
+		return "", errors.New("port mapping unsuccessful")
 	}
 
-	// let's do the ssh
+	// Build the SSH command string
 	sshPath, err := exec.LookPath(ssh_prog)
 	if err != nil {
-		logging.Errorf("%s not found, please install it first: %v", ssh_prog, err)
+		return "", fmt.Errorf("%s not found, please install it first: %v", ssh_prog, err)
 	}
 	sshCmd := fmt.Sprintf("%s -p %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no %s",
 		sshPath, lport, "127.0.0.1")
@@ -213,21 +197,8 @@ wait:
 			sshPath, lport, "127.0.0.1")
 	}
 
-	// agent name
-	name := target.Hostname
-
-	// if open in split tmux pane
-	if split {
-		cli.AgentShellPane, err = cli.TmuxNewPane("Shell", "v", cli.CommandPane.ID, 30, sshCmd)
-		cli.TmuxPanes[cli.AgentShellPane.ID] = cli.AgentShellPane
-		return err
-	}
-
-	// if open in new tmux window
-	logging.Infof("\nOpening SSH (%s - %s) session for %s in Shell tab.\n"+
-		"If that fails, please execute command\n%s\nmanaully",
+	logging.Infof("\nSSH (%s - %s) session ready for %s.\nConnection command:\n%s",
 		shell, port, target.Tag, sshCmd)
 
-	// if a shell is wanted, just open in new tmux window, you will see a new tab
-	return cli.TmuxNewWindow(fmt.Sprintf("shell/%s/%s-%s", name, shell, port), sshCmd)
+	return sshCmd, nil
 }

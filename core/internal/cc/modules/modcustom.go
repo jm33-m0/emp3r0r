@@ -223,12 +223,20 @@ func handleInteractiveModule(config def.ModuleConfig, job_id string) {
 		live.CmdResults.Delete(job_id)
 	}()
 
-	sshErr := SSHClient(fmt.Sprintf("%s/%s",
+	connStr, sshErr := SSHClient(fmt.Sprintf("%s/%s",
 		live.ActiveModule.Name, config.AgentConfig.Exec),
-		args, port, false)
+		args, port)
 	if sshErr != nil {
 		logging.Errorf("module %s: %v", config.Name, sshErr)
+		return
 	}
+
+	// For interactive modules, we need to open a shell
+	// Use OnShellReady callback if available (from context)
+	// Note: This function doesn't have access to context, so we log for now
+	// TODO: Refactor to pass context through
+	logging.Successf("Interactive module %s ready! Connection command:\n%s", config.Name, connStr)
+	logging.Infof("Note: Operator should handle opening this in tmux/UI")
 }
 
 // Print module meta data

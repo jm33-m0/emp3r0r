@@ -86,9 +86,22 @@ func ModuleShell(ctx *c2context.C2Context) {
 	port := portOpt
 
 	logging.Warningf("OPSEC: Interactive shells involve forking a process on the agent")
-	// run
-	err := SSHClient(shell, args, port, false)
+	// run - get connection string
+	connStr, err := SSHClient(shell, args, port)
 	if err != nil {
 		logging.Errorf("moduleShell: %v", err)
+		return
+	}
+
+	// Call UI callback if provided (dependency inversion)
+	if ctx.OnUIReady != nil {
+		err = ctx.OnUIReady(connStr)
+		if err != nil {
+			logging.Errorf("UI callback failed: %v", err)
+		}
+	} else {
+		// No UI callback - just log the connection string
+		logging.Successf("Shell ready! Connection command:\n%s", connStr)
+		logging.Infof("Note: Set ctx.OnUIReady to handle UI automatically")
 	}
 }

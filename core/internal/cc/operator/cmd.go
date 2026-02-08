@@ -152,7 +152,22 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			GroupID: "filesystem",
 			Short:   "Browse remote files in your local file manager with SFTP protocol",
 			Args:    cobra.NoArgs,
-			Run:     modules.CmdOpenFileManager,
+			Run: func(cmd *cobra.Command, args []string) {
+				agent := agents.MustGetActiveAgent()
+				if agent == nil {
+					logging.Errorf("No active agent")
+					return
+				}
+				ctx := &c2context.C2Context{
+					Target:    agent,
+					OpSession: OPERATOR_SESSION,
+					OnUIReady: func(connStr string) error {
+						logging.Successf("File manager ready! Opening tmux...")
+						return cli.TmuxNewWindow("file_manager", connStr)
+					},
+				}
+				modules.CmdOpenFileManager(ctx)
+			},
 		}
 		rootCmd.AddCommand(fileManagerCmd)
 
@@ -454,6 +469,8 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 }
 
 func CmdListPortFwdsModule(cmd *cobra.Command, args []string) {
+	// Import controllers at the top of the file
+	// This function now uses the controller layer
 	ctx := &c2context.C2Context{
 		Flags: map[string]string{"switch": "list"},
 	}

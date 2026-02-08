@@ -1,6 +1,7 @@
 package operator
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
@@ -89,6 +90,15 @@ func cmdModuleRun(cmd *cobra.Command, _ []string) {
 		Target:    target,
 		Flags:     flags,
 		OpSession: "operator", // TODO: Get actual session ID if available
+		// Inject UI callback for interactive shells
+		OnUIReady: func(connStr string) error {
+			logging.Successf("Shell ready! Opening tmux...")
+			windowName := "shell"
+			if target != nil {
+				windowName = fmt.Sprintf("shell/%s", target.Hostname)
+			}
+			return cli.TmuxNewWindow(windowName, connStr)
+		},
 	}
 	modules.ModuleRun(ctx)
 }
