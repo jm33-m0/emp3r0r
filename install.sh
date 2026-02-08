@@ -1,88 +1,112 @@
 #!/bin/bash
 
+# emp3r0r Installation Script (Source-based)
+# This script installs emp3r0r by building it from source.
+
 # Function to print informational messages
 info() {
-  echo -e "\033[32m$1\033[0m"
+  echo -e "\033[32m[INFO] $1\033[0m"
 }
 
 # Function to print error messages and exit
 error() {
-  echo -e "\033[31m$1\033[0m"
-  cd - || echo "Failed to cd back"
+  echo -e "\033[31m[ERROR] $1\033[0m"
   exit 1
 }
 
 # Function to print warning messages
 warn() {
-  echo -e "\033[33m$1\033[0m"
+  echo -e "\033[33m[WARN] $1\033[0m"
 }
 
-# Function to check if a command exists
-check_command() {
-  command -v apt >/dev/null || error "This script is only for Kali/Ubuntu/Debian"
-  (
-    command -v "$1" >/dev/null || {
-      sudo apt update && sudo apt install -y "$1"
-    }
-  ) || error "Failed to install $1"
-}
-
-# Function to download a file
-download_file() {
-  local url=$1
-  local output=$2
-  curl -LO "$url" || error "Failed to download $output"
-}
-
-# Function to verify the checksum of a file
-verify_checksum() {
-  local file=$1
-  local checksum_file=$2
-  local expected_checksum
-  expected_checksum=$(cat "$checksum_file")
-  local actual_checksum
-  actual_checksum=$(sha256sum "$file" | awk '{ print $1 }')
-
-  if [ "$expected_checksum" != "$actual_checksum" ]; then
-    error "SHA256 verification failed"
+# Function to check and install basic packages via apt
+check_apt_pkg() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    info "Installing $1 via apt..."
+    sudo apt update && sudo apt install -y "$1" || error "Failed to install $1"
   fi
 }
 
-# Check if required commands are available
-check_command curl
-check_command jq
-check_command tmux
+# Install Go from go.dev
+install_go() {
+  local min_go_version="1.25.0"
+  local target_go_version="1.25.0"
+  local go_tarball="go${target_go_version}.linux-amd64.tar.gz"
+  local go_url="https://go.dev/dl/${go_tarball}"
 
-# Get the latest version tag from GitHub API
-ver=$(curl -sSL https://api.github.com/repos/jm33-m0/emp3r0r/releases/latest | jq -r .tag_name)
-warn "Downloading emp3r0r $ver"
+  if command -v go >/dev/null 2>&1; then
+    local current_ver=$(go version | awk '{print $3}' | sed 's/go//')
+    # Compare versions: if current >= min, we are good
+    if [[ "$(printf '%s\n%s' "$min_go_version" "$current_ver" | sort -V | head -n1)" == "$min_go_version" ]]; then
+      info "Go $current_ver is already installed (minimum required: $min_go_version)"
+      return
+    fi
+    warn "Current Go version is $current_ver, but we need at least $min_go_version. Installing $target_go_version..."
+  fi
 
-# Get the download URLs for the tarball and sha256 file
-tarball_url=$(curl -sSL https://api.github.com/repos/jm33-m0/emp3r0r/releases/latest | jq -r '.assets[] | select(.name | endswith(".tar.zst")) | .browser_download_url')
-sha256_url=$(curl -sSL https://api.github.com/repos/jm33-m0/emp3r0r/releases/latest | jq -r '.assets[] | select(.name | endswith(".tar.zst.sha256")) | .browser_download_url')
+  info "Downloading Go $go_version from $go_url..."
+  curl -LO "$go_url" || error "Failed to download Go"
+  sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf "$go_tarball" || error "Failed to extract Go"
+  rm "$go_tarball"
 
-# Define the filenames for the downloaded files
-sha256_file="$(basename "$sha256_url")"
-tarball_file="$(basename "$tarball_url")"
+  # Update PATH for current session
+  export PATH=$PATH:/usr/local/go/bin
+  if ! grep -q "/usr/local/go/bin" ~/.bashrc; then
+    echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+    info "Added /usr/local/go/bin to ~/.bashrc"
+  fi
+}
 
-# Download the sha256 file
-download_file "$sha256_url" "$sha256_file"
-# Download the tarball if it doesn't already exist
-[ -f "$tarball_file" ] || download_file "$tarball_url" "$tarball_file"
+# Main installation flow
+info "Starting emp3r0r installation from source"
 
-# Verify the checksum of the downloaded tarball
-info "Verifying download"
-verify_checksum "$tarball_file" "$sha256_file"
+# 0. Setup temporary workdir
+workdir=$(mktemp -d)
+trap 'rm -rf "$workdir"' EXIT
+info "Workdir: $workdir"
+cd "$workdir" || error "Failed to enter workdir"
 
-warn "Download and verification successful"
+# 1. Install basic dependencies
+check_apt_pkg curl
+check_apt_pkg git
+check_apt_pkg tmux
+# Check for build-essential by looking for make
+if ! command -v make >/dev/null 2>&1; then
+  check_apt_pkg build-essential
+fi
+# Check for libcap2-bin by looking for setcap
+if ! command -v setcap >/dev/null 2>&1; then
+  check_apt_pkg libcap2-bin
+fi
+check_apt_pkg jq
 
-# Extract the tarball to /tmp/ directory
-tar -xvf "$tarball_file" -C /tmp/ || error "Failed to extract tarball"
-cd /tmp/emp3r0r-build || error "Failed to cd to /tmp/emp3r0r-build"
+# 2. Install Go
+install_go
 
-# Install emp3r0r
-warn "Installing emp3r0r"
-sudo ./build.sh --install-only || error "Failed to install emp3r0r"
+# 3. Download source
+info "Checking for latest release..."
+tag=$(curl -sSL https://api.github.com/repos/jm33-m0/emp3r0r/releases/latest | jq -r .tag_name)
+if [[ -z "$tag" || "$tag" == "null" ]]; then
+  warn "Failed to fetch latest release tag, falling back to v3"
+  tag="v3"
+fi
+info "Downloading source tarball for $tag..."
+source_url="https://github.com/jm33-m0/emp3r0r/archive/refs/tags/${tag}.tar.gz"
+# if it's a branch like v3, the URL is different
+if [[ "$tag" == "v3" ]]; then
+    source_url="https://github.com/jm33-m0/emp3r0r/archive/refs/heads/${tag}.tar.gz"
+fi
+curl -L "$source_url" -o emp3r0r-src.tar.gz || error "Failed to download source"
 
-info "emp3r0r installed successfully"
-cd - || error "Failed to cd back"
+# 4. Extract
+info "Extracting source..."
+mkdir emp3r0r-source
+tar -xzf emp3r0r-src.tar.gz -C emp3r0r-source --strip-components=1 || error "Failed to extract source"
+cd emp3r0r-source/core || error "Failed to enter core directory"
+
+# 5. Build and Install
+warn "Building and installing emp3r0r (this may take a while)..."
+# build.sh will handle zig and other internal dependencies
+./build.sh --install || error "Build and installation failed"
+
+info "emp3r0r installed successfully!"

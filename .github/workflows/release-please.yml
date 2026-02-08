@@ -27,26 +27,7 @@ jobs:
           go-version: "^1.25"
           cache-dependency-path: core/go.sum
 
-      - name: Upload URL
+      - name: Release Note
         if: ${{ steps.release.outputs.release_created }}
         run: |
-          echo 'Upload to ${{ steps.release.outputs.upload_url }}'
-
-      - name: Debug token permissions
-        if: ${{ steps.release.outputs.release_created }}
-        run: |
-          echo "Testing GitHub API access..."
-          curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-               -H "Accept: application/vnd.github.v3+json" \
-               https://api.github.com/repos/jm33-m0/emp3r0r
-
-      - name: Create archive and upload assets
-        if: ${{ steps.release.outputs.release_created }}
-        run: |
-          cd core || exit 1
-          ls -lah
-          chmod 755 ./build.sh
-          TAG=v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }} ./build.sh --release || exit 2
-          mv emp3r0r.tar.zst emp3r0r-v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}.tar.zst || exit 3
-          ls -lah
-          bash ./upload.sh github_api_token=${{ secrets.GITHUB_TOKEN }} owner=jm33-m0 repo=emp3r0r tag=v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }} filename=./emp3r0r-v${{ steps.release.outputs.major }}.${{ steps.release.outputs.minor }}.${{ steps.release.outputs.patch }}.tar.zst
+          echo "Release created: ${{ steps.release.outputs.tag_name }}"

@@ -10,7 +10,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/ftp"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
 	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -147,16 +146,6 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Args: cobra.NoArgs,
 		}
 		rootCmd.AddCommand(upgradeAgentCmd)
-
-		upgradeCCCmd := &cobra.Command{
-			Use:     "upgrade_cc",
-			GroupID: "c2",
-			Short:   "Upgrade emp3r0r from GitHub",
-			Example: "upgrade_cc [--force]",
-			Run:     tools.UpdateCC,
-		}
-		upgradeCCCmd.Flags().BoolP("force", "f", false, "Force upgrade")
-		rootCmd.AddCommand(upgradeCCCmd)
 
 		fileManagerCmd := &cobra.Command{
 			Use:     "file_manager",
