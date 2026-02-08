@@ -16,7 +16,6 @@ import (
 	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
-	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -240,21 +239,16 @@ func handleInteractiveModule(config def.ModuleConfig, job_id string) {
 }
 
 // Print module meta data
-func ModuleDetails(modName string) {
-	config, exists := def.Modules[modName]
-	if !exists {
+func ModuleDetails(modName string, ctx *c2context.C2Context) {
+	info := GetModuleDetails(modName)
+	if info == nil {
 		return
 	}
 
-	// build table using helper function
-	header := []string{"Name", "Exec", "Platform", "Author", "Date", "Comment"}
-	rows := [][]string{
-		{config.Name, config.AgentConfig.Exec, config.Platform, config.Author, config.Date, config.Comment},
+	// Call UI callback if provided
+	if ctx != nil && ctx.OnUIReady != nil {
+		ctx.OnUIReady(info)
 	}
-
-	tableStr := cli.BuildTable(header, rows)
-	cli.AdaptiveTable(tableStr)
-	logging.Printf("Module details:\n%s", tableStr)
 }
 
 // scan custom modules in ModuleDir,

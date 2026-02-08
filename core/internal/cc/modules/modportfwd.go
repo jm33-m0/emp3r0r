@@ -10,7 +10,6 @@ import (
 	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
-	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -24,35 +23,13 @@ func ModulePortFwd(ctx *c2context.C2Context) {
 
 	// list command does not require active agent
 	if switchOpt == "list" {
-		tdata := [][]string{}
-		for id, portmap := range network.PortFwds {
-			if portmap.Sh == nil {
-				portmap.Cancel()
-				continue
-			}
-			bindAddr := portmap.BindAddr
-			if bindAddr == "" {
-				bindAddr = "127.0.0.1"
-			}
-			to := portmap.To + " (Agent) "
-			lport := bindAddr + ":" + portmap.Lport + " (CC) "
-			if portmap.Reverse {
-				to = portmap.To + " (CC) "
-				lport = portmap.Lport + " (Agent) "
-			}
-			tdata = append(tdata,
-				[]string{
-					lport,
-					to,
-					util.SplitLongLine(portmap.Agent.Tag, 10),
-					util.SplitLongLine(portmap.Description, 10),
-					util.SplitLongLine(id, 10),
-				})
+		// Get data
+		sessions := GetPortFwdSessions()
+
+		// Call UI callback if provided
+		if ctx.OnUIReady != nil {
+			ctx.OnUIReady(sessions)
 		}
-		header := []string{"Local Port", "To", "Agent", "Description", "ID"}
-		tableStr := cli.BuildTable(header, tdata)
-		cli.AdaptiveTable(tableStr)
-		logging.Infof("\n\033[0m%s\n\n", tableStr)
 		return
 	}
 

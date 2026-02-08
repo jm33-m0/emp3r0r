@@ -91,7 +91,11 @@ func cmdModuleRun(cmd *cobra.Command, _ []string) {
 		Flags:     flags,
 		OpSession: "operator", // TODO: Get actual session ID if available
 		// Inject UI callback for interactive shells
-		OnUIReady: func(connStr string) error {
+		OnUIReady: func(data any) error {
+			connStr, ok := data.(string)
+			if !ok {
+				return fmt.Errorf("expected string, got %T", data)
+			}
 			logging.Successf("Shell ready! Opening tmux...")
 			windowName := "shell"
 			if target != nil {

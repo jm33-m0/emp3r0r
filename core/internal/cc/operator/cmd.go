@@ -12,6 +12,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
@@ -161,7 +162,8 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 				ctx := &c2context.C2Context{
 					Target:    agent,
 					OpSession: OPERATOR_SESSION,
-					OnUIReady: func(connStr string) error {
+					OnUIReady: func(data any) error {
+						connStr := data.(string)
 						logging.Successf("File manager ready! Opening tmux...")
 						return cli.TmuxNewWindow("file_manager", connStr)
 					},
@@ -469,10 +471,30 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 }
 
 func CmdListPortFwdsModule(cmd *cobra.Command, args []string) {
-	// Import controllers at the top of the file
-	// This function now uses the controller layer
 	ctx := &c2context.C2Context{
 		Flags: map[string]string{"switch": "list"},
+		OnUIReady: func(data any) error {
+			sessions, ok := data.([]def.PortFwdSession)
+			if !ok {
+				logging.Errorf("Expected []def.PortFwdSession, got %T", data)
+				return fmt.Errorf("type mismatch")
+			}
+
+			header := []string{"Local Port", "To", "Agent", "Description", "ID"}
+			var rows [][]string
+			for _, s := range sessions {
+				rows = append(rows, []string{
+					s.LocalPort,
+					s.RemoteAddr,
+					util.SplitLongLine(s.AgentTag, 10),
+					util.SplitLongLine(s.Description, 10),
+					util.SplitLongLine(s.ID, 10),
+				})
+			}
+			tableStr := cli.BuildTable(header, rows)
+			logging.Infof("\n\033[0m%s\n\n", tableStr)
+			return nil
+		},
 	}
 	modules.ModulePortFwd(ctx)
 }
