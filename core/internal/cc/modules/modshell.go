@@ -85,6 +85,7 @@ func ModuleShell(ctx *c2context.C2Context) {
 	}
 	port := portOpt
 
+	logging.Warningf("OPSEC: Interactive shells involve forking a process on the agent")
 	// run
 	err := SSHClient(shell, args, port, false)
 	if err != nil {

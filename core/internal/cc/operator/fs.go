@@ -85,6 +85,7 @@ func CmdPs(cmd *cobra.Command, args []string) {
 	if cmdLine != "" {
 		cmdArgs = fmt.Sprintf("%s --cmdline %s", cmdArgs, cmdLine)
 	}
+	logging.Warningf("OPSEC: ps recorded as process/thread enumeration")
 	executeCmd(cmdArgs)
 }
 

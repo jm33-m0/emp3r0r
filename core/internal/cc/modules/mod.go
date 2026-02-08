@@ -148,6 +148,21 @@ func SetActiveModule(modName string) {
 			mod, exists := def.Modules[modName]
 			if exists {
 				logging.Successf("%s: %s", modName, mod.Comment)
+
+				// OPSEC warnings
+				if mod.AgentConfig.Exec != "built-in" && !mod.IsLocal {
+					if mod.AgentConfig.Type == "coff" {
+						logging.Infof("OPSEC: This is a BOF module, which is recommended for OPSEC (runs in-memory)")
+					} else {
+						logging.Warningf("OPSEC: This module is NOT built-in and NOT BOF. It may involve fork-and-run or disk activity")
+					}
+				}
+				if mod.AgentConfig.IsInteractive {
+					logging.Warningf("OPSEC: Interactive modules like this one involve forking a shell/process on the agent")
+				}
+				if !mod.Fileless {
+					logging.Warningf("OPSEC: This module is NOT fileless, it WILL touch the agent's disk")
+				}
 			}
 			return
 		}

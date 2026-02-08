@@ -355,6 +355,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 				if out != "" {
 					cmdStr += fmt.Sprintf(" --out '%s'", out)
 				}
+				logging.Warningf("OPSEC: decrypt writes plaintext files to agent's disk")
 				executeCmd(cmdStr) // Helper to send command
 			},
 		}
@@ -495,6 +496,7 @@ func execCmd(cmd *cobra.Command, args []string) {
 		Flags:     make(map[string]string),
 	}
 	ctx.Flags["cmd_to_exec"] = fmt.Sprintf("exec --cmd %s", strconv.Quote(cmdStr))
+	logging.Warningf("OPSEC: exec recorded as fork and run (High OPSEC Risk)")
 	modules.ModuleCmd(ctx)
 }
 
