@@ -1,8 +1,6 @@
 package operator
 
 import (
-	"bytes"
-	"encoding/base64"
 	"fmt"
 	"net/url"
 	"os"
@@ -10,13 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
-	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/controllers"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
-	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/donut"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -68,86 +64,53 @@ var Arch_List_All = []string{
 
 // CmdGenerateAgent generates agent binary
 func CmdGenerateAgent(cmd *cobra.Command, args []string) {
-	var outfile string // write agent binary to this path
+	// Parse flags (UI layer)
+	payloadType, _ := cmd.Flags().GetString("type")
+	archChoice, _ := cmd.Flags().GetString("arch")
 
-	// check if we have all required options
-	payload_type, _ := cmd.Flags().GetString("type")
-	arch_choice, _ := cmd.Flags().GetString("arch")
-
-	if !isArchValid(payload_type, arch_choice) {
+	if !isArchValid(payloadType, archChoice) {
 		logging.Errorf("Invalid arch choice")
 		return
 	}
 
-	// file paths
-	now := time.Now()
-	stubFile := ""
-	stubFile, outfile = generateFilePaths(payload_type, arch_choice, now)
-
-	// is this stub file available?
-	if !util.IsExist(stubFile) {
-		logging.Errorf("%s not found, build it first", stubFile)
-		return
-	}
-
-	// fill emp3r0r.json
+	// Fill config (UI layer - handles flag parsing and user interaction)
 	if err := MakeConfig(cmd); err != nil {
 		logging.Errorf("Failed to configure agent: %v", err)
 		return
 	}
 
-	// read and encrypt config file
-	config_payload, err := readAndEncryptConfig()
-	if err != nil {
-		logging.Errorf("Failed to encrypt %s: %v", live.EmpConfigFile, err)
-		return
+	// Build agent (business logic via controller)
+	buildCfg := controllers.AgentBuildConfig{
+		PayloadType: payloadType,
+		Arch:        archChoice,
+		Timestamp:   time.Now(),
+		WorkSpace:   live.EmpWorkSpace,
 	}
-	logging.Debugf("Config payload: %d bytes", len(config_payload))
 
-	// read stub file
-	toWrite, err := os.ReadFile(stubFile)
+	result, err := controllers.BuildAgent(buildCfg, live.RuntimeConfig)
 	if err != nil {
-		logging.Errorf("Read stub: %v", err)
-		return
-	}
-	// payload
-	// binary patching, we need to patch the stub file at emp3r0r_def.AgentConfig, which is 4096 bytes long
-	if len(config_payload) < len(def.AgentConfig) {
-		// pad with 0x00
-		config_payload = append(config_payload, bytes.Repeat([]byte{0x00}, len(def.AgentConfig)-len(config_payload))...)
-	} else if len(config_payload) > len(def.AgentConfig) {
-		logging.Errorf("Config payload is too large, %d bytes, max %d bytes", len(config_payload), len(def.AgentConfig))
-		return
-	}
-	// fill in
-	toWrite = bytes.Replace(toWrite,
-		// by now config_payload should be 4096 bytes long
-		bytes.Repeat([]byte{0xff}, len(config_payload)),
-		config_payload,
-		1)
-	// write
-	if err = os.WriteFile(outfile, toWrite, 0o755); err != nil {
-		logging.Errorf("Save agent binary %s: %v", outfile, err)
+		logging.Errorf("Failed to build agent: %v", err)
 		return
 	}
 
-	// done
-	logging.Successf("Generated %s from %s and %s",
-		outfile, stubFile, live.EmpConfigFile)
-	if payload_type == PayloadTypeWindowsExecutable || payload_type == PayloadTypeWindowsDLL {
-		// generate shellcode for the agent binary
-		donut.DonoutPE2Shellcode(outfile, arch_choice)
+	// Success (UI layer)
+	logging.Infof("Generated agent UUID: %s", result.AgentUUID)
+	logging.Debugf("Config payload: %d bytes", result.ConfigSize)
+	logging.Successf("Generated %s from %s and %s", result.OutputFile, result.StubFile, live.EmpConfigFile)
+
+	// Generate shellcode for Windows (UI layer)
+	if payloadType == PayloadTypeWindowsExecutable || payloadType == PayloadTypeWindowsDLL {
+		donut.DonoutPE2Shellcode(result.OutputFile, archChoice)
 	}
-	if payload_type == PayloadTypeLinuxExecutable {
-		// tell user to use shared library stager
+
+	// Informational messages (UI layer)
+	if payloadType == PayloadTypeLinuxExecutable {
 		logging.Printf("Use stager module to create a shared library stager that delivers the agent with encryption and compression. You will need another stager to load the shared library (or use LD_PRELOAD)")
 	}
-	if payload_type == PayloadTypeLinuxSO {
-		// inform user about CGO support
+	if payloadType == PayloadTypeLinuxSO {
 		logging.Printf("Note: linux_so supports CGO and can be loaded as a shared library using LD_PRELOAD or dlopen()")
 	}
-	if payload_type == PayloadTypeWindowsDLL {
-		// inform user about CGO support
+	if payloadType == PayloadTypeWindowsDLL {
 		logging.Printf("Note: windows_dll supports CGO and can be loaded as a DLL using LoadLibrary() or similar methods")
 	}
 }
@@ -165,70 +128,6 @@ func isArchValid(payload_type, arch_choice string) bool {
 		list = Arch_List_All
 	}
 	return slices.Contains(list, arch_choice)
-}
-
-func generateFilePaths(payload_type, arch_choice string, now time.Time) (stubFile, outfile string) {
-	logging.Infof("Generating '%s'", PayloadTypeLinuxExecutable)
-	switch payload_type {
-	case PayloadTypeLinuxExecutable:
-		stubFile = fmt.Sprintf("stub-%s", arch_choice)
-		outfile = fmt.Sprintf("%s/agent_linux_%s_%d-%d-%d_%d-%d-%d",
-			live.EmpWorkSpace, arch_choice,
-			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
-	case PayloadTypeWindowsExecutable:
-		stubFile = fmt.Sprintf("stub-win-%s", arch_choice)
-		outfile = fmt.Sprintf("%s/agent_windows_%s_%d-%d-%d_%d-%d-%d.exe",
-			live.EmpWorkSpace, arch_choice,
-			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
-	case PayloadTypeWindowsDLL:
-		stubFile = fmt.Sprintf("stub-win-%s.dll", arch_choice)
-		outfile = fmt.Sprintf("%s/agent_windows_%s_%d-%d-%d_%d-%d-%d.dll",
-			live.EmpWorkSpace, arch_choice,
-			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
-	case PayloadTypeLinuxSO:
-		stubFile = fmt.Sprintf("stub-%s.so", arch_choice)
-		outfile = fmt.Sprintf("%s/agent_linux_so_%s_%d-%d-%d_%d-%d-%d.so",
-			live.EmpWorkSpace, arch_choice,
-			now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
-	default:
-		logging.Errorf("Unsupported: '%s'", payload_type)
-	}
-	// set full path
-	stubFile = fmt.Sprintf("%s/%s", live.EmpWorkSpace, stubFile)
-	return
-}
-
-func readAndEncryptConfig() ([]byte, error) {
-	// convert JSON to CBOR
-	configStruct := *live.RuntimeConfig
-
-	// generate a random UUID for the agent
-	configStruct.AgentUUID = uuid.NewString()
-	logging.Infof("Generated agent UUID: %s", configStruct.AgentUUID)
-
-	// Ensure CA crt/key are available for signing
-	if err := transport.LoadCACrt(); err != nil {
-		return nil, fmt.Errorf("load CA crt: %v", err)
-	}
-
-	sig, err := transport.SignWithCAKey([]byte(configStruct.AgentUUID))
-	if err != nil {
-		return nil, fmt.Errorf("sign agent UUID: %v", err)
-	}
-	configStruct.AgentUUIDSig = base64.URLEncoding.EncodeToString(sig)
-
-	cborBytes, err := cbor.Marshal(configStruct)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal config to CBOR: %v", err)
-	}
-
-	// encrypt
-	encryptedBytes, err := crypto.AES_GCM_Encrypt([]byte(def.MagicString), cborBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encrypt config: %v", err)
-	}
-
-	return encryptedBytes, nil
 }
 
 func MakeConfig(cmd *cobra.Command) (err error) {
