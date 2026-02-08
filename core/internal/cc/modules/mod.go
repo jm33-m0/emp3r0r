@@ -160,7 +160,7 @@ func SetActiveModule(modName string) {
 				if mod.AgentConfig.IsInteractive {
 					logging.Warningf("OPSEC: Interactive modules like this one involve forking a shell/process on the agent")
 				}
-				if !mod.Fileless {
+				if !mod.Fileless && !mod.IsLocal {
 					logging.Warningf("OPSEC: This module is NOT fileless, it WILL touch the agent's disk")
 				}
 			}
