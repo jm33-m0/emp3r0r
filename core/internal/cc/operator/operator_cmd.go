@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/google/uuid"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/jobs"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -60,20 +60,25 @@ func sendCBORRequest(url string, data any) ([]byte, error) {
 
 // operatorSendCommand2Agent sends a command to an agent through the mTLS C2 operator server
 // Runs asynchronously to avoid blocking the console
-func operatorSendCommand2Agent(cmd, cmdID, agentTag string) error {
-	if cmdID == "" {
-		cmdID = uuid.NewString()
+func operatorSendCommand2Agent(cmd, jobID, agentTag string) error {
+	if jobID == "" {
+		// create a job to track this command
+		job := jobs.CreateJob(cmd, "command", agentTag)
+		if job == nil {
+			return fmt.Errorf("failed to create job for command: %s", cmd)
+		}
+		jobID = job.ID
 	}
 	operation := def.Operation{
-		AgentTag:  agentTag,
-		Action:    "command",
-		Command:   &cmd,
-		CommandID: &cmdID,
+		AgentTag: agentTag,
+		Action:   "command",
+		Command:  &cmd,
+		JobID:    &jobID,
 	}
 
 	// Record command time immediately
 	live.CmdTimeMutex.Lock()
-	live.CmdTime[cmdID] = time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST")
+	live.CmdTime[jobID] = time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST")
 	live.CmdTimeMutex.Unlock()
 
 	// Send command asynchronously to avoid blocking

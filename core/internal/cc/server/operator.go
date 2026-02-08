@@ -70,14 +70,14 @@ func handleSendCommand(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Get command and command ID
-	if !operation.IsOptionSet("command") || !operation.IsOptionSet("command_id") {
-		http.Error(wrt, "Command or CommandID is empty", http.StatusBadRequest)
+	// Get command and job ID
+	if !operation.IsOptionSet("command") || !operation.IsOptionSet("job_id") {
+		http.Error(wrt, "Command or JobID is empty", http.StatusBadRequest)
 		return
 	}
 
 	// Send command to agent
-	err = agents.SendCmd(*operation.Command, *operation.CommandID, agent)
+	err = agents.SendCmd(*operation.Command, *operation.JobID, agent)
 	if err != nil {
 		http.Error(wrt, err.Error(), http.StatusInternalServerError)
 		return

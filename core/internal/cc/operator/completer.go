@@ -132,8 +132,8 @@ func listRemoteDir(ctx carapace.Context) carapace.Action {
 func listRemoteDirWorker(path_to_list, agent_tag string) (cwd string, names []string) {
 	names = make([]string, 0) // listing to return
 	cmd := fmt.Sprintf("%s --path %s", def.C2CmdListDir, path_to_list)
-	cmd_id := uuid.NewString()
-	err := operatorSendCommand2Agent(cmd, cmd_id, agent_tag)
+	job_id := uuid.NewString()
+	err := operatorSendCommand2Agent(cmd, job_id, agent_tag)
 	if err != nil {
 		logging.Debugf("Cannot list remote directory: %v", err)
 		return
@@ -142,9 +142,9 @@ func listRemoteDirWorker(path_to_list, agent_tag string) (cwd string, names []st
 	listingCtx, listingCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer listingCancel()
 	for listingCtx.Err() == nil {
-		if res, exists := live.CmdResults.Load(cmd_id); exists {
+		if res, exists := live.CmdResults.Load(job_id); exists {
 			remote_entries = strings.Split(res.(string), "\n")
-			live.CmdResults.Delete(cmd_id)
+			live.CmdResults.Delete(job_id)
 			listingCancel()
 			break
 		}

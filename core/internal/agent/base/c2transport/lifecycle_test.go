@@ -209,7 +209,7 @@ func TestFullAgentLifecycle(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	agents.SendMessageToAgent(&def.MsgTunData{
 		Tag:      agentTag,
-		CmdID:    "test-cmd-id",
+		JobID:    "test-cmd-id",
 		CmdSlice: []string{"ls"},
 	}, agent)
 	t.Log("Command 'ls' sent to agent")

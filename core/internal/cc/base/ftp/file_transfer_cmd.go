@@ -75,9 +75,9 @@ func downloadFromAgent(cmd *cobra.Command, args []string) {
 	}
 
 	if isRecursive {
-		cmd_id := uuid.NewString()
+		job_id := uuid.NewString()
 		cmd_str := fmt.Sprintf("get --file_path %s --filter %s --offset 0 --token %s", file_path, strconv.Quote(filter), uuid.NewString())
-		err = ExecCmd(cmd_str, cmd_id, target.Tag)
+		err = ExecCmd(cmd_str, job_id, target.Tag)
 		if err != nil {
 			logging.Errorf("Cannot get %+v: %v", args, err)
 			return
@@ -85,11 +85,11 @@ func downloadFromAgent(cmd *cobra.Command, args []string) {
 		logging.Infof("Waiting for response from agent %s", target.Tag)
 		var result string
 		for i := 0; i < 10; i++ {
-			res, ok := live.CmdResults.Load(cmd_id)
+			res, ok := live.CmdResults.Load(job_id)
 			if ok {
 				result = res.(string)
 				logging.Infof("Got file list from %s", target.Tag)
-				live.CmdResults.Delete(cmd_id)
+				live.CmdResults.Delete(job_id)
 				if result == "" {
 					logging.Errorf("Cannot get %s: empty file list in directory", file_path)
 				}

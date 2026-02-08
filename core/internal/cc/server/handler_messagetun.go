@@ -12,6 +12,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/jobs"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -142,7 +143,7 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 				// respond with random data, wrapped in MsgTunData
 				replyData := util.RandBytes(util.RandInt(10, 100))
 				replyMsg := def.MsgTunData{
-					CmdID:    msg.CmdID,
+					JobID:    msg.JobID,
 					Tag:      "handshake",
 					Response: replyData,
 				}
@@ -157,8 +158,10 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 
 			// if not a handshake, forward message to operators
 			// also cache it for automated tests or local usage
-			if msg.CmdID != "" {
-				live.CmdResults.Store(msg.CmdID, string(msg.Response))
+			if msg.JobID != "" {
+				live.CmdResults.Store(msg.JobID, string(msg.Response))
+				// persistence
+				jobs.HandleOutput(msg.JobID, msg.Response)
 			}
 			err = fwdMsg2Operators(msg)
 			if err != nil {
@@ -181,7 +184,7 @@ func operatorBroadcastPrintf(msg_type, format string, a ...any) (err error) {
 	msgTunData := def.MsgTunData{
 		Tag:      msg_type,                          // tell operator about the message type: INFO, WARN, ERROR, SUCCESS
 		Response: []byte(fmt.Sprintf(format, a...)), // message content
-		CmdID:    "",
+		JobID:    "",
 		CmdSlice: []string{},
 	}
 	return fwdMsg2Operators(msgTunData)

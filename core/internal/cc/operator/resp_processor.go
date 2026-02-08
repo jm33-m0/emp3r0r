@@ -201,9 +201,9 @@ func processAgentData(data *def.MsgTunData) {
 	is_builtin_cmd := strings.HasPrefix(cmd, "!")
 	cmd_slice := data.CmdSlice
 	out := data.Response
-	cmd_id := data.CmdID
+	job_id := data.JobID
 	// cache this cmd response
-	live.CmdResults.Store(cmd_id, string(out))
+	live.CmdResults.Store(job_id, string(out))
 
 	// Handle specific commands that need special processing
 	lookup_cmd := strings.TrimPrefix(cmd_slice[0], "!")
@@ -228,7 +228,7 @@ func processAgentData(data *def.MsgTunData) {
 		color.HiMagentaString("%s", cmd),
 		color.HiWhiteString(stripped))
 	// time spent on this cmd
-	cmdtime, ok := live.CmdTime[cmd_id]
+	cmdtime, ok := live.CmdTime[job_id]
 	if !ok {
 		logging.Warningf("No start time found for command %s", cmd)
 		logging.Printf(agent_output)
@@ -236,7 +236,7 @@ func processAgentData(data *def.MsgTunData) {
 	}
 	start_time, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", cmdtime)
 	if err != nil {
-		logging.Warningf("Parsing timestamp '%s': %v", live.CmdTime[cmd_id], err)
+		logging.Warningf("Parsing timestamp '%s': %v", live.CmdTime[job_id], err)
 		logging.Printf(agent_output)
 	} else {
 		time_spent := time.Since(start_time)

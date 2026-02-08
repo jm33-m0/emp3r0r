@@ -110,43 +110,46 @@ func SSHClient(shell, args, port string, split bool) (err error) {
 
 	if !port_mapping_exists {
 		// start sshd server on target
-		cmd_id := uuid.NewString()
+		job_id := uuid.NewString()
 		if args == "" {
 			args = "--"
 		}
 		cmd := fmt.Sprintf("%s --shell %s --port %s --args %s", def.C2CmdSSHD, shell, port, args)
-		err = CmdSender(cmd, cmd_id, target.Tag)
+		err = CmdSender(cmd, job_id, target.Tag)
 		if err != nil {
 			return
 		}
 		logging.Infof("Waiting for sshd (%s) on target %s", shell, strconv.Quote(target.Tag))
 
-		// wait until sshd is up
-		defer func() {
-			live.CmdResults.Delete(cmd_id)
-		}()
 		is_response := false
 		res := ""
-		for i := 0; i < 100; i++ {
+		// wait for response
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
+		for range 100 {
 			time.Sleep(100 * time.Millisecond)
-			if val, ok := live.CmdResults.Load(cmd_id); ok {
+			if ctx.Err() != nil {
+				err = fmt.Errorf("didn't get response from agent (%s), aborting", target.Tag)
+				return
+			}
+
+			if val, ok := live.CmdResults.Load(job_id); ok {
+				logging.Successf("SSHClient: %s", val.(string))
 				res = val.(string)
 				is_response = true
-			} else {
-				is_response = false
-			}
-			if is_response {
-				if strings.Contains(res, "success") ||
-					strings.Contains(res,
-						fmt.Sprintf("listen tcp 127.0.0.1:%s: bind: address already in use", port)) {
-					break
-				} else {
-					err = fmt.Errorf("start sshd (%s) failed: %s", shell, res)
-					return
-				}
+				live.CmdResults.Delete(job_id)
+				break
 			}
 		}
-		if !is_response {
+		if is_response {
+			if strings.Contains(res, "success") ||
+				strings.Contains(res, fmt.Sprintf("listen tcp 127.0.0.1:%s: bind: address already in use", port)) {
+				// success
+			} else {
+				err = fmt.Errorf("start sshd (%s) failed: %s", shell, res)
+				return
+			}
+		} else {
 			err = fmt.Errorf("didn't get response from agent (%s), aborting", target.Tag)
 			return
 		}

@@ -118,7 +118,7 @@ func TestOperatorConnection(t *testing.T) {
 	// Mock SendCmd
 	originalSendCmd := agents.SendCmd
 	defer func() { agents.SendCmd = originalSendCmd }()
-	agents.SendCmd = func(cmd, cmd_id string, a *def.Emp3r0rAgent) error {
+	agents.SendCmd = func(cmd, job_id string, a *def.Emp3r0rAgent) error {
 		t.Logf("Mock SendCmd called: %s", cmd)
 		return nil
 	}
@@ -126,10 +126,10 @@ func TestOperatorConnection(t *testing.T) {
 	cmd := "ls -la"
 	cmdID := "test-cmd-id"
 	op := def.Operation{
-		AgentTag:  agentTag,
-		Action:    "command",
-		Command:   &cmd,
-		CommandID: &cmdID,
+		AgentTag: agentTag,
+		Action:   "command",
+		Command:  &cmd,
+		JobID:    &cmdID,
 	}
 
 	opData, err := cbor.Marshal(op)

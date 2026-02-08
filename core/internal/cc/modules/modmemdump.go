@@ -24,28 +24,28 @@ func moduleMemDump(ctx *c2context.C2Context) {
 		return
 	}
 	cmd := fmt.Sprintf("%s --pid %s", def.C2CmdMemDump, pidOpt)
-	cmd_id := uuid.NewString()
-	err := CmdSender(cmd, cmd_id, ctx.Target.Tag)
+	job_id := uuid.NewString()
+	err := CmdSender(cmd, job_id, ctx.Target.Tag)
 	if err != nil {
-		logging.Errorf("SendCmd: %v", err)
+		logging.Errorf("ModuleMemDump: %v", err)
 		return
 	}
-	logging.Printf("Please wait for agent's response...")
 
-	var cmd_res string
+	// wait for results
+	var path string
 	for i := 0; i < 100; i++ {
-		// check if the command has finished
-		res, ok := live.CmdResults.Load(cmd_id) // check if the command has finished
+		time.Sleep(1 * time.Second)
+		res, ok := live.CmdResults.Load(job_id) // check if the command has finished
 		if ok {
-			cmd_res = res.(string)
-			live.CmdResults.Delete(cmd_id)
+			path = res.(string)
+			logging.Successf("ModuleMemDump: %s", path)
+			live.CmdResults.Delete(job_id)
 			break
 		}
-		time.Sleep(100 * time.Millisecond)
 	}
-	path := cmd_res
+
 	if path == "" || strings.HasPrefix(path, "Error") {
-		logging.Errorf("Failed to get memdump file path: invalid response")
+		logging.Errorf("Failed to get memdump file path: %s", path)
 		return
 	}
 

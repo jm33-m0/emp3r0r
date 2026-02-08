@@ -27,29 +27,32 @@ var ExecCmd ExecCmdFunc
 
 // StatFile Get stat info of a file on agent
 func StatFile(filepath string, a *def.Emp3r0rAgent) (fi *util.FileStat, err error) {
-	cmd_id := uuid.NewString()
+	job_id := uuid.NewString()
 	cmd := fmt.Sprintf("%s --path '%s'", def.C2CmdStat, filepath)
-	err = ExecCmd(cmd, cmd_id, a.Tag)
+	// send command
+	err = ExecCmd(cmd, job_id, a.Tag)
 	if err != nil {
 		return
 	}
 	var fileinfo util.FileStat
 
-	defer func() {
-		live.CmdResults.Delete(cmd_id)
-	}()
-
-	for {
-		time.Sleep(100 * time.Millisecond)
-		res, exists := live.CmdResults.Load(cmd_id)
-		if exists {
+	// wait for response
+	for range 10 {
+		time.Sleep(1 * time.Second)
+		// check if cmd results ready
+		if res, exists := live.CmdResults.Load(job_id); exists {
 			err = cbor.Unmarshal([]byte(res.(string)), &fileinfo)
 			if err != nil {
 				return
 			}
 			fi = &fileinfo
+			live.CmdResults.Delete(job_id)
 			break
 		}
+	}
+
+	if fi == nil && err == nil {
+		err = fmt.Errorf("StatFile: timed out waiting for response")
 	}
 
 	return

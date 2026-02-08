@@ -12,7 +12,7 @@ func TestMsgTunDecoding(t *testing.T) {
 	// 1. Prepare a sample message
 	originalMsg := &def.MsgTunData{
 		Tag:      "test-agent",
-		CmdID:    "cmd-123",
+		JobID:    "cmd-123",
 		CmdSlice: []string{"ls", "-la"},
 		Response: []byte("file1\nfile2"),
 	}
@@ -37,8 +37,8 @@ func TestMsgTunDecoding(t *testing.T) {
 	if decodedMsg.Tag != originalMsg.Tag {
 		t.Errorf("Tag mismatch: got %s, want %s", decodedMsg.Tag, originalMsg.Tag)
 	}
-	if decodedMsg.CmdID != originalMsg.CmdID {
-		t.Errorf("CmdID mismatch: got %s, want %s", decodedMsg.CmdID, originalMsg.CmdID)
+	if decodedMsg.JobID != originalMsg.JobID {
+		t.Errorf("JobID mismatch: got %s, want %s", decodedMsg.JobID, originalMsg.JobID)
 	}
 	if len(decodedMsg.CmdSlice) != len(originalMsg.CmdSlice) {
 		t.Errorf("CmdSlice length mismatch")

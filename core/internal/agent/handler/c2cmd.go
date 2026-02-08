@@ -28,7 +28,7 @@ func C2Commands() *cobra.Command {
 		&cobra.Group{ID: "linux", Title: "Linux Commands"},
 		&cobra.Group{ID: "windows", Title: "Windows Commands"},
 	)
-	rootCmd.PersistentFlags().StringP("cmd_id", "", "", "Command ID")
+	rootCmd.PersistentFlags().StringP("job_id", "", "", "Job ID")
 
 	// Generic commands group
 	// !ls_dir is an API for path auto-completion in the operator's shell

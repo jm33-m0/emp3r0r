@@ -25,7 +25,7 @@ func CoreCommands() *cobra.Command {
 		&cobra.Group{ID: "network", Title: "Network Commands"},
 		&cobra.Group{ID: "process", Title: "Process Commands"},
 	)
-	rootCmd.PersistentFlags().StringP("cmd_id", "", "", "Command ID")
+	rootCmd.PersistentFlags().StringP("job_id", "", "", "Job ID")
 
 	// Filesystem commands
 	lsCmd := &cobra.Command{

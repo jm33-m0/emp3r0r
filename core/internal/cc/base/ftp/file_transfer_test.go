@@ -15,7 +15,7 @@ import (
 
 func TestStatFile(t *testing.T) {
 	// Mock ExecCmd
-	ExecCmd = func(cmd, cmd_id, tag string) error {
+	ExecCmd = func(cmd, job_id, tag string) error {
 		// Simulate agent response
 		go func() {
 			time.Sleep(100 * time.Millisecond)
@@ -30,7 +30,7 @@ func TestStatFile(t *testing.T) {
 				t.Errorf("Failed to marshal fstat: %v", err)
 				return
 			}
-			live.CmdResults.Store(cmd_id, string(data))
+			live.CmdResults.Store(job_id, string(data))
 		}()
 		return nil
 	}

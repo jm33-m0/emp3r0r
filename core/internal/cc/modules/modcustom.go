@@ -154,9 +154,9 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 	if download_addr != "" {
 		cmd += fmt.Sprintf(" --download_addr %s", strconv.Quote(download_addr))
 	}
-	cmd_id := uuid.NewString()
+	job_id := uuid.NewString()
 	logging.Debugf("Sending command %s to %s", cmd, ctx.Target.Tag)
-	err = CmdSender(cmd, cmd_id, ctx.Target.Tag)
+	err = CmdSender(cmd, job_id, ctx.Target.Tag)
 	if err != nil {
 		logging.Errorf("Sending command %s to %s: %v", cmd, ctx.Target.Tag, err)
 	}
@@ -186,18 +186,18 @@ func handleCompressedModule(ctx *c2context.C2Context, config def.ModuleConfig, p
 	if download_addr != "" {
 		cmd += fmt.Sprintf(" --download_addr %s", strconv.Quote(download_addr))
 	}
-	cmd_id := uuid.NewString()
-	err := CmdSender(cmd, cmd_id, ctx.Target.Tag)
+	job_id := uuid.NewString()
+	err := CmdSender(cmd, job_id, ctx.Target.Tag)
 	if err != nil {
 		logging.Errorf("Sending command %s to %s: %v", cmd, ctx.Target.Tag, err)
 	}
 
 	if config.AgentConfig.IsInteractive {
-		handleInteractiveModule(config, cmd_id)
+		handleInteractiveModule(config, job_id)
 	}
 }
 
-func handleInteractiveModule(config def.ModuleConfig, cmd_id string) {
+func handleInteractiveModule(config def.ModuleConfig, job_id string) {
 	opt, exists := config.Options["args"]
 	if !exists {
 		config.Options["args"] = &def.ModOption{
@@ -212,7 +212,7 @@ func handleInteractiveModule(config def.ModuleConfig, cmd_id string) {
 	look_for := crypto.SHA256SumRaw([]byte(def.MagicString))
 
 	for i := 0; i < 10; i++ {
-		if res, ok := live.CmdResults.Load(cmd_id); ok {
+		if res, ok := live.CmdResults.Load(job_id); ok {
 			if strings.Contains(res.(string), look_for) {
 				break
 			}
@@ -220,7 +220,7 @@ func handleInteractiveModule(config def.ModuleConfig, cmd_id string) {
 		util.TakeABlink()
 	}
 	defer func() {
-		live.CmdResults.Delete(cmd_id)
+		live.CmdResults.Delete(job_id)
 	}()
 
 	sshErr := SSHClient(fmt.Sprintf("%s/%s",
