@@ -76,14 +76,28 @@ func InitConfig() (err error) {
 	transport.CACrtPEM = []byte(RuntimeConfig.CAPEM)
 
 	// Socks5 proxy server
+	def.ProxyServer, err = NewSocks5ProxyServer()
+	return
+}
+
+// NewSocks5ProxyServer creates a new SOCKS5 server with current config
+func NewSocks5ProxyServer() (*socks5.Server, error) {
 	addr := fmt.Sprintf("0.0.0.0:%s", RuntimeConfig.AgentSocksServerPort)
-	def.ProxyServer, err = socks5.NewClassicServer(
+	s, err := socks5.NewClassicServer(
 		addr, "", // listen on emp3r0r_proxy_port
 		RuntimeConfig.ShadowsocksLocalSocksPort, // used as socks5 username
 		RuntimeConfig.Password,                  // socks5 password
 		RuntimeConfig.AgentSocksTimeout,
 		RuntimeConfig.AgentSocksTimeout)
-	return
+	if err == nil && s != nil {
+		if s.Handle == nil {
+			logging.Infof("NewSocks5ProxyServer: s.Handle is nil! Initializing with DefaultHandle")
+			s.Handle = &socks5.DefaultHandle{}
+		} else {
+			logging.Infof("NewSocks5ProxyServer: s.Handle is initialized")
+		}
+	}
+	return s, err
 }
 
 // GetRandomWritablePath get a random writable path for privileged or normal user

@@ -49,8 +49,12 @@ func StartSocks5Proxy(addr, doh string, proxyserver *socks5.Server, onListen fun
 				}
 			}()
 
-			if proxyserver == nil || proxyserver.Handle == nil {
-				logging.Errorf("StartSocks5Proxy: proxyserver or proxyserver.Handle is nil")
+			if proxyserver == nil {
+				logging.Errorf("StartSocks5Proxy: proxyserver is nil")
+				return
+			}
+			if proxyserver.Handle == nil {
+				logging.Errorf("StartSocks5Proxy: proxyserver.Handle is nil")
 				return
 			}
 

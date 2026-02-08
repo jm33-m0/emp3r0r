@@ -53,8 +53,12 @@ func Socks5Proxy(op string, addr string) (err error) {
 				close(def.ProxyDone)
 			}()
 			if def.ProxyServer == nil {
-				logging.Errorf("Socks5Proxy: ProxyServer is nil")
-				return
+				var err error
+				def.ProxyServer, err = common.NewSocks5ProxyServer()
+				if err != nil {
+					logging.Errorf("Socks5Proxy: ProxyServer is nil and failed to re-initialize: %v", err)
+					return
+				}
 			}
 			err = transport.StartSocks5Proxy(addr, common.RuntimeConfig.DoHServer, def.ProxyServer, func(l net.Listener) {
 				def.ProxyLock.Lock()
@@ -81,7 +85,7 @@ func Socks5Proxy(op string, addr string) (err error) {
 		if err != nil {
 			logging.Print(err)
 		}
-		def.ProxyServer = nil
+
 	default:
 		return errors.New("operation not supported")
 	}

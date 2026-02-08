@@ -70,6 +70,9 @@ func SSHReverseProxyClient(ssh_serverAddr string, // SSH server address:port
 	ctx context.Context, cancel context.CancelFunc,
 ) (err error) {
 	logging.Infof("Starting SSH reverse proxy client on %s, proxy port %d", ssh_serverAddr, proxyPort)
+	if socks5proxy == nil {
+		return fmt.Errorf("SSHReverseProxyClient: socks5proxy is nil")
+	}
 
 	// start SOCKS5 proxy
 	go func() {

