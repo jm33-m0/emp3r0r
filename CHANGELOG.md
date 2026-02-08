@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.19.4](https://github.com/jm33-m0/emp3r0r/compare/v3.19.3...v3.19.4) (2026-02-08)
+
+
+### Bug Fixes
+
+* data race in proxy server ([7dcdc4a](https://github.com/jm33-m0/emp3r0r/commit/7dcdc4acb4a8fbf77dcc74cbdd189901a91c543f))
+* implement panic recovery with stack trace logging across agent modules. ([d1b079f](https://github.com/jm33-m0/emp3r0r/commit/d1b079f061e849a326198f9b9e6b116a750e3d84))
+* Improve SOCKS5 proxy lifecycle management with nil checks, re-initialization logic, and a dedicated test. ([a363d98](https://github.com/jm33-m0/emp3r0r/commit/a363d984e64c72d35be5e0eb7f736e62bc6f2dd6))
+* prevent concurrent operator connections as it's not supported ([503eb62](https://github.com/jm33-m0/emp3r0r/commit/503eb626af6a7136f929b2cee752ca889cd09ce6))
+
 ## [3.19.3](https://github.com/jm33-m0/emp3r0r/compare/v3.19.2...v3.19.3) (2026-02-06)
 
 
