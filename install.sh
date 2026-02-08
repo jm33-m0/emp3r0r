@@ -105,8 +105,9 @@ tar -xzf emp3r0r-src.tar.gz -C emp3r0r-source --strip-components=1 || error "Fai
 cd emp3r0r-source/core || error "Failed to enter core directory"
 
 # 5. Build and Install
-warn "Building and installing emp3r0r (this may take a while)..."
+warn "Building and installing emp3r0r $tag (this may take a while)..."
 # build.sh will handle zig and other internal dependencies
+export TAG="$tag"
 ./build.sh --install || error "Build and installation failed"
 
 info "emp3r0r installed successfully!"

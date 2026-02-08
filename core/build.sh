@@ -401,11 +401,12 @@ is_in_github_runner() {
 
 get_git_version() {
   local version
-  version=$(git describe --tags --always 2>/dev/null)
-  [[ -z "$version" ]] && version="unknown"
-  if is_in_github_runner; then
-    version="$TAG" # from github actions, see release-please.yml
+  if [[ -n "$TAG" ]]; then
+    version="$TAG"
+  else
+    version=$(git describe --tags --always 2>/dev/null)
   fi
+  [[ -z "$version" ]] && version="unknown"
   echo "$version"
 }
 
