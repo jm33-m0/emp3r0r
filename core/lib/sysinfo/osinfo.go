@@ -2,10 +2,10 @@ package sysinfo
 
 // OSInfo information.
 type OSInfo struct {
-	Name         string `json:"name,omitempty"`
-	Vendor       string `json:"vendor,omitempty"`
-	Version      string `json:"version,omitempty"`
-	Release      string `json:"release,omitempty"`
-	Architecture string `json:"architecture,omitempty"`
-	Kernel       string `json:"kernel,omitempty"`
+	Name         string `cbor:"1,keyasint"`
+	Vendor       string `cbor:"2,keyasint"`
+	Version      string `cbor:"3,keyasint"`
+	Release      string `cbor:"4,keyasint"`
+	Architecture string `cbor:"5,keyasint"`
+	Kernel       string `cbor:"6,keyasint"`
 }

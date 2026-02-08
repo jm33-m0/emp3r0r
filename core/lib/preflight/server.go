@@ -1,9 +1,10 @@
 package preflight
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/fxamacker/cbor/v2"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -22,8 +23,8 @@ func ProcessRequest(data []byte, allowConn bool) ([]byte, error) {
 
 	// 2. Unmarshal
 	var req PreflightRequest
-	if err := json.Unmarshal(decrypted, &req); err != nil {
-		return nil, fmt.Errorf("unmarshal: %v", err)
+	if err := cbor.Unmarshal(decrypted, &req); err != nil {
+		return nil, fmt.Errorf("cbor unmarshal: %v", err)
 	}
 
 	// 3. Verify Timestamp (within 60 seconds?)
@@ -51,7 +52,7 @@ func ProcessRequest(data []byte, allowConn bool) ([]byte, error) {
 		Status:      status,
 		Instruction: instruction,
 	}
-	respBytes, err := json.Marshal(resp)
+	respBytes, err := cbor.Marshal(resp)
 	if err != nil {
 		return nil, err
 	}

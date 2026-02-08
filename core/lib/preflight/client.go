@@ -2,10 +2,11 @@ package preflight
 
 import (
 	"bytes"
-	"encoding/json"
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/fxamacker/cbor/v2"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -38,9 +39,9 @@ func Check(config *def.Config) bool {
 		reqData.AgentUUIDSig = sig
 	}
 
-	rawBytes, err := json.Marshal(reqData)
+	rawBytes, err := cbor.Marshal(reqData)
 	if err != nil {
-		logging.Errorf("Preflight: json marshal: %v", err)
+		logging.Errorf("Preflight: cbor marshal: %v", err)
 		return false
 	}
 
@@ -96,7 +97,7 @@ func Check(config *def.Config) bool {
 	}
 
 	var pfResp PreflightResponse
-	if err := json.Unmarshal(decryptedResp, &pfResp); err != nil {
+	if err := cbor.Unmarshal(decryptedResp, &pfResp); err != nil {
 		logging.Errorf("Preflight: unmarshal response: %v", err)
 		return false
 	}

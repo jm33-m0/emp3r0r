@@ -2,13 +2,13 @@ package preflight
 
 // PreflightRequest payload sent by agent
 type PreflightRequest struct {
-	AgentUUID    string `json:"uuid"`      // Agent UUID
-	AgentUUIDSig []byte `json:"sig"`       // Signature of UUID using AgentKey
-	Timestamp    int64  `json:"timestamp"` // Unix timestamp for replay protection
+	AgentUUID    string `cbor:"1,keyasint"` // Agent UUID
+	AgentUUIDSig []byte `cbor:"2,keyasint"` // Signature of UUID using AgentKey
+	Timestamp    int64  `cbor:"3,keyasint"` // Unix timestamp for replay protection
 }
 
 // PreflightResponse payload returned by server
 type PreflightResponse struct {
-	Status      string `json:"status"`      // "OK" or "AC" (Allow Connect)
-	Instruction string `json:"instruction"` // Optional instruction
+	Status      string `cbor:"1,keyasint"` // "OK" or "AC" (Allow Connect)
+	Instruction string `cbor:"2,keyasint"` // Optional instruction
 }
