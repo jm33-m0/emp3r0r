@@ -52,14 +52,17 @@ func Socks5Proxy(op string, addr string) (err error) {
 				}
 				close(def.ProxyDone)
 			}()
+			def.ProxyLock.Lock()
 			if def.ProxyServer == nil {
 				var err error
 				def.ProxyServer, err = common.NewSocks5ProxyServer()
 				if err != nil {
 					logging.Errorf("Socks5Proxy: ProxyServer is nil and failed to re-initialize: %v", err)
+					def.ProxyLock.Unlock()
 					return
 				}
 			}
+			def.ProxyLock.Unlock()
 			err = transport.StartSocks5Proxy(addr, common.RuntimeConfig.DoHServer, def.ProxyServer, func(l net.Listener) {
 				def.ProxyLock.Lock()
 				def.ProxyListener = l

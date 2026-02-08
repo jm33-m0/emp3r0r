@@ -34,9 +34,11 @@ func TestSocks5ProxyLifecycle(t *testing.T) {
 	// Allow some time for the goroutine to start
 	time.Sleep(200 * time.Millisecond)
 
+	def.ProxyLock.Lock()
 	if def.ProxyServer == nil {
 		t.Fatal("def.ProxyServer is nil after start")
 	}
+	def.ProxyLock.Unlock()
 
 	conn, err := net.DialTimeout("tcp", addr, 1*time.Second)
 	if err != nil {
@@ -53,9 +55,11 @@ func TestSocks5ProxyLifecycle(t *testing.T) {
 	}
 
 	// Verify it's stopped but Server is NOT nil (Prevent Root Cause)
+	def.ProxyLock.Lock()
 	if def.ProxyServer == nil {
 		t.Fatal("def.ProxyServer should NOT be nil after stop (Root Cause Fix)")
 	}
+	def.ProxyLock.Unlock()
 
 	// Verify listening port is closed
 	conn, err = net.DialTimeout("tcp", addr, 100*time.Millisecond)
@@ -75,9 +79,11 @@ func TestSocks5ProxyLifecycle(t *testing.T) {
 	// Verify it's running again
 	time.Sleep(200 * time.Millisecond)
 
+	def.ProxyLock.Lock()
 	if def.ProxyServer == nil {
 		t.Fatal("def.ProxyServer is nil after restart")
 	}
+	def.ProxyLock.Unlock()
 
 	conn, err = net.DialTimeout("tcp", addr, 1*time.Second)
 	if err != nil {
