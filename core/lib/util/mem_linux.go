@@ -111,3 +111,7 @@ func DumpProcMem(pid int) (memdata map[int64][]byte, err error) {
 func DumpCurrentProcMem() (memdata map[int64][]byte, err error) {
 	return DumpProcMem(os.Getpid())
 }
+
+func MiniDumpProcess(_ int, _ string) error {
+	return fmt.Errorf("MiniDumpProcess: not implemented on Linux")
+}
