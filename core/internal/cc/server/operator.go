@@ -142,6 +142,13 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 	defer func() {
 		logging.Debugf("handleOperatorConn exiting")
 		delete(OPERATORS, operator_session)
+
+		// If this was the last operator, disconnect all agents
+		if len(OPERATORS) == 0 {
+			logging.Infof("Last operator disconnected, closing all agent connections")
+			agents.DisconnectAllAgents()
+		}
+
 		_ = conn.Close()
 		cancel()
 	}()
