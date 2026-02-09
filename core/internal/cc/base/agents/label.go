@@ -2,6 +2,7 @@ package agents
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"strconv"
 
@@ -9,7 +10,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/spf13/cobra"
 )
 
 // LabeledAgent stores agent custom label info to a file.
@@ -94,34 +94,22 @@ func RefreshAgentLabel(a *def.Emp3r0rAgent) (label string) {
 	return
 }
 
-func CmdSetAgentLabel(cmd *cobra.Command, args []string) {
-	label, err := cmd.Flags().GetString("label")
-	if err != nil {
-		logging.Errorf("set target label: %v", err)
-		return
-	}
-	agent_id, err := cmd.Flags().GetString("id")
-	if err != nil {
-		logging.Errorf("set target label: %v", err)
-		return
-	}
-
-	if agent_id == "" || label == "" {
-		logging.Errorf(cmd.UsageString())
-		return
+// SetAgentLabel sets a custom label for an agent by ID or tag.
+// Returns error if agent not found or parameters invalid.
+func SetAgentLabel(agentID string, label string) error {
+	if agentID == "" || label == "" {
+		return fmt.Errorf("agent ID and label are required")
 	}
 
 	target := new(def.Emp3r0rAgent)
 
 	// select by tag or index
-	index, e := strconv.Atoi(agent_id)
+	index, e := strconv.Atoi(agentID)
 	if e != nil {
 		// try by tag
-		target = GetAgentByTag(agent_id)
+		target = GetAgentByTag(agentID)
 		if target == nil {
-			// cannot parse
-			logging.Errorf("Cannot set target label by index: %v", e)
-			return
+			return fmt.Errorf("cannot find agent by tag: %s", agentID)
 		}
 	} else {
 		// try by index
@@ -130,10 +118,11 @@ func CmdSetAgentLabel(cmd *cobra.Command, args []string) {
 
 	// target exists?
 	if target == nil {
-		logging.Errorf("Failed to label agent: target does not exist")
-		return
+		return fmt.Errorf("agent does not exist: %s", agentID)
 	}
+
 	live.AgentControlMap[target].Label = label // set label
 	PersistLabeledAgentsToFile()
 	logging.Successf("%s has been labeled as %s", target.Tag, label)
+	return nil
 }

@@ -10,7 +10,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/lithammer/fuzzysearch/fuzzy"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -114,11 +113,7 @@ func ModuleRun(ctx *context.C2Context) {
 	}
 }
 
-func CmdModuleSearch(cmd *cobra.Command, args []string) {
-	ModuleSearch(args[0])
-}
-
-// search modules, powered by fuzzysearch
+// ModuleSearch searches modules, powered by fuzzysearch
 func ModuleSearch(keyword string) []*def.ModuleConfig {
 	search_targets := new([]string)
 	for name, mod_config := range def.Modules {

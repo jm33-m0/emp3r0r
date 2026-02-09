@@ -10,11 +10,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
-	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/posener/h2conn"
-	"github.com/spf13/cobra"
 )
 
 // HandlePortMapping handles proxy/port forwarding.
@@ -119,61 +117,31 @@ func HandlePortMapping(sh *StreamHandler, wrt http.ResponseWriter, req *http.Req
 	}
 }
 
-// CmdDeletePortFwdSession deletes a port mapping session by ID.
-func CmdDeletePortFwdSession(cmd *cobra.Command, args []string) {
-	sessionID, err := cmd.Flags().GetString("id")
-	if err != nil {
-		logging.Errorf("DeletePortFwdSession: %v", err)
-		return
-	}
+// DeletePortFwdSession deletes a port mapping session by ID.
+// Returns error if session not found or deletion fails.
+func DeletePortFwdSession(sessionID string) error {
 	if sessionID == "" {
-		logging.Errorf("DeletePortFwdSession: no session ID provided")
-		return
+		return fmt.Errorf("no session ID provided")
 	}
+
 	PortFwdsMutex.Lock()
 	defer PortFwdsMutex.Unlock()
-	for id, session := range PortFwds {
-		if id == sessionID {
-			err := session.SendCmdFunc(fmt.Sprintf("%s --id %s", def.C2CmdDeletePortFwd, id), "", session.Agent.Tag)
-			if err != nil {
-				logging.Warningf("Tell agent %s to delete port mapping %s: %v", session.Agent.Tag, sessionID, err)
-			}
-			session.Cancel()
-			delete(PortFwds, id)
-		}
-	}
-}
 
-// CmdListPortFwds lists currently active port mappings.
-func CmdListPortFwds(cmd *cobra.Command, args []string) {
-	tdata := [][]string{}
-	for id, portmap := range PortFwds {
-		if portmap.Sh == nil {
-			portmap.Cancel()
-			continue
-
-		}
-		bindAddr := portmap.BindAddr
-		if bindAddr == "" {
-			bindAddr = "127.0.0.1"
-		}
-		to := portmap.To + " (Agent) "
-		lport := bindAddr + ":" + portmap.Lport + " (CC) "
-		if portmap.Reverse {
-			to = portmap.To + " (CC) "
-			lport = portmap.Lport + " (Agent) "
-		}
-		tdata = append(tdata,
-			[]string{
-				lport,
-				to,
-				util.SplitLongLine(portmap.Agent.Tag, 10),
-				util.SplitLongLine(portmap.Description, 10),
-				util.SplitLongLine(id, 10),
-			})
+	session, exists := PortFwds[sessionID]
+	if !exists {
+		return fmt.Errorf("session %s not found", sessionID)
 	}
-	header := []string{"Local Port", "To", "Agent", "Description", "ID"}
-	tableStr := cli.BuildTable(header, tdata)
-	cli.AdaptiveTable(tableStr)
-	logging.Infof("\n\033[0m%s\n\n", tableStr)
+
+	// Tell agent to delete the port mapping
+	err := session.SendCmdFunc(fmt.Sprintf("%s --id %s", def.C2CmdDeletePortFwd, sessionID), "", session.Agent.Tag)
+	if err != nil {
+		logging.Warningf("Tell agent %s to delete port mapping %s: %v", session.Agent.Tag, sessionID, err)
+	}
+
+	// Cancel and delete locally
+	session.Cancel()
+	delete(PortFwds, sessionID)
+
+	logging.Infof("Deleted port forwarding session %s", sessionID)
+	return nil
 }

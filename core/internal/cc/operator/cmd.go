@@ -321,7 +321,24 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			GroupID: "filesystem",
 			Short:   "Download a file from selected agent",
 			Example: "get [--recursive] [--regex '*.pdf'] --path /tmp/1.txt",
-			Run:     ftp.CmdDownloadFromAgent,
+			Run: func(cmd *cobra.Command, args []string) {
+				target := agents.MustGetActiveAgent()
+				if target == nil {
+					logging.Errorf("No active agent")
+					return
+				}
+
+				filePath, _ := cmd.Flags().GetString("path")
+				isRecursive, _ := cmd.Flags().GetBool("recursive")
+				filter, _ := cmd.Flags().GetString("regex")
+
+				go func() {
+					err := ftp.DownloadFromAgent(target, filePath, isRecursive, filter)
+					if err != nil {
+						logging.Errorf("Download failed: %v", err)
+					}
+				}()
+			},
 		}
 		getCmd.Flags().BoolP("recursive", "r", false, "Download recursively")
 		getCmd.Flags().StringP("path", "f", "", "Path to download")
@@ -337,7 +354,24 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			GroupID: "filesystem",
 			Short:   "Upload a file to selected agent. Supports mem:///path/to/file paths.",
 			Example: "put --src /tmp/1.txt --dst /tmp/2.txt\nput --src /tmp/loader.so --dst mem:///tmp/loader.so",
-			Run:     ftp.CmdUploadToAgent,
+			Run: func(cmd *cobra.Command, args []string) {
+				target := agents.MustGetActiveAgent()
+				if target == nil {
+					logging.Errorf("No active agent")
+					return
+				}
+
+				src, _ := cmd.Flags().GetString("src")
+				dst, _ := cmd.Flags().GetString("dst")
+				saveToMem, _ := cmd.Flags().GetBool("mem")
+
+				go func() {
+					err := ftp.UploadToAgent(src, dst, target, saveToMem)
+					if err != nil {
+						logging.Errorf("Upload failed: %v", err)
+					}
+				}()
+			},
 		}
 		putCmd.Flags().StringP("src", "s", "", "Local source file path")
 		putCmd.Flags().StringP("dst", "d", "", "Destination file path (mem:///path/to/file will save to memory)")
@@ -423,7 +457,19 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			GroupID: "network",
 			Short:   "Delete a port mapping session",
 			Example: "delete_port_fwd --id <session_id>",
-			Run:     network.CmdDeletePortFwdSession,
+			Run: func(cmd *cobra.Command, args []string) {
+				sessionID, err := cmd.Flags().GetString("id")
+				if err != nil {
+					logging.Errorf("Get session ID: %v", err)
+					return
+				}
+				err = network.DeletePortFwdSession(sessionID)
+				if err != nil {
+					logging.Errorf("Delete port forwarding session: %v", err)
+					return
+				}
+				logging.Successf("Deleted port forwarding session %s", sessionID)
+			},
 		}
 		rmPortMappingCmd.Flags().StringP("id", "", "", "Port mapping ID")
 		rmPortMappingCmd.MarkFlagRequired("id")
@@ -438,8 +484,15 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Short:   "Label an agent with custom name",
 			Example: "label --id <agent_id> --label <custom_name>",
 			Run: func(cmd *cobra.Command, args []string) {
-				logging.Errorf("Not implemented yet")
-			}, // TODO: use operator API
+				agentID, _ := cmd.Flags().GetString("id")
+				label, _ := cmd.Flags().GetString("label")
+
+				err := agents.SetAgentLabel(agentID, label)
+				if err != nil {
+					logging.Errorf("Set agent label: %v", err)
+					return
+				}
+			},
 		}
 		labelAgentCmd.Flags().StringP("id", "", "0", "Agent ID")
 		labelAgentCmd.Flags().StringP("label", "", "no-label", "Custom name")
