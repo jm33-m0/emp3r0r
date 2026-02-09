@@ -26,10 +26,6 @@ import (
 func moduleCustom(ctx *c2context.C2Context) {
 	// We might still need live.ActiveModule for metadata like Name
 	// But Options come from ctx.Flags
-	if ctx.Target == nil {
-		logging.Errorf("No active agent")
-		return
-	}
 	if live.ActiveModule == nil {
 		logging.Warningf("No module selected")
 		return
@@ -37,6 +33,12 @@ func moduleCustom(ctx *c2context.C2Context) {
 	config, exists := def.Modules[live.ActiveModule.Name]
 	if !exists {
 		logging.Errorf("Config of %s does not exist", live.ActiveModule.Name)
+		return
+	}
+
+	// Only require target for non-local modules
+	if ctx.Target == nil && !config.IsLocal {
+		logging.Errorf("No active agent")
 		return
 	}
 
