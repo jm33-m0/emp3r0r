@@ -10,8 +10,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"syscall"
-	"unsafe"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
@@ -112,29 +110,4 @@ func DumpProcMem(pid int) (memdata map[int64][]byte, err error) {
 // This function is Linux only
 func DumpCurrentProcMem() (memdata map[int64][]byte, err error) {
 	return DumpProcMem(os.Getpid())
-}
-
-const (
-	memfdCreateX64 = 319
-)
-
-// MemFDWrite creates a memfd and writes data to it
-// It returns the file descriptor of the created memfd
-func MemFDWrite(data []byte) int {
-	mem_name := ""
-	fd, _, errno := syscall.Syscall(memfdCreateX64, uintptr(unsafe.Pointer(&mem_name)), uintptr(0), 0)
-	if errno <= 0 {
-		logging.Debugf("MemFDWrite: %v", errno)
-		return -1
-	}
-	_, err := syscall.Write(int(fd), data)
-	if err != nil {
-		logging.Debugf("MemFDWrite: %v", err)
-		return -1
-	}
-	return int(fd)
-}
-
-func MiniDumpProcess(_ int, _ string) error {
-	return fmt.Errorf("MiniDumpProcess: not implemented on Linux")
 }
