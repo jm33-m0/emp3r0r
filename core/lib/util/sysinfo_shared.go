@@ -2,7 +2,6 @@ package util
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"net"
 	"os"
@@ -117,33 +116,38 @@ func macUint64() uint64 {
 	}
 
 	for _, i := range interfaces {
-		if i.Flags&net.FlagUp != 0 && bytes.Equal(i.HardwareAddr, nil) {
-
-			var mac uint64
-			for j, b := range i.HardwareAddr {
-				if j >= 8 {
-					break
-				}
-				mac <<= 8
-				mac += uint64(b)
-			}
-
-			return mac
+		// Skip loopback and down interfaces
+		if i.Flags&net.FlagLoopback != 0 || i.Flags&net.FlagUp == 0 {
+			continue
 		}
+
+		// Skip if no hardware address
+		if len(i.HardwareAddr) == 0 {
+			continue
+		}
+
+		// Skip virtual/locally administered MAC addresses (bit 1 of first byte is set)
+		if i.HardwareAddr[0]&0x02 != 0 {
+			continue
+		}
+
+		var mac uint64
+		for j, b := range i.HardwareAddr {
+			if j >= 8 {
+				break
+			}
+			mac <<= 8
+			mac += uint64(b)
+		}
+
+		return mac
 	}
 
 	return uint64(0)
 }
 
-// generate a static short identifier for the current host
-func genShortID() (id string) {
-	return fmt.Sprintf("%x", macUint64())
-}
-
-// GetHostID unique identifier of the host
-func GetHostID(productInfo *ghw.ProductInfo, fallbackUUID string) (id string) {
-	shortID := genShortID()
-	id = fmt.Sprintf("unknown_hostname_%s-agent", shortID)
+// GenAgentTag unique identifier of the host
+func GenAgentTag(agentUUID string) (id string) {
 	name, err := os.Hostname()
 	if err != nil {
 		logging.Debugf("GetHostID: %v", err)
@@ -151,9 +155,8 @@ func GetHostID(productInfo *ghw.ProductInfo, fallbackUUID string) (id string) {
 	}
 	name = fmt.Sprintf("%s\\%s", name, GetUsername()) // hostname\\username
 
-	// Always use fallbackUUID (which is the AgentUUID generated at startup)
-	// along with hostname and shortID (MAC-based) to derive a deterministic AgentTag
-	id = fmt.Sprintf("%s_%s-agent-%s", name, shortID, fallbackUUID)
+	// Use MachineID-based shortID and AgentUUID for deterministic AgentTag
+	id = fmt.Sprintf("%s-agent-%s", name, agentUUID)
 
 	return
 }
