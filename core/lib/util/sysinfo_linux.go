@@ -4,7 +4,6 @@
 package util
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -27,7 +26,7 @@ func GetMachineID() string {
 
 	// Fallback to MAC-based ID if machine-id is missing (e.g. docker container, stripped OS)
 	if id == "" {
-		id = fmt.Sprintf("%x", macUint64())
+		id = genShortID()
 	}
 
 	return id

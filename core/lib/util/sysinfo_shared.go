@@ -146,6 +146,10 @@ func macUint64() uint64 {
 	return uint64(0)
 }
 
+func genShortID() string {
+	return fmt.Sprintf("%x", macUint64())
+}
+
 // GenAgentTag unique identifier of the host
 func GenAgentTag(agentUUID string) (id string) {
 	name, err := os.Hostname()

