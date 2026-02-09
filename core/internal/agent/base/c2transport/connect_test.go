@@ -207,7 +207,11 @@ func TestEstablishC2Connection(t *testing.T) {
 	go func() {
 		defer close(tunDone)
 		if err := c2transport.MsgTunneler(conn, config, handler.HandleC2Command, ctx, cancel); err != nil {
-			t.Logf("CCMsgTun exited with error: %v", err)
+			// Use log.Printf instead of t.Logf since goroutine may outlive test
+			// This prevents "Log in goroutine after test has completed" panic
+			if !strings.Contains(err.Error(), "context canceled") && !strings.Contains(err.Error(), "closed") {
+				fmt.Printf("CCMsgTun exited with error: %v\n", err)
+			}
 		}
 	}()
 
@@ -407,7 +411,8 @@ func TestDuplicatedCheckin(t *testing.T) {
 	tunDone := make(chan struct{})
 	go func() {
 		defer close(tunDone)
-		c2transport.MsgTunneler(conn, config, func(data *def.MsgTunData) {}, ctx, cancel)
+		// Ignore errors since goroutine may outlive test
+		_ = c2transport.MsgTunneler(conn, config, func(data *def.MsgTunData) {}, ctx, cancel)
 	}()
 
 	// Wait for CC to process the connection
