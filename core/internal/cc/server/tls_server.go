@@ -44,18 +44,20 @@ func StartC2AgentTLSServer() {
 				// Check if there are any active operators
 				allowConn := len(OPERATORS) > 0
 				respData, err := preflight.ProcessRequest(body, allowConn)
-				// Log decision
-				if allowConn {
-					logging.Infof("Preflight: Allowed connection (Operators active)")
-				} else {
-					logging.Warningf("Preflight: Rejected connection (No operators)")
-				}
 
 				if err != nil {
 					logging.Warningf("Preflight failed: %v", err)
 					http.Error(w, "Preflight failed", http.StatusForbidden)
 					return
 				}
+
+				// Log decision only on success
+				if allowConn {
+					logging.Infof("Preflight: Allowed connection (Operators active)")
+				} else {
+					logging.Warningf("Preflight: Rejected connection (No operators)")
+				}
+
 				// Write Response
 				w.WriteHeader(http.StatusOK)
 				w.Write(respData)

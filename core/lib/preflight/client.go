@@ -29,10 +29,12 @@ func Check(config *def.Config) bool {
 	logging.Printf("Performing Preflight Check: %s", url)
 
 	// 1. Prepare Payload
+	timestamp := time.Now().Unix()
 	reqData := PreflightRequest{
 		AgentUUID: config.AgentUUID,
-		Timestamp: time.Now().Unix(),
+		Timestamp: timestamp,
 	}
+	logging.Debugf("Preflight: sending request with timestamp=%d", timestamp)
 	// Sign
 	sig, err := agentutils.SignWithAgentKey([]byte(config.AgentUUID))
 	if err == nil {

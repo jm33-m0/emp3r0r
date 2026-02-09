@@ -27,14 +27,24 @@ func ProcessRequest(data []byte, allowConn bool) ([]byte, error) {
 		return nil, fmt.Errorf("cbor unmarshal: %v", err)
 	}
 
-	// 3. Verify Timestamp (within 60 seconds?)
+	// 3. Verify Timestamp (within 60 seconds)
+	// Strict 60-second window for replay protection
 	now := time.Now().Unix()
 	diff := now - req.Timestamp
 	if diff < 0 {
 		diff = -diff
 	}
+
+	// Log timestamp details for debugging
+	direction := "too old"
+	if req.Timestamp > now {
+		direction = "too future"
+	}
+	logging.Debugf("Preflight timestamp check: server=%d, agent=%d, diff=%d seconds (%s)",
+		now, req.Timestamp, diff, direction)
+
 	if diff > 60 {
-		return nil, fmt.Errorf("invalid timestamp: request too old or future")
+		return nil, fmt.Errorf("invalid timestamp: request %s (diff=%d seconds)", direction, diff)
 	}
 
 	logging.Debugf("Preflight request from %s (ts: %d)", req.AgentUUID, req.Timestamp)

