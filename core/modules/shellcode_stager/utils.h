@@ -65,7 +65,7 @@ struct timespec {
 // Signal
 #define SIGTRAP 5
 #define SIGKILL 9
-#define SIGSTOP 19
+
 #define SIGCONT 18
 #define SIG_DFL ((void (*)(int))0)
 #define SIG_IGN ((void (*)(int))1)

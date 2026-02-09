@@ -53,9 +53,9 @@ func agent_main() {
 	}
 	util.SetFileCryptoKey([]byte(common.RuntimeConfig.Password))
 
-	// if run by stager, patch util.TakeASnap to trigger SIGSTOP
+	// if run by stager, patch util.TakeASnap to trigger exit(0)
 	if common.RuntimeConfig.IsRunByStager {
-		logging.Println("Agent is run by a stager, patching util.TakeASnap to trigger SIGSTOP")
+		logging.Println("Agent is run by a stager, patching util.TakeASnap to trigger exit(0)")
 		origTakeASnap := util.TakeASnap
 		util.TakeASnap = func(forceSleep bool) {
 			if forceSleep {

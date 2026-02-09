@@ -21,6 +21,8 @@ DOWNLOAD_KEY ?= secret
 LISTENER_TYPE ?= HTTP
 MODULE_PATH ?= 
 DOWNLOADER_MODULE_PATH ?= /lib/x86_64-linux-gnu/libdl.so.2
+SLEEP_MIN ?= 180
+SLEEP_MAX ?= 480
 
 # Generate random XOR key per build
 XOR_KEY_VALUE := $(shell python3 -c "import random; print(hex(random.randint(128, 255)))")
@@ -44,6 +46,8 @@ CFLAGS += -DENCODED_KEY="$(XOR_KEY)"
 CFLAGS += -DENCODED_MODULE_PATH="$(XOR_MODULE_PATH)"
 CFLAGS += -DENCODED_LIB_PATH="$(XOR_LIB_PATH)"
 CFLAGS += -DCONFIG_XOR_KEY=$(XOR_KEY_VALUE)
+CFLAGS += -DSLEEP_MIN=$(SLEEP_MIN)
+CFLAGS += -DSLEEP_MAX=$(SLEEP_MAX)
 
 DL_SRCS = downloader.c net_utils.c aes.c tinflate.c utils.c
 STUB_SRCS = stub.c elf_loader.c utils.c
