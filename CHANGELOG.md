@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.20.2](https://github.com/jm33-m0/emp3r0r/compare/v3.20.1...v3.20.2) (2026-02-09)
+
+
+### Bug Fixes
+
+* `0` in agent tag, invalid `shortID` ([3242f22](https://github.com/jm33-m0/emp3r0r/commit/3242f2299c481942118f6272f3ef2342992f3cdc))
+* agents should be kicked offline when there's no active operator ([c69c1b6](https://github.com/jm33-m0/emp3r0r/commit/c69c1b6fce27666b4a2755274b12702bf79710c8))
+* do not require "active agent" for local modules ([633981e](https://github.com/jm33-m0/emp3r0r/commit/633981e1c1356e518d60f2861bbe319d937940ea))
+* preflight fails after resuming from suspension ([ccb846a](https://github.com/jm33-m0/emp3r0r/commit/ccb846af3e4344445fbf0c1fd45867195ead8c75))
+* Refactor shellcode stager to restart agents by exiting and re-forking with configurable sleep intervals. ([afc63d8](https://github.com/jm33-m0/emp3r0r/commit/afc63d8254ea639d8a6a1fa811cafa169c222209))
+
 ## [3.20.1](https://github.com/jm33-m0/emp3r0r/compare/v3.20.0...v3.20.1) (2026-02-08)
 
 
