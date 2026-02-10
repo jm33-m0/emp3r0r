@@ -69,7 +69,6 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 		logging.Warningf("handleAgentCheckIn decode error: %v", err)
 		return
 	}
-
 	// verify agent identification
 	// timestamp is already checked in transport.VerifySignatureWithCA
 	agent_sig, err := base64.URLEncoding.DecodeString(target.UUIDSig)
@@ -98,10 +97,12 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 	// If not in memory, check if it exists in DB (Persistent Session)
 	if isNew && agents.AgentDB != nil {
 		storedAgent, err := agents.GetStoredAgent(target.UUID)
-		if err == nil && storedAgent != nil {
+		if err != nil {
+			logging.Errorf("handleAgentCheckIn: GetStoredAgent error: %v", err)
+		}
+		if storedAgent != nil {
 			isNew = false
 			existingKey = storedAgent.PublicKey
-			logging.Debugf("Agent %s found in DB, verifying key...", target.UUID)
 		}
 	}
 
@@ -173,6 +174,7 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 	}
 	if !isValid {
 		logging.Errorf("Invalid agent uuid signature (CA mismatch), refusing request")
+		wrt.WriteHeader(http.StatusForbidden)
 		return
 	}
 	target.From = req.RemoteAddr
@@ -234,7 +236,7 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 				shortname = l
 			}
 		}
-		logging.Printf("Checked in: %s from %s, running %s", strconv.Quote(shortname), fmt.Sprintf("'%s - %s'", target.From, target.Transport), strconv.Quote(target.OS))
+		logging.Infof("Checked in: %s from %s, running %s", strconv.Quote(shortname), fmt.Sprintf("'%s - %s'", target.From, target.Transport), strconv.Quote(target.OS))
 	} else {
 		// Existing agent - refresh info
 		var existingKey *def.Emp3r0rAgent

@@ -265,7 +265,7 @@ func TestFullAgentLifecycle(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	// Generate NEW ephemeral key (simulating agent restart)
-	err = agentutils.GetAgentKey()
+	err = agentutils.RenewAgentKey()
 	if err != nil {
 		t.Fatalf("Failed to generate new ephemeral key: %v", err)
 	}

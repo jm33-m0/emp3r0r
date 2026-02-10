@@ -173,13 +173,15 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 	}
 
 	// CC names and certs
-	live.RuntimeConfig.CCAddress = cc_host
+	if cmd.Flags().Changed("cc") || cc_host != "" {
+		live.RuntimeConfig.CCAddress = cc_host
+	}
 	live.RuntimeConfig.CCAddress = strings.TrimSuffix(live.RuntimeConfig.CCAddress, "/")
 	logging.Printf("C2 server name: %s", live.RuntimeConfig.CCAddress)
 	existing_names := transport.NamesInCert(transport.ServerCrtFile)
 
 	exists := slices.Contains(existing_names, live.RuntimeConfig.CCAddress)
-	if !exists {
+	if !exists && live.RuntimeConfig.CCAddress != "" {
 		logging.Warningf("Name '%s' is not covered by our server cert, fetching new certs from server",
 			live.RuntimeConfig.CCAddress)
 
@@ -198,29 +200,39 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 	}
 
 	// Internet check
-	live.RuntimeConfig.EnableNCSI = ncsi
+	if cmd.Flags().Changed("ncsi") {
+		live.RuntimeConfig.EnableNCSI = ncsi
+	}
 	if live.RuntimeConfig.EnableNCSI {
 		logging.Printf("NCSI is enabled")
 	}
 
 	// CDN proxy
-	live.RuntimeConfig.CDNProxy = cdn_proxy
+	if cmd.Flags().Changed("cdn") || cdn_proxy != "" {
+		live.RuntimeConfig.CDNProxy = cdn_proxy
+	}
 	if live.RuntimeConfig.CDNProxy != "" {
 		logging.Printf("Using CDN proxy %s", live.RuntimeConfig.CDNProxy)
 	}
 
-	live.RuntimeConfig.UseKCP = kcp
-	if kcp {
+	if cmd.Flags().Changed("kcp") {
+		live.RuntimeConfig.UseKCP = kcp
+	}
+	if live.RuntimeConfig.UseKCP {
 		logging.Printf("Using KCP")
 	}
 
 	// agent proxy for c2 transport
-	live.RuntimeConfig.C2TransportProxy = c2transport_proxy
+	if cmd.Flags().Changed("proxy") || c2transport_proxy != "" {
+		live.RuntimeConfig.C2TransportProxy = c2transport_proxy
+	}
 	if live.RuntimeConfig.C2TransportProxy != "" {
 		logging.Printf("Using C2 transport proxy %s", live.RuntimeConfig.C2TransportProxy)
 	}
 
-	live.RuntimeConfig.DoHServer = doh_server
+	if cmd.Flags().Changed("doh") || doh_server != "" {
+		live.RuntimeConfig.DoHServer = doh_server
+	}
 	if live.RuntimeConfig.DoHServer != "" {
 		logging.Printf("Using DoH server %s", live.RuntimeConfig.DoHServer)
 	}
@@ -291,27 +303,33 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 	logging.Printf("Conditional C2 (Hybrid Mode) beacon interval: %d - %d seconds",
 		live.RuntimeConfig.PreflightIntervalMin, live.RuntimeConfig.PreflightIntervalMax)
 
-	if proxy_chain {
-		if !cmd.Flags().Changed("proxychain-wait-min") {
-			proxy_chain_min = util.RandInt(30, 120)
-		}
-		live.RuntimeConfig.ProxyChainBroadcastIntervalMin = proxy_chain_min
+	if cmd.Flags().Changed("proxychain") {
+		if proxy_chain {
+			if !cmd.Flags().Changed("proxychain-wait-min") {
+				proxy_chain_min = util.RandInt(30, 120)
+			}
+			live.RuntimeConfig.ProxyChainBroadcastIntervalMin = proxy_chain_min
 
-		if !cmd.Flags().Changed("proxychain-wait-max") {
-			live.RuntimeConfig.ProxyChainBroadcastIntervalMax = util.RandInt(proxy_chain_min+10, proxy_chain_min+100)
+			if !cmd.Flags().Changed("proxychain-wait-max") {
+				live.RuntimeConfig.ProxyChainBroadcastIntervalMax = util.RandInt(proxy_chain_min+10, proxy_chain_min+100)
+			} else {
+				live.RuntimeConfig.ProxyChainBroadcastIntervalMax = proxy_chain_max
+			}
+			logging.Printf("Proxy chain is enabled with broadcast interval %d-%d",
+				live.RuntimeConfig.ProxyChainBroadcastIntervalMin,
+				live.RuntimeConfig.ProxyChainBroadcastIntervalMax)
 		} else {
-			live.RuntimeConfig.ProxyChainBroadcastIntervalMax = proxy_chain_max
+			live.RuntimeConfig.ProxyChainBroadcastIntervalMax = 0
+			logging.Printf("Proxy chain is disabled")
 		}
-		logging.Printf("Proxy chain is enabled with broadcast interval %d-%d",
-			live.RuntimeConfig.ProxyChainBroadcastIntervalMin,
-			live.RuntimeConfig.ProxyChainBroadcastIntervalMax)
-	} else {
-		live.RuntimeConfig.ProxyChainBroadcastIntervalMax = 0
+	} else if live.RuntimeConfig.ProxyChainBroadcastIntervalMax == 0 {
 		logging.Printf("Proxy chain is disabled")
 	}
 
-	live.RuntimeConfig.IsRunByStager = is_stager
-	if is_stager {
+	if cmd.Flags().Changed("stager") {
+		live.RuntimeConfig.IsRunByStager = is_stager
+	}
+	if live.RuntimeConfig.IsRunByStager {
 		logging.Printf("Agent is built for stager")
 	}
 

@@ -14,7 +14,6 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
-	"log"
 	"math/big"
 	"net"
 	"os"
@@ -22,6 +21,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
@@ -85,7 +86,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	log.Printf("Test workspace: %s", tmpDir)
+	logging.Infof("Test workspace: %s", tmpDir)
 
 	// 2. Build Real Agent Stub (cmd/agent)
 	mockAgentPath := filepath.Join(tmpDir, "agent_stub")
@@ -107,7 +108,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to build agent stub: %v\nOutput: %s", err, string(out))
 	}
-	log.Println("Agent stub built successfully")
+	logging.Successf("Agent stub built successfully")
 
 	// 3. Setup Real C2 Server
 	c2Port := util.RandInt(50000, 60000)
@@ -178,8 +179,8 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 
 	// Debug: verify maps are empty
 	live.AgentControlMapMutex.RLock()
-	log.Printf("DEBUG: AgentControlMap size after reset: %d", len(live.AgentControlMap))
-	log.Printf("DEBUG: AgentList size after reset: %d", len(live.AgentList))
+	logging.Debugf("AgentControlMap size after reset: %d", len(live.AgentControlMap))
+	logging.Debugf("AgentList size after reset: %d", len(live.AgentList))
 	live.AgentControlMapMutex.RUnlock()
 
 	// Small delay to ensure map reset propagates
@@ -243,7 +244,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to write patched agent: %v", err)
 	}
-	log.Println("Mock agent patched with config")
+	logging.Successf("Mock agent patched with config")
 
 	// Dummy operator for preflight
 	server.OPERATORS["dummy"] = nil
@@ -256,7 +257,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	}
 
 	go func() {
-		log.Printf("Starting real C2 server on port %s", c2PortStr)
+		logging.Infof("Starting real C2 server on port %s", c2PortStr)
 		server.StartC2AgentTLSServer()
 	}()
 
@@ -292,7 +293,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 		// compression=true matching standard behavior
 		err := listener.HTTPAESCompressedListener(patchedAgentPath, stagerPortStr, stagerKey, true)
 		if err != nil {
-			log.Printf("Stager listener failed: %v", err)
+			logging.Errorf("Stager listener failed: %v", err)
 		}
 	}()
 	// Wait for stager listener to be ready
@@ -350,7 +351,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Make failed: %v\nOutput: %s", err, string(out))
 	}
-	log.Println("Stager built with make")
+	logging.Successf("Stager built with make")
 	defer exec.Command("make", "clean").Run()
 
 	// Move the generated stager.bin to tmpDir to be safe/clear
@@ -384,7 +385,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	// Set HOME to tmpDir to isolate agent state (prevent reusing keys from ~/.emp3r0r)
 	cmdLoader.Env = append(os.Environ(), fmt.Sprintf("HOME=%s", tmpDir))
 
-	log.Println("Running loader...")
+	logging.Infof("Running loader...")
 	if err := cmdLoader.Start(); err != nil {
 		t.Fatalf("Failed to start loader: %v", err)
 	}
@@ -402,8 +403,8 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	var agent *def.Emp3r0rAgent
 	for {
 		if time.Since(start) > timeout {
-			log.Printf("Loader Stdout:\n%s", stdout.String())
-			log.Printf("Loader Stderr:\n%s", stderr.String())
+			logging.Debugf("Loader Stdout:\n%s", stdout.String())
+			logging.Debugf("Loader Stderr:\n%s", stderr.String())
 			t.Fatalf("Timeout waiting for agent checkin")
 		}
 
@@ -418,16 +419,16 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 		live.AgentControlMapMutex.RUnlock()
 
 		if agent != nil {
-			log.Printf("SUCCESS: Agent checked in and connected! Tag: %s", agent.Tag)
+			logging.Successf("Agent checked in and connected! Tag: %s", agent.Tag)
 			break
 		}
 
 		// Check if loader exited
 		select {
 		case err := <-doneChan:
-			log.Printf("Loader exited unexpectedly: %v", err)
-			log.Printf("Loader Stdout:\n%s", stdout.String())
-			log.Printf("Loader Stderr:\n%s", stderr.String())
+			logging.Errorf("Loader exited unexpectedly: %v", err)
+			logging.Debugf("Loader Stdout:\n%s", stdout.String())
+			logging.Debugf("Loader Stderr:\n%s", stderr.String())
 			t.Fatalf("Loader exited before checkin")
 		default:
 			// Continue polling
@@ -437,17 +438,17 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	}
 
 	// 7. Verify Command Execution (E2E)
-	log.Println("Verifying command execution...")
+	logging.Infof("Verifying command execution...")
 	cmdID := uuid.NewString()
 	// Using "ls" command as it is ubiquitous and safer
 	err = agents.SendCmd("ls", cmdID, agent)
 	if err != nil {
 		t.Fatalf("Failed to send command to agent: %v", err)
 	}
-	log.Printf("Sent command 'ls' to agent %s", agent.Tag)
+	logging.Infof("Sent command 'ls' to agent %s", agent.Tag)
 
 	// Wait for output
-	log.Println("Waiting for command output...")
+	logging.Println("Waiting for command output...")
 
 	// Check if agent is still connected and verify output
 	outputReceived := false
@@ -465,7 +466,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 		// Check result
 		if res, ok := live.CmdResults.Load(cmdID); ok {
 			output := res.(string)
-			log.Printf("Command Output received: %s", output)
+			logging.Successf("Command Output received: %s", output)
 			if output == "" {
 				// might be empty if dir is empty, but we expect agent_stub
 				// wait a bit more?
@@ -482,17 +483,17 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	if !outputReceived {
 		t.Fatalf("Failed to receive command output")
 	}
-	log.Println("Command output verification passed.")
+	logging.Println("Command output verification passed.")
 
 	// Check loader status
 	select {
 	case err := <-doneChan:
-		log.Printf("Loader exited after command: %v", err)
-		log.Printf("Loader Stdout:\n%s", stdout.String())
-		log.Printf("Loader Stderr:\n%s", stderr.String())
+		logging.Errorf("Loader exited after command: %v", err)
+		logging.Debugf("Loader Stdout:\n%s", stdout.String())
+		logging.Debugf("Loader Stderr:\n%s", stderr.String())
 		t.Fatalf("Loader process died")
 	default:
-		log.Println("Loader process is still running.")
+		logging.Println("Loader process is still running.")
 	}
 
 	// Verify stager output log contains command execution trace if possible?
@@ -501,23 +502,23 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	// But logging goes to file? Or if we built with specific flags?
 	// We can't verify output easily, but stability check covers the "connection drop" bug.
 
-	log.Println("TestAgentEndToEndLifecycle PASSED")
-	log.Println("Cleaning up...")
+	logging.Successf("TestAgentEndToEndLifecycle PASSED")
+	logging.Infof("Cleaning up...")
 	// Cleanup
 	cmdLoader.Process.Kill()
-	log.Println("Loader process killed")
+	logging.Debugf("Loader process killed")
 	listener.StopHTTP()
-	log.Println("HTTP stager stopped")
+	logging.Debugf("HTTP stager stopped")
 	if network.EmpTLSServer != nil {
 		// Use a context with timeout for shutdown
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		network.EmpTLSServer.Shutdown(ctx)
 		network.EmpTLSServerCancel()
-		log.Println("C2 TLS server stopped")
+		logging.Debugf("C2 TLS server stopped")
 	}
 	if network.EmpKCPCancel != nil {
 		network.EmpKCPCancel()
-		log.Println("C2 KCP server stopped")
+		logging.Debugf("C2 KCP server stopped")
 	}
 }

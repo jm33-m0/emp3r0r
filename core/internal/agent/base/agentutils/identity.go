@@ -33,6 +33,18 @@ func GetAgentKey() error {
 	return nil
 }
 
+// RenewAgentKey force-regenerates the ephemeral agent key.
+// Primarily used for testing key rotation scenarios.
+func RenewAgentKey() error {
+	var err error
+	logging.Infof("Renewing ephemeral agent key...")
+	AgentKey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return fmt.Errorf("failed to renew ephemeral key: %v", err)
+	}
+	return nil
+}
+
 // SignWithAgentKey signs data with the agent's unique key
 func SignWithAgentKey(data []byte) ([]byte, error) {
 	if AgentKey == nil {
