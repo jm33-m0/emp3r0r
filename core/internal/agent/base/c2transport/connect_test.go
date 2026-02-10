@@ -29,6 +29,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 )
 
@@ -207,10 +208,10 @@ func TestEstablishC2Connection(t *testing.T) {
 	go func() {
 		defer close(tunDone)
 		if err := c2transport.MsgTunneler(conn, config, handler.HandleC2Command, ctx, cancel); err != nil {
-			// Use log.Printf instead of t.Logf since goroutine may outlive test
+			// Use logging.Printf instead of t.Logf since goroutine may outlive test
 			// This prevents "Log in goroutine after test has completed" panic
 			if !strings.Contains(err.Error(), "context canceled") && !strings.Contains(err.Error(), "closed") {
-				fmt.Printf("CCMsgTun exited with error: %v\n", err)
+				logging.Errorf("CCMsgTun exited with error: %v", err)
 			}
 		}
 	}()
