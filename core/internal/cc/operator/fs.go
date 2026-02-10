@@ -3,6 +3,7 @@ package operator
 import (
 	"strconv"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/controllers"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
@@ -123,7 +124,7 @@ func executeCmd(cmd string) {
 		return
 	}
 
-	err := controllers.ExecuteAgentCommand(activeAgent, cmd, OPERATOR_SESSION)
+	err := controllers.ExecuteAgentCommand(activeAgent, cmd, client.SessionID)
 	if err != nil {
 		logging.Errorf("Failed to execute command: %v", err)
 	}

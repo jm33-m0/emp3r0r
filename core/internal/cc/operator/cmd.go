@@ -7,6 +7,7 @@ import (
 
 	"github.com/carapace-sh/carapace"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/ftp"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
@@ -132,7 +133,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Short:   "Set active target",
 			Example: "target 0",
 			Args:    cobra.ExactArgs(1),
-			Run:     cmdSetActiveAgent,
+			Run:     CmdSetActiveAgent,
 		}
 		rootCmd.AddCommand(targetCmd)
 		carapace.Gen(targetCmd).PositionalCompletion(carapace.ActionCallback(listAgents))
@@ -161,7 +162,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 				}
 				ctx := &c2context.C2Context{
 					Target:    agent,
-					OpSession: OPERATOR_SESSION,
+					OpSession: client.SessionID,
 					OnUIReady: func(data any) error {
 						connStr := data.(string)
 						logging.Successf("File manager ready! Opening tmux...")
@@ -430,7 +431,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			GroupID: "agent",
 			Short:   "List connected agents",
 			Args:    cobra.NoArgs,
-			Run:     cmdListAgents,
+			Run:     CmdListAgents,
 		}
 		rootCmd.AddCommand(lsTargetCmd)
 
@@ -584,7 +585,7 @@ func execCmd(cmd *cobra.Command, args []string) {
 	// execute command
 	ctx := &c2context.C2Context{
 		Target:    agent,
-		OpSession: OPERATOR_SESSION,
+		OpSession: client.SessionID,
 		Flags:     make(map[string]string),
 	}
 	ctx.Flags["cmd_to_exec"] = fmt.Sprintf("exec --cmd %s", strconv.Quote(cmdStr))

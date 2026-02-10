@@ -28,3 +28,19 @@ func (op *Operation) IsOptionSet(option string) bool {
 		return false
 	}
 }
+
+// SignRequest is the request to sign data
+type SignRequest struct {
+	Content []byte `cbor:"1,keyasint"` // content to sign (usually UUID)
+}
+
+// PortFwdRequest is the request to register a port mapping
+type PortFwdRequest struct {
+	SessionID   string `cbor:"1,keyasint"`
+	Lport       string `cbor:"2,keyasint"`
+	To          string `cbor:"3,keyasint"`
+	Description string `cbor:"4,keyasint"`
+	Protocol    string `cbor:"5,keyasint"`
+	AgentTag    string `cbor:"6,keyasint"` // Add Agent Tag for context
+	IsReverse   bool   `cbor:"7,keyasint"`
+}

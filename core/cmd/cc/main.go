@@ -242,8 +242,8 @@ func connectWg(opts *Options) {
 	}
 	netutil.WgServerIP = opts.wg_server_ip
 	netutil.WgOperatorIP = opts.wg_operator_ip
-	operator.SERVER_IP = opts.c2_server_ip
-	operator.SERVER_KEY = opts.wg_server_key
+	operator.ServerIP = opts.c2_server_ip
+	operator.ServerKey = opts.wg_server_key
 
 	// Connect to C2 wireguard server with given wireguard keypair
 	var wg_key string

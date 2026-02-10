@@ -2,26 +2,25 @@ package controllers
 
 import (
 	"bytes"
-	"encoding/base64"
 	"fmt"
 	"os"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
-	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // AgentBuildConfig contains parameters for agent generation
 type AgentBuildConfig struct {
-	PayloadType string
-	Arch        string
-	Timestamp   time.Time
-	WorkSpace   string
+	PayloadType  string
+	Arch         string
+	Timestamp    time.Time
+	WorkSpace    string
+	AgentUUID    string // Provided by operator (generated locally)
+	AgentUUIDSig string // Provided by operator (signed by server)
 }
 
 // GenerateFilePaths determines stub and output file paths
@@ -56,22 +55,12 @@ func GenerateFilePaths(cfg AgentBuildConfig) (stubFile, outFile string) {
 }
 
 // EncryptAgentConfig generates UUID, signs it, marshals config to CBOR, and encrypts
-func EncryptAgentConfig() ([]byte, string, error) {
+func EncryptAgentConfig(cfg AgentBuildConfig) ([]byte, string, error) {
 	configStruct := *live.RuntimeConfig
 
-	// Generate UUID
-	configStruct.AgentUUID = uuid.NewString()
-
-	// Load CA and sign UUID
-	if err := transport.LoadCACrt(); err != nil {
-		return nil, "", fmt.Errorf("load CA crt: %w", err)
-	}
-
-	sig, err := transport.SignWithCAKey([]byte(configStruct.AgentUUID))
-	if err != nil {
-		return nil, "", fmt.Errorf("sign agent UUID: %w", err)
-	}
-	configStruct.AgentUUIDSig = base64.URLEncoding.EncodeToString(sig)
+	// use provided UUID and signature
+	configStruct.AgentUUID = cfg.AgentUUID
+	configStruct.AgentUUIDSig = cfg.AgentUUIDSig
 
 	// Marshal to CBOR
 	cborBytes, err := cbor.Marshal(configStruct)
@@ -137,7 +126,7 @@ func BuildAgent(cfg AgentBuildConfig, runtimeConfig *def.Config) (*BuildAgentRes
 	}
 
 	// 3. Encrypt agent config
-	configPayload, agentUUID, err := EncryptAgentConfig()
+	configPayload, agentUUID, err := EncryptAgentConfig(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("encrypt config: %w", err)
 	}

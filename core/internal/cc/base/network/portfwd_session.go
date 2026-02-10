@@ -29,11 +29,13 @@ type PortFwdSession struct {
 	Listener    *net.UDPConn // if mapping is UDP, we need its listener
 	Timeout     int          // timeout in seconds
 
-	Agent       *def.Emp3r0rAgent                  // agent who holds this port mapping session
-	SendCmdFunc func(string, string, string) error // send command to agent
-	Sh          map[string]*StreamHandler          // related to HTTP handler
-	Ctx         context.Context                    // PortFwd context
-	Cancel      context.CancelFunc                 // PortFwd cancel
+	Agent          *def.Emp3r0rAgent                  // agent who holds this port mapping session
+	SendCmdFunc    func(string, string, string) error // send command to agent
+	RegisterFunc   func(def.PortFwdRequest) error     // register session with server
+	UnregisterFunc func(string) error                 // unregister session with server
+	Sh             map[string]*StreamHandler          // related to HTTP handler
+	Ctx            context.Context                    // PortFwd context
+	Cancel         context.CancelFunc                 // PortFwd cancel
 }
 
 // InitReversedPortFwd sends portfwd command to agent to set up a reverse port mapping.
@@ -62,6 +64,20 @@ func (pf *PortFwdSession) InitReversedPortFwd() (err error) {
 	if err != nil {
 		logging.Errorf("SendCmd: %v", err)
 		return
+	}
+	if pf.RegisterFunc != nil {
+		req := def.PortFwdRequest{
+			SessionID:   fwdID,
+			Lport:       pf.Lport,
+			To:          pf.To,
+			Description: pf.Description,
+			Protocol:    pf.Protocol,
+			AgentTag:    pf.Agent.Tag,
+			IsReverse:   pf.Reverse,
+		}
+		if err = pf.RegisterFunc(req); err != nil {
+			logging.Errorf("InitReversedPortFwd: failed to register with server: %v", err)
+		}
 	}
 	return
 }
@@ -212,6 +228,21 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 	PortFwds[fwdID] = pf
 	PortFwdsMutex.Unlock()
 
+	if pf.RegisterFunc != nil {
+		req := def.PortFwdRequest{
+			SessionID:   fwdID,
+			Lport:       pf.Lport,
+			To:          pf.To,
+			Description: pf.Description,
+			Protocol:    pf.Protocol,
+			AgentTag:    pf.Agent.Tag,
+			IsReverse:   pf.Reverse,
+		}
+		if err = pf.RegisterFunc(req); err != nil {
+			logging.Errorf("RunPortFwd: failed to register with server: %v", err)
+		}
+	}
+
 	cleanup := func() {
 		cancel()
 		if tcp_listener != nil {
@@ -223,6 +254,11 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		PortFwdsMutex.Lock()
 		defer PortFwdsMutex.Unlock()
 		delete(PortFwds, fwdID)
+		if pf.UnregisterFunc != nil {
+			if err = pf.UnregisterFunc(fwdID); err != nil {
+				logging.Errorf("cleanup: failed to unregister %s: %v", fwdID, err)
+			}
+		}
 		logging.Warningf("PortFwd session (%s) has finished:\n%s: %s:%s -> %s\n%s",
 			pf.Description, pf.Protocol, bindAddr, pf.Lport, pf.To, fwdID)
 	}

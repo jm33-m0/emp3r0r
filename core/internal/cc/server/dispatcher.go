@@ -149,6 +149,16 @@ func operationDispatcher(w http.ResponseWriter, r *http.Request) {
 		handleListAgents(w, r)
 	case transport.OperatorForgetAgent:
 		handleForgetAgent(w, r)
+	case transport.OperatorListPortFwds:
+		handleListPortFwds(w, r)
+	case transport.OperatorRegisterPortFwd:
+		handleRegisterPortFwd(w, r)
+	case transport.OperatorUnregisterPortFwd:
+		handleUnregisterPortFwd(w, r)
+	case transport.OperatorGetCA:
+		handleGetCA(w, r)
+	case transport.OperatorSignAgent:
+		handleSignAgent(w, r)
 	default:
 		http.Error(w, fmt.Sprintf("Invalid API: %s", api), http.StatusNotFound)
 	}

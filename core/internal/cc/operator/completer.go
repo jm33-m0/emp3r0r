@@ -10,8 +10,9 @@ import (
 
 	"github.com/carapace-sh/carapace"
 	"github.com/google/uuid"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/controllers"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -42,9 +43,14 @@ func listMods(ctx carapace.Context) carapace.Action {
 
 // autocomplete portfwd session IDs
 func listPortMappings(ctx carapace.Context) carapace.Action {
-	ids := make([]string, 0)
-	for id := range network.PortFwds {
-		ids = append(ids, id)
+	sessions, err := client.GetPortFwdSessions()
+	if err != nil {
+		logging.Debugf("Failed to list port mappings: %v", err)
+		return carapace.ActionValues()
+	}
+	ids := make([]string, len(sessions))
+	for i, s := range sessions {
+		ids[i] = s.ID
 	}
 	return carapace.ActionValues(ids...)
 }
@@ -133,7 +139,7 @@ func listRemoteDirWorker(path_to_list, agent_tag string) (cwd string, names []st
 	names = make([]string, 0) // listing to return
 	cmd := fmt.Sprintf("%s --path %s", def.C2CmdListDir, path_to_list)
 	job_id := uuid.NewString()
-	err := operatorSendCommand2Agent(cmd, job_id, agent_tag)
+	err := controllers.ExecuteCommand(cmd, job_id, agent_tag)
 	if err != nil {
 		logging.Debugf("Cannot list remote directory: %v", err)
 		return

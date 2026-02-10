@@ -71,7 +71,7 @@ func TestOperatorConnection(t *testing.T) {
 	}
 	port := ln.Addr().(*net.TCPAddr).Port
 	ln.Close()
-	OPERATOR_PORT = port
+	OperatorPort = port
 
 	// Start Operator mTLS Server
 	go func() {

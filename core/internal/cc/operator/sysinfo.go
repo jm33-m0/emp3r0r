@@ -1,6 +1,7 @@
 package operator
 
 import (
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/controllers"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -29,7 +30,7 @@ func CmdSysinfo(cmd *cobra.Command, args []string) {
 	}
 
 	// Call controller (business logic)
-	err := controllers.ExecuteSysinfoCommand(agent, opts, OPERATOR_SESSION)
+	err := controllers.ExecuteSysinfoCommand(agent, opts, client.SessionID)
 	if err != nil {
 		logging.Errorf("Failed to execute sysinfo: %v", err)
 		return

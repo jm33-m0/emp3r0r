@@ -11,9 +11,11 @@ import (
 	"github.com/alecthomas/chroma/quick"
 	"github.com/fatih/color"
 	"github.com/google/uuid"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/ftp"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/relay"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/controllers"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -29,15 +31,15 @@ const AppName = "emp3r0r"
 var (
 	// EMP3R0R_CONSOLE: the main console interface
 	EMP3R0R_CONSOLE = console.New(AppName)
+
 	// SERVER_IP: operator server IP, non-WireGuard IP
-	SERVER_IP string
+	ServerIP string
 	// SERVER_KEY: operator server's public key
-	SERVER_KEY string
+	ServerKey string
 	// OPERATOR_ADDR: operator server address
-	OPERATOR_ADDR string
-	OPERATOR_PORT int
-	// OPERATOR_SESSION is the session ID for this operator
-	OPERATOR_SESSION = uuid.NewString()
+	OperatorAddr string
+	// OPERATOR_PORT: operator server port
+	OperatorPort int
 
 	// AgentRefreshCh triggers agent list refresh
 	AgentRefreshCh = make(chan struct{}, 1)
@@ -45,27 +47,34 @@ var (
 
 func backgroundJobs() {
 	var err error
-	OperatorHTTPClient, err = createMTLSHttpClient()
+	client.HTTPClient, err = createMTLSHttpClient()
 	if err != nil {
 		logging.Fatalf("Failed to create HTTP client: %v", err)
 	}
-	OPERATOR_ADDR = fmt.Sprintf("%s:%d", netutil.WgServerIP, OPERATOR_PORT)
-	logging.Infof("Operator's address: %s", OPERATOR_ADDR)
+	client.SessionID = uuid.NewString()
+
+	OperatorAddr = fmt.Sprintf("%s:%d", netutil.WgServerIP, OperatorPort)
+	logging.Infof("Operator's address: %s", OperatorAddr)
 
 	// Update operator's IP to Wireguard IP
-	OperatorRootURL = fmt.Sprintf("https://%s", OPERATOR_ADDR)
-	logging.Infof("Operator's WireGuard address: %s", OperatorRootURL)
+	client.RootURL = fmt.Sprintf("https://%s", OperatorAddr)
+	logging.Infof("Operator's WireGuard address: %s", client.RootURL)
 
 	// set up command senders
-	ftp.ExecCmd = operatorSendCommand2Agent
-	modules.CmdSender = operatorSendCommand2Agent
+	ftp.ExecCmd = controllers.ExecuteCommand
+	modules.CmdSender = controllers.ExecuteCommand
+	modules.RegisterPortFwdFunc = client.RegisterPortFwd
+	modules.UnregisterPortFwdFunc = client.UnregisterPortFwd
+	modules.GetPortFwdSessionsFunc = client.GetPortFwdSessions
 
 	// init modules by querying server for available modules
 	go modules.InitModules()
 	// refresh agent list every 10 seconds
 	go agentListRefresher()
 	// handle messages from operator
-	go msgTunHandler()
+	go client.StartMessageTunnel(processAgentData, func(err error) {
+		logging.Errorf("Message tunnel: %v", err)
+	})
 	// relayed HTTP server
 	go relay.RelayHTTP2Server()
 }
@@ -78,8 +87,8 @@ func CliMain(wg_server_ip string, wg_server_port int) {
 		}
 		logging.Printf("CliMain resumed (or returned normally)")
 	}()
-	OPERATOR_PORT = wg_server_port + 1
-	SERVER_IP = wg_server_ip
+	OperatorPort = wg_server_port + 1
+	ServerIP = wg_server_ip
 
 	// unlock incomplete downloads
 	err := tools.UnlockDownloads()
@@ -241,9 +250,9 @@ func CliBanner(console *console.Console) {
 		live.RuntimeConfig.CCPort,
 		live.RuntimeConfig.KCPServerPort,
 		name_list,
-		OPERATOR_ADDR,
-		SERVER_IP,
-		SERVER_KEY,
+		OperatorAddr,
+		ServerIP,
+		ServerKey,
 	))
 	if encodingErr != nil {
 		logging.Fatalf("CowSay: %v", encodingErr)

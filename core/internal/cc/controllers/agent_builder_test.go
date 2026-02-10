@@ -27,7 +27,11 @@ func TestEncryptAgentConfig(t *testing.T) {
 	}
 
 	// Test encryption
-	configPayload, agentUUID, err := EncryptAgentConfig()
+	cfg := AgentBuildConfig{
+		AgentUUID:    "test-uuid",
+		AgentUUIDSig: "test-sig",
+	}
+	configPayload, agentUUID, err := EncryptAgentConfig(cfg)
 	if err != nil {
 		// If CA not available, skip this test
 		t.Skipf("Skipping test - CA cert not available: %v", err)

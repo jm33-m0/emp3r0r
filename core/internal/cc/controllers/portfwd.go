@@ -80,6 +80,7 @@ func AddForward(ctx *c2context.C2Context) error {
 		}
 
 		pf.SendCmdFunc = modules.CmdSender
+		pf.RegisterFunc = modules.RegisterPortFwdFunc
 		pf.Protocol = ctx.Flags["protocol"]
 		pf.Agent = ctx.Target
 
@@ -107,6 +108,7 @@ func AddForward(ctx *c2context.C2Context) error {
 		}
 
 		pf.SendCmdFunc = modules.CmdSender
+		pf.RegisterFunc = modules.RegisterPortFwdFunc
 		pf.Agent = ctx.Target
 
 		go func() {

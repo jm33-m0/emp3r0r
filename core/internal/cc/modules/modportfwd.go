@@ -14,6 +14,16 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
+// RegisterPortFwdFunc is a function to register a port mapping with the server
+// It is set by the operator when it starts up
+var RegisterPortFwdFunc func(def.PortFwdRequest) error
+
+// UnregisterPortFwdFunc is a function to unregister a port mapping with the server
+var UnregisterPortFwdFunc func(string) error
+
+// GetPortFwdSessionsFunc is a function to get all active port forwarding sessions from the server
+var GetPortFwdSessionsFunc func() ([]def.PortFwdSession, error)
+
 func ModulePortFwd(ctx *c2context.C2Context) {
 	switchOpt, ok := ctx.Flags["switch"]
 	if !ok {
@@ -85,6 +95,8 @@ func ModulePortFwd(ctx *c2context.C2Context) {
 		}
 
 		pf.SendCmdFunc = CmdSender
+		pf.RegisterFunc = RegisterPortFwdFunc
+		pf.UnregisterFunc = UnregisterPortFwdFunc
 		pf.Agent = activeAgent
 		go func() {
 			logging.Printf("RunReversedPortFwd: %s:%s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.BindAddr, pf.Lport, pf.To, pf.Protocol)
@@ -107,6 +119,8 @@ func ModulePortFwd(ctx *c2context.C2Context) {
 		}
 
 		pf.SendCmdFunc = CmdSender
+		pf.RegisterFunc = RegisterPortFwdFunc
+		pf.UnregisterFunc = UnregisterPortFwdFunc
 		pf.Protocol = ctx.Flags["protocol"]
 		pf.Agent = activeAgent
 		go func() {
@@ -156,6 +170,8 @@ func moduleProxy(ctx *c2context.C2Context) {
 	pf.Lport, pf.To = port, "127.0.0.1:"+live.RuntimeConfig.AgentSocksServerPort
 	pf.BindAddr = bindAddr
 	pf.SendCmdFunc = CmdSender
+	pf.RegisterFunc = RegisterPortFwdFunc
+	pf.UnregisterFunc = UnregisterPortFwdFunc
 	pf.Description = fmt.Sprintf("Agent Proxy (TCP):\n%s:%s (Local) -> %s (Agent)", bindAddr, pf.Lport, pf.To)
 	pf.Protocol = "tcp"
 	pf.Timeout = live.RuntimeConfig.AgentSocksTimeout
@@ -170,6 +186,8 @@ func moduleProxy(ctx *c2context.C2Context) {
 	pfu.Protocol = "udp"
 	pfu.Timeout = live.RuntimeConfig.AgentSocksTimeout
 	pfu.SendCmdFunc = CmdSender
+	pfu.RegisterFunc = RegisterPortFwdFunc
+	pfu.UnregisterFunc = UnregisterPortFwdFunc
 	pfu.Agent = activeAgent
 
 	switch status {

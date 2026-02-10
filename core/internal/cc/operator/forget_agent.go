@@ -1,8 +1,7 @@
 package operator
 
 import (
-	"fmt"
-
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -20,8 +19,7 @@ func CmdForgetAgent(cmd *cobra.Command, args []string) {
 	}
 
 	// Send request to C2 server
-	url := fmt.Sprintf("%s/%s", OperatorRootURL, transport.OperatorForgetAgent)
-	respBody, err := sendCBORRequest(url, operation)
+	respBody, err := client.SendCBORRequest(transport.OperatorForgetAgent, operation)
 	if err != nil {
 		logging.Errorf("Failed to forget agent: %v", err)
 		return

@@ -7,6 +7,15 @@ import (
 
 // GetPortFwdSessions returns all active port forwarding sessions
 func GetPortFwdSessions() []def.PortFwdSession {
+	// If the callback is set, use it to fetch from server
+	// This is set by the operator when it starts up
+	if RegisterPortFwdFunc != nil && GetPortFwdSessionsFunc != nil {
+		sessions, err := GetPortFwdSessionsFunc()
+		if err == nil {
+			return sessions
+		}
+	}
+
 	var sessions []def.PortFwdSession
 
 	for id, portmap := range network.PortFwds {

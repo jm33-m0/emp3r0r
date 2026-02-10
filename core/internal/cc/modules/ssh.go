@@ -147,6 +147,7 @@ func SSHClient(shell, args, port string) (string, error) {
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
 		pf.Lport, pf.To = lport, to
 		pf.SendCmdFunc = CmdSender
+		pf.RegisterFunc = RegisterPortFwdFunc
 		go func() {
 			// remember the port mapping and shell and agent
 			SSHShellPort[shell] = &SSH_SHELL_Mapping{

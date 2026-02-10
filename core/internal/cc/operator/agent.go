@@ -6,12 +6,41 @@ import (
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
+	"github.com/spf13/cobra"
 )
+
+// cmdSetActiveAgent sets the active agent for the operator
+func CmdSetActiveAgent(cmd *cobra.Command, args []string) {
+	agent, err := client.SetActiveAgent(args[0])
+	if err != nil {
+		logging.Errorf("Failed to set active agent: %v", err)
+		return
+	}
+	live.ActiveAgent = agent
+	logging.Successf("Now targeting %s", live.ActiveAgent.Tag)
+
+	// Update tmux window title to show active agent
+	setTitleErr := cli.TmuxSetWindowTitle(fmt.Sprintf("#[fg=cyan]%s", live.ActiveAgent.Name), cli.CommandPane.WindowID)
+	if setTitleErr != nil {
+		logging.Warningf("Failed to set tmux window title: %v", setTitleErr)
+	}
+}
+
+// cmdListAgents triggers a refresh of the agent list and switches to the agent list pane
+func CmdListAgents(_ *cobra.Command, _ []string) {
+	err := refreshAgentList()
+	if err != nil {
+		logging.Errorf("Failed to list agents: %v", err)
+		return
+	}
+	cli.TmuxSwitchWindow(cli.AgentListPane.WindowID)
+}
 
 // RenderAgentTable builds and returns a table string for the given agents.
 func RenderAgentTable(agents []*def.Emp3r0rAgent) {
@@ -120,9 +149,19 @@ func agentListRefresher() {
 
 // refreshAgentList refreshes agent list from server
 func refreshAgentList() error {
-	err := getAgentListFromServer()
+	agents, err := client.GetAgentList()
 	if err != nil {
 		return err
+	}
+	live.AgentList = agents
+	// Update active agent pointer to avoid staleness
+	if live.ActiveAgent != nil {
+		for _, a := range agents {
+			if a.UUID == live.ActiveAgent.UUID {
+				live.ActiveAgent = a
+				break
+			}
+		}
 	}
 
 	RenderAgentTable(live.AgentList)

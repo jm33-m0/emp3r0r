@@ -142,6 +142,12 @@ func DeletePortFwdSession(sessionID string) error {
 	session.Cancel()
 	delete(PortFwds, sessionID)
 
+	if session.UnregisterFunc != nil {
+		if err = session.UnregisterFunc(sessionID); err != nil {
+			logging.Errorf("DeletePortFwdSession: failed to unregister %s: %v", sessionID, err)
+		}
+	}
+
 	logging.Infof("Deleted port forwarding session %s", sessionID)
 	return nil
 }

@@ -4,13 +4,16 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/posener/h2conn"
@@ -163,6 +166,114 @@ func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
 
 	wrt.WriteHeader(http.StatusOK)
 	wrt.Write([]byte(fmt.Sprintf("%s\n\nHas been forgotten.", agentDetails)))
+}
+
+func handleListPortFwds(wrt http.ResponseWriter, _ *http.Request) {
+	network.PortFwdsMutex.Lock()
+	defer network.PortFwdsMutex.Unlock()
+
+	var sessions []def.PortFwdSession
+	for id, portmap := range network.PortFwds {
+		bindAddr := portmap.BindAddr
+		if bindAddr == "" {
+			bindAddr = "127.0.0.1"
+		}
+
+		sessions = append(sessions, def.PortFwdSession{
+			ID:          id,
+			LocalPort:   portmap.Lport,
+			RemoteAddr:  portmap.To,
+			BindAddr:    bindAddr,
+			AgentTag:    portmap.Agent.Tag,
+			Description: portmap.Description,
+			Reverse:     portmap.Reverse,
+			Protocol:    portmap.Protocol,
+		})
+	}
+
+	data, err := cbor.Marshal(sessions)
+	if err != nil {
+		logging.Errorf("Failed to marshal port mappings: %v", err)
+		http.Error(wrt, "Failed to marshal response", http.StatusInternalServerError)
+		return
+	}
+
+	wrt.Header().Set("Content-Type", "application/cbor")
+	wrt.WriteHeader(http.StatusOK)
+	wrt.Write(data)
+}
+
+func handleRegisterPortFwd(wrt http.ResponseWriter, req *http.Request) {
+	// Decode CBOR request body
+	pfReq, err := DecodeCBORBody[def.PortFwdRequest](wrt, req)
+	if err != nil {
+		return
+	}
+
+	// Register session in server's map
+	network.PortFwdsMutex.Lock()
+	network.PortFwds[pfReq.SessionID] = &network.PortFwdSession{
+		Lport:       pfReq.Lport,
+		To:          pfReq.To,
+		Description: pfReq.Description,
+		Protocol:    pfReq.Protocol,
+		Reverse:     pfReq.IsReverse,
+		Agent: &def.Emp3r0rAgent{
+			Tag: pfReq.AgentTag,
+		},
+	}
+	network.PortFwdsMutex.Unlock()
+
+	logging.Infof("Registered port mapping %s (%s) from operator", pfReq.SessionID, pfReq.Description)
+	wrt.WriteHeader(http.StatusOK)
+}
+
+func handleUnregisterPortFwd(wrt http.ResponseWriter, req *http.Request) {
+	// Decode CBOR request body
+	sessionID, err := DecodeCBORBody[string](wrt, req)
+	if err != nil {
+		return
+	}
+
+	// Unregister session in server's map
+	network.PortFwdsMutex.Lock()
+	delete(network.PortFwds, *sessionID)
+	network.PortFwdsMutex.Unlock()
+
+	logging.Infof("Unregistered port mapping %s from operator", *sessionID)
+	wrt.WriteHeader(http.StatusOK)
+}
+
+func handleGetCA(wrt http.ResponseWriter, req *http.Request) {
+	caData, err := os.ReadFile(transport.CaCrtFile)
+	if err != nil {
+		logging.Errorf("Failed to read CA cert: %v", err)
+		http.Error(wrt, "Failed to read CA cert", http.StatusInternalServerError)
+		return
+	}
+
+	serverCrtData, err := os.ReadFile(transport.ServerCrtFile)
+	if err != nil {
+		logging.Errorf("Failed to read Server cert: %v", err)
+		http.Error(wrt, "Failed to read Server cert", http.StatusInternalServerError)
+		return
+	}
+
+	resp := map[string][]byte{
+		"ca_crt":     caData,
+		"server_crt": serverCrtData,
+	}
+
+	data, err := cbor.Marshal(resp)
+	if err != nil {
+		logging.Errorf("Failed to marshal certs: %v", err)
+		http.Error(wrt, "Failed to marshal response", http.StatusInternalServerError)
+		return
+	}
+
+	wrt.Header().Set("Content-Type", "application/cbor")
+	wrt.WriteHeader(http.StatusOK)
+	wrt.Write(data)
 }
 
 // handleOperatorConn handles operator connections, this connection will be used to relay the message tunnel
