@@ -231,7 +231,10 @@ connect:
 		goto connect
 	}
 	logging.Println("Connecting to message tunnel...")
-	c2transport.MsgTunneler(def.CCMsgConn, common.RuntimeConfig, handler.HandleC2Command, ctx, cancel)
+	err = c2transport.MsgTunneler(def.CCMsgConn, common.RuntimeConfig, handler.HandleC2Command, ctx, cancel)
+	if err != nil {
+		logging.Errorf("Message tunnel exited with error: %v", err)
+	}
 	logging.Printf("Message tunnel closed, signaling parent and sleeping")
 	// Signal parent (shellcode stager) to suspend us immediately
 	// This prevents attempting reconnection that gets interrupted mid-preflight

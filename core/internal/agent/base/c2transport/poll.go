@@ -149,6 +149,8 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 			if msg.Tag == "handshake" {
 				if pfsKeysExchanged {
 					// We already have the keys, this is likely a keep-alive from server (random data)
+					// Notify wait_hello that handshake is done/alive
+					HandShakes.Store(msg.JobID, true)
 					continue
 				}
 
