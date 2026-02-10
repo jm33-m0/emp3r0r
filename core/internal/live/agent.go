@@ -33,4 +33,8 @@ var (
 
 	// AgentList list of connected agents
 	AgentList = make([]*def.Emp3r0rAgent, 0)
+	// PendingKeyRotations stores new public keys for agents that requested rotation
+	// key: UUID, value: PublicKey
+	PendingKeyRotations      = make(map[string]string)
+	PendingKeyRotationsMutex = sync.RWMutex{}
 )

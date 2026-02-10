@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jm33-m0/arc/v2"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/relay"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
@@ -21,6 +22,14 @@ import (
 )
 
 func ServerMain(wg_port int, hosts string, numOperators int) {
+	// Initialize agent database for persistent tracking
+	dbPath := filepath.Join(live.EmpWorkSpace, "agents.db")
+	if err := agents.InitAgentDB(dbPath); err != nil {
+		logging.Errorf("Failed to initialize agent database: %v", err)
+		return
+	}
+	defer agents.CloseAgentDB()
+
 	// start all services
 	network.EmpKCPCtx, network.EmpKCPCancel = context.WithCancel(context.Background())
 	go KCPC2ListenAndServe(network.EmpKCPCtx, network.EmpKCPCancel)

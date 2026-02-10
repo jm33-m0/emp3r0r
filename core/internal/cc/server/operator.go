@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
@@ -93,6 +94,75 @@ func handleListAgents(wrt http.ResponseWriter, _ *http.Request) {
 	if err := cbor.NewEncoder(wrt).Encode(agentsList); err != nil {
 		http.Error(wrt, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
+	// Decode CBOR request body to get Agent UUID
+	operation, err := DecodeCBORBody[def.Operation](wrt, req)
+	if err != nil {
+		return
+	}
+
+	uuid := operation.AgentTag
+	if uuid == "" {
+		http.Error(wrt, "Agent UUID is empty", http.StatusBadRequest)
+		return
+	}
+
+	// Prepare response message with agent details
+	var agentDetails string = fmt.Sprintf("Agent %s", uuid)
+
+	// Try to get agent details from memory first (if connected/recently connected)
+	live.AgentControlMapMutex.RLock()
+	var targetAgent *def.Emp3r0rAgent
+	for a := range live.AgentControlMap {
+		if a.UUID == uuid {
+			targetAgent = a
+			break
+		}
+	}
+	live.AgentControlMapMutex.RUnlock()
+
+	if targetAgent != nil {
+		agentDetails += fmt.Sprintf("\n  Tag: %s\n  Hostname: %s\n  IPs: %s\n  OS: %s",
+			targetAgent.Tag, targetAgent.Hostname, strings.Join(targetAgent.IPs, ", "), targetAgent.OS)
+	} else if agents.AgentDB != nil {
+		// Try to get from DB
+		stored, err := agents.GetStoredAgent(uuid)
+		if err == nil && stored != nil {
+			agentDetails += fmt.Sprintf("\n  Tag: %s\n  Hostname: %s\n  IPs: %s\n  OS: %s\n  (Offline/Database Record)",
+				stored.Tag, stored.Hostname, stored.IPAddresses, stored.OS)
+		}
+	}
+
+	// Remove from DB
+	if agents.AgentDB != nil {
+		err := agents.RemoveAgent(uuid)
+		if err != nil {
+			logging.Errorf("Failed to remove agent %s from DB: %v", uuid, err)
+			http.Error(wrt, fmt.Sprintf("DB removal failed: %v", err), http.StatusInternalServerError)
+			return
+		}
+	} else {
+		http.Error(wrt, "Agent database not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	// Remove from memory
+	live.AgentControlMapMutex.Lock()
+	if targetAgent != nil {
+		delete(live.AgentControlMap, targetAgent)
+		logging.Successf("Operator removed agent %s from memory", uuid)
+	}
+	live.AgentControlMapMutex.Unlock()
+
+	// Clean up any pending key rotations for this agent
+	live.PendingKeyRotationsMutex.Lock()
+	delete(live.PendingKeyRotations, uuid)
+	live.PendingKeyRotationsMutex.Unlock()
+
+	wrt.WriteHeader(http.StatusOK)
+	wrt.Write([]byte(fmt.Sprintf("%s\n\nHas been forgotten.", agentDetails)))
 }
 
 // handleOperatorConn handles operator connections, this connection will be used to relay the message tunnel

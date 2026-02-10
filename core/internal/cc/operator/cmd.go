@@ -519,6 +519,17 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			"cmd": carapace.ActionCallback(listAgentExes),
 		})
 
+		forgetAgentCmd := &cobra.Command{
+			Use:     "forget_agent <uuid>",
+			GroupID: "c2",
+			Short:   "Remove an agent from the database (tracking history)",
+			Example: "forget_agent <agent-uuid>",
+			Args:    cobra.ExactArgs(1),
+			Run:     CmdForgetAgent,
+		}
+		rootCmd.AddCommand(forgetAgentCmd)
+		carapace.Gen(forgetAgentCmd).PositionalCompletion(carapace.ActionCallback(listAgents))
+
 		return rootCmd
 	}
 }

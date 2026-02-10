@@ -147,6 +147,8 @@ func operationDispatcher(w http.ResponseWriter, r *http.Request) {
 		handleSendCommand(w, r)
 	case transport.OperatorListConnectedAgents:
 		handleListAgents(w, r)
+	case transport.OperatorForgetAgent:
+		handleForgetAgent(w, r)
 	default:
 		http.Error(w, fmt.Sprintf("Invalid API: %s", api), http.StatusNotFound)
 	}

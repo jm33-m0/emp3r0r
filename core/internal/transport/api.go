@@ -28,4 +28,6 @@ const (
 	OperatorListConnectedAgents = OperatorRoot + "/list_connected_agents"
 	// OperatorSendCommand
 	OperatorSendCommand = OperatorRoot + "/send_command"
+	// OperatorForgetAgent
+	OperatorForgetAgent = OperatorRoot + "/forget_agent"
 )
