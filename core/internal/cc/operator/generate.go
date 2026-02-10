@@ -303,26 +303,22 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 	logging.Printf("Conditional C2 (Hybrid Mode) beacon interval: %d - %d seconds",
 		live.RuntimeConfig.PreflightIntervalMin, live.RuntimeConfig.PreflightIntervalMax)
 
-	if cmd.Flags().Changed("proxychain") {
-		if proxy_chain {
-			if !cmd.Flags().Changed("proxychain-wait-min") {
-				proxy_chain_min = util.RandInt(30, 120)
-			}
-			live.RuntimeConfig.ProxyChainBroadcastIntervalMin = proxy_chain_min
-
-			if !cmd.Flags().Changed("proxychain-wait-max") {
-				live.RuntimeConfig.ProxyChainBroadcastIntervalMax = util.RandInt(proxy_chain_min+10, proxy_chain_min+100)
-			} else {
-				live.RuntimeConfig.ProxyChainBroadcastIntervalMax = proxy_chain_max
-			}
-			logging.Printf("Proxy chain is enabled with broadcast interval %d-%d",
-				live.RuntimeConfig.ProxyChainBroadcastIntervalMin,
-				live.RuntimeConfig.ProxyChainBroadcastIntervalMax)
-		} else {
-			live.RuntimeConfig.ProxyChainBroadcastIntervalMax = 0
-			logging.Printf("Proxy chain is disabled")
+	if proxy_chain {
+		if !cmd.Flags().Changed("proxychain-wait-min") {
+			proxy_chain_min = util.RandInt(30, 120)
 		}
-	} else if live.RuntimeConfig.ProxyChainBroadcastIntervalMax == 0 {
+		live.RuntimeConfig.ProxyChainBroadcastIntervalMin = proxy_chain_min
+
+		if !cmd.Flags().Changed("proxychain-wait-max") {
+			live.RuntimeConfig.ProxyChainBroadcastIntervalMax = util.RandInt(proxy_chain_min+10, proxy_chain_min+100)
+		} else {
+			live.RuntimeConfig.ProxyChainBroadcastIntervalMax = proxy_chain_max
+		}
+		logging.Printf("Proxy chain is enabled with broadcast interval %d-%d",
+			live.RuntimeConfig.ProxyChainBroadcastIntervalMin,
+			live.RuntimeConfig.ProxyChainBroadcastIntervalMax)
+	} else {
+		live.RuntimeConfig.ProxyChainBroadcastIntervalMax = 0
 		logging.Printf("Proxy chain is disabled")
 	}
 

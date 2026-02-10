@@ -51,6 +51,14 @@ func NewSecureConn(conn io.ReadWriteCloser) *SecureConn {
 	}
 }
 
+// SetKey updates the encryption key for the connection.
+// This is used to switch to a session key after a successful handshake.
+func (sc *SecureConn) SetKey(key []byte) {
+	sc.bufMutex.Lock()
+	defer sc.bufMutex.Unlock()
+	sc.key = key
+}
+
 // Read reads encrypted data from the connection, decrypts it, and returns it.
 // It handles framing by reading a length prefix (4 bytes int) if necessary,
 // OR by reading until it gets a valid chunk.

@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"encoding/base64"
-	"fmt"
 	"net/http"
 	"strconv"
 	"sync"
@@ -53,6 +52,9 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 		logging.Debugf("handleMessageTunnel exited")
 	}()
 	in := cbor.NewDecoder(secureConn)
+	// Track PFS state for this connection
+	var pfsEstablished bool
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -140,8 +142,15 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 				}
 				// verify hello
 				logging.Debugf("Handshake from %s successful", msg.Tag)
-				// respond with random data, wrapped in MsgTunData
-				replyData := util.RandBytes(util.RandInt(10, 100))
+
+				// ECDH Key Exchange Support
+				replyData, sessionKey, err := processKeyExchange(&msg, pfsEstablished)
+				if err != nil {
+					logging.Errorf("Handshake processing error: %v", err)
+					return
+				}
+
+				// respond with Server Public Key (or random data), wrapped in MsgTunData
 				replyMsg := def.MsgTunData{
 					JobID:    msg.JobID,
 					Tag:      "handshake",
@@ -151,7 +160,17 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 				err = encoder.Encode(replyMsg)
 				if err != nil {
 					logging.Warningf("handleMessageTunnel: %v", err)
+				} else if sessionKey != nil {
+					// 6. Switch to Session Key (only if exchange was successful)
+					secureConn.SetKey(sessionKey)
+					if !pfsEstablished {
+						logging.Infof("SecureConn: Switched to ephemeral session key for %s (PFS enabled)", msg.Tag)
+						pfsEstablished = true
+					} else {
+						logging.Debugf("SecureConn: Re-keyed ephemeral session key for %s", msg.Tag)
+					}
 				}
+
 				atomic.StoreInt64(&lastHandshake, time.Now().Unix())
 				continue // Handshake handled, next message
 			}
@@ -178,33 +197,4 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 		}
 		util.TakeABlink()
 	}
-}
-
-func operatorBroadcastPrintf(msg_type, format string, a ...any) (err error) {
-	msgTunData := def.MsgTunData{
-		Tag:      msg_type,                          // tell operator about the message type: INFO, WARN, ERROR, SUCCESS
-		Response: []byte(fmt.Sprintf(format, a...)), // message content
-		JobID:    "",
-		CmdSlice: []string{},
-	}
-	return fwdMsg2Operators(msgTunData)
-}
-
-func fwdMsg2Operators(msg def.MsgTunData) (err error) {
-	for operator_session_id, operator := range OPERATORS {
-		if operator == nil {
-			continue
-		}
-		if operator.conn == nil {
-			continue
-		}
-		encoder := cbor.NewEncoder(operator.conn)
-		err = encoder.Encode(msg)
-		if err != nil {
-			logging.Errorf("Failed to forward message to operator: %v", err)
-			return
-		}
-		logging.Debugf("Forwarded message %v to operator %s", msg, operator_session_id)
-	}
-	return
 }

@@ -95,8 +95,9 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 	def.CCMsgConn = secureConn
 
 	var (
-		in  = cbor.NewDecoder(secureConn)
-		out = cbor.NewEncoder(secureConn)
+		in            = cbor.NewDecoder(secureConn)
+		out           = cbor.NewEncoder(secureConn)
+		handshakeDone = false
 	)
 	go catchInterruptAndExit(ctx, cancel)
 	defer func() {
@@ -115,6 +116,13 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 		logging.Print("MsgTunneler closed")
 	}()
 
+	// Generate Ephemeral Key Pair for this session
+	privKey, err := transport.GenerateEphemeralKeyPair()
+	if err != nil {
+		return fmt.Errorf("failed to generate ephemeral key pair: %v", err)
+	}
+	pubKeyBytes := transport.SerializePublicKey(&privKey.PublicKey)
+
 	// check for CC server's response
 	go func() {
 		defer func() {
@@ -123,6 +131,8 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 			}
 			cancel()
 		}()
+		// Track if we have already exchanged keys in this session
+		var pfsKeysExchanged bool
 		logging.Println("Check CC response: started")
 		for ctx.Err() == nil {
 			// read response
@@ -137,6 +147,38 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 
 			// if it's a handshake reply
 			if msg.Tag == "handshake" {
+				if pfsKeysExchanged {
+					// We already have the keys, this is likely a keep-alive from server (random data)
+					continue
+				}
+
+				// 1. Parse Server's Public Key
+				serverPubKey, err := transport.DeserializePublicKey(msg.Response)
+				if err != nil {
+					logging.Errorf("Failed to deserialize server public key: %v", err)
+					continue
+				}
+
+				// 2. Derive Shared Secret (ECDH)
+				sharedSecret, err := transport.PerformECDH(privKey, serverPubKey)
+				if err != nil {
+					logging.Errorf("Failed to perform ECDH: %v", err)
+					continue
+				}
+
+				// 3. Derive Session Key (HKDF)
+				sessionKey, err := transport.DeriveSessionKey(sharedSecret, config.AgentUUID)
+				if err != nil {
+					logging.Errorf("Failed to derive session key: %v", err)
+					continue
+				}
+
+				// 4. Switch SecureConn to new Session Key
+				secureConn.SetKey(sessionKey)
+				logging.Successf("SecureConn: Switched to ephemeral session key (PFS enabled)")
+				pfsKeysExchanged = true
+
+				// Notify wait_hello that handshake is done
 				HandShakes.Store(msg.JobID, true)
 				continue
 			}
@@ -183,6 +225,9 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 			hello_msg.Tag = config.AgentTag
 			hello_msg.AgentUUID = config.AgentUUID
 			hello_msg.Time = time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST")
+			if !handshakeDone {
+				hello_msg.EphemPublicKey = pubKeyBytes // Send our ephemeral public key
+			}
 
 			// Dynamic TOFU: Sign UUID with Agent Key for session authentication
 			sig, err := agentutils.SignWithAgentKey([]byte(config.AgentUUID))
@@ -197,7 +242,13 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 				util.TakeABlink()
 				continue
 			}
+			// Use a specialized struct or distinct type to indicate "pending" if needed,
+			// but here we just don't store "true" (which would be success).
+			// We store nil or rely on Load returning nil.
+			// Actually, let's explicitly store checking info if we want, but 'false' or nothing is fine.
+			// The original code stored 'false'. Let's stick to that to indicate "sent but not received".
 			HandShakes.Store(hello_msg.JobID, false)
+
 			if !wait_hello(hello_msg.JobID) {
 				cancel()
 				break
@@ -213,6 +264,7 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 			logging.Errorf("sendHello failed")
 			break
 		}
+		handshakeDone = true
 		util.TakeASnap(true)
 	}
 
