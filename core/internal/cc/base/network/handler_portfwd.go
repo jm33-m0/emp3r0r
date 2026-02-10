@@ -68,7 +68,7 @@ func HandlePortMapping(sh *StreamHandler, wrt http.ResponseWriter, req *http.Req
 	}
 	pf, exist := PortFwds[sessionID.String()]
 	if !exist {
-		logging.Errorf("Port mapping session %s unknown", sessionID.String())
+		logging.Debugf("Port mapping session %s unknown. Did you remove it?", sessionID.String())
 		return
 	}
 	pf.Sh = make(map[string]*StreamHandler)
@@ -103,10 +103,10 @@ func HandlePortMapping(sh *StreamHandler, wrt http.ResponseWriter, req *http.Req
 		if pf, exist = PortFwds[sessionID.String()]; exist {
 			pf.Cancel()
 		} else {
-			logging.Warningf("Port mapping %s not found", sessionID.String())
+			logging.Debugf("Port mapping %s not found (likely deleted)", sessionID.String())
 		}
 		cancel()
-		logging.Warningf("Closed port forwarding connection from %s", req.RemoteAddr)
+		logging.Debugf("Closed port forwarding connection from %s", req.RemoteAddr)
 	}()
 	for pf.Ctx.Err() == nil {
 		if _, exist := PortFwds[sessionID.String()]; !exist {
@@ -148,6 +148,6 @@ func DeletePortFwdSession(sessionID string) error {
 		}
 	}
 
-	logging.Infof("Deleted port forwarding session %s", sessionID)
+	logging.Debugf("Deleted port forwarding session %s", sessionID)
 	return nil
 }
