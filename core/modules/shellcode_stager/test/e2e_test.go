@@ -1,5 +1,4 @@
-//go:build cgo
-// +build cgo
+//go:build linux && cgo
 
 package shellcode_stager
 
