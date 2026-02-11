@@ -1,5 +1,21 @@
 # Changelog
 
+## [3.21.0](https://github.com/jm33-m0/emp3r0r/compare/v3.20.2...v3.21.0) (2026-02-11)
+
+
+### Features
+
+* implement agent key rotation, persistent agent database, and ephemeral agent keys for enhanced security. ([884ba38](https://github.com/jm33-m0/emp3r0r/commit/884ba388d85a09ce0fcb7641230f811d8b167161))
+* implement Perfect Forward Secrecy (PFS) for C2 communication and refine proxy chain configuration logic. ([471b41d](https://github.com/jm33-m0/emp3r0r/commit/471b41de29e5fa588f95f492e21ccb8f08ae4841))
+* implement seed injection via FD3 for persistent agent identity and refactor stager's main loop and ELF loading. ([77552f3](https://github.com/jm33-m0/emp3r0r/commit/77552f3ffd64eaaab2f0a55bf6a3437c070d9299))
+
+
+### Bug Fixes
+
+* agent should sleep instead of exiting when `--stager` is not given ([c76b35b](https://github.com/jm33-m0/emp3r0r/commit/c76b35b8556c8027bcd9e1a8f9fa981c7073df98))
+* data race ([56704f3](https://github.com/jm33-m0/emp3r0r/commit/56704f348ff2be2451e33ddf42e52dbaa7dd75e4))
+* handshake not handled properly ([b43f3d7](https://github.com/jm33-m0/emp3r0r/commit/b43f3d778277a57f929c44b0f81fd79697e89df0))
+
 ## [3.20.2](https://github.com/jm33-m0/emp3r0r/compare/v3.20.1...v3.20.2) (2026-02-09)
 
 
