@@ -28,8 +28,8 @@ emp3r0r is a comprehensive post-exploitation framework that stands out as one of
 
 - **Linux-Native Architecture**: Built from the ground up for Linux targets with full Windows compatibility.
 - **Universal Module Support**: Execute Bash, PowerShell, Python, DLL, SO, and EXE modules seamlessly across platforms.
-- **Advanced Stealth**: **Global AES-GCM Encryption**, **Memory-backed agent file system** with transparent encryption, **configurable module stomping**, stager-managed **shared memory execution** with process resumption, native **Linux BOF support**, and **XOR-based payload rotation** for idle stagers.
-- **Modern Infrastructure**: WireGuard + mTLS operator authentication, HTTP2/TLS with **JA3 fingerprinting evasion** + **Conditional C2 (Hybrid Mode)**, KCP-based UDP tunneling, and **customizable C2 paths** (WebRoot, check-in, message paths).
+- **Advanced Stealth**: **Perfect Forward Secrecy (PFS)**, **Agent Key Rotation**, **Global AES-GCM Encryption**, **Memory-backed agent file system** with transparent encryption, **configurable module stomping**, stager-managed **shared memory execution** with process resumption, native **Linux BOF support**, and **XOR-based payload rotation** for idle stagers.
+- **Modern Infrastructure**: WireGuard + mTLS operator authentication, **CBOR-based communication** and data serialization, HTTP2/TLS with **JA3 fingerprinting evasion** + **Conditional C2 (Hybrid Mode)**, KCP-based UDP tunneling, and **customizable C2 paths** (WebRoot, check-in, message paths).
 - **COFF/BOF Loader**: Native BOF execution on Windows agents with typed argument packing (LPSTR/LPWSTR/INT/BOOL/BINARY), and integration-friendly module schema; on Linux you can load ELF object files in-memory to achieve the same effect or execute full ELF binaries via the advanced stager.
 - **APT-Grade Connectivity**: **Auto-Proxy Chain** creates a resilient, automatic P2P mesh network. Agents in isolated network segments autonomously discover and piggyback on internet-connected peers to reach the C2, ensuring long-term survival in hardened environments.
 - **Bring2CC**: Reverse proxy any target to the C2 server, enabling direct access to internal networks even when agents cannot make outbound connections.
@@ -40,7 +40,10 @@ emp3r0r is a comprehensive post-exploitation framework that stands out as one of
 
 ### Installation
 
+While pre-built binaries may be available, building from source is the primary and recommended installation method:
+
 ```bash
+# Automated install script (Installs dependencies and builds from source)
 curl -sSL https://raw.githubusercontent.com/jm33-m0/emp3r0r/refs/heads/v3/install.sh | bash
 ```
 
@@ -80,6 +83,7 @@ Use the `generate` command from within the emp3r0r shell interface to create cus
 
 - **Memory-first approach** with intelligent storage management to minimize disk presence.
 - **Minimal footprint** with no dedicated agent directories or persistent files.
+- **OPSEC Warnings**: Real-time warnings for operations that pose operational security risks (e.g., "fork and run" patterns, unencrypted disk activity).
 - **Warn-before-write** for operations that touch disk, keeping hosts clean.
 - **Consistent artifacts** via uniform file handling for predictable, low-profile operations.
 
@@ -94,8 +98,10 @@ Use the `generate` command from within the emp3r0r shell interface to create cus
 
 #### Secure Command & Control
 
+- **Perfect Forward Secrecy (PFS)** for all C2 communications, ensuring past traffic remains secure even if long-term keys are compromised.
 - **JA3-evasive HTTP2/TLS** ([uTLS](https://github.com/refraction-networking/utls): Randomizes TLS Client Hello fingerprints to evade JA3-based detection systems
 - **WireGuard+mTLS** for secure operator access.
+- **CBOR Serialization**: All network traffic and data storage uses space-efficient, binary CBOR instead of JSON.
 - **KCP** for speed and resilience in high-latency environments
 - **TOR/CDN** support for additional operational cover.
 
@@ -105,7 +111,7 @@ Use the `generate` command from within the emp3r0r shell interface to create cus
 
 - **Console + Cobra core** for robust command handling.
 - **Intelligent auto-completion** with syntax highlighting.
-- **Native tmux integration** for parallel operations.
+- **Adaptive tmux UI**: Native integration with dynamic status bars, adaptive layouts, and real-time agent/C2 status monitoring.
 - **BYOS (Bring Your Own Shell)**: SSH-based reverse PTY that drives any shell available on the target (bash, zsh, sh, python REPL, etc.) over the same tunnel you also reuse for the file manager and transfers.
 
 #### Advanced Shell Integration
@@ -171,9 +177,9 @@ Use the `generate` command from within the emp3r0r shell interface to create cus
 
 #### Additional Capabilities
 
-- **Screenshot**: Fully integrated module for capturing target screens.
 - **LPE**: Privilege escalation tools with automated suggestions (`lpe_suggest`).
 - **Log Sanitization**: `clean_log` module for anti-forensics.
+- **Process Insight**: Multi-platform tools for inspecting process memory and file handles.
 
 ---
 
