@@ -18,9 +18,11 @@ import (
 // SecureConn wraps a net.Conn with AES-GCM encryption
 type SecureConn struct {
 	net.Conn
-	key      []byte
-	readBuf  []byte
-	bufMutex sync.Mutex
+	key     []byte
+	keyMu   sync.RWMutex
+	readBuf []byte
+	readMu  sync.Mutex
+	writeMu sync.Mutex
 }
 
 // ByteReadWriteCloser wraps io.ReadWriteCloser to implement net.Conn
@@ -54,8 +56,8 @@ func NewSecureConn(conn io.ReadWriteCloser) *SecureConn {
 // SetKey updates the encryption key for the connection.
 // This is used to switch to a session key after a successful handshake.
 func (sc *SecureConn) SetKey(key []byte) {
-	sc.bufMutex.Lock()
-	defer sc.bufMutex.Unlock()
+	sc.keyMu.Lock()
+	defer sc.keyMu.Unlock()
 	sc.key = key
 }
 
@@ -70,8 +72,8 @@ func (sc *SecureConn) SetKey(key []byte) {
 // If we are wrapping `h2conn`, we are wrapping the stream *inside* the HTTP2 stream.
 // So simple framing `[Len][Payload]` is appropriate here.
 func (sc *SecureConn) Read(p []byte) (n int, err error) {
-	sc.bufMutex.Lock()
-	defer sc.bufMutex.Unlock()
+	sc.readMu.Lock()
+	defer sc.readMu.Unlock()
 
 	// If we have buffered data, return it
 	if len(sc.readBuf) > 0 {
@@ -104,7 +106,10 @@ func (sc *SecureConn) Read(p []byte) (n int, err error) {
 	}
 
 	// Decrypt
-	decrypted, err := crypto.AES_GCM_Decrypt(sc.key, encryptedData)
+	sc.keyMu.RLock()
+	key := sc.key
+	sc.keyMu.RUnlock()
+	decrypted, err := crypto.AES_GCM_Decrypt(key, encryptedData)
 	if err != nil {
 		logging.Errorf("SecureConn: decryption failed: %v", err)
 		return 0, err
@@ -123,9 +128,15 @@ func (sc *SecureConn) Read(p []byte) (n int, err error) {
 
 // Write encrypts the data and writes it to the connection with framing.
 func (sc *SecureConn) Write(p []byte) (n int, err error) {
+	sc.writeMu.Lock()
+	defer sc.writeMu.Unlock()
+
 	// AES Encrypt: this returns IV + Ciphertext (if using crypto.AESEnc from core)
 	// Let's verify what crypto.AESEnc does. It uses AES-GCM.
-	encrypted, err := crypto.AES_GCM_Encrypt(sc.key, p)
+	sc.keyMu.RLock()
+	key := sc.key
+	sc.keyMu.RUnlock()
+	encrypted, err := crypto.AES_GCM_Encrypt(key, p)
 	if err != nil {
 		return 0, fmt.Errorf("encryption failed: %v", err)
 	}
