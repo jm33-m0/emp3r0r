@@ -2,7 +2,7 @@
 
 ### emp3r0r
 
-**A powerful Linux/Windows post-exploitation framework designed by Linux users, for Linux environments**
+**A stealth-focused C2 designed by Linux users for Linux environments, with native support for Windows and Linux BOFs.**
 
 <br clear="all" />
 
