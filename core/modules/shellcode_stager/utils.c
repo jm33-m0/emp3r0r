@@ -306,9 +306,6 @@ void debug_print(const char *format, ...) {
 }
 
 void perror(const char *s) { debug_print("Error: %s\n", s); }
-#else
-void debug_print(const char *format, ...) { (void)format; }
-void perror(const char *s) { (void)s; }
 #endif
 
 // -----------------------------------------------------------------------------

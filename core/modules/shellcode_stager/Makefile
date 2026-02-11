@@ -2,16 +2,19 @@ CC = gcc
 # Add -ffunction-sections -fdata-sections
 CFLAGS = -Wall -Wextra -Os -fno-builtin -fno-stack-protector -fPIC -nostdlib -I. \
          -fno-toplevel-reorder -s -fno-ident -ffunction-sections -fdata-sections \
-         -fno-asynchronous-unwind-tables
+         -fno-asynchronous-unwind-tables -fvisibility=hidden
 
 # Debug support
 ifdef DEBUG
 CFLAGS += -DDEBUG
 endif
 
-# Add -Wl,--gc-sections
-LDFLAGS = -nostdlib -static -Wl,-Ttext-segment=0x10000000 -s -Wl,--gc-sections -Wl,-N
-DL_LDFLAGS = -nostdlib -static -fPIC -Wl,-Ttext-segment=0x0 -s -Wl,--gc-sections -Wl,-N
+# Common linker flags
+LDFLAGS_COMMON = -static -Wl,--gc-sections -Wl,-N -Wl,--build-id=none
+
+# Specific linker flags
+LDFLAGS = $(LDFLAGS_COMMON) -Wl,-Ttext-segment=0x10000000
+DL_LDFLAGS = $(LDFLAGS_COMMON) -Wl,-Ttext-segment=0x0
 
 # Default configuration (can be overridden by environment variables)
 DOWNLOAD_HOST ?= 127.0.0.1
@@ -67,6 +70,7 @@ $(DL_TARGET): $(DL_SRCS)
 	$(CC) $(CFLAGS) $(DL_LDFLAGS) -o $@ $(DL_SRCS)
 
 $(DL_BIN): $(DL_TARGET)
+	strip --strip-all --strip-debug --strip-unneeded -R .comment -R .note -R .note.gnu.build-id $<
 	objcopy -O binary -j .init -j .text -j .rodata -j .data $< $@
 
 $(DL_BLOB_H): $(DL_BIN)
@@ -86,6 +90,7 @@ $(TARGET): $(STUB_SRCS) $(DL_BLOB_H)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(STUB_SRCS)
 
 $(SHELLCODE): $(TARGET)
+	strip --strip-all --strip-debug --strip-unneeded -R .comment -R .note -R .note.gnu.build-id $(TARGET)
 	objcopy -O binary -j .init -j .text -j .rodata -j .data $(TARGET) $@
 	@echo "Shellcode generated at $(PWD)/$@"
 	@wc -c $@

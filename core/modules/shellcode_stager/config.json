@@ -1,6 +1,6 @@
 {
   "name": "shellcode_stager",
-  "build": "make LISTENER_TYPE=$LISTENER_TYPE",
+  "build": "make clean && make LISTENER_TYPE=$LISTENER_TYPE",
   "author": "jm33-ng",
   "date": "2025-12-12",
   "comment": "A Linux shellcode stager that supports payload delivery via HTTP/TCP/UDP with encryption and compression. Use with emp3r0r-listener",

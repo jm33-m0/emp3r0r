@@ -99,8 +99,13 @@ int strncmp(const char *s1, const char *s2, size_t n);
 char *strstr(const char *haystack, const char *needle);
 int snprintf(char *str, size_t size, const char *format,
              ...); // Minimal implementation or stub
+#ifdef DEBUG
 void debug_print(const char *format, ...);
-void perror(const char *s); // Stub
+void perror(const char *s);
+#else
+#define debug_print(...) do {} while(0)
+#define perror(s) do {} while(0)
+#endif
 
 // Random
 long getrandom(void *buf, size_t buflen, unsigned int flags);
