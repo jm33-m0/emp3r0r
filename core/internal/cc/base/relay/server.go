@@ -49,11 +49,19 @@ func dispatcher(wrt http.ResponseWriter, req *http.Request) {
 	api = transport.WebRoot + "/" + api
 	switch api {
 	case transport.Upload2AgentAPI:
-		for _, sh := range network.FTPStreams {
+		var targetSH *network.StreamHandler
+		network.FTPStreams.Range(func(_, value interface{}) bool {
+			sh := value.(*network.StreamHandler)
 			if token == sh.Token {
-				ftp.HandleFTPTransfer(sh, wrt, req)
-				return
+				targetSH = sh
+				return false // stop iteration
 			}
+			return true
+		})
+
+		if targetSH != nil {
+			ftp.HandleFTPTransfer(targetSH, wrt, req)
+			return
 		}
 		logging.Debugf("FTP stream not found: %s", token)
 		wrt.WriteHeader(http.StatusNotFound)

@@ -16,43 +16,44 @@ import (
 )
 
 func GetConnectedAgents() []*def.Emp3r0rAgent {
-	live.AgentControlMapMutex.RLock()
-	defer live.AgentControlMapMutex.RUnlock()
-	agents := make([]*def.Emp3r0rAgent, 0, len(live.AgentControlMap))
-	for agent := range live.AgentControlMap {
+	var agents []*def.Emp3r0rAgent
+	live.AgentControlMap.Range(func(key, value interface{}) bool {
+		agent := key.(*def.Emp3r0rAgent)
 		shortID := fmt.Sprintf("%x", sha1.Sum([]byte(agent.UUID+agent.UUIDSig)))
 		if len(shortID) > 8 {
 			shortID = shortID[:8]
 		}
 		agent.ShortID = shortID
 		agents = append(agents, agent)
-	}
+		return true
+	})
 	return agents
 }
 
 // GetAgentByIndex find target from def.AgentControlMap via control index, return nil if not found
 func GetAgentByIndex(index int) (target *def.Emp3r0rAgent) {
-	live.AgentControlMapMutex.RLock()
-	defer live.AgentControlMapMutex.RUnlock()
-	for t, ctl := range live.AgentControlMap {
+	live.AgentControlMap.Range(func(key, value interface{}) bool {
+		t := key.(*def.Emp3r0rAgent)
+		ctl := value.(*live.AgentControl)
 		if ctl.Index == index {
 			target = t
-			break
+			return false // stop iteration
 		}
-	}
+		return true
+	})
 	return
 }
 
 // GetAgentByTag find target from def.AgentControlMap via tag, return nil if not found
 func GetAgentByTag(tag string) (target *def.Emp3r0rAgent) {
-	live.AgentControlMapMutex.RLock()
-	defer live.AgentControlMapMutex.RUnlock()
-	for t := range live.AgentControlMap {
+	live.AgentControlMap.Range(func(key, value interface{}) bool {
+		t := key.(*def.Emp3r0rAgent)
 		if t.Tag == tag {
 			target = t
-			break
+			return false // stop iteration
 		}
-	}
+		return true
+	})
 	if target == nil {
 		for _, t := range live.AgentList {
 			if t.Tag == tag {
@@ -66,14 +67,14 @@ func GetAgentByTag(tag string) (target *def.Emp3r0rAgent) {
 
 // GetAgentByUUID find target from def.AgentControlMap via UUID, return nil if not found
 func GetAgentByUUID(uuid string) (target *def.Emp3r0rAgent) {
-	live.AgentControlMapMutex.RLock()
-	defer live.AgentControlMapMutex.RUnlock()
-	for t := range live.AgentControlMap {
+	live.AgentControlMap.Range(func(key, value interface{}) bool {
+		t := key.(*def.Emp3r0rAgent)
 		if t.UUID == uuid {
 			target = t
-			break
+			return false // stop iteration
 		}
-	}
+		return true
+	})
 	if target == nil {
 		for _, t := range live.AgentList {
 			if t.UUID == uuid {
@@ -87,24 +88,25 @@ func GetAgentByUUID(uuid string) (target *def.Emp3r0rAgent) {
 
 // IsAgentExistByUUID is agent already in target list?
 func IsAgentExistByUUID(uuid string) bool {
-	live.AgentControlMapMutex.RLock()
-	defer live.AgentControlMapMutex.RUnlock()
-	for a := range live.AgentControlMap {
+	exists := false
+	live.AgentControlMap.Range(func(key, value interface{}) bool {
+		a := key.(*def.Emp3r0rAgent)
 		if a.UUID == uuid {
-			return true
+			exists = true
+			return false // stop iteration
 		}
-	}
-
-	return false
+		return true
+	})
+	return exists
 }
 
 // GetTargetFromH2Conn find target from def.AgentControlMap via HTTP2 connection ID, return nil if not found
 func GetTargetFromH2Conn(conn *h2conn.Conn) (target *def.Emp3r0rAgent) {
-	live.AgentControlMapMutex.RLock()
-	defer live.AgentControlMapMutex.RUnlock()
-	for t, ctrl := range live.AgentControlMap {
+	live.AgentControlMap.Range(func(key, value interface{}) bool {
+		t := key.(*def.Emp3r0rAgent)
+		ctrl := value.(*live.AgentControl)
 		if ctrl.Conn == nil {
-			continue
+			return true
 		}
 		// Check keys (not valid if using encryption, but kept for safety if wrappers change)
 		// We cannot directly compare net.Conn with *h2conn.Conn if they are not compatible.
@@ -116,22 +118,22 @@ func GetTargetFromH2Conn(conn *h2conn.Conn) (target *def.Emp3r0rAgent) {
 			if wrapped, ok := secure.Conn.(*transport.ByteReadWriteCloser); ok {
 				if wrapped.ReadWriteCloser == conn {
 					target = t
-					break
+					return false // stop iteration
 				}
 			}
 		}
-	}
+		return true
+	})
 	return
 }
 
 // SendMessageToAgent send MsgTunData to agent
 func SendMessageToAgent(msg_data *def.MsgTunData, agent *def.Emp3r0rAgent) (err error) {
-	live.AgentControlMapMutex.RLock()
-	defer live.AgentControlMapMutex.RUnlock()
-	ctrl := live.AgentControlMap[agent]
-	if ctrl == nil {
+	val, ok := live.AgentControlMap.Load(agent)
+	if !ok {
 		return fmt.Errorf("Send2Agent (%s): Target is not connected", msg_data.CmdSlice)
 	}
+	ctrl := val.(*live.AgentControl)
 	if ctrl.Conn == nil {
 		return fmt.Errorf("Send2Agent (%s): Target is not connected", msg_data.CmdSlice)
 	}
@@ -167,52 +169,45 @@ func SetActiveAgent(identifier string) {
 
 // IsAgentExistByTag is agent already in target list?
 func IsAgentExistByTag(tag string) bool {
-	live.AgentControlMapMutex.RLock()
-	defer live.AgentControlMapMutex.RUnlock()
-	for a := range live.AgentControlMap {
+	exists := false
+	live.AgentControlMap.Range(func(key, value interface{}) bool {
+		a := key.(*def.Emp3r0rAgent)
 		if a.Tag == tag {
-			return true
+			exists = true
+			return false // stop iteration
 		}
-	}
-
-	return false
+		return true
+	})
+	return exists
 }
 
 // IsAgentExist is agent already in target list?
 func IsAgentExist(t *def.Emp3r0rAgent) bool {
-	live.AgentControlMapMutex.RLock()
-	defer live.AgentControlMapMutex.RUnlock()
-	return IsAgentExistLocked(t)
-}
-
-// IsAgentExistLocked checks if agent exists (caller must hold lock)
-func IsAgentExistLocked(t *def.Emp3r0rAgent) bool {
-	for a := range live.AgentControlMap {
+	exists := false
+	live.AgentControlMap.Range(func(key, value interface{}) bool {
+		a := key.(*def.Emp3r0rAgent)
 		if a.UUID == t.UUID {
-			return true
+			exists = true
+			return false // stop iteration
 		}
-	}
-	return false
+		return true
+	})
+	return exists
 }
 
 // AssignAgentIndex assign an index number to new agent
 func AssignAgentIndex() (index int) {
-	live.AgentControlMapMutex.RLock()
-	defer live.AgentControlMapMutex.RUnlock()
-	return AssignAgentIndexLocked()
-}
-
-// AssignAgentIndexLocked assigns index (caller must hold lock)
-func AssignAgentIndexLocked() (index int) {
-	// index is 0 for the first agent
-	if len(live.AgentControlMap) == 0 {
-		return 0
-	}
-
 	// loop thru agent list and get all index numbers
 	index_list := make([]int, 0)
-	for _, c := range live.AgentControlMap {
+	live.AgentControlMap.Range(func(key, value interface{}) bool {
+		c := value.(*live.AgentControl)
 		index_list = append(index_list, c.Index)
+		return true
+	})
+
+	// index is 0 for the first agent
+	if len(index_list) == 0 {
+		return 0
 	}
 
 	// sort

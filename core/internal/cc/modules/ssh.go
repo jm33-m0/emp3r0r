@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,7 +28,7 @@ type SSH_SHELL_Mapping struct {
 
 // shell - port mapping
 // one port for one shell
-var SSHShellPort = make(map[string]*SSH_SHELL_Mapping)
+var SSHShellPort sync.Map
 
 // SSHClient ssh to sshd server, returns the SSH connection command string
 // shell: the executable to run, eg. bash, python
@@ -49,12 +50,16 @@ func SSHClient(shell, args, port string) (string, error) {
 	// SSHDShellPort is reserved
 	is_new_port_needed := (port == live.RuntimeConfig.SSHDShellPort && shell != "sftp")
 	// check if port mapping is already open, if yes, use it
-	for s, mapping := range SSHShellPort {
+	SSHShellPort.Range(func(key, value interface{}) bool {
+		s := key.(string)
+		mapping := value.(*SSH_SHELL_Mapping)
 		if s == shell && mapping.Agent == target {
 			port = mapping.ToPort
 			is_new_port_needed = false
+			return false // stop iteration
 		}
-	}
+		return true
+	})
 
 	if !util.IsCommandExist("ssh") {
 		return "", fmt.Errorf("ssh must be installed")
@@ -77,24 +82,34 @@ func SSHClient(shell, args, port string) (string, error) {
 
 	// is port mapping already done?
 	port_mapping_exists := false
-	for _, p := range network.PortFwds {
+	network.PortFwds.Range(func(id, value interface{}) bool {
+		p := value.(*network.PortFwdSession)
 		if p.Agent == target && p.To == to {
 			port_mapping_exists = true
-			for s, ssh_mapping := range SSHShellPort {
+			SSHShellPort.Range(func(key, value interface{}) bool {
+				s := key.(string)
+				ssh_mapping := value.(*SSH_SHELL_Mapping)
 				// one port for one shell
 				// if trying to open a different shell on the same port, change to a new port
 				if s != shell && ssh_mapping.ToPort == port {
-					new_port := strconv.Itoa(util.RandInt(2048, 65535))
-					logging.Warningf("Port %s has %s shell on it, restarting with a different port %s", port, s, new_port)
-					live.SetOption("port", new_port)
-					return SSHClient(shell, args, new_port)
+					lport = "" // mark for recursion
+					return false
 				}
-			}
+				return true
+			})
 			// if a shell is already open, use it
 			logging.Warningf("Using existing port mapping %s -> remote:%s for shell %s", p.Lport, port, shell)
 			lport = p.Lport // use the correct port
-			break
+			return false    // stop iteration
 		}
+		return true
+	})
+
+	if port_mapping_exists && lport == "" {
+		new_port := strconv.Itoa(util.RandInt(2048, 65535))
+		logging.Warningf("Port collision or conflict, restarting with a different port %s", new_port)
+		live.SetOption("port", new_port)
+		return SSHClient(shell, args, new_port)
 	}
 
 	if !port_mapping_exists {
@@ -152,12 +167,12 @@ func SSHClient(shell, args, port string) (string, error) {
 		pf.RegisterFunc = RegisterPortFwdFunc
 		go func() {
 			// remember the port mapping and shell and agent
-			SSHShellPort[shell] = &SSH_SHELL_Mapping{
+			SSHShellPort.Store(shell, &SSH_SHELL_Mapping{
 				Shell:   shell,
 				Agent:   target,
 				PortFwd: pf,
 				ToPort:  port,
-			}
+			})
 			err = pf.RunPortFwd()
 			if err != nil {
 				logging.Errorf("Start port mapping for sshd (%s): %v", shell, err)
@@ -177,11 +192,16 @@ wait:
 			break
 		}
 		time.Sleep(50 * time.Millisecond)
-		for _, p := range network.PortFwds {
+		network.PortFwds.Range(func(_, value interface{}) bool {
+			p := value.(*network.PortFwdSession)
 			if p.Agent.Tag == target.Tag && p.To == to {
 				port_mapping_exists = true
-				break wait
+				return false // stop iteration
 			}
+			return true
+		})
+		if port_mapping_exists {
+			break wait
 		}
 	}
 	if !port_mapping_exists {

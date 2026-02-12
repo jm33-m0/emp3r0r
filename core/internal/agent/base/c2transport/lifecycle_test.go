@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -78,11 +79,9 @@ func TestFullAgentLifecycle(t *testing.T) {
 		CAPEM:  string(caCertData),
 	}
 
-	// Reset live maps with proper locking
-	live.AgentControlMapMutex.Lock()
-	live.AgentControlMap = make(map[*def.Emp3r0rAgent]*live.AgentControl)
+	// Reset live maps
+	live.AgentControlMap = sync.Map{}
 	live.AgentList = make([]*def.Emp3r0rAgent, 0)
-	live.AgentControlMapMutex.Unlock()
 
 	// Initialize agent database for tracking BEFORE starting server
 	dbPath := filepath.Join(tmpDir, "agents.db")
@@ -291,7 +290,6 @@ func TestFullAgentLifecycle(t *testing.T) {
 
 	// Verify pending request matches
 	var newKey string
-	var ok bool
 	timeout := time.After(5 * time.Second)
 	ticker := time.NewTicker(100 * time.Millisecond)
 
@@ -300,10 +298,8 @@ func TestFullAgentLifecycle(t *testing.T) {
 		case <-timeout:
 			t.Fatal("Timed out waiting for PendingKeyRotations")
 		case <-ticker.C:
-			live.PendingKeyRotationsMutex.RLock()
-			newKey, ok = live.PendingKeyRotations[agentUUID]
-			live.PendingKeyRotationsMutex.RUnlock()
-			if ok {
+			if val, exists := live.PendingKeyRotations.Load(agentUUID); exists {
+				newKey = val.(string)
 				goto PendingFound
 			}
 		}
@@ -314,19 +310,17 @@ PendingFound:
 	}
 
 	// Approve key rotation (Simulate operator command logic)
-	live.PendingKeyRotationsMutex.Lock()
-
 	// Update in-memory map
-	live.AgentControlMapMutex.Lock()
 	foundAgent := false
-	for a := range live.AgentControlMap {
+	live.AgentControlMap.Range(func(key, value interface{}) bool {
+		a := key.(*def.Emp3r0rAgent)
 		if a.UUID == agentUUID {
 			a.PublicKey = newKey
 			foundAgent = true
-			break
+			return false // stop iteration
 		}
-	}
-	live.AgentControlMapMutex.Unlock()
+		return true
+	})
 
 	// If agent disconnected, it won't be in map, so we update DB
 	if !foundAgent {
@@ -340,8 +334,7 @@ PendingFound:
 	}
 
 	// Clear pending
-	delete(live.PendingKeyRotations, agentUUID)
-	live.PendingKeyRotationsMutex.Unlock()
+	live.PendingKeyRotations.Delete(agentUUID)
 	t.Log("✓ Key rotation approved manually")
 
 	// Check in again with new key (should succeed now)

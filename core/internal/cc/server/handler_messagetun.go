@@ -39,15 +39,16 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 		logging.Debugf("handleMessageTunnel exiting")
 		cancel()  // Signal goroutine to stop
 		wg.Wait() // Wait for goroutine to finish before returning
-		live.AgentControlMapMutex.Lock()
-		for t, c := range live.AgentControlMap {
+		live.AgentControlMap.Range(func(key, value interface{}) bool {
+			t := key.(*def.Emp3r0rAgent)
+			c := value.(*live.AgentControl)
 			if c.Conn == secureConn {
-				delete(live.AgentControlMap, t)
+				live.AgentControlMap.Delete(t)
 				operatorBroadcastPrintf(logging.ERROR, "Agent dies... %s is disconnected", strconv.Quote(t.Name))
-				break
+				return false // stop iteration
 			}
-		}
-		live.AgentControlMapMutex.Unlock()
+			return true
+		})
 		_ = conn.Close()
 		logging.Debugf("handleMessageTunnel exited")
 	}()
@@ -116,16 +117,19 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 				return
 			}
 			shortname := agent.Name
-			live.AgentControlMapMutex.Lock()
-			if live.AgentControlMap[agent].Conn == nil {
-				operatorBroadcastPrintf(logging.SUCCESS,
-					"Knock.. Knock... Agent %s is connected",
-					strconv.Quote(shortname))
+			if val, ok := live.AgentControlMap.Load(agent); ok {
+				ctrl := val.(*live.AgentControl)
+				if ctrl.Conn == nil {
+					operatorBroadcastPrintf(logging.SUCCESS,
+						"Knock.. Knock... Agent %s is connected",
+						strconv.Quote(shortname))
+				}
+				// Update control info and publish via Store to ensure memory visibility
+				ctrl.Conn = secureConn
+				ctrl.Ctx = ctx
+				ctrl.Cancel = cancel
+				live.AgentControlMap.Store(agent, ctrl)
 			}
-			live.AgentControlMap[agent].Conn = secureConn
-			live.AgentControlMap[agent].Ctx = ctx
-			live.AgentControlMap[agent].Cancel = cancel
-			live.AgentControlMapMutex.Unlock()
 
 			agent.LastSeen = time.Now()
 			if msg.Time != "" {

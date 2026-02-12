@@ -1,6 +1,8 @@
 package modules
 
 import (
+	"sync"
+
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -8,7 +10,7 @@ import (
 )
 
 // RShellStatus stores errors from reverseBash
-var RShellStatus = make(map[string]error)
+var RShellStatus sync.Map
 
 // ModuleCmd exec cmd on target
 func ModuleCmd(ctx *c2context.C2Context) {

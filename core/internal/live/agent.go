@@ -13,8 +13,7 @@ var (
 	CmdResults = sync.Map{}
 
 	// CmdTime store command time
-	CmdTime      = make(map[string]string)
-	CmdTimeMutex = &sync.Mutex{}
+	CmdTime sync.Map
 )
 
 // AgentControl controller interface of a target
@@ -28,13 +27,11 @@ type AgentControl struct {
 
 var (
 	// AgentControlMap target list, with control (tun) interface
-	AgentControlMap      = make(map[*def.Emp3r0rAgent]*AgentControl)
-	AgentControlMapMutex = sync.RWMutex{}
+	AgentControlMap sync.Map
 
 	// AgentList list of connected agents
 	AgentList = make([]*def.Emp3r0rAgent, 0)
 	// PendingKeyRotations stores new public keys for agents that requested rotation
 	// key: UUID, value: PublicKey
-	PendingKeyRotations      = make(map[string]string)
-	PendingKeyRotationsMutex = sync.RWMutex{}
+	PendingKeyRotations sync.Map
 )

@@ -29,13 +29,8 @@ type PortFwdSession struct {
 	Cancel context.CancelFunc
 }
 
-var (
-	// PortFwds manage port mappings
-	PortFwds = make(map[string]*PortFwdSession)
-
-	// PortFwdsMutex lock map
-	PortFwdsMutex = &sync.Mutex{}
-)
+// PortFwds manage port mappings
+var PortFwds sync.Map
 
 // Socks5Proxy sock5 proxy server on agent, listening on addr
 // op: on/off
@@ -137,9 +132,7 @@ func PortFwd(addr, sessionID, protocol string, reverse bool, timeout int) (err e
 			conn.Close()
 		}
 
-		PortFwdsMutex.Lock()
-		delete(PortFwds, sessionID)
-		PortFwdsMutex.Unlock()
+		PortFwds.Delete(sessionID)
 		logging.Printf("PortFwd stopped: %s (%s)", addr, sessionID)
 	}()
 
@@ -148,9 +141,7 @@ func PortFwd(addr, sessionID, protocol string, reverse bool, timeout int) (err e
 	session.Conn = conn
 	session.Ctx = ctx
 	session.Cancel = cancel
-	PortFwdsMutex.Lock()
-	PortFwds[sessionID] = &session
-	PortFwdsMutex.Unlock()
+	PortFwds.Store(sessionID, &session)
 
 	// check if h2conn is disconnected,
 	// if yes, kill all goroutines and cleanup

@@ -52,20 +52,22 @@ func ModulePortFwd(ctx *c2context.C2Context) {
 	switch switchOpt {
 	case "off":
 		// ugly, i know, it will delete port mappings matching current lport-to combination
-		for id, session := range network.PortFwds {
+		found := false
+		network.PortFwds.Range(func(id, value interface{}) bool {
+			session := value.(*network.PortFwdSession)
 			toOpt, ok := ctx.Flags["to"]
 			if !ok {
 				logging.Errorf("Option 'to' not found")
-				return
+				return false // stop iteration
 			}
 			listenPortOpt, ok := ctx.Flags["listen_port"]
 			if !ok {
 				logging.Errorf("Option 'listen_port' not found")
-				return
+				return false // stop iteration
 			}
 			if session.To == toOpt && session.Lport == listenPortOpt {
-				session.Cancel()             // cancel the PortFwd session
-				delete(network.PortFwds, id) // remove from port mapping list
+				session.Cancel()            // cancel the PortFwd session
+				network.PortFwds.Delete(id) // remove from port mapping list
 
 				// tell the agent to close connection
 				// make sure handler returns
@@ -74,12 +76,17 @@ func ModulePortFwd(ctx *c2context.C2Context) {
 				sendCMDerr := CmdSender(cmd, "", activeAgent.Tag)
 				if sendCMDerr != nil {
 					logging.Errorf("SendCmd: %v", sendCMDerr)
-					return
 				}
-				return
+				found = true
+				return false // stop iteration
 			}
-			logging.Errorf("Could not find port mapping (to %s, listening on %s)",
-				toOpt, listenPortOpt)
+			return true
+		})
+
+		if !found {
+			toOpt := ctx.Flags["to"]
+			listenPortOpt := ctx.Flags["listen_port"]
+			logging.Errorf("Could find port mapping (to %s, listening on %s)", toOpt, listenPortOpt)
 		}
 	case "reverse": // expose a dest from CC to agent
 		var pf network.PortFwdSession
@@ -234,7 +241,8 @@ func moduleProxy(ctx *c2context.C2Context) {
 			}()
 		}
 	case "off":
-		for id, session := range network.PortFwds {
+		network.PortFwds.Range(func(id, value interface{}) bool {
+			session := value.(*network.PortFwdSession)
 			if session.Description == pf.Description ||
 				session.Description == pfu.Description {
 				session.Cancel() // cancel the PortFwd session
@@ -245,10 +253,10 @@ func moduleProxy(ctx *c2context.C2Context) {
 				err := CmdSender(cmd, "", session.Agent.Tag)
 				if err != nil {
 					logging.Errorf("SendCmd: %v", err)
-					return
 				}
 			}
-		}
+			return true
+		})
 	default:
 		logging.Errorf("Unknown operation '%s'", status)
 	}

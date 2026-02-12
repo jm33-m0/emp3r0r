@@ -105,8 +105,7 @@ type RemoteDirListingCache struct {
 }
 
 var (
-	RemoteDirListing      = make(map[string]*RemoteDirListingCache)
-	RemoteDirListingMutex = new(sync.RWMutex)
+	RemoteDirListing sync.Map
 )
 
 // autocomplete items in current remote directory
@@ -130,7 +129,7 @@ func listRemoteDir(ctx carapace.Context) carapace.Action {
 		Listing: listing,
 	}
 	cache.Ctx, cache.Cancel = context.WithTimeout(context.Background(), 2*time.Minute)
-	RemoteDirListing[cache.CWD] = cache
+	RemoteDirListing.Store(cache.CWD, cache)
 
 	return carapace.ActionValues(listing...)
 }

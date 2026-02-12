@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -335,11 +336,9 @@ func TestDuplicatedCheckin(t *testing.T) {
 		CAPEM:  string(caCertData),
 	}
 
-	// Reset live maps with proper locking
-	live.AgentControlMapMutex.Lock()
-	live.AgentControlMap = make(map[*def.Emp3r0rAgent]*live.AgentControl)
+	// Reset live maps
+	live.AgentControlMap = sync.Map{}
 	live.AgentList = make([]*def.Emp3r0rAgent, 0)
-	live.AgentControlMapMutex.Unlock()
 
 	// Start Real C2 Server
 	go server.StartC2AgentTLSServer()

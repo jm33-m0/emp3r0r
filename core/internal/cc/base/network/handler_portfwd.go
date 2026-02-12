@@ -66,11 +66,12 @@ func HandlePortMapping(sh *StreamHandler, wrt http.ResponseWriter, req *http.Req
 		logging.Errorf("Parse UUID failed from %s: %v", req.RemoteAddr, err)
 		return
 	}
-	pf, exist := PortFwds[sessionID.String()]
+	val, exist := PortFwds.Load(sessionID.String())
 	if !exist {
 		logging.Debugf("Port mapping session %s unknown. Did you remove it?", sessionID.String())
 		return
 	}
+	pf := val.(*PortFwdSession)
 	pf.Sh = make(map[string]*StreamHandler)
 	if !isSubSession {
 		pf.Sh[sessionID.String()] = sh
@@ -100,7 +101,8 @@ func HandlePortMapping(sh *StreamHandler, wrt http.ResponseWriter, req *http.Req
 			logging.Debugf("Closed sub-connection %s", origToken)
 			return
 		}
-		if pf, exist = PortFwds[sessionID.String()]; exist {
+		if val, exist := PortFwds.Load(sessionID.String()); exist {
+			pf := val.(*PortFwdSession)
 			pf.Cancel()
 		} else {
 			logging.Debugf("Port mapping %s not found (likely deleted)", sessionID.String())
@@ -109,7 +111,8 @@ func HandlePortMapping(sh *StreamHandler, wrt http.ResponseWriter, req *http.Req
 		logging.Debugf("Closed port forwarding connection from %s", req.RemoteAddr)
 	}()
 	for pf.Ctx.Err() == nil {
-		if _, exist := PortFwds[sessionID.String()]; !exist {
+		_, exist := PortFwds.Load(sessionID.String())
+		if !exist {
 			logging.Warningf("Port mapping %s disconnected", sessionID.String())
 			return
 		}
@@ -124,13 +127,11 @@ func DeletePortFwdSession(sessionID string) error {
 		return fmt.Errorf("no session ID provided")
 	}
 
-	PortFwdsMutex.Lock()
-	defer PortFwdsMutex.Unlock()
-
-	session, exists := PortFwds[sessionID]
+	val, exists := PortFwds.Load(sessionID)
 	if !exists {
 		return fmt.Errorf("session %s not found", sessionID)
 	}
+	session := val.(*PortFwdSession)
 
 	// Tell agent to delete the port mapping
 	err := session.SendCmdFunc(fmt.Sprintf("%s --id %s", def.C2CmdDeletePortFwd, sessionID), "", session.Agent.Tag)
@@ -140,7 +141,7 @@ func DeletePortFwdSession(sessionID string) error {
 
 	// Cancel and delete locally
 	session.Cancel()
-	delete(PortFwds, sessionID)
+	PortFwds.Delete(sessionID)
 
 	if session.UnregisterFunc != nil {
 		if err = session.UnregisterFunc(sessionID); err != nil {

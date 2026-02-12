@@ -191,9 +191,7 @@ func GetFile(file_path string, agent *def.Emp3r0rAgent) (ftpSh *network.StreamHa
 	ftpSh.Token = fmt.Sprintf("%s-%s", util.RandMD5String(), fileinfo.Checksum)
 	ftpSh.Buf = make(chan []byte)
 	ftpSh.BufSize = 1024 * 8
-	network.FTPMutex.Lock()
-	network.FTPStreams[file_path] = ftpSh
-	network.FTPMutex.Unlock()
+	network.FTPStreams.Store(file_path, ftpSh)
 
 	// h2x
 	ftpSh.H2x = new(def.H2Conn)

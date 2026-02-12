@@ -22,8 +22,7 @@ import (
 
 var (
 	// rotationRateLimiter tracks key rotation timestamps per AgentUUID to prevent log flooding
-	rotationRateLimiter = make(map[string][]time.Time)
-	limiterMutex        sync.Mutex
+	rotationRateLimiter sync.Map
 )
 
 // handleAgentCheckIn processes agent check-in requests.
@@ -35,15 +34,14 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 	if token != "" && agents.IsAgentExistByUUID(token) {
 		agent := agents.GetAgentByUUID(token)
 		if agent != nil {
-			live.AgentControlMapMutex.RLock()
-			ctrl := live.AgentControlMap[agent]
-			if ctrl != nil && ctrl.Conn != nil {
-				logging.Warningf("handleAgentCheckIn: %s already connected, refusing duplicated checkin", token)
-				wrt.WriteHeader(http.StatusForbidden)
-				live.AgentControlMapMutex.RUnlock()
-				return
+			if val, ok := live.AgentControlMap.Load(agent); ok {
+				ctrl := val.(*live.AgentControl)
+				if ctrl.Conn != nil {
+					logging.Warningf("handleAgentCheckIn: %s already connected, refusing duplicated checkin", token)
+					wrt.WriteHeader(http.StatusForbidden)
+					return
+				}
 			}
-			live.AgentControlMapMutex.RUnlock()
 		}
 	}
 
@@ -85,16 +83,16 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 	// If agent is new, verify with provided key and pin it
 	isNew := true
 
-	live.AgentControlMapMutex.RLock()
 	existingKey := ""
-	for a := range live.AgentControlMap {
+	live.AgentControlMap.Range(func(key, value interface{}) bool {
+		a := key.(*def.Emp3r0rAgent)
 		if a.UUID == target.UUID {
 			existingKey = a.PublicKey
 			isNew = false
-			break
+			return false // stop iteration
 		}
-	}
-	live.AgentControlMapMutex.RUnlock()
+		return true
+	})
 
 	// If not in memory, check if it exists in DB (Persistent Session)
 	// If not in memory, check if it exists in DB (Persistent Session)
@@ -114,21 +112,16 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 		if existingKey != "" && target.PublicKey != existingKey {
 			// KEY ROTATION DETECTED
 
-			// Check rate limit for rotation events specifically
-			limiterMutex.Lock()
-			rotationRateLimiter[target.UUID] = append(rotationRateLimiter[target.UUID], time.Now())
-			limiterMutex.Unlock()
-
 			// Find if there is an active controller (Scenario A: Active Session)
 			var activeCtrl *live.AgentControl
-			live.AgentControlMapMutex.RLock()
-			for a, ctrl := range live.AgentControlMap {
+			live.AgentControlMap.Range(func(key, value interface{}) bool {
+				a := key.(*def.Emp3r0rAgent)
 				if a.UUID == target.UUID {
-					activeCtrl = ctrl
-					break
+					activeCtrl = value.(*live.AgentControl)
+					return false // stop iteration
 				}
-			}
-			live.AgentControlMapMutex.RUnlock()
+				return true
+			})
 
 			// Scenario A: Clone Attack (Parallel Session)
 			if activeCtrl != nil && activeCtrl.Conn != nil {
@@ -141,20 +134,14 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 
 			// Scenario B: Rotation Request
 			// Check pending
-			live.PendingKeyRotationsMutex.RLock()
-			_, pending := live.PendingKeyRotations[target.UUID]
-			live.PendingKeyRotationsMutex.RUnlock()
-
-			if pending {
+			if _, pending := live.PendingKeyRotations.Load(target.UUID); pending {
 				// Already pending, just block
 				wrt.WriteHeader(http.StatusForbidden)
 				return
 			}
 
 			// Create Request
-			live.PendingKeyRotationsMutex.Lock()
-			live.PendingKeyRotations[target.UUID] = target.PublicKey
-			live.PendingKeyRotationsMutex.Unlock()
+			live.PendingKeyRotations.Store(target.UUID, target.PublicKey)
 
 			msg := fmt.Sprintf("CRITICAL: Agent %s requests key rotation. Run 'forget_agent %s' to remove old record and allow re-registration.", target.UUID, strconv.Quote(target.UUID))
 			logging.Warningf("%s", msg)
@@ -185,20 +172,19 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 	// ------------------------------------------------------------
 	// SECURITY: DoS Protection (Rate Limiting)
 	// ------------------------------------------------------------
-	limiterMutex.Lock()
-	defer limiterMutex.Unlock()
-
 	now := time.Now()
 	// Prune old timestamps (> 1 minute)
 	validTimestamps := []time.Time{}
-	if timestamps, exists := rotationRateLimiter[target.UUID]; exists {
+	if val, exists := rotationRateLimiter.Load(target.UUID); exists {
+		timestamps := val.([]time.Time)
 		for _, t := range timestamps {
 			if now.Sub(t) < time.Minute {
 				validTimestamps = append(validTimestamps, t)
 			}
 		}
 	}
-	rotationRateLimiter[target.UUID] = validTimestamps
+	validTimestamps = append(validTimestamps, now)
+	rotationRateLimiter.Store(target.UUID, validTimestamps)
 
 	// Check limit (10 rotations per minute)
 	if len(validTimestamps) > 10 {
@@ -225,14 +211,11 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	live.AgentControlMapMutex.Lock()
-	defer live.AgentControlMapMutex.Unlock()
-
-	if !agents.IsAgentExistLocked(target) {
+	if !agents.IsAgentExist(target) {
 		// New agent - register it
-		inx := agents.AssignAgentIndexLocked()
+		inx := agents.AssignAgentIndex()
 		target.LastSeen = time.Now()
-		live.AgentControlMap[target] = &live.AgentControl{Index: inx, Conn: nil}
+		live.AgentControlMap.Store(target, &live.AgentControl{Index: inx, Conn: nil})
 		shortname := strings.Split(target.Tag, "-agent")[0]
 		if util.IsExist(agents.AgentsJSON) {
 			if l := agents.RefreshAgentLabel(target); l != "" {
@@ -243,7 +226,9 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 	} else {
 		// Existing agent - refresh info
 		var existingKey *def.Emp3r0rAgent
-		for a, ctrl := range live.AgentControlMap {
+		live.AgentControlMap.Range(func(key, value interface{}) bool {
+			a := key.(*def.Emp3r0rAgent)
+			ctrl := value.(*live.AgentControl)
 			if a.UUID == target.UUID {
 				// if agent is already connected, it must be the same instance
 				// because we already checked for duplications
@@ -278,9 +263,10 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 				a.Product = target.Product
 				a.LastSeen = time.Now()
 				existingKey = a
-				break
+				return false // stop iteration
 			}
-		}
+			return true
+		})
 		shortname := strings.Split(target.Tag, "-agent")[0]
 		if util.IsExist(agents.AgentsJSON) {
 			if existingKey != nil {

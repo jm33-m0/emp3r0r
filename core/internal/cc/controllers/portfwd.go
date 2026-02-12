@@ -7,7 +7,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
-	"github.com/jm33-m0/emp3r0r/core/internal/def"
 )
 
 // PortMapping represents a single port forward session
@@ -26,11 +25,12 @@ type PortMapping struct {
 func GetActiveForwards() ([]PortMapping, error) {
 	mappings := []PortMapping{}
 
-	for id, portmap := range network.PortFwds {
+	network.PortFwds.Range(func(id, value interface{}) bool {
+		portmap := value.(*network.PortFwdSession)
 		// Skip invalid sessions
 		if portmap.Sh == nil {
 			portmap.Cancel()
-			continue
+			return true // continue iteration
 		}
 
 		bindAddr := portmap.BindAddr
@@ -38,18 +38,33 @@ func GetActiveForwards() ([]PortMapping, error) {
 			bindAddr = "127.0.0.1"
 		}
 
-		mapping := PortMapping{
-			ID:          id,
-			LocalPort:   portmap.Lport,
-			RemoteAddr:  portmap.To,
-			BindAddr:    bindAddr,
-			AgentTag:    portmap.Agent.Tag,
-			Description: portmap.Description,
-			IsReverse:   portmap.Reverse,
+		// Build local and remote addresses
+		localPort := bindAddr + ":" + portmap.Lport
+		remoteAddr := portmap.To
+
+		// Add context for reverse vs forward
+		var description string
+		if portmap.Reverse {
+			localPort = portmap.Lport + " (Agent)"
+			remoteAddr = portmap.To + " (CC)"
+			description = fmt.Sprintf("Reverse: %s -> %s", localPort, remoteAddr)
+		} else {
+			localPort = localPort + " (CC)"
+			remoteAddr = remoteAddr + " (Agent)"
+			description = fmt.Sprintf("Forward: %s -> %s", localPort, remoteAddr)
 		}
 
-		mappings = append(mappings, mapping)
-	}
+		mappings = append(mappings, PortMapping{ // Changed sessions to mappings, def.PortFwdSession to PortMapping
+			ID:          id.(string),
+			LocalPort:   localPort,
+			RemoteAddr:  remoteAddr,
+			BindAddr:    bindAddr,
+			AgentTag:    portmap.Agent.Tag,
+			Description: description,
+			IsReverse:   portmap.Reverse, // Changed Reverse to IsReverse
+		})
+		return true
+	})
 
 	return mappings, nil
 }
@@ -130,25 +145,18 @@ func AddForward(ctx *c2context.C2Context) error {
 func RemoveForward(lport, to string, agentTag string) error {
 	found := false
 
-	for id, session := range network.PortFwds {
+	network.PortFwds.Range(func(id, value any) bool {
+		session := value.(*network.PortFwdSession)
 		if session.To == to && session.Lport == lport && session.Agent.Tag == agentTag {
-			session.Cancel() // cancel the PortFwd session
-			delete(network.PortFwds, id)
-
-			// Tell the agent to close connection
-			cmd := fmt.Sprintf("%s --shID %s --operation stop", def.C2CmdPortFwd, id)
-			sendCMDerr := modules.CmdSender(cmd, "", agentTag)
-			if sendCMDerr != nil {
-				return fmt.Errorf("failed to send stop command to agent: %w", sendCMDerr)
-			}
-
+			session.Cancel()
+			network.PortFwds.Delete(id)
 			found = true
-			break
+			return false // stop iteration
 		}
-	}
-
+		return true
+	})
 	if !found {
-		return fmt.Errorf("could not find port mapping (to %s, listening on %s)", to, lport)
+		return fmt.Errorf("port mapping (to %s, listening on %s) not found for agent %s", to, lport, agentTag)
 	}
 
 	return nil

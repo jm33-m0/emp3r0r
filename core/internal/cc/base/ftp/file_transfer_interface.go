@@ -97,7 +97,8 @@ func DownloadFromAgent(target *def.Emp3r0rAgent, filePath string, isRecursive bo
 
 			// wait for file to be downloaded
 			for {
-				if sh, ok := network.FTPStreams[file]; ok {
+				if val, ok := network.FTPStreams.Load(file); ok {
+					sh := val.(*network.StreamHandler)
 					if ftpSh.Token == sh.Token {
 						util.TakeABlink()
 						continue

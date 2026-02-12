@@ -29,18 +29,15 @@ func PersistLabeledAgentsToFile() {
 	)
 	if util.IsExist(AgentsJSON) {
 		data, readErr := os.ReadFile(AgentsJSON)
-		if readErr != nil {
-			logging.Warningf("Reading labeled agents: %v", readErr)
-		}
-		readErr = json.Unmarshal(data, &old)
-		if readErr != nil {
-			logging.Warningf("Reading labeled agents: %v", readErr)
+		if readErr == nil {
+			_ = json.Unmarshal(data, &old)
 		}
 	}
-outter:
-	for t, c := range live.AgentControlMap {
+	live.AgentControlMap.Range(func(tag, control interface{}) bool {
+		t := tag.(*def.Emp3r0rAgent)
+		c := control.(*live.AgentControl)
 		if c.Label == "" {
-			continue
+			return true
 		}
 		labeled := &LabeledAgent{
 			Tag:   t.Tag,
@@ -50,11 +47,12 @@ outter:
 			if l.Tag == labeled.Tag {
 				old[i].Label = labeled.Label // update label
 				old[i] = l
-				continue outter
+				return true // continue outter loop (simulated by returning true)
 			}
 		}
 		labeledAgents = append(labeledAgents, *labeled)
-	}
+		return true
+	})
 	labeledAgents = append(labeledAgents, old...)
 	if len(labeledAgents) == 0 {
 		return
@@ -85,8 +83,8 @@ func RefreshAgentLabel(a *def.Emp3r0rAgent) (label string) {
 	}
 	for _, labeled := range labeledAgents {
 		if a.Tag == labeled.Tag {
-			if live.AgentControlMap[a] != nil {
-				live.AgentControlMap[a].Label = labeled.Label
+			if val, ok := live.AgentControlMap.Load(a); ok {
+				val.(*live.AgentControl).Label = labeled.Label
 			}
 			return labeled.Label
 		}
@@ -121,7 +119,9 @@ func SetAgentLabel(agentID string, label string) error {
 		return fmt.Errorf("agent does not exist: %s", agentID)
 	}
 
-	live.AgentControlMap[target].Label = label // set label
+	if val, ok := live.AgentControlMap.Load(target); ok {
+		val.(*live.AgentControl).Label = label // set label
+	}
 	PersistLabeledAgentsToFile()
 	logging.Successf("%s has been labeled as %s", target.Tag, label)
 	return nil

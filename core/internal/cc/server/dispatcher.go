@@ -19,6 +19,12 @@ import (
 
 // apiDispatcher routes requests to the correct handler.
 func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("apiDispatcher panicked: %v", r)
+			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
+		}
+	}()
 	vars := mux.Vars(req)
 
 	if vars["api"] == "" || vars["token"] == "" {
@@ -133,6 +139,12 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 
 // operationDispatcher routes operator requests to the correct handler.
 func operationDispatcher(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("operationDispatcher panicked: %v", r)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+	}()
 	vars := mux.Vars(r)
 	api := vars["api"]
 	logging.Debugf("Operator request: API: %s", api)

@@ -1,6 +1,8 @@
 package agents
 
 import (
+	"sync"
+
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -9,19 +11,22 @@ import (
 // DisconnectAllAgents closes all agent connections
 // This should be called when the last operator disconnects
 func DisconnectAllAgents() {
-	live.AgentControlMapMutex.Lock()
-	defer live.AgentControlMapMutex.Unlock()
-
-	count := len(live.AgentControlMap)
+	count := 0
+	live.AgentControlMap.Range(func(key, value interface{}) bool {
+		count++
+		return true
+	})
 	if count == 0 {
 		return
 	}
 
 	logging.Infof("Disconnecting all %d agent(s) due to operator exit", count)
 
-	for agent, ctrl := range live.AgentControlMap {
+	live.AgentControlMap.Range(func(key, value interface{}) bool {
+		agent := key.(*def.Emp3r0rAgent)
+		ctrl := value.(*live.AgentControl)
 		if ctrl == nil {
-			continue
+			return true
 		}
 
 		// Close the connection
@@ -35,9 +40,10 @@ func DisconnectAllAgents() {
 		if ctrl.Cancel != nil {
 			ctrl.Cancel()
 		}
-	}
+		return true
+	})
 
 	// Clear the map
-	live.AgentControlMap = make(map[*def.Emp3r0rAgent]*live.AgentControl)
+	live.AgentControlMap = sync.Map{}
 	logging.Infof("All agents disconnected")
 }

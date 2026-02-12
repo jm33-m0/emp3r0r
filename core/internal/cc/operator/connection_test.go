@@ -104,16 +104,13 @@ func TestOperatorConnection(t *testing.T) {
 	// Since "checkin" might not be a valid API handler or might require POST
 	t.Logf("Response status: %s", resp.Status)
 
-	// Test sending a command
 	// Mock active agent
 	agentTag := "test-agent"
 	agent := &def.Emp3r0rAgent{Tag: agentTag}
-	live.AgentControlMapMutex.Lock()
-	live.AgentControlMap[agent] = &live.AgentControl{
+	live.AgentControlMap.Store(agent, &live.AgentControl{
 		Index: 0,
 		Label: "test-label",
-	}
-	live.AgentControlMapMutex.Unlock()
+	})
 
 	// Mock SendCmd
 	originalSendCmd := agents.SendCmd

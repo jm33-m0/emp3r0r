@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
@@ -27,7 +28,7 @@ type operator_t struct {
 
 var (
 	// OPERATORS holds all operator connections
-	OPERATORS = make(map[string]*operator_t)
+	OPERATORS sync.Map
 
 	// SERVER_WG_CONFIG is the wireguard config for the server
 	SERVER_WG_CONFIG *netutil.WireGuardConfig
@@ -44,6 +45,12 @@ func DecodeCBORBody[T any](wrt http.ResponseWriter, req *http.Request) (*T, erro
 }
 
 func handleSetActiveAgent(wrt http.ResponseWriter, req *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("handleSetActiveAgent panicked: %v", r)
+			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
+		}
+	}()
 	// Decode CBOR request body
 	operation, err := DecodeCBORBody[def.Operation](wrt, req)
 	if err != nil {
@@ -61,6 +68,12 @@ func handleSetActiveAgent(wrt http.ResponseWriter, req *http.Request) {
 }
 
 func handleSendCommand(wrt http.ResponseWriter, req *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("handleSendCommand panicked: %v", r)
+			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
+		}
+	}()
 	// Decode CBOR request body
 	operation, err := DecodeCBORBody[def.Operation](wrt, req)
 	if err != nil {
@@ -90,6 +103,12 @@ func handleSendCommand(wrt http.ResponseWriter, req *http.Request) {
 }
 
 func handleListAgents(wrt http.ResponseWriter, _ *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("handleListAgents panicked: %v", r)
+			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
+		}
+	}()
 	// Get all agents
 	agentsList := agents.GetConnectedAgents()
 
@@ -100,6 +119,12 @@ func handleListAgents(wrt http.ResponseWriter, _ *http.Request) {
 }
 
 func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("handleForgetAgent panicked: %v", r)
+			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
+		}
+	}()
 	// Decode CBOR request body to get Agent UUID
 	operation, err := DecodeCBORBody[def.Operation](wrt, req)
 	if err != nil {
@@ -116,16 +141,15 @@ func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
 	var agentDetails string = fmt.Sprintf("Agent %s", uuid)
 
 	// Try to get agent details from memory first (if connected/recently connected)
-	live.AgentControlMapMutex.RLock()
 	var targetAgent *def.Emp3r0rAgent
-	for a := range live.AgentControlMap {
+	live.AgentControlMap.Range(func(key, value interface{}) bool {
+		a := key.(*def.Emp3r0rAgent)
 		if a.UUID == uuid {
 			targetAgent = a
-			break
+			return false // stop iteration
 		}
-	}
-	live.AgentControlMapMutex.RUnlock()
-
+		return true
+	})
 	if targetAgent != nil {
 		agentDetails += fmt.Sprintf("\n  Tag: %s\n  Hostname: %s\n  IPs: %s\n  OS: %s",
 			targetAgent.Tag, targetAgent.Hostname, strings.Join(targetAgent.IPs, ", "), targetAgent.OS)
@@ -152,35 +176,35 @@ func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
 	}
 
 	// Remove from memory
-	live.AgentControlMapMutex.Lock()
 	if targetAgent != nil {
-		delete(live.AgentControlMap, targetAgent)
+		live.AgentControlMap.Delete(targetAgent)
 		logging.Successf("Operator removed agent %s from memory", uuid)
 	}
-	live.AgentControlMapMutex.Unlock()
-
 	// Clean up any pending key rotations for this agent
-	live.PendingKeyRotationsMutex.Lock()
-	delete(live.PendingKeyRotations, uuid)
-	live.PendingKeyRotationsMutex.Unlock()
+	live.PendingKeyRotations.Delete(uuid)
 
 	wrt.WriteHeader(http.StatusOK)
 	wrt.Write([]byte(fmt.Sprintf("%s\n\nHas been forgotten.", agentDetails)))
 }
 
 func handleListPortFwds(wrt http.ResponseWriter, _ *http.Request) {
-	network.PortFwdsMutex.Lock()
-	defer network.PortFwdsMutex.Unlock()
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("handleListPortFwds panicked: %v", r)
+			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
+		}
+	}()
 
 	var sessions []def.PortFwdSession
-	for id, portmap := range network.PortFwds {
+	network.PortFwds.Range(func(id, value any) bool {
+		portmap := value.(*network.PortFwdSession)
 		bindAddr := portmap.BindAddr
 		if bindAddr == "" {
 			bindAddr = "127.0.0.1"
 		}
 
 		sessions = append(sessions, def.PortFwdSession{
-			ID:          id,
+			ID:          id.(string),
 			LocalPort:   portmap.Lport,
 			RemoteAddr:  portmap.To,
 			BindAddr:    bindAddr,
@@ -189,7 +213,8 @@ func handleListPortFwds(wrt http.ResponseWriter, _ *http.Request) {
 			Reverse:     portmap.Reverse,
 			Protocol:    portmap.Protocol,
 		})
-	}
+		return true
+	})
 
 	data, err := cbor.Marshal(sessions)
 	if err != nil {
@@ -204,6 +229,12 @@ func handleListPortFwds(wrt http.ResponseWriter, _ *http.Request) {
 }
 
 func handleRegisterPortFwd(wrt http.ResponseWriter, req *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("handleRegisterPortFwd panicked: %v", r)
+			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
+		}
+	}()
 	// Decode CBOR request body
 	pfReq, err := DecodeCBORBody[def.PortFwdRequest](wrt, req)
 	if err != nil {
@@ -211,8 +242,7 @@ func handleRegisterPortFwd(wrt http.ResponseWriter, req *http.Request) {
 	}
 
 	// Register session in server's map
-	network.PortFwdsMutex.Lock()
-	network.PortFwds[pfReq.SessionID] = &network.PortFwdSession{
+	network.PortFwds.Store(pfReq.SessionID, &network.PortFwdSession{
 		Lport:       pfReq.Lport,
 		To:          pfReq.To,
 		Description: pfReq.Description,
@@ -221,14 +251,19 @@ func handleRegisterPortFwd(wrt http.ResponseWriter, req *http.Request) {
 		Agent: &def.Emp3r0rAgent{
 			Tag: pfReq.AgentTag,
 		},
-	}
-	network.PortFwdsMutex.Unlock()
+	})
 
 	logging.Infof("Registered port mapping %s (%s) from operator", pfReq.SessionID, pfReq.Description)
 	wrt.WriteHeader(http.StatusOK)
 }
 
 func handleUnregisterPortFwd(wrt http.ResponseWriter, req *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("handleUnregisterPortFwd panicked: %v", r)
+			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
+		}
+	}()
 	// Decode CBOR request body
 	sessionID, err := DecodeCBORBody[string](wrt, req)
 	if err != nil {
@@ -236,15 +271,19 @@ func handleUnregisterPortFwd(wrt http.ResponseWriter, req *http.Request) {
 	}
 
 	// Unregister session in server's map
-	network.PortFwdsMutex.Lock()
-	delete(network.PortFwds, *sessionID)
-	network.PortFwdsMutex.Unlock()
+	network.PortFwds.Delete(*sessionID)
 
 	logging.Infof("Unregistered port mapping %s from operator", *sessionID)
 	wrt.WriteHeader(http.StatusOK)
 }
 
 func handleGetCA(wrt http.ResponseWriter, req *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("handleGetCA panicked: %v", r)
+			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
+		}
+	}()
 	caData, err := os.ReadFile(transport.CaCrtFile)
 	if err != nil {
 		logging.Errorf("Failed to read CA cert: %v", err)
@@ -278,6 +317,11 @@ func handleGetCA(wrt http.ResponseWriter, req *http.Request) {
 
 // handleOperatorConn handles operator connections, this connection will be used to relay the message tunnel
 func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("handleOperatorConn panicked: %v", r)
+		}
+	}()
 	conn, err := h2conn.Accept(wrt, req)
 	if err != nil {
 		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -286,7 +330,11 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 	operator_session := req.Header.Get("operator_session")
 
 	// Check if other operators are already connected
-	activeSessionCount := len(OPERATORS)
+	activeSessionCount := 0
+	OPERATORS.Range(func(key, value interface{}) bool {
+		activeSessionCount++
+		return true
+	})
 	if activeSessionCount > 0 {
 		logging.Warningf("⚠️  New operator %s connecting while %d session(s) active!", operator_session, activeSessionCount)
 
@@ -309,23 +357,27 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 	logging.Infof("Operator %s connected to message tunnel from %s", operator_session, req.RemoteAddr)
-	operator, ok := OPERATORS[operator_session]
-	if !ok {
-		OPERATORS[operator_session] = &operator_t{
-			sessionID: operator_session,
-			conn:      conn,
-		}
-	} else {
-		operator.conn = conn
-	}
+	op, _ := OPERATORS.LoadOrStore(operator_session, &operator_t{
+		sessionID: operator_session,
+		conn:      conn,
+	})
+	operator := op.(*operator_t)
+	operator.conn = conn
+	OPERATORS.Store(operator_session, operator)
 
 	ctx, cancel := context.WithCancel(req.Context())
 	defer func() {
 		logging.Debugf("handleOperatorConn exiting")
-		delete(OPERATORS, operator_session)
+		OPERATORS.Delete(operator_session)
 
 		// If this was the last operator, disconnect all agents
-		if len(OPERATORS) == 0 {
+		lastOperator := true
+		OPERATORS.Range(func(key, value interface{}) bool {
+			lastOperator = false
+			return false // stop iteration
+		})
+
+		if lastOperator {
 			logging.Infof("Last operator disconnected, closing all agent connections")
 			agents.DisconnectAllAgents()
 		}

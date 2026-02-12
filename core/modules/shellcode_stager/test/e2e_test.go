@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -174,16 +175,17 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	}
 
 	// Reset live agent maps
-	live.AgentControlMapMutex.Lock()
-	live.AgentControlMap = make(map[*def.Emp3r0rAgent]*live.AgentControl)
+	live.AgentControlMap = sync.Map{}
 	live.AgentList = make([]*def.Emp3r0rAgent, 0)
-	live.AgentControlMapMutex.Unlock()
 
 	// Debug: verify maps are empty
-	live.AgentControlMapMutex.RLock()
-	logging.Debugf("AgentControlMap size after reset: %d", len(live.AgentControlMap))
+	size := 0
+	live.AgentControlMap.Range(func(key, value interface{}) bool {
+		size++
+		return true
+	})
+	logging.Debugf("AgentControlMap size after reset: %d", size)
 	logging.Debugf("AgentList size after reset: %d", len(live.AgentList))
-	live.AgentControlMapMutex.RUnlock()
 
 	// Small delay to ensure map reset propagates
 	time.Sleep(100 * time.Millisecond)
@@ -250,7 +252,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	logging.Successf("Mock agent patched with config")
 
 	// Dummy operator for preflight
-	server.OPERATORS["dummy"] = nil
+	server.OPERATORS.Store("dummy", nil)
 
 	// 4. Start Real C2 Server
 	// Shutdown any existing server first
@@ -417,14 +419,15 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 		}
 
 		// Check if agent has checked in (added to AgentControlMap) AND has an active connection
-		live.AgentControlMapMutex.RLock()
-		for k, v := range live.AgentControlMap {
+		live.AgentControlMap.Range(func(key, value interface{}) bool {
+			k := key.(*def.Emp3r0rAgent)
+			v := value.(*live.AgentControl)
 			if k.Tag != "" && v.Conn != nil { // Wait for MsgTun connection
 				agent = k
-				break
+				return false // stop iteration
 			}
-		}
-		live.AgentControlMapMutex.RUnlock()
+			return true
+		})
 
 		if agent != nil {
 			logging.Successf("Agent checked in and connected! Tag: %s", agent.Tag)
@@ -494,14 +497,14 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	outputReceived := false
 	for i := 0; i < 20; i++ {
 		// Check connection status
-		live.AgentControlMapMutex.RLock()
-		if a, ok := live.AgentControlMap[agent]; ok && a.Conn != nil {
-			// still connected
-		} else {
-			live.AgentControlMapMutex.RUnlock()
-			t.Fatalf("Agent disconnected while waiting for command output!")
+		if val, ok := live.AgentControlMap.Load(agent); ok {
+			a := val.(*live.AgentControl)
+			if a.Conn != nil {
+				// still connected
+			} else {
+				t.Fatalf("Agent disconnected while waiting for command output!")
+			}
 		}
-		live.AgentControlMapMutex.RUnlock()
 
 		// Check result
 		if res, ok := live.CmdResults.Load(cmdID); ok {
@@ -529,12 +532,10 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	logging.Infof("Testing Agent Restart & Key Persistence...")
 
 	// Get first session key
-	live.AgentControlMapMutex.RLock()
 	firstKey := ""
 	if agent != nil {
 		firstKey = agent.PublicKey
 	}
-	live.AgentControlMapMutex.RUnlock()
 
 	if firstKey == "" {
 		t.Fatalf("Failed to get first session key")
@@ -614,13 +615,12 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	reconnected := false
 
 	for time.Since(startRestart) < 30*time.Second {
-		live.AgentControlMapMutex.RLock()
-		for k, v := range live.AgentControlMap {
+		live.AgentControlMap.Range(func(key, value interface{}) bool {
+			k := key.(*def.Emp3r0rAgent)
+			v := value.(*live.AgentControl)
 			// Look for the same UUID
 			if k.UUID == agent.UUID && v.Conn != nil {
 				// Check PID to ensure it's a new process
-				// k.Process might be nil if not fully populated yet, or old?
-				// But handler_checkin updates the struct k points to.
 
 				if k.Process != nil && k.Process.PID != childPid {
 					// New Process detected!
@@ -629,16 +629,16 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 					if k.PublicKey != firstKey {
 						logging.Errorf("Agent Logs (Stderr):\n%s", stderr.String())
 						logging.Errorf("Stager Logs (Stdout):\n%s", stdout.String())
-						live.AgentControlMapMutex.RUnlock()
 						t.Fatalf("CRITICAL FAILURE: Agent Restarted with DIFFERENT Key!\nFirst: %s\nNew: %s", firstKey, k.PublicKey)
 					}
 
 					logging.Infof("New Agent PID: %d (Old: %d)", k.Process.PID, childPid)
 					reconnected = true
+					return false // stop iteration
 				}
 			}
-		}
-		live.AgentControlMapMutex.RUnlock()
+			return true
+		})
 
 		if reconnected {
 			logging.Successf("Agent reconnected with SAME key. Persistence verified.")

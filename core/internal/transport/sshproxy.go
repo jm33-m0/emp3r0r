@@ -60,12 +60,10 @@ func SSHRemoteFwdServer(port, password string, hostkey []byte) (err error) {
 
 // SSHReverseProxyClient dial SSHProxyServer, start a reverse proxy
 // serverAddr format: 127.0.0.1:22
-// FIXME: when using KCP, port number calculation is wrong
 func SSHReverseProxyClient(ssh_serverAddr string, // SSH server address:port
 	password string, // SSH authentication password
 	proxyPort int, // local port to forward to remote, in here it should be Emp3r0rProxyPort
-	reverseConns *map[string]context.CancelFunc,
-	reverseConnsMutex *sync.Mutex,
+	reverseConns *sync.Map,
 	socks5proxy *socks5.Server,
 	ctx context.Context, cancel context.CancelFunc,
 ) (err error) {
@@ -89,7 +87,7 @@ func SSHReverseProxyClient(ssh_serverAddr string, // SSH server address:port
 	}()
 
 	return SSHRemoteFwdClient(ssh_serverAddr, password, nil,
-		proxyPort, reverseConns, reverseConnsMutex, ctx, cancel)
+		proxyPort, reverseConns, ctx, cancel)
 }
 
 // SSHRemoteFwdClient dial SSHRemoteFwdServer, forward local TCP port to remote server
@@ -98,8 +96,7 @@ func SSHReverseProxyClient(ssh_serverAddr string, // SSH server address:port
 func SSHRemoteFwdClient(ssh_serverAddr, password string,
 	hostkey ssh.PublicKey, // ssh server public key
 	local_port int, // local port to forward to remote
-	conns *map[string]context.CancelFunc, // record this connection
-	connsMutex *sync.Mutex,
+	conns *sync.Map, // record this connection
 	ctx context.Context, cancel context.CancelFunc,
 ) (err error) {
 	hostkey_callback := ssh.InsecureIgnoreHostKey()
@@ -143,23 +140,10 @@ func SSHRemoteFwdClient(ssh_serverAddr, password string,
 		l.Close()
 	}()
 
-	connsList := *conns
-	if connsMutex != nil {
-		connsMutex.Lock()
-	}
-	connsList[ssh_serverAddr] = cancel // record this connection
-	if connsMutex != nil {
-		connsMutex.Unlock()
-	}
+	conns.Store(ssh_serverAddr, cancel) // record this connection
 	toAddr := fmt.Sprintf("127.0.0.1:%d", local_port)
 	defer func() {
-		if connsMutex != nil {
-			connsMutex.Lock()
-		}
-		delete(connsList, ssh_serverAddr)
-		if connsMutex != nil {
-			connsMutex.Unlock()
-		}
+		conns.Delete(ssh_serverAddr)
 	}()
 
 	// forward to target local port

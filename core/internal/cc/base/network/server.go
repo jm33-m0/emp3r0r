@@ -19,12 +19,9 @@ var (
 	// Shared stream handlers and maps
 	RShellStream  = &StreamHandler{H2x: nil, BufSize: def.RShellBufSize, Buf: make(chan []byte)}
 	ProxyStream   = &StreamHandler{H2x: nil, BufSize: def.ProxyBufSize, Buf: make(chan []byte)}
-	FTPStreams    = make(map[string]*StreamHandler)
-	FTPMutex      = &sync.Mutex{}
-	RShellStreams = make(map[string]*StreamHandler)
-	RShellMutex   = &sync.Mutex{}
-	PortFwds      = make(map[string]*PortFwdSession)
-	PortFwdsMutex = &sync.Mutex{}
+	FTPStreams    sync.Map
+	RShellStreams sync.Map
+	PortFwds      sync.Map
 )
 
 // StreamHandler allows the HTTP handler to use H2Conn.

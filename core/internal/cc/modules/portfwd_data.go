@@ -18,11 +18,12 @@ func GetPortFwdSessions() []def.PortFwdSession {
 
 	var sessions []def.PortFwdSession
 
-	for id, portmap := range network.PortFwds {
+	network.PortFwds.Range(func(id, value interface{}) bool {
+		portmap := value.(*network.PortFwdSession)
 		// Skip invalid sessions
 		if portmap.Sh == nil {
 			portmap.Cancel()
-			continue
+			return true // continue iteration
 		}
 
 		bindAddr := portmap.BindAddr
@@ -44,7 +45,7 @@ func GetPortFwdSessions() []def.PortFwdSession {
 		}
 
 		sessions = append(sessions, def.PortFwdSession{
-			ID:          id,
+			ID:          id.(string),
 			LocalPort:   localPort,
 			RemoteAddr:  remoteAddr,
 			BindAddr:    bindAddr,
@@ -52,7 +53,8 @@ func GetPortFwdSessions() []def.PortFwdSession {
 			Description: portmap.Description,
 			Reverse:     portmap.Reverse,
 		})
-	}
+		return true
+	})
 
 	return sessions
 }

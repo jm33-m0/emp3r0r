@@ -85,11 +85,8 @@ func ProcessAgentResponse(data *def.MsgTunData) (*ProcessedResponse, error) {
 	live.CmdResults.Store(data.JobID, resp.Output)
 
 	// Calculate time spent
-	live.CmdTimeMutex.Lock()
-	cmdtime, ok := live.CmdTime[data.JobID]
-	live.CmdTimeMutex.Unlock()
-
-	if ok {
+	if val, ok := live.CmdTime.Load(data.JobID); ok {
+		cmdtime := val.(string)
 		startTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", cmdtime)
 		if err == nil {
 			resp.TimeSpent = time.Since(startTime)

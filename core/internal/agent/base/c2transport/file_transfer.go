@@ -221,11 +221,10 @@ func SendFile2CC(filepath string, offset int64, token string) (err error) {
 	return
 }
 
-var (
-	// AgentFileTransferSessions stores active file transfer sessions between agents
-	AgentFileTransferSessions = make(map[string]context.CancelFunc)
-	sessionsMutex             sync.Mutex
+// AgentFileTransferSessions stores active file transfer sessions between agents
+var AgentFileTransferSessions sync.Map
 
+var (
 	// FileServer switch
 	FileServerCtx    context.Context
 	FileServerCancel context.CancelFunc
@@ -358,13 +357,12 @@ func FetchFileKCP(address, filepath, path, checksum string) (err error) {
 // CancelFileTransfer cancels an ongoing file transfer session
 func CancelFileTransfer(clientAddr, filepath string) {
 	sessionID := fmt.Sprintf("%s:%s", clientAddr, filepath)
-	sessionsMutex.Lock()
-	defer sessionsMutex.Unlock()
 
-	if cancel, exists := AgentFileTransferSessions[sessionID]; exists {
+	if val, exists := AgentFileTransferSessions.Load(sessionID); exists {
+		cancel := val.(context.CancelFunc)
 		cancel()
 		logging.Printf("File transfer session for %s canceled", sessionID)
-		delete(AgentFileTransferSessions, sessionID)
+		AgentFileTransferSessions.Delete(sessionID)
 	} else {
 		logging.Printf("No active file transfer session for %s", sessionID)
 	}

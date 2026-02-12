@@ -72,20 +72,18 @@ func operatorBroadcastPrintf(msg_type, format string, a ...any) (err error) {
 
 // fwdMsg2Operators forwards a message to all connected operator sessions.
 func fwdMsg2Operators(msg def.MsgTunData) (err error) {
-	for operator_session_id, operator := range OPERATORS {
-		if operator == nil {
-			continue
+	OPERATORS.Range(func(id, value interface{}) bool {
+		op, ok := value.(*operator_t)
+		if !ok || op == nil || op.conn == nil {
+			return true // continue iteration
 		}
-		if operator.conn == nil {
-			continue
-		}
-		encoder := cbor.NewEncoder(operator.conn)
+		encoder := cbor.NewEncoder(op.conn)
 		err = encoder.Encode(msg)
 		if err != nil {
 			logging.Errorf("Failed to forward message to operator: %v", err)
-			return
+			return false // stop iteration on error
 		}
-		logging.Debugf("Forwarded message %v to operator %s", msg, operator_session_id)
-	}
+		return true // continue iteration
+	})
 	return
 }

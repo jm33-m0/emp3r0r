@@ -15,9 +15,7 @@ import (
 
 var (
 	// Jobs holds all jobs, key is JobID
-	Jobs = make(map[string]*def.Job)
-	// JobsMutex protects Jobs map
-	JobsMutex = &sync.RWMutex{}
+	Jobs sync.Map
 )
 
 // CreateJob creates a new job and saves it to Jobs map
@@ -31,17 +29,16 @@ func CreateJob(name, module, agentTag string) *def.Job {
 		Status:   def.JobStatusPending,
 	}
 
-	JobsMutex.Lock()
-	defer JobsMutex.Unlock()
-	Jobs[job.ID] = job
+	Jobs.Store(job.ID, job)
 	return job
 }
 
 // GetJob retrieves a job by ID
 func GetJob(id string) *def.Job {
-	JobsMutex.RLock()
-	defer JobsMutex.RUnlock()
-	return Jobs[id]
+	if val, ok := Jobs.Load(id); ok {
+		return val.(*def.Job)
+	}
+	return nil
 }
 
 // HandleOutput appends output to job's log file or prints to console
@@ -75,12 +72,11 @@ func HandleOutput(jobID string, output []byte) {
 
 // GetJobs returns a list of all jobs
 func GetJobs() []*def.Job {
-	JobsMutex.RLock()
-	defer JobsMutex.RUnlock()
-	jobs := make([]*def.Job, 0, len(Jobs))
-	for _, job := range Jobs {
-		jobs = append(jobs, job)
-	}
+	var jobs []*def.Job
+	Jobs.Range(func(key, value interface{}) bool {
+		jobs = append(jobs, value.(*def.Job))
+		return true
+	})
 	return jobs
 }
 

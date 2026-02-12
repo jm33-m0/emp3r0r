@@ -55,9 +55,7 @@ func (pf *PortFwdSession) InitReversedPortFwd() (err error) {
 	}
 	pf.Reverse = true
 	pf.Agent = live.ActiveAgent
-	PortFwdsMutex.Lock()
-	PortFwds[fwdID] = pf
-	PortFwdsMutex.Unlock()
+	PortFwds.Store(fwdID, pf)
 
 	cmd := fmt.Sprintf("%s --to %s --shID %s --operation reverse", def.C2CmdPortFwd, listenPort, fwdID)
 	err = pf.SendCmdFunc(cmd, "", pf.Agent.Tag)
@@ -224,9 +222,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 	if pf.Description == "" {
 		pf.Description = fmt.Sprintf("Agent to CC mapping (%s)", pf.Protocol)
 	}
-	PortFwdsMutex.Lock()
-	PortFwds[fwdID] = pf
-	PortFwdsMutex.Unlock()
+	PortFwds.Store(fwdID, pf)
 
 	if pf.RegisterFunc != nil {
 		req := def.PortFwdRequest{
@@ -251,9 +247,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		if udp_listener != nil {
 			udp_listener.Close()
 		}
-		PortFwdsMutex.Lock()
-		defer PortFwdsMutex.Unlock()
-		delete(PortFwds, fwdID)
+		PortFwds.Delete(fwdID)
 		if pf.UnregisterFunc != nil {
 			if err = pf.UnregisterFunc(fwdID); err != nil {
 				logging.Errorf("cleanup: failed to unregister %s: %v", fwdID, err)
@@ -319,10 +313,11 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 	}
 
 	for ctx.Err() == nil {
-		p, exist := PortFwds[fwdID]
+		val, exist := PortFwds.Load(fwdID)
 		if !exist {
 			return
 		}
+		p := val.(*PortFwdSession)
 		if p.Sh == nil {
 			time.Sleep(100 * time.Millisecond)
 			continue

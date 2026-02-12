@@ -85,12 +85,14 @@ func HandleFTPTransfer(sh *network.StreamHandler, wrt http.ResponseWriter, req *
 
 	// Determine file paths.
 	filename := ""
-	for fname, persh := range network.FTPStreams {
+	network.FTPStreams.Range(func(fname, value interface{}) bool {
+		persh := value.(*network.StreamHandler)
 		if sh.Token == persh.Token {
-			filename = fname
-			break
+			filename = fname.(string)
+			return false // stop iteration
 		}
-	}
+		return true
+	})
 	if filename == "" {
 		logging.Errorf("Failed to parse filename for token %s", sh.Token)
 		return
@@ -154,9 +156,7 @@ func HandleFTPTransfer(sh *network.StreamHandler, wrt http.ResponseWriter, req *
 			}
 		}
 		sh.H2x.Cancel()
-		network.FTPMutex.Lock()
-		delete(network.FTPStreams, mapKey)
-		network.FTPMutex.Unlock()
+		network.FTPStreams.Delete(mapKey)
 		logging.Warningf("Closed FTP connection from %s", req.RemoteAddr)
 		err = os.Remove(lock)
 		if err != nil {
