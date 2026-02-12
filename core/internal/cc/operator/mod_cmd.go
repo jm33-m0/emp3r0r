@@ -99,7 +99,7 @@ func cmdModuleRun(cmd *cobra.Command, _ []string) {
 			logging.Successf("Shell ready! Opening tmux...")
 			windowName := "shell"
 			if target != nil {
-				windowName = fmt.Sprintf("shell/%s", target.Hostname)
+				windowName = fmt.Sprintf("shell-%s", target.ShortID)
 			}
 			return cli.TmuxNewWindow(windowName, connStr)
 		},

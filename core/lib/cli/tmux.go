@@ -213,7 +213,7 @@ func TmuxCurrentPane() (pane_id string) {
 }
 
 func TmuxSwitchWindow(window_id string) (res bool) {
-	out, cmdErr := exec.Command("/bin/sh", "-c", "tmux select-window -t "+window_id).CombinedOutput()
+	out, cmdErr := exec.Command("tmux", "select-window", "-t", window_id).CombinedOutput()
 	if cmdErr != nil {
 		logging.Warningf("TmuxSwitchWindow: %v: %s", cmdErr, out)
 		return
@@ -307,15 +307,13 @@ func (pane *TmuxPane) Printf(clear bool, format string, a ...interface{}) {
 func (pane *TmuxPane) ClearPane() (err error) {
 	id := pane.ID
 
-	job := fmt.Sprintf("tmux respawn-pane -t %s -k %s", id, pane.Cmd)
-	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
+	out, err := exec.Command("tmux", "respawn-pane", "-t", id, "-k", pane.Cmd).CombinedOutput()
 	if err != nil {
 		err = fmt.Errorf("exec tmux respawn pane: %s\n%v", out, err)
 		return
 	}
 
-	job = fmt.Sprintf("tmux clear-history -t %s", id)
-	out, err = exec.Command("/bin/sh", "-c", job).CombinedOutput()
+	out, err = exec.Command("tmux", "clear-history", "-t", id).CombinedOutput()
 	if err != nil {
 		err = fmt.Errorf("exec tmux clear-history: %s\n%v", out, err)
 		return
@@ -343,11 +341,9 @@ func (pane *TmuxPane) PaneDetails() (
 		return
 	}
 
-	out, err := exec.Command("/bin/sh", "-c",
-		fmt.Sprintf("tmux display-message -p -t %s "+
-			`'#{pane_dead}:#{pane_tty}:#{pane_pid}:#{pane_width}:`+
-			`#{pane_height}:#{pane_current_command}:#{pane_title}'`,
-			pane.ID)).CombinedOutput()
+	format := `#{pane_dead}:#{pane_tty}:#{pane_pid}:#{pane_width}:` +
+		`#{pane_height}:#{pane_current_command}:#{pane_title}`
+	out, err := exec.Command("tmux", "display-message", "-p", "-t", pane.ID, format).CombinedOutput()
 	if err != nil {
 		logging.Warningf("tmux get pane details: %s, %v", out, err)
 		return
@@ -387,9 +383,7 @@ func (pane *TmuxPane) PaneDetails() (
 // ResizePane resize pane in x/y to number of lines
 func (pane *TmuxPane) ResizePane(direction string, lines int) (err error) {
 	id := pane.ID
-	job := fmt.Sprintf("tmux resize-pane -t %s -%s %d", id, direction, lines)
-	logging.Debugf("Resizing pane %s: %s", pane.Title, job)
-	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
+	out, err := exec.Command("tmux", "resize-pane", "-t", id, "-"+direction, strconv.Itoa(lines)).CombinedOutput()
 	if err != nil {
 		err = fmt.Errorf("exec tmux resize-pane: %s\n%v", out, err)
 		return
@@ -399,8 +393,7 @@ func (pane *TmuxPane) ResizePane(direction string, lines int) (err error) {
 
 func (pane *TmuxPane) KillPane() (err error) {
 	id := pane.ID
-	job := fmt.Sprintf("tmux kill-pane -t %s", id)
-	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
+	out, err := exec.Command("tmux", "kill-pane", "-t", id).CombinedOutput()
 	if err != nil {
 		err = fmt.Errorf("exec tmux kill-pane: %s\n%v", out, err)
 		return
@@ -417,7 +410,7 @@ func TmuxDeinitWindows() {
 
 	time.Sleep(2 * time.Second)
 	// kill session altogether
-	out, err := exec.Command("/bin/sh", "-c", "tmux kill-session -t emp3r0r").CombinedOutput()
+	out, err := exec.Command("tmux", "kill-session", "-t", "emp3r0r").CombinedOutput()
 	if err != nil {
 		logging.Errorf("exec tmux kill-session -t emp3r0r: %s\n%v", out, err)
 	}
@@ -431,8 +424,9 @@ func TermSize() (width, height int, err error) {
 
 // Set tmux option of current tmux window
 func TmuxSetOpt(index, opt string) (err error) {
-	job := fmt.Sprintf("tmux set-option %s", opt)
-	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
+	args := strings.Fields(opt)
+	tmuxArgs := append([]string{"set-option"}, args...)
+	out, err := exec.Command("tmux", tmuxArgs...).CombinedOutput()
 	if err != nil {
 		err = fmt.Errorf("exec tmux set-option %s: %s\n%v", opt, out, err)
 		return
@@ -454,20 +448,16 @@ func TmuxNewPane(title, hV string, target_pane_id string, size int, cmd string) 
 	}
 	is_new_window := hV == "" && size == 0
 
-	job := fmt.Sprintf(`tmux split-window -%s -l %d%% -P -d -F "#{pane_id}:#{pane_pid}:#{pane_tty}:#{window_id}" '%s'`,
-		hV, size, cmd)
+	var args []string
 	if target_pane_id != "" {
-		job = fmt.Sprintf(`tmux split-window -t %s -%s -l %d%% -P -d -F "#{pane_id}:#{pane_pid}:#{pane_tty}:#{window_id}" '%s'`,
-			target_pane_id, hV, size, cmd)
+		args = []string{"split-window", "-t", target_pane_id, "-" + hV, "-l", fmt.Sprintf("%d%%", size), "-P", "-d", "-F", "#{pane_id}:#{pane_pid}:#{pane_tty}:#{window_id}", cmd}
+	} else if is_new_window {
+		args = []string{"new-window", "-n", title, "-P", "-d", "-F", "#{pane_id}:#{pane_pid}:#{pane_tty}:#{window_id}", cmd}
+	} else {
+		args = []string{"split-window", "-" + hV, "-l", fmt.Sprintf("%d%%", size), "-P", "-d", "-F", "#{pane_id}:#{pane_pid}:#{pane_tty}:#{window_id}", cmd}
 	}
 
-	// what if i want to open a new tmux window?
-	if is_new_window {
-		job = fmt.Sprintf(`tmux new-window -n '%s' -P -d -F "#{pane_id}:#{pane_pid}:#{pane_tty}:#{window_id}" '%s'`,
-			title, cmd)
-	}
-
-	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
+	out, err := exec.Command("tmux", args...).CombinedOutput()
 	if err != nil {
 		err = fmt.Errorf("exec tmux: %s\n%v", out, err)
 		return
@@ -475,8 +465,8 @@ func TmuxNewPane(title, hV string, target_pane_id string, size int, cmd string) 
 	tmux_result := string(out)
 	tmux_res_split := strings.Split(tmux_result, ":")
 	if len(tmux_res_split) < 3 {
-		err = fmt.Errorf("tmux result cannot be parsed:\n%s\n==>\n%s",
-			strconv.Quote(job), strconv.Quote(tmux_result))
+		err = fmt.Errorf("tmux result cannot be parsed:\n%v\n==>\n%s",
+			args, strconv.Quote(tmux_result))
 		return
 	}
 
@@ -521,11 +511,8 @@ func TmuxSetWindowTitle(title, window_id string) error {
 }
 
 // TmuxSetStatusLeft set tmux status left
-func TmuxSetStatusLeft(format string, a ...any) error {
-	msg := fmt.Sprintf(format, a...)
-	tmuxCmd := fmt.Sprintf("tmux set-option -g status-left '%s'", msg)
-	job := exec.Command("/bin/sh", "-c", tmuxCmd)
-	out, err := job.CombinedOutput()
+func TmuxSetStatusLeft(msg string) error {
+	out, err := exec.Command("tmux", "set-option", "-g", "status-left", msg).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%s\n%v", out, err)
 	}
@@ -533,11 +520,8 @@ func TmuxSetStatusLeft(format string, a ...any) error {
 }
 
 // TmuxSetStatusRight set tmux status right
-func TmuxSetStatusRight(format string, a ...any) error {
-	msg := fmt.Sprintf(format, a...)
-	tmuxCmd := fmt.Sprintf("tmux set-option -g status-right '%s'", msg)
-	job := exec.Command("/bin/sh", "-c", tmuxCmd)
-	out, err := job.CombinedOutput()
+func TmuxSetStatusRight(msg string) error {
+	out, err := exec.Command("tmux", "set-option", "-g", "status-right", msg).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%s\n%v", out, err)
 	}
@@ -551,9 +535,7 @@ func TmuxNewWindow(name, cmd string) error {
 		return errors.New("you need to run emp3r0r under `tmux`")
 	}
 
-	tmuxCmd := fmt.Sprintf("tmux new-window -n %s '%s'", name, cmd)
-	job := exec.Command("/bin/sh", "-c", tmuxCmd)
-	out, err := job.CombinedOutput()
+	out, err := exec.Command("tmux", "new-window", "-n", name, cmd).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%v: %s", err, out)
 	}
@@ -568,9 +550,7 @@ func TmuxSplit(hV, cmd string) error {
 		return errors.New("you need to run emp3r0r under tmux")
 	}
 
-	job := fmt.Sprintf("tmux split-window -%s '%s || read'", hV, cmd)
-
-	out, err := exec.Command("/bin/sh", "-c", job).CombinedOutput()
+	out, err := exec.Command("tmux", "split-window", "-"+hV, cmd).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%v: %s", err, out)
 	}

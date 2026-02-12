@@ -166,7 +166,11 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 					OnUIReady: func(data any) error {
 						connStr := data.(string)
 						logging.Successf("File manager ready! Opening tmux...")
-						return cli.TmuxNewWindow("file_manager", connStr)
+						windowName := "file_manager"
+						if agent != nil {
+							windowName = fmt.Sprintf("sftp-%s", agent.ShortID)
+						}
+						return cli.TmuxNewWindow(windowName, connStr)
 					},
 				}
 				modules.CmdOpenFileManager(ctx)

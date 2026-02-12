@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"crypto/sha1"
 	"fmt"
 	"sort"
 	"strconv"
@@ -14,12 +15,16 @@ import (
 	"github.com/posener/h2conn"
 )
 
-// GetConnectedAgents returns a slice of connected emp3r0r agents.
 func GetConnectedAgents() []*def.Emp3r0rAgent {
 	live.AgentControlMapMutex.RLock()
 	defer live.AgentControlMapMutex.RUnlock()
 	agents := make([]*def.Emp3r0rAgent, 0, len(live.AgentControlMap))
 	for agent := range live.AgentControlMap {
+		shortID := fmt.Sprintf("%x", sha1.Sum([]byte(agent.UUID+agent.UUIDSig)))
+		if len(shortID) > 8 {
+			shortID = shortID[:8]
+		}
+		agent.ShortID = shortID
 		agents = append(agents, agent)
 	}
 	return agents

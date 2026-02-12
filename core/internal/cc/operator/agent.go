@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -26,7 +25,7 @@ func CmdSetActiveAgent(cmd *cobra.Command, args []string) {
 	logging.Successf("Now targeting %s", live.ActiveAgent.Tag)
 
 	// Update tmux window title to show active agent
-	setTitleErr := cli.TmuxSetWindowTitle(fmt.Sprintf("#[fg=cyan]%s", live.ActiveAgent.Name), cli.CommandPane.WindowID)
+	setTitleErr := cli.TmuxSetWindowTitle(live.ActiveAgent.ShortID, cli.CommandPane.WindowID)
 	if setTitleErr != nil {
 		logging.Warningf("Failed to set tmux window title: %v", setTitleErr)
 	}
@@ -61,11 +60,13 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 			"IPs":     ips,
 		}
 		row := []string{
+			target.ShortID,
 			util.SplitLongLine(target.Tag, 15),
 			infoMap["OS"], infoMap["Process"], infoMap["User"], infoMap["IPs"], infoMap["From"],
 		}
 		if live.ActiveAgent != nil && live.ActiveAgent.Tag == target.Tag {
 			row = []string{
+				target.ShortID,
 				util.SplitLongLine(target.Tag, 15),
 				infoMap["OS"], infoMap["Process"], infoMap["User"], infoMap["IPs"], infoMap["From"],
 			}
@@ -78,16 +79,12 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 		tdata = append(tdata, tail)
 	}
 
-	// Set tmux status with agent count and C2 status
-	c2_ip := common.RuntimeConfig.CCAddress
-	transport_type := "[??]"
+	// Set tmux status with agent count and RTT/Idle info
 	rtt := "⚡??ms"
 	idle := "Idle: ??s"
 	idle_color := "green"
 
 	if live.ActiveAgent != nil {
-		c2_ip = live.ActiveAgent.C2Host
-		transport_type = fmt.Sprintf("[%s]", live.ActiveAgent.Transport)
 		rtt = fmt.Sprintf("⚡%dms", live.ActiveAgent.LastSeenRTT.Milliseconds())
 
 		idle_time := time.Since(live.ActiveAgent.LastSeen).Seconds()
@@ -110,17 +107,17 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 		agentCountColor = "green"
 	}
 
-	// Status Left: [emp3r0r] 🛡️ AgentCount | 📡 C2Address
-	status_left := fmt.Sprintf("#[fg=colour15,bg=colour235,bold] [emp3r0r] #[fg=%s,bg=colour235,nobold]🛡️ %d Agents #[fg=white]| 📡 %s ",
-		agentCountColor, len(agents), util.ShortenString(c2_ip, 20))
-	_ = cli.TmuxSetStatusLeft("%s", status_left)
+	// Status Left: [emp3r0r] 🛡️ AgentCount
+	status_left := fmt.Sprintf("#[fg=colour15,bg=colour235,bold] [emp3r0r] #[fg=%s,bg=colour235,nobold]🛡️ %d Agents ",
+		agentCountColor, len(agents))
+	_ = cli.TmuxSetStatusLeft(status_left)
 
-	// Status Right: Transport RTT | Idle: Time
-	status_right := fmt.Sprintf("#[fg=colour15,bg=colour235,bold] %s %s | #[fg=%s]%s ",
-		transport_type, rtt, idle_color, idle)
-	_ = cli.TmuxSetStatusRight("%s", status_right)
+	// Status Right: RTT | Idle: Time
+	status_right := fmt.Sprintf("#[fg=colour15,bg=colour235,bold] %s | #[fg=%s]%s ",
+		rtt, idle_color, idle)
+	_ = cli.TmuxSetStatusRight(status_right)
 
-	header := []string{"Tag", "OS", "Process", "User", "IPs", "From"}
+	header := []string{"ID", "Tag", "OS", "Process", "User", "IPs", "From"}
 	tabStr := cli.BuildTable(header, tdata)
 	if cli.AgentListPane != nil {
 		cli.AgentListPane.Printf(true, "%s", tabStr)
@@ -159,6 +156,8 @@ func refreshAgentList() error {
 		for _, a := range agents {
 			if a.UUID == live.ActiveAgent.UUID {
 				live.ActiveAgent = a
+				// Update tmux window title
+				_ = cli.TmuxSetWindowTitle(live.ActiveAgent.ShortID, cli.CommandPane.WindowID)
 				break
 			}
 		}

