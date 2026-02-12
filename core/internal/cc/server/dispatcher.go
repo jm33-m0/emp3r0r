@@ -21,6 +21,9 @@ import (
 func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 	defer func() {
 		if r := recover(); r != nil {
+			if r == http.ErrAbortHandler {
+				return
+			}
 			logging.Errorf("apiDispatcher panicked: %v", r)
 			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
 		}
@@ -141,6 +144,9 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 func operationDispatcher(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if r := recover(); r != nil {
+			if r == http.ErrAbortHandler {
+				return
+			}
 			logging.Errorf("operationDispatcher panicked: %v", r)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}

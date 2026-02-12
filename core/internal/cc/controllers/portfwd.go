@@ -170,9 +170,14 @@ func CleanupPortFwdsByAgent(agent *def.Emp3r0rAgent) {
 	}
 
 	network.PortFwds.Range(func(id, value any) bool {
-		session := value.(*network.PortFwdSession)
+		session, ok := value.(*network.PortFwdSession)
+		if !ok || session == nil {
+			return true
+		}
 		if session.Agent != nil && session.Agent.Tag == agent.Tag {
-			session.Cancel()
+			if session.Cancel != nil {
+				session.Cancel()
+			}
 			network.PortFwds.Delete(id)
 		}
 		return true
