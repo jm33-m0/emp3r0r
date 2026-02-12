@@ -11,6 +11,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/controllers"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/jobs"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -44,6 +45,7 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 			c := value.(*live.AgentControl)
 			if c.Conn == secureConn {
 				live.AgentControlMap.Delete(t)
+				controllers.CleanupPortFwdsByAgent(t)
 				operatorBroadcastPrintf(logging.ERROR, "Agent dies... %s is disconnected", strconv.Quote(t.Name))
 				return false // stop iteration
 			}

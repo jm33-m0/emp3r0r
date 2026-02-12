@@ -7,6 +7,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
 )
 
 // PortMapping represents a single port forward session
@@ -160,4 +161,20 @@ func RemoveForward(lport, to string, agentTag string) error {
 	}
 
 	return nil
+}
+
+// CleanupPortFwdsByAgent stops and removes all port forwarding sessions for a specific agent
+func CleanupPortFwdsByAgent(agent *def.Emp3r0rAgent) {
+	if agent == nil {
+		return
+	}
+
+	network.PortFwds.Range(func(id, value any) bool {
+		session := value.(*network.PortFwdSession)
+		if session.Agent != nil && session.Agent.Tag == agent.Tag {
+			session.Cancel()
+			network.PortFwds.Delete(id)
+		}
+		return true
+	})
 }

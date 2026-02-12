@@ -12,6 +12,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/controllers"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -178,6 +179,7 @@ func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
 	// Remove from memory
 	if targetAgent != nil {
 		live.AgentControlMap.Delete(targetAgent)
+		controllers.CleanupPortFwdsByAgent(targetAgent)
 		logging.Successf("Operator removed agent %s from memory", uuid)
 	}
 	// Clean up any pending key rotations for this agent
