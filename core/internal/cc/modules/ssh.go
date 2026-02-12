@@ -98,12 +98,14 @@ func SSHClient(shell, args, port string) (string, error) {
 	}
 
 	if !port_mapping_exists {
-		// start sshd server on target
+		// start sshd on agent
 		job_id := uuid.NewString()
-		if args == "" {
-			args = "--"
+		ssh_args := fmt.Sprintf("--shell %s --port %s", strconv.Quote(shell), strconv.Quote(port))
+		if args != "" {
+			ssh_args += fmt.Sprintf(" --args %s", strconv.Quote(args))
 		}
-		cmd := fmt.Sprintf("%s --shell %s --port %s --args %s", def.C2CmdSSHD, shell, port, args)
+		cmd := fmt.Sprintf("%s %s", def.C2CmdSSHD, ssh_args)
+		logging.Debugf("SSHClient logic: starting sshd on agent: %s", cmd)
 		err := CmdSender(cmd, job_id, target.Tag)
 		if err != nil {
 			return "", err

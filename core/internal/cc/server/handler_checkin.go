@@ -69,6 +69,9 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 		logging.Warningf("handleAgentCheckIn decode error: %v", err)
 		return
 	}
+	// sanitize agent data
+	agents.SanitizeAgentData(target)
+
 	// verify agent identification
 	// timestamp is already checked in transport.VerifySignatureWithCA
 	agent_sig, err := base64.URLEncoding.DecodeString(target.UUIDSig)

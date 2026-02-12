@@ -137,7 +137,7 @@ func listRemoteDir(ctx carapace.Context) carapace.Action {
 
 func listRemoteDirWorker(path_to_list, agent_tag string) (cwd string, names []string) {
 	names = make([]string, 0) // listing to return
-	cmd := fmt.Sprintf("%s --path %s", def.C2CmdListDir, path_to_list)
+	cmd := fmt.Sprintf("%s --path %s", def.C2CmdListDir, strconv.Quote(path_to_list))
 	job_id := uuid.NewString()
 	err := controllers.ExecuteCommand(cmd, job_id, agent_tag)
 	if err != nil {
