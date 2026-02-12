@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.21.1](https://github.com/jm33-m0/emp3r0r/compare/v3.21.0...v3.21.1) (2026-02-12)
+
+
+### Bug Fixes
+
+* introduce `shortID` as agent identifier and remove unsafe use of untrusted agent metadata in tmux UI code ([3d2e553](https://github.com/jm33-m0/emp3r0r/commit/3d2e553291d1b0e255d3d1810d56605049b5c371))
+* sanitize agent data and quote command arguments to prevent injection. ([0cd64e4](https://github.com/jm33-m0/emp3r0r/commit/0cd64e4a26e7839a9a54bca3d756a665fcb7fda0))
+
 ## [3.21.0](https://github.com/jm33-m0/emp3r0r/compare/v3.20.2...v3.21.0) (2026-02-11)
 
 
