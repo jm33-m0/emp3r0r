@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.21.3](https://github.com/jm33-m0/emp3r0r/compare/v3.21.2...v3.21.3) (2026-02-13)
+
+
+### Bug Fixes
+
+* add response size limit for job caching in handleMessageTunnel ([3f70f4c](https://github.com/jm33-m0/emp3r0r/commit/3f70f4c5a6d23f081b193225987237d198b2f29f))
+* harden agent check-in handling ([c9c2719](https://github.com/jm33-m0/emp3r0r/commit/c9c271973edd34141016a72ae09e72c76308ed67))
+* quote path names in FS commands ([f03011f](https://github.com/jm33-m0/emp3r0r/commit/f03011fc7dac9637728ca236f6f6984d0a91f04f))
+
 ## [3.21.2](https://github.com/jm33-m0/emp3r0r/compare/v3.21.1...v3.21.2) (2026-02-13)
 
 
