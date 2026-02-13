@@ -67,6 +67,14 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 	// sanitize agent data
 	agents.SanitizeAgentData(target)
 
+	// SECURITY: Agent MUST provide its public key in every checkin
+	// If missing, reject immediately - something is wrong (malicious, compromised, or misconfigured)
+	if target.PublicKey == "" {
+		logging.Warningf("handleAgentCheckIn: Agent %s provided no public key, rejecting", strconv.Quote(target.UUID))
+		http.Error(wrt, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+
 	// TOFU: Trust On First Use
 	// If agent exists, verify with pinned key
 	// If agent is new, verify with provided key and pin it
@@ -83,7 +91,6 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 		return true
 	})
 
-	// If not in memory, check if it exists in DB (Persistent Session)
 	// If not in memory, check if it exists in DB (Persistent Session)
 	if isNew && agents.AgentDB != nil {
 		storedAgent, err := agents.GetStoredAgent(target.UUID)
@@ -138,10 +145,6 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 			wrt.WriteHeader(http.StatusForbidden)
 			return
 		}
-	} else {
-		if target.PublicKey == "" {
-			logging.Warningf("New agent %s provided no public key", target.UUID)
-		}
 	}
 
 	// CA signature already verified via HTTP headers in dispatcher
@@ -190,7 +193,7 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 	}
 
 	if !agents.IsAgentExist(target) {
-		// New agent - register it
+		// New agent - register it (TOFU: trust the provided public key on first use)
 		inx := agents.AssignAgentIndex()
 		target.LastSeen = time.Now()
 		live.AgentControlMap.Store(target, &live.AgentControl{Index: inx, Conn: nil})
@@ -239,7 +242,12 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 				a.Exes = target.Exes
 				a.CWD = target.CWD
 				a.Product = target.Product
-				a.PublicKey = target.PublicKey
+				// TOFU: Public key remains pinned for existing agents
+				// Already validated against existing key in key rotation check
+				// If agent provides a key, it must match the existing one (or rotation is blocked)
+				if target.PublicKey != "" {
+					a.PublicKey = target.PublicKey
+				}
 				a.LastSeen = time.Now()
 				existingKey = a
 				return false // stop iteration
