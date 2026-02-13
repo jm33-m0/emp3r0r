@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.21.2](https://github.com/jm33-m0/emp3r0r/compare/v3.21.1...v3.21.2) (2026-02-13)
+
+
+### Bug Fixes
+
+* enhance malleable C2 configuration handling ([353e758](https://github.com/jm33-m0/emp3r0r/commit/353e758eba95e4e9b234d2916b3cb165cd486d4f))
+* enhance TOFU logic ([be88616](https://github.com/jm33-m0/emp3r0r/commit/be88616d63a175688bc703fbd9324a17638d27a7))
+* implement agent authentication at HTTP level to ensure all requests are authorized ([f4541d0](https://github.com/jm33-m0/emp3r0r/commit/f4541d055c2c63810b9e0e0852694f8d85bc44f5))
+* lingering portfwd sessions after agent disconnection ([09c83b8](https://github.com/jm33-m0/emp3r0r/commit/09c83b8f8c569d86d436d047004858c01fcaec40))
+* racing in checkin ([23f9798](https://github.com/jm33-m0/emp3r0r/commit/23f97982a49655638fd370e60feffc6d0f9255d7))
+* replace map-based concurrency with sync.Map for improved thread safety and performance. ([ea4d074](https://github.com/jm33-m0/emp3r0r/commit/ea4d074f081dac6293f3aec38f01def5f08d5af5))
+* some API paths are not malleable ([98654f8](https://github.com/jm33-m0/emp3r0r/commit/98654f882f4901df1edb987cbe68025a78e8dd4e))
+
 ## [3.21.1](https://github.com/jm33-m0/emp3r0r/compare/v3.21.0...v3.21.1) (2026-02-12)
 
 
