@@ -20,6 +20,8 @@ import (
 	"github.com/posener/h2conn"
 )
 
+const maxCmdResultCacheBytes = 1024 * 1024 // 1 MiB
+
 // handleMessageTunnel processes CBOR C&C tunnel connections.
 func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 	var lastHandshake int64
@@ -163,9 +165,18 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 			// if not a handshake, forward message to operators
 			// also cache it for automated tests or local usage
 			if msg.JobID != "" {
-				live.CmdResults.Store(msg.JobID, string(msg.Response))
-				// persistence
-				jobs.HandleOutput(msg.JobID, msg.Response)
+				if _, knownJob := live.CmdTime.Load(msg.JobID); knownJob {
+					responseToCache := msg.Response
+					if len(responseToCache) > maxCmdResultCacheBytes {
+						logging.Warningf("handleMessageTunnel: truncating oversized response for job %s from %d to %d bytes", strconv.Quote(msg.JobID), len(responseToCache), maxCmdResultCacheBytes)
+						responseToCache = responseToCache[:maxCmdResultCacheBytes]
+					}
+					live.CmdResults.Store(msg.JobID, string(responseToCache))
+					// persistence
+					jobs.HandleOutput(msg.JobID, responseToCache)
+				} else {
+					logging.Warningf("handleMessageTunnel: dropping response for unknown job ID %s", strconv.Quote(msg.JobID))
+				}
 			}
 			err = fwdMsg2Operators(msg)
 			if err != nil {
