@@ -2,7 +2,9 @@ package ftp
 
 import (
 	"context"
+	"errors"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -20,6 +22,32 @@ import (
 	"github.com/posener/h2conn"
 	"github.com/schollz/progressbar/v3"
 )
+
+const maxTransferSizeBuffer int64 = 1024 * 1024
+
+var errTransferSizeExceeded = errors.New("decompressed transfer exceeds expected size")
+
+func copyWithDecompressedLimit(dst io.Writer, src io.Reader, expectedSize int64) (int64, error) {
+	if expectedSize < 0 {
+		return 0, errors.New("expected size cannot be negative")
+	}
+	if expectedSize > math.MaxInt64-maxTransferSizeBuffer-1 {
+		return 0, errors.New("expected size too large")
+	}
+
+	limit := expectedSize + maxTransferSizeBuffer
+	limitedReader := io.LimitReader(src, limit+1)
+
+	n, err := io.Copy(dst, limitedReader)
+	if err != nil {
+		return n, err
+	}
+	if n > limit {
+		return n, errTransferSizeExceeded
+	}
+
+	return n, nil
+}
 
 // progressMonitor updates the progress bar.
 func progressMonitor(bar *progressbar.ProgressBar, filewrite, targetFile string, targetSize int64) {
@@ -192,8 +220,13 @@ func HandleFTPTransfer(sh *network.StreamHandler, wrt http.ResponseWriter, req *
 		return
 	}
 	defer decompressor.Close()
-	n, err := io.Copy(f, decompressor)
+	n, err := copyWithDecompressedLimit(f, decompressor, targetSize)
 	if err != nil {
+		if errors.Is(err, errTransferSizeExceeded) {
+			logging.Errorf("Security Alert: transfer for %s exceeded expected size (%d bytes + %d bytes buffer); received %d bytes",
+				targetFile, targetSize, maxTransferSizeBuffer, n)
+			return
+		}
 		logging.Warningf("Saving file failed after %d bytes: %v", n, err)
 		return
 	}

@@ -1,6 +1,8 @@
 package ftp
 
 import (
+	"bytes"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -8,6 +10,46 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 )
+
+func TestCopyWithDecompressedLimit_AllowsExpectedSize(t *testing.T) {
+	expectedSize := int64(32)
+	data := bytes.Repeat([]byte("A"), int(expectedSize))
+
+	var dst bytes.Buffer
+	n, err := copyWithDecompressedLimit(&dst, bytes.NewReader(data), expectedSize)
+	if err != nil {
+		t.Fatalf("copyWithDecompressedLimit returned error: %v", err)
+	}
+	if n != expectedSize {
+		t.Fatalf("copied bytes mismatch: got %d, want %d", n, expectedSize)
+	}
+	if !bytes.Equal(dst.Bytes(), data) {
+		t.Fatalf("destination data mismatch")
+	}
+}
+
+func TestCopyWithDecompressedLimit_BlocksOversizedStream(t *testing.T) {
+	expectedSize := int64(64)
+	overLimit := expectedSize + maxTransferSizeBuffer + 2
+	data := bytes.Repeat([]byte("B"), int(overLimit))
+
+	var dst bytes.Buffer
+	n, err := copyWithDecompressedLimit(&dst, bytes.NewReader(data), expectedSize)
+	if !errors.Is(err, errTransferSizeExceeded) {
+		t.Fatalf("expected errTransferSizeExceeded, got %v", err)
+	}
+	if n != expectedSize+maxTransferSizeBuffer+1 {
+		t.Fatalf("copied bytes mismatch when limited: got %d, want %d", n, expectedSize+maxTransferSizeBuffer+1)
+	}
+}
+
+func TestCopyWithDecompressedLimit_RejectsNegativeExpectedSize(t *testing.T) {
+	var dst bytes.Buffer
+	_, err := copyWithDecompressedLimit(&dst, bytes.NewReader([]byte("x")), -1)
+	if err == nil {
+		t.Fatal("expected error for negative expected size")
+	}
+}
 
 // TestHandleFTPTransfer_PathValidation tests that path generation works correctly for various path types
 func TestHandleFTPTransfer_PathValidation(t *testing.T) {
