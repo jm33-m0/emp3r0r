@@ -23,18 +23,31 @@ import (
 var rotationRateLimiter sync.Map
 
 // handleAgentCheckIn processes agent check-in requests.
-func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
+func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request, expectedUUID string) {
+	expectedUUID = util.StripANSI(expectedUUID)
+	if expectedUUID == "" {
+		logging.Warningf("handleAgentCheckIn: empty expected UUID")
+		http.Error(wrt, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+
 	// check if agent is already connected (duplicated checkin)
-	// strictly by tag (token in URL)
+	// strictly by UUID (token in URL must match authenticated header UUID)
 	vars := mux.Vars(req)
-	token := vars["token"]
-	if token != "" && agents.IsAgentExistByUUID(token) {
-		agent := agents.GetAgentByUUID(token)
+	token := util.StripANSI(vars["token"])
+	if token == "" || token != expectedUUID {
+		logging.Warningf("handleAgentCheckIn: token/UUID mismatch: token=%s expected=%s", strconv.Quote(token), strconv.Quote(expectedUUID))
+		http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		return
+	}
+
+	if agents.IsAgentExistByUUID(expectedUUID) {
+		agent := agents.GetAgentByUUID(expectedUUID)
 		if agent != nil {
 			if val, ok := live.AgentControlMap.Load(agent); ok {
 				ctrl := val.(*live.AgentControl)
 				if ctrl.Conn != nil {
-					logging.Warningf("handleAgentCheckIn: %s already connected, refusing duplicated checkin", token)
+					logging.Warningf("handleAgentCheckIn: %s already connected, refusing duplicated checkin", expectedUUID)
 					wrt.WriteHeader(http.StatusForbidden)
 					return
 				}
@@ -66,6 +79,13 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 	}
 	// sanitize agent data
 	agents.SanitizeAgentData(target)
+
+	// Header UUID was already CA-validated in dispatcher. Body UUID MUST match.
+	if target.UUID == "" || target.UUID != expectedUUID {
+		logging.Warningf("handleAgentCheckIn: body UUID mismatch: body=%s expected=%s", strconv.Quote(target.UUID), strconv.Quote(expectedUUID))
+		http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		return
+	}
 
 	// SECURITY: Agent MUST provide its public key in every checkin
 	// If missing, reject immediately - something is wrong (malicious, compromised, or misconfigured)
@@ -188,12 +208,8 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 		logging.Infof("Updated agent %s with full data from CBOR (public key length=%d)", strconv.Quote(target.UUID), len(target.PublicKey))
 		
 		// Signal that public key is now available (for any waiting requests)
-		if readyChanVal, exists := checkinReadyChannels.Load(target.UUID); exists {
-			readyChan := readyChanVal.(chan struct{})
-			close(readyChan)
-			checkinReadyChannels.Delete(target.UUID)
-			logging.Debugf("Signaled checkin completion for %s", strconv.Quote(target.UUID))
-		}
+		closeCheckinReadyChannel(target.UUID)
+		logging.Debugf("Signaled checkin completion for %s", strconv.Quote(target.UUID))
 	} else {
 		// Existing agent - update it in memory NOW to ensure pubkey and info are available
 		live.AgentControlMap.Range(func(key, value interface{}) bool {

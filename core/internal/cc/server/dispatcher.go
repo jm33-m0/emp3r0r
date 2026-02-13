@@ -33,6 +33,18 @@ var replayNonceCache sync.Map
 // Channel is closed when public key is stored, waking up waiting requests
 var checkinReadyChannels sync.Map // map[string]chan struct{}
 
+func closeCheckinReadyChannel(agentUUID string) {
+	if v, ok := checkinReadyChannels.LoadAndDelete(agentUUID); ok {
+		readyChan := v.(chan struct{})
+		defer func() {
+			if r := recover(); r != nil {
+				logging.Debugf("closeCheckinReadyChannel: channel for %s already closed", strconv.Quote(agentUUID))
+			}
+		}()
+		close(readyChan)
+	}
+}
+
 // verifyAgentCAOnly validates CA signature only (for new agent checkin/TOFU).
 // This allows new agents to check in without their public key being known yet.
 func verifyAgentCAOnly(wrt http.ResponseWriter, req *http.Request) (agentUUID string, ok bool) {
@@ -396,6 +408,7 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 		if !ok {
 			return
 		}
+		defer closeCheckinReadyChannel(agentUUID)
 
 		// Create synchronization channel for this checkin
 		// Handler will close it when public key is stored
@@ -412,7 +425,7 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 			inx := agents.AssignAgentIndex()
 			live.AgentControlMap.Store(placeholder, &live.AgentControl{Index: inx, Conn: nil})
 		}
-		handleAgentCheckIn(wrt, req)
+		handleAgentCheckIn(wrt, req, agentUUID)
 	case msgPath:
 		logging.Infof("apiDispatcher: routing to handleMessageTunnel (msg path)")
 		// Message tunnel requires full validation (agent must have checked in first)
