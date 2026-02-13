@@ -6,7 +6,7 @@ import (
 
 func TestBuildLsCommand(t *testing.T) {
 	result := BuildLsCommand("/tmp")
-	expected := "ls --dst '/tmp'"
+	expected := "ls --dst \"/tmp\""
 	if result != expected {
 		t.Errorf("BuildLsCommand() = %v, want %v", result, expected)
 	}
@@ -14,7 +14,7 @@ func TestBuildLsCommand(t *testing.T) {
 
 func TestBuildCatCommand(t *testing.T) {
 	result := BuildCatCommand("/etc/passwd")
-	expected := "cat --dst '/etc/passwd'"
+	expected := "cat --dst \"/etc/passwd\""
 	if result != expected {
 		t.Errorf("BuildCatCommand() = %v, want %v", result, expected)
 	}
@@ -22,7 +22,7 @@ func TestBuildCatCommand(t *testing.T) {
 
 func TestBuildCpCommand(t *testing.T) {
 	result := BuildCpCommand("/tmp/src", "/tmp/dst")
-	expected := "cp --src '/tmp/src' --dst '/tmp/dst'"
+	expected := "cp --src \"/tmp/src\" --dst \"/tmp/dst\""
 	if result != expected {
 		t.Errorf("BuildCpCommand() = %v, want %v", result, expected)
 	}
@@ -30,7 +30,7 @@ func TestBuildCpCommand(t *testing.T) {
 
 func TestBuildRmCommand(t *testing.T) {
 	result := BuildRmCommand("/tmp/file")
-	expected := "rm --dst '/tmp/file'"
+	expected := "rm --dst \"/tmp/file\""
 	if result != expected {
 		t.Errorf("BuildRmCommand() = %v, want %v", result, expected)
 	}
@@ -38,7 +38,7 @@ func TestBuildRmCommand(t *testing.T) {
 
 func TestBuildMkdirCommand(t *testing.T) {
 	result := BuildMkdirCommand("/tmp/newdir")
-	expected := "mkdir --dst '/tmp/newdir'"
+	expected := "mkdir --dst \"/tmp/newdir\""
 	if result != expected {
 		t.Errorf("BuildMkdirCommand() = %v, want %v", result, expected)
 	}
@@ -46,7 +46,7 @@ func TestBuildMkdirCommand(t *testing.T) {
 
 func TestBuildMvCommand(t *testing.T) {
 	result := BuildMvCommand("/tmp/src", "/tmp/dst")
-	expected := "mv --src '/tmp/src' --dst '/tmp/dst'"
+	expected := "mv --src \"/tmp/src\" --dst \"/tmp/dst\""
 	if result != expected {
 		t.Errorf("BuildMvCommand() = %v, want %v", result, expected)
 	}
@@ -62,7 +62,7 @@ func TestBuildPwdCommand(t *testing.T) {
 
 func TestBuildCdCommand(t *testing.T) {
 	result := BuildCdCommand("/tmp")
-	expected := "cd --dst /tmp"
+	expected := "cd --dst \"/tmp\""
 	if result != expected {
 		t.Errorf("BuildCdCommand() = %v, want %v", result, expected)
 	}
@@ -89,17 +89,17 @@ func TestBuildPsCommand(t *testing.T) {
 		{
 			name:     "user only",
 			user:     "root",
-			expected: "ps --user root",
+			expected: "ps --user \"root\"",
 		},
 		{
 			name:     "name only",
 			procName: "nginx",
-			expected: "ps --name nginx",
+			expected: "ps --name \"nginx\"",
 		},
 		{
 			name:     "cmdline only",
 			cmdline:  "python",
-			expected: "ps --cmdline python",
+			expected: "ps --cmdline \"python\"",
 		},
 		{
 			name:     "all filters",
@@ -107,7 +107,7 @@ func TestBuildPsCommand(t *testing.T) {
 			user:     "root",
 			procName: "nginx",
 			cmdline:  "python",
-			expected: "ps --pid 1234 --user root --name nginx --cmdline python",
+			expected: "ps --pid 1234 --user \"root\" --name \"nginx\" --cmdline \"python\"",
 		},
 	}
 
