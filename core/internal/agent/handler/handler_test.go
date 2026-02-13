@@ -498,6 +498,11 @@ func TestPortFwdCmd(t *testing.T) {
 	if common.RuntimeConfig == nil {
 		common.RuntimeConfig = &def.Config{}
 	}
+	common.RuntimeConfig.C2Prefix = "api"
+	common.RuntimeConfig.ProxyPath = "proxy"
+	originalCCAddress := def.CCAddress
+	def.CCAddress = "https://127.0.0.1:443"
+	defer func() { def.CCAddress = originalCCAddress }()
 
 	var mockConn bytes.Buffer
 	c2transport.Connection = &mockConn

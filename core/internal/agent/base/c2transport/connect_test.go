@@ -16,7 +16,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -339,8 +338,11 @@ func TestDuplicatedCheckin(t *testing.T) {
 		CAPEM:  string(caCertData),
 	}
 
-	// Reset live maps
-	live.AgentControlMap = sync.Map{}
+	// Reset live maps without replacing sync.Map instance (avoids races with goroutines)
+	live.AgentControlMap.Range(func(key, _ interface{}) bool {
+		live.AgentControlMap.Delete(key)
+		return true
+	})
 	live.AgentList = make([]*def.Emp3r0rAgent, 0)
 
 	// Start Real C2 Server
@@ -748,7 +750,11 @@ func TestNewAgentCheckin(t *testing.T) {
 		t.Fatalf("Failed to gen agent key: %v", err)
 	}
 	agentutils.AgentKey = agentPriv
-	agentSig, err := signUUID(agentUUID, agentPriv)
+	caKey, err := transport.ParseKeyPemFile(caKeyFile)
+	if err != nil {
+		t.Fatalf("Failed to parse CA key: %v", err)
+	}
+	agentSig, err := signUUID(agentUUID, caKey)
 	if err != nil {
 		t.Fatalf("Failed to sign UUID: %v", err)
 	}

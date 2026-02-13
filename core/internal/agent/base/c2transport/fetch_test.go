@@ -42,6 +42,8 @@ func TestFetchFile(t *testing.T) {
 	common.RuntimeConfig = &def.Config{
 		AgentUUID:    "test-agent-uuid",
 		AgentUUIDSig: "test-agent-sig",
+		C2Prefix:     "api",
+		WWWPath:      "www",
 	}
 
 	// 3. Test DownloadViaC2 (to Memory)
