@@ -267,3 +267,6 @@ tmp/
 
 # blob
 downloader_blob.h
+
+# AI agent
+project_knowledge.md
