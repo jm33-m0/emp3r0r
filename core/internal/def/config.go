@@ -61,6 +61,9 @@ type Config struct {
 	MsgPath     string            `cbor:"52,keyasint"` // Custom MsgAPI (replaces "msg")
 	UserAgent   string            `cbor:"53,keyasint"` // Custom User-Agent
 	C2Headers   map[string]string `cbor:"54,keyasint"` // Custom HTTP headers
+	FTPPath     string            `cbor:"61,keyasint"` // Custom FTP API path (replaces "ftp")
+	WWWPath     string            `cbor:"62,keyasint"` // Custom WWW API path (replaces "www")
+	ProxyPath   string            `cbor:"63,keyasint"` // Custom Proxy API path (replaces "proxy")
 
 	// Traffic Shaping
 	PaddingMin int `cbor:"55,keyasint"`

@@ -263,6 +263,24 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 		msgPath = "msg"
 	}
 
+	// ftp path
+	ftpPath := live.RuntimeConfig.FTPPath
+	if ftpPath == "" {
+		ftpPath = "ftp"
+	}
+
+	// www path
+	wwwPath := live.RuntimeConfig.WWWPath
+	if wwwPath == "" {
+		wwwPath = "www"
+	}
+
+	// proxy path
+	proxyPath := live.RuntimeConfig.ProxyPath
+	if proxyPath == "" {
+		proxyPath = "proxy"
+	}
+
 	// Create base target URL for operator proxying
 	// Use the remote address (operator's IP in the WireGuard network)
 	remoteIP, _, _ := net.SplitHostPort(req.RemoteAddr)
@@ -341,14 +359,14 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 			return
 		}
 		handleMessageTunnel(wrt, req)
-	case "ftp": // fixed path for legacy support or internal use if needed, but should ideally be malleable too
+	case ftpPath:
 		if !verifyAgentRequest(wrt, req, "", nil) {
 			return
 		}
 		logging.Debugf("About to proxy request: %s %s", req.Method, req.URL.Path)
 		logging.Debugf("Request headers: %v", req.Header)
 		proxy.ServeHTTP(wrt, req)
-	case "www":
+	case wwwPath:
 		if !verifyAgentRequest(wrt, req, vars["token"], nil) {
 			return
 		}
@@ -356,7 +374,7 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 		logging.Debugf("Request headers: %v", req.Header)
 		logging.Debugf("Forwarding PUT request to operator at %s", targetURL)
 		proxy.ServeHTTP(wrt, req)
-	case "proxy":
+	case proxyPath:
 		sessionID := vars["token"]
 		if !verifyAgentRequest(wrt, req, "", func(agentUUID string) bool {
 			return validatePortFwdSessionOwner(sessionID, agentUUID)
@@ -368,7 +386,7 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 		logging.Debugf("Forwarding port mapping request to operator at %s", targetURL)
 		proxy.ServeHTTP(wrt, req)
 	default:
-		logging.Warningf("apiDispatcher: 404 for api=%s, token=%s (expected checkin=%s, msg=%s)", vars["api"], vars["token"], checkinPath, msgPath)
+		logging.Warningf("apiDispatcher: 404 for api=%s, token=%s (expected checkin=%s, msg=%s, ftp=%s, www=%s, proxy=%s)", vars["api"], vars["token"], checkinPath, msgPath, ftpPath, wwwPath, proxyPath)
 		wrt.WriteHeader(http.StatusNotFound)
 	}
 }

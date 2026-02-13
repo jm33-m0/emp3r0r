@@ -247,6 +247,15 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 	if live.RuntimeConfig.MsgPath == "" {
 		live.RuntimeConfig.MsgPath = util.RandStr(util.RandInt(5, 15))
 	}
+	if live.RuntimeConfig.FTPPath == "" {
+		live.RuntimeConfig.FTPPath = util.RandStr(util.RandInt(5, 15))
+	}
+	if live.RuntimeConfig.WWWPath == "" {
+		live.RuntimeConfig.WWWPath = util.RandStr(util.RandInt(5, 15))
+	}
+	if live.RuntimeConfig.ProxyPath == "" {
+		live.RuntimeConfig.ProxyPath = util.RandStr(util.RandInt(5, 15))
+	}
 	if live.RuntimeConfig.UserAgent == "" {
 		uaList := []string{
 			"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
