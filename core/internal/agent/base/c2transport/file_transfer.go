@@ -88,11 +88,17 @@ func DownloadViaC2(config *def.Config, file_to_download, path, checksum string) 
 			err = fmt.Errorf("failed to initialize HTTP client")
 			return
 		}
-		req, err := http.NewRequest("GET", downloadURL, nil)
+		req, err := http.NewRequest(http.MethodGet, downloadURL, nil)
 		if err != nil {
 			err = fmt.Errorf("DownloadViaCC HTTP GET failed to create request: %v", err)
 			return nil, err
 		}
+		authHeaders, authErr := buildAuthHeaders(http.MethodGet, req.URL)
+		if authErr != nil {
+			err = fmt.Errorf("DownloadViaCC build auth headers: %v", authErr)
+			return nil, err
+		}
+		req.Header = authHeaders
 
 		resp, err := client.Do(req)
 		if err != nil {
@@ -129,6 +135,12 @@ func DownloadViaC2(config *def.Config, file_to_download, path, checksum string) 
 		err = fmt.Errorf("create grab request: %v", err)
 		return
 	}
+	authHeaders, authErr := buildAuthHeaders(http.MethodGet, req.HTTPRequest.URL)
+	if authErr != nil {
+		err = fmt.Errorf("DownloadViaCC build auth headers: %v", authErr)
+		return
+	}
+	req.HTTPRequest.Header = authHeaders
 
 	resp := client.Do(req)
 

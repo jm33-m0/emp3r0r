@@ -40,7 +40,8 @@ func TestFetchFile(t *testing.T) {
 	defer func() { def.CCAddress = oldCCAddress }()
 
 	common.RuntimeConfig = &def.Config{
-		AgentUUID: "test-agent-uuid",
+		AgentUUID:    "test-agent-uuid",
+		AgentUUIDSig: "test-agent-sig",
 	}
 
 	// 3. Test DownloadViaC2 (to Memory)

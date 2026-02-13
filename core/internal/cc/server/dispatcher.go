@@ -3,19 +3,231 @@ package server
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"fmt"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
+
+// replayNonceCache tracks nonces within the replay window.
+var replayNonceCache sync.Map
+
+// verifyAgentCAOnly validates CA signature only (for new agent checkin/TOFU).
+// This allows new agents to check in without their public key being known yet.
+func verifyAgentCAOnly(wrt http.ResponseWriter, req *http.Request) (agentUUID string, ok bool) {
+	agentUUID = util.StripANSI(req.Header.Get(transport.HeaderClientID))
+	signedTS := util.StripANSI(req.Header.Get(transport.HeaderRequestTimestamp))
+	nonce := util.StripANSI(req.Header.Get(transport.HeaderRequestNonce))
+	caSigB64 := strings.TrimSpace(req.Header.Get(transport.HeaderClientCASignature))
+
+	if agentUUID == "" || signedTS == "" || nonce == "" || caSigB64 == "" {
+		logging.Warningf("verifyAgentCAOnly: missing auth headers from %s", req.RemoteAddr)
+		http.Error(wrt, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return "", false
+	}
+
+	ts, err := strconv.ParseInt(signedTS, 10, 64)
+	if err != nil {
+		logging.Warningf("verifyAgentCAOnly: bad timestamp %s: %v", strconv.Quote(signedTS), err)
+		http.Error(wrt, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return "", false
+	}
+	now := time.Now().Unix()
+	if ts <= 0 || abs64(now-ts) > transport.ReplayWindowSeconds {
+		logging.Warningf("verifyAgentCAOnly: timestamp outside window for %s (agent=%s)", req.URL.Path, strconv.Quote(agentUUID))
+		http.Error(wrt, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return "", false
+	}
+
+	// Replay protection
+	nonceKey := agentUUID + ":" + nonce
+	if prev, loaded := replayNonceCache.Load(nonceKey); loaded {
+		if prevTS, okTS := prev.(int64); okTS && abs64(now-prevTS) <= transport.ReplayWindowSeconds {
+			logging.Warningf("verifyAgentCAOnly: replay detected for %s (agent=%s)", req.URL.Path, strconv.Quote(agentUUID))
+			http.Error(wrt, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return "", false
+		}
+	}
+	replayNonceCache.Store(nonceKey, ts)
+	replayNonceCache.Range(func(k, v interface{}) bool {
+		if cachedTS, ok := v.(int64); ok && abs64(now-cachedTS) > transport.ReplayWindowSeconds {
+			replayNonceCache.Delete(k)
+		}
+		return true
+	})
+
+	// Verify CA signature
+	caSig, err := base64.URLEncoding.DecodeString(caSigB64)
+	if err != nil {
+		logging.Warningf("verifyAgentCAOnly: invalid CA signature encoding for %s: %v", strconv.Quote(agentUUID), err)
+		http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		return "", false
+	}
+	caValid, err := transport.VerifySignatureWithCA([]byte(agentUUID), caSig)
+	if err != nil || !caValid {
+		logging.Warningf("verifyAgentCAOnly: CA verification failed for %s: %v", strconv.Quote(agentUUID), err)
+		http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		return "", false
+	}
+
+	return agentUUID, true
+}
+
+func verifyAgentRequest(wrt http.ResponseWriter, req *http.Request, expectedAgent string, sessionCheck func(string) bool) bool {
+	agentUUID := util.StripANSI(req.Header.Get(transport.HeaderClientID))
+	signedTS := util.StripANSI(req.Header.Get(transport.HeaderRequestTimestamp))
+	nonce := util.StripANSI(req.Header.Get(transport.HeaderRequestNonce))
+	sigB64 := strings.TrimSpace(req.Header.Get(transport.HeaderClientSignature))
+	caSigB64 := strings.TrimSpace(req.Header.Get(transport.HeaderClientCASignature))
+
+	if agentUUID == "" || signedTS == "" || nonce == "" || sigB64 == "" || caSigB64 == "" {
+		logging.Warningf("verifyAgentRequest: missing auth headers from %s", req.RemoteAddr)
+		http.Error(wrt, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return false
+	}
+
+	if expectedAgent != "" && expectedAgent != agentUUID {
+		logging.Warningf("verifyAgentRequest: agent mismatch, expected %s got %s", strconv.Quote(expectedAgent), strconv.Quote(agentUUID))
+		http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		return false
+	}
+
+	ts, err := strconv.ParseInt(signedTS, 10, 64)
+	if err != nil {
+		logging.Warningf("verifyAgentRequest: bad timestamp %s: %v", strconv.Quote(signedTS), err)
+		http.Error(wrt, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return false
+	}
+	now := time.Now().Unix()
+	if ts <= 0 || abs64(now-ts) > transport.ReplayWindowSeconds {
+		logging.Warningf("verifyAgentRequest: timestamp outside window for %s (agent=%s)", req.URL.Path, strconv.Quote(agentUUID))
+		http.Error(wrt, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return false
+	}
+
+	// Replay protection: nonce + agent scoped within the replay window.
+	nonceKey := agentUUID + ":" + nonce
+	if prev, ok := replayNonceCache.Load(nonceKey); ok {
+		if prevTS, okTS := prev.(int64); okTS && abs64(now-prevTS) <= transport.ReplayWindowSeconds {
+			logging.Warningf("verifyAgentRequest: replay detected for %s (agent=%s)", req.URL.Path, strconv.Quote(agentUUID))
+			http.Error(wrt, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return false
+		}
+	}
+	replayNonceCache.Store(nonceKey, ts)
+	replayNonceCache.Range(func(k, v interface{}) bool {
+		if cachedTS, ok := v.(int64); ok && abs64(now-cachedTS) > transport.ReplayWindowSeconds {
+			replayNonceCache.Delete(k)
+		}
+		return true
+	})
+
+	caSig, err := base64.URLEncoding.DecodeString(caSigB64)
+	if err != nil {
+		logging.Warningf("verifyAgentRequest: invalid CA signature encoding for %s: %v", strconv.Quote(agentUUID), err)
+		http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		return false
+	}
+	caValid, err := transport.VerifySignatureWithCA([]byte(agentUUID), caSig)
+	if err != nil || !caValid {
+		logging.Warningf("verifyAgentRequest: CA verification failed for %s: %v", strconv.Quote(agentUUID), err)
+		http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		return false
+	}
+
+	pubKey, err := resolveAgentPublicKey(agentUUID)
+	if err != nil || pubKey == "" {
+		logging.Warningf("verifyAgentRequest: cannot resolve public key for %s: %v", strconv.Quote(agentUUID), err)
+		http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		return false
+	}
+
+	canonical := transport.CanonicalRequestString(req.Method, req.URL.Path, req.URL.RawQuery, signedTS, nonce)
+	sig, err := base64.URLEncoding.DecodeString(sigB64)
+	if err != nil {
+		logging.Warningf("verifyAgentRequest: invalid signature encoding for %s: %v", strconv.Quote(agentUUID), err)
+		http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		return false
+	}
+	okSig, err := transport.VerifySignatureWithPEM([]byte(pubKey), []byte(canonical), sig)
+	if err != nil || !okSig {
+		logging.Warningf("verifyAgentRequest: signature verification failed for %s: %v", strconv.Quote(agentUUID), err)
+		http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		return false
+	}
+
+	if sessionCheck != nil && !sessionCheck(agentUUID) {
+		logging.Warningf("verifyAgentRequest: session validation failed for %s", strconv.Quote(agentUUID))
+		http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		return false
+	}
+
+	return true
+}
+
+func resolveAgentPublicKey(agentUUID string) (string, error) {
+	if agent := agents.GetAgentByUUID(agentUUID); agent != nil {
+		if logging.Level >= 4 {
+			logging.Debugf("resolveAgentPublicKey: found agent %s in memory, pubkey length=%d", strconv.Quote(agentUUID), len(agent.PublicKey))
+		}
+		if agent.PublicKey != "" {
+			return agent.PublicKey, nil
+		}
+	}
+	if agents.AgentDB != nil {
+		stored, err := agents.GetStoredAgent(agentUUID)
+		if err != nil {
+			return "", err
+		}
+		if stored != nil {
+			if logging.Level >= 4 {
+				logging.Debugf("resolveAgentPublicKey: found agent %s in DB, pubkey length=%d", strconv.Quote(agentUUID), len(stored.PublicKey))
+			}
+			if stored.PublicKey != "" {
+				return stored.PublicKey, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("public key for agent %s not found", agentUUID)
+}
+
+func validatePortFwdSessionOwner(sessionID, agentUUID string) bool {
+	if sessionID == "" {
+		return false
+	}
+	val, ok := network.PortFwds.Load(sessionID)
+	if !ok {
+		return false
+	}
+	pf := val.(*network.PortFwdSession)
+	if pf.Agent != nil && pf.Agent.UUID != "" {
+		return pf.Agent.UUID == agentUUID
+	}
+	return true
+}
+
+func abs64(v int64) int64 {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
 
 // apiDispatcher routes requests to the correct handler.
 func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
@@ -117,19 +329,40 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 	// handlers
 	switch vars["api"] {
 	case checkinPath:
+		// Checkin uses CA-only validation (TOFU: agent public key sent in CBOR body)
+		if _, ok := verifyAgentCAOnly(wrt, req); !ok {
+			return
+		}
 		handleAgentCheckIn(wrt, req)
 	case msgPath:
+		// Message tunnel requires full validation (agent must have checked in first)
+		// Token in URL is session/connection identifier, not necessarily agent UUID
+		if !verifyAgentRequest(wrt, req, "", nil) {
+			return
+		}
 		handleMessageTunnel(wrt, req)
 	case "ftp": // fixed path for legacy support or internal use if needed, but should ideally be malleable too
+		if !verifyAgentRequest(wrt, req, "", nil) {
+			return
+		}
 		logging.Debugf("About to proxy request: %s %s", req.Method, req.URL.Path)
 		logging.Debugf("Request headers: %v", req.Header)
 		proxy.ServeHTTP(wrt, req)
 	case "www":
+		if !verifyAgentRequest(wrt, req, vars["token"], nil) {
+			return
+		}
 		logging.Debugf("About to proxy request: %s %s", req.Method, req.URL.Path)
 		logging.Debugf("Request headers: %v", req.Header)
 		logging.Debugf("Forwarding PUT request to operator at %s", targetURL)
 		proxy.ServeHTTP(wrt, req)
 	case "proxy":
+		sessionID := vars["token"]
+		if !verifyAgentRequest(wrt, req, "", func(agentUUID string) bool {
+			return validatePortFwdSessionOwner(sessionID, agentUUID)
+		}) {
+			return
+		}
 		logging.Debugf("About to proxy request: %s %s", req.Method, req.URL.Path)
 		logging.Debugf("Request headers: %v", req.Header)
 		logging.Debugf("Forwarding port mapping request to operator at %s", targetURL)

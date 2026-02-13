@@ -194,6 +194,9 @@ func TestEstablishC2Connection(t *testing.T) {
 	}
 	t.Log("Successfully checked in")
 
+	// Allow time for agent to be fully registered
+	time.Sleep(100 * time.Millisecond)
+
 	// Construct MsgAPI URL
 	msgURL := fmt.Sprintf("%s/%s/%s", c2URL, transport.MsgAPI, "test-token")
 
@@ -397,6 +400,9 @@ func TestDuplicatedCheckin(t *testing.T) {
 		t.Fatalf("First ReportStatus failed: %v", err)
 	}
 
+	// Allow time for agent to be fully registered
+	time.Sleep(100 * time.Millisecond)
+
 	// Establish persistent connection for first agent
 	msgURL := fmt.Sprintf("%s/%s/%s", c2URL, transport.MsgAPI, "test-token")
 	conn, ctx, cancel, err := c2transport.EstablishC2Connection(msgURL)
@@ -553,6 +559,9 @@ func TestBackslashTag(t *testing.T) {
 		t.Fatalf("ReportStatus failed with backslash tag: %v", err)
 	}
 	t.Log("Successfully checked in with backslash tag")
+
+	// Allow time for agent to be fully registered
+	time.Sleep(100 * time.Millisecond)
 }
 
 func TestEmptyUUID(t *testing.T) {
@@ -666,8 +675,8 @@ func TestEmptyUUID(t *testing.T) {
 		t.Fatalf("ReportStatus matched with empty UUID??")
 	}
 	t.Logf("ReportStatus failed as expected: %v", err)
-	if !strings.Contains(err.Error(), "404") {
-		t.Errorf("Expected 404 error, got: %v", err)
+	if !strings.Contains(err.Error(), "missing agent identity or CA signature") {
+		t.Errorf("Expected missing identity error, got: %v", err)
 	}
 }
 
@@ -776,4 +785,7 @@ func TestNewAgentCheckin(t *testing.T) {
 		t.Fatalf("ReportStatus failed for new agent: %v", err)
 	}
 	t.Log("Successfully checked in new agent")
+
+	// Allow time for agent to be fully registered
+	time.Sleep(100 * time.Millisecond)
 }

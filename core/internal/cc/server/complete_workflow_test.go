@@ -1,18 +1,26 @@
 package server
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
@@ -91,6 +99,41 @@ func TestCompleteWorkflow_MultiOperator(t *testing.T) {
 	live.RuntimeConfig.CheckInPath = "checkin"
 	live.RuntimeConfig.MsgPath = "msg"
 
+	// Prepare agent identity and pin it in memory
+	agentUUID := "agent-uuid-1"
+	agentKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("gen agent key: %v", err)
+	}
+	agentPub, err := transport.PublicKeyToPEM(&agentKey.PublicKey)
+	if err != nil {
+		t.Fatalf("PublicKeyToPEM: %v", err)
+	}
+	caSig, err := transport.SignWithCAKey([]byte(agentUUID))
+	if err != nil {
+		t.Fatalf("SignWithCAKey: %v", err)
+	}
+	agent := &def.Emp3r0rAgent{UUID: agentUUID, PublicKey: string(agentPub), UUIDSig: base64.URLEncoding.EncodeToString(caSig)}
+	live.AgentControlMap.Store(agent, &live.AgentControl{})
+	defer live.AgentControlMap.Delete(agent)
+
+	signHeaders := func(method string, u *url.URL) (http.Header, error) {
+		ts := strconv.FormatInt(time.Now().Unix(), 10)
+		nonce := strconv.FormatInt(time.Now().UnixNano(), 10)
+		canonical := transport.CanonicalRequestString(method, u.Path, u.RawQuery, ts, nonce)
+		sig, sigErr := transport.SignECDSA([]byte(canonical), agentKey)
+		if sigErr != nil {
+			return nil, sigErr
+		}
+		h := make(http.Header)
+		h.Set(transport.HeaderClientID, agentUUID)
+		h.Set(transport.HeaderClientCASignature, agent.UUIDSig)
+		h.Set(transport.HeaderRequestTimestamp, ts)
+		h.Set(transport.HeaderRequestNonce, nonce)
+		h.Set(transport.HeaderClientSignature, base64.URLEncoding.EncodeToString(sig))
+		return h, nil
+	}
+
 	tests := []struct {
 		name         string
 		relay        *httptest.Server
@@ -140,13 +183,18 @@ func TestCompleteWorkflow_MultiOperator(t *testing.T) {
 			}
 			defer func() { netutil.WgOperatorIP = originalOpIP }()
 
-			req := httptest.NewRequest("GET", "/api/www/token123?file_to_download="+tt.fileName, nil)
+			req := httptest.NewRequest(http.MethodGet, "/api/www/"+agentUUID+"?file_to_download="+tt.fileName, nil)
 			req.RemoteAddr = reqRemote
 			req = mux.SetURLVars(req, map[string]string{
 				"prefix": "api",
 				"api":    "www",
-				"token":  "token123",
+				"token":  agentUUID,
 			})
+			headers, err := signHeaders(http.MethodGet, req.URL)
+			if err != nil {
+				t.Fatalf("signHeaders: %v", err)
+			}
+			req.Header = headers
 
 			w := httptest.NewRecorder()
 			apiDispatcher(w, req)

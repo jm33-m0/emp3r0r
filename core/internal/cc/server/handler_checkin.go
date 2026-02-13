@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/base64"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -69,14 +68,6 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 	}
 	// sanitize agent data
 	agents.SanitizeAgentData(target)
-
-	// verify agent identification
-	// timestamp is already checked in transport.VerifySignatureWithCA
-	agent_sig, err := base64.URLEncoding.DecodeString(target.UUIDSig)
-	if err != nil {
-		logging.Errorf("Failed to decode agent sig: %v", err)
-		return
-	}
 
 	// TOFU: Trust On First Use
 	// If agent exists, verify with pinned key
@@ -155,18 +146,7 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	// Verify that the UUID is authorized by the CA (Proof of Origin)
-	// This prevents forgery of new UUIDs.
-	isValid, err := transport.VerifySignatureWithCA([]byte(target.UUID), agent_sig)
-	if err != nil {
-		logging.Errorf("Failed to verify agent uuid sig (CA): %v", err)
-		return
-	}
-	if !isValid {
-		logging.Errorf("Invalid agent uuid signature (CA mismatch), refusing request")
-		wrt.WriteHeader(http.StatusForbidden)
-		return
-	}
+	// CA signature already verified via HTTP headers in dispatcher
 	target.From = req.RemoteAddr
 
 	// ------------------------------------------------------------

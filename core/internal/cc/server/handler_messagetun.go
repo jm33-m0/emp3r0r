@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/base64"
 	"net/http"
 	"strconv"
 	"sync"
@@ -93,31 +92,7 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			// verify agent identification (TOFU)
-			agent_sig, err := base64.URLEncoding.DecodeString(msg.AgentUUIDSig)
-			if err != nil {
-				logging.Errorf("handleMessageTunnel: invalid signature encoding from %s: %v", msg.Tag, err)
-				return
-			}
-
-			// Verify signature using PINNED key
-			var pubKeyBytes []byte
-			if agent.PublicKey != "" {
-				pubKeyBytes = []byte(agent.PublicKey)
-			} else {
-				// Fallback or error?
-				// If agent has no key, we can't verify self-signed signature.
-				// For legacy/migration, maybe fetch from CheckIn if checkin happened?
-				// But checkin should have populated PublicKey.
-				logging.Errorf("handleMessageTunnel: Agent %s has no pinned public key", agent.Tag)
-				return
-			}
-
-			isValid, err := transport.VerifySignatureWithPEM(pubKeyBytes, []byte(msg.AgentUUID), agent_sig)
-			if err != nil || !isValid {
-				logging.Errorf("handleMessageTunnel: invalid signature from %s: %v", msg.Tag, err)
-				return
-			}
+			// Agent authentication already verified via HTTP headers in dispatcher
 			shortname := agent.Name
 			if val, ok := live.AgentControlMap.Load(agent); ok {
 				ctrl := val.(*live.AgentControl)
