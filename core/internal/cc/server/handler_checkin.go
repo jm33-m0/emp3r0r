@@ -19,10 +19,8 @@ import (
 	"github.com/posener/h2conn"
 )
 
-var (
-	// rotationRateLimiter tracks key rotation timestamps per AgentUUID to prevent log flooding
-	rotationRateLimiter sync.Map
-)
+// rotationRateLimiter tracks key rotation timestamps per AgentUUID to prevent log flooding
+var rotationRateLimiter sync.Map
 
 // handleAgentCheckIn processes agent check-in requests.
 func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
@@ -241,6 +239,7 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request) {
 				a.Exes = target.Exes
 				a.CWD = target.CWD
 				a.Product = target.Product
+				a.PublicKey = target.PublicKey
 				a.LastSeen = time.Now()
 				existingKey = a
 				return false // stop iteration
