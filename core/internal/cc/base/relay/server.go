@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -16,6 +17,37 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
+
+const (
+	relayAPIUnknown = iota
+	relayAPIFTP
+	relayAPIWWW
+	relayAPIProxy
+)
+
+func relayPathOrDefault(path, fallback string) string {
+	if path == "" {
+		return fallback
+	}
+	return path
+}
+
+func resolveRelayAPI(api string) int {
+	ftpPath := relayPathOrDefault(live.RuntimeConfig.FTPPath, "ftp")
+	wwwPath := relayPathOrDefault(live.RuntimeConfig.WWWPath, "www")
+	proxyPath := relayPathOrDefault(live.RuntimeConfig.ProxyPath, "proxy")
+
+	switch api {
+	case ftpPath:
+		return relayAPIFTP
+	case wwwPath:
+		return relayAPIWWW
+	case proxyPath:
+		return relayAPIProxy
+	default:
+		return relayAPIUnknown
+	}
+}
 
 // This server handles relayed HTTP requests from C2, it listens on WireGuard interface
 func RelayHTTP2Server() {
@@ -40,15 +72,18 @@ func dispatcher(wrt http.ResponseWriter, req *http.Request) {
 	api := mux.Vars(req)["api"]
 	token := mux.Vars(req)["token"]
 	logging.Debugf("Got relayed request from C2: API: %s, token: %s", api, token)
+	logging.Debugf("Relay dispatcher expected API names: ftp=%s www=%s proxy=%s",
+		strconv.Quote(relayPathOrDefault(live.RuntimeConfig.FTPPath, "ftp")),
+		strconv.Quote(relayPathOrDefault(live.RuntimeConfig.WWWPath, "www")),
+		strconv.Quote(relayPathOrDefault(live.RuntimeConfig.ProxyPath, "proxy")),
+	)
 
 	// Setup H2Conn for port mapping.
 	proxyConn := new(def.H2Conn)
 	network.ProxyStream.H2x = proxyConn
 
-	// match API names
-	api = transport.WebRoot + "/" + api
-	switch api {
-	case transport.Upload2AgentAPI:
+	switch resolveRelayAPI(api) {
+	case relayAPIFTP:
 		var targetSH *network.StreamHandler
 		network.FTPStreams.Range(func(_, value interface{}) bool {
 			sh := value.(*network.StreamHandler)
@@ -65,7 +100,7 @@ func dispatcher(wrt http.ResponseWriter, req *http.Request) {
 		}
 		logging.Debugf("FTP stream not found: %s", token)
 		wrt.WriteHeader(http.StatusNotFound)
-	case transport.DownloadFile2AgentAPI:
+	case relayAPIWWW:
 		rawPath := req.URL.Query().Get("file_to_download")
 		localized, err := util.SecureLocalPath(rawPath)
 		if err != nil {
@@ -82,7 +117,7 @@ func dispatcher(wrt http.ResponseWriter, req *http.Request) {
 			return
 		}
 		http.ServeFile(wrt, req, local_path)
-	case transport.PortMappingAPI:
+	case relayAPIProxy:
 		network.HandlePortMapping(network.ProxyStream, wrt, req)
 	default:
 		logging.Debugf("API not found: %s", api)

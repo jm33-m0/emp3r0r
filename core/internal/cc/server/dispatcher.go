@@ -240,13 +240,13 @@ func validatePortFwdSessionOwner(sessionID, agentUUID string) bool {
 	if sessionID == "" {
 		return false
 	}
-	
+
 	// Extract base session ID (subsessions have format: sessionID_portNumber)
 	baseSessionID := sessionID
 	if strings.Contains(sessionID, "_") {
 		baseSessionID = strings.Split(sessionID, "_")[0]
 	}
-	
+
 	val, ok := network.PortFwds.Load(baseSessionID)
 	if !ok {
 		return false

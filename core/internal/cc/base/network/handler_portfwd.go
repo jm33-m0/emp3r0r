@@ -72,12 +72,18 @@ func HandlePortMapping(sh *StreamHandler, wrt http.ResponseWriter, req *http.Req
 		return
 	}
 	pf := val.(*PortFwdSession)
-	pf.Sh = make(map[string]*StreamHandler)
+	if pf.Sh == nil {
+		pf.Sh = make(map[string]*StreamHandler)
+	}
 	if !isSubSession {
 		pf.Sh[sessionID.String()] = sh
 		logging.Debugf("Port forwarding connection (%s) from %s", sessionID.String(), req.RemoteAddr)
 	} else {
 		pf.Sh[origToken] = sh
+		if readyAny, ok := portFwdStreamReady.LoadAndDelete(origToken); ok {
+			close(readyAny.(chan struct{}))
+			logging.Debugf("Signaled stream handler ready for %s", origToken)
+		}
 		if strings.HasSuffix(origToken, "-reverse") {
 			logging.Debugf("Reverse connection (%s) from %s", origToken, req.RemoteAddr)
 			err = pf.RunReversedPortFwd(sh)
@@ -88,6 +94,14 @@ func HandlePortMapping(sh *StreamHandler, wrt http.ResponseWriter, req *http.Req
 			dstAddr := strings.Split(strings.Split(origToken, "_")[1], "-udp")[0]
 			go udpHandler(dstAddr, pf.Listener)
 		}
+	}
+	
+	// Signal that Sh map is ready (close channel to wake up waiters)
+	select {
+	case <-pf.ShReady:
+		// Already closed, ignore
+	default:
+		close(pf.ShReady)
 	}
 	defer func() {
 		if sh.H2x.Conn != nil {

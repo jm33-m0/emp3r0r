@@ -8,6 +8,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,7 +16,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // PortFwdSession holds controller interface of a port-fwd session
@@ -34,9 +34,13 @@ type PortFwdSession struct {
 	RegisterFunc   func(def.PortFwdRequest) error     // register session with server
 	UnregisterFunc func(string) error                 // unregister session with server
 	Sh             map[string]*StreamHandler          // related to HTTP handler
+	ShReady        chan struct{}                      // signals when Sh map is initialized
 	Ctx            context.Context                    // PortFwd context
 	Cancel         context.CancelFunc                 // PortFwd cancel
 }
+
+// portFwdStreamReady signals per-stream handler readiness, keyed by shID.
+var portFwdStreamReady sync.Map // map[string]chan struct{}
 
 // InitReversedPortFwd sends portfwd command to agent to set up a reverse port mapping.
 func (pf *PortFwdSession) InitReversedPortFwd() (err error) {
@@ -134,16 +138,22 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 			exist bool
 		)
 
-		for i := 0; i < 1e5; i++ {
-			time.Sleep(time.Millisecond)
-			sh, exist = pf.Sh[fwdID]
-			if exist {
-				break
-			}
-		}
+		sh, exist = pf.Sh[fwdID]
 		if !exist {
-			err = errors.New("handlePerConn: timeout")
-			return
+			readyChanAny, _ := portFwdStreamReady.LoadOrStore(fwdID, make(chan struct{}))
+			readyChan := readyChanAny.(chan struct{})
+			logging.Debugf("handlePerConn: waiting for stream handler %s", fwdID)
+			select {
+			case <-readyChan:
+				sh, exist = pf.Sh[fwdID]
+				if !exist {
+					err = errors.New("handlePerConn: stream signaled ready but missing in map")
+					return
+				}
+			case <-time.After(15 * time.Second):
+				err = errors.New("handlePerConn: timeout waiting for specific stream handler")
+				return
+			}
 		}
 
 		cleanup := func() {
@@ -292,16 +302,21 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 			sh    *StreamHandler
 			exist bool
 		)
-		for i := 0; i < 10000; i++ {
-			util.TakeABlink()
-			sh, exist = pf.Sh[shID]
-			if exist {
-				break
-			}
-		}
+		sh, exist = pf.Sh[shID]
 		if !exist {
-			err = fmt.Errorf("UDP forwarding: timeout waiting for agent connection: %s", udp_client_addr.String())
-			return
+			readyAny, _ := portFwdStreamReady.LoadOrStore(shID, make(chan struct{}))
+			readyChan := readyAny.(chan struct{})
+			select {
+			case <-readyChan:
+				sh, exist = pf.Sh[shID]
+				if !exist {
+					err = fmt.Errorf("UDP forwarding: stream %s signaled ready but missing", shID)
+					return
+				}
+			case <-time.After(15 * time.Second):
+				err = fmt.Errorf("UDP forwarding: timeout waiting for stream handler: %s", udp_client_addr.String())
+				return
+			}
 		}
 
 		buf = buf[0:n]
@@ -318,10 +333,6 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 			return
 		}
 		p := val.(*PortFwdSession)
-		if p.Sh == nil {
-			time.Sleep(100 * time.Millisecond)
-			continue
-		}
 
 		switch pf.Protocol {
 		case "udp":

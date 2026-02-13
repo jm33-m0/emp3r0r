@@ -143,12 +143,17 @@ func SetupFilePaths() (err error) {
 		return fmt.Errorf("emp3r0r is not installed correctly: %s not found", CAT)
 	}
 
-	// set workspace to ~/.emp3r0r
-	u, err := user.Current()
-	if err != nil {
-		return fmt.Errorf("get current user: %v", err)
+	// set workspace to ~/.emp3r0r (or override via EMP3R0R_WORKSPACE)
+	workspaceOverride := os.Getenv("EMP3R0R_WORKSPACE")
+	if workspaceOverride != "" {
+		EmpWorkSpace = workspaceOverride
+	} else {
+		u, err := user.Current()
+		if err != nil {
+			return fmt.Errorf("get current user: %v", err)
+		}
+		EmpWorkSpace = u.HomeDir + "/.emp3r0r"
 	}
-	EmpWorkSpace = u.HomeDir + "/.emp3r0r"
 	FileGetDir = EmpWorkSpace + "/file-get/"
 	EmpConfigFile = EmpWorkSpace + "/emp3r0r.json"
 	EmpLogFile = EmpWorkSpace + "/emp3r0r.log"

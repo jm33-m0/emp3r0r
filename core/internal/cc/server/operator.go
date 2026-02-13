@@ -253,6 +253,7 @@ func handleRegisterPortFwd(wrt http.ResponseWriter, req *http.Request) {
 		Agent: &def.Emp3r0rAgent{
 			Tag: pfReq.AgentTag,
 		},
+		ShReady: make(chan struct{}),
 	})
 
 	logging.Infof("Registered port mapping %s (%s) from operator", pfReq.SessionID, pfReq.Description)

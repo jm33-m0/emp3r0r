@@ -125,6 +125,12 @@ func TestSaveConfigJSON(t *testing.T) {
 		CCAddress:            "test.example.com",
 		CCPort:               "9999",
 		AgentSocksServerPort: "1080",
+		C2Prefix:             "prefix_x",
+		CheckInPath:          "checkin_x",
+		MsgPath:              "msg_x",
+		FTPPath:              "ftp_x",
+		WWWPath:              "www_x",
+		ProxyPath:            "proxy_x",
 	}
 
 	// Test SaveConfigJSON
@@ -150,6 +156,15 @@ func TestSaveConfigJSON(t *testing.T) {
 	}
 	if loadedConfig.CCPort != "9999" {
 		t.Errorf("Loaded config mismatch. Expected CCPort '9999', got '%s'", loadedConfig.CCPort)
+	}
+	if loadedConfig.FTPPath != "ftp_x" {
+		t.Errorf("Loaded config mismatch. Expected FTPPath 'ftp_x', got '%s'", loadedConfig.FTPPath)
+	}
+	if loadedConfig.WWWPath != "www_x" {
+		t.Errorf("Loaded config mismatch. Expected WWWPath 'www_x', got '%s'", loadedConfig.WWWPath)
+	}
+	if loadedConfig.ProxyPath != "proxy_x" {
+		t.Errorf("Loaded config mismatch. Expected ProxyPath 'proxy_x', got '%s'", loadedConfig.ProxyPath)
 	}
 }
 

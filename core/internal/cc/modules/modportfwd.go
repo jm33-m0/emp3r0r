@@ -105,6 +105,7 @@ func ModulePortFwd(ctx *c2context.C2Context) {
 		pf.RegisterFunc = RegisterPortFwdFunc
 		pf.UnregisterFunc = UnregisterPortFwdFunc
 		pf.Agent = activeAgent
+		pf.ShReady = make(chan struct{})
 		go func() {
 			logging.Printf("RunReversedPortFwd: %s:%s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.BindAddr, pf.Lport, pf.To, pf.Protocol)
 			initErr := pf.InitReversedPortFwd()
@@ -130,6 +131,7 @@ func ModulePortFwd(ctx *c2context.C2Context) {
 		pf.UnregisterFunc = UnregisterPortFwdFunc
 		pf.Protocol = ctx.Flags["protocol"]
 		pf.Agent = activeAgent
+		pf.ShReady = make(chan struct{})
 		go func() {
 			logging.Printf("RunPortFwd: %s:%s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.BindAddr, pf.Lport, pf.To, pf.Protocol)
 			runErr := pf.RunPortFwd()
@@ -183,6 +185,7 @@ func moduleProxy(ctx *c2context.C2Context) {
 	pf.Protocol = "tcp"
 	pf.Timeout = live.RuntimeConfig.AgentSocksTimeout
 	pf.Agent = activeAgent
+	pf.ShReady = make(chan struct{})
 
 	// udp port fwd
 	pfu := new(network.PortFwdSession)
@@ -196,6 +199,7 @@ func moduleProxy(ctx *c2context.C2Context) {
 	pfu.RegisterFunc = RegisterPortFwdFunc
 	pfu.UnregisterFunc = UnregisterPortFwdFunc
 	pfu.Agent = activeAgent
+	pfu.ShReady = make(chan struct{})
 
 	switch status {
 	case "on":
@@ -231,9 +235,6 @@ func moduleProxy(ctx *c2context.C2Context) {
 			}()
 			// UDP forwarding
 			go func() {
-				for pf.Sh == nil {
-					util.TakeABlink()
-				}
 				err := pfu.RunPortFwd()
 				if err != nil {
 					logging.Errorf("PortFwd (UDP) failed: %v", err)

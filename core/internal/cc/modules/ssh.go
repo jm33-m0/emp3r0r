@@ -165,6 +165,7 @@ func SSHClient(shell, args, port string) (string, error) {
 		pf.Lport, pf.To = lport, to
 		pf.SendCmdFunc = CmdSender
 		pf.RegisterFunc = RegisterPortFwdFunc
+		pf.ShReady = make(chan struct{})
 		go func() {
 			// remember the port mapping and shell and agent
 			SSHShellPort.Store(shell, &SSH_SHELL_Mapping{

