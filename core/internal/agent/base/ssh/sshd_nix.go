@@ -71,7 +71,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		// we have a special bashrc and we would like to apply it
 		if shell == "bash" {
 			temp_bash_dir := fmt.Sprintf("%s/emp3r0r-%s", os.TempDir(), util.RandMD5String())
-			os.MkdirAll(temp_bash_dir, 0700)
+			os.MkdirAll(temp_bash_dir, 0o700)
 			custom_bash := temp_bash_dir + "/bash"
 
 			// We might need to rethink how vaccine works, but for now we'll look in a common place or skip

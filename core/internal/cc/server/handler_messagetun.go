@@ -69,10 +69,8 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 			if err != nil {
 				return
 			}
-			// sanitize agent metadata in message (single-line, no control chars)
-			msg.Tag = util.SanitizeOneLine(msg.Tag)
-			msg.AgentUUID = util.SanitizeOneLine(msg.AgentUUID)
-			msg.AgentUUIDSig = util.SanitizeOneLine(msg.AgentUUIDSig)
+			// Sanitize agent metadata at trust boundary (after CBOR decode)
+			util.SanitizeMsgTunMetadata(&msg)
 
 			// find agent
 			var agent *def.Emp3r0rAgent

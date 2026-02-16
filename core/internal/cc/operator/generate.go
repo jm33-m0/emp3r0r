@@ -191,10 +191,10 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 		}
 
 		// Save certs
-		if err := os.WriteFile(transport.CaCrtFile, certs["ca_crt"], 0644); err != nil {
+		if err := os.WriteFile(transport.CaCrtFile, certs["ca_crt"], 0o644); err != nil {
 			return fmt.Errorf("failed to save CA cert: %v", err)
 		}
-		if err := os.WriteFile(transport.ServerCrtFile, certs["server_crt"], 0644); err != nil {
+		if err := os.WriteFile(transport.ServerCrtFile, certs["server_crt"], 0o644); err != nil {
 			return fmt.Errorf("failed to save Server cert: %v", err)
 		}
 	}

@@ -75,12 +75,12 @@ func DownloadFromAgent(target *def.Emp3r0rAgent, filePath string, isRecursive bo
 				_, target_file, tempname, lock := GenerateGetFilePaths(file)
 				// check if download is successful
 				if util.IsFileExist(tempname) || util.IsFileExist(lock) || !util.IsFileExist(target_file) {
-					logging.Warningf("%s: download seems unsuccessful", util.SanitizeOneLine(file))
+					logging.Warningf("%s: download seems unsuccessful", file)
 					failed_files = append(failed_files, file)
 				}
 			}
 			if len(failed_files) > 0 {
-				logging.Errorf("Failed to download %d files: %s", len(failed_files), util.SanitizeOneLine(strings.Join(failed_files, ", ")))
+				logging.Errorf("Failed to download %d files: %s", len(failed_files), strings.Join(failed_files, ", "))
 			} else {
 				logging.Successf("All %d files downloaded successfully", len(files))
 			}
@@ -90,11 +90,11 @@ func DownloadFromAgent(target *def.Emp3r0rAgent, filePath string, isRecursive bo
 		for n, file := range files {
 			ftpSh, err := GetFile(file, target)
 			if err != nil {
-				logging.Warningf("Cannot get %s: %v", util.SanitizeOneLine(file), err)
+				logging.Warningf("Cannot get %s: %v", file, err)
 				continue
 			}
 
-			logging.Printf("Downloading %d/%d: %s", n+1, len(files), util.SanitizeOneLine(file))
+			logging.Printf("Downloading %d/%d: %s", n+1, len(files), file)
 
 			// wait for file to be downloaded
 			for {

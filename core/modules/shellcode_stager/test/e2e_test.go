@@ -245,7 +245,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 
 	// Create patched agent file
 	patchedAgentPath := filepath.Join(tmpDir, "patched_agent")
-	err = os.WriteFile(patchedAgentPath, patchedAgentBytes, 0755)
+	err = os.WriteFile(patchedAgentPath, patchedAgentBytes, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to write patched agent: %v", err)
 	}
@@ -367,7 +367,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to read stager.bin: %v", err)
 	}
-	err = os.WriteFile(stagerBinPath, input, 0644)
+	err = os.WriteFile(stagerBinPath, input, 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write stager.bin to tmp: %v", err)
 	}

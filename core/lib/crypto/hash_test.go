@@ -94,7 +94,7 @@ func TestSHA256SumDeterministic(t *testing.T) {
 	input := "test input for determinism"
 	result1 := SHA256Sum(input)
 	result2 := SHA256Sum(input)
-	
+
 	if result1 != result2 {
 		t.Errorf("SHA256Sum is not deterministic: got %q and %q for same input", result1, result2)
 	}
@@ -139,12 +139,12 @@ func TestSHA256SumRaw(t *testing.T) {
 // TestSHA256SumRawCompareWithSHA256Sum verifies SHA256SumRaw matches SHA256Sum
 func TestSHA256SumRawCompareWithSHA256Sum(t *testing.T) {
 	testInputs := []string{"hello", "world", "test", ""}
-	
+
 	for _, input := range testInputs {
 		t.Run(input, func(t *testing.T) {
 			result1 := SHA256Sum(input)
 			result2 := SHA256SumRaw([]byte(input))
-			
+
 			if result1 != result2 {
 				t.Errorf("SHA256Sum and SHA256SumRaw produce different results for %q: %q vs %q", input, result1, result2)
 			}
@@ -246,7 +246,7 @@ func TestBase64URLRoundTrip(t *testing.T) {
 		t.Run(input, func(t *testing.T) {
 			encoded := Base64URLEncode(input)
 			decoded := Base64URLDecode(encoded)
-			
+
 			if string(decoded) != input {
 				t.Errorf("Round-trip failed for %q: got %q after decode", input, string(decoded))
 			}
@@ -285,7 +285,7 @@ func TestSHA256SumFile(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test file
 			filePath := filepath.Join(tmpDir, tt.name+".txt")
-			err := os.WriteFile(filePath, []byte(tt.content), 0644)
+			err := os.WriteFile(filePath, []byte(tt.content), 0o644)
 			if err != nil {
 				t.Fatalf("Failed to create test file: %v", err)
 			}

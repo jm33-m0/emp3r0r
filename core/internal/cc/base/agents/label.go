@@ -123,6 +123,6 @@ func SetAgentLabel(agentID string, label string) error {
 		val.(*live.AgentControl).Label = label // set label
 	}
 	PersistLabeledAgentsToFile()
-	logging.Successf("%s has been labeled as %s", util.SanitizeOneLine(target.Tag), util.SanitizeOneLine(label))
+	logging.Successf("%s has been labeled as %s", target.Tag, label)
 	return nil
 }

@@ -91,7 +91,7 @@ func TestModuleHandler_Python(t *testing.T) {
 
 	// Setup 'python' symlink in PATH
 	binDir := filepath.Join(t.TempDir(), "bin")
-	os.MkdirAll(binDir, 0755)
+	os.MkdirAll(binDir, 0o755)
 	os.Symlink(py3, filepath.Join(binDir, "python"))
 	oldPath := os.Getenv("PATH")
 	os.Setenv("PATH", binDir+":"+oldPath)

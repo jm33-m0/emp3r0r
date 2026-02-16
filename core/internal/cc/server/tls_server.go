@@ -49,7 +49,6 @@ func StartC2AgentTLSServer() {
 				})
 
 				respData, err := preflight.ProcessRequest(body, hasOperators)
-
 				if err != nil {
 					logging.Warningf("Preflight failed: %v", err)
 					http.Error(w, "Preflight failed", http.StatusForbidden)

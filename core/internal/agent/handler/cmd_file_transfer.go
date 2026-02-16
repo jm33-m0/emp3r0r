@@ -157,7 +157,7 @@ func decryptCmdRun(cmd *cobra.Command, args []string) {
 	}
 
 	// Write plaintext directly to disk (bypassing WriteFileAgent/encryption)
-	err = os.WriteFile(out, data, 0600)
+	err = os.WriteFile(out, data, 0o600)
 	if err != nil {
 		c2transport.NotifyC2(cmd, "Write error: %v", err)
 		return

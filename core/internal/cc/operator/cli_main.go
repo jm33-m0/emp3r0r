@@ -169,6 +169,7 @@ func SetDynamicPrompt() string {
 	transport := color.New(color.FgRed).Sprint("local")
 
 	if live.ActiveAgent != nil {
+		// live.ActiveAgent is already sanitized at storage time
 		shortName = strings.Split(live.ActiveAgent.Tag, "-agent")[0]
 		if live.ActiveAgent.HasRoot {
 			prompt_arrow = color.New(color.Bold, color.FgHiGreen).Sprint("\n# ")

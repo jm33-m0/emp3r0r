@@ -22,14 +22,14 @@ func TestCCInit(t *testing.T) {
 	// Create necessary directory structure
 	// emp3r0r expects Prefix + "/lib/emp3r0r"
 	empLibDir := filepath.Join(tempDir, "lib", "emp3r0r")
-	err = os.MkdirAll(empLibDir, 0755)
+	err = os.MkdirAll(empLibDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create emp3r0r lib dir: %v", err)
 	}
 
 	// Create dummy emp3r0r-cat
 	catPath := filepath.Join(empLibDir, "emp3r0r-cat")
-	err = os.WriteFile(catPath, []byte("dummy"), 0755)
+	err = os.WriteFile(catPath, []byte("dummy"), 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create dummy emp3r0r-cat: %v", err)
 	}

@@ -3,11 +3,12 @@ package listener
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"net"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 var (

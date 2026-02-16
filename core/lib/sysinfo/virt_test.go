@@ -16,7 +16,7 @@ func TestCheckContainer(t *testing.T) {
 
 	t.Run("basic functionality", func(t *testing.T) {
 		result := CheckContainer()
-		
+
 		// Result should be a string (either "None" or a container type)
 		if result == "" {
 			t.Error("CheckContainer() returned empty string")
@@ -44,7 +44,7 @@ func TestCheckContainer(t *testing.T) {
 1:name=systemd:/docker/abc123
 0::/system.slice/docker.service`
 
-		err := os.WriteFile(cgroupPath, []byte(mockCgroupContent), 0644)
+		err := os.WriteFile(cgroupPath, []byte(mockCgroupContent), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to create mock cgroup file: %v", err)
 		}
@@ -73,7 +73,7 @@ func TestCheckContainer(t *testing.T) {
 1:name=systemd:/
 0::/init.scope`
 
-		err := os.WriteFile(cgroupPath, []byte(mockCgroupContent), 0644)
+		err := os.WriteFile(cgroupPath, []byte(mockCgroupContent), 0o644)
 		if err != nil {
 			t.Fatalf("Failed to create mock cgroup file: %v", err)
 		}

@@ -202,7 +202,7 @@ func TestFsCmds(t *testing.T) {
 
 	// 2. cp
 	srcFile := filepath.Join(tmpDir, "src.txt")
-	if err := os.WriteFile(srcFile, []byte("hello"), 0600); err != nil {
+	if err := os.WriteFile(srcFile, []byte("hello"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	dstFile := filepath.Join(newDir, "dst.txt")
@@ -393,10 +393,10 @@ func TestGetCmdRun_Dir(t *testing.T) {
 	tmpDir := t.TempDir()
 	f1 := filepath.Join(tmpDir, "f1.txt")
 	f2 := filepath.Join(tmpDir, "f2.txt")
-	if err := os.WriteFile(f1, []byte("content1"), 0600); err != nil {
+	if err := os.WriteFile(f1, []byte("content1"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(f2, []byte("content2"), 0600); err != nil {
+	if err := os.WriteFile(f2, []byte("content2"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 

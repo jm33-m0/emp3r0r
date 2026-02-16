@@ -10,7 +10,14 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+	"github.com/jm33-m0/emp3r0r/core/lib/sanitize"
 )
+
+// Raw marks a string as trusted, pre-sanitized output.
+//
+// Use sparingly and only with strings constructed from trusted/static content
+// or from already-sanitized components (e.g., UI color formatting).
+type Raw string
 
 const (
 	SUCCESS = "SUCCESS"
@@ -39,13 +46,13 @@ func NewLogger(logFilePath string, level int) (*Logger, error) {
 	writer := io.MultiWriter(os.Stderr)
 	if logFilePath != "" {
 		if _, err := os.Stat(logFilePath); os.IsNotExist(err) {
-			err = os.MkdirAll(filepath.Dir(logFilePath), 0755)
+			err = os.MkdirAll(filepath.Dir(logFilePath), 0o755)
 			if err != nil {
 				return nil, err
 			}
 		}
 		// open log file
-		logf, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
+		logf, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o600)
 		if err != nil {
 			return nil, fmt.Errorf("error opening file: %v", err)
 		}
@@ -113,10 +120,43 @@ func (l *Logger) Start() {
 	}()
 }
 
+// sanitizeLogArg sanitizes a single log argument, with defense-in-depth approach.
+// Even though data is sanitized at storage time, this provides an additional safety layer.
+func sanitizeLogArg(v interface{}) interface{} {
+	switch t := v.(type) {
+	case nil:
+		return nil
+	case Raw:
+		return string(t) // Raw type bypasses sanitization (trusted/pre-sanitized)
+	case string:
+		return sanitize.SanitizeText(t)
+	case []byte:
+		return sanitize.SanitizeText(string(t))
+	case error:
+		return sanitize.SanitizeText(t.Error())
+	case fmt.Stringer:
+		return sanitize.SanitizeText(t.String())
+	default:
+		return v
+	}
+}
+
+func sanitizeLogArgs(args []interface{}) []interface{} {
+	if len(args) == 0 {
+		return args
+	}
+	safe := make([]interface{}, len(args))
+	for i := range args {
+		safe[i] = sanitizeLogArg(args[i])
+	}
+	return safe
+}
+
 func (l *Logger) helper(format string, a []interface{}, msgColor *color.Color, _ string, _ bool) {
-	logMsg := fmt.Sprintf(format, a...)
+	safeArgs := sanitizeLogArgs(a)
+	logMsg := fmt.Sprintf(format, safeArgs...)
 	if msgColor != nil {
-		logMsg = msgColor.Sprintf(format, a...)
+		logMsg = msgColor.Sprint(logMsg)
 	}
 	l.logChan <- logMsg
 }
@@ -159,7 +199,8 @@ func (l *Logger) Fatal(format string, a ...interface{}) {
 	l.helper(format, a, color.New(color.FgHiRed, color.Bold, color.Italic), FATAL, true)
 	l.Msg("Run 'tmux kill-session -t emp3r0r' to clean up dead emp3r0r windows")
 	time.Sleep(2 * time.Second) // give user some time to read the error message
-	log.Fatal(color.New(color.Bold, color.FgHiRed).Sprintf(format, a...))
+	safeArgs := sanitizeLogArgs(a)
+	log.Fatal(color.New(color.Bold, color.FgHiRed).Sprint(fmt.Sprintf(format, safeArgs...)))
 }
 
 // Error prints an error message in red and bold font to console and log file, regardless of log level

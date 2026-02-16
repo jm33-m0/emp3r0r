@@ -3,8 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/external_file"
 )

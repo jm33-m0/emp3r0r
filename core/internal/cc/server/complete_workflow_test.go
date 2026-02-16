@@ -36,7 +36,7 @@ func TestCompleteWorkflow_MultiOperator(t *testing.T) {
 
 	live.EmpWorkSpace = tempDir
 	live.WWWRoot = filepath.Join(tempDir, "www")
-	os.MkdirAll(live.WWWRoot, 0700)
+	os.MkdirAll(live.WWWRoot, 0o700)
 
 	transport.CaCrtFile = filepath.Join(tempDir, "ca-cert.pem")
 	transport.CaKeyFile = filepath.Join(tempDir, "ca-key.pem")
@@ -70,8 +70,8 @@ func TestCompleteWorkflow_MultiOperator(t *testing.T) {
 	}
 
 	// Prepare files for each operator
-	os.WriteFile(filepath.Join(live.WWWRoot, "file1.txt"), []byte("Hello from Operator 1"), 0600)
-	os.WriteFile(filepath.Join(live.WWWRoot, "file2.txt"), []byte("Hello from Operator 2"), 0600)
+	os.WriteFile(filepath.Join(live.WWWRoot, "file1.txt"), []byte("Hello from Operator 1"), 0o600)
+	os.WriteFile(filepath.Join(live.WWWRoot, "file2.txt"), []byte("Hello from Operator 2"), 0o600)
 
 	// Setup Mock Relay Server for Operator 1
 	r1 := mux.NewRouter()
@@ -206,7 +206,7 @@ func TestCompleteWorkflow_MultiOperator(t *testing.T) {
 			}
 			// Simulate Client: Save downloaded content to a file
 			downloadedFile := filepath.Join(tempDir, "client_download_"+tt.name+".txt")
-			err = os.WriteFile(downloadedFile, body, 0600)
+			err = os.WriteFile(downloadedFile, body, 0o600)
 			if err != nil {
 				t.Fatalf("Failed to save downloaded file: %v", err)
 			}

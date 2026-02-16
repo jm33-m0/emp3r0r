@@ -31,29 +31,29 @@ func TestDownloadExtractConfig(t *testing.T) {
 
 	// Create necessary directories and files for SetupFilePaths
 	empDataDir := filepath.Join(prefixDir, "lib/emp3r0r")
-	if err := os.MkdirAll(empDataDir, 0755); err != nil {
+	if err := os.MkdirAll(empDataDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	// Create dummy emp3r0r-cat
-	if err := os.WriteFile(filepath.Join(empDataDir, "emp3r0r-cat"), []byte("dummy"), 0755); err != nil {
+	if err := os.WriteFile(filepath.Join(empDataDir, "emp3r0r-cat"), []byte("dummy"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 
 	// Set EmpWorkSpace to a valid directory for cleanupConfig
 	EmpWorkSpace = filepath.Join(tmpDir, ".emp3r0r")
-	if err := os.MkdirAll(EmpWorkSpace, 0700); err != nil {
+	if err := os.MkdirAll(EmpWorkSpace, 0o700); err != nil {
 		t.Fatal(err)
 	}
 
 	// 2. Create a dummy tarball using system tar command (to support xz)
 	tarSrcDir := filepath.Join(tmpDir, "tar_src")
-	if err := os.MkdirAll(tarSrcDir, 0700); err != nil {
+	if err := os.MkdirAll(tarSrcDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 
 	testFileName := "test_config_file.txt"
 	testFileContent := "hello world"
-	if err := os.WriteFile(filepath.Join(tarSrcDir, testFileName), []byte(testFileContent), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(tarSrcDir, testFileName), []byte(testFileContent), 0o600); err != nil {
 		t.Fatal(err)
 	}
 

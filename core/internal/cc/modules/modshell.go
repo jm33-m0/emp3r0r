@@ -21,7 +21,6 @@ func ModuleCmd(ctx *c2context.C2Context) {
 
 	// send command
 	execOnTarget := func(target *def.Emp3r0rAgent) {
-
 		cmdOpt, ok := ctx.Flags["cmd_to_exec"]
 		if !ok {
 			logging.Errorf("Option 'cmd_to_exec' not found")

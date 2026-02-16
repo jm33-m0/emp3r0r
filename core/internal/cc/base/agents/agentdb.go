@@ -12,10 +12,8 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-var (
-	// AgentDB is the global database connection
-	AgentDB *sql.DB
-)
+// AgentDB is the global database connection
+var AgentDB *sql.DB
 
 // InitAgentDB initializes the SQLite database and creates tables if they don't exist
 func InitAgentDB(dbPath string) error {

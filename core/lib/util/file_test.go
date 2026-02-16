@@ -17,7 +17,7 @@ func TestSaveFileAgent(t *testing.T) {
 	// Test StorageMemory
 	memFile := filepath.Join(tmpDir, "mem_test.txt")
 	data := []byte("memory file content")
-	err := SaveFileAgent(memFile, data, 0600, StorageMemory)
+	err := SaveFileAgent(memFile, data, 0o600, StorageMemory)
 	if err != nil {
 		t.Fatalf("Failed to save to memory: %v", err)
 	}
@@ -43,7 +43,7 @@ func TestSaveFileAgent(t *testing.T) {
 	// Test StorageDisk
 	diskFile := filepath.Join(tmpDir, "disk_test.txt")
 	diskData := []byte("disk file content")
-	err = SaveFileAgent(diskFile, diskData, 0600, StorageDisk)
+	err = SaveFileAgent(diskFile, diskData, 0o600, StorageDisk)
 	if err != nil {
 		t.Fatalf("Failed to save to disk: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestSaveFileAgent(t *testing.T) {
 	// Test StorageAuto (Small file -> Memory)
 	autoFile := filepath.Join(tmpDir, "auto_test.txt")
 	autoData := []byte("auto file content")
-	err = SaveFileAgent(autoFile, autoData, 0600, StorageAuto)
+	err = SaveFileAgent(autoFile, autoData, 0o600, StorageAuto)
 	if err != nil {
 		t.Fatalf("Failed to save auto: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestSaveFileAgent(t *testing.T) {
 func TestUnarchiveAgent_ZipSlip(t *testing.T) {
 	tmpDir := t.TempDir()
 	dstDir := filepath.Join(tmpDir, "extract")
-	err := os.MkdirAll(dstDir, 0700)
+	err := os.MkdirAll(dstDir, 0o700)
 	if err != nil {
 		t.Fatalf("Failed to create dst dir: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestUnarchiveAgent_ZipSlip(t *testing.T) {
 	// Create a malicious tarball content
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
-	var files = []struct {
+	files := []struct {
 		Name, Body string
 	}{
 		{"safe.txt", "safe content"},
@@ -112,7 +112,7 @@ func TestUnarchiveAgent_ZipSlip(t *testing.T) {
 	for _, file := range files {
 		hdr := &tar.Header{
 			Name: file.Name,
-			Mode: 0600,
+			Mode: 0o600,
 			Size: int64(len(file.Body)),
 		}
 		if err := tw.WriteHeader(hdr); err != nil {
@@ -135,7 +135,7 @@ func TestUnarchiveAgent_ZipSlip(t *testing.T) {
 
 	// Save it using SaveFileAgent (so ReadFileAgent can read it)
 	tarballPath := filepath.Join(tmpDir, "malicious.tar.xz")
-	err = SaveFileAgent(tarballPath, xzData, 0600, StorageMemory)
+	err = SaveFileAgent(tarballPath, xzData, 0o600, StorageMemory)
 	if err != nil {
 		t.Fatalf("Failed to save tarball: %v", err)
 	}

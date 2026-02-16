@@ -33,18 +33,18 @@ func TestDownloadExtractConfig_Retry(t *testing.T) {
 
 	// Create necessary directories and files
 	empDataDir := filepath.Join(prefixDir, "lib/emp3r0r")
-	os.MkdirAll(empDataDir, 0755)
-	os.WriteFile(filepath.Join(empDataDir, "emp3r0r-cat"), []byte("dummy"), 0755)
+	os.MkdirAll(empDataDir, 0o755)
+	os.WriteFile(filepath.Join(empDataDir, "emp3r0r-cat"), []byte("dummy"), 0o755)
 
 	EmpWorkSpace = filepath.Join(tmpDir, ".emp3r0r")
-	os.MkdirAll(EmpWorkSpace, 0700)
+	os.MkdirAll(EmpWorkSpace, 0o700)
 
 	// 2. Create a dummy tarball
 	tarSrcDir := filepath.Join(tmpDir, "tar_src")
-	os.MkdirAll(tarSrcDir, 0700)
+	os.MkdirAll(tarSrcDir, 0o700)
 	testFileName := "test_retry.txt"
 	testFileContent := "retry success"
-	os.WriteFile(filepath.Join(tarSrcDir, testFileName), []byte(testFileContent), 0600)
+	os.WriteFile(filepath.Join(tarSrcDir, testFileName), []byte(testFileContent), 0o600)
 	tarPath := filepath.Join(tmpDir, "config.tar.xz")
 	arc.Archive(filepath.Join(tarSrcDir, testFileName), tarPath, arc.CompressionMap["xz"], arc.ArchivalMap["tar"])
 

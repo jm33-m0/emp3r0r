@@ -61,7 +61,8 @@ func SanitizeAgentMetadata(a *def.Emp3r0rAgent) {
 }
 
 // SanitizeMsgTunMetadata sanitizes agent-identifying metadata in message tunnel data.
-// Command output (Response) must be sanitized at presentation time depending on context.
+// Command output (Response) is NOT sanitized here as it may contain binary CBOR data.
+// Response should be sanitized at presentation time when converted to string.
 func SanitizeMsgTunMetadata(m *def.MsgTunData) {
 	if m == nil {
 		return
@@ -69,4 +70,11 @@ func SanitizeMsgTunMetadata(m *def.MsgTunData) {
 	m.Tag = SanitizeOneLine(m.Tag)
 	m.AgentUUID = SanitizeOneLine(m.AgentUUID)
 	m.AgentUUIDSig = SanitizeOneLine(m.AgentUUIDSig)
+	m.JobID = SanitizeOneLine(m.JobID)
+	m.Time = SanitizeOneLine(m.Time)
+
+	// Sanitize command arguments
+	for i := range m.CmdSlice {
+		m.CmdSlice[i] = SanitizeOneLine(m.CmdSlice[i])
+	}
 }

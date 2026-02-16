@@ -206,7 +206,7 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request, expectedUUID
 			live.AgentControlMap.Store(target, &live.AgentControl{Index: inx, Conn: nil})
 		}
 		logging.Infof("Updated agent %s with full data from CBOR (public key length=%d)", strconv.Quote(target.UUID), len(target.PublicKey))
-		
+
 		// Signal that public key is now available (for any waiting requests)
 		closeCheckinReadyChannel(target.UUID)
 		logging.Debugf("Signaled checkin completion for %s", strconv.Quote(target.UUID))
@@ -218,7 +218,7 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request, expectedUUID
 			if a.UUID == target.UUID {
 				// if agent is already connected, it must be the same instance
 				if ctrl.Conn != nil {
-					logging.Warningf("handleAgentCheckIn: %s just connected, but state says it is already connected. This implies a race condition or logic error.", util.SanitizeOneLine(target.Tag))
+					logging.Warningf("handleAgentCheckIn: %s just connected, but state says it is already connected. This implies a race condition or logic error.", target.Tag)
 				}
 				// Refresh all agent info to keep it current
 				a.Name = target.Name

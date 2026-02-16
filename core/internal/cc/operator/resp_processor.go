@@ -9,7 +9,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
+	"github.com/jm33-m0/emp3r0r/core/lib/sanitize"
 )
 
 // CommandHandler handles specific command responses from agents
@@ -96,24 +96,24 @@ func processAgentData(data *def.MsgTunData) {
 	// Handle different message types (UI rendering)
 	switch resp.MessageType {
 	case "success":
-		logging.Successf("%s", util.StripANSI(resp.Output))
+		logging.Successf("%s", resp.Output)
 		select {
 		case AgentRefreshCh <- struct{}{}:
 		default:
 		}
 		return
 	case "error":
-		logging.Errorf("%s", util.StripANSI(resp.Output))
+		logging.Errorf("%s", resp.Output)
 		select {
 		case AgentRefreshCh <- struct{}{}:
 		default:
 		}
 		return
 	case "warn":
-		logging.Warningf("%s", util.StripANSI(resp.Output))
+		logging.Warningf("%s", resp.Output)
 		return
 	case "info":
-		logging.Infof("%s", util.StripANSI(resp.Output))
+		logging.Infof("%s", resp.Output)
 		return
 	}
 
@@ -128,8 +128,9 @@ func processAgentData(data *def.MsgTunData) {
 		resp.Output = handler([]byte(resp.Output), resp.Agent)
 	}
 
-	// Strip ANSI and format output (UI rendering)
-	stripped := util.StripANSI(resp.Output)
+	// Sanitize command output before rendering (Response field may contain untrusted output)
+	// Agent.Name and Command are already sanitized at storage time
+	stripped := sanitize.SanitizeText(resp.Output)
 	agentOutput := fmt.Sprintf("\n[%s] %s:\n%s\n",
 		color.CyanString("%s", resp.Agent.Name),
 		color.HiMagentaString("%s", resp.Command),
@@ -143,5 +144,5 @@ func processAgentData(data *def.MsgTunData) {
 		}
 	}
 
-	logging.Printf(agentOutput)
+	logging.Printf("%s", logging.Raw(agentOutput))
 }

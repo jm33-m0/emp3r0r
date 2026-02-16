@@ -13,10 +13,8 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-var (
-	// Jobs holds all jobs, key is JobID
-	Jobs sync.Map
-)
+// Jobs holds all jobs, key is JobID
+var Jobs sync.Map
 
 // CreateJob creates a new job and saves it to Jobs map
 func CreateJob(name, module, agentTag string) *def.Job {
@@ -56,12 +54,12 @@ func HandleOutput(jobID string, output []byte) {
 	// Ensure job directory exists
 	jobDir := filepath.Join(live.EmpWorkSpace, "jobs")
 	if _, err := os.Stat(jobDir); os.IsNotExist(err) {
-		os.MkdirAll(jobDir, 0700)
+		os.MkdirAll(jobDir, 0o700)
 	}
 
 	// Append to log file
 	logPath := filepath.Join(jobDir, fmt.Sprintf("%s.log", jobID))
-	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err == nil {
 		defer f.Close()
 		// Sanitize output before logging

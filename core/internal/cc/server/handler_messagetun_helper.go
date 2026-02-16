@@ -7,6 +7,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/sanitize"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -61,9 +62,10 @@ func processKeyExchange(msg *def.MsgTunData, pfsEstablished bool) (replyData []b
 
 // operatorBroadcastPrintf broadcasts a message to all connected operators.
 func operatorBroadcastPrintf(msg_type, format string, a ...any) (err error) {
+	msg := sanitize.SanitizeText(fmt.Sprintf(format, a...))
 	msgTunData := def.MsgTunData{
-		Tag:      msg_type,                          // tell operator about the message type: INFO, WARN, ERROR, SUCCESS
-		Response: []byte(fmt.Sprintf(format, a...)), // message content
+		Tag:      msg_type,    // tell operator about the message type: INFO, WARN, ERROR, SUCCESS
+		Response: []byte(msg), // message content
 		JobID:    "",
 		CmdSlice: []string{},
 	}

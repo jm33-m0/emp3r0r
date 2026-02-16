@@ -2,7 +2,6 @@ package def
 
 import (
 	"context"
-
 	"time"
 
 	"github.com/jaypipes/ghw"

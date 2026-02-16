@@ -5,10 +5,11 @@ package sysinfo
 
 import (
 	"fmt"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"golang.org/x/sys/windows"

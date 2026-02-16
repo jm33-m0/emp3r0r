@@ -28,7 +28,7 @@ func TestHandleClient_PathTraversal(t *testing.T) {
 	// or update the test to reflect the new behavior.
 	// Since handleClient uses os.TempDir(), we should use it too.
 	safeFile := filepath.Join(os.TempDir(), "safe.txt")
-	err = util.WriteFileAgent(safeFile, []byte("safe content"), 0600)
+	err = util.WriteFileAgent(safeFile, []byte("safe content"), 0o600)
 	if err != nil {
 		t.Fatalf("Failed to create safe file: %v", err)
 	}
@@ -40,7 +40,7 @@ func TestHandleClient_PathTraversal(t *testing.T) {
 	}
 	defer os.RemoveAll(outsideDir)
 	outsideFile := filepath.Join(outsideDir, "secret.txt")
-	err = os.WriteFile(outsideFile, []byte("secret content"), 0600)
+	err = os.WriteFile(outsideFile, []byte("secret content"), 0o600)
 	if err != nil {
 		t.Fatalf("Failed to create outside file: %v", err)
 	}

@@ -2,8 +2,9 @@ package transport
 
 import (
 	"encoding/binary"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"net"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 // IPinCIDR all IPs in a CIDR

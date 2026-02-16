@@ -114,7 +114,6 @@ type ModuleConfig struct {
 
 // Module help info and options
 var Modules = map[string]*ModuleConfig{
-
 	ModCMD_EXEC: {
 		Name:     ModCMD_EXEC,
 		Build:    "",

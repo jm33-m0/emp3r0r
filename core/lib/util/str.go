@@ -7,98 +7,33 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
-	"regexp"
 	"runtime"
 	"strings"
 	"time"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/sanitize"
 )
 
 // StripANSI strips ANSI text escape codes from a string
 // It also enforces strict sanitization: only unicode graphic chars and whitespace are allowed.
 // If any other binary/control data is found, it appends the hex dump of the stripped data.
 func StripANSI(str string) string {
-	// 1. Strip ANSI escape codes
-	ansi := regexp.MustCompile(`\x1b\[[0-9;]*m`)
-	stripped := ansi.ReplaceAllString(str, "")
-
-	// 2. Check for non-graphic characters (allow whitespace like \n, \t, etc)
-	var builder strings.Builder
-	var strippedBuilder strings.Builder
-	hasBinary := false
-
-	// Iterate over the string as UTF-8
-	for i := 0; i < len(stripped); {
-		r, width := utf8.DecodeRuneInString(stripped[i:])
-		if r == utf8.RuneError && width == 1 {
-			// Invalid UTF-8 byte
-			hasBinary = true
-			strippedBuilder.WriteByte(stripped[i])
-			i++
-			continue
-		}
-
-		if unicode.IsGraphic(r) || unicode.IsSpace(r) {
-			builder.WriteRune(r)
-		} else {
-			hasBinary = true
-			strippedBuilder.WriteRune(r)
-		}
-		i += width
-	}
-
-	// 3. If binary data was stripped, append hex dump (hex only) of the stripped data
-	if hasBinary {
-		data := []byte(strippedBuilder.String())
-		var hexBuilder strings.Builder
-		for i := 0; i < len(data); i += 16 {
-			end := i + 16
-			if end > len(data) {
-				end = len(data)
-			}
-			hexBuilder.WriteString(fmt.Sprintf("%08x  % x\n", i, data[i:end]))
-		}
-		return fmt.Sprintf("%s\n\n[Binary data stripped]:\n%s", builder.String(), hexBuilder.String())
-	}
-
-	// 4. Otherwise return the sanitized string
-	return builder.String()
+	return sanitize.StripANSI(str)
 }
 
 // SanitizeText removes ANSI color escapes and drops non-printable/binary data.
 // Unlike StripANSI, it does NOT append a hex dump when binary/control data is found.
 // This is preferred for any user-facing rendering where output amplification is a concern.
 func SanitizeText(str string) string {
-	// 1. Strip ANSI escape codes
-	ansi := regexp.MustCompile(`\x1b\[[0-9;]*m`)
-	stripped := ansi.ReplaceAllString(str, "")
-
-	// 2. Keep only unicode graphic chars and whitespace (drop everything else)
-	var builder strings.Builder
-	for i := 0; i < len(stripped); {
-		r, width := utf8.DecodeRuneInString(stripped[i:])
-		if r == utf8.RuneError && width == 1 {
-			// Invalid UTF-8 byte: drop
-			i++
-			continue
-		}
-		if unicode.IsGraphic(r) || unicode.IsSpace(r) {
-			builder.WriteRune(r)
-		}
-		i += width
-	}
-
-	return builder.String()
+	return sanitize.SanitizeText(str)
 }
 
 // SanitizeOneLine sanitizes text and normalizes it into a single line.
 // It collapses all whitespace (including newlines/tabs) into single spaces.
 func SanitizeOneLine(str string) string {
-	return strings.Join(strings.Fields(SanitizeText(str)), " ")
+	return sanitize.SanitizeOneLine(str)
 }
 
 // ParseCmd parse commands containing whitespace

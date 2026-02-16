@@ -5,11 +5,12 @@ package main
 
 import (
 	"io"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 func main() {

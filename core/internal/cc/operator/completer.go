@@ -105,9 +105,7 @@ type RemoteDirListingCache struct {
 	Cancel  context.CancelFunc
 }
 
-var (
-	RemoteDirListing sync.Map
-)
+var RemoteDirListing sync.Map
 
 // autocomplete items in current remote directory
 func listRemoteDir(ctx carapace.Context) carapace.Action {

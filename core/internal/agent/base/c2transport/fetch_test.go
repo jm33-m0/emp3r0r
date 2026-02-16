@@ -91,7 +91,7 @@ func TestFetchFile(t *testing.T) {
 	t.Run("FetchFile_Local_Cache", func(t *testing.T) {
 		// Mock local file existence
 		localPath := filepath.Join(os.TempDir(), "local_cache.txt")
-		util.WriteFileAgent(localPath, fileContent, 0600)
+		util.WriteFileAgent(localPath, fileContent, 0o600)
 		defer util.RemoveFileAgent(localPath)
 
 		// FetchFile should prefer local file if checksum matches

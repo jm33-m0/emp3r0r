@@ -180,7 +180,7 @@ func SSHClient(shell, args, port string) (string, error) {
 				logging.Errorf("Start port mapping for sshd (%s): %v", shell, err)
 			}
 		}()
-		logging.Infof("Waiting for response from %s", util.SanitizeOneLine(target.Tag))
+		logging.Infof("Waiting for response from %s", target.Tag)
 		if err != nil {
 			return "", err
 		}

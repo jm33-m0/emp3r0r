@@ -3,6 +3,7 @@ package tools
 import (
 	"encoding/base64"
 	"fmt"
+
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"

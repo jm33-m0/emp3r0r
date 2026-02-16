@@ -9,7 +9,7 @@ func TestMemFileOperations(t *testing.T) {
 	// 1. WriteFileAgent with mem:// prefix
 	filepath := "mem:///test_file.txt"
 	content := []byte("hello world")
-	err := WriteFileAgent(filepath, content, 0600)
+	err := WriteFileAgent(filepath, content, 0o600)
 	if err != nil {
 		t.Fatalf("WriteFileAgent failed: %v", err)
 	}

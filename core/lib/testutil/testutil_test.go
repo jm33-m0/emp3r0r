@@ -9,7 +9,7 @@ import (
 // TestTempDir tests the TempDir function
 func TestTempDir(t *testing.T) {
 	dir := TempDir(t)
-	
+
 	// Verify directory was created
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		t.Errorf("TempDir() did not create directory: %v", err)
@@ -21,24 +21,24 @@ func TestCreateTempFile(t *testing.T) {
 	dir := t.TempDir()
 	content := "test content"
 	filename := "test.txt"
-	
+
 	path := CreateTempFile(t, dir, filename, content)
-	
+
 	// Verify file was created
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		t.Errorf("CreateTempFile() did not create file: %v", err)
 	}
-	
+
 	// Verify content
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("Failed to read file: %v", err)
 	}
-	
+
 	if string(data) != content {
 		t.Errorf("CreateTempFile() content = %q, want %q", string(data), content)
 	}
-	
+
 	// Verify path is correct
 	expectedPath := filepath.Join(dir, filename)
 	if path != expectedPath {
@@ -50,7 +50,7 @@ func TestCreateTempFile(t *testing.T) {
 func TestAssertEqual(t *testing.T) {
 	// This is a meta-test - we're testing our test helpers
 	// We can't easily test failure cases without creating a mock testing.T
-	
+
 	// Test success case
 	AssertEqual(t, 1, 1)
 	AssertEqual(t, "hello", "hello")
@@ -157,7 +157,7 @@ func TestContains(t *testing.T) {
 			expected: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := contains(tt.str, tt.substr)

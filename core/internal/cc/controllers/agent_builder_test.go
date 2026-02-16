@@ -205,7 +205,7 @@ func TestPatchAgentBinary(t *testing.T) {
 	for i := 1024; i < 1024+4096; i++ {
 		stubContent[i] = 0xff
 	}
-	os.WriteFile(stubFile, stubContent, 0644)
+	os.WriteFile(stubFile, stubContent, 0o644)
 
 	// Create config payload
 	configPayload := []byte("test config data")

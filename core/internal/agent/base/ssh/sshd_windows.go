@@ -36,7 +36,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		// on Windows we don't have a memory execution loader for EXEs yet
 		// so we write it to a temp file and run it
 		tempExe := fmt.Sprintf("%s/%s.exe", os.TempDir(), util.RandMD5String())
-		err = util.WriteFileAgent(tempExe, shellData, 0755)
+		err = util.WriteFileAgent(tempExe, shellData, 0o755)
 		if err != nil {
 			logging.Printf("sshd: write temp shell %s: %v", tempExe, err)
 			return err

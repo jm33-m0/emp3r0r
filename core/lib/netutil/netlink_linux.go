@@ -5,8 +5,9 @@ package netutil
 
 import (
 	"fmt"
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"strings"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/vishvananda/netlink"
 )

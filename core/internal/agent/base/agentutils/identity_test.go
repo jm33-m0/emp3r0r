@@ -238,6 +238,7 @@ func TestGetAgentKeyFromStager_PartialRead(t *testing.T) {
 	}
 	r.Close()
 }
+
 func TestDeterministicKeyDerivation(t *testing.T) {
 	// Mock RuntimeConfig
 	common.RuntimeConfig = &def.Config{

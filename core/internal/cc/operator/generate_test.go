@@ -53,7 +53,7 @@ func TestMakeConfig_PreservesPaths(t *testing.T) {
 		"msg_path":                expectedMsg,
 	}
 	data, _ := json.Marshal(existingConfig)
-	os.WriteFile(live.EmpConfigFile, data, 0600)
+	os.WriteFile(live.EmpConfigFile, data, 0o600)
 
 	// Mock cobra command with NO flags (defaults)
 	cmd := &cobra.Command{}
@@ -259,7 +259,7 @@ func TestMakeConfig_AllFlags(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// 1. Write config (Reset base state)
 			data, _ := json.Marshal(baseConfig)
-			os.WriteFile(live.EmpConfigFile, data, 0600)
+			os.WriteFile(live.EmpConfigFile, data, 0o600)
 
 			// 2. Setup Command
 			cmd := &cobra.Command{}
