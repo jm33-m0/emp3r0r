@@ -96,24 +96,24 @@ func processAgentData(data *def.MsgTunData) {
 	// Handle different message types (UI rendering)
 	switch resp.MessageType {
 	case "success":
-		logging.Successf("%s", resp.Output)
+		logging.Successf("%s", util.StripANSI(resp.Output))
 		select {
 		case AgentRefreshCh <- struct{}{}:
 		default:
 		}
 		return
 	case "error":
-		logging.Errorf("%s", resp.Output)
+		logging.Errorf("%s", util.StripANSI(resp.Output))
 		select {
 		case AgentRefreshCh <- struct{}{}:
 		default:
 		}
 		return
 	case "warn":
-		logging.Warningf("%s", resp.Output)
+		logging.Warningf("%s", util.StripANSI(resp.Output))
 		return
 	case "info":
-		logging.Infof("%s", resp.Output)
+		logging.Infof("%s", util.StripANSI(resp.Output))
 		return
 	}
 

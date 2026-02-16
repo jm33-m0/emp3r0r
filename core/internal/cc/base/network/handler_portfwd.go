@@ -150,7 +150,7 @@ func DeletePortFwdSession(sessionID string) error {
 	// Tell agent to delete the port mapping
 	err := session.SendCmdFunc(fmt.Sprintf("%s --id %s", def.C2CmdDeletePortFwd, sessionID), "", session.Agent.Tag)
 	if err != nil {
-		logging.Warningf("Tell agent %s to delete port mapping %s: %v", session.Agent.Tag, sessionID, err)
+		logging.Warningf("Tell agent %s to delete port mapping %s: %v", util.SanitizeOneLine(session.Agent.Tag), sessionID, err)
 	}
 
 	// Cancel and delete locally

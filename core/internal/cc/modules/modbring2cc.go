@@ -6,6 +6,7 @@ import (
 	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func moduleBring2CC(ctx *c2context.C2Context) {
@@ -33,5 +34,5 @@ func moduleBring2CC(ctx *c2context.C2Context) {
 		logging.Errorf("SendCmd: %v", err)
 		return
 	}
-	logging.Infof("agent %s is connecting to %s to proxy it out to C2", ctx.Target.Tag, addr)
+	logging.Infof("agent %s is connecting to %s to proxy it out to C2", util.SanitizeOneLine(ctx.Target.Tag), addr)
 }

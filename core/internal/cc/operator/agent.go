@@ -22,7 +22,7 @@ func CmdSetActiveAgent(cmd *cobra.Command, args []string) {
 		return
 	}
 	live.ActiveAgent = agent
-	logging.Successf("Now targeting %s", live.ActiveAgent.Tag)
+	logging.Successf("Now targeting %s", util.SanitizeOneLine(live.ActiveAgent.Tag))
 
 	// Update tmux window title to show active agent
 	setTitleErr := cli.TmuxSetWindowTitle(live.ActiveAgent.ShortID, cli.CommandPane.WindowID)

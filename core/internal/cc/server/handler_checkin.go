@@ -218,7 +218,7 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request, expectedUUID
 			if a.UUID == target.UUID {
 				// if agent is already connected, it must be the same instance
 				if ctrl.Conn != nil {
-					logging.Warningf("handleAgentCheckIn: %s just connected, but state says it is already connected. This implies a race condition or logic error.", target.Tag)
+					logging.Warningf("handleAgentCheckIn: %s just connected, but state says it is already connected. This implies a race condition or logic error.", util.SanitizeOneLine(target.Tag))
 				}
 				// Refresh all agent info to keep it current
 				a.Name = target.Name

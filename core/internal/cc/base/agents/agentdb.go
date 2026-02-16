@@ -8,6 +8,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	_ "modernc.org/sqlite"
 )
 
@@ -230,7 +231,11 @@ func DetectAgentChanges(agent *def.Emp3r0rAgent) error {
 	}
 
 	if stored.Hostname != agent.Hostname {
-		logging.Warningf("Agent %s hostname changed: %s → %s", agent.UUID, stored.Hostname, agent.Hostname)
+		logging.Warningf("Agent %s hostname changed: %s → %s",
+			util.SanitizeOneLine(agent.UUID),
+			util.SanitizeOneLine(stored.Hostname),
+			util.SanitizeOneLine(agent.Hostname),
+		)
 		if err := recordHistory(agent.UUID, "property_change",
 			fmt.Sprintf("hostname:%s", stored.Hostname),
 			fmt.Sprintf("hostname:%s", agent.Hostname), now); err != nil {
@@ -239,7 +244,11 @@ func DetectAgentChanges(agent *def.Emp3r0rAgent) error {
 	}
 
 	if stored.OS != agent.OS {
-		logging.Warningf("Agent %s OS changed: %s → %s", agent.UUID, stored.OS, agent.OS)
+		logging.Warningf("Agent %s OS changed: %s → %s",
+			util.SanitizeOneLine(agent.UUID),
+			util.SanitizeOneLine(stored.OS),
+			util.SanitizeOneLine(agent.OS),
+		)
 		if err := recordHistory(agent.UUID, "property_change",
 			fmt.Sprintf("os:%s", stored.OS),
 			fmt.Sprintf("os:%s", agent.OS), now); err != nil {
@@ -248,7 +257,11 @@ func DetectAgentChanges(agent *def.Emp3r0rAgent) error {
 	}
 
 	if stored.User != agent.User {
-		logging.Warningf("Agent %s user changed: %s → %s", agent.UUID, stored.User, agent.User)
+		logging.Warningf("Agent %s user changed: %s → %s",
+			util.SanitizeOneLine(agent.UUID),
+			util.SanitizeOneLine(stored.User),
+			util.SanitizeOneLine(agent.User),
+		)
 		if err := recordHistory(agent.UUID, "property_change",
 			fmt.Sprintf("user:%s", stored.User),
 			fmt.Sprintf("user:%s", agent.User), now); err != nil {
@@ -257,7 +270,11 @@ func DetectAgentChanges(agent *def.Emp3r0rAgent) error {
 	}
 
 	if stored.IPAddresses != ipAddresses {
-		logging.Infof("Agent %s IP addresses changed: %s → %s", agent.UUID, stored.IPAddresses, ipAddresses)
+		logging.Infof("Agent %s IP addresses changed: %s → %s",
+			util.SanitizeOneLine(agent.UUID),
+			util.SanitizeOneLine(stored.IPAddresses),
+			util.SanitizeOneLine(ipAddresses),
+		)
 		if err := recordHistory(agent.UUID, "property_change",
 			fmt.Sprintf("ips:%s", stored.IPAddresses),
 			fmt.Sprintf("ips:%s", ipAddresses), now); err != nil {

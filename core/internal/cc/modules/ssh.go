@@ -139,8 +139,9 @@ func SSHClient(shell, args, port string) (string, error) {
 			}
 
 			if val, ok := live.CmdResults.Load(job_id); ok {
-				logging.Successf("SSHClient: %s", val.(string))
-				res = val.(string)
+				safeRes := util.SanitizeText(val.(string))
+				logging.Successf("SSHClient: %s", safeRes)
+				res = safeRes
 				is_response = true
 				live.CmdResults.Delete(job_id)
 				break
@@ -179,7 +180,7 @@ func SSHClient(shell, args, port string) (string, error) {
 				logging.Errorf("Start port mapping for sshd (%s): %v", shell, err)
 			}
 		}()
-		logging.Infof("Waiting for response from %s", target.Tag)
+		logging.Infof("Waiting for response from %s", util.SanitizeOneLine(target.Tag))
 		if err != nil {
 			return "", err
 		}

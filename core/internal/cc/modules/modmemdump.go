@@ -11,6 +11,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func moduleMemDump(ctx *c2context.C2Context) {
@@ -37,7 +38,7 @@ func moduleMemDump(ctx *c2context.C2Context) {
 		time.Sleep(1 * time.Second)
 		res, ok := live.CmdResults.Load(job_id) // check if the command has finished
 		if ok {
-			path = res.(string)
+			path = util.SanitizeText(res.(string))
 			logging.Successf("ModuleMemDump: %s", path)
 			live.CmdResults.Delete(job_id)
 			break

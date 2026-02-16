@@ -69,6 +69,38 @@ func StripANSI(str string) string {
 	return builder.String()
 }
 
+// SanitizeText removes ANSI color escapes and drops non-printable/binary data.
+// Unlike StripANSI, it does NOT append a hex dump when binary/control data is found.
+// This is preferred for any user-facing rendering where output amplification is a concern.
+func SanitizeText(str string) string {
+	// 1. Strip ANSI escape codes
+	ansi := regexp.MustCompile(`\x1b\[[0-9;]*m`)
+	stripped := ansi.ReplaceAllString(str, "")
+
+	// 2. Keep only unicode graphic chars and whitespace (drop everything else)
+	var builder strings.Builder
+	for i := 0; i < len(stripped); {
+		r, width := utf8.DecodeRuneInString(stripped[i:])
+		if r == utf8.RuneError && width == 1 {
+			// Invalid UTF-8 byte: drop
+			i++
+			continue
+		}
+		if unicode.IsGraphic(r) || unicode.IsSpace(r) {
+			builder.WriteRune(r)
+		}
+		i += width
+	}
+
+	return builder.String()
+}
+
+// SanitizeOneLine sanitizes text and normalizes it into a single line.
+// It collapses all whitespace (including newlines/tabs) into single spaces.
+func SanitizeOneLine(str string) string {
+	return strings.Join(strings.Fields(SanitizeText(str)), " ")
+}
+
 // ParseCmd parse commands containing whitespace
 func ParseCmd(cmd string) (parsedCmd []string) {
 	isQuoted := strings.Contains(cmd, "'") && strings.Count(cmd, "'")%2 == 0 && !strings.Contains(cmd, "\\")

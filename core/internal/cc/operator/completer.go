@@ -16,6 +16,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // autocomplete module options
@@ -148,7 +149,8 @@ func listRemoteDirWorker(path_to_list, agent_tag string) (cwd string, names []st
 	defer listingCancel()
 	for listingCtx.Err() == nil {
 		if res, exists := live.CmdResults.Load(job_id); exists {
-			remote_entries = strings.Split(res.(string), "\n")
+			safeListing := util.SanitizeText(res.(string))
+			remote_entries = strings.Split(safeListing, "\n")
 			live.CmdResults.Delete(job_id)
 			listingCancel()
 			break

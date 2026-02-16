@@ -6,6 +6,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // GetAgentList fetches the list of connected agents from the server
@@ -18,6 +19,9 @@ func GetAgentList() ([]*def.Emp3r0rAgent, error) {
 	var agents []*def.Emp3r0rAgent
 	if err := cbor.Unmarshal(body, &agents); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal agents: %v", err)
+	}
+	for _, a := range agents {
+		util.SanitizeAgentMetadata(a)
 	}
 
 	return agents, nil
@@ -99,6 +103,7 @@ func SetActiveAgent(agentTag string) (*def.Emp3r0rAgent, error) {
 	if err := cbor.Unmarshal(body, &agent); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal active agent: %v", err)
 	}
+	util.SanitizeAgentMetadata(agent)
 
 	return agent, nil
 }

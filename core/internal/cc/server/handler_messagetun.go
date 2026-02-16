@@ -69,10 +69,10 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 			if err != nil {
 				return
 			}
-			// sanitize agent data in message
-			msg.Tag = util.StripANSI(msg.Tag)
-			msg.AgentUUID = util.StripANSI(msg.AgentUUID)
-			msg.AgentUUIDSig = util.StripANSI(msg.AgentUUIDSig)
+			// sanitize agent metadata in message (single-line, no control chars)
+			msg.Tag = util.SanitizeOneLine(msg.Tag)
+			msg.AgentUUID = util.SanitizeOneLine(msg.AgentUUID)
+			msg.AgentUUIDSig = util.SanitizeOneLine(msg.AgentUUIDSig)
 
 			// find agent
 			var agent *def.Emp3r0rAgent
