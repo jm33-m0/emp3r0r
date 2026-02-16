@@ -1,4 +1,3 @@
-
 CC=gcc
 CFLAGS=-fPIC -c -I../bof_common -fno-stack-protector -fvisibility=hidden -g0
 TARGET=process_list_handles_linux.o

@@ -1,6 +1,6 @@
 
-CC=zig cc
-CFLAGS=-fPIC -c -I../bof_common -fno-stack-protector -fvisibility=hidden -target x86_64-linux-musl -g0
+CC=gcc
+CFLAGS=-fPIC -c -I../bof_common -fno-stack-protector -fvisibility=hidden -g0
 TARGET=hello_linux.o
 SOURCE=hello_linux.c
 
