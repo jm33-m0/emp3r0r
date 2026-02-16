@@ -1,6 +1,10 @@
 package util
 
-import "github.com/jm33-m0/emp3r0r/core/internal/def"
+import (
+	"strings"
+
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+)
 
 // SanitizeAgentMetadata sanitizes all agent-supplied metadata fields in-place.
 //
@@ -34,7 +38,8 @@ func SanitizeAgentMetadata(a *def.Emp3r0rAgent) {
 	a.CWD = SanitizeOneLine(a.CWD)
 	a.UUID = SanitizeOneLine(a.UUID)
 	a.UUIDSig = SanitizeOneLine(a.UUIDSig)
-	a.PublicKey = SanitizeOneLine(a.PublicKey)
+	// PublicKey is typically PEM which is multi-line; collapsing whitespace breaks PEM parsing.
+	a.PublicKey = strings.TrimSpace(SanitizeText(a.PublicKey))
 	a.C2Host = SanitizeOneLine(a.C2Host)
 
 	// String slices
