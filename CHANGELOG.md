@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.21.4](https://github.com/jm33-m0/emp3r0r/compare/v3.21.3...v3.21.4) (2026-02-16)
+
+
+### Bug Fixes
+
+* add decompression size limit to copyWithDecompressedLimit and corresponding tests ([58acb2b](https://github.com/jm33-m0/emp3r0r/commit/58acb2b0acea0717a7f421ae1282229eddfe397f))
+* sanitize agent metadata and logging outputs to prevent injection vulnerabilities ([97c0a1d](https://github.com/jm33-m0/emp3r0r/commit/97c0a1dddafe120cb0df87eb270ab3a7da70ff11))
+* update dependencies ([eba8d9d](https://github.com/jm33-m0/emp3r0r/commit/eba8d9de716bc9d7b63b5df63c38024b15bf08cc))
+
 ## [3.21.3](https://github.com/jm33-m0/emp3r0r/compare/v3.21.2...v3.21.3) (2026-02-13)
 
 
