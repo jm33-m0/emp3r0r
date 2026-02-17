@@ -2,7 +2,7 @@
 
 ### emp3r0r
 
-**A stealth-focused C2 designed by Linux users for Linux environments, with native support for Windows and Linux BOFs.**
+**Zero-Trust C2: Ephemeral TOFU + PFS + Auto-Proxy Mesh + Memory-Only Ops + Bring2CC + Native BOF**
 
 <br clear="all" />
 
@@ -22,17 +22,51 @@
 
 ## What is emp3r0r?
 
-emp3r0r is a comprehensive post-exploitation framework that stands out as one of the first C2 platforms purpose-built for Linux environments. While most frameworks treat Linux as an afterthought, emp3r0r puts it front and center, delivering robust capabilities for penetration testing and red team operations across both Linux and Windows targets.
+emp3r0r is the first post-exploitation framework designed from the ground up for Linux environments with **APT-level operational security**. While traditional C2 platforms treat Linux as an afterthought, emp3r0r implements a comprehensive **zero-trust architecture** with cryptographic primitives and autonomous networking that rival nation-state malware.
 
-### Why emp3r0r?
+## What Makes emp3r0r Different?
 
-- **Linux-Native Architecture**: Built from the ground up for Linux targets with full Windows compatibility.
-- **Universal Module Support**: Execute Bash, PowerShell, Python, DLL, SO, and EXE modules seamlessly across platforms.
-- **Advanced Stealth**: **Perfect Forward Secrecy (PFS)**, **Agent Key Rotation**, **Global AES-GCM Encryption**, **Memory-backed agent file system** with transparent encryption, **configurable module stomping**, stager-managed **shared memory execution** with process resumption, native **Linux BOF support**, and **XOR-based payload rotation** for idle stagers.
-- **Modern Infrastructure**: WireGuard + mTLS operator authentication, **CBOR-based communication** and data serialization, HTTP2/TLS with **JA3 fingerprinting evasion** + **Conditional C2 (Hybrid Mode)**, KCP-based UDP tunneling, and **customizable C2 paths** (WebRoot, check-in, message paths).
-- **COFF/BOF Loader**: Native BOF execution on Windows agents with typed argument packing (LPSTR/LPWSTR/INT/BOOL/BINARY), and integration-friendly module schema; on Linux you can load ELF object files in-memory to achieve the same effect or execute full ELF binaries via the advanced stager.
-- **APT-Grade Connectivity**: **Auto-Proxy Chain** creates a resilient, automatic P2P mesh network. Agents in isolated network segments autonomously discover and piggyback on internet-connected peers to reach the C2, ensuring long-term survival in hardened environments.
-- **Bring2CC**: Reverse proxy any target to the C2 server, enabling direct access to internal networks even when agents cannot make outbound connections.
+### 🔐 Ephemeral TOFU Identity (Unique to emp3r0r)
+
+Agent identities are **generated per-session** using ECDSA P-256 and **lost on restart**—no static credentials to extract from disk or memory dumps. **Trust-on-first-use (TOFU)** authentication prevents impersonation: the C2 "pins" the agent's public key on first check-in, and subsequent connections must prove possession of the same ephemeral key. Key rotation requires manual operator approval, making agent hijacking nearly impossible.
+
+**Why this matters:** Most C2 frameworks bake agent credentials into binaries. If an agent is captured, adversaries can extract keys and impersonate it indefinitely. emp3r0r's ephemeral keys exist only in process memory and disappear on reboot.
+
+### 🔒 Perfect Forward Secrecy for All Communications
+
+Every C2 session uses **ECDH key exchange** with **HKDF-derived session keys**. Past traffic remains secure even if long-term keys or agents are compromised—a rarity in the C2 space. Combined with ephemeral agent identities, this creates **defense-in-depth** against forensic analysis.
+
+**Why this matters:** Traditional C2s use static encryption keys. If blue team captures those keys, they can decrypt historical PCAP traffic. emp3r0r's PFS ensures that compromise of today's session doesn't reveal yesterday's commands.
+
+### 🕸️ Self-Healing P2P Mesh Network (Auto-Proxy Chain)
+
+Agents in isolated network segments **autonomously discover and tunnel through internet-connected peers** via Shadowsocks, creating resilient command paths without manual pivoting configuration. The mesh network **self-heals** like APT implants—if one proxy fails, agents automatically find alternative routes to C2.
+
+**Why this matters:** Manual pivoting is tedious and fragile. emp3r0r's agents form a dynamic mesh using UDP broadcasts and rolling tags, ensuring long-term survival in segmented enterprise networks. This is APT-grade connectivity in a red team tool.
+
+### 🚪 Bring2CC: Reverse Tunneling for Isolated Targets
+
+When agents **cannot** make outbound connections, **Bring2CC** reverse-proxies them back to the C2 server using SSH + KCP tunneling—effectively "bringing" isolated targets to your infrastructure. This bypasses egress filtering and enables access to air-gapped segments via compromised jump hosts.
+
+**Why this matters:** Traditional C2s fail when egress is blocked. Bring2CC inverts the problem: instead of reaching into the network, you pull the network out to yourself. Combine this with Auto-Proxy Mesh for unstoppable connectivity.
+
+### 💾 Memory-Only Operations with Transparent Encryption
+
+Agents use an **in-memory filesystem with AES-GCM encryption** for all file operations. Bash, PowerShell, Python, and ELF modules execute entirely from memory. Large files automatically spill to **encrypted disk storage** when memory is exhausted, balancing stealth with resource efficiency. The agent binary itself contains no dedicated directories or persistent files.
+
+**Why this matters:** EDR and forensic tools look for disk artifacts. emp3r0r's memory-first approach leaves minimal trace. Even when disk spillover occurs, files are encrypted and indistinguishable from random data.
+
+### 🧩 Native BOF Support (Cross-Platform)
+
+Execute **Windows COFF objects** on Windows agents with typed argument packing (LPSTR/LPWSTR/INT/BOOL/BINARY). On Linux, load **ELF object files (.o)** entirely in-memory with the same modularity. This brings the flexibility of Cobalt Strike's BOF ecosystem to both platforms, with an integration-friendly module schema.
+
+**Why this matters:** BOFs are compact, fast, and avoid process creation. emp3r0r extends this capability to Linux, where most C2s still rely on shell scripts or full binaries.
+
+### 🎭 JA3 Fingerprint Evasion + CBOR Serialization
+
+HTTP2/TLS connections use **uTLS** to randomize TLS Client Hello fingerprints, evading JA3-based detection. All network traffic and data storage uses **CBOR** (binary) instead of JSON, reducing bandwidth and avoiding signature-based detection on JSON parsing patterns.
+
+**Why this matters:** Modern EDR/NDR systems fingerprint TLS handshakes. Static TLS implementations create detectable patterns. emp3r0r randomizes these fingerprints on every connection while using a compact binary protocol that's harder to inspect.
 
 ---
 
@@ -75,111 +109,48 @@ Use the `generate` command from within the emp3r0r shell interface to create cus
 
 ---
 
-## Core Capabilities
+## Additional Capabilities
 
 ### Stealth & Evasion
 
-#### OpSec Safety & File Operations
-
-- **Memory-first approach** with intelligent storage management to minimize disk presence.
-- **Minimal footprint** with no dedicated agent directories or persistent files.
-- **OPSEC Warnings**: Real-time warnings for operations that pose operational security risks (e.g., "fork and run" patterns, unencrypted disk activity).
-- **Warn-before-write** for operations that touch disk, keeping hosts clean.
-- **Consistent artifacts** via uniform file handling for predictable, low-profile operations.
-
-#### Advanced Process Hiding
-
-- **Obfuscated processes** and hidden helpers to lower visibility.
-- **Anti-debug/analysis** measures to make inspection harder.
 - **sRDI-like Shellcode Stager**: Load ELF binaries from memory without touching disk, similar to sRDI for Windows.
-- **Self-suspension & Resumption**: Agents can suspend themselves and let the stager manage their memory; the stager can even rotate XOR-based obfuscation while the agent is idle.
+- **Self-suspension & Resumption**: Agents can suspend themselves and let the stager manage their memory; the stager rotates XOR-based obfuscation while the agent is idle.
 - **Module Stomping**: Disguise malicious modules by loading them into the memory space of legitimate system libraries.
-- **Memory-backed Agent Filesystem**: Agents use an in-memory file system with transparent encryption for file operations. Large files automatically spill to encrypted disk storage when memory limits are reached, balancing stealth with resource efficiency.
-
-#### Secure Command & Control
-
-- **Perfect Forward Secrecy (PFS)** for all C2 communications, ensuring past traffic remains secure even if long-term keys are compromised.
-- **JA3-evasive HTTP2/TLS** ([uTLS](https://github.com/refraction-networking/utls): Randomizes TLS Client Hello fingerprints to evade JA3-based detection systems
-- **WireGuard+mTLS** for secure operator access.
-- **CBOR Serialization**: All network traffic and data storage uses space-efficient, binary CBOR instead of JSON.
-- **KCP** for speed and resilience in high-latency environments
-- **TOR/CDN** support for additional operational cover.
+- **OPSEC Warnings**: Real-time warnings for operations that pose operational security risks (e.g., "fork and run" patterns, unencrypted disk activity).
+- **Anti-debug/analysis** measures to make inspection harder.
 
 ### Operator Experience
 
-#### Professional CLI Interface
-
-- **Console + Cobra core** for robust command handling.
-- **Intelligent auto-completion** with syntax highlighting.
 - **Adaptive tmux UI**: Native integration with dynamic status bars, adaptive layouts, and real-time agent/C2 status monitoring.
-- **BYOS (Bring Your Own Shell)**: SSH-based reverse PTY that drives any shell available on the target (bash, zsh, sh, python REPL, etc.) over the same tunnel you also reuse for the file manager and transfers.
-
-#### Advanced Shell Integration
-
-- **SSH PTY** for native terminal experience.
-- **Windows-compatible** with standard OpenSSH clients.
+- **BYOS (Bring Your Own Shell)**: SSH-based reverse PTY that drives any shell available on the target (bash, zsh, sh, python REPL, etc.) over the same tunnel you also reuse for file manager and transfers.
+- **Intelligent auto-completion** with syntax highlighting.
 - **SFTP integration** for efficient remote file operations.
 
-#### File Transfer System
+### File Transfer System
 
-- **Bidirectional Transfer**: Upload files to agents (`put`) and download from agents (`get`) with intuitive commands.
-- **Recursive Downloads**: Download entire directories with `--recursive` flag and filter files using regex patterns (`--regex`).
 - **Smart Transfer Strategy**: Agents can fetch files from peer agents via encrypted KCP tunnels before falling back to C2, improving speed and stealth.
 - **Integrity & Reliability**: SHA256 verification plus **resumable uploads/downloads** so interrupted transfers continue from the last offset.
-- **Real-Time Monitoring**: Progress bars display transfer speed, completion percentage, and estimated time remaining.
 - **Compression**: Zstandard compression reduces bandwidth usage and accelerates transfers.
 - **FileServer Module**: Agents can host an encrypted HTTP server to share files with other agents, enabling peer-to-peer distribution.
-- **Security**: All transfers occur over HTTP2/TLS connections with lock file protection to prevent concurrent access.
 
 ### Network Pivoting
 
-#### Intelligent Network Traversal
-
-- **Automatic P2P Mesh**: Agents autonomously form a mesh network using UDP broadcasts and rolling tags. Agents in isolated networks (that have at least one passage for data transfer) automatically find and tunnel through internet-connected peers (via Shadowsocks), creating a resilient, self-healing command path typical of advanced APT implants.
-- **Bring2CC**: A reverse proxy mechanism (SSH + KCP) that tunnels any port from the agent (or its network) back to the C2 server. This beats the isolation where agents cannot make outbound connections, effectively "bringing" the target to the Command & Control server.
 - **Flexible Pivoting**: Bi-directional TCP/UDP port mapping and agent-side Socks5 (with UDP) support.
+- **KCP-based UDP tunneling** for speed and resilience in high-latency environments.
+- **TOR/CDN** support for additional operational cover.
 
 ### Payload Delivery
 
-#### Flexible Staging Options
-
-- Multi-stage delivery for Linux and Windows with ELF/DLL/shellcode options.
-- Windows DLL/shellcode agents for loader-friendly drops; Linux shared-library stager for stealthy starts.
-- **Built-in listener module** supports HTTP, TCP, and UDP protocols for agent-side payload hosting during lateral movement.
-
-#### Advanced Linux Stager (Outcome-Focused)
-
-- Keeps the agent payload encrypted until the moment of execution, avoiding plaintext on disk.
-- Watches the agent and auto-restarts with jitter when connectivity/policy requires, so access recovers without manual action.
-- Ships with safe defaults to prevent self-deletion or noisy argv changes when invoked by the stager.
-- Supports multiple listener protocols (HTTP/TCP/UDP) via compile-time configuration.
-
-#### Agent-Side Listener for Lateral Movement
-
-- Deploy listeners on compromised hosts to serve payloads internally, bypassing slow C2 connections.
-- Supports `http_aes_compressed`, `tcp_aes_compressed`, and `udp_aes_compressed` for encrypted payload delivery.
-- Ideal for rapid agent propagation within target networks without external communication.
-
-#### In-Memory Execution
-
-- **All modules execute in-memory** - Bash, PowerShell, Python, and native ELF modules run directly from the agent's memory-backed file system.
-- **Linux BOF Support**: Execute ELF objects (.o) entirely in memory with argument support, bringing BOF-like modularity to Linux.
-- **In-Memory Helpers**: `sysinfo` command for comprehensive system details and `mem://` prefix for transparent memory-only file operations.
-- ELF patcher module lets you graft the agent into existing binaries when needed.
+- **Advanced Linux Stager**: Keeps the agent payload encrypted until execution; auto-restarts with jitter when connectivity requires.
+- **Agent-Side Listener**: Deploy listeners on compromised hosts to serve payloads internally, bypassing slow C2 connections.
+- **Multi-stage delivery** for Linux and Windows with ELF/DLL/shellcode options.
 
 ### Post-Exploitation Arsenal
 
-#### Credential Harvesting
-
-- OpenSSH credential harvesting with real-time monitoring (`ssh_harvester`).
-- Cross-platform memory dumping capabilities (`mem_dump`).
-- Windows mini-dump extraction (pypykatz compatible).
-
-#### Additional Capabilities
-
+- **OpenSSH credential harvesting** with real-time monitoring (`ssh_harvester`).
+- **Cross-platform memory dumping** capabilities (`mem_dump`).
 - **LPE**: Privilege escalation tools with automated suggestions (`lpe_suggest`).
 - **Log Sanitization**: `clean_log` module for anti-forensics.
-- **Process Insight**: Multi-platform tools for inspecting process memory and file handles.
 
 ---
 
