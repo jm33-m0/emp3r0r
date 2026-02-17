@@ -26,7 +26,7 @@ emp3r0r is the first post-exploitation framework designed from the ground up for
 
 ## What Makes emp3r0r Different?
 
-### 🔐 Ephemeral TOFU Identity (Unique to emp3r0r)
+### 🔐 Ephemeral TOFU Identity
 
 Agent identities are **generated per-session** using ECDSA P-256 and **lost on restart**—no static credentials to extract from disk or memory dumps. **Trust-on-first-use (TOFU)** authentication prevents impersonation: the C2 "pins" the agent's public key on first check-in, and subsequent connections must prove possession of the same ephemeral key. Key rotation requires manual operator approval, making agent hijacking nearly impossible.
 
