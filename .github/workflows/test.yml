@@ -75,7 +75,7 @@ jobs:
         env:
           CGO_ENABLED: 1
         run: |
-          cd test && go test -v -count=1 -timeout 3m -run TestShellcodeStagerLifecycle
+          cd test && go test -v -count=1 -timeout 3m -run TestAgentEndToEndLifecycle
 
       - name: Run tests (Windows, with race)
         if: runner.os == 'Windows'

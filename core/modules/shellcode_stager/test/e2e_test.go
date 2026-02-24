@@ -32,6 +32,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/jobs"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -482,7 +483,10 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 
 	// 7. Verify Command Execution (E2E)
 	logging.Infof("Verifying command execution...")
-	cmdID := uuid.NewString()
+	job := jobs.CreateJob("ls", "command", agent.Tag)
+	cmdID := job.ID
+	// Register in CmdTime so handleMessageTunnel won't drop the response
+	live.CmdTime.Store(cmdID, time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST"))
 	// Using "ls" command as it is ubiquitous and safer
 	err = agents.SendCmd("ls", cmdID, agent)
 	if err != nil {

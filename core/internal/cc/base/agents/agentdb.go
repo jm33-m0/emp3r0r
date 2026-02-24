@@ -272,6 +272,19 @@ func DetectAgentChanges(agent *def.Emp3r0rAgent) error {
 		}
 	}
 
+	if stored.PublicKey != agent.PublicKey {
+		logging.Warningf("Agent %s public key changed (key_rotation detected): pinned=%s new=%s",
+			util.SanitizeOneLine(agent.UUID),
+			util.SanitizeOneLine(stored.PublicKey[:min(len(stored.PublicKey), 16)]),
+			util.SanitizeOneLine(agent.PublicKey[:min(len(agent.PublicKey), 16)]),
+		)
+		if err := recordHistory(agent.UUID, "key_rotation",
+			stored.PublicKey,
+			agent.PublicKey, now); err != nil {
+			logging.Warningf("Failed to record key rotation: %v", err)
+		}
+	}
+
 	return nil
 }
 

@@ -128,23 +128,21 @@ func TestMakeConfig_AllFlags(t *testing.T) {
 		"c2_transport_proxy":      "",
 	}
 
-	type fields struct {
-		flagName  string
-		flagValue string
-	}
+	type testFlags map[string]string
+
 	type checks struct {
 		checkFunc func(*testing.T, *def.Config)
 	}
 
 	tests := []struct {
 		name   string
-		fields fields
+		flags  testFlags
 		checks checks
 	}{
 		// P2P / Mesh tests
 		{
-			name:   "P2P Silent Node",
-			fields: fields{flagName: "p2p", flagValue: "true"},
+			name:  "P2P Silent Node",
+			flags: testFlags{"p2p": "true", "peers": "1.2.3.4:51996"},
 			checks: checks{func(t *testing.T, c *def.Config) {
 				if !c.IsP2PEnabled {
 					t.Errorf("Expected IsP2PEnabled=true")
@@ -152,11 +150,14 @@ func TestMakeConfig_AllFlags(t *testing.T) {
 				if c.IsDirectC2Enabled {
 					t.Errorf("Expected IsDirectC2Enabled=false for silent node")
 				}
+				if len(c.InitialPeers) == 0 {
+					t.Errorf("Expected InitialPeers for silent node")
+				}
 			}},
 		},
 		{
-			name:   "P2P Gateway (--p2p --direct-c2)",
-			fields: fields{flagName: "p2p", flagValue: "true"},
+			name:  "P2P Gateway (--p2p --direct-c2)",
+			flags: testFlags{"p2p": "true", "direct-c2": "true"},
 			checks: checks{func(t *testing.T, c *def.Config) {
 				if !c.IsP2PEnabled {
 					t.Errorf("Expected IsP2PEnabled=true")
@@ -166,8 +167,8 @@ func TestMakeConfig_AllFlags(t *testing.T) {
 
 		// NCSI Tests
 		{
-			name:   "NCSI Enabled via Flag",
-			fields: fields{flagName: "ncsi", flagValue: "true"},
+			name:  "NCSI Enabled via Flag",
+			flags: testFlags{"ncsi": "true"},
 			checks: checks{func(t *testing.T, c *def.Config) {
 				if !c.EnableNCSI {
 					t.Errorf("Expected NCSI Enabled, got Disabled")
@@ -175,8 +176,8 @@ func TestMakeConfig_AllFlags(t *testing.T) {
 			}},
 		},
 		{
-			name:   "NCSI Disabled (Default)",
-			fields: fields{flagName: "", flagValue: ""},
+			name:  "NCSI Disabled (Default)",
+			flags: testFlags{},
 			checks: checks{func(t *testing.T, c *def.Config) {
 				if c.EnableNCSI {
 					t.Errorf("Expected NCSI Disabled, got Enabled")
@@ -186,8 +187,8 @@ func TestMakeConfig_AllFlags(t *testing.T) {
 
 		// KCP Tests
 		{
-			name:   "KCP Enabled via Flag",
-			fields: fields{flagName: "kcp", flagValue: "true"},
+			name:  "KCP Enabled via Flag",
+			flags: testFlags{"kcp": "true"},
 			checks: checks{func(t *testing.T, c *def.Config) {
 				if !c.UseKCP {
 					t.Errorf("Expected KCP Enabled, got Disabled")
@@ -197,8 +198,8 @@ func TestMakeConfig_AllFlags(t *testing.T) {
 
 		// Stager Tests
 		{
-			name:   "Stager Enabled via Flag",
-			fields: fields{flagName: "stager", flagValue: "true"},
+			name:  "Stager Enabled via Flag",
+			flags: testFlags{"stager": "true"},
 			checks: checks{func(t *testing.T, c *def.Config) {
 				if !c.IsRunByStager {
 					t.Errorf("Expected Stager Enabled, got Disabled")
@@ -208,8 +209,8 @@ func TestMakeConfig_AllFlags(t *testing.T) {
 
 		// CC Address Tests
 		{
-			name:   "CC Address Override",
-			fields: fields{flagName: "cc", flagValue: "10.0.0.1"},
+			name:  "CC Address Override",
+			flags: testFlags{"cc": "10.0.0.1"},
 			checks: checks{func(t *testing.T, c *def.Config) {
 				if c.CCAddress != "10.0.0.1" {
 					t.Errorf("Expected CCAddress 10.0.0.1, got %s", c.CCAddress)
@@ -219,8 +220,8 @@ func TestMakeConfig_AllFlags(t *testing.T) {
 
 		// CDN Proxy Tests
 		{
-			name:   "CDN Proxy Override",
-			fields: fields{flagName: "cdn", flagValue: "http://cdn.example.com"},
+			name:  "CDN Proxy Override",
+			flags: testFlags{"cdn": "http://cdn.example.com"},
 			checks: checks{func(t *testing.T, c *def.Config) {
 				if c.CDNProxy != "http://cdn.example.com" {
 					t.Errorf("Expected CDNProxy http://cdn.example.com, got %s", c.CDNProxy)
@@ -230,8 +231,8 @@ func TestMakeConfig_AllFlags(t *testing.T) {
 
 		// C2 Transport Proxy Tests
 		{
-			name:   "C2 Transport Proxy Override",
-			fields: fields{flagName: "proxy", flagValue: "socks5://1.2.3.4:1080"},
+			name:  "C2 Transport Proxy Override",
+			flags: testFlags{"proxy": "socks5://1.2.3.4:1080"},
 			checks: checks{func(t *testing.T, c *def.Config) {
 				if c.C2TransportProxy != "socks5://1.2.3.4:1080" {
 					t.Errorf("Expected C2TransportProxy socks5://1.2.3.4:1080, got %s", c.C2TransportProxy)
@@ -241,8 +242,8 @@ func TestMakeConfig_AllFlags(t *testing.T) {
 
 		// DoH Server Tests
 		{
-			name:   "DoH Server Override",
-			fields: fields{flagName: "doh", flagValue: "https://doh.example.com"},
+			name:  "DoH Server Override",
+			flags: testFlags{"doh": "https://doh.example.com"},
 			checks: checks{func(t *testing.T, c *def.Config) {
 				if c.DoHServer != "https://doh.example.com" {
 					t.Errorf("Expected DoHServer https://doh.example.com, got %s", c.DoHServer)
@@ -261,6 +262,7 @@ func TestMakeConfig_AllFlags(t *testing.T) {
 			cmd := &cobra.Command{}
 			cmd.Flags().BoolP("p2p", "", false, "Enable P2P mesh networking")
 			cmd.Flags().BoolP("direct-c2", "", false, "Gateway mode")
+			cmd.Flags().StringSlice("peers", []string{}, "")
 			cmd.Flags().String("cc", "", "")
 			cmd.Flags().String("cdn", "", "")
 			cmd.Flags().String("proxy", "", "")
@@ -270,10 +272,10 @@ func TestMakeConfig_AllFlags(t *testing.T) {
 			cmd.Flags().Bool("stager", false, "")
 
 			// Set flags if specified
-			if tc.fields.flagName != "" {
-				err := cmd.Flags().Set(tc.fields.flagName, tc.fields.flagValue)
+			for flagName, flagValue := range tc.flags {
+				err := cmd.Flags().Set(flagName, flagValue)
 				if err != nil {
-					t.Fatalf("Failed to set flag %s: %v", tc.fields.flagName, err)
+					t.Fatalf("Failed to set flag %s: %v", flagName, err)
 				}
 			}
 
