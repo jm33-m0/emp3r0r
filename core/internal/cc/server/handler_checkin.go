@@ -93,8 +93,31 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request, expectedUUID
 		return
 	}
 
-	// SECURITY: Agent MUST provide its public key in every checkin
-	// If missing, reject immediately - something is wrong (malicious, compromised, or misconfigured)
+	// ── Rate limiting: cap ALL log/alert output per UUID ─────────────────────
+	// Must run immediately after we have a validated UUID so that every
+	// subsequent rejection path (missing key, key mismatch, ghost session, etc.)
+	// is capped. An attacker with a valid CA cert cannot flood logs or the
+	// operator console beyond 10 requests/minute per agent UUID.
+	{
+		now := time.Now()
+		validTimestamps := []time.Time{}
+		if val, exists := rotationRateLimiter.Load(target.UUID); exists {
+			for _, t := range val.([]time.Time) {
+				if now.Sub(t) < time.Minute {
+					validTimestamps = append(validTimestamps, t)
+				}
+			}
+		}
+		validTimestamps = append(validTimestamps, now)
+		rotationRateLimiter.Store(target.UUID, validTimestamps)
+		if len(validTimestamps) > 10 {
+			// Silent drop — no log, no broadcast.
+			http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			return
+		}
+	}
+
+	// SECURITY: Agent MUST provide its public key in every checkin.
 	if target.PublicKey == "" {
 		logging.Warningf("handleAgentCheckIn: Agent %s provided no public key, rejecting", strconv.Quote(target.UUID))
 		http.Error(wrt, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
@@ -110,53 +133,24 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request, expectedUUID
 	live.AgentControlMap.Range(func(key, value interface{}) bool {
 		a := key.(*def.Emp3r0rAgent)
 		if a.UUID == target.UUID {
-			// Skip placeholders that don't have a public key yet.
-			// If we find an agent with a key, use it and stop.
 			if a.PublicKey != "" {
 				existingKey = a.PublicKey
 				isNew = false
-				return false // stop iteration
+				return false
 			}
-			// If it's just a placeholder, keep searching (or let it fall through to the DB check)
 		}
 		return true
 	})
 
 	if isNew {
-		// New agent in memory (or placeholder) - check if it's firmly pinned in the DB
 		if agents.AgentDB != nil {
 			stored, err := agents.GetStoredAgent(target.UUID)
-			logging.Infof("DEBUG-CHECKIN: GetStoredAgent(%s) returned stored=%v, err=%v", target.UUID, stored != nil, err)
-			if err == nil && stored != nil { // Only consider if no error and agent found
+			if err == nil && stored != nil {
 				existingKey = stored.PublicKey
 				isNew = false
 			} else if err != nil {
 				logging.Errorf("handleAgentCheckIn: GetStoredAgent error: %v", err)
 			}
-		}
-	}
-
-	// remove debug lines that expose key contents
-	// ── Rate limiting: cap noisy logs/alerts per UUID ────────────────────────
-	// MUST run BEFORE any key-check so that a rogue agent hammering with a wrong
-	// key cannot flood the operator console or fill disk with logs.
-	{
-		now := time.Now()
-		// Prune timestamps older than 1 minute
-		validTimestamps := []time.Time{}
-		if val, exists := rotationRateLimiter.Load(target.UUID); exists {
-			for _, t := range val.([]time.Time) {
-				if now.Sub(t) < time.Minute {
-					validTimestamps = append(validTimestamps, t)
-				}
-			}
-		}
-		validTimestamps = append(validTimestamps, now)
-		rotationRateLimiter.Store(target.UUID, validTimestamps)
-		if len(validTimestamps) > 10 {
-			// Silent drop — reject but do NOT log or broadcast
-			http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
-			return
 		}
 	}
 
@@ -179,8 +173,6 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request, expectedUUID
 
 	// CA signature already verified via HTTP headers in dispatcher
 	target.From = req.RemoteAddr
-
-	logging.Infof("DEBUG-CHECKIN: Database pointer in handler_checkin is %p", agents.AgentDB)
 
 	// Update agent in memory (dispatcher already created placeholder)
 	// Find the placeholder and update it with full agent data from CBOR
