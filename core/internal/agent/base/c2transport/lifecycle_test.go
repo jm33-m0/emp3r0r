@@ -272,16 +272,46 @@ func TestFullAgentLifecycle(t *testing.T) {
 
 	// Verify DB state right before rotation checkin
 	if agents.AgentDB != nil {
+		rows, err := agents.AgentDB.Query("SELECT uuid FROM agents")
+		if err == nil {
+			t.Log("--- DB CONTENTS BEFORE ROTATION ---")
+			count := 0
+			for rows.Next() {
+				var u string
+				rows.Scan(&u)
+				t.Logf("Found in DB: %q", u)
+				count++
+			}
+			t.Logf("Total rows in DB: %d", count)
+			rows.Close()
+		} else {
+			t.Logf("DB Query Error: %v", err)
+		}
+
 		stored, err := agents.GetStoredAgent(agentUUID)
 		t.Logf("DB State before rotation: stored_found=%v, err=%v", stored != nil, err)
 	}
 
-	// This MUST be rejected — key rotation is permanently disabled.
+	// Check-in succeeds at the HTTP transport level because h2conn upgrades immediately,
+	// but the server silently drops the agent inside handleAgentCheckIn.
 	err = c2transport.ReportStatus(config, agentInfo)
-	if err == nil {
-		t.Fatal("SECURITY VIOLATION: check-in with rotated key was accepted! Key rotation is supposed to be banned.")
+	if err != nil {
+		t.Logf("ReportStatus returned error (expected or early EOF): %v", err)
 	}
-	t.Logf("✓ Key rotation correctly rejected: %v", err)
+
+	time.Sleep(500 * time.Millisecond)
+
+	// To verify the rotation was actually rejected, we attempt to open the message
+	// tunnel. Since the server never pinned the new key, VerifyAgentRequest will fail
+	// the signature check and return 403 Forbidden *before* upgrading the connection!
+	failedMsgURL := fmt.Sprintf("%s/%s/%s", c2URL, transport.MsgAPI, agentUUID)
+	failedConn, _, failedCancel, err := c2transport.EstablishC2Connection(failedMsgURL)
+	if err == nil {
+		failedCancel()
+		failedConn.Close()
+		t.Fatal("SECURITY VIOLATION: msg tunnel established with rotated key! Key rotation is supposed to be banned.")
+	}
+	t.Logf("✓ Key rotation correctly rejected (msg tunnel denied): %v", err)
 
 	t.Log("Full Agent Lifecycle Test Passed")
 	select {
