@@ -21,6 +21,7 @@ import (
 	"golang.org/x/crypto/pbkdf2"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/pkg/errors"
 	kcp "github.com/xtaci/kcp-go/v5"
 	"github.com/xtaci/kcptun/std"
@@ -320,8 +321,9 @@ func KCPTunClient(remote_kcp_addr, kcp_listen_port, password, salt string, ctx c
 			if session, err := createConn(); err == nil {
 				return session
 			} else {
-				logging.Debugf("re-connecting: %v", err)
-				time.Sleep(time.Second)
+				interval := time.Duration(util.RandInt(1000, 5000)) * time.Millisecond
+				logging.Debugf("re-connecting in %v: %v", interval, err)
+				time.Sleep(interval)
 			}
 		}
 	}
@@ -421,17 +423,17 @@ type timedSession struct {
 
 // scavenger goroutine is used to close expired sessions
 func scavenger(ch chan timedSession, config *Config) {
-	ticker := time.NewTicker(scavengePeriod * time.Second)
-	defer ticker.Stop()
 	var sessionList []timedSession
 	for {
+		// Randomized wait
+		interval := time.Duration(util.RandInt(scavengePeriod*1000, scavengePeriod*3000)) * time.Millisecond
 		select {
 		case item := <-ch:
 			sessionList = append(sessionList, timedSession{
 				item.session,
 				item.expiryDate.Add(time.Duration(config.ScavengeTTL) * time.Second),
 			})
-		case <-ticker.C:
+		case <-time.After(interval):
 			var newList []timedSession
 			for k := range sessionList {
 				s := sessionList[k]

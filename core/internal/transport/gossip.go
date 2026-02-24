@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/memberlist"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // GossipDelegate implements memberlist.Delegate.
@@ -53,8 +54,9 @@ func (d *GossipDelegate) MergeRemoteState([]byte, bool)   {}
 // StartGossip initialises and starts a memberlist gossip engine.
 // getMeta is a closure returning the current MeshNodeMeta (may be nil initially).
 // Gossip traffic is encrypted with def.AESPassword via the official keyring.
-func StartGossip(ctx context.Context, initialPeers []string, port int, getMeta func() *def.MeshNodeMeta) (*memberlist.Memberlist, error) {
+func StartGossip(ctx context.Context, name string, initialPeers []string, port int, getMeta func() *def.MeshNodeMeta) (*memberlist.Memberlist, error) {
 	config := memberlist.DefaultWANConfig()
+	config.Name = name
 	config.BindPort = port
 	config.AdvertisePort = port
 
@@ -95,6 +97,39 @@ func StartGossip(ctx context.Context, initialPeers []string, port int, getMeta f
 		if _, err = list.Join(initialPeers); err != nil {
 			logging.Warningf("StartGossip: join peers: %v", err)
 		}
+	}
+
+	// Periodic bootstrap retry: ensure we can re-join the mesh if we become isolated.
+	// This handles the case where all known peers die and a new node eventually
+	// joins at one of the bootstrap IPs.
+	if len(initialPeers) > 0 {
+		go func() {
+			for {
+				// Only retry if we are isolated or have few members.
+				// We count only alive members (not suspect/dead).
+				aliveNodes := 0
+				for _, m := range list.Members() {
+					if m.State == memberlist.StateAlive {
+						aliveNodes++
+					}
+				}
+
+				if aliveNodes < 2 {
+					if _, err := list.Join(initialPeers); err != nil {
+						logging.Debugf("StartGossip: periodic join: %v", err)
+					} else {
+						logging.Debugf("StartGossip: periodic join successful")
+					}
+				}
+
+				// Randomized sleep
+				util.TakeASnap(false)
+
+				if ctx.Err() != nil {
+					return
+				}
+			}
+		}()
 	}
 
 	// Shut down when context is cancelled.

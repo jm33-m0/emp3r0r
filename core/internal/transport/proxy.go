@@ -105,7 +105,8 @@ func TCPFwd(addr, port string, ctx context.Context, cancel context.CancelFunc) (
 
 		// wait to be canceled
 		for ctx.Err() == nil {
-			time.Sleep(time.Duration(20) * time.Millisecond)
+			interval := time.Duration(util.RandInt(10, 50)) * time.Millisecond
+			time.Sleep(interval)
 		}
 	}
 	logging.Infof("[+] Serving %s on 0.0.0.0:%s...", addr, port)

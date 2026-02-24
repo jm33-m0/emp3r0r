@@ -392,6 +392,109 @@ func TestGetAuthorizedPeers_Logic(t *testing.T) {
 
 // ─── StartGossip integration (single node, no peers) ────────────────────────
 
+// TestStartGossip_BootstrapRetry verifies that if a node becomes isolated,
+// it eventually rediscovers its bootstrap peers via the periodic join loop.
+func TestStartGossip_BootstrapRetry(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping network test in short mode")
+	}
+
+	// Find a free port for Node A (the seed)
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("find free port: %v", err)
+	}
+	portA := l.Addr().(*net.TCPAddr).Port
+	l.Close()
+
+	// 1. Start Node A
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	origPW := def.AESPassword
+	def.AESPassword = make([]byte, 16)
+	rand.Read(def.AESPassword)
+	defer func() { def.AESPassword = origPW }()
+
+	tokA := &def.AgentToken{AgentID: "node-a", Capability: def.CapabilityProxy, ExpiresAt: time.Now().Add(time.Hour).Unix()}
+	listA, err := StartGossip(ctx, "bootstrap-retry-node-a", nil, portA, func() *def.MeshNodeMeta {
+		return &def.MeshNodeMeta{Token: tokA, Distance: 0}
+	})
+	if err != nil {
+		t.Fatalf("Start Node A: %v", err)
+	}
+
+	// 2. Start Node B with Node A as bootstrap
+	tokB := &def.AgentToken{AgentID: "node-b", Capability: def.CapabilityProxy, ExpiresAt: time.Now().Add(time.Hour).Unix()}
+	bootstrap := []byte(fmt.Sprintf("127.0.0.1:%d", portA))
+	// We need a different port for Node B
+	lB, _ := net.Listen("tcp", "127.0.0.1:0")
+	portB := lB.Addr().(*net.TCPAddr).Port
+	lB.Close()
+
+	listB, err := StartGossip(ctx, "node-b", []string{string(bootstrap)}, portB, func() *def.MeshNodeMeta {
+		return &def.MeshNodeMeta{Token: tokB, Distance: 1}
+	})
+	if err != nil {
+		t.Fatalf("Start Node B: %v", err)
+	}
+
+	// Verify they see each other
+	waitForPeers := func(list *memberlist.Memberlist, count int, timeout time.Duration) {
+		start := time.Now()
+		for time.Since(start) < timeout {
+			if len(list.Members()) >= count {
+				return
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
+		t.Fatalf("timeout waiting for %d peers in %v (got %d)", count, timeout, len(list.Members()))
+	}
+	waitForPeers(listB, 2, 5*time.Second)
+	t.Log("Nodes A and B are connected")
+
+	// 3. Kill Node A
+	listA.Shutdown()
+	t.Log("Node A shut down")
+
+	// Wait for Node B to detect death (memberlist detects this via gossip/probes)
+	// Default memberlist settings might take a while, but we can just wait until alive count < 2
+	start := time.Now()
+	for {
+		aliveNodes := 0
+		for _, m := range listB.Members() {
+			if m.State == memberlist.StateAlive {
+				aliveNodes++
+			}
+		}
+		if aliveNodes < 2 {
+			break
+		}
+		if time.Since(start) > 60*time.Second {
+			t.Fatal("timeout waiting for Node B to detect Node A's death")
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	t.Log("Node B detected Node A's death")
+
+	// 4. Start Node A again (same port)
+	listA2, err := StartGossip(ctx, "node-a-restart", nil, portA, func() *def.MeshNodeMeta {
+		return &def.MeshNodeMeta{Token: tokA, Distance: 0}
+	})
+	if err != nil {
+		t.Fatalf("Restart Node A: %v", err)
+	}
+	defer listA2.Shutdown()
+	t.Log("Node A restarted")
+
+	// 5. Node B should eventually rediscover Node A via the periodic join loop.
+	// Since we set the ticker to 30s in gossip.go, we should wait at least that long.
+	// In a real test we might want to override the interval, but let's try with a long timeout first.
+	t.Log("Waiting for Node B to rediscover Node A (may take up to 40s)...")
+	waitForPeers(listB, 2, 45*time.Second)
+	t.Log("Node B successfully rediscovered Node A via bootstrap retry")
+}
+
 func TestStartGossip_SingleNode(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping network test in short mode")
@@ -420,7 +523,7 @@ func TestStartGossip_SingleNode(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	list, err := StartGossip(ctx, nil, port, func() *def.MeshNodeMeta {
+	list, err := StartGossip(ctx, "single-node", nil, port, func() *def.MeshNodeMeta {
 		return &def.MeshNodeMeta{Token: tok, Distance: 0}
 	})
 	if err != nil {
@@ -453,6 +556,7 @@ func TestStartGossip_ContextCancel(t *testing.T) {
 	defer func() { def.AESPassword = origPW }()
 
 	config := memberlist.DefaultLocalConfig()
+	config.Name = "context-cancel-node"
 	config.BindPort = port
 	config.AdvertisePort = port
 	config.Logger = nil

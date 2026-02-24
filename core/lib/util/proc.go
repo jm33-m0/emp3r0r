@@ -209,8 +209,19 @@ func GetChildren(pid int) (children []int, err error) {
 
 // sleep for a random interval between 5s to 60s
 var TakeASnap = func(forceSleep bool) {
-	interval := time.Duration(RandInt(5000, 60000))
-	time.Sleep(interval * time.Millisecond)
+	interval := time.Duration(RandInt(5000, 60000)) * time.Millisecond
+	for {
+		start := time.Now()
+		time.Sleep(interval)
+		elapsed := time.Since(start)
+		if elapsed >= interval {
+			break
+		}
+		// If we are here, it means the sleep was interrupted or skipped.
+		// We subtract the elapsed time and try to sleep the remainder.
+		logging.Debugf("TakeASnap: sleep was interrupted/skipped (%v < %v), sleeping remainder", elapsed, interval)
+		interval -= elapsed
+	}
 }
 
 // sleep for a random interval between 100ms to 500ms

