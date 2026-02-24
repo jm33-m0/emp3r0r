@@ -168,12 +168,10 @@ func watchPeers(ctx context.Context) {
 		logging.Debugf("Mesh: %d authorized peer(s) in gossip view", len(peers))
 		for _, ip := range peers {
 			// Probe dial: verify the gateway is reachable.
-			conn, err := connectViaPeer(ctx, ip, t)
-			if err != nil {
+			if err := t.Ping(ctx, ip, ""); err != nil {
 				logging.Debugf("Mesh: peer %s failed: %v", ip, err)
 				continue
 			}
-			conn.Close() // probe only — DialGateway is called fresh per C2 request
 			SetDistance(1)
 			gatewayMu.Lock()
 			prev := gatewayIP
@@ -201,8 +199,7 @@ func watchPeers(ctx context.Context) {
 		if ip == "" {
 			return // already cleared
 		}
-		conn, err := connectViaPeer(ctx, ip, t)
-		if err != nil {
+		if err := t.Ping(ctx, ip, ""); err != nil {
 			logging.Warningf("Mesh: current gateway %s is unreachable (%v), clearing route", ip, err)
 			gatewayMu.Lock()
 			gatewayIP = ""
@@ -210,7 +207,6 @@ func watchPeers(ctx context.Context) {
 			SetDistance(-1)
 			signalGatewayDead()
 		} else {
-			conn.Close()
 			logging.Debugf("Mesh: current gateway %s is alive", ip)
 		}
 	}

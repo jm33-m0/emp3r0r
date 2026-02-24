@@ -16,6 +16,7 @@ import (
 // Dial should return a net.Conn representing a transparent pipe to the C2 server.
 type MeshTransport interface {
 	Dial(ctx context.Context, peerIP, kcpPort string) (net.Conn, error)
+	Ping(ctx context.Context, peerIP, kcpPort string) error
 }
 
 // KCPTransport is the default MeshTransport.
@@ -24,5 +25,14 @@ type MeshTransport interface {
 type KCPTransport struct{}
 
 func (KCPTransport) Dial(ctx context.Context, peerIP, kcpPort string) (net.Conn, error) {
-	return DialGateway(ctx, peerIP)
+	return DialGateway(ctx, peerIP, OpcodeConnectC2)
+}
+
+func (KCPTransport) Ping(ctx context.Context, peerIP, kcpPort string) error {
+	conn, err := DialGateway(ctx, peerIP, OpcodePing)
+	if err != nil {
+		return err
+	}
+	conn.Close()
+	return nil
 }

@@ -22,15 +22,17 @@ import (
 
 const (
 	OpcodeConnectC2 byte = 0x01
+	OpcodePing      byte = 0x02
 	OpcodeOK        byte = 0x00
 	OpcodeErr       byte = 0xFF
 
 	bridgeDialTimeout = 10 * time.Second
 )
 
-// DialGateway opens a KCP connection to the Gateway IP, sends CONNECT_C2,
-// and returns a net.Conn transparently piped to the real C2 TLS endpoint.
-func DialGateway(ctx context.Context, gatewayIP string) (net.Conn, error) {
+// DialGateway opens a KCP connection to the Gateway IP, sends the specified opcode,
+// and returns a net.Conn. If opcode is OpcodeConnectC2, the conn is transparently
+// piped to the real C2 TLS endpoint.
+func DialGateway(ctx context.Context, gatewayIP string, opcode byte) (net.Conn, error) {
 	kcpPort := common.RuntimeConfig.KCPServerPort
 	addr := fmt.Sprintf("%s:%s", gatewayIP, kcpPort)
 
@@ -41,7 +43,7 @@ func DialGateway(ctx context.Context, gatewayIP string) (net.Conn, error) {
 	}
 
 	// Send opcode
-	if _, err = kcpConn.Write([]byte{OpcodeConnectC2}); err != nil {
+	if _, err = kcpConn.Write([]byte{opcode}); err != nil {
 		kcpConn.Close()
 		return nil, fmt.Errorf("DialGateway send opcode: %v", err)
 	}
@@ -128,7 +130,17 @@ func handleRelayConn(ctx context.Context, peer net.Conn) {
 	}
 	peer.SetDeadline(time.Time{})
 
-	if op[0] != OpcodeConnectC2 {
+	switch op[0] {
+	case OpcodePing:
+		logging.Debugf("Mesh relay: ping from %s", peer.RemoteAddr())
+		if _, err := peer.Write([]byte{OpcodeOK}); err != nil {
+			logging.Warningf("Mesh relay: send OK (ping): %v", err)
+		}
+		return
+
+	case OpcodeConnectC2:
+		// proceed to dial C2
+	default:
 		logging.Warningf("Mesh relay: unknown opcode 0x%02x from %s", op[0], peer.RemoteAddr())
 		writeRelayError(peer, "unknown opcode")
 		return

