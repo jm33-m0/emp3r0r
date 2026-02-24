@@ -119,6 +119,11 @@ func GetAuthorizedPeers(list *memberlist.Memberlist, capability string) []string
 	var peers []authorizedPeer
 
 	for _, member := range list.Members() {
+		// Only consider members actively gossiping as alive
+		if member.State != memberlist.StateAlive {
+			continue
+		}
+
 		if len(member.Meta) == 0 {
 			continue
 		}

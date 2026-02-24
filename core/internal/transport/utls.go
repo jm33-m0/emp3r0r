@@ -34,6 +34,7 @@
 package transport
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -76,7 +77,13 @@ func addrForDial(url *url.URL) (string, error) {
 // Analogous to tls.Dial. Connect to the given address and initiate a TLS
 // handshake using the given ClientHelloID, returning the resulting connection.
 func dialUTLS(network, addr string, cfg *utls.Config, clientHelloID *utls.ClientHelloID, forward proxy.Dialer) (*utls.UConn, error) {
-	conn, err := forward.Dial(network, addr)
+	var conn net.Conn
+	var err error
+	if GlobalMeshDialer != nil {
+		conn, err = GlobalMeshDialer(context.Background(), network, addr)
+	} else {
+		conn, err = forward.Dial(network, addr)
+	}
 	if err != nil {
 		return nil, err
 	}

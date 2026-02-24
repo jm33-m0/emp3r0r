@@ -33,7 +33,7 @@ func DialGateway(ctx context.Context, gatewayIP string) (net.Conn, error) {
 	kcpPort := common.RuntimeConfig.KCPServerPort
 	addr := fmt.Sprintf("%s:%s", gatewayIP, kcpPort)
 
-	logging.Infof("Mesh: dialing Gateway KCP relay at %s", addr)
+	logging.Debugf("Mesh: dialing Gateway KCP relay at %s", addr)
 	kcpConn, err := transport.DialKCP(addr, common.RuntimeConfig.Password, def.MagicString)
 	if err != nil {
 		return nil, fmt.Errorf("DialGateway KCP: %v", err)
@@ -56,7 +56,7 @@ func DialGateway(ctx context.Context, gatewayIP string) (net.Conn, error) {
 
 	switch resp[0] {
 	case OpcodeOK:
-		logging.Infof("Mesh: Gateway accepted relay, C2 tunnel established")
+		logging.Debugf("Mesh: Gateway accepted relay, C2 tunnel established")
 		return kcpConn, nil
 	case OpcodeErr:
 		// Read 2-byte LE error length then message

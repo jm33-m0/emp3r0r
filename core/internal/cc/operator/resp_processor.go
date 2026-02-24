@@ -132,7 +132,7 @@ func processAgentData(data *def.MsgTunData) {
 	// Agent.Name and Command are already sanitized at storage time
 	stripped := sanitize.SanitizeText(resp.Output)
 	agentOutput := fmt.Sprintf("\n[%s] %s:\n%s\n",
-		color.CyanString("%s", resp.Agent.Name),
+		color.CyanString("%s - %s", resp.Agent.ShortID, resp.Agent.Name),
 		color.HiMagentaString("%s", resp.Command),
 		color.HiWhiteString(stripped))
 
