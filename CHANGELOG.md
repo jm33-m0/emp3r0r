@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.22.0](https://github.com/jm33-m0/emp3r0r/compare/v3.21.4...v3.22.0) (2026-02-24)
+
+
+### Features
+
+* add `Ping` opcode and method for mesh gateway reachability checks. ([d028e19](https://github.com/jm33-m0/emp3r0r/commit/d028e1905a2a889822237ff863db692c053de81d))
+* Add mesh gateway liveness monitoring and automatic C2 client re-initialization when the gateway dies. ([36b7925](https://github.com/jm33-m0/emp3r0r/commit/36b7925154816930b8030f4c6de903af75df17fb))
+* enhance mesh resilience and stealth by randomizing sleep intervals, improving `TakeASnap` robustness, and adding periodic gossip bootstrap retry. ([cb2e9ca](https://github.com/jm33-m0/emp3r0r/commit/cb2e9ca541b662ac5af6e98de3ce2accf4d954e4))
+* Implement C2-assisted mesh peer discovery and self-healing for agents. ([7f96743](https://github.com/jm33-m0/emp3r0r/commit/7f96743b729b1fd7c058bed1eacca4f98c65b94f))
+* implement mesh networking with token-based authentication and Trust On First Use (TOFU) agent key pinning, replacing proxychain broadcast. ([10e2e01](https://github.com/jm33-m0/emp3r0r/commit/10e2e01faaab502a23269ce282d6db96e0f7a9b6))
+
+
+### Bug Fixes
+
+* implement early rate limiting in the check-in handler to prevent DoS and remove debug key content logging. ([8126fea](https://github.com/jm33-m0/emp3r0r/commit/8126fea7f5467fcfdc04cf49a4ead8b8637ea242))
+* introduce early rate-limiting for agent check-ins to prevent log flooding and remove debug logging. ([9d5cba8](https://github.com/jm33-m0/emp3r0r/commit/9d5cba8fec4a2de4942e0bf81a04d65772fcd6cc))
+
 ## [3.21.4](https://github.com/jm33-m0/emp3r0r/compare/v3.21.3...v3.21.4) (2026-02-16)
 
 
