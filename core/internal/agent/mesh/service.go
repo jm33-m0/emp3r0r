@@ -9,7 +9,6 @@ package mesh
 
 import (
 	"context"
-	"net"
 	"strconv"
 	"sync"
 	"time"
@@ -143,6 +142,39 @@ func UpdateGossipMeta() {
 	}
 }
 
+// Join attempts to join the gossip cluster using the provided peer addresses.
+func Join(peers []string) {
+	gossipMu.RLock()
+	list := gossipList
+	gossipMu.RUnlock()
+	if list == nil {
+		return
+	}
+
+	// Deduplicate against current members to avoid noise and redundant work.
+	currentMembers := make(map[string]bool)
+	for _, m := range list.Members() {
+		currentMembers[m.Addr.String()] = true
+	}
+
+	newPeers := make([]string, 0)
+	for _, p := range peers {
+		if !currentMembers[p] {
+			newPeers = append(newPeers, p)
+		}
+	}
+
+	if len(newPeers) == 0 {
+		return
+	}
+
+	if n, err := list.Join(newPeers); err != nil {
+		logging.Debugf("Mesh: Join failed for %v: %v", newPeers, err)
+	} else if n > 0 {
+		logging.Infof("Mesh: Joined %d new peer(s) via C2 push", n)
+	}
+}
+
 // signalGatewayDead sends a non-blocking notification that the current gateway is dead.
 func signalGatewayDead() {
 	select {
@@ -243,12 +275,6 @@ func watchPeers(ctx context.Context) {
 			}
 		}
 	}
-}
-
-// connectViaPeer dials a Gateway via KCP, sends CONNECT_C2, and returns the
-// established tunnel connection on success.
-func connectViaPeer(ctx context.Context, ip string, t MeshTransport) (net.Conn, error) {
-	return t.Dial(ctx, ip, common.RuntimeConfig.KCPServerPort)
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

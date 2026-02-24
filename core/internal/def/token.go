@@ -21,6 +21,9 @@ type MeshNodeMeta struct {
 // TagAgentToken is the MsgTunData tag for token push from C2 to agent.
 const TagAgentToken = "agent_token"
 
+// TagPeerList is the MsgTunData tag for P2P peer list push from C2 to agent.
+const TagPeerList = "peer_list"
+
 // CapabilityRouter is the capability value that authorises a node to serve
 // as a mesh router (accept relay connections via KCP and pipe them to C2).
 const CapabilityRouter = "router"

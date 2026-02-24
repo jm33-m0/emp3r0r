@@ -99,38 +99,59 @@ func StartGossip(ctx context.Context, name string, initialPeers []string, port i
 		}
 	}
 
-	// Periodic bootstrap retry: ensure we can re-join the mesh if we become isolated.
-	// This handles the case where all known peers die and a new node eventually
-	// joins at one of the bootstrap IPs.
-	if len(initialPeers) > 0 {
-		go func() {
-			for {
-				// Only retry if we are isolated or have few members.
-				// We count only alive members (not suspect/dead).
-				aliveNodes := 0
-				for _, m := range list.Members() {
-					if m.State == memberlist.StateAlive {
-						aliveNodes++
-					}
+	// Peer discovery and visibility management.
+	go func() {
+		peerList := make(map[string]bool)
+		for _, p := range initialPeers {
+			peerList[p] = true
+		}
+
+		for {
+			// Randomized sleep for OPSEC.
+			util.TakeASnap(false)
+			if ctx.Err() != nil {
+				return
+			}
+
+			// 1. Update peerList and log visibility.
+			members := list.Members()
+			aliveNodes := 0
+			logging.Infof("Gossip cluster state: %d member(s)", len(members))
+			for _, m := range members {
+				state := "Unknown"
+				switch m.State {
+				case 0:
+					state = "Alive"
+					aliveNodes++
+					// Remember this healthy peer for future re-discovery.
+					peerList[m.Addr.String()] = true
+				case 1:
+					state = "Suspect"
+				case 2:
+					state = "Dead"
+				case 3:
+					state = "Left"
 				}
+				logging.Infof(" - %s (%s) [%s]", m.Name, m.Addr.String(), state)
+			}
 
-				if aliveNodes < 2 {
-					if _, err := list.Join(initialPeers); err != nil {
-						logging.Debugf("StartGossip: periodic join: %v", err)
-					} else {
-						logging.Debugf("StartGossip: periodic join successful")
-					}
+			// 2. Self-Healing: If isolated, try to re-join ANY peer from out peerList.
+			if aliveNodes < 2 {
+				peersToTry := make([]string, 0, len(peerList))
+				for p := range peerList {
+					peersToTry = append(peersToTry, p)
 				}
-
-				// Randomized sleep
-				util.TakeASnap(false)
-
-				if ctx.Err() != nil {
-					return
+				if len(peersToTry) > 0 {
+					logging.Debugf("Gossip: isolated (%d alive)! Attempting P2P re-join with %d known peers...", aliveNodes, len(peersToTry))
+					if n, err := list.Join(peersToTry); err != nil {
+						logging.Debugf("Gossip: P2P re-join failed: %v", err)
+					} else if n > 0 {
+						logging.Infof("Gossip: P2P re-join successful (%d nodes)", n)
+					}
 				}
 			}
-		}()
-	}
+		}
+	}()
 
 	// Shut down when context is cancelled.
 	go func() {

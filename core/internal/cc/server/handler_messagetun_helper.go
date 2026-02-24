@@ -2,9 +2,11 @@ package server
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/sanitize"
@@ -88,4 +90,30 @@ func fwdMsg2Operators(msg def.MsgTunData) (err error) {
 		return true // continue iteration
 	})
 	return
+}
+
+// collectPeerList gathers all unique IPs from all connected agents to help with discovery.
+func collectPeerList() []string {
+	peerMap := make(map[string]bool)
+	live.AgentControlMap.Range(func(key, value any) bool {
+		agent := key.(*def.Emp3r0rAgent)
+		// Add the IP the agent connected from.
+		fromIP := strings.Split(agent.From, ":")[0]
+		if fromIP != "" && fromIP != "127.0.0.1" {
+			peerMap[fromIP] = true
+		}
+		// Add all internal IPs reported by the agent.
+		for _, ip := range agent.IPs {
+			if ip != "" && ip != "127.0.0.1" && !strings.HasPrefix(ip, "127.") {
+				peerMap[ip] = true
+			}
+		}
+		return true
+	})
+
+	peerList := make([]string, 0, len(peerMap))
+	for ip := range peerMap {
+		peerList = append(peerList, ip)
+	}
+	return peerList
 }

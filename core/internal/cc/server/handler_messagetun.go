@@ -149,17 +149,35 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 				}
 				encoder := cbor.NewEncoder(secureConn)
 				err = encoder.Encode(replyMsg)
-				if err != nil {
-					logging.Warningf("handleMessageTunnel: %v", err)
-				} else if sessionKey != nil {
-					// 6. Switch to Session Key (only if exchange was successful)
-					secureConn.SetKey(sessionKey)
-					if !pfsEstablished {
-						logging.Infof("SecureConn: Switched to ephemeral session key for %s (PFS enabled)", msg.Tag)
-						pfsEstablished = true
-					} else {
-						logging.Debugf("SecureConn: Re-keyed ephemeral session key for %s", msg.Tag)
+				if err == nil {
+					if sessionKey != nil {
+						// 6. Switch to Session Key (only if exchange was successful)
+						secureConn.SetKey(sessionKey)
+						if !pfsEstablished {
+							logging.Infof("SecureConn: Switched to ephemeral session key for %s (PFS enabled)", msg.Tag)
+							pfsEstablished = true
+						} else {
+							logging.Debugf("SecureConn: Re-keyed ephemeral session key for %s", msg.Tag)
+						}
 					}
+
+					// Only push PeerList to TRUSTED agents (must have established PFS)
+					// This ensures the layout is encrypted with the ephemeral session key and
+					// we are talking to a successfully authenticated agent.
+					if pfsEstablished {
+						peerList := collectPeerList()
+						if len(peerList) > 0 {
+							peerMsg := def.MsgTunData{
+								Tag:      def.TagPeerList,
+								PeerList: peerList,
+							}
+							if err := encoder.Encode(peerMsg); err != nil {
+								logging.Errorf("handleMessageTunnel: send PeerList to %s: %v", agent.Name, err)
+							}
+						}
+					}
+				} else {
+					logging.Warningf("handleMessageTunnel: %v", err)
 				}
 
 				atomic.StoreInt64(&lastHandshake, time.Now().Unix())
