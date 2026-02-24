@@ -253,122 +253,37 @@ func TestFullAgentLifecycle(t *testing.T) {
 	// Wait for agent to process and notify back
 	time.Sleep(2 * time.Second)
 
-	// ------------------------------------------------------------
-	// 5. Test Key Rotation (Legitimate Reboot Scenario)
-	// ------------------------------------------------------------
-	t.Log("Testing key rotation after simulated reboot...")
-
-	// Close existing connection (simulate agent disconnect)
+	// 5. Verify key rotation is REJECTED (policy: rotation is permanently banned)
+	t.Log("Verifying key rotation is rejected...")
 	cancel()
 	conn.Close()
-	time.Sleep(1 * time.Second)
+	time.Sleep(500 * time.Millisecond)
 
-	// Generate NEW ephemeral key (simulating agent restart)
+	// Generate NEW ephemeral key (simulating a second instance of the same binary)
 	err = agentutils.RenewAgentKey()
 	if err != nil {
-		t.Fatalf("Failed to generate new ephemeral key: %v", err)
+		t.Fatalf("Failed to renew agent key: %v", err)
 	}
-
 	newAgentPubKeyPEM, err := transport.PublicKeyToPEM(&agentutils.AgentKey.PublicKey)
 	if err != nil {
 		t.Fatalf("Failed to convert new public key to PEM: %v", err)
 	}
-
-	// Update agent info with new key
 	agentInfo.PublicKey = string(newAgentPubKeyPEM)
 
-	// Check in with new key (simulating reboot)
-	// This should fail initially (manual approval restricted)
+	// Verify DB state right before rotation checkin
+	if agents.AgentDB != nil {
+		stored, err := agents.GetStoredAgent(agentUUID)
+		t.Logf("DB State before rotation: stored_found=%v, err=%v", stored != nil, err)
+	}
+
+	// This MUST be rejected — key rotation is permanently disabled.
 	err = c2transport.ReportStatus(config, agentInfo)
-	requiresApproval := true
 	if err == nil {
-		t.Log("WARNING: Check-in succeeded (likely due to test env DB latency treating it as new agent). Skipping approval verification.")
-		requiresApproval = false
-	} else {
-		t.Log("✓ Agent check-in blocked as expected (pending approval)")
+		t.Fatal("SECURITY VIOLATION: check-in with rotated key was accepted! Key rotation is supposed to be banned.")
 	}
-	if !requiresApproval {
-		return
-	}
+	t.Logf("✓ Key rotation correctly rejected: %v", err)
 
-	// Verify pending request matches
-	var newKey string
-	timeout := time.After(5 * time.Second)
-	ticker := time.NewTicker(100 * time.Millisecond)
-
-	for {
-		select {
-		case <-timeout:
-			t.Fatal("Timed out waiting for PendingKeyRotations")
-		case <-ticker.C:
-			if val, exists := live.PendingKeyRotations.Load(agentUUID); exists {
-				newKey = val.(string)
-				goto PendingFound
-			}
-		}
-	}
-PendingFound:
-	if newKey != agentInfo.PublicKey {
-		t.Errorf("Pending key mismatch. Expected %s, got %s", agentInfo.PublicKey, newKey)
-	}
-
-	// Approve key rotation (Simulate operator command logic)
-	// Update in-memory map
-	foundAgent := false
-	live.AgentControlMap.Range(func(key, value interface{}) bool {
-		a := key.(*def.Emp3r0rAgent)
-		if a.UUID == agentUUID {
-			a.PublicKey = newKey
-			foundAgent = true
-			return false // stop iteration
-		}
-		return true
-	})
-
-	// If agent disconnected, it won't be in map, so we update DB
-	if !foundAgent {
-		t.Log("Agent not in memory (expected for reboot), updating DB directly")
-	}
-
-	// Update DB
-	_, err = agents.AgentDB.Exec("UPDATE agents SET public_key = ? WHERE uuid = ?", newKey, agentUUID)
-	if err != nil {
-		t.Fatalf("Failed to update DB manually: %v", err)
-	}
-
-	// Clear pending
-	live.PendingKeyRotations.Delete(agentUUID)
-	t.Log("✓ Key rotation approved manually")
-
-	// Check in again with new key (should succeed now)
-	err = c2transport.ReportStatus(config, agentInfo)
-	if err != nil {
-		t.Fatalf("Check-in with new key failed after approval: %v", err)
-	}
-	t.Log("✓ Agent checked in successfully after approval")
-
-	// Wait for database update (connection count inc)
-	time.Sleep(500 * time.Millisecond)
-
-	// Verify connection count increased (proves check-in was successful)
-	storedAgent, err = agents.GetStoredAgent(agentUUID)
-	if err != nil {
-		t.Fatalf("Failed to get stored agent after key rotation: %v", err)
-	}
-	if storedAgent.ConnectionCount < 2 {
-		t.Errorf("Expected connection count >= 2 after reboot, got %d", storedAgent.ConnectionCount)
-	}
-	t.Logf("✓ Connection count after reboot: %d", storedAgent.ConnectionCount)
-
-	// Verify the key was updated in the database
-	if storedAgent.PublicKey != string(newAgentPubKeyPEM) {
-		t.Error("Agent public key was not updated in database after rotation")
-	}
-	t.Log("✓ Agent public key updated in database after legitimate reboot")
-
-	t.Log("Full Agent Lifecycle Test Passed (including key rotation)")
-
-	// No need for cleanup since connection already closed
+	t.Log("Full Agent Lifecycle Test Passed")
 	select {
 	case <-tunDone:
 	case <-time.After(1 * time.Second):
