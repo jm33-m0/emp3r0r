@@ -2,7 +2,7 @@
 
 ### emp3r0r
 
-**Zero-Trust C2: Ephemeral TOFU + PFS + P2P Mesh Stack + Memory-Only Ops + Bring2CC + Native BOF**
+**Self‑healing Gossip Mesh C2 with Assisted Peer Discovery, Modular Post‑Exploitation, and OPSEC‑Focused Transport**
 
 <br clear="all" />
 
