@@ -17,32 +17,30 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 
 	// 1. Prepare a config with ALL fields populated
 	originalCfg := &def.Config{
-		CCAddress:                      "192.168.1.100",
-		CCHost:                         "192.168.1.100",
-		CCPort:                         "8443",
-		AgentSocksServerPort:           "50001",
-		AgentSocksTimeout:              60,
-		StagerHTTPListenerPort:         "8080",
-		Password:                       "secret_password",
-		ShadowsocksLocalSocksPort:      "1080",
-		ShadowsocksServerPort:          "8388",
-		KCPServerPort:                  "4000",
-		KCPClientPort:                  "4001",
-		UseKCP:                         false,
-		EnableNCSI:                     true,
-		SSHHostKey:                     []byte("ssh-rsa AAAAB3Nza..."),
-		Bring2CCReverseProxyPort:       "6000",
-		SSHDShellPort:                  "2222",
-		ProxyChainBroadcastPort:        "9000",
-		ProxyChainBroadcastIntervalMin: 30,
-		ProxyChainBroadcastIntervalMax: 60,
-		CCTimeout:                      5000,
-		PreflightEnabled:               true,
-		PreflightURL:                   "http://example.com",
-		PreflightMethod:                "GET",
-		PreflightHeaders:               map[string]string{"X-Test": "True"},
-		PreflightIntervalMin:           30,
-		PreflightIntervalMax:           120,
+		CCAddress:                 "192.168.1.100",
+		CCHost:                    "192.168.1.100",
+		CCPort:                    "8443",
+		AgentSocksServerPort:      "50001",
+		AgentSocksTimeout:         60,
+		StagerHTTPListenerPort:    "8080",
+		Password:                  "secret_password",
+		ShadowsocksLocalSocksPort: "1080",
+		ShadowsocksServerPort:     "8388",
+		KCPServerPort:             "4000",
+		KCPClientPort:             "4001",
+		UseKCP:                    false,
+		EnableNCSI:                true,
+		SSHHostKey:                []byte("ssh-rsa AAAAB3Nza..."),
+		Bring2CCReverseProxyPort:  "6000",
+		SSHDShellPort:             "2222",
+		MeshGossipPort:            "9000",
+		CCTimeout:                 5000,
+		PreflightEnabled:          true,
+		PreflightURL:              "http://example.com",
+		PreflightMethod:           "GET",
+		PreflightHeaders:          map[string]string{"X-Test": "True"},
+		PreflightIntervalMin:      30,
+		PreflightIntervalMax:      120,
 	}
 
 	// 2. Marshal to CBOR
@@ -118,14 +116,8 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 	if RuntimeConfig.SSHDShellPort != originalCfg.SSHDShellPort {
 		t.Errorf("SSHDShellPort mismatch: got %s, want %s", RuntimeConfig.SSHDShellPort, originalCfg.SSHDShellPort)
 	}
-	if RuntimeConfig.ProxyChainBroadcastPort != originalCfg.ProxyChainBroadcastPort {
-		t.Errorf("ProxyChainBroadcastPort mismatch: got %s, want %s", RuntimeConfig.ProxyChainBroadcastPort, originalCfg.ProxyChainBroadcastPort)
-	}
-	if RuntimeConfig.ProxyChainBroadcastIntervalMin != originalCfg.ProxyChainBroadcastIntervalMin {
-		t.Errorf("ProxyChainBroadcastIntervalMin mismatch: got %d, want %d", RuntimeConfig.ProxyChainBroadcastIntervalMin, originalCfg.ProxyChainBroadcastIntervalMin)
-	}
-	if RuntimeConfig.ProxyChainBroadcastIntervalMax != originalCfg.ProxyChainBroadcastIntervalMax {
-		t.Errorf("ProxyChainBroadcastIntervalMax mismatch: got %d, want %d", RuntimeConfig.ProxyChainBroadcastIntervalMax, originalCfg.ProxyChainBroadcastIntervalMax)
+	if RuntimeConfig.MeshGossipPort != originalCfg.MeshGossipPort {
+		t.Errorf("MeshGossipPort mismatch: got %s, want %s", RuntimeConfig.MeshGossipPort, originalCfg.MeshGossipPort)
 	}
 	if RuntimeConfig.PreflightEnabled != originalCfg.PreflightEnabled {
 		t.Errorf("PreflightEnabled mismatch: got %v, want %v", RuntimeConfig.PreflightEnabled, originalCfg.PreflightEnabled)

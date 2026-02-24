@@ -638,10 +638,12 @@ func gen_agent_cmd() *cobra.Command {
 	// See Wiki: Customizable-Transport for details.
 	genAgentCmd.Flags().BoolP("kcp", "", false, "Use KCP (secure UDP multiplexed tunnel)")
 	genAgentCmd.Flags().BoolP("NCSI", "", false, "Use NCSI to check for Internet connectivity before connecting to C2")
-	genAgentCmd.Flags().BoolP("proxychain", "", false, "Enable auto proxy chain, agents will negotiate and form a Shadowsocks proxy chain to reach C2")
-	genAgentCmd.Flags().IntP("proxychain-wait-min", "", util.RandInt(30, 120), "How many minimum seconds to wait before sending each broadcast packet to negotiate proxy chain")
-	genAgentCmd.Flags().IntP("proxychain-wait-max", "", 0, "How many maximum seconds to wait before sending each broadcast packet to negotiate proxy chain")
 	genAgentCmd.Flags().BoolP("stager", "", false, "Whether the agent is intended to be delivered by a stager. This enables stealth features like memory encryption and suspension.")
+
+	// Mesh / P2P flags
+	genAgentCmd.Flags().BoolP("p2p", "", false, "Enable P2P mesh networking. Agent will join the mesh and participate in peer discovery.")
+	genAgentCmd.Flags().BoolP("direct-c2", "", false, "When used with --p2p, agent acts as a Gateway: contacts C2 directly (with preflight) AND relays traffic for Silent Nodes. Without --p2p this has no effect.")
+	genAgentCmd.Flags().StringSliceP("peers", "", nil, "Comma-separated list of gossip bootstrap peers (ip:gossipport). Required for Silent Nodes. Example: --peers 1.2.3.4:51996")
 
 	// Force user to specify CC address
 	genAgentCmd.MarkFlagRequired("cc")

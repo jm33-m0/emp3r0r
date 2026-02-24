@@ -148,9 +148,9 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 	cdn_proxy, _ := cmd.Flags().GetString("cdn")
 	c2transport_proxy, _ := cmd.Flags().GetString("proxy")
 	doh_server, _ := cmd.Flags().GetString("doh")
-	proxy_chain, _ := cmd.Flags().GetBool("proxychain")
-	proxy_chain_min, _ := cmd.Flags().GetInt("proxychain-wait-min")
-	proxy_chain_max, _ := cmd.Flags().GetInt("proxychain-wait-max")
+	p2p, _ := cmd.Flags().GetBool("p2p")
+	directC2, _ := cmd.Flags().GetBool("direct-c2")
+	peers, _ := cmd.Flags().GetStringSlice("peers")
 	ncsi, _ := cmd.Flags().GetBool("ncsi")
 	kcp, _ := cmd.Flags().GetBool("kcp")
 	is_stager, _ := cmd.Flags().GetBool("stager")
@@ -312,23 +312,42 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 	logging.Printf("Conditional C2 (Hybrid Mode) beacon interval: %d - %d seconds",
 		live.RuntimeConfig.PreflightIntervalMin, live.RuntimeConfig.PreflightIntervalMax)
 
-	if proxy_chain {
-		if !cmd.Flags().Changed("proxychain-wait-min") {
-			proxy_chain_min = util.RandInt(30, 120)
-		}
-		live.RuntimeConfig.ProxyChainBroadcastIntervalMin = proxy_chain_min
+	// Mesh / P2P mode — always reset first to avoid stale state from a
+	// previous `generate` call sharing live.RuntimeConfig.
+	live.RuntimeConfig.IsP2PEnabled = false
+	live.RuntimeConfig.IsDirectC2Enabled = false
+	if cmd.Flags().Changed("p2p") {
+		live.RuntimeConfig.IsP2PEnabled = p2p
+	}
+	if cmd.Flags().Changed("direct-c2") {
+		live.RuntimeConfig.IsDirectC2Enabled = directC2
+	}
+	// Standalone agents always contact C2 directly.
+	// Gateway agents (--p2p --direct-c2) also contact C2 directly and run preflight.
+	if !live.RuntimeConfig.IsP2PEnabled {
+		live.RuntimeConfig.IsDirectC2Enabled = true
+	}
 
-		if !cmd.Flags().Changed("proxychain-wait-max") {
-			live.RuntimeConfig.ProxyChainBroadcastIntervalMax = util.RandInt(proxy_chain_min+10, proxy_chain_min+100)
-		} else {
-			live.RuntimeConfig.ProxyChainBroadcastIntervalMax = proxy_chain_max
+	// Bootstrap peers for gossip (reset to avoid stale list from previous generate)
+	live.RuntimeConfig.InitialPeers = nil
+	if cmd.Flags().Changed("peers") {
+		live.RuntimeConfig.InitialPeers = peers
+	}
+	// Silent Nodes (--p2p without --direct-c2) must have at least one bootstrap peer.
+	if live.RuntimeConfig.IsP2PEnabled && !live.RuntimeConfig.IsDirectC2Enabled {
+		if len(live.RuntimeConfig.InitialPeers) == 0 {
+			return fmt.Errorf("Silent Node build requires --peers: specify at least one Gateway IP:gossipport (e.g. --peers 1.2.3.4:51996)")
 		}
-		logging.Printf("Proxy chain is enabled with broadcast interval %d-%d",
-			live.RuntimeConfig.ProxyChainBroadcastIntervalMin,
-			live.RuntimeConfig.ProxyChainBroadcastIntervalMax)
-	} else {
-		live.RuntimeConfig.ProxyChainBroadcastIntervalMax = 0
-		logging.Printf("Proxy chain is disabled")
+		logging.Printf("Silent Node bootstrap peers: %v", live.RuntimeConfig.InitialPeers)
+	}
+
+	switch {
+	case live.RuntimeConfig.IsP2PEnabled && live.RuntimeConfig.IsDirectC2Enabled:
+		logging.Printf("Mode: Gateway (P2P mesh + direct C2 + preflight)")
+	case live.RuntimeConfig.IsP2PEnabled:
+		logging.Printf("Mode: Silent Node (P2P mesh only, no direct C2)")
+	default:
+		logging.Printf("Mode: Standalone (direct C2, no mesh)")
 	}
 
 	if cmd.Flags().Changed("stager") {

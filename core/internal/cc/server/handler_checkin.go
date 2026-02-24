@@ -104,65 +104,49 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request, expectedUUID
 	live.AgentControlMap.Range(func(key, value interface{}) bool {
 		a := key.(*def.Emp3r0rAgent)
 		if a.UUID == target.UUID {
-			existingKey = a.PublicKey
-			isNew = false
-			return false // stop iteration
+			// Skip placeholders that don't have a public key yet.
+			// If we find an agent with a key, use it and stop.
+			if a.PublicKey != "" {
+				existingKey = a.PublicKey
+				isNew = false
+				return false // stop iteration
+			}
+			// If it's just a placeholder, keep searching (or let it fall through to the DB check)
 		}
 		return true
 	})
 
-	// If not in memory, check if it exists in DB (Persistent Session)
-	if isNew && agents.AgentDB != nil {
-		storedAgent, err := agents.GetStoredAgent(target.UUID)
-		if err != nil {
-			logging.Errorf("handleAgentCheckIn: GetStoredAgent error: %v", err)
-		}
-		if storedAgent != nil {
-			isNew = false
-			existingKey = storedAgent.PublicKey
+	if isNew {
+		// New agent in memory (or placeholder) - check if it's firmly pinned in the DB
+		if agents.AgentDB != nil {
+			stored, err := agents.GetStoredAgent(target.UUID)
+			logging.Infof("DEBUG-CHECKIN: GetStoredAgent(%s) returned stored=%v, err=%v", target.UUID, stored != nil, err)
+			if err == nil && stored != nil { // Only consider if no error and agent found
+				existingKey = stored.PublicKey
+				isNew = false
+			} else if err != nil {
+				logging.Errorf("handleAgentCheckIn: GetStoredAgent error: %v", err)
+			}
 		}
 	}
 
+	if len(existingKey) > 10 {
+		logging.Infof("DEBUG-CHECKIN: isNew=%v, existingKey_len=%d, targetKey_len=%d, existingKey=(%s...)", isNew, len(existingKey), len(target.PublicKey), existingKey[:10])
+	} else {
+		logging.Infof("DEBUG-CHECKIN: isNew=%v, existingKey_len=%d, targetKey_len=%d, existingKey=(%s)", isNew, len(existingKey), len(target.PublicKey), existingKey)
+	}
+
 	if !isNew {
-		// Existing agent: Check for key mismatch
+		// Existing agent: key MUST match the pinned key. Key rotation is never allowed.
 		if existingKey != "" && target.PublicKey != existingKey {
-			// KEY ROTATION DETECTED
-
-			// Find if there is an active controller (Scenario A: Active Session)
-			var activeCtrl *live.AgentControl
-			live.AgentControlMap.Range(func(key, value interface{}) bool {
-				a := key.(*def.Emp3r0rAgent)
-				if a.UUID == target.UUID {
-					activeCtrl = value.(*live.AgentControl)
-					return false // stop iteration
-				}
-				return true
-			})
-
-			// Scenario A: Clone Attack (Parallel Session)
-			if activeCtrl != nil && activeCtrl.Conn != nil {
-				msg := fmt.Sprintf("CRITICAL SECURITY ALERT: Clone detected for %s! Active session has Key A, new request has Key B. Blocking.", target.UUID)
-				logging.Errorf("%s", msg)
-				operatorBroadcastPrintf(logging.ERROR, "%s", msg)
-				wrt.WriteHeader(http.StatusForbidden)
-				return
-			}
-
-			// Scenario B: Rotation Request
-			// Check pending
-			if _, pending := live.PendingKeyRotations.Load(target.UUID); pending {
-				// Already pending, just block
-				wrt.WriteHeader(http.StatusForbidden)
-				return
-			}
-
-			// Create Request
-			live.PendingKeyRotations.Store(target.UUID, target.PublicKey)
-
-			msg := fmt.Sprintf("CRITICAL: Agent %s requests key rotation. Run 'forget_agent %s' to remove old record and allow re-registration.", target.UUID, strconv.Quote(target.UUID))
-			logging.Warningf("%s", msg)
-			operatorBroadcastPrintf(logging.WARN, "%s", msg)
-			wrt.WriteHeader(http.StatusForbidden)
+			ips := strings.Join(target.IPs, ", ")
+			msg := fmt.Sprintf("SECURITY: agent %s presented a different key — rejecting (key rotation is disabled).\n"+
+				"  Rejected Payload Info:\n    User: %s\n    Host: %s\n    IPs:  %s\n    OS:   %s\n"+
+				"  If this is a legitimate reinstall, run `forget_agent %s` to reset its identity.",
+				target.UUID, target.User, target.Hostname, ips, target.OS, strconv.Quote(target.UUID))
+			logging.Errorf("%s", msg)
+			operatorBroadcastPrintf(logging.ERROR, "%s", msg)
+			http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
 			return
 		}
 	}
@@ -170,93 +154,42 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request, expectedUUID
 	// CA signature already verified via HTTP headers in dispatcher
 	target.From = req.RemoteAddr
 
+	logging.Infof("DEBUG-CHECKIN: Database pointer in handler_checkin is %p", agents.AgentDB)
+
 	// Update agent in memory (dispatcher already created placeholder)
 	// Find the placeholder and update it with full agent data from CBOR
-	isAgentNew := false
 	var existingCtrl *live.AgentControl
 	live.AgentControlMap.Range(func(key, value interface{}) bool {
 		a := key.(*def.Emp3r0rAgent)
 		if a.UUID == target.UUID {
 			existingCtrl = value.(*live.AgentControl)
-			// Check if this is the placeholder (no public key yet) or a real agent
-			if a.PublicKey == "" {
-				isAgentNew = true
+			if existingCtrl.Conn != nil {
+				logging.Warningf("handleAgentCheckIn: %s just connected, but state says it is already connected. This implies a ghost session.", target.Tag)
 			}
+			// TOFU: Public key remains pinned for existing agents
+			target.PublicKey = a.PublicKey
+
+			// Remove the old pointer so we can replace it cleanly
+			live.AgentControlMap.Delete(key)
 			return false
 		}
 		return true
 	})
 
-	if isAgentNew || existingCtrl != nil {
-		// Remove old entry (placeholder or existing agent)
-		live.AgentControlMap.Range(func(key, value interface{}) bool {
-			a := key.(*def.Emp3r0rAgent)
-			if a.UUID == target.UUID {
-				live.AgentControlMap.Delete(key)
-				return false
-			}
-			return true
-		})
-		// Store updated agent with full data
-		target.LastSeen = time.Now()
-		if existingCtrl != nil {
-			live.AgentControlMap.Store(target, existingCtrl)
-		} else {
-			inx := agents.AssignAgentIndex()
-			live.AgentControlMap.Store(target, &live.AgentControl{Index: inx, Conn: nil})
-		}
-		logging.Infof("Updated agent %s with full data from CBOR (public key length=%d)", strconv.Quote(target.UUID), len(target.PublicKey))
-
-		// Signal that public key is now available (for any waiting requests)
-		closeCheckinReadyChannel(target.UUID)
-		logging.Debugf("Signaled checkin completion for %s", strconv.Quote(target.UUID))
+	// Store updated agent pointer with full data into the map
+	target.LastSeen = time.Now()
+	if existingCtrl != nil {
+		live.AgentControlMap.Store(target, existingCtrl)
 	} else {
-		// Existing agent - update it in memory NOW to ensure pubkey and info are available
-		live.AgentControlMap.Range(func(key, value interface{}) bool {
-			a := key.(*def.Emp3r0rAgent)
-			ctrl := value.(*live.AgentControl)
-			if a.UUID == target.UUID {
-				// if agent is already connected, it must be the same instance
-				if ctrl.Conn != nil {
-					logging.Warningf("handleAgentCheckIn: %s just connected, but state says it is already connected. This implies a race condition or logic error.", target.Tag)
-				}
-				// Refresh all agent info to keep it current
-				a.Name = target.Name
-				a.Version = target.Version
-				a.Transport = target.Transport
-				a.Hostname = target.Hostname
-				a.Hardware = target.Hardware
-				a.Container = target.Container
-				a.CPU = target.CPU
-				a.GPU = target.GPU
-				a.Mem = target.Mem
-				a.OS = target.OS
-				a.GOOS = target.GOOS
-				a.Kernel = target.Kernel
-				a.Arch = target.Arch
-				a.From = target.From
-				a.IPs = target.IPs
-				a.ARP = target.ARP
-				a.User = target.User
-				a.HasRoot = target.HasRoot
-				a.HasTor = target.HasTor
-				a.HasInternet = target.HasInternet
-				a.NCSIEnabled = target.NCSIEnabled
-				a.Process = target.Process
-				a.Exes = target.Exes
-				a.CWD = target.CWD
-				a.Product = target.Product
-				// TOFU: Public key remains pinned for existing agents
-				// Already validated against existing key in key rotation check
-				if target.PublicKey != "" {
-					a.PublicKey = target.PublicKey
-				}
-				a.LastSeen = time.Now()
-				return false
-			}
-			return true
-		})
+		inx := agents.AssignAgentIndex()
+		live.AgentControlMap.Store(target, &live.AgentControl{Index: inx, Conn: nil})
 	}
+
+	logging.Infof("Updated agent %q with full data from CBOR", target.UUID)
+
+	// Signal that public key is now available (for any waiting requests)
+	closeCheckinReadyChannel(target.UUID)
+	logging.Debugf("Signaled checkin completion for %s", strconv.Quote(target.UUID))
 
 	// Now that agent is in memory with pubkey, safe to proceed with other operations
 	// (message tunnel requests can now resolve the pubkey)
@@ -285,45 +218,22 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request, expectedUUID
 	}
 
 	// ------------------------------------------------------------ // SECURITY: Clone Detection & Session Management
-	// ------------------------------------------------------------
-	// ------------------------------------------------------------ // DATABASE: Change Detection & Recording
-	// ------------------------------------------------------------
 	if agents.AgentDB != nil {
-		// Detect changes before recording new data
-		if err := agents.DetectAgentChanges(target); err != nil {
-			logging.Warningf("Failed to detect agent changes: %v", err)
-		}
-
-		// Record check-in
 		if err := agents.RecordAgentCheckin(target); err != nil {
 			logging.Warningf("Failed to record agent check-in: %v", err)
 		}
 	}
 
-	if isAgentNew {
-		shortname := strings.Split(target.Tag, "-agent")[0]
-		if util.IsExist(agents.AgentsJSON) {
-			if l := agents.RefreshAgentLabel(target); l != "" {
-				shortname = l
-			}
+	shortname := strings.Split(target.Tag, "-agent")[0]
+	if util.IsExist(agents.AgentsJSON) {
+		if l := agents.RefreshAgentLabel(target); l != "" {
+			shortname = l
 		}
+	}
+
+	if isNew {
 		logging.Infof("Checked in: %s from %s, running %s", strconv.Quote(shortname), fmt.Sprintf("'%s - %s'", target.From, target.Transport), strconv.Quote(target.OS))
 	} else {
-		// Existing agent - refresh system info logging
-		shortname := strings.Split(target.Tag, "-agent")[0]
-		if util.IsExist(agents.AgentsJSON) {
-			// Find the agent in memory to refresh label
-			live.AgentControlMap.Range(func(key, value interface{}) bool {
-				a := key.(*def.Emp3r0rAgent)
-				if a.UUID == target.UUID {
-					if l := agents.RefreshAgentLabel(a); l != "" {
-						shortname = l
-					}
-					return false
-				}
-				return true
-			})
-		}
 		if logging.Level >= 4 {
 			logging.Debugf("Agent reconnected: %s from %s, running %s", shortname, fmt.Sprintf("%s - %s", target.From, target.Transport), strconv.Quote(target.OS))
 		}

@@ -48,9 +48,12 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 	var tail []string
 
 	for _, target := range agents {
-		agentProc := *target.Process
-		procInfo := fmt.Sprintf("%s (%d) <- %s (%d)",
-			agentProc.Cmdline, agentProc.PID, agentProc.Parent, agentProc.PPID)
+		procInfo := "unknown"
+		if target.Process != nil {
+			agentProc := *target.Process
+			procInfo = fmt.Sprintf("%s (%d) <- %s (%d)",
+				agentProc.Cmdline, agentProc.PID, agentProc.Parent, agentProc.PPID)
+		}
 		ips := strings.Join(target.IPs, ", ")
 		infoMap := map[string]string{
 			"OS":      util.SplitLongLine(target.OS, 20),

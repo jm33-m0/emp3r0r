@@ -18,7 +18,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
-	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -410,21 +409,9 @@ func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
 		}
 		defer closeCheckinReadyChannel(agentUUID)
 
-		// Create synchronization channel for this checkin
-		// Handler will close it when public key is stored
+		// Synchronization channel creation
 		readyChan := make(chan struct{})
 		checkinReadyChannels.Store(agentUUID, readyChan)
-
-		// Pre-register agent placeholder to prevent race condition
-		if !agents.IsAgentExistByUUID(agentUUID) {
-			logging.Infof("Pre-registering agent %s before checkin handler processes CBOR body", strconv.Quote(agentUUID))
-			placeholder := &def.Emp3r0rAgent{
-				UUID:      agentUUID,
-				PublicKey: "", // Will be filled by handler after CBOR decode
-			}
-			inx := agents.AssignAgentIndex()
-			live.AgentControlMap.Store(placeholder, &live.AgentControl{Index: inx, Conn: nil})
-		}
 		handleAgentCheckIn(wrt, req, agentUUID)
 	case msgPath:
 		logging.Infof("apiDispatcher: routing to handleMessageTunnel (msg path)")

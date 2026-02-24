@@ -1,5 +1,9 @@
 package operator
 
+// generate_test.go — tests for MakeConfig flag handling.
+// Proxychain tests have been removed; the proxychain module is gone.
+// P2P/mesh tests are integration tests deferred to manual verification.
+
 import (
 	"encoding/json"
 	"os"
@@ -83,7 +87,7 @@ func TestMakeConfig_PreservesPaths(t *testing.T) {
 
 func TestMakeConfig_AllFlags(t *testing.T) {
 	// Setup temp config file
-	tmpFile, err := os.CreateTemp("", "emp3r0r_proxy_test.json")
+	tmpFile, err := os.CreateTemp("", "emp3r0r_flags_test.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +95,7 @@ func TestMakeConfig_AllFlags(t *testing.T) {
 	live.EmpConfigFile = tmpFile.Name()
 
 	// Mock Transport Paths
-	tmpDir, _ := os.MkdirTemp("", "emp3r0r_operator_test_proxy")
+	tmpDir, _ := os.MkdirTemp("", "emp3r0r_operator_test_flags")
 	defer os.RemoveAll(tmpDir)
 
 	transport.CaCrtFile = filepath.Join(tmpDir, "ca-cert.pem")
@@ -110,25 +114,23 @@ func TestMakeConfig_AllFlags(t *testing.T) {
 
 	// Base config (mimics emp3r0r.json state)
 	baseConfig := map[string]interface{}{
-		"cc_address":                         "127.0.0.1",
-		"cc_host":                            "127.0.0.1",
-		"cc_port":                            "1337",
-		"agent_socks_server_port":            "1338",
-		"ssh_host_key":                       "mock-key",
-		"agent_uuid":                         "mock-uuid",
-		"proxy_chain_broadcast_interval_min": 30,
-		"proxy_chain_broadcast_interval_max": 130, // Enabled in file
-		"enable_ncsi":                        false,
-		"use_kcp":                            false,
-		"is_run_by_stager":                   false,
-		"cdn_proxy":                          "",
-		"doh_server":                         "",
-		"c2_transport_proxy":                 "",
+		"cc_address":              "127.0.0.1",
+		"cc_host":                 "127.0.0.1",
+		"cc_port":                 "1337",
+		"agent_socks_server_port": "1338",
+		"ssh_host_key":            "mock-key",
+		"agent_uuid":              "mock-uuid",
+		"enable_ncsi":             false,
+		"use_kcp":                 false,
+		"is_run_by_stager":        false,
+		"cdn_proxy":               "",
+		"doh_server":              "",
+		"c2_transport_proxy":      "",
 	}
 
 	type fields struct {
 		flagName  string
-		flagValue string // "true", "false", or "string_value"
+		flagValue string
 	}
 	type checks struct {
 		checkFunc func(*testing.T, *def.Config)
@@ -139,31 +141,25 @@ func TestMakeConfig_AllFlags(t *testing.T) {
 		fields fields
 		checks checks
 	}{
-		// ProxyChain Tests (Previous Bug Fix)
+		// P2P / Mesh tests
 		{
-			name:   "ProxyChain Default (Flag Not Set)",
-			fields: fields{flagName: "", flagValue: ""}, // Not set
+			name:   "P2P Silent Node",
+			fields: fields{flagName: "p2p", flagValue: "true"},
 			checks: checks{func(t *testing.T, c *def.Config) {
-				if c.ProxyChainBroadcastIntervalMax != 0 {
-					t.Errorf("Expected ProxyChain Disabled (0), got %d", c.ProxyChainBroadcastIntervalMax)
+				if !c.IsP2PEnabled {
+					t.Errorf("Expected IsP2PEnabled=true")
+				}
+				if c.IsDirectC2Enabled {
+					t.Errorf("Expected IsDirectC2Enabled=false for silent node")
 				}
 			}},
 		},
 		{
-			name:   "ProxyChain Explicitly Disabled",
-			fields: fields{flagName: "proxychain", flagValue: "false"},
+			name:   "P2P Gateway (--p2p --direct-c2)",
+			fields: fields{flagName: "p2p", flagValue: "true"},
 			checks: checks{func(t *testing.T, c *def.Config) {
-				if c.ProxyChainBroadcastIntervalMax != 0 {
-					t.Errorf("Expected ProxyChain Disabled (0), got %d", c.ProxyChainBroadcastIntervalMax)
-				}
-			}},
-		},
-		{
-			name:   "ProxyChain Explicitly Enabled",
-			fields: fields{flagName: "proxychain", flagValue: "true"},
-			checks: checks{func(t *testing.T, c *def.Config) {
-				if c.ProxyChainBroadcastIntervalMax == 0 {
-					t.Errorf("Expected ProxyChain Enabled, but it was disabled")
+				if !c.IsP2PEnabled {
+					t.Errorf("Expected IsP2PEnabled=true")
 				}
 			}},
 		},
@@ -263,9 +259,8 @@ func TestMakeConfig_AllFlags(t *testing.T) {
 
 			// 2. Setup Command
 			cmd := &cobra.Command{}
-			cmd.Flags().BoolP("proxychain", "", false, "Enable auto proxy chain")
-			cmd.Flags().IntP("proxychain-wait-min", "", 0, "")
-			cmd.Flags().IntP("proxychain-wait-max", "", 0, "")
+			cmd.Flags().BoolP("p2p", "", false, "Enable P2P mesh networking")
+			cmd.Flags().BoolP("direct-c2", "", false, "Gateway mode")
 			cmd.Flags().String("cc", "", "")
 			cmd.Flags().String("cdn", "", "")
 			cmd.Flags().String("proxy", "", "")

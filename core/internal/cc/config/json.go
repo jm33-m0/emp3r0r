@@ -62,9 +62,7 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 
 	config_to_write.Bring2CCReverseProxyPort = getString("bring2cc_reverse_proxy_port")
 	config_to_write.SSHDShellPort = getString("sshd_shell_port")
-	config_to_write.ProxyChainBroadcastPort = getString("proxy_chain_broadcast_port")
-	config_to_write.ProxyChainBroadcastIntervalMin = getInt("proxy_chain_broadcast_interval_min")
-	config_to_write.ProxyChainBroadcastIntervalMax = getInt("proxy_chain_broadcast_interval_max")
+	config_to_write.MeshGossipPort = getString("mesh_gossip_port")
 	config_to_write.PreflightEnabled = getBool("preflight_enabled")
 	config_to_write.PreflightURL = getString("preflight_url")
 	config_to_write.PreflightMethod = getString("preflight_method")

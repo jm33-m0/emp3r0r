@@ -157,6 +157,30 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 				}
 
 				atomic.StoreInt64(&lastHandshake, time.Now().Unix())
+
+				// Issue AgentToken if missing or expiring within 6 hours.
+				// Trust condition: agent has a live MsgTun session (checked-in + communicating).
+				needsToken := agent.AgentToken == nil ||
+					time.Until(time.Unix(agent.AgentToken.ExpiresAt, 0)) < 6*time.Hour
+				if needsToken {
+					tok, err := SignAgentToken(agent.UUID, agent.From, def.CapabilityProxy, 24*time.Hour)
+					if err != nil {
+						logging.Errorf("handleMessageTunnel: SignAgentToken for %s: %v", agent.Name, err)
+					} else {
+						tokData, _ := cbor.Marshal(tok)
+						tokMsg := def.MsgTunData{
+							Tag:      def.TagAgentToken,
+							Response: tokData,
+						}
+						if err := encoder.Encode(tokMsg); err != nil {
+							logging.Errorf("handleMessageTunnel: send AgentToken to %s: %v", agent.Name, err)
+						} else {
+							logging.Infof("Sent AgentToken(cap=proxy) to %s", agent.Name)
+							agent.AgentToken = tok
+						}
+					}
+				}
+
 				continue // Handshake handled, next message
 			}
 

@@ -43,13 +43,15 @@ func GatherSystemDetails() *def.Emp3r0rAgent {
 	info.UUID = common.RuntimeConfig.AgentUUID
 	info.C2Host = common.RuntimeConfig.CCAddress
 
-	// Identity (TOFU)
+	// Identity (TOFU) — ensure key is generated
 	if AgentKey == nil {
 		if err := GetAgentKey(); err != nil {
 			logging.Errorf("Failed to get agent key: %v", err)
 		}
-	} else {
-		// Public Key
+	}
+	// Serialize key into payload. Must be a separate if (not else) — the block
+	// above may have just generated the key and we must serialize it either way.
+	if AgentKey != nil {
 		pubKeyBytes, err := transport.PublicKeyToPEM(&AgentKey.PublicKey)
 		if err != nil {
 			logging.Errorf("PublicKeyToPEM: %v", err)

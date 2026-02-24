@@ -94,6 +94,9 @@ func handleSendCommand(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Track the job ID so the message tunnel accepts the response
+	live.CmdTime.Store(*operation.JobID, time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST"))
+
 	// Send command to agent
 	err = agents.SendCmd(*operation.Command, *operation.JobID, agent)
 	if err != nil {
@@ -151,12 +154,13 @@ func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
 		}
 		return true
 	})
-	if targetAgent != nil {
+	if targetAgent != nil && targetAgent.Tag != "" {
 		agentDetails += fmt.Sprintf("\n  Tag: %s\n  Hostname: %s\n  IPs: %s\n  OS: %s",
 			targetAgent.Tag, targetAgent.Hostname, strings.Join(targetAgent.IPs, ", "), targetAgent.OS)
 	} else if agents.AgentDB != nil {
 		// Try to get from DB
 		stored, err := agents.GetStoredAgent(uuid)
+		// Try DB fallback even if targetAgent is a placeholder
 		if err == nil && stored != nil {
 			agentDetails += fmt.Sprintf("\n  Tag: %s\n  Hostname: %s\n  IPs: %s\n  OS: %s\n  (Offline/Database Record)",
 				stored.Tag, stored.Hostname, stored.IPAddresses, stored.OS)
@@ -182,11 +186,8 @@ func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
 		controllers.CleanupPortFwdsByAgent(targetAgent)
 		logging.Successf("Operator removed agent %s from memory", uuid)
 	}
-	// Clean up any pending key rotations for this agent
-	live.PendingKeyRotations.Delete(uuid)
-
 	wrt.WriteHeader(http.StatusOK)
-	wrt.Write([]byte(fmt.Sprintf("%s\n\nHas been forgotten.", agentDetails)))
+	fmt.Fprintf(wrt, "%s\n\nHas been forgotten.", agentDetails)
 }
 
 func handleListPortFwds(wrt http.ResponseWriter, _ *http.Request) {
@@ -280,7 +281,7 @@ func handleUnregisterPortFwd(wrt http.ResponseWriter, req *http.Request) {
 	wrt.WriteHeader(http.StatusOK)
 }
 
-func handleGetCA(wrt http.ResponseWriter, req *http.Request) {
+func handleGetCA(wrt http.ResponseWriter, _ *http.Request) {
 	defer func() {
 		if r := recover(); r != nil {
 			logging.Errorf("handleGetCA panicked: %v", r)

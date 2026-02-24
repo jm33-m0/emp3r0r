@@ -313,6 +313,30 @@ func TestFullAgentLifecycle(t *testing.T) {
 	}
 	t.Logf("✓ Key rotation correctly rejected (msg tunnel denied): %v", err)
 
+	// Simulate `forget_agent`
+	t.Logf("Testing forgotten agent recovery workflow...")
+	err = agents.RemoveAgent(agentUUID)
+	if err != nil {
+		t.Fatalf("Failed to remove agent from DB: %v", err)
+	}
+
+	// The agent should now be able to check in successfully with its new key!
+	err = c2transport.ReportStatus(config, agentInfo)
+	if err != nil {
+		t.Logf("ReportStatus returned error (expected or early EOF): %v", err)
+	}
+
+	time.Sleep(500 * time.Millisecond)
+
+	// Verify the message tunnel can now be established with the new key
+	recoveredConn, _, recoveredCancel, err := c2transport.EstablishC2Connection(failedMsgURL)
+	if err != nil {
+		t.Fatalf("Recovery failed: msg tunnel could not be established after forget_agent: %v", err)
+	}
+	recoveredCancel()
+	recoveredConn.Close()
+	t.Log("✓ Agent successfully recovered and re-registered after forget_agent")
+
 	t.Log("Full Agent Lifecycle Test Passed")
 	select {
 	case <-tunDone:

@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -11,6 +12,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
+// handleSignAgent handles operator requests to sign an agent UUID with the CA key.
 func handleSignAgent(wrt http.ResponseWriter, req *http.Request) {
 	var signReq def.SignRequest
 	decoder := cbor.NewDecoder(req.Body)
@@ -25,7 +27,6 @@ func handleSignAgent(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Sign the content (UUID)
 	sig, err := transport.SignWithCAKey(signReq.Content)
 	if err != nil {
 		logging.Errorf("handleSignAgent: failed to sign content: %v", err)
@@ -33,9 +34,7 @@ func handleSignAgent(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Base64 encode the signature
 	sigStr := base64.URLEncoding.EncodeToString(sig)
-
 	data, err := cbor.Marshal(sigStr)
 	if err != nil {
 		logging.Errorf("handleSignAgent: failed to marshal response: %v", err)
@@ -46,4 +45,26 @@ func handleSignAgent(wrt http.ResponseWriter, req *http.Request) {
 	wrt.Header().Set("Content-Type", "application/cbor")
 	wrt.WriteHeader(http.StatusOK)
 	wrt.Write(data)
+}
+
+// SignAgentToken issues a signed AgentToken for the given agent and capability.
+// SignWithCAKey hashes the payload internally, so we pass the raw payload string.
+func SignAgentToken(agentID, ip, capability string, duration time.Duration) (*def.AgentToken, error) {
+	expiresAt := time.Now().Add(duration).Unix()
+	payload := fmt.Sprintf("%s%s%s%d", agentID, ip, capability, expiresAt)
+	// Do NOT pre-hash: SignWithCAKey hashes the data internally (sha256).
+	sig, err := transport.SignWithCAKey([]byte(payload))
+	if err != nil {
+		return nil, fmt.Errorf("SignAgentToken: %v", err)
+	}
+
+	tok := &def.AgentToken{
+		AgentID:    agentID,
+		IP:         ip,
+		Capability: capability,
+		ExpiresAt:  expiresAt,
+		Signature:  sig,
+	}
+	logging.Infof("Issued AgentToken(cap=%s) for %s (expires in %v)", capability, agentID, duration)
+	return tok, nil
 }

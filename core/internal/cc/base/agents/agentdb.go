@@ -177,14 +177,14 @@ func RecordAgentCheckin(agent *def.Emp3r0rAgent) error {
 
 		logging.Infof("New agent recorded in database: %s", agent.UUID)
 	} else {
-		// Existing agent - update
-		query := `UPDATE agents SET tag = ?, public_key = ?, hostname = ?, os = ?, arch = ?, 
+		// Existing agent — update everything EXCEPT public_key (pinned at first registration,
+		// never rotated per security policy).
+		query := `UPDATE agents SET tag = ?, hostname = ?, os = ?, arch = ?,
 		          user = ?, ip_addresses = ?, last_seen = ?, connection_count = connection_count + 1
 		          WHERE uuid = ?`
 
 		_, err := AgentDB.Exec(query,
 			agent.Tag,
-			agent.PublicKey,
 			agent.Hostname,
 			agent.OS,
 			agent.Arch,
@@ -219,14 +219,6 @@ func DetectAgentChanges(agent *def.Emp3r0rAgent) error {
 
 	now := time.Now().Unix()
 	ipAddresses := strings.Join(agent.IPs, ",")
-
-	// Check for changes and log them
-	if stored.PublicKey != agent.PublicKey {
-		logging.Warningf("Agent %s rotated keys (Reboot/Reconnect)", agent.UUID)
-		if err := recordHistory(agent.UUID, "key_rotation", stored.PublicKey, agent.PublicKey, now); err != nil {
-			logging.Warningf("Failed to record key rotation: %v", err)
-		}
-	}
 
 	if stored.Hostname != agent.Hostname {
 		logging.Warningf("Agent %s hostname changed: %s → %s",
