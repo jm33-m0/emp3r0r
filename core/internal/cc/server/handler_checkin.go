@@ -136,10 +136,28 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request, expectedUUID
 		}
 	}
 
-	if len(existingKey) > 10 {
-		logging.Infof("DEBUG-CHECKIN: isNew=%v, existingKey_len=%d, targetKey_len=%d, existingKey=(%s...)", isNew, len(existingKey), len(target.PublicKey), existingKey[:10])
-	} else {
-		logging.Infof("DEBUG-CHECKIN: isNew=%v, existingKey_len=%d, targetKey_len=%d, existingKey=(%s)", isNew, len(existingKey), len(target.PublicKey), existingKey)
+	// remove debug lines that expose key contents
+	// ── Rate limiting: cap noisy logs/alerts per UUID ────────────────────────
+	// MUST run BEFORE any key-check so that a rogue agent hammering with a wrong
+	// key cannot flood the operator console or fill disk with logs.
+	{
+		now := time.Now()
+		// Prune timestamps older than 1 minute
+		validTimestamps := []time.Time{}
+		if val, exists := rotationRateLimiter.Load(target.UUID); exists {
+			for _, t := range val.([]time.Time) {
+				if now.Sub(t) < time.Minute {
+					validTimestamps = append(validTimestamps, t)
+				}
+			}
+		}
+		validTimestamps = append(validTimestamps, now)
+		rotationRateLimiter.Store(target.UUID, validTimestamps)
+		if len(validTimestamps) > 10 {
+			// Silent drop — reject but do NOT log or broadcast
+			http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			return
+		}
 	}
 
 	if !isNew {
@@ -150,6 +168,8 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request, expectedUUID
 				"  Rejected Payload Info:\n    User: %s\n    Host: %s\n    IPs:  %s\n    OS:   %s\n"+
 				"  If this is a legitimate reinstall, run `forget_agent %s` to reset its identity.",
 				target.UUID, target.User, target.Hostname, ips, target.OS, strconv.Quote(target.UUID))
+			// Only broadcast to operators if under the alert rate limit (3/min per UUID).
+			// The overall request rate limit above already caps requests at 10/min.
 			logging.Errorf("%s", msg)
 			operatorBroadcastPrintf(logging.ERROR, "%s", msg)
 			http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
@@ -199,29 +219,6 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request, expectedUUID
 
 	// Now that agent is in memory with pubkey, safe to proceed with other operations
 	// (message tunnel requests can now resolve the pubkey)
-
-	// ------------------------------------------------------------ // SECURITY: DoS Protection (Rate Limiting)
-	// ------------------------------------------------------------
-	now := time.Now()
-	// Prune old timestamps (> 1 minute)
-	validTimestamps := []time.Time{}
-	if val, exists := rotationRateLimiter.Load(target.UUID); exists {
-		timestamps := val.([]time.Time)
-		for _, t := range timestamps {
-			if now.Sub(t) < time.Minute {
-				validTimestamps = append(validTimestamps, t)
-			}
-		}
-	}
-	validTimestamps = append(validTimestamps, now)
-	rotationRateLimiter.Store(target.UUID, validTimestamps)
-
-	// Check limit (10 rotations per minute)
-	if len(validTimestamps) > 10 {
-		// Silent Drop: Stop processing to save CPU/Disk
-		logging.Warningf("Rate limit exceeded for agent %s, dropping request", target.UUID)
-		return
-	}
 
 	// ------------------------------------------------------------ // SECURITY: Clone Detection & Session Management
 	if agents.AgentDB != nil {
