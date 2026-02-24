@@ -89,6 +89,10 @@ func AcceptKCPConn(l *kcp.Listener, ctx context.Context) (net.Conn, error) {
 // bytes between a Silent Node and the real C2 without decrypting.
 func DialC2TLS(c2Addr, proxy string) (net.Conn, error) {
 	client := CreateEmp3r0rHTTPClient(c2Addr, proxy)
+	if client == nil || client.Transport == nil {
+		return nil, fmt.Errorf("DialC2TLS: failed to initialize HTTP client for %s", c2Addr)
+	}
+
 	transport, ok := client.Transport.(interface {
 		DialContext(ctx context.Context, network, addr string) (net.Conn, error)
 	})

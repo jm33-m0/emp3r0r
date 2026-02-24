@@ -8,6 +8,8 @@ import (
 	"net"
 	"time"
 
+	"runtime/debug"
+
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -110,6 +112,12 @@ func ServeRelay(ctx context.Context) {
 
 // handleRelayConn processes a single incoming relay connection.
 func handleRelayConn(ctx context.Context, peer net.Conn) {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("handleRelayConn panic: %v", r)
+			logging.Debugf("Stack trace: %s", debug.Stack())
+		}
+	}()
 	defer peer.Close()
 
 	// Read opcode
