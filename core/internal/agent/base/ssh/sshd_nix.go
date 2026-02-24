@@ -25,7 +25,7 @@ func setWinsize(f *os.File, w, h int) {
 		Cols: uint16(w),
 	}
 	if err := pty.Setsize(f, winsize); err != nil {
-		logging.Printf("error resizing pty: %s", err)
+		logging.Infof("error resizing pty: %s", err)
 	}
 }
 
@@ -39,7 +39,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 	if isMemShell {
 		shellData, err = util.ReadFileAgent(shell)
 		if err != nil {
-			logging.Printf("sshd: read shell %s from memory: %v", shell, err)
+			logging.Infof("sshd: read shell %s from memory: %v", shell, err)
 			return
 		}
 	} else {
@@ -83,12 +83,12 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			}
 
 			if !util.IsFileExist(custom_bash) {
-				logging.Printf("sshd: custom bash not found at %s, skipping custom bashrc", custom_bash)
+				logging.Infof("sshd: custom bash not found at %s, skipping custom bashrc", custom_bash)
 			} else {
 				bashrc := fmt.Sprintf("%s/.bashrc", temp_bash_dir)
 				err = external_file.ExtractBashRC(custom_bash, bashrc)
 				if err != nil {
-					logging.Printf("sshd: extract built-in bashrc: %v", err)
+					logging.Infof("sshd: extract built-in bashrc: %v", err)
 				} else if !isMemShell {
 					cmd = exec.Command(custom_bash)
 					os.Setenv("HOME", temp_bash_dir)
@@ -107,7 +107,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 				}
 			}
 			cmd.Args = tmp_args
-			logging.Printf("sshd execute: %v, args=%v, env=%s", cmd, cmd.Args, cmd.Env)
+			logging.Infof("sshd execute: %v, args=%v, env=%s", cmd, cmd.Args, cmd.Env)
 		}
 
 		ptyReq, winCh, isPTY := s.Pty()
@@ -116,7 +116,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			s.Write([]byte("Not a PTY request"))
 			return
 		}
-		logging.Printf("Got an SSH PTY request: %s", ptyReq.Term)
+		logging.Infof("Got an SSH PTY request: %s", ptyReq.Term)
 
 		var f *os.File
 		var pid int
@@ -151,20 +151,20 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 
 		go func() {
 			for win := range winCh {
-				logging.Printf("set pty size to %dx%d", win.Width, win.Height)
+				logging.Infof("set pty size to %dx%d", win.Width, win.Height)
 				setWinsize(f, win.Width, win.Height)
 			}
 		}()
 		go func() {
 			defer func() {
-				logging.Printf("Closing PTY file: %s", f.Name())
+				logging.Infof("Closing PTY file: %s", f.Name())
 				f.Close()
 				if util.IsPIDAlive(pid) {
 					p, _ := os.FindProcess(pid)
 					if p != nil {
 						p.Kill()
 					}
-					logging.Printf("Killed PTY process %d", pid)
+					logging.Infof("Killed PTY process %d", pid)
 				}
 			}()
 			_, err = io.Copy(f, s) // stdin
@@ -187,6 +187,6 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		}
 	})
 
-	logging.Printf("Starting SSHD on port %s...", port)
+	logging.Infof("Starting SSHD on port %s...", port)
 	return ssh_server.ListenAndServe()
 }

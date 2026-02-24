@@ -112,7 +112,7 @@ func CmdResetLayout(_ *cobra.Command, _ []string) {
 	if err != nil {
 		logging.Errorf("Failed to reset pane layout: %v", err)
 	} else {
-		logging.Printf("Pane layout reset to default proportions")
+		logging.Infof("Pane layout reset to default proportions")
 	}
 }
 

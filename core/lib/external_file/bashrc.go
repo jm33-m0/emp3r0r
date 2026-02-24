@@ -20,7 +20,7 @@ func ExtractBashRC(bash, bashrc string) error {
 	}
 	err = os.WriteFile(bashrc, bashrcData, 0o600)
 	if err != nil {
-		logging.Printf("Write bashrc: %v", err)
+		logging.Infof("Write bashrc: %v", err)
 	}
 
 	if !util.IsFileExist(bash) {

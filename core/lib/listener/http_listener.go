@@ -34,7 +34,7 @@ func encryptData(data []byte, key []byte) []byte {
 	if _, err := rand.Read(iv); err != nil {
 		logging.Fatalf("Failed to generate IV: %v", err)
 	}
-	logging.Printf("Generated IV: %s", hex.EncodeToString(iv))
+	logging.Infof("Generated IV: %s", hex.EncodeToString(iv))
 
 	// Use CTR mode for encryption
 	stream := cipher.NewCTR(block, iv)
@@ -74,26 +74,26 @@ func deriveKeyFromString(str string) []byte {
 	for i, v := range key {
 		binary.LittleEndian.PutUint32(keyBytes[i*4:], v)
 	}
-	logging.Printf("Derived key: %08x %08x %08x %08x\n", key[0], key[1], key[2], key[3])
+	logging.Infof("Derived key: %08x %08x %08x %08x\n", key[0], key[1], key[2], key[3])
 	return keyBytes[:16] // Ensure the key is 16 bytes long
 }
 
 // serveStager serves the encrypted stager file over HTTP.
 func serveStager(stager_enc []byte, port string) error {
 	if server != nil {
-		logging.Printf("Shutting down existing server on port %s", server.Addr)
+		logging.Infof("Shutting down existing server on port %s", server.Addr)
 		if err := server.Shutdown(context.TODO()); err != nil {
-			logging.Printf("Error shutting down server: %v", err)
+			logging.Infof("Error shutting down server: %v", err)
 		}
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		logging.Printf("Received request from %s", r.RemoteAddr)
+		logging.Infof("Received request from %s", r.RemoteAddr)
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(stager_enc)))
 		w.Write(stager_enc)
-		logging.Printf("Served encrypted stager to %s", r.RemoteAddr)
+		logging.Infof("Served encrypted stager to %s", r.RemoteAddr)
 	})
 
 	server = &http.Server{
@@ -101,7 +101,7 @@ func serveStager(stager_enc []byte, port string) error {
 		Handler: mux,
 	}
 
-	logging.Printf("Starting HTTP server on port %s", port)
+	logging.Infof("Starting HTTP server on port %s", port)
 	return server.ListenAndServe()
 }
 
@@ -125,7 +125,7 @@ func HTTPAESCompressedListener(stagerPath string, port string, keyStr string, co
 	}
 	encryptedStager := encryptData(toEncrypt, key)
 
-	logging.Printf("Serving encrypted stager file on port %s", port)
+	logging.Infof("Serving encrypted stager file on port %s", port)
 	return serveStager(encryptedStager, port)
 }
 
@@ -136,16 +136,16 @@ func HTTPBareListener(stagerPath string, port string) error {
 		return fmt.Errorf("failed to read stager file: %v", err)
 	}
 
-	logging.Printf("Serving stager file on port %s", port)
+	logging.Infof("Serving stager file on port %s", port)
 	return serveStager(stager, port)
 }
 
 // StopHTTP stops the HTTP server.
 func StopHTTP() {
 	if server != nil {
-		logging.Printf("Shutting down HTTP server on %s", server.Addr)
+		logging.Infof("Shutting down HTTP server on %s", server.Addr)
 		if err := server.Shutdown(context.TODO()); err != nil {
-			logging.Printf("Error shutting down HTTP server: %v", err)
+			logging.Infof("Error shutting down HTTP server: %v", err)
 		}
 		server = nil
 	}

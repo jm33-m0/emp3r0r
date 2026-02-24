@@ -66,7 +66,7 @@ func PutFile(lpath, rpath string, a *def.Emp3r0rAgent, saveToMemory bool) error 
 	// file size
 	size := util.FileSize(lpath)
 	sizemB := float32(size) / 1024 / 1024
-	logging.Printf("\nPutFile:\nUploading '%s' to\n'%s' "+
+	logging.Infof("\nPutFile:\nUploading '%s' to\n'%s' "+
 		"on %s, agent [%s]\n"+
 		"size: %d bytes (%.2fMB)\n"+
 		"sha256sum: %s",
@@ -176,7 +176,7 @@ func GetFile(file_path string, agent *def.Emp3r0rAgent) (ftpSh *network.StreamHa
 		err = fmt.Errorf("GetFile: %s allocate file: %v", file_path, err)
 		return
 	}
-	logging.Printf("We will be downloading %s, %d bytes in total (%s)", file_path, filesize, fileinfo.Checksum)
+	logging.Infof("We will be downloading %s, %d bytes in total (%s)", file_path, filesize, fileinfo.Checksum)
 
 	// what if we have downloaded part of the file
 	var offset int64 = 0

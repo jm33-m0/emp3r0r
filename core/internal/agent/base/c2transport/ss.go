@@ -18,12 +18,12 @@ func startShadowsocksClient(ss_serverAddr, localSocksAddr, tcptun string) {
 	ss_config := createSSConfig(ss_serverAddr, localSocksAddr, tcptun, false)
 	err := transport.SSMain(ss_config)
 	if err != nil {
-		logging.Printf("ShadowsocksProxy failed to start: %v", err)
+		logging.Infof("ShadowsocksProxy failed to start: %v", err)
 		return
 	}
 
 	defer func() {
-		logging.Printf("Shadowsocks client (%v) exited", ss_config)
+		logging.Infof("Shadowsocks client (%v) exited", ss_config)
 		ss_config.Cancel()
 	}()
 
@@ -56,7 +56,7 @@ func shadowsocksC2Client() {
 		ss_server_port = common.RuntimeConfig.KCPClientPort
 		ss_server_addr = "127.0.0.1"
 	} else {
-		logging.Printf("C2 traffic will go through Shadowsocks: %s:%s",
+		logging.Infof("C2 traffic will go through Shadowsocks: %s:%s",
 			common.RuntimeConfig.CCAddress,
 			common.RuntimeConfig.ShadowsocksServerPort)
 	}
@@ -69,7 +69,7 @@ func shadowsocksC2Client() {
 
 // StartLocalSocks client, you get a SOCKS5 proxy server at lport
 func StartLocalSocks(ss_server, lport string) {
-	logging.Printf("StartLocalSocks: %s:%s", ss_server, lport)
+	logging.Infof("StartLocalSocks: %s:%s", ss_server, lport)
 	ss_server_port := common.RuntimeConfig.ShadowsocksServerPort
 	ss_server_ip := ss_server
 
@@ -101,7 +101,7 @@ func RunSSServer() error {
 	ss_config.Cancel = cancel
 
 	// start server
-	logging.Printf("Shadowsocks Server: %v", ss_config)
+	logging.Infof("Shadowsocks Server: %v", ss_config)
 
 	err := transport.SSMain(ss_config)
 	if err != nil {

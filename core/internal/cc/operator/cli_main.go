@@ -85,7 +85,7 @@ func CliMain(wg_server_ip string, wg_server_port int) {
 		if r := recover(); r != nil {
 			logging.Fatalf("CliMain panicked: %v", r)
 		}
-		logging.Printf("CliMain resumed (or returned normally)")
+		logging.Infof("CliMain resumed (or returned normally)")
 	}()
 	OperatorPort = wg_server_port + 1
 	ServerIP = wg_server_ip

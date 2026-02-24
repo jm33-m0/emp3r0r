@@ -83,7 +83,7 @@ func putCmdRun(cmd *cobra.Command, args []string) {
 	}
 
 	// Download to memory buffer first
-	logging.Printf("putCmdRun: downloading %s to memory buffer", fileName)
+	logging.Infof("putCmdRun: downloading %s to memory buffer", fileName)
 	data, err := c2transport.FetchFile(common.RuntimeConfig, downloadAddr, fileName, "", origChecksum)
 	if err != nil {
 		c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("put: failed to download to memory buffer %s: %v", fileName, err))
@@ -149,7 +149,7 @@ func decryptCmdRun(cmd *cobra.Command, args []string) {
 		c2transport.NotifyC2(cmd, "Output path not specified, using: %s", out)
 	}
 
-	logging.Printf("Decrypting %s to %s", path, out)
+	logging.Infof("Decrypting %s to %s", path, out)
 	data, err := util.ReadFileAgent(path)
 	if err != nil {
 		c2transport.NotifyC2(cmd, "Read error: %v", err)

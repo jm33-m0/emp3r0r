@@ -31,7 +31,7 @@ func GetOSInfo() *OSInfo {
 	)
 	err := windows.IsWow64Process(handle, &isWoW64)
 	if err != nil {
-		logging.Printf("isWow64Process: %v", err)
+		logging.Infof("isWow64Process: %v", err)
 		return &osinfo
 	}
 
@@ -50,22 +50,22 @@ func GetOSInfo() *OSInfo {
 func getOSName() string {
 	current_ver_key, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows NT\CurrentVersion`, registry.QUERY_VALUE)
 	if err != nil {
-		logging.Printf("getOSRelease: open key: %v", err)
+		logging.Infof("getOSRelease: open key: %v", err)
 	}
 	defer current_ver_key.Close()
 	product_name, _, err := current_ver_key.GetStringValue(`ProductName`)
 	if err != nil {
-		logging.Printf("product name: %v", err)
+		logging.Infof("product name: %v", err)
 		product_name = "Unknown_Product"
 	}
 	owner, _, err := current_ver_key.GetStringValue(`RegisteredOwner`)
 	if err != nil {
-		logging.Printf("registered owner: %v", err)
+		logging.Infof("registered owner: %v", err)
 		product_name = "Unknown_Owner"
 	}
 	install_date_unix, _, err := current_ver_key.GetIntegerValue(`InstallDate`)
 	if err != nil {
-		logging.Printf("install date: %v", err)
+		logging.Infof("install date: %v", err)
 		install_date_unix = 0
 	}
 	install_time := time.Unix(int64(install_date_unix), 0)
@@ -74,7 +74,7 @@ func getOSName() string {
 }
 
 func GetKernelVersion() (ver string) {
-	logging.Println("Reading kernel version...")
+	logging.Infof("Reading kernel version...")
 	ver = def.Unknown
 	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows NT\CurrentVersion`, registry.QUERY_VALUE)
 	if err != nil {
@@ -111,7 +111,7 @@ func GetKernelVersion() (ver string) {
 	}
 	buildlab_ex, _, err := k.GetStringValue("BuildLabEx")
 	if err != nil {
-		logging.Printf("buildLabEx: %v", err)
+		logging.Infof("buildLabEx: %v", err)
 		buildlab_ex = cb
 	}
 

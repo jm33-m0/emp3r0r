@@ -31,12 +31,12 @@ func IsUserPrivileged(token windows.Token) (result bool) {
 		0, 0, 0, 0, 0, 0,
 		&sid)
 	if err != nil {
-		logging.Printf("SID Error: %s", err)
+		logging.Infof("SID Error: %s", err)
 		return false
 	}
 	result, err = token.IsMember(sid)
 	if err != nil {
-		logging.Printf("Token Membership Error: %s", err)
+		logging.Infof("Token Membership Error: %s", err)
 		return
 	}
 

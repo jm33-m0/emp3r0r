@@ -24,7 +24,7 @@ func genC2TransportString() (transport_str string) {
 		// parse proxy url
 		proxyURL, err := url.Parse(common.RuntimeConfig.C2TransportProxy)
 		if err != nil {
-			logging.Printf("invalid proxy URL: %v", err)
+			logging.Infof("invalid proxy URL: %v", err)
 		}
 
 		// if the proxy port is emp3r0r proxy server's port

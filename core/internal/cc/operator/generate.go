@@ -118,13 +118,13 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 
 	// Informational messages (UI layer)
 	if payloadType == PayloadTypeLinuxExecutable {
-		logging.Printf("Use stager module to create a shared library stager that delivers the agent with encryption and compression. You will need another stager to load the shared library (or use LD_PRELOAD)")
+		logging.Infof("Use stager module to create a shared library stager that delivers the agent with encryption and compression. You will need another stager to load the shared library (or use LD_PRELOAD)")
 	}
 	if payloadType == PayloadTypeLinuxSO {
-		logging.Printf("Note: linux_so supports CGO and can be loaded as a shared library using LD_PRELOAD or dlopen()")
+		logging.Infof("Note: linux_so supports CGO and can be loaded as a shared library using LD_PRELOAD or dlopen()")
 	}
 	if payloadType == PayloadTypeWindowsDLL {
-		logging.Printf("Note: windows_dll supports CGO and can be loaded as a DLL using LoadLibrary() or similar methods")
+		logging.Infof("Note: windows_dll supports CGO and can be loaded as a DLL using LoadLibrary() or similar methods")
 	}
 }
 
@@ -177,7 +177,7 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 		live.RuntimeConfig.CCAddress = cc_host
 	}
 	live.RuntimeConfig.CCAddress = strings.TrimSuffix(live.RuntimeConfig.CCAddress, "/")
-	logging.Printf("C2 server name: %s", live.RuntimeConfig.CCAddress)
+	logging.Infof("C2 server name: %s", live.RuntimeConfig.CCAddress)
 	existing_names := transport.NamesInCert(transport.ServerCrtFile)
 
 	exists := slices.Contains(existing_names, live.RuntimeConfig.CCAddress)
@@ -204,7 +204,7 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 		live.RuntimeConfig.EnableNCSI = ncsi
 	}
 	if live.RuntimeConfig.EnableNCSI {
-		logging.Printf("NCSI is enabled")
+		logging.Infof("NCSI is enabled")
 	}
 
 	// CDN proxy
@@ -212,14 +212,14 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 		live.RuntimeConfig.CDNProxy = cdn_proxy
 	}
 	if live.RuntimeConfig.CDNProxy != "" {
-		logging.Printf("Using CDN proxy %s", live.RuntimeConfig.CDNProxy)
+		logging.Infof("Using CDN proxy %s", live.RuntimeConfig.CDNProxy)
 	}
 
 	if cmd.Flags().Changed("kcp") {
 		live.RuntimeConfig.UseKCP = kcp
 	}
 	if live.RuntimeConfig.UseKCP {
-		logging.Printf("Using KCP")
+		logging.Infof("Using KCP")
 	}
 
 	// agent proxy for c2 transport
@@ -227,14 +227,14 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 		live.RuntimeConfig.C2TransportProxy = c2transport_proxy
 	}
 	if live.RuntimeConfig.C2TransportProxy != "" {
-		logging.Printf("Using C2 transport proxy %s", live.RuntimeConfig.C2TransportProxy)
+		logging.Infof("Using C2 transport proxy %s", live.RuntimeConfig.C2TransportProxy)
 	}
 
 	if cmd.Flags().Changed("doh") || doh_server != "" {
 		live.RuntimeConfig.DoHServer = doh_server
 	}
 	if live.RuntimeConfig.DoHServer != "" {
-		logging.Printf("Using DoH server %s", live.RuntimeConfig.DoHServer)
+		logging.Infof("Using DoH server %s", live.RuntimeConfig.DoHServer)
 	}
 
 	// malleable C2
@@ -309,7 +309,7 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 		// Max should be larger than min
 		live.RuntimeConfig.PreflightIntervalMax = live.RuntimeConfig.PreflightIntervalMin + util.RandInt(30, 300)
 	}
-	logging.Printf("Conditional C2 (Hybrid Mode) beacon interval: %d - %d seconds",
+	logging.Infof("Conditional C2 (Hybrid Mode) beacon interval: %d - %d seconds",
 		live.RuntimeConfig.PreflightIntervalMin, live.RuntimeConfig.PreflightIntervalMax)
 
 	// Mesh / P2P mode — always reset first to avoid stale state from a
@@ -338,23 +338,23 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 		if len(live.RuntimeConfig.InitialPeers) == 0 {
 			return fmt.Errorf("Silent Node build requires --peers: specify at least one Gateway IP:gossipport (e.g. --peers 1.2.3.4:51996)")
 		}
-		logging.Printf("Silent Node bootstrap peers: %v", live.RuntimeConfig.InitialPeers)
+		logging.Infof("Silent Node bootstrap peers: %v", live.RuntimeConfig.InitialPeers)
 	}
 
 	switch {
 	case live.RuntimeConfig.IsP2PEnabled && live.RuntimeConfig.IsDirectC2Enabled:
-		logging.Printf("Mode: Gateway (P2P mesh + direct C2 + preflight)")
+		logging.Infof("Mode: Gateway (P2P mesh + direct C2 + preflight)")
 	case live.RuntimeConfig.IsP2PEnabled:
-		logging.Printf("Mode: Silent Node (P2P mesh only, no direct C2)")
+		logging.Infof("Mode: Silent Node (P2P mesh only, no direct C2)")
 	default:
-		logging.Printf("Mode: Standalone (direct C2, no mesh)")
+		logging.Infof("Mode: Standalone (direct C2, no mesh)")
 	}
 
 	if cmd.Flags().Changed("stager") {
 		live.RuntimeConfig.IsRunByStager = is_stager
 	}
 	if live.RuntimeConfig.IsRunByStager {
-		logging.Printf("Agent is built for stager")
+		logging.Infof("Agent is built for stager")
 	}
 
 	// save emp3r0r.json

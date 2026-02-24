@@ -26,7 +26,7 @@ func Check(config *def.Config) bool {
 		return true
 	}
 
-	logging.Printf("Performing Preflight Check: %s", url)
+	logging.Infof("Performing Preflight Check: %s", url)
 
 	// 1. Prepare Payload
 	timestamp := time.Now().Unix()
@@ -109,6 +109,6 @@ func Check(config *def.Config) bool {
 		return false
 	}
 
-	logging.Printf("Preflight Success! %s", pfResp.Instruction)
+	logging.Infof("Preflight Success! %s", pfResp.Instruction)
 	return true
 }

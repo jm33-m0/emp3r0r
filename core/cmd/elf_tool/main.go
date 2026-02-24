@@ -41,6 +41,6 @@ func main() {
 		if err != nil {
 			logging.Fatalf("Error adding library to DT_NEEDED entries: %v", err)
 		}
-		logging.Printf("Added %s to DT_NEEDED entries", *libName)
+		logging.Infof("Added %s to DT_NEEDED entries", *libName)
 	}
 }

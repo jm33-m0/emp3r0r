@@ -23,12 +23,12 @@ func CmdJobs(c *console.Console) *cobra.Command {
 					logging.Errorf("Job %s not found", jobID)
 					return
 				}
-				logging.Printf("Job ID: %s", job.ID)
-				logging.Printf("Name: %s", job.Name)
-				logging.Printf("Agent: %s", job.AgentTag)
-				logging.Printf("Module: %s", job.Module)
-				logging.Printf("Status: %d", job.Status)
-				logging.Printf("Created: %s", job.Created)
+				logging.Infof("Job ID: %s", job.ID)
+				logging.Infof("Name: %s", job.Name)
+				logging.Infof("Agent: %s", job.AgentTag)
+				logging.Infof("Module: %s", job.Module)
+				logging.Infof("Status: %d", job.Status)
+				logging.Infof("Created: %s", job.Created)
 				return
 			}
 
@@ -63,7 +63,7 @@ func CmdJobs(c *console.Console) *cobra.Command {
 			}
 
 			table := cli.BuildTable(header, tdata)
-			logging.Printf("\n%s", table)
+			logging.Infof("\n%s", table)
 		},
 	}
 	cmd.Flags().String("id", "", "Job ID to inspect")

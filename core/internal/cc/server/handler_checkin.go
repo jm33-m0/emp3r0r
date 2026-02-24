@@ -24,6 +24,12 @@ var rotationRateLimiter sync.Map
 
 // handleAgentCheckIn processes agent check-in requests.
 func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request, expectedUUID string) {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("handleAgentCheckIn panic: %v\n%s", r, util.CallStack())
+			http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
+	}()
 	expectedUUID = util.StripANSI(expectedUUID)
 	if expectedUUID == "" {
 		logging.Warningf("handleAgentCheckIn: empty expected UUID")

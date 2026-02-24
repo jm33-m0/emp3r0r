@@ -47,9 +47,9 @@ func CliPrettyPrint(header1, header2 string, map2write *map[string]string) {
 		c1_split := util.SplitLongLine(c1, 40)
 		c2_split := util.SplitLongLine(c2, 60)
 
-		logging.Printf("%s: %s\n",
+		logging.Infof("%s: %s\n",
 			color.HiCyanString("%-40s", c1_split),
 			color.WhiteString(c2_split))
 	}
-	logging.Printf("\n")
+	logging.Infof("\n")
 }

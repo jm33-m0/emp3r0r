@@ -44,6 +44,10 @@ var (
 	// unreachable. agent.go listens on this to drop and rebuild the HTTP client.
 	// Buffer=1 so the send is non-blocking; the agent drains it when it reacts.
 	GatewayDeadCh = make(chan struct{}, 1)
+
+	// gatewayReadyCh receives a token whenever watchPeers confirms a live gateway.
+	// Buffer=1 so producers never block; WaitForRoute drains it.
+	gatewayReadyCh = make(chan struct{}, 1)
 )
 
 // SetDistance updates this node's advertised distance.
@@ -99,17 +103,17 @@ func Start(ctx context.Context) {
 // block again until watchPeers sets a new live gateway.
 func WaitForRoute() string {
 	logging.Infof("Mesh: waiting for route to C2...")
-	// On first call: block until routeReady is closed (first gateway ever found).
+	// First call: block until routeReady is closed (first gateway ever found).
 	<-routeReady
-	// After first gateway: poll until GetGatewayIP() is non-empty
-	// (handles the case where we lost a gateway and are waiting for a new one).
+	// Subsequent calls (e.g. after failover): block on the ready channel.
 	for {
 		ip := GetGatewayIP()
 		if ip != "" {
 			logging.Infof("Mesh: route ready (gateway %s)", ip)
 			return ip
 		}
-		time.Sleep(300 * time.Millisecond)
+		// Block until watchPeers signals a new gateway is available.
+		<-gatewayReadyCh
 	}
 }
 
@@ -179,6 +183,11 @@ func watchPeers(ctx context.Context) {
 			}
 			// Signal WaitForRoute on first success.
 			routeOnce.Do(func() { close(routeReady) })
+			// Also wake any WaitForRoute callers waiting for a new gateway after failover.
+			select {
+			case gatewayReadyCh <- struct{}{}:
+			default:
+			}
 			return true
 		}
 		return false

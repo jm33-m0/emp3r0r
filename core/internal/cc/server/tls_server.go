@@ -32,7 +32,7 @@ func StartC2AgentTLSServer() {
 	if live.RuntimeConfig.PreflightEnabled && live.RuntimeConfig.PreflightURL != "" {
 		u, err := url.Parse(live.RuntimeConfig.PreflightURL)
 		if err == nil {
-			logging.Printf("Registering Preflight handler at %s", u.Path)
+			logging.Infof("Registering Preflight handler at %s", u.Path)
 			r.HandleFunc(u.Path, func(w http.ResponseWriter, req *http.Request) {
 				// Read Body
 				body, err := io.ReadAll(req.Body)

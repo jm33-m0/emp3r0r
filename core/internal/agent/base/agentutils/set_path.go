@@ -60,5 +60,5 @@ func InitializePath() {
 	}
 
 	os.Setenv("PATH", path_str)
-	logging.Printf("PATH=%s", path_str)
+	logging.Infof("PATH=%s", path_str)
 }

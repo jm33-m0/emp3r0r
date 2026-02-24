@@ -31,7 +31,7 @@ func TestConnectivity(test_url, proxy string) bool {
 	if test_url != MicrosoftNCSIURL {
 		client = CreateEmp3r0rHTTPClient(test_url, proxy)
 		if client == nil {
-			logging.Printf("TestConnectivity: cannot create http client for %s", test_url)
+			logging.Infof("TestConnectivity: cannot create http client for %s", test_url)
 			return false
 		}
 	}
@@ -64,10 +64,10 @@ func IsProxyOK(proxy, test_url string) bool {
 	if proxy == "" || test_url == "" {
 		return false
 	}
-	logging.Printf("IsProxyOK: testing proxy %s with %s", proxy, test_url)
+	logging.Infof("IsProxyOK: testing proxy %s with %s", proxy, test_url)
 	client := CreateEmp3r0rHTTPClient(test_url, proxy)
 	if client == nil {
-		logging.Printf("IsProxyOK: cannot create http client")
+		logging.Infof("IsProxyOK: cannot create http client")
 		return false
 	}
 	resp, err := client.Get(test_url)
@@ -80,7 +80,7 @@ func IsProxyOK(proxy, test_url string) bool {
 	if err != nil {
 		return false
 	}
-	logging.Printf("IsProxyOK: testing proxy %s: %s, looks fine", proxy, respData)
+	logging.Infof("IsProxyOK: testing proxy %s: %s, looks fine", proxy, respData)
 
 	// MicrosoftNCSIURL
 	if test_url == MicrosoftNCSIURL {

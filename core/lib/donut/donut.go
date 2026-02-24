@@ -15,7 +15,7 @@ func DonoutPE2Shellcode(executable_file, arch_choice string) {
 		logging.Errorf("Donut: %s: %v", out, err)
 		return
 	}
-	logging.Printf("Generated shellcode:\n%s", out)
+	logging.Infof("Generated shellcode:\n%s", out)
 }
 
 // DonutShellcodeFromFile returns a Donut shellcode for the given PE file

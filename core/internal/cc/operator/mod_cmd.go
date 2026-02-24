@@ -59,7 +59,7 @@ func listModOptionsTable() {
 	// reuse BuildTable helper
 	tableStr := cli.BuildTable([]string{"Option", "Help", "Value"}, rows)
 	cli.AdaptiveTable(tableStr)
-	logging.Printf("\n%s", tableStr)
+	logging.Infof("\n%s", tableStr)
 }
 
 func cmdModuleRun(cmd *cobra.Command, _ []string) {
@@ -73,7 +73,7 @@ func cmdModuleRun(cmd *cobra.Command, _ []string) {
 		force, _ := cmd.Flags().GetBool("force")
 		if !force {
 			logging.Warningf("Module %s is not fileless and may drop files or modify system configuration.", live.ActiveModule.Name)
-			logging.Printf("Run with 'run --force' to confirm.")
+			logging.Infof("Run with 'run --force' to confirm.")
 			return
 		}
 	}
@@ -135,7 +135,7 @@ func cmdListModules(_ *cobra.Command, _ []string) {
 	}
 	tableStr := cli.BuildTable([]string{"Module", "Description"}, rows)
 	cli.AdaptiveTable(tableStr)
-	logging.Printf("\n%s", tableStr)
+	logging.Infof("\n%s", tableStr)
 }
 
 func cmdSearchModule(cmd *cobra.Command, args []string) {
@@ -146,7 +146,7 @@ func cmdSearchModule(cmd *cobra.Command, args []string) {
 	}
 	tableStr := cli.BuildTable([]string{"Module", "Description"}, row)
 	cli.AdaptiveTable(tableStr)
-	logging.Printf("\n%s", tableStr)
+	logging.Infof("\n%s", tableStr)
 }
 
 func cmdModuleListOptions(_ *cobra.Command, _ []string) {

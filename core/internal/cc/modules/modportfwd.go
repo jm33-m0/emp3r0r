@@ -107,7 +107,7 @@ func ModulePortFwd(ctx *c2context.C2Context) {
 		pf.Agent = activeAgent
 		pf.ShReady = make(chan struct{})
 		go func() {
-			logging.Printf("RunReversedPortFwd: %s:%s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.BindAddr, pf.Lport, pf.To, pf.Protocol)
+			logging.Infof("RunReversedPortFwd: %s:%s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.BindAddr, pf.Lport, pf.To, pf.Protocol)
 			initErr := pf.InitReversedPortFwd()
 			if initErr != nil {
 				logging.Errorf("PortFwd (reverse) failed: %v", initErr)
@@ -133,7 +133,7 @@ func ModulePortFwd(ctx *c2context.C2Context) {
 		pf.Agent = activeAgent
 		pf.ShReady = make(chan struct{})
 		go func() {
-			logging.Printf("RunPortFwd: %s:%s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.BindAddr, pf.Lport, pf.To, pf.Protocol)
+			logging.Infof("RunPortFwd: %s:%s -> %s (%s), make a connection and it will appear in `ls_port_fwds`", pf.BindAddr, pf.Lport, pf.To, pf.Protocol)
 			runErr := pf.RunPortFwd()
 			if runErr != nil {
 				logging.Errorf("PortFwd failed: %v", runErr)
@@ -225,7 +225,7 @@ func moduleProxy(ctx *c2context.C2Context) {
 			logging.Errorf("Timeout waiting for agent to start SOCKS5 proxy")
 			return
 		} else {
-			logging.Printf("Agent started SOCKS5 proxy")
+			logging.Infof("Agent started SOCKS5 proxy")
 			// TCP forwarding
 			go func() {
 				err := pf.RunPortFwd()

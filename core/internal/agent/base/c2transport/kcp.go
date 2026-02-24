@@ -21,7 +21,7 @@ func RunKCPClient() {
 	if !common.RuntimeConfig.UseKCP {
 		return
 	}
-	logging.Printf("C2 traffic will go through KCP tunnel at port %s, KCP server port %s, C2 port %s",
+	logging.Infof("C2 traffic will go through KCP tunnel at port %s, KCP server port %s, C2 port %s",
 		common.RuntimeConfig.KCPClientPort, common.RuntimeConfig.KCPServerPort, common.RuntimeConfig.CCPort)
 	// this context ends when agent exits
 	KCPC2Ctx, KCPC2Cancel = context.WithCancel(context.Background())
@@ -33,6 +33,6 @@ func RunKCPClient() {
 	err := transport.KCPTunClient(kcp_server_addr, common.RuntimeConfig.KCPClientPort,
 		common.RuntimeConfig.Password, def.MagicString, KCPC2Ctx, KCPC2Cancel)
 	if err != nil {
-		logging.Printf("RunKCPClient failed to start: %v", err)
+		logging.Infof("RunKCPClient failed to start: %v", err)
 	}
 }

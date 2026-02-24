@@ -194,7 +194,7 @@ func runSSHD(cmd *cobra.Command, args []string) {
 		c2transport.NotifyC2(cmd, "Error: args error\n")
 		return
 	}
-	logging.Printf("Got sshd request: %v", args)
+	logging.Infof("Got sshd request: %v", args)
 	errChan := make(chan error)
 	go func() {
 		defer func() {
@@ -228,7 +228,7 @@ func runProxy(cmd *cobra.Command, args []string) {
 		c2transport.NotifyC2(cmd, "Error: args error\n")
 		return
 	}
-	logging.Printf("Got proxy request: %v", args)
+	logging.Infof("Got proxy request: %v", args)
 	err := modules.Socks5Proxy(mode, addr)
 	if err != nil {
 		c2transport.NotifyC2(cmd, "Error: Failed to start Socks5Proxy: %v\n", err)
@@ -358,7 +358,7 @@ func runListener(cmd *cobra.Command, args []string) {
 		c2transport.NotifyC2(cmd, "Error: payload not specified\n")
 		return
 	}
-	logging.Printf("Got listener request: %v", args)
+	logging.Infof("Got listener request: %v", args)
 	errChan := make(chan error)
 	switch listenerType {
 	case "http_aes_compressed":

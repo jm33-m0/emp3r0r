@@ -77,7 +77,7 @@ func StartSocks5Proxy(addr, doh string, proxyserver *socks5.Server, onListen fun
 // port: listen on this port
 func TCPFwd(addr, port string, ctx context.Context, cancel context.CancelFunc) (err error) {
 	defer func() {
-		logging.Printf("%s <- 0.0.0.0:%s exited", addr, port)
+		logging.Infof("%s <- 0.0.0.0:%s exited", addr, port)
 		cancel()
 	}()
 	serveConn := func(conn net.Conn) {
@@ -108,10 +108,10 @@ func TCPFwd(addr, port string, ctx context.Context, cancel context.CancelFunc) (
 			time.Sleep(time.Duration(20) * time.Millisecond)
 		}
 	}
-	logging.Printf("[+] Serving %s on 0.0.0.0:%s...", addr, port)
+	logging.Infof("[+] Serving %s on 0.0.0.0:%s...", addr, port)
 	l, err := net.Listen("tcp", "0.0.0.0:"+port)
 	if err != nil {
-		logging.Printf("unable to listen on 0.0.0.0:%s: %v", port, err)
+		logging.Infof("unable to listen on 0.0.0.0:%s: %v", port, err)
 		return
 	}
 	for ctx.Err() == nil {
@@ -138,25 +138,25 @@ func FwdToDport(ctx context.Context, cancel context.CancelFunc,
 			dest.Close()
 		}
 		cancel()
-		logging.Printf("FwdToDport %s (%s) exited", to, protocol)
+		logging.Infof("FwdToDport %s (%s) exited", to, protocol)
 	}()
 	if err != nil {
-		logging.Printf("FwdToDport %s (%s): %v", to, protocol, err)
+		logging.Infof("FwdToDport %s (%s): %v", to, protocol, err)
 		return
 	}
-	logging.Printf("FwdToDport: connected to %s (%s)", to, protocol)
+	logging.Infof("FwdToDport: connected to %s (%s)", to, protocol)
 
 	// io.Copy
 	go func() {
 		_, err = io.Copy(dest, h2)
 		if err != nil {
-			logging.Printf("FwdToDport %s (%s): h2 -> dest: %v", protocol, sessionID, err)
+			logging.Infof("FwdToDport %s (%s): h2 -> dest: %v", protocol, sessionID, err)
 			return
 		}
 	}()
 	_, err = io.Copy(h2, dest)
 	if err != nil {
-		logging.Printf("FwdToDport %s (%s): dest -> h2: %v", protocol, sessionID, err)
+		logging.Infof("FwdToDport %s (%s): dest -> h2: %v", protocol, sessionID, err)
 		return
 	}
 }

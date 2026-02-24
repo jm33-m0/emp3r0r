@@ -35,7 +35,7 @@ func EstablishC2Connection(url string) (conn *h2conn.Conn, ctx context.Context, 
 		Method: http.MethodPost,
 		Header: headers,
 	}
-	logging.Printf("EstablishC2Connection: connecting to %s", url)
+	logging.Infof("EstablishC2Connection: connecting to %s", url)
 
 	type connectResult struct {
 		conn *h2conn.Conn

@@ -168,7 +168,7 @@ func IPaddr() (ips []IPWithMask) {
 func IPIfaces() (ifaces []net.Interface) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		logging.Printf("IPIfaces: %v", err)
+		logging.Infof("IPIfaces: %v", err)
 		return nil
 	}
 	return
@@ -181,7 +181,7 @@ func IPbroadcastAddr(ipMask IPWithMask) string {
 
 	// check if IP is a valid IPv4 address
 	if ip.To4() == nil {
-		logging.Printf("%s is not a valid IPv4 address", ip.String())
+		logging.Infof("%s is not a valid IPv4 address", ip.String())
 		return ""
 	}
 

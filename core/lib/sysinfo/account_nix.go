@@ -23,7 +23,7 @@ func CheckAccount(username string) (accountInfo map[string]string, err error) {
 	// parse /etc/passwd
 	passwdFile, err := os.Open("/etc/passwd")
 	if err != nil {
-		logging.Println(err)
+		logging.Errorf("CheckAccount: %v", err)
 		return nil, err
 	}
 	scanner := bufio.NewScanner(passwdFile)

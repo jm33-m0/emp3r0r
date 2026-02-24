@@ -205,13 +205,13 @@ func NameTheLibrary() string {
 		return nil
 	})
 	if err != nil {
-		logging.Println("Error scanning for .so files:", err)
+		logging.Infof("Error scanning for .so files:", err)
 		return ""
 	}
 
 	// Check if any .so files were found
 	if len(soFiles) == 0 {
-		logging.Println("No .so files found")
+		logging.Infof("No .so files found")
 		return ""
 	}
 

@@ -144,5 +144,5 @@ func processAgentData(data *def.MsgTunData) {
 		}
 	}
 
-	logging.Printf("%s", logging.Raw(agentOutput))
+	logging.Infof("%s", logging.Raw(agentOutput))
 }

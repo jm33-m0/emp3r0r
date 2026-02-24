@@ -136,7 +136,7 @@ func IsPIDAlive(pid int) (alive bool) {
 func IsProcAlive(procName string) (alive bool, procs []*process.Process) {
 	allprocs, err := process.Processes()
 	if err != nil {
-		logging.Println(err)
+		logging.Errorf("IsProcAlive: %v", err)
 		return
 	}
 
@@ -160,7 +160,7 @@ func PidOf(name string) []int {
 	pids := make([]int, 1)
 	allprocs, err := process.Processes()
 	if err != nil {
-		logging.Println(err)
+		logging.Errorf("PidOf: %v", err)
 		return pids
 	}
 

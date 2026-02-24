@@ -24,6 +24,12 @@ const maxCmdResultCacheBytes = 1024 * 1024 // 1 MiB
 
 // handleMessageTunnel processes CBOR C&C tunnel connections.
 func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("handleMessageTunnel panic: %v\n%s", r, util.CallStack())
+			http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		}
+	}()
 	var lastHandshake int64
 	atomic.StoreInt64(&lastHandshake, time.Now().Unix())
 	conn, err := h2conn.Accept(wrt, req)

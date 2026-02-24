@@ -44,18 +44,18 @@ func moduleCustom(ctx *c2context.C2Context) {
 
 	// build module on C2
 	if config.Build != "" {
-		logging.Printf("Building %s...", config.Name)
+		logging.Infof("Building %s...", config.Name)
 		out, err := build_module(config, ctx.Flags)
 		if err != nil {
 			logging.Errorf("Build module %s: %v", config.Name, err)
 			return
 		}
-		logging.Printf("Module output:\n%s", out)
+		logging.Infof("Module output:\n%s", out)
 	}
 
 	// if module is a plugin, no need to upload and execute files on target
 	if config.IsLocal {
-		logging.Printf("%s will run as a plugin on C2, no files will be executed on target", config.Name)
+		logging.Infof("%s will run as a plugin on C2, no files will be executed on target", config.Name)
 		return
 	}
 
@@ -329,7 +329,7 @@ func InitModules() {
 		load_mod(mod_search_dir)
 	}
 
-	logging.Printf("Loaded %d modules", len(def.Modules))
+	logging.Infof("Loaded %d modules", len(def.Modules))
 }
 
 // readModCondig read config.json of a module

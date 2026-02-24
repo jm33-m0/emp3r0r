@@ -25,7 +25,7 @@ func IPr() (routes []string) {
 		}
 		r, err := netlink.RouteList(link, netlink.FAMILY_ALL)
 		if err != nil {
-			logging.Printf("cannot get route list from %d: %v", link.Attrs().Index, err)
+			logging.Infof("cannot get route list from %d: %v", link.Attrs().Index, err)
 			continue
 		}
 		for _, route := range r {
@@ -50,7 +50,7 @@ func IPr() (routes []string) {
 func IPLink() (links []netlink.Link) {
 	links, err := netlink.LinkList()
 	if err != nil {
-		logging.Printf("Failed to get network interfaces: %v", err)
+		logging.Infof("Failed to get network interfaces: %v", err)
 		return nil
 	}
 
@@ -60,7 +60,7 @@ func IPLink() (links []netlink.Link) {
 func linkIdx2Name(index int) (name string) {
 	link, err := netlink.LinkByIndex(index)
 	if err != nil {
-		logging.Printf("Cannot read name from interface %d: %v", index, err)
+		logging.Infof("Cannot read name from interface %d: %v", index, err)
 		return "N/A"
 	}
 
@@ -82,7 +82,7 @@ func IPNeigh() []string {
 		l, err := netlink.NeighList(ifIdx, netlink.FAMILY_ALL)
 		neighList = append(neighList, l...)
 		if err != nil {
-			logging.Printf("Cannot get neigh list on interface %d: %v", ifIdx, err)
+			logging.Infof("Cannot get neigh list on interface %d: %v", ifIdx, err)
 			continue
 		}
 	}

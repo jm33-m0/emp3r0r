@@ -116,7 +116,7 @@ func RandInt(min, max int) int {
 	bg := big.NewInt(int64(max - min))
 	n, err := crypto_rand.Int(crypto_rand.Reader, bg)
 	if err != nil {
-		logging.Println("falling back to math/rand with time seed")
+		logging.Infof("falling back to math/rand with time seed")
 		return min + rand.New(rand.NewSource(time.Now().UnixNano())).Intn(max-min)
 	}
 	return min + int(n.Int64())
