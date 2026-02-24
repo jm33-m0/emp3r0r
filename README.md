@@ -2,7 +2,7 @@
 
 ### emp3r0r
 
-**Zero-Trust C2: Ephemeral TOFU + PFS + Auto-Proxy Mesh + Memory-Only Ops + Bring2CC + Native BOF**
+**Zero-Trust C2: Ephemeral TOFU + PFS + P2P Mesh Stack + Memory-Only Ops + Bring2CC + Native BOF**
 
 <br clear="all" />
 
@@ -38,11 +38,11 @@ Every C2 session uses **ECDH key exchange** with **HKDF-derived session keys**. 
 
 **Why this matters:** Traditional C2s use static encryption keys. If those keys are recovered, historical network captures can be decrypted. emp3r0r's PFS ensures that compromising today's session keys doesn't reveal previous communications.
 
-### 🕸️ Self-Healing P2P Mesh Network (Auto-Proxy Chain)
+### 🕸️ Peer-to-Peer (P2P) Mesh Network
 
-Agents in isolated network segments **autonomously discover and tunnel through internet-connected peers** via Shadowsocks. The mesh network automatically reconfigures when proxies fail, maintaining C2 connectivity without manual intervention using UDP broadcasts and rolling authentication tags.
+Agents in isolated network segments **autonomously discover and tunnel through internet-connected peers** via a gossip-based (memberlist) mesh network. The mesh stack uses KCP for fast, reliable transport, maintaining C2 connectivity without manual intervention even in segmented enterprise networks.
 
-**Why this matters:** Manual pivoting requires constant operator intervention and breaks when intermediate hosts fail. emp3r0r's agents automatically form redundant communication paths, ensuring persistence in segmented enterprise networks.
+**Why this matters:** Manual pivoting requires constant operator intervention and breaks when intermediate hosts fail. emp3r0r's agents automatically form redundant communication paths, ensuring persistence through resilient peer discovery and relay.
 
 ### 🚪 Bring2CC: Reverse Tunneling for Isolated Targets
 
