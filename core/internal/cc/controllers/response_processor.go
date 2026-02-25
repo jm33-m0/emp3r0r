@@ -83,6 +83,10 @@ func ProcessAgentResponse(data *def.MsgTunData) (*ProcessedResponse, error) {
 
 	// Cache command result
 	live.CmdResults.Store(data.JobID, resp.Output)
+	// Signal any waiting goroutine that a result is ready.
+	if ch, ok := live.CmdResultsReady.LoadAndDelete(data.JobID); ok {
+		close(ch.(chan struct{}))
+	}
 
 	// Calculate time spent
 	if val, ok := live.CmdTime.Load(data.JobID); ok {

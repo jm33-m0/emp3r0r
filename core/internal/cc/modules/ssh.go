@@ -112,6 +112,7 @@ func SSHClient(shell, args, port string) (string, error) {
 		return SSHClient(shell, args, new_port)
 	}
 
+	var pf *network.PortFwdSession
 	if !port_mapping_exists {
 		// start sshd on agent
 		job_id := uuid.NewString()
@@ -160,13 +161,14 @@ func SSHClient(shell, args, port string) (string, error) {
 
 		// set up port mapping for the ssh session
 		logging.Infof("Setting up port mapping (local %s -> remote %s) for sshd (%s)", lport, to, shell)
-		pf := &network.PortFwdSession{}
+		pf = &network.PortFwdSession{}
 		pf.Description = fmt.Sprintf("ssh shell (%s)", shell)
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
 		pf.Lport, pf.To = lport, to
 		pf.SendCmdFunc = CmdSender
 		pf.RegisterFunc = RegisterPortFwdFunc
 		pf.ShReady = make(chan struct{})
+		pf.RegistrationDone = make(chan struct{})
 		go func() {
 			// remember the port mapping and shell and agent
 			SSHShellPort.Store(shell, &SSH_SHELL_Mapping{
@@ -186,24 +188,13 @@ func SSHClient(shell, args, port string) (string, error) {
 		}
 	}
 
-	// wait until the port mapping is ready
-	port_mapping_exists = false
-wait:
-	for i := 0; i < 100; i++ {
-		if port_mapping_exists {
-			break
-		}
-		time.Sleep(50 * time.Millisecond)
-		network.PortFwds.Range(func(_, value interface{}) bool {
-			p := value.(*network.PortFwdSession)
-			if p.Agent.Tag == target.Tag && p.To == to {
-				port_mapping_exists = true
-				return false // stop iteration
-			}
-			return true
-		})
-		if port_mapping_exists {
-			break wait
+	// Wait until the port mapping is registered (RegistrationDone is closed by RunPortFwd).
+	if !port_mapping_exists {
+		select {
+		case <-pf.RegistrationDone:
+			port_mapping_exists = true
+		case <-time.After(5 * time.Second):
+			// fall through, port_mapping_exists remains false
 		}
 	}
 	if !port_mapping_exists {

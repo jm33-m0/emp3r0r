@@ -12,6 +12,13 @@ var (
 	// CmdResults receive response from agent and cache them
 	CmdResults = sync.Map{}
 
+	// CmdResultsReady holds per-job-id notification channels.
+	// A caller populates this before sending a command:
+	//   ch := make(chan struct{}, 1)
+	//   live.CmdResultsReady.Store(jobID, ch)
+	// When a result arrives, the channel is closed so any waiter wakes up.
+	CmdResultsReady = sync.Map{}
+
 	// CmdTime store command time
 	CmdTime sync.Map
 )

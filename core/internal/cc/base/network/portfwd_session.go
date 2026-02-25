@@ -29,14 +29,15 @@ type PortFwdSession struct {
 	Listener    *net.UDPConn // if mapping is UDP, we need its listener
 	Timeout     int          // timeout in seconds
 
-	Agent          *def.Emp3r0rAgent                  // agent who holds this port mapping session
-	SendCmdFunc    func(string, string, string) error // send command to agent
-	RegisterFunc   func(def.PortFwdRequest) error     // register session with server
-	UnregisterFunc func(string) error                 // unregister session with server
-	Sh             map[string]*StreamHandler          // related to HTTP handler
-	ShReady        chan struct{}                      // signals when Sh map is initialized
-	Ctx            context.Context                    // PortFwd context
-	Cancel         context.CancelFunc                 // PortFwd cancel
+	Agent            *def.Emp3r0rAgent                  // agent who holds this port mapping session
+	SendCmdFunc      func(string, string, string) error // send command to agent
+	RegisterFunc     func(def.PortFwdRequest) error     // register session with server
+	UnregisterFunc   func(string) error                 // unregister session with server
+	Sh               map[string]*StreamHandler          // related to HTTP handler
+	ShReady          chan struct{}                      // signals when Sh map is initialized
+	RegistrationDone chan struct{}                      // closed once PortFwds.Store has been called for this session
+	Ctx              context.Context                    // PortFwd context
+	Cancel           context.CancelFunc                 // PortFwd cancel
 }
 
 // portFwdStreamReady signals per-stream handler readiness, keyed by shID.
@@ -233,6 +234,10 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		pf.Description = fmt.Sprintf("Agent to CC mapping (%s)", pf.Protocol)
 	}
 	PortFwds.Store(fwdID, pf)
+	// Signal any goroutine waiting for the session to be registered.
+	if pf.RegistrationDone != nil {
+		close(pf.RegistrationDone)
+	}
 
 	if pf.RegisterFunc != nil {
 		req := def.PortFwdRequest{

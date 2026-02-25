@@ -137,23 +137,29 @@ func listRemoteDirWorker(path_to_list, agent_tag string) (cwd string, names []st
 	names = make([]string, 0) // listing to return
 	cmd := fmt.Sprintf("%s --path %s", def.C2CmdListDir, strconv.Quote(path_to_list))
 	job_id := uuid.NewString()
+	// Register a ready channel before sending the command so we don't miss the signal.
+	resultReady := make(chan struct{}, 1)
+	live.CmdResultsReady.Store(job_id, resultReady)
+
 	err := controllers.ExecuteCommand(cmd, job_id, agent_tag)
 	if err != nil {
+		live.CmdResultsReady.Delete(job_id) // clean up if we never send
 		logging.Debugf("Cannot list remote directory: %v", err)
 		return
 	}
 	remote_entries := []string{}
 	listingCtx, listingCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer listingCancel()
-	for listingCtx.Err() == nil {
+	select {
+	case <-resultReady:
 		if res, exists := live.CmdResults.Load(job_id); exists {
 			safeListing := util.SanitizeText(res.(string))
 			remote_entries = strings.Split(safeListing, "\n")
 			live.CmdResults.Delete(job_id)
-			listingCancel()
-			break
 		}
-		time.Sleep(50 * time.Millisecond)
+	case <-listingCtx.Done():
+		live.CmdResultsReady.Delete(job_id) // timed out, clean up orphaned channel
+		logging.Debugf("listRemoteDirWorker: timeout waiting for result")
 	}
 	if len(remote_entries) == 0 {
 		logging.Debugf("Nothing in remote directory")

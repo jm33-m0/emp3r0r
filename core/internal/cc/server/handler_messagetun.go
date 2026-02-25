@@ -218,6 +218,10 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 						responseToCache = responseToCache[:maxCmdResultCacheBytes]
 					}
 					live.CmdResults.Store(msg.JobID, string(responseToCache))
+					// Signal any goroutine waiting for this job's result.
+					if ch, ok := live.CmdResultsReady.LoadAndDelete(msg.JobID); ok {
+						close(ch.(chan struct{}))
+					}
 					// persistence
 					jobs.HandleOutput(msg.JobID, responseToCache)
 				} else {
