@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.22.1](https://github.com/jm33-m0/emp3r0r/compare/v3.22.0...v3.22.1) (2026-02-25)
+
+
+### Bug Fixes
+
+* Authenticate agents using header UUID and implement session hijacking prevention checks. ([f1d4f1f](https://github.com/jm33-m0/emp3r0r/commit/f1d4f1fc3312b10bf6cc8850e2ba21bb172494ae))
+* generalize p2p transport and add mTLS transport as default ([b666bca](https://github.com/jm33-m0/emp3r0r/commit/b666bca6858370927fb7fef7e56facde1afa53db))
+
 ## [3.22.0](https://github.com/jm33-m0/emp3r0r/compare/v3.21.4...v3.22.0) (2026-02-24)
 
 
