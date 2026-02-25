@@ -642,6 +642,7 @@ func gen_agent_cmd() *cobra.Command {
 
 	// Mesh / P2P flags
 	genAgentCmd.Flags().BoolP("p2p", "", false, "Enable P2P mesh networking. Agent will join the mesh and participate in peer discovery.")
+	genAgentCmd.Flags().StringP("p2p-transport", "", "mtls", "Transport type for P2P mesh connections. Defaults to 'mtls'. Available: use tab completion.")
 	genAgentCmd.Flags().BoolP("direct-c2", "", false, "When used with --p2p, agent acts as a Gateway: contacts C2 directly (with preflight) AND relays traffic for Silent Nodes. Without --p2p this has no effect.")
 	genAgentCmd.Flags().StringSliceP("peers", "", nil, "Comma-separated list of gossip bootstrap peers (ip:gossipport). Required for Silent Nodes. Example: --peers 1.2.3.4:51996")
 
@@ -650,12 +651,13 @@ func gen_agent_cmd() *cobra.Command {
 
 	// completers
 	carapace.Gen(genAgentCmd).FlagCompletion(carapace.ActionMap{
-		"type":  carapace.ActionValues(PayloadTypeList...),
-		"arch":  carapace.ActionValues(Arch_List_All...),
-		"cc":    carapace.ActionValues(cc_hosts...),
-		"cdn":   carapace.ActionValues("wss://", "ws://"),
-		"doh":   carapace.ActionValues("https://1.1.1.1/dns-query", "https://8.8.8.8/dns-query", "https://9.9.9.9/dns-query"),
-		"proxy": carapace.ActionValues("socks5://127.0.0.1:9050", "socks5://"),
+		"type":          carapace.ActionValues(PayloadTypeList...),
+		"arch":          carapace.ActionValues(Arch_List_All...),
+		"cc":            carapace.ActionValues(cc_hosts...),
+		"cdn":           carapace.ActionValues("wss://", "ws://"),
+		"doh":           carapace.ActionValues("https://1.1.1.1/dns-query", "https://8.8.8.8/dns-query", "https://9.9.9.9/dns-query"),
+		"proxy":         carapace.ActionValues("socks5://127.0.0.1:9050", "socks5://"),
+		"p2p-transport": carapace.ActionValues(transport.AllTransportNames()...),
 	})
 	return genAgentCmd
 }

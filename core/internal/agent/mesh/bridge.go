@@ -36,10 +36,18 @@ func DialGateway(ctx context.Context, gatewayIP string, opcode byte) (net.Conn, 
 	kcpPort := common.RuntimeConfig.KCPServerPort
 	addr := fmt.Sprintf("%s:%s", gatewayIP, kcpPort)
 
-	logging.Debugf("Mesh: dialing Gateway KCP relay at %s", addr)
-	kcpConn, err := transport.DialKCP(addr, common.RuntimeConfig.Password, def.MagicString)
+	var kcpConn net.Conn
+	var err error
+
+	t := transport.GetTransportImplementation(common.RuntimeConfig.P2PTransport)
+	if camo, ok := t.(*transport.CamouflageMTLS); ok {
+		camo.CertOrg = common.RuntimeConfig.CamouflageCertOrg
+		camo.CertCN = common.RuntimeConfig.CamouflageCertCN
+	}
+	logging.Debugf("Mesh: dialing Gateway %s relay at %s", common.RuntimeConfig.P2PTransport, addr)
+	kcpConn, err = t.Dial(addr, common.RuntimeConfig.Password, def.MagicString)
 	if err != nil {
-		return nil, fmt.Errorf("DialGateway KCP: %v", err)
+		return nil, fmt.Errorf("DialGateway %s: %v", addr, err)
 	}
 
 	// Send opcode
@@ -85,9 +93,19 @@ func ServeRelay(ctx context.Context) {
 	// Create ONE persistent listener for the lifetime of the relay.
 	// Previously AcceptKCP created+closed a new UDP socket per accept call,
 	// which invalidated the connection that was just handed off to handleRelayConn.
-	listener, err := transport.ListenKCP(kcpPort, common.RuntimeConfig.Password, def.MagicString)
+	var listener net.Listener
+	var err error
+
+	t := transport.GetTransportImplementation(common.RuntimeConfig.P2PTransport)
+	if camo, ok := t.(*transport.CamouflageMTLS); ok {
+		camo.CertOrg = common.RuntimeConfig.CamouflageCertOrg
+		camo.CertCN = common.RuntimeConfig.CamouflageCertCN
+	}
+	listener, err = t.Listen(kcpPort, common.RuntimeConfig.Password, def.MagicString)
+	logging.Infof("Mesh: Gateway relay listening on %s port %s", common.RuntimeConfig.P2PTransport, kcpPort)
+
 	if err != nil {
-		logging.Errorf("Mesh ServeRelay: failed to listen on KCP port %s: %v", kcpPort, err)
+		logging.Errorf("Mesh ServeRelay: failed to listen on %s port %s: %v", common.RuntimeConfig.P2PTransport, kcpPort, err)
 		return
 	}
 	defer listener.Close()
@@ -95,18 +113,19 @@ func ServeRelay(ctx context.Context) {
 		<-ctx.Done()
 		listener.Close()
 	}()
-	logging.Infof("Mesh: Gateway relay listening on KCP port %s", kcpPort)
 
 	for ctx.Err() == nil {
-		conn, err := transport.AcceptKCPConn(listener, ctx)
+		conn, err := t.Accept(ctx, listener)
 		if err != nil {
-			if ctx.Err() != nil {
+			if ctx.Err() != nil { // Context cancelled, listener closed
+				logging.Debugf("Mesh ServeRelay: listener closed: %v", err)
 				return
 			}
-			logging.Warningf("Mesh ServeRelay: accept: %v", err)
-			time.Sleep(time.Second)
+			logging.Errorf("Mesh ServeRelay: accept %s connection: %v", common.RuntimeConfig.P2PTransport, err)
 			continue
 		}
+
+		logging.Infof("Mesh ServeRelay: accepted %s connection from %s", common.RuntimeConfig.P2PTransport, conn.RemoteAddr())
 		go handleRelayConn(ctx, conn)
 	}
 }

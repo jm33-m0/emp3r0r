@@ -319,6 +319,22 @@ func MakeConfig(cmd *cobra.Command) (err error) {
 	if cmd.Flags().Changed("p2p") {
 		live.RuntimeConfig.IsP2PEnabled = p2p
 	}
+	if cmd.Flags().Changed("p2p-transport") {
+		p2pTransport, _ := cmd.Flags().GetString("p2p-transport")
+		isValid := false
+		for _, name := range transport.AllTransportNames() {
+			if name == p2pTransport {
+				isValid = true
+				break
+			}
+		}
+		if !isValid {
+			return fmt.Errorf("invalid p2p-transport: %s (available: %v)", p2pTransport, transport.AllTransportNames())
+		}
+		live.RuntimeConfig.P2PTransport = p2pTransport
+	} else if live.RuntimeConfig.P2PTransport == "" {
+		live.RuntimeConfig.P2PTransport = "mtls"
+	}
 	if cmd.Flags().Changed("direct-c2") {
 		live.RuntimeConfig.IsDirectC2Enabled = directC2
 	}

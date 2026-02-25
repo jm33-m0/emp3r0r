@@ -19,16 +19,14 @@ type MeshTransport interface {
 	Ping(ctx context.Context, peerIP, kcpPort string) error
 }
 
-// KCPTransport is the default MeshTransport.
-// It calls DialGateway (bridge.go): connects via KCP, sends CONNECT_C2 opcode,
-// and returns a net.Conn transparently piped to C2 TLS.
-type KCPTransport struct{}
+// RegistryTransport uses the transport registry to connect.
+type RegistryTransport struct{}
 
-func (KCPTransport) Dial(ctx context.Context, peerIP, kcpPort string) (net.Conn, error) {
+func (RegistryTransport) Dial(ctx context.Context, peerIP, kcpPort string) (net.Conn, error) {
 	return DialGateway(ctx, peerIP, OpcodeConnectC2)
 }
 
-func (KCPTransport) Ping(ctx context.Context, peerIP, kcpPort string) error {
+func (RegistryTransport) Ping(ctx context.Context, peerIP, kcpPort string) error {
 	conn, err := DialGateway(ctx, peerIP, OpcodePing)
 	if err != nil {
 		return err

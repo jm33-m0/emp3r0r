@@ -186,8 +186,8 @@ func signalGatewayDead() {
 // ─── Silent Node peer watcher ─────────────────────────────────────────────────
 
 func watchPeers(ctx context.Context) {
-	// Default transport: KCP
-	var t MeshTransport = KCPTransport{}
+	// Use RegistryTransport which handles the transport selection via config
+	var t MeshTransport = RegistryTransport{}
 
 	tryPeers := func() bool {
 		gossipMu.RLock()
