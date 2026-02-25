@@ -41,6 +41,9 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 	// Global Encryption: Wrap connection
 	secureConn := transport.NewSecureConn(conn)
 
+	// SECURITY: Use authenticated UUID from headers, completely distrusting CBOR payload for identity
+	authAgentUUID := util.StripANSI(req.Header.Get(transport.HeaderClientID))
+
 	ctx, cancel := context.WithCancel(req.Context())
 	var wg sync.WaitGroup
 	defer func() {
@@ -78,23 +81,20 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 			// Sanitize agent metadata at trust boundary (after CBOR decode)
 			util.SanitizeMsgTunMetadata(&msg)
 
-			// find agent
-			var agent *def.Emp3r0rAgent
-			for i := 0; i < 5; i++ {
-				// prefer UUID
-				if msg.AgentUUID != "" {
-					agent = agents.GetAgentByUUID(msg.AgentUUID)
-				}
-				if agent == nil {
-					agent = agents.GetAgentByTag(msg.Tag)
-				}
-				if agent != nil {
-					break
-				}
-				time.Sleep(100 * time.Millisecond)
-			}
+			// match authenticated agent
+			agent := agents.GetAgentByUUID(authAgentUUID)
 			if agent == nil {
-				logging.Errorf("handleMessageTunnel: No agent found for message: %v", msg)
+				logging.Errorf("handleMessageTunnel: No agent found for authenticated UUID %s", strconv.Quote(authAgentUUID))
+				return
+			}
+
+			// SECURITY: prevent session hijacking where authenticated Agent A tries to send CBOR for Agent B
+			if msg.AgentUUID != "" && msg.AgentUUID != authAgentUUID {
+				logging.Warningf("SECURITY: Agent %s attempted to hijack session for UUID %s", strconv.Quote(authAgentUUID), strconv.Quote(msg.AgentUUID))
+				return
+			}
+			if msg.Tag != "" && msg.Tag != agent.Tag {
+				logging.Warningf("SECURITY: Agent %s attempted to hijack session for Tag %s", strconv.Quote(authAgentUUID), strconv.Quote(msg.Tag))
 				return
 			}
 
