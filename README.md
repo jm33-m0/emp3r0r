@@ -40,7 +40,7 @@ Every C2 session uses **ECDH key exchange** with **HKDF-derived session keys**. 
 
 ### 🕸️ Peer-to-Peer (P2P) Mesh Network
 
-Agents in isolated network segments **autonomously discover and tunnel through internet-connected peers** via a gossip-based (memberlist) mesh network. The mesh stack uses KCP for fast, reliable transport, maintaining C2 connectivity without manual intervention even in segmented enterprise networks.
+Agents in isolated network segments **autonomously discover and tunnel through internet-connected peers** via a gossip-based (memberlist) mesh network. The mesh hop transport is **pluggable**: the default is `mtls` — camouflage mTLS 1.3 using ephemeral, malleable certificates — with `kcp` (reliable UDP) also available. All hops are further wrapped in AES-GCM end-to-end encryption.
 
 **Why this matters:** Manual pivoting requires constant operator intervention and breaks when intermediate hosts fail. emp3r0r's agents automatically form redundant communication paths, ensuring persistence through resilient peer discovery and relay.
 
