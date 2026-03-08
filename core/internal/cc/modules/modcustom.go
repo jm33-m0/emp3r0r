@@ -312,13 +312,16 @@ func InitModules() {
 			// add to module helpers
 			ModuleRunners[config.Name] = moduleCustom
 
+			// Store FIRST so that updateModuleHelp can Load and patch the Options map.
+			// Without this, the Load inside updateModuleHelp always misses and the
+			// validated options are silently discarded.
+			def.Modules.Store(config.Name, config)
 			readConfigErr = updateModuleHelp(config)
 			if readConfigErr != nil {
 				logging.Warningf("Loading config from %s: %v", config.Name, readConfigErr)
+				def.Modules.Delete(config.Name) // rollback — don't expose a broken entry
 				continue
 			}
-			// add module meta data
-			def.Modules.Store(config.Name, config)
 			logging.Debugf("Loaded module %s", strconv.Quote(config.Name))
 		}
 	}
