@@ -55,8 +55,8 @@ func DeriveSessionKey(sharedSecret []byte, agentUUID string) ([]byte, error) {
 	}
 
 	// HKDF parameters
-	salt := []byte("emp3r0r-session-key-salt-v1")
-	info := []byte(fmt.Sprintf("emp3r0r-session:%s", agentUUID))
+	salt := []byte("session-key-salt-v1")
+	info := []byte(fmt.Sprintf("client-session:%s", agentUUID))
 
 	// Create HKDF reader
 	hkdfReader := hkdf.New(sha256.New, sharedSecret, salt, info)

@@ -47,7 +47,7 @@ func GetAgentKey() error {
 
 					// Use HKDF to derive a stream of bytes for ECDSA key generation
 					// We use SHA256 as hash, seed as secret, no salt, fixed info
-					hkdfReader := hkdf.New(sha256.New, seed, nil, []byte("emp3r0r persistent identity"))
+					hkdfReader := hkdf.New(sha256.New, seed, nil, []byte("host identity verification"))
 					derivedBytes := make([]byte, 32)
 					_, err = io.ReadFull(hkdfReader, derivedBytes)
 					if err != nil {
