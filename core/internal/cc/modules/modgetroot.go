@@ -3,6 +3,8 @@ package modules
 import (
 	"fmt"
 
+	"sync"
+
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
 	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -12,13 +14,15 @@ import (
 )
 
 // LPEHelperURLs scripts that help you get root
-var LPEHelperURLs = map[string]string{
-	"lpe_les":         "https://raw.githubusercontent.com/mzet-/linux-exploit-suggester/master/linux-exploit-suggester.sh",
-	"lpe_lse":         "https://raw.githubusercontent.com/diego-treitos/linux-smart-enumeration/master/lse.sh",
-	"lpe_linpeas":     "https://github.com/carlospolop/PEASS-ng/releases/latest/download/linpeas.sh",
-	"lpe_winpeas.ps1": "https://raw.githubusercontent.com/carlospolop/PEASS-ng/master/winPEAS/winPEASps1/winPEAS.ps1",
-	"lpe_winpeas.bat": "https://github.com/carlospolop/PEASS-ng/releases/latest/download/winPEAS.bat",
-	"lpe_winpeas.exe": "https://github.com/carlospolop/PEASS-ng/releases/latest/download/winPEASany_ofs.exe",
+var LPEHelperURLs sync.Map // map[string]string
+
+func init() {
+	LPEHelperURLs.Store("lpe_les", "https://raw.githubusercontent.com/mzet-/linux-exploit-suggester/master/linux-exploit-suggester.sh")
+	LPEHelperURLs.Store("lpe_lse", "https://raw.githubusercontent.com/diego-treitos/linux-smart-enumeration/master/lse.sh")
+	LPEHelperURLs.Store("lpe_linpeas", "https://github.com/carlospolop/PEASS-ng/releases/latest/download/linpeas.sh")
+	LPEHelperURLs.Store("lpe_winpeas.ps1", "https://raw.githubusercontent.com/carlospolop/PEASS-ng/master/winPEAS/winPEASps1/winPEAS.ps1")
+	LPEHelperURLs.Store("lpe_winpeas.bat", "https://github.com/carlospolop/PEASS-ng/releases/latest/download/winPEAS.bat")
+	LPEHelperURLs.Store("lpe_winpeas.exe", "https://github.com/carlospolop/PEASS-ng/releases/latest/download/winPEASany_ofs.exe")
 }
 
 func moduleLPE(ctx *c2context.C2Context) {
@@ -38,7 +42,12 @@ func moduleLPE(ctx *c2context.C2Context) {
 
 		// download third-party LPE helper
 		logging.Infof("Updating local LPE helper...")
-		err := tools.DownloadFile(LPEHelperURLs[helperName], live.Temp+transport.WWW+helperName)
+		url, ok := LPEHelperURLs.Load(helperName)
+		if !ok {
+			logging.Errorf("LPE helper %s not found", helperName)
+			return
+		}
+		err := tools.DownloadFile(url.(string), live.Temp+transport.WWW+helperName)
 		if err != nil {
 			logging.Errorf("Failed to download %s: %v", helperName, err)
 			return

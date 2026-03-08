@@ -29,7 +29,7 @@ func listModOptionsTable() {
 
 	// build table rows
 	rows := [][]string{}
-	_, ok := def.Modules[live.ActiveModule.Name]
+	_, ok := def.Modules.Load(live.ActiveModule.Name)
 	if !ok {
 		logging.Errorf("Module %s not found", live.ActiveModule.Name)
 		return
@@ -130,9 +130,11 @@ func cmdSetActiveModule(cmd *cobra.Command, args []string) {
 func cmdListModules(_ *cobra.Command, _ []string) {
 	// table output
 	rows := [][]string{}
-	for _, mod := range def.Modules {
+	def.Modules.Range(func(key, value any) bool {
+		mod := value.(*def.ModuleConfig)
 		rows = append(rows, []string{mod.Name, mod.Comment})
-	}
+		return true
+	})
 	tableStr := cli.BuildTable([]string{"Module", "Description"}, rows)
 	cli.AdaptiveTable(tableStr)
 	logging.Infof("\n%s", tableStr)

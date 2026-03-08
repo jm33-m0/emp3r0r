@@ -9,8 +9,11 @@ import (
 // CmdLsModules list all available modules
 func CmdLsModules(_ *cobra.Command, _ []string) {
 	mod_comment_map := make(map[string]string)
-	for mod_name, mod := range def.Modules {
+	def.Modules.Range(func(key, value any) bool {
+		mod_name := key.(string)
+		mod := value.(*def.ModuleConfig)
 		mod_comment_map[mod_name] = mod.Comment
-	}
+		return true
+	})
 	cli.CliPrettyPrint("Module Name", "Help", &mod_comment_map)
 }

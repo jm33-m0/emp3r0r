@@ -68,7 +68,14 @@ func UpdateOptions(modName string) (exist bool) {
 		}
 	}
 
-	modconfig := def.Modules[modName]
+	var modconfig *def.ModuleConfig
+	if val, ok := def.Modules.Load(modName); ok {
+		modconfig = val.(*def.ModuleConfig)
+	}
+	if modconfig == nil {
+		logging.Errorf("UpdateOptions: module %s config not found", modName)
+		return
+	}
 	if strings.ToLower(modconfig.AgentConfig.Exec) != "built-in" && !modconfig.IsLocal {
 		logging.Debugf("UpdateOptions: module %s is not built-in, adding download_addr", modName)
 		download_addr := &def.ModOption{
@@ -116,17 +123,20 @@ func ModuleRun(ctx *context.C2Context) {
 // ModuleSearch searches modules, powered by fuzzysearch
 func ModuleSearch(keyword string) []*def.ModuleConfig {
 	search_targets := new([]string)
-	for name, mod_config := range def.Modules {
+	def.Modules.Range(func(key, value any) bool {
+		name := key.(string)
+		mod_config := value.(*def.ModuleConfig)
 		*search_targets = append(*search_targets, fmt.Sprintf("%s: %s", name, mod_config.Comment))
-	}
+		return true
+	})
 	result := fuzzy.Find(keyword, *search_targets)
 
 	// render results
 	search_results := make([]*def.ModuleConfig, 0)
 	for _, r := range result {
 		mod_name := strings.Split(r, ":")[0]
-		mod, ok := def.Modules[mod_name]
-		if ok {
+		if val, ok := def.Modules.Load(mod_name); ok {
+			mod := val.(*def.ModuleConfig)
 			search_results = append(search_results, mod)
 		}
 	}
@@ -136,12 +146,14 @@ func ModuleSearch(keyword string) []*def.ModuleConfig {
 // SetActiveModule set the active module to use: `use` command
 func SetActiveModule(modName string) {
 	for mod := range ModuleRunners {
-		if mod == modName {
-			live.ActiveModule = def.Modules[modName]
+		if modName == mod {
+			if val, ok := def.Modules.Load(modName); ok {
+				live.ActiveModule = val.(*def.ModuleConfig)
+			}
 			UpdateOptions(modName)
 			logging.Infof("Using module %s", strconv.Quote(modName))
-			mod, exists := def.Modules[modName]
-			if exists {
+			if val, exists := def.Modules.Load(modName); exists {
+				mod := val.(*def.ModuleConfig)
 				logging.Successf("%s: %s", modName, mod.Comment)
 
 				// OPSEC warnings

@@ -30,11 +30,12 @@ func moduleCustom(ctx *c2context.C2Context) {
 		logging.Warningf("No module selected")
 		return
 	}
-	config, exists := def.Modules[live.ActiveModule.Name]
+	val, exists := def.Modules.Load(live.ActiveModule.Name)
 	if !exists {
 		logging.Errorf("Config of %s does not exist", live.ActiveModule.Name)
 		return
 	}
+	config := val.(*def.ModuleConfig)
 
 	// Only require target for non-local modules
 	if ctx.Target == nil && !config.IsLocal {
@@ -311,15 +312,13 @@ func InitModules() {
 			// add to module helpers
 			ModuleRunners[config.Name] = moduleCustom
 
-			// add module meta data
-			def.Modules[config.Name] = config
-
 			readConfigErr = updateModuleHelp(config)
 			if readConfigErr != nil {
 				logging.Warningf("Loading config from %s: %v", config.Name, readConfigErr)
 				continue
 			}
-			def.Modules[config.Name] = config
+			// add module meta data
+			def.Modules.Store(config.Name, config)
 			logging.Debugf("Loaded module %s", strconv.Quote(config.Name))
 		}
 	}
@@ -329,7 +328,12 @@ func InitModules() {
 		load_mod(mod_search_dir)
 	}
 
-	logging.Infof("Loaded %d modules", len(def.Modules))
+	count := 0
+	def.Modules.Range(func(_, _ any) bool {
+		count++
+		return true
+	})
+	logging.Infof("Loaded %d modules", count)
 }
 
 // readModCondig read config.json of a module
@@ -503,7 +507,11 @@ func updateModuleHelp(config *def.ModuleConfig) error {
 			return fmt.Errorf("%s config error: %s incomplete", config.Name, opt)
 		}
 		help_map[opt] = modOption
-		def.Modules[config.Name].Options = help_map
+		if val, ok := def.Modules.Load(config.Name); ok {
+			mod := val.(*def.ModuleConfig)
+			mod.Options = help_map
+			def.Modules.Store(config.Name, mod)
+		}
 	}
 	return nil
 }

@@ -36,9 +36,10 @@ func listValChoices(ctx carapace.Context) carapace.Action {
 // autocomplete modules names
 func listMods(ctx carapace.Context) carapace.Action {
 	names := make([]string, 0)
-	for mod := range def.Modules {
-		names = append(names, mod)
-	}
+	def.Modules.Range(func(key, value any) bool {
+		names = append(names, key.(string))
+		return true
+	})
 	return carapace.ActionValues(names...)
 }
 

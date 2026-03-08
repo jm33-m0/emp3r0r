@@ -318,13 +318,13 @@ func TestUpdateModuleHelp(t *testing.T) {
 			"foo": {Name: "foo", Desc: "bar"},
 		},
 	}
-	def.Modules[modName] = config
-	defer delete(def.Modules, modName)
+	def.Modules.Store(modName, config)
+	defer def.Modules.Delete(modName)
 
 	if err := updateModuleHelp(config); err != nil {
 		t.Fatalf("expected success, got %v", err)
 	}
-	if def.Modules[modName].Options["foo"].Desc != "bar" {
+	if val, ok := def.Modules.Load(modName); !ok || val.(*def.ModuleConfig).Options["foo"].Desc != "bar" {
 		t.Fatalf("help map not applied")
 	}
 
@@ -357,7 +357,11 @@ func TestInitModulesLoadsLocalModule(t *testing.T) {
 		t.Fatalf("write config: %v", err)
 	}
 
-	origModules := len(def.Modules)
+	origModules := 0
+	def.Modules.Range(func(_, _ any) bool {
+		origModules++
+		return true
+	})
 	origRunners := ModuleRunners
 	origModuleDirs := live.ModuleDirs
 	origWorkspace := live.EmpWorkSpace
@@ -372,7 +376,7 @@ func TestInitModulesLoadsLocalModule(t *testing.T) {
 		for k, v := range origRunners {
 			ModuleRunners[k] = v
 		}
-		delete(def.Modules, "foo")
+		def.Modules.Delete("foo")
 		live.ModuleDirs = origModuleDirs
 		live.EmpWorkSpace = origWorkspace
 	}()
@@ -382,16 +386,22 @@ func TestInitModulesLoadsLocalModule(t *testing.T) {
 
 	InitModules()
 
-	if len(def.Modules) != origModules+1 {
+	count := 0
+	def.Modules.Range(func(_, _ any) bool {
+		count++
+		return true
+	})
+	if count != origModules+1 {
 		t.Fatalf("module not loaded")
 	}
 	if _, ok := ModuleRunners["foo"]; !ok {
 		t.Fatalf("custom runner not registered")
 	}
-	loaded, ok := def.Modules["foo"]
+	loadedVal, ok := def.Modules.Load("foo")
 	if !ok {
 		t.Fatalf("module not stored")
 	}
+	loaded := loadedVal.(*def.ModuleConfig)
 	expectedPath := filepath.Join(live.EmpWorkSpace, "modules", "foo")
 	if loaded.Path != expectedPath {
 		t.Fatalf("path not rewritten for local module: %s", loaded.Path)
@@ -443,15 +453,23 @@ func TestInitModulesLoadsRepoModules(t *testing.T) {
 		t.Fatalf("temp workspace: %v", err)
 	}
 
-	origModules := def.Modules
+	// Backup def.Modules
+	backupModules := make(map[string]*def.ModuleConfig)
+	def.Modules.Range(func(key, value any) bool {
+		backupModules[key.(string)] = value.(*def.ModuleConfig)
+		return true
+	})
+
 	origRunners := ModuleRunners
 	origModuleDirs := live.ModuleDirs
 	origWorkspace := live.EmpWorkSpace
 
-	def.Modules = make(map[string]*def.ModuleConfig, len(origModules))
-	for k, v := range origModules {
-		def.Modules[k] = v
-	}
+	// Clear def.Modules for test
+	def.Modules.Range(func(key, value any) bool {
+		def.Modules.Delete(key)
+		return true
+	})
+
 	ModuleRunners = make(map[string]func(ctx *context.C2Context), len(origRunners))
 	for k, v := range origRunners {
 		ModuleRunners[k] = v
@@ -460,7 +478,14 @@ func TestInitModulesLoadsRepoModules(t *testing.T) {
 	live.EmpWorkSpace = tmpWorkspace
 
 	defer func() {
-		def.Modules = origModules
+		// Restore def.Modules
+		def.Modules.Range(func(key, value any) bool {
+			def.Modules.Delete(key)
+			return true
+		})
+		for k, v := range backupModules {
+			def.Modules.Store(k, v)
+		}
 		ModuleRunners = origRunners
 		live.ModuleDirs = origModuleDirs
 		live.EmpWorkSpace = origWorkspace
@@ -470,10 +495,11 @@ func TestInitModulesLoadsRepoModules(t *testing.T) {
 	InitModules()
 
 	for modName := range expected {
-		mod, ok := def.Modules[modName]
+		val, ok := def.Modules.Load(modName)
 		if !ok {
 			t.Fatalf("module %s not loaded", modName)
 		}
+		mod := val.(*def.ModuleConfig)
 		if _, ok := ModuleRunners[modName]; !ok {
 			t.Fatalf("runner not registered for %s", modName)
 		}
@@ -493,12 +519,12 @@ func TestInitModulesLoadsRepoModules(t *testing.T) {
 
 func TestUpdateOptionsAddsDownloadAddr(t *testing.T) {
 	modName := "dl_mod"
-	def.Modules[modName] = &def.ModuleConfig{
+	def.Modules.Store(modName, &def.ModuleConfig{
 		Name:        modName,
 		IsLocal:     false,
 		AgentConfig: def.AgentModuleConfig{Exec: "custom"},
-	}
-	defer delete(def.Modules, modName)
+	})
+	defer def.Modules.Delete(modName)
 
 	ModuleRunners[modName] = func(ctx *context.C2Context) {}
 	defer delete(ModuleRunners, modName)

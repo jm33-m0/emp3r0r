@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"sync"
+
 	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/controllers"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -16,11 +18,13 @@ import (
 type CommandHandler func(out []byte, target *def.Emp3r0rAgent) string
 
 // CommandHandlers maps command names to their handlers
-var CommandHandlers = map[string]CommandHandler{
-	"ps":      handlePS,
-	"ls":      handleLS,
-	"stat":    handleStat,
-	"sysinfo": handleSysInfo,
+var CommandHandlers sync.Map // map[string]CommandHandler
+
+func init() {
+	CommandHandlers.Store("ps", handlePS)
+	CommandHandlers.Store("ls", handleLS)
+	CommandHandlers.Store("stat", handleStat)
+	CommandHandlers.Store("sysinfo", handleSysInfo)
 }
 
 func handleSysInfo(out []byte, target *def.Emp3r0rAgent) string {
@@ -124,7 +128,8 @@ func processAgentData(data *def.MsgTunData) {
 
 	// Handle special command processing
 	lookupCmd := strings.TrimPrefix(resp.Command, "!")
-	if handler, ok := CommandHandlers[lookupCmd]; ok {
+	if h, ok := CommandHandlers.Load(lookupCmd); ok {
+		handler := h.(CommandHandler)
 		resp.Output = handler([]byte(resp.Output), resp.Agent)
 	}
 

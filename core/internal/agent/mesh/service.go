@@ -90,7 +90,14 @@ func Start(ctx context.Context) {
 	if common.RuntimeConfig.IsDirectC2Enabled {
 		// Gateway: distance=0, serve relay.
 		SetDistance(0)
-		go ServeRelay(ctx)
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logging.Errorf("ServeRelay panic: %v", r)
+				}
+			}()
+			ServeRelay(ctx)
+		}()
 		logging.Infof("Mesh: Gateway relay started on KCP port %s", common.RuntimeConfig.KCPServerPort)
 	} else {
 		// Silent Node: watch peers for an authorized Gateway.
@@ -186,6 +193,11 @@ func signalGatewayDead() {
 // ─── Silent Node peer watcher ─────────────────────────────────────────────────
 
 func watchPeers(ctx context.Context) {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("watchPeers panic: %v", r)
+		}
+	}()
 	// Use RegistryTransport which handles the transport selection via config
 	var t MeshTransport = RegistryTransport{}
 
