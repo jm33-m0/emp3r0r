@@ -7,7 +7,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// getAgentProcess fill up info.emp3r0r_def.AgentProcess
+// getAgentProcess fill up info.AgentProcess
 func getAgentProcess() *def.AgentProcess {
 	p := &def.AgentProcess{}
 	p.PID = os.Getpid()

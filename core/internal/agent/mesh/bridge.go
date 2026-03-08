@@ -171,7 +171,7 @@ func handleRelayConn(ctx context.Context, peer net.Conn) {
 	c2Conn, err := transport.DialC2TLS(c2Addr, common.RuntimeConfig.C2TransportProxy)
 	if err != nil {
 		logging.Errorf("Mesh relay: dial C2: %v", err)
-		writeRelayError(peer, fmt.Sprintf("dial C2 failed: %v", err))
+		writeRelayError(peer, fmt.Sprintf("dial server failed: %v", err))
 		return
 	}
 	defer c2Conn.Close()

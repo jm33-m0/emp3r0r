@@ -26,7 +26,7 @@ type PortMapping struct {
 func GetActiveForwards() ([]PortMapping, error) {
 	mappings := []PortMapping{}
 
-	network.PortFwds.Range(func(id, value interface{}) bool {
+	network.PortFwds.Range(func(id, value any) bool {
 		portmap := value.(*network.PortFwdSession)
 		// Skip invalid sessions
 		if portmap.Sh == nil {
@@ -36,7 +36,7 @@ func GetActiveForwards() ([]PortMapping, error) {
 
 		bindAddr := portmap.BindAddr
 		if bindAddr == "" {
-			bindAddr = "127.0.0.1"
+			bindAddr = def.Localhost
 		}
 
 		// Build local and remote addresses
@@ -92,7 +92,7 @@ func AddForward(ctx *c2context.C2Context) error {
 		if ok {
 			pf.BindAddr = bindAddrOpt
 		} else {
-			pf.BindAddr = "127.0.0.1"
+			pf.BindAddr = def.Localhost
 		}
 
 		pf.SendCmdFunc = modules.CmdSender
@@ -120,7 +120,7 @@ func AddForward(ctx *c2context.C2Context) error {
 		if ok {
 			pf.BindAddr = bindAddrOpt
 		} else {
-			pf.BindAddr = "127.0.0.1"
+			pf.BindAddr = def.Localhost
 		}
 
 		pf.SendCmdFunc = modules.CmdSender

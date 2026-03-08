@@ -19,7 +19,7 @@ import (
 // SaveConfigJSON save runtime config to emp3r0r.json
 func SaveConfigJSON() (err error) {
 	// Create a map to hold the config values with snake_case keys
-	configMap := map[string]interface{}{
+	configMap := map[string]any{
 		"cc_address":                   live.RuntimeConfig.CCAddress,
 		"cc_host":                      live.RuntimeConfig.CCHost,
 		"cc_port":                      live.RuntimeConfig.CCPort,
@@ -234,8 +234,8 @@ func GenC2Certs(hosts_str string) error {
 
 	// if C2 server TLS cert not found, generate new ones
 	logging.Warningf("C2 TLS cert not found, generating a new one")
-	hosts = append(hosts, "127.0.0.1") // sometimes we need to connect to a relay that listens on localhost
-	hosts = append(hosts, "localhost") // sometimes we need to connect to a relay that listens on localhost
+	hosts = append(hosts, def.Localhost) // sometimes we need to connect to a relay that listens on localhost
+	hosts = append(hosts, "localhost")   // sometimes we need to connect to a relay that listens on localhost
 
 	// validate host names
 	for _, host := range hosts {
@@ -271,5 +271,5 @@ func LoadConfig() error {
 		return ReadJSONConfig(nil, nil)
 	}
 	// init config file using the first host name
-	return InitConfigFile("127.0.0.1")
+	return InitConfigFile(def.Localhost)
 }

@@ -18,7 +18,7 @@ func GetPortFwdSessions() []def.PortFwdSession {
 
 	var sessions []def.PortFwdSession
 
-	network.PortFwds.Range(func(id, value interface{}) bool {
+	network.PortFwds.Range(func(id, value any) bool {
 		portmap := value.(*network.PortFwdSession)
 		// Skip invalid sessions
 		if portmap.Sh == nil {
@@ -28,7 +28,7 @@ func GetPortFwdSessions() []def.PortFwdSession {
 
 		bindAddr := portmap.BindAddr
 		if bindAddr == "" {
-			bindAddr = "127.0.0.1"
+			bindAddr = def.Localhost
 		}
 
 		// Build local and remote addresses

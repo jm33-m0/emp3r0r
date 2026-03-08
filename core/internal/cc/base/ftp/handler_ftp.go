@@ -113,7 +113,7 @@ func HandleFTPTransfer(sh *network.StreamHandler, wrt http.ResponseWriter, req *
 
 	// Determine file paths.
 	filename := ""
-	network.FTPStreams.Range(func(fname, value interface{}) bool {
+	network.FTPStreams.Range(func(fname, value any) bool {
 		persh := value.(*network.StreamHandler)
 		if sh.Token == persh.Token {
 			filename = fname.(string)

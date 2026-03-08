@@ -85,7 +85,7 @@ func dispatcher(wrt http.ResponseWriter, req *http.Request) {
 	switch resolveRelayAPI(api) {
 	case relayAPIFTP:
 		var targetSH *network.StreamHandler
-		network.FTPStreams.Range(func(_, value interface{}) bool {
+		network.FTPStreams.Range(func(_, value any) bool {
 			sh := value.(*network.StreamHandler)
 			if token == sh.Token {
 				targetSH = sh

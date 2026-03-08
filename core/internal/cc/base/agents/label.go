@@ -33,7 +33,7 @@ func PersistLabeledAgentsToFile() {
 			_ = json.Unmarshal(data, &old)
 		}
 	}
-	live.AgentControlMap.Range(func(tag, control interface{}) bool {
+	live.AgentControlMap.Range(func(tag, control any) bool {
 		t := tag.(*def.Emp3r0rAgent)
 		c := control.(*live.AgentControl)
 		if c.Label == "" {

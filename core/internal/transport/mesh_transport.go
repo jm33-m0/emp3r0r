@@ -170,7 +170,7 @@ func GetTransportImplementation(name string) MeshTransport {
 // AllTransportNames returns a sorted list of registered transport names.
 func AllTransportNames() []string {
 	var names []string
-	Transports.Range(func(key, value interface{}) bool {
+	Transports.Range(func(key, value any) bool {
 		names = append(names, key.(string))
 		return true
 	})

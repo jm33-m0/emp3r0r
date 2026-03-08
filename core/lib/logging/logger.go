@@ -122,7 +122,7 @@ func (l *Logger) Start() {
 
 // sanitizeLogArg sanitizes a single log argument, with defense-in-depth approach.
 // Even though data is sanitized at storage time, this provides an additional safety layer.
-func sanitizeLogArg(v interface{}) interface{} {
+func sanitizeLogArg(v any) any {
 	switch t := v.(type) {
 	case nil:
 		return nil
@@ -141,18 +141,18 @@ func sanitizeLogArg(v interface{}) interface{} {
 	}
 }
 
-func sanitizeLogArgs(args []interface{}) []interface{} {
+func sanitizeLogArgs(args []any) []any {
 	if len(args) == 0 {
 		return args
 	}
-	safe := make([]interface{}, len(args))
+	safe := make([]any, len(args))
 	for i := range args {
 		safe[i] = sanitizeLogArg(args[i])
 	}
 	return safe
 }
 
-func (l *Logger) helper(format string, a []interface{}, msgColor *color.Color, _ string, _ bool) {
+func (l *Logger) helper(format string, a []any, msgColor *color.Color, _ string, _ bool) {
 	safeArgs := sanitizeLogArgs(a)
 	logMsg := fmt.Sprintf(format, safeArgs...)
 	if msgColor != nil {
@@ -161,41 +161,52 @@ func (l *Logger) helper(format string, a []interface{}, msgColor *color.Color, _
 	l.logChan <- logMsg
 }
 
-func (l *Logger) Debug(format string, a ...interface{}) {
+func (l *Logger) Debug(format string, a ...any) {
 	if l.Level >= 3 {
 		l.helper(format, a, nil, DEBUG, false)
 	}
 }
 
-func (l *Logger) Info(format string, a ...interface{}) {
+func (l *Logger) Info(format string, a ...any) {
 	if l.Level >= 2 {
 		l.helper(format, a, nil, INFO, false)
 	}
 }
 
-func (l *Logger) Warning(format string, a ...interface{}) {
+func (l *Logger) Warning(format string, a ...any) {
 	if l.Level >= 1 {
 		l.helper(format, a, color.New(color.FgHiYellow), WARN, false)
 	}
 }
 
 // Msg prints a message to console and log file, regardless of log level
-func (logger *Logger) Msg(format string, a ...interface{}) {
+func (logger *Logger) Msg(format string, a ...any) {
 	logger.helper(format, a, nil, INFO, false)
 }
 
 // Alert prints an alert message with custom color in bold font to console and log file, regardless of log level
-func (l *Logger) Alert(textColor color.Attribute, format string, a ...interface{}) {
+func (l *Logger) Alert(textColor color.Attribute, format string, a ...any) {
 	l.helper(format, a, color.New(textColor, color.Bold), WARN, false)
 }
 
+// Printf writes formatted output directly to the multi-writer without log prefixes.
+func (l *Logger) Printf(textColor *color.Color, format string, a ...any) {
+	logMsg := fmt.Sprintf(format, a...)
+	if textColor != nil {
+		logMsg = textColor.Sprint(logMsg)
+	}
+	if l.writer != nil {
+		fmt.Fprint(l.writer, logMsg)
+	}
+}
+
 // Success prints a success message in green and bold font to console and log file, regardless of log level
-func (l *Logger) Success(format string, a ...interface{}) {
+func (l *Logger) Success(format string, a ...any) {
 	l.helper(format, a, color.New(color.FgHiGreen, color.Bold), SUCCESS, true)
 }
 
 // Fatal prints a fatal error message in red, bold and italic font to console and log file, then exits the program
-func (l *Logger) Fatal(format string, a ...interface{}) {
+func (l *Logger) Fatal(format string, a ...any) {
 	l.helper(format, a, color.New(color.FgHiRed, color.Bold, color.Italic), FATAL, true)
 	l.Msg("Run 'tmux kill-session -t emp3r0r' to clean up dead emp3r0r windows")
 	time.Sleep(2 * time.Second) // give user some time to read the error message
@@ -204,7 +215,7 @@ func (l *Logger) Fatal(format string, a ...interface{}) {
 }
 
 // Error prints an error message in red and bold font to console and log file, regardless of log level
-func (l *Logger) Error(format string, a ...interface{}) {
+func (l *Logger) Error(format string, a ...any) {
 	l.helper(format, a, color.New(color.FgHiRed, color.Bold), ERROR, true)
 }
 

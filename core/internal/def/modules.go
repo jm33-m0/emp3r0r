@@ -45,7 +45,7 @@ type InvocationArg struct {
 // CoffArgSpec defines a COFF argument and its wire type
 type CoffArgSpec struct {
 	Param    string
-	Literal  interface{}
+	Literal  any
 	WireType string
 	Encoding string
 }
@@ -80,9 +80,9 @@ type ResolvedCoffInvocation struct {
 
 // ResolvedCoffArg holds a typed value to be packed by lighthouse
 type ResolvedCoffArg struct {
-	WireType string      `cbor:"1,keyasint"`
-	Value    interface{} `cbor:"2,keyasint"`
-	Encoding string      `cbor:"3,keyasint"`
+	WireType string `cbor:"1,keyasint"`
+	Value    any    `cbor:"2,keyasint"`
+	Encoding string `cbor:"3,keyasint"`
 }
 
 // AgentModuleConfig stores configuration data for the agent side

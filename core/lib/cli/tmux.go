@@ -270,7 +270,7 @@ func (pane *TmuxPane) Respawn() (err error) {
 
 // Printf like printf, but prints to a tmux pane/window
 // id: pane unique id
-func (pane *TmuxPane) Printf(clear bool, format string, a ...interface{}) {
+func (pane *TmuxPane) Printf(clear bool, format string, a ...any) {
 	msg := fmt.Sprintf(format, a...)
 	if clear {
 		clearPaneErr := pane.ClearPane()

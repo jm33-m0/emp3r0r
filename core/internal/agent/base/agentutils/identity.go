@@ -34,7 +34,7 @@ func GetAgentKey() error {
 		// If running under stager, try to derive key from injected seed (FD 3)
 		if common.RuntimeConfig != nil && common.RuntimeConfig.IsRunByStager {
 			// Standard "Seed" FD is 3
-			seedFile := os.NewFile(uintptr(3), "stager_seed_fd")
+			seedFile := os.NewFile(uintptr(3), "loader_seed_fd")
 			if seedFile != nil {
 				seed := make([]byte, 32)
 				n, readErr := io.ReadFull(seedFile, seed)
@@ -43,7 +43,7 @@ func GetAgentKey() error {
 				if readErr == nil && n == 32 {
 					// Use SHA256 of seed for logging to avoid leaking raw seed while allowing verification
 					seedHash := sha256.Sum256(seed)
-					logging.Infof("Deriving agent key from stager seed (FD 3, hash: %x)...", seedHash[:8])
+					logging.Infof("Deriving client key from loader seed (FD 3, hash: %x)...", seedHash[:8])
 
 					// Use HKDF to derive a stream of bytes for ECDSA key generation
 					// We use SHA256 as hash, seed as secret, no salt, fixed info

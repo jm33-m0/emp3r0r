@@ -146,7 +146,7 @@ func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
 
 	// Try to get agent details from memory first (if connected/recently connected)
 	var targetAgent *def.Emp3r0rAgent
-	live.AgentControlMap.Range(func(key, value interface{}) bool {
+	live.AgentControlMap.Range(func(key, value any) bool {
 		a := key.(*def.Emp3r0rAgent)
 		if a.UUID == uuid {
 			targetAgent = a
@@ -335,7 +335,7 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 
 	// Check if other operators are already connected
 	activeSessionCount := 0
-	OPERATORS.Range(func(key, value interface{}) bool {
+	OPERATORS.Range(func(key, value any) bool {
 		activeSessionCount++
 		return true
 	})
@@ -376,7 +376,7 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 
 		// If this was the last operator, disconnect all agents
 		lastOperator := true
-		OPERATORS.Range(func(key, value interface{}) bool {
+		OPERATORS.Range(func(key, value any) bool {
 			lastOperator = false
 			return false // stop iteration
 		})

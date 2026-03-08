@@ -356,17 +356,17 @@ func readModCondig(file string) (pconfig *def.ModuleConfig, err error) {
 	}
 
 	type invocationArgJSON struct {
-		Literal string      `json:"literal"`
-		Flag    string      `json:"flag"`
-		Param   string      `json:"param"`
-		Value   interface{} `json:"value"`
+		Literal string `json:"literal"`
+		Flag    string `json:"flag"`
+		Param   string `json:"param"`
+		Value   any    `json:"value"`
 	}
 
 	type coffArgJSON struct {
-		Param    string      `json:"param"`
-		Literal  interface{} `json:"literal"`
-		WireType string      `json:"wire_type"`
-		Encoding string      `json:"encoding"`
+		Param    string `json:"param"`
+		Literal  any    `json:"literal"`
+		WireType string `json:"wire_type"`
+		Encoding string `json:"encoding"`
 	}
 
 	type coffJSON struct {
@@ -527,7 +527,7 @@ func resolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.R
 		return nil, "", fmt.Errorf("option %s not defined", name)
 	}
 
-	coerceVal := func(name string) (string, interface{}, error) {
+	coerceVal := func(name string) (string, any, error) {
 		opt, val, err := lookupOpt(name)
 		if err != nil {
 			return "", nil, err
@@ -572,7 +572,7 @@ func resolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.R
 		coffInv := &def.ResolvedCoffInvocation{Export: config.Invocation.Coff.Export}
 		for _, arg := range config.Invocation.Coff.Args {
 			var (
-				typed interface{}
+				typed any
 				err   error
 			)
 			if arg.Param != "" {
@@ -592,7 +592,7 @@ func resolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.R
 }
 
 // renderOptionValue validates and returns both string and typed representations
-func renderOptionValue(opt *def.ModOption, val string) (string, interface{}, error) {
+func renderOptionValue(opt *def.ModOption, val string) (string, any, error) {
 	val = strings.TrimSpace(val)
 	if val == "" {
 		if opt.Required {

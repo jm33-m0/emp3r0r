@@ -135,7 +135,7 @@ func runBring2CC(cmd *cobra.Command, args []string) {
 		c2transport.NotifyC2(cmd, "Error: We don't have any internet to share\n")
 		return
 	}
-	ReverseConns.Range(func(p, cancelfunc interface{}) bool {
+	ReverseConns.Range(func(p, cancelfunc any) bool {
 		if addr == p.(string) {
 			cancelfunc.(context.CancelFunc)()
 		}
@@ -298,7 +298,7 @@ func runDeletePortFwd(cmd *cobra.Command, args []string) {
 	if id == "" {
 		return
 	}
-	modules.PortFwds.Range(func(sessionID, value interface{}) bool {
+	modules.PortFwds.Range(func(sessionID, value any) bool {
 		if sessionID.(string) == id {
 			session := value.(*modules.PortFwdSession)
 			session.Cancel()

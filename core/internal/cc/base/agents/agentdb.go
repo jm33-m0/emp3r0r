@@ -319,7 +319,7 @@ func RemoveAgent(uuid string) error {
 }
 
 // GetAgentHistory retrieves historical events for an agent
-func GetAgentHistory(uuid string, limit int) ([]map[string]interface{}, error) {
+func GetAgentHistory(uuid string, limit int) ([]map[string]any, error) {
 	if AgentDB == nil {
 		return nil, fmt.Errorf("database not initialized")
 	}
@@ -336,7 +336,7 @@ func GetAgentHistory(uuid string, limit int) ([]map[string]interface{}, error) {
 	}
 	defer rows.Close()
 
-	var history []map[string]interface{}
+	var history []map[string]any
 	for rows.Next() {
 		var eventType, oldValue, newValue string
 		var timestamp int64
@@ -345,7 +345,7 @@ func GetAgentHistory(uuid string, limit int) ([]map[string]interface{}, error) {
 			return nil, fmt.Errorf("scan history row: %v", err)
 		}
 
-		history = append(history, map[string]interface{}{
+		history = append(history, map[string]any{
 			"event_type": eventType,
 			"old_value":  oldValue,
 			"new_value":  newValue,

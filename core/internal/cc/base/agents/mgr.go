@@ -17,7 +17,7 @@ import (
 
 func GetConnectedAgents() []*def.Emp3r0rAgent {
 	var agents []*def.Emp3r0rAgent
-	live.AgentControlMap.Range(func(key, value interface{}) bool {
+	live.AgentControlMap.Range(func(key, value any) bool {
 		agent := key.(*def.Emp3r0rAgent)
 		shortID := fmt.Sprintf("%x", sha1.Sum([]byte(agent.UUID+agent.UUIDSig)))
 		if len(shortID) > 8 {
@@ -32,7 +32,7 @@ func GetConnectedAgents() []*def.Emp3r0rAgent {
 
 // GetAgentByIndex find target from def.AgentControlMap via control index, return nil if not found
 func GetAgentByIndex(index int) (target *def.Emp3r0rAgent) {
-	live.AgentControlMap.Range(func(key, value interface{}) bool {
+	live.AgentControlMap.Range(func(key, value any) bool {
 		t := key.(*def.Emp3r0rAgent)
 		ctl := value.(*live.AgentControl)
 		if ctl.Index == index {
@@ -46,7 +46,7 @@ func GetAgentByIndex(index int) (target *def.Emp3r0rAgent) {
 
 // GetAgentByTag find target from def.AgentControlMap via tag, return nil if not found
 func GetAgentByTag(tag string) (target *def.Emp3r0rAgent) {
-	live.AgentControlMap.Range(func(key, value interface{}) bool {
+	live.AgentControlMap.Range(func(key, value any) bool {
 		t := key.(*def.Emp3r0rAgent)
 		if t.Tag == tag {
 			target = t
@@ -67,7 +67,7 @@ func GetAgentByTag(tag string) (target *def.Emp3r0rAgent) {
 
 // GetAgentByUUID find target from def.AgentControlMap via UUID, return nil if not found
 func GetAgentByUUID(uuid string) (target *def.Emp3r0rAgent) {
-	live.AgentControlMap.Range(func(key, value interface{}) bool {
+	live.AgentControlMap.Range(func(key, value any) bool {
 		t := key.(*def.Emp3r0rAgent)
 		if t.UUID == uuid {
 			target = t
@@ -89,7 +89,7 @@ func GetAgentByUUID(uuid string) (target *def.Emp3r0rAgent) {
 // IsAgentExistByUUID is agent already in target list?
 func IsAgentExistByUUID(uuid string) bool {
 	exists := false
-	live.AgentControlMap.Range(func(key, value interface{}) bool {
+	live.AgentControlMap.Range(func(key, value any) bool {
 		a := key.(*def.Emp3r0rAgent)
 		if a.UUID == uuid {
 			exists = true
@@ -102,7 +102,7 @@ func IsAgentExistByUUID(uuid string) bool {
 
 // GetTargetFromH2Conn find target from def.AgentControlMap via HTTP2 connection ID, return nil if not found
 func GetTargetFromH2Conn(conn *h2conn.Conn) (target *def.Emp3r0rAgent) {
-	live.AgentControlMap.Range(func(key, value interface{}) bool {
+	live.AgentControlMap.Range(func(key, value any) bool {
 		t := key.(*def.Emp3r0rAgent)
 		ctrl := value.(*live.AgentControl)
 		if ctrl.Conn == nil {
@@ -170,7 +170,7 @@ func SetActiveAgent(identifier string) {
 // IsAgentExistByTag is agent already in target list?
 func IsAgentExistByTag(tag string) bool {
 	exists := false
-	live.AgentControlMap.Range(func(key, value interface{}) bool {
+	live.AgentControlMap.Range(func(key, value any) bool {
 		a := key.(*def.Emp3r0rAgent)
 		if a.Tag == tag {
 			exists = true
@@ -184,7 +184,7 @@ func IsAgentExistByTag(tag string) bool {
 // IsAgentExist is agent already in target list?
 func IsAgentExist(t *def.Emp3r0rAgent) bool {
 	exists := false
-	live.AgentControlMap.Range(func(key, value interface{}) bool {
+	live.AgentControlMap.Range(func(key, value any) bool {
 		a := key.(*def.Emp3r0rAgent)
 		if a.UUID == t.UUID {
 			exists = true
@@ -199,7 +199,7 @@ func IsAgentExist(t *def.Emp3r0rAgent) bool {
 func AssignAgentIndex() (index int) {
 	// loop thru agent list and get all index numbers
 	index_list := make([]int, 0)
-	live.AgentControlMap.Range(func(key, value interface{}) bool {
+	live.AgentControlMap.Range(func(key, value any) bool {
 		c := value.(*live.AgentControl)
 		index_list = append(index_list, c.Index)
 		return true

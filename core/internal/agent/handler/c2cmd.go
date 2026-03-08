@@ -19,7 +19,7 @@ import (
 // C2Commands returns a root cobra.Command for C2 commands.
 func C2Commands() *cobra.Command {
 	rootCmd := &cobra.Command{
-		Short: "agent C2 commands",
+		Short: "agent commands",
 	}
 
 	// Add command groups for categorization

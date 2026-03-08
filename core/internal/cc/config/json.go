@@ -12,7 +12,7 @@ import (
 // readJSONConfig read runtime variables from JSON, and apply them
 func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 	// parse the json
-	var raw map[string]interface{}
+	var raw map[string]any
 	err = json.Unmarshal(jsonData, &raw)
 	if err != nil {
 		return fmt.Errorf("failed to parse JSON config: %v", err)
@@ -66,7 +66,7 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 	config_to_write.PreflightEnabled = getBool("preflight_enabled")
 	config_to_write.PreflightURL = getString("preflight_url")
 	config_to_write.PreflightMethod = getString("preflight_method")
-	if val, ok := raw["preflight_headers"].(map[string]interface{}); ok {
+	if val, ok := raw["preflight_headers"].(map[string]any); ok {
 		config_to_write.PreflightHeaders = make(map[string]string)
 		for k, v := range val {
 			if strV, ok := v.(string); ok {
@@ -103,7 +103,7 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 	config_to_write.IsRunByStager = getBool("is_run_by_stager")
 
 	// C2 Headers
-	if val, ok := raw["c2_headers"].(map[string]interface{}); ok {
+	if val, ok := raw["c2_headers"].(map[string]any); ok {
 		config_to_write.C2Headers = make(map[string]string)
 		for k, v := range val {
 			if strV, ok := v.(string); ok {

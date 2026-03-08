@@ -76,7 +76,7 @@ func operatorBroadcastPrintf(msg_type, format string, a ...any) (err error) {
 
 // fwdMsg2Operators forwards a message to all connected operator sessions.
 func fwdMsg2Operators(msg def.MsgTunData) (err error) {
-	OPERATORS.Range(func(id, value interface{}) bool {
+	OPERATORS.Range(func(id, value any) bool {
 		op, ok := value.(*operator_t)
 		if !ok || op == nil || op.conn == nil {
 			return true // continue iteration

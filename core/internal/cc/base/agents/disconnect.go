@@ -12,7 +12,7 @@ import (
 // This should be called when the last operator disconnects
 func DisconnectAllAgents() {
 	count := 0
-	live.AgentControlMap.Range(func(key, value interface{}) bool {
+	live.AgentControlMap.Range(func(key, value any) bool {
 		count++
 		return true
 	})
@@ -22,7 +22,7 @@ func DisconnectAllAgents() {
 
 	logging.Infof("Disconnecting all %d agent(s) due to operator exit", count)
 
-	live.AgentControlMap.Range(func(key, value interface{}) bool {
+	live.AgentControlMap.Range(func(key, value any) bool {
 		agent := key.(*def.Emp3r0rAgent)
 		ctrl := value.(*live.AgentControl)
 		if ctrl == nil {

@@ -181,7 +181,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 
 	// Debug: verify maps are empty
 	size := 0
-	live.AgentControlMap.Range(func(key, value interface{}) bool {
+	live.AgentControlMap.Range(func(key, value any) bool {
 		size++
 		return true
 	})
@@ -420,7 +420,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 		}
 
 		// Check if agent has checked in (added to AgentControlMap) AND has an active connection
-		live.AgentControlMap.Range(func(key, value interface{}) bool {
+		live.AgentControlMap.Range(func(key, value any) bool {
 			k := key.(*def.Emp3r0rAgent)
 			v := value.(*live.AgentControl)
 			if k.Tag != "" && v.Conn != nil { // Wait for MsgTun connection
@@ -619,7 +619,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	reconnected := false
 
 	for time.Since(startRestart) < 30*time.Second {
-		live.AgentControlMap.Range(func(key, value interface{}) bool {
+		live.AgentControlMap.Range(func(key, value any) bool {
 			k := key.(*def.Emp3r0rAgent)
 			v := value.(*live.AgentControl)
 			// Look for the same UUID

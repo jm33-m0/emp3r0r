@@ -130,7 +130,7 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request, expectedUUID
 	isNew := true
 
 	existingKey := ""
-	live.AgentControlMap.Range(func(key, value interface{}) bool {
+	live.AgentControlMap.Range(func(key, value any) bool {
 		a := key.(*def.Emp3r0rAgent)
 		if a.UUID == target.UUID {
 			if a.PublicKey != "" {
@@ -177,7 +177,7 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request, expectedUUID
 	// Update agent in memory (dispatcher already created placeholder)
 	// Find the placeholder and update it with full agent data from CBOR
 	var existingCtrl *live.AgentControl
-	live.AgentControlMap.Range(func(key, value interface{}) bool {
+	live.AgentControlMap.Range(func(key, value any) bool {
 		a := key.(*def.Emp3r0rAgent)
 		if a.UUID == target.UUID {
 			existingCtrl = value.(*live.AgentControl)

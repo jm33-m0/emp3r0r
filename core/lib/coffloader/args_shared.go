@@ -109,7 +109,7 @@ func normalizeCoffValue(arg CoffArg) (string, error) {
 			return "b" + base64.StdEncoding.EncodeToString([]byte(v)), nil
 		case []byte:
 			return "b" + base64.StdEncoding.EncodeToString(v), nil
-		case []interface{}:
+		case []any:
 			buf := make([]byte, 0, len(v))
 			for _, b := range v {
 				if num, ok := b.(float64); ok {

@@ -53,7 +53,7 @@ func ModulePortFwd(ctx *c2context.C2Context) {
 	case "off":
 		// ugly, i know, it will delete port mappings matching current lport-to combination
 		found := false
-		network.PortFwds.Range(func(id, value interface{}) bool {
+		network.PortFwds.Range(func(id, value any) bool {
 			session := value.(*network.PortFwdSession)
 			toOpt, ok := ctx.Flags["to"]
 			if !ok {
@@ -98,7 +98,7 @@ func ModulePortFwd(ctx *c2context.C2Context) {
 		if ok {
 			pf.BindAddr = bindAddrOpt
 		} else {
-			pf.BindAddr = "127.0.0.1"
+			pf.BindAddr = def.Localhost
 		}
 
 		pf.SendCmdFunc = CmdSender
@@ -123,7 +123,7 @@ func ModulePortFwd(ctx *c2context.C2Context) {
 		if ok {
 			pf.BindAddr = bindAddrOpt
 		} else {
-			pf.BindAddr = "127.0.0.1"
+			pf.BindAddr = def.Localhost
 		}
 
 		pf.SendCmdFunc = CmdSender
@@ -164,12 +164,12 @@ func moduleProxy(ctx *c2context.C2Context) {
 	status := statusOpt
 
 	// Get bind address option, default to localhost if not specified
-	bindAddr := "127.0.0.1"
+	bindAddr := def.Localhost
 	bindAddrOpt, ok := ctx.Flags["bind_addr"]
 	if ok {
 		bindAddr = bindAddrOpt
 		if bindAddr == "localhost" {
-			bindAddr = "127.0.0.1"
+			bindAddr = def.Localhost
 		}
 	}
 
@@ -242,7 +242,7 @@ func moduleProxy(ctx *c2context.C2Context) {
 			}()
 		}
 	case "off":
-		network.PortFwds.Range(func(id, value interface{}) bool {
+		network.PortFwds.Range(func(id, value any) bool {
 			session := value.(*network.PortFwdSession)
 			if session.Description == pf.Description ||
 				session.Description == pfu.Description {

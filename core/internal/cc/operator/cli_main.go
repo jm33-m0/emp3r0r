@@ -259,5 +259,5 @@ func CliBanner(console *console.Console) {
 		logging.Fatalf("CowSay: %v", encodingErr)
 	}
 	banner.WriteString(color.BlueString("%s\n\n", say))
-	fmt.Print(banner.String())
+	logging.RawPrintf(nil, "%s", banner.String())
 }

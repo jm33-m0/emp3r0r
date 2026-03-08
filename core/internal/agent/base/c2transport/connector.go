@@ -55,7 +55,7 @@ func EstablishC2Connection(url string) (conn *h2conn.Conn, ctx context.Context, 
 		resp := res.resp
 		err = res.err
 		if err != nil {
-			err = fmt.Errorf("EstablishC2Connection: initiate h2 conn: %s", err)
+			err = fmt.Errorf("EstablishConnection: initiate h2 conn: %s", err)
 			logging.Print(err)
 			cancel()
 			return
@@ -70,7 +70,7 @@ func EstablishC2Connection(url string) (conn *h2conn.Conn, ctx context.Context, 
 			}
 		}
 	case <-time.After(10 * time.Second):
-		err = fmt.Errorf("EstablishC2Connection at %s failed: timeout", url)
+		err = fmt.Errorf("EstablishConnection at %s failed: timeout", url)
 		cancel()
 		return
 	}

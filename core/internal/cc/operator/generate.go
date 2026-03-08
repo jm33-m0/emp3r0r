@@ -1,22 +1,15 @@
 package operator
 
 import (
-	"fmt"
-	"net/url"
-	"os"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/controllers"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
-	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/donut"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
 )
 
@@ -74,8 +67,46 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// Fill config (UI layer - handles flag parsing and user interaction)
-	if err := MakeConfig(cmd); err != nil {
+	// Gather config from flags
+	p2p, p2pChanged := getBoolFlag(cmd, "p2p")
+	directC2, directC2Changed := getBoolFlag(cmd, "direct-c2")
+	ncsi, ncsiChanged := getBoolFlag(cmd, "ncsi")
+	kcp, kcpChanged := getBoolFlag(cmd, "kcp")
+	isStager, isStagerChanged := getBoolFlag(cmd, "stager")
+
+	opts := controllers.AgentConfig{
+		CCAddress:        getStringOpt(cmd, "cc"),
+		CDNProxy:         getStringOpt(cmd, "cdn"),
+		C2TransportProxy: getStringOpt(cmd, "proxy"),
+		DoHServer:        getStringOpt(cmd, "doh"),
+		InitialPeers:     getStringSliceOpt(cmd, "peers"),
+		P2PTransport:     getStringOpt(cmd, "p2p-transport"),
+	}
+
+	// Assign booleans only if they were explicitly changed, or default to current live.RuntimeConfig settings
+	opts.IsP2PEnabled = live.RuntimeConfig.IsP2PEnabled
+	if p2pChanged {
+		opts.IsP2PEnabled = p2p
+	}
+	opts.IsDirectC2 = live.RuntimeConfig.IsDirectC2Enabled
+	if directC2Changed {
+		opts.IsDirectC2 = directC2
+	}
+	opts.IsNCSIEnabled = live.RuntimeConfig.EnableNCSI
+	if ncsiChanged {
+		opts.IsNCSIEnabled = ncsi
+	}
+	opts.UseKCP = live.RuntimeConfig.UseKCP
+	if kcpChanged {
+		opts.UseKCP = kcp
+	}
+	opts.IsStager = live.RuntimeConfig.IsRunByStager
+	if isStagerChanged {
+		opts.IsStager = isStager
+	}
+
+	// Pass config to controller
+	if err := controllers.MakeConfig(opts); err != nil {
 		logging.Errorf("Failed to configure agent: %v", err)
 		return
 	}
@@ -128,6 +159,28 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 	}
 }
 
+// Helpers for reading flags cleanly
+func getBoolFlag(cmd *cobra.Command, name string) (bool, bool) {
+	val, _ := cmd.Flags().GetBool(name)
+	return val, cmd.Flags().Changed(name)
+}
+
+func getStringOpt(cmd *cobra.Command, name string) string {
+	if cmd.Flags().Changed(name) {
+		val, _ := cmd.Flags().GetString(name)
+		return val
+	}
+	return ""
+}
+
+func getStringSliceOpt(cmd *cobra.Command, name string) []string {
+	if cmd.Flags().Changed(name) {
+		val, _ := cmd.Flags().GetStringSlice(name)
+		return val
+	}
+	return nil
+}
+
 func isArchValid(payload_type, arch_choice string) bool {
 	var list []string
 	switch payload_type {
@@ -141,238 +194,4 @@ func isArchValid(payload_type, arch_choice string) bool {
 		list = Arch_List_All
 	}
 	return slices.Contains(list, arch_choice)
-}
-
-func MakeConfig(cmd *cobra.Command) (err error) {
-	cc_host, _ := cmd.Flags().GetString("cc")
-	cdn_proxy, _ := cmd.Flags().GetString("cdn")
-	c2transport_proxy, _ := cmd.Flags().GetString("proxy")
-	doh_server, _ := cmd.Flags().GetString("doh")
-	p2p, _ := cmd.Flags().GetBool("p2p")
-	directC2, _ := cmd.Flags().GetBool("direct-c2")
-	peers, _ := cmd.Flags().GetStringSlice("peers")
-	ncsi, _ := cmd.Flags().GetBool("ncsi")
-	kcp, _ := cmd.Flags().GetBool("kcp")
-	is_stager, _ := cmd.Flags().GetBool("stager")
-
-	// Preflight check is now enabled by default for better stealth
-	live.RuntimeConfig.PreflightEnabled = true
-
-	// read existing config when possible
-	if util.IsExist(live.EmpConfigFile) {
-		logging.Infof("Reading config from existing %s", live.EmpConfigFile)
-		jsonData, err := os.ReadFile(live.EmpConfigFile)
-		if err != nil {
-			return fmt.Errorf("failed to read %s: %v", live.EmpConfigFile, err)
-		}
-		// load to live.RuntimeConfig
-		err = config.ReadJSONConfig(jsonData, live.RuntimeConfig)
-		if err != nil {
-			return fmt.Errorf("parsing existing %s: %v", live.EmpConfigFile, err)
-		}
-	}
-
-	// CC names and certs
-	if cmd.Flags().Changed("cc") || cc_host != "" {
-		live.RuntimeConfig.CCAddress = cc_host
-	}
-	live.RuntimeConfig.CCAddress = strings.TrimSuffix(live.RuntimeConfig.CCAddress, "/")
-	logging.Infof("C2 server name: %s", live.RuntimeConfig.CCAddress)
-	existing_names := transport.NamesInCert(transport.ServerCrtFile)
-
-	exists := slices.Contains(existing_names, live.RuntimeConfig.CCAddress)
-	if !exists && live.RuntimeConfig.CCAddress != "" {
-		logging.Warningf("Name '%s' is not covered by our server cert, fetching new certs from server",
-			live.RuntimeConfig.CCAddress)
-
-		certs, err := client.GetCerts()
-		if err != nil {
-			return fmt.Errorf("failed to get certs from server: %v", err)
-		}
-
-		// Save certs
-		if err := os.WriteFile(transport.CaCrtFile, certs["ca_crt"], 0o644); err != nil {
-			return fmt.Errorf("failed to save CA cert: %v", err)
-		}
-		if err := os.WriteFile(transport.ServerCrtFile, certs["server_crt"], 0o644); err != nil {
-			return fmt.Errorf("failed to save Server cert: %v", err)
-		}
-	}
-
-	// Internet check
-	if cmd.Flags().Changed("ncsi") {
-		live.RuntimeConfig.EnableNCSI = ncsi
-	}
-	if live.RuntimeConfig.EnableNCSI {
-		logging.Infof("NCSI is enabled")
-	}
-
-	// CDN proxy
-	if cmd.Flags().Changed("cdn") || cdn_proxy != "" {
-		live.RuntimeConfig.CDNProxy = cdn_proxy
-	}
-	if live.RuntimeConfig.CDNProxy != "" {
-		logging.Infof("Using CDN proxy %s", live.RuntimeConfig.CDNProxy)
-	}
-
-	if cmd.Flags().Changed("kcp") {
-		live.RuntimeConfig.UseKCP = kcp
-	}
-	if live.RuntimeConfig.UseKCP {
-		logging.Infof("Using KCP")
-	}
-
-	// agent proxy for c2 transport
-	if cmd.Flags().Changed("proxy") || c2transport_proxy != "" {
-		live.RuntimeConfig.C2TransportProxy = c2transport_proxy
-	}
-	if live.RuntimeConfig.C2TransportProxy != "" {
-		logging.Infof("Using C2 transport proxy %s", live.RuntimeConfig.C2TransportProxy)
-	}
-
-	if cmd.Flags().Changed("doh") || doh_server != "" {
-		live.RuntimeConfig.DoHServer = doh_server
-	}
-	if live.RuntimeConfig.DoHServer != "" {
-		logging.Infof("Using DoH server %s", live.RuntimeConfig.DoHServer)
-	}
-
-	// malleable C2
-	if live.RuntimeConfig.C2Prefix == "" {
-		live.RuntimeConfig.C2Prefix = util.RandStr(util.RandInt(3, 10))
-	}
-	if live.RuntimeConfig.CheckInPath == "" {
-		live.RuntimeConfig.CheckInPath = util.RandStr(util.RandInt(5, 15))
-	}
-	if live.RuntimeConfig.MsgPath == "" {
-		live.RuntimeConfig.MsgPath = util.RandStr(util.RandInt(5, 15))
-	}
-	if live.RuntimeConfig.FTPPath == "" {
-		live.RuntimeConfig.FTPPath = util.RandStr(util.RandInt(5, 15))
-	}
-	if live.RuntimeConfig.WWWPath == "" {
-		live.RuntimeConfig.WWWPath = util.RandStr(util.RandInt(5, 15))
-	}
-	if live.RuntimeConfig.ProxyPath == "" {
-		live.RuntimeConfig.ProxyPath = util.RandStr(util.RandInt(5, 15))
-	}
-	if live.RuntimeConfig.UserAgent == "" {
-		uaList := []string{
-			"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-			"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-			"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-			"Mozilla/5.0 (iPhone; CPU iPhone OS 17_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1",
-		}
-		live.RuntimeConfig.UserAgent = uaList[util.RandInt(0, len(uaList))]
-	}
-	// Randomize C2 headers if empty
-	if len(live.RuntimeConfig.C2Headers) == 0 {
-		live.RuntimeConfig.C2Headers = map[string]string{
-			"Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-			"Accept-Language": "en-US,en;q=0.5",
-			"Cache-Control":   "no-cache",
-			"Connection":      "keep-alive",
-			"Pragma":          "no-cache",
-			"Server":          fmt.Sprintf("Apache/%d.%d.%d", util.RandInt(2, 3), util.RandInt(3, 5), util.RandInt(10, 50)),
-			"X-Powered-By":    fmt.Sprintf("PHP/%d.%d.%d", util.RandInt(5, 9), util.RandInt(0, 5), util.RandInt(0, 30)),
-			"X-Request-ID":    uuid.NewString(),
-		}
-	}
-	if live.RuntimeConfig.PaddingMin == 0 {
-		live.RuntimeConfig.PaddingMin = 1024
-	}
-	if live.RuntimeConfig.PaddingMax == 0 {
-		live.RuntimeConfig.PaddingMax = 10240
-	}
-	if live.RuntimeConfig.Jitter == 0 {
-		live.RuntimeConfig.Jitter = 20
-	}
-
-	// Preflight / Hybrid Mode intervals
-	if live.RuntimeConfig.PreflightURL == "" {
-		// generate new if empty
-		live.RuntimeConfig.PreflightURL = fmt.Sprintf("https://%s:%s/%s", live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCPort, util.RandStr(util.RandInt(5, 10)))
-	} else {
-		// synchronise host and port with CCAddress
-		u, err := url.Parse(live.RuntimeConfig.PreflightURL)
-		if err == nil {
-			u.Host = fmt.Sprintf("%s:%s", live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCPort)
-			u.Scheme = "https" // ensure it's https
-			live.RuntimeConfig.PreflightURL = u.String()
-		}
-	}
-	if live.RuntimeConfig.PreflightIntervalMin == 0 {
-		// Default to a reasonably long beacon interval for stealth (e.g. 30s - 120s)
-		live.RuntimeConfig.PreflightIntervalMin = util.RandInt(30, 120)
-	}
-	if live.RuntimeConfig.PreflightIntervalMax == 0 {
-		// Max should be larger than min
-		live.RuntimeConfig.PreflightIntervalMax = live.RuntimeConfig.PreflightIntervalMin + util.RandInt(30, 300)
-	}
-	logging.Infof("Conditional C2 (Hybrid Mode) beacon interval: %d - %d seconds",
-		live.RuntimeConfig.PreflightIntervalMin, live.RuntimeConfig.PreflightIntervalMax)
-
-	// Mesh / P2P mode — always reset first to avoid stale state from a
-	// previous `generate` call sharing live.RuntimeConfig.
-	live.RuntimeConfig.IsP2PEnabled = false
-	live.RuntimeConfig.IsDirectC2Enabled = false
-	if cmd.Flags().Changed("p2p") {
-		live.RuntimeConfig.IsP2PEnabled = p2p
-	}
-	if cmd.Flags().Changed("p2p-transport") {
-		p2pTransport, _ := cmd.Flags().GetString("p2p-transport")
-		isValid := false
-		for _, name := range transport.AllTransportNames() {
-			if name == p2pTransport {
-				isValid = true
-				break
-			}
-		}
-		if !isValid {
-			return fmt.Errorf("invalid p2p-transport: %s (available: %v)", p2pTransport, transport.AllTransportNames())
-		}
-		live.RuntimeConfig.P2PTransport = p2pTransport
-	} else if live.RuntimeConfig.P2PTransport == "" {
-		live.RuntimeConfig.P2PTransport = "mtls"
-	}
-	if cmd.Flags().Changed("direct-c2") {
-		live.RuntimeConfig.IsDirectC2Enabled = directC2
-	}
-	// Standalone agents always contact C2 directly.
-	// Gateway agents (--p2p --direct-c2) also contact C2 directly and run preflight.
-	if !live.RuntimeConfig.IsP2PEnabled {
-		live.RuntimeConfig.IsDirectC2Enabled = true
-	}
-
-	// Bootstrap peers for gossip (reset to avoid stale list from previous generate)
-	live.RuntimeConfig.InitialPeers = nil
-	if cmd.Flags().Changed("peers") {
-		live.RuntimeConfig.InitialPeers = peers
-	}
-	// Silent Nodes (--p2p without --direct-c2) must have at least one bootstrap peer.
-	if live.RuntimeConfig.IsP2PEnabled && !live.RuntimeConfig.IsDirectC2Enabled {
-		if len(live.RuntimeConfig.InitialPeers) == 0 {
-			return fmt.Errorf("Silent Node build requires --peers: specify at least one Gateway IP:gossipport (e.g. --peers 1.2.3.4:51996)")
-		}
-		logging.Infof("Silent Node bootstrap peers: %v", live.RuntimeConfig.InitialPeers)
-	}
-
-	switch {
-	case live.RuntimeConfig.IsP2PEnabled && live.RuntimeConfig.IsDirectC2Enabled:
-		logging.Infof("Mode: Gateway (P2P mesh + direct C2 + preflight)")
-	case live.RuntimeConfig.IsP2PEnabled:
-		logging.Infof("Mode: Silent Node (P2P mesh only, no direct C2)")
-	default:
-		logging.Infof("Mode: Standalone (direct C2, no mesh)")
-	}
-
-	if cmd.Flags().Changed("stager") {
-		live.RuntimeConfig.IsRunByStager = is_stager
-	}
-	if live.RuntimeConfig.IsRunByStager {
-		logging.Infof("Agent is built for stager")
-	}
-
-	// save emp3r0r.json
-	return config.SaveConfigJSON()
 }

@@ -50,7 +50,7 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 		logging.Debugf("handleMessageTunnel exiting")
 		cancel()  // Signal goroutine to stop
 		wg.Wait() // Wait for goroutine to finish before returning
-		live.AgentControlMap.Range(func(key, value interface{}) bool {
+		live.AgentControlMap.Range(func(key, value any) bool {
 			t := key.(*def.Emp3r0rAgent)
 			c := value.(*live.AgentControl)
 			if c.Conn == secureConn {

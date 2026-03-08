@@ -71,7 +71,7 @@ func HandleOutput(jobID string, output []byte) {
 // GetJobs returns a list of all jobs
 func GetJobs() []*def.Job {
 	var jobs []*def.Job
-	Jobs.Range(func(key, value interface{}) bool {
+	Jobs.Range(func(key, value any) bool {
 		jobs = append(jobs, value.(*def.Job))
 		return true
 	})

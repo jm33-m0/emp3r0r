@@ -81,7 +81,7 @@ func verifyAgentCAOnly(wrt http.ResponseWriter, req *http.Request) (agentUUID st
 		}
 	}
 	replayNonceCache.Store(nonceKey, ts)
-	replayNonceCache.Range(func(k, v interface{}) bool {
+	replayNonceCache.Range(func(k, v any) bool {
 		if cachedTS, ok := v.(int64); ok && abs64(now-cachedTS) > transport.ReplayWindowSeconds {
 			replayNonceCache.Delete(k)
 		}
@@ -147,7 +147,7 @@ func verifyAgentRequest(wrt http.ResponseWriter, req *http.Request, expectedAgen
 		}
 	}
 	replayNonceCache.Store(nonceKey, ts)
-	replayNonceCache.Range(func(k, v interface{}) bool {
+	replayNonceCache.Range(func(k, v any) bool {
 		if cachedTS, ok := v.(int64); ok && abs64(now-cachedTS) > transport.ReplayWindowSeconds {
 			replayNonceCache.Delete(k)
 		}

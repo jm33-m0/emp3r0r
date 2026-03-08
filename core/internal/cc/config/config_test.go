@@ -198,7 +198,7 @@ func TestSaveAndLoadConfigJSON(t *testing.T) {
 	}
 
 	// Check if keys are snake_case
-	var raw map[string]interface{}
+	var raw map[string]any
 	err = json.Unmarshal(content, &raw)
 	if err != nil {
 		t.Fatalf("Failed to unmarshal saved JSON: %v", err)

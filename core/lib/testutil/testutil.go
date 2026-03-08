@@ -27,7 +27,7 @@ func CreateTempFile(t *testing.T, dir, filename, content string) string {
 }
 
 // AssertEqual checks if two values are equal
-func AssertEqual(t *testing.T, got, want interface{}) {
+func AssertEqual(t *testing.T, got, want any) {
 	t.Helper()
 	if got != want {
 		t.Errorf("got %v, want %v", got, want)
@@ -67,7 +67,7 @@ func AssertFalse(t *testing.T, condition bool, msg string) {
 }
 
 // AssertNil checks that a value is nil
-func AssertNil(t *testing.T, value interface{}) {
+func AssertNil(t *testing.T, value any) {
 	t.Helper()
 	if value != nil {
 		// For better nil checking with interfaces, use reflection
@@ -78,7 +78,7 @@ func AssertNil(t *testing.T, value interface{}) {
 }
 
 // AssertNotNil checks that a value is not nil
-func AssertNotNil(t *testing.T, value interface{}) {
+func AssertNotNil(t *testing.T, value any) {
 	t.Helper()
 	if value == nil {
 		t.Error("expected non-nil value but got nil")

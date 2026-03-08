@@ -27,7 +27,7 @@ func genC2TransportString() (transport_str string) {
 			logging.Infof("invalid proxy URL: %v", err)
 		}
 
-		// if the proxy port is emp3r0r proxy server's port
+		// if the proxy port is the proxy server's port
 		if proxyURL.Port() == common.RuntimeConfig.AgentSocksServerPort && proxyURL.Hostname() == "127.0.0.1" {
 			return fmt.Sprintf("Reverse Proxy: %s", common.RuntimeConfig.C2TransportProxy)
 		}

@@ -50,7 +50,7 @@ func SSHClient(shell, args, port string) (string, error) {
 	// SSHDShellPort is reserved
 	is_new_port_needed := (port == live.RuntimeConfig.SSHDShellPort && shell != "sftp")
 	// check if port mapping is already open, if yes, use it
-	SSHShellPort.Range(func(key, value interface{}) bool {
+	SSHShellPort.Range(func(key, value any) bool {
 		s := key.(string)
 		mapping := value.(*SSH_SHELL_Mapping)
 		if s == shell && mapping.Agent == target {
@@ -82,11 +82,11 @@ func SSHClient(shell, args, port string) (string, error) {
 
 	// is port mapping already done?
 	port_mapping_exists := false
-	network.PortFwds.Range(func(id, value interface{}) bool {
+	network.PortFwds.Range(func(id, value any) bool {
 		p := value.(*network.PortFwdSession)
 		if p.Agent == target && p.To == to {
 			port_mapping_exists = true
-			SSHShellPort.Range(func(key, value interface{}) bool {
+			SSHShellPort.Range(func(key, value any) bool {
 				s := key.(string)
 				ssh_mapping := value.(*SSH_SHELL_Mapping)
 				// one port for one shell
@@ -207,10 +207,10 @@ func SSHClient(shell, args, port string) (string, error) {
 		return "", fmt.Errorf("%s not found, please install it first: %v", ssh_prog, err)
 	}
 	sshCmd := fmt.Sprintf("%s -p %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no %s",
-		sshPath, lport, "127.0.0.1")
+		sshPath, lport, def.Localhost)
 	if is_sftp {
 		sshCmd = fmt.Sprintf("%s -P %s -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no %s",
-			sshPath, lport, "127.0.0.1")
+			sshPath, lport, def.Localhost)
 	}
 
 	logging.Infof("\nSSH (%s - %s) session ready for %s.\nConnection command:\n%s",

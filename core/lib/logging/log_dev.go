@@ -7,56 +7,61 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
 var logger *Logger
 
-func Print(a ...interface{}) {
+func Print(a ...any) {
 	logger.Msg("%v", fmt.Sprint(a...))
 }
 
-func Println(a ...interface{}) {
+func Println(a ...any) {
 	logger.Msg("%v", fmt.Sprint(a...))
 }
 
-func Printf(format string, a ...interface{}) {
+func Printf(format string, a ...any) {
 	logger.Msg(format, a...)
+}
+
+func RawPrintf(textColor *color.Color, format string, a ...any) {
+	logger.Printf(textColor, format, a...)
 }
 
 func Writer() io.Writer {
 	return logger.writer
 }
 
-func Sprintf(format string, a ...interface{}) string {
+func Sprintf(format string, a ...any) string {
 	return fmt.Sprintf(format, a...)
 }
 
-func Successf(format string, a ...interface{}) {
+func Successf(format string, a ...any) {
 	logger.Success(format, a...)
 }
 
-func Infof(format string, a ...interface{}) {
+func Infof(format string, a ...any) {
 	logger.Info(format, a...)
 }
 
-func Debugf(format string, a ...interface{}) {
+func Debugf(format string, a ...any) {
 	logger.Debug(format, a...)
 }
 
-func Warningf(format string, a ...interface{}) {
+func Warningf(format string, a ...any) {
 	logger.Warning(format, a...)
 }
 
-func Errorf(format string, a ...interface{}) {
+func Errorf(format string, a ...any) {
 	logger.Error(format, a...)
 }
 
-func Fatalf(format string, a ...interface{}) {
+func Fatalf(format string, a ...any) {
 	logger.Fatal(format, a...)
 }
 
-func Fatal(a ...interface{}) {
+func Fatal(a ...any) {
 	logger.Msg("%v", fmt.Sprint(a...))
 }
 
