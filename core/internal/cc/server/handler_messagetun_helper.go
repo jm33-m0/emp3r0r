@@ -54,9 +54,7 @@ func processKeyExchange(msg *def.MsgTunData, pfsEstablished bool) (replyData []b
 			replyData = util.RandBytes(util.RandInt(10, 100))
 			logging.Debugf("Keep-alive from %s (PFS active)", msg.Tag)
 		} else {
-			// Legacy / Fallback: random data
-			replyData = util.RandBytes(util.RandInt(10, 100))
-			logging.Warningf("Key Exchange: Agent %s did not provide ephemeral key, using legacy connection", msg.Tag)
+			return nil, nil, fmt.Errorf("agent %s did not provide ephemeral key for initial handshake", msg.Tag)
 		}
 	}
 	return replyData, sessionKey, nil

@@ -96,31 +96,32 @@ func (pf *PortFwdSession) RunReversedPortFwd(sh *StreamHandler) (err error) {
 	cleanup := func() {
 		_, _ = conn.Write([]byte("exit\n"))
 		conn.Close()
-		sh.H2x.Conn.Close()
+		if sh.Cancel != nil {
+			sh.Cancel()
+		}
 		logging.Debugf("PortFwd conn handler (%s) finished", conn.RemoteAddr().String())
-		sh.H2x.Cancel()
 	}
 
 	pf.Agent = live.ActiveAgent
 	pf.Reverse = true
 
 	go func() {
-		_, err = io.Copy(sh.H2x.Conn, conn)
+		_, err = io.Copy(sh, conn)
 		if err != nil {
-			logging.Debugf("RunReversedPortFwd: conn -> h2: %v", err)
+			logging.Debugf("RunReversedPortFwd: conn -> sh: %v", err)
 			return
 		}
 	}()
 	go func() {
-		_, err = io.Copy(conn, sh.H2x.Conn)
+		_, err = io.Copy(conn, sh)
 		if err != nil {
-			logging.Debugf("RunReversedPortFwd: h2 -> conn: %v", err)
+			logging.Debugf("RunReversedPortFwd: sh -> conn: %v", err)
 			return
 		}
 	}()
 
 	defer cleanup()
-	for sh.H2x.Ctx.Err() == nil {
+	for sh.Ctx.Err() == nil {
 		time.Sleep(500 * time.Millisecond)
 	}
 	return
@@ -160,20 +161,22 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		cleanup := func() {
 			_, _ = conn.Write([]byte("exit"))
 			conn.Close()
-			sh.H2x.Conn.Close()
+			if sh.Cancel != nil {
+				sh.Cancel()
+			}
 			logging.Debugf("handlePerConn: %s finished", conn.RemoteAddr().String())
 		}
 
 		go func() {
-			_, err = io.Copy(sh.H2x.Conn, conn)
+			_, err = io.Copy(sh, conn)
 			if err != nil {
-				logging.Debugf("handlePerConn: conn -> h2: %v", err)
+				logging.Debugf("handlePerConn: conn -> sh: %v", err)
 				return
 			}
 		}()
-		_, err = io.Copy(conn, sh.H2x.Conn)
+		_, err = io.Copy(conn, sh)
 		if err != nil {
-			logging.Debugf("handlePerConn: h2 -> conn: %v", err)
+			logging.Debugf("handlePerConn: sh -> conn: %v", err)
 			return
 		}
 		defer cleanup()
@@ -325,7 +328,7 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 		}
 
 		buf = buf[0:n]
-		n, err = sh.H2x.Conn.Write(buf)
+		n, err = sh.Write(buf)
 		if err != nil {
 			logging.Errorf("Write to H2: %v", err)
 		}

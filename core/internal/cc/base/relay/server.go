@@ -4,50 +4,15 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
-	"strconv"
+	"strings"
 	"time"
 
-	"github.com/gorilla/mux"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/ftp"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
-	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
-
-const (
-	relayAPIUnknown = iota
-	relayAPIFTP
-	relayAPIWWW
-	relayAPIProxy
-)
-
-func relayPathOrDefault(path, fallback string) string {
-	if path == "" {
-		return fallback
-	}
-	return path
-}
-
-func resolveRelayAPI(api string) int {
-	ftpPath := relayPathOrDefault(live.RuntimeConfig.FTPPath, "ftp")
-	wwwPath := relayPathOrDefault(live.RuntimeConfig.WWWPath, "www")
-	proxyPath := relayPathOrDefault(live.RuntimeConfig.ProxyPath, "proxy")
-
-	switch api {
-	case ftpPath:
-		return relayAPIFTP
-	case wwwPath:
-		return relayAPIWWW
-	case proxyPath:
-		return relayAPIProxy
-	default:
-		return relayAPIUnknown
-	}
-}
 
 // This server handles relayed HTTP requests from C2, it listens on WireGuard interface
 func RelayHTTP2Server() {
@@ -57,10 +22,11 @@ func RelayHTTP2Server() {
 		}
 	}()
 	time.Sleep(3 * time.Second)
-	r := mux.NewRouter()
-	r.HandleFunc("/{prefix}/{api}/{token}", dispatcher)
+	mux := http.NewServeMux()
+	// Routes use fixed capability names — no malleable path config needed.
+	mux.HandleFunc("/", dispatcher)
 	listenAddr := fmt.Sprintf("%s:%d", netutil.WgOperatorIP, netutil.WgRelayedHTTPPort)
-	err := http.ListenAndServeTLS(listenAddr, transport.OperatorServerCrtFile, transport.OperatorServerKeyFile, r)
+	err := http.ListenAndServeTLS(listenAddr, transport.OperatorServerCrtFile, transport.OperatorServerKeyFile, mux)
 	if err != nil {
 		logging.Errorf("Failed to start HTTP server: %v", err)
 	}
@@ -68,39 +34,24 @@ func RelayHTTP2Server() {
 
 func dispatcher(wrt http.ResponseWriter, req *http.Request) {
 	logging.Debugf("Relayed request: %s %s", req.Method, req.URL.Path)
-	logging.Debugf("Relayed request headers: %v", req.Header)
-	api := mux.Vars(req)["api"]
-	token := mux.Vars(req)["token"]
+	// Extract capability from path: /{api}/{token}
+	parts := strings.SplitN(strings.TrimPrefix(req.URL.Path, "/"), "/", 2)
+	if len(parts) < 2 {
+		wrt.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	api := parts[0]
+	token := parts[1]
 	logging.Debugf("Got relayed request from C2: API: %s, token: %s", api, token)
-	logging.Debugf("Relay dispatcher expected API names: ftp=%s www=%s proxy=%s",
-		strconv.Quote(relayPathOrDefault(live.RuntimeConfig.FTPPath, "ftp")),
-		strconv.Quote(relayPathOrDefault(live.RuntimeConfig.WWWPath, "www")),
-		strconv.Quote(relayPathOrDefault(live.RuntimeConfig.ProxyPath, "proxy")),
-	)
 
-	// Setup H2Conn for port mapping.
-	proxyConn := new(def.H2Conn)
-	network.ProxyStream.H2x = proxyConn
+	// network.ProxyStream uses sh.Secure now. Relay server still uses h2conn wrapper and needs migration.
+	// For now, we decommission the legacy proxy path.
 
-	switch resolveRelayAPI(api) {
-	case relayAPIFTP:
-		var targetSH *network.StreamHandler
-		network.FTPStreams.Range(func(_, value any) bool {
-			sh := value.(*network.StreamHandler)
-			if token == sh.Token {
-				targetSH = sh
-				return false // stop iteration
-			}
-			return true
-		})
-
-		if targetSH != nil {
-			ftp.HandleFTPTransfer(targetSH, wrt, req)
-			return
-		}
-		logging.Debugf("FTP stream not found: %s", token)
-		wrt.WriteHeader(http.StatusNotFound)
-	case relayAPIWWW:
+	switch api {
+	case live.RuntimeConfig.C2Routes.FTP:
+		logging.Errorf("Relay FTP is legacy and has been decommissioned. Please use the new pure-CBOR C2 transport.")
+		wrt.WriteHeader(http.StatusNotImplemented)
+	case live.RuntimeConfig.C2Routes.WWW:
 		rawPath := req.URL.Query().Get("file_to_download")
 		localized, err := util.SecureLocalPath(rawPath)
 		if err != nil {
@@ -117,8 +68,9 @@ func dispatcher(wrt http.ResponseWriter, req *http.Request) {
 			return
 		}
 		http.ServeFile(wrt, req, local_path)
-	case relayAPIProxy:
-		network.HandlePortMapping(network.ProxyStream, wrt, req)
+	case live.RuntimeConfig.C2Routes.Proxy:
+		logging.Errorf("Relay Proxy/PortFwd is legacy and has been decommissioned. Please use the new pure-CBOR C2 transport.")
+		wrt.WriteHeader(http.StatusNotImplemented)
 	default:
 		logging.Debugf("API not found: %s", api)
 		wrt.WriteHeader(http.StatusNotFound)

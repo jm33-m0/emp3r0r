@@ -3,38 +3,36 @@ package network
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
-	"net/http"
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/gorilla/mux"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/posener/h2conn"
 )
 
-// HandlePortMapping handles proxy/port forwarding.
-func HandlePortMapping(sh *StreamHandler, wrt http.ResponseWriter, req *http.Request) {
-	var err error
-	h2x := new(def.H2Conn)
-	sh.H2x = h2x
-	sh.H2x.Conn, err = h2conn.Accept(wrt, req)
-	if err != nil {
-		logging.Errorf("handlePortForwarding: connection failed from %s: %s", req.RemoteAddr, err)
-		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
+// HandlePortFwdStream natively handles port forwarding over a pure io.ReadWriteCloser stream.
+func HandlePortFwdStream(sh *StreamHandler, conn io.ReadWriteCloser, token string, remoteAddr string, cancel context.CancelFunc) {
+	sh.Secure = conn
+	sh.Token = token
+	sh.Ctx, sh.Cancel = context.WithCancel(context.Background())
+	// Wrap the cancel to also call the parent context's cancel
+	origCancel := sh.Cancel
+	sh.Cancel = func() {
+		origCancel()
+		if cancel != nil {
+			cancel()
+		}
 	}
-	ctx, cancel := context.WithCancel(req.Context())
-	sh.H2x.Ctx = ctx
-	sh.H2x.Cancel = cancel
+	ctx := sh.Ctx
 
 	udpHandler := func(dstAddr string, listener *net.UDPConn) {
 		logging.Debugf("Handling UDP packet for %s", dstAddr)
 		for ctx.Err() == nil {
 			buf := make([]byte, 1024)
-			n, err := sh.H2x.Conn.Read(buf)
+			n, err := sh.Read(buf)
 			if err != nil {
 				logging.Errorf("Read error: %v", err)
 			}
@@ -53,9 +51,8 @@ func HandlePortMapping(sh *StreamHandler, wrt http.ResponseWriter, req *http.Req
 			}
 		}
 	}
+
 	// port-forwarding logic, token parsing and session lookup
-	vars := mux.Vars(req)
-	token := vars["token"]
 	origToken := token
 	isSubSession := strings.Contains(token, "_")
 	if isSubSession {
@@ -63,7 +60,7 @@ func HandlePortMapping(sh *StreamHandler, wrt http.ResponseWriter, req *http.Req
 	}
 	sessionID, err := uuid.Parse(token)
 	if err != nil {
-		logging.Errorf("Parse UUID failed from %s: %v", req.RemoteAddr, err)
+		logging.Errorf("Parse UUID failed from %s: %v", remoteAddr, err)
 		return
 	}
 	val, exist := PortFwds.Load(sessionID.String())
@@ -77,7 +74,7 @@ func HandlePortMapping(sh *StreamHandler, wrt http.ResponseWriter, req *http.Req
 	}
 	if !isSubSession {
 		pf.Sh[sessionID.String()] = sh
-		logging.Debugf("Port forwarding connection (%s) from %s", sessionID.String(), req.RemoteAddr)
+		logging.Debugf("Port forwarding connection (%s) from %s", sessionID.String(), remoteAddr)
 	} else {
 		pf.Sh[origToken] = sh
 		if readyAny, ok := portFwdStreamReady.LoadAndDelete(origToken); ok {
@@ -85,7 +82,7 @@ func HandlePortMapping(sh *StreamHandler, wrt http.ResponseWriter, req *http.Req
 			logging.Debugf("Signaled stream handler ready for %s", origToken)
 		}
 		if strings.HasSuffix(origToken, "-reverse") {
-			logging.Debugf("Reverse connection (%s) from %s", origToken, req.RemoteAddr)
+			logging.Debugf("Reverse connection (%s) from %s", origToken, remoteAddr)
 			err = pf.RunReversedPortFwd(sh)
 			if err != nil {
 				logging.Errorf("RunReversedPortFwd error: %v", err)
@@ -104,14 +101,13 @@ func HandlePortMapping(sh *StreamHandler, wrt http.ResponseWriter, req *http.Req
 		close(pf.ShReady)
 	}
 	defer func() {
-		if sh.H2x.Conn != nil {
-			err = sh.H2x.Conn.Close()
-			if err != nil {
-				logging.Errorf("Close error in port forwarding: %v", err)
-			}
+		err := sh.Close()
+		if err != nil {
+			logging.Errorf("Close error in port forwarding: %v", err)
 		}
+
 		if origToken != sessionID.String() {
-			cancel()
+			sh.Cancel()
 			logging.Debugf("Closed sub-connection %s", origToken)
 			return
 		}
@@ -121,8 +117,8 @@ func HandlePortMapping(sh *StreamHandler, wrt http.ResponseWriter, req *http.Req
 		} else {
 			logging.Debugf("Port mapping %s not found (likely deleted)", sessionID.String())
 		}
-		cancel()
-		logging.Debugf("Closed port forwarding connection from %s", req.RemoteAddr)
+		sh.Cancel()
+		logging.Debugf("Closed port forwarding connection from %s", remoteAddr)
 	}()
 	for pf.Ctx.Err() == nil {
 		_, exist := PortFwds.Load(sessionID.String())

@@ -10,7 +10,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/ncruces/go-dns"
-	"github.com/posener/h2conn"
 	"github.com/txthinking/socks5"
 )
 
@@ -128,7 +127,7 @@ func TCPFwd(addr, port string, ctx context.Context, cancel context.CancelFunc) (
 
 // FwdToDport forward request to agent-side destination, h2 <-> tcp/udp
 func FwdToDport(ctx context.Context, cancel context.CancelFunc,
-	to, sessionID, protocol string, h2 *h2conn.Conn, timeout int,
+	to, sessionID, protocol string, h2 io.ReadWriteCloser, timeout int,
 ) {
 	var err error
 

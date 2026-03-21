@@ -191,10 +191,8 @@ func GetFile(file_path string, agent *def.Emp3r0rAgent) (ftpSh *network.StreamHa
 	ftpSh.Token = fmt.Sprintf("%s-%s", util.RandMD5String(), fileinfo.Checksum)
 	ftpSh.Buf = make(chan []byte)
 	ftpSh.BufSize = 1024 * 8
+	// stream handler
 	network.FTPStreams.Store(file_path, ftpSh)
-
-	// h2x
-	ftpSh.H2x = new(def.H2Conn)
 
 	// cmd
 	cmd := fmt.Sprintf("get --file_path '%s' --offset %d --token '%s'", file_path, offset, ftpSh.Token)

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	_ "modernc.org/sqlite"
@@ -171,7 +172,7 @@ func RecordAgentCheckin(agent *def.Emp3r0rAgent) error {
 		}
 
 		// Record history
-		if err := recordHistory(agent.UUID, "checkin", "", "First connection", now); err != nil {
+		if err := recordHistory(agent.UUID, live.RuntimeConfig.C2Routes.Checkin, "", "First connection", now); err != nil {
 			logging.Warningf("Failed to record history: %v", err)
 		}
 
@@ -315,6 +316,23 @@ func RemoveAgent(uuid string) error {
 	}
 
 	logging.Successf("Agent %s removed from database", uuid)
+
+	// Also clear from in-memory maps to ensure PINNED KEYS are forgotten.
+	live.AgentControlMap.Range(func(key, value any) bool {
+		a := key.(*def.Emp3r0rAgent)
+		if a.UUID == uuid {
+			live.AgentControlMap.Delete(key)
+			return false
+		}
+		return true
+	})
+	for i, a := range live.AgentList {
+		if a.UUID == uuid {
+			live.AgentList = append(live.AgentList[:i], live.AgentList[i+1:]...)
+			break
+		}
+	}
+
 	return nil
 }
 

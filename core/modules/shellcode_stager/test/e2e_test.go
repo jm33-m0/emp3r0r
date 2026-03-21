@@ -168,8 +168,15 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 
 	// Initialize live.RuntimeConfig for the C2 server
 	live.RuntimeConfig = &def.Config{
-		CCPort:           c2PortStr,
-		CAPEM:            string(caCertData),
+		CCPort: c2PortStr,
+		CAPEM:  string(caCertData),
+		C2Routes: def.C2Routing{
+			Checkin: "c2-checkin",
+			Msg:     "c2-msg",
+			FTP:     "c2-ftp",
+			WWW:     "c2-www",
+			Proxy:   "c2-proxy",
+		},
 		PreflightEnabled: true,
 		PreflightURL:     fmt.Sprintf("https://127.0.0.1:%s/preflight-test", c2PortStr),
 		PreflightMethod:  "POST",
@@ -193,12 +200,16 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 
 	// Create agent config
 	cfg := &def.Config{
-		CCAddress:        "127.0.0.1",
-		CCPort:           c2PortStr,
-		CAPEM:            string(caCertData),
-		C2Prefix:         "api",
-		CheckInPath:      "checkin",
-		MsgPath:          "msg",
+		CCAddress: "127.0.0.1",
+		CCPort:    c2PortStr,
+		CAPEM:     string(caCertData),
+		C2Routes: def.C2Routing{
+			Checkin: "c2-checkin",
+			Msg:     "c2-msg",
+			FTP:     "c2-ftp",
+			WWW:     "c2-www",
+			Proxy:   "c2-proxy",
+		},
 		AgentUUID:        agentUUID,
 		AgentUUIDSig:     agentSig,
 		AgentTag:         agentTag,

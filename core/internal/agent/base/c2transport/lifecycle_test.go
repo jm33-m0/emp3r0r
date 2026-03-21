@@ -1,8 +1,13 @@
 package c2transport_test
 
 import (
+	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"fmt"
 	"net"
 	"net/http"
@@ -13,17 +18,69 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/handler"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
+	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
+	"github.com/posener/h2conn"
 )
+
+func assertInvalidCAIdentityRejected(t *testing.T, c2URL string, caCertData []byte, agentUUID string) {
+	t.Helper()
+
+	dummyPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey failed: %v", err)
+	}
+	forgedIdentityRaw, err := transport.SignECDSA([]byte(agentUUID), dummyPriv)
+	if err != nil {
+		t.Fatalf("SignECDSA failed: %v", err)
+	}
+
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(caCertData)
+	h2client := h2conn.Client{Client: &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: certPool, NextProtos: []string{"h2"}}, ForceAttemptHTTP2: true}}}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	c2Conn, _, err := h2client.Connect(ctx, c2URL)
+	if err != nil {
+		t.Fatalf("h2.Connect failed: %v", err)
+	}
+	defer c2Conn.Close()
+
+	sc := transport.NewSecureConn(c2Conn)
+	msgAuth := def.MsgAuth{
+		Type:          def.MsgAuthType,
+		AgentUUID:     agentUUID,
+		IdentityToken: base64.URLEncoding.EncodeToString(forgedIdentityRaw),
+		Timestamp:     time.Now().Unix(),
+		Nonce:         "bad-ca-nonce",
+		Capabilities:  []string{live.RuntimeConfig.C2Routes.Checkin},
+	}
+	if err := cbor.NewEncoder(sc).Encode(msgAuth); err != nil {
+		t.Fatalf("encode MsgAuth failed: %v", err)
+	}
+
+	timer := time.AfterFunc(1500*time.Millisecond, func() {
+		_ = c2Conn.Close()
+	})
+	defer timer.Stop()
+
+	buf := make([]byte, 1)
+	if _, err := sc.Read(buf); err == nil {
+		t.Fatal("SECURITY VIOLATION: invalid CA identity token was not rejected")
+	}
+}
 
 func TestFullAgentLifecycle(t *testing.T) {
 	// Setup temp dir for certs
@@ -75,15 +132,23 @@ func TestFullAgentLifecycle(t *testing.T) {
 
 	// Setup C2 Config
 	live.RuntimeConfig = &def.Config{
-		CCPort: fmt.Sprintf("%d", port),
-		CAPEM:  string(caCertData),
+		CCPort:    fmt.Sprintf("%d", port),
+		CCAddress: fmt.Sprintf("https://127.0.0.1:%d", port),
+		CAPEM:     string(caCertData),
+		C2Routes: def.C2Routing{
+			Checkin: "c2-checkin",
+			Msg:     "c2-msg",
+			FTP:     "c2-ftp",
+			WWW:     "c2-www",
+			Proxy:   "c2-proxy",
+		},
 	}
 
 	// Reset live maps
 	live.AgentControlMap = sync.Map{}
 	live.AgentList = make([]*def.Emp3r0rAgent, 0)
 
-	// Initialize agent database for tracking BEFORE starting server
+	// Initialize agent database for tracking
 	dbPath := filepath.Join(tmpDir, "agents.db")
 	err = agents.InitAgentDB(dbPath)
 	if err != nil {
@@ -93,6 +158,17 @@ func TestFullAgentLifecycle(t *testing.T) {
 
 	// Start Real C2 Server
 	go server.StartC2AgentTLSServer()
+	defer func() {
+		if network.EmpTLSServer != nil {
+			network.EmpTLSServer.Shutdown(network.EmpTLSServerCtx)
+		}
+	}()
+	// Shutdown C2 Server on exit
+	defer func() {
+		if network.EmpTLSServer != nil {
+			network.EmpTLSServer.Shutdown(network.EmpTLSServerCtx)
+		}
+	}()
 
 	// Wait for server to start
 	time.Sleep(2 * time.Second)
@@ -130,6 +206,7 @@ func TestFullAgentLifecycle(t *testing.T) {
 		AgentUUIDSig: agentSig,
 		AgentTag:     agentTag,
 		CCTimeout:    5000,
+		C2Routes:     live.RuntimeConfig.C2Routes,
 	}
 	def.CCAddress = c2URL
 
@@ -141,6 +218,9 @@ func TestFullAgentLifecycle(t *testing.T) {
 		ForceAttemptHTTP2: true,
 	}
 	def.HTTPClient = &http.Client{Transport: tr}
+
+	// 0. Security gate: invalid CA-signed identity token must be rejected.
+	assertInvalidCAIdentityRejected(t, c2URL, caCertData, "bad-ca-"+uuid.NewString())
 
 	// 1. ReportStatus (Check-in)
 	agentInfo := &def.Emp3r0rAgent{
@@ -187,7 +267,7 @@ func TestFullAgentLifecycle(t *testing.T) {
 
 	// 2. Establish persistent connection
 	msgURL := fmt.Sprintf("%s/%s/%s", c2URL, transport.MsgAPI, agentUUID)
-	conn, ctx, cancel, err := c2transport.EstablishC2Connection(msgURL)
+	conn, ctx, cancel, err := c2transport.EstablishC2Connection(msgURL, "", common.RuntimeConfig.C2Routes.Msg)
 	if err != nil {
 		t.Fatalf("EstablishC2Connection failed: %v", err)
 	}
@@ -302,16 +382,24 @@ func TestFullAgentLifecycle(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 
 	// To verify the rotation was actually rejected, we attempt to open the message
-	// tunnel. Since the server never pinned the new key, VerifyAgentRequest will fail
-	// the signature check and return 403 Forbidden *before* upgrading the connection!
+	// tunnel. Since the server never pinned the new key, the dispatcher will verify
+	// the signature against the OLD pinned key and fail!
 	failedMsgURL := fmt.Sprintf("%s/%s/%s", c2URL, transport.MsgAPI, agentUUID)
-	failedConn, _, failedCancel, err := c2transport.EstablishC2Connection(failedMsgURL)
+	failedConn, _, failedCancel, err := c2transport.EstablishC2Connection(failedMsgURL, "", common.RuntimeConfig.C2Routes.Msg)
 	if err == nil {
+		// New protocol: server might close connection AFTER MsgAuth is sent.
+		// Try to read to see if it's still alive.
+		buf := make([]byte, 1)
+		_, readErr := failedConn.Read(buf)
+		if readErr == nil {
+			failedCancel()
+			failedConn.Close()
+			t.Fatal("SECURITY VIOLATION: msg tunnel established with rotated key! Key rotation is supposed to be banned.")
+		}
 		failedCancel()
 		failedConn.Close()
-		t.Fatal("SECURITY VIOLATION: msg tunnel established with rotated key! Key rotation is supposed to be banned.")
 	}
-	t.Logf("✓ Key rotation correctly rejected (msg tunnel denied): %v", err)
+	t.Logf("✓ Key rotation correctly rejected (msg tunnel denied or closed): %v", err)
 
 	// Simulate `forget_agent`
 	t.Logf("Testing forgotten agent recovery workflow...")
@@ -329,7 +417,7 @@ func TestFullAgentLifecycle(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 
 	// Verify the message tunnel can now be established with the new key
-	recoveredConn, _, recoveredCancel, err := c2transport.EstablishC2Connection(failedMsgURL)
+	recoveredConn, _, recoveredCancel, err := c2transport.EstablishC2Connection(failedMsgURL, "", common.RuntimeConfig.C2Routes.Msg)
 	if err != nil {
 		t.Fatalf("Recovery failed: msg tunnel could not be established after forget_agent: %v", err)
 	}
@@ -394,19 +482,27 @@ func TestCheckinWithRandomPaths(t *testing.T) {
 	listener.Close()
 
 	// CUSTOM PATHS
-	c2Prefix := "custom_prefix"
-	checkInPath := "custom_checkin"
 
 	// Setup C2 Config
 	live.RuntimeConfig = &def.Config{
-		CCPort:      fmt.Sprintf("%d", port),
-		CAPEM:       string(caCertData),
-		C2Prefix:    c2Prefix,
-		CheckInPath: checkInPath,
+		CCPort: fmt.Sprintf("%d", port),
+		CAPEM:  string(caCertData),
+		C2Routes: def.C2Routing{
+			Checkin: "c2-checkin",
+			Msg:     "c2-msg",
+			FTP:     "c2-ftp",
+			WWW:     "c2-www",
+			Proxy:   "c2-proxy",
+		},
 	}
 
 	// Start Real C2 Server
 	go server.StartC2AgentTLSServer()
+	defer func() {
+		if network.EmpTLSServer != nil {
+			network.EmpTLSServer.Shutdown(network.EmpTLSServerCtx)
+		}
+	}()
 
 	// Wait for server to start
 	time.Sleep(2 * time.Second)
@@ -436,8 +532,7 @@ func TestCheckinWithRandomPaths(t *testing.T) {
 		AgentUUID:    agentUUID,
 		AgentUUIDSig: agentSig,
 		AgentTag:     agentTag,
-		C2Prefix:     c2Prefix,
-		CheckInPath:  checkInPath,
+		C2Routes:     live.RuntimeConfig.C2Routes,
 	}
 	def.CCAddress = c2URL
 
@@ -518,11 +613,22 @@ func TestDynamicPrefix(t *testing.T) {
 	live.RuntimeConfig = &def.Config{
 		CCPort: fmt.Sprintf("%d", port),
 		CAPEM:  string(caCertData),
-		// C2Prefix is NOT set
+		C2Routes: def.C2Routing{
+			Checkin: "c2-checkin",
+			Msg:     "c2-msg",
+			FTP:     "c2-ftp",
+			WWW:     "c2-www",
+			Proxy:   "c2-proxy",
+		},
 	}
 
 	// Start Real C2 Server
 	go server.StartC2AgentTLSServer()
+	defer func() {
+		if network.EmpTLSServer != nil {
+			network.EmpTLSServer.Shutdown(network.EmpTLSServerCtx)
+		}
+	}()
 
 	// Wait for server to start
 	time.Sleep(2 * time.Second)
@@ -555,7 +661,7 @@ func TestDynamicPrefix(t *testing.T) {
 		AgentUUID:    agentUUID,
 		AgentUUIDSig: agentSig,
 		AgentTag:     agentUUID,
-		C2Prefix:     randomPrefix, // Agent uses this prefix
+		C2Routes:     live.RuntimeConfig.C2Routes,
 	}
 	def.CCAddress = c2URL
 
@@ -586,7 +692,7 @@ func TestDynamicPrefix(t *testing.T) {
 
 	// MsgTun
 	msgURL := fmt.Sprintf("%s/%s/msg/%s", c2URL, randomPrefix, "test-token")
-	conn, _, cancel, err := c2transport.EstablishC2Connection(msgURL)
+	conn, _, cancel, err := c2transport.EstablishC2Connection(msgURL, "", common.RuntimeConfig.C2Routes.Msg)
 	if err != nil {
 		t.Fatalf("EstablishC2Connection failed with dynamic prefix: %v", err)
 	}
@@ -644,15 +750,18 @@ func TestCheckinWithRandomPaths_Strict(t *testing.T) {
 	listener.Close()
 
 	// CUSTOM PATHS on SERVER
-	c2Prefix := "custom_prefix"
-	checkInPath := "custom_checkin"
 
 	// Setup C2 Config
 	live.RuntimeConfig = &def.Config{
-		CCPort:      fmt.Sprintf("%d", port),
-		CAPEM:       string(caCertData),
-		C2Prefix:    c2Prefix,
-		CheckInPath: checkInPath, // Server expects this
+		CCPort: fmt.Sprintf("%d", port),
+		CAPEM:  string(caCertData),
+		C2Routes: def.C2Routing{
+			Checkin: "c2-checkin",
+			Msg:     "c2-msg",
+			FTP:     "c2-ftp",
+			WWW:     "c2-www",
+			Proxy:   "c2-proxy",
+		},
 	}
 
 	// Start Real C2 Server
@@ -686,8 +795,7 @@ func TestCheckinWithRandomPaths_Strict(t *testing.T) {
 		AgentUUID:    agentUUID,
 		AgentUUIDSig: agentSig,
 		AgentTag:     agentTag,
-		C2Prefix:     c2Prefix,
-		CheckInPath:  checkInPath, // Agent MUST use the correct path now
+		C2Routes:     live.RuntimeConfig.C2Routes,
 	}
 	def.CCAddress = c2URL
 
@@ -714,4 +822,89 @@ func TestCheckinWithRandomPaths_Strict(t *testing.T) {
 		t.Fatalf("ReportStatus failed with random paths: %v", err)
 	}
 	t.Log("Successfully checked in with random paths")
+
+	// --- FTP Upload Test Over CBOR ---
+	t.Log("Testing FTP upload over pure CBOR")
+
+	// Create a dummy file to upload
+	testData := []byte("FTP over CBOR integration test data for emp3r0r C2!")
+	dummyFile := filepath.Join(tmpDir, "upload_test.txt")
+	err = os.WriteFile(dummyFile, testData, 0o600)
+	if err != nil {
+		t.Fatalf("Failed to write dummy file: %v", err)
+	}
+	hash := crypto.SHA256SumFile(dummyFile)
+	ftpToken := strings.ReplaceAll(uuid.New().String(), "-", "") + "-" + hash
+
+	// Setup Server-side expectations (normally done by the 'put' command handler)
+	sh := &network.StreamHandler{
+		Token: ftpToken,
+	}
+	// The key in FTPStreams is the raw filename (e.g. "upload_test.txt")
+	network.FTPStreams.Store("upload_test.txt", sh)
+
+	// Set live download directory so the server knows where to put it
+	live.FileGetDir = filepath.Join(tmpDir, "c2_downloads")
+	expectedDest := filepath.Join(live.FileGetDir, "upload_test.txt")
+	os.MkdirAll(live.FileGetDir, 0700)
+
+	// Pre-allocate the file so HandleFTPStream knows the expected size (as get.go does)
+	f, _ := os.Create(expectedDest)
+	f.Truncate(int64(len(testData)))
+	f.Close()
+
+	// Agent: Execute the file transfer
+	go func() {
+		err := c2transport.SendFile2CC(dummyFile, 0, ftpToken)
+		if err != nil {
+			t.Errorf("SendFile2CC failed: %v", err)
+		}
+	}()
+
+	// Wait for the transfer to complete server-side
+	time.Sleep(3 * time.Second)
+
+	// Verify the file arrived intact
+	receivedData, err := os.ReadFile(expectedDest)
+	if err != nil {
+		t.Fatalf("Failed to read downloaded file on server: %v", err)
+	}
+	if string(receivedData) != string(testData) {
+		t.Fatalf("Downloaded file mismatch! got %q, want %q", receivedData, testData)
+	}
+	t.Logf("✓ FTP upload over CBOR stream succeeded. File saved to %s", expectedDest)
+
+	// --- WWW Download Test Over CBOR ---
+	t.Log("Testing WWW download over pure CBOR")
+
+	downloadName := "download_test_" + strings.ReplaceAll(uuid.New().String(), "-", "") + ".bin"
+	downloadData := []byte("C2 WWW pure CBOR download payload for full lifecycle test")
+	downloadHash := crypto.SHA256SumRaw(downloadData)
+
+	wwwDir := live.Temp + transport.WWW
+	err = os.MkdirAll(wwwDir, 0o700)
+	if err != nil {
+		t.Fatalf("Failed to create WWW dir %s: %v", wwwDir, err)
+	}
+	err = os.WriteFile(filepath.Join(wwwDir, downloadName), downloadData, 0o600)
+	if err != nil {
+		t.Fatalf("Failed to stage WWW download file: %v", err)
+	}
+
+	agentDownloadPath := filepath.Join(tmpDir, "agent_download.bin")
+	defer os.Remove(agentDownloadPath)
+
+	_, err = c2transport.DownloadViaC2(common.RuntimeConfig, downloadName, agentDownloadPath, downloadHash)
+	if err != nil {
+		t.Fatalf("DownloadViaC2 failed over CBOR stream: %v", err)
+	}
+
+	downloadedData, err := os.ReadFile(agentDownloadPath)
+	if err != nil {
+		t.Fatalf("Failed to read downloaded file on agent side: %v", err)
+	}
+	if string(downloadedData) != string(downloadData) {
+		t.Fatalf("WWW download mismatch! got %q, want %q", downloadedData, downloadData)
+	}
+	t.Logf("✓ WWW download over CBOR stream succeeded. File saved to %s", agentDownloadPath)
 }

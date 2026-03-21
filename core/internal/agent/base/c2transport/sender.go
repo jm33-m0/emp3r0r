@@ -52,10 +52,9 @@ func NotifyC2(cmd *cobra.Command, format string, args ...any) {
 	sig, err := agentutils.SignWithAgentKey([]byte(msg.AgentUUID))
 	if err != nil {
 		logging.Errorf("NotifyC2 SignWithAgentKey: %v", err)
-		msg.AgentUUIDSig = common.RuntimeConfig.AgentUUIDSig // Fallback
-	} else {
-		msg.AgentUUIDSig = base64.URLEncoding.EncodeToString(sig)
+		return
 	}
+	msg.AgentUUIDSig = base64.URLEncoding.EncodeToString(sig)
 	job_id, _ := cmd.Flags().GetString("job_id")
 	cmdSlice := []string{cmd.Name()}
 	msg.JobID = job_id
@@ -90,10 +89,9 @@ func NotifyC2Binary(cmd *cobra.Command, data []byte) {
 	sig, err := agentutils.SignWithAgentKey([]byte(msg.AgentUUID))
 	if err != nil {
 		logging.Errorf("NotifyC2Binary SignWithAgentKey: %v", err)
-		msg.AgentUUIDSig = common.RuntimeConfig.AgentUUIDSig // Fallback
-	} else {
-		msg.AgentUUIDSig = base64.URLEncoding.EncodeToString(sig)
+		return
 	}
+	msg.AgentUUIDSig = base64.URLEncoding.EncodeToString(sig)
 	job_id, _ := cmd.Flags().GetString("job_id")
 	cmdSlice := []string{cmd.Name()}
 	msg.JobID = job_id

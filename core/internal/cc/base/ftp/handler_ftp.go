@@ -5,21 +5,17 @@ import (
 	"errors"
 	"io"
 	"math"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
-	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/mholt/archives"
-	"github.com/posener/h2conn"
 	"github.com/schollz/progressbar/v3"
 )
 
@@ -75,63 +71,54 @@ func progressMonitor(bar *progressbar.ProgressBar, filewrite, targetFile string,
 	}
 }
 
-// HandleFTPTransfer processes file transfer requests.
-func HandleFTPTransfer(sh *network.StreamHandler, wrt http.ResponseWriter, req *http.Request) {
-	vars := mux.Vars(req)
-	token := vars["token"]
-
-	// Check connection occupancy and accept connection via H2Conn.
-	if sh.H2x != nil && (sh.H2x.Ctx != nil || sh.H2x.Cancel != nil || sh.H2x.Conn != nil) {
-		logging.Errorf("handleFTPTransfer: connection occupied")
-		http.Error(wrt, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-		return
-	}
-	var err error
-	sh.H2x = &def.H2Conn{}
-	sh.H2x.Conn, err = h2conn.Accept(wrt, req)
-	if err != nil {
-		logging.Errorf("handleFTPTransfer: failed connection from %s: %s", req.RemoteAddr, err)
-		http.Error(wrt, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-		return
-	}
-	sh.H2x.Ctx, sh.H2x.Cancel = context.WithCancel(req.Context())
-	defer sh.H2x.Conn.Close()
-	defer sh.H2x.Cancel()
-
-	// Verify token consistency & extract checksum.
-	if token != sh.Token {
-		logging.Errorf("Invalid ftp token '%s vs %s'", token, sh.Token)
-		return
-	}
-	logging.Debugf("FTP connection (%s) from %s", sh.Token, req.RemoteAddr)
+// HandleFTPStream processes file transfer requests over a continuous stream.
+func HandleFTPStream(conn io.ReadWriteCloser, token string, remoteAddr string, cancel context.CancelFunc) {
+	logging.Debugf("FTP connection (%s) from %s", token, remoteAddr)
 	tokenSplit := strings.Split(token, "-")
 	if len(tokenSplit) != 2 {
 		logging.Errorf("Invalid token: %s", token)
+		conn.Close()
+		cancel()
 		return
 	}
 	mustHaveChecksum := tokenSplit[1]
 
-	// Determine file paths.
+	// Determine file paths and lookup StreamHandler.
 	filename := ""
+	var sh *network.StreamHandler
 	network.FTPStreams.Range(func(fname, value any) bool {
 		persh := value.(*network.StreamHandler)
-		if sh.Token == persh.Token {
+		if token == persh.Token {
 			filename = fname.(string)
+			sh = persh
 			return false // stop iteration
 		}
 		return true
 	})
-	if filename == "" {
-		logging.Errorf("Failed to parse filename for token %s", sh.Token)
+	if filename == "" || sh == nil {
+		logging.Errorf("Failed to parse filename for token %s", token)
+		conn.Close()
+		cancel()
 		return
 	}
+
+	// Check connection occupancy
+	if sh.Secure != nil {
+		logging.Errorf("handleFTPStream: connection occupied")
+		conn.Close()
+		cancel()
+		return
+	}
+	sh.Secure = conn
+	sh.Cancel = cancel
+
 	mapKey := filename
-	// Prepare file paths. targetFile is the final destination, filewrite is the temp file that we write to, it will be renamed to targetFile when done.
+	// Prepare file paths. targetFile is the final destination, filewrite is the temp file that we write to...
 	writeDir, targetFile, filewrite, lock := GenerateGetFilePaths(filename)
 	logging.Debugf("Downloading to %s, saving to %s, using lock file %s", filewrite, targetFile, lock)
 	if !util.IsDirExist(writeDir) {
 		logging.Debugf("Creating directory: %s", writeDir)
-		err = os.MkdirAll(writeDir, 0o700)
+		err := os.MkdirAll(writeDir, 0o700)
 		if err != nil {
 			logging.Errorf("Mkdir %s: %v", writeDir, err)
 			return
@@ -139,13 +126,15 @@ func HandleFTPTransfer(sh *network.StreamHandler, wrt http.ResponseWriter, req *
 	}
 	if util.IsExist(lock) {
 		logging.Errorf("%s is already being downloaded", filename)
-		http.Error(wrt, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		sh.Close()
+		sh.Cancel()
 		return
 	}
-	_, err = os.Create(lock)
+	_, err := os.Create(lock)
 	if err != nil {
 		logging.Errorf("Create lock file error: %v", err)
-		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		sh.Close()
+		sh.Cancel()
 		return
 	}
 	if !util.IsExist(live.FileGetDir) {
@@ -177,15 +166,17 @@ func HandleFTPTransfer(sh *network.StreamHandler, wrt http.ResponseWriter, req *
 
 	// On-exit cleanup.
 	cleanup := func() {
-		if sh.H2x.Conn != nil {
-			err = sh.H2x.Conn.Close()
+		if sh != nil {
+			err = sh.Close()
 			if err != nil {
 				logging.Errorf("Failed to close connection: %v", err)
 			}
+			if sh.Cancel != nil {
+				sh.Cancel()
+			}
 		}
-		sh.H2x.Cancel()
 		network.FTPStreams.Delete(mapKey)
-		logging.Warningf("Closed FTP connection from %s", req.RemoteAddr)
+		logging.Warningf("Closed FTP connection from %s", remoteAddr)
 		err = os.Remove(lock)
 		if err != nil {
 			logging.Warningf("Remove lock %s: %v", lock, err)
@@ -214,7 +205,7 @@ func HandleFTPTransfer(sh *network.StreamHandler, wrt http.ResponseWriter, req *
 	defer cleanup()
 
 	// Decompress and write file data.
-	decompressor, err := archives.Zstd{}.OpenReader(sh.H2x.Conn)
+	decompressor, err := archives.Zstd{}.OpenReader(sh)
 	if err != nil {
 		logging.Errorf("Open decompressor error: %v", err)
 		return

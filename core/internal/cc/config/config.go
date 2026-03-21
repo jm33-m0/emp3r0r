@@ -50,18 +50,11 @@ func SaveConfigJSON() (err error) {
 		"agent_uuid_sig":               live.RuntimeConfig.AgentUUIDSig,
 		"agent_tag":                    live.RuntimeConfig.AgentTag,
 		"cc_timeout":                   live.RuntimeConfig.CCTimeout,
-		"c2_prefix":                    live.RuntimeConfig.C2Prefix,
-		"checkin_path":                 live.RuntimeConfig.CheckInPath,
-		"msg_path":                     live.RuntimeConfig.MsgPath,
-		"ftp_path":                     live.RuntimeConfig.FTPPath,
-		"www_path":                     live.RuntimeConfig.WWWPath,
-		"proxy_path":                   live.RuntimeConfig.ProxyPath,
-		"user_agent":                   live.RuntimeConfig.UserAgent,
-		"c2_headers":                   live.RuntimeConfig.C2Headers,
 		"padding_min":                  live.RuntimeConfig.PaddingMin,
 		"padding_max":                  live.RuntimeConfig.PaddingMax,
 		"jitter":                       live.RuntimeConfig.Jitter,
 		"is_run_by_stager":             live.RuntimeConfig.IsRunByStager,
+		"c2_routes":                    live.RuntimeConfig.C2Routes,
 	}
 
 	w_data, err := json.MarshalIndent(configMap, "", "  ")
@@ -87,6 +80,11 @@ func InitConfigFile(cc_host string) (err error) {
 	live.RuntimeConfig.KCPClientPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.StagerHTTPListenerPort = fmt.Sprintf("%v", util.RandInt(1026, 65534))
 	live.RuntimeConfig.CCTimeout = util.RandInt(10000, 20000)
+	live.RuntimeConfig.C2Routes.Checkin = "c2-" + strings.ToLower(util.RandStr(12))
+	live.RuntimeConfig.C2Routes.Msg = "c2-" + strings.ToLower(util.RandStr(12))
+	live.RuntimeConfig.C2Routes.FTP = "c2-" + strings.ToLower(util.RandStr(12))
+	live.RuntimeConfig.C2Routes.WWW = "c2-" + strings.ToLower(util.RandStr(12))
+	live.RuntimeConfig.C2Routes.Proxy = "c2-" + strings.ToLower(util.RandStr(12))
 
 	// SSH host key
 	live.RuntimeConfig.SSHHostKey, _, err = transport.GenerateSSHKeyPair()
@@ -123,28 +121,6 @@ func InitConfigFile(cc_host string) (err error) {
 	live.RuntimeConfig.AgentUUIDSig = base64.URLEncoding.EncodeToString(sig)
 	live.RuntimeConfig.AgentTag = live.RuntimeConfig.AgentUUID
 
-	// malleable C2
-	if live.RuntimeConfig.C2Prefix == "" {
-		live.RuntimeConfig.C2Prefix = util.RandStr(util.RandInt(3, 10))
-	}
-	if live.RuntimeConfig.CheckInPath == "" {
-		live.RuntimeConfig.CheckInPath = util.RandStr(util.RandInt(5, 15))
-	}
-	if live.RuntimeConfig.MsgPath == "" {
-		live.RuntimeConfig.MsgPath = util.RandStr(util.RandInt(5, 15))
-	}
-	if live.RuntimeConfig.FTPPath == "" {
-		live.RuntimeConfig.FTPPath = util.RandStr(util.RandInt(5, 15))
-	}
-	if live.RuntimeConfig.WWWPath == "" {
-		live.RuntimeConfig.WWWPath = util.RandStr(util.RandInt(5, 15))
-	}
-	if live.RuntimeConfig.ProxyPath == "" {
-		live.RuntimeConfig.ProxyPath = util.RandStr(util.RandInt(5, 15))
-	}
-	if live.RuntimeConfig.UserAgent == "" {
-		live.RuntimeConfig.UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.3"
-	}
 	if live.RuntimeConfig.PaddingMin == 0 {
 		live.RuntimeConfig.PaddingMin = 1024
 	}

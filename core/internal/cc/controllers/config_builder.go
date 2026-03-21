@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -108,48 +107,6 @@ func MakeConfig(opts AgentConfig) error {
 		logging.Infof("Using DoH server %s", live.RuntimeConfig.DoHServer)
 	}
 
-	// Malleable C2 parameters
-	if live.RuntimeConfig.C2Prefix == "" {
-		live.RuntimeConfig.C2Prefix = util.RandStr(util.RandInt(3, 10))
-	}
-	if live.RuntimeConfig.CheckInPath == "" {
-		live.RuntimeConfig.CheckInPath = util.RandStr(util.RandInt(5, 15))
-	}
-	if live.RuntimeConfig.MsgPath == "" {
-		live.RuntimeConfig.MsgPath = util.RandStr(util.RandInt(5, 15))
-	}
-	if live.RuntimeConfig.FTPPath == "" {
-		live.RuntimeConfig.FTPPath = util.RandStr(util.RandInt(5, 15))
-	}
-	if live.RuntimeConfig.WWWPath == "" {
-		live.RuntimeConfig.WWWPath = util.RandStr(util.RandInt(5, 15))
-	}
-	if live.RuntimeConfig.ProxyPath == "" {
-		live.RuntimeConfig.ProxyPath = util.RandStr(util.RandInt(5, 15))
-	}
-	if live.RuntimeConfig.UserAgent == "" {
-		uaList := []string{
-			"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-			"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-			"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-			"Mozilla/5.0 (iPhone; CPU iPhone OS 17_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1",
-		}
-		live.RuntimeConfig.UserAgent = uaList[util.RandInt(0, len(uaList))]
-	}
-
-	// Randomize C2 headers if empty
-	if len(live.RuntimeConfig.C2Headers) == 0 {
-		live.RuntimeConfig.C2Headers = map[string]string{
-			"Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-			"Accept-Language": "en-US,en;q=0.5",
-			"Cache-Control":   "no-cache",
-			"Connection":      "keep-alive",
-			"Pragma":          "no-cache",
-			"Server":          fmt.Sprintf("Apache/%d.%d.%d", util.RandInt(2, 3), util.RandInt(3, 5), util.RandInt(10, 50)),
-			"X-Powered-By":    fmt.Sprintf("PHP/%d.%d.%d", util.RandInt(5, 9), util.RandInt(0, 5), util.RandInt(0, 30)),
-			"X-Request-ID":    uuid.NewString(),
-		}
-	}
 	if live.RuntimeConfig.PaddingMin == 0 {
 		live.RuntimeConfig.PaddingMin = 1024
 	}

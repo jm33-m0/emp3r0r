@@ -9,10 +9,8 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
-	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/posener/h2conn"
 )
 
 func GetConnectedAgents() []*def.Emp3r0rAgent {
@@ -98,33 +96,6 @@ func IsAgentExistByUUID(uuid string) bool {
 		return true
 	})
 	return exists
-}
-
-// GetTargetFromH2Conn find target from def.AgentControlMap via HTTP2 connection ID, return nil if not found
-func GetTargetFromH2Conn(conn *h2conn.Conn) (target *def.Emp3r0rAgent) {
-	live.AgentControlMap.Range(func(key, value any) bool {
-		t := key.(*def.Emp3r0rAgent)
-		ctrl := value.(*live.AgentControl)
-		if ctrl.Conn == nil {
-			return true
-		}
-		// Check keys (not valid if using encryption, but kept for safety if wrappers change)
-		// We cannot directly compare net.Conn with *h2conn.Conn if they are not compatible.
-		// Instead we inspect wrappers.
-
-		// Check SecureConn wrapper
-		if secure, ok := ctrl.Conn.(*transport.SecureConn); ok {
-			// Check ByteReadWriteCloser wrapper (since h2conn doesn't implement net.Conn)
-			if wrapped, ok := secure.Conn.(*transport.ByteReadWriteCloser); ok {
-				if wrapped.ReadWriteCloser == conn {
-					target = t
-					return false // stop iteration
-				}
-			}
-		}
-		return true
-	})
-	return
 }
 
 // SendMessageToAgent send MsgTunData to agent

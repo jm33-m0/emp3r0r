@@ -2,8 +2,11 @@ package operator
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -146,5 +149,25 @@ func TestOperatorConnection(t *testing.T) {
 	// We expect 200 OK because we mocked the agent and SendCmd
 	if resp.StatusCode != 200 {
 		t.Errorf("Expected 200 OK, got %s", resp.Status)
+	}
+
+	// Security assertion: operator endpoint must require mTLS client certs.
+	operatorCAPEM, err := os.ReadFile(transport.OperatorCaCrtFile)
+	if err != nil {
+		t.Fatalf("Failed to read operator CA cert: %v", err)
+	}
+	rootCAs := x509.NewCertPool()
+	if !rootCAs.AppendCertsFromPEM(operatorCAPEM) {
+		t.Fatal("Failed to append operator CA cert to pool")
+	}
+	unauthorizedClient := &http.Client{
+		Timeout: 3 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{RootCAs: rootCAs},
+		},
+	}
+	_, err = unauthorizedClient.Get(fmt.Sprintf("https://127.0.0.1:%d/%s/checkin", port, transport.OperatorRoot))
+	if err == nil {
+		t.Fatal("SECURITY VIOLATION: operator endpoint accepted a client without mTLS certificate")
 	}
 }

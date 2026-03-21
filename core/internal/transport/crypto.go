@@ -15,6 +15,8 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
+const DefaultC2BlockSize = 32 * 1024
+
 // SecureConn wraps a net.Conn with AES-GCM encryption
 type SecureConn struct {
 	net.Conn
@@ -62,15 +64,6 @@ func (sc *SecureConn) SetKey(key []byte) {
 }
 
 // Read reads encrypted data from the connection, decrypts it, and returns it.
-// It handles framing by reading a length prefix (4 bytes int) if necessary,
-// OR by reading until it gets a valid chunk.
-// DESIGN DECISION: Since this is wrapping a raw stream, and we want packet-like behavior for crypto,
-// we will assume a simple framing: [Length (4 bytes)][IV (12 bytes)][Ciphertext]
-// HOWEVER, existing C2 protocols (like HTTP2/WebSocket) might frame things differently.
-// BUT since we are wrapping the INNER stream (e.g. the Body of a Request/Response or a tunnel),
-// we need to be careful.
-// If we are wrapping `h2conn`, we are wrapping the stream *inside* the HTTP2 stream.
-// So simple framing `[Len][Payload]` is appropriate here.
 func (sc *SecureConn) Read(p []byte) (n int, err error) {
 	sc.readMu.Lock()
 	defer sc.readMu.Unlock()
@@ -83,7 +76,6 @@ func (sc *SecureConn) Read(p []byte) (n int, err error) {
 	}
 
 	// Read header: 4 bytes length
-	// We loop until we get 4 bytes
 	header := make([]byte, 4)
 	_, err = io.ReadFull(sc.Conn, header)
 	if err != nil {
@@ -131,8 +123,6 @@ func (sc *SecureConn) Write(p []byte) (n int, err error) {
 	sc.writeMu.Lock()
 	defer sc.writeMu.Unlock()
 
-	// AES Encrypt: this returns IV + Ciphertext (if using crypto.AESEnc from core)
-	// Let's verify what crypto.AESEnc does. It uses AES-GCM.
 	sc.keyMu.RLock()
 	key := sc.key
 	sc.keyMu.RUnlock()
@@ -157,8 +147,6 @@ func (sc *SecureConn) Write(p []byte) (n int, err error) {
 		return 0, err
 	}
 
-	// Return unencrypted length to satisfy io.Writer contract
-	// (Callers expect n == len(p) on success)
 	return len(p), nil
 }
 
@@ -167,7 +155,38 @@ func (sc *SecureConn) Close() error {
 	return sc.Conn.Close()
 }
 
-// Helpers for manual Encrypt/Decrypt if needed (e.g. Preflight)
+// CopyC2Blocks copies data in explicit fixed-size blocks over the C2 stream.
+// Each Write call is framed by SecureConn, so this enforces deterministic block boundaries.
+func CopyC2Blocks(dst io.Writer, src io.Reader, blockSize int) (int64, error) {
+	if blockSize <= 0 {
+		blockSize = DefaultC2BlockSize
+	}
+
+	buf := make([]byte, blockSize)
+	var written int64
+
+	for {
+		nr, er := src.Read(buf)
+		if nr > 0 {
+			nw, ew := dst.Write(buf[:nr])
+			written += int64(nw)
+			if ew != nil {
+				return written, ew
+			}
+			if nw != nr {
+				return written, io.ErrShortWrite
+			}
+		}
+		if er != nil {
+			if er == io.EOF {
+				return written, nil
+			}
+			return written, er
+		}
+	}
+}
+
+// Helpers for manual Encrypt/Decrypt (used by Preflight)
 func Encrypt(data []byte) ([]byte, error) {
 	block, err := aes.NewCipher(def.AESPassword)
 	if err != nil {

@@ -16,6 +16,27 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 )
 
+func restoreFD3(t *testing.T, originalFD3 int) {
+	t.Helper()
+	if originalFD3 >= 0 {
+		if err := syscall.Dup2(originalFD3, 3); err != nil {
+			t.Fatalf("Failed to restore FD 3: %v", err)
+		}
+		_ = syscall.Close(originalFD3)
+		return
+	}
+
+	devNull, err := os.OpenFile(os.DevNull, os.O_RDONLY, 0)
+	if err != nil {
+		t.Fatalf("Failed to open %s for FD 3 restore: %v", os.DevNull, err)
+	}
+	defer devNull.Close()
+
+	if err := syscall.Dup2(int(devNull.Fd()), 3); err != nil {
+		t.Fatalf("Failed to bind %s to FD 3: %v", os.DevNull, err)
+	}
+}
+
 func TestGetAgentKey(t *testing.T) {
 	// Test that GetAgentKey generates a valid ephemeral key
 	err := GetAgentKey()
@@ -152,12 +173,7 @@ func TestGetAgentKeyFromStager(t *testing.T) {
 	t.Logf("Key1: X=%x Y=%x", key1.X, key1.Y)
 
 	// Cleanup FD 3 for next pass
-	syscall.Close(3)
-	// Restore original if valid
-	if originalFD3 != -1 {
-		syscall.Dup2(originalFD3, 3)
-		syscall.Close(originalFD3)
-	}
+	restoreFD3(t, originalFD3)
 	r.Close() // Close original pipe reader FD (dup2 copied it)
 
 	// --- Pass 2: Same Seed -> Same Key ---
@@ -165,6 +181,7 @@ func TestGetAgentKeyFromStager(t *testing.T) {
 	AgentKey = nil
 
 	r2, w2, _ := os.Pipe()
+	originalFD3Pass2, _ := syscall.Dup(3)
 	syscall.Dup2(int(r2.Fd()), 3)
 
 	go func() {
@@ -189,7 +206,7 @@ func TestGetAgentKeyFromStager(t *testing.T) {
 	}
 
 	// Cleanup final
-	syscall.Close(3)
+	restoreFD3(t, originalFD3Pass2)
 	r2.Close()
 }
 
@@ -231,11 +248,7 @@ func TestGetAgentKeyFromStager_PartialRead(t *testing.T) {
 	}
 
 	// Cleanup
-	syscall.Close(3)
-	if originalFD3 != -1 {
-		syscall.Dup2(originalFD3, 3)
-		syscall.Close(originalFD3)
-	}
+	restoreFD3(t, originalFD3)
 	r.Close()
 }
 
@@ -270,11 +283,7 @@ func TestDeterministicKeyDerivation(t *testing.T) {
 		}
 
 		// Revert FD 3
-		syscall.Close(3)
-		if originalFD3 != -1 {
-			syscall.Dup2(originalFD3, 3)
-			syscall.Close(originalFD3)
-		}
+		restoreFD3(t, originalFD3)
 		r.Close()
 
 		// Return public key thumbprint

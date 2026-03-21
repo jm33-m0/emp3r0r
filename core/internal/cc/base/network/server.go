@@ -2,9 +2,12 @@ package network
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"sync"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 )
 
@@ -17,17 +20,76 @@ var (
 	EmpKCPCancel       context.CancelFunc
 
 	// Shared stream handlers and maps
-	RShellStream  = &StreamHandler{H2x: nil, BufSize: def.RShellBufSize, Buf: make(chan []byte)}
-	ProxyStream   = &StreamHandler{H2x: nil, BufSize: def.ProxyBufSize, Buf: make(chan []byte)}
-	FTPStreams    sync.Map
-	RShellStreams sync.Map
-	PortFwds      sync.Map
+	ProxyStream = &StreamHandler{Secure: nil, BufSize: def.ProxyBufSize, Buf: make(chan []byte)}
+	FTPStreams  sync.Map
+	PortFwds    sync.Map
 )
 
-// StreamHandler allows the HTTP handler to use H2Conn.
+// StreamHandler allows the HTTP handler to use CBOR-encapsulated streams.
 type StreamHandler struct {
-	H2x     *def.H2Conn // H2Conn with context
-	Buf     chan []byte // buffer for receiving data
-	Token   string      // token string for authentication
-	BufSize int         // buffer size (e.g., for reverse shell)
+	Secure   io.ReadWriter // The SecureConn (PSK or Session Key)
+	Buf      chan []byte   // buffer for receiving data from agent
+	Token    string        // token string for identification
+	BufSize  int           // buffer size
+	Ctx      context.Context
+	Cancel   context.CancelFunc
+	IsClosed bool
+}
+
+// Read implements io.Reader by reading from the internal buffer.
+// This buffer is filled by the dispatcher when it receives a MsgTunData frame for this handler.
+func (sh *StreamHandler) Read(p []byte) (n int, err error) {
+	// New C2 protocol mode: raw stream handler (e.g. FTP upload over CBOR-routed
+	// SecureConn) reads directly from the secure stream.
+	if sh.Buf == nil {
+		if sh.Secure == nil {
+			return 0, io.EOF
+		}
+		r, ok := sh.Secure.(io.Reader)
+		if !ok {
+			return 0, fmt.Errorf("StreamHandler: secure stream is not readable")
+		}
+		return r.Read(p)
+	}
+
+	if sh.Ctx == nil {
+		data, ok := <-sh.Buf
+		if !ok {
+			return 0, io.EOF
+		}
+		return copy(p, data), nil
+	}
+
+	select {
+	case data, ok := <-sh.Buf:
+		if !ok {
+			return 0, io.EOF
+		}
+		return copy(p, data), nil
+	case <-sh.Ctx.Done():
+		return 0, sh.Ctx.Err()
+	}
+}
+
+// Write implements io.Writer by wrapping the data in a MsgTunData CBOR envelope
+// and sending it over the SecureConn.
+func (sh *StreamHandler) Write(p []byte) (n int, err error) {
+	if sh.Secure == nil {
+		return 0, fmt.Errorf("StreamHandler: No secure connection")
+	}
+	msg := def.MsgTunData{
+		Response: p,
+		Tag:      sh.Token, // Use token as tag for routing back to agent
+	}
+	err = cbor.NewEncoder(sh.Secure).Encode(msg)
+	if err != nil {
+		return 0, err
+	}
+	return len(p), nil
+}
+
+func (sh *StreamHandler) Close() error {
+	sh.IsClosed = true
+	sh.Cancel()
+	return nil
 }

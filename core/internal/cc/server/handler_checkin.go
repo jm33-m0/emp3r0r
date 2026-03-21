@@ -2,95 +2,60 @@ package server
 
 import (
 	"fmt"
-	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/gorilla/mux"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
-	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/posener/h2conn"
 )
 
 // rotationRateLimiter tracks key rotation timestamps per AgentUUID to prevent log flooding
 var rotationRateLimiter sync.Map
 
-// handleAgentCheckIn processes agent check-in requests.
-func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request, expectedUUID string) {
-	defer func() {
-		if r := recover(); r != nil {
-			logging.Errorf("handleAgentCheckIn panic: %v\n%s", r, util.CallStack())
-			http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		}
-	}()
-	expectedUUID = util.StripANSI(expectedUUID)
-	if expectedUUID == "" {
-		logging.Warningf("handleAgentCheckIn: empty expected UUID")
-		http.Error(wrt, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-		return
+// handleAgentCheckInStream is the protocol-native checkin handler.
+// It is transport-agnostic and only depends on an encrypted byte stream.
+// secureConn is already authenticated and its first frame (MsgAuth) consumed by dec.
+func handleAgentCheckInStream(dec *cbor.Decoder, agentUUID, remoteAddr string) error {
+	target := new(def.Emp3r0rAgent)
+	// Dispatcher already decoded the first MsgAuth frame using dec.
+	// We are now at the second frame, which MUST be the Emp3r0rAgent info.
+	err := dec.Decode(target)
+	if err != nil {
+		logging.Warningf("handleAgentCheckIn decode agent payload error from %s: %v", remoteAddr, err)
+		return err
 	}
 
-	// check if agent is already connected (duplicated checkin)
-	// strictly by UUID (token in URL must match authenticated header UUID)
-	vars := mux.Vars(req)
-	token := util.StripANSI(vars["token"])
-	if token == "" || token != expectedUUID {
-		logging.Warningf("handleAgentCheckIn: token/UUID mismatch: token=%s expected=%s", strconv.Quote(token), strconv.Quote(expectedUUID))
-		http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
-		return
+	// SECURITY: Treat agent-supplied metadata as hostile.
+	util.SanitizeAgentMetadata(target)
+
+	if target.UUID == "" {
+		logging.Warningf("handleAgentCheckIn: empty UUID in payload")
+		return fmt.Errorf("forbidden: empty uuid")
+	}
+	if agentUUID != "" && target.UUID != agentUUID {
+		logging.Warningf("handleAgentCheckIn: compatibility route/body UUID mismatch: body=%s route=%s", strconv.Quote(target.UUID), strconv.Quote(agentUUID))
 	}
 
-	if agents.IsAgentExistByUUID(expectedUUID) {
-		agent := agents.GetAgentByUUID(expectedUUID)
+	// Check duplicate sessions by payload identity (authoritative source).
+	if agents.IsAgentExistByUUID(target.UUID) {
+		agent := agents.GetAgentByUUID(target.UUID)
 		if agent != nil {
 			if val, ok := live.AgentControlMap.Load(agent); ok {
 				ctrl := val.(*live.AgentControl)
 				if ctrl.Conn != nil {
-					logging.Warningf("handleAgentCheckIn: %s already connected, refusing duplicated checkin", expectedUUID)
-					wrt.WriteHeader(http.StatusForbidden)
-					return
+					if agentUUID == "" || target.UUID != agentUUID {
+						logging.Warningf("handleAgentCheckIn: %s already connected, refusing duplicated checkin", target.UUID)
+					}
+					return fmt.Errorf("forbidden: duplicated checkin")
 				}
 			}
 		}
-	}
-
-	conn, err := h2conn.Accept(wrt, req)
-	defer func() {
-		_ = conn.Close()
-		if logging.Level >= 4 {
-			logging.Debugf("handleAgentCheckIn finished")
-		}
-	}()
-	if err != nil {
-		logging.Errorf("handleAgentCheckIn: connection failed from %s: %s", req.RemoteAddr, err)
-		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-	// Global Encryption: Wrap connection
-	secureConn := transport.NewSecureConn(conn)
-	// target is a pointer to Emp3r0rAgent
-	target := new(def.Emp3r0rAgent)
-	in := cbor.NewDecoder(secureConn) // Use secureConn
-	err = in.Decode(target)
-	if err != nil {
-		logging.Warningf("handleAgentCheckIn decode error: %v", err)
-		return
-	}
-	// sanitize agent data
-	agents.SanitizeAgentData(target)
-
-	// Header UUID was already CA-validated in dispatcher. Body UUID MUST match.
-	if target.UUID == "" || target.UUID != expectedUUID {
-		logging.Warningf("handleAgentCheckIn: body UUID mismatch: body=%s expected=%s", strconv.Quote(target.UUID), strconv.Quote(expectedUUID))
-		http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
-		return
 	}
 
 	// ── Rate limiting: cap ALL log/alert output per UUID ─────────────────────
@@ -112,96 +77,83 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request, expectedUUID
 		rotationRateLimiter.Store(target.UUID, validTimestamps)
 		if len(validTimestamps) > 10 {
 			// Silent drop — no log, no broadcast.
-			http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
-			return
+			return fmt.Errorf("forbidden: rate limit")
 		}
 	}
 
 	// SECURITY: Agent MUST provide its public key in every checkin.
 	if target.PublicKey == "" {
 		logging.Warningf("handleAgentCheckIn: Agent %s provided no public key, rejecting", strconv.Quote(target.UUID))
-		http.Error(wrt, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-		return
+		return fmt.Errorf("unauthorized: missing public key")
 	}
 
-	// TOFU: Trust On First Use
-	// If agent exists, verify with pinned key
-	// If agent is new, verify with provided key and pin it
-	isNew := true
-
-	existingKey := ""
+	// ── Phase 1: Identity & State Lookup ───────────────────────────────────
+	var (
+		existingCtrl *live.AgentControl
+		existingKey  string
+		isConnected  bool
+		placeholder  any // the key (agent pointer) currently in the map
+	)
 	live.AgentControlMap.Range(func(key, value any) bool {
 		a := key.(*def.Emp3r0rAgent)
 		if a.UUID == target.UUID {
-			if a.PublicKey != "" {
-				existingKey = a.PublicKey
-				isNew = false
-				return false
+			ctrl := value.(*live.AgentControl)
+			existingCtrl = ctrl
+			existingKey = a.PublicKey
+			placeholder = key
+			if ctrl.Conn != nil {
+				isConnected = true
 			}
-		}
-		return true
-	})
-
-	if isNew {
-		if agents.AgentDB != nil {
-			stored, err := agents.GetStoredAgent(target.UUID)
-			if err == nil && stored != nil {
-				existingKey = stored.PublicKey
-				isNew = false
-			} else if err != nil {
-				logging.Errorf("handleAgentCheckIn: GetStoredAgent error: %v", err)
-			}
-		}
-	}
-
-	if !isNew {
-		// Existing agent: key MUST match the pinned key. Key rotation is never allowed.
-		if existingKey != "" && target.PublicKey != existingKey {
-			ips := strings.Join(target.IPs, ", ")
-			msg := fmt.Sprintf("SECURITY: agent %s presented a different key — rejecting (key rotation is disabled).\n"+
-				"  Rejected Payload Info:\n    User: %s\n    Host: %s\n    IPs:  %s\n    OS:   %s\n"+
-				"  If this is a legitimate reinstall, run `forget_agent %s` to reset its identity.",
-				target.UUID, target.User, target.Hostname, ips, target.OS, strconv.Quote(target.UUID))
-			// Only broadcast to operators if under the alert rate limit (3/min per UUID).
-			// The overall request rate limit above already caps requests at 10/min.
-			logging.Errorf("%s", msg)
-			operatorBroadcastPrintf(logging.ERROR, "%s", msg)
-			http.Error(wrt, http.StatusText(http.StatusForbidden), http.StatusForbidden)
-			return
-		}
-	}
-
-	// CA signature already verified via HTTP headers in dispatcher
-	target.From = req.RemoteAddr
-
-	// Update agent in memory (dispatcher already created placeholder)
-	// Find the placeholder and update it with full agent data from CBOR
-	var existingCtrl *live.AgentControl
-	live.AgentControlMap.Range(func(key, value any) bool {
-		a := key.(*def.Emp3r0rAgent)
-		if a.UUID == target.UUID {
-			existingCtrl = value.(*live.AgentControl)
-			if existingCtrl.Conn != nil {
-				logging.Warningf("handleAgentCheckIn: %s just connected, but state says it is already connected. This implies a ghost session.", target.Tag)
-			}
-			// TOFU: Public key remains pinned for existing agents
-			target.PublicKey = a.PublicKey
-
-			// Remove the old pointer so we can replace it cleanly
-			live.AgentControlMap.Delete(key)
 			return false
 		}
 		return true
 	})
 
-	// Store updated agent pointer with full data into the map
-	target.LastSeen = time.Now()
-	if existingCtrl != nil {
-		live.AgentControlMap.Store(target, existingCtrl)
-	} else {
-		inx := agents.AssignAgentIndex()
-		live.AgentControlMap.Store(target, &live.AgentControl{Index: inx, Conn: nil})
+	// If not in map, check persistence
+	if placeholder == nil {
+		if agents.AgentDB != nil {
+			stored, err := agents.GetStoredAgent(target.UUID)
+			if err == nil && stored != nil {
+				existingKey = stored.PublicKey
+			}
+		}
 	}
+
+	// ── Phase 2: Duplicate Protection ──────────────────────────────────────
+	if isConnected {
+		logging.Warningf("handleAgentCheckIn: %s already connected, refusing duplicated checkin from %s", target.UUID, remoteAddr)
+		return fmt.Errorf("forbidden: duplicated checkin")
+	}
+
+	// ── Phase 3: TOFU Verification ─────────────────────────────────────────
+	if existingKey != "" && target.PublicKey != existingKey {
+		ips := strings.Join(target.IPs, ", ")
+		msg := fmt.Sprintf("SECURITY: agent %s presented a different key — rejecting (key rotation is disabled).\n"+
+			"  Rejected Payload Info:\n    User: %s\n    Host: %s\n    IPs:  %s\n    OS:   %s\n"+
+			"  If this is a legitimate reinstall, run `forget_agent %s` to reset its identity.",
+			target.UUID, target.User, target.Hostname, ips, target.OS, strconv.Quote(target.UUID))
+		logging.Errorf("%s", msg)
+		operatorBroadcastPrintf(logging.ERROR, "%s", msg)
+		return fmt.Errorf("forbidden: key rotation")
+	}
+
+	target.From = remoteAddr
+	target.LastSeen = time.Now()
+
+	// ── Phase 4: State Update ──────────────────────────────────────────────
+	if placeholder != nil {
+		// Replace placeholder/old entry with the new authoritative data
+		live.AgentControlMap.Delete(placeholder)
+		// Preservepinned key if it was already known
+		if existingKey != "" {
+			target.PublicKey = existingKey
+		}
+	}
+
+	if existingCtrl == nil {
+		existingCtrl = &live.AgentControl{Index: agents.AssignAgentIndex()}
+	}
+	live.AgentControlMap.Store(target, existingCtrl)
 
 	logging.Infof("Updated agent %q with full data from CBOR", target.UUID)
 
@@ -226,11 +178,13 @@ func handleAgentCheckIn(wrt http.ResponseWriter, req *http.Request, expectedUUID
 		}
 	}
 
-	if isNew {
+	if placeholder == nil {
 		logging.Infof("Checked in: %s from %s, running %s", strconv.Quote(shortname), fmt.Sprintf("'%s - %s'", target.From, target.Transport), strconv.Quote(target.OS))
 	} else {
 		if logging.Level >= 4 {
 			logging.Debugf("Agent reconnected: %s from %s, running %s", shortname, fmt.Sprintf("%s - %s", target.From, target.Transport), strconv.Quote(target.OS))
 		}
 	}
+
+	return nil
 }
