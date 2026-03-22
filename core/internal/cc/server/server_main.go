@@ -28,6 +28,12 @@ func ServerMain(wg_port int, hosts string, numOperators int) {
 		logging.Errorf("Failed to initialize agent database: %v", err)
 		return
 	}
+	if active, purged, err := agents.ReconcileSessionsOnStartup(); err != nil {
+		logging.Errorf("Failed to reconcile persisted sessions: %v", err)
+		return
+	} else {
+		logging.Infof("Session restore: active=%d purged_stale=%d", active, purged)
+	}
 	defer agents.CloseAgentDB()
 
 	// start all services

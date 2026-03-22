@@ -352,3 +352,79 @@ func TestRemoveAgentCleansSession(t *testing.T) {
 		t.Fatal("expected session to be removed after RemoveAgent")
 	}
 }
+
+func TestReconcileSessionsOnStartupPurgesStale(t *testing.T) {
+	setupTestDB(t)
+	defer CloseAgentDB()
+
+	agent := &def.Emp3r0rAgent{
+		UUID:      "reconcile-stale-uuid",
+		Tag:       "reconcile-stale-agent",
+		UUIDSig:   "sig",
+		PublicKey: "pk",
+	}
+	if err := RecordAgentCheckin(agent); err != nil {
+		t.Fatalf("RecordAgentCheckin failed: %v", err)
+	}
+
+	now := time.Now().Unix()
+	staleTS := now - (15*60 + 1)
+	freshTS := now
+
+	if _, err := AgentDB.Exec(`INSERT INTO agent_sessions (uuid, session_id, session_start, last_heartbeat, remote_addr)
+		VALUES (?, ?, ?, ?, ?)`, "stale-uuid", "legacy-stale", staleTS, staleTS, "127.0.0.1"); err == nil {
+		// stale-uuid has no agent row and may fail depending on sqlite foreign-key pragma; ignore intentionally.
+	}
+
+	if _, err := AgentDB.Exec(`INSERT INTO agent_sessions (uuid, session_id, session_start, last_heartbeat, remote_addr)
+		VALUES (?, ?, ?, ?, ?)`, agent.UUID, "legacy-fresh", freshTS, freshTS, "127.0.0.1"); err != nil {
+		t.Fatalf("insert fresh session failed: %v", err)
+	}
+
+	active, purged, err := ReconcileSessionsOnStartup()
+	if err != nil {
+		t.Fatalf("ReconcileSessionsOnStartup failed: %v", err)
+	}
+	if active != 1 {
+		t.Fatalf("expected 1 active session after reconcile, got %d", active)
+	}
+	if purged < 0 {
+		t.Fatalf("expected non-negative purged count, got %d", purged)
+	}
+}
+
+func TestStartSessionResumesLegacySession(t *testing.T) {
+	setupTestDB(t)
+	defer CloseAgentDB()
+
+	agent := &def.Emp3r0rAgent{
+		UUID:      "resume-legacy-uuid",
+		Tag:       "resume-legacy-agent",
+		UUIDSig:   "sig",
+		PublicKey: "pk",
+	}
+	if err := RecordAgentCheckin(agent); err != nil {
+		t.Fatalf("RecordAgentCheckin failed: %v", err)
+	}
+
+	now := time.Now().Unix()
+	if _, err := AgentDB.Exec(`INSERT INTO agent_sessions (uuid, session_id, session_start, last_heartbeat, remote_addr)
+		VALUES (?, ?, ?, ?, ?)`, agent.UUID, "legacy-session", now, now, "10.0.0.1"); err != nil {
+		t.Fatalf("insert legacy session failed: %v", err)
+	}
+
+	if err := StartSession(agent.UUID, "new-session", "10.0.0.2"); err != nil {
+		t.Fatalf("StartSession should resume legacy session, got error: %v", err)
+	}
+
+	var sessionID, remoteAddr string
+	if err := AgentDB.QueryRow("SELECT session_id, remote_addr FROM agent_sessions WHERE uuid = ?", agent.UUID).Scan(&sessionID, &remoteAddr); err != nil {
+		t.Fatalf("query resumed session failed: %v", err)
+	}
+	if sessionID == "legacy-session" {
+		t.Fatal("expected session id to be replaced during resume")
+	}
+	if remoteAddr != "10.0.0.2" {
+		t.Fatalf("expected remote_addr to be updated, got %s", remoteAddr)
+	}
+}

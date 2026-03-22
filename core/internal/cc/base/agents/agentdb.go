@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -17,8 +18,62 @@ import (
 // AgentDB is the global database connection
 var AgentDB *sql.DB
 
+var (
+	sessionEpochMu sync.RWMutex
+	// sessionEpoch identifies the running C2 process for duplicate-session checks.
+	sessionEpoch = fmt.Sprintf("%d", time.Now().UnixNano())
+)
+
 // ErrSessionAlreadyActive indicates a duplicate live session for the same UUID.
 var ErrSessionAlreadyActive = errors.New("session already active")
+
+const sessionStaleWindow = 15 * time.Minute
+
+func staleThresholdUnix(now int64) int64 {
+	return now - int64(sessionStaleWindow/time.Second)
+}
+
+func currentSessionEpoch() string {
+	sessionEpochMu.RLock()
+	defer sessionEpochMu.RUnlock()
+	return sessionEpoch
+}
+
+func encodeSessionID(raw string) string {
+	return currentSessionEpoch() + ":" + raw
+}
+
+func sessionEpochFromID(sessionID string) string {
+	parts := strings.SplitN(sessionID, ":", 2)
+	if len(parts) != 2 {
+		return ""
+	}
+	return parts[0]
+}
+
+// ReconcileSessionsOnStartup purges stale persisted sessions and returns count
+// of active sessions that can be resumed by this server process.
+func ReconcileSessionsOnStartup() (active, purged int64, err error) {
+	if AgentDB == nil {
+		return 0, 0, fmt.Errorf("database not initialized")
+	}
+
+	now := time.Now().Unix()
+	staleThreshold := staleThresholdUnix(now)
+
+	res, err := AgentDB.Exec("DELETE FROM agent_sessions WHERE last_heartbeat <= ?", staleThreshold)
+	if err != nil {
+		return 0, 0, fmt.Errorf("purge stale sessions: %v", err)
+	}
+	purged, _ = res.RowsAffected()
+
+	err = AgentDB.QueryRow("SELECT COUNT(*) FROM agent_sessions").Scan(&active)
+	if err != nil {
+		return 0, purged, fmt.Errorf("count active sessions: %v", err)
+	}
+
+	return active, purged, nil
+}
 
 // InitAgentDB initializes the SQLite database and creates tables if they don't exist
 func InitAgentDB(dbPath string) error {
@@ -94,7 +149,7 @@ func IsSessionActive(uuid string) (bool, error) {
 		return false, fmt.Errorf("database not initialized")
 	}
 	now := time.Now().Unix()
-	staleThreshold := now - 900 // 15 minutes in seconds
+	staleThreshold := staleThresholdUnix(now)
 
 	query := `SELECT COUNT(*) FROM agent_sessions WHERE uuid = ? AND last_heartbeat > ?`
 	var count int
@@ -113,7 +168,8 @@ func StartSession(uuid, sessionID, remoteAddr string) error {
 	}
 
 	now := time.Now().Unix()
-	staleThreshold := now - 900 // 15 minutes in seconds
+	staleThreshold := staleThresholdUnix(now)
+	encodedSessionID := encodeSessionID(sessionID)
 
 	tx, err := AgentDB.Begin()
 	if err != nil {
@@ -128,10 +184,34 @@ func StartSession(uuid, sessionID, remoteAddr string) error {
 		return fmt.Errorf("delete stale session: %v", err)
 	}
 
+	var existingSessionID string
+	lookupErr := tx.QueryRow("SELECT session_id FROM agent_sessions WHERE uuid = ?", uuid).Scan(&existingSessionID)
+	if lookupErr != nil && lookupErr != sql.ErrNoRows {
+		return fmt.Errorf("lookup existing session: %v", lookupErr)
+	}
+
+	if lookupErr == nil {
+		existingEpoch := sessionEpochFromID(existingSessionID)
+		if existingEpoch == currentSessionEpoch() {
+			return fmt.Errorf("%w: %s", ErrSessionAlreadyActive, uuid)
+		}
+		// Session persisted from a previous C2 process. Atomically take ownership.
+		_, err = tx.Exec(`UPDATE agent_sessions
+			SET session_id = ?, session_start = ?, last_heartbeat = ?, remote_addr = ?
+			WHERE uuid = ?`, encodedSessionID, now, now, remoteAddr, uuid)
+		if err != nil {
+			return fmt.Errorf("resume session: %v", err)
+		}
+		if err = tx.Commit(); err != nil {
+			return fmt.Errorf("commit session tx: %v", err)
+		}
+		return nil
+	}
+
 	query := `INSERT INTO agent_sessions (uuid, session_id, session_start, last_heartbeat, remote_addr)
 	          VALUES (?, ?, ?, ?, ?)`
 
-	_, err = tx.Exec(query, uuid, sessionID, now, now, remoteAddr)
+	_, err = tx.Exec(query, uuid, encodedSessionID, now, now, remoteAddr)
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "unique") || strings.Contains(strings.ToLower(err.Error()), "constraint") {
 			return fmt.Errorf("%w: %s", ErrSessionAlreadyActive, uuid)

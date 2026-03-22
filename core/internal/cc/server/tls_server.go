@@ -30,6 +30,11 @@ func StartC2AgentTLSServer() {
 		if err := agents.InitAgentDB(dbPath); err != nil {
 			logging.Fatalf("StartC2AgentTLSServer: init AgentDB: %v", err)
 		}
+		if active, purged, err := agents.ReconcileSessionsOnStartup(); err != nil {
+			logging.Fatalf("StartC2AgentTLSServer: reconcile sessions: %v", err)
+		} else {
+			logging.Infof("Session restore: active=%d purged_stale=%d", active, purged)
+		}
 	}
 
 	if _, err := os.Stat(live.Temp + transport.WWW); os.IsNotExist(err) {
