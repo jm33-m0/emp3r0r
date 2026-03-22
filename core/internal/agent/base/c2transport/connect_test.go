@@ -445,7 +445,7 @@ func TestDuplicatedCheckin(t *testing.T) {
 	// Second agent (same Tag) attempts to check in
 	configDupe := common.RuntimeConfig
 	err = c2transport.ReportStatus(configDupe, agentInfo)
-	
+
 	if err != nil {
 		t.Logf("Second ReportStatus failed early as expected: %v", err)
 		if !strings.Contains(err.Error(), "EOF") && !strings.Contains(err.Error(), "closed") && !strings.Contains(err.Error(), "reset") && !strings.Contains(err.Error(), "forbidden") {

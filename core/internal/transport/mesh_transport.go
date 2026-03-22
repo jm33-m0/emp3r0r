@@ -20,6 +20,7 @@ import (
 
 	"golang.org/x/crypto/pbkdf2"
 
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	kcp "github.com/xtaci/kcp-go/v5"
 )
 
@@ -74,6 +75,13 @@ func AcceptKCPConn(l *kcp.Listener, ctx context.Context) (net.Conn, error) {
 	}
 	ch := make(chan result, 1)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logging.Errorf("Mesh KCP accept goroutine panicked: %v", r)
+				ch <- result{nil, fmt.Errorf("accept panicked: %v", r)}
+			}
+		}()
+
 		conn, err := l.AcceptKCP()
 		ch <- result{conn, err}
 	}()

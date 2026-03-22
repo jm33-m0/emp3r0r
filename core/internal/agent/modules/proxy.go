@@ -127,7 +127,7 @@ func PortFwd(addr, sessionID, protocol string, reverse bool, timeout int) (err e
 			return fmt.Errorf("failed to connect to CC: %v", err)
 		}
 		logging.Infof("PortFwd (%s) started: %s (%s)", protocol, addr, sessionID)
-		
+
 		secureConn := transport.NewSecureConn(conn)
 		go transport.FwdToDport(ctx, cancel, addr, sessionID, protocol, secureConn, timeout)
 	}

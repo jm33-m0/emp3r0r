@@ -40,17 +40,14 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 		logging.Debugf("handleMessageTunnel exiting")
 		cancel()  // Signal goroutine to stop
 		wg.Wait() // Wait for goroutine to finish before returning
-		live.AgentControlMap.Range(func(key, value any) bool {
-			t := key.(*def.Emp3r0rAgent)
-			c := value.(*live.AgentControl)
-			if c.Conn == secureConn {
-				live.AgentControlMap.Delete(t)
-				controllers.CleanupPortFwdsByAgent(t)
-				operatorBroadcastPrintf(logging.ERROR, "Agent dies... %s is disconnected", strconv.Quote(t.Name))
-				return false // stop iteration
+		if t, _, key, found := agents.RuntimeControlByConn(secureConn); found {
+			live.AgentControlMap.Delete(key)
+			if endErr := agents.EndSession(t.UUID); endErr != nil {
+				logging.Debugf("handleMessageTunnel: end session for %s failed: %v", strconv.Quote(t.UUID), endErr)
 			}
-			return true
-		})
+			controllers.CleanupPortFwdsByAgent(t)
+			operatorBroadcastPrintf(logging.ERROR, "Agent dies... %s is disconnected", strconv.Quote(t.Name))
+		}
 		_ = secureConn.Close()
 		logging.Debugf("handleMessageTunnel exited")
 	}()
@@ -84,32 +81,45 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 				replayNonceCache.Store(nonceKey, msgAuth.Timestamp)
 
 				authAgentUUID = msgAuth.AgentUUID
-				if agent := agents.GetAgentByUUID(authAgentUUID); agent == nil {
+				if agents.AgentDB == nil {
+					logging.Warningf("handleMessageTunnel: AgentDB unavailable for trust decision")
+					return
+				}
+				pinnedKey, pinnedUUIDSig, found, lookupErr := agents.GetPinnedIdentity(authAgentUUID)
+				if lookupErr != nil {
+					logging.Warningf("handleMessageTunnel: MsgAuth trust lookup failed for %s: %v", strconv.Quote(authAgentUUID), lookupErr)
+					return
+				}
+				if !found {
 					logging.Warningf("handleMessageTunnel: MsgAuth unknown agent %s", strconv.Quote(authAgentUUID))
 					return
-				} else if agent.UUIDSig != "" && msgAuth.IdentityToken != "" && agent.UUIDSig != msgAuth.IdentityToken {
+				}
+				if pinnedUUIDSig != "" && msgAuth.IdentityToken != "" && pinnedUUIDSig != msgAuth.IdentityToken {
 					logging.Warningf("handleMessageTunnel: MsgAuth token mismatch for %s", strconv.Quote(authAgentUUID))
 					return
-				} else {
-					if agent.PublicKey == "" {
-						logging.Warningf("handleMessageTunnel: MsgAuth missing pinned key for %s", strconv.Quote(authAgentUUID))
-						return
-					}
-					if msgAuth.AgentProof == "" {
-						logging.Warningf("handleMessageTunnel: MsgAuth missing agent proof for %s", strconv.Quote(authAgentUUID))
-						return
-					}
-					proof, decodeErr := base64.URLEncoding.DecodeString(msgAuth.AgentProof)
-					if decodeErr != nil {
-						logging.Warningf("handleMessageTunnel: MsgAuth bad proof encoding for %s: %v", strconv.Quote(authAgentUUID), decodeErr)
-						return
-					}
-					canonical := transport.CanonicalAuthString(msgAuth.AgentUUID, msgAuth.Timestamp, msgAuth.Nonce, msgAuth.Capabilities)
-					proofOK, proofErr := transport.VerifySignatureWithPEM([]byte(agent.PublicKey), []byte(canonical), proof)
-					if proofErr != nil || !proofOK {
-						logging.Warningf("handleMessageTunnel: MsgAuth pinned key proof failed for %s: %v", strconv.Quote(authAgentUUID), proofErr)
-						return
-					}
+				}
+				if pinnedKey == "" {
+					logging.Warningf("handleMessageTunnel: MsgAuth missing pinned key for %s", strconv.Quote(authAgentUUID))
+					return
+				}
+				if msgAuth.AgentProof == "" {
+					logging.Warningf("handleMessageTunnel: MsgAuth missing agent proof for %s", strconv.Quote(authAgentUUID))
+					return
+				}
+				proof, decodeErr := base64.URLEncoding.DecodeString(msgAuth.AgentProof)
+				if decodeErr != nil {
+					logging.Warningf("handleMessageTunnel: MsgAuth bad proof encoding for %s: %v", strconv.Quote(authAgentUUID), decodeErr)
+					return
+				}
+				canonical := transport.CanonicalAuthString(msgAuth.AgentUUID, msgAuth.Timestamp, msgAuth.Nonce, msgAuth.Capabilities)
+				proofOK, proofErr := transport.VerifySignatureWithPEM([]byte(pinnedKey), []byte(canonical), proof)
+				if proofErr != nil || !proofOK {
+					logging.Warningf("handleMessageTunnel: MsgAuth pinned key proof failed for %s: %v", strconv.Quote(authAgentUUID), proofErr)
+					return
+				}
+				if hbErr := agents.UpdateSessionHeartbeat(authAgentUUID); hbErr != nil {
+					logging.Warningf("handleMessageTunnel: session heartbeat failed for %s: %v", strconv.Quote(authAgentUUID), hbErr)
+					return
 				}
 
 				continue
@@ -128,6 +138,10 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 					return
 				}
 				authAgentUUID = resolvedUUID
+			}
+			if hbErr := agents.UpdateSessionHeartbeat(authAgentUUID); hbErr != nil {
+				logging.Warningf("handleMessageTunnel: session heartbeat failed for %s: %v", strconv.Quote(authAgentUUID), hbErr)
+				return
 			}
 			// Sanitize agent metadata at trust boundary (after CBOR decode)
 			util.SanitizeMsgTunMetadata(&msg)
@@ -309,8 +323,14 @@ func validateInitialMsgIdentity(msg *def.MsgTunData) (string, error) {
 	if msg.AgentUUID == "" {
 		return "", fmt.Errorf("empty AgentUUID")
 	}
-	agent := agents.GetAgentByUUID(msg.AgentUUID)
-	if agent == nil {
+	if agents.AgentDB == nil {
+		return "", fmt.Errorf("trust store unavailable")
+	}
+	pinnedKey, _, found, err := agents.GetPinnedIdentity(msg.AgentUUID)
+	if err != nil {
+		return "", fmt.Errorf("identity lookup failed: %w", err)
+	}
+	if !found {
 		return "", fmt.Errorf("unknown agent %q", msg.AgentUUID)
 	}
 
@@ -322,10 +342,10 @@ func validateInitialMsgIdentity(msg *def.MsgTunData) (string, error) {
 		return "", fmt.Errorf("decode payload proof: %w", err)
 	}
 
-	if agent.PublicKey == "" {
+	if pinnedKey == "" {
 		return "", fmt.Errorf("missing pinned public key for %q", msg.AgentUUID)
 	}
-	agentOK, err := transport.VerifySignatureWithPEM([]byte(agent.PublicKey), []byte(msg.AgentUUID), proof)
+	agentOK, err := transport.VerifySignatureWithPEM([]byte(pinnedKey), []byte(msg.AgentUUID), proof)
 	if err != nil || !agentOK {
 		return "", fmt.Errorf("agent identity proof invalid")
 	}

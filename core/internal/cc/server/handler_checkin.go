@@ -1,6 +1,8 @@
 package server
 
 import (
+	"encoding/base64"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -11,6 +13,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -21,7 +24,7 @@ var rotationRateLimiter sync.Map
 // handleAgentCheckInStream is the protocol-native checkin handler.
 // It is transport-agnostic and only depends on an encrypted byte stream.
 // secureConn is already authenticated and its first frame (MsgAuth) consumed by dec.
-func handleAgentCheckInStream(dec *cbor.Decoder, agentUUID, remoteAddr string) error {
+func handleAgentCheckInStream(dec *cbor.Decoder, auth *def.MsgAuth, agentUUID, remoteAddr string) error {
 	target := new(def.Emp3r0rAgent)
 	// Dispatcher already decoded the first MsgAuth frame using dec.
 	// We are now at the second frame, which MUST be the Emp3r0rAgent info.
@@ -40,22 +43,6 @@ func handleAgentCheckInStream(dec *cbor.Decoder, agentUUID, remoteAddr string) e
 	}
 	if agentUUID != "" && target.UUID != agentUUID {
 		logging.Warningf("handleAgentCheckIn: compatibility route/body UUID mismatch: body=%s route=%s", strconv.Quote(target.UUID), strconv.Quote(agentUUID))
-	}
-
-	// Check duplicate sessions by payload identity (authoritative source).
-	if agents.IsAgentExistByUUID(target.UUID) {
-		agent := agents.GetAgentByUUID(target.UUID)
-		if agent != nil {
-			if val, ok := live.AgentControlMap.Load(agent); ok {
-				ctrl := val.(*live.AgentControl)
-				if ctrl.Conn != nil {
-					if agentUUID == "" || target.UUID != agentUUID {
-						logging.Warningf("handleAgentCheckIn: %s already connected, refusing duplicated checkin", target.UUID)
-					}
-					return fmt.Errorf("forbidden: duplicated checkin")
-				}
-			}
-		}
 	}
 
 	// ── Rate limiting: cap ALL log/alert output per UUID ─────────────────────
@@ -86,68 +73,104 @@ func handleAgentCheckInStream(dec *cbor.Decoder, agentUUID, remoteAddr string) e
 		logging.Warningf("handleAgentCheckIn: Agent %s provided no public key, rejecting", strconv.Quote(target.UUID))
 		return fmt.Errorf("unauthorized: missing public key")
 	}
+	if target.UUIDSig == "" {
+		logging.Warningf("handleAgentCheckIn: Agent %s provided no UUID signature, rejecting", strconv.Quote(target.UUID))
+		return fmt.Errorf("unauthorized: missing uuid signature")
+	}
+	if agents.AgentDB == nil {
+		logging.Warningf("handleAgentCheckIn: AgentDB unavailable for trust decision")
+		return fmt.Errorf("forbidden: trust store unavailable")
+	}
 
 	// ── Phase 1: Identity & State Lookup ───────────────────────────────────
 	var (
-		existingCtrl *live.AgentControl
-		existingKey  string
-		isConnected  bool
-		placeholder  any // the key (agent pointer) currently in the map
+		isKnown       bool
+		pinnedKey     string
+		pinnedUUIDSig string
 	)
-	live.AgentControlMap.Range(func(key, value any) bool {
-		a := key.(*def.Emp3r0rAgent)
-		if a.UUID == target.UUID {
-			ctrl := value.(*live.AgentControl)
-			existingCtrl = ctrl
-			existingKey = a.PublicKey
-			placeholder = key
-			if ctrl.Conn != nil {
-				isConnected = true
-			}
-			return false
-		}
-		return true
-	})
-
-	// If not in map, check persistence
-	if placeholder == nil {
-		if agents.AgentDB != nil {
-			stored, err := agents.GetStoredAgent(target.UUID)
-			if err == nil && stored != nil {
-				existingKey = stored.PublicKey
-			}
-		}
+	pinnedKey, pinnedUUIDSig, isKnown, err = agents.GetPinnedIdentity(target.UUID)
+	if err != nil {
+		logging.Warningf("handleAgentCheckIn: AgentDB lookup failed for %s: %v", strconv.Quote(target.UUID), err)
+		return fmt.Errorf("forbidden: trust lookup failed")
 	}
 
-	// ── Phase 2: Duplicate Protection ──────────────────────────────────────
-	if isConnected {
-		logging.Warningf("handleAgentCheckIn: %s already connected, refusing duplicated checkin from %s", target.UUID, remoteAddr)
-		return fmt.Errorf("forbidden: duplicated checkin")
+	// ── Phase 2: TOFU Verification (DB-Authoritative) ─────────────────────
+	if isKnown && pinnedKey == "" {
+		logging.Warningf("handleAgentCheckIn: %s has empty pinned key in DB", strconv.Quote(target.UUID))
+		return fmt.Errorf("forbidden: invalid pinned identity")
 	}
 
-	// ── Phase 3: TOFU Verification ─────────────────────────────────────────
-	if existingKey != "" && target.PublicKey != existingKey {
+	if isKnown && target.PublicKey != pinnedKey {
 		ips := strings.Join(target.IPs, ", ")
 		msg := fmt.Sprintf("SECURITY: agent %s presented a different key — rejecting (key rotation is disabled).\n"+
 			"  Rejected Payload Info:\n    User: %s\n    Host: %s\n    IPs:  %s\n    OS:   %s\n"+
 			"  If this is a legitimate reinstall, run `forget_agent %s` to reset its identity.",
 			target.UUID, target.User, target.Hostname, ips, target.OS, strconv.Quote(target.UUID))
 		logging.Errorf("%s", msg)
-		operatorBroadcastPrintf(logging.ERROR, "%s", msg)
+		operatorBroadcastPrintf(logging.FATAL, "%s", msg)
 		return fmt.Errorf("forbidden: key rotation")
+	}
+	if isKnown && pinnedUUIDSig != "" && target.UUIDSig != pinnedUUIDSig {
+		msg := fmt.Sprintf("SECURITY: agent %s presented mismatching UUID signature — rejecting clone/impersonation risk", target.UUID)
+		logging.Errorf("%s", msg)
+		operatorBroadcastPrintf(logging.FATAL, "%s", msg)
+		return fmt.Errorf("forbidden: identity token mismatch")
+	}
+
+	if !isKnown {
+		if auth == nil {
+			return fmt.Errorf("forbidden: missing auth envelope context")
+		}
+		if auth.AgentUUID != target.UUID {
+			return fmt.Errorf("forbidden: auth/payload UUID mismatch")
+		}
+		if auth.AgentProof == "" {
+			return fmt.Errorf("forbidden: missing agent proof for first enrollment")
+		}
+		proof, decodeErr := base64.URLEncoding.DecodeString(auth.AgentProof)
+		if decodeErr != nil {
+			return fmt.Errorf("forbidden: bad agent proof encoding: %w", decodeErr)
+		}
+		canonical := transport.CanonicalAuthString(auth.AgentUUID, auth.Timestamp, auth.Nonce, auth.Capabilities)
+		ok, verifyErr := transport.VerifySignatureWithPEM([]byte(target.PublicKey), []byte(canonical), proof)
+		if verifyErr != nil || !ok {
+			return fmt.Errorf("forbidden: first enrollment proof invalid")
+		}
 	}
 
 	target.From = remoteAddr
 	target.LastSeen = time.Now()
+	if isKnown {
+		target.PublicKey = pinnedKey
+		if pinnedUUIDSig != "" {
+			target.UUIDSig = pinnedUUIDSig
+		}
+	}
 
-	// ── Phase 4: State Update ──────────────────────────────────────────────
+	// ── Phase 3: Session Admission (Explicit Duplicate Prohibition) ────────
+	sessionID := fmt.Sprintf("%d", time.Now().UnixNano())
+	if sessionErr := agents.StartSession(target.UUID, sessionID, remoteAddr); sessionErr != nil {
+		if errors.Is(sessionErr, agents.ErrSessionAlreadyActive) {
+			logging.Warningf("handleAgentCheckIn: duplicate live session blocked for %s from %s", strconv.Quote(target.UUID), remoteAddr)
+			return fmt.Errorf("forbidden: duplicate session")
+		}
+		logging.Warningf("handleAgentCheckIn: session admission failed for %s: %v", strconv.Quote(target.UUID), sessionErr)
+		return fmt.Errorf("forbidden: session admission failed")
+	}
+
+	// ── Phase 4: Runtime Projection Update (Non-Security State) ────────────
+	var (
+		existingCtrl *live.AgentControl
+		placeholder  any // the key (agent pointer) currently in the map
+	)
+	if _, ctrl, key, found := agents.RuntimeControlByUUID(target.UUID); found {
+		existingCtrl = ctrl
+		placeholder = key
+	}
+
 	if placeholder != nil {
 		// Replace placeholder/old entry with the new authoritative data
 		live.AgentControlMap.Delete(placeholder)
-		// Preservepinned key if it was already known
-		if existingKey != "" {
-			target.PublicKey = existingKey
-		}
 	}
 
 	if existingCtrl == nil {
@@ -167,7 +190,9 @@ func handleAgentCheckInStream(dec *cbor.Decoder, agentUUID, remoteAddr string) e
 	// ------------------------------------------------------------ // SECURITY: Clone Detection & Session Management
 	if agents.AgentDB != nil {
 		if err := agents.RecordAgentCheckin(target); err != nil {
-			logging.Warningf("Failed to record agent check-in: %v", err)
+			_ = agents.EndSession(target.UUID)
+			logging.Warningf("Failed to record agent check-in (session rolled back): %v", err)
+			return fmt.Errorf("forbidden: failed to persist check-in")
 		}
 	}
 

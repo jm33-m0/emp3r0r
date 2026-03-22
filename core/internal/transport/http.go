@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 var (
@@ -23,6 +26,13 @@ func ServeFileHTTP(file_path, port string, ctx context.Context, cancel context.C
 
 	errChan := make(chan error)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logging.Errorf("ServeFileHTTP goroutine panicked: %v\n%s", r, util.CallStack())
+				errChan <- fmt.Errorf("http server panic: %v", r)
+			}
+		}()
+
 		err = Stager_HTTP_Server.ListenAndServe()
 		if err == http.ErrServerClosed {
 			err = fmt.Errorf("stager HTTP server is shutdown")

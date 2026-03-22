@@ -2,6 +2,7 @@ package agents
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -15,6 +16,9 @@ import (
 
 // AgentDB is the global database connection
 var AgentDB *sql.DB
+
+// ErrSessionAlreadyActive indicates a duplicate live session for the same UUID.
+var ErrSessionAlreadyActive = errors.New("session already active")
 
 // InitAgentDB initializes the SQLite database and creates tables if they don't exist
 func InitAgentDB(dbPath string) error {
@@ -39,6 +43,7 @@ func InitAgentDB(dbPath string) error {
 	CREATE TABLE IF NOT EXISTS agents (
 		uuid TEXT PRIMARY KEY,
 		tag TEXT NOT NULL,
+		uuid_sig TEXT NOT NULL,
 		public_key TEXT NOT NULL,
 		hostname TEXT,
 		os TEXT,
@@ -49,6 +54,15 @@ func InitAgentDB(dbPath string) error {
 		first_seen INTEGER,
 		connection_count INTEGER DEFAULT 1,
 		created_at INTEGER NOT NULL
+	);
+
+	CREATE TABLE IF NOT EXISTS agent_sessions (
+		uuid TEXT PRIMARY KEY,
+		session_id TEXT NOT NULL,
+		session_start INTEGER NOT NULL,
+		last_heartbeat INTEGER NOT NULL,
+		remote_addr TEXT,
+		FOREIGN KEY (uuid) REFERENCES agents(uuid)
 	);
 
 	CREATE TABLE IF NOT EXISTS agent_history (
@@ -73,6 +87,87 @@ func InitAgentDB(dbPath string) error {
 	return nil
 }
 
+// IsSessionActive checks if an agent has an active session in the database
+// An active session is one created within the last 15 minutes (stale session timeout)
+func IsSessionActive(uuid string) (bool, error) {
+	if AgentDB == nil {
+		return false, fmt.Errorf("database not initialized")
+	}
+	now := time.Now().Unix()
+	staleThreshold := now - 900 // 15 minutes in seconds
+
+	query := `SELECT COUNT(*) FROM agent_sessions WHERE uuid = ? AND last_heartbeat > ?`
+	var count int
+	err := AgentDB.QueryRow(query, uuid, staleThreshold).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("query session: %v", err)
+	}
+	return count > 0, nil
+}
+
+// StartSession creates or updates a session record for an agent
+// Returns an error if a session already exists (duplicate prevention)
+func StartSession(uuid, sessionID, remoteAddr string) error {
+	if AgentDB == nil {
+		return fmt.Errorf("database not initialized")
+	}
+
+	now := time.Now().Unix()
+	staleThreshold := now - 900 // 15 minutes in seconds
+
+	tx, err := AgentDB.Begin()
+	if err != nil {
+		return fmt.Errorf("begin session tx: %v", err)
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	// Garbage-collect stale session for this UUID, then attempt strict insert.
+	if _, err = tx.Exec("DELETE FROM agent_sessions WHERE uuid = ? AND last_heartbeat <= ?", uuid, staleThreshold); err != nil {
+		return fmt.Errorf("delete stale session: %v", err)
+	}
+
+	query := `INSERT INTO agent_sessions (uuid, session_id, session_start, last_heartbeat, remote_addr)
+	          VALUES (?, ?, ?, ?, ?)`
+
+	_, err = tx.Exec(query, uuid, sessionID, now, now, remoteAddr)
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "unique") || strings.Contains(strings.ToLower(err.Error()), "constraint") {
+			return fmt.Errorf("%w: %s", ErrSessionAlreadyActive, uuid)
+		}
+		return fmt.Errorf("insert session: %v", err)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("commit session tx: %v", err)
+	}
+
+	return nil
+}
+
+// UpdateSessionHeartbeat updates the last heartbeat timestamp for an active session
+func UpdateSessionHeartbeat(uuid string) error {
+	if AgentDB == nil {
+		return fmt.Errorf("database not initialized")
+	}
+
+	now := time.Now().Unix()
+	query := `UPDATE agent_sessions SET last_heartbeat = ? WHERE uuid = ?`
+	_, err := AgentDB.Exec(query, now, uuid)
+	return err
+}
+
+// EndSession removes a session record for an agent
+func EndSession(uuid string) error {
+	if AgentDB == nil {
+		return fmt.Errorf("database not initialized")
+	}
+
+	_, err := AgentDB.Exec("DELETE FROM agent_sessions WHERE uuid = ?", uuid)
+	return err
+}
+
 // CloseAgentDB closes the database connection
 func CloseAgentDB() error {
 	if AgentDB != nil {
@@ -85,6 +180,7 @@ func CloseAgentDB() error {
 type StoredAgent struct {
 	UUID            string
 	Tag             string
+	UUIDSig         string
 	PublicKey       string
 	Hostname        string
 	OS              string
@@ -103,7 +199,7 @@ func GetStoredAgent(uuid string) (*StoredAgent, error) {
 		return nil, fmt.Errorf("database not initialized")
 	}
 
-	query := `SELECT uuid, tag, public_key, hostname, os, arch, user, ip_addresses, 
+	query := `SELECT uuid, tag, uuid_sig, public_key, hostname, os, arch, user, ip_addresses, 
 	          last_seen, first_seen, connection_count, created_at 
 	          FROM agents WHERE uuid = ?`
 
@@ -111,6 +207,7 @@ func GetStoredAgent(uuid string) (*StoredAgent, error) {
 	err := AgentDB.QueryRow(query, uuid).Scan(
 		&agent.UUID,
 		&agent.Tag,
+		&agent.UUIDSig,
 		&agent.PublicKey,
 		&agent.Hostname,
 		&agent.OS,
@@ -150,13 +247,14 @@ func RecordAgentCheckin(agent *def.Emp3r0rAgent) error {
 
 	if existing == nil {
 		// New agent - insert
-		query := `INSERT INTO agents (uuid, tag, public_key, hostname, os, arch, user, 
+		query := `INSERT INTO agents (uuid, tag, uuid_sig, public_key, hostname, os, arch, user, 
 		          ip_addresses, last_seen, first_seen, connection_count, created_at)
-		          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`
+		          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`
 
 		_, err := AgentDB.Exec(query,
 			agent.UUID,
 			agent.Tag,
+			agent.UUIDSig,
 			agent.PublicKey,
 			agent.Hostname,
 			agent.OS,
@@ -178,6 +276,13 @@ func RecordAgentCheckin(agent *def.Emp3r0rAgent) error {
 
 		logging.Infof("New agent recorded in database: %s", agent.UUID)
 	} else {
+		if existing.PublicKey != "" && agent.PublicKey != "" && existing.PublicKey != agent.PublicKey {
+			return fmt.Errorf("immutable identity violation: public key mismatch for %s", agent.UUID)
+		}
+		if existing.UUIDSig != "" && agent.UUIDSig != "" && existing.UUIDSig != agent.UUIDSig {
+			return fmt.Errorf("immutable identity violation: uuid signature mismatch for %s", agent.UUID)
+		}
+
 		// Existing agent — update everything EXCEPT public_key (pinned at first registration,
 		// never rotated per security policy).
 		query := `UPDATE agents SET tag = ?, hostname = ?, os = ?, arch = ?,
@@ -200,6 +305,19 @@ func RecordAgentCheckin(agent *def.Emp3r0rAgent) error {
 	}
 
 	return nil
+}
+
+// GetPinnedIdentity returns the persisted trust baseline for an agent UUID.
+// Security decisions must use this DB state, not in-memory projections.
+func GetPinnedIdentity(uuid string) (publicKey, uuidSig string, found bool, err error) {
+	stored, err := GetStoredAgent(uuid)
+	if err != nil {
+		return "", "", false, err
+	}
+	if stored == nil {
+		return "", "", false, nil
+	}
+	return stored.PublicKey, stored.UUIDSig, true, nil
 }
 
 // DetectAgentChanges compares incoming agent data with stored data and logs changes
@@ -293,6 +411,11 @@ func DetectAgentChanges(agent *def.Emp3r0rAgent) error {
 func RemoveAgent(uuid string) error {
 	if AgentDB == nil {
 		return fmt.Errorf("database not initialized")
+	}
+
+	// Delete session first to guarantee clean lifecycle state after forget.
+	if _, err := AgentDB.Exec("DELETE FROM agent_sessions WHERE uuid = ?", uuid); err != nil {
+		return fmt.Errorf("delete agent session: %v", err)
 	}
 
 	// Delete history first (foreign key constraint)

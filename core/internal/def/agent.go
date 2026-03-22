@@ -1,11 +1,9 @@
 package def
 
 import (
-	"context"
 	"time"
 
 	"github.com/jaypipes/ghw"
-	"github.com/posener/h2conn"
 )
 
 // Emp3r0rAgent agent properties
@@ -68,11 +66,4 @@ type MsgTunData struct {
 	AgentUUIDSig   string   `cbor:"7,keyasint"` // agent UUID signature for verification
 	EphemPublicKey []byte   `cbor:"8,keyasint"` // ephemeral public key for ECDH key exchange
 	PeerList       []string `cbor:"9,keyasint"` // pushed by CC to help with discovery
-}
-
-// H2Conn add context to h2conn.Conn
-type H2Conn struct {
-	Conn   *h2conn.Conn
-	Ctx    context.Context
-	Cancel context.CancelFunc
 }

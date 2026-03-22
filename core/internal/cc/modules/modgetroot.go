@@ -2,7 +2,6 @@ package modules
 
 import (
 	"fmt"
-
 	"sync"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"

@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -301,5 +302,53 @@ func TestDatabasePersistence(t *testing.T) {
 
 	if stored.UUID != agent.UUID {
 		t.Errorf("UUID mismatch after persistence: expected %s, got %s", agent.UUID, stored.UUID)
+	}
+}
+
+func TestSessionDuplicatePrevention(t *testing.T) {
+	setupTestDB(t)
+	defer CloseAgentDB()
+
+	uuid := "session-test-uuid"
+	if err := StartSession(uuid, "s1", "127.0.0.1"); err != nil {
+		t.Fatalf("StartSession first failed: %v", err)
+	}
+
+	err := StartSession(uuid, "s2", "127.0.0.2")
+	if err == nil {
+		t.Fatal("expected duplicate session error, got nil")
+	}
+	if !errors.Is(err, ErrSessionAlreadyActive) {
+		t.Fatalf("expected ErrSessionAlreadyActive, got: %v", err)
+	}
+}
+
+func TestRemoveAgentCleansSession(t *testing.T) {
+	setupTestDB(t)
+	defer CloseAgentDB()
+
+	agent := &def.Emp3r0rAgent{
+		UUID:      "remove-cleans-session-uuid",
+		Tag:       "remove-cleans-session-agent",
+		UUIDSig:   "sig",
+		PublicKey: "pk",
+	}
+	if err := RecordAgentCheckin(agent); err != nil {
+		t.Fatalf("RecordAgentCheckin failed: %v", err)
+	}
+	if err := StartSession(agent.UUID, "s1", "127.0.0.1"); err != nil {
+		t.Fatalf("StartSession failed: %v", err)
+	}
+
+	if err := RemoveAgent(agent.UUID); err != nil {
+		t.Fatalf("RemoveAgent failed: %v", err)
+	}
+
+	active, err := IsSessionActive(agent.UUID)
+	if err != nil {
+		t.Fatalf("IsSessionActive failed: %v", err)
+	}
+	if active {
+		t.Fatal("expected session to be removed after RemoveAgent")
 	}
 }

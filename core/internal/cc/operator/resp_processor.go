@@ -3,7 +3,6 @@ package operator
 import (
 	"fmt"
 	"strings"
-
 	"sync"
 
 	"github.com/fatih/color"

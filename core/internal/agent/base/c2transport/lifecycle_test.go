@@ -846,7 +846,7 @@ func TestCheckinWithRandomPaths_Strict(t *testing.T) {
 	// Set live download directory so the server knows where to put it
 	live.FileGetDir = filepath.Join(tmpDir, "c2_downloads")
 	expectedDest := filepath.Join(live.FileGetDir, "upload_test.txt")
-	os.MkdirAll(live.FileGetDir, 0700)
+	os.MkdirAll(live.FileGetDir, 0o700)
 
 	// Pre-allocate the file so HandleFTPStream knows the expected size (as get.go does)
 	f, _ := os.Create(expectedDest)

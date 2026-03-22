@@ -27,13 +27,13 @@ var (
 type AgentControl struct {
 	Index  int      // index of a connected agent
 	Label  string   // custom label for an agent
-	Conn   net.Conn // h2 connection of an agent
+	Conn   net.Conn // active C2 stream for this agent (transport-agnostic)
 	Ctx    context.Context
 	Cancel context.CancelFunc
 }
 
 var (
-	// AgentControlMap target list, with control (tun) interface
+	// AgentControlMap runtime projection of live agent control state.
 	AgentControlMap sync.Map
 
 	// AgentList list of connected agents

@@ -90,7 +90,19 @@ func TCPFwd(addr, port string, ctx context.Context, cancel context.CancelFunc) (
 
 		// IO copy
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logging.Errorf("TCPFwd IO copy goroutine (dst←conn) panicked: %v", r)
+				}
+			}()
+
 			_, dialErr = io.Copy(dst, conn)
+			defer func() {
+				if r := recover(); r != nil {
+					logging.Errorf("TCPFwd IO copy goroutine (conn←dst) panicked: %v", r)
+				}
+			}()
+
 			if dialErr != nil {
 				logging.Print(dialErr)
 			}
@@ -147,6 +159,12 @@ func FwdToDport(ctx context.Context, cancel context.CancelFunc,
 	logging.Infof("FwdToDport: connected to %s (%s)", to, protocol)
 
 	// io.Copy
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("FwdToDport IO copy goroutine panicked: %v", r)
+		}
+	}()
+
 	go func() {
 		_, err = io.Copy(dest, h2)
 		if err != nil {

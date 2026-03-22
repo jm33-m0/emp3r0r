@@ -16,7 +16,6 @@ const (
 	ReplayWindowSeconds = 60
 )
 
-
 // CanonicalAuthString builds the payload-auth canonical string.
 // It is independent from wrapper details like method/path/header.
 func CanonicalAuthString(agentUUID string, timestamp int64, nonce string, capabilities []string) string {

@@ -59,6 +59,18 @@ func tcpLocal(addr, server string,
 		}
 
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logging.Errorf("ss_tcp remote goroutine panicked: %v", r)
+				}
+			}()
+
+			defer func() {
+				if r := recover(); r != nil {
+					logging.Errorf("ss_tcp relay goroutine panicked: %v", r)
+				}
+			}()
+
 			defer c.Close()
 			tgt, err := getAddr(c)
 			if err != nil {

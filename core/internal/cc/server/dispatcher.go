@@ -130,18 +130,22 @@ func cborProtocolDispatch(t transport.C2Transport) {
 	logging.Debugf("cborProtocolDispatch: MsgAuth CA verified from %s", remoteAddr)
 
 	// ── Step ①.⑤: Pinned Key (TOFU) Verification ────────────────────────────
-	// If the agent is already known (in memory or DB), the provided AgentProof MUST match the pinned key.
-	var pinnedKey string
-	if agent := agents.GetAgentByUUID(msgAuth.AgentUUID); agent != nil {
-		pinnedKey = agent.PublicKey
+	// Security decisions are DB-authoritative. Memory maps are runtime projections only.
+	if agents.AgentDB == nil {
+		logging.Warningf("cborProtocolDispatch: AgentDB unavailable for trust decision from %s", remoteAddr)
+		return
 	}
-	if pinnedKey == "" {
-		if stored, err := agents.GetStoredAgent(msgAuth.AgentUUID); err == nil && stored != nil {
-			pinnedKey = stored.PublicKey
-		}
+	pinnedKey, _, isKnown, err := agents.GetPinnedIdentity(msgAuth.AgentUUID)
+	if err != nil {
+		logging.Warningf("cborProtocolDispatch: AgentDB lookup failed for %s from %s: %v", strconv.Quote(msgAuth.AgentUUID), remoteAddr, err)
+		return
 	}
 
-	if pinnedKey != "" {
+	if isKnown {
+		if pinnedKey == "" {
+			logging.Warningf("cborProtocolDispatch: agent %s has empty pinned key in DB", strconv.Quote(msgAuth.AgentUUID))
+			return
+		}
 		if msgAuth.AgentProof == "" {
 			logging.Warningf("cborProtocolDispatch: agent %s is known but provided no AgentProof from %s", strconv.Quote(msgAuth.AgentUUID), remoteAddr)
 			return
@@ -159,7 +163,7 @@ func cborProtocolDispatch(t transport.C2Transport) {
 		}
 		logging.Debugf("cborProtocolDispatch: pinned key verified for agent %s", strconv.Quote(msgAuth.AgentUUID))
 	} else {
-		logging.Debugf("cborProtocolDispatch: agent %s is new or has no pinned key", strconv.Quote(msgAuth.AgentUUID))
+		logging.Debugf("cborProtocolDispatch: agent %s has no pinned identity in DB (first enrollment path)", strconv.Quote(msgAuth.AgentUUID))
 	}
 
 	// ── Step ②: Replay protection ────────────────────────────────────────────
@@ -188,6 +192,13 @@ func cborProtocolDispatch(t transport.C2Transport) {
 	}
 	logging.Infof("cborProtocolDispatch: service=%s agent=%s from %s", routeCtx.Service, strconv.Quote(msgAuth.AgentUUID), remoteAddr)
 
+	// Check-in is the only route allowed for unknown agents; all others require prior TOFU enrollment.
+	isCheckinRoute := routeCtx.Service == live.RuntimeConfig.C2Routes.Checkin
+	if !isKnown && !isCheckinRoute {
+		logging.Warningf("cborProtocolDispatch: rejecting %s route for unknown agent %s from %s", routeCtx.Service, strconv.Quote(msgAuth.AgentUUID), remoteAddr)
+		return
+	}
+
 	switch routeCtx.Service {
 	case live.RuntimeConfig.C2Routes.Checkin:
 		agentUUID := msgAuth.AgentUUID
@@ -196,7 +207,7 @@ func cborProtocolDispatch(t transport.C2Transport) {
 			readyChan := make(chan struct{})
 			checkinReadyChannels.Store(agentUUID, readyChan)
 		}
-		if err := handleAgentCheckInStream(dec, agentUUID, remoteAddr); err != nil {
+		if err := handleAgentCheckInStream(dec, &msgAuth, agentUUID, remoteAddr); err != nil {
 			logging.Warningf("cborProtocolDispatch: checkin error for %s: %v", strconv.Quote(agentUUID), err)
 		}
 
@@ -214,7 +225,6 @@ func cborProtocolDispatch(t transport.C2Transport) {
 
 	case live.RuntimeConfig.C2Routes.WWW:
 		handleFileDownloadStream(secureConn, routeCtx.StreamID, remoteAddr)
-
 
 	default:
 		logging.Warningf("cborProtocolDispatch: service %q is disabled or unknown for agent %s from %s", routeCtx.Service, strconv.Quote(msgAuth.AgentUUID), remoteAddr)

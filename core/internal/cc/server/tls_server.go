@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -23,6 +25,13 @@ import (
 // delegates to the pure-CBOR protocol dispatcher. No HTTP concepts (URL paths,
 // headers, methods, status codes) carry any C2 semantics.
 func StartC2AgentTLSServer() {
+	if agents.AgentDB == nil || agents.AgentDB.Ping() != nil {
+		dbPath := filepath.Join(live.EmpWorkSpace, "agents.db")
+		if err := agents.InitAgentDB(dbPath); err != nil {
+			logging.Fatalf("StartC2AgentTLSServer: init AgentDB: %v", err)
+		}
+	}
+
 	if _, err := os.Stat(live.Temp + transport.WWW); os.IsNotExist(err) {
 		if err = os.MkdirAll(live.Temp+transport.WWW, 0o700); err != nil {
 			logging.Fatalf("StartC2AgentTLSServer: %v", err)

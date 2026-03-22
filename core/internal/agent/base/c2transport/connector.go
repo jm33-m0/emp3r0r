@@ -87,7 +87,6 @@ func EstablishC2Connection(url string, streamID string, capabilities ...string) 
 	return
 }
 
-
 func normalizeMsgAuthCapabilities(capabilities []string) ([]string, error) {
 	seen := make(map[string]struct{}, len(capabilities)+1)
 	normalized := make([]string, 0, len(capabilities)+1)

@@ -101,6 +101,12 @@ func StartGossip(ctx context.Context, name string, initialPeers []string, port i
 
 	// Peer discovery and visibility management.
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logging.Errorf("Gossip peer discovery goroutine panicked: %v", r)
+			}
+		}()
+
 		peerList := make(map[string]bool)
 		for _, p := range initialPeers {
 			peerList[p] = true
@@ -154,6 +160,12 @@ func StartGossip(ctx context.Context, name string, initialPeers []string, port i
 	}()
 
 	// Shut down when context is cancelled.
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("Gossip shutdown goroutine panicked: %v", r)
+		}
+	}()
+
 	go func() {
 		<-ctx.Done()
 		_ = list.Shutdown()

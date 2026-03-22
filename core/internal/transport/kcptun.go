@@ -667,6 +667,12 @@ func handleMux(_Q_ *qpp.QuantumPermutationPad, conn net.Conn, config *Config) {
 		}
 
 		go func(p1 *smux.Stream) {
+			defer func() {
+				if r := recover(); r != nil {
+					logging.Errorf("KCP stream multiplexer goroutine panicked: %v", r)
+				}
+			}()
+
 			var p2 net.Conn
 			var err error
 

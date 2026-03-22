@@ -40,6 +40,12 @@ func DisconnectAllAgents() {
 		if ctrl.Cancel != nil {
 			ctrl.Cancel()
 		}
+
+		// End DB session tracking
+		if err := EndSession(agent.UUID); err != nil {
+			logging.Debugf("Failed to end session for %s: %v", agent.UUID, err)
+		}
+
 		return true
 	})
 
