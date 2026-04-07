@@ -147,7 +147,7 @@ import "github.com/jm33-m0/emp3r0r/core/lib/testutil"
 func TestExample(t *testing.T) {
     tmpDir := testutil.TempDir(t)
     filePath := testutil.CreateTempFile(t, tmpDir, "test.txt", "content")
-    
+
     testutil.AssertEqual(t, result, expected)
     testutil.AssertNoError(t, err)
 }
@@ -200,10 +200,12 @@ For cryptographic and security-sensitive functions:
 ## CI/CD Integration
 
 Tests run automatically on:
+
 - Push to main/master/develop branches
 - Pull requests to main/master/develop branches
 
 The CI pipeline:
+
 - Tests on multiple Go versions (1.21, 1.22, 1.23)
 - Tests on multiple platforms (Linux, macOS, Windows)
 - Runs race detector
@@ -247,6 +249,7 @@ If `-race` flag causes failures, investigate concurrent access to shared variabl
 ### Coverage Too Low
 
 Focus on:
+
 1. Error paths that aren't tested
 2. Edge cases
 3. Complex conditional logic
@@ -254,6 +257,7 @@ Focus on:
 ### Import Cycle Errors
 
 If you get import cycle errors in tests:
+
 - Create a separate `_test` package
 - Example: `package util_test` instead of `package util`
 
@@ -267,6 +271,7 @@ If you get import cycle errors in tests:
 ## Contributing Tests
 
 When contributing code:
+
 1. Write tests for new functionality
 2. Ensure existing tests pass
 3. Add tests for bug fixes

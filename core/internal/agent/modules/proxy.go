@@ -18,13 +18,12 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
-	"github.com/posener/h2conn"
 )
 
 // PortFwdSession manage a port fwd session
 type PortFwdSession struct {
 	Addr   string // is a listener when `reverse` is set, a dialer when used normally
-	Conn   *h2conn.Conn
+	Conn   io.ReadWriteCloser
 	Ctx    context.Context
 	Cancel context.CancelFunc
 }
@@ -107,7 +106,7 @@ func PortFwd(addr, sessionID, protocol string, reverse bool, timeout int) (err e
 		session PortFwdSession
 
 		// connection
-		conn   *h2conn.Conn
+		conn   io.ReadWriteCloser
 		ctx    context.Context
 		cancel context.CancelFunc
 	)

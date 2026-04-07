@@ -4,18 +4,63 @@ import (
 	"github.com/fxamacker/cbor/v2"
 )
 
+const (
+	// Backward-compatible C2 route defaults used when older configs omit C2Routes.
+	DefaultC2RouteCheckin = "c2-checkin"
+	DefaultC2RouteMsg     = "c2-msg"
+	DefaultC2RouteFTP     = "c2-ftp"
+	DefaultC2RouteWWW     = "c2-www"
+	DefaultC2RouteProxy   = "c2-proxy"
+)
+
 func init() {
 	AESPassword = GenAESKey(MagicString)
 }
 
 // ReadCBORConfig read runtime variables from CBOR, and apply them
 func ReadCBORConfig(cborData []byte, config_to_write *Config) (err error) {
-	return cbor.Unmarshal(cborData, config_to_write)
+	if err = cbor.Unmarshal(cborData, config_to_write); err != nil {
+		return err
+	}
+	NormalizeC2Routes(&config_to_write.C2Routes)
+	if config_to_write.C2ChannelMode == "" {
+		config_to_write.C2ChannelMode = C2ChannelModeDefault
+	}
+	return nil
+}
+
+// NormalizeC2Routes fills missing C2 route names with backward-compatible defaults.
+func NormalizeC2Routes(routes *C2Routing) {
+	if routes == nil {
+		return
+	}
+	if routes.Checkin == "" {
+		routes.Checkin = DefaultC2RouteCheckin
+	}
+	if routes.Msg == "" {
+		routes.Msg = DefaultC2RouteMsg
+	}
+	if routes.FTP == "" {
+		routes.FTP = DefaultC2RouteFTP
+	}
+	if routes.WWW == "" {
+		routes.WWW = DefaultC2RouteWWW
+	}
+	if routes.Proxy == "" {
+		routes.Proxy = DefaultC2RouteProxy
+	}
 }
 
 const (
 	// Localhost represents the local loopback address
 	Localhost = "127.0.0.1"
+
+	// C2 channel modes select only the outer byte-stream wrapper.
+	// CBOR MsgAuth/MsgTunData stays authoritative for trust and routing.
+	C2ChannelModeDefault = "h2conn"
+
+	// Backward-compatible alias.
+	C2ChannelModeH2Conn = C2ChannelModeDefault
 )
 
 // C2Routing randomized names for each service
@@ -88,6 +133,9 @@ type Config struct {
 
 	// C2 Routing malleability
 	C2Routes C2Routing `cbor:"75,keyasint"`
+
+	// C2 channel wrapper mode: h2conn.
+	C2ChannelMode string `cbor:"76,keyasint"`
 
 	// Runtime state (not persisted in config file)
 	MyAgentToken *AgentToken `cbor:"-"` // Current AgentToken issued by C2

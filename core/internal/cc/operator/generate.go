@@ -79,6 +79,7 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 		CDNProxy:         getStringOpt(cmd, "cdn"),
 		C2TransportProxy: getStringOpt(cmd, "proxy"),
 		DoHServer:        getStringOpt(cmd, "doh"),
+		C2ChannelMode:    getStringOpt(cmd, "c2-channel-mode"),
 		InitialPeers:     getStringSliceOpt(cmd, "peers"),
 		P2PTransport:     getStringOpt(cmd, "p2p-transport"),
 	}

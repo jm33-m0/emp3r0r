@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/carapace-sh/carapace"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
@@ -634,6 +635,7 @@ func gen_agent_cmd() *cobra.Command {
 	genAgentCmd.Flags().StringP("cdn", "", "", "CDN proxy to reach C2, leave empty to disable. Example: wss://cdn.example.com/ws")
 	genAgentCmd.Flags().StringP("doh", "", "", "DNS over HTTPS server to use for DNS resolution, leave empty to disable. Example: https://1.1.1.1/dns-query")
 	genAgentCmd.Flags().StringP("proxy", "", "", "Hard coded proxy URL for agent's C2 transport, leave empty to disable. Example: socks5://127.0.0.1:9050")
+	genAgentCmd.Flags().StringP("c2-channel-mode", "", def.C2ChannelModeDefault, fmt.Sprintf("C2 channel wrapper mode. Available: %s", strings.Join(transport.AllC2ChannelModes(), ",")))
 	// Preflight configuration is now handled via emp3r0r.json (PreflightURL, PreflightIntervalMin/Max)
 	// See Wiki: Customizable-Transport for details.
 	genAgentCmd.Flags().BoolP("kcp", "", false, "Use KCP (secure UDP multiplexed tunnel)")
@@ -651,13 +653,14 @@ func gen_agent_cmd() *cobra.Command {
 
 	// completers
 	carapace.Gen(genAgentCmd).FlagCompletion(carapace.ActionMap{
-		"type":          carapace.ActionValues(PayloadTypeList...),
-		"arch":          carapace.ActionValues(Arch_List_All...),
-		"cc":            carapace.ActionValues(cc_hosts...),
-		"cdn":           carapace.ActionValues("wss://", "ws://"),
-		"doh":           carapace.ActionValues("https://1.1.1.1/dns-query", "https://8.8.8.8/dns-query", "https://9.9.9.9/dns-query"),
-		"proxy":         carapace.ActionValues("socks5://127.0.0.1:9050", "socks5://"),
-		"p2p-transport": carapace.ActionValues(transport.AllTransportNames()...),
+		"type":            carapace.ActionValues(PayloadTypeList...),
+		"arch":            carapace.ActionValues(Arch_List_All...),
+		"cc":              carapace.ActionValues(cc_hosts...),
+		"cdn":             carapace.ActionValues("wss://", "ws://"),
+		"doh":             carapace.ActionValues("https://1.1.1.1/dns-query", "https://8.8.8.8/dns-query", "https://9.9.9.9/dns-query"),
+		"proxy":           carapace.ActionValues("socks5://127.0.0.1:9050", "socks5://"),
+		"c2-channel-mode": carapace.ActionValues(transport.AllC2ChannelModes()...),
+		"p2p-transport":   carapace.ActionValues(transport.AllTransportNames()...),
 	})
 	return genAgentCmd
 }

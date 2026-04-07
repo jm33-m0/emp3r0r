@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"sync"
 
@@ -14,6 +15,7 @@ import (
 // Shared server variables and globals
 var (
 	EmpTLSServer       *http.Server
+	EmpTLSListener     net.Listener
 	EmpTLSServerCtx    context.Context
 	EmpTLSServerCancel context.CancelFunc
 	EmpKCPCtx          context.Context
@@ -24,6 +26,24 @@ var (
 	FTPStreams  sync.Map
 	PortFwds    sync.Map
 )
+
+// StopEmpTLSServer stops whichever C2 TLS endpoint is currently active.
+// It supports both HTTP-fronted and raw TLS listener modes.
+func StopEmpTLSServer() {
+	if EmpTLSServer != nil {
+		_ = EmpTLSServer.Shutdown(EmpTLSServerCtx)
+		EmpTLSServer = nil
+	}
+	if EmpTLSServerCancel != nil {
+		EmpTLSServerCancel()
+		EmpTLSServerCancel = nil
+	}
+	if EmpTLSListener != nil {
+		_ = EmpTLSListener.Close()
+		EmpTLSListener = nil
+	}
+	EmpTLSServerCtx = nil
+}
 
 // StreamHandler allows the HTTP handler to use CBOR-encapsulated streams.
 type StreamHandler struct {

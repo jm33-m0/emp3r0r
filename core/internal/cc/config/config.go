@@ -55,6 +55,7 @@ func SaveConfigJSON() (err error) {
 		"jitter":                       live.RuntimeConfig.Jitter,
 		"is_run_by_stager":             live.RuntimeConfig.IsRunByStager,
 		"c2_routes":                    live.RuntimeConfig.C2Routes,
+		"c2_channel_mode":              live.RuntimeConfig.C2ChannelMode,
 	}
 
 	w_data, err := json.MarshalIndent(configMap, "", "  ")
@@ -80,6 +81,7 @@ func InitConfigFile(cc_host string) (err error) {
 	live.RuntimeConfig.KCPClientPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.StagerHTTPListenerPort = fmt.Sprintf("%v", util.RandInt(1026, 65534))
 	live.RuntimeConfig.CCTimeout = util.RandInt(10000, 20000)
+	live.RuntimeConfig.C2ChannelMode = def.C2ChannelModeDefault
 	live.RuntimeConfig.C2Routes.Checkin = "c2-" + strings.ToLower(util.RandStr(12))
 	live.RuntimeConfig.C2Routes.Msg = "c2-" + strings.ToLower(util.RandStr(12))
 	live.RuntimeConfig.C2Routes.FTP = "c2-" + strings.ToLower(util.RandStr(12))

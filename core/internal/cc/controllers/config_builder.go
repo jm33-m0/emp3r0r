@@ -9,6 +9,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -22,6 +23,7 @@ type AgentConfig struct {
 	CDNProxy         string
 	C2TransportProxy string
 	DoHServer        string
+	C2ChannelMode    string
 	IsP2PEnabled     bool
 	IsDirectC2       bool
 	IsNCSIEnabled    bool
@@ -106,6 +108,17 @@ func MakeConfig(opts AgentConfig) error {
 	if live.RuntimeConfig.DoHServer != "" {
 		logging.Infof("Using DoH server %s", live.RuntimeConfig.DoHServer)
 	}
+
+	if opts.C2ChannelMode != "" {
+		live.RuntimeConfig.C2ChannelMode = opts.C2ChannelMode
+	}
+	if live.RuntimeConfig.C2ChannelMode == "" {
+		live.RuntimeConfig.C2ChannelMode = def.C2ChannelModeDefault
+	}
+	if _, err := transport.GetC2ChannelWrapper(live.RuntimeConfig.C2ChannelMode); err != nil {
+		return fmt.Errorf("invalid c2-channel-mode: %s (available: %s)", live.RuntimeConfig.C2ChannelMode, strings.Join(transport.AllC2ChannelModes(), ","))
+	}
+	logging.Infof("Using C2 channel mode %s", live.RuntimeConfig.C2ChannelMode)
 
 	if live.RuntimeConfig.PaddingMin == 0 {
 		live.RuntimeConfig.PaddingMin = 1024

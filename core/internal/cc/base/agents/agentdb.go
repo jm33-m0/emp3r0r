@@ -234,8 +234,18 @@ func UpdateSessionHeartbeat(uuid string) error {
 
 	now := time.Now().Unix()
 	query := `UPDATE agent_sessions SET last_heartbeat = ? WHERE uuid = ?`
-	_, err := AgentDB.Exec(query, now, uuid)
-	return err
+	res, err := AgentDB.Exec(query, now, uuid)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return fmt.Errorf("session not found: %s", uuid)
+	}
+	return nil
 }
 
 // EndSession removes a session record for an agent

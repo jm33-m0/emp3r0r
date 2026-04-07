@@ -128,6 +128,7 @@ func TestSaveConfigJSON(t *testing.T) {
 		PaddingMin:           512,
 		PaddingMax:           4096,
 		Jitter:               10,
+		C2ChannelMode:        def.C2ChannelModeH2Conn,
 	}
 
 	// Test SaveConfigJSON
@@ -160,6 +161,9 @@ func TestSaveConfigJSON(t *testing.T) {
 	if loadedConfig.PaddingMax != 4096 {
 		t.Errorf("Loaded config mismatch. Expected PaddingMax 4096, got %d", loadedConfig.PaddingMax)
 	}
+	if loadedConfig.C2ChannelMode != def.C2ChannelModeH2Conn {
+		t.Errorf("Loaded config mismatch. Expected C2ChannelMode %s, got %s", def.C2ChannelModeH2Conn, loadedConfig.C2ChannelMode)
+	}
 }
 
 func TestSaveAndLoadConfigJSON(t *testing.T) {
@@ -169,6 +173,7 @@ func TestSaveAndLoadConfigJSON(t *testing.T) {
 		CCPort:               "5678",
 		AgentSocksServerPort: "9090",
 		Password:             "another_secret",
+		C2ChannelMode:        def.C2ChannelModeH2Conn,
 	}
 
 	// Mock EmpConfigFile
@@ -203,5 +208,42 @@ func TestSaveAndLoadConfigJSON(t *testing.T) {
 	}
 	if _, ok := raw["CCAddress"]; ok {
 		t.Errorf("Saved JSON contains 'CCAddress' key (should be snake_case). Content: %s", string(content))
+	}
+}
+
+func TestReadJSONConfigLoadsC2Routes(t *testing.T) {
+	jsonData := []byte(`{
+		"cc_address": "127.0.0.1",
+		"cc_port": "12345",
+		"agent_socks_server_port": "1080",
+		"c2_routes": {
+			"Checkin": "route-checkin",
+			"Msg": "route-msg",
+			"FTP": "route-ftp",
+			"WWW": "route-www",
+			"Proxy": "route-proxy"
+		}
+	}`)
+
+	loaded := &def.Config{}
+	err := readJSONConfig(jsonData, loaded)
+	if err != nil {
+		t.Fatalf("readJSONConfig failed: %v", err)
+	}
+
+	if loaded.C2Routes.Checkin != "route-checkin" {
+		t.Errorf("Expected C2Routes.Checkin route-checkin, got %s", loaded.C2Routes.Checkin)
+	}
+	if loaded.C2Routes.Msg != "route-msg" {
+		t.Errorf("Expected C2Routes.Msg route-msg, got %s", loaded.C2Routes.Msg)
+	}
+	if loaded.C2Routes.FTP != "route-ftp" {
+		t.Errorf("Expected C2Routes.FTP route-ftp, got %s", loaded.C2Routes.FTP)
+	}
+	if loaded.C2Routes.WWW != "route-www" {
+		t.Errorf("Expected C2Routes.WWW route-www, got %s", loaded.C2Routes.WWW)
+	}
+	if loaded.C2Routes.Proxy != "route-proxy" {
+		t.Errorf("Expected C2Routes.Proxy route-proxy, got %s", loaded.C2Routes.Proxy)
 	}
 }

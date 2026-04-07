@@ -86,6 +86,30 @@ func HandleFTPStream(conn io.ReadWriteCloser, token string, remoteAddr string, c
 	// Determine file paths and lookup StreamHandler.
 	filename := ""
 	var sh *network.StreamHandler
+	if v, ok := network.FTPStreams.Load("token:" + token); ok {
+		if stream, ok := v.(*network.StreamHandler); ok {
+			sh = stream
+		}
+	}
+	if sh != nil {
+		network.FTPStreams.Range(func(fname, value any) bool {
+			key, ok := fname.(string)
+			if !ok || strings.HasPrefix(key, "token:") {
+				return true
+			}
+			persh, ok := value.(*network.StreamHandler)
+			if !ok {
+				return true
+			}
+			if persh == sh {
+				filename = key
+				return false
+			}
+			return true
+		})
+	}
+
+	if filename == "" || sh == nil {
 	network.FTPStreams.Range(func(fname, value any) bool {
 		persh := value.(*network.StreamHandler)
 		if token == persh.Token {
@@ -95,6 +119,7 @@ func HandleFTPStream(conn io.ReadWriteCloser, token string, remoteAddr string, c
 		}
 		return true
 	})
+	}
 	if filename == "" || sh == nil {
 		logging.Errorf("Failed to parse filename for token %s", token)
 		conn.Close()
@@ -176,6 +201,7 @@ func HandleFTPStream(conn io.ReadWriteCloser, token string, remoteAddr string, c
 			}
 		}
 		network.FTPStreams.Delete(mapKey)
+		network.FTPStreams.Delete("token:" + token)
 		logging.Warningf("Closed FTP connection from %s", remoteAddr)
 		err = os.Remove(lock)
 		if err != nil {

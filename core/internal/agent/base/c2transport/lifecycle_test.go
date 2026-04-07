@@ -48,7 +48,7 @@ func assertInvalidCAIdentityRejected(t *testing.T, c2URL string, caCertData []by
 
 	certPool := x509.NewCertPool()
 	certPool.AppendCertsFromPEM(caCertData)
-	h2client := h2conn.Client{Client: &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: certPool, NextProtos: []string{"h2"}}, ForceAttemptHTTP2: true}}}
+	h2client := h2conn.Client{Client: &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: certPool, NextProtos: []string{"h2"}}, ForceAttemptHTTP2: true}}, Method: http.MethodPost}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -121,6 +121,7 @@ func TestFullAgentLifecycle(t *testing.T) {
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
 	transport.EmpWorkSpace = tmpDir
+	live.EmpWorkSpace = tmpDir
 
 	// Get random port
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -158,17 +159,9 @@ func TestFullAgentLifecycle(t *testing.T) {
 
 	// Start Real C2 Server
 	go server.StartC2AgentTLSServer()
-	defer func() {
-		if network.EmpTLSServer != nil {
-			network.EmpTLSServer.Shutdown(network.EmpTLSServerCtx)
-		}
-	}()
+	defer network.StopEmpTLSServer()
 	// Shutdown C2 Server on exit
-	defer func() {
-		if network.EmpTLSServer != nil {
-			network.EmpTLSServer.Shutdown(network.EmpTLSServerCtx)
-		}
-	}()
+	defer network.StopEmpTLSServer()
 
 	// Wait for server to start
 	time.Sleep(2 * time.Second)
@@ -472,6 +465,7 @@ func TestCheckinWithRandomPaths(t *testing.T) {
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
 	transport.EmpWorkSpace = tmpDir
+	live.EmpWorkSpace = tmpDir
 
 	// Get random port
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -496,13 +490,19 @@ func TestCheckinWithRandomPaths(t *testing.T) {
 		},
 	}
 
+	// Ensure this test uses an isolated fresh AgentDB handle.
+	if agents.AgentDB != nil {
+		_ = agents.CloseAgentDB()
+	}
+	dbPath := filepath.Join(tmpDir, "agents.db")
+	if err = agents.InitAgentDB(dbPath); err != nil {
+		t.Fatalf("Failed to initialize agent database: %v", err)
+	}
+	defer agents.CloseAgentDB()
+
 	// Start Real C2 Server
 	go server.StartC2AgentTLSServer()
-	defer func() {
-		if network.EmpTLSServer != nil {
-			network.EmpTLSServer.Shutdown(network.EmpTLSServerCtx)
-		}
-	}()
+	defer network.StopEmpTLSServer()
 
 	// Wait for server to start
 	time.Sleep(2 * time.Second)
@@ -559,6 +559,20 @@ func TestCheckinWithRandomPaths(t *testing.T) {
 		t.Fatalf("ReportStatus failed with random paths: %v", err)
 	}
 	t.Log("Successfully checked in with random paths")
+
+	// Check-in processing is async on server side. Wait until the agent is
+	// durably visible in AgentDB before opening FTP/WWW streams.
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		storedAgent, getErr := agents.GetStoredAgent(agentUUID)
+		if getErr == nil && storedAgent != nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("agent %s not persisted after check-in before FTP/WWW tests", agentUUID)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 }
 
 func TestDynamicPrefix(t *testing.T) {
@@ -600,6 +614,7 @@ func TestDynamicPrefix(t *testing.T) {
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
 	transport.EmpWorkSpace = tmpDir
+	live.EmpWorkSpace = tmpDir
 
 	// Get random port
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -624,11 +639,7 @@ func TestDynamicPrefix(t *testing.T) {
 
 	// Start Real C2 Server
 	go server.StartC2AgentTLSServer()
-	defer func() {
-		if network.EmpTLSServer != nil {
-			network.EmpTLSServer.Shutdown(network.EmpTLSServerCtx)
-		}
-	}()
+	defer network.StopEmpTLSServer()
 
 	// Wait for server to start
 	time.Sleep(2 * time.Second)
@@ -740,6 +751,7 @@ func TestCheckinWithRandomPaths_Strict(t *testing.T) {
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
 	transport.EmpWorkSpace = tmpDir
+	live.EmpWorkSpace = tmpDir
 
 	// Get random port
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -764,8 +776,19 @@ func TestCheckinWithRandomPaths_Strict(t *testing.T) {
 		},
 	}
 
+	// Ensure this test uses an isolated fresh AgentDB handle.
+	if agents.AgentDB != nil {
+		_ = agents.CloseAgentDB()
+	}
+	dbPath := filepath.Join(tmpDir, "agents.db")
+	if err = agents.InitAgentDB(dbPath); err != nil {
+		t.Fatalf("Failed to initialize agent database: %v", err)
+	}
+	defer agents.CloseAgentDB()
+
 	// Start Real C2 Server
 	go server.StartC2AgentTLSServer()
+	defer network.StopEmpTLSServer()
 
 	// Wait for server to start
 	time.Sleep(2 * time.Second)
@@ -822,6 +845,20 @@ func TestCheckinWithRandomPaths_Strict(t *testing.T) {
 		t.Fatalf("ReportStatus failed with random paths: %v", err)
 	}
 	t.Log("Successfully checked in with random paths")
+
+	// Check-in processing is async on server side. Wait until the agent is
+	// durably visible in AgentDB before opening FTP/WWW streams.
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		storedAgent, getErr := agents.GetStoredAgent(agentUUID)
+		if getErr == nil && storedAgent != nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("agent %s not persisted after check-in before FTP/WWW tests", agentUUID)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 
 	// --- FTP Upload Test Over CBOR ---
 	t.Log("Testing FTP upload over pure CBOR")

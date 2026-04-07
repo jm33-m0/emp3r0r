@@ -19,7 +19,8 @@ import (
 	"github.com/posener/h2conn"
 )
 
-// TestUnauthenticatedRequestRejection verifies that requests without valid auth headers are rejected.
+// TestUnauthenticatedRequestRejection verifies that sessions without a valid
+// CBOR MsgAuth envelope are rejected quickly by the protocol dispatcher.
 func TestUnauthenticatedRequestRejection(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "dispatcher_auth_test")
 	if err != nil {
@@ -74,75 +75,40 @@ func TestUnauthenticatedRequestRejection(t *testing.T) {
 	go StartC2AgentTLSServer()
 	time.Sleep(2 * time.Second)
 	defer func() {
-		// Shutdown
-		if network.EmpTLSServer != nil {
-			network.EmpTLSServer.Shutdown(network.EmpTLSServerCtx)
-		}
+		network.StopEmpTLSServer()
 	}()
 
-	// Setup HTTP Client
+	// Setup HTTP client for h2conn tunnel establishment
 	certPool := x509.NewCertPool()
 	certPool.AppendCertsFromPEM(caCertData)
-	tr := &http.Transport{
-		TLSClientConfig:   &tls.Config{RootCAs: certPool},
+	clientRaw := &http.Client{Transport: &http.Transport{
+		TLSClientConfig:   &tls.Config{RootCAs: certPool, NextProtos: []string{"h2"}},
 		ForceAttemptHTTP2: true,
-	}
-	client := &http.Client{Transport: tr}
+	}}
 
 	c2URL := fmt.Sprintf("https://127.0.0.1:%d", port)
 
-	// Test Cases: requests without auth headers should be rejected
-	testCases := []struct {
-		name           string
-		path           string
-		expectedStatus int
-	}{
-		{
-			name:           "www without auth",
-			path:           "/api/www/fake-agent-uuid?file_to_download=test.txt",
-			expectedStatus: http.StatusUnauthorized,
-		},
-		{
-			name:           "ftp without auth",
-			path:           "/api/ftp/fake-agent-uuid",
-			expectedStatus: http.StatusUnauthorized,
-		},
-		{
-			name:           "proxy without auth",
-			path:           "/api/proxy/fake-session-id",
-			expectedStatus: http.StatusUnauthorized,
-		},
+	h2 := h2conn.Client{Client: clientRaw, Method: http.MethodPost}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, _, err := h2.Connect(ctx, c2URL)
+	if err != nil {
+		t.Fatalf("Failed to establish h2 stream: %v", err)
+	}
+	defer conn.Close()
+
+	// Send invalid first frame (not SecureConn chunk, not MsgAuth).
+	if _, err = conn.Write([]byte("not-a-valid-msgauth-frame")); err != nil {
+		t.Fatalf("Failed to write invalid frame: %v", err)
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			url := c2URL + tc.path
-			// New protocol: use h2conn
-			h2 := h2conn.Client{Client: client}
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
-			conn, resp, err := h2.Connect(ctx, url)
-			if err != nil {
-				// Some rejections might happen at the H2 level
-				return
-			}
-			defer conn.Close()
-
-			if resp.StatusCode != http.StatusOK {
-				// Accepted rejections for ahora
-				return
-			}
-
-			// Try to read MsgAuth (server should close connection instead of sending one if unauthenticated)
-			// Use a short timer to avoid waiting for the full server-side handshake timeout (10s)
-			timer := time.AfterFunc(1*time.Second, func() {
-				conn.Close()
-			})
-			defer timer.Stop()
-			_, err = transport.NewSecureConn(conn).Read(make([]byte, 1)) // try to read 1 byte
-			if err == nil {
-				t.Errorf("Expected connection closure or error for unauthenticated request, but read succeeded")
-			}
-		})
+	timer := time.AfterFunc(2*time.Second, func() {
+		_ = conn.Close()
+	})
+	defer timer.Stop()
+	buf := make([]byte, 1)
+	_, err = conn.Read(buf)
+	if err == nil {
+		t.Fatalf("Expected server to terminate unauthenticated session, but read succeeded")
 	}
 }

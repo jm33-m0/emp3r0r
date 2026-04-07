@@ -20,10 +20,10 @@ type CommandHandler func(out []byte, target *def.Emp3r0rAgent) string
 var CommandHandlers sync.Map // map[string]CommandHandler
 
 func init() {
-	CommandHandlers.Store("ps", handlePS)
-	CommandHandlers.Store("ls", handleLS)
-	CommandHandlers.Store("stat", handleStat)
-	CommandHandlers.Store("sysinfo", handleSysInfo)
+	CommandHandlers.Store("ps", CommandHandler(handlePS))
+	CommandHandlers.Store("ls", CommandHandler(handleLS))
+	CommandHandlers.Store("stat", CommandHandler(handleStat))
+	CommandHandlers.Store("sysinfo", CommandHandler(handleSysInfo))
 }
 
 func handleSysInfo(out []byte, target *def.Emp3r0rAgent) string {
@@ -128,8 +128,15 @@ func processAgentData(data *def.MsgTunData) {
 	// Handle special command processing
 	lookupCmd := strings.TrimPrefix(resp.Command, "!")
 	if h, ok := CommandHandlers.Load(lookupCmd); ok {
-		handler := h.(CommandHandler)
-		resp.Output = handler([]byte(resp.Output), resp.Agent)
+		switch handler := h.(type) {
+		case CommandHandler:
+			resp.Output = handler([]byte(resp.Output), resp.Agent)
+		case func([]byte, *def.Emp3r0rAgent) string:
+			// Backward-compatible fallback in case a handler was stored without type conversion.
+			resp.Output = handler([]byte(resp.Output), resp.Agent)
+		default:
+			logging.Warningf("Ignoring command handler for %q: unsupported type %T", lookupCmd, h)
+		}
 	}
 
 	// Sanitize command output before rendering (Response field may contain untrusted output)

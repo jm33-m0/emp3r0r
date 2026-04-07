@@ -103,6 +103,7 @@ func TestEstablishC2Connection(t *testing.T) {
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
 	transport.EmpWorkSpace = tmpDir
+	live.EmpWorkSpace = tmpDir
 
 	// Get random port
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -331,6 +332,7 @@ func TestDuplicatedCheckin(t *testing.T) {
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
 	transport.EmpWorkSpace = tmpDir
+	live.EmpWorkSpace = tmpDir
 
 	// Get random port
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -507,6 +509,7 @@ func TestBackslashTag(t *testing.T) {
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
 	transport.EmpWorkSpace = tmpDir
+	live.EmpWorkSpace = tmpDir
 
 	// Get random port
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -631,6 +634,7 @@ func TestEmptyUUID(t *testing.T) {
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
 	transport.EmpWorkSpace = tmpDir
+	live.EmpWorkSpace = tmpDir
 
 	// Get random port
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -754,6 +758,7 @@ func TestNewAgentCheckin(t *testing.T) {
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
 	transport.EmpWorkSpace = tmpDir
+	live.EmpWorkSpace = tmpDir
 
 	// Get random port
 	listener, err := net.Listen("tcp", "127.0.0.1:0")

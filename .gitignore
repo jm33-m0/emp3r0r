@@ -278,3 +278,7 @@ project_knowledge.md
 *.sqlite3-*
 *.db
 *.db-*
+
+# shellcode stager binaries
+core/modules/shellcode_stager/downloader
+core/modules/shellcode_stager/stager

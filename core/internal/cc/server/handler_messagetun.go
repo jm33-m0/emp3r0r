@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"strconv"
 	"sync"
@@ -28,6 +29,7 @@ const maxCmdResultCacheBytes = 1024 * 1024 // 1 MiB
 func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decoder, remoteAddr string, baseCtx context.Context) {
 	// Session identity is payload-authoritative.
 	authAgentUUID := ""
+	sessionStarted := false
 	var (
 		lastHandshake int64
 		err           error
@@ -66,7 +68,7 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			var msgAuth def.MsgAuth
 			if err = cbor.Unmarshal(raw, &msgAuth); err == nil && msgAuth.Type == def.MsgAuthType {
 				if err = transport.VerifyMsgAuth(&msgAuth); err != nil {
-					logging.Warningf("handleMessageTunnel: MsgAuth verify failed from %s: %v", remoteAddr, err)
+					logging.Errorf("CRITICAL: handleMessageTunnel: MsgAuth verify failed from %s: %v", remoteAddr, err)
 					return
 				}
 
@@ -74,7 +76,7 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 				nonceKey := msgAuth.AgentUUID + ":" + msgAuth.Nonce
 				if prev, loaded := replayNonceCache.Load(nonceKey); loaded {
 					if prevTS, okTS := prev.(int64); okTS && abs64(now-prevTS) <= transport.ReplayWindowSeconds {
-						logging.Warningf("handleMessageTunnel: MsgAuth replay detected for %s", strconv.Quote(msgAuth.AgentUUID))
+						logging.Errorf("CRITICAL: handleMessageTunnel: MsgAuth replay detected for %s", strconv.Quote(msgAuth.AgentUUID))
 						return
 					}
 				}
@@ -82,44 +84,60 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 
 				authAgentUUID = msgAuth.AgentUUID
 				if agents.AgentDB == nil {
-					logging.Warningf("handleMessageTunnel: AgentDB unavailable for trust decision")
+					logging.Errorf("CRITICAL: handleMessageTunnel: AgentDB unavailable for trust decision")
 					return
 				}
 				pinnedKey, pinnedUUIDSig, found, lookupErr := agents.GetPinnedIdentity(authAgentUUID)
 				if lookupErr != nil {
-					logging.Warningf("handleMessageTunnel: MsgAuth trust lookup failed for %s: %v", strconv.Quote(authAgentUUID), lookupErr)
+					logging.Errorf("CRITICAL: handleMessageTunnel: MsgAuth trust lookup failed for %s: %v", strconv.Quote(authAgentUUID), lookupErr)
 					return
 				}
 				if !found {
-					logging.Warningf("handleMessageTunnel: MsgAuth unknown agent %s", strconv.Quote(authAgentUUID))
+					logging.Errorf("CRITICAL: handleMessageTunnel: MsgAuth unknown agent %s", strconv.Quote(authAgentUUID))
 					return
 				}
 				if pinnedUUIDSig != "" && msgAuth.IdentityToken != "" && pinnedUUIDSig != msgAuth.IdentityToken {
-					logging.Warningf("handleMessageTunnel: MsgAuth token mismatch for %s", strconv.Quote(authAgentUUID))
+					logging.Errorf("CRITICAL: handleMessageTunnel: MsgAuth token mismatch for %s", strconv.Quote(authAgentUUID))
 					return
 				}
 				if pinnedKey == "" {
-					logging.Warningf("handleMessageTunnel: MsgAuth missing pinned key for %s", strconv.Quote(authAgentUUID))
+					logging.Errorf("CRITICAL: handleMessageTunnel: MsgAuth missing pinned key for %s", strconv.Quote(authAgentUUID))
 					return
 				}
 				if msgAuth.AgentProof == "" {
-					logging.Warningf("handleMessageTunnel: MsgAuth missing agent proof for %s", strconv.Quote(authAgentUUID))
+					logging.Errorf("CRITICAL: handleMessageTunnel: MsgAuth missing agent proof for %s", strconv.Quote(authAgentUUID))
 					return
 				}
 				proof, decodeErr := base64.URLEncoding.DecodeString(msgAuth.AgentProof)
 				if decodeErr != nil {
-					logging.Warningf("handleMessageTunnel: MsgAuth bad proof encoding for %s: %v", strconv.Quote(authAgentUUID), decodeErr)
+					logging.Errorf("CRITICAL: handleMessageTunnel: MsgAuth bad proof encoding for %s: %v", strconv.Quote(authAgentUUID), decodeErr)
 					return
 				}
 				canonical := transport.CanonicalAuthString(msgAuth.AgentUUID, msgAuth.Timestamp, msgAuth.Nonce, msgAuth.Capabilities)
 				proofOK, proofErr := transport.VerifySignatureWithPEM([]byte(pinnedKey), []byte(canonical), proof)
 				if proofErr != nil || !proofOK {
-					logging.Warningf("handleMessageTunnel: MsgAuth pinned key proof failed for %s: %v", strconv.Quote(authAgentUUID), proofErr)
+					logging.Errorf("CRITICAL: handleMessageTunnel: MsgAuth pinned key proof failed for %s: %v", strconv.Quote(authAgentUUID), proofErr)
 					return
 				}
 				if hbErr := agents.UpdateSessionHeartbeat(authAgentUUID); hbErr != nil {
-					logging.Warningf("handleMessageTunnel: session heartbeat failed for %s: %v", strconv.Quote(authAgentUUID), hbErr)
+					logging.Errorf("CRITICAL: handleMessageTunnel: session heartbeat failed for %s: %v", strconv.Quote(authAgentUUID), hbErr)
 					return
+				}
+
+				// SECURITY: Enforce duplicate session prevention on first authenticated MsgAuth.
+				// Each UUID is limited to exactly one live session across all routes.
+				if !sessionStarted {
+					sessionID := fmt.Sprintf("%d", time.Now().UnixNano())
+					sessionErr := agents.StartSession(authAgentUUID, sessionID, remoteAddr)
+					if sessionErr != nil {
+						if errors.Is(sessionErr, agents.ErrSessionAlreadyActive) {
+							logging.Errorf("CRITICAL: handleMessageTunnel: duplicate live session blocked for %s from %s", strconv.Quote(authAgentUUID), remoteAddr)
+							return
+						}
+						logging.Errorf("CRITICAL: handleMessageTunnel: session admission failed for %s: %v", strconv.Quote(authAgentUUID), sessionErr)
+						return
+					}
+					sessionStarted = true
 				}
 
 				continue
@@ -128,19 +146,19 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			var msg def.MsgTunData
 			err = cbor.Unmarshal(raw, &msg)
 			if err != nil {
-				logging.Warningf("handleMessageTunnel: decode MsgTunData failed: %v", err)
+				logging.Errorf("CRITICAL: handleMessageTunnel: decode MsgTunData failed: %v", err)
 				return
 			}
 			if authAgentUUID == "" {
 				resolvedUUID, authErr := validateInitialMsgIdentity(&msg)
 				if authErr != nil {
-					logging.Warningf("handleMessageTunnel: initial MsgTunData identity rejected: %v", authErr)
+					logging.Errorf("CRITICAL: handleMessageTunnel: initial MsgTunData identity rejected: %v", authErr)
 					return
 				}
 				authAgentUUID = resolvedUUID
 			}
 			if hbErr := agents.UpdateSessionHeartbeat(authAgentUUID); hbErr != nil {
-				logging.Warningf("handleMessageTunnel: session heartbeat failed for %s: %v", strconv.Quote(authAgentUUID), hbErr)
+				logging.Errorf("CRITICAL: handleMessageTunnel: session heartbeat failed for %s: %v", strconv.Quote(authAgentUUID), hbErr)
 				return
 			}
 			// Sanitize agent metadata at trust boundary (after CBOR decode)
@@ -155,11 +173,11 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 
 			// SECURITY: prevent session hijacking where authenticated Agent A tries to send CBOR for Agent B
 			if msg.AgentUUID != "" && msg.AgentUUID != authAgentUUID {
-				logging.Warningf("SECURITY: Agent %s attempted to hijack session for UUID %s", strconv.Quote(authAgentUUID), strconv.Quote(msg.AgentUUID))
+				logging.Errorf("CRITICAL: SECURITY: Agent %s attempted to hijack session for UUID %s", strconv.Quote(authAgentUUID), strconv.Quote(msg.AgentUUID))
 				return
 			}
 			if msg.Tag != "" && msg.Tag != agent.Tag {
-				logging.Warningf("SECURITY: Agent %s attempted to hijack session for Tag %s", strconv.Quote(authAgentUUID), strconv.Quote(msg.Tag))
+				logging.Errorf("CRITICAL: SECURITY: Agent %s attempted to hijack session for Tag %s", strconv.Quote(authAgentUUID), strconv.Quote(msg.Tag))
 				return
 			}
 

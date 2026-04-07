@@ -5,16 +5,58 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // HandlePortFwdStream natively handles port forwarding over a pure io.ReadWriteCloser stream.
-func HandlePortFwdStream(sh *StreamHandler, conn io.ReadWriteCloser, token string, remoteAddr string, cancel context.CancelFunc) {
+func HandlePortFwdStream(sh *StreamHandler, conn io.ReadWriteCloser, agentUUID string, token string, remoteAddr string, cancel context.CancelFunc) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		logging.Errorf("HandlePortFwdStream: blocked proxy stream from %s with empty token", remoteAddr)
+		cancel()
+		conn.Close()
+		return
+	}
+
+	if agentUUID == "" {
+		logging.Errorf("HandlePortFwdStream: blocked proxy stream from %s with empty agentUUID", remoteAddr)
+		cancel()
+		conn.Close()
+		return
+	}
+
+	// SECURITY: Verify that agent is enrolled and has an active session.
+	// Auxiliary routes (FTP, Proxy, WWW) are sub-operations of the main agent session.
+	if agents.AgentDB == nil {
+		logging.Errorf("HandlePortFwdStream: AgentDB unavailable for %s from %s", strconv.Quote(agentUUID), remoteAddr)
+		cancel()
+		conn.Close()
+		return
+	}
+	pinnedKey, _, found, lookupErr := agents.GetPinnedIdentity(agentUUID)
+	if lookupErr != nil {
+		logging.Warningf("HandlePortFwdStream: AgentDB lookup failed for %s from %s: %v", strconv.Quote(agentUUID), remoteAddr, lookupErr)
+		cancel()
+		conn.Close()
+		return
+	}
+	if !found || pinnedKey == "" {
+		logging.Warningf("HandlePortFwdStream: agent %s not enrolled or has empty pinned key from %s", strconv.Quote(agentUUID), remoteAddr)
+		cancel()
+		conn.Close()
+		return
+	}
+
+	// Update heartbeat to show activity on this auxiliary channel
+	_ = agents.UpdateSessionHeartbeat(agentUUID)
+
 	sh.Secure = conn
 	sh.Token = token
 	sh.Ctx, sh.Cancel = context.WithCancel(context.Background())
@@ -56,19 +98,34 @@ func HandlePortFwdStream(sh *StreamHandler, conn io.ReadWriteCloser, token strin
 	origToken := token
 	isSubSession := strings.Contains(token, "_")
 	if isSubSession {
-		token = strings.Split(token, "_")[0]
+		parts := strings.SplitN(token, "_", 2)
+		token = parts[0]
+		if token == "" {
+			logging.Errorf("HandlePortFwdStream: malformed proxy token %q from %s", origToken, remoteAddr)
+			cancel()
+			conn.Close()
+			return
+		}
 	}
 	sessionID, err := uuid.Parse(token)
 	if err != nil {
 		logging.Errorf("Parse UUID failed from %s: %v", remoteAddr, err)
+		cancel()
+		conn.Close()
 		return
 	}
 	val, exist := PortFwds.Load(sessionID.String())
 	if !exist {
 		logging.Debugf("Port mapping session %s unknown. Did you remove it?", sessionID.String())
+		cancel()
+		conn.Close()
 		return
 	}
 	pf := val.(*PortFwdSession)
+	if pf.Ctx == nil || pf.Cancel == nil {
+		// Session may come from operator registration and miss runtime context fields.
+		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
+	}
 	if pf.Sh == nil {
 		pf.Sh = make(map[string]*StreamHandler)
 	}
@@ -94,11 +151,13 @@ func HandlePortFwdStream(sh *StreamHandler, conn io.ReadWriteCloser, token strin
 	}
 
 	// Signal that Sh map is ready (close channel to wake up waiters)
-	select {
-	case <-pf.ShReady:
-		// Already closed, ignore
-	default:
-		close(pf.ShReady)
+	if pf.ShReady != nil {
+		select {
+		case <-pf.ShReady:
+			// Already closed, ignore
+		default:
+			close(pf.ShReady)
+		}
 	}
 	defer func() {
 		err := sh.Close()
@@ -109,18 +168,22 @@ func HandlePortFwdStream(sh *StreamHandler, conn io.ReadWriteCloser, token strin
 		if origToken != sessionID.String() {
 			sh.Cancel()
 			logging.Debugf("Closed sub-connection %s", origToken)
+			_ = agents.UpdateSessionHeartbeat(agentUUID)
 			return
 		}
 		if val, exist := PortFwds.Load(sessionID.String()); exist {
 			pf := val.(*PortFwdSession)
-			pf.Cancel()
+			if pf.Cancel != nil {
+				pf.Cancel()
+			}
 		} else {
 			logging.Debugf("Port mapping %s not found (likely deleted)", sessionID.String())
 		}
 		sh.Cancel()
+		_ = agents.UpdateSessionHeartbeat(agentUUID)
 		logging.Debugf("Closed port forwarding connection from %s", remoteAddr)
 	}()
-	for pf.Ctx.Err() == nil {
+	for pf.Ctx != nil && pf.Ctx.Err() == nil {
 		_, exist := PortFwds.Load(sessionID.String())
 		if !exist {
 			logging.Warningf("Port mapping %s disconnected", sessionID.String())
@@ -144,13 +207,19 @@ func DeletePortFwdSession(sessionID string) error {
 	session := val.(*PortFwdSession)
 
 	// Tell agent to delete the port mapping
-	err := session.SendCmdFunc(fmt.Sprintf("%s --id %s", def.C2CmdDeletePortFwd, sessionID), "", session.Agent.Tag)
+	agentTag := ""
+	if session.Agent != nil {
+		agentTag = session.Agent.Tag
+	}
+	err := session.SendCmdFunc(fmt.Sprintf("%s --id %s", def.C2CmdDeletePortFwd, sessionID), "", agentTag)
 	if err != nil {
-		logging.Warningf("Tell agent %s to delete port mapping %s: %v", session.Agent.Tag, sessionID, err)
+		logging.Warningf("Tell agent %s to delete port mapping %s: %v", agentTag, sessionID, err)
 	}
 
 	// Cancel and delete locally
-	session.Cancel()
+	if session.Cancel != nil {
+		session.Cancel()
+	}
 	PortFwds.Delete(sessionID)
 
 	if session.UnregisterFunc != nil {

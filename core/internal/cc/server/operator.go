@@ -244,18 +244,56 @@ func handleRegisterPortFwd(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Register session in server's map
-	network.PortFwds.Store(pfReq.SessionID, &network.PortFwdSession{
-		Lport:       pfReq.Lport,
-		To:          pfReq.To,
-		Description: pfReq.Description,
-		Protocol:    pfReq.Protocol,
-		Reverse:     pfReq.IsReverse,
-		Agent: &def.Emp3r0rAgent{
-			Tag: pfReq.AgentTag,
-		},
-		ShReady: make(chan struct{}),
-	})
+	// Register session in server's map.
+	// If a runtime session already exists, update metadata in-place instead of replacing
+	// the object, so we don't drop live fields like Ctx/Cancel/Sh and crash stream handling.
+	if existing, ok := network.PortFwds.Load(pfReq.SessionID); ok {
+		if pf, ok := existing.(*network.PortFwdSession); ok && pf != nil {
+			pf.Lport = pfReq.Lport
+			pf.To = pfReq.To
+			pf.Description = pfReq.Description
+			pf.Protocol = pfReq.Protocol
+			pf.Reverse = pfReq.IsReverse
+			if pf.Agent == nil {
+				pf.Agent = &def.Emp3r0rAgent{}
+			}
+			pf.Agent.Tag = pfReq.AgentTag
+			if pf.ShReady == nil {
+				pf.ShReady = make(chan struct{})
+			}
+			if pf.Ctx == nil || pf.Cancel == nil {
+				pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
+			}
+		} else {
+			network.PortFwds.Store(pfReq.SessionID, &network.PortFwdSession{
+				Lport:       pfReq.Lport,
+				To:          pfReq.To,
+				Description: pfReq.Description,
+				Protocol:    pfReq.Protocol,
+				Reverse:     pfReq.IsReverse,
+				Agent: &def.Emp3r0rAgent{
+					Tag: pfReq.AgentTag,
+				},
+				ShReady: make(chan struct{}),
+				Ctx:     context.Background(),
+				Cancel:  func() {},
+			})
+		}
+	} else {
+		network.PortFwds.Store(pfReq.SessionID, &network.PortFwdSession{
+			Lport:       pfReq.Lport,
+			To:          pfReq.To,
+			Description: pfReq.Description,
+			Protocol:    pfReq.Protocol,
+			Reverse:     pfReq.IsReverse,
+			Agent: &def.Emp3r0rAgent{
+				Tag: pfReq.AgentTag,
+			},
+			ShReady: make(chan struct{}),
+			Ctx:     context.Background(),
+			Cancel:  func() {},
+		})
+	}
 
 	logging.Infof("Registered port mapping %s (%s) from operator", pfReq.SessionID, pfReq.Description)
 	wrt.WriteHeader(http.StatusOK)
