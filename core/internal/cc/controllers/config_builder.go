@@ -31,6 +31,9 @@ type AgentConfig struct {
 	IsStager         bool
 	P2PTransport     string
 	InitialPeers     []string
+	CCHTTPPort       string
+	PollInterval     int
+	Jitter           int
 }
 
 // MakeConfig takes the generalized AgentConfig options and orchestrates the
@@ -108,6 +111,16 @@ func MakeConfig(opts AgentConfig) error {
 	if live.RuntimeConfig.DoHServer != "" {
 		logging.Infof("Using DoH server %s", live.RuntimeConfig.DoHServer)
 	}
+	
+	// HTTP Port
+	if opts.CCHTTPPort != "" {
+		live.RuntimeConfig.CCHTTPPort = opts.CCHTTPPort
+	}
+	if live.RuntimeConfig.CCHTTPPort == "" {
+		live.RuntimeConfig.CCHTTPPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
+		logging.Warningf("HTTP port not set, randomized to %s", live.RuntimeConfig.CCHTTPPort)
+	}
+	logging.Infof("C2 HTTP port: %s", live.RuntimeConfig.CCHTTPPort)
 
 	if opts.C2ChannelMode != "" {
 		live.RuntimeConfig.C2ChannelMode = opts.C2ChannelMode
@@ -125,6 +138,16 @@ func MakeConfig(opts AgentConfig) error {
 	}
 	if live.RuntimeConfig.PaddingMax == 0 {
 		live.RuntimeConfig.PaddingMax = 10240
+	}
+	if opts.PollInterval > 0 {
+		live.RuntimeConfig.PollInterval = opts.PollInterval
+	}
+	if live.RuntimeConfig.PollInterval == 0 {
+		live.RuntimeConfig.PollInterval = 60
+	}
+
+	if opts.Jitter > 0 {
+		live.RuntimeConfig.Jitter = opts.Jitter
 	}
 	if live.RuntimeConfig.Jitter == 0 {
 		live.RuntimeConfig.Jitter = 20

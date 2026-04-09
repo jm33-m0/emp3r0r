@@ -82,6 +82,9 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 		C2ChannelMode:    getStringOpt(cmd, "c2-channel-mode"),
 		InitialPeers:     getStringSliceOpt(cmd, "peers"),
 		P2PTransport:     getStringOpt(cmd, "p2p-transport"),
+		CCHTTPPort:       getStringOpt(cmd, "cc-http-port"),
+		PollInterval:     getIntOpt(cmd, "interval"),
+		Jitter:           getIntOpt(cmd, "jitter"),
 	}
 
 	// Assign booleans only if they were explicitly changed, or default to current live.RuntimeConfig settings
@@ -172,6 +175,14 @@ func getStringOpt(cmd *cobra.Command, name string) string {
 		return val
 	}
 	return ""
+}
+
+func getIntOpt(cmd *cobra.Command, name string) int {
+	if cmd.Flags().Changed(name) {
+		val, _ := cmd.Flags().GetInt(name)
+		return val
+	}
+	return 0
 }
 
 func getStringSliceOpt(cmd *cobra.Command, name string) []string {

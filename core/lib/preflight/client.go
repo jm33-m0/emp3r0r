@@ -53,8 +53,12 @@ func Check(config *def.Config) bool {
 		return false
 	}
 
-	// 2. Prepare Request (POST)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(encrypted))
+	// 2. Prepare Request (POST or GET, based on config)
+	method := config.PreflightMethod
+	if method == "" {
+		method = "POST"
+	}
+	req, err := http.NewRequest(method, url, bytes.NewBuffer(encrypted))
 	if err != nil {
 		logging.Errorf("Preflight: NewRequest: %v", err)
 		return false

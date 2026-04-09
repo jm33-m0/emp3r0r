@@ -65,6 +65,17 @@ func CreateEmp3r0rHTTPClient(c2_addr, proxyServer string) *http.Client {
 		proxyDialer, _ = makeProxyDialer(proxyUrl, config, clientHelloIDMap["hellorandomizedalpn"])
 	}
 
+	// For plain HTTP, we do not need TLS camouflage or uTLS probes.
+	if c2url.Scheme == "http" {
+		logging.Infof("Using plain HTTP client for %s", c2url)
+		tr := httpRoundTripper.Clone()
+		if proxyServer != "" {
+			proxyUrl, _ := url.Parse(proxyServer)
+			tr.Proxy = http.ProxyURL(proxyUrl)
+		}
+		return &http.Client{Transport: tr}
+	}
+
 	// transport of our http client, with configured TLS client
 	try := 0
 init_transport:

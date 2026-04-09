@@ -129,6 +129,14 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 	}
 	logging.Debugf("cborProtocolDispatch: MsgAuth CA verified from %s", remoteAddr)
 
+	// ── Dispatch by Capabilities ──────────────────────────────────────────────
+	routeCtx, routeErr := normalizeRouteFromMsgAuth(&msgAuth)
+	if routeErr != nil {
+		logging.Errorf("CRITICAL: cborProtocolDispatch: invalid route capabilities for agent %s from %s: %v", strconv.Quote(msgAuth.AgentUUID), remoteAddr, routeErr)
+		return
+	}
+	logging.Debugf("cborProtocolDispatch: normalized route: service=%s agent=%s", routeCtx.Service, strconv.Quote(msgAuth.AgentUUID))
+
 	// ── Step ①.⑤: Pinned Key (TOFU) Verification ────────────────────────────
 	// Security decisions are DB-authoritative. Memory maps are runtime projections only.
 	if agents.AgentDB == nil {
@@ -139,6 +147,29 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 	if err != nil {
 		logging.Errorf("CRITICAL: cborProtocolDispatch: AgentDB lookup failed for %s from %s: %v", strconv.Quote(msgAuth.AgentUUID), remoteAddr, err)
 		return
+	}
+
+	// ── Wait for Check-in ────────────────────────────────────────────────────
+	// If the agent is unknown AND the route is NOT Checkin, someone might be
+	// enrolling right now. Wait for completion and re-check DB.
+	isCheckinRoute := routeCtx.Service == live.RuntimeConfig.C2Routes.Checkin
+	if !isKnown && !isCheckinRoute {
+		if val, exists := checkinReadyChannels.Load(msgAuth.AgentUUID); exists {
+			if ch, ok := val.(chan struct{}); ok {
+				logging.Debugf("cborProtocolDispatch: waiting for in-progress enrollment of %s", strconv.Quote(msgAuth.AgentUUID))
+				select {
+				case <-ch:
+					// Re-check DB after signal
+					pinnedKey, _, isKnown, err = agents.GetPinnedIdentity(msgAuth.AgentUUID)
+					if err != nil {
+						logging.Errorf("CRITICAL: cborProtocolDispatch: secondary AgentDB lookup failed for %s: %v", strconv.Quote(msgAuth.AgentUUID), err)
+						return
+					}
+				case <-time.After(15 * time.Second):
+					logging.Warningf("cborProtocolDispatch: timed out waiting for enrollment of %s", strconv.Quote(msgAuth.AgentUUID))
+				}
+			}
+		}
 	}
 
 	if isKnown {
@@ -163,6 +194,11 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 		}
 		logging.Debugf("cborProtocolDispatch: pinned key verified for agent %s", strconv.Quote(msgAuth.AgentUUID))
 	} else {
+		// Check-in is the only route allowed for unknown agents; all others require prior TOFU enrollment.
+		if !isCheckinRoute {
+			logging.Errorf("CRITICAL: cborProtocolDispatch: rejecting %s route for unknown agent %s from %s", routeCtx.Service, strconv.Quote(msgAuth.AgentUUID), remoteAddr)
+			return
+		}
 		logging.Debugf("cborProtocolDispatch: agent %s has no pinned identity in DB (first enrollment path)", strconv.Quote(msgAuth.AgentUUID))
 	}
 
@@ -184,20 +220,11 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 		return true
 	})
 
-	// ── Dispatch by Capabilities ──────────────────────────────────────────────
-	routeCtx, routeErr := normalizeRouteFromMsgAuth(&msgAuth)
-	if routeErr != nil {
-		logging.Errorf("CRITICAL: cborProtocolDispatch: invalid route capabilities for agent %s from %s: %v", strconv.Quote(msgAuth.AgentUUID), remoteAddr, routeErr)
-		return
-	}
-	logging.Infof("cborProtocolDispatch: service=%s agent=%s from %s", routeCtx.Service, strconv.Quote(msgAuth.AgentUUID), remoteAddr)
-
-	// Check-in is the only route allowed for unknown agents; all others require prior TOFU enrollment.
-	isCheckinRoute := routeCtx.Service == live.RuntimeConfig.C2Routes.Checkin
-	if !isKnown && !isCheckinRoute {
-		logging.Errorf("CRITICAL: cborProtocolDispatch: rejecting %s route for unknown agent %s from %s", routeCtx.Service, strconv.Quote(msgAuth.AgentUUID), remoteAddr)
-		return
-	}
+	// ── Handshake Complete ───────────────────────────────────────────────────
+	// Stop the handshake timer now that we have successfully verified the agent
+	// and are about to transition to a potentially persistent service handler.
+	timer.Stop()
+	logging.Debugf("cborProtocolDispatch: handshake complete, timer stopped for %s", strconv.Quote(msgAuth.AgentUUID))
 
 	switch routeCtx.Service {
 	case live.RuntimeConfig.C2Routes.Checkin:
@@ -207,7 +234,8 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 			readyChan := make(chan struct{})
 			checkinReadyChannels.Store(agentUUID, readyChan)
 		}
-		if err := handleAgentCheckInStream(dec, &msgAuth, agentUUID, remoteAddr); err != nil {
+		enc := cbor.NewEncoder(secureConn)
+		if err := handleAgentCheckInStream(dec, enc, &msgAuth, agentUUID, remoteAddr); err != nil {
 			logging.Errorf("CRITICAL: cborProtocolDispatch: checkin error for %s: %v", strconv.Quote(agentUUID), err)
 		}
 

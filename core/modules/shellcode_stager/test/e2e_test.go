@@ -167,9 +167,12 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	}
 
 	// Initialize live.RuntimeConfig for the C2 server
+	c2HttpPortStr := fmt.Sprintf("%d", c2Port+1)
 	live.RuntimeConfig = &def.Config{
-		CCPort: c2PortStr,
-		CAPEM:  string(caCertData),
+		CCPort:        c2PortStr,
+		CCHTTPPort:    c2HttpPortStr,
+		C2ChannelMode: "plain_http",
+		CAPEM:         string(caCertData),
 		C2Routes: def.C2Routing{
 			Checkin: "c2-checkin",
 			Msg:     "c2-msg",
@@ -178,8 +181,17 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 			Proxy:   "c2-proxy",
 		},
 		PreflightEnabled: true,
-		PreflightURL:     fmt.Sprintf("https://127.0.0.1:%s/preflight-test", c2PortStr),
-		PreflightMethod:  "POST",
+		PreflightURL:     fmt.Sprintf("http://127.0.0.1:%s/preflight-test", c2HttpPortStr),
+		PreflightMethod:  "GET",
+		MalleableC2: def.MalleableHTTPConfig{
+			C2Path:        "/api/v1/telemetry",
+			SessionHeader: "Cookie",
+			SessionValue:  "sessionID=%s",
+			InitHeader:    "Cookie",
+			InitValue:     "init=1",
+			CloseHeader:   "Cookie",
+			CloseValue:    "close=1",
+		},
 	}
 
 	// Reset live agent maps
@@ -200,9 +212,11 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 
 	// Create agent config
 	cfg := &def.Config{
-		CCAddress: "127.0.0.1",
-		CCPort:    c2PortStr,
-		CAPEM:     string(caCertData),
+		CCAddress:     "127.0.0.1",
+		CCPort:        c2PortStr,
+		CCHTTPPort:    c2HttpPortStr,
+		C2ChannelMode: "plain_http",
+		CAPEM:         string(caCertData),
 		C2Routes: def.C2Routing{
 			Checkin: "c2-checkin",
 			Msg:     "c2-msg",
@@ -216,8 +230,18 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 		ModulePath:       "", // Empty for anonymous memory loading in test
 		CCTimeout:        1000,
 		PreflightEnabled: true,
-		PreflightURL:     fmt.Sprintf("https://127.0.0.1:%s/preflight-test", c2PortStr),
+		PreflightURL:     fmt.Sprintf("http://127.0.0.1:%s/preflight-test", c2HttpPortStr),
+		PreflightMethod:  "GET",
 		IsRunByStager:    true,
+		MalleableC2: def.MalleableHTTPConfig{
+			C2Path:        "/api/v1/telemetry",
+			SessionHeader: "Cookie",
+			SessionValue:  "sessionID=%s",
+			InitHeader:    "Cookie",
+			InitValue:     "init=1",
+			CloseHeader:   "Cookie",
+			CloseValue:    "close=1",
+		},
 	}
 
 	// Serialize to CBOR
@@ -277,6 +301,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 		logging.Infof("Starting real C2 server on port %s", c2PortStr)
 		server.StartC2AgentTLSServer()
 	}()
+	go server.StartC2HTTPServer()
 
 	// Ensure server cleanup at end of test
 	defer func() {
@@ -425,8 +450,8 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	var agent *def.Emp3r0rAgent
 	for {
 		if time.Since(start) > timeout {
-			logging.Debugf("Loader Stdout:\n%s", stdout.String())
-			logging.Debugf("Loader Stderr:\n%s", stderr.String())
+			fmt.Printf("Loader Stdout:\n%s\n", stdout.String())
+			fmt.Printf("Loader Stderr:\n%s\n", stderr.String())
 			t.Fatalf("Timeout waiting for agent checkin")
 		}
 
@@ -450,8 +475,8 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 		select {
 		case err := <-doneChan:
 			logging.Errorf("Loader exited unexpectedly: %v", err)
-			logging.Debugf("Loader Stdout:\n%s", stdout.String())
-			logging.Debugf("Loader Stderr:\n%s", stderr.String())
+			fmt.Printf("Loader Stdout:\n%s\n", stdout.String())
+			fmt.Printf("Loader Stderr:\n%s\n", stderr.String())
 			t.Fatalf("Loader exited before checkin")
 		default:
 			// Continue polling

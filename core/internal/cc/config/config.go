@@ -18,47 +18,75 @@ import (
 
 // SaveConfigJSON save runtime config to emp3r0r.json
 func SaveConfigJSON() (err error) {
-	// Create a map to hold the config values with snake_case keys
-	configMap := map[string]any{
-		"cc_address":                   live.RuntimeConfig.CCAddress,
-		"cc_host":                      live.RuntimeConfig.CCHost,
-		"cc_port":                      live.RuntimeConfig.CCPort,
-		"agent_socks_server_port":      live.RuntimeConfig.AgentSocksServerPort,
-		"agent_socks_timeout":          live.RuntimeConfig.AgentSocksTimeout,
-		"stager_http_listener_port":    live.RuntimeConfig.StagerHTTPListenerPort,
-		"password":                     live.RuntimeConfig.Password,
-		"shadowsocks_local_socks_port": live.RuntimeConfig.ShadowsocksLocalSocksPort,
-		"shadowsocks_server_port":      live.RuntimeConfig.ShadowsocksServerPort,
-		"kcp_server_port":              live.RuntimeConfig.KCPServerPort,
-		"kcp_client_port":              live.RuntimeConfig.KCPClientPort,
-		"use_kcp":                      live.RuntimeConfig.UseKCP,
-		"enable_ncsi":                  live.RuntimeConfig.EnableNCSI,
-		"ssh_host_key":                 string(live.RuntimeConfig.SSHHostKey),
-		"bring2cc_reverse_proxy_port":  live.RuntimeConfig.Bring2CCReverseProxyPort,
-		"sshd_shell_port":              live.RuntimeConfig.SSHDShellPort,
-		"mesh_gossip_port":             live.RuntimeConfig.MeshGossipPort,
-		"preflight_enabled":            live.RuntimeConfig.PreflightEnabled,
-		"preflight_url":                live.RuntimeConfig.PreflightURL,
-		"preflight_method":             live.RuntimeConfig.PreflightMethod,
-		"preflight_headers":            live.RuntimeConfig.PreflightHeaders,
-		"ca_pem":                       live.RuntimeConfig.CAPEM,
-		"ca_fingerprint":               live.RuntimeConfig.CAFingerprint,
-		"c2_transport_proxy":           live.RuntimeConfig.C2TransportProxy,
-		"cdn_proxy":                    live.RuntimeConfig.CDNProxy,
-		"doh_server":                   live.RuntimeConfig.DoHServer,
-		"agent_uuid":                   live.RuntimeConfig.AgentUUID,
-		"agent_uuid_sig":               live.RuntimeConfig.AgentUUIDSig,
-		"agent_tag":                    live.RuntimeConfig.AgentTag,
-		"cc_timeout":                   live.RuntimeConfig.CCTimeout,
-		"padding_min":                  live.RuntimeConfig.PaddingMin,
-		"padding_max":                  live.RuntimeConfig.PaddingMax,
-		"jitter":                       live.RuntimeConfig.Jitter,
-		"is_run_by_stager":             live.RuntimeConfig.IsRunByStager,
-		"c2_routes":                    live.RuntimeConfig.C2Routes,
-		"c2_channel_mode":              live.RuntimeConfig.C2ChannelMode,
+	// Use shadow struct for JSON serialization to keep strings out of shared def package
+	jCfg := jsonConfig{
+		CCAddress:                 live.RuntimeConfig.CCAddress,
+		CCHost:                    live.RuntimeConfig.CCHost,
+		CCPort:                    live.RuntimeConfig.CCPort,
+		AgentSocksServerPort:      live.RuntimeConfig.AgentSocksServerPort,
+		AgentSocksTimeout:         live.RuntimeConfig.AgentSocksTimeout,
+		StagerHTTPListenerPort:    live.RuntimeConfig.StagerHTTPListenerPort,
+		Password:                  live.RuntimeConfig.Password,
+		ShadowsocksLocalSocksPort: live.RuntimeConfig.ShadowsocksLocalSocksPort,
+		ShadowsocksServerPort:     live.RuntimeConfig.ShadowsocksServerPort,
+		KCPServerPort:             live.RuntimeConfig.KCPServerPort,
+		KCPClientPort:             live.RuntimeConfig.KCPClientPort,
+		UseKCP:                    live.RuntimeConfig.UseKCP,
+		EnableNCSI:                live.RuntimeConfig.EnableNCSI,
+		SSHHostKey:                string(live.RuntimeConfig.SSHHostKey),
+		Bring2CCReverseProxyPort:  live.RuntimeConfig.Bring2CCReverseProxyPort,
+		SSHDShellPort:             live.RuntimeConfig.SSHDShellPort,
+		MeshGossipPort:            live.RuntimeConfig.MeshGossipPort,
+		PreflightEnabled:          live.RuntimeConfig.PreflightEnabled,
+		PreflightURL:              live.RuntimeConfig.PreflightURL,
+		PreflightMethod:           live.RuntimeConfig.PreflightMethod,
+		PreflightHeaders:          live.RuntimeConfig.PreflightHeaders,
+		PreflightIntervalMin:      live.RuntimeConfig.PreflightIntervalMin,
+		PreflightIntervalMax:      live.RuntimeConfig.PreflightIntervalMax,
+		CAPEM:                     live.RuntimeConfig.CAPEM,
+		CAFingerprint:             live.RuntimeConfig.CAFingerprint,
+		C2TransportProxy:          live.RuntimeConfig.C2TransportProxy,
+		CDNProxy:                  live.RuntimeConfig.CDNProxy,
+		DoHServer:                 live.RuntimeConfig.DoHServer,
+		AgentUUID:                 live.RuntimeConfig.AgentUUID,
+		AgentUUIDSig:              live.RuntimeConfig.AgentUUIDSig,
+		AgentTag:                  live.RuntimeConfig.AgentTag,
+		CCTimeout:                 live.RuntimeConfig.CCTimeout,
+		PaddingMin:                live.RuntimeConfig.PaddingMin,
+		PaddingMax:                live.RuntimeConfig.PaddingMax,
+		Jitter:                    live.RuntimeConfig.Jitter,
+		PollInterval:              live.RuntimeConfig.PollInterval,
+		ModulePath:                live.RuntimeConfig.ModulePath,
+		IsRunByStager:             live.RuntimeConfig.IsRunByStager,
+		MachineID:                 live.RuntimeConfig.MachineID,
+		InitialPeers:              live.RuntimeConfig.InitialPeers,
+		IsP2PEnabled:              live.RuntimeConfig.IsP2PEnabled,
+		IsDirectC2Enabled:         live.RuntimeConfig.IsDirectC2Enabled,
+		P2PTransport:              live.RuntimeConfig.P2PTransport,
+		CamouflageCertOrg:         live.RuntimeConfig.CamouflageCertOrg,
+		CamouflageCertCN:          live.RuntimeConfig.CamouflageCertCN,
+		C2ChannelMode:             live.RuntimeConfig.C2ChannelMode,
+		CCHTTPPort:                live.RuntimeConfig.CCHTTPPort,
+		C2Routes: jsonC2Routing{
+			Checkin: live.RuntimeConfig.C2Routes.Checkin,
+			Msg:     live.RuntimeConfig.C2Routes.Msg,
+			FTP:     live.RuntimeConfig.C2Routes.FTP,
+			WWW:     live.RuntimeConfig.C2Routes.WWW,
+			Proxy:   live.RuntimeConfig.C2Routes.Proxy,
+		},
+		MalleableC2: jsonMalleableHTTPConfig{
+			C2Path:        live.RuntimeConfig.MalleableC2.C2Path,
+			SessionHeader: live.RuntimeConfig.MalleableC2.SessionHeader,
+			SessionValue:  live.RuntimeConfig.MalleableC2.SessionValue,
+			InitHeader:    live.RuntimeConfig.MalleableC2.InitHeader,
+			InitValue:     live.RuntimeConfig.MalleableC2.InitValue,
+			CloseHeader:   live.RuntimeConfig.MalleableC2.CloseHeader,
+			CloseValue:    live.RuntimeConfig.MalleableC2.CloseValue,
+			CustomHeaders: live.RuntimeConfig.MalleableC2.CustomHeaders,
+		},
 	}
 
-	w_data, err := json.MarshalIndent(configMap, "", "  ")
+	w_data, err := json.MarshalIndent(jCfg, "", "  ")
 	if err != nil {
 		return fmt.Errorf("saving %s: %v", live.EmpConfigFile, err)
 	}
@@ -72,6 +100,7 @@ func InitConfigFile(cc_host string) (err error) {
 	live.RuntimeConfig.CCAddress = cc_host
 	live.RuntimeConfig.CCHost = cc_host
 	live.RuntimeConfig.CCPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
+	live.RuntimeConfig.CCHTTPPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.AgentSocksServerPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.MeshGossipPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.SSHDShellPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
@@ -131,6 +160,21 @@ func InitConfigFile(cc_host string) (err error) {
 	}
 	if live.RuntimeConfig.Jitter == 0 {
 		live.RuntimeConfig.Jitter = 20
+	}
+	if live.RuntimeConfig.PollInterval == 0 {
+		live.RuntimeConfig.PollInterval = 60
+	}
+
+	// Malleable C2 Defaults
+	live.RuntimeConfig.MalleableC2.C2Path = "/api/v1/telemetry"
+	live.RuntimeConfig.MalleableC2.SessionHeader = "Cookie"
+	live.RuntimeConfig.MalleableC2.SessionValue = "sessionID=%s"
+	live.RuntimeConfig.MalleableC2.InitHeader = "Cookie"
+	live.RuntimeConfig.MalleableC2.InitValue = "init=1"
+	live.RuntimeConfig.MalleableC2.CloseHeader = "Cookie"
+	live.RuntimeConfig.MalleableC2.CloseValue = "close=1"
+	live.RuntimeConfig.MalleableC2.CustomHeaders = map[string]string{
+		"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 	}
 
 	// save

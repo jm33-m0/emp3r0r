@@ -247,3 +247,101 @@ func TestReadJSONConfigLoadsC2Routes(t *testing.T) {
 		t.Errorf("Expected C2Routes.Proxy route-proxy, got %s", loaded.C2Routes.Proxy)
 	}
 }
+
+func TestReadJSONConfigLoadsPlainHTTP(t *testing.T) {
+	jsonData := []byte(`{
+		"cc_address": "127.0.0.1",
+		"cc_port": "12345",
+		"agent_socks_server_port": "1080",
+		"cc_http_port": "8080",
+		"c2_channel_mode": "plain_http",
+		"malleable_c2": {
+			"c2_path": "/test-path",
+			"session_header": "X-Session-ID",
+			"session_value": "sid-%s",
+			"custom_headers": {
+				"User-Agent": "Test-UA",
+				"X-Custom": "Value"
+			}
+		}
+	}`)
+
+	loaded := &def.Config{}
+	err := readJSONConfig(jsonData, loaded)
+	if err != nil {
+		t.Fatalf("readJSONConfig failed: %v", err)
+	}
+
+	if loaded.CCHTTPPort != "8080" {
+		t.Errorf("Expected CCHTTPPort 8080, got %s", loaded.CCHTTPPort)
+	}
+	if loaded.C2ChannelMode != "plain_http" {
+		t.Errorf("Expected C2ChannelMode plain_http, got %s", loaded.C2ChannelMode)
+	}
+	if loaded.MalleableC2.C2Path != "/test-path" {
+		t.Errorf("Expected MalleableC2.C2Path /test-path, got %s", loaded.MalleableC2.C2Path)
+	}
+	if loaded.MalleableC2.SessionHeader != "X-Session-ID" {
+		t.Errorf("Expected MalleableC2.SessionHeader X-Session-ID, got %s", loaded.MalleableC2.SessionHeader)
+	}
+	if loaded.MalleableC2.CustomHeaders["User-Agent"] != "Test-UA" {
+		t.Errorf("Expected User-Agent Test-UA, got %s", loaded.MalleableC2.CustomHeaders["User-Agent"])
+	}
+}
+
+func TestReadJSONConfigFullCoverage(t *testing.T) {
+	jsonData := []byte(`{
+		"cc_address": "10.0.0.1",
+		"cc_port": "443",
+		"agent_socks_server_port": "1080",
+		"preflight_interval_min": 60,
+		"preflight_interval_max": 300,
+		"is_p2p_enabled": true,
+		"is_direct_c2_enabled": false,
+		"p2p_transport": "kcp",
+		"camouflage_cert_org": "MyOrg",
+		"camouflage_cert_cn": "www.google.com",
+		"initial_peers": ["1.1.1.1:51996", "2.2.2.2:51996"],
+		"machine_id": "test-machine",
+		"module_path": "/tmp/test"
+	}`)
+
+	loaded := &def.Config{}
+	err := readJSONConfig(jsonData, loaded)
+	if err != nil {
+		t.Fatalf("readJSONConfig failed: %v", err)
+	}
+
+	if loaded.PreflightIntervalMin != 60 {
+		t.Errorf("Expected PreflightIntervalMin 60, got %d", loaded.PreflightIntervalMin)
+	}
+	if loaded.PreflightIntervalMax != 300 {
+		t.Errorf("Expected PreflightIntervalMax 300, got %d", loaded.PreflightIntervalMax)
+	}
+	if !loaded.IsP2PEnabled {
+		t.Errorf("Expected IsP2PEnabled true, got false")
+	}
+	if loaded.IsDirectC2Enabled {
+		t.Errorf("Expected IsDirectC2Enabled false, got true")
+	}
+	if loaded.P2PTransport != "kcp" {
+		t.Errorf("Expected P2PTransport kcp, got %s", loaded.P2PTransport)
+	}
+	if loaded.CamouflageCertOrg != "MyOrg" {
+		t.Errorf("Expected CamouflageCertOrg MyOrg, got %s", loaded.CamouflageCertOrg)
+	}
+	if loaded.CamouflageCertCN != "www.google.com" {
+		t.Errorf("Expected CamouflageCertCN www.google.com, got %s", loaded.CamouflageCertCN)
+	}
+	if len(loaded.InitialPeers) != 2 || loaded.InitialPeers[0] != "1.1.1.1:51996" {
+		t.Errorf("Expected InitialPeers [1.1.1.1:51996, 2.2.2.2:51996], got %v", loaded.InitialPeers)
+	}
+	if loaded.MachineID != "test-machine" {
+		t.Errorf("Expected MachineID test-machine, got %s", loaded.MachineID)
+	}
+	if loaded.ModulePath != "/tmp/test" {
+		t.Errorf("Expected ModulePath /tmp/test, got %s", loaded.ModulePath)
+	}
+}
+
+

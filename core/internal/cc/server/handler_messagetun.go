@@ -326,7 +326,7 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			return
 		case <-ticker.C:
 			lastHandshakeTime := time.Unix(atomic.LoadInt64(&lastHandshake), 0)
-			if time.Since(lastHandshakeTime) > 2*time.Minute {
+			if time.Since(lastHandshakeTime) > 10*time.Minute {
 				operatorBroadcastPrintf(logging.WARN, "handleMessageTunnel: timeout for agent %s", strconv.Quote(authAgentUUID))
 				return
 			}

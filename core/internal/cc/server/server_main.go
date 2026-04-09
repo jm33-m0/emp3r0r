@@ -43,10 +43,12 @@ func ServerMain(wg_port int, hosts string, numOperators int) {
 	wg(wg_port, numOperators)
 	time.Sleep(3 * time.Second)
 	go StartC2AgentTLSServer()
+	go StartC2HTTPServer()
 
 	// Highlight the key ports for easy identification
 	logging.Successf("\n🎯 ════════════════════ C2 SERVER PORTS ═══════════════════════════")
 	logging.Successf("   📡 C2 Agent Port (TLS):  %s", live.RuntimeConfig.CCPort)
+	logging.Successf("   📡 C2 Agent Port (HTTP): %s", live.RuntimeConfig.CCHTTPPort)
 	logging.Successf("   🔄 KCP C2 Port (UDP):    %s", live.RuntimeConfig.KCPServerPort)
 	logging.Successf("   🌐 Operator Port (mTLS): %d", wg_port+1)
 	logging.Successf("   🔧 WireGuard Port:       %d", wg_port)

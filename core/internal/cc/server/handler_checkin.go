@@ -24,7 +24,7 @@ var rotationRateLimiter sync.Map
 // handleAgentCheckInStream is the protocol-native checkin handler.
 // It is transport-agnostic and only depends on an encrypted byte stream.
 // secureConn is already authenticated and its first frame (MsgAuth) consumed by dec.
-func handleAgentCheckInStream(dec *cbor.Decoder, auth *def.MsgAuth, agentUUID, remoteAddr string) error {
+func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.MsgAuth, agentUUID, remoteAddr string) error {
 	target := new(def.Emp3r0rAgent)
 	// Dispatcher already decoded the first MsgAuth frame using dec.
 	// We are now at the second frame, which MUST be the Emp3r0rAgent info.
@@ -147,6 +147,17 @@ func handleAgentCheckInStream(dec *cbor.Decoder, auth *def.MsgAuth, agentUUID, r
 		}
 	}
 
+	// ── Phase 2.5: Synchronous Persistence (Identity Enrollment) ────────
+	// SECURITY: identity MUST be persistent BEFORE session admission or signals.
+	// This ensures TOFU is locked and any concurrent dispatcher threads can
+	// find the agent in the database.
+	if agents.AgentDB != nil {
+		if err := agents.RecordAgentCheckin(target); err != nil {
+			logging.Errorf("CRITICAL: Failed to record agent enrollment for %s: %v", strconv.Quote(target.UUID), err)
+			return fmt.Errorf("forbidden: failed to persist identity")
+		}
+	}
+
 	// ── Phase 3: Session Admission (Explicit Duplicate Prohibition) ────────
 	sessionID := fmt.Sprintf("%d", time.Now().UnixNano())
 	if sessionErr := agents.StartSession(target.UUID, sessionID, remoteAddr); sessionErr != nil {
@@ -181,21 +192,11 @@ func handleAgentCheckInStream(dec *cbor.Decoder, auth *def.MsgAuth, agentUUID, r
 	logging.Infof("Updated agent %q with full data from CBOR", target.UUID)
 
 	// Signal that public key is now available (for any waiting requests)
+	// ONLY after DB persistence and Session admission are complete.
 	closeCheckinReadyChannel(target.UUID)
 	logging.Debugf("Signaled checkin completion for %s", strconv.Quote(target.UUID))
 
-	// Now that agent is in memory with pubkey, safe to proceed with other operations
-	// (message tunnel requests can now resolve the pubkey)
-
-	// ------------------------------------------------------------ // SECURITY: Clone Detection & Session Management
-	if agents.AgentDB != nil {
-		if err := agents.RecordAgentCheckin(target); err != nil {
-			_ = agents.EndSession(target.UUID)
-			logging.Errorf("CRITICAL: Failed to record agent check-in (session rolled back): %v", err)
-			return fmt.Errorf("forbidden: failed to persist check-in")
-		}
-	}
-
+	// Now that agent is persistent and in memory, safe to proceed with other operations
 	shortname := strings.Split(target.Tag, "-agent")[0]
 	if util.IsExist(agents.AgentsJSON) {
 		if l := agents.RefreshAgentLabel(target); l != "" {
@@ -209,6 +210,13 @@ func handleAgentCheckInStream(dec *cbor.Decoder, auth *def.MsgAuth, agentUUID, r
 		if logging.Level >= 4 {
 			logging.Debugf("Agent reconnected: %s from %s, running %s", shortname, fmt.Sprintf("%s - %s", target.From, target.Transport), strconv.Quote(target.OS))
 		}
+	}
+
+	// Send checkin-ok ACK to agent
+	// This helps agents synchronize their connection teardown, especially in polling modes
+	ack := &def.MsgTunData{Tag: "checkin-ok"}
+	if err := out.Encode(ack); err != nil {
+		logging.Errorf("Failed to send checkin-ok ACK to %s: %v", target.UUID, err)
 	}
 
 	return nil

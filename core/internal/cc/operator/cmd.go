@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"text/template"
 
 	"github.com/carapace-sh/carapace"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
@@ -23,6 +24,7 @@ import (
 	"github.com/reeflective/console"
 	"github.com/reeflective/console/commands/readline"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 type Command struct {
@@ -616,8 +618,20 @@ func gen_agent_cmd() *cobra.Command {
 		Example: "generate --type linux_executable --arch amd64",
 		Run:     CmdGenerateAgent,
 	}
+
+	// Helper to add flags to groups
+	addFlagToGroup := func(group string, flags ...string) {
+		for _, f := range flags {
+			genAgentCmd.Flags().Lookup(f).Annotations = map[string][]string{"group": {group}}
+		}
+	}
+
+	// Group 1: Payload & Target
 	genAgentCmd.Flags().StringP("type", "t", PayloadTypeLinuxExecutable, fmt.Sprintf("Payload type, available: %v+ (linux_so and windows_dll support CGO)", PayloadTypeList))
 	genAgentCmd.Flags().StringP("arch", "a", "amd64", fmt.Sprintf("Target architecture, available: %v+", Arch_List_All))
+	addFlagToGroup("Payload & Target Options", "type", "arch")
+
+	// Group 2: C2 Connectivity & Transport
 	cc_hosts := transport.NamesInCert(transport.ServerCrtFile)
 	default_cc := live.RuntimeConfig.CCAddress
 	if default_cc == "127.0.0.1" || default_cc == "localhost" {
@@ -631,25 +645,121 @@ func gen_agent_cmd() *cobra.Command {
 			}
 		}
 	}
-	genAgentCmd.Flags().StringP("cc", "", default_cc, "C2 server address")
-	genAgentCmd.Flags().StringP("cdn", "", "", "CDN proxy to reach C2, leave empty to disable. Example: wss://cdn.example.com/ws")
-	genAgentCmd.Flags().StringP("doh", "", "", "DNS over HTTPS server to use for DNS resolution, leave empty to disable. Example: https://1.1.1.1/dns-query")
-	genAgentCmd.Flags().StringP("proxy", "", "", "Hard coded proxy URL for agent's C2 transport, leave empty to disable. Example: socks5://127.0.0.1:9050")
+	genAgentCmd.Flags().StringP("cc", "", default_cc, "C2 server address (Required)")
 	genAgentCmd.Flags().StringP("c2-channel-mode", "", def.C2ChannelModeDefault, fmt.Sprintf("C2 channel wrapper mode. Available: %s", strings.Join(transport.AllC2ChannelModes(), ",")))
-	// Preflight configuration is now handled via emp3r0r.json (PreflightURL, PreflightIntervalMin/Max)
-	// See Wiki: Customizable-Transport for details.
+	genAgentCmd.Flags().StringP("cc-http-port", "", live.RuntimeConfig.CCHTTPPort, "Port for plain HTTP C2 transport")
+	genAgentCmd.Flags().StringP("proxy", "", "", "Hard coded proxy URL for agent's C2 transport. Example: socks5://127.0.0.1:9050")
+	genAgentCmd.Flags().StringP("cdn", "", "", "CDN proxy to reach C2. Example: wss://cdn.example.com/ws")
+	genAgentCmd.Flags().StringP("doh", "", "", "DNS over HTTPS server to use for DNS resolution. Example: https://1.1.1.1/dns-query")
 	genAgentCmd.Flags().BoolP("kcp", "", false, "Use KCP (secure UDP multiplexed tunnel)")
-	genAgentCmd.Flags().BoolP("NCSI", "", false, "Use NCSI to check for Internet connectivity before connecting to C2")
-	genAgentCmd.Flags().BoolP("stager", "", false, "Whether the agent is intended to be delivered by a stager. This enables stealth features like memory encryption and suspension.")
+	addFlagToGroup("C2 Transport Options", "cc", "c2-channel-mode", "cc-http-port", "proxy", "cdn", "doh", "kcp")
 
-	// Mesh / P2P flags
-	genAgentCmd.Flags().BoolP("p2p", "", false, "Enable P2P mesh networking. Agent will join the mesh and participate in peer discovery.")
-	genAgentCmd.Flags().StringP("p2p-transport", "", "mtls", "Transport type for P2P mesh connections. Defaults to 'mtls'. Available: use tab completion.")
-	genAgentCmd.Flags().BoolP("direct-c2", "", false, "When used with --p2p, agent acts as a Gateway: contacts C2 directly (with preflight) AND relays traffic for Silent Nodes. Without --p2p this has no effect.")
-	genAgentCmd.Flags().StringSliceP("peers", "", nil, "Comma-separated list of gossip bootstrap peers (ip:gossipport). Required for Silent Nodes. Example: --peers 1.2.3.4:51996")
+	// Group 3: Beaconing (Polling Mode Only)
+	genAgentCmd.Flags().IntP("interval", "i", 60, "C2 beacon interval in seconds")
+	genAgentCmd.Flags().IntP("jitter", "j", 20, "C2 beacon jitter percentage (0-100)")
+	addFlagToGroup("Beaconing Options (HTTP Mode)", "interval", "jitter")
+
+	// Group 4: Mesh / P2P
+	genAgentCmd.Flags().BoolP("p2p", "", false, "Enable P2P mesh networking")
+	genAgentCmd.Flags().StringP("p2p-transport", "", "mtls", "Transport type for P2P mesh connections")
+	genAgentCmd.Flags().BoolP("direct-c2", "", false, "Gateway mode: contacts C2 directly AND relays for Silent Nodes")
+	genAgentCmd.Flags().StringSliceP("peers", "", nil, "Gossip bootstrap peers (ip:gossipport). Example: --peers 1.2.3.4:51996")
+	addFlagToGroup("Mesh networking (P2P) Options", "p2p", "p2p-transport", "direct-c2", "peers")
+
+	// Group 5: Stealth & Connectivity
+	genAgentCmd.Flags().BoolP("stager", "", false, "Built for stager (enables memory encryption and suspension)")
+	genAgentCmd.Flags().BoolP("NCSI", "", false, "Use NCSI to check for Internet connectivity before connecting to C2")
+	addFlagToGroup("Stealth & Connectivity Options", "stager", "NCSI")
 
 	// Force user to specify CC address
 	genAgentCmd.MarkFlagRequired("cc")
+
+	// Help Template for flag grouping
+	genAgentCmd.SetHelpTemplate(`{{.Short}}
+
+Usage:
+  {{.CommandPath}} [flags]
+
+{{range .Groups}}
+{{.Title}}:
+{{.Flags}}{{end}}
+Example:
+  {{.Example}}
+`)
+
+	// help / usage categories
+	groups := []string{
+		"Payload & Target Options",
+		"C2 Transport Options",
+		"Beaconing Options (HTTP Mode)",
+		"Mesh networking (P2P) Options",
+		"Stealth & Connectivity Options",
+	}
+
+	// help and usage functions
+	type flagGroup struct {
+		Title string
+		Flags string
+	}
+	renderHelp := func(cmd *cobra.Command) {
+		var groupData []flagGroup
+		for _, g := range groups {
+			fset := &pflag.FlagSet{}
+			cmd.Flags().VisitAll(func(f *pflag.Flag) {
+				if f.Annotations["group"] != nil && f.Annotations["group"][0] == g {
+					fset.AddFlag(f)
+				}
+			})
+			if fset.HasFlags() {
+				groupData = append(groupData, flagGroup{
+					Title: g,
+					Flags: fset.FlagUsages(),
+				})
+			}
+		}
+
+		// miscellaneous flags
+		fset := &pflag.FlagSet{}
+		cmd.Flags().VisitAll(func(f *pflag.Flag) {
+			hasGroup := false
+			for _, g := range groups {
+				if f.Annotations["group"] != nil && f.Annotations["group"][0] == g {
+					hasGroup = true
+					break
+				}
+			}
+			if !hasGroup {
+				fset.AddFlag(f)
+			}
+		})
+		if fset.HasFlags() {
+			groupData = append(groupData, flagGroup{
+				Title: "Miscellaneous Options",
+				Flags: fset.FlagUsages(),
+			})
+		}
+
+		// render the template
+		t := template.Must(template.New("help").Parse(cmd.HelpTemplate()))
+		err := t.Execute(cmd.OutOrStdout(), struct {
+			*cobra.Command
+			Groups []flagGroup
+		}{
+			Command: cmd,
+			Groups:  groupData,
+		})
+		if err != nil {
+			logging.Errorf("render help: %v", err)
+		}
+	}
+
+	genAgentCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		renderHelp(cmd)
+	})
+	genAgentCmd.SetUsageFunc(func(cmd *cobra.Command) error {
+		renderHelp(cmd)
+		return nil
+	})
 
 	// completers
 	carapace.Gen(genAgentCmd).FlagCompletion(carapace.ActionMap{

