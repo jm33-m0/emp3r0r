@@ -229,8 +229,8 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 	if err != nil {
 		return fmt.Errorf("SendCmd: %v", err)
 	}
-	logging.Debugf("RunPortFwd (%s: %s) %s: %s:%s to %s\n%s",
-		pf.Description, fwdID, pf.Protocol, bindAddr, pf.Lport, pf.To, cmd)
+	logging.Notify(logging.INFO, "RunPortFwd (%s: %s) %s: %s:%s to %s",
+		pf.Description, fwdID, pf.Protocol, bindAddr, pf.Lport, pf.To)
 
 	pf.Sh = nil
 	if pf.Description == "" {
@@ -271,8 +271,8 @@ func (pf *PortFwdSession) RunPortFwd() (err error) {
 				logging.Errorf("cleanup: failed to unregister %s: %v", fwdID, err)
 			}
 		}
-		logging.Warningf("PortFwd session (%s) has finished:\n%s: %s:%s -> %s\n%s",
-			pf.Description, pf.Protocol, bindAddr, pf.Lport, pf.To, fwdID)
+		logging.Notify(logging.WARN, "PortFwd session (%s) has finished:\n%s: %s:%s -> %s",
+			pf.Description, pf.Protocol, bindAddr, pf.Lport, pf.To)
 	}
 
 	go func() {

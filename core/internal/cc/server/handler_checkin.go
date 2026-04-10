@@ -107,13 +107,13 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 			"  If this is a legitimate reinstall, run `forget_agent %s` to reset its identity.",
 			target.UUID, target.User, target.Hostname, ips, target.OS, strconv.Quote(target.UUID))
 		logging.Errorf("%s", msg)
-		operatorBroadcastPrintf(logging.FATAL, "%s", msg)
+		logging.Notify(logging.ERROR, "%s", msg)
 		return fmt.Errorf("forbidden: key rotation")
 	}
 	if isKnown && pinnedUUIDSig != "" && target.UUIDSig != pinnedUUIDSig {
 		msg := fmt.Sprintf("SECURITY: agent %s presented mismatching UUID signature — rejecting clone/impersonation risk", target.UUID)
 		logging.Errorf("%s", msg)
-		operatorBroadcastPrintf(logging.FATAL, "%s", msg)
+		logging.Notify(logging.ERROR, "%s", msg)
 		return fmt.Errorf("forbidden: identity token mismatch")
 	}
 
@@ -162,7 +162,7 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 	sessionID := fmt.Sprintf("%d", time.Now().UnixNano())
 	if sessionErr := agents.StartSession(target.UUID, sessionID, remoteAddr); sessionErr != nil {
 		if errors.Is(sessionErr, agents.ErrSessionAlreadyActive) {
-			logging.Errorf("CRITICAL: handleAgentCheckIn: duplicate live session blocked for %s from %s", strconv.Quote(target.UUID), remoteAddr)
+			logging.Notify(logging.ERROR, "CRITICAL: handleAgentCheckIn: duplicate live session blocked for %s from %s", strconv.Quote(target.UUID), remoteAddr)
 			return fmt.Errorf("forbidden: duplicate session")
 		}
 		logging.Errorf("CRITICAL: handleAgentCheckIn: session admission failed for %s: %v", strconv.Quote(target.UUID), sessionErr)
@@ -205,7 +205,7 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 	}
 
 	if placeholder == nil {
-		logging.Infof("Checked in: %s from %s, running %s", strconv.Quote(shortname), fmt.Sprintf("'%s - %s'", target.From, target.Transport), strconv.Quote(target.OS))
+		logging.Notify(logging.INFO, "Checked in: %s from %s, running %s", strconv.Quote(shortname), fmt.Sprintf("'%s - %s'", target.From, target.Transport), strconv.Quote(target.OS))
 	} else {
 		if logging.Level >= 4 {
 			logging.Debugf("Agent reconnected: %s from %s, running %s", shortname, fmt.Sprintf("%s - %s", target.From, target.Transport), strconv.Quote(target.OS))

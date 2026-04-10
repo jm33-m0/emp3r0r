@@ -49,6 +49,12 @@ func Errorf(format string, a ...any) {
 func Fatalf(format string, a ...any) {
 }
 
+func Notify(level string, format string, a ...any) {
+}
+
+func SetBroadcastHandler(h func(level string, msg string)) {
+}
+
 func Fatal(a ...any) {
 }
 

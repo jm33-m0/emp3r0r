@@ -34,6 +34,10 @@ type Logger struct {
 	writer  io.Writer
 	ctx     context.Context
 	cancel  context.CancelFunc
+
+	// BroadcastHandler is called whenever Notify is called.
+	// Used to send important logs to the operator console.
+	BroadcastHandler func(level string, msg string)
 }
 
 var (
@@ -217,6 +221,31 @@ func (l *Logger) Fatal(format string, a ...any) {
 // Error prints an error message in red and bold font to console and log file, regardless of log level
 func (l *Logger) Error(format string, a ...any) {
 	l.helper(format, a, color.New(color.FgHiRed, color.Bold), ERROR, true)
+}
+
+// Notify prints a message and also triggers the broadcast handler (if set).
+// Used for logs that are important enough to be shown to the operator.
+func (l *Logger) Notify(level string, format string, a ...any) {
+	// Log locally first
+	switch level {
+	case SUCCESS:
+		l.Success(format, a...)
+	case INFO:
+		l.Info(format, a...)
+	case WARN:
+		l.Warning(format, a...)
+	case ERROR:
+		l.Error(format, a...)
+	default:
+		l.helper(format, a, nil, level, false)
+	}
+
+	// Trigger broadcast
+	if l.BroadcastHandler != nil {
+		safeArgs := sanitizeLogArgs(a)
+		msg := fmt.Sprintf(format, safeArgs...)
+		l.BroadcastHandler(level, msg)
+	}
 }
 
 func (l *Logger) SetDebugLevel(level int) {

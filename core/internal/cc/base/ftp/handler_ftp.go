@@ -245,14 +245,14 @@ func HandleFTPStream(conn io.ReadWriteCloser, token string, remoteAddr string, c
 			}
 			checksum := crypto.SHA256SumFile(targetFile)
 			if checksum == mustHaveChecksum {
-				logging.Successf("Downloaded %d bytes to %s (%s)", nowSize, targetFile, checksum)
+				logging.Notify(logging.SUCCESS, "Downloaded %d bytes to %s (%s)", nowSize, targetFile, checksum)
 				return
 			}
-			logging.Errorf("%s downloaded but checksum mismatch: %s vs %s", targetFile, checksum, mustHaveChecksum)
+			logging.Notify(logging.ERROR, "%s downloaded but checksum mismatch: %s vs %s", targetFile, checksum, mustHaveChecksum)
 			return
 		}
 		if nowSize > targetSize {
-			logging.Errorf("%s: downloaded (%d of %d bytes), error", targetFile, nowSize, targetSize)
+			logging.Notify(logging.ERROR, "%s: downloaded (%d of %d bytes), error", targetFile, nowSize, targetSize)
 			return
 		}
 		logging.Warningf("Incomplete download: %.4f%% (%d of %d bytes)", float64(nowSize)*100/float64(targetSize), nowSize, targetSize)
@@ -269,7 +269,7 @@ func HandleFTPStream(conn io.ReadWriteCloser, token string, remoteAddr string, c
 	n, err := copyWithDecompressedLimit(f, decompressor, targetSize)
 	if err != nil {
 		if errors.Is(err, errTransferSizeExceeded) {
-			logging.Errorf("Security Alert: transfer for %s exceeded expected size (%d bytes + %d bytes buffer); received %d bytes",
+			logging.Notify(logging.ERROR, "Security Alert: transfer for %s exceeded expected size (%d bytes + %d bytes buffer); received %d bytes",
 				targetFile, targetSize, maxTransferSizeBuffer, n)
 			return
 		}

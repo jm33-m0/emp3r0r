@@ -28,6 +28,12 @@ func ServerMain(wg_port int, hosts string, numOperators int) {
 		logging.Errorf("Failed to initialize agent database: %v", err)
 		return
 	}
+
+	// Register log handler to broadcast important logs to operators
+	logging.SetBroadcastHandler(func(level string, msg string) {
+		_ = operatorBroadcastPrintf(level, "%s", msg)
+	})
+
 	if active, purged, err := agents.ReconcileSessionsOnStartup(); err != nil {
 		logging.Errorf("Failed to reconcile persisted sessions: %v", err)
 		return

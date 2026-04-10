@@ -67,7 +67,7 @@ func PutFile(lpath, rpath string, a *def.Emp3r0rAgent, saveToMemory bool) error 
 	// file size
 	size := util.FileSize(lpath)
 	sizemB := float32(size) / 1024 / 1024
-	logging.Infof("\nPutFile:\nUploading '%s' to\n'%s' "+
+	logging.Notify(logging.INFO, "\nPutFile:\nUploading '%s' to\n'%s' "+
 		"on %s, agent [%s]\n"+
 		"size: %d bytes (%.2fMB)\n"+
 		"sha256sum: %s",
@@ -132,7 +132,7 @@ func GenerateGetFilePaths(file_path string) (write_dir, save_to_file, tempname, 
 
 // GetFile get file from agent
 func GetFile(file_path string, agent *def.Emp3r0rAgent) (ftpSh *network.StreamHandler, err error) {
-	logging.Infof("Waiting for response from agent %s", agent.Tag)
+	logging.Notify(logging.INFO, "Getting file '%s' from agent %s", file_path, agent.Tag)
 
 	write_dir, save_to_file, tempname, lock := GenerateGetFilePaths(file_path)
 	logging.Debugf("Get file: %s, save to: %s, tempname: %s, lock: %s", file_path, save_to_file, tempname, lock)

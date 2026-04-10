@@ -61,6 +61,14 @@ func Fatalf(format string, a ...any) {
 	logger.Fatal(format, a...)
 }
 
+func Notify(level string, format string, a ...any) {
+	logger.Notify(level, format, a...)
+}
+
+func SetBroadcastHandler(h func(level string, msg string)) {
+	logger.BroadcastHandler = h
+}
+
 func Fatal(a ...any) {
 	logger.Msg("%v", fmt.Sprint(a...))
 }
