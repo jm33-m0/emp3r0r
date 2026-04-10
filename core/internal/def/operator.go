@@ -44,3 +44,9 @@ type PortFwdRequest struct {
 	AgentTag    string `cbor:"6,keyasint"` // Add Agent Tag for context
 	IsReverse   bool   `cbor:"7,keyasint"`
 }
+
+// FTPStreamRequest is the request to register an FTP stream
+type FTPStreamRequest struct {
+	Token    string `cbor:"1,keyasint"`
+	FilePath string `cbor:"2,keyasint"`
+}

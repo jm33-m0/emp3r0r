@@ -40,4 +40,8 @@ const (
 	OperatorRegisterPortFwd = OperatorRoot + "/register_port_fwd"
 	// OperatorUnregisterPortFwd
 	OperatorUnregisterPortFwd = OperatorRoot + "/unregister_port_fwd"
+	// OperatorRegisterFTPStream
+	OperatorRegisterFTPStream = OperatorRoot + "/register_ftp_stream"
+	// OperatorUnregisterFTPStream
+	OperatorUnregisterFTPStream = OperatorRoot + "/unregister_ftp_stream"
 )

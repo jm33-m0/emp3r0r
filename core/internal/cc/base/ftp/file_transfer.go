@@ -12,6 +12,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -196,6 +197,12 @@ func GetFile(file_path string, agent *def.Emp3r0rAgent) (ftpSh *network.StreamHa
 	// stream handler
 	network.FTPStreams.Store(file_path, ftpSh)
 	network.FTPStreams.Store("token:"+ftpSh.Token, ftpSh)
+
+	// Register with server if we are an operator client
+	err = client.RegisterFTPStream(ftpSh.Token, file_path)
+	if err != nil {
+		logging.Errorf("GetFile: failed to register FTP stream on server: %v", err)
+	}
 
 	// cmd
 	cmd := fmt.Sprintf("get --file_path '%s' --offset %d --token '%s'", file_path, offset, ftpSh.Token)

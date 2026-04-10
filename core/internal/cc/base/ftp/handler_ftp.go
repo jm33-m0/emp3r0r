@@ -135,17 +135,22 @@ func HandleFTPStream(conn io.ReadWriteCloser, token string, remoteAddr string, c
 
 	if filename == "" || sh == nil {
 		// Diagnostic: dump what's actually in FTPStreams so we can trace the mismatch
-		logging.Errorf("Failed to parse filename for token %s (len=%d)", token, len(token))
+		logging.Errorf("Failed to parse filename for token %q (len=%d) from %s", token, len(token), remoteAddr)
+		count := 0
 		network.FTPStreams.Range(func(key, value any) bool {
+			count++
 			k, _ := key.(string)
 			v, vOk := value.(*network.StreamHandler)
 			if vOk {
-				logging.Debugf("  FTPStreams entry: key=%q token=%q", k, v.Token)
+				logging.Errorf("  FTPStreams[%d] key=%q stored_token=%q pointer=%p", count, k, v.Token, v)
 			} else {
-				logging.Debugf("  FTPStreams entry: key=%q (non-StreamHandler value)", k)
+				logging.Errorf("  FTPStreams[%d] key=%q (non-StreamHandler value type=%T)", count, k, value)
 			}
 			return true
 		})
+		if count == 0 {
+			logging.Errorf("  FTPStreams is EMPTY — Registration from operator may have failed or was never received")
+		}
 		conn.Close()
 		cancel()
 		return

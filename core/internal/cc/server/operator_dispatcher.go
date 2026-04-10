@@ -43,6 +43,10 @@ func operationDispatcher(w http.ResponseWriter, r *http.Request) {
 		handleRegisterPortFwd(w, r)
 	case transport.OperatorUnregisterPortFwd:
 		handleUnregisterPortFwd(w, r)
+	case transport.OperatorRegisterFTPStream:
+		handleRegisterFTPStream(w, r)
+	case transport.OperatorUnregisterFTPStream:
+		handleUnregisterFTPStream(w, r)
 	case transport.OperatorGetCA:
 		handleGetCA(w, r)
 	case transport.OperatorSignAgent:

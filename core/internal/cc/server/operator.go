@@ -299,6 +299,51 @@ func handleRegisterPortFwd(wrt http.ResponseWriter, req *http.Request) {
 	wrt.WriteHeader(http.StatusOK)
 }
 
+func handleRegisterFTPStream(wrt http.ResponseWriter, req *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("handleRegisterFTPStream panicked: %v", r)
+			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
+		}
+	}()
+	// Decode CBOR request body
+	ftpReq, err := DecodeCBORBody[def.FTPStreamRequest](wrt, req)
+	if err != nil {
+		return
+	}
+
+	// Register token in server's map
+	sh := &network.StreamHandler{
+		Token: ftpReq.Token,
+	}
+	network.FTPStreams.Store(ftpReq.FilePath, sh)
+	network.FTPStreams.Store("token:"+ftpReq.Token, sh)
+
+	logging.Infof("Registered FTP stream token %s for %s from operator", ftpReq.Token, ftpReq.FilePath)
+	wrt.WriteHeader(http.StatusOK)
+}
+
+func handleUnregisterFTPStream(wrt http.ResponseWriter, req *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("handleUnregisterFTPStream panicked: %v", r)
+			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
+		}
+	}()
+	// Decode CBOR request body
+	ftpReq, err := DecodeCBORBody[def.FTPStreamRequest](wrt, req)
+	if err != nil {
+		return
+	}
+
+	// Unregister token in server's map
+	network.FTPStreams.Delete(ftpReq.FilePath)
+	network.FTPStreams.Delete("token:" + ftpReq.Token)
+
+	logging.Infof("Unregistered FTP stream token %s for %s from operator", ftpReq.Token, ftpReq.FilePath)
+	wrt.WriteHeader(http.StatusOK)
+}
+
 func handleUnregisterPortFwd(wrt http.ResponseWriter, req *http.Request) {
 	defer func() {
 		if r := recover(); r != nil {

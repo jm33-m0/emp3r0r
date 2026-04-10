@@ -87,6 +87,26 @@ func UnregisterPortFwd(sessionID string) error {
 	return err
 }
 
+// RegisterFTPStream registers a new FTP stream with the server
+func RegisterFTPStream(token, file_path string) error {
+	req := def.FTPStreamRequest{
+		Token:    token,
+		FilePath: file_path,
+	}
+	_, err := SendCBORRequest(transport.OperatorRegisterFTPStream, req)
+	return err
+}
+
+// UnregisterFTPStream unregisters an FTP stream from the server
+func UnregisterFTPStream(token, file_path string) error {
+	req := def.FTPStreamRequest{
+		Token:    token,
+		FilePath: file_path,
+	}
+	_, err := SendCBORRequest(transport.OperatorUnregisterFTPStream, req)
+	return err
+}
+
 // SetActiveAgent notifies the server that the operator is now targeting a specific agent
 func SetActiveAgent(agentTag string) (*def.Emp3r0rAgent, error) {
 	operation := def.Operation{
