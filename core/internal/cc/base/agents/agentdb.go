@@ -78,14 +78,26 @@ func ReconcileSessionsOnStartup() (active, purged int64, err error) {
 // InitAgentDB initializes the SQLite database and creates tables if they don't exist
 func InitAgentDB(dbPath string) error {
 	var err error
-	AgentDB, err = sql.Open("sqlite", dbPath)
+	// Use a DSN with busy_timeout and cache=shared so concurrent goroutines
+	// retry instead of immediately returning SQLITE_BUSY.
+	dsn := fmt.Sprintf("%s?_busy_timeout=5000&cache=shared", dbPath)
+	AgentDB, err = sql.Open("sqlite", dsn)
 	if err != nil {
 		return fmt.Errorf("open database: %v", err)
 	}
 
-	// Enable WAL mode for better concurrency
+	// Serialize all writes through a single connection to prevent SQLITE_BUSY
+	// under concurrent agent load. WAL mode allows readers to proceed in parallel.
+	AgentDB.SetMaxOpenConns(1)
+
+	// Enable WAL mode for better concurrency (readers don't block writers)
 	if _, err := AgentDB.Exec("PRAGMA journal_mode=WAL;"); err != nil {
 		return fmt.Errorf("enable WAL: %v", err)
+	}
+
+	// Reduce checkpoint sync pressure
+	if _, err := AgentDB.Exec("PRAGMA synchronous=NORMAL;"); err != nil {
+		return fmt.Errorf("set synchronous: %v", err)
 	}
 
 	// Test connection
