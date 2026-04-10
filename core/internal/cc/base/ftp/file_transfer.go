@@ -189,7 +189,9 @@ func GetFile(file_path string, agent *def.Emp3r0rAgent) (ftpSh *network.StreamHa
 	ftpSh = &network.StreamHandler{}
 	// tell agent where to seek the left bytes
 	ftpSh.Token = fmt.Sprintf("%s-%s", util.RandMD5String(), fileinfo.Checksum)
-	ftpSh.Buf = make(chan []byte)
+	// NOTE: Do NOT allocate ftpSh.Buf — FTP now operates directly on the
+	// SecureConn set in HandleFTPStream (sh.Secure = conn). The legacy
+	// channel-based path is not used for this route.
 	ftpSh.BufSize = 1024 * 8
 	// stream handler
 	network.FTPStreams.Store(file_path, ftpSh)

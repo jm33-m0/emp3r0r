@@ -60,16 +60,18 @@ type StreamHandler struct {
 // This buffer is filled by the dispatcher when it receives a MsgTunData frame for this handler.
 func (sh *StreamHandler) Read(p []byte) (n int, err error) {
 	// New C2 protocol mode: raw stream handler (e.g. FTP upload over CBOR-routed
-	// SecureConn) reads directly from the secure stream.
-	if sh.Buf == nil {
-		if sh.Secure == nil {
-			return 0, io.EOF
-		}
+	// SecureConn) reads directly from the secure stream if available.
+	if sh.Secure != nil {
 		r, ok := sh.Secure.(io.Reader)
 		if !ok {
 			return 0, fmt.Errorf("StreamHandler: secure stream is not readable")
 		}
 		return r.Read(p)
+	}
+
+	// Legacy polling mode: read from the internal buffer.
+	if sh.Buf == nil {
+		return 0, io.EOF
 	}
 
 	if sh.Ctx == nil {

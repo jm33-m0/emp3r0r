@@ -34,7 +34,9 @@ func copyWithDecompressedLimit(dst io.Writer, src io.Reader, expectedSize int64)
 	limit := expectedSize + maxTransferSizeBuffer
 	limitedReader := io.LimitReader(src, limit+1)
 
-	n, err := io.Copy(dst, limitedReader)
+	// Use a larger buffer for bulk stream performance (especially over polling transports like plain_http)
+	buf := make([]byte, 1024*1024)
+	n, err := io.CopyBuffer(dst, limitedReader, buf)
 	if err != nil {
 		return n, err
 	}
@@ -86,42 +88,64 @@ func HandleFTPStream(conn io.ReadWriteCloser, token string, remoteAddr string, c
 	// Determine file paths and lookup StreamHandler.
 	filename := ""
 	var sh *network.StreamHandler
-	if v, ok := network.FTPStreams.Load("token:" + token); ok {
-		if stream, ok := v.(*network.StreamHandler); ok {
-			sh = stream
+
+	// Look up the stream handler for this token, with retry for race conditions.
+	// The agent may connect back before GetFile finishes storing the token in FTPStreams.
+	deadline := time.Now().Add(5 * time.Second)
+	for filename == "" || sh == nil {
+		sh = nil
+		filename = ""
+
+		if val, ok := network.FTPStreams.Load("token:" + token); ok {
+			if stream, ok := val.(*network.StreamHandler); ok {
+				sh = stream
+			}
 		}
-	}
-	if sh != nil {
-		network.FTPStreams.Range(func(fname, value any) bool {
-			key, ok := fname.(string)
-			if !ok || strings.HasPrefix(key, "token:") {
+
+		// Find the actual file path associated with this StreamHandler
+		network.FTPStreams.Range(func(key, value any) bool {
+			k, kOk := key.(string)
+			v, vOk := value.(*network.StreamHandler)
+			if !kOk || !vOk {
 				return true
 			}
-			persh, ok := value.(*network.StreamHandler)
-			if !ok {
-				return true
+			// Prefer pointer equality after direct Load
+			if sh != nil && v == sh && !strings.HasPrefix(k, "token:") {
+				filename = k
+				return false
 			}
-			if persh == sh {
-				filename = key
+			// Fallback: token field comparison
+			if sh == nil && v.Token == token && !strings.HasPrefix(k, "token:") {
+				filename = k
+				sh = v
 				return false
 			}
 			return true
 		})
+
+		if filename != "" && sh != nil {
+			break
+		}
+
+		if time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
 	}
 
 	if filename == "" || sh == nil {
-	network.FTPStreams.Range(func(fname, value any) bool {
-		persh := value.(*network.StreamHandler)
-		if token == persh.Token {
-			filename = fname.(string)
-			sh = persh
-			return false // stop iteration
-		}
-		return true
-	})
-	}
-	if filename == "" || sh == nil {
-		logging.Errorf("Failed to parse filename for token %s", token)
+		// Diagnostic: dump what's actually in FTPStreams so we can trace the mismatch
+		logging.Errorf("Failed to parse filename for token %s (len=%d)", token, len(token))
+		network.FTPStreams.Range(func(key, value any) bool {
+			k, _ := key.(string)
+			v, vOk := value.(*network.StreamHandler)
+			if vOk {
+				logging.Debugf("  FTPStreams entry: key=%q token=%q", k, v.Token)
+			} else {
+				logging.Debugf("  FTPStreams entry: key=%q (non-StreamHandler value)", k)
+			}
+			return true
+		})
 		conn.Close()
 		cancel()
 		return

@@ -160,16 +160,30 @@ func (s *HTTPClientStream) pollRead() {
 		}
 		switch resp.StatusCode {
 		case http.StatusOK:
-			data, err := io.ReadAll(resp.Body)
-			resp.Body.Close()
-			if err == nil && len(data) > 0 {
-				select {
-				case s.readCh <- data:
-					gotData = true // Signal that we received data to skip long sleep
-				case <-s.ctx.Done():
-					return
+			// Read in chunks to handle large bodies and prevent memory issues
+			// This also ensures we don't discard data if the transfer is large
+			buf := make([]byte, 1024*1024) // 1MB chunks
+			for {
+				n, rErr := resp.Body.Read(buf)
+				if n > 0 {
+					chunk := make([]byte, n)
+					copy(chunk, buf[:n])
+					select {
+					case s.readCh <- chunk:
+						gotData = true
+					case <-s.ctx.Done():
+						resp.Body.Close()
+						return
+					}
+				}
+				if rErr != nil {
+					if rErr != io.EOF {
+						logging.Errorf("HTTPClientStream: pollRead body read error: %v", rErr)
+					}
+					break
 				}
 			}
+			resp.Body.Close()
 		case http.StatusNotFound:
 			// Session was terminated by server
 			resp.Body.Close()
@@ -440,7 +454,28 @@ func HandleHTTPServerSession(w http.ResponseWriter, req *http.Request, config *d
 		case <-req.Context().Done():
 		case data := <-stream.writeCh:
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write(data)
+			if _, err := w.Write(data); err != nil {
+				return nil, ErrPollingRequest
+			}
+			// Drain any additional buffered data to send in the same response
+			// We cap the total size to avoid massive responses that might be unstable
+			totalWritten := len(data)
+		loop:
+			for totalWritten < 50*1024*1024 { // Cap at 50MB per polling response
+				select {
+				case more, ok := <-stream.writeCh:
+					if !ok {
+						break loop
+					}
+					n, err := w.Write(more)
+					if err != nil {
+						break loop
+					}
+					totalWritten += n
+				default:
+					break loop
+				}
+			}
 			return nil, ErrPollingRequest
 		case <-time.After(50 * time.Second):
 			// Timeout, return empty 200 OK so client polls again

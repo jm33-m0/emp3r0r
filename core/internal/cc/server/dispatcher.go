@@ -115,13 +115,21 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 	defer t.Close() // Ensure connection is closed when dispatch or persistent handler returns
 
 	remoteAddr := t.RemoteAddrString()
-	dec := cbor.NewDecoder(secureConn)
-	var msgAuth def.MsgAuth
-	if err := dec.Decode(&msgAuth); err != nil {
-		logging.Errorf("CRITICAL: cborProtocolDispatch: first frame decode failed from %s: %v", remoteAddr, err)
+	// Read the first frame (MsgAuth envelope)
+	// We use a direct Read from SecureConn instead of a buffered cbor.Decoder
+	// to ensure we don't over-read data intended for the service handlers (e.g. FTP data)
+	authFrame := make([]byte, 8192) // MsgAuth should definitely fit in 8KB
+	n, err := secureConn.Read(authFrame)
+	if err != nil {
+		logging.Errorf("CRITICAL: cborProtocolDispatch: first frame read failed from %s: %v", remoteAddr, err)
 		return
 	}
-	logging.Debugf("cborProtocolDispatch: decoded MsgAuth from %s: type=%d agent=%s", remoteAddr, msgAuth.Type, msgAuth.AgentUUID)
+	var msgAuth def.MsgAuth
+	if err := cbor.Unmarshal(authFrame[:n], &msgAuth); err != nil {
+		logging.Errorf("CRITICAL: cborProtocolDispatch: first frame unmarshal failed from %s: %v", remoteAddr, err)
+		return
+	}
+	logging.Debugf("cborProtocolDispatch: decoded MsgAuth from %s: type=%s agent=%s", remoteAddr, msgAuth.Type, msgAuth.AgentUUID)
 
 	if err := transport.VerifyMsgAuth(&msgAuth); err != nil {
 		logging.Errorf("CRITICAL: cborProtocolDispatch: MsgAuth CA verification failed from %s: %v", remoteAddr, err)
@@ -234,12 +242,14 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 			readyChan := make(chan struct{})
 			checkinReadyChannels.Store(agentUUID, readyChan)
 		}
+		dec := cbor.NewDecoder(secureConn)
 		enc := cbor.NewEncoder(secureConn)
 		if err := handleAgentCheckInStream(dec, enc, &msgAuth, agentUUID, remoteAddr); err != nil {
 			logging.Errorf("CRITICAL: cborProtocolDispatch: checkin error for %s: %v", strconv.Quote(agentUUID), err)
 		}
 
 	case live.RuntimeConfig.C2Routes.Msg:
+		dec := cbor.NewDecoder(secureConn)
 		handleMessageTunnelStream(secureConn, dec, remoteAddr, context.Background())
 
 	case live.RuntimeConfig.C2Routes.FTP:
@@ -320,7 +330,9 @@ func handleFileDownloadStream(agentUUID string, conn io.ReadWriteCloser, filenam
 	}
 	defer f.Close()
 
-	n, err := io.Copy(conn, f)
+	// Use a 1MB buffer for optimal bulk stream performance
+	copyBuf := make([]byte, 1024*1024)
+	n, err := io.CopyBuffer(conn, f, copyBuf)
 	if err != nil {
 		logging.Errorf("handleFileDownloadStream: served %s to %s failed: %v", filename, remoteAddr, err)
 		return
