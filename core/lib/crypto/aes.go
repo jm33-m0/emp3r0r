@@ -115,6 +115,55 @@ func AES_GCM_Decrypt(password, ciphertext []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt: %v", err)
 	}
-
 	return plaintext, nil
+}
+
+// AES_GCM_Encrypt_Raw encrypts plaintext with a pre-derived 32-byte key using AES-GCM.
+// The output format is: [nonce (12 bytes)][ciphertext].
+// This is much faster than AES_GCM_Encrypt as it skips PBKDF2 key derivation.
+func AES_GCM_Encrypt_Raw(key, plaintext []byte) ([]byte, error) {
+	if len(key) != 32 {
+		return nil, fmt.Errorf("AES_GCM_Encrypt_Raw: key must be 32 bytes")
+	}
+	// Generate random nonce
+	nonce, err := GenerateRandomBytes(nonceSize)
+	if err != nil {
+		return nil, err
+	}
+	// Create AES-GCM cipher
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	// Encrypt
+	ciphertext := aesgcm.Seal(nil, nonce, plaintext, nil)
+	// Format: [nonce][ciphertext]
+	return append(nonce, ciphertext...), nil
+}
+
+// AES_GCM_Decrypt_Raw decrypts ciphertext with a pre-derived 32-byte key using AES-GCM.
+func AES_GCM_Decrypt_Raw(key, ciphertext []byte) ([]byte, error) {
+	if len(key) != 32 {
+		return nil, fmt.Errorf("AES_GCM_Decrypt_Raw: key must be 32 bytes")
+	}
+	if len(ciphertext) < nonceSize {
+		return nil, fmt.Errorf("AES_GCM_Decrypt_Raw: ciphertext too short")
+	}
+	nonce := ciphertext[:nonceSize]
+	encMessage := ciphertext[nonceSize:]
+	// Create AES-GCM cipher
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	// Decrypt
+	return aesgcm.Open(nil, nonce, encMessage, nil)
 }

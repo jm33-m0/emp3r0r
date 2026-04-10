@@ -101,7 +101,7 @@ func (sc *SecureConn) Read(p []byte) (n int, err error) {
 	sc.keyMu.RLock()
 	key := sc.key
 	sc.keyMu.RUnlock()
-	decrypted, err := crypto.AES_GCM_Decrypt(key, encryptedData)
+	decrypted, err := crypto.AES_GCM_Decrypt_Raw(key, encryptedData)
 	if err != nil {
 		logging.Errorf("SecureConn: decryption failed: %v", err)
 		return 0, err
@@ -126,7 +126,7 @@ func (sc *SecureConn) Write(p []byte) (n int, err error) {
 	sc.keyMu.RLock()
 	key := sc.key
 	sc.keyMu.RUnlock()
-	encrypted, err := crypto.AES_GCM_Encrypt(key, p)
+	encrypted, err := crypto.AES_GCM_Encrypt_Raw(key, p)
 	if err != nil {
 		return 0, fmt.Errorf("encryption failed: %v", err)
 	}
