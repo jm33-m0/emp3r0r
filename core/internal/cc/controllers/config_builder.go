@@ -19,21 +19,21 @@ import (
 // AgentConfig represents the options provided by a user (via CLI, Web UI, API)
 // to generate a new agent configuration payload.
 type AgentConfig struct {
-	CCAddress        string
-	CDNProxy         string
-	C2TransportProxy string
-	DoHServer        string
-	C2ChannelMode    string
+	CCAddress        *string
+	CDNProxy         *string
+	C2TransportProxy *string
+	DoHServer        *string
+	C2ChannelMode    *string
 	IsP2PEnabled     bool
 	IsDirectC2       bool
 	IsNCSIEnabled    bool
 	UseKCP           bool
 	IsStager         bool
-	P2PTransport     string
-	InitialPeers     []string
-	CCHTTPPort       string
-	PollInterval     int
-	Jitter           int
+	P2PTransport     *string
+	InitialPeers     *[]string
+	CCHTTPPort       *string
+	PollInterval     *int
+	Jitter           *int
 }
 
 // MakeConfig takes the generalized AgentConfig options and orchestrates the
@@ -55,8 +55,8 @@ func MakeConfig(opts AgentConfig) error {
 	}
 
 	// CC names and certs
-	if opts.CCAddress != "" {
-		live.RuntimeConfig.CCAddress = opts.CCAddress
+	if opts.CCAddress != nil {
+		live.RuntimeConfig.CCAddress = *opts.CCAddress
 	}
 	live.RuntimeConfig.CCAddress = strings.TrimSuffix(live.RuntimeConfig.CCAddress, "/")
 	logging.Infof("C2 server name: %s", live.RuntimeConfig.CCAddress)
@@ -86,8 +86,8 @@ func MakeConfig(opts AgentConfig) error {
 	}
 
 	// Proxies & Transports
-	if opts.CDNProxy != "" {
-		live.RuntimeConfig.CDNProxy = opts.CDNProxy
+	if opts.CDNProxy != nil {
+		live.RuntimeConfig.CDNProxy = *opts.CDNProxy
 	}
 	if live.RuntimeConfig.CDNProxy != "" {
 		logging.Infof("Using CDN proxy %s", live.RuntimeConfig.CDNProxy)
@@ -98,23 +98,23 @@ func MakeConfig(opts AgentConfig) error {
 		logging.Infof("Using KCP")
 	}
 
-	if opts.C2TransportProxy != "" {
-		live.RuntimeConfig.C2TransportProxy = opts.C2TransportProxy
+	if opts.C2TransportProxy != nil {
+		live.RuntimeConfig.C2TransportProxy = *opts.C2TransportProxy
 	}
 	if live.RuntimeConfig.C2TransportProxy != "" {
 		logging.Infof("Using C2 transport proxy %s", live.RuntimeConfig.C2TransportProxy)
 	}
 
-	if opts.DoHServer != "" {
-		live.RuntimeConfig.DoHServer = opts.DoHServer
+	if opts.DoHServer != nil {
+		live.RuntimeConfig.DoHServer = *opts.DoHServer
 	}
 	if live.RuntimeConfig.DoHServer != "" {
 		logging.Infof("Using DoH server %s", live.RuntimeConfig.DoHServer)
 	}
 	
 	// HTTP Port
-	if opts.CCHTTPPort != "" {
-		live.RuntimeConfig.CCHTTPPort = opts.CCHTTPPort
+	if opts.CCHTTPPort != nil {
+		live.RuntimeConfig.CCHTTPPort = *opts.CCHTTPPort
 	}
 	if live.RuntimeConfig.CCHTTPPort == "" {
 		live.RuntimeConfig.CCHTTPPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
@@ -122,8 +122,8 @@ func MakeConfig(opts AgentConfig) error {
 	}
 	logging.Infof("C2 HTTP port: %s", live.RuntimeConfig.CCHTTPPort)
 
-	if opts.C2ChannelMode != "" {
-		live.RuntimeConfig.C2ChannelMode = opts.C2ChannelMode
+	if opts.C2ChannelMode != nil {
+		live.RuntimeConfig.C2ChannelMode = *opts.C2ChannelMode
 	}
 	if live.RuntimeConfig.C2ChannelMode == "" {
 		live.RuntimeConfig.C2ChannelMode = def.C2ChannelModeDefault
@@ -139,15 +139,15 @@ func MakeConfig(opts AgentConfig) error {
 	if live.RuntimeConfig.PaddingMax == 0 {
 		live.RuntimeConfig.PaddingMax = 10240
 	}
-	if opts.PollInterval > 0 {
-		live.RuntimeConfig.PollInterval = opts.PollInterval
+	if opts.PollInterval != nil {
+		live.RuntimeConfig.PollInterval = *opts.PollInterval
 	}
 	if live.RuntimeConfig.PollInterval == 0 {
 		live.RuntimeConfig.PollInterval = 60
 	}
 
-	if opts.Jitter > 0 {
-		live.RuntimeConfig.Jitter = opts.Jitter
+	if opts.Jitter != nil {
+		live.RuntimeConfig.Jitter = *opts.Jitter
 	}
 	if live.RuntimeConfig.Jitter == 0 {
 		live.RuntimeConfig.Jitter = 20
@@ -178,18 +178,18 @@ func MakeConfig(opts AgentConfig) error {
 	live.RuntimeConfig.IsP2PEnabled = opts.IsP2PEnabled
 	live.RuntimeConfig.IsDirectC2Enabled = opts.IsDirectC2
 
-	if opts.P2PTransport != "" {
+	if opts.P2PTransport != nil {
 		isValid := false
 		for _, name := range transport.AllTransportNames() {
-			if name == opts.P2PTransport {
+			if name == *opts.P2PTransport {
 				isValid = true
 				break
 			}
 		}
 		if !isValid {
-			return fmt.Errorf("invalid p2p-transport: %s (available: %v)", opts.P2PTransport, transport.AllTransportNames())
+			return fmt.Errorf("invalid p2p-transport: %s (available: %v)", *opts.P2PTransport, transport.AllTransportNames())
 		}
-		live.RuntimeConfig.P2PTransport = opts.P2PTransport
+		live.RuntimeConfig.P2PTransport = *opts.P2PTransport
 	} else if live.RuntimeConfig.P2PTransport == "" {
 		live.RuntimeConfig.P2PTransport = "mtls"
 	}
@@ -200,7 +200,9 @@ func MakeConfig(opts AgentConfig) error {
 	}
 
 	// Bootstrap peers for gossip
-	live.RuntimeConfig.InitialPeers = opts.InitialPeers
+	if opts.InitialPeers != nil {
+		live.RuntimeConfig.InitialPeers = *opts.InitialPeers
+	}
 
 	if live.RuntimeConfig.IsP2PEnabled && !live.RuntimeConfig.IsDirectC2Enabled {
 		if len(live.RuntimeConfig.InitialPeers) == 0 {

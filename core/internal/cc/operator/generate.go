@@ -67,46 +67,29 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// Gather config from flags
-	p2p, p2pChanged := getBoolFlag(cmd, "p2p")
-	directC2, directC2Changed := getBoolFlag(cmd, "direct-c2")
-	ncsi, ncsiChanged := getBoolFlag(cmd, "ncsi")
-	kcp, kcpChanged := getBoolFlag(cmd, "kcp")
-	isStager, isStagerChanged := getBoolFlag(cmd, "stager")
+	// Gather config from flags. Bool flags default to false when omitted.
+	p2p, _ := cmd.Flags().GetBool("p2p")
+	directC2, _ := cmd.Flags().GetBool("direct-c2")
+	ncsi, _ := cmd.Flags().GetBool("NCSI")
+	kcp, _ := cmd.Flags().GetBool("kcp")
+	isStager, _ := cmd.Flags().GetBool("stager")
 
 	opts := controllers.AgentConfig{
-		CCAddress:        getStringOpt(cmd, "cc"),
-		CDNProxy:         getStringOpt(cmd, "cdn"),
-		C2TransportProxy: getStringOpt(cmd, "proxy"),
-		DoHServer:        getStringOpt(cmd, "doh"),
-		C2ChannelMode:    getStringOpt(cmd, "c2-channel-mode"),
-		InitialPeers:     getStringSliceOpt(cmd, "peers"),
-		P2PTransport:     getStringOpt(cmd, "p2p-transport"),
-		CCHTTPPort:       getStringOpt(cmd, "cc-http-port"),
-		PollInterval:     getIntOpt(cmd, "interval"),
-		Jitter:           getIntOpt(cmd, "jitter"),
-	}
-
-	// Assign booleans only if they were explicitly changed, or default to current live.RuntimeConfig settings
-	opts.IsP2PEnabled = live.RuntimeConfig.IsP2PEnabled
-	if p2pChanged {
-		opts.IsP2PEnabled = p2p
-	}
-	opts.IsDirectC2 = live.RuntimeConfig.IsDirectC2Enabled
-	if directC2Changed {
-		opts.IsDirectC2 = directC2
-	}
-	opts.IsNCSIEnabled = live.RuntimeConfig.EnableNCSI
-	if ncsiChanged {
-		opts.IsNCSIEnabled = ncsi
-	}
-	opts.UseKCP = live.RuntimeConfig.UseKCP
-	if kcpChanged {
-		opts.UseKCP = kcp
-	}
-	opts.IsStager = live.RuntimeConfig.IsRunByStager
-	if isStagerChanged {
-		opts.IsStager = isStager
+		CCAddress:        getStringOptPtr(cmd, "cc"),
+		CDNProxy:         getStringOptPtr(cmd, "cdn"),
+		C2TransportProxy: getStringOptPtr(cmd, "proxy"),
+		DoHServer:        getStringOptPtr(cmd, "doh"),
+		C2ChannelMode:    getStringOptPtr(cmd, "c2-channel-mode"),
+		InitialPeers:     getStringSliceOptPtr(cmd, "peers"),
+		P2PTransport:     getStringOptPtr(cmd, "p2p-transport"),
+		CCHTTPPort:       getStringOptPtr(cmd, "cc-http-port"),
+		PollInterval:     getIntOptPtr(cmd, "interval"),
+		Jitter:           getIntOptPtr(cmd, "jitter"),
+		IsP2PEnabled:     p2p,
+		IsDirectC2:       directC2,
+		IsNCSIEnabled:    ncsi,
+		UseKCP:           kcp,
+		IsStager:         isStager,
 	}
 
 	// Pass config to controller
@@ -163,32 +146,26 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 	}
 }
 
-// Helpers for reading flags cleanly
-func getBoolFlag(cmd *cobra.Command, name string) (bool, bool) {
-	val, _ := cmd.Flags().GetBool(name)
-	return val, cmd.Flags().Changed(name)
-}
-
-func getStringOpt(cmd *cobra.Command, name string) string {
+func getStringOptPtr(cmd *cobra.Command, name string) *string {
 	if cmd.Flags().Changed(name) {
 		val, _ := cmd.Flags().GetString(name)
-		return val
+		return &val
 	}
-	return ""
+	return nil
 }
 
-func getIntOpt(cmd *cobra.Command, name string) int {
+func getIntOptPtr(cmd *cobra.Command, name string) *int {
 	if cmd.Flags().Changed(name) {
 		val, _ := cmd.Flags().GetInt(name)
-		return val
+		return &val
 	}
-	return 0
+	return nil
 }
 
-func getStringSliceOpt(cmd *cobra.Command, name string) []string {
+func getStringSliceOptPtr(cmd *cobra.Command, name string) *[]string {
 	if cmd.Flags().Changed(name) {
 		val, _ := cmd.Flags().GetStringSlice(name)
-		return val
+		return &val
 	}
 	return nil
 }
