@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -40,6 +41,8 @@ type HTTPClientStream struct {
 	readBuf []byte
 	readMu  sync.Mutex
 	readCh  chan []byte
+
+	writeInFlight int32
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -144,7 +147,6 @@ func (s *HTTPClientStream) pollRead() {
 		}
 		u += s.config.C2Path
 	}
-
 	for s.ctx.Err() == nil {
 		gotData := false
 		req, err := http.NewRequestWithContext(s.ctx, http.MethodGet, u, nil)
@@ -185,8 +187,10 @@ func (s *HTTPClientStream) pollRead() {
 			}
 			resp.Body.Close()
 		case http.StatusNotFound:
-			// Session was terminated by server
 			resp.Body.Close()
+			if atomic.LoadInt32(&s.writeInFlight) > 0 {
+				continue
+			}
 			return
 		default:
 			resp.Body.Close()
@@ -262,6 +266,8 @@ func (s *HTTPClientStream) Write(p []byte) (n int, err error) {
 	if s.ctx.Err() != nil {
 		return 0, s.ctx.Err()
 	}
+	atomic.AddInt32(&s.writeInFlight, 1)
+	defer atomic.AddInt32(&s.writeInFlight, -1)
 
 	u := s.url
 	if s.config != nil && s.config.C2Path != "" {
@@ -283,8 +289,21 @@ func (s *HTTPClientStream) Write(p []byte) (n int, err error) {
 	}
 	defer resp.Body.Close()
 
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, err
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		return 0, fmt.Errorf("write rejected by server: %d", resp.StatusCode)
+	}
+
+	if len(body) > 0 {
+		select {
+		case s.readCh <- body:
+		case <-s.ctx.Done():
+			return 0, s.ctx.Err()
+		}
 	}
 
 	return len(p), nil
@@ -488,7 +507,36 @@ func HandleHTTPServerSession(w http.ResponseWriter, req *http.Request, config *d
 		if err == nil && len(data) > 0 {
 			select {
 			case stream.readCh <- data:
-				w.WriteHeader(http.StatusOK)
+				// If the handler already queued a response, return it in the same
+				// POST so the client can read it before the virtual session closes.
+				select {
+				case respData := <-stream.writeCh:
+					w.WriteHeader(http.StatusOK)
+					if _, err := w.Write(respData); err != nil {
+						return nil, ErrPollingRequest
+					}
+					totalWritten := len(respData)
+				postLoop:
+					for totalWritten < 50*1024*1024 {
+						select {
+						case more, ok := <-stream.writeCh:
+							if !ok {
+								break postLoop
+							}
+							n, err := w.Write(more)
+							if err != nil {
+								break postLoop
+							}
+							totalWritten += n
+						default:
+							break postLoop
+						}
+					}
+				case <-time.After(750 * time.Millisecond):
+					w.WriteHeader(http.StatusOK)
+				case <-req.Context().Done():
+					w.WriteHeader(http.StatusOK)
+				}
 			case <-time.After(5 * time.Second):
 				http.Error(w, "buffer full", http.StatusServiceUnavailable)
 			}
