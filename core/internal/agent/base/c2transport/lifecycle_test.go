@@ -875,7 +875,8 @@ func TestCheckinWithRandomPaths_Strict(t *testing.T) {
 
 	// Setup Server-side expectations (normally done by the 'put' command handler)
 	sh := &network.StreamHandler{
-		Token: ftpToken,
+		Token:           ftpToken,
+		OperatorSession: "test-operator-session",
 	}
 	// The key in FTPStreams is the raw filename (e.g. "upload_test.txt")
 	network.FTPStreams.Store("upload_test.txt", sh)

@@ -2,10 +2,12 @@ package server
 
 import (
 	"context"
+	"io"
 	"strconv"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/ftp"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
@@ -56,7 +58,7 @@ func handleFileUploadStream(conn *transport.SecureConn, agentUUID string, stream
 		_ = agents.UpdateSessionHeartbeat(agentUUID)
 	}()
 
-	logging.Infof("CBOR FTP routing: delegating stream %s from %s to core FTP handler", streamID, remoteAddr)
+	logging.Infof("CBOR FTP routing: relaying stream %s from %s to operator", streamID, remoteAddr)
 
 	// Since we are not using an HTTP roundtripper to monitor Context cancelation for us,
 	// we spawn a goroutine to force-close the underlying connection when the parent context
@@ -66,6 +68,57 @@ func handleFileUploadStream(conn *transport.SecureConn, agentUUID string, stream
 		conn.Close()
 	}()
 
-	// The legacy FTP package accepts io.ReadWriteCloser directly now.
-	ftp.HandleFTPStream(conn, streamID, remoteAddr, cancel)
+	streamAny, ok := network.FTPStreams.Load("token:" + streamID)
+	if !ok {
+		logging.Errorf("CRITICAL: handleFileUploadStream: unknown FTP token %q from %s", streamID, remoteAddr)
+		cancel()
+		conn.Close()
+		return
+	}
+	sh, castOK := streamAny.(*network.StreamHandler)
+	if !castOK || sh == nil {
+		logging.Errorf("CRITICAL: handleFileUploadStream: invalid FTP stream handler for token %q", streamID)
+		cancel()
+		conn.Close()
+		return
+	}
+	if sh.OperatorSession == "" {
+		logging.Errorf("CRITICAL: handleFileUploadStream: missing owner operator for FTP token %q", streamID)
+		cancel()
+		conn.Close()
+		return
+	}
+
+	relayTag := def.TagFTPRelayDataPrefix + streamID
+	doneTag := def.TagFTPRelayDonePrefix + streamID
+	errTag := def.TagFTPRelayErrorPrefix + streamID
+
+	buf := make([]byte, 64*1024)
+	for {
+		n, readErr := conn.Read(buf)
+		if n > 0 {
+			chunk := make([]byte, n)
+			copy(chunk, buf[:n])
+			msg := def.MsgTunData{Tag: relayTag, Response: chunk}
+			if sendErr := fwdMsgToOperator(sh.OperatorSession, msg); sendErr != nil {
+				logging.Errorf("CRITICAL: handleFileUploadStream: relay chunk for token %q failed: %v", streamID, sendErr)
+				cancel()
+				conn.Close()
+				return
+			}
+		}
+
+		if readErr != nil {
+			if readErr == io.EOF {
+				_ = fwdMsgToOperator(sh.OperatorSession, def.MsgTunData{Tag: doneTag})
+			} else {
+				logging.Warningf("handleFileUploadStream: relay stream %q read error from %s: %v", streamID, remoteAddr, readErr)
+				_ = fwdMsgToOperator(sh.OperatorSession, def.MsgTunData{Tag: errTag, Response: []byte(readErr.Error())})
+			}
+			break
+		}
+	}
+
+	cancel()
+	conn.Close()
 }

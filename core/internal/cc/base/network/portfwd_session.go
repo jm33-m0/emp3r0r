@@ -20,14 +20,15 @@ import (
 
 // PortFwdSession holds controller interface of a port-fwd session
 type PortFwdSession struct {
-	Protocol    string       // TCP or UDP
-	Lport       string       // listen_port
-	BindAddr    string       // bind address (IP to bind to), defaults to 127.0.0.1
-	To          string       // to address
-	Description string       // fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, to_addr)
-	Reverse     bool         // from agent to cc or cc to agent
-	Listener    *net.UDPConn // if mapping is UDP, we need its listener
-	Timeout     int          // timeout in seconds
+	Protocol        string       // TCP or UDP
+	Lport           string       // listen_port
+	BindAddr        string       // bind address (IP to bind to), defaults to 127.0.0.1
+	To              string       // to address
+	Description     string       // fmt.Sprintf("%s (Local) -> %s (Agent)", listenPort, to_addr)
+	Reverse         bool         // from agent to cc or cc to agent
+	OperatorSession string       // owner operator session id
+	Listener        *net.UDPConn // if mapping is UDP, we need its listener
+	Timeout         int          // timeout in seconds
 
 	Agent            *def.Emp3r0rAgent                  // agent who holds this port mapping session
 	SendCmdFunc      func(string, string, string) error // send command to agent

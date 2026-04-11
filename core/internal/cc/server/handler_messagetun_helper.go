@@ -79,6 +79,8 @@ func fwdMsg2Operators(msg def.MsgTunData) (err error) {
 		if !ok || op == nil || op.conn == nil {
 			return true // continue iteration
 		}
+		op.mu.Lock()
+		defer op.mu.Unlock()
 		encoder := cbor.NewEncoder(op.conn)
 		err = encoder.Encode(msg)
 		if err != nil {
@@ -88,6 +90,28 @@ func fwdMsg2Operators(msg def.MsgTunData) (err error) {
 		return true // continue iteration
 	})
 	return
+}
+
+// fwdMsgToOperator forwards a message to one operator session.
+func fwdMsgToOperator(operatorSession string, msg def.MsgTunData) error {
+	if operatorSession == "" {
+		return fmt.Errorf("empty operator session")
+	}
+	val, ok := OPERATORS.Load(operatorSession)
+	if !ok {
+		return fmt.Errorf("operator session %q not connected", operatorSession)
+	}
+	op, ok := val.(*operator_t)
+	if !ok || op == nil || op.conn == nil {
+		return fmt.Errorf("operator session %q has no active tunnel", operatorSession)
+	}
+	op.mu.Lock()
+	defer op.mu.Unlock()
+	encoder := cbor.NewEncoder(op.conn)
+	if err := encoder.Encode(msg); err != nil {
+		return fmt.Errorf("forward to operator %q: %w", operatorSession, err)
+	}
+	return nil
 }
 
 // collectPeerList gathers all unique IPs from all connected agents to help with discovery.

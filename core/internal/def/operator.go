@@ -36,17 +36,21 @@ type SignRequest struct {
 
 // PortFwdRequest is the request to register a port mapping
 type PortFwdRequest struct {
-	SessionID   string `cbor:"1,keyasint"`
-	Lport       string `cbor:"2,keyasint"`
-	To          string `cbor:"3,keyasint"`
-	Description string `cbor:"4,keyasint"`
-	Protocol    string `cbor:"5,keyasint"`
-	AgentTag    string `cbor:"6,keyasint"` // Add Agent Tag for context
-	IsReverse   bool   `cbor:"7,keyasint"`
+	SessionID   string               `cbor:"1,keyasint"`
+	Lport       string               `cbor:"2,keyasint"`
+	To          string               `cbor:"3,keyasint"`
+	Description string               `cbor:"4,keyasint"`
+	Protocol    string               `cbor:"5,keyasint"`
+	AgentTag    string               `cbor:"6,keyasint"` // Add Agent Tag for context
+	IsReverse   bool                 `cbor:"7,keyasint"`
+	Claim       *OperatorStreamClaim `cbor:"8,keyasint"`
 }
 
 // FTPStreamRequest is the request to register an FTP stream
 type FTPStreamRequest struct {
-	Token    string `cbor:"1,keyasint"`
-	FilePath string `cbor:"2,keyasint"`
+	Token        string               `cbor:"1,keyasint"`
+	FilePath     string               `cbor:"2,keyasint"`
+	ExpectedSize int64                `cbor:"3,keyasint"`
+	Checksum     string               `cbor:"4,keyasint"`
+	Claim        *OperatorStreamClaim `cbor:"5,keyasint"`
 }

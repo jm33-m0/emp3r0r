@@ -89,6 +89,9 @@ func TestOperatorConnection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("createMTLSHttpClient failed: %v", err)
 	}
+	if client.Timeout != 0 {
+		t.Fatalf("createMTLSHttpClient must not set a global timeout for streaming tunnel, got %v", client.Timeout)
+	}
 
 	// Test connection
 	// The server exposes /emp3r0r/api

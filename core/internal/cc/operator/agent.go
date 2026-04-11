@@ -88,7 +88,11 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 	idle_color := "green"
 
 	if live.ActiveAgent != nil {
-		rtt = fmt.Sprintf("⚡%dms", live.ActiveAgent.LastSeenRTT.Milliseconds())
+		if live.ActiveAgent.LastSeenRTT > 0 {
+			rtt = fmt.Sprintf("⚡%.1fms", float64(live.ActiveAgent.LastSeenRTT)/float64(time.Millisecond))
+		} else {
+			rtt = "⚡0ms"
+		}
 
 		idle_time := time.Since(live.ActiveAgent.LastSeen).Seconds()
 		if live.ActiveAgent.LastSeen.IsZero() {

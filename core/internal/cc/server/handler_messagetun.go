@@ -310,6 +310,17 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 				} else {
 					logging.Warningf("handleMessageTunnel: dropping response for unknown job ID %s", strconv.Quote(msg.JobID))
 				}
+
+				if ownerSession, ok := getJobOwner(msg.JobID); ok {
+					err = fwdMsgToOperator(ownerSession, msg)
+					if err != nil {
+						logging.Warningf("handleMessageTunnel: targeted relay failed for job %s owner %s: %v", strconv.Quote(msg.JobID), strconv.Quote(ownerSession), err)
+						return
+					}
+					continue
+				}
+				logging.Warningf("CRITICAL: no operator owner for job response %s from agent %s", strconv.Quote(msg.JobID), strconv.Quote(authAgentUUID))
+				continue
 			}
 			err = fwdMsg2Operators(msg)
 			if err != nil {

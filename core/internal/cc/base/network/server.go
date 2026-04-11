@@ -22,9 +22,8 @@ var (
 	EmpKCPCancel       context.CancelFunc
 
 	// Shared stream handlers and maps
-	ProxyStream = &StreamHandler{Secure: nil, BufSize: def.ProxyBufSize, Buf: make(chan []byte)}
-	FTPStreams  sync.Map
-	PortFwds    sync.Map
+	FTPStreams sync.Map
+	PortFwds   sync.Map
 )
 
 // StopEmpTLSServer stops whichever C2 TLS endpoint is currently active.
@@ -47,13 +46,16 @@ func StopEmpTLSServer() {
 
 // StreamHandler allows the HTTP handler to use CBOR-encapsulated streams.
 type StreamHandler struct {
-	Secure   io.ReadWriter // The SecureConn (PSK or Session Key)
-	Buf      chan []byte   // buffer for receiving data from agent
-	Token    string        // token string for identification
-	BufSize  int           // buffer size
-	Ctx      context.Context
-	Cancel   context.CancelFunc
-	IsClosed bool
+	Secure          io.ReadWriter // The SecureConn (PSK or Session Key)
+	Token           string        // token string for identification
+	StreamID        string        // stream identifier bound at registration
+	Capability      string        // operator capability bound at registration
+	OperatorSession string        // stream owner operator session id
+	ExpectedSize    int64         // expected final file size for file transfers
+	Checksum        string        // expected checksum for file transfers
+	Ctx             context.Context
+	Cancel          context.CancelFunc
+	IsClosed        bool
 }
 
 // Read implements io.Reader by reading from the internal buffer.
@@ -69,28 +71,7 @@ func (sh *StreamHandler) Read(p []byte) (n int, err error) {
 		return r.Read(p)
 	}
 
-	// Legacy polling mode: read from the internal buffer.
-	if sh.Buf == nil {
-		return 0, io.EOF
-	}
-
-	if sh.Ctx == nil {
-		data, ok := <-sh.Buf
-		if !ok {
-			return 0, io.EOF
-		}
-		return copy(p, data), nil
-	}
-
-	select {
-	case data, ok := <-sh.Buf:
-		if !ok {
-			return 0, io.EOF
-		}
-		return copy(p, data), nil
-	case <-sh.Ctx.Done():
-		return 0, sh.Ctx.Err()
-	}
+	return 0, io.EOF
 }
 
 // Write implements io.Writer by wrapping the data in a MsgTunData CBOR envelope

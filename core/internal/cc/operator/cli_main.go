@@ -13,7 +13,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/ftp"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/relay"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/controllers"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
@@ -75,8 +74,6 @@ func backgroundJobs() {
 	go client.StartMessageTunnel(processAgentData, func(err error) {
 		logging.Errorf("Message tunnel: %v", err)
 	})
-	// relayed HTTP server
-	go relay.RelayHTTP2Server()
 }
 
 // CliMain launches the commandline UI

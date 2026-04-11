@@ -4,9 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
@@ -24,7 +27,96 @@ var (
 
 	// SessionID marks the operator session
 	SessionID string
+
+	msgTunConnMu  sync.RWMutex
+	msgTunConn    *h2conn.Conn
+	msgTunWriteMu sync.Mutex
+	msgTunUpdateCh = make(chan struct{}, 1)
 )
+
+func notifyMsgTunUpdate() {
+	select {
+	case msgTunUpdateCh <- struct{}{}:
+	default:
+	}
+}
+
+// SendMsgTunData sends a CBOR message through the active operator message tunnel.
+func SendMsgTunData(msg *def.MsgTunData) error {
+	if msg == nil {
+		return fmt.Errorf("nil message")
+	}
+
+	timeout := time.NewTimer(10 * time.Second)
+	defer timeout.Stop()
+	var lastErr error
+
+	for {
+		msgTunConnMu.RLock()
+		conn := msgTunConn
+		msgTunConnMu.RUnlock()
+
+		if conn == nil {
+			lastErr = fmt.Errorf("message tunnel is not connected")
+			select {
+			case <-msgTunUpdateCh:
+				continue
+			case <-timeout.C:
+				return lastErr
+			}
+		}
+
+		msgTunWriteMu.Lock()
+		err := cbor.NewEncoder(conn).Encode(msg)
+		msgTunWriteMu.Unlock()
+
+		if err == nil {
+			return nil
+		}
+
+		lastErr = fmt.Errorf("encode msg tunnel data: %w", err)
+
+		// If this connection is stale/closed, clear it so next loop can wait for a fresh tunnel.
+		if isTransientTunnelWriteError(err) {
+			msgTunConnMu.Lock()
+			if msgTunConn == conn {
+				msgTunConn = nil
+			}
+			msgTunConnMu.Unlock()
+			notifyMsgTunUpdate()
+			select {
+			case <-msgTunUpdateCh:
+				continue
+			case <-timeout.C:
+				return lastErr
+			}
+		}
+
+		// Non-transient error: fail fast.
+		return lastErr
+	}
+
+	if lastErr != nil {
+		return lastErr
+	}
+	return fmt.Errorf("message tunnel send timeout")
+}
+
+func isTransientTunnelWriteError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, io.EOF) {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "closed pipe") ||
+		strings.Contains(msg, "broken pipe") ||
+		strings.Contains(msg, "use of closed network connection") ||
+		strings.Contains(msg, "connection reset by peer") ||
+		strings.Contains(msg, "context canceled") ||
+		strings.Contains(msg, "deadline exceeded")
+}
 
 // SendCBORRequest sends a POST request with CBOR encoded data and returns the response body
 func SendCBORRequest(urlPath string, data any) ([]byte, error) {
@@ -115,6 +207,10 @@ func StartMessageTunnel(onData func(*def.MsgTunData), onError func(error)) {
 		}
 
 		decoder := cbor.NewDecoder(bufio.NewReader(conn))
+		msgTunConnMu.Lock()
+		msgTunConn = conn
+		msgTunConnMu.Unlock()
+		notifyMsgTunUpdate()
 
 		// Channel to receive decode results
 		msgCh := make(chan *def.MsgTunData, 10)
@@ -153,6 +249,12 @@ func StartMessageTunnel(onData func(*def.MsgTunData), onError func(error)) {
 		}
 
 	reconnect:
+		msgTunConnMu.Lock()
+		if msgTunConn == conn {
+			msgTunConn = nil
+		}
+		msgTunConnMu.Unlock()
+		notifyMsgTunUpdate()
 		cancel()
 		conn.Close()
 

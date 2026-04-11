@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -17,6 +16,15 @@ import (
 
 // HandlePortFwdStream natively handles port forwarding over a pure io.ReadWriteCloser stream.
 func HandlePortFwdStream(sh *StreamHandler, conn io.ReadWriteCloser, agentUUID string, token string, remoteAddr string, cancel context.CancelFunc) {
+	// Architecture guardrail: this handler is for operator-side relay runtime only.
+	// Server-side proxy traffic must stay in stream_relay and never execute this handler.
+	if agents.AgentDB != nil {
+		logging.Errorf("CRITICAL: HandlePortFwdStream called in server context from %s; server must relay-only", remoteAddr)
+		cancel()
+		conn.Close()
+		return
+	}
+
 	token = strings.TrimSpace(token)
 	if token == "" {
 		logging.Errorf("HandlePortFwdStream: blocked proxy stream from %s with empty token", remoteAddr)
@@ -24,38 +32,6 @@ func HandlePortFwdStream(sh *StreamHandler, conn io.ReadWriteCloser, agentUUID s
 		conn.Close()
 		return
 	}
-
-	if agentUUID == "" {
-		logging.Errorf("HandlePortFwdStream: blocked proxy stream from %s with empty agentUUID", remoteAddr)
-		cancel()
-		conn.Close()
-		return
-	}
-
-	// SECURITY: Verify that agent is enrolled and has an active session.
-	// Auxiliary routes (FTP, Proxy, WWW) are sub-operations of the main agent session.
-	if agents.AgentDB == nil {
-		logging.Errorf("HandlePortFwdStream: AgentDB unavailable for %s from %s", strconv.Quote(agentUUID), remoteAddr)
-		cancel()
-		conn.Close()
-		return
-	}
-	pinnedKey, _, found, lookupErr := agents.GetPinnedIdentity(agentUUID)
-	if lookupErr != nil {
-		logging.Warningf("HandlePortFwdStream: AgentDB lookup failed for %s from %s: %v", strconv.Quote(agentUUID), remoteAddr, lookupErr)
-		cancel()
-		conn.Close()
-		return
-	}
-	if !found || pinnedKey == "" {
-		logging.Warningf("HandlePortFwdStream: agent %s not enrolled or has empty pinned key from %s", strconv.Quote(agentUUID), remoteAddr)
-		cancel()
-		conn.Close()
-		return
-	}
-
-	// Update heartbeat to show activity on this auxiliary channel
-	_ = agents.UpdateSessionHeartbeat(agentUUID)
 
 	sh.Secure = conn
 	sh.Token = token
@@ -122,6 +98,9 @@ func HandlePortFwdStream(sh *StreamHandler, conn io.ReadWriteCloser, agentUUID s
 		return
 	}
 	pf := val.(*PortFwdSession)
+	if pf.OperatorSession == "" {
+		logging.Debugf("HandlePortFwdStream: local relay session %s has no owner metadata", sessionID.String())
+	}
 	if pf.Ctx == nil || pf.Cancel == nil {
 		// Session may come from operator registration and miss runtime context fields.
 		pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
@@ -168,7 +147,6 @@ func HandlePortFwdStream(sh *StreamHandler, conn io.ReadWriteCloser, agentUUID s
 		if origToken != sessionID.String() {
 			sh.Cancel()
 			logging.Debugf("Closed sub-connection %s", origToken)
-			_ = agents.UpdateSessionHeartbeat(agentUUID)
 			return
 		}
 		if val, exist := PortFwds.Load(sessionID.String()); exist {
@@ -180,7 +158,6 @@ func HandlePortFwdStream(sh *StreamHandler, conn io.ReadWriteCloser, agentUUID s
 			logging.Debugf("Port mapping %s not found (likely deleted)", sessionID.String())
 		}
 		sh.Cancel()
-		_ = agents.UpdateSessionHeartbeat(agentUUID)
 		logging.Debugf("Closed port forwarding connection from %s", remoteAddr)
 	}()
 	for pf.Ctx != nil && pf.Ctx.Err() == nil {

@@ -4,9 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"io"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -14,7 +11,6 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -259,10 +255,10 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 
 	case live.RuntimeConfig.C2Routes.Proxy:
 		_, cancel := context.WithCancel(context.Background())
-		network.HandlePortFwdStream(&network.StreamHandler{}, secureConn, msgAuth.AgentUUID, routeCtx.StreamID, remoteAddr, cancel)
+		handleProxyRelayStream(secureConn, msgAuth.AgentUUID, routeCtx.StreamID, remoteAddr, cancel)
 
 	case live.RuntimeConfig.C2Routes.WWW:
-		handleFileDownloadStream(msgAuth.AgentUUID, secureConn, routeCtx.StreamID, remoteAddr)
+		handleWWWRelayStream(secureConn, msgAuth.AgentUUID, routeCtx.StreamID, remoteAddr)
 
 	default:
 		logging.Errorf("CRITICAL: cborProtocolDispatch: service %q is disabled or unknown for agent %s from %s", routeCtx.Service, strconv.Quote(msgAuth.AgentUUID), remoteAddr)
@@ -272,70 +268,4 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 // cborStreamAccept is the single HTTP handler for agent connections.
 func cborStreamAccept(t transport.StreamTransport) {
 	cborProtocolDispatch(t)
-}
-
-// handleFileDownloadStream serves files from the WWW directory to agents.
-func handleFileDownloadStream(agentUUID string, conn io.ReadWriteCloser, filename string, remoteAddr string) {
-	if agentUUID == "" {
-		logging.Errorf("handleFileDownloadStream: blocked download stream from %s with empty agentUUID", remoteAddr)
-		conn.Close()
-		return
-	}
-	if strings.TrimSpace(filename) == "" {
-		logging.Errorf("handleFileDownloadStream: blocked download stream from %s with empty filename", remoteAddr)
-		conn.Close()
-		return
-	}
-
-	// SECURITY: Verify that agent is enrolled and has an active session.
-	// Auxiliary routes (FTP, Proxy, WWW) are sub-operations of the main agent session.
-	if agents.AgentDB == nil {
-		logging.Errorf("handleFileDownloadStream: AgentDB unavailable for %s from %s", strconv.Quote(agentUUID), remoteAddr)
-		conn.Close()
-		return
-	}
-	pinnedKey, _, found, lookupErr := agents.GetPinnedIdentity(agentUUID)
-	if lookupErr != nil {
-		logging.Errorf("CRITICAL: handleFileDownloadStream: AgentDB lookup failed for %s from %s: %v", strconv.Quote(agentUUID), remoteAddr, lookupErr)
-		conn.Close()
-		return
-	}
-	if !found || pinnedKey == "" {
-		logging.Errorf("CRITICAL: handleFileDownloadStream: agent %s not enrolled or has empty pinned key from %s", strconv.Quote(agentUUID), remoteAddr)
-		conn.Close()
-		return
-	}
-
-	// Clean up on exit
-	defer conn.Close()
-
-	// Update heartbeat to show activity on this auxiliary channel
-	_ = agents.UpdateSessionHeartbeat(agentUUID)
-
-	// SECURITY: Ensure the filename is just a basename to prevent path traversal
-	filename = filepath.Base(filename)
-	path := live.Temp + transport.WWW + filename
-	if st, statErr := os.Stat(path); statErr != nil {
-		logging.Warningf("handleFileDownloadStream: stat %s failed: %v", path, statErr)
-		return
-	} else if !st.Mode().IsRegular() {
-		logging.Warningf("handleFileDownloadStream: refusing non-regular file %s", path)
-		return
-	}
-
-	f, err := os.Open(path)
-	if err != nil {
-		logging.Warningf("handleFileDownloadStream: open %s failed: %v", path, err)
-		return
-	}
-	defer f.Close()
-
-	// Use a 1MB buffer for optimal bulk stream performance
-	copyBuf := make([]byte, 1024*1024)
-	n, err := io.CopyBuffer(conn, f, copyBuf)
-	if err != nil {
-		logging.Errorf("handleFileDownloadStream: served %s to %s failed: %v", filename, remoteAddr, err)
-		return
-	}
-	logging.Infof("handleFileDownloadStream: served %s (%d bytes) to %s", filename, n, remoteAddr)
 }

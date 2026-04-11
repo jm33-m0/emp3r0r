@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/jobs"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -30,7 +31,14 @@ func ExecuteCommand(cmd, jobID, agentTag string) error {
 	}
 
 	// Record command time immediately
-	live.CmdTime.Store(jobID, time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST"))
+	now := time.Now()
+	live.CmdTime.Store(jobID, now.Format("2006-01-02 15:04:05.999999999 -0700 MST"))
+	if agent := agents.GetAgentByTag(agentTag); agent != nil {
+		agent.LastSeen = now
+	}
+	if live.ActiveAgent != nil && live.ActiveAgent.Tag == agentTag {
+		live.ActiveAgent.LastSeen = now
+	}
 
 	// Send command asynchronously to avoid blocking
 	go func() {

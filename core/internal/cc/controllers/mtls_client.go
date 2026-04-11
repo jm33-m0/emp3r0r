@@ -52,10 +52,15 @@ func CreateMTLSClient(cfg MTLSClientConfig) (*http.Client, error) {
 		PingTimeout:     5 * time.Second,
 	}
 
-	// Set default timeout if not specified
+	// Set timeout policy:
+	// - timeout > 0: use caller-provided timeout
+	// - timeout == 0: apply safe default timeout (30s)
+	// - timeout < 0: disable global client timeout (required for long-lived streams)
 	timeout := cfg.Timeout
 	if timeout == 0 {
 		timeout = 30 * time.Second
+	} else if timeout < 0 {
+		timeout = 0
 	}
 
 	// Create HTTP client

@@ -155,6 +155,12 @@ func HandleFTPStream(conn io.ReadWriteCloser, token string, remoteAddr string, c
 		cancel()
 		return
 	}
+	if sh.OperatorSession == "" {
+		logging.Errorf("CRITICAL: FTP stream %q missing operator owner metadata from %s", token, remoteAddr)
+		conn.Close()
+		cancel()
+		return
+	}
 
 	// Check connection occupancy
 	if sh.Secure != nil {
@@ -211,6 +217,9 @@ func HandleFTPStream(conn io.ReadWriteCloser, token string, remoteAddr string, c
 
 	// Initialize progress bar.
 	targetSize = util.FileSize(targetFile)
+	if targetSize == 0 && sh.ExpectedSize > 0 {
+		targetSize = sh.ExpectedSize
+	}
 	nowSize = util.FileSize(filewrite)
 	bar := progressbar.DefaultBytesSilent(targetSize)
 	bar.Add64(nowSize)
@@ -238,6 +247,9 @@ func HandleFTPStream(conn io.ReadWriteCloser, token string, remoteAddr string, c
 		}
 		nowSize = util.FileSize(filewrite)
 		targetSize = util.FileSize(targetFile)
+		if targetSize == 0 && sh.ExpectedSize > 0 {
+			targetSize = sh.ExpectedSize
+		}
 		if nowSize == targetSize && nowSize >= 0 {
 			err = os.Rename(filewrite, targetFile)
 			if err != nil {

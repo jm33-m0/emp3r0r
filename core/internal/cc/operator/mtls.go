@@ -15,7 +15,9 @@ func createMTLSHttpClient() (*http.Client, error) {
 		ClientCertFile: transport.OperatorClientCrtFile,
 		ClientKeyFile:  transport.OperatorClientKeyFile,
 		CACertFile:     transport.OperatorCaCrtFile,
-		Timeout:        30 * time.Second,
+		// Keep client-wide timeout disabled for long-lived h2 message tunnel streams.
+		// Request-level deadlines are enforced by per-request contexts.
+		Timeout: -1 * time.Second,
 	}
 	return controllers.CreateMTLSClient(cfg)
 }

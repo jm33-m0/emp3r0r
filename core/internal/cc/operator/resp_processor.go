@@ -89,6 +89,16 @@ func handleStat(out []byte, target *def.Emp3r0rAgent) string {
 // processAgentData handles data from agent side
 // UI layer - calls controller for business logic, renders output
 func processAgentData(data *def.MsgTunData) {
+	if handleFTPRelayMessage(data) {
+		return
+	}
+	if handleProxyRelayMessage(data) {
+		return
+	}
+	if handleWWWRelayMessage(data) {
+		return
+	}
+
 	// Call controller for business logic
 	resp, err := controllers.ProcessAgentResponse(data)
 	if err != nil {
@@ -130,9 +140,6 @@ func processAgentData(data *def.MsgTunData) {
 	if h, ok := CommandHandlers.Load(lookupCmd); ok {
 		switch handler := h.(type) {
 		case CommandHandler:
-			resp.Output = handler([]byte(resp.Output), resp.Agent)
-		case func([]byte, *def.Emp3r0rAgent) string:
-			// Backward-compatible fallback in case a handler was stored without type conversion.
 			resp.Output = handler([]byte(resp.Output), resp.Agent)
 		default:
 			logging.Warningf("Ignoring command handler for %q: unsupported type %T", lookupCmd, h)

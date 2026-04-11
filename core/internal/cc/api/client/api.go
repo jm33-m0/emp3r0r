@@ -1,13 +1,56 @@
 package client
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
+	"time"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
+
+func buildOperatorStreamClaim(streamID, capability string) (*def.OperatorStreamClaim, error) {
+	if SessionID == "" {
+		return nil, fmt.Errorf("operator session is empty")
+	}
+	if streamID == "" {
+		return nil, fmt.Errorf("stream id is empty")
+	}
+	if capability == "" {
+		return nil, fmt.Errorf("capability is empty")
+	}
+
+	nonceBytes := make([]byte, 16)
+	if _, err := rand.Read(nonceBytes); err != nil {
+		return nil, fmt.Errorf("generate nonce: %w", err)
+	}
+
+	now := time.Now().Unix()
+	claim := &def.OperatorStreamClaim{
+		OperatorSession: SessionID,
+		StreamID:        streamID,
+		Capability:      capability,
+		IssuedAt:        now,
+		ExpiresAt:       now + 120,
+		Nonce:           base64.RawURLEncoding.EncodeToString(nonceBytes),
+	}
+
+	priv, err := transport.ParseKeyPemFile(transport.OperatorClientKeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("parse operator key: %w", err)
+	}
+	canonical := transport.CanonicalOperatorStreamClaimString(claim)
+	sig, err := transport.SignECDSA([]byte(canonical), priv)
+	if err != nil {
+		return nil, fmt.Errorf("sign operator stream claim: %w", err)
+	}
+	claim.Signature = sig
+
+	return claim, nil
+}
 
 // GetAgentList fetches the list of connected agents from the server
 func GetAgentList() ([]*def.Emp3r0rAgent, error) {
@@ -77,7 +120,12 @@ func SignAgent(uuid string) (string, error) {
 
 // RegisterPortFwd registers a new port forwarding session with the server
 func RegisterPortFwd(req def.PortFwdRequest) error {
-	_, err := SendCBORRequest(transport.OperatorRegisterPortFwd, req)
+	claim, err := buildOperatorStreamClaim(req.SessionID, def.OperatorCapabilityRegisterPortFwd)
+	if err != nil {
+		return err
+	}
+	req.Claim = claim
+	_, err = SendCBORRequest(transport.OperatorRegisterPortFwd, req)
 	return err
 }
 
@@ -88,12 +136,19 @@ func UnregisterPortFwd(sessionID string) error {
 }
 
 // RegisterFTPStream registers a new FTP stream with the server
-func RegisterFTPStream(token, file_path string) error {
-	req := def.FTPStreamRequest{
-		Token:    token,
-		FilePath: file_path,
+func RegisterFTPStream(token, file_path string, expectedSize int64, checksum string) error {
+	claim, err := buildOperatorStreamClaim(token, def.OperatorCapabilityRegisterFTP)
+	if err != nil {
+		return err
 	}
-	_, err := SendCBORRequest(transport.OperatorRegisterFTPStream, req)
+	req := def.FTPStreamRequest{
+		Token:        token,
+		FilePath:     file_path,
+		ExpectedSize: expectedSize,
+		Checksum:     checksum,
+		Claim:        claim,
+	}
+	_, err = SendCBORRequest(transport.OperatorRegisterFTPStream, req)
 	return err
 }
 
