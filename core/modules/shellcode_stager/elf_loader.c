@@ -19,11 +19,11 @@ void jump_start(void *init, void *exit_func, void *entry);
 
 // Define RELATIVE constant based on arch
 #if defined(__x86_64__) || defined(__amd64__) || defined(__i386__)
-    #define REL_TYPE_RELATIVE 8
+#define REL_TYPE_RELATIVE 8
 #elif defined(__aarch64__)
-    #define REL_TYPE_RELATIVE 1027
+#define REL_TYPE_RELATIVE 1027
 #else
-    #define REL_TYPE_RELATIVE 8 // Fallback
+#define REL_TYPE_RELATIVE 8 // Fallback
 #endif
 
 #if defined(GOARCH_amd64)
@@ -100,12 +100,11 @@ static void _get_rand(char *buf, int size) {
   (void)result; // Suppress unused result warning
 }
 
-
-
 // Returns the required memory size and bounds for the ELF
 // min_vaddr: lowest virtual address
 // max_vaddr: highest virtual address (exclusive)
-int elf_get_memory_bounds(char *elf_start, size_t *min_vaddr, size_t *max_vaddr) {
+int elf_get_memory_bounds(char *elf_start, size_t *min_vaddr,
+                          size_t *max_vaddr) {
   Elf_Ehdr *hdr = (Elf_Ehdr *)elf_start;
   Elf_Phdr *phdr = (Elf_Phdr *)(elf_start + hdr->e_phoff);
   size_t min = (size_t)-1;
@@ -122,12 +121,16 @@ int elf_get_memory_bounds(char *elf_start, size_t *min_vaddr, size_t *max_vaddr)
     size_t start = (size_t)map_start;
     size_t end = start + map_size;
 
-    if (start < min) min = start;
-    if (end > max) max = end;
+    if (start < min)
+      min = start;
+    if (end > max)
+      max = end;
   }
 
-  if (min_vaddr) *min_vaddr = min;
-  if (max_vaddr) *max_vaddr = max;
+  if (min_vaddr)
+    *min_vaddr = min;
+  if (max_vaddr)
+    *max_vaddr = max;
 
   return 0;
 }
@@ -148,7 +151,8 @@ static int elf_relocate(char *elf_start, size_t base_addr) {
     }
   }
 
-  if (!dyn) return 0; // Not dynamic
+  if (!dyn)
+    return 0; // Not dynamic
 
   size_t rela = 0, relasz = 0, relaent = 0;
   size_t rel = 0, relsz = 0, relent = 0;
@@ -156,17 +160,36 @@ static int elf_relocate(char *elf_start, size_t base_addr) {
   int plt_is_rela = 0;
 
   for (size_t i = 0; i < dyn_size / sizeof(Elf_Dyn); i++) {
-    if (dyn[i].d_tag == DT_NULL) break;
+    if (dyn[i].d_tag == DT_NULL)
+      break;
     switch (dyn[i].d_tag) {
-      case DT_RELA: rela = dyn[i].d_un.d_ptr; break;
-      case DT_RELASZ: relasz = dyn[i].d_un.d_val; break;
-      case DT_RELAENT: relaent = dyn[i].d_un.d_val; break;
-      case DT_REL: rel = dyn[i].d_un.d_ptr; break;
-      case DT_RELSZ: relsz = dyn[i].d_un.d_val; break;
-      case DT_RELENT: relent = dyn[i].d_un.d_val; break;
-      case DT_JMPREL: jmprel = dyn[i].d_un.d_ptr; break;
-      case DT_PLTRELSZ: pltrelsz = dyn[i].d_un.d_val; break;
-      case DT_PLTREL: plt_is_rela = (dyn[i].d_un.d_val == DT_RELA); break;
+    case DT_RELA:
+      rela = dyn[i].d_un.d_ptr;
+      break;
+    case DT_RELASZ:
+      relasz = dyn[i].d_un.d_val;
+      break;
+    case DT_RELAENT:
+      relaent = dyn[i].d_un.d_val;
+      break;
+    case DT_REL:
+      rel = dyn[i].d_un.d_ptr;
+      break;
+    case DT_RELSZ:
+      relsz = dyn[i].d_un.d_val;
+      break;
+    case DT_RELENT:
+      relent = dyn[i].d_un.d_val;
+      break;
+    case DT_JMPREL:
+      jmprel = dyn[i].d_un.d_ptr;
+      break;
+    case DT_PLTRELSZ:
+      pltrelsz = dyn[i].d_un.d_val;
+      break;
+    case DT_PLTREL:
+      plt_is_rela = (dyn[i].d_un.d_val == DT_RELA);
+      break;
     }
   }
 
@@ -194,7 +217,8 @@ static int elf_relocate(char *elf_start, size_t base_addr) {
 
   // Apply PLT relocations
   if (jmprel && pltrelsz) {
-    size_t ent = plt_is_rela ? (relaent ? relaent : sizeof(Elf_Rela)) : (relent ? relent : sizeof(Elf_Rel));
+    size_t ent = plt_is_rela ? (relaent ? relaent : sizeof(Elf_Rela))
+                             : (relent ? relent : sizeof(Elf_Rel));
     for (size_t i = 0; i < pltrelsz / ent; i++) {
       if (plt_is_rela) {
         Elf_Rela *r = (Elf_Rela *)(base_addr + jmprel + i * ent);
@@ -215,17 +239,19 @@ static int elf_relocate(char *elf_start, size_t base_addr) {
   return 0;
 }
 
-
-// pre_mapped: if true, assume memory at base_addr is already mapped and writable
+// pre_mapped: if true, assume memory at base_addr is already mapped and
+// writable
 int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
-             size_t *entry, size_t *mapped_size, int pre_mapped, const char *module_path) {
+             size_t *entry, size_t *mapped_size, int pre_mapped,
+             const char *module_path) {
   DEBUG_PRINT("elf_load started\n");
+  (void)stack;
+  (void)stack_size;
+  (void)entry;
   Elf_Ehdr *hdr;
   Elf_Phdr *phdr;
 
   size_t x;
-  int elf_prot = 0;
-  int stack_prot = 0;
   size_t base = 0;
   size_t total_mapped_size = 0;
 
@@ -237,8 +263,8 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
   if (hdr->e_type == ET_DYN) {
     DEBUG_PRINT("ET_DYN (PIE) detected.\n");
     if (pre_mapped && base_addr && *base_addr != 0) {
-        base = *base_addr;
-        mapped_mem = (void *)base;
+      base = *base_addr;
+      mapped_mem = (void *)base;
     } else if (module_path && module_path[0] != '\0') {
       DEBUG_PRINT("Attempting module stomping on %s\n", module_path);
       int fd = open(module_path, O_RDONLY, 0);
@@ -246,72 +272,79 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
         // Get file size using lseek
         long size = lseek(fd, 0, SEEK_END);
         if (size > 0) {
-            size_t st_size = (size_t)size;
-            // Seek back to start
-            lseek(fd, 0, SEEK_SET);
+          size_t st_size = (size_t)size;
+          // Seek back to start
+          lseek(fd, 0, SEEK_SET);
 
-            // Calculate required size for our payload
-            size_t required_size = 0;
-             // We need to iterate PHDRs to find the total span
-             size_t min_v = (size_t)-1, max_v = 0;
-             for (int i=0; i<hdr->e_phnum; i++) {
-                 if (phdr[i].p_type == PT_LOAD && phdr[i].p_memsz > 0) {
-                     size_t vstart = phdr[i].p_vaddr;
-                     size_t vend = vstart + phdr[i].p_memsz;
-                     if (vstart < min_v) min_v = vstart;
-                     if (vend > max_v) max_v = vend;
-                 }
-             }
-             required_size = max_v - min_v; // Assuming base 0 for calculation
-             
-             if (st_size >= required_size) {
-                  // Map the legitimate file Copy-On-Write
-                  mapped_mem = (void *)mmap(NULL, st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-                  if (mapped_mem != MAP_FAILED) {
-                      DEBUG_PRINT("Mapped %s at %p\n", module_path, mapped_mem);
-                      
-                      // We need it writable to stomp
-                      if (mprotect(mapped_mem, st_size, PROT_READ | PROT_WRITE) == 0) {
-                           DEBUG_PRINT("Stomping memory...\n");
-                           // We will use this as base
-                           base = (size_t)mapped_mem;
-                           total_mapped_size = st_size;
-                      } else {
-                           DEBUG_PRINT("mprotect RW failed\n");
-                           munmap(mapped_mem, st_size);
-                           mapped_mem = NULL;
-                      }
-                  }
-             } else {
-                 DEBUG_PRINT("Module file too small (%ld vs %ld)\n", (long)st_size, (long)required_size);
-             }
+          // Calculate required size for our payload
+          size_t required_size = 0;
+          // We need to iterate PHDRs to find the total span
+          size_t min_v = (size_t)-1, max_v = 0;
+          for (int i = 0; i < hdr->e_phnum; i++) {
+            if (phdr[i].p_type == PT_LOAD && phdr[i].p_memsz > 0) {
+              size_t vstart = phdr[i].p_vaddr;
+              size_t vend = vstart + phdr[i].p_memsz;
+              if (vstart < min_v)
+                min_v = vstart;
+              if (vend > max_v)
+                max_v = vend;
+            }
+          }
+          required_size = max_v - min_v; // Assuming base 0 for calculation
+
+          if (st_size >= required_size) {
+            // Map the legitimate file Copy-On-Write
+            mapped_mem =
+                (void *)mmap(NULL, st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+            if (mapped_mem != MAP_FAILED) {
+              DEBUG_PRINT("Mapped %s at %p\n", module_path, mapped_mem);
+
+              // We need it writable to stomp
+              if (mprotect(mapped_mem, st_size, PROT_READ | PROT_WRITE) == 0) {
+                DEBUG_PRINT("Stomping memory...\n");
+                // We will use this as base
+                base = (size_t)mapped_mem;
+                total_mapped_size = st_size;
+              } else {
+                DEBUG_PRINT("mprotect RW failed\n");
+                munmap(mapped_mem, st_size);
+                mapped_mem = NULL;
+              }
+            }
+          } else {
+            DEBUG_PRINT("Module file too small (%ld vs %ld)\n", (long)st_size,
+                        (long)required_size);
+          }
         }
         close(fd);
       } else {
-           DEBUG_PRINT("Failed to open module path\n");
+        DEBUG_PRINT("Failed to open module path\n");
       }
     }
-    
+
     if (!mapped_mem) {
-        DEBUG_PRINT("Falling back to anonymous memory\n");
-        // Let's just calculate total size and mmap a region
-         size_t min_v = (size_t)-1, max_v = 0;
-         for (int i=0; i<hdr->e_phnum; i++) {
-             if (phdr[i].p_type == PT_LOAD && phdr[i].p_memsz > 0) {
-                 size_t vstart = phdr[i].p_vaddr;
-                 size_t vend = vstart + phdr[i].p_memsz;
-                 if (vstart < min_v) min_v = vstart;
-                 if (vend > max_v) max_v = vend;
-             }
-         }
-         size_t total_size = max_v - min_v;
-         mapped_mem = mmap(NULL, total_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-         if (mapped_mem == MAP_FAILED) {
-             DEBUG_PRINT("Failed to allocate anonymous memory\n");
-             return -1;
-         }
-         base = (size_t)mapped_mem;
-         total_mapped_size = total_size;
+      DEBUG_PRINT("Falling back to anonymous memory\n");
+      // Let's just calculate total size and mmap a region
+      size_t min_v = (size_t)-1, max_v = 0;
+      for (int i = 0; i < hdr->e_phnum; i++) {
+        if (phdr[i].p_type == PT_LOAD && phdr[i].p_memsz > 0) {
+          size_t vstart = phdr[i].p_vaddr;
+          size_t vend = vstart + phdr[i].p_memsz;
+          if (vstart < min_v)
+            min_v = vstart;
+          if (vend > max_v)
+            max_v = vend;
+        }
+      }
+      size_t total_size = max_v - min_v;
+      mapped_mem = (void *)mmap(NULL, total_size, PROT_READ | PROT_WRITE,
+                                MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+      if (mapped_mem == MAP_FAILED) {
+        DEBUG_PRINT("Failed to allocate anonymous memory\n");
+        return -1;
+      }
+      base = (size_t)mapped_mem;
+      total_mapped_size = total_size;
     }
 
   } else {
@@ -323,7 +356,7 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
     *base_addr = base; // Set base addr
 
   if (mapped_size != NULL) {
-      *mapped_size = total_mapped_size;
+    *mapped_size = total_mapped_size;
   }
 
   // Use a fixed size array to avoid VLA issues
@@ -343,53 +376,61 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
     int map_size = ROUND_UP(phdr[x].p_memsz + round_down_size, PAGE_SIZE);
     int elf_prot = 0;
 
-    if (phdr[x].p_flags & PF_R) elf_prot |= PROT_READ;
-    if (phdr[x].p_flags & PF_W) elf_prot |= PROT_WRITE;
-    if (phdr[x].p_flags & PF_X) elf_prot |= PROT_EXEC;
+    if (phdr[x].p_flags & PF_R)
+      elf_prot |= PROT_READ;
+    if (phdr[x].p_flags & PF_W)
+      elf_prot |= PROT_WRITE;
+    if (phdr[x].p_flags & PF_X)
+      elf_prot |= PROT_EXEC;
 
     DEBUG_PRINT("Mapping segment %d: vaddr 0x%lx, map_size %d, flags=%u\n", x,
                 phdr[x].p_vaddr, map_size, phdr[x].p_flags);
 
     void *m = NULL;
     if (hdr->e_type == ET_DYN) {
-        // For PIE, we copy into our pre-allocated/mapped region
-        m = (void *)(base + (size_t)map_start);
-        
-        // If we are stomping (mapped_mem is set and it was mmapped from file), 
-        // OR if we are using anonymous memory (mapped_mem is set),
-        // we already have the underlying memory.
-        
-        // However, we need to ensure permissions are RW for now.
-        // For partial stomping (if we used mmap with file), the whole region is RW.
-        
-        // Copy segment data
-        memcpy((void *)base + phdr[x].p_vaddr, elf_start + phdr[x].p_offset, phdr[x].p_filesz);
-        
-        // Zero-out BSS
-        if (phdr[x].p_memsz > phdr[x].p_filesz)
-          memset((void *)(base + phdr[x].p_vaddr + phdr[x].p_filesz), 0,
-                 phdr[x].p_memsz - phdr[x].p_filesz);
-                 
+      // For PIE, we copy into our pre-allocated/mapped region
+      m = (void *)(base + (size_t)map_start);
+
+      // If we are stomping (mapped_mem is set and it was mmapped from file),
+      // OR if we are using anonymous memory (mapped_mem is set),
+      // we already have the underlying memory.
+
+      // However, we need to ensure permissions are RW for now.
+      // For partial stomping (if we used mmap with file), the whole region is
+      // RW.
+
+      // Copy segment data
+      memcpy((void *)base + phdr[x].p_vaddr, elf_start + phdr[x].p_offset,
+             phdr[x].p_filesz);
+
+      // Zero-out BSS
+      if (phdr[x].p_memsz > phdr[x].p_filesz)
+        memset((void *)(base + phdr[x].p_vaddr + phdr[x].p_filesz), 0,
+               phdr[x].p_memsz - phdr[x].p_filesz);
+
     } else {
-        // Static executable (ET_EXEC) - classic behavior
-        if (!pre_mapped) {
-            m = (void *)mmap((void *)(base + (size_t)map_start), map_size,
-                                   PROT_READ | PROT_WRITE, // Map RW for loading/relocation
-                                   MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
-            if ((long)m < 0) {
-              DEBUG_PRINT("mmap failed for segment %d at %p\n", x, (void*)(base + (size_t)map_start));
-              return -1;
-            }
-        } else {
-            m = (void *)(base + (size_t)map_start);
+      // Static executable (ET_EXEC) - classic behavior
+      if (!pre_mapped) {
+        m = (void *)mmap((void *)(base + (size_t)map_start), map_size,
+                         PROT_READ |
+                             PROT_WRITE, // Map RW for loading/relocation
+                         MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+        if ((long)m < 0) {
+          DEBUG_PRINT("mmap failed for segment %d at %p\n", x,
+                      (void *)(base + (size_t)map_start));
+          return -1;
         }
+      } else {
+        m = (void *)(base + (size_t)map_start);
+      }
 
-        memcpy((void *)base + phdr[x].p_vaddr, elf_start + phdr[x].p_offset, phdr[x].p_filesz);
+      memcpy((void *)base + phdr[x].p_vaddr, elf_start + phdr[x].p_offset,
+             phdr[x].p_filesz);
 
-        // Zero-out BSS
-        if (phdr[x].p_memsz > phdr[x].p_filesz)
-          memset((void *)(base + phdr[x].p_vaddr + phdr[x].p_filesz), 0,
-                 phdr[x].p_memsz - phdr[x].p_filesz);
+      // Zero-out BSS
+      if (phdr[x].p_memsz > phdr[x].p_filesz)
+        memset((void *)(base + phdr[x].p_vaddr + phdr[x].p_filesz), 0,
+               phdr[x].p_memsz - phdr[x].p_filesz);
     }
 
     segments[seg_count].m = m;
@@ -397,17 +438,18 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
     segments[seg_count].prot = elf_prot;
     seg_count++;
   }
-  
+
   // Perform relocations if PIE
   if (hdr->e_type == ET_DYN) {
-      DEBUG_PRINT("Relocating...\n");
-      elf_relocate(elf_start, base);
+    DEBUG_PRINT("Relocating...\n");
+    elf_relocate(elf_start, base);
 
-      // Seal the memory before applying segment permissions.
-      // This ensures the "tail" (unused part of the stomped module) is not left RW.
-      if (mapped_mem) {
-          mprotect(mapped_mem, total_mapped_size, PROT_READ);
-      }
+    // Seal the memory before applying segment permissions.
+    // This ensures the "tail" (unused part of the stomped module) is not left
+    // RW.
+    if (mapped_mem) {
+      mprotect(mapped_mem, total_mapped_size, PROT_READ);
+    }
   }
 
   // Set proper protection on all sections
@@ -422,7 +464,8 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
   return 0;
 }
 
-int elf_run(void *buf, char **argv, char **env, int pre_mapped, const char *module_path, size_t base_addr) {
+int elf_run(void *buf, char **argv, char **env, int pre_mapped,
+            const char *module_path, size_t base_addr) {
   DEBUG_PRINT("elf_run started\n");
   size_t x;
   int str_len;
@@ -441,8 +484,6 @@ int elf_run(void *buf, char **argv, char **env, int pre_mapped, const char *modu
 
   // Fill in 16 random bytes for the loader below
   _get_rand(rand_bytes, 16);
-
-
 
   // First, let's count arguments...
   DEBUG_PRINT("Counting arguments, argv=%p, env=%p\n", argv, env);
@@ -470,7 +511,8 @@ int elf_run(void *buf, char **argv, char **env, int pre_mapped, const char *modu
   DEBUG_PRINT("Stack allocated at %p\n", stack);
 
   // Map the ELF in memory
-  if (elf_load(buf, stack, STACK_SIZE, &elf_base, &elf_entry, NULL, pre_mapped, module_path) < 0) {
+  if (elf_load(buf, stack, STACK_SIZE, &elf_base, &elf_entry, NULL, pre_mapped,
+               module_path) < 0) {
     DEBUG_PRINT("elf_load failed\n");
     return -1;
   }
@@ -478,7 +520,6 @@ int elf_run(void *buf, char **argv, char **env, int pre_mapped, const char *modu
   DEBUG_PRINT("ELF loaded at 0x%lx, entry 0x%lx\n", elf_base, elf_entry);
 
   // Check if this is a shared object and find main symbol
-
 
   // if (hdr->e_type == ET_DYN) {
   //     DEBUG_PRINT("Error: Shared Objects not supported.\n");
@@ -584,19 +625,21 @@ int elf_run(void *buf, char **argv, char **env, int pre_mapped, const char *modu
   unsigned long *sp_ptr = (unsigned long *)argv;
   // Walk past argc, argv, envp to find auxv
   unsigned int p_argc = *--sp_ptr;
-  sp_ptr++; // argc
+  sp_ptr++;             // argc
   sp_ptr += p_argc + 1; // skip argv
-  while (*sp_ptr++) ; // skip envp
-  
+  while (*sp_ptr++)
+    ; // skip envp
+
   // Now we are at auxv
   struct ATENTRY *p_at = (struct ATENTRY *)sp_ptr;
   for (; p_at->id != AT_NULL; p_at++) {
-      if (p_at->id == 33) { // AT_SYSINFO_EHDR
-          at[cnt].id = 33;
-          at[cnt++].value = p_at->value;
-          DEBUG_PRINT("Found and forwarded VDSO (AT_SYSINFO_EHDR) at 0x%lx\n", p_at->value);
-          break;
-      }
+    if (p_at->id == 33) { // AT_SYSINFO_EHDR
+      at[cnt].id = 33;
+      at[cnt++].value = p_at->value;
+      DEBUG_PRINT("Found and forwarded VDSO (AT_SYSINFO_EHDR) at 0x%lx\n",
+                  p_at->value);
+      break;
+    }
   }
 
   // AT_SECURE (0 = not setuid/setgid)
@@ -618,7 +661,8 @@ int elf_run(void *buf, char **argv, char **env, int pre_mapped, const char *modu
   at[cnt].id = AT_NULL;
   at[cnt++].value = 0;
 
-  // Run constructors (Disabled again as they cause SIGSEGV with dynamic payloads)
+  // Run constructors (Disabled again as they cause SIGSEGV with dynamic
+  // payloads)
   /*
   if (init || init_array) {
     ...
@@ -628,9 +672,6 @@ int elf_run(void *buf, char **argv, char **env, int pre_mapped, const char *modu
   DEBUG_PRINT("Stack setup complete, jumping to entry point\n");
   DEBUG_PRINT("Stack storage: 0x%lx\n", (unsigned long)stack_storage);
   DEBUG_PRINT("Entry point: 0x%lx\n", (unsigned long)elf_entry);
-
-
-
 
   jump_start(stack_storage, (void *)_exit_func, (void *)elf_entry);
 
