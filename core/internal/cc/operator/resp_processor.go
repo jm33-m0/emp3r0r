@@ -92,9 +92,6 @@ func processAgentData(data *def.MsgTunData) {
 	if handleFTPRelayMessage(data) {
 		return
 	}
-	if handleProxyRelayMessage(data) {
-		return
-	}
 	if handleWWWRelayMessage(data) {
 		return
 	}

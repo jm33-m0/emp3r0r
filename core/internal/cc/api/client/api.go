@@ -70,21 +70,6 @@ func GetAgentList() ([]*def.Emp3r0rAgent, error) {
 	return agents, nil
 }
 
-// GetPortFwdSessions fetches active port forwarding sessions from the server
-func GetPortFwdSessions() ([]def.PortFwdSession, error) {
-	body, err := SendCBORRequest(transport.OperatorListPortFwds, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var sessions []def.PortFwdSession
-	if err := cbor.Unmarshal(body, &sessions); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal port mappings: %v", err)
-	}
-
-	return sessions, nil
-}
-
 // GetCerts fetches CA and Server certificates from the server
 func GetCerts() (map[string][]byte, error) {
 	body, err := SendCBORRequest(transport.OperatorGetCA, nil)
@@ -116,23 +101,6 @@ func SignAgent(uuid string) (string, error) {
 	}
 
 	return sig, nil
-}
-
-// RegisterPortFwd registers a new port forwarding session with the server
-func RegisterPortFwd(req def.PortFwdRequest) error {
-	claim, err := buildOperatorStreamClaim(req.SessionID, def.OperatorCapabilityRegisterPortFwd)
-	if err != nil {
-		return err
-	}
-	req.Claim = claim
-	_, err = SendCBORRequest(transport.OperatorRegisterPortFwd, req)
-	return err
-}
-
-// UnregisterPortFwd unregisters a port forwarding session from the server
-func UnregisterPortFwd(sessionID string) error {
-	_, err := SendCBORRequest(transport.OperatorUnregisterPortFwd, sessionID)
-	return err
 }
 
 // RegisterFTPStream registers a new FTP stream with the server

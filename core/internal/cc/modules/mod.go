@@ -26,9 +26,6 @@ var (
 	// ModuleRunners a map of module helpers
 	ModuleRunners = map[string]func(ctx *context.C2Context){
 		def.ModCMD_EXEC:    ModuleCmd,
-		def.ModSHELL:       ModuleShell,
-		def.ModPROXY:       moduleProxy,
-		def.ModPORT_FWD:    ModulePortFwd,
 		def.ModLPE_SUGGEST: moduleLPE,
 		def.ModCLEAN_LOG:   moduleLogCleaner,
 

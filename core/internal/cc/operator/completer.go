@@ -10,7 +10,6 @@ import (
 
 	"github.com/carapace-sh/carapace"
 	"github.com/google/uuid"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/controllers"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -41,20 +40,6 @@ func listMods(ctx carapace.Context) carapace.Action {
 		return true
 	})
 	return carapace.ActionValues(names...)
-}
-
-// autocomplete portfwd session IDs
-func listPortMappings(ctx carapace.Context) carapace.Action {
-	sessions, err := client.GetPortFwdSessions()
-	if err != nil {
-		logging.Debugf("Failed to list port mappings: %v", err)
-		return carapace.ActionValues()
-	}
-	ids := make([]string, len(sessions))
-	for i, s := range sessions {
-		ids[i] = s.ID
-	}
-	return carapace.ActionValues(ids...)
 }
 
 // autocomplete agent tags

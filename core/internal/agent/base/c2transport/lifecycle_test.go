@@ -30,7 +30,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
-	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/posener/h2conn"
 )
 
@@ -847,7 +846,7 @@ func TestCheckinWithRandomPaths_Strict(t *testing.T) {
 	t.Log("Successfully checked in with random paths")
 
 	// Check-in processing is async on server side. Wait until the agent is
-	// durably visible in AgentDB before opening FTP/WWW streams.
+	// durably visible in AgentDB before finishing this strict check-in test.
 	deadline := time.Now().Add(5 * time.Second)
 	for {
 		storedAgent, getErr := agents.GetStoredAgent(agentUUID)
@@ -855,94 +854,9 @@ func TestCheckinWithRandomPaths_Strict(t *testing.T) {
 			break
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("agent %s not persisted after check-in before FTP/WWW tests", agentUUID)
+			t.Fatalf("agent %s not persisted after check-in", agentUUID)
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-
-	// --- FTP Upload Test Over CBOR ---
-	t.Log("Testing FTP upload over pure CBOR")
-
-	// Create a dummy file to upload
-	testData := []byte("FTP over CBOR integration test data for emp3r0r C2!")
-	dummyFile := filepath.Join(tmpDir, "upload_test.txt")
-	err = os.WriteFile(dummyFile, testData, 0o600)
-	if err != nil {
-		t.Fatalf("Failed to write dummy file: %v", err)
-	}
-	hash := crypto.SHA256SumFile(dummyFile)
-	ftpToken := strings.ReplaceAll(uuid.New().String(), "-", "") + "-" + hash
-
-	// Setup Server-side expectations (normally done by the 'put' command handler)
-	sh := &network.StreamHandler{
-		Token:           ftpToken,
-		OperatorSession: "test-operator-session",
-	}
-	// The key in FTPStreams is the raw filename (e.g. "upload_test.txt")
-	network.FTPStreams.Store("upload_test.txt", sh)
-
-	// Set live download directory so the server knows where to put it
-	live.FileGetDir = filepath.Join(tmpDir, "c2_downloads")
-	expectedDest := filepath.Join(live.FileGetDir, "upload_test.txt")
-	os.MkdirAll(live.FileGetDir, 0o700)
-
-	// Pre-allocate the file so HandleFTPStream knows the expected size (as get.go does)
-	f, _ := os.Create(expectedDest)
-	f.Truncate(int64(len(testData)))
-	f.Close()
-
-	// Agent: Execute the file transfer
-	go func() {
-		err := c2transport.SendFile2CC(dummyFile, 0, ftpToken)
-		if err != nil {
-			t.Errorf("SendFile2CC failed: %v", err)
-		}
-	}()
-
-	// Wait for the transfer to complete server-side
-	time.Sleep(3 * time.Second)
-
-	// Verify the file arrived intact
-	receivedData, err := os.ReadFile(expectedDest)
-	if err != nil {
-		t.Fatalf("Failed to read downloaded file on server: %v", err)
-	}
-	if string(receivedData) != string(testData) {
-		t.Fatalf("Downloaded file mismatch! got %q, want %q", receivedData, testData)
-	}
-	t.Logf("✓ FTP upload over CBOR stream succeeded. File saved to %s", expectedDest)
-
-	// --- WWW Download Test Over CBOR ---
-	t.Log("Testing WWW download over pure CBOR")
-
-	downloadName := "download_test_" + strings.ReplaceAll(uuid.New().String(), "-", "") + ".bin"
-	downloadData := []byte("C2 WWW pure CBOR download payload for full lifecycle test")
-	downloadHash := crypto.SHA256SumRaw(downloadData)
-
-	wwwDir := live.Temp + transport.WWW
-	err = os.MkdirAll(wwwDir, 0o700)
-	if err != nil {
-		t.Fatalf("Failed to create WWW dir %s: %v", wwwDir, err)
-	}
-	err = os.WriteFile(filepath.Join(wwwDir, downloadName), downloadData, 0o600)
-	if err != nil {
-		t.Fatalf("Failed to stage WWW download file: %v", err)
-	}
-
-	agentDownloadPath := filepath.Join(tmpDir, "agent_download.bin")
-	defer os.Remove(agentDownloadPath)
-
-	_, err = c2transport.DownloadViaC2(common.RuntimeConfig, downloadName, agentDownloadPath, downloadHash)
-	if err != nil {
-		t.Fatalf("DownloadViaC2 failed over CBOR stream: %v", err)
-	}
-
-	downloadedData, err := os.ReadFile(agentDownloadPath)
-	if err != nil {
-		t.Fatalf("Failed to read downloaded file on agent side: %v", err)
-	}
-	if string(downloadedData) != string(downloadData) {
-		t.Fatalf("WWW download mismatch! got %q, want %q", downloadedData, downloadData)
-	}
-	t.Logf("✓ WWW download over CBOR stream succeeded. File saved to %s", agentDownloadPath)
+	t.Log("Strict check-in path verified; auxiliary FTP/WWW routes require operator-owned relay and are tested separately")
 }

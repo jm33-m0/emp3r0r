@@ -12,7 +12,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/ftp"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -20,7 +19,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/reeflective/console"
 	"github.com/reeflective/console/commands/readline"
 	"github.com/spf13/cobra"
@@ -152,34 +150,6 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		}
 		rootCmd.AddCommand(upgradeAgentCmd)
 
-		fileManagerCmd := &cobra.Command{
-			Use:     "file_manager",
-			GroupID: "filesystem",
-			Short:   "Browse remote files in your local file manager with SFTP protocol",
-			Args:    cobra.NoArgs,
-			Run: func(cmd *cobra.Command, args []string) {
-				agent := agents.MustGetActiveAgent()
-				if agent == nil {
-					logging.Errorf("No active agent")
-					return
-				}
-				ctx := &c2context.C2Context{
-					Target:    agent,
-					OpSession: client.SessionID,
-					OnUIReady: func(data any) error {
-						connStr := data.(string)
-						logging.Successf("File manager ready! Opening tmux...")
-						windowName := "file_manager"
-						if agent != nil {
-							windowName = fmt.Sprintf("sftp-%s", agent.ShortID)
-						}
-						return cli.TmuxNewWindow(windowName, connStr)
-					},
-				}
-				modules.CmdOpenFileManager(ctx)
-			},
-		}
-		rootCmd.AddCommand(fileManagerCmd)
 
 		lsCmd := &cobra.Command{
 			Use:     "ls [dir]",
@@ -452,39 +422,6 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		}
 		rootCmd.AddCommand(searchCmd)
 
-		lsPortMapppingsCmd := &cobra.Command{
-			Use:     "ls_port_fwds",
-			GroupID: "network",
-			Short:   "List active port mappings",
-			Run:     CmdListPortFwdsModule,
-		}
-		rootCmd.AddCommand(lsPortMapppingsCmd)
-
-		rmPortMappingCmd := &cobra.Command{
-			Use:     "delete_port_fwd port_mapping_id",
-			GroupID: "network",
-			Short:   "Delete a port mapping session",
-			Example: "delete_port_fwd --id <session_id>",
-			Run: func(cmd *cobra.Command, args []string) {
-				sessionID, err := cmd.Flags().GetString("id")
-				if err != nil {
-					logging.Errorf("Get session ID: %v", err)
-					return
-				}
-				err = network.DeletePortFwdSession(sessionID)
-				if err != nil {
-					logging.Errorf("Delete port forwarding session: %v", err)
-					return
-				}
-				logging.Successf("Deleted port forwarding session %s", sessionID)
-			},
-		}
-		rmPortMappingCmd.Flags().StringP("id", "", "", "Port mapping ID")
-		rmPortMappingCmd.MarkFlagRequired("id")
-		rootCmd.AddCommand(rmPortMappingCmd)
-		carapace.Gen(rmPortMappingCmd).FlagCompletion(carapace.ActionMap{
-			"id": carapace.ActionCallback(listPortMappings),
-		})
 
 		labelAgentCmd := &cobra.Command{
 			Use:     "label --id agent_id --label custom_name",
@@ -540,35 +477,6 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 
 		return rootCmd
 	}
-}
-
-func CmdListPortFwdsModule(cmd *cobra.Command, args []string) {
-	ctx := &c2context.C2Context{
-		Flags: map[string]string{"switch": "list"},
-		OnUIReady: func(data any) error {
-			sessions, ok := data.([]def.PortFwdSession)
-			if !ok {
-				logging.Errorf("Expected []def.PortFwdSession, got %T", data)
-				return fmt.Errorf("type mismatch")
-			}
-
-			header := []string{"Local Port", "To", "Agent", "Description", "ID"}
-			var rows [][]string
-			for _, s := range sessions {
-				rows = append(rows, []string{
-					s.LocalPort,
-					s.RemoteAddr,
-					util.SplitLongLine(s.AgentTag, 10),
-					util.SplitLongLine(s.Description, 10),
-					util.SplitLongLine(s.ID, 10),
-				})
-			}
-			tableStr := cli.BuildTable(header, rows)
-			logging.Infof("\n\033[0m%s\n\n", tableStr)
-			return nil
-		},
-	}
-	modules.ModulePortFwd(ctx)
 }
 
 func execCmd(cmd *cobra.Command, args []string) {

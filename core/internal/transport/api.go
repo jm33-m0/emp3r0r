@@ -30,16 +30,10 @@ const (
 	OperatorSendCommand = OperatorRoot + "/send_command"
 	// OperatorForgetAgent
 	OperatorForgetAgent = OperatorRoot + "/forget_agent"
-	// OperatorListPortFwds
-	OperatorListPortFwds = OperatorRoot + "/list_port_fwds"
 	// OperatorGetCA
 	OperatorGetCA = OperatorRoot + "/get_ca"
 	// OperatorSignAgent
 	OperatorSignAgent = OperatorRoot + "/sign_agent"
-	// OperatorRegisterPortFwd
-	OperatorRegisterPortFwd = OperatorRoot + "/register_port_fwd"
-	// OperatorUnregisterPortFwd
-	OperatorUnregisterPortFwd = OperatorRoot + "/unregister_port_fwd"
 	// OperatorRegisterFTPStream
 	OperatorRegisterFTPStream = OperatorRoot + "/register_ftp_stream"
 	// OperatorUnregisterFTPStream

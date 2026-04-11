@@ -62,9 +62,6 @@ func backgroundJobs() {
 	// set up command senders
 	ftp.ExecCmd = controllers.ExecuteCommand
 	modules.CmdSender = controllers.ExecuteCommand
-	modules.RegisterPortFwdFunc = client.RegisterPortFwd
-	modules.UnregisterPortFwdFunc = client.UnregisterPortFwd
-	modules.GetPortFwdSessionsFunc = client.GetPortFwdSessions
 
 	// init modules by querying server for available modules
 	go modules.InitModules()

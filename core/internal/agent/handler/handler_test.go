@@ -494,60 +494,6 @@ func TestProxyCmd(t *testing.T) {
 	}
 }
 
-func TestPortFwdCmd(t *testing.T) {
-	if common.RuntimeConfig == nil {
-		common.RuntimeConfig = &def.Config{}
-	}
-	originalCCAddress := def.CCAddress
-	def.CCAddress = "https://127.0.0.1:443"
-	defer func() { def.CCAddress = originalCCAddress }()
-
-	var mockConn bytes.Buffer
-	c2transport.Connection = &mockConn
-	defer func() { c2transport.Connection = nil }()
-
-	rootCmd := C2Commands()
-
-	// Test PortFwd Reverse
-	// Get a random port
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("Failed to listen: %v", err)
-	}
-	port := fmt.Sprintf("%d", ln.Addr().(*net.TCPAddr).Port)
-	ln.Close()
-
-	rootCmd.SetArgs([]string{def.C2CmdPortFwd, "--to", port, "--shID", "test-session", "--operation", "reverse"})
-
-	if err := rootCmd.Execute(); err != nil {
-		t.Fatalf("Failed to execute port_fwd command: %v", err)
-	}
-
-	var msg def.MsgTunData
-	if err := cbor.Unmarshal(mockConn.Bytes(), &msg); err != nil {
-		t.Fatalf("Failed to unmarshal CBOR response: %v", err)
-	}
-	output := string(msg.Response)
-	if !strings.Contains(output, "Port forwarding started successfully") {
-		t.Errorf("Expected 'Port forwarding started successfully', got '%s'", output)
-	}
-	mockConn.Reset()
-
-	// Stop it
-	rootCmd.SetArgs([]string{def.C2CmdPortFwd, "--to", port, "--shID", "test-session", "--operation", "stop"})
-	if err := rootCmd.Execute(); err != nil {
-		t.Fatalf("Failed to execute port_fwd stop command: %v", err)
-	}
-
-	if err := cbor.Unmarshal(mockConn.Bytes(), &msg); err != nil {
-		t.Fatalf("Failed to unmarshal CBOR response: %v", err)
-	}
-	output = string(msg.Response)
-	if !strings.Contains(output, "stopped") {
-		t.Errorf("Expected 'stopped', got '%s'", output)
-	}
-}
-
 // Helper process for TestKillCmdRun
 func TestHelperProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {

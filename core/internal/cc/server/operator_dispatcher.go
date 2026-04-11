@@ -37,12 +37,6 @@ func operationDispatcher(w http.ResponseWriter, r *http.Request) {
 		handleListAgents(w, r)
 	case transport.OperatorForgetAgent:
 		handleForgetAgent(w, r)
-	case transport.OperatorListPortFwds:
-		handleListPortFwds(w, r)
-	case transport.OperatorRegisterPortFwd:
-		handleRegisterPortFwd(w, r)
-	case transport.OperatorUnregisterPortFwd:
-		handleUnregisterPortFwd(w, r)
 	case transport.OperatorRegisterFTPStream:
 		handleRegisterFTPStream(w, r)
 	case transport.OperatorUnregisterFTPStream:

@@ -16,7 +16,6 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/controllers"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -299,129 +298,10 @@ func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
 	// Remove from memory
 	if targetAgent != nil {
 		live.AgentControlMap.Delete(targetAgent)
-		controllers.CleanupPortFwdsByAgent(targetAgent)
 		logging.Successf("Operator removed agent %s from memory", uuid)
 	}
 	wrt.WriteHeader(http.StatusOK)
 	fmt.Fprintf(wrt, "%s\n\nHas been forgotten.", agentDetails)
-}
-
-func handleListPortFwds(wrt http.ResponseWriter, _ *http.Request) {
-	defer func() {
-		if r := recover(); r != nil {
-			logging.Errorf("handleListPortFwds panicked: %v", r)
-			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
-		}
-	}()
-
-	var sessions []def.PortFwdSession
-	network.PortFwds.Range(func(id, value any) bool {
-		portmap := value.(*network.PortFwdSession)
-		bindAddr := portmap.BindAddr
-		if bindAddr == "" {
-			bindAddr = "127.0.0.1"
-		}
-
-		sessions = append(sessions, def.PortFwdSession{
-			ID:          id.(string),
-			LocalPort:   portmap.Lport,
-			RemoteAddr:  portmap.To,
-			BindAddr:    bindAddr,
-			AgentTag:    portmap.Agent.Tag,
-			Description: portmap.Description,
-			Reverse:     portmap.Reverse,
-			Protocol:    portmap.Protocol,
-		})
-		return true
-	})
-
-	data, err := cbor.Marshal(sessions)
-	if err != nil {
-		logging.Errorf("Failed to marshal port mappings: %v", err)
-		http.Error(wrt, "Failed to marshal response", http.StatusInternalServerError)
-		return
-	}
-
-	wrt.Header().Set("Content-Type", "application/cbor")
-	wrt.WriteHeader(http.StatusOK)
-	wrt.Write(data)
-}
-
-func handleRegisterPortFwd(wrt http.ResponseWriter, req *http.Request) {
-	defer func() {
-		if r := recover(); r != nil {
-			logging.Errorf("handleRegisterPortFwd panicked: %v", r)
-			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
-		}
-	}()
-	// Decode CBOR request body
-	pfReq, err := DecodeCBORBody[def.PortFwdRequest](wrt, req)
-	if err != nil {
-		return
-	}
-	operatorSession, err := verifyOperatorStreamClaim(req, pfReq.Claim, pfReq.SessionID, def.OperatorCapabilityRegisterPortFwd)
-	if err != nil {
-		logging.Errorf("CRITICAL: Reject portfwd registration from %s: %v", req.RemoteAddr, err)
-		http.Error(wrt, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	// Register session in server's map.
-	// If a runtime session already exists, update metadata in-place instead of replacing
-	// the object, so we don't drop live fields like Ctx/Cancel/Sh and crash stream handling.
-	if existing, ok := network.PortFwds.Load(pfReq.SessionID); ok {
-		if pf, ok := existing.(*network.PortFwdSession); ok && pf != nil {
-			pf.Lport = pfReq.Lport
-			pf.To = pfReq.To
-			pf.Description = pfReq.Description
-			pf.Protocol = pfReq.Protocol
-			pf.Reverse = pfReq.IsReverse
-			pf.OperatorSession = operatorSession
-			if pf.Agent == nil {
-				pf.Agent = &def.Emp3r0rAgent{}
-			}
-			pf.Agent.Tag = pfReq.AgentTag
-			if pf.ShReady == nil {
-				pf.ShReady = make(chan struct{})
-			}
-			if pf.Ctx == nil || pf.Cancel == nil {
-				pf.Ctx, pf.Cancel = context.WithCancel(context.Background())
-			}
-		} else {
-			network.PortFwds.Store(pfReq.SessionID, &network.PortFwdSession{
-				Lport:           pfReq.Lport,
-				To:              pfReq.To,
-				Description:     pfReq.Description,
-				Protocol:        pfReq.Protocol,
-				Reverse:         pfReq.IsReverse,
-				OperatorSession: operatorSession,
-				Agent: &def.Emp3r0rAgent{
-					Tag: pfReq.AgentTag,
-				},
-				ShReady: make(chan struct{}),
-				Ctx:     context.Background(),
-				Cancel:  func() {},
-			})
-		}
-	} else {
-		network.PortFwds.Store(pfReq.SessionID, &network.PortFwdSession{
-			Lport:           pfReq.Lport,
-			To:              pfReq.To,
-			Description:     pfReq.Description,
-			Protocol:        pfReq.Protocol,
-			Reverse:         pfReq.IsReverse,
-			OperatorSession: operatorSession,
-			Agent: &def.Emp3r0rAgent{
-				Tag: pfReq.AgentTag,
-			},
-			ShReady: make(chan struct{}),
-			Ctx:     context.Background(),
-			Cancel:  func() {},
-		})
-	}
-
-	logging.Infof("Registered port mapping %s (%s) from operator", pfReq.SessionID, pfReq.Description)
-	wrt.WriteHeader(http.StatusOK)
 }
 
 func handleRegisterFTPStream(wrt http.ResponseWriter, req *http.Request) {
@@ -490,40 +370,6 @@ func handleUnregisterFTPStream(wrt http.ResponseWriter, req *http.Request) {
 	network.FTPStreams.Delete("token:" + ftpReq.Token)
 
 	logging.Infof("Unregistered FTP stream token %s for %s from operator", ftpReq.Token, ftpReq.FilePath)
-	wrt.WriteHeader(http.StatusOK)
-}
-
-func handleUnregisterPortFwd(wrt http.ResponseWriter, req *http.Request) {
-	defer func() {
-		if r := recover(); r != nil {
-			logging.Errorf("handleUnregisterPortFwd panicked: %v", r)
-			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
-		}
-	}()
-	// Decode CBOR request body
-	sessionID, err := DecodeCBORBody[string](wrt, req)
-	if err != nil {
-		return
-	}
-	operatorSession, err := operatorSessionFromReq(req)
-	if err != nil {
-		logging.Errorf("CRITICAL: Reject unregister portfwd from %s: %v", req.RemoteAddr, err)
-		http.Error(wrt, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-	val, ok := network.PortFwds.Load(*sessionID)
-	if ok {
-		if pf, castOK := val.(*network.PortFwdSession); castOK && pf != nil && pf.OperatorSession != "" && pf.OperatorSession != operatorSession {
-			logging.Errorf("CRITICAL: operator %s attempted to unregister portfwd owned by %s", operatorSession, pf.OperatorSession)
-			http.Error(wrt, "Forbidden", http.StatusForbidden)
-			return
-		}
-	}
-
-	// Unregister session in server's map
-	network.PortFwds.Delete(*sessionID)
-
-	logging.Infof("Unregistered port mapping %s from operator", *sessionID)
 	wrt.WriteHeader(http.StatusOK)
 }
 

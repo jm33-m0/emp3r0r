@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
@@ -59,67 +58,9 @@ func verifyAuxRouteAgent(agentUUID, remoteAddr, route string) bool {
 }
 
 func handleProxyRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remoteAddr string, cancel context.CancelFunc) {
-	if !verifyAuxRouteAgent(agentUUID, remoteAddr, "proxy") {
-		cancel()
-		conn.Close()
-		return
-	}
-	streamID = strings.TrimSpace(streamID)
-	if streamID == "" {
-		logging.Errorf("CRITICAL: proxy relay: empty stream id from %s", remoteAddr)
-		cancel()
-		conn.Close()
-		return
-	}
-
-	token := streamID
-	if strings.Contains(token, "_") {
-		token = strings.SplitN(token, "_", 2)[0]
-	}
-	val, ok := network.PortFwds.Load(token)
-	if !ok {
-		logging.Errorf("CRITICAL: proxy relay: unknown token %q from %s", token, remoteAddr)
-		cancel()
-		conn.Close()
-		return
-	}
-	pf, ok := val.(*network.PortFwdSession)
-	if !ok || pf == nil || pf.OperatorSession == "" {
-		logging.Errorf("CRITICAL: proxy relay: token %q missing owner operator", token)
-		cancel()
-		conn.Close()
-		return
-	}
-	owner := pf.OperatorSession
-
-	rs := &relayStream{ownerSession: owner, conn: conn}
-	proxyRelayStreams.Store(streamID, rs)
-	defer proxyRelayStreams.Delete(streamID)
-	defer func() {
-		_ = fwdMsgToOperator(owner, def.MsgTunData{Tag: def.TagProxyRelayDonePrefix + streamID})
-		cancel()
-		_ = conn.Close()
-	}()
-
-	buf := make([]byte, 64*1024)
-	for {
-		n, err := conn.Read(buf)
-		if n > 0 {
-			chunk := make([]byte, n)
-			copy(chunk, buf[:n])
-			msg := def.MsgTunData{Tag: def.TagProxyRelayDataPrefix + streamID, Response: chunk}
-			if sendErr := fwdMsgToOperator(owner, msg); sendErr != nil {
-				logging.Errorf("CRITICAL: proxy relay: forwarding chunk failed for %q: %v", streamID, sendErr)
-				return
-			}
-		}
-		if err != nil {
-			if err != io.EOF {
-				_ = fwdMsgToOperator(owner, def.MsgTunData{Tag: def.TagProxyRelayErrorPrefix + streamID, Response: []byte(err.Error())})
-			}
-			return
-		}
-	}
+	logging.Errorf("CRITICAL: proxy relay is disabled; rejecting stream %q from %s", streamID, remoteAddr)
+	cancel()
+	_ = conn.Close()
 }
 
 func handleWWWRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remoteAddr string) {

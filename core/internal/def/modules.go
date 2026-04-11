@@ -8,7 +8,6 @@ const (
 	ModCLEAN_LOG   = "clean_log"
 	ModLPE_SUGGEST = "lpe_suggest"
 
-	ModPROXY        = "run_proxy"
 	ModPORT_FWD     = "port_fwd"
 	ModSHELL        = "interactive_shell"
 	ModBring2CC     = "bring2cc"
@@ -200,129 +199,6 @@ func populateModules() {
 				InMemory:      false,
 				Type:          "go",
 				IsInteractive: false,
-			},
-		},
-
-		ModPROXY: {
-			Name:     ModPROXY,
-			Build:    "",
-			Date:     "2020-01-25",
-			Comment:  "Start a socks proxy on target host",
-			IsLocal:  false,
-			Platform: "Generic",
-			Path:     "",
-			Fileless: true,
-			Options: ModOptions{
-				"port": &ModOption{
-					Name: "port",
-					Desc: "Port of our local proxy server",
-					Vals: []string{"1080", "8080", "10800", "10888"},
-					Val:  "8080",
-				},
-				"bind_addr": &ModOption{
-					Name: "bind_addr",
-					Desc: "IP address to bind to (localhost binds to 127.0.0.1 only)",
-					Vals: []string{"127.0.0.1", "0.0.0.0", "localhost"},
-					Val:  "127.0.0.1",
-				},
-				"status": &ModOption{
-					Name: "status",
-					Desc: "Turn proxy on/off",
-					Vals: []string{"on", "off", "reverse"},
-					Val:  "on",
-				},
-			},
-			AgentConfig: AgentModuleConfig{
-				Exec:          "built-in",
-				Files:         []string{},
-				InMemory:      false,
-				Type:          "go",
-				IsInteractive: false,
-			},
-		},
-		ModPORT_FWD: {
-			Name:     ModPORT_FWD,
-			Build:    "",
-			Date:     "2020-01-25",
-			Comment:  "Port mapping from agent to CC",
-			IsLocal:  false,
-			Platform: "Generic",
-			Path:     "",
-			Fileless: true,
-			Options: ModOptions{
-				"to": &ModOption{
-					Name: "to",
-					Desc: "Address:Port (to forward to) on agent/CC side",
-					Vals: []string{"127.0.0.1:22", "127.0.0.1:8080"},
-				},
-				"listen_port": &ModOption{
-					Name: "listen_port",
-					Desc: "Listen port on CC/agent side",
-					Vals: []string{"8080", "1080", "22", "23", "21"},
-				},
-				"bind_addr": &ModOption{
-					Name: "bind_addr",
-					Desc: "IP address to bind to on CC side (localhost binds to 127.0.0.1 only)",
-					Vals: []string{"127.0.0.1", "0.0.0.0", "localhost"},
-					Val:  "127.0.0.1",
-				},
-				"switch": &ModOption{
-					Name: "switch",
-					Desc: "Turn port mapping on/off, or use `reverse` mapping",
-					Vals: []string{"on", "off", "reverse"},
-					Val:  "on",
-				},
-				"protocol": &ModOption{
-					Name: "protocol",
-					Desc: "Forward to TCP or UDP port on agent side",
-					Vals: []string{"tcp", "udp"},
-					Val:  "tcp",
-				},
-			},
-			AgentConfig: AgentModuleConfig{
-				Exec:          "built-in",
-				Files:         []string{},
-				InMemory:      false,
-				Type:          "go",
-				IsInteractive: false,
-			},
-		},
-		ModSHELL: {
-			Name:     ModSHELL,
-			Build:    "",
-			Date:     "2020-01-25",
-			Comment:  "Bring your own shell program to run on target",
-			IsLocal:  false,
-			Platform: "Generic",
-			Path:     "",
-			Fileless: true,
-			Options: ModOptions{
-				"shell": &ModOption{
-					Name: "shell",
-					Desc: "Shell program to run, eg. /bin/bash. Please use `elvish` module or upload a custom shell for opsec reasons. Default `bash` shell can be installed via module `vaccine`",
-					Vals: []string{
-						"/bin/bash", "/bin/zsh", "/bin/sh", "python", "python3",
-						"cmd.exe", "powershell.exe", "elvish",
-					},
-					Val: "bash",
-				},
-				"args": &ModOption{
-					Name: "args",
-					Desc: "Command line args of the shell program",
-					Val:  "",
-				},
-				"port": &ModOption{
-					Name: "port",
-					Desc: "The (sshd) port that our shell will be using",
-					Val:  "22222",
-				},
-			},
-			AgentConfig: AgentModuleConfig{
-				Exec:          "built-in",
-				Files:         []string{},
-				InMemory:      false,
-				Type:          "go",
-				IsInteractive: true,
 			},
 		},
 

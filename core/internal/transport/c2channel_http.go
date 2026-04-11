@@ -353,6 +353,7 @@ type HTTPServerStream struct {
 	writeMu      sync.Mutex
 	lastActivity time.Time
 	activityMu   sync.Mutex
+	closing      int32
 }
 
 func newHTTPServerStream(sessionID string) *HTTPServerStream {
@@ -389,6 +390,10 @@ func newHTTPServerStream(sessionID string) *HTTPServerStream {
 
 	serverSessions.Store(sessionID, s)
 	return s
+}
+
+func (s *HTTPServerStream) isClosing() bool {
+	return atomic.LoadInt32(&s.closing) == 1
 }
 
 func HandleHTTPServerSession(w http.ResponseWriter, req *http.Request, config *def.MalleableHTTPConfig) (stream *HTTPServerStream, err error) {
@@ -461,6 +466,10 @@ func HandleHTTPServerSession(w http.ResponseWriter, req *http.Request, config *d
 		return nil, ErrPollingRequest
 	}
 	stream = val.(*HTTPServerStream)
+	if stream.isClosing() && req.Method != http.MethodGet {
+		http.Error(w, "invalid session", http.StatusNotFound)
+		return nil, ErrPollingRequest
+	}
 
 	stream.activityMu.Lock()
 	stream.lastActivity = time.Now()
@@ -468,7 +477,16 @@ func HandleHTTPServerSession(w http.ResponseWriter, req *http.Request, config *d
 
 	switch req.Method {
 	case http.MethodGet:
+		if stream.isClosing() && len(stream.writeCh) == 0 {
+			serverSessions.Delete(stream.sessionID)
+			http.Error(w, "invalid session", http.StatusNotFound)
+			return nil, ErrPollingRequest
+		}
 		// Client is reading from us
+		pollTimeout := 50 * time.Second
+		if stream.isClosing() {
+			pollTimeout = 500 * time.Millisecond
+		}
 		select {
 		case <-req.Context().Done():
 		case data := <-stream.writeCh:
@@ -496,7 +514,12 @@ func HandleHTTPServerSession(w http.ResponseWriter, req *http.Request, config *d
 				}
 			}
 			return nil, ErrPollingRequest
-		case <-time.After(50 * time.Second):
+		case <-time.After(pollTimeout):
+			if stream.isClosing() {
+				serverSessions.Delete(stream.sessionID)
+				http.Error(w, "invalid session", http.StatusNotFound)
+				return nil, ErrPollingRequest
+			}
 			// Timeout, return empty 200 OK so client polls again
 			w.WriteHeader(http.StatusOK)
 			return nil, ErrPollingRequest
@@ -507,36 +530,7 @@ func HandleHTTPServerSession(w http.ResponseWriter, req *http.Request, config *d
 		if err == nil && len(data) > 0 {
 			select {
 			case stream.readCh <- data:
-				// If the handler already queued a response, return it in the same
-				// POST so the client can read it before the virtual session closes.
-				select {
-				case respData := <-stream.writeCh:
-					w.WriteHeader(http.StatusOK)
-					if _, err := w.Write(respData); err != nil {
-						return nil, ErrPollingRequest
-					}
-					totalWritten := len(respData)
-				postLoop:
-					for totalWritten < 50*1024*1024 {
-						select {
-						case more, ok := <-stream.writeCh:
-							if !ok {
-								break postLoop
-							}
-							n, err := w.Write(more)
-							if err != nil {
-								break postLoop
-							}
-							totalWritten += n
-						default:
-							break postLoop
-						}
-					}
-				case <-time.After(750 * time.Millisecond):
-					w.WriteHeader(http.StatusOK)
-				case <-req.Context().Done():
-					w.WriteHeader(http.StatusOK)
-				}
+				w.WriteHeader(http.StatusOK)
 			case <-time.After(5 * time.Second):
 				http.Error(w, "buffer full", http.StatusServiceUnavailable)
 			}
@@ -607,8 +601,19 @@ func (s *HTTPServerStream) Write(p []byte) (n int, err error) {
 }
 
 func (s *HTTPServerStream) Close() error {
+	if !atomic.CompareAndSwapInt32(&s.closing, 0, 1) {
+		return nil
+	}
 	s.cancel()
-	serverSessions.Delete(s.sessionID)
+	go func(sessionID string) {
+		defer func() {
+			if r := recover(); r != nil {
+				logging.Errorf("HTTPServerStream: deferred cleanup panic for %s: %v", sessionID, r)
+			}
+		}()
+		<-time.After(5 * time.Second)
+		serverSessions.Delete(sessionID)
+	}(s.sessionID)
 	return nil
 }
 
