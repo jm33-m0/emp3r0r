@@ -20,7 +20,6 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/hashicorp/memberlist"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -402,11 +401,9 @@ func TestStartGossip_BootstrapRetry(t *testing.T) {
 
 	// Make the gossip healing loop deterministic for CI: production uses randomized
 	// 5-60s sleeps, which can exceed this test's rediscovery window on slower runners.
-	origTakeASnap := util.TakeASnap
-	util.TakeASnap = func(forceSleep bool) {
+	testTakeASnap := func(forceSleep bool) {
 		time.Sleep(200 * time.Millisecond)
 	}
-	defer func() { util.TakeASnap = origTakeASnap }()
 
 	// Find a free port for Node A (the seed)
 	l, err := net.Listen("tcp", "127.0.0.1:0")
@@ -426,9 +423,9 @@ func TestStartGossip_BootstrapRetry(t *testing.T) {
 	defer func() { def.AESPassword = origPW }()
 
 	tokA := &def.AgentToken{AgentID: "node-a", Capability: def.CapabilityProxy, ExpiresAt: time.Now().Add(time.Hour).Unix()}
-	listA, err := StartGossip(ctx, "bootstrap-retry-node-a", nil, portA, func() *def.MeshNodeMeta {
+	listA, err := startGossipWithTakeASnap(ctx, "bootstrap-retry-node-a", nil, portA, func() *def.MeshNodeMeta {
 		return &def.MeshNodeMeta{Token: tokA, Distance: 0}
-	})
+	}, testTakeASnap)
 	if err != nil {
 		t.Fatalf("Start Node A: %v", err)
 	}
@@ -441,9 +438,9 @@ func TestStartGossip_BootstrapRetry(t *testing.T) {
 	portB := lB.Addr().(*net.TCPAddr).Port
 	lB.Close()
 
-	listB, err := StartGossip(ctx, "node-b", []string{string(bootstrap)}, portB, func() *def.MeshNodeMeta {
+	listB, err := startGossipWithTakeASnap(ctx, "node-b", []string{string(bootstrap)}, portB, func() *def.MeshNodeMeta {
 		return &def.MeshNodeMeta{Token: tokB, Distance: 1}
-	})
+	}, testTakeASnap)
 	if err != nil {
 		t.Fatalf("Start Node B: %v", err)
 	}
@@ -487,9 +484,9 @@ func TestStartGossip_BootstrapRetry(t *testing.T) {
 	t.Log("Node B detected Node A's death")
 
 	// 4. Start Node A again (same port)
-	listA2, err := StartGossip(ctx, "node-a-restart", nil, portA, func() *def.MeshNodeMeta {
+	listA2, err := startGossipWithTakeASnap(ctx, "node-a-restart", nil, portA, func() *def.MeshNodeMeta {
 		return &def.MeshNodeMeta{Token: tokA, Distance: 0}
-	})
+	}, testTakeASnap)
 	if err != nil {
 		t.Fatalf("Restart Node A: %v", err)
 	}

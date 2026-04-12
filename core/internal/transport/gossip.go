@@ -55,6 +55,14 @@ func (d *GossipDelegate) MergeRemoteState([]byte, bool)   {}
 // getMeta is a closure returning the current MeshNodeMeta (may be nil initially).
 // Gossip traffic is encrypted with def.AESPassword via the official keyring.
 func StartGossip(ctx context.Context, name string, initialPeers []string, port int, getMeta func() *def.MeshNodeMeta) (*memberlist.Memberlist, error) {
+	return startGossipWithTakeASnap(ctx, name, initialPeers, port, getMeta, util.TakeASnap)
+}
+
+func startGossipWithTakeASnap(ctx context.Context, name string, initialPeers []string, port int, getMeta func() *def.MeshNodeMeta, takeASnap func(bool)) (*memberlist.Memberlist, error) {
+	if takeASnap == nil {
+		takeASnap = util.TakeASnap
+	}
+
 	config := memberlist.DefaultWANConfig()
 	config.Name = name
 	config.BindPort = port
@@ -114,7 +122,7 @@ func StartGossip(ctx context.Context, name string, initialPeers []string, port i
 
 		for {
 			// Randomized sleep for OPSEC.
-			util.TakeASnap(false)
+			takeASnap(false)
 			if ctx.Err() != nil {
 				return
 			}
@@ -172,12 +180,6 @@ func StartGossip(ctx context.Context, name string, initialPeers []string, port i
 	}()
 
 	return list, nil
-}
-
-// authorizedPeer holds a peer IP and its Distance for sorting.
-type authorizedPeer struct {
-	IP       string
-	Distance int
 }
 
 // GetAuthorizedPeers scans the gossip member list, verifies each node's
