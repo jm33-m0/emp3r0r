@@ -2,11 +2,11 @@ name: Tests
 
 on:
   push:
-    branches: [v3]
+    branches: [v4]
     paths:
       - "core/**"
   pull_request:
-    branches: [v3]
+    branches: [v4]
     paths:
       - "core/**"
 
