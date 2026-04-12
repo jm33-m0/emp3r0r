@@ -59,19 +59,21 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 			"OS":      util.SplitLongLine(target.OS, 20),
 			"Process": util.SplitLongLine(procInfo, 20),
 			"User":    util.SplitLongLine(target.User, 20),
-			"From":    fmt.Sprintf("%s via %s", target.From, target.Transport),
+			"From":    target.From,
+			"C2":      util.SplitLongLine(target.Transport, 20),
+			"Mesh":    util.SplitLongLine(target.MeshRoute, 18),
 			"IPs":     ips,
 		}
 		row := []string{
 			target.ShortID,
 			util.SplitLongLine(target.Tag, 15),
-			infoMap["OS"], infoMap["Process"], infoMap["User"], infoMap["IPs"], infoMap["From"],
+			infoMap["OS"], infoMap["Process"], infoMap["User"], infoMap["IPs"], infoMap["From"], infoMap["C2"], infoMap["Mesh"],
 		}
 		if live.ActiveAgent != nil && live.ActiveAgent.Tag == target.Tag {
 			row = []string{
 				target.ShortID,
 				util.SplitLongLine(target.Tag, 15),
-				infoMap["OS"], infoMap["Process"], infoMap["User"], infoMap["IPs"], infoMap["From"],
+				infoMap["OS"], infoMap["Process"], infoMap["User"], infoMap["IPs"], infoMap["From"], infoMap["C2"], infoMap["Mesh"],
 			}
 			tail = row
 			continue
@@ -124,7 +126,7 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 		rtt, idle_color, idle)
 	_ = cli.TmuxSetStatusRight(status_right)
 
-	header := []string{"ID", "Tag", "OS", "Process", "User", "IPs", "From"}
+	header := []string{"ID", "Tag", "OS", "Process", "User", "IPs", "From", "C2", "Mesh"}
 	tabStr := cli.BuildTable(header, tdata)
 	if cli.AgentListPane != nil {
 		cli.AgentListPane.Printf(true, "%s", tabStr)

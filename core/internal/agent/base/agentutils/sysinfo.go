@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/mesh"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jaypipes/ghw"
@@ -77,6 +78,20 @@ func GatherSystemDetails() *def.Emp3r0rAgent {
 	info.Container = "N/A" // sysinfo.CheckContainer() might be light, but skipping for minimal
 	info.Transport = genC2TransportString()
 	def.Transport = info.Transport
+	if common.RuntimeConfig.IsP2PEnabled {
+		if common.RuntimeConfig.IsDirectC2Enabled {
+			info.MeshRoute = "gateway"
+		} else {
+			gatewayIP := mesh.GetGatewayIP()
+			if gatewayIP != "" {
+				info.MeshRoute = fmt.Sprintf("via %s", gatewayIP)
+			} else {
+				info.MeshRoute = "via <pending>"
+			}
+		}
+	} else {
+		info.MeshRoute = "direct"
+	}
 
 	// have root?
 	info.HasRoot = sysinfo.HasRoot()
