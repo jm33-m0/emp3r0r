@@ -409,6 +409,20 @@ func RecordAgentCheckin(agent *def.Emp3r0rAgent) error {
 	return nil
 }
 
+// TouchAgentLastSeen updates only the persisted last_seen timestamp for an agent.
+func TouchAgentLastSeen(uuid string, lastSeen time.Time) error {
+	if AgentDB == nil {
+		return fmt.Errorf("database not initialized")
+	}
+
+	query := `UPDATE agents SET last_seen = ? WHERE uuid = ?`
+	if _, err := AgentDB.Exec(query, lastSeen.Unix(), uuid); err != nil {
+		return fmt.Errorf("touch agent last_seen: %v", err)
+	}
+
+	return nil
+}
+
 // GetPinnedIdentity returns the persisted trust baseline for an agent UUID.
 // Security decisions must use this DB state, not in-memory projections.
 func GetPinnedIdentity(uuid string) (publicKey, uuidSig string, found bool, err error) {
