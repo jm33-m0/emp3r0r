@@ -9,6 +9,7 @@ package mesh
 
 import (
 	"context"
+	"math/rand"
 	"strconv"
 	"sync"
 	"time"
@@ -215,7 +216,54 @@ func watchPeers(ctx context.Context) {
 		}
 		peers := transport.GetAuthorizedPeers(list, def.CapabilityRouter)
 		logging.Debugf("Mesh: %d authorized peer(s) in gossip view", len(peers))
+		if len(peers) == 0 {
+			return false
+		}
+
+		bestDistance := peers[0].Distance
+		bestPeers := make([]def.MeshNodeMeta, 0, len(peers))
 		for _, p := range peers {
+			if p.Distance != bestDistance {
+				break
+			}
+			bestPeers = append(bestPeers, p)
+		}
+
+		currentIP := GetGatewayIP()
+		if common.RuntimeConfig.PersistentRouter && currentIP != "" {
+			currentFound := false
+			for i, p := range bestPeers {
+				if p.Addr == currentIP {
+					bestPeers[0], bestPeers[i] = bestPeers[i], bestPeers[0]
+					currentFound = true
+					break
+				}
+			}
+			if currentFound && len(bestPeers) > 1 {
+				rand.Shuffle(len(bestPeers)-1, func(i, j int) {
+					bestPeers[1+i], bestPeers[1+j] = bestPeers[1+j], bestPeers[1+i]
+				})
+			} else if !currentFound {
+				rand.Shuffle(len(bestPeers), func(i, j int) {
+					bestPeers[i], bestPeers[j] = bestPeers[j], bestPeers[i]
+				})
+			}
+		} else if currentIP != "" && len(bestPeers) > 1 {
+			filtered := make([]def.MeshNodeMeta, 0, len(bestPeers)-1)
+			for _, p := range bestPeers {
+				if p.Addr != currentIP {
+					filtered = append(filtered, p)
+				}
+			}
+			if len(filtered) > 0 {
+				bestPeers = filtered
+			}
+			rand.Shuffle(len(bestPeers), func(i, j int) {
+				bestPeers[i], bestPeers[j] = bestPeers[j], bestPeers[i]
+			})
+		}
+
+		for _, p := range bestPeers {
 			// Probe dial: verify the gateway is reachable.
 			if err := t.Ping(ctx, p.Addr, ""); err != nil {
 				logging.Debugf("Mesh: peer %s failed: %v", p.Addr, err)

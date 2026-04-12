@@ -72,6 +72,7 @@ type jsonConfig struct {
 	InitialPeers              []string                `json:"initial_peers"`
 	IsP2PEnabled              bool                    `json:"is_p2p_enabled"`
 	IsDirectC2Enabled         bool                    `json:"is_direct_c2_enabled"`
+	PersistentRouter          bool                    `json:"persistent_router"`
 	P2PTransport              string                  `json:"p2p_transport"`
 	CamouflageCertOrg         string                  `json:"camouflage_cert_org"`
 	CamouflageCertCN          string                  `json:"camouflage_cert_cn"`
@@ -279,6 +280,10 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 	if !config_to_write.IsDirectC2Enabled {
 		config_to_write.IsDirectC2Enabled = getBool("IsDirectC2Enabled")
 	}
+	config_to_write.PersistentRouter = getBool("persistent_router")
+	if !config_to_write.PersistentRouter {
+		config_to_write.PersistentRouter = getBool("PersistentRouter")
+	}
 	config_to_write.P2PTransport = getString("p2p_transport")
 	if config_to_write.P2PTransport == "" {
 		config_to_write.P2PTransport = getString("P2PTransport")
@@ -433,6 +438,9 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 		}
 		if jCfg.IsDirectC2Enabled {
 			config_to_write.IsDirectC2Enabled = jCfg.IsDirectC2Enabled
+		}
+		if jCfg.PersistentRouter {
+			config_to_write.PersistentRouter = jCfg.PersistentRouter
 		}
 		if jCfg.P2PTransport != "" {
 			config_to_write.P2PTransport = jCfg.P2PTransport

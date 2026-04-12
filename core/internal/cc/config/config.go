@@ -62,6 +62,7 @@ func SaveConfigJSON() (err error) {
 		InitialPeers:              live.RuntimeConfig.InitialPeers,
 		IsP2PEnabled:              live.RuntimeConfig.IsP2PEnabled,
 		IsDirectC2Enabled:         live.RuntimeConfig.IsDirectC2Enabled,
+		PersistentRouter:          live.RuntimeConfig.PersistentRouter,
 		P2PTransport:              live.RuntimeConfig.P2PTransport,
 		CamouflageCertOrg:         live.RuntimeConfig.CamouflageCertOrg,
 		CamouflageCertCN:          live.RuntimeConfig.CamouflageCertCN,

@@ -569,8 +569,9 @@ func gen_agent_cmd() *cobra.Command {
 	genAgentCmd.Flags().BoolP("p2p", "", false, "Enable P2P mesh networking")
 	genAgentCmd.Flags().StringP("p2p-transport", "", "mtls", "Transport type for P2P mesh connections")
 	genAgentCmd.Flags().BoolP("direct-c2", "", false, "Gateway mode: contacts C2 directly AND relays for Silent Nodes")
+	genAgentCmd.Flags().BoolP("persistent-router", "", false, "Keep the current router while it is alive")
 	genAgentCmd.Flags().StringSliceP("peers", "", nil, "Gossip bootstrap peers (ip:gossipport). Example: --peers 1.2.3.4:51996")
-	addFlagToGroup("Mesh networking (P2P) Options", "p2p", "p2p-transport", "direct-c2", "peers")
+	addFlagToGroup("Mesh networking (P2P) Options", "p2p", "p2p-transport", "direct-c2", "persistent-router", "peers")
 
 	// Group 5: Stealth & Connectivity
 	genAgentCmd.Flags().BoolP("stager", "", false, "Built for stager (enables memory encryption and suspension)")

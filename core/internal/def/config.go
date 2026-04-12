@@ -143,6 +143,7 @@ type Config struct {
 	P2PTransport      string `cbor:"72,keyasint"` // Transport for P2P mesh (e.g. kcp, mtls)
 	CamouflageCertOrg string `cbor:"73,keyasint"` // Camouflage cert organization (random if empty)
 	CamouflageCertCN  string `cbor:"74,keyasint"` // Camouflage cert common name (random if empty)
+	PersistentRouter  bool   `cbor:"79,keyasint"` // keep current router while it is alive
 
 	// C2 Routing malleability
 	C2Routes C2Routing `cbor:"75,keyasint"`

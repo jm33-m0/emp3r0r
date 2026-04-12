@@ -299,6 +299,7 @@ func TestReadJSONConfigFullCoverage(t *testing.T) {
 		"is_p2p_enabled": true,
 		"is_direct_c2_enabled": false,
 		"p2p_transport": "kcp",
+		"persistent_router": true,
 		"camouflage_cert_org": "MyOrg",
 		"camouflage_cert_cn": "www.google.com",
 		"initial_peers": ["1.1.1.1:51996", "2.2.2.2:51996"],
@@ -323,6 +324,9 @@ func TestReadJSONConfigFullCoverage(t *testing.T) {
 	}
 	if loaded.IsDirectC2Enabled {
 		t.Errorf("Expected IsDirectC2Enabled false, got true")
+	}
+	if !loaded.PersistentRouter {
+		t.Errorf("Expected PersistentRouter true, got false")
 	}
 	if loaded.P2PTransport != "kcp" {
 		t.Errorf("Expected P2PTransport kcp, got %s", loaded.P2PTransport)

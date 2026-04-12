@@ -70,6 +70,7 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 	// Gather config from flags. Bool flags default to false when omitted.
 	p2p, _ := cmd.Flags().GetBool("p2p")
 	directC2, _ := cmd.Flags().GetBool("direct-c2")
+	persistentRouter, _ := cmd.Flags().GetBool("persistent-router")
 	ncsi, _ := cmd.Flags().GetBool("NCSI")
 	kcp, _ := cmd.Flags().GetBool("kcp")
 	isStager, _ := cmd.Flags().GetBool("stager")
@@ -87,6 +88,7 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 		Jitter:           getIntOptPtr(cmd, "jitter"),
 		IsP2PEnabled:     p2p,
 		IsDirectC2:       directC2,
+		PersistentRouter: persistentRouter,
 		IsNCSIEnabled:    ncsi,
 		UseKCP:           kcp,
 		IsStager:         isStager,

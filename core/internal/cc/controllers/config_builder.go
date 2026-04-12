@@ -26,6 +26,7 @@ type AgentConfig struct {
 	C2ChannelMode    *string
 	IsP2PEnabled     bool
 	IsDirectC2       bool
+	PersistentRouter bool
 	IsNCSIEnabled    bool
 	UseKCP           bool
 	IsStager         bool
@@ -177,6 +178,7 @@ func MakeConfig(opts AgentConfig) error {
 	// Mesh / P2P mode
 	live.RuntimeConfig.IsP2PEnabled = opts.IsP2PEnabled
 	live.RuntimeConfig.IsDirectC2Enabled = opts.IsDirectC2
+	live.RuntimeConfig.PersistentRouter = opts.PersistentRouter
 
 	if opts.P2PTransport != nil {
 		isValid := false
