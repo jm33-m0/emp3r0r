@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
-	agentdb "github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
@@ -165,16 +164,6 @@ func refreshAgentList() error {
 	if live.ActiveAgent != nil {
 		for _, a := range agents {
 			if a.UUID == live.ActiveAgent.UUID {
-				if live.ActiveAgent.LastSeen.After(a.LastSeen) {
-					if err := agentdb.TouchAgentLastSeen(a.UUID, live.ActiveAgent.LastSeen); err != nil {
-						logging.Warningf("Failed to update stale last_seen for %s: %v", a.UUID, err)
-					} else {
-						a.LastSeen = live.ActiveAgent.LastSeen
-					}
-				}
-				if live.ActiveAgent.LastSeenRTT > a.LastSeenRTT {
-					a.LastSeenRTT = live.ActiveAgent.LastSeenRTT
-				}
 				live.ActiveAgent = a
 				// Update tmux window title
 				_ = cli.TmuxSetWindowTitle(live.ActiveAgent.ShortID, cli.CommandPane.WindowID)

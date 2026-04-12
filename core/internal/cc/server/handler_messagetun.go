@@ -196,6 +196,9 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			}
 
 			agent.LastSeen = time.Now()
+			if err := agents.UpdateAgentLastSeen(agent.UUID, agent.LastSeen); err != nil {
+				logging.Warningf("handleMessageTunnel: persist last_seen for %s failed: %v", agent.UUID, err)
+			}
 			if msg.Time != "" {
 				start_time, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", msg.Time)
 				if err == nil {

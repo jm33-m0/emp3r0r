@@ -212,6 +212,13 @@ func handleSendCommand(wrt http.ResponseWriter, req *http.Request) {
 	// Track the job ID so the message tunnel accepts the response
 	live.CmdTime.Store(*operation.JobID, time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST"))
 
+	// A command dispatch is server-side activity, so refresh the agent's
+	// LastSeen immediately on the authoritative runtime projection.
+	agent.LastSeen = time.Now()
+	if err := agents.UpdateAgentLastSeen(agent.UUID, agent.LastSeen); err != nil {
+		logging.Warningf("handleSendCommand: persist last_seen for %s failed: %v", agent.UUID, err)
+	}
+
 	// Send command to agent
 	err = agents.SendCmd(*operation.Command, *operation.JobID, agent)
 	if err != nil {

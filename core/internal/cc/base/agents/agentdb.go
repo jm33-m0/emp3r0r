@@ -260,6 +260,27 @@ func UpdateSessionHeartbeat(uuid string) error {
 	return nil
 }
 
+// UpdateAgentLastSeen updates the persisted last_seen timestamp for an agent.
+func UpdateAgentLastSeen(uuid string, seenAt time.Time) error {
+	if AgentDB == nil {
+		return fmt.Errorf("database not initialized")
+	}
+
+	query := `UPDATE agents SET last_seen = ? WHERE uuid = ?`
+	res, err := AgentDB.Exec(query, seenAt.Unix(), uuid)
+	if err != nil {
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return fmt.Errorf("agent not found: %s", uuid)
+	}
+	return nil
+}
+
 // EndSession removes a session record for an agent
 func EndSession(uuid string) error {
 	if AgentDB == nil {
