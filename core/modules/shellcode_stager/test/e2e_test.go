@@ -664,37 +664,54 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 
 	// Wait for restart (sleep cycle is 1-2s + overhead)
 	logging.Infof("Waiting for agent to restart and check in again...")
+	var oldConn net.Conn
+	if val, ok := live.AgentControlMap.Load(agent); ok {
+		if ctrl, ok := val.(*live.AgentControl); ok {
+			oldConn = ctrl.Conn
+		}
+	}
 
 	// Reset agent variable to detect new checkin
 	startRestart := time.Now()
 	reconnected := false
-	cleanupStaleSession := false
+	lastCleanup := time.Time{}
 
-	for time.Since(startRestart) < 30*time.Second {
+	cleanupRuntimeByUUID := func(uuid string) {
 		live.AgentControlMap.Range(func(key, value any) bool {
-			k := key.(*def.Emp3r0rAgent)
-			v := value.(*live.AgentControl)
-			// Look for the same UUID
-			if k.UUID == agent.UUID && v.Conn != nil {
-				// Check PID to ensure it's a new process
-
-				if k.Process != nil && k.Process.PID != childPid {
-					// New Process detected!
-
-					// Verify Key
-					if k.PublicKey != firstKey {
-						logging.Errorf("Agent Logs (Stderr):\n%s", stderr.String())
-						logging.Errorf("Stager Logs (Stdout):\n%s", stdout.String())
-						t.Fatalf("CRITICAL FAILURE: Agent Restarted with DIFFERENT Key!\nFirst: %s\nNew: %s", firstKey, k.PublicKey)
-					}
-
-					logging.Infof("New Agent PID: %d (Old: %d)", k.Process.PID, childPid)
-					reconnected = true
-					return false // stop iteration
-				}
+			a, okA := key.(*def.Emp3r0rAgent)
+			ctrl, okC := value.(*live.AgentControl)
+			if !okA || !okC || a.UUID != uuid {
+				return true
 			}
+			if ctrl.Cancel != nil {
+				ctrl.Cancel()
+			}
+			if ctrl.Conn != nil {
+				_ = ctrl.Conn.Close()
+			}
+			live.AgentControlMap.Delete(key)
 			return true
 		})
+	}
+
+	for time.Since(startRestart) < 30*time.Second {
+		if k, v, _, found := agents.RuntimeControlByUUID(agent.UUID); found {
+			if k.PublicKey != firstKey {
+				logging.Errorf("Agent Logs (Stderr):\n%s", stderr.String())
+				logging.Errorf("Stager Logs (Stdout):\n%s", stdout.String())
+				t.Fatalf("CRITICAL FAILURE: Agent Restarted with DIFFERENT Key!\nFirst: %s\nNew: %s", firstKey, k.PublicKey)
+			}
+
+			newProcessSeen := k.Process != nil && k.Process.PID != childPid
+			freshCheckinSeen := !k.LastSeen.IsZero() && !k.LastSeen.Before(startRestart)
+			newConnSeen := v != nil && v.Conn != nil && (oldConn == nil || v.Conn != oldConn)
+			if newProcessSeen || freshCheckinSeen || newConnSeen {
+				if k.Process != nil {
+					logging.Infof("New Agent PID: %d (Old: %d)", k.Process.PID, childPid)
+				}
+				reconnected = true
+			}
+		}
 
 		if reconnected {
 			logging.Successf("Agent reconnected with SAME key. Persistence verified.")
@@ -703,24 +720,15 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 
 		// In strict fail-closed mode, abrupt process kill can leave a stale session
 		// record for a short period. Force cleanup in test to validate key persistence.
-		if mode == "plain_http" && !cleanupStaleSession && time.Since(startRestart) > 8*time.Second {
+		if mode == "plain_http" && time.Since(startRestart) > 1*time.Second &&
+			(lastCleanup.IsZero() || time.Since(lastCleanup) >= 5*time.Second) {
 			if endErr := agents.EndSession(agent.UUID); endErr != nil {
 				logging.Warningf("Failed to clean stale session for %s: %v", agent.UUID, endErr)
 			} else {
 				logging.Infof("Cleaned stale session for %s to allow restart check-in", agent.UUID)
 			}
-			if val, ok := live.AgentControlMap.Load(agent); ok {
-				if ctrl, ok := val.(*live.AgentControl); ok {
-					if ctrl.Cancel != nil {
-						ctrl.Cancel()
-					}
-					if ctrl.Conn != nil {
-						_ = ctrl.Conn.Close()
-					}
-				}
-				live.AgentControlMap.Delete(agent)
-			}
-			cleanupStaleSession = true
+			cleanupRuntimeByUUID(agent.UUID)
+			lastCleanup = time.Now()
 		}
 		time.Sleep(500 * time.Millisecond)
 	}

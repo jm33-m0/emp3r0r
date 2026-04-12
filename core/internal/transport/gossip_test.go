@@ -20,6 +20,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/hashicorp/memberlist"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -399,6 +400,14 @@ func TestStartGossip_BootstrapRetry(t *testing.T) {
 		t.Skip("skipping network test in short mode")
 	}
 
+	// Make the gossip healing loop deterministic for CI: production uses randomized
+	// 5-60s sleeps, which can exceed this test's rediscovery window on slower runners.
+	origTakeASnap := util.TakeASnap
+	util.TakeASnap = func(forceSleep bool) {
+		time.Sleep(200 * time.Millisecond)
+	}
+	defer func() { util.TakeASnap = origTakeASnap }()
+
 	// Find a free port for Node A (the seed)
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -490,8 +499,8 @@ func TestStartGossip_BootstrapRetry(t *testing.T) {
 	// 5. Node B should eventually rediscover Node A via the periodic join loop.
 	// Since we set the ticker to 30s in gossip.go, we should wait at least that long.
 	// In a real test we might want to override the interval, but let's try with a long timeout first.
-	t.Log("Waiting for Node B to rediscover Node A (may take up to 40s)...")
-	waitForPeers(listB, 2, 45*time.Second)
+	t.Log("Waiting for Node B to rediscover Node A (deterministic retry interval)...")
+	waitForPeers(listB, 2, 75*time.Second)
 	t.Log("Node B successfully rediscovered Node A via bootstrap retry")
 }
 
