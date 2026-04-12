@@ -11,9 +11,9 @@
 [![Screenshots](https://img.shields.io/badge/View-Screenshots-blue?style=for-the-badge)](./Screenshots.md)
 
 [![Go Report Card](https://goreportcard.com/badge/gojp/goreportcard)](https://goreportcard.com/report/github.com/jm33-m0/emp3r0r/core)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/jm33-m0/emp3r0r?filename=core/go.mod)](https://github.com/jm33-m0/emp3r0r/blob/v3/core/go.mod)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/jm33-m0/emp3r0r?filename=core/go.mod)](https://github.com/jm33-m0/emp3r0r/blob/v4/core/go.mod)
 [![Tests](https://github.com/jm33-m0/emp3r0r/actions/workflows/test.yml/badge.svg)](https://github.com/jm33-m0/emp3r0r/actions/workflows/test.yml)
-[![License](https://img.shields.io/github/license/jm33-m0/emp3r0r.svg)](https://github.com/jm33-m0/emp3r0r/blob/v3/LICENSE)
+[![License](https://img.shields.io/github/license/jm33-m0/emp3r0r.svg)](https://github.com/jm33-m0/emp3r0r/blob/v4/LICENSE)
 [![GitHub release](https://img.shields.io/github/release/jm33-m0/emp3r0r.svg)](https://github.com/jm33-m0/emp3r0r/releases)
 
 ---
@@ -26,11 +26,11 @@ emp3r0r is a comprehensive post-exploitation framework designed from the ground 
 
 ## What Makes emp3r0r Different?
 
-### 🔐 Ephemeral TOFU Identity
+### 🔐 TOFU Identity Pinning (Immutable per Enrollment)
 
-Agent identities are **generated per-session** using ECDSA P-256 and **lost on restart**—no static credentials exist in binaries or on disk. **Trust-on-first-use (TOFU)** authentication pins the agent's public key on first check-in; subsequent connections must prove possession of the same ephemeral key. Key rotation requires manual operator approval.
+emp3r0r enforces **Trust-on-first-use (TOFU)** with strict UUID/public-key pinning on first successful enrollment. After enrollment, the pinned identity is immutable for that lifecycle: if the same UUID appears with a different key, the connection is rejected as clone/impersonation. Re-enrollment with changed credentials requires a deliberate `forget_agent` first.
 
-**Why this matters:** Most C2 frameworks embed agent credentials in binaries. If captured, these credentials can be extracted and reused. emp3r0r's ephemeral keys exist only in process memory and are regenerated on every restart.
+**Why this matters:** This blocks silent identity drift and session hijacking patterns. Trust comes from CA-signed claims plus pinned DB state, not mutable runtime metadata.
 
 ### 🔒 Perfect Forward Secrecy for All Communications
 
@@ -66,6 +66,8 @@ Execute **Windows COFF objects** on Windows agents with typed argument packing (
 
 HTTP2/TLS connections use **uTLS** to randomize TLS Client Hello fingerprints, preventing static JA3 signature detection. All network traffic and data storage uses **CBOR** (binary) instead of JSON, reducing bandwidth by 30-40% and avoiding text-based parsing signatures.
 
+In v4, the C2 channel wrapper is pluggable (`h2conn` or `plain_http`). `plain_http` runs over HTTP/1.1 and can be proxied by CDN/reverse proxies directly, without the websocket `--cdn2proxy` bridge.
+
 **Why this matters:** Network monitoring tools fingerprint TLS handshakes for application identification. Static TLS implementations create consistent signatures. emp3r0r randomizes these on every connection while using a compact binary protocol that lacks JSON's obvious structure.
 
 ---
@@ -78,7 +80,7 @@ While pre-built binaries may be available, building from source is the primary a
 
 ```bash
 # Automated install script (Installs dependencies and builds from source)
-curl -sSL https://raw.githubusercontent.com/jm33-m0/emp3r0r/refs/heads/v3/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/jm33-m0/emp3r0r/refs/heads/v4/install.sh | bash
 ```
 
 ### 3-Step Deployment
@@ -100,12 +102,30 @@ This command deploys emp3r0r with:
 Copy the generated connection command and replace `<C2_PUBLIC_IP>` with your server's IP:
 
 ```bash
-emp3r0r client --c2-port 12345 --server-wg-key 'key...' --c2-host your.domain.com
+emp3r0r client --c2-port 12345 \
+	--server-wg-key 'server_wg_pubkey...' \
+	--server-wg-ip '10.10.0.1' \
+	--operator-wg-ip '10.10.0.2' \
+	--operator-wg-key 'operator_wg_private_key...' \
+	--c2-host <C2_PUBLIC_IP>
 ```
 
 #### Generate Agent Payloads
 
 Use the `generate` command from within the emp3r0r shell interface to create customized agent payloads.
+
+Example (standalone direct C2):
+
+```bash
+generate --type linux_executable --arch amd64 --cc your.domain.com
+```
+
+Example (mesh gateway):
+
+```bash
+generate --type linux_executable --arch amd64 --cc your.domain.com \
+	--p2p --direct-c2 --p2p-transport mtls
+```
 
 ---
 
@@ -135,7 +155,7 @@ Use the `generate` command from within the emp3r0r shell interface to create cus
 
 ### Network Pivoting
 
-- **Flexible Pivoting**: Bi-directional TCP/UDP port mapping and agent-side Socks5 (with UDP) support.
+- **Flexible Pivoting**: Gossip mesh relay plus reverse-tunnel workflows for segmented networks.
 - **KCP-based UDP tunneling** for speed and resilience in high-latency environments.
 - **TOR/CDN** support for additional operational cover.
 
