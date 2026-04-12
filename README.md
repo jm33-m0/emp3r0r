@@ -62,11 +62,11 @@ Execute **Windows COFF objects** on Windows agents with typed argument packing (
 
 **Why this matters:** BOFs avoid process creation overhead and are difficult to detect. emp3r0r brings this capability to Linux, where most C2 frameworks rely on forking processes or interpreting shell scripts.
 
-### 🎭 JA3 Fingerprint Evasion + CBOR Serialization
+### 🎭 Pluggable C2 Transport + JA3 Evasion + CBOR
+
+emp3r0r supports **pluggable C2 channel wrappers**. In v4, the default is `h2conn`, and `plain_http` is also available. `plain_http` runs over HTTP/1.1 and can be proxied by CDN/reverse proxies directly, without the websocket `--cdn2proxy` bridge.
 
 HTTP2/TLS connections use **uTLS** to randomize TLS Client Hello fingerprints, preventing static JA3 signature detection. All network traffic and data storage uses **CBOR** (binary) instead of JSON, reducing bandwidth by 30-40% and avoiding text-based parsing signatures.
-
-In v4, the C2 channel wrapper is pluggable (`h2conn` or `plain_http`). `plain_http` runs over HTTP/1.1 and can be proxied by CDN/reverse proxies directly, without the websocket `--cdn2proxy` bridge.
 
 **Why this matters:** Network monitoring tools fingerprint TLS handshakes for application identification. Static TLS implementations create consistent signatures. emp3r0r randomizes these on every connection while using a compact binary protocol that lacks JSON's obvious structure.
 
@@ -142,9 +142,7 @@ generate --type linux_executable --arch amd64 --cc your.domain.com \
 ### Operator Experience
 
 - **Adaptive tmux UI**: Native integration with dynamic status bars, adaptive layouts, and real-time agent/C2 status monitoring.
-- **BYOS (Bring Your Own Shell)**: SSH-based reverse PTY that drives any shell available on the target (bash, zsh, sh, python REPL, etc.) over the same tunnel you also reuse for file manager and transfers.
 - **Intelligent auto-completion** with syntax highlighting.
-- **SFTP integration** for efficient remote file operations.
 
 ### File Transfer System
 
