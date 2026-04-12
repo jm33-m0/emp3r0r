@@ -308,68 +308,188 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 	var jCfg jsonConfig
 	if err := json.Unmarshal(jsonData, &jCfg); err == nil {
 		// Only override if not empty/zero (basic heuristic)
-		if jCfg.CCAddress != "" { config_to_write.CCAddress = jCfg.CCAddress }
-		if jCfg.CCHost != "" { config_to_write.CCHost = jCfg.CCHost }
-		if jCfg.CCPort != "" { config_to_write.CCPort = jCfg.CCPort }
-		if jCfg.AgentSocksServerPort != "" { config_to_write.AgentSocksServerPort = jCfg.AgentSocksServerPort }
-		if jCfg.AgentSocksTimeout != 0 { config_to_write.AgentSocksTimeout = jCfg.AgentSocksTimeout }
-		if jCfg.StagerHTTPListenerPort != "" { config_to_write.StagerHTTPListenerPort = jCfg.StagerHTTPListenerPort }
-		if jCfg.Password != "" { config_to_write.Password = jCfg.Password }
-		if jCfg.ShadowsocksLocalSocksPort != "" { config_to_write.ShadowsocksLocalSocksPort = jCfg.ShadowsocksLocalSocksPort }
-		if jCfg.ShadowsocksServerPort != "" { config_to_write.ShadowsocksServerPort = jCfg.ShadowsocksServerPort }
-		if jCfg.KCPServerPort != "" { config_to_write.KCPServerPort = jCfg.KCPServerPort }
-		if jCfg.KCPClientPort != "" { config_to_write.KCPClientPort = jCfg.KCPClientPort }
-		if jCfg.UseKCP { config_to_write.UseKCP = jCfg.UseKCP }
-		if jCfg.EnableNCSI { config_to_write.EnableNCSI = jCfg.EnableNCSI }
-		if jCfg.SSHHostKey != "" { config_to_write.SSHHostKey = []byte(jCfg.SSHHostKey) }
-		if jCfg.Bring2CCReverseProxyPort != "" { config_to_write.Bring2CCReverseProxyPort = jCfg.Bring2CCReverseProxyPort }
-		if jCfg.SSHDShellPort != "" { config_to_write.SSHDShellPort = jCfg.SSHDShellPort }
-		if jCfg.MeshGossipPort != "" { config_to_write.MeshGossipPort = jCfg.MeshGossipPort }
-		if jCfg.PreflightEnabled { config_to_write.PreflightEnabled = jCfg.PreflightEnabled }
-		if jCfg.PreflightURL != "" { config_to_write.PreflightURL = jCfg.PreflightURL }
-		if jCfg.PreflightMethod != "" { config_to_write.PreflightMethod = jCfg.PreflightMethod }
-		if len(jCfg.PreflightHeaders) > 0 { config_to_write.PreflightHeaders = jCfg.PreflightHeaders }
-		if jCfg.PreflightIntervalMin != 0 { config_to_write.PreflightIntervalMin = jCfg.PreflightIntervalMin }
-		if jCfg.PreflightIntervalMax != 0 { config_to_write.PreflightIntervalMax = jCfg.PreflightIntervalMax }
-		if jCfg.CAPEM != "" { config_to_write.CAPEM = jCfg.CAPEM }
-		if jCfg.CAFingerprint != "" { config_to_write.CAFingerprint = jCfg.CAFingerprint }
-		if jCfg.C2TransportProxy != "" { config_to_write.C2TransportProxy = jCfg.C2TransportProxy }
-		if jCfg.CDNProxy != "" { config_to_write.CDNProxy = jCfg.CDNProxy }
-		if jCfg.DoHServer != "" { config_to_write.DoHServer = jCfg.DoHServer }
-		if jCfg.AgentUUID != "" { config_to_write.AgentUUID = jCfg.AgentUUID }
-		if jCfg.AgentUUIDSig != "" { config_to_write.AgentUUIDSig = jCfg.AgentUUIDSig }
-		if jCfg.AgentTag != "" { config_to_write.AgentTag = jCfg.AgentTag }
-		if jCfg.CCTimeout != 0 { config_to_write.CCTimeout = jCfg.CCTimeout }
-		if jCfg.PaddingMin != 0 { config_to_write.PaddingMin = jCfg.PaddingMin }
-		if jCfg.PaddingMax != 0 { config_to_write.PaddingMax = jCfg.PaddingMax }
-		if jCfg.Jitter != 0 { config_to_write.Jitter = jCfg.Jitter }
-		if jCfg.PollInterval != 0 { config_to_write.PollInterval = jCfg.PollInterval }
-		if jCfg.ModulePath != "" { config_to_write.ModulePath = jCfg.ModulePath }
-		if jCfg.IsRunByStager { config_to_write.IsRunByStager = jCfg.IsRunByStager }
-		if jCfg.MachineID != "" { config_to_write.MachineID = jCfg.MachineID }
-		if len(jCfg.InitialPeers) > 0 { config_to_write.InitialPeers = jCfg.InitialPeers }
-		if jCfg.IsP2PEnabled { config_to_write.IsP2PEnabled = jCfg.IsP2PEnabled }
-		if jCfg.IsDirectC2Enabled { config_to_write.IsDirectC2Enabled = jCfg.IsDirectC2Enabled }
-		if jCfg.P2PTransport != "" { config_to_write.P2PTransport = jCfg.P2PTransport }
-		if jCfg.CamouflageCertOrg != "" { config_to_write.CamouflageCertOrg = jCfg.CamouflageCertOrg }
-		if jCfg.CamouflageCertCN != "" { config_to_write.CamouflageCertCN = jCfg.CamouflageCertCN }
-		if jCfg.C2Routes.Checkin != "" { config_to_write.C2Routes.Checkin = jCfg.C2Routes.Checkin }
-		if jCfg.C2Routes.Msg != "" { config_to_write.C2Routes.Msg = jCfg.C2Routes.Msg }
-		if jCfg.C2Routes.FTP != "" { config_to_write.C2Routes.FTP = jCfg.C2Routes.FTP }
-		if jCfg.C2Routes.WWW != "" { config_to_write.C2Routes.WWW = jCfg.C2Routes.WWW }
-		if jCfg.C2Routes.Proxy != "" { config_to_write.C2Routes.Proxy = jCfg.C2Routes.Proxy }
-		if jCfg.C2ChannelMode != "" { config_to_write.C2ChannelMode = jCfg.C2ChannelMode }
-		if jCfg.CCHTTPPort != "" { config_to_write.CCHTTPPort = jCfg.CCHTTPPort }
-		
+		if jCfg.CCAddress != "" {
+			config_to_write.CCAddress = jCfg.CCAddress
+		}
+		if jCfg.CCHost != "" {
+			config_to_write.CCHost = jCfg.CCHost
+		}
+		if jCfg.CCPort != "" {
+			config_to_write.CCPort = jCfg.CCPort
+		}
+		if jCfg.AgentSocksServerPort != "" {
+			config_to_write.AgentSocksServerPort = jCfg.AgentSocksServerPort
+		}
+		if jCfg.AgentSocksTimeout != 0 {
+			config_to_write.AgentSocksTimeout = jCfg.AgentSocksTimeout
+		}
+		if jCfg.StagerHTTPListenerPort != "" {
+			config_to_write.StagerHTTPListenerPort = jCfg.StagerHTTPListenerPort
+		}
+		if jCfg.Password != "" {
+			config_to_write.Password = jCfg.Password
+		}
+		if jCfg.ShadowsocksLocalSocksPort != "" {
+			config_to_write.ShadowsocksLocalSocksPort = jCfg.ShadowsocksLocalSocksPort
+		}
+		if jCfg.ShadowsocksServerPort != "" {
+			config_to_write.ShadowsocksServerPort = jCfg.ShadowsocksServerPort
+		}
+		if jCfg.KCPServerPort != "" {
+			config_to_write.KCPServerPort = jCfg.KCPServerPort
+		}
+		if jCfg.KCPClientPort != "" {
+			config_to_write.KCPClientPort = jCfg.KCPClientPort
+		}
+		if jCfg.UseKCP {
+			config_to_write.UseKCP = jCfg.UseKCP
+		}
+		if jCfg.EnableNCSI {
+			config_to_write.EnableNCSI = jCfg.EnableNCSI
+		}
+		if jCfg.SSHHostKey != "" {
+			config_to_write.SSHHostKey = []byte(jCfg.SSHHostKey)
+		}
+		if jCfg.Bring2CCReverseProxyPort != "" {
+			config_to_write.Bring2CCReverseProxyPort = jCfg.Bring2CCReverseProxyPort
+		}
+		if jCfg.SSHDShellPort != "" {
+			config_to_write.SSHDShellPort = jCfg.SSHDShellPort
+		}
+		if jCfg.MeshGossipPort != "" {
+			config_to_write.MeshGossipPort = jCfg.MeshGossipPort
+		}
+		if jCfg.PreflightEnabled {
+			config_to_write.PreflightEnabled = jCfg.PreflightEnabled
+		}
+		if jCfg.PreflightURL != "" {
+			config_to_write.PreflightURL = jCfg.PreflightURL
+		}
+		if jCfg.PreflightMethod != "" {
+			config_to_write.PreflightMethod = jCfg.PreflightMethod
+		}
+		if len(jCfg.PreflightHeaders) > 0 {
+			config_to_write.PreflightHeaders = jCfg.PreflightHeaders
+		}
+		if jCfg.PreflightIntervalMin != 0 {
+			config_to_write.PreflightIntervalMin = jCfg.PreflightIntervalMin
+		}
+		if jCfg.PreflightIntervalMax != 0 {
+			config_to_write.PreflightIntervalMax = jCfg.PreflightIntervalMax
+		}
+		if jCfg.CAPEM != "" {
+			config_to_write.CAPEM = jCfg.CAPEM
+		}
+		if jCfg.CAFingerprint != "" {
+			config_to_write.CAFingerprint = jCfg.CAFingerprint
+		}
+		if jCfg.C2TransportProxy != "" {
+			config_to_write.C2TransportProxy = jCfg.C2TransportProxy
+		}
+		if jCfg.CDNProxy != "" {
+			config_to_write.CDNProxy = jCfg.CDNProxy
+		}
+		if jCfg.DoHServer != "" {
+			config_to_write.DoHServer = jCfg.DoHServer
+		}
+		if jCfg.AgentUUID != "" {
+			config_to_write.AgentUUID = jCfg.AgentUUID
+		}
+		if jCfg.AgentUUIDSig != "" {
+			config_to_write.AgentUUIDSig = jCfg.AgentUUIDSig
+		}
+		if jCfg.AgentTag != "" {
+			config_to_write.AgentTag = jCfg.AgentTag
+		}
+		if jCfg.CCTimeout != 0 {
+			config_to_write.CCTimeout = jCfg.CCTimeout
+		}
+		if jCfg.PaddingMin != 0 {
+			config_to_write.PaddingMin = jCfg.PaddingMin
+		}
+		if jCfg.PaddingMax != 0 {
+			config_to_write.PaddingMax = jCfg.PaddingMax
+		}
+		if jCfg.Jitter != 0 {
+			config_to_write.Jitter = jCfg.Jitter
+		}
+		if jCfg.PollInterval != 0 {
+			config_to_write.PollInterval = jCfg.PollInterval
+		}
+		if jCfg.ModulePath != "" {
+			config_to_write.ModulePath = jCfg.ModulePath
+		}
+		if jCfg.IsRunByStager {
+			config_to_write.IsRunByStager = jCfg.IsRunByStager
+		}
+		if jCfg.MachineID != "" {
+			config_to_write.MachineID = jCfg.MachineID
+		}
+		if len(jCfg.InitialPeers) > 0 {
+			config_to_write.InitialPeers = jCfg.InitialPeers
+		}
+		if jCfg.IsP2PEnabled {
+			config_to_write.IsP2PEnabled = jCfg.IsP2PEnabled
+		}
+		if jCfg.IsDirectC2Enabled {
+			config_to_write.IsDirectC2Enabled = jCfg.IsDirectC2Enabled
+		}
+		if jCfg.P2PTransport != "" {
+			config_to_write.P2PTransport = jCfg.P2PTransport
+		}
+		if jCfg.CamouflageCertOrg != "" {
+			config_to_write.CamouflageCertOrg = jCfg.CamouflageCertOrg
+		}
+		if jCfg.CamouflageCertCN != "" {
+			config_to_write.CamouflageCertCN = jCfg.CamouflageCertCN
+		}
+		if jCfg.C2Routes.Checkin != "" {
+			config_to_write.C2Routes.Checkin = jCfg.C2Routes.Checkin
+		}
+		if jCfg.C2Routes.Msg != "" {
+			config_to_write.C2Routes.Msg = jCfg.C2Routes.Msg
+		}
+		if jCfg.C2Routes.FTP != "" {
+			config_to_write.C2Routes.FTP = jCfg.C2Routes.FTP
+		}
+		if jCfg.C2Routes.WWW != "" {
+			config_to_write.C2Routes.WWW = jCfg.C2Routes.WWW
+		}
+		if jCfg.C2Routes.Proxy != "" {
+			config_to_write.C2Routes.Proxy = jCfg.C2Routes.Proxy
+		}
+		if jCfg.C2ChannelMode != "" {
+			config_to_write.C2ChannelMode = jCfg.C2ChannelMode
+		}
+		if jCfg.CCHTTPPort != "" {
+			config_to_write.CCHTTPPort = jCfg.CCHTTPPort
+		}
+
 		// Malleable C2 from shadow struct
-		if jCfg.MalleableC2.C2Path != "" { config_to_write.MalleableC2.C2Path = jCfg.MalleableC2.C2Path }
-		if jCfg.MalleableC2.SessionHeader != "" { config_to_write.MalleableC2.SessionHeader = jCfg.MalleableC2.SessionHeader }
-		if jCfg.MalleableC2.SessionValue != "" { config_to_write.MalleableC2.SessionValue = jCfg.MalleableC2.SessionValue }
-		if jCfg.MalleableC2.InitHeader != "" { config_to_write.MalleableC2.InitHeader = jCfg.MalleableC2.InitHeader }
-		if jCfg.MalleableC2.InitValue != "" { config_to_write.MalleableC2.InitValue = jCfg.MalleableC2.InitValue }
-		if jCfg.MalleableC2.CloseHeader != "" { config_to_write.MalleableC2.CloseHeader = jCfg.MalleableC2.CloseHeader }
-		if jCfg.MalleableC2.CloseValue != "" { config_to_write.MalleableC2.CloseValue = jCfg.MalleableC2.CloseValue }
-		if len(jCfg.MalleableC2.CustomHeaders) > 0 { config_to_write.MalleableC2.CustomHeaders = jCfg.MalleableC2.CustomHeaders }
+		if jCfg.MalleableC2.C2Path != "" {
+			config_to_write.MalleableC2.C2Path = jCfg.MalleableC2.C2Path
+		}
+		if jCfg.MalleableC2.SessionHeader != "" {
+			config_to_write.MalleableC2.SessionHeader = jCfg.MalleableC2.SessionHeader
+		}
+		if jCfg.MalleableC2.SessionValue != "" {
+			config_to_write.MalleableC2.SessionValue = jCfg.MalleableC2.SessionValue
+		}
+		if jCfg.MalleableC2.InitHeader != "" {
+			config_to_write.MalleableC2.InitHeader = jCfg.MalleableC2.InitHeader
+		}
+		if jCfg.MalleableC2.InitValue != "" {
+			config_to_write.MalleableC2.InitValue = jCfg.MalleableC2.InitValue
+		}
+		if jCfg.MalleableC2.CloseHeader != "" {
+			config_to_write.MalleableC2.CloseHeader = jCfg.MalleableC2.CloseHeader
+		}
+		if jCfg.MalleableC2.CloseValue != "" {
+			config_to_write.MalleableC2.CloseValue = jCfg.MalleableC2.CloseValue
+		}
+		if len(jCfg.MalleableC2.CustomHeaders) > 0 {
+			config_to_write.MalleableC2.CustomHeaders = jCfg.MalleableC2.CustomHeaders
+		}
 	}
 
 	calculateReverseProxyPort := func() (string, error) {

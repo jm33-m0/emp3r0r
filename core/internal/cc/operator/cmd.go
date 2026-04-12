@@ -150,7 +150,6 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		}
 		rootCmd.AddCommand(upgradeAgentCmd)
 
-
 		lsCmd := &cobra.Command{
 			Use:     "ls [dir]",
 			GroupID: "filesystem",
@@ -421,7 +420,6 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run:     cmdSearchModule,
 		}
 		rootCmd.AddCommand(searchCmd)
-
 
 		labelAgentCmd := &cobra.Command{
 			Use:     "label --id agent_id --label custom_name",

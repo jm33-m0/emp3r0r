@@ -38,6 +38,7 @@ func StartC2H2StreamServer() {
 		logging.Fatalf("Failed to start C2 h2 stream server at *:%s: %v", live.RuntimeConfig.CCPort, err)
 	}
 }
+
 func registerC2H2StreamAcceptHandler(mux *http.ServeMux, channelWrapper transport.C2ChannelWrapper) {
 	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		if req.Method != http.MethodPost {

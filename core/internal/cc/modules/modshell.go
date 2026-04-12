@@ -54,4 +54,3 @@ func ModuleCmd(ctx *c2context.C2Context) {
 
 	execOnTarget(target)
 }
-

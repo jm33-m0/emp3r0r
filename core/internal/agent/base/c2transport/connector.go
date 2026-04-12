@@ -65,8 +65,8 @@ func EstablishC2Connection(url string, streamID string, capabilities ...string) 
 func establishChannelStream(ctx context.Context, url string, channelWrapper transport.C2ChannelWrapper) (io.ReadWriteCloser, error) {
 	type connectResult struct {
 		stream io.ReadWriteCloser
-		resp *http.Response
-		err  error
+		resp   *http.Response
+		err    error
 	}
 	resultChan := make(chan connectResult, 1)
 	go func() {

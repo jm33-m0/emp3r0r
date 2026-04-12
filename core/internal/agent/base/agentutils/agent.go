@@ -3,13 +3,13 @@ package agentutils
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
-	"strings"
 )
 
 // set C2Transport string

@@ -28,9 +28,9 @@ var (
 	// SessionID marks the operator session
 	SessionID string
 
-	msgTunConnMu  sync.RWMutex
-	msgTunConn    *h2conn.Conn
-	msgTunWriteMu sync.Mutex
+	msgTunConnMu   sync.RWMutex
+	msgTunConn     *h2conn.Conn
+	msgTunWriteMu  sync.Mutex
 	msgTunUpdateCh = make(chan struct{}, 1)
 )
 

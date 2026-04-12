@@ -343,5 +343,3 @@ func TestReadJSONConfigFullCoverage(t *testing.T) {
 		t.Errorf("Expected ModulePath /tmp/test, got %s", loaded.ModulePath)
 	}
 }
-
-

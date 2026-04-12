@@ -111,7 +111,7 @@ func MakeConfig(opts AgentConfig) error {
 	if live.RuntimeConfig.DoHServer != "" {
 		logging.Infof("Using DoH server %s", live.RuntimeConfig.DoHServer)
 	}
-	
+
 	// HTTP Port
 	if opts.CCHTTPPort != nil {
 		live.RuntimeConfig.CCHTTPPort = *opts.CCHTTPPort
