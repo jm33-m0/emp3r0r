@@ -17,14 +17,14 @@ func CheckContainer() (product string) {
 	if err != nil {
 		return
 	}
-	lines := strings.Split(string(data), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(data), "\n")
+	for line := range lines {
 		if strings.Contains(line, "freezer") {
 			fields := strings.Split(line, ":")
-			if len(fields) > 1 &&
+			if len(fields) > 2 &&
 				fields[len(fields)-1] != "/" {
 				product = strings.Split(fields[2], "/")[1]
-				logging.Infof("Inside a container: ", product)
+				logging.Infof("Inside a container: %s", product)
 				return
 			}
 		}
