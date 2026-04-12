@@ -183,8 +183,8 @@ type authorizedPeer struct {
 // GetAuthorizedPeers scans the gossip member list, verifies each node's
 // MeshNodeMeta (CA-signed AgentToken + capability check + expiry), and returns
 // the IPs sorted by Distance ascending (shortest hop to C2 first).
-func GetAuthorizedPeers(list *memberlist.Memberlist, capability string) []string {
-	var peers []authorizedPeer
+func GetAuthorizedPeers(list *memberlist.Memberlist, capability string) []def.MeshNodeMeta {
+	var peers []def.MeshNodeMeta
 
 	for _, member := range list.Members() {
 		// Only consider members actively gossiping as alive
@@ -225,11 +225,20 @@ func GetAuthorizedPeers(list *memberlist.Memberlist, capability string) []string
 			continue
 		}
 
-		peers = append(peers, authorizedPeer{IP: member.Addr.String(), Distance: meta.Distance})
+		peers = append(peers, def.MeshNodeMeta{
+			Addr:     member.Addr.String(),
+			Distance: meta.Distance,
+		})
 	}
 
-	// Sort by Distance ascending — prefer shortest hop to C2.
 	sort.Slice(peers, func(i, j int) bool {
+		// Prefer nodes with lower distance to C2. -1 is unknown/infinite.
+		if peers[i].Distance < 0 {
+			return false
+		}
+		if peers[j].Distance < 0 {
+			return true
+		}
 		return peers[i].Distance < peers[j].Distance
 	})
 	// Within each same-distance tier, shuffle randomly so multiple Silent Nodes
@@ -246,9 +255,5 @@ func GetAuthorizedPeers(list *memberlist.Memberlist, capability string) []string
 		i = j
 	}
 
-	result := make([]string, len(peers))
-	for i, p := range peers {
-		result[i] = p.IP
-	}
-	return result
+	return peers
 }

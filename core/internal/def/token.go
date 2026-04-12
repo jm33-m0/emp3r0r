@@ -16,6 +16,7 @@ type AgentToken struct {
 type MeshNodeMeta struct {
 	Token    *AgentToken `cbor:"1,keyasint"` // C2-signed, capability=CapabilityRouter
 	Distance int         `cbor:"2,keyasint"` // hops to C2: 0=Gateway, >0=Routed, -1=Unknown
+	Addr     string      `cbor:"3,keyasint"` // node address
 }
 
 // TagAgentToken is the MsgTunData tag for token push from C2 to agent.

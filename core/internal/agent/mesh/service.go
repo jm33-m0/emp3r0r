@@ -90,16 +90,21 @@ func Start(ctx context.Context) {
 	if common.RuntimeConfig.IsDirectC2Enabled {
 		// Gateway: distance=0, serve relay.
 		SetDistance(0)
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					logging.Errorf("ServeRelay panic: %v", r)
-				}
-			}()
-			ServeRelay(ctx)
+	}
+
+	// Always start the mesh relay service if P2P is enabled.
+	// This allows non-direct-C2 nodes to serve as intermediate routers
+	// once they receive an authorized 'router' token from the C2.
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logging.Errorf("ServeRelay panic: %v", r)
+			}
 		}()
-		logging.Infof("Mesh: Gateway relay started on KCP port %s", common.RuntimeConfig.KCPServerPort)
-	} else {
+		ServeRelay(ctx)
+	}()
+
+	if !common.RuntimeConfig.IsDirectC2Enabled {
 		// Silent Node: watch peers for an authorized Gateway.
 		go watchPeers(ctx)
 	}
@@ -210,19 +215,19 @@ func watchPeers(ctx context.Context) {
 		}
 		peers := transport.GetAuthorizedPeers(list, def.CapabilityRouter)
 		logging.Debugf("Mesh: %d authorized peer(s) in gossip view", len(peers))
-		for _, ip := range peers {
+		for _, p := range peers {
 			// Probe dial: verify the gateway is reachable.
-			if err := t.Ping(ctx, ip, ""); err != nil {
-				logging.Debugf("Mesh: peer %s failed: %v", ip, err)
+			if err := t.Ping(ctx, p.Addr, ""); err != nil {
+				logging.Debugf("Mesh: peer %s failed: %v", p.Addr, err)
 				continue
 			}
-			SetDistance(1)
+			SetDistance(p.Distance + 1)
 			gatewayMu.Lock()
 			prev := gatewayIP
-			gatewayIP = ip
+			gatewayIP = p.Addr
 			gatewayMu.Unlock()
-			if prev != ip {
-				logging.Infof("Mesh: gateway updated %s → %s", prev, ip)
+			if prev != p.Addr {
+				logging.Infof("Mesh: gateway updated %s → %s", prev, p.Addr)
 			}
 			// Signal WaitForRoute on first success.
 			routeOnce.Do(func() { close(routeReady) })
