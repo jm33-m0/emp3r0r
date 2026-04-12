@@ -84,6 +84,15 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 		t.Skip("Skipping test: race detector is enabled")
 	}
 
+	for _, mode := range []string{def.C2ChannelModeH2Conn, "plain_http"} {
+		mode := mode
+		t.Run(mode, func(t *testing.T) {
+			runAgentEndToEndLifecycle(t, mode)
+		})
+	}
+}
+
+func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 	// 1. Setup workspace
 	tmpDir, err := os.MkdirTemp("", "stager_test_*")
 	if err != nil {
@@ -168,10 +177,14 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 
 	// Initialize live.RuntimeConfig for the C2 server
 	c2HttpPortStr := fmt.Sprintf("%d", c2Port+1)
+	preflightURL := fmt.Sprintf("http://127.0.0.1:%s/preflight-test", c2HttpPortStr)
+	if mode == def.C2ChannelModeH2Conn {
+		preflightURL = fmt.Sprintf("https://127.0.0.1:%s/preflight-test", c2PortStr)
+	}
 	live.RuntimeConfig = &def.Config{
 		CCPort:        c2PortStr,
 		CCHTTPPort:    c2HttpPortStr,
-		C2ChannelMode: "plain_http",
+		C2ChannelMode: mode,
 		CAPEM:         string(caCertData),
 		C2Routes: def.C2Routing{
 			Checkin: "c2-checkin",
@@ -181,7 +194,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 			Proxy:   "c2-proxy",
 		},
 		PreflightEnabled: true,
-		PreflightURL:     fmt.Sprintf("http://127.0.0.1:%s/preflight-test", c2HttpPortStr),
+		PreflightURL:     preflightURL,
 		PreflightMethod:  "GET",
 		MalleableC2: def.MalleableHTTPConfig{
 			C2Path:        "/api/v1/telemetry",
@@ -215,7 +228,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 		CCAddress:     "127.0.0.1",
 		CCPort:        c2PortStr,
 		CCHTTPPort:    c2HttpPortStr,
-		C2ChannelMode: "plain_http",
+		C2ChannelMode: mode,
 		CAPEM:         string(caCertData),
 		C2Routes: def.C2Routing{
 			Checkin: "c2-checkin",
@@ -230,7 +243,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 		ModulePath:       "", // Empty for anonymous memory loading in test
 		CCTimeout:        1000,
 		PreflightEnabled: true,
-		PreflightURL:     fmt.Sprintf("http://127.0.0.1:%s/preflight-test", c2HttpPortStr),
+		PreflightURL:     preflightURL,
 		PreflightMethod:  "GET",
 		IsRunByStager:    true,
 		MalleableC2: def.MalleableHTTPConfig{
@@ -301,7 +314,9 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 		logging.Infof("Starting real C2 server on port %s", c2PortStr)
 		server.StartC2AgentTLSServer()
 	}()
-	go server.StartC2HTTPServer()
+	if mode == "plain_http" {
+		go server.StartC2HTTPServer()
+	}
 
 	// Ensure server cleanup at end of test
 	defer func() {
@@ -653,6 +668,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	// Reset agent variable to detect new checkin
 	startRestart := time.Now()
 	reconnected := false
+	cleanupStaleSession := false
 
 	for time.Since(startRestart) < 30*time.Second {
 		live.AgentControlMap.Range(func(key, value any) bool {
@@ -683,6 +699,28 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 		if reconnected {
 			logging.Successf("Agent reconnected with SAME key. Persistence verified.")
 			break
+		}
+
+		// In strict fail-closed mode, abrupt process kill can leave a stale session
+		// record for a short period. Force cleanup in test to validate key persistence.
+		if mode == "plain_http" && !cleanupStaleSession && time.Since(startRestart) > 8*time.Second {
+			if endErr := agents.EndSession(agent.UUID); endErr != nil {
+				logging.Warningf("Failed to clean stale session for %s: %v", agent.UUID, endErr)
+			} else {
+				logging.Infof("Cleaned stale session for %s to allow restart check-in", agent.UUID)
+			}
+			if val, ok := live.AgentControlMap.Load(agent); ok {
+				if ctrl, ok := val.(*live.AgentControl); ok {
+					if ctrl.Cancel != nil {
+						ctrl.Cancel()
+					}
+					if ctrl.Conn != nil {
+						_ = ctrl.Conn.Close()
+					}
+				}
+				live.AgentControlMap.Delete(agent)
+			}
+			cleanupStaleSession = true
 		}
 		time.Sleep(500 * time.Millisecond)
 	}

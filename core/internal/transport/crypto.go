@@ -142,9 +142,18 @@ func (sc *SecureConn) Write(p []byte) (n int, err error) {
 
 	copy(frame[4:], encrypted)
 
-	_, err = sc.Conn.Write(frame)
-	if err != nil {
-		return 0, err
+	written := 0
+	for written < len(frame) {
+		nw, writeErr := sc.Conn.Write(frame[written:])
+		if nw > 0 {
+			written += nw
+		}
+		if writeErr != nil {
+			return 0, writeErr
+		}
+		if nw == 0 {
+			return 0, io.ErrShortWrite
+		}
 	}
 
 	return len(p), nil

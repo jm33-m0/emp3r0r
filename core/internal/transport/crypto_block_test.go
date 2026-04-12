@@ -11,7 +11,7 @@ import (
 
 func TestCopyC2Blocks_RoundTripOverSecureConn(t *testing.T) {
 	origKey := def.AESPassword
-	def.AESPassword = []byte("1234567890123456")
+	def.AESPassword = []byte("12345678901234567890123456789012")
 	defer func() {
 		def.AESPassword = origKey
 	}()
@@ -27,10 +27,8 @@ func TestCopyC2Blocks_RoundTripOverSecureConn(t *testing.T) {
 
 	sendErrCh := make(chan error, 1)
 	go func() {
+		defer clientSecure.Close()
 		_, err := CopyC2Blocks(clientSecure, bytes.NewReader(srcData), 4096)
-		if err == nil {
-			err = clientSecure.Close()
-		}
 		sendErrCh <- err
 	}()
 
@@ -38,12 +36,12 @@ func TestCopyC2Blocks_RoundTripOverSecureConn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadAll over SecureConn failed: %v", err)
 	}
-	if !bytes.Equal(recvData, srcData) {
-		t.Fatalf("round trip data mismatch: got %d bytes, want %d bytes", len(recvData), len(srcData))
-	}
 
 	if sendErr := <-sendErrCh; sendErr != nil {
 		t.Fatalf("CopyC2Blocks sender failed: %v", sendErr)
+	}
+	if !bytes.Equal(recvData, srcData) {
+		t.Fatalf("round trip data mismatch: got %d bytes, want %d bytes", len(recvData), len(srcData))
 	}
 }
 

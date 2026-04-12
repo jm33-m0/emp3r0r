@@ -17,18 +17,38 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 )
 
-func TestPlainHTTPCheckinACK(t *testing.T) {
+func waitForPort(addr string, deadline time.Time) error {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timeout waiting for %s to accept connections", addr)
+		}
+		conn, err := net.DialTimeout("tcp", addr, 200*time.Millisecond)
+		if err == nil {
+			conn.Close()
+			return nil
+		}
+		<-ticker.C
+	}
+}
+
+func runCheckinACK(t *testing.T, mode string) {
+	t.Helper()
+
 	tmpDir, err := os.MkdirTemp("", "agent_plain_http_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
+	defer network.StopEmpTLSServer()
 
 	caCertFile := filepath.Join(tmpDir, "ca-cert.pem")
 	caKeyFile := filepath.Join(tmpDir, "ca-key.pem")
@@ -73,7 +93,7 @@ func TestPlainHTTPCheckinACK(t *testing.T) {
 		CCPort:        fmt.Sprintf("%d", tlsPort),
 		CCHTTPPort:    fmt.Sprintf("%d", httpPort),
 		CAPEM:         string(caCertData),
-		C2ChannelMode: "plain_http",
+		C2ChannelMode: mode,
 		C2Routes: def.C2Routing{
 			Checkin: "c2-checkin",
 			Msg:     "c2-msg",
@@ -96,24 +116,15 @@ func TestPlainHTTPCheckinACK(t *testing.T) {
 	live.AgentList = make([]*def.Emp3r0rAgent, 0)
 
 	go server.StartC2AgentTLSServer()
-	go server.StartC2HTTPServer()
-	waitForPort := func(addr string, deadline time.Time) error {
-		ticker := time.NewTicker(100 * time.Millisecond)
-		defer ticker.Stop()
-		for {
-			if time.Now().After(deadline) {
-				return fmt.Errorf("timeout waiting for %s to accept connections", addr)
-			}
-			conn, err := net.DialTimeout("tcp", addr, 200*time.Millisecond)
-			if err == nil {
-				conn.Close()
-				return nil
-			}
-			<-ticker.C
-		}
+	if err := waitForPort(fmt.Sprintf("127.0.0.1:%d", tlsPort), time.Now().Add(10*time.Second)); err != nil {
+		t.Fatalf("TLS C2 server did not become ready: %v", err)
 	}
-	if err := waitForPort(fmt.Sprintf("127.0.0.1:%d", httpPort), time.Now().Add(10*time.Second)); err != nil {
-		t.Fatalf("Plain HTTP server did not become ready: %v", err)
+
+	if mode == "plain_http" {
+		go server.StartC2HTTPServer()
+		if err := waitForPort(fmt.Sprintf("127.0.0.1:%d", httpPort), time.Now().Add(10*time.Second)); err != nil {
+			t.Fatalf("Plain HTTP server did not become ready: %v", err)
+		}
 	}
 
 	agentUUID := uuid.NewString()
@@ -134,8 +145,9 @@ func TestPlainHTTPCheckinACK(t *testing.T) {
 
 	common.RuntimeConfig = &def.Config{
 		CCAddress:     "127.0.0.1",
+		CCPort:        fmt.Sprintf("%d", tlsPort),
 		CCHTTPPort:    fmt.Sprintf("%d", httpPort),
-		C2ChannelMode: "plain_http",
+		C2ChannelMode: mode,
 		CAPEM:         string(caCertData),
 		C2Routes:      live.RuntimeConfig.C2Routes,
 		AgentUUID:     agentUUID,
@@ -143,18 +155,27 @@ func TestPlainHTTPCheckinACK(t *testing.T) {
 		AgentTag:      agentUUID,
 		MalleableC2:   live.RuntimeConfig.MalleableC2,
 	}
-	def.CCAddress = fmt.Sprintf("http://127.0.0.1:%d", httpPort)
-	def.HTTPClient = transport.CreateEmp3r0rHTTPClient(def.CCAddress, "")
-	if def.HTTPClient == nil {
-		t.Fatalf("Failed to create plain HTTP client")
-	}
 
 	certPool := x509.NewCertPool()
 	if ok := certPool.AppendCertsFromPEM(caCertData); !ok {
 		t.Fatalf("Failed to append CA cert")
 	}
-	if tr, ok := def.HTTPClient.Transport.(*http.Transport); ok {
-		tr.TLSClientConfig = &tls.Config{RootCAs: certPool}
+
+	if mode == "plain_http" {
+		def.CCAddress = fmt.Sprintf("http://127.0.0.1:%d", httpPort)
+		def.HTTPClient = transport.CreateEmp3r0rHTTPClient(def.CCAddress, "")
+		if def.HTTPClient == nil {
+			t.Fatalf("Failed to create plain HTTP client")
+		}
+		if tr, ok := def.HTTPClient.Transport.(*http.Transport); ok {
+			tr.TLSClientConfig = &tls.Config{RootCAs: certPool}
+		}
+	} else {
+		def.CCAddress = fmt.Sprintf("https://127.0.0.1:%d", tlsPort)
+		def.HTTPClient = &http.Client{Transport: &http.Transport{
+			TLSClientConfig:   &tls.Config{RootCAs: certPool, NextProtos: []string{"h2"}},
+			ForceAttemptHTTP2: true,
+		}}
 	}
 
 	agentInfo := &def.Emp3r0rAgent{
@@ -169,10 +190,26 @@ func TestPlainHTTPCheckinACK(t *testing.T) {
 	}
 
 	if err := c2transport.ReportStatus(common.RuntimeConfig, agentInfo); err != nil {
-		t.Fatalf("ReportStatus failed for plain_http: %v", err)
+		t.Fatalf("ReportStatus failed for mode %s: %v", mode, err)
 	}
 
-	if agents.GetAgentByUUID(agentUUID) == nil {
-		t.Fatalf("Agent was not registered after plain_http check-in")
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if agents.GetAgentByUUID(agentUUID) != nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("Agent was not registered after %s check-in", mode)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+func TestPlainHTTPCheckinACK(t *testing.T) {
+	for _, mode := range []string{def.C2ChannelModeH2Conn, "plain_http"} {
+		mode := mode
+		t.Run(mode, func(t *testing.T) {
+			runCheckinACK(t, mode)
+		})
 	}
 }
