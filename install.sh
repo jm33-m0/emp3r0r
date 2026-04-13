@@ -87,13 +87,13 @@ install_go
 info "Checking for latest release..."
 tag=$(curl -sSL https://api.github.com/repos/jm33-m0/emp3r0r/releases/latest | jq -r .tag_name)
 if [[ -z "$tag" || "$tag" == "null" ]]; then
-  warn "Failed to fetch latest release tag, falling back to v3"
-  tag="v3"
+  warn "Failed to fetch latest release tag, falling back to v4"
+  tag="v4"
 fi
 info "Downloading source tarball for $tag..."
 source_url="https://github.com/jm33-m0/emp3r0r/archive/refs/tags/${tag}.tar.gz"
-# if it's a branch like v3, the URL is different
-if [[ "$tag" == "v3" ]]; then
+# if it's a branch like v4, the URL is different
+if [[ "$tag" == "v4" ]]; then
     source_url="https://github.com/jm33-m0/emp3r0r/archive/refs/heads/${tag}.tar.gz"
 fi
 curl -L "$source_url" -o emp3r0r-src.tar.gz || error "Failed to download source"
