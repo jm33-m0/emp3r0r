@@ -10,9 +10,9 @@ import (
 
 func TestDetectContainerFromCgroup(t *testing.T) {
 	tests := []struct {
-		name    string
-		cgroup  string
-		expect  string
+		name   string
+		cgroup string
+		expect string
 	}{
 		{
 			name: "docker v1 style",
@@ -23,12 +23,12 @@ func TestDetectContainerFromCgroup(t *testing.T) {
 			expect: "docker",
 		},
 		{
-			name: "containerd/kubernetes",
+			name:   "containerd/kubernetes",
 			cgroup: `0::/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod1234.slice/containerd://abcdef`,
 			expect: "kubernetes",
 		},
 		{
-			name: "podman",
+			name:   "podman",
 			cgroup: `0::/user.slice/user-1000.slice/user@1000.service/app.slice/libpod-123456.scope`,
 			expect: "podman",
 		},
