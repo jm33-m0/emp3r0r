@@ -1,5 +1,46 @@
 # Changelog
 
+## [4.0.0](https://github.com/jm33-m0/emp3r0r/compare/v3.22.1...v4.0.0) (2026-04-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* bump version to v4
+
+### Features
+
+* add MeshRoute to agent structure and update system details gathering ([9a82e29](https://github.com/jm33-m0/emp3r0r/commit/9a82e291d886810dbc96bab765f70e942b4d9d8c))
+* add PersistentRouter support across configuration and command handling ([f620fa2](https://github.com/jm33-m0/emp3r0r/commit/f620fa24e2a27624057add4c8af903c9ef0bd842))
+* bump version to v4 ([c5d19bb](https://github.com/jm33-m0/emp3r0r/commit/c5d19bb098cdc1877c9af544456ab36b88ef610f))
+* Enhance error logging and preflight feature ([4481959](https://github.com/jm33-m0/emp3r0r/commit/44819592527bbc659e2a20b02dd40a9cacb1f504))
+* enhance mesh relay functionality and update peer handling with address support ([aa638f6](https://github.com/jm33-m0/emp3r0r/commit/aa638f67affe44f6340f7faa9c64c34b87b3855a))
+* implement Notify log method with configurable broadcast handler for operator console notifications ([e1a19a9](https://github.com/jm33-m0/emp3r0r/commit/e1a19a94b0ac555adc31e47415736a68731b1703))
+* implement plain HTTP (beacon) C2 transport and improve agent enrollment synchronization ([cd5d901](https://github.com/jm33-m0/emp3r0r/commit/cd5d901464e8da674ed29194fbbbac906966c2cb))
+* Implement session management and duplicate prevention for agents ([88e7b6b](https://github.com/jm33-m0/emp3r0r/commit/88e7b6b0d57b1d9d47e4e6d0bb38c1616106e7d2))
+* Implement session reconciliation and legacy session handling ([8497f00](https://github.com/jm33-m0/emp3r0r/commit/8497f00ccd6a41c95c05b153a758eaafecb2243e))
+* implement UpdateAgentLastSeen function to persist agent's last_seen timestamp ([b43279d](https://github.com/jm33-m0/emp3r0r/commit/b43279d121a20db0175b1d843b75cac4810e885d))
+* Remove traditional port mapping relay functionality and associated commands ([91f10b8](https://github.com/jm33-m0/emp3r0r/commit/91f10b8b6a16cc363064648de48358914cf675fa))
+* replace h2conn with websocket for operator message tunnel connections ([27156f4](https://github.com/jm33-m0/emp3r0r/commit/27156f4cef371e12be15032c389e9b8e7453dcde))
+* Revamp C2 protocol to be CBOR-based, protocol-agnostic, compatible with pluggable C2 transport. ([7c5fe3f](https://github.com/jm33-m0/emp3r0r/commit/7c5fe3f2a9eaf0ede3337732a85c1b3887bb96c7))
+
+
+### Bug Fixes
+
+* `generate` should never assume boolean flags as `true` when flags are omitted ([91c0f9e](https://github.com/jm33-m0/emp3r0r/commit/91c0f9e3bb3f5461104c26bd8d47cec2ad9fa0b6))
+* `get` fails to parse token ([fef3449](https://github.com/jm33-m0/emp3r0r/commit/fef3449a0d00f7bfb552de4eb5bbcedffd18de34))
+* agent's last_seen timestamp incorrect ([6b58aa6](https://github.com/jm33-m0/emp3r0r/commit/6b58aa68c17972da8e22b4fa5c130d7e2d1b571d))
+* agentdb should support parallel operations ([247ebe2](https://github.com/jm33-m0/emp3r0r/commit/247ebe24c9659a71fbda1309bd293e81ed1aea9a))
+* check container reports `None` for containers ([817a337](https://github.com/jm33-m0/emp3r0r/commit/817a3370c7b6521226a6e5ff296a4ff2d44b002b))
+* enhance container detection logic and improve tests for `CheckContainer` ([d433d06](https://github.com/jm33-m0/emp3r0r/commit/d433d06684fe67176535beebe4d329433b660c33))
+* http c2 checkin error ([f2287c5](https://github.com/jm33-m0/emp3r0r/commit/f2287c576f8809b51b31eccc2548ab728f4c1ff1))
+* http transport shown as unknown ([c5c3720](https://github.com/jm33-m0/emp3r0r/commit/c5c3720fe836c459ede5dd9a87a8572e6e0d9dfc))
+* improve encryption performance ([f0d68dc](https://github.com/jm33-m0/emp3r0r/commit/f0d68dcd0da4414564a09a8b8d1da373331b862d))
+* migrate operator-c2 connection to websocket ([3de57a1](https://github.com/jm33-m0/emp3r0r/commit/3de57a1d7da3d69582dc5acd1ee7ec896ab67bae))
+* optimize C2 transport performance with direct stream handling, buffered I/O, and improved polling efficiency ([2bede39](https://github.com/jm33-m0/emp3r0r/commit/2bede3906a323b25aebc06683d046b2f659bfc71))
+* race condition in gossip implementation ([65e30b6](https://github.com/jm33-m0/emp3r0r/commit/65e30b6d8eb565d918952ce94757ac6a6720d626))
+* relaying stream based FTP to operator ([8e6bd10](https://github.com/jm33-m0/emp3r0r/commit/8e6bd1024c7165ce61c8a7be8f034c050a74819b))
+* shellcode stager fails to build on Kali ([e43cc8c](https://github.com/jm33-m0/emp3r0r/commit/e43cc8c1b2330dc48ad81489076698d32cb2c8d3))
+
 ## [3.22.1](https://github.com/jm33-m0/emp3r0r/compare/v3.22.0...v3.22.1) (2026-02-25)
 
 
