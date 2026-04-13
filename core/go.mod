@@ -9,6 +9,7 @@ require (
 	github.com/alecthomas/chroma v0.10.0
 	github.com/carapace-sh/carapace v1.11.1
 	github.com/cavaliergopher/grab/v3 v3.0.1
+	github.com/coder/websocket v1.8.14
 	github.com/creack/pty v1.1.24
 	github.com/fatih/color v1.18.0
 	github.com/fxamacker/cbor/v2 v2.9.0

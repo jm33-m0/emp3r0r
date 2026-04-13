@@ -7,15 +7,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/coder/websocket"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
-	"github.com/posener/h2conn"
 )
 
 var (
@@ -29,7 +31,7 @@ var (
 	SessionID string
 
 	msgTunConnMu   sync.RWMutex
-	msgTunConn     *h2conn.Conn
+	msgTunConn     net.Conn
 	msgTunWriteMu  sync.Mutex
 	msgTunUpdateCh = make(chan struct{}, 1)
 )
@@ -95,11 +97,6 @@ func SendMsgTunData(msg *def.MsgTunData) error {
 		// Non-transient error: fail fast.
 		return lastErr
 	}
-
-	if lastErr != nil {
-		return lastErr
-	}
-	return fmt.Errorf("message tunnel send timeout")
 }
 
 func isTransientTunnelWriteError(err error) bool {
@@ -162,21 +159,41 @@ func SendCBORRequest(urlPath string, data any) ([]byte, error) {
 	return body, nil
 }
 
+func operatorMsgTunnelWSURL() (string, error) {
+	u, err := url.Parse(fmt.Sprintf("%s/%s", RootURL, transport.OperatorMsgTunnel))
+	if err != nil {
+		return "", fmt.Errorf("parse operator tunnel url: %w", err)
+	}
+	switch u.Scheme {
+	case "https":
+		u.Scheme = "wss"
+	case "http":
+		u.Scheme = "ws"
+	default:
+		return "", fmt.Errorf("unsupported operator root scheme: %s", u.Scheme)
+	}
+	return u.String(), nil
+}
+
 // ConnectMsgTun connects to the operator message tunnel
-func ConnectMsgTun() (conn *h2conn.Conn, ctx context.Context, cancel context.CancelFunc, err error) {
-	h2 := h2conn.Client{
-		Client: HTTPClient,
-		Header: http.Header{
+func ConnectMsgTun() (conn net.Conn, ctx context.Context, cancel context.CancelFunc, err error) {
+	wsURL, urlErr := operatorMsgTunnelWSURL()
+	if urlErr != nil {
+		err = urlErr
+		return
+	}
+	ctx, cancel = context.WithCancel(context.Background())
+	wsConn, resp, err := websocket.Dial(ctx, wsURL, &websocket.DialOptions{
+		HTTPClient: HTTPClient,
+		HTTPHeader: http.Header{
 			"operator_session": {SessionID},
 		},
-	}
-	url := fmt.Sprintf("%s/%s", RootURL, transport.OperatorMsgTunnel)
-	ctx, cancel = context.WithCancel(context.Background())
-	conn, resp, err := h2.Connect(ctx, url)
+	})
 	if err != nil {
 		err = fmt.Errorf("connect to message tunnel: %v", err)
 		return
 	}
+	conn = websocket.NetConn(ctx, wsConn, websocket.MessageBinary)
 	if resp.StatusCode != http.StatusOK {
 		err = fmt.Errorf("bad status code: %d", resp.StatusCode)
 		return

