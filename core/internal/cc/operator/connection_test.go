@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
+	clientpkg "github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
@@ -173,4 +174,20 @@ func TestOperatorConnection(t *testing.T) {
 	if err == nil {
 		t.Fatal("SECURITY VIOLATION: operator endpoint accepted a client without mTLS certificate")
 	}
+
+	// Verify the websocket operator message tunnel also connects over the same mTLS trust root.
+	clientpkg.HTTPClient = client
+	clientpkg.RootURL = fmt.Sprintf("https://127.0.0.1:%d", port)
+	clientpkg.SessionID = "test-operator-session"
+	msgConn, msgCtx, msgCancel, err := clientpkg.ConnectMsgTun()
+	if err != nil {
+		t.Fatalf("ConnectMsgTun failed: %v", err)
+	}
+	defer msgCancel()
+	defer msgConn.Close()
+
+	if err := cbor.NewEncoder(msgConn).Encode(&def.MsgTunData{Tag: "ping"}); err != nil {
+		t.Fatalf("Failed to send CBOR frame over websocket tunnel: %v", err)
+	}
+	_ = msgCtx
 }

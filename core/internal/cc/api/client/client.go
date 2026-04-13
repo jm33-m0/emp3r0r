@@ -4,12 +4,14 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -18,6 +20,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 var (
@@ -175,6 +178,59 @@ func operatorMsgTunnelWSURL() (string, error) {
 	return u.String(), nil
 }
 
+func websocketHTTPClient() (*http.Client, error) {
+	if HTTPClient == nil {
+		return nil, fmt.Errorf("HTTPClient is nil")
+	}
+
+	if transport.OperatorCaCrtFile == "" {
+		return nil, fmt.Errorf("operator CA file path is empty")
+	}
+
+	operatorCAPEM, err := os.ReadFile(transport.OperatorCaCrtFile)
+	if err != nil {
+		return nil, fmt.Errorf("read operator CA cert: %w", err)
+	}
+
+	rootCAs, err := transport.ExtractCABundle(operatorCAPEM)
+	if err != nil {
+		return nil, fmt.Errorf("extract operator CA bundle: %w", err)
+	}
+
+	serverURL, err := url.Parse(RootURL)
+	if err != nil {
+		return nil, fmt.Errorf("parse RootURL: %w", err)
+	}
+
+	tlsConfig := &tls.Config{
+		ServerName:         serverURL.Hostname(),
+		RootCAs:            rootCAs,
+		InsecureSkipVerify: false,
+		NextProtos:         []string{"http/1.1"},
+	}
+
+	if transport.OperatorClientCrtFile != "" && transport.OperatorClientKeyFile != "" {
+		clientCert, err := tls.LoadX509KeyPair(transport.OperatorClientCrtFile, transport.OperatorClientKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("load operator client certificate: %w", err)
+		}
+		tlsConfig.Certificates = []tls.Certificate{clientCert}
+	}
+
+	httpTransport := &http.Transport{
+		TLSClientConfig:   tlsConfig,
+		ForceAttemptHTTP2: false,
+		Proxy:             http.ProxyFromEnvironment,
+	}
+
+	client := &http.Client{Transport: httpTransport}
+	if HTTPClient.Timeout > 0 {
+		client.Timeout = HTTPClient.Timeout
+	}
+
+	return client, nil
+}
+
 // ConnectMsgTun connects to the operator message tunnel
 func ConnectMsgTun() (conn net.Conn, ctx context.Context, cancel context.CancelFunc, err error) {
 	wsURL, urlErr := operatorMsgTunnelWSURL()
@@ -182,9 +238,14 @@ func ConnectMsgTun() (conn net.Conn, ctx context.Context, cancel context.CancelF
 		err = urlErr
 		return
 	}
+	wsHTTPClient, clientErr := websocketHTTPClient()
+	if clientErr != nil {
+		err = clientErr
+		return
+	}
 	ctx, cancel = context.WithCancel(context.Background())
 	wsConn, resp, err := websocket.Dial(ctx, wsURL, &websocket.DialOptions{
-		HTTPClient: HTTPClient,
+		HTTPClient: wsHTTPClient,
 		HTTPHeader: http.Header{
 			"operator_session": {SessionID},
 		},
@@ -194,10 +255,12 @@ func ConnectMsgTun() (conn net.Conn, ctx context.Context, cancel context.CancelF
 		return
 	}
 	conn = websocket.NetConn(ctx, wsConn, websocket.MessageBinary)
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusSwitchingProtocols {
 		err = fmt.Errorf("bad status code: %d", resp.StatusCode)
 		return
 	}
+
+	logging.Successf("Operator message tunnel connected to C2 %s via %s", RootURL, wsURL)
 
 	return
 }
