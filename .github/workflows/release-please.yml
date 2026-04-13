@@ -1,7 +1,7 @@
 on:
   push:
     branches:
-      - v3
+      - v4
 name: release-please
 permissions:
   contents: write
