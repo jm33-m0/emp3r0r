@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.0.3](https://github.com/jm33-m0/emp3r0r/compare/v4.0.2...v4.0.3) (2026-04-17)
+
+
+### Bug Fixes
+
+* enhance agent key retrieval with improved locking mechanism ([49ba778](https://github.com/jm33-m0/emp3r0r/commit/49ba778c1d998c5c004c8ad937a180ac82e7f2b7))
+* improve agent key management with safe access and encapsulation ([25780f4](https://github.com/jm33-m0/emp3r0r/commit/25780f4d8277c3a3860ea82c4302a0b28079aa02))
+
 ## [4.0.2](https://github.com/jm33-m0/emp3r0r/compare/v4.0.1...v4.0.2) (2026-04-17)
 
 
