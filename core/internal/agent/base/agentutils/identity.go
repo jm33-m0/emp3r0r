@@ -1,22 +1,20 @@
 package agentutils
 
 import (
-	"crypto/ecdh"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/hkdf"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
 	"fmt"
 	"io"
-	"math/big"
 	"os"
 	"sync"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
-	"golang.org/x/crypto/hkdf"
 )
 
 var (
@@ -45,29 +43,19 @@ func GetAgentKey() error {
 					seedHash := sha256.Sum256(seed)
 					logging.Infof("Deriving agent key from stager seed (FD 3, hash: %x)...", seedHash[:8])
 
-					// Use HKDF to derive a stream of bytes for ECDSA key generation
-					// We use SHA256 as hash, seed as secret, no salt, fixed info
-					hkdfReader := hkdf.New(sha256.New, seed, nil, []byte("host identity verification"))
-					derivedBytes := make([]byte, 32)
-					_, err = io.ReadFull(hkdfReader, derivedBytes)
+					// Use HKDF-SHA256 to derive fixed key material from the seed.
+					derivedBytes, err := hkdf.Key(sha256.New, seed, nil, "host identity verification", 32)
 					if err != nil {
-						logging.Warningf("Failed to read from HKDF: %v", err)
+						logging.Warningf("Failed to derive key material with HKDF: %v", err)
 						return
 					}
 
-					// Use crypto/ecdh for standard-compliant P-256 private key derivation
-					ecdhKey, ecdhErr := ecdh.P256().NewPrivateKey(derivedBytes)
-					if ecdhErr != nil {
-						logging.Warningf("Failed to derive ECDH key: %v, falling back to random", ecdhErr)
+					// Parse via ecdsa API to avoid touching deprecated raw key fields.
+					parsedKey, parseErr := ecdsa.ParseRawPrivateKey(elliptic.P256(), derivedBytes)
+					if parseErr != nil {
+						logging.Warningf("Failed to derive ECDSA key from seed: %v, falling back to random", parseErr)
 					} else {
-						// Convert ECDH private key to ECDSA
-						AgentKey = new(ecdsa.PrivateKey)
-						AgentKey.Curve = elliptic.P256()
-						AgentKey.D = new(big.Int).SetBytes(ecdhKey.Bytes())
-						// Derive Public Key coordinates from ECDH seamlessly
-						pubBytes := ecdhKey.PublicKey().Bytes()
-						AgentKey.PublicKey.X = new(big.Int).SetBytes(pubBytes[1:33])
-						AgentKey.PublicKey.Y = new(big.Int).SetBytes(pubBytes[33:])
+						AgentKey = parsedKey
 
 						// Log public key thumbprint for verification
 						pubKeyBytes, _ := x509.MarshalPKIXPublicKey(&AgentKey.PublicKey)
