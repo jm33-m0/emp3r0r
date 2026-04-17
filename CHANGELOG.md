@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.0.1](https://github.com/jm33-m0/emp3r0r/compare/v4.0.0...v4.0.1) (2026-04-17)
+
+
+### Bug Fixes
+
+* [#558](https://github.com/jm33-m0/emp3r0r/issues/558) ([d0ab749](https://github.com/jm33-m0/emp3r0r/commit/d0ab7497497459081f8c2a7ba6808bbea90276da))
+
 ## [4.0.0](https://github.com/jm33-m0/emp3r0r/compare/v3.22.1...v4.0.0) (2026-04-13)
 
 
