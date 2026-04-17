@@ -499,7 +499,7 @@ case "$1" in
 
   ;;
 
---install) #  build and install
+--install)
   if build && prepare_misc_files && do_install; then
     exit 0
   fi
