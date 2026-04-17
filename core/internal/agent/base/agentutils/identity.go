@@ -50,8 +50,22 @@ func AgentPrivateKey() (*ecdsa.PrivateKey, error) {
 // It uses sync.Once to ensure the key persists for the process lifetime
 // (critical for stagers/shellcode stability) but is lost on restart.
 func GetAgentKey() error {
+	agentKeyMu.RLock()
+	if AgentKey != nil {
+		agentKeyMu.RUnlock()
+		return nil
+	}
+	agentKeyMu.RUnlock()
+
 	var err error
 	agentKeyOnce.Do(func() {
+		agentKeyMu.RLock()
+		if AgentKey != nil {
+			agentKeyMu.RUnlock()
+			return
+		}
+		agentKeyMu.RUnlock()
+
 		// If running under stager, try to derive key from injected seed (FD 3)
 		if common.RuntimeConfig != nil && common.RuntimeConfig.IsRunByStager {
 			// Standard "Seed" FD is 3

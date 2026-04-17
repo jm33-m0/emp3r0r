@@ -25,6 +25,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/handler"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -62,6 +63,17 @@ func signUUID(uuid string, privKey *ecdsa.PrivateKey) (string, error) {
 	}
 
 	return base64.URLEncoding.EncodeToString(sig), nil
+}
+
+func startTestC2Server(t *testing.T) {
+	t.Helper()
+	go server.StartC2AgentTLSServer()
+	t.Cleanup(func() {
+		network.StopEmpTLSServer()
+		_ = agents.CloseAgentDB()
+		// Allow in-flight stream handlers to observe shutdown and exit.
+		time.Sleep(150 * time.Millisecond)
+	})
 }
 
 func TestEstablishC2Connection(t *testing.T) {
@@ -127,7 +139,7 @@ func TestEstablishC2Connection(t *testing.T) {
 	}
 
 	// Start Real C2 Server
-	go server.StartC2AgentTLSServer()
+	startTestC2Server(t)
 
 	// Wait for server to start
 	time.Sleep(2 * time.Second)
@@ -363,7 +375,7 @@ func TestDuplicatedCheckin(t *testing.T) {
 	live.AgentList = make([]*def.Emp3r0rAgent, 0)
 
 	// Start Real C2 Server
-	go server.StartC2AgentTLSServer()
+	startTestC2Server(t)
 
 	// Wait for server to start
 	time.Sleep(3 * time.Second)
@@ -533,7 +545,7 @@ func TestBackslashTag(t *testing.T) {
 	}
 
 	// Start Real C2 Server
-	go server.StartC2AgentTLSServer()
+	startTestC2Server(t)
 
 	// Wait for server to start
 	time.Sleep(2 * time.Second)
@@ -658,7 +670,7 @@ func TestEmptyUUID(t *testing.T) {
 	}
 
 	// Start Real C2 Server
-	go server.StartC2AgentTLSServer()
+	startTestC2Server(t)
 
 	// Wait for server to start
 	time.Sleep(2 * time.Second)
@@ -782,7 +794,7 @@ func TestNewAgentCheckin(t *testing.T) {
 	}
 
 	// Start Real C2 Server
-	go server.StartC2AgentTLSServer()
+	startTestC2Server(t)
 
 	// Wait for server to start
 	time.Sleep(2 * time.Second)
