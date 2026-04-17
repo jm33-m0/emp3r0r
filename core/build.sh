@@ -59,7 +59,7 @@ check_required_go() {
 
 check_disk_space() {
   local path
-  for path in "$pwd" "/tmp"; do
+  for path in "$pwd" "/"; do
     local avail_kb
     avail_kb="$(df -Pk "$path" | awk 'NR==2 {print $4}')"
     [[ -n "$avail_kb" ]] || error "Failed to check available disk space for $path"
@@ -67,7 +67,7 @@ check_disk_space() {
     if ((avail_kb < required_free_kb)); then
       local avail_gb
       avail_gb="$(awk -v kb="$avail_kb" 'BEGIN {printf "%.2f", kb/1024/1024}')"
-      error "Need at least 10GB free on filesystem for $path, only ${avail_gb}GB available"
+      warn "$path only has ${avail_gb}GB available. Installation might fail due to garble's huge cache"
     fi
   done
 
