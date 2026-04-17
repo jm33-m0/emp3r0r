@@ -23,6 +23,8 @@ prefix="/usr/local"
 bin_dir="$prefix/bin"
 data_dir="$prefix/lib/emp3r0r"
 build_dir="$data_dir/build"
+required_go_version="1.26.2"
+required_free_kb=$((10 * 1024 * 1024))
 
 # build and tar
 temp=/tmp/emp3r0r-build
@@ -33,6 +35,44 @@ magic_str="$(head -c 32 </dev/urandom | sha256sum | awk '{print $1}')"
 # GOPATH
 [[ -z "$GOPATH" ]] && export GOPATH="$HOME/go"
 export PATH="$GOPATH/bin:$PATH"
+
+check_required_go() {
+  local go_bin
+  go_bin="$(command -v go 2>/dev/null)"
+  [[ -n "$go_bin" ]] || error "You need to set up Go $required_go_version first"
+
+  local current_go_version
+  current_go_version="$($go_bin version | awk '{print $3}' | sed 's/^go//')"
+  if [[ "$current_go_version" != "$required_go_version" ]]; then
+    error "Go $required_go_version is required, found $current_go_version"
+  fi
+
+  # Use the official Go installation environment explicitly during builds.
+  export GOROOT="/usr/local/go"
+  export PATH="$GOROOT/bin:$GOPATH/bin:$PATH"
+  export GOTOOLCHAIN=local
+
+  GO_BIN="$GOROOT/bin/go"
+  [[ -x "$GO_BIN" ]] || GO_BIN="$go_bin"
+  info "Using Go toolchain: $($GO_BIN version)"
+}
+
+check_disk_space() {
+  local path
+  for path in "$pwd" "/tmp"; do
+    local avail_kb
+    avail_kb="$(df -Pk "$path" | awk 'NR==2 {print $4}')"
+    [[ -n "$avail_kb" ]] || error "Failed to check available disk space for $path"
+
+    if ((avail_kb < required_free_kb)); then
+      local avail_gb
+      avail_gb="$(awk -v kb="$avail_kb" 'BEGIN {printf "%.2f", kb/1024/1024}')"
+      error "Need at least 10GB free on filesystem for $path, only ${avail_gb}GB available"
+    fi
+  done
+
+  info "Disk space check passed: at least 10GB free for build and temp files"
+}
 
 check_zig() {
   if ! command -v zig >/dev/null 2>&1; then
@@ -62,7 +102,7 @@ build_agent_pure() {
 
   local win_gui_flag=""
   [[ "$arg1" != "--debug" ]] && [[ "$os" == "windows" ]] && win_gui_flag="-H=windowsgui "
-  
+
   # Add extra extldflags if provided
   local current_ldflags="$ldflags"
   if [[ -n "$extra_extldflags" ]]; then
@@ -111,7 +151,7 @@ build_agent_cgo() {
     extldflags="-s"
   fi
   [[ "$arg1" != "--debug" ]] && extldflags="$extldflags -s"
-  
+
   # Append extra extldflags if provided
   if [[ -n "$extra_extldflags" ]]; then
     extldflags="$extldflags $extra_extldflags"
@@ -181,10 +221,9 @@ build_shared_object() {
 build() {
   # build
   # -----
-  command -v go || {
-    error "You need to set up Go first"
-  }
-  go mod tidy || error "go mod tidy"
+  check_required_go
+  check_disk_space
+  $GO_BIN mod tidy || error "go mod tidy"
 
   # Check for zig installation
   check_zig
@@ -192,27 +231,27 @@ build() {
   ldflags="-v -X 'github.com/jm33-m0/emp3r0r/core/internal/def.MagicString=$magic_str'"
   ldflags+=" -X 'github.com/jm33-m0/emp3r0r/core/internal/def.Version=$(get_version)'"
   if [[ "$1" = "--debug" ]]; then
-    gobuild_cmd="go"
+    gobuild_cmd="$GO_BIN"
     build_opt="build"
   else
     gobuild_cmd="garble"
     build_opt="-tiny -seed=random build"
     ldflags+=" -s -w"
     info "Setting up garble"
-    go install mvdan.cc/garble@latest || error "Failed to install garble"
+    $GO_BIN install mvdan.cc/garble@master || error "Failed to install garble"
   fi
 
   info "Building CC"
   {
-    cd cmd/cc && CGO_ENABLED=0 go build -o "$temp/cc.exe" -ldflags="$ldflags"
+    cd cmd/cc && CGO_ENABLED=0 $GO_BIN build -o "$temp/cc.exe" -ldflags="$ldflags"
   } || error "build cc"
   info "Building cat"
   {
-    cd "$pwd/cmd/cat" && CGO_ENABLED=0 go build -o "$temp/cat.exe" -ldflags="$ldflags"
+    cd "$pwd/cmd/cat" && CGO_ENABLED=0 $GO_BIN build -o "$temp/cat.exe" -ldflags="$ldflags"
   } || error "build cat"
   info "Building listener"
   {
-    cd "$pwd/cmd/listener" && CGO_ENABLED=0 go build -o "$temp/listener.exe" -ldflags="$ldflags"
+    cd "$pwd/cmd/listener" && CGO_ENABLED=0 $GO_BIN build -o "$temp/listener.exe" -ldflags="$ldflags"
   } || error "build listener"
 
   # Linux
@@ -225,11 +264,11 @@ build() {
   build_agent_cgo "386" "linux" "stub-386" "$pie_flags" "$ext_pie"
   build_agent_pure "arm" "linux" "stub-arm"
   build_agent_cgo "arm64" "linux" "stub-arm64" "$pie_flags" "$ext_pie"
-  
+
   # MIPS often has issues with PIE, keep static for now unless explicitly requested or tested
-  build_agent_pure "mips" "linux" "stub-mips" 
+  build_agent_pure "mips" "linux" "stub-mips"
   build_agent_pure "mips64" "linux" "stub-mips64"
-  
+
   build_agent_cgo "riscv64" "linux" "stub-riscv64" "$pie_flags" "$ext_pie"
   build_agent_pure "ppc64" "linux" "stub-ppc64"
 
@@ -477,8 +516,10 @@ case "$1" in
   ;;
 
 --install)
-  (build) && (install) || error "install failed"
-  exit 0
+  if build && install; then
+    exit 0
+  fi
+  error "install failed"
 
   ;;
 

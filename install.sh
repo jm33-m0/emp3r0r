@@ -3,6 +3,9 @@
 # emp3r0r Installation Script (Source-based)
 # This script installs emp3r0r by building it from source.
 
+required_go_version="1.26.2"
+required_free_kb=$((10 * 1024 * 1024))
+
 # Function to print informational messages
 info() {
   echo -e "\033[32m[INFO] $1\033[0m"
@@ -19,6 +22,53 @@ warn() {
   echo -e "\033[33m[WARN] $1\033[0m"
 }
 
+check_disk_space() {
+  local path
+  for path in "$workdir" "/tmp"; do
+    local avail_kb
+    avail_kb="$(df -Pk "$path" | awk 'NR==2 {print $4}')"
+    [[ -n "$avail_kb" ]] || error "Failed to check available disk space for $path"
+
+    if ((avail_kb < required_free_kb)); then
+      local avail_gb
+      avail_gb="$(awk -v kb="$avail_kb" 'BEGIN {printf "%.2f", kb/1024/1024}')"
+      error "Need at least 10GB free on filesystem for $path, only ${avail_gb}GB available"
+    fi
+  done
+
+  info "Disk space check passed: at least 10GB free"
+}
+
+cleanup_go_cache() {
+  info "Cleaning Go and garble cache"
+  export GOROOT="/usr/local/go"
+  export PATH="$GOROOT/bin:$PATH"
+  export GOTOOLCHAIN=local
+
+  if [[ -x "$GOROOT/bin/go" ]]; then
+    local go_cache gomod_cache
+    go_cache="$($GOROOT/bin/go env GOCACHE 2>/dev/null)"
+    gomod_cache="$($GOROOT/bin/go env GOMODCACHE 2>/dev/null)"
+    [[ -n "$go_cache" ]] && rm -rf "$go_cache"
+    [[ -n "$gomod_cache" ]] && rm -rf "$gomod_cache"
+    $GOROOT/bin/go clean -cache -modcache -testcache -fuzzcache >/dev/null 2>&1 || true
+  fi
+
+  rm -rf "$GOCACHE" "$GOMODCACHE" 2>/dev/null || true
+}
+
+setup_required_go_env() {
+  export GOROOT="/usr/local/go"
+  export PATH="$GOROOT/bin:$PATH"
+  export GOTOOLCHAIN=local
+
+  [[ -x "$GOROOT/bin/go" ]] || error "Go not found at $GOROOT/bin/go"
+  local current_ver
+  current_ver="$($GOROOT/bin/go version | awk '{print $3}' | sed 's/^go//')"
+  [[ "$current_ver" == "$required_go_version" ]] || error "Go $required_go_version is required, found $current_ver"
+  info "Using Go toolchain: $($GOROOT/bin/go version)"
+}
+
 # Function to check and install basic packages via apt
 check_apt_pkg() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -29,28 +79,30 @@ check_apt_pkg() {
 
 # Install Go from go.dev
 install_go() {
-  local min_go_version="1.25.0"
-  local target_go_version="1.25.0"
+  local target_go_version="$required_go_version"
   local go_tarball="go${target_go_version}.linux-amd64.tar.gz"
-  local go_url="https://go.dev/dl/${go_tarball}"
+  local go_url="https://golang.org/dl/${go_tarball}"
 
   if command -v go >/dev/null 2>&1; then
     local current_ver=$(go version | awk '{print $3}' | sed 's/go//')
-    # Compare versions: if current >= min, we are good
-    if [[ "$(printf '%s\n%s' "$min_go_version" "$current_ver" | sort -V | head -n1)" == "$min_go_version" ]]; then
-      info "Go $current_ver is already installed (minimum required: $min_go_version)"
+    if [[ "$current_ver" == "$target_go_version" ]]; then
+      info "Go $current_ver is already installed"
       return
     fi
-    warn "Current Go version is $current_ver, but we need at least $min_go_version. Installing $target_go_version..."
+    warn "Current Go version is $current_ver, required is $target_go_version. Reinstalling..."
   fi
 
-  info "Downloading Go $go_version from $go_url..."
+  info "Downloading Go $target_go_version from $go_url..."
+  info "Installing with the official archive method from golang.org"
   curl -LO "$go_url" || error "Failed to download Go"
   sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf "$go_tarball" || error "Failed to extract Go"
   rm "$go_tarball"
 
-  # Update PATH for current session
-  export PATH=$PATH:/usr/local/go/bin
+  # Update Go environment for current session
+  export GOROOT="/usr/local/go"
+  export PATH="$GOROOT/bin:$PATH"
+  export GOTOOLCHAIN=local
+
   if ! grep -q "/usr/local/go/bin" ~/.bashrc; then
     echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
     info "Added /usr/local/go/bin to ~/.bashrc"
@@ -65,6 +117,7 @@ workdir=$(mktemp -d)
 trap 'rm -rf "$workdir"' EXIT
 info "Workdir: $workdir"
 cd "$workdir" || error "Failed to enter workdir"
+check_disk_space
 
 # 1. Install basic dependencies
 check_apt_pkg curl
@@ -82,6 +135,9 @@ check_apt_pkg jq
 
 # 2. Install Go
 install_go
+setup_required_go_env
+cleanup_go_cache
+check_disk_space
 
 # 3. Download source
 info "Checking for latest release..."
@@ -108,6 +164,6 @@ cd emp3r0r-source/core || error "Failed to enter core directory"
 warn "Building and installing emp3r0r $tag (this may take a while)..."
 # build.sh will handle zig and other internal dependencies
 export TAG="$tag"
-./build.sh --install || error "Build and installation failed"
+GOROOT="$GOROOT" PATH="$PATH" GOTOOLCHAIN="$GOTOOLCHAIN" ./build.sh --install || error "Build and installation failed"
 
 info "emp3r0r installed successfully!"

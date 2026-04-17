@@ -1,8 +1,6 @@
 module github.com/jm33-m0/emp3r0r/core
 
-go 1.25.0
-
-toolchain go1.25.8
+go 1.26.2
 
 require (
 	github.com/Code-Hex/Neo-cowsay/v2 v2.0.4
