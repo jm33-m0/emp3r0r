@@ -27,7 +27,7 @@ required_go_version="1.26.2"
 required_free_kb=$((10 * 1024 * 1024))
 
 # build and tar
-temp=/tmp/emp3r0r-build
+temp=$(mktemp -d -t emp3r0r-build-XXXXXXXXXX) || error "Failed to create temporary directory"
 [[ -d "$temp" ]] || mkdir -p "$temp"
 magic_str="$(head -c 32 </dev/urandom | sha256sum | awk '{print $1}')"
 magic_str="$(head -c 32 </dev/urandom | sha256sum | awk '{print $1}')"
@@ -338,8 +338,8 @@ do_install() {
 
   # create directories
   mkdir -p "$build_dir" || error "Failed to mkdir $build_dir"
-  cp -avR tmux "$data_dir" || error "tmux"
-  cp -avR modules "$data_dir" || error "modules"
+  cp -avR "$temp"/tmux "$data_dir" || error "tmux"
+  cp -avR "$temp"/modules "$data_dir" || error "modules"
   cp -avR "$temp"/stub* "$build_dir" || error "stub"
 
   # fix tmux config
@@ -348,8 +348,8 @@ do_install() {
   sed -i "s/~\/sh/$replace/g" "$tmux_dir/.tmux.conf"
 
   # emp3r0r binaries
-  chmod 755 "$0" "$temp"/cc.exe "$temp"/cat.exe
-  cp -avfR emp3r0r "$bin_dir/emp3r0r" || error "emp3r0r-main"
+  chmod 755 "$temp"/cc.exe "$temp"/cat.exe
+  cp -avfR "$temp"/emp3r0r "$bin_dir/emp3r0r" || error "emp3r0r-main"
   cp -avfR "$temp"/listener.exe "$bin_dir/emp3r0r-listener" || error "emp3r0r-listener"
   cp -avfR "$temp"/cc.exe "$data_dir/emp3r0r-cc" || error "emp3r0r-cc"
   cp -avfR "$temp"/cat.exe "$data_dir/emp3r0r-cat" || error "emp3r0r-cat"
@@ -420,17 +420,19 @@ uninstall() {
   fi
 }
 
-install() {
-  if [[ "$EUID" -ne 0 ]]; then
-    sudo "$0" --install-only
-  else
-    do_install
-  fi
+prepare_misc_files() {
+  info "Preparing misc files"
+  cp -aR "$pwd/tmux" "$temp" || error "cp tmux"
+  cp -aR "$pwd/modules" "$temp" || error "cp modules"
+  cp -aR "$pwd/emp3r0r" "$temp" || error "cp emp3r0r"
+  cp -aR "$pwd/build.sh" "$temp" || error "cp build.sh"
 }
 
 create_tar() {
+  prepare_misc_files
   info "Creating archive..."
-  tar --zstd -cpf "$pwd/emp3r0r.tar.zst" ./emp3r0r-build || error "failed to create archive"
+  cd /tmp || error "Cannot cd to /tmp"
+  tar --zstd -cpf "$pwd/emp3r0r.tar.zst" "$temp" || error "failed to create archive"
   success "Packaged emp3r0r"
 }
 
@@ -466,12 +468,6 @@ arg1="$1"
 case "$1" in
 --release)
   (build) && (
-    info "Preparing to archive files"
-    cd /tmp || error "Cannot cd to /tmp"
-    cp -aR "$pwd/tmux" "$temp" || error "cp tmux"
-    cp -aR "$pwd/modules" "$temp" || error "cp modules"
-    cp -aR "$pwd/emp3r0r" "$temp" || error "cp emp3r0r"
-    cp -aR "$pwd/build.sh" "$temp" || error "cp build.sh"
     create_tar
   )
 
@@ -480,12 +476,6 @@ case "$1" in
 --debug)
 
   (build --debug) && (
-    info "Preparing to archive files"
-    cd /tmp || error "Cannot cd to /tmp"
-    cp -aR "$pwd/tmux" "$temp" || error "cp tmux"
-    cp -aR "$pwd/modules" "$temp" || error "cp modules"
-    cp -aR "$pwd/emp3r0r" "$temp" || error "cp emp3r0r"
-    cp -aR "$pwd/build.sh" "$temp" || error "cp build.sh"
     create_tar
   )
 
@@ -503,20 +493,14 @@ case "$1" in
 
   ;;
 
---install-only)
+--install-only) # install from the release, skipping build
   (do_install) || error "install failed"
   exit 0
 
   ;;
 
---uninstall-only)
-  (do_uninstall) || error "uninstall failed"
-  exit 0
-
-  ;;
-
---install)
-  if build && install; then
+--install) #  build and install
+  if build && prepare_misc_files && do_install; then
     exit 0
   fi
   error "install failed"

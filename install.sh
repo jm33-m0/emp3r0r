@@ -36,7 +36,8 @@ install_go() {
   local go_url="https://golang.org/dl/${go_tarball}"
 
   if command -v go >/dev/null 2>&1; then
-    local current_ver=$(go version | awk '{print $3}' | sed 's/go//')
+    local current_ver
+    current_ver=$(go version | awk '{print $3}' | sed 's/go//')
     if [[ "$current_ver" == "$target_go_version" ]]; then
       info "Go $current_ver is already installed"
       return
@@ -56,7 +57,7 @@ install_go() {
   export GOTOOLCHAIN=local
 
   if ! grep -q "/usr/local/go/bin" ~/.bashrc; then
-    echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+    echo 'export PATH=$PATH:/usr/local/go/bin' >>~/.bashrc
     info "Added /usr/local/go/bin to ~/.bashrc"
   fi
 }
@@ -107,7 +108,7 @@ info "Downloading source tarball for $tag..."
 source_url="https://github.com/jm33-m0/emp3r0r/archive/refs/tags/${tag}.tar.gz"
 # if it's a branch like v4, the URL is different
 if [[ "$tag" == "v4" ]]; then
-    source_url="https://github.com/jm33-m0/emp3r0r/archive/refs/heads/${tag}.tar.gz"
+  source_url="https://github.com/jm33-m0/emp3r0r/archive/refs/heads/${tag}.tar.gz"
 fi
 curl -L "$source_url" -o emp3r0r-src.tar.gz || error "Failed to download source"
 
@@ -121,6 +122,6 @@ cd emp3r0r-source/core || error "Failed to enter core directory"
 warn "Building and installing emp3r0r $tag (this may take a while)..."
 # build.sh will handle zig and other internal dependencies
 export TAG="$tag"
-GOROOT="$GOROOT" PATH="$PATH" GOTOOLCHAIN="$GOTOOLCHAIN" ./build.sh --install || error "Build and installation failed"
+GOROOT="$GOROOT" PATH="$PATH" GOTOOLCHAIN="$GOTOOLCHAIN" sudo ./build.sh --install || error "Build and installation failed"
 
 info "emp3r0r installed successfully!"
