@@ -20,8 +20,31 @@ import (
 var (
 	// AgentKey is the unique ephemeral key for this agent session
 	AgentKey     *ecdsa.PrivateKey
+	agentKeyMu   sync.RWMutex
 	agentKeyOnce sync.Once
 )
+
+func setAgentKey(key *ecdsa.PrivateKey) {
+	agentKeyMu.Lock()
+	AgentKey = key
+	agentKeyMu.Unlock()
+}
+
+// AgentPrivateKey returns the current agent private key, generating it if needed.
+func AgentPrivateKey() (*ecdsa.PrivateKey, error) {
+	if err := GetAgentKey(); err != nil {
+		return nil, err
+	}
+
+	agentKeyMu.RLock()
+	key := AgentKey
+	agentKeyMu.RUnlock()
+	if key == nil {
+		return nil, fmt.Errorf("agent key is nil")
+	}
+
+	return key, nil
+}
 
 // GetAgentKey generates a random, ephemeral agent key.
 // It uses sync.Once to ensure the key persists for the process lifetime
@@ -55,10 +78,10 @@ func GetAgentKey() error {
 					if parseErr != nil {
 						logging.Warningf("Failed to derive ECDSA key from seed: %v, falling back to random", parseErr)
 					} else {
-						AgentKey = parsedKey
+						setAgentKey(parsedKey)
 
 						// Log public key thumbprint for verification
-						pubKeyBytes, _ := x509.MarshalPKIXPublicKey(&AgentKey.PublicKey)
+						pubKeyBytes, _ := x509.MarshalPKIXPublicKey(&parsedKey.PublicKey)
 						pubKeyHash := sha256.Sum256(pubKeyBytes)
 						logging.Infof("Agent key derived from seed successfully. Public key thumbprint: %x", pubKeyHash[:8])
 						return // Success
@@ -77,7 +100,11 @@ func GetAgentKey() error {
 		}
 
 		logging.Infof("Generating ephemeral agent key (PFS enabled)...")
-		AgentKey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		generatedKey, keyErr := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		err = keyErr
+		if keyErr == nil {
+			setAgentKey(generatedKey)
+		}
 	})
 
 	if err != nil {
@@ -89,21 +116,20 @@ func GetAgentKey() error {
 // RenewAgentKey force-regenerates the ephemeral agent key.
 // Primarily used for testing key rotation scenarios.
 func RenewAgentKey() error {
-	var err error
 	logging.Infof("Renewing ephemeral agent key...")
-	AgentKey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return fmt.Errorf("failed to renew ephemeral key: %v", err)
 	}
+	setAgentKey(key)
 	return nil
 }
 
 // SignWithAgentKey signs data with the agent's unique key
 func SignWithAgentKey(data []byte) ([]byte, error) {
-	if AgentKey == nil {
-		if err := GetAgentKey(); err != nil {
-			return nil, fmt.Errorf("get key: %v", err)
-		}
+	key, err := AgentPrivateKey()
+	if err != nil {
+		return nil, fmt.Errorf("get key: %v", err)
 	}
-	return transport.SignJSONWithKey(AgentKey, data)
+	return transport.SignJSONWithKey(key, data)
 }
