@@ -25,6 +25,8 @@ data_dir="$prefix/lib/emp3r0r"
 build_dir="$data_dir/build"
 required_go_version="1.26.2"
 required_free_kb=$((10 * 1024 * 1024))
+# Set EMP3R0R_DISABLE_GARBLE=1 to use plain go build for non-debug builds.
+disable_garble="${EMP3R0R_DISABLE_GARBLE:-0}"
 
 # build and tar
 temp=$(mktemp -d -t emp3r0r-build-XXXXXXXXXX) || error "Failed to create temporary directory"
@@ -234,11 +236,18 @@ build() {
     gobuild_cmd="$GO_BIN"
     build_opt="build"
   else
-    gobuild_cmd="garble"
-    build_opt="-tiny -seed=random build"
-    ldflags+=" -s -w"
-    info "Setting up garble"
-    $GO_BIN install mvdan.cc/garble@master || error "Failed to install garble"
+    if [[ "$disable_garble" = "1" || "$disable_garble" = "true" || "$disable_garble" = "yes" ]]; then
+      gobuild_cmd="$GO_BIN"
+      build_opt="build"
+      ldflags+=" -s -w"
+      info "Garble disabled by EMP3R0R_DISABLE_GARBLE=$disable_garble, using plain go build"
+    else
+      gobuild_cmd="garble"
+      build_opt="-tiny -seed=random build"
+      ldflags+=" -s -w"
+      info "Setting up garble"
+      $GO_BIN install mvdan.cc/garble@master || error "Failed to install garble"
+    fi
   fi
 
   info "Building CC"
@@ -509,6 +518,7 @@ case "$1" in
 
 *)
   warn "Usage: $0 [--build|--release|--debug|--install|--uninstall]"
+  warn "Env: EMP3R0R_DISABLE_GARBLE=1 disables garble for non-debug builds (including --install)"
 
   ;;
 
