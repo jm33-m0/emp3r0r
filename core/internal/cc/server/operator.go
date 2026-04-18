@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -259,13 +260,25 @@ func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
 	}
 
 	uuid := operation.AgentTag
+	uuid = strings.TrimSpace(uuid)
+	if unquoted, err := strconv.Unquote(uuid); err == nil {
+		uuid = unquoted
+	}
 	if uuid == "" {
 		http.Error(wrt, "Agent UUID is empty", http.StatusBadRequest)
 		return
 	}
 
+	requestedID := uuid
+	if byTag := agents.GetAgentByTag(requestedID); byTag != nil && byTag.UUID != "" {
+		uuid = byTag.UUID
+	}
+
 	// Prepare response message with agent details
 	var agentDetails string = fmt.Sprintf("Agent %s", uuid)
+	if requestedID != uuid {
+		agentDetails = fmt.Sprintf("Agent %s (resolved from tag %s)", uuid, requestedID)
+	}
 
 	// Try to get agent details from memory first (if connected/recently connected)
 	var targetAgent *def.Emp3r0rAgent
@@ -277,6 +290,9 @@ func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
 		}
 		return true
 	})
+	if targetAgent == nil {
+		targetAgent = agents.GetAgentByUUID(uuid)
+	}
 	if targetAgent != nil && targetAgent.Tag != "" {
 		agentDetails += fmt.Sprintf("\n  Tag: %s\n  Hostname: %s\n  IPs: %s\n  OS: %s",
 			targetAgent.Tag, targetAgent.Hostname, strings.Join(targetAgent.IPs, ", "), targetAgent.OS)
@@ -293,6 +309,14 @@ func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
 	// Remove from DB
 	if agents.AgentDB != nil {
 		err := agents.RemoveAgent(uuid)
+		if err != nil {
+			if requestedID == uuid {
+				if byTag := agents.GetAgentByTag(requestedID); byTag != nil && byTag.UUID != "" {
+					uuid = byTag.UUID
+					err = agents.RemoveAgent(uuid)
+				}
+			}
+		}
 		if err != nil {
 			logging.Errorf("Failed to remove agent %s from DB: %v", uuid, err)
 			http.Error(wrt, fmt.Sprintf("DB removal failed: %v", err), http.StatusInternalServerError)

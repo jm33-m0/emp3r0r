@@ -1,7 +1,11 @@
 package operator
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -10,7 +14,13 @@ import (
 
 // CmdForgetAgent removes an agent from the database
 func CmdForgetAgent(cmd *cobra.Command, args []string) {
-	uuid := args[0]
+	uuid := strings.TrimSpace(args[0])
+	if unquoted, err := strconv.Unquote(uuid); err == nil {
+		uuid = unquoted
+	}
+	if byTag := agents.GetAgentByTag(uuid); byTag != nil && byTag.UUID != "" {
+		uuid = byTag.UUID
+	}
 
 	// Create operation payload
 	operation := def.Operation{

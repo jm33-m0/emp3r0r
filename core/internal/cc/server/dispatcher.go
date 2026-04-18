@@ -193,7 +193,12 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 		canonical := transport.CanonicalAuthString(msgAuth.AgentUUID, msgAuth.Timestamp, msgAuth.Nonce, msgAuth.Capabilities)
 		ok, err := transport.VerifySignatureWithPEM([]byte(pinnedKey), []byte(canonical), proof)
 		if err != nil || !ok {
-			logging.Errorf("CRITICAL: cborProtocolDispatch: pinned key verification failed for agent %s from %s (ok=%v, err=%v)", strconv.Quote(msgAuth.AgentUUID), remoteAddr, ok, err)
+			msg := fmt.Sprintf("CRITICAL: cborProtocolDispatch: pinned key verification failed for agent %s from %s (ok=%v, err=%v)", strconv.Quote(msgAuth.AgentUUID), remoteAddr, ok, err)
+			logging.Errorf("%s", msg)
+			logging.Notify(logging.ERROR, "%s", msg)
+			if agents.DisconnectAgentByUUID(msgAuth.AgentUUID) {
+				logging.Notify(logging.ERROR, "SECURITY: terminated active session for agent %s after pinned key verification failure", strconv.Quote(msgAuth.AgentUUID))
+			}
 			return
 		}
 		logging.Debugf("cborProtocolDispatch: pinned key verified for agent %s", strconv.Quote(msgAuth.AgentUUID))

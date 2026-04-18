@@ -8,6 +8,48 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
+// DisconnectAgentByUUID closes one agent's live runtime session, if present.
+// It also clears DB session state and runtime projections for that UUID.
+func DisconnectAgentByUUID(uuid string) bool {
+	if uuid == "" {
+		return false
+	}
+
+	agent, ctrl, key, found := RuntimeControlByUUID(uuid)
+	if !found {
+		if err := EndSession(uuid); err != nil {
+			logging.Debugf("Failed to end session for %s: %v", uuid, err)
+		}
+		return false
+	}
+
+	if ctrl != nil {
+		if ctrl.Cancel != nil {
+			ctrl.Cancel()
+		}
+		if ctrl.Conn != nil {
+			if err := ctrl.Conn.Close(); err != nil {
+				logging.Debugf("Error closing connection for agent %s (%s): %v", agent.Tag, uuid, err)
+			}
+		}
+	}
+
+	live.AgentControlMap.Delete(key)
+	for i, a := range live.AgentList {
+		if a != nil && a.UUID == uuid {
+			live.AgentList = append(live.AgentList[:i], live.AgentList[i+1:]...)
+			break
+		}
+	}
+
+	if err := EndSession(uuid); err != nil {
+		logging.Debugf("Failed to end session for %s: %v", uuid, err)
+	}
+
+	logging.Warningf("Disconnected live session for agent %s (%s)", agent.Tag, uuid)
+	return true
+}
+
 // DisconnectAllAgents closes all agent connections
 // This should be called when the last operator disconnects
 func DisconnectAllAgents() {
