@@ -7,8 +7,6 @@ const (
 	ModCLEAN_LOG   = "clean_log"
 	ModLPE_SUGGEST = "lpe_suggest"
 
-	ModPORT_FWD     = "port_fwd"
-	ModSHELL        = "interactive_shell"
 	ModBring2CC     = "bring2cc"
 	ModListener     = "listener"
 	ModSSHHarvester = "ssh_harvester"

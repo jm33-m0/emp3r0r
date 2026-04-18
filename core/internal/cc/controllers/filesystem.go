@@ -4,10 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-
-	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
-	"github.com/jm33-m0/emp3r0r/core/internal/def"
 )
 
 // Filesystem command builders
@@ -104,20 +100,3 @@ func BuildSuicideCommand() string {
 	return "suicide"
 }
 
-// ExecuteAgentCommand sends a command to an agent
-// This is the generic command execution function used by all filesystem commands
-func ExecuteAgentCommand(agent *def.Emp3r0rAgent, cmd string, opSession string) error {
-	if agent == nil {
-		return fmt.Errorf("no agent specified")
-	}
-
-	ctx := &c2context.C2Context{
-		Target:    agent,
-		OpSession: opSession,
-		Flags:     make(map[string]string),
-	}
-	ctx.Flags["cmd_to_exec"] = cmd
-
-	modules.ExecCommand(ctx)
-	return nil
-}

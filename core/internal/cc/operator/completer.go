@@ -20,9 +20,16 @@ import (
 
 // autocomplete module options
 func listValChoices(ctx carapace.Context) carapace.Action {
+	if live.ActiveModule == nil {
+		return carapace.ActionValues()
+	}
 	ret := make([]string, 0)
 	argc := len(ctx.Args)
+	if argc == 0 {
+		return carapace.ActionValues()
+	}
 	prev_word := ctx.Args[argc-1]
+	prev_word = strings.TrimPrefix(prev_word, "--")
 	for _, opt := range live.ActiveModule.Options {
 		if prev_word == opt.Name {
 			ret = append(ret, opt.Vals...)

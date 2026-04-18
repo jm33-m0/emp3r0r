@@ -13,7 +13,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/ftp"
 	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/controllers"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -85,48 +85,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			"level": carapace.ActionValues("0", "1", "2", "3"),
 		})
 
-		useModuleCmd := &cobra.Command{
-			Use:     "use module",
-			GroupID: "module",
-			Short:   "Use a module",
-			Example: "use bring2cc",
-			Args:    cobra.ExactArgs(1),
-			Run:     cmdSetActiveModule,
-		}
-		rootCmd.AddCommand(useModuleCmd)
-		carapace.Gen(useModuleCmd).PositionalCompletion(carapace.ActionCallback(listMods))
-
-		infoCmd := &cobra.Command{
-			Use:     "info",
-			GroupID: "module",
-			Short:   "What options do we have?",
-			Args:    cobra.NoArgs,
-			Run:     cmdModuleListOptions,
-		}
-		rootCmd.AddCommand(infoCmd)
-
-		setCmd := &cobra.Command{
-			Use:     "set option value",
-			GroupID: "module",
-			Short:   "Set an option of the current module",
-			Example: "set cc_host \"emp3r0r.com\"",
-			Args:    cobra.ExactArgs(2),
-			Run:     cmdSetOptVal,
-		}
-		rootCmd.AddCommand(setCmd)
-		carapace.Gen(setCmd).PositionalCompletion(
-			carapace.ActionCallback(listOptions),
-			carapace.ActionCallback(listValChoices))
-
-		runCmd := &cobra.Command{
-			Use:     "run",
-			GroupID: "module",
-			Short:   "Run the current module",
-			Args:    cobra.NoArgs,
-			Run:     cmdModuleRun,
-		}
-		runCmd.Flags().BoolP("force", "f", false, "Force execution without confirmation")
-		rootCmd.AddCommand(runCmd)
+		addModuleCommands(rootCmd)
 
 		targetCmd := &cobra.Command{
 			Use:     "target (agent_id | agent_tag)",
@@ -503,7 +462,7 @@ func execCmd(cmd *cobra.Command, args []string) {
 	}
 	ctx.Flags["cmd_to_exec"] = fmt.Sprintf("exec --cmd %s", strconv.Quote(cmdStr))
 	logging.Warningf("OPSEC: exec recorded as fork and run (High OPSEC Risk)")
-	modules.ExecCommand(ctx)
+	controllers.ExecuteRawCommand(ctx)
 }
 
 func exitEmp3r0r(_ *console.Console) {

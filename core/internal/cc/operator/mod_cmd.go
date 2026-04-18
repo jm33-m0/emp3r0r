@@ -2,8 +2,11 @@ package operator
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
+	"github.com/carapace-sh/carapace"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
@@ -11,86 +14,105 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
 )
 
-// listModOptionsTable list currently available options for `set`, in a table
-func listModOptionsTable() {
-	if live.ActiveModule == nil {
-		logging.Warningf("No module selected")
-		return
-	}
-	agent := agents.MustGetActiveAgent()
-	shortName := "none"
-	if agent != nil {
-		shortName = strings.Split(agent.Tag, "-agent")[0]
-	}
-
-	// build table rows
-	rows := [][]string{}
-	_, ok := def.Modules.Load(live.ActiveModule.Name)
-	if !ok {
-		logging.Errorf("Module %s not found", live.ActiveModule.Name)
-		return
-	}
-	rows = append(rows, []string{"module", "Selected module", live.ActiveModule.Name})
-	rows = append(rows, []string{"target", "Selected target", shortName})
-	for opt_name, opt_obj := range live.ActiveModule.Options {
-		help := "N/A"
-		if opt_obj == nil {
-			continue
+func addModuleCommands(rootCmd *cobra.Command) {
+	mods := make([]*def.ModuleConfig, 0)
+	def.Modules.Range(func(_, value any) bool {
+		if mod, ok := value.(*def.ModuleConfig); ok && mod != nil {
+			mods = append(mods, mod)
 		}
-		help = opt_obj.Desc
-		val := ""
-		currentOpt, ok := live.ActiveModule.Options[opt_name]
-		if ok {
-			val = currentOpt.Val
+		return true
+	})
+	sort.Slice(mods, func(i, j int) bool {
+		return mods[i].Name < mods[j].Name
+	})
+
+	for _, mod := range mods {
+		mod := mod
+		flagActions := carapace.ActionMap{}
+		cmd := &cobra.Command{
+			Use:     mod.Name,
+			GroupID: "module",
+			Short:   mod.Comment,
+			Long:    fmt.Sprintf("Run module %s", mod.Name),
+			Args:    cobra.NoArgs,
+			Run: func(cmd *cobra.Command, _ []string) {
+				runModuleByName(cmd, mod.Name)
+			},
+		}
+		cmd.Flags().Bool("force", false, "Force execution without confirmation")
+
+		keys := make([]string, 0, len(mod.Options))
+		for key := range mod.Options {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+
+		for _, key := range keys {
+			opt := mod.Options[key]
+			if opt == nil {
+				continue
+			}
+			help := strings.TrimSpace(opt.Desc)
+			if len(opt.Vals) > 0 {
+				help = fmt.Sprintf("%s (choices: %s)", help, strings.Join(opt.Vals, ", "))
+			}
+			if opt.Required {
+				help = strings.TrimSpace(help + " [required]")
+			}
+			cmd.Flags().String(opt.Name, opt.Val, help)
+			if len(opt.Vals) > 0 {
+				flagActions[opt.Name] = carapace.ActionCallback(func(ctx carapace.Context) carapace.Action {
+					live.ActiveModule = mod
+					return listValChoices(ctx)
+				})
+			}
+		}
+		if len(flagActions) > 0 {
+			carapace.Gen(cmd).FlagCompletion(flagActions)
 		}
 
-		rows = append(rows,
-			[]string{
-				util.SplitLongLine(opt_name, 50),
-				util.SplitLongLine(help, 50),
-				util.SplitLongLine(val, 50),
-			})
+		rootCmd.AddCommand(cmd)
 	}
-
-	// reuse BuildTable helper
-	tableStr := cli.BuildTable([]string{"Option", "Help", "Value"}, rows)
-	cli.AdaptiveTable(tableStr)
-	logging.Infof("\n%s", tableStr)
 }
 
-func cmdModuleRun(cmd *cobra.Command, _ []string) {
+func runModuleByName(cmd *cobra.Command, modName string) {
+
+	modules.SetActiveModule(modName)
 	if live.ActiveModule == nil {
-		logging.Errorf("No module selected")
+		logging.Errorf("No such module: %s", modName)
+		return
+	}
+	mod := live.ActiveModule
+
+	if agents.MustGetActiveAgent() == nil && !mod.IsLocal {
+		logging.Errorf("No active agent")
+		return
+	}
+	force, _ := cmd.Flags().GetBool("force")
+	if !mod.Fileless && !mod.IsLocal && !force {
+		logging.Warningf("Module %s is not fileless and may drop files or modify system configuration.", mod.Name)
+		logging.Infof("Run with: %s --force ...", mod.Name)
 		return
 	}
 
-	// Warnings
-	if !live.ActiveModule.Fileless && !live.ActiveModule.IsLocal {
-		force, _ := cmd.Flags().GetBool("force")
-		if !force {
-			logging.Warningf("Module %s is not fileless and may drop files or modify system configuration.", live.ActiveModule.Name)
-			logging.Infof("Run with 'run --force' to confirm.")
-			return
+	runtimeFlags := make(map[string]string)
+	for optName := range mod.Options {
+		val, err := cmd.Flags().GetString(optName)
+		if err != nil {
+			logging.Errorf("module %s: read flag %s: %v", mod.Name, optName, err)
+			continue
 		}
+		live.SetOption(optName, val)
+		runtimeFlags[optName] = val
 	}
 
-	// Send command to module
-	target := agents.MustGetActiveAgent()
-	flags := make(map[string]string)
-	for k, v := range live.ActiveModule.Options {
-		if v != nil {
-			flags[k] = v.Val
-		}
-	}
 	ctx := &c2context.C2Context{
-		Target:    target,
-		Flags:     flags,
-		OpSession: "operator", // TODO: Get actual session ID if available
-		// Inject UI callback for interactive shells
+		Target:    agents.MustGetActiveAgent(),
+		Flags:     runtimeFlags,
+		OpSession: client.SessionID,
 		OnUIReady: func(data any) error {
 			connStr, ok := data.(string)
 			if !ok {
@@ -98,33 +120,16 @@ func cmdModuleRun(cmd *cobra.Command, _ []string) {
 			}
 			logging.Successf("Shell ready! Opening tmux...")
 			windowName := "shell"
-			if target != nil {
-				windowName = fmt.Sprintf("shell-%s", target.ShortID)
+			if ctxTarget := agents.MustGetActiveAgent(); ctxTarget != nil {
+				windowName = fmt.Sprintf("shell-%s", ctxTarget.ShortID)
 			}
 			return cli.TmuxNewWindow(windowName, connStr)
 		},
 	}
 	modules.ModuleRun(ctx)
-}
-
-func cmdSetOptVal(cmd *cobra.Command, args []string) {
-	if live.ActiveModule == nil {
-		logging.Errorf("No module selected")
-		return
+	if mod.IsLocal {
+		logging.Infof("Module %s is local-only; execution remains on C2", mod.Name)
 	}
-	opt := args[0]
-	val := args[1]
-
-	// hand to SetOption helper
-	live.SetOption(opt, val)
-
-	listModOptionsTable()
-}
-
-func cmdSetActiveModule(cmd *cobra.Command, args []string) {
-	// Set active module
-	modules.SetActiveModule(args[0])
-	listModOptionsTable()
 }
 
 func cmdListModules(_ *cobra.Command, _ []string) {
@@ -149,8 +154,4 @@ func cmdSearchModule(cmd *cobra.Command, args []string) {
 	tableStr := cli.BuildTable([]string{"Module", "Description"}, row)
 	cli.AdaptiveTable(tableStr)
 	logging.Infof("\n%s", tableStr)
-}
-
-func cmdModuleListOptions(_ *cobra.Command, _ []string) {
-	listModOptionsTable()
 }

@@ -62,9 +62,6 @@ func backgroundJobs() {
 	// set up command senders
 	ftp.ExecCmd = controllers.ExecuteCommand
 	modules.CmdSender = controllers.ExecuteCommand
-
-	// init modules by querying server for available modules
-	go modules.InitModules()
 	// refresh agent list every 10 seconds
 	go agentListRefresher()
 	// handle messages from operator
@@ -89,6 +86,8 @@ func CliMain(wg_server_ip string, wg_server_port int) {
 	if err != nil {
 		logging.Debugf("UnlockDownloads: %v", err)
 	}
+	// Load modules before command tree creation so module_name commands and flags exist for completion.
+	modules.InitModules()
 	mainMenu := EMP3R0R_CONSOLE.NewMenu("")
 	EMP3R0R_CONSOLE.SetPrintLogo(CliBanner)
 
@@ -155,12 +154,13 @@ func highLighter(line []rune) string {
 	return highlightedStr.String()
 }
 
-// SetDynamicPrompt set prompt with module and target info
+// SetDynamicPrompt set prompt with target and working-directory info
 func SetDynamicPrompt() string {
 	shortName := "local" // if no target is selected
 	prompt_arrow := color.New(color.Bold, color.FgHiCyan).Sprintf("\n$ ")
 	prompt_name := color.New(color.Bold, color.FgBlack, color.BgHiWhite).Sprint(AppName)
 	transport := color.New(color.FgRed).Sprint("local")
+	cwd := color.New(color.FgHiBlue).Sprint("cwd:local")
 
 	if live.ActiveAgent != nil {
 		// live.ActiveAgent is already sanitized at storage time
@@ -170,19 +170,19 @@ func SetDynamicPrompt() string {
 			prompt_name = color.New(color.Bold, color.FgBlack, color.BgHiGreen).Sprint(AppName)
 		}
 		transport = getTransport(live.ActiveAgent.Transport)
+		if live.ActiveAgent.CWD != "" {
+			cwd = color.New(color.FgHiBlue).Sprint(live.ActiveAgent.CWD)
+		} else {
+			cwd = color.New(color.FgHiBlue).Sprint("cwd:unknown")
+		}
 	}
 	agent_name := color.New(color.FgCyan, color.Underline).Sprint(shortName)
-	mod := "none"
-	if live.ActiveModule != nil {
-		mod = live.ActiveModule.Name
-	}
-	mod_name := color.New(color.FgHiBlue).Sprint(mod)
 
 	dynamicPrompt := fmt.Sprintf("%s - %s @%s (%s) "+prompt_arrow,
 		prompt_name,
 		transport,
 		agent_name,
-		mod_name,
+		cwd,
 	)
 	return dynamicPrompt
 }

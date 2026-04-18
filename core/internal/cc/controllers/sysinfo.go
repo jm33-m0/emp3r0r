@@ -3,8 +3,6 @@ package controllers
 import (
 	"fmt"
 
-	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 )
 
@@ -64,15 +62,5 @@ func ExecuteSysinfoCommand(agent *def.Emp3r0rAgent, opts SysinfoOptions, opSessi
 	}
 
 	cmdStr := BuildSysinfoCommand(opts)
-
-	// Create context and execute
-	ctx := &c2context.C2Context{
-		Target:    agent,
-		OpSession: opSession,
-		Flags:     make(map[string]string),
-	}
-	ctx.Flags["cmd_to_exec"] = cmdStr
-
-	modules.ExecCommand(ctx)
-	return nil
+	return ExecuteAgentCommand(agent, cmdStr, opSession)
 }
