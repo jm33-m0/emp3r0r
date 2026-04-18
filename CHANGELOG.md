@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.1.0](https://github.com/jm33-m0/emp3r0r/compare/v4.0.3...v4.1.0) (2026-04-18)
+
+
+### Features
+
+* default to `plain_http` transport for flexibility ([da2a66f](https://github.com/jm33-m0/emp3r0r/commit/da2a66f70a4335adfb8b229d06054ff26453c06c))
+* revamp module system to invoke modules as cobra commands, ensuring UX consistency ([6093b1f](https://github.com/jm33-m0/emp3r0r/commit/6093b1f0cf24186e44c35890f67c53b5297e88c2))
+
+
+### Bug Fixes
+
+* enhance agent disconnection and UUID handling ([de981be](https://github.com/jm33-m0/emp3r0r/commit/de981beae2e29761460ba193e3f8f5bd47c465d2))
+* wrong handler for h2conn after changing default c2 transport ([ddde5e4](https://github.com/jm33-m0/emp3r0r/commit/ddde5e4b3c8521221110e5c4d2eba99226a08f4b))
+
 ## [4.0.3](https://github.com/jm33-m0/emp3r0r/compare/v4.0.2...v4.0.3) (2026-04-17)
 
 
