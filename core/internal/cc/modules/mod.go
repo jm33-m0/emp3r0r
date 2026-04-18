@@ -13,45 +13,21 @@ import (
 )
 
 var (
-	// ShellHelpInfo provide utilities like ps, kill, etc
-	// deprecated
-	ShellHelpInfo = map[string]string{
-		"#ps":   "List processes: `ps`",
-		"#kill": "Kill process: `kill <PID>`",
-		"#net":  "Show network info",
-		"put":   "Put a file from CC to agent: `put <local file> <remote path>`\nPath starting with `mem://` enforces memory storage. Otherwise smart selection is used.\nUse --force to write to disk if memory fails.",
-		"get":   "Get a file from agent: `get <remote file>`",
-	}
-
 	// ModuleRunners a map of module helpers
-	ModuleRunners = map[string]func(ctx *context.C2Context){
-		def.ModCMD_EXEC:    ModuleCmd,
-		def.ModLPE_SUGGEST: moduleLPE,
-		def.ModCLEAN_LOG:   moduleLogCleaner,
-
-		def.ModBring2CC:     moduleBring2CC,
-		def.ModListener:     modListener,
-		def.ModSSHHarvester: module_ssh_harvester,
-		def.ModDownloader:   moduleDownloader,
-		def.ModFileServer:   moduleFileServer,
-		def.ModMemDump:      moduleMemDump,
-	}
+	ModuleRunners = make(map[string]func(ctx *context.C2Context))
 )
 
 // UpdateOptions reads options from modules config, and set default values
 func UpdateOptions(modName string) (exist bool) {
+	ensureBuiltInGoModuleRunners()
+
 	if live.ActiveModule == nil {
 		logging.Errorf("No active module")
 		return
 	}
 
 	// filter user supplied option
-	for mod := range ModuleRunners {
-		if mod == modName {
-			exist = true
-			break
-		}
-	}
+	exist = hasModuleRunner(modName)
 	if !exist {
 		logging.Errorf("UpdateOptions: no such module: %s", modName)
 		return
@@ -89,6 +65,8 @@ func UpdateOptions(modName string) (exist bool) {
 
 // ModuleRun run current module
 func ModuleRun(ctx *context.C2Context) {
+	ensureBuiltInGoModuleRunners()
+
 	if live.ActiveModule == nil {
 		logging.Errorf("No active module")
 		return
@@ -109,7 +87,7 @@ func ModuleRun(ctx *context.C2Context) {
 	}
 
 	// run module
-	mod := ModuleRunners[live.ActiveModule.Name]
+	mod := getModuleRunner(live.ActiveModule.Name)
 	if mod != nil {
 		go mod(ctx)
 	} else {
@@ -142,34 +120,34 @@ func ModuleSearch(keyword string) []*def.ModuleConfig {
 
 // SetActiveModule set the active module to use: `use` command
 func SetActiveModule(modName string) {
-	for mod := range ModuleRunners {
-		if modName == mod {
-			if val, ok := def.Modules.Load(modName); ok {
-				live.ActiveModule = val.(*def.ModuleConfig)
-			}
-			UpdateOptions(modName)
-			logging.Infof("Using module %s", strconv.Quote(modName))
-			if val, exists := def.Modules.Load(modName); exists {
-				mod := val.(*def.ModuleConfig)
-				logging.Successf("%s: %s", modName, mod.Comment)
+	ensureBuiltInGoModuleRunners()
 
-				// OPSEC warnings
-				if mod.AgentConfig.Exec != "built-in" && !mod.IsLocal {
-					if mod.AgentConfig.Type == "coff" {
-						logging.Infof("OPSEC: This is a BOF module, which is recommended for OPSEC (runs in-memory)")
-					} else {
-						logging.Warningf("OPSEC: This module is NOT built-in and NOT BOF. It may involve fork-and-run or disk activity")
-					}
-				}
-				if mod.AgentConfig.IsInteractive {
-					logging.Warningf("OPSEC: Interactive modules like this one involve forking a shell/process on the agent")
-				}
-				if !mod.Fileless && !mod.IsLocal {
-					logging.Warningf("OPSEC: This module is NOT fileless, it WILL touch the agent's disk")
+	if hasModuleRunner(modName) {
+		if val, ok := def.Modules.Load(modName); ok {
+			live.ActiveModule = val.(*def.ModuleConfig)
+		}
+		UpdateOptions(modName)
+		logging.Infof("Using module %s", strconv.Quote(modName))
+		if val, exists := def.Modules.Load(modName); exists {
+			mod := val.(*def.ModuleConfig)
+			logging.Successf("%s: %s", modName, mod.Comment)
+
+			// OPSEC warnings
+			if mod.AgentConfig.Exec != "built-in" && !mod.IsLocal {
+				if mod.AgentConfig.Type == "coff" {
+					logging.Infof("OPSEC: This is a BOF module, which is recommended for OPSEC (runs in-memory)")
+				} else {
+					logging.Warningf("OPSEC: This module is NOT built-in and NOT BOF. It may involve fork-and-run or disk activity")
 				}
 			}
-			return
+			if mod.AgentConfig.IsInteractive {
+				logging.Warningf("OPSEC: Interactive modules like this one involve forking a shell/process on the agent")
+			}
+			if !mod.Fileless && !mod.IsLocal {
+				logging.Warningf("OPSEC: This module is NOT fileless, it WILL touch the agent's disk")
+			}
 		}
+		return
 	}
 	logging.Errorf("No such module: %s", strconv.Quote(modName))
 }

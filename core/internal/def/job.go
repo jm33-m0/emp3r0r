@@ -21,7 +21,7 @@ type Job struct {
 	ID          string    `cbor:"1,keyasint"`  // UUID
 	Name        string    `cbor:"2,keyasint"`  // "nmap scan", "interactive shell", "get root"
 	AgentTag    string    `cbor:"3,keyasint"`  // Target agent tag
-	Module      string    `cbor:"4,keyasint"`  // "mod_cmd", "mod_shell"
+	Module      string    `cbor:"4,keyasint"`  // "exec_cmd", "exec_shell"
 	Args        []string  `cbor:"5,keyasint"`  // Arguments passed to the module
 	Created     time.Time `cbor:"6,keyasint"`  // When the job was created
 	Finished    time.Time `cbor:"7,keyasint"`  // When the job finished

@@ -503,7 +503,7 @@ func execCmd(cmd *cobra.Command, args []string) {
 	}
 	ctx.Flags["cmd_to_exec"] = fmt.Sprintf("exec --cmd %s", strconv.Quote(cmdStr))
 	logging.Warningf("OPSEC: exec recorded as fork and run (High OPSEC Risk)")
-	modules.ModuleCmd(ctx)
+	modules.ExecCommand(ctx)
 }
 
 func exitEmp3r0r(_ *console.Console) {

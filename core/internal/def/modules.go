@@ -4,7 +4,6 @@ import "sync"
 
 // built-in module names
 const (
-	ModCMD_EXEC    = "cmd_exec"
 	ModCLEAN_LOG   = "clean_log"
 	ModLPE_SUGGEST = "lpe_suggest"
 
@@ -122,35 +121,6 @@ func init() {
 
 func populateModules() {
 	builtIn := map[string]*ModuleConfig{
-		ModCMD_EXEC: {
-			Name:     ModCMD_EXEC,
-			Build:    "",
-			Date:     "2020-01-25",
-			Comment:  "Run a single command on one or more targets",
-			IsLocal:  false,
-			Platform: "Generic",
-			Path:     "",
-			Fileless: true,
-			Options: ModOptions{
-				"cmd_to_exec": &ModOption{
-					Name: "cmd_to_exec",
-					Desc: "Press TAB for some hints",
-					Vals: []string{
-						"id", "whoami", "ifconfig",
-						"ip a", "arp -a",
-						"ps -ef", "lsmod", "ss -antup",
-						"netstat -antup", "uname -a",
-					},
-				},
-			},
-			AgentConfig: AgentModuleConfig{
-				Exec:          "built-in",
-				Files:         []string{},
-				InMemory:      false,
-				Type:          "go",
-				IsInteractive: false,
-			},
-		},
 		ModCLEAN_LOG: {
 			Name:     ModCLEAN_LOG,
 			Build:    "",

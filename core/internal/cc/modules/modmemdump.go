@@ -14,6 +14,10 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
+func init() {
+	registerModuleRunner(def.ModMemDump, moduleMemDump)
+}
+
 func moduleMemDump(ctx *c2context.C2Context) {
 	if ctx.Target == nil {
 		logging.Errorf("No active agent")

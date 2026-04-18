@@ -118,6 +118,6 @@ func ExecuteAgentCommand(agent *def.Emp3r0rAgent, cmd string, opSession string) 
 	}
 	ctx.Flags["cmd_to_exec"] = cmd
 
-	modules.ModuleCmd(ctx)
+	modules.ExecCommand(ctx)
 	return nil
 }

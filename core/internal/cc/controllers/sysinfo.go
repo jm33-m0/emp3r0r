@@ -73,6 +73,6 @@ func ExecuteSysinfoCommand(agent *def.Emp3r0rAgent, opts SysinfoOptions, opSessi
 	}
 	ctx.Flags["cmd_to_exec"] = cmdStr
 
-	modules.ModuleCmd(ctx)
+	modules.ExecCommand(ctx)
 	return nil
 }

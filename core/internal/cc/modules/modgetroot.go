@@ -16,6 +16,8 @@ import (
 var LPEHelperURLs sync.Map // map[string]string
 
 func init() {
+	registerModuleRunner(def.ModLPE_SUGGEST, moduleLPE)
+
 	LPEHelperURLs.Store("lpe_les", "https://raw.githubusercontent.com/mzet-/linux-exploit-suggester/master/linux-exploit-suggester.sh")
 	LPEHelperURLs.Store("lpe_lse", "https://raw.githubusercontent.com/diego-treitos/linux-smart-enumeration/master/lse.sh")
 	LPEHelperURLs.Store("lpe_linpeas", "https://github.com/carlospolop/PEASS-ng/releases/latest/download/linpeas.sh")

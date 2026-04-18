@@ -299,7 +299,7 @@ func InitModules() {
 			}
 
 			// add to module helpers
-			ModuleRunners[config.Name] = moduleCustom
+			registerModuleRunner(config.Name, moduleCustom)
 
 			// Store FIRST so that updateModuleHelp can Load and patch the Options map.
 			// Without this, the Load inside updateModuleHelp always misses and the

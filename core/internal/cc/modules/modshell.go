@@ -12,8 +12,8 @@ import (
 // RShellStatus stores errors from reverseBash
 var RShellStatus sync.Map
 
-// ModuleCmd exec cmd on target
-func ModuleCmd(ctx *c2context.C2Context) {
+// ExecCommand executes a raw command on one or more targets.
+func ExecCommand(ctx *c2context.C2Context) {
 	// check if ActiveModule and Options are valid
 	// In context-based approach, we check Flags
 	// but live.ActiveModule might still be used for static config if needed,
@@ -32,7 +32,7 @@ func ModuleCmd(ctx *c2context.C2Context) {
 		}
 		err := CmdSender(cmdOpt, jobID, target.Tag)
 		if err != nil {
-			logging.Errorf("ModuleCmd: %v", err)
+			logging.Errorf("ExecCommand: %v", err)
 		}
 	}
 
