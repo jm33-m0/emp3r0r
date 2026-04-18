@@ -57,7 +57,7 @@ const (
 
 	// C2 channel modes select only the outer byte-stream wrapper.
 	// CBOR MsgAuth/MsgTunData stays authoritative for trust and routing.
-	C2ChannelModeDefault = "h2conn"
+	C2ChannelModeDefault = "plain_http"
 
 	// Backward-compatible alias.
 	C2ChannelModeH2Conn = C2ChannelModeDefault
