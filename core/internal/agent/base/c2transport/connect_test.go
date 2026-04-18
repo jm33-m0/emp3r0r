@@ -167,12 +167,13 @@ func TestEstablishC2Connection(t *testing.T) {
 
 	c2URL := fmt.Sprintf("https://127.0.0.1:%d", port)
 	common.RuntimeConfig = &def.Config{
-		CCAddress:    c2URL,
-		AgentUUID:    agentUUID,
-		AgentUUIDSig: agentSig,
-		AgentTag:     agentUUID, // Set AgentTag to match UUID for test
-		CCTimeout:    10000,     // Set timeout to 10 seconds
-		C2Routes:     live.RuntimeConfig.C2Routes,
+		CCAddress:     c2URL,
+		C2ChannelMode: def.C2ChannelModeH2Conn,
+		AgentUUID:     agentUUID,
+		AgentUUIDSig:  agentSig,
+		AgentTag:      agentUUID, // Set AgentTag to match UUID for test
+		CCTimeout:     10000,     // Set timeout to 10 seconds
+		C2Routes:      live.RuntimeConfig.C2Routes,
 	}
 	def.CCAddress = c2URL // Set global CCAddress for ReportStatus
 
@@ -400,12 +401,13 @@ func TestDuplicatedCheckin(t *testing.T) {
 
 	c2URL := fmt.Sprintf("https://127.0.0.1:%d", port)
 	common.RuntimeConfig = &def.Config{
-		CCAddress:    c2URL,
-		AgentUUID:    agentUUID,
-		AgentUUIDSig: agentSig,
-		AgentTag:     agentUUID,
-		CCTimeout:    3000,
-		C2Routes:     live.RuntimeConfig.C2Routes,
+		CCAddress:     c2URL,
+		C2ChannelMode: def.C2ChannelModeH2Conn,
+		AgentUUID:     agentUUID,
+		AgentUUIDSig:  agentSig,
+		AgentTag:      agentUUID,
+		CCTimeout:     3000,
+		C2Routes:      live.RuntimeConfig.C2Routes,
 	}
 	def.CCAddress = c2URL
 
@@ -571,11 +573,12 @@ func TestBackslashTag(t *testing.T) {
 
 	c2URL := fmt.Sprintf("https://127.0.0.1:%d", port)
 	common.RuntimeConfig = &def.Config{
-		CCAddress:    c2URL,
-		AgentUUID:    agentUUID,
-		AgentUUIDSig: agentSig,
-		AgentTag:     agentTag,
-		C2Routes:     live.RuntimeConfig.C2Routes,
+		CCAddress:     c2URL,
+		C2ChannelMode: def.C2ChannelModeH2Conn,
+		AgentUUID:     agentUUID,
+		AgentUUIDSig:  agentSig,
+		AgentTag:      agentTag,
+		C2Routes:      live.RuntimeConfig.C2Routes,
 	}
 	def.CCAddress = c2URL
 
@@ -696,11 +699,12 @@ func TestEmptyUUID(t *testing.T) {
 
 	c2URL := fmt.Sprintf("https://127.0.0.1:%d", port)
 	common.RuntimeConfig = &def.Config{
-		CCAddress:    c2URL,
-		AgentUUID:    agentUUID,
-		AgentUUIDSig: agentSig,
-		AgentTag:     agentTag,
-		C2Routes:     live.RuntimeConfig.C2Routes,
+		CCAddress:     c2URL,
+		C2ChannelMode: def.C2ChannelModeH2Conn,
+		AgentUUID:     agentUUID,
+		AgentUUIDSig:  agentSig,
+		AgentTag:      agentTag,
+		C2Routes:      live.RuntimeConfig.C2Routes,
 	}
 	def.CCAddress = c2URL
 
@@ -819,11 +823,12 @@ func TestNewAgentCheckin(t *testing.T) {
 
 	c2URL := fmt.Sprintf("https://127.0.0.1:%d", port)
 	common.RuntimeConfig = &def.Config{
-		CCAddress:    c2URL,
-		AgentUUID:    agentUUID,
-		AgentUUIDSig: agentSig,
-		AgentTag:     agentTag,
-		C2Routes:     live.RuntimeConfig.C2Routes,
+		CCAddress:     c2URL,
+		C2ChannelMode: def.C2ChannelModeH2Conn,
+		AgentUUID:     agentUUID,
+		AgentUUIDSig:  agentSig,
+		AgentTag:      agentTag,
+		C2Routes:      live.RuntimeConfig.C2Routes,
 	}
 	def.CCAddress = c2URL
 

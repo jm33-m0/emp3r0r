@@ -28,7 +28,7 @@ func StartC2AgentTLSServer() {
 	if mode == "" {
 		mode = def.C2ChannelModeDefault
 	}
-	if mode == def.C2ChannelModeDefault || mode == "plain_http" {
+	if mode == def.C2ChannelModeH2Conn || mode == def.C2ChannelModeDefault || mode == def.C2ChannelModePlainHTTP {
 		StartC2H2StreamServer()
 		return
 	}

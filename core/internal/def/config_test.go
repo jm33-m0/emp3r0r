@@ -33,8 +33,8 @@ func TestReadCBORConfig(t *testing.T) {
 	if newConfig.CCTimeout != originalConfig.CCTimeout {
 		t.Errorf("Expected CCTimeout %d, got %d", originalConfig.CCTimeout, newConfig.CCTimeout)
 	}
-	if newConfig.C2ChannelMode != C2ChannelModeH2Conn {
-		t.Errorf("Expected default C2ChannelMode %s, got %s", C2ChannelModeH2Conn, newConfig.C2ChannelMode)
+	if newConfig.C2ChannelMode != C2ChannelModeDefault {
+		t.Errorf("Expected default C2ChannelMode %s, got %s", C2ChannelModeDefault, newConfig.C2ChannelMode)
 	}
 }
 

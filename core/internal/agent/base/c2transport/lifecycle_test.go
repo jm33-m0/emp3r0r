@@ -193,12 +193,13 @@ func TestFullAgentLifecycle(t *testing.T) {
 
 	c2URL := fmt.Sprintf("https://127.0.0.1:%d", port)
 	common.RuntimeConfig = &def.Config{
-		CCAddress:    c2URL,
-		AgentUUID:    agentUUID,
-		AgentUUIDSig: agentSig,
-		AgentTag:     agentTag,
-		CCTimeout:    5000,
-		C2Routes:     live.RuntimeConfig.C2Routes,
+		CCAddress:     c2URL,
+		C2ChannelMode: def.C2ChannelModeH2Conn,
+		AgentUUID:     agentUUID,
+		AgentUUIDSig:  agentSig,
+		AgentTag:      agentTag,
+		CCTimeout:     5000,
+		C2Routes:      live.RuntimeConfig.C2Routes,
 	}
 	def.CCAddress = c2URL
 
@@ -527,11 +528,12 @@ func TestCheckinWithRandomPaths(t *testing.T) {
 
 	c2URL := fmt.Sprintf("https://127.0.0.1:%d", port)
 	common.RuntimeConfig = &def.Config{
-		CCAddress:    c2URL,
-		AgentUUID:    agentUUID,
-		AgentUUIDSig: agentSig,
-		AgentTag:     agentTag,
-		C2Routes:     live.RuntimeConfig.C2Routes,
+		CCAddress:     c2URL,
+		C2ChannelMode: def.C2ChannelModeH2Conn,
+		AgentUUID:     agentUUID,
+		AgentUUIDSig:  agentSig,
+		AgentTag:      agentTag,
+		C2Routes:      live.RuntimeConfig.C2Routes,
 	}
 	def.CCAddress = c2URL
 
@@ -667,11 +669,12 @@ func TestDynamicPrefix(t *testing.T) {
 	randomPrefix := "stealthy-prefix-" + uuid.New().String()
 
 	common.RuntimeConfig = &def.Config{
-		CCAddress:    c2URL,
-		AgentUUID:    agentUUID,
-		AgentUUIDSig: agentSig,
-		AgentTag:     agentUUID,
-		C2Routes:     live.RuntimeConfig.C2Routes,
+		CCAddress:     c2URL,
+		C2ChannelMode: def.C2ChannelModeH2Conn,
+		AgentUUID:     agentUUID,
+		AgentUUIDSig:  agentSig,
+		AgentTag:      agentUUID,
+		C2Routes:      live.RuntimeConfig.C2Routes,
 	}
 	def.CCAddress = c2URL
 
@@ -813,11 +816,12 @@ func TestCheckinWithRandomPaths_Strict(t *testing.T) {
 
 	c2URL := fmt.Sprintf("https://127.0.0.1:%d", port)
 	common.RuntimeConfig = &def.Config{
-		CCAddress:    c2URL,
-		AgentUUID:    agentUUID,
-		AgentUUIDSig: agentSig,
-		AgentTag:     agentTag,
-		C2Routes:     live.RuntimeConfig.C2Routes,
+		CCAddress:     c2URL,
+		C2ChannelMode: def.C2ChannelModeH2Conn,
+		AgentUUID:     agentUUID,
+		AgentUUIDSig:  agentSig,
+		AgentTag:      agentTag,
+		C2Routes:      live.RuntimeConfig.C2Routes,
 	}
 	def.CCAddress = c2URL
 

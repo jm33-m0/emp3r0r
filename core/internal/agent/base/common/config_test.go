@@ -20,6 +20,7 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 		CCAddress:                 "192.168.1.100",
 		CCHost:                    "192.168.1.100",
 		CCPort:                    "8443",
+		C2ChannelMode:             def.C2ChannelModeH2Conn,
 		AgentSocksServerPort:      "50001",
 		AgentSocksTimeout:         60,
 		StagerHTTPListenerPort:    "8080",

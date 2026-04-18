@@ -76,7 +76,7 @@ func InitConfig() (err error) {
 	} else if RuntimeConfig.UseKCP {
 		RuntimeConfig.CCPort = RuntimeConfig.KCPClientPort
 		def.CCAddress = fmt.Sprintf("https://127.0.0.1:%s", RuntimeConfig.CCPort)
-	} else if RuntimeConfig.C2ChannelMode == "plain_http" {
+	} else if RuntimeConfig.C2ChannelMode == def.C2ChannelModePlainHTTP {
 		def.CCAddress = fmt.Sprintf("http://%s:%s", def.CCAddress, RuntimeConfig.CCHTTPPort)
 	} else {
 		def.CCAddress = fmt.Sprintf("https://%s:%s", def.CCAddress, RuntimeConfig.CCPort)
