@@ -1,5 +1,21 @@
 # Changelog
 
+## [4.2.0](https://github.com/jm33-m0/emp3r0r/compare/v4.1.0...v4.2.0) (2026-04-19)
+
+
+### Features
+
+* implement indirect syscalls via vDSO gadget resolution to evade eBPF-based monitoring ([849e183](https://github.com/jm33-m0/emp3r0r/commit/849e1834d817d79012a15978d16eaef3273693be))
+* implement XOR encryption for staged blobs ([e355ae6](https://github.com/jm33-m0/emp3r0r/commit/e355ae6f2be0fd41b4e8e7d56995c982f00c62b4))
+* refactor `shellcode_stager` to 3 stages, significantly reducing stage0 size ([ce6999a](https://github.com/jm33-m0/emp3r0r/commit/ce6999ac796cc4259d31c33ec5b345d949e75b8e))
+
+
+### Bug Fixes
+
+* allocate stack via alloca to stay within valid VMA ([4e367a5](https://github.com/jm33-m0/emp3r0r/commit/4e367a574d00885b9c6e253d19869ee796f8667f))
+* improve memory reallocation logic in shellcode stager downloader ([664ec86](https://github.com/jm33-m0/emp3r0r/commit/664ec8648283e8a4fabec1f036a0e5aa5682a118))
+* use syscall gadget instead of direct syscall ([ab9d548](https://github.com/jm33-m0/emp3r0r/commit/ab9d548874da4699b2a3cb605cef75760d700bff))
+
 ## [4.1.0](https://github.com/jm33-m0/emp3r0r/compare/v4.0.3...v4.1.0) (2026-04-18)
 
 
