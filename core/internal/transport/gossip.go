@@ -58,7 +58,7 @@ func StartGossip(ctx context.Context, name string, initialPeers []string, port i
 	return startGossipWithTakeASnap(ctx, name, initialPeers, port, getMeta, util.TakeASnap)
 }
 
-func startGossipWithTakeASnap(ctx context.Context, name string, initialPeers []string, port int, getMeta func() *def.MeshNodeMeta, takeASnap func(bool)) (*memberlist.Memberlist, error) {
+func startGossipWithTakeASnap(ctx context.Context, name string, initialPeers []string, port int, getMeta func() *def.MeshNodeMeta, takeASnap func()) (*memberlist.Memberlist, error) {
 	if takeASnap == nil {
 		takeASnap = util.TakeASnap
 	}
@@ -122,7 +122,7 @@ func startGossipWithTakeASnap(ctx context.Context, name string, initialPeers []s
 
 		for {
 			// Randomized sleep for OPSEC.
-			takeASnap(false)
+			takeASnap()
 			if ctx.Err() != nil {
 				return
 			}

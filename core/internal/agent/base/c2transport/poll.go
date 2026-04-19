@@ -273,7 +273,7 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 			break
 		}
 		handshakeDone = true
-		util.TakeASnap(true)
+		util.TakeASnap()
 	}
 
 	return fmt.Errorf("MsgTunneler closed: %v", ctx.Err())

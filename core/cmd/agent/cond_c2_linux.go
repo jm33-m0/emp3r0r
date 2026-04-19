@@ -21,5 +21,5 @@ func conditionalC2FailNotify() {
 
 	// Otherwise, just wait and retry
 	logging.Warningf("Connection failed, sleeping...")
-	util.TakeASnap(false) // sleeps for random interval
+	util.TakeASnap() // sleeps for random interval
 }

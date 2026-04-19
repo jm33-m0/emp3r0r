@@ -401,7 +401,7 @@ func TestStartGossip_BootstrapRetry(t *testing.T) {
 
 	// Make the gossip healing loop deterministic for CI: production uses randomized
 	// 5-60s sleeps, which can exceed this test's rediscovery window on slower runners.
-	testTakeASnap := func(forceSleep bool) {
+	testTakeASnap := func() {
 		time.Sleep(200 * time.Millisecond)
 	}
 

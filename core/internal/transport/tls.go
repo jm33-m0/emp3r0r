@@ -85,7 +85,7 @@ init_transport:
 	if err != nil {
 		if proxyServer != "" && try < 5 {
 			logging.Infof("Proxy server (%s) down, retrying (%d)...", proxyServer, try)
-			util.TakeASnap(false)
+			util.TakeASnap()
 			goto init_transport
 		} else {
 			logging.Infof("Error initializing transport (%s): makeRoundTripper: %v", c2url, err)

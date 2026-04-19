@@ -326,7 +326,7 @@ func watchPeers(ctx context.Context) {
 	// on a randomized schedule.
 	for {
 		// Randomized sleep
-		util.TakeASnap(false)
+		util.TakeASnap()
 
 		if ctx.Err() != nil {
 			return
