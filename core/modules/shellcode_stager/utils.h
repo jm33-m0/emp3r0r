@@ -33,7 +33,7 @@ typedef long ssize_t;
 
 // Wait status macros
 #define WIFEXITED(status) (((status) & 0x7f) == 0)
-#define WIFSIGNALED(status) (((signed char) (((status) & 0x7f) + 1) >> 1) > 0)
+#define WIFSIGNALED(status) (((signed char)(((status) & 0x7f) + 1) >> 1) > 0)
 #define WIFSTOPPED(status) (((status) & 0xff) == 0x7f)
 #define WEXITSTATUS(status) (((status) & 0xff00) >> 8)
 #define WTERMSIG(status) ((status) & 0x7f)
@@ -47,13 +47,12 @@ typedef long ssize_t;
 // Open flags
 #define O_RDONLY 00
 #define O_WRONLY 01
-#define O_RDWR   02
+#define O_RDWR 02
 
 // Lseek whence
 #define SEEK_SET 0
 #define SEEK_CUR 1
 #define SEEK_END 2
-
 
 struct timespec {
   long tv_sec;
@@ -103,8 +102,12 @@ int snprintf(char *str, size_t size, const char *format,
 void debug_print(const char *format, ...);
 void perror(const char *s);
 #else
-#define debug_print(...) do {} while(0)
-#define perror(s) do {} while(0)
+#define debug_print(...)                                                       \
+  do {                                                                         \
+  } while (0)
+#define perror(s)                                                              \
+  do {                                                                         \
+  } while (0)
 #endif
 
 // Random
@@ -117,7 +120,7 @@ long close(int fd);
 long open(const char *pathname, int flags, int mode);
 long lseek(int fd, long offset, int whence);
 long exit(int error_code);
-long mmap(void *addr, size_t length, int prot, int flags, int fd, long offset);
+void *mmap(void *addr, size_t length, int prot, int flags, int fd, long offset);
 long munmap(void *addr, size_t length);
 long mprotect(void *addr, size_t len, int prot);
 long fork(void);

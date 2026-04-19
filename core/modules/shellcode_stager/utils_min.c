@@ -76,8 +76,10 @@ long close(int fd) { return syscall1(SYS_close, fd); }
 
 long exit(int error_code) { return syscall1(SYS_exit, error_code); }
 
-long mmap(void *addr, size_t length, int prot, int flags, int fd, long offset) {
-  return syscall6(SYS_mmap, (long)addr, length, prot, flags, fd, offset);
+void *mmap(void *addr, size_t length, int prot, int flags, int fd,
+           long offset) {
+  return (void *)syscall6(SYS_mmap, (long)addr, length, prot, flags, fd,
+                          offset);
 }
 
 long munmap(void *addr, size_t length) {
