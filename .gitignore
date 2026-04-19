@@ -270,3 +270,7 @@ downloader_blob.h
 
 # AI agent
 project_knowledge.md
+
+# shellcode stager
+core/modules/shellcode_stager/downloader
+core/modules/shellcode_stager/stager
