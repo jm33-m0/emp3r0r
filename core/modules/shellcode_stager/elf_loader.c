@@ -337,8 +337,8 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
         }
       }
       size_t total_size = max_v - min_v;
-      mapped_mem = (void *)mmap(NULL, total_size, PROT_READ | PROT_WRITE,
-                                MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+      mapped_mem = mmap(NULL, total_size, PROT_READ | PROT_WRITE,
+                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
       if (mapped_mem == MAP_FAILED) {
         DEBUG_PRINT("Failed to allocate anonymous memory\n");
         return -1;
@@ -502,8 +502,8 @@ int elf_run(void *buf, char **argv, char **env, int pre_mapped,
 
   // Allocate some stack space
   DEBUG_PRINT("Allocating stack...\n");
-  void *stack = (void *)mmap(0, STACK_SIZE, PROT_READ | PROT_WRITE,
-                             MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  size_t setup_size = STACK_STORAGE_SIZE + STACK_STRING_SIZE;
+  void *stack = __builtin_alloca(setup_size);
   if ((long)stack < 0) {
     DEBUG_PRINT("Failed to allocate stack\n");
     return -1;
@@ -511,8 +511,8 @@ int elf_run(void *buf, char **argv, char **env, int pre_mapped,
   DEBUG_PRINT("Stack allocated at %p\n", stack);
 
   // Map the ELF in memory
-  if (elf_load(buf, stack, STACK_SIZE, &elf_base, &elf_entry, NULL, pre_mapped,
-               module_path) < 0) {
+  if (elf_load(buf, stack, setup_size /* used to be STACK_SIZE */, &elf_base,
+               &elf_entry, NULL, pre_mapped, module_path) < 0) {
     DEBUG_PRINT("elf_load failed\n");
     return -1;
   }
@@ -526,12 +526,13 @@ int elf_run(void *buf, char **argv, char **env, int pre_mapped,
   //     return -1;
   // }
 
+  // Ensure 16-byte alignment as required by ABI
   unsigned long *stack_storage =
-      stack + STACK_SIZE - STACK_STORAGE_SIZE - STACK_STRING_SIZE;
+      (unsigned long *)(((unsigned long)stack + 15) & ~0xFl);
+  char *string_storage = (char *)stack_storage + STACK_STORAGE_SIZE;
 
   // Zero out the whole stack storage area
   memset(stack_storage, 0, STACK_STORAGE_SIZE);
-  char *string_storage = stack + STACK_SIZE - STACK_STRING_SIZE;
 
   unsigned long *s_argc = stack_storage;
   unsigned long *s_argv = &stack_storage[1];
