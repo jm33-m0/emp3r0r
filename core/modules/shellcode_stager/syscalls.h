@@ -335,35 +335,53 @@
 #define SYS_pkey_free 331
 #define SYS_statx 332
 
+static inline void *get_syscall_gadget(void) {
+  void *gadget;
+  __asm__ __volatile__("lea 1f(%%rip), %0\n\t"
+                       "jmp 2f\n\t"
+                       "1: syscall\n\t"
+                       "ret\n\t"
+                       "2:\n\t"
+                       : "=r"(gadget));
+  return gadget;
+}
+
 static inline long syscall0(long n) {
   unsigned long ret;
-  __asm__ __volatile__("syscall" : "=a"(ret) : "a"(n) : "rcx", "r11", "memory");
+  void *gadget = get_syscall_gadget();
+  __asm__ __volatile__("call *%1"
+                       : "=a"(ret)
+                       : "r"(gadget), "a"(n)
+                       : "rcx", "r11", "memory");
   return ret;
 }
 
 static inline long syscall1(long n, long a1) {
   unsigned long ret;
-  __asm__ __volatile__("syscall"
+  void *gadget = get_syscall_gadget();
+  __asm__ __volatile__("call *%1"
                        : "=a"(ret)
-                       : "a"(n), "D"(a1)
+                       : "r"(gadget), "a"(n), "D"(a1)
                        : "rcx", "r11", "memory");
   return ret;
 }
 
 static inline long syscall2(long n, long a1, long a2) {
   unsigned long ret;
-  __asm__ __volatile__("syscall"
+  void *gadget = get_syscall_gadget();
+  __asm__ __volatile__("call *%1"
                        : "=a"(ret)
-                       : "a"(n), "D"(a1), "S"(a2)
+                       : "r"(gadget), "a"(n), "D"(a1), "S"(a2)
                        : "rcx", "r11", "memory");
   return ret;
 }
 
 static inline long syscall3(long n, long a1, long a2, long a3) {
   unsigned long ret;
-  __asm__ __volatile__("syscall"
+  void *gadget = get_syscall_gadget();
+  __asm__ __volatile__("call *%1"
                        : "=a"(ret)
-                       : "a"(n), "D"(a1), "S"(a2), "d"(a3)
+                       : "r"(gadget), "a"(n), "D"(a1), "S"(a2), "d"(a3)
                        : "rcx", "r11", "memory");
   return ret;
 }
@@ -371,9 +389,11 @@ static inline long syscall3(long n, long a1, long a2, long a3) {
 static inline long syscall4(long n, long a1, long a2, long a3, long a4) {
   unsigned long ret;
   register long r10 __asm__("r10") = a4;
-  __asm__ __volatile__("syscall"
+  void *gadget = get_syscall_gadget();
+  __asm__ __volatile__("call *%1"
                        : "=a"(ret)
-                       : "a"(n), "D"(a1), "S"(a2), "d"(a3), "r"(r10)
+                       : "r"(gadget), "a"(n), "D"(a1), "S"(a2), "d"(a3),
+                         "r"(r10)
                        : "rcx", "r11", "memory");
   return ret;
 }
@@ -383,9 +403,11 @@ static inline long syscall5(long n, long a1, long a2, long a3, long a4,
   unsigned long ret;
   register long r10 __asm__("r10") = a4;
   register long r8 __asm__("r8") = a5;
-  __asm__ __volatile__("syscall"
+  void *gadget = get_syscall_gadget();
+  __asm__ __volatile__("call *%1"
                        : "=a"(ret)
-                       : "a"(n), "D"(a1), "S"(a2), "d"(a3), "r"(r10), "r"(r8)
+                       : "r"(gadget), "a"(n), "D"(a1), "S"(a2), "d"(a3),
+                         "r"(r10), "r"(r8)
                        : "rcx", "r11", "memory");
   return ret;
 }
@@ -396,10 +418,11 @@ static inline long syscall6(long n, long a1, long a2, long a3, long a4, long a5,
   register long r10 __asm__("r10") = a4;
   register long r8 __asm__("r8") = a5;
   register long r9 __asm__("r9") = a6;
-  __asm__ __volatile__("syscall"
+  void *gadget = get_syscall_gadget();
+  __asm__ __volatile__("call *%1"
                        : "=a"(ret)
-                       : "a"(n), "D"(a1), "S"(a2), "d"(a3), "r"(r10), "r"(r8),
-                         "r"(r9)
+                       : "r"(gadget), "a"(n), "D"(a1), "S"(a2), "d"(a3),
+                         "r"(r10), "r"(r8), "r"(r9)
                        : "rcx", "r11", "memory");
   return ret;
 }
