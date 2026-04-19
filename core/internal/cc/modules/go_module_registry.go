@@ -12,8 +12,10 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
-var moduleRunnersMu sync.RWMutex
-var autoRegisterBuiltInsOnce sync.Once
+var (
+	moduleRunnersMu          sync.RWMutex
+	autoRegisterBuiltInsOnce sync.Once
+)
 
 type builtInGoModuleMeta struct {
 	C2Cmd   string
@@ -159,4 +161,3 @@ func hasModuleRunner(name string) bool {
 	_, ok := ModuleRunners[name]
 	return ok
 }
-

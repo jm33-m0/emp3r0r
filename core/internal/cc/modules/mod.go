@@ -12,10 +12,8 @@ import (
 	"github.com/lithammer/fuzzysearch/fuzzy"
 )
 
-var (
-	// ModuleRunners a map of module helpers
-	ModuleRunners = make(map[string]func(ctx *context.C2Context))
-)
+// ModuleRunners a map of module helpers
+var ModuleRunners = make(map[string]func(ctx *context.C2Context))
 
 // UpdateOptions reads options from modules config, and set default values
 func UpdateOptions(modName string) (exist bool) {

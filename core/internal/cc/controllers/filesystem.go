@@ -99,4 +99,3 @@ func BuildNetHelperCommand() string {
 func BuildSuicideCommand() string {
 	return "suicide"
 }
-
