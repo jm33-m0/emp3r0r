@@ -27,6 +27,7 @@ required_go_version="1.26.2"
 required_free_kb=$((10 * 1024 * 1024))
 # Set EMP3R0R_DISABLE_GARBLE=1 to use plain go build for non-debug builds.
 disable_garble="${EMP3R0R_DISABLE_GARBLE:-0}"
+operator_bundle_name="emp3r0r-operator-kit.tar.zst"
 
 # build and tar
 temp=$(mktemp -d -t emp3r0r-build-XXXXXXXXXX) || error "Failed to create temporary directory"
@@ -89,6 +90,51 @@ check_zig() {
   else
     info "zig is already installed"
   fi
+}
+
+find_installed_prefix() {
+  local detected_prefix="$prefix"
+  if [[ ! -x "$detected_prefix/lib/emp3r0r/emp3r0r-cc" ]]; then
+    for candidate in "/usr/local" "/usr"; do
+      if [[ -x "$candidate/lib/emp3r0r/emp3r0r-cc" ]]; then
+        detected_prefix="$candidate"
+        break
+      fi
+    done
+  fi
+
+  [[ -x "$detected_prefix/lib/emp3r0r/emp3r0r-cc" ]] || error "emp3r0r is not installed. Please run --install on the C2 server first"
+  echo "$detected_prefix"
+}
+
+package_operator_bundle() {
+  local installed_prefix
+  installed_prefix="$(find_installed_prefix)"
+  info "Using installed files from $installed_prefix"
+
+  local -a tar_paths
+  tar_paths+=("${installed_prefix#/}/bin/emp3r0r")
+  tar_paths+=("${installed_prefix#/}/lib/emp3r0r/emp3r0r-cc")
+  tar_paths+=("${installed_prefix#/}/lib/emp3r0r/emp3r0r-cat")
+
+  local dir
+  for dir in build modules tmux; do
+    if [[ -d "$installed_prefix/lib/emp3r0r/$dir" ]]; then
+      tar_paths+=("${installed_prefix#/}/lib/emp3r0r/$dir")
+    else
+      warn "$installed_prefix/lib/emp3r0r/$dir not found; operator package may be incomplete"
+    fi
+  done
+
+  # Create a tarball of the installed tree only.
+  tar --zstd -cpf "$pwd/$operator_bundle_name" -C / "${tar_paths[@]}" || error "failed to create operator package"
+
+  success "Created portable operator package: $pwd/$operator_bundle_name"
+  success "Next steps:"
+  success "  1. Transfer: $operator_bundle_name" to your local machine or operator environment
+  success "  2. Install: sudo tar --zstd -xpf $operator_bundle_name -C /"
+  success "  3. Capabilities: sudo setcap cap_net_admin=eip /usr/local/lib/emp3r0r/emp3r0r-cc"
+  success "  4. Run emp3r0r server, copy and paste the command from the output to your operator environment"
 }
 
 build_agent_pure() {
@@ -503,22 +549,34 @@ case "$1" in
   ;;
 
 --install-only) # install from the release, skipping build
-  (do_install) || error "install failed"
+  if do_install; then
+    package_operator_bundle
+    exit 0
+  fi
+  error "install failed"
   exit 0
 
   ;;
 
 --install)
   if build && prepare_misc_files && do_install; then
+    package_operator_bundle
     exit 0
   fi
   error "install failed"
 
   ;;
 
+--package-operator)
+  package_operator_bundle
+  exit 0
+
+  ;;
+
 *)
   warn "Usage: $0 [--build|--release|--debug|--install|--uninstall]"
   warn "Env: EMP3R0R_DISABLE_GARBLE=1 disables garble for non-debug builds (including --install)"
+  warn "Extra: --package-operator builds a portable operator package from an existing install"
 
   ;;
 

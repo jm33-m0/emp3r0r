@@ -211,6 +211,47 @@ func getTransport(transportStr string) string {
 	}
 }
 
+func valueOrUnset(value string) string {
+	if value == "" {
+		return "unset"
+	}
+	return value
+}
+
+func formatRouteSummary() string {
+	routes := live.RuntimeConfig.C2Routes
+	return fmt.Sprintf("checkin=%s msg=%s ftp=%s www=%s proxy=%s",
+		valueOrUnset(routes.Checkin),
+		valueOrUnset(routes.Msg),
+		valueOrUnset(routes.FTP),
+		valueOrUnset(routes.WWW),
+		valueOrUnset(routes.Proxy),
+	)
+}
+
+func formatBannerSummary() string {
+	return fmt.Sprintf(
+		"Config: mode=%s http=%s c2=%s kcp=%s\n"+
+			"Routes: %s\n"+
+			"Paths: prefix=%s data=%s workspace=%s log=%s\n"+
+			"Server: %s\n"+
+			"Operator: %s\n"+
+			"Server Key: %s",
+		valueOrUnset(live.RuntimeConfig.C2ChannelMode),
+		valueOrUnset(live.RuntimeConfig.CCHTTPPort),
+		valueOrUnset(live.RuntimeConfig.CCPort),
+		valueOrUnset(live.RuntimeConfig.KCPServerPort),
+		formatRouteSummary(),
+		valueOrUnset(live.Prefix),
+		valueOrUnset(live.EmpDataDir),
+		valueOrUnset(live.EmpWorkSpace),
+		valueOrUnset(live.EmpLogFile),
+		valueOrUnset(ServerIP),
+		valueOrUnset(OperatorAddr),
+		valueOrUnset(ServerKey),
+	)
+}
+
 // CliBanner prints banner
 func CliBanner(console *console.Console) {
 	const logo string = `
@@ -237,19 +278,12 @@ func CliBanner(console *console.Console) {
 	}
 	name_list := strings.Join(c2_names, ", ")
 
-	say, encodingErr := cow.Say(fmt.Sprintf("Welcome! You are using emp3r0r %s,\n"+
-		"C2: *:%s,\n"+
-		"KCP: *:%s,\n"+
+	say, encodingErr := cow.Say(fmt.Sprintf("Welcome! You are using emp3r0r %s\n"+
 		"C2 Names: %s\n"+
-		"Server: %s (%s)\n"+
-		"Server Key: %s",
+		"%s",
 		def.Version,
-		live.RuntimeConfig.CCPort,
-		live.RuntimeConfig.KCPServerPort,
 		name_list,
-		OperatorAddr,
-		ServerIP,
-		ServerKey,
+		formatBannerSummary(),
 	))
 	if encodingErr != nil {
 		logging.Fatalf("CowSay: %v", encodingErr)

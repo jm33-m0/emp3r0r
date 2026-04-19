@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	terminal "golang.org/x/term"
@@ -134,7 +135,7 @@ func TmuxInitWindows() (err error) {
 	}
 
 	// Agent output
-	OutputPane, err = new_pane("Output", "Saving to emp3r0r.log...\n", "h", "", 50)
+	OutputPane, err = new_pane("Output", fmt.Sprintf("Saving to %s...\n", live.EmpLogFile), "h", "", 50)
 	if err != nil {
 		return
 	}
