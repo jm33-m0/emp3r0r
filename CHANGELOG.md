@@ -1,5 +1,21 @@
 # Changelog
 
+## [3.23.0](https://github.com/jm33-m0/emp3r0r/compare/v3.22.1...v3.23.0) (2026-04-19)
+
+
+### Features
+
+* implement indirect syscalls via vDSO gadget resolution to evade eBPF-based monitoring ([3c3eeb5](https://github.com/jm33-m0/emp3r0r/commit/3c3eeb5c9bce2e02ee0f65628c242c752fd97b4e))
+* implement XOR encryption for staged blobs ([ec44e99](https://github.com/jm33-m0/emp3r0r/commit/ec44e99e54efb3085d2d8a1f7c5641140ad7f331))
+* refactor `shellcode_stager` to 3 stages, significantly reducing stage0 size ([c4fe763](https://github.com/jm33-m0/emp3r0r/commit/c4fe76356e5bf6affaa4f3fb15ce71c8cba0e13d))
+
+
+### Bug Fixes
+
+* allocate stack via alloca to stay within valid VMA ([ee6d4c4](https://github.com/jm33-m0/emp3r0r/commit/ee6d4c4bb01367afc6d3d568dab9a60acb7b703b))
+* improve memory reallocation logic in shellcode stager downloader ([2a3a257](https://github.com/jm33-m0/emp3r0r/commit/2a3a257de9c6fd62d7642c3120969460e98a6c98))
+* install `garble` from `master` branch to include latest fixes ([94704c1](https://github.com/jm33-m0/emp3r0r/commit/94704c1c98875daa263be0b0d5672fd839ea334c))
+
 ## [3.22.1](https://github.com/jm33-m0/emp3r0r/compare/v3.22.0...v3.22.1) (2026-02-25)
 
 
