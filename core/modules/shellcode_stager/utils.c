@@ -63,19 +63,33 @@ void *realloc(void *ptr, size_t size) {
   uint8_t *real_ptr = (uint8_t *)ptr - sizeof(size_t);
   size_t old_size = *(size_t *)real_ptr;
 
-  // If new size is smaller, we could just shrink, but mmap doesn't support
-  // shrinking easily without mremap. For simplicity, we'll alloc new and copy.
+  size_t old_total = old_size + sizeof(size_t);
+  size_t new_total = size + sizeof(size_t);
 
-  void *new_ptr = malloc(size);
-  if (!new_ptr)
-    return NULL;
+  size_t page_size = 4096;
+  size_t old_aligned = (old_total + page_size - 1) & ~(page_size - 1);
+  size_t new_aligned = (new_total + page_size - 1) & ~(page_size - 1);
 
-  size_t copy_size = old_size < size ? old_size : size;
-  memcpy(new_ptr, ptr, copy_size);
+  if (old_aligned == new_aligned) {
+    *(size_t *)real_ptr = size;
+    return ptr;
+  }
 
-  free(ptr);
+  long ret = syscall6(SYS_mremap, (long)real_ptr, old_aligned, new_aligned,
+                      1 /* MREMAP_MAYMOVE */, 0, 0);
+  if (ret < 0 || ret == -1) {
+    void *new_ptr = malloc(size);
+    if (!new_ptr)
+      return NULL;
+    size_t copy_size = old_size < size ? old_size : size;
+    memcpy(new_ptr, ptr, copy_size);
+    free(ptr);
+    return new_ptr;
+  }
 
-  return new_ptr;
+  uint8_t *new_real_ptr = (uint8_t *)ret;
+  *(size_t *)new_real_ptr = size;
+  return new_real_ptr + sizeof(size_t);
 }
 
 // -----------------------------------------------------------------------------
@@ -252,18 +266,19 @@ void debug_print(const char *format, ...) {
         int is_hex = (*fmt == 'x' || *fmt == 'p');
         int is_signed = (*fmt == 'd');
         if (is_signed) {
-            // check for %lld or %ld
-            if (fmt > format && *(fmt - 1) == 'l') {
-                is_signed = 0; // treat as unsigned for simplification or add long support
-                if (fmt > format + 1 && *(fmt - 2) == 'l') {
-                    // %lld
-                }
+          // check for %lld or %ld
+          if (fmt > format && *(fmt - 1) == 'l') {
+            is_signed =
+                0; // treat as unsigned for simplification or add long support
+            if (fmt > format + 1 && *(fmt - 2) == 'l') {
+              // %lld
             }
+          }
         }
-        
+
         if (*fmt == 'p')
           u = (unsigned long)va_arg(args, void *);
-        else if (*(fmt-1) == 'l')
+        else if (*(fmt - 1) == 'l')
           u = va_arg(args, unsigned long);
         else
           u = (unsigned long)va_arg(args, unsigned int);
