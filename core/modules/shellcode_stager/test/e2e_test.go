@@ -470,14 +470,9 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 	logging.Infof("Stage 1 loader size: %d bytes", len(finalLoaderBytes))
 
 	// Start Stager Listener after make so loader.bin is available.
-	if err := os.Setenv("EMP3R0R_STAGE1_LOADER", loaderBinFromBuild); err != nil {
-		t.Fatalf("Failed to set EMP3R0R_STAGE1_LOADER: %v", err)
-	}
-	defer os.Unsetenv("EMP3R0R_STAGE1_LOADER")
-
 	go func() {
 		// Serve patched agent as Stage 2 payload; listener prepends Stage 1 loader.bin
-		err := listener.HTTPAESCompressedListener(patchedAgentPath, stagerPortStr, stagerKey, true)
+		err := listener.HTTPAESCompressedListener(patchedAgentPath, stagerPortStr, stagerKey, true, loaderBinFromBuild)
 		if err != nil {
 			logging.Errorf("Stager listener failed: %v", err)
 		}
