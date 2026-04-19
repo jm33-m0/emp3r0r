@@ -21,8 +21,9 @@ var (
 // port: the port to serve the stager file on.
 // keyStr: the passphrase to encrypt the stager file.
 // compression: whether to compress the stager file before encryption.
-func TCPAESCompressedListener(stagerPath string, port string, keyStr string, compression bool) error {
-	blob, err := buildServedBlob(stagerPath, keyStr, compression)
+// loaderPath: optional path to stage1 loader (empty string if not used).
+func TCPAESCompressedListener(stagerPath string, port string, keyStr string, compression bool, loaderPath string) error {
+	blob, err := buildServedBlob(stagerPath, keyStr, loaderPath, compression)
 	if err != nil {
 		return err
 	}
@@ -91,8 +92,9 @@ func TCPBareListener(stagerPath string, port string) error {
 // port: the port to serve the stager file on.
 // keyStr: the passphrase to encrypt the stager file.
 // compression: whether to compress the stager file before encryption.
-func UDPAESCompressedListener(stagerPath string, port string, keyStr string, compression bool) error {
-	blob, err := buildServedBlob(stagerPath, keyStr, compression)
+// loaderPath: optional path to stage1 loader (empty string if not used).
+func UDPAESCompressedListener(stagerPath string, port string, keyStr string, compression bool, loaderPath string) error {
+	blob, err := buildServedBlob(stagerPath, keyStr, loaderPath, compression)
 	if err != nil {
 		return err
 	}

