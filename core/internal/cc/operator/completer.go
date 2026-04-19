@@ -115,6 +115,30 @@ func listRemoteDir(ctx carapace.Context) carapace.Action {
 		dir_to_list = "/"
 	}
 
+	// Handle memfs paths: if user typed mem:// or mem:///, we need to preserve that
+	// ctx.Parts might be ["mem:", ""] for "mem:/" or ["mem:", "", ""] for "mem://"
+	// We want to reconstruct the proper mem:// prefix
+	if len(ctx.Parts) > 0 && strings.HasPrefix(ctx.Parts[0], "mem") {
+		// Reconstruct as mem:// + rest of path
+		restParts := ctx.Parts[1:]
+		if len(restParts) == 0 || (len(restParts) == 1 && restParts[0] == "") {
+			dir_to_list = "mem://"
+		} else {
+			// Remove empty parts and rejoin
+			var nonEmpty []string
+			for _, part := range restParts {
+				if part != "" {
+					nonEmpty = append(nonEmpty, part)
+				}
+			}
+			if len(nonEmpty) == 0 {
+				dir_to_list = "mem://"
+			} else {
+				dir_to_list = "mem:///" + strings.Join(nonEmpty, "/")
+			}
+		}
+	}
+
 	cwd, listing := listRemoteDirWorker(dir_to_list, activeAgent.Tag)
 	cache := &RemoteDirListingCache{
 		CWD:     cwd,

