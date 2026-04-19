@@ -2,6 +2,11 @@
 #include "syscalls.h"
 #include <stdarg.h>
 
+/* Single shared instance of the syscall gadget cache.
+ * Initialized to non-zero to force placement in .data (not .bss).
+ * See syscalls.h for the extern declaration. */
+void *_cached_syscall_gadget __attribute__((visibility("hidden"))) = (void *)1;
+
 // -----------------------------------------------------------------------------
 // Memory Management (Stateless mmap-based allocator)
 // -----------------------------------------------------------------------------

