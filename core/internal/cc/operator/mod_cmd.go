@@ -64,10 +64,8 @@ func addModuleCommands(rootCmd *cobra.Command) {
 			}
 			cmd.Flags().String(opt.Name, opt.Val, help)
 			if len(opt.Vals) > 0 {
-				flagActions[opt.Name] = carapace.ActionCallback(func(ctx carapace.Context) carapace.Action {
-					live.ActiveModule = mod
-					return listValChoices(ctx)
-				})
+				vals := append([]string(nil), opt.Vals...)
+				flagActions[opt.Name] = carapace.ActionValues(vals...)
 			}
 		}
 		if len(flagActions) > 0 {
@@ -79,7 +77,6 @@ func addModuleCommands(rootCmd *cobra.Command) {
 }
 
 func runModuleByName(cmd *cobra.Command, modName string) {
-
 	modules.SetActiveModule(modName)
 	if live.ActiveModule == nil {
 		logging.Errorf("No such module: %s", modName)
