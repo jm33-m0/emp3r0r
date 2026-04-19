@@ -129,15 +129,15 @@ func C2Commands() *cobra.Command {
 	listenerCmd := &cobra.Command{
 		Use:     def.C2CmdListener,
 		Short:   "Start a listener",
-		Example: "!listener --listener <listener> --port <port> --payload <payload> --compression <on/off> --passphrase <passphrase>",
+		Example: "!listener --type <http/tcp/udp> --port <port> --stager <path> --key <key> [--loader <path>]",
 		GroupID: "generic",
 		Run:     runListener,
 	}
-	listenerCmd.Flags().StringP("listener", "l", "http_aes_compressed", "Listener type: http_aes_compressed, tcp_aes_compressed, udp_aes_compressed")
-	listenerCmd.Flags().StringP("port", "p", "8000", "Port")
-	listenerCmd.Flags().StringP("payload", "P", "", "Payload")
-	listenerCmd.Flags().StringP("compression", "c", "on", "Compression (on/off)")
-	listenerCmd.Flags().StringP("passphrase", "s", "my_secret_key", "Passphrase")
+	listenerCmd.Flags().StringP("type", "t", "http", "Listener type: http, tcp, or udp")
+	listenerCmd.Flags().StringP("port", "p", "8080", "Port")
+	listenerCmd.Flags().StringP("stager", "s", "", "Path to stager payload")
+	listenerCmd.Flags().StringP("key", "k", "my_secret_key", "Encryption key for stager")
+	listenerCmd.Flags().StringP("loader", "l", "", "Optional path to loader.bin for stage-1 prepend")
 	rootCmd.AddCommand(listenerCmd)
 
 	// C2 File Server command

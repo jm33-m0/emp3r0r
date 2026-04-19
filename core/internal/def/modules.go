@@ -211,29 +211,29 @@ func populateModules() {
 			Path:     "",
 			Fileless: true,
 			Options: ModOptions{
-				"payload": &ModOption{
-					Name: "payload",
-					Desc: "The payload to serve, eg. ./stager",
-				},
-				"listener": &ModOption{
-					Name: "listener",
-					Desc: "Listener type: http_aes_compressed, tcp_aes_compressed, udp_aes_compressed",
-					Val:  "http_aes_compressed",
-					Vals: []string{"http_aes_compressed", "tcp_aes_compressed", "udp_aes_compressed"},
+				"stager": &ModOption{
+					Name: "stager",
+					Desc: "Path to the stager file to serve, eg. ./stager",
 				},
 				"port": &ModOption{
 					Name: "port",
 					Desc: "Port to listen on, eg. 8080",
+					Val:  "8080",
 				},
-				"compression": &ModOption{
-					Name: "compression",
-					Desc: "Compression algorithm, eg. on, off",
-					Val:  "on",
-					Vals: []string{"on", "off"},
+				"key": &ModOption{
+					Name: "key",
+					Desc: "Key to encrypt the stager file",
+					Val:  "my_secret_key",
 				},
-				"passphrase": &ModOption{
-					Name: "passphrase",
-					Desc: "Passphrase for encryption",
+				"loader": &ModOption{
+					Name: "loader",
+					Desc: "Optional path to loader.bin to prepend before encrypted payload",
+				},
+				"type": &ModOption{
+					Name: "type",
+					Desc: "Listener type: http, tcp, or udp",
+					Val:  "http",
+					Vals: []string{"http", "tcp", "udp"},
 				},
 			},
 			AgentConfig: AgentModuleConfig{
