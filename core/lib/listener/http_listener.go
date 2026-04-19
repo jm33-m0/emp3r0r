@@ -110,23 +110,13 @@ func serveStager(stager_enc []byte, port string) error {
 // port: the port to serve the stager file on.
 // keyStr: the passpharase to encrypt the stager file.
 func HTTPAESCompressedListener(stagerPath string, port string, keyStr string, compression bool) error {
-	stager, err := os.ReadFile(stagerPath)
+	blob, err := buildServedBlob(stagerPath, keyStr, compression)
 	if err != nil {
-		return fmt.Errorf("failed to read stager file: %v", err)
+		return err
 	}
-
-	key := deriveKeyFromString(keyStr)
-
-	var toEncrypt []byte
-	if compression {
-		toEncrypt = compressData(stager)
-	} else {
-		toEncrypt = stager
-	}
-	encryptedStager := encryptData(toEncrypt, key)
 
 	logging.Infof("Serving encrypted stager file on port %s", port)
-	return serveStager(encryptedStager, port)
+	return serveStager(blob, port)
 }
 
 // HTTPBareListener serves the stager file over HTTP without any encryption or compression.

