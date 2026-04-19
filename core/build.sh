@@ -62,7 +62,7 @@ build_agent_pure() {
 
   local win_gui_flag=""
   [[ "$arg1" != "--debug" ]] && [[ "$os" == "windows" ]] && win_gui_flag="-H=windowsgui "
-  
+
   # Add extra extldflags if provided
   local current_ldflags="$ldflags"
   if [[ -n "$extra_extldflags" ]]; then
@@ -111,7 +111,7 @@ build_agent_cgo() {
     extldflags="-s"
   fi
   [[ "$arg1" != "--debug" ]] && extldflags="$extldflags -s"
-  
+
   # Append extra extldflags if provided
   if [[ -n "$extra_extldflags" ]]; then
     extldflags="$extldflags $extra_extldflags"
@@ -199,7 +199,7 @@ build() {
     build_opt="-tiny -seed=random build"
     ldflags+=" -s -w"
     info "Setting up garble"
-    go install mvdan.cc/garble@latest || error "Failed to install garble"
+    go install mvdan.cc/garble@master || error "Failed to install garble"
   fi
 
   info "Building CC"
@@ -225,11 +225,11 @@ build() {
   build_agent_cgo "386" "linux" "stub-386" "$pie_flags" "$ext_pie"
   build_agent_pure "arm" "linux" "stub-arm"
   build_agent_cgo "arm64" "linux" "stub-arm64" "$pie_flags" "$ext_pie"
-  
+
   # MIPS often has issues with PIE, keep static for now unless explicitly requested or tested
-  build_agent_pure "mips" "linux" "stub-mips" 
+  build_agent_pure "mips" "linux" "stub-mips"
   build_agent_pure "mips64" "linux" "stub-mips64"
-  
+
   build_agent_cgo "riscv64" "linux" "stub-riscv64" "$pie_flags" "$ext_pie"
   build_agent_pure "ppc64" "linux" "stub-ppc64"
 
