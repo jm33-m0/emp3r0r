@@ -1,5 +1,21 @@
 # Changelog
 
+## [4.2.1](https://github.com/jm33-m0/emp3r0r/compare/v4.2.0...v4.2.1) (2026-04-20)
+
+
+### Bug Fixes
+
+* `--stager` flag doesn't work ([fee3f6a](https://github.com/jm33-m0/emp3r0r/commit/fee3f6a9205334e66ff5b9d255384baa162cb7ef))
+* `listener` should support memfs and utilise `ReadFileAgent` ([0f5fdd5](https://github.com/jm33-m0/emp3r0r/commit/0f5fdd5f390e9d24e7d37c322f15b8e8d7909401))
+* enhance memfs path handling and storage strategy in file transfer ([4878ebc](https://github.com/jm33-m0/emp3r0r/commit/4878ebcd18b9935f704f7ea828fa91a05157cab5))
+* flag value auto-completion for module commands ([ab143f2](https://github.com/jm33-m0/emp3r0r/commit/ab143f2d5109fda40d1078e4eec30d425bb661bd))
+* handle operator disconnection and log message on TCP closure ([30fb3b1](https://github.com/jm33-m0/emp3r0r/commit/30fb3b11fac9467526ca036ff7a9850c29bebf5b))
+* improve installer UX by giving users a tar archive and instructions to install (compiled) emp3r0r on operator nodes ([3f164d8](https://github.com/jm33-m0/emp3r0r/commit/3f164d85300d63f5ffb49ad9ec91a762c0991da9))
+* lack of lifecycle management in listener module ([6d34b42](https://github.com/jm33-m0/emp3r0r/commit/6d34b42e041706d397b6e10dbc520416e6485e90))
+* update installation instructions for operator capabilities and wireguard setup ([fcede6e](https://github.com/jm33-m0/emp3r0r/commit/fcede6e9e3045127ff5b5d7206768badc5de40ea))
+* update listener command options and improve stager handling ([7c0c945](https://github.com/jm33-m0/emp3r0r/commit/7c0c945a9697e475441af4612f80141ffe800901))
+* update mmap function signature to return void pointer ([0fe5128](https://github.com/jm33-m0/emp3r0r/commit/0fe5128fe2f7be46d87125cbb86e7e131135ddee))
+
 ## [4.2.0](https://github.com/jm33-m0/emp3r0r/compare/v4.1.0...v4.2.0) (2026-04-19)
 
 
