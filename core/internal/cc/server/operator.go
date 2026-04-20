@@ -548,6 +548,9 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 	// receiving heartbeats from the operator
 	for {
 		select {
+		case <-readDone:
+			logging.Infof("Operator %s disconnected (TCP connection closed)", operator_session)
+			return
 		case <-heartbeatTicker.C:
 			// If no heartbeat received in the last minute, close the connection
 			if !timeoutTimer.Stop() {
