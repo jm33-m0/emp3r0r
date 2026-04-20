@@ -128,11 +128,12 @@ func C2Commands() *cobra.Command {
 	// C2 Listener command
 	listenerCmd := &cobra.Command{
 		Use:     def.C2CmdListener,
-		Short:   "Start a listener",
-		Example: "!listener --type <http/tcp/udp> --port <port> --stager <path> --key <key> [--loader <path>]",
+		Short:   "Manage listeners (start/list/stop)",
+		Example: "!listener --action start --type <http/tcp/udp> --port <port> --stager <path> --key <key> [--loader <path>]\n!listener --action list\n!listener --action stop --type <http/tcp/udp> [--port <port>]",
 		GroupID: "generic",
 		Run:     runListener,
 	}
+	listenerCmd.Flags().StringP("action", "a", "start", "Action: start, list, or stop")
 	listenerCmd.Flags().StringP("type", "t", "http", "Listener type: http, tcp, or udp")
 	listenerCmd.Flags().StringP("port", "p", "8080", "Port")
 	listenerCmd.Flags().StringP("stager", "s", "", "Path to stager payload")

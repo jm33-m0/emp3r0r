@@ -2,13 +2,12 @@ package listener
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 	"os"
 	"sync"
 	"time"
-
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 var (
@@ -32,14 +31,20 @@ func TCPAESCompressedListener(stagerPath string, port string, keyStr string, com
 	if err != nil {
 		return fmt.Errorf("failed to start TCP listener: %v", err)
 	}
+	registerTCPListener(port, listener)
 	defer listener.Close()
+	defer unregisterTCPListener(port)
 
-	logging.Infof("TCP listener started on port %s", port)
+	listenerLogf("TCP listener started on port %s", port)
 
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			logging.Infof("Failed to accept connection: %v", err)
+			if errors.Is(err, net.ErrClosed) {
+				listenerLogf("TCP listener on port %s stopped", port)
+				return nil
+			}
+			listenerLogf("Failed to accept connection: %v", err)
 			continue
 		}
 
@@ -49,16 +54,16 @@ func TCPAESCompressedListener(stagerPath string, port string, keyStr string, com
 
 func handleTCPConnection(conn net.Conn, data []byte) {
 	defer conn.Close()
-	logging.Infof("TCP connection from %s", conn.RemoteAddr())
+	listenerLogf("TCP connection from %s", conn.RemoteAddr())
 
 	// Send the encrypted data
 	_, err := conn.Write(data)
 	if err != nil {
-		logging.Infof("Failed to send data to %s: %v", conn.RemoteAddr(), err)
+		listenerLogf("Failed to send data to %s: %v", conn.RemoteAddr(), err)
 		return
 	}
 
-	logging.Infof("Sent %d bytes to %s", len(data), conn.RemoteAddr())
+	listenerLogf("Sent %d bytes to %s", len(data), conn.RemoteAddr())
 }
 
 // TCPBareListener serves the stager file over raw TCP without encryption or compression.
@@ -74,12 +79,15 @@ func TCPBareListener(stagerPath string, port string) error {
 	}
 	defer listener.Close()
 
-	logging.Infof("TCP listener (bare) started on port %s", port)
+	listenerLogf("TCP listener (bare) started on port %s", port)
 
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			logging.Infof("Failed to accept connection: %v", err)
+			if errors.Is(err, net.ErrClosed) {
+				return nil
+			}
+			listenerLogf("Failed to accept connection: %v", err)
 			continue
 		}
 
@@ -110,9 +118,11 @@ func UDPAESCompressedListener(stagerPath string, port string, keyStr string, com
 	if err != nil {
 		return fmt.Errorf("failed to start UDP listener: %v", err)
 	}
+	registerUDPListener(port, conn)
 	defer conn.Close()
+	defer unregisterUDPListener(port)
 
-	logging.Infof("UDP listener started on port %s", port)
+	listenerLogf("UDP listener started on port %s", port)
 
 	// Calculate key hash for authentication
 	keyHash := uint32(0)
@@ -124,7 +134,11 @@ func UDPAESCompressedListener(stagerPath string, port string, keyStr string, com
 	for {
 		n, remoteAddr, err := conn.ReadFromUDP(buffer)
 		if err != nil {
-			logging.Infof("Failed to read from UDP: %v", err)
+			if errors.Is(err, net.ErrClosed) {
+				listenerLogf("UDP listener on port %s stopped", port)
+				return nil
+			}
+			listenerLogf("Failed to read from UDP: %v", err)
 			continue
 		}
 
@@ -141,7 +155,7 @@ func UDPAESCompressedListener(stagerPath string, port string, keyStr string, com
 			}
 			receivedHash := binary.LittleEndian.Uint32(payload[:4])
 			if receivedHash == keyHash {
-				logging.Infof("Authenticated request from %s", remoteAddr)
+				listenerLogf("Authenticated request from %s", remoteAddr)
 
 				udpSessionsMutex.Lock()
 				if _, exists := udpSessions[remoteAddr.String()]; !exists {
@@ -151,7 +165,7 @@ func UDPAESCompressedListener(stagerPath string, port string, keyStr string, com
 				}
 				udpSessionsMutex.Unlock()
 			} else {
-				logging.Infof("Authentication failed from %s (hash mismatch)", remoteAddr)
+				listenerLogf("Authentication failed from %s (hash mismatch)", remoteAddr)
 			}
 		} else if packetType == 0x01 { // ACK
 			if len(payload) < 4 {
@@ -204,7 +218,7 @@ func handleUDPConnection(conn *net.UDPConn, addr *net.UDPAddr, data []byte, ackC
 		for retryCount < maxRetries {
 			_, err := conn.WriteToUDP(packet, addr)
 			if err != nil {
-				logging.Infof("Failed to send UDP chunk to %s: %v", addr, err)
+				listenerLogf("Failed to send UDP chunk to %s: %v", addr, err)
 				return
 			}
 
@@ -221,7 +235,7 @@ func handleUDPConnection(conn *net.UDPConn, addr *net.UDPAddr, data []byte, ackC
 				retryCount++
 			}
 		}
-		logging.Infof("Max retries reached for packet %d to %s", i, addr)
+		listenerLogf("Max retries reached for packet %d to %s", i, addr)
 		return
 
 	NextPacket:
@@ -239,7 +253,7 @@ func handleUDPConnection(conn *net.UDPConn, addr *net.UDPAddr, data []byte, ackC
 		case ackSeq := <-ackChan:
 			if ackSeq == uint32(totalPackets) {
 				timeout.Stop()
-				logging.Infof("Sent %d bytes to %s (Completed)", len(data), addr)
+				listenerLogf("Sent %d bytes to %s (Completed)", len(data), addr)
 				return
 			}
 		case <-timeout.C:

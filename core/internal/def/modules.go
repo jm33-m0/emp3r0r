@@ -211,6 +211,12 @@ func populateModules() {
 			Path:     "",
 			Fileless: true,
 			Options: ModOptions{
+				"action": &ModOption{
+					Name: "action",
+					Desc: "Listener action: start, list, or stop",
+					Val:  "start",
+					Vals: []string{"start", "list", "stop"},
+				},
 				"stager": &ModOption{
 					Name: "stager",
 					Desc: "Path to the stager file to serve, eg. ./stager",
