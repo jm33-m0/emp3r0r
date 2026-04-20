@@ -133,7 +133,7 @@ package_operator_bundle() {
   success "Next steps:"
   success "  1. Transfer: $operator_bundle_name" to your local machine or operator environment
   success "  2. Install: sudo tar --zstd -xpf $operator_bundle_name -C /"
-  success "  3. Capabilities: sudo setcap cap_net_admin=eip /usr/local/lib/emp3r0r/emp3r0r-cc"
+  success "  3. Run once: sudo setcap cap_net_admin=eip /usr/local/lib/emp3r0r/emp3r0r-cc && sudo mkdir -p /var/run/wireguard && sudo chown -R \"\$(id -un):\$(id -gn)\" /var/run/wireguard"
   success "  4. Run emp3r0r server, copy and paste the command from the output to your operator environment"
 }
 
@@ -410,14 +410,7 @@ do_install() {
   cp -avfR "$temp"/cat.exe "$data_dir/emp3r0r-cat" || error "emp3r0r-cat"
 
   # set capabilities for cc
-  current_user="$SUDO_USER"
-  current_group=$(id -gn "$current_user")
-  if [[ -z "$current_user" ]] || [[ -z "$current_group" ]]; then
-    error "Failed to get current user and group"
-  fi
   setcap cap_net_admin=eip "$data_dir/emp3r0r-cc" || error "setcap"
-  # wireguard socket directory needs to be accessible by the user
-  sudo mkdir -p /var/run/wireguard && sudo chown -R "$current_user:$current_group" /var/run/wireguard
 
   # Auto-complete
   # Find a suitable zsh completion directory
@@ -460,6 +453,7 @@ do_install() {
   info "Restart your bash shell or run 'source /etc/bash_completion.d/emp3r0r'"
 
   success "Installed emp3r0r, please check"
+  success "Operator prep (run as the operator user): sudo setcap cap_net_admin=eip $data_dir/emp3r0r-cc && sudo mkdir -p /var/run/wireguard && sudo chown -R \"\$(id -un):\$(id -gn)\" /var/run/wireguard"
   if tmux has-session -t emp3r0r 2>/dev/null; then
     warn "emp3r0r is still running, stopping it in 3 seconds"
     sleep 3
