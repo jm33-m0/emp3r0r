@@ -275,12 +275,13 @@ func connectWg(opts *Options) {
 			},
 		},
 	}
+	logging.Infof("Connecting to C2 WireGuard server at %s:%d...", opts.c2_server_ip, opts.c2_server_port)
 	go func() {
 		_, err = netutil.WireGuardMain(wgConfig)
 		if err != nil {
-			logging.Fatalf("Connecting to C2 WireGuard server: %v", err)
+			logging.Fatalf("WireGuard connection error: %v", err)
 		}
-		logging.Successf("Connected to C2 WireGuard server at %s:%d", opts.c2_server_ip, opts.c2_server_port)
+		logging.Infof("WireGuard interface closed")
 	}()
 	time.Sleep(2 * time.Second)
 }

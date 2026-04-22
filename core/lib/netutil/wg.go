@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"time"
 
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
@@ -338,9 +339,11 @@ func configureInterface(name string, privateKey string, listenPort int, peers []
 				return fmt.Errorf("invalid peer public key: %w", err)
 			}
 
+			keepalive := 25 * time.Second
 			peerConfig := wgtypes.PeerConfig{
-				PublicKey:         pubKey,
-				ReplaceAllowedIPs: true,
+				PublicKey:                   pubKey,
+				ReplaceAllowedIPs:           true,
+				PersistentKeepaliveInterval: &keepalive,
 			}
 
 			// Parse endpoint
