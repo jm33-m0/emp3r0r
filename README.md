@@ -162,7 +162,7 @@ generate --type linux_executable --arch amd64 --cc your.domain.com \
 
 ### Payload Delivery
 
-- **Advanced Linux Stager**: 2K self-contained stage0 downloader; opsec focused; keeps the agent payload encrypted until execution; auto-restarts with jitter when connectivity requires.
+- **Advanced Linux Stager**: 1.5K self-contained stage0 downloader; opsec focused; keeps the agent payload encrypted until execution; auto-restarts with jitter when connectivity requires.
 - **Agent-Side Listener**: Deploy listeners on compromised hosts to serve payloads internally, bypassing slow C2 connections.
 - **Multi-stage delivery** for Linux and Windows with ELF/DLL/shellcode options.
 
