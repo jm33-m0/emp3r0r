@@ -453,7 +453,6 @@ do_install() {
   info "Restart your bash shell or run 'source /etc/bash_completion.d/emp3r0r'"
 
   success "Installed emp3r0r, please check"
-  success "Operator prep (run as the operator user): sudo setcap cap_net_admin=eip $data_dir/emp3r0r-cc && sudo mkdir -p /var/run/wireguard && sudo chown -R \"\$(id -un):\$(id -gn)\" /var/run/wireguard"
   if tmux has-session -t emp3r0r 2>/dev/null; then
     warn "emp3r0r is still running, stopping it in 3 seconds"
     sleep 3
