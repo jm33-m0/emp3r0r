@@ -1,5 +1,14 @@
 # Changelog
 
+## [4.2.2](https://github.com/jm33-m0/emp3r0r/compare/v4.2.1...v4.2.2) (2026-04-22)
+
+
+### Bug Fixes
+
+* enhance installation instructions for WireGuard setup and persist runtime directory ([3895476](https://github.com/jm33-m0/emp3r0r/commit/38954768808b5c6d0529a16f9c9228894ce2eaf9))
+* enhance WireGuard connection logging and add persistent keepalive interval ([008e5c0](https://github.com/jm33-m0/emp3r0r/commit/008e5c0a8505b004a7dda75bb1013efcc7a23feb))
+* improve operator disconnection handling ([458c05f](https://github.com/jm33-m0/emp3r0r/commit/458c05f218d2095972fdce818170494568f3e66b))
+
 ## [4.2.1](https://github.com/jm33-m0/emp3r0r/compare/v4.2.0...v4.2.1) (2026-04-20)
 
 
