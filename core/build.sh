@@ -131,9 +131,9 @@ package_operator_bundle() {
 
   success "Created portable operator package: $pwd/$operator_bundle_name"
   success "Next steps:"
-  success "  1. Transfer: $operator_bundle_name" to your local machine or operator environment
-  success "  2. Install: sudo tar --zstd -xpf $operator_bundle_name -C /"
-  success "  3. Run once: sudo setcap cap_net_admin=eip /usr/local/lib/emp3r0r/emp3r0r-cc && sudo mkdir -p /var/run/wireguard && sudo chown -R \"\$(id -un):\$(id -gn)\" /var/run/wireguard"
+  success "  1. Transfer to your operator environment: $operator_bundle_name"
+  success "  2. Install on your operator machine: sudo tar --zstd -xpf $operator_bundle_name -C /"
+  success "  3. Run once: sudo setcap cap_net_admin=eip /usr/local/lib/emp3r0r/emp3r0r-cc"
   success "  4. Run emp3r0r server, copy and paste the command from the output to your operator environment"
 }
 
