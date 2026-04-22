@@ -133,7 +133,7 @@ package_operator_bundle() {
   success "Next steps:"
   success "  1. Transfer to your operator environment: $operator_bundle_name"
   success "  2. Install on your operator machine: sudo tar --zstd -xpf $operator_bundle_name -C /"
-  success "  3. Run once: sudo setcap cap_net_admin=eip /usr/local/lib/emp3r0r/emp3r0r-cc"
+  success "  3. Run once: sudo setcap cap_net_admin=eip /usr/local/lib/emp3r0r/emp3r0r-cc && sudo mkdir -p /var/run/wireguard && sudo chown \$(id -un):\$(id -gn) /var/run/wireguard && echo \"d /var/run/wireguard 0755 \$(id -un) \$(id -gn)\" | sudo tee /etc/tmpfiles.d/emp3r0r-wireguard.conf"
   success "  4. Run emp3r0r server, copy and paste the command from the output to your operator environment"
 }
 
@@ -409,8 +409,16 @@ do_install() {
   cp -avfR "$temp"/cc.exe "$data_dir/emp3r0r-cc" || error "emp3r0r-cc"
   cp -avfR "$temp"/cat.exe "$data_dir/emp3r0r-cat" || error "emp3r0r-cat"
 
-  # set capabilities for cc
+  # set capabilities for cc and setup wireguard runtime dir
   setcap cap_net_admin=eip "$data_dir/emp3r0r-cc" || error "setcap"
+  mkdir -p /var/run/wireguard || error "mkdir wireguard"
+  chown "${SUDO_USER:-$USER}":"${SUDO_USER:-$USER}" /var/run/wireguard || error "chown wireguard"
+
+  # tmpfiles.d entry to persist the directory
+  if [[ -d "/etc/tmpfiles.d" ]]; then
+    local _user="${SUDO_USER:-$USER}"
+    echo "d /var/run/wireguard 0755 $_user $_user" >/etc/tmpfiles.d/emp3r0r-wireguard.conf
+  fi
 
   # Auto-complete
   # Find a suitable zsh completion directory
