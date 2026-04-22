@@ -534,16 +534,9 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 		<-readDone
 	}()
 
-	// Create a ticker to send heartbeat messages
-	heartbeatTicker := time.NewTicker(1 * time.Second)
-	defer heartbeatTicker.Stop()
-
-	// Create a timeout timer for 1 minute (60 seconds)
-	timeoutTimer := time.NewTimer(1 * time.Minute)
-	defer timeoutTimer.Stop()
-
-	// Channel to track the latest heartbeat
-	heartbeatCh := make(chan struct{})
+	// Create a ticker to send keepalive pings
+	pingTicker := time.NewTicker(10 * time.Second)
+	defer pingTicker.Stop()
 
 	// receiving heartbeats from the operator
 	for {
@@ -551,20 +544,17 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 		case <-readDone:
 			logging.Infof("Operator %s disconnected (TCP connection closed)", operator_session)
 			return
-		case <-heartbeatTicker.C:
-			// If no heartbeat received in the last minute, close the connection
-			if !timeoutTimer.Stop() {
-				<-timeoutTimer.C
-				logging.Warningf("Operator %s heartbeat timeout, closing connection", operator_session)
+		case <-pingTicker.C:
+			// Send WebSocket ping to detect silent disconnections
+			pingCtx, pingCancel := context.WithTimeout(ctx, 5*time.Second)
+			err := wsConn.Ping(pingCtx)
+			pingCancel()
+			if err != nil {
+				logging.Warningf("Operator %s ping timeout/error, closing connection: %v", operator_session, err)
 				conn.Close()
 				cancel()
 				return
 			}
-			// Reset the timeout timer after receiving a heartbeat
-			timeoutTimer.Reset(1 * time.Minute)
-		case <-heartbeatCh:
-			// Heartbeat received, reset the timeout
-			timeoutTimer.Reset(1 * time.Minute)
 		case <-ctx.Done():
 			logging.Warningf("handleOperatorConn exited")
 			return
