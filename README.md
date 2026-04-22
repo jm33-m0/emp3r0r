@@ -20,7 +20,7 @@
 
 ---
 
-<img width="2560" height="1392" alt="image" src="https://github.com/user-attachments/assets/4ce74add-695f-4572-9a19-b6954856c73f" />
+<img width="2560" height="1392" alt="image" src="https://github.com/user-attachments/assets/264e7752-aef6-4451-aca6-db29b1d45f78" />
 
 ## What is emp3r0r?
 
@@ -42,13 +42,13 @@ Every C2 session uses **ECDH key exchange** with **HKDF-derived session keys**. 
 
 ### 🕸️ Peer-to-Peer (P2P) Mesh Network
 
-Agents in isolated network segments **autonomously discover and tunnel through internet-connected peers** via a gossip-based (memberlist) mesh network. The mesh hop transport is **pluggable**: the default is `mtls` — camouflage mTLS 1.3 using ephemeral, malleable certificates — with `kcp` (reliable UDP) also available. All hops are further wrapped in AES-GCM end-to-end encryption.
+Agents in isolated network segments **autonomously discover and tunnel through internet-connected peers** via a gossip-based (memberlist) mesh network. The mesh hop transport is **pluggable**: the default is `mtls` — camouflage mTLS 1.3 using ephemeral, malleable certificates — with `kcp` (reliable UDP) also available. All hops are further wrapped in AES-GCM end-to-end encryption. **No unnecessary noise** in your C2 infrastructure: agents connect to each other instead of C2 server; **no broadcasting**; configurable bootstrap peers allowing granular control.
 
 **Why this matters:** Manual pivoting requires constant operator intervention and breaks when intermediate hosts fail. emp3r0r's agents automatically form redundant communication paths, ensuring persistence through resilient peer discovery and relay.
 
 ### 🚪 Bring2CC: Reverse Tunneling for Isolated Targets
 
-When agents **cannot** make outbound connections, **Bring2CC** reverse-proxies them back to the C2 server using SSH + KCP tunneling. This inverts the connection model: instead of the C2 reaching into the network, isolated targets are tunneled out to the C2 infrastructure.
+When agents **cannot make outbound connections**, `Bring2CC` reverse-proxies them back to the C2 server using SSH + KCP tunneling. This inverts the connection model: instead of the C2 reaching into the network, isolated targets are tunneled out to the C2 infrastructure.
 
 **Why this matters:** Traditional C2s fail when egress filtering blocks outbound connections. Bring2CC enables access to air-gapped segments by having internet-connected hosts pull isolated targets out through reverse tunnels.
 
@@ -90,7 +90,7 @@ curl -sSL https://raw.githubusercontent.com/jm33-m0/emp3r0r/refs/heads/v4/instal
 #### Initialize the Server
 
 ```bash
-emp3r0r server --c2-hosts 'your.domain.com' --port 12345 --operators 2
+emp3r0r server --c2-hosts 'your.domain.com' --port 12345
 ```
 
 This command deploys emp3r0r with:
@@ -145,6 +145,7 @@ generate --type linux_executable --arch amd64 --cc your.domain.com \
 
 - **Adaptive tmux UI**: Native integration with dynamic status bars, adaptive layouts, and real-time agent/C2 status monitoring.
 - **Intelligent auto-completion** with syntax highlighting.
+- **Pluggable Frontend**: Develop your own frontend by replicating `operator` package features.
 
 ### File Transfer System
 
@@ -161,7 +162,7 @@ generate --type linux_executable --arch amd64 --cc your.domain.com \
 
 ### Payload Delivery
 
-- **Advanced Linux Stager**: Keeps the agent payload encrypted until execution; auto-restarts with jitter when connectivity requires.
+- **Advanced Linux Stager**: 2K self-contained stage0 downloader; opsec focused; keeps the agent payload encrypted until execution; auto-restarts with jitter when connectivity requires.
 - **Agent-Side Listener**: Deploy listeners on compromised hosts to serve payloads internally, bypassing slow C2 connections.
 - **Multi-stage delivery** for Linux and Windows with ELF/DLL/shellcode options.
 
@@ -182,8 +183,6 @@ Join our [Discord server](https://discord.gg/vU98aQtk9f) for real-time discussio
 
 ### Resources
 
-- 📸 [Screenshots and Videos](./Screenshots.md)
-- 📋 [Features Overview](./FEATURES.md)
 - 📝 [Security Policy](./SECURITY.md)
 - 📜 [Changelog](./CHANGELOG.md)
 - 📦 [Module Development (including COFF/BOF)](https://github.com/jm33-m0/emp3r0r/wiki/Modules)
@@ -191,9 +190,8 @@ Join our [Discord server](https://discord.gg/vU98aQtk9f) for real-time discussio
 ### Troubleshooting
 
 - **Connection stalls**: Verify C2 host/WireGuard settings.
-- **Compatibility**: Remove `~/.emp3r0r` for a clean install.
-
-> **Note**: Cross-version compatibility is not guaranteed.
+- **Compatibility**: Remove `~/.emp3r0r` for a clean install; make sure to use the same build.
+- **Support**: Always use the latest release to get support.
 
 ---
 
