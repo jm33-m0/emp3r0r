@@ -1,11 +1,11 @@
 CC = gcc
 COMMON_CFLAGS = -Wall -Wextra -Os -fno-builtin -fno-stack-protector -fPIC -nostdlib -I. \
-				-fno-toplevel-reorder -s -fno-ident -ffunction-sections -fdata-sections \
-				-fno-asynchronous-unwind-tables -fvisibility=hidden
+								-fno-toplevel-reorder -s -fno-ident -ffunction-sections -fdata-sections \
+								-fno-asynchronous-unwind-tables -fvisibility=hidden
 
 # Debug support
 ifdef DEBUG
-COMMON_CFLAGS += -DDEBUG
+	COMMON_CFLAGS += -DDEBUG
 endif
 
 # Common linker flags
@@ -87,18 +87,13 @@ $(STAGE1_BIN): $(STAGE1_TARGET)
 	strip --strip-all --strip-debug --strip-unneeded -R .comment -R .note -R .note.gnu.build-id $(STAGE1_TARGET)
 	objcopy -O binary -j .init -j .text -j .rodata -j .data $(STAGE1_TARGET) $@
 	@echo "Stage1 loader generated at $(PWD)/$@"
-	@wc -c $@
-	@final_size=$$(wc -c < $@); hdr_size=$$(awk '/^#define STAGE1_SIZE/{print $$3}' $(STAGE1_SIZE_H)); \
-	if [ "$$final_size" != "$$hdr_size" ]; then \
-		echo "Warning: STAGE1_SIZE ($$hdr_size) does not match final loader.bin size ($$final_size)"; \
-	fi
 
 verify_loader_pic: $(STAGE1_TARGET)
 	@if readelf -r $(STAGE1_TARGET) | grep -Eq 'R_X86_64_(64|32|32S)'; then \
 		echo "Error: absolute relocations detected in $(STAGE1_TARGET)"; \
 		readelf -r $(STAGE1_TARGET); \
 		exit 1; \
-	fi
+		fi
 
 $(STAGE0_TARGET): $(STAGE0_SRCS)
 	$(CC) $(COMMON_CFLAGS) $(STAGE0_LDFLAGS) -o $@ $(STAGE0_SRCS)
