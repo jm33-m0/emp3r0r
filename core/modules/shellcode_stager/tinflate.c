@@ -26,12 +26,6 @@
 #include "tinf.h"
 #include "utils.h"
 
-#ifdef DEBUG
-#define DEBUG_PRINT(fmt, args...) debug_print("TINF: " fmt, ##args)
-#else
-#define DEBUG_PRINT(fmt, args...)
-#endif
-
 // #include <assert.h>
 // #include <limits.h>
 
@@ -535,7 +529,7 @@ void tinf_init(void) { return; }
 /* Inflate stream from source to dest */
 int tinf_uncompress(void *dest, unsigned int *destLen, const void *source,
                     unsigned int sourceLen) {
-  DEBUG_PRINT("tinf_uncompress start: src=%p len=%d, dst=%p len=%d\n", source,
+  debug_print("tinf_uncompress start: src=%p len=%d, dst=%p len=%d\n", source,
               sourceLen, dest, *destLen);
   struct tinf_data d;
   int bfinal;
@@ -561,7 +555,7 @@ int tinf_uncompress(void *dest, unsigned int *destLen, const void *source,
     /* Read block type (2 bits) */
     btype = tinf_getbits(&d, 2);
 
-    DEBUG_PRINT("Block type: %d, final: %d\n", btype, bfinal);
+    debug_print("Block type: %d, final: %d\n", btype, bfinal);
 
     /* Decompress block */
     switch (btype) {
@@ -583,14 +577,14 @@ int tinf_uncompress(void *dest, unsigned int *destLen, const void *source,
     }
 
     if (res != TINF_OK) {
-      DEBUG_PRINT("Decompression failed with error: %d\n", res);
+      debug_print("Decompression failed with error: %d\n", res);
       return res;
     }
   } while (!bfinal);
 
   /* Check for overflow in bit reader */
   if (d.overflow) {
-    DEBUG_PRINT("Bit reader overflow\n");
+    debug_print("Bit reader overflow\n");
     return TINF_DATA_ERROR;
   }
 

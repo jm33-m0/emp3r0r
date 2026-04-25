@@ -7,13 +7,6 @@
 #include "utils.h"
 #include <elf.h>
 
-#ifdef DEBUG
-void debug_print(const char *format, ...);
-#define DEBUG_PRINT(fmt, args...) debug_print("ELF: " fmt, ##args)
-#else
-#define DEBUG_PRINT(fmt, args...)
-#endif
-
 // Declare the jump_start function for all architectures
 void jump_start(void *init, void *exit_func, void *entry);
 
@@ -244,7 +237,7 @@ static int elf_relocate(char *elf_start, size_t base_addr) {
 int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
              size_t *entry, size_t *mapped_size, int pre_mapped,
              const char *module_path) {
-  DEBUG_PRINT("elf_load started\n");
+  debug_print("elf_load started\n");
   (void)stack;
   (void)stack_size;
   (void)entry;
@@ -261,12 +254,12 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
   void *mapped_mem = NULL;
 
   if (hdr->e_type == ET_DYN) {
-    DEBUG_PRINT("ET_DYN (PIE) detected.\n");
+    debug_print("ET_DYN (PIE) detected.\n");
     if (pre_mapped && base_addr && *base_addr != 0) {
       base = *base_addr;
       mapped_mem = (void *)base;
     } else if (module_path && module_path[0] != '\0') {
-      DEBUG_PRINT("Attempting module stomping on %s\n", module_path);
+      debug_print("Attempting module stomping on %s\n", module_path);
       int fd = open(module_path, O_RDONLY, 0);
       if (fd >= 0) {
         // Get file size using lseek
@@ -297,33 +290,33 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
             mapped_mem =
                 (void *)mmap(NULL, st_size, PROT_READ, MAP_PRIVATE, fd, 0);
             if (mapped_mem != MAP_FAILED) {
-              DEBUG_PRINT("Mapped %s at %p\n", module_path, mapped_mem);
+              debug_print("Mapped %s at %p\n", module_path, mapped_mem);
 
               // We need it writable to stomp
               if (mprotect(mapped_mem, st_size, PROT_READ | PROT_WRITE) == 0) {
-                DEBUG_PRINT("Stomping memory...\n");
+                debug_print("Stomping memory...\n");
                 // We will use this as base
                 base = (size_t)mapped_mem;
                 total_mapped_size = st_size;
               } else {
-                DEBUG_PRINT("mprotect RW failed\n");
+                debug_print("mprotect RW failed\n");
                 munmap(mapped_mem, st_size);
                 mapped_mem = NULL;
               }
             }
           } else {
-            DEBUG_PRINT("Module file too small (%ld vs %ld)\n", (long)st_size,
+            debug_print("Module file too small (%ld vs %ld)\n", (long)st_size,
                         (long)required_size);
           }
         }
         close(fd);
       } else {
-        DEBUG_PRINT("Failed to open module path\n");
+        debug_print("Failed to open module path\n");
       }
     }
 
     if (!mapped_mem) {
-      DEBUG_PRINT("Falling back to anonymous memory\n");
+      debug_print("Falling back to anonymous memory\n");
       // Let's just calculate total size and mmap a region
       size_t min_v = (size_t)-1, max_v = 0;
       for (int i = 0; i < hdr->e_phnum; i++) {
@@ -340,7 +333,7 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
       mapped_mem = mmap(NULL, total_size, PROT_READ | PROT_WRITE,
                         MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
       if (mapped_mem == MAP_FAILED) {
-        DEBUG_PRINT("Failed to allocate anonymous memory\n");
+        debug_print("Failed to allocate anonymous memory\n");
         return -1;
       }
       base = (size_t)mapped_mem;
@@ -349,7 +342,7 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
 
   } else {
     base = 0;
-    DEBUG_PRINT("Static ELF, base set to 0\n");
+    debug_print("Static ELF, base set to 0\n");
   }
 
   if (base_addr != NULL)
@@ -383,7 +376,7 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
     if (phdr[x].p_flags & PF_X)
       elf_prot |= PROT_EXEC;
 
-    DEBUG_PRINT("Mapping segment %d: vaddr 0x%lx, map_size %d, flags=%u\n", x,
+    debug_print("Mapping segment %d: vaddr 0x%lx, map_size %d, flags=%u\n", x,
                 phdr[x].p_vaddr, map_size, phdr[x].p_flags);
 
     void *m = NULL;
@@ -416,7 +409,7 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
                              PROT_WRITE, // Map RW for loading/relocation
                          MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
         if ((long)m < 0) {
-          DEBUG_PRINT("mmap failed for segment %d at %p\n", x,
+          debug_print("mmap failed for segment %d at %p\n", x,
                       (void *)(base + (size_t)map_start));
           return -1;
         }
@@ -441,7 +434,7 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
 
   // Perform relocations if PIE
   if (hdr->e_type == ET_DYN) {
-    DEBUG_PRINT("Relocating...\n");
+    debug_print("Relocating...\n");
     elf_relocate(elf_start, base);
 
     // Seal the memory before applying segment permissions.
@@ -456,17 +449,17 @@ int elf_load(char *elf_start, void *stack, int stack_size, size_t *base_addr,
   for (int i = 0; i < seg_count; i++) {
     // For PIE, m is absolute address. For static, it is also absolute.
     if (mprotect(segments[i].m, segments[i].size, segments[i].prot) < 0) {
-      DEBUG_PRINT("mprotect failed for segment %d\n", i);
+      debug_print("mprotect failed for segment %d\n", i);
     }
   }
 
-  DEBUG_PRINT("elf_load finished\n");
+  debug_print("elf_load finished\n");
   return 0;
 }
 
 int elf_run(void *buf, char **argv, char **env, int pre_mapped,
             const char *module_path, size_t base_addr) {
-  DEBUG_PRINT("elf_run started\n");
+  debug_print("elf_run started\n");
   size_t x;
   int str_len;
   int str_ptr = 0;
@@ -486,45 +479,38 @@ int elf_run(void *buf, char **argv, char **env, int pre_mapped,
   _get_rand(rand_bytes, 16);
 
   // First, let's count arguments...
-  DEBUG_PRINT("Counting arguments, argv=%p, env=%p\n", argv, env);
+  debug_print("Counting arguments, argv=%p, env=%p\n", argv, env);
   if (argv != NULL) {
     while (argv[argc])
       argc++;
   }
-  DEBUG_PRINT("argc=%d\n", (int)argc);
+  debug_print("argc=%d\n", (int)argc);
 
   // ...and envs
   if (env != NULL) {
     while (env[envc])
       envc++;
   }
-  DEBUG_PRINT("envc=%d\n", (int)envc);
+  debug_print("envc=%d\n", (int)envc);
 
   // Allocate some stack space
-  DEBUG_PRINT("Allocating stack...\n");
+  debug_print("Allocating stack...\n");
   size_t setup_size = STACK_STORAGE_SIZE + STACK_STRING_SIZE;
   void *stack = __builtin_alloca(setup_size);
   if ((long)stack < 0) {
-    DEBUG_PRINT("Failed to allocate stack\n");
+    debug_print("Failed to allocate stack\n");
     return -1;
   }
-  DEBUG_PRINT("Stack allocated at %p\n", stack);
+  debug_print("Stack allocated at %p\n", stack);
 
   // Map the ELF in memory
   if (elf_load(buf, stack, setup_size /* used to be STACK_SIZE */, &elf_base,
                &elf_entry, NULL, pre_mapped, module_path) < 0) {
-    DEBUG_PRINT("elf_load failed\n");
+    debug_print("elf_load failed\n");
     return -1;
   }
   elf_entry = elf_base + hdr->e_entry;
-  DEBUG_PRINT("ELF loaded at 0x%lx, entry 0x%lx\n", elf_base, elf_entry);
-
-  // Check if this is a shared object and find main symbol
-
-  // if (hdr->e_type == ET_DYN) {
-  //     DEBUG_PRINT("Error: Shared Objects not supported.\n");
-  //     return -1;
-  // }
+  debug_print("ELF loaded at 0x%lx, entry 0x%lx\n", elf_base, elf_entry);
 
   // Ensure 16-byte alignment as required by ABI
   unsigned long *stack_storage =
@@ -538,7 +524,7 @@ int elf_run(void *buf, char **argv, char **env, int pre_mapped,
   unsigned long *s_argv = &stack_storage[1];
 
   // Setup argc
-  DEBUG_PRINT("Setting up stackargc=%d at %p\n", (int)argc, s_argc);
+  debug_print("Setting up stackargc=%d at %p\n", (int)argc, s_argc);
   *s_argc = argc;
 
   // Setup argv
@@ -637,7 +623,7 @@ int elf_run(void *buf, char **argv, char **env, int pre_mapped,
     if (p_at->id == 33) { // AT_SYSINFO_EHDR
       at[cnt].id = 33;
       at[cnt++].value = p_at->value;
-      DEBUG_PRINT("Found and forwarded VDSO (AT_SYSINFO_EHDR) at 0x%lx\n",
+      debug_print("Found and forwarded VDSO (AT_SYSINFO_EHDR) at 0x%lx\n",
                   p_at->value);
       break;
     }
@@ -670,9 +656,9 @@ int elf_run(void *buf, char **argv, char **env, int pre_mapped,
   }
   */
 
-  DEBUG_PRINT("Stack setup complete, jumping to entry point\n");
-  DEBUG_PRINT("Stack storage: 0x%lx\n", (unsigned long)stack_storage);
-  DEBUG_PRINT("Entry point: 0x%lx\n", (unsigned long)elf_entry);
+  debug_print("Stack setup complete, jumping to entry point\n");
+  debug_print("Stack storage: 0x%lx\n", (unsigned long)stack_storage);
+  debug_print("Entry point: 0x%lx\n", (unsigned long)elf_entry);
 
   jump_start(stack_storage, (void *)_exit_func, (void *)elf_entry);
 
