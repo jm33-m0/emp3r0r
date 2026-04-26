@@ -313,9 +313,9 @@ func generateConnectionCommands(wg_port int, server_pubkey string, operators []O
 	// Generate example commands for local and remote usage
 	if len(operators) > 0 {
 		op := operators[0]
-		localCmd := fmt.Sprintf("emp3r0r client --c2-host 127.0.0.1 --c2-port %d --server-wg-key '%s' --server-wg-ip '%s' --operator-wg-ip '%s' --operator-wg-key '%s'",
+		localCmd := fmt.Sprintf("emp3r0r client --c2-host 127.0.0.1 --operator-port %d --server-wg-key '%s' --server-wg-ip '%s' --operator-wg-ip '%s' --operator-wg-key '%s'",
 			wg_port, server_pubkey, netutil.WgServerIP, op.IP, op.PrivateKey)
-		remoteCmd := fmt.Sprintf("emp3r0r client --c2-port %d --server-wg-key '%s' --server-wg-ip '%s' --operator-wg-ip '%s' --operator-wg-key '%s' --c2-host <YOUR_PUBLIC_IP>",
+		remoteCmd := fmt.Sprintf("emp3r0r client --operator-port %d --server-wg-key '%s' --server-wg-ip '%s' --operator-wg-ip '%s' --operator-wg-key '%s' --c2-host <YOUR_PUBLIC_IP>",
 			wg_port, server_pubkey, netutil.WgServerIP, op.IP, op.PrivateKey)
 
 		logging.Successf("\n💡 Example Commands (for Operator 1):")
@@ -326,6 +326,6 @@ func generateConnectionCommands(wg_port int, server_pubkey string, operators []O
 
 // generateClientCommand generates a client connection command for a specific operator
 func generateClientCommand(wg_port int, server_pubkey string, op OperatorConfig) string {
-	return fmt.Sprintf("emp3r0r client --c2-port %d --server-wg-key '%s' --server-wg-ip '%s' --operator-wg-ip '%s' --operator-wg-key '%s' --c2-host <C2_PUBLIC_IP>",
+	return fmt.Sprintf("emp3r0r client --operator-port %d --server-wg-key '%s' --server-wg-ip '%s' --operator-wg-ip '%s' --operator-wg-key '%s' --c2-host <C2_PUBLIC_IP>",
 		wg_port, server_pubkey, netutil.WgServerIP, op.IP, op.PrivateKey)
 }

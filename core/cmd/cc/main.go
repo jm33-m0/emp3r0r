@@ -90,14 +90,12 @@ func main() {
 
 	// Client-specific flags
 	clientCmd.Flags().StringVar(&opts.c2_server_ip, "c2-host", operatorDefaultIP, "Connect to this C2 server to start operations")
-	clientCmd.Flags().IntVar(&opts.c2_operator_server_port, "c2-port", operatorDefaultPort, "C2 operator server port")
+	clientCmd.Flags().IntVar(&opts.c2_operator_server_port, "operator-port", operatorDefaultPort, "C2 operator server port")
 	clientCmd.Flags().StringVar(&opts.wg_server_key, "server-wg-key", "", "WireGuard public key provided by the C2 server")
 	clientCmd.Flags().StringVar(&opts.wg_server_ip, "server-wg-ip", "", "WireGuard server IP provided by the C2 server")
 	clientCmd.Flags().StringVar(&opts.wg_operator_ip, "operator-wg-ip", "", "Operator's wireguard IP")
 	clientCmd.Flags().StringVar(&opts.wg_operator_key, "operator-wg-key", "", "Operator's WireGuard private key") // Added flag
 	clientCmd.Flags().BoolVar(&opts.debug, "debug", false, "Do not kill tmux session when crashing, so you can see the crash log")
-
-	// Note: Removed MarkFlagRequired for WireGuard flags to allow local connections
 
 	// Server subcommand
 	serverCmd := &cobra.Command{
