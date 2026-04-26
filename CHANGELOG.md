@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.2.3](https://github.com/jm33-m0/emp3r0r/compare/v4.2.2...v4.2.3) (2026-04-26)
+
+
+### Bug Fixes
+
+* optimise installer for edge cases ([2393940](https://github.com/jm33-m0/emp3r0r/commit/2393940ef9ff93dd5013a35b3accc55783c7dbb3))
+
 ## [4.2.2](https://github.com/jm33-m0/emp3r0r/compare/v4.2.1...v4.2.2) (2026-04-22)
 
 
