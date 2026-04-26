@@ -109,7 +109,7 @@ func main() {
 	// Server-specific flags
 	serverCmd.Flags().IntVar(&opts.c2_operator_server_port, "operator-port", operatorDefaultPort, "Operator server port to listen on")
 	serverCmd.Flags().IntVar(&opts.c2_http_port, "http-port", 0, "C2 HTTP server port to listen on")
-	serverCmd.Flags().IntVar(&opts.c2_h2_port, "operator-port", 0, "C2 HTTP/2 stream (h2conn) server port to listen on")
+	serverCmd.Flags().IntVar(&opts.c2_h2_port, "h2-port", 0, "C2 HTTP/2 stream (h2conn) server port to listen on")
 	serverCmd.Flags().StringVar(&opts.c2_hosts, "c2-hosts", "", "C2 hosts to generate cert for, separated by whitespace")
 	serverCmd.Flags().IntVar(&opts.num_operators, "operators", 1, "Number of operator configurations to generate")
 
