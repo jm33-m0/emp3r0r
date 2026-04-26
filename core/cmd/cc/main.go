@@ -6,6 +6,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/ftp"
@@ -222,6 +223,10 @@ func runServerMode(opts *Options) {
 	if opts.cdnProxy != "" {
 		startCDN2Proxy(opts)
 	}
+
+	// Set up C2 service ports
+	live.RuntimeConfig.CCH2Port = strconv.Itoa(opts.c2_h2_port)
+	live.RuntimeConfig.CCHTTPPort = strconv.Itoa(opts.c2_http_port)
 
 	err = config.InitCertsAndConfig()
 	if err != nil {

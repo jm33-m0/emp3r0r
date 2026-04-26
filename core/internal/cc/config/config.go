@@ -97,11 +97,17 @@ func SaveConfigJSON() (err error) {
 
 // InitConfigFile generate a new emp3r0r.json
 func InitConfigFile(cc_host string) (err error) {
-	// random ports
+	// C2 service ports
+	if live.RuntimeConfig.CCH2Port == "0" {
+		live.RuntimeConfig.CCH2Port = fmt.Sprintf("%v", util.RandInt(1025, 65534))
+	}
+	if live.RuntimeConfig.CCHTTPPort == "0" {
+		live.RuntimeConfig.CCHTTPPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
+	}
+
+	// randomize other ports
 	live.RuntimeConfig.CCAddress = cc_host
 	live.RuntimeConfig.CCHost = cc_host
-	live.RuntimeConfig.CCH2Port = fmt.Sprintf("%v", util.RandInt(1025, 65534))
-	live.RuntimeConfig.CCHTTPPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.AgentSocksServerPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.MeshGossipPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.SSHDShellPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
