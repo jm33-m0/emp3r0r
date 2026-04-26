@@ -87,7 +87,7 @@ type MalleableHTTPConfig struct {
 type Config struct {
 	CCAddress                 string `cbor:"1,keyasint"`  // Address of C2 server, might include port (agent side)
 	CCHost                    string `cbor:"2,keyasint"`  // Hostname of C2 server (hostname only)
-	CCPort                    string `cbor:"3,keyasint"`  // CC service port, TLS enabled
+	CCH2Port                  string `cbor:"3,keyasint"`  // CC service port, TLS enabled
 	AgentSocksServerPort      string `cbor:"4,keyasint"`  // agent side socks5 proxy server port
 	AgentSocksTimeout         int    `cbor:"5,keyasint"`  // timeout (in seconds) for agent side Socks5 server, 0 to disable
 	StagerHTTPListenerPort    string `cbor:"6,keyasint"`  // For stager HTTP server

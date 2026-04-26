@@ -19,7 +19,7 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 	originalCfg := &def.Config{
 		CCAddress:                 "192.168.1.100",
 		CCHost:                    "192.168.1.100",
-		CCPort:                    "8443",
+		CCH2Port:                  "8443",
 		C2ChannelMode:             def.C2ChannelModeH2Conn,
 		AgentSocksServerPort:      "50001",
 		AgentSocksTimeout:         60,
@@ -75,8 +75,8 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 	if RuntimeConfig.CCHost != originalCfg.CCHost {
 		t.Errorf("CCHost mismatch: got %s, want %s", RuntimeConfig.CCHost, originalCfg.CCHost)
 	}
-	if RuntimeConfig.CCPort != originalCfg.CCPort {
-		t.Errorf("CCPort mismatch: got %s, want %s", RuntimeConfig.CCPort, originalCfg.CCPort)
+	if RuntimeConfig.CCH2Port != originalCfg.CCH2Port {
+		t.Errorf("CCPort mismatch: got %s, want %s", RuntimeConfig.CCH2Port, originalCfg.CCH2Port)
 	}
 	if RuntimeConfig.AgentSocksServerPort != originalCfg.AgentSocksServerPort {
 		t.Errorf("AgentSocksServerPort mismatch: got %s, want %s", RuntimeConfig.AgentSocksServerPort, originalCfg.AgentSocksServerPort)
@@ -172,7 +172,7 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 
 	// 1. def.CCAddress construction (Standard case)
 	// Should be https://<CCAddress>:<CCPort>
-	expectedCCAddr := fmt.Sprintf("https://%s:%s", originalCfg.CCAddress, originalCfg.CCPort)
+	expectedCCAddr := fmt.Sprintf("https://%s:%s", originalCfg.CCAddress, originalCfg.CCH2Port)
 	if def.CCAddress != expectedCCAddr {
 		t.Errorf("def.CCAddress mismatch (Standard): got %s, want %s", def.CCAddress, expectedCCAddr)
 	}
@@ -191,7 +191,7 @@ func TestInitConfig_Tor(t *testing.T) {
 	// Prepare Tor config
 	cfg := &def.Config{
 		CCAddress:        "abcdefghijklmnop.onion", // Tor address
-		CCPort:           "80",
+		CCH2Port:         "80",
 		C2TransportProxy: "", // Should default to socks5://127.0.0.1:9050
 	}
 
@@ -245,8 +245,8 @@ func TestInitConfig_KCP(t *testing.T) {
 
 	// Verify KCP logic
 	// RuntimeConfig.CCPort should become KCPClientPort
-	if RuntimeConfig.CCPort != "9999" {
-		t.Errorf("KCP CCPort mismatch: got %s, want 9999", RuntimeConfig.CCPort)
+	if RuntimeConfig.CCH2Port != "9999" {
+		t.Errorf("KCP CCPort mismatch: got %s, want 9999", RuntimeConfig.CCH2Port)
 	}
 	// def.CCAddress should be https://127.0.0.1:<KCPClientPort>
 	expectedCCAddr := "https://127.0.0.1:9999"

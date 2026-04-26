@@ -157,12 +157,12 @@ func MakeConfig(opts AgentConfig) error {
 	// Preflight / Hybrid Mode intervals
 	if live.RuntimeConfig.PreflightURL == "" {
 		// generate new if empty
-		live.RuntimeConfig.PreflightURL = fmt.Sprintf("https://%s:%s/%s", live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCPort, util.RandStr(util.RandInt(5, 10)))
+		live.RuntimeConfig.PreflightURL = fmt.Sprintf("https://%s:%s/%s", live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCH2Port, util.RandStr(util.RandInt(5, 10)))
 	} else {
 		// synchronise host and port with CCAddress
 		u, err := url.Parse(live.RuntimeConfig.PreflightURL)
 		if err == nil {
-			u.Host = fmt.Sprintf("%s:%s", live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCPort)
+			u.Host = fmt.Sprintf("%s:%s", live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCH2Port)
 			u.Scheme = "https"
 			live.RuntimeConfig.PreflightURL = u.String()
 		}

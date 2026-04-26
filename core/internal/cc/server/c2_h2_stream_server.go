@@ -25,17 +25,17 @@ func StartC2H2StreamServer() {
 
 	listener := setupC2TLSListener()
 	network.EmpTLSServer = &http.Server{
-		Addr:    fmt.Sprintf(":%s", live.RuntimeConfig.CCPort),
+		Addr:    fmt.Sprintf(":%s", live.RuntimeConfig.CCH2Port),
 		Handler: mux,
 	}
 
-	logging.Successf("🚀 Starting C2 h2 stream server with TLS at port %s", live.RuntimeConfig.CCPort)
+	logging.Successf("🚀 Starting C2 h2 stream server with TLS at port %s", live.RuntimeConfig.CCH2Port)
 	if err = network.EmpTLSServer.Serve(listener); err != nil {
 		if err == http.ErrServerClosed {
 			logging.Warningf("C2 h2 stream server is shutdown")
 			return
 		}
-		logging.Fatalf("Failed to start C2 h2 stream server at *:%s: %v", live.RuntimeConfig.CCPort, err)
+		logging.Fatalf("Failed to start C2 h2 stream server at *:%s: %v", live.RuntimeConfig.CCH2Port, err)
 	}
 }
 

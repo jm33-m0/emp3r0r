@@ -127,8 +127,8 @@ func TestEstablishC2Connection(t *testing.T) {
 
 	// Setup C2 Config
 	live.RuntimeConfig = &def.Config{
-		CCPort: fmt.Sprintf("%d", port),
-		CAPEM:  string(caCertData),
+		CCH2Port: fmt.Sprintf("%d", port),
+		CAPEM:    string(caCertData),
 		C2Routes: def.C2Routing{
 			Checkin: "c2-checkin",
 			Msg:     "c2-msg",
@@ -357,8 +357,8 @@ func TestDuplicatedCheckin(t *testing.T) {
 
 	// Setup C2 Config
 	live.RuntimeConfig = &def.Config{
-		CCPort: fmt.Sprintf("%d", port),
-		CAPEM:  string(caCertData),
+		CCH2Port: fmt.Sprintf("%d", port),
+		CAPEM:    string(caCertData),
 		C2Routes: def.C2Routing{
 			Checkin: "c2-checkin",
 			Msg:     "c2-msg",
@@ -535,8 +535,8 @@ func TestBackslashTag(t *testing.T) {
 
 	// Setup C2 Config
 	live.RuntimeConfig = &def.Config{
-		CCPort: fmt.Sprintf("%d", port),
-		CAPEM:  string(caCertData),
+		CCH2Port: fmt.Sprintf("%d", port),
+		CAPEM:    string(caCertData),
 		C2Routes: def.C2Routing{
 			Checkin: "c2-checkin",
 			Msg:     "c2-msg",
@@ -661,8 +661,8 @@ func TestEmptyUUID(t *testing.T) {
 
 	// Setup C2 Config
 	live.RuntimeConfig = &def.Config{
-		CCPort: fmt.Sprintf("%d", port),
-		CAPEM:  string(caCertData),
+		CCH2Port: fmt.Sprintf("%d", port),
+		CAPEM:    string(caCertData),
 		C2Routes: def.C2Routing{
 			Checkin: "c2-checkin",
 			Msg:     "c2-msg",
@@ -786,8 +786,8 @@ func TestNewAgentCheckin(t *testing.T) {
 
 	// Setup C2 Config
 	live.RuntimeConfig = &def.Config{
-		CCPort: fmt.Sprintf("%d", port),
-		CAPEM:  string(caCertData),
+		CCH2Port: fmt.Sprintf("%d", port),
+		CAPEM:    string(caCertData),
 		C2Routes: def.C2Routing{
 			Checkin: "c2-checkin",
 			Msg:     "c2-msg",

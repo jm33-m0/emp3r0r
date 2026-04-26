@@ -90,7 +90,7 @@ func runCheckinACK(t *testing.T, mode string) {
 	httpListener.Close()
 
 	live.RuntimeConfig = &def.Config{
-		CCPort:        fmt.Sprintf("%d", tlsPort),
+		CCH2Port:      fmt.Sprintf("%d", tlsPort),
 		CCHTTPPort:    fmt.Sprintf("%d", httpPort),
 		CAPEM:         string(caCertData),
 		C2ChannelMode: mode,
@@ -145,7 +145,7 @@ func runCheckinACK(t *testing.T, mode string) {
 
 	common.RuntimeConfig = &def.Config{
 		CCAddress:     "127.0.0.1",
-		CCPort:        fmt.Sprintf("%d", tlsPort),
+		CCH2Port:      fmt.Sprintf("%d", tlsPort),
 		CCHTTPPort:    fmt.Sprintf("%d", httpPort),
 		C2ChannelMode: mode,
 		CAPEM:         string(caCertData),

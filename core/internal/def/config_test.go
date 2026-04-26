@@ -42,7 +42,7 @@ func TestReadCBORConfigFull(t *testing.T) {
 	cfg := &Config{
 		CCAddress:                 "127.0.0.1",
 		CCHost:                    "localhost",
-		CCPort:                    "8080",
+		CCH2Port:                  "8080",
 		AgentSocksServerPort:      "1080",
 		AgentSocksTimeout:         60,
 		StagerHTTPListenerPort:    "80",

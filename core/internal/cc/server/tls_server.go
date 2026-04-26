@@ -77,9 +77,9 @@ func setupC2TLSListener() net.Listener {
 		MinVersion: tls.VersionTLS12,
 	}
 
-	listener, err := tls.Listen("tcp", fmt.Sprintf(":%s", live.RuntimeConfig.CCPort), tlsCfg)
+	listener, err := tls.Listen("tcp", fmt.Sprintf(":%s", live.RuntimeConfig.CCH2Port), tlsCfg)
 	if err != nil {
-		logging.Fatalf("Failed to start C2 TLS listener at *:%s: %v", live.RuntimeConfig.CCPort, err)
+		logging.Fatalf("Failed to start C2 TLS listener at *:%s: %v", live.RuntimeConfig.CCH2Port, err)
 	}
 	network.EmpTLSListener = listener
 
@@ -92,7 +92,7 @@ func setupC2TLSListener() net.Listener {
 func startRawC2TLSServer() {
 	listener := setupC2TLSListener()
 
-	logging.Successf("🚀 Starting C2 agent listener service with TLS at port %s", live.RuntimeConfig.CCPort)
+	logging.Successf("🚀 Starting C2 agent listener service with TLS at port %s", live.RuntimeConfig.CCH2Port)
 	for {
 		conn, acceptErr := listener.Accept()
 		if acceptErr != nil {

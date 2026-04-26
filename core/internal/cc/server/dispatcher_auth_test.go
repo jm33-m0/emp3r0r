@@ -68,7 +68,7 @@ func TestUnauthenticatedRequestRejection(t *testing.T) {
 
 	// Setup C2 Config
 	live.RuntimeConfig = &def.Config{
-		CCPort:        fmt.Sprintf("%d", port),
+		CCH2Port:      fmt.Sprintf("%d", port),
 		CAPEM:         string(caCertData),
 		C2ChannelMode: def.C2ChannelModeH2Conn,
 	}

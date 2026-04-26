@@ -132,7 +132,7 @@ func TestFullAgentLifecycle(t *testing.T) {
 
 	// Setup C2 Config
 	live.RuntimeConfig = &def.Config{
-		CCPort:    fmt.Sprintf("%d", port),
+		CCH2Port:  fmt.Sprintf("%d", port),
 		CCAddress: fmt.Sprintf("https://127.0.0.1:%d", port),
 		CAPEM:     string(caCertData),
 		C2Routes: def.C2Routing{
@@ -479,8 +479,8 @@ func TestCheckinWithRandomPaths(t *testing.T) {
 
 	// Setup C2 Config
 	live.RuntimeConfig = &def.Config{
-		CCPort: fmt.Sprintf("%d", port),
-		CAPEM:  string(caCertData),
+		CCH2Port: fmt.Sprintf("%d", port),
+		CAPEM:    string(caCertData),
 		C2Routes: def.C2Routing{
 			Checkin: "c2-checkin",
 			Msg:     "c2-msg",
@@ -627,8 +627,8 @@ func TestDynamicPrefix(t *testing.T) {
 
 	// Setup C2 Config
 	live.RuntimeConfig = &def.Config{
-		CCPort: fmt.Sprintf("%d", port),
-		CAPEM:  string(caCertData),
+		CCH2Port: fmt.Sprintf("%d", port),
+		CAPEM:    string(caCertData),
 		C2Routes: def.C2Routing{
 			Checkin: "c2-checkin",
 			Msg:     "c2-msg",
@@ -767,8 +767,8 @@ func TestCheckinWithRandomPaths_Strict(t *testing.T) {
 
 	// Setup C2 Config
 	live.RuntimeConfig = &def.Config{
-		CCPort: fmt.Sprintf("%d", port),
-		CAPEM:  string(caCertData),
+		CCH2Port: fmt.Sprintf("%d", port),
+		CAPEM:    string(caCertData),
 		C2Routes: def.C2Routing{
 			Checkin: "c2-checkin",
 			Msg:     "c2-msg",

@@ -74,12 +74,12 @@ func InitConfig() (err error) {
 			RuntimeConfig.C2TransportProxy = "socks5://127.0.0.1:9050"
 		}
 	} else if RuntimeConfig.UseKCP {
-		RuntimeConfig.CCPort = RuntimeConfig.KCPClientPort
-		def.CCAddress = fmt.Sprintf("https://127.0.0.1:%s", RuntimeConfig.CCPort)
+		RuntimeConfig.CCH2Port = RuntimeConfig.KCPClientPort
+		def.CCAddress = fmt.Sprintf("https://127.0.0.1:%s", RuntimeConfig.CCH2Port)
 	} else if RuntimeConfig.C2ChannelMode == def.C2ChannelModePlainHTTP {
 		def.CCAddress = fmt.Sprintf("http://%s:%s", def.CCAddress, RuntimeConfig.CCHTTPPort)
 	} else {
-		def.CCAddress = fmt.Sprintf("https://%s:%s", def.CCAddress, RuntimeConfig.CCPort)
+		def.CCAddress = fmt.Sprintf("https://%s:%s", def.CCAddress, RuntimeConfig.CCH2Port)
 	}
 
 	// CA

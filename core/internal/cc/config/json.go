@@ -153,7 +153,7 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 
 	config_to_write.CCAddress = getString("cc_address")
 	config_to_write.CCHost = getString("cc_host")
-	config_to_write.CCPort = getString("cc_port")
+	config_to_write.CCH2Port = getString("cc_port")
 	config_to_write.AgentSocksServerPort = getString("agent_socks_server_port")
 	config_to_write.AgentSocksTimeout = getInt("agent_socks_timeout")
 	config_to_write.StagerHTTPListenerPort = getString("stager_http_listener_port")
@@ -320,7 +320,7 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 			config_to_write.CCHost = jCfg.CCHost
 		}
 		if jCfg.CCPort != "" {
-			config_to_write.CCPort = jCfg.CCPort
+			config_to_write.CCH2Port = jCfg.CCPort
 		}
 		if jCfg.AgentSocksServerPort != "" {
 			config_to_write.AgentSocksServerPort = jCfg.AgentSocksServerPort

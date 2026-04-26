@@ -239,7 +239,7 @@ func formatBannerSummary() string {
 			"Server Key: %s",
 		valueOrUnset(live.RuntimeConfig.C2ChannelMode),
 		valueOrUnset(live.RuntimeConfig.CCHTTPPort),
-		valueOrUnset(live.RuntimeConfig.CCPort),
+		valueOrUnset(live.RuntimeConfig.CCH2Port),
 		valueOrUnset(live.RuntimeConfig.KCPServerPort),
 		formatRouteSummary(),
 		valueOrUnset(live.Prefix),

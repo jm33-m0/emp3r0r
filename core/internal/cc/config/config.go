@@ -22,7 +22,7 @@ func SaveConfigJSON() (err error) {
 	jCfg := jsonConfig{
 		CCAddress:                 live.RuntimeConfig.CCAddress,
 		CCHost:                    live.RuntimeConfig.CCHost,
-		CCPort:                    live.RuntimeConfig.CCPort,
+		CCPort:                    live.RuntimeConfig.CCH2Port,
 		AgentSocksServerPort:      live.RuntimeConfig.AgentSocksServerPort,
 		AgentSocksTimeout:         live.RuntimeConfig.AgentSocksTimeout,
 		StagerHTTPListenerPort:    live.RuntimeConfig.StagerHTTPListenerPort,
@@ -100,7 +100,7 @@ func InitConfigFile(cc_host string) (err error) {
 	// random ports
 	live.RuntimeConfig.CCAddress = cc_host
 	live.RuntimeConfig.CCHost = cc_host
-	live.RuntimeConfig.CCPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
+	live.RuntimeConfig.CCH2Port = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.CCHTTPPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.AgentSocksServerPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.MeshGossipPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))

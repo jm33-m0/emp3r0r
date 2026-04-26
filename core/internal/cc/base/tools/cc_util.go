@@ -13,7 +13,7 @@ import (
 // IsCCRunning check if CC is already running
 func IsCCRunning() bool {
 	// it is running if we can connect to it
-	return netutil.IsPortOpen("127.0.0.1", live.RuntimeConfig.CCPort)
+	return netutil.IsPortOpen("127.0.0.1", live.RuntimeConfig.CCH2Port)
 }
 
 // UnlockDownloads if there are incomplete file downloads that are "locked", unlock them

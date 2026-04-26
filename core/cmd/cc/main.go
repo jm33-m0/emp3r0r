@@ -25,6 +25,8 @@ import (
 // Options struct to hold flag values
 type Options struct {
 	c2_server_ip            string // C2 server IP
+	c2_http_port            int    // C2 HTTP service port
+	c2_h2_port              int    // C2 HTTP/2 stream service port
 	c2_operator_server_port int    // C2 operator server port
 	wg_server_key           string // C2 server's WireGuard public key
 	wg_server_ip            string // C2 server's WireGuard IP
@@ -107,6 +109,8 @@ func main() {
 
 	// Server-specific flags
 	serverCmd.Flags().IntVar(&opts.c2_operator_server_port, "operator-port", operatorDefaultPort, "Operator server port to listen on")
+	serverCmd.Flags().IntVar(&opts.c2_http_port, "http-port", 0, "C2 HTTP server port to listen on")
+	serverCmd.Flags().IntVar(&opts.c2_h2_port, "operator-port", 0, "C2 HTTP/2 stream (h2conn) server port to listen on")
 	serverCmd.Flags().StringVar(&opts.c2_hosts, "c2-hosts", "", "C2 hosts to generate cert for, separated by whitespace")
 	serverCmd.Flags().IntVar(&opts.num_operators, "operators", 1, "Number of operator configurations to generate")
 
@@ -293,7 +297,7 @@ func startCDN2Proxy(opts *Options) {
 		if openErr != nil {
 			logging.Fatalf("OpenFile: %v", openErr)
 		}
-		openErr = cdn2proxy.StartServer(opts.cdnProxy, "127.0.0.1:"+live.RuntimeConfig.CCPort, "ws", logFile)
+		openErr = cdn2proxy.StartServer(opts.cdnProxy, "127.0.0.1:"+live.RuntimeConfig.CCH2Port, "ws", logFile)
 		if openErr != nil {
 			logging.Fatalf("CDN StartServer: %v", openErr)
 		}

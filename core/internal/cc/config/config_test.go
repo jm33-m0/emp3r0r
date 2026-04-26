@@ -85,7 +85,7 @@ func TestInitConfigFile(t *testing.T) {
 		}
 	}
 
-	checkPort("CCPort", live.RuntimeConfig.CCPort)
+	checkPort("CCPort", live.RuntimeConfig.CCH2Port)
 	checkPort("AgentSocksServerPort", live.RuntimeConfig.AgentSocksServerPort)
 	checkPort("SSHDShellPort", live.RuntimeConfig.SSHDShellPort)
 
@@ -123,7 +123,7 @@ func TestSaveConfigJSON(t *testing.T) {
 	// Setup a dummy RuntimeConfig
 	live.RuntimeConfig = &def.Config{
 		CCAddress:            "test.example.com",
-		CCPort:               "9999",
+		CCH2Port:             "9999",
 		AgentSocksServerPort: "1080",
 		PaddingMin:           512,
 		PaddingMax:           4096,
@@ -152,8 +152,8 @@ func TestSaveConfigJSON(t *testing.T) {
 	if loadedConfig.CCAddress != "test.example.com" {
 		t.Errorf("Loaded config mismatch. Expected CCAddress 'test.example.com', got '%s'", loadedConfig.CCAddress)
 	}
-	if loadedConfig.CCPort != "9999" {
-		t.Errorf("Loaded config mismatch. Expected CCPort '9999', got '%s'", loadedConfig.CCPort)
+	if loadedConfig.CCH2Port != "9999" {
+		t.Errorf("Loaded config mismatch. Expected CCPort '9999', got '%s'", loadedConfig.CCH2Port)
 	}
 	if loadedConfig.PaddingMin != 512 {
 		t.Errorf("Loaded config mismatch. Expected PaddingMin 512, got %d", loadedConfig.PaddingMin)
@@ -170,7 +170,7 @@ func TestSaveAndLoadConfigJSON(t *testing.T) {
 	// Initialize RuntimeConfig
 	live.RuntimeConfig = &def.Config{
 		CCAddress:            "5.6.7.8",
-		CCPort:               "5678",
+		CCH2Port:             "5678",
 		AgentSocksServerPort: "9090",
 		Password:             "another_secret",
 		C2ChannelMode:        def.C2ChannelModeH2Conn,

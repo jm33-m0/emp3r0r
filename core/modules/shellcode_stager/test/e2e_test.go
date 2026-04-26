@@ -209,7 +209,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 		preflightURL = fmt.Sprintf("https://127.0.0.1:%s/preflight-test", c2PortStr)
 	}
 	live.RuntimeConfig = &def.Config{
-		CCPort:        c2PortStr,
+		CCH2Port:      c2PortStr,
 		CCHTTPPort:    c2HttpPortStr,
 		C2ChannelMode: mode,
 		CAPEM:         string(caCertData),
@@ -253,7 +253,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 	// Create agent config
 	cfg := &def.Config{
 		CCAddress:     "127.0.0.1",
-		CCPort:        c2PortStr,
+		CCH2Port:      c2PortStr,
 		CCHTTPPort:    c2HttpPortStr,
 		C2ChannelMode: mode,
 		CAPEM:         string(caCertData),

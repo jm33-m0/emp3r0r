@@ -22,7 +22,7 @@ func RunKCPClient() {
 		return
 	}
 	logging.Infof("C2 traffic will go through KCP tunnel at port %s, KCP server port %s, C2 port %s",
-		common.RuntimeConfig.KCPClientPort, common.RuntimeConfig.KCPServerPort, common.RuntimeConfig.CCPort)
+		common.RuntimeConfig.KCPClientPort, common.RuntimeConfig.KCPServerPort, common.RuntimeConfig.CCH2Port)
 	// this context ends when agent exits
 	KCPC2Ctx, KCPC2Cancel = context.WithCancel(context.Background())
 	defer func() {
