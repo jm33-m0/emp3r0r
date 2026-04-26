@@ -285,3 +285,6 @@ core/modules/shellcode_stager/stager
 core/modules/shellcode_stager/loader
 core/modules/shellcode_stager/loader.pre
 core/modules/shellcode_stager/stage1_size.h
+
+# build
+zig*
