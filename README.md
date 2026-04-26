@@ -16,8 +16,6 @@
 ![GitHub License](https://img.shields.io/github/license/jm33-m0/emp3r0r)
 [![GitHub release](https://img.shields.io/github/release/jm33-m0/emp3r0r.svg)](https://github.com/jm33-m0/emp3r0r/releases)
 
-
-
 ---
 
 <img width="2560" height="1392" alt="image" src="https://github.com/user-attachments/assets/264e7752-aef6-4451-aca6-db29b1d45f78" />
@@ -76,41 +74,36 @@ HTTP2/TLS connections use **uTLS** to randomize TLS Client Hello fingerprints, p
 
 ## Quick Start
 
-### Installation
-
-While pre-built binaries may be available, building from source is the primary and recommended installation method:
+### Docker Deployment
 
 ```bash
-# Automated install script (Installs dependencies and builds from source)
-curl -sSL https://raw.githubusercontent.com/jm33-m0/emp3r0r/refs/heads/v4/install.sh | bash
+git clone --depth=1 https://github.com/jm33-m0/emp3r0r.git && \
+  cd emp3r0r && podman build . -t emp3r0r:4.2.3 # use your own tag, or simply `latest`
+
+# Run the server. Be sure to change your port mappings to fit your environment
+mkdir ~/.emp3r0r
+podman run -it --rm --cap-add=NET_ADMIN --device /dev/net/tun:/dev/net/tun \
+  -v "$HOME/.emp3r0r:/root/.emp3r0r" \
+  -p 12345:12345 -p 13377:13377 \
+  --name emp3r0r-server \
+  emp3r0r:4.2.3 \
+  server --c2-hosts 1.2.3.4 --http-port 12345 --operator-port 13377
+
+# Server prints C2 connection command
+emp3r0r client --c2-port 13377 --server-wg-key '0OKqMZmJfLDhAQLST4MKtKNa6MKxVkLn3UcOP14sMA8=' --server-wg-ip '10.88.14.158' --operator-wg-ip '10.88.14.236' --operator-wg-key 'LOe4sUyjyyIS3Kjnmz0SpKJwvDGle0880Q73qzsMg48=' --c2-host <YOUR_PUBLIC_IP>
 ```
 
-### 3-Step Deployment
-
-#### Initialize the Server
+Deploy the built Docker image on your operator machine. Use the command given by C2 server, just replace the `emp3r0r` argument with `podman` command.
 
 ```bash
-emp3r0r server --c2-hosts 'your.domain.com' --port 12345
+podman run -it --rm --cap-add=NET_ADMIN --device /dev/net/tun:/dev/net/tun \
+  -v "$HOME/.emp3r0r:/root/.emp3r0r"
+  --name emp3r0r-server \
+  emp3r0r:4.2.3 \
+  client --operator-port 13377 --server-wg-key '0OKqMZmJfLDhAQLST4MKtKNa6MKxVkLn3UcOP14sMA8=' --server-wg-ip '10.88.14.158' --operator-wg-ip '10.88.14.236' --operator-wg-key 'LOe4sUyjyyIS3Kjnmz0SpKJwvDGle0880Q73qzsMg48=' --c2-host 1.2.3.4
 ```
 
-This command deploys emp3r0r with:
-
-- HTTP2/TLS agent listener on a randomized port.
-- WireGuard operator service.
-- Operator mTLS server.
-
-#### Connect as Operator
-
-Copy the generated connection command and replace `<C2_PUBLIC_IP>` with your server's IP:
-
-```bash
-emp3r0r client --c2-port 12345 \
-	--server-wg-key 'server_wg_pubkey...' \
-	--server-wg-ip '10.10.0.1' \
-	--operator-wg-ip '10.10.0.2' \
-	--operator-wg-key 'operator_wg_private_key...' \
-	--c2-host <C2_PUBLIC_IP>
-```
+`emp3r0r client` automatically downloads and applies config files from C2 server via WireGuard tunnel.
 
 #### Generate Agent Payloads
 
