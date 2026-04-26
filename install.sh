@@ -122,6 +122,10 @@ cd emp3r0r-source/core || error "Failed to enter core directory"
 warn "Building and installing emp3r0r $tag (this may take a while)..."
 # build.sh will handle zig and other internal dependencies
 export TAG="$tag"
-GOROOT="$GOROOT" PATH="$PATH" GOTOOLCHAIN="$GOTOOLCHAIN" sudo ./build.sh --install || error "Build and installation failed"
+if "$EUID" -eq 0; then
+  ./build.sh --install || error "Build and installation failed"
+else
+  sudo ./build.sh --install || error "Build and installation failed"
+fi
 
 info "emp3r0r installed successfully!"

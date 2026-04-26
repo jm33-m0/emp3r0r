@@ -412,7 +412,7 @@ do_install() {
   # set capabilities for cc and setup wireguard runtime dir
   setcap cap_net_admin=eip "$data_dir/emp3r0r-cc" || error "setcap"
   mkdir -p /var/run/wireguard || error "mkdir wireguard"
-  chown "${SUDO_USER:-$USER}":"${SUDO_USER:-$USER}" /var/run/wireguard || error "chown wireguard"
+  chown "$(id -nu):$(id -ng)" /var/run/wireguard || error "chown wireguard"
 
   # tmpfiles.d entry to persist the directory
   if [[ -d "/etc/tmpfiles.d" ]]; then
@@ -555,7 +555,6 @@ case "$1" in
     exit 0
   fi
   error "install failed"
-  exit 0
 
   ;;
 
