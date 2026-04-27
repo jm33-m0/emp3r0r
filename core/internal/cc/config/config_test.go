@@ -63,6 +63,8 @@ func TestInitConfigFile(t *testing.T) {
 	transport.CaCrtFile = tmpCrtFile.Name()
 
 	ccHost := "127.0.0.1"
+	live.RuntimeConfig.CCHTTPPort = "12345"
+	live.RuntimeConfig.CCH2Port = "12346"
 	err = InitConfigFile(ccHost)
 	if err != nil {
 		t.Fatalf("InitConfigFile failed: %v", err)
