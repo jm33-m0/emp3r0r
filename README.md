@@ -76,15 +76,24 @@ HTTP2/TLS connections use **uTLS** to randomize TLS Client Hello fingerprints, p
 
 ### Docker Deployment
 
+Podman is used here, you can use Docker if you like. Just replace `podman` with `docker`.
+
 ```bash
-git clone --depth=1 https://github.com/jm33-m0/emp3r0r.git && \
-  cd emp3r0r && podman build . -t emp3r0r:4.2.3 # use your own tag, or simply `latest`
+# Clone the project
+git clone --depth=1 https://github.com/jm33-m0/emp3r0r.git && cd emp3r0r
+
+# Step 1: Build the archive on the host using a throwaway container
+podman run --rm -v .:/src:z -w /src/core golang:1.26.2 \
+    /bin/bash -c "apt update && apt install -y sudo curl git jq tmux zstd libcap2-bin build-essential && ./build.sh --install"
+
+# Step 2: Build your slim production image
+podman build -t emp3r0r:4.2.3 . # use any tag you like
 
 # Run the server. Be sure to change your port mappings to fit your environment
 mkdir ~/.emp3r0r
 podman run -it --rm --cap-add=NET_ADMIN --device /dev/net/tun:/dev/net/tun \
   -v "$HOME/.emp3r0r:/root/.emp3r0r" \
-  -p 12345:12345 -p 13377:13377 \
+  -p 12345:12345 -p 13377:13377/udp \
   --name emp3r0r-server \
   emp3r0r:4.2.3 \
   server --c2-hosts 1.2.3.4 --http-port 12345 --operator-port 13377
@@ -93,14 +102,10 @@ podman run -it --rm --cap-add=NET_ADMIN --device /dev/net/tun:/dev/net/tun \
 emp3r0r client --c2-port 13377 --server-wg-key '0OKqMZmJfLDhAQLST4MKtKNa6MKxVkLn3UcOP14sMA8=' --server-wg-ip '10.88.14.158' --operator-wg-ip '10.88.14.236' --operator-wg-key 'LOe4sUyjyyIS3Kjnmz0SpKJwvDGle0880Q73qzsMg48=' --c2-host <YOUR_PUBLIC_IP>
 ```
 
-Deploy the built Docker image on your operator machine. Use the command given by C2 server, just replace the `emp3r0r` argument with `podman` command.
+And follow the instructions given by the `emp3r0r server`, transfer `emp3r0r-operator-kit.tar.zst` to your operator machine and install it. Then run `emp3r0r client`.
 
 ```bash
-podman run -it --rm --cap-add=NET_ADMIN --device /dev/net/tun:/dev/net/tun \
-  -v "$HOME/.emp3r0r:/root/.emp3r0r"
-  --name emp3r0r-server \
-  emp3r0r:4.2.3 \
-  client --operator-port 13377 --server-wg-key '0OKqMZmJfLDhAQLST4MKtKNa6MKxVkLn3UcOP14sMA8=' --server-wg-ip '10.88.14.158' --operator-wg-ip '10.88.14.236' --operator-wg-key 'LOe4sUyjyyIS3Kjnmz0SpKJwvDGle0880Q73qzsMg48=' --c2-host 1.2.3.4
+emp3r0r client --operator-port 13377 --server-wg-key '0OKqMZmJfLDhAQLST4MKtKNa6MKxVkLn3UcOP14sMA8=' --server-wg-ip '10.88.14.158' --operator-wg-ip '10.88.14.236' --operator-wg-key 'LOe4sUyjyyIS3Kjnmz0SpKJwvDGle0880Q73qzsMg48=' --c2-host 1.2.3.4
 ```
 
 `emp3r0r client` automatically downloads and applies config files from C2 server via WireGuard tunnel.
