@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.2.4](https://github.com/jm33-m0/emp3r0r/compare/v4.2.3...v4.2.4) (2026-04-28)
+
+
+### Bug Fixes
+
+* users should be able to specify C2 server ports in command line ([478882f](https://github.com/jm33-m0/emp3r0r/commit/478882f1de217192e1575672652ad4b61638cdeb))
+
 ## [4.2.3](https://github.com/jm33-m0/emp3r0r/compare/v4.2.2...v4.2.3) (2026-04-26)
 
 
