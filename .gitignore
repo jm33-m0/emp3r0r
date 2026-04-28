@@ -288,3 +288,6 @@ core/modules/shellcode_stager/stage1_size.h
 
 # build
 zig*
+
+# clangd
+compile_commands.json
