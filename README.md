@@ -111,7 +111,7 @@ emp3r0r client --operator-port 13377 --server-wg-key '0OKqMZmJfLDhAQLST4MKtKNa6M
 
 `emp3r0r client` automatically downloads and applies config files from C2 server via WireGuard tunnel.
 
-#### Generate Agent Payloads
+### Generate Agent Payloads
 
 Use the `generate` command from within the emp3r0r shell interface to create customized agent payloads.
 
