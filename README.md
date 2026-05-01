@@ -64,7 +64,7 @@ Execute **Windows COFF objects** on Windows agents with typed argument packing (
 
 ### 🎭 Pluggable C2 Transport + JA3 Evasion + CBOR
 
-emp3r0r supports **pluggable C2 channel wrappers**. In v4, the default is `h2conn`, and `plain_http` is also available. `plain_http` runs over HTTP/1.1 and can be proxied by CDN/reverse proxies directly, without the websocket `--cdn2proxy` bridge.
+emp3r0r supports **pluggable C2 channel wrappers**. In v4, the default is `plain_http` beacon mode, and `h2conn` stream mode is also available. `plain_http` runs over HTTP/1.1 with malleable profiles and can be proxied by CDN/reverse proxies directly, without the websocket `--cdn2proxy` bridge.
 
 HTTP2/TLS connections use **uTLS** to randomize TLS Client Hello fingerprints, preventing static JA3 signature detection. All network traffic and data storage uses **CBOR** (binary) instead of JSON, reducing bandwidth by 30-40% and avoiding text-based parsing signatures.
 
