@@ -60,7 +60,7 @@
 
 ### Features
 
-* default to `plain_http` transport for flexibility ([da2a66f](https://github.com/jm33-m0/emp3r0r/commit/da2a66f70a4335adfb8b229d06054ff26453c06c))
+* default to `http_poll` transport for flexibility ([da2a66f](https://github.com/jm33-m0/emp3r0r/commit/da2a66f70a4335adfb8b229d06054ff26453c06c))
 * revamp module system to invoke modules as cobra commands, ensuring UX consistency ([6093b1f](https://github.com/jm33-m0/emp3r0r/commit/6093b1f0cf24186e44c35890f67c53b5297e88c2))
 
 

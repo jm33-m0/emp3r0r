@@ -39,7 +39,7 @@ func genC2TransportString() (transport_str string) {
 		return fmt.Sprintf("Proxy %s", common.RuntimeConfig.C2TransportProxy)
 	} else {
 		mode := strings.ToLower(common.RuntimeConfig.C2ChannelMode)
-		if mode == "plain_http" {
+		if mode == "http_poll" {
 			return fmt.Sprintf("HTTP (%s)", def.CCAddress)
 		}
 		// Default to HTTP2 for h2conn or unknown modes

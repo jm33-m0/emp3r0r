@@ -43,7 +43,7 @@ func waitForPort(addr string, deadline time.Time) error {
 func runCheckinACK(t *testing.T, mode string) {
 	t.Helper()
 
-	tmpDir, err := os.MkdirTemp("", "agent_plain_http_test")
+	tmpDir, err := os.MkdirTemp("", "agent_http_poll_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
@@ -120,7 +120,7 @@ func runCheckinACK(t *testing.T, mode string) {
 		t.Fatalf("TLS C2 server did not become ready: %v", err)
 	}
 
-	if mode == "plain_http" {
+	if mode == "http_poll" {
 		go server.StartC2HTTPServer()
 		if err := waitForPort(fmt.Sprintf("127.0.0.1:%d", httpPort), time.Now().Add(10*time.Second)); err != nil {
 			t.Fatalf("Plain HTTP server did not become ready: %v", err)
@@ -161,7 +161,7 @@ func runCheckinACK(t *testing.T, mode string) {
 		t.Fatalf("Failed to append CA cert")
 	}
 
-	if mode == "plain_http" {
+	if mode == "http_poll" {
 		def.CCAddress = fmt.Sprintf("http://127.0.0.1:%d", httpPort)
 		def.HTTPClient = transport.CreateEmp3r0rHTTPClient(def.CCAddress, "")
 		if def.HTTPClient == nil {
@@ -206,7 +206,7 @@ func runCheckinACK(t *testing.T, mode string) {
 }
 
 func TestPlainHTTPCheckinACK(t *testing.T) {
-	for _, mode := range []string{def.C2ChannelModeH2Conn, "plain_http"} {
+	for _, mode := range []string{def.C2ChannelModeH2Conn, "http_poll"} {
 		mode := mode
 		t.Run(mode, func(t *testing.T) {
 			runCheckinACK(t, mode)

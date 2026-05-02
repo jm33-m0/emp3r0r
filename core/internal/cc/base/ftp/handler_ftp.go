@@ -34,7 +34,7 @@ func copyWithDecompressedLimit(dst io.Writer, src io.Reader, expectedSize int64)
 	limit := expectedSize + maxTransferSizeBuffer
 	limitedReader := io.LimitReader(src, limit+1)
 
-	// Use a larger buffer for bulk stream performance (especially over polling transports like plain_http)
+	// Use a larger buffer for bulk stream performance (especially over polling transports like http_poll)
 	buf := make([]byte, 1024*1024)
 	n, err := io.CopyBuffer(dst, limitedReader, buf)
 	if err != nil {

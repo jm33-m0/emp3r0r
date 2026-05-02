@@ -111,7 +111,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 		t.Skip("Skipping test: race detector is enabled")
 	}
 
-	for _, mode := range []string{def.C2ChannelModeH2Conn, "plain_http"} {
+	for _, mode := range []string{def.C2ChannelModeH2Conn, "http_poll"} {
 		mode := mode
 		t.Run(mode, func(t *testing.T) {
 			runAgentEndToEndLifecycle(t, mode)
@@ -342,7 +342,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 		logging.Infof("Starting real C2 server on port %s", c2PortStr)
 		server.StartC2AgentTLSServer()
 	}()
-	if mode == "plain_http" {
+	if mode == "http_poll" {
 		go server.StartC2HTTPServer()
 	}
 
@@ -801,7 +801,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 
 		// In strict fail-closed mode, abrupt process kill can leave a stale session
 		// record for a short period. Force cleanup in test to validate key persistence.
-		if mode == "plain_http" && time.Since(startRestart) > 1*time.Second &&
+		if mode == "http_poll" && time.Since(startRestart) > 1*time.Second &&
 			(lastCleanup.IsZero() || time.Since(lastCleanup) >= 5*time.Second) {
 			if endErr := agents.EndSession(agent.UUID); endErr != nil {
 				logging.Warningf("Failed to clean stale session for %s: %v", agent.UUID, endErr)

@@ -256,7 +256,7 @@ func TestReadJSONConfigLoadsPlainHTTP(t *testing.T) {
 		"cc_port": "12345",
 		"agent_socks_server_port": "1080",
 		"cc_http_port": "8080",
-		"c2_channel_mode": "plain_http",
+		"c2_channel_mode": "http_poll",
 		"malleable_c2": {
 			"c2_path": "/test-path",
 			"session_header": "X-Session-ID",
@@ -277,8 +277,8 @@ func TestReadJSONConfigLoadsPlainHTTP(t *testing.T) {
 	if loaded.CCHTTPPort != "8080" {
 		t.Errorf("Expected CCHTTPPort 8080, got %s", loaded.CCHTTPPort)
 	}
-	if loaded.C2ChannelMode != "plain_http" {
-		t.Errorf("Expected C2ChannelMode plain_http, got %s", loaded.C2ChannelMode)
+	if loaded.C2ChannelMode != "http_poll" {
+		t.Errorf("Expected C2ChannelMode http_poll, got %s", loaded.C2ChannelMode)
 	}
 	if loaded.MalleableC2.C2Path != "/test-path" {
 		t.Errorf("Expected MalleableC2.C2Path /test-path, got %s", loaded.MalleableC2.C2Path)

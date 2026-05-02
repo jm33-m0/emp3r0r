@@ -52,7 +52,7 @@ func ReportStatus(config *def.Config, info *def.Emp3r0rAgent) (err error) {
 
 	// Wait for ACK from server
 	// This ensures the server has processed our check-in before we close the connection
-	// especially important for polling-based transports like plain_http
+	// especially important for polling-based transports like http_poll
 	dec := cbor.NewDecoder(secureConn)
 	var ack def.MsgTunData
 	if err = dec.Decode(&ack); err != nil {

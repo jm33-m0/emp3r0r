@@ -134,7 +134,7 @@ func (h HTTPChannelWrapper) Dial(ctx context.Context, client *http.Client, url s
 }
 
 func (h HTTPChannelWrapper) Accept(w http.ResponseWriter, req *http.Request) (io.ReadWriteCloser, error) {
-	// Accept is bypassed by CC's dedicated HTTP server for `plain_http`.
+	// Accept is bypassed by CC's dedicated HTTP server for `http_poll`.
 	return nil, errors.New("Accept is not implemented for HTTPChannelWrapper; please use HandleHTTPSession on the server")
 }
 
@@ -618,5 +618,5 @@ func (s *HTTPServerStream) Close() error {
 }
 
 func init() {
-	RegisterC2Channel("plain_http", "Plain HTTP/1.1 stateless polling wrapper", &HTTPChannelWrapper{})
+	RegisterC2Channel("http_poll", "Plain HTTP/1.1 stateless polling wrapper", &HTTPChannelWrapper{})
 }

