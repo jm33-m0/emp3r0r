@@ -74,6 +74,19 @@ func AllC2ChannelModes() []string {
 	return names
 }
 
+func AllC2ChannelModesDetailed() []string {
+	descriptions := []string{}
+	// Get C2 channel descriptions
+	C2Channels.Range(func(key, value any) bool {
+		descriptor := value.(C2ChannelDescriptor)
+		description := fmt.Sprintf("%s: %s", descriptor.Name, descriptor.Description)
+		descriptions = append(descriptions, description)
+		return true
+	})
+	sort.Strings(descriptions)
+	return descriptions
+}
+
 // GenericStreamTransport adapts a raw ReadWriteCloser to the StreamTransport interface.
 // It intentionally exposes only byte-stream semantics to higher protocol layers.
 type GenericStreamTransport struct {

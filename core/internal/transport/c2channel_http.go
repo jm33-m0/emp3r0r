@@ -618,5 +618,5 @@ func (s *HTTPServerStream) Close() error {
 }
 
 func init() {
-	RegisterC2Channel("http_poll", "Plain HTTP/1.1 stateless polling wrapper", &HTTPChannelWrapper{})
+	RegisterC2Channel("http_poll", "HTTP/1.1 stateless polling wrapper. Use `https://` to enable TLS", &HTTPChannelWrapper{})
 }
