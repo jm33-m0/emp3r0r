@@ -1,5 +1,24 @@
 # Changelog
 
+## [5.0.0](https://github.com/jm33-m0/emp3r0r/compare/v4.2.4...v5.0.0) (2026-05-31)
+
+
+### ⚠ BREAKING CHANGES
+
+* remove `ghw` dependency
+* clean up legacy code
+
+### Bug Fixes
+
+* disable hardware query ([a5000a3](https://github.com/jm33-m0/emp3r0r/commit/a5000a350b7114010ba2796be9c77088f4e4aa0f))
+* improve compatibility with existing CS BOFs ([2089255](https://github.com/jm33-m0/emp3r0r/commit/20892558b4518ea70396f6a3be4fb83f4d67404b))
+
+
+### Code Refactoring
+
+* clean up legacy code ([dc70754](https://github.com/jm33-m0/emp3r0r/commit/dc70754691c7cdfa6c90ac63843cee9ae15f1b22))
+* remove `ghw` dependency ([2c6bd1d](https://github.com/jm33-m0/emp3r0r/commit/2c6bd1db3274f89927e8fd2bbde6df69b4d9c761))
+
 ## [4.2.4](https://github.com/jm33-m0/emp3r0r/compare/v4.2.3...v4.2.4) (2026-04-28)
 
 
