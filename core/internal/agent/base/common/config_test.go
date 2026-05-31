@@ -32,7 +32,6 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 		UseKCP:                    false,
 		EnableNCSI:                true,
 		SSHHostKey:                []byte("ssh-rsa AAAAB3Nza..."),
-		Bring2CCReverseProxyPort:  "6000",
 		SSHDShellPort:             "2222",
 		MeshGossipPort:            "9000",
 		CCTimeout:                 5000,
@@ -110,9 +109,6 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 	}
 	if string(RuntimeConfig.SSHHostKey) != string(originalCfg.SSHHostKey) {
 		t.Errorf("SSHHostKey mismatch")
-	}
-	if RuntimeConfig.Bring2CCReverseProxyPort != originalCfg.Bring2CCReverseProxyPort {
-		t.Errorf("Bring2CCReverseProxyPort mismatch: got %s, want %s", RuntimeConfig.Bring2CCReverseProxyPort, originalCfg.Bring2CCReverseProxyPort)
 	}
 	if RuntimeConfig.SSHDShellPort != originalCfg.SSHDShellPort {
 		t.Errorf("SSHDShellPort mismatch: got %s, want %s", RuntimeConfig.SSHDShellPort, originalCfg.SSHDShellPort)

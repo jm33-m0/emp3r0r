@@ -99,7 +99,6 @@ type Config struct {
 	UseKCP                    bool   `cbor:"12,keyasint"` // enable KCP for Shadowsocks C2 transport
 	EnableNCSI                bool   `cbor:"13,keyasint"` // NCSI connectivity checking, disable when C2 is reachable but NCSI is not
 	SSHHostKey                []byte `cbor:"14,keyasint"` // SSH host (private) key (PEM string), used by remote forwarding server
-	Bring2CCReverseProxyPort  string `cbor:"15,keyasint"` // Used to bring target host to C2, see Bring2CC
 	SSHDShellPort             string `cbor:"16,keyasint"` // interactive shell
 	MeshGossipPort            string `cbor:"17,keyasint"` // UDP/TCP port for gossip (memberlist)
 	// Preflight Config

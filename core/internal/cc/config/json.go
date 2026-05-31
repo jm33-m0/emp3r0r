@@ -44,7 +44,6 @@ type jsonConfig struct {
 	UseKCP                    bool                    `json:"use_kcp"`
 	EnableNCSI                bool                    `json:"enable_ncsi"`
 	SSHHostKey                string                  `json:"ssh_host_key"`
-	Bring2CCReverseProxyPort  string                  `json:"bring2cc_reverse_proxy_port"`
 	SSHDShellPort             string                  `json:"sshd_shell_port"`
 	MeshGossipPort            string                  `json:"mesh_gossip_port"`
 	PreflightEnabled          bool                    `json:"preflight_enabled"`
@@ -169,7 +168,6 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 		config_to_write.SSHHostKey = []byte(val)
 	}
 
-	config_to_write.Bring2CCReverseProxyPort = getString("bring2cc_reverse_proxy_port")
 	config_to_write.SSHDShellPort = getString("sshd_shell_port")
 	config_to_write.MeshGossipPort = getString("mesh_gossip_port")
 	config_to_write.PreflightEnabled = getBool("preflight_enabled")
@@ -355,9 +353,6 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 		if jCfg.SSHHostKey != "" {
 			config_to_write.SSHHostKey = []byte(jCfg.SSHHostKey)
 		}
-		if jCfg.Bring2CCReverseProxyPort != "" {
-			config_to_write.Bring2CCReverseProxyPort = jCfg.Bring2CCReverseProxyPort
-		}
 		if jCfg.SSHDShellPort != "" {
 			config_to_write.SSHDShellPort = jCfg.SSHDShellPort
 		}
@@ -500,20 +495,6 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 		}
 	}
 
-	calculateReverseProxyPort := func() (string, error) {
-		p, err := strconv.Atoi(config_to_write.AgentSocksServerPort)
-		if err != nil {
-			return "", fmt.Errorf("WTF? AgentSocksServerPort: %s: %v. Invalid JSON config, perhaps start over with a new config file?", config_to_write.AgentSocksServerPort, err)
-		}
-
-		// reverseProxyPort
-		rProxyPortInt := p + 1
-		return strconv.Itoa(rProxyPortInt), nil
-	}
-	config_to_write.Bring2CCReverseProxyPort, err = calculateReverseProxyPort()
-	if err != nil {
-		return err
-	}
 
 	// these variables are decided by other variables
 	def.CCAddress = fmt.Sprintf("https://%s", config_to_write.CCAddress)
