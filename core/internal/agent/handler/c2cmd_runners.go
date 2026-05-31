@@ -25,8 +25,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-
-
 type listenerMeta struct {
 	Type      string
 	Port      string
