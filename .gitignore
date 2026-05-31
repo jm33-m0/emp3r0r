@@ -291,3 +291,4 @@ zig*
 
 # clangd
 compile_commands.json
+vendor/
