@@ -1,15 +1,15 @@
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <elf.h>
+#include <pthread.h>
+#include <setjmp.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
-#include <signal.h>
-#include <setjmp.h>
-#include <pthread.h>
 #include <unistd.h>
 
 #pragma GCC visibility push(hidden)
@@ -59,11 +59,134 @@ static uint64_t align_up(uint64_t val, uint64_t align) {
   return (val + align - 1) & ~(align - 1);
 }
 
+// BOF Mock API State
+static char *bof_out_buf = NULL;
+static size_t bof_out_len = 0;
+static size_t bof_out_cap = 0;
+
+static void bof_out_append(const char *data, size_t len) {
+  if (len == 0)
+    return;
+  if (bof_out_len + len + 1 > bof_out_cap) {
+    size_t new_cap = bof_out_cap * 2;
+    if (new_cap < bof_out_len + len + 1)
+      new_cap = bof_out_len + len + 4096;
+    char *new_buf = realloc(bof_out_buf, new_cap);
+    if (!new_buf)
+      return;
+    bof_out_buf = new_buf;
+    bof_out_cap = new_cap;
+  }
+  memcpy(bof_out_buf + bof_out_len, data, len);
+  bof_out_len += len;
+  bof_out_buf[bof_out_len] = '\0';
+}
+
+void BeaconPrintf(int type, const char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  int needed = vsnprintf(NULL, 0, fmt, ap);
+  va_end(ap);
+
+  if (needed < 0)
+    return;
+  char *buf = malloc(needed + 1);
+  if (!buf)
+    return;
+
+  va_start(ap, fmt);
+  vsnprintf(buf, needed + 1, fmt, ap);
+  va_end(ap);
+
+  bof_out_append(buf, needed);
+  bof_out_append("\n", 1);
+  free(buf);
+}
+
+void BeaconOutput(int type, const char *data, int len) {
+  bof_out_append(data, len);
+}
+
+// Data parse APIs
+typedef struct {
+  char *original;
+  char *buffer;
+  int length;
+  int size;
+} datap;
+
+void BeaconDataParse(datap *parser, char *buffer, int size) {
+  parser->original = buffer;
+  parser->buffer = buffer;
+  parser->length = size;
+  parser->size = size;
+}
+
+int BeaconDataInt(datap *parser) {
+  if (parser->length < 4)
+    return 0;
+  int v = *(int *)parser->buffer;
+  parser->buffer += 4;
+  parser->length -= 4;
+  return v;
+}
+
+short BeaconDataShort(datap *parser) {
+  if (parser->length < 2)
+    return 0;
+  short v = *(short *)parser->buffer;
+  parser->buffer += 2;
+  parser->length -= 2;
+  return v;
+}
+
+int BeaconDataLength(datap *parser) { return parser->length; }
+
+char *BeaconDataExtract(datap *parser, int *size) {
+  if (parser->length < 4) {
+    if (size)
+      *size = 0;
+    return NULL;
+  }
+  int len = *(int *)parser->buffer;
+  parser->buffer += 4;
+  parser->length -= 4;
+  if (len > parser->length || len < 0) {
+    if (size)
+      *size = 0;
+    return NULL;
+  }
+  char *out = parser->buffer;
+  parser->buffer += len;
+  parser->length -= len;
+  if (size)
+    *size = len;
+  return out;
+}
+
+void *mocked_apis(const char *sym_name) {
+  if (strcmp(sym_name, "BeaconPrintf") == 0)
+    return BeaconPrintf;
+  if (strcmp(sym_name, "BeaconOutput") == 0)
+    return BeaconOutput;
+  if (strcmp(sym_name, "BeaconDataParse") == 0)
+    return BeaconDataParse;
+  if (strcmp(sym_name, "BeaconDataInt") == 0)
+    return BeaconDataInt;
+  if (strcmp(sym_name, "BeaconDataShort") == 0)
+    return BeaconDataShort;
+  if (strcmp(sym_name, "BeaconDataLength") == 0)
+    return BeaconDataLength;
+  if (strcmp(sym_name, "BeaconDataExtract") == 0)
+    return BeaconDataExtract;
+  return NULL;
+}
+
 // Global mutex to serialize BOF execution and protect signal handler state
 static pthread_mutex_t bof_lock = PTHREAD_MUTEX_INITIALIZER;
 
 // Saved signal handlers
-static struct sigaction old_sa[32]; 
+static struct sigaction old_sa[32];
 static int handled_sigs[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE};
 #define NUM_HANDLED_SIGS (sizeof(handled_sigs) / sizeof(handled_sigs[0]))
 
@@ -72,36 +195,38 @@ static __thread sigjmp_buf bof_env;
 static __thread volatile int is_in_bof = 0;
 
 static void bof_signal_handler(int sig, siginfo_t *info, void *ctx) {
-    if (is_in_bof) {
-        siglongjmp(bof_env, 1);
+  if (is_in_bof) {
+    siglongjmp(bof_env, 1);
+  }
+
+  // Chain to original handler if not in BOF or if handler exists
+  // Note: We only save old_sa when we take the lock.
+  // Since we are in the handler, we assume old_sa is valid for the chained
+  // call.
+  if (sig >= 0 && sig < 32) {
+    if (old_sa[sig].sa_flags & SA_SIGINFO) {
+      if (old_sa[sig].sa_sigaction)
+        old_sa[sig].sa_sigaction(sig, info, ctx);
+    } else {
+      if (old_sa[sig].sa_handler != SIG_IGN &&
+          old_sa[sig].sa_handler != SIG_DFL)
+        old_sa[sig].sa_handler(sig);
+      else if (old_sa[sig].sa_handler == SIG_DFL) {
+        // If default, we need to unblock and re-raise or let it crash.
+        // Ideally we restore specific handler and raise.
+        // For now, minimal implementation: do nothing implies return/ignore?
+        // No, SIGSEGV return won't fix cause.
+        // But since we are here, likely Go Runtime installed a handler.
+      }
     }
-    
-    // Chain to original handler if not in BOF or if handler exists
-    // Note: We only save old_sa when we take the lock.
-    // Since we are in the handler, we assume old_sa is valid for the chained call.
-    if (sig >= 0 && sig < 32) {
-        if (old_sa[sig].sa_flags & SA_SIGINFO) {
-            if (old_sa[sig].sa_sigaction)
-                old_sa[sig].sa_sigaction(sig, info, ctx);
-        } else {
-             if (old_sa[sig].sa_handler != SIG_IGN && old_sa[sig].sa_handler != SIG_DFL)
-                old_sa[sig].sa_handler(sig);
-             else if (old_sa[sig].sa_handler == SIG_DFL) {
-                 // If default, we need to unblock and re-raise or let it crash.
-                 // Ideally we restore specific handler and raise.
-                 // For now, minimal implementation: do nothing implies return/ignore?
-                 // No, SIGSEGV return won't fix cause. 
-                 // But since we are here, likely Go Runtime installed a handler. 
-             }
-        }
-    }
+  }
 }
 
 // bof_run loads an x86_64 ELF ET_REL object and executes the requested symbol.
 __attribute__((visibility("default"))) int
 bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
         const uint8_t *args_buf, int args_len, char **out_buf, char **err_buf) {
-  
+
   // Serialize access
   pthread_mutex_lock(&bof_lock);
 
@@ -147,6 +272,10 @@ bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
     total_size += shdrs[i].sh_size;
   }
 
+  total_size = align_up(total_size, 4096);
+  uintptr_t trampoline_offset = total_size;
+  total_size += 4096; // Space for up to 256 trampolines
+
   if (total_size == 0) {
     free(sec_offsets);
     pthread_mutex_unlock(&bof_lock);
@@ -191,6 +320,7 @@ bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
     return set_err(err_buf, "missing symtab");
   }
 
+  int next_trampoline = 0;
   for (int i = 0; i < ehdr->e_shnum; i++) {
     if (shdrs[i].sh_type != SHT_RELA) {
       continue;
@@ -232,14 +362,34 @@ bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
       const char *sym_name = strtab + sym.st_name;
 
       if (sym.st_shndx == SHN_UNDEF) {
-        void *handle = dlsym(RTLD_DEFAULT, sym_name);
+        void *handle = mocked_apis(sym_name);
+        if (!handle) {
+          handle = dlsym(RTLD_DEFAULT, sym_name);
+        }
         if (!handle) {
           munmap(mem_base, total_size);
           free(sec_offsets);
           pthread_mutex_unlock(&bof_lock);
           return set_errf(err_buf, "unresolved symbol: %s", sym_name);
         }
-        sym_addr = (uintptr_t)handle;
+
+        if (next_trampoline >= 256) {
+          munmap(mem_base, total_size);
+          free(sec_offsets);
+          pthread_mutex_unlock(&bof_lock);
+          return set_err(err_buf,
+                         "too many undefined symbols for trampoline limit");
+        }
+        uint8_t *tramp = mem_base + trampoline_offset + (next_trampoline * 16);
+        next_trampoline++;
+        tramp[0] = 0x49;
+        tramp[1] = 0xbb; // movabs r11, ...
+        *(uint64_t *)(tramp + 2) = (uint64_t)handle;
+        tramp[10] = 0x41;
+        tramp[11] = 0xff;
+        tramp[12] = 0xe3; // jmp r11
+
+        sym_addr = (uintptr_t)tramp;
       } else if (sym.st_shndx == SHN_ABS) {
         sym_addr = sym.st_value;
       } else {
@@ -261,10 +411,13 @@ bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
       case R_X86_64_PLT32: {
         int64_t val = (int64_t)sym_addr + rel.r_addend - (int64_t)patch_addr;
         if (val > 2147483647L || val < -2147483648L) {
-             munmap(mem_base, total_size);
-             free(sec_offsets);
-             pthread_mutex_unlock(&bof_lock);
-             return set_errf(err_buf, "relocation overflow for symbol %s (type %u): distance %ld exceeds 32 bits", sym_name, type, val);
+          munmap(mem_base, total_size);
+          free(sec_offsets);
+          pthread_mutex_unlock(&bof_lock);
+          return set_errf(err_buf,
+                          "relocation overflow for symbol %s (type %u): "
+                          "distance %ld exceeds 32 bits",
+                          sym_name, type, val);
         }
         *(uint32_t *)patch_addr = (uint32_t)val;
         break;
@@ -273,10 +426,13 @@ bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
         munmap(mem_base, total_size);
         free(sec_offsets);
         pthread_mutex_unlock(&bof_lock);
-        return set_errf(err_buf, "unsupported relocation %u for symbol %s", type, sym_name);
+        return set_errf(err_buf, "unsupported relocation %u for symbol %s",
+                        type, sym_name);
       }
     }
   }
+
+  mprotect(mem_base + trampoline_offset, 4096, PROT_READ | PROT_EXEC);
 
   // Apply protection (W^X)
   for (int i = 0; i < ehdr->e_shnum; i++) {
@@ -285,20 +441,23 @@ bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
     }
     uintptr_t start = (uintptr_t)mem_base + sec_offsets[i];
     uint64_t size = shdrs[i].sh_size;
-    if (size == 0) continue;
-    
+    if (size == 0)
+      continue;
+
     uint64_t prot_len = align_up(size, 4096);
 
     int prot = PROT_READ;
     // Map data as RW, code as RX
-    if (shdrs[i].sh_flags & SHF_WRITE) prot |= PROT_WRITE;
-    if (shdrs[i].sh_flags & SHF_EXECINSTR) prot |= PROT_EXEC;
+    if (shdrs[i].sh_flags & SHF_WRITE)
+      prot |= PROT_WRITE;
+    if (shdrs[i].sh_flags & SHF_EXECINSTR)
+      prot |= PROT_EXEC;
 
     if (mprotect((void *)start, prot_len, prot) < 0) {
-        munmap(mem_base, total_size);
-        free(sec_offsets);
-        pthread_mutex_unlock(&bof_lock);
-        return set_err(err_buf, "mprotect failed");
+      munmap(mem_base, total_size);
+      free(sec_offsets);
+      pthread_mutex_unlock(&bof_lock);
+      return set_err(err_buf, "mprotect failed");
     }
   }
 
@@ -326,48 +485,56 @@ bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
   struct sigaction sa;
   memset(&sa, 0, sizeof(sa));
   sa.sa_sigaction = bof_signal_handler;
-  sa.sa_flags = SA_SIGINFO | SA_NODEFER | SA_ONSTACK; 
+  sa.sa_flags = SA_SIGINFO | SA_NODEFER | SA_ONSTACK;
 
-  for(int i=0; i<NUM_HANDLED_SIGS; i++) {
-      sigaction(handled_sigs[i], &sa, &old_sa[handled_sigs[i]]);
+  for (int i = 0; i < NUM_HANDLED_SIGS; i++) {
+    sigaction(handled_sigs[i], &sa, &old_sa[handled_sigs[i]]);
   }
 
-  typedef char *(*func_ptr)(uint8_t *, int);
-  char *result = NULL;
+  typedef void (*func_ptr)(uint8_t *, int);
   int status = 0;
 
+  bof_out_buf = NULL;
+  bof_out_len = 0;
+  bof_out_cap = 0;
+
   if (sigsetjmp(bof_env, 1) == 0) {
-      is_in_bof = 1;
-      func_ptr f = (func_ptr)entry_addr;
-      result = f((uint8_t *)args_buf, args_len);
-      is_in_bof = 0;
+    is_in_bof = 1;
+    func_ptr f = (func_ptr)entry_addr;
+    f((uint8_t *)args_buf, args_len);
+    is_in_bof = 0;
   } else {
-      is_in_bof = 0;
-      status = -1; // Specific status for crash?
-      set_err(err_buf, "BOF Crashed (SIGSEGV/SIGBUS/etc caught)");
+    is_in_bof = 0;
+    status = -1; // Specific status for crash?
+    set_err(err_buf, "BOF Crashed (SIGSEGV/SIGBUS/etc caught)");
   }
 
   // Restore signal handlers
-  for(int i=0; i<NUM_HANDLED_SIGS; i++) {
-      sigaction(handled_sigs[i], &old_sa[handled_sigs[i]], NULL);
+  for (int i = 0; i < NUM_HANDLED_SIGS; i++) {
+    sigaction(handled_sigs[i], &old_sa[handled_sigs[i]], NULL);
   }
 
   if (status == 0) {
-      if (out_buf) {
-        if (result) {
-          size_t len = strlen(result) + 1;
-          *out_buf = (char *)malloc(len);
-          if (*out_buf) {
-            memcpy(*out_buf, result, len);
-          }
-        } else {
-          *out_buf = (char *)malloc(1);
-          if (*out_buf) {
-            (*out_buf)[0] = '\0';
-          }
+    if (out_buf) {
+      if (bof_out_buf) {
+        *out_buf = bof_out_buf;
+      } else {
+        *out_buf = (char *)malloc(1);
+        if (*out_buf) {
+          (*out_buf)[0] = '\0';
         }
       }
+    } else {
+      if (bof_out_buf)
+        free(bof_out_buf);
+    }
+  } else {
+    if (bof_out_buf)
+      free(bof_out_buf);
   }
+  bof_out_buf = NULL;
+  bof_out_len = 0;
+  bof_out_cap = 0;
 
   munmap(mem_base, total_size);
   free(sec_offsets);
@@ -376,4 +543,3 @@ bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
 }
 
 #pragma GCC visibility pop
-
