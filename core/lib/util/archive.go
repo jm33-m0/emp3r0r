@@ -58,11 +58,11 @@ func Unarchive(tarball, dst string) error {
 			return err
 		}
 
-		target := filepath.Join(dst, header.Name)
-		cleanDst := filepath.Clean(dst)
-		if target != cleanDst && !strings.HasPrefix(target, cleanDst+string(os.PathSeparator)) {
-			return fmt.Errorf("invalid file path: %s", header.Name)
+		localName, err := SecureLocalPath(header.Name)
+		if err != nil {
+			return fmt.Errorf("invalid file path %s: %w", header.Name, err)
 		}
+		target := filepath.Join(dst, localName)
 
 		switch header.Typeflag {
 		case tar.TypeDir:
