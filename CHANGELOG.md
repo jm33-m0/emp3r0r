@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.2.5](https://github.com/jm33-m0/emp3r0r/compare/v4.2.4...v4.2.5) (2026-05-31)
+
+
+### Bug Fixes
+
+* disable hardware query ([889e72c](https://github.com/jm33-m0/emp3r0r/commit/889e72c5881b61ef827082ce8af1a69dc82ec534))
+* improve compatibility with existing CS BOFs ([3ef6b0e](https://github.com/jm33-m0/emp3r0r/commit/3ef6b0ebd52c151b6962f9ab5650e56677e17cf6))
+
 ## [4.2.4](https://github.com/jm33-m0/emp3r0r/compare/v4.2.3...v4.2.4) (2026-04-28)
 
 
