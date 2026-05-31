@@ -10,7 +10,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/mesh"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
-	"github.com/jaypipes/ghw"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -152,11 +151,8 @@ func CollectFullSystemInfo() *def.Emp3r0rAgent {
 		logging.Infof("Gethostname: %v", err)
 		hostname = "unknown_host"
 	}
-	// read productInfo
-	info.Product, err = ghw.Product(ghw.WithDisableWarnings())
-	if err != nil {
-		logging.Infof("ProductInfo: %v", err)
-	}
+	// Native lightweight product info (no ghw dependency)
+	info.Hardware = sysinfo.GetHardwareInfo()
 	info.CWD, err = os.Getwd()
 	if err != nil {
 		logging.Infof("Getwd: %v", err)
@@ -174,7 +170,7 @@ func CollectFullSystemInfo() *def.Emp3r0rAgent {
 	info.CPU = util.GetCPUInfo()
 	info.GPU = util.GetGPUInfo()
 	info.Mem = fmt.Sprintf("%d MB", util.GetMemSize())
-	info.Hardware = util.CheckProduct(info.Product)
+	// info.Hardware already set
 	info.Container = sysinfo.CheckContainer()
 	info.Transport = genC2TransportString()
 	def.Transport = info.Transport
