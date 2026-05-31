@@ -4,15 +4,12 @@ import "sync"
 
 // built-in module names
 const (
-	ModCLEAN_LOG   = "clean_log"
-	ModLPE_SUGGEST = "lpe_suggest"
+	ModCLEAN_LOG = "clean_log"
 
-	ModBring2CC     = "bring2cc"
 	ModListener     = "listener"
 	ModSSHHarvester = "ssh_harvester"
 	ModFileServer   = "file_server"
 	ModDownloader   = "file_downloader"
-	ModMemDump      = "mem_dump"
 )
 
 // ModOption represents module options with typing metadata
@@ -144,63 +141,7 @@ func populateModules() {
 				IsInteractive: false,
 			},
 		},
-		ModLPE_SUGGEST: {
-			Name:     ModLPE_SUGGEST,
-			Build:    "",
-			Date:     "2020-01-25",
-			Comment:  "Run linux-smart-enumeration or linux exploit suggester",
-			IsLocal:  false,
-			Platform: "Generic",
-			Path:     "",
-			Fileless: false,
-			Options: ModOptions{
-				"lpe_helper": &ModOption{
-					Name: "lpe_helper",
-					Desc: "Which LPE helper to use, available helpers: lpe_les (Linux exploit suggester), lpe_lse (Linux smart enumeration), lpe_linpeas (PEASS-ng, works on Linux), lpe_winpeas (PEASS-ng, works on Windows",
-					Vals: []string{"lpe_les", "lpe_lse", "lpe_linpeas", "lpe_winpeas"},
-					Val:  "lpe_les",
-				},
-			},
-			AgentConfig: AgentModuleConfig{
-				Exec:          "built-in",
-				Files:         []string{},
-				InMemory:      false,
-				Type:          "go",
-				IsInteractive: false,
-			},
-		},
 
-		ModBring2CC: {
-			Name:     ModBring2CC,
-			Build:    "",
-			Date:     "2020-01-25",
-			Comment:  "Bring arbitrary agent to CC",
-			IsLocal:  false,
-			Platform: "Generic",
-			Path:     "",
-			Fileless: true,
-			Options: ModOptions{
-				"addr": &ModOption{
-					Name: "addr",
-					Desc: "Target host to proxy, we will connect to it and proxy it out",
-					Vals: []string{"127.0.0.1"},
-					Val:  "",
-				},
-				"kcp": &ModOption{
-					Name: "kcp",
-					Desc: "Use KCP (fast UDP tunnel) for proxy",
-					Vals: []string{"on", "off"},
-					Val:  "on",
-				},
-			},
-			AgentConfig: AgentModuleConfig{
-				Exec:          "built-in",
-				Files:         []string{},
-				InMemory:      false,
-				Type:          "go",
-				IsInteractive: false,
-			},
-		},
 		ModListener: {
 			Name:     ModListener,
 			Build:    "",
@@ -338,30 +279,6 @@ func populateModules() {
 				"checksum": &ModOption{
 					Name: "checksum",
 					Desc: "SHA256 checksum of the file, used to verify integrity, wont't check if empty",
-					Val:  "",
-				},
-			},
-			AgentConfig: AgentModuleConfig{
-				Exec:          "built-in",
-				Files:         []string{},
-				InMemory:      false,
-				Type:          "go",
-				IsInteractive: false,
-			},
-		},
-		ModMemDump: {
-			Name:     ModMemDump,
-			Build:    "",
-			Date:     "2020-01-25",
-			Comment:  "Dump memory regions of a process",
-			IsLocal:  false,
-			Platform: "Generic",
-			Path:     "",
-			Fileless: false,
-			Options: ModOptions{
-				"pid": &ModOption{
-					Name: "pid",
-					Desc: "PID of the target process",
 					Val:  "",
 				},
 			},

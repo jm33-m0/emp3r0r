@@ -178,7 +178,8 @@ func SetDynamicPrompt() string {
 	}
 	agent_name := color.New(color.FgCyan, color.Underline).Sprint(shortName)
 
-	dynamicPrompt := fmt.Sprintf("%s - %s @%s (%s) "+prompt_arrow,
+	dynamicPrompt := fmt.Sprintf(
+		"%s - %s @%s (%s) "+prompt_arrow,
 		prompt_name,
 		transport,
 		agent_name,
@@ -220,7 +221,8 @@ func valueOrUnset(value string) string {
 
 func formatRouteSummary() string {
 	routes := live.RuntimeConfig.C2Routes
-	return fmt.Sprintf("checkin=%s msg=%s ftp=%s www=%s proxy=%s",
+	return fmt.Sprintf(
+		"checkin=%s msg=%s ftp=%s www=%s proxy=%s",
 		valueOrUnset(routes.Checkin),
 		valueOrUnset(routes.Msg),
 		valueOrUnset(routes.FTP),
@@ -278,9 +280,10 @@ func CliBanner(console *console.Console) {
 	}
 	name_list := strings.Join(c2_names, ", ")
 
-	say, encodingErr := cow.Say(fmt.Sprintf("Welcome! You are using emp3r0r %s\n"+
-		"C2 Names: %s\n"+
-		"%s",
+	say, encodingErr := cow.Say(fmt.Sprintf(
+		"Welcome! You are using emp3r0r %s\n"+
+			"C2 Names: %s\n"+
+			"%s",
 		def.Version,
 		name_list,
 		formatBannerSummary(),

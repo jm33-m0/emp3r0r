@@ -18,7 +18,7 @@ import (
 // hProcess is the file descriptor of open file /proc/pid/mem, or 0 for current process
 // address is the starting address of the memory region
 // size is the size of the memory region to read
-func ReadMemoryRegion(hProcess uintptr, address, size uintptr) (data []byte, err error) {
+func ReadMemoryRegion(hProcess, address, size uintptr) (data []byte, err error) {
 	mem := os.NewFile(hProcess, "mem")
 	if hProcess == 0 {
 		mem, err = os.Open(fmt.Sprintf("/proc/%d/mem", os.Getpid()))
@@ -53,7 +53,7 @@ func DumpProcMem(pid int) (memdata map[int64][]byte, err error) {
 	// parse maps
 	maps, err := os.Open(maps_file)
 	if err != nil {
-		return
+		return memdata, err
 	}
 	scanner := bufio.NewScanner(maps)
 	for scanner.Scan() {
@@ -102,7 +102,7 @@ func DumpProcMem(pid int) (memdata map[int64][]byte, err error) {
 		memdata[start] = read_buf
 	}
 
-	return
+	return memdata, err
 }
 
 // DumpCurrentProcMem dumps everything (readable) from the self process

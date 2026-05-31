@@ -14,7 +14,7 @@ import (
 )
 
 // processKeyExchange handles the ECDH key exchange and session key derivation.
-func processKeyExchange(msg *def.MsgTunData, pfsEstablished bool) (replyData []byte, sessionKey []byte, err error) {
+func processKeyExchange(msg *def.MsgTunData, pfsEstablished bool) (replyData, sessionKey []byte, err error) {
 	if len(msg.EphemPublicKey) > 0 {
 		// 1. Generate Server Ephemeral Key Pair
 		serverPrivKey, err := transport.GenerateEphemeralKeyPair()
@@ -89,7 +89,7 @@ func fwdMsg2Operators(msg def.MsgTunData) (err error) {
 		}
 		return true // continue iteration
 	})
-	return
+	return err
 }
 
 // fwdMsgToOperator forwards a message to one operator session.

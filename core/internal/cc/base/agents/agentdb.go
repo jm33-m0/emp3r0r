@@ -374,7 +374,8 @@ func RecordAgentCheckin(agent *def.Emp3r0rAgent) error {
 		          ip_addresses, last_seen, first_seen, connection_count, created_at)
 		          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`
 
-		_, err := AgentDB.Exec(query,
+		_, err := AgentDB.Exec(
+			query,
 			agent.UUID,
 			agent.Tag,
 			agent.UUIDSig,
@@ -412,7 +413,8 @@ func RecordAgentCheckin(agent *def.Emp3r0rAgent) error {
 		          user = ?, ip_addresses = ?, last_seen = ?, connection_count = connection_count + 1
 		          WHERE uuid = ?`
 
-		_, err := AgentDB.Exec(query,
+		_, err := AgentDB.Exec(
+			query,
 			agent.Tag,
 			agent.Hostname,
 			agent.OS,
@@ -477,7 +479,8 @@ func DetectAgentChanges(agent *def.Emp3r0rAgent) error {
 	ipAddresses := strings.Join(agent.IPs, ",")
 
 	if stored.Hostname != agent.Hostname {
-		logging.Warningf("Agent %s hostname changed: %s → %s",
+		logging.Warningf(
+			"Agent %s hostname changed: %s → %s",
 			util.SanitizeOneLine(agent.UUID),
 			util.SanitizeOneLine(stored.Hostname),
 			util.SanitizeOneLine(agent.Hostname),
@@ -490,7 +493,8 @@ func DetectAgentChanges(agent *def.Emp3r0rAgent) error {
 	}
 
 	if stored.OS != agent.OS {
-		logging.Warningf("Agent %s OS changed: %s → %s",
+		logging.Warningf(
+			"Agent %s OS changed: %s → %s",
 			util.SanitizeOneLine(agent.UUID),
 			util.SanitizeOneLine(stored.OS),
 			util.SanitizeOneLine(agent.OS),
@@ -503,7 +507,8 @@ func DetectAgentChanges(agent *def.Emp3r0rAgent) error {
 	}
 
 	if stored.User != agent.User {
-		logging.Warningf("Agent %s user changed: %s → %s",
+		logging.Warningf(
+			"Agent %s user changed: %s → %s",
 			util.SanitizeOneLine(agent.UUID),
 			util.SanitizeOneLine(stored.User),
 			util.SanitizeOneLine(agent.User),
@@ -516,7 +521,8 @@ func DetectAgentChanges(agent *def.Emp3r0rAgent) error {
 	}
 
 	if stored.IPAddresses != ipAddresses {
-		logging.Infof("Agent %s IP addresses changed: %s → %s",
+		logging.Infof(
+			"Agent %s IP addresses changed: %s → %s",
 			util.SanitizeOneLine(agent.UUID),
 			util.SanitizeOneLine(stored.IPAddresses),
 			util.SanitizeOneLine(ipAddresses),
@@ -529,7 +535,8 @@ func DetectAgentChanges(agent *def.Emp3r0rAgent) error {
 	}
 
 	if stored.PublicKey != agent.PublicKey {
-		logging.Warningf("Agent %s public key changed (key_rotation detected): pinned=%s new=%s",
+		logging.Warningf(
+			"Agent %s public key changed (key_rotation detected): pinned=%s new=%s",
 			util.SanitizeOneLine(agent.UUID),
 			util.SanitizeOneLine(stored.PublicKey[:min(len(stored.PublicKey), 16)]),
 			util.SanitizeOneLine(agent.PublicKey[:min(len(agent.PublicKey), 16)]),

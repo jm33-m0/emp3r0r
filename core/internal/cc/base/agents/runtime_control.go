@@ -22,7 +22,7 @@ func RuntimeControlByUUID(uuid string) (agent *def.Emp3r0rAgent, ctrl *live.Agen
 		}
 		return true
 	})
-	return
+	return agent, ctrl, key, found
 }
 
 // RuntimeControlByConn returns the runtime projection entry associated with conn, if present.
@@ -39,5 +39,5 @@ func RuntimeControlByConn(conn net.Conn) (agent *def.Emp3r0rAgent, ctrl *live.Ag
 		}
 		return true
 	})
-	return
+	return agent, ctrl, key, found
 }

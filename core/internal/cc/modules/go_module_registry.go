@@ -23,14 +23,11 @@ type builtInGoModuleMeta struct {
 }
 
 var builtInGoModules = map[string]builtInGoModuleMeta{
-	def.ModCLEAN_LOG:    {C2Cmd: def.C2CmdCleanLog},
-	def.ModBring2CC:     {C2Cmd: def.C2CmdBring2CC},
-	def.ModListener:     {C2Cmd: def.C2CmdListener},
-	def.ModSSHHarvester: {C2Cmd: def.C2CmdSSHHarvester},
-	def.ModFileServer:   {C2Cmd: def.C2CmdFileServer},
-	def.ModDownloader:   {C2Cmd: def.C2CmdFileDownloader},
-	def.ModLPE_SUGGEST:  {Special: true},
-	def.ModMemDump:      {Special: true},
+	def.ModCLEAN_LOG: {C2Cmd: def.C2CmdCleanLog},
+
+	def.ModListener:   {C2Cmd: def.C2CmdListener},
+	def.ModFileServer: {C2Cmd: def.C2CmdFileServer},
+	def.ModDownloader: {C2Cmd: def.C2CmdFileDownloader},
 }
 
 func ensureBuiltInGoModuleRunners() {
@@ -134,9 +131,7 @@ func runAutoBuiltInModule(ctx *c2context.C2Context, modName string) error {
 	if modName == def.ModFileServer {
 		logging.Infof("File server (port %s) is now %s", flagVals["port"], flagVals["switch"])
 	}
-	if modName == def.ModBring2CC {
-		logging.Infof("agent %s is connecting to %s to proxy it out to C2", ctx.Target.Tag, flagVals["addr"])
-	}
+
 	if modName == def.ModListener {
 		action := flagVals["action"]
 		if action == "" {

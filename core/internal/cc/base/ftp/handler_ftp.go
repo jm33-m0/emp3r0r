@@ -1,6 +1,7 @@
 package ftp
 
 import (
+	"compress/gzip"
 	"context"
 	"errors"
 	"io"
@@ -15,7 +16,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/mholt/archives"
 	"github.com/schollz/progressbar/v3"
 )
 
@@ -74,7 +74,7 @@ func progressMonitor(bar *progressbar.ProgressBar, filewrite, targetFile string,
 }
 
 // HandleFTPStream processes file transfer requests over a continuous stream.
-func HandleFTPStream(conn io.ReadWriteCloser, token string, remoteAddr string, cancel context.CancelFunc) {
+func HandleFTPStream(conn io.ReadWriteCloser, token, remoteAddr string, cancel context.CancelFunc) {
 	logging.Debugf("FTP connection (%s) from %s", token, remoteAddr)
 	tokenSplit := strings.Split(token, "-")
 	if len(tokenSplit) != 2 {
@@ -272,7 +272,7 @@ func HandleFTPStream(conn io.ReadWriteCloser, token string, remoteAddr string, c
 	defer cleanup()
 
 	// Decompress and write file data.
-	decompressor, err := archives.Zstd{}.OpenReader(sh)
+	decompressor, err := gzip.NewReader(sh)
 	if err != nil {
 		logging.Errorf("Open decompressor error: %v", err)
 		return

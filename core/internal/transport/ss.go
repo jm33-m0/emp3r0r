@@ -68,7 +68,7 @@ func SSMain(ss_config *SSConfig) (err error) {
 	if strings.HasPrefix(ss_config.ServerAddr, "ss://") {
 		ss_config.ServerAddr, ss_config.Cipher, ss_config.Password, err = ParseSSURL(ss_config.ServerAddr)
 		if err != nil {
-			return
+			return err
 		}
 	}
 
@@ -76,7 +76,7 @@ func SSMain(ss_config *SSConfig) (err error) {
 	// Derive key from password if given key is empty.
 	ciph, err := core.PickCipher(ss_config.Cipher, key, ss_config.Password)
 	if err != nil {
-		return
+		return err
 	}
 
 	// Start shadowsocks server / client / TCP tunnel / UDP tunnel
@@ -103,14 +103,14 @@ func SSMain(ss_config *SSConfig) (err error) {
 		err = fmt.Errorf("invalid ss config")
 	}
 
-	return
+	return err
 }
 
 // ParseSSURL parse ss:// URL, eg. ss://AEAD_CHACHA20_POLY1305:your-password@[server_address]:8488
 func ParseSSURL(s string) (addr, cipher, password string, err error) {
 	u, err := url.Parse(s)
 	if err != nil {
-		return
+		return addr, cipher, password, err
 	}
 
 	addr = u.Host
@@ -118,5 +118,5 @@ func ParseSSURL(s string) (addr, cipher, password string, err error) {
 		cipher = u.User.Username()
 		password, _ = u.User.Password()
 	}
-	return
+	return addr, cipher, password, err
 }

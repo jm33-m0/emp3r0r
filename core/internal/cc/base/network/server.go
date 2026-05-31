@@ -23,7 +23,6 @@ var (
 
 	// Shared stream handlers and maps
 	FTPStreams sync.Map
-	PortFwds   sync.Map
 )
 
 // StopEmpTLSServer stops whichever C2 TLS endpoint is currently active.

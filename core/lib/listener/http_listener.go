@@ -18,13 +18,13 @@ import (
 )
 
 var (
-	server     *http.Server
+	server       *http.Server
 	httpServerMu sync.RWMutex
 )
 
 // encryptData encrypts the given data using the AES-128-CTR algorithm and the provided key.
 // The IV is prepended to the encrypted data.
-func encryptData(data []byte, key []byte) []byte {
+func encryptData(data, key []byte) []byte {
 	if len(key) != 16 {
 		logging.Fatalf("Key length must be 16 bytes for AES-128-CTR")
 	}
@@ -116,7 +116,7 @@ func serveStager(stager_enc []byte, port string) error {
 // port: the port to serve the stager file on.
 // keyStr: the passpharase to encrypt the stager file.
 // loaderPath: optional path to stage1 loader (empty string if not used).
-func HTTPAESCompressedListener(stagerPath string, port string, keyStr string, compression bool, loaderPath string) error {
+func HTTPAESCompressedListener(stagerPath, port, keyStr string, compression bool, loaderPath string) error {
 	blob, err := buildServedBlob(stagerPath, keyStr, loaderPath, compression)
 	if err != nil {
 		return err
@@ -127,7 +127,7 @@ func HTTPAESCompressedListener(stagerPath string, port string, keyStr string, co
 }
 
 // HTTPBareListener serves the stager file over HTTP without any encryption or compression.
-func HTTPBareListener(stagerPath string, port string) error {
+func HTTPBareListener(stagerPath, port string) error {
 	stager, err := os.ReadFile(stagerPath)
 	if err != nil {
 		return fmt.Errorf("failed to read stager file: %v", err)

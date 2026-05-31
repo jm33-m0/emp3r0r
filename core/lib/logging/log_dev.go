@@ -61,11 +61,11 @@ func Fatalf(format string, a ...any) {
 	logger.Fatal(format, a...)
 }
 
-func Notify(level string, format string, a ...any) {
+func Notify(level, format string, a ...any) {
 	logger.Notify(level, format, a...)
 }
 
-func SetBroadcastHandler(h func(level string, msg string)) {
+func SetBroadcastHandler(h func(level, msg string)) {
 	logger.BroadcastHandler = h
 }
 

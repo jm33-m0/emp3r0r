@@ -473,7 +473,8 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 			Response: []byte(fmt.Sprintf(
 				"\n\n⛔  ERROR: %d other operator session(s) are currently active!\n"+
 					"   Concurrent usage is PROHIBITED to prevent state corruption.\n"+
-					"   Closing connection... Please retry when the other session is closed.\n", activeSessionCount)),
+					"   Closing connection... Please retry when the other session is closed.\n", activeSessionCount,
+			)),
 		}
 
 		// Send the warning immediately upon connection

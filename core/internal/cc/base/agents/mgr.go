@@ -39,7 +39,7 @@ func GetAgentByIndex(index int) (target *def.Emp3r0rAgent) {
 		}
 		return true
 	})
-	return
+	return target
 }
 
 // GetAgentByTag find target from def.AgentControlMap via tag, return nil if not found
@@ -60,7 +60,7 @@ func GetAgentByTag(tag string) (target *def.Emp3r0rAgent) {
 			}
 		}
 	}
-	return
+	return target
 }
 
 // GetAgentByUUID find target from def.AgentControlMap via UUID, return nil if not found
@@ -81,7 +81,7 @@ func GetAgentByUUID(uuid string) (target *def.Emp3r0rAgent) {
 			}
 		}
 	}
-	return
+	return target
 }
 
 // IsAgentExistByUUID is agent already in target list?
@@ -111,7 +111,7 @@ func SendMessageToAgent(msg_data *def.MsgTunData, agent *def.Emp3r0rAgent) (err 
 	out := cbor.NewEncoder(ctrl.Conn)
 
 	err = out.Encode(msg_data)
-	return
+	return err
 }
 
 // SetActiveAgent set the active agent as the target

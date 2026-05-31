@@ -21,7 +21,7 @@ func GetNetworkDetails() (out string) {
 		strings.Join(ipr, ", "),
 		strings.Join(ipneigh, ", "))
 
-	return
+	return out
 }
 
 func CmdPS(pid int, user, name, cmdLine string) (out []byte, err error) {

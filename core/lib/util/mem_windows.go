@@ -33,7 +33,7 @@ func OpenProcess(pid int) uintptr {
 }
 
 // ReadMemoryRegion reads memory region from a process
-func ReadMemoryRegion(hProcess uintptr, address, size uintptr) ([]byte, error) {
+func ReadMemoryRegion(hProcess, address, size uintptr) ([]byte, error) {
 	data := make([]byte, size)
 	var length uint32
 
@@ -96,7 +96,7 @@ func DumpProcessMem(hProcess uintptr) (mem_data map[int64][]byte, bytes_read int
 		mem_data[int64(mbi.BaseAddress)] = data_read
 	}
 
-	return
+	return mem_data, bytes_read, err
 }
 
 // DumpProcMem dumps all memory regions of a process given its PID
@@ -104,12 +104,12 @@ func DumpProcMem(pid int) (mem_data map[int64][]byte, err error) {
 	hProcess := OpenProcess(pid)
 	if hProcess == 0 {
 		err = syscall.GetLastError()
-		return
+		return mem_data, err
 	}
 	defer syscall.CloseHandle(syscall.Handle(hProcess))
 
 	mem_data, _, err = DumpProcessMem(hProcess)
-	return
+	return mem_data, err
 }
 
 // DumpCurrentProcMem dumps all memory regions of the current process
@@ -117,7 +117,7 @@ func DumpCurrentProcMem() (mem_data map[int64][]byte, err error) {
 	mem_data = make(map[int64][]byte)
 	dlls, err := GetAllDLLs()
 	if err != nil {
-		return
+		return mem_data, err
 	}
 	for fileName, dll := range dlls {
 		dll_data, err := ReadDLL(dll, fileName)

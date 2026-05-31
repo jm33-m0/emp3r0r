@@ -25,7 +25,7 @@ func PKCS5Trimming(encrypt []byte) []byte {
 }
 
 // XOREncrypt
-func XOREncrypt(key []byte, plaintext []byte) []byte {
+func XOREncrypt(key, plaintext []byte) []byte {
 	ciphertext := make([]byte, len(plaintext))
 	for i := 0; i < len(plaintext); i++ {
 		ciphertext[i] = plaintext[i] ^ key[i%len(key)]

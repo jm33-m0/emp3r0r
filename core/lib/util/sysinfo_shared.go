@@ -66,13 +66,13 @@ func GetGPUInfo() (info string) {
 	}
 
 	info = strings.TrimSpace(info)
-	return
+	return info
 }
 
 func GetCPUInfo() (info string) {
 	cpuinfo, err := ghw.CPU(ghw.WithDisableWarnings())
 	if err != nil {
-		return
+		return info
 	}
 
 	var cpus []string
@@ -93,7 +93,7 @@ loopProcessors:
 		info += ", " + c
 	}
 
-	return
+	return info
 }
 
 func GetUsername() string {
@@ -155,14 +155,14 @@ func GenAgentTag(agentUUID string) (id string) {
 	name, err := os.Hostname()
 	if err != nil {
 		logging.Debugf("GetHostID: %v", err)
-		return
+		return id
 	}
 	name = fmt.Sprintf("%s\\%s", name, GetUsername()) // hostname\\username
 
 	// Use MachineID-based shortID and AgentUUID for deterministic AgentTag
 	id = fmt.Sprintf("%s-agent-%s", name, agentUUID)
 
-	return
+	return id
 }
 
 // ScanPATH scan $PATH and return a list of executables, for autocomplete
@@ -177,7 +177,7 @@ func ScanPATH() (exes []string) {
 	if len(paths) < 1 {
 		exes = []string{""}
 		logging.Debugf("Empty PATH: %s", path_str)
-		return
+		return exes
 	}
 
 	// scan paths
@@ -191,17 +191,17 @@ func ScanPATH() (exes []string) {
 		}
 	}
 	logging.Debugf("Found %d executables from PATH (%s)", len(exes), path_str)
-	return
+	return exes
 }
 
 func GetProductInfo() (product *ghw.ProductInfo, err error) {
 	product, err = ghw.Product(ghw.WithDisableWarnings())
 	if err != nil {
 		logging.Debugf("GetProductInfo: %v", err)
-		return
+		return product, err
 	}
 
-	return
+	return product, err
 }
 
 // CheckProduct check machine details
@@ -215,7 +215,7 @@ func CheckProduct(info *ghw.ProductInfo) (product string) {
 		info.Version,
 		info.Vendor)
 
-	return
+	return product
 }
 
 // FormatUptime converts seconds to human readable string (d h m s)

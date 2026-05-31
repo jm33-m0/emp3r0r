@@ -21,10 +21,10 @@ func ReadDLL(moduleInfo *windows.ModuleInfo, fileName string) (dll_data []byte, 
 		uintptr(moduleInfo.SizeOfImage), &bytes_read)
 	if err != nil {
 		err = fmt.Errorf("failed to get module info of %s: %v", fileName, err)
-		return
+		return dll_data, err
 	}
 	dll_data = dllContent
-	return
+	return dll_data, err
 }
 
 // Enum all DLLs and get their handles
@@ -40,7 +40,7 @@ func GetAllDLLs() (modules map[string]*windows.ModuleInfo, err error) {
 	err = windows.EnumProcessModules(processHandle, &moduleHandles[0], 1024, &neededBytes)
 	if err != nil {
 		err = fmt.Errorf("enum modules: %v", err)
-		return
+		return modules, err
 	}
 
 	// Calculate the number of modules
@@ -69,5 +69,5 @@ func GetAllDLLs() (modules map[string]*windows.ModuleInfo, err error) {
 		modules[fileName] = modinfo
 	}
 
-	return
+	return modules, err
 }

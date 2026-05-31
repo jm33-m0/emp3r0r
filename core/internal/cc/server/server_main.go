@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/jm33-m0/arc/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/relay"
@@ -30,7 +29,7 @@ func ServerMain(wg_port int, hosts string, numOperators int) {
 	}
 
 	// Register log handler to broadcast important logs to operators
-	logging.SetBroadcastHandler(func(level string, msg string) {
+	logging.SetBroadcastHandler(func(level, msg string) {
 		_ = operatorBroadcastPrintf(level, "%s", msg)
 	})
 
@@ -76,7 +75,7 @@ type SavedWgConfig struct {
 	Operators        []OperatorConfig `json:"operators"`
 }
 
-func wg(wg_port int, numOperators int) {
+func wg(wg_port, numOperators int) {
 	var (
 		server_privkey string
 		server_pubkey  string
@@ -276,7 +275,7 @@ func tarConfig(hosts string) {
 	}
 	defer os.Chdir(cwd)
 
-	err = arc.Archive(filepath.Base(live.EmpWorkSpace), live.EmpConfigTar, arc.CompressionMap["xz"], arc.ArchivalMap["tar"])
+	err = util.TarArchive(filepath.Base(live.EmpWorkSpace), live.EmpConfigTar)
 	if err != nil {
 		logging.Errorf("Failed to tar config files: %v", err)
 	}

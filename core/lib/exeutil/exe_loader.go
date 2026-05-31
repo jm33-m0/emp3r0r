@@ -21,7 +21,7 @@ import (
 import "C"
 
 // InMemExeRun runs an ELF binary with the given arguments and environment variables, completely in memory.
-func InMemExeRun(elf_data []byte, args []string, env []string) (output string, err error) {
+func InMemExeRun(elf_data []byte, args, env []string) (output string, err error) {
 	// Convert args and env to C strings
 	c_args := make([]*C.char, len(args)+1)
 	for i, arg := range args {
@@ -52,7 +52,7 @@ func InMemExeRun(elf_data []byte, args []string, env []string) (output string, e
 }
 
 // InMemExePTYRun runs an ELF binary in a PTY, completely in memory.
-func InMemExePTYRun(elf_data []byte, args []string, env []string, tty_fd int) (pid int, err error) {
+func InMemExePTYRun(elf_data []byte, args, env []string, tty_fd int) (pid int, err error) {
 	// Convert args and env to C strings
 	c_args := make([]*C.char, len(args)+1)
 	for i, arg := range args {

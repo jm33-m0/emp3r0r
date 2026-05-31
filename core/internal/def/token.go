@@ -54,8 +54,7 @@ const (
 
 // Operator stream capabilities for claim-scoped authorization.
 const (
-	OperatorCapabilityRegisterPortFwd = "register_portfwd"
-	OperatorCapabilityRegisterFTP     = "register_ftp"
+	OperatorCapabilityRegisterFTP = "register_ftp"
 )
 
 // OperatorStreamClaim is a signed, short-lived claim used by operators to
