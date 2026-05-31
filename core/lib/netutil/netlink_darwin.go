@@ -9,12 +9,12 @@ import (
 
 // IPr works like `ip r`, covers both IPv4 and IPv6
 func IPr() (routes []string) {
-	return
+	return routes
 }
 
 // IPLink get all interfaces
 func IPLink() (links []netlink.Link) {
-	return
+	return links
 }
 
 // IPNeigh works like `ip neigh`, dumps ARP cache

@@ -14,7 +14,7 @@ func GetOSInfo() (osinfo *OSInfo) {
 		Architecture: "Unknown",
 		Kernel:       "Unknown",
 	}
-	return
+	return osinfo
 }
 
 func CheckContainer() (product string) {

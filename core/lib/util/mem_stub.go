@@ -6,7 +6,7 @@ package util
 import "fmt"
 
 // Dummy implementation of ReadMemoryRegion for unsupported OSes.
-func ReadMemoryRegion(hProcess uintptr, address, size uintptr) ([]byte, error) {
+func ReadMemoryRegion(hProcess, address, size uintptr) ([]byte, error) {
 	return nil, fmt.Errorf("ReadMemoryRegion not implemented on this OS")
 }
 

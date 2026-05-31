@@ -7,7 +7,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-func xorData(data []byte, key []byte) {
+func xorData(data, key []byte) {
 	if len(key) == 0 {
 		return
 	}
@@ -16,7 +16,7 @@ func xorData(data []byte, key []byte) {
 	}
 }
 
-func buildServedBlob(payloadPath string, keyStr string, loaderPath string, compression bool) ([]byte, error) {
+func buildServedBlob(payloadPath, keyStr, loaderPath string, compression bool) ([]byte, error) {
 	// ReadFileAgent handles both mem:// and disk paths
 	payload, err := util.ReadFileAgent(payloadPath)
 	if err != nil {

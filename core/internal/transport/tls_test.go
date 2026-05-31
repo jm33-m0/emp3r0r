@@ -80,7 +80,7 @@ func generateCerts(t *testing.T) (caPEM []byte, serverCert tls.Certificate) {
 		t.Fatalf("Failed to load server key pair: %v", err)
 	}
 
-	return
+	return caPEM, serverCert
 }
 
 func TestCreateEmp3r0rHTTPClient(t *testing.T) {

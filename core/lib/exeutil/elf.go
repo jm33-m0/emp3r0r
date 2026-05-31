@@ -164,18 +164,18 @@ func GetSymFromLibc(pid int, sym string) (addr int64, err error) {
 	libc_path, base, offset, err := GetLibc(pid)
 	if base == 0 || err != nil {
 		err = fmt.Errorf("libc not found: %v", err)
-		return
+		return addr, err
 	}
 	elf_file, err := elf.Open(libc_path)
 	if err != nil {
 		err = fmt.Errorf("ELF open: %v", err)
-		return
+		return addr, err
 	}
 	defer elf_file.Close()
 	syms, err := elf_file.DynamicSymbols()
 	if err != nil {
 		err = fmt.Errorf("ELF symbols: %v", err)
-		return
+		return addr, err
 	}
 	for _, s := range syms {
 		if strings.Contains(s.Name, sym) {
@@ -185,11 +185,11 @@ func GetSymFromLibc(pid int, sym string) (addr int64, err error) {
 	}
 	if addr == 0 {
 		err = fmt.Errorf("scanned %d symbols, symbol (addr 0x%x) %s not found", len(syms), addr, sym)
-		return
+		return addr, err
 	}
 	logging.Infof("Address of %s is 0x%x", sym, addr)
 
-	return
+	return addr, err
 }
 
 // GetLibc gets the base address, ASLR offset value, and path of libc by parsing /proc/pid/maps.
@@ -201,7 +201,7 @@ func GetLibc(pid int) (path string, addr, offset int64, err error) {
 	f, err := os.Open(map_path)
 	if err != nil {
 		err = fmt.Errorf("open %s: %v", map_path, err)
-		return
+		return path, addr, offset, err
 	}
 	defer f.Close()
 	scanner := bufio.NewScanner(f)
@@ -226,7 +226,7 @@ func GetLibc(pid int) (path string, addr, offset int64, err error) {
 		err = fmt.Errorf("scanned map file, libc not found")
 	}
 
-	return
+	return path, addr, offset, err
 }
 
 // IsELF checks if a file is an ELF file.
@@ -585,7 +585,7 @@ func parseSectionHeaders(f *os.File, shOff uint64, shNum int, elfClass byte) ([]
 // - dynOff: Offset to the dynamic entries.
 // - dynSize: Size of the dynamic entries.
 // - elfClass: ELF class (32-bit or 64-bit).
-func parseDynamicEntries(f *os.File, dynOff uint64, dynSize uint64, elfClass byte) ([]Dynamic, error) {
+func parseDynamicEntries(f *os.File, dynOff, dynSize uint64, elfClass byte) ([]Dynamic, error) {
 	if _, err := f.Seek(int64(dynOff), 0); err != nil {
 		return nil, err
 	}
@@ -617,7 +617,7 @@ func parseDynamicEntries(f *os.File, dynOff uint64, dynSize uint64, elfClass byt
 // - f: File containing the ELF data.
 // - offset: Offset to the section data.
 // - size: Size of the section data.
-func readSectionData(f *os.File, offset uint64, size uint64) ([]byte, error) {
+func readSectionData(f *os.File, offset, size uint64) ([]byte, error) {
 	if _, err := f.Seek(int64(offset), 0); err != nil {
 		return nil, err
 	}

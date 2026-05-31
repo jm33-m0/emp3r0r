@@ -39,5 +39,5 @@ func CheckAccount(username string) (accountInfo map[string]string, err error) {
 
 	}
 
-	return
+	return accountInfo, err
 }

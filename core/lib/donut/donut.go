@@ -19,7 +19,7 @@ func DonoutPE2Shellcode(executable_file, arch_choice string) {
 }
 
 // DonutShellcodeFromFile returns a Donut shellcode for the given PE file
-func DonutShellcodeFromFile(filePath string, outfile string, arch string, dotnet bool, params string, className string, method string) (out string, err error) {
+func DonutShellcodeFromFile(filePath, outfile, arch string, dotnet bool, params, className, method string) (out string, err error) {
 	donutOps := DonutOptions{
 		InputPath:   filePath,
 		OutputPath:  outfile,

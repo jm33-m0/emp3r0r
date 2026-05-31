@@ -195,7 +195,7 @@ func runClientMode(opts *Options) {
 	}
 
 	// download and extract config files
-	url := fmt.Sprintf("http://%s:%d/%s", netutil.WgServerIP, netutil.WgFileServerPort, "emp3r0r_operator_config.tar.xz")
+	url := fmt.Sprintf("http://%s:%d/%s", netutil.WgServerIP, netutil.WgFileServerPort, "emp3r0r_operator_config.tar.gz")
 	err = live.DownloadExtractConfig(url, ftp.DownloadFile)
 	if err != nil {
 		logging.Fatalf("Failed to extract config: %v", err)

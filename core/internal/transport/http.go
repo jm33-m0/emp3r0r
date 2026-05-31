@@ -46,8 +46,8 @@ func ServeFileHTTP(file_path, port string, ctx context.Context, cancel context.C
 		if err != nil {
 			err = fmt.Errorf("shutdown Stager HTTP server: %v", err)
 		}
-		return
+		return err
 	case err = <-errChan:
-		return
+		return err
 	}
 }

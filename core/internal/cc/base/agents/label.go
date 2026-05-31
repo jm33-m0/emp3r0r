@@ -73,13 +73,13 @@ func RefreshAgentLabel(a *def.Emp3r0rAgent) (label string) {
 	data, err := os.ReadFile(AgentsJSON)
 	if err != nil {
 		logging.Warningf("Updating agent label: %v", err)
-		return
+		return label
 	}
 	var labeledAgents []LabeledAgent
 	err = json.Unmarshal(data, &labeledAgents)
 	if err != nil {
 		logging.Warningf("Invalid JSON: %v", err)
-		return
+		return label
 	}
 	for _, labeled := range labeledAgents {
 		if a.Tag == labeled.Tag {
@@ -89,12 +89,12 @@ func RefreshAgentLabel(a *def.Emp3r0rAgent) (label string) {
 			return labeled.Label
 		}
 	}
-	return
+	return label
 }
 
 // SetAgentLabel sets a custom label for an agent by ID or tag.
 // Returns error if agent not found or parameters invalid.
-func SetAgentLabel(agentID string, label string) error {
+func SetAgentLabel(agentID, label string) error {
 	if agentID == "" || label == "" {
 		return fmt.Errorf("agent ID and label are required")
 	}

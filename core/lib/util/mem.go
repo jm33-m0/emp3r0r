@@ -13,14 +13,14 @@ func ExtractData() (data []byte, err error) {
 	data, err = extractFromAgentConfig()
 	if err != nil {
 		err = fmt.Errorf("extract data from agent config: %v", err)
-		return
+		return data, err
 	}
 
 	if len(data) <= 0 {
 		err = fmt.Errorf("no data extracted")
 	}
 
-	return
+	return data, err
 }
 
 func extractFromAgentConfig() ([]byte, error) {
@@ -39,8 +39,8 @@ func VerifyConfigData(data []byte) (jsonData []byte, err error) {
 	jsonData, err = crypto.AES_GCM_Decrypt([]byte(def.MagicString), data)
 	if err != nil {
 		err = fmt.Errorf("decrypt config JSON failed (%v), invalid config data?", err)
-		return
+		return jsonData, err
 	}
 
-	return
+	return jsonData, err
 }

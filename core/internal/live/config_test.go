@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jm33-m0/arc/v2"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func TestDownloadExtractConfig(t *testing.T) {
@@ -57,10 +57,10 @@ func TestDownloadExtractConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tarPath := filepath.Join(tmpDir, "config.tar.xz")
-	// Create .tar.xz using arc library (cross-platform)
-	if err := arc.Archive(filepath.Join(tarSrcDir, testFileName), tarPath, arc.CompressionMap["xz"], arc.ArchivalMap["tar"]); err != nil {
-		t.Fatalf("Failed to create tar.xz: %v", err)
+	tarPath := filepath.Join(tmpDir, "config.tar.gz")
+	// Create .tar.gz using arc library (cross-platform)
+	if err := util.TarArchive(filepath.Join(tarSrcDir, testFileName), tarPath); err != nil {
+		t.Fatalf("Failed to create tar.gz: %v", err)
 	}
 
 	// 3. Mock downloader

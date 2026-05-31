@@ -55,43 +55,6 @@ func C2Commands() *cobra.Command {
 	statCmd.RegisterFlagCompletionFunc("path", memFileCompletion)
 	rootCmd.AddCommand(statCmd)
 
-	// C2 Bring2CC command
-	bring2ccCmd := &cobra.Command{
-		Use:     def.C2CmdBring2CC,
-		Short:   "Setup reverse proxy",
-		Example: "!bring2cc --addr <target> --kcp <on/off>",
-		GroupID: "generic",
-		Run:     runBring2CC,
-	}
-	bring2ccCmd.Flags().StringP("addr", "a", "", "Target agent IP address")
-	bring2ccCmd.Flags().StringP("kcp", "k", "off", "Use KCP for reverse proxy (on/off)")
-	rootCmd.AddCommand(bring2ccCmd)
-
-	// C2 SSHD command
-	sshdCmd := &cobra.Command{
-		Use:     def.C2CmdSSHD,
-		Short:   "Start an SSHD server",
-		Example: "!sshd --shell <shell> --port <port> --args <args>",
-		GroupID: "generic",
-		Run:     runSSHD,
-	}
-	sshdCmd.Flags().StringP("shell", "s", "", "Shell to use")
-	sshdCmd.Flags().StringP("port", "p", "", "Port to use")
-	sshdCmd.Flags().StringSliceP("args", "a", []string{}, "Arguments for SSHD")
-	rootCmd.AddCommand(sshdCmd)
-
-	// C2 Proxy command
-	proxyCmd := &cobra.Command{
-		Use:     def.C2CmdProxy,
-		Short:   "Start a Socks5 proxy",
-		Example: "!proxy --mode <mode> --addr <address>",
-		GroupID: "generic",
-		Run:     runProxy,
-	}
-	proxyCmd.Flags().StringP("mode", "m", "", "Proxy mode")
-	proxyCmd.Flags().StringP("addr", "a", "", "Address to bind")
-	rootCmd.AddCommand(proxyCmd)
-
 	// C2 Put command
 	putCmd := &cobra.Command{
 		Use:     "put",
@@ -166,17 +129,6 @@ func C2Commands() *cobra.Command {
 	fileDownloaderCmd.RegisterFlagCompletionFunc("path", memFileCompletion)
 	fileDownloaderCmd.Flags().StringP("checksum", "c", "", "Checksum")
 	rootCmd.AddCommand(fileDownloaderCmd)
-
-	// C2 Memory Dump command
-	memDumpCmd := &cobra.Command{
-		Use:     def.C2CmdMemDump,
-		Short:   "Memory dump",
-		Example: "!mem_dump --pid <pid>",
-		GroupID: "generic",
-		Run:     runMemDump,
-	}
-	memDumpCmd.Flags().IntP("pid", "p", 0, "PID of target process")
-	rootCmd.AddCommand(memDumpCmd)
 
 	sysInfoCmd := &cobra.Command{
 		Use:     def.C2CmdSysInfo,

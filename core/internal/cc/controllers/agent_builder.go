@@ -51,7 +51,7 @@ func GenerateFilePaths(cfg AgentBuildConfig) (stubFile, outFile string) {
 
 	// Set full path for stub
 	stubFile = fmt.Sprintf("%s/%s", cfg.WorkSpace, stubFile)
-	return
+	return stubFile, outFile
 }
 
 // EncryptAgentConfig generates UUID, signs it, marshals config to CBOR, and encrypts

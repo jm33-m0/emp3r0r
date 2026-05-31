@@ -76,7 +76,7 @@ func ProcessList(pid int, username, command, commandLine string) (list []ProcEnt
 			list = append(list, p)
 		}
 	}
-	return
+	return list
 }
 
 // ProcExePath read exe path of a process
@@ -137,7 +137,7 @@ func IsProcAlive(procName string) (alive bool, procs []*process.Process) {
 	allprocs, err := process.Processes()
 	if err != nil {
 		logging.Errorf("IsProcAlive: %v", err)
-		return
+		return alive, procs
 	}
 
 	for _, p := range allprocs {
@@ -152,7 +152,7 @@ func IsProcAlive(procName string) (alive bool, procs []*process.Process) {
 		}
 	}
 
-	return
+	return alive, procs
 }
 
 // PidOf PID of a process name
@@ -178,7 +178,7 @@ func GetChildren(pid int) (children []int, err error) {
 	d, err := os.ReadDir(fmt.Sprintf("/proc/%d/task", pid))
 	if err != nil {
 		logging.Debugf("GetChildren: %v", err)
-		return
+		return children, err
 	}
 	threads := make([]int, 0)
 	for _, thread := range d {
@@ -204,7 +204,7 @@ func GetChildren(pid int) (children []int, err error) {
 			children = append(children, child_pid)
 		}
 	}
-	return
+	return children, err
 }
 
 // sleep for a random interval between 5s to 60s

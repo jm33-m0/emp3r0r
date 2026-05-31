@@ -9,5 +9,5 @@ import (
 func DownloadFile(url, path string) (err error) {
 	logging.Debugf("Downloading '%s' to '%s'", url, path)
 	_, err = grab.Get(path, url)
-	return
+	return err
 }

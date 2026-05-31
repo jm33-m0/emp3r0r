@@ -13,7 +13,6 @@ import (
 
 	// Added sync import
 	"github.com/fxamacker/cbor/v2"
-	"github.com/jm33-m0/arc/v2"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
@@ -212,28 +211,28 @@ func IntArrayToStringArray(arr []int) []string {
 func AppendToFile(filename string, data []byte) (err error) {
 	f, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
-		return
+		return err
 	}
 	defer f.Close()
 
 	if _, err = f.Write(data); err != nil {
-		return
+		return err
 	}
-	return
+	return err
 }
 
 // AppendTextToFile append text to a file
-func AppendTextToFile(filename string, text string) (err error) {
+func AppendTextToFile(filename, text string) (err error) {
 	f, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
-		return
+		return err
 	}
 	defer f.Close()
 
 	if _, err = f.WriteString(text); err != nil {
-		return
+		return err
 	}
-	return
+	return err
 }
 
 // IsStrInFile works like grep, check if a string is in a text file
@@ -360,17 +359,17 @@ func FileAllocate(filepath string, n int64) (err error) {
 	if IsExist(filepath) {
 		err = os.Remove(filepath)
 		if err != nil {
-			return
+			return err
 		}
 	}
 	f, err := os.Create(filepath)
 	if err != nil {
-		return
+		return err
 	}
 	defer f.Close()
 	_ = f.Truncate(n)
 
-	return
+	return err
 }
 
 // FileSize calc file size
@@ -392,7 +391,7 @@ func FileSize(path string) (size int64) {
 		return 0
 	}
 	size = fi.Size()
-	return
+	return size
 }
 
 // FindHolesInBinary find holes in a binary file that are big enough for a payload
@@ -406,7 +405,7 @@ func FindHolesInBinary(fdata []byte, size int64) (indexes []int64, err error) {
 				break
 			}
 		}
-		return
+		return end
 	}
 
 	// find holes
@@ -421,7 +420,7 @@ func FindHolesInBinary(fdata []byte, size int64) (indexes []int64, err error) {
 		}
 	}
 
-	return
+	return indexes, err
 }
 
 // IsDirWritable check if a directory is writable
@@ -881,7 +880,7 @@ func AppendToFileAgent(filename string, data []byte) error {
 
 // AppendTextToFileAgent is a centralized text appending function for agent operations.
 // This function wraps text appending operations to allow for future modifications.
-func AppendTextToFileAgent(filename string, text string) error {
+func AppendTextToFileAgent(filename, text string) error {
 	return AppendToFileAgent(filename, []byte(text))
 }
 
@@ -895,7 +894,7 @@ func UnarchiveAgent(tarball, dst string) error {
 	}
 
 	// 2. Decompress XZ (using arc library)
-	tarData, err := arc.DecompressXz(data)
+	tarData, err := Decompress(data)
 	if err != nil {
 		return fmt.Errorf("decompress xz: %v", err)
 	}

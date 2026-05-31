@@ -33,7 +33,7 @@ func StatFile(filepath string, a *def.Emp3r0rAgent) (fi *util.FileStat, err erro
 	// send command
 	err = ExecCmd(cmd, job_id, a.Tag)
 	if err != nil {
-		return
+		return fi, err
 	}
 	var fileinfo util.FileStat
 
@@ -44,7 +44,7 @@ func StatFile(filepath string, a *def.Emp3r0rAgent) (fi *util.FileStat, err erro
 		if res, exists := live.CmdResults.Load(job_id); exists {
 			err = cbor.Unmarshal([]byte(res.(string)), &fileinfo)
 			if err != nil {
-				return
+				return fi, err
 			}
 			fi = &fileinfo
 			live.CmdResults.Delete(job_id)
@@ -56,7 +56,7 @@ func StatFile(filepath string, a *def.Emp3r0rAgent) (fi *util.FileStat, err erro
 		err = fmt.Errorf("StatFile: timed out waiting for response")
 	}
 
-	return
+	return fi, err
 }
 
 // PutFile put file to agent
@@ -67,10 +67,11 @@ func PutFile(lpath, rpath string, a *def.Emp3r0rAgent, saveToMemory bool) error 
 	// file size
 	size := util.FileSize(lpath)
 	sizemB := float32(size) / 1024 / 1024
-	logging.Notify(logging.INFO, "\nPutFile:\nUploading '%s' to\n'%s' "+
-		"on %s, agent [%s]\n"+
-		"size: %d bytes (%.2fMB)\n"+
-		"sha256sum: %s",
+	logging.Notify(
+		logging.INFO, "\nPutFile:\nUploading '%s' to\n'%s' "+
+			"on %s, agent [%s]\n"+
+			"size: %d bytes (%.2fMB)\n"+
+			"sha256sum: %s",
 		lpath, rpath,
 		a.From, a.Name,
 		size, sizemB,
@@ -127,7 +128,7 @@ func GenerateGetFilePaths(file_path string) (write_dir, save_to_file, tempname, 
 	save_to_file = filepath.Join(write_dir, filepath.Base(localized))
 	tempname = save_to_file + ".tmp"
 	lock = save_to_file + ".lock"
-	return
+	return write_dir, save_to_file, tempname, lock
 }
 
 // GetFile get file from agent
@@ -143,21 +144,21 @@ func GetFile(file_path string, agent *def.Emp3r0rAgent) (ftpSh *network.StreamHa
 		err = os.MkdirAll(write_dir, 0o700)
 		if err != nil {
 			err = fmt.Errorf("GetFile mkdir %s: %v", write_dir, err)
-			return
+			return ftpSh, err
 		}
 	}
 
 	// is this file already being downloaded?
 	if util.IsExist(lock) {
 		err = fmt.Errorf("%s is already being downloaded", save_to_file)
-		return
+		return ftpSh, err
 	}
 
 	// stat target file, know its size, and allocate the file on disk
 	fi, err := StatFile(file_path, agent)
 	if err != nil {
 		err = fmt.Errorf("GetFile: failed to stat %s: %v", file_path, err)
-		return
+		return ftpSh, err
 	}
 	fileinfo := *fi
 	filesize := fileinfo.Size
@@ -166,7 +167,7 @@ func GetFile(file_path string, agent *def.Emp3r0rAgent) (ftpSh *network.StreamHa
 		checksum := crypto.SHA256SumFile(save_to_file)
 		if checksum == fileinfo.Checksum {
 			logging.Successf("%s already exists, checksum matched", save_to_file)
-			return
+			return ftpSh, err
 		} else {
 			logging.Warningf("%s already exists, but checksum mismatched", save_to_file)
 		}
@@ -175,7 +176,7 @@ func GetFile(file_path string, agent *def.Emp3r0rAgent) (ftpSh *network.StreamHa
 	err = util.FileAllocate(save_to_file, filesize)
 	if err != nil {
 		err = fmt.Errorf("GetFile: %s allocate file: %v", file_path, err)
-		return
+		return ftpSh, err
 	}
 	logging.Infof("We will be downloading %s, %d bytes in total (%s)", file_path, filesize, fileinfo.Checksum)
 
@@ -215,7 +216,7 @@ func GetFile(file_path string, agent *def.Emp3r0rAgent) (ftpSh *network.StreamHa
 }
 
 // DownloadFile download file from URL
-func DownloadFile(url string, filepath string) error {
+func DownloadFile(url, filepath string) error {
 	// Create the HTTP request
 	resp, err := http.Get(url)
 	if err != nil {

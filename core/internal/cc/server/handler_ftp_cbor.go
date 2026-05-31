@@ -14,7 +14,7 @@ import (
 
 // handleFileUploadStream processes an FTP upload directly over the pure CBOR encrypted stream.
 // It bypasses the legacy HTTP multiplexer and injects the raw SecureConn into the stream handler.
-func handleFileUploadStream(conn *transport.SecureConn, agentUUID string, streamID string, remoteAddr string, ctx context.Context, cancel context.CancelFunc) {
+func handleFileUploadStream(conn *transport.SecureConn, agentUUID, streamID, remoteAddr string, ctx context.Context, cancel context.CancelFunc) {
 	if agentUUID == "" {
 		logging.Errorf("handleFileUploadStream: blocked FTP stream from %s with empty agentUUID", remoteAddr)
 		cancel()

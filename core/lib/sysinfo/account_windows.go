@@ -29,7 +29,8 @@ func IsUserPrivileged(token windows.Token) (result bool) {
 		windows.SECURITY_BUILTIN_DOMAIN_RID,
 		windows.DOMAIN_ALIAS_RID_ADMINS,
 		0, 0, 0, 0, 0, 0,
-		&sid)
+		&sid,
+	)
 	if err != nil {
 		logging.Infof("SID Error: %s", err)
 		return false
@@ -37,7 +38,7 @@ func IsUserPrivileged(token windows.Token) (result bool) {
 	result, err = token.IsMember(sid)
 	if err != nil {
 		logging.Infof("Token Membership Error: %s", err)
-		return
+		return result
 	}
 
 	return result || token.IsElevated()

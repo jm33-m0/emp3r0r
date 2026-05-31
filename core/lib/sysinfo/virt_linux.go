@@ -68,7 +68,7 @@ func CheckContainer() (product string) {
 
 	data, err := os.ReadFile("/proc/1/cgroup")
 	if err != nil {
-		return
+		return product
 	}
 
 	if detected := detectContainerFromCgroup(string(data)); detected != "" {
@@ -76,5 +76,5 @@ func CheckContainer() (product string) {
 		return detected
 	}
 
-	return
+	return product
 }

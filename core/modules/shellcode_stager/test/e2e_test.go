@@ -70,7 +70,7 @@ func writeStage1SizeHeader(headerPath string, size int) error {
 }
 
 // signUUID signs the agent UUID with the CA private key
-func signUUID(uuid string, keyFile string) (string, error) {
+func signUUID(uuid, keyFile string) (string, error) {
 	// Read private key
 	keyBytes, err := os.ReadFile(keyFile)
 	if err != nil {
@@ -132,7 +132,8 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 	mockAgentPath := filepath.Join(tmpDir, "agent_stub")
 	// Using "real" agent code from cmd/agent
 	// We use CGO_ENABLED=1 and zig cc to match production build (static-pie musl)
-	cmdBuildAgent := exec.Command("go", "build",
+	cmdBuildAgent := exec.Command(
+		"go", "build",
 		"-buildmode=pie",
 		"-tags", "netgo agent",
 		"-trimpath",
@@ -140,7 +141,8 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 		"-o", mockAgentPath,
 		"../../../cmd/agent", // From test/ -> shellcode_stager/ -> modules/ -> core/ -> cmd/agent
 	)
-	cmdBuildAgent.Env = append(os.Environ(),
+	cmdBuildAgent.Env = append(
+		os.Environ(),
 		"CGO_ENABLED=1",
 		"CC=zig cc -target x86_64-linux-musl",
 	)
@@ -392,7 +394,8 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 	cleanCmd.Dir = ".." // Run in parent directory where Makefile is
 	cleanCmd.Run()
 
-	makeCmd := exec.Command("make",
+	makeCmd := exec.Command(
+		"make",
 		fmt.Sprintf("DOWNLOAD_HOST=%s", downloadHost),
 		fmt.Sprintf("DOWNLOAD_PORT=%s", downloadPort),
 		fmt.Sprintf("DOWNLOAD_PATH=%s", downloadPath),
@@ -438,7 +441,8 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 			t.Fatalf("Failed to rewrite stage1_size.h: %v", err)
 		}
 
-		rebuildCmd := exec.Command("make",
+		rebuildCmd := exec.Command(
+			"make",
 			fmt.Sprintf("DOWNLOAD_HOST=%s", downloadHost),
 			fmt.Sprintf("DOWNLOAD_PORT=%s", downloadPort),
 			fmt.Sprintf("DOWNLOAD_PATH=%s", downloadPath),
@@ -523,7 +527,8 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 	cmdLoader.Stdout = &stdout
 	cmdLoader.Stderr = &stderr
 	// Set HOME to tmpDir to isolate agent state (prevent reusing keys from ~/.emp3r0r)
-	cmdLoader.Env = append(os.Environ(),
+	cmdLoader.Env = append(
+		os.Environ(),
 		fmt.Sprintf("HOME=%s", tmpDir),
 		"STAGER_TEST=1",
 	)

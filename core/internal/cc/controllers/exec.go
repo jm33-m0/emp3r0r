@@ -49,7 +49,7 @@ func ExecuteRawCommand(ctx *c2context.C2Context) {
 }
 
 // ExecuteAgentCommand sends one command to one agent.
-func ExecuteAgentCommand(agent *def.Emp3r0rAgent, cmd string, _ string) error {
+func ExecuteAgentCommand(agent *def.Emp3r0rAgent, cmd, _ string) error {
 	if agent == nil {
 		return fmt.Errorf("no agent specified")
 	}

@@ -166,7 +166,7 @@ func NamesInCert(cert_file string) (names []string) {
 	cert, err := ParseCertPemFile(cert_file)
 	if err != nil {
 		logging.Infof("ParseCert %s: %v", cert_file, err)
-		return
+		return names
 	}
 	for _, netip := range cert.IPAddresses {
 		ip := netip.String()
@@ -174,7 +174,7 @@ func NamesInCert(cert_file string) (names []string) {
 	}
 	names = append(names, cert.DNSNames...)
 
-	return
+	return names
 }
 
 func ParsePem(data []byte) (*x509.Certificate, error) {
@@ -187,7 +187,7 @@ func ParseKeyPemFile(key_file string) (cert *ecdsa.PrivateKey, err error) {
 	data, err := os.ReadFile(key_file)
 	if err != nil {
 		err = fmt.Errorf("read %s: %v", key_file, err)
-		return
+		return cert, err
 	}
 	block, _ := pem.Decode(data)
 
@@ -199,7 +199,7 @@ func ParseCertPemFile(cert_file string) (cert *x509.Certificate, err error) {
 	cert_data, err := os.ReadFile(cert_file)
 	if err != nil {
 		err = fmt.Errorf("read %s: %v", cert_file, err)
-		return
+		return cert, err
 	}
 	return ParsePem(cert_data)
 }
@@ -209,7 +209,7 @@ func GenerateSSHKeyPair() (privateKey, publicKey []byte, err error) {
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		err = fmt.Errorf("GenerateKey: %v", err)
-		return
+		return privateKey, publicKey, err
 
 	}
 	// pem encode
@@ -223,13 +223,13 @@ func GenerateSSHKeyPair() (privateKey, publicKey []byte, err error) {
 	pubBytes, err := x509.MarshalPKIXPublicKey(pub)
 	if err != nil {
 		err = fmt.Errorf("MarshalPKIXPublicKey: %v", err)
-		return
+		return privateKey, publicKey, err
 
 	}
 	pem.Encode(pub_buf, &pem.Block{Type: "EC PUBLIC KEY", Bytes: pubBytes})
 	publicKey = pub_buf.Bytes()
 
-	return
+	return privateKey, publicKey, err
 }
 
 // SSHPublicKey return ssh.PublicKey from PEM encoded private key
@@ -237,11 +237,11 @@ func SSHPublicKey(privkey []byte) (pubkey ssh.PublicKey, err error) {
 	priv, err := ssh.ParsePrivateKey(privkey)
 	if err != nil {
 		err = fmt.Errorf("ParsePrivateKey: %v", err)
-		return
+		return pubkey, err
 	}
 	pubkey = priv.PublicKey()
 
-	return
+	return pubkey, err
 }
 
 // SignECDSA sign a message with ECDSA private key
@@ -299,7 +299,7 @@ func SignWithCAKey(data []byte) ([]byte, error) {
 }
 
 // VerifySignatureWithCA verifies the given signature against the data using the CA's public key
-func VerifySignatureWithCA(data []byte, signature []byte) (bool, error) {
+func VerifySignatureWithCA(data, signature []byte) (bool, error) {
 	var caCertData []byte
 	var err error
 
@@ -383,7 +383,7 @@ func SignJSONWithKey(priv *ecdsa.PrivateKey, data []byte) ([]byte, error) {
 }
 
 // VerifySignatureWithPEM verifies signature using PEM encoded public key
-func VerifySignatureWithPEM(pubKPEM []byte, data []byte, sig []byte) (bool, error) {
+func VerifySignatureWithPEM(pubKPEM, data, sig []byte) (bool, error) {
 	block, _ := pem.Decode(pubKPEM)
 	if block == nil {
 		return false, fmt.Errorf("failed to parse PEM")

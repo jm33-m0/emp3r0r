@@ -30,5 +30,5 @@ func IPinCIDR(port, cidr string) (ips []string) {
 		ips = append(ips, string(ip))
 	}
 
-	return
+	return ips
 }

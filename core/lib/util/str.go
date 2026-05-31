@@ -52,7 +52,7 @@ func ParseCmd(cmd string) (parsedCmd []string) {
 		for n, arg := range parsedCmd {
 			parsedCmd[n] = strings.ReplaceAll(strings.ReplaceAll(arg, space, " "), tab, "\t")
 		}
-		return
+		return parsedCmd
 	}
 
 	if isEscaped {
@@ -73,7 +73,7 @@ func parseEscapedCmd(cmd, space, tab string) (parsedCmd []string) {
 	for n, arg := range parsedCmd {
 		parsedCmd[n] = strings.ReplaceAll(strings.ReplaceAll(arg, space, " "), tab, "\t")
 	}
-	return
+	return parsedCmd
 }
 
 func parseQuotedCmd(cmd string) (parsedCmd []string) {
@@ -84,12 +84,12 @@ func parseQuotedCmd(cmd string) (parsedCmd []string) {
 	fields, err := r.Read()
 	if err != nil {
 		logging.Debugf("ParseCmd: %v", err)
-		return
+		return parsedCmd
 	}
 	for _, f := range fields {
 		parsedCmd = append(parsedCmd, strings.TrimSpace(f))
 	}
-	return
+	return parsedCmd
 }
 
 func ReverseString(s string) string {
@@ -156,7 +156,7 @@ func HexEncode(s string) (result string) {
 	for _, c := range s {
 		result = fmt.Sprintf("%s\\x%x", result, c)
 	}
-	return
+	return result
 }
 
 // LogStreamPrintf logs a message to the console and sends it to a log stream channel.
@@ -182,7 +182,7 @@ func ParseEnvStr(envStr string) (envMap map[string]string) {
 			envMap[key] = value
 		}
 	}
-	return
+	return envMap
 }
 
 // LimitString limits the length of a string
