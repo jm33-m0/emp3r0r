@@ -29,7 +29,8 @@ static inline void BeaconDataParse(datap *parser, char *buffer, int size) { pars
 static inline int BeaconDataInt(datap *parser) { int32_t v = 0; if (parser->length >= 4) { memcpy(&v, parser->buffer, 4); parser->buffer += 4; parser->length -= 4; } return (int)v; }
 static inline short BeaconDataShort(datap *parser) { int16_t v = 0; if (parser->length >= 2) { memcpy(&v, parser->buffer, 2); parser->buffer += 2; parser->length -= 2; } return (short)v; }
 static inline char *BeaconDataExtract(datap *parser, int *size) { uint32_t len = 0; if (parser->length < 4) return NULL; memcpy(&len, parser->buffer, 4); parser->buffer += 4; char *out = parser->buffer; parser->buffer += len; parser->length -= (4 + len); if (size) *size = (int)len; return out; }
-char *go(char *args, int size) { datap p; BeaconDataParse(&p, args, size); int id = BeaconDataInt(&p); short age = BeaconDataShort(&p); char *name = BeaconDataExtract(&p, NULL); char *buf = (char *)malloc(128); if (!buf) return NULL; snprintf(buf, 128, "[%d] Hello, %s (%d)!", id, name ? name : "", age); return buf; }`
+extern void BeaconPrintf(int type, const char *fmt, ...);
+void go(char *args, int size) { datap p; BeaconDataParse(&p, args, size); int id = BeaconDataInt(&p); short age = BeaconDataShort(&p); char *name = BeaconDataExtract(&p, NULL); BeaconPrintf(0, "[%d] Hello, %s (%d)!", id, name ? name : "", age); }`
 
 	tmpDir := t.TempDir()
 	srcPath := filepath.Join(tmpDir, "inline_bof.c")
