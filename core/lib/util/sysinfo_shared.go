@@ -10,18 +10,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jaypipes/ghw"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/sysinfo"
 )
 
 func GetMemSize() int {
-	memInfo, err := ghw.Memory(ghw.WithDisableWarnings())
-	if err != nil {
-		logging.Debugf("GetMemSize error: %v", err)
-		return -1
-	}
-
-	return int(float32(memInfo.TotalUsableBytes) / 1024 / 1024)
+	return sysinfo.GetMemSize()
 }
 
 // GetMemAvailable returns available memory in bytes
@@ -56,44 +50,11 @@ func GetMemAvailable() int64 {
 }
 
 func GetGPUInfo() (info string) {
-	gpuinfo, err := ghw.GPU(ghw.WithDisableWarnings())
-	if err != nil {
-		return "no_gpu"
-	}
-
-	for _, card := range gpuinfo.GraphicsCards {
-		info += card.String() + "\n"
-	}
-
-	info = strings.TrimSpace(info)
-	return info
+	return sysinfo.GetGPUInfo()
 }
 
 func GetCPUInfo() (info string) {
-	cpuinfo, err := ghw.CPU(ghw.WithDisableWarnings())
-	if err != nil {
-		return info
-	}
-
-	var cpus []string
-loopProcessors:
-	for _, cpu := range cpuinfo.Processors {
-		percpu := fmt.Sprintf("%s %s", cpu.Vendor, cpu.Model)
-		for _, c := range cpus {
-			if c == percpu {
-				continue loopProcessors
-			}
-		}
-		cpus = append(cpus, percpu)
-	}
-
-	info = cpuinfo.String()
-
-	for _, c := range cpus {
-		info += ", " + c
-	}
-
-	return info
+	return sysinfo.GetCPUInfo()
 }
 
 func GetUsername() string {
@@ -192,30 +153,6 @@ func ScanPATH() (exes []string) {
 	}
 	logging.Debugf("Found %d executables from PATH (%s)", len(exes), path_str)
 	return exes
-}
-
-func GetProductInfo() (product *ghw.ProductInfo, err error) {
-	product, err = ghw.Product(ghw.WithDisableWarnings())
-	if err != nil {
-		logging.Debugf("GetProductInfo: %v", err)
-		return product, err
-	}
-
-	return product, err
-}
-
-// CheckProduct check machine details
-func CheckProduct(info *ghw.ProductInfo) (product string) {
-	if info == nil {
-		return "unknown_product"
-	}
-
-	product = fmt.Sprintf("%s (%s) by %s",
-		info.Name,
-		info.Version,
-		info.Vendor)
-
-	return product
 }
 
 // FormatUptime converts seconds to human readable string (d h m s)
