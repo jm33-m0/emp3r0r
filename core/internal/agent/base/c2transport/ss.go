@@ -93,7 +93,7 @@ func shadowsocksTCPTunnel(ss_server, lport, raddr string) {
 
 // Start Shadowsocks proxy server with common.RuntimeConfig.ShadowsocksPassword
 // This server will serve as a secure tunnel that encapsulates SOCKS5 service provider
-// for both broadcasted proxy server and `bring2cc` SSH reverse proxy
+// for broadcasted proxy server
 func RunSSServer() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	ss_config := createSSConfig("0.0.0.0:"+common.RuntimeConfig.ShadowsocksServerPort, "", "", true)

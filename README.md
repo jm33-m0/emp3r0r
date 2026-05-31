@@ -44,11 +44,6 @@ Agents in isolated network segments **autonomously discover and tunnel through i
 
 **Why this matters:** Manual pivoting requires constant operator intervention and breaks when intermediate hosts fail. emp3r0r's agents automatically form redundant communication paths, ensuring persistence through resilient peer discovery and relay.
 
-### 🚪 Bring2CC: Reverse Tunneling for Isolated Targets
-
-When agents **cannot make outbound connections**, `Bring2CC` reverse-proxies them back to the C2 server using SSH + KCP tunneling. This inverts the connection model: instead of the C2 reaching into the network, isolated targets are tunneled out to the C2 infrastructure.
-
-**Why this matters:** Traditional C2s fail when egress filtering blocks outbound connections. Bring2CC enables access to air-gapped segments by having internet-connected hosts pull isolated targets out through reverse tunnels.
 
 ### 💾 Memory-Only Operations with Transparent Encryption
 

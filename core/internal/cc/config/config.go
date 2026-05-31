@@ -34,7 +34,6 @@ func SaveConfigJSON() (err error) {
 		UseKCP:                    live.RuntimeConfig.UseKCP,
 		EnableNCSI:                live.RuntimeConfig.EnableNCSI,
 		SSHHostKey:                string(live.RuntimeConfig.SSHHostKey),
-		Bring2CCReverseProxyPort:  live.RuntimeConfig.Bring2CCReverseProxyPort,
 		SSHDShellPort:             live.RuntimeConfig.SSHDShellPort,
 		MeshGossipPort:            live.RuntimeConfig.MeshGossipPort,
 		PreflightEnabled:          live.RuntimeConfig.PreflightEnabled,
