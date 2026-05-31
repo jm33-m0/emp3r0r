@@ -25,9 +25,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// ReverseConns tracks active Bring2CC reverse proxy connections.
-// Key: target addr string, Value: context.CancelFunc
-var ReverseConns sync.Map
+
 
 type listenerMeta struct {
 	Type      string
