@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -494,7 +493,6 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 			config_to_write.MalleableC2.CustomHeaders = jCfg.MalleableC2.CustomHeaders
 		}
 	}
-
 
 	// these variables are decided by other variables
 	def.CCAddress = fmt.Sprintf("https://%s", config_to_write.CCAddress)
