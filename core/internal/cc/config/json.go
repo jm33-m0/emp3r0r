@@ -519,5 +519,5 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 	def.CCAddress = fmt.Sprintf("https://%s", config_to_write.CCAddress)
 	def.DefaultShell = "/bin/bash" // Default to standard bash
 
-	return
+	return err
 }

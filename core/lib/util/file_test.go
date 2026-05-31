@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/jm33-m0/arc/v2"
 )
 
 func TestSaveFileAgent(t *testing.T) {
@@ -128,13 +126,13 @@ func TestUnarchiveAgent_ZipSlip(t *testing.T) {
 
 	// Compress it to XZ
 	tarData := buf.Bytes()
-	xzData, err := arc.CompressXz(tarData)
+	xzData, err := Compress(tarData)
 	if err != nil {
 		t.Fatalf("Failed to compress tarball: %v", err)
 	}
 
 	// Save it using SaveFileAgent (so ReadFileAgent can read it)
-	tarballPath := filepath.Join(tmpDir, "malicious.tar.xz")
+	tarballPath := filepath.Join(tmpDir, "malicious.tar.gz")
 	err = SaveFileAgent(tarballPath, xzData, 0o600, StorageMemory)
 	if err != nil {
 		t.Fatalf("Failed to save tarball: %v", err)

@@ -306,7 +306,7 @@ func CreateWireGuardDevice(config WireGuardConfig) (*WireGuardDevice, error) {
 }
 
 // configureInterface configures WireGuard device using the UAPI (internal function)
-func configureInterface(name string, privateKey string, listenPort int, peers []PeerConfig) error {
+func configureInterface(name, privateKey string, listenPort int, peers []PeerConfig) error {
 	client, err := wgctrl.New()
 	if err != nil {
 		return fmt.Errorf("failed to create wgctrl client: %w", err)

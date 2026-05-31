@@ -21,7 +21,7 @@ func feedScriptToStdin(cmd *exec.Cmd, scriptBytes []byte) (output string, err er
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		err = fmt.Errorf("error creating StdinPipe for Cmd %s: %s", shell, err)
-		return
+		return output, err
 	}
 
 	collect_output := func() error {
@@ -39,7 +39,7 @@ func feedScriptToStdin(cmd *exec.Cmd, scriptBytes []byte) (output string, err er
 
 	if err = cmd.Start(); err != nil {
 		err = fmt.Errorf("error starting Cmd %s: %s: %v", shell, err, collect_output())
-		return
+		return output, err
 	}
 
 	go func() {
@@ -53,14 +53,14 @@ func feedScriptToStdin(cmd *exec.Cmd, scriptBytes []byte) (output string, err er
 	}()
 	if err = cmd.Wait(); err != nil {
 		err = fmt.Errorf("error waiting for Cmd %s: %s: %v", shell, err, collect_output())
-		return
+		return output, err
 	}
 
-	return
+	return output, err
 }
 
 // ExecutePython runs a Python script in memory and returns the output.
-func ExecutePython(scriptBytes []byte, argv []string, env []string) (output string, err error) {
+func ExecutePython(scriptBytes []byte, argv, env []string) (output string, err error) {
 	cmd := exec.Command("python")
 	if len(argv) > 0 {
 		cmd.Args = append(cmd.Args, argv...)
@@ -72,7 +72,7 @@ func ExecutePython(scriptBytes []byte, argv []string, env []string) (output stri
 }
 
 // ExecutePowerShell runs powershell script on windows
-func ExecutePowerShell(scriptBytes []byte, argv []string, env []string) (output string, err error) {
+func ExecutePowerShell(scriptBytes []byte, argv, env []string) (output string, err error) {
 	shell := "powershell.exe"
 
 	cmd := exec.Command(shell, append([]string{"-Command", "-"}, argv...)...)
@@ -84,7 +84,7 @@ func ExecutePowerShell(scriptBytes []byte, argv []string, env []string) (output 
 }
 
 // ExecuteBatch runs batch script on windows
-func ExecuteBatch(scriptBytes []byte, argv []string, env []string) (output string, err error) {
+func ExecuteBatch(scriptBytes []byte, argv, env []string) (output string, err error) {
 	shell := "cmd.exe"
 
 	cmd := exec.Command(shell, argv...)
@@ -96,7 +96,7 @@ func ExecuteBatch(scriptBytes []byte, argv []string, env []string) (output strin
 }
 
 // ExecuteShell runs a bash script on target
-func ExecuteShell(scriptBytes []byte, argv []string, env []string) (output string, err error) {
+func ExecuteShell(scriptBytes []byte, argv, env []string) (output string, err error) {
 	shell := def.DefaultShell
 	if !util.IsFileExist(shell) {
 		return "", fmt.Errorf("shell not found: %s", shell)

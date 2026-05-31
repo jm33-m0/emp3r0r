@@ -79,35 +79,35 @@ func GetKernelVersion() (ver string) {
 	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows NT\CurrentVersion`, registry.QUERY_VALUE)
 	if err != nil {
 		logging.Print(err)
-		return
+		return ver
 	}
 	defer k.Close()
 
 	cv, _, err := k.GetStringValue("CurrentVersion")
 	if err != nil {
 		logging.Print(err)
-		return
+		return ver
 	}
 	ver = cv
 
 	maj, _, err := k.GetIntegerValue("CurrentMajorVersionNumber")
 	if err != nil {
 		logging.Print(err)
-		return
+		return ver
 	}
 	ver = fmt.Sprintf("%s, NT %d", ver, maj)
 
 	min, _, err := k.GetIntegerValue("CurrentMinorVersionNumber")
 	if err != nil {
 		logging.Print(err)
-		return
+		return ver
 	}
 	ver = fmt.Sprintf("%s.%d", ver, min)
 
 	cb, _, err := k.GetStringValue("CurrentBuild")
 	if err != nil {
 		logging.Print(err)
-		return
+		return ver
 	}
 	buildlab_ex, _, err := k.GetStringValue("BuildLabEx")
 	if err != nil {
@@ -117,5 +117,5 @@ func GetKernelVersion() (ver string) {
 
 	ver = fmt.Sprintf("%s, build %s", ver, buildlab_ex)
 
-	return
+	return ver
 }

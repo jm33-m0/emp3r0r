@@ -89,7 +89,8 @@ func agent_main() {
 		// use DoH resolver
 		net.DefaultResolver, err = dns.NewDoHResolver(
 			common.RuntimeConfig.DoHServer,
-			dns.DoHCache())
+			dns.DoHCache(),
+		)
 		if err != nil {
 			logging.Fatal(err)
 		}

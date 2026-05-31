@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jm33-m0/arc/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func TestDownloadAndVerifyModuleError(t *testing.T) {
@@ -42,13 +42,13 @@ func TestDownloadAndVerifyModuleSuccessLocal(t *testing.T) {
 
 func createTestModule(t *testing.T, content []byte) (path, checksum string) {
 	// 1. Compress content (as if it was downloaded)
-	compressed, err := arc.CompressXz(content)
+	compressed, err := util.Compress(content)
 	if err != nil {
 		t.Fatalf("compress: %v", err)
 	}
 
 	// 2. Write to temp file
-	tmpFile := filepath.Join(t.TempDir(), "mod.tar.xz")
+	tmpFile := filepath.Join(t.TempDir(), "mod.tar.gz")
 	if err := os.WriteFile(tmpFile, compressed, 0o600); err != nil {
 		t.Fatalf("write temp: %v", err)
 	}

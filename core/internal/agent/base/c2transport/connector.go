@@ -16,7 +16,7 @@ import (
 
 // EstablishC2Connection connects to C2 using the configured wrapper mode.
 // All auth is carried in MsgAuth CBOR over SecureConn, independent of wrapper.
-func EstablishC2Connection(url string, streamID string, capabilities ...string) (conn io.ReadWriteCloser, ctx context.Context, cancel context.CancelFunc, err error) {
+func EstablishC2Connection(url, streamID string, capabilities ...string) (conn io.ReadWriteCloser, ctx context.Context, cancel context.CancelFunc, err error) {
 	ctx, cancel = context.WithCancel(context.Background())
 	mode := common.RuntimeConfig.C2ChannelMode
 	if mode == "" {

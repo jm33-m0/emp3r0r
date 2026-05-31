@@ -236,12 +236,12 @@ func ConnectMsgTun() (conn net.Conn, ctx context.Context, cancel context.CancelF
 	wsURL, urlErr := operatorMsgTunnelWSURL()
 	if urlErr != nil {
 		err = urlErr
-		return
+		return conn, ctx, cancel, err
 	}
 	wsHTTPClient, clientErr := websocketHTTPClient()
 	if clientErr != nil {
 		err = clientErr
-		return
+		return conn, ctx, cancel, err
 	}
 	ctx, cancel = context.WithCancel(context.Background())
 	wsConn, resp, err := websocket.Dial(ctx, wsURL, &websocket.DialOptions{
@@ -252,17 +252,17 @@ func ConnectMsgTun() (conn net.Conn, ctx context.Context, cancel context.CancelF
 	})
 	if err != nil {
 		err = fmt.Errorf("connect to message tunnel: %v", err)
-		return
+		return conn, ctx, cancel, err
 	}
 	conn = websocket.NetConn(ctx, wsConn, websocket.MessageBinary)
 	if resp.StatusCode != http.StatusSwitchingProtocols {
 		err = fmt.Errorf("bad status code: %d", resp.StatusCode)
-		return
+		return conn, ctx, cancel, err
 	}
 
 	logging.Successf("Operator message tunnel connected to C2 %s via %s", RootURL, wsURL)
 
-	return
+	return conn, ctx, cancel, err
 }
 
 // StartMessageTunnel starts the background message tunnel handler

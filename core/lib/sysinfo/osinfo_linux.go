@@ -96,7 +96,7 @@ func GetOSInfo() (osinfo *OSInfo) {
 
 	f, err := os.Open(osReleaseFile)
 	if err != nil {
-		return
+		return osinfo
 	}
 	defer f.Close()
 
@@ -157,7 +157,7 @@ func GetOSInfo() (osinfo *OSInfo) {
 		osinfo.Release = slurpFile("/etc/debian_version")
 
 	}
-	return
+	return osinfo
 }
 
 func GetKernelVersion() (uname string) {
@@ -184,6 +184,6 @@ func slurpFile(path string) string {
 }
 
 // Write one-liner text files, add newline, ignore errors (best effort).
-func spewFile(path string, data string, perm os.FileMode) {
+func spewFile(path, data string, perm os.FileMode) {
 	_ = os.WriteFile(path, []byte(data+"\n"), perm)
 }

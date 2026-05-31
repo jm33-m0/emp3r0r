@@ -13,7 +13,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
-	"github.com/txthinking/socks5"
 )
 
 var RuntimeConfig = &def.Config{}
@@ -85,29 +84,7 @@ func InitConfig() (err error) {
 	// CA
 	transport.CACrtPEM = []byte(RuntimeConfig.CAPEM)
 
-	// Socks5 proxy server
-	def.ProxyServer, err = NewSocks5ProxyServer()
-	return
-}
-
-// NewSocks5ProxyServer creates a new SOCKS5 server with current config
-func NewSocks5ProxyServer() (*socks5.Server, error) {
-	addr := fmt.Sprintf("0.0.0.0:%s", RuntimeConfig.AgentSocksServerPort)
-	s, err := socks5.NewClassicServer(
-		addr, "", // listen on emp3r0r_proxy_port
-		RuntimeConfig.ShadowsocksLocalSocksPort, // used as socks5 username
-		RuntimeConfig.Password,                  // socks5 password
-		RuntimeConfig.AgentSocksTimeout,
-		RuntimeConfig.AgentSocksTimeout)
-	if err == nil && s != nil {
-		if s.Handle == nil {
-			logging.Infof("NewSocks5ProxyServer: s.Handle is nil! Initializing with DefaultHandle")
-			s.Handle = &socks5.DefaultHandle{}
-		} else {
-			logging.Infof("NewSocks5ProxyServer: s.Handle is initialized")
-		}
-	}
-	return s, err
+	return err
 }
 
 // GetRandomWritablePath get a random writable path for privileged or normal user

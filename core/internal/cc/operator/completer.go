@@ -162,7 +162,7 @@ func listRemoteDirWorker(path_to_list, agent_tag string) (cwd string, names []st
 	if err != nil {
 		live.CmdResultsReady.Delete(job_id) // clean up if we never send
 		logging.Debugf("Cannot list remote directory: %v", err)
-		return
+		return cwd, names
 	}
 	remote_entries := []string{}
 	listingCtx, listingCancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -180,7 +180,7 @@ func listRemoteDirWorker(path_to_list, agent_tag string) (cwd string, names []st
 	}
 	if len(remote_entries) == 0 {
 		logging.Debugf("Nothing in remote directory")
-		return
+		return cwd, names
 	}
 	cwd = remote_entries[0]
 	for n, name := range remote_entries {
@@ -191,5 +191,5 @@ func listRemoteDirWorker(path_to_list, agent_tag string) (cwd string, names []st
 		name = strings.ReplaceAll(name, " ", "\\ ")
 		names = append(names, name)
 	}
-	return
+	return cwd, names
 }

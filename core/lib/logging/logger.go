@@ -37,7 +37,7 @@ type Logger struct {
 
 	// BroadcastHandler is called whenever Notify is called.
 	// Used to send important logs to the operator console.
-	BroadcastHandler func(level string, msg string)
+	BroadcastHandler func(level, msg string)
 }
 
 var (
@@ -225,7 +225,7 @@ func (l *Logger) Error(format string, a ...any) {
 
 // Notify prints a message and also triggers the broadcast handler (if set).
 // Used for logs that are important enough to be shown to the operator.
-func (l *Logger) Notify(level string, format string, a ...any) {
+func (l *Logger) Notify(level, format string, a ...any) {
 	// Log locally first
 	switch level {
 	case SUCCESS:

@@ -21,14 +21,14 @@ func UpdateOptions(modName string) (exist bool) {
 
 	if live.ActiveModule == nil {
 		logging.Errorf("No active module")
-		return
+		return exist
 	}
 
 	// filter user supplied option
 	exist = hasModuleRunner(modName)
 	if !exist {
 		logging.Errorf("UpdateOptions: no such module: %s", modName)
-		return
+		return exist
 	}
 
 	// help us add new options
@@ -45,7 +45,7 @@ func UpdateOptions(modName string) (exist bool) {
 	}
 	if modconfig == nil {
 		logging.Errorf("UpdateOptions: module %s config not found", modName)
-		return
+		return exist
 	}
 	if strings.ToLower(modconfig.AgentConfig.Exec) != "built-in" && !modconfig.IsLocal {
 		logging.Debugf("UpdateOptions: module %s is not built-in, adding download_addr", modName)
@@ -58,7 +58,7 @@ func UpdateOptions(modName string) (exist bool) {
 		addIfNotFound(download_addr)
 	}
 
-	return
+	return exist
 }
 
 // ModuleRun run current module

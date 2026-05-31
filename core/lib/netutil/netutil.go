@@ -35,7 +35,7 @@ const (
 )
 
 // IsPortOpen is this TCP port open?
-func IsPortOpen(host string, port string) bool {
+func IsPortOpen(host, port string) bool {
 	timeout := 3 * time.Second
 	conn, err := net.DialTimeout("tcp", net.JoinHostPort(host, port), timeout)
 	if err != nil {
@@ -119,7 +119,7 @@ func IPa() (ips []string) {
 		ips = append(ips, ip)
 	}
 
-	return
+	return ips
 }
 
 // IPaddr returns a list of local IP addresses
@@ -161,7 +161,7 @@ func IPaddr() (ips []IPWithMask) {
 		}
 
 	}
-	return
+	return ips
 }
 
 // IPIfaces returns a list of network interfaces
@@ -171,7 +171,7 @@ func IPIfaces() (ifaces []net.Interface) {
 		logging.Infof("IPIfaces: %v", err)
 		return nil
 	}
-	return
+	return ifaces
 }
 
 // IPbroadcastAddr calculate broadcast address of an IP

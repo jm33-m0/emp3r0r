@@ -12,7 +12,6 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
-	"github.com/jm33-m0/arc/v2"
 	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -98,7 +97,7 @@ func moduleCustom(ctx *c2context.C2Context) {
 func build_module(config *def.ModuleConfig, flags map[string]string) (out []byte, err error) {
 	err = os.Chdir(config.Path)
 	if err != nil {
-		return
+		return out, err
 	}
 	defer os.Chdir(live.EmpWorkSpace)
 
@@ -111,10 +110,10 @@ func build_module(config *def.ModuleConfig, flags map[string]string) (out []byte
 	out, err = exec.Command("sh", "-c", config.Build).CombinedOutput()
 	if err != nil {
 		err = fmt.Errorf("%s (%v)", out, err)
-		return
+		return out, err
 	}
 
-	return
+	return out, err
 }
 
 func getDownloadAddr(flags map[string]string) string {
@@ -126,7 +125,7 @@ func getDownloadAddr(flags map[string]string) string {
 
 func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, payload_type, invocationB64, download_addr string) {
 	hosted_file := live.WWWRoot + live.ActiveModule.Name + ".xz"
-	logging.Infof("Compressing %s with xz...", live.ActiveModule.Name)
+	logging.Infof("Compressing %s with gzip...", live.ActiveModule.Name)
 
 	// only one file is allowed
 	if len(config.AgentConfig.Files) == 0 {
@@ -139,7 +138,7 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 		logging.Errorf("Reading %s: %v", path, err)
 		return
 	}
-	compressedBytes, err := arc.CompressXz(data)
+	compressedBytes, err := util.Compress(data)
 	if err != nil {
 		logging.Errorf("Compressing %s: %v", path, err)
 		return
@@ -165,12 +164,12 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 }
 
 func handleCompressedModule(ctx *c2context.C2Context, config def.ModuleConfig, payload_type, invocationB64, download_addr string) {
-	tarball_path := live.WWWRoot + live.ActiveModule.Name + ".tar.xz"
+	tarball_path := live.WWWRoot + live.ActiveModule.Name + ".tar.gz"
 	file_to_download := filepath.Base(tarball_path)
 	if !util.IsFileExist(tarball_path) {
-		logging.Infof("Compressing %s with tar.xz...", live.ActiveModule.Name)
+		logging.Infof("Compressing %s with tar.gz...", live.ActiveModule.Name)
 		path := config.Path
-		err := util.TarXZ(path, tarball_path)
+		err := util.TarArchive(path, tarball_path)
 		if err != nil {
 			logging.Errorf("Compressing %s: %v", live.ActiveModule.Name, err)
 			return
@@ -489,7 +488,7 @@ func readModCondig(file string) (pconfig *def.ModuleConfig, err error) {
 	}
 
 	pconfig = &config
-	return
+	return pconfig, err
 }
 
 func updateModuleHelp(config *def.ModuleConfig) error {

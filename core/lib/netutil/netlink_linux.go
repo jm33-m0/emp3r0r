@@ -43,7 +43,7 @@ func IPr() (routes []string) {
 			routes = append(routes, ip)
 		}
 	}
-	return
+	return routes
 }
 
 // IPLink get all interfaces
@@ -54,7 +54,7 @@ func IPLink() (links []netlink.Link) {
 		return nil
 	}
 
-	return
+	return links
 }
 
 func linkIdx2Name(index int) (name string) {

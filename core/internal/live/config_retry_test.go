@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jm33-m0/arc/v2"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func TestDownloadExtractConfig_Retry(t *testing.T) {
@@ -45,8 +45,8 @@ func TestDownloadExtractConfig_Retry(t *testing.T) {
 	testFileName := "test_retry.txt"
 	testFileContent := "retry success"
 	os.WriteFile(filepath.Join(tarSrcDir, testFileName), []byte(testFileContent), 0o600)
-	tarPath := filepath.Join(tmpDir, "config.tar.xz")
-	arc.Archive(filepath.Join(tarSrcDir, testFileName), tarPath, arc.CompressionMap["xz"], arc.ArchivalMap["tar"])
+	tarPath := filepath.Join(tmpDir, "config.tar.gz")
+	util.TarArchive(filepath.Join(tarSrcDir, testFileName), tarPath)
 
 	// 3. Mock downloader with failures
 	attempts := 0

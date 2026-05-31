@@ -19,7 +19,7 @@ func getTerminalEmulator() (res string) {
 			break
 		}
 	}
-	return
+	return res
 }
 
 // OpenInNewTerminalWindow run a command in new terminal emulator window
@@ -43,7 +43,7 @@ func GetDateTime() (datetime string) {
 	now := time.Now()
 	datetime = now.String()
 
-	return
+	return datetime
 }
 
 // CopyToClipboard copy data to clipboard using xsel -b

@@ -21,7 +21,7 @@ var (
 // keyStr: the passphrase to encrypt the stager file.
 // compression: whether to compress the stager file before encryption.
 // loaderPath: optional path to stage1 loader (empty string if not used).
-func TCPAESCompressedListener(stagerPath string, port string, keyStr string, compression bool, loaderPath string) error {
+func TCPAESCompressedListener(stagerPath, port, keyStr string, compression bool, loaderPath string) error {
 	blob, err := buildServedBlob(stagerPath, keyStr, loaderPath, compression)
 	if err != nil {
 		return err
@@ -67,7 +67,7 @@ func handleTCPConnection(conn net.Conn, data []byte) {
 }
 
 // TCPBareListener serves the stager file over raw TCP without encryption or compression.
-func TCPBareListener(stagerPath string, port string) error {
+func TCPBareListener(stagerPath, port string) error {
 	stager, err := os.ReadFile(stagerPath)
 	if err != nil {
 		return fmt.Errorf("failed to read stager file: %v", err)
@@ -101,7 +101,7 @@ func TCPBareListener(stagerPath string, port string) error {
 // keyStr: the passphrase to encrypt the stager file.
 // compression: whether to compress the stager file before encryption.
 // loaderPath: optional path to stage1 loader (empty string if not used).
-func UDPAESCompressedListener(stagerPath string, port string, keyStr string, compression bool, loaderPath string) error {
+func UDPAESCompressedListener(stagerPath, port, keyStr string, compression bool, loaderPath string) error {
 	blob, err := buildServedBlob(stagerPath, keyStr, loaderPath, compression)
 	if err != nil {
 		return err

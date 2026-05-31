@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jm33-m0/arc/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -27,8 +26,8 @@ var (
 	// WWWRoot host static files for agent
 	WWWRoot = Temp + "www/"
 
-	// UtilsArchive host utils.tar.xz for agent
-	UtilsArchive = WWWRoot + "utils.tar.xz"
+	// UtilsArchive host utils.tar.gz for agent
+	UtilsArchive = WWWRoot + "utils.tar.gz"
 
 	// Save the configuration of the current session
 	RuntimeConfig = &def.Config{}
@@ -49,7 +48,7 @@ var (
 	// EmpLogFile ~/.emp3r0r/emp3r0r.log, initialized in logging package
 	EmpLogFile = ""
 
-	// EmpConfigTar emp3r0r_operator_config.tar.xz
+	// EmpConfigTar emp3r0r_operator_config.tar.gz
 	EmpConfigTar = ""
 
 	// emp3r0r-cat
@@ -64,7 +63,7 @@ const (
 func cleanupConfig() (err error) {
 	dents, err := os.ReadDir(EmpWorkSpace)
 	if err != nil {
-		return
+		return err
 	}
 	for _, d := range dents {
 		if strings.HasSuffix(d.Name(), ".json") ||
@@ -72,18 +71,18 @@ func cleanupConfig() (err error) {
 			strings.HasSuffix(d.Name(), ".history") {
 			err = os.Remove(EmpWorkSpace + "/" + d.Name())
 			if err != nil {
-				return
+				return err
 			}
 		}
 	}
-	return
+	return err
 }
 
 func DownloadExtractConfig(url string, downloader func(string, string) error) (err error) {
 	// Use a client-only destination to avoid clobbering the server's copy when running locally
 	configTarPath := EmpConfigTar
 	if !IsServer {
-		configTarPath = filepath.Join(EmpWorkSpace, "emp3r0r_operator_config.client.tar.xz")
+		configTarPath = filepath.Join(EmpWorkSpace, "emp3r0r_operator_config.client.tar.gz")
 	}
 
 	logging.Infof("Downloading and extracting config from %s to %s", url, configTarPath)
@@ -103,12 +102,12 @@ func DownloadExtractConfig(url string, downloader func(string, string) error) (e
 	// remove existing config files for a clean start
 	err = cleanupConfig()
 	if err != nil {
-		return
+		return err
 	}
 	// re-create workspace
 	err = SetupFilePaths()
 	if err != nil {
-		return
+		return err
 	}
 
 	// unarchive config files to workspace
@@ -117,15 +116,15 @@ func DownloadExtractConfig(url string, downloader func(string, string) error) (e
 			_ = os.Remove(configTarPath)
 		}
 	}()
-	return arc.Unarchive(configTarPath, HOME)
+	return util.Unarchive(configTarPath, HOME)
 }
 
 func SetupFilePaths() (err error) {
 	HOME, err = os.UserHomeDir()
 	if err != nil {
-		return
+		return err
 	}
-	EmpConfigTar = HOME + "/emp3r0r_operator_config.tar.xz"
+	EmpConfigTar = HOME + "/emp3r0r_operator_config.tar.gz"
 	// prefix
 	Prefix = os.Getenv("EMP3R0R_PREFIX")
 	if Prefix == "" {

@@ -100,9 +100,7 @@ func ProcessAgentResponse(data *def.MsgTunData) (*ProcessedResponse, error) {
 	}
 
 	// Determine if output should be shown
-	noNeedToShow := strings.HasPrefix(resp.Command, def.C2CmdPortFwd) ||
-		strings.HasPrefix(resp.Command, def.C2CmdSSHD) ||
-		strings.HasPrefix(resp.Command, def.C2CmdListDir)
+	noNeedToShow := strings.HasPrefix(resp.Command, def.C2CmdListDir)
 
 	resp.ShouldShow = !noNeedToShow
 

@@ -49,5 +49,5 @@ func IPNeigh() (table []string) {
 }
 
 func IPr() (routes []string) {
-	return
+	return routes
 }
