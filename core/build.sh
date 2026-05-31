@@ -194,9 +194,9 @@ build_agent_cgo() {
   # We need to tell Go to use this CC
   # And we add external linker flags for static build
   # Also add -s to extldflags if not debugging, to ensure the binary is stripped
-  local extldflags="-static"
+  local extldflags="-static -Wl,--gc-sections"
   if [[ "$extra_extldflags" == *"-static-pie"* ]]; then
-    extldflags="-s"
+    extldflags="-s -Wl,--gc-sections"
   fi
   [[ "$arg1" != "--debug" ]] && extldflags="$extldflags -s"
 
@@ -220,7 +220,7 @@ build_shared_object() {
   local output=$3
   info "Building shared object for $os $arch"
   local build_cmd
-  local extldflags="-nostdlib -nodefaultlibs -static"
+  local extldflags="-nostdlib -nodefaultlibs -static -Wl,--gc-sections"
   [[ "$arg1" != "--debug" ]] && extldflags="-s $extldflags"
   local win_gui_flag=""
   [[ "$arg1" != "--debug" ]] && [[ "$os" == "windows" ]] && win_gui_flag="-H=windowsgui "
