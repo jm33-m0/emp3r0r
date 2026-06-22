@@ -1,0 +1,33 @@
+{
+  "name": "starlark_demo",
+  "build": "",
+  "author": "antigravity",
+  "date": "2026-06-22",
+  "comment": "Demo module using Starlark script engine with custom Go APIs",
+  "is_local": false,
+  "platform": "generic",
+  "path": "",
+  "parameters": [
+    {
+      "name": "target_file",
+      "description": "File to read/write during the demo",
+      "default": "starlark_test.txt",
+      "type": "string",
+      "required": false
+    }
+  ],
+  "agent_config": {
+    "exec": "run.star",
+    "files": ["run.star"],
+    "in_memory": true,
+    "type": "starlark",
+    "interactive": false
+  },
+  "invocation": {
+    "argv": [
+      {
+        "param": "target_file"
+      }
+    ]
+  }
+}
