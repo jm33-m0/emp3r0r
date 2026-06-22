@@ -1,5 +1,27 @@
 # Changelog
 
+## [4.3.0](https://github.com/jm33-m0/emp3r0r/compare/v4.2.5...v4.3.0) (2026-06-22)
+
+
+### Features
+
+* a practical demo module written in starlark ([57ad526](https://github.com/jm33-m0/emp3r0r/commit/57ad5265648c44df1c952986d35777960fa59250))
+* implement scripting engine to support python-like modules ([8a5c440](https://github.com/jm33-m0/emp3r0r/commit/8a5c440484450cdbc64aa8ea431c8f6b245caa98))
+
+
+### Bug Fixes
+
+* BOF modules fail to compile ([351a304](https://github.com/jm33-m0/emp3r0r/commit/351a304dee54f2253cacfdd2590eeabb6fc49137))
+* broken C2 shell ([6da47fd](https://github.com/jm33-m0/emp3r0r/commit/6da47fd477f243a3b0e2db19b9f1ad75c36919f1))
+* correct EUID conditional syntax in install.sh ([#573](https://github.com/jm33-m0/emp3r0r/issues/573)) ([3d9ee7e](https://github.com/jm33-m0/emp3r0r/commit/3d9ee7eba3bb801d8c142c97de6e34325dd73aaa))
+* global rate limit for pre-auth requests ([51c31bc](https://github.com/jm33-m0/emp3r0r/commit/51c31bc900e39f6b18c7e3a52d3f5dd60df370ed))
+* incorrect config unarchiving causing operator failure ([c1601a8](https://github.com/jm33-m0/emp3r0r/commit/c1601a8b6cf17f80777afb3d0d3f829820bc9a00))
+* limit POST body size to 50MB ([246743d](https://github.com/jm33-m0/emp3r0r/commit/246743d804e6cdf444d4b945b357a3f8f341c05f))
+* limit retries on inter-agent file transfer ([f9137e8](https://github.com/jm33-m0/emp3r0r/commit/f9137e85e4f5ad15f1c9856dbba2e507e5719178))
+* preflight unreachable ([43a0d38](https://github.com/jm33-m0/emp3r0r/commit/43a0d384ba400450bf0908b8b539c845a5c30897))
+* rate limiting breaks file transfer ([6866c1b](https://github.com/jm33-m0/emp3r0r/commit/6866c1b1ce7216b97b5b35412d7047861208f743))
+* starlark_ps format bug ([ad87df5](https://github.com/jm33-m0/emp3r0r/commit/ad87df52fe8428c68b189a0cda8b7569a2034b35))
+
 ## [4.2.5](https://github.com/jm33-m0/emp3r0r/compare/v4.2.4...v4.2.5) (2026-05-31)
 
 
