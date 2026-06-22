@@ -88,7 +88,7 @@ func CliMain(wg_server_ip string, wg_server_port int) {
 	}
 	// Load modules before command tree creation so module_name commands and flags exist for completion.
 	modules.InitModules()
-	mainMenu := EMP3R0R_CONSOLE.NewMenu("")
+	mainMenu := EMP3R0R_CONSOLE.ActiveMenu()
 	EMP3R0R_CONSOLE.SetPrintLogo(CliBanner)
 
 	// History

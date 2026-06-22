@@ -78,9 +78,11 @@ func AllC2ChannelModesDetailed() []string {
 	descriptions := []string{}
 	// Get C2 channel descriptions
 	C2Channels.Range(func(key, value any) bool {
-		descriptor := value.(C2ChannelDescriptor)
-		description := fmt.Sprintf("%s: %s", descriptor.Name, descriptor.Description)
-		descriptions = append(descriptions, description)
+		descriptor, ok := value.(*C2ChannelDescriptor)
+		if ok && descriptor != nil {
+			description := fmt.Sprintf("%s: %s", descriptor.Name, descriptor.Description)
+			descriptions = append(descriptions, description)
+		}
 		return true
 	})
 	sort.Strings(descriptions)

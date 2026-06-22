@@ -2,10 +2,13 @@ package operator
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/reeflective/console"
+	"github.com/spf13/cobra"
 )
 
 func TestMsgTunDecoding(t *testing.T) {
@@ -51,5 +54,36 @@ func TestMsgTunDecoding(t *testing.T) {
 	}
 	if string(decodedMsg.Response) != string(originalMsg.Response) {
 		t.Errorf("Response mismatch: got %s, want %s", decodedMsg.Response, originalMsg.Response)
+	}
+}
+
+func TestConsoleMenuMismatchFix(t *testing.T) {
+	c := console.New("test-app")
+	// Retrieve active menu to register commands
+	mainMenu := c.ActiveMenu()
+
+	executed := false
+	cmd := &cobra.Command{
+		Use: "test",
+		Run: func(cmd *cobra.Command, args []string) {
+			executed = true
+		},
+	}
+	mainMenu.SetCommands(func() *cobra.Command {
+		root := &cobra.Command{}
+		root.AddCommand(cmd)
+		return root
+	})
+
+	// Retrieve active menu, which console runs with
+	activeMenu := c.ActiveMenu()
+	// Trigger command execution via the public API (this internally calls resetPreRun and executes)
+	err := activeMenu.RunCommandLine(context.Background(), "test")
+	if err != nil {
+		t.Fatalf("Failed to run command line: %v", err)
+	}
+
+	if !executed {
+		t.Error("Test command was not executed; the active menu did not resolve the commands")
 	}
 }
