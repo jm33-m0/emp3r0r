@@ -47,9 +47,15 @@ Agents in isolated network segments **autonomously discover and tunnel through i
 
 ### 💾 Memory-Only Operations with Transparent Encryption
 
-Agents use an **in-memory filesystem with AES-GCM encryption** for all file operations. Bash, PowerShell, Python, and ELF modules execute entirely from memory. Large files automatically spill to **encrypted disk storage** when memory is exhausted. The agent creates no dedicated directories or persistent configuration files.
+Agents use an **in-memory filesystem with AES-GCM encryption** for all file operations. Bash, PowerShell, Python, Starlark, and ELF modules execute entirely from memory. Large files automatically spill to **encrypted disk storage** when memory is exhausted. The agent creates no dedicated directories or persistent configuration files.
 
 **Why this matters:** EDR and forensic tools rely on disk artifacts for detection and analysis. emp3r0r's memory-first design minimizes disk writes. When disk spillover occurs, all data is encrypted and lacks identifying file extensions or headers.
+
+### 🐍 In-Memory Scripting via Starlark (No Python Required)
+
+emp3r0r embeds a **Starlark scripting engine** (a dialect of Python implemented in Go) directly inside the agent. Scripts execute entirely in memory without spawning new processes or requiring Python, Bash, or PowerShell to be installed on the target machine.
+
+**Why this matters:** Traditional script modules require local interpreters, leaving footprints on disk or in command histories. emp3r0r's Starlark engine runs scripts in-memory with built-in Go APIs for filesystem access, network communication, process enumeration, and system execution.
 
 ### 🧩 Native BOF Support (Cross-Platform)
 
@@ -143,6 +149,7 @@ generate --type linux_executable --arch amd64 --cc your.domain.com \
 - **Self-suspension & Resumption**: Agents can suspend themselves and let the stager manage their memory; the stager rotates XOR-based obfuscation while the agent is idle.
 - **Module Stomping**: Disguise malicious modules by loading them into the memory space of legitimate system libraries.
 - **OPSEC Warnings**: Real-time warnings for operations that pose operational security risks (e.g., "fork and run" patterns, unencrypted disk activity).
+- **Embedded Starlark Scripting**: Execute Python-like scripts entirely in memory on the agent via the built-in Go Starlark interpreter, removing dependencies on target host interpreters.
 - **Anti-debug/analysis** measures to make inspection harder.
 
 ### Operator Experience
