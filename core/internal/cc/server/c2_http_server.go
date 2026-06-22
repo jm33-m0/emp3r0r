@@ -52,10 +52,12 @@ func StartC2HTTPServer() {
 			ip = req.RemoteAddr
 		}
 
-		if !ipLimiter.getLimiter(ip).Allow() || !globalLimiter.Allow() {
-			logging.Warningf("C2 HTTP Server: rate limit exceeded for %s", req.RemoteAddr)
-			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
-			return
+		if !transport.IsActiveHTTPServerSession(req, &live.RuntimeConfig.MalleableC2) {
+			if !ipLimiter.getLimiter(ip).Allow() || !globalLimiter.Allow() {
+				logging.Warningf("C2 HTTP Server: rate limit exceeded for %s", req.RemoteAddr)
+				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+				return
+			}
 		}
 
 		stream, err := transport.HandleHTTPServerSession(w, req, &live.RuntimeConfig.MalleableC2)

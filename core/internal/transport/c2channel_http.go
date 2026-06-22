@@ -623,6 +623,27 @@ func (s *HTTPServerStream) Close() error {
 	return nil
 }
 
+func IsActiveHTTPServerSession(req *http.Request, config *def.MalleableHTTPConfig) bool {
+	if config == nil {
+		return false
+	}
+	sessionID := ""
+	if strings.EqualFold(config.SessionHeader, "Cookie") {
+		c2_cookie, cookieErr := req.Cookie(strings.Split(config.SessionValue, "=")[0])
+		if cookieErr == nil {
+			sessionID = c2_cookie.Value
+		}
+	} else {
+		sessionID = req.Header.Get(config.SessionHeader)
+	}
+	if sessionID == "" {
+		return false
+	}
+	_, exists := serverSessions.Load(sessionID)
+	return exists
+}
+
 func init() {
 	RegisterC2Channel("http_poll", "HTTP/1.1 stateless polling wrapper. Use `https://` to enable TLS", &HTTPChannelWrapper{})
 }
+
