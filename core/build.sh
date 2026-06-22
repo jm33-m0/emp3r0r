@@ -530,10 +530,11 @@ case "$1" in
   ;;
 
 --debug)
-
-  (build --debug) && (
-    create_tar
-  )
+  if build --debug && prepare_misc_files && do_install; then
+    package_operator_bundle
+    exit 0
+  fi
+  error "install failed"
 
   ;;
 
