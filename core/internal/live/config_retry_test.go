@@ -84,7 +84,7 @@ func TestDownloadExtractConfig_Retry(t *testing.T) {
 	}
 
 	// 5. Verify extraction
-	extractedFile := filepath.Join(tmpDir, testFileName)
+	extractedFile := filepath.Join(EmpWorkSpace, testFileName)
 	content, _ := os.ReadFile(extractedFile)
 	if string(content) != testFileContent {
 		t.Errorf("Extracted content mismatch. Got %s, want %s", content, testFileContent)

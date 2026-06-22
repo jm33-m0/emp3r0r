@@ -116,7 +116,7 @@ func DownloadExtractConfig(url string, downloader func(string, string) error) (e
 			_ = os.Remove(configTarPath)
 		}
 	}()
-	return util.Unarchive(configTarPath, HOME)
+	return util.Unarchive(configTarPath, EmpWorkSpace)
 }
 
 func SetupFilePaths() (err error) {

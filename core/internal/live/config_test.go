@@ -97,8 +97,8 @@ func TestDownloadExtractConfig(t *testing.T) {
 	}
 
 	// 5. Verify extraction
-	// The file should be extracted to HOME (tmpDir)
-	extractedFile := filepath.Join(tmpDir, testFileName)
+	// The file should be extracted to EmpWorkSpace
+	extractedFile := filepath.Join(EmpWorkSpace, testFileName)
 	content, err := os.ReadFile(extractedFile)
 	if err != nil {
 		t.Errorf("Failed to read extracted file: %v", err)

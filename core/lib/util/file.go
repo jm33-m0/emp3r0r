@@ -887,6 +887,10 @@ func AppendTextToFileAgent(filename, text string) error {
 // UnarchiveAgent unarchives a tarball (which might be encrypted) to a directory
 // It ensures that extracted files are also written using WriteFileAgent (blocking plaintext on disk)
 func UnarchiveAgent(tarball, dst string) error {
+	if err := os.MkdirAll(dst, 0o700); err != nil {
+		return fmt.Errorf("create destination directory: %w", err)
+	}
+
 	// 1. Read (and decrypt) tarball
 	data, err := ReadFileAgent(tarball)
 	if err != nil {

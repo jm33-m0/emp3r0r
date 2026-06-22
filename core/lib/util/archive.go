@@ -35,6 +35,10 @@ func Decompress(data []byte) ([]byte, error) {
 
 // Unarchive unarchives a tarball to a directory
 func Unarchive(tarball, dst string) error {
+	if err := os.MkdirAll(dst, 0o700); err != nil {
+		return fmt.Errorf("create destination directory: %w", err)
+	}
+
 	f, err := os.Open(tarball)
 	if err != nil {
 		return err
