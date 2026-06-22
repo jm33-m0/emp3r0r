@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
+
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -272,5 +274,17 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 
 // cborStreamAccept is the single HTTP handler for agent connections.
 func cborStreamAccept(t transport.StreamTransport) {
+	remoteAddr := t.RemoteAddrString()
+	ip, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		ip = remoteAddr
+	}
+
+	if !ipLimiter.getLimiter(ip).Allow() || !globalLimiter.Allow() {
+		logging.Warningf("cborStreamAccept: rate limit exceeded for %s, closing connection", remoteAddr)
+		_ = t.Close()
+		return
+	}
+
 	cborProtocolDispatch(t)
 }

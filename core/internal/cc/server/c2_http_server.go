@@ -2,11 +2,33 @@ package server
 
 import (
 	"fmt"
+	"net"
 	"net/http"
+	"sync"
+
+	"golang.org/x/time/rate"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+)
+
+type ipRateLimiter struct {
+	ips sync.Map
+}
+
+func (l *ipRateLimiter) getLimiter(ip string) *rate.Limiter {
+	if val, ok := l.ips.Load(ip); ok {
+		return val.(*rate.Limiter)
+	}
+	newLimiter := rate.NewLimiter(rate.Limit(10), 20) // 10 rps per IP, burst of 20
+	val, _ := l.ips.LoadOrStore(ip, newLimiter)
+	return val.(*rate.Limiter)
+}
+
+var (
+	globalLimiter = rate.NewLimiter(rate.Limit(100), 200) // 100 rps globally, burst of 200
+	ipLimiter     = &ipRateLimiter{}
 )
 
 // StartC2HTTPServer starts the plain HTTP transport server.
@@ -24,6 +46,18 @@ func StartC2HTTPServer() {
 		c2Path = "/"
 	}
 	mux.HandleFunc(c2Path, func(w http.ResponseWriter, req *http.Request) {
+		// Rate limiting
+		ip, _, err := net.SplitHostPort(req.RemoteAddr)
+		if err != nil {
+			ip = req.RemoteAddr
+		}
+
+		if !ipLimiter.getLimiter(ip).Allow() || !globalLimiter.Allow() {
+			logging.Warningf("C2 HTTP Server: rate limit exceeded for %s", req.RemoteAddr)
+			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+			return
+		}
+
 		stream, err := transport.HandleHTTPServerSession(w, req, &live.RuntimeConfig.MalleableC2)
 		if err == transport.ErrPollingRequest {
 			// It was a polling internal multiplexing request, handled successfully

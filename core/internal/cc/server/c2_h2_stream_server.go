@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
@@ -41,6 +42,18 @@ func StartC2H2StreamServer() {
 
 func registerC2H2StreamAcceptHandler(mux *http.ServeMux, channelWrapper transport.C2ChannelWrapper) {
 	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		// Rate limiting
+		ip, _, err := net.SplitHostPort(req.RemoteAddr)
+		if err != nil {
+			ip = req.RemoteAddr
+		}
+
+		if !ipLimiter.getLimiter(ip).Allow() || !globalLimiter.Allow() {
+			logging.Warningf("C2 H2 stream server: rate limit exceeded for %s", req.RemoteAddr)
+			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+			return
+		}
+
 		if req.Method != http.MethodPost {
 			logging.Debugf("cborStreamAccept: rejecting non-stream request method=%s path=%s from %s", req.Method, req.URL.Path, req.RemoteAddr)
 			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
