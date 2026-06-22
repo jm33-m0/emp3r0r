@@ -101,3 +101,5 @@ def main(*args):
 		t.Errorf("expected multiplication result 42, got output: %q", out)
 	}
 }
+
+

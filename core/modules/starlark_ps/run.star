@@ -1,5 +1,11 @@
 # Starlark module for process listing on Linux agents
 
+def pad(text, width):
+    text = str(text)
+    if len(text) >= width:
+        return text
+    return text + " " * (width - len(text))
+
 def main(*args):
     # Optional search filter from arguments/argv
     filter_query = ""
@@ -11,7 +17,7 @@ def main(*args):
     if filter_query:
         print(" Filter: '" + filter_query + "'")
     print("==================================================")
-    print("%-8s %-8s %-20s %s" % ("PID", "PPID", "Name", "Cmdline"))
+    print("%s %s %s %s" % (pad("PID", 8), pad("PPID", 8), pad("Name", 20), "Cmdline"))
     print("-" * 80)
 
     processes = list_processes()
@@ -36,9 +42,10 @@ def main(*args):
             cmdline = cmdline[:47] + "..."
 
         # Left align formatting
-        print("%-8s %-8s %-20s %s" % (pid, ppid, name, cmdline))
+        print("%s %s %s %s" % (pad(pid, 8), pad(ppid, 8), pad(name, 20), cmdline))
 
     print("-" * 80)
     print("Total Processes: %d, Matched: %d" % (count, matched))
     print("==================================================")
     return "OK"
+
