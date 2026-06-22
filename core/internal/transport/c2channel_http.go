@@ -526,8 +526,14 @@ func HandleHTTPServerSession(w http.ResponseWriter, req *http.Request, config *d
 		}
 	case http.MethodPost:
 		// Client is writing to us
-		data, err := io.ReadAll(req.Body)
-		if err == nil && len(data) > 0 {
+		limitReader := http.MaxBytesReader(w, req.Body, 50*1024*1024)
+		data, err := io.ReadAll(limitReader)
+		if err != nil {
+			logging.Warningf("HandleHTTPServerSession POST: read body: %v", err)
+			http.Error(w, "request too large or read failed", http.StatusRequestEntityTooLarge)
+			return nil, ErrPollingRequest
+		}
+		if len(data) > 0 {
 			select {
 			case stream.readCh <- data:
 				w.WriteHeader(http.StatusOK)
