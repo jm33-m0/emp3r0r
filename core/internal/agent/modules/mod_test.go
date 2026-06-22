@@ -109,3 +109,29 @@ func TestModuleHandler_Python(t *testing.T) {
 		t.Errorf("python output mismatch: got %q", out)
 	}
 }
+
+func TestDownloadAndVerifyModuleRetryLimit(t *testing.T) {
+	originalFetchFile := fetchFile
+	defer func() { fetchFile = originalFetchFile }()
+
+	callsCount := 0
+	fetchFile = func(config *def.Config, download_addr, file_to_download, path, checksum string) ([]byte, error) {
+		callsCount++
+		return []byte("corrupted-payload"), nil
+	}
+
+	tempFile := filepath.Join(t.TempDir(), "test-retry.bin")
+
+	_, err := downloadAndVerifyModule(tempFile, "expected-checksum-xyz", "")
+	if err == nil {
+		t.Fatalf("expected error, but got nil")
+	}
+
+	if callsCount != 3 {
+		t.Errorf("expected exactly 3 attempts, got %d", callsCount)
+	}
+
+	if !strings.Contains(err.Error(), "checksum verification failed after 3 attempts") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
