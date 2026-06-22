@@ -505,7 +505,7 @@ func TestInitModulesLoadsRepoModules(t *testing.T) {
 		}
 
 		expectedPath := filepath.Join(modulesRoot, modName)
-		if mod.IsLocal {
+		if mod.IsLocal || mod.Build != "" {
 			expectedPath = filepath.Join(tmpWorkspace, "modules", modName)
 		}
 		if mod.Path != expectedPath {

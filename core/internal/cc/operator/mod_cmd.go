@@ -96,11 +96,17 @@ func runModuleByName(cmd *cobra.Command, modName string) {
 	}
 
 	runtimeFlags := make(map[string]string)
-	for optName := range mod.Options {
-		val, err := cmd.Flags().GetString(optName)
-		if err != nil {
-			logging.Errorf("module %s: read flag %s: %v", mod.Name, optName, err)
-			continue
+	for optName, opt := range mod.Options {
+		var val string
+		var err error
+		if cmd.Flags().Lookup(optName) != nil {
+			val, err = cmd.Flags().GetString(optName)
+			if err != nil {
+				logging.Errorf("module %s: read flag %s: %v", mod.Name, optName, err)
+				continue
+			}
+		} else {
+			val = opt.Val
 		}
 		live.SetOption(optName, val)
 		runtimeFlags[optName] = val

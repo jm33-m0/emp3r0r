@@ -254,6 +254,15 @@ func InitModules() {
 		if !util.IsExist(mod_search_dir) {
 			return
 		}
+
+		// Ensure bof_common is in the workspace modules directory if it exists in search dir
+		src_bof_common := filepath.Join(mod_search_dir, "bof_common")
+		dst_bof_common := filepath.Join(live.EmpWorkSpace, "modules", "bof_common")
+		if util.IsExist(src_bof_common) && src_bof_common != dst_bof_common {
+			_ = os.MkdirAll(filepath.Dir(dst_bof_common), 0o700)
+			_ = util.Copy(src_bof_common, dst_bof_common)
+		}
+
 		logging.Debugf("Scanning %s for modules", mod_search_dir)
 		dirs, readdirErr := os.ReadDir(mod_search_dir)
 		if readdirErr != nil {
@@ -276,7 +285,7 @@ func InitModules() {
 
 			// module path, eg. ~/.emp3r0r/modules/foo
 			config.Path = fmt.Sprintf("%s/%s", mod_search_dir, dir.Name())
-			if config.IsLocal {
+			if config.IsLocal || config.Build != "" {
 				mod_dir := filepath.Join(live.EmpWorkSpace, "modules", dir.Name())
 				absConfigPath, _ := filepath.Abs(config.Path)
 				absModDir, _ := filepath.Abs(mod_dir)
