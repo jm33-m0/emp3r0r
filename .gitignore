@@ -292,3 +292,6 @@ zig*
 # clangd
 compile_commands.json
 vendor/
+
+# Go
+.config/
