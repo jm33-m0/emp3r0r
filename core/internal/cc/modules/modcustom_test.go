@@ -442,15 +442,32 @@ func TestInitModulesLoadsRepoModules(t *testing.T) {
 		t.Fatalf("no module configs found under %s", modulesRoot)
 	}
 
-	expected := make(map[string]string, len(configFiles))
-	for _, cfg := range configFiles {
-		modName := filepath.Base(filepath.Dir(cfg))
-		expected[modName] = cfg
-	}
-
 	tmpWorkspace, err := os.MkdirTemp("", "emp3r0r-modules")
 	if err != nil {
 		t.Fatalf("temp workspace: %v", err)
+	}
+
+	type expectedMod struct {
+		Name         string
+		ExpectedPath string
+	}
+	expected := make(map[string]expectedMod)
+	for _, cfg := range configFiles {
+		configs, err := readModConfigs(cfg)
+		if err != nil {
+			t.Fatalf("readModConfigs %s: %v", cfg, err)
+		}
+		dirName := filepath.Base(filepath.Dir(cfg))
+		for _, config := range configs {
+			expectedPath := filepath.Dir(cfg)
+			if config.IsLocal || config.Build != "" {
+				expectedPath = filepath.Join(tmpWorkspace, "modules", dirName)
+			}
+			expected[config.Name] = expectedMod{
+				Name:         config.Name,
+				ExpectedPath: expectedPath,
+			}
+		}
 	}
 
 	// Backup def.Modules
@@ -494,7 +511,7 @@ func TestInitModulesLoadsRepoModules(t *testing.T) {
 
 	InitModules()
 
-	for modName := range expected {
+	for modName, exp := range expected {
 		val, ok := def.Modules.Load(modName)
 		if !ok {
 			t.Fatalf("module %s not loaded", modName)
@@ -504,12 +521,8 @@ func TestInitModulesLoadsRepoModules(t *testing.T) {
 			t.Fatalf("runner not registered for %s", modName)
 		}
 
-		expectedPath := filepath.Join(modulesRoot, modName)
-		if mod.IsLocal || mod.Build != "" {
-			expectedPath = filepath.Join(tmpWorkspace, "modules", modName)
-		}
-		if mod.Path != expectedPath {
-			t.Fatalf("module %s path mismatch: got %s want %s", modName, mod.Path, expectedPath)
+		if mod.Path != exp.ExpectedPath {
+			t.Fatalf("module %s path mismatch: got %s want %s", modName, mod.Path, exp.ExpectedPath)
 		}
 		if !util.IsDirExist(mod.Path) {
 			t.Fatalf("module path missing on disk for %s: %s", modName, mod.Path)
