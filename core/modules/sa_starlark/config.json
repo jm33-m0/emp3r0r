@@ -1,0 +1,134 @@
+[
+  {
+    "name": "sa_uptime",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-13",
+    "comment": "Get system uptime and boot time using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "uptime.star",
+      "files": ["uptime.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {
+      "argv": []
+    }
+  },
+  {
+    "name": "sa_locale",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-13",
+    "comment": "Get system locale information using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "locale.star",
+      "files": ["locale.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {
+      "argv": []
+    }
+  },
+  {
+    "name": "sa_env",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-13",
+    "comment": "Get process environment variables using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "env.star",
+      "files": ["env.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {
+      "argv": []
+    }
+  },
+  {
+    "name": "sa_arp",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-13",
+    "comment": "Get ARP table using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "arp.star",
+      "files": ["arp.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {
+      "argv": []
+    }
+  },
+  {
+    "name": "sa_whoami",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-13",
+    "comment": "Get user token information using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "whoami.star",
+      "files": ["whoami.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {
+      "argv": []
+    }
+  },
+  {
+    "name": "sa_netstat",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-13",
+    "comment": "Get active network connections using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "netstat.star",
+      "files": ["netstat.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {
+      "argv": []
+    }
+  }
+]
