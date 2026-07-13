@@ -25,15 +25,24 @@ func getAPIs() starlark.StringDict {
 }
 
 var builtInAPIs = map[string]StarlarkAPI{
-	"read_file":  starlarkReadFile,
-	"write_file": starlarkWriteFile,
-	"list_dir":   starlarkListDir,
-	"exists":     starlarkExists,
-	"mkdir":      starlarkMkdir,
-	"remove":     starlarkRemove,
-	"http_get":   starlarkHTTPGet,
-	"http_post":  starlarkHTTPPost,
-	"exec_cmd":   starlarkExecCmd,
+	"read_file":      starlarkReadFile,
+	"write_file":     starlarkWriteFile,
+	"list_dir":       starlarkListDir,
+	"exists":         starlarkExists,
+	"mkdir":          starlarkMkdir,
+	"remove":         starlarkRemove,
+	"http_get":       starlarkHTTPGet,
+	"http_post":      starlarkHTTPPost,
+	"exec_cmd":       starlarkExecCmd,
+	"list_processes":                  starlarkListProcesses,
+	"crypto_hash":                     starlarkCryptoHash,
+	"win32_GetTickCount64":            starlarkGetTickCount64,
+	"win32_GetLocalTime":              starlarkGetLocalTime,
+	"win32_GetSystemDefaultLocaleName": starlarkGetSystemDefaultLocaleName,
+	"win32_GetLocaleInfoEx":            starlarkGetLocaleInfoEx,
+	"win32_LocaleNameToLCID":           starlarkLocaleNameToLCID,
+	"win32_GetDateFormatEx":            starlarkGetDateFormatEx,
+	"win32_GetEnvironmentStrings":      starlarkGetEnvironmentStrings,
 }
 
 func init() {

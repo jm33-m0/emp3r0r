@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"go.starlark.net/starlark"
 )
 
@@ -13,7 +15,7 @@ func starlarkReadFile(thread *starlark.Thread, fn *starlark.Builtin, args starla
 	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "path", &path); err != nil {
 		return starlark.None, err
 	}
-	content, err := os.ReadFile(path)
+	content, err := util.ReadFileAgent(path)
 	if err != nil {
 		return starlark.None, fmt.Errorf("read_file %s: %w", path, err)
 	}
@@ -26,7 +28,7 @@ func starlarkWriteFile(thread *starlark.Thread, fn *starlark.Builtin, args starl
 	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "path", &path, "content", &content); err != nil {
 		return starlark.None, err
 	}
-	err := os.WriteFile(path, []byte(content), 0o644)
+	err := util.WriteFileAgent(path, []byte(content), 0o644)
 	if err != nil {
 		return starlark.None, fmt.Errorf("write_file %s: %w", path, err)
 	}
@@ -38,14 +40,50 @@ func starlarkListDir(thread *starlark.Thread, fn *starlark.Builtin, args starlar
 	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "path", &path); err != nil {
 		return starlark.None, err
 	}
-	entries, err := os.ReadDir(path)
-	if err != nil {
-		return starlark.None, fmt.Errorf("list_dir %s: %w", path, err)
-	}
+
+	namesMap := make(map[string]bool)
 	list := starlark.NewList(nil)
-	for _, entry := range entries {
-		list.Append(starlark.String(entry.Name()))
+
+	// Read disk directory
+	if diskEntries, err := os.ReadDir(path); err == nil {
+		for _, entry := range diskEntries {
+			name := entry.Name()
+			if !namesMap[name] {
+				namesMap[name] = true
+				list.Append(starlark.String(name))
+			}
+		}
 	}
+
+	// Clean target path for memory file comparison
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		absPath = filepath.Clean(path)
+	}
+
+	// Retrieve all memory file keys directly from the exported MemFileMap map under lock
+	util.MemFileLock.RLock()
+	var memFiles []string
+	for k := range util.MemFileMap {
+		memFiles = append(memFiles, k)
+	}
+	util.MemFileLock.RUnlock()
+
+	// Merge memory files residing in the target directory
+	for _, memFile := range memFiles {
+		absMemFile, err := filepath.Abs(memFile)
+		if err != nil {
+			absMemFile = filepath.Clean(memFile)
+		}
+		if filepath.Dir(absMemFile) == absPath {
+			name := filepath.Base(absMemFile)
+			if !namesMap[name] {
+				namesMap[name] = true
+				list.Append(starlark.String(name))
+			}
+		}
+	}
+
 	return list, nil
 }
 
@@ -54,8 +92,7 @@ func starlarkExists(thread *starlark.Thread, fn *starlark.Builtin, args starlark
 	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "path", &path); err != nil {
 		return starlark.None, err
 	}
-	_, err := os.Stat(path)
-	return starlark.Bool(err == nil), nil
+	return starlark.Bool(util.IsExist(path)), nil
 }
 
 func starlarkMkdir(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -75,7 +112,7 @@ func starlarkRemove(thread *starlark.Thread, fn *starlark.Builtin, args starlark
 	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "path", &path); err != nil {
 		return starlark.None, err
 	}
-	err := os.RemoveAll(path)
+	err := util.RemoveFileAgent(path)
 	if err != nil {
 		return starlark.None, fmt.Errorf("remove %s: %w", path, err)
 	}
