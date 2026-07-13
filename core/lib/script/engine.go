@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"go.starlark.net/starlark"
+	"go.starlark.net/syntax"
 )
 
 // Run executes a Starlark script with the provided source code, arguments, and optional custom global variables.
@@ -16,7 +17,8 @@ func Run(src []byte, argv []string, customGlobals map[string]any) (string, error
 	thread := &starlark.Thread{
 		Name: "script_engine_thread",
 		Print: func(thread *starlark.Thread, msg string) {
-			buf.WriteString(msg + "\n")
+			buf.WriteString(msg)
+			buf.WriteString("\n")
 		},
 	}
 
@@ -38,7 +40,12 @@ func Run(src []byte, argv []string, customGlobals map[string]any) (string, error
 	}
 
 	// Execute Starlark script from memory
-	globals, err := starlark.ExecFile(thread, "script.star", src, predeclared)
+	globals, err := starlark.ExecFileOptions(&syntax.FileOptions{
+		TopLevelControl: true,
+		Recursion:       true,
+		GlobalReassign:  true,
+		While:           true,
+	}, thread, "script.star", src, predeclared)
 	if err != nil {
 		return buf.String(), fmt.Errorf("starlark execution: %w", err)
 	}
@@ -55,7 +62,8 @@ func Run(src []byte, argv []string, customGlobals map[string]any) (string, error
 				return buf.String(), fmt.Errorf("calling main function: %w", err)
 			}
 			if resVal != starlark.None {
-				buf.WriteString(resVal.String() + "\n")
+				buf.WriteString(resVal.String())
+				buf.WriteString("\n")
 			}
 		}
 	}
