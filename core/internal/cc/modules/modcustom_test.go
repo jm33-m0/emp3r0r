@@ -673,4 +673,3 @@ func TestReadModConfigsMultiple(t *testing.T) {
 		t.Errorf("Expected second config IsLocal false, got true")
 	}
 }
-

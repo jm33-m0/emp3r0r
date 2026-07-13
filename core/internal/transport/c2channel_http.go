@@ -646,4 +646,3 @@ func IsActiveHTTPServerSession(req *http.Request, config *def.MalleableHTTPConfi
 func init() {
 	RegisterC2Channel("http_poll", "HTTP/1.1 stateless polling wrapper. Use `https://` to enable TLS", &HTTPChannelWrapper{})
 }
-

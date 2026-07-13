@@ -112,28 +112,6 @@ def main(*args):
     print("SHA1 of hello: " + sha1_hash)
     sha256_hash = crypto_hash("sha256", "hello")
     print("SHA256 of hello: " + sha256_hash)
-
-    # Test Win32 APIs
-    ticks = win32_GetTickCount64()
-    print("Ticks: " + str(ticks))
-    local_time = win32_GetLocalTime()
-    print("Year: " + str(local_time["year"]))
-    locale_name = win32_GetSystemDefaultLocaleName()
-    print("Locale: " + locale_name)
-    locale_lang = win32_GetLocaleInfoEx(locale_name, 0x1001)
-    print("LocaleLang: " + locale_lang)
-    lcid = win32_LocaleNameToLCID(locale_name)
-    print("LCID: " + str(lcid))
-    date_str = win32_GetDateFormatEx(locale_name, 0)
-    print("DateStr: " + date_str)
-
-    envs = win32_GetEnvironmentStrings()
-    found_env = False
-    for env in envs:
-        if "=" in env:
-            found_env = True
-            break
-    print("FoundEnv: " + str(found_env))
     return "OK"
 `
 	out, err := Run([]byte(script), nil, nil)
@@ -149,16 +127,67 @@ def main(*args):
 	if !strings.Contains(out, "SHA256 of hello: 2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824") {
 		t.Errorf("expected sha256 match, got: %q", out)
 	}
-	if !strings.Contains(out, "LocaleLang: English") {
-		t.Errorf("expected locale lang English, got: %q", out)
-	}
-	if !strings.Contains(out, "FoundEnv: True") {
-		t.Errorf("expected environments found, got: %q", out)
-	}
 	if !strings.Contains(out, "OK") {
 		t.Errorf("expected OK, got: %q", out)
 	}
+
+	if runtime.GOOS == "windows" {
+		winScript := `
+def main(*args):
+    # Call GetTickCount64 from kernel32.dll
+    res = win_call("kernel32.dll", "GetTickCount64")
+    print("Ticks: " + str(res["r1"]))
+
+    # Test win_alloc, GetLocalTime, win_read_mem, win_free
+    addr = win_alloc(16)
+    if addr == 0:
+        return "Fail: alloc failed"
+    win_call("kernel32.dll", "GetLocalTime", addr)
+    year_bytes = win_read_mem(addr, 2)
+    year = year_bytes[0] | (year_bytes[1] << 8)
+    print("Year: " + str(year))
+    win_free(addr)
+    return "OK"
+`
+		out, err = Run([]byte(winScript), nil, nil)
+		if err != nil {
+			t.Fatalf("Run windows script failed: %v", err)
+		}
+		if !strings.Contains(out, "Ticks: ") {
+			t.Errorf("expected ticks in output, got: %q", out)
+		}
+		if !strings.Contains(out, "Year: ") {
+			t.Errorf("expected year in output, got: %q", out)
+		}
+		if !strings.Contains(out, "OK") {
+			t.Errorf("expected OK from windows script, got: %q", out)
+		}
+	} else {
+		// Non-Windows: verify win_* functions return errors
+		nonWinScript := `
+def main(*args):
+    # win_call should fail
+    res = win_call("kernel32.dll", "GetTickCount64")
+    return "Fail: win_call succeeded on non-Windows"
+`
+		_, err = Run([]byte(nonWinScript), nil, nil)
+		if err == nil {
+			t.Errorf("expected error when calling win_call on non-Windows, but got none")
+		} else if !strings.Contains(err.Error(), "win_call is only supported on Windows") {
+			t.Errorf("expected 'win_call is only supported on Windows' error, got: %v", err)
+		}
+
+		nonWinScriptAlloc := `
+def main(*args):
+    # win_alloc should fail
+    addr = win_alloc(16)
+    return "Fail: win_alloc succeeded on non-Windows"
+`
+		_, err = Run([]byte(nonWinScriptAlloc), nil, nil)
+		if err == nil {
+			t.Errorf("expected error when calling win_alloc on non-Windows, but got none")
+		} else if !strings.Contains(err.Error(), "win_alloc is only supported on Windows") {
+			t.Errorf("expected 'win_alloc is only supported on Windows' error, got: %v", err)
+		}
+	}
 }
-
-
-

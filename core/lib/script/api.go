@@ -34,15 +34,12 @@ var builtInAPIs = map[string]StarlarkAPI{
 	"http_get":       starlarkHTTPGet,
 	"http_post":      starlarkHTTPPost,
 	"exec_cmd":       starlarkExecCmd,
-	"list_processes":                  starlarkListProcesses,
-	"crypto_hash":                     starlarkCryptoHash,
-	"win32_GetTickCount64":            starlarkGetTickCount64,
-	"win32_GetLocalTime":              starlarkGetLocalTime,
-	"win32_GetSystemDefaultLocaleName": starlarkGetSystemDefaultLocaleName,
-	"win32_GetLocaleInfoEx":            starlarkGetLocaleInfoEx,
-	"win32_LocaleNameToLCID":           starlarkLocaleNameToLCID,
-	"win32_GetDateFormatEx":            starlarkGetDateFormatEx,
-	"win32_GetEnvironmentStrings":      starlarkGetEnvironmentStrings,
+	"list_processes": starlarkListProcesses,
+	"crypto_hash":    starlarkCryptoHash,
+	"win_call":       starlarkWinCall,
+	"win_alloc":      starlarkWinAlloc,
+	"win_free":       starlarkWinFree,
+	"win_read_mem":   starlarkWinReadMem,
 }
 
 func init() {
