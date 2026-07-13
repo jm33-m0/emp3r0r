@@ -277,49 +277,63 @@ func InitModules() {
 			if !util.IsExist(config_file) {
 				continue
 			}
-			config, readConfigErr := readModCondig(config_file)
+			configs, readConfigErr := readModConfigs(config_file)
 			if readConfigErr != nil {
 				logging.Warningf("Reading config from %s: %v", dir.Name(), readConfigErr)
 				continue
 			}
 
-			// module path, eg. ~/.emp3r0r/modules/foo
-			config.Path = fmt.Sprintf("%s/%s", mod_search_dir, dir.Name())
-			if config.IsLocal || config.Build != "" {
-				mod_dir := filepath.Join(live.EmpWorkSpace, "modules", dir.Name())
-				absConfigPath, _ := filepath.Abs(config.Path)
-				absModDir, _ := filepath.Abs(mod_dir)
-				if absConfigPath == absModDir {
-					logging.Debugf("Module %s is already in workspace, skipping copy", config.Name)
-					continue
-				}
-				err := os.MkdirAll(mod_dir, 0o700)
-				if err != nil {
-					logging.Warningf("Failed to create %s: %v", mod_dir, err)
-					continue
-				}
-				err = util.Copy(config.Path, mod_dir)
-				if err != nil {
-					logging.Warningf("Copying %s to %s: %v", config.Path, mod_dir, err)
-					continue
-				}
-				config.Path = mod_dir
-			}
+			var copiedPath string
+			var hasCopied bool
 
-			// add to module helpers
-			registerModuleRunner(config.Name, moduleCustom)
+			for _, config := range configs {
+				// module path, eg. ~/.emp3r0r/modules/foo
+				originalPath := fmt.Sprintf("%s/%s", mod_search_dir, dir.Name())
+				config.Path = originalPath
+				if config.IsLocal || config.Build != "" {
+					if hasCopied {
+						config.Path = copiedPath
+					} else {
+						mod_dir := filepath.Join(live.EmpWorkSpace, "modules", dir.Name())
+						absConfigPath, _ := filepath.Abs(config.Path)
+						absModDir, _ := filepath.Abs(mod_dir)
+						if absConfigPath == absModDir {
+							logging.Debugf("Module %s is already in workspace, skipping copy", config.Name)
+							copiedPath = mod_dir
+							hasCopied = true
+						} else {
+							err := os.MkdirAll(mod_dir, 0o700)
+							if err != nil {
+								logging.Warningf("Failed to create %s: %v", mod_dir, err)
+								continue
+							}
+							err = util.Copy(config.Path, mod_dir)
+							if err != nil {
+								logging.Warningf("Copying %s to %s: %v", config.Path, mod_dir, err)
+								continue
+							}
+							config.Path = mod_dir
+							copiedPath = mod_dir
+							hasCopied = true
+						}
+					}
+				}
 
-			// Store FIRST so that updateModuleHelp can Load and patch the Options map.
-			// Without this, the Load inside updateModuleHelp always misses and the
-			// validated options are silently discarded.
-			def.Modules.Store(config.Name, config)
-			readConfigErr = updateModuleHelp(config)
-			if readConfigErr != nil {
-				logging.Warningf("Loading config from %s: %v", config.Name, readConfigErr)
-				def.Modules.Delete(config.Name) // rollback — don't expose a broken entry
-				continue
+				// add to module helpers
+				registerModuleRunner(config.Name, moduleCustom)
+
+				// Store FIRST so that updateModuleHelp can Load and patch the Options map.
+				// Without this, the Load inside updateModuleHelp always misses and the
+				// validated options are silently discarded.
+				def.Modules.Store(config.Name, config)
+				readConfigErr = updateModuleHelp(config)
+				if readConfigErr != nil {
+					logging.Warningf("Loading config from %s: %v", config.Name, readConfigErr)
+					def.Modules.Delete(config.Name) // rollback — don't expose a broken entry
+					continue
+				}
+				logging.Debugf("Loaded module %s", strconv.Quote(config.Name))
 			}
-			logging.Debugf("Loaded module %s", strconv.Quote(config.Name))
 		}
 	}
 
@@ -338,6 +352,18 @@ func InitModules() {
 
 // readModCondig read config.json of a module
 func readModCondig(file string) (pconfig *def.ModuleConfig, err error) {
+	configs, err := readModConfigs(file)
+	if err != nil {
+		return nil, err
+	}
+	if len(configs) == 0 {
+		return nil, fmt.Errorf("no configurations found in %s", file)
+	}
+	return configs[0], nil
+}
+
+// readModConfigs read config.json of a module which may define multiple modules
+func readModConfigs(file string) (configs []*def.ModuleConfig, err error) {
 	type legacyOption struct {
 		OptName string   `json:"opt_name"`
 		OptDesc string   `json:"opt_desc"`
@@ -416,88 +442,97 @@ func readModCondig(file string) (pconfig *def.ModuleConfig, err error) {
 		return nil, fmt.Errorf("read %s: %v", file, err)
 	}
 
-	var raw moduleConfigJSON
-	if err = json.Unmarshal(jsonData, &raw); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal JSON config: %v", err)
+	var rawList []moduleConfigJSON
+	// Try parsing as array first
+	if err = json.Unmarshal(jsonData, &rawList); err != nil {
+		// If it fails, try parsing as a single object
+		var raw moduleConfigJSON
+		if err = json.Unmarshal(jsonData, &raw); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal JSON config: %v", err)
+		}
+		rawList = []moduleConfigJSON{raw}
 	}
 
-	config := def.ModuleConfig{
-		Name:     raw.Name,
-		Build:    raw.Build,
-		Author:   raw.Author,
-		Date:     raw.Date,
-		Comment:  raw.Comment,
-		IsLocal:  raw.IsLocal,
-		Platform: raw.Platform,
-		Path:     raw.Path,
-		Fileless: raw.Fileless,
-		Options:  def.ModOptions{},
-		AgentConfig: def.AgentModuleConfig{
-			Exec:          raw.AgentConfig.Exec,
-			Files:         raw.AgentConfig.Files,
-			InMemory:      raw.AgentConfig.InMemory,
-			Type:          raw.AgentConfig.Type,
-			IsInteractive: raw.AgentConfig.IsInteractive,
-			WorkDir:       raw.AgentConfig.WorkDir,
-			NeedsRoot:     raw.AgentConfig.NeedsRoot,
-		},
-	}
+	for _, raw := range rawList {
+		config := def.ModuleConfig{
+			Name:     raw.Name,
+			Build:    raw.Build,
+			Author:   raw.Author,
+			Date:     raw.Date,
+			Comment:  raw.Comment,
+			IsLocal:  raw.IsLocal,
+			Platform: raw.Platform,
+			Path:     raw.Path,
+			Fileless: raw.Fileless,
+			Options:  def.ModOptions{},
+			AgentConfig: def.AgentModuleConfig{
+				Exec:          raw.AgentConfig.Exec,
+				Files:         raw.AgentConfig.Files,
+				InMemory:      raw.AgentConfig.InMemory,
+				Type:          raw.AgentConfig.Type,
+				IsInteractive: raw.AgentConfig.IsInteractive,
+				WorkDir:       raw.AgentConfig.WorkDir,
+				NeedsRoot:     raw.AgentConfig.NeedsRoot,
+			},
+		}
 
-	config.Invocation.TimeoutSeconds = raw.Invocation.TimeoutSeconds
-	config.Invocation.StdinParam = raw.Invocation.StdinParam
-	for _, arg := range raw.Invocation.Argv {
-		config.Invocation.Argv = append(config.Invocation.Argv, def.InvocationArg{
-			Literal: arg.Literal,
-			Flag:    arg.Flag,
-			Param:   arg.Param,
-		})
-	}
-	if raw.Invocation.Coff != nil {
-		coff := def.CoffInvocation{Export: raw.Invocation.Coff.Export}
-		for _, arg := range raw.Invocation.Coff.Args {
-			coff.Args = append(coff.Args, def.CoffArgSpec{
-				Param:    arg.Param,
-				Literal:  arg.Literal,
-				WireType: arg.WireType,
-				Encoding: arg.Encoding,
+		config.Invocation.TimeoutSeconds = raw.Invocation.TimeoutSeconds
+		config.Invocation.StdinParam = raw.Invocation.StdinParam
+		for _, arg := range raw.Invocation.Argv {
+			config.Invocation.Argv = append(config.Invocation.Argv, def.InvocationArg{
+				Literal: arg.Literal,
+				Flag:    arg.Flag,
+				Param:   arg.Param,
 			})
 		}
-		config.Invocation.Coff = &coff
-	}
-
-	for _, p := range raw.Parameters {
-		if p.Name == "" {
-			continue
+		if raw.Invocation.Coff != nil {
+			coff := def.CoffInvocation{Export: raw.Invocation.Coff.Export}
+			for _, arg := range raw.Invocation.Coff.Args {
+				coff.Args = append(coff.Args, def.CoffArgSpec{
+					Param:    arg.Param,
+					Literal:  arg.Literal,
+					WireType: arg.WireType,
+					Encoding: arg.Encoding,
+				})
+			}
+			config.Invocation.Coff = &coff
 		}
-		config.Options[p.Name] = &def.ModOption{
-			Name:     p.Name,
-			Desc:     p.Desc,
-			Val:      p.Val,
-			Vals:     p.Vals,
-			Type:     p.Type,
-			Required: p.Required,
-			Pattern:  p.Pattern,
-			Encoding: p.Encoding,
-			Secret:   p.Secret,
-			Min:      p.Min,
-			Max:      p.Max,
-		}
-	}
 
-	if len(config.Options) == 0 && len(raw.LegacyOpts) > 0 {
-		for key, opt := range raw.LegacyOpts {
-			config.Options[key] = &def.ModOption{
-				Name: opt.OptName,
-				Desc: opt.OptDesc,
-				Val:  opt.OptVal,
-				Vals: opt.OptVals,
-				Type: "string",
+		for _, p := range raw.Parameters {
+			if p.Name == "" {
+				continue
+			}
+			config.Options[p.Name] = &def.ModOption{
+				Name:     p.Name,
+				Desc:     p.Desc,
+				Val:      p.Val,
+				Vals:     p.Vals,
+				Type:     p.Type,
+				Required: p.Required,
+				Pattern:  p.Pattern,
+				Encoding: p.Encoding,
+				Secret:   p.Secret,
+				Min:      p.Min,
+				Max:      p.Max,
 			}
 		}
+
+		if len(config.Options) == 0 && len(raw.LegacyOpts) > 0 {
+			for key, opt := range raw.LegacyOpts {
+				config.Options[key] = &def.ModOption{
+					Name: opt.OptName,
+					Desc: opt.OptDesc,
+					Val:  opt.OptVal,
+					Vals: opt.OptVals,
+					Type: "string",
+				}
+			}
+		}
+
+		configs = append(configs, &config)
 	}
 
-	pconfig = &config
-	return pconfig, err
+	return configs, nil
 }
 
 func updateModuleHelp(config *def.ModuleConfig) error {

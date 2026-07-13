@@ -541,3 +541,123 @@ func TestUpdateOptionsAddsDownloadAddr(t *testing.T) {
 		t.Fatalf("expected missing module to return false")
 	}
 }
+
+func TestReadModConfigsMultiple(t *testing.T) {
+	// Create a temporary directory for the test
+	tmpDir, err := os.MkdirTemp("", "emp3r0r-test-multiple")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Define a sample JSON config that defines multiple modules
+	jsonConfig := `[
+		{
+			"name": "multi_module_1",
+			"build": "go build 1",
+			"author": "tester",
+			"date": "2023-10-27",
+			"comment": "A test module 1",
+			"is_local": true,
+			"platform": "Linux",
+			"path": "/tmp/test_module",
+			"fileless": false,
+			"agent_config": {
+				"exec": "exec1",
+				"files": ["file1"],
+				"in_memory": true,
+				"type": "go",
+				"interactive": false
+			},
+			"parameters": [
+				{
+					"name": "option1",
+					"description": "Description 1",
+					"default": "value1",
+					"choices": ["value1", "value2"],
+					"type": "string",
+					"required": true
+				}
+			],
+			"invocation": {
+				"argv": [
+					{"literal": "exec1"},
+					{"param": "option1"}
+				]
+			}
+		},
+		{
+			"name": "multi_module_2",
+			"build": "go build 2",
+			"author": "tester",
+			"date": "2023-10-27",
+			"comment": "A test module 2",
+			"is_local": false,
+			"platform": "Windows",
+			"path": "/tmp/test_module",
+			"fileless": true,
+			"agent_config": {
+				"exec": "exec2",
+				"files": ["file2"],
+				"in_memory": false,
+				"type": "coff",
+				"interactive": false
+			},
+			"parameters": [
+				{
+					"name": "option2",
+					"description": "Description 2",
+					"default": "value2",
+					"choices": ["value2", "value3"],
+					"type": "string",
+					"required": true
+				}
+			],
+			"invocation": {
+				"argv": [
+					{"literal": "exec2"},
+					{"param": "option2"}
+				]
+			}
+		}
+	]`
+
+	// Write the config to a file
+	configFile := filepath.Join(tmpDir, "config.json")
+	err = os.WriteFile(configFile, []byte(jsonConfig), 0o644)
+	if err != nil {
+		t.Fatalf("Failed to write config file: %v", err)
+	}
+
+	// Call the function to test
+	configs, err := readModConfigs(configFile)
+	if err != nil {
+		t.Fatalf("readModConfigs failed: %v", err)
+	}
+
+	// Verify the results
+	if len(configs) != 2 {
+		t.Fatalf("Expected 2 configurations, got %d", len(configs))
+	}
+
+	if configs[0].Name != "multi_module_1" {
+		t.Errorf("Expected first config Name 'multi_module_1', got '%s'", configs[0].Name)
+	}
+	if configs[0].Build != "go build 1" {
+		t.Errorf("Expected first config Build 'go build 1', got '%s'", configs[0].Build)
+	}
+	if !configs[0].IsLocal {
+		t.Errorf("Expected first config IsLocal true, got false")
+	}
+
+	if configs[1].Name != "multi_module_2" {
+		t.Errorf("Expected second config Name 'multi_module_2', got '%s'", configs[1].Name)
+	}
+	if configs[1].Build != "go build 2" {
+		t.Errorf("Expected second config Build 'go build 2', got '%s'", configs[1].Build)
+	}
+	if configs[1].IsLocal {
+		t.Errorf("Expected second config IsLocal false, got true")
+	}
+}
+
