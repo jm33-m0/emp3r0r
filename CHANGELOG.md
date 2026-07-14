@@ -1,5 +1,22 @@
 # Changelog
 
+## [4.4.0](https://github.com/jm33-m0/emp3r0r/compare/v4.3.0...v4.4.0) (2026-07-14)
+
+
+### Features
+
+* implemented a Go proxy of WIN32 APIs for Starlark scripting ([e96c112](https://github.com/jm33-m0/emp3r0r/commit/e96c112c5d5e7d729ba3ab6ac3377fa5ee587055))
+* port some SA BOFs into starlark ([4f2cf5a](https://github.com/jm33-m0/emp3r0r/commit/4f2cf5a7c815e404844a195cd50291a65ef9bd98))
+* support modules with multiple files ([bc67d47](https://github.com/jm33-m0/emp3r0r/commit/bc67d47145299a644b6759f0fc40e792857e6a0c))
+
+
+### Bug Fixes
+
+* do not attempt C2 connection before `preflight` ([46278b2](https://github.com/jm33-m0/emp3r0r/commit/46278b24412dd517e90cd5522865372d4ba70955))
+* high CPU usage on non-Linux platforms ([d5c8691](https://github.com/jm33-m0/emp3r0r/commit/d5c86913000d0dbcf78ad72a9d8a7bcf063136f4))
+* reduce frictions in deployment ([6cae369](https://github.com/jm33-m0/emp3r0r/commit/6cae3698e33f6674bfb0d4f34621329db0b43007))
+* repeated path name ([f1ca240](https://github.com/jm33-m0/emp3r0r/commit/f1ca240ebcd4f70b0b37d09f29b192b20f032eaa))
+
 ## [4.3.0](https://github.com/jm33-m0/emp3r0r/compare/v4.2.5...v4.3.0) (2026-06-22)
 
 
