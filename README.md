@@ -44,7 +44,6 @@ Agents in isolated network segments **autonomously discover and tunnel through i
 
 **Why this matters:** Manual pivoting requires constant operator intervention and breaks when intermediate hosts fail. emp3r0r's agents automatically form redundant communication paths, ensuring persistence through resilient peer discovery and relay.
 
-
 ### 💾 Memory-Only Operations with Transparent Encryption
 
 Agents use an **in-memory filesystem with AES-GCM encryption** for all file operations. Bash, PowerShell, Python, Starlark, and ELF modules execute entirely from memory. Large files automatically spill to **encrypted disk storage** when memory is exhausted. The agent creates no dedicated directories or persistent configuration files.
@@ -88,6 +87,7 @@ git clone --depth=1 https://github.com/jm33-m0/emp3r0r.git && cd emp3r0r
 ```
 
 `install.sh` will:
+
 1. Pull the official `golang:1.26.2` image and compile emp3r0r inside it from the **local repository**
 2. Produce `core/emp3r0r-operator-kit.tar.zst` containing all precompiled binaries (including `emp3r0r-listener`) and data files
 3. Extract that operator kit locally and invoke its bundled installer to automatically configure permissions (`setcap`), create WireGuard run directories (`tmpfiles.d`), and install shell autocompletions on the host

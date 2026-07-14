@@ -67,9 +67,13 @@ detect_container_engine() {
   elif command -v podman >/dev/null 2>&1; then
     CONTAINER_ENGINE="podman"
   else
-    error "Neither 'docker' nor 'podman' was found. Please install one of them first:
-  Debian/Ubuntu:  sudo apt install docker.io
-  Or visit:       https://docs.docker.com/engine/install/"
+    warn "Neither 'docker' nor 'podman' was found. Attempting to install 'podman' via apt..."
+    if command -v apt-get >/dev/null 2>&1; then
+      sudo apt-get update -qq && sudo apt-get install -y podman || error "Failed to install podman"
+      CONTAINER_ENGINE="podman"
+    else
+      error "Neither 'docker' nor 'podman' was found, and apt-get is not available to install podman. Please install docker or podman manually."
+    fi
   fi
   info "Using container engine: $CONTAINER_ENGINE"
 }
