@@ -22,21 +22,27 @@ set -euo pipefail
 # Colour helpers
 # ---------------------------------------------------------------------------
 success() { printf "\n\e[32m[SUCCESS] %s\e[0m\n\n" "$1"; }
-info()    { printf "\e[34m[INFO] %s\e[0m\n" "$1"; }
-error()   { printf "\n\e[31m[ERROR] %s\e[0m\n\n" "$1" >&2; exit 1; }
-warn()    { printf "\e[33m[WARN] %s\e[0m\n" "$1"; }
+info() { printf "\e[34m[INFO] %s\e[0m\n" "$1"; }
+error() {
+  printf "\n\e[31m[ERROR] %s\e[0m\n\n" "$1" >&2
+  exit 1
+}
+warn() { printf "\e[33m[WARN] %s\e[0m\n" "$1"; }
 
 # ---------------------------------------------------------------------------
 # Defaults / argument parsing
 # ---------------------------------------------------------------------------
-BUILD_ARG="--install"   # passed to build.sh inside the container
+BUILD_ARG="--install" # passed to build.sh inside the container
 PREFIX="/usr/local"
 SKIP_BUILD=0
 CONTAINER_ENGINE=""
 
 # Persistent cache: the operator kit contains all compiled binaries and is used for installation
 # Resolve the repo root: the directory containing this script
-REPO_ROOT="$(cd "$(dirname "$(realpath "$0")")"; pwd)"
+REPO_ROOT="$(
+  cd "$(dirname "$(realpath "$0")")"
+  pwd
+)"
 CACHED_KIT="$REPO_ROOT/core/emp3r0r-operator-kit.tar.zst"
 
 usage() {
@@ -46,15 +52,24 @@ usage() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --debug)           BUILD_ARG="--debug"         ; shift ;;
-    --disable-garble)
-      export EMP3R0R_DISABLE_GARBLE=1
-      shift
-      ;;
-    --prefix)          PREFIX="$2"                 ; shift 2 ;;
-    --skip-build)      SKIP_BUILD=1                ; shift ;;
-    --help|-h)         usage ;;
-    *)  error "Unknown option: $1" ;;
+  --debug)
+    BUILD_ARG="--debug"
+    shift
+    ;;
+  --disable-garble)
+    export EMP3R0R_DISABLE_GARBLE=1
+    shift
+    ;;
+  --prefix)
+    PREFIX="$2"
+    shift 2
+    ;;
+  --skip-build)
+    SKIP_BUILD=1
+    shift
+    ;;
+  --help | -h) usage ;;
+  *) error "Unknown option: $1" ;;
   esac
 done
 
@@ -88,12 +103,12 @@ check_host_deps() {
   done
   if [[ ${#missing[@]} -gt 0 ]]; then
     warn "Missing host tools: ${missing[*]}. Installing via apt..."
-    sudo apt-get update -qq && sudo apt-get install -y "${missing[@]}" \
-      || error "Failed to install: ${missing[*]}"
+    sudo apt-get update -qq && sudo apt-get install -y "${missing[@]}" ||
+      error "Failed to install: ${missing[*]}"
   fi
 
   # Verify we are inside the emp3r0r repo
-  [[ -f "$REPO_ROOT/core/build.sh" ]] || \
+  [[ -f "$REPO_ROOT/core/build.sh" ]] ||
     error "core/build.sh not found under $REPO_ROOT. Run install.sh from the emp3r0r repo root."
 }
 
@@ -106,7 +121,7 @@ docker_build() {
 
   # Build env args
   local build_env_args=()
-  [[ "${EMP3R0R_DISABLE_GARBLE:-0}" == "1" ]] && \
+  [[ "${EMP3R0R_DISABLE_GARBLE:-0}" == "1" ]] &&
     build_env_args+=(-e EMP3R0R_DISABLE_GARBLE=1)
   build_env_args+=(-e EMP3R0R_BUILD_ARG="$BUILD_ARG")
 
@@ -118,7 +133,8 @@ docker_build() {
 
   local go_image="golang:1.26.2"
   local container_cmd
-  container_cmd=$(cat <<'CONTAINER_CMD'
+  container_cmd=$(
+    cat <<'CONTAINER_CMD'
 set -euo pipefail
 
 # Install build-time and runtime dependencies
@@ -134,14 +150,14 @@ bash build.sh "${EMP3R0R_BUILD_ARG:---install}"
 
 echo "Build complete."
 CONTAINER_CMD
-)
+  )
 
   "$CONTAINER_ENGINE" run --rm \
     -v "${REPO_ROOT}:/src" \
     "${build_env_args[@]}" \
     "$go_image" \
-    /bin/bash -c "$container_cmd" \
-    || error "Docker build failed"
+    /bin/bash -c "$container_cmd" ||
+    error "Docker build failed"
 
   success "Docker build completed"
 }
@@ -176,7 +192,7 @@ install_from_operator_kit() {
 main() {
   if [[ "$SKIP_BUILD" -eq 1 ]]; then
     # --skip-build: reinstall from the cached operator kit without running Docker
-    [[ -f "$CACHED_KIT" ]] || \
+    [[ -f "$CACHED_KIT" ]] ||
       error "No cached operator kit found at $CACHED_KIT. Run ./install.sh first to build."
     info "--skip-build: skipping Docker build, using cached operator kit"
     info "  Kit    : $CACHED_KIT"

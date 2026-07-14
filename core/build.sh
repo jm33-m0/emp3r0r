@@ -125,9 +125,9 @@ package_operator_bundle() {
   local lib_src="$installed_prefix/lib/emp3r0r"
 
   mkdir -p "$kit_dir/bin" "$kit_dir/lib/emp3r0r"
-  cp -aL "$bin_src"                          "$kit_dir/bin/emp3r0r"          || error "Failed to copy emp3r0r launcher"
-  cp -aL "$lib_src/emp3r0r-cc"              "$kit_dir/lib/emp3r0r/emp3r0r-cc"  || error "Failed to copy emp3r0r-cc"
-  cp -aL "$lib_src/emp3r0r-cat"             "$kit_dir/lib/emp3r0r/emp3r0r-cat" || error "Failed to copy emp3r0r-cat"
+  cp -aL "$bin_src" "$kit_dir/bin/emp3r0r" || error "Failed to copy emp3r0r launcher"
+  cp -aL "$lib_src/emp3r0r-cc" "$kit_dir/lib/emp3r0r/emp3r0r-cc" || error "Failed to copy emp3r0r-cc"
+  cp -aL "$lib_src/emp3r0r-cat" "$kit_dir/lib/emp3r0r/emp3r0r-cat" || error "Failed to copy emp3r0r-cat"
   # listener lives in bin/, include it so the kit is also usable for full reinstalls
   local listener_src="$installed_prefix/bin/emp3r0r-listener"
   if [[ -f "$listener_src" ]]; then
@@ -295,8 +295,8 @@ OPERATOR_INSTALL_EOF
   chmod 755 "$kit_dir/install.sh"
 
   # Create the final archive from the staging directory
-  tar --zstd -cpf "$pwd/$operator_bundle_name" -C "$bundle_stage" "emp3r0r-operator-kit" \
-    || error "failed to create operator package"
+  tar --zstd -cpf "$pwd/$operator_bundle_name" -C "$bundle_stage" "emp3r0r-operator-kit" ||
+    error "failed to create operator package"
 
   success "Created portable operator package: $pwd/$operator_bundle_name"
   success "Transfer to your operator machine, then:"
@@ -468,17 +468,20 @@ build() {
     fi
   fi
 
+  local core_tags=""
+  [[ "$arg1" != "--debug" ]] && core_tags="-tags release"
+
   info "Building CC"
   {
-    cd cmd/cc && CGO_ENABLED=0 $GO_BIN build -mod=vendor -o "$temp/cc.exe" -ldflags="$ldflags"
+    cd cmd/cc && CGO_ENABLED=0 $GO_BIN build -mod=vendor $core_tags -o "$temp/cc.exe" -ldflags="$ldflags"
   } || error "build cc"
   info "Building cat"
   {
-    cd "$pwd/cmd/cat" && CGO_ENABLED=0 $GO_BIN build -mod=vendor -o "$temp/cat.exe" -ldflags="$ldflags"
+    cd "$pwd/cmd/cat" && CGO_ENABLED=0 $GO_BIN build -mod=vendor $core_tags -o "$temp/cat.exe" -ldflags="$ldflags"
   } || error "build cat"
   info "Building listener"
   {
-    cd "$pwd/cmd/listener" && CGO_ENABLED=0 $GO_BIN build -mod=vendor -o "$temp/listener.exe" -ldflags="$ldflags"
+    cd "$pwd/cmd/listener" && CGO_ENABLED=0 $GO_BIN build -mod=vendor $core_tags -o "$temp/listener.exe" -ldflags="$ldflags"
   } || error "build listener"
 
   # Linux
