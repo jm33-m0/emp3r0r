@@ -220,7 +220,7 @@ chmod 755 "$DATA_DIR/emp3r0r-cc" "$DATA_DIR/emp3r0r-cat" "$BIN_DIR/emp3r0r"
 
 for dir in build modules tmux; do
   if [[ -d "$SCRIPT_DIR/lib/emp3r0r/$dir" ]]; then
-    cp -afR "$SCRIPT_DIR/lib/emp3r0r/$dir" "$DATA_DIR/$dir"
+    cp -afR "$SCRIPT_DIR/lib/emp3r0r/$dir" "$DATA_DIR/"
     info "Installed $dir"
   fi
 done
