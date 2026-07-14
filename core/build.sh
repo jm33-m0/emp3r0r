@@ -437,7 +437,13 @@ build() {
   # -----
   check_required_go
   check_disk_space
-  $GO_BIN mod tidy || error "go mod tidy"
+  if [[ ! -d "vendor" ]]; then
+    info "vendor directory not found, downloading modules..."
+    $GO_BIN mod tidy || error "go mod tidy"
+    $GO_BIN mod vendor || error "go mod vendor"
+  else
+    info "Using existing vendor/ directory for local modules"
+  fi
 
   # Check for zig installation
   check_zig
@@ -446,16 +452,16 @@ build() {
   ldflags+=" -X 'github.com/jm33-m0/emp3r0r/core/internal/def.Version=$(get_version)'"
   if [[ "$1" = "--debug" ]]; then
     gobuild_cmd="$GO_BIN"
-    build_opt="build"
+    build_opt="build -mod=vendor"
   else
     if [[ "$disable_garble" = "1" || "$disable_garble" = "true" || "$disable_garble" = "yes" ]]; then
       gobuild_cmd="$GO_BIN"
-      build_opt="build"
+      build_opt="build -mod=vendor"
       ldflags+=" -s -w"
       info "Garble disabled by EMP3R0R_DISABLE_GARBLE=$disable_garble, using plain go build"
     else
       gobuild_cmd="garble"
-      build_opt="-tiny -seed=random build"
+      build_opt="-tiny -seed=random build -mod=vendor"
       ldflags+=" -s -w"
       info "Setting up garble"
       $GO_BIN install mvdan.cc/garble@master || error "Failed to install garble"
@@ -464,15 +470,15 @@ build() {
 
   info "Building CC"
   {
-    cd cmd/cc && CGO_ENABLED=0 $GO_BIN build -o "$temp/cc.exe" -ldflags="$ldflags"
+    cd cmd/cc && CGO_ENABLED=0 $GO_BIN build -mod=vendor -o "$temp/cc.exe" -ldflags="$ldflags"
   } || error "build cc"
   info "Building cat"
   {
-    cd "$pwd/cmd/cat" && CGO_ENABLED=0 $GO_BIN build -o "$temp/cat.exe" -ldflags="$ldflags"
+    cd "$pwd/cmd/cat" && CGO_ENABLED=0 $GO_BIN build -mod=vendor -o "$temp/cat.exe" -ldflags="$ldflags"
   } || error "build cat"
   info "Building listener"
   {
-    cd "$pwd/cmd/listener" && CGO_ENABLED=0 $GO_BIN build -o "$temp/listener.exe" -ldflags="$ldflags"
+    cd "$pwd/cmd/listener" && CGO_ENABLED=0 $GO_BIN build -mod=vendor -o "$temp/listener.exe" -ldflags="$ldflags"
   } || error "build listener"
 
   # Linux
