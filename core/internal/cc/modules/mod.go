@@ -132,10 +132,10 @@ func SetActiveModule(modName string) {
 
 			// OPSEC warnings
 			if mod.AgentConfig.Exec != "built-in" && !mod.IsLocal {
-				if mod.AgentConfig.Type == "coff" {
-					logging.Infof("OPSEC: This is a BOF module, which is recommended for OPSEC (runs in-memory)")
+				if mod.AgentConfig.Type == "coff" || mod.AgentConfig.Type == "starlark" {
+					logging.Infof("OPSEC: This is a BOF/Starlark module, which is recommended for OPSEC (runs in-memory)")
 				} else {
-					logging.Warningf("OPSEC: This module is NOT built-in and NOT BOF. It may involve fork-and-run or disk activity")
+					logging.Warningf("OPSEC: This module may involve fork-and-run or disk activity")
 				}
 			}
 			if mod.AgentConfig.IsInteractive {
