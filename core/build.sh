@@ -112,29 +112,195 @@ package_operator_bundle() {
   installed_prefix="$(find_installed_prefix)"
   info "Using installed files from $installed_prefix"
 
-  local -a tar_paths
-  tar_paths+=("${installed_prefix#/}/bin/emp3r0r")
-  tar_paths+=("${installed_prefix#/}/lib/emp3r0r/emp3r0r-cc")
-  tar_paths+=("${installed_prefix#/}/lib/emp3r0r/emp3r0r-cat")
+  # Stage the operator bundle in a temp directory so we can inject install.sh
+  local bundle_stage
+  bundle_stage="$(mktemp -d -t emp3r0r-operator-bundle-XXXXXX)" || error "Failed to create bundle staging dir"
+  trap 'rm -rf "$bundle_stage"' RETURN
+
+  local kit_dir="$bundle_stage/emp3r0r-operator-kit"
+  mkdir -p "$kit_dir"
+
+  # Copy binaries and data into the kit directory (preserving relative paths)
+  local bin_src="$installed_prefix/bin/emp3r0r"
+  local lib_src="$installed_prefix/lib/emp3r0r"
+
+  mkdir -p "$kit_dir/bin" "$kit_dir/lib/emp3r0r"
+  cp -aL "$bin_src"                          "$kit_dir/bin/emp3r0r"          || error "Failed to copy emp3r0r launcher"
+  cp -aL "$lib_src/emp3r0r-cc"              "$kit_dir/lib/emp3r0r/emp3r0r-cc"  || error "Failed to copy emp3r0r-cc"
+  cp -aL "$lib_src/emp3r0r-cat"             "$kit_dir/lib/emp3r0r/emp3r0r-cat" || error "Failed to copy emp3r0r-cat"
+  # listener lives in bin/, include it so the kit is also usable for full reinstalls
+  local listener_src="$installed_prefix/bin/emp3r0r-listener"
+  if [[ -f "$listener_src" ]]; then
+    cp -aL "$listener_src" "$kit_dir/bin/emp3r0r-listener" || warn "Failed to copy emp3r0r-listener"
+  else
+    warn "emp3r0r-listener not found at $listener_src; skipping"
+  fi
 
   local dir
   for dir in build modules tmux; do
-    if [[ -d "$installed_prefix/lib/emp3r0r/$dir" ]]; then
-      tar_paths+=("${installed_prefix#/}/lib/emp3r0r/$dir")
+    if [[ -d "$lib_src/$dir" ]]; then
+      cp -aR "$lib_src/$dir" "$kit_dir/lib/emp3r0r/$dir" || warn "Failed to copy $dir"
     else
-      warn "$installed_prefix/lib/emp3r0r/$dir not found; operator package may be incomplete"
+      warn "$lib_src/$dir not found; operator package may be incomplete"
     fi
   done
 
-  # Create a tarball of the installed tree only.
-  tar --zstd -cpf "$pwd/$operator_bundle_name" -C / "${tar_paths[@]}" || error "failed to create operator package"
+  # Generate the self-contained install.sh that operators run after extracting the kit
+  cat >"$kit_dir/install.sh" <<'OPERATOR_INSTALL_EOF'
+#!/bin/bash
+# emp3r0r Operator Kit Installer
+# --------------------------------
+# Run this script once after transferring the operator kit to your machine.
+# It installs emp3r0r into /usr/local, sets required capabilities, creates
+# the WireGuard runtime directory, and sets up shell completion automatically.
+#
+# Usage: sudo ./install.sh
+#        ./install.sh          (will re-exec itself with sudo)
+
+set -euo pipefail
+
+success() { printf "\n\e[32m[SUCCESS] %s\e[0m\n\n" "$1"; }
+info()    { printf "\e[34m[INFO] %s\e[0m\n" "$1"; }
+error()   { printf "\n\e[31m[ERROR] %s\e[0m\n\n" "$1"; exit 1; }
+warn()    { printf "\e[33m[WARN] %s\e[0m\n" "$1"; }
+
+# Re-exec with sudo if not root
+if [[ "$EUID" -ne 0 ]]; then
+  info "Re-running with sudo..."
+  exec sudo bash "$0" "$@"
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PREFIX="${PREFIX:-/usr/local}"
+BIN_DIR="$PREFIX/bin"
+DATA_DIR="$PREFIX/lib/emp3r0r"
+INSTALL_USER="${SUDO_USER:-${USER:-$(id -un)}}"
+
+info "Installing emp3r0r operator kit to $PREFIX"
+info "Operator user: $INSTALL_USER"
+
+# Verify kit contents
+[[ -f "$SCRIPT_DIR/bin/emp3r0r" ]]              || error "Kit is missing: bin/emp3r0r"
+[[ -f "$SCRIPT_DIR/lib/emp3r0r/emp3r0r-cc" ]]  || error "Kit is missing: lib/emp3r0r/emp3r0r-cc"
+[[ -f "$SCRIPT_DIR/lib/emp3r0r/emp3r0r-cat" ]] || error "Kit is missing: lib/emp3r0r/emp3r0r-cat"
+
+# -- Check required system dependencies --
+for dep in setcap tmux; do
+  if ! command -v "$dep" >/dev/null 2>&1; then
+    warn "Required tool '$dep' not found. Attempting to install via apt..."
+    if command -v apt-get >/dev/null 2>&1; then
+      apt-get update -qq && apt-get install -y \
+        "$( [[ "$dep" == "setcap" ]] && echo libcap2-bin || echo "$dep" )" \
+        || error "Failed to install $dep"
+    else
+      error "$dep is required but could not be installed automatically. Please install it manually."
+    fi
+  fi
+done
+
+# -- Stop any running emp3r0r session --
+if command -v tmux >/dev/null 2>&1 && tmux has-session -t emp3r0r 2>/dev/null; then
+  warn "Stopping existing emp3r0r tmux session..."
+  tmux kill-session -t emp3r0r || true
+fi
+
+# -- Install files --
+info "Creating directories..."
+mkdir -p "$BIN_DIR" "$DATA_DIR/build"
+
+info "Installing binaries and data..."
+cp -afR "$SCRIPT_DIR/bin/emp3r0r"             "$BIN_DIR/emp3r0r"
+if [[ -f "$SCRIPT_DIR/bin/emp3r0r-listener" ]]; then
+  cp -afR "$SCRIPT_DIR/bin/emp3r0r-listener"  "$BIN_DIR/emp3r0r-listener"
+  chmod 755 "$BIN_DIR/emp3r0r-listener"
+fi
+cp -afR "$SCRIPT_DIR/lib/emp3r0r/emp3r0r-cc"  "$DATA_DIR/emp3r0r-cc"
+cp -afR "$SCRIPT_DIR/lib/emp3r0r/emp3r0r-cat" "$DATA_DIR/emp3r0r-cat"
+chmod 755 "$DATA_DIR/emp3r0r-cc" "$DATA_DIR/emp3r0r-cat" "$BIN_DIR/emp3r0r"
+
+for dir in build modules tmux; do
+  if [[ -d "$SCRIPT_DIR/lib/emp3r0r/$dir" ]]; then
+    cp -afR "$SCRIPT_DIR/lib/emp3r0r/$dir" "$DATA_DIR/$dir"
+    info "Installed $dir"
+  fi
+done
+
+# Fix tmux config path (replace placeholder with actual install path)
+tmux_conf="$DATA_DIR/tmux/.tmux.conf"
+if [[ -f "$tmux_conf" ]]; then
+  tmux_sh_dir="$DATA_DIR/tmux/sh"
+  replace="$(echo -n "$tmux_sh_dir" | sed 's/\//\\\//g')"
+  sed -i "s/~\/sh/$replace/g" "$tmux_conf"
+  info "Fixed tmux config paths"
+fi
+
+# -- Set capabilities for WireGuard --
+info "Setting cap_net_admin on emp3r0r-cc..."
+setcap cap_net_admin=eip "$DATA_DIR/emp3r0r-cc" || error "setcap failed — is libcap2-bin installed?"
+
+# -- WireGuard runtime directory --
+info "Creating /var/run/wireguard..."
+mkdir -p /var/run/wireguard
+chown "${INSTALL_USER}:${INSTALL_USER}" /var/run/wireguard || \
+  chown "${INSTALL_USER}" /var/run/wireguard || true
+chmod 0755 /var/run/wireguard
+
+# Persist the directory across reboots via tmpfiles.d
+if [[ -d "/etc/tmpfiles.d" ]]; then
+  echo "d /var/run/wireguard 0755 ${INSTALL_USER} ${INSTALL_USER}" \
+    >/etc/tmpfiles.d/emp3r0r-wireguard.conf
+  info "Created /etc/tmpfiles.d/emp3r0r-wireguard.conf"
+fi
+
+# -- Shell completion --
+CC_BIN="$DATA_DIR/emp3r0r-cc"
+
+# Bash completion
+if [[ -d "/etc/bash_completion.d" ]]; then
+  "$CC_BIN" completion bash >"/etc/bash_completion.d/emp3r0r" 2>/dev/null && \
+    chmod 644 "/etc/bash_completion.d/emp3r0r" && \
+    info "Installed Bash completion to /etc/bash_completion.d/emp3r0r" || \
+    warn "Failed to install Bash completion"
+fi
+
+# Zsh completion
+ZSH_COMP_DIR=""
+# Prefer the invoking user's personal completion dirs
+REAL_HOME="$(eval echo "~$INSTALL_USER" 2>/dev/null || echo "/home/$INSTALL_USER")"
+if [[ -d "$REAL_HOME/.zsh/completions" ]]; then
+  ZSH_COMP_DIR="$REAL_HOME/.zsh/completions"
+else
+  for d in "/usr/local/share/zsh/site-functions" "/usr/share/zsh/site-functions" "/usr/share/zsh/vendor-completions"; do
+    if [[ -d "$d" ]]; then
+      ZSH_COMP_DIR="$d"
+      break
+    fi
+  done
+fi
+if [[ -n "$ZSH_COMP_DIR" ]]; then
+  mkdir -p "$ZSH_COMP_DIR"
+  "$CC_BIN" completion zsh >"$ZSH_COMP_DIR/_emp3r0r" 2>/dev/null && \
+    chmod 644 "$ZSH_COMP_DIR/_emp3r0r" && \
+    info "Installed Zsh completion to $ZSH_COMP_DIR/_emp3r0r" || \
+    warn "Failed to install Zsh completion"
+else
+  warn "No Zsh completion directory found; skipping Zsh completion install"
+fi
+
+success "emp3r0r operator kit installed successfully!"
+info "Run 'emp3r0r client --help' to get started."
+info "Use the connection command printed by the C2 server to connect."
+OPERATOR_INSTALL_EOF
+
+  chmod 755 "$kit_dir/install.sh"
+
+  # Create the final archive from the staging directory
+  tar --zstd -cpf "$pwd/$operator_bundle_name" -C "$bundle_stage" "emp3r0r-operator-kit" \
+    || error "failed to create operator package"
 
   success "Created portable operator package: $pwd/$operator_bundle_name"
-  success "Next steps:"
-  success "  1. Transfer to your operator environment: $operator_bundle_name"
-  success "  2. Install on your operator machine: sudo tar --zstd -xpf $operator_bundle_name -C /"
-  success "  3. Run once: sudo setcap cap_net_admin=eip /usr/local/lib/emp3r0r/emp3r0r-cc && sudo mkdir -p /var/run/wireguard && sudo chown \$(id -un):\$(id -gn) /var/run/wireguard && echo \"d /var/run/wireguard 0755 \$(id -un) \$(id -gn)\" | sudo tee /etc/tmpfiles.d/emp3r0r-wireguard.conf"
-  success "  4. Run emp3r0r server, copy and paste the command from the output to your operator environment"
+  success "Transfer to your operator machine, then:"
+  success "  tar --zstd -xpf $operator_bundle_name && ./emp3r0r-operator-kit/install.sh"
 }
 
 build_agent_pure() {

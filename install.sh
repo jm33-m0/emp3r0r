@@ -1,131 +1,200 @@
 #!/bin/bash
+# emp3r0r Installation Script
+# ----------------------------
+# Uses Docker (or Podman) as a throwaway build container to compile emp3r0r
+# from the LOCAL source tree, then installs the resulting binaries directly
+# on the local machine. No Go toolchain or Zig installation required on the host.
+#
+# Run from the root of the emp3r0r repository:
+#   ./install.sh [OPTIONS]
+#
+# Options:
+#   --debug           Build with debug symbols (no garble obfuscation)
+#   --disable-garble  Release build without garble obfuscation
+#   --prefix PATH     Install prefix (default: /usr/local)
+#   --skip-build      Skip Docker build; reinstall from the last cached build
+#                     (requires a previous successful ./install.sh run)
+#   --help            Show this help
 
-# emp3r0r Installation Script (Source-based)
-# This script installs emp3r0r by building it from source.
+set -euo pipefail
 
-required_go_version="1.26.2"
+# ---------------------------------------------------------------------------
+# Colour helpers
+# ---------------------------------------------------------------------------
+success() { printf "\n\e[32m[SUCCESS] %s\e[0m\n\n" "$1"; }
+info()    { printf "\e[34m[INFO] %s\e[0m\n" "$1"; }
+error()   { printf "\n\e[31m[ERROR] %s\e[0m\n\n" "$1" >&2; exit 1; }
+warn()    { printf "\e[33m[WARN] %s\e[0m\n" "$1"; }
 
-# Function to print informational messages
-info() {
-  echo -e "\033[32m[INFO] $1\033[0m"
+# ---------------------------------------------------------------------------
+# Defaults / argument parsing
+# ---------------------------------------------------------------------------
+BUILD_ARG="--install"   # passed to build.sh inside the container
+PREFIX="/usr/local"
+SKIP_BUILD=0
+CONTAINER_ENGINE=""
+
+# Persistent cache: the operator kit contains all compiled binaries and is used for installation
+# Resolve the repo root: the directory containing this script
+REPO_ROOT="$(cd "$(dirname "$(realpath "$0")")"; pwd)"
+CACHED_KIT="$REPO_ROOT/core/emp3r0r-operator-kit.tar.zst"
+
+usage() {
+  grep '^#' "$0" | sed 's/^# \{0,1\}//'
+  exit 0
 }
 
-# Function to print error messages and exit
-error() {
-  echo -e "\033[31m[ERROR] $1\033[0m"
-  exit 1
-}
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --debug)           BUILD_ARG="--debug"         ; shift ;;
+    --disable-garble)
+      export EMP3R0R_DISABLE_GARBLE=1
+      shift
+      ;;
+    --prefix)          PREFIX="$2"                 ; shift 2 ;;
+    --skip-build)      SKIP_BUILD=1                ; shift ;;
+    --help|-h)         usage ;;
+    *)  error "Unknown option: $1" ;;
+  esac
+done
 
-# Function to print warning messages
-warn() {
-  echo -e "\033[33m[WARN] $1\033[0m"
-}
-
-# Function to check and install basic packages via apt
-check_apt_pkg() {
-  if ! command -v "$1" >/dev/null 2>&1; then
-    info "Installing $1 via apt..."
-    sudo apt update && sudo apt install -y "$1" || error "Failed to install $1"
+# ---------------------------------------------------------------------------
+# Detect container engine (Docker or Podman)
+# ---------------------------------------------------------------------------
+detect_container_engine() {
+  if command -v docker >/dev/null 2>&1; then
+    CONTAINER_ENGINE="docker"
+  elif command -v podman >/dev/null 2>&1; then
+    CONTAINER_ENGINE="podman"
+  else
+    error "Neither 'docker' nor 'podman' was found. Please install one of them first:
+  Debian/Ubuntu:  sudo apt install docker.io
+  Or visit:       https://docs.docker.com/engine/install/"
   fi
+  info "Using container engine: $CONTAINER_ENGINE"
 }
 
-# Install Go from go.dev
-install_go() {
-  local target_go_version="$required_go_version"
-  local go_tarball="go${target_go_version}.linux-amd64.tar.gz"
-  local go_url="https://golang.org/dl/${go_tarball}"
-
-  if command -v go >/dev/null 2>&1; then
-    local current_ver
-    current_ver=$(go version | awk '{print $3}' | sed 's/go//')
-    if [[ "$current_ver" == "$target_go_version" ]]; then
-      info "Go $current_ver is already installed"
-      return
-    fi
-    warn "Current Go version is $current_ver, required is $target_go_version. Reinstalling..."
+# ---------------------------------------------------------------------------
+# Check that required host tools are available
+# ---------------------------------------------------------------------------
+check_host_deps() {
+  local missing=()
+  for dep in tar; do
+    command -v "$dep" >/dev/null 2>&1 || missing+=("$dep")
+  done
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    warn "Missing host tools: ${missing[*]}. Installing via apt..."
+    sudo apt-get update -qq && sudo apt-get install -y "${missing[@]}" \
+      || error "Failed to install: ${missing[*]}"
   fi
 
-  info "Downloading Go $target_go_version from $go_url..."
-  info "Installing with the official archive method from golang.org"
-  curl -LO "$go_url" || error "Failed to download Go"
-  sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf "$go_tarball" || error "Failed to extract Go"
-  rm "$go_tarball"
-
-  # Update Go environment for current session
-  export GOROOT="/usr/local/go"
-  export PATH="$GOROOT/bin:$PATH"
-  export GOTOOLCHAIN=local
-
-  if ! grep -q "/usr/local/go/bin" ~/.bashrc; then
-    echo 'export PATH=$PATH:/usr/local/go/bin' >>~/.bashrc
-    info "Added /usr/local/go/bin to ~/.bashrc"
-  fi
+  # Verify we are inside the emp3r0r repo
+  [[ -f "$REPO_ROOT/core/build.sh" ]] || \
+    error "core/build.sh not found under $REPO_ROOT. Run install.sh from the emp3r0r repo root."
 }
 
-# Main installation flow
-info "Starting emp3r0r installation from source"
+# ---------------------------------------------------------------------------
+# Docker build: compile emp3r0r inside a throwaway container using the LOCAL
+# source tree.
+# ---------------------------------------------------------------------------
+docker_build() {
+  info "Using local source: $REPO_ROOT"
 
-# 0. Setup temporary workdir
-workdir=$(mktemp -d)
-trap 'rm -rf "$workdir"' EXIT
-info "Workdir: $workdir"
-cd "$workdir" || error "Failed to enter workdir"
+  # Build env args
+  local build_env_args=()
+  [[ "${EMP3R0R_DISABLE_GARBLE:-0}" == "1" ]] && \
+    build_env_args+=(-e EMP3R0R_DISABLE_GARBLE=1)
+  build_env_args+=(-e EMP3R0R_BUILD_ARG="$BUILD_ARG")
 
-# 1. Install basic dependencies
-check_apt_pkg curl
-check_apt_pkg git
-check_apt_pkg tmux
-# Check for build-essential by looking for make
-if ! command -v make >/dev/null 2>&1; then
-  check_apt_pkg build-essential
-fi
-# Check for libcap2-bin by looking for setcap
-if ! command -v setcap >/dev/null 2>&1; then
-  check_apt_pkg libcap2-bin
-fi
-check_apt_pkg jq
+  info "Starting Docker build container (golang:1.26.2)..."
+  info "This may take a while on first run (Go modules + garble cache)."
 
-# 2. Install Go
-install_go
+  # Mounts:
+  #   /src  ← local repo root (read-write; build.sh writes the operator kit here)
 
-# Explicitly use the required official Go environment when building.
-export GOROOT="/usr/local/go"
-export PATH="$GOROOT/bin:$PATH"
-export GOTOOLCHAIN=local
-[[ -x "$GOROOT/bin/go" ]] || error "Go not found at $GOROOT/bin/go"
-current_ver="$($GOROOT/bin/go version | awk '{print $3}' | sed 's/^go//')"
-[[ "$current_ver" == "$required_go_version" ]] || error "Go $required_go_version is required, found $current_ver"
-info "Using Go toolchain: $($GOROOT/bin/go version)"
+  local go_image="golang:1.26.2"
+  local container_cmd
+  container_cmd=$(cat <<'CONTAINER_CMD'
+set -euo pipefail
 
-# 3. Download source
-info "Checking for latest release..."
-tag=$(curl -sSL https://api.github.com/repos/jm33-m0/emp3r0r/releases/latest | jq -r .tag_name)
-if [[ -z "$tag" || "$tag" == "null" ]]; then
-  warn "Failed to fetch latest release tag, falling back to v4"
-  tag="v4"
-fi
-info "Downloading source tarball for $tag..."
-source_url="https://github.com/jm33-m0/emp3r0r/archive/refs/tags/${tag}.tar.gz"
-# if it's a branch like v4, the URL is different
-if [[ "$tag" == "v4" ]]; then
-  source_url="https://github.com/jm33-m0/emp3r0r/archive/refs/heads/${tag}.tar.gz"
-fi
-curl -L "$source_url" -o emp3r0r-src.tar.gz || error "Failed to download source"
+# Install build-time and runtime dependencies
+apt-get update -qq && apt-get install -y --no-install-recommends \
+  sudo curl wget git jq tmux zstd libcap2-bin build-essential ca-certificates \
+  >/dev/null
 
-# 4. Extract
-info "Extracting source..."
-mkdir emp3r0r-source
-tar -xzf emp3r0r-src.tar.gz -C emp3r0r-source --strip-components=1 || error "Failed to extract source"
-cd emp3r0r-source/core || error "Failed to enter core directory"
+# Build from the locally mounted source tree
+export PREFIX=/usr/local
+export GOPATH=/root/go
+cd /src/core
+bash build.sh "${EMP3R0R_BUILD_ARG:---install}"
 
-# 5. Build and Install
-warn "Building and installing emp3r0r $tag (this may take a while)..."
-# build.sh will handle zig and other internal dependencies
-export TAG="$tag"
-if [ "$EUID" -eq 0 ]; then
-  ./build.sh --install || error "Build and installation failed"
-else
-  sudo ./build.sh --install || error "Build and installation failed"
-fi
+echo "Build complete."
+CONTAINER_CMD
+)
 
-info "emp3r0r installed successfully!"
+  "$CONTAINER_ENGINE" run --rm \
+    -v "${REPO_ROOT}:/src" \
+    "${build_env_args[@]}" \
+    "$go_image" \
+    /bin/bash -c "$container_cmd" \
+    || error "Docker build failed"
+
+  success "Docker build completed"
+}
+
+# ---------------------------------------------------------------------------
+# Extract the operator kit and execute its installer to perform local setup
+# ---------------------------------------------------------------------------
+install_from_operator_kit() {
+  [[ -f "$CACHED_KIT" ]] || error "Operator kit not found: $CACHED_KIT"
+
+  local tmp
+  tmp="$(mktemp -d -t emp3r0r-kit-extract-XXXXXX)"
+
+  info "Extracting operator kit to install..."
+  if ! tar --zstd -xpf "$CACHED_KIT" -C "$tmp"; then
+    rm -rf "$tmp"
+    error "Failed to extract operator kit"
+  fi
+
+  info "Running operator kit installer..."
+  if ! PREFIX="$PREFIX" bash "$tmp/emp3r0r-operator-kit/install.sh"; then
+    rm -rf "$tmp"
+    exit 1
+  fi
+
+  rm -rf "$tmp"
+}
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+main() {
+  if [[ "$SKIP_BUILD" -eq 1 ]]; then
+    # --skip-build: reinstall from the cached operator kit without running Docker
+    [[ -f "$CACHED_KIT" ]] || \
+      error "No cached operator kit found at $CACHED_KIT. Run ./install.sh first to build."
+    info "--skip-build: skipping Docker build, using cached operator kit"
+    info "  Kit    : $CACHED_KIT"
+    info "  Prefix : $PREFIX"
+    info "  Cached : $(date -r "$CACHED_KIT" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || stat -c '%y' "$CACHED_KIT" 2>/dev/null || echo 'unknown')"
+    check_host_deps
+    install_from_operator_kit
+  else
+    detect_container_engine
+    check_host_deps
+    info "Starting emp3r0r installation (Docker-based build from local source)"
+    info "  Repo   : $REPO_ROOT"
+    info "  Prefix : $PREFIX"
+    info "  Build  : $BUILD_ARG"
+    docker_build
+    install_from_operator_kit
+  fi
+
+  success "emp3r0r installed successfully to $PREFIX"
+  info "Run 'emp3r0r server --help' to get started."
+  info "Operator kit → $REPO_ROOT/core/emp3r0r-operator-kit.tar.zst"
+  info "  Transfer it to your operator machine and run: ./emp3r0r-operator-kit/install.sh"
+}
+
+main "$@"

@@ -75,39 +75,51 @@ HTTP2/TLS connections use **uTLS** to randomize TLS Client Hello fingerprints, p
 
 ## Quick Start
 
-### Docker Deployment
+### Install on C2 Server
 
-Podman is used here, you can use Docker if you like. Just replace `podman` with `docker`.
+Requires Docker (or Podman) on the host. No Go toolchain needed.
 
 ```bash
 # Clone the project
 git clone --depth=1 https://github.com/jm33-m0/emp3r0r.git && cd emp3r0r
 
-# Step 1: Build the archive on the host using a throwaway container
-podman run --rm -v .:/src:z -w /src/core golang:1.26.2 \
-    /bin/bash -c "apt update && apt install -y sudo curl git jq tmux zstd libcap2-bin build-essential && ./build.sh --install"
-
-# Step 2: Build your slim production image
-podman build -t emp3r0r:4.2.3 . # use any tag you like
-
-# Run the server. Be sure to change your port mappings to fit your environment
-mkdir ~/.emp3r0r
-podman run -it --rm --cap-add=NET_ADMIN --device /dev/net/tun:/dev/net/tun \
-  -v "$HOME/.emp3r0r:/root/.emp3r0r" \
-  -p 12345:12345 -p 13377:13377/udp \
-  --name emp3r0r-server \
-  emp3r0r:4.2.3 \
-  server --c2-hosts 1.2.3.4 --http-port 12345 --operator-port 13377
-
-# Server prints C2 connection command
-emp3r0r client --c2-port 13377 --server-wg-key '0OKqMZmJfLDhAQLST4MKtKNa6MKxVkLn3UcOP14sMA8=' --server-wg-ip '10.88.14.158' --operator-wg-ip '10.88.14.236' --operator-wg-key 'LOe4sUyjyyIS3Kjnmz0SpKJwvDGle0880Q73qzsMg48=' --c2-host <YOUR_PUBLIC_IP>
+# Build inside a throwaway Docker container, then install locally
+./install.sh
 ```
 
-And follow the on-screen instructions given by `emp3r0r server`. Transfer `emp3r0r-operator-kit.tar.zst` to your operator machine and install it.
+`install.sh` will:
+1. Pull the official `golang:1.26.2` image and compile emp3r0r inside it from the **local repository**
+2. Produce `core/emp3r0r-operator-kit.tar.zst` containing all precompiled binaries (including `emp3r0r-listener`) and data files
+3. Extract that operator kit locally and invoke its bundled installer to automatically configure permissions (`setcap`), create WireGuard run directories (`tmpfiles.d`), and install shell autocompletions on the host
+
+Options:
+
+```
+./install.sh [--debug] [--disable-garble] [--prefix /usr/local] [--skip-build]
+```
+
+Use `--skip-build` to skip the Docker compilation step entirely and reinstall/reconfigure using the cached operator kit from a previous build.
+
+Then start the C2 server:
 
 ```bash
-# Run the command given by emp3r0r server on your operator machin after installation
-emp3r0r client --operator-port 13377 --server-wg-key '0OKqMZmJfLDhAQLST4MKtKNa6MKxVkLn3UcOP14sMA8=' --server-wg-ip '10.88.14.158' --operator-wg-ip '10.88.14.236' --operator-wg-key 'LOe4sUyjyyIS3Kjnmz0SpKJwvDGle0880Q73qzsMg48=' --c2-host 1.2.3.4
+emp3r0r server --c2-hosts 1.2.3.4 --http-port 12345 --operator-port 13377
+```
+
+### Operator Machine Setup
+
+After the C2 server prints its connection command, transfer the operator kit and run its bundled installer:
+
+```bash
+# On your operator machine
+tar --zstd -xpf emp3r0r-operator-kit.tar.zst
+./emp3r0r-operator-kit/install.sh    # handles setcap, WireGuard dir, and shell completion automatically
+```
+
+Then run the connection command printed by the C2 server:
+
+```bash
+emp3r0r client --c2-port 13377 --server-wg-key '0OKqMZmJfLDhAQLST4MKtKNa6MKxVkLn3UcOP14sMA8=' --server-wg-ip '10.88.14.158' --operator-wg-ip '10.88.14.236' --operator-wg-key 'LOe4sUyjyyIS3Kjnmz0SpKJwvDGle0880Q73qzsMg48=' --c2-host 1.2.3.4
 ```
 
 `emp3r0r client` automatically downloads and applies config files from C2 server via WireGuard tunnel.
