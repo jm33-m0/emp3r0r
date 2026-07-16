@@ -287,52 +287,63 @@ func InitModules() {
 			var hasCopied bool
 
 			for _, config := range configs {
-				// module path, eg. ~/.emp3r0r/modules/foo
-				originalPath := fmt.Sprintf("%s/%s", mod_search_dir, dir.Name())
-				config.Path = originalPath
-				if config.IsLocal || config.Build != "" {
-					if hasCopied {
-						config.Path = copiedPath
-					} else {
-						mod_dir := filepath.Join(live.EmpWorkSpace, "modules", dir.Name())
-						absConfigPath, _ := filepath.Abs(config.Path)
-						absModDir, _ := filepath.Abs(mod_dir)
-						if absConfigPath == absModDir {
-							logging.Debugf("Module %s is already in workspace, skipping copy", config.Name)
-							copiedPath = mod_dir
-							hasCopied = true
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							logging.Errorf("Panic while loading module %s: %v. Rolling back registration.", config.Name, r)
+							def.Modules.Delete(config.Name)
+							deleteModuleRunner(config.Name)
+						}
+					}()
+
+					// module path, eg. ~/.emp3r0r/modules/foo
+					originalPath := fmt.Sprintf("%s/%s", mod_search_dir, dir.Name())
+					config.Path = originalPath
+					if config.IsLocal || config.Build != "" {
+						if hasCopied {
+							config.Path = copiedPath
 						} else {
-							err := os.MkdirAll(mod_dir, 0o700)
-							if err != nil {
-								logging.Warningf("Failed to create %s: %v", mod_dir, err)
-								continue
+							mod_dir := filepath.Join(live.EmpWorkSpace, "modules", dir.Name())
+							absConfigPath, _ := filepath.Abs(config.Path)
+							absModDir, _ := filepath.Abs(mod_dir)
+							if absConfigPath == absModDir {
+								logging.Debugf("Module %s is already in workspace, skipping copy", config.Name)
+								copiedPath = mod_dir
+								hasCopied = true
+							} else {
+								err := os.MkdirAll(mod_dir, 0o700)
+								if err != nil {
+									logging.Warningf("Failed to create %s: %v", mod_dir, err)
+									return
+								}
+								err = util.Copy(config.Path, mod_dir)
+								if err != nil {
+									logging.Warningf("Copying %s to %s: %v", config.Path, mod_dir, err)
+									return
+								}
+								config.Path = mod_dir
+								copiedPath = mod_dir
+								hasCopied = true
 							}
-							err = util.Copy(config.Path, mod_dir)
-							if err != nil {
-								logging.Warningf("Copying %s to %s: %v", config.Path, mod_dir, err)
-								continue
-							}
-							config.Path = mod_dir
-							copiedPath = mod_dir
-							hasCopied = true
 						}
 					}
-				}
 
-				// add to module helpers
-				registerModuleRunner(config.Name, moduleCustom)
+					// add to module helpers
+					registerModuleRunner(config.Name, moduleCustom)
 
-				// Store FIRST so that updateModuleHelp can Load and patch the Options map.
-				// Without this, the Load inside updateModuleHelp always misses and the
-				// validated options are silently discarded.
-				def.Modules.Store(config.Name, config)
-				readConfigErr = updateModuleHelp(config)
-				if readConfigErr != nil {
-					logging.Warningf("Loading config from %s: %v", config.Name, readConfigErr)
-					def.Modules.Delete(config.Name) // rollback — don't expose a broken entry
-					continue
-				}
-				logging.Debugf("Loaded module %s", strconv.Quote(config.Name))
+					// Store FIRST so that updateModuleHelp can Load and patch the Options map.
+					// Without this, the Load inside updateModuleHelp always misses and the
+					// validated options are silently discarded.
+					def.Modules.Store(config.Name, config)
+					readConfigErr = updateModuleHelp(config)
+					if readConfigErr != nil {
+						logging.Warningf("Loading config from %s: %v", config.Name, readConfigErr)
+						def.Modules.Delete(config.Name) // rollback — don't expose a broken entry
+						deleteModuleRunner(config.Name)
+						return
+					}
+					logging.Debugf("Loaded module %s", strconv.Quote(config.Name))
+				}()
 			}
 		}
 	}

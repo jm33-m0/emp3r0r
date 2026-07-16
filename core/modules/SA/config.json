@@ -891,7 +891,7 @@
         "required": false
       },
       {
-        "name": "force",
+        "name": "force_delete",
         "description": "Force disconnect even if resources are open (0=no, 1=yes)",
         "default": "0",
         "type": "short",

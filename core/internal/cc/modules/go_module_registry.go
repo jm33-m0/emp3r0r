@@ -148,6 +148,12 @@ func registerModuleRunner(name string, runner func(ctx *c2context.C2Context)) {
 	ModuleRunners[name] = runner
 }
 
+func deleteModuleRunner(name string) {
+	moduleRunnersMu.Lock()
+	defer moduleRunnersMu.Unlock()
+	delete(ModuleRunners, name)
+}
+
 func getModuleRunner(name string) func(ctx *c2context.C2Context) {
 	moduleRunnersMu.RLock()
 	defer moduleRunnersMu.RUnlock()

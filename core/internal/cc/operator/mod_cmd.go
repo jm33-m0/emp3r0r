@@ -30,49 +30,58 @@ func addModuleCommands(rootCmd *cobra.Command) {
 	})
 
 	for _, mod := range mods {
-		mod := mod
-		flagActions := carapace.ActionMap{}
-		cmd := &cobra.Command{
-			Use:     mod.Name,
-			GroupID: "module",
-			Short:   mod.Comment,
-			Long:    fmt.Sprintf("Run module %s", mod.Name),
-			Args:    cobra.NoArgs,
-			Run: func(cmd *cobra.Command, _ []string) {
-				runModuleByName(cmd, mod.Name)
-			},
-		}
-		cmd.Flags().Bool("force", false, "Force execution without confirmation")
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logging.Errorf("Failed to register command for module %s: %v. Rolling back registration.", mod.Name, r)
+					def.Modules.Delete(mod.Name)
+				}
+			}()
 
-		keys := make([]string, 0, len(mod.Options))
-		for key := range mod.Options {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
+			mod := mod
+			flagActions := carapace.ActionMap{}
+			cmd := &cobra.Command{
+				Use:     mod.Name,
+				GroupID: "module",
+				Short:   mod.Comment,
+				Long:    fmt.Sprintf("Run module %s", mod.Name),
+				Args:    cobra.NoArgs,
+				Run: func(cmd *cobra.Command, _ []string) {
+					runModuleByName(cmd, mod.Name)
+				},
+			}
+			cmd.Flags().Bool("force", false, "Force execution without confirmation")
 
-		for _, key := range keys {
-			opt := mod.Options[key]
-			if opt == nil {
-				continue
+			keys := make([]string, 0, len(mod.Options))
+			for key := range mod.Options {
+				keys = append(keys, key)
 			}
-			help := strings.TrimSpace(opt.Desc)
-			if len(opt.Vals) > 0 {
-				help = fmt.Sprintf("%s (choices: %s)", help, strings.Join(opt.Vals, ", "))
-			}
-			if opt.Required {
-				help = strings.TrimSpace(help + " [required]")
-			}
-			cmd.Flags().String(opt.Name, opt.Val, help)
-			if len(opt.Vals) > 0 {
-				vals := append([]string(nil), opt.Vals...)
-				flagActions[opt.Name] = carapace.ActionValues(vals...)
-			}
-		}
-		if len(flagActions) > 0 {
-			carapace.Gen(cmd).FlagCompletion(flagActions)
-		}
+			sort.Strings(keys)
 
-		rootCmd.AddCommand(cmd)
+			for _, key := range keys {
+				opt := mod.Options[key]
+				if opt == nil {
+					continue
+				}
+				help := strings.TrimSpace(opt.Desc)
+				if len(opt.Vals) > 0 {
+					help = fmt.Sprintf("%s (choices: %s)", help, strings.Join(opt.Vals, ", "))
+				}
+				if opt.Required {
+					help = strings.TrimSpace(help + " [required]")
+				}
+				cmd.Flags().String(opt.Name, opt.Val, help)
+				if len(opt.Vals) > 0 {
+					vals := append([]string(nil), opt.Vals...)
+					flagActions[opt.Name] = carapace.ActionValues(vals...)
+				}
+			}
+			if len(flagActions) > 0 {
+				carapace.Gen(cmd).FlagCompletion(flagActions)
+			}
+
+			rootCmd.AddCommand(cmd)
+		}()
 	}
 }
 
