@@ -331,6 +331,11 @@ func InitModules() {
 					// add to module helpers
 					registerModuleRunner(config.Name, moduleCustom)
 
+					// Check for conflicting module names
+					if _, exists := def.Modules.Load(config.Name); exists {
+						logging.Warningf("Conflicting module name: module '%s' is already registered/loaded. The new definition will overwrite it.", config.Name)
+					}
+
 					// Store FIRST so that updateModuleHelp can Load and patch the Options map.
 					// Without this, the Load inside updateModuleHelp always misses and the
 					// validated options are silently discarded.
@@ -485,10 +490,21 @@ func readModConfigs(file string) (configs []*def.ModuleConfig, err error) {
 		config.Invocation.StdinParam = raw.Invocation.StdinParam
 		config.Invocation.CoffExport = raw.Invocation.CoffExport
 
+		seenParams := make(map[string]bool)
 		for _, p := range raw.Parameters {
 			if p.Name == "" {
 				continue
 			}
+			if seenParams[p.Name] {
+				logging.Warningf("Module '%s' config warning: duplicate parameter '%s' defined", raw.Name, p.Name)
+			}
+			seenParams[p.Name] = true
+
+			// Check for conflicts with reserved command-line flags
+			if p.Name == "force" || p.Name == "help" {
+				logging.Warningf("Module '%s' config warning: parameter '%s' conflicts with reserved command-line flags (Cobra/pflag built-in)", raw.Name, p.Name)
+			}
+
 			config.Options[p.Name] = &def.ModOption{
 				Name:     p.Name,
 				Desc:     p.Desc,
