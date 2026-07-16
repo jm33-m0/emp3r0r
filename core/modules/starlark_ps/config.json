@@ -26,11 +26,5 @@
     "type": "starlark",
     "interactive": false
   },
-  "invocation": {
-    "argv": [
-      {
-        "param": "filter"
-      }
-    ]
-  }
+  "invocation": {}
 }

@@ -304,8 +304,8 @@ func copyDir(src, dst string) error {
 			return err
 		}
 
-		// Skip test directories to avoid permission errors when tests are running
-		if d.IsDir() && d.Name() == "test" {
+		// Skip test, .cache, and .git directories to avoid permission/OPSEC issues
+		if d.IsDir() && (d.Name() == "test" || d.Name() == ".cache" || d.Name() == ".git") {
 			return filepath.SkipDir
 		}
 

@@ -12,36 +12,70 @@ const (
 	ModDownloader   = "file_downloader"
 )
 
-// ModOption represents module options with typing metadata
+// ModOption represents a module parameter.
+//
+// The "type" field unifies validation (C2-side) and wire-packing (agent-side
+// for COFF/BOF) into a single declaration.  The loader uses the type for both
+// input validation and, when the module is a COFF/BOF, for determining the
+// lighthouse wire-packing token.
+//
+// Non-COFF types (starlark, bash, python, elf, …) use only the validation
+// semantics; the wire-packing semantics are silently ignored.
+//
+// Type vocabulary
+// ───────────────
+// Generic (all module kinds):
+//
+//	string  – UTF-8 text; no numeric constraint.
+//	int     – signed 64-bit integer.
+//	uint    – unsigned 64-bit integer.
+//	bool    – "true"/"false".
+//	port    – uint in [1,65535].
+//	base64  – arbitrary bytes, user supplies base64-encoded string.
+//
+// COFF/BOF wire types (also accepted for non-COFF as aliases to the generic
+// types above; the extra packing semantics are just ignored):
+//
+//	cstr    – alias: "s", "lpstr"  → UTF-8 C-string; wire token "S".
+//	wstr    – alias: "w", "lpwstr" → UTF-16LE string; wire token "z".
+//	dword   – alias: "i", "uint32" → unsigned 32-bit int; wire token "i".
+//	short   – alias: "word","int16"→ signed 16-bit int; wire token "s".
+//	binary  – alias: "b"           → length-prefixed bytes (base64 input); wire token "b".
+//
+// ArgvFlag, when non-empty, prefixes the resolved string value in the argv
+// list, e.g. "-p" produces ["-p", "<value>"].  Ignored for COFF modules
+// (COFF args are passed via the Coff sub-invocation, not argv).
 type ModOption struct {
 	Name     string   `cbor:"1,keyasint"`  // option name
 	Desc     string   `cbor:"2,keyasint"`  // option description
 	Val      string   `cbor:"3,keyasint"`  // option value (current / default)
 	Vals     []string `cbor:"4,keyasint"`  // allowed values for enum-like options
-	Type     string   `cbor:"5,keyasint"`  // string,int,uint,bool,enum,base64,duration,port
+	Type     string   `cbor:"5,keyasint"`  // unified type (see above)
 	Required bool     `cbor:"6,keyasint"`  // whether the option is required
 	Pattern  string   `cbor:"7,keyasint"`  // optional regex validation for strings
 	Encoding string   `cbor:"8,keyasint"`  // encoding hint (utf8/utf16le) for string/binary
 	Secret   bool     `cbor:"9,keyasint"`  // mark sensitive values (avoid logging)
 	Min      *float64 `cbor:"10,keyasint"` // numeric lower bound
 	Max      *float64 `cbor:"11,keyasint"` // numeric upper bound
+	// ArgvFlag, when non-empty, prefixes the value in the argv list.
+	// e.g. "-p" produces ["-p", "<value>"].
+	ArgvFlag string `cbor:"12,keyasint"`
 }
 
 // ModOptions represents multiple module options
 type ModOptions map[string]*ModOption
 
-// InvocationArg models a single argv element
+// InvocationArg models a single argv element (literal or param reference).
+// Used internally; in JSON only literal/flag entries need to be listed.
 type InvocationArg struct {
 	Literal string // raw value
 	Flag    string // flag prefix, eg. -I
 	Param   string // reference to option name
 }
 
-// CoffArgSpec defines a COFF argument and its wire type
+// CoffArgSpec defines a COFF argument derived from a parameter.
 type CoffArgSpec struct {
 	Param    string
-	Literal  any
-	WireType string
 	Encoding string
 }
 
@@ -51,12 +85,15 @@ type CoffInvocation struct {
 	Args   []CoffArgSpec
 }
 
-// InvocationSpec defines how to run a module
+// InvocationSpec defines how to run a module.
+//
+// The parameter list drives argv ordering and COFF argument packing.
 type InvocationSpec struct {
+	CoffExport     string
 	Argv           []InvocationArg
 	StdinParam     string
 	TimeoutSeconds int
-	Coff           *CoffInvocation
+	Coff           *CoffInvocation // populated internally from parameters
 }
 
 // ResolvedInvocation is the rendered form sent to the agent
@@ -73,7 +110,8 @@ type ResolvedCoffInvocation struct {
 	Args   []ResolvedCoffArg `cbor:"2,keyasint"`
 }
 
-// ResolvedCoffArg holds a typed value to be packed by lighthouse
+// ResolvedCoffArg holds a typed value to be packed by lighthouse.
+// WireType is derived from the parameter's unified Type field.
 type ResolvedCoffArg struct {
 	WireType string `cbor:"1,keyasint"`
 	Value    any    `cbor:"2,keyasint"`

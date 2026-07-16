@@ -362,15 +362,25 @@ func readModCondig(file string) (pconfig *def.ModuleConfig, err error) {
 	return configs[0], nil
 }
 
-// readModConfigs read config.json of a module which may define multiple modules
+// readModConfigs reads config.json which may define one or more modules.
+//
+// JSON format (unified)
+// ─────────────────────
+//
+//	{
+//	  "name": "hello_linux",
+//	  "parameters": [
+//	    { "name":"who", "description":"...", "default":"World",
+//	      "type":"cstr", "required":false }
+//	  ],
+//	  "agent_config": { "type":"coff", ... },
+//	  "invocation":  { "coff_export":"go" }
+//	}
+//
+// The "type" field in each parameter is the single source of truth for both
+// input validation (C2 side) and COFF wire-packing (agent side).
 func readModConfigs(file string) (configs []*def.ModuleConfig, err error) {
-	type legacyOption struct {
-		OptName string   `json:"opt_name"`
-		OptDesc string   `json:"opt_desc"`
-		OptVal  string   `json:"opt_val"`
-		OptVals []string `json:"opt_vals"`
-	}
-
+	// optionJSON is the unified parameter declaration.
 	type optionJSON struct {
 		Name     string   `json:"name"`
 		Desc     string   `json:"description"`
@@ -383,32 +393,19 @@ func readModConfigs(file string) (configs []*def.ModuleConfig, err error) {
 		Secret   bool     `json:"secret"`
 		Min      *float64 `json:"min"`
 		Max      *float64 `json:"max"`
+		ArgvFlag string   `json:"argv_flag"`
 	}
 
 	type invocationArgJSON struct {
 		Literal string `json:"literal"`
 		Flag    string `json:"flag"`
-		Param   string `json:"param"`
-		Value   any    `json:"value"`
-	}
-
-	type coffArgJSON struct {
-		Param    string `json:"param"`
-		Literal  any    `json:"literal"`
-		WireType string `json:"wire_type"`
-		Encoding string `json:"encoding"`
-	}
-
-	type coffJSON struct {
-		Export string        `json:"export"`
-		Args   []coffArgJSON `json:"args"`
 	}
 
 	type invocationJSON struct {
 		Argv           []invocationArgJSON `json:"argv"`
 		StdinParam     string              `json:"stdin_param"`
 		TimeoutSeconds int                 `json:"timeout_seconds"`
-		Coff           *coffJSON           `json:"coff"`
+		CoffExport     string              `json:"coff_export"`
 	}
 
 	type agentConfigJSON struct {
@@ -422,19 +419,18 @@ func readModConfigs(file string) (configs []*def.ModuleConfig, err error) {
 	}
 
 	type moduleConfigJSON struct {
-		Name        string                  `json:"name"`
-		Build       string                  `json:"build"`
-		Author      string                  `json:"author"`
-		Date        string                  `json:"date"`
-		Comment     string                  `json:"comment"`
-		IsLocal     bool                    `json:"is_local"`
-		Platform    string                  `json:"platform"`
-		Path        string                  `json:"path"`
-		Fileless    bool                    `json:"fileless"`
-		AgentConfig agentConfigJSON         `json:"agent_config"`
-		Parameters  []optionJSON            `json:"parameters"`
-		LegacyOpts  map[string]legacyOption `json:"options"`
-		Invocation  invocationJSON          `json:"invocation"`
+		Name        string          `json:"name"`
+		Build       string          `json:"build"`
+		Author      string          `json:"author"`
+		Date        string          `json:"date"`
+		Comment     string          `json:"comment"`
+		IsLocal     bool            `json:"is_local"`
+		Platform    string          `json:"platform"`
+		Path        string          `json:"path"`
+		Fileless    bool            `json:"fileless"`
+		AgentConfig agentConfigJSON `json:"agent_config"`
+		Parameters  []optionJSON    `json:"parameters"`
+		Invocation  invocationJSON  `json:"invocation"`
 	}
 
 	jsonData, err := os.ReadFile(file)
@@ -443,9 +439,7 @@ func readModConfigs(file string) (configs []*def.ModuleConfig, err error) {
 	}
 
 	var rawList []moduleConfigJSON
-	// Try parsing as array first
 	if err = json.Unmarshal(jsonData, &rawList); err != nil {
-		// If it fails, try parsing as a single object
 		var raw moduleConfigJSON
 		if err = json.Unmarshal(jsonData, &raw); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal JSON config: %v", err)
@@ -478,25 +472,7 @@ func readModConfigs(file string) (configs []*def.ModuleConfig, err error) {
 
 		config.Invocation.TimeoutSeconds = raw.Invocation.TimeoutSeconds
 		config.Invocation.StdinParam = raw.Invocation.StdinParam
-		for _, arg := range raw.Invocation.Argv {
-			config.Invocation.Argv = append(config.Invocation.Argv, def.InvocationArg{
-				Literal: arg.Literal,
-				Flag:    arg.Flag,
-				Param:   arg.Param,
-			})
-		}
-		if raw.Invocation.Coff != nil {
-			coff := def.CoffInvocation{Export: raw.Invocation.Coff.Export}
-			for _, arg := range raw.Invocation.Coff.Args {
-				coff.Args = append(coff.Args, def.CoffArgSpec{
-					Param:    arg.Param,
-					Literal:  arg.Literal,
-					WireType: arg.WireType,
-					Encoding: arg.Encoding,
-				})
-			}
-			config.Invocation.Coff = &coff
-		}
+		config.Invocation.CoffExport = raw.Invocation.CoffExport
 
 		for _, p := range raw.Parameters {
 			if p.Name == "" {
@@ -514,19 +490,44 @@ func readModConfigs(file string) (configs []*def.ModuleConfig, err error) {
 				Secret:   p.Secret,
 				Min:      p.Min,
 				Max:      p.Max,
+				ArgvFlag: p.ArgvFlag,
 			}
 		}
 
-		if len(config.Options) == 0 && len(raw.LegacyOpts) > 0 {
-			for key, opt := range raw.LegacyOpts {
-				config.Options[key] = &def.ModOption{
-					Name: opt.OptName,
-					Desc: opt.OptDesc,
-					Val:  opt.OptVal,
-					Vals: opt.OptVals,
-					Type: "string",
-				}
+		isCOFF := strings.EqualFold(raw.AgentConfig.Type, "coff")
+
+		// Literal-only argv prefix entries
+		for _, a := range raw.Invocation.Argv {
+			config.Invocation.Argv = append(config.Invocation.Argv, def.InvocationArg{
+				Literal: a.Literal,
+				Flag:    a.Flag,
+			})
+		}
+
+		// Derive argv entries from ordered parameters
+		for _, p := range raw.Parameters {
+			if p.Name == "" {
+				continue
 			}
+			config.Invocation.Argv = append(config.Invocation.Argv, def.InvocationArg{
+				Flag:  p.ArgvFlag,
+				Param: p.Name,
+			})
+		}
+
+		// Derive CoffInvocation from parameters (COFF only)
+		if isCOFF && raw.Invocation.CoffExport != "" {
+			coff := def.CoffInvocation{Export: raw.Invocation.CoffExport}
+			for _, p := range raw.Parameters {
+				if p.Name == "" {
+					continue
+				}
+				coff.Args = append(coff.Args, def.CoffArgSpec{
+					Param:    p.Name,
+					Encoding: p.Encoding,
+				})
+			}
+			config.Invocation.Coff = &coff
 		}
 
 		configs = append(configs, &config)
@@ -551,19 +552,49 @@ func updateModuleHelp(config *def.ModuleConfig) error {
 	return nil
 }
 
-// resolveInvocation renders an invocation with concrete values from module options
+// typeToWireToken maps the unified parameter type to a lighthouse wire token.
+// Returns "" for non-COFF types (starlark, string, int, …); the caller should
+// only pass COFF-relevant types.
+//
+// Wire token conventions (lighthouse/BOF):
+//
+//	S / s  – null-terminated UTF-8 C-string
+//	z      – null-terminated UTF-16LE wide string
+//	i      – 32-bit integer (signed or unsigned)
+//	s      – 16-bit short integer  (NB: lowercase "s" for short, uppercase "S" for cstr)
+//	b      – length-prefixed binary blob (base64 input)
+func typeToWireToken(typeName string) string {
+	switch strings.ToLower(typeName) {
+	case "cstr", "s", "lpstr", "string":
+		return "S"
+	case "wstr", "w", "lpwstr", "wstring":
+		return "z"
+	case "dword", "i", "uint32", "int", "uint", "int32", "port":
+		return "i"
+	case "short", "word", "int16":
+		return "s"
+	case "bool":
+		return "i" // bools packed as int (0/1)
+	case "binary", "b", "base64":
+		return "b"
+	default:
+		return ""
+	}
+}
+
+// resolveInvocation renders an invocation with concrete values from module options.
+//
+// For COFF modules the WireType on each ResolvedCoffArg is derived from the
+// parameter's unified "type" field via typeToWireToken.
 func resolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.ResolvedInvocation, error) {
 	resolved := def.ResolvedInvocation{TimeoutSeconds: config.Invocation.TimeoutSeconds}
 
 	lookupOpt := func(name string) (*def.ModOption, string, error) {
-		// look for option definition
 		if config.Options != nil {
 			if opt, ok := config.Options[name]; ok && opt != nil {
-				// if flag is provided, use it
 				if val, ok := flags[name]; ok {
 					return opt, val, nil
 				}
-				// otherwise use default
 				return opt, opt.Val, nil
 			}
 		}
@@ -578,6 +609,7 @@ func resolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.R
 		return renderOptionValue(opt, val)
 	}
 
+	// ── argv ──────────────────────────────────────────────────────────────
 	for _, arg := range config.Invocation.Argv {
 		switch {
 		case arg.Literal != "":
@@ -603,6 +635,7 @@ func resolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.R
 		}
 	}
 
+	// ── stdin ─────────────────────────────────────────────────────────────
 	if config.Invocation.StdinParam != "" {
 		stdinVal, _, err := coerceVal(config.Invocation.StdinParam)
 		if err != nil {
@@ -611,22 +644,25 @@ func resolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.R
 		resolved.Stdin = stdinVal
 	}
 
+	// ── COFF packing ─────────────────────────────────────────────────────
+	// Wire type comes from the parameter's unified "type" field.
 	if config.Invocation.Coff != nil {
 		coffInv := &def.ResolvedCoffInvocation{Export: config.Invocation.Coff.Export}
 		for _, arg := range config.Invocation.Coff.Args {
-			var (
-				typed any
-				err   error
-			)
-			if arg.Param != "" {
-				_, typed, err = coerceVal(arg.Param)
-			} else {
-				typed = arg.Literal
+			opt, val, lookupErr := lookupOpt(arg.Param)
+			if lookupErr != nil {
+				return resolved, lookupErr
 			}
+			_, typed, err := renderOptionValue(opt, val)
 			if err != nil {
 				return resolved, err
 			}
-			coffInv.Args = append(coffInv.Args, def.ResolvedCoffArg{WireType: arg.WireType, Value: typed, Encoding: arg.Encoding})
+			wireTyp := typeToWireToken(opt.Type)
+			coffInv.Args = append(coffInv.Args, def.ResolvedCoffArg{
+				WireType: wireTyp,
+				Value:    typed,
+				Encoding: arg.Encoding,
+			})
 		}
 		resolved.Coff = coffInv
 	}
@@ -634,7 +670,10 @@ func resolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.R
 	return resolved, nil
 }
 
-// renderOptionValue validates and returns both string and typed representations
+// renderOptionValue validates and returns both string and typed representations.
+// The unified "type" field covers both non-COFF validation types (string, int,
+// uint, bool, port, base64) and COFF wire types (cstr, wstr, dword, short,
+// binary).  COFF-specific types fall through to the nearest generic equivalent.
 func renderOptionValue(opt *def.ModOption, val string) (string, any, error) {
 	val = strings.TrimSpace(val)
 	if val == "" {
@@ -658,13 +697,18 @@ func renderOptionValue(opt *def.ModOption, val string) (string, any, error) {
 	}
 
 	switch strings.ToLower(opt.Type) {
+	// ── Boolean ────────────────────────────────────────────────────────
 	case "bool":
 		b, err := strconv.ParseBool(val)
 		if err != nil {
 			return "", nil, fmt.Errorf("option %s expects bool: %w", opt.Name, err)
 		}
 		return strconv.FormatBool(b), b, nil
-	case "int":
+
+	// ── Signed / unsigned integers ─────────────────────────────────────
+	// Generic:        int, uint, port
+	// COFF aliases:   dword/i/uint32/int32, short/word/int16
+	case "int", "dword", "i", "uint32", "int32":
 		num, err := strconv.ParseInt(val, 10, 64)
 		if err != nil {
 			return "", nil, fmt.Errorf("option %s expects int: %w", opt.Name, err)
@@ -676,6 +720,7 @@ func renderOptionValue(opt *def.ModOption, val string) (string, any, error) {
 			return "", nil, fmt.Errorf("option %s above max", opt.Name)
 		}
 		return fmt.Sprintf("%d", num), float64(num), nil
+
 	case "uint", "port":
 		num, err := strconv.ParseUint(val, 10, 64)
 		if err != nil {
@@ -688,11 +733,28 @@ func renderOptionValue(opt *def.ModOption, val string) (string, any, error) {
 			return "", nil, fmt.Errorf("option %s above max", opt.Name)
 		}
 		return fmt.Sprintf("%d", num), float64(num), nil
-	default:
-		// Check regex pattern if present
-		if opt.Pattern != "" {
-			// TODO: Implement regex check if needed, though it wasn't there before
+
+	case "short", "word", "int16":
+		num, err := strconv.ParseInt(val, 10, 16)
+		if err != nil {
+			return "", nil, fmt.Errorf("option %s expects int16: %w", opt.Name, err)
 		}
+		return fmt.Sprintf("%d", num), float64(num), nil
+
+	// ── String variants ────────────────────────────────────────────────
+	// Generic:       string
+	// COFF aliases:  cstr/s/lpstr (UTF-8), wstr/w/lpwstr (UTF-16LE)
+	// Both are treated as plain Go strings on the C2 side; the agent's
+	// coffloader handles the actual encoding difference.
+	case "string", "cstr", "s", "lpstr", "wstr", "w", "lpwstr", "wstring":
+		return val, val, nil
+
+	// ── Binary / base64 ───────────────────────────────────────────────
+	// Accepted as-is (base64 string); agent unpacks.
+	case "binary", "b", "base64":
+		return val, val, nil
+
+	default:
 		return val, val, nil
 	}
 }

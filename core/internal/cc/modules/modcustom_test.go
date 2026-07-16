@@ -13,14 +13,12 @@ import (
 )
 
 func TestReadModConfig(t *testing.T) {
-	// Create a temporary directory for the test
 	tmpDir, err := os.MkdirTemp("", "emp3r0r-test")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Define a sample JSON config
 	jsonConfig := `{
 		"name": "test_module",
 		"build": "go build",
@@ -50,26 +48,22 @@ func TestReadModConfig(t *testing.T) {
 		],
 		"invocation": {
 			"argv": [
-				{"literal": "test_exec"},
-				{"param": "option1"}
+				{"literal": "test_exec"}
 			]
 		}
 	}`
 
-	// Write the config to a file
 	configFile := filepath.Join(tmpDir, "config.json")
 	err = os.WriteFile(configFile, []byte(jsonConfig), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
 
-	// Call the function to test
 	config, err := readModCondig(configFile)
 	if err != nil {
 		t.Fatalf("readModCondig failed: %v", err)
 	}
 
-	// Verify the results
 	if config.Name != "test_module" {
 		t.Errorf("Expected Name 'test_module', got '%s'", config.Name)
 	}
@@ -102,34 +96,29 @@ func TestReadModConfig(t *testing.T) {
 }
 
 func TestReadModConfigPartial(t *testing.T) {
-	// Create a temporary directory for the test
 	tmpDir, err := os.MkdirTemp("", "emp3r0r-test-partial")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Define a sample JSON config with missing fields
 	jsonConfig := `{
 		"name": "test_module_partial",
 		"parameters": [],
 		"invocation": {"argv": []}
 	}`
 
-	// Write the config to a file
 	configFile := filepath.Join(tmpDir, "config.json")
 	err = os.WriteFile(configFile, []byte(jsonConfig), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
 
-	// Call the function to test
 	config, err := readModCondig(configFile)
 	if err != nil {
 		t.Fatalf("readModCondig failed: %v", err)
 	}
 
-	// Verify the results
 	if config.Name != "test_module_partial" {
 		t.Errorf("Expected Name 'test_module_partial', got '%s'", config.Name)
 	}
@@ -145,6 +134,7 @@ func TestResolveInvocation(t *testing.T) {
 	config := &def.ModuleConfig{
 		AgentConfig: def.AgentModuleConfig{Type: "coff"},
 		Invocation: def.InvocationSpec{
+			CoffExport: "Run",
 			Argv: []def.InvocationArg{
 				{Literal: "runner"},
 				{Flag: "-p", Param: "port"},
@@ -152,7 +142,7 @@ func TestResolveInvocation(t *testing.T) {
 			StdinParam: "message",
 			Coff: &def.CoffInvocation{
 				Export: "Run",
-				Args:   []def.CoffArgSpec{{Param: "port", WireType: "DWORD"}},
+				Args:   []def.CoffArgSpec{{Param: "port"}},
 			},
 		},
 		Options: def.ModOptions{
@@ -177,7 +167,7 @@ func TestResolveInvocation(t *testing.T) {
 	if inv.Coff == nil || len(inv.Coff.Args) != 1 {
 		t.Fatalf("expected one COFF arg")
 	}
-	if inv.Coff.Args[0].WireType != "DWORD" {
+	if inv.Coff.Args[0].WireType != "i" {
 		t.Fatalf("wire type mismatch: %s", inv.Coff.Args[0].WireType)
 	}
 }
@@ -228,7 +218,7 @@ func TestReadModConfigFullInvocationAndAgentConfig(t *testing.T) {
 				"description": "flag option",
 				"default": "on",
 				"choices": ["on", "off"],
-				"type": "enum",
+				"type": "cstr",
 				"required": true,
 				"pattern": "on|off",
 				"encoding": "utf8",
@@ -239,15 +229,11 @@ func TestReadModConfigFullInvocationAndAgentConfig(t *testing.T) {
 		],
 		"invocation": {
 			"argv": [
-				{"literal": "runner"},
-				{"flag": "-o", "param": "flagged"}
+				{"literal": "runner"}
 			],
 			"stdin_param": "flagged",
 			"timeout_seconds": 42,
-			"coff": {
-				"export": "Run",
-				"args": [{"param": "flagged", "literal": "on", "wire_type": "LPSTR", "encoding": "utf8"}]
-			}
+			"coff_export": "Run"
 		}
 	}`
 
@@ -276,37 +262,6 @@ func TestReadModConfigFullInvocationAndAgentConfig(t *testing.T) {
 	}
 	if config.AgentConfig.WorkDir != "C:/tmp" || !config.AgentConfig.NeedsRoot {
 		t.Fatalf("agent config fields not parsed: %+v", config.AgentConfig)
-	}
-}
-
-func TestReadModConfigLegacyOptions(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "emp3r0r-legacy")
-	if err != nil {
-		t.Fatalf("temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	jsonConfig := `{
-		"name": "legacy_mod",
-		"options": {
-			"old": {"opt_name": "old", "opt_desc": "legacy", "opt_val": "x", "opt_vals": ["x"]}
-		},
-		"parameters": [],
-		"invocation": {"argv": []}
-	}`
-	configFile := filepath.Join(tmpDir, "config.json")
-	if err := os.WriteFile(configFile, []byte(jsonConfig), 0o644); err != nil {
-		t.Fatalf("write config: %v", err)
-	}
-
-	config, err := readModCondig(configFile)
-	if err != nil {
-		t.Fatalf("readModCondig: %v", err)
-	}
-
-	opt := config.Options["old"]
-	if opt == nil || opt.Val != "x" || opt.Type != "string" {
-		t.Fatalf("legacy option not parsed: %+v", opt)
 	}
 }
 
@@ -556,14 +511,12 @@ func TestUpdateOptionsAddsDownloadAddr(t *testing.T) {
 }
 
 func TestReadModConfigsMultiple(t *testing.T) {
-	// Create a temporary directory for the test
 	tmpDir, err := os.MkdirTemp("", "emp3r0r-test-multiple")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Define a sample JSON config that defines multiple modules
 	jsonConfig := `[
 		{
 			"name": "multi_module_1",
@@ -594,8 +547,7 @@ func TestReadModConfigsMultiple(t *testing.T) {
 			],
 			"invocation": {
 				"argv": [
-					{"literal": "exec1"},
-					{"param": "option1"}
+					{"literal": "exec1"}
 				]
 			}
 		},
@@ -628,27 +580,23 @@ func TestReadModConfigsMultiple(t *testing.T) {
 			],
 			"invocation": {
 				"argv": [
-					{"literal": "exec2"},
-					{"param": "option2"}
+					{"literal": "exec2"}
 				]
 			}
 		}
 	]`
 
-	// Write the config to a file
 	configFile := filepath.Join(tmpDir, "config.json")
 	err = os.WriteFile(configFile, []byte(jsonConfig), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write config file: %v", err)
 	}
 
-	// Call the function to test
 	configs, err := readModConfigs(configFile)
 	if err != nil {
 		t.Fatalf("readModConfigs failed: %v", err)
 	}
 
-	// Verify the results
 	if len(configs) != 2 {
 		t.Fatalf("Expected 2 configurations, got %d", len(configs))
 	}
@@ -671,5 +619,247 @@ func TestReadModConfigsMultiple(t *testing.T) {
 	}
 	if configs[1].IsLocal {
 		t.Errorf("Expected second config IsLocal false, got true")
+	}
+}
+
+func TestReadModConfigUnifiedCOFF(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "emp3r0r-unified-coff")
+	if err != nil {
+		t.Fatalf("temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	unified := `{
+		"name": "unified_coff",
+		"build": "make",
+		"author": "tester",
+		"date": "2026-01-01",
+		"comment": "unified COFF module",
+		"is_local": false,
+		"platform": "Linux",
+		"fileless": true,
+		"agent_config": {
+			"exec": "",
+			"files": ["unified.o"],
+			"in_memory": true,
+			"type": "coff",
+			"interactive": false
+		},
+		"parameters": [
+			{
+				"name": "who",
+				"description": "Who to greet",
+				"default": "World",
+				"type": "cstr",
+				"required": false
+			},
+			{
+				"name": "count",
+				"description": "How many times",
+				"default": "1",
+				"type": "int",
+				"required": true
+			}
+		],
+		"invocation": {
+			"coff_export": "go"
+		}
+	}`
+
+	cfgFile := filepath.Join(tmpDir, "config.json")
+	if err := os.WriteFile(cfgFile, []byte(unified), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	config, err := readModCondig(cfgFile)
+	if err != nil {
+		t.Fatalf("readModCondig: %v", err)
+	}
+
+	if config.Invocation.CoffExport != "go" {
+		t.Fatalf("CoffExport mismatch: %q", config.Invocation.CoffExport)
+	}
+
+	if config.Invocation.Coff == nil {
+		t.Fatalf("Coff invocation not synthesised")
+	}
+	if config.Invocation.Coff.Export != "go" {
+		t.Fatalf("Coff.Export mismatch: %q", config.Invocation.Coff.Export)
+	}
+	if len(config.Invocation.Coff.Args) != 2 {
+		t.Fatalf("expected 2 COFF args, got %d", len(config.Invocation.Coff.Args))
+	}
+	if config.Invocation.Coff.Args[0].Param != "who" {
+		t.Fatalf("COFF arg[0] mismatch: %+v", config.Invocation.Coff.Args[0])
+	}
+	if config.Invocation.Coff.Args[1].Param != "count" {
+		t.Fatalf("COFF arg[1] mismatch: %+v", config.Invocation.Coff.Args[1])
+	}
+
+	paramArgvCount := 0
+	for _, a := range config.Invocation.Argv {
+		if a.Param != "" {
+			paramArgvCount++
+		}
+	}
+	if paramArgvCount != 2 {
+		t.Fatalf("expected 2 param-derived argv entries, got %d", paramArgvCount)
+	}
+
+	whoOpt := config.Options["who"]
+	if whoOpt == nil || whoOpt.Type != "cstr" {
+		t.Fatalf("who option type missing: %+v", whoOpt)
+	}
+	countOpt := config.Options["count"]
+	if countOpt == nil || countOpt.Type != "int" {
+		t.Fatalf("count option type missing: %+v", countOpt)
+	}
+}
+
+func TestReadModConfigUnifiedStarlark(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "emp3r0r-unified-star")
+	if err != nil {
+		t.Fatalf("temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	unified := `{
+		"name": "unified_star",
+		"author": "tester",
+		"date": "2026-01-01",
+		"comment": "unified starlark module",
+		"is_local": false,
+		"platform": "Windows",
+		"fileless": true,
+		"agent_config": {
+			"exec": "search.star",
+			"files": ["search.star"],
+			"in_memory": true,
+			"type": "starlark",
+			"interactive": false
+		},
+		"parameters": [
+			{
+				"name": "filter",
+				"description": "LDAP filter",
+				"default": "(objectclass=*)",
+				"type": "string",
+				"required": true
+			},
+			{
+				"name": "scope",
+				"description": "Search scope",
+				"default": "0",
+				"type": "int",
+				"required": false
+			}
+		],
+		"invocation": {}
+	}`
+
+	cfgFile := filepath.Join(tmpDir, "config.json")
+	if err := os.WriteFile(cfgFile, []byte(unified), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	config, err := readModCondig(cfgFile)
+	if err != nil {
+		t.Fatalf("readModCondig: %v", err)
+	}
+
+	if config.Invocation.Coff != nil {
+		t.Fatalf("unexpected Coff invocation for starlark module")
+	}
+
+	filterOpt := config.Options["filter"]
+	if filterOpt == nil || filterOpt.Type != "string" {
+		t.Fatalf("filter option unexpected: %+v", filterOpt)
+	}
+	scopeOpt := config.Options["scope"]
+	if scopeOpt == nil || scopeOpt.Type != "int" {
+		t.Fatalf("scope option unexpected: %+v", scopeOpt)
+	}
+}
+
+func TestReadModConfigUnifiedArgvFlag(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "emp3r0r-unified-flag")
+	if err != nil {
+		t.Fatalf("temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	unified := `{
+		"name": "unified_flag",
+		"author": "tester",
+		"date": "2026-01-01",
+		"comment": "unified module with argv_flag",
+		"is_local": false,
+		"platform": "Linux",
+		"fileless": true,
+		"agent_config": {
+			"exec": "tool",
+			"files": ["tool"],
+			"in_memory": false,
+			"type": "elf",
+			"interactive": false
+		},
+		"parameters": [
+			{
+				"name": "port",
+				"description": "Port number",
+				"default": "8080",
+				"type": "uint",
+				"argv_flag": "-p",
+				"required": true
+			},
+			{
+				"name": "host",
+				"description": "Target host",
+				"default": "localhost",
+				"type": "string",
+				"argv_flag": "-h",
+				"required": false
+			}
+		],
+		"invocation": {
+			"argv": [{"literal": "tool"}]
+		}
+	}`
+
+	cfgFile := filepath.Join(tmpDir, "config.json")
+	if err := os.WriteFile(cfgFile, []byte(unified), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	config, err := readModCondig(cfgFile)
+	if err != nil {
+		t.Fatalf("readModCondig: %v", err)
+	}
+
+	if len(config.Invocation.Argv) != 3 {
+		t.Fatalf("expected 3 argv entries, got %d: %+v", len(config.Invocation.Argv), config.Invocation.Argv)
+	}
+	if config.Invocation.Argv[0].Literal != "tool" {
+		t.Fatalf("first argv should be literal 'tool': %+v", config.Invocation.Argv[0])
+	}
+	if config.Invocation.Argv[1].Flag != "-p" || config.Invocation.Argv[1].Param != "port" {
+		t.Fatalf("second argv should be flag -p / param port: %+v", config.Invocation.Argv[1])
+	}
+	if config.Invocation.Argv[2].Flag != "-h" || config.Invocation.Argv[2].Param != "host" {
+		t.Fatalf("third argv should be flag -h / param host: %+v", config.Invocation.Argv[2])
+	}
+
+	inv, err := resolveInvocation(config, map[string]string{})
+	if err != nil {
+		t.Fatalf("resolveInvocation: %v", err)
+	}
+	expected := []string{"tool", "-p", "8080", "-h", "localhost"}
+	if len(inv.Argv) != len(expected) {
+		t.Fatalf("resolved argv len mismatch: %v", inv.Argv)
+	}
+	for i, v := range expected {
+		if inv.Argv[i] != v {
+			t.Fatalf("argv[%d]: want %q got %q", i, v, inv.Argv[i])
+		}
 	}
 }

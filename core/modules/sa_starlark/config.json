@@ -17,9 +17,7 @@
       "type": "starlark",
       "interactive": false
     },
-    "invocation": {
-      "argv": []
-    }
+    "invocation": {}
   },
   {
     "name": "sa_locale",
@@ -39,9 +37,7 @@
       "type": "starlark",
       "interactive": false
     },
-    "invocation": {
-      "argv": []
-    }
+    "invocation": {}
   },
   {
     "name": "sa_env",
@@ -61,9 +57,7 @@
       "type": "starlark",
       "interactive": false
     },
-    "invocation": {
-      "argv": []
-    }
+    "invocation": {}
   },
   {
     "name": "sa_arp",
@@ -83,9 +77,7 @@
       "type": "starlark",
       "interactive": false
     },
-    "invocation": {
-      "argv": []
-    }
+    "invocation": {}
   },
   {
     "name": "sa_whoami",
@@ -105,9 +97,7 @@
       "type": "starlark",
       "interactive": false
     },
-    "invocation": {
-      "argv": []
-    }
+    "invocation": {}
   },
   {
     "name": "sa_netstat",
@@ -127,9 +117,7 @@
       "type": "starlark",
       "interactive": false
     },
-    "invocation": {
-      "argv": []
-    }
+    "invocation": {}
   },
   {
     "name": "sa_ldapsearch",
@@ -199,30 +187,6 @@
       "type": "starlark",
       "interactive": false
     },
-    "invocation": {
-      "argv": [
-        {
-          "param": "filter"
-        },
-        {
-          "param": "attributes"
-        },
-        {
-          "param": "results_count"
-        },
-        {
-          "param": "scope"
-        },
-        {
-          "param": "hostname"
-        },
-        {
-          "param": "domain"
-        },
-        {
-          "param": "ldaps"
-        }
-      ]
-    }
+    "invocation": {}
   }
 ]

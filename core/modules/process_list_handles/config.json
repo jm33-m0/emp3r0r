@@ -19,23 +19,12 @@
   ],
   "agent_config": {
     "exec": "",
-    "files": [
-      "ProcessListHandles.x64.o"
-    ],
+    "files": ["ProcessListHandles.x64.o"],
     "in_memory": true,
     "type": "coff",
     "interactive": false
   },
   "invocation": {
-    "argv": [],
-    "coff": {
-      "export": "go",
-      "args": [
-        {
-          "param": "pid",
-          "wire_type": "INT"
-        }
-      ]
-    }
+    "coff_export": "go"
   }
 }

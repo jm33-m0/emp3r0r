@@ -25,16 +25,6 @@
     "interactive": false
   },
   "invocation": {
-    "argv": [],
-    "coff": {
-      "export": "go",
-      "args": [
-        {
-          "param": "pid",
-          "wire_type": "INT"
-        }
-      ]
-    }
+    "coff_export": "go"
   }
 }
-
