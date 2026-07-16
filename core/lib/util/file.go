@@ -312,7 +312,11 @@ func copyDir(src, dst string) error {
 		targetPath := filepath.Join(dst, relPath)
 
 		if d.IsDir() {
-			return os.MkdirAll(targetPath, d.Type().Perm())
+			info, err := d.Info()
+			if err != nil {
+				return err
+			}
+			return os.MkdirAll(targetPath, info.Mode().Perm())
 		}
 
 		return copyFile(path, targetPath)
