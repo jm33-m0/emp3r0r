@@ -13,24 +13,6 @@ type CoffArg struct {
 	Value    any
 }
 
-// ParseCOFFArgs extracts the space-delimited args= entry from an env list.
-// Provided for compatibility with existing tests.
-func ParseCOFFArgs(env []string) ([]string, error) {
-	var raw string
-	for _, e := range env {
-		if strings.HasPrefix(e, "args=") {
-			raw = strings.TrimPrefix(e, "args=")
-			break
-		}
-	}
-
-	if raw == "" {
-		return nil, fmt.Errorf("args not found in env")
-	}
-
-	return strings.Fields(raw), nil
-}
-
 // PackCoffArgs converts CoffArg values to the lighthouse wire format.
 func PackCoffArgs(args []CoffArg) ([]string, error) {
 	packed := make([]string, 0, len(args))
