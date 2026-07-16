@@ -863,3 +863,49 @@ func TestReadModConfigUnifiedArgvFlag(t *testing.T) {
 		}
 	}
 }
+
+// TestLoadAllRepoModules verifies that all custom module configs located
+// under core/modules scan, parse, and load successfully.
+func TestLoadAllRepoModules(t *testing.T) {
+	modulesRoot := "/app/core/modules"
+	if !util.IsExist(modulesRoot) {
+		t.Skipf("modules directory not found at %s", modulesRoot)
+	}
+
+	dirs, err := os.ReadDir(modulesRoot)
+	if err != nil {
+		t.Fatalf("failed to read modules root: %v", err)
+	}
+
+	for _, dir := range dirs {
+		if !dir.IsDir() {
+			continue
+		}
+		configPath := filepath.Join(modulesRoot, dir.Name(), "config.json")
+		if !util.IsExist(configPath) {
+			continue
+		}
+
+		t.Run(dir.Name(), func(t *testing.T) {
+			configs, err := readModConfigs(configPath)
+			if err != nil {
+				t.Fatalf("failed to parse %s: %v", configPath, err)
+			}
+			if len(configs) == 0 {
+				t.Fatalf("no module configurations loaded from %s", configPath)
+			}
+			for _, config := range configs {
+				if config.Name == "" {
+					t.Errorf("module config has empty name in %s", configPath)
+				}
+				if config.AgentConfig.Type == "coff" {
+					if config.Invocation.Coff == nil {
+						t.Errorf("module %s is COFF type but has nil Coff invocation in %s", config.Name, configPath)
+					} else if config.Invocation.Coff.Export == "" {
+						t.Errorf("module %s is COFF type but has empty export in %s", config.Name, configPath)
+					}
+				}
+			}
+		})
+	}
+}
