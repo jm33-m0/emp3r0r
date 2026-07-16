@@ -1,6 +1,6 @@
 [
   {
-    "name": "sa_uptime",
+    "name": "sl_sa_uptime",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-13",
@@ -20,7 +20,7 @@
     "invocation": {}
   },
   {
-    "name": "sa_locale",
+    "name": "sl_sa_locale",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-13",
@@ -40,7 +40,7 @@
     "invocation": {}
   },
   {
-    "name": "sa_env",
+    "name": "sl_sa_env",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-13",
@@ -60,7 +60,7 @@
     "invocation": {}
   },
   {
-    "name": "sa_arp",
+    "name": "sl_sa_arp",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-13",
@@ -80,7 +80,7 @@
     "invocation": {}
   },
   {
-    "name": "sa_whoami",
+    "name": "sl_sa_whoami",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-13",
@@ -100,7 +100,7 @@
     "invocation": {}
   },
   {
-    "name": "sa_netstat",
+    "name": "sl_sa_netstat",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-13",
@@ -120,7 +120,7 @@
     "invocation": {}
   },
   {
-    "name": "sa_ldapsearch",
+    "name": "sl_sa_ldapsearch",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-13",
