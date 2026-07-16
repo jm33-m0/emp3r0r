@@ -84,7 +84,9 @@ detect_container_engine() {
   else
     warn "Neither 'docker' nor 'podman' was found. Attempting to install 'podman' via apt..."
     if command -v apt-get >/dev/null 2>&1; then
-      sudo apt-get update -qq && sudo apt-get install -y podman || error "Failed to install podman"
+      if ! (sudo apt-get update -qq && sudo apt-get install -y podman); then
+        error "Failed to install podman"
+      fi
       CONTAINER_ENGINE="podman"
     else
       error "Neither 'docker' nor 'podman' was found, and apt-get is not available to install podman. Please install docker or podman manually."
@@ -98,13 +100,14 @@ detect_container_engine() {
 # ---------------------------------------------------------------------------
 check_host_deps() {
   local missing=()
-  for dep in tar; do
-    command -v "$dep" >/dev/null 2>&1 || missing+=("$dep")
-  done
+  if ! command -v tar >/dev/null 2>&1; then
+    missing+=("tar")
+  fi
   if [[ ${#missing[@]} -gt 0 ]]; then
     warn "Missing host tools: ${missing[*]}. Installing via apt..."
-    sudo apt-get update -qq && sudo apt-get install -y "${missing[@]}" ||
+    if ! (sudo apt-get update -qq && sudo apt-get install -y "${missing[@]}"); then
       error "Failed to install: ${missing[*]}"
+    fi
   fi
 
   # Verify we are inside the emp3r0r repo
@@ -125,22 +128,28 @@ docker_build() {
     build_env_args+=(-e EMP3R0R_DISABLE_GARBLE=1)
   build_env_args+=(-e EMP3R0R_BUILD_ARG="$BUILD_ARG")
 
-  info "Starting Docker build container (golang:1.26.2)..."
-  info "This may take a while on first run (Go modules + garble cache)."
+  local builder_image="emp3r0r-builder"
+
+  # Build the builder image if it does not exist
+  if ! "$CONTAINER_ENGINE" image inspect "$builder_image" >/dev/null 2>&1; then
+    info "Builder image '$builder_image' not found. Building it from Dockerfile..."
+    if ! "$CONTAINER_ENGINE" build -t "$builder_image" -f "$REPO_ROOT/Dockerfile" "$REPO_ROOT"; then
+      error "Failed to build builder image '$builder_image'"
+    fi
+  else
+    info "Using existing builder image '$builder_image'"
+  fi
+
+  info "Starting Docker build container ($builder_image) to compile emp3r0r and modules..."
+  info "This may take a while on first run (Go modules, emp3r0r modules + garble cache)."
 
   # Mounts:
   #   /src  ← local repo root (read-write; build.sh writes the operator kit here)
 
-  local go_image="golang:1.26.2"
   local container_cmd
   container_cmd=$(
     cat <<'CONTAINER_CMD'
 set -euo pipefail
-
-# Install build-time and runtime dependencies
-apt-get update -qq && apt-get install -y --no-install-recommends \
-  sudo curl wget git jq tmux zstd libcap2-bin build-essential ca-certificates \
-  >/dev/null
 
 # Build from the locally mounted source tree
 export PREFIX=/usr/local
@@ -155,7 +164,7 @@ CONTAINER_CMD
   "$CONTAINER_ENGINE" run --rm \
     -v "${REPO_ROOT}:/src" \
     "${build_env_args[@]}" \
-    "$go_image" \
+    "$builder_image" \
     /bin/bash -c "$container_cmd" ||
     error "Docker build failed"
 

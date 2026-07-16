@@ -1,7 +1,6 @@
 [
   {
     "name": "sa_windowlist",
-    "build": "make -C SA/windowlist",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Lists windows in the current user's desktop session",
@@ -31,7 +30,6 @@
   },
   {
     "name": "sa_aadjoininfo",
-    "build": "make -C SA/aadjoininfo",
     "author": "c2biz",
     "date": "2026-07-16",
     "comment": "Displays Entra ID (Azure AD) join information",
@@ -56,7 +54,6 @@
   },
   {
     "name": "sa_dir",
-    "build": "make -C SA/dir",
     "author": "c2biz",
     "date": "2026-07-16",
     "comment": "Lists files and directories in a target path, with optional recursive listing.",
@@ -93,7 +90,6 @@
   },
   {
     "name": "sa_listdns",
-    "build": "make -C SA/listdns",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Lists DNS cache entries with their record types",
@@ -115,7 +111,6 @@
   },
   {
     "name": "sa_get_netsession2",
-    "build": "make -C SA/get-netsession2",
     "author": "c2biz",
     "date": "2026-07-16",
     "comment": "Enumerate network sessions with client hostname resolution (BOFHound compatible)",
@@ -162,7 +157,6 @@
   },
   {
     "name": "sa_routeprint",
-    "build": "make -C SA/routeprint",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Prints IPv4 routing table, interface list, and default gateway",
@@ -184,7 +178,6 @@
   },
   {
     "name": "sa_netlocalgroup2",
-    "build": "make -C SA/netlocalgroup2",
     "author": "c2biz",
     "date": "2026-07-16",
     "comment": "List local group members with detailed info (SID, type) for BOFHound.",
@@ -224,7 +217,6 @@
   },
   {
     "name": "sa_resources",
-    "build": "make -C SA/resources",
     "author": "c2biz",
     "date": "2026-07-16",
     "comment": "Display system memory and disk usage",
@@ -246,7 +238,6 @@
   },
   {
     "name": "sa_netloggedon",
-    "build": "make -C SA/netloggedon",
     "author": "c2biz",
     "date": "2026-07-16",
     "comment": "List users currently logged on to local or remote computer.",
@@ -279,7 +270,6 @@
   },
   {
     "name": "sa_arp",
-    "build": "make -C SA/arp",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Lists ARP table entries (IP to MAC address mappings)",
@@ -301,7 +291,6 @@
   },
   {
     "name": "sa_sc_qfailure",
-    "build": "make -C SA/sc_qfailure",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Query the failure recovery actions for a Windows service",
@@ -341,7 +330,6 @@
   },
   {
     "name": "sa_tasklist",
-    "build": "make -C SA/tasklist",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "List running processes with PID, PPID, session ID and command line via WMI",
@@ -371,7 +359,6 @@
   },
   {
     "name": "sa_netloggedon2",
-    "build": "make -C SA/netloggedon2",
     "author": "c2biz",
     "date": "2026-07-16",
     "comment": "List logged-on users with structured output for BOFHound.",
@@ -404,7 +391,6 @@
   },
   {
     "name": "sa_nonpagedldapsearch",
-    "build": "make -C SA/nonpagedldapsearch",
     "author": "c2biz",
     "date": "2026-07-16",
     "comment": "Execute non-paged LDAP searches against Active Directory",
@@ -465,7 +451,6 @@
   },
   {
     "name": "sa_notepad",
-    "build": "make -C SA/notepad",
     "author": "c2biz",
     "date": "2026-07-16",
     "comment": "Search for open notepad and notepad++ windows and grab text from the editor control object",
@@ -487,7 +472,6 @@
   },
   {
     "name": "sa_listmods",
-    "build": "make -C SA/listmods",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "List loaded modules (DLLs) for a process with version info",
@@ -517,7 +501,6 @@
   },
   {
     "name": "sa_nettime",
-    "build": "make -C SA/nettime",
     "author": "c2biz",
     "date": "2026-07-16",
     "comment": "Display current time on local or remote computer.",
@@ -547,7 +530,6 @@
   },
   {
     "name": "sa_netuser",
-    "build": "make -C SA/netuser",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Get detailed information about a specific user account.",
@@ -584,7 +566,6 @@
   },
   {
     "name": "sa_adcs_enum_com2",
-    "build": "make -C SA/adcs_enum_com2",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Enumerate AD Certificate Services via IX509PolicyServerListManager and enrollment policy servers",
@@ -609,7 +590,6 @@
   },
   {
     "name": "sa_get_netsession",
-    "build": "make -C SA/get-netsession",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Enumerate network sessions established to a computer using NetSessionEnum",
@@ -642,7 +622,6 @@
   },
   {
     "name": "sa_netview",
-    "build": "make -C SA/netview",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "List computers visible on the network or in a domain.",
@@ -672,7 +651,6 @@
   },
   {
     "name": "sa_regsession",
-    "build": "make -C SA/regsession",
     "author": "c2biz",
     "date": "2026-07-16",
     "comment": "Enumerate logged-on user SIDs from HKEY_USERS registry hive",
@@ -702,7 +680,6 @@
   },
   {
     "name": "sa_useridletime",
-    "build": "make -C SA/useridletime",
     "author": "c2biz",
     "date": "2026-07-16",
     "comment": "Display the idle time for the current user session on the local system",
@@ -727,7 +704,6 @@
   },
   {
     "name": "sa_probe",
-    "build": "make -C SA/probe",
     "author": "c2biz",
     "date": "2026-07-16",
     "comment": "Check if a TCP port is open on a remote host",
@@ -771,7 +747,6 @@
   },
   {
     "name": "sa_netuse_add",
-    "build": "make -C SA/netuse",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Connect to a network share",
@@ -843,7 +818,6 @@
   },
   {
     "name": "sa_netuse_list",
-    "build": "make -C SA/netuse",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "List network share connections",
@@ -880,7 +854,6 @@
   },
   {
     "name": "sa_netuse_delete",
-    "build": "make -C SA/netuse",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Disconnect from a network share",
@@ -931,7 +904,6 @@
   },
   {
     "name": "sa_wmi_query",
-    "build": "make -C SA/wmi_query",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Run a WMI query and display results in CSV format",
@@ -982,7 +954,6 @@
   },
   {
     "name": "sa_ldapsearch",
-    "build": "make -C SA/ldapsearch",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Execute paged LDAP searches against Active Directory",
@@ -1054,7 +1025,6 @@
   },
   {
     "name": "sa_ipconfig",
-    "build": "make -C SA/ipconfig",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Lists network adapters with IPv4 addresses, MAC addresses, hostname, DNS suffix and DNS servers",
@@ -1076,7 +1046,6 @@
   },
   {
     "name": "sa_schtasksquery",
-    "build": "make -C SA/schtasksquery",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Query details for a specific scheduled task",
@@ -1116,7 +1085,6 @@
   },
   {
     "name": "sa_sc_enum",
-    "build": "make -C SA/sc_enum",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Enumerate all Windows services with detailed configuration",
@@ -1146,7 +1114,6 @@
   },
   {
     "name": "sa_reg_query",
-    "build": "make -C SA/reg_query",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Query the Windows registry for keys and values",
@@ -1204,7 +1171,6 @@
   },
   {
     "name": "sa_get_session_info",
-    "build": "make -C SA/get_session_info",
     "author": "c2biz",
     "date": "2026-07-16",
     "comment": "Retrieve detailed logon session information for the current process token",
@@ -1229,7 +1195,6 @@
   },
   {
     "name": "sa_adcs_enum",
-    "build": "make -C SA/adcs_enum",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Enumerate AD Certificate Services CAs and templates using CERTCLI Win32 APIs",
@@ -1259,7 +1224,6 @@
   },
   {
     "name": "sa_sc_qdescription",
-    "build": "make -C SA/sc_qdescription",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Query the description text of a Windows service",
@@ -1299,7 +1263,6 @@
   },
   {
     "name": "sa_find_loaded_module",
-    "build": "make -C SA/findLoadedModule",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Find processes that have a specific module loaded",
@@ -1339,7 +1302,6 @@
   },
   {
     "name": "sa_sc_qtriggerinfo",
-    "build": "make -C SA/sc_qtriggerinfo",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Query the start/stop trigger conditions for a Windows service",
@@ -1379,7 +1341,6 @@
   },
   {
     "name": "sa_netuserenum",
-    "build": "make -C SA/netuserenum",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Enumerate user accounts on local system or domain.",
@@ -1419,7 +1380,6 @@
   },
   {
     "name": "sa_sc_qc",
-    "build": "make -C SA/sc_qc",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Query configuration for a specific Windows service",
@@ -1456,7 +1416,6 @@
   },
   {
     "name": "sa_adcs_enum_com",
-    "build": "make -C SA/adcs_enum_com",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Enumerate AD Certificate Services CAs and templates using ICertConfig/ICertRequest COM interfaces",
@@ -1481,7 +1440,6 @@
   },
   {
     "name": "sa_sc_query",
-    "build": "make -C SA/sc_query",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Query the status of Windows services",
@@ -1518,7 +1476,6 @@
   },
   {
     "name": "sa_get_password_policy",
-    "build": "make -C SA/get_password_policy",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Retrieve password policy and account lockout settings from a server or domain",
@@ -1551,7 +1508,6 @@
   },
   {
     "name": "sa_vssenum",
-    "build": "make -C SA/vssenum",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Enumerates Volume Shadow Copy snapshots on a remote share",
@@ -1588,7 +1544,6 @@
   },
   {
     "name": "sa_adv_audit_policies",
-    "build": "make -C SA/adv_audit_policies",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Retrieves advanced security audit policies from local Group Policy",
@@ -1621,7 +1576,6 @@
   },
   {
     "name": "sa_env",
-    "build": "make -C SA/env",
     "author": "c2biz",
     "date": "2026-07-16",
     "comment": "List process environment variables",
@@ -1643,7 +1597,6 @@
   },
   {
     "name": "sa_netstat",
-    "build": "make -C SA/netstat",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Lists TCP/UDP IPv4/IPv6 connections with owning process name and PID",
@@ -1673,7 +1626,6 @@
   },
   {
     "name": "sa_netgroup",
-    "build": "make -C SA/netgroup",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "List domain groups or enumerate members of a specific group.",
@@ -1717,7 +1669,6 @@
   },
   {
     "name": "sa_netlocalgroup",
-    "build": "make -C SA/netlocalgroup",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "List local groups or enumerate members of a specific local group.",
@@ -1764,7 +1715,6 @@
   },
   {
     "name": "sa_whoami",
-    "build": "make -C SA/whoami",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Displays current user, group memberships, and token privileges",
@@ -1786,7 +1736,6 @@
   },
   {
     "name": "sa_enum_local_sessions",
-    "build": "make -C SA/enumLocalSessions",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Enumerate active and disconnected user sessions on the local system (console and RDP)",
@@ -1811,7 +1760,6 @@
   },
   {
     "name": "sa_locale",
-    "build": "make -C SA/locale",
     "author": "c2biz",
     "date": "2026-07-16",
     "comment": "List system locale language, locale ID, date, time, and country",
@@ -1833,7 +1781,6 @@
   },
   {
     "name": "sa_sha1",
-    "build": "make -C SA/sha1",
     "author": "c2biz",
     "date": "2026-07-16",
     "comment": "Calculates the SHA1 hash of a file.",
@@ -1863,7 +1810,6 @@
   },
   {
     "name": "sa_enum_filter_driver",
-    "build": "make -C SA/enum_filter_driver",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Enumerates security-related filter drivers (AV, activity monitors, content screeners)",
@@ -1896,7 +1842,6 @@
   },
   {
     "name": "sa_driversigs",
-    "build": "make -C SA/driversigs",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Checks loaded drivers for signatures from known EDR vendors",
@@ -1918,7 +1863,6 @@
   },
   {
     "name": "sa_sha256",
-    "build": "make -C SA/sha256",
     "author": "c2biz",
     "date": "2026-07-16",
     "comment": "Calculates the SHA256 hash of a file.",
@@ -1948,7 +1892,6 @@
   },
   {
     "name": "sa_ldapsecuritycheck",
-    "build": "make -C SA/ldapsecuritycheck",
     "author": "c2biz",
     "date": "2026-07-16",
     "comment": "Check LDAP signing and LDAPS channel binding requirements",
@@ -1981,7 +1924,6 @@
   },
   {
     "name": "sa_list_firewall_rules",
-    "build": "make -C SA/list_firewall_rules",
     "author": "c2biz",
     "date": "2026-07-16",
     "comment": "List Windows firewall rules",
@@ -2006,7 +1948,6 @@
   },
   {
     "name": "sa_md5",
-    "build": "make -C SA/md5",
     "author": "c2biz",
     "date": "2026-07-16",
     "comment": "Calculates the MD5 hash of a file.",
@@ -2036,7 +1977,6 @@
   },
   {
     "name": "sa_netuptime",
-    "build": "make -C SA/netuptime",
     "author": "c2biz",
     "date": "2026-07-16",
     "comment": "Display boot time of local or remote computer.",
@@ -2066,7 +2006,6 @@
   },
   {
     "name": "sa_schtasksenum",
-    "build": "make -C SA/schtasksenum",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Enumerate all scheduled tasks on a machine",
@@ -2099,7 +2038,6 @@
   },
   {
     "name": "sa_netshares",
-    "build": "make -C SA/netshares",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "List network shares on local or remote computer.",
@@ -2136,7 +2074,6 @@
   },
   {
     "name": "sa_nslookup",
-    "build": "make -C SA/nslookup",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Perform DNS lookups using the Windows DNS API",
@@ -2180,7 +2117,6 @@
   },
   {
     "name": "sa_uptime",
-    "build": "make -C SA/uptime",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Displays system uptime, local time, and boot time (x64 only shows boot time)",
@@ -2202,7 +2138,6 @@
   },
   {
     "name": "sa_get_dpapi_system",
-    "build": "make -C SA/get_dpapi_system",
     "author": "c2biz",
     "date": "2026-07-16",
     "comment": "Extract the DPAPI_SYSTEM LSA secret (requires high integrity/elevation)",
@@ -2227,7 +2162,6 @@
   },
   {
     "name": "sa_cacls",
-    "build": "make -C SA/cacls",
     "author": "moloch--",
     "date": "2026-07-16",
     "comment": "Lists file or directory DACL permissions, with wildcard support.",

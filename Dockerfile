@@ -1,30 +1,19 @@
-FROM debian:trixie-slim
+FROM golang:1.26.2
 
+# Avoid interactive prompts during apt installations
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Metadata
-LABEL org.opencontainers.image.security.rootless="true" \
-  org.opencontainers.image.description="Hardened emp3r0r server"
-
-# Install runtime dependencies for the C2 server
-RUN apt-get update && apt-get install -y \
-  zstd \
-  libcap2-bin \
-  tmux \
-  bash \
+# Install build-time and runtime dependencies
+RUN apt-get update -qq && apt-get install -y --no-install-recommends \
+  sudo curl wget git jq tmux zstd libcap2-bin build-essential ca-certificates \
+  make clang mingw-w64 xz-utils \
   && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /
+# Install Zig toolchain
+RUN wget -q https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz \
+  && tar -xpf zig-linux-x86_64-0.13.0.tar.xz -C /usr/local \
+  && ln -sf /usr/local/zig-linux-x86_64-0.13.0/zig /usr/local/bin/zig \
+  && rm -f zig-linux-x86_64-0.13.0.tar.xz
 
-# Copy pre-built archive
-COPY core/emp3r0r-operator-kit.tar.zst /tmp/
-
-# Extract the bundle and then DELETE it to keep the image slim
-RUN tar --zstd -xpf /tmp/emp3r0r-operator-kit.tar.zst -C / && \
-  rm /tmp/emp3r0r-operator-kit.tar.zst
-
-# Prepare Wireguard environment as required by your scripts
-RUN mkdir -p /var/run/wireguard && chmod 700 /var/run/wireguard
-
-ENTRYPOINT ["emp3r0r"]
-CMD ["server"]
+# Set default working directory inside the container
+WORKDIR /src

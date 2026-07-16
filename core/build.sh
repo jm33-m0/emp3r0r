@@ -78,15 +78,31 @@ check_disk_space() {
 }
 
 check_zig() {
+  local is_container=0
+  if [[ -f /.dockerenv || -f /run/.containerenv ]]; then
+    is_container=1
+  fi
+
   if ! command -v zig >/dev/null 2>&1; then
-    info "zig not found, installing zig to /usr/local/bin ..."
-    {
-      (test -e zig-linux-x86_64-0.13.0.tar.xz ||
-        wget https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz) &&
-        tar -xpf zig-linux-x86_64-0.13.0.tar.xz &&
-        sudo cp -aR ./zig-linux-x86_64-0.13.0 /usr/local/lib/zig &&
-        sudo ln -sf /usr/local/lib/zig/zig /usr/local/bin/zig
-    } || error "Failed to install zig"
+    if [[ "$is_container" -eq 1 ]]; then
+      info "zig not found in container, installing zig to /usr/local/bin ..."
+      local zig_tmp
+      zig_tmp=$(mktemp -d -t zig-install-XXXXXX)
+      {
+        cd "$zig_tmp" &&
+          wget -q https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz &&
+          tar -xpf zig-linux-x86_64-0.13.0.tar.xz &&
+          sudo cp -aR ./zig-linux-x86_64-0.13.0 /usr/local/lib/zig &&
+          sudo ln -sf /usr/local/lib/zig/zig /usr/local/bin/zig
+      } || {
+        rm -rf "$zig_tmp"
+        error "Failed to install zig"
+      }
+      rm -rf "$zig_tmp"
+      cd "$pwd" || error "cd $pwd"
+    else
+      error "zig not found. Please run build inside the builder container, or install zig 0.13.0 manually on the host."
+    fi
   else
     info "zig is already installed"
   fi
@@ -432,9 +448,46 @@ build_shared_object() {
   } || error "build shared object for $os $arch"
 }
 
+check_build_toolchain() {
+  local is_container=0
+  if [[ -f /.dockerenv || -f /run/.containerenv ]]; then
+    is_container=1
+  fi
+
+  local toolchains=()
+  command -v make >/dev/null 2>&1 || toolchains+=("make")
+  command -v clang >/dev/null 2>&1 || toolchains+=("clang")
+  command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1 || toolchains+=("mingw-w64")
+  command -v i686-w64-mingw32-gcc >/dev/null 2>&1 || toolchains+=("mingw-w64")
+  command -v gcc >/dev/null 2>&1 || toolchains+=("build-essential")
+
+  local unique_toolchains=()
+  for t in "${toolchains[@]}"; do
+    if [[ " ${unique_toolchains[*]} " != *" ${t} "* ]]; then
+      unique_toolchains+=("$t")
+    fi
+  done
+
+  if [[ ${#unique_toolchains[@]} -gt 0 ]]; then
+    if [[ "$is_container" -eq 1 ]]; then
+      if command -v apt-get >/dev/null 2>&1; then
+        info "Installing build toolchains in container: ${unique_toolchains[*]}..."
+        if ! (sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${unique_toolchains[@]}"); then
+          warn "Failed to install some toolchains: ${unique_toolchains[*]}"
+        fi
+      else
+        error "Missing required toolchains: ${unique_toolchains[*]}. Please install them."
+      fi
+    else
+      error "Missing required toolchains: ${unique_toolchains[*]}. Please run build inside the builder container, or install them manually on the host."
+    fi
+  fi
+}
+
 build() {
   # build
   # -----
+  check_build_toolchain
   check_required_go
   check_disk_space
   if [[ ! -d "vendor" ]]; then
@@ -468,20 +521,20 @@ build() {
     fi
   fi
 
-  local core_tags=""
-  [[ "$arg1" != "--debug" ]] && core_tags="-tags release"
+  local core_tags=()
+  [[ "$arg1" != "--debug" ]] && core_tags=(-tags release)
 
   info "Building CC"
   {
-    cd cmd/cc && CGO_ENABLED=0 $GO_BIN build -mod=vendor $core_tags -o "$temp/cc.exe" -ldflags="$ldflags"
+    cd cmd/cc && CGO_ENABLED=0 $GO_BIN build -mod=vendor "${core_tags[@]}" -o "$temp/cc.exe" -ldflags="$ldflags"
   } || error "build cc"
   info "Building cat"
   {
-    cd "$pwd/cmd/cat" && CGO_ENABLED=0 $GO_BIN build -mod=vendor $core_tags -o "$temp/cat.exe" -ldflags="$ldflags"
+    cd "$pwd/cmd/cat" && CGO_ENABLED=0 $GO_BIN build -mod=vendor "${core_tags[@]}" -o "$temp/cat.exe" -ldflags="$ldflags"
   } || error "build cat"
   info "Building listener"
   {
-    cd "$pwd/cmd/listener" && CGO_ENABLED=0 $GO_BIN build -mod=vendor $core_tags -o "$temp/listener.exe" -ldflags="$ldflags"
+    cd "$pwd/cmd/listener" && CGO_ENABLED=0 $GO_BIN build -mod=vendor "${core_tags[@]}" -o "$temp/listener.exe" -ldflags="$ldflags"
   } || error "build listener"
 
   # Linux
@@ -518,6 +571,15 @@ build() {
 
   # error: https://github.com/golang/go/issues/22040
   # build_shared_object "arm64" "linux" "stub-arm64.so"
+
+  # Build SA modules
+  info "Building SA modules"
+  for dir in "$pwd"/modules/SA/SA/*; do
+    if [[ -d "$dir" && -f "$dir/Makefile" ]]; then
+      info "Building SA module: $(basename "$dir")"
+      make -C "$dir" || error "Failed to build SA module $(basename "$dir")"
+    fi
+  done
 }
 
 do_uninstall() {
@@ -585,55 +647,64 @@ do_install() {
   cp -avfR "$temp"/cat.exe "$data_dir/emp3r0r-cat" || error "emp3r0r-cat"
 
   # set capabilities for cc and setup wireguard runtime dir
-  setcap cap_net_admin=eip "$data_dir/emp3r0r-cc" || error "setcap"
-  mkdir -p /var/run/wireguard || error "mkdir wireguard"
-  chown "$(id -nu):$(id -ng)" /var/run/wireguard || error "chown wireguard"
-
-  # tmpfiles.d entry to persist the directory
-  if [[ -d "/etc/tmpfiles.d" ]]; then
-    local _user="${SUDO_USER:-$USER}"
-    echo "d /var/run/wireguard 0755 $_user $_user" >/etc/tmpfiles.d/emp3r0r-wireguard.conf
+  local is_container=0
+  if [[ -f /.dockerenv || -f /run/.containerenv ]]; then
+    is_container=1
   fi
 
-  # Auto-complete
-  # Find a suitable zsh completion directory
-  zsh_completion_dir=""
-  # Check user's personal completion directory first
-  if [ -n "$ZDOTDIR" ] && [ -d "$ZDOTDIR/completions" ]; then
-    zsh_completion_dir="$ZDOTDIR/completions"
-  elif [ -d "$HOME/.zsh/completions" ]; then
-    zsh_completion_dir="$HOME/.zsh/completions"
+  if [[ "$is_container" -eq 0 ]]; then
+    setcap cap_net_admin=eip "$data_dir/emp3r0r-cc" || error "setcap"
+    mkdir -p /var/run/wireguard || error "mkdir wireguard"
+    chown "$(id -nu):$(id -ng)" /var/run/wireguard || error "chown wireguard"
+
+    # tmpfiles.d entry to persist the directory
+    if [[ -d "/etc/tmpfiles.d" ]]; then
+      local _user="${SUDO_USER:-$USER}"
+      echo "d /var/run/wireguard 0755 $_user $_user" >/etc/tmpfiles.d/emp3r0r-wireguard.conf
+    fi
+
+    # Auto-complete
+    # Find a suitable zsh completion directory
+    zsh_completion_dir=""
+    # Check user's personal completion directory first
+    if [ -n "$ZDOTDIR" ] && [ -d "$ZDOTDIR/completions" ]; then
+      zsh_completion_dir="$ZDOTDIR/completions"
+    elif [ -d "$HOME/.zsh/completions" ]; then
+      zsh_completion_dir="$HOME/.zsh/completions"
+    else
+      # Fall back to system directories
+      for dir in "/usr/local/share/zsh/site-functions" "/usr/share/zsh/site-functions" "/usr/share/zsh/vendor-completions"; do
+        if [ -d "$dir" ]; then
+          zsh_completion_dir="$dir"
+          break
+        fi
+      done
+    fi
+
+    # zsh
+    if [ -n "$zsh_completion_dir" ]; then
+      # Install Zsh completion file
+      mkdir -p "$zsh_completion_dir"
+      "$data_dir/emp3r0r-cc" completion zsh | sudo tee "$zsh_completion_dir/_emp3r0r" >/dev/null
+      sudo chmod 644 "$zsh_completion_dir/_emp3r0r"
+      info "Installed Zsh completion to $zsh_completion_dir/_emp3r0r"
+    else
+      warn "No suitable Zsh completion directory found"
+      warn "You can manually set up Zsh completion by adding this to your ~/.zshrc:"
+      # shellcheck disable=SC2154
+      warn "  fpath=(/path/to/dir/with/completion $fpath)"
+      warn "  autoload -Uz compinit && compinit"
+    fi
+
+    # bash
+    mkdir -p "/etc/bash_completion.d"
+    "$data_dir/emp3r0r-cc" completion bash | sudo tee "/etc/bash_completion.d/emp3r0r" >/dev/null
+    sudo chmod 644 "/etc/bash_completion.d/emp3r0r"
+    info "Installed Bash completion to /etc/bash_completion.d/emp3r0r"
+    info "Restart your bash shell or run 'source /etc/bash_completion.d/emp3r0r'"
   else
-    # Fall back to system directories
-    for dir in "/usr/local/share/zsh/site-functions" "/usr/share/zsh/site-functions" "/usr/share/zsh/vendor-completions"; do
-      if [ -d "$dir" ]; then
-        zsh_completion_dir="$dir"
-        break
-      fi
-    done
+    info "Running inside container, skipping setcap, wireguard runtime dir, and autocomplete setup"
   fi
-
-  # zsh
-  if [ -n "$zsh_completion_dir" ]; then
-    # Install Zsh completion file
-    mkdir -p "$zsh_completion_dir"
-    "$data_dir/emp3r0r-cc" completion zsh | sudo tee "$zsh_completion_dir/_emp3r0r" >/dev/null
-    sudo chmod 644 "$zsh_completion_dir/_emp3r0r"
-    info "Installed Zsh completion to $zsh_completion_dir/_emp3r0r"
-  else
-    warn "No suitable Zsh completion directory found"
-    warn "You can manually set up Zsh completion by adding this to your ~/.zshrc:"
-    # shellcheck disable=SC2154
-    warn "  fpath=(/path/to/dir/with/completion $fpath)"
-    warn "  autoload -Uz compinit && compinit"
-  fi
-
-  # bash
-  mkdir -p "/etc/bash_completion.d"
-  "$data_dir/emp3r0r-cc" completion bash | sudo tee "/etc/bash_completion.d/emp3r0r" >/dev/null
-  sudo chmod 644 "/etc/bash_completion.d/emp3r0r"
-  info "Installed Bash completion to /etc/bash_completion.d/emp3r0r"
-  info "Restart your bash shell or run 'source /etc/bash_completion.d/emp3r0r'"
 
   success "Installed emp3r0r, please check"
   if tmux has-session -t emp3r0r 2>/dev/null; then
