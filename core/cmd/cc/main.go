@@ -169,6 +169,7 @@ func runClientMode(opts *Options) {
 	// do not kill tmux session when crashing
 	if opts.debug {
 		live.TmuxPersistence = true
+		logging.TmuxPersistence = true
 	}
 
 	// abort if CC is already running
