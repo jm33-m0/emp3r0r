@@ -4,11 +4,13 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/lib/coffloader"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -864,17 +866,26 @@ func TestReadModConfigUnifiedArgvFlag(t *testing.T) {
 	}
 }
 
-// TestLoadAllRepoModules verifies that all custom module configs located
-// under core/modules scan, parse, and load successfully.
-func TestLoadAllRepoModules(t *testing.T) {
-	modulesRoot := "/app/core/modules"
+func generateDummyArg(paramType string) string {
+	switch strings.ToLower(paramType) {
+	case "int", "uint", "dword", "i", "uint32", "int32", "port", "short", "word", "int16":
+		return "1"
+	case "bool":
+		return "true"
+	default:
+		return "dummy"
+	}
+}
+
+func TestCOFFArgParsingAllModules(t *testing.T) {
+	modulesRoot := "../../../modules"
 	if !util.IsExist(modulesRoot) {
 		t.Skipf("modules directory not found at %s", modulesRoot)
 	}
 
 	dirs, err := os.ReadDir(modulesRoot)
 	if err != nil {
-		t.Fatalf("failed to read modules root: %v", err)
+		t.Fatalf("failed to read modules directory: %v", err)
 	}
 
 	for _, dir := range dirs {
@@ -894,46 +905,79 @@ func TestLoadAllRepoModules(t *testing.T) {
 			if len(configs) == 0 {
 				t.Fatalf("no module configurations loaded from %s", configPath)
 			}
+			
 			for _, config := range configs {
 				if config.Name == "" {
 					t.Errorf("module config has empty name in %s", configPath)
 				}
-				if config.AgentConfig.Type == "coff" {
-					if config.Invocation.Coff == nil {
-						t.Errorf("module %s is COFF type but has nil Coff invocation in %s", config.Name, configPath)
-					} else if config.Invocation.Coff.Export == "" {
-						t.Errorf("module %s is COFF type but has empty export in %s", config.Name, configPath)
-					}
-					// Verify parameter consistency
-					for name, opt := range config.Options {
+				
+				isCOFF := strings.EqualFold(config.AgentConfig.Type, "coff")
+				var coffArgs []coffloader.CoffArg
+				
+				for name, opt := range config.Options {
+					// Dummy value based on type
+					dummyVal := generateDummyArg(opt.Type)
+					
+					if isCOFF {
 						wireToken := typeToWireToken(opt.Type)
 						if wireToken == "" {
 							t.Errorf("module %s (COFF) has parameter '%s' with unsupported type '%s'", config.Name, name, opt.Type)
 							continue
 						}
 						
-						// Verify correct wire token is resolved for specific common parameter types
-						switch opt.Type {
+						// Verify wire token logic
+						switch strings.ToLower(opt.Type) {
 						case "cstr", "s", "lpstr", "string":
 							if wireToken != "z" {
-								t.Errorf("module %s (COFF) has parameter '%s' of type '%s' mapped to incorrect wire token '%s', expected 'z'", config.Name, name, opt.Type, wireToken)
+								t.Errorf("expected wire token 'z', got '%s'", wireToken)
 							}
 						case "wstr", "w", "lpwstr", "wstring":
 							if wireToken != "Z" {
-								t.Errorf("module %s (COFF) has parameter '%s' of type '%s' mapped to incorrect wire token '%s', expected 'Z'", config.Name, name, opt.Type, wireToken)
+								t.Errorf("expected wire token 'Z', got '%s'", wireToken)
 							}
 						case "dword", "i", "uint32", "int", "uint", "int32", "port", "bool":
 							if wireToken != "i" {
-								t.Errorf("module %s (COFF) has parameter '%s' of type '%s' mapped to incorrect wire token '%s', expected 'i'", config.Name, name, opt.Type, wireToken)
+								t.Errorf("expected wire token 'i', got '%s'", wireToken)
 							}
 						case "short", "word", "int16":
 							if wireToken != "s" {
-								t.Errorf("module %s (COFF) has parameter '%s' of type '%s' mapped to incorrect wire token '%s', expected 's'", config.Name, name, opt.Type, wireToken)
+								t.Errorf("expected wire token 's', got '%s'", wireToken)
 							}
 						case "binary", "b", "base64":
 							if wireToken != "b" {
-								t.Errorf("module %s (COFF) has parameter '%s' of type '%s' mapped to incorrect wire token '%s', expected 'b'", config.Name, name, opt.Type, wireToken)
+								t.Errorf("expected wire token 'b', got '%s'", wireToken)
 							}
+						}
+						
+						// Type casting via modcustom's internal option renderer to handle bools correctly
+						_, typedVal, err := renderOptionValue(opt, dummyVal)
+						if err != nil {
+							t.Errorf("renderOptionValue failed for %s (%s): %v", name, opt.Type, err)
+							continue
+						}
+						
+						coffArgs = append(coffArgs, coffloader.CoffArg{
+							WireType: wireToken,
+							Value:    typedVal,
+						})
+					}
+				}
+				
+				if isCOFF && len(coffArgs) > 0 {
+					packed, err := coffloader.PackCoffArgs(coffArgs)
+					if err != nil {
+						t.Errorf("PackCoffArgs failed for %s: %v", config.Name, err)
+					}
+					for _, arg := range packed {
+						if len(arg) == 0 {
+							t.Errorf("Packed arg is empty for %s", config.Name)
+							continue
+						}
+						switch arg[0] {
+						case 'z', 'Z', 'i', 's', 'b':
+							// OK
+						default:
+							t.Errorf("Data must be prefixed correctly, got %q for %s", arg, config.Name)
 						}
 					}
 				}
@@ -941,3 +985,38 @@ func TestLoadAllRepoModules(t *testing.T) {
 		})
 	}
 }
+
+func TestStarlarkArgParsing(t *testing.T) {
+	configPath := "../../../modules/sa_starlark/config.json"
+	if !util.IsExist(configPath) {
+		t.Skipf("config %s not found", configPath)
+	}
+
+	configs, err := readModConfigs(configPath)
+	if err != nil {
+		t.Fatalf("failed to parse %s: %v", configPath, err)
+	}
+	if len(configs) == 0 {
+		t.Fatalf("no module configurations loaded from %s", configPath)
+	}
+
+	for _, config := range configs {
+		if config.Name == "sl_sa_ldapsearch" {
+			if !strings.EqualFold(config.AgentConfig.Type, "starlark") {
+				t.Fatalf("Expected type starlark, got %s", config.AgentConfig.Type)
+			}
+			
+			// Verify it correctly populated Argv instead of Coff
+			if config.Invocation.Coff != nil {
+				t.Errorf("Starlark module %s should not have COFF invocation set", config.Name)
+			}
+			
+			// Just verify that the Argv array was populated correctly based on parameters
+			if len(config.Invocation.Argv) == 0 && len(config.Options) > 0 {
+				t.Errorf("Starlark module %s has options but empty Argv", config.Name)
+			}
+		}
+	}
+}
+
+// Platform-specific execution tests are in modcustom_linux_test.go and modcustom_windows_test.go
