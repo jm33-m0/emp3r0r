@@ -105,6 +105,7 @@ jobs:
         shell: msys2 {0}
         working-directory: ./core
         run: |
+          export PATH="/mingw32/bin:$PATH"
           make -C modules/SA/SA/dir
 
       - name: Run BOF and module integration without race (Windows only)
