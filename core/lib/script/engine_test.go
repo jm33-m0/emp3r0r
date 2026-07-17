@@ -166,11 +166,21 @@ def main(*args):
 
 func TestRunStar(t *testing.T) {
 	_, filename, _, _ := runtime.Caller(0)
-	scriptPath := filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filename))), "modules", "starlark_procinfo", "run.star")
+	var scriptPath string
+	if runtime.GOOS == "windows" {
+		scriptPath = filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filename))), "modules", "sa_starlark", "whoami.star")
+	} else {
+		scriptPath = filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filename))), "modules", "starlark_procinfo", "run.star")
+	}
+
 	scriptBytes, err := os.ReadFile(scriptPath)
 	if err != nil {
-		t.Fatalf("failed to read run.star: %v", err)
+		if os.IsNotExist(err) && runtime.GOOS != "linux" && runtime.GOOS != "windows" {
+			t.Skipf("skipping test on unsupported os %s", runtime.GOOS)
+		}
+		t.Fatalf("failed to read %s: %v", scriptPath, err)
 	}
+
 	out, err := Run(scriptBytes, nil, nil)
 	if err != nil {
 		t.Fatalf("Run failed: %v", err)
