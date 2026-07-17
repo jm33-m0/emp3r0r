@@ -12,6 +12,10 @@ import (
 )
 
 func TestCOFFExecutionLinux(t *testing.T) {
+	if os.Getenv("EMP3R0R_RACE_ON") == "1" {
+		t.Skip("skipped under race run (EMP3R0R_RACE_ON=1)")
+	}
+
 	t.Run("hello_linux", func(t *testing.T) {
 		payloadPath := "../../../modules/hello_linux/hello_linux.o"
 		if !util.IsExist(payloadPath) {

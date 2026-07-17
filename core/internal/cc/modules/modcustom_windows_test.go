@@ -11,6 +11,10 @@ import (
 )
 
 func TestCOFFExecutionWindows(t *testing.T) {
+	if os.Getenv("EMP3R0R_RACE_ON") == "1" {
+		t.Skip("skipped under race run (EMP3R0R_RACE_ON=1)")
+	}
+
 	t.Run("process_list_handles", func(t *testing.T) {
 		payloadPath := "../../../modules/process_list_handles/ProcessListHandles.x64.o"
 		if !util.IsExist(payloadPath) {
