@@ -877,8 +877,13 @@ func generateDummyArg(paramType string) string {
 	}
 }
 
+func getModulesRoot() string {
+	_, b, _, _ := runtime.Caller(0)
+	return filepath.Join(filepath.Dir(b), "../../../modules")
+}
+
 func TestCOFFArgParsingAllModules(t *testing.T) {
-	modulesRoot := "../../../modules"
+	modulesRoot := getModulesRoot()
 	if !util.IsExist(modulesRoot) {
 		t.Skipf("modules directory not found at %s", modulesRoot)
 	}
@@ -987,7 +992,7 @@ func TestCOFFArgParsingAllModules(t *testing.T) {
 }
 
 func TestStarlarkArgParsing(t *testing.T) {
-	configPath := "../../../modules/sa_starlark/config.json"
+	configPath := filepath.Join(getModulesRoot(), "sa_starlark/config.json")
 	if !util.IsExist(configPath) {
 		t.Skipf("config %s not found", configPath)
 	}

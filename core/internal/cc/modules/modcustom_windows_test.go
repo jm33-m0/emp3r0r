@@ -4,6 +4,7 @@ package modules
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/coffloader"
@@ -16,7 +17,7 @@ func TestCOFFExecutionWindows(t *testing.T) {
 	}
 
 	t.Run("process_list_handles", func(t *testing.T) {
-		payloadPath := "../../../modules/process_list_handles/ProcessListHandles.x64.o"
+		payloadPath := filepath.Join(getModulesRoot(), "process_list_handles/ProcessListHandles.x64.o")
 		if !util.IsExist(payloadPath) {
 			t.Skipf("payload %s not found", payloadPath)
 		}
@@ -41,7 +42,7 @@ func TestCOFFExecutionWindows(t *testing.T) {
 	})
 
 	t.Run("sa_dir", func(t *testing.T) {
-		payloadPath := "../../../modules/SA/dir/dir.x64.o"
+		payloadPath := filepath.Join(getModulesRoot(), "SA/dir/dir.x64.o")
 		if !util.IsExist(payloadPath) {
 			t.Skipf("payload %s not found", payloadPath)
 		}

@@ -4,6 +4,7 @@ package modules
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -17,7 +18,7 @@ func TestCOFFExecutionLinux(t *testing.T) {
 	}
 
 	t.Run("hello_linux", func(t *testing.T) {
-		payloadPath := "../../../modules/hello_linux/hello_linux.o"
+		payloadPath := filepath.Join(getModulesRoot(), "hello_linux/hello_linux.o")
 		if !util.IsExist(payloadPath) {
 			t.Skipf("payload %s not found", payloadPath)
 		}
@@ -42,7 +43,7 @@ func TestCOFFExecutionLinux(t *testing.T) {
 	})
 
 	t.Run("process_list_handles_linux", func(t *testing.T) {
-		payloadPath := "../../../modules/process_list_handles_linux/process_list_handles_linux.o"
+		payloadPath := filepath.Join(getModulesRoot(), "process_list_handles_linux/process_list_handles_linux.o")
 		if !util.IsExist(payloadPath) {
 			t.Skipf("payload %s not found", payloadPath)
 		}

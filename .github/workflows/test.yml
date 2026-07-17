@@ -52,6 +52,8 @@ jobs:
           CGO_ENABLED: 1
           EMP3R0R_RACE_ON: "0"
         run: |
+          make -C modules/hello_linux
+          make -C modules/process_list_handles_linux
           go test -v ./lib/coffloader -run TestRunLinuxCOFFWithInlineBOF -count=1
           go test -v ./internal/cc/modules -run TestCOFF
 
@@ -86,6 +88,24 @@ jobs:
           EMP3R0R_RACE_ON: "1"
         run: |
           go test -v -race ./...
+
+      - name: Set up MSYS2 (Windows)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-i686-gcc
+            make
+
+      - name: Build Windows BOFs
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        working-directory: ./core
+        run: |
+          make -C modules/SA/SA/dir
 
       - name: Run BOF and module integration without race (Windows only)
         if: runner.os == 'Windows'
