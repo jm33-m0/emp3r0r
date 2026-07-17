@@ -1,0 +1,37 @@
+{
+    "name": "Ask MFA (Remote)",
+    "package_name": "remote-ask-mfa",
+    "version": "0.0.0",
+    "extension_author": "c2biz",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Remote-OPs-BOF",
+    "commands": [
+        {
+            "command_name": "remote-ask-mfa",
+            "help": "Display a fake Microsoft Authenticator MFA approval dialog",
+            "long_help": "Displays a fake Microsoft Authenticator approval dialog showing the specified number. The dialog appears topmost and centered on the target's screen, auto-closes after 30 seconds or when dismissed by the user. Runs on a separate thread to avoid blocking the BOF.",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "ask_mfa.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "ask_mfa.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "number",
+                    "desc": "MFA number to display (0-99)",
+                    "type": "integer",
+                    "optional": false
+                }
+            ]
+        }
+    ]
+}

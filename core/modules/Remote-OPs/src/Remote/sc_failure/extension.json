@@ -1,0 +1,76 @@
+{
+    "name": "Service Failure (Remote)",
+    "package_name": "remote-sc_failure",
+    "version": "0.0.0",
+    "extension_author": "TrustedSec",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Remote-OPs-BOF",
+    "commands": [
+        {
+            "command_name": "remote-sc_failure",
+            "help": "Configure failure recovery actions for a service",
+            "long_help": "Configures the actions taken when a service fails using ChangeServiceConfig2 with SERVICE_CONFIG_FAILURE_ACTIONS. Can set reboot messages, run commands, and define recovery actions (restart, reboot, run command, none).",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "sc_failure.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "sc_failure.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "hostname",
+                    "desc": "Target machine. Empty string for local machine",
+                    "type": "string",
+                    "optional": true,
+                    "default": ""
+                },
+                {
+                    "name": "service-name",
+                    "desc": "Name of the service to configure",
+                    "type": "string",
+                    "optional": false
+                },
+                {
+                    "name": "reset-period",
+                    "desc": "Length of period with no failures before resetting the failure count (in seconds)",
+                    "type": "integer",
+                    "optional": false
+                },
+                {
+                    "name": "reboot-msg",
+                    "desc": "Broadcast message before reboot on failure. Empty string to omit",
+                    "type": "string",
+                    "optional": true,
+                    "default": ""
+                },
+                {
+                    "name": "command",
+                    "desc": "Command to run on failure. Empty string to omit",
+                    "type": "string",
+                    "optional": true,
+                    "default": ""
+                },
+                {
+                    "name": "num-actions",
+                    "desc": "Number of failure actions to configure",
+                    "type": "short",
+                    "optional": false
+                },
+                {
+                    "name": "actions",
+                    "desc": "Comma-separated action/delay pairs (e.g., restart/5000,reboot/30000). Actions: none, restart, reboot, run",
+                    "type": "string",
+                    "optional": false
+                }
+            ]
+        }
+    ]
+}

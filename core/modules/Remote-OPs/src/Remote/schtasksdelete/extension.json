@@ -1,0 +1,52 @@
+{
+    "name": "Scheduled Task Delete (Remote)",
+    "package_name": "remote-schtasks-delete",
+    "version": "0.0.0",
+    "extension_author": "TrustedSec",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Remote-OPs-BOF",
+    "commands": [
+        {
+            "command_name": "remote-schtasks-delete",
+            "help": "Delete a scheduled task or task folder",
+            "long_help": "Deletes a scheduled task or task folder on a local or remote machine using the ITaskFolder COM interface.",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "schtasksdelete.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "schtasksdelete.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "hostname",
+                    "desc": "Target machine. Empty string for local machine",
+                    "type": "wstring",
+                    "optional": true,
+                    "default": ""
+                },
+                {
+                    "name": "taskpath",
+                    "desc": "Full path to the task or folder to delete (e.g., \\Folder\\MyTask)",
+                    "type": "wstring",
+                    "optional": false
+                },
+                {
+                    "name": "is-folder",
+                    "desc": "Delete a folder instead of a task: 0=task, 1=folder",
+                    "type": "integer",
+                    "optional": true,
+                    "default": 0,
+                    "choices": ["0", "1"]
+                }
+            ]
+        }
+    ]
+}

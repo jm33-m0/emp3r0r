@@ -1,0 +1,55 @@
+{
+    "name": "Shellcode Spawn As (Remote)",
+    "package_name": "remote-shspawnas",
+    "version": "0.0.0",
+    "extension_author": "TrustedSec",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Remote-OPs-BOF",
+    "commands": [
+        {
+            "command_name": "remote-shspawnas",
+            "help": "Spawn a process as another user and inject shellcode into it",
+            "long_help": "Creates a new process using CreateProcessWithLogonW with the specified credentials, then injects and executes shellcode in the spawned process.",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "shspawnas.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "shspawnas.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "domain",
+                    "desc": "Domain or computer name for the user account",
+                    "type": "wstring",
+                    "optional": false
+                },
+                {
+                    "name": "username",
+                    "desc": "Username to spawn the process as",
+                    "type": "wstring",
+                    "optional": false
+                },
+                {
+                    "name": "password",
+                    "desc": "Password for the user account",
+                    "type": "wstring",
+                    "optional": false
+                },
+                {
+                    "name": "shellcode",
+                    "desc": "Path to shellcode file to inject",
+                    "type": "file",
+                    "optional": false
+                }
+            ]
+        }
+    ]
+}

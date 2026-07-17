@@ -1,0 +1,64 @@
+{
+    "name": "Get Azure Token (Remote)",
+    "package_name": "remote-get-azure-token",
+    "version": "0.0.0",
+    "extension_author": "c2biz",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Remote-OPs-BOF",
+    "commands": [
+        {
+            "command_name": "remote-get-azure-token",
+            "help": "Perform an OAuth code grant against Azure and print the returned tokens",
+            "long_help": "Performs an OAuth authorization code flow with PKCE against Azure AD. Opens a browser on the target to authenticate, listens on localhost for the redirect callback, then exchanges the authorization code for tokens. The specified client_id must already have consent in the tenant and accept http://localhost as a redirect URI. If hint is omitted and multiple saved logins exist, authentication will fail.",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "get_azure_token.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "get_azure_token.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "client-id",
+                    "desc": "Azure app client ID (must have consent and http://localhost redirect URI)",
+                    "type": "string",
+                    "optional": false
+                },
+                {
+                    "name": "scope",
+                    "desc": "OAuth scope string for the client ID",
+                    "type": "string",
+                    "optional": false
+                },
+                {
+                    "name": "browser",
+                    "desc": "Browser to use: 0=Edge, 1=Chrome, 2=Default, 3=Other",
+                    "type": "integer",
+                    "optional": false,
+                    "choices": ["0", "1", "2", "3"]
+                },
+                {
+                    "name": "hint",
+                    "desc": "Login hint email address. Omit if only one saved login exists",
+                    "type": "string",
+                    "optional": true,
+                    "default": ""
+                },
+                {
+                    "name": "browser-path",
+                    "desc": "Full path to browser executable (only used when browser=3/Other, max 260 chars)",
+                    "type": "string",
+                    "optional": true,
+                    "default": ""
+                }
+            ]
+        }
+    ]
+}

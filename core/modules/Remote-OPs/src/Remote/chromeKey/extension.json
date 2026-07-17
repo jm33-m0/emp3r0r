@@ -1,0 +1,24 @@
+{
+    "name": "chromeKey",
+    "version": "0.0.0",
+    "command_name": "remote-chrome-key",
+    "extension_author": "TrustedSec",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Remote-OPs-BOF",
+    "help": "Get Decryption key usable with Chlonium (https://github.com/rxwx/chlonium)",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+      {
+        "os": "windows",
+        "arch": "amd64",
+        "path": "chromeKey.x64.o"
+      },
+      {
+        "os": "windows",
+        "arch": "386",
+        "path": "chromeKey.x86.o"
+      }
+    ],
+    "arguments": []
+  }

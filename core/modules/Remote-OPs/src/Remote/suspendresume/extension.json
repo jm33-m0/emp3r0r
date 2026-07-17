@@ -1,0 +1,44 @@
+{
+    "name": "Suspend Resume (Remote)",
+    "package_name": "remote-suspendresume",
+    "version": "0.0.0",
+    "extension_author": "TrustedSec",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Remote-OPs-BOF",
+    "commands": [
+        {
+            "command_name": "remote-suspendresume",
+            "help": "Suspend or resume all threads in a process",
+            "long_help": "Suspends or resumes all threads in the specified process using NtSuspendProcess or NtResumeProcess.",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "suspendresume.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "suspendresume.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "option",
+                    "desc": "Action to perform: 0=resume, 1=suspend",
+                    "type": "short",
+                    "optional": false,
+                    "choices": ["0", "1"]
+                },
+                {
+                    "name": "pid",
+                    "desc": "Process ID to suspend or resume",
+                    "type": "integer",
+                    "optional": false
+                }
+            ]
+        }
+    ]
+}

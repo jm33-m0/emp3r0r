@@ -1,0 +1,25 @@
+{
+    "name": "global_unprotect",
+    "version": "0.0.0",
+    "command_name": "remote-global_unprotect",
+    "extension_author": "c2biz",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Remote-OPs-BOF",
+    "help": "Attempts to find, decrypt, and download Global Protect VPN profiles and HIP settings",
+    "long_help": "There are no arguments to this command\n",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+      {
+        "os": "windows",
+        "arch": "amd64",
+        "path": "global_unprotect.x64.o"
+      },
+      {
+        "os": "windows",
+        "arch": "386",
+        "path": "global_unprotect.x86.o"
+      }
+    ],
+    "arguments": []
+}

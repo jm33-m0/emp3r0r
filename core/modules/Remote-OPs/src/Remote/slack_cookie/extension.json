@@ -1,0 +1,31 @@
+{
+    "name": "slack_cookie",
+    "version": "0.0.0",
+    "command_name": "remote-slack_cookie",
+    "extension_author": "TrustedSec",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Remote-OPs-BOF",
+    "help": "Collect the Slack authentication cookie from a Slack process",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+      {
+        "os": "windows",
+        "arch": "amd64",
+        "path": "slack_cookie.x64.o"
+      },
+      {
+        "os": "windows",
+        "arch": "386",
+        "path": "slack_cookie.x86.o"
+      }
+    ],
+    "arguments": [
+      {
+        "name": "pid",
+        "desc": "pid",
+        "type": "integer",
+        "optional": false
+      }
+    ]
+  }

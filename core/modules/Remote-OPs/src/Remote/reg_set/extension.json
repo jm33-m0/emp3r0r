@@ -1,0 +1,70 @@
+{
+    "name": "Registry Set (Remote)",
+    "package_name": "remote-reg-set",
+    "version": "0.0.0",
+    "extension_author": "TrustedSec",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Remote-OPs-BOF",
+    "commands": [
+        {
+            "command_name": "remote-reg-set",
+            "help": "Set a registry value on a local or remote machine",
+            "long_help": "Creates or modifies a registry value using RegSetValueExA. Supports REG_SZ, REG_EXPAND_SZ, REG_BINARY, REG_DWORD, REG_MULTI_SZ, and REG_QWORD types.",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "reg_set.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "reg_set.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "hostname",
+                    "desc": "Target machine. Empty string for local machine",
+                    "type": "string",
+                    "optional": true,
+                    "default": ""
+                },
+                {
+                    "name": "hive",
+                    "desc": "Registry hive: 0=HKCR, 1=HKCU, 2=HKLM, 3=HKU",
+                    "type": "integer",
+                    "optional": false,
+                    "choices": ["0", "1", "2", "3"]
+                },
+                {
+                    "name": "path",
+                    "desc": "Registry key path",
+                    "type": "string",
+                    "optional": false
+                },
+                {
+                    "name": "value",
+                    "desc": "Value name to set",
+                    "type": "string",
+                    "optional": false
+                },
+                {
+                    "name": "type",
+                    "desc": "Registry value type: 1=REG_SZ, 2=REG_EXPAND_SZ, 3=REG_BINARY, 4=REG_DWORD, 7=REG_MULTI_SZ, 11=REG_QWORD",
+                    "type": "integer",
+                    "optional": false,
+                    "choices": ["1", "2", "3", "4", "7", "11"]
+                },
+                {
+                    "name": "data",
+                    "desc": "Data to store in the registry value",
+                    "type": "file",
+                    "optional": false
+                }
+            ]
+        }
+    ]
+}

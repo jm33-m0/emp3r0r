@@ -1,0 +1,68 @@
+{
+    "name": "Shutdown (Remote)",
+    "package_name": "remote-shutdown",
+    "version": "0.0.0",
+    "extension_author": "c2biz",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Remote-OPs-BOF",
+    "commands": [
+        {
+            "command_name": "remote-shutdown",
+            "help": "Shutdown or reboot a local or remote machine",
+            "long_help": "Initiates a system shutdown or reboot using InitiateSystemShutdownExA. Can display a message and set a countdown timeout before the action occurs.",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "shutdown.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "shutdown.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "hostname",
+                    "desc": "Target machine. Empty string for local machine",
+                    "type": "string",
+                    "optional": true,
+                    "default": ""
+                },
+                {
+                    "name": "message",
+                    "desc": "Message to display before shutdown. Empty string for no message",
+                    "type": "string",
+                    "optional": true,
+                    "default": ""
+                },
+                {
+                    "name": "timeout",
+                    "desc": "Seconds to wait before shutdown",
+                    "type": "integer",
+                    "optional": true,
+                    "default": 0
+                },
+                {
+                    "name": "close-apps",
+                    "desc": "Force close applications: 0=no, 1=yes",
+                    "type": "short",
+                    "optional": true,
+                    "default": 1,
+                    "choices": ["0", "1"]
+                },
+                {
+                    "name": "reboot",
+                    "desc": "Reboot instead of shutdown: 0=shutdown, 1=reboot",
+                    "type": "short",
+                    "optional": true,
+                    "default": 0,
+                    "choices": ["0", "1"]
+                }
+            ]
+        }
+    ]
+}

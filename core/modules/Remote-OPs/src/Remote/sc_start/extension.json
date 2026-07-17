@@ -1,0 +1,44 @@
+{
+    "name": "Service Start (Remote)",
+    "package_name": "remote-sc-start",
+    "version": "0.0.0",
+    "extension_author": "TrustedSec",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Remote-OPs-BOF",
+    "commands": [
+        {
+            "command_name": "remote-sc-start",
+            "help": "Start a service on a local or remote machine",
+            "long_help": "Starts an existing Windows service using StartServiceA.",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "sc_start.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "sc_start.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "hostname",
+                    "desc": "Target machine. Empty string for local machine",
+                    "type": "string",
+                    "optional": true,
+                    "default": ""
+                },
+                {
+                    "name": "service-name",
+                    "desc": "Name of the service to start",
+                    "type": "string",
+                    "optional": false
+                }
+            ]
+        }
+    ]
+}

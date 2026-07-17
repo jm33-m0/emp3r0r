@@ -1,0 +1,23 @@
+<Task xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <Triggers>
+    <LogonTrigger>
+      <Enabled>true</Enabled>
+      <UserId>TESTING\Administrator</UserId>
+    </LogonTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <UserId>TESTING\Administrator</UserId>
+    </Principal>
+  </Principals>
+  <Settings>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>true</Enabled>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>notepad.exe</Command>
+    </Exec>
+  </Actions>
+</Task>
+

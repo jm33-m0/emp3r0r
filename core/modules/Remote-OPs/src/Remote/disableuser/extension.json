@@ -1,0 +1,44 @@
+{
+    "name": "Disable User (Remote)",
+    "package_name": "remote-disableuser",
+    "version": "0.0.0",
+    "extension_author": "c2biz",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Remote-OPs-BOF",
+    "commands": [
+        {
+            "command_name": "remote-disableuser",
+            "help": "Disable a local or remote user account",
+            "long_help": "Disables a user account by setting the UF_ACCOUNTDISABLE flag via NetUserSetInfo. If the account is already disabled, reports that and takes no action. Specify an empty server to target the local machine.",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "disableuser.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "disableuser.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "server",
+                    "desc": "Target machine. Empty string for local machine",
+                    "type": "wstring",
+                    "optional": true,
+                    "default": ""
+                },
+                {
+                    "name": "username",
+                    "desc": "User account to disable",
+                    "type": "wstring",
+                    "optional": false
+                }
+            ]
+        }
+    ]
+}

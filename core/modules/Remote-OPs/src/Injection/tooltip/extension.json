@@ -1,0 +1,43 @@
+{
+    "name": "Tooltip Inject (Injection)",
+    "package_name": "inject-tooltip",
+    "version": "v0.0.0",
+    "extension_author": "0xbad53c",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Remote-OPs-BOF",
+    "commands": [
+        {
+            "command_name": "inject-tooltip",
+            "help": "Inject shellcode via tooltips_class32 window vftable hijack",
+            "long_help": "Injects shellcode by hijacking the tooltips_class32 virtual function table pointer using direct syscalls loaded from ntdll on disk. Targets processes with tooltip windows (e.g., explorer.exe). Triggers execution via TTM_GETBUBBLESIZE message.",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "tooltip.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "tooltip.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "pid",
+                    "desc": "Target process ID (must have tooltip windows, e.g., explorer.exe)",
+                    "type": "integer",
+                    "optional": false
+                },
+                {
+                    "name": "bin",
+                    "desc": "Path to shellcode file",
+                    "type": "file",
+                    "optional": false
+                }
+            ]
+        }
+    ]
+}

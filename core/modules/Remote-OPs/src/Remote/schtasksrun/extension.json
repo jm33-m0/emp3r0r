@@ -1,0 +1,44 @@
+{
+    "name": "Scheduled Task Run (Remote)",
+    "package_name": "remote-schtasksrun",
+    "version": "0.0.0",
+    "extension_author": "TrustedSec",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Remote-OPs-BOF",
+    "commands": [
+        {
+            "command_name": "remote-schtasksrun",
+            "help": "Run a scheduled task on a local or remote machine",
+            "long_help": "Triggers execution of an existing scheduled task using the IRegisteredTask::Run COM interface.",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "schtasksrun.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "schtasksrun.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "hostname",
+                    "desc": "Target machine. Empty string for local machine",
+                    "type": "wstring",
+                    "optional": true,
+                    "default": ""
+                },
+                {
+                    "name": "taskpath",
+                    "desc": "Full path to the task (e.g., \\Microsoft\\Windows\\MUI\\LpRemove)",
+                    "type": "wstring",
+                    "optional": false
+                }
+            ]
+        }
+    ]
+}

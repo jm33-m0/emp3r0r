@@ -1,0 +1,78 @@
+{
+    "name": "Scheduled Task Create (Remote)",
+    "package_name": "remote-schtaskscreate",
+    "version": "0.0.0",
+    "extension_author": "TrustedSec",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Remote-OPs-BOF",
+    "commands": [
+        {
+            "command_name": "remote-schtaskscreate",
+            "help": "Create a scheduled task from XML on a local or remote machine",
+            "long_help": "Creates a scheduled task using ITaskFolder::RegisterTask with the provided XML definition. Supports specifying credentials, run mode (user, system, or principal from XML), and force overwrite of existing tasks.",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "schtaskscreate.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "schtaskscreate.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "hostname",
+                    "desc": "Target machine. Empty string for local machine",
+                    "type": "wstring",
+                    "optional": true,
+                    "default": ""
+                },
+                {
+                    "name": "username",
+                    "desc": "Username for task registration credentials. Empty string for current user",
+                    "type": "wstring",
+                    "optional": true,
+                    "default": ""
+                },
+                {
+                    "name": "password",
+                    "desc": "Password for task registration credentials. Empty string for current user",
+                    "type": "wstring",
+                    "optional": true,
+                    "default": ""
+                },
+                {
+                    "name": "taskpath",
+                    "desc": "Full path for the task (e.g., \\MyTask or \\Folder\\MyTask)",
+                    "type": "wstring",
+                    "optional": false
+                },
+                {
+                    "name": "xml",
+                    "desc": "XML task definition content",
+                    "type": "wstring",
+                    "optional": false
+                },
+                {
+                    "name": "usermode",
+                    "desc": "Run mode: 0=USER, 1=SYSTEM, 2=PRINCIPAL (from XML)",
+                    "type": "integer",
+                    "optional": false,
+                    "choices": ["0", "1", "2"]
+                },
+                {
+                    "name": "force",
+                    "desc": "Overwrite existing task: 0=no, 1=yes",
+                    "type": "integer",
+                    "optional": true,
+                    "default": 0
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,44 @@
+{
+    "name": "Process Destroy (Remote)",
+    "package_name": "remote-process-destroy",
+    "version": "0.0.0",
+    "extension_author": "TrustedSec",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Remote-OPs-BOF",
+    "commands": [
+        {
+            "command_name": "remote-process-destroy",
+            "help": "Crash a process by closing its handles via NtDuplicateObject",
+            "long_help": "Closes handles in the target process using NtDuplicateObject with DUPLICATE_CLOSE_SOURCE. Can close a specific handle by ID, or all handles to crash the process. Do not target system processes.",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "ProcessDestroy.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "ProcessDestroy.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "pid",
+                    "desc": "Process ID to target",
+                    "type": "integer",
+                    "optional": false
+                },
+                {
+                    "name": "handle-id",
+                    "desc": "Specific handle ID to close. Omit or 0 to close all handles",
+                    "type": "integer",
+                    "optional": true,
+                    "default": 0
+                }
+            ]
+        }
+    ]
+}

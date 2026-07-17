@@ -1,0 +1,93 @@
+{
+    "name": "ADCS Request (Remote)",
+    "package_name": "remote-adcs-request",
+    "version": "0.0.0",
+    "extension_author": "TrustedSec",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Remote-OPs-BOF",
+    "commands": [
+        {
+            "command_name": "remote-adcs-request",
+            "help": "Request an enrollment certificate from an AD certificate authority",
+            "long_help": "Connects to a certificate authority and requests an enrollment certificate of the specified type. Supports custom subject, alternative name, SAN URL, and optional certificate installation. Can request user or machine certificates. Supports ESC15 via app policy flag.",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "adcs_request.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "adcs_request.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "ca",
+                    "desc": "Certificate authority to request from (e.g., cert.example.org\\example-CERT-CA)",
+                    "type": "wstring",
+                    "optional": false
+                },
+                {
+                    "name": "template",
+                    "desc": "Certificate template to request. Empty string for default (User/Machine)",
+                    "type": "wstring",
+                    "optional": true,
+                    "default": ""
+                },
+                {
+                    "name": "subject",
+                    "desc": "Subject distinguished name (e.g., CN=Administrator,CN=Users,DC=example,DC=org). Empty for current user/machine",
+                    "type": "wstring",
+                    "optional": true,
+                    "default": ""
+                },
+                {
+                    "name": "alt-name",
+                    "desc": "Alternative subject distinguished name. Empty to omit",
+                    "type": "wstring",
+                    "optional": true,
+                    "default": ""
+                },
+                {
+                    "name": "alt-url",
+                    "desc": "SAN URL entry, can specify alternate subject SID (e.g., tag:microsoft.com,2022-09-14:sid:S-1-5-21-...). Empty to omit",
+                    "type": "wstring",
+                    "optional": true,
+                    "default": ""
+                },
+                {
+                    "name": "install",
+                    "desc": "Install certificate in current context: 0 = no, 1 = yes",
+                    "type": "short",
+                    "optional": true,
+                    "default": 0
+                },
+                {
+                    "name": "machine",
+                    "desc": "Request machine certificate instead of user: 0 = no, 1 = yes",
+                    "type": "short",
+                    "optional": true,
+                    "default": 0
+                },
+                {
+                    "name": "app-policy",
+                    "desc": "Add app policy for client auth and certificate agent (ESC15): 0 = no, 1 = yes",
+                    "type": "short",
+                    "optional": true,
+                    "default": 0
+                },
+                {
+                    "name": "dns",
+                    "desc": "Treat alt-name as DNS name instead of UPN: 0 = no, 1 = yes",
+                    "type": "short",
+                    "optional": true,
+                    "default": 0
+                }
+            ]
+        }
+    ]
+}

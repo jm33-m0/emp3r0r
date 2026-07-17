@@ -1,0 +1,43 @@
+{
+    "name": "SvcCtrl Inject (Injection)",
+    "package_name": "inject-svcctrl",
+    "version": "v0.0.0",
+    "extension_author": "0xbad53c",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Remote-OPs-BOF",
+    "commands": [
+        {
+            "command_name": "inject-svcctrl",
+            "help": "Inject shellcode via service dispatch table overwrite",
+            "long_help": "Injects shellcode by overwriting a service's internal dispatch entry (IDE) table in the target process. The target must be a process hosting services (e.g., svchost.exe, spoolsv.exe).",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "svcctrl.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "svcctrl.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "pid",
+                    "desc": "Target process ID (must be a service-hosting process, e.g., svchost.exe, spoolsv.exe)",
+                    "type": "integer",
+                    "optional": false
+                },
+                {
+                    "name": "bin",
+                    "desc": "Path to shellcode file",
+                    "type": "file",
+                    "optional": false
+                }
+            ]
+        }
+    ]
+}

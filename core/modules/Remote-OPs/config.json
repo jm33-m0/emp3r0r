@@ -1,0 +1,2012 @@
+[
+    {
+        "name": "remote-sc-description",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Change the description of a service on a local or remote machine",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/sc_description/sc_description.x64.o",
+                "Remote-OPs/sc_description/sc_description.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "hostname",
+                "description": "Target machine. Empty string for local machine",
+                "default": "",
+                "type": "cstr",
+                "required": false
+            },
+            {
+                "name": "service-name",
+                "description": "Name of the service to modify",
+                "default": "",
+                "type": "cstr",
+                "required": true
+            },
+            {
+                "name": "description",
+                "description": "New description text for the service",
+                "default": "",
+                "type": "cstr",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-process-destroy",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Crash a process by closing its handles via NtDuplicateObject",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/ProcessDestroy/ProcessDestroy.x64.o",
+                "Remote-OPs/ProcessDestroy/ProcessDestroy.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "pid",
+                "description": "Process ID to target",
+                "default": "",
+                "type": "integer",
+                "required": true
+            },
+            {
+                "name": "handle-id",
+                "description": "Specific handle ID to close. Omit or 0 to close all handles",
+                "default": 0,
+                "type": "integer",
+                "required": false
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-sc-start",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Start a service on a local or remote machine",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/sc_start/sc_start.x64.o",
+                "Remote-OPs/sc_start/sc_start.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "hostname",
+                "description": "Target machine. Empty string for local machine",
+                "default": "",
+                "type": "cstr",
+                "required": false
+            },
+            {
+                "name": "service-name",
+                "description": "Name of the service to start",
+                "default": "",
+                "type": "cstr",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-schtasks-delete",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Delete a scheduled task or task folder",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/schtasksdelete/schtasksdelete.x64.o",
+                "Remote-OPs/schtasksdelete/schtasksdelete.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "hostname",
+                "description": "Target machine. Empty string for local machine",
+                "default": "",
+                "type": "wstr",
+                "required": false
+            },
+            {
+                "name": "taskpath",
+                "description": "Full path to the task or folder to delete (e.g., \\Folder\\MyTask)",
+                "default": "",
+                "type": "wstr",
+                "required": true
+            },
+            {
+                "name": "is-folder",
+                "description": "Delete a folder instead of a task: 0=task, 1=folder",
+                "default": 0,
+                "type": "integer",
+                "required": false
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-sc-create",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Create a new service on a local or remote machine",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/sc_create/sc_create.x64.o",
+                "Remote-OPs/sc_create/sc_create.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "hostname",
+                "description": "Target machine. Empty string for local machine",
+                "default": "",
+                "type": "cstr",
+                "required": false
+            },
+            {
+                "name": "service-name",
+                "description": "Internal name of the service to create",
+                "default": "",
+                "type": "cstr",
+                "required": true
+            },
+            {
+                "name": "binpath",
+                "description": "Binary path for the service executable",
+                "default": "",
+                "type": "cstr",
+                "required": true
+            },
+            {
+                "name": "display-name",
+                "description": "Display name for the service",
+                "default": "",
+                "type": "cstr",
+                "required": true
+            },
+            {
+                "name": "description",
+                "description": "Service description text",
+                "default": "",
+                "type": "cstr",
+                "required": false
+            },
+            {
+                "name": "error-mode",
+                "description": "Error mode: 0=ignore, 1=normal, 2=severe, 3=critical",
+                "default": "",
+                "type": "short",
+                "required": true
+            },
+            {
+                "name": "start-mode",
+                "description": "Start mode: 2=auto, 3=demand, 4=disabled",
+                "default": "",
+                "type": "short",
+                "required": true
+            },
+            {
+                "name": "service-type",
+                "description": "Service type: 1=FILE_SYSTEM_DRIVER, 2=KERNEL_DRIVER, 16=WIN32_OWN_PROCESS, 32=WIN32_SHARE_PROCESS",
+                "default": "",
+                "type": "short",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-process-list-handles",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "List the open handles of a process",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/ProcessListHandles/ProcessListHandles.x64.o",
+                "Remote-OPs/ProcessListHandles/ProcessListHandles.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "pid",
+                "description": "Process ID to list handles for",
+                "default": "",
+                "type": "integer",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-sc-stop",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Stop a service on a local or remote machine",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/sc_stop/sc_stop.x64.o",
+                "Remote-OPs/sc_stop/sc_stop.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "hostname",
+                "description": "Target machine. Empty string for local machine",
+                "default": "",
+                "type": "cstr",
+                "required": false
+            },
+            {
+                "name": "service-name",
+                "description": "Name of the service to stop",
+                "default": "",
+                "type": "cstr",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-disableuser",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Disable a local or remote user account",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/disableuser/disableuser.x64.o",
+                "Remote-OPs/disableuser/disableuser.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "server",
+                "description": "Target machine. Empty string for local machine",
+                "default": "",
+                "type": "wstr",
+                "required": false
+            },
+            {
+                "name": "username",
+                "description": "User account to disable",
+                "default": "",
+                "type": "wstr",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-get_priv",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Activate a token privilege on the current process or thread",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/get_priv/get_priv.x64.o",
+                "Remote-OPs/get_priv/get_priv.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "privilege",
+                "description": "Privilege name to enable (e.g., SeDebugPrivilege). Prefix with ~ to apply to thread token instead of process token",
+                "default": "",
+                "type": "cstr",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-adcs_request_on_behalf",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Request an enrollment certificate on behalf of another user",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/adcs_request_on_behalf/adcs_request_on_behalf.x64.o",
+                "Remote-OPs/adcs_request_on_behalf/adcs_request_on_behalf.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "template",
+                "description": "Certificate template to request on behalf of the target user",
+                "default": "",
+                "type": "wstr",
+                "required": true
+            },
+            {
+                "name": "requester",
+                "description": "Domain\\username to request the certificate on behalf of (e.g., EXAMPLE\\Administrator)",
+                "default": "",
+                "type": "wstr",
+                "required": true
+            },
+            {
+                "name": "download-name",
+                "description": "Filename for the downloaded PFX (e.g., Admin.pfx)",
+                "default": "",
+                "type": "cstr",
+                "required": true
+            },
+            {
+                "name": "enrollment-cert",
+                "description": "Path to enrollment agent PFX file with OID_ENROLLMENT_AGENT extension",
+                "default": "",
+                "type": "file",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-make_token_cert",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Create an impersonation token from a certificate PFX file",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/make_token_cert/make_token_cert.x64.o",
+                "Remote-OPs/make_token_cert/make_token_cert.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "pfx",
+                "description": "Path to PFX certificate file",
+                "default": "",
+                "type": "file",
+                "required": true
+            },
+            {
+                "name": "password",
+                "description": "Password to decrypt the PFX. Omit if no password",
+                "default": "",
+                "type": "wstr",
+                "required": false
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-adduser",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Add a new user to a local or remote machine",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/adduser/adduser.x64.o",
+                "Remote-OPs/adduser/adduser.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "username",
+                "description": "Name of the new user account",
+                "default": "",
+                "type": "wstr",
+                "required": true
+            },
+            {
+                "name": "password",
+                "description": "Password for the new user account",
+                "default": "",
+                "type": "wstr",
+                "required": true
+            },
+            {
+                "name": "server",
+                "description": "Target machine. Omit for local machine",
+                "default": "",
+                "type": "wstr",
+                "required": false
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-reg-delete",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Delete a registry key or value",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/reg_delete/reg_delete.x64.o",
+                "Remote-OPs/reg_delete/reg_delete.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "hostname",
+                "description": "Target machine. Empty string for local machine",
+                "default": "",
+                "type": "cstr",
+                "required": false
+            },
+            {
+                "name": "hive",
+                "description": "Registry hive: 0=HKCR, 1=HKCU, 2=HKLM, 3=HKU",
+                "default": "",
+                "type": "integer",
+                "required": true
+            },
+            {
+                "name": "path",
+                "description": "Registry key path",
+                "default": "",
+                "type": "cstr",
+                "required": true
+            },
+            {
+                "name": "value",
+                "description": "Value name to delete. Empty string when deleting an entire key",
+                "default": "",
+                "type": "cstr",
+                "required": false
+            },
+            {
+                "name": "delete-key",
+                "description": "Set to 1 to delete the entire key instead of a value: 0=no, 1=yes",
+                "default": 0,
+                "type": "integer",
+                "required": false
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-ask-mfa",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Display a fake Microsoft Authenticator MFA approval dialog",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/ask_mfa/ask_mfa.x64.o",
+                "Remote-OPs/ask_mfa/ask_mfa.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "number",
+                "description": "MFA number to display (0-99)",
+                "default": "",
+                "type": "integer",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-suspendresume",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Suspend or resume all threads in a process",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/suspendresume/suspendresume.x64.o",
+                "Remote-OPs/suspendresume/suspendresume.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "option",
+                "description": "Action to perform: 0=resume, 1=suspend",
+                "default": "",
+                "type": "short",
+                "required": true
+            },
+            {
+                "name": "pid",
+                "description": "Process ID to suspend or resume",
+                "default": "",
+                "type": "integer",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-adcs-request",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Request an enrollment certificate from an AD certificate authority",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/adcs_request/adcs_request.x64.o",
+                "Remote-OPs/adcs_request/adcs_request.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "ca",
+                "description": "Certificate authority to request from (e.g., cert.example.org\\example-CERT-CA)",
+                "default": "",
+                "type": "wstr",
+                "required": true
+            },
+            {
+                "name": "template",
+                "description": "Certificate template to request. Empty string for default (User/Machine)",
+                "default": "",
+                "type": "wstr",
+                "required": false
+            },
+            {
+                "name": "subject",
+                "description": "Subject distinguished name (e.g., CN=Administrator,CN=Users,DC=example,DC=org). Empty for current user/machine",
+                "default": "",
+                "type": "wstr",
+                "required": false
+            },
+            {
+                "name": "alt-name",
+                "description": "Alternative subject distinguished name. Empty to omit",
+                "default": "",
+                "type": "wstr",
+                "required": false
+            },
+            {
+                "name": "alt-url",
+                "description": "SAN URL entry, can specify alternate subject SID (e.g., tag:microsoft.com,2022-09-14:sid:S-1-5-21-...). Empty to omit",
+                "default": "",
+                "type": "wstr",
+                "required": false
+            },
+            {
+                "name": "install",
+                "description": "Install certificate in current context: 0 = no, 1 = yes",
+                "default": 0,
+                "type": "short",
+                "required": false
+            },
+            {
+                "name": "machine",
+                "description": "Request machine certificate instead of user: 0 = no, 1 = yes",
+                "default": 0,
+                "type": "short",
+                "required": false
+            },
+            {
+                "name": "app-policy",
+                "description": "Add app policy for client auth and certificate agent (ESC15): 0 = no, 1 = yes",
+                "default": 0,
+                "type": "short",
+                "required": false
+            },
+            {
+                "name": "dns",
+                "description": "Treat alt-name as DNS name instead of UPN: 0 = no, 1 = yes",
+                "default": 0,
+                "type": "short",
+                "required": false
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-sc-delete",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Delete a service from a local or remote machine",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/sc_delete/sc_delete.x64.o",
+                "Remote-OPs/sc_delete/sc_delete.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "hostname",
+                "description": "Target machine. Empty string for local machine",
+                "default": "",
+                "type": "cstr",
+                "required": false
+            },
+            {
+                "name": "service-name",
+                "description": "Name of the service to delete",
+                "default": "",
+                "type": "cstr",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-schtasksrun",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Run a scheduled task on a local or remote machine",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/schtasksrun/schtasksrun.x64.o",
+                "Remote-OPs/schtasksrun/schtasksrun.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "hostname",
+                "description": "Target machine. Empty string for local machine",
+                "default": "",
+                "type": "wstr",
+                "required": false
+            },
+            {
+                "name": "taskpath",
+                "description": "Full path to the task (e.g., \\Microsoft\\Windows\\MUI\\LpRemove)",
+                "default": "",
+                "type": "wstr",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-office-tokens",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Search a process's memory for Office JWT access tokens",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/office_tokens/office_tokens.x64.o",
+                "Remote-OPs/office_tokens/office_tokens.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "pid",
+                "description": "Process ID to search for Office tokens",
+                "default": "",
+                "type": "integer",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-unexpireuser",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Set a user account to never expire",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/unexpireuser/unexpireuser.x64.o",
+                "Remote-OPs/unexpireuser/unexpireuser.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "server",
+                "description": "Target machine. Empty string for local machine",
+                "default": "",
+                "type": "wstr",
+                "required": false
+            },
+            {
+                "name": "username",
+                "description": "User account to set as never-expiring",
+                "default": "",
+                "type": "wstr",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-schtasks-stop",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Stop a running scheduled task on a local or remote machine",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/schtasksstop/schtasksstop.x64.o",
+                "Remote-OPs/schtasksstop/schtasksstop.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "hostname",
+                "description": "Target machine. Empty string for local machine",
+                "default": "",
+                "type": "wstr",
+                "required": false
+            },
+            {
+                "name": "taskpath",
+                "description": "Full path to the task to stop",
+                "default": "",
+                "type": "wstr",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-reg-set",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Set a registry value on a local or remote machine",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/reg_set/reg_set.x64.o",
+                "Remote-OPs/reg_set/reg_set.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "hostname",
+                "description": "Target machine. Empty string for local machine",
+                "default": "",
+                "type": "cstr",
+                "required": false
+            },
+            {
+                "name": "hive",
+                "description": "Registry hive: 0=HKCR, 1=HKCU, 2=HKLM, 3=HKU",
+                "default": "",
+                "type": "integer",
+                "required": true
+            },
+            {
+                "name": "path",
+                "description": "Registry key path",
+                "default": "",
+                "type": "cstr",
+                "required": true
+            },
+            {
+                "name": "value",
+                "description": "Value name to set",
+                "default": "",
+                "type": "cstr",
+                "required": true
+            },
+            {
+                "name": "type",
+                "description": "Registry value type: 1=REG_SZ, 2=REG_EXPAND_SZ, 3=REG_BINARY, 4=REG_DWORD, 7=REG_MULTI_SZ, 11=REG_QWORD",
+                "default": "",
+                "type": "integer",
+                "required": true
+            },
+            {
+                "name": "data",
+                "description": "Data to store in the registry value",
+                "default": "",
+                "type": "file",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-sc-config",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Configure an existing service on a local or remote machine",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/sc_config/sc_config.x64.o",
+                "Remote-OPs/sc_config/sc_config.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "hostname",
+                "description": "Target machine. Empty string for local machine",
+                "default": "",
+                "type": "cstr",
+                "required": false
+            },
+            {
+                "name": "service-name",
+                "description": "Name of the service to configure",
+                "default": "",
+                "type": "cstr",
+                "required": true
+            },
+            {
+                "name": "binpath",
+                "description": "New binary path for the service",
+                "default": "",
+                "type": "cstr",
+                "required": true
+            },
+            {
+                "name": "error-mode",
+                "description": "Error mode: 0=ignore, 1=normal, 2=severe, 3=critical",
+                "default": "",
+                "type": "short",
+                "required": true
+            },
+            {
+                "name": "start-mode",
+                "description": "Start mode: 2=auto, 3=demand, 4=disabled",
+                "default": "",
+                "type": "short",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-shspawnas",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Spawn a process as another user and inject shellcode into it",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/shspawnas/shspawnas.x64.o",
+                "Remote-OPs/shspawnas/shspawnas.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "domain",
+                "description": "Domain or computer name for the user account",
+                "default": "",
+                "type": "wstr",
+                "required": true
+            },
+            {
+                "name": "username",
+                "description": "Username to spawn the process as",
+                "default": "",
+                "type": "wstr",
+                "required": true
+            },
+            {
+                "name": "password",
+                "description": "Password for the user account",
+                "default": "",
+                "type": "wstr",
+                "required": true
+            },
+            {
+                "name": "shellcode",
+                "description": "Path to shellcode file to inject",
+                "default": "",
+                "type": "file",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-enable-user",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Unlock and enable a local or remote user account",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/enableuser/enableuser.x64.o",
+                "Remote-OPs/enableuser/enableuser.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "server",
+                "description": "Target machine or DC for domain accounts. Empty string for local machine",
+                "default": "",
+                "type": "wstr",
+                "required": false
+            },
+            {
+                "name": "username",
+                "description": "User account to unlock and enable",
+                "default": "",
+                "type": "wstr",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-shutdown",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Shutdown or reboot a local or remote machine",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/shutdown/shutdown.x64.o",
+                "Remote-OPs/shutdown/shutdown.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "hostname",
+                "description": "Target machine. Empty string for local machine",
+                "default": "",
+                "type": "cstr",
+                "required": false
+            },
+            {
+                "name": "message",
+                "description": "Message to display before shutdown. Empty string for no message",
+                "default": "",
+                "type": "cstr",
+                "required": false
+            },
+            {
+                "name": "timeout",
+                "description": "Seconds to wait before shutdown",
+                "default": 0,
+                "type": "integer",
+                "required": false
+            },
+            {
+                "name": "close-apps",
+                "description": "Force close applications: 0=no, 1=yes",
+                "default": 1,
+                "type": "short",
+                "required": false
+            },
+            {
+                "name": "reboot",
+                "description": "Reboot instead of shutdown: 0=shutdown, 1=reboot",
+                "default": 0,
+                "type": "short",
+                "required": false
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-addusertogroup",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Add a user to a domain group",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/addusertogroup/addusertogroup.x64.o",
+                "Remote-OPs/addusertogroup/addusertogroup.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "domain",
+                "description": "Domain for the user account. Use empty string for local account",
+                "default": "",
+                "type": "wstr",
+                "required": true
+            },
+            {
+                "name": "server",
+                "description": "Target computer to perform the addition on. Use empty string for local machine",
+                "default": "",
+                "type": "wstr",
+                "required": true
+            },
+            {
+                "name": "username",
+                "description": "User to add to the group",
+                "default": "",
+                "type": "wstr",
+                "required": true
+            },
+            {
+                "name": "groupname",
+                "description": "Group to add the user to",
+                "default": "",
+                "type": "wstr",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-get-azure-token",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Perform an OAuth code grant against Azure and print the returned tokens",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/get_azure_token/get_azure_token.x64.o",
+                "Remote-OPs/get_azure_token/get_azure_token.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "client-id",
+                "description": "Azure app client ID (must have consent and http://localhost redirect URI)",
+                "default": "",
+                "type": "cstr",
+                "required": true
+            },
+            {
+                "name": "scope",
+                "description": "OAuth scope string for the client ID",
+                "default": "",
+                "type": "cstr",
+                "required": true
+            },
+            {
+                "name": "browser",
+                "description": "Browser to use: 0=Edge, 1=Chrome, 2=Default, 3=Other",
+                "default": "",
+                "type": "integer",
+                "required": true
+            },
+            {
+                "name": "hint",
+                "description": "Login hint email address. Omit if only one saved login exists",
+                "default": "",
+                "type": "cstr",
+                "required": false
+            },
+            {
+                "name": "browser-path",
+                "description": "Full path to browser executable (only used when browser=3/Other, max 260 chars)",
+                "default": "",
+                "type": "cstr",
+                "required": false
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-reg-save",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Save a registry hive to a file on disk",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/reg_save/reg_save.x64.o",
+                "Remote-OPs/reg_save/reg_save.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "path",
+                "description": "Registry key path to save from",
+                "default": "",
+                "type": "cstr",
+                "required": true
+            },
+            {
+                "name": "output-path",
+                "description": "File path on target to write the backup to",
+                "default": "",
+                "type": "cstr",
+                "required": true
+            },
+            {
+                "name": "hive",
+                "description": "Registry hive: 0=HKCR, 1=HKCU, 2=HKLM, 3=HKU",
+                "default": "",
+                "type": "integer",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-sc_failure",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Configure failure recovery actions for a service",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/sc_failure/sc_failure.x64.o",
+                "Remote-OPs/sc_failure/sc_failure.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "hostname",
+                "description": "Target machine. Empty string for local machine",
+                "default": "",
+                "type": "cstr",
+                "required": false
+            },
+            {
+                "name": "service-name",
+                "description": "Name of the service to configure",
+                "default": "",
+                "type": "cstr",
+                "required": true
+            },
+            {
+                "name": "reset-period",
+                "description": "Length of period with no failures before resetting the failure count (in seconds)",
+                "default": "",
+                "type": "integer",
+                "required": true
+            },
+            {
+                "name": "reboot-msg",
+                "description": "Broadcast message before reboot on failure. Empty string to omit",
+                "default": "",
+                "type": "cstr",
+                "required": false
+            },
+            {
+                "name": "command",
+                "description": "Command to run on failure. Empty string to omit",
+                "default": "",
+                "type": "cstr",
+                "required": false
+            },
+            {
+                "name": "num-actions",
+                "description": "Number of failure actions to configure",
+                "default": "",
+                "type": "short",
+                "required": true
+            },
+            {
+                "name": "actions",
+                "description": "Comma-separated action/delay pairs (e.g., restart/5000,reboot/30000). Actions: none, restart, reboot, run",
+                "default": "",
+                "type": "cstr",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-schtaskscreate",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Create a scheduled task from XML on a local or remote machine",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/schtaskscreate/schtaskscreate.x64.o",
+                "Remote-OPs/schtaskscreate/schtaskscreate.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "hostname",
+                "description": "Target machine. Empty string for local machine",
+                "default": "",
+                "type": "wstr",
+                "required": false
+            },
+            {
+                "name": "username",
+                "description": "Username for task registration credentials. Empty string for current user",
+                "default": "",
+                "type": "wstr",
+                "required": false
+            },
+            {
+                "name": "password",
+                "description": "Password for task registration credentials. Empty string for current user",
+                "default": "",
+                "type": "wstr",
+                "required": false
+            },
+            {
+                "name": "taskpath",
+                "description": "Full path for the task (e.g., \\MyTask or \\Folder\\MyTask)",
+                "default": "",
+                "type": "wstr",
+                "required": true
+            },
+            {
+                "name": "xml",
+                "description": "XML task definition content",
+                "default": "",
+                "type": "wstr",
+                "required": true
+            },
+            {
+                "name": "usermode",
+                "description": "Run mode: 0=USER, 1=SYSTEM, 2=PRINCIPAL (from XML)",
+                "default": "",
+                "type": "integer",
+                "required": true
+            },
+            {
+                "name": "force",
+                "description": "Overwrite existing task: 0=no, 1=yes",
+                "default": 0,
+                "type": "integer",
+                "required": false
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "remote-procdump",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Dump a process to a file on disk",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/procdump/procdump.x64.o",
+                "Remote-OPs/procdump/procdump.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "pid",
+                "description": "Process ID to dump",
+                "default": "",
+                "type": "integer",
+                "required": true
+            },
+            {
+                "name": "output-path",
+                "description": "File path on target to write the dump to",
+                "default": "",
+                "type": "wstr",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "inject-setthreadcontext",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Inject shellcode into a process via thread context hijack",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/setthreadcontext/setthreadcontext.x64.o",
+                "Remote-OPs/setthreadcontext/setthreadcontext.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "pid",
+                "description": "Target process ID",
+                "default": "",
+                "type": "integer",
+                "required": true
+            },
+            {
+                "name": "bin",
+                "description": "Path to shellcode file",
+                "default": "",
+                "type": "file",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "inject-conhost",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Inject shellcode via conhost.exe ConsoleWindowClass vftable hijack",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/conhost/conhost.x64.o",
+                "Remote-OPs/conhost/conhost.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "pid",
+                "description": "Target console process ID (must have a conhost.exe child process)",
+                "default": "",
+                "type": "integer",
+                "required": true
+            },
+            {
+                "name": "bin",
+                "description": "Path to shellcode file",
+                "default": "",
+                "type": "file",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "inject-ntcreatethread",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Inject shellcode into a process via NtCreateThreadEx syscall",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/ntcreatethread/ntcreatethread.x64.o",
+                "Remote-OPs/ntcreatethread/ntcreatethread.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "pid",
+                "description": "Target process ID",
+                "default": "",
+                "type": "integer",
+                "required": true
+            },
+            {
+                "name": "bin",
+                "description": "Path to shellcode file",
+                "default": "",
+                "type": "file",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "inject-ctray",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Inject shellcode into explorer.exe via CTray window class",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/ctray/ctray.x64.o",
+                "Remote-OPs/ctray/ctray.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "bin",
+                "description": "Path to shellcode file",
+                "default": "",
+                "type": "file",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "inject-createremotethread",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Inject shellcode into a process via CreateRemoteThread",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/createremotethread/createremotethread.x64.o",
+                "Remote-OPs/createremotethread/createremotethread.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "pid",
+                "description": "Target process ID",
+                "default": "",
+                "type": "integer",
+                "required": true
+            },
+            {
+                "name": "bin",
+                "description": "Path to shellcode file",
+                "default": "",
+                "type": "file",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "inject-clipboard",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Inject shellcode via clipboard window class (CLIPBRDWNDCLASS)",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/clipboard/clipboard.x64.o",
+                "Remote-OPs/clipboard/clipboard.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "pid",
+                "description": "Target process ID (must have a CLIPBRDWNDCLASS window, e.g., explorer.exe, vmtoolsd.exe)",
+                "default": "",
+                "type": "integer",
+                "required": true
+            },
+            {
+                "name": "bin",
+                "description": "Path to shellcode file",
+                "default": "",
+                "type": "file",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "inject-tooltip",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Inject shellcode via tooltips_class32 window vftable hijack",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/tooltip/tooltip.x64.o",
+                "Remote-OPs/tooltip/tooltip.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "pid",
+                "description": "Target process ID (must have tooltip windows, e.g., explorer.exe)",
+                "default": "",
+                "type": "integer",
+                "required": true
+            },
+            {
+                "name": "bin",
+                "description": "Path to shellcode file",
+                "default": "",
+                "type": "file",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "inject-kernelcallbacktable",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Inject shellcode via PEB KernelCallbackTable hijack",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/kernelcallbacktable/kernelcallbacktable.x64.o",
+                "Remote-OPs/kernelcallbacktable/kernelcallbacktable.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "pid",
+                "description": "Target process ID (must be a GUI process that handles window messages)",
+                "default": "",
+                "type": "integer",
+                "required": true
+            },
+            {
+                "name": "bin",
+                "description": "Path to shellcode file",
+                "default": "",
+                "type": "file",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "inject-ntqueueapcthread",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Inject shellcode into a process via NtQueueApcThread syscall",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/ntqueueapcthread/ntqueueapcthread.x64.o",
+                "Remote-OPs/ntqueueapcthread/ntqueueapcthread.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "pid",
+                "description": "Target process ID",
+                "default": "",
+                "type": "integer",
+                "required": true
+            },
+            {
+                "name": "bin",
+                "description": "Path to shellcode file",
+                "default": "",
+                "type": "file",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "inject-uxsubclassinfo",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Inject shellcode into explorer.exe via UxSubclassInfo property",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/uxsubclassinfo/uxsubclassinfo.x64.o",
+                "Remote-OPs/uxsubclassinfo/uxsubclassinfo.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "bin",
+                "description": "Path to shellcode file",
+                "default": "",
+                "type": "file",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "inject-dde",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Inject shellcode into explorer.exe via DDE window class",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/dde/dde.x64.o",
+                "Remote-OPs/dde/dde.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "bin",
+                "description": "Path to shellcode file",
+                "default": "",
+                "type": "file",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    },
+    {
+        "name": "inject-svcctrl",
+        "author": "TrustedSec",
+        "date": "2026-07-17",
+        "comment": "Inject shellcode via service dispatch table overwrite",
+        "is_local": false,
+        "platform": "Windows",
+        "path": "",
+        "fileless": true,
+        "agent_config": {
+            "exec": "",
+            "files": [
+                "Remote-OPs/svcctrl/svcctrl.x64.o",
+                "Remote-OPs/svcctrl/svcctrl.x86.o"
+            ],
+            "in_memory": true,
+            "type": "coff",
+            "interactive": false
+        },
+        "parameters": [
+            {
+                "name": "pid",
+                "description": "Target process ID (must be a service-hosting process, e.g., svchost.exe, spoolsv.exe)",
+                "default": "",
+                "type": "integer",
+                "required": true
+            },
+            {
+                "name": "bin",
+                "description": "Path to shellcode file",
+                "default": "",
+                "type": "file",
+                "required": true
+            }
+        ],
+        "invocation": {
+            "coff_export": "go"
+        }
+    }
+]
