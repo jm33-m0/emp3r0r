@@ -572,24 +572,19 @@ build() {
   # error: https://github.com/golang/go/issues/22040
   # build_shared_object "arm64" "linux" "stub-arm64.so"
 
-  # Build SA modules
-  info "Building SA modules"
-  for dir in "$pwd"/modules/SA/SA/*; do
-    if [[ -d "$dir" && -f "$dir/Makefile" ]]; then
-      info "Building SA module: $(basename "$dir")"
-      make -C "$dir" || error "Failed to build SA module $(basename "$dir")"
+
+  # Build modules with a make_all.sh wrapper
+  info "Building complex modules with make_all.sh..."
+  for mod_dir in "$pwd"/modules/*; do
+    if [[ -d "$mod_dir" && -f "$mod_dir/make_all.sh" ]]; then
+      info "Running make_all.sh in $(basename "$mod_dir")"
+      {
+        cd "$mod_dir" &&
+        chmod +x make_all.sh &&
+        ./make_all.sh
+      } || warn "Failed to build modules in $(basename "$mod_dir") via make_all.sh"
     fi
   done
-
-  # Build Remote-OPs modules
-  info "Building Remote-OPs modules"
-  if [[ -d "$pwd/modules/Remote-OPs" && -f "$pwd/modules/Remote-OPs/make_all.sh" ]]; then
-    {
-      cd "$pwd/modules/Remote-OPs" &&
-      chmod +x make_all.sh &&
-      ./make_all.sh
-    } || error "Failed to build Remote-OPs modules"
-  fi
 
   # Build basic Linux test BOFs
   info "Building Linux test BOFs"
