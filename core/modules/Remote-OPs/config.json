@@ -1512,7 +1512,7 @@
         "required": true
       },
       {
-        "name": "force",
+        "name": "force-overwrite",
         "description": "Overwrite existing task: 0=no, 1=yes",
         "default": "0",
         "type": "integer",
