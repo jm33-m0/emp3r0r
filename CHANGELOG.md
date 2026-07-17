@@ -1,5 +1,30 @@
 # Changelog
 
+## [4.5.0](https://github.com/jm33-m0/emp3r0r/compare/v4.4.0...v4.5.0) (2026-07-17)
+
+
+### Features
+
+* add Kerbeus-BOF ([ad44d43](https://github.com/jm33-m0/emp3r0r/commit/ad44d432f26348cce06431cd71b6cc0f3efb5632))
+* add Remote-OPs BOF collection ([391a811](https://github.com/jm33-m0/emp3r0r/commit/391a8110b9758aaf9c68408fd1eeae5d7dbe3032))
+* SA BOFs ([0549e7f](https://github.com/jm33-m0/emp3r0r/commit/0549e7f5a86086ed7311ae47b952ba4b208e27f7))
+
+
+### Bug Fixes
+
+* `--debug` doesn't keep tmux session ([1a9371a](https://github.com/jm33-m0/emp3r0r/commit/1a9371af67206f51e9fd6cfa46bfa2ae5d4c53c3))
+* broken `config.json` in RemoteOPs ([0ee2624](https://github.com/jm33-m0/emp3r0r/commit/0ee26243ce9942d5c6d998e37571abb9df2a2542))
+* check for module name conflicts ([f23ddf7](https://github.com/jm33-m0/emp3r0r/commit/f23ddf7679940f672e3f7bdb778518d76f940811))
+* conflict key ([4daea86](https://github.com/jm33-m0/emp3r0r/commit/4daea86030917300464c3ff106eed0b8371c8f20))
+* ensure consistency in BOF arg packing ([f9f642d](https://github.com/jm33-m0/emp3r0r/commit/f9f642d1b22c79739f145699c07ff4dcd7b81422))
+* module loading panic ([4043bca](https://github.com/jm33-m0/emp3r0r/commit/4043bcac470893dbde186a7c42d6aa4249ea9ef7))
+* module name conflict ([2f71574](https://github.com/jm33-m0/emp3r0r/commit/2f71574f428815c75941ce49959b33f161876f50))
+* optimize building workflow ([db882d2](https://github.com/jm33-m0/emp3r0r/commit/db882d2ac975171383d743144956aa47a55aa351))
+* permission error ([055a6e9](https://github.com/jm33-m0/emp3r0r/commit/055a6e90b0883b320368d5d783b4242219133eb0))
+* simplify module manifest template ([9b595d7](https://github.com/jm33-m0/emp3r0r/commit/9b595d7887361bab40294bd26b9d51c8e24d5f92))
+* switch to a maintained goffloader branch ([d6ffceb](https://github.com/jm33-m0/emp3r0r/commit/d6ffceb84824a98ee34c5c698ed4d7fab957fa04))
+* unify module args format and parsing ([1d4368e](https://github.com/jm33-m0/emp3r0r/commit/1d4368e1b77eac28e462d6dccfeebf9cf75819de))
+
 ## [4.4.0](https://github.com/jm33-m0/emp3r0r/compare/v4.3.0...v4.4.0) (2026-07-14)
 
 
