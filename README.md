@@ -208,7 +208,7 @@ Join our [Discord server](https://discord.gg/vU98aQtk9f) for real-time discussio
 
 - 📝 [Security Policy](./SECURITY.md)
 - 📜 [Changelog](./CHANGELOG.md)
-- 📦 [Module Development (including COFF/BOF)](https://github.com/jm33-m0/emp3r0r/wiki/Modules)
+- 🛠️ [Module Development Guide (COFF/BOF & Starlark)](./core/modules/module_development_guide.md)
 
 ### Troubleshooting
 
