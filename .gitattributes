@@ -1,1 +1,3 @@
-*.ps1 linguist-language=Plaintext
+core/modules/Kerbeus-BOF/** linguist-vendored
+core/modules/Remote-OPs/** linguist-vendored
+core/modules/SA/** linguist-vendored
