@@ -28,10 +28,27 @@ func PackCoffArgs(args []CoffArg) ([]string, error) {
 }
 
 func normalizeCoffValue(arg CoffArg) (string, error) {
-	wireType := strings.ToUpper(arg.WireType)
 	val := arg.Value
+	wireType := arg.WireType
 
-	switch wireType {
+	// Handle the single character prefixed types produced by modcustom first.
+	// These are case sensitive because "z" (narrow) and "Z" (wide) map to different things,
+	// and "s" (short) and "S" (legacy string) mean different things.
+	if wireType == "z" {
+		return "z" + fmt.Sprint(val), nil
+	} else if wireType == "Z" {
+		return "Z" + fmt.Sprint(val), nil
+	} else if wireType == "i" {
+		return formatInt(val, "i")
+	} else if wireType == "s" {
+		return formatInt(val, "s")
+	} else if wireType == "b" {
+		return formatBinary(val)
+	}
+
+	upperWireType := strings.ToUpper(wireType)
+
+	switch upperWireType {
 	case "LPWSTR":
 		return "Z" + fmt.Sprint(val), nil
 	case "LPSTR", "S":
@@ -59,58 +76,53 @@ func normalizeCoffValue(arg CoffArg) (string, error) {
 			return "i0", nil
 		}
 	case "DWORD", "QWORD", "SIZE_T", "HANDLE", "UINT", "INT", "PORT":
-		switch v := val.(type) {
-		case int:
-			return "i" + strconv.FormatInt(int64(v), 10), nil
-		case int32:
-			return "i" + strconv.FormatInt(int64(v), 10), nil
-		case int64:
-			return "i" + strconv.FormatInt(v, 10), nil
-		case float64:
-			return "i" + strconv.FormatFloat(v, 'f', -1, 64), nil
-		case string:
-			num, err := strconv.ParseFloat(v, 64)
-			if err != nil {
-				return "", fmt.Errorf("invalid numeric value %q", v)
-			}
-			return "i" + strconv.FormatFloat(num, 'f', -1, 64), nil
-		}
+		return formatInt(val, "i")
 	case "SHORT", "WORD", "INT16":
-		switch v := val.(type) {
-		case int:
-			return "s" + strconv.FormatInt(int64(v), 10), nil
-		case int32:
-			return "s" + strconv.FormatInt(int64(v), 10), nil
-		case int64:
-			return "s" + strconv.FormatInt(v, 10), nil
-		case float64:
-			return "s" + strconv.FormatFloat(v, 'f', -1, 64), nil
-		case string:
-			num, err := strconv.ParseFloat(v, 64)
-			if err != nil {
-				return "", fmt.Errorf("invalid numeric value %q", v)
-			}
-			return "s" + strconv.FormatFloat(num, 'f', -1, 64), nil
-		}
+		return formatInt(val, "s")
 	case "BINARY":
-		switch v := val.(type) {
-		case string:
-			if decoded, err := base64.StdEncoding.DecodeString(v); err == nil {
-				return "b" + hex.EncodeToString(decoded), nil
-			}
-			return "b" + hex.EncodeToString([]byte(v)), nil
-		case []byte:
-			return "b" + hex.EncodeToString(v), nil
-		case []any:
-			buf := make([]byte, 0, len(v))
-			for _, b := range v {
-				if num, ok := b.(float64); ok {
-					buf = append(buf, byte(num))
-				}
-			}
-			return "b" + hex.EncodeToString(buf), nil
-		}
+		return formatBinary(val)
 	}
 
 	return fmt.Sprint(val), nil
+}
+
+func formatInt(val any, prefix string) (string, error) {
+	switch v := val.(type) {
+	case int:
+		return prefix + strconv.FormatInt(int64(v), 10), nil
+	case int32:
+		return prefix + strconv.FormatInt(int64(v), 10), nil
+	case int64:
+		return prefix + strconv.FormatInt(v, 10), nil
+	case float64:
+		return prefix + strconv.FormatFloat(v, 'f', -1, 64), nil
+	case string:
+		num, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return "", fmt.Errorf("invalid numeric value %q", v)
+		}
+		return prefix + strconv.FormatFloat(num, 'f', -1, 64), nil
+	}
+	return "", fmt.Errorf("invalid int value %v", val)
+}
+
+func formatBinary(val any) (string, error) {
+	switch v := val.(type) {
+	case string:
+		if decoded, err := base64.StdEncoding.DecodeString(v); err == nil {
+			return "b" + hex.EncodeToString(decoded), nil
+		}
+		return "b" + hex.EncodeToString([]byte(v)), nil
+	case []byte:
+		return "b" + hex.EncodeToString(v), nil
+	case []any:
+		buf := make([]byte, 0, len(v))
+		for _, b := range v {
+			if num, ok := b.(float64); ok {
+				buf = append(buf, byte(num))
+			}
+		}
+		return "b" + hex.EncodeToString(buf), nil
+	}
+	return "", fmt.Errorf("invalid binary value %v", val)
 }
