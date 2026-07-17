@@ -1,6 +1,6 @@
 [
   {
-    "name": "remote_ops_remote-sc-description",
+    "name": "remote_ops_sc-description",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Change the description of a service on a local or remote machine",
@@ -11,8 +11,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/sc_description/sc_description.x64.o",
-        "Remote-OPs/sc_description/sc_description.x86.o"
+        "src/Remote/sc_description/sc_description.x64.o",
+        "src/Remote/sc_description/sc_description.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -46,7 +46,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-process-destroy",
+    "name": "remote_ops_process-destroy",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Crash a process by closing its handles via NtDuplicateObject",
@@ -57,8 +57,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/ProcessDestroy/ProcessDestroy.x64.o",
-        "Remote-OPs/ProcessDestroy/ProcessDestroy.x86.o"
+        "src/Remote/ProcessDestroy/ProcessDestroy.x64.o",
+        "src/Remote/ProcessDestroy/ProcessDestroy.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -85,7 +85,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-sc-start",
+    "name": "remote_ops_sc-start",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Start a service on a local or remote machine",
@@ -96,8 +96,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/sc_start/sc_start.x64.o",
-        "Remote-OPs/sc_start/sc_start.x86.o"
+        "src/Remote/sc_start/sc_start.x64.o",
+        "src/Remote/sc_start/sc_start.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -124,7 +124,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-schtasks-delete",
+    "name": "remote_ops_schtasks-delete",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Delete a scheduled task or task folder",
@@ -135,8 +135,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/schtasksdelete/schtasksdelete.x64.o",
-        "Remote-OPs/schtasksdelete/schtasksdelete.x86.o"
+        "src/Remote/schtasksdelete/schtasksdelete.x64.o",
+        "src/Remote/schtasksdelete/schtasksdelete.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -170,7 +170,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-sc-create",
+    "name": "remote_ops_sc-create",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Create a new service on a local or remote machine",
@@ -181,8 +181,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/sc_create/sc_create.x64.o",
-        "Remote-OPs/sc_create/sc_create.x86.o"
+        "src/Remote/sc_create/sc_create.x64.o",
+        "src/Remote/sc_create/sc_create.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -251,7 +251,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-process-list-handles",
+    "name": "remote_ops_process-list-handles",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "List the open handles of a process",
@@ -262,8 +262,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/ProcessListHandles/ProcessListHandles.x64.o",
-        "Remote-OPs/ProcessListHandles/ProcessListHandles.x86.o"
+        "src/Remote/ProcessListHandles/ProcessListHandles.x64.o",
+        "src/Remote/ProcessListHandles/ProcessListHandles.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -283,7 +283,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-sc-stop",
+    "name": "remote_ops_sc-stop",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Stop a service on a local or remote machine",
@@ -294,8 +294,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/sc_stop/sc_stop.x64.o",
-        "Remote-OPs/sc_stop/sc_stop.x86.o"
+        "src/Remote/sc_stop/sc_stop.x64.o",
+        "src/Remote/sc_stop/sc_stop.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -322,7 +322,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-disableuser",
+    "name": "remote_ops_disableuser",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Disable a local or remote user account",
@@ -333,8 +333,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/disableuser/disableuser.x64.o",
-        "Remote-OPs/disableuser/disableuser.x86.o"
+        "src/Remote/disableuser/disableuser.x64.o",
+        "src/Remote/disableuser/disableuser.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -361,7 +361,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-get_priv",
+    "name": "remote_ops_get_priv",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Activate a token privilege on the current process or thread",
@@ -372,8 +372,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/get_priv/get_priv.x64.o",
-        "Remote-OPs/get_priv/get_priv.x86.o"
+        "src/Remote/get_priv/get_priv.x64.o",
+        "src/Remote/get_priv/get_priv.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -393,7 +393,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-adcs_request_on_behalf",
+    "name": "remote_ops_adcs_request_on_behalf",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Request an enrollment certificate on behalf of another user",
@@ -404,8 +404,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/adcs_request_on_behalf/adcs_request_on_behalf.x64.o",
-        "Remote-OPs/adcs_request_on_behalf/adcs_request_on_behalf.x86.o"
+        "src/Remote/adcs_request_on_behalf/adcs_request_on_behalf.x64.o",
+        "src/Remote/adcs_request_on_behalf/adcs_request_on_behalf.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -446,7 +446,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-make_token_cert",
+    "name": "remote_ops_make_token_cert",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Create an impersonation token from a certificate PFX file",
@@ -457,8 +457,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/make_token_cert/make_token_cert.x64.o",
-        "Remote-OPs/make_token_cert/make_token_cert.x86.o"
+        "src/Remote/make_token_cert/make_token_cert.x64.o",
+        "src/Remote/make_token_cert/make_token_cert.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -485,7 +485,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-adduser",
+    "name": "remote_ops_adduser",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Add a new user to a local or remote machine",
@@ -496,8 +496,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/adduser/adduser.x64.o",
-        "Remote-OPs/adduser/adduser.x86.o"
+        "src/Remote/adduser/adduser.x64.o",
+        "src/Remote/adduser/adduser.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -531,7 +531,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-reg-delete",
+    "name": "remote_ops_reg-delete",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Delete a registry key or value",
@@ -542,8 +542,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/reg_delete/reg_delete.x64.o",
-        "Remote-OPs/reg_delete/reg_delete.x86.o"
+        "src/Remote/reg_delete/reg_delete.x64.o",
+        "src/Remote/reg_delete/reg_delete.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -591,7 +591,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-ask-mfa",
+    "name": "remote_ops_ask-mfa",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Display a fake Microsoft Authenticator MFA approval dialog",
@@ -602,8 +602,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/ask_mfa/ask_mfa.x64.o",
-        "Remote-OPs/ask_mfa/ask_mfa.x86.o"
+        "src/Remote/ask_mfa/ask_mfa.x64.o",
+        "src/Remote/ask_mfa/ask_mfa.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -623,7 +623,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-suspendresume",
+    "name": "remote_ops_suspendresume",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Suspend or resume all threads in a process",
@@ -634,8 +634,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/suspendresume/suspendresume.x64.o",
-        "Remote-OPs/suspendresume/suspendresume.x86.o"
+        "src/Remote/suspendresume/suspendresume.x64.o",
+        "src/Remote/suspendresume/suspendresume.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -662,7 +662,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-adcs-request",
+    "name": "remote_ops_adcs-request",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Request an enrollment certificate from an AD certificate authority",
@@ -673,8 +673,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/adcs_request/adcs_request.x64.o",
-        "Remote-OPs/adcs_request/adcs_request.x86.o"
+        "src/Remote/adcs_request/adcs_request.x64.o",
+        "src/Remote/adcs_request/adcs_request.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -750,7 +750,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-sc-delete",
+    "name": "remote_ops_sc-delete",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Delete a service from a local or remote machine",
@@ -761,8 +761,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/sc_delete/sc_delete.x64.o",
-        "Remote-OPs/sc_delete/sc_delete.x86.o"
+        "src/Remote/sc_delete/sc_delete.x64.o",
+        "src/Remote/sc_delete/sc_delete.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -789,7 +789,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-schtasksrun",
+    "name": "remote_ops_schtasksrun",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Run a scheduled task on a local or remote machine",
@@ -800,8 +800,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/schtasksrun/schtasksrun.x64.o",
-        "Remote-OPs/schtasksrun/schtasksrun.x86.o"
+        "src/Remote/schtasksrun/schtasksrun.x64.o",
+        "src/Remote/schtasksrun/schtasksrun.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -828,7 +828,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-office-tokens",
+    "name": "remote_ops_office-tokens",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Search a process's memory for Office JWT access tokens",
@@ -839,8 +839,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/office_tokens/office_tokens.x64.o",
-        "Remote-OPs/office_tokens/office_tokens.x86.o"
+        "src/Remote/office_tokens/office_tokens.x64.o",
+        "src/Remote/office_tokens/office_tokens.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -860,7 +860,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-unexpireuser",
+    "name": "remote_ops_unexpireuser",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Set a user account to never expire",
@@ -871,8 +871,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/unexpireuser/unexpireuser.x64.o",
-        "Remote-OPs/unexpireuser/unexpireuser.x86.o"
+        "src/Remote/unexpireuser/unexpireuser.x64.o",
+        "src/Remote/unexpireuser/unexpireuser.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -899,7 +899,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-schtasks-stop",
+    "name": "remote_ops_schtasks-stop",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Stop a running scheduled task on a local or remote machine",
@@ -910,8 +910,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/schtasksstop/schtasksstop.x64.o",
-        "Remote-OPs/schtasksstop/schtasksstop.x86.o"
+        "src/Remote/schtasksstop/schtasksstop.x64.o",
+        "src/Remote/schtasksstop/schtasksstop.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -938,7 +938,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-reg-set",
+    "name": "remote_ops_reg-set",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Set a registry value on a local or remote machine",
@@ -949,8 +949,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/reg_set/reg_set.x64.o",
-        "Remote-OPs/reg_set/reg_set.x86.o"
+        "src/Remote/reg_set/reg_set.x64.o",
+        "src/Remote/reg_set/reg_set.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -1005,7 +1005,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-sc-config",
+    "name": "remote_ops_sc-config",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Configure an existing service on a local or remote machine",
@@ -1016,8 +1016,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/sc_config/sc_config.x64.o",
-        "Remote-OPs/sc_config/sc_config.x86.o"
+        "src/Remote/sc_config/sc_config.x64.o",
+        "src/Remote/sc_config/sc_config.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -1065,7 +1065,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-shspawnas",
+    "name": "remote_ops_shspawnas",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Spawn a process as another user and inject shellcode into it",
@@ -1076,8 +1076,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/shspawnas/shspawnas.x64.o",
-        "Remote-OPs/shspawnas/shspawnas.x86.o"
+        "src/Remote/shspawnas/shspawnas.x64.o",
+        "src/Remote/shspawnas/shspawnas.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -1118,7 +1118,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-enable-user",
+    "name": "remote_ops_enable-user",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Unlock and enable a local or remote user account",
@@ -1129,8 +1129,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/enableuser/enableuser.x64.o",
-        "Remote-OPs/enableuser/enableuser.x86.o"
+        "src/Remote/enableuser/enableuser.x64.o",
+        "src/Remote/enableuser/enableuser.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -1157,7 +1157,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-shutdown",
+    "name": "remote_ops_shutdown",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Shutdown or reboot a local or remote machine",
@@ -1168,8 +1168,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/shutdown/shutdown.x64.o",
-        "Remote-OPs/shutdown/shutdown.x86.o"
+        "src/Remote/shutdown/shutdown.x64.o",
+        "src/Remote/shutdown/shutdown.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -1217,7 +1217,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-addusertogroup",
+    "name": "remote_ops_addusertogroup",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Add a user to a domain group",
@@ -1228,8 +1228,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/addusertogroup/addusertogroup.x64.o",
-        "Remote-OPs/addusertogroup/addusertogroup.x86.o"
+        "src/Remote/addusertogroup/addusertogroup.x64.o",
+        "src/Remote/addusertogroup/addusertogroup.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -1270,7 +1270,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-get-azure-token",
+    "name": "remote_ops_get-azure-token",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Perform an OAuth code grant against Azure and print the returned tokens",
@@ -1281,8 +1281,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/get_azure_token/get_azure_token.x64.o",
-        "Remote-OPs/get_azure_token/get_azure_token.x86.o"
+        "src/Remote/get_azure_token/get_azure_token.x64.o",
+        "src/Remote/get_azure_token/get_azure_token.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -1330,7 +1330,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-reg-save",
+    "name": "remote_ops_reg-save",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Save a registry hive to a file on disk",
@@ -1341,8 +1341,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/reg_save/reg_save.x64.o",
-        "Remote-OPs/reg_save/reg_save.x86.o"
+        "src/Remote/reg_save/reg_save.x64.o",
+        "src/Remote/reg_save/reg_save.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -1376,7 +1376,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-sc_failure",
+    "name": "remote_ops_sc_failure",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Configure failure recovery actions for a service",
@@ -1387,8 +1387,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/sc_failure/sc_failure.x64.o",
-        "Remote-OPs/sc_failure/sc_failure.x86.o"
+        "src/Remote/sc_failure/sc_failure.x64.o",
+        "src/Remote/sc_failure/sc_failure.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -1450,7 +1450,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-schtaskscreate",
+    "name": "remote_ops_schtaskscreate",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Create a scheduled task from XML on a local or remote machine",
@@ -1461,8 +1461,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/schtaskscreate/schtaskscreate.x64.o",
-        "Remote-OPs/schtaskscreate/schtaskscreate.x86.o"
+        "src/Remote/schtaskscreate/schtaskscreate.x64.o",
+        "src/Remote/schtaskscreate/schtaskscreate.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -1524,7 +1524,7 @@
     }
   },
   {
-    "name": "remote_ops_remote-procdump",
+    "name": "remote_ops_procdump",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Dump a process to a file on disk",
@@ -1535,8 +1535,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/procdump/procdump.x64.o",
-        "Remote-OPs/procdump/procdump.x86.o"
+        "src/Remote/procdump/procdump.x64.o",
+        "src/Remote/procdump/procdump.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -1563,7 +1563,7 @@
     }
   },
   {
-    "name": "remote_ops_inject-setthreadcontext",
+    "name": "remote_ops_setthreadcontext",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode into a process via thread context hijack",
@@ -1574,8 +1574,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/setthreadcontext/setthreadcontext.x64.o",
-        "Remote-OPs/setthreadcontext/setthreadcontext.x86.o"
+        "src/Injection/setthreadcontext/setthreadcontext.x64.o",
+        "src/Injection/setthreadcontext/setthreadcontext.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -1602,7 +1602,7 @@
     }
   },
   {
-    "name": "remote_ops_inject-conhost",
+    "name": "remote_ops_conhost",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode via conhost.exe ConsoleWindowClass vftable hijack",
@@ -1613,8 +1613,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/conhost/conhost.x64.o",
-        "Remote-OPs/conhost/conhost.x86.o"
+        "src/Injection/conhost/conhost.x64.o",
+        "src/Injection/conhost/conhost.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -1641,7 +1641,7 @@
     }
   },
   {
-    "name": "remote_ops_inject-ntcreatethread",
+    "name": "remote_ops_ntcreatethread",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode into a process via NtCreateThreadEx syscall",
@@ -1652,8 +1652,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/ntcreatethread/ntcreatethread.x64.o",
-        "Remote-OPs/ntcreatethread/ntcreatethread.x86.o"
+        "src/Injection/ntcreatethread/ntcreatethread.x64.o",
+        "src/Injection/ntcreatethread/ntcreatethread.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -1680,7 +1680,7 @@
     }
   },
   {
-    "name": "remote_ops_inject-ctray",
+    "name": "remote_ops_ctray",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode into explorer.exe via CTray window class",
@@ -1690,7 +1690,10 @@
     "fileless": true,
     "agent_config": {
       "exec": "",
-      "files": ["Remote-OPs/ctray/ctray.x64.o", "Remote-OPs/ctray/ctray.x86.o"],
+      "files": [
+        "src/Injection/ctray/ctray.x64.o",
+        "src/Injection/ctray/ctray.x86.o"
+      ],
       "in_memory": true,
       "type": "coff",
       "interactive": false
@@ -1709,7 +1712,7 @@
     }
   },
   {
-    "name": "remote_ops_inject-createremotethread",
+    "name": "remote_ops_createremotethread",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode into a process via CreateRemoteThread",
@@ -1720,8 +1723,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/createremotethread/createremotethread.x64.o",
-        "Remote-OPs/createremotethread/createremotethread.x86.o"
+        "src/Injection/createremotethread/createremotethread.x64.o",
+        "src/Injection/createremotethread/createremotethread.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -1748,7 +1751,7 @@
     }
   },
   {
-    "name": "remote_ops_inject-clipboard",
+    "name": "remote_ops_clipboard",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode via clipboard window class (CLIPBRDWNDCLASS)",
@@ -1759,8 +1762,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/clipboard/clipboard.x64.o",
-        "Remote-OPs/clipboard/clipboard.x86.o"
+        "src/Injection/clipboard/clipboard.x64.o",
+        "src/Injection/clipboard/clipboard.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -1787,7 +1790,7 @@
     }
   },
   {
-    "name": "remote_ops_inject-tooltip",
+    "name": "remote_ops_tooltip",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode via tooltips_class32 window vftable hijack",
@@ -1798,8 +1801,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/tooltip/tooltip.x64.o",
-        "Remote-OPs/tooltip/tooltip.x86.o"
+        "src/Injection/tooltip/tooltip.x64.o",
+        "src/Injection/tooltip/tooltip.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -1826,7 +1829,7 @@
     }
   },
   {
-    "name": "remote_ops_inject-kernelcallbacktable",
+    "name": "remote_ops_kernelcallbacktable",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode via PEB KernelCallbackTable hijack",
@@ -1837,8 +1840,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/kernelcallbacktable/kernelcallbacktable.x64.o",
-        "Remote-OPs/kernelcallbacktable/kernelcallbacktable.x86.o"
+        "src/Injection/kernelcallbacktable/kernelcallbacktable.x64.o",
+        "src/Injection/kernelcallbacktable/kernelcallbacktable.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -1865,7 +1868,7 @@
     }
   },
   {
-    "name": "remote_ops_inject-ntqueueapcthread",
+    "name": "remote_ops_ntqueueapcthread",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode into a process via NtQueueApcThread syscall",
@@ -1876,8 +1879,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/ntqueueapcthread/ntqueueapcthread.x64.o",
-        "Remote-OPs/ntqueueapcthread/ntqueueapcthread.x86.o"
+        "src/Injection/ntqueueapcthread/ntqueueapcthread.x64.o",
+        "src/Injection/ntqueueapcthread/ntqueueapcthread.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -1904,7 +1907,7 @@
     }
   },
   {
-    "name": "remote_ops_inject-uxsubclassinfo",
+    "name": "remote_ops_uxsubclassinfo",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode into explorer.exe via UxSubclassInfo property",
@@ -1915,8 +1918,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/uxsubclassinfo/uxsubclassinfo.x64.o",
-        "Remote-OPs/uxsubclassinfo/uxsubclassinfo.x86.o"
+        "src/Injection/uxsubclassinfo/uxsubclassinfo.x64.o",
+        "src/Injection/uxsubclassinfo/uxsubclassinfo.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
@@ -1936,7 +1939,7 @@
     }
   },
   {
-    "name": "remote_ops_inject-dde",
+    "name": "remote_ops_dde",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode into explorer.exe via DDE window class",
@@ -1946,7 +1949,7 @@
     "fileless": true,
     "agent_config": {
       "exec": "",
-      "files": ["Remote-OPs/dde/dde.x64.o", "Remote-OPs/dde/dde.x86.o"],
+      "files": ["src/Injection/dde/dde.x64.o", "src/Injection/dde/dde.x86.o"],
       "in_memory": true,
       "type": "coff",
       "interactive": false
@@ -1965,7 +1968,7 @@
     }
   },
   {
-    "name": "remote_ops_inject-svcctrl",
+    "name": "remote_ops_svcctrl",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode via service dispatch table overwrite",
@@ -1976,8 +1979,8 @@
     "agent_config": {
       "exec": "",
       "files": [
-        "Remote-OPs/svcctrl/svcctrl.x64.o",
-        "Remote-OPs/svcctrl/svcctrl.x86.o"
+        "src/Injection/svcctrl/svcctrl.x64.o",
+        "src/Injection/svcctrl/svcctrl.x86.o"
       ],
       "in_memory": true,
       "type": "coff",
