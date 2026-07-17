@@ -1,0 +1,467 @@
+[
+  {
+    "name": "kerbeus_asreproasting",
+    "author": "kerbeus",
+    "date": "2026-07-17",
+    "comment": "Perform AS-REP roasting",
+    "is_local": false,
+    "platform": "Windows",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["_bin/asreproasting.x64.o", "_bin/asreproasting.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "params",
+        "description": "kerbeus asreproasting /user:pre_user",
+        "default": "",
+        "type": "cstr",
+        "required": false,
+        "argv_flag": ""
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "kerbeus_asktgt",
+    "author": "kerbeus",
+    "date": "2026-07-17",
+    "comment": "Retrieve a TGT",
+    "is_local": false,
+    "platform": "Windows",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["_bin/asktgt.x64.o", "_bin/asktgt.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "params",
+        "description": "kerbeus asktgt /user:Admin /password:QWErty /enctype:aes256 /opsec /ptt",
+        "default": "",
+        "type": "cstr",
+        "required": false,
+        "argv_flag": ""
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "kerbeus_asktgs",
+    "author": "kerbeus",
+    "date": "2026-07-17",
+    "comment": "Retrieve a TGS",
+    "is_local": false,
+    "platform": "Windows",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["_bin/asktgs.x64.o", "_bin/asktgs.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "params",
+        "description": "kerbeus asktgs /service:CIFS/dc.domain.local /ticket:doIF8DCCBey... /opsec",
+        "default": "",
+        "type": "cstr",
+        "required": false,
+        "argv_flag": ""
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "kerbeus_changepw",
+    "author": "kerbeus",
+    "date": "2026-07-17",
+    "comment": "Reset a user's password from a supplied TGT",
+    "is_local": false,
+    "platform": "Windows",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["_bin/changepw.x64.o", "_bin/changepw.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "params",
+        "description": "kerbeus changepw /new:New_P4ss /ticket:doIF8DCCBey...",
+        "default": "",
+        "type": "cstr",
+        "required": false,
+        "argv_flag": ""
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "kerbeus_describe",
+    "author": "kerbeus",
+    "date": "2026-07-17",
+    "comment": "Parse and describe a ticket",
+    "is_local": false,
+    "platform": "Windows",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["_bin/describe.x64.o", "_bin/describe.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "params",
+        "description": "kerbeus describe /ticket:doIF8DCCBey...",
+        "default": "",
+        "type": "cstr",
+        "required": false,
+        "argv_flag": ""
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "kerbeus_dump",
+    "author": "kerbeus",
+    "date": "2026-07-17",
+    "comment": "Dump tickets",
+    "is_local": false,
+    "platform": "Windows",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["_bin/dump.x64.o", "_bin/dump.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "params",
+        "description": "kerbeus dump",
+        "default": "",
+        "type": "cstr",
+        "required": false,
+        "argv_flag": ""
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "kerbeus_hash",
+    "author": "kerbeus",
+    "date": "2026-07-17",
+    "comment": "Calculate rc4_hmac, aes128_cts_hmac_sha1, aes256_cts_hmac_sha1 hashes",
+    "is_local": false,
+    "platform": "Windows",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["_bin/hash.x64.o", "_bin/hash.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "params",
+        "description": "kerbeus hash /password:!Q@W3e4r",
+        "default": "",
+        "type": "cstr",
+        "required": false,
+        "argv_flag": ""
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "kerbeus_kerberoasting",
+    "author": "kerbeus",
+    "date": "2026-07-17",
+    "comment": "Perform Kerberoasting",
+    "is_local": false,
+    "platform": "Windows",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["_bin/kerberoasting.x64.o", "_bin/kerberoasting.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "params",
+        "description": "kerbeus kerberoasting /spn:CIFS/COMP.domain.local /ticket:doIF8DCCBey...",
+        "default": "",
+        "type": "cstr",
+        "required": false,
+        "argv_flag": ""
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "kerbeus_klist",
+    "author": "kerbeus",
+    "date": "2026-07-17",
+    "comment": "List tickets",
+    "is_local": false,
+    "platform": "Windows",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["_bin/klist.x64.o", "_bin/klist.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "params",
+        "description": "kerbeus klist /luid:3ea8",
+        "default": "",
+        "type": "cstr",
+        "required": false,
+        "argv_flag": ""
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "kerbeus_ptt",
+    "author": "kerbeus",
+    "date": "2026-07-17",
+    "comment": "Submit a TGT",
+    "is_local": false,
+    "platform": "Windows",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["_bin/ptt.x64.o", "_bin/ptt.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "params",
+        "description": "kerbeus ptt /ticket:doIF8DCCBey...",
+        "default": "",
+        "type": "cstr",
+        "required": false,
+        "argv_flag": ""
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "kerbeus_purge",
+    "author": "kerbeus",
+    "date": "2026-07-17",
+    "comment": "Purge tickets",
+    "is_local": false,
+    "platform": "Windows",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["_bin/purge.x64.o", "_bin/purge.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "params",
+        "description": "kerbeus purge /luid:3ea8",
+        "default": "",
+        "type": "cstr",
+        "required": false,
+        "argv_flag": ""
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "kerbeus_renew",
+    "author": "kerbeus",
+    "date": "2026-07-17",
+    "comment": "Renew a TGT",
+    "is_local": false,
+    "platform": "Windows",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["_bin/renew.x64.o", "_bin/renew.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "params",
+        "description": "kerbeus renew /ticket:doIF8DCCBey...",
+        "default": "",
+        "type": "cstr",
+        "required": false,
+        "argv_flag": ""
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "kerbeus_s4u",
+    "author": "kerbeus",
+    "date": "2026-07-17",
+    "comment": "Perform S4U constrained delegation abuse",
+    "is_local": false,
+    "platform": "Windows",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["_bin/s4u.x64.o", "_bin/s4u.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "params",
+        "description": "kerbeus s4u /ticket:doIF8DCCBey... /impersonateuser:Administrator /service:host/comp.domain.local /altservice:http,cifs",
+        "default": "",
+        "type": "cstr",
+        "required": false,
+        "argv_flag": ""
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "kerbeus_cross_s4u",
+    "author": "kerbeus",
+    "date": "2026-07-17",
+    "comment": "Perform S4U constrained delegation abuse across domains",
+    "is_local": false,
+    "platform": "Windows",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["_bin/cross_s4u.x64.o", "_bin/cross_s4u.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "params",
+        "description": "kerbeus cross_s4u /ticket:doIF8DCCBey... /impersonateuser:Administrator /targetdomain:sdomain.local /targetdc:dc.sdomain.local /service:host/comp.sdomain.local /altservice:http,cifs",
+        "default": "",
+        "type": "cstr",
+        "required": false,
+        "argv_flag": ""
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "kerbeus_tgtdeleg",
+    "author": "kerbeus",
+    "date": "2026-07-17",
+    "comment": "Retrieve a usable TGT for the current user without elevation by abusing the Kerberos GSS-API",
+    "is_local": false,
+    "platform": "Windows",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["_bin/tgtdeleg.x64.o", "_bin/tgtdeleg.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "params",
+        "description": "kerbeus tgtdeleg",
+        "default": "",
+        "type": "cstr",
+        "required": false,
+        "argv_flag": ""
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "kerbeus_triage",
+    "author": "kerbeus",
+    "date": "2026-07-17",
+    "comment": "List tickets in table format",
+    "is_local": false,
+    "platform": "Windows",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["_bin/triage.x64.o", "_bin/triage.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "params",
+        "description": "kerbeus triage /luid:3ea8",
+        "default": "",
+        "type": "cstr",
+        "required": false,
+        "argv_flag": ""
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  }
+]
+
