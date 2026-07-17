@@ -7,6 +7,7 @@ require (
 	github.com/alecthomas/chroma v0.10.0
 	github.com/carapace-sh/carapace v1.13.2
 	github.com/cavaliergopher/grab/v3 v3.0.1
+	github.com/chvancooten/goffloader v0.1.0
 	github.com/coder/websocket v1.8.15
 	github.com/fatih/color v1.19.0
 	github.com/fxamacker/cbor/v2 v2.9.2
@@ -19,7 +20,6 @@ require (
 	github.com/ncruces/go-dns v1.3.3
 	github.com/pkg/errors v0.9.1
 	github.com/posener/h2conn v0.0.0-20231204025407-3997deeca0f0
-	github.com/praetorian-inc/goffloader v0.0.0-20250222211414-7a1519bb384d
 	github.com/reeflective/console v0.4.0
 	github.com/refraction-networking/utls v1.8.2
 	github.com/schollz/progressbar/v3 v3.19.1

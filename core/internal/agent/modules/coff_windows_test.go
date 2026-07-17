@@ -33,7 +33,7 @@ func TestRunCOFFModuleWithRealBOF(t *testing.T) {
 	}
 
 	// Non-privileged BOF to avoid admin requirement
-	const url = "https://github.com/praetorian-inc/goffloader/raw/refs/heads/main/cmd/bof_example/whoami.x64.o"
+	const url = "https://github.com/chvancooten/goffloader/raw/refs/heads/main/cmd/bof_example/whoami.x64.o"
 	resp, err := http.Get(url)
 	if err != nil {
 		t.Fatalf("download BOF: %v", err)

@@ -6,8 +6,8 @@ package coffloader
 import (
 	"fmt"
 
-	"github.com/praetorian-inc/goffloader/src/coff"
-	"github.com/praetorian-inc/goffloader/src/lighthouse"
+	"github.com/chvancooten/goffloader/src/coff"
+	"github.com/chvancooten/goffloader/src/lighthouse"
 )
 
 // RunWindowsCOFF executes a COFF/BOF payload using goffloader on Windows.
