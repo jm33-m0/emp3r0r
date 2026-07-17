@@ -2,7 +2,7 @@
 
 ### emp3r0r
 
-**Self‑healing Gossip Mesh C2 with Assisted Peer Discovery, Modular Post‑Exploitation, and OPSEC‑Focused Transport**
+**Self‑healing Gossip Mesh C2 with Assisted Peer Discovery, Modular Post‑Exploitation, and Scriptable Agents.**
 
 <br clear="all" />
 
