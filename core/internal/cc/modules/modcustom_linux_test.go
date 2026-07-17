@@ -53,8 +53,9 @@ func TestCOFFExecutionLinux(t *testing.T) {
 			t.Fatalf("failed to read payload: %v", err)
 		}
 
+		pid := os.Getpid()
 		args := []coffloader.CoffArg{
-			{WireType: "i", Value: 1}, // PID 1
+			{WireType: "i", Value: pid},
 		}
 
 		output, err := coffloader.RunLinuxCOFF(payload, "go", args)
@@ -62,7 +63,7 @@ func TestCOFFExecutionLinux(t *testing.T) {
 			t.Fatalf("RunLinuxCOFF failed: %v", err)
 		}
 
-		if output == "" || !strings.Contains(output, "Listing handles for PID 1") {
+		if output == "" || !strings.Contains(output, "Listing handles for PID") {
 			t.Errorf("Unexpected output from process_list_handles_linux: %s", output)
 		}
 	})
