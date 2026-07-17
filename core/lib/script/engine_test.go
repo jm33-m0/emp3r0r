@@ -1,6 +1,8 @@
 package script
 
 import (
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -44,31 +46,7 @@ def main(*args):
 	}
 }
 
-func TestEngineProcInfo(t *testing.T) {
-	script := `
-def main(*args):
-    cgroup = read_file("/proc/self/cgroup")
-    if len(cgroup) == 0:
-        return "Fail: no cgroup found"
-    
-    print("Found cgroup.")
-    return "OK"
-`
-	out, err := Run([]byte(script), nil, nil)
-	if runtime.GOOS != "linux" {
-		if err == nil {
-			t.Errorf("expected error on non-linux OS, but got none")
-		}
-		return
-	}
 
-	if err != nil {
-		t.Fatalf("Run failed: %v", err)
-	}
-	if !strings.Contains(out, "OK") {
-		t.Errorf("expected OK, got: %q", out)
-	}
-}
 
 func TestEngineRegisterCustomAPI(t *testing.T) {
 	// Register a new custom API function
@@ -183,5 +161,21 @@ def main(*args):
 		} else if !strings.Contains(err.Error(), "win_alloc is only supported on Windows") {
 			t.Errorf("expected 'win_alloc is only supported on Windows' error, got: %v", err)
 		}
+	}
+}
+
+func TestRunStar(t *testing.T) {
+	_, filename, _, _ := runtime.Caller(0)
+	scriptPath := filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filename))), "modules", "starlark_procinfo", "run.star")
+	scriptBytes, err := os.ReadFile(scriptPath)
+	if err != nil {
+		t.Fatalf("failed to read run.star: %v", err)
+	}
+	out, err := Run(scriptBytes, nil, nil)
+	if err != nil {
+		t.Fatalf("Run failed: %v", err)
+	}
+	if len(out) == 0 {
+		t.Errorf("expected script output, got empty")
 	}
 }

@@ -25,20 +25,20 @@ func getAPIs() starlark.StringDict {
 }
 
 var builtInAPIs = map[string]StarlarkAPI{
-	"read_file":      starlarkReadFile,
-	"write_file":     starlarkWriteFile,
-	"list_dir":       starlarkListDir,
-	"exists":         starlarkExists,
-	"mkdir":          starlarkMkdir,
-	"remove":         starlarkRemove,
-	"http_get":       starlarkHTTPGet,
-	"http_post":      starlarkHTTPPost,
-	"exec_cmd":       starlarkExecCmd,
-	"crypto_hash":    starlarkCryptoHash,
-	"win_call":       starlarkWinCall,
-	"win_alloc":      starlarkWinAlloc,
-	"win_free":       starlarkWinFree,
-	"win_read_mem":   starlarkWinReadMem,
+	"read_file":    starlarkReadFile,
+	"write_file":   starlarkWriteFile,
+	"list_dir":     starlarkListDir,
+	"exists":       starlarkExists,
+	"mkdir":        starlarkMkdir,
+	"remove":       starlarkRemove,
+	"http_get":     starlarkHTTPGet,
+	"http_post":    starlarkHTTPPost,
+	"exec_cmd":     starlarkExecCmd,
+	"crypto_hash":  starlarkCryptoHash,
+	"win_call":     starlarkWinCall,
+	"win_alloc":    starlarkWinAlloc,
+	"win_free":     starlarkWinFree,
+	"win_read_mem": starlarkWinReadMem,
 }
 
 func init() {

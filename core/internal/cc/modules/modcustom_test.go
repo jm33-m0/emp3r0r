@@ -656,7 +656,6 @@ func TestLoadAllModulesConfigs(t *testing.T) {
 		}
 		return nil
 	})
-
 	if err != nil {
 		t.Fatalf("Failed to walk modules directory: %v", err)
 	}
@@ -953,26 +952,26 @@ func TestCOFFArgParsingAllModules(t *testing.T) {
 			if len(configs) == 0 {
 				t.Fatalf("no module configurations loaded from %s", configPath)
 			}
-			
+
 			for _, config := range configs {
 				if config.Name == "" {
 					t.Errorf("module config has empty name in %s", configPath)
 				}
-				
+
 				isCOFF := strings.EqualFold(config.AgentConfig.Type, "coff")
 				var coffArgs []coffloader.CoffArg
-				
+
 				for name, opt := range config.Options {
 					// Dummy value based on type
 					dummyVal := generateDummyArg(opt.Type)
-					
+
 					if isCOFF {
 						wireToken := typeToWireToken(opt.Type)
 						if wireToken == "" {
 							t.Errorf("module %s (COFF) has parameter '%s' with unsupported type '%s'", config.Name, name, opt.Type)
 							continue
 						}
-						
+
 						// Verify wire token logic
 						switch strings.ToLower(opt.Type) {
 						case "cstr", "s", "lpstr", "string":
@@ -996,21 +995,21 @@ func TestCOFFArgParsingAllModules(t *testing.T) {
 								t.Errorf("expected wire token 'b', got '%s'", wireToken)
 							}
 						}
-						
+
 						// Type casting via modcustom's internal option renderer to handle bools correctly
 						_, typedVal, err := renderOptionValue(opt, dummyVal)
 						if err != nil {
 							t.Errorf("renderOptionValue failed for %s (%s): %v", name, opt.Type, err)
 							continue
 						}
-						
+
 						coffArgs = append(coffArgs, coffloader.CoffArg{
 							WireType: wireToken,
 							Value:    typedVal,
 						})
 					}
 				}
-				
+
 				if isCOFF && len(coffArgs) > 0 {
 					packed, err := coffloader.PackCoffArgs(coffArgs)
 					if err != nil {
@@ -1053,12 +1052,12 @@ func TestStarlarkArgParsing(t *testing.T) {
 			if !strings.EqualFold(config.AgentConfig.Type, "starlark") {
 				t.Fatalf("Expected type starlark, got %s", config.AgentConfig.Type)
 			}
-			
+
 			// Verify it correctly populated Argv instead of Coff
 			if config.Invocation.Coff != nil {
 				t.Errorf("Starlark module %s should not have COFF invocation set", config.Name)
 			}
-			
+
 			// Just verify that the Argv array was populated correctly based on parameters
 			if len(config.Invocation.Argv) == 0 && len(config.Options) > 0 {
 				t.Errorf("Starlark module %s has options but empty Argv", config.Name)

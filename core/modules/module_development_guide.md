@@ -77,7 +77,7 @@ See `core/modules/starlark_procinfo/config.json` for a real-world example:
   {
     "name": "starlark_procinfo",
     "build": "",
-    "author": "antigravity",
+    "author": "you",
     "date": "2026-06-22",
     "comment": "List running process info on Linux using Starlark script engine",
     "is_local": false,
@@ -132,8 +132,33 @@ void go(char *args, int len) {
 #### Starlark Source (`core/modules/starlark_procinfo/run.star`)
 
 ```python
-# Starlark scripts receive arguments injected by the agent as global variables
-# based on the parameter names defined in config.json.
+CAPABILITIES = [
+    "CAP_CHOWN", "CAP_DAC_OVERRIDE", "CAP_DAC_READ_SEARCH", "CAP_FOWNER",
+    "CAP_FSETID", "CAP_KILL", "CAP_SETGID", "CAP_SETUID", "CAP_SETPCAP",
+    "CAP_LINUX_IMMUTABLE", "CAP_NET_BIND_SERVICE", "CAP_NET_BROADCAST",
+    "CAP_NET_ADMIN", "CAP_NET_RAW", "CAP_IPC_LOCK", "CAP_IPC_OWNER",
+    "CAP_SYS_MODULE", "CAP_SYS_RAWIO", "CAP_SYS_CHROOT", "CAP_SYS_PTRACE",
+    "CAP_SYS_PACCT", "CAP_SYS_ADMIN", "CAP_SYS_BOOT", "CAP_SYS_NICE",
+    "CAP_SYS_RESOURCE", "CAP_SYS_TIME", "CAP_SYS_TTY_CONFIG", "CAP_MKNOD",
+    "CAP_LEASE", "CAP_AUDIT_WRITE", "CAP_AUDIT_CONTROL", "CAP_SETFCAP",
+    "CAP_MAC_OVERRIDE", "CAP_MAC_ADMIN", "CAP_SYSLOG", "CAP_WAKE_ALARM",
+    "CAP_BLOCK_SUSPEND", "CAP_AUDIT_READ", "CAP_PERFMON", "CAP_BPF",
+    "CAP_CHECKPOINT_RESTORE"
+]
+
+def decode_caps(hex_str):
+    if not hex_str or hex_str == "N/A":
+        return "N/A"
+    val = int(hex_str, 16)
+    if val == 0:
+        return "None"
+    caps = []
+    for i in range(len(CAPABILITIES)):
+        if (val & (1 << i)) != 0:
+            caps.append(CAPABILITIES[i])
+    if not caps:
+        return hex_str
+    return ", ".join(caps)
 
 def parse_status(status_text):
     info = {}
@@ -163,6 +188,9 @@ def main(*args):
     print(" Current Process Info ")
     print("==================================================")
 
+    cmdline = read_file("/proc/self/cmdline").strip("\x00").replace("\x00", " ")
+    print("Cmdline:    %s" % (cmdline or "N/A"))
+
     status_text = read_file("/proc/self/status")
     status = parse_status(status_text)
 
@@ -176,11 +204,11 @@ def main(*args):
     print("Groups:     %s" % status.get("Groups", "N/A"))
 
     print("\n--- Capabilities ---")
-    print("Inheritable:%s" % status.get("CapInh", "N/A"))
-    print("Permitted:  %s" % status.get("CapPrm", "N/A"))
-    print("Effective:  %s" % status.get("CapEff", "N/A"))
-    print("Bounding:   %s" % status.get("CapBnd", "N/A"))
-    print("Ambient:    %s" % status.get("CapAmb", "N/A"))
+    print("Inheritable:\n  %s" % decode_caps(status.get("CapInh", "N/A")))
+    print("Permitted:\n  %s" % decode_caps(status.get("CapPrm", "N/A")))
+    print("Effective:\n  %s" % decode_caps(status.get("CapEff", "N/A")))
+    print("Bounding:\n  %s" % decode_caps(status.get("CapBnd", "N/A")))
+    print("Ambient:\n  %s" % decode_caps(status.get("CapAmb", "N/A")))
     print("NoNewPrivs: %s" % status.get("NoNewPrivs", "N/A"))
 
     print("\n--- Cgroups ---")
@@ -195,7 +223,15 @@ def main(*args):
     ns_info = exec_cmd("ls", ["-l", "/proc/self/ns"])
     namespaces = format_ns(ns_info)
     for k in sorted(namespaces.keys()):
-        print("%-12s %s" % (k + ":", namespaces[k]))
+        k_padded = k + ":"
+        if len(k_padded) < 12:
+            k_padded = k_padded + " " * (12 - len(k_padded))
+        print("%s %s" % (k_padded, namespaces[k]))
+
+    print("\n--- Environment ---")
+    environ = read_file("/proc/self/environ")
+    env_vars = [e for e in environ.split("\x00") if e]
+    print("%d environment variables loaded." % len(env_vars))
 
     print("==================================================")
     return "OK"
