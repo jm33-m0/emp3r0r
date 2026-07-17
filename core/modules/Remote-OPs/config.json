@@ -69,14 +69,14 @@
         "name": "pid",
         "description": "Process ID to target",
         "default": "",
-        "type": "integer",
+        "type": "int",
         "required": true
       },
       {
         "name": "handle-id",
         "description": "Specific handle ID to close. Omit or 0 to close all handles",
         "default": "0",
-        "type": "integer",
+        "type": "int",
         "required": false
       }
     ],
@@ -161,7 +161,7 @@
         "name": "is-folder",
         "description": "Delete a folder instead of a task: 0=task, 1=folder",
         "default": "0",
-        "type": "integer",
+        "type": "int",
         "required": false
       }
     ],
@@ -274,7 +274,7 @@
         "name": "pid",
         "description": "Process ID to list handles for",
         "default": "",
-        "type": "integer",
+        "type": "int",
         "required": true
       }
     ],
@@ -437,7 +437,7 @@
         "name": "enrollment-cert",
         "description": "Path to enrollment agent PFX file with OID_ENROLLMENT_AGENT extension",
         "default": "",
-        "type": "file",
+        "type": "binary",
         "required": true
       }
     ],
@@ -469,7 +469,7 @@
         "name": "pfx",
         "description": "Path to PFX certificate file",
         "default": "",
-        "type": "file",
+        "type": "binary",
         "required": true
       },
       {
@@ -561,7 +561,7 @@
         "name": "hive",
         "description": "Registry hive: 0=HKCR, 1=HKCU, 2=HKLM, 3=HKU",
         "default": "",
-        "type": "integer",
+        "type": "int",
         "required": true
       },
       {
@@ -582,7 +582,7 @@
         "name": "delete-key",
         "description": "Set to 1 to delete the entire key instead of a value: 0=no, 1=yes",
         "default": "0",
-        "type": "integer",
+        "type": "int",
         "required": false
       }
     ],
@@ -614,7 +614,7 @@
         "name": "number",
         "description": "MFA number to display (0-99)",
         "default": "",
-        "type": "integer",
+        "type": "int",
         "required": true
       }
     ],
@@ -653,7 +653,7 @@
         "name": "pid",
         "description": "Process ID to suspend or resume",
         "default": "",
-        "type": "integer",
+        "type": "int",
         "required": true
       }
     ],
@@ -851,7 +851,7 @@
         "name": "pid",
         "description": "Process ID to search for Office tokens",
         "default": "",
-        "type": "integer",
+        "type": "int",
         "required": true
       }
     ],
@@ -968,7 +968,7 @@
         "name": "hive",
         "description": "Registry hive: 0=HKCR, 1=HKCU, 2=HKLM, 3=HKU",
         "default": "",
-        "type": "integer",
+        "type": "int",
         "required": true
       },
       {
@@ -989,14 +989,14 @@
         "name": "type",
         "description": "Registry value type: 1=REG_SZ, 2=REG_EXPAND_SZ, 3=REG_BINARY, 4=REG_DWORD, 7=REG_MULTI_SZ, 11=REG_QWORD",
         "default": "",
-        "type": "integer",
+        "type": "int",
         "required": true
       },
       {
         "name": "data",
         "description": "Data to store in the registry value",
         "default": "",
-        "type": "file",
+        "type": "binary",
         "required": true
       }
     ],
@@ -1109,7 +1109,7 @@
         "name": "shellcode",
         "description": "Path to shellcode file to inject",
         "default": "",
-        "type": "file",
+        "type": "binary",
         "required": true
       }
     ],
@@ -1194,7 +1194,7 @@
         "name": "timeout",
         "description": "Seconds to wait before shutdown",
         "default": "0",
-        "type": "integer",
+        "type": "int",
         "required": false
       },
       {
@@ -1307,7 +1307,7 @@
         "name": "browser",
         "description": "Browser to use: 0=Edge, 1=Chrome, 2=Default, 3=Other",
         "default": "",
-        "type": "integer",
+        "type": "int",
         "required": true
       },
       {
@@ -1367,7 +1367,7 @@
         "name": "hive",
         "description": "Registry hive: 0=HKCR, 1=HKCU, 2=HKLM, 3=HKU",
         "default": "",
-        "type": "integer",
+        "type": "int",
         "required": true
       }
     ],
@@ -1413,7 +1413,7 @@
         "name": "reset-period",
         "description": "Length of period with no failures before resetting the failure count (in seconds)",
         "default": "",
-        "type": "integer",
+        "type": "int",
         "required": true
       },
       {
@@ -1508,14 +1508,14 @@
         "name": "usermode",
         "description": "Run mode: 0=USER, 1=SYSTEM, 2=PRINCIPAL (from XML)",
         "default": "",
-        "type": "integer",
+        "type": "int",
         "required": true
       },
       {
         "name": "force-overwrite",
         "description": "Overwrite existing task: 0=no, 1=yes",
         "default": "0",
-        "type": "integer",
+        "type": "int",
         "required": false
       }
     ],
@@ -1547,7 +1547,7 @@
         "name": "pid",
         "description": "Process ID to dump",
         "default": "",
-        "type": "integer",
+        "type": "int",
         "required": true
       },
       {
@@ -1586,14 +1586,14 @@
         "name": "pid",
         "description": "Target process ID",
         "default": "",
-        "type": "integer",
+        "type": "int",
         "required": true
       },
       {
         "name": "bin",
         "description": "Path to shellcode file",
         "default": "",
-        "type": "file",
+        "type": "binary",
         "required": true
       }
     ],
@@ -1625,14 +1625,14 @@
         "name": "pid",
         "description": "Target console process ID (must have a conhost.exe child process)",
         "default": "",
-        "type": "integer",
+        "type": "int",
         "required": true
       },
       {
         "name": "bin",
         "description": "Path to shellcode file",
         "default": "",
-        "type": "file",
+        "type": "binary",
         "required": true
       }
     ],
@@ -1664,14 +1664,14 @@
         "name": "pid",
         "description": "Target process ID",
         "default": "",
-        "type": "integer",
+        "type": "int",
         "required": true
       },
       {
         "name": "bin",
         "description": "Path to shellcode file",
         "default": "",
-        "type": "file",
+        "type": "binary",
         "required": true
       }
     ],
@@ -1703,7 +1703,7 @@
         "name": "bin",
         "description": "Path to shellcode file",
         "default": "",
-        "type": "file",
+        "type": "binary",
         "required": true
       }
     ],
@@ -1735,14 +1735,14 @@
         "name": "pid",
         "description": "Target process ID",
         "default": "",
-        "type": "integer",
+        "type": "int",
         "required": true
       },
       {
         "name": "bin",
         "description": "Path to shellcode file",
         "default": "",
-        "type": "file",
+        "type": "binary",
         "required": true
       }
     ],
@@ -1774,14 +1774,14 @@
         "name": "pid",
         "description": "Target process ID (must have a CLIPBRDWNDCLASS window, e.g., explorer.exe, vmtoolsd.exe)",
         "default": "",
-        "type": "integer",
+        "type": "int",
         "required": true
       },
       {
         "name": "bin",
         "description": "Path to shellcode file",
         "default": "",
-        "type": "file",
+        "type": "binary",
         "required": true
       }
     ],
@@ -1813,14 +1813,14 @@
         "name": "pid",
         "description": "Target process ID (must have tooltip windows, e.g., explorer.exe)",
         "default": "",
-        "type": "integer",
+        "type": "int",
         "required": true
       },
       {
         "name": "bin",
         "description": "Path to shellcode file",
         "default": "",
-        "type": "file",
+        "type": "binary",
         "required": true
       }
     ],
@@ -1852,14 +1852,14 @@
         "name": "pid",
         "description": "Target process ID (must be a GUI process that handles window messages)",
         "default": "",
-        "type": "integer",
+        "type": "int",
         "required": true
       },
       {
         "name": "bin",
         "description": "Path to shellcode file",
         "default": "",
-        "type": "file",
+        "type": "binary",
         "required": true
       }
     ],
@@ -1891,14 +1891,14 @@
         "name": "pid",
         "description": "Target process ID",
         "default": "",
-        "type": "integer",
+        "type": "int",
         "required": true
       },
       {
         "name": "bin",
         "description": "Path to shellcode file",
         "default": "",
-        "type": "file",
+        "type": "binary",
         "required": true
       }
     ],
@@ -1930,7 +1930,7 @@
         "name": "bin",
         "description": "Path to shellcode file",
         "default": "",
-        "type": "file",
+        "type": "binary",
         "required": true
       }
     ],
@@ -1959,7 +1959,7 @@
         "name": "bin",
         "description": "Path to shellcode file",
         "default": "",
-        "type": "file",
+        "type": "binary",
         "required": true
       }
     ],
@@ -1991,14 +1991,14 @@
         "name": "pid",
         "description": "Target process ID (must be a service-hosting process, e.g., svchost.exe, spoolsv.exe)",
         "default": "",
-        "type": "integer",
+        "type": "int",
         "required": true
       },
       {
         "name": "bin",
         "description": "Path to shellcode file",
         "default": "",
-        "type": "file",
+        "type": "binary",
         "required": true
       }
     ],
