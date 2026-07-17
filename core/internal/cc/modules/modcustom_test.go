@@ -904,6 +904,38 @@ func TestLoadAllRepoModules(t *testing.T) {
 					} else if config.Invocation.Coff.Export == "" {
 						t.Errorf("module %s is COFF type but has empty export in %s", config.Name, configPath)
 					}
+					// Verify parameter consistency
+					for name, opt := range config.Options {
+						wireToken := typeToWireToken(opt.Type)
+						if wireToken == "" {
+							t.Errorf("module %s (COFF) has parameter '%s' with unsupported type '%s'", config.Name, name, opt.Type)
+							continue
+						}
+						
+						// Verify correct wire token is resolved for specific common parameter types
+						switch opt.Type {
+						case "cstr", "s", "lpstr", "string":
+							if wireToken != "z" {
+								t.Errorf("module %s (COFF) has parameter '%s' of type '%s' mapped to incorrect wire token '%s', expected 'z'", config.Name, name, opt.Type, wireToken)
+							}
+						case "wstr", "w", "lpwstr", "wstring":
+							if wireToken != "Z" {
+								t.Errorf("module %s (COFF) has parameter '%s' of type '%s' mapped to incorrect wire token '%s', expected 'Z'", config.Name, name, opt.Type, wireToken)
+							}
+						case "dword", "i", "uint32", "int", "uint", "int32", "port", "bool":
+							if wireToken != "i" {
+								t.Errorf("module %s (COFF) has parameter '%s' of type '%s' mapped to incorrect wire token '%s', expected 'i'", config.Name, name, opt.Type, wireToken)
+							}
+						case "short", "word", "int16":
+							if wireToken != "s" {
+								t.Errorf("module %s (COFF) has parameter '%s' of type '%s' mapped to incorrect wire token '%s', expected 's'", config.Name, name, opt.Type, wireToken)
+							}
+						case "binary", "b", "base64":
+							if wireToken != "b" {
+								t.Errorf("module %s (COFF) has parameter '%s' of type '%s' mapped to incorrect wire token '%s', expected 'b'", config.Name, name, opt.Type, wireToken)
+							}
+						}
+					}
 				}
 			}
 		})
