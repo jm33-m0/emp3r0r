@@ -624,6 +624,49 @@ func TestReadModConfigsMultiple(t *testing.T) {
 	}
 }
 
+func TestLoadAllModulesConfigs(t *testing.T) {
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatalf("unable to resolve caller path")
+	}
+	repoRoot := filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(thisFile))))
+	modulesRoot := filepath.Join(repoRoot, "modules")
+
+	configCount := 0
+	err := filepath.Walk(modulesRoot, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() && info.Name() == "config.json" {
+			configs, readErr := readModConfigs(path)
+			if readErr != nil {
+				t.Errorf("Failed to read config %s: %v", path, readErr)
+				return nil
+			}
+			if len(configs) == 0 {
+				t.Errorf("Config file %s produced 0 configurations", path)
+				return nil
+			}
+			for i, c := range configs {
+				if c.Name == "" {
+					t.Errorf("Config %d in %s has an empty name", i, path)
+				}
+				configCount++
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		t.Fatalf("Failed to walk modules directory: %v", err)
+	}
+
+	if configCount == 0 {
+		t.Fatalf("No module configs found in %s", modulesRoot)
+	}
+	t.Logf("Successfully loaded %d configurations from all config.json files", configCount)
+}
+
 func TestReadModConfigUnifiedCOFF(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "emp3r0r-unified-coff")
 	if err != nil {
