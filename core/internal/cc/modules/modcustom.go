@@ -585,17 +585,17 @@ func updateModuleHelp(config *def.ModuleConfig) error {
 //
 // Wire token conventions (lighthouse/BOF):
 //
-//	S / s  – null-terminated UTF-8 C-string
-//	z      – null-terminated UTF-16LE wide string
+//	z      – UTF-8 C-string
+//	Z      – UTF-16LE wide string
 //	i      – 32-bit integer (signed or unsigned)
-//	s      – 16-bit short integer  (NB: lowercase "s" for short, uppercase "S" for cstr)
+//	s      – 16-bit short integer
 //	b      – length-prefixed binary blob (base64 input)
 func typeToWireToken(typeName string) string {
 	switch strings.ToLower(typeName) {
 	case "cstr", "s", "lpstr", "string":
-		return "S"
-	case "wstr", "w", "lpwstr", "wstring":
 		return "z"
+	case "wstr", "w", "lpwstr", "wstring":
+		return "Z"
 	case "dword", "i", "uint32", "int", "uint", "int32", "port":
 		return "i"
 	case "short", "word", "int16":

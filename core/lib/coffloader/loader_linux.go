@@ -123,16 +123,14 @@ func packLinuxArgs(args []string) ([]byte, error) {
 				return nil, err
 			}
 		case 'z':
-			u := utf16.Encode([]rune(arg[1:] + "\x00"))
-			if err := binary.Write(&body, binary.LittleEndian, uint32(len(u)*2)); err != nil {
+			// Narrow string (goffloader just packs it, no null terminator)
+			b := []byte(arg[1:])
+			if err := binary.Write(&body, binary.LittleEndian, uint32(len(b))); err != nil {
 				return nil, err
 			}
-			for _, r := range u {
-				if err := binary.Write(&body, binary.LittleEndian, r); err != nil {
-					return nil, err
-				}
-			}
+			body.Write(b)
 		case 'Z':
+			// Wide string (goffloader convertToWindowsUnicode)
 			u := utf16.Encode([]rune(arg[1:]))
 			buf := make([]byte, len(u)*2)
 			for i, r := range u {
@@ -143,14 +141,6 @@ func packLinuxArgs(args []string) ([]byte, error) {
 				return nil, err
 			}
 			body.Write(buf)
-		case 'S':
-			// UTF-8 string (null terminated for convenience)
-			b := []byte(arg[1:])
-			b = append(b, 0)
-			if err := binary.Write(&body, binary.LittleEndian, uint32(len(b))); err != nil {
-				return nil, err
-			}
-			body.Write(b)
 		default:
 			return nil, fmt.Errorf("unknown arg prefix %q", arg[0])
 		}

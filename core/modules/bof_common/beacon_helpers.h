@@ -75,14 +75,12 @@ static inline char *BeaconDataExtract(datap *parser, int *size) {
     return ptr;
 }
 
-// Helper for 'S' type strings (null terminated)
-// Returns pointer to string.
+// Helper for 'Z' type wide strings and 'z' type narrow strings
+// Note: new protocol format does not include null terminators explicitly in the length,
+// but we just return the pointer.
 static inline char *BeaconDataString(datap *parser) {
     int len = 0;
     char *str = BeaconDataExtract(parser, &len);
-    // 'S' type guarantees null terminator at the end of the buffer?
-    // In loader_linux.go we wrote len+1 bytes, including the null.
-    // So str[len-1] should be 0.
     return str; 
 }
 

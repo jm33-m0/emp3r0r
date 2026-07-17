@@ -2,6 +2,7 @@ package coffloader
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
@@ -32,21 +33,30 @@ func normalizeCoffValue(arg CoffArg) (string, error) {
 
 	switch wireType {
 	case "LPWSTR":
-		return "z" + fmt.Sprint(val), nil
+		return "Z" + fmt.Sprint(val), nil
 	case "LPSTR", "S":
-		return "S" + fmt.Sprint(val), nil
+		return "z" + fmt.Sprint(val), nil
 	case "BOOL":
 		switch v := val.(type) {
 		case bool:
-			return "i" + strconv.FormatBool(v), nil
+			if v {
+				return "i1", nil
+			}
+			return "i0", nil
 		case string:
 			b, err := strconv.ParseBool(v)
 			if err != nil {
 				return "", fmt.Errorf("invalid bool value %q", v)
 			}
-			return "i" + strconv.FormatBool(b), nil
+			if b {
+				return "i1", nil
+			}
+			return "i0", nil
 		case float64:
-			return "i" + strconv.FormatBool(v != 0), nil
+			if v != 0 {
+				return "i1", nil
+			}
+			return "i0", nil
 		}
 	case "DWORD", "QWORD", "SIZE_T", "HANDLE", "UINT", "INT", "PORT":
 		switch v := val.(type) {
@@ -86,11 +96,11 @@ func normalizeCoffValue(arg CoffArg) (string, error) {
 		switch v := val.(type) {
 		case string:
 			if decoded, err := base64.StdEncoding.DecodeString(v); err == nil {
-				return "b" + base64.StdEncoding.EncodeToString(decoded), nil
+				return "b" + hex.EncodeToString(decoded), nil
 			}
-			return "b" + base64.StdEncoding.EncodeToString([]byte(v)), nil
+			return "b" + hex.EncodeToString([]byte(v)), nil
 		case []byte:
-			return "b" + base64.StdEncoding.EncodeToString(v), nil
+			return "b" + hex.EncodeToString(v), nil
 		case []any:
 			buf := make([]byte, 0, len(v))
 			for _, b := range v {
@@ -98,7 +108,7 @@ func normalizeCoffValue(arg CoffArg) (string, error) {
 					buf = append(buf, byte(num))
 				}
 			}
-			return "b" + base64.StdEncoding.EncodeToString(buf), nil
+			return "b" + hex.EncodeToString(buf), nil
 		}
 	}
 
