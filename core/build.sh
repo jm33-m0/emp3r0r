@@ -580,6 +580,25 @@ build() {
       make -C "$dir" || error "Failed to build SA module $(basename "$dir")"
     fi
   done
+
+  # Build Remote-OPs modules
+  info "Building Remote-OPs modules"
+  if [[ -d "$pwd/modules/Remote-OPs" && -f "$pwd/modules/Remote-OPs/make_all.sh" ]]; then
+    {
+      cd "$pwd/modules/Remote-OPs" &&
+      chmod +x make_all.sh &&
+      ./make_all.sh
+    } || error "Failed to build Remote-OPs modules"
+  fi
+
+  # Build basic Linux test BOFs
+  info "Building Linux test BOFs"
+  if [[ -d "$pwd/modules/hello_linux" ]]; then
+    make -C "$pwd/modules/hello_linux" || warn "Failed to build hello_linux module"
+  fi
+  if [[ -d "$pwd/modules/process_list_handles_linux" ]]; then
+    make -C "$pwd/modules/process_list_handles_linux" || warn "Failed to build process_list_handles_linux module"
+  fi
 }
 
 do_uninstall() {
