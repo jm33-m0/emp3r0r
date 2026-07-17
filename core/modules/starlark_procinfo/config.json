@@ -1,5 +1,5 @@
 {
-  "name": "starlark_ps",
+  "name": "starlark_procinfo",
   "build": "",
   "author": "antigravity",
   "date": "2026-06-22",
@@ -19,9 +19,7 @@
   ],
   "agent_config": {
     "exec": "run.star",
-    "files": [
-      "run.star"
-    ],
+    "files": ["run.star"],
     "in_memory": true,
     "type": "starlark",
     "interactive": false

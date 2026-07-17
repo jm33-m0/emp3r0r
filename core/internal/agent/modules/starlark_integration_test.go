@@ -8,32 +8,19 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 )
 
-func TestModuleHandler_Starlark_ProcessListing(t *testing.T) {
+func TestModuleHandler_Starlark_ProcInfo(t *testing.T) {
 	script := `
 def main(*args):
-    procs = list_processes()
-    if len(procs) == 0:
-        print("Error: no processes found")
+    cgroup = read_file("/proc/self/cgroup")
+    if len(cgroup) == 0:
+        print("Error: cgroup empty")
         return "FAIL"
     
-    # Verify we can find some basic details
-    found_self = False
-    for p in procs:
-        # Check if the process name looks like our test binary
-        if "test" in p["name"].lower() or "go" in p["name"].lower():
-            found_self = True
-            print("Found test process: PID=" + str(p["pid"]) + ", Name=" + p["name"])
-            break
-            
-    if found_self:
-        print("Starlark integration process list success")
-        return "OK"
-    else:
-        print("Starlark integration process list completed, but self not found")
-        return "OK"
+    print("Starlark integration procinfo success")
+    return "OK"
 `
 	if runtime.GOOS != "linux" {
-		t.Skip("Process listing via /proc is only supported on Linux")
+		t.Skip("Procinfo via /proc is only supported on Linux")
 	}
 
 	// Compress script content using helper in mod_test.go
@@ -44,9 +31,9 @@ def main(*args):
 	}
 
 	// Call ModuleHandler with "starlark" payload type
-	out := ModuleHandler("", path, "starlark", "test_starlark_ps", checksum, inv)
+	out := ModuleHandler("", path, "starlark", "test_starlark_procinfo", checksum, inv)
 
-	if !strings.Contains(out, "Starlark integration process list success") && !strings.Contains(out, "Starlark integration process list completed, but self not found") {
+	if !strings.Contains(out, "Starlark integration procinfo success") {
 		t.Errorf("starlark output missing expected print logs: got %q", out)
 	}
 	if !strings.Contains(out, "OK") {

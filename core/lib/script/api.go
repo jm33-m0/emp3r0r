@@ -34,7 +34,6 @@ var builtInAPIs = map[string]StarlarkAPI{
 	"http_get":       starlarkHTTPGet,
 	"http_post":      starlarkHTTPPost,
 	"exec_cmd":       starlarkExecCmd,
-	"list_processes": starlarkListProcesses,
 	"crypto_hash":    starlarkCryptoHash,
 	"win_call":       starlarkWinCall,
 	"win_alloc":      starlarkWinAlloc,

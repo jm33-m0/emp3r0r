@@ -44,20 +44,14 @@ def main(*args):
 	}
 }
 
-func TestEngineListProcesses(t *testing.T) {
+func TestEngineProcInfo(t *testing.T) {
 	script := `
 def main(*args):
-    procs = list_processes()
-    if len(procs) == 0:
-        return "Fail: no processes found"
+    cgroup = read_file("/proc/self/cgroup")
+    if len(cgroup) == 0:
+        return "Fail: no cgroup found"
     
-    # Check that each process has the expected keys
-    first = procs[0]
-    if "pid" not in first or "ppid" not in first or "name" not in first or "cmdline" not in first:
-        return "Fail: missing keys in process dict"
-    
-    print("Found " + str(len(procs)) + " processes.")
-    print("First process: PID=" + str(first["pid"]) + ", Name=" + first["name"])
+    print("Found cgroup.")
     return "OK"
 `
 	out, err := Run([]byte(script), nil, nil)

@@ -31,43 +31,174 @@ The `config.json` file is the heart of your module. It is a JSON array containin
 
 ### Example Configuration (BOF)
 
+See `core/modules/hello_linux/config.json` for a real-world example:
+
 ```json
 [
   {
-    "name": "my_suite_process_list",
-    "author": "YourName",
-    "date": "2026-07-17",
-    "comment": "Lists processes using a Beacon Object File.",
-    "platform": "Windows",
+    "name": "hello_linux",
+    "build": "make",
+    "author": "jm33-ng",
+    "date": "2026-01-26",
+    "comment": "Linux BOF Hello World",
     "is_local": false,
+    "platform": "Linux",
+    "path": "",
     "fileless": true,
+    "parameters": [
+      {
+        "name": "who",
+        "description": "Who to greet",
+        "default": "World",
+        "type": "cstr",
+        "required": false
+      }
+    ],
     "agent_config": {
-      "type": "coff",
-      "files": ["src/MyBof/MyBof.x64.o", "src/MyBof/MyBof.x86.o"],
+      "exec": "",
+      "files": ["hello_linux.o"],
       "in_memory": true,
+      "type": "coff",
       "interactive": false
     },
     "invocation": {
       "coff_export": "go"
-    },
-    "parameters": [
-      {
-        "name": "pid",
-        "description": "Target Process ID to inspect",
-        "default": "0",
-        "type": "int",
-        "required": true
-      },
-      {
-        "name": "filter",
-        "description": "String filter to match",
-        "default": "",
-        "type": "cstr",
-        "required": false
-      }
-    ]
+    }
   }
 ]
+```
+
+### Example Configuration (Starlark)
+
+See `core/modules/starlark_procinfo/config.json` for a real-world example:
+
+```json
+[
+  {
+    "name": "starlark_procinfo",
+    "build": "",
+    "author": "antigravity",
+    "date": "2026-06-22",
+    "comment": "List running process info on Linux using Starlark script engine",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "filter",
+        "description": "Optional search filter for process name or cmdline",
+        "default": "",
+        "type": "string",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "run.star",
+      "files": ["run.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  }
+]
+```
+
+### Minimal Source Code Examples
+
+#### BOF Source (`core/modules/hello_linux/hello_linux.c`)
+
+```c
+#include "beacon_helpers.h"
+#include "syscall_helpers.h"
+
+// Declare BeaconPrintf
+extern void BeaconPrintf(int type, const char *fmt, ...);
+
+void go(char *args, int len) {
+  datap parser;
+  BeaconDataParse(&parser, args, len);
+
+  char *who = BeaconDataString(&parser);
+  if (!who || !who[0]) {
+    who = "World";
+  }
+
+  BeaconPrintf(0, "Hello %s!", who);
+}
+```
+
+#### Starlark Source (`core/modules/starlark_procinfo/run.star`)
+
+```python
+# Starlark scripts receive arguments injected by the agent as global variables
+# based on the parameter names defined in config.json.
+
+def parse_status(status_text):
+    info = {}
+    for line in status_text.split('\n'):
+        if not line:
+            continue
+        parts = line.split(':\t')
+        if len(parts) == 2:
+            key = parts[0].strip()
+            val = parts[1].strip()
+            info[key] = val
+    return info
+
+def format_ns(ns_ls_output):
+    ns_dict = {}
+    for line in ns_ls_output.split('\n'):
+        if " -> " in line:
+            parts = line.split(" -> ")
+            if len(parts) == 2:
+                name = parts[0].split(" ")[-1]
+                target = parts[1].strip()
+                ns_dict[name] = target
+    return ns_dict
+
+def main(*args):
+    print("==================================================")
+    print(" Current Process Info ")
+    print("==================================================")
+
+    status_text = read_file("/proc/self/status")
+    status = parse_status(status_text)
+
+    print("\n--- Identity & Privileges ---")
+    print("Name:       %s" % status.get("Name", "N/A"))
+    print("State:      %s" % status.get("State", "N/A"))
+    print("PID:        %s" % status.get("Pid", "N/A"))
+    print("PPID:       %s" % status.get("PPid", "N/A"))
+    print("UIDs:       %s (Real, Effective, Saved, FS)" % status.get("Uid", "N/A"))
+    print("GIDs:       %s (Real, Effective, Saved, FS)" % status.get("Gid", "N/A"))
+    print("Groups:     %s" % status.get("Groups", "N/A"))
+
+    print("\n--- Capabilities ---")
+    print("Inheritable:%s" % status.get("CapInh", "N/A"))
+    print("Permitted:  %s" % status.get("CapPrm", "N/A"))
+    print("Effective:  %s" % status.get("CapEff", "N/A"))
+    print("Bounding:   %s" % status.get("CapBnd", "N/A"))
+    print("Ambient:    %s" % status.get("CapAmb", "N/A"))
+    print("NoNewPrivs: %s" % status.get("NoNewPrivs", "N/A"))
+
+    print("\n--- Cgroups ---")
+    cgroup_text = read_file("/proc/self/cgroup")
+    for line in cgroup_text.split('\n'):
+        if line:
+            parts = line.split(':')
+            if len(parts) >= 3:
+                print(parts[2])
+
+    print("\n--- Namespaces ---")
+    ns_info = exec_cmd("ls", ["-l", "/proc/self/ns"])
+    namespaces = format_ns(ns_info)
+    for k in sorted(namespaces.keys()):
+        print("%-12s %s" % (k + ":", namespaces[k]))
+
+    print("==================================================")
+    return "OK"
 ```
 
 ### Critical Fields Explained
@@ -130,4 +261,4 @@ When the emp3r0r C2 starts, it parses the modules via `InitModules` in `core/int
 3. **Registration:** Stores the valid module into the `def.Modules` memory map.
 4. **Execution:** When the operator runs your module, `moduleCustom` reads the operator's input, validates it against your `parameters`, packs it according to the `type` aliases, and dispatches the task down to the agent memory for fileless execution.
 
-_Note: Currently only the first file in the `files` list is executed, which in most cases means only `x64` BOFs are picked up._
+_Note: Currently, only the first file in the `files` list is executed, which in most cases means only `x64` BOFs are picked up._
