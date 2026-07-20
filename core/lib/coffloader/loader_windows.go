@@ -5,9 +5,6 @@ package coffloader
 
 import (
 	"fmt"
-
-	"github.com/chvancooten/goffloader/src/coff"
-	"github.com/chvancooten/goffloader/src/lighthouse"
 )
 
 // RunWindowsCOFF executes a COFF/BOF payload using goffloader on Windows.
@@ -25,12 +22,12 @@ func RunWindowsCOFF(payload []byte, _ string, args []CoffArg) (out string, err e
 		return "", err
 	}
 
-	packed, err := lighthouse.PackArgs(packedArgs)
+	packed, err := LighthousePackArgs(packedArgs)
 	if err != nil {
 		return "", fmt.Errorf("packing BOF args: %w", err)
 	}
 
-	output, err := coff.Load(payload, packed)
+	output, err := CoffLoad(payload, packed)
 	if err != nil {
 		return "", fmt.Errorf("executing COFF module: %w", err)
 	}

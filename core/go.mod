@@ -4,10 +4,10 @@ go 1.26.2
 
 require (
 	github.com/Code-Hex/Neo-cowsay/v2 v2.0.4
+	github.com/RIscRIpt/pecoff v0.0.0-20200923152459-a332238caa87
 	github.com/alecthomas/chroma v0.10.0
 	github.com/carapace-sh/carapace v1.13.2
 	github.com/cavaliergopher/grab/v3 v3.0.1
-	github.com/chvancooten/goffloader v0.1.0
 	github.com/coder/websocket v1.8.15
 	github.com/fatih/color v1.19.0
 	github.com/fxamacker/cbor/v2 v2.9.2
@@ -47,7 +47,6 @@ require (
 
 require (
 	github.com/Code-Hex/go-wordwrap v1.0.0 // indirect
-	github.com/RIscRIpt/pecoff v0.0.0-20200923152459-a332238caa87 // indirect
 	github.com/andybalholm/brotli v1.2.2 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/carapace-sh/carapace-shlex v1.1.1 // indirect
