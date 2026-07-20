@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.5.1](https://github.com/jm33-m0/emp3r0r/compare/v4.5.0...v4.5.1) (2026-07-20)
+
+
+### Bug Fixes
+
+* `goffloader` leaves lingering BOF memory ([966bc63](https://github.com/jm33-m0/emp3r0r/commit/966bc63354dffee18bebe686c8b6a276cc054954))
+
 ## [4.5.0](https://github.com/jm33-m0/emp3r0r/compare/v4.4.0...v4.5.0) (2026-07-17)
 
 
