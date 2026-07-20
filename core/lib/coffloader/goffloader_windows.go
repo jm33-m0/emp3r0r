@@ -16,12 +16,6 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-/*
-  NOTE: There are random logging.Infofs sprinkled through the code - these are intentional
-        and seem to break static Go malware signatures. LEAVE THEM IN PLACE. If this starts
-        getting detected again, add some more logging.Infofs.
-*/
-
 const (
 	MEM_COMMIT             = windows.MEM_COMMIT
 	MEM_RESERVE            = windows.MEM_RESERVE
