@@ -2,7 +2,7 @@
 
 ### emp3r0r
 
-**Self‑healing Gossip Mesh C2 with Assisted Peer Discovery, Modular Post‑Exploitation, and Scriptable Agents.**
+**Self‑healing Gossip Mesh C2 with Assisted Peer Discovery, Cross-Platform BOF Execution, and Scriptable Agents.**
 
 <br clear="all" />
 
@@ -20,199 +20,183 @@
 
 ## What is emp3r0r?
 
-emp3r0r is a comprehensive post-exploitation framework designed from the ground up for Linux environments. While most C2 platforms treat Linux as an afterthought, emp3r0r implements a **zero-trust architecture** with ephemeral cryptographic identities, perfect forward secrecy, and autonomous mesh networking for penetration testing and red team operations.
+emp3r0r is an advanced, zero-trust post-exploitation framework and command & control (C2) system designed for Linux and Windows target environments. Built from the ground up to operate in high-security environments, emp3r0r combines **autonomous gossip mesh networking**, **fileless memory-only execution**, **cross-platform BOF loading**, and **in-memory scriptable agents** to deliver superior stealth, operational control, and operational security (OPSEC).
 
-## What Makes emp3r0r Different?
+---
 
-### 🔐 TOFU Identity Pinning (Immutable per Enrollment)
+## Key Highlights & Unique Features
 
-emp3r0r enforces **Trust-on-first-use (TOFU)** with strict UUID/public-key pinning on first successful enrollment. After enrollment, the pinned identity is immutable for that lifecycle: if the same UUID appears with a different key, the connection is rejected as clone/impersonation. Re-enrollment with changed credentials requires a deliberate `forget_agent` first.
+### 🐍 Scriptable Agents (Embedded Starlark Engine & Win32 API Proxy)
 
-**Why this matters:** This blocks silent identity drift and session hijacking patterns. Trust comes from CA-signed claims plus pinned DB state, not mutable runtime metadata.
+emp3r0r agents feature an embedded **Starlark scripting engine** (a Python dialect implemented purely in Go). Scripts execute filelessly in memory without requiring Python, Bash, or PowerShell installed on the target.
 
-### 🔒 Perfect Forward Secrecy for All Communications
+- **Zero Host Dependencies:** Executes standalone scripts without spawning command interpreters (`/bin/sh`, `powershell.exe`) or relying on installed runtimes.
+- **Built-in Agent Go APIs:** Exposed functions for filesystem operations (`read_file`, `write_file`, `list_dir`, `mkdir`, `remove`, `exists`), HTTP networking (`http_get`, `http_post`), command execution (`exec_cmd`), and hashing (`crypto_hash`).
+- **Dynamic Win32 API Proxy:** On Windows targets, Starlark scripts can dynamically load system DLLs and execute native Win32 APIs (`win_call`, `win_alloc`, `win_free`, `win_read_mem`) directly from script code without compiling native C code.
+- **Modular Integration:** Starlark scripts are defined using JSON manifests (`config.json`) for seamless CLI parameter parsing and distribution.
 
-Every C2 session uses **ECDH key exchange** with **HKDF-derived session keys**. Past traffic remains secure even if long-term keys or agents are compromised. Each session's encryption keys are unique and cannot be derived from other sessions.
+**Why this matters:** Traditional C2 script modules require host interpreters or process spawning, leaving heavy disk or command-line execution traces. emp3r0r's scriptable agents execute complex logic entirely in memory with native system interaction.
 
-**Why this matters:** Traditional C2s use static encryption keys. If those keys are recovered, historical network captures can be decrypted. emp3r0r's PFS ensures that compromising today's session keys doesn't reveal previous communications.
+---
 
-### 🕸️ Peer-to-Peer (P2P) Mesh Network
+### 🔐 TOFU Cryptographic Identity Pinning
 
-Agents in isolated network segments **autonomously discover and tunnel through internet-connected peers** via a gossip-based (memberlist) mesh network. The mesh hop transport is **pluggable**: the default is `mtls` — camouflage mTLS 1.3 using ephemeral, malleable certificates — with `kcp` (reliable UDP) also available. All hops are further wrapped in AES-GCM end-to-end encryption. **No unnecessary noise** in your C2 infrastructure: agents connect to each other instead of C2 server; **no broadcasting**; configurable bootstrap peers allowing granular control.
+emp3r0r enforces **Trust-On-First-Use (TOFU)** with strict UUID and public-key pinning upon agent enrollment.
 
-**Why this matters:** Manual pivoting requires constant operator intervention and breaks when intermediate hosts fail. emp3r0r's agents automatically form redundant communication paths, ensuring persistence through resilient peer discovery and relay.
+- **Immutable Binding:** Once enrolled, an agent's UUID is pinned to its cryptographic public key. Re-enrollment with altered credentials is rejected as an impersonation attempt.
+- **Controlled Reset:** De-registration requires explicit operator authorization via `forget_agent`.
 
-### 💾 Memory-Only Operations with Transparent Encryption
+**Why this matters:** Prevents session hijacking, agent cloning, and silent identity drift across operational environments.
 
-Agents use an **in-memory filesystem with AES-GCM encryption** for all file operations. Bash, PowerShell, Python, Starlark, and ELF modules execute entirely from memory. Large files automatically spill to **encrypted disk storage** when memory is exhausted. The agent creates no dedicated directories or persistent configuration files.
+---
 
-**Why this matters:** EDR and forensic tools rely on disk artifacts for detection and analysis. emp3r0r's memory-first design minimizes disk writes. When disk spillover occurs, all data is encrypted and lacks identifying file extensions or headers.
+### 🔒 Perfect Forward Secrecy (PFS)
 
-### 🐍 In-Memory Scripting via Starlark (No Python Required)
+All C2 and peer communications enforce **ECDH key exchange** with **HKDF-derived session keys**.
 
-emp3r0r embeds a **Starlark scripting engine** (a dialect of Python implemented in Go) directly inside the agent. Scripts execute entirely in memory without spawning new processes or requiring Python, Bash, or PowerShell to be installed on the target machine.
+- **Ephemeral Keys:** Each session generates unique encryption keys.
+- **Decoupled Security:** Compromising long-term keys or an individual agent cannot compromise past or parallel communications.
 
-**Why this matters:** Traditional script modules require local interpreters, leaving footprints on disk or in command histories. emp3r0r's Starlark engine runs scripts in-memory with built-in Go APIs for filesystem access, network communication, process enumeration, and system execution.
+**Why this matters:** Prevents retrospective decryption of intercepted network captures.
 
-### 🧩 Native BOF Support (Cross-Platform)
+---
 
-Execute **Windows COFF objects** on Windows agents with typed argument packing (LPSTR/LPWSTR/INT/BOOL/BINARY). On Linux, load **ELF object files (.o)** entirely in-memory with the same modularity. Modules use a standardized schema for cross-platform consistency.
+### 🕸️ Autonomous P2P Gossip Mesh Network
 
-**Why this matters:** BOFs avoid process creation overhead and are difficult to detect. emp3r0r brings this capability to Linux, where most C2 frameworks rely on forking processes or interpreting shell scripts.
+Agents in egress-restricted or isolated network segments autonomously discover peers and tunnel traffic via a gossip-based (Memberlist) mesh network.
 
-### 🎭 Pluggable C2 Transport + JA3 Evasion + CBOR
+- **Pluggable Peer Transports:** Support for camouflage **mTLS 1.3** (using ephemeral certificates) and **KCP** (reliable UDP).
+- **End-to-End Encryption:** All inter-agent mesh hops are wrapped in AES-GCM encryption.
+- **Low Network Footprint:** Direct agent-to-agent relaying eliminates unnecessary broadcast noise and centralized C2 connection chokepoints.
 
-emp3r0r supports **pluggable C2 channel wrappers**. In v4, the default is `http_poll` beacon mode, and `h2conn` stream mode is also available. `http_poll` runs over HTTP/1.1 with malleable profiles and can be proxied by CDN/reverse proxies directly, without the websocket `--cdn2proxy` bridge.
+**Why this matters:** Pivoting across segmented networks occurs autonomously without requiring constant operator intervention or static proxy setups.
 
-HTTP2/TLS connections use **uTLS** to randomize TLS Client Hello fingerprints, preventing static JA3 signature detection. All network traffic and data storage uses **CBOR** (binary) instead of JSON, reducing bandwidth by 30-40% and avoiding text-based parsing signatures.
+---
 
-**Why this matters:** Network monitoring tools fingerprint TLS handshakes for application identification. Static TLS implementations create consistent signatures. emp3r0r randomizes these on every connection while using a compact binary protocol that lacks JSON's obvious structure.
+### 🧩 Native Cross-Platform BOF Support (COFF & ELF)
+
+Execute in-memory binary modules on both Windows and Linux targets:
+
+- **Windows COFF Loaders:** Run Windows BOF binaries filelessly with typed parameter packing (`int`, `short`, `cstr`, `wstr`, `binary`).
+- **Linux ELF Object Loaders:** Load ELF relocatable object files (`.o`) directly into agent memory on Linux.
+- **Bundled BOF Suites:** Built-in support for Kerbeus-BOF, Remote-OPs, and Situational Awareness (SA) module collections.
+
+**Why this matters:** Eliminates process creation overhead and circumvents command-line monitoring by running compiled C modules in-process.
+
+---
+
+### 🎭 Pluggable C2 Transport, uTLS JA3 Evasion & CBOR Protocol
+
+- **Pluggable C2 Modes:** Flexible beaconing (`http_poll`) with malleable HTTP profiles and streaming (`h2conn`) over HTTP/2.
+- **JA3 Signature Randomization:** Utilizes **uTLS** to randomize TLS Client Hello fingerprints, defeating static network signatures.
+- **Binary Wire Protocol:** Uses **CBOR** (Concise Binary Object Representation) for all control data and wire serialization, reducing network payload sizes by 30-40% compared to JSON.
+
+---
+
+### 💾 Encrypted Memory-First Storage & OPSEC Safeguards
+
+- **In-Memory Encrypted Virtual Filesystem:** All agent file operations use an in-memory AES-GCM virtual filesystem. Large data automatically spills to encrypted disk storage without identifiable headers or extensions.
+- **Stealth & Evasion:** sRDI-like ELF stagers, module stomping, and self-suspension with XOR-rotated memory obfuscation during idle states.
 
 ---
 
 ## Quick Start
 
-### Install on C2 Server
+### 1. C2 Server Installation
 
-Requires Docker (or Podman) on the host. No Go toolchain needed.
+Building emp3r0r requires Docker or Podman on the host. No local Go toolchain is required.
 
 ```bash
-# Clone the project
+# Clone repository
 git clone --depth=1 https://github.com/jm33-m0/emp3r0r.git && cd emp3r0r
 
-# Build inside a throwaway Docker container, then install locally
+# Build inside a container and install locally
 ./install.sh
 ```
 
-`install.sh` will:
-
-1. Pull the official `golang:1.26.2` image and compile emp3r0r inside it from the **local repository**
-2. Produce `core/emp3r0r-operator-kit.tar.zst` containing all precompiled binaries (including `emp3r0r-listener`) and data files
-3. Extract that operator kit locally and invoke its bundled installer to automatically configure permissions (`setcap`), create WireGuard run directories (`tmpfiles.d`), and install shell autocompletions on the host
+The installer compiles the core binaries inside a throwaway container, generates the precompiled `emp3r0r-operator-kit.tar.zst`, configures required Linux capabilities (`setcap`), and sets up system runtime directories.
 
 Options:
 
-```
+```bash
 ./install.sh [--debug] [--disable-garble] [--prefix /usr/local] [--skip-build]
 ```
 
-Use `--skip-build` to skip the Docker compilation step entirely and reinstall/reconfigure using the cached operator kit from a previous build.
-
-Then start the C2 server:
+Launch the C2 server:
 
 ```bash
 emp3r0r server --c2-hosts 1.2.3.4 --http-port 12345 --operator-port 13377
 ```
 
-### Operator Machine Setup
+---
 
-After the C2 server prints its connection command, transfer the operator kit and run its bundled installer:
+### 2. Operator Machine Setup
+
+Transfer the generated `emp3r0r-operator-kit.tar.zst` to your operator machine and run the installer:
 
 ```bash
-# On your operator machine
 tar --zstd -xpf emp3r0r-operator-kit.tar.zst
-./emp3r0r-operator-kit/install.sh    # handles setcap, WireGuard dir, and shell completion automatically
+cd ./emp3r0r-operator-kit && ./install.sh
 ```
 
-Then run the connection command printed by the C2 server:
+Connect the operator client to the C2 server using the WireGuard tunnel credentials printed by the server:
 
 ```bash
-emp3r0r client --c2-port 13377 --server-wg-key '0OKqMZmJfLDhAQLST4MKtKNa6MKxVkLn3UcOP14sMA8=' --server-wg-ip '10.88.14.158' --operator-wg-ip '10.88.14.236' --operator-wg-key 'LOe4sUyjyyIS3Kjnmz0SpKJwvDGle0880Q73qzsMg48=' --c2-host 1.2.3.4
+emp3r0r client --c2-port 13377 \
+  --server-wg-key '<SERVER_WG_KEY>' \
+  --server-wg-ip '<SERVER_WG_IP>' \
+  --operator-wg-ip '<OPERATOR_WG_IP>' \
+  --operator-wg-key '<OPERATOR_WG_KEY>' \
+  --c2-host 1.2.3.4
 ```
 
-`emp3r0r client` automatically downloads and applies config files from C2 server via WireGuard tunnel.
+---
 
-### Generate Agent Payloads
+### 3. Generate Agent Payloads
 
-Use the `generate` command from within the emp3r0r shell interface to create customized agent payloads.
+Use the `generate` command within the emp3r0r operator interface to create payloads.
 
-Example (standalone direct C2):
+**Direct C2 Agent:**
 
 ```bash
 generate --type linux_executable --arch amd64 --cc your.domain.com
 ```
 
-Example (mesh gateway):
-
-The gateway peer:
+**Mesh Gateway Agent:**
 
 ```bash
 generate --type linux_executable --arch amd64 --cc your.domain.com \
-	--p2p --direct-c2 --p2p-transport mtls
+  --p2p --direct-c2 --p2p-transport mtls
 ```
 
-An intermediate peer:
+**Mesh Intermediate Peer:**
 
 ```bash
-# 1.2.3.4 is the pre-existing agent node that you want to use as bootstrap peer
 generate --type linux_executable --arch amd64 --cc your.domain.com \
-	--p2p --p2p-transport mtls --peers 1.2.3.4
+  --p2p --p2p-transport mtls --peers 1.2.3.4
 ```
 
 ---
 
-## Additional Capabilities
+## Overview of Capabilities
 
-### Stealth & Evasion
-
-- **sRDI-like Shellcode Stager**: Load ELF binaries from memory without touching disk, similar to sRDI for Windows.
-- **Self-suspension & Resumption**: Agents can suspend themselves and let the stager manage their memory; the stager rotates XOR-based obfuscation while the agent is idle.
-- **Module Stomping**: Disguise malicious modules by loading them into the memory space of legitimate system libraries.
-- **OPSEC Warnings**: Real-time warnings for operations that pose operational security risks (e.g., "fork and run" patterns, unencrypted disk activity).
-- **Embedded Starlark Scripting**: Execute Python-like scripts entirely in memory on the agent via the built-in Go Starlark interpreter, removing dependencies on target host interpreters.
-- **Anti-debug/analysis** measures to make inspection harder.
-
-### Operator Experience
-
-- **Adaptive tmux UI**: Native integration with dynamic status bars, adaptive layouts, and real-time agent/C2 status monitoring.
-- **Intelligent auto-completion** with syntax highlighting.
-- **Pluggable Frontend**: Develop your own frontend by replicating `operator` package features.
-
-### File Transfer System
-
-- **Smart Transfer Strategy**: Agents can fetch files from peer agents via encrypted KCP tunnels before falling back to C2, improving speed and stealth.
-- **Integrity & Reliability**: SHA256 verification plus **resumable uploads/downloads** so interrupted transfers continue from the last offset.
-- **Compression**: Zstandard compression reduces bandwidth usage and accelerates transfers.
-- **FileServer Module**: Agents can host an encrypted HTTP server to share files with other agents, enabling peer-to-peer distribution.
-
-### Network Pivoting
-
-- **Flexible Pivoting**: Gossip mesh relay plus reverse-tunnel workflows for segmented networks.
-- **KCP-based UDP tunneling** for speed and resilience in high-latency environments.
-- **TOR/CDN** support for additional operational cover.
-
-### Payload Delivery
-
-- **Advanced Linux Stager**: 1.5K self-contained stage0 downloader; opsec focused; keeps the agent payload encrypted until execution; auto-restarts with jitter when connectivity requires.
-- **Agent-Side Listener**: Deploy listeners on compromised hosts to serve payloads internally, bypassing slow C2 connections.
-- **Multi-stage delivery** for Linux and Windows with ELF/DLL/shellcode options.
-
-### Post-Exploitation Arsenal
-
-- **OpenSSH credential harvesting** with real-time monitoring (`ssh_harvester`).
-- **Cross-platform memory dumping** capabilities (`mem_dump`).
-- **LPE**: Privilege escalation tools with automated suggestions (`lpe_suggest`).
-- **Log Sanitization**: `clean_log` module for anti-forensics.
+| Category                        | Features & Description                                                                                                                                                                      |
+| :------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Scripting & Automation**      | Embedded Starlark interpreter (Python dialect), fileless execution, Go Agent APIs (FS, Network, Exec, Hash), Dynamic Win32 API Proxy (`win_call`, `win_alloc`, `win_free`, `win_read_mem`). |
+| **Stealth & Evasion**           | In-memory AES-GCM encrypted filesystem, uTLS JA3 fingerprint randomization, CBOR binary protocol, ELF shellcode stager, module stomping, idle memory XOR rotation, OPSEC warning engine.    |
+| **P2P Mesh Network**            | Memberlist gossip protocol, autonomous peer discovery, multi-hop relaying, mTLS 1.3 / KCP transports, end-to-end AES-GCM encryption per hop.                                                |
+| **Cross-Platform BOFs**         | Windows COFF loader (`goffloader`), Linux ELF `.o` loader, argument packing (`int`, `short`, `cstr`, `wstr`, `binary`), Kerbeus-BOF, Remote-OPs, SA BOFs.                                   |
+| **File Transfer & P2P Sharing** | Encrypted KCP peer transfer, SHA256 integrity verification, offset-based transfer resumption, Zstandard compression, agent-hosted encrypted HTTP file servers.                              |
+| **Post-Exploitation Arsenal**   | SSH credential harvester (`ssh_harvester`), cross-platform memory dumper (`mem_dump`), automated privilege escalation suggestions (`lpe_suggest`), anti-forensic log cleaner (`clean_log`). |
+| **Operator Experience**         | Tmux UI integration, dynamic status bars, intelligent CLI autocompletion, WireGuard encrypted operator-to-C2 tunneling.                                                                     |
 
 ---
 
-## Documentation & Support
+## Documentation & Resources
 
-### Community
-
-Join our [Discord server](https://discord.gg/vU98aQtk9f) for real-time discussions, technical support, and the latest updates on emp3r0r development.
-
-### Resources
-
-- 📝 [Security Policy](./SECURITY.md)
-- 📜 [Changelog](./CHANGELOG.md)
-- 🛠️ [Module Development Guide (COFF/BOF & Starlark)](./core/modules/module_development_guide.md)
-
-### Troubleshooting
-
-- **Connection stalls**: Verify C2 host/WireGuard settings.
-- **Compatibility**: Remove `~/.emp3r0r` for a clean install; make sure to use the same build.
-- **Support**: Always use the latest release to get support.
+- 📝 **Security Policy:** [SECURITY.md](./SECURITY.md)
+- 📜 **Changelog:** [CHANGELOG.md](./CHANGELOG.md)
+- 🛠️ **Module Development Guide:** [core/modules/module_development_guide.md](./core/modules/module_development_guide.md)
 
 ---
 

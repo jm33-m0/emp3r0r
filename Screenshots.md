@@ -4,6 +4,8 @@
 
 **Visual guide to emp3r0r's capabilities and features**
 
+_Note: emp3r0r is under active development and features might change_
+
 ---
 
 </div>
