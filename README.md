@@ -178,20 +178,6 @@ generate --type linux_executable --arch amd64 --cc your.domain.com \
 
 ---
 
-## Overview of Capabilities
-
-| Category                        | Features & Description                                                                                                                                                                      |
-| :------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Scripting & Automation**      | Embedded Starlark interpreter (Python dialect), fileless execution, Go Agent APIs (FS, Network, Exec, Hash), Dynamic Win32 API Proxy (`win_call`, `win_alloc`, `win_free`, `win_read_mem`). |
-| **Stealth & Evasion**           | In-memory AES-GCM encrypted filesystem, uTLS JA3 fingerprint randomization, CBOR binary protocol, ELF shellcode stager, module stomping, idle memory XOR rotation, OPSEC warning engine.    |
-| **P2P Mesh Network**            | Memberlist gossip protocol, autonomous peer discovery, multi-hop relaying, mTLS 1.3 / KCP transports, end-to-end AES-GCM encryption per hop.                                                |
-| **Cross-Platform BOFs**         | Windows COFF loader (`goffloader`), Linux ELF `.o` loader, argument packing (`int`, `short`, `cstr`, `wstr`, `binary`), Kerbeus-BOF, Remote-OPs, SA BOFs.                                   |
-| **File Transfer & P2P Sharing** | Encrypted KCP peer transfer, SHA256 integrity verification, offset-based transfer resumption, Zstandard compression, agent-hosted encrypted HTTP file servers.                              |
-| **Post-Exploitation Arsenal**   | SSH credential harvester (`ssh_harvester`), cross-platform memory dumper (`mem_dump`), automated privilege escalation suggestions (`lpe_suggest`), anti-forensic log cleaner (`clean_log`). |
-| **Operator Experience**         | Tmux UI integration, dynamic status bars, intelligent CLI autocompletion, WireGuard encrypted operator-to-C2 tunneling.                                                                     |
-
----
-
 ## Documentation & Resources
 
 - 📝 **Security Policy:** [SECURITY.md](./SECURITY.md)
