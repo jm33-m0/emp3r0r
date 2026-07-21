@@ -111,18 +111,19 @@ func serveStager(stager_enc []byte, port string) error {
 	return server.ListenAndServe()
 }
 
-// HTTPAESCompressedListener reads, compresses, encrypts the stager file and serves it over HTTP.
-// stagerPath: the path to the stager file to serve.
-// port: the port to serve the stager file on.
-// keyStr: the passpharase to encrypt the stager file.
-// loaderPath: optional path to stage1 loader (empty string if not used).
-func HTTPAESCompressedListener(stagerPath, port, keyStr string, compression bool) error {
+// HTTPListener reads the payload file, optionally deflate-compresses it,
+// encrypts it with the key-derived stream, and serves it over HTTP.
+// stagerPath: path to the payload file to serve.
+// port: TCP port to listen on.
+// keyStr: passphrase used for key derivation.
+// compression: whether to deflate-compress before encryption.
+func HTTPListener(stagerPath, port, keyStr string, compression bool) error {
 	blob, err := buildServedBlob(stagerPath, keyStr, compression)
 	if err != nil {
 		return err
 	}
 
-	listenerLogf("Serving encrypted stager file on port %s", port)
+	listenerLogf("Serving payload on port %s via HTTP", port)
 	return serveStager(blob, port)
 }
 

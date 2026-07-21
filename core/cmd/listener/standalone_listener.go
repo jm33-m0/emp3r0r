@@ -25,11 +25,11 @@ func main() {
 
 	switch *listenerType {
 	case "http":
-		logging.Fatal(listener.HTTPAESCompressedListener(*stagerPath, *port, *keyStr, true))
+		logging.Fatal(listener.HTTPListener(*stagerPath, *port, *keyStr, true))
 	case "tcp":
-		logging.Fatal(listener.TCPAESCompressedListener(*stagerPath, *port, *keyStr, true))
+		logging.Fatal(listener.TCPListener(*stagerPath, *port, *keyStr, true))
 	case "udp":
-		logging.Fatal(listener.UDPAESCompressedListener(*stagerPath, *port, *keyStr, true))
+		logging.Fatal(listener.UDPListener(*stagerPath, *port, *keyStr, true))
 	default:
 		logging.Fatalf("Unknown listener type: %s (supported: http, tcp, udp)", *listenerType)
 	}

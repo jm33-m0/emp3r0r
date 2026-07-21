@@ -7,13 +7,7 @@
 #define CONFIG_XOR_KEY 0x5A
 #endif
 
-#ifndef SLEEP_MAX
-#define SLEEP_MAX 60
-#endif
 
-#ifndef SLEEP_MIN
-#define SLEEP_MIN 10
-#endif
 
 #ifndef STAGE1_SIZE
 #define STAGE1_SIZE 0

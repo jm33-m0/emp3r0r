@@ -55,18 +55,6 @@
       "description": "Path to a library to stomp for the downloader (intermediate stage). Leave empty for anonymous memory.",
       "default": "/lib/x86_64-linux-gnu/libdl.so.2",
       "type": "string"
-    },
-    {
-      "name": "SLEEP_MIN",
-      "description": "Minimum sleep time in seconds between agent restarts",
-      "default": "180",
-      "type": "uint"
-    },
-    {
-      "name": "SLEEP_MAX",
-      "description": "Maximum sleep time in seconds between agent restarts",
-      "default": "480",
-      "type": "uint"
     }
   ],
   "agent_config": {

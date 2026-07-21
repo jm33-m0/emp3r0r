@@ -314,8 +314,6 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 		fmt.Sprintf("DOWNLOAD_PATH=%s", "/"),
 		fmt.Sprintf("DOWNLOAD_KEY=%s", stagerKey),
 		"DEBUG=1",
-		"SLEEP_MIN=1",
-		"SLEEP_MAX=2",
 	)
 	makeCmd.Dir = ".."
 	makeCmd.Env = append(os.Environ(), "CGO_ENABLED=0")
@@ -323,8 +321,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 	if err != nil {
 		t.Fatalf("Make failed: %v\nOutput: %s", err, string(out))
 	}
-	logging.Successf("Stager (downloader shellcode) built")
-	defer exec.Command("make", "clean").Run()
+	logging.Successf("Stager compiled successfully")
 
 	stagerBinPath := filepath.Join(tmpDir, "stager.bin")
 	input, err := os.ReadFile("../stager.bin")
@@ -344,7 +341,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 	// malasada payload is already position-independent shellcode; compressing
 	// it a second time buys little and would require a second decompressor.
 	go func() {
-		if err := listener.HTTPAESCompressedListener(payloadPath, stagerPortStr, stagerKey, false); err != nil {
+		if err := listener.HTTPListener(payloadPath, stagerPortStr, stagerKey, false); err != nil {
 			logging.Errorf("Stager listener failed: %v", err)
 		}
 	}()

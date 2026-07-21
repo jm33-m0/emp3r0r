@@ -316,31 +316,31 @@ func runListener(cmd *cobra.Command, args []string) {
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
-					logging.Errorf("HTTPAESCompressedlistener panic: %v\n%s", r, util.CallStack())
+					logging.Errorf("HTTPlistener panic: %v\n%s", r, util.CallStack())
 					errChan <- fmt.Errorf("listener panic: %v", r)
 				}
 			}()
-			errChan <- listener.HTTPAESCompressedListener(stagerPath, port, keyStr, true)
+			errChan <- listener.HTTPListener(stagerPath, port, keyStr, true)
 		}()
 	case "tcp":
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
-					logging.Errorf("TCPAESCompressedlistener panic: %v\n%s", r, util.CallStack())
+					logging.Errorf("TCPlistener panic: %v\n%s", r, util.CallStack())
 					errChan <- fmt.Errorf("listener panic: %v", r)
 				}
 			}()
-			errChan <- listener.TCPAESCompressedListener(stagerPath, port, keyStr, true)
+			errChan <- listener.TCPListener(stagerPath, port, keyStr, true)
 		}()
 	case "udp":
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
-					logging.Errorf("UDPAESCompressedlistener panic: %v\n%s", r, util.CallStack())
+					logging.Errorf("UDPlistener panic: %v\n%s", r, util.CallStack())
 					errChan <- fmt.Errorf("listener panic: %v", r)
 				}
 			}()
-			errChan <- listener.UDPAESCompressedListener(stagerPath, port, keyStr, true)
+			errChan <- listener.UDPListener(stagerPath, port, keyStr, true)
 		}()
 	default:
 		c2transport.NotifyC2(cmd, "Error: unknown listener type '%s' (supported: http, tcp, udp)\n", listenerType)

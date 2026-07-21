@@ -15,13 +15,12 @@ var (
 	udpSessionsMutex sync.Mutex
 )
 
-// TCPAESCompressedListener serves the encrypted stager file over raw TCP.
-// stagerPath: the path to the stager file to serve.
-// port: the port to serve the stager file on.
-// keyStr: the passphrase to encrypt the stager file.
-// compression: whether to compress the stager file before encryption.
-// loaderPath: optional path to stage1 loader (empty string if not used).
-func TCPAESCompressedListener(stagerPath, port, keyStr string, compression bool) error {
+// TCPListener serves the encrypted payload file over raw TCP.
+// stagerPath: the path to the payload file to serve.
+// port: the port to serve the file on.
+// keyStr: the passphrase to encrypt the file.
+// compression: whether to compress the file before encryption.
+func TCPListener(stagerPath, port, keyStr string, compression bool) error {
 	blob, err := buildServedBlob(stagerPath, keyStr, compression)
 	if err != nil {
 		return err
@@ -95,13 +94,12 @@ func TCPBareListener(stagerPath, port string) error {
 	}
 }
 
-// UDPAESCompressedListener serves the encrypted stager file over UDP.
-// stagerPath: the path to the stager file to serve.
-// port: the port to serve the stager file on.
-// keyStr: the passphrase to encrypt the stager file.
-// compression: whether to compress the stager file before encryption.
-// loaderPath: optional path to stage1 loader (empty string if not used).
-func UDPAESCompressedListener(stagerPath, port, keyStr string, compression bool) error {
+// UDPListener serves the encrypted payload file over UDP.
+// stagerPath: the path to the payload file to serve.
+// port: the port to serve the file on.
+// keyStr: the passphrase to encrypt the file.
+// compression: whether to compress the file before encryption.
+func UDPListener(stagerPath, port, keyStr string, compression bool) error {
 	blob, err := buildServedBlob(stagerPath, keyStr, compression)
 	if err != nil {
 		return err
