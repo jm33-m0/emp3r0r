@@ -78,31 +78,8 @@ check_disk_space() {
 }
 
 check_zig() {
-  local is_container=0
-  if [[ -f /.dockerenv || -f /run/.containerenv ]]; then
-    is_container=1
-  fi
-
   if ! command -v zig >/dev/null 2>&1; then
-    if [[ "$is_container" -eq 1 ]]; then
-      info "zig not found in container, installing zig to /usr/local/bin ..."
-      local zig_tmp
-      zig_tmp=$(mktemp -d -t zig-install-XXXXXX)
-      {
-        cd "$zig_tmp" &&
-          wget -q https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz &&
-          tar -xpf zig-linux-x86_64-0.13.0.tar.xz &&
-          sudo cp -aR ./zig-linux-x86_64-0.13.0 /usr/local/lib/zig &&
-          sudo ln -sf /usr/local/lib/zig/zig /usr/local/bin/zig
-      } || {
-        rm -rf "$zig_tmp"
-        error "Failed to install zig"
-      }
-      rm -rf "$zig_tmp"
-      cd "$pwd" || error "cd $pwd"
-    else
-      error "zig not found. Please run build inside the builder container, or install zig 0.13.0 manually on the host."
-    fi
+    error "zig not found. Please run build inside the builder container, or install zig 0.13.0 manually on the host."
   else
     info "zig is already installed"
   fi
@@ -203,11 +180,15 @@ info "Operator user: $INSTALL_USER"
 # -- Check required system dependencies --
 for dep in setcap tmux; do
   if ! command -v "$dep" >/dev/null 2>&1; then
-    warn "Required tool '$dep' not found. Attempting to install via apt..."
+    warn "Required tool '$dep' not found. Attempting to install..."
     if command -v apt-get >/dev/null 2>&1; then
       apt-get update -qq && apt-get install -y \
         "$( [[ "$dep" == "setcap" ]] && echo libcap2-bin || echo "$dep" )" \
         || error "Failed to install $dep"
+    elif command -v yum >/dev/null 2>&1; then
+      yum install -y \
+        "$( [[ "$dep" == "setcap" ]] && echo libcap || echo "$dep" )" \
+        || error "Failed to install $dep via yum"
     else
       error "$dep is required but could not be installed automatically. Please install it manually."
     fi
@@ -311,12 +292,12 @@ OPERATOR_INSTALL_EOF
   chmod 755 "$kit_dir/install.sh"
 
   # Create the final archive from the staging directory
-  tar --zstd -cpf "$pwd/$operator_bundle_name" -C "$bundle_stage" "emp3r0r-operator-kit" ||
+  tar -I zstd -cpf "$pwd/$operator_bundle_name" -C "$bundle_stage" "emp3r0r-operator-kit" ||
     error "failed to create operator package"
 
   success "Created portable operator package: $pwd/$operator_bundle_name"
   success "Transfer to your operator machine, then:"
-  success "  tar --zstd -xpf $operator_bundle_name && ./emp3r0r-operator-kit/install.sh"
+  success "  tar -I zstd -xpf $operator_bundle_name && ./emp3r0r-operator-kit/install.sh"
 }
 
 build_agent_pure() {
@@ -401,42 +382,47 @@ build_shared_object() {
   local os=$2
   local output=$3
   info "Building shared object for $os $arch"
+
+  local tags="emp3r0r_so"
+  [[ "$arg1" != "--debug" ]] && tags="release emp3r0r_so"
+
   local build_cmd
-  local extldflags="-nostdlib -nodefaultlibs -static -Wl,--gc-sections"
+  local extldflags="-nostdlib -nodefaultlibs -Wl,--gc-sections"
   [[ "$arg1" != "--debug" ]] && extldflags="-s $extldflags"
   local win_gui_flag=""
   [[ "$arg1" != "--debug" ]] && [[ "$os" == "windows" ]] && win_gui_flag="-H=windowsgui "
   case "$os" in
   windows)
+    tags="netgo $tags"
     case "$arch" in
     386)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86-windows-gnu\" CXX=\"zig c++ -target x86-windows-gnu\" GOOS=$os GOARCH=$arch $gobuild_cmd $build_opt -tags \"netgo emp3r0r_so\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"${win_gui_flag}$ldflags -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86-windows-gnu\" CXX=\"zig c++ -target x86-windows-gnu\" GOOS=$os GOARCH=$arch $gobuild_cmd $build_opt -trimpath -buildvcs=false -tags \"$tags\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"${win_gui_flag}$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     amd64)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86_64-windows-gnu\" CXX=\"zig c++ -target x86_64-windows-gnu\" GOOS=$os GOARCH=$arch $gobuild_cmd $build_opt -tags \"netgo emp3r0r_so\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"${win_gui_flag}$ldflags -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86_64-windows-gnu\" CXX=\"zig c++ -target x86_64-windows-gnu\" GOOS=$os GOARCH=$arch $gobuild_cmd $build_opt -trimpath -buildvcs=false -tags \"$tags\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"${win_gui_flag}$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     arm64)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target aarch64-windows-gnu\" CXX=\"zig c++ -target aarch64-windows-gnu\" GOOS=$os GOARCH=$arch $gobuild_cmd $build_opt -tags \"netgo emp3r0r_so\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"${win_gui_flag}$ldflags -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target aarch64-windows-gnu\" CXX=\"zig c++ -target aarch64-windows-gnu\" GOOS=$os GOARCH=$arch $gobuild_cmd $build_opt -trimpath -buildvcs=false -tags \"$tags\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"${win_gui_flag}$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     esac
     ;;
   linux)
     case "$arch" in
     386)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86-linux-gnu\" GOARCH=$arch $gobuild_cmd $build_opt -tags emp3r0r_so -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86-linux-gnu\" GOARCH=$arch $gobuild_cmd $build_opt -trimpath -buildvcs=false -tags \"$tags\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     amd64)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86_64-linux-gnu\" GOARCH=$arch $gobuild_cmd $build_opt -tags emp3r0r_so -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86_64-linux-gnu\" GOARCH=$arch $gobuild_cmd $build_opt -trimpath -buildvcs=false -tags \"$tags\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     arm)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target arm-linux-gnueabi\" GOARCH=$arch $gobuild_cmd $build_opt -tags emp3r0r_so -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target arm-linux-gnueabi\" GOARCH=$arch $gobuild_cmd $build_opt -trimpath -buildvcs=false -tags \"$tags\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     arm64)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target aarch64-linux-gnu\" GOARCH=$arch $gobuild_cmd $build_opt -tags emp3r0r_so -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target aarch64-linux-gnu\" GOARCH=$arch $gobuild_cmd $build_opt -trimpath -buildvcs=false -tags \"$tags\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     riscv64)
       # the built shared object is untested
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target riscv64-linux-musl\" GOARCH=$arch $gobuild_cmd $build_opt -tags emp3r0r_so -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target riscv64-linux-musl\" GOARCH=$arch $gobuild_cmd $build_opt -trimpath -buildvcs=false -tags \"$tags\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     esac
     ;;
@@ -469,18 +455,7 @@ check_build_toolchain() {
   done
 
   if [[ ${#unique_toolchains[@]} -gt 0 ]]; then
-    if [[ "$is_container" -eq 1 ]]; then
-      if command -v apt-get >/dev/null 2>&1; then
-        info "Installing build toolchains in container: ${unique_toolchains[*]}..."
-        if ! (sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${unique_toolchains[@]}"); then
-          warn "Failed to install some toolchains: ${unique_toolchains[*]}"
-        fi
-      else
-        error "Missing required toolchains: ${unique_toolchains[*]}. Please install them."
-      fi
-    else
-      error "Missing required toolchains: ${unique_toolchains[*]}. Please run build inside the builder container, or install them manually on the host."
-    fi
+    error "Missing required toolchains: ${unique_toolchains[*]}. Please run build inside the builder container, or install them manually on the host."
   fi
 }
 
@@ -516,8 +491,8 @@ build() {
       gobuild_cmd="garble"
       build_opt="-tiny -seed=random build -mod=vendor"
       ldflags+=" -s -w"
-      info "Setting up garble"
-      $GO_BIN install mvdan.cc/garble@master || error "Failed to install garble"
+      info "Using garble for obfuscation"
+      command -v garble >/dev/null 2>&1 || error "garble not found. It should be installed in the builder container."
     fi
   fi
 
@@ -748,7 +723,7 @@ create_tar() {
   prepare_misc_files
   info "Creating archive..."
   cd /tmp || error "Cannot cd to /tmp"
-  tar --zstd -cpf "$pwd/emp3r0r.tar.zst" "$temp" || error "failed to create archive"
+  tar -I zstd -cpf "$pwd/emp3r0r.tar.zst" "$temp" || error "failed to create archive"
   success "Packaged emp3r0r"
 }
 

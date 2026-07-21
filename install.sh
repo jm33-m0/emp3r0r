@@ -82,14 +82,19 @@ detect_container_engine() {
   elif command -v podman >/dev/null 2>&1; then
     CONTAINER_ENGINE="podman"
   else
-    warn "Neither 'docker' nor 'podman' was found. Attempting to install 'podman' via apt..."
+    warn "Neither 'docker' nor 'podman' was found. Attempting to install 'podman'..."
     if command -v apt-get >/dev/null 2>&1; then
       if ! (sudo apt-get update -qq && sudo apt-get install -y podman); then
         error "Failed to install podman"
       fi
       CONTAINER_ENGINE="podman"
+    elif command -v yum >/dev/null 2>&1; then
+      if ! (sudo yum install -y podman); then
+        error "Failed to install podman via yum"
+      fi
+      CONTAINER_ENGINE="podman"
     else
-      error "Neither 'docker' nor 'podman' was found, and apt-get is not available to install podman. Please install docker or podman manually."
+      error "Neither 'docker' nor 'podman' was found, and apt-get/yum is not available to install podman. Please install docker or podman manually."
     fi
   fi
   info "Using container engine: $CONTAINER_ENGINE"
@@ -103,10 +108,21 @@ check_host_deps() {
   if ! command -v tar >/dev/null 2>&1; then
     missing+=("tar")
   fi
+  if ! command -v zstd >/dev/null 2>&1; then
+    missing+=("zstd")
+  fi
   if [[ ${#missing[@]} -gt 0 ]]; then
-    warn "Missing host tools: ${missing[*]}. Installing via apt..."
-    if ! (sudo apt-get update -qq && sudo apt-get install -y "${missing[@]}"); then
-      error "Failed to install: ${missing[*]}"
+    warn "Missing host tools: ${missing[*]}. Installing..."
+    if command -v apt-get >/dev/null 2>&1; then
+      if ! (sudo apt-get update -qq && sudo apt-get install -y "${missing[@]}"); then
+        error "Failed to install: ${missing[*]}"
+      fi
+    elif command -v yum >/dev/null 2>&1; then
+      if ! (sudo yum install -y "${missing[@]}"); then
+        error "Failed to install via yum: ${missing[*]}"
+      fi
+    else
+      error "Missing host tools: ${missing[*]}. Please install them manually."
     fi
   fi
 
@@ -181,7 +197,7 @@ install_from_operator_kit() {
   tmp="$(mktemp -d -t emp3r0r-kit-extract-XXXXXX)"
 
   info "Extracting operator kit to install..."
-  if ! tar --zstd -xpf "$CACHED_KIT" -C "$tmp"; then
+  if ! tar -I zstd -xpf "$CACHED_KIT" -C "$tmp"; then
     rm -rf "$tmp"
     error "Failed to extract operator kit"
   fi
