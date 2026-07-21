@@ -89,9 +89,3 @@ long munmap(void *addr, size_t length) {
 long mprotect(void *addr, size_t len, int prot) {
   return syscall3(SYS_mprotect, (long)addr, len, prot);
 }
-
-#ifdef DEBUG
-void debug_print(const char *format, ...) { (void)format; }
-
-void perror(const char *s) { (void)s; }
-#endif
