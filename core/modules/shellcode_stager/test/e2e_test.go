@@ -96,7 +96,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 	//   - -buildvcs=false, -trimpath
 	//   - -buildmode c-shared
 	//   - ldflags:    -s -w -linkmode external
-	//   - extldflags: -nostdlib -nodefaultlibs -Wl,--gc-sections -s
+	//   - extldflags: -Wl,--gc-sections -s
 	// "emp3r0r_so" activates main_cgo_shared.go which exports the `main`
 	// symbol that malasada's stage0 calls after reflective loading.
 	agentSOPath := filepath.Join(tmpDir, "agent.so")
@@ -106,7 +106,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 		"-tags", "release emp3r0r_so",
 		"-trimpath",
 		"-buildvcs=false",
-		"-ldflags", "-s -w -linkmode external -extldflags '-nostdlib -nodefaultlibs -Wl,--gc-sections -s'",
+		"-ldflags", "-s -w -linkmode external -extldflags '-Wl,--gc-sections -s'",
 		"-o", agentSOPath,
 		"../../../cmd/agent",
 	)
@@ -390,7 +390,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 	if err := os.WriteFile(runnerSrc, []byte(runnerCode), 0o644); err != nil {
 		t.Fatalf("Failed to write runner source: %v", err)
 	}
-	if out, err := exec.Command("gcc", "-o", runnerBin, runnerSrc).CombinedOutput(); err != nil {
+	if out, err := exec.Command("gcc", "-rdynamic", "-o", runnerBin, runnerSrc, "-ldl").CombinedOutput(); err != nil {
 		t.Fatalf("Failed to build stager runner: %v\nOutput: %s", err, string(out))
 	}
 
