@@ -412,7 +412,7 @@ build_shared_object() {
       build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86-linux-gnu.2.17\" GOARCH=$arch $gobuild_cmd $build_opt -trimpath -buildvcs=false -tags \"$tags\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     amd64)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86_64-linux-gnu.2.17\" GOARCH=$arch $gobuild_cmd $build_opt -trimpath -buildvcs=false -tags \"$tags\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 GOARCH=$arch $gobuild_cmd $build_opt -trimpath -buildvcs=false -tags \"$tags\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     arm)
       build_cmd="CGO_ENABLED=1 CC=\"zig cc -target arm-linux-gnueabihf.2.17\" GOARCH=$arch $gobuild_cmd $build_opt -trimpath -buildvcs=false -tags \"$tags\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
@@ -496,20 +496,17 @@ build() {
     fi
   fi
 
-  local core_tags=()
-  [[ "$arg1" != "--debug" ]] && core_tags=(-tags release)
-
   info "Building CC"
   {
-    cd cmd/cc && CGO_ENABLED=0 $GO_BIN build -mod=vendor "${core_tags[@]}" -o "$temp/cc.exe" -ldflags="$ldflags"
+    cd cmd/cc && CGO_ENABLED=0 $GO_BIN build -mod=vendor -o "$temp/cc.exe" -ldflags="$ldflags"
   } || error "build cc"
   info "Building cat"
   {
-    cd "$pwd/cmd/cat" && CGO_ENABLED=0 $GO_BIN build -mod=vendor "${core_tags[@]}" -o "$temp/cat.exe" -ldflags="$ldflags"
+    cd "$pwd/cmd/cat" && CGO_ENABLED=0 $GO_BIN build -mod=vendor -o "$temp/cat.exe" -ldflags="$ldflags"
   } || error "build cat"
   info "Building listener"
   {
-    cd "$pwd/cmd/listener" && CGO_ENABLED=0 $GO_BIN build -mod=vendor "${core_tags[@]}" -o "$temp/listener.exe" -ldflags="$ldflags"
+    cd "$pwd/cmd/listener" && CGO_ENABLED=0 $GO_BIN build -mod=vendor -o "$temp/listener.exe" -ldflags="$ldflags"
   } || error "build listener"
 
   # Linux
