@@ -1,5 +1,23 @@
 # Changelog
 
+## [4.6.0](https://github.com/jm33-m0/emp3r0r/compare/v4.5.1...v4.6.0) (2026-07-21)
+
+
+### Features
+
+* add malasada to generate shellcode payload for Linux shared library agents ([1d82cff](https://github.com/jm33-m0/emp3r0r/commit/1d82cffe24fb1797ebb9f6bf2364a2b838e19ff8))
+* remove `elf` module type in favor of BOFs ([3bc9f27](https://github.com/jm33-m0/emp3r0r/commit/3bc9f2725de59f3dca8349f57a2e31b3c7bb4abe))
+
+
+### Bug Fixes
+
+* `shellcode_stager` can't print debug logs ([8624470](https://github.com/jm33-m0/emp3r0r/commit/86244706284d4e83385e11291119e8f7282054ed))
+* `shellcode_stager` downloader error ([01c18f9](https://github.com/jm33-m0/emp3r0r/commit/01c18f9559e09beb6f7f0a6a20e42e1c19fd4d2a))
+* clean up `shellcode_stager` bloat in favor of Linux shellcode agent ([26e60dd](https://github.com/jm33-m0/emp3r0r/commit/26e60dd1e744a7408277ef4e0e2c18c5e9fb836b))
+* link to glibc 2.17 in `zig` shared library builds ([0e5cc31](https://github.com/jm33-m0/emp3r0r/commit/0e5cc31d5885a777d50e5c2be5a72bdf27dab9c7))
+* remove `loader` stage to serve reflective shellcode loader directly ([5436ea4](https://github.com/jm33-m0/emp3r0r/commit/5436ea4a88eb2757ecec913a805ee224b9c82868))
+* use of RWX memory in stager ([6042fa7](https://github.com/jm33-m0/emp3r0r/commit/6042fa79100ed9e96260da899e2dbd498d51fa3d))
+
 ## [4.5.1](https://github.com/jm33-m0/emp3r0r/compare/v4.5.0...v4.5.1) (2026-07-20)
 
 
