@@ -409,16 +409,16 @@ build_shared_object() {
   linux)
     case "$arch" in
     386)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86-linux-gnu\" GOARCH=$arch $gobuild_cmd $build_opt -trimpath -buildvcs=false -tags \"$tags\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86-linux-gnu.2.17\" GOARCH=$arch $gobuild_cmd $build_opt -trimpath -buildvcs=false -tags \"$tags\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     amd64)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86_64-linux-gnu\" GOARCH=$arch $gobuild_cmd $build_opt -trimpath -buildvcs=false -tags \"$tags\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target x86_64-linux-gnu.2.17\" GOARCH=$arch $gobuild_cmd $build_opt -trimpath -buildvcs=false -tags \"$tags\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     arm)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target arm-linux-gnueabi\" GOARCH=$arch $gobuild_cmd $build_opt -trimpath -buildvcs=false -tags \"$tags\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target arm-linux-gnueabihf.2.17\" GOARCH=$arch $gobuild_cmd $build_opt -trimpath -buildvcs=false -tags \"$tags\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     arm64)
-      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target aarch64-linux-gnu\" GOARCH=$arch $gobuild_cmd $build_opt -trimpath -buildvcs=false -tags \"$tags\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
+      build_cmd="CGO_ENABLED=1 CC=\"zig cc -target aarch64-linux-gnu.2.17\" GOARCH=$arch $gobuild_cmd $build_opt -trimpath -buildvcs=false -tags \"$tags\" -o \"$temp/$output\" -buildmode c-shared -ldflags=\"$ldflags -linkmode external -extldflags '$extldflags'\""
       ;;
     riscv64)
       # the built shared object is untested
@@ -547,7 +547,6 @@ build() {
   # error: https://github.com/golang/go/issues/22040
   # build_shared_object "arm64" "linux" "stub-arm64.so"
 
-
   # Build modules with a make_all.sh wrapper
   info "Building complex modules with make_all.sh..."
   for mod_dir in "$pwd"/modules/*; do
@@ -555,8 +554,8 @@ build() {
       info "Running make_all.sh in $(basename "$mod_dir")"
       {
         cd "$mod_dir" &&
-        chmod +x make_all.sh &&
-        ./make_all.sh
+          chmod +x make_all.sh &&
+          ./make_all.sh
       } || warn "Failed to build modules in $(basename "$mod_dir") via make_all.sh"
     fi
   done
