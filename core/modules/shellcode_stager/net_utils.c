@@ -1,10 +1,8 @@
-#include "utils.h"
 #include "net_utils.h"
 #include "syscalls.h"
 #include <stdarg.h>
 
 // Non-network functions removed.
-
 
 unsigned short htons(unsigned short hostshort) {
   return (hostshort << 8) | (hostshort >> 8);
