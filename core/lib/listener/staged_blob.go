@@ -16,7 +16,7 @@ func xorData(data, key []byte) {
 	}
 }
 
-func buildServedBlob(payloadPath, keyStr, loaderPath string, compression bool) ([]byte, error) {
+func buildServedBlob(payloadPath, keyStr string, compression bool) ([]byte, error) {
 	// ReadFileAgent handles both mem:// and disk paths
 	payload, err := util.ReadFileAgent(payloadPath)
 	if err != nil {
@@ -24,28 +24,16 @@ func buildServedBlob(payloadPath, keyStr, loaderPath string, compression bool) (
 	}
 
 	key := deriveKeyFromString(keyStr)
-	var toEncrypt []byte
+	var toServe []byte
 	if compression {
-		toEncrypt = compressData(payload)
+		toServe = compressData(payload)
 	} else {
-		toEncrypt = payload
-	}
-	encryptedPayload := encryptData(toEncrypt, key)
-
-	if loaderPath == "" {
-		return encryptedPayload, nil
+		toServe = payload
 	}
 
-	loader, err := util.ReadFileAgent(loaderPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read stage1 loader (%s): %v", loaderPath, err)
-	}
-
-	blob := make([]byte, 0, len(loader)+len(encryptedPayload))
-	blob = append(blob, loader...)
-	blob = append(blob, encryptedPayload...)
+	blob := make([]byte, 0, len(toServe))
+	blob = append(blob, toServe...)
 	xorData(blob, key)
-	logging.Infof("Serving staged blob: loader=%d bytes payload=%d bytes total=%d bytes",
-		len(loader), len(encryptedPayload), len(blob))
+	logging.Infof("Serving staged blob: payload=%d bytes", len(blob))
 	return blob, nil
 }

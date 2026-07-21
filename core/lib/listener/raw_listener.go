@@ -21,8 +21,8 @@ var (
 // keyStr: the passphrase to encrypt the stager file.
 // compression: whether to compress the stager file before encryption.
 // loaderPath: optional path to stage1 loader (empty string if not used).
-func TCPAESCompressedListener(stagerPath, port, keyStr string, compression bool, loaderPath string) error {
-	blob, err := buildServedBlob(stagerPath, keyStr, loaderPath, compression)
+func TCPAESCompressedListener(stagerPath, port, keyStr string, compression bool) error {
+	blob, err := buildServedBlob(stagerPath, keyStr, compression)
 	if err != nil {
 		return err
 	}
@@ -101,8 +101,8 @@ func TCPBareListener(stagerPath, port string) error {
 // keyStr: the passphrase to encrypt the stager file.
 // compression: whether to compress the stager file before encryption.
 // loaderPath: optional path to stage1 loader (empty string if not used).
-func UDPAESCompressedListener(stagerPath, port, keyStr string, compression bool, loaderPath string) error {
-	blob, err := buildServedBlob(stagerPath, keyStr, loaderPath, compression)
+func UDPAESCompressedListener(stagerPath, port, keyStr string, compression bool) error {
+	blob, err := buildServedBlob(stagerPath, keyStr, compression)
 	if err != nil {
 		return err
 	}
@@ -126,6 +126,7 @@ func UDPAESCompressedListener(stagerPath, port, keyStr string, compression bool,
 
 	// Calculate key hash for authentication
 	keyHash := uint32(0)
+
 	for i := 0; i < len(key); i++ {
 		keyHash ^= uint32(key[i]) << ((i % 4) * 8)
 	}

@@ -116,8 +116,8 @@ func serveStager(stager_enc []byte, port string) error {
 // port: the port to serve the stager file on.
 // keyStr: the passpharase to encrypt the stager file.
 // loaderPath: optional path to stage1 loader (empty string if not used).
-func HTTPAESCompressedListener(stagerPath, port, keyStr string, compression bool, loaderPath string) error {
-	blob, err := buildServedBlob(stagerPath, keyStr, loaderPath, compression)
+func HTTPAESCompressedListener(stagerPath, port, keyStr string, compression bool) error {
+	blob, err := buildServedBlob(stagerPath, keyStr, compression)
 	if err != nil {
 		return err
 	}
