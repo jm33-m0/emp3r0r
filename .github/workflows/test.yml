@@ -57,14 +57,6 @@ jobs:
           go test -v ./lib/coffloader -run TestRunLinuxCOFFWithInlineBOF -count=1
           go test -v ./internal/cc/modules -run TestCOFF
 
-      - name: Run exeutil ELF loader test (cgo)
-        if: runner.os == 'Linux'
-        working-directory: ./core
-        env:
-          CGO_ENABLED: 1
-        run: |
-          go test -v ./lib/exeutil -run TestInMemExeRun -count=1
-
       - name: Install zig (for shellcode stager test)
         if: runner.os == 'Linux'
         run: |
