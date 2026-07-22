@@ -75,11 +75,11 @@ Agents in egress-restricted or isolated network segments autonomously discover p
 
 ### 📂 Inter-Agent Peer-to-Peer File Transfer
 
-Direct agent-to-agent file sharing via KCP tunnels and local encrypted HTTP servers to accelerate file delivery across internal networks.
+Direct agent-to-agent file sharing via P2P relay transport (mYLS/KCP) to accelerate file delivery across internal networks.
 
-- **Encrypted KCP Tunnels:** Tunnel transfers across peers using UDP/KCP (e.g., port 53) to bypass egress restrictions and reduce central C2 bandwidth bottlenecks.
-- **Automatic C2 Relay Fallback:** If a target peer lacks the requested file, it dynamically fetches and streams it from the C2 server on demand.
-- **SHA-256 Verification & Memory Storage:** Validates file integrity automatically before writing to memory or disk.
+- **Encrypted P2P Tunnels:** Tunnel transfers across peers using mTLS/KCP to bypass egress restrictions and reduce central C2 bandwidth bottlenecks.
+- **Smart In-Memory File Caching**: Files are cached in agent memory as encrypted blobs; can be seamlessly served for other agents to download on-demand. When requesting a file, agents look at their local memfs, then other peers, finally the C2.
+- **Automatic C2 Relay Fallback:** If a target peer lacks the requested file, it dynamically fetches and streams it from the C2 server on-demand.
 
 **Why this matters:** Direct agent-to-agent file sharing maximizes transfer speeds, bypasses network chokepoints, and reduces direct C2 traffic visibility.
 
