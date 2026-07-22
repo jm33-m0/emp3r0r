@@ -94,20 +94,27 @@ func moduleCustom(ctx *c2context.C2Context) {
 	handleCompressedModule(ctx, *config, payload_type, invB64, download_addr)
 }
 
+// build_module builds a local module using `build.sh`, passing flags as args to `./build.sh`
 func build_module(config *def.ModuleConfig, flags map[string]string) (out []byte, err error) {
 	err = os.Chdir(config.Path)
 	if err != nil {
 		return out, err
 	}
-	defer os.Chdir(live.EmpWorkSpace)
+	defer func() {
+		err = os.Chdir(live.EmpWorkSpace)
+		if err != nil {
+			logging.Warningf("Failed changing directory to %s: %v", live.EmpWorkSpace, err)
+		}
+	}()
 
+	invoc_args := ""
 	for name, val := range flags {
-		// Environment variables need to be in uppercase
-		os.Setenv(strings.ToUpper(name), val)
+		invoc_args = fmt.Sprintf("%s --%s %s ", invoc_args, name, val)
 	}
+	build_cmd := fmt.Sprintf("%s %s", config.Build, invoc_args)
 
 	// build module
-	out, err = exec.Command("sh", "-c", config.Build).CombinedOutput()
+	out, err = exec.Command("sh", "-c", build_cmd).CombinedOutput()
 	if err != nil {
 		err = fmt.Errorf("%s (%v)", out, err)
 		return out, err

@@ -134,22 +134,23 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 
 	// Generate shellcode for Windows (UI layer)
 	if payloadType == PayloadTypeWindowsExecutable || payloadType == PayloadTypeWindowsDLL {
-		donut.DonoutPE2Shellcode(result.OutputFile, archChoice)
+		err = donut.DonoutPE2Shellcode(result.OutputFile, archChoice)
+		if err != nil {
+			logging.Warningf("Donut failed to generate shellcode for %s: %v", result.OutputFile, err)
+		} else {
+			logging.Infof("Donut converted %s into shellcode at %s.bin", result.OutputFile, result.OutputFile)
+		}
 	}
 
 	// Informational messages (UI layer)
-	if payloadType == PayloadTypeLinuxExecutable {
-		logging.Infof("Use stager module to create a shared library stager that delivers the agent with encryption and compression. You will need another stager to load the shared library (or use LD_PRELOAD)")
-	}
 	if payloadType == PayloadTypeLinuxSO {
-		logging.Infof("Note: linux_so supports CGO and can be loaded as a shared library using LD_PRELOAD or dlopen(). Malasada is automatically invoked to create a reflective ELF loader shellcode of this payload")
 		err = tools.MalasadaConvert2Shellcode(result.OutputFile, "main", true)
 		if err != nil {
-			logging.Warningf("Generating Linux agent shellcode: %v", err)
+			logging.Warningf("Malasada failed to generate shellcode for %s: %v", result.OutputFile, err)
+		} else {
+			logging.Infof("Malasada converted %s into shellcode at %s.bin", result.OutputFile, result.OutputFile)
+			logging.Infof("Look into stager module to deliver this shellcode")
 		}
-	}
-	if payloadType == PayloadTypeWindowsDLL {
-		logging.Infof("Note: windows_dll supports CGO and can be loaded as a DLL using LoadLibrary() or similar methods")
 	}
 }
 

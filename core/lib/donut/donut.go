@@ -7,15 +7,14 @@ import (
 )
 
 // DonoutPE2Shellcode generates shellcode using donut for the executable files
-func DonoutPE2Shellcode(executable_file, arch_choice string) {
+func DonoutPE2Shellcode(executable_file, arch_choice string) error {
 	logging.Infof("Generating shellcode for: %s", executable_file)
 	outfile := fmt.Sprintf("%s.bin", executable_file)
 	out, err := DonutShellcodeFromFile(executable_file, outfile, arch_choice, false, "", "", "")
 	if err != nil {
-		logging.Errorf("Donut: %s: %v", out, err)
-		return
+		return fmt.Errorf("donut: %s: %v", out, err)
 	}
-	logging.Infof("Generated shellcode:\n%s", out)
+	return nil
 }
 
 // DonutShellcodeFromFile returns a Donut shellcode for the given PE file

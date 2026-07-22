@@ -492,7 +492,7 @@ func gen_agent_cmd() *cobra.Command {
 	}
 
 	// Group 1: Payload & Target
-	genAgentCmd.Flags().StringP("type", "t", PayloadTypeLinuxExecutable, fmt.Sprintf("Payload type, available: %v+ (linux_so and windows_dll support CGO)", PayloadTypeList))
+	genAgentCmd.Flags().StringP("type", "t", PayloadTypeLinuxSO, fmt.Sprintf("Payload type, available: %v+ (linux_so and windows_dll support CGO)", PayloadTypeList))
 	genAgentCmd.Flags().StringP("arch", "a", "amd64", fmt.Sprintf("Target architecture, available: %v+", Arch_List_All))
 	addFlagToGroup("Payload & Target Options", "type", "arch")
 
