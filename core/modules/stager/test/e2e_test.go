@@ -292,7 +292,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 	}()
 	time.Sleep(2 * time.Second)
 
-	// 6. Build stager.bin (downloader shellcode via make)
+	// 6. Build stager.bin (downloader shellcode)
 	//
 	// downloader.c downloads the malasada payload, XOR-decrypts it (same key
 	// derivation as buildServedBlob), then calls:
