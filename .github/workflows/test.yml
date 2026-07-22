@@ -67,7 +67,7 @@ jobs:
 
       - name: Run shellcode stager lifecycle test (cgo, no race)
         if: runner.os == 'Linux'
-        working-directory: ./core/modules/shellcode_stager
+        working-directory: ./core/modules/stager
         env:
           CGO_ENABLED: 1
         run: |
