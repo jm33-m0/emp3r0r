@@ -1,5 +1,21 @@
 # Changelog
 
+## [4.6.1](https://github.com/jm33-m0/emp3r0r/compare/v4.6.0...v4.6.1) (2026-07-22)
+
+
+### Bug Fixes
+
+* `shellcode_stager` is now `stager` with support of exe/so/raw formats ([d540070](https://github.com/jm33-m0/emp3r0r/commit/d54007026972fa53fe210889bcdcdd92f494bceb))
+* automatically install donut ([2709ab2](https://github.com/jm33-m0/emp3r0r/commit/2709ab254aad67377c58d561e13154bd36b77e42))
+* handle memfs paths ([e902e6f](https://github.com/jm33-m0/emp3r0r/commit/e902e6fce43a0f81dc3dd159482731ee17626985))
+* improve usability of payload generator ([0b616f9](https://github.com/jm33-m0/emp3r0r/commit/0b616f97fa0dcc0de8df8521dc0e4b54f2c90157))
+* p2p file transfer ([638f1b4](https://github.com/jm33-m0/emp3r0r/commit/638f1b4f5ae86d2769f55d671b5b16fbbbb493e0))
+* p2p file transfer should use p2p mesh transport ([ed9c1ef](https://github.com/jm33-m0/emp3r0r/commit/ed9c1ef81f60725f4bb87a81985c92db385d6e24))
+* remove compression from listener as malasada has built-in compression ([2e0d0f0](https://github.com/jm33-m0/emp3r0r/commit/2e0d0f00e46a33e7d5891dd9e0c10d992e4a45ea))
+* remove deprecated flag ([be3447b](https://github.com/jm33-m0/emp3r0r/commit/be3447bdd9629bdd1b5633a63223692f256891d4))
+* revamp p2p mesh, make p2p ports dynamic, improve p2p file system ([d5b6723](https://github.com/jm33-m0/emp3r0r/commit/d5b6723713af11e4640bbc494f5c92b799cc76a0))
+* specify DLL entry function for donut ([0136e87](https://github.com/jm33-m0/emp3r0r/commit/0136e8721d7ed6bbf6e23de12eb77a2439ab4778))
+
 ## [4.6.0](https://github.com/jm33-m0/emp3r0r/compare/v4.5.1...v4.6.0) (2026-07-21)
 
 
