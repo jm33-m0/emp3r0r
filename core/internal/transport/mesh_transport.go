@@ -434,3 +434,115 @@ func (c *GCMConn) Write(b []byte) (n int, err error) {
 
 	return len(b), nil
 }
+
+// P2PTunServer starts a tunnel server using the configured P2P mesh transport.
+// It listens on listenPortStr using P2PTransport and forwards accepted connections to target.
+func P2PTunServer(target, listenPortStr, password, salt, p2pTransport, certOrg, certCN string, ctx context.Context, cancel context.CancelFunc) error {
+	t := GetTransportImplementation(p2pTransport)
+	if t == nil {
+		return fmt.Errorf("P2PTunServer: transport %s not found", p2pTransport)
+	}
+	if camo, ok := t.(*CamouflageMTLS); ok {
+		if certOrg != "" {
+			camo.CertOrg = certOrg
+		}
+		if certCN != "" {
+			camo.CertCN = certCN
+		}
+	}
+	listener, err := t.Listen(listenPortStr, password, salt)
+	if err != nil {
+		return fmt.Errorf("P2PTunServer listen error on port %s: %v", listenPortStr, err)
+	}
+	defer listener.Close()
+
+	go func() {
+		<-ctx.Done()
+		listener.Close()
+	}()
+
+	logging.Infof("P2PTunServer listening on %s port %s (forwarding to %s)", p2pTransport, listenPortStr, target)
+
+	for ctx.Err() == nil {
+		conn, err := t.Accept(ctx, listener)
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil
+			}
+			logging.Errorf("P2PTunServer accept error: %v", err)
+			continue
+		}
+
+		go func(c net.Conn) {
+			defer c.Close()
+			targetConn, err := net.Dial("tcp", target)
+			if err != nil {
+				logging.Errorf("P2PTunServer dial target %s error: %v", target, err)
+				return
+			}
+			defer targetConn.Close()
+
+			buf1 := make([]byte, 32*1024)
+			buf2 := make([]byte, 32*1024)
+			go io.CopyBuffer(targetConn, c, buf1)
+			io.CopyBuffer(c, targetConn, buf2)
+		}(conn)
+	}
+	return nil
+}
+
+// P2PTunClient starts a local tunnel client that listens on localPortStr.
+// Incoming local connections are tunneled to remoteAddr via P2PTransport.
+func P2PTunClient(remoteAddr, localPortStr, password, salt, p2pTransport, certOrg, certCN string, ctx context.Context, cancel context.CancelFunc) error {
+	localListenAddr := fmt.Sprintf("127.0.0.1:%s", localPortStr)
+	listener, err := net.Listen("tcp", localListenAddr)
+	if err != nil {
+		return fmt.Errorf("P2PTunClient local listen error on %s: %v", localListenAddr, err)
+	}
+	defer listener.Close()
+
+	go func() {
+		<-ctx.Done()
+		listener.Close()
+	}()
+
+	t := GetTransportImplementation(p2pTransport)
+	if t == nil {
+		return fmt.Errorf("P2PTunClient: transport %s not found", p2pTransport)
+	}
+	if camo, ok := t.(*CamouflageMTLS); ok {
+		if certOrg != "" {
+			camo.CertOrg = certOrg
+		}
+		if certCN != "" {
+			camo.CertCN = certCN
+		}
+	}
+
+	for ctx.Err() == nil {
+		localConn, err := listener.Accept()
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil
+			}
+			logging.Errorf("P2PTunClient local accept error: %v", err)
+			continue
+		}
+
+		go func(lc net.Conn) {
+			defer lc.Close()
+			remoteConn, err := t.Dial(remoteAddr, password, salt)
+			if err != nil {
+				logging.Errorf("P2PTunClient dial remote %s error: %v", remoteAddr, err)
+				return
+			}
+			defer remoteConn.Close()
+
+			buf1 := make([]byte, 32*1024)
+			buf2 := make([]byte, 32*1024)
+			go io.CopyBuffer(remoteConn, lc, buf1)
+			io.CopyBuffer(lc, remoteConn, buf2)
+		}(localConn)
+	}
+	return nil
+}

