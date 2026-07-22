@@ -20,7 +20,7 @@
 
 ## What is emp3r0r?
 
-emp3r0r is an advanced, zero-trust post-exploitation framework and command & control (C2) system designed for Linux and Windows target environments. Built from the ground up to operate in high-security environments, emp3r0r combines **autonomous gossip mesh networking**, **fileless memory-only execution**, **cross-platform BOF loading**, and **in-memory scriptable agents** to deliver superior stealth, operational control, and operational security (OPSEC).
+emp3r0r is an advanced, zero-trust post-exploitation framework and command & control (C2) system designed for Linux and Windows target environments. Built from the ground up to operate in high-security environments, emp3r0r combines **autonomous gossip mesh networking**, **fileless memory-only execution**, **cross-platform BOF loading**, **inter-agent file transfer**, and **in-memory scriptable agents** to deliver superior stealth, operational control, and operational security (OPSEC).
 
 ---
 
@@ -70,6 +70,29 @@ Agents in egress-restricted or isolated network segments autonomously discover p
 - **Low Network Footprint:** Direct agent-to-agent relaying eliminates unnecessary broadcast noise and centralized C2 connection chokepoints.
 
 **Why this matters:** Pivoting across segmented networks occurs autonomously without requiring constant operator intervention or static proxy setups.
+
+---
+
+### 📂 Inter-Agent Peer-to-Peer File Transfer
+
+Direct agent-to-agent file sharing via KCP tunnels and local encrypted HTTP servers to accelerate file delivery across internal networks.
+
+- **Encrypted KCP Tunnels:** Tunnel transfers across peers using UDP/KCP (e.g., port 53) to bypass egress restrictions and reduce central C2 bandwidth bottlenecks.
+- **Automatic C2 Relay Fallback:** If a target peer lacks the requested file, it dynamically fetches and streams it from the C2 server on demand.
+- **SHA-256 Verification & Memory Storage:** Validates file integrity automatically before writing to memory or disk.
+
+**Why this matters:** Direct agent-to-agent file sharing maximizes transfer speeds, bypasses network chokepoints, and reduces direct C2 traffic visibility.
+
+---
+
+### 📡 Multi-Protocol Listeners & Stagers
+
+Flexible Stage 0 downloader stagers and protocol listeners for initial access and payload delivery.
+
+- **Multi-Protocol Listeners:** Embedded and standalone HTTP, TCP, and UDP listeners with reliable sequence-acknowledgment framing and custom HTTP profiles.
+- **Standalone C Downloader Stager:** Built with direct, libc-independent Linux syscalls for compatibility across distributions without symbol errors.
+- **Flexible Formats:** Compiles into raw position-independent shellcode (`.bin`), standalone ELF executables, or shared objects (`.so`).
+- **In-Memory Hardening:** Allocates stage memory with read-write permissions, de-obfuscates payloads, and enforces read-execute (`mprotect`) prior to reflectively executing Stage 1.
 
 ---
 
