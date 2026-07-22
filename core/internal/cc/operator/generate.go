@@ -134,7 +134,7 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 
 	// Generate shellcode for Windows (UI layer)
 	if payloadType == PayloadTypeWindowsExecutable || payloadType == PayloadTypeWindowsDLL {
-		err = donut.DonoutPE2Shellcode(result.OutputFile, archChoice)
+		err = donut.DonoutPE2Shellcode(result.OutputFile, archChoice, "main")
 		if err != nil {
 			logging.Warningf("Donut failed to generate shellcode for %s: %v", result.OutputFile, err)
 		} else {
