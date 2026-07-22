@@ -100,6 +100,61 @@ find_installed_prefix() {
   echo "$detected_prefix"
 }
 
+DONUT_URL="https://github.com/TheWover/donut/releases/download/v1.1/donut_v1.1.tar.gz"
+DONUT_ARCHIVE_NAME="donut_v1.1.tar.gz"
+
+download_file() {
+  local url="$1"
+  local dest="$2"
+  if command -v curl >/dev/null 2>&1; then
+    curl -sSL --connect-timeout 15 "$url" -o "$dest" 2>/dev/null
+  elif command -v wget >/dev/null 2>&1; then
+    wget -qO "$dest" "$url" 2>/dev/null
+  else
+    return 1
+  fi
+}
+
+install_donut() {
+  local target_dir="$1"
+  local search_dir="${2:-}"
+  local donut_archive=""
+
+  if [[ -n "$search_dir" && -f "$search_dir/$DONUT_ARCHIVE_NAME" ]]; then
+    donut_archive="$search_dir/$DONUT_ARCHIVE_NAME"
+  fi
+
+  if [[ -z "$donut_archive" || ! -f "$donut_archive" ]]; then
+    donut_archive="$(mktemp -t donut_v0.1.XXXXXX.tar.gz 2>/dev/null || echo "/tmp/$DONUT_ARCHIVE_NAME")"
+    info "Downloading donut archive from $DONUT_URL..."
+    download_file "$DONUT_URL" "$donut_archive" || warn "Failed to download $DONUT_URL"
+  fi
+
+  if [[ -f "$donut_archive" ]]; then
+    info "Extracting and installing donut..."
+    local donut_tmp
+    donut_tmp="$(mktemp -d)"
+    if tar -xzf "$donut_archive" -C "$donut_tmp" 2>/dev/null; then
+      local donut_bin
+      donut_bin="$(find "$donut_tmp" -type f -name "donut" | head -n 1)"
+      if [[ -n "$donut_bin" && -f "$donut_bin" ]]; then
+        mkdir -p "$target_dir/bin" "/usr/local/bin"
+        cp -af "$donut_bin" "$target_dir/bin/donut"
+        chmod 755 "$target_dir/bin/donut"
+        ln -sf "$target_dir/bin/donut" "/usr/local/bin/donut"
+        info "Linked donut executable to /usr/local/bin/donut"
+      else
+        warn "Executable 'donut' not found inside $donut_archive"
+      fi
+    else
+      warn "Failed to extract $donut_archive"
+    fi
+    rm -rf "$donut_tmp"
+  else
+    warn "Donut archive could not be obtained; skipping donut installation"
+  fi
+}
+
 package_operator_bundle() {
   local installed_prefix
   installed_prefix="$(find_installed_prefix)"
@@ -138,6 +193,10 @@ package_operator_bundle() {
     fi
   done
 
+  # Download donut tar archive from release URL to include in the kit
+  info "Downloading donut package from $DONUT_URL..."
+  download_file "$DONUT_URL" "$kit_dir/$DONUT_ARCHIVE_NAME" || warn "Could not download $DONUT_URL at package time"
+
   # Generate the self-contained install.sh that operators run after extracting the kit
   cat >"$kit_dir/install.sh" <<'OPERATOR_INSTALL_EOF'
 #!/bin/bash
@@ -152,10 +211,65 @@ package_operator_bundle() {
 
 set -euo pipefail
 
+DONUT_URL="https://github.com/TheWover/donut/releases/download/v1.1/donut_v1.1.tar.gz"
+DONUT_ARCHIVE_NAME="donut_v1.1.tar.gz"
+
 success() { printf "\n\e[32m[SUCCESS] %s\e[0m\n\n" "$1"; }
 info()    { printf "\e[34m[INFO] %s\e[0m\n" "$1"; }
 error()   { printf "\n\e[31m[ERROR] %s\e[0m\n\n" "$1"; exit 1; }
 warn()    { printf "\e[33m[WARN] %s\e[0m\n" "$1"; }
+
+download_file() {
+  local url="$1"
+  local dest="$2"
+  if command -v curl >/dev/null 2>&1; then
+    curl -sSL --connect-timeout 15 "$url" -o "$dest" 2>/dev/null
+  elif command -v wget >/dev/null 2>&1; then
+    wget -qO "$dest" "$url" 2>/dev/null
+  else
+    return 1
+  fi
+}
+
+install_donut() {
+  local target_dir="$1"
+  local search_dir="${2:-}"
+  local donut_archive=""
+
+  if [[ -n "$search_dir" && -f "$search_dir/$DONUT_ARCHIVE_NAME" ]]; then
+    donut_archive="$search_dir/$DONUT_ARCHIVE_NAME"
+  fi
+
+  if [[ -z "$donut_archive" || ! -f "$donut_archive" ]]; then
+    donut_archive="$(mktemp -t donut_v0.1.XXXXXX.tar.gz 2>/dev/null || echo "/tmp/$DONUT_ARCHIVE_NAME")"
+    info "Downloading donut archive from $DONUT_URL..."
+    download_file "$DONUT_URL" "$donut_archive" || warn "Failed to download $DONUT_URL"
+  fi
+
+  if [[ -f "$donut_archive" ]]; then
+    info "Extracting and installing donut..."
+    local donut_tmp
+    donut_tmp="$(mktemp -d)"
+    if tar -xzf "$donut_archive" -C "$donut_tmp" 2>/dev/null; then
+      local donut_bin
+      donut_bin="$(find "$donut_tmp" -type f -name "donut" | head -n 1)"
+      if [[ -n "$donut_bin" && -f "$donut_bin" ]]; then
+        mkdir -p "$target_dir/bin" "/usr/local/bin"
+        cp -af "$donut_bin" "$target_dir/bin/donut"
+        chmod 755 "$target_dir/bin/donut"
+        ln -sf "$target_dir/bin/donut" "/usr/local/bin/donut"
+        info "Linked donut executable to /usr/local/bin/donut"
+      else
+        warn "Executable 'donut' not found inside $donut_archive"
+      fi
+    else
+      warn "Failed to extract $donut_archive"
+    fi
+    rm -rf "$donut_tmp"
+  else
+    warn "Donut archive could not be obtained; skipping donut installation"
+  fi
+}
 
 # Re-exec with sudo if not root
 if [[ "$EUID" -ne 0 ]]; then
@@ -221,6 +335,9 @@ for dir in build modules tmux; do
     info "Installed $dir"
   fi
 done
+
+# -- Install Donut package --
+install_donut "$DATA_DIR" "$SCRIPT_DIR"
 
 # Fix tmux config path (replace placeholder with actual install path)
 tmux_conf="$DATA_DIR/tmux/.tmux.conf"
@@ -630,6 +747,9 @@ do_install() {
   cp -avfR "$temp"/listener.exe "$bin_dir/emp3r0r-listener" || error "emp3r0r-listener"
   cp -avfR "$temp"/cc.exe "$data_dir/emp3r0r-cc" || error "emp3r0r-cc"
   cp -avfR "$temp"/cat.exe "$data_dir/emp3r0r-cat" || error "emp3r0r-cat"
+
+  # -- Install Donut package --
+  install_donut "$data_dir" "$temp"
 
   # set capabilities for cc and setup wireguard runtime dir
   local is_container=0
