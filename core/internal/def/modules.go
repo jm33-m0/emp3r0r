@@ -210,10 +210,6 @@ func populateModules() {
 					Desc: "Key to encrypt the stager file",
 					Val:  "my_secret_key",
 				},
-				"loader": &ModOption{
-					Name: "loader",
-					Desc: "Optional path to loader.bin to prepend before encrypted payload",
-				},
 				"type": &ModOption{
 					Name: "type",
 					Desc: "Listener type: http, tcp, or udp",
