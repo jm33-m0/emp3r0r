@@ -14,7 +14,6 @@ const (
 
 	C2CmdStat           = "!stat"
 	C2CmdListener       = "!listener"
-	C2CmdFileServer     = "!file_server"
 	C2CmdFileDownloader = "!file_downloader"
 
 	C2CmdSysInfo = "!sysinfo"

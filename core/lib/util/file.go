@@ -37,76 +37,94 @@ type FileStat struct {
 
 // LsPath ls path and return cbor data
 func LsPath(path string) ([]byte, error) {
+	if strings.HasPrefix(path, "mem:") {
+		dents := lsMemDir(path)
+		return cbor.Marshal(dents)
+	}
+
 	parse_fileInfo := func(info os.FileInfo) (dent Dentry) {
 		dent.Name = info.Name()
 		dent.Date = info.ModTime().String()
 		dent.Ftype = "file"
+		if info.IsDir() {
+			dent.Ftype = "dir"
+		}
 		dent.Permission = info.Mode().String()
 		dent.Size = fmt.Sprintf("%d bytes", info.Size())
 		return dent
 	}
+
 	// if it's a file, return its info
-	if IsFileExist(path) {
+	if IsFileExist(path) && !strings.HasPrefix(path, "mem:") {
 		info, statErr := os.Stat(path)
-		if statErr != nil {
-			logging.Debugf("LsPath: %v", statErr)
-			return nil, statErr
+		if statErr == nil && !info.IsDir() {
+			dents := []Dentry{parse_fileInfo(info)}
+			return cbor.Marshal(dents)
 		}
-		dents := []Dentry{parse_fileInfo(info)}
-		jsonData, err := cbor.Marshal(dents)
-		if err != nil {
-			logging.Debugf("LsPath: %v", err)
-			return nil, err
-		}
-		return jsonData, nil
 	}
 
 	// parse disk files
 	files, err := os.ReadDir(path)
 	if err != nil {
 		logging.Debugf("LsPath: %v", err)
-		// Don't return error yet, we might have memory files
+		return nil, err
 	}
 
-	// parse
 	var dents []Dentry
-
-	// Add memory files that are in this directory
-	// Clean path
-	path = filepath.Clean(path)
-	MemFileLock.RLock()
-	for memPath, data := range MemFileMap {
-		memDir := filepath.Dir(memPath)
-		if memDir == path {
-			dents = append(dents, Dentry{
-				Name:       filepath.Base(memPath),
-				Ftype:      "file (mem)",
-				Size:       fmt.Sprintf("%d bytes", len(data)),
-				Date:       "N/A", // or keep track of creation time?
-				Permission: "-rw-------",
-			})
-		}
-	}
-	MemFileLock.RUnlock()
-
 	for _, f := range files {
 		info, statErr := f.Info()
 		if statErr != nil {
 			logging.Debugf("LsPath: %v", statErr)
 			continue
 		}
-		// If memory file overlaps with disk file, we show both? Or memory overrides?
-		// WriteFileAgent (memory strategy) deletes disk file.
-		// So they shouldn't overlap usually.
 		dents = append(dents, parse_fileInfo(info))
 	}
 
-	if len(dents) == 0 && err != nil {
-		return nil, err
+	return cbor.Marshal(dents)
+}
+
+// lsMemDir lists all entries in the in-memory filesystem (MemFileMap).
+// memfs is a flat key-value store — paths are just names, not real directories.
+// When targetPath is the root ("mem:///"), all keys are listed.
+// When targetPath is a prefix, only keys under that prefix are listed.
+func lsMemDir(targetPath string) []Dentry {
+	var dents []Dentry
+
+	// Normalize root forms
+	isRoot := targetPath == "" ||
+		targetPath == "mem:" ||
+		targetPath == "mem:/" ||
+		targetPath == "mem://" ||
+		targetPath == "mem:///"
+
+	// For sub-path queries, ensure prefix ends with "/"
+	prefix := NormalizeMemPath(targetPath)
+	if !strings.HasSuffix(prefix, "/") {
+		prefix += "/"
 	}
 
-	// cbor
-	return cbor.Marshal(dents)
+	MemFileLock.RLock()
+	defer MemFileLock.RUnlock()
+
+	for memPath, data := range MemFileMap {
+		if !strings.HasPrefix(memPath, "mem:") {
+			continue
+		}
+		// Root listing: include every key
+		// Prefix listing: include only keys that start with the given prefix
+		if !isRoot && !strings.HasPrefix(memPath, prefix) {
+			continue
+		}
+		dents = append(dents, Dentry{
+			Name:       memPath, // show full mem:/// path so users know exactly where it lives
+			Ftype:      "file (mem)",
+			Size:       fmt.Sprintf("%d bytes", len(data)),
+			Date:       "N/A",
+			Permission: "-rw-------",
+		})
+	}
+
+	return dents
 }
 
 // IsCommandExist check if an executable is in $PATH
@@ -115,21 +133,25 @@ func IsCommandExist(exe string) bool {
 	return err == nil
 }
 
+// NormalizeMemPath canonicalizes any mem: URI into strict mem:/// format.
+// e.g. "mem:foo" -> "mem:///foo", "mem:/foo" -> "mem:///foo", "mem://foo" -> "mem:///foo", "mem:///foo" -> "mem:///foo"
+func NormalizeMemPath(path string) string {
+	if !strings.HasPrefix(path, "mem:") {
+		return path
+	}
+	clean := strings.TrimPrefix(path, "mem:")
+	clean = strings.TrimLeft(clean, "/")
+	return "mem:///" + clean
+}
+
 // IsFileExist check if a file exists
 func IsFileExist(path string) bool {
-	// check memory first
-	MemFileLock.RLock()
-	// Check for strict mem:// prefix or just key existence
-	_, inMem := MemFileMap[path]
-	if !inMem && strings.HasPrefix(path, "mem://") {
-		// If strict mem protocol is used, we only check keys.
-		// If not found, it's not there.
+	if strings.HasPrefix(path, "mem:") {
+		norm := NormalizeMemPath(path)
+		MemFileLock.RLock()
+		_, ok := MemFileMap[norm]
 		MemFileLock.RUnlock()
-		return false
-	}
-	MemFileLock.RUnlock()
-	if inMem {
-		return true
+		return ok
 	}
 
 	f, err := os.Stat(path)
@@ -145,16 +167,15 @@ func IsFileExist(path string) bool {
 
 // IsExist check if a path exists
 func IsExist(path string) bool {
-	// check memory first
-	MemFileLock.RLock()
-	_, inMem := MemFileMap[path]
-	if !inMem && strings.HasPrefix(path, "mem://") {
+	if strings.HasPrefix(path, "mem:") {
+		norm := NormalizeMemPath(path)
+		if norm == "mem:///" {
+			return true
+		}
+		MemFileLock.RLock()
+		_, ok := MemFileMap[norm]
 		MemFileLock.RUnlock()
-		return false
-	}
-	MemFileLock.RUnlock()
-	if inMem {
-		return true
+		return ok
 	}
 
 	_, statErr := os.Stat(path)
@@ -163,6 +184,25 @@ func IsExist(path string) bool {
 
 // IsDirExist check if a directory exists
 func IsDirExist(path string) bool {
+	if strings.HasPrefix(path, "mem:") {
+		norm := NormalizeMemPath(path)
+		if norm == "mem:///" {
+			return true
+		}
+		prefix := norm
+		if !strings.HasSuffix(prefix, "/") {
+			prefix += "/"
+		}
+		MemFileLock.RLock()
+		defer MemFileLock.RUnlock()
+		for k := range MemFileMap {
+			if strings.HasPrefix(k, prefix) || k == norm {
+				return true
+			}
+		}
+		return false
+	}
+
 	f, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		return false
@@ -347,8 +387,9 @@ func SecureLocalPath(path string) (string, error) {
 
 // FileBaseName extracts the base name of the file from a given path while enforcing locality.
 func FileBaseName(path string) string {
-	if strings.HasPrefix(path, "mem://") {
-		return filepath.Base(path)
+	if strings.HasPrefix(path, "mem:") {
+		norm := NormalizeMemPath(path)
+		return filepath.Base(norm)
 	}
 	sanitized, err := SecureLocalPath(path)
 	if err != nil {
@@ -378,15 +419,14 @@ func FileAllocate(filepath string, n int64) (err error) {
 
 // FileSize calc file size
 func FileSize(path string) (size int64) {
-	MemFileLock.RLock()
-	if data, ok := MemFileMap[path]; ok {
+	if strings.HasPrefix(path, "mem:") {
+		norm := NormalizeMemPath(path)
+		MemFileLock.RLock()
+		data, ok := MemFileMap[norm]
 		MemFileLock.RUnlock()
-		return int64(len(data))
-	}
-	MemFileLock.RUnlock()
-
-	// If it was meant to be a memory file but didn't exist, return 0
-	if strings.HasPrefix(path, "mem://") {
+		if ok {
+			return int64(len(data))
+		}
 		return 0
 	}
 
@@ -508,22 +548,25 @@ func ApplyFilePattern(path string) string {
 
 // Agent-specific file operations for centralized control
 
+// MkdirAgent creates a directory (in memory for mem: paths, or on disk)
+func MkdirAgent(path string, perm os.FileMode) error {
+	if strings.HasPrefix(path, "mem:") {
+		return nil
+	}
+	return os.MkdirAll(path, perm)
+}
+
 // RemoveFileAgent removes a file (wrapper for os.RemoveAll with pattern support)
 func RemoveFileAgent(path string) error {
 	path = ApplyFilePattern(path)
 
-	// memory
-	MemFileLock.Lock()
-	if _, ok := MemFileMap[path]; ok {
+	if strings.HasPrefix(path, "mem:") {
+		path = NormalizeMemPath(path)
+		MemFileLock.Lock()
 		delete(MemFileMap, path)
 		MemFileLock.Unlock()
 		logging.Debugf("Agent: Removed memory file %s", path)
 		return nil
-	}
-	MemFileLock.Unlock()
-
-	if strings.HasPrefix(path, "mem://") {
-		return fmt.Errorf("memory file %s not found", path)
 	}
 
 	logging.Debugf("Agent: Removing file %s", path)
@@ -539,19 +582,12 @@ func CopyAgent(src, dst string) error {
 		return fmt.Errorf("CopyAgent: %s does not exist", src)
 	}
 
-	// Try memory copy first (if src is memory file)
-	// We optimize by checking MemFileMap directly or using IsFileExist
-	// But to differentiate Dir vs File for mixed usage, we need care.
-	// For "mem://", it is always a file.
-	if strings.HasPrefix(src, "mem://") {
+	if strings.HasPrefix(src, "mem:") {
 		return copyFileAgent(src, dst)
 	}
 
 	srcInfo, err := os.Stat(src)
 	if err != nil {
-		// If not on disk, it might be an implicit memory file (not starting with mem://)?
-		// IsFileExist said yes, but os.Stat says no -> Must be Memory.
-		// So treat as file.
 		return copyFileAgent(src, dst)
 	}
 
@@ -567,20 +603,13 @@ func copyFileAgent(src, dst string) error {
 		return err
 	}
 
-	// if destination is a directory
-	// we need to be careful with pattern here.
-	// If dst is a dir, we join with basename.
-	// WriteFileAgent will apply pattern to the FULL path.
-	// So we pass the path as intended.
-
-	f, err := os.Stat(dst)
-	if err == nil {
-		if f.IsDir() {
-			dst = filepath.Join(dst, filepath.Base(src))
+	if !strings.HasPrefix(dst, "mem:") {
+		f, err := os.Stat(dst)
+		if err == nil && f.IsDir() {
+			dst = filepath.Join(dst, FileBaseName(src))
 		}
 	}
 
-	// WriteFileAgent handles MkdirAll and ApplyFilePattern
 	return WriteFileAgent(dst, in, 0o755)
 }
 
@@ -599,7 +628,7 @@ func copyDirAgent(src, dst string) error {
 
 		if d.IsDir() {
 			targetPath = ApplyFilePattern(targetPath)
-			return os.MkdirAll(targetPath, d.Type().Perm())
+			return MkdirAgent(targetPath, d.Type().Perm())
 		}
 
 		return copyFileAgent(path, targetPath)
@@ -622,7 +651,7 @@ func ListMemFiles() []string {
 	defer MemFileLock.RUnlock()
 	keys := make([]string, 0, len(MemFileMap))
 	for k := range MemFileMap {
-		if strings.HasPrefix(k, "mem://") {
+		if strings.HasPrefix(k, "mem:") {
 			keys = append(keys, k)
 		}
 	}
@@ -655,16 +684,30 @@ func WriteFileAgent(filename string, data []byte, perm os.FileMode) error {
 
 // SaveFileAgent saves file with specific storage strategy
 func SaveFileAgent(filename string, data []byte, perm os.FileMode, strategy StorageStrategy) error {
-	// Apply pattern
 	filename = ApplyFilePattern(filename)
 
-	// Force memory strategy for mem:// paths
-	if strings.HasPrefix(filename, "mem://") {
-		strategy = StorageMemory
+	if strings.HasPrefix(filename, "mem:") || strategy == StorageMemory {
+		filename = NormalizeMemPath(filename)
+
+		if len(fileCryptoKey) > 0 {
+			var err error
+			data, err = crypto.AES_GCM_Encrypt(fileCryptoKey, data)
+			if err != nil {
+				return fmt.Errorf("WriteFileAgent encrypt: %v", err)
+			}
+		}
+
+		MemFileLock.Lock()
+		dataCopy := make([]byte, len(data))
+		copy(dataCopy, data)
+		MemFileMap[filename] = dataCopy
+		MemFileLock.Unlock()
+
+		logging.Debugf("Agent: Wrote %d bytes (encrypted) to memfs memory: %s", len(data), filename)
+		return nil
 	}
 
-	// Encrypt data BEFORE storage (Disk or Memory)
-	// This ensures memory dumps don't show plaintext files
+	// For disk storage
 	if len(fileCryptoKey) > 0 {
 		var err error
 		data, err = crypto.AES_GCM_Encrypt(fileCryptoKey, data)
@@ -673,134 +716,62 @@ func SaveFileAgent(filename string, data []byte, perm os.FileMode, strategy Stor
 		}
 	}
 
-	// In-memory storage decision based on available memory
-	limit := int64(MemFileSizeLimit)
-
-	// Check available physical memory
-	freeMem := GetMemAvailable()
-	if freeMem > 0 {
-		dynamicLimit := freeMem / 10
-
-		const MaxMemPerFile = 100 * 1024 * 1024 // 100MB
-		if dynamicLimit > MaxMemPerFile {
-			dynamicLimit = MaxMemPerFile
-		}
-
-		limit = dynamicLimit
-	}
-
-	// Decide storage
-	saveToMemory := false
-	switch strategy {
-	case StorageMemory:
-		saveToMemory = true
-	case StorageDisk:
-		saveToMemory = false
-	case StorageAuto:
-		if int64(len(data)) <= limit {
-			saveToMemory = true
-		}
-	}
-
-	if saveToMemory {
-		MemFileLock.Lock()
-
-		// We store ENCRYPTED data in memory now
-		dataCopy := make([]byte, len(data))
-		copy(dataCopy, data)
-		MemFileMap[filename] = dataCopy
-		MemFileLock.Unlock()
-
-		// Remove from disk if it exists there, to enforce "memory only"
-		if IsExist(filename) && !strings.HasPrefix(filename, "mem://") {
-			os.Remove(filename)
-		}
-
-		logging.Debugf("Agent: Wrote %d bytes (encrypted) to memory: %s (limit: %d)", len(data), filename, limit)
-		return nil
-	}
-
-	// Fail if we wanted memory but couldn't
-	if strategy == StorageMemory {
-		return fmt.Errorf("SaveFileAgent: failed to save %s to memory (limit: %d bytes)", filename, limit)
-	}
-
-	// If implicit memory (StorageAuto) fell through to here, it means we must write to disk.
-	// But if path is explicitly mem://, we should have caught it above?
-	// Yes, mem:// sets strategy=StorageMemory, so it returns error instead of falling through.
-
-	// For disk storage
-	// Ensure we clean up memory if it was there
 	MemFileLock.Lock()
 	delete(MemFileMap, filename)
 	MemFileLock.Unlock()
 
 	logging.Debugf("Agent: Writing %d bytes (encrypted) to %s with permissions %o", len(data), filename, perm)
 
-	// ensure the directory exists
 	if err := os.MkdirAll(filepath.Dir(filename), 0o700); err != nil {
 		return fmt.Errorf("WriteFileAgent mkdir %s: %v", filepath.Dir(filename), err)
 	}
 
-	// Currently just wraps os.WriteFile
 	return os.WriteFile(filename, data, perm)
 }
 
 // ReadFileAgent reads a file from the agent's filesystem
 func ReadFileAgent(filename string) ([]byte, error) {
-	// Apply pattern
 	filename = ApplyFilePattern(filename)
 
 	logging.Debugf("Agent: Reading file %s", filename)
 
 	var data []byte
 	var err error
-	inMemory := false
 
-	// Check memory first
-	MemFileLock.RLock()
-	if memData, ok := MemFileMap[filename]; ok {
-		// return copy
-		data = make([]byte, len(memData))
-		copy(data, memData)
-		inMemory = true
-	}
-	MemFileLock.RUnlock()
-
-	if inMemory {
-		logging.Debugf("Agent: Read %d bytes from memory: %s", len(data), filename)
-	} else {
-		data, err = os.ReadFile(filename)
-		if err != nil {
-			return nil, err
+	if strings.HasPrefix(filename, "mem:") {
+		filename = NormalizeMemPath(filename)
+		MemFileLock.RLock()
+		memData, ok := MemFileMap[filename]
+		if ok {
+			data = make([]byte, len(memData))
+			copy(data, memData)
 		}
+		MemFileLock.RUnlock()
+
+		if !ok {
+			return nil, fmt.Errorf("memfs: %s: file not found", filename)
+		}
+
+		if len(fileCryptoKey) > 0 {
+			decrypted, err := crypto.AES_GCM_Decrypt(fileCryptoKey, data)
+			if err == nil {
+				data = decrypted
+			}
+		}
+		return data, nil
 	}
 
-	// File decryption after reading
-	// Note: If it was executable, we wrote it plaintext. We need to know if we should decrypt.
-	// How do we know?
-	// 1. We can try to decrypt. If it fails (AES GCM tag check), assume plaintext?
-	// 2. Or we trust that if it's in MemFileMap, it IS encrypted.
-	//    If it's on Disk, it MIGHT be encrypted.
-
-	// Issue: If we force plaintext for executables on disk, ReadFileAgent needs to know not to decrypt them.
-	// But ReadFileAgent doesn't take 'perm' or 'isExecutable'.
-	// Heuristic: Try Decrypt. If error, return original data?
-	// GCM Open will fail if not valid.
-	// BUT, what if plaintext coincidentally looks like valid GCM? Unlikely with Salt/Nonce.
-	// Let's use Try-Decrypt strategy.
+	data, err = os.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
 
 	if len(fileCryptoKey) > 0 {
 		decrypted, err := crypto.AES_GCM_Decrypt(fileCryptoKey, data)
 		if err == nil {
 			data = decrypted
-		} else {
-			// If decryption fails, it might be a plaintext file (e.g. executable) or corruption.
-			// Return as-is (Plaintext).
-			// logging.Debugf("ReadFileAgent: Decrypt failed for %s, returning raw: %v", filename, err)
 		}
 	}
-
 	return data, nil
 }
 

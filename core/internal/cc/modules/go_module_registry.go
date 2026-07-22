@@ -26,7 +26,6 @@ var builtInGoModules = map[string]builtInGoModuleMeta{
 	def.ModCLEAN_LOG: {C2Cmd: def.C2CmdCleanLog},
 
 	def.ModListener:   {C2Cmd: def.C2CmdListener},
-	def.ModFileServer: {C2Cmd: def.C2CmdFileServer},
 	def.ModDownloader: {C2Cmd: def.C2CmdFileDownloader},
 }
 
@@ -126,10 +125,6 @@ func runAutoBuiltInModule(ctx *c2context.C2Context, modName string) error {
 	cmd := strings.Join(parts, " ")
 	if err := CmdSender(cmd, "", ctx.Target.Tag); err != nil {
 		return fmt.Errorf("SendCmd: %w", err)
-	}
-
-	if modName == def.ModFileServer {
-		logging.Infof("File server (port %s) is now %s", flagVals["port"], flagVals["switch"])
 	}
 
 	if modName == def.ModListener {

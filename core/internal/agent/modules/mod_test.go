@@ -115,7 +115,7 @@ func TestDownloadAndVerifyModuleRetryLimit(t *testing.T) {
 	defer func() { fetchFile = originalFetchFile }()
 
 	callsCount := 0
-	fetchFile = func(config *def.Config, download_addr, file_to_download, path, checksum string) ([]byte, error) {
+	fetchFile = func(config *def.Config, peer, file_to_download, path, checksum string) ([]byte, error) {
 		callsCount++
 		return []byte("corrupted-payload"), nil
 	}

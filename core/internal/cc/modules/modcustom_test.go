@@ -503,8 +503,8 @@ func TestUpdateOptionsAddsDownloadAddr(t *testing.T) {
 	if !UpdateOptions(modName) {
 		t.Fatalf("expected module to exist")
 	}
-	if _, ok := live.ActiveModule.Options["download_addr"]; !ok {
-		t.Fatalf("download_addr not injected")
+	if _, ok := live.ActiveModule.Options["download_addr"]; ok {
+		t.Fatalf("download_addr should not be injected")
 	}
 
 	if UpdateOptions("missing") {

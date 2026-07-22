@@ -31,14 +31,6 @@ func UpdateOptions(modName string) (exist bool) {
 		return exist
 	}
 
-	// help us add new options
-	addIfNotFound := func(modOpt *def.ModOption) {
-		if _, exist := live.ActiveModule.Options[modOpt.Name]; !exist {
-			logging.Debugf("UpdateOptions: adding %s", modOpt.Name)
-			live.ActiveModule.Options[modOpt.Name] = modOpt
-		}
-	}
-
 	var modconfig *def.ModuleConfig
 	if val, ok := def.Modules.Load(modName); ok {
 		modconfig = val.(*def.ModuleConfig)
@@ -47,17 +39,6 @@ func UpdateOptions(modName string) (exist bool) {
 		logging.Errorf("UpdateOptions: module %s config not found", modName)
 		return exist
 	}
-	if strings.ToLower(modconfig.AgentConfig.Exec) != "built-in" && !modconfig.IsLocal {
-		logging.Debugf("UpdateOptions: module %s is not built-in, adding download_addr", modName)
-		download_addr := &def.ModOption{
-			Name: "download_addr",
-			Desc: "Download URL for this module, useful when you want to use an agent as caching server",
-			Val:  "",
-			Vals: []string{},
-		}
-		addIfNotFound(download_addr)
-	}
-
 	return exist
 }
 

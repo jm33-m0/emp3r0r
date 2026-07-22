@@ -74,7 +74,7 @@ func C2Commands() *cobra.Command {
 	customModuleCmd := &cobra.Command{
 		Use:     def.C2CmdCustomModule,
 		Short:   "Load a custom module",
-		Example: "!custom_module --mod_name <name> --invocation <base64> --checksum <checksum> --in_mem <bool> --type <payload_type> --file_to_download <file> --download_addr <addr>",
+		Example: "!custom_module --mod_name <name> --invocation <base64> --checksum <checksum> --in_mem <bool> --type <payload_type> --file_to_download <file> --peer <ip>",
 		GroupID: "generic",
 		Run:     runCustomModule,
 	}
@@ -85,7 +85,7 @@ func C2Commands() *cobra.Command {
 	customModuleCmd.Flags().StringP("type", "t", "", "Payload type")
 	customModuleCmd.Flags().StringP("file_to_download", "f", "", "File to download")
 	customModuleCmd.RegisterFlagCompletionFunc("file_to_download", memFileCompletion)
-	customModuleCmd.Flags().StringP("download_addr", "d", "", "Download address")
+	customModuleCmd.Flags().StringP("peer", "d", "", "Peer agent IP")
 	rootCmd.AddCommand(customModuleCmd)
 
 	// C2 Listener command
@@ -104,27 +104,15 @@ func C2Commands() *cobra.Command {
 	listenerCmd.Flags().StringP("loader", "l", "", "Optional path to loader.bin for stage-1 prepend")
 	rootCmd.AddCommand(listenerCmd)
 
-	// C2 File Server command
-	fileServerCmd := &cobra.Command{
-		Use:     def.C2CmdFileServer,
-		Short:   "Start file server",
-		Example: "!file_server --port <port> --switch <on/off>",
-		GroupID: "generic",
-		Run:     runFileServer,
-	}
-	fileServerCmd.Flags().StringP("port", "p", "8000", "Port")
-	fileServerCmd.Flags().StringP("switch", "s", "on", "Switch (on/off)")
-	rootCmd.AddCommand(fileServerCmd)
-
 	// C2 File Downloader command
 	fileDownloaderCmd := &cobra.Command{
 		Use:     def.C2CmdFileDownloader,
 		Short:   "Download file",
-		Example: "!file_downloader --download_addr <url> --path <path> --checksum <checksum>",
+		Example: "!file_downloader --peer <ip> --path <path> --checksum <checksum>",
 		GroupID: "generic",
 		Run:     runFileDownloader,
 	}
-	fileDownloaderCmd.Flags().StringP("download_addr", "u", "", "URL to download")
+	fileDownloaderCmd.Flags().StringP("peer", "u", "", "Peer agent IP to download from")
 	fileDownloaderCmd.Flags().StringP("path", "p", "", "Path to save")
 	fileDownloaderCmd.RegisterFlagCompletionFunc("path", memFileCompletion)
 	fileDownloaderCmd.Flags().StringP("checksum", "c", "", "Checksum")
