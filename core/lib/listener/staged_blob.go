@@ -16,7 +16,7 @@ func xorData(data, key []byte) {
 	}
 }
 
-func buildServedBlob(payloadPath, keyStr string, compression bool) ([]byte, error) {
+func buildServedBlob(payloadPath, keyStr string) ([]byte, error) {
 	// ReadFileAgent handles both mem:// and disk paths
 	payload, err := util.ReadFileAgent(payloadPath)
 	if err != nil {
@@ -24,15 +24,8 @@ func buildServedBlob(payloadPath, keyStr string, compression bool) ([]byte, erro
 	}
 
 	key := deriveKeyFromString(keyStr)
-	var toServe []byte
-	if compression {
-		toServe = compressData(payload)
-	} else {
-		toServe = payload
-	}
-
-	blob := make([]byte, 0, len(toServe))
-	blob = append(blob, toServe...)
+	blob := make([]byte, 0, len(payload))
+	blob = append(blob, payload...)
 	xorData(blob, key)
 	logging.Infof("Serving staged blob: payload=%d bytes", len(blob))
 	return blob, nil

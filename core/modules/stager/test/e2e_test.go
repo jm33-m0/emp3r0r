@@ -339,7 +339,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 	// malasada payload is already position-independent shellcode; compressing
 	// it a second time buys little and would require a second decompressor.
 	go func() {
-		if err := listener.HTTPListener(payloadPath, stagerPortStr, stagerKey, false); err != nil {
+		if err := listener.HTTPListener(payloadPath, stagerPortStr, stagerKey); err != nil {
 			logging.Errorf("Stager listener failed: %v", err)
 		}
 	}()

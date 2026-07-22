@@ -320,7 +320,7 @@ func runListener(cmd *cobra.Command, args []string) {
 					errChan <- fmt.Errorf("listener panic: %v", r)
 				}
 			}()
-			errChan <- listener.HTTPListener(stagerPath, port, keyStr, true)
+			errChan <- listener.HTTPListener(stagerPath, port, keyStr)
 		}()
 	case "tcp":
 		go func() {
@@ -330,7 +330,7 @@ func runListener(cmd *cobra.Command, args []string) {
 					errChan <- fmt.Errorf("listener panic: %v", r)
 				}
 			}()
-			errChan <- listener.TCPListener(stagerPath, port, keyStr, true)
+			errChan <- listener.TCPListener(stagerPath, port, keyStr)
 		}()
 	case "udp":
 		go func() {
@@ -340,7 +340,7 @@ func runListener(cmd *cobra.Command, args []string) {
 					errChan <- fmt.Errorf("listener panic: %v", r)
 				}
 			}()
-			errChan <- listener.UDPListener(stagerPath, port, keyStr, true)
+			errChan <- listener.UDPListener(stagerPath, port, keyStr)
 		}()
 	default:
 		c2transport.NotifyC2(cmd, "Error: unknown listener type '%s' (supported: http, tcp, udp)\n", listenerType)

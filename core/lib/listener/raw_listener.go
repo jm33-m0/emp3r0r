@@ -19,9 +19,8 @@ var (
 // stagerPath: the path to the payload file to serve.
 // port: the port to serve the file on.
 // keyStr: the passphrase to encrypt the file.
-// compression: whether to compress the file before encryption.
-func TCPListener(stagerPath, port, keyStr string, compression bool) error {
-	blob, err := buildServedBlob(stagerPath, keyStr, compression)
+func TCPListener(stagerPath, port, keyStr string) error {
+	blob, err := buildServedBlob(stagerPath, keyStr)
 	if err != nil {
 		return err
 	}
@@ -98,9 +97,8 @@ func TCPBareListener(stagerPath, port string) error {
 // stagerPath: the path to the payload file to serve.
 // port: the port to serve the file on.
 // keyStr: the passphrase to encrypt the file.
-// compression: whether to compress the file before encryption.
-func UDPListener(stagerPath, port, keyStr string, compression bool) error {
-	blob, err := buildServedBlob(stagerPath, keyStr, compression)
+func UDPListener(stagerPath, port, keyStr string) error {
+	blob, err := buildServedBlob(stagerPath, keyStr)
 	if err != nil {
 		return err
 	}

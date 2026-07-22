@@ -1,8 +1,6 @@
 package listener
 
 import (
-	"bytes"
-	"compress/flate"
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
@@ -48,21 +46,6 @@ func encryptData(data, key []byte) []byte {
 
 	// Prepend the IV to the encrypted data
 	return append(iv, encrypted...)
-}
-
-// compressData compresses the given data using raw deflate.
-func compressData(data []byte) []byte {
-	var b bytes.Buffer
-	w, err := flate.NewWriter(&b, flate.BestCompression)
-	if err != nil {
-		logging.Fatalf("Failed to create deflate writer: %v", err)
-	}
-	_, err = w.Write(data)
-	if err != nil {
-		logging.Fatalf("Failed to compress data: %v", err)
-	}
-	w.Close()
-	return b.Bytes()
 }
 
 // deriveKeyFromString derives a 16-byte key from a string.
@@ -111,14 +94,13 @@ func serveStager(stager_enc []byte, port string) error {
 	return server.ListenAndServe()
 }
 
-// HTTPListener reads the payload file, optionally deflate-compresses it,
-// encrypts it with the key-derived stream, and serves it over HTTP.
+// HTTPListener reads the payload file, encrypts it with the key-derived stream,
+// and serves it over HTTP.
 // stagerPath: path to the payload file to serve.
 // port: TCP port to listen on.
 // keyStr: passphrase used for key derivation.
-// compression: whether to deflate-compress before encryption.
-func HTTPListener(stagerPath, port, keyStr string, compression bool) error {
-	blob, err := buildServedBlob(stagerPath, keyStr, compression)
+func HTTPListener(stagerPath, port, keyStr string) error {
+	blob, err := buildServedBlob(stagerPath, keyStr)
 	if err != nil {
 		return err
 	}
