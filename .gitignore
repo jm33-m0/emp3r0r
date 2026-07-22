@@ -280,11 +280,11 @@ project_knowledge.md
 *.db-*
 
 # shellcode stager binaries
-core/modules/shellcode_stager/downloader
-core/modules/shellcode_stager/stager
-core/modules/shellcode_stager/loader
-core/modules/shellcode_stager/loader.pre
-core/modules/shellcode_stager/stage1_size.h
+core/modules/stager/downloader
+core/modules/stager/stager
+core/modules/stager/loader
+core/modules/stager/loader.pre
+core/modules/stager/stage1_size.h
 
 # build
 zig*
