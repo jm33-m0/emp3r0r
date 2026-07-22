@@ -114,28 +114,69 @@ func fwdMsgToOperator(operatorSession string, msg def.MsgTunData) error {
 	return nil
 }
 
-// collectPeerList gathers all unique IPs from all connected agents to help with discovery.
-func collectPeerList() []string {
-	peerMap := make(map[string]bool)
+// collectEnrichedPeerList gathers active agent peer info and signs it with the CA key.
+func collectEnrichedPeerList() (*def.EnrichedPeerList, []string, error) {
+	peers := make([]def.EnrichedPeer, 0)
+	simpleIPsMap := make(map[string]bool)
+
 	live.AgentControlMap.Range(func(key, value any) bool {
-		agent := key.(*def.Emp3r0rAgent)
-		// Add the IP the agent connected from.
+		agent, ok := key.(*def.Emp3r0rAgent)
+		if !ok || agent == nil {
+			return true
+		}
+
 		fromIP := strings.Split(agent.From, ":")[0]
 		if fromIP != "" && fromIP != "127.0.0.1" {
-			peerMap[fromIP] = true
+			simpleIPsMap[fromIP] = true
 		}
-		// Add all internal IPs reported by the agent.
 		for _, ip := range agent.IPs {
 			if ip != "" && ip != "127.0.0.1" && !strings.HasPrefix(ip, "127.") {
-				peerMap[ip] = true
+				simpleIPsMap[ip] = true
 			}
 		}
+
+		gossipPort := agent.MeshGossipPort
+		if gossipPort == "" {
+			gossipPort = "7946"
+		}
+		if fromIP != "" && fromIP != "127.0.0.1" {
+			simpleIPsMap[fmt.Sprintf("%s:%s", fromIP, gossipPort)] = true
+		}
+
+		p := def.EnrichedPeer{
+			UUID:           agent.UUID,
+			IPs:            agent.IPs,
+			From:           agent.From,
+			P2PRelayPort:   agent.P2PRelayPort,
+			MeshGossipPort: agent.MeshGossipPort,
+			Files:          agent.Files,
+			LastSeen:       agent.LastSeen.Unix(),
+		}
+		peers = append(peers, p)
 		return true
 	})
 
-	peerList := make([]string, 0, len(peerMap))
-	for ip := range peerMap {
-		peerList = append(peerList, ip)
+	simpleIPList := make([]string, 0, len(simpleIPsMap))
+	for ip := range simpleIPsMap {
+		simpleIPList = append(simpleIPList, ip)
 	}
-	return peerList
+
+	if len(peers) == 0 {
+		return nil, simpleIPList, nil
+	}
+
+	cborBytes, err := cbor.Marshal(peers)
+	if err != nil {
+		return nil, simpleIPList, fmt.Errorf("marshal enriched peers: %w", err)
+	}
+
+	sig, err := transport.SignWithCAKey(cborBytes)
+	if err != nil {
+		return nil, simpleIPList, fmt.Errorf("sign enriched peers: %w", err)
+	}
+
+	return &def.EnrichedPeerList{
+		Peers:     peers,
+		Signature: sig,
+	}, simpleIPList, nil
 }

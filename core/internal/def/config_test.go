@@ -49,7 +49,7 @@ func TestReadCBORConfigFull(t *testing.T) {
 		Password:                  "password",
 		ShadowsocksLocalSocksPort: "1081",
 		ShadowsocksServerPort:     "8388",
-		KCPServerPort:             "4000",
+		P2PRelayPort:              "4000",
 		KCPClientPort:             "4001",
 		UseKCP:                    true,
 		EnableNCSI:                false,

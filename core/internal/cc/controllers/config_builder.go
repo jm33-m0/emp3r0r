@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
@@ -31,6 +32,8 @@ type AgentConfig struct {
 	UseKCP           bool
 	IsStager         bool
 	P2PTransport     *string
+	P2PRelayPort     *string
+	MeshGossipPort   *string
 	InitialPeers     *[]string
 	CCHTTPPort       *string
 	PollInterval     *int
@@ -189,6 +192,25 @@ func MakeConfig(opts AgentConfig) error {
 	live.RuntimeConfig.IsDirectC2Enabled = opts.IsDirectC2
 	live.RuntimeConfig.PersistentRouter = opts.PersistentRouter
 
+	if live.RuntimeConfig.IsP2PEnabled {
+		if opts.P2PRelayPort != nil && *opts.P2PRelayPort != "" {
+			if p, err := strconv.Atoi(*opts.P2PRelayPort); err != nil || p <= 0 || p > 65535 {
+				return fmt.Errorf("invalid p2p-relay-port: %s", *opts.P2PRelayPort)
+			}
+			live.RuntimeConfig.P2PRelayPort = *opts.P2PRelayPort
+		} else {
+			live.RuntimeConfig.P2PRelayPort = fmt.Sprintf("%d", util.RandInt(1025, 65534))
+		}
+		if opts.MeshGossipPort != nil && *opts.MeshGossipPort != "" {
+			if p, err := strconv.Atoi(*opts.MeshGossipPort); err != nil || p <= 0 || p > 65535 {
+				return fmt.Errorf("invalid mesh-gossip-port: %s", *opts.MeshGossipPort)
+			}
+			live.RuntimeConfig.MeshGossipPort = *opts.MeshGossipPort
+		} else {
+			live.RuntimeConfig.MeshGossipPort = fmt.Sprintf("%d", util.RandInt(1025, 65534))
+		}
+	}
+
 	if opts.P2PTransport != nil {
 		isValid := false
 		for _, name := range transport.AllTransportNames() {
@@ -215,9 +237,15 @@ func MakeConfig(opts AgentConfig) error {
 		live.RuntimeConfig.InitialPeers = *opts.InitialPeers
 	}
 
+	for _, p := range live.RuntimeConfig.InitialPeers {
+		if !strings.Contains(p, ":") {
+			return fmt.Errorf("invalid peer address %q: --peers entries must be in ip:port format (e.g. --peers 1.2.3.4:7946)", p)
+		}
+	}
+
 	if live.RuntimeConfig.IsP2PEnabled && !live.RuntimeConfig.IsDirectC2Enabled {
 		if len(live.RuntimeConfig.InitialPeers) == 0 {
-			return fmt.Errorf("Silent Node build requires --peers: specify at least one Gateway IP:gossipport (e.g. --peers 1.2.3.4:51996)")
+			return fmt.Errorf("Silent Node build requires --peers: specify at least one Gateway IP:port (e.g. --peers 1.2.3.4:7946)")
 		}
 		logging.Infof("Silent Node bootstrap peers: %v", live.RuntimeConfig.InitialPeers)
 	}

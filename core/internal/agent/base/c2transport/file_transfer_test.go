@@ -134,7 +134,7 @@ func TestFileTransfer_EndToEnd(t *testing.T) {
 		P2PTransport:      "mtls",
 		CamouflageCertOrg: "emp3r0r test org",
 		CamouflageCertCN:  "emp3r0r test cn",
-		KCPServerPort:     "", // will be set per sub-test
+		P2PRelayPort:      "", // will be set per sub-test
 	}
 
 	testKey := []byte("12345678901234567890123456789012")
@@ -145,7 +145,7 @@ func TestFileTransfer_EndToEnd(t *testing.T) {
 
 	// Start the test server
 	serverPort := startTestFileServer(t, ctx)
-	common.RuntimeConfig.KCPServerPort = serverPort
+	common.RuntimeConfig.P2PRelayPort = serverPort
 
 	// Create a test file on disk
 	fileName := fmt.Sprintf("e2e_transfer_%d.txt", time.Now().UnixNano())
@@ -222,4 +222,80 @@ func TestFileTransfer_EndToEnd(t *testing.T) {
 		}
 		t.Logf("FetchFilePeer: saved %s to %s (%d bytes)", memFileName, destMemPath, len(got))
 	})
+}
+
+func TestFetchFile_MemFSCaching(t *testing.T) {
+	// Setup test data
+	moduleName := fmt.Sprintf("sa_whoami_%d", time.Now().UnixNano())
+	content := []byte("#!/bin/bash\necho 'whoami module content'")
+	checksum := crypto.SHA256SumRaw(content)
+
+	// Pre-populate memfs with the canonical key (mem:///sa_whoami_...)
+	memKey := MemFSKey(moduleName)
+	if err := util.WriteFileAgent(memKey, content, 0o600); err != nil {
+		t.Fatalf("WriteFileAgent failed: %v", err)
+	}
+
+	// FetchFile should hit memfs cache without touching peer or C2
+	data, err := FetchFile(common.RuntimeConfig, "", moduleName, "", checksum)
+	if err != nil {
+		t.Fatalf("FetchFile failed: %v", err)
+	}
+
+	if string(data) != string(content) {
+		t.Fatalf("FetchFile memfs cache content mismatch: got %q, want %q", string(data), string(content))
+	}
+}
+
+func TestFetchFile_GossipPeerDiscovery(t *testing.T) {
+	common.RuntimeConfig = &def.Config{
+		Password:          "gossip_e2e_password",
+		P2PTransport:      "mtls",
+		CamouflageCertOrg: "emp3r0r test org",
+		CamouflageCertCN:  "emp3r0r test cn",
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start test file server on a dynamic port
+	serverPortStr := startTestFileServer(t, ctx)
+	var serverPort int
+	fmt.Sscanf(serverPortStr, "%d", &serverPort)
+
+	// Pre-populate memfs with a module
+	moduleName := fmt.Sprintf("sa_whoami_peer_%d", time.Now().UnixNano())
+	content := []byte("#!/bin/bash\necho 'hello from peer'")
+	memKey := MemFSKey(moduleName)
+	if err := util.WriteFileAgent(memKey, content, 0o600); err != nil {
+		t.Fatalf("write memfs: %v", err)
+	}
+	checksum := crypto.SHA256SumRaw(content)
+
+	// Mock PeerFileProvider to simulate gossip metadata indicating 127.0.0.1 has moduleName on serverPort
+	PeerFileProvider = func(fileName string) map[string]int {
+		if fileName == moduleName || fileName == memKey {
+			return map[string]int{"127.0.0.1": serverPort}
+		}
+		return nil
+	}
+	defer func() { PeerFileProvider = nil }()
+
+	// Clear local cache for moduleName (under a different key) so it has to fetch from peer
+	destMemPath := fmt.Sprintf("mem:///result_%d.txt", time.Now().UnixNano())
+
+	// Call FetchFile with peer="" -> should use PeerFileProvider, discover 127.0.0.1:serverPort, and pull from it
+	data, err := FetchFile(common.RuntimeConfig, "", moduleName, destMemPath, checksum)
+	if err != nil {
+		t.Fatalf("FetchFile via gossip peer discovery failed: %v", err)
+	}
+
+	readData, err := util.ReadFileAgent(destMemPath)
+	if err != nil {
+		t.Fatalf("read destination file: %v", err)
+	}
+	if string(readData) != string(content) {
+		t.Fatalf("content mismatch: got %q, want %q", string(readData), string(content))
+	}
+	_ = data
 }

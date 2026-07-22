@@ -94,7 +94,7 @@ type Config struct {
 	Password                  string `cbor:"7,keyasint"`  // password of shadowsocks, socks5 and SSH server
 	ShadowsocksLocalSocksPort string `cbor:"8,keyasint"`  // socks5 port of shadowsocks
 	ShadowsocksServerPort     string `cbor:"9,keyasint"`  // server port of shadowsocks proxy server, can run on CC and agent
-	KCPServerPort             string `cbor:"10,keyasint"` // server port of kcp server
+	P2PRelayPort              string `cbor:"10,keyasint"` // port of p2p relay transport, also used as KCP server port
 	KCPClientPort             string `cbor:"11,keyasint"` // client port of kcp
 	UseKCP                    bool   `cbor:"12,keyasint"` // enable KCP for Shadowsocks C2 transport
 	EnableNCSI                bool   `cbor:"13,keyasint"` // NCSI connectivity checking, disable when C2 is reachable but NCSI is not

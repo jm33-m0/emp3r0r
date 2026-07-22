@@ -34,6 +34,7 @@ func serveWWWRelay(streamID string) {
 	}
 	name := filepath.Base(localized)
 	path := filepath.Join(live.WWWRoot, name)
+
 	f, err := os.Open(path)
 	if err != nil {
 		_ = client.SendMsgTunData(&def.MsgTunData{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte(err.Error())})

@@ -54,7 +54,7 @@ func ServerMain(wg_port int, hosts string, numOperators int) {
 	logging.Successf("\n🎯 ════════════════════ C2 SERVER PORTS ═══════════════════════════")
 	logging.Successf("   📡 C2 Agent Port (TLS):  %s", live.RuntimeConfig.CCH2Port)
 	logging.Successf("   📡 C2 Agent Port (HTTP): %s", live.RuntimeConfig.CCHTTPPort)
-	logging.Successf("   🔄 KCP C2 Port (UDP):    %s", live.RuntimeConfig.KCPServerPort)
+	logging.Successf("   🔄 KCP C2 Port (UDP):    %s", live.RuntimeConfig.P2PRelayPort)
 	logging.Successf("   🌐 Operator Port (mTLS): %d", wg_port+1)
 	logging.Successf("   🔧 WireGuard Port:       %d", wg_port)
 	logging.Successf("══════════════════════════════════════════════════════════════════\n")

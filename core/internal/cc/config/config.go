@@ -29,7 +29,7 @@ func SaveConfigJSON() (err error) {
 		Password:                  live.RuntimeConfig.Password,
 		ShadowsocksLocalSocksPort: live.RuntimeConfig.ShadowsocksLocalSocksPort,
 		ShadowsocksServerPort:     live.RuntimeConfig.ShadowsocksServerPort,
-		KCPServerPort:             live.RuntimeConfig.KCPServerPort,
+		KCPServerPort:             live.RuntimeConfig.P2PRelayPort,
 		KCPClientPort:             live.RuntimeConfig.KCPClientPort,
 		UseKCP:                    live.RuntimeConfig.UseKCP,
 		EnableNCSI:                live.RuntimeConfig.EnableNCSI,
@@ -112,7 +112,7 @@ func InitConfigFile(cc_host string) (err error) {
 	live.RuntimeConfig.SSHDShellPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.ShadowsocksLocalSocksPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.ShadowsocksServerPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
-	live.RuntimeConfig.KCPServerPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
+	live.RuntimeConfig.P2PRelayPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.KCPClientPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.StagerHTTPListenerPort = fmt.Sprintf("%v", util.RandInt(1026, 65534))
 	live.RuntimeConfig.CCTimeout = util.RandInt(10000, 20000)

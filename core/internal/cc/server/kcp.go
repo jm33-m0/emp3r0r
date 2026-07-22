@@ -11,7 +11,7 @@ import (
 
 // KCPC2ListenAndServe KCP server that forwards to C2 port
 func KCPC2ListenAndServe(ctx context.Context, cancel context.CancelFunc) {
-	logging.Successf("🚀 Starting KCP C2 server at port %s", live.RuntimeConfig.KCPServerPort)
+	logging.Successf("🚀 Starting KCP C2 server at port %s", live.RuntimeConfig.P2PRelayPort)
 	transport.KCPTunServer("127.0.0.1:"+live.RuntimeConfig.CCH2Port,
-		live.RuntimeConfig.KCPServerPort, live.RuntimeConfig.Password, def.MagicString, ctx, cancel)
+		live.RuntimeConfig.P2PRelayPort, live.RuntimeConfig.Password, def.MagicString, ctx, cancel)
 }

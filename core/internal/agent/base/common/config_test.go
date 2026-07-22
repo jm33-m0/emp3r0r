@@ -27,7 +27,7 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 		Password:                  "secret_password",
 		ShadowsocksLocalSocksPort: "1080",
 		ShadowsocksServerPort:     "8388",
-		KCPServerPort:             "4000",
+		P2PRelayPort:              "4000",
 		KCPClientPort:             "4001",
 		UseKCP:                    false,
 		EnableNCSI:                true,
@@ -95,8 +95,8 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 	if RuntimeConfig.ShadowsocksServerPort != originalCfg.ShadowsocksServerPort {
 		t.Errorf("ShadowsocksServerPort mismatch: got %s, want %s", RuntimeConfig.ShadowsocksServerPort, originalCfg.ShadowsocksServerPort)
 	}
-	if RuntimeConfig.KCPServerPort != originalCfg.KCPServerPort {
-		t.Errorf("KCPServerPort mismatch: got %s, want %s", RuntimeConfig.KCPServerPort, originalCfg.KCPServerPort)
+	if RuntimeConfig.P2PRelayPort != originalCfg.P2PRelayPort {
+		t.Errorf("KCPServerPort mismatch: got %s, want %s", RuntimeConfig.P2PRelayPort, originalCfg.P2PRelayPort)
 	}
 	if RuntimeConfig.KCPClientPort != originalCfg.KCPClientPort {
 		t.Errorf("KCPClientPort mismatch: got %s, want %s", RuntimeConfig.KCPClientPort, originalCfg.KCPClientPort)

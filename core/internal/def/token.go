@@ -17,6 +17,8 @@ type MeshNodeMeta struct {
 	Token    *AgentToken `cbor:"1,keyasint"` // C2-signed, capability=CapabilityRouter
 	Distance int         `cbor:"2,keyasint"` // hops to C2: 0=Gateway, >0=Routed, -1=Unknown
 	Addr     string      `cbor:"3,keyasint"` // node address
+	P2PPort  int         `cbor:"4,keyasint"` // dynamic P2P server port
+	Files    []string    `cbor:"5,keyasint"` // list of available files/modules in memfs
 }
 
 // TagAgentToken is the MsgTunData tag for token push from C2 to agent.

