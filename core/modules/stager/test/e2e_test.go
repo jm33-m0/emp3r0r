@@ -303,25 +303,23 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 	stagerPortStr := fmt.Sprintf("%d", stagerListenerPort)
 	stagerKey := "password123"
 
-	cleanCmd := exec.Command("make", "clean")
-	cleanCmd.Dir = ".."
-	cleanCmd.Run()
-
-	makeCmd := exec.Command(
-		"make",
-		fmt.Sprintf("DOWNLOAD_HOST=%s", "127.0.0.1"),
-		fmt.Sprintf("DOWNLOAD_PORT=%s", stagerPortStr),
-		fmt.Sprintf("DOWNLOAD_PATH=%s", "/"),
-		fmt.Sprintf("DOWNLOAD_KEY=%s", stagerKey),
-		"DEBUG=1",
+	buildCmd := exec.Command(
+		"./build.sh",
+		"--download-host", "127.0.0.1",
+		"--download-port", stagerPortStr,
+		"--download-path", "/",
+		"--download-key", stagerKey,
+		"--stager-format", "shellcode",
+		"--listener-type", "HTTP",
+		"--debug",
 	)
-	makeCmd.Dir = ".."
-	makeCmd.Env = append(os.Environ(), "CGO_ENABLED=0")
-	out, err = makeCmd.CombinedOutput()
+	buildCmd.Dir = ".."
+	buildCmd.Env = append(os.Environ(), "CGO_ENABLED=0")
+	out, err = buildCmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("Make failed: %v\nOutput: %s", err, string(out))
+		t.Fatalf("build.sh failed: %v\nOutput: %s", err, string(out))
 	}
-	logging.Successf("Stager compiled successfully")
+	logging.Successf("Stager compiled successfully via build.sh")
 
 	stagerBinPath := filepath.Join(tmpDir, "stager.bin")
 	input, err := os.ReadFile("../stager.bin")

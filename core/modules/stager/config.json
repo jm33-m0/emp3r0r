@@ -1,0 +1,51 @@
+{
+  "name": "stager",
+  "build": "bash ./build.sh",
+  "author": "jm33-ng",
+  "date": "2025-12-12",
+  "comment": "A Linux stager that supports payload delivery via HTTP/TCP/UDP with obfuscation and compression. Use with emp3r0r-listener",
+  "is_local": true,
+  "platform": "Linux",
+  "path": "",
+  "parameters": [
+    {
+      "name": "stager-format",
+      "description": "Stager can be generated as shared library (.so), ELF executable, or raw shellcode (.bin)",
+      "default": "shellcode",
+      "choices": ["so", "executable", "raw"],
+      "type": "cstr"
+    },
+    {
+      "name": "listener-type",
+      "description": "Listener protocol type: HTTP, TCP, or UDP",
+      "default": "HTTP",
+      "choices": ["HTTP", "TCP", "UDP"],
+      "type": "cstr"
+    },
+    {
+      "name": "download-host",
+      "description": "The host to download the payload from, eg. 192.168.0.1",
+      "default": "",
+      "type": "cstr"
+    },
+    {
+      "name": "download-port",
+      "description": "The port to download the payload from, eg. 8000",
+      "default": "8000",
+      "type": "int"
+    },
+    {
+      "name": "download-path",
+      "description": "The path to download the payload from (HTTP only), eg. /payload",
+      "default": "/",
+      "type": "cstr"
+    },
+    {
+      "name": "download-key",
+      "description": "The key to decrypt the payload",
+      "default": "",
+      "type": "cstr",
+      "secret": true
+    }
+  ]
+}

