@@ -5,9 +5,6 @@
 # binary release
 emp3r0r*.tar.*
 
-# go.sum
-go.sum
-
 *.log
 emp3r0r.json
 

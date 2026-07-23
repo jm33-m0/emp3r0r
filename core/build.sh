@@ -582,12 +582,19 @@ build() {
   check_build_toolchain
   check_required_go
   check_disk_space
-  if [[ ! -d "vendor" ]]; then
-    info "vendor directory not found, downloading modules..."
-    $GO_BIN mod tidy || error "go mod tidy"
-    $GO_BIN mod vendor || error "go mod vendor"
-  else
+  local mod_opt=""
+  if [[ -d "vendor" && -f "vendor/modules.txt" ]]; then
     info "Using existing vendor/ directory for local modules"
+    mod_opt="-mod=vendor"
+  else
+    info "vendor/ directory missing or incomplete, attempting to vendor dependencies..."
+    if $GO_BIN mod vendor; then
+      info "Successfully vendored modules"
+      mod_opt="-mod=vendor"
+    else
+      warn "go mod vendor failed; falling back to default Go module resolution"
+      mod_opt=""
+    fi
   fi
 
   # Check for zig installation
@@ -597,16 +604,16 @@ build() {
   ldflags+=" -X 'github.com/jm33-m0/emp3r0r/core/internal/def.Version=$(get_version)'"
   if [[ "$1" = "--debug" ]]; then
     gobuild_cmd="$GO_BIN"
-    build_opt="build -mod=vendor"
+    build_opt="build $mod_opt"
   else
     if [[ "$disable_garble" = "1" || "$disable_garble" = "true" || "$disable_garble" = "yes" ]]; then
       gobuild_cmd="$GO_BIN"
-      build_opt="build -mod=vendor"
+      build_opt="build $mod_opt"
       ldflags+=" -s -w"
       info "Garble disabled by EMP3R0R_DISABLE_GARBLE=$disable_garble, using plain go build"
     else
       gobuild_cmd="garble"
-      build_opt="-tiny -seed=random build -mod=vendor"
+      build_opt="-tiny -seed=random build $mod_opt"
       ldflags+=" -s -w"
       info "Using garble for obfuscation"
       command -v garble >/dev/null 2>&1 || error "garble not found. It should be installed in the builder container."
@@ -615,15 +622,15 @@ build() {
 
   info "Building CC"
   {
-    cd cmd/cc && CGO_ENABLED=0 $GO_BIN build -mod=vendor -o "$temp/cc.exe" -ldflags="$ldflags"
+    cd cmd/cc && CGO_ENABLED=0 $GO_BIN build $mod_opt -o "$temp/cc.exe" -ldflags="$ldflags"
   } || error "build cc"
   info "Building cat"
   {
-    cd "$pwd/cmd/cat" && CGO_ENABLED=0 $GO_BIN build -mod=vendor -o "$temp/cat.exe" -ldflags="$ldflags"
+    cd "$pwd/cmd/cat" && CGO_ENABLED=0 $GO_BIN build $mod_opt -o "$temp/cat.exe" -ldflags="$ldflags"
   } || error "build cat"
   info "Building listener"
   {
-    cd "$pwd/cmd/listener" && CGO_ENABLED=0 $GO_BIN build -mod=vendor -o "$temp/listener.exe" -ldflags="$ldflags"
+    cd "$pwd/cmd/listener" && CGO_ENABLED=0 $GO_BIN build $mod_opt -o "$temp/listener.exe" -ldflags="$ldflags"
   } || error "build listener"
 
   # Linux
