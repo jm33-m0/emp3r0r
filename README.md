@@ -73,13 +73,13 @@ Agents in egress-restricted or isolated network segments autonomously discover p
 
 ---
 
-### 📂 Inter-Agent Peer-to-Peer File Transfer
+### 📂 P2P Filesystem
 
-Direct agent-to-agent file sharing via P2P relay transport (mYLS/KCP) to accelerate file delivery across internal networks.
+Direct agent-to-agent file sharing via P2P relay transport (mTLS/KCP) to accelerate file delivery across internal networks.
 
 - **Encrypted P2P Tunnels:** Tunnel transfers across peers using mTLS/KCP to bypass egress restrictions and reduce central C2 bandwidth bottlenecks.
-- **Smart In-Memory File Caching**: Files are cached in agent memory as encrypted blobs; can be seamlessly served for other agents to download on-demand. When requesting a file, agents look at their local memfs, then other peers, finally the C2.
-- **Automatic C2 Relay Fallback:** If a target peer lacks the requested file, it dynamically fetches and streams it from the C2 server on-demand.
+- **Smart In-Memory File Caching**: Files are cached in agent memory as encrypted blobs; can be seamlessly served for other agents to download on demand. When requesting a file, agents look at their local memfs, then other peers, finally the C2.
+- **Automatic C2 Relay Fallback:** If a target peer lacks the requested file, it dynamically fetches and streams it from the C2 server on demand.
 
 **Why this matters:** Direct agent-to-agent file sharing maximizes transfer speeds, bypasses network chokepoints, and reduces direct C2 traffic visibility.
 
@@ -91,8 +91,9 @@ Flexible Stage 0 downloader stagers and protocol listeners for initial access an
 
 - **Multi-Protocol Listeners:** Embedded and standalone HTTP, TCP, and UDP listeners with reliable sequence-acknowledgment framing and custom HTTP profiles.
 - **Standalone C Downloader Stager:** Built with direct, libc-independent Linux syscalls for compatibility across distributions without symbol errors.
+- **Tiny Payload Size:** While emp3r0r agent binaries are ~20MB without compression, this stager is below 1.5KB; the sRDI-like payload it fetches from emp3r0r listener, is ~8MB (compressed from agent binary in ELF shared object format).
 - **Flexible Formats:** Compiles into raw position-independent shellcode (`.bin`), standalone ELF executables, or shared objects (`.so`).
-- **In-Memory Hardening:** Allocates stage memory with read-write permissions, de-obfuscates payloads, and enforces read-execute (`mprotect`) prior to reflectively executing Stage 1.
+- **In-Memory Hardening:** Allocates stage memory with read-write permissions, de-obfuscates payloads, and enforces read-execute prior to reflectively executing Stage 1.
 
 ---
 
@@ -116,10 +117,10 @@ Execute in-memory binary modules on both Windows and Linux targets:
 
 ---
 
-### 💾 Encrypted Memory-First Storage & OPSEC Safeguards
+### 💾 Encrypted Memory-First Storage
 
 - **In-Memory Encrypted Virtual Filesystem:** All agent file operations use an in-memory AES-GCM virtual filesystem. Large data automatically spills to encrypted disk storage without identifiable headers or extensions.
-- **Stealth & Evasion:** sRDI-like ELF stagers, module stomping, and self-suspension with XOR-rotated memory obfuscation during idle states.
+- **P2P-Powered Smart Caching**: Each P2P-enabled agent caches the files they fetch from C2 in memfs; then makes it available for other peers, minimizing C2 traffic footprint while making use of fast inter-agent connections.
 
 ---
 
