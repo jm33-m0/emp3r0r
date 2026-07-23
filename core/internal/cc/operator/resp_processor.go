@@ -23,22 +23,6 @@ func init() {
 	CommandHandlers.Store("ps", CommandHandler(handlePS))
 	CommandHandlers.Store("ls", CommandHandler(handleLS))
 	CommandHandlers.Store("stat", CommandHandler(handleStat))
-	CommandHandlers.Store("sysinfo", CommandHandler(handleSysInfo))
-}
-
-func handleSysInfo(out []byte, target *def.Emp3r0rAgent) string {
-	// Call controller for parsing (business logic)
-	parsed, err := controllers.ParseSysinfoOutput(out)
-	if err != nil {
-		logging.Debugf("sysinfo: %v", err)
-		logging.Errorf("sysinfo: %v", err)
-		return ""
-	}
-
-	// UI rendering only
-	outTable := cli.BuildTable(parsed.Headers, parsed.Rows)
-	cli.AdaptiveTable(outTable)
-	return outTable
 }
 
 func handlePS(out []byte, target *def.Emp3r0rAgent) string {

@@ -46,8 +46,6 @@ def main(*args):
 	}
 }
 
-
-
 func TestEngineRegisterCustomAPI(t *testing.T) {
 	// Register a new custom API function
 	RegisterAPI("custom_multiply", func(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {

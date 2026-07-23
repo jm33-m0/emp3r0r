@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -13,50 +12,6 @@ import (
 type ParsedCommandOutput struct {
 	Headers []string
 	Rows    [][]string
-}
-
-// ParseSysinfoOutput parses sysinfo CBOR data into table format
-func ParseSysinfoOutput(data []byte) (*ParsedCommandOutput, error) {
-	var info def.Emp3r0rAgent
-	if err := cbor.Unmarshal(data, &info); err != nil {
-		return nil, fmt.Errorf("unmarshal sysinfo: %w", err)
-	}
-
-	result := &ParsedCommandOutput{
-		Headers: []string{},
-		Rows:    [][]string{},
-	}
-
-	var row []string
-
-	addIfNotEmpty := func(name, value string) {
-		if value != "" && value != "[]" && value != "0" {
-			result.Headers = append(result.Headers, name)
-			row = append(row, value)
-		}
-	}
-
-	addIfNotEmpty("Hostname", info.Hostname)
-	addIfNotEmpty("Uptime", info.Uptime)
-	addIfNotEmpty("OS", info.OS)
-	addIfNotEmpty("Kernel", info.Kernel)
-	addIfNotEmpty("Arch", info.Arch)
-	addIfNotEmpty("CPU", info.CPU)
-	addIfNotEmpty("Mem", info.Mem)
-	addIfNotEmpty("User", info.User)
-	addIfNotEmpty("Groups", info.Groups)
-	addIfNotEmpty("IPs", fmt.Sprintf("%v", info.IPs))
-	if info.Container != "" && info.Container != "N/A" {
-		addIfNotEmpty("Container", info.Container)
-	}
-	if info.Process != nil {
-		addIfNotEmpty("Agent PID", strconv.Itoa(info.Process.PID))
-	}
-	addIfNotEmpty("CWD", info.CWD)
-	addIfNotEmpty("Transport", info.Transport)
-
-	result.Rows = [][]string{row}
-	return result, nil
 }
 
 // ParsePSOutput parses process list CBOR data

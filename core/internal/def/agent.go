@@ -6,41 +6,41 @@ import (
 
 // Emp3r0rAgent agent properties
 type Emp3r0rAgent struct {
-	Tag         string        `cbor:"1,keyasint"`  // identifier of the agent
-	Name        string        `cbor:"2,keyasint"`  // short name of the agent
-	ShortID     string        `cbor:"35,keyasint"` // short hash of UUID-UUIDSig for persistence
-	Version     string        `cbor:"3,keyasint"`  // agent version
-	Transport   string        `cbor:"4,keyasint"`  // transport the agent uses (HTTP2 / CDN / TOR)
-	Hostname    string        `cbor:"5,keyasint"`  // Hostname and machine ID
-	Hardware    string        `cbor:"6,keyasint"`  // machine details and hypervisor
-	Container   string        `cbor:"7,keyasint"`  // container tech (if any)
-	Uptime      string        `cbor:"33,keyasint"` // System uptime
-	Groups      string        `cbor:"34,keyasint"` // User groups
-	CPU         string        `cbor:"8,keyasint"`  // CPU info
-	GPU         string        `cbor:"9,keyasint"`  // GPU info
-	Mem         string        `cbor:"10,keyasint"` // memory size
-	OS          string        `cbor:"11,keyasint"` // OS name and version
-	GOOS        string        `cbor:"12,keyasint"` // runtime.GOOS
-	Kernel      string        `cbor:"13,keyasint"` // kernel release
-	Arch        string        `cbor:"14,keyasint"` // kernel architecture
-	From        string        `cbor:"15,keyasint"` // where the agent is coming from, usually a public IP, or 127.0.0.1
-	IPs         []string      `cbor:"16,keyasint"` // IPs that are found on target's NICs
-	ARP         []string      `cbor:"17,keyasint"` // ARP table
-	User        string        `cbor:"18,keyasint"` // user account info
-	HasRoot     bool          `cbor:"19,keyasint"` // is agent run as root?
-	HasTor      bool          `cbor:"20,keyasint"` // is agent from Tor?
-	HasInternet bool          `cbor:"21,keyasint"` // has internet access?
-	NCSIEnabled bool          `cbor:"22,keyasint"` // NCSI (or similar services) enabled
-	Process     *AgentProcess `cbor:"23,keyasint"` // agent's process
-	Exes        []string      `cbor:"24,keyasint"` // executables found in agent's $PATH
-	CWD         string        `cbor:"25,keyasint"` // current working directory
-	Product     any           `cbor:"26,keyasint"` // product info
-	UUID        string        `cbor:"27,keyasint"` // agent UUID, specific to the agent binary
-	UUIDSig     string        `cbor:"28,keyasint"` // signature of UUID, signed by CA
-	PublicKey   string        `cbor:"29,keyasint"` // agent's public key (PEM encoded) for TOFU
-	C2Host      string        `cbor:"30,keyasint"` // C2 server's IP or domain name that the agent is connected to
-	LastSeen    time.Time     `cbor:"31,keyasint"` // last time the agent was seen
-	LastSeenRTT time.Duration `cbor:"32,keyasint"` // last RTT of the agent
+	Tag            string        `cbor:"1,keyasint"`  // identifier of the agent
+	Name           string        `cbor:"2,keyasint"`  // short name of the agent
+	ShortID        string        `cbor:"35,keyasint"` // short hash of UUID-UUIDSig for persistence
+	Version        string        `cbor:"3,keyasint"`  // agent version
+	Transport      string        `cbor:"4,keyasint"`  // transport the agent uses (HTTP2 / CDN / TOR)
+	Hostname       string        `cbor:"5,keyasint"`  // Hostname and machine ID
+	Hardware       string        `cbor:"6,keyasint"`  // machine details and hypervisor
+	Container      string        `cbor:"7,keyasint"`  // container tech (if any)
+	Uptime         string        `cbor:"33,keyasint"` // System uptime
+	Groups         string        `cbor:"34,keyasint"` // User groups
+	CPU            string        `cbor:"8,keyasint"`  // CPU info
+	GPU            string        `cbor:"9,keyasint"`  // GPU info
+	Mem            string        `cbor:"10,keyasint"` // memory size
+	OS             string        `cbor:"11,keyasint"` // OS name and version
+	GOOS           string        `cbor:"12,keyasint"` // runtime.GOOS
+	Kernel         string        `cbor:"13,keyasint"` // kernel release
+	Arch           string        `cbor:"14,keyasint"` // kernel architecture
+	From           string        `cbor:"15,keyasint"` // where the agent is coming from, usually a public IP, or 127.0.0.1
+	IPs            []string      `cbor:"16,keyasint"` // IPs that are found on target's NICs
+	ARP            []string      `cbor:"17,keyasint"` // ARP table
+	User           string        `cbor:"18,keyasint"` // user account info
+	HasRoot        bool          `cbor:"19,keyasint"` // is agent run as root?
+	HasTor         bool          `cbor:"20,keyasint"` // is agent from Tor?
+	HasInternet    bool          `cbor:"21,keyasint"` // has internet access?
+	NCSIEnabled    bool          `cbor:"22,keyasint"` // NCSI (or similar services) enabled
+	Process        *AgentProcess `cbor:"23,keyasint"` // agent's process
+	Exes           []string      `cbor:"24,keyasint"` // executables found in agent's $PATH
+	CWD            string        `cbor:"25,keyasint"` // current working directory
+	Product        any           `cbor:"26,keyasint"` // product info
+	UUID           string        `cbor:"27,keyasint"` // agent UUID, specific to the agent binary
+	UUIDSig        string        `cbor:"28,keyasint"` // signature of UUID, signed by CA
+	PublicKey      string        `cbor:"29,keyasint"` // agent's public key (PEM encoded) for TOFU
+	C2Host         string        `cbor:"30,keyasint"` // C2 server's IP or domain name that the agent is connected to
+	LastSeen       time.Time     `cbor:"31,keyasint"` // last time the agent was seen
+	LastSeenRTT    time.Duration `cbor:"32,keyasint"` // last RTT of the agent
 	AgentToken     *AgentToken   `cbor:"36,keyasint"` // current token issued by C2
 	MeshRoute      string        `cbor:"37,keyasint"` // p2p routing role or gateway used by this agent
 	P2PRelayPort   string        `cbor:"38,keyasint"` // dynamic P2P relay port assigned to this agent

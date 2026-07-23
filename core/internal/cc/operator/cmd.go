@@ -217,22 +217,6 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		}
 		rootCmd.AddCommand(netHelperCmd)
 
-		sysinfoCmd := &cobra.Command{
-			Use:     "sysinfo",
-			GroupID: "agent",
-			Short:   "Get system info of selected agent",
-			Run:     CmdSysinfo,
-		}
-		sysinfoCmd.Flags().BoolP("full", "f", false, "Get full system info")
-		sysinfoCmd.Flags().Bool("cpu", false, "Get CPU info")
-		sysinfoCmd.Flags().Bool("mem", false, "Get memory info")
-		sysinfoCmd.Flags().Bool("os", false, "Get OS info")
-		sysinfoCmd.Flags().Bool("net", false, "Get network info")
-		sysinfoCmd.Flags().Bool("user", false, "Get user info")
-		sysinfoCmd.Flags().Bool("container", false, "Get container info")
-		sysinfoCmd.Flags().Bool("uptime", false, "Get uptime info")
-		rootCmd.AddCommand(sysinfoCmd)
-
 		killCmd := &cobra.Command{
 			Use:     "kill pid [pid...]",
 			GroupID: "util",
