@@ -633,6 +633,9 @@ build() {
     cd "$pwd/cmd/listener" && CGO_ENABLED=0 $GO_BIN build $mod_opt -o "$temp/listener.exe" -ldflags="$ldflags"
   } || error "build listener"
 
+  # Add -buildid= for agent builds to further reduce binary size
+  [[ "$1" != "--debug" ]] && ldflags+=" -buildid="
+
   # Linux
   # PIE builds for all architectures where supported
   local pie_flags="-buildmode=pie"
