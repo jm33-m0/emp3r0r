@@ -5,44 +5,74 @@ package netutil
 
 import (
 	"fmt"
-	"os/exec"
-	"strings"
+	"unsafe"
+
+	"golang.org/x/sys/windows"
 )
 
+var (
+	modiphlpapi       = windows.NewLazySystemDLL("iphlpapi.dll")
+	procGetIpNetTable = modiphlpapi.NewProc("GetIpNetTable")
+)
+
+type mibIpNetRow struct {
+	Index       uint32
+	PhysAddrLen uint32
+	PhysAddr    [8]byte
+	Addr        uint32
+	Type        uint32
+}
+
 func IPNeigh() (table []string) {
-	data, err := exec.Command("arp", "-a").Output()
-	if err != nil {
+	var size uint32
+	// Call once to determine required buffer size
+	ret, _, _ := procGetIpNetTable.Call(0, uintptr(unsafe.Pointer(&size)), 0)
+	if size == 0 {
 		return nil
 	}
 
-	skipNext := false
-	for _, line := range strings.Split(string(data), "\n") {
-		// skip empty lines
-		if len(line) <= 0 {
-			continue
-		}
-		// skip Interface: lines
-		if line[0] != ' ' {
-			skipNext = true
-			continue
-		}
-		// skip column headers
-		if skipNext {
-			skipNext = false
+	buf := make([]byte, size)
+	ret, _, _ = procGetIpNetTable.Call(uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&size)), 0)
+	if ret != 0 {
+		return nil
+	}
+
+	numEntries := *(*uint32)(unsafe.Pointer(&buf[0]))
+	if numEntries == 0 {
+		return nil
+	}
+
+	offset := uintptr(4)
+	for i := uint32(0); i < numEntries; i++ {
+		row := (*mibIpNetRow)(unsafe.Pointer(&buf[offset]))
+		offset += 24
+
+		// Type 2 = MIB_IPNET_TYPE_INVALID (deleted/invalid)
+		if row.Type == 2 || row.PhysAddrLen == 0 {
 			continue
 		}
 
-		fields := strings.Fields(line)
-		if len(fields) < 2 {
-			continue
+		ip := fmt.Sprintf(
+			"%d.%d.%d.%d",
+			byte(row.Addr),
+			byte(row.Addr>>8),
+			byte(row.Addr>>16),
+			byte(row.Addr>>24),
+		)
+
+		var mac string
+		if row.PhysAddrLen <= 8 {
+			for j := uint32(0); j < row.PhysAddrLen; j++ {
+				if j > 0 {
+					mac += ":"
+				}
+				mac += fmt.Sprintf("%02x", row.PhysAddr[j])
+			}
 		}
 
-		ip := fields[0]
-		// Normalize MAC address to colon-separated format
-		mac := strings.Replace(fields[1], "-", ":", -1)
-
-		// append
-		table = append(table, fmt.Sprintf("%s (%s), ", ip, mac))
+		if mac != "" {
+			table = append(table, fmt.Sprintf("%s (%s), ", ip, mac))
+		}
 	}
 
 	return table

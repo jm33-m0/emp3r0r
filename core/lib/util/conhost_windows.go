@@ -6,7 +6,6 @@ package util
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"unsafe"
@@ -186,14 +185,29 @@ func SetCosoleWinsize(pid, w, h int) {
 	}
 }
 
+type coord struct {
+	x int16
+	y int16
+}
+
+var (
+	modkernel32                    = windows.NewLazySystemDLL("kernel32.dll")
+	procSetConsoleScreenBufferSize = modkernel32.NewProc("SetConsoleScreenBufferSize")
+)
+
 func SetConsoleBufferSize(w, h int) {
-	cmd := exec.Command("mode.com", "con:", fmt.Sprintf("cols=%d", w), fmt.Sprintf("lines=%d", h))
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		logging.Infof("SetConsoleBufferSize: %s, %v", out, err)
+	hConsole, err := windows.GetStdHandle(windows.STD_OUTPUT_HANDLE)
+	if err != nil || hConsole == windows.InvalidHandle {
+		logging.Infof("SetConsoleBufferSize: GetStdHandle failed: %v", err)
 		return
 	}
-	logging.Infof("SetConsoleBufferSize: set buffer size to %dx%d", w, h)
+	c := coord{x: int16(w), y: int16(h)}
+	ret, _, err := procSetConsoleScreenBufferSize.Call(uintptr(hConsole), uintptr(*(*uint32)(unsafe.Pointer(&c))))
+	if ret == 0 {
+		logging.Infof("SetConsoleBufferSize: SetConsoleScreenBufferSize failed: %v", err)
+		return
+	}
+	logging.Infof("SetConsoleBufferSize: set buffer size to %dx%d via Win32 API", w, h)
 }
 
 func AutoSetConsoleBufferSize() {
