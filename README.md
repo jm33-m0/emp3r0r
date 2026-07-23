@@ -152,6 +152,8 @@ Launch the C2 server:
 emp3r0r server --c2-hosts 1.2.3.4 --http-port 12345 --operator-port 13377
 ```
 
+_Note: If installed with `root` user instead of standard `sudo`, your current user might not be able to launch emp3r0r as permissions can't be properly set by the installer. The same applies to your operator machines as well._
+
 ---
 
 ### 2. Operator Machine Setup
