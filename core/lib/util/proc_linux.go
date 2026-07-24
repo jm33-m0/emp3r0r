@@ -13,6 +13,26 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
+var (
+	rootMntNS string
+)
+
+func getRootMntNS() string {
+	if rootMntNS != "" {
+		return rootMntNS
+	}
+	link, err := os.Readlink("/proc/1/ns/mnt")
+	if err == nil && link != "" {
+		rootMntNS = link
+		return rootMntNS
+	}
+	link, err = os.Readlink("/proc/self/ns/mnt")
+	if err == nil {
+		rootMntNS = link
+	}
+	return rootMntNS
+}
+
 // ProcessList a list of current processes with filters
 func ProcessList(pid int, username, command, commandLine string) (list []ProcEntry) {
 	entries, err := os.ReadDir("/proc")
@@ -57,6 +77,16 @@ func getProcEntry(pid int) ProcEntry {
 		p.Name = "unknown_proc"
 	}
 
+	// Read /proc/<pid>/cmdline for cmdline
+	p.Cmdline = ProcCmdline(pid)
+	if p.Cmdline == "unknown_cmdline" || p.Cmdline == "dead_process" || strings.HasPrefix(p.Cmdline, "err_") || p.Cmdline == "" {
+		if p.Name != "" && p.Name != "unknown_proc" {
+			p.Cmdline = fmt.Sprintf("[%s]", p.Name)
+		} else {
+			p.Cmdline = "N/A"
+		}
+	}
+
 	// Parse /proc/<pid>/status for PPID and UID
 	statusBytes, err := os.ReadFile(fmt.Sprintf("/proc/%d/status", pid))
 	if err == nil {
@@ -91,7 +121,12 @@ func getProcEntry(pid int) ProcEntry {
 	// Read FS (mount) namespace from /proc/<pid>/ns/mnt
 	nsLink, err := os.Readlink(fmt.Sprintf("/proc/%d/ns/mnt", pid))
 	if err == nil && nsLink != "" {
-		p.Namespace = nsLink
+		rootNS := getRootMntNS()
+		if rootNS != "" && nsLink == rootNS {
+			p.Namespace = "root"
+		} else {
+			p.Namespace = nsLink
+		}
 	}
 
 	return p
