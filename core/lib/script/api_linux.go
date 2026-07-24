@@ -192,15 +192,23 @@ func init() {
 	registerArchSyscalls()
 }
 
+const maxUintptr = uint64(^uintptr(0))
+
 func parseSyscallNum(val starlark.Value) (uintptr, error) {
 	switch v := val.(type) {
 	case starlark.Int:
 		if num, ok := v.Uint64(); ok {
+			if num > maxUintptr {
+				return 0, fmt.Errorf("syscall number exceeds architecture pointer limit: %d", num)
+			}
 			return uintptr(num), nil
 		}
 		if num, ok := v.Int64(); ok {
 			if num < 0 {
 				return 0, fmt.Errorf("invalid negative syscall number: %d", num)
+			}
+			if uint64(num) > maxUintptr {
+				return 0, fmt.Errorf("syscall number exceeds architecture pointer limit: %d", num)
 			}
 			return uintptr(num), nil
 		}
@@ -208,6 +216,9 @@ func parseSyscallNum(val starlark.Value) (uintptr, error) {
 	case starlark.String:
 		str := string(v)
 		if num, err := strconv.ParseUint(str, 0, 64); err == nil {
+			if num > maxUintptr {
+				return 0, fmt.Errorf("syscall number exceeds architecture pointer limit: %d", num)
+			}
 			return uintptr(num), nil
 		}
 

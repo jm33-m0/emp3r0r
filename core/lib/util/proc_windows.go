@@ -5,6 +5,7 @@ package util
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -94,8 +95,15 @@ func getSystemProcessInformation() ([]systemProcessItem, error) {
 
 		var name string
 		if imgBuf != 0 && imgLen > 0 {
-			utf16Slice := unsafe.Slice((*uint16)(unsafe.Pointer(imgBuf)), imgLen/2)
-			name = windows.UTF16ToString(utf16Slice)
+			bufStart := uintptr(unsafe.Pointer(&buf[0]))
+			bufEnd := bufStart + uintptr(len(buf))
+			if imgBuf >= bufStart && imgBuf+uintptr(imgLen) <= bufEnd {
+				strOffset := imgBuf - bufStart
+				utf16Slice := unsafe.Slice((*uint16)(unsafe.Pointer(&buf[strOffset])), imgLen/2)
+				name = windows.UTF16ToString(utf16Slice)
+			} else {
+				name = "unknown_proc"
+			}
 		} else if pid == 0 {
 			name = "System Idle Process"
 		} else if pid == 4 {
@@ -339,7 +347,9 @@ func IsProcAlive(procName string) (alive bool, procs []*ProcSimple) {
 	for _, item := range items {
 		if strings.EqualFold(item.Name, procName) || strings.EqualFold(filepath.Base(item.Name), procName) {
 			alive = true
-			procs = append(procs, &ProcSimple{Pid: int32(item.PID)})
+			if item.PID >= 0 && item.PID <= math.MaxInt32 {
+				procs = append(procs, &ProcSimple{Pid: int32(item.PID)})
+			}
 		}
 	}
 

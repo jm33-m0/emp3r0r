@@ -5,6 +5,7 @@ package util
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"os/user"
 	"strconv"
@@ -206,7 +207,9 @@ func IsProcAlive(procName string) (alive bool, procs []*ProcSimple) {
 		if name == procName {
 			if IsPIDAlive(pid) {
 				alive = true
-				procs = append(procs, &ProcSimple{Pid: int32(pid)})
+				if pid >= 0 && pid <= math.MaxInt32 {
+					procs = append(procs, &ProcSimple{Pid: int32(pid)})
+				}
 			}
 		}
 	}
