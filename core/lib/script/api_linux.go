@@ -199,12 +199,15 @@ func parseSyscallNum(val starlark.Value) (uintptr, error) {
 			return uintptr(num), nil
 		}
 		if num, ok := v.Int64(); ok {
+			if num < 0 {
+				return 0, fmt.Errorf("invalid negative syscall number: %d", num)
+			}
 			return uintptr(num), nil
 		}
 		return 0, fmt.Errorf("invalid syscall number integer")
 	case starlark.String:
 		str := string(v)
-		if num, err := strconv.ParseUint(str, 10, 64); err == nil {
+		if num, err := strconv.ParseUint(str, 0, 64); err == nil {
 			return uintptr(num), nil
 		}
 
