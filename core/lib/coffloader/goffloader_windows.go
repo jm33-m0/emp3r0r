@@ -19,30 +19,91 @@ import (
 const (
 	MEM_COMMIT             = windows.MEM_COMMIT
 	MEM_RESERVE            = windows.MEM_RESERVE
-	MEM_TOP_DOWN           = windows.MEM_TOP_DOWN
 	PAGE_EXECUTE_READWRITE = windows.PAGE_EXECUTE_READWRITE
-	// PAGE_EXECUTE_READ is a Windows constant used with Windows API calls
-	PAGE_EXECUTE_READ = windows.PAGE_EXECUTE_READ
-	// PAGE_READWRITE is a Windows constant used with Windows API calls
-	PAGE_READWRITE = windows.PAGE_READWRITE
-
-	// Characteristic Flag that implies a section should be executable
-	IMAGE_SCN_MEM_EXECUTE = 0x20000000
+	PAGE_EXECUTE_READ      = windows.PAGE_EXECUTE_READ
+	PAGE_READWRITE         = windows.PAGE_READWRITE
+	IMAGE_SCN_MEM_EXECUTE  = 0x20000000
 )
 
 var (
-	kernel32           = syscall.MustLoadDLL("kernel32.dll")
-	procVirtualAlloc   = kernel32.MustFindProc("VirtualAlloc")
-	procVirtualProtect = kernel32.MustFindProc("VirtualProtect")
-	procVirtualFree    = kernel32.MustFindProc("VirtualFree")
+	kernel32                           = syscall.MustLoadDLL("kernel32.dll")
+	procVirtualAlloc                   = kernel32.MustFindProc("VirtualAlloc")
+	procVirtualProtect                 = kernel32.MustFindProc("VirtualProtect")
+	procVirtualFree                    = kernel32.MustFindProc("VirtualFree")
+	procAddVectoredExceptionHandler    = kernel32.MustFindProc("AddVectoredExceptionHandler")
+	procRemoveVectoredExceptionHandler = kernel32.MustFindProc("RemoveVectoredExceptionHandler")
+
+	isExecutingBOF    bool
+	bofExceptionCode  uint32
+	bofExceptionAddr  uintptr
+	vehHandlerHandle  uintptr
+	bofRecoveryHandle uintptr
 )
+
+type exceptionRecordStruct struct {
+	ExceptionCode        uint32
+	ExceptionFlags       uint32
+	ExceptionRecord      uintptr
+	ExceptionAddress     uintptr
+	NumberParameters     uint32
+	ExceptionInformation [15]uintptr
+}
+
+type exceptionPointersStruct struct {
+	ExceptionRecord *exceptionRecordStruct
+	ContextRecord   uintptr
+}
+
+func initVEH() {
+	if vehHandlerHandle != 0 {
+		return
+	}
+	bofRecoveryHandle = windows.NewCallback(bofRecoveryStub)
+	handlerCallback := windows.NewCallback(vehHandler)
+	ret, _, _ := procAddVectoredExceptionHandler.Call(1, handlerCallback)
+	vehHandlerHandle = ret
+}
+
+func bofRecoveryStub() uintptr {
+	panic(fmt.Sprintf("BOF native SEH exception 0x%X at address 0x%X", bofExceptionCode, bofExceptionAddr))
+}
+
+func vehHandler(exceptionPointers uintptr) uintptr {
+	if exceptionPointers == 0 || !isExecutingBOF {
+		return 0 // EXCEPTION_CONTINUE_SEARCH
+	}
+
+	ep := (*exceptionPointersStruct)(unsafe.Pointer(exceptionPointers))
+	if ep == nil || ep.ExceptionRecord == nil || ep.ContextRecord == 0 {
+		return 0
+	}
+
+	code := ep.ExceptionRecord.ExceptionCode
+	if code >= 0x80000000 {
+		bofExceptionCode = code
+		bofExceptionAddr = ep.ExceptionRecord.ExceptionAddress
+		isExecutingBOF = false
+
+		if unsafe.Sizeof(uintptr(0)) == 8 {
+			// 64-bit AMD64: RIP offset is 0xF8 (248) inside CONTEXT
+			*(*uintptr)(unsafe.Pointer(ep.ContextRecord + 0xF8)) = bofRecoveryHandle
+		} else {
+			// 32-bit x86: EIP offset is 0xB4 (180) inside CONTEXT
+			*(*uintptr)(unsafe.Pointer(ep.ContextRecord + 0xB4)) = bofRecoveryHandle
+		}
+
+		return ^uintptr(0) // EXCEPTION_CONTINUE_EXECUTION (-1)
+	}
+
+	return 0 // EXCEPTION_CONTINUE_SEARCH
+}
 
 func virtualProtectError(ret uintptr, err error) error {
 	if ret != 0 {
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("Error calling VirtualProtect:\r\n%w", err)
+		return fmt.Errorf("Error calling VirtualProtect: %w", err)
 	}
 	return fmt.Errorf("Error calling VirtualProtect (returned 0)")
 }
@@ -50,12 +111,10 @@ func virtualProtectError(ret uintptr, err error) error {
 func resolveExternalAddress(symbolName string, outChannel chan<- any) uintptr {
 	if strings.HasPrefix(symbolName, "__imp_") {
 		symbolName = symbolName[6:]
-		// 32 bit import names are __imp__
 		symbolName = strings.TrimPrefix(symbolName, "_")
 
 		libName := ""
 		procName := ""
-		// If we're following Dynamic Function Resolution Naming Conventions
 		parts := strings.Split(symbolName, "$")
 		if len(parts) == 2 {
 			libName = parts[0] + ".dll"
@@ -68,59 +127,43 @@ func resolveExternalAddress(symbolName string, outChannel chan<- any) uintptr {
 				libName = "kernel32.dll"
 			case "MessageBoxA":
 				libName = "user32.dll"
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'O', 'u', 't', 'p', 'u', 't'}):
+			case "BeaconOutput":
 				return windows.NewCallback(GetCoffOutputForChannel(outChannel))
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'D', 'a', 't', 'a', 'P', 'a', 'r', 's', 'e'}):
+			case "BeaconDataParse":
 				return windows.NewCallback(DataParse)
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'D', 'a', 't', 'a', 'I', 'n', 't'}):
+			case "BeaconDataInt":
 				return windows.NewCallback(DataInt)
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'D', 'a', 't', 'a', 'S', 'h', 'o', 'r', 't'}):
+			case "BeaconDataShort":
 				return windows.NewCallback(DataShort)
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'D', 'a', 't', 'a', 'L', 'e', 'n', 'g', 't', 'h'}):
+			case "BeaconDataLength":
 				return windows.NewCallback(DataLength)
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'D', 'a', 't', 'a', 'E', 'x', 't', 'r', 'a', 'c', 't'}):
+			case "BeaconDataExtract":
 				return windows.NewCallback(DataExtract)
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'P', 'r', 'i', 'n', 't', 'f'}):
+			case "BeaconPrintf":
 				return windows.NewCallback(GetCoffPrintfForChannel(outChannel))
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'A', 'd', 'd', 'V', 'a', 'l', 'u', 'e'}):
+			case "BeaconAddValue":
 				return windows.NewCallback(AddValue)
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'G', 'e', 't', 'V', 'a', 'l', 'u', 'e'}):
+			case "BeaconGetValue":
 				return windows.NewCallback(GetValue)
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'R', 'e', 'm', 'o', 'v', 'e', 'V', 'a', 'l', 'u', 'e'}):
+			case "BeaconRemoveValue":
 				return windows.NewCallback(RemoveValue)
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'F', 'o', 'r', 'm', 'a', 't', 'A', 'l', 'l', 'o', 'c'}):
+			case "BeaconFormatAlloc":
 				return windows.NewCallback(BeaconFormatAlloc)
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'F', 'o', 'r', 'm', 'a', 't', 'R', 'e', 's', 'e', 't'}):
+			case "BeaconFormatReset":
 				return windows.NewCallback(BeaconFormatReset)
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'F', 'o', 'r', 'm', 'a', 't', 'F', 'r', 'e', 'e'}):
+			case "BeaconFormatFree":
 				return windows.NewCallback(BeaconFormatFree)
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'F', 'o', 'r', 'm', 'a', 't', 'A', 'p', 'p', 'e', 'n', 'd'}):
+			case "BeaconFormatAppend":
 				return windows.NewCallback(BeaconFormatAppend)
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'F', 'o', 'r', 'm', 'a', 't', 'P', 'r', 'i', 'n', 't', 'f'}):
+			case "BeaconFormatPrintf":
 				return windows.NewCallback(BeaconFormatPrintf)
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'F', 'o', 'r', 'm', 'a', 't', 'T', 'o', 'S', 't', 'r', 'i', 'n', 'g'}):
+			case "BeaconFormatToString":
 				return windows.NewCallback(BeaconFormatToString)
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'F', 'o', 'r', 'm', 'a', 't', 'I', 'n', 't'}):
+			case "BeaconFormatInt":
 				return windows.NewCallback(BeaconFormatInt)
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'U', 's', 'e', 'T', 'o', 'k', 'e', 'n'}):
-				fallthrough
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'R', 'e', 'v', 'e', 'r', 't', 'T', 'o', 'k', 'e', 'n'}):
-				fallthrough
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'I', 's', 'A', 'd', 'm', 'i', 'n'}):
-				fallthrough
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'G', 'e', 't', 'S', 'p', 'a', 'w', 'n', 'T', 'o'}):
-				fallthrough
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'S', 'p', 'a', 'w', 'n', 'T', 'e', 'm', 'p', 'o', 'r', 'a', 'r', 'y', 'P', 'r', 'o', 'c', 'e', 's', 's'}):
-				fallthrough
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'I', 'n', 'j', 'e', 'c', 't', 'P', 'r', 'o', 'c', 'e', 's', 's'}):
-				fallthrough
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'I', 'n', 'j', 'e', 'c', 't', 'T', 'e', 'm', 'p', 'o', 'r', 'a', 'r', 'y', 'P', 'r', 'o', 'c', 'e', 's', 's'}):
-				fallthrough
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'C', 'l', 'e', 'a', 'n', 'u', 'p', 'P', 'r', 'o', 'c', 'e', 's', 's'}):
-				fallthrough
-			case string([]rune{'t', 'o', 'W', 'i', 'd', 'e', 'C', 'h', 'a', 'r'}):
-				fallthrough
-			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'G', 'e', 't', 'O', 'u', 't', 'p', 'u', 't', 'D', 'a', 't', 'a'}):
+			case "BeaconUseToken", "BeaconRevertToken", "BeaconIsAdmin", "BeaconGetSpawnTo",
+				"BeaconSpawnTemporaryProcess", "BeaconInjectProcess", "BeaconInjectTemporaryProcess",
+				"BeaconCleanupProcess", "toWideChar", "BeaconGetOutputData":
 				fallthrough
 			default:
 				logging.Warningf("Unknown symbol: %s\n", procName)
@@ -178,9 +221,7 @@ func processRelocation(symbolDefAddress uintptr, sectionAddress uintptr, reloc w
 		return fmt.Errorf("invalid section address (0)")
 	}
 	symbolOffset := uintptr(reloc.VirtualAddress)
-
 	absoluteSymbolAddress := symbolOffset + sectionAddress
-
 	segmentValue := *(*uint32)(unsafe.Pointer(absoluteSymbolAddress))
 
 	if (symbol.StorageClass == windef.IMAGE_SYM_CLASS_STATIC && symbol.Value != 0) ||
@@ -195,17 +236,14 @@ func processRelocation(symbolDefAddress uintptr, sectionAddress uintptr, reloc w
 	switch reloc.Type {
 	case windef.IMAGE_REL_AMD64_ADDR64:
 		addr := (*uint64)(unsafe.Pointer(absoluteSymbolAddress))
-		logging.Infof("Symbol Ref Address: 0x%x\n", addr)
 		*addr = uint64(symbolDefAddress)
 	case windef.IMAGE_REL_AMD64_ADDR32NB:
 		addr := (*uint32)(unsafe.Pointer(absoluteSymbolAddress))
 		valueToWrite := symbolDefAddress - (symbolRefAddress + 4 + symbolOffset)
-		logging.Infof("Symbol Ref Address: 0x%x\n", addr)
 		*addr = uint32(valueToWrite)
 	case windef.IMAGE_REL_AMD64_REL32, windef.IMAGE_REL_AMD64_REL32_1, windef.IMAGE_REL_AMD64_REL32_2, windef.IMAGE_REL_AMD64_REL32_3, windef.IMAGE_REL_AMD64_REL32_4, windef.IMAGE_REL_AMD64_REL32_5:
 		relativeSymbolDefAddress := symbolDefAddress - uintptr(reloc.Type-4) - (absoluteSymbolAddress + 4)
 		addr := (*uint32)(unsafe.Pointer(absoluteSymbolAddress))
-		logging.Infof("Symbol Ref Address: 0x%x\n", addr)
 		*addr = uint32(relativeSymbolDefAddress)
 	default:
 		return fmt.Errorf("unsupported relocation type: %d", reloc.Type)
@@ -283,7 +321,7 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (res strin
 			if isImportSymbol(symbol) {
 				gotSize += 8
 			} else {
-				bssSize += symbol.Value + 8 // leave room for null bytes
+				bssSize += symbol.Value + 8
 			}
 		}
 	}
@@ -368,7 +406,6 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (res strin
 			continue
 		}
 		sectionVirtualAddr := secInfo.Address
-		logging.Infof("Section: %s\n", section.NameString())
 
 		for _, reloc := range section.Relocations() {
 			if reloc.SymbolTableIndex >= uint32(len(parsedCoff.Symbols)) {
@@ -376,19 +413,10 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (res strin
 			}
 
 			symbol := parsedCoff.Symbols[reloc.SymbolTableIndex]
-			if symbol == nil {
+			if symbol == nil || symbol.StorageClass > 3 {
 				continue
 			}
 
-			if symbol.StorageClass > 3 {
-				continue
-			}
-
-			symbolTypeString := ""
-			if int(symbol.StorageClass) < len(windef.MAP_IMAGE_SYM_CLASS) {
-				symbolTypeString = windef.MAP_IMAGE_SYM_CLASS[symbol.StorageClass]
-			}
-			logging.Infof("0x%08X %s %s\n", reloc.VirtualAddress, symbolTypeString, symbol.NameString())
 			symbolDefAddress := uintptr(0)
 
 			if isSpecialSymbol(symbol) {
@@ -430,7 +458,6 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (res strin
 				symbolDefAddress = targetCoffSec.Address + uintptr(symbol.Value)
 			}
 
-			logging.Infof("Symbol Def Address: 0x%x\n", symbolDefAddress)
 			if relocErr := processRelocation(symbolDefAddress, sectionVirtualAddr, reloc, symbol); relocErr != nil {
 				return "", fmt.Errorf("relocation failed for symbol %s: %w", symbol.NameString(), relocErr)
 			}
@@ -466,14 +493,15 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (res strin
 func invokeMethod(methodName string, argBytes []byte, parsedCoff *pecoff.File, sectionMap map[string]CoffSection, outChannel chan<- any) {
 	defer close(outChannel)
 
-	// Catch unexpected panics and propagate them to the output channel
-	// This prevents the host program from terminating unexpectedly
 	defer func() {
+		isExecutingBOF = false
 		if r := recover(); r != nil {
 			errorMsg := fmt.Sprintf("Panic occurred when executing COFF: %v\n%s", r, debug.Stack())
 			outChannel <- errorMsg
 		}
 	}()
+
+	initVEH()
 
 	if parsedCoff == nil || parsedCoff.Sections == nil {
 		outChannel <- "COFF file structure is invalid or nil"
@@ -505,7 +533,10 @@ func invokeMethod(methodName string, argBytes []byte, parsedCoff *pecoff.File, s
 			if len(argBytes) == 0 {
 				argBytes = make([]byte, 1)
 			}
+
+			isExecutingBOF = true
 			syscall.SyscallN(entryPoint, uintptr(unsafe.Pointer(&argBytes[0])), uintptr(len(argBytes)))
+			isExecutingBOF = false
 		}
 	}
 	if !found {
