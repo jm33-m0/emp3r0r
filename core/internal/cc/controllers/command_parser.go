@@ -22,17 +22,21 @@ func ParsePSOutput(data []byte) (*ParsedCommandOutput, error) {
 	}
 
 	result := &ParsedCommandOutput{
-		Headers: []string{"Name", "PID", "PPID", "User"},
+		Headers: []string{"PID", "PPID", "User", "UID", "Namespace", "Name", "Cmdline"},
 		Rows:    [][]string{},
 	}
 
 	for _, p := range procs {
 		pname := util.SplitLongLine(p.Name, 20)
+		cmdline := util.SplitLongLine(p.Cmdline, 35)
 		result.Rows = append(result.Rows, []string{
-			pname,
 			strconv.Itoa(p.PID),
 			strconv.Itoa(p.PPID),
 			p.Token,
+			p.UID,
+			p.Namespace,
+			pname,
+			cmdline,
 		})
 	}
 

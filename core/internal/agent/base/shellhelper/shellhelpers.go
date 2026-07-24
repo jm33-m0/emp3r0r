@@ -26,11 +26,13 @@ func GetNetworkDetails() (out string) {
 
 func CmdPS(pid int, user, name, cmdLine string) (out []byte, err error) {
 	empty_proc := &util.ProcEntry{
-		Name:    "N/A",
-		Cmdline: "N/A",
-		Token:   "N/A",
-		PID:     0,
-		PPID:    0,
+		Name:      "N/A",
+		Cmdline:   "N/A",
+		Token:     "N/A",
+		UID:       "N/A",
+		Namespace: "N/A",
+		PID:       0,
+		PPID:      0,
 	}
 	procs := util.ProcessList(pid, user, name, cmdLine)
 	if len(procs) == 0 || procs == nil {
