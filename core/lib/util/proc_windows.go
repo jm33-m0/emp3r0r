@@ -62,12 +62,15 @@ func getSystemProcessInformation() ([]systemProcessItem, error) {
 	}
 
 	var items []systemProcessItem
-	offset := uintptr(0)
+	offset := 0
 	is64Bit := unsafe.Sizeof(uintptr(0)) == 8
 
-	for {
-		basePtr := uintptr(unsafe.Pointer(&buf[offset]))
-		nextOffset := *(*uint32)(unsafe.Pointer(basePtr))
+	for offset < len(buf) {
+		if offset+96 > len(buf) {
+			break
+		}
+
+		nextOffset := int(*(*uint32)(unsafe.Pointer(&buf[offset])))
 
 		var imgLen uint16
 		var imgBuf uintptr
@@ -75,15 +78,15 @@ func getSystemProcessInformation() ([]systemProcessItem, error) {
 		var ppidVal uintptr
 
 		if is64Bit {
-			imgLen = *(*uint16)(unsafe.Pointer(basePtr + 56))
-			imgBuf = *(*uintptr)(unsafe.Pointer(basePtr + 64))
-			pidVal = *(*uintptr)(unsafe.Pointer(basePtr + 80))
-			ppidVal = *(*uintptr)(unsafe.Pointer(basePtr + 88))
+			imgLen = *(*uint16)(unsafe.Pointer(&buf[offset+56]))
+			imgBuf = *(*uintptr)(unsafe.Pointer(&buf[offset+64]))
+			pidVal = *(*uintptr)(unsafe.Pointer(&buf[offset+80]))
+			ppidVal = *(*uintptr)(unsafe.Pointer(&buf[offset+88]))
 		} else {
-			imgLen = *(*uint16)(unsafe.Pointer(basePtr + 56))
-			imgBuf = *(*uintptr)(unsafe.Pointer(basePtr + 60))
-			pidVal = *(*uintptr)(unsafe.Pointer(basePtr + 68))
-			ppidVal = *(*uintptr)(unsafe.Pointer(basePtr + 72))
+			imgLen = *(*uint16)(unsafe.Pointer(&buf[offset+56]))
+			imgBuf = *(*uintptr)(unsafe.Pointer(&buf[offset+60]))
+			pidVal = *(*uintptr)(unsafe.Pointer(&buf[offset+68]))
+			ppidVal = *(*uintptr)(unsafe.Pointer(&buf[offset+72]))
 		}
 
 		pid := int(pidVal)
@@ -110,7 +113,7 @@ func getSystemProcessInformation() ([]systemProcessItem, error) {
 		if nextOffset == 0 {
 			break
 		}
-		offset += uintptr(nextOffset)
+		offset += nextOffset
 	}
 
 	return items, nil
