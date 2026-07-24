@@ -187,3 +187,46 @@ func TestRunStar(t *testing.T) {
 		t.Errorf("expected script output, got empty")
 	}
 }
+
+func TestLinuxSyscallAPIs(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skipf("skipping Linux syscall test on %s", runtime.GOOS)
+	}
+
+	linuxScript := `
+def main(*args):
+    # Test getpid syscall by name and by sys_call
+    res = sys_call("getpid")
+    pid = res["r1"]
+    if pid <= 0:
+        return "Fail: invalid pid from sys_call"
+    print("PID: " + str(pid))
+
+    # Test lin_syscall alias
+    res2 = lin_syscall("getpid")
+    if res2["r1"] != pid:
+        return "Fail: lin_syscall pid mismatch"
+
+    # Test sys_alloc, sys_read_mem, sys_free
+    addr = sys_alloc(64)
+    if addr == 0:
+        return "Fail: sys_alloc failed"
+
+    mem = sys_read_mem(addr, 4)
+    if len(mem) != 4:
+        return "Fail: sys_read_mem failed"
+
+    sys_free(addr)
+    return "OK"
+`
+	out, err := Run([]byte(linuxScript), nil, nil)
+	if err != nil {
+		t.Fatalf("Run linux script failed: %v", err)
+	}
+	if !strings.Contains(out, "PID: ") {
+		t.Errorf("expected PID in output, got: %q", out)
+	}
+	if !strings.Contains(out, "OK") {
+		t.Errorf("expected OK from linux script, got: %q", out)
+	}
+}
