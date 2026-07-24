@@ -144,7 +144,7 @@ func ProcessList(pid int, username, command, commandLine string) (list []ProcEnt
 			Cmdline:   cmdline,
 			Token:     token,
 			UID:       uid,
-			Namespace: "N/A",
+			Namespace: "",
 			PID:       pID,
 			PPID:      item.PPID,
 		}
