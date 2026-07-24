@@ -1,5 +1,29 @@
 # Changelog
 
+## [4.7.0](https://github.com/jm33-m0/emp3r0r/compare/v4.6.1...v4.7.0) (2026-07-24)
+
+
+### Features
+
+* add linux syscall proxy for starlark ([ec89e36](https://github.com/jm33-m0/emp3r0r/commit/ec89e369af672ab418853e9fd91615242ad9aca9))
+* add priv manipulation modules for Windows targets ([70c6c2c](https://github.com/jm33-m0/emp3r0r/commit/70c6c2c47432ebdfe3b1b08bc6458ebe915bc3c2))
+
+
+### Bug Fixes
+
+* `ps` should be rewritten for every platform in absence of gopsutils ([e3740c8](https://github.com/jm33-m0/emp3r0r/commit/e3740c8ac929451e34eef06377c1f9adfb665a14))
+* add recover for module runners to avoid crashing the whole agent process ([e21e64a](https://github.com/jm33-m0/emp3r0r/commit/e21e64abaca172fa27242d8b35ddd4b298698600))
+* arch-aware syscalls for starlark ([4d628dd](https://github.com/jm33-m0/emp3r0r/commit/4d628dd235d360384319c689ef3879910ae2f5e8))
+* do not print namespace in `ps` when running on Windows ([544970b](https://github.com/jm33-m0/emp3r0r/commit/544970bba0d155e512e674bbaa7dc30e19166dec))
+* failed racing test ([40b2f5f](https://github.com/jm33-m0/emp3r0r/commit/40b2f5f25f8a0dec62e07e96144af7bf986969bc))
+* handle native exception to avoid crash ([6f823f2](https://github.com/jm33-m0/emp3r0r/commit/6f823f2a4f362b62b432cb41488a395a1bd3b95f))
+* improve error handling in coffloader ([3562af5](https://github.com/jm33-m0/emp3r0r/commit/3562af5e585ba628e3bb0c7833e9e15298661eed))
+* incomplete info in Linux process listing ([47b4841](https://github.com/jm33-m0/emp3r0r/commit/47b4841bcec8a4d5eda3d76613f8fab51305310c))
+* remove `sysinfo` command in favor of BOF/starlark ([c6659a2](https://github.com/jm33-m0/emp3r0r/commit/c6659a2edb23bf147743cb0fe77129b11baaf0b3))
+* remove gopsutils ([227b942](https://github.com/jm33-m0/emp3r0r/commit/227b9424408f5f59f5e1e8ff4e73dcda6908d1fc))
+* replace go-sockaddr with my own fork ([fbc06c5](https://github.com/jm33-m0/emp3r0r/commit/fbc06c5b041aae7cfef5b6aaae0662561a8f7c69))
+* use native win32 api instead of exec ([e4e132b](https://github.com/jm33-m0/emp3r0r/commit/e4e132b603c756d57af372221fec1f49dc7b0522))
+
 ## [4.6.1](https://github.com/jm33-m0/emp3r0r/compare/v4.6.0...v4.6.1) (2026-07-22)
 
 
