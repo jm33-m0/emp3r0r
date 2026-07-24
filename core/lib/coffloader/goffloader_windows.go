@@ -42,9 +42,9 @@ func virtualProtectError(ret uintptr, err error) error {
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("Error calling VirtualProtect:\r\n%s", err.Error())
+		return fmt.Errorf("Error calling VirtualProtect:\r\n%w", err)
 	}
-	return fmt.Errorf("Error calling VirtualProtect")
+	return fmt.Errorf("Error calling VirtualProtect (returned 0)")
 }
 
 func resolveExternalAddress(symbolName string, outChannel chan<- any) uintptr {
@@ -56,9 +56,10 @@ func resolveExternalAddress(symbolName string, outChannel chan<- any) uintptr {
 		libName := ""
 		procName := ""
 		// If we're following Dynamic Function Resolution Naming Conventions
-		if len(strings.Split(symbolName, "$")) == 2 {
-			libName = strings.Split(symbolName, "$")[0] + ".dll"
-			procName = strings.Split(symbolName, "$")[1]
+		parts := strings.Split(symbolName, "$")
+		if len(parts) == 2 {
+			libName = parts[0] + ".dll"
+			procName = parts[1]
 		} else {
 			procName = symbolName
 
@@ -122,14 +123,21 @@ func resolveExternalAddress(symbolName string, outChannel chan<- any) uintptr {
 			case string([]rune{'B', 'e', 'a', 'c', 'o', 'n', 'G', 'e', 't', 'O', 'u', 't', 'p', 'u', 't', 'D', 'a', 't', 'a'}):
 				fallthrough
 			default:
-				// TODO: Check directives here for libraries
-				fmt.Printf("Unknown symbol: %s\n", procName)
+				logging.Warningf("Unknown symbol: %s\n", procName)
 				return 0
 			}
 		}
 
-		libStringPtr, _ := syscall.LoadLibrary(libName)
-		procAddress, _ := syscall.GetProcAddress(libStringPtr, procName)
+		libStringPtr, err := syscall.LoadLibrary(libName)
+		if err != nil {
+			logging.Errorf("Failed to load library %s for symbol %s: %v", libName, symbolName, err)
+			return 0
+		}
+		procAddress, err := syscall.GetProcAddress(libStringPtr, procName)
+		if err != nil {
+			logging.Errorf("Failed to get proc address %s in %s for symbol %s: %v", procName, libName, symbolName, err)
+			return 0
+		}
 		return procAddress
 	}
 	return 0
@@ -143,20 +151,32 @@ func virtualAlloc(lpAddress uintptr, dwSize uintptr, flAllocationType uint32, fl
 		uintptr(flProtect),
 	)
 	if ret == 0 {
-		return 0, err
+		if err != nil && err != windows.ERROR_SUCCESS {
+			return 0, fmt.Errorf("VirtualAlloc call failed: %w", err)
+		}
+		return 0, fmt.Errorf("VirtualAlloc call returned NULL")
 	}
 	return ret, nil
 }
 
 func isSpecialSymbol(sym *pecoff.Symbol) bool {
+	if sym == nil {
+		return false
+	}
 	return sym.StorageClass == windef.IMAGE_SYM_CLASS_EXTERNAL && sym.SectionNumber == 0
 }
 
 func isImportSymbol(sym *pecoff.Symbol) bool {
+	if sym == nil {
+		return false
+	}
 	return strings.HasPrefix(sym.NameString(), "__imp_")
 }
 
-func processRelocation(symbolDefAddress uintptr, sectionAddress uintptr, reloc windef.Relocation, symbol *pecoff.Symbol) {
+func processRelocation(symbolDefAddress uintptr, sectionAddress uintptr, reloc windef.Relocation, symbol *pecoff.Symbol) error {
+	if sectionAddress == 0 {
+		return fmt.Errorf("invalid section address (0)")
+	}
 	symbolOffset := uintptr(reloc.VirtualAddress)
 
 	absoluteSymbolAddress := symbolOffset + sectionAddress
@@ -189,8 +209,9 @@ func processRelocation(symbolDefAddress uintptr, sectionAddress uintptr, reloc w
 		logging.Infof("Symbol Ref Address: 0x%x\n", addr)
 		*addr = uint32(relativeSymbolDefAddress)
 	default:
-		fmt.Printf("Unsupported relocation type: %d\n", reloc.Type)
+		return fmt.Errorf("unsupported relocation type: %d", reloc.Type)
 	}
+	return nil
 }
 
 type CoffSection struct {
@@ -211,16 +232,47 @@ func AlterProtection(oldProtect, newProtect int, addr, size uintptr) error {
 	return nil
 }
 
-func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (string, error) {
+func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (res string, err error) {
+	var sections map[string]CoffSection
+	gotBaseAddress := uintptr(0)
+
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("LoadWithMethod panic: %v\n%s", r, debug.Stack())
+			for _, section := range sections {
+				if section.Address != 0 && section.Section != nil {
+					_ = AlterProtection(PAGE_EXECUTE_READ, PAGE_READWRITE, section.Address, uintptr(section.Section.SizeOfRawData))
+					procVirtualFree.Call(section.Address, 0, windows.MEM_RELEASE)
+				}
+			}
+			if gotBaseAddress != 0 {
+				procVirtualFree.Call(gotBaseAddress, 0, windows.MEM_RELEASE)
+			}
+		}
+	}()
+
+	if len(coffBytes) == 0 {
+		return "", fmt.Errorf("coffBytes is empty")
+	}
+
 	output := make(chan any)
 
 	parsedCoff := pecoff.Explore(binutil.WrapByteSlice(coffBytes))
-	parsedCoff.ReadAll()
+	if parsedCoff == nil {
+		return "", fmt.Errorf("failed to explore COFF payload")
+	}
+
+	if parseErr := parsedCoff.ReadAll(); parseErr != nil {
+		return "", fmt.Errorf("failed to read COFF structure: %w", parseErr)
+	}
 	parsedCoff.Seal()
 
-	sections := make(map[string]CoffSection, parsedCoff.Sections.Len())
+	if parsedCoff.Sections == nil {
+		return "", fmt.Errorf("invalid COFF: no sections found")
+	}
 
-	gotBaseAddress := uintptr(0)
+	sections = make(map[string]CoffSection, parsedCoff.Sections.Len())
+
 	gotOffset := 0
 	gotSize := uint32(0)
 	gotMap := make(map[string]uintptr)
@@ -230,6 +282,9 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (string, e
 	bssSize := uint32(0)
 
 	for _, symbol := range parsedCoff.Symbols {
+		if symbol == nil {
+			continue
+		}
 		if isSpecialSymbol(symbol) {
 			if isImportSymbol(symbol) {
 				gotSize += 8
@@ -240,6 +295,9 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (string, e
 	}
 
 	for _, section := range parsedCoff.Sections.Array() {
+		if section == nil {
+			continue
+		}
 		allocationSize := uintptr(section.SizeOfRawData)
 		if strings.HasPrefix(section.NameString(), ".bss") {
 			allocationSize = uintptr(bssSize)
@@ -251,7 +309,7 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (string, e
 
 		addr, err := virtualAlloc(0, allocationSize, MEM_COMMIT|MEM_RESERVE|MEM_TOP_DOWN, PAGE_READWRITE)
 		if err != nil {
-			return "", fmt.Errorf("VirtualAlloc failed: %s", err.Error())
+			return "", fmt.Errorf("VirtualAlloc failed for section %s: %w", section.NameString(), err)
 		}
 
 		if strings.HasPrefix(section.NameString(), ".bss") {
@@ -268,24 +326,41 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (string, e
 		sections[section.NameString()] = allocatedSection
 	}
 
-	gotBaseAddress, err := virtualAlloc(0, uintptr(gotSize), MEM_COMMIT|MEM_RESERVE|MEM_TOP_DOWN, PAGE_READWRITE)
-	if err != nil {
-		return "", fmt.Errorf("VirtualAlloc failed: %s", err.Error())
+	var allocErr error
+	gotBaseAddress, allocErr = virtualAlloc(0, uintptr(gotSize), MEM_COMMIT|MEM_RESERVE|MEM_TOP_DOWN, PAGE_READWRITE)
+	if allocErr != nil {
+		return "", fmt.Errorf("VirtualAlloc failed for GOT: %w", allocErr)
 	}
 
 	for _, section := range parsedCoff.Sections.Array() {
-		sectionVirtualAddr := sections[section.NameString()].Address
+		if section == nil {
+			continue
+		}
+		secInfo, ok := sections[section.NameString()]
+		if !ok && section.SizeOfRawData > 0 && !strings.HasPrefix(section.NameString(), ".bss") {
+			continue
+		}
+		sectionVirtualAddr := secInfo.Address
 		logging.Infof("Section: %s\n", section.NameString())
 
 		for _, reloc := range section.Relocations() {
+			if reloc.SymbolTableIndex >= uint32(len(parsedCoff.Symbols)) {
+				return "", fmt.Errorf("relocation symbol table index %d out of bounds (%d symbols)", reloc.SymbolTableIndex, len(parsedCoff.Symbols))
+			}
 
 			symbol := parsedCoff.Symbols[reloc.SymbolTableIndex]
+			if symbol == nil {
+				continue
+			}
 
 			if symbol.StorageClass > 3 {
 				continue
 			}
 
-			symbolTypeString := windef.MAP_IMAGE_SYM_CLASS[symbol.StorageClass]
+			symbolTypeString := ""
+			if int(symbol.StorageClass) < len(windef.MAP_IMAGE_SYM_CLASS) {
+				symbolTypeString = windef.MAP_IMAGE_SYM_CLASS[symbol.StorageClass]
+			}
 			logging.Infof("0x%08X %s %s\n", reloc.VirtualAddress, symbolTypeString, symbol.NameString())
 			symbolDefAddress := uintptr(0)
 
@@ -306,22 +381,38 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (string, e
 					}
 					copy((*[8]byte)(unsafe.Pointer(symbolDefAddress))[:], (*[8]byte)(unsafe.Pointer(&externalAddress))[:])
 				} else {
+					if bssBaseAddress == 0 {
+						return "", fmt.Errorf("bssBaseAddress is 0 when resolving symbol %s", symbol.NameString())
+					}
 					symbolDefAddress = bssBaseAddress + uintptr(bssOffset)
 					bssOffset += int(symbol.Value) + 8
 				}
 			} else {
-				targetSection := parsedCoff.Sections.Array()[symbol.SectionNumber-1]
-				symbolDefAddress = sections[targetSection.NameString()].Address + uintptr(symbol.Value)
+				secIdx := int(symbol.SectionNumber) - 1
+				if secIdx < 0 || secIdx >= len(parsedCoff.Sections.Array()) {
+					return "", fmt.Errorf("invalid section number %d for symbol %s", symbol.SectionNumber, symbol.NameString())
+				}
+				targetSection := parsedCoff.Sections.Array()[secIdx]
+				if targetSection == nil {
+					return "", fmt.Errorf("target section for symbol %s is nil", symbol.NameString())
+				}
+				targetCoffSec, ok := sections[targetSection.NameString()]
+				if !ok {
+					return "", fmt.Errorf("target section %s not allocated", targetSection.NameString())
+				}
+				symbolDefAddress = targetCoffSec.Address + uintptr(symbol.Value)
 			}
 
 			logging.Infof("Symbol Def Address: 0x%x\n", symbolDefAddress)
-			processRelocation(symbolDefAddress, sectionVirtualAddr, reloc, symbol)
+			if relocErr := processRelocation(symbolDefAddress, sectionVirtualAddr, reloc, symbol); relocErr != nil {
+				return "", fmt.Errorf("relocation failed for symbol %s: %w", symbol.NameString(), relocErr)
+			}
 		}
 
-		if section.Characteristics&IMAGE_SCN_MEM_EXECUTE != 0 {
+		if section.Characteristics&IMAGE_SCN_MEM_EXECUTE != 0 && sectionVirtualAddr != 0 {
 			oldProtect := PAGE_READWRITE
 			if err := AlterProtection(oldProtect, PAGE_EXECUTE_READ, sectionVirtualAddr, uintptr(section.SizeOfRawData)); err != nil {
-				return "", err
+				return "", fmt.Errorf("failed to alter section protection to executable: %w", err)
 			}
 		}
 	}
@@ -331,13 +422,17 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (string, e
 
 	var bofOutput strings.Builder
 	for msg := range output {
-		bofOutput.WriteString(msg.(string))
-		bofOutput.WriteString("\n")
+		if s, ok := msg.(string); ok {
+			bofOutput.WriteString(s)
+			bofOutput.WriteString("\n")
+		} else if msg != nil {
+			bofOutput.WriteString(fmt.Sprintf("%v\n", msg))
+		}
 	}
 
 	// Clean up the unmanaged memory allocated for the sections
 	for _, section := range sections {
-		if section.Address != 0 {
+		if section.Address != 0 && section.Section != nil {
 			// Temporarily change the page protection to Read/Write so we can overwrite it
 			err := AlterProtection(PAGE_EXECUTE_READ, PAGE_READWRITE, section.Address, uintptr(section.Section.SizeOfRawData))
 			if err != nil {
@@ -352,6 +447,9 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (string, e
 			clear(memSlice)
 			procVirtualFree.Call(section.Address, 0, windows.MEM_RELEASE)
 		}
+	}
+	if gotBaseAddress != 0 {
+		procVirtualFree.Call(gotBaseAddress, 0, windows.MEM_RELEASE)
 	}
 
 	return bofOutput.String(), nil
@@ -369,16 +467,40 @@ func invokeMethod(methodName string, argBytes []byte, parsedCoff *pecoff.File, s
 		}
 	}()
 
+	if parsedCoff == nil || parsedCoff.Sections == nil {
+		outChannel <- "COFF file structure is invalid or nil"
+		return
+	}
+
 	// Call the entry point
+	found := false
 	for _, symbol := range parsedCoff.Symbols {
-		if symbol.NameString() == methodName {
-			mainSection := parsedCoff.Sections.Array()[symbol.SectionNumber-1]
-			entryPoint := sectionMap[mainSection.NameString()].Address + uintptr(symbol.Value)
+		if symbol != nil && symbol.NameString() == methodName {
+			found = true
+			secIdx := int(symbol.SectionNumber) - 1
+			if secIdx < 0 || secIdx >= len(parsedCoff.Sections.Array()) {
+				outChannel <- fmt.Sprintf("Invalid section number %d for entry symbol %s", symbol.SectionNumber, methodName)
+				return
+			}
+			mainSection := parsedCoff.Sections.Array()[secIdx]
+			if mainSection == nil {
+				outChannel <- fmt.Sprintf("Entry section for symbol %s is nil", methodName)
+				return
+			}
+			sec, ok := sectionMap[mainSection.NameString()]
+			if !ok || sec.Address == 0 {
+				outChannel <- fmt.Sprintf("Entry section %s memory not allocated", mainSection.NameString())
+				return
+			}
+			entryPoint := sec.Address + uintptr(symbol.Value)
 
 			if len(argBytes) == 0 {
 				argBytes = make([]byte, 1)
 			}
 			syscall.SyscallN(entryPoint, uintptr(unsafe.Pointer(&argBytes[0])), uintptr(len(argBytes)))
 		}
+	}
+	if !found {
+		outChannel <- fmt.Sprintf("Entry symbol '%s' not found in COFF", methodName)
 	}
 }
