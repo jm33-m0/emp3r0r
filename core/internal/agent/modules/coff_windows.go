@@ -10,7 +10,14 @@ import (
 )
 
 // runCOFFModule executes a COFF/BOF payload using goffloader on Windows.
-func runCOFFModule(payload []byte, invocation def.ResolvedInvocation) (string, error) {
+func runCOFFModule(payload []byte, invocation def.ResolvedInvocation) (out string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("runCOFFModule panic: %v", r)
+			out = ""
+		}
+	}()
+
 	if invocation.Coff == nil {
 		return "", fmt.Errorf("missing COFF invocation data")
 	}

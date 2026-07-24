@@ -192,7 +192,6 @@ func processRelocation(symbolDefAddress uintptr, sectionAddress uintptr, reloc w
 
 	symbolRefAddress := sectionAddress
 
-	// TODO: Handle x86 cases as well
 	switch reloc.Type {
 	case windef.IMAGE_REL_AMD64_ADDR64:
 		addr := (*uint64)(unsafe.Pointer(absoluteSymbolAddress))
@@ -233,20 +232,15 @@ func AlterProtection(oldProtect, newProtect int, addr, size uintptr) error {
 }
 
 func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (res string, err error) {
-	var sections map[string]CoffSection
-	gotBaseAddress := uintptr(0)
+	var baseBlockAddr uintptr
+	var totalSize uintptr
 
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("LoadWithMethod panic: %v\n%s", r, debug.Stack())
-			for _, section := range sections {
-				if section.Address != 0 && section.Section != nil {
-					_ = AlterProtection(PAGE_EXECUTE_READ, PAGE_READWRITE, section.Address, uintptr(section.Section.SizeOfRawData))
-					procVirtualFree.Call(section.Address, 0, windows.MEM_RELEASE)
-				}
-			}
-			if gotBaseAddress != 0 {
-				procVirtualFree.Call(gotBaseAddress, 0, windows.MEM_RELEASE)
+			if baseBlockAddr != 0 && totalSize != 0 {
+				_ = AlterProtection(PAGE_EXECUTE_READ, PAGE_READWRITE, baseBlockAddr, totalSize)
+				procVirtualFree.Call(baseBlockAddr, 0, windows.MEM_RELEASE)
 			}
 		}
 	}()
@@ -271,7 +265,7 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (res strin
 		return "", fmt.Errorf("invalid COFF: no sections found")
 	}
 
-	sections = make(map[string]CoffSection, parsedCoff.Sections.Len())
+	sections := make(map[string]CoffSection, parsedCoff.Sections.Len())
 
 	gotOffset := 0
 	gotSize := uint32(0)
@@ -294,6 +288,9 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (res strin
 		}
 	}
 
+	// Calculate single contiguous memory allocation for all sections + BSS + GOT
+	sectionOffsets := make(map[string]uintptr)
+
 	for _, section := range parsedCoff.Sections.Array() {
 		if section == nil {
 			continue
@@ -307,29 +304,59 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (res strin
 			continue
 		}
 
-		addr, err := virtualAlloc(0, allocationSize, MEM_COMMIT|MEM_RESERVE|MEM_TOP_DOWN, PAGE_READWRITE)
-		if err != nil {
-			return "", fmt.Errorf("VirtualAlloc failed for section %s: %w", section.NameString(), err)
+		// Align to 16 bytes
+		if totalSize%16 != 0 {
+			totalSize += 16 - (totalSize % 16)
 		}
+		sectionOffsets[section.NameString()] = totalSize
+		totalSize += allocationSize
+	}
 
+	gotOffsetInBlock := uintptr(0)
+	if gotSize > 0 {
+		if totalSize%16 != 0 {
+			totalSize += 16 - (totalSize % 16)
+		}
+		gotOffsetInBlock = totalSize
+		totalSize += uintptr(gotSize)
+	}
+
+	if totalSize == 0 {
+		return "", fmt.Errorf("invalid COFF: total allocation size is 0")
+	}
+
+	var allocErr error
+	baseBlockAddr, allocErr = virtualAlloc(0, totalSize, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE)
+	if allocErr != nil {
+		return "", fmt.Errorf("VirtualAlloc failed for COFF payload (%d bytes): %w", totalSize, allocErr)
+	}
+
+	gotBaseAddress := uintptr(0)
+	if gotSize > 0 {
+		gotBaseAddress = baseBlockAddr + gotOffsetInBlock
+	}
+
+	for _, section := range parsedCoff.Sections.Array() {
+		if section == nil {
+			continue
+		}
+		offset, ok := sectionOffsets[section.NameString()]
+		if !ok {
+			continue
+		}
+		addr := baseBlockAddr + offset
 		if strings.HasPrefix(section.NameString(), ".bss") {
 			bssBaseAddress = addr
 		}
 
-		copy((*[1 << 30]byte)(unsafe.Pointer(addr))[:], section.RawData())
+		if section.SizeOfRawData > 0 {
+			copy((*[1 << 30]byte)(unsafe.Pointer(addr))[:], section.RawData())
+		}
 
-		allocatedSection := CoffSection{
+		sections[section.NameString()] = CoffSection{
 			Section: section,
 			Address: addr,
 		}
-
-		sections[section.NameString()] = allocatedSection
-	}
-
-	var allocErr error
-	gotBaseAddress, allocErr = virtualAlloc(0, uintptr(gotSize), MEM_COMMIT|MEM_RESERVE|MEM_TOP_DOWN, PAGE_READWRITE)
-	if allocErr != nil {
-		return "", fmt.Errorf("VirtualAlloc failed for GOT: %w", allocErr)
 	}
 
 	for _, section := range parsedCoff.Sections.Array() {
@@ -408,13 +435,11 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (res strin
 				return "", fmt.Errorf("relocation failed for symbol %s: %w", symbol.NameString(), relocErr)
 			}
 		}
+	}
 
-		if section.Characteristics&IMAGE_SCN_MEM_EXECUTE != 0 && sectionVirtualAddr != 0 {
-			oldProtect := PAGE_READWRITE
-			if err := AlterProtection(oldProtect, PAGE_EXECUTE_READ, sectionVirtualAddr, uintptr(section.SizeOfRawData)); err != nil {
-				return "", fmt.Errorf("failed to alter section protection to executable: %w", err)
-			}
-		}
+	// Change memory protection of the entire BOF block to PAGE_EXECUTE_READWRITE
+	if err := AlterProtection(PAGE_READWRITE, PAGE_EXECUTE_READWRITE, baseBlockAddr, totalSize); err != nil {
+		return "", fmt.Errorf("failed to set execution protection on BOF payload: %w", err)
 	}
 
 	// Call the entry point
@@ -430,27 +455,10 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (res strin
 		}
 	}
 
-	// Clean up the unmanaged memory allocated for the sections
-	for _, section := range sections {
-		if section.Address != 0 && section.Section != nil {
-			// Temporarily change the page protection to Read/Write so we can overwrite it
-			err := AlterProtection(PAGE_EXECUTE_READ, PAGE_READWRITE, section.Address, uintptr(section.Section.SizeOfRawData))
-			if err != nil {
-				// If we cannot alter the protection, we cannot safely clear it
-				// Fall back to just freeing the memory to prevent a leak
-				procVirtualFree.Call(section.Address, 0, windows.MEM_RELEASE)
-				continue
-			}
-			// Create a slice view of the unmanaged memory
-			memSlice := unsafe.Slice((*byte)(unsafe.Pointer(section.Address)), section.Section.SizeOfRawData)
-			// Zero out the entire slice contents
-			clear(memSlice)
-			procVirtualFree.Call(section.Address, 0, windows.MEM_RELEASE)
-		}
-	}
-	if gotBaseAddress != 0 {
-		procVirtualFree.Call(gotBaseAddress, 0, windows.MEM_RELEASE)
-	}
+	// Zero out and release memory block
+	memSlice := unsafe.Slice((*byte)(unsafe.Pointer(baseBlockAddr)), totalSize)
+	clear(memSlice)
+	procVirtualFree.Call(baseBlockAddr, 0, windows.MEM_RELEASE)
 
 	return bofOutput.String(), nil
 }

