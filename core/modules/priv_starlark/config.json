@@ -62,21 +62,21 @@
         "name": "domain",
         "description": "Windows domain (use '.' for local accounts)",
         "default": ".",
-        "type": "string",
+        "type": "cstr",
         "required": true
       },
       {
         "name": "username",
         "description": "Account username",
         "default": "",
-        "type": "string",
+        "type": "cstr",
         "required": true
       },
       {
         "name": "password",
         "description": "Account password",
         "default": "",
-        "type": "string",
+        "type": "cstr",
         "required": true
       },
       {
@@ -111,35 +111,35 @@
         "name": "username",
         "description": "Windows username",
         "default": "",
-        "type": "string",
+        "type": "cstr",
         "required": true
       },
       {
         "name": "domain",
         "description": "Windows domain (use '.' for local accounts)",
         "default": ".",
-        "type": "string",
+        "type": "cstr",
         "required": true
       },
       {
         "name": "password",
         "description": "Account password",
         "default": "",
-        "type": "string",
+        "type": "cstr",
         "required": true
       },
       {
         "name": "program",
         "description": "Full path to the executable to launch",
         "default": "",
-        "type": "string",
+        "type": "cstr",
         "required": true
       },
       {
         "name": "prog_args",
-        "description": "Additional command-line arguments (empty string = none)",
+        "description": "Additional command-line arguments (empty cstr = none)",
         "default": "",
-        "type": "string",
+        "type": "cstr",
         "required": false
       },
       {
@@ -181,21 +181,21 @@
         "name": "username",
         "description": "Target Windows username whose token to steal",
         "default": "",
-        "type": "string",
+        "type": "cstr",
         "required": true
       },
       {
         "name": "command",
         "description": "Full path to the executable to run",
         "default": "",
-        "type": "string",
+        "type": "cstr",
         "required": true
       },
       {
         "name": "cmd_args",
-        "description": "Arguments to pass to the command (empty string = none)",
+        "description": "Arguments to pass to the command (empty cstr = none)",
         "default": "",
-        "type": "string",
+        "type": "cstr",
         "required": false
       }
     ],
@@ -223,7 +223,7 @@
         "name": "mode",
         "description": "Leave empty for full RevertToSelf(); pass 'thread' for TRevertToSelf() (no handle cleanup)",
         "default": "",
-        "type": "string",
+        "type": "cstr",
         "required": false
       }
     ],
@@ -251,7 +251,7 @@
         "name": "privilege_name",
         "description": "SE privilege to enable (e.g. SeDebugPrivilege, SeImpersonatePrivilege)",
         "default": "SeDebugPrivilege",
-        "type": "string",
+        "type": "cstr",
         "required": true
       }
     ],
