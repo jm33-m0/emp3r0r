@@ -234,35 +234,59 @@ def main(*args):
 	}
 }
 
-func TestPrivStarlarkScripts(t *testing.T) {
+func TestAllStarlarkModules(t *testing.T) {
 	_, filename, _, _ := runtime.Caller(0)
-	privDir := filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filename))), "modules", "priv_starlark")
-	files, err := os.ReadDir(privDir)
+	modulesDir := filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filename))), "modules")
+
+	var starFiles []string
+	err := filepath.Walk(modulesDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() && strings.HasSuffix(info.Name(), ".star") {
+			starFiles = append(starFiles, path)
+		}
+		return nil
+	})
 	if err != nil {
-		t.Fatalf("failed to read priv_starlark dir: %v", err)
+		t.Fatalf("failed to walk modules directory: %v", err)
 	}
 
-	for _, f := range files {
-		if strings.HasSuffix(f.Name(), ".star") {
-			path := filepath.Join(privDir, f.Name())
+	if len(starFiles) == 0 {
+		t.Fatalf("no .star files found in %s", modulesDir)
+	}
+
+	t.Logf("found %d starlark modules to test", len(starFiles))
+
+	for _, path := range starFiles {
+		relPath, _ := filepath.Rel(modulesDir, path)
+		t.Run(relPath, func(t *testing.T) {
 			data, err := os.ReadFile(path)
 			if err != nil {
 				t.Fatalf("failed to read %s: %v", path, err)
 			}
 
-			// Validate syntax parsing
-			_, err = syntax.Parse(f.Name(), data, 0)
+			// 1. Validate syntax parsing on all platforms
+			_, err = syntax.Parse(filepath.Base(path), data, 0)
 			if err != nil {
-				t.Errorf("syntax error in %s: %v", f.Name(), err)
+				t.Fatalf("syntax error in %s: %v", path, err)
 			}
 
-			if runtime.GOOS == "windows" {
-				_, err := Run(data, []string{"1"}, nil)
+			// 2. Execute script on supported platform
+			if runtime.GOOS == "windows" && (strings.Contains(path, "priv_starlark") || strings.Contains(path, "sa_starlark")) {
+				out, err := Run(data, []string{"1"}, nil)
 				if err != nil {
-					t.Errorf("error running %s: %v", f.Name(), err)
+					t.Errorf("error running %s on windows: %v", relPath, err)
 				}
+				t.Logf("output from %s:\n%s", relPath, out)
+			} else if runtime.GOOS == "linux" && strings.Contains(path, "starlark_procinfo") {
+				out, err := Run(data, nil, nil)
+				if err != nil {
+					t.Errorf("error running %s on linux: %v", relPath, err)
+				}
+				t.Logf("output from %s:\n%s", relPath, out)
 			}
-		}
+		})
 	}
 }
 
