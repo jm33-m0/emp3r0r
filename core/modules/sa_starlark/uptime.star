@@ -1,26 +1,6 @@
 # Starlark implementation of uptime/entry.c
 
-def read_uint16(addr, offset):
-    data = win_read_mem(addr + offset, 2)
-    return data[0] | (data[1] << 8)
 
-def read_uint32(addr, offset):
-    data = win_read_mem(addr + offset, 4)
-    return data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24)
-
-def read_uint64(addr, offset):
-    data = win_read_mem(addr + offset, 8)
-    return data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24) | (data[4] << 32) | (data[5] << 40) | (data[6] << 48) | (data[7] << 56)
-
-def write_uint32(addr, val):
-    win_call("msvcrt.dll", "memset", addr, val & 0xff, 1)
-    win_call("msvcrt.dll", "memset", addr + 1, (val >> 8) & 0xff, 1)
-    win_call("msvcrt.dll", "memset", addr + 2, (val >> 16) & 0xff, 1)
-    win_call("msvcrt.dll", "memset", addr + 3, (val >> 24) & 0xff, 1)
-
-def write_uint64(addr, val):
-    write_uint32(addr, val & 0xffffffff)
-    write_uint32(addr + 4, (val >> 32) & 0xffffffff)
 
 def main(*args):
     # Counts millisecond ticks since last boot
@@ -47,29 +27,32 @@ def main(*args):
     wMinute = read_uint16(cur_time_ptr, 10)
     wSecond = read_uint16(cur_time_ptr, 12)
     
-    print("Local time: %04d-%02d-%02d %02d:%02d:%02d" % (wYear, wMonth, wDay, wHour, wMinute, wSecond))
+    print(sprintf("Local time: %04d-%02d-%02d %02d:%02d:%02d", wYear, wMonth, wDay, wHour, wMinute, wSecond))
     
     # Convert local SystemTime to FileTime
     win_call("kernel32.dll", "SystemTimeToFileTime", cur_time_ptr, cur_ftime_ptr)
     
     # Subtract uptime in 100-nanosecond intervals (ticks * 10000)
     utime = read_uint64(cur_ftime_ptr, 0)
-    utime -= ticks * 10000
+    sub_val = ticks * 10000
+    utime = utime - sub_val if utime >= sub_val else 0
     
     # Write boot file time back
     write_uint64(cur_ftime_ptr, utime)
     
     # Convert back to SystemTime
-    win_call("kernel32.dll", "FileTimeToSystemTime", cur_ftime_ptr, cur_time_ptr)
+    res_ft = win_call("kernel32.dll", "FileTimeToSystemTime", cur_ftime_ptr, cur_time_ptr)
     
-    bYear = read_uint16(cur_time_ptr, 0)
-    bMonth = read_uint16(cur_time_ptr, 2)
-    bDay = read_uint16(cur_time_ptr, 6)
-    bHour = read_uint16(cur_time_ptr, 8)
-    bMinute = read_uint16(cur_time_ptr, 10)
-    bSecond = read_uint16(cur_time_ptr, 12)
-    
-    print("Boot time: %04d-%02d-%02d %02d:%02d:%02d" % (bYear, bMonth, bDay, bHour, bMinute, bSecond))
+    if res_ft["r1"] != 0:
+        bYear = read_uint16(cur_time_ptr, 0)
+        bMonth = read_uint16(cur_time_ptr, 2)
+        bDay = read_uint16(cur_time_ptr, 6)
+        bHour = read_uint16(cur_time_ptr, 8)
+        bMinute = read_uint16(cur_time_ptr, 10)
+        bSecond = read_uint16(cur_time_ptr, 12)
+        print(sprintf("Boot time: %04d-%02d-%02d %02d:%02d:%02d", bYear, bMonth, bDay, bHour, bMinute, bSecond))
+    else:
+        print("Boot time: Unknown")
     
     win_free(cur_time_ptr)
     win_free(cur_ftime_ptr)

@@ -1,41 +1,5 @@
 # Starlark implementation of dir/entry.c
 
-def pad(text, width):
-    text = str(text)
-    if len(text) >= width:
-        return text
-    return text + " " * (width - len(text))
-
-def write_byte(addr, offset, val):
-    win_call("msvcrt.dll", "memset", addr + offset, val & 0xFF, 1)
-
-def read_uint32(addr, offset):
-    d = win_read_mem(addr + offset, 4)
-    return d[0] | (d[1] << 8) | (d[2] << 16) | (d[3] << 24)
-
-def read_wstring(ptr, max_len=256):
-    if ptr == 0:
-        return ""
-    result = ""
-    for i in range(max_len):
-        data = win_read_mem(ptr + i * 2, 2)
-        c = data[0] | (data[1] << 8)
-        if c == 0:
-            break
-        result += chr(c)
-    return result
-
-def utf16_ptr(s):
-    if not s:
-        return 0
-    p = win_alloc((len(s) + 1) * 2)
-    for i in range(len(s)):
-        c = ord(s[i : i + 1])
-        write_byte(p, i * 2, c & 0xFF)
-        write_byte(p, i * 2 + 1, (c >> 8) & 0xFF)
-    write_byte(p, len(s) * 2, 0)
-    write_byte(p, len(s) * 2 + 1, 0)
-    return p
 
 def list_dir(search_path="C:\\*"):
     path_ptr = utf16_ptr(search_path)

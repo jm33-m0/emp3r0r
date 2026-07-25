@@ -23,3 +23,7 @@ func starlarkWinFree(thread *starlark.Thread, fn *starlark.Builtin, args starlar
 func starlarkWinReadMem(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	return starlark.None, fmt.Errorf("win_read_mem is only supported on Windows")
 }
+
+func readWinMem(addr uintptr, size int) ([]byte, error) {
+	return nil, fmt.Errorf("win_read_mem is only supported on Windows")
+}

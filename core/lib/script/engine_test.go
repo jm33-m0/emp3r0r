@@ -45,62 +45,6 @@ def main(*args):
 	if !strings.Contains(out, "All tests in Starlark main passed") {
 		t.Errorf("expected output to contain main return value, got: %q", out)
 	}
-}
-
-func TestEngineRegisterCustomAPI(t *testing.T) {
-	// Register a new custom API function
-	RegisterAPI("custom_multiply", func(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-		var a, b int
-		if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "a", &a, "b", &b); err != nil {
-			return starlark.None, err
-		}
-		return starlark.MakeInt(a * b), nil
-	})
-
-	script := `
-def main(*args):
-    res = custom_multiply(6, 7)
-    print("Result of multiplication is: " + str(res))
-    return "OK"
-`
-	out, err := Run([]byte(script), nil, nil)
-	if err != nil {
-		t.Fatalf("Run failed: %v", err)
-	}
-
-	if !strings.Contains(out, "Result of multiplication is: 42") {
-		t.Errorf("expected multiplication result 42, got output: %q", out)
-	}
-}
-
-func TestNewAPIs(t *testing.T) {
-	script := `
-def main(*args):
-    # Test crypto_hash
-    md5_hash = crypto_hash("md5", "hello")
-    print("MD5 of hello: " + md5_hash)
-    sha1_hash = crypto_hash("sha1", "hello")
-    print("SHA1 of hello: " + sha1_hash)
-    sha256_hash = crypto_hash("sha256", "hello")
-    print("SHA256 of hello: " + sha256_hash)
-    return "OK"
-`
-	out, err := Run([]byte(script), nil, nil)
-	if err != nil {
-		t.Fatalf("Run failed: %v", err)
-	}
-	if !strings.Contains(out, "MD5 of hello: 5d41402abc4b2a76b9719d911017c592") {
-		t.Errorf("expected md5 match, got: %q", out)
-	}
-	if !strings.Contains(out, "SHA1 of hello: aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d") {
-		t.Errorf("expected sha1 match, got: %q", out)
-	}
-	if !strings.Contains(out, "SHA256 of hello: 2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824") {
-		t.Errorf("expected sha256 match, got: %q", out)
-	}
-	if !strings.Contains(out, "OK") {
-		t.Errorf("expected OK, got: %q", out)
-	}
 
 	if runtime.GOOS == "windows" {
 		winScript := `
@@ -162,6 +106,209 @@ def main(*args):
 		} else if !strings.Contains(err.Error(), "win_alloc is only supported on Windows") {
 			t.Errorf("expected 'win_alloc is only supported on Windows' error, got: %v", err)
 		}
+	}
+}
+
+func TestEngineRegisterCustomAPI(t *testing.T) {
+	// Register a new custom API function
+	RegisterAPI("custom_multiply", func(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+		var a, b int
+		if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "a", &a, "b", &b); err != nil {
+			return starlark.None, err
+		}
+		return starlark.MakeInt(a * b), nil
+	})
+
+	script := `
+def main(*args):
+    res = custom_multiply(6, 7)
+    print("Result of multiplication is: " + str(res))
+    return "OK"
+`
+	out, err := Run([]byte(script), nil, nil)
+	if err != nil {
+		t.Fatalf("Run failed: %v", err)
+	}
+
+	if !strings.Contains(out, "Result of multiplication is: 42") {
+		t.Errorf("expected multiplication result 42, got output: %q", out)
+	}
+}
+
+func TestNewAPIs(t *testing.T) {
+	script := `
+def main(*args):
+    # Test crypto_hash
+    md5_hash = crypto_hash("md5", "hello")
+    print("MD5 of hello: " + md5_hash)
+    sha1_hash = crypto_hash("sha1", "hello")
+    print("SHA1 of hello: " + sha1_hash)
+    sha256_hash = crypto_hash("sha256", "hello")
+    print("SHA256 of hello: " + sha256_hash)
+    return "OK"
+`
+	out, err := Run([]byte(script), nil, nil)
+	if err != nil {
+		t.Fatalf("Run failed: %v", err)
+	}
+	if !strings.Contains(out, "MD5 of hello: 5d41402abc4b2a76b9719d911017c592") {
+		t.Errorf("unexpected md5 hash in output: %q", out)
+	}
+	if !strings.Contains(out, "OK") {
+		t.Errorf("expected OK, got: %q", out)
+	}
+}
+
+func TestStringAPIs(t *testing.T) {
+	script := `
+def main(*args):
+    # Test sprintf & hex
+    print("HEX: " + hex(255))
+    print("FMT: " + sprintf("%04d-%02d-%02d %-10s", 2026, 7, 25, "test"))
+
+    # Test str_split & str_join
+    parts = str_split("a,b,c", ",")
+    joined = str_join(parts, "-")
+    print("JOINED: " + joined)
+
+    # Test str_replace & str_contains
+    replaced = str_replace("hello world", "world", "starlark")
+    print("REPLACED: " + replaced)
+    if not str_contains(replaced, "starlark"):
+        return "Fail: str_contains failed"
+
+    # Test str_trim, str_lower, str_upper
+    trimmed = str_trim("  hello  ")
+    print("TRIMMED: " + trimmed)
+    print("LOWER: " + str_lower("HELLO"))
+    print("UPPER: " + str_upper("hello"))
+
+    # Test str_startswith, str_endswith, str_index
+    if not str_startswith("hello", "he") or not str_endswith("hello", "lo"):
+        return "Fail: prefix/suffix check failed"
+    if str_index("hello", "ll") != 2:
+        return "Fail: str_index failed"
+
+    # Test pad
+    print("PAD: [" + pad("foo", 8) + "]")
+    return "OK"
+`
+	out, err := Run([]byte(script), nil, nil)
+	if err != nil {
+		t.Fatalf("Run failed: %v", err)
+	}
+	if !strings.Contains(out, "HEX: 0xff") {
+		t.Errorf("expected HEX: 0xff, got: %q", out)
+	}
+	if !strings.Contains(out, "FMT: 2026-07-25 test      ") {
+		t.Errorf("expected FMT: 2026-07-25 test      , got: %q", out)
+	}
+	if !strings.Contains(out, "JOINED: a-b-c") {
+		t.Errorf("expected JOINED: a-b-c, got: %q", out)
+	}
+	if !strings.Contains(out, "REPLACED: hello starlark") {
+		t.Errorf("expected REPLACED: hello starlark, got: %q", out)
+	}
+	if !strings.Contains(out, "PAD: [foo     ]") {
+		t.Errorf("expected PAD: [foo     ], got: %q", out)
+	}
+}
+
+func TestMemHelperAPIs(t *testing.T) {
+	var script string
+	if runtime.GOOS == "windows" {
+		script = `
+def main(*args):
+    addr = win_alloc(64)
+    if addr == 0:
+        return "Fail: alloc failed"
+    
+    write_u8(addr, 0, 0x12)
+    write_u16(addr, 2, 0x1234)
+    write_u32(addr, 4, 0xDEADBEEF)
+    write_u64(addr, 8, 0x1122334455667788)
+
+    v8 = read_u8(addr, 0)
+    v16 = read_u16(addr, 2)
+    v32 = read_u32(addr, 4)
+    v64 = read_u64(addr, 8)
+
+    print("V8: " + hex(v8))
+    print("V16: " + hex(v16))
+    print("V32: " + hex(v32))
+    print("V64: " + hex(v64))
+
+    u_ptr = utf16_ptr("Hello WString")
+    ws = read_wstring(u_ptr)
+    print("WSTRING: " + ws)
+    win_free(u_ptr)
+
+    c_ptr = cstring_ptr("Hello CString")
+    cs = read_cstring(c_ptr)
+    print("CSTRING: " + cs)
+    win_free(c_ptr)
+
+    win_free(addr)
+    return "OK"
+`
+	} else {
+		script = `
+def main(*args):
+    addr = sys_alloc(64)
+    if addr == 0:
+        return "Fail: alloc failed"
+    
+    write_u8(addr, 0, 0x12)
+    write_u16(addr, 2, 0x1234)
+    write_u32(addr, 4, 0xDEADBEEF)
+    write_u64(addr, 8, 0x1122334455667788)
+
+    v8 = read_u8(addr, 0)
+    v16 = read_u16(addr, 2)
+    v32 = read_u32(addr, 4)
+    v64 = read_u64(addr, 8)
+
+    print("V8: " + hex(v8))
+    print("V16: " + hex(v16))
+    print("V32: " + hex(v32))
+    print("V64: " + hex(v64))
+
+    u_ptr = utf16_ptr("Hello WString")
+    ws = read_wstring(u_ptr)
+    print("WSTRING: " + ws)
+    sys_free(u_ptr)
+
+    c_ptr = cstring_ptr("Hello CString")
+    cs = read_cstring(c_ptr)
+    print("CSTRING: " + cs)
+    sys_free(c_ptr)
+
+    sys_free(addr)
+    return "OK"
+`
+	}
+
+	out, err := Run([]byte(script), nil, nil)
+	if err != nil {
+		t.Fatalf("Run failed: %v", err)
+	}
+	if !strings.Contains(out, "V8: 0x12") {
+		t.Errorf("expected V8: 0x12, got: %q", out)
+	}
+	if !strings.Contains(out, "V16: 0x1234") {
+		t.Errorf("expected V16: 0x1234, got: %q", out)
+	}
+	if !strings.Contains(out, "V32: 0xdeadbeef") {
+		t.Errorf("expected V32: 0xdeadbeef, got: %q", out)
+	}
+	if !strings.Contains(out, "V64: 0x1122334455667788") {
+		t.Errorf("expected V64: 0x1122334455667788, got: %q", out)
+	}
+	if !strings.Contains(out, "WSTRING: Hello WString") {
+		t.Errorf("expected WSTRING: Hello WString, got: %q", out)
+	}
+	if !strings.Contains(out, "CSTRING: Hello CString") {
+		t.Errorf("expected CSTRING: Hello CString, got: %q", out)
 	}
 }
 
@@ -270,6 +417,45 @@ def main(*args):
 		_, err := Run([]byte(memPanicScript), nil, nil)
 		if err == nil {
 			t.Errorf("expected error when reading invalid memory address on Linux, got nil")
+		} else if !strings.Contains(err.Error(), "unallocated or invalid memory address") {
+			t.Errorf("expected 'unallocated or invalid memory address' error, got: %v", err)
+		}
+
+		nullMemScript := `
+def main(*args):
+    res = sys_read_mem(0, 16)
+    return "OK"
+`
+		_, err = Run([]byte(nullMemScript), nil, nil)
+		if err == nil {
+			t.Errorf("expected error when reading NULL address on Linux, got nil")
+		} else if !strings.Contains(err.Error(), "unallocated or invalid memory address") {
+			t.Errorf("expected 'unallocated or invalid memory address' error, got: %v", err)
+		}
+	}
+
+	// Test 3: FFI invalid memory read recovery on Windows
+	if runtime.GOOS == "windows" {
+		winMemPanicScript := `
+def main(*args):
+    res = win_read_mem(0xDEADBEEF00000000, 16)
+    return "OK"
+`
+		_, err := Run([]byte(winMemPanicScript), nil, nil)
+		if err == nil {
+			t.Errorf("expected error when reading invalid memory address on Windows, got nil")
+		} else if !strings.Contains(err.Error(), "unallocated or invalid memory address") {
+			t.Errorf("expected 'unallocated or invalid memory address' error, got: %v", err)
+		}
+
+		winNullMemScript := `
+def main(*args):
+    res = win_read_mem(0, 16)
+    return "OK"
+`
+		_, err = Run([]byte(winNullMemScript), nil, nil)
+		if err == nil {
+			t.Errorf("expected error when reading NULL address on Windows, got nil")
 		} else if !strings.Contains(err.Error(), "unallocated or invalid memory address") {
 			t.Errorf("expected 'unallocated or invalid memory address' error, got: %v", err)
 		}

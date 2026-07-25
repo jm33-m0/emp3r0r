@@ -26,11 +26,11 @@ def read_ptr(addr, offset):
         | (d[7] << 56)
     )
 
-def read_wstring(ptr):
+def read_wstring(ptr, max_len=256):
     if ptr == 0:
         return ""
     result = ""
-    for i in range(512):
+    for i in range(max_len):
         data = win_read_mem(ptr + i * 2, 2)
         c = data[0] | (data[1] << 8)
         if c == 0:
@@ -60,7 +60,7 @@ def enumerate_services():
     sc_manager = win_call("advapi32.dll", "OpenSCManagerW", 0, 0, SC_MANAGER_CONNECT | SC_MANAGER_ENUMERATE_SERVICE)["r1"]
     if sc_manager == 0:
         print("[-] OpenSCManagerW failed")
-        return "Fail"
+        return "OK"
 
     bytes_needed = win_alloc(4)
     services_returned = win_alloc(4)
@@ -88,7 +88,7 @@ def enumerate_services():
         win_free(resume_handle)
         win_call("advapi32.dll", "CloseServiceHandle", sc_manager)
         print("[-] EnumServicesStatusExW failed to determine buffer size")
-        return "Fail"
+        return "OK"
 
     buf = win_alloc(needed)
     res = win_call(
@@ -111,15 +111,15 @@ def enumerate_services():
         print("SERVICE_NAME                                 DISPLAY_NAME                                 STATE      PID")
         print("============================================ ============================================ ========== ======")
 
-        # ENUM_SERVICE_STATUS_PROCESSW struct size on x64 is 48 bytes:
-        # lpServiceName(0,8), lpDisplayName(8,8), ServiceStatusProcess(16,32)
-        # ServiceStatusProcess offsets: dwServiceType(16), dwCurrentState(20), ..., dwProcessId(40)
+        # ENUM_SERVICE_STATUS_PROCESSW struct size on x64 is 56 bytes:
+        # lpServiceName(0,8), lpDisplayName(8,8), ServiceStatusProcess(16,36)
+        # ServiceStatusProcess offsets: dwServiceType(16), dwCurrentState(20), ..., dwProcessId(44)
         for i in range(count):
-            entry_addr = buf + i * 48
+            entry_addr = buf + i * 56
             svc_name = read_wstring(read_ptr(entry_addr, 0))
             display_name = read_wstring(read_ptr(entry_addr, 8))
             state = read_uint32(entry_addr, 20)
-            pid = read_uint32(entry_addr, 40)
+            pid = read_uint32(entry_addr, 44)
 
             print("%s %s %s %s" % (pad(svc_name, 44), pad(display_name, 44), pad(get_state_string(state), 10), str(pid)))
 

@@ -23,3 +23,7 @@ func starlarkSysFree(thread *starlark.Thread, fn *starlark.Builtin, args starlar
 func starlarkSysReadMem(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	return starlark.None, fmt.Errorf("sys_read_mem is only supported on Linux")
 }
+
+func readLinuxMem(addr uintptr, size int) ([]byte, error) {
+	return nil, fmt.Errorf("sys_read_mem is only supported on Linux")
+}

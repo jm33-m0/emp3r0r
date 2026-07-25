@@ -1,36 +1,5 @@
 # Starlark translation of findLoadedModule/entry.c
 
-def write_byte(addr, offset, val):
-    win_call("msvcrt.dll", "memset", addr + offset, val & 0xFF, 1)
-
-def read_uint32(addr, offset):
-    d = win_read_mem(addr + offset, 4)
-    return d[0] | (d[1] << 8) | (d[2] << 16) | (d[3] << 24)
-
-def read_ptr(addr, offset):
-    d = win_read_mem(addr + offset, 8)
-    return (
-        d[0]
-        | (d[1] << 8)
-        | (d[2] << 16)
-        | (d[3] << 24)
-        | (d[4] << 32)
-        | (d[5] << 40)
-        | (d[6] << 48)
-        | (d[7] << 56)
-    )
-
-def read_wstring(ptr, max_len=256):
-    if ptr == 0:
-        return ""
-    result = ""
-    for i in range(max_len):
-        data = win_read_mem(ptr + i * 2, 2)
-        c = data[0] | (data[1] << 8)
-        if c == 0:
-            break
-        result += chr(c)
-    return result
 
 def find_loaded_module(mod_name="", pid=0):
     PROCESS_QUERY_INFORMATION = 0x0400
@@ -38,6 +7,10 @@ def find_loaded_module(mod_name="", pid=0):
 
     target_pid = int(pid) if pid and str(pid) != "0" else win_call("kernel32.dll", "GetCurrentProcessId")["r1"]
     h_proc = win_call("kernel32.dll", "OpenProcess", PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, 0, target_pid)["r1"]
+
+    if h_proc == 0:
+        target_pid = win_call("kernel32.dll", "GetCurrentProcessId")["r1"]
+        h_proc = win_call("kernel32.dll", "OpenProcess", PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, 0, target_pid)["r1"]
 
     if h_proc == 0:
         print("[-] OpenProcess failed for PID %d" % target_pid)
@@ -58,6 +31,8 @@ def find_loaded_module(mod_name="", pid=0):
     win_free(cb_needed_ptr)
 
     count = needed // 8
+    if count > 1024:
+        count = 1024
     name_buf = win_alloc(512)
     found = False
 
@@ -70,7 +45,7 @@ def find_loaded_module(mod_name="", pid=0):
             win_call("psapi.dll", "GetModuleFileNameExW", h_proc, h_mod, name_buf, 255)
             path = read_wstring(name_buf)
             if not mod_name or mod_name.lower() in path.lower():
-                print("FOUND: 0x%016x -> %s" % (h_mod, path))
+                print("FOUND: %s -> %s" % (sprintf("0x%016x", h_mod), path))
                 found = True
 
     if not found:

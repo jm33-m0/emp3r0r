@@ -1,54 +1,5 @@
 # Starlark translation of get-netsession2/entry.c
 
-def write_byte(addr, offset, val):
-    win_call("msvcrt.dll", "memset", addr + offset, val & 0xFF, 1)
-
-def write_uint32(addr, offset, val):
-    write_byte(addr, offset, val & 0xFF)
-    write_byte(addr, offset + 1, (val >> 8) & 0xFF)
-    write_byte(addr, offset + 2, (val >> 16) & 0xFF)
-    write_byte(addr, offset + 3, (val >> 24) & 0xFF)
-
-def read_uint32(addr, offset):
-    d = win_read_mem(addr + offset, 4)
-    return d[0] | (d[1] << 8) | (d[2] << 16) | (d[3] << 24)
-
-def read_ptr(addr, offset):
-    d = win_read_mem(addr + offset, 8)
-    return (
-        d[0]
-        | (d[1] << 8)
-        | (d[2] << 16)
-        | (d[3] << 24)
-        | (d[4] << 32)
-        | (d[5] << 40)
-        | (d[6] << 48)
-        | (d[7] << 56)
-    )
-
-def read_wstring(ptr):
-    if ptr == 0:
-        return ""
-    result = ""
-    for i in range(512):
-        data = win_read_mem(ptr + i * 2, 2)
-        c = data[0] | (data[1] << 8)
-        if c == 0:
-            break
-        result += chr(c)
-    return result
-
-def utf16_ptr(s):
-    if not s:
-        return 0
-    p = win_alloc((len(s) + 1) * 2)
-    for i in range(len(s)):
-        c = ord(s[i : i + 1])
-        write_byte(p, i * 2, c & 0xFF)
-        write_byte(p, i * 2 + 1, (c >> 8) & 0xFF)
-    write_byte(p, len(s) * 2, 0)
-    write_byte(p, len(s) * 2 + 1, 0)
-    return p
 
 def net_sessions_2(hostname=None, resolve_method=1):
     server_ptr = utf16_ptr(hostname) if hostname else 0

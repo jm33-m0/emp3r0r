@@ -1,35 +1,7 @@
 # Starlark translation of enumLocalSessions/entry.c
 
-def write_byte(addr, offset, val):
-    win_call("msvcrt.dll", "memset", addr + offset, val & 0xFF, 1)
-
-def read_uint32(addr, offset):
-    d = win_read_mem(addr + offset, 4)
-    return d[0] | (d[1] << 8) | (d[2] << 16) | (d[3] << 24)
-
-def read_ptr(addr, offset):
-    d = win_read_mem(addr + offset, 8)
-    return (
-        d[0]
-        | (d[1] << 8)
-        | (d[2] << 16)
-        | (d[3] << 24)
-        | (d[4] << 32)
-        | (d[5] << 40)
-        | (d[6] << 48)
-        | (d[7] << 56)
-    )
-
 def read_astring(ptr):
-    if ptr == 0:
-        return ""
-    result = ""
-    for i in range(256):
-        data = win_read_mem(ptr + i, 1)
-        if data[0] == 0:
-            break
-        result += chr(data[0])
-    return result
+    return read_cstring(ptr)
 
 def enum_local_sessions():
     WTS_CURRENT_SERVER_HANDLE = 0

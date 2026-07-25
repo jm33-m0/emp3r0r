@@ -14,75 +14,7 @@ import (
 var (
 	dllCacheMu sync.RWMutex
 	dllCache   = make(map[string]*windows.LazyDLL)
-
-	kernel32Mod                        = windows.NewLazySystemDLL("kernel32.dll")
-	procAddVectoredExceptionHandler    = kernel32Mod.NewProc("AddVectoredExceptionHandler")
-	procRemoveVectoredExceptionHandler = kernel32Mod.NewProc("RemoveVectoredExceptionHandler")
-
-	scriptVEHOnce          sync.Once
-	scriptVEHHandle        uintptr
-	scriptRecoveryCallback uintptr
-	scriptInWinCall        bool
-	scriptExceptionCode    uint32
-	scriptExceptionAddr    uintptr
 )
-
-type exceptionRecordStruct struct {
-	ExceptionCode        uint32
-	ExceptionFlags       uint32
-	ExceptionRecord      uintptr
-	ExceptionAddress     uintptr
-	NumberParameters     uint32
-	ExceptionInformation [15]uintptr
-}
-
-type exceptionPointersStruct struct {
-	ExceptionRecord *exceptionRecordStruct
-	ContextRecord   uintptr
-}
-
-func initScriptVEH() {
-	scriptVEHOnce.Do(func() {
-		scriptRecoveryCallback = windows.NewCallback(scriptRecoveryStub)
-		cb := windows.NewCallback(scriptVEHHandler)
-		ret, _, _ := procAddVectoredExceptionHandler.Call(1, cb)
-		scriptVEHHandle = ret
-	})
-}
-
-func scriptRecoveryStub() uintptr {
-	panic(fmt.Sprintf("native Win32 exception 0x%X at address 0x%X", scriptExceptionCode, scriptExceptionAddr))
-}
-
-func scriptVEHHandler(exceptionPointers uintptr) uintptr {
-	if exceptionPointers == 0 || !scriptInWinCall {
-		return 0 // EXCEPTION_CONTINUE_SEARCH
-	}
-
-	ep := (*exceptionPointersStruct)(unsafe.Pointer(exceptionPointers))
-	if ep == nil || ep.ExceptionRecord == nil || ep.ContextRecord == 0 {
-		return 0
-	}
-
-	code := ep.ExceptionRecord.ExceptionCode
-	if code >= 0x80000000 {
-		scriptExceptionCode = code
-		scriptExceptionAddr = ep.ExceptionRecord.ExceptionAddress
-		scriptInWinCall = false
-
-		if unsafe.Sizeof(uintptr(0)) == 8 {
-			// 64-bit AMD64: RIP offset is 0xF8 (248) inside CONTEXT
-			*(*uintptr)(unsafe.Pointer(ep.ContextRecord + 0xF8)) = scriptRecoveryCallback
-		} else {
-			// 32-bit x86: EIP offset is 0xB4 (180) inside CONTEXT
-			*(*uintptr)(unsafe.Pointer(ep.ContextRecord + 0xB4)) = scriptRecoveryCallback
-		}
-
-		return ^uintptr(0) // EXCEPTION_CONTINUE_EXECUTION (-1)
-	}
-
-	return 0
-}
 
 // getLazyProc retrieves a cached reference to a system module or initialises a new handle dynamically
 func getLazyProc(dllName, procName string) *windows.LazyProc {
@@ -148,13 +80,7 @@ func starlarkWinCall(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tup
 		}
 	}
 
-	initScriptVEH()
-	scriptInWinCall = true
-	defer func() {
-		scriptInWinCall = false
-	}()
-
-	// Recover from dynamic procedure resolution panics or native VEH exceptions
+	// Recover from dynamic procedure resolution panics or runtime call failures
 	defer func() {
 		if r := recover(); r != nil {
 			dict := starlark.NewDict(4)
@@ -212,6 +138,10 @@ func starlarkWinFree(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tup
 		return starlark.None, err
 	}
 
+	if addr == 0 {
+		return starlark.None, nil
+	}
+
 	err := windows.VirtualFree(uintptr(addr), 0, windows.MEM_RELEASE)
 	if err != nil {
 		return starlark.None, fmt.Errorf("VirtualFree execution failed: %w", err)
@@ -219,33 +149,44 @@ func starlarkWinFree(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tup
 	return starlark.None, nil
 }
 
-// starlarkWinReadMem copies data out of unmanaged space back into a script list of bytes
+// starlarkWinReadMem copies data out of unmanaged space back into a script list of bytes safely via ReadProcessMemory
 func starlarkWinReadMem(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (retVal starlark.Value, retErr error) {
 	var addr uint64
 	var size int
 	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "address", &addr, "size", &size); err != nil {
 		return starlark.None, err
 	}
-	if size <= 0 {
-		return starlark.None, fmt.Errorf("read range length constraint must be greater than zero")
+	if size < 0 {
+		return starlark.None, fmt.Errorf("read range length constraint cannot be negative")
+	}
+	if size == 0 {
+		return starlark.NewList(nil), nil
 	}
 	if addr == 0 || addr < 4096 {
-		return starlark.None, fmt.Errorf("win_read_mem: invalid memory address 0x%x", addr)
+		return starlark.None, fmt.Errorf("win_read_mem: unallocated or invalid memory address 0x%x", addr)
 	}
 
-	defer func() {
-		if r := recover(); r != nil {
-			retErr = fmt.Errorf("win_read_mem panic: %v", r)
-		}
-	}()
-
 	buf := make([]byte, size)
-	src := unsafe.Slice((*byte)(unsafe.Pointer(uintptr(addr))), size)
-	copy(buf, src)
+	var bytesRead uintptr
+	err := windows.ReadProcessMemory(windows.CurrentProcess(), uintptr(addr), &buf[0], uintptr(size), &bytesRead)
+	if err != nil || bytesRead == 0 {
+		return starlark.None, fmt.Errorf("win_read_mem: unallocated or invalid memory address 0x%x", addr)
+	}
 
-	elems := make([]starlark.Value, size)
+	buf = buf[:bytesRead]
+	elems := make([]starlark.Value, len(buf))
 	for i, b := range buf {
 		elems[i] = starlark.MakeInt(int(b))
 	}
 	return starlark.NewList(elems), nil
+}
+
+func readWinMem(addr uintptr, size int) ([]byte, error) {
+	buf := make([]byte, size)
+	var bytesRead uintptr
+	err := windows.ReadProcessMemory(windows.CurrentProcess(), addr, &buf[0], uintptr(size), &bytesRead)
+	if err != nil || bytesRead == 0 {
+		return nil, fmt.Errorf("readWinMem: invalid memory address 0x%x", addr)
+	}
+	return buf[:bytesRead], nil
 }

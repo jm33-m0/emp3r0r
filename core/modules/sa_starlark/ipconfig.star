@@ -1,41 +1,5 @@
 # Starlark implementation of ipconfig/entry.c
 
-def pad(text, width):
-    text = str(text)
-    if len(text) >= width:
-        return text
-    return text + " " * (width - len(text))
-
-def write_byte(addr, offset, val):
-    win_call("msvcrt.dll", "memset", addr + offset, val & 0xFF, 1)
-
-def read_uint32(addr, offset):
-    d = win_read_mem(addr + offset, 4)
-    return d[0] | (d[1] << 8) | (d[2] << 16) | (d[3] << 24)
-
-def read_ptr(addr, offset):
-    d = win_read_mem(addr + offset, 8)
-    return (
-        d[0]
-        | (d[1] << 8)
-        | (d[2] << 16)
-        | (d[3] << 24)
-        | (d[4] << 32)
-        | (d[5] << 40)
-        | (d[6] << 48)
-        | (d[7] << 56)
-    )
-
-def read_ansi_string(ptr, max_len=256):
-    if ptr == 0:
-        return ""
-    result = ""
-    for i in range(max_len):
-        d = win_read_mem(ptr + i, 1)
-        if d[0] == 0:
-            break
-        result += chr(d[0])
-    return result
 
 def format_mac(addr_mem, length):
     parts = []
@@ -80,8 +44,8 @@ def ipconfig():
                 next_ptr = read_ptr(curr, 0)
                 desc = read_ansi_string(curr + 268, 128)  # Description at offset 268
                 mac_len = read_uint32(curr + 400, 0)      # AddressLength at offset 400
-                mac_raw = win_read_mem(curr + 404, mac_len if mac_len <= 8 else 8)
-                mac_str = format_mac(mac_raw, mac_len) if mac_len > 0 else ""
+                mac_raw = win_read_mem(curr + 404, mac_len if mac_len <= 8 else 8) if mac_len > 0 else []
+                mac_str = format_mac(mac_raw, len(mac_raw)) if len(mac_raw) > 0 else ""
 
                 ip_str = read_ansi_string(curr + 432, 16)      # IpAddressList.IpAddress at 432
                 mask_str = read_ansi_string(curr + 448, 16)    # IpAddressList.IpMask at 448

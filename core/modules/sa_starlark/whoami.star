@@ -21,30 +21,6 @@ SidTypeUnknown        = 8
 SidTypeComputer       = 9
 SidTypeLabel          = 10
 
-def read_uint32(addr, offset):
-    data = win_read_mem(addr + offset, 4)
-    return data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24)
-
-def read_uint64(addr, offset):
-    data = win_read_mem(addr + offset, 8)
-    return data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24) | (data[4] << 32) | (data[5] << 40) | (data[6] << 48) | (data[7] << 56)
-
-def read_ptr(addr, offset):
-    return read_uint64(addr, offset)
-
-def read_wstring(ptr):
-    result = ""
-    offset = 0
-    for i in range(256):
-        data = win_read_mem(ptr + offset, 2)
-        b0 = data[0]
-        b1 = data[1]
-        char_code = b0 | (b1 << 8)
-        if char_code == 0:
-            break
-        result += chr(char_code)
-        offset += 2
-    return result
 
 # Low-level Windows API wrapper abstractions
 def get_current_token():

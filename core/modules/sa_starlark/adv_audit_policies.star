@@ -1,24 +1,5 @@
 # Starlark implementation of adv_audit_policies/entry.c
 
-def write_byte(addr, offset, val):
-    win_call("msvcrt.dll", "memset", addr + offset, val & 0xFF, 1)
-
-def read_uint32(addr, offset):
-    d = win_read_mem(addr + offset, 4)
-    return d[0] | (d[1] << 8) | (d[2] << 16) | (d[3] << 24)
-
-def read_ptr(addr, offset):
-    d = win_read_mem(addr + offset, 8)
-    return (
-        d[0]
-        | (d[1] << 8)
-        | (d[2] << 16)
-        | (d[3] << 24)
-        | (d[4] << 32)
-        | (d[5] << 40)
-        | (d[6] << 48)
-        | (d[7] << 56)
-    )
 
 def adv_audit_policies():
     print("Advanced Audit Policies:")

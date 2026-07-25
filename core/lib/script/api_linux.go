@@ -383,26 +383,63 @@ func starlarkSysReadMem(_ *starlark.Thread, fn *starlark.Builtin, args starlark.
 	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "address", &addr, "size", &size); err != nil {
 		return starlark.None, err
 	}
-	if size <= 0 {
-		return starlark.None, fmt.Errorf("read range length constraint must be greater than zero")
+	if size < 0 {
+		return starlark.None, fmt.Errorf("read range length constraint cannot be negative")
+	}
+	if size == 0 {
+		return starlark.NewList(nil), nil
 	}
 
 	allocMapMu.RLock()
 	buf, exists := allocMap[uintptr(addr)]
 	allocMapMu.RUnlock()
 
-	if !exists {
-		return starlark.None, fmt.Errorf("sys_read_mem: unallocated or invalid memory address 0x%x", addr)
+	var src []byte
+	if exists {
+		if size > len(buf) {
+			size = len(buf)
+		}
+		src = buf[:size]
+	} else {
+		if addr == 0 || addr < 4096 {
+			return starlark.None, fmt.Errorf("sys_read_mem: unallocated or invalid memory address 0x%x", addr)
+		}
+		readBuf := make([]byte, size)
+		localIov := []unix.Iovec{{Base: &readBuf[0], Len: uint64(size)}}
+		remoteIov := []unix.RemoteIovec{{Base: uintptr(addr), Len: size}}
+		n, err := unix.ProcessVMReadv(unix.Getpid(), localIov, remoteIov, 0)
+		if err != nil || n <= 0 {
+			return starlark.None, fmt.Errorf("sys_read_mem: unallocated or invalid memory address 0x%x", addr)
+		}
+		src = readBuf[:n]
 	}
-
-	if size > len(buf) {
-		size = len(buf)
-	}
-	src := buf[:size]
 
 	elems := make([]starlark.Value, len(src))
 	for i, b := range src {
 		elems[i] = starlark.MakeInt(int(b))
 	}
 	return starlark.NewList(elems), nil
+}
+
+func readLinuxMem(addr uintptr, size int) ([]byte, error) {
+	allocMapMu.RLock()
+	buf, exists := allocMap[addr]
+	allocMapMu.RUnlock()
+	if exists {
+		if size > len(buf) {
+			size = len(buf)
+		}
+		return buf[:size], nil
+	}
+	if addr == 0 || addr < 4096 {
+		return nil, fmt.Errorf("readLinuxMem: invalid memory address 0x%x", addr)
+	}
+	readBuf := make([]byte, size)
+	localIov := []unix.Iovec{{Base: &readBuf[0], Len: uint64(size)}}
+	remoteIov := []unix.RemoteIovec{{Base: addr, Len: size}}
+	n, err := unix.ProcessVMReadv(unix.Getpid(), localIov, remoteIov, 0)
+	if err != nil || n <= 0 {
+		return nil, fmt.Errorf("readLinuxMem: invalid memory address 0x%x", addr)
+	}
+	return readBuf[:n], nil
 }

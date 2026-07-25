@@ -1,7 +1,3 @@
-def pad(s, width):
-    if len(s) < width:
-        return s + " " * (width - len(s))
-    return s
 
 def int_to_arp_type(arp_type):
     if arp_type == 1:
