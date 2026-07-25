@@ -20,7 +20,9 @@ def main(*args):
     res = win_call("kernel32.dll", "GetEnvironmentStrings")
     env_ptr = res["r1"]
     if env_ptr == 0:
-        print("GetEnvironmentStrings failed.")
+        err_code = res.get("err_code", 0)
+        err_msg = res.get("error", "")
+        print("GetEnvironmentStrings failed. Error %d: %s" % (err_code, err_msg))
         return "Fail"
     
     current_ptr = env_ptr

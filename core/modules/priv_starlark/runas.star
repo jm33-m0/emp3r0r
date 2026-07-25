@@ -145,8 +145,9 @@ def RunAs(username, domain, password, program, extra_args, show, netonly):
     )
 
     if res["r1"] == 0:
-        err = win_call("kernel32.dll", "GetLastError")["r1"]
-        print("[-] CreateProcessWithLogonW failed. Error: %d" % err)
+        err_code = res.get("err_code", 0)
+        err_msg = res.get("error", "")
+        print("[-] CreateProcessWithLogonW failed. Error %d: %s" % (err_code, err_msg))
     else:
         new_pid = read_uint32(pi, 16)
         new_tid = read_uint32(pi, 20)

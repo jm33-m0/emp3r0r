@@ -183,8 +183,9 @@ def MakeToken(domain, username, password, logonType):
 
     if res["r1"] == 0:
         win_free(token_ptr)
-        err = win_call("kernel32.dll", "GetLastError")["r1"]
-        print("[-] LogonUserW failed. Error: %d" % err)
+        err_code = res.get("err_code", 0)
+        err_msg = res.get("error", "")
+        print("[-] LogonUserW failed. Error %d: %s" % (err_code, err_msg))
         return
 
     token = read_ptr(token_ptr, 0)
@@ -193,9 +194,10 @@ def MakeToken(domain, username, password, logonType):
     # err = syscalls.ImpersonateLoggedOnUser(token)
     res = win_call("advapi32.dll", "ImpersonateLoggedOnUser", token)
     if res["r1"] == 0:
-        err = win_call("kernel32.dll", "GetLastError")["r1"]
+        err_code = res.get("err_code", 0)
+        err_msg = res.get("error", "")
         win_call("kernel32.dll", "CloseHandle", token)
-        print("[-] ImpersonateLoggedOnUser failed. Error: %d" % err)
+        print("[-] ImpersonateLoggedOnUser failed. Error %d: %s" % (err_code, err_msg))
         return
 
     # CurrentToken = token  (resolved via token owner for output)

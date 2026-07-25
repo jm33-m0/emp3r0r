@@ -322,7 +322,9 @@ def GetPrivs():
     )
     if res["r1"] == 0:
         win_free(tokenHandle_ptr)
-        print("[-] OpenProcessToken failed")
+        err_code = res.get("err_code", 0)
+        err_msg = res.get("error", "")
+        print("[-] OpenProcessToken failed. Error %d: %s" % (err_code, err_msg))
         return
 
     tokenHandle = read_ptr(tokenHandle_ptr, 0)
@@ -366,7 +368,9 @@ def GetPrivs():
     if res["r1"] == 0:
         win_free(tokenInfoBuffer)
         win_call("kernel32.dll", "CloseHandle", tokenHandle)
-        print("[-] GetTokenInformation (privileges) failed")
+        err_code = res.get("err_code", 0)
+        err_msg = res.get("error", "")
+        print("[-] GetTokenInformation (privileges) failed. Error %d: %s" % (err_code, err_msg))
         return
 
     # var privilegeCount uint32

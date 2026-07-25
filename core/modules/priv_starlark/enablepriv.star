@@ -72,13 +72,19 @@ def SePrivEnable(s):
     thsHandle = win_call("kernel32.dll", "GetCurrentProcess")["r1"]
 
     # windows.OpenProcessToken(thsHandle, windows.TOKEN_ADJUST_PRIVILEGES, &tokenHandle)
-    win_call(
+    res = win_call(
         "advapi32.dll",
         "OpenProcessToken",
         thsHandle,
         TOKEN_ADJUST_PRIVILEGES,
         tokenHandle_ptr,
     )
+    if res["r1"] == 0:
+        win_free(tokenHandle_ptr)
+        err_code = res.get("err_code", 0)
+        err_msg = res.get("error", "")
+        print("[-] OpenProcessToken failed. Error %d: %s" % (err_code, err_msg))
+        return False
 
     tokenHandle = read_ptr(tokenHandle_ptr, 0)
     win_free(tokenHandle_ptr)
@@ -95,7 +101,9 @@ def SePrivEnable(s):
     if res["r1"] == 0:
         win_free(luid_ptr)
         win_call("kernel32.dll", "CloseHandle", tokenHandle)
-        print("[-] LookupPrivilegeValueW failed for: " + s)
+        err_code = res.get("err_code", 0)
+        err_msg = res.get("error", "")
+        print("[-] LookupPrivilegeValueW failed for: %s. Error %d: %s" % (s, err_code, err_msg))
         return False
 
     # privs := windows.Tokenprivileges{}
@@ -125,10 +133,12 @@ def SePrivEnable(s):
     win_call("kernel32.dll", "CloseHandle", tokenHandle)
 
     if res["r1"] == 0:
-        print("[-] AdjustTokenPrivileges failed for: " + s)
+        err_code = res.get("err_code", 0)
+        err_msg = res.get("error", "")
+        print("[-] AdjustTokenPrivileges failed for: %s. Error %d: %s" % (s, err_code, err_msg))
         return False
 
-    last_err = win_call("kernel32.dll", "GetLastError")["r1"]
+    last_err = res.get("err_code", 0)
     if last_err == 1300:  # ERROR_NOT_ALL_ASSIGNED
         print("[-] Privilege not held, cannot enable: " + s)
         return False

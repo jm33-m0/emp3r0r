@@ -22,8 +22,9 @@ def RevertToSelf():
     # err := windows.RevertToSelf()
     res = win_call("advapi32.dll", "RevertToSelf")
     if res["r1"] == 0:
-        err = win_call("kernel32.dll", "GetLastError")["r1"]
-        print("[-] RevertToSelf failed. Error: %d" % err)
+        err_code = res.get("err_code", 0)
+        err_msg = res.get("error", "")
+        print("[-] RevertToSelf failed. Error %d: %s" % (err_code, err_msg))
         return False
 
     # NOTE: CurrentToken handle lifecycle is managed per-invocation in Starlark;
@@ -44,8 +45,9 @@ def TRevertToSelf():
     # return windows.RevertToSelf()
     res = win_call("advapi32.dll", "RevertToSelf")
     if res["r1"] == 0:
-        err = win_call("kernel32.dll", "GetLastError")["r1"]
-        print("[-] TRevertToSelf failed. Error: %d" % err)
+        err_code = res.get("err_code", 0)
+        err_msg = res.get("error", "")
+        print("[-] TRevertToSelf failed. Error %d: %s" % (err_code, err_msg))
         return False
     print("[+] TRevertToSelf succeeded.")
     return True

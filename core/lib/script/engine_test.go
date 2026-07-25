@@ -107,6 +107,8 @@ def main(*args):
 def main(*args):
     # Call GetTickCount64 from kernel32.dll
     res = win_call("kernel32.dll", "GetTickCount64")
+    if "r1" not in res or "r2" not in res or "error" not in res or "err_code" not in res:
+        return "Fail: missing error reporting keys in win_call return dict"
     print("Ticks: " + str(res["r1"]))
 
     # Test win_alloc, GetLocalTime, win_read_mem, win_free

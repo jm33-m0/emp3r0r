@@ -51,7 +51,7 @@ def get_name_by_pid(pid):
         
     name_buf = win_alloc(512)
     size_ptr = win_alloc(4)
-    win_call("kernel32.dll", "InterlockedExchange", [size_ptr, 256])
+    win_call("kernel32.dll", "InterlockedExchange", size_ptr, 256)
     
     # QueryFullProcessImageNameA
     res = win_call("kernel32.dll", "QueryFullProcessImageNameA", hProcess, 0, name_buf, size_ptr)
@@ -74,7 +74,7 @@ def show_tcp_table():
     # TCP_TABLE_OWNER_PID_ALL = 5
     # AF_INET = 2
     size_ptr = win_alloc(4)
-    win_call("kernel32.dll", "InterlockedExchange", [size_ptr, 0])
+    win_call("kernel32.dll", "InterlockedExchange", size_ptr, 0)
     
     # GetExtendedTcpTable
     win_call("iphlpapi.dll", "GetExtendedTcpTable", 0, size_ptr, 1, 2, 5, 0)
@@ -89,6 +89,9 @@ def show_tcp_table():
     table_ptr = win_alloc(size)
     res = win_call("iphlpapi.dll", "GetExtendedTcpTable", table_ptr, size_ptr, 1, 2, 5, 0)
     if res["r1"] != 0:
+        err_code = res.get("err_code", 0)
+        err_msg = res.get("error", "")
+        print("GetExtendedTcpTable (TCP) failed with status %d (Error %d: %s)" % (res["r1"], err_code, err_msg))
         win_free(table_ptr)
         win_free(size_ptr)
         return
@@ -137,7 +140,7 @@ def show_tcp6_table():
     # TCP_TABLE_OWNER_PID_ALL = 5
     # AF_INET6 = 23
     size_ptr = win_alloc(4)
-    win_call("kernel32.dll", "InterlockedExchange", [size_ptr, 0])
+    win_call("kernel32.dll", "InterlockedExchange", size_ptr, 0)
     
     win_call("iphlpapi.dll", "GetExtendedTcpTable", 0, size_ptr, 1, 23, 5, 0)
     
@@ -151,6 +154,9 @@ def show_tcp6_table():
     table_ptr = win_alloc(size)
     res = win_call("iphlpapi.dll", "GetExtendedTcpTable", table_ptr, size_ptr, 1, 23, 5, 0)
     if res["r1"] != 0:
+        err_code = res.get("err_code", 0)
+        err_msg = res.get("error", "")
+        print("GetExtendedTcpTable (TCP6) failed with status %d (Error %d: %s)" % (res["r1"], err_code, err_msg))
         win_free(table_ptr)
         win_free(size_ptr)
         return
@@ -201,7 +207,7 @@ def show_udp_table():
     # UDP_TABLE_OWNER_PID = 1
     # AF_INET = 2
     size_ptr = win_alloc(4)
-    win_call("kernel32.dll", "InterlockedExchange", [size_ptr, 0])
+    win_call("kernel32.dll", "InterlockedExchange", size_ptr, 0)
     
     win_call("iphlpapi.dll", "GetExtendedUdpTable", 0, size_ptr, 1, 2, 1, 0)
     
@@ -215,6 +221,9 @@ def show_udp_table():
     table_ptr = win_alloc(size)
     res = win_call("iphlpapi.dll", "GetExtendedUdpTable", table_ptr, size_ptr, 1, 2, 1, 0)
     if res["r1"] != 0:
+        err_code = res.get("err_code", 0)
+        err_msg = res.get("error", "")
+        print("GetExtendedUdpTable (UDP) failed with status %d (Error %d: %s)" % (res["r1"], err_code, err_msg))
         win_free(table_ptr)
         win_free(size_ptr)
         return
@@ -253,7 +262,7 @@ def show_udp6_table():
     # UDP_TABLE_OWNER_PID = 1
     # AF_INET6 = 23
     size_ptr = win_alloc(4)
-    win_call("kernel32.dll", "InterlockedExchange", [size_ptr, 0])
+    win_call("kernel32.dll", "InterlockedExchange", size_ptr, 0)
     
     win_call("iphlpapi.dll", "GetExtendedUdpTable", 0, size_ptr, 1, 23, 1, 0)
     
@@ -267,6 +276,9 @@ def show_udp6_table():
     table_ptr = win_alloc(size)
     res = win_call("iphlpapi.dll", "GetExtendedUdpTable", table_ptr, size_ptr, 1, 23, 1, 0)
     if res["r1"] != 0:
+        err_code = res.get("err_code", 0)
+        err_msg = res.get("error", "")
+        print("GetExtendedUdpTable (UDP6) failed with status %d (Error %d: %s)" % (res["r1"], err_code, err_msg))
         win_free(table_ptr)
         win_free(size_ptr)
         return

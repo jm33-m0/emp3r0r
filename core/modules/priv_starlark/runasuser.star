@@ -357,8 +357,9 @@ def RunProcessAsUser(username, command, cmd_args):
     )
 
     if res["r1"] == 0:
-        err = win_call("kernel32.dll", "GetLastError")["r1"]
-        print("[-] CreateProcessAsUserW failed. Error: %d" % err)
+        err_code = res.get("err_code", 0)
+        err_msg = res.get("error", "")
+        print("[-] CreateProcessAsUserW failed. Error %d: %s" % (err_code, err_msg))
     else:
         new_pid = read_uint32(pi, 16)
         print(

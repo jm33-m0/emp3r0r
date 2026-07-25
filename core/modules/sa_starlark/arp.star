@@ -38,11 +38,11 @@ def arp():
     # Allocate 4 bytes for length
     len_ptr = win_alloc(4)
     # Initialize length to 0
-    win_call("kernel32.dll", "InterlockedExchange", [len_ptr, 0])
+    win_call("kernel32.dll", "InterlockedExchange", len_ptr, 0)
     
     # GetIpNetTable(NULL, &ipNetTableBufLen, TRUE);
     # ERROR_INSUFFICIENT_BUFFER is 122 (0x7A)
-    win_call("Iphlpapi.dll", "GetIpNetTable", [0, len_ptr, 1])
+    win_call("Iphlpapi.dll", "GetIpNetTable", 0, len_ptr, 1)
     
     buf_len_bytes = win_read_mem(len_ptr, 4)
     length = buf_len_bytes[0] + (buf_len_bytes[1] << 8) + (buf_len_bytes[2] << 16) + (buf_len_bytes[3] << 24)
@@ -54,10 +54,13 @@ def arp():
         
     table_ptr = win_alloc(length)
     
-    ret = win_call("Iphlpapi.dll", "GetIpNetTable", [table_ptr, len_ptr, 1])
+    res = win_call("Iphlpapi.dll", "GetIpNetTable", table_ptr, len_ptr, 1)
+    ret = res["r1"]
     
     if ret != 0 and ret != 234: # ERROR_MORE_DATA
-        print("Error code: {}".format(ret))
+        err_code = res.get("err_code", 0)
+        err_msg = res.get("error", "")
+        print("Error code: %d, sys error: %d (%s)" % (ret, err_code, err_msg))
         print("Could not get ipnet table info")
         win_free(table_ptr)
         win_free(len_ptr)

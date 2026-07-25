@@ -93,6 +93,10 @@ def TokenOwner(hToken):
 
     if res["r1"] == 0:
         win_free(tokenUserBuf)
+        err_code = res.get("err_code", 0)
+        err_msg = res.get("error", "")
+        if err_code != 0 or err_msg != "":
+            print("[-] GetTokenInformation failed. Error %d: %s" % (err_code, err_msg))
         return ""
 
     # tokenUser.User.Sid  →  first pointer in SID_AND_ATTRIBUTES

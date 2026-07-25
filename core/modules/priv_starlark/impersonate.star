@@ -117,12 +117,12 @@ def token_owner(h_token):
 # ─────────────────────────────────────────────────────────────────────────────
 def getPrimaryToken(pid):
     # handle, err := windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION, true, pid)
-    handle = win_call("kernel32.dll", "OpenProcess", PROCESS_QUERY_INFORMATION, 1, pid)[
-        "r1"
-    ]
+    res = win_call("kernel32.dll", "OpenProcess", PROCESS_QUERY_INFORMATION, 1, pid)
+    handle = res["r1"]
     if handle == 0:
-        err = win_call("kernel32.dll", "GetLastError")["r1"]
-        print("[-] OpenProcess failed for PID %d. Error: %d" % (pid, err))
+        err_code = res.get("err_code", 0)
+        err_msg = res.get("error", "")
+        print("[-] OpenProcess failed for PID %d. Error %d: %s" % (pid, err_code, err_msg))
         return 0
 
     # var token windows.Token
@@ -142,8 +142,9 @@ def getPrimaryToken(pid):
     win_call("kernel32.dll", "CloseHandle", handle)
 
     if res["r1"] == 0:
-        err = win_call("kernel32.dll", "GetLastError")["r1"]
-        print("[-] OpenProcessToken failed for PID %d. Error: %d" % (pid, err))
+        err_code = res.get("err_code", 0)
+        err_msg = res.get("error", "")
+        print("[-] OpenProcessToken failed for PID %d. Error %d: %s" % (pid, err_code, err_msg))
         win_free(token_ptr)
         return 0
 
@@ -223,8 +224,9 @@ def impersonateProcess(pid):
     # err = syscalls.ImpersonateLoggedOnUser(*primaryToken)
     res = win_call("advapi32.dll", "ImpersonateLoggedOnUser", primaryToken)
     if res["r1"] == 0:
-        err = win_call("kernel32.dll", "GetLastError")["r1"]
-        print("[-] ImpersonateLoggedOnUser failed. Error: %d" % err)
+        err_code = res.get("err_code", 0)
+        err_msg = res.get("error", "")
+        print("[-] ImpersonateLoggedOnUser failed. Error %d: %s" % (err_code, err_msg))
         # defer primaryToken.Close()
         win_call("kernel32.dll", "CloseHandle", primaryToken)
         return 0
@@ -249,8 +251,9 @@ def impersonateProcess(pid):
     win_call("kernel32.dll", "CloseHandle", primaryToken)
 
     if res["r1"] == 0:
-        err = win_call("kernel32.dll", "GetLastError")["r1"]
-        print("[-] DuplicateTokenEx failed. Error: %d" % err)
+        err_code = res.get("err_code", 0)
+        err_msg = res.get("error", "")
+        print("[-] DuplicateTokenEx failed. Error %d: %s" % (err_code, err_msg))
         win_free(newToken_ptr)
         return 0
 
