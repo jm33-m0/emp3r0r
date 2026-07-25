@@ -179,14 +179,14 @@ def do_whoami_user():
     win_free(token_user_buf)
     win_call("kernel32.dll", "CloseHandle", h_token)
     
-    full_name = lookup["domain"] + "\\\\" + lookup["account"]
+    full_name = (lookup["domain"] + "\\" + lookup["account"]) if lookup["domain"] else lookup["account"]
     
-    print("\\nUserName\\t\\tSID")
+    print("\nUserName\t\tSID")
     print("====================== ====================================")
-    print("%s\\t%s\\n" % (full_name, user_sid_str))
+    print("%s\t%s\n" % (full_name, user_sid_str))
 
 def do_whoami_groups():
-    print("\\n%s%s%s%s" % (pad("GROUP INFORMATION", 50), pad("Type", 25), pad("SID", 45), pad("Attributes", 25)))
+    print("\n%s%s%s%s" % (pad("GROUP INFORMATION", 50), pad("Type", 25), pad("SID", 45), pad("Attributes", 25)))
     print("================================================= ===================== ============================================= ==================================================")
     
     h_token = get_current_token()
@@ -229,7 +229,7 @@ def do_whoami_groups():
             
         name_str = lookup["account"]
         if lookup["domain"]:
-            name_str = lookup["domain"] + "\\\\" + lookup["account"]
+            name_str = lookup["domain"] + "\\" + lookup["account"]
             
         type_str = get_sid_type_string(lookup["use"])
         attr_str = parse_group_attributes(attrs)
@@ -240,7 +240,7 @@ def do_whoami_groups():
     win_call("kernel32.dll", "CloseHandle", h_token)
 
 def do_whoami_privs():
-    print("\\n%s%s%s" % (pad("Privilege Name", 30), pad("Description", 50), pad("State", 30)))
+    print("\n%s%s%s" % (pad("Privilege Name", 30), pad("Description", 50), pad("State", 30)))
     print("============================= ================================================= ===========================")
     
     h_token = get_current_token()

@@ -188,5 +188,144 @@
       "interactive": false
     },
     "invocation": {}
+  },
+  {
+    "name": "sl_sa_nettime",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Get remote time of day using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target server name",
+        "default": "",
+        "type": "string",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "nettime.star",
+      "files": ["nettime.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_useridletime",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Get user idle time using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "useridletime.star",
+      "files": ["useridletime.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_netshares",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "List network shares using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target server name",
+        "default": "",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "as_admin",
+        "description": "Query detailed share info as admin (true/false)",
+        "default": "false",
+        "type": "bool",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "netshares.star",
+      "files": ["netshares.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_netuse",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Manage or list mapped network drives and shares using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "cmd",
+        "description": "Subcommand: list, add, delete",
+        "default": "list",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "arg1",
+        "description": "First argument (device name or share name)",
+        "default": "",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "arg2",
+        "description": "Second argument (username or target)",
+        "default": "",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "arg3",
+        "description": "Third argument (password)",
+        "default": "",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "arg4",
+        "description": "Fourth argument (device)",
+        "default": "",
+        "type": "string",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "netuse.star",
+      "files": ["netuse.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
   }
 ]

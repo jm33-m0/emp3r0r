@@ -83,7 +83,7 @@ def arp():
         
         if last_if_index != dwIndex:
             last_if_index = dwIndex
-            print("\nInteface  --- 0x{:X}".format(dwIndex))
+            print("\nInterface  --- 0x%X" % dwIndex)
             print(pad("Internet Address", 24) + pad("Physical Address", 24) + pad("Type", 24))
             
         ip_str = print_ip_from_int(dwAddr)

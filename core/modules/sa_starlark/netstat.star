@@ -35,7 +35,7 @@ def get_ip6_host_name(addr_bytes):
         b1 = addr_bytes[i*2]
         b2 = addr_bytes[i*2+1]
         val = (b1 << 8) | b2
-        parts.append("{:x}".format(val))
+        parts.append("%x" % val)
     return ":".join(parts)
 
 def get_port_name(port_addr):
@@ -314,7 +314,7 @@ def show_udp6_table():
     win_free(size_ptr)
 
 def netstat():
-    print("Active Connections\\n")
+    print("Active Connections\n")
     print("  {} {} {} {} {}".format(
         pad("Proto", 6),
         pad("Local Address", 48),
