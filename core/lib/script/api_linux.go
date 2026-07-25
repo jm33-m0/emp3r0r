@@ -240,10 +240,22 @@ func parseSyscallNum(val starlark.Value) (uintptr, error) {
 }
 
 // starlarkSysCall provides an interface to execute any Linux system call dynamically
-func starlarkSysCall(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+func starlarkSysCall(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (retVal starlark.Value, retErr error) {
 	if len(args) < 1 {
 		return starlark.None, fmt.Errorf("sys_call requires at least a syscall number or name")
 	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			dict := starlark.NewDict(4)
+			dict.SetKey(starlark.String("r1"), starlark.MakeUint64(0))
+			dict.SetKey(starlark.String("r2"), starlark.MakeUint64(0))
+			dict.SetKey(starlark.String("errno"), starlark.MakeInt(1))
+			dict.SetKey(starlark.String("error"), starlark.String(fmt.Sprintf("sys_call panic: %v", r)))
+			retErr = nil
+			retVal = dict
+		}
+	}()
 
 	trap, err := parseSyscallNum(args[0])
 	if err != nil {
@@ -375,8 +387,20 @@ func starlarkSysReadMem(_ *starlark.Thread, fn *starlark.Builtin, args starlark.
 		return starlark.None, fmt.Errorf("read range length constraint must be greater than zero")
 	}
 
-	src := unsafe.Slice((*byte)(unsafe.Pointer(uintptr(addr))), size)
-	elems := make([]starlark.Value, size)
+	allocMapMu.RLock()
+	buf, exists := allocMap[uintptr(addr)]
+	allocMapMu.RUnlock()
+
+	if !exists {
+		return starlark.None, fmt.Errorf("sys_read_mem: unallocated or invalid memory address 0x%x", addr)
+	}
+
+	if size > len(buf) {
+		size = len(buf)
+	}
+	src := buf[:size]
+
+	elems := make([]starlark.Value, len(src))
 	for i, b := range src {
 		elems[i] = starlark.MakeInt(int(b))
 	}

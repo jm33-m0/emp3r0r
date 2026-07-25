@@ -234,6 +234,48 @@ def main(*args):
 	}
 }
 
+func TestPanicRecovery(t *testing.T) {
+	// Test 1: Top-level panic recovery in script.Run
+	customGlobals := map[string]any{
+		"trigger_panic": starlark.NewBuiltin("trigger_panic", func(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+			panic("simulated builtin panic")
+		}),
+	}
+
+	panicScript := `
+def main(*args):
+    print("before panic")
+    trigger_panic()
+    print("after panic")
+    return "OK"
+`
+	out, err := Run([]byte(panicScript), nil, customGlobals)
+	if err == nil {
+		t.Fatalf("expected error from panic recovery, got nil")
+	}
+	if !strings.Contains(err.Error(), "script engine panic") || !strings.Contains(err.Error(), "simulated builtin panic") {
+		t.Errorf("expected 'script engine panic: simulated builtin panic' error, got: %v", err)
+	}
+	if !strings.Contains(out, "before panic") {
+		t.Errorf("expected output buffer to contain 'before panic', got: %q", out)
+	}
+
+	// Test 2: FFI invalid memory read recovery on Linux
+	if runtime.GOOS == "linux" {
+		memPanicScript := `
+def main(*args):
+    res = sys_read_mem(0xDEADBEEF00000000, 16)
+    return "OK"
+`
+		_, err := Run([]byte(memPanicScript), nil, nil)
+		if err == nil {
+			t.Errorf("expected error when reading invalid memory address on Linux, got nil")
+		} else if !strings.Contains(err.Error(), "unallocated or invalid memory address") {
+			t.Errorf("expected 'unallocated or invalid memory address' error, got: %v", err)
+		}
+	}
+}
+
 func TestAllStarlarkModules(t *testing.T) {
 	_, filename, _, _ := runtime.Caller(0)
 	modulesDir := filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filename))), "modules")

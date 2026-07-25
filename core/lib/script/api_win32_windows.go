@@ -30,7 +30,7 @@ func getLazyProc(dllName, procName string) *windows.LazyProc {
 }
 
 // starlarkWinCall provides an interface to execute any function within a specified DLL dynamically
-func starlarkWinCall(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+func starlarkWinCall(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (retVal starlark.Value, retErr error) {
 	if len(args) < 2 {
 		return starlark.None, fmt.Errorf("win_call requires at least a DLL name and a procedure name")
 	}
@@ -79,6 +79,19 @@ func starlarkWinCall(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tup
 			return starlark.None, fmt.Errorf("unsupported type parameter passed at index %d: %s", i, args[i].Type())
 		}
 	}
+
+	// Recover from dynamic procedure resolution panics (e.g., proc.Find() failure inside proc.Call)
+	defer func() {
+		if r := recover(); r != nil {
+			dict := starlark.NewDict(4)
+			dict.SetKey(starlark.String("r1"), starlark.MakeUint64(0))
+			dict.SetKey(starlark.String("r2"), starlark.MakeUint64(0))
+			dict.SetKey(starlark.String("error"), starlark.String(fmt.Sprintf("win_call error: %v", r)))
+			dict.SetKey(starlark.String("err_code"), starlark.MakeUint64(1))
+			retErr = nil
+			retVal = dict
+		}
+	}()
 
 	r1, r2, callErr := proc.Call(uintptrArgs...)
 	_ = keepAlive

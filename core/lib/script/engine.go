@@ -10,8 +10,16 @@ import (
 
 // Run executes a Starlark script with the provided source code, arguments, and optional custom global variables.
 // It redirects all Starlark print() calls to a string buffer and returns the captured output along with any execution error.
-func Run(src []byte, argv []string, customGlobals map[string]any) (string, error) {
+func Run(src []byte, argv []string, customGlobals map[string]any) (out string, err error) {
 	var buf bytes.Buffer
+
+	// Top-level panic recovery to prevent script execution runtime crashes
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("script engine panic: %v", r)
+			out = buf.String()
+		}
+	}()
 
 	// Create a new Starlark thread
 	thread := &starlark.Thread{
