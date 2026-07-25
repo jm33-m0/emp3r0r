@@ -63,7 +63,7 @@ def sc_enum():
             name = read_wstring(read_ptr(entry_addr, 0))
             disp = read_wstring(read_ptr(entry_addr, 8))
             state_val = read_uint32(entry_addr, 20)
-            state_str = states[state_val - 1] if 0 < state_val <= len(states) else "UNKNOWN"
+            state_str = states[state_val - 1] if (0 < state_val) and (state_val <= len(states)) else "UNKNOWN"
 
             print("  - Service: %-30s | State: %-12s | Name: %s" % (name, state_str, disp))
 

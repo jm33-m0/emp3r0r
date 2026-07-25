@@ -13,8 +13,10 @@ def read_uint64(addr, offset):
     return data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24) | (data[4] << 32) | (data[5] << 40) | (data[6] << 48) | (data[7] << 56)
 
 def write_uint32(addr, val):
-    # Call InterlockedExchange to safely write a 32-bit value to memory
-    win_call("kernel32.dll", "InterlockedExchange", addr, val & 0xffffffff)
+    win_call("msvcrt.dll", "memset", addr, val & 0xff, 1)
+    win_call("msvcrt.dll", "memset", addr + 1, (val >> 8) & 0xff, 1)
+    win_call("msvcrt.dll", "memset", addr + 2, (val >> 16) & 0xff, 1)
+    win_call("msvcrt.dll", "memset", addr + 3, (val >> 24) & 0xff, 1)
 
 def write_uint64(addr, val):
     write_uint32(addr, val & 0xffffffff)

@@ -51,7 +51,9 @@ def get_name_by_pid(pid):
         
     name_buf = win_alloc(512)
     size_ptr = win_alloc(4)
-    win_call("kernel32.dll", "InterlockedExchange", size_ptr, 256)
+    win_call("msvcrt.dll", "memset", size_ptr, 0, 4)
+    win_call("msvcrt.dll", "memset", size_ptr, 256 & 0xFF, 1)
+    win_call("msvcrt.dll", "memset", size_ptr + 1, (256 >> 8) & 0xFF, 1)
     
     # QueryFullProcessImageNameA
     res = win_call("kernel32.dll", "QueryFullProcessImageNameA", hProcess, 0, name_buf, size_ptr)
@@ -74,7 +76,7 @@ def show_tcp_table():
     # TCP_TABLE_OWNER_PID_ALL = 5
     # AF_INET = 2
     size_ptr = win_alloc(4)
-    win_call("kernel32.dll", "InterlockedExchange", size_ptr, 0)
+    win_call("msvcrt.dll", "memset", size_ptr, 0, 4)
     
     # GetExtendedTcpTable
     win_call("iphlpapi.dll", "GetExtendedTcpTable", 0, size_ptr, 1, 2, 5, 0)
@@ -140,7 +142,7 @@ def show_tcp6_table():
     # TCP_TABLE_OWNER_PID_ALL = 5
     # AF_INET6 = 23
     size_ptr = win_alloc(4)
-    win_call("kernel32.dll", "InterlockedExchange", size_ptr, 0)
+    win_call("msvcrt.dll", "memset", size_ptr, 0, 4)
     
     win_call("iphlpapi.dll", "GetExtendedTcpTable", 0, size_ptr, 1, 23, 5, 0)
     
@@ -207,7 +209,7 @@ def show_udp_table():
     # UDP_TABLE_OWNER_PID = 1
     # AF_INET = 2
     size_ptr = win_alloc(4)
-    win_call("kernel32.dll", "InterlockedExchange", size_ptr, 0)
+    win_call("msvcrt.dll", "memset", size_ptr, 0, 4)
     
     win_call("iphlpapi.dll", "GetExtendedUdpTable", 0, size_ptr, 1, 2, 1, 0)
     
@@ -262,7 +264,7 @@ def show_udp6_table():
     # UDP_TABLE_OWNER_PID = 1
     # AF_INET6 = 23
     size_ptr = win_alloc(4)
-    win_call("kernel32.dll", "InterlockedExchange", size_ptr, 0)
+    win_call("msvcrt.dll", "memset", size_ptr, 0, 4)
     
     win_call("iphlpapi.dll", "GetExtendedUdpTable", 0, size_ptr, 1, 23, 1, 0)
     

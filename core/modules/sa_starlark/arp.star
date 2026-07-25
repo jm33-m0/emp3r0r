@@ -38,7 +38,7 @@ def arp():
     # Allocate 4 bytes for length
     len_ptr = win_alloc(4)
     # Initialize length to 0
-    win_call("kernel32.dll", "InterlockedExchange", len_ptr, 0)
+    win_call("msvcrt.dll", "memset", len_ptr, 0, 4)
     
     # GetIpNetTable(NULL, &ipNetTableBufLen, TRUE);
     # ERROR_INSUFFICIENT_BUFFER is 122 (0x7A)
