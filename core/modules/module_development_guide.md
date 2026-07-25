@@ -298,3 +298,88 @@ When the emp3r0r C2 starts, it parses the modules via `InitModules` in `core/int
 4. **Execution:** When the operator runs your module, `moduleCustom` reads the operator's input, validates it against your `parameters`, packs it according to the `type` aliases, and dispatches the task down to the agent memory for fileless execution.
 
 _Note: Currently, only the first file in the `files` list is executed, which in most cases means only `x64` BOFs are picked up._
+
+---
+
+## 5. Starlark Module Scripting & API Reference
+
+emp3r0r includes a high-performance, embedded Starlark script engine for cross-platform and Windows/Linux native system scripting.
+
+### Critical Rules & Differences from Python
+
+> [!IMPORTANT]
+> **Starlark is NOT Python!**
+>
+> - Starlark does **not** have Python's standard library (do not `import sys`, `import re`, `import math`, etc.).
+> - Standard Python functions like `hex()` or advanced `%016x`, `%-30s` format specifiers in `%` string formatting are **not** built into standard Starlark.
+> - **Use the Go-Native APIs**: Use the native built-in APIs provided by the engine (`sprintf`, `hex`, `read_uint32`, `read_wstring`, `utf16_ptr`, `str_split`, etc.) for maximum performance and safety.
+
+### Starlark Built-in API Reference
+
+#### A. String Formatting & Manipulation
+
+| API Function                      | Parameters               | Description                                                                                      |
+| :-------------------------------- | :----------------------- | :----------------------------------------------------------------------------------------------- |
+| `sprintf`                         | `(format_string, *args)` | Formats a string using Go `fmt.Sprintf` format specifiers (`%016x`, `%02d`, `%-30s`, `%+03d`).   |
+| `hex`                             | `(val)`                  | Converts an integer value to a `0x...` hexadecimal string.                                       |
+| `str_split`                       | `(s, sep)`               | Splits string `s` by separator `sep` into a list of strings.                                     |
+| `str_join`                        | `(elements, sep)`        | Joins an iterable list/tuple of strings with separator `sep`.                                    |
+| `str_replace`                     | `(s, old, new, n=-1)`    | Replaces occurrences of `old` with `new` in string `s`.                                          |
+| `str_contains`                    | `(s, substr)`            | Returns `True` if `substr` is inside `s`, `False` otherwise.                                     |
+| `str_trim`                        | `(s, cutset="")`         | Trims leading and trailing whitespace or characters in `cutset`.                                 |
+| `str_lower` / `str_upper`         | `(s)`                    | Returns lowercase or uppercase representation of string `s`.                                     |
+| `str_startswith` / `str_endswith` | `(s, prefix/suffix)`     | Returns `True` if string `s` starts with `prefix` or ends with `suffix`.                         |
+| `str_pad` / `pad`                 | `(text, width)`          | Pads `text` to specified column width (right-padded if `width > 0`, left-padded if `width < 0`). |
+| `str_index`                       | `(s, substr)`            | Returns the zero-based index of `substr` in `s`, or `-1` if not found.                           |
+
+#### B. Memory Reading Primitives (Go Native)
+
+All memory reading primitives safely access unmanaged memory addresses across Windows and Linux processes.
+
+| API Function                            | Parameters           | Description                                                                                   |
+| :-------------------------------------- | :------------------- | :-------------------------------------------------------------------------------------------- |
+| `read_u8` / `read_uint8`                | `(addr, offset=0)`   | Reads 1 byte (`uint8`) from `addr + offset`.                                                  |
+| `read_u16` / `read_uint16`              | `(addr, offset=0)`   | Reads 2 bytes (`uint16`, little-endian) from `addr + offset`.                                 |
+| `read_u32` / `read_uint32`              | `(addr, offset=0)`   | Reads 4 bytes (`uint32`, little-endian) from `addr + offset`.                                 |
+| `read_u64` / `read_uint64` / `read_ptr` | `(addr, offset=0)`   | Reads 8 bytes (`uint64`/pointer, little-endian) from `addr + offset`.                         |
+| `read_i32` / `read_int32`               | `(addr, offset=0)`   | Reads signed 4 bytes (`int32`, little-endian) from `addr + offset`.                           |
+| `read_wstring`                          | `(ptr, max_len=256)` | Safely reads a null-terminated UTF-16 wide string from memory pointer into a Starlark string. |
+| `read_cstring` / `read_ansi_string`     | `(ptr, max_len=256)` | Safely reads a null-terminated C/ANSI string from memory pointer into a Starlark string.      |
+
+#### C. Memory Writing Primitives & String Allocators
+
+| API Function                               | Parameters                | Description                                                                                                         |
+| :----------------------------------------- | :------------------------ | :------------------------------------------------------------------------------------------------------------------ |
+| `write_byte` / `write_u8`                  | `(addr, [offset=0,] val)` | Writes 1 byte to target memory address `addr + offset`.                                                             |
+| `write_u16` / `write_uint16`               | `(addr, [offset=0,] val)` | Writes 2 bytes (`uint16`, little-endian) to `addr + offset`.                                                        |
+| `write_u32` / `write_uint32`               | `(addr, [offset=0,] val)` | Writes 4 bytes (`uint32`, little-endian) to `addr + offset`.                                                        |
+| `write_u64` / `write_uint64` / `write_ptr` | `(addr, [offset=0,] val)` | Writes 8 bytes (`uint64`/pointer, little-endian) to `addr + offset`.                                                |
+| `utf16_ptr`                                | `(s)`                     | Allocates unmanaged memory, encodes string `s` to UTF-16LE null-terminated, and returns memory address pointer.     |
+| `cstring_ptr` / `ansi_ptr`                 | `(s)`                     | Allocates unmanaged memory, encodes string `s` to null-terminated C/ANSI bytes, and returns memory address pointer. |
+
+#### D. Windows & Linux System Interop
+
+| API Function                                       | Parameters                    | Description                                                                                                                   |
+| :------------------------------------------------- | :---------------------------- | :---------------------------------------------------------------------------------------------------------------------------- |
+| `win_call`                                         | `(dll, function_name, *args)` | Dynamically calls an exported Windows DLL function with native parameters. Returns dict with `r1`, `r2`, `err_code`, `error`. |
+| `win_alloc` / `win_free`                           | `(size)` / `(addr)`           | Allocates / frees unmanaged memory on Windows via `VirtualAlloc`/`VirtualFree`. Passing `0` to `win_free` is safely ignored.  |
+| `win_read_mem`                                     | `(addr, size)`                | Reads raw memory byte list from Windows process memory via `ReadProcessMemory`.                                               |
+| `sys_call` / `lin_syscall` / `linux_syscall`       | `(syscall_num, *args)`        | Executes a native Linux syscall.                                                                                              |
+| `sys_alloc` / `lin_alloc` / `linux_alloc`          | `(size)`                      | Linux memory allocation via `mmap`. Returns base memory address.                                                              |
+| `sys_free` / `lin_free` / `linux_free`             | `(addr)`                      | Deallocates memory allocated on Linux.                                                                                        |
+| `sys_read_mem` / `lin_read_mem` / `linux_read_mem` | `(addr, size)`                | Reads raw memory byte list from Linux process memory.                                                                         |
+
+#### E. File System, Networking, Execution & Cryptography
+
+| API Function                               | Parameters                   | Description                                                                                |
+| :----------------------------------------- | :--------------------------- | :----------------------------------------------------------------------------------------- |
+| `read_file` / `write_file`                 | `(path)` / `(path, content)` | File reading and writing.                                                                  |
+| `list_dir` / `exists` / `mkdir` / `remove` | `(path)`                     | Directory listing, existence check, directory creation, and file removal.                  |
+| `http_get`                                 | `(url)`                      | Performs HTTP GET request and returns body content string.                                 |
+| `http_post`                                | `(url, content_type, body)`  | Performs HTTP POST request and returns body content string.                                |
+| `exec_cmd`                                 | `(cmd, args=[])`             | Executes shell command with optional argument string list. Returns combined output string. |
+| `crypto_hash`                              | `(algo, data)`               | Computes hash (`"md5"`, `"sha1"`, `"sha256"`) of `data`.                                   |
+
+#### F. Predeclared Global Variables
+
+- **`argv`**: List of string arguments passed to the script execution thread.
