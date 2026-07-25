@@ -73,8 +73,8 @@ def driversigs():
     ]
 
     for i in range(count):
-        # ENUM_SERVICE_STATUS_PROCESSW struct: lpServiceName(0,8), lpDisplayName(8,8)
-        service_ptr = buf + i * 48
+        # ENUM_SERVICE_STATUS_PROCESSW struct on x64 is 56 bytes: lpServiceName(0,8), lpDisplayName(8,8)
+        service_ptr = buf + i * 56
         name_ptr = read_ptr(service_ptr, 0)
         if name_ptr != 0 and name_ptr > 4096:
             service_name = read_wstring(name_ptr)

@@ -59,7 +59,8 @@ def sc_enum():
         states = ["STOPPED", "START_PENDING", "STOP_PENDING", "RUNNING", "CONTINUE_PENDING", "PAUSE_PENDING", "PAUSED"]
 
         for i in range(count):
-            entry_addr = buf + i * 48
+            # ENUM_SERVICE_STATUS_PROCESSW struct on x64 is 56 bytes
+            entry_addr = buf + i * 56
             name = read_wstring(read_ptr(entry_addr, 0))
             disp = read_wstring(read_ptr(entry_addr, 8))
             state_val = read_uint32(entry_addr, 20)
