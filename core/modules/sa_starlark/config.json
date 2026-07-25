@@ -327,5 +327,1387 @@
       "interactive": false
     },
     "invocation": {}
+  },
+  {
+    "name": "sl_sa_ipconfig",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Get IP and adapter configuration using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "ipconfig.star",
+      "files": ["ipconfig.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_tasklist",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "List running processes using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "tasklist.star",
+      "files": ["tasklist.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_netuser",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Get detailed user account info using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "username",
+        "description": "Target username",
+        "default": "",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "server",
+        "description": "Target server or domain controller",
+        "default": "",
+        "type": "string",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "netuser.star",
+      "files": ["netuser.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_windowlist",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "List top-level desktop windows using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "all_windows",
+        "description": "Include hidden windows (true/false)",
+        "default": "true",
+        "type": "bool",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "windowlist.star",
+      "files": ["windowlist.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_routeprint",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Print IPv4 routing table using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "routeprint.star",
+      "files": ["routeprint.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_sc_query",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Enumerate Windows services using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "sc_query.star",
+      "files": ["sc_query.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_hash",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Compute MD5/SHA1/SHA256 hash of a file using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "algo",
+        "description": "Hash algorithm (md5, sha1, sha256, sha512)",
+        "default": "md5",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "filepath",
+        "description": "Path to file to hash",
+        "default": "",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "agent_config": {
+      "exec": "hash.star",
+      "files": ["hash.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_netuserenum",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Enumerate user accounts using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target server or domain controller",
+        "default": "",
+        "type": "string",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "netuserenum.star",
+      "files": ["netuserenum.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_netlocalgroup",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Enumerate local groups or members using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "group",
+        "description": "Local group name (leave empty to list groups)",
+        "default": "",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "server",
+        "description": "Target server name",
+        "default": "",
+        "type": "string",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "netlocalgroup.star",
+      "files": ["netlocalgroup.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_netgroup",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Enumerate domain global groups or members using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "group",
+        "description": "Domain group name (leave empty to list groups)",
+        "default": "",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "domain",
+        "description": "Target domain name",
+        "default": "",
+        "type": "string",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "netgroup.star",
+      "files": ["netgroup.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_reg_query",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Query Windows Registry keys and values using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "hive",
+        "description": "Registry hive (HKLM, HKCU, HKCR, HKU)",
+        "default": "HKLM",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "key",
+        "description": "Subkey path",
+        "default": "",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "value",
+        "description": "Value name (leave empty to list all values)",
+        "default": "",
+        "type": "string",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "reg_query.star",
+      "files": ["reg_query.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_netview",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Enumerate domain servers using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "domain",
+        "description": "Target domain name",
+        "default": "",
+        "type": "string",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "netview.star",
+      "files": ["netview.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_netloggedon",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Get logged-on users using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target server name",
+        "default": "",
+        "type": "string",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "netloggedon.star",
+      "files": ["netloggedon.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_nslookup",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Perform DNS A-record lookup using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "hostname",
+        "description": "Target hostname to look up",
+        "default": "",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "agent_config": {
+      "exec": "nslookup.star",
+      "files": ["nslookup.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_dir",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "List directory contents using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "path",
+        "description": "Directory or wildcard path (e.g. C:\\*)",
+        "default": "C:\\*",
+        "type": "string",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "dir.star",
+      "files": ["dir.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_get_password_policy",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Get domain or local password policy using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target server or domain controller",
+        "default": "",
+        "type": "string",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "get_password_policy.star",
+      "files": ["get_password_policy.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_aadjoininfo",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Get Azure AD/Entra ID join info using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "aadjoininfo.star",
+      "files": ["aadjoininfo.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_cacls",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Get file/directory permissions using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "path",
+        "description": "Target file or directory path",
+        "default": "",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "agent_config": {
+      "exec": "cacls.star",
+      "files": ["cacls.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_listmods",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "List loaded modules of a process using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "pid",
+        "description": "Target process ID (0 for current process)",
+        "default": "0",
+        "type": "int",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "listmods.star",
+      "files": ["listmods.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_schtasks",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Enumerate scheduled tasks using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target server name",
+        "default": "",
+        "type": "string",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "schtasks.star",
+      "files": ["schtasks.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_driver_enum",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Enumerate minifilter drivers using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "driver_enum.star",
+      "files": ["driver_enum.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_adv_audit_policies",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Query advanced system audit policies using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "adv_audit_policies.star",
+      "files": ["adv_audit_policies.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_probe",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Probe network port connectivity using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "host",
+        "description": "Target IP or hostname",
+        "default": "",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "port",
+        "description": "Target port number",
+        "default": "80",
+        "type": "int",
+        "required": true
+      }
+    ],
+    "agent_config": {
+      "exec": "probe.star",
+      "files": ["probe.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_resources",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Query system memory and resource statistics using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "resources.star",
+      "files": ["resources.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_wmi_query",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Execute WMI queries using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "query",
+        "description": "WMI WQL query",
+        "default": "SELECT * FROM Win32_Process",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "namespace",
+        "description": "WMI namespace",
+        "default": "root\\cimv2",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "server",
+        "description": "Target server",
+        "default": ".",
+        "type": "string",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "wmi_query.star",
+      "files": ["wmi_query.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_vssenum",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Enumerate VSS volume shadow copies using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "hostname",
+        "description": "Target hostname",
+        "default": "localhost",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "sharename",
+        "description": "Target share name",
+        "default": "C$",
+        "type": "string",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "vssenum.star",
+      "files": ["vssenum.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_firewall",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "List Windows Firewall rules using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "firewall.star",
+      "files": ["firewall.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_dpapi",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Query DPAPI system keys using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "dpapi.star",
+      "files": ["dpapi.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_notepad",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Notepad helper module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "text",
+        "description": "Text content",
+        "default": "",
+        "type": "string",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "notepad.star",
+      "files": ["notepad.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_adcs_enum",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "ADCS enumeration module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "adcs_enum.star",
+      "files": ["adcs_enum.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_adcs_enum_com",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "ADCS COM enumeration module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "adcs_enum_com.star",
+      "files": ["adcs_enum_com.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_adcs_enum_com2",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "ADCS COM2 enumeration module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "adcs_enum_com2.star",
+      "files": ["adcs_enum_com2.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_driversigs",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Driver signatures module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "driversigs.star",
+      "files": ["driversigs.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_enumLocalSessions",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Enumerate local sessions module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "enumLocalSessions.star",
+      "files": ["enumLocalSessions.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_enum_filter_driver",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Enumerate filter drivers module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "enum_filter_driver.star",
+      "files": ["enum_filter_driver.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_findLoadedModule",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Find loaded process module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "findLoadedModule.star",
+      "files": ["findLoadedModule.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_get_netsession",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Get network sessions module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "get-netsession.star",
+      "files": ["get-netsession.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_get_netsession2",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Get network sessions 2 module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "get-netsession2.star",
+      "files": ["get-netsession2.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_get_dpapi_system",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Get DPAPI system keys module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "get_dpapi_system.star",
+      "files": ["get_dpapi_system.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_get_session_info",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Get session info module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "get_session_info.star",
+      "files": ["get_session_info.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_ldapsecuritycheck",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "LDAP security check module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "ldapsecuritycheck.star",
+      "files": ["ldapsecuritycheck.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_list_firewall_rules",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "List firewall rules module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "list_firewall_rules.star",
+      "files": ["list_firewall_rules.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_listdns",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "List DNS cache module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "listdns.star",
+      "files": ["listdns.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_md5",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "MD5 hash module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "md5.star",
+      "files": ["md5.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_netlocalgroup2",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Net local group 2 module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "netlocalgroup2.star",
+      "files": ["netlocalgroup2.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_netloggedon2",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Net logged on 2 module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "netloggedon2.star",
+      "files": ["netloggedon2.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_netuptime",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Net uptime module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "netuptime.star",
+      "files": ["netuptime.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_nonpagedldapsearch",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Nonpaged LDAP search module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "nonpagedldapsearch.star",
+      "files": ["nonpagedldapsearch.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_regsession",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Registry session query module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "regsession.star",
+      "files": ["regsession.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_sc_enum",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Service controller enum module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "sc_enum.star",
+      "files": ["sc_enum.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_sc_qc",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Service controller QC module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "sc_qc.star",
+      "files": ["sc_qc.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_sc_qdescription",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Service controller QDescription module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "sc_qdescription.star",
+      "files": ["sc_qdescription.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_sc_qfailure",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Service controller QFailure module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "sc_qfailure.star",
+      "files": ["sc_qfailure.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_sc_qtriggerinfo",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Service controller QTriggerInfo module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "sc_qtriggerinfo.star",
+      "files": ["sc_qtriggerinfo.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_schtasksenum",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Scheduled tasks enum module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "schtasksenum.star",
+      "files": ["schtasksenum.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_schtasksquery",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "Scheduled tasks query module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "schtasksquery.star",
+      "files": ["schtasksquery.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_sha1",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "SHA1 hash module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "sha1.star",
+      "files": ["sha1.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  },
+  {
+    "name": "sl_sa_sha256",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-25",
+    "comment": "SHA256 hash module using Starlark",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [],
+    "agent_config": {
+      "exec": "sha256.star",
+      "files": ["sha256.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
   }
 ]
