@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"go.starlark.net/starlark"
+	"go.starlark.net/syntax"
 )
 
 func TestEngineRun(t *testing.T) {
@@ -230,3 +231,36 @@ def main(*args):
 		t.Errorf("expected OK from linux script, got: %q", out)
 	}
 }
+
+func TestPrivStarlarkScripts(t *testing.T) {
+	_, filename, _, _ := runtime.Caller(0)
+	privDir := filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filename))), "modules", "priv_starlark")
+	files, err := os.ReadDir(privDir)
+	if err != nil {
+		t.Fatalf("failed to read priv_starlark dir: %v", err)
+	}
+
+	for _, f := range files {
+		if strings.HasSuffix(f.Name(), ".star") {
+			path := filepath.Join(privDir, f.Name())
+			data, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("failed to read %s: %v", path, err)
+			}
+
+			// Validate syntax parsing
+			_, err = syntax.Parse(f.Name(), data, 0)
+			if err != nil {
+				t.Errorf("syntax error in %s: %v", f.Name(), err)
+			}
+
+			if runtime.GOOS == "windows" {
+				_, err := Run(data, []string{"1"}, nil)
+				if err != nil {
+					t.Errorf("error running %s: %v", f.Name(), err)
+				}
+			}
+		}
+	}
+}
+

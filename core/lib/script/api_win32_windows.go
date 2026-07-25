@@ -83,15 +83,20 @@ func starlarkWinCall(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tup
 	r1, r2, callErr := proc.Call(uintptrArgs...)
 	_ = keepAlive
 
-	dict := starlark.NewDict(3)
+	dict := starlark.NewDict(4)
 	dict.SetKey(starlark.String("r1"), starlark.MakeUint64(uint64(r1)))
 	dict.SetKey(starlark.String("r2"), starlark.MakeUint64(uint64(r2)))
 
 	errStr := ""
+	var errCode uint64 = 0
 	if callErr != nil && callErr != windows.ERROR_SUCCESS {
 		errStr = callErr.Error()
+		if errno, ok := callErr.(windows.Errno); ok {
+			errCode = uint64(errno)
+		}
 	}
 	dict.SetKey(starlark.String("error"), starlark.String(errStr))
+	dict.SetKey(starlark.String("err_code"), starlark.MakeUint64(errCode))
 
 	return dict, nil
 }
