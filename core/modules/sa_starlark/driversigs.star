@@ -19,6 +19,19 @@ def read_wstring(ptr, max_len=256):
         result += chr(c)
     return result
 
+def read_ptr(addr, offset):
+    d = win_read_mem(addr + offset, 8)
+    return (
+        d[0]
+        | (d[1] << 8)
+        | (d[2] << 16)
+        | (d[3] << 24)
+        | (d[4] << 32)
+        | (d[5] << 40)
+        | (d[6] << 48)
+        | (d[7] << 56)
+    )
+
 def driversigs():
     SC_MANAGER_ENUMERATE_SERVICE = 4
     SERVICE_DRIVER = 11
@@ -62,18 +75,10 @@ def driversigs():
     for i in range(count):
         # ENUM_SERVICE_STATUS_PROCESSW struct: lpServiceName(0,8), lpDisplayName(8,8)
         service_ptr = buf + i * 48
-        name_ptr = (
-            win_read_mem(service_ptr, 1)[0]
-            | (win_read_mem(service_ptr + 1, 1)[0] << 8)
-            | (win_read_mem(service_ptr + 2, 1)[0] << 16)
-            | (win_read_mem(service_ptr + 3, 1)[0] << 24)
-            | (win_read_mem(service_ptr + 4, 1)[0] << 32)
-            | (win_read_mem(service_ptr + 5, 1)[0] << 40)
-            | (win_read_mem(service_ptr + 6, 1)[0] << 48)
-            | (win_read_mem(service_ptr + 7, 1)[0] << 56)
-        )
-        service_name = read_wstring(name_ptr)
-        print("Driver: %s" % service_name)
+        name_ptr = read_ptr(service_ptr, 0)
+        if name_ptr != 0 and name_ptr > 4096:
+            service_name = read_wstring(name_ptr)
+            print("Driver: %s" % service_name)
 
     win_free(buf)
     win_call("advapi32.dll", "CloseServiceHandle", h_scm)
