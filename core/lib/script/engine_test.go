@@ -1,6 +1,7 @@
 package script
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -436,6 +437,42 @@ def main(*args):
 	}
 }
 
+type moduleConfigEntry struct {
+	Platform    string `json:"platform"`
+	AgentConfig struct {
+		Exec  string   `json:"exec"`
+		Files []string `json:"files"`
+		Type  string   `json:"type"`
+	} `json:"agent_config"`
+}
+
+func getStarlarkScriptPlatform(starPath string) string {
+	dir := filepath.Dir(starPath)
+	configPath := filepath.Join(dir, "config.json")
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return ""
+	}
+
+	var entries []moduleConfigEntry
+	if err := json.Unmarshal(data, &entries); err != nil {
+		return ""
+	}
+
+	starBase := filepath.Base(starPath)
+	for _, entry := range entries {
+		if entry.AgentConfig.Exec == starBase {
+			return strings.ToLower(entry.Platform)
+		}
+		for _, f := range entry.AgentConfig.Files {
+			if filepath.Base(f) == starBase {
+				return strings.ToLower(entry.Platform)
+			}
+		}
+	}
+	return ""
+}
+
 func TestAllStarlarkModules(t *testing.T) {
 	_, filename, _, _ := runtime.Caller(0)
 	modulesDir := filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filename))), "modules")
@@ -474,17 +511,14 @@ func TestAllStarlarkModules(t *testing.T) {
 				t.Fatalf("syntax error in %s: %v", path, err)
 			}
 
-			// 2. Execute script on supported platform
-			if runtime.GOOS == "windows" && (strings.Contains(path, "priv_starlark") || strings.Contains(path, "starlark_SA") || strings.Contains(path, "sa_starlark")) {
+			// 2. Execute script on supported platform determined dynamically from config.json
+			platform := getStarlarkScriptPlatform(path)
+			shouldRun := platform == "" || platform == "any" || platform == "all" || platform == runtime.GOOS
+
+			if shouldRun {
 				out, err := Run(data, []string{"1"}, nil)
 				if err != nil {
-					t.Errorf("error running %s on windows: %v", relPath, err)
-				}
-				t.Logf("output from %s:\n%s", relPath, out)
-			} else if runtime.GOOS == "linux" && strings.Contains(path, "starlark_procinfo") {
-				out, err := Run(data, nil, nil)
-				if err != nil {
-					t.Errorf("error running %s on linux: %v", relPath, err)
+					t.Errorf("error running %s on %s: %v", relPath, runtime.GOOS, err)
 				}
 				t.Logf("output from %s:\n%s", relPath, out)
 			}
