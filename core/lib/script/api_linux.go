@@ -4,6 +4,7 @@ package script
 
 import (
 	"fmt"
+	"maps"
 	"strconv"
 	"sync"
 	"unsafe"
@@ -23,9 +24,7 @@ var (
 func registerSyscalls(syscalls map[string]uintptr) {
 	syscallNamesMu.Lock()
 	defer syscallNamesMu.Unlock()
-	for name, num := range syscalls {
-		syscallNames[name] = num
-	}
+	maps.Copy(syscallNames, syscalls)
 }
 
 func init() {
@@ -263,7 +262,7 @@ func starlarkSysCall(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tup
 	}
 
 	var uintptrArgs [6]uintptr
-	var keepAlive []interface{}
+	var keepAlive []any
 
 	for i := 1; i < len(args) && i <= 6; i++ {
 		idx := i - 1
@@ -405,7 +404,8 @@ func starlarkSysReadMem(_ *starlark.Thread, fn *starlark.Builtin, args starlark.
 			return starlark.None, fmt.Errorf("sys_read_mem: unallocated or invalid memory address 0x%x", addr)
 		}
 		readBuf := make([]byte, size)
-		localIov := []unix.Iovec{{Base: &readBuf[0], Len: uint64(size)}}
+		localIov := []unix.Iovec{{Base: &readBuf[0]}}
+		localIov[0].SetLen(size)
 		remoteIov := []unix.RemoteIovec{{Base: uintptr(addr), Len: size}}
 		n, err := unix.ProcessVMReadv(unix.Getpid(), localIov, remoteIov, 0)
 		if err != nil || n <= 0 {
@@ -435,7 +435,8 @@ func readLinuxMem(addr uintptr, size int) ([]byte, error) {
 		return nil, fmt.Errorf("readLinuxMem: invalid memory address 0x%x", addr)
 	}
 	readBuf := make([]byte, size)
-	localIov := []unix.Iovec{{Base: &readBuf[0], Len: uint64(size)}}
+	localIov := []unix.Iovec{{Base: &readBuf[0]}}
+	localIov[0].SetLen(size)
 	remoteIov := []unix.RemoteIovec{{Base: addr, Len: size}}
 	n, err := unix.ProcessVMReadv(unix.Getpid(), localIov, remoteIov, 0)
 	if err != nil || n <= 0 {
