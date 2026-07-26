@@ -1,10 +1,10 @@
 [
   {
-    "name": "priv_getsystem",
+    "name": "impersonate",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-26",
-    "comment": "Get SYSTEM from a high trustlevel. New session will be created via shellcode injection.",
+    "comment": "Inject emp3r0r shellcode into a target process and impersonate it.",
     "is_local": false,
     "platform": "Windows",
     "path": "",
@@ -12,7 +12,7 @@
     "parameters": [
       {
         "name": "pid",
-        "description": "Hosting process that already runs as system (e.g. spoolsv.exe)",
+        "description": "PID of target process",
         "default": "0",
         "type": "int",
         "required": true
@@ -33,8 +33,8 @@
       }
     ],
     "agent_config": {
-      "exec": "get_system.star",
-      "files": ["get_system.star"],
+      "exec": "impersonate.star",
+      "files": ["impersonate.star"],
       "in_memory": true,
       "type": "starlark",
       "interactive": false

