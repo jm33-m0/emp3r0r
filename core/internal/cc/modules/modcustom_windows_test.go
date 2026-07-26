@@ -16,8 +16,8 @@ func TestCOFFExecutionWindows(t *testing.T) {
 		t.Skip("skipped under race run (EMP3R0R_RACE_ON=1)")
 	}
 
-	t.Run("process_list_handles", func(t *testing.T) {
-		payloadPath := filepath.Join(getModulesRoot(), "process_list_handles/ProcessListHandles.x64.o")
+	t.Run("get_priv", func(t *testing.T) {
+		payloadPath := filepath.Join(getModulesRoot(), "Remote-OPs/src/Remote/get_priv/get_priv.x64.o")
 		if !util.IsExist(payloadPath) {
 			t.Skipf("payload %s not found", payloadPath)
 		}
@@ -27,11 +27,7 @@ func TestCOFFExecutionWindows(t *testing.T) {
 			t.Fatalf("failed to read payload: %v", err)
 		}
 
-		args := []coffloader.CoffArg{
-			{WireType: "i", Value: 4}, // System process PID
-		}
-
-		output, err := coffloader.RunWindowsCOFF(payload, "go", args)
+		output, err := coffloader.RunWindowsCOFF(payload, "go", nil)
 		if err != nil {
 			t.Fatalf("RunWindowsCOFF failed: %v", err)
 		}
@@ -41,8 +37,8 @@ func TestCOFFExecutionWindows(t *testing.T) {
 		}
 	})
 
-	t.Run("sa_dir", func(t *testing.T) {
-		payloadPath := filepath.Join(getModulesRoot(), "SA/dir/dir.x64.o")
+	t.Run("sc_description", func(t *testing.T) {
+		payloadPath := filepath.Join(getModulesRoot(), "Remote-OPs/src/Remote/sc_description/sc_description.x64.o")
 		if !util.IsExist(payloadPath) {
 			t.Skipf("payload %s not found", payloadPath)
 		}
@@ -53,8 +49,9 @@ func TestCOFFExecutionWindows(t *testing.T) {
 		}
 
 		args := []coffloader.CoffArg{
-			{WireType: "z", Value: "C:\\"},
-			{WireType: "s", Value: 0},
+			{WireType: "z", Value: ""},
+			{WireType: "z", Value: "test_service"},
+			{WireType: "z", Value: "test_description"},
 		}
 
 		output, err := coffloader.RunWindowsCOFF(payload, "go", args)
