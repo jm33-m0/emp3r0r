@@ -456,7 +456,12 @@ func getStarlarkScriptPlatform(starPath string) string {
 
 	var entries []moduleConfigEntry
 	if err := json.Unmarshal(data, &entries); err != nil {
-		return ""
+		var single moduleConfigEntry
+		if errSingle := json.Unmarshal(data, &single); errSingle == nil {
+			entries = []moduleConfigEntry{single}
+		} else {
+			return ""
+		}
 	}
 
 	starBase := filepath.Base(starPath)
