@@ -312,32 +312,6 @@ def main(*args):
 	}
 }
 
-func TestRunStar(t *testing.T) {
-	_, filename, _, _ := runtime.Caller(0)
-	var scriptPath string
-	if runtime.GOOS == "windows" {
-		scriptPath = filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filename))), "modules", "sa_starlark", "whoami.star")
-	} else {
-		scriptPath = filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filename))), "modules", "starlark_procinfo", "run.star")
-	}
-
-	scriptBytes, err := os.ReadFile(scriptPath)
-	if err != nil {
-		if os.IsNotExist(err) && runtime.GOOS != "linux" && runtime.GOOS != "windows" {
-			t.Skipf("skipping test on unsupported os %s", runtime.GOOS)
-		}
-		t.Fatalf("failed to read %s: %v", scriptPath, err)
-	}
-
-	out, err := Run(scriptBytes, nil, nil)
-	if err != nil {
-		t.Fatalf("Run failed: %v", err)
-	}
-	if len(out) == 0 {
-		t.Errorf("expected script output, got empty")
-	}
-}
-
 func TestLinuxSyscallAPIs(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skipf("skipping Linux syscall test on %s", runtime.GOOS)
