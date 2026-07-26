@@ -1,4 +1,4 @@
-package controllers
+package builder
 
 import (
 	"fmt"
@@ -213,11 +213,8 @@ func MakeConfig(opts AgentConfig) error {
 
 	if opts.P2PTransport != nil {
 		isValid := false
-		for _, name := range transport.AllTransportNames() {
-			if name == *opts.P2PTransport {
-				isValid = true
-				break
-			}
+		if slices.Contains(transport.AllTransportNames(), *opts.P2PTransport) {
+			isValid = true
 		}
 		if !isValid {
 			return fmt.Errorf("invalid p2p-transport: %s (available: %v)", *opts.P2PTransport, transport.AllTransportNames())
@@ -245,7 +242,7 @@ func MakeConfig(opts AgentConfig) error {
 
 	if live.RuntimeConfig.IsP2PEnabled && !live.RuntimeConfig.IsDirectC2Enabled {
 		if len(live.RuntimeConfig.InitialPeers) == 0 {
-			return fmt.Errorf("Silent Node build requires --peers: specify at least one Gateway IP:port (e.g. --peers 1.2.3.4:7946)")
+			return fmt.Errorf("silent Node build requires --peers: specify at least one Gateway IP:port (e.g. --peers 1.2.3.4:7946)")
 		}
 		logging.Infof("Silent Node bootstrap peers: %v", live.RuntimeConfig.InitialPeers)
 	}

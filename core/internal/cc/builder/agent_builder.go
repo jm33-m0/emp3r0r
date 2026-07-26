@@ -1,17 +1,80 @@
-package controllers
+package builder
 
 import (
 	"bytes"
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/google/uuid"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
+	"github.com/jm33-m0/emp3r0r/core/lib/donut"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
+
+const (
+	PayloadTypeLinuxExecutable   = "linux_executable"
+	PayloadTypeWindowsExecutable = "windows_executable"
+	PayloadTypeWindowsDLL        = "windows_dll"
+	PayloadTypeLinuxSO           = "linux_so"
+)
+
+var PayloadTypeList = []string{
+	PayloadTypeLinuxExecutable,
+	PayloadTypeLinuxSO,
+	PayloadTypeWindowsExecutable,
+	PayloadTypeWindowsDLL,
+}
+
+var ArchListWindows = []string{
+	"386",
+	"amd64",
+	"arm64",
+}
+
+var ArchListWindowsDLL = []string{
+	"386",
+	"amd64",
+	"arm64",
+}
+
+var ArchListLinuxSO = []string{
+	"amd64",
+	"386",
+	"arm",
+	"riscv64",
+}
+
+var ArchListAll = []string{
+	"386",
+	"amd64",
+	"arm",
+	"arm64",
+	"mips",
+	"mips64",
+	"riscv64",
+}
+
+// IsArchValid validates if target arch choice is compatible with payload type
+func IsArchValid(payloadType, archChoice string) bool {
+	var list []string
+	switch payloadType {
+	case PayloadTypeWindowsExecutable:
+		list = ArchListWindows
+	case PayloadTypeWindowsDLL:
+		list = ArchListWindowsDLL
+	case PayloadTypeLinuxSO:
+		list = ArchListLinuxSO
+	default:
+		list = ArchListAll
+	}
+	return slices.Contains(list, archChoice)
+}
 
 // AgentBuildConfig contains parameters for agent generation
 type AgentBuildConfig struct {
@@ -142,4 +205,75 @@ func BuildAgent(cfg AgentBuildConfig, runtimeConfig *def.Config) (*BuildAgentRes
 		AgentUUID:  agentUUID,
 		ConfigSize: len(configPayload),
 	}, nil
+}
+
+// GenerateAgentWorkflowResult contains complete build and post-processing results
+type GenerateAgentWorkflowResult struct {
+	BuildResult   *BuildAgentResult
+	ShellcodeFile string
+	ShellcodeErr  error
+}
+
+// GenerateAgentWorkflow extracts the core agent generation business logic (configuration, UUID signing, binary patching, and shellcode conversion)
+func GenerateAgentWorkflow(opts AgentConfig, payloadType, archChoice string, signAgentFn func(uuid string) (string, error)) (*GenerateAgentWorkflowResult, error) {
+	if !IsArchValid(payloadType, archChoice) {
+		return nil, fmt.Errorf("invalid arch choice '%s' for payload type '%s'", archChoice, payloadType)
+	}
+
+	// 1. Pass config to controller
+	if err := MakeConfig(opts); err != nil {
+		return nil, fmt.Errorf("configure agent: %w", err)
+	}
+
+	// 2. Generate UUID and Sign
+	agentUUID := uuid.NewString()
+	var sig string
+	var err error
+	if signAgentFn != nil {
+		sig, err = signAgentFn(agentUUID)
+		if err != nil {
+			return nil, fmt.Errorf("sign agent UUID: %w", err)
+		}
+	}
+
+	// 3. Build Agent
+	buildCfg := AgentBuildConfig{
+		PayloadType:  payloadType,
+		Arch:         archChoice,
+		Timestamp:    time.Now(),
+		WorkSpace:    live.EmpWorkSpace,
+		AgentUUID:    agentUUID,
+		AgentUUIDSig: sig,
+	}
+
+	result, err := BuildAgent(buildCfg, live.RuntimeConfig)
+	if err != nil {
+		return nil, fmt.Errorf("build agent: %w", err)
+	}
+
+	workflowResult := &GenerateAgentWorkflowResult{
+		BuildResult: result,
+	}
+
+	// 4. Generate shellcode for Windows
+	if payloadType == PayloadTypeWindowsExecutable || payloadType == PayloadTypeWindowsDLL {
+		err = donut.DonoutPE2Shellcode(result.OutputFile, archChoice, "main")
+		if err != nil {
+			workflowResult.ShellcodeErr = fmt.Errorf("donut failed: %w", err)
+		} else {
+			workflowResult.ShellcodeFile = result.OutputFile + ".bin"
+		}
+	}
+
+	// 5. Generate shellcode for Linux SO
+	if payloadType == PayloadTypeLinuxSO {
+		err = tools.MalasadaConvert2Shellcode(result.OutputFile, "main", true)
+		if err != nil {
+			workflowResult.ShellcodeErr = fmt.Errorf("malasada failed: %w", err)
+		} else {
+			workflowResult.ShellcodeFile = result.OutputFile + ".bin"
+		}
+	}
+
+	return workflowResult, nil
 }

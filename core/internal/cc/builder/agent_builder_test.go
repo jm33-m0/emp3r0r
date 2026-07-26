@@ -1,4 +1,4 @@
-package controllers
+package builder
 
 import (
 	"os"

@@ -12,6 +12,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/ftp"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/builder"
 	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/controllers"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -476,8 +477,8 @@ func gen_agent_cmd() *cobra.Command {
 	}
 
 	// Group 1: Payload & Target
-	genAgentCmd.Flags().StringP("type", "t", PayloadTypeLinuxSO, fmt.Sprintf("Payload type, available: %v+ (linux_so and windows_dll support CGO)", PayloadTypeList))
-	genAgentCmd.Flags().StringP("arch", "a", "amd64", fmt.Sprintf("Target architecture, available: %v+", Arch_List_All))
+	genAgentCmd.Flags().StringP("type", "t", builder.PayloadTypeLinuxSO, fmt.Sprintf("Payload type, available: %v+ (linux_so and windows_dll support CGO)", builder.PayloadTypeList))
+	genAgentCmd.Flags().StringP("arch", "a", "amd64", fmt.Sprintf("Target architecture, available: %v+", builder.ArchListAll))
 	addFlagToGroup("Payload & Target Options", "type", "arch")
 
 	// Group 2: C2 Connectivity & Transport
@@ -616,8 +617,8 @@ Example:
 
 	// completers
 	carapace.Gen(genAgentCmd).FlagCompletion(carapace.ActionMap{
-		"type":            carapace.ActionValues(PayloadTypeList...),
-		"arch":            carapace.ActionValues(Arch_List_All...),
+		"type":            carapace.ActionValues(builder.PayloadTypeList...),
+		"arch":            carapace.ActionValues(builder.ArchListAll...),
 		"cc":              carapace.ActionValues(cc_hosts...),
 		"cdn":             carapace.ActionValues("wss://", "ws://"),
 		"doh":             carapace.ActionValues("https://1.1.1.1/dns-query", "https://8.8.8.8/dns-query", "https://9.9.9.9/dns-query"),
