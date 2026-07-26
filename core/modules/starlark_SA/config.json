@@ -1,6 +1,6 @@
 [
   {
-    "name": "sl_sa_uptime",
+    "name": "sa_uptime",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-13",
@@ -20,7 +20,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_locale",
+    "name": "sa_locale",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-13",
@@ -40,7 +40,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_env",
+    "name": "sa_env",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-13",
@@ -60,7 +60,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_arp",
+    "name": "sa_arp",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-13",
@@ -80,7 +80,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_whoami",
+    "name": "sa_whoami",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-13",
@@ -100,7 +100,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_netstat",
+    "name": "sa_netstat",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-13",
@@ -120,7 +120,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_ldapsearch",
+    "name": "sa_ldapsearch",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-13",
@@ -190,7 +190,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_nettime",
+    "name": "sa_nettime",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -218,7 +218,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_useridletime",
+    "name": "sa_useridletime",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -238,7 +238,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_netshares",
+    "name": "sa_netshares",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -273,7 +273,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_netuse",
+    "name": "sa_netuse",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -329,7 +329,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_ipconfig",
+    "name": "sa_ipconfig",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -349,7 +349,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_tasklist",
+    "name": "sa_tasklist",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -369,7 +369,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_netuser",
+    "name": "sa_netuser",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -404,7 +404,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_windowlist",
+    "name": "sa_windowlist",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -432,7 +432,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_routeprint",
+    "name": "sa_routeprint",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -452,7 +452,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_sc_query",
+    "name": "sa_sc_query",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -472,7 +472,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_hash",
+    "name": "sa_hash",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -507,7 +507,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_netuserenum",
+    "name": "sa_netuserenum",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -535,7 +535,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_netlocalgroup",
+    "name": "sa_netlocalgroup",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -570,7 +570,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_netgroup",
+    "name": "sa_netgroup",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -605,7 +605,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_reg_query",
+    "name": "sa_reg_query",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -647,7 +647,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_netview",
+    "name": "sa_netview",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -675,7 +675,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_netloggedon",
+    "name": "sa_netloggedon",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -703,7 +703,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_nslookup",
+    "name": "sa_nslookup",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -731,7 +731,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_dir",
+    "name": "sa_dir",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -759,7 +759,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_get_password_policy",
+    "name": "sa_get_password_policy",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -787,7 +787,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_aadjoininfo",
+    "name": "sa_aadjoininfo",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -807,7 +807,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_cacls",
+    "name": "sa_cacls",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -835,7 +835,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_listmods",
+    "name": "sa_listmods",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -863,7 +863,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_schtasks",
+    "name": "sa_schtasks",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -891,7 +891,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_driver_enum",
+    "name": "sa_driver_enum",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -911,7 +911,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_adv_audit_policies",
+    "name": "sa_adv_audit_policies",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -931,7 +931,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_probe",
+    "name": "sa_probe",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -966,7 +966,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_resources",
+    "name": "sa_resources",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -986,7 +986,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_wmi_query",
+    "name": "sa_wmi_query",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1028,7 +1028,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_vssenum",
+    "name": "sa_vssenum",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1063,7 +1063,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_firewall",
+    "name": "sa_firewall",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1083,7 +1083,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_dpapi",
+    "name": "sa_dpapi",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1103,7 +1103,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_notepad",
+    "name": "sa_notepad",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1131,7 +1131,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_adcs_enum",
+    "name": "sa_adcs_enum",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1151,7 +1151,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_adcs_enum_com",
+    "name": "sa_adcs_enum_com",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1171,7 +1171,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_adcs_enum_com2",
+    "name": "sa_adcs_enum_com2",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1191,7 +1191,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_driversigs",
+    "name": "sa_driversigs",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1211,7 +1211,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_enumLocalSessions",
+    "name": "sa_enumLocalSessions",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1231,7 +1231,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_enum_filter_driver",
+    "name": "sa_enum_filter_driver",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1251,7 +1251,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_findLoadedModule",
+    "name": "sa_findLoadedModule",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1271,7 +1271,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_get_netsession",
+    "name": "sa_get_netsession",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1291,7 +1291,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_get_netsession2",
+    "name": "sa_get_netsession2",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1311,7 +1311,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_get_dpapi_system",
+    "name": "sa_get_dpapi_system",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1331,7 +1331,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_get_session_info",
+    "name": "sa_get_session_info",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1351,7 +1351,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_ldapsecuritycheck",
+    "name": "sa_ldapsecuritycheck",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1371,7 +1371,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_list_firewall_rules",
+    "name": "sa_list_firewall_rules",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1391,7 +1391,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_listdns",
+    "name": "sa_listdns",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1411,7 +1411,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_md5",
+    "name": "sa_md5",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1431,7 +1431,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_netlocalgroup2",
+    "name": "sa_netlocalgroup2",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1451,7 +1451,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_netloggedon2",
+    "name": "sa_netloggedon2",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1471,7 +1471,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_netuptime",
+    "name": "sa_netuptime",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1491,7 +1491,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_nonpagedldapsearch",
+    "name": "sa_nonpagedldapsearch",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1511,7 +1511,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_regsession",
+    "name": "sa_regsession",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1531,7 +1531,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_sc_enum",
+    "name": "sa_sc_enum",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1551,7 +1551,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_sc_qc",
+    "name": "sa_sc_qc",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1571,7 +1571,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_sc_qdescription",
+    "name": "sa_sc_qdescription",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1591,7 +1591,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_sc_qfailure",
+    "name": "sa_sc_qfailure",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1611,7 +1611,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_sc_qtriggerinfo",
+    "name": "sa_sc_qtriggerinfo",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1631,7 +1631,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_schtasksenum",
+    "name": "sa_schtasksenum",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1651,7 +1651,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_schtasksquery",
+    "name": "sa_schtasksquery",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1671,7 +1671,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_sha1",
+    "name": "sa_sha1",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",
@@ -1691,7 +1691,7 @@
     "invocation": {}
   },
   {
-    "name": "sl_sa_sha256",
+    "name": "sa_sha256",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-25",

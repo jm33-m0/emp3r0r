@@ -1,19 +1,19 @@
 {
-  "name": "starlark_procinfo",
+  "name": "procinfo",
   "build": "",
   "author": "jm33-ng",
   "date": "2026-06-22",
-  "comment": "List running processes on Linux using Starlark script engine",
+  "comment": "Display detailed information of a Linux process",
   "is_local": false,
   "platform": "Linux",
   "path": "",
   "fileless": true,
   "parameters": [
     {
-      "name": "filter",
-      "description": "Optional search filter for process name or cmdline",
+      "name": "pid",
+      "description": "PID of target process",
       "default": "",
-      "type": "string",
+      "type": "int",
       "required": false
     }
   ],
