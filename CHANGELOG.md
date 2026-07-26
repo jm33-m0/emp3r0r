@@ -1,5 +1,21 @@
 # Changelog
 
+## [4.8.0](https://github.com/jm33-m0/emp3r0r/compare/v4.7.1...v4.8.0) (2026-07-26)
+
+
+### Features
+
+* `impersonate` starlark module ([c324c54](https://github.com/jm33-m0/emp3r0r/commit/c324c54f96f839fc0fc1c2b6d0aaeb627b3fc5f8))
+* expose agent functions to starlark ([a06ef86](https://github.com/jm33-m0/emp3r0r/commit/a06ef865d8866085640a83d0b99d86649691e98e))
+
+
+### Bug Fixes
+
+* `main()` causes the scripts to run twice ([ec2672e](https://github.com/jm33-m0/emp3r0r/commit/ec2672edcdc26062f46aa8eb695336f73549c279))
+* do not terminated active session on key error ([c2e2b27](https://github.com/jm33-m0/emp3r0r/commit/c2e2b27ca7cf799f722b50337ccd82d18f06b89b))
+* int len ([47f5494](https://github.com/jm33-m0/emp3r0r/commit/47f5494dfbfd78d06c57ae251025738701ede355))
+* silent key verification error to avoid console being overflown by errors ([a48c8ea](https://github.com/jm33-m0/emp3r0r/commit/a48c8ea4b0a66f7242a2ba122687d0c5c3db8320))
+
 ## [4.7.1](https://github.com/jm33-m0/emp3r0r/compare/v4.7.0...v4.7.1) (2026-07-26)
 
 
