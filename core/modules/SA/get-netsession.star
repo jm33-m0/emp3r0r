@@ -46,4 +46,3 @@ def main(*args):
     server = args[0] if len(args) > 0 and args[0] else None
     return get_netsession(server)
 
-main()

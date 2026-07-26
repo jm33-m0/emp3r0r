@@ -5,4 +5,3 @@ def main(*args):
     print("Querying Service Description for: " + service)
     return "OK"
 
-main()

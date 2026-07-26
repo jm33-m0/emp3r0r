@@ -50,4 +50,3 @@ def get_resources():
 def main(*args):
     return get_resources()
 
-main()

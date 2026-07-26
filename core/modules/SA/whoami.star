@@ -256,4 +256,3 @@ def main(*args):
     do_whoami_groups()
     do_whoami_privs()
 
-main()

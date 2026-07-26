@@ -46,4 +46,3 @@ def main(*args):
     path = args[0] if len(args) > 0 else "C:\\*"
     return list_dir(path)
 
-main()

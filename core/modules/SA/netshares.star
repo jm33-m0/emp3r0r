@@ -126,4 +126,3 @@ def main(*args):
     as_admin = as_admin_raw == True or as_admin_raw == 1 or str(as_admin_raw).lower() == "true"
     list_shares(server, as_admin)
 
-main()

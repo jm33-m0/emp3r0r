@@ -61,4 +61,3 @@ def main(*args):
     pid = args[1] if len(args) > 1 else 0
     return find_loaded_module(mod_name, pid)
 
-main()

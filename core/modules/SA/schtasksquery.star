@@ -5,4 +5,3 @@ def main(*args):
     print("Querying Scheduled Task Details for: " + (taskname if taskname else "All Tasks"))
     return "OK"
 
-main()

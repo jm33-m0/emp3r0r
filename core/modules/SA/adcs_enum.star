@@ -10,4 +10,3 @@ def main(*args):
     print("adcs_enum SUCCESS.")
     return "OK"
 
-main()

@@ -24,4 +24,3 @@ def main(*args):
     filepath = args[1] if len(args) > 1 else ""
     return hash_file(algo, filepath)
 
-main()

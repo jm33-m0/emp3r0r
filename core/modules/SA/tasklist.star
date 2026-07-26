@@ -65,4 +65,3 @@ def tasklist():
 def main(*args):
     return tasklist()
 
-main()

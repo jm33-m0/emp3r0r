@@ -10,4 +10,3 @@ def main(*args):
     print("adcs_enum_com2 SUCCESS.")
     return "OK"
 
-main()

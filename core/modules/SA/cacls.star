@@ -67,4 +67,3 @@ def main(*args):
     path = args[0] if len(args) > 0 else ""
     return get_cacls(path)
 
-main()

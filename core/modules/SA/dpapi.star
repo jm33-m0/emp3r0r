@@ -9,4 +9,3 @@ def get_dpapi_system():
 def main(*args):
     return get_dpapi_system()
 
-main()

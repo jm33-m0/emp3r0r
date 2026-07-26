@@ -47,4 +47,3 @@ def userIdletime():
 def main(*args):
     return userIdletime()
 
-main()

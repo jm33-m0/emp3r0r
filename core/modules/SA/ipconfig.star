@@ -71,4 +71,3 @@ def ipconfig():
 def main(*args):
     return ipconfig()
 
-main()

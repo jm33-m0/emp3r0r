@@ -106,4 +106,3 @@ def main(*args):
     server = args[1] if len(args) > 1 and args[1] and str(args[1]).lower() not in ("false", "none") else None
     return netuserinfo(username, server)
 
-main()

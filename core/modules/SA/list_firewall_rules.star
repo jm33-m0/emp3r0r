@@ -4,4 +4,3 @@ def main(*args):
     print("Enumerating active Windows Firewall rules and profiles...")
     return "OK"
 
-main()

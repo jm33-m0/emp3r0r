@@ -29,4 +29,3 @@ def adv_audit_policies():
 def main(*args):
     return adv_audit_policies()
 
-main()

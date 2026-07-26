@@ -65,4 +65,3 @@ def main(*args):
     port = args[1] if len(args) > 1 else "80"
     return probe(host, port)
 
-main()

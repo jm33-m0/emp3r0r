@@ -100,4 +100,3 @@ def main(*args):
     host = args[1] if len(args) > 1 else None
     return sc_qc(service, host)
 
-main()

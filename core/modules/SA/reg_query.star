@@ -119,4 +119,3 @@ def main(*args):
     value = args[2] if len(args) > 2 and args[2] and str(args[2]).lower() not in ("false", "none") else None
     return reg_query(hive, key, value)
 
-main()

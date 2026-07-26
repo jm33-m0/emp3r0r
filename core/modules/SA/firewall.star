@@ -10,4 +10,3 @@ def list_firewall_rules():
 def main(*args):
     return list_firewall_rules()
 
-main()

@@ -67,4 +67,3 @@ def routeprint():
 def main(*args):
     return routeprint()
 
-main()

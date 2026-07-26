@@ -6,4 +6,3 @@ def main(*args):
     print("Querying NetLocalGroup2 for group '%s' on '%s'" % (group, server if server else "Local Host"))
     return "OK"
 
-main()

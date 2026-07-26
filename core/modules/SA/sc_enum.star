@@ -47,4 +47,3 @@ def sc_enum():
 def main(*args):
     return sc_enum()
 
-main()

@@ -166,4 +166,3 @@ def main(*args):
     else:
         return list_domain_groups(domain)
 
-main()

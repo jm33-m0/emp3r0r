@@ -5,4 +5,3 @@ def main(*args):
     print("Performing LDAP Security Configuration Check for: " + (domain if domain else "Default Domain"))
     return "OK"
 
-main()

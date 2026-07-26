@@ -166,4 +166,3 @@ def main(*args):
     else:
         return list_local_groups(server)
 
-main()

@@ -4,4 +4,3 @@ def main(*args):
     print("Querying Detailed Session Info...")
     return "OK"
 
-main()

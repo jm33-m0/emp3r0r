@@ -10,4 +10,3 @@ def main(*args):
     text = args[0] if len(args) > 0 else ""
     return notepad(text)
 
-main()

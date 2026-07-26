@@ -12,4 +12,3 @@ def main(*args):
     server = args[2] if len(args) > 2 else "."
     return wmi_query(query, namespace, server)
 
-main()

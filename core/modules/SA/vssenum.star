@@ -120,4 +120,3 @@ def main(*args):
     share = args[1] if len(args) > 1 else "C$"
     return vssenum(host, share)
 
-main()

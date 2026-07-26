@@ -5,4 +5,3 @@ def main(*args):
     print("Enumerating Scheduled Tasks on: " + (server if server else "Local Host"))
     return "OK"
 
-main()

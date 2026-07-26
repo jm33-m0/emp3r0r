@@ -56,4 +56,3 @@ def main(*args):
     pid = args[0] if len(args) > 0 else 0
     return listmods(pid)
 
-main()

@@ -5,4 +5,3 @@ def main(*args):
     print("Querying Service Failure Config for: " + service)
     return "OK"
 
-main()

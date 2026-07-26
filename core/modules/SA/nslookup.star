@@ -104,4 +104,3 @@ def main(*args):
     hostname = args[0] if len(args) > 0 else ""
     return nslookup(hostname)
 
-main()

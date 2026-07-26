@@ -42,4 +42,3 @@ def enum_filter_drivers():
 def main(*args):
     return enum_filter_drivers()
 
-main()

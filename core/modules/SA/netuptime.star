@@ -5,4 +5,3 @@ def main(*args):
     print("Querying Network Uptime for: " + (server if server else "Local Host"))
     return "OK"
 
-main()

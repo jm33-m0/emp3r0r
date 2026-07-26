@@ -5,4 +5,3 @@ def main(*args):
     print("Querying Extended Logged On Users for: " + (target if target else "Local Host"))
     return "OK"
 
-main()

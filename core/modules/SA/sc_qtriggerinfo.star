@@ -5,4 +5,3 @@ def main(*args):
     print("Querying Service Trigger Info for: " + service)
     return "OK"
 
-main()

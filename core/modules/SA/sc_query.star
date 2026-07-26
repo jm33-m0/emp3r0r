@@ -133,4 +133,3 @@ def enumerate_services():
 def main(*args):
     return enumerate_services()
 
-main()

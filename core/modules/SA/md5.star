@@ -9,4 +9,3 @@ def main(*args):
     print("MD5 (%s) = %s" % (filepath, res))
     return "OK"
 
-main()

@@ -40,4 +40,3 @@ def get_aad_join_info():
 def main(*args):
     return get_aad_join_info()
 
-main()

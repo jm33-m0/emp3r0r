@@ -5,4 +5,3 @@ def main(*args):
     print("Performing Non-Paged LDAP Search: " + query)
     return "OK"
 
-main()

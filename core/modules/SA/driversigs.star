@@ -57,4 +57,3 @@ def driversigs():
 def main(*args):
     return driversigs()
 
-main()

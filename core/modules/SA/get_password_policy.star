@@ -77,4 +77,3 @@ def main(*args):
     server = args[0] if len(args) > 0 and args[0] and str(args[0]).lower() not in ("false", "none") else None
     return get_password_policy(server)
 
-main()

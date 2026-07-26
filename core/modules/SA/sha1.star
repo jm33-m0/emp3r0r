@@ -9,4 +9,3 @@ def main(*args):
     print("SHA1 (%s) = %s" % (filepath, res))
     return "OK"
 
-main()

@@ -70,4 +70,3 @@ def enum_local_sessions():
 def main(*args):
     return enum_local_sessions()
 
-main()

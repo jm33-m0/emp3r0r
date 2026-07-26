@@ -55,4 +55,3 @@ def main(*args):
     all_windows = all_raw == True or all_raw == 1 or str(all_raw).lower() in ("true", "1")
     return windowlist(all_windows)
 
-main()
