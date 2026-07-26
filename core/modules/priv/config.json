@@ -19,7 +19,14 @@
       },
       {
         "name": "payload",
-        "description": "Shellcode payload filename to download via agent.fetch_file",
+        "description": "Shellcode payload filename to download via agent.fetch_file. Please generate a NEW payload to avoid duplicated agents. Payloads should be placed under /tmp/emp3r0r/www.",
+        "default": "",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "checksum",
+        "description": "SHA256 of the payload.",
         "default": "",
         "type": "string",
         "required": true
