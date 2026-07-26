@@ -4,6 +4,7 @@ package modules
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -19,12 +20,17 @@ func TestCOFFExecutionWindows(t *testing.T) {
 	t.Run("get_priv", func(t *testing.T) {
 		payloadPath := filepath.Join(getModulesRoot(), "Remote-OPs/src/Remote/get_priv/get_priv.x64.o")
 		if !util.IsExist(payloadPath) {
-			t.Skipf("payload %s not found", payloadPath)
+			makeDir := filepath.Join(getModulesRoot(), "Remote-OPs/src/Remote/get_priv")
+			cmd := exec.Command("make", "-C", makeDir)
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("failed to build %s with make -C %s: %v\nOutput: %s", payloadPath, makeDir, err, string(out))
+			}
 		}
 
 		payload, err := os.ReadFile(payloadPath)
 		if err != nil {
-			t.Fatalf("failed to read payload: %v", err)
+			t.Fatalf("failed to read payload %s: %v", payloadPath, err)
 		}
 
 		output, err := coffloader.RunWindowsCOFF(payload, "go", nil)
@@ -40,12 +46,17 @@ func TestCOFFExecutionWindows(t *testing.T) {
 	t.Run("sc_description", func(t *testing.T) {
 		payloadPath := filepath.Join(getModulesRoot(), "Remote-OPs/src/Remote/sc_description/sc_description.x64.o")
 		if !util.IsExist(payloadPath) {
-			t.Skipf("payload %s not found", payloadPath)
+			makeDir := filepath.Join(getModulesRoot(), "Remote-OPs/src/Remote/sc_description")
+			cmd := exec.Command("make", "-C", makeDir)
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("failed to build %s with make -C %s: %v\nOutput: %s", payloadPath, makeDir, err, string(out))
+			}
 		}
 
 		payload, err := os.ReadFile(payloadPath)
 		if err != nil {
-			t.Fatalf("failed to read payload: %v", err)
+			t.Fatalf("failed to read payload %s: %v", payloadPath, err)
 		}
 
 		args := []coffloader.CoffArg{

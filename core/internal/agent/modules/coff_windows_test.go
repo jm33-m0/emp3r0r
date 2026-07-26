@@ -4,13 +4,14 @@
 package modules
 
 import (
-	"io"
-	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func TestRunCOFFModuleInvalidPayload(t *testing.T) {
@@ -32,25 +33,24 @@ func TestRunCOFFModuleWithRealBOF(t *testing.T) {
 		t.Skip("skipped under race run (EMP3R0R_RACE_ON=1)")
 	}
 
-	// Non-privileged BOF to avoid admin requirement
-	const url = "https://github.com/chvancooten/goffloader/raw/refs/heads/main/cmd/bof_example/whoami.x64.o"
-	resp, err := http.Get(url)
-	if err != nil {
-		t.Fatalf("download BOF: %v", err)
+	payloadPath := filepath.Join(getModulesRoot(), "Remote-OPs/src/Remote/get_priv/get_priv.x64.o")
+	if !util.IsExist(payloadPath) {
+		makeDir := filepath.Join(getModulesRoot(), "Remote-OPs/src/Remote/get_priv")
+		cmd := exec.Command("make", "-C", makeDir)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("failed to build %s with make -C %s: %v\nOutput: %s", payloadPath, makeDir, err, string(out))
+		}
 	}
-	defer resp.Body.Close()
 
-	payload, err := io.ReadAll(resp.Body)
+	payload, err := os.ReadFile(payloadPath)
 	if err != nil {
-		t.Fatalf("read BOF: %v", err)
-	}
-	if len(payload) == 0 {
-		t.Fatalf("downloaded empty BOF payload")
+		t.Fatalf("read BOF %s: %v", payloadPath, err)
 	}
 
 	inv := def.ResolvedInvocation{
-		Coff: &def.ResolvedCoffInvocation{ // whoami.x64.o exports main(), no args required
-			Export: "main",
+		Coff: &def.ResolvedCoffInvocation{
+			Export: "go",
 			Args:   nil,
 		},
 	}

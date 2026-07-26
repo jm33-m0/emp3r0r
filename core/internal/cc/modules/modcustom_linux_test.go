@@ -4,6 +4,7 @@ package modules
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -20,12 +21,17 @@ func TestCOFFExecutionLinux(t *testing.T) {
 	t.Run("hello_linux", func(t *testing.T) {
 		payloadPath := filepath.Join(getModulesRoot(), "hello_linux/hello_linux.o")
 		if !util.IsExist(payloadPath) {
-			t.Skipf("payload %s not found", payloadPath)
+			makeDir := filepath.Join(getModulesRoot(), "hello_linux")
+			cmd := exec.Command("make", "-C", makeDir)
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("failed to build %s with make -C %s: %v\nOutput: %s", payloadPath, makeDir, err, string(out))
+			}
 		}
 
 		payload, err := os.ReadFile(payloadPath)
 		if err != nil {
-			t.Fatalf("failed to read payload: %v", err)
+			t.Fatalf("failed to read payload %s: %v", payloadPath, err)
 		}
 
 		args := []coffloader.CoffArg{
