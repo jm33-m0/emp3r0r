@@ -56,11 +56,14 @@ func closeCheckinReadyChannel(agentUUID string) {
 // normalizeRouteFromMsgAuth interprets MsgAuth capabilities as routing information.
 // Exactly one configured route capability must be provided; no default/fallback route is allowed.
 func normalizeRouteFromMsgAuth(msg *def.MsgAuth) (c2RouteContext, error) {
+	if msg == nil {
+		return c2RouteContext{}, fmt.Errorf("msg is nil")
+	}
 	ctx := c2RouteContext{
 		AgentUUID: msg.AgentUUID,
 		StreamID:  msg.StreamID,
 	}
-	if msg == nil || len(msg.Capabilities) == 0 {
+	if len(msg.Capabilities) == 0 {
 		return ctx, fmt.Errorf("missing route capability")
 	}
 
@@ -195,7 +198,7 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 		canonical := transport.CanonicalAuthString(msgAuth.AgentUUID, msgAuth.Timestamp, msgAuth.Nonce, msgAuth.Capabilities)
 		ok, err := transport.VerifySignatureWithPEM([]byte(pinnedKey), []byte(canonical), proof)
 		if err != nil || !ok {
-			msg := fmt.Sprintf("CRITICAL: cborProtocolDispatch: pinned key verification failed for agent %s from %s (ok=%v, err=%v)", strconv.Quote(msgAuth.AgentUUID), remoteAddr, ok, err)
+			msg := fmt.Sprintf("CRITICAL: cborProtocolDispatch: pinned key verification failed for agent %s from %s (sig_ok=%v, err=%v)", strconv.Quote(msgAuth.AgentUUID), remoteAddr, ok, err)
 			logging.Errorf("%s", msg)
 			logging.Notify(logging.ERROR, "%s", msg)
 			return
