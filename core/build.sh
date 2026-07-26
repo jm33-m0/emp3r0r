@@ -689,9 +689,6 @@ build() {
   if [[ -d "$pwd/modules/hello_linux" ]]; then
     make -C "$pwd/modules/hello_linux" || warn "Failed to build hello_linux module"
   fi
-  if [[ -d "$pwd/modules/process_list_handles_linux" ]]; then
-    make -C "$pwd/modules/process_list_handles_linux" || warn "Failed to build process_list_handles_linux module"
-  fi
 }
 
 do_uninstall() {
