@@ -200,7 +200,6 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 		if err != nil || !ok {
 			msg := fmt.Sprintf("CRITICAL: cborProtocolDispatch: pinned key verification failed for agent %s from %s (sig_ok=%v, err=%v)", strconv.Quote(msgAuth.AgentUUID), remoteAddr, ok, err)
 			logging.Errorf("%s", msg)
-			logging.Notify(logging.ERROR, "%s", msg)
 			return
 		}
 		logging.Debugf("cborProtocolDispatch: pinned key verified for agent %s", strconv.Quote(msgAuth.AgentUUID))
