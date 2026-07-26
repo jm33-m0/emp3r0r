@@ -4,7 +4,7 @@
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-26",
-    "comment": "Inject emp3r0r shellcode into a target process and impersonate it.",
+    "comment": "Inject emp3r0r shellcode into a target process and impersonate it. Original implementation is from Sliver C2",
     "is_local": false,
     "platform": "Windows",
     "path": "",

