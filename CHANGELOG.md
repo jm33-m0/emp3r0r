@@ -1,5 +1,15 @@
 # Changelog
 
+## [4.7.1](https://github.com/jm33-m0/emp3r0r/compare/v4.7.0...v4.7.1) (2026-07-26)
+
+
+### Bug Fixes
+
+* implement utility functions in Go for starlark ([6d68fa5](https://github.com/jm33-m0/emp3r0r/commit/6d68fa53de20e36bd214a9795191949fe2213c6d))
+* improve panic recovery in starlark runners ([3ba7111](https://github.com/jm33-m0/emp3r0r/commit/3ba7111b2aa9398087f5c6a162cc833a55a37267))
+* starlark script syntax ([5a0174f](https://github.com/jm33-m0/emp3r0r/commit/5a0174f89634b63ac19f293b08a45f05d14a36e8))
+* translating SA BOFs into starlark ([d9a8cd0](https://github.com/jm33-m0/emp3r0r/commit/d9a8cd01892ddb53fa5dc00003f1c6854a7e6a95))
+
 ## [4.7.0](https://github.com/jm33-m0/emp3r0r/compare/v4.6.1...v4.7.0) (2026-07-24)
 
 
