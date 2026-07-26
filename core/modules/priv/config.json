@@ -1,0 +1,37 @@
+[
+  {
+    "name": "priv_getsystem",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-07-26",
+    "comment": "Get SYSTEM from a high trustlevel. New session will be created via shellcode injection.",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "pid",
+        "description": "Hosting process that already runs as system (e.g. spoolsv.exe)",
+        "default": "0",
+        "type": "int",
+        "required": true
+      },
+      {
+        "name": "payload",
+        "description": "Shellcode payload filename to download via agent.fetch_file",
+        "default": "",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "agent_config": {
+      "exec": "get_system.star",
+      "files": ["get_system.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {}
+  }
+]
