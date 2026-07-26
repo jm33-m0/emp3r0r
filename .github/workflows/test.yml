@@ -52,8 +52,8 @@ jobs:
           CGO_ENABLED: 1
           EMP3R0R_RACE_ON: "0"
         run: |
-          go test -v ./lib/coffloader -run TestRunLinuxCOFFWithInlineBOF -count=1
-          go test -v ./internal/cc/modules -run TestCOFF
+          go test -v ./lib/coffloader -count=1
+          go test -v ./internal/cc/modules -count=1
 
       - name: Install zig (for shellcode stager test)
         if: runner.os == 'Linux'
@@ -97,6 +97,7 @@ jobs:
         env:
           EMP3R0R_RACE_ON: "0"
         run: |
+          go test -v -gcflags="all=-d=checkptr=0" ./lib/coffloader -count=1
           go test -v -gcflags="all=-d=checkptr=0" ./internal/agent/modules/...
           go test -v -gcflags="all=-d=checkptr=0" ./internal/cc/modules/...
 

@@ -475,7 +475,7 @@ func TestAllStarlarkModules(t *testing.T) {
 			}
 
 			// 2. Execute script on supported platform
-			if runtime.GOOS == "windows" && (strings.Contains(path, "priv_starlark") || strings.Contains(path, "sa_starlark")) {
+			if runtime.GOOS == "windows" && (strings.Contains(path, "priv_starlark") || strings.Contains(path, "starlark_SA") || strings.Contains(path, "sa_starlark")) {
 				out, err := Run(data, []string{"1"}, nil)
 				if err != nil {
 					t.Errorf("error running %s on windows: %v", relPath, err)

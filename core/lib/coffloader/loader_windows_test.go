@@ -1,14 +1,15 @@
 //go:build windows
-// +build windows
 
 package coffloader
 
 import (
-	"io"
-	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func TestNormalizeCoffValuePrefixes(t *testing.T) {
@@ -75,7 +76,6 @@ func TestLoadWithMethodPanicRecover(t *testing.T) {
 }
 
 func TestLoadWithMethodMemoryError(t *testing.T) {
-	// Construct a COFF binary with out-of-bounds relocation symbol index that produces a memory error if unhandled
 	buf := make([]byte, 0, 200)
 
 	// Machine AMD64 (0x8664)
@@ -151,28 +151,61 @@ func TestRunWindowsCOFFWithRealBOF(t *testing.T) {
 		t.Skip("skipped under race run (EMP3R0R_RACE_ON=1)")
 	}
 
-	// Non-privileged BOF to avoid admin requirement
-	const url = "https://github.com/chvancooten/goffloader/raw/refs/heads/main/cmd/bof_example/whoami.x64.o"
-	resp, err := http.Get(url)
-	if err != nil {
-		t.Fatalf("download BOF: %v", err)
-	}
-	defer resp.Body.Close()
+	t.Run("get_priv", func(t *testing.T) {
+		payloadPath := filepath.Join("../../modules/Remote-OPs/src/Remote/get_priv/get_priv.x64.o")
+		if !util.IsExist(payloadPath) {
+			makeDir := filepath.Join("../../modules/Remote-OPs/src/Remote/get_priv")
+			cmd := exec.Command("make", "-C", makeDir)
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("failed to build %s with make -C %s: %v\nOutput: %s", payloadPath, makeDir, err, string(out))
+			}
+		}
 
-	payload, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("read BOF: %v", err)
-	}
-	if len(payload) == 0 {
-		t.Fatalf("downloaded empty BOF payload")
-	}
+		payload, err := os.ReadFile(payloadPath)
+		if err != nil {
+			t.Fatalf("read BOF %s: %v", payloadPath, err)
+		}
 
-	out, err := RunWindowsCOFF(payload, "main", nil)
-	if err != nil {
-		t.Fatalf("RunWindowsCOFF failed: %v", err)
-	}
+		out, err := RunWindowsCOFF(payload, "go", nil)
+		if err != nil {
+			t.Fatalf("RunWindowsCOFF failed: %v", err)
+		}
 
-	if strings.TrimSpace(out) == "" {
-		t.Fatalf("unexpected empty BOF output")
-	}
+		if strings.TrimSpace(out) == "" {
+			t.Fatalf("unexpected empty BOF output")
+		}
+	})
+
+	t.Run("sc_description", func(t *testing.T) {
+		payloadPath := filepath.Join("../../modules/Remote-OPs/src/Remote/sc_description/sc_description.x64.o")
+		if !util.IsExist(payloadPath) {
+			makeDir := filepath.Join("../../modules/Remote-OPs/src/Remote/sc_description")
+			cmd := exec.Command("make", "-C", makeDir)
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("failed to build %s with make -C %s: %v\nOutput: %s", payloadPath, makeDir, err, string(out))
+			}
+		}
+
+		payload, err := os.ReadFile(payloadPath)
+		if err != nil {
+			t.Fatalf("read BOF %s: %v", payloadPath, err)
+		}
+
+		args := []CoffArg{
+			{WireType: "z", Value: ""},
+			{WireType: "z", Value: "test_service"},
+			{WireType: "z", Value: "test_description"},
+		}
+
+		out, err := RunWindowsCOFF(payload, "go", args)
+		if err != nil {
+			t.Fatalf("RunWindowsCOFF failed: %v", err)
+		}
+
+		if strings.TrimSpace(out) == "" {
+			t.Fatalf("unexpected empty BOF output")
+		}
+	})
 }

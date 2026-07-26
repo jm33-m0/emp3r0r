@@ -210,7 +210,6 @@ func DownloadViaC2(config *def.Config, file_to_download, path, checksum string) 
 		return nil, fmt.Errorf("DownloadViaC2 write: %v", err)
 	}
 	return nil, nil
-	return nil, nil
 }
 
 // SendFile2CC send file to CC, with buffering

@@ -1034,7 +1034,7 @@ func TestCOFFArgParsingAllModules(t *testing.T) {
 }
 
 func TestStarlarkArgParsing(t *testing.T) {
-	configPath := filepath.Join(getModulesRoot(), "sa_starlark/config.json")
+	configPath := filepath.Join(getModulesRoot(), "starlark_SA/config.json")
 	if !util.IsExist(configPath) {
 		t.Skipf("config %s not found", configPath)
 	}
