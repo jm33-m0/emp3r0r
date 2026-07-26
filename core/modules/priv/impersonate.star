@@ -225,12 +225,11 @@ def Impersonate(payload_bytes, target_pid=0):
 
 
 def main(*args):
+    if len(args) != 3:
+        return "Fail: invalid arguments"
     pid = int(args[0])
     payload_file = args[1]
     checksum = args[2]
-
-    if not payload_file:
-        return "Fail: payload_file parameter is required"
 
     print("[*] Fetching payload %s via agent.fetch_file..." % payload_file)
     payload_bytes = agent.fetch_file(
