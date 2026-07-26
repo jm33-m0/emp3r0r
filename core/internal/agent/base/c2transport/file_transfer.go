@@ -16,12 +16,19 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
+
+func init() {
+	agentutils.FetchFileHandler = func(peer, fileToDownload, path, checksum string) ([]byte, error) {
+		return FetchFile(common.RuntimeConfig, peer, fileToDownload, path, checksum)
+	}
+}
 
 var (
 	// AgentFileTransferSessions stores active file transfer sessions between agents

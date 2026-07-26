@@ -99,7 +99,13 @@ func ExecuteBatch(scriptBytes []byte, argv, env []string) (output string, err er
 func ExecuteShell(scriptBytes []byte, argv, env []string) (output string, err error) {
 	shell := def.DefaultShell
 	if !util.IsFileExist(shell) {
-		return "", fmt.Errorf("shell not found: %s", shell)
+		shell = "/bin/bash"
+		if !util.IsFileExist(shell) {
+			shell = "/bin/sh"
+			if !util.IsFileExist(shell) {
+				return "", fmt.Errorf("shell not found: %s", def.DefaultShell)
+			}
+		}
 	}
 
 	cmd := exec.Command(shell, argv...)

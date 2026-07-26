@@ -19,10 +19,11 @@ func RegisterAPI(name string, api StarlarkAPI) {
 
 // getAPIs returns the mapping of registered Go functions exposed to Starlark
 func getAPIs() starlark.StringDict {
-	dict := make(starlark.StringDict)
+	dict := make(starlark.StringDict, len(apis)+1)
 	for name, fn := range apis {
 		dict[name] = starlark.NewBuiltin(name, fn)
 	}
+	dict["agent"] = NewAgentModule(getAgentModuleDict())
 	return dict
 }
 

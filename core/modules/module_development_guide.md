@@ -383,3 +383,23 @@ All memory reading primitives safely access unmanaged memory addresses across Wi
 #### F. Predeclared Global Variables
 
 - **`argv`**: List of string arguments passed to the script execution thread.
+
+#### G. Agent Interop & Proxy APIs (`agent.*` / `agent_*`)
+
+| API Function / Method                             | Parameters                  | Description                                                                                                       |
+| :------------------------------------------------ | :-------------------------- | :---------------------------------------------------------------------------------------------------------------- |
+| `agent.sys_info` / `agent_sys_info`               | `()`                        | Returns a dictionary containing system details (`tag`, `uuid`, `os`, `user`, `has_root`, `process`, `cwd`, etc.). |
+| `agent.uptime` / `agent_uptime`                   | `()`                        | Returns target system uptime string.                                                                              |
+| `agent.user` / `agent_user`                       | `()`                        | Returns dictionary with `user` and `groups` strings.                                                              |
+| `agent.container` / `agent_container`             | `()`                        | Returns container runtime environment if running inside a container, or empty string.                             |
+| `agent.has_root` / `agent_has_root`               | `()`                        | Returns `True` if running with root privileges, `False` otherwise.                                                |
+| `agent.exec_shell` / `agent_exec_shell`           | `(script, args=[], env=[])` | Executes shell script in memory.                                                                                  |
+| `agent.exec_python` / `agent_exec_python`         | `(script, args=[], env=[])` | Executes Python script in memory.                                                                                 |
+| `agent.exec_powershell` / `agent_exec_powershell` | `(script, args=[], env=[])` | Executes PowerShell script in memory on Windows targets.                                                          |
+| `agent.exec_batch` / `agent_exec_batch`           | `(script, args=[], env=[])` | Executes Batch script in memory on Windows targets.                                                               |
+| `agent.sign` / `agent_sign`                       | `(data)`                    | Signs data string or bytes with agent's ephemeral private key.                                                    |
+| `agent.tag` / `agent_tag`                         | `()`                        | Returns agent tag string.                                                                                         |
+| `agent.uuid` / `agent_uuid`                       | `()`                        | Returns agent UUID string.                                                                                        |
+| `agent.touch_file` / `agent_touch_file`           | `(path)`                                                                   | Restores/synchronizes timestamps on target file.                                                                  |
+| `agent.fetch_file` / `agent_fetch_file`           | `(file_to_download, peer="", path="", checksum="")`                        | Downloads file via memfs/P2P/C2 pipeline. Returns bytes if `path` is empty, or saves to `path`.                 |
+

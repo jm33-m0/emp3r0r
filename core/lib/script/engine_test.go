@@ -530,3 +530,173 @@ func TestAllStarlarkModules(t *testing.T) {
 		})
 	}
 }
+
+func TestAgentProxyAPIs(t *testing.T) {
+	origProxy := GetAgentProxy()
+	defer SetAgentProxy(origProxy)
+	SetAgentProxy(&testMockAgentProxy{})
+
+	script := `
+def main(*args):
+    # Test agent.sys_info() and agent_sys_info()
+    info = agent.sys_info()
+    if "goos" not in info or "user" not in info or "cwd" not in info:
+        return "Fail: missing sys_info keys"
+    
+    info2 = agent_sys_info()
+    if info2["goos"] != info["goos"]:
+        return "Fail: agent_sys_info mismatch"
+
+    # Test uptime
+    up = agent.uptime()
+    if agent_uptime() != up:
+        return "Fail: agent_uptime mismatch"
+    print("Uptime: " + up)
+
+    # Test user & groups
+    user_info = agent.user()
+    if "user" not in user_info or "groups" not in user_info:
+        return "Fail: agent.user missing keys"
+
+    # Test container check
+    container = agent.container()
+    print("Container: " + container)
+
+    # Test root check
+    is_root = agent.has_root()
+    if agent_has_root() != is_root or agent_is_root() != is_root or agent.is_root() != is_root:
+        return "Fail: root status mismatch"
+    print("IsRoot: " + str(is_root))
+
+    # Test exec_shell
+    out = agent.exec_shell("echo hello_agent_proxy")
+    if "hello_agent_proxy" not in out:
+        return "Fail: exec_shell output mismatch: " + out
+    
+    out2 = agent_exec_shell("echo hello_top_level")
+    if "hello_top_level" not in out2:
+        return "Fail: agent_exec_shell output mismatch: " + out2
+
+    return "OK"
+`
+	out, err := Run([]byte(script), nil, nil)
+	if err != nil {
+		t.Fatalf("Run agent proxy script failed: %v", err)
+	}
+	if !strings.Contains(out, "Uptime: ") || !strings.Contains(out, "OK") {
+		t.Errorf("expected Uptime and OK in output, got: %q", out)
+	}
+}
+
+type testMockAgentProxy struct{}
+
+func (m *testMockAgentProxy) GatherSystemDetails() (map[string]any, error) {
+	return map[string]any{
+		"goos": "linux",
+		"user": "testuser",
+		"cwd":  "/tmp",
+	}, nil
+}
+
+func (m *testMockAgentProxy) GetUptime() string {
+	return "mocked 100 days"
+}
+
+func (m *testMockAgentProxy) GetUserAndGroups() (string, string) {
+	return "testuser", "testgroup"
+}
+
+func (m *testMockAgentProxy) GetContainerName() string {
+	return "none"
+}
+
+func (m *testMockAgentProxy) HasRoot() bool {
+	return false
+}
+
+func (m *testMockAgentProxy) ExecuteShell(scriptBytes []byte, argv, env []string) (string, error) {
+	return "mock shell: " + string(scriptBytes), nil
+}
+
+func (m *testMockAgentProxy) ExecutePython(scriptBytes []byte, argv, env []string) (string, error) {
+	return "mock python: " + string(scriptBytes), nil
+}
+
+func (m *testMockAgentProxy) ExecutePowerShell(scriptBytes []byte, argv, env []string) (string, error) {
+	return "mock powershell: " + string(scriptBytes), nil
+}
+
+func (m *testMockAgentProxy) ExecuteBatch(scriptBytes []byte, argv, env []string) (string, error) {
+	return "mock batch: " + string(scriptBytes), nil
+}
+
+func (m *testMockAgentProxy) SignWithAgentKey(data []byte) ([]byte, error) {
+	return append([]byte("SIGNED:"), data...), nil
+}
+
+func (m *testMockAgentProxy) GetTag() string {
+	return "test-agent-tag"
+}
+
+func (m *testMockAgentProxy) GetUUID() string {
+	return "test-agent-uuid"
+}
+
+func (m *testMockAgentProxy) TouchFile(path string) error {
+	return nil
+}
+
+func (m *testMockAgentProxy) CopyFileTimes(src, dst string) error {
+	return nil
+}
+
+func (m *testMockAgentProxy) FetchFile(peer, fileToDownload, path, checksum string) ([]byte, error) {
+	if path != "" {
+		return nil, nil
+	}
+	return []byte("fetched:" + fileToDownload), nil
+}
+
+func TestCustomAgentProxy(t *testing.T) {
+	origProxy := GetAgentProxy()
+	defer SetAgentProxy(origProxy)
+
+	SetAgentProxy(&testMockAgentProxy{})
+
+	script := `
+def main(*args):
+    up = agent.uptime()
+    if up != "mocked 100 days":
+        return "Fail: custom uptime expected 'mocked 100 days', got: " + up
+
+    tag = agent.tag()
+    if tag != "test-agent-tag":
+        return "Fail: custom tag mismatch: " + tag
+
+    uuid = agent.uuid()
+    if uuid != "test-agent-uuid":
+        return "Fail: custom uuid mismatch: " + uuid
+
+    sig = agent.sign("hello")
+    if str(sig) != "SIGNED:hello":
+        return "Fail: custom sign mismatch: " + str(sig)
+
+    sh = agent.exec_shell("echo hello_agent_proxy")
+    if sh != "mock shell: echo hello_agent_proxy":
+        return "Fail: custom exec_shell mismatch: " + sh
+
+    fetched = agent.fetch_file("test.bin")
+    if str(fetched) != "fetched:test.bin":
+        return "Fail: custom fetch_file mismatch: " + str(fetched)
+
+    return "OK"
+`
+	out, err := Run([]byte(script), nil, nil)
+	if err != nil {
+		t.Fatalf("Run custom agent proxy script failed: %v", err)
+	}
+	if !strings.Contains(out, "OK") {
+		t.Errorf("expected OK from custom proxy script, got: %q", out)
+	}
+}
+
