@@ -383,23 +383,141 @@ All memory reading primitives safely access unmanaged memory addresses across Wi
 #### F. Predeclared Global Variables
 
 - **`argv`**: List of string arguments passed to the script execution thread.
+- **`current_token`**: Returns a `HANDLE` (as integer) to the current effective token. On Windows this tries the thread token first (so impersonation is visible), then falls back to the process token. Returns `0` on failure. **The caller must close the handle** with `win_call("kernel32.dll", "CloseHandle", h)`.
+
+---
+
+## 6. Token Impersonation (Windows)
+
+emp3r0r supports stealing Windows access tokens from running processes and using them to impersonate users during module execution. This section explains how tokens flow through the system and how to write token-aware modules.
+
+### 6.1 Built-in Token Commands
+
+| Command                    | Description                                                                                                                 |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `!steal_token --pid <PID>` | Steal the primary token from a process and cache it. Enables `SeDebugPrivilege` and `SeImpersonatePrivilege` automatically. |
+| `!list_tokens`             | List all cached tokens (DOMAIN\\User + SID).                                                                                |
+
+Every module registered via `config.json` automatically receives a `--token <SID>` parameter. When the operator sets this to a SID from `!list_tokens`, the module runs under that stolen identity.
+
+### 6.2 How Token Impersonation Works
+
+```
+ModuleHandler
+  executeWithToken(sid, func(token uintptr) error {
+    // token = raw HANDLE from TokenMap, or 0 if no token set
+    ...
+  })
+```
+
+For **starlark modules**, each I/O builtin wraps itself with `runWithToken`:
+
+```
+starlarkReadFile(thread, ...)
+  runWithToken(thread, func() error {
+    1. LockOSThread()
+    2. NtSetInformationThread(ThreadImpersonationToken)  ← indirect syscall
+    3. os.ReadFile(path)     ← file opened with stolen identity
+    4. NtSetInformationThread(nil)   ← revert
+    5. UnlockOSThread()
+  })
+```
+
+This means **every** `read_file`, `write_file`, `list_dir`, `exists`, `mkdir`, `remove`, `win_call`, `win_alloc`, `win_free`, `win_read_mem`, `http_get`, `http_post` and `exec_cmd` call automatically runs under the stolen token when one is assigned. No extra code is needed in the starlark script.
+
+### 6.3 Using `current_token()` in Starlark Scripts
+
+When a script needs to inspect the effective identity (e.g. for whoami-style output or to pass the token to a Win32 API that requires a token handle), use the `current_token()` builtin:
+
+```python
+def example_whoami():
+    TOKEN_QUERY = 0x0008
+
+    # Returns a handle to the current effective token.
+    # If a token was stolen and assigned to this module, this IS the stolen token.
+    h_token = current_token()
+    if h_token == 0:
+        print("[-] Failed to open current token")
+        return
+
+    # Query token information (example: TokenUser)
+    TOKEN_INFORMATION_CLASS_TokenUser = 1
+    req_size_ptr = win_alloc(4)
+    win_call("advapi32.dll", "GetTokenInformation", h_token,
+             TOKEN_INFORMATION_CLASS_TokenUser, 0, 0, req_size_ptr)
+    req_size = read_uint32(req_size_ptr, 0)
+
+    token_user_buf = win_alloc(req_size)
+    win_call("advapi32.dll", "GetTokenInformation", h_token,
+             TOKEN_INFORMATION_CLASS_TokenUser, token_user_buf, req_size, req_size_ptr)
+
+    # ... parse TOKEN_USER, resolve SID, etc.
+
+    # Always close the handle when done.
+    win_call("kernel32.dll", "CloseHandle", h_token)
+```
+
+> **Important**: Always `CloseHandle` the token handle returned by `current_token()`. Each call returns a new handle.
+
+### 6.4 Token-Aware Script Examples
+
+See these reference implementations:
+
+| Script                                  | What it demonstrates                                                          |
+| --------------------------------------- | ----------------------------------------------------------------------------- |
+| `core/modules/SA/whoami.star`           | Full token inspection: user, groups, privileges. Thread-token-first fallback. |
+| `core/modules/priv/impersonate.star`    | Enabling privileges on the effective token, remote process injection.         |
+| `core/modules/SA/get_dpapi_system.star` | Checking token elevation before attempting LSA secret extraction.             |
+
+### 6.5 COFF (BOF) Modules and Tokens
+
+COFF/BOF payloads run in-process on a dedicated goroutine. When a token is assigned:
+
+1. The token handle is stored before the BOF goroutine starts.
+2. `PreExecHook` fires on the BOF goroutine: `LockOSThread` + `NtSetInformationThread(token)`.
+3. The BOF entry point (`syscall.SyscallN`) executes — any Win32 APIs called by the BOF see the impersonated identity.
+4. `PostExecHook` fires: `NtSetInformationThread(nil)` + `UnlockOSThread`.
+
+No changes are needed in the BOF source code.
+
+### 6.6 Limitations
+
+| Module type    | Token support | Notes                                                                                                   |
+| -------------- | ------------- | ------------------------------------------------------------------------------------------------------- |
+| **starlark**   | Full          | Every I/O builtin impersonates independently. `exec_cmd` spawns children via `CreateProcessWithTokenW`. |
+| **coff (BOF)** | Full          | Pre/post-exec hooks impersonate the BOF goroutine.                                                      |
+| **powershell** | None          | `exec.Command` cannot use thread tokens. A warning is logged if a token is assigned.                    |
+| **bash**       | None          | Same limitation as powershell.                                                                          |
+| **python**     | None          | Same limitation as powershell.                                                                          |
+
+> **Recommendation**: Use **starlark modules** for any token-aware operations. The starlark `win_call` builtin gives you direct access to the full Win32 API under the stolen identity.
+
+### 6.7 Privilege Requirements
+
+`!steal_token` automatically enables:
+
+- `SeDebugPrivilege` — required to open handles to most processes (especially SYSTEM-level).
+- `SeImpersonatePrivilege` — required to set thread tokens and spawn children via `CreateProcessWithTokenW`.
+
+If the agent does not hold these privileges (e.g. running as a low-privilege user), warnings are logged and token operations will fail with `STATUS_ACCESS_DENIED`.
+
+---
 
 #### G. Agent Interop & Proxy APIs (`agent.*` / `agent_*`)
 
-| API Function / Method                             | Parameters                  | Description                                                                                                       |
-| :------------------------------------------------ | :-------------------------- | :---------------------------------------------------------------------------------------------------------------- |
-| `agent.sys_info` / `agent_sys_info`               | `()`                        | Returns a dictionary containing system details (`tag`, `uuid`, `os`, `user`, `has_root`, `process`, `cwd`, etc.). |
-| `agent.uptime` / `agent_uptime`                   | `()`                        | Returns target system uptime string.                                                                              |
-| `agent.user` / `agent_user`                       | `()`                        | Returns dictionary with `user` and `groups` strings.                                                              |
-| `agent.container` / `agent_container`             | `()`                        | Returns container runtime environment if running inside a container, or empty string.                             |
-| `agent.has_root` / `agent_has_root`               | `()`                        | Returns `True` if running with root privileges, `False` otherwise.                                                |
-| `agent.exec_shell` / `agent_exec_shell`           | `(script, args=[], env=[])` | Executes shell script in memory.                                                                                  |
-| `agent.exec_python` / `agent_exec_python`         | `(script, args=[], env=[])` | Executes Python script in memory.                                                                                 |
-| `agent.exec_powershell` / `agent_exec_powershell` | `(script, args=[], env=[])` | Executes PowerShell script in memory on Windows targets.                                                          |
-| `agent.exec_batch` / `agent_exec_batch`           | `(script, args=[], env=[])` | Executes Batch script in memory on Windows targets.                                                               |
-| `agent.sign` / `agent_sign`                       | `(data)`                    | Signs data string or bytes with agent's ephemeral private key.                                                    |
-| `agent.tag` / `agent_tag`                         | `()`                        | Returns agent tag string.                                                                                         |
-| `agent.uuid` / `agent_uuid`                       | `()`                        | Returns agent UUID string.                                                                                        |
-| `agent.touch_file` / `agent_touch_file`           | `(path)`                                                                   | Restores/synchronizes timestamps on target file.                                                                  |
-| `agent.fetch_file` / `agent_fetch_file`           | `(file_to_download, peer="", path="", checksum="")`                        | Downloads file via memfs/P2P/C2 pipeline. Returns bytes if `path` is empty, or saves to `path`.                 |
-
+| API Function / Method                             | Parameters                                          | Description                                                                                                       |
+| :------------------------------------------------ | :-------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------- |
+| `agent.sys_info` / `agent_sys_info`               | `()`                                                | Returns a dictionary containing system details (`tag`, `uuid`, `os`, `user`, `has_root`, `process`, `cwd`, etc.). |
+| `agent.uptime` / `agent_uptime`                   | `()`                                                | Returns target system uptime string.                                                                              |
+| `agent.user` / `agent_user`                       | `()`                                                | Returns dictionary with `user` and `groups` strings.                                                              |
+| `agent.container` / `agent_container`             | `()`                                                | Returns container runtime environment if running inside a container, or empty string.                             |
+| `agent.has_root` / `agent_has_root`               | `()`                                                | Returns `True` if running with root privileges, `False` otherwise.                                                |
+| `agent.exec_shell` / `agent_exec_shell`           | `(script, args=[], env=[])`                         | Executes shell script in memory.                                                                                  |
+| `agent.exec_python` / `agent_exec_python`         | `(script, args=[], env=[])`                         | Executes Python script in memory.                                                                                 |
+| `agent.exec_powershell` / `agent_exec_powershell` | `(script, args=[], env=[])`                         | Executes PowerShell script in memory on Windows targets.                                                          |
+| `agent.exec_batch` / `agent_exec_batch`           | `(script, args=[], env=[])`                         | Executes Batch script in memory on Windows targets.                                                               |
+| `agent.sign` / `agent_sign`                       | `(data)`                                            | Signs data string or bytes with agent's ephemeral private key.                                                    |
+| `agent.tag` / `agent_tag`                         | `()`                                                | Returns agent tag string.                                                                                         |
+| `agent.uuid` / `agent_uuid`                       | `()`                                                | Returns agent UUID string.                                                                                        |
+| `agent.touch_file` / `agent_touch_file`           | `(path)`                                            | Restores/synchronizes timestamps on target file.                                                                  |
+| `agent.fetch_file` / `agent_fetch_file`           | `(file_to_download, peer="", path="", checksum="")` | Downloads file via memfs/P2P/C2 pipeline. Returns bytes if `path` is empty, or saves to `path`.                   |
