@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	emp3r0rSyscall "github.com/jm33-m0/emp3r0r/core/lib/syscall"
 	"go.starlark.net/starlark"
 	"go.starlark.net/syntax"
 )
@@ -531,6 +532,33 @@ func TestAllStarlarkModules(t *testing.T) {
 	}
 }
 
+func TestCurrentTokenWithoutSyscallTable(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("windows-only test")
+	}
+
+	origTable := emp3r0rSyscall.RuntimeSyscallTable
+	emp3r0rSyscall.RuntimeSyscallTable = nil
+	t.Cleanup(func() {
+		emp3r0rSyscall.RuntimeSyscallTable = origTable
+	})
+
+	script := `
+def main(*args):
+    h = current_token()
+    if h != 0:
+        return "Fail: expected 0 token when syscall table is unavailable"
+    return "OK"
+`
+	out, err := Run([]byte(script), nil, nil, 0)
+	if err != nil {
+		t.Fatalf("Run current_token script failed: %v", err)
+	}
+	if !strings.Contains(out, "OK") {
+		t.Errorf("expected OK in output, got: %q", out)
+	}
+}
+
 func TestAgentProxyAPIs(t *testing.T) {
 	origProxy := GetAgentProxy()
 	defer SetAgentProxy(origProxy)
@@ -699,4 +727,3 @@ def main(*args):
 		t.Errorf("expected OK from custom proxy script, got: %q", out)
 	}
 }
-
