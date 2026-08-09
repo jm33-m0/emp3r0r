@@ -9,7 +9,23 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// ensureTable sets syscall.RuntimeSyscallTable if it is not already
+// initialized, so that functions relying on the global (Whoami,
+// EnablePrivilege, ExecuteAsToken, GetTokenUserSid, etc.) work in tests.
+func ensureTable(t *testing.T) {
+	t.Helper()
+	if syscall.RuntimeSyscallTable != nil {
+		return
+	}
+	table, err := syscall.InitializeSyscallTable()
+	if err != nil {
+		t.Fatalf("InitializeSyscallTable failed: %v", err)
+	}
+	syscall.RuntimeSyscallTable = table
+}
+
 func TestWhoami(t *testing.T) {
+	ensureTable(t)
 	out, err := Whoami()
 	if err != nil {
 		t.Fatalf("Whoami failed: %v", err)
@@ -21,6 +37,7 @@ func TestWhoami(t *testing.T) {
 }
 
 func TestGetTokenUserSid(t *testing.T) {
+	ensureTable(t)
 	var token windows.Token
 	err := windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_QUERY, &token)
 	if err != nil {
@@ -39,6 +56,7 @@ func TestGetTokenUserSid(t *testing.T) {
 }
 
 func TestGetTokenIntegrityLevel(t *testing.T) {
+	ensureTable(t)
 	var token windows.Token
 	err := windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_QUERY, &token)
 	if err != nil {
@@ -54,6 +72,7 @@ func TestGetTokenIntegrityLevel(t *testing.T) {
 }
 
 func TestGetTokenPrivileges(t *testing.T) {
+	ensureTable(t)
 	var token windows.Token
 	err := windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_QUERY, &token)
 	if err != nil {
@@ -69,19 +88,15 @@ func TestGetTokenPrivileges(t *testing.T) {
 }
 
 func TestDuplicateSystemTokenAndExecute(t *testing.T) {
-	table, err := syscall.InitializeSyscallTable()
-	if err != nil {
-		t.Fatalf("InitializeSyscallTable failed: %v", err)
-	}
-
+	ensureTable(t)
 	var token windows.Token
-	err = windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_QUERY|windows.TOKEN_DUPLICATE, &token)
+	err := windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_QUERY|windows.TOKEN_DUPLICATE, &token)
 	if err != nil {
 		t.Fatalf("OpenProcessToken failed: %v", err)
 	}
 	defer token.Close()
 
-	hDupToken, err := DuplicateSystemToken(table, windows.Handle(token))
+	hDupToken, err := DuplicateSystemToken(syscall.RuntimeSyscallTable, windows.Handle(token))
 	if err != nil {
 		t.Fatalf("DuplicateSystemToken failed: %v", err)
 	}
@@ -106,14 +121,10 @@ func TestDuplicateSystemTokenAndExecute(t *testing.T) {
 }
 
 func TestStealTokenCurrentProcess(t *testing.T) {
-	table, err := syscall.InitializeSyscallTable()
-	if err != nil {
-		t.Fatalf("InitializeSyscallTable failed: %v", err)
-	}
-
+	ensureTable(t)
 	currentPID := windows.GetCurrentProcessId()
 
-	hToken, err := StealToken(table, currentPID)
+	hToken, err := StealToken(syscall.RuntimeSyscallTable, currentPID)
 	if err != nil {
 		t.Fatalf("StealToken for current process failed: %v", err)
 	}
