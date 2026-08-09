@@ -25,7 +25,7 @@ import (
 )
 
 // RunLinuxCOFF executes an x86_64 ELF BOF payload on Linux using the Beacon arg format.
-func RunLinuxCOFF(payload []byte, export string, args []CoffArg) (string, error) {
+func RunLinuxCOFF(payload []byte, export string, args []CoffArg, _ uintptr) (string, error) {
 	// Lock OS thread for safety with signal handling (setjmp/longjmp)
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()

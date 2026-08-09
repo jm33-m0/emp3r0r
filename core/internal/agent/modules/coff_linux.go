@@ -10,7 +10,7 @@ import (
 )
 
 // runCOFFModule executes a BOF payload on Linux.
-func runCOFFModule(payload []byte, invocation def.ResolvedInvocation) (out string, err error) {
+func runCOFFModule(payload []byte, invocation def.ResolvedInvocation, token uintptr) (out string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("runCOFFModule panic: %v", r)
@@ -27,5 +27,5 @@ func runCOFFModule(payload []byte, invocation def.ResolvedInvocation) (out strin
 		args = append(args, coffloader.CoffArg{WireType: a.WireType, Value: a.Value})
 	}
 
-	return coffloader.RunLinuxCOFF(payload, invocation.Coff.Export, args)
+	return coffloader.RunLinuxCOFF(payload, invocation.Coff.Export, args, token)
 }

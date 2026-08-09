@@ -10,7 +10,8 @@ import (
 )
 
 // runCOFFModule executes a COFF/BOF payload using goffloader on Windows.
-func runCOFFModule(payload []byte, invocation def.ResolvedInvocation) (out string, err error) {
+// If token is non-zero, the BOF entry point runs under impersonation.
+func runCOFFModule(payload []byte, invocation def.ResolvedInvocation, token uintptr) (out string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("runCOFFModule panic: %v", r)
@@ -27,5 +28,5 @@ func runCOFFModule(payload []byte, invocation def.ResolvedInvocation) (out strin
 		args = append(args, coffloader.CoffArg{WireType: a.WireType, Value: a.Value})
 	}
 
-	return coffloader.RunWindowsCOFF(payload, invocation.Coff.Export, args)
+	return coffloader.RunWindowsCOFF(payload, invocation.Coff.Export, args, token)
 }

@@ -93,9 +93,9 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 		}
 		return out
 	case "coff":
-		err = executeWithToken(invocation.Token, func(_ uintptr) error {
+		err = executeWithToken(invocation.Token, func(token uintptr) error {
 			var execErr error
-			out, execErr = runCOFFModule(payload_data, invocation)
+			out, execErr = runCOFFModule(payload_data, invocation, token)
 			if execErr != nil {
 				out = logging.Sprintf("running COFF module: %v", execErr)
 			}

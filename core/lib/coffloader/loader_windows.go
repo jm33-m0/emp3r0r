@@ -9,7 +9,18 @@ import (
 
 // RunWindowsCOFF executes a COFF/BOF payload using goffloader on Windows.
 // Export is accepted for parity, but goffloader determines the entry from the object itself.
-func RunWindowsCOFF(payload []byte, _ string, args []CoffArg) (out string, err error) {
+// If token is non-zero the BOF entry point runs under impersonation via PreExecHook / PostExecHook.
+func RunWindowsCOFF(payload []byte, _ string, args []CoffArg, token uintptr) (out string, err error) {
+	// Publish token so invokeMethod's goroutine can read it.
+	activeTokenMu.Lock()
+	activeToken = token
+	activeTokenMu.Unlock()
+	defer func() {
+		activeTokenMu.Lock()
+		activeToken = 0
+		activeTokenMu.Unlock()
+	}()
+
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("coff loader panic: %v", r)

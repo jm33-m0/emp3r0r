@@ -8,6 +8,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 )
 
-func runCOFFModule(_ []byte, _ def.ResolvedInvocation) (string, error) {
+func runCOFFModule(_ []byte, _ def.ResolvedInvocation, _ uintptr) (string, error) {
 	return "", fmt.Errorf("COFF modules are supported on Windows or Linux agents")
 }
