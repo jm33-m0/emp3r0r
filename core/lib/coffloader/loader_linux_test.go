@@ -56,7 +56,7 @@ void go(char *args, int size) { datap p; BeaconDataParse(&p, args, size); int id
 		{WireType: "LPSTR", Value: "Alice"},
 	}
 
-	out, err := RunLinuxCOFF(payload, "go", args)
+	out, err := RunLinuxCOFF(payload, "go", args, 0)
 	if err != nil {
 		t.Fatalf("RunLinuxCOFF failed: %v", err)
 	}
@@ -111,7 +111,7 @@ func TestHelloLinuxBOF(t *testing.T) {
 		args := []CoffArg{
 			{WireType: "S", Value: "Unit Tester"},
 		}
-		out, err := RunLinuxCOFF(payload, "go", args)
+		out, err := RunLinuxCOFF(payload, "go", args, 0)
 		if err != nil {
 			t.Fatalf("RunLinuxCOFF failed: %v", err)
 		}
@@ -126,7 +126,7 @@ func TestHelloLinuxBOF(t *testing.T) {
 		args := []CoffArg{
 			{WireType: "S", Value: ""},
 		}
-		out, err := RunLinuxCOFF(payload, "go", args)
+		out, err := RunLinuxCOFF(payload, "go", args, 0)
 		if err != nil {
 			t.Fatalf("RunLinuxCOFF failed: %v", err)
 		}
@@ -179,7 +179,7 @@ func TestZigCompiledBOF(t *testing.T) {
 	args_coff := []CoffArg{
 		{WireType: "S", Value: "Zig Tester"},
 	}
-	out, err := RunLinuxCOFF(payload, "go", args_coff)
+	out, err := RunLinuxCOFF(payload, "go", args_coff, 0)
 	if err != nil {
 		t.Fatalf("RunLinuxCOFF failed with Zig-compiled object: %v", err)
 	}

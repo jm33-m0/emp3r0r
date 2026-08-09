@@ -64,7 +64,7 @@ func TestNormalizeCoffValuePrefixes(t *testing.T) {
 
 func TestRunWindowsCOFFInvalidPayload(t *testing.T) {
 	inv := []CoffArg{{WireType: "LPSTR", Value: "hello"}}
-	if _, err := RunWindowsCOFF([]byte("not-a-coff"), "main", inv); err == nil {
+	if _, err := RunWindowsCOFF([]byte("not-a-coff"), "main", inv, 0); err == nil {
 		t.Fatalf("expected error for invalid COFF payload")
 	}
 }
@@ -167,7 +167,7 @@ func TestRunWindowsCOFFWithRealBOF(t *testing.T) {
 			t.Fatalf("read BOF %s: %v", payloadPath, err)
 		}
 
-		out, err := RunWindowsCOFF(payload, "go", nil)
+		out, err := RunWindowsCOFF(payload, "go", nil, 0)
 		if err != nil {
 			t.Fatalf("RunWindowsCOFF failed: %v", err)
 		}
@@ -199,7 +199,7 @@ func TestRunWindowsCOFFWithRealBOF(t *testing.T) {
 			{WireType: "z", Value: "test_description"},
 		}
 
-		out, err := RunWindowsCOFF(payload, "go", args)
+		out, err := RunWindowsCOFF(payload, "go", args, 0)
 		if err != nil {
 			t.Fatalf("RunWindowsCOFF failed: %v", err)
 		}
