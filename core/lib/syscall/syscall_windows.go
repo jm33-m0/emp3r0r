@@ -1,4 +1,4 @@
-//go:build windows && amd64
+//go:build windows
 
 package syscall
 
@@ -167,7 +167,7 @@ func bytePtrToString(ptr *byte) string {
 		return ""
 	}
 	var length int
-	for *(*byte)(unsafe.Pointer(uintptr(unsafe.Pointer(ptr)) + uintptr(length))) != 0 {
+	for *(*byte)(unsafe.Add(unsafe.Pointer(ptr), length)) != 0 {
 		length++
 	}
 	slice := unsafe.Slice(ptr, length)
