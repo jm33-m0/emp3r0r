@@ -7,7 +7,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN yum update -y && yum install -y epel-release \
   && yum install -y sudo curl wget git jq tmux zstd libcap make clang xz ca-certificates \
   && yum clean all \
-  && rm -rf /var/cache/yum
+  && rm -rf /var/cache/yum \
+  && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python3
 
 # Install Zig toolchain
 RUN wget -q https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz \
