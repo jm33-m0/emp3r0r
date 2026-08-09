@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -350,10 +351,11 @@ func TestExecCmdRun(t *testing.T) {
 	// Get the root command
 	rootCmd := CoreCommands()
 
-	// Run exec command: echo hello
-	// Note: exec command uses util.ParseCmd to parse the command string.
-	// The command string is passed via --cmd flag.
-	rootCmd.SetArgs([]string{"exec", "--cmd", "echo hello"})
+	cmdStr := "echo hello"
+	if runtime.GOOS == "windows" {
+		cmdStr = "cmd.exe /c echo hello"
+	}
+	rootCmd.SetArgs([]string{"exec", "--cmd", cmdStr})
 	if err := rootCmd.Execute(); err != nil {
 		t.Fatalf("Failed to execute exec command: %v", err)
 	}

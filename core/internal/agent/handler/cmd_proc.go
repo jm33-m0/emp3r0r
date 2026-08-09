@@ -110,7 +110,11 @@ func execCmdRun(cmd *cobra.Command, args []string) {
 	}
 	parsed := util.ParseCmd(cmdStr)
 	if runtime.GOOS == "windows" && !strings.HasSuffix(parsed[0], ".exe") {
-		parsed[0] += ".exe"
+		// Only append .exe if the bare name doesn't resolve on its own.
+		// exec.LookPath honours PATHEXT so names like "echo" resolve correctly.
+		if _, err := exec.LookPath(parsed[0]); err != nil {
+			parsed[0] += ".exe"
+		}
 	}
 	execCmd := exec.Command(parsed[0], parsed[1:]...)
 	var outBuf bytes.Buffer
