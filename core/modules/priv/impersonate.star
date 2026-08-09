@@ -17,25 +17,12 @@ PROCESS_QUERY_INFORMATION = 0x0400
 
 
 def SePrivEnable(s):
-    res = win_call("kernel32.dll", "GetCurrentProcess")
-    ths_handle = res["r1"]
-    if ths_handle == 0:
-        return "GetCurrentProcess failed"
-
-    token_ptr = win_alloc(8)
-    res = win_call(
-        "advapi32.dll",
-        "OpenProcessToken",
-        ths_handle,
-        TOKEN_ADJUST_PRIVILEGES,
-        token_ptr,
-    )
-    if res["r1"] == 0:
-        win_free(token_ptr)
-        return "OpenProcessToken failed"
-
-    token_handle = read_u64(token_ptr, 0)
-    win_free(token_ptr)
+    # Use the current effective token (thread token if impersonating,
+    # process token otherwise) so privilege enablement affects the right
+    # security context.
+    token_handle = current_token()
+    if token_handle == 0:
+        return "current_token failed"
 
     luid_ptr = win_alloc(8)
     res = win_call("advapi32.dll", "LookupPrivilegeValueW", 0, s, luid_ptr)
