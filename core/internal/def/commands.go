@@ -10,6 +10,7 @@ package def
 const (
 	C2CmdListDir      = "!ls_dir" // API for path auto-completion
 	C2CmdCleanLog     = "!clean_log"
+	C2CmdImpersonate  = "!impersonate"
 	C2CmdCustomModule = "!custom_module"
 
 	C2CmdStat           = "!stat"

