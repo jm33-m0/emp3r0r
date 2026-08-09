@@ -5,6 +5,7 @@ package syscall
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"strings"
 	"unicode/utf16"
 	"unsafe"
@@ -12,7 +13,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// Native PE Header definitions for 64-bit Windows
+// Native PE Header definitions for 32-bit and 64-bit Windows
 type IMAGE_DOS_HEADER struct {
 	E_magic  uint16
 	_        [58]byte
@@ -22,6 +23,18 @@ type IMAGE_DOS_HEADER struct {
 type IMAGE_DATA_DIRECTORY struct {
 	VirtualAddress uint32
 	Size           uint32
+}
+
+type IMAGE_OPTIONAL_HEADER32 struct {
+	Magic         uint16
+	_             [94]byte
+	DataDirectory [16]IMAGE_DATA_DIRECTORY
+}
+
+type IMAGE_NT_HEADERS32 struct {
+	Signature      uint32
+	FileHeader     [20]byte
+	OptionalHeader IMAGE_OPTIONAL_HEADER32
 }
 
 type IMAGE_OPTIONAL_HEADER64 struct {
@@ -50,14 +63,6 @@ type IMAGE_EXPORT_DIRECTORY struct {
 	AddressOfNameOrdinals uint32
 }
 
-// UNICODE_STRING matches the native NT structure layout on 64-bit Windows.
-type UNICODE_STRING struct {
-	Length        uint16
-	MaximumLength uint16
-	_             uint32 // Padding for 8-byte alignment on x64
-	Buffer        *uint16
-}
-
 // String converts a native UNICODE_STRING buffer into a standard Go string.
 func (us *UNICODE_STRING) String() string {
 	if us == nil || us.Buffer == nil || us.Length == 0 {
@@ -69,8 +74,34 @@ func (us *UNICODE_STRING) String() string {
 	return string(utf16.Decode(slice))
 }
 
-// Assembly function declared in peb_amd64.s
+// Assembly function declared in peb_386.s / peb_amd64.s
 func getPEBAddress() uintptr
+
+// getExportDirectoryRVA returns the RVA of the Export Data Directory for PE32 or PE32+ module.
+func getExportDirectoryRVA(base uintptr) (uint32, error) {
+	dosHeader := (*IMAGE_DOS_HEADER)(unsafe.Pointer(base))
+	if dosHeader.E_magic != 0x5A4D { // "MZ"
+		return 0, fmt.Errorf("invalid DOS header magic: 0x%x", dosHeader.E_magic)
+	}
+
+	ntHeaderPtr := base + uintptr(dosHeader.E_lfanew)
+	signature := *(*uint32)(unsafe.Pointer(ntHeaderPtr))
+	if signature != 0x00004550 { // "PE\0\0"
+		return 0, fmt.Errorf("invalid NT header signature: 0x%x", signature)
+	}
+
+	magic := *(*uint16)(unsafe.Pointer(ntHeaderPtr + 24))
+	switch magic {
+	case 0x010B: // PE32
+		nt32 := (*IMAGE_NT_HEADERS32)(unsafe.Pointer(ntHeaderPtr))
+		return nt32.OptionalHeader.DataDirectory[0].VirtualAddress, nil
+	case 0x020B: // PE32+
+		nt64 := (*IMAGE_NT_HEADERS64)(unsafe.Pointer(ntHeaderPtr))
+		return nt64.OptionalHeader.DataDirectory[0].VirtualAddress, nil
+	}
+
+	return 0, fmt.Errorf("unsupported PE optional header magic: 0x%x", magic)
+}
 
 // ExtractSSN reads the System Service Number from an unhooked function address.
 func ExtractSSN(funcVA uintptr) (uint32, error) {
@@ -81,21 +112,19 @@ func ExtractSSN(funcVA uintptr) (uint32, error) {
 	// Create a slice referencing the first 8 bytes of the function memory
 	stubBytes := unsafe.Slice((*byte)(unsafe.Pointer(funcVA)), 8)
 
-	// Verify standard unhooked x64 syscall preamble:
-	// 0x4C, 0x8B, 0xD1 -> mov r10, rcx
-	// 0xB8             -> mov eax, <SSN>
-	isUnhooked := stubBytes[0] == 0x4C &&
-		stubBytes[1] == 0x8B &&
-		stubBytes[2] == 0xD1 &&
-		stubBytes[3] == 0xB8
-
-	if !isUnhooked {
-		return 0, errors.New("function stub signature check failed, function is likely hooked")
+	// x64 preamble: 0x4C, 0x8B, 0xD1, 0xB8 -> mov r10, rcx; mov eax, <SSN>
+	if stubBytes[0] == 0x4C && stubBytes[1] == 0x8B && stubBytes[2] == 0xD1 && stubBytes[3] == 0xB8 {
+		ssn := binary.LittleEndian.Uint32(stubBytes[4:8])
+		return ssn, nil
 	}
 
-	// Extract the 32-bit SSN starting from offset 4
-	ssn := binary.LittleEndian.Uint32(stubBytes[4:8])
-	return ssn, nil
+	// x86 / standard preamble: 0xB8 -> mov eax, <SSN>
+	if stubBytes[0] == 0xB8 {
+		ssn := binary.LittleEndian.Uint32(stubBytes[1:5])
+		return ssn, nil
+	}
+
+	return 0, errors.New("function stub signature check failed, function is likely hooked")
 }
 
 // GetModuleBaseAddress walks the PEB InMemoryOrderModuleList structure in memory
@@ -106,25 +135,20 @@ func GetModuleBaseAddress(moduleName string) uintptr {
 		return 0
 	}
 
-	// PEB -> Ldr pointer is located at offset 0x18 on 64-bit Windows
-	ldrPtr := *(*uintptr)(unsafe.Pointer(pebAddr + 0x18))
+	ldrPtr := *(*uintptr)(unsafe.Pointer(pebAddr + pebLdrOffset))
 	if ldrPtr == 0 {
 		return 0
 	}
 
-	// PEB_LDR_DATA -> InMemoryOrderModuleList LIST_ENTRY is at offset 0x20
-	head := ldrPtr + 0x20
+	head := ldrPtr + ldrInMemoryOrderOffset
 	curr := *(*uintptr)(unsafe.Pointer(head))
 
 	targetLower := strings.ToLower(moduleName)
 
 	// Iterate through the doubly-linked list until returning to the head
 	for curr != head && curr != 0 {
-		// Memory Offsets relative to InMemoryOrderLinks (offset 0x10 in LDR_DATA_TABLE_ENTRY):
-		// DllBase is at struct offset 0x30, which equals curr + 0x20
-		// BaseDllName is at struct offset 0x58, which equals curr + 0x48
-		dllBase := *(*uintptr)(unsafe.Pointer(curr + 0x20))
-		baseNameUnicode := (*UNICODE_STRING)(unsafe.Pointer(curr + 0x48))
+		dllBase := *(*uintptr)(unsafe.Pointer(curr + ldrEntryDllBaseOffset))
+		baseNameUnicode := (*UNICODE_STRING)(unsafe.Pointer(curr + ldrEntryBaseNameOffset))
 
 		if dllBase != 0 && baseNameUnicode != nil {
 			name := baseNameUnicode.String()
@@ -146,34 +170,18 @@ func GetCustomProcAddress(dllBase uintptr, funcName string) uintptr {
 		return 0
 	}
 
-	// 1. Verify DOS Header
-	dosHeader := (*IMAGE_DOS_HEADER)(unsafe.Pointer(dllBase))
-	if dosHeader.E_magic != 0x5A4D { // "MZ"
+	exportRVA, err := getExportDirectoryRVA(dllBase)
+	if err != nil || exportRVA == 0 {
 		return 0
 	}
 
-	// 2. Verify NT Headers
-	ntHeaders := (*IMAGE_NT_HEADERS64)(unsafe.Pointer(dllBase + uintptr(dosHeader.E_lfanew)))
-	if ntHeaders.Signature != 0x00004550 { // "PE\0\0"
-		return 0
-	}
-
-	// 3. Locate Export Directory
-	exportDirData := ntHeaders.OptionalHeader.DataDirectory[0] // IMAGE_DIRECTORY_ENTRY_EXPORT
-	if exportDirData.VirtualAddress == 0 {
-		return 0
-	}
-
-	exportDirVA := dllBase + uintptr(exportDirData.VirtualAddress)
-	exportDirSize := uintptr(exportDirData.Size)
+	exportDirVA := dllBase + uintptr(exportRVA)
 	exportDir := (*IMAGE_EXPORT_DIRECTORY)(unsafe.Pointer(exportDirVA))
 
-	// 4. Map PE Parallel Arrays
 	namesRVA := (*[1 << 24]uint32)(unsafe.Pointer(dllBase + uintptr(exportDir.AddressOfNames)))[:exportDir.NumberOfNames:exportDir.NumberOfNames]
 	functionsRVA := (*[1 << 24]uint32)(unsafe.Pointer(dllBase + uintptr(exportDir.AddressOfFunctions)))[:exportDir.NumberOfFunctions:exportDir.NumberOfFunctions]
 	ordinals := (*[1 << 24]uint16)(unsafe.Pointer(dllBase + uintptr(exportDir.AddressOfNameOrdinals)))[:exportDir.NumberOfNames:exportDir.NumberOfNames]
 
-	// 5. Search for export name
 	for i := uint32(0); i < exportDir.NumberOfNames; i++ {
 		currentNamePtr := (*byte)(unsafe.Pointer(dllBase + uintptr(namesRVA[i])))
 		currentName := windows.BytePtrToString(currentNamePtr)
@@ -183,8 +191,8 @@ func GetCustomProcAddress(dllBase uintptr, funcName string) uintptr {
 			funcRVA := functionsRVA[ordinal]
 			funcVA := dllBase + uintptr(funcRVA)
 
-			// 6. Handle Forwarded Exports
-			if funcVA >= exportDirVA && funcVA < (exportDirVA+exportDirSize) {
+			// Handle Forwarded Exports (if address points within export directory)
+			if funcVA >= exportDirVA && funcVA < (exportDirVA+0x10000) {
 				forwarderStr := windows.BytePtrToString((*byte)(unsafe.Pointer(funcVA)))
 				return resolveForwardedExport(forwarderStr)
 			}
@@ -206,7 +214,6 @@ func resolveForwardedExport(forwarder string) uintptr {
 	dllName := parts[0] + ".dll"
 	functionName := parts[1]
 
-	// Get base address of target DLL (e.g., via PEB walk)
 	mod, err := windows.LoadLibrary(dllName)
 	if err != nil {
 		return 0

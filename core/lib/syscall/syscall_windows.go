@@ -70,23 +70,21 @@ func (table *SyscallTable) InvokeSyscall(name string, args ...uintptr) (uint32, 
 	return status, nil
 }
 
-// Scan ntdll memory for a 'syscall; ret' gadget (0x0F 0x05 0xC3)
+// Scan ntdll memory for a syscall gadget matching architecture-specific gadget patterns
 func findSyscallGadget(ntdllBase uintptr) uintptr {
-	dosHeader := (*IMAGE_DOS_HEADER)(unsafe.Pointer(ntdllBase))
-	ntHeaders := (*IMAGE_NT_HEADERS64)(unsafe.Pointer(ntdllBase + uintptr(dosHeader.E_lfanew)))
-
-	// Search within .text section or first 0x100000 bytes of ntdll
-	searchSize := uintptr(ntHeaders.OptionalHeader.DataDirectory[0].VirtualAddress)
-	if searchSize == 0 {
+	exportRVA, err := getExportDirectoryRVA(ntdllBase)
+	searchSize := uintptr(exportRVA)
+	if err != nil || searchSize == 0 {
 		searchSize = 0x100000
 	}
 
 	buffer := unsafe.Slice((*byte)(unsafe.Pointer(ntdllBase)), searchSize)
-	gadgetPattern := []byte{0x0F, 0x05, 0xC3}
 
-	index := bytes.Index(buffer, gadgetPattern)
-	if index != -1 {
-		return ntdllBase + uintptr(index)
+	for _, pattern := range syscallGadgetPatterns {
+		index := bytes.Index(buffer, pattern)
+		if index != -1 {
+			return ntdllBase + uintptr(index)
+		}
 	}
 
 	return 0
@@ -104,10 +102,12 @@ func InitializeSyscallTable() (*SyscallTable, error) {
 		return nil, fmt.Errorf("failed to locate syscall gadget in ntdll.dll")
 	}
 
-	dosHeader := (*IMAGE_DOS_HEADER)(unsafe.Pointer(ntdllBase))
-	ntHeaders := (*IMAGE_NT_HEADERS64)(unsafe.Pointer(ntdllBase + uintptr(dosHeader.E_lfanew)))
-	exportDirVA := ntdllBase + uintptr(ntHeaders.OptionalHeader.DataDirectory[0].VirtualAddress)
-	exportDir := (*IMAGE_EXPORT_DIRECTORY)(unsafe.Pointer(exportDirVA))
+	exportRVA, err := getExportDirectoryRVA(ntdllBase)
+	if err != nil || exportRVA == 0 {
+		return nil, fmt.Errorf("failed to locate export directory in ntdll.dll: %v", err)
+	}
+
+	exportDir := (*IMAGE_EXPORT_DIRECTORY)(unsafe.Pointer(ntdllBase + uintptr(exportRVA)))
 
 	namesRVA := (*[1 << 24]uint32)(unsafe.Pointer(ntdllBase + uintptr(exportDir.AddressOfNames)))[:exportDir.NumberOfNames:exportDir.NumberOfNames]
 	functionsRVA := (*[1 << 24]uint32)(unsafe.Pointer(ntdllBase + uintptr(exportDir.AddressOfFunctions)))[:exportDir.NumberOfFunctions:exportDir.NumberOfFunctions]

@@ -41,6 +41,9 @@ copy_loop:
     JMP copy_loop
 
 do_call:
+    // Load WOW64 transition pointer from FS:[0xC0] into EDX
+    MOVL 0xC0(FS), DX
+
     // Execute indirect syscall gadget call
     CALL CX
 
@@ -56,3 +59,4 @@ do_call:
     // Move return value from EAX into Go return slot
     MOVL AX, ret+20(FP)
     RET
+

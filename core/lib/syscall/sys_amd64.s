@@ -1,10 +1,12 @@
 //go:build amd64 && windows
+
 #include "textflag.h"
 
 // Signature: func executeSyscall(ssn uint32, gadget uintptr, args []uintptr) uint32
 // Stack frame: $160-48 allocates local stack space for up to 16 arguments
 TEXT ·executeSyscall(SB), NOSPLIT, $160-48
     // Preserve non-volatile registers required by Windows x64 ABI
+    MOVQ BX,  120(SP)
     MOVQ R12, 128(SP)
     MOVQ R13, 136(SP)
     MOVQ SI,  144(SP)
@@ -60,6 +62,7 @@ do_call:
     CALL R11
 
     // Restore preserved registers
+    MOVQ 120(SP), BX
     MOVQ 128(SP), R12
     MOVQ 136(SP), R13
     MOVQ 144(SP), SI
