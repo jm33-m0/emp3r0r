@@ -27,3 +27,7 @@ func starlarkWinReadMem(thread *starlark.Thread, fn *starlark.Builtin, args star
 func readWinMem(_ uintptr, _ int) ([]byte, error) {
 	return nil, fmt.Errorf("win_read_mem is only supported on Windows")
 }
+
+func starlarkCurrentToken(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	return starlark.MakeUint64(0), nil
+}

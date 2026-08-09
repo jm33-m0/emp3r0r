@@ -14,16 +14,23 @@ func starlarkHTTPGet(thread *starlark.Thread, fn *starlark.Builtin, args starlar
 	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "url", &url); err != nil {
 		return starlark.None, err
 	}
-	resp, err := http.Get(url)
+	var body []byte
+	err := runWithToken(thread, func() error {
+		resp, e := http.Get(url)
+		if e != nil {
+			return fmt.Errorf("http_get %s: %w", url, e)
+		}
+		defer resp.Body.Close()
+		body, e = io.ReadAll(resp.Body)
+		if e != nil {
+			return fmt.Errorf("http_get %s: reading body: %w", url, e)
+		}
+		return nil
+	})
 	if err != nil {
-		return starlark.None, fmt.Errorf("http_get %s: %w", url, err)
+		return starlark.None, err
 	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return starlark.None, fmt.Errorf("http_get %s: reading body: %w", url, err)
-	}
-	return starlark.String(body), nil
+	return starlark.String(string(body)), nil
 }
 
 func starlarkHTTPPost(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -33,14 +40,21 @@ func starlarkHTTPPost(thread *starlark.Thread, fn *starlark.Builtin, args starla
 	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "url", &url, "content_type", &contentType, "body", &bodyData); err != nil {
 		return starlark.None, err
 	}
-	resp, err := http.Post(url, contentType, strings.NewReader(bodyData))
+	var body []byte
+	err := runWithToken(thread, func() error {
+		resp, e := http.Post(url, contentType, strings.NewReader(bodyData))
+		if e != nil {
+			return fmt.Errorf("http_post %s: %w", url, e)
+		}
+		defer resp.Body.Close()
+		body, e = io.ReadAll(resp.Body)
+		if e != nil {
+			return fmt.Errorf("http_post %s: reading body: %w", url, e)
+		}
+		return nil
+	})
 	if err != nil {
-		return starlark.None, fmt.Errorf("http_post %s: %w", url, err)
+		return starlark.None, err
 	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return starlark.None, fmt.Errorf("http_post %s: reading body: %w", url, err)
-	}
-	return starlark.String(body), nil
+	return starlark.String(string(body)), nil
 }

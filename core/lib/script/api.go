@@ -79,6 +79,7 @@ var builtInAPIs = map[string]StarlarkAPI{
 	"utf16_ptr":        starlarkUTF16Ptr,
 	"cstring_ptr":      starlarkCStringPtr,
 	"ansi_ptr":         starlarkCStringPtr,
+	"current_token":    starlarkCurrentToken,
 	"win_call":         starlarkWinCall,
 	"win_alloc":        starlarkWinAlloc,
 	"win_free":         starlarkWinFree,

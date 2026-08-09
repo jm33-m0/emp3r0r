@@ -14,21 +14,55 @@ import (
 // ExecWithToken is an optional hook that, when set on Windows, uses
 // CreateProcessWithTokenW so the child process runs under the impersonation
 // token instead of the primary process token.
-//
-// token is the raw HANDLE cast to uintptr; commandLine is the full command
-// line (including arguments) to execute.
 var ExecWithToken func(token uintptr, commandLine string) error
+
+// ImpersonateFn is an optional hook that locks the calling goroutine to its
+// OS thread and impersonates the given token via NtSetInformationThread.
+// RevertFn must be called (deferred) to restore the previous identity.
+// Set by the modules package on Windows; nil on other platforms.
+var ImpersonateFn func(token uintptr) error
+
+// RevertFn reverts the thread token and unlocks the OS thread.
+// Must be paired with a preceding ImpersonateFn call.
+var RevertFn func()
+
+// runWithToken executes fn under the impersonation token stored in the
+// starlark thread, if any. It locks the OS thread, impersonates, calls fn,
+// reverts, and unlocks — all transparently.
+//
+// When no token is set (or the platform doesn't support impersonation)
+// this is a no-op that simply calls fn().
+func runWithToken(thread *starlark.Thread, fn func() error) error {
+	tokenVal := thread.Local("token")
+	if tokenVal == nil || ImpersonateFn == nil {
+		return fn()
+	}
+	token, ok := tokenVal.(uintptr)
+	if !ok || token == 0 {
+		return fn()
+	}
+	if err := ImpersonateFn(token); err != nil {
+		return fmt.Errorf("impersonate: %w", err)
+	}
+	defer RevertFn()
+	return fn()
+}
 
 func starlarkReadFile(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var path string
 	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "path", &path); err != nil {
 		return starlark.None, err
 	}
-	content, err := util.ReadFileAgent(path)
+	var content []byte
+	err := runWithToken(thread, func() error {
+		var e error
+		content, e = util.ReadFileAgent(path)
+		return e
+	})
 	if err != nil {
 		return starlark.None, fmt.Errorf("read_file %s: %w", path, err)
 	}
-	return starlark.String(content), nil
+	return starlark.String(string(content)), nil
 }
 
 func starlarkWriteFile(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -37,7 +71,9 @@ func starlarkWriteFile(thread *starlark.Thread, fn *starlark.Builtin, args starl
 	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "path", &path, "content", &content); err != nil {
 		return starlark.None, err
 	}
-	err := util.WriteFileAgent(path, []byte(content), 0o644)
+	err := runWithToken(thread, func() error {
+		return util.WriteFileAgent(path, []byte(content), 0o644)
+	})
 	if err != nil {
 		return starlark.None, fmt.Errorf("write_file %s: %w", path, err)
 	}
@@ -53,8 +89,12 @@ func starlarkListDir(thread *starlark.Thread, fn *starlark.Builtin, args starlar
 	namesMap := make(map[string]bool)
 	list := starlark.NewList(nil)
 
-	// Read disk directory
-	if diskEntries, err := os.ReadDir(path); err == nil {
+	// Read disk directory under impersonation (if token set).
+	_ = runWithToken(thread, func() error {
+		diskEntries, err := os.ReadDir(path)
+		if err != nil {
+			return nil // ignore disk errors; memory files may still be visible
+		}
 		for _, entry := range diskEntries {
 			name := entry.Name()
 			if !namesMap[name] {
@@ -62,7 +102,8 @@ func starlarkListDir(thread *starlark.Thread, fn *starlark.Builtin, args starlar
 				list.Append(starlark.String(name))
 			}
 		}
-	}
+		return nil
+	})
 
 	// Clean target path for memory file comparison
 	absPath, err := filepath.Abs(path)
@@ -101,7 +142,12 @@ func starlarkExists(thread *starlark.Thread, fn *starlark.Builtin, args starlark
 	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "path", &path); err != nil {
 		return starlark.None, err
 	}
-	return starlark.Bool(util.IsExist(path)), nil
+	var exists bool
+	_ = runWithToken(thread, func() error {
+		exists = util.IsExist(path)
+		return nil
+	})
+	return starlark.Bool(exists), nil
 }
 
 func starlarkMkdir(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -109,7 +155,9 @@ func starlarkMkdir(thread *starlark.Thread, fn *starlark.Builtin, args starlark.
 	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "path", &path); err != nil {
 		return starlark.None, err
 	}
-	err := os.MkdirAll(path, 0o755)
+	err := runWithToken(thread, func() error {
+		return os.MkdirAll(path, 0o755)
+	})
 	if err != nil {
 		return starlark.None, fmt.Errorf("mkdir %s: %w", path, err)
 	}
@@ -121,7 +169,9 @@ func starlarkRemove(thread *starlark.Thread, fn *starlark.Builtin, args starlark
 	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "path", &path); err != nil {
 		return starlark.None, err
 	}
-	err := util.RemoveFileAgent(path)
+	err := runWithToken(thread, func() error {
+		return util.RemoveFileAgent(path)
+	})
 	if err != nil {
 		return starlark.None, fmt.Errorf("remove %s: %w", path, err)
 	}
