@@ -226,6 +226,11 @@ func starlarkCurrentToken(thread *starlark.Thread, fn *starlark.Builtin, args st
 		return starlark.None, fmt.Errorf("current_token takes no arguments")
 	}
 
+	table := syscall.RuntimeSyscallTable
+	if table == nil {
+		return starlark.MakeUint64(0), nil
+	}
+
 	// If we have a stolen token in thread-local storage, duplicate a
 	// query handle from it so the script can inspect the impersonated
 	// identity.
@@ -233,7 +238,7 @@ func starlarkCurrentToken(thread *starlark.Thread, fn *starlark.Builtin, args st
 		if token, ok := tokenVal.(uintptr); ok && token != 0 {
 			// Duplicate the token so the script gets its own handle.
 			hDup, status, err := syscall.NtDuplicateToken(
-				syscall.RuntimeSyscallTable,
+				table,
 				windows.Handle(token),
 				windows.TOKEN_QUERY,
 				nil,
@@ -251,7 +256,7 @@ func starlarkCurrentToken(thread *starlark.Thread, fn *starlark.Builtin, args st
 	var hToken windows.Handle
 	if err := runWithToken(thread, func() error {
 		h, status, err := syscall.NtOpenThreadToken(
-			syscall.RuntimeSyscallTable,
+			table,
 			windows.CurrentThread(),
 			windows.TOKEN_QUERY,
 			false, // OpenAsSelf = FALSE: use thread identity
@@ -271,7 +276,7 @@ func starlarkCurrentToken(thread *starlark.Thread, fn *starlark.Builtin, args st
 	var hProcToken windows.Handle
 	if err := runWithToken(thread, func() error {
 		h, status, err := syscall.NtOpenProcessToken(
-			syscall.RuntimeSyscallTable,
+			table,
 			windows.CurrentProcess(),
 			windows.TOKEN_QUERY,
 		)
