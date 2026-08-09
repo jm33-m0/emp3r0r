@@ -1,5 +1,24 @@
 # Changelog
 
+## [4.9.0](https://github.com/jm33-m0/emp3r0r/compare/v4.8.0...v4.9.0) (2026-08-09)
+
+
+### Features
+
+* allow modules to run with cached token ([aa4566b](https://github.com/jm33-m0/emp3r0r/commit/aa4566b0b524de530022fdf6a424a8baef4e261c))
+* implement direct syscalls and token manipulation primitives for Windows ([98b2d73](https://github.com/jm33-m0/emp3r0r/commit/98b2d732c6849e52f1173afa80cae7c1a4bc96c3))
+* run BOFs with token ([a7c92f7](https://github.com/jm33-m0/emp3r0r/commit/a7c92f7cce0258700010dbea868d3b62f2102d73))
+* starlark engine passes token to scripts ([8e8b4cb](https://github.com/jm33-m0/emp3r0r/commit/8e8b4cbaeee815ba2548888f569fbf37b01cf773))
+* **syscall:** add Windows syscall support for amd64 architecture ([1bbb0fc](https://github.com/jm33-m0/emp3r0r/commit/1bbb0fc2fa2149ae4288130a4c76d797df06aaa7))
+
+
+### Bug Fixes
+
+* `.exe` suffix shouldn't be blindly added ([970c75a](https://github.com/jm33-m0/emp3r0r/commit/970c75a903ce926f78cc0ef07ad91c5481fc3350))
+* improve error reporting in thread token impersonation ([b37c2a3](https://github.com/jm33-m0/emp3r0r/commit/b37c2a34e8588bdb770c08365f5bc00a5a957c9f))
+* improve stability of `steal_token` ([b7f4b64](https://github.com/jm33-m0/emp3r0r/commit/b7f4b641db9afdbfac9f2e4d102866b4891b416b))
+* make starlark modules aware of thread token ([029acc4](https://github.com/jm33-m0/emp3r0r/commit/029acc46a5395b9e64f6b0bb613b0fdc87cc49f7))
+
 ## [4.8.0](https://github.com/jm33-m0/emp3r0r/compare/v4.7.1...v4.8.0) (2026-07-26)
 
 
