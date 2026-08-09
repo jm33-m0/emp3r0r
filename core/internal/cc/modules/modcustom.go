@@ -349,6 +349,7 @@ func InitModules() {
 					// Store FIRST so that updateModuleHelp can Load and patch the Options map.
 					// Without this, the Load inside updateModuleHelp always misses and the
 					// validated options are silently discarded.
+					def.InjectTokenOption(config)
 					def.Modules.Store(config.Name, config)
 					readConfigErr = updateModuleHelp(config)
 					if readConfigErr != nil {
@@ -625,6 +626,13 @@ func typeToWireToken(typeName string) string {
 // parameter's unified "type" field via typeToWireToken.
 func resolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.ResolvedInvocation, error) {
 	resolved := def.ResolvedInvocation{TimeoutSeconds: config.Invocation.TimeoutSeconds}
+
+	// ── token (Windows impersonation) ─────────────────────────────────────
+	// The "token" option is special: it is not passed as argv but wired
+	// directly into ResolvedInvocation.Token for the agent's ExecuteAsToken.
+	if tokenSID, ok := flags["token"]; ok {
+		resolved.Token = strings.TrimSpace(tokenSID)
+	}
 
 	lookupOpt := func(name string) (*def.ModOption, string, error) {
 		if config.Options != nil {

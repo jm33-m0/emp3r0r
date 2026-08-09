@@ -128,6 +128,24 @@ func GetTokenUserSid(hToken windows.Handle) (string, error) {
 	return tokenUser.User.Sid.String(), nil
 }
 
+// GetTokenFriendlyName resolves a token handle to a human-readable
+// "DOMAIN\User (SID)" string. If account lookup fails the raw SID is
+// returned with a note, so the caller always gets something useful.
+func GetTokenFriendlyName(hToken windows.Handle) string {
+	token := windows.Token(hToken)
+	tokenUser, err := token.GetTokenUser()
+	if err != nil {
+		return fmt.Sprintf("<unknown> (GetTokenUser: %v)", err)
+	}
+	sid := tokenUser.User.Sid
+	sidStr := sid.String()
+	account, domain, _, err := sid.LookupAccount("")
+	if err != nil {
+		return fmt.Sprintf("%s (lookup failed)", sidStr)
+	}
+	return fmt.Sprintf("%s\\%s (%s)", domain, account, sidStr)
+}
+
 // GetTokenIntegrityLevel retrieves the mandatory integrity level SID
 func GetTokenIntegrityLevel(hToken windows.Handle) (string, error) {
 	token := windows.Token(hToken)
