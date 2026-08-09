@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/coffloader"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/priv"
 	"github.com/jm33-m0/emp3r0r/core/lib/script"
 	"golang.org/x/sys/windows"
@@ -30,7 +31,9 @@ func init() {
 	// coffloader. These hooks ensure that goroutine is impersonated before
 	// the BOF entry point (syscall.SyscallN) is called.
 	coffloader.PreExecHook = func(token uintptr) {
-		_ = priv.ImpersonateThread(windows.Handle(token))
+		if err := priv.ImpersonateThread(windows.Handle(token)); err != nil {
+			logging.Warningf("COFF PreExecHook: ImpersonateThread failed: %v", err)
+		}
 	}
 	coffloader.PostExecHook = func() {
 		priv.RevertThread()

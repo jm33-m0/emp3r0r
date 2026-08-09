@@ -188,6 +188,9 @@ func DuplicateSystemToken(
 // hToken via NtSetInformationThread(ThreadImpersonationToken), calls
 // action(), reverts, and unlocks the thread.
 func ExecuteAsToken(hImpersonationToken windows.Handle, action func() error) error {
+	if syscall.RuntimeSyscallTable == nil {
+		return fmt.Errorf("ExecuteAsToken: syscall table not initialized")
+	}
 	runtime.LockOSThread()
 
 	defer func() {
@@ -224,6 +227,9 @@ func ExecuteAsToken(hImpersonationToken windows.Handle, action func() error) err
 // thread. Caller MUST call RevertThread() to restore the previous identity
 // and unlock the thread.
 func ImpersonateThread(hToken windows.Handle) error {
+	if syscall.RuntimeSyscallTable == nil {
+		return fmt.Errorf("ImpersonateThread: syscall table not initialized")
+	}
 	runtime.LockOSThread()
 
 	tokenPtr := unsafe.Pointer(&hToken)
@@ -448,7 +454,9 @@ func CreateProcessWithToken(hToken windows.Handle, commandLine string) error {
 		uintptr(unsafe.Pointer(&pi)),
 	)
 	if r1 == 0 {
-		return fmt.Errorf("CreateProcessWithTokenW: %v", e1)
+		err := fmt.Errorf("CreateProcessWithTokenW: %v", e1)
+		logging.Warningf("CreateProcessWithToken: %v (SeImpersonatePrivilege may be required)", err)
+		return err
 	}
 
 	windows.CloseHandle(windows.Handle(pi.Process))

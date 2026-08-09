@@ -90,7 +90,7 @@ func starlarkListDir(thread *starlark.Thread, fn *starlark.Builtin, args starlar
 	list := starlark.NewList(nil)
 
 	// Read disk directory under impersonation (if token set).
-	_ = runWithToken(thread, func() error {
+	if err := runWithToken(thread, func() error {
 		diskEntries, err := os.ReadDir(path)
 		if err != nil {
 			return nil // ignore disk errors; memory files may still be visible
@@ -103,7 +103,17 @@ func starlarkListDir(thread *starlark.Thread, fn *starlark.Builtin, args starlar
 			}
 		}
 		return nil
-	})
+	}); err != nil {
+		thread.Print(thread, fmt.Sprintf("list_dir: impersonation failed, reading as process identity: %v", err))
+		diskEntries, _ := os.ReadDir(path)
+		for _, entry := range diskEntries {
+			name := entry.Name()
+			if !namesMap[name] {
+				namesMap[name] = true
+				list.Append(starlark.String(name))
+			}
+		}
+	}
 
 	// Clean target path for memory file comparison
 	absPath, err := filepath.Abs(path)
@@ -143,10 +153,13 @@ func starlarkExists(thread *starlark.Thread, fn *starlark.Builtin, args starlark
 		return starlark.None, err
 	}
 	var exists bool
-	_ = runWithToken(thread, func() error {
+	if err := runWithToken(thread, func() error {
 		exists = util.IsExist(path)
 		return nil
-	})
+	}); err != nil {
+		thread.Print(thread, fmt.Sprintf("exists: impersonation failed: %v", err))
+		exists = util.IsExist(path)
+	}
 	return starlark.Bool(exists), nil
 }
 
