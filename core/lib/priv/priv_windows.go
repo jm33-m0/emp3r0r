@@ -210,12 +210,15 @@ func ExecuteAsToken(hImpersonationToken windows.Handle, action func() error) err
 
 	defer func() {
 		// Revert: set NULL token on the current thread.
+		// Pass a pointer to a null handle with sizeof(HANDLE) — some
+		// Windows versions reject nil+0 with STATUS_INFO_LENGTH_MISMATCH.
+		var nullToken windows.Handle
 		status, err := syscall.NtSetInformationThread(
 			syscall.RuntimeSyscallTable,
 			windows.CurrentThread(),
 			syscall.ThreadImpersonationToken,
-			nil,
-			0,
+			unsafe.Pointer(&nullToken),
+			uint32(unsafe.Sizeof(nullToken)),
 		)
 		if err != nil || status != syscall.STATUS_SUCCESS {
 			logging.Warningf("NtSetInformationThread (revert) failed: 0x%08X, %v", status, err)
@@ -265,12 +268,15 @@ func ImpersonateThread(hToken windows.Handle) error {
 // RevertThread reverts the thread token to the process token and unlocks the
 // OS thread locked by ImpersonateThread.
 func RevertThread() {
+	// Pass a pointer to a null handle with sizeof(HANDLE) — some Windows
+	// versions reject nil+0 with STATUS_INFO_LENGTH_MISMATCH.
+	var nullToken windows.Handle
 	status, err := syscall.NtSetInformationThread(
 		syscall.RuntimeSyscallTable,
 		windows.CurrentThread(),
 		syscall.ThreadImpersonationToken,
-		nil,
-		0,
+		unsafe.Pointer(&nullToken),
+		uint32(unsafe.Sizeof(nullToken)),
 	)
 	if err != nil || status != syscall.STATUS_SUCCESS {
 		logging.Warningf("RevertThread: 0x%08X, %v", status, err)

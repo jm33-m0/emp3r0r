@@ -139,8 +139,8 @@ func NtDuplicateToken(
 // NtSetInformationThread sets information on a thread object.
 //
 // threadInformationClass = ThreadImpersonationToken (5):
-//   - To impersonate: pass pointer to token handle
-//   - To revert: pass nil (0) for threadInformation
+//   - To impersonate: pass pointer to token handle, length = sizeof(HANDLE)
+//   - To revert: pass pointer to null handle, length = sizeof(HANDLE)
 func NtSetInformationThread(
 	table *SyscallTable,
 	threadHandle windows.Handle,
