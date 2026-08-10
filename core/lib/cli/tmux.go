@@ -132,7 +132,7 @@ func TmuxInitWindows() (err error) {
 	}
 
 	// Agent output
-	OutputPane, err = new_pane("Output", fmt.Sprintf("Saving to %s...\n", live.EmpLogFile), "h", "", 50)
+	OutputPane, err = new_pane("Output", fmt.Sprintf("Saving to %s...\n", live.EmpLogFile), "v", "", 70)
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func TmuxInitWindows() (err error) {
 		}
 	} else {
 		// Agent List
-		AgentListPane, err = new_pane("Agent List", "No agents connected", "v", "", 40)
+		AgentListPane, err = new_pane("Agent List", "No agents connected", "h", "", 40)
 		if err != nil {
 			return err
 		}
