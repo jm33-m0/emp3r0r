@@ -1,5 +1,15 @@
 # Changelog
 
+## [4.9.2](https://github.com/jm33-m0/emp3r0r/compare/v4.9.1...v4.9.2) (2026-08-10)
+
+
+### Bug Fixes
+
+* `ldapsearch` doesn't return anything ([7d0a598](https://github.com/jm33-m0/emp3r0r/commit/7d0a5983b7c64475e8967841f27dfb9cfd4652fd))
+* donut not automatically installed ([70073f0](https://github.com/jm33-m0/emp3r0r/commit/70073f043fa97307c1b862ee327e7fcdfd026dd2))
+* module flags incorrectly cached and sent ([2abe8ae](https://github.com/jm33-m0/emp3r0r/commit/2abe8aeb1e6e7e22041d6480c356cfc3812b4b0a))
+* starlark crashes agent process ([6ed4506](https://github.com/jm33-m0/emp3r0r/commit/6ed45063a2bda8e7a0c45bdde14e744a26f03790))
+
 ## [4.9.1](https://github.com/jm33-m0/emp3r0r/compare/v4.9.0...v4.9.1) (2026-08-10)
 
 
