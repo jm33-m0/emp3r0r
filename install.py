@@ -273,6 +273,7 @@ def docker_build(
         "set -euo pipefail\n"
         "export PREFIX=/usr/local\n"
         "export GOPATH=/root/go\n"
+        "export PYTHONUNBUFFERED=1\n"
         "PYTHON_BIN=$(command -v python3 || command -v python3.12 || command -v python3.11 || command -v python3.10 || find /usr/local/bin /usr/bin -name 'python3*' 2>/dev/null | head -n 1)\n"
         "if [ -z \"$PYTHON_BIN\" ]; then\n"
         "  echo '[ERROR] Python 3 binary not found in builder container.' >&2\n"
