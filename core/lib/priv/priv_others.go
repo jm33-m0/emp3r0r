@@ -13,7 +13,7 @@ type Handle uintptr
 var errNotSupported = errors.New("privilege manipulation not supported on non-windows platforms")
 
 // StealToken stub for non-windows platforms
-func StealToken(table *syscall.SyscallTable, targetPID uint32) (Handle, error) {
+func StealToken(table *syscall.SyscallTable, targetPID uint32, hExistingToken ...Handle) (Handle, error) {
 	return 0, errNotSupported
 }
 

