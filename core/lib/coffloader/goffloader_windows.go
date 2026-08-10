@@ -249,15 +249,14 @@ func processRelocation(symbolDefAddress uintptr, sectionAddress uintptr, reloc w
 		symbolDefAddress += uintptr(segmentValue)
 	}
 
-	symbolRefAddress := sectionAddress
-
 	switch reloc.Type {
 	case windef.IMAGE_REL_AMD64_ADDR64:
 		addr := (*uint64)(unsafe.Pointer(absoluteSymbolAddress))
 		*addr = uint64(symbolDefAddress)
 	case windef.IMAGE_REL_AMD64_ADDR32NB:
+		// Standard COFF formula: sym_addr - (section_base + reloc_offset + 4)
 		addr := (*uint32)(unsafe.Pointer(absoluteSymbolAddress))
-		valueToWrite := symbolDefAddress - (symbolRefAddress + 4 + symbolOffset)
+		valueToWrite := symbolDefAddress - (sectionAddress + uintptr(reloc.VirtualAddress) + 4)
 		*addr = uint32(valueToWrite)
 	case windef.IMAGE_REL_AMD64_REL32, windef.IMAGE_REL_AMD64_REL32_1, windef.IMAGE_REL_AMD64_REL32_2, windef.IMAGE_REL_AMD64_REL32_3, windef.IMAGE_REL_AMD64_REL32_4, windef.IMAGE_REL_AMD64_REL32_5:
 		// Standard COFF REL32 formula (see TrustedSec COFFLoader):
