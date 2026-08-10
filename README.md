@@ -16,7 +16,8 @@
 
 ---
 
-<img width="2560" height="1392" alt="image" src="https://github.com/user-attachments/assets/264e7752-aef6-4451-aca6-db29b1d45f78" />
+<img width="1918" height="1082" alt="emp3r0r" src="https://github.com/user-attachments/assets/01fd6c67-c9e0-4c33-8573-6a20dd3f5dd5" />
+
 
 ## What is emp3r0r?
 
