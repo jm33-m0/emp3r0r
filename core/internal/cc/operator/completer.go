@@ -154,6 +154,7 @@ func listRemoteDirWorker(path_to_list, agent_tag string) (cwd string, names []st
 }
 
 // autocomplete cached impersonation tokens from target agent
+// Returns only the SID portion (quoted), e.g. "S-1-5-21-..."
 func listTokens(ctx carapace.Context) carapace.Action {
 	activeAgent := agents.MustGetActiveAgent()
 	if activeAgent == nil {
@@ -197,7 +198,10 @@ func listTokensWorker(agent_tag string) (tokens []string) {
 		if line == "" || strings.HasPrefix(line, "Cached tokens") || strings.HasPrefix(line, "No cached tokens") {
 			continue
 		}
-		tokens = append(tokens, line)
+		// Agent outputs "SID  friendly_name", take the SID (first field)
+		if fields := strings.Fields(line); len(fields) > 0 {
+			tokens = append(tokens, strconv.Quote(fields[0]))
+		}
 	}
 	return tokens
 }
