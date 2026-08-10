@@ -18,37 +18,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// autocomplete module options
-func listValChoices(ctx carapace.Context) carapace.Action {
-	if live.ActiveModule == nil {
-		return carapace.ActionValues()
-	}
-	ret := make([]string, 0)
-	argc := len(ctx.Args)
-	if argc == 0 {
-		return carapace.ActionValues()
-	}
-	prev_word := ctx.Args[argc-1]
-	prev_word = strings.TrimPrefix(prev_word, "--")
-	for _, opt := range live.ActiveModule.Options {
-		if prev_word == opt.Name {
-			ret = append(ret, opt.Vals...)
-			break
-		}
-	}
-	return carapace.ActionValues(ret...)
-}
-
-// autocomplete modules names
-func listMods(ctx carapace.Context) carapace.Action {
-	names := make([]string, 0)
-	def.Modules.Range(func(key, value any) bool {
-		names = append(names, key.(string))
-		return true
-	})
-	return carapace.ActionValues(names...)
-}
-
 // autocomplete agent tags
 func listAgents(ctx carapace.Context) carapace.Action {
 	names := make([]string, 0)
@@ -56,16 +25,6 @@ func listAgents(ctx carapace.Context) carapace.Action {
 		tag := t.Tag
 		tag = strconv.Quote(tag) // escape special characters
 		names = append(names, tag)
-	}
-	return carapace.ActionValues(names...)
-}
-
-// autocomplete option names
-func listOptions(ctx carapace.Context) carapace.Action {
-	names := make([]string, 0)
-
-	for opt := range live.ActiveModule.Options {
-		names = append(names, opt)
 	}
 	return carapace.ActionValues(names...)
 }
@@ -192,4 +151,53 @@ func listRemoteDirWorker(path_to_list, agent_tag string) (cwd string, names []st
 		names = append(names, name)
 	}
 	return cwd, names
+}
+
+// autocomplete cached impersonation tokens from target agent
+func listTokens(ctx carapace.Context) carapace.Action {
+	activeAgent := agents.MustGetActiveAgent()
+	if activeAgent == nil {
+		logging.Debugf("No valid target selected so no auto-completion for tokens")
+		return carapace.ActionValues()
+	}
+
+	tokens := listTokensWorker(activeAgent.Tag)
+	return carapace.ActionValues(tokens...)
+}
+
+func listTokensWorker(agent_tag string) (tokens []string) {
+	tokens = make([]string, 0)
+	cmd := def.C2CmdListTokens
+	job_id := uuid.NewString()
+	resultReady := make(chan struct{}, 1)
+	live.CmdResultsReady.Store(job_id, resultReady)
+
+	err := controllers.ExecuteCommand(cmd, job_id, agent_tag)
+	if err != nil {
+		live.CmdResultsReady.Delete(job_id)
+		logging.Debugf("Cannot list tokens: %v", err)
+		return tokens
+	}
+	raw_entries := []string{}
+	listingCtx, listingCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer listingCancel()
+	select {
+	case <-resultReady:
+		if res, exists := live.CmdResults.Load(job_id); exists {
+			safeListing := util.SanitizeText(res.(string))
+			raw_entries = strings.Split(safeListing, "\n")
+			live.CmdResults.Delete(job_id)
+		}
+	case <-listingCtx.Done():
+		live.CmdResultsReady.Delete(job_id)
+		logging.Debugf("listTokensWorker: timeout waiting for result")
+	}
+	for _, line := range raw_entries {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "Cached tokens") || strings.HasPrefix(line, "No cached tokens") {
+			continue
+		}
+		tokens = append(tokens, line)
+	}
+	return tokens
 }
