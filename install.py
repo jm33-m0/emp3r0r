@@ -149,6 +149,27 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
                 shutil.copytree(src_d, data_dir / d, dirs_exist_ok=True)
                 log_info(f"Installed {d}")
 
+    donut_src = kit_dir / "lib" / "emp3r0r" / "bin" / "donut"
+    if donut_src.is_file():
+        log_info("Installing donut...")
+        donut_dst = data_dir / "bin" / "donut"
+        if not IS_DRY_RUN:
+            donut_dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(donut_src, donut_dst)
+            donut_dst.chmod(0o755)
+            usr_local_bin = pathlib.Path("/usr/local/bin")
+            usr_local_bin.mkdir(parents=True, exist_ok=True)
+            symlink = usr_local_bin / "donut"
+            if symlink.is_symlink() or symlink.exists():
+                symlink.unlink(missing_ok=True)
+            try:
+                symlink.symlink_to(donut_dst)
+                log_info("Linked donut executable to /usr/local/bin/donut")
+            except Exception as e:
+                log_warn(f"Could not symlink /usr/local/bin/donut: {e}")
+    else:
+        log_warn("Donut not found in kit; skipping donut installation")
+
     if shutil.which("setcap") or IS_DRY_RUN:
         log_info("Setting cap_net_admin on emp3r0r-cc...")
         run_cmd(["setcap", "cap_net_admin=eip", str(data_dir / "emp3r0r-cc")], check=False)

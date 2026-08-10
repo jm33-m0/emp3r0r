@@ -612,6 +612,7 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
 
         log_info(f"Downloading donut package from {DONUT_URL}...")
         download_file(DONUT_URL, kit_dir / DONUT_ARCHIVE_NAME)
+        install_donut(kit_dir / "lib" / "emp3r0r", search_dir=kit_dir)
 
         # Copy Python installer directly from repo root
         root_install_py = core_dir.parent / "install.py"
