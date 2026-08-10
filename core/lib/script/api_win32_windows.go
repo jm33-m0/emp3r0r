@@ -30,6 +30,11 @@ func getLazyProc(dllName, procName string) *windows.LazyProc {
 	return dll.NewProc(procName)
 }
 
+// callProcProtected is the implementation used to safely invoke a Win32
+// DLL procedure.  It is set at init time by api_win32_veh_windows.go
+// (VEH-based, catches all native exceptions).
+var callProcProtected func(proc *windows.LazyProc, args ...uintptr) (r1, r2 uintptr, err error)
+
 // starlarkWinCall provides an interface to execute any function within a specified DLL dynamically
 func starlarkWinCall(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (retVal starlark.Value, retErr error) {
 	if len(args) < 2 {
@@ -81,7 +86,8 @@ func starlarkWinCall(thread *starlark.Thread, fn *starlark.Builtin, args starlar
 		}
 	}
 
-	// Recover from dynamic procedure resolution panics or runtime call failures
+	// Recover from native access violations, dynamic procedure resolution panics,
+	// and runtime call failures — all converted to a safe error dict.
 	defer func() {
 		if r := recover(); r != nil {
 			dict := starlark.NewDict(4)
@@ -99,13 +105,13 @@ func starlarkWinCall(thread *starlark.Thread, fn *starlark.Builtin, args starlar
 
 	// Run the Win32 call under impersonation if a token is set.
 	if err := runWithToken(thread, func() error {
-		r1, r2, callErr = proc.Call(uintptrArgs...)
+		r1, r2, callErr = callProcProtected(proc, uintptrArgs...)
 		return nil
 	}); err != nil {
 		// Impersonation failed — still call the API (as process identity)
 		// but let the script know via the error key.
 		thread.Print(thread, fmt.Sprintf("win_call: impersonation failed: %v", err))
-		r1, r2, callErr = proc.Call(uintptrArgs...)
+		r1, r2, callErr = callProcProtected(proc, uintptrArgs...)
 	}
 	_ = keepAlive
 

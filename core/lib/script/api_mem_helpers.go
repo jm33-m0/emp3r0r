@@ -3,6 +3,7 @@ package script
 import (
 	"fmt"
 	"runtime"
+	"runtime/debug"
 	"unsafe"
 
 	"go.starlark.net/starlark"
@@ -23,8 +24,10 @@ func readMemoryBytes(addr uintptr, size int) ([]byte, error) {
 	return readLinuxMem(addr, size)
 }
 
-// writeMemoryBytes writes raw bytes to target memory address safely
-func writeMemoryBytes(addr uintptr, data []byte) error {
+// writeMemoryBytes writes raw bytes to target memory address safely.
+// Uses debug.SetPanicOnFault to catch native access violations (0xc0000005)
+// which would otherwise crash the agent process.
+func writeMemoryBytes(addr uintptr, data []byte) (err error) {
 	if addr == 0 || addr < 4096 {
 		return fmt.Errorf("invalid memory address 0x%x", addr)
 	}
@@ -32,9 +35,12 @@ func writeMemoryBytes(addr uintptr, data []byte) error {
 		return nil
 	}
 
+	// Native access violations become Go panics so recover() can catch them
+	debug.SetPanicOnFault(true)
 	defer func() {
+		debug.SetPanicOnFault(false)
 		if r := recover(); r != nil {
-			_ = r
+			err = fmt.Errorf("writeMemoryBytes fault at 0x%x: %v", addr, r)
 		}
 	}()
 
