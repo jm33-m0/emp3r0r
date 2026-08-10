@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.9.1](https://github.com/jm33-m0/emp3r0r/compare/v4.9.0...v4.9.1) (2026-08-10)
+
+
+### Bug Fixes
+
+* `--token` autocompletion should only provide SID ([9c9d02d](https://github.com/jm33-m0/emp3r0r/commit/9c9d02d70029dd38daaabe2f8387dcf980d5d6f3))
+* `build.py` output is not in order ([93b9b6d](https://github.com/jm33-m0/emp3r0r/commit/93b9b6d9bdd586a9c4e52cad3d2df1505671b0a0))
+* `list_tokens` autocompletion ([d329e76](https://github.com/jm33-m0/emp3r0r/commit/d329e762bf1a31f6ab55b29541766eed01e3f0a5))
+* `RevertThread` error ([f5a7185](https://github.com/jm33-m0/emp3r0r/commit/f5a7185988030adda7b8a8c5e6e2ab0be50a1652))
+* `steal_token` should support `--token` parameter too ([8e81938](https://github.com/jm33-m0/emp3r0r/commit/8e819389d10f3c2de9ba9315055c617ceca47f2b))
+* binary data gets printed with BOF ([10900db](https://github.com/jm33-m0/emp3r0r/commit/10900dbc2b02eeac0253e6e20dd1a1b440929397))
+* goffloader crash ([adaf785](https://github.com/jm33-m0/emp3r0r/commit/adaf7858fa788485861ee0b72f4ae13411c4f6e3))
+* output pane needs to be wider ([84e2852](https://github.com/jm33-m0/emp3r0r/commit/84e285257ab369aea7119bbb33ddd2fa821ad774))
+
 ## [4.9.0](https://github.com/jm33-m0/emp3r0r/compare/v4.8.0...v4.9.0) (2026-08-09)
 
 
