@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/carapace-sh/carapace"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
@@ -16,6 +17,14 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/spf13/cobra"
 )
+
+// moduleOptionDefaults stores the original (JSON) default value for each
+// module option. pflag does NOT reset flag values to their defaults between
+// Execute() calls — only the Changed bool is reset. Without this map we
+// cannot distinguish "user explicitly set the flag" from "user didn't
+// provide the flag at all" on subsequent invocations.
+var moduleOptionDefaults = make(map[string]map[string]string)
+var moduleOptionDefaultsMu sync.RWMutex
 
 func addModuleCommands(rootCmd *cobra.Command) {
 	mods := make([]*def.ModuleConfig, 0)
@@ -71,6 +80,14 @@ func addModuleCommands(rootCmd *cobra.Command) {
 					help = strings.TrimSpace(help + " [required]")
 				}
 				cmd.Flags().String(opt.Name, opt.Val, help)
+				// Store the original JSON default so we can reset to it when
+				// the flag is not provided in a subsequent invocation.
+				moduleOptionDefaultsMu.Lock()
+				if moduleOptionDefaults[mod.Name] == nil {
+					moduleOptionDefaults[mod.Name] = make(map[string]string)
+				}
+				moduleOptionDefaults[mod.Name][opt.Name] = opt.Val
+				moduleOptionDefaultsMu.Unlock()
 				if len(opt.Vals) > 0 {
 					vals := append([]string(nil), opt.Vals...)
 					flagActions[opt.Name] = carapace.ActionValues(vals...)
@@ -109,15 +126,29 @@ func runModuleByName(cmd *cobra.Command, modName string) {
 	runtimeFlags := make(map[string]string)
 	for optName, opt := range mod.Options {
 		var val string
-		var err error
-		if cmd.Flags().Lookup(optName) != nil {
+		flag := cmd.Flags().Lookup(optName)
+		if flag != nil && flag.Changed {
+			// User explicitly provided this flag — use the supplied value.
+			var err error
 			val, err = cmd.Flags().GetString(optName)
 			if err != nil {
 				logging.Errorf("module %s: read flag %s: %v", mod.Name, optName, err)
 				continue
 			}
 		} else {
-			val = opt.Val
+			// Flag not provided — reset to the original JSON default.
+			// (pflag does NOT reset values between Execute() calls, only Changed.)
+			moduleOptionDefaultsMu.RLock()
+			if defaults, ok := moduleOptionDefaults[modName]; ok {
+				if defVal, ok2 := defaults[optName]; ok2 {
+					val = defVal
+				} else {
+					val = opt.Val
+				}
+			} else {
+				val = opt.Val
+			}
+			moduleOptionDefaultsMu.RUnlock()
 		}
 		live.SetOption(optName, val)
 		runtimeFlags[optName] = val
