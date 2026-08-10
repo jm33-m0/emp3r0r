@@ -260,7 +260,9 @@ func processRelocation(symbolDefAddress uintptr, sectionAddress uintptr, reloc w
 		valueToWrite := symbolDefAddress - (symbolRefAddress + 4 + symbolOffset)
 		*addr = uint32(valueToWrite)
 	case windef.IMAGE_REL_AMD64_REL32, windef.IMAGE_REL_AMD64_REL32_1, windef.IMAGE_REL_AMD64_REL32_2, windef.IMAGE_REL_AMD64_REL32_3, windef.IMAGE_REL_AMD64_REL32_4, windef.IMAGE_REL_AMD64_REL32_5:
-		relativeSymbolDefAddress := symbolDefAddress - uintptr(reloc.Type-4) - (absoluteSymbolAddress + 4)
+		// Standard COFF REL32 formula (see TrustedSec COFFLoader):
+		//   *(DWORD*)addr = sym_addr + reloc_type - IMAGE_REL_AMD64_REL32 - addr - 4
+		relativeSymbolDefAddress := symbolDefAddress + uintptr(reloc.Type) - uintptr(windef.IMAGE_REL_AMD64_REL32) - absoluteSymbolAddress - 4
 		addr := (*uint32)(unsafe.Pointer(absoluteSymbolAddress))
 		*addr = uint32(relativeSymbolDefAddress)
 	default:
@@ -548,8 +550,10 @@ func invokeMethod(methodName string, argBytes []byte, parsedCoff *pecoff.File, s
 			}
 			entryPoint := sec.Address + uintptr(symbol.Value)
 
+			// BOF always reads a 4-byte length prefix regardless of argc.
+			// Provide a zero-length buffer so the BOF sees no arguments.
 			if len(argBytes) == 0 {
-				argBytes = make([]byte, 1)
+				argBytes = make([]byte, 4)
 			}
 
 			isExecutingBOF = true

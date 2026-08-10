@@ -12,8 +12,6 @@ import (
 	"sync"
 	"unicode/utf16"
 	"unsafe"
-
-	"golang.org/x/sys/windows"
 )
 
 func GetCoffOutputForChannel(channel chan<- interface{}) func(int, uintptr, int) uintptr {
@@ -581,15 +579,12 @@ func PackShortString(s string) ([]byte, error) {
 }
 
 func PackString(s string) ([]byte, error) {
-	d, err := windows.UTF16FromString(s)
-	if err != nil {
-		return nil, err
-	}
+	b := []byte(s)
 	buff := make([]byte, 4)
-	binary.LittleEndian.PutUint32(buff, uint32(len(d)))
-	for _, c := range d {
-		buff = append(buff, byte(c))
-	}
+	// Length includes the null terminator, matching the standard BOF arg format.
+	binary.LittleEndian.PutUint32(buff, uint32(len(b)+1))
+	buff = append(buff, b...)
+	buff = append(buff, 0)
 	return buff, nil
 }
 
