@@ -24,16 +24,16 @@ import (
 // ---------------------------------------------------------------------------
 
 var (
-	vehOnce       sync.Once
-	vehHandle     uintptr
-	recoveryFunc  uintptr
+	vehOnce      sync.Once
+	vehHandle    uintptr
+	recoveryFunc uintptr
 
 	// Protected by vehMu; set to true only while a guarded call is in flight
 	// on this OS thread.
-	vehMu         sync.Mutex
-	isProtected   bool
-	lastExcCode   uint32
-	lastExcAddr   uintptr
+	vehMu       sync.Mutex
+	isProtected bool
+	lastExcCode uint32
+	lastExcAddr uintptr
 )
 
 // exceptionPointers mirrors what the OS passes to a VEH handler.
