@@ -18,7 +18,6 @@
 
 <img width="1919" height="1076" alt="Screenshot From 2026-08-10 19-37-20" src="https://github.com/user-attachments/assets/d3e4c956-f1e5-4aef-aa35-09573a81b092" />
 
-
 ## What is emp3r0r?
 
 emp3r0r is an advanced, zero-trust post-exploitation framework and command & control (C2) system designed for Linux and Windows target environments. Built from the ground up to operate in high-security environments, emp3r0r combines **autonomous gossip mesh networking**, **fileless memory-only execution**, **cross-platform BOF loading**, **inter-agent file transfer**, and **in-memory scriptable agents** to deliver superior stealth, operational control, and operational security (OPSEC).
@@ -107,6 +106,19 @@ Execute in-memory binary modules on both Windows and Linux targets:
 - **Bundled BOF Suites:** Built-in support for Kerbeus-BOF, Remote-OPs, and Situational Awareness (SA) module collections.
 
 **Why this matters:** Eliminates process creation overhead and circumvents command-line monitoring by running compiled C modules in-process.
+
+---
+
+### 🔑 On-Demand Windows Token Manipulation
+
+Agents on Windows can steal, cache, and impersonate access tokens from running processes — entirely in-process using indirect NT syscalls.
+
+- **Steal & Cache:** `steal_token --pid <PID>` duplicates a process token via `NtOpenProcess` + `NtDuplicateToken` and stores it in memory by SID. Optionally chain impersonation with `--token <sid>` to escalate from one stolen identity to another.
+- **Enumerate:** `list_tokens` displays all cached tokens with `DOMAIN\User (SID)` names.
+- **Universal Impersonation:** Reference a cached token by SID (`--token <sid>`) in **any** module — Go, Starlark, COFF/BOF. Thread-level impersonation (`NtSetInformationThread`) is applied around sensitive operations.
+- **Token-Aware Starlark:** Builtins (`read_file`, `write_file`, `exec_cmd`, Win32 API proxy, etc.) automatically impersonate per-syscall when a token is set, and `exec_cmd` can spawn child processes under the stolen identity via `CreateProcessWithTokenW`.
+
+**Why this matters:** No external tools, no disk artifacts, no process-creation noise. Token theft and reuse happen entirely in-process using indirect syscalls, with stolen tokens immediately consumable by every built-in module.
 
 ---
 
