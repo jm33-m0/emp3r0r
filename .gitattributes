@@ -1,3 +1,37 @@
+# Auto-detect text files and ensure LF line endings on commit
+* text=auto eol=lf
+
+# Force LF for source code
+*.go text eol=lf
+*.py text eol=lf
+*.sh text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.svelte text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+*.mod text eol=lf
+*.sum text eol=lf
+*.toml text eol=lf
+
+# Binary files
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+
+# Vendored/third-party
 core/modules/Kerbeus-BOF/** linguist-vendored
 core/modules/Remote-OPs/** linguist-vendored
 core/modules/SA/** linguist-vendored
