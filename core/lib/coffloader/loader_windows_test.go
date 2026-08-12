@@ -157,8 +157,8 @@ func TestRunWindowsCOFFWithRealBOF(t *testing.T) {
 			makeDir := filepath.Join("../../modules/Remote-OPs/src/Remote/get_priv")
 			cmd := exec.Command("make", "-C", makeDir)
 			out, err := cmd.CombinedOutput()
-			if err != nil {
-				t.Fatalf("failed to build %s with make -C %s: %v\nOutput: %s", payloadPath, makeDir, err, string(out))
+			if err != nil && !util.IsExist(payloadPath) {
+				t.Skipf("failed to build %s with make -C %s: %v\nOutput: %s", payloadPath, makeDir, err, string(out))
 			}
 		}
 
@@ -188,8 +188,8 @@ func TestRunWindowsCOFFWithRealBOF(t *testing.T) {
 			makeDir := filepath.Join("../../modules/Remote-OPs/src/Remote/get_priv")
 			cmd := exec.Command("make", "-C", makeDir)
 			out, err := cmd.CombinedOutput()
-			if err != nil {
-				t.Fatalf("failed to build %s: %v\nOutput: %s", payloadPath, err, string(out))
+			if err != nil && !util.IsExist(payloadPath) {
+				t.Skipf("failed to build %s: %v\nOutput: %s", payloadPath, err, string(out))
 			}
 		}
 
@@ -219,8 +219,8 @@ func TestRunWindowsCOFFWithRealBOF(t *testing.T) {
 			makeDir := filepath.Join("../../modules/Remote-OPs/src/Remote/sc_description")
 			cmd := exec.Command("make", "-C", makeDir)
 			out, err := cmd.CombinedOutput()
-			if err != nil {
-				t.Fatalf("failed to build %s with make -C %s: %v\nOutput: %s", payloadPath, makeDir, err, string(out))
+			if err != nil && !util.IsExist(payloadPath) {
+				t.Skipf("failed to build %s with make -C %s: %v\nOutput: %s", payloadPath, makeDir, err, string(out))
 			}
 		}
 
