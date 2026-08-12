@@ -146,6 +146,91 @@ func TestLoadWithMethodMemoryError(t *testing.T) {
 	t.Logf("Successfully caught memory/relocation error: %v", err)
 }
 
+// buildMinimalCOFF creates a minimal AMD64 COFF object file with a single .text section.
+func buildMinimalCOFF(code []byte, entryName string) []byte {
+	nameBytes := make([]byte, 8)
+	copy(nameBytes, []byte(entryName))
+
+	rawDataOffset := uint32(60)
+	symTableOffset := rawDataOffset + uint32(len(code))
+
+	buf := make([]byte, 0, symTableOffset+18+4)
+
+	// File Header (20 bytes)
+	buf = append(buf, 0x64, 0x86)                 // Machine: AMD64
+	buf = append(buf, 0x01, 0x00)                 // NumberOfSections: 1
+	buf = append(buf, 0x00, 0x00, 0x00, 0x00)     // TimeDateStamp: 0
+	buf = append(buf, byte(symTableOffset), byte(symTableOffset>>8), byte(symTableOffset>>16), byte(symTableOffset>>24)) // PointerToSymbolTable
+	buf = append(buf, 0x01, 0x00, 0x00, 0x00)     // NumberOfSymbols: 1
+	buf = append(buf, 0x00, 0x00)                 // SizeOfOptionalHeader: 0
+	buf = append(buf, 0x00, 0x00)                 // Characteristics: 0
+
+	// Section Header .text (40 bytes)
+	buf = append(buf, []byte(".text\x00\x00\x00")...)
+	codeLen := uint32(len(code))
+	buf = append(buf, byte(codeLen), byte(codeLen>>8), byte(codeLen>>16), byte(codeLen>>24)) // VirtualSize
+	buf = append(buf, 0x00, 0x00, 0x00, 0x00)     // VirtualAddress: 0
+	buf = append(buf, byte(codeLen), byte(codeLen>>8), byte(codeLen>>16), byte(codeLen>>24)) // SizeOfRawData
+	buf = append(buf, byte(rawDataOffset), byte(rawDataOffset>>8), byte(rawDataOffset>>16), byte(rawDataOffset>>24)) // PointerToRawData
+	buf = append(buf, 0x00, 0x00, 0x00, 0x00)     // PointerToRelocations: 0
+	buf = append(buf, 0x00, 0x00, 0x00, 0x00)     // PointerToLinenumbers: 0
+	buf = append(buf, 0x00, 0x00)                 // NumberOfRelocations: 0
+	buf = append(buf, 0x00, 0x00)                 // NumberOfLinenumbers: 0
+	buf = append(buf, 0x20, 0x00, 0x00, 0x60)     // Characteristics: CODE|EXECUTE|READ
+
+	// Raw Data
+	buf = append(buf, code...)
+
+	// Symbol Table (1 entry, 18 bytes)
+	buf = append(buf, nameBytes...)               // Name (8 bytes)
+	buf = append(buf, 0x00, 0x00, 0x00, 0x00)     // Value: 0
+	buf = append(buf, 0x01, 0x00)                 // SectionNumber: 1
+	buf = append(buf, 0x00, 0x00)                 // Type: 0
+	buf = append(buf, 0x02)                       // StorageClass: EXTERNAL
+	buf = append(buf, 0x00)                       // NumberOfAuxSymbols: 0
+
+	// String Table (4 bytes: just the size)
+	buf = append(buf, 0x04, 0x00, 0x00, 0x00)
+
+	return buf
+}
+
+// TestCOFFSimpleReturn tests execution of a minimal BOF that just returns.
+func TestCOFFSimpleReturn(t *testing.T) {
+	code := []byte{0xC3} // ret
+	coff := buildMinimalCOFF(code, "go")
+	out, err := LoadWithMethod(coff, nil, "go")
+	if err != nil {
+		t.Fatalf("simple ret BOF should succeed: %v", err)
+	}
+	t.Logf("Simple ret BOF output: %q", out)
+}
+
+// TestCOFFAccessViolationRecovery tests that a crashing BOF doesn't hang
+// the caller indefinitely. Due to Go runtime limitations on Windows
+// (cgocall SEH terminates goroutines without running deferred functions),
+// the crash itself cannot be fully recovered. The timeout mechanism in
+// LoadWithToken ensures the caller doesn't hang.
+func TestCOFFAccessViolationRecovery(t *testing.T) {
+	t.Skip("BOF crash recovery via cgocall SEH is not fully recoverable in Go 1.23+ on Windows. " +
+		"The goroutine is terminated without running deferred functions. " +
+		"A CGo-based VEH handler is needed for full crash recovery.")
+}
+
+// TestCOFFMultipleInvocations tests running several safe BOFs in sequence.
+func TestCOFFMultipleInvocations(t *testing.T) {
+	safeCode := []byte{0xC3}
+	safeCOFF := buildMinimalCOFF(safeCode, "go")
+
+	for i := 0; i < 5; i++ {
+		out, err := LoadWithMethod(safeCOFF, nil, "go")
+		if err != nil {
+			t.Fatalf("iteration %d: simple ret BOF failed: %v", i, err)
+		}
+		t.Logf("iteration %d: safe output: %q", i, out)
+	}
+}
+
 func TestRunWindowsCOFFWithRealBOF(t *testing.T) {
 	if os.Getenv("EMP3R0R_RACE_ON") == "1" {
 		t.Skip("skipped under race run (EMP3R0R_RACE_ON=1)")

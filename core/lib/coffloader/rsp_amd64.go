@@ -3,5 +3,6 @@
 package coffloader
 
 var currentSavedRSP uintptr
+var vehAsmHandlerAddr uintptr
 
 func callBOF(entryPoint, argPtr, argLen uintptr)

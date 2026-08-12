@@ -407,6 +407,30 @@ func RemoveValue(key uintptr) (res uintptr) {
 	return uintptr(0)
 }
 
+// BeaconGetSpawnToStub fills the provided buffer with the default spawn-to
+// process path for the requested architecture. This is a best-effort stub
+// for BOFs that need to know the spawn-to binary (injection BOFs, etc.).
+func BeaconGetSpawnToStub(x86 uintptr, buffer uintptr, length int32) uintptr {
+	if buffer == 0 || length <= 0 {
+		return 0
+	}
+	var spawnTo string
+	if x86 != 0 {
+		spawnTo = `C:\Windows\SysWOW64\cmd.exe`
+	} else {
+		spawnTo = `C:\Windows\System32\cmd.exe`
+	}
+	// Copy with null terminator, truncating if needed
+	b := []byte(spawnTo)
+	maxLen := int(length) - 1
+	if maxLen > len(b) {
+		maxLen = len(b)
+	}
+	copy((*[1 << 30]byte)(unsafe.Pointer(buffer))[:maxLen], b[:maxLen])
+	*(*byte)(unsafe.Pointer(buffer + uintptr(maxLen))) = 0
+	return 1
+}
+
 func swapEndianness(indata uint32) uint32 {
 	return (indata>>24)&0x000000ff |
 		(indata>>8)&0x0000ff00 |

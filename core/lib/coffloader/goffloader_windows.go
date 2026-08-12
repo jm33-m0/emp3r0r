@@ -4,11 +4,11 @@ package coffloader
 
 import (
 	"fmt"
-	"runtime"
 	"runtime/debug"
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/RIscRIpt/pecoff"
@@ -34,11 +34,12 @@ const (
 )
 
 var (
-	kernel32                        = syscall.MustLoadDLL("kernel32.dll")
-	procVirtualAlloc                = kernel32.MustFindProc("VirtualAlloc")
-	procVirtualProtect              = kernel32.MustFindProc("VirtualProtect")
-	procVirtualFree                 = kernel32.MustFindProc("VirtualFree")
-	procAddVectoredExceptionHandler = kernel32.MustFindProc("AddVectoredExceptionHandler")
+	kernel32                           = syscall.MustLoadDLL("kernel32.dll")
+	procVirtualAlloc                   = kernel32.MustFindProc("VirtualAlloc")
+	procVirtualProtect                 = kernel32.MustFindProc("VirtualProtect")
+	procVirtualFree                    = kernel32.MustFindProc("VirtualFree")
+	procAddVectoredExceptionHandler    = kernel32.MustFindProc("AddVectoredExceptionHandler")
+	procRemoveVectoredExceptionHandler = kernel32.MustFindProc("RemoveVectoredExceptionHandler")
 
 	vehHandlerHandle uintptr
 
@@ -69,65 +70,17 @@ type exceptionPointersStruct struct {
 
 var vehOnce sync.Once
 
+// initVEH registers our pure-assembly VEH handler (vehAsmHandler in veh_amd64.s)
+// directly with the OS. No CGo, no windows.NewCallback. The handler receives
+// exceptions directly from Windows via the platform ABI, checks isExecutingBOF
+// and currentSavedRSP, redirects execution, and returns EXCEPTION_CONTINUE_EXECUTION.
 func initVEH() {
 	vehOnce.Do(func() {
-		handlerCallback := windows.NewCallback(vehHandler)
-		ret, _, _ := procAddVectoredExceptionHandler.Call(1, handlerCallback)
+		// vehAsmHandlerAddr is set by veh_amd64.s to the raw PC of vehAsmHandler.
+		// This is a pure assembly function with the platform ABI — no CGo involved.
+		ret, _, _ := procAddVectoredExceptionHandler.Call(1, vehAsmHandlerAddr)
 		vehHandlerHandle = ret
 	})
-}
-
-func vehHandler(exceptionPointers uintptr) uintptr {
-	if exceptionPointers == 0 {
-		return 0 // EXCEPTION_CONTINUE_SEARCH
-	}
-
-	bofFaultMu.Lock()
-	executing := isExecutingBOF
-	savedRsp := currentSavedRSP
-	bofFaultMu.Unlock()
-
-	if !executing || savedRsp == 0 {
-		return 0 // EXCEPTION_CONTINUE_SEARCH
-	}
-
-	ep := (*exceptionPointersStruct)(unsafe.Pointer(exceptionPointers))
-	if ep == nil || ep.ExceptionRecord == nil || ep.ContextRecord == 0 {
-		return 0
-	}
-
-	code := ep.ExceptionRecord.ExceptionCode
-	// Only catch hardware exceptions (0xC0000000-0xCFFFFFFF, 0x80000001, 0x80000002).
-	// Software exceptions (e.g. C++ 0xE0xxxxxx, CLR 0xE0434352) are passed through
-	// so internal BOF exception handling (try/catch) continues to work.
-	isHardwareExc := (code&0xF0000000) == 0xC0000000 || code == 0x80000001 || code == 0x80000002
-
-	if isHardwareExc {
-		bofFaultMu.Lock()
-		currentFault = bofFault{code: code, addr: ep.ExceptionRecord.ExceptionAddress}
-		hasFaulted = true
-		isExecutingBOF = false
-		bofFaultMu.Unlock()
-
-		// Read return address inside callBOF right after CALL AX from *(savedRsp - 8).
-		// Safely restore RSP to callBOF stack frame pointer (savedRsp - 8) and redirect RIP to retAddr.
-		// When NtContinue resumes execution, callBOF executes ADDQ $32, SP; RET,
-		// returning cleanly back into invokeMethod without invalidating Go's stack unwinder.
-		retAddr := *(*uintptr)(unsafe.Pointer(savedRsp))
-		if unsafe.Sizeof(uintptr(0)) == 8 {
-			// 64-bit AMD64: RSP is at offset 0x98 (152), RIP is at offset 0xF8 (248) inside CONTEXT
-			*(*uintptr)(unsafe.Pointer(ep.ContextRecord + 0x98)) = savedRsp
-			*(*uintptr)(unsafe.Pointer(ep.ContextRecord + 0xF8)) = retAddr
-		} else {
-			// 32-bit x86: ESP is at offset 0xC4 (196), EIP is at offset 0xB4 (180) inside CONTEXT
-			*(*uintptr)(unsafe.Pointer(ep.ContextRecord + 0xC4)) = savedRsp
-			*(*uintptr)(unsafe.Pointer(ep.ContextRecord + 0xB4)) = retAddr
-		}
-
-		return ^uintptr(0) // EXCEPTION_CONTINUE_EXECUTION (-1)
-	}
-
-	return 0 // EXCEPTION_CONTINUE_SEARCH
 }
 
 func virtualProtectError(ret uintptr, err error) error {
@@ -193,7 +146,9 @@ func resolveExternalAddress(symbolName string, outChannel chan<- any) uintptr {
 				return windows.NewCallback(BeaconFormatToString)
 			case "BeaconFormatInt":
 				return windows.NewCallback(BeaconFormatInt)
-			case "BeaconUseToken", "BeaconRevertToken", "BeaconIsAdmin", "BeaconGetSpawnTo",
+			case "BeaconGetSpawnTo":
+				return windows.NewCallback(BeaconGetSpawnToStub)
+			case "BeaconUseToken", "BeaconRevertToken", "BeaconIsAdmin",
 				"BeaconSpawnTemporaryProcess", "BeaconInjectProcess", "BeaconInjectTemporaryProcess",
 				"BeaconCleanupProcess", "toWideChar", "BeaconGetOutputData":
 				fallthrough
@@ -534,15 +489,46 @@ func LoadWithToken(coffBytes []byte, argBytes []byte, method string, token uintp
 
 	var bofOutput strings.Builder
 	var bofErr error
-	for msg := range output {
-		if s, ok := msg.(string); ok {
-			if strings.HasPrefix(s, "BOF native exception:") || strings.HasPrefix(s, "Panic occurred") || strings.HasPrefix(s, "Entry symbol") {
-				bofErr = fmt.Errorf("%s", strings.TrimSpace(s))
+
+	// Read output with a timeout. If the BOF crashes, Go's runtime may
+	// terminate the goroutine without running deferred functions (including
+	// close(outChannel)). The timeout prevents us from hanging forever.
+	bofTimeout := 5 * 60 * time.Second // 5 minutes for slow BOFs
+	timer := time.NewTimer(bofTimeout)
+	defer timer.Stop()
+
+	loop:
+	for {
+		select {
+		case msg, ok := <-output:
+			if !ok {
+				break loop
 			}
-			bofOutput.WriteString(s)
-			bofOutput.WriteString("\n")
-		} else if msg != nil {
-			bofOutput.WriteString(fmt.Sprintf("%v\n", msg))
+			if s, ok := msg.(string); ok {
+				if strings.HasPrefix(s, "BOF native exception:") || strings.HasPrefix(s, "Panic occurred") || strings.HasPrefix(s, "Entry symbol") {
+					bofErr = fmt.Errorf("%s", strings.TrimSpace(s))
+				}
+				bofOutput.WriteString(s)
+				bofOutput.WriteString("\n")
+			} else if msg != nil {
+				bofOutput.WriteString(fmt.Sprintf("%v\n", msg))
+			}
+		case <-timer.C:
+			// Timeout: the goroutine likely crashed.
+			// Check VEH telemetry for fault info.
+			bofFaultMu.Lock()
+			faulted := hasFaulted
+			fault := currentFault
+			bofFaultMu.Unlock()
+
+			if faulted {
+				bofErr = fmt.Errorf("BOF native exception: code=0x%08X addr=0x%X (detected via timeout)", fault.code, fault.addr)
+				bofOutput.WriteString(bofErr.Error())
+			} else {
+				bofErr = fmt.Errorf("BOF execution timed out after %v", bofTimeout)
+				bofOutput.WriteString(bofErr.Error())
+			}
+			break loop
 		}
 	}
 
@@ -555,13 +541,22 @@ func LoadWithToken(coffBytes []byte, argBytes []byte, method string, token uintp
 }
 
 func invokeMethod(methodName string, argBytes []byte, parsedCoff *pecoff.File, sectionMap map[string]CoffSection, outChannel chan<- any, token uintptr) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
 	defer close(outChannel)
 
 	defer func() {
+		bofFaultMu.Lock()
+		isExecutingBOF = false
+		faulted := hasFaulted
+		fault := currentFault
+		hasFaulted = false
+		bofFaultMu.Unlock()
+
 		if r := recover(); r != nil {
-			outChannel <- fmt.Sprintf("Panic occurred when executing COFF: %v\n%s", r, debug.Stack())
+			if faulted {
+				outChannel <- fmt.Sprintf("BOF native exception: code=0x%08X addr=0x%X", fault.code, fault.addr)
+			} else {
+				outChannel <- fmt.Sprintf("Panic occurred when executing COFF: %v\n%s", r, debug.Stack())
+			}
 		}
 	}()
 
@@ -623,13 +618,13 @@ func invokeMethod(methodName string, argBytes []byte, parsedCoff *pecoff.File, s
 		currentFault = bofFault{}
 		bofFaultMu.Unlock()
 
-		syscall.SyscallN(entryPoint, uintptr(unsafe.Pointer(&argBytes[0])), uintptr(len(argBytes)))
+		callBOF(entryPoint, uintptr(unsafe.Pointer(&argBytes[0])), uintptr(len(argBytes)))
 
 		bofFaultMu.Lock()
+		isExecutingBOF = false
 		faulted := hasFaulted
 		fault := currentFault
-		isExecutingBOF = false
-		currentSavedRSP = 0
+		hasFaulted = false
 		bofFaultMu.Unlock()
 
 		if faulted {
