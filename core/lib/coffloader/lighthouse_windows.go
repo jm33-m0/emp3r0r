@@ -431,6 +431,13 @@ func BeaconGetSpawnToStub(x86 uintptr, buffer uintptr, length int32) uintptr {
 	return 1
 }
 
+// BeaconSpawnTemporaryProcessStub is a minimal stub for the
+// BeaconSpawnTemporaryProcess API. Returns 0 (failure) so
+// injection BOFs that require it fail gracefully.
+func BeaconSpawnTemporaryProcessStub(x86 uintptr, ignoreToken uintptr, si uintptr, pi uintptr) uintptr {
+	return 0
+}
+
 func swapEndianness(indata uint32) uint32 {
 	return (indata>>24)&0x000000ff |
 		(indata>>8)&0x0000ff00 |

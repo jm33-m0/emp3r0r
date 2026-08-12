@@ -148,8 +148,10 @@ func resolveExternalAddress(symbolName string, outChannel chan<- any) uintptr {
 				return windows.NewCallback(BeaconFormatInt)
 			case "BeaconGetSpawnTo":
 				return windows.NewCallback(BeaconGetSpawnToStub)
+			case "BeaconSpawnTemporaryProcess":
+				return windows.NewCallback(BeaconSpawnTemporaryProcessStub)
 			case "BeaconUseToken", "BeaconRevertToken", "BeaconIsAdmin",
-				"BeaconSpawnTemporaryProcess", "BeaconInjectProcess", "BeaconInjectTemporaryProcess",
+				"BeaconInjectProcess", "BeaconInjectTemporaryProcess",
 				"BeaconCleanupProcess", "toWideChar", "BeaconGetOutputData":
 				fallthrough
 			default:
@@ -618,7 +620,7 @@ func invokeMethod(methodName string, argBytes []byte, parsedCoff *pecoff.File, s
 		currentFault = bofFault{}
 		bofFaultMu.Unlock()
 
-		callBOF(entryPoint, uintptr(unsafe.Pointer(&argBytes[0])), uintptr(len(argBytes)))
+		syscall.SyscallN(entryPoint, uintptr(unsafe.Pointer(&argBytes[0])), uintptr(len(argBytes)))
 
 		bofFaultMu.Lock()
 		isExecutingBOF = false
