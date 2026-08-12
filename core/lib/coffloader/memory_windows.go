@@ -9,8 +9,16 @@ func CopyMemory(dst, src uintptr, length uint32) {
 	copy((*[1 << 30]byte)(unsafe.Pointer(dst))[:length], (*[1 << 30]byte)(unsafe.Pointer(src))[:length])
 }
 
-func ReadBytesFromPtr(src uintptr, length uint32) []byte {
-	out := make([]byte, length)
+func ReadBytesFromPtr(src uintptr, length uint32) (out []byte) {
+	if src == 0 || length == 0 {
+		return nil
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			out = nil
+		}
+	}()
+	out = make([]byte, length)
 	CopyMemory(uintptr(unsafe.Pointer(&out[0])), src, length)
 	return out
 }
@@ -23,11 +31,15 @@ func ReadShortFromPtr(src uintptr) uint16 {
 	return *(*uint16)(unsafe.Pointer(src))
 }
 
-func ReadCStringFromPtr(src uintptr) string {
+func ReadCStringFromPtr(src uintptr) (str string) {
 	if src == 0 {
 		return ""
 	}
-	str := ""
+	defer func() {
+		if r := recover(); r != nil {
+			// Catch memory protection fault on invalid/freed pointers
+		}
+	}()
 	offset := 0
 	for {
 		c := *(*byte)(unsafe.Pointer(src + uintptr(offset)))

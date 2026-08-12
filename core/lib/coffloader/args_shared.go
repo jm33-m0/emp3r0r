@@ -34,15 +34,16 @@ func normalizeCoffValue(arg CoffArg) (string, error) {
 	// Handle the single character prefixed types produced by modcustom first.
 	// These are case sensitive because "z" (narrow) and "Z" (wide) map to different things,
 	// and "s" (short) and "S" (legacy string) mean different things.
-	if wireType == "z" {
+	switch wireType {
+	case "z":
 		return "z" + fmt.Sprint(val), nil
-	} else if wireType == "Z" {
+	case "Z":
 		return "Z" + fmt.Sprint(val), nil
-	} else if wireType == "i" {
+	case "i":
 		return formatInt(val, "i")
-	} else if wireType == "s" {
+	case "s":
 		return formatInt(val, "s")
-	} else if wireType == "b" {
+	case "b":
 		return formatBinary(val)
 	}
 

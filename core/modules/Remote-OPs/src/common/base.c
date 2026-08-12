@@ -43,10 +43,10 @@ void internal_printf(const char* format, ...){
     va_start(args, format);
     buffersize = MSVCRT$vsnprintf(NULL, 0, format, args); // +1 because vsprintf goes to buffersize-1 , and buffersize won't return with the null
     va_end(args);
-    intBuffer = (char*)intAlloc(buffersize);
+    intBuffer = (char*)intAlloc(buffersize + 1);
     /*Print string to memory buffer*/
     va_start(args, format);
-    MSVCRT$vsnprintf(intBuffer, buffersize, format, args); // tmpBuffer2 has a null terminated string
+    MSVCRT$vsnprintf(intBuffer, buffersize + 1, format, args); // tmpBuffer2 has a null terminated string
     va_end(args);
     if(buffersize + currentoutsize < bufsize) // If this print doesn't overflow our output buffer, just buffer it to the end
     {

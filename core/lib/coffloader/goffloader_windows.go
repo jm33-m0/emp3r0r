@@ -4,6 +4,7 @@ package coffloader
 
 import (
 	"fmt"
+	"runtime"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -17,21 +18,10 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// PreExecHook is called on the BOF goroutine immediately before the COFF
-// entry point is invoked. It receives the impersonation token handle (0 if
-// none). The hook should lock the OS thread and impersonate.
-var PreExecHook func(token uintptr)
-
-// PostExecHook is called on the BOF goroutine immediately after the COFF
-// entry point returns (or panics). It should revert impersonation and
-// unlock the OS thread.
-var PostExecHook func()
-
-// activeToken is the token handle passed to RunWindowsCOFF for the current
-// execution; it is read by invokeMethod's goroutine.
 var (
-	activeTokenMu sync.Mutex
-	activeToken   uintptr
+	PreExecHook  func(token uintptr)
+	PostExecHook func()
+	hooksMu      sync.RWMutex
 )
 
 const (
@@ -44,19 +34,24 @@ const (
 )
 
 var (
-	kernel32                           = syscall.MustLoadDLL("kernel32.dll")
-	procVirtualAlloc                   = kernel32.MustFindProc("VirtualAlloc")
-	procVirtualProtect                 = kernel32.MustFindProc("VirtualProtect")
-	procVirtualFree                    = kernel32.MustFindProc("VirtualFree")
-	procAddVectoredExceptionHandler    = kernel32.MustFindProc("AddVectoredExceptionHandler")
-	procRemoveVectoredExceptionHandler = kernel32.MustFindProc("RemoveVectoredExceptionHandler")
+	kernel32                        = syscall.MustLoadDLL("kernel32.dll")
+	procVirtualAlloc                = kernel32.MustFindProc("VirtualAlloc")
+	procVirtualProtect              = kernel32.MustFindProc("VirtualProtect")
+	procVirtualFree                 = kernel32.MustFindProc("VirtualFree")
+	procAddVectoredExceptionHandler = kernel32.MustFindProc("AddVectoredExceptionHandler")
 
-	isExecutingBOF    bool
-	bofExceptionCode  uint32
-	bofExceptionAddr  uintptr
-	vehHandlerHandle  uintptr
-	bofRecoveryHandle uintptr
+	vehHandlerHandle uintptr
+
+	bofFaultMu     sync.Mutex
+	isExecutingBOF bool
+	currentFault   bofFault
+	hasFaulted     bool
 )
+
+type bofFault struct {
+	code uint32
+	addr uintptr
+}
 
 type exceptionRecordStruct struct {
 	ExceptionCode        uint32
@@ -72,22 +67,27 @@ type exceptionPointersStruct struct {
 	ContextRecord   uintptr
 }
 
-func initVEH() {
-	if vehHandlerHandle != 0 {
-		return
-	}
-	bofRecoveryHandle = windows.NewCallback(bofRecoveryStub)
-	handlerCallback := windows.NewCallback(vehHandler)
-	ret, _, _ := procAddVectoredExceptionHandler.Call(1, handlerCallback)
-	vehHandlerHandle = ret
-}
+var vehOnce sync.Once
 
-func bofRecoveryStub() uintptr {
-	panic(fmt.Sprintf("BOF native SEH exception 0x%X at address 0x%X", bofExceptionCode, bofExceptionAddr))
+func initVEH() {
+	vehOnce.Do(func() {
+		handlerCallback := windows.NewCallback(vehHandler)
+		ret, _, _ := procAddVectoredExceptionHandler.Call(1, handlerCallback)
+		vehHandlerHandle = ret
+	})
 }
 
 func vehHandler(exceptionPointers uintptr) uintptr {
-	if exceptionPointers == 0 || !isExecutingBOF {
+	if exceptionPointers == 0 {
+		return 0 // EXCEPTION_CONTINUE_SEARCH
+	}
+
+	bofFaultMu.Lock()
+	executing := isExecutingBOF
+	savedRsp := currentSavedRSP
+	bofFaultMu.Unlock()
+
+	if !executing || savedRsp == 0 {
 		return 0 // EXCEPTION_CONTINUE_SEARCH
 	}
 
@@ -97,17 +97,31 @@ func vehHandler(exceptionPointers uintptr) uintptr {
 	}
 
 	code := ep.ExceptionRecord.ExceptionCode
-	if code >= 0x80000000 {
-		bofExceptionCode = code
-		bofExceptionAddr = ep.ExceptionRecord.ExceptionAddress
-		isExecutingBOF = false
+	// Only catch hardware exceptions (0xC0000000-0xCFFFFFFF, 0x80000001, 0x80000002).
+	// Software exceptions (e.g. C++ 0xE0xxxxxx, CLR 0xE0434352) are passed through
+	// so internal BOF exception handling (try/catch) continues to work.
+	isHardwareExc := (code&0xF0000000) == 0xC0000000 || code == 0x80000001 || code == 0x80000002
 
+	if isHardwareExc {
+		bofFaultMu.Lock()
+		currentFault = bofFault{code: code, addr: ep.ExceptionRecord.ExceptionAddress}
+		hasFaulted = true
+		isExecutingBOF = false
+		bofFaultMu.Unlock()
+
+		// Read return address inside callBOF right after CALL AX from *(savedRsp - 8).
+		// Safely restore RSP to callBOF stack frame pointer (savedRsp - 8) and redirect RIP to retAddr.
+		// When NtContinue resumes execution, callBOF executes ADDQ $32, SP; RET,
+		// returning cleanly back into invokeMethod without invalidating Go's stack unwinder.
+		retAddr := *(*uintptr)(unsafe.Pointer(savedRsp))
 		if unsafe.Sizeof(uintptr(0)) == 8 {
-			// 64-bit AMD64: RIP offset is 0xF8 (248) inside CONTEXT
-			*(*uintptr)(unsafe.Pointer(ep.ContextRecord + 0xF8)) = bofRecoveryHandle
+			// 64-bit AMD64: RSP is at offset 0x98 (152), RIP is at offset 0xF8 (248) inside CONTEXT
+			*(*uintptr)(unsafe.Pointer(ep.ContextRecord + 0x98)) = savedRsp
+			*(*uintptr)(unsafe.Pointer(ep.ContextRecord + 0xF8)) = retAddr
 		} else {
-			// 32-bit x86: EIP offset is 0xB4 (180) inside CONTEXT
-			*(*uintptr)(unsafe.Pointer(ep.ContextRecord + 0xB4)) = bofRecoveryHandle
+			// 32-bit x86: ESP is at offset 0xC4 (196), EIP is at offset 0xB4 (180) inside CONTEXT
+			*(*uintptr)(unsafe.Pointer(ep.ContextRecord + 0xC4)) = savedRsp
+			*(*uintptr)(unsafe.Pointer(ep.ContextRecord + 0xB4)) = retAddr
 		}
 
 		return ^uintptr(0) // EXCEPTION_CONTINUE_EXECUTION (-1)
@@ -189,13 +203,44 @@ func resolveExternalAddress(symbolName string, outChannel chan<- any) uintptr {
 			}
 		}
 
+		if strings.EqualFold(libName, "MSVCRT.dll") {
+			if procName == "vsnprintf" || procName == "_vsnprintf" {
+				if ntdll, err := syscall.LoadLibrary("ntdll.dll"); err == nil && ntdll != 0 {
+					if addr, err := syscall.GetProcAddress(ntdll, "_vsnprintf"); err == nil && addr != 0 {
+						return addr
+					}
+				}
+			}
+			if ucrt, err := syscall.LoadLibrary("ucrtbase.dll"); err == nil && ucrt != 0 {
+				if addr, err := syscall.GetProcAddress(ucrt, procName); err == nil && addr != 0 {
+					return addr
+				}
+				if strings.HasPrefix(procName, "_") {
+					if addr, err := syscall.GetProcAddress(ucrt, strings.TrimPrefix(procName, "_")); err == nil && addr != 0 {
+						return addr
+					}
+				} else {
+					if addr, err := syscall.GetProcAddress(ucrt, "_"+procName); err == nil && addr != 0 {
+						return addr
+					}
+				}
+			}
+		}
+
 		libStringPtr, err := syscall.LoadLibrary(libName)
 		if err != nil {
 			logging.Errorf("Failed to load library %s for symbol %s: %v", libName, symbolName, err)
 			return 0
 		}
 		procAddress, err := syscall.GetProcAddress(libStringPtr, procName)
-		if err != nil {
+		if err != nil || procAddress == 0 {
+			if strings.HasPrefix(procName, "_") {
+				procAddress, err = syscall.GetProcAddress(libStringPtr, strings.TrimPrefix(procName, "_"))
+			} else {
+				procAddress, err = syscall.GetProcAddress(libStringPtr, "_"+procName)
+			}
+		}
+		if err != nil || procAddress == 0 {
 			logging.Errorf("Failed to get proc address %s in %s for symbol %s: %v", procName, libName, symbolName, err)
 			return 0
 		}
@@ -234,34 +279,26 @@ func isImportSymbol(sym *pecoff.Symbol) bool {
 	return strings.HasPrefix(sym.NameString(), "__imp_")
 }
 
-func processRelocation(symbolDefAddress uintptr, sectionAddress uintptr, reloc windef.Relocation, symbol *pecoff.Symbol) error {
+func processRelocation(symbolDefAddress uintptr, sectionAddress uintptr, reloc windef.Relocation, _ *pecoff.Symbol) error {
 	if sectionAddress == 0 {
 		return fmt.Errorf("invalid section address (0)")
 	}
 	symbolOffset := uintptr(reloc.VirtualAddress)
 	absoluteSymbolAddress := symbolOffset + sectionAddress
-	segmentValue := *(*uint32)(unsafe.Pointer(absoluteSymbolAddress))
-
-	if (symbol.StorageClass == windef.IMAGE_SYM_CLASS_STATIC && symbol.Value != 0) ||
-		(symbol.StorageClass == windef.IMAGE_SYM_CLASS_EXTERNAL && symbol.SectionNumber != 0) {
-		symbolOffset = uintptr(symbol.Value)
-	} else {
-		symbolDefAddress += uintptr(segmentValue)
-	}
 
 	switch reloc.Type {
 	case windef.IMAGE_REL_AMD64_ADDR64:
 		addr := (*uint64)(unsafe.Pointer(absoluteSymbolAddress))
 		*addr = uint64(symbolDefAddress)
 	case windef.IMAGE_REL_AMD64_ADDR32NB:
-		// Standard COFF formula: sym_addr - (section_base + reloc_offset + 4)
 		addr := (*uint32)(unsafe.Pointer(absoluteSymbolAddress))
 		valueToWrite := symbolDefAddress - (sectionAddress + uintptr(reloc.VirtualAddress) + 4)
 		*addr = uint32(valueToWrite)
 	case windef.IMAGE_REL_AMD64_REL32, windef.IMAGE_REL_AMD64_REL32_1, windef.IMAGE_REL_AMD64_REL32_2, windef.IMAGE_REL_AMD64_REL32_3, windef.IMAGE_REL_AMD64_REL32_4, windef.IMAGE_REL_AMD64_REL32_5:
-		// Standard COFF REL32 formula (see TrustedSec COFFLoader):
-		//   *(DWORD*)addr = sym_addr + reloc_type - IMAGE_REL_AMD64_REL32 - addr - 4
-		relativeSymbolDefAddress := symbolDefAddress + uintptr(reloc.Type) - uintptr(windef.IMAGE_REL_AMD64_REL32) - absoluteSymbolAddress - 4
+		addend := int32(*(*uint32)(unsafe.Pointer(absoluteSymbolAddress)))
+		target := symbolDefAddress + uintptr(addend)
+		relocOffset := absoluteSymbolAddress + 4 + (uintptr(reloc.Type) - uintptr(windef.IMAGE_REL_AMD64_REL32))
+		relativeSymbolDefAddress := target - relocOffset
 		addr := (*uint32)(unsafe.Pointer(absoluteSymbolAddress))
 		*addr = uint32(relativeSymbolDefAddress)
 	default:
@@ -276,7 +313,7 @@ type CoffSection struct {
 }
 
 func CoffLoad(coffBytes []byte, argBytes []byte) (string, error) {
-	return LoadWithMethod(coffBytes, argBytes, "go")
+	return LoadWithToken(coffBytes, argBytes, "go", 0)
 }
 
 // AlterProtection changes permissions of a memory section
@@ -288,7 +325,11 @@ func AlterProtection(oldProtect, newProtect int, addr, size uintptr) error {
 	return nil
 }
 
-func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (res string, err error) {
+func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (string, error) {
+	return LoadWithToken(coffBytes, argBytes, method, 0)
+}
+
+func LoadWithToken(coffBytes []byte, argBytes []byte, method string, token uintptr) (res string, err error) {
 	var baseBlockAddr uintptr
 	var totalSize uintptr
 
@@ -302,31 +343,22 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (res strin
 		}
 	}()
 
-	if len(coffBytes) == 0 {
-		return "", fmt.Errorf("coffBytes is empty")
-	}
-
-	output := make(chan any)
-
 	parsedCoff := pecoff.Explore(binutil.WrapByteSlice(coffBytes))
 	if parsedCoff == nil {
-		return "", fmt.Errorf("failed to explore COFF payload")
+		return "", fmt.Errorf("failed to explore COFF file: null handle")
 	}
 
-	if parseErr := parsedCoff.ReadAll(); parseErr != nil {
-		return "", fmt.Errorf("failed to read COFF structure: %w", parseErr)
+	if err := parsedCoff.ReadAll(); err != nil {
+		return "", fmt.Errorf("failed to read COFF structure: %w", err)
 	}
+
 	parsedCoff.Seal()
 
-	if parsedCoff.Sections == nil {
-		return "", fmt.Errorf("invalid COFF: no sections found")
-	}
-
-	sections := make(map[string]CoffSection, parsedCoff.Sections.Len())
-
-	gotOffset := 0
+	sections := make(map[string]CoffSection)
 	gotSize := uint32(0)
+
 	gotMap := make(map[string]uintptr)
+	gotOffset := 0
 
 	bssBaseAddress := uintptr(0)
 	bssOffset := 0
@@ -345,7 +377,6 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (res strin
 		}
 	}
 
-	// Calculate single contiguous memory allocation for all sections + BSS + GOT
 	sectionOffsets := make(map[string]uintptr)
 
 	for _, section := range parsedCoff.Sections.Array() {
@@ -361,7 +392,6 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (res strin
 			continue
 		}
 
-		// Align to 16 bytes
 		if totalSize%16 != 0 {
 			totalSize += 16 - (totalSize % 16)
 		}
@@ -383,7 +413,7 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (res strin
 	}
 
 	var allocErr error
-	baseBlockAddr, allocErr = virtualAlloc(0, totalSize, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE)
+	baseBlockAddr, allocErr = virtualAlloc(0, totalSize, MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE)
 	if allocErr != nil {
 		return "", fmt.Errorf("VirtualAlloc failed for COFF payload (%d bytes): %w", totalSize, allocErr)
 	}
@@ -393,41 +423,45 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (res strin
 		gotBaseAddress = baseBlockAddr + gotOffsetInBlock
 	}
 
+	// Populate memory block
 	for _, section := range parsedCoff.Sections.Array() {
 		if section == nil {
 			continue
 		}
-		offset, ok := sectionOffsets[section.NameString()]
-		if !ok {
+
+		offset, exists := sectionOffsets[section.NameString()]
+		if !exists {
 			continue
 		}
-		addr := baseBlockAddr + offset
-		if strings.HasPrefix(section.NameString(), ".bss") {
-			bssBaseAddress = addr
-		}
 
-		if section.SizeOfRawData > 0 {
-			copy((*[1 << 30]byte)(unsafe.Pointer(addr))[:], section.RawData())
-		}
-
+		destAddr := baseBlockAddr + offset
 		sections[section.NameString()] = CoffSection{
 			Section: section,
-			Address: addr,
+			Address: destAddr,
+		}
+
+		if strings.HasPrefix(section.NameString(), ".bss") {
+			bssBaseAddress = destAddr
+			continue
+		}
+
+		rawData := section.RawData()
+		if len(rawData) > 0 {
+			copy((*[1 << 30]byte)(unsafe.Pointer(destAddr))[:len(rawData)], rawData)
 		}
 	}
 
-	for _, section := range parsedCoff.Sections.Array() {
-		if section == nil {
-			continue
-		}
-		secInfo, ok := sections[section.NameString()]
-		if !ok && section.SizeOfRawData > 0 && !strings.HasPrefix(section.NameString(), ".bss") {
-			continue
-		}
-		sectionVirtualAddr := secInfo.Address
+	output := make(chan any, 1000)
 
-		for _, reloc := range section.Relocations() {
-			if reloc.SymbolTableIndex >= uint32(len(parsedCoff.Symbols)) {
+	// Process relocations
+	for _, sectionVirtualAddr := range sections {
+		if sectionVirtualAddr.Section == nil {
+			continue
+		}
+
+		for _, reloc := range sectionVirtualAddr.Section.Relocations() {
+			if int(reloc.SymbolTableIndex) >= len(parsedCoff.Symbols) {
+				procVirtualFree.Call(baseBlockAddr, 0, windows.MEM_RELEASE)
 				return "", fmt.Errorf("relocation symbol table index %d out of bounds (%d symbols)", reloc.SymbolTableIndex, len(parsedCoff.Symbols))
 			}
 
@@ -443,6 +477,7 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (res strin
 					externalAddress := resolveExternalAddress(symbol.NameString(), output)
 
 					if externalAddress == 0 {
+						procVirtualFree.Call(baseBlockAddr, 0, windows.MEM_RELEASE)
 						return "", fmt.Errorf("failed to resolve external address for symbol: %s", symbol.NameString())
 					}
 
@@ -456,6 +491,7 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (res strin
 					copy((*[8]byte)(unsafe.Pointer(symbolDefAddress))[:], (*[8]byte)(unsafe.Pointer(&externalAddress))[:])
 				} else {
 					if bssBaseAddress == 0 {
+						procVirtualFree.Call(baseBlockAddr, 0, windows.MEM_RELEASE)
 						return "", fmt.Errorf("bssBaseAddress is 0 when resolving symbol %s", symbol.NameString())
 					}
 					symbolDefAddress = bssBaseAddress + uintptr(bssOffset)
@@ -464,36 +500,45 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (res strin
 			} else {
 				secIdx := int(symbol.SectionNumber) - 1
 				if secIdx < 0 || secIdx >= len(parsedCoff.Sections.Array()) {
+					procVirtualFree.Call(baseBlockAddr, 0, windows.MEM_RELEASE)
 					return "", fmt.Errorf("invalid section number %d for symbol %s", symbol.SectionNumber, symbol.NameString())
 				}
 				targetSection := parsedCoff.Sections.Array()[secIdx]
 				if targetSection == nil {
+					procVirtualFree.Call(baseBlockAddr, 0, windows.MEM_RELEASE)
 					return "", fmt.Errorf("target section for symbol %s is nil", symbol.NameString())
 				}
 				targetCoffSec, ok := sections[targetSection.NameString()]
 				if !ok {
+					procVirtualFree.Call(baseBlockAddr, 0, windows.MEM_RELEASE)
 					return "", fmt.Errorf("target section %s not allocated", targetSection.NameString())
 				}
 				symbolDefAddress = targetCoffSec.Address + uintptr(symbol.Value)
 			}
 
-			if relocErr := processRelocation(symbolDefAddress, sectionVirtualAddr, reloc, symbol); relocErr != nil {
+			if relocErr := processRelocation(symbolDefAddress, sectionVirtualAddr.Address, reloc, symbol); relocErr != nil {
+				procVirtualFree.Call(baseBlockAddr, 0, windows.MEM_RELEASE)
 				return "", fmt.Errorf("relocation failed for symbol %s: %w", symbol.NameString(), relocErr)
 			}
 		}
 	}
 
 	// Change memory protection of the entire BOF block to PAGE_EXECUTE_READWRITE
-	if err := AlterProtection(PAGE_READWRITE, PAGE_EXECUTE_READWRITE, baseBlockAddr, totalSize); err != nil {
-		return "", fmt.Errorf("failed to set execution protection on BOF payload: %w", err)
+	if errProtect := AlterProtection(PAGE_READWRITE, PAGE_EXECUTE_READWRITE, baseBlockAddr, totalSize); errProtect != nil {
+		procVirtualFree.Call(baseBlockAddr, 0, windows.MEM_RELEASE)
+		return "", fmt.Errorf("failed to change BOF memory permissions: %w", errProtect)
 	}
 
 	// Call the entry point
-	go invokeMethod(method, argBytes, parsedCoff, sections, output)
+	go invokeMethod(method, argBytes, parsedCoff, sections, output, token)
 
 	var bofOutput strings.Builder
+	var bofErr error
 	for msg := range output {
 		if s, ok := msg.(string); ok {
+			if strings.HasPrefix(s, "BOF native exception:") || strings.HasPrefix(s, "Panic occurred") || strings.HasPrefix(s, "Entry symbol") {
+				bofErr = fmt.Errorf("%s", strings.TrimSpace(s))
+			}
 			bofOutput.WriteString(s)
 			bofOutput.WriteString("\n")
 		} else if msg != nil {
@@ -506,74 +551,89 @@ func LoadWithMethod(coffBytes []byte, argBytes []byte, method string) (res strin
 	clear(memSlice)
 	procVirtualFree.Call(baseBlockAddr, 0, windows.MEM_RELEASE)
 
-	return bofOutput.String(), nil
+	return bofOutput.String(), bofErr
 }
 
-func invokeMethod(methodName string, argBytes []byte, parsedCoff *pecoff.File, sectionMap map[string]CoffSection, outChannel chan<- any) {
+func invokeMethod(methodName string, argBytes []byte, parsedCoff *pecoff.File, sectionMap map[string]CoffSection, outChannel chan<- any, token uintptr) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 	defer close(outChannel)
 
 	defer func() {
-		isExecutingBOF = false
 		if r := recover(); r != nil {
-			errorMsg := fmt.Sprintf("Panic occurred when executing COFF: %v\n%s", r, debug.Stack())
-			outChannel <- errorMsg
+			outChannel <- fmt.Sprintf("Panic occurred when executing COFF: %v\n%s", r, debug.Stack())
 		}
 	}()
-
-	initVEH()
 
 	if parsedCoff == nil || parsedCoff.Sections == nil {
 		outChannel <- "COFF file structure is invalid or nil"
 		return
 	}
 
-	// Call the entry point
 	found := false
 	for _, symbol := range parsedCoff.Symbols {
-		if symbol != nil && symbol.NameString() == methodName {
-			found = true
-			secIdx := int(symbol.SectionNumber) - 1
-			if secIdx < 0 || secIdx >= len(parsedCoff.Sections.Array()) {
-				outChannel <- fmt.Sprintf("Invalid section number %d for entry symbol %s", symbol.SectionNumber, methodName)
-				return
-			}
-			mainSection := parsedCoff.Sections.Array()[secIdx]
-			if mainSection == nil {
-				outChannel <- fmt.Sprintf("Entry section for symbol %s is nil", methodName)
-				return
-			}
-			sec, ok := sectionMap[mainSection.NameString()]
-			if !ok || sec.Address == 0 {
-				outChannel <- fmt.Sprintf("Entry section %s memory not allocated", mainSection.NameString())
-				return
-			}
-			entryPoint := sec.Address + uintptr(symbol.Value)
+		if symbol == nil || symbol.NameString() != methodName {
+			continue
+		}
+		found = true
 
-			// BOF always reads a 4-byte length prefix regardless of argc.
-			// Provide a zero-length buffer so the BOF sees no arguments.
-			if len(argBytes) == 0 {
-				argBytes = make([]byte, 4)
-			}
+		secIdx := int(symbol.SectionNumber) - 1
+		if secIdx < 0 || secIdx >= len(parsedCoff.Sections.Array()) {
+			outChannel <- fmt.Sprintf("Invalid section number %d for entry symbol %s", symbol.SectionNumber, methodName)
+			return
+		}
+		mainSection := parsedCoff.Sections.Array()[secIdx]
+		if mainSection == nil {
+			outChannel <- fmt.Sprintf("Entry section for symbol %s is nil", methodName)
+			return
+		}
+		sec, ok := sectionMap[mainSection.NameString()]
+		if !ok || sec.Address == 0 {
+			outChannel <- fmt.Sprintf("Entry section %s memory not allocated", mainSection.NameString())
+			return
+		}
+		entryPoint := sec.Address + uintptr(symbol.Value)
 
-			isExecutingBOF = true
+		// BOF always reads a 4-byte length prefix regardless of argc.
+		// Provide a zero-length buffer so the BOF sees no arguments.
+		if len(argBytes) == 0 {
+			argBytes = make([]byte, 4)
+		}
 
-			// If a token was provided, impersonate on this goroutine before
-			// calling the BOF so that any Win32 APIs it invokes see the
-			// stolen identity.
-			activeTokenMu.Lock()
-			tok := activeToken
-			activeTokenMu.Unlock()
-			if tok != 0 && PreExecHook != nil {
-				PreExecHook(tok)
-				defer func() {
-					if PostExecHook != nil {
-						PostExecHook()
-					}
-				}()
-			}
+		// Optionally impersonate before calling the BOF.
+		hooksMu.RLock()
+		preHook := PreExecHook
+		postHook := PostExecHook
+		hooksMu.RUnlock()
 
-			syscall.SyscallN(entryPoint, uintptr(unsafe.Pointer(&argBytes[0])), uintptr(len(argBytes)))
-			isExecutingBOF = false
+		if token != 0 && preHook != nil {
+			preHook(token)
+			defer func() {
+				if postHook != nil {
+					postHook()
+				}
+			}()
+		}
+
+		initVEH()
+
+		bofFaultMu.Lock()
+		isExecutingBOF = true
+		hasFaulted = false
+		currentFault = bofFault{}
+		bofFaultMu.Unlock()
+
+		syscall.SyscallN(entryPoint, uintptr(unsafe.Pointer(&argBytes[0])), uintptr(len(argBytes)))
+
+		bofFaultMu.Lock()
+		faulted := hasFaulted
+		fault := currentFault
+		isExecutingBOF = false
+		currentSavedRSP = 0
+		bofFaultMu.Unlock()
+
+		if faulted {
+			outChannel <- fmt.Sprintf("BOF native exception: code=0x%08X addr=0x%X", fault.code, fault.addr)
 		}
 	}
 	if !found {

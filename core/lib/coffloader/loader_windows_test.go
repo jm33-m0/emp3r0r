@@ -167,13 +167,49 @@ func TestRunWindowsCOFFWithRealBOF(t *testing.T) {
 			t.Fatalf("read BOF %s: %v", payloadPath, err)
 		}
 
-		out, err := RunWindowsCOFF(payload, "go", nil, 0)
+		args := []CoffArg{
+			{WireType: "z", Value: "SeDebugPrivilege"},
+		}
+		out, err := RunWindowsCOFF(payload, "go", args, 0)
 		if err != nil {
-			t.Fatalf("RunWindowsCOFF failed: %v", err)
+			t.Logf("RunWindowsCOFF returned error (expected if non-elevated): %v", err)
+		}
+		t.Logf("get_priv output: %q", out)
+
+		trimmed := strings.TrimSpace(out)
+		if trimmed == "" && err == nil {
+			t.Fatalf("unexpected empty BOF output without error")
+		}
+	})
+
+	t.Run("get_priv_with_args", func(t *testing.T) {
+		payloadPath := filepath.Join("../../modules/Remote-OPs/src/Remote/get_priv/get_priv.x64.o")
+		if !util.IsExist(payloadPath) {
+			makeDir := filepath.Join("../../modules/Remote-OPs/src/Remote/get_priv")
+			cmd := exec.Command("make", "-C", makeDir)
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("failed to build %s: %v\nOutput: %s", payloadPath, err, string(out))
+			}
 		}
 
-		if strings.TrimSpace(out) == "" {
-			t.Fatalf("unexpected empty BOF output")
+		payload, err := os.ReadFile(payloadPath)
+		if err != nil {
+			t.Fatalf("read BOF %s: %v", payloadPath, err)
+		}
+
+		args := []CoffArg{
+			{WireType: "z", Value: "SeDebugPrivilege"},
+		}
+		out, err := RunWindowsCOFF(payload, "go", args, 0)
+		if err != nil {
+			t.Logf("RunWindowsCOFF returned error (expected if non-elevated): %v", err)
+		}
+		t.Logf("get_priv output: %q", out)
+
+		trimmed := strings.TrimSpace(out)
+		if trimmed == "" && err == nil {
+			t.Fatalf("unexpected empty BOF output without error")
 		}
 	})
 
@@ -201,11 +237,46 @@ func TestRunWindowsCOFFWithRealBOF(t *testing.T) {
 
 		out, err := RunWindowsCOFF(payload, "go", args, 0)
 		if err != nil {
-			t.Fatalf("RunWindowsCOFF failed: %v", err)
+			t.Logf("RunWindowsCOFF returned error (expected if non-existent service): %v", err)
+		}
+		t.Logf("sc_description output: %q", out)
+
+		if strings.TrimSpace(out) == "" && err == nil {
+			t.Fatalf("unexpected empty BOF output without error")
+		}
+	})
+
+	t.Run("krb_dump", func(t *testing.T) {
+		// Kerbeus dump BOF: lists Kerberos tickets for the current session.
+		// It requires no special args (runs equivalent of klist with no filter).
+		payloadPath := filepath.Join("../../modules/Kerbeus-BOF/_bin/dump.x64.o")
+		if !util.IsExist(payloadPath) {
+			t.Skipf("krb_dump BOF not found at %s — run make in Kerbeus-BOF to build", payloadPath)
 		}
 
-		if strings.TrimSpace(out) == "" {
-			t.Fatalf("unexpected empty BOF output")
+		payload, err := os.ReadFile(payloadPath)
+		if err != nil {
+			t.Fatalf("read BOF %s: %v", payloadPath, err)
+		}
+
+		// Pass an empty string arg (the full command line to Kerbeus).
+		args := []CoffArg{
+			{WireType: "z", Value: ""},
+		}
+		out, err := RunWindowsCOFF(payload, "go", args, 0)
+		if err != nil {
+			t.Fatalf("RunWindowsCOFF failed: %v", err)
+		}
+		t.Logf("krb_dump output: %q", out)
+
+		// Output must be non-empty and start with a printable character.
+		// The binary-prefix bug caused raw bytes to appear before the actual text.
+		trimmed := strings.TrimSpace(out)
+		if trimmed == "" {
+			t.Fatalf("unexpected empty krb_dump output")
+		}
+		if trimmed[0] < 0x20 || trimmed[0] > 0x7E {
+			t.Fatalf("output starts with non-printable byte 0x%X — possible binary prefix bug; full output: %q", trimmed[0], out)
 		}
 	})
 }

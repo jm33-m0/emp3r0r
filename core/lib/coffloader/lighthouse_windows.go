@@ -222,12 +222,16 @@ func formatPrintf(format string, args []uintptr) string {
 	return builder.String()
 }
 
-func GetCoffPrintfForChannel(channel chan<- interface{}) func(int, uintptr, uintptr, uintptr, uintptr, uintptr, uintptr, uintptr, uintptr, uintptr, uintptr, uintptr) uintptr {
-	return func(beaconType int, data uintptr, arg0 uintptr, arg1 uintptr, arg2 uintptr, arg3 uintptr, arg4 uintptr, arg5 uintptr, arg6 uintptr, arg7 uintptr, arg8 uintptr, arg9 uintptr) uintptr {
+func GetCoffPrintfForChannel(channel chan<- interface{}) func(int, uintptr, uintptr, uintptr) uintptr {
+	return func(beaconType int, data uintptr, arg0 uintptr, arg1 uintptr) (res uintptr) {
+		defer func() {
+			if r := recover(); r != nil {
+				res = 0
+			}
+		}()
 		out := ReadCStringFromPtr(data)
-		args := []uintptr{arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9}
+		args := []uintptr{arg0, arg1}
 		formatted := formatPrintf(out, args)
-		//fmt.Printf("%s\n", formatted) //uncomment for debugging failed BOF/Executable runs
 		channel <- formatted
 		return 0
 	}
@@ -246,8 +250,13 @@ type DataParser struct {
 	size     uint32
 }
 
-func DataExtract(datap *DataParser, size *uint32) uintptr {
-	if datap.length <= 0 {
+func DataExtract(datap *DataParser, size *uint32) (res uintptr) {
+	defer func() {
+		if r := recover(); r != nil {
+			res = 0
+		}
+	}()
+	if datap == nil || datap.length < 4 || datap.buffer == 0 {
 		return 0
 	}
 
@@ -259,13 +268,18 @@ func DataExtract(datap *DataParser, size *uint32) uintptr {
 	}
 
 	out := make([]byte, binaryLength)
-	CopyMemory(uintptr(unsafe.Pointer(&out[0])), datap.buffer, binaryLength)
-	if uintptr(unsafe.Pointer(size)) != uintptr(0) && binaryLength != 0 {
+	if binaryLength > 0 {
+		CopyMemory(uintptr(unsafe.Pointer(&out[0])), datap.buffer, binaryLength)
+	}
+	if size != nil && unsafe.Pointer(size) != nil && binaryLength != 0 {
 		*size = binaryLength
 	}
 
 	datap.buffer += uintptr(binaryLength)
 	datap.length -= binaryLength
+	if binaryLength == 0 {
+		return 0
+	}
 	// Keep the buffer alive by storing it in a global map to prevent GC
 	ptr := uintptr(unsafe.Pointer(&out[0]))
 	extractedBuffersMu.Lock()
@@ -274,19 +288,40 @@ func DataExtract(datap *DataParser, size *uint32) uintptr {
 	return ptr
 }
 
-func DataInt(datap *DataParser) uintptr {
+func DataInt(datap *DataParser) (res uintptr) {
+	defer func() {
+		if r := recover(); r != nil {
+			res = 0
+		}
+	}()
+	if datap == nil || datap.length < 4 || datap.buffer == 0 {
+		return 0
+	}
 	value := ReadUIntFromPtr(datap.buffer)
 	datap.buffer += uintptr(4)
 	datap.length -= 4
 	return uintptr(value)
 }
 
-func DataLength(datap *DataParser) uintptr {
+func DataLength(datap *DataParser) (res uintptr) {
+	defer func() {
+		if r := recover(); r != nil {
+			res = 0
+		}
+	}()
+	if datap == nil {
+		return 0
+	}
 	return uintptr(datap.length)
 }
 
-func DataParse(datap *DataParser, buff uintptr, size uint32) uintptr {
-	if size <= 0 {
+func DataParse(datap *DataParser, buff uintptr, size uint32) (res uintptr) {
+	defer func() {
+		if r := recover(); r != nil {
+			res = 0
+		}
+	}()
+	if datap == nil || buff == 0 || size <= 4 {
 		return 0
 	}
 	datap.original = buff
@@ -296,8 +331,13 @@ func DataParse(datap *DataParser, buff uintptr, size uint32) uintptr {
 	return 1
 }
 
-func DataShort(datap *DataParser) uintptr {
-	if datap.length < 2 {
+func DataShort(datap *DataParser) (res uintptr) {
+	defer func() {
+		if r := recover(); r != nil {
+			res = 0
+		}
+	}()
+	if datap == nil || datap.length < 2 || datap.buffer == 0 {
 		return 0
 	}
 
@@ -307,28 +347,63 @@ func DataShort(datap *DataParser) uintptr {
 	return uintptr(value)
 }
 
-var keyStore = make(map[string]uintptr, 0)
+var (
+	keyStore   = make(map[string]uintptr)
+	keyStoreMu sync.RWMutex
+)
 
-func AddValue(key uintptr, ptr uintptr) uintptr {
+func AddValue(key uintptr, ptr uintptr) (res uintptr) {
+	defer func() {
+		if r := recover(); r != nil {
+			res = 0
+		}
+	}()
+	if key == 0 {
+		return 0
+	}
 	sKey := ReadCStringFromPtr(key)
+	keyStoreMu.Lock()
 	keyStore[sKey] = ptr
+	keyStoreMu.Unlock()
 	return uintptr(1)
 }
 
-func GetValue(key uintptr) uintptr {
+func GetValue(key uintptr) (res uintptr) {
+	defer func() {
+		if r := recover(); r != nil {
+			res = 0
+		}
+	}()
+	if key == 0 {
+		return 0
+	}
 	sKey := ReadCStringFromPtr(key)
-	if value, exists := keyStore[sKey]; exists {
-		return value
+	keyStoreMu.RLock()
+	val, exists := keyStore[sKey]
+	keyStoreMu.RUnlock()
+	if exists {
+		return val
 	}
 	return uintptr(0)
 }
 
-func RemoveValue(key uintptr) uintptr {
+func RemoveValue(key uintptr) (res uintptr) {
+	defer func() {
+		if r := recover(); r != nil {
+			res = 0
+		}
+	}()
+	if key == 0 {
+		return 0
+	}
 	sKey := ReadCStringFromPtr(key)
+	keyStoreMu.Lock()
 	if _, exists := keyStore[sKey]; exists {
 		delete(keyStore, sKey)
+		keyStoreMu.Unlock()
 		return uintptr(1)
 	}
+	keyStoreMu.Unlock()
 	return uintptr(0)
 }
 
@@ -375,7 +450,12 @@ func appendToFormatBuffer(format *formatBuffer, data []byte) uintptr {
 	return 1
 }
 
-func BeaconFormatAlloc(format *formatBuffer, maxsz int32) uintptr {
+func BeaconFormatAlloc(format *formatBuffer, maxsz int32) (res uintptr) {
+	defer func() {
+		if r := recover(); r != nil {
+			res = 0
+		}
+	}()
 	if format == nil || maxsz <= 0 {
 		return 0
 	}
@@ -392,7 +472,12 @@ func BeaconFormatAlloc(format *formatBuffer, maxsz int32) uintptr {
 	return 1
 }
 
-func BeaconFormatReset(format *formatBuffer) uintptr {
+func BeaconFormatReset(format *formatBuffer) (res uintptr) {
+	defer func() {
+		if r := recover(); r != nil {
+			res = 0
+		}
+	}()
 	if format == nil {
 		return 0
 	}
@@ -408,7 +493,12 @@ func BeaconFormatReset(format *formatBuffer) uintptr {
 	return 1
 }
 
-func BeaconFormatFree(format *formatBuffer) uintptr {
+func BeaconFormatFree(format *formatBuffer) (res uintptr) {
+	defer func() {
+		if r := recover(); r != nil {
+			res = 0
+		}
+	}()
 	if format == nil {
 		return 0
 	}
@@ -424,7 +514,12 @@ func BeaconFormatFree(format *formatBuffer) uintptr {
 	return 1
 }
 
-func BeaconFormatAppend(format *formatBuffer, text uintptr, length int32) uintptr {
+func BeaconFormatAppend(format *formatBuffer, text uintptr, length int32) (res uintptr) {
+	defer func() {
+		if r := recover(); r != nil {
+			res = 0
+		}
+	}()
 	if format == nil || text == 0 || length <= 0 {
 		return 0
 	}
@@ -432,27 +527,42 @@ func BeaconFormatAppend(format *formatBuffer, text uintptr, length int32) uintpt
 	return appendToFormatBuffer(format, data)
 }
 
-func BeaconFormatPrintf(format *formatBuffer, fmtPtr uintptr, arg0 uintptr, arg1 uintptr, arg2 uintptr, arg3 uintptr, arg4 uintptr, arg5 uintptr, arg6 uintptr, arg7 uintptr, arg8 uintptr, arg9 uintptr) uintptr {
+func BeaconFormatPrintf(format *formatBuffer, fmtPtr uintptr, arg0 uintptr, arg1 uintptr) (res uintptr) {
+	defer func() {
+		if r := recover(); r != nil {
+			res = 0
+		}
+	}()
 	if format == nil || fmtPtr == 0 {
 		return 0
 	}
 	fmtString := ReadCStringFromPtr(fmtPtr)
-	args := []uintptr{arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9}
+	args := []uintptr{arg0, arg1}
 	formatted := formatPrintf(fmtString, args)
 	return appendToFormatBuffer(format, []byte(formatted))
 }
 
-func BeaconFormatToString(format *formatBuffer, size *int32) uintptr {
+func BeaconFormatToString(format *formatBuffer, size *int32) (res uintptr) {
+	defer func() {
+		if r := recover(); r != nil {
+			res = 0
+		}
+	}()
 	if format == nil {
 		return 0
 	}
-	if size != nil {
+	if size != nil && unsafe.Pointer(size) != nil {
 		*size = format.length
 	}
 	return format.original
 }
 
-func BeaconFormatInt(format *formatBuffer, value int32) uintptr {
+func BeaconFormatInt(format *formatBuffer, value int32) (res uintptr) {
+	defer func() {
+		if r := recover(); r != nil {
+			res = 0
+		}
+	}()
 	if format == nil {
 		return 0
 	}

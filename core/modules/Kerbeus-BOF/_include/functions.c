@@ -215,27 +215,37 @@ int INIT_BOF() {
 
 void PRINT_OUT(char* format, ...) {
     va_list args;
-    va_start( args, format );
-    int bufSize = MSVCRT$vsnprintf( NULL, 0, format, args );
+
+    // Determine required buffer size (excluding null terminator).
+    va_start(args, format);
+    int bufSize = MSVCRT$vsnprintf(NULL, 0, format, args);
     va_end(args);
 
     if (bufSize == -1)
         return;
 
     if (bufSize + currentOutSize < globalOutSize) {
-        MSVCRT$vsnprintf(globalOut + currentOutSize, bufSize, format, args);
+        // Fits in remaining space; +1 for null terminator.
+        va_start(args, format);
+        MSVCRT$vsnprintf(globalOut + currentOutSize, bufSize + 1, format, args);
+        va_end(args);
         currentOutSize += bufSize;
     }
     else {
+        // Flush current buffer first.
         SEND_OUT(FALSE);
         if (bufSize <= globalOutSize) {
-            MSVCRT$vsnprintf(globalOut + currentOutSize, bufSize, format, args);
+            va_start(args, format);
+            MSVCRT$vsnprintf(globalOut + currentOutSize, bufSize + 1, format, args);
+            va_end(args);
             currentOutSize += bufSize;
         } else {
-            char* tmpOut = MemAlloc( bufSize );
-            MSVCRT$vsnprintf(tmpOut, bufSize, format, args);
+            // Oversized output — allocate a temporary buffer.
+            char* tmpOut = MemAlloc(bufSize + 1);
+            va_start(args, format);
+            MSVCRT$vsnprintf(tmpOut, bufSize + 1, format, args);
+            va_end(args);
             BeaconOutput(CALLBACK_OUTPUT, tmpOut, bufSize);
-//            MemFree(tmpOut);
         }
     }
 }
