@@ -150,9 +150,12 @@ func resolveExternalAddress(symbolName string, outChannel chan<- any) uintptr {
 				return windows.NewCallback(BeaconGetSpawnToStub)
 			case "BeaconSpawnTemporaryProcess":
 				return windows.NewCallback(BeaconSpawnTemporaryProcessStub)
+			case "BeaconInjectProcess", "BeaconInjectTemporaryProcess":
+				return windows.NewCallback(BeaconSpawnTemporaryProcessStub)
+			case "BeaconCleanupProcess":
+				return windows.NewCallback(BeaconCleanupProcessStub)
 			case "BeaconUseToken", "BeaconRevertToken", "BeaconIsAdmin",
-				"BeaconInjectProcess", "BeaconInjectTemporaryProcess",
-				"BeaconCleanupProcess", "toWideChar", "BeaconGetOutputData":
+				"toWideChar", "BeaconGetOutputData":
 				fallthrough
 			default:
 				logging.Warningf("Unknown symbol: %s\n", procName)

@@ -438,6 +438,11 @@ func BeaconSpawnTemporaryProcessStub(x86 uintptr, ignoreToken uintptr, si uintpt
 	return 0
 }
 
+// BeaconCleanupProcessStub is a minimal stub for BeaconCleanupProcess.
+func BeaconCleanupProcessStub(pi uintptr, si uintptr) uintptr {
+	return 0
+}
+
 func swapEndianness(indata uint32) uint32 {
 	return (indata>>24)&0x000000ff |
 		(indata>>8)&0x0000ff00 |
