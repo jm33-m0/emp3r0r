@@ -1,5 +1,15 @@
 # Changelog
 
+## [4.9.3](https://github.com/jm33-m0/emp3r0r/compare/v4.9.2...v4.9.3) (2026-08-13)
+
+
+### Bug Fixes
+
+* COFF loader crashes when running some BOFs. ([55f776f](https://github.com/jm33-m0/emp3r0r/commit/55f776f4a8b457aca9ff2aec38c43f9d4e7aa461))
+* **coffloader:** add stubs for BeaconCleanupProcess and update symbol resolution ([604eb33](https://github.com/jm33-m0/emp3r0r/commit/604eb3351cd156115fd29d8cfe1e66cf79174529))
+* **coffloader:** pure-assembly VEH crash recovery - BOF crashes can no longer kill the process ([8ebedba](https://github.com/jm33-m0/emp3r0r/commit/8ebedba59ad1f3b88266a5c60a03c2613567022e))
+* **coffloader:** robust BOF error handling with pure-assembly VEH telemetry ([0f46169](https://github.com/jm33-m0/emp3r0r/commit/0f4616963fca63f17798c61d7d60580fd78db49b))
+
 ## [4.9.2](https://github.com/jm33-m0/emp3r0r/compare/v4.9.1...v4.9.2) (2026-08-10)
 
 
