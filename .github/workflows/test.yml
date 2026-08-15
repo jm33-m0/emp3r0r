@@ -94,8 +94,9 @@ jobs:
       - name: Build COFFLoader and BOF fixtures (Windows)
         if: runner.os == 'Windows'
         working-directory: ./core/modules
-        shell: bash
+        shell: msys2 {0}
         run: |
+          export PATH="$PATH:/mingw32/bin"
           make -C coffloader dll dll32
           make -C Remote-OPs/src/Remote/get_priv
           make -C Remote-OPs/src/Remote/ProcessListHandles
@@ -104,6 +105,7 @@ jobs:
       - name: Run BOF and module integration without race (Windows only)
         if: runner.os == 'Windows'
         working-directory: ./core
+        shell: msys2 {0}
         env:
           EMP3R0R_RACE_ON: "0"
         run: |

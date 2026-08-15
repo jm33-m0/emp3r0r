@@ -18,6 +18,10 @@ func getModulesRoot() string {
 }
 
 func TestRunWindowsCOFFViaDLL(t *testing.T) {
+	if os.Getenv("EMP3R0R_RACE_ON") == "1" {
+		t.Skip("skipping: race detector enables checkptr, which conflicts with memmod BOF loading")
+	}
+
 	modulesRoot := getModulesRoot()
 	dllPath := filepath.Join(modulesRoot, "coffloader", "COFFLoader.x64.dll")
 	dllData, err := os.ReadFile(dllPath)

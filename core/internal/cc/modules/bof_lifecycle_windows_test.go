@@ -39,6 +39,16 @@ func readOrSkip(t *testing.T, path string) []byte {
 	return data
 }
 
+// skipUnderRace skips BOF lifecycle tests under the race detector, which
+// enables Go's checkptr validation and conflicts with memmod's unsafe pointer
+// arithmetic when loading the COFFLoader DLL into memory.
+func skipUnderRace(t *testing.T) {
+	t.Helper()
+	if os.Getenv("EMP3R0R_RACE_ON") == "1" {
+		t.Skip("skipping: race detector is enabled")
+	}
+}
+
 // findConfig returns the module config with the given name from a parsed list.
 func findConfig(t *testing.T, configs []*def.ModuleConfig, name string) *def.ModuleConfig {
 	t.Helper()
@@ -85,6 +95,8 @@ func cacheCoffLoaderDLL(t *testing.T, dll []byte) {
 // It uses the actual Remote-OPs and Kerbeus-BOF modules and their real
 // compiled object files, not mocks.
 func TestBOFFullLifecycle(t *testing.T) {
+	skipUnderRace(t)
+
 	modulesRoot := modulesRootFromTest(t)
 
 	dllPath := filepath.Join(modulesRoot, "coffloader", "COFFLoader.x64.dll")
@@ -191,6 +203,8 @@ func TestBOFFullLifecycle(t *testing.T) {
 // file endpoint as <name>.<arch>.xz, decompressed and cached before the BOF
 // runs.
 func TestBOFDependencyDownloadLifecycle(t *testing.T) {
+	skipUnderRace(t)
+
 	modulesRoot := modulesRootFromTest(t)
 	dll := readOrSkip(t, filepath.Join(modulesRoot, "coffloader", "COFFLoader.x64.dll"))
 	bof := readOrSkip(t, filepath.Join(modulesRoot, "Remote-OPs", "src", "Remote", "get_priv", "get_priv.x64.o"))
@@ -280,6 +294,8 @@ func buildCrashBOF(t *testing.T) string {
 // the complete module pipeline. The VEH crash guard must convert the native
 // access violation into a Go error instead of killing the test process.
 func TestBOFCrashIsContained(t *testing.T) {
+	skipUnderRace(t)
+
 	modulesRoot := modulesRootFromTest(t)
 	dll := readOrSkip(t, filepath.Join(modulesRoot, "coffloader", "COFFLoader.x64.dll"))
 	crashBOF := readOrSkip(t, buildCrashBOF(t))
@@ -313,6 +329,8 @@ func TestBOFCrashIsContained(t *testing.T) {
 // TestBOFLifecycleErrorResilience verifies that failures at every stage of the
 // lifecycle return errors to the operator instead of crashing the process.
 func TestBOFLifecycleErrorResilience(t *testing.T) {
+	skipUnderRace(t)
+
 	modulesRoot := modulesRootFromTest(t)
 	dll := readOrSkip(t, filepath.Join(modulesRoot, "coffloader", "COFFLoader.x64.dll"))
 	bof := readOrSkip(t, filepath.Join(modulesRoot, "Remote-OPs", "src", "Remote", "get_priv", "get_priv.x64.o"))
