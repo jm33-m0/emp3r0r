@@ -772,6 +772,27 @@ func typeToWireToken(typeName string) string {
 	}
 }
 
+// coffArgNeedsZero reports whether a rendered COFF argument value must be
+// replaced with a zero value: numeric wire types (i/s) reject an empty string
+// when packed on the agent side.
+func coffArgNeedsZero(typed any, wireTyp string) bool {
+	if s, ok := typed.(string); ok && s == "" {
+		return wireTyp == "i" || wireTyp == "s"
+	}
+	return false
+}
+
+// coffArgZeroValue returns a valid zero value for a COFF wire token so a
+// declared BOF argument is always packed even when the operator left it empty.
+func coffArgZeroValue(wireTyp string) any {
+	switch wireTyp {
+	case "i", "s":
+		return float64(0)
+	default:
+		return ""
+	}
+}
+
 // resolveInvocation renders an invocation with concrete values from module options.
 //
 // For COFF modules the WireType on each ResolvedCoffArg is derived from the
@@ -848,6 +869,9 @@ func resolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.R
 
 	// ── COFF packing ─────────────────────────────────────────────────────
 	// Wire type comes from the parameter's unified "type" field.
+	// Every declared BOF argument is always packed, even when the operator
+	// did not supply a value, so the BOF always receives a well-formed arg
+	// list and never dereferences a NULL BeaconDataExtract result.
 	if config.Invocation.Coff != nil {
 		coffInv := &def.ResolvedCoffInvocation{Export: config.Invocation.Coff.Export}
 		for _, arg := range config.Invocation.Coff.Args {
@@ -855,11 +879,12 @@ func resolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.R
 			if lookupErr != nil {
 				return resolved, lookupErr
 			}
-			_, typed, err := renderOptionValue(opt, val)
-			if err != nil {
-				return resolved, err
-			}
 			wireTyp := typeToWireToken(opt.Type)
+			_, typed, renderErr := renderOptionValue(opt, val)
+			if renderErr != nil || coffArgNeedsZero(typed, wireTyp) {
+				logging.Warningf("BOF arg '%s' (%s) not supplied, packing zero value", arg.Param, wireTyp)
+				typed = coffArgZeroValue(wireTyp)
+			}
 			coffInv.Args = append(coffInv.Args, def.ResolvedCoffArg{
 				WireType: wireTyp,
 				Value:    typed,

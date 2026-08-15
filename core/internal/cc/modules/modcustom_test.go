@@ -187,6 +187,44 @@ func TestResolveInvocationMissingRequired(t *testing.T) {
 	}
 }
 
+func TestResolveInvocationCOFFArgsAlwaysSatisfied(t *testing.T) {
+	config := &def.ModuleConfig{
+		AgentConfig: def.AgentModuleConfig{Type: "coff"},
+		Invocation: def.InvocationSpec{
+			Coff: &def.CoffInvocation{
+				Export: "go",
+				Args: []def.CoffArgSpec{
+					{Param: "privilege"},
+					{Param: "pid"},
+				},
+			},
+		},
+		Options: def.ModOptions{
+			"privilege": {Name: "privilege", Type: "cstr", Required: true, Val: ""},
+			"pid":       {Name: "pid", Type: "int", Required: false, Val: ""},
+		},
+	}
+
+	// A missing required string arg and an empty numeric arg must still be
+	// packed (as zero values) so the BOF always receives the full arg list.
+	inv, err := resolveInvocation(config, map[string]string{})
+	if err != nil {
+		t.Fatalf("resolveInvocation: %v", err)
+	}
+	if inv.Coff == nil || len(inv.Coff.Args) != 2 {
+		t.Fatalf("expected 2 packed COFF args, got %+v", inv.Coff)
+	}
+	if inv.Coff.Args[0].WireType != "z" || inv.Coff.Args[0].Value != "" {
+		t.Fatalf("privilege arg not satisfied: %+v", inv.Coff.Args[0])
+	}
+	if inv.Coff.Args[1].WireType != "i" {
+		t.Fatalf("pid wire type mismatch: %+v", inv.Coff.Args[1])
+	}
+	if _, ok := inv.Coff.Args[1].Value.(float64); !ok {
+		t.Fatalf("pid arg should be numeric zero, got %T (%v)", inv.Coff.Args[1].Value, inv.Coff.Args[1].Value)
+	}
+}
+
 func TestReadModConfigFullInvocationAndAgentConfig(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "emp3r0r-full")
 	if err != nil {
