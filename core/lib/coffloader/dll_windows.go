@@ -117,7 +117,13 @@ func ensureSyscallTable() error {
 // Each component is length-prefixed (BeaconDataExtract format).
 func buildLoadAndRunBuffer(entry string, coff, bofArgs []byte) []byte {
 	buf := make([]byte, 4) // skipped by BeaconDataParse
-	buf = append(buf, packCString(entry)...)
+	// The entry name must be padded to a 4-byte boundary: the C loader casts
+	// the extracted COFF blob to naturally aligned structs (coff_file_header_t
+	// etc.), so the COFF data pointer that follows the entry must stay 4-byte
+	// aligned. An unaligned pointer is UB and trips the UB alignment traps that
+	// sanitizer/debug builds (e.g. zig cc's default Debug mode) emit, raising
+	// STATUS_ILLEGAL_INSTRUCTION (0xc000001d).
+	buf = append(buf, packCStringAligned(entry)...)
 	buf = append(buf, packBlob(coff)...)
 	buf = append(buf, packBlob(bofArgs)...)
 	return buf
@@ -209,6 +215,17 @@ func packBlob(data []byte) []byte {
 // packCString returns a length-prefixed, NUL-terminated C string.
 func packCString(s string) []byte {
 	return packBlob(append([]byte(s), 0))
+}
+
+// packCStringAligned packs a NUL-terminated C string padded with extra NUL
+// bytes so its length-prefixed payload is a multiple of 4 bytes. The C side
+// only consumes it as a NUL-terminated string, so the padding is harmless and
+// keeps the next length-prefixed blob 4-byte aligned.
+func packCStringAligned(s string) []byte {
+	raw := append([]byte(s), 0)
+	data := make([]byte, (len(raw)+3)&^3)
+	copy(data, raw)
+	return packBlob(data)
 }
 
 // utf16Bytes encodes s as UTF-16LE without a NUL terminator.

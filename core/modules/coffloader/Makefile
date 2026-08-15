@@ -4,19 +4,19 @@ all-dll: dll dll32
 debug: debug32 debug64
 
 dll:
-	x86_64-w64-mingw32-gcc -shared -Wall -DBUILD_DLL dll.c beacon_compatibility.c COFFLoader.c -o COFFLoader.x64.dll
+	x86_64-w64-mingw32-gcc -shared -O2 -Wall -DBUILD_DLL dll.c beacon_compatibility.c COFFLoader.c -o COFFLoader.x64.dll
 	x86_64-w64-mingw32-gcc -c test.c -o test64.out
 
 dll32:
-	i686-w64-mingw32-gcc -shared -Wall -DBUILD_DLL dll.c beacon_compatibility.c COFFLoader.c -o COFFLoader.x86.dll
+	i686-w64-mingw32-gcc -shared -O2 -Wall -DBUILD_DLL dll.c beacon_compatibility.c COFFLoader.c -o COFFLoader.x86.dll
 	i686-w64-mingw32-gcc -c test.c -o test32.out
 
 bof:
-	x86_64-w64-mingw32-gcc -Wall -DCOFF_STANDALONE beacon_compatibility.c COFFLoader.c -o COFFLoader64.exe
+	x86_64-w64-mingw32-gcc -O2 -Wall -DCOFF_STANDALONE beacon_compatibility.c COFFLoader.c -o COFFLoader64.exe
 	x86_64-w64-mingw32-gcc -c test.c -o test64.out
 
 bof32:
-	i686-w64-mingw32-gcc -Wall -DCOFF_STANDALONE beacon_compatibility.c COFFLoader.c -o COFFLoader32.exe
+	i686-w64-mingw32-gcc -O2 -Wall -DCOFF_STANDALONE beacon_compatibility.c COFFLoader.c -o COFFLoader32.exe
 	i686-w64-mingw32-gcc -c test.c -o test32.out
 
 debug64:
