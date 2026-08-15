@@ -267,3 +267,206 @@ func NtCreateUserProcess(
 		uintptr(attributeList),
 	)
 }
+
+// ---------------------------------------------------------------------------
+// Thread Management Routines
+// ---------------------------------------------------------------------------
+
+// NtCreateThreadEx creates a thread in the specified process.
+func NtCreateThreadEx(
+	table *SyscallTable,
+	threadHandle *windows.Handle,
+	desiredAccess uint32,
+	objectAttributes *OBJECT_ATTRIBUTES,
+	processHandle windows.Handle,
+	startRoutine uintptr,
+	argument uintptr,
+	createFlags uint32,
+	zeroBits uintptr,
+	stackSize uintptr,
+	maximumStackSize uintptr,
+	attributeList unsafe.Pointer,
+) (uint32, error) {
+	return table.InvokeSyscall(
+		"NtCreateThreadEx",
+		uintptr(unsafe.Pointer(threadHandle)),
+		uintptr(desiredAccess),
+		uintptr(unsafe.Pointer(objectAttributes)),
+		uintptr(processHandle),
+		startRoutine,
+		argument,
+		uintptr(createFlags),
+		zeroBits,
+		stackSize,
+		maximumStackSize,
+		uintptr(attributeList),
+	)
+}
+
+// NtOpenThread opens a handle to an existing thread object.
+func NtOpenThread(
+	table *SyscallTable,
+	threadHandle *windows.Handle,
+	desiredAccess uint32,
+	objectAttributes *OBJECT_ATTRIBUTES,
+	clientId *CLIENT_ID,
+) (uint32, error) {
+	return table.InvokeSyscall(
+		"NtOpenThread",
+		uintptr(unsafe.Pointer(threadHandle)),
+		uintptr(desiredAccess),
+		uintptr(unsafe.Pointer(objectAttributes)),
+		uintptr(unsafe.Pointer(clientId)),
+	)
+}
+
+// NtSuspendThread suspends the execution of the specified thread.
+func NtSuspendThread(
+	table *SyscallTable,
+	threadHandle windows.Handle,
+	previousSuspendCount *uint32,
+) (uint32, error) {
+	return table.InvokeSyscall(
+		"NtSuspendThread",
+		uintptr(threadHandle),
+		uintptr(unsafe.Pointer(previousSuspendCount)),
+	)
+}
+
+// NtResumeThread resumes the execution of the specified thread.
+func NtResumeThread(
+	table *SyscallTable,
+	threadHandle windows.Handle,
+	previousSuspendCount *uint32,
+) (uint32, error) {
+	return table.InvokeSyscall(
+		"NtResumeThread",
+		uintptr(threadHandle),
+		uintptr(unsafe.Pointer(previousSuspendCount)),
+	)
+}
+
+// NtGetContextThread retrieves the execution context of the specified thread.
+func NtGetContextThread(
+	table *SyscallTable,
+	threadHandle windows.Handle,
+	context unsafe.Pointer,
+) (uint32, error) {
+	return table.InvokeSyscall(
+		"NtGetContextThread",
+		uintptr(threadHandle),
+		uintptr(context),
+	)
+}
+
+// NtSetContextThread sets the execution context of the specified thread.
+func NtSetContextThread(
+	table *SyscallTable,
+	threadHandle windows.Handle,
+	context unsafe.Pointer,
+) (uint32, error) {
+	return table.InvokeSyscall(
+		"NtSetContextThread",
+		uintptr(threadHandle),
+		uintptr(context),
+	)
+}
+
+// ---------------------------------------------------------------------------
+// Virtual Memory Routines
+// ---------------------------------------------------------------------------
+
+// NtAllocateVirtualMemory reserves, commits, or alters page protections in a process.
+func NtAllocateVirtualMemory(
+	table *SyscallTable,
+	processHandle windows.Handle,
+	baseAddress *uintptr,
+	zeroBits uintptr,
+	regionSize *uintptr,
+	allocationType uint32,
+	protect uint32,
+) (uint32, error) {
+	return table.InvokeSyscall(
+		"NtAllocateVirtualMemory",
+		uintptr(processHandle),
+		uintptr(unsafe.Pointer(baseAddress)),
+		zeroBits,
+		uintptr(unsafe.Pointer(regionSize)),
+		uintptr(allocationType),
+		uintptr(protect),
+	)
+}
+
+// NtProtectVirtualMemory changes the access protection on a region of committed pages.
+func NtProtectVirtualMemory(
+	table *SyscallTable,
+	processHandle windows.Handle,
+	baseAddress *uintptr,
+	regionSize *uintptr,
+	newProtect uint32,
+	oldProtect *uint32,
+) (uint32, error) {
+	return table.InvokeSyscall(
+		"NtProtectVirtualMemory",
+		uintptr(processHandle),
+		uintptr(unsafe.Pointer(baseAddress)),
+		uintptr(unsafe.Pointer(regionSize)),
+		uintptr(newProtect),
+		uintptr(unsafe.Pointer(oldProtect)),
+	)
+}
+
+// NtReadVirtualMemory reads data from a specified process memory area.
+func NtReadVirtualMemory(
+	table *SyscallTable,
+	processHandle windows.Handle,
+	baseAddress uintptr,
+	buffer unsafe.Pointer,
+	bufferSize uintptr,
+	numberOfBytesRead *uintptr,
+) (uint32, error) {
+	return table.InvokeSyscall(
+		"NtReadVirtualMemory",
+		uintptr(processHandle),
+		baseAddress,
+		uintptr(buffer),
+		bufferSize,
+		uintptr(unsafe.Pointer(numberOfBytesRead)),
+	)
+}
+
+// NtWriteVirtualMemory writes data to a specified process memory area.
+func NtWriteVirtualMemory(
+	table *SyscallTable,
+	processHandle windows.Handle,
+	baseAddress uintptr,
+	buffer unsafe.Pointer,
+	bufferSize uintptr,
+	numberOfBytesWritten *uintptr,
+) (uint32, error) {
+	return table.InvokeSyscall(
+		"NtWriteVirtualMemory",
+		uintptr(processHandle),
+		baseAddress,
+		uintptr(buffer),
+		bufferSize,
+		uintptr(unsafe.Pointer(numberOfBytesWritten)),
+	)
+}
+
+// NtFreeVirtualMemory releases, decommits, or frees a region of pages.
+func NtFreeVirtualMemory(
+	table *SyscallTable,
+	processHandle windows.Handle,
+	baseAddress *uintptr,
+	regionSize *uintptr,
+	freeType uint32,
+) (uint32, error) {
+	return table.InvokeSyscall(
+		"NtFreeVirtualMemory",
+		uintptr(processHandle),
+		uintptr(unsafe.Pointer(baseAddress)),
+		uintptr(unsafe.Pointer(regionSize)),
+		uintptr(freeType),
+	)
+}
