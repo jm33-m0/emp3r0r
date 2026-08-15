@@ -91,6 +91,16 @@ jobs:
         run: |
           go test -v -race ./...
 
+      - name: Build COFFLoader and BOF fixtures (Windows)
+        if: runner.os == 'Windows'
+        working-directory: ./core/modules
+        shell: bash
+        run: |
+          make -C coffloader dll dll32
+          make -C Remote-OPs/src/Remote/get_priv
+          make -C Remote-OPs/src/Remote/ProcessListHandles
+          cd Kerbeus-BOF && bash make_all.sh
+
       - name: Run BOF and module integration without race (Windows only)
         if: runner.os == 'Windows'
         working-directory: ./core
