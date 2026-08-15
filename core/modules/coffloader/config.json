@@ -1,0 +1,37 @@
+[
+  {
+    "name": "coffloader",
+    "build": "",
+    "author": "TrustedSec",
+    "date": "2026-08-14",
+    "comment": "Load and execute Beacon Object Files (BOFs) in memory via the COFFLoader DLL",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "file",
+        "description": "BOF object file to execute (agent local path or mem:///path)",
+        "default": "",
+        "type": "string",
+        "required": true
+      }
+    ],
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "COFFLoader.x64.dll",
+        "COFFLoader.x86.dll"
+      ],
+      "in_memory": true,
+      "type": "dll",
+      "interactive": false
+    },
+    "invocation": {
+      "dll_export": "LoadAndRun",
+      "dll_entry": "go",
+      "dll_file_param": "file"
+    }
+  }
+]
