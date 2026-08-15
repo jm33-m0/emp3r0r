@@ -134,15 +134,25 @@ func getPeerIP(flags map[string]string) string {
 }
 
 func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, payload_type, invocationB64, peerIP string) {
-	hosted_file := live.WWWRoot + live.ActiveModule.Name + ".xz"
-	logging.Infof("Compressing %s with gzip...", live.ActiveModule.Name)
-
-	// only one file is allowed
 	if len(config.AgentConfig.Files) == 0 {
 		logging.Errorf("No files found for module %s in %s", config.Name, config.Path)
 		return
 	}
-	path := fmt.Sprintf("%s/%s", config.Path, config.AgentConfig.Files[0])
+
+	// DLL modules may ship per-arch payloads (e.g. COFFLoader.x64.dll and
+	// COFFLoader.x86.dll). Pick the file matching the target agent arch.
+	payloadFile := config.AgentConfig.Files[0]
+	hostedName := strings.ToLower(live.ActiveModule.Name)
+	if strings.EqualFold(payload_type, "dll") && ctx.Target != nil {
+		arch := normalizeAgentArch(ctx.Target.Arch)
+		payloadFile = selectDLLFile(config.AgentConfig.Files, arch)
+		hostedName = fmt.Sprintf("%s.%s", strings.ToLower(live.ActiveModule.Name), arch)
+	}
+
+	hosted_file := filepath.Join(live.WWWRoot, hostedName+".xz")
+	logging.Infof("Compressing %s with gzip...", hostedName)
+
+	path := filepath.Join(config.Path, payloadFile)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		logging.Errorf("Reading %s: %v", path, err)
@@ -161,7 +171,7 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 	}
 	fileToDownload := filepath.Base(hosted_file)
 	cmd := fmt.Sprintf("%s --mod_name %s --type %s --file_to_download %s --checksum %s --in_mem --invocation %s",
-		def.C2CmdCustomModule, live.ActiveModule.Name, payload_type, fileToDownload, crypto.SHA256SumFile(hosted_file), strconv.Quote(invocationB64))
+		def.C2CmdCustomModule, strings.ToLower(live.ActiveModule.Name), payload_type, fileToDownload, crypto.SHA256SumFile(hosted_file), strconv.Quote(invocationB64))
 	if peerIP != "" {
 		cmd += fmt.Sprintf(" --peer %s", strconv.Quote(peerIP))
 	}
@@ -174,10 +184,11 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 }
 
 func handleCompressedModule(ctx *c2context.C2Context, config def.ModuleConfig, payload_type, invocationB64, peerIP string) {
-	tarball_path := live.WWWRoot + live.ActiveModule.Name + ".tar.gz"
+	moduleName := strings.ToLower(live.ActiveModule.Name)
+	tarball_path := live.WWWRoot + moduleName + ".tar.gz"
 	file_to_download := filepath.Base(tarball_path)
 	if !util.IsFileExist(tarball_path) {
-		logging.Infof("Compressing %s with tar.gz...", live.ActiveModule.Name)
+		logging.Infof("Compressing %s with tar.gz...", moduleName)
 		path := config.Path
 		err := util.TarArchive(path, tarball_path)
 		if err != nil {
@@ -193,7 +204,7 @@ func handleCompressedModule(ctx *c2context.C2Context, config def.ModuleConfig, p
 	checksum := crypto.SHA256SumFile(tarball_path)
 	cmd := fmt.Sprintf("%s --mod_name %s --checksum %s --invocation %s --type %s --file_to_download %s",
 		def.C2CmdCustomModule,
-		live.ActiveModule.Name, checksum, strconv.Quote(invocationB64), payload_type, file_to_download)
+		moduleName, checksum, strconv.Quote(invocationB64), payload_type, file_to_download)
 	if peerIP != "" {
 		cmd += fmt.Sprintf(" --peer %s", strconv.Quote(peerIP))
 	}
@@ -237,6 +248,83 @@ func handleInteractiveModule(config def.ModuleConfig, job_id string) {
 	_ = args
 	_ = port
 	logging.Warningf("Interactive module %s is disabled because SSH/SFTP and port-forwarding were removed", config.Name)
+}
+
+// hostDLLModules compresses and hosts every DLL module's payload so that
+// dependent BOF modules can fetch the correct arch from the C2 file endpoint
+// at runtime. DLL payloads are hosted as <name>.<arch>.xz.
+func hostDLLModules() {
+	def.Modules.Range(func(_, val any) bool {
+		config, ok := val.(*def.ModuleConfig)
+		if !ok || !strings.EqualFold(config.AgentConfig.Type, "dll") {
+			return true
+		}
+		if len(config.AgentConfig.Files) == 0 || config.Path == "" {
+			return true
+		}
+		for _, file := range config.AgentConfig.Files {
+			arch := dllArch(file)
+			if arch == "" {
+				arch = "amd64"
+			}
+			hosted := filepath.Join(live.WWWRoot, fmt.Sprintf("%s.%s.xz", strings.ToLower(config.Name), arch))
+			if util.IsFileExist(hosted) {
+				continue
+			}
+			path := filepath.Join(config.Path, file)
+			data, err := os.ReadFile(path)
+			if err != nil {
+				logging.Warningf("hostDLLModules: read %s: %v", path, err)
+				continue
+			}
+			compressed, err := util.Compress(data)
+			if err != nil {
+				logging.Warningf("hostDLLModules: compress %s: %v", path, err)
+				continue
+			}
+			if err := os.WriteFile(hosted, compressed, 0o600); err != nil {
+				logging.Warningf("hostDLLModules: write %s: %v", hosted, err)
+				continue
+			}
+			logging.Infof("Hosted DLL module %s as %s", config.Name, hosted)
+		}
+		return true
+	})
+}
+
+// dllArch derives the canonical arch ("amd64" or "386") from a DLL file name.
+func dllArch(file string) string {
+	lower := strings.ToLower(file)
+	switch {
+	case strings.Contains(lower, "x64"), strings.Contains(lower, "amd64"):
+		return "amd64"
+	case strings.Contains(lower, "x86"), strings.Contains(lower, "386"):
+		return "386"
+	}
+	return ""
+}
+
+// normalizeAgentArch maps agent-reported arch strings to the canonical
+// amd64/386 names used by the module system.
+func normalizeAgentArch(arch string) string {
+	switch strings.ToLower(arch) {
+	case "x64", "amd64", "x86_64":
+		return "amd64"
+	case "x32", "x86", "386", "i386", "i686":
+		return "386"
+	}
+	return strings.ToLower(arch)
+}
+
+// selectDLLFile picks the DLL payload matching the given canonical arch,
+// falling back to the first file when no match is found.
+func selectDLLFile(files []string, arch string) string {
+	for _, file := range files {
+		if dllArch(file) == arch {
+			return file
+		}
+	}
+	return files[0]
 }
 
 // Print module meta data
@@ -369,6 +457,10 @@ func InitModules() {
 		load_mod(mod_search_dir)
 	}
 
+	// Pre-host DLL modules so BOF module dependencies can download them on
+	// demand even if the operator never ran the DLL module directly.
+	hostDLLModules()
+
 	count := 0
 	def.Modules.Range(func(_, _ any) bool {
 		count++
@@ -433,6 +525,9 @@ func readModConfigs(file string) (configs []*def.ModuleConfig, err error) {
 		StdinParam     string              `json:"stdin_param"`
 		TimeoutSeconds int                 `json:"timeout_seconds"`
 		CoffExport     string              `json:"coff_export"`
+		DllExport      string              `json:"dll_export"`
+		DllEntry       string              `json:"dll_entry"`
+		DllFileParam   string              `json:"dll_file_param"`
 	}
 
 	type agentConfigJSON struct {
@@ -446,18 +541,19 @@ func readModConfigs(file string) (configs []*def.ModuleConfig, err error) {
 	}
 
 	type moduleConfigJSON struct {
-		Name        string          `json:"name"`
-		Build       string          `json:"build"`
-		Author      string          `json:"author"`
-		Date        string          `json:"date"`
-		Comment     string          `json:"comment"`
-		IsLocal     bool            `json:"is_local"`
-		Platform    string          `json:"platform"`
-		Path        string          `json:"path"`
-		Fileless    bool            `json:"fileless"`
-		AgentConfig agentConfigJSON `json:"agent_config"`
-		Parameters  []optionJSON    `json:"parameters"`
-		Invocation  invocationJSON  `json:"invocation"`
+		Name         string          `json:"name"`
+		Build        string          `json:"build"`
+		Author       string          `json:"author"`
+		Date         string          `json:"date"`
+		Comment      string          `json:"comment"`
+		IsLocal      bool            `json:"is_local"`
+		Platform     string          `json:"platform"`
+		Path         string          `json:"path"`
+		Fileless     bool            `json:"fileless"`
+		AgentConfig  agentConfigJSON `json:"agent_config"`
+		Parameters   []optionJSON    `json:"parameters"`
+		Invocation   invocationJSON  `json:"invocation"`
+		Dependencies []string        `json:"dependencies"`
 	}
 
 	jsonData, err := os.ReadFile(file)
@@ -500,6 +596,10 @@ func readModConfigs(file string) (configs []*def.ModuleConfig, err error) {
 		config.Invocation.TimeoutSeconds = raw.Invocation.TimeoutSeconds
 		config.Invocation.StdinParam = raw.Invocation.StdinParam
 		config.Invocation.CoffExport = raw.Invocation.CoffExport
+		config.Invocation.DllExport = raw.Invocation.DllExport
+		config.Invocation.DllEntry = raw.Invocation.DllEntry
+		config.Invocation.DllFileParam = raw.Invocation.DllFileParam
+		config.Dependencies = raw.Dependencies
 
 		seenParams := make(map[string]bool)
 		for _, p := range raw.Parameters {
@@ -533,6 +633,20 @@ func readModConfigs(file string) (configs []*def.ModuleConfig, err error) {
 		}
 
 		isCOFF := strings.EqualFold(raw.AgentConfig.Type, "coff")
+		isDLL := strings.EqualFold(raw.AgentConfig.Type, "dll")
+
+		// DLL defaults (in-memory DLL loader convention)
+		if isDLL {
+			if config.Invocation.DllExport == "" {
+				config.Invocation.DllExport = "LoadAndRun"
+			}
+			if config.Invocation.DllEntry == "" {
+				config.Invocation.DllEntry = "go"
+			}
+			if config.Invocation.DllFileParam == "" {
+				config.Invocation.DllFileParam = "file"
+			}
+		}
 
 		// Literal-only argv prefix entries
 		for _, a := range raw.Invocation.Argv {
@@ -553,11 +667,22 @@ func readModConfigs(file string) (configs []*def.ModuleConfig, err error) {
 			})
 		}
 
-		// Derive CoffInvocation from parameters (COFF only)
-		if isCOFF && raw.Invocation.CoffExport != "" {
-			coff := def.CoffInvocation{Export: raw.Invocation.CoffExport}
+		// Derive CoffInvocation from parameters.
+		// COFF modules pack their exported entry (usually "go"). DLL loader
+		// modules use DllEntry as the BOF entry name instead.
+		coffExport := raw.Invocation.CoffExport
+		if isDLL {
+			coffExport = config.Invocation.DllEntry
+		}
+		if (isCOFF || isDLL) && coffExport != "" {
+			coff := def.CoffInvocation{Export: coffExport}
 			for _, p := range raw.Parameters {
 				if p.Name == "" {
+					continue
+				}
+				// The BOF file path is a control parameter for DLL modules,
+				// not a BOF argument.
+				if isDLL && config.Invocation.DllFileParam != "" && p.Name == config.Invocation.DllFileParam {
 					continue
 				}
 				coff.Args = append(coff.Args, def.CoffArgSpec{
@@ -566,6 +691,20 @@ func readModConfigs(file string) (configs []*def.ModuleConfig, err error) {
 				})
 			}
 			config.Invocation.Coff = &coff
+		}
+
+		// Windows BOF modules automatically depend on the in-memory COFFLoader DLL.
+		if isCOFF && strings.EqualFold(raw.Platform, "windows") {
+			found := false
+			for _, dep := range config.Dependencies {
+				if strings.EqualFold(dep, "coffloader") {
+					found = true
+					break
+				}
+			}
+			if !found {
+				config.Dependencies = append(config.Dependencies, "coffloader")
+			}
 		}
 
 		configs = append(configs, &config)
@@ -590,30 +729,43 @@ func updateModuleHelp(config *def.ModuleConfig) error {
 	return nil
 }
 
-// typeToWireToken maps the unified parameter type to a lighthouse wire token.
+// typeToWireToken maps the unified parameter type to a COFFLoader wire token.
 // Returns "" for non-COFF types (starlark, string, int, …); the caller should
 // only pass COFF-relevant types.
 //
-// Wire token conventions (lighthouse/BOF):
+// Wire token conventions follow the COFFLoader beacon_generate.py standard:
 //
-//	z      – UTF-8 C-string
-//	Z      – UTF-16LE wide string
-//	i      – 32-bit integer (signed or unsigned)
-//	s      – 16-bit short integer
+//	z      – UTF-8 C-string (addString)
+//	Z      – UTF-16LE wide string (addWString)
+//	i      – 32-bit integer (addint)
+//	s      – 16-bit short integer (addshort)
 //	b      – length-prefixed binary blob (base64 input)
 func typeToWireToken(typeName string) string {
-	switch strings.ToLower(typeName) {
-	case "cstr", "s", "lpstr", "string":
+	// Canonical single-char tokens are case-sensitive: z is narrow, Z is wide,
+	// s is short.
+	switch typeName {
+	case "z":
 		return "z"
-	case "wstr", "w", "lpwstr", "wstring":
+	case "Z":
 		return "Z"
-	case "dword", "i", "uint32", "int", "uint", "int32", "port":
+	case "i":
+		return "i"
+	case "s":
+		return "s"
+	case "b":
+		return "b"
+	}
+
+	switch strings.ToLower(typeName) {
+	case "cstr", "string", "str", "lpstr":
+		return "z"
+	case "wstr", "wstring", "lpwstr", "w":
+		return "Z"
+	case "int", "dword", "uint32", "uint", "int32", "port", "bool":
 		return "i"
 	case "short", "word", "int16":
 		return "s"
-	case "bool":
-		return "i" // bools packed as int (0/1)
-	case "binary", "b", "base64":
+	case "binary", "base64":
 		return "b"
 	default:
 		return ""
@@ -633,6 +785,11 @@ func resolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.R
 	if tokenSID, ok := flags["token"]; ok {
 		resolved.Token = strings.TrimSpace(tokenSID)
 	}
+
+	// ── dependencies & DLL invocation ─────────────────────────────────────
+	resolved.Dependencies = config.Dependencies
+	resolved.DllExport = config.Invocation.DllExport
+	resolved.DllEntry = config.Invocation.DllEntry
 
 	lookupOpt := func(name string) (*def.ModOption, string, error) {
 		if config.Options != nil {
@@ -710,6 +867,17 @@ func resolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.R
 			})
 		}
 		resolved.Coff = coffInv
+	}
+
+	// ── DLL file parameter ────────────────────────────────────────────────
+	// The named parameter points at the BOF object file on the agent
+	// (mem:/// or disk). It is resolved here but not packed as a BOF arg.
+	if config.Invocation.DllFileParam != "" {
+		fileVal, _, err := coerceVal(config.Invocation.DllFileParam)
+		if err != nil {
+			return resolved, err
+		}
+		resolved.DllFileValue = fileVal
 	}
 
 	return resolved, nil

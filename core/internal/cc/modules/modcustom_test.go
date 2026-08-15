@@ -907,18 +907,149 @@ func TestReadModConfigUnifiedArgvFlag(t *testing.T) {
 	}
 }
 
-func generateDummyArg(paramType string) string {
-	switch strings.ToLower(paramType) {
-	case "int", "uint", "dword", "i", "uint32", "int32", "port", "short", "word", "int16":
-		return "1"
-	case "bool":
-		return "true"
-	default:
-		return "dummy"
+func TestReadModConfigDLL(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "emp3r0r-test-dll")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	jsonConfig := `{
+		"name": "coffloader",
+		"platform": "Windows",
+		"agent_config": {
+			"exec": "",
+			"files": ["COFFLoader.x64.dll"],
+			"in_memory": true,
+			"type": "dll",
+			"interactive": false
+		},
+		"parameters": [
+			{"name": "file", "description": "BOF file to run", "default": "", "type": "string", "required": true},
+			{"name": "priv", "description": "Privilege to enable", "default": "SeShutdownPrivilege", "type": "string", "required": false}
+		],
+		"invocation": {
+			"dll_export": "LoadAndRun",
+			"dll_entry": "go",
+			"dll_file_param": "file"
+		},
+		"dependencies": ["coffloader"]
+	}`
+
+	configFile := filepath.Join(tmpDir, "config.json")
+	if err := os.WriteFile(configFile, []byte(jsonConfig), 0o644); err != nil {
+		t.Fatalf("Failed to write config file: %v", err)
+	}
+
+	config, err := readModCondig(configFile)
+	if err != nil {
+		t.Fatalf("readModCondig failed: %v", err)
+	}
+
+	if !strings.EqualFold(config.AgentConfig.Type, "dll") {
+		t.Fatalf("expected type dll, got %s", config.AgentConfig.Type)
+	}
+	if config.Invocation.DllExport != "LoadAndRun" {
+		t.Fatalf("expected DllExport LoadAndRun, got %s", config.Invocation.DllExport)
+	}
+	if config.Invocation.DllEntry != "go" {
+		t.Fatalf("expected DllEntry go, got %s", config.Invocation.DllEntry)
+	}
+	if config.Invocation.DllFileParam != "file" {
+		t.Fatalf("expected DllFileParam file, got %s", config.Invocation.DllFileParam)
+	}
+	if config.Invocation.Coff == nil {
+		t.Fatalf("expected Coff invocation to be populated for DLL module")
+	}
+	if config.Invocation.Coff.Export != "go" {
+		t.Fatalf("expected Coff.Export go, got %s", config.Invocation.Coff.Export)
+	}
+	if len(config.Invocation.Coff.Args) != 1 {
+		t.Fatalf("expected only the priv arg to be packed (file excluded), got %d", len(config.Invocation.Coff.Args))
+	}
+	if config.Invocation.Coff.Args[0].Param != "priv" {
+		t.Fatalf("expected first Coff arg to be priv, got %s", config.Invocation.Coff.Args[0].Param)
+	}
+	if len(config.Dependencies) != 1 || config.Dependencies[0] != "coffloader" {
+		t.Fatalf("unexpected dependencies: %v", config.Dependencies)
+	}
+
+	inv, err := resolveInvocation(config, map[string]string{"file": "mem:///get_priv.x64.o", "priv": "SeDebugPrivilege"})
+	if err != nil {
+		t.Fatalf("resolveInvocation: %v", err)
+	}
+	if inv.DllFileValue != "mem:///get_priv.x64.o" {
+		t.Fatalf("unexpected DllFileValue: %q", inv.DllFileValue)
+	}
+	if inv.Coff == nil || len(inv.Coff.Args) != 1 || inv.Coff.Args[0].WireType != "z" {
+		t.Fatalf("unexpected resolved Coff args: %+v", inv.Coff)
 	}
 }
 
-func getModulesRoot() string {
-	_, b, _, _ := runtime.Caller(0)
-	return filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(b))), "modules")
+func TestReadModConfigWindowsCOFFAutoDependency(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "emp3r0r-test-coff-dep")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	jsonConfig := `{
+		"name": "get_priv",
+		"platform": "Windows",
+		"agent_config": {
+			"files": ["get_priv.x64.o"],
+			"in_memory": true,
+			"type": "coff",
+			"interactive": false
+		},
+		"parameters": [
+			{"name": "priv", "description": "Privilege to enable", "default": "", "type": "string", "required": true}
+		],
+		"invocation": {"coff_export": "go"}
+	}`
+
+	configFile := filepath.Join(tmpDir, "config.json")
+	if err := os.WriteFile(configFile, []byte(jsonConfig), 0o644); err != nil {
+		t.Fatalf("Failed to write config file: %v", err)
+	}
+
+	config, err := readModCondig(configFile)
+	if err != nil {
+		t.Fatalf("readModCondig failed: %v", err)
+	}
+
+	found := false
+	for _, dep := range config.Dependencies {
+		if dep == "coffloader" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected Windows COFF module to auto-depend on coffloader, got %v", config.Dependencies)
+	}
+}
+
+func TestDLLArchHelpers(t *testing.T) {
+	if got := dllArch("COFFLoader.x64.dll"); got != "amd64" {
+		t.Fatalf("dllArch x64: got %q", got)
+	}
+	if got := dllArch("COFFLoader.x86.dll"); got != "386" {
+		t.Fatalf("dllArch x86: got %q", got)
+	}
+	if got := normalizeAgentArch("x64"); got != "amd64" {
+		t.Fatalf("normalizeAgentArch x64: got %q", got)
+	}
+	if got := normalizeAgentArch("x32"); got != "386" {
+		t.Fatalf("normalizeAgentArch x32: got %q", got)
+	}
+	if got := normalizeAgentArch("386"); got != "386" {
+		t.Fatalf("normalizeAgentArch 386: got %q", got)
+	}
+	files := []string{"COFFLoader.x64.dll", "COFFLoader.x86.dll"}
+	if got := selectDLLFile(files, "386"); got != "COFFLoader.x86.dll" {
+		t.Fatalf("selectDLLFile 386: got %q", got)
+	}
+	if got := selectDLLFile(files, "amd64"); got != "COFFLoader.x64.dll" {
+		t.Fatalf("selectDLLFile amd64: got %q", got)
+	}
 }

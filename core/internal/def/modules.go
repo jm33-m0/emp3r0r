@@ -25,7 +25,7 @@ const (
 // The "type" field unifies validation (C2-side) and wire-packing (agent-side
 // for COFF/BOF) into a single declaration.  The loader uses the type for both
 // input validation and, when the module is a COFF/BOF, for determining the
-// lighthouse wire-packing token.
+// COFFLoader wire-packing token.
 //
 // Non-COFF types (starlark, bash, python, elf, …) use only the validation
 // semantics; the wire-packing semantics are silently ignored.
@@ -42,13 +42,14 @@ const (
 //	base64  – arbitrary bytes, user supplies base64-encoded string.
 //
 // COFF/BOF wire types (also accepted for non-COFF as aliases to the generic
-// types above; the extra packing semantics are just ignored):
+// types above; the extra packing semantics are just ignored). Wire tokens
+// follow the COFFLoader beacon_generate.py standard:
 //
-//	cstr    – alias: "s", "lpstr"  → UTF-8 C-string; wire token "S".
-//	wstr    – alias: "w", "lpwstr" → UTF-16LE string; wire token "z".
-//	dword   – alias: "i", "uint32" → unsigned 32-bit int; wire token "i".
-//	short   – alias: "word","int16"→ signed 16-bit int; wire token "s".
-//	binary  – alias: "b"           → length-prefixed bytes (base64 input); wire token "b".
+//	z       – NUL-terminated UTF-8 C-string; aliases: cstr, string, str, lpstr.
+//	Z       – NUL-terminated UTF-16LE wide string; aliases: wstr, wstring, lpwstr, w.
+//	i       – 32-bit integer; aliases: int, dword, uint32, uint, int32, port, bool.
+//	s       – 16-bit short integer; aliases: short, word, int16.
+//	b       – length-prefixed binary blob (base64 input); aliases: binary, base64.
 //
 // ArgvFlag, when non-empty, prefixes the resolved string value in the argv
 // list, e.g. "-p" produces ["-p", "<value>"].  Ignored for COFF modules
@@ -102,6 +103,11 @@ type InvocationSpec struct {
 	StdinParam     string
 	TimeoutSeconds int
 	Coff           *CoffInvocation // populated internally from parameters
+
+	// DLL module invocation (agent_config.type == "dll").
+	DllExport    string // exported symbol to call after loading the DLL
+	DllEntry     string // BOF entry function name packed for the DLL loader
+	DllFileParam string // parameter that names the BOF file to execute
 }
 
 // ResolvedInvocation is the rendered form sent to the agent
@@ -113,6 +119,13 @@ type ResolvedInvocation struct {
 	// Token is the SID string key into priv.TokenMap for token impersonation.
 	// When non-empty on Windows, module execution runs under that token context.
 	Token string `cbor:"5,keyasint"`
+	// Dependencies are module names that must be loaded before this module.
+	// Windows COFF modules use the "coffloader" DLL dependency automatically.
+	Dependencies []string `cbor:"6,keyasint"`
+	// DLL invocation fields (agent_config.type == "dll").
+	DllExport    string `cbor:"7,keyasint"` // exported symbol to call
+	DllEntry     string `cbor:"8,keyasint"` // BOF entry function name
+	DllFileValue string `cbor:"9,keyasint"` // resolved BOF file path (agent local/memfs)
 }
 
 // ResolvedCoffInvocation contains packed COFF args with concrete values
@@ -121,7 +134,8 @@ type ResolvedCoffInvocation struct {
 	Args   []ResolvedCoffArg `cbor:"2,keyasint"`
 }
 
-// ResolvedCoffArg holds a typed value to be packed by lighthouse.
+// ResolvedCoffArg holds a typed value to be packed into the COFFLoader BOF
+// argument buffer.
 // WireType is derived from the parameter's unified Type field.
 type ResolvedCoffArg struct {
 	WireType string `cbor:"1,keyasint"`
@@ -142,18 +156,19 @@ type AgentModuleConfig struct {
 
 // ModuleConfig stores the complete module config data
 type ModuleConfig struct {
-	Name        string            `cbor:"1,keyasint"`  // Display as this name
-	Build       string            `cbor:"2,keyasint"`  // Command to run on C2, you can use it to build module
-	Author      string            `cbor:"3,keyasint"`  // by whom
-	Date        string            `cbor:"4,keyasint"`  // when did you write it
-	Comment     string            `cbor:"5,keyasint"`  // describe your module in one line
-	IsLocal     bool              `cbor:"6,keyasint"`  // If true, this module is a C2 plugin and doesn't run on agent, use `Build` to specify the command to run
-	Platform    string            `cbor:"7,keyasint"`  // targeting which OS? Linux/Windows
-	Path        string            `cbor:"8,keyasint"`  // Path to the module directory
-	Fileless    bool              `cbor:"9,keyasint"`  // If true, this module doesn't drop files to disk
-	Options     ModOptions        `cbor:"10,keyasint"` // module options, will be passed as environment variables to the module, either on C2 or agent side
-	AgentConfig AgentModuleConfig `cbor:"11,keyasint"` // Configuration for agent side
-	Invocation  InvocationSpec    `cbor:"12,keyasint"` // how to run the module without run.sh/env
+	Name         string            `cbor:"1,keyasint"`  // Display as this name
+	Build        string            `cbor:"2,keyasint"`  // Command to run on C2, you can use it to build module
+	Author       string            `cbor:"3,keyasint"`  // by whom
+	Date         string            `cbor:"4,keyasint"`  // when did you write it
+	Comment      string            `cbor:"5,keyasint"`  // describe your module in one line
+	IsLocal      bool              `cbor:"6,keyasint"`  // If true, this module is a C2 plugin and doesn't run on agent, use `Build` to specify the command to run
+	Platform     string            `cbor:"7,keyasint"`  // targeting which OS? Linux/Windows
+	Path         string            `cbor:"8,keyasint"`  // Path to the module directory
+	Fileless     bool              `cbor:"9,keyasint"`  // If true, this module doesn't drop files to disk
+	Options      ModOptions        `cbor:"10,keyasint"` // module options, will be passed as environment variables to the module, either on C2 or agent side
+	AgentConfig  AgentModuleConfig `cbor:"11,keyasint"` // Configuration for agent side
+	Invocation   InvocationSpec    `cbor:"12,keyasint"` // how to run the module without run.sh/env
+	Dependencies []string          `cbor:"13,keyasint"` // module names that must be loaded before this one (e.g. "coffloader")
 }
 
 // Module help info and options

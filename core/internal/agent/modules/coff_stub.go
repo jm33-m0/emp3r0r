@@ -11,3 +11,7 @@ import (
 func runCOFFModule(_ []byte, _ def.ResolvedInvocation, _ uintptr) (string, error) {
 	return "", fmt.Errorf("COFF modules are supported on Windows or Linux agents")
 }
+
+func runDLLModule(_ []byte, _ def.ResolvedInvocation, _ uintptr) (string, error) {
+	return "", fmt.Errorf("DLL modules are only supported on Windows agents")
+}

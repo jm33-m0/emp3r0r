@@ -26,16 +26,31 @@ func getModulesRoot() string {
 }
 
 func typeToWireToken(t string) string {
-	switch strings.ToLower(t) {
-	case "cstr", "s", "lpstr", "string":
+	// Canonical single-char tokens are case-sensitive: z is narrow, Z is wide,
+	// s is short.
+	switch t {
+	case "z":
 		return "z"
-	case "wstr", "w", "lpwstr", "wstring":
+	case "Z":
 		return "Z"
-	case "dword", "i", "uint32", "int", "uint", "int32", "port", "bool":
+	case "i":
+		return "i"
+	case "s":
+		return "s"
+	case "b":
+		return "b"
+	}
+
+	switch strings.ToLower(t) {
+	case "cstr", "string", "str", "lpstr":
+		return "z"
+	case "wstr", "wstring", "lpwstr", "w":
+		return "Z"
+	case "int", "dword", "uint32", "uint", "int32", "port", "bool":
 		return "i"
 	case "short", "word", "int16":
 		return "s"
-	case "binary", "b", "base64":
+	case "binary", "base64":
 		return "b"
 	default:
 		return ""

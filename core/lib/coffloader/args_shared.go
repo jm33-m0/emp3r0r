@@ -14,7 +14,7 @@ type CoffArg struct {
 	Value    any
 }
 
-// PackCoffArgs converts CoffArg values to the lighthouse wire format.
+// PackCoffArgs converts CoffArg values to the COFFLoader BOF wire format.
 func PackCoffArgs(args []CoffArg) ([]string, error) {
 	packed := make([]string, 0, len(args))
 	for _, arg := range args {

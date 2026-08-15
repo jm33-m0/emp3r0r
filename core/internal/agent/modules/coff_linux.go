@@ -29,3 +29,8 @@ func runCOFFModule(payload []byte, invocation def.ResolvedInvocation, token uint
 
 	return coffloader.RunLinuxCOFF(payload, invocation.Coff.Export, args, token)
 }
+
+// runDLLModule is Windows-only; DLL modules are not supported on Linux agents.
+func runDLLModule(_ []byte, _ def.ResolvedInvocation, _ uintptr) (string, error) {
+	return "", fmt.Errorf("DLL modules are only supported on Windows agents")
+}
