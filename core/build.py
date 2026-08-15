@@ -532,19 +532,23 @@ def build(arg1: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> None:
     build_shared_object("arm", "linux", "stub-arm.so", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
     build_shared_object("riscv64", "linux", "stub-riscv64.so", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
 
-    # Build modules with a make_all.sh wrapper
+    # Build modules with a make_all.sh wrapper.
+    # EMP3R0R_DEBUG is passed to every module so any module that supports a
+    # debug build (e.g. coffloader's -DDEBUG) can opt in for --debug builds.
     log_info("Building complex modules with make_all.sh...")
     modules_dir = core_dir / "modules"
+    module_env = os.environ.copy()
+    module_env["EMP3R0R_DEBUG"] = "1" if arg1 == "--debug" else "0"
     if modules_dir.is_dir():
         for mod_dir in modules_dir.iterdir():
             make_all = mod_dir / "make_all.sh"
             if mod_dir.is_dir() and make_all.is_file():
-                log_info(f"Running make_all.sh in {mod_dir.name}")
+                log_info(f"Running make_all.sh in {mod_dir.name} ({'debug' if arg1 == '--debug' else 'release'})")
                 try:
                     make_all.chmod(0o755)
                 except Exception:
                     pass
-                res = run_cmd(["./make_all.sh"], check=False, cwd=mod_dir)
+                res = run_cmd(["./make_all.sh"], check=False, cwd=mod_dir, env=module_env)
                 if res.returncode != 0:
                     log_warn(f"Failed to build modules in {mod_dir.name} via make_all.sh")
 
