@@ -130,12 +130,48 @@ static BOOL starts_with(const char *string, const char *substring)
  * library its from, and return the right function pointer. Will need to
  * implement in the loading of the beacon internal functions, or any other
  * internal functions you want to have available. */
+
+#if defined(_WIN32)
+/* Resolve a bare CRT/system import (e.g. memcpy, memset, strlen) that mingw
+ * emitted without a library prefix. These live in the C runtime DLLs. */
+static void *resolve_crt_symbol(const char *name)
+{
+    static const char *crt_dlls[] = {
+        "msvcrt.dll",
+        "ucrtbase.dll",
+        "ntdll.dll",
+        "kernel32.dll",
+    };
+    size_t i;
+
+    if (name == NULL || name[0] == '\0')
+    {
+        return NULL;
+    }
+
+    for (i = 0; i < sizeof(crt_dlls) / sizeof(crt_dlls[0]); i++)
+    {
+        HMODULE h = LoadLibraryA(crt_dlls[i]);
+        if (h != NULL)
+        {
+            void *addr = GetProcAddress(h, name);
+            if (addr != NULL)
+            {
+                return addr;
+            }
+        }
+    }
+    return NULL;
+}
+#endif
+
 void *process_symbol(char *symbolstring)
 {
     void *functionaddress = NULL;
     char localcopy[1024] = {0};
     char *locallib = NULL;
     char *localfunc = NULL;
+    char *crt_name = NULL;
 #if defined(_WIN32)
     int tempcounter = 0;
     HMODULE llHandle = NULL;
@@ -180,17 +216,38 @@ void *process_symbol(char *symbolstring)
 
         locallib = strtok(locallib, "$");
         localfunc = strtok(NULL, "$");
-        DEBUG_PRINT("\t\tLibrary: %s\n", locallib);
-        localfunc = strtok(localfunc, "@");
-        DEBUG_PRINT("\t\tFunction: %s\n", localfunc);
-        /* Resolve the symbols here, and set the functionpointervalue */
+        if (localfunc == NULL)
+        {
+            /* __imp_memcpy (no $library prefix): a bare CRT import. */
+            crt_name = locallib;
+        }
+        else
+        {
+            localfunc = strtok(localfunc, "@");
+            DEBUG_PRINT("\t\tLibrary: %s\n", locallib);
+            DEBUG_PRINT("\t\tFunction: %s\n", localfunc);
+            /* Resolve the symbols here, and set the functionpointervalue */
 #if defined(_WIN32)
-        llHandle = LoadLibraryA(locallib);
-        DEBUG_PRINT("\t\tHandle: 0x%lx\n", llHandle);
-        functionaddress = GetProcAddress(llHandle, localfunc);
-        DEBUG_PRINT("\t\tProcAddress: 0x%p\n", functionaddress);
+            llHandle = LoadLibraryA(locallib);
+            DEBUG_PRINT("\t\tHandle: 0x%lx\n", llHandle);
+            functionaddress = GetProcAddress(llHandle, localfunc);
+            DEBUG_PRINT("\t\tProcAddress: 0x%p\n", functionaddress);
 #endif
+        }
     }
+    else
+    {
+        /* Bare external symbol without the __imp_ prefix, e.g. memcpy. */
+        crt_name = symbolstring;
+    }
+
+#if defined(_WIN32)
+    if (functionaddress == NULL && crt_name != NULL)
+    {
+        functionaddress = resolve_crt_symbol(crt_name);
+    }
+#endif
+
     return functionaddress;
 }
 
@@ -312,7 +369,9 @@ int RunCOFF(char *functionname, unsigned char *coff_data, uint32_t filesize, uns
 #endif
     void (*foo)(char *in, unsigned long datalen);
     void **functionMapping = NULL;
+    unsigned char *trampolineMapping = NULL;
     int functionMappingCount = 0;
+    int trampolineCount = 0;
     int relocationCount = 0;
 #endif
     /* Buffer to hold the symbol short name if the symbol has no trailing NULL byte */
@@ -394,6 +453,20 @@ int RunCOFF(char *functionname, unsigned char *coff_data, uint32_t filesize, uns
         DEBUG_PRINT("Failed to allocate functionMapping\n");
         goto cleanup;
     }
+
+    /* Near-executable stub region for direct calls to far CRT/system symbols
+     * (e.g. memcpy). A 32-bit relative call cannot reach msvcrt.dll from a
+     * MEM_TOP_DOWN BOF section, so we jump through a nearby stub instead. */
+    if (relocationCount > 0)
+    {
+        trampolineMapping = (unsigned char *)VirtualAlloc(NULL, relocationCount * 16, MEM_COMMIT | MEM_RESERVE | MEM_TOP_DOWN, PAGE_EXECUTE_READWRITE);
+        if (trampolineMapping == NULL)
+        {
+            DEBUG_PRINT("Failed to allocate trampolineMapping\n");
+            goto cleanup;
+        }
+        DEBUG_PRINT("Allocated trampoline region at %p (%d bytes)\n", trampolineMapping, relocationCount * 16);
+    }
 #endif
 
     /* Start parsing the relocations, and *hopefully* handle them correctly. */
@@ -461,15 +534,51 @@ int RunCOFF(char *functionname, unsigned char *coff_data, uint32_t filesize, uns
                     goto cleanup;
                 }
 
-                /* Map the imported symbol address to the local import table */
-                functionMapping[functionMappingCount] = funcptrlocation;
+                /* __imp_* symbols are DLL imports accessed through an import
+                 * address slot: route them through the local function table so
+                 * indirect calls (call [rip+x]) dereference correctly. Bare
+                 * symbols (e.g. memcpy) are direct calls: patch them straight
+                 * to the resolved address. */
+                if (starts_with(symbol_name, PREPENDSYMBOLVALUE))
+                {
+                    /* Map the imported symbol address to the local import table */
+                    functionMapping[functionMappingCount] = funcptrlocation;
 
-                /* Get the address of the imported symbol mapped in the local import
-                 * table for the relocation target */
-                funcptrlocation = &functionMapping[functionMappingCount];
+                    /* Get the address of the imported symbol mapped in the local import
+                     * table for the relocation target */
+                    funcptrlocation = &functionMapping[functionMappingCount];
 
-                /* Increment the number of mapped imported functions */
-                functionMappingCount += 1;
+                    /* Increment the number of mapped imported functions */
+                    functionMappingCount += 1;
+                }
+                else
+                {
+                    /* Bare symbol (direct call): emit a nearby jump stub so the
+                     * 32-bit relative relocation stays in range. */
+                    unsigned char *stub;
+                    if (trampolineMapping == NULL || trampolineCount >= relocationCount)
+                    {
+                        DEBUG_PRINT("Trampoline overflow for symbol %s\n", symbol_name);
+                        retcode = 1;
+                        goto cleanup;
+                    }
+                    stub = trampolineMapping + (trampolineCount * 16);
+                    DEBUG_PRINT("Trampoline for %s at %p -> %p\n", symbol_name, stub, funcptrlocation);
+#ifdef _WIN64
+                    stub[0] = 0x48; /* mov rax, imm64 */
+                    stub[1] = 0xB8;
+                    *(uint64_t *)(stub + 2) = (uint64_t)(uintptr_t)funcptrlocation;
+                    stub[10] = 0xFF; /* jmp rax */
+                    stub[11] = 0xE0;
+#else
+                    stub[0] = 0xB8; /* mov eax, imm32 */
+                    *(uint32_t *)(stub + 1) = (uint32_t)(uintptr_t)funcptrlocation;
+                    stub[5] = 0xFF; /* jmp eax */
+                    stub[6] = 0xE0;
+#endif
+                    funcptrlocation = stub;
+                    trampolineCount += 1;
+                }
             }
             else
             {
@@ -499,7 +608,7 @@ int RunCOFF(char *functionname, unsigned char *coff_data, uint32_t filesize, uns
                 DEBUG_PRINT("\t\tEnd of Relocation Bytes: 0x%X\n", sectionMapping[counter] + coff_reloc_ptr->VirtualAddress + 4);
                 if (((char *)(sectionMapping[coff_sym_ptr[coff_reloc_ptr->SymbolTableIndex].SectionNumber - 1] + offsetvalue) - (char *)(sectionMapping[counter] + coff_reloc_ptr->VirtualAddress + 4)) > 0xffffffff)
                 {
-                    DEBUG_PRINT("Relocations > 4 gigs away, exiting\n");
+                    DEBUG_PRINT("Relocations > 2 gigs away, exiting\n");
                     retcode = 1;
                     goto cleanup;
                 }
@@ -516,9 +625,9 @@ int RunCOFF(char *functionname, unsigned char *coff_data, uint32_t filesize, uns
                 memcpy(&offsetvalue, sectionMapping[counter] + coff_reloc_ptr->VirtualAddress, sizeof(int32_t));
                 DEBUG_PRINT("\t\tReadin offset value: 0x%X\n", offsetvalue);
 
-                if (llabs((long long)funcptrlocation - (long long)(sectionMapping[counter] + coff_reloc_ptr->VirtualAddress + 4)) > UINT_MAX)
+                if (llabs((long long)funcptrlocation - (long long)(sectionMapping[counter] + coff_reloc_ptr->VirtualAddress + 4)) > 0x7fffffff)
                 {
-                    DEBUG_PRINT("Relocations > 4 gigs away, exiting\n");
+                    DEBUG_PRINT("Relocations > 2 gigs away, exiting\n");
                     goto cleanup;
                 }
 
@@ -532,9 +641,9 @@ int RunCOFF(char *functionname, unsigned char *coff_data, uint32_t filesize, uns
                 memcpy(&offsetvalue, sectionMapping[counter] + coff_reloc_ptr->VirtualAddress, sizeof(int32_t));
                 DEBUG_PRINT("\t\tReadin offset value: 0x%X\n", offsetvalue);
 
-                if (llabs((long long)funcptrlocation - (long long)(sectionMapping[counter] + coff_reloc_ptr->VirtualAddress + 4 + 1)) > UINT_MAX)
+                if (llabs((long long)funcptrlocation - (long long)(sectionMapping[counter] + coff_reloc_ptr->VirtualAddress + 4 + 1)) > 0x7fffffff)
                 {
-                    DEBUG_PRINT("Relocations > 4 gigs away, exiting\n");
+                    DEBUG_PRINT("Relocations > 2 gigs away, exiting\n");
                     retcode = 1;
                     goto cleanup;
                 }
@@ -550,9 +659,9 @@ int RunCOFF(char *functionname, unsigned char *coff_data, uint32_t filesize, uns
                 memcpy(&offsetvalue, sectionMapping[counter] + coff_reloc_ptr->VirtualAddress, sizeof(int32_t));
                 DEBUG_PRINT("\t\tReadin offset value: 0x%X\n", offsetvalue);
 
-                if (llabs((long long)funcptrlocation - (long long)(sectionMapping[counter] + coff_reloc_ptr->VirtualAddress + 4 + 2)) > UINT_MAX)
+                if (llabs((long long)funcptrlocation - (long long)(sectionMapping[counter] + coff_reloc_ptr->VirtualAddress + 4 + 2)) > 0x7fffffff)
                 {
-                    DEBUG_PRINT("Relocations > 4 gigs away, exiting\n");
+                    DEBUG_PRINT("Relocations > 2 gigs away, exiting\n");
                     retcode = 1;
                     goto cleanup;
                 }
@@ -568,9 +677,9 @@ int RunCOFF(char *functionname, unsigned char *coff_data, uint32_t filesize, uns
                 memcpy(&offsetvalue, sectionMapping[counter] + coff_reloc_ptr->VirtualAddress, sizeof(int32_t));
                 DEBUG_PRINT("\t\tReadin offset value: 0x%X\n", offsetvalue);
 
-                if (llabs((long long)funcptrlocation - (long long)(sectionMapping[counter] + coff_reloc_ptr->VirtualAddress + 4 + 3)) > UINT_MAX)
+                if (llabs((long long)funcptrlocation - (long long)(sectionMapping[counter] + coff_reloc_ptr->VirtualAddress + 4 + 3)) > 0x7fffffff)
                 {
-                    DEBUG_PRINT("Relocations > 4 gigs away, exiting\n");
+                    DEBUG_PRINT("Relocations > 2 gigs away, exiting\n");
                     retcode = 1;
                     goto cleanup;
                 }
@@ -586,9 +695,9 @@ int RunCOFF(char *functionname, unsigned char *coff_data, uint32_t filesize, uns
                 memcpy(&offsetvalue, sectionMapping[counter] + coff_reloc_ptr->VirtualAddress, sizeof(int32_t));
                 DEBUG_PRINT("\t\tReadin offset value: 0x%X\n", offsetvalue);
 
-                if (llabs((long long)funcptrlocation - (long long)(sectionMapping[counter] + coff_reloc_ptr->VirtualAddress + 4 + 4)) > UINT_MAX)
+                if (llabs((long long)funcptrlocation - (long long)(sectionMapping[counter] + coff_reloc_ptr->VirtualAddress + 4 + 4)) > 0x7fffffff)
                 {
-                    DEBUG_PRINT("Relocations > 4 gigs away, exiting\n");
+                    DEBUG_PRINT("Relocations > 2 gigs away, exiting\n");
                     retcode = 1;
                     goto cleanup;
                 }
@@ -603,9 +712,9 @@ int RunCOFF(char *functionname, unsigned char *coff_data, uint32_t filesize, uns
                 memcpy(&offsetvalue, sectionMapping[counter] + coff_reloc_ptr->VirtualAddress, sizeof(int32_t));
                 DEBUG_PRINT("\t\tReadin offset value: 0x%X\n", offsetvalue);
 
-                if (llabs((long long)funcptrlocation - (long long)(sectionMapping[counter] + coff_reloc_ptr->VirtualAddress + 4 + 5)) > UINT_MAX)
+                if (llabs((long long)funcptrlocation - (long long)(sectionMapping[counter] + coff_reloc_ptr->VirtualAddress + 4 + 5)) > 0x7fffffff)
                 {
-                    DEBUG_PRINT("Relocations > 4 gigs away, exiting\n");
+                    DEBUG_PRINT("Relocations > 2 gigs away, exiting\n");
                     retcode = 1;
                     goto cleanup;
                 }
@@ -725,6 +834,10 @@ cleanup:
     if (functionMapping)
     {
         VirtualFree(functionMapping, 0, MEM_RELEASE);
+    }
+    if (trampolineMapping)
+    {
+        VirtualFree(trampolineMapping, 0, MEM_RELEASE);
     }
 #endif
     if (entryfuncname && entryfuncname != functionname)
