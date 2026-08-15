@@ -86,7 +86,7 @@ func RunWindowsCOFFViaDLL(dllData, payload []byte, entry string, args []CoffArg,
 		}()
 	}
 
-	r0 := callLoadAndRun(loadAndRun, buf, callback)
+	r0 := guardedCallLoadAndRun(loadAndRun, buf, callback)
 	if ret := int32(uint32(r0)); ret != 0 {
 		return string(output), fmt.Errorf("LoadAndRun returned %d", ret)
 	}
