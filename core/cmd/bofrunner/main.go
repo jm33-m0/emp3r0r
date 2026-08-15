@@ -1,0 +1,171 @@
+//go:build windows
+
+// bofrunner is a standalone debug tool that loads the COFFLoader DLL in
+// memory (via memmod, the same way the agent does) and uses it to execute a
+// Beacon Object File. The COFFLoader's DEBUG_PRINT tracing goes straight to
+// stdout, so build the DLL with debug enabled:
+//
+//	make -C modules/coffloader dll DEBUG=1
+//
+// Usage:
+//
+//	bofrunner -bof /path/to/bof.o [-dll /path/to/COFFLoader.x64.dll] \
+//	          [-entry go] [-args "z:arg1,i:1234"]
+package main
+
+import (
+	"flag"
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/coffloader"
+)
+
+func main() {
+	os.Exit(run())
+}
+
+func run() int {
+	var (
+		dllPath = flag.String("dll", "", "path to COFFLoader DLL (auto-detected when empty)")
+		bofPath = flag.String("bof", "", "path to BOF object file (.o)")
+		entry   = flag.String("entry", "go", "BOF entry function name")
+		argsStr = flag.String("args", "", `comma-separated BOF args: z:str, Z:wide, i:int, s:short, b:base64/hex`)
+	)
+	flag.Parse()
+
+	if *bofPath == "" {
+		fmt.Fprintln(os.Stderr, "usage: bofrunner -bof <bof.o> [-dll <COFFLoader.dll>] [-entry go] [-args z:str,i:int]")
+		flag.PrintDefaults()
+		return 2
+	}
+
+	dllFile, err := findDLL(*dllPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[!] %v\n", err)
+		return 1
+	}
+	dllData, err := os.ReadFile(dllFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[!] read %s: %v\n", dllFile, err)
+		return 1
+	}
+
+	payload, err := os.ReadFile(*bofPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[!] read %s: %v\n", *bofPath, err)
+		return 1
+	}
+
+	args, err := parseArgs(*argsStr)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[!] parse args: %v\n", err)
+		return 1
+	}
+
+	fmt.Fprintf(os.Stderr, "[*] COFFLoader DLL: %s (%d bytes)\n", dllFile, len(dllData))
+	fmt.Fprintf(os.Stderr, "[*] BOF: %s (entry=%s, %d args)\n", *bofPath, *entry, len(args))
+	fmt.Fprintf(os.Stderr, "[*] Loading COFFLoader DLL in-memory and executing BOF...\n\n")
+
+	out, execErr := coffloader.RunWindowsCOFFViaDLL(dllData, payload, *entry, args, 0)
+	if out != "" {
+		fmt.Print(out)
+		if !strings.HasSuffix(out, "\n") {
+			fmt.Println()
+		}
+	}
+	if execErr != nil {
+		fmt.Fprintf(os.Stderr, "\n[!] BOF execution failed: %v\n", execErr)
+		return 1
+	}
+
+	fmt.Fprintln(os.Stderr, "\n[+] BOF execution finished")
+	return 0
+}
+
+// findDLL resolves the COFFLoader DLL path, checking the user-supplied path
+// first and then a set of conventional locations relative to the binary and
+// the repository layout.
+func findDLL(userPath string) (string, error) {
+	if userPath != "" {
+		if _, err := os.Stat(userPath); err != nil {
+			return "", fmt.Errorf("COFFLoader DLL not found at %s: %v", userPath, err)
+		}
+		return userPath, nil
+	}
+
+	name := "COFFLoader.x64.dll"
+	if runtime.GOARCH == "386" {
+		name = "COFFLoader.x86.dll"
+	}
+
+	candidates := []string{
+		name,
+		filepath.Join("modules", "coffloader", name),
+		filepath.Join("..", "modules", "coffloader", name),
+		filepath.Join("..", "..", "modules", "coffloader", name),
+		filepath.Join("..", "..", "..", "modules", "coffloader", name),
+	}
+
+	if exe, err := os.Executable(); err == nil {
+		dir := filepath.Dir(exe)
+		candidates = append([]string{
+			filepath.Join(dir, name),
+			filepath.Join(dir, "modules", "coffloader", name),
+		}, candidates...)
+	}
+
+	for _, c := range candidates {
+		if fi, err := os.Stat(c); err == nil && !fi.IsDir() {
+			return c, nil
+		}
+	}
+
+	return "", fmt.Errorf(
+		"COFFLoader DLL not found (searched: %s); build it with `make -C modules/coffloader dll DEBUG=1` or pass -dll",
+		strings.Join(candidates, ", "))
+}
+
+// parseArgs parses the -args flag into COFFLoader wire args. Supported tokens:
+// z (UTF-8 string), Z (UTF-16 wide string), i (32-bit int), s (16-bit short),
+// b (binary: base64 or hex).
+func parseArgs(s string) ([]coffloader.CoffArg, error) {
+	if strings.TrimSpace(s) == "" {
+		return nil, nil
+	}
+
+	parts := strings.Split(s, ",")
+	args := make([]coffloader.CoffArg, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		typ, val, ok := strings.Cut(part, ":")
+		if !ok {
+			return nil, fmt.Errorf("invalid arg %q (want type:value)", part)
+		}
+		typ = strings.TrimSpace(typ)
+		val = strings.TrimSpace(val)
+
+		switch typ {
+		case "z", "Z":
+			args = append(args, coffloader.CoffArg{WireType: typ, Value: val})
+		case "i", "s":
+			n, err := strconv.ParseInt(val, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("arg %q: %w", part, err)
+			}
+			args = append(args, coffloader.CoffArg{WireType: typ, Value: n})
+		case "b":
+			args = append(args, coffloader.CoffArg{WireType: "b", Value: val})
+		default:
+			return nil, fmt.Errorf("unsupported arg type %q in %q", typ, part)
+		}
+	}
+	return args, nil
+}
