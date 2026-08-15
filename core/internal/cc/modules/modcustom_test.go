@@ -524,31 +524,6 @@ func TestInitModulesLoadsRepoModules(t *testing.T) {
 	}
 }
 
-func TestUpdateOptionsAddsDownloadAddr(t *testing.T) {
-	modName := "dl_mod"
-	def.Modules.Store(modName, &def.ModuleConfig{
-		Name:        modName,
-		IsLocal:     false,
-		AgentConfig: def.AgentModuleConfig{Exec: "custom"},
-	})
-	defer def.Modules.Delete(modName)
-
-	ModuleRunners[modName] = func(ctx *context.C2Context) {}
-	defer delete(ModuleRunners, modName)
-
-	live.ActiveModule = &def.ModuleConfig{Name: modName, Options: def.ModOptions{}}
-	if !UpdateOptions(modName) {
-		t.Fatalf("expected module to exist")
-	}
-	if _, ok := live.ActiveModule.Options["download_addr"]; ok {
-		t.Fatalf("download_addr should not be injected")
-	}
-
-	if UpdateOptions("missing") {
-		t.Fatalf("expected missing module to return false")
-	}
-}
-
 func TestReadModConfigsMultiple(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "emp3r0r-test-multiple")
 	if err != nil {

@@ -12,10 +12,22 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// skipUnderRace skips memmod tests when the race detector is enabled (the CI
+// workflow sets EMP3R0R_RACE_ON=1 for the race step). memmod maps arbitrary
+// non-Go memory and performs unsafe pointer arithmetic, which trip Go's
+// checkptr validation under -race.
+func skipUnderRace(t *testing.T) {
+	t.Helper()
+	if os.Getenv("EMP3R0R_RACE_ON") == "1" {
+		t.Skip("skipping: race detector is enabled")
+	}
+}
+
 // ensureSyscallTable initializes the global syscall table used by the Nt*
 // wrappers if it has not already been set up.
 func ensureSyscallTable(t *testing.T) *ntsyscall.SyscallTable {
 	t.Helper()
+	skipUnderRace(t)
 	if ntsyscall.RuntimeSyscallTable == nil {
 		table, err := ntsyscall.InitializeSyscallTable()
 		if err != nil {

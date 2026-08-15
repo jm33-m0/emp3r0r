@@ -5,9 +5,17 @@ package coffloader
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
+
+// getModulesRoot resolves the <repo>/core/modules directory relative to this
+// test file (core/lib/coffloader).
+func getModulesRoot() string {
+	_, b, _, _ := runtime.Caller(0)
+	return filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(b))), "modules")
+}
 
 func TestRunWindowsCOFFViaDLL(t *testing.T) {
 	modulesRoot := getModulesRoot()
