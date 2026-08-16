@@ -1,0 +1,25 @@
+{
+    "name": "AAD Join Info (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-aadjoininfo",
+    "extension_author": "c2biz",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Displays Entra ID (Azure AD) join information",
+    "long_help": "Returns device join information including join type (device/workplace), Device ID, Tenant ID, Tenant Name, IDP Domain, and join user details if available.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "aadjoininfo.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "aadjoininfo.x86.o"
+        }
+    ],
+    "arguments": []
+}

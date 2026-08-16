@@ -1,0 +1,32 @@
+{
+    "name": "nettime",
+    "version": "0.0.0",
+    "command_name": "sa-nettime",
+    "extension_author": "c2biz",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Display current time on local or remote computer.",
+    "long_help": "Retrieves and displays the current local time from a computer using the NetRemoteTOD API. Useful for identifying time zone differences or time synchronization issues across systems.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "nettime.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "nettime.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+            "name": "name",
+            "desc": "Target computer to query (defaults to localhost if not specified)",
+            "type": "wstring",
+            "optional": true
+        }
+    ]
+}

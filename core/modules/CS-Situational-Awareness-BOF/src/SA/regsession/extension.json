@@ -1,0 +1,32 @@
+{
+    "name": "regsession",
+    "version": "0.0.0",
+    "command_name": "sa-regsession",
+    "extension_author": "c2biz",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Enumerate logged-on user SIDs from HKEY_USERS registry hive",
+    "long_help": "Enumerates the HKEY_USERS registry hive to find user SIDs (S-1-5-21-*), indicating active user sessions. Can query local or remote systems. Useful for identifying which users have loaded registry profiles on a system.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "regsession.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "regsession.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+            "name": "name",
+            "desc": "Target hostname or IP for remote query (empty for local)",
+            "type": "string",
+            "optional": true
+        }
+    ]
+}

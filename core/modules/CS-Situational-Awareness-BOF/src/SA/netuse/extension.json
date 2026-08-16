@@ -1,0 +1,158 @@
+{
+    "name": "Netuse (SA)",
+    "package_name": "sa-netuse",
+    "version": "0.0.0",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "commands": [
+        {
+            "command_name": "sa-netuse-add",
+            "help": "Connect to a network share",
+            "long_help": "Connects to a network share using WNetAddConnection2. Supports optional credentials, device mapping (drive letter), persistent connections, and SMBv3 encryption requirement.",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "netuse.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "netuse.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "action",
+                    "desc": "Action code (always 1 for add)",
+                    "type": "short",
+                    "optional": true,
+                    "default": 1
+                },
+                {
+                    "name": "share",
+                    "desc": "UNC path to share (e.g., \\\\server\\share)",
+                    "type": "wstring",
+                    "optional": false
+                },
+                {
+                    "name": "user",
+                    "desc": "Username for authentication (empty for current user)",
+                    "type": "wstring",
+                    "optional": true
+                },
+                {
+                    "name": "password",
+                    "desc": "Password for authentication (empty for current user)",
+                    "type": "wstring",
+                    "optional": true
+                },
+                {
+                    "name": "device",
+                    "desc": "Local device name to map (e.g., Z:). Empty for no mapping.",
+                    "type": "wstring",
+                    "optional": true
+                },
+                {
+                    "name": "persist",
+                    "desc": "Make connection persistent across reboots (0=no, 1=yes)",
+                    "type": "short",
+                    "optional": true,
+                    "default": 0
+                },
+                {
+                    "name": "require_privacy",
+                    "desc": "Require SMBv3 encryption, fail if unsupported (0=no, 1=yes)",
+                    "type": "short",
+                    "optional": true,
+                    "default": 0
+                }
+            ]
+        },
+        {
+            "command_name": "sa-netuse-list",
+            "help": "List network share connections",
+            "long_help": "Lists currently connected network shares showing status, local device name, remote path, and provider. Optionally filter by specific device or share name.",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "netuse.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "netuse.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "action",
+                    "desc": "Action code (always 2 for list)",
+                    "type": "short",
+                    "optional": true,
+                    "default": 2
+                },
+                {
+                    "name": "target",
+                    "desc": "Filter by device (e.g., Z:) or share name. Empty to list all.",
+                    "type": "wstring",
+                    "optional": true
+                }
+            ]
+        },
+        {
+            "command_name": "sa-netuse-delete",
+            "help": "Disconnect from a network share",
+            "long_help": "Disconnects from a network share using WNetCancelConnection2. Can remove persistent mappings and force disconnection even if resources are in use.",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "netuse.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "netuse.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "action",
+                    "desc": "Action code (always 3 for delete)",
+                    "type": "short",
+                    "optional": true,
+                    "default": 3
+                },
+                {
+                    "name": "target",
+                    "desc": "Device name (e.g., Z:) or UNC share path to disconnect",
+                    "type": "wstring",
+                    "optional": false
+                },
+                {
+                    "name": "persist",
+                    "desc": "Remove persistent mapping so it won't reconnect (0=no, 1=yes)",
+                    "type": "short",
+                    "optional": true,
+                    "default": 0
+                },
+                {
+                    "name": "force",
+                    "desc": "Force disconnect even if resources are open (0=no, 1=yes)",
+                    "type": "short",
+                    "optional": true,
+                    "default": 0
+                }
+            ]
+        }
+    ]
+}

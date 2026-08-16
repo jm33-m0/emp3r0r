@@ -1,0 +1,25 @@
+{
+    "name": "Driver Sigs (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-driversigs",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Checks loaded drivers for signatures from known EDR vendors",
+    "long_help": "Enumerates active driver services and checks their code signing certificates against a list of known EDR/AV vendors: Carbon Black, CrowdStrike, Cylance, FireEye, McAfee, Sentinel Labs, Symantec, and Tanium.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "driversigs.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "driversigs.x86.o"
+        }
+    ],
+    "arguments": []
+}

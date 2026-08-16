@@ -1,0 +1,45 @@
+{
+    "name": "Dir (SA)",
+    "package_name": "sa-dir",
+    "version": "0.0.0",
+    "extension_author": "c2biz",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "commands": [
+        {
+            "command_name": "sa-dir",
+            "help": "Lists files and directories in a target path, with optional recursive listing.",
+            "long_help": "Lists directory contents including file sizes and modification times. Supports local paths, drive letters (C:), UNC paths (\\\\server\\share), and wildcards. Output shows date/time, size (or <dir>/<junction>), and filename. Displays total file size and counts at the end. When omitted, lists the current directory.",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "dir.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "dir.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "targetdir",
+                    "desc": "Directory or file path to list. Supports UNC paths (\\\\server\\share) and wildcards. Default: current directory.",
+                    "type": "string",
+                    "optional": true,
+                    "default": ".\\"
+                },
+                {
+                    "name": "subdirs",
+                    "desc": "Recurse into subdirectories (0=no, 1=yes). Default: 0.",
+                    "type": "short",
+                    "optional": true,
+                    "default": 0
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,38 @@
+{
+    "name": "Net Shares (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-netshares",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "List network shares on local or remote computer.",
+    "long_help": "Enumerates network shares on the specified computer. Standard mode shows share name and remark. Admin mode (requires admin privileges) shows additional details including local path and current connection count.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "netshares.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "netshares.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+            "name": "computername",
+            "desc": "Target computer to query (defaults to local system if not specified)",
+            "type": "wstring",
+            "optional": true
+        },
+        {
+            "name": "as-admin",
+            "desc": "Show admin-level details including local paths (0 = basic info, 1 = admin info; default: 0)",
+            "type": "integer",
+            "optional": true
+        }
+    ]
+}

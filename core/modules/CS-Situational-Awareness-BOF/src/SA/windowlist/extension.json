@@ -1,0 +1,32 @@
+{
+    "name": "Window List (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-windowlist",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Lists windows in the current user's desktop session",
+    "long_help": "Enumerates windows on the current desktop. By default (all=0), only shows visible windows. Set all=1 to include all windows with their visibility status labels.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "windowlist.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "windowlist.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+            "name": "all",
+            "desc": "0 = visible windows only (default), 1 = all windows with visibility status",
+            "type": "integer",
+            "optional": true
+        }
+    ]
+}

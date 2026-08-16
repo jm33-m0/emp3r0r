@@ -1,0 +1,50 @@
+{
+    "name": "Probe (SA)",
+    "package_name": "sa-probe",
+    "version": "0.0.0",
+    "extension_author": "c2biz",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "commands": [
+        {
+            "command_name": "sa-probe",
+            "help": "Check if a TCP port is open on a remote host",
+            "long_help": "Performs a non-blocking TCP connection attempt to check if a specific port is open on a target host. Returns OPEN if the connection succeeds, FAILED otherwise. Timeout is configurable (default 5 seconds).",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "probe.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "probe.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "host",
+                    "desc": "Target hostname or IP address to probe",
+                    "type": "string",
+                    "optional": false
+                },
+                {
+                    "name": "port",
+                    "desc": "TCP port number to check (1-65535)",
+                    "type": "integer",
+                    "optional": false
+                },
+                {
+                    "name": "timeout",
+                    "desc": "Connection timeout in seconds. Default: 5.",
+                    "type": "integer",
+                    "optional": true,
+                    "default": 5
+                }
+            ]
+        }
+    ]
+}

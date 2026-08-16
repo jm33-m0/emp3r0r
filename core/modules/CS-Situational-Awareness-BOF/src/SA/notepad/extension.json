@@ -1,0 +1,25 @@
+{
+    "name": "notepad",
+    "version": "0.0.0",
+    "command_name": "sa-notepad",
+    "extension_author": "c2biz",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Search for open notepad and notepad++ windows and grab text from the editor control object",
+    "long_help": "Synopsis: notepad \n\nPrints any observed open notepad or notepad++ sessions and prints their contents. Not reliant on clipboard. Not reliant on window being non-minimized",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "notepad.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "notepad.x86.o"
+        }
+    ],
+    "arguments": []
+}

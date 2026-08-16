@@ -1,0 +1,32 @@
+{
+    "name": "Get Password Policy (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-get-password-policy",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Retrieve password policy and account lockout settings from a server or domain",
+    "long_help": "Uses NetUserModalsGet to retrieve password and lockout policies. Displays: minimum password length, maximum/minimum password age, forced logoff time, password history length, lockout duration, lockout observation window, and lockout threshold.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "get_password_policy.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "get_password_policy.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+            "name": "server",
+            "desc": "Target server or domain controller to query (default: local system or domain)",
+            "type": "wstring",
+            "optional": true
+        }
+    ]
+}

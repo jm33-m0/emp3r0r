@@ -1,0 +1,24 @@
+{
+    "name": "Route Print (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-routeprint",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Prints IPv4 routing table, interface list, and default gateway",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "routeprint.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "routeprint.x86.o"
+        }
+    ],
+    "arguments": []
+}

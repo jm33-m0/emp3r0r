@@ -1,0 +1,25 @@
+{
+    "name": "locale",
+    "version": "0.0.0",
+    "command_name": "sa-locale",
+    "extension_author": "c2biz",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "List system locale language, locale ID, date, time, and country",
+    "long_help": "",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "locale.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "locale.x86.o"
+        }
+    ],
+    "arguments": []
+}

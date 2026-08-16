@@ -1,0 +1,24 @@
+{
+    "name": "Enum Local Sessions (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-enum-local-sessions",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Enumerate active and disconnected user sessions on the local system (console and RDP)",
+    "long_help": "Uses WTSEnumerateSessions to list all user sessions on the local machine. Shows session ID, station name (console/RDP), domain, and username for each active or disconnected session.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "enumLocalSessions.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "enumLocalSessions.x86.o"
+        }
+    ]
+}

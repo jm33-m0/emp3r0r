@@ -1,0 +1,7 @@
+.vs
+*.exe
+.vscode
+*.log
+*.o
+/packages
+/SA/**

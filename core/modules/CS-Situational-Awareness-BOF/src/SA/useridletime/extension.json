@@ -1,0 +1,25 @@
+{
+    "name": "User Idle Time (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-useridletime",
+    "extension_author": "c2biz",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Display the idle time for the current user session on the local system",
+    "long_help": "Uses GetLastInputInfo to determine how long since the last keyboard or mouse input. Displays idle time in days, hours, minutes, and seconds. Useful for determining if a user is actively using the system before taking actions that might be noticed.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "useridletime.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "useridletime.x86.o"
+        }
+    ],
+    "arguments": []
+}

@@ -1,0 +1,24 @@
+{
+    "name": "ARP (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-arp",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Lists ARP table entries (IP to MAC address mappings)",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "arp.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "arp.x86.o"
+        }
+    ],
+    "arguments": []
+}

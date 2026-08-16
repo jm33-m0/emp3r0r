@@ -1,0 +1,2207 @@
+[
+  {
+    "name": "sa_bof_windowlist",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Lists windows in the current user's desktop session",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/windowlist/windowlist.x64.o",
+        "SA/windowlist/windowlist.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "all",
+        "description": "0 = visible windows only (default), 1 = all windows with visibility status",
+        "default": "",
+        "type": "int",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_aadjoininfo",
+    "author": "c2biz",
+    "date": "2026-08-16",
+    "comment": "Displays Entra ID (Azure AD) join information",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/aadjoininfo/aadjoininfo.x64.o",
+        "SA/aadjoininfo/aadjoininfo.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_dir",
+    "author": "c2biz",
+    "date": "2026-08-16",
+    "comment": "Lists files and directories in a target path, with optional recursive listing.",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/dir/dir.x64.o", "SA/dir/dir.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "targetdir",
+        "description": "Directory or file path to list. Supports UNC paths (\\\\server\\share) and wildcards. Default: current directory.",
+        "default": ".\\",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "subdirs",
+        "description": "Recurse into subdirectories (0=no, 1=yes). Default: 0.",
+        "default": "0",
+        "type": "short",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_listdns",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Lists DNS cache entries with their record types",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/listdns/listdns.x64.o", "SA/listdns/listdns.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_get_netsession2",
+    "author": "c2biz",
+    "date": "2026-08-16",
+    "comment": "Enumerate network sessions with client hostname resolution (BOFHound compatible)",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/get-netsession2/get-netsession2.x64.o",
+        "SA/get-netsession2/get-netsession2.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "hostname",
+        "description": "Target computer to query for sessions (default: local system)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      },
+      {
+        "name": "method",
+        "description": "Resolution method for client IPs: 1 = DNS PTR lookup (default), any other value = NetWkstaGetInfo",
+        "default": "1",
+        "type": "short",
+        "required": false
+      },
+      {
+        "name": "dnsserver",
+        "description": "DNS server IP address for PTR lookups (only used with method=1). Omit to use system default DNS.",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_routeprint",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Prints IPv4 routing table, interface list, and default gateway",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/routeprint/routeprint.x64.o",
+        "SA/routeprint/routeprint.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_netlocalgroup2",
+    "author": "c2biz",
+    "date": "2026-08-16",
+    "comment": "List local group members with detailed info (SID, type) for BOFHound.",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/netlocalgroup2/netlocalgroup2.x64.o",
+        "SA/netlocalgroup2/netlocalgroup2.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Server to query (default: local system)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      },
+      {
+        "name": "group",
+        "description": "Group name to query (if not specified, queries RDP Users, DCOM Users, Remote Mgmt Users, and Administrators)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_resources",
+    "author": "c2biz",
+    "date": "2026-08-16",
+    "comment": "Display system memory and disk usage",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/resources/resources.x64.o", "SA/resources/resources.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_netloggedon",
+    "author": "c2biz",
+    "date": "2026-08-16",
+    "comment": "List users currently logged on to local or remote computer.",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/netloggedon/netloggedon.x64.o",
+        "SA/netloggedon/netloggedon.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "computername",
+        "description": "Target computer to query (defaults to local system if not specified)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_arp",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Lists ARP table entries (IP to MAC address mappings)",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/arp/arp.x64.o", "SA/arp/arp.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_sc_qfailure",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Query the failure recovery actions for a Windows service",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/sc_qfailure/sc_qfailure.x64.o",
+        "SA/sc_qfailure/sc_qfailure.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "hostname",
+        "description": "Target hostname or IP address (default: local machine)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "servicename",
+        "description": "Service name to query (not display name)",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_tasklist",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "List running processes with PID, PPID, session ID and command line via WMI",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/tasklist/tasklist.x64.o", "SA/tasklist/tasklist.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "resource",
+        "description": "WMI resource path, e.g. \\\\.\\root\\cimv2 (local) or \\\\HOST\\root\\cimv2 (remote). Empty for local default",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_netloggedon2",
+    "author": "c2biz",
+    "date": "2026-08-16",
+    "comment": "List logged-on users with structured output for BOFHound.",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/netloggedon2/netloggedon2.x64.o",
+        "SA/netloggedon2/netloggedon2.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "computername",
+        "description": "Target computer to query (defaults to local system if not specified)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_nonpagedldapsearch",
+    "author": "c2biz",
+    "date": "2026-08-16",
+    "comment": "Execute non-paged LDAP searches against Active Directory",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/nonpagedldapsearch/nonpagedldapsearch.x64.o",
+        "SA/nonpagedldapsearch/nonpagedldapsearch.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "query",
+        "description": "LDAP filter query (e.g., '(objectClass=user)', '(&(objectCategory=person)(sAMAccountName=admin*))')",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "attributes",
+        "description": "Comma-separated list of attributes to return (e.g., 'sAMAccountName,mail,memberOf'). Omit to return all attributes.",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "result_limit",
+        "description": "Maximum number of results to display. 0 or omit for no limit. Note: server may still truncate at its own limit (e.g., 1000).",
+        "default": "",
+        "type": "int",
+        "required": false
+      },
+      {
+        "name": "hostname",
+        "description": "Target Domain Controller hostname or IP. Default: auto-discovered via DsGetDcName.",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "domain",
+        "description": "Distinguished Name for search base (e.g., 'DC=corp,DC=local'). Default: current domain DN.",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_notepad",
+    "author": "c2biz",
+    "date": "2026-08-16",
+    "comment": "Search for open notepad and notepad++ windows and grab text from the editor control object",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/notepad/notepad.x64.o", "SA/notepad/notepad.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_listmods",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "List loaded modules (DLLs) for a process with version info",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/listmods/listmods.x64.o", "SA/listmods/listmods.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "pid",
+        "description": "Process ID to inspect. Default: current process (0 or empty)",
+        "default": "",
+        "type": "int",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_nettime",
+    "author": "c2biz",
+    "date": "2026-08-16",
+    "comment": "Display current time on local or remote computer.",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/nettime/nettime.x64.o", "SA/nettime/nettime.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "name",
+        "description": "Target computer to query (defaults to localhost if not specified)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_netuser",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Get detailed information about a specific user account.",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/netuser/netuser.x64.o", "SA/netuser/netuser.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "username",
+        "description": "Username to pull info for",
+        "default": "",
+        "type": "wstr",
+        "required": true
+      },
+      {
+        "name": "domain",
+        "description": "Domain or server to query (defaults to local system if not specified)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_adcs_enum_com2",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Enumerate AD Certificate Services via IX509PolicyServerListManager and enrollment policy servers",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/adcs_enum_com2/adcs_enum_com2.x64.o",
+        "SA/adcs_enum_com2/adcs_enum_com2.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_get_netsession",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Enumerate network sessions established to a computer using NetSessionEnum",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/get-netsession/get-netsession.x64.o",
+        "SA/get-netsession/get-netsession.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "computer",
+        "description": "Target computer to query for sessions (default: local system)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_netview",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "List computers visible on the network or in a domain.",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/netview/netview.x64.o", "SA/netview/netview.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "domain",
+        "description": "Domain to enumerate computers from (defaults to all visible computers if not specified)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_regsession",
+    "author": "c2biz",
+    "date": "2026-08-16",
+    "comment": "Enumerate logged-on user SIDs from HKEY_USERS registry hive",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/regsession/regsession.x64.o",
+        "SA/regsession/regsession.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "name",
+        "description": "Target hostname or IP for remote query (empty for local)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_useridletime",
+    "author": "c2biz",
+    "date": "2026-08-16",
+    "comment": "Display the idle time for the current user session on the local system",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/useridletime/useridletime.x64.o",
+        "SA/useridletime/useridletime.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_probe",
+    "author": "c2biz",
+    "date": "2026-08-16",
+    "comment": "Check if a TCP port is open on a remote host",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/probe/probe.x64.o", "SA/probe/probe.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "host",
+        "description": "Target hostname or IP address to probe",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "port",
+        "description": "TCP port number to check (1-65535)",
+        "default": "",
+        "type": "int",
+        "required": true
+      },
+      {
+        "name": "timeout",
+        "description": "Connection timeout in seconds. Default: 5.",
+        "default": "5",
+        "type": "int",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_netuse_add",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Connect to a network share",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/netuse/netuse.x64.o", "SA/netuse/netuse.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "action",
+        "description": "Action code (always 1 for add)",
+        "default": "1",
+        "type": "short",
+        "required": false
+      },
+      {
+        "name": "share",
+        "description": "UNC path to share (e.g., \\\\server\\share)",
+        "default": "",
+        "type": "wstr",
+        "required": true
+      },
+      {
+        "name": "user",
+        "description": "Username for authentication (empty for current user)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      },
+      {
+        "name": "password",
+        "description": "Password for authentication (empty for current user)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      },
+      {
+        "name": "device",
+        "description": "Local device name to map (e.g., Z:). Empty for no mapping.",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      },
+      {
+        "name": "persist",
+        "description": "Make connection persistent across reboots (0=no, 1=yes)",
+        "default": "0",
+        "type": "short",
+        "required": false
+      },
+      {
+        "name": "require_privacy",
+        "description": "Require SMBv3 encryption, fail if unsupported (0=no, 1=yes)",
+        "default": "0",
+        "type": "short",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_netuse_list",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "List network share connections",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/netuse/netuse.x64.o", "SA/netuse/netuse.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "action",
+        "description": "Action code (always 2 for list)",
+        "default": "2",
+        "type": "short",
+        "required": false
+      },
+      {
+        "name": "target",
+        "description": "Filter by device (e.g., Z:) or share name. Empty to list all.",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_netuse_delete",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Disconnect from a network share",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/netuse/netuse.x64.o", "SA/netuse/netuse.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "action",
+        "description": "Action code (always 3 for delete)",
+        "default": "3",
+        "type": "short",
+        "required": false
+      },
+      {
+        "name": "target",
+        "description": "Device name (e.g., Z:) or UNC share path to disconnect",
+        "default": "",
+        "type": "wstr",
+        "required": true
+      },
+      {
+        "name": "persist",
+        "description": "Remove persistent mapping so it won't reconnect (0=no, 1=yes)",
+        "default": "0",
+        "type": "short",
+        "required": false
+      },
+      {
+        "name": "force_disconnect",
+        "description": "Force disconnect even if resources are open (0=no, 1=yes)",
+        "default": "0",
+        "type": "short",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_wmi_query",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Run a WMI query and display results in CSV format",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/wmi_query/wmi_query.x64.o", "SA/wmi_query/wmi_query.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target server hostname (default: local machine)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      },
+      {
+        "name": "namespace",
+        "description": "WMI namespace (e.g., root\\cimv2, root\\SecurityCenter2)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      },
+      {
+        "name": "query",
+        "description": "WQL query to execute (e.g., SELECT * FROM Win32_Process)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      },
+      {
+        "name": "resource",
+        "description": "Full WMI resource path (alternative to server+namespace)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_ldapsearch",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Execute paged LDAP searches against Active Directory",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/ldapsearch/ldapsearch.x64.o",
+        "SA/ldapsearch/ldapsearch.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "query",
+        "description": "LDAP filter query (e.g., '(objectClass=user)', '(&(objectCategory=person)(sAMAccountName=admin*))')",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "attributes",
+        "description": "Comma-separated list of attributes to return (e.g., 'sAMAccountName,mail,memberOf'). Omit to return all attributes.",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "count",
+        "description": "Maximum number of results to return. Default: 0 (unlimited).",
+        "default": "0",
+        "type": "int",
+        "required": false
+      },
+      {
+        "name": "scope",
+        "description": "Search scope: 1=BASE (single object), 2=ONELEVEL (immediate children), 3=SUBTREE (all descendants). Default: 3.",
+        "default": "3",
+        "type": "int",
+        "required": false
+      },
+      {
+        "name": "hostname",
+        "description": "Target Domain Controller hostname or IP. Default: auto-discovered PDC.",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "dn",
+        "description": "Distinguished Name for search base (e.g., 'DC=corp,DC=local'). Default: current domain DN.",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "ldaps",
+        "description": "Connection protocol: 1=LDAPS (port 636 with SSL), 0=LDAP (port 389 with signing/sealing). Default: 0.",
+        "default": "0",
+        "type": "int",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_ipconfig",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Lists network adapters with IPv4 addresses, MAC addresses, hostname, DNS suffix and DNS servers",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/ipconfig/ipconfig.x64.o", "SA/ipconfig/ipconfig.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_schtasksquery",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Query details for a specific scheduled task",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/schtasksquery/schtasksquery.x64.o",
+        "SA/schtasksquery/schtasksquery.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target hostname or IP address (empty string for local machine)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      },
+      {
+        "name": "taskname",
+        "description": "Full path to the task (e.g., \\Microsoft\\Windows\\Autochk\\Proxy)",
+        "default": "",
+        "type": "wstr",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_sc_enum",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Enumerate all Windows services with detailed configuration",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/sc_enum/sc_enum.x64.o", "SA/sc_enum/sc_enum.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "hostname",
+        "description": "Target hostname or IP address (default: local machine)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_reg_query",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Query the Windows registry for keys and values",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/reg_query/reg_query.x64.o", "SA/reg_query/reg_query.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "hostname",
+        "description": "Target hostname for remote registry (empty for local)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "hive",
+        "description": "Hive identifier: 0 = HKCR, 1 = HKCU, 2 = HKLM, 3 = HKU",
+        "default": "",
+        "type": "int",
+        "required": true
+      },
+      {
+        "name": "path",
+        "description": "Registry key path",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "key",
+        "description": "Value name to retrieve (empty to enumerate all values/subkeys)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "recursive",
+        "description": "Enumerate subkeys recursively (0=no, 1=yes). Only applies when key is empty. Default: 0",
+        "default": "",
+        "type": "int",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_get_session_info",
+    "author": "c2biz",
+    "date": "2026-08-16",
+    "comment": "Retrieve detailed logon session information for the current process token",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/get_session_info/get_session_info.x64.o",
+        "SA/get_session_info/get_session_info.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_adcs_enum",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Enumerate AD Certificate Services CAs and templates using CERTCLI Win32 APIs",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/adcs_enum/adcs_enum.x64.o", "SA/adcs_enum/adcs_enum.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "domain",
+        "description": "Target domain DNS name (e.g., 'corp.local'). Default: current domain.",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_sc_qdescription",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Query the description text of a Windows service",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/sc_qdescription/sc_qdescription.x64.o",
+        "SA/sc_qdescription/sc_qdescription.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "hostname",
+        "description": "Target hostname or IP address (default: local machine)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "servicename",
+        "description": "Service name to query (not display name)",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_find_loaded_module",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Find processes that have a specific module loaded",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/findLoadedModule/findLoadedModule.x64.o",
+        "SA/findLoadedModule/findLoadedModule.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "modname",
+        "description": "Module name or partial match to search for (e.g., amsi.dll, ntdll)",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "procname",
+        "description": "Process name filter - only search processes matching this string (empty for all processes)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_sc_qtriggerinfo",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Query the start/stop trigger conditions for a Windows service",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/sc_qtriggerinfo/sc_qtriggerinfo.x64.o",
+        "SA/sc_qtriggerinfo/sc_qtriggerinfo.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "hostname",
+        "description": "Target hostname or IP address (empty string for local machine)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "servicename",
+        "description": "Service name to query (not display name)",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_netuserenum",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Enumerate user accounts on local system or domain.",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/netuserenum/netuserenum.x64.o",
+        "SA/netuserenum/netuserenum.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "domain",
+        "description": "Query domain instead of local system (0 = local, 1 = domain)",
+        "default": "",
+        "type": "int",
+        "required": true
+      },
+      {
+        "name": "filter",
+        "description": "Filter by account status: 1 = all users, 2 = locked out only, 3 = disabled only, 4 = active only (not disabled or locked)",
+        "default": "",
+        "type": "int",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_sc_qc",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Query configuration for a specific Windows service",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/sc_qc/sc_qc.x64.o", "SA/sc_qc/sc_qc.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "hostname",
+        "description": "Target hostname or IP address (empty string for local machine)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "servicename",
+        "description": "Service name to query (not display name)",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_adcs_enum_com",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Enumerate AD Certificate Services CAs and templates using ICertConfig/ICertRequest COM interfaces",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/adcs_enum_com/adcs_enum_com.x64.o",
+        "SA/adcs_enum_com/adcs_enum_com.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_sc_query",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Query the status of Windows services",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/sc_query/sc_query.x64.o", "SA/sc_query/sc_query.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "hostname",
+        "description": "Target hostname or IP address (default: local machine)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "servicename",
+        "description": "Service name to query, or omit to enumerate all services",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_get_password_policy",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Retrieve password policy and account lockout settings from a server or domain",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/get_password_policy/get_password_policy.x64.o",
+        "SA/get_password_policy/get_password_policy.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target server or domain controller to query (default: local system or domain)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_vssenum",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Enumerates Volume Shadow Copy snapshots on a remote share",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/vssenum/vssenum.x64.o", "SA/vssenum/vssenum.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "hostname",
+        "description": "Target server hostname or IP address",
+        "default": "",
+        "type": "wstr",
+        "required": true
+      },
+      {
+        "name": "sharename",
+        "description": "SMB share name to enumerate snapshots on (default: C$)",
+        "default": "C$",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_adv_audit_policies",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Retrieves advanced security audit policies from local Group Policy",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/adv_audit_policies/adv_audit_policies.x64.o",
+        "SA/adv_audit_policies/adv_audit_policies.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "is-wow64",
+        "description": "Set to 1 if the implant is a 32-bit process on a 64-bit host (WoW64). Uses sysnative path to access the real GroupPolicy directory. Default: 0 (native process).",
+        "default": "0",
+        "type": "int",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_env",
+    "author": "c2biz",
+    "date": "2026-08-16",
+    "comment": "List process environment variables",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/env/env.x64.o", "SA/env/env.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_netstat",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Lists TCP/UDP IPv4/IPv6 connections with owning process name and PID",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/netstat/netstat.x64.o", "SA/netstat/netstat.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "filter",
+        "description": "Bitmask selecting which tables to display. Common values: 4369=all (default), 1=TCP4 only, 17=all TCP, 4352=all UDP, 257=IPv4 only, 4112=IPv6 only. Combine individual bits: 1=TCP4, 16=TCP6, 256=UDP4, 4096=UDP6.",
+        "default": "4369",
+        "type": "int",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_netgroup",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "List domain groups or enumerate members of a specific group.",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/netgroup/netgroup.x64.o", "SA/netgroup/netgroup.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "type",
+        "description": "Operation mode: 0 = list all domain groups, 1 = list members of specified group",
+        "default": "",
+        "type": "short",
+        "required": true
+      },
+      {
+        "name": "domain",
+        "description": "Domain to query (defaults to computer's domain if not specified)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      },
+      {
+        "name": "group",
+        "description": "Group name to enumerate members from (required when type=1)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_netlocalgroup",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "List local groups or enumerate members of a specific local group.",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/netlocalgroup/netlocalgroup.x64.o",
+        "SA/netlocalgroup/netlocalgroup.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "type",
+        "description": "Operation mode: 0 = list all local groups (default), 1 = list members of specified group",
+        "default": "0",
+        "type": "short",
+        "required": false
+      },
+      {
+        "name": "server",
+        "description": "Server to query (defaults to local system if not specified)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      },
+      {
+        "name": "group",
+        "description": "Group name to enumerate members from (required when type=1)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_whoami",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Displays current user, group memberships, and token privileges",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/whoami/whoami.x64.o", "SA/whoami/whoami.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_enum_local_sessions",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Enumerate active and disconnected user sessions on the local system (console and RDP)",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/enumLocalSessions/enumLocalSessions.x64.o",
+        "SA/enumLocalSessions/enumLocalSessions.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_locale",
+    "author": "c2biz",
+    "date": "2026-08-16",
+    "comment": "List system locale language, locale ID, date, time, and country",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/locale/locale.x64.o", "SA/locale/locale.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_sha1",
+    "author": "c2biz",
+    "date": "2026-08-16",
+    "comment": "Calculates the SHA1 hash of a file.",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/sha1/sha1.x64.o", "SA/sha1/sha1.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "filepath",
+        "description": "The file path to hash",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_enum_filter_driver",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Enumerates security-related filter drivers (AV, activity monitors, content screeners)",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/enum_filter_driver/enum_filter_driver.x64.o",
+        "SA/enum_filter_driver/enum_filter_driver.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "system",
+        "description": "Remote computer to query (default: local machine)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_driversigs",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Checks loaded drivers for signatures from known EDR vendors",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/driversigs/driversigs.x64.o",
+        "SA/driversigs/driversigs.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_sha256",
+    "author": "c2biz",
+    "date": "2026-08-16",
+    "comment": "Calculates the SHA256 hash of a file.",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/sha256/sha256.x64.o", "SA/sha256/sha256.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "filepath",
+        "description": "The file path to hash",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_ldapsecuritycheck",
+    "author": "c2biz",
+    "date": "2026-08-16",
+    "comment": "Check LDAP signing and LDAPS channel binding requirements",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/ldapsecuritycheck/ldapsecuritycheck.x64.o",
+        "SA/ldapsecuritycheck/ldapsecuritycheck.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "dc",
+        "description": "Domain Controller hostname or IP to test (default: auto-discovered)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_list_firewall_rules",
+    "author": "c2biz",
+    "date": "2026-08-16",
+    "comment": "List Windows firewall rules",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/list_firewall_rules/list_firewall_rules.x64.o",
+        "SA/list_firewall_rules/list_firewall_rules.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_md5",
+    "author": "c2biz",
+    "date": "2026-08-16",
+    "comment": "Calculates the MD5 hash of a file.",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/md5/md5.x64.o", "SA/md5/md5.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "filepath",
+        "description": "The file path to hash",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_netuptime",
+    "author": "c2biz",
+    "date": "2026-08-16",
+    "comment": "Display boot time of local or remote computer.",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/netuptime/netuptime.x64.o", "SA/netuptime/netuptime.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "computername",
+        "description": "Target computer to query (defaults to local system if not specified)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_schtasksenum",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Enumerate all scheduled tasks on a machine",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/schtasksenum/schtasksenum.x64.o",
+        "SA/schtasksenum/schtasksenum.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target hostname or IP address (default: local machine)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_netshares",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "List network shares on local or remote computer.",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/netshares/netshares.x64.o", "SA/netshares/netshares.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "computername",
+        "description": "Target computer to query (defaults to local system if not specified)",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      },
+      {
+        "name": "as-admin",
+        "description": "Show admin-level details including local paths (0 = basic info, 1 = admin info; default: 0)",
+        "default": "",
+        "type": "int",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_nslookup",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Perform DNS lookups using the Windows DNS API",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/nslookup/nslookup.x64.o", "SA/nslookup/nslookup.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "hostname",
+        "description": "Hostname to resolve",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "server",
+        "description": "DNS server IP address. Omit to use system default. Not supported on x86 implants.",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "type",
+        "description": "DNS record type: 1=A (default), 5=CNAME, 6=SOA, 15=MX, 28=AAAA, 33=SRV, 255=ANY",
+        "default": "1",
+        "type": "short",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_uptime",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Displays system uptime, local time, and boot time (x64 only shows boot time)",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/uptime/uptime.x64.o", "SA/uptime/uptime.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_get_dpapi_system",
+    "author": "c2biz",
+    "date": "2026-08-16",
+    "comment": "Extract the DPAPI_SYSTEM LSA secret (requires high integrity/elevation)",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SA/get_dpapi_system/get_dpapi_system.x64.o",
+        "SA/get_dpapi_system/get_dpapi_system.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_bof_cacls",
+    "author": "moloch--",
+    "date": "2026-08-16",
+    "comment": "Lists file or directory DACL permissions, with wildcard support.",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": ["SA/cacls/cacls.x64.o", "SA/cacls/cacls.x86.o"],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "filepath",
+        "description": "File or directory path to list permissions for. Supports wildcards (e.g., C:\\Windows\\*.dll).",
+        "default": "",
+        "type": "wstr",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  }
+]

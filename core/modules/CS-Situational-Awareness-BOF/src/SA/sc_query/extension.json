@@ -1,0 +1,38 @@
+{
+    "name": "Service Query (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-sc-query",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Query the status of Windows services",
+    "long_help": "Retrieves runtime status for one or all services including type, state, exit codes, PID, and flags. If no service name is provided, enumerates all Win32 services. Equivalent to 'sc query'.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "sc_query.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "sc_query.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+            "name": "hostname",
+            "desc": "Target hostname or IP address (default: local machine)",
+            "type": "string",
+            "optional": true
+        },
+        {
+            "name": "servicename",
+            "desc": "Service name to query, or omit to enumerate all services",
+            "type": "string",
+            "optional": true
+        }
+    ]
+}

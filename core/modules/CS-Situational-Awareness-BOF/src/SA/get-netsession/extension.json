@@ -1,0 +1,32 @@
+{
+    "name": "Get Net Session (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-get-netsession",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Enumerate network sessions established to a computer using NetSessionEnum",
+    "long_help": "Uses NetSessionEnum to list network sessions (SMB connections) to the target computer. Shows client IP/hostname, username, active time, and idle time for each session. Useful for identifying who is connected to a file server.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "get-netsession.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "get-netsession.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+            "name": "computer",
+            "desc": "Target computer to query for sessions (default: local system)",
+            "type": "wstring",
+            "optional": true
+        }
+    ]
+}

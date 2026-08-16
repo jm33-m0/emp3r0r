@@ -1,0 +1,32 @@
+{
+    "name": "Service Enum (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-sc-enum",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Enumerate all Windows services with detailed configuration",
+    "long_help": "Lists all Win32 services including status, PID, type, startup configuration, binary path, dependencies, failure actions, and trigger conditions. Similar to 'sc query' with additional detail.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "sc_enum.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "sc_enum.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+            "name": "hostname",
+            "desc": "Target hostname or IP address (default: local machine)",
+            "type": "string",
+            "optional": true
+        }
+    ]
+}

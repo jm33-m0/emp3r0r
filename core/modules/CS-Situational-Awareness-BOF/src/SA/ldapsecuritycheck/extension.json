@@ -1,0 +1,32 @@
+{
+    "name": "LDAP Security Check (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-ldapsecuritycheck",
+    "extension_author": "c2biz",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Check LDAP signing and LDAPS channel binding requirements",
+    "long_help": "Checks whether the target domain controller requires LDAP signing for unencrypted connections and LDAPS channel binding for encrypted connections. Performs authentication attempts to detect these security requirements. The LDAP SPN is automatically set to ldap/<dc>. Note: This command will generate Event ID 2889 on the target DC when LDAP signing is required but not used.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "ldapsecuritycheck.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "ldapsecuritycheck.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+            "name": "dc",
+            "desc": "Domain Controller hostname or IP to test (default: auto-discovered)",
+            "type": "wstring",
+            "optional": true
+        }
+    ]
+}

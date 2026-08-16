@@ -1,0 +1,56 @@
+{
+    "name": "Reg Query (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-reg-query",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Query the Windows registry for keys and values",
+    "long_help": "Reads registry keys and values from local or remote systems. Can enumerate subkeys and values at a path, or retrieve a specific value. Supports recursive enumeration. Displays value names, types, and data along with last modified timestamps.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "reg_query.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "reg_query.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+            "name": "hostname",
+            "desc": "Target hostname for remote registry (empty for local)",
+            "type": "string",
+            "optional": true
+        },
+        {
+            "name": "hive",
+            "desc": "Hive identifier: 0 = HKCR, 1 = HKCU, 2 = HKLM, 3 = HKU",
+            "type": "integer",
+            "optional": false
+        },
+        {
+            "name": "path",
+            "desc": "Registry key path",
+            "type": "string",
+            "optional": false
+        },
+        {
+            "name": "key",
+            "desc": "Value name to retrieve (empty to enumerate all values/subkeys)",
+            "type": "string",
+            "optional": true
+        },
+        {
+            "name": "recursive",
+            "desc": "Enumerate subkeys recursively (0=no, 1=yes). Only applies when key is empty. Default: 0",
+            "type": "integer",
+            "optional": true
+        }
+    ]
+}

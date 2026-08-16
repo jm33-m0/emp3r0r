@@ -1,0 +1,32 @@
+{
+    "name": "Net View (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-netview",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "List computers visible on the network or in a domain.",
+    "long_help": "Enumerates servers and workstations on the network using NetServerEnum API. Can query all visible computers or filter by a specific domain. Returns computer names for all discovered systems.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "netview.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "netview.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+            "name": "domain",
+            "desc": "Domain to enumerate computers from (defaults to all visible computers if not specified)",
+            "type": "wstring",
+            "optional": true
+        }
+    ]
+}

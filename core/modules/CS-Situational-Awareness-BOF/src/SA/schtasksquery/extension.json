@@ -1,0 +1,38 @@
+{
+    "name": "Scheduled Task Query (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-schtasksquery",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Query details for a specific scheduled task",
+    "long_help": "Retrieves detailed information for a single scheduled task including name, path, enabled state, last/next run times, current state, and full XML definition.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "schtasksquery.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "schtasksquery.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+            "name": "server",
+            "desc": "Target hostname or IP address (empty string for local machine)",
+            "type": "wstring",
+            "optional": true
+        },
+        {
+            "name": "taskname",
+            "desc": "Full path to the task (e.g., \\Microsoft\\Windows\\Autochk\\Proxy)",
+            "type": "wstring",
+            "optional": false
+        }
+    ]
+}

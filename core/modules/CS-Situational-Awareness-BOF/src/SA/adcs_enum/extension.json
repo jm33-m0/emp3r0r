@@ -1,0 +1,32 @@
+{
+    "name": "ADCS Enum (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-adcs-enum",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Enumerate AD Certificate Services CAs and templates using CERTCLI Win32 APIs",
+    "long_help": "Enumerates Active Directory Certificate Services (ADCS) infrastructure using the CERTCLI Win32 API (CAEnumFirstCA, CAGetCAProperty, etc.). Lists Certificate Authorities, their certificates, permissions, and all enabled certificate templates with their enrollment flags, name flags, EKU requirements, and ACLs. Useful for identifying misconfigured templates that could allow privilege escalation (ESC1-ESC8 attacks). This method provides the most detailed output of the three ADCS enumeration tools.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "adcs_enum.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "adcs_enum.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+            "name": "domain",
+            "desc": "Target domain DNS name (e.g., 'corp.local'). Default: current domain.",
+            "type": "wstring",
+            "optional": true
+        }
+    ]
+}

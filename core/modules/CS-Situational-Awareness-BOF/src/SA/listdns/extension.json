@@ -1,0 +1,24 @@
+{
+    "name": "List DNS (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-listdns",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Lists DNS cache entries with their record types",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "listdns.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "listdns.x86.o"
+        }
+    ],
+    "arguments": []
+}

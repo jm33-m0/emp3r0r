@@ -1,0 +1,45 @@
+{
+    "name": "Net Local Group (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-netlocalgroup",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "List local groups or enumerate members of a specific local group.",
+    "long_help": "Lists all local groups on a computer or retrieves members of a specific local group. When 'type' is 0, lists all local groups with their comments. When 'type' is 1, lists members of the specified group. Queries the local system by default if no server is specified.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "netlocalgroup.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "netlocalgroup.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+            "name": "type",
+            "desc": "Operation mode: 0 = list all local groups (default), 1 = list members of specified group",
+            "type": "short",
+            "optional": true,
+            "default": 0
+        },
+        {
+            "name": "server",
+            "desc": "Server to query (defaults to local system if not specified)",
+            "type": "wstring",
+            "optional": true
+        },
+        {
+            "name": "group",
+            "desc": "Group name to enumerate members from (required when type=1)",
+            "type": "wstring",
+            "optional": true
+        }
+    ]
+}

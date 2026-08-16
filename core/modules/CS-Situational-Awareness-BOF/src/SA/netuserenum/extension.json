@@ -1,0 +1,38 @@
+{
+    "name": "Net User Enum (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-netuserenum",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Enumerate user accounts on local system or domain.",
+    "long_help": "Lists user accounts with optional filtering by account status. Can query the local system or domain depending on the 'use domain' parameter. Filter options allow targeting all users, locked out accounts, disabled accounts, or only active accounts.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "netuserenum.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "netuserenum.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+            "name": "domain",
+            "desc": "Query domain instead of local system (0 = local, 1 = domain)",
+            "type": "integer",
+            "optional": false
+        },
+        {
+            "name": "filter",
+            "desc": "Filter by account status: 1 = all users, 2 = locked out only, 3 = disabled only, 4 = active only (not disabled or locked)",
+            "type": "integer",
+            "optional": false
+        }
+    ]
+}

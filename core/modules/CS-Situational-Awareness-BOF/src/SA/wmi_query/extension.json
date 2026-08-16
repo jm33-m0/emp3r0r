@@ -1,0 +1,50 @@
+{
+    "name": "WMI Query (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-wmi-query",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Run a WMI query and display results in CSV format",
+    "long_help": "Executes a WQL query against a WMI namespace and returns results in CSV format. Can target local or remote systems. Example query: SELECT * FROM Win32_Process",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "wmi_query.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "wmi_query.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+            "name": "server",
+            "desc": "Target server hostname (default: local machine)",
+            "type": "wstring",
+            "optional": true
+        },
+        {
+            "name": "namespace",
+            "desc": "WMI namespace (e.g., root\\cimv2, root\\SecurityCenter2)",
+            "type": "wstring",
+            "optional": true
+        },
+        {
+            "name": "query",
+            "desc": "WQL query to execute (e.g., SELECT * FROM Win32_Process)",
+            "type": "wstring",
+            "optional": true
+        },
+        {
+            "name": "resource",
+            "desc": "Full WMI resource path (alternative to server+namespace)",
+            "type": "wstring",
+            "optional": true
+        }
+    ]
+}

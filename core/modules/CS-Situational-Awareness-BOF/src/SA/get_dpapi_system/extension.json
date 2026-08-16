@@ -1,0 +1,25 @@
+{
+    "name": "Get DPAPI System (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-get-dpapi-system",
+    "extension_author": "c2biz",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Extract the DPAPI_SYSTEM LSA secret (requires high integrity/elevation)",
+    "long_help": "Extracts the DPAPI_SYSTEM machine key from the LSA secrets registry. This key can decrypt DPAPI-protected data for the SYSTEM account and all users on the machine. Requires high integrity (elevated) context. Temporarily modifies registry ACLs to read protected keys, then restores original permissions.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "get_dpapi_system.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "get_dpapi_system.x86.o"
+        }
+    ],
+    "arguments": []
+}

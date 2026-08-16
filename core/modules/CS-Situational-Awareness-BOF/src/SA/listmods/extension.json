@@ -1,0 +1,32 @@
+{
+    "name": "List Modules (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-listmods",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "List loaded modules (DLLs) for a process with version info",
+    "long_help": "Enumerates all loaded modules (DLLs) for a specified process, displaying file path, company name, and file description from version info. Useful for identifying injected DLLs from EDR/AV products.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "listmods.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "listmods.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+            "name": "pid",
+            "desc": "Process ID to inspect. Default: current process (0 or empty)",
+            "type": "integer",
+            "optional": true
+        }
+    ]
+}

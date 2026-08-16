@@ -1,0 +1,38 @@
+{
+    "name": "Adv Audit Policies (SA)",
+    "package_name": "sa-adv-audit-policies",
+    "version": "0.0.0",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "commands": [
+        {
+            "command_name": "sa-adv-audit-policies",
+            "help": "Retrieves advanced security audit policies from local Group Policy",
+            "long_help": "Reads and combines audit.csv files from the local Group Policy directory to display configured advanced audit policies. Shows audit subcategory settings including inclusion/exclusion criteria and success/failure auditing configuration. When running a 32-bit implant on a 64-bit host (WoW64), set is_wow64 to 1 so the BOF reads from the sysnative GroupPolicy path instead of the redirected system32 path.",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "adv_audit_policies.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "adv_audit_policies.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "is-wow64",
+                    "desc": "Set to 1 if the implant is a 32-bit process on a 64-bit host (WoW64). Uses sysnative path to access the real GroupPolicy directory. Default: 0 (native process).",
+                    "type": "integer",
+                    "optional": true,
+                    "default": 0
+                }
+            ]
+        }
+    ]
+}

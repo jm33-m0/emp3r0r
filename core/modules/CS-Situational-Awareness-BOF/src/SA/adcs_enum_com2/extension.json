@@ -1,0 +1,24 @@
+{
+    "name": "ADCS Enum COM2 (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-adcs-enum-com2",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Enumerate AD Certificate Services via IX509PolicyServerListManager and enrollment policy servers",
+    "long_help": "Enumerates Active Directory Certificate Services (ADCS) infrastructure using the IX509PolicyServerListManager and IX509EnrollmentPolicyServer COM interfaces. Discovers policy servers from Group Policy and registry, then enumerates CAs and certificate templates via enrollment policy. Provides CA certificate details, web servers, security permissions, and template configurations. Uses Kerberos authentication. Alternative enumeration method when other approaches fail.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "adcs_enum_com2.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "adcs_enum_com2.x86.o"
+        }
+    ]
+}

@@ -1,0 +1,24 @@
+{
+    "name": "Uptime (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-uptime",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Displays system uptime, local time, and boot time (x64 only shows boot time)",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "uptime.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "uptime.x86.o"
+        }
+    ],
+    "arguments": []
+}

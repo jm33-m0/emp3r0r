@@ -1,0 +1,39 @@
+{
+    "name": "VSS Enum (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-vssenum",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Enumerates Volume Shadow Copy snapshots on a remote share",
+    "long_help": "Lists available Volume Shadow Copy (VSS) snapshots on a remote SMB share using the FSCTL_SRV_ENUMERATE_SNAPSHOTS control code. Shadow copies can be accessed via paths like \\\\server\\share\\@GMT-YYYY.MM.DD-HH.MM.SS. Works on Server 2012 and later with Previous Versions enabled.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "vssenum.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "vssenum.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+            "name": "hostname",
+            "desc": "Target server hostname or IP address",
+            "type": "wstring",
+            "optional": false
+        },
+        {
+            "name": "sharename",
+            "desc": "SMB share name to enumerate snapshots on (default: C$)",
+            "type": "wstring",
+            "optional": true,
+            "default": "C$"
+        }
+    ]
+}

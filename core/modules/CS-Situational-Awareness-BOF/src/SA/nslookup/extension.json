@@ -1,0 +1,51 @@
+{
+    "name": "NSLookup (SA)",
+    "package_name": "sa-nslookup",
+    "version": "0.0.0",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "commands": [
+        {
+            "command_name": "sa-nslookup",
+            "help": "Perform DNS lookups using the Windows DNS API",
+            "long_help": "Queries DNS records for a hostname using DnsQuery_A. Supports common record types including A, CNAME, SOA, MX, AAAA, SRV, and ANY. Can optionally specify a custom DNS server IP address. NOTE: x86 implants do not support custom DNS servers. Avoid querying 127.0.0.1 as it may cause instability.",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "nslookup.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "nslookup.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "hostname",
+                    "desc": "Hostname to resolve",
+                    "type": "string",
+                    "optional": false
+                },
+                {
+                    "name": "server",
+                    "desc": "DNS server IP address. Omit to use system default. Not supported on x86 implants.",
+                    "type": "string",
+                    "optional": true
+                },
+                {
+                    "name": "type",
+                    "desc": "DNS record type: 1=A (default), 5=CNAME, 6=SOA, 15=MX, 28=AAAA, 33=SRV, 255=ANY",
+                    "type": "short",
+                    "optional": true,
+                    "default": 1,
+                    "choices": ["1", "5", "6", "15", "28", "33", "255"]
+                }
+            ]
+        }
+    ]
+}

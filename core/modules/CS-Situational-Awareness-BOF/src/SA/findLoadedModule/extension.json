@@ -1,0 +1,38 @@
+{
+    "name": "Find Loaded Module (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-find-loaded-module",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Find processes that have a specific module loaded",
+    "long_help": "Searches all running processes to find which ones have a specific module (DLL) loaded. Supports partial matching on both module name and process name. Useful for identifying processes with specific DLLs like amsi.dll or security product DLLs.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "findLoadedModule.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "findLoadedModule.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+            "name": "modname",
+            "desc": "Module name or partial match to search for (e.g., amsi.dll, ntdll)",
+            "type": "string",
+            "optional": false
+        },
+        {
+            "name": "procname",
+            "desc": "Process name filter - only search processes matching this string (empty for all processes)",
+            "type": "string",
+            "optional": true
+        }
+    ]
+}

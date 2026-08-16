@@ -1,0 +1,38 @@
+{
+    "name": "netlocalgroup2",
+    "version": "0.0.0",
+    "command_name": "sa-netlocalgroup2",
+    "extension_author": "c2biz",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "List local group members with detailed info (SID, type) for BOFHound.",
+    "long_help": "Enhanced version of netlocalgroup that outputs member details including SID and member type (User, Group, WellKnownGroup, etc.). Optimized for BOFHound ingestion. If no group is specified, queries: Remote Desktop Users, Distributed COM Users, Remote Management Users, and Administrators.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "netlocalgroup2.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "netlocalgroup2.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+          "name": "server",
+          "desc": "Server to query (default: local system)",
+          "type": "wstring",
+          "optional": true
+        },
+        {
+          "name": "group",
+          "desc": "Group name to query (if not specified, queries RDP Users, DCOM Users, Remote Mgmt Users, and Administrators)",
+          "type": "wstring",
+          "optional": true
+        }
+    ]
+}

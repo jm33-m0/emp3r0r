@@ -1,0 +1,32 @@
+{
+    "name": "netuptime",
+    "version": "0.0.0",
+    "command_name": "sa-netuptime",
+    "extension_author": "c2biz",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Display boot time of local or remote computer.",
+    "long_help": "Retrieves the boot time (when the LanmanWorkstation service started) from a computer using NetStatisticsGet. Useful for determining system uptime and identifying recently rebooted machines.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "netuptime.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "netuptime.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+            "name": "computername",
+            "desc": "Target computer to query (defaults to local system if not specified)",
+            "type": "wstring",
+            "optional": true
+        }
+    ]
+}

@@ -1,0 +1,25 @@
+{
+    "name": "Who Am I (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-whoami",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Displays current user, group memberships, and token privileges",
+    "long_help": "Returns information similar to 'whoami /all': the current username and SID, all group memberships with their SIDs and attributes, and all token privileges with their enabled/disabled state.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "whoami.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "whoami.x86.o"
+        }
+    ],
+    "arguments": []
+}

@@ -1,0 +1,51 @@
+{
+    "name": "Get Net Session 2 (SA)",
+    "package_name": "sa-get-netsession2",
+    "version": "0.0.0",
+    "extension_author": "c2biz",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "commands": [
+        {
+            "command_name": "sa-get-netsession2",
+            "help": "Enumerate network sessions with client hostname resolution (BOFHound compatible)",
+            "long_help": "Extended version of get-netsession that resolves client IP addresses to hostnames. Uses NetSessionEnum to list sessions with additional hostname resolution via DNS PTR lookup or NetWkstaGetInfo. Outputs computer name and domain for BloodHound/BOFHound ingestion.",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "get-netsession2.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "get-netsession2.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "hostname",
+                    "desc": "Target computer to query for sessions (default: local system)",
+                    "type": "wstring",
+                    "optional": true
+                },
+                {
+                    "name": "method",
+                    "desc": "Resolution method for client IPs: 1 = DNS PTR lookup (default), any other value = NetWkstaGetInfo",
+                    "type": "short",
+                    "optional": true,
+                    "default": 1,
+                    "choices": ["1", "2"]
+                },
+                {
+                    "name": "dnsserver",
+                    "desc": "DNS server IP address for PTR lookups (only used with method=1). Omit to use system default DNS.",
+                    "type": "string",
+                    "optional": true
+                }
+            ]
+        }
+    ]
+}

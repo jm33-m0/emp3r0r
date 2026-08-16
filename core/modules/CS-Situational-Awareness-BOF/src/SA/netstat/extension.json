@@ -1,0 +1,39 @@
+{
+    "name": "Netstat (SA)",
+    "package_name": "sa-netstat",
+    "version": "0.0.0",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "commands": [
+        {
+            "command_name": "sa-netstat",
+            "help": "Lists TCP/UDP IPv4/IPv6 connections with owning process name and PID",
+            "long_help": "Displays active network connections including protocol, local and foreign addresses, connection state, and owning process name and PID. Filter output by protocol and IP version using a bitmask: 0x0001=TCP4, 0x0010=TCP6, 0x0100=UDP4, 0x1000=UDP6. Combine with bitwise OR (e.g., 0x0101 for TCP4+UDP4). Default 0x1111 (4369) shows all.",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "netstat.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "netstat.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "filter",
+                    "desc": "Bitmask selecting which tables to display. Common values: 4369=all (default), 1=TCP4 only, 17=all TCP, 4352=all UDP, 257=IPv4 only, 4112=IPv6 only. Combine individual bits: 1=TCP4, 16=TCP6, 256=UDP4, 4096=UDP6.",
+                    "type": "integer",
+                    "optional": true,
+                    "default": 4369,
+                    "choices": ["4369", "1", "17", "4352", "257", "4112"]
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,38 @@
+{
+    "name": "Service QDescription (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-sc-qdescription",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Query the description text of a Windows service",
+    "long_help": "Retrieves the human-readable description configured for a service. Equivalent to 'sc qdescription'.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "sc_qdescription.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "sc_qdescription.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+            "name": "hostname",
+            "desc": "Target hostname or IP address (default: local machine)",
+            "type": "string",
+            "optional": true
+        },
+        {
+            "name": "servicename",
+            "desc": "Service name to query (not display name)",
+            "type": "string",
+            "optional": false
+        }
+    ]
+}

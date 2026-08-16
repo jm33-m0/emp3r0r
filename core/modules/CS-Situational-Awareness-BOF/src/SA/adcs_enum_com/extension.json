@@ -1,0 +1,24 @@
+{
+    "name": "ADCS Enum COM (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-adcs-enum-com",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "Enumerate AD Certificate Services CAs and templates using ICertConfig/ICertRequest COM interfaces",
+    "long_help": "Enumerates Active Directory Certificate Services (ADCS) infrastructure using COM interfaces (ICertConfig2, ICertRequest2, IX509CertificateRequestPkcs7). Lists all CA configurations in the enterprise, their certificates, web enrollment servers, and certificate templates with enrollment/name flags, EKU, and permissions. Requires enrollment rights on the CA to enumerate templates. Alternative to sa-adcs-enum when Win32 API access is restricted.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "adcs_enum_com.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "adcs_enum_com.x86.o"
+        }
+    ]
+}

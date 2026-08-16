@@ -1,0 +1,78 @@
+{
+    "name": "LDAP Search (SA)",
+    "package_name": "sa-ldapsearch",
+    "version": "0.0.0",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "commands": [
+        {
+            "command_name": "sa-ldapsearch",
+            "help": "Execute paged LDAP searches against Active Directory",
+            "long_help": "Performs LDAP queries against Active Directory using paged results. Supports custom filters, attribute selection, result limits, search scopes, and LDAPS. Uses current user credentials via Kerberos/NTLM negotiate authentication. Binary attributes like objectSid, objectGUID, and nTSecurityDescriptor are automatically decoded. This is the preferred LDAP search tool; use sa-nonpagedldapsearch only if paging is not supported.",
+            "depends_on": "coff-loader",
+            "entrypoint": "go",
+            "files": [
+                {
+                    "os": "windows",
+                    "arch": "amd64",
+                    "path": "ldapsearch.x64.o"
+                },
+                {
+                    "os": "windows",
+                    "arch": "386",
+                    "path": "ldapsearch.x86.o"
+                }
+            ],
+            "arguments": [
+                {
+                    "name": "query",
+                    "desc": "LDAP filter query (e.g., '(objectClass=user)', '(&(objectCategory=person)(sAMAccountName=admin*))')",
+                    "type": "string",
+                    "optional": false
+                },
+                {
+                    "name": "attributes",
+                    "desc": "Comma-separated list of attributes to return (e.g., 'sAMAccountName,mail,memberOf'). Omit to return all attributes.",
+                    "type": "string",
+                    "optional": true
+                },
+                {
+                    "name": "count",
+                    "desc": "Maximum number of results to return. Default: 0 (unlimited).",
+                    "type": "integer",
+                    "optional": true,
+                    "default": 0
+                },
+                {
+                    "name": "scope",
+                    "desc": "Search scope: 1=BASE (single object), 2=ONELEVEL (immediate children), 3=SUBTREE (all descendants). Default: 3.",
+                    "type": "integer",
+                    "optional": true,
+                    "default": 3,
+                    "choices": ["1", "2", "3"]
+                },
+                {
+                    "name": "hostname",
+                    "desc": "Target Domain Controller hostname or IP. Default: auto-discovered PDC.",
+                    "type": "string",
+                    "optional": true
+                },
+                {
+                    "name": "dn",
+                    "desc": "Distinguished Name for search base (e.g., 'DC=corp,DC=local'). Default: current domain DN.",
+                    "type": "string",
+                    "optional": true
+                },
+                {
+                    "name": "ldaps",
+                    "desc": "Connection protocol: 1=LDAPS (port 636 with SSL), 0=LDAP (port 389 with signing/sealing). Default: 0.",
+                    "type": "integer",
+                    "optional": true,
+                    "default": 0,
+                    "choices": ["0", "1"]
+                }
+            ]
+        }
+    ]
+}

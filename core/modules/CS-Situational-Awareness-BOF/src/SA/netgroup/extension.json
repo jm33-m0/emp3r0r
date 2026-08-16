@@ -1,0 +1,44 @@
+{
+    "name": "Net Group (SA)",
+    "version": "0.0.0",
+    "command_name": "sa-netgroup",
+    "extension_author": "moloch--",
+    "original_author": "TrustedSec",
+    "repo_url": "https://github.com/sliverarmory/CS-Situational-Awareness-BOF",
+    "help": "List domain groups or enumerate members of a specific group.",
+    "long_help": "Lists all domain groups or retrieves members of a specific group. When 'global' is 0, lists all domain groups with their IDs and attributes. When 'global' is 1, lists members of the specified group. Uses the computer's domain by default if no domain is specified.",
+    "depends_on": "coff-loader",
+    "entrypoint": "go",
+    "files": [
+        {
+            "os": "windows",
+            "arch": "amd64",
+            "path": "netgroup.x64.o"
+        },
+        {
+            "os": "windows",
+            "arch": "386",
+            "path": "netgroup.x86.o"
+        }
+    ],
+    "arguments": [
+        {
+            "name": "type",
+            "type": "short",
+            "desc": "Operation mode: 0 = list all domain groups, 1 = list members of specified group",
+            "optional": false
+        },
+        {
+            "name": "domain",
+            "desc": "Domain to query (defaults to computer's domain if not specified)",
+            "type": "wstring",
+            "optional": true
+        },
+        {
+            "name": "group",
+            "desc": "Group name to enumerate members from (required when type=1)",
+            "type": "wstring",
+            "optional": true
+        }
+    ]
+}
