@@ -158,6 +158,8 @@ func TestFullAgentLifecycle(t *testing.T) {
 
 	// Start Real C2 Server
 	go server.StartC2AgentTLSServer()
+	server.MarkOperatorOnline("test-operator")
+	defer server.MarkOperatorOffline("test-operator")
 	defer network.StopEmpTLSServer()
 	// Shutdown C2 Server on exit
 	defer network.StopEmpTLSServer()
@@ -502,6 +504,8 @@ func TestCheckinWithRandomPaths(t *testing.T) {
 
 	// Start Real C2 Server
 	go server.StartC2AgentTLSServer()
+	server.MarkOperatorOnline("test-operator")
+	defer server.MarkOperatorOffline("test-operator")
 	defer network.StopEmpTLSServer()
 
 	// Wait for server to start
@@ -640,6 +644,8 @@ func TestDynamicPrefix(t *testing.T) {
 
 	// Start Real C2 Server
 	go server.StartC2AgentTLSServer()
+	server.MarkOperatorOnline("test-operator")
+	defer server.MarkOperatorOffline("test-operator")
 	defer network.StopEmpTLSServer()
 
 	// Wait for server to start
@@ -790,6 +796,8 @@ func TestCheckinWithRandomPaths_Strict(t *testing.T) {
 
 	// Start Real C2 Server
 	go server.StartC2AgentTLSServer()
+	server.MarkOperatorOnline("test-operator")
+	defer server.MarkOperatorOffline("test-operator")
 	defer network.StopEmpTLSServer()
 
 	// Wait for server to start

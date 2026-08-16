@@ -49,6 +49,7 @@ func runCheckinACK(t *testing.T, mode string) {
 	}
 	defer os.RemoveAll(tmpDir)
 	defer network.StopEmpTLSServer()
+	defer server.MarkOperatorOffline("test-operator")
 
 	caCertFile := filepath.Join(tmpDir, "ca-cert.pem")
 	caKeyFile := filepath.Join(tmpDir, "ca-key.pem")
@@ -116,6 +117,7 @@ func runCheckinACK(t *testing.T, mode string) {
 	live.AgentList = make([]*def.Emp3r0rAgent, 0)
 
 	go server.StartC2AgentTLSServer()
+	server.MarkOperatorOnline("test-operator")
 	if err := waitForPort(fmt.Sprintf("127.0.0.1:%d", tlsPort), time.Now().Add(10*time.Second)); err != nil {
 		t.Fatalf("TLS C2 server did not become ready: %v", err)
 	}

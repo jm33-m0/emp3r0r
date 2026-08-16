@@ -68,7 +68,9 @@ func signUUID(uuid string, privKey *ecdsa.PrivateKey) (string, error) {
 func startTestC2Server(t *testing.T) {
 	t.Helper()
 	go server.StartC2AgentTLSServer()
+	server.MarkOperatorOnline("test-operator")
 	t.Cleanup(func() {
+		server.MarkOperatorOffline("test-operator")
 		network.StopEmpTLSServer()
 		_ = agents.CloseAgentDB()
 		// Allow in-flight stream handlers to observe shutdown and exit.
