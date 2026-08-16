@@ -123,29 +123,32 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 	operatorIdleColor := "red"
 
 	if live.ActiveAgent != nil {
-		connected := false
+		// Use the freshly-fetched agent entry rather than the possibly stale
+		// live.ActiveAgent pointer, so LastSeen/RTT always reflect the server's
+		// latest state for the selected agent.
+		var active *def.Emp3r0rAgent
 		for _, a := range agents {
 			if a != nil && a.UUID == live.ActiveAgent.UUID {
-				connected = true
+				active = a
 				break
 			}
 		}
 
-		if !connected {
+		if active == nil {
 			// The selected agent is no longer in the connected-agent list.
 			// Show this explicitly instead of a stale, ever-growing idle time.
 			rtt = "⚡N/A"
 			lastSeen = "Agent offline"
 			lastSeenColor = "red"
-		} else if live.ActiveAgent.LastSeenRTT > 0 {
-			rtt = fmt.Sprintf("⚡%.1fms", float64(live.ActiveAgent.LastSeenRTT)/float64(time.Millisecond))
 		} else {
-			rtt = "⚡0ms"
-		}
+			if active.LastSeenRTT > 0 {
+				rtt = fmt.Sprintf("⚡%.1fms", float64(active.LastSeenRTT)/float64(time.Millisecond))
+			} else {
+				rtt = "⚡0ms"
+			}
 
-		if connected {
-			lastSeenTime := time.Since(live.ActiveAgent.LastSeen).Seconds()
-			if live.ActiveAgent.LastSeen.IsZero() {
+			lastSeenTime := time.Since(active.LastSeen).Seconds()
+			if active.LastSeen.IsZero() {
 				lastSeen = "Last seen: N/A"
 				lastSeenColor = "red"
 			} else {
