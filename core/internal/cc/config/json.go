@@ -71,6 +71,7 @@ type jsonConfig struct {
 	IsP2PEnabled              bool                    `json:"is_p2p_enabled"`
 	IsDirectC2Enabled         bool                    `json:"is_direct_c2_enabled"`
 	PersistentRouter          bool                    `json:"persistent_router"`
+	OperatorIdleTimeout       int                     `json:"operator_idle_timeout"`
 	P2PTransport              string                  `json:"p2p_transport"`
 	CamouflageCertOrg         string                  `json:"camouflage_cert_org"`
 	CamouflageCertCN          string                  `json:"camouflage_cert_cn"`
@@ -281,6 +282,10 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 	if !config_to_write.PersistentRouter {
 		config_to_write.PersistentRouter = getBool("PersistentRouter")
 	}
+	config_to_write.OperatorIdleTimeout = getInt("operator_idle_timeout")
+	if config_to_write.OperatorIdleTimeout == 0 {
+		config_to_write.OperatorIdleTimeout = getInt("OperatorIdleTimeout")
+	}
 	config_to_write.P2PTransport = getString("p2p_transport")
 	if config_to_write.P2PTransport == "" {
 		config_to_write.P2PTransport = getString("P2PTransport")
@@ -435,6 +440,9 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 		}
 		if jCfg.PersistentRouter {
 			config_to_write.PersistentRouter = jCfg.PersistentRouter
+		}
+		if jCfg.OperatorIdleTimeout != 0 {
+			config_to_write.OperatorIdleTimeout = jCfg.OperatorIdleTimeout
 		}
 		if jCfg.P2PTransport != "" {
 			config_to_write.P2PTransport = jCfg.P2PTransport

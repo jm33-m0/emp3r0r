@@ -38,4 +38,6 @@ const (
 	OperatorRegisterFTPStream = OperatorRoot + "/register_ftp_stream"
 	// OperatorUnregisterFTPStream
 	OperatorUnregisterFTPStream = OperatorRoot + "/unregister_ftp_stream"
+	// OperatorUpdateConfig
+	OperatorUpdateConfig = OperatorRoot + "/update_config"
 )

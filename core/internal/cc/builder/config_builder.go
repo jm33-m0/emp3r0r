@@ -20,24 +20,25 @@ import (
 // AgentConfig represents the options provided by a user (via CLI, Web UI, API)
 // to generate a new agent configuration payload.
 type AgentConfig struct {
-	CCAddress        *string
-	CDNProxy         *string
-	C2TransportProxy *string
-	DoHServer        *string
-	C2ChannelMode    *string
-	IsP2PEnabled     bool
-	IsDirectC2       bool
-	PersistentRouter bool
-	IsNCSIEnabled    bool
-	UseKCP           bool
-	IsStager         bool
-	P2PTransport     *string
-	P2PRelayPort     *string
-	MeshGossipPort   *string
-	InitialPeers     *[]string
-	CCHTTPPort       *string
-	PollInterval     *int
-	Jitter           *int
+	CCAddress           *string
+	CDNProxy            *string
+	C2TransportProxy    *string
+	DoHServer           *string
+	C2ChannelMode       *string
+	IsP2PEnabled        bool
+	IsDirectC2          bool
+	PersistentRouter    bool
+	IsNCSIEnabled       bool
+	UseKCP              bool
+	IsStager            bool
+	P2PTransport        *string
+	P2PRelayPort        *string
+	MeshGossipPort      *string
+	InitialPeers        *[]string
+	CCHTTPPort          *string
+	PollInterval        *int
+	Jitter              *int
+	OperatorIdleTimeout *int
 }
 
 // MakeConfig takes the generalized AgentConfig options and orchestrates the
@@ -155,6 +156,10 @@ func MakeConfig(opts AgentConfig) error {
 	}
 	if live.RuntimeConfig.Jitter == 0 {
 		live.RuntimeConfig.Jitter = 20
+	}
+
+	if opts.OperatorIdleTimeout != nil {
+		live.RuntimeConfig.OperatorIdleTimeout = *opts.OperatorIdleTimeout
 	}
 
 	// Preflight / Hybrid Mode intervals

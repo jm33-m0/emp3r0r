@@ -28,24 +28,32 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 	isStager, _ := cmd.Flags().GetBool("stager")
 
 	opts := builder.AgentConfig{
-		CCAddress:        getStringOptPtr(cmd, "cc"),
-		CDNProxy:         getStringOptPtr(cmd, "cdn"),
-		C2TransportProxy: getStringOptPtr(cmd, "proxy"),
-		DoHServer:        getStringOptPtr(cmd, "doh"),
-		C2ChannelMode:    getStringOptPtr(cmd, "c2-channel-mode"),
-		InitialPeers:     getStringSliceOptPtr(cmd, "peers"),
-		P2PTransport:     getStringOptPtr(cmd, "p2p-transport"),
-		P2PRelayPort:     getStringOptPtr(cmd, "p2p-relay-port"),
-		MeshGossipPort:   getStringOptPtr(cmd, "mesh-gossip-port"),
-		CCHTTPPort:       getStringOptPtr(cmd, "cc-http-port"),
-		PollInterval:     getIntOptPtr(cmd, "interval"),
-		Jitter:           getIntOptPtr(cmd, "jitter"),
-		IsP2PEnabled:     p2p,
-		IsDirectC2:       directC2,
-		PersistentRouter: persistentRouter,
-		IsNCSIEnabled:    ncsi,
-		UseKCP:           kcp,
-		IsStager:         isStager,
+		CCAddress:           getStringOptPtr(cmd, "cc"),
+		CDNProxy:            getStringOptPtr(cmd, "cdn"),
+		C2TransportProxy:    getStringOptPtr(cmd, "proxy"),
+		DoHServer:           getStringOptPtr(cmd, "doh"),
+		C2ChannelMode:       getStringOptPtr(cmd, "c2-channel-mode"),
+		InitialPeers:        getStringSliceOptPtr(cmd, "peers"),
+		P2PTransport:        getStringOptPtr(cmd, "p2p-transport"),
+		P2PRelayPort:        getStringOptPtr(cmd, "p2p-relay-port"),
+		MeshGossipPort:      getStringOptPtr(cmd, "mesh-gossip-port"),
+		CCHTTPPort:          getStringOptPtr(cmd, "cc-http-port"),
+		PollInterval:        getIntOptPtr(cmd, "interval"),
+		Jitter:              getIntOptPtr(cmd, "jitter"),
+		OperatorIdleTimeout: getIntOptPtr(cmd, "operator-idle-timeout"),
+		IsP2PEnabled:        p2p,
+		IsDirectC2:          directC2,
+		PersistentRouter:    persistentRouter,
+		IsNCSIEnabled:       ncsi,
+		UseKCP:              kcp,
+		IsStager:            isStager,
+	}
+
+	// Push operator-idle policy to the C2 server (remote or local).
+	if opts.OperatorIdleTimeout != nil {
+		if err := client.UpdateOperatorIdleConfig(*opts.OperatorIdleTimeout); err != nil {
+			logging.Warningf("Failed to update operator idle timeout on C2: %v", err)
+		}
 	}
 
 	// Invoke core agent generation business logic outside operator package and controller package

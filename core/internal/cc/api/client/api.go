@@ -156,3 +156,11 @@ func SendCommand(operation def.Operation) error {
 	_, err := SendCBORRequest(transport.OperatorSendCommand, operation)
 	return err
 }
+
+// UpdateOperatorIdleConfig updates the server-side operator idle timeout.
+func UpdateOperatorIdleConfig(timeout int) error {
+	_, err := SendCBORRequest(transport.OperatorUpdateConfig, def.OperatorIdleConfig{
+		OperatorIdleTimeout: timeout,
+	})
+	return err
+}

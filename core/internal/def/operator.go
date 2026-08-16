@@ -34,6 +34,11 @@ type SignRequest struct {
 	Content []byte `cbor:"1,keyasint"` // content to sign (usually UUID)
 }
 
+// OperatorIdleConfig updates server-side operator-idle settings.
+type OperatorIdleConfig struct {
+	OperatorIdleTimeout int `cbor:"1,keyasint"` // seconds; 0 disables idle-based rejection
+}
+
 // FTPStreamRequest is the request to register an FTP stream
 type FTPStreamRequest struct {
 	Token        string               `cbor:"1,keyasint"`
