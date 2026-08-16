@@ -23,8 +23,10 @@ import (
 // Execute() calls — only the Changed bool is reset. Without this map we
 // cannot distinguish "user explicitly set the flag" from "user didn't
 // provide the flag at all" on subsequent invocations.
-var moduleOptionDefaults = make(map[string]map[string]string)
-var moduleOptionDefaultsMu sync.RWMutex
+var (
+	moduleOptionDefaults   = make(map[string]map[string]string)
+	moduleOptionDefaultsMu sync.RWMutex
+)
 
 func addModuleCommands(rootCmd *cobra.Command) {
 	mods := make([]*def.ModuleConfig, 0)
