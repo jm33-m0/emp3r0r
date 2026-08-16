@@ -873,9 +873,12 @@ int main(int argc, char *argv[])
         return 1;
     }
     printf("Got contents of COFF file\n");
-    arguments = unhexlify((unsigned char *)argv[3], &argumentSize);
+    if (argc >= 4)
+    {
+        arguments = unhexlify((unsigned char *)argv[3], &argumentSize);
+    }
     printf("Running/Parsing the COFF file\n");
-    checkcode = RunCOFF(argv[1], (unsigned char *)coff_data, filesize, arguments, argumentSize);
+    checkcode = RunCOFF(argv[1], (unsigned char *)coff_data, filesize, arguments, argumentSize, NULL);
     if (checkcode == 0)
     {
 #ifdef _WIN32
