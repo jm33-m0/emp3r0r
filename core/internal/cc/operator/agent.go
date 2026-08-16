@@ -3,6 +3,7 @@ package operator
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
@@ -13,6 +14,36 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
 )
+
+// lastCommandSent tracks, for each agent tag, when the operator last
+// successfully dispatched a command to that agent. It is keyed by agent tag
+// because command dispatch is reported with the tag and the active agent is
+// looked up by tag in RenderAgentTable.
+var lastCommandSent sync.Map // agentTag -> time.Time
+
+// markAgentCommandSent records that the agent with the given tag has just
+// received a command from this operator.
+func markAgentCommandSent(agentTag string) {
+	if agentTag == "" {
+		return
+	}
+	lastCommandSent.Store(agentTag, time.Now())
+}
+
+// operatorIdleFor returns how long ago the operator last sent a command to the
+// given agent tag. The second return value reports whether a command has been
+// sent yet.
+func operatorIdleFor(agentTag string) (time.Duration, bool) {
+	val, ok := lastCommandSent.Load(agentTag)
+	if !ok {
+		return 0, false
+	}
+	last, ok := val.(time.Time)
+	if !ok || last.IsZero() {
+		return 0, false
+	}
+	return time.Since(last), true
+}
 
 // cmdSetActiveAgent sets the active agent for the operator
 func CmdSetActiveAgent(cmd *cobra.Command, args []string) {
@@ -84,29 +115,54 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 		tdata = append(tdata, tail)
 	}
 
-	// Set tmux status with agent count and RTT/Idle info
+	// Set tmux status with agent count, RTT, agent last-seen and operator idle.
 	rtt := "⚡??ms"
-	idle := "Idle: ??s"
-	idle_color := "green"
+	lastSeen := "Last seen: N/A"
+	lastSeenColor := "red"
+	operatorIdle := "Operator idle: N/A"
+	operatorIdleColor := "red"
 
 	if live.ActiveAgent != nil {
-		if live.ActiveAgent.LastSeenRTT > 0 {
+		connected := false
+		for _, a := range agents {
+			if a != nil && a.UUID == live.ActiveAgent.UUID {
+				connected = true
+				break
+			}
+		}
+
+		if !connected {
+			// The selected agent is no longer in the connected-agent list.
+			// Show this explicitly instead of a stale, ever-growing idle time.
+			rtt = "⚡N/A"
+			lastSeen = "Agent offline"
+			lastSeenColor = "red"
+		} else if live.ActiveAgent.LastSeenRTT > 0 {
 			rtt = fmt.Sprintf("⚡%.1fms", float64(live.ActiveAgent.LastSeenRTT)/float64(time.Millisecond))
 		} else {
 			rtt = "⚡0ms"
 		}
 
-		idle_time := time.Since(live.ActiveAgent.LastSeen).Seconds()
-		if live.ActiveAgent.LastSeen.IsZero() {
-			idle = "Idle: N/A"
-			idle_color = "red"
-		} else {
-			idle = fmt.Sprintf("Idle: %.0fs", idle_time)
-			if idle_time > 120 {
-				idle_color = "red"
-			} else if idle_time > 45 {
-				idle_color = "yellow"
+		if connected {
+			lastSeenTime := time.Since(live.ActiveAgent.LastSeen).Seconds()
+			if live.ActiveAgent.LastSeen.IsZero() {
+				lastSeen = "Last seen: N/A"
+				lastSeenColor = "red"
+			} else {
+				lastSeen = fmt.Sprintf("Last seen: %s", formatIdle(lastSeenTime))
+				if lastSeenTime > 120 {
+					lastSeenColor = "red"
+				} else if lastSeenTime > 45 {
+					lastSeenColor = "yellow"
+				} else {
+					lastSeenColor = "green"
+				}
 			}
+		}
+
+		if opIdle, ok := operatorIdleFor(live.ActiveAgent.Tag); ok {
+			operatorIdle = fmt.Sprintf("Operator idle: %s", formatIdle(opIdle.Seconds()))
+			operatorIdleColor = "green"
 		}
 	}
 
@@ -121,15 +177,48 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 		agentCountColor, len(agents))
 	_ = cli.TmuxSetStatusLeft(status_left)
 
-	// Status Right: RTT | Idle: Time
-	status_right := fmt.Sprintf("#[fg=colour15,bg=colour235,bold] %s | #[fg=%s]%s ",
-		rtt, idle_color, idle)
+	// Status Right: RTT | Last seen | Operator idle
+	status_right := fmt.Sprintf("#[fg=colour15,bg=colour235,bold] %s | #[fg=%s]%s | #[fg=%s]%s ",
+		rtt, lastSeenColor, lastSeen, operatorIdleColor, operatorIdle)
 	_ = cli.TmuxSetStatusRight(status_right)
 
 	header := []string{"ID", "Tag", "OS", "Process", "User", "IPs", "From", "C2", "Mesh"}
 	tabStr := cli.BuildTable(header, tdata)
 	if cli.AgentListPane != nil {
 		cli.AgentListPane.Printf(true, "%s", tabStr)
+	}
+}
+
+// formatIdle renders an idle duration in a compact human-readable form
+// (seconds, minutes, hours, or days) instead of a raw second count.
+func formatIdle(seconds float64) string {
+	if seconds < 0 {
+		seconds = 0
+	}
+	total := int64(seconds)
+	days := total / 86400
+	hours := (total % 86400) / 3600
+	minutes := (total % 3600) / 60
+	secs := total % 60
+
+	switch {
+	case days > 0:
+		if hours > 0 {
+			return fmt.Sprintf("%dd%dh", days, hours)
+		}
+		return fmt.Sprintf("%dd", days)
+	case hours > 0:
+		if minutes > 0 {
+			return fmt.Sprintf("%dh%dm", hours, minutes)
+		}
+		return fmt.Sprintf("%dh", hours)
+	case minutes > 0:
+		if secs > 0 {
+			return fmt.Sprintf("%dm%ds", minutes, secs)
+		}
+		return fmt.Sprintf("%dm", minutes)
+	default:
+		return fmt.Sprintf("%ds", secs)
 	}
 }
 

@@ -62,6 +62,9 @@ func backgroundJobs() {
 	// set up command senders
 	ftp.ExecCmd = controllers.ExecuteCommand
 	modules.CmdSender = controllers.ExecuteCommand
+	// track per-agent operator idle (time since the agent last received a
+	// command from this operator)
+	controllers.OnCommandSent = markAgentCommandSent
 	// refresh agent list every 10 seconds
 	go agentListRefresher()
 	// handle messages from operator

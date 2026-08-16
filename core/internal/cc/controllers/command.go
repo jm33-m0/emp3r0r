@@ -5,12 +5,16 @@ import (
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/jobs"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
+
+// OnCommandSent is invoked after a command has been successfully dispatched
+// to an agent. The operator frontend uses this to track operator idle per
+// agent (how long since the agent last received a command from the operator).
+var OnCommandSent func(agentTag string)
 
 // ExecuteCommand sends a command to an agent through the mTLS C2 operator server
 // This replaces operator.operatorSendCommand2Agent
@@ -30,21 +34,21 @@ func ExecuteCommand(cmd, jobID, agentTag string) error {
 		JobID:    &jobID,
 	}
 
-	// Record command time immediately
+	// Record command time immediately. Note: this must not update the agent's
+	// LastSeen; LastSeen reflects only agent activity, while operator idle is
+	// tracked separately via OnCommandSent.
 	now := time.Now()
 	live.CmdTime.Store(jobID, now.Format("2006-01-02 15:04:05.999999999 -0700 MST"))
-	if agent := agents.GetAgentByTag(agentTag); agent != nil {
-		agent.LastSeen = now
-	}
-	if live.ActiveAgent != nil && live.ActiveAgent.Tag == agentTag {
-		live.ActiveAgent.LastSeen = now
-	}
 
 	// Send command asynchronously to avoid blocking
 	go func() {
 		err := client.SendCommand(operation)
 		if err != nil {
 			logging.Errorf("Failed to send command to agent %s: %v", agentTag, err)
+			return
+		}
+		if OnCommandSent != nil {
+			OnCommandSent(agentTag)
 		}
 	}()
 
