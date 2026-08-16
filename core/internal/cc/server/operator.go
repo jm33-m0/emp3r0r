@@ -175,9 +175,11 @@ func handleSetActiveAgent(wrt http.ResponseWriter, req *http.Request) {
 	// Set active agent
 	agents.SetActiveAgent(operation.AgentTag)
 
-	// Return active agent
+	// Return a snapshot so the operator always gets a consistent view of the
+	// agent metadata (especially LastSeen/RTT) instead of the shared pointer
+	// that the message-tunnel goroutine is mutating.
 	wrt.Header().Set("Content-Type", "application/cbor")
-	if err := cbor.NewEncoder(wrt).Encode(live.ActiveAgent); err != nil {
+	if err := cbor.NewEncoder(wrt).Encode(agents.SnapshotAgent(live.ActiveAgent)); err != nil {
 		http.Error(wrt, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -246,6 +248,12 @@ func handleListAgents(wrt http.ResponseWriter, _ *http.Request) {
 	}()
 	// Get all agents
 	agentsList := agents.GetConnectedAgents()
+	if logging.Level >= 4 {
+		for _, a := range agentsList {
+			logging.Debugf("handleListAgents: %s LastSeen=%v (%.0fs ago)", a.Tag, a.LastSeen, time.Since(a.LastSeen).Seconds())
+		}
+		logging.Debugf("handleListAgents: returning %d agents", len(agentsList))
+	}
 
 	wrt.Header().Set("Content-Type", "application/cbor")
 	if err := cbor.NewEncoder(wrt).Encode(agentsList); err != nil {
@@ -520,6 +528,7 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 			if err := decoder.Decode(msg); err != nil {
 				return
 			}
+			touchOperatorCommand()
 			handleOperatorRelayFrame(operator_session, msg)
 		}
 	}()
@@ -566,6 +575,7 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 				cancel()
 				return
 			}
+			touchOperatorCommand()
 		case <-ctx.Done():
 			logging.Warningf("handleOperatorConn exited")
 			return

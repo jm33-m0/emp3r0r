@@ -3,8 +3,10 @@ package server
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -107,6 +109,9 @@ func fwdMsgToOperator(operatorSession string, msg def.MsgTunData) error {
 	}
 	op.mu.Lock()
 	defer op.mu.Unlock()
+	// Never let a stuck operator block the caller indefinitely. The caller
+	// (message tunnel) forwards in a goroutine; a timeout bounds the goroutine.
+	_ = op.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 	encoder := cbor.NewEncoder(op.conn)
 	if err := encoder.Encode(msg); err != nil {
 		return fmt.Errorf("forward to operator %q: %w", operatorSession, err)
@@ -129,6 +134,10 @@ func collectEnrichedPeerList() (*def.EnrichedPeerList, []string, error) {
 		if fromIP != "" && fromIP != "127.0.0.1" {
 			simpleIPsMap[fromIP] = true
 		}
+		var lastSeen time.Time
+		if seenAt, ok := agents.AgentLastSeen(agent.UUID); ok {
+			lastSeen = seenAt
+		}
 		for _, ip := range agent.IPs {
 			if ip != "" && ip != "127.0.0.1" && !strings.HasPrefix(ip, "127.") {
 				simpleIPsMap[ip] = true
@@ -150,7 +159,7 @@ func collectEnrichedPeerList() (*def.EnrichedPeerList, []string, error) {
 			P2PRelayPort:   agent.P2PRelayPort,
 			MeshGossipPort: agent.MeshGossipPort,
 			Files:          agent.Files,
-			LastSeen:       agent.LastSeen.Unix(),
+			LastSeen:       lastSeen.Unix(),
 		}
 		peers = append(peers, p)
 		return true

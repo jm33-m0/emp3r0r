@@ -245,6 +245,7 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 		return
 	}
 	if !operatorIsActive() {
+		maybeNotifyOperatorIdle()
 		logging.Warningf("cborProtocolDispatch: operator idle, rejecting agent %s from %s", strconv.Quote(msgAuth.AgentUUID), remoteAddr)
 		return
 	}

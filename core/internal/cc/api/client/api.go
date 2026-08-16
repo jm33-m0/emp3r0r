@@ -164,3 +164,10 @@ func UpdateOperatorIdleConfig(timeout int) error {
 	})
 	return err
 }
+
+// ResumeOperator asks the server to clear the operator idle state and allow
+// agents to reconnect.
+func ResumeOperator() error {
+	_, err := SendCBORRequest(transport.OperatorResume, nil)
+	return err
+}

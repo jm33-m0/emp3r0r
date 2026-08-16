@@ -21,6 +21,7 @@ func operationDispatcher(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 		}
 	}()
+	touchOperatorCommand()
 	vars := mux.Vars(r)
 	api := vars["api"]
 	logging.Debugf("Operator request: API: %s", api)
@@ -43,6 +44,8 @@ func operationDispatcher(w http.ResponseWriter, r *http.Request) {
 		handleUnregisterFTPStream(w, r)
 	case transport.OperatorUpdateConfig:
 		handleUpdateOperatorIdleConfig(w, r)
+	case transport.OperatorResume:
+		handleResumeOperator(w, r)
 	case transport.OperatorGetCA:
 		handleGetCA(w, r)
 	case transport.OperatorSignAgent:

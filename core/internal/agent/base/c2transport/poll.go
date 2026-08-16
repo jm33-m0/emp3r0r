@@ -153,10 +153,16 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 
 			// if it's a handshake reply
 			if msg.Tag == "handshake" {
+				// Only mark a hello as answered if sendHello is actually waiting
+				// on this JobID. Otherwise a late/unsolicited reply would leak an
+				// entry into HandShakes forever.
+				_, waiting := HandShakes.Load(msg.JobID)
 				if pfsKeysExchanged {
 					// We already have the keys, this is likely a keep-alive from server (random data)
 					// Notify wait_hello that handshake is done/alive
-					HandShakes.Store(msg.JobID, true)
+					if waiting {
+						HandShakes.Store(msg.JobID, true)
+					}
 					continue
 				}
 
@@ -187,7 +193,9 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 				pfsKeysExchanged = true
 
 				// Notify wait_hello that handshake is done
-				HandShakes.Store(msg.JobID, true)
+				if waiting {
+					HandShakes.Store(msg.JobID, true)
+				}
 				continue
 			}
 
@@ -245,17 +253,18 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 				continue
 			}
 			hello_msg.AgentUUIDSig = base64.URLEncoding.EncodeToString(sig)
+
+			// Mark the hello as pending BEFORE writing it. In polling transports
+			// (http_poll) the server can reply before out.Encode returns, so
+			// storing after Encode could overwrite the success marker with false
+			// and make wait_hello hang forever.
+			HandShakes.Store(hello_msg.JobID, false)
 			if encodeErr := out.Encode(hello_msg); encodeErr != nil {
+				HandShakes.Delete(hello_msg.JobID)
 				logging.Errorf("agent cannot connect to cc: %v", encodeErr)
 				util.TakeABlink()
 				continue
 			}
-			// Use a specialized struct or distinct type to indicate "pending" if needed,
-			// but here we just don't store "true" (which would be success).
-			// We store nil or rely on Load returning nil.
-			// Actually, let's explicitly store checking info if we want, but 'false' or nothing is fine.
-			// The original code stored 'false'. Let's stick to that to indicate "sent but not received".
-			HandShakes.Store(hello_msg.JobID, false)
 
 			if !wait_hello(hello_msg.JobID) {
 				cancel()

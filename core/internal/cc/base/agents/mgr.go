@@ -1,7 +1,6 @@
 package agents
 
 import (
-	"crypto/sha1"
 	"fmt"
 	"sort"
 	"strconv"
@@ -16,13 +15,11 @@ import (
 func GetConnectedAgents() []*def.Emp3r0rAgent {
 	var agents []*def.Emp3r0rAgent
 	live.AgentControlMap.Range(func(key, value any) bool {
-		agent := key.(*def.Emp3r0rAgent)
-		shortID := fmt.Sprintf("%x", sha1.Sum([]byte(agent.UUID+agent.UUIDSig)))
-		if len(shortID) > 8 {
-			shortID = shortID[:8]
+		agent, ok := key.(*def.Emp3r0rAgent)
+		if !ok || agent == nil {
+			return true
 		}
-		agent.ShortID = shortID
-		agents = append(agents, agent)
+		agents = append(agents, SnapshotAgent(agent))
 		return true
 	})
 	return agents

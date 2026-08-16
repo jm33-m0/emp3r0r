@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 	"sync/atomic"
 	"time"
@@ -16,9 +17,35 @@ import (
 // the message-tunnel admission/teardown logic.
 var lastOperatorCommand int64
 
+// operatorIdleNotified is set once the C2 has warned the operator that the
+// idle timeout was exceeded. It is cleared when the operator becomes active
+// again, so the resume notification is only broadcast on an actual
+// idle -> active transition.
+var operatorIdleNotified atomic.Bool
+
 // touchOperatorCommand marks the operator as active right now.
 func touchOperatorCommand() {
 	atomic.StoreInt64(&lastOperatorCommand, time.Now().UnixNano())
+	if operatorIdleNotified.Swap(false) {
+		logging.Successf("Operator active again. Agents may reconnect.")
+		_ = operatorBroadcastPrintf(logging.SUCCESS, "Operator active again. Agents may reconnect.")
+	}
+}
+
+// maybeNotifyOperatorIdle sends one warning to the operator when the idle
+// timeout first expires. Repeated expiry events are suppressed until the
+// operator becomes active again.
+func maybeNotifyOperatorIdle() {
+	if !operatorOnline() {
+		return
+	}
+	if !operatorIdleNotified.CompareAndSwap(false, true) {
+		return
+	}
+	timeout := live.RuntimeConfig.OperatorIdleTimeout
+	msg := fmt.Sprintf("Operator idle timeout (%ds) exceeded. Agents are being disconnected/rejected. Use `resume` to reactivate, or quit and relaunch emp3r0r.", timeout)
+	logging.Warningf("%s", msg)
+	_ = operatorBroadcastPrintf(logging.WARN, "%s", msg)
 }
 
 // operatorOnline reports whether at least one operator message tunnel is
@@ -93,5 +120,20 @@ func handleUpdateOperatorIdleConfig(wrt http.ResponseWriter, req *http.Request) 
 		return
 	}
 	logging.Infof("Operator idle timeout updated to %d seconds", cfg.OperatorIdleTimeout)
+	wrt.WriteHeader(http.StatusOK)
+}
+
+// handleResumeOperator clears the operator idle state so agents are admitted
+// again after an idle timeout. The dispatcher already touched the operator
+// command timer, but this endpoint makes the intent explicit for the `resume`
+// command and returns a clean HTTP 200 response.
+func handleResumeOperator(wrt http.ResponseWriter, _ *http.Request) {
+	defer func() {
+		if r := recover(); r != nil {
+			logging.Errorf("handleResumeOperator panicked: %v", r)
+			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
+		}
+	}()
+	touchOperatorCommand()
 	wrt.WriteHeader(http.StatusOK)
 }

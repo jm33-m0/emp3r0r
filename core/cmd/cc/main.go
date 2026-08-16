@@ -36,6 +36,7 @@ type Options struct {
 	c2_hosts                string // C2 hosts to generate cert for
 	cdnProxy                string // Start cdn2proxy server on this port
 	debug                   bool   // Do not kill tmux session when crashing
+	server_debug            bool   // Enable verbose server logging (level 4)
 	num_operators           int    // Number of operator configurations to generate
 }
 
@@ -112,6 +113,7 @@ func main() {
 	serverCmd.Flags().IntVar(&opts.c2_h2_port, "h2-port", 0, "C2 HTTP/2 stream (h2conn) server port to listen on")
 	serverCmd.Flags().StringVar(&opts.c2_hosts, "c2-hosts", "", "C2 hosts to generate cert for, separated by whitespace")
 	serverCmd.Flags().IntVar(&opts.num_operators, "operators", 1, "Number of operator configurations to generate")
+	serverCmd.Flags().BoolVar(&opts.server_debug, "debug", false, "Enable verbose server logging (level 4, includes agent hellos)")
 
 	// Completion command
 	completionCmd := &cobra.Command{
@@ -212,6 +214,9 @@ func runServerMode(opts *Options) {
 	var err error
 	live.IsServer = true
 	logging.AddWriter(os.Stderr)
+	if opts.server_debug {
+		logging.SetDebugLevel(4)
+	}
 
 	// abort if CC is already running
 	if tools.IsCCRunning() {

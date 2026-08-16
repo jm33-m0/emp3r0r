@@ -55,6 +55,14 @@ func CmdSetActiveAgent(cmd *cobra.Command, args []string) {
 	live.ActiveAgent = agent
 	logging.Successf("Now targeting %s", live.ActiveAgent.Tag)
 
+	// Reset operator-idle tracking for the newly selected agent so the status
+	// bar shows "Operator idle: 0s" instead of "--".
+	markAgentCommandSent(live.ActiveAgent.Tag)
+
+	// Refresh the list immediately so the newly selected agent's Last seen/RTT
+	// reflect the latest server state instead of waiting for the next 10s tick.
+	safeRefreshAgentList()
+
 	// Update tmux window title to show active agent
 	setTitleErr := cli.TmuxSetWindowTitle(live.ActiveAgent.ShortID, cli.CommandPane.WindowID)
 	if setTitleErr != nil {
@@ -79,6 +87,9 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 	var tail []string
 
 	for _, target := range agents {
+		if target == nil {
+			continue
+		}
 		procInfo := "unknown"
 		if target.Process != nil {
 			agentProc := *target.Process
@@ -99,13 +110,9 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 			target.ShortID,
 			util.SplitLongLine(target.Tag, 15),
 			infoMap["OS"], infoMap["Process"], infoMap["User"], infoMap["IPs"], infoMap["From"], infoMap["C2"], infoMap["Mesh"],
+			agentLastSeen(target),
 		}
 		if live.ActiveAgent != nil && live.ActiveAgent.Tag == target.Tag {
-			row = []string{
-				target.ShortID,
-				util.SplitLongLine(target.Tag, 15),
-				infoMap["OS"], infoMap["Process"], infoMap["User"], infoMap["IPs"], infoMap["From"], infoMap["C2"], infoMap["Mesh"],
-			}
 			tail = row
 			continue
 		}
@@ -116,10 +123,10 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 	}
 
 	// Set tmux status with agent count, RTT, agent last-seen and operator idle.
-	rtt := "⚡??ms"
-	lastSeen := "Last seen: N/A"
+	rtt := "⚡--"
+	lastSeen := "Last seen: --"
 	lastSeenColor := "red"
-	operatorIdle := "Operator idle: N/A"
+	operatorIdle := "Operator idle: --"
 	operatorIdleColor := "red"
 
 	if live.ActiveAgent != nil {
@@ -137,7 +144,7 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 		if active == nil {
 			// The selected agent is no longer in the connected-agent list.
 			// Show this explicitly instead of a stale, ever-growing idle time.
-			rtt = "⚡N/A"
+			rtt = "⚡--"
 			lastSeen = "Agent offline"
 			lastSeenColor = "red"
 		} else {
@@ -149,13 +156,13 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 
 			lastSeenTime := time.Since(active.LastSeen).Seconds()
 			if active.LastSeen.IsZero() {
-				lastSeen = "Last seen: N/A"
+				lastSeen = "Last seen: --"
 				lastSeenColor = "red"
 			} else {
 				lastSeen = fmt.Sprintf("Last seen: %s", formatIdle(lastSeenTime))
-				if lastSeenTime > 120 {
+				if lastSeenTime > 240 {
 					lastSeenColor = "red"
-				} else if lastSeenTime > 45 {
+				} else if lastSeenTime > 120 {
 					lastSeenColor = "yellow"
 				} else {
 					lastSeenColor = "green"
@@ -180,12 +187,20 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 		agentCountColor, len(agents))
 	_ = cli.TmuxSetStatusLeft(status_left)
 
-	// Status Right: RTT | Last seen | Operator idle
-	status_right := fmt.Sprintf("#[fg=colour15,bg=colour235,bold] %s | #[fg=%s]%s | #[fg=%s]%s ",
-		rtt, lastSeenColor, lastSeen, operatorIdleColor, operatorIdle)
+	// Status Right: RTT | Last seen | Operator idle.
+	// When no target is selected, avoid showing a misleading red "timeout"
+	// status; the per-agent Last seen column in the list carries that info.
+	var status_right string
+	if live.ActiveAgent == nil {
+		status_right = fmt.Sprintf("#[fg=colour15,bg=colour235,bold] %s | #[fg=yellow]No active target ",
+			rtt)
+	} else {
+		status_right = fmt.Sprintf("#[fg=colour15,bg=colour235,bold] %s | #[fg=%s]%s | #[fg=%s]%s ",
+			rtt, lastSeenColor, lastSeen, operatorIdleColor, operatorIdle)
+	}
 	_ = cli.TmuxSetStatusRight(status_right)
 
-	header := []string{"ID", "Tag", "OS", "Process", "User", "IPs", "From", "C2", "Mesh"}
+	header := []string{"ID", "Tag", "OS", "Process", "User", "IPs", "From", "C2", "Mesh", "Last seen"}
 	tabStr := cli.BuildTable(header, tdata)
 	if cli.AgentListPane != nil {
 		cli.AgentListPane.Printf(true, "%s", tabStr)
@@ -225,22 +240,38 @@ func formatIdle(seconds float64) string {
 	}
 }
 
-// AgentListRefresher refreshes agent list every 10 seconds
-func agentListRefresher() {
+// agentLastSeen formats an agent's last-seen time for display in the agent list.
+func agentLastSeen(a *def.Emp3r0rAgent) string {
+	if a == nil || a.LastSeen.IsZero() {
+		return "--"
+	}
+	return formatIdle(time.Since(a.LastSeen).Seconds())
+}
+
+// safeRefreshAgentList runs refreshAgentList and never lets a panic stop the
+// refresher loop.
+func safeRefreshAgentList() {
 	defer func() {
 		if r := recover(); r != nil {
-			logging.Errorf("agentListRefresher panicked: %v", r)
+			logging.Errorf("refreshAgentList panicked: %v", r)
 		}
 	}()
-	refreshAgentList() // refresh immediately
+	if err := refreshAgentList(); err != nil {
+		logging.Errorf("Failed to refresh agent list: %v", err)
+	}
+}
+
+// AgentListRefresher refreshes agent list every 10 seconds
+func agentListRefresher() {
+	safeRefreshAgentList() // refresh immediately
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-AgentRefreshCh:
-			refreshAgentList()
+			safeRefreshAgentList()
 		case <-ticker.C:
-			refreshAgentList()
+			safeRefreshAgentList()
 		}
 	}
 }
@@ -250,6 +281,11 @@ func refreshAgentList() error {
 	agents, err := client.GetAgentList()
 	if err != nil {
 		return err
+	}
+	if logging.Level >= 4 {
+		for _, a := range agents {
+			logging.Debugf("refreshAgentList: %s LastSeen=%v (%.0fs ago)", a.Tag, a.LastSeen, time.Since(a.LastSeen).Seconds())
+		}
 	}
 	live.AgentList = agents
 	// Update active agent pointer to avoid staleness

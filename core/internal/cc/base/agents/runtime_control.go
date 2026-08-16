@@ -17,7 +17,7 @@ func RuntimeControlByUUID(uuid string) (agent *def.Emp3r0rAgent, ctrl *live.Agen
 			return true
 		}
 		if a.UUID == uuid {
-			agent, ctrl, key, found = a, c, k, true
+			agent, ctrl, key, found = SnapshotAgent(a), c, k, true
 			return false
 		}
 		return true
@@ -34,7 +34,7 @@ func RuntimeControlByConn(conn net.Conn) (agent *def.Emp3r0rAgent, ctrl *live.Ag
 			return true
 		}
 		if c.Conn == conn {
-			agent, ctrl, key, found = a, c, k, true
+			agent, ctrl, key, found = SnapshotAgent(a), c, k, true
 			return false
 		}
 		return true

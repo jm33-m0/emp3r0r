@@ -141,6 +141,7 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 
 	target.From = remoteAddr
 	target.LastSeen = time.Now()
+	agents.MarkAgentSeen(target, target.LastSeen)
 	if isKnown {
 		target.PublicKey = pinnedKey
 		if pinnedUUIDSig != "" {

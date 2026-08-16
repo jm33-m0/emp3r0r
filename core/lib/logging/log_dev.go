@@ -69,6 +69,11 @@ func SetBroadcastHandler(h func(level, msg string)) {
 	logger.BroadcastHandler = h
 }
 
+// SetDebugLevel sets the global log level.
+func SetDebugLevel(level int) {
+	logger.SetDebugLevel(level)
+}
+
 func Fatal(a ...any) {
 	logger.Msg("%v", fmt.Sprint(a...))
 }

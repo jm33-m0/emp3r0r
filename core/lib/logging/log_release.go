@@ -55,6 +55,10 @@ func Notify(level, format string, a ...any) {
 func SetBroadcastHandler(h func(level, msg string)) {
 }
 
+// SetDebugLevel is a no-op in release builds.
+func SetDebugLevel(level int) {
+}
+
 func Fatal(a ...any) {
 }
 

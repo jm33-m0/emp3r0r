@@ -179,6 +179,21 @@ func TestOperatorConnection(t *testing.T) {
 	clientpkg.HTTPClient = client
 	clientpkg.RootURL = fmt.Sprintf("https://127.0.0.1:%d", port)
 	clientpkg.SessionID = "test-operator-session"
+
+	// Verify the agent-list poll path (list_connected_agents) round-trips
+	// LastSeen correctly.
+	live.AgentControlMap.Store(&def.Emp3r0rAgent{UUID: "u-poll", Tag: "t-poll", LastSeen: time.Now()}, &live.AgentControl{Index: 0})
+	pollAgents, pollErr := clientpkg.GetAgentList()
+	if pollErr != nil {
+		t.Fatalf("GetAgentList failed: %v", pollErr)
+	}
+	if len(pollAgents) == 0 {
+		t.Fatal("GetAgentList returned no agents")
+	}
+	for _, a := range pollAgents {
+		t.Logf("GetAgentList: %s LastSeen=%v (%.0fs ago)", a.Tag, a.LastSeen, time.Since(a.LastSeen).Seconds())
+	}
+
 	msgConn, msgCtx, msgCancel, err := clientpkg.ConnectMsgTun()
 	if err != nil {
 		t.Fatalf("ConnectMsgTun failed: %v", err)

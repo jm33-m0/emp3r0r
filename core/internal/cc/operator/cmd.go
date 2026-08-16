@@ -69,6 +69,24 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			},
 		}
 		rootCmd.AddCommand(exitCmd)
+
+		resumeCmd := &cobra.Command{
+			Use:     "resume",
+			GroupID: "core",
+			Short:   "Reactivate the operator after idle timeout",
+			Long:    "Clear the server-side operator idle state so agents can reconnect. Use this if agents were disconnected due to operator idle timeout.",
+			Args:    cobra.NoArgs,
+			Run: func(cmd *cobra.Command, args []string) {
+				if err := client.ResumeOperator(); err != nil {
+					logging.Errorf("Failed to resume operator: %v", err)
+					return
+				}
+				logging.Successf("Operator resumed. Agents may reconnect.")
+				safeRefreshAgentList()
+			},
+		}
+		rootCmd.AddCommand(resumeCmd)
+
 		// this command will be used to generate an agent binary
 		rootCmd.AddCommand(gen_agent_cmd())
 

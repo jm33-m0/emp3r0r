@@ -22,6 +22,14 @@ import (
 
 const maxCmdResultCacheBytes = 1024 * 1024 // 1 MiB
 
+// handshakeTimeout is the maximum silence allowed on a message tunnel before
+// it is torn down. It is a var so tests can shorten it.
+var handshakeTimeout = 10 * time.Minute
+
+// handshakeCheckInterval is how often the tunnel checks the handshake timer.
+// It is a var so tests can shorten it.
+var handshakeCheckInterval = 20 * time.Second
+
 // handleMessageTunnelStream is the protocol-native message tunnel handler.
 // It is transport-agnostic and only depends on a bidirectional byte stream.
 // secureConn is already authenticated and its first frame (MsgAuth) consumed by dec.
@@ -38,19 +46,48 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 	atomic.StoreInt64(&lastHandshake, time.Now().Unix())
 
 	ctx, cancel := context.WithCancel(baseCtx)
+	if logging.Level >= 4 {
+		logging.Debugf("handleMessageTunnel: stream start uuid=%s remote=%s", initialAgentUUID, remoteAddr)
+	}
 	var wg sync.WaitGroup
 	defer func() {
 		logging.Debugf("handleMessageTunnel exiting")
-		cancel()  // Signal goroutine to stop
-		wg.Wait() // Wait for goroutine to finish before returning
-		if t, _, key, found := agents.RuntimeControlByConn(secureConn); found {
-			live.AgentControlMap.Delete(key)
-			if endErr := agents.EndSession(t.UUID); endErr != nil {
-				logging.Debugf("handleMessageTunnel: end session for %s failed: %v", strconv.Quote(t.UUID), endErr)
-			}
-			operatorBroadcastPrintf(logging.ERROR, "Agent dies... %s is disconnected", strconv.Quote(t.Name))
-		}
+		cancel() // Signal goroutine to stop
+		// Close the connection BEFORE waiting for the read goroutine.
+		// The goroutine blocks on dec.Decode() reading from this conn, so
+		// without closing first wg.Wait() would deadlock until the agent
+		// happens to send another frame (e.g. a command response).
 		_ = secureConn.Close()
+		wg.Wait() // Wait for goroutine to finish before returning
+
+		agent, ctrl, key, found := agents.RuntimeControlByConn(secureConn)
+		if !found {
+			// The agent may have been admitted but never sent a frame on this
+			// tunnel (e.g. operator idle teardown before the first hello). In
+			// that case ctrl.Conn is still nil and RuntimeControlByConn cannot
+			// find it; fall back to the authenticated UUID so it is removed
+			// from the operator-facing list instead of showing a stale,
+			// ever-growing LastSeen.
+			agent, ctrl, key, found = agents.RuntimeControlByUUID(authAgentUUID)
+			if found && ctrl != nil && ctrl.Conn != nil && ctrl.Conn != secureConn {
+				found = false // another live tunnel owns this agent
+			}
+		}
+		if logging.Level >= 4 {
+			ctrlConnNil := ctrl == nil || ctrl.Conn == nil
+			logging.Debugf("handleMessageTunnel: teardown uuid=%s found=%v ctrlConnNil=%v", authAgentUUID, found, ctrlConnNil)
+		}
+		if found {
+			live.AgentControlMap.Delete(key)
+			if endErr := agents.EndSession(agent.UUID); endErr != nil {
+				logging.Debugf("handleMessageTunnel: end session for %s failed: %v", strconv.Quote(agent.UUID), endErr)
+			}
+			name := agent.Name
+			if name == "" {
+				name = agent.Tag
+			}
+			operatorBroadcastPrintf(logging.ERROR, "Agent dies... %s is disconnected", strconv.Quote(name))
+		}
 		logging.Debugf("handleMessageTunnel exited")
 	}()
 	// Track PFS state for this connection
@@ -144,6 +181,18 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 					sessionStarted = true
 				}
 
+				seenAt := time.Now()
+				atomic.StoreInt64(&lastHandshake, seenAt.Unix())
+				agents.MarkAgentSeenByUUID(authAgentUUID, seenAt)
+				if agent := agents.GetAgentByUUID(authAgentUUID); agent != nil {
+					if err := agents.UpdateAgentLastSeen(agent.UUID, seenAt); err != nil {
+						logging.Warningf("handleMessageTunnel: persist last_seen for %s failed: %v", agent.UUID, err)
+					}
+				}
+				if logging.Level >= 4 {
+					logging.Debugf("handleMessageTunnel: MsgAuth keepalive uuid=%s lastHandshake=%d", authAgentUUID, seenAt.Unix())
+				}
+
 				continue
 			}
 
@@ -171,8 +220,25 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			// match authenticated agent
 			agent := agents.GetAgentByUUID(authAgentUUID)
 			if agent == nil {
-				logging.Errorf("handleMessageTunnel: No agent found for authenticated UUID %s", strconv.Quote(authAgentUUID))
-				return
+				if stored, err := agents.GetStoredAgent(authAgentUUID); err == nil && stored != nil {
+					agent = &def.Emp3r0rAgent{
+						UUID:      stored.UUID,
+						Tag:       stored.Tag,
+						UUIDSig:   stored.UUIDSig,
+						PublicKey: stored.PublicKey,
+						Hostname:  stored.Hostname,
+						OS:        stored.OS,
+						Arch:      stored.Arch,
+						User:      stored.User,
+						From:      remoteAddr,
+					}
+				} else {
+					agent = &def.Emp3r0rAgent{
+						UUID: authAgentUUID,
+						Tag:  authAgentUUID,
+						From: remoteAddr,
+					}
+				}
 			}
 
 			// SECURITY: prevent session hijacking where authenticated Agent A tries to send CBOR for Agent B
@@ -180,35 +246,50 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 				logging.Errorf("CRITICAL: SECURITY: Agent %s attempted to hijack session for UUID %s", strconv.Quote(authAgentUUID), strconv.Quote(msg.AgentUUID))
 				return
 			}
-			if msg.Tag != "" && msg.Tag != agent.Tag {
+			if msg.Tag != "" && agent.Tag != "" && msg.Tag != agent.Tag {
 				logging.Errorf("CRITICAL: SECURITY: Agent %s attempted to hijack session for Tag %s", strconv.Quote(authAgentUUID), strconv.Quote(msg.Tag))
 				return
 			}
 
 			// Agent authentication is payload-authoritative via MsgAuth / signed MsgTunData.
 			shortname := agent.Name
-			if val, ok := live.AgentControlMap.Load(agent); ok {
-				ctrl := val.(*live.AgentControl)
-				if ctrl.Conn == nil {
-					operatorBroadcastPrintf(logging.SUCCESS,
-						"Knock.. Knock... Agent %s is connected",
-						strconv.Quote(shortname))
-				}
-				// Update control info and publish via Store to ensure memory visibility
-				ctrl.Conn = secureConn
-				ctrl.Ctx = ctx
-				ctrl.Cancel = cancel
-				live.AgentControlMap.Store(agent, ctrl)
+			if shortname == "" {
+				shortname = agent.Tag
 			}
+			var ctrl *live.AgentControl
+			if val, ok := live.AgentControlMap.Load(agent); ok {
+				ctrl = val.(*live.AgentControl)
+			} else {
+				ctrl = &live.AgentControl{Index: agents.AssignAgentIndex()}
+			}
+			if ctrl.Conn == nil {
+				operatorBroadcastPrintf(logging.SUCCESS,
+					"Knock.. Knock... Agent %s is connected",
+					strconv.Quote(shortname))
+			}
+			now := time.Now()
+			agents.MarkAgentSeen(agent, now)
+			if logging.Level >= 4 {
+				logging.Debugf("handleMessageTunnel: authenticated frame uuid=%s tag=%q cmd=%d resp=%d job=%q", authAgentUUID, msg.Tag, len(msg.CmdSlice), len(msg.Response), msg.JobID)
+			}
+			// Update control info and publish via Store to ensure memory visibility
+			ctrl.Conn = secureConn
+			ctrl.Ctx = ctx
+			ctrl.Cancel = cancel
+			live.AgentControlMap.Store(agent, ctrl)
 
-			agent.LastSeen = time.Now()
-			if err := agents.UpdateAgentLastSeen(agent.UUID, agent.LastSeen); err != nil {
+			// Any authenticated frame (keep-alive hello OR command response)
+			// proves the agent is still alive, so refresh the handshake timer
+			// here too. Otherwise an agent that answers commands but whose
+			// keep-alive loop stalls would be wrongly timed out after 10m.
+			atomic.StoreInt64(&lastHandshake, now.Unix())
+			if err := agents.UpdateAgentLastSeen(agent.UUID, now); err != nil {
 				logging.Warningf("handleMessageTunnel: persist last_seen for %s failed: %v", agent.UUID, err)
 			}
 			if msg.Time != "" {
-				start_time, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", msg.Time)
+				startTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", msg.Time)
 				if err == nil {
-					agent.LastSeenRTT = time.Since(start_time)
+					agents.MarkAgentRTT(agent, time.Since(startTime))
 				}
 			}
 			// handshake (hello) message has empty CmdSlice or just random data
@@ -216,6 +297,9 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			// here we just respond to keep-alive if it matches any criteria
 			// or if it's explicitly a hello
 			if msg.Response == nil && len(msg.CmdSlice) > 0 {
+				if logging.Level >= 4 {
+					logging.Debugf("handleMessageTunnel: hello received uuid=%s job=%q cmd=%d", authAgentUUID, msg.JobID, len(msg.CmdSlice))
+				}
 				// Check if context is still valid before writing
 				if ctx.Err() != nil {
 					logging.Debugf("Context cancelled, skipping handshake response")
@@ -274,8 +358,6 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 					logging.Warningf("handleMessageTunnel: %v", err)
 				}
 
-				atomic.StoreInt64(&lastHandshake, time.Now().Unix())
-
 				// Issue AgentToken if missing or expiring within 6 hours.
 				// Trust condition: agent has a live MsgTun session (checked-in + communicating).
 				needsToken := agent.AgentToken == nil ||
@@ -328,11 +410,15 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 				}
 
 				if ownerSession, ok := getJobOwner(msg.JobID); ok {
-					err = fwdMsgToOperator(ownerSession, msg)
-					if err != nil {
-						logging.Warningf("handleMessageTunnel: targeted relay failed for job %s owner %s: %v", strconv.Quote(msg.JobID), strconv.Quote(ownerSession), err)
-						return
-					}
+					// Forward asynchronously. A slow/stuck operator must not block
+					// this goroutine, otherwise keep-alive hellos stop being
+					// processed and the agent is falsely timed out after 10m.
+					msgCopy := msg
+					go func() {
+						if relayErr := fwdMsgToOperator(ownerSession, msgCopy); relayErr != nil {
+							logging.Warningf("handleMessageTunnel: targeted relay failed for job %s owner %s: %v", strconv.Quote(msgCopy.JobID), strconv.Quote(ownerSession), relayErr)
+						}
+					}()
 					continue
 				}
 				logging.Warningf("CRITICAL: no operator owner for job response %s from agent %s", strconv.Quote(msg.JobID), strconv.Quote(authAgentUUID))
@@ -345,7 +431,7 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			}
 		}
 	})
-	ticker := time.NewTicker(20 * time.Second)
+	ticker := time.NewTicker(handshakeCheckInterval)
 	defer ticker.Stop()
 	for {
 		select {
@@ -355,12 +441,20 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			// Tear down tunnels when the operator goes offline or idle. The
 			// agent will back off and retry later, and the C2 will admit it only
 			// once the operator is online/active again.
-			if !operatorIsActive() {
+			operatorActive := operatorIsActive()
+			operatorOnlineNow := operatorOnline()
+			lastHandshakeAge := time.Since(time.Unix(atomic.LoadInt64(&lastHandshake), 0))
+			if logging.Level >= 4 {
+				logging.Debugf("handleMessageTunnel: ticker uuid=%s operatorOnline=%v operatorActive=%v lastHandshakeAge=%s", authAgentUUID, operatorOnlineNow, operatorActive, lastHandshakeAge)
+			}
+			if !operatorActive {
+				if operatorOnlineNow {
+					maybeNotifyOperatorIdle()
+				}
 				logging.Infof("handleMessageTunnel: operator offline/idle, closing tunnel for agent %s", strconv.Quote(authAgentUUID))
 				return
 			}
-			lastHandshakeTime := time.Unix(atomic.LoadInt64(&lastHandshake), 0)
-			if time.Since(lastHandshakeTime) > 10*time.Minute {
+			if lastHandshakeAge > handshakeTimeout {
 				operatorBroadcastPrintf(logging.WARN, "handleMessageTunnel: timeout for agent %s", strconv.Quote(authAgentUUID))
 				return
 			}
