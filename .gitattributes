@@ -32,6 +32,8 @@
 *.ttf binary
 
 # Vendored/third-party
+
+core/modules/CS-Situational-Awareness-BOF/** linguist-vendored
 core/modules/Kerbeus-BOF/** linguist-vendored
 core/modules/Remote-OPs/** linguist-vendored
 core/modules/SA/** linguist-vendored
