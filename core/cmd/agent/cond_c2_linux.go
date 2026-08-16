@@ -8,7 +8,6 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // conditionalC2FailNotify tells the parent (stager/loader) to recycle us.
@@ -19,7 +18,6 @@ func conditionalC2FailNotify() {
 		os.Exit(0)
 	}
 
-	// Otherwise, just wait and retry
-	logging.Warningf("Connection failed, sleeping...")
-	util.TakeASnap() // sleeps for random interval
+	// Otherwise, back off and retry
+	takeC2Backoff()
 }
