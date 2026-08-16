@@ -1,5 +1,34 @@
 # Changelog
 
+## [4.10.0](https://github.com/jm33-m0/emp3r0r/compare/v4.9.2...v4.10.0) (2026-08-16)
+
+
+### Features
+
+* add SA BOF ([7e3046c](https://github.com/jm33-m0/emp3r0r/commit/7e3046ce8662e3924e208acd8f03221d79359607))
+* add Vectored Exception Handler for COFF/BOF execution safety on Windows ([50d7d27](https://github.com/jm33-m0/emp3r0r/commit/50d7d276a6ca224daa235cb82f6fce0565706c88))
+* add Windows build steps for COFFLoader and BOF fixtures ([43cada0](https://github.com/jm33-m0/emp3r0r/commit/43cada001a3719f5448f1388c494d3df5cae8af8))
+* adopt coffloader for Windows BOF loading ([2ad97fd](https://github.com/jm33-m0/emp3r0r/commit/2ad97fd00e4c0e084520358130af29daa898f9c0))
+* **agent:** add exponential reconnect backoff ([61344d7](https://github.com/jm33-m0/emp3r0r/commit/61344d7a4be054cb5a30353d4faaac1d264ebd71))
+* coffloader module from Sliver ([f8843da](https://github.com/jm33-m0/emp3r0r/commit/f8843da8e9a61ad922478eed8c4fd8f53549a005))
+* **config:** add operator idle timeout option ([37df3d5](https://github.com/jm33-m0/emp3r0r/commit/37df3d578c6244134e5e0e737d9cde1e00667ac1))
+* **config:** default operator idle timeout to 30 minutes ([7f036d7](https://github.com/jm33-m0/emp3r0r/commit/7f036d77054055a59b18db9bf12b30ef5e12653e))
+* fork `memmod` from wireguard-windows and make it use indirect syscalls ([a87b487](https://github.com/jm33-m0/emp3r0r/commit/a87b4872848028d67c8a4f6c3f96f27f45c1003e))
+* implement CRT symbol resolution for bare imports on Windows ([c88d9ed](https://github.com/jm33-m0/emp3r0r/commit/c88d9edade8b7568163cfdfad64fe21d3f7c0eb4))
+* implement operator idle tracking and enhance command dispatch logging ([57e9e07](https://github.com/jm33-m0/emp3r0r/commit/57e9e072323c5c5374634dc92c613cf5cd85dfb8))
+* selective build (only builds selected payload types to save time) ([92912e2](https://github.com/jm33-m0/emp3r0r/commit/92912e234f89b05bfbe618b43bfa8ae9264d8103))
+* **server:** enforce operator-idle admission and queue commands ([c409209](https://github.com/jm33-m0/emp3r0r/commit/c409209611e7d532bf098abeb8899faacf53d233))
+* **server:** gate all agent routes on operator presence and idle ([5bae8a0](https://github.com/jm33-m0/emp3r0r/commit/5bae8a0a4e97cabf22c7dd1b3d827b232da1fe7b))
+
+
+### Bug Fixes
+
+* ensure COFF arguments are packed with zero values when missing ([7b126bf](https://github.com/jm33-m0/emp3r0r/commit/7b126bfb75f14a90272d36b9b65e930a5262ed88))
+* operator idle timeout handling and last-seen consistency ([9de5a28](https://github.com/jm33-m0/emp3r0r/commit/9de5a28f9930cd7ef9ecbe353253ac3615691bf4))
+* **operator:** use fresh agent entry for last seen status ([cb78da0](https://github.com/jm33-m0/emp3r0r/commit/cb78da0ece83767f7b179caa34d9453ab80edb26))
+* **server:** reject check-in payload UUID mismatches ([342c9b2](https://github.com/jm33-m0/emp3r0r/commit/342c9b286cb89d9d65028c12fa0a39d788d4e437))
+* Starlark argument handling ([285ef18](https://github.com/jm33-m0/emp3r0r/commit/285ef1833cf485859940e61261853aa428cf2fd4))
+
 ## [4.9.2](https://github.com/jm33-m0/emp3r0r/compare/v4.9.1...v4.9.2) (2026-08-10)
 
 
