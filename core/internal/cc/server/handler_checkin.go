@@ -42,7 +42,8 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 		return fmt.Errorf("forbidden: empty uuid")
 	}
 	if agentUUID != "" && target.UUID != agentUUID {
-		logging.Errorf("CRITICAL: handleAgentCheckIn: compatibility route/body UUID mismatch: body=%s route=%s", strconv.Quote(target.UUID), strconv.Quote(agentUUID))
+		logging.Errorf("CRITICAL: handleAgentCheckIn: route/body UUID mismatch: body=%s route=%s", strconv.Quote(target.UUID), strconv.Quote(agentUUID))
+		return fmt.Errorf("forbidden: uuid mismatch")
 	}
 
 	// ── Rate limiting: cap ALL log/alert output per UUID ─────────────────────
