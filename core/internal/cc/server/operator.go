@@ -502,6 +502,9 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 	operator.conn = conn
 	OPERATORS.Store(operator_session, operator)
 
+	// A fresh operator connection resets the idle timer.
+	touchOperatorCommand()
+
 	ctx, cancel := context.WithCancel(req.Context())
 	readDone := make(chan struct{})
 	go func() {

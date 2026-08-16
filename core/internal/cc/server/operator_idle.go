@@ -8,16 +8,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
-// shouldAdmitAgentForMsg decides whether an agent's message-tunnel connection
-// should be admitted. While the operator is active the connection is always
-// admitted; otherwise it is admitted only when the agent has queued commands.
-func shouldAdmitAgentForMsg(agentUUID string) bool {
-	if operatorIsActive() {
-		return true
-	}
-	return hasQueuedCommands(agentUUID)
-}
-
 // agentCommandQueue is a per-agent FIFO of MsgTunData commands awaiting a live
 // message tunnel.
 type agentCommandQueue struct {

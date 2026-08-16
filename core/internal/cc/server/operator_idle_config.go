@@ -21,9 +21,43 @@ func touchOperatorCommand() {
 	atomic.StoreInt64(&lastOperatorCommand, time.Now().UnixNano())
 }
 
-// operatorIsActive reports whether the operator is still within the configured
-// idle timeout. A non-positive timeout disables idle-based rejection.
+// operatorOnline reports whether at least one operator message tunnel is
+// currently connected to the C2.
+func operatorOnline() bool {
+	online := false
+	OPERATORS.Range(func(_, _ any) bool {
+		online = true
+		return false
+	})
+	return online
+}
+
+// MarkOperatorOnline registers an operator session in the OPERATORS map and
+// resets the idle timer. It is useful for tests and embedders that do not run
+// the full operator message-tunnel handshake.
+func MarkOperatorOnline(session string) {
+	if session == "" {
+		session = "test-operator"
+	}
+	OPERATORS.Store(session, &operator_t{sessionID: session})
+	touchOperatorCommand()
+}
+
+// MarkOperatorOffline removes an operator session from the OPERATORS map.
+func MarkOperatorOffline(session string) {
+	if session == "" {
+		session = "test-operator"
+	}
+	OPERATORS.Delete(session)
+}
+
+// operatorIsActive reports whether the operator is online and still within the
+// configured idle timeout. A non-positive timeout disables idle-based rejection
+// while the operator remains online.
 func operatorIsActive() bool {
+	if !operatorOnline() {
+		return false
+	}
 	timeout := live.RuntimeConfig.OperatorIdleTimeout
 	if timeout <= 0 {
 		return true

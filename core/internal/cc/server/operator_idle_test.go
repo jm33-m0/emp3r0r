@@ -43,6 +43,13 @@ func TestOperatorIsActive(t *testing.T) {
 	oldTimeout := live.RuntimeConfig.OperatorIdleTimeout
 	defer func() { live.RuntimeConfig.OperatorIdleTimeout = oldTimeout }()
 
+	if operatorOnline() {
+		t.Fatal("expected no operator to be online before test setup")
+	}
+
+	OPERATORS.Store("test-operator", &operator_t{sessionID: "test-operator"})
+	defer OPERATORS.Delete("test-operator")
+
 	live.RuntimeConfig.OperatorIdleTimeout = 1
 	atomic.StoreInt64(&lastOperatorCommand, 0)
 	if operatorIsActive() {
@@ -57,5 +64,10 @@ func TestOperatorIsActive(t *testing.T) {
 	live.RuntimeConfig.OperatorIdleTimeout = 0
 	if !operatorIsActive() {
 		t.Fatal("expected operator to be active when idle timeout is disabled")
+	}
+
+	OPERATORS.Delete("test-operator")
+	if operatorIsActive() {
+		t.Fatal("expected operator to be inactive when offline")
 	}
 }

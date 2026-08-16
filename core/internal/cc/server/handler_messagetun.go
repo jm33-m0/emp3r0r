@@ -352,11 +352,11 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			// Tear down idle tunnels: if the operator is idle and there is no
-			// queued work for this agent, close the tunnel so the agent backs
-			// off instead of holding an idle connection.
-			if !operatorIsActive() && !hasQueuedCommands(authAgentUUID) {
-				logging.Infof("handleMessageTunnel: operator idle, closing tunnel for agent %s", strconv.Quote(authAgentUUID))
+			// Tear down tunnels when the operator goes offline or idle. The
+			// agent will back off and retry later, and the C2 will admit it only
+			// once the operator is online/active again.
+			if !operatorIsActive() {
+				logging.Infof("handleMessageTunnel: operator offline/idle, closing tunnel for agent %s", strconv.Quote(authAgentUUID))
 				return
 			}
 			lastHandshakeTime := time.Unix(atomic.LoadInt64(&lastHandshake), 0)
