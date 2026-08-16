@@ -9,7 +9,7 @@ shared objects, BOFs, and custom modules. Performs local system installation,
 operator bundle packaging, and uninstallation.
 
 Usage:
-  python3 build.py [COMMAND]
+  python3 build.py [COMMAND] [OPTIONS]
 
 Commands:
   --build             Build binaries and agent stubs in temp directory
@@ -20,9 +20,27 @@ Commands:
   --uninstall         Remove installed files and completions from install prefix
   --package-operator  Package existing installed files into emp3r0r-operator-kit.tar.zst
 
+Target selection options (combinable with any build command):
+  --lightweight       Build only linux/amd64 and windows/amd64 exe/dll targets.
+                      Much faster than a full build; ideal for development and
+                      quick deployments that only need x86-64 coverage.
+  --targets OS/ARCH[,OS/ARCH,...]
+                      Comma-separated list of exact OS/arch targets to build.
+                      Examples:
+                        --targets linux/amd64
+                        --targets linux/amd64,windows/amd64,windows/386
+                      Recognised OS values : linux, windows
+                      Recognised arch values: amd64, 386, arm, arm64, mips,
+                                              mips64, riscv64, ppc64
+                      The special token "shared" selects all shared-object
+                      (.so/.dll) variants for the matched targets.
+                      C2 server binaries (cc, cat, listener) are always built.
+
 Environment variables:
   EMP3R0R_DISABLE_GARBLE=1   Disable garble obfuscation for non-debug builds
   PREFIX=/usr/local          Custom install prefix
+  EMP3R0R_TARGETS            Comma-separated targets (same format as --targets)
+  EMP3R0R_LIGHTWEIGHT=1      Equivalent to --lightweight
 """
 
 import argparse
@@ -427,7 +445,90 @@ def build_shared_object(
         log_error(f"Failed to build shared object for {os_name} {arch}")
 
 
-def build(arg1: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> None:
+# ---------------------------------------------------------------------------
+# Target filter helpers
+# ---------------------------------------------------------------------------
+
+# Lightweight preset: linux/amd64 exe+so and windows/amd64 exe+dll.
+LIGHTWEIGHT_TARGETS: frozenset[str] = frozenset({
+    "linux/amd64",
+    "windows/amd64",
+})
+
+
+def parse_targets(targets_str: str) -> frozenset[str]:
+    """Parse a comma-separated 'os/arch' target string into a frozenset.
+
+    Each token must be in the form 'OS/ARCH'. Case is normalised to lowercase.
+    An empty string or None returns an empty frozenset (= build all targets).
+    """
+    if not targets_str:
+        return frozenset()
+    tokens = {t.strip().lower() for t in targets_str.split(",") if t.strip()}
+    valid_os = {"linux", "windows"}
+    valid_arch = {"amd64", "386", "arm", "arm64", "mips", "mips64", "riscv64", "ppc64"}
+    for tok in tokens:
+        parts = tok.split("/")
+        if len(parts) != 2 or parts[0] not in valid_os or parts[1] not in valid_arch:
+            log_error(
+                f"Invalid target '{tok}'. Expected 'OS/ARCH', e.g. 'linux/amd64'. "
+                f"Valid OS: {sorted(valid_os)}, valid ARCH: {sorted(valid_arch)}"
+            )
+    return frozenset(tokens)
+
+
+def want_target(os_name: str, arch: str, target_filter: frozenset[str]) -> bool:
+    """Return True if the given OS/arch combination should be built.
+
+    An empty filter means 'build everything'.
+    """
+    if not target_filter:
+        return True
+    return f"{os_name}/{arch}" in target_filter
+
+
+def resolve_target_filter(args: "argparse.Namespace") -> frozenset[str]:
+    """Determine the effective target filter from CLI args and env vars.
+
+    Priority (highest first):
+      1. --lightweight flag
+      2. EMP3R0R_LIGHTWEIGHT=1 env var
+      3. --targets CLI option
+      4. EMP3R0R_TARGETS env var
+      5. Empty set (build all)
+    """
+    if getattr(args, "lightweight", False) or os.environ.get("EMP3R0R_LIGHTWEIGHT", "0").lower() in ("1", "true", "yes"):
+        log_info(f"Lightweight build: restricting targets to {sorted(LIGHTWEIGHT_TARGETS)}")
+        return LIGHTWEIGHT_TARGETS
+
+    raw = getattr(args, "targets", None) or os.environ.get("EMP3R0R_TARGETS", "")
+    if raw:
+        filt = parse_targets(raw)
+        log_info(f"Target filter active: {sorted(filt)}")
+        return filt
+
+    return frozenset()  # build all
+
+
+# ---------------------------------------------------------------------------
+# Core build function
+# ---------------------------------------------------------------------------
+
+def build(arg1: str, temp_dir: pathlib.Path, core_dir: pathlib.Path,
+          target_filter: frozenset[str] | None = None) -> None:
+    """Build all emp3r0r components.
+
+    Args:
+        arg1: Build mode flag (``--debug``, ``--install``, ``--release``, …).
+        temp_dir: Temporary staging directory for build artefacts.
+        core_dir: Root of the ``core/`` source tree.
+        target_filter: Set of ``'os/arch'`` strings that restrict which agent
+            stubs and shared objects are built.  An empty set or ``None`` means
+            build every target (default full build).
+    """
+    if target_filter is None:
+        target_filter = frozenset()
+
     check_build_toolchain()
     go_bin = check_required_go()
     check_disk_space(core_dir)
@@ -477,7 +578,12 @@ def build(arg1: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> None:
             if not shutil.which("garble"):
                 log_error("garble not found. It should be installed in the builder container.")
 
-    # Build CC
+    if target_filter:
+        log_info(f"Active target filter: {sorted(target_filter)} — skipping all other stubs")
+    else:
+        log_info("No target filter: building all platforms")
+
+    # ── C2 server binaries (always built, no target filter) ──────────────────
     log_info("Building CC")
     env_cgo0 = os.environ.copy()
     env_cgo0["CGO_ENABLED"] = "0"
@@ -486,14 +592,12 @@ def build(arg1: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> None:
     if res.returncode != 0:
         log_error("Failed to build CC")
 
-    # Build cat
     log_info("Building cat")
     cat_cmd = f"{go_bin} build {mod_opt} -buildvcs=false -o \"{temp_dir / 'cat.exe'}\" -ldflags=\"{ldflags}\""
     res = run_cmd(cat_cmd, check=False, cwd=core_dir / "cmd" / "cat", env=env_cgo0, shell=True)
     if res.returncode != 0:
         log_error("Failed to build cat")
 
-    # Build listener
     log_info("Building listener")
     listener_cmd = f"{go_bin} build {mod_opt} -buildvcs=false -o \"{temp_dir / 'listener.exe'}\" -ldflags=\"{ldflags}\""
     res = run_cmd(listener_cmd, check=False, cwd=core_dir / "cmd" / "listener", env=env_cgo0, shell=True)
@@ -506,35 +610,55 @@ def build(arg1: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> None:
     pie_flags = "-buildmode=pie"
     ext_pie = "-static-pie"
 
-    # Agent stubs
-    build_agent_cgo("amd64", "linux", "stub-amd64", pie_flags, ext_pie, arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
-    build_agent_cgo("386", "linux", "stub-386", pie_flags, ext_pie, arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
-    build_agent_pure("arm", "linux", "stub-arm", "", "", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
-    build_agent_cgo("arm64", "linux", "stub-arm64", pie_flags, ext_pie, arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+    # Helper so call-sites stay readable.
+    def _want(os_name: str, arch: str) -> bool:
+        return want_target(os_name, arch, target_filter)
 
-    build_agent_pure("mips", "linux", "stub-mips", "", "", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
-    build_agent_pure("mips64", "linux", "stub-mips64", "", "", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+    # ── Linux agent stubs ────────────────────────────────────────────────────
+    if _want("linux", "amd64"):
+        build_agent_cgo("amd64", "linux", "stub-amd64", pie_flags, ext_pie, arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+    if _want("linux", "386"):
+        build_agent_cgo("386", "linux", "stub-386", pie_flags, ext_pie, arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+    if _want("linux", "arm"):
+        build_agent_pure("arm", "linux", "stub-arm", "", "", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+    if _want("linux", "arm64"):
+        build_agent_cgo("arm64", "linux", "stub-arm64", pie_flags, ext_pie, arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+    if _want("linux", "mips"):
+        build_agent_pure("mips", "linux", "stub-mips", "", "", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+    if _want("linux", "mips64"):
+        build_agent_pure("mips64", "linux", "stub-mips64", "", "", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+    if _want("linux", "riscv64"):
+        build_agent_cgo("riscv64", "linux", "stub-riscv64", pie_flags, ext_pie, arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+    if _want("linux", "ppc64"):
+        build_agent_pure("ppc64", "linux", "stub-ppc64", "", "", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
 
-    build_agent_cgo("riscv64", "linux", "stub-riscv64", pie_flags, ext_pie, arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
-    build_agent_pure("ppc64", "linux", "stub-ppc64", "", "", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+    # ── Windows agent stubs ──────────────────────────────────────────────────
+    if _want("windows", "amd64"):
+        build_agent_pure("amd64", "windows", "stub-win-amd64", "", "", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+    if _want("windows", "386"):
+        build_agent_pure("386", "windows", "stub-win-386", "", "", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+    if _want("windows", "arm64"):
+        build_agent_pure("arm64", "windows", "stub-win-arm64", "", "", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
 
-    # Windows stubs
-    build_agent_pure("amd64", "windows", "stub-win-amd64", "", "", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
-    build_agent_pure("386", "windows", "stub-win-386", "", "", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
-    build_agent_pure("arm64", "windows", "stub-win-arm64", "", "", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+    # ── Shared Objects ───────────────────────────────────────────────────────
+    if _want("windows", "amd64"):
+        build_shared_object("amd64", "windows", "stub-win-amd64.dll", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+    if _want("windows", "386"):
+        build_shared_object("386", "windows", "stub-win-386.dll", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+    if _want("windows", "arm64"):
+        build_shared_object("arm64", "windows", "stub-win-arm64.dll", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+    if _want("linux", "amd64"):
+        build_shared_object("amd64", "linux", "stub-amd64.so", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+    if _want("linux", "386"):
+        build_shared_object("386", "linux", "stub-386.so", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+    if _want("linux", "arm"):
+        build_shared_object("arm", "linux", "stub-arm.so", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+    if _want("linux", "riscv64"):
+        build_shared_object("riscv64", "linux", "stub-riscv64.so", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
 
-    # Shared Objects
-    build_shared_object("amd64", "windows", "stub-win-amd64.dll", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
-    build_shared_object("386", "windows", "stub-win-386.dll", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
-    build_shared_object("arm64", "windows", "stub-win-arm64.dll", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
-    build_shared_object("amd64", "linux", "stub-amd64.so", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
-    build_shared_object("386", "linux", "stub-386.so", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
-    build_shared_object("arm", "linux", "stub-arm.so", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
-    build_shared_object("riscv64", "linux", "stub-riscv64.so", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
-
-    # Build modules with a make_all.sh wrapper.
-    # EMP3R0R_DEBUG is passed to every module so any module that supports a
-    # debug build (e.g. coffloader's -DDEBUG) can opt in for --debug builds.
+    # ── Modules (make_all.sh) — always run, target-filtering not applicable ──
+    # Native modules are OS/arch-agnostic build artefacts (BOFs, etc.) so we
+    # do not suppress them based on the target filter.
     log_info("Building complex modules with make_all.sh...")
     modules_dir = core_dir / "modules"
     module_env = os.environ.copy()
@@ -815,6 +939,36 @@ def parse_args() -> argparse.Namespace:
     group.add_argument("--uninstall", action="store_true", help="Remove installed files and completions")
     group.add_argument("--package-operator", action="store_true", help="Package existing install into operator kit")
     parser.add_argument("--dry-run", action="store_true", help="Print build and setup commands without executing them")
+
+    # ── Target selection ─────────────────────────────────────────────────────
+    tgt_group = parser.add_argument_group(
+        "target selection",
+        "Restrict which agent stubs/shared-objects are compiled. "
+        "C2 binaries (cc, cat, listener) are always built.",
+    )
+    tgt_excl = tgt_group.add_mutually_exclusive_group()
+    tgt_excl.add_argument(
+        "--lightweight",
+        action="store_true",
+        default=False,
+        help=(
+            "Build only linux/amd64 and windows/amd64 exe/dll targets. "
+            "Fastest preset — ideal for development or x86-64-only deployments. "
+            "Equivalent to --targets linux/amd64,windows/amd64."
+        ),
+    )
+    tgt_excl.add_argument(
+        "--targets",
+        metavar="OS/ARCH[,OS/ARCH,...]",
+        default="",
+        help=(
+            "Comma-separated list of OS/arch targets to build, e.g. "
+            "'linux/amd64,windows/amd64,windows/386'. "
+            "Valid OS values: linux, windows. "
+            "Valid arch values: amd64, 386, arm, arm64, mips, mips64, riscv64, ppc64."
+        ),
+    )
+
     return parser.parse_args()
 
 
@@ -847,19 +1001,22 @@ def main() -> None:
     elif args.install_only:
         mode = "--install-only"
 
+    # Resolve which agent targets to build (may be an empty set = all).
+    target_filter = resolve_target_filter(args)
+
     with tempfile.TemporaryDirectory(prefix="emp3r0r-build-") as tmp_dir:
         temp_dir = pathlib.Path(tmp_dir)
 
         if mode == "--release":
-            build(mode, temp_dir, core_dir)
+            build(mode, temp_dir, core_dir, target_filter)
             create_tar(core_dir, temp_dir)
         elif mode == "--build":
-            build(mode, temp_dir, core_dir)
+            build(mode, temp_dir, core_dir, target_filter)
         elif mode == "--install-only":
             do_install(prefix, temp_dir, core_dir)
             package_operator_bundle(prefix, core_dir)
         elif mode in ("--install", "--debug"):
-            build(mode, temp_dir, core_dir)
+            build(mode, temp_dir, core_dir, target_filter)
             prepare_misc_files(core_dir, temp_dir)
             do_install(prefix, temp_dir, core_dir)
             package_operator_bundle(prefix, core_dir)

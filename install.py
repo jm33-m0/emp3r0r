@@ -255,6 +255,7 @@ def docker_build(
     repo_root: pathlib.Path,
     build_arg: str,
     disable_garble: bool,
+    extra_build_flags: str = "",
 ) -> None:
     log_info(f"Using local source: {repo_root}")
 
@@ -288,7 +289,12 @@ def docker_build(
         build_env.extend(["-e", "EMP3R0R_DRY_RUN=1"])
         build_arg += " --dry-run"
 
-    build_env.extend(["-e", f"EMP3R0R_BUILD_ARG={build_arg}"])
+    # Append any extra target-selection flags (--lightweight / --targets ...)
+    full_build_arg = build_arg
+    if extra_build_flags:
+        full_build_arg = f"{build_arg} {extra_build_flags}"
+
+    build_env.extend(["-e", f"EMP3R0R_BUILD_ARG={full_build_arg}"])
 
     container_cmd = (
         "set -euo pipefail\n"
@@ -387,6 +393,34 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Print build and setup commands without executing them",
     )
+
+    # ── Target selection (forwarded verbatim to core/build.py) ───────────────
+    tgt_group = parser.add_argument_group(
+        "target selection",
+        "Restrict which agent stubs/shared-objects are compiled inside the "
+        "build container. C2 binaries (cc, cat, listener) are always built. "
+        "These flags are forwarded verbatim to core/build.py.",
+    )
+    tgt_excl = tgt_group.add_mutually_exclusive_group()
+    tgt_excl.add_argument(
+        "--lightweight",
+        action="store_true",
+        default=False,
+        help=(
+            "Build only linux/amd64 and windows/amd64 exe/dll targets. "
+            "Fastest preset — ideal for development or x86-64-only deployments."
+        ),
+    )
+    tgt_excl.add_argument(
+        "--targets",
+        metavar="OS/ARCH[,OS/ARCH,...]",
+        default="",
+        help=(
+            "Comma-separated list of OS/arch targets, e.g. "
+            "'linux/amd64,windows/amd64,windows/386'."
+        ),
+    )
+
     return parser.parse_args()
 
 
@@ -418,6 +452,14 @@ def main() -> None:
     if disable_garble:
         os.environ["EMP3R0R_DISABLE_GARBLE"] = "1"
 
+    # Build any extra target-selection flags to pass into core/build.py.
+    extra_build_flags = ""
+    if getattr(args, "lightweight", False):
+        extra_build_flags = "--lightweight"
+    elif getattr(args, "targets", ""):
+        # Shell-quote the targets string so spaces/commas survive the env var.
+        extra_build_flags = f"--targets {args.targets}"
+
     if args.skip_build:
         log_info("--skip-build: skipping Docker build, using cached operator kit")
         check_host_deps(script_dir)
@@ -426,7 +468,7 @@ def main() -> None:
         container_engine = detect_container_engine()
         check_host_deps(script_dir)
         log_info("Starting emp3r0r installation (Docker-based build from local source)")
-        docker_build(container_engine, script_dir, build_arg, disable_garble)
+        docker_build(container_engine, script_dir, build_arg, disable_garble, extra_build_flags)
         install_from_operator_kit(cached_kit, args.prefix)
 
     log_success(f"emp3r0r installed successfully to {args.prefix}")
