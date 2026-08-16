@@ -27,8 +27,10 @@ const (
 // input validation and, when the module is a COFF/BOF, for determining the
 // COFFLoader wire-packing token.
 //
-// Non-COFF types (starlark, bash, python, elf, …) use only the validation
-// semantics; the wire-packing semantics are silently ignored.
+// Starlark modules are dynamically typed: their parameters are passed to
+// main(*args) as positional strings without type coercion. Other non-COFF
+// types (bash, python, elf, …) use only the validation semantics; the
+// wire-packing semantics are silently ignored.
 //
 // Type vocabulary
 // ───────────────

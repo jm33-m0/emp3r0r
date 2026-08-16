@@ -10,6 +10,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/lib/script"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -185,6 +186,95 @@ func TestResolveInvocationMissingRequired(t *testing.T) {
 	if _, err := resolveInvocation(config, map[string]string{}); err == nil {
 		t.Fatalf("expected error for missing required option")
 	}
+}
+
+func TestResolveInvocationStarlarkArgsFlexible(t *testing.T) {
+	config := &def.ModuleConfig{
+		AgentConfig: def.AgentModuleConfig{Type: "starlark"},
+		Invocation: def.InvocationSpec{
+			Argv: []def.InvocationArg{
+				{Param: "filter"},
+				{Param: "attributes"},
+				{Param: "count"},
+				{Param: "scope"},
+				{Param: "hostname"},
+			},
+		},
+		Options: def.ModOptions{
+			"filter":     {Name: "filter", Type: "string", Val: "(objectclass=*)"},
+			"attributes": {Name: "attributes", Type: "string", Val: ""},
+			"count":      {Name: "count", Type: "int", Val: "0"},
+			"scope":      {Name: "scope", Type: "int", Val: "0"},
+			"hostname":   {Name: "hostname", Type: "int", Val: "not-an-int"},
+		},
+	}
+
+	// Starlark must receive positional args in declaration order, including
+	// empty optionals, and must not have typed values coerced/validated.
+	inv, err := resolveInvocation(config, map[string]string{})
+	if err != nil {
+		t.Fatalf("resolveInvocation: %v", err)
+	}
+	expected := []string{"(objectclass=*)", "", "0", "0", "not-an-int"}
+	if len(inv.Argv) != len(expected) {
+		t.Fatalf("expected %d argv entries, got %d: %v", len(expected), len(inv.Argv), inv.Argv)
+	}
+	for i := range expected {
+		if inv.Argv[i] != expected[i] {
+			t.Fatalf("argv[%d] = %q, want %q (full argv: %v)", i, inv.Argv[i], expected[i], inv.Argv)
+		}
+	}
+}
+
+func TestStarlarkArgPackingEndToEnd(t *testing.T) {
+	config := &def.ModuleConfig{
+		AgentConfig: def.AgentModuleConfig{Type: "starlark"},
+		Invocation: def.InvocationSpec{
+			Argv: []def.InvocationArg{
+				{Param: "filter"},
+				{Param: "attributes"},
+				{Param: "count"},
+				{Param: "scope"},
+				{Param: "hostname"},
+			},
+		},
+		Options: def.ModOptions{
+			"filter":     {Name: "filter", Type: "string", Val: "(objectclass=*)"},
+			"attributes": {Name: "attributes", Type: "string", Val: ""},
+			"count":      {Name: "count", Type: "int", Val: "0"},
+			"scope":      {Name: "scope", Type: "int", Val: "0"},
+			"hostname":   {Name: "hostname", Type: "int", Val: "not-an-int"},
+		},
+	}
+
+	inv, err := resolveInvocation(config, map[string]string{})
+	if err != nil {
+		t.Fatalf("resolveInvocation: %v", err)
+	}
+
+	// Run the resolved argv through the real starlark engine and make sure the
+	// script sees exactly the positional args we packed, including the empty
+	// optional and the un-coerced "not-an-int" value.
+	starSrc := `
+def main(*args):
+    print("ARGS:" + "|".join(args))
+    print("ARGV:" + "|".join(argv))
+    return "OK"
+`
+	out, err := script.Run([]byte(starSrc), inv.Argv, nil, 0)
+	if err != nil {
+		t.Fatalf("script.Run: %v", err)
+	}
+
+	expected := "ARGS:" + strings.Join(inv.Argv, "|")
+	if !strings.Contains(out, expected) {
+		t.Fatalf("starlark main received unexpected args\nwant substring: %q\ngot output:\n%s", expected, out)
+	}
+	expectedArgv := "ARGV:" + strings.Join(inv.Argv, "|")
+	if !strings.Contains(out, expectedArgv) {
+		t.Fatalf("starlark argv global has unexpected values\nwant substring: %q\ngot output:\n%s", expectedArgv, out)
+	}
+	t.Logf("starlark output:\n%s", out)
 }
 
 func TestResolveInvocationCOFFArgsAlwaysSatisfied(t *testing.T) {

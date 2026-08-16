@@ -832,26 +832,55 @@ func resolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.R
 		return renderOptionValue(opt, val)
 	}
 
+	// Starlark is dynamically typed: its main(*args) receives positional
+	// strings and scripts coerce values themselves (int(), bool(), ...). BOF
+	// arg packing (type validation, zero-filling, dropping empty args) must
+	// not apply here, because dropping an empty optional arg would shift every
+	// subsequent positional argument.
+	isStarlark := strings.EqualFold(config.AgentConfig.Type, "starlark")
+	rawVal := func(name string) (string, error) {
+		opt, val, err := lookupOpt(name)
+		if err != nil {
+			return "", err
+		}
+		if strings.TrimSpace(val) == "" && opt.Required {
+			return "", fmt.Errorf("option %s is required", opt.Name)
+		}
+		return val, nil
+	}
+
 	// ── argv ──────────────────────────────────────────────────────────────
 	for _, arg := range config.Invocation.Argv {
 		switch {
 		case arg.Literal != "":
 			resolved.Argv = append(resolved.Argv, arg.Literal)
 		case arg.Flag != "" && arg.Param != "":
-			strVal, _, err := coerceVal(arg.Param)
+			var strVal string
+			var err error
+			if isStarlark {
+				strVal, err = rawVal(arg.Param)
+			} else {
+				strVal, _, err = coerceVal(arg.Param)
+			}
 			if err != nil {
 				return resolved, err
 			}
-			if strVal == "" {
+			if !isStarlark && strVal == "" {
 				continue
 			}
 			resolved.Argv = append(resolved.Argv, arg.Flag, strVal)
 		case arg.Param != "":
-			strVal, _, err := coerceVal(arg.Param)
+			var strVal string
+			var err error
+			if isStarlark {
+				strVal, err = rawVal(arg.Param)
+			} else {
+				strVal, _, err = coerceVal(arg.Param)
+			}
 			if err != nil {
 				return resolved, err
 			}
-			if strVal == "" {
+			if !isStarlark && strVal == "" {
 				continue
 			}
 			resolved.Argv = append(resolved.Argv, strVal)
