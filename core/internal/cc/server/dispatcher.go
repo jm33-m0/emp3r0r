@@ -251,8 +251,12 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 		}
 
 	case live.RuntimeConfig.C2Routes.Msg:
+		if !shouldAdmitAgentForMsg(msgAuth.AgentUUID) {
+			logging.Warningf("cborProtocolDispatch: rejecting idle agent %s message tunnel (operator idle, no queued commands)", strconv.Quote(msgAuth.AgentUUID))
+			return
+		}
 		dec := cbor.NewDecoder(secureConn)
-		handleMessageTunnelStream(secureConn, dec, remoteAddr, context.Background())
+		handleMessageTunnelStream(secureConn, dec, remoteAddr, context.Background(), msgAuth.AgentUUID)
 
 	case live.RuntimeConfig.C2Routes.FTP:
 		// Provide a cancel function to terminate the connection properly

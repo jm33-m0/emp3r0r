@@ -25,9 +25,11 @@ const maxCmdResultCacheBytes = 1024 * 1024 // 1 MiB
 // handleMessageTunnelStream is the protocol-native message tunnel handler.
 // It is transport-agnostic and only depends on a bidirectional byte stream.
 // secureConn is already authenticated and its first frame (MsgAuth) consumed by dec.
-func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decoder, remoteAddr string, baseCtx context.Context) {
-	// Session identity is payload-authoritative.
-	authAgentUUID := ""
+func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decoder, remoteAddr string, baseCtx context.Context, initialAgentUUID string) {
+	// Session identity is payload-authoritative, but we seed it with the
+	// already-verified MsgAuth UUID so admission/teardown decisions can use it
+	// immediately.
+	authAgentUUID := initialAgentUUID
 	sessionStarted := false
 	var (
 		lastHandshake int64
@@ -67,6 +69,10 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			if err = cbor.Unmarshal(raw, &msgAuth); err == nil && msgAuth.Type == def.MsgAuthType {
 				if err = transport.VerifyMsgAuth(&msgAuth); err != nil {
 					logging.Errorf("CRITICAL: handleMessageTunnel: MsgAuth verify failed from %s: %v", remoteAddr, err)
+					return
+				}
+				if initialAgentUUID != "" && msgAuth.AgentUUID != initialAgentUUID {
+					logging.Errorf("CRITICAL: handleMessageTunnel: MsgAuth UUID %s does not match stream UUID %s", strconv.Quote(msgAuth.AgentUUID), strconv.Quote(initialAgentUUID))
 					return
 				}
 
@@ -293,6 +299,11 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 					}
 				}
 
+				// Deliver any commands queued while the agent had no live tunnel.
+				if err == nil {
+					drainQueuedCommands(agent.UUID, encoder)
+				}
+
 				continue // Handshake handled, next message
 			}
 
@@ -341,6 +352,13 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			// Tear down idle tunnels: if the operator is idle and there is no
+			// queued work for this agent, close the tunnel so the agent backs
+			// off instead of holding an idle connection.
+			if !operatorIsActive() && !hasQueuedCommands(authAgentUUID) {
+				logging.Infof("handleMessageTunnel: operator idle, closing tunnel for agent %s", strconv.Quote(authAgentUUID))
+				return
+			}
 			lastHandshakeTime := time.Unix(atomic.LoadInt64(&lastHandshake), 0)
 			if time.Since(lastHandshakeTime) > 10*time.Minute {
 				operatorBroadcastPrintf(logging.WARN, "handleMessageTunnel: timeout for agent %s", strconv.Quote(authAgentUUID))

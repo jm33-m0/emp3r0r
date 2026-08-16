@@ -24,6 +24,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // represents an operator_t
@@ -214,11 +215,24 @@ func handleSendCommand(wrt http.ResponseWriter, req *http.Request) {
 	// Track the job ID so the message tunnel accepts the response
 	live.CmdTime.Store(*operation.JobID, time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST"))
 
-	// Send command to agent
-	err = agents.SendCmd(*operation.Command, *operation.JobID, agent)
-	if err != nil {
-		http.Error(wrt, err.Error(), http.StatusInternalServerError)
-		return
+	// Any accepted command resets the operator-idle timer.
+	touchOperatorCommand()
+
+	// Send command to agent. If the agent has no live message tunnel, queue the
+	// command so it is pulled when the agent is next admitted.
+	if err = agents.SendCmd(*operation.Command, *operation.JobID, agent); err != nil {
+		if agent.UUID == "" {
+			http.Error(wrt, "Agent has no UUID", http.StatusInternalServerError)
+			return
+		}
+		msg := def.MsgTunData{
+			JobID:    *operation.JobID,
+			CmdSlice: util.ParseCmd(*operation.Command),
+			Tag:      agent.Tag,
+			Time:     time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST"),
+		}
+		enqueueAgentCommand(agent.UUID, msg)
+		logging.Infof("Agent %s has no live message tunnel, queued command %s", agent.Tag, *operation.JobID)
 	}
 	wrt.WriteHeader(http.StatusOK)
 }
