@@ -286,6 +286,13 @@ func readJSONConfig(jsonData []byte, config_to_write *def.Config) (err error) {
 	if config_to_write.OperatorIdleTimeout == 0 {
 		config_to_write.OperatorIdleTimeout = getInt("OperatorIdleTimeout")
 	}
+	// Default to a long idle timeout when the key is absent; an explicit 0
+	// still disables the idle timeout.
+	if _, ok := raw["operator_idle_timeout"]; !ok {
+		if _, ok := raw["OperatorIdleTimeout"]; !ok {
+			config_to_write.OperatorIdleTimeout = 1800
+		}
+	}
 	config_to_write.P2PTransport = getString("p2p_transport")
 	if config_to_write.P2PTransport == "" {
 		config_to_write.P2PTransport = getString("P2PTransport")

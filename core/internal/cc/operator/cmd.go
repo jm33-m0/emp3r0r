@@ -523,7 +523,7 @@ func gen_agent_cmd() *cobra.Command {
 	// Group 5: Stealth & Connectivity
 	genAgentCmd.Flags().BoolP("stager", "", false, "Built for stager (enables memory encryption and suspension)")
 	genAgentCmd.Flags().BoolP("NCSI", "", false, "Use NCSI to check for Internet connectivity before connecting to C2")
-	genAgentCmd.Flags().IntP("operator-idle-timeout", "", 0, "Operator idle timeout in seconds before C2 rejects agent msg tunnels (0 disables)")
+	genAgentCmd.Flags().IntP("operator-idle-timeout", "", 1800, "Operator idle timeout in seconds before C2 refuses agent connections (0 disables idle timeout)")
 	addFlagToGroup("Stealth & Connectivity Options", "stager", "NCSI", "operator-idle-timeout")
 
 	// Force user to specify CC address

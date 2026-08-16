@@ -26,6 +26,7 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 	ncsi, _ := cmd.Flags().GetBool("NCSI")
 	kcp, _ := cmd.Flags().GetBool("kcp")
 	isStager, _ := cmd.Flags().GetBool("stager")
+	operatorIdleTimeout, _ := cmd.Flags().GetInt("operator-idle-timeout")
 
 	opts := builder.AgentConfig{
 		CCAddress:           getStringOptPtr(cmd, "cc"),
@@ -40,7 +41,7 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 		CCHTTPPort:          getStringOptPtr(cmd, "cc-http-port"),
 		PollInterval:        getIntOptPtr(cmd, "interval"),
 		Jitter:              getIntOptPtr(cmd, "jitter"),
-		OperatorIdleTimeout: getIntOptPtr(cmd, "operator-idle-timeout"),
+		OperatorIdleTimeout: &operatorIdleTimeout,
 		IsP2PEnabled:        p2p,
 		IsDirectC2:          directC2,
 		PersistentRouter:    persistentRouter,
@@ -50,10 +51,8 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 	}
 
 	// Push operator-idle policy to the C2 server (remote or local).
-	if opts.OperatorIdleTimeout != nil {
-		if err := client.UpdateOperatorIdleConfig(*opts.OperatorIdleTimeout); err != nil {
-			logging.Warningf("Failed to update operator idle timeout on C2: %v", err)
-		}
+	if err := client.UpdateOperatorIdleConfig(operatorIdleTimeout); err != nil {
+		logging.Warningf("Failed to update operator idle timeout on C2: %v", err)
 	}
 
 	// Invoke core agent generation business logic outside operator package and controller package
