@@ -1,1 +1,1 @@
-void cleanup_memory ( MEMORY_LAYOUT * memory );
+void cleanup_memory(MEMORY_LAYOUT *memory);
