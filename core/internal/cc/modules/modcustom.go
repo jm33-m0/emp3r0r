@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -107,11 +108,20 @@ func build_module(config *def.ModuleConfig, flags map[string]string) (out []byte
 		}
 	}()
 
-	invoc_args := ""
-	for name, val := range flags {
-		invoc_args = fmt.Sprintf("%s --%s %s ", invoc_args, name, val)
+	// Sort flag names so the generated command is deterministic, and shell-quote
+	// every value so paths with spaces/backslashes and empty defaults survive
+	// interpolation into the `sh -c` command line.
+	keys := make([]string, 0, len(flags))
+	for name := range flags {
+		keys = append(keys, name)
 	}
-	build_cmd := fmt.Sprintf("%s %s", config.Build, invoc_args)
+	sort.Strings(keys)
+
+	invoc_args := ""
+	for _, name := range keys {
+		invoc_args += " --" + name + " " + shellQuote(flags[name])
+	}
+	build_cmd := fmt.Sprintf("%s%s", config.Build, invoc_args)
 
 	// build module
 	out, err = exec.Command("sh", "-c", build_cmd).CombinedOutput()
@@ -121,6 +131,12 @@ func build_module(config *def.ModuleConfig, flags map[string]string) (out []byte
 	}
 
 	return out, err
+}
+
+// shellQuote quotes a value for safe interpolation into a POSIX shell command.
+// Empty values are quoted as ” so they survive `sh -c` word splitting.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 func getPeerIP(flags map[string]string) string {
