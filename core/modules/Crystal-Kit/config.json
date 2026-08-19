@@ -1,0 +1,77 @@
+[
+  {
+    "name": "crystal_kit",
+    "build": "",
+    "author": "rasta-mouse, nickswink, licitrasimone, jm33-ng",
+    "date": "2026-08-19",
+    "comment": "Run Crystal Palace PICO shellcode in memory (ported from licitrasimone/crystal-kit-sliver)",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "file",
+        "description": "Crystal Palace PICO .bin shellcode to execute (agent local path or mem:///path)",
+        "default": "",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "args",
+        "description": "Optional runtime arguments passed to the PICO entry / post-ex DLL",
+        "default": "",
+        "type": "string",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "CrystalKit.x64.dll"
+      ],
+      "in_memory": true,
+      "type": "dll",
+      "interactive": false
+    },
+    "invocation": {
+      "dll_export": "LoadAndRun",
+      "dll_entry": "go",
+      "dll_file_param": "file"
+    }
+  },
+  {
+    "name": "crystal_pack",
+    "build": "bash ./build.sh",
+    "author": "rasta-mouse, nickswink, licitrasimone, jm33-ng",
+    "date": "2026-08-19",
+    "comment": "Convert a Windows DLL into Crystal Palace PICO shellcode (postex-loader, ror13)",
+    "is_local": true,
+    "platform": "generic",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "dll",
+        "description": "Path to the Windows DLL to wrap into PICO (C2 local path)",
+        "default": "",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "output",
+        "description": "Output .bin shellcode path (default: <dll>.pico.bin next to the input DLL)",
+        "default": "",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "args",
+        "description": "Optional args baked into the PICO at link time",
+        "default": "",
+        "type": "string",
+        "required": false
+      }
+    ]
+  }
+]

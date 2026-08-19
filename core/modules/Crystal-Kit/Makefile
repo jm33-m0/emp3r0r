@@ -1,7 +1,6 @@
 all:
-	cd loader && make $@
-	cd postex-loader && make $@
+	bash ./make_all.sh
 
 clean:
-	cd loader && make $@
-	cd postex-loader && make $@
+	cd wrapper && make clean
+	cd postex-loader && make clean

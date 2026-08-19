@@ -10,6 +10,7 @@ DECLSPEC_IMPORT BOOL WINAPI KERNEL32$VirtualFree(LPVOID, SIZE_T, DWORD);
 char _PICO_[0] __attribute__((section("pico")));
 char _MASK_[0] __attribute__((section("mask")));
 char _DLL_[0] __attribute__((section("dll")));
+char _DLLARGS_[0] __attribute__((section("dll_args")));
 
 int __tag_setup_hooks();
 int __tag_setup_memory();
@@ -100,7 +101,15 @@ void go(void *loader_arguments)
     KERNEL32$VirtualProtect(pico_code, PicoCodeSize(pico_src), PAGE_EXECUTE_READ, &old_protect);
 
     /* begin tracking memory allocations */
-    MEMORY_LAYOUT memory = {0};
+    MEMORY_LAYOUT memory;
+    {
+        /* avoid a memset relocation Crystal Palace can't process */
+        volatile unsigned char *zero = (volatile unsigned char *)&memory;
+        for (size_t i = 0; i < sizeof(MEMORY_LAYOUT); i++)
+        {
+            zero[i] = 0;
+        }
+    }
 
     memory.Pico.Data = pico_data;
     memory.Pico.Code = pico_code;
@@ -140,9 +149,14 @@ void go(void *loader_arguments)
     /* now run the DLL */
     DLLMAIN_FUNC entry_point = EntryPoint(&dll_data, dll_dst);
 
+    /* Pointer to DLL arguments: prefer runtime args from the PICO runner,
+     * fall back to the args baked into the dll_args section at link time. */
+    RESOURCE *args_resource = (RESOURCE *)GETRESOURCE(_DLLARGS_);
+    char *baked_args = (args_resource->len > 0) ? args_resource->value : NULL;
+    char *dll_arguments = loader_arguments ? (char *)loader_arguments : baked_args;
+
     /* free the unmasked copy */
     KERNEL32$VirtualFree(dll_src, 0, MEM_RELEASE);
 
-    entry_point((HINSTANCE)dll_dst, DLL_PROCESS_ATTACH, NULL);
-    entry_point((HINSTANCE)(char *)go, 0x4, loader_arguments);
+    entry_point((HINSTANCE)dll_dst, DLL_PROCESS_ATTACH, dll_arguments);
 }
