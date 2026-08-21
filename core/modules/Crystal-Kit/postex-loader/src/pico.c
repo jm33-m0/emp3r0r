@@ -1,54 +1,47 @@
-#include <windows.h>
-#include "memory.h"
-#include "spoof.h"
+#include "Spoof.h"
 #include "cleanup.h"
+#include "memory.h"
 #include "tcg.h"
+#include <windows.h>
 
 MEMORY_LAYOUT g_memory;
 
 DECLSPEC_IMPORT VOID WINAPI KERNEL32$ExitThread(DWORD);
 
-FARPROC WINAPI _GetProcAddress(HMODULE hModule, LPCSTR lpProcName)
-{
-    /* lpProcName may be an ordinal */
-    if ((ULONG_PTR)lpProcName >> 16 == 0)
-    {
-        /* just resolve normally */
-        return GetProcAddress(hModule, lpProcName);
-    }
-
-    FARPROC result = __resolve_hook(ror13hash(lpProcName));
-
-    /*
-     * result may still be NULL if
-     * it wasn't hooked in the spec
-     */
-    if (result != NULL)
-    {
-        return result;
-    }
-
+FARPROC WINAPI _GetProcAddress(HMODULE hModule, LPCSTR lpProcName) {
+  /* lpProcName may be an ordinal */
+  if ((ULONG_PTR)lpProcName >> 16 == 0) {
+    /* just resolve normally */
     return GetProcAddress(hModule, lpProcName);
+  }
+
+  FARPROC result = __resolve_hook(ror13hash(lpProcName));
+
+  /*
+   * result may still be NULL if
+   * it wasn't hooked in the spec
+   */
+  if (result != NULL) {
+    return result;
+  }
+
+  return GetProcAddress(hModule, lpProcName);
 }
 
-void setup_hooks(IMPORTFUNCS *funcs)
-{
-    funcs->GetProcAddress = (__typeof__(GetProcAddress) *)_GetProcAddress;
+void setup_hooks(IMPORTFUNCS *funcs) {
+  funcs->GetProcAddress = (__typeof__(GetProcAddress) *)_GetProcAddress;
 }
 
-void setup_memory(MEMORY_LAYOUT *layout)
-{
-    if (layout != NULL)
-    {
-        /* Crystal Palace can't process a memcpy relocation, so copy the
-         * layout by hand instead of relying on struct assignment. */
-        volatile unsigned char *dst = (volatile unsigned char *)&g_memory;
-        volatile unsigned char *src = (volatile unsigned char *)layout;
-        for (size_t i = 0; i < sizeof(MEMORY_LAYOUT); i++)
-        {
-            dst[i] = src[i];
-        }
+void setup_memory(MEMORY_LAYOUT *layout) {
+  if (layout != NULL) {
+    /* Crystal Palace can't process a memcpy relocation, so copy the
+     * layout by hand instead of relying on struct assignment. */
+    volatile unsigned char *dst = (volatile unsigned char *)&g_memory;
+    volatile unsigned char *src = (volatile unsigned char *)layout;
+    for (size_t i = 0; i < sizeof(MEMORY_LAYOUT); i++) {
+      dst[i] = src[i];
     }
+  }
 }
 
 /*
@@ -57,18 +50,17 @@ void setup_memory(MEMORY_LAYOUT *layout)
  * modules is still a bit of a headache
  */
 
-VOID WINAPI _ExitThread(DWORD dwExitCode)
-{
-    /* free memory */
-    cleanup_memory(&g_memory);
+VOID WINAPI _ExitThread(DWORD dwExitCode) {
+  /* free memory */
+  cleanup_memory(&g_memory);
 
-    /* call the real exit thread */
-    FUNCTION_CALL call = {0};
+  /* call the real exit thread */
+  FUNCTION_CALL call = {0};
 
-    call.ptr = (PVOID)(KERNEL32$ExitThread);
-    call.argc = 1;
+  call.ptr = (PVOID)(KERNEL32$ExitThread);
+  call.argc = 1;
 
-    call.args[0] = spoof_arg(dwExitCode);
+  call.args[0] = spoof_arg(dwExitCode);
 
-    spoof_call(&call);
+  spoof_call(&call);
 }

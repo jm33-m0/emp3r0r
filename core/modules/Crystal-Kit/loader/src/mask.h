@@ -1,1 +1,1 @@
-void mask_memory ( MEMORY_LAYOUT * memory, BOOL mask );
+void mask_memory(MEMORY_LAYOUT *memory, BOOL mask);

@@ -14,12 +14,12 @@ x64:
         merge
 
     # merge call stack spoofing into the loader
-    load "bin/spoof.x64.o"
+    load "bin/SilentMoonwalk.x64.o"
         merge
 
     # load the stack spoofing assembly
-    load "bin/draugr.x64.bin"
-        linkfunc "draugr_stub"
+    load "bin/DesyncSpoofer.x64.bin"
+        linkfunc "silentmoonwalk_spoof_call"
 
     # hook functions that the loader uses
     attach "KERNEL32$LoadLibraryA"    "_LoadLibraryA"

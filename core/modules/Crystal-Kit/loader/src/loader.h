@@ -1,6 +1,6 @@
-#define GETRESOURCE(x) ( char * ) &x
+#define GETRESOURCE(x) (char *)&x
 
 typedef struct {
-    int  len;
-    char value [ ];
+  int len;
+  char value[];
 } RESOURCE;

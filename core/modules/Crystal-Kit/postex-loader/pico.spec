@@ -7,12 +7,12 @@ x64:
         merge
 
     # merge the call stack spoofing
-    load "bin/spoof.x64.o"
+    load "bin/SilentMoonwalk.x64.o"
         merge
 
     # merge the asm stub
-    load "bin/draugr.x64.bin"
-        linkfunc "draugr_stub"
+    load "bin/DesyncSpoofer.x64.bin"
+        linkfunc "silentmoonwalk_spoof_call"
 
     # merge cfg code
     load "bin/cfg.x64.o"

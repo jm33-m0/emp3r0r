@@ -69,7 +69,7 @@ bash make_all.sh
 
 - `x86_64-w64-mingw32-gcc` for `CrystalKit.x64.dll` and the postex-loader
   objects.
-- `nasm` for the Draugr stack-spoofing stub.
+- `nasm` for the SilentMoonwalk stack-spoofing stub.
 - Java + `crystalpalace/crystalpalace.jar` for the `crystal_pack` link step.
 
 ## Notes
