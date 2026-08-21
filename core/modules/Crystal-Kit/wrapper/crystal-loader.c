@@ -95,12 +95,15 @@ static DWORD WINAPI reader_thread(LPVOID param) {
   DWORD avail = 0;
   DWORD n = 0;
 
-  while (!rs->stop) {
+  for (;;) {
     if (!PeekNamedPipe(rs->hRead, NULL, 0, NULL, &avail, NULL)) {
       break;
     }
 
     if (avail == 0) {
+      if (rs->stop) {
+        break;
+      }
       Sleep(10);
       continue;
     }
