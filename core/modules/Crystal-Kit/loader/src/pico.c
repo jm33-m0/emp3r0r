@@ -43,7 +43,13 @@ void setup_hooks(IMPORTFUNCS *funcs) {
 
 void setup_memory(MEMORY_LAYOUT *layout) {
   if (layout != NULL) {
-    g_memory = *layout;
+    /* Crystal Palace can't process a memcpy relocation, so copy the
+     * layout by hand instead of relying on struct assignment. */
+    volatile unsigned char *dst = (volatile unsigned char *)&g_memory;
+    volatile unsigned char *src = (volatile unsigned char *)layout;
+    for (size_t i = 0; i < sizeof(MEMORY_LAYOUT); i++) {
+      dst[i] = src[i];
+    }
   }
 }
 

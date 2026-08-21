@@ -138,7 +138,7 @@ void go() {
   char *dll_src = NULL;
   char *dll_dst = NULL;
   DLLDATA dll_data;
-  MEMORY_LAYOUT memory = {0};
+  MEMORY_LAYOUT memory;
   DWORD old_protect = 0;
   DWORD dll_size = 0;
   DLLMAIN_FUNC entry_point;
@@ -173,6 +173,15 @@ void go() {
   if (!KERNEL32$VirtualProtect(pico_code, (SIZE_T)pico_code_size,
                                PAGE_EXECUTE_READ, &old_protect)) {
     goto fail;
+  }
+
+  /* begin tracking memory allocations */
+  {
+    /* avoid a memset relocation Crystal Palace can't process */
+    volatile unsigned char *zero = (volatile unsigned char *)&memory;
+    for (size_t i = 0; i < sizeof(MEMORY_LAYOUT); i++) {
+      zero[i] = 0;
+    }
   }
 
   memory.Pico.Data = pico_data;

@@ -45,7 +45,15 @@ void cleanup_memory(MEMORY_LAYOUT *memory) {
    * to free the memory regions
    */
 
-  CONTEXT ctx = {0};
+  CONTEXT ctx;
+  {
+    /* Crystal Palace can't process a memset relocation, so zero the
+     * CONTEXT by hand instead of relying on aggregate initialization. */
+    volatile unsigned char *zero = (volatile unsigned char *)&ctx;
+    for (size_t i = 0; i < sizeof(CONTEXT); i++) {
+      zero[i] = 0;
+    }
+  }
   ctx.ContextFlags = CONTEXT_ALL;
 
   HANDLE timer_queue = KERNEL32$CreateTimerQueue(), timer = NULL;
