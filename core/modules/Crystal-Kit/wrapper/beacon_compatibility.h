@@ -9,20 +9,18 @@
 #ifndef BEACON_COMPATIBILITY_H_
 /* Structures as is in beacon.h */
 extern unsigned char *InternalFunctions[30][2];
-typedef struct
-{
-    char *original; /* the original buffer [so we can free it] */
-    char *buffer;   /* current pointer into our buffer */
-    int length;     /* remaining length of data */
-    int size;       /* total size of this buffer */
+typedef struct {
+  char *original; /* the original buffer [so we can free it] */
+  char *buffer;   /* current pointer into our buffer */
+  int length;     /* remaining length of data */
+  int size;       /* total size of this buffer */
 } datap;
 
-typedef struct
-{
-    char *original; /* the original buffer [so we can free it] */
-    char *buffer;   /* current pointer into our buffer */
-    int length;     /* remaining length of data */
-    int size;       /* total size of this buffer */
+typedef struct {
+  char *original; /* the original buffer [so we can free it] */
+  char *buffer;   /* current pointer into our buffer */
+  int length;     /* remaining length of data */
+  int size;       /* total size of this buffer */
 } formatp;
 
 void BeaconDataParse(datap *parser, char *buffer, int size);
@@ -54,9 +52,13 @@ BOOL BeaconIsAdmin();
 
 /* Spawn+Inject Functions */
 void BeaconGetSpawnTo(BOOL x86, char *buffer, int length);
-BOOL BeaconSpawnTemporaryProcess(BOOL x86, BOOL ignoreToken, STARTUPINFO *sInfo, PROCESS_INFORMATION *pInfo);
-void BeaconInjectProcess(HANDLE hProc, int pid, char *payload, int p_len, int p_offset, char *arg, int a_len);
-void BeaconInjectTemporaryProcess(PROCESS_INFORMATION *pInfo, char *payload, int p_len, int p_offset, char *arg, int a_len);
+BOOL BeaconSpawnTemporaryProcess(BOOL x86, BOOL ignoreToken, STARTUPINFO *sInfo,
+                                 PROCESS_INFORMATION *pInfo);
+void BeaconInjectProcess(HANDLE hProc, int pid, char *payload, int p_len,
+                         int p_offset, char *arg, int a_len);
+void BeaconInjectTemporaryProcess(PROCESS_INFORMATION *pInfo, char *payload,
+                                  int p_len, int p_offset, char *arg,
+                                  int a_len);
 void BeaconCleanupProcess(PROCESS_INFORMATION *pInfo);
 
 /* Utility Functions */

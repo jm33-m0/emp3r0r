@@ -7,11 +7,13 @@
  * Crystal-Kit loader is CRT-free and only uses the desync stack.
  */
 
+// clang-format off
 #include "Common.h"
 #include "Functions.h"
 #include "Spoof.h"
 #include <windows.h>
 
+// clang-format on
 DECLSPEC_IMPORT HMODULE WINAPI KERNEL32$GetModuleHandleA(LPCSTR);
 
 extern PVOID silentmoonwalk_spoof_call(PSPOOFER config);

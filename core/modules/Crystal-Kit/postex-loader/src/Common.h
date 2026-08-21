@@ -1,7 +1,9 @@
 #pragma once
 
+// clang-format off
 #include <windows.h>
 
+// clang-format on
 #define SEED 123456
 
 typedef UCHAR UBYTE;

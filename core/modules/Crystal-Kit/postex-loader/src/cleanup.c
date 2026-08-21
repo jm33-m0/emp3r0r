@@ -1,8 +1,11 @@
+// clang-format off
+#include <windows.h>
+
 #include "cfg.h"
 #include "memory.h"
 #include "tcg.h"
-#include <windows.h>
 
+// clang-format on
 DECLSPEC_IMPORT HANDLE WINAPI KERNEL32$CreateTimerQueue();
 DECLSPEC_IMPORT BOOL WINAPI KERNEL32$CreateTimerQueueTimer(PHANDLE, HANDLE,
                                                            WAITORTIMERCALLBACK,

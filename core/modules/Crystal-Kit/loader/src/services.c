@@ -1,6 +1,9 @@
-#include "tcg.h"
+// clang-format off
 #include <windows.h>
 
+#include "tcg.h"
+
+// clang-format on
 /* for the local loader */
 __typeof__(GetModuleHandle) *get_module_handle
     __attribute__((section(".text")));

@@ -1,6 +1,9 @@
-#include "cfg.h"
+// clang-format off
 #include <windows.h>
 
+#include "cfg.h"
+
+// clang-format on
 #define NT_SUCCESS(status) ((NTSTATUS)(status) >= 0)
 #define NtCurrentProcess() ((HANDLE)(ULONG_PTR) - 1)
 

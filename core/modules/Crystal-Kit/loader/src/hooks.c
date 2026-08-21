@@ -1,9 +1,12 @@
-#include "Spoof.h"
-#include <combaseapi.h>
+// clang-format off
+#include <winsock2.h>
 #include <windows.h>
 #include <wininet.h>
-#include <winsock2.h>
+#include <combaseapi.h>
 
+#include "Spoof.h"
+
+// clang-format on
 DECLSPEC_IMPORT BOOL WINAPI WININET$HttpSendRequestA(HINTERNET, LPCSTR, DWORD,
                                                      LPVOID, DWORD);
 DECLSPEC_IMPORT HINTERNET WINAPI WININET$InternetConnectA(HINTERNET, LPCSTR,

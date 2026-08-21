@@ -1,10 +1,13 @@
-#include "Spoof.h"
-#include "hash.h"
-#include "tcg.h"
+// clang-format off
 #include <combaseapi.h>
 #include <windows.h>
 #include <wininet.h>
 
+#include "Spoof.h"
+#include "hash.h"
+#include "tcg.h"
+
+// clang-format on
 DECLSPEC_IMPORT LPVOID WINAPI KERNEL32$VirtualAlloc(LPVOID, SIZE_T, DWORD,
                                                     DWORD);
 DECLSPEC_IMPORT BOOL WINAPI KERNEL32$VirtualProtect(LPVOID, SIZE_T, DWORD,

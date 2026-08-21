@@ -1,7 +1,9 @@
 #pragma once
 
+// clang-format off
 #include <windows.h>
 
+// clang-format on
 #define spoof_arg(x) (ULONG_PTR)(x)
 
 #define JMP_RBX 9215           /* 0x23ff little-endian : ff 23 (jmp [rbx]) */

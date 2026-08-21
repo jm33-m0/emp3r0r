@@ -1,6 +1,9 @@
-#include "memory.h"
+// clang-format off
 #include <windows.h>
 
+#include "memory.h"
+
+// clang-format on
 DECLSPEC_IMPORT BOOL WINAPI KERNEL32$VirtualProtect(LPVOID, SIZE_T, DWORD,
                                                     PDWORD);
 

@@ -1,9 +1,11 @@
 #pragma once
 
+// clang-format off
 #include "Common.h"
 #include "Spoof.h"
 #include <windows.h>
 
+// clang-format on
 PVOID GetExceptionDirectoryAddress(HMODULE hModule, DWORD *size);
 DWORD GetStackFrameSize(HMODULE hModule, PVOID unwindInfoAddress,
                         DWORD *targetStackOffset);

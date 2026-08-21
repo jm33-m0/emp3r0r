@@ -1,10 +1,13 @@
-#include "Spoof.h"
-#include "cleanup.h"
-#include "mask.h"
-#include "memory.h"
-#include "tcg.h"
+// clang-format off
 #include <windows.h>
 
+#include "Spoof.h"
+#include "memory.h"
+#include "cleanup.h"
+#include "mask.h"
+#include "tcg.h"
+
+// clang-format on
 MEMORY_LAYOUT g_memory;
 
 DECLSPEC_IMPORT VOID WINAPI KERNEL32$Sleep(DWORD);
