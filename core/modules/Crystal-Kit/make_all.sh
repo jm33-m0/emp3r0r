@@ -61,7 +61,7 @@ for obj in \
     "$HERE/CrystalKit.x64.dll" \
     "$HERE/postex-loader/bin/loader.x64.o" \
     "$HERE/postex-loader/bin/pico.x64.o" \
-    "$HERE/postex-loader/bin/draugr.x64.bin"; do
+    "$HERE/postex-loader/bin/DesyncSpoofer.x64.bin"; do
     if [ -f "$obj" ]; then
         echo "    ok: $obj"
     else
