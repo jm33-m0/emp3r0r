@@ -61,6 +61,11 @@ void cleanup_memory(MEMORY_LAYOUT *memory)
             HANDLE heap = KERNEL32$GetProcessHeap();
             CONTEXT *ctx_free = (CONTEXT *)KERNEL32$HeapAlloc(heap, HEAP_ZERO_MEMORY, sizeof(CONTEXT) * CTX_COUNT);
 
+            if (ctx_free == NULL)
+            {
+                return;
+            }
+
             for (int i = 0; i < CTX_COUNT; i++)
             {
                 memcpy(&ctx_free[i], &ctx, sizeof(CONTEXT));

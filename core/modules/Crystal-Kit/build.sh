@@ -12,6 +12,14 @@ POSTEX_DIR="$SCRIPT_DIR/postex-loader"
 SPEC="$POSTEX_DIR/loader.spec"
 LIBTCG="$SCRIPT_DIR/libtcg.x64.zip"
 
+# Native MinGW gcc needs a Windows temp path when invoked from MSYS/Cygwin;
+# otherwise it falls back to C:\Windows and fails to create temporary files.
+# The guard keeps this portable: plain Linux/macOS builds keep /tmp.
+if command -v cygpath >/dev/null 2>&1; then
+    TMP_WIN="$(cygpath -w "${TMPDIR:-${TMP:-/tmp}}")"
+    export TMP="$TMP_WIN" TEMP="$TMP_WIN" TMPDIR="$TMP_WIN"
+fi
+
 DLL=""
 OUTPUT=""
 ARGS=""

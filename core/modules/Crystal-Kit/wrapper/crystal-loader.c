@@ -84,20 +84,57 @@ typedef struct
     char *buf;
     DWORD len;
     DWORD cap;
+    volatile BOOL stop;
 } reader_state_t;
 
+/* Drain the read end while the PICO runs. PeekNamedPipe + a bounded ReadFile
+ * keeps the thread non-blocking so the main thread can stop it safely, and it
+ * keeps draining (discarding overflow) once the capture buffer is full so a
+ * chatty DLL can never deadlock on a full pipe. */
 static DWORD WINAPI reader_thread(LPVOID param)
 {
     reader_state_t *rs = (reader_state_t *)param;
+    char discard[4096];
+    DWORD avail = 0;
     DWORD n = 0;
 
-    while (rs->len < rs->cap)
+    while (!rs->stop)
     {
-        if (!ReadFile(rs->hRead, rs->buf + rs->len, rs->cap - rs->len, &n, NULL) || n == 0)
+        if (!PeekNamedPipe(rs->hRead, NULL, 0, NULL, &avail, NULL))
         {
             break;
         }
-        rs->len += n;
+
+        if (avail == 0)
+        {
+            Sleep(10);
+            continue;
+        }
+
+        if (rs->len < rs->cap)
+        {
+            if (avail > rs->cap - rs->len)
+            {
+                avail = rs->cap - rs->len;
+            }
+            if (!ReadFile(rs->hRead, rs->buf + rs->len, avail, &n, NULL) || n == 0)
+            {
+                break;
+            }
+            rs->len += n;
+        }
+        else
+        {
+            /* capture buffer is full: drain and discard to keep the pipe flowing */
+            if (avail > sizeof(discard))
+            {
+                avail = sizeof(discard);
+            }
+            if (!ReadFile(rs->hRead, discard, avail, &n, NULL) || n == 0)
+            {
+                break;
+            }
+        }
     }
 
     return 0;
@@ -236,7 +273,9 @@ EXPORT int __cdecl LoadAndRun(char *argsBuffer, uint32_t bufferSize, goCallback 
     }
     if (hReader != NULL)
     {
-        WaitForSingleObject(hReader, 10000);
+        rs.stop = TRUE;
+        /* reader_thread never blocks indefinitely, so this cannot hang */
+        WaitForSingleObject(hReader, INFINITE);
         CloseHandle(hReader);
     }
     if (hRead != NULL)
