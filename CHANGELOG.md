@@ -1,5 +1,23 @@
 # Changelog
 
+## [4.11.0](https://github.com/jm33-m0/emp3r0r/compare/v4.10.0...v4.11.0) (2026-08-21)
+
+
+### Features
+
+* add crystal-kit module tests ([de48cad](https://github.com/jm33-m0/emp3r0r/commit/de48cad9a621265db76d29d5a526faa06cf1b349))
+* add crystal-kit PICO loader and packer modules ([52db8e7](https://github.com/jm33-m0/emp3r0r/commit/52db8e761ffaa8c1734693d32b03fda9fbefe789))
+
+
+### Bug Fixes
+
+* avoid memset/memcpy relocations in crystal-kit postex-loader ([25740a0](https://github.com/jm33-m0/emp3r0r/commit/25740a07b28f090863369842896094f6c573f21a))
+* **crystal-kit:** avoid memset/memcpy relocations Crystal Palace cannot process ([e0c40ea](https://github.com/jm33-m0/emp3r0r/commit/e0c40ea320cd220bc148b587d35b91b5c97db7ff))
+* **crystal-kit:** harden loaders and make build portable ([d63ecde](https://github.com/jm33-m0/emp3r0r/commit/d63ecde36e6acb90d65873d1836064f189591ff7))
+* **crystal-loader:** prevent potential deadlock in reader_thread ([8a6cf30](https://github.com/jm33-m0/emp3r0r/commit/8a6cf307ff47e87ff346eda185ce5803e2c54f0e))
+* **modcustom:** ensure deterministic command generation by sorting flags and adding shell quoting ([c6f5170](https://github.com/jm33-m0/emp3r0r/commit/c6f51700a7283620af58580b55ed3aa8b7d86a55))
+* silent moon walk generates broken callstack ([d493318](https://github.com/jm33-m0/emp3r0r/commit/d493318cfa1ea609839554ab7171ae079890b643))
+
 ## [4.10.0](https://github.com/jm33-m0/emp3r0r/compare/v4.9.2...v4.10.0) (2026-08-16)
 
 
