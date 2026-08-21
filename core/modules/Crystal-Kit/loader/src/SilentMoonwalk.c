@@ -15,6 +15,7 @@
 
 // clang-format on
 DECLSPEC_IMPORT HMODULE WINAPI KERNEL32$GetModuleHandleA(LPCSTR);
+DECLSPEC_IMPORT FARPROC WINAPI KERNEL32$GetProcAddress(HMODULE, LPCSTR);
 
 extern PVOID silentmoonwalk_spoof_call(PSPOOFER config);
 
@@ -257,6 +258,24 @@ DWORD GetStackFrameSizeIgnoringUwopSetFpreg(HMODULE moduleBase,
   return *targetStackOffset;
 }
 
+DWORD FindFrameSizeByAddress(HMODULE moduleBase, PRUNTIME_FUNCTION rt,
+                             DWORD rtLastIndex, PVOID targetAddress) {
+  UINT64 targetRva = (UINT64)targetAddress - (UINT64)moduleBase;
+  DWORD i;
+
+  for (i = 0; i < rtLastIndex; i++) {
+    if (targetRva >= rt[i].BeginAddress && targetRva < rt[i].EndAddress) {
+      PUNWIND_INFO unwindInfo =
+          (PUNWIND_INFO)((UINT64)moduleBase + (DWORD)rt[i].UnwindData);
+      DWORD stackSize = 0;
+      return GetStackFrameSizeIgnoringUwopSetFpreg(moduleBase, (PVOID)unwindInfo,
+                                                   &stackSize);
+    }
+  }
+
+  return 0;
+}
+
 DWORD GetStackFrameSizeWhereRbpIsPushedOnStack(HMODULE moduleBase,
                                                PVOID unwindInfoAddress,
                                                DWORD *targetStackOffset) {
@@ -476,7 +495,6 @@ void FindGadget(HMODULE moduleBase, PRUNTIME_FUNCTION pRuntimeFunctionTable,
   DWORD gadgets = 0;
   DWORD status = 0;
   DWORD i;
-  DWORD imm = 0x38;
   DWORD addRspGadget = ADD_RSP_0x38;
 
   for (i = 0; i < rtLastIndex; i++) {
@@ -511,10 +529,6 @@ void FindGadget(HMODULE moduleBase, PRUNTIME_FUNCTION pRuntimeFunctionTable,
       }
 
       if (status != 0) {
-        if (gadgetType == 1 && *stackSize != imm) {
-          continue;
-        }
-
         gadgets++;
         if (*skip >= gadgets) {
           continue;
@@ -544,6 +558,8 @@ void FindGadget(HMODULE moduleBase, PRUNTIME_FUNCTION pRuntimeFunctionTable,
 ULONG_PTR spoof_call(FUNCTION_CALL *call) {
   SPOOFER config;
   HMODULE kernelBase;
+  HMODULE kernel32;
+  HMODULE ntdll;
   DWORD rtSize = 0;
   PRUNTIME_FUNCTION rt;
   DWORD rtLastIndex;
@@ -566,6 +582,45 @@ ULONG_PTR spoof_call(FUNCTION_CALL *call) {
     return 0;
   }
   config.KernelBaseAddress = (PVOID)kernelBase;
+
+  /* The desync spoofer terminates the fake stack walk by pointing the
+   * unwinder at kernel32!BaseThreadInitThunk + 0x14 and then at
+   * ntdll!RtlUserThreadStart + 0x21. Resolve the exports and their unwind
+   * frame sizes once per call so the assembly can synthesise the thread-root
+   * frames above the patched return address. */
+  kernel32 = KERNEL32$GetModuleHandleA("kernel32.dll");
+  if (kernel32) {
+    config.BaseThreadInitThunkAddress =
+        (PVOID)KERNEL32$GetProcAddress(kernel32, "BaseThreadInitThunk");
+  }
+
+  ntdll = KERNEL32$GetModuleHandleA("ntdll.dll");
+  if (ntdll) {
+    config.RtlUserThreadStartAddress =
+        (PVOID)KERNEL32$GetProcAddress(ntdll, "RtlUserThreadStart");
+  }
+
+  if (kernel32 && config.BaseThreadInitThunkAddress) {
+    DWORD k32RtSize = 0;
+    PRUNTIME_FUNCTION k32Rt =
+        (PRUNTIME_FUNCTION)GetExceptionDirectoryAddress(kernel32, &k32RtSize);
+    if (k32Rt && k32RtSize >= sizeof(RUNTIME_FUNCTION)) {
+      config.BaseThreadInitThunkFrameSize = FindFrameSizeByAddress(
+          kernel32, k32Rt, k32RtSize / sizeof(RUNTIME_FUNCTION),
+          config.BaseThreadInitThunkAddress);
+    }
+  }
+
+  if (ntdll && config.RtlUserThreadStartAddress) {
+    DWORD ntdllRtSize = 0;
+    PRUNTIME_FUNCTION ntdllRt =
+        (PRUNTIME_FUNCTION)GetExceptionDirectoryAddress(ntdll, &ntdllRtSize);
+    if (ntdllRt && ntdllRtSize >= sizeof(RUNTIME_FUNCTION)) {
+      config.RtlUserThreadStartFrameSize = FindFrameSizeByAddress(
+          ntdll, ntdllRt, ntdllRtSize / sizeof(RUNTIME_FUNCTION),
+          config.RtlUserThreadStartAddress);
+    }
+  }
 
   rt = (PRUNTIME_FUNCTION)GetExceptionDirectoryAddress(kernelBase, &rtSize);
   if (!rt || rtSize < sizeof(RUNTIME_FUNCTION)) {

