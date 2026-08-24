@@ -1,5 +1,21 @@
 # Changelog
 
+## [4.12.0](https://github.com/jm33-m0/emp3r0r/compare/v4.11.0...v4.12.0) (2026-08-24)
+
+
+### Features
+
+* add optional TLS to standalone listener ([37863cf](https://github.com/jm33-m0/emp3r0r/commit/37863cfdc67d9758519c8e76b457f942c1cdc866))
+* replace XOR obfuscation with RC4 encryption in stager ([7c6d1e3](https://github.com/jm33-m0/emp3r0r/commit/7c6d1e30435d9a9d0d3601554bf47d3cd09bd966))
+* **stager:** add libcurl transport with shared runtime dynamic loading ([7430aea](https://github.com/jm33-m0/emp3r0r/commit/7430aeaa0133fa32fa265d1f4f10d74745bef8a4))
+* **stager:** modular download transports ([2d01718](https://github.com/jm33-m0/emp3r0r/commit/2d0171857f4eb09d73c128406d6992572d6954a5))
+* **stager:** pluggable packer, allowing users to implement their own packer code to hide the stager payload ([afd7b1d](https://github.com/jm33-m0/emp3r0r/commit/afd7b1d4352b63e6ff20691c95a6e14ccb4de671))
+
+
+### Bug Fixes
+
+* avoid `RWX` memory allocation in unpacker code ([2effa7d](https://github.com/jm33-m0/emp3r0r/commit/2effa7dd403c379da9b66da5ba107df59a12313a))
+
 ## [4.11.0](https://github.com/jm33-m0/emp3r0r/compare/v4.10.0...v4.11.0) (2026-08-21)
 
 
