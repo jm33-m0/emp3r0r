@@ -1,5 +1,6 @@
 #include "net_utils.h"
 #include "syscalls.h"
+#include "utils.h"
 #include <stdarg.h>
 
 // Non-network functions removed.
@@ -37,6 +38,23 @@ int inet_aton(const char *cp, struct in_addr *inp) {
   val = (val << 8) | part;
   inp->s_addr = htonl(val);
   return 1;
+}
+
+int resolve_addr(const char *host, const char *port, struct sockaddr_in *out) {
+  memset(out, 0, sizeof(*out));
+  out->sin_family = AF_INET;
+
+  int port_num = 0;
+  const char *p = port;
+  while (*p) {
+    port_num = port_num * 10 + (*p - '0');
+    p++;
+  }
+  out->sin_port = htons(port_num);
+
+  if (inet_aton(host, &out->sin_addr) == 0)
+    return -1;
+  return 0;
 }
 
 // -----------------------------------------------------------------------------

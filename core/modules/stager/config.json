@@ -3,7 +3,7 @@
   "build": "bash ./build.sh",
   "author": "jm33-ng",
   "date": "2025-12-12",
-  "comment": "A Linux stager that supports payload delivery via HTTP/TCP/UDP with obfuscation and compression. Use with emp3r0r-listener",
+  "comment": "A Linux stager with modular payload transports (http, tcp, udp, and custom ones such as libcurl) and RC4 obfuscation. Use with emp3r0r-listener",
   "is_local": true,
   "platform": "Linux",
   "path": "",
@@ -16,10 +16,10 @@
       "type": "cstr"
     },
     {
-      "name": "listener-type",
-      "description": "Listener protocol type: HTTP, TCP, or UDP",
-      "default": "HTTP",
-      "choices": ["HTTP", "TCP", "UDP"],
+      "name": "transport",
+      "description": "Transport used to download the payload. Built-in: http, tcp, udp. Custom transports can be added as transport_<name>.c (e.g. libcurl)",
+      "default": "http",
+      "choices": ["http", "tcp", "udp", "libcurl"],
       "type": "cstr"
     },
     {
@@ -36,7 +36,7 @@
     },
     {
       "name": "download-path",
-      "description": "The path to download the payload from (HTTP only), eg. /payload",
+      "description": "The path to download the payload from (http transports only), eg. /payload",
       "default": "/",
       "type": "cstr"
     },

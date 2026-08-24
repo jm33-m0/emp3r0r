@@ -41,6 +41,9 @@ int inet_aton(const char *cp, struct in_addr *inp);
 unsigned short htons(unsigned short hostshort);
 unsigned int htonl(unsigned int hostlong);
 
+// Resolve host:port into an IPv4 sockaddr_in (returns 0 on success).
+int resolve_addr(const char *host, const char *port, struct sockaddr_in *out);
+
 // Socket wrappers
 int socket(int domain, int type, int protocol);
 int connect(int sockfd, const struct sockaddr *addr, unsigned int addrlen);

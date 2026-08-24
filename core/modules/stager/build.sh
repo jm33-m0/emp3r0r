@@ -3,7 +3,7 @@ set -e
 
 # Default configuration values
 STAGER_FORMAT="shellcode"
-LISTENER_TYPE="HTTP"
+TRANSPORT="http"
 DOWNLOAD_HOST="127.0.0.1"
 DOWNLOAD_PORT="8000"
 DOWNLOAD_PATH="/"
@@ -22,8 +22,8 @@ while [[ $# -gt 0 ]]; do
     STAGER_FORMAT="$2"
     shift 2
     ;;
-  --listener-type | --listener_type)
-    LISTENER_TYPE="$2"
+  --transport)
+    TRANSPORT="$2"
     shift 2
     ;;
   --download-host | --download_host)
@@ -50,7 +50,7 @@ while [[ $# -gt 0 ]]; do
       case "$opt" in
       --debug) DEBUG_FLAG="DEBUG=1" ;;
       --stager-format | --stager_format) STAGER_FORMAT="$val" ;;
-      --listener-type | --listener_type) LISTENER_TYPE="$val" ;;
+      --transport) TRANSPORT="$val" ;;
       --download-host | --download_host) DOWNLOAD_HOST="$val" ;;
       --download-port | --download_port) DOWNLOAD_PORT="$val" ;;
       --download-path | --download_path) DOWNLOAD_PATH="$val" ;;
@@ -66,7 +66,7 @@ done
 
 echo "[+] Building shellcode stager with options:"
 echo "    Format:        $STAGER_FORMAT"
-echo "    Listener Type: $LISTENER_TYPE"
+echo "    Transport:     $TRANSPORT"
 echo "    Download Host: $DOWNLOAD_HOST"
 echo "    Download Port: $DOWNLOAD_PORT"
 echo "    Download Path: $DOWNLOAD_PATH"
@@ -98,6 +98,6 @@ make "$MAKE_TARGET" $DEBUG_FLAG \
   DOWNLOAD_PORT="$DOWNLOAD_PORT" \
   DOWNLOAD_PATH="$DOWNLOAD_PATH" \
   DOWNLOAD_KEY="$DOWNLOAD_KEY" \
-  LISTENER_TYPE="$LISTENER_TYPE"
+  TRANSPORT="$TRANSPORT"
 
 echo "[+] Stager build complete."

