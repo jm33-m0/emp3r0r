@@ -89,23 +89,26 @@ Direct agent-to-agent file sharing via P2P relay transport (mTLS/KCP) to acceler
 
 Flexible Stage 0 downloader stagers and protocol listeners for initial access and payload delivery.
 
-- **Multi-Protocol Listeners:** Embedded and standalone HTTP, TCP, and UDP listeners with reliable sequence-acknowledgment framing and custom HTTP profiles.
+- **Multi-Protocol Listeners:** Embedded and standalone HTTP, TCP, and UDP listeners with reliable sequence-acknowledgment framing, optional TLS support, and custom HTTP profiles.
 - **Standalone C Downloader Stager:** Built with direct, libc-independent Linux syscalls for compatibility across distributions without symbol errors.
+- **Modular Transports:** Support for built-in freestanding transports (HTTP, TCP, UDP via raw syscalls) as well as dynamically loaded custom transports (e.g., `libcurl` via shared runtime dynamic symbol resolution).
+- **Pluggable Self-Unpacking Packers:** Extensible stub/packer architecture supporting custom payload encryption/compression algorithms such as RC4 stream encryption and greedy LZSS compression with automated header patching.
 - **Tiny Payload Size:** While emp3r0r agent binaries are ~20MB without compression, this stager is below 1.5KB; the sRDI-like payload it fetches from emp3r0r listener, is ~8MB (compressed from agent binary in ELF shared object format).
-- **Flexible Formats:** Compiles into raw position-independent shellcode (`.bin`), standalone ELF executables, or shared objects (`.so`).
+- **Flexible Formats:** Compiles into raw position-independent shellcode (`.bin`), self-unpacking packed shellcode (`packed`), standalone ELF executables, or shared objects (`.so`).
 - **In-Memory Hardening:** Allocates stage memory with read-write permissions, de-obfuscates payloads, and enforces read-execute prior to reflectively executing Stage 1.
 
 ---
 
-### 🧩 Native Cross-Platform BOF Support (COFF & ELF)
+### 🧩 Native Cross-Platform BOF & PICO Support (COFF, ELF & PICO)
 
 Execute in-memory binary modules on both Windows and Linux targets:
 
 - **Windows COFF Loaders:** Run Windows BOF binaries filelessly with typed parameter packing (`int`, `short`, `cstr`, `wstr`, `binary`).
 - **Linux ELF Object Loaders:** Load ELF relocatable object files (`.o`) directly into agent memory on Linux.
+- **Crystal-Kit PICO Modules & Stack Spoofing:** Integrated PICO (Position-Independent Code Object) loaders and packers featuring SilentMoonwalk callstack desync spoofer for advanced evasion.
 - **Bundled BOF Suites:** Built-in support for Kerbeus-BOF, Remote-OPs, and Situational Awareness (SA) module collections.
 
-**Why this matters:** Eliminates process creation overhead and circumvents command-line monitoring by running compiled C modules in-process.
+**Why this matters:** Eliminates process creation overhead and circumvents command-line and callstack monitoring by running compiled C modules in-process with callstack spoofing.
 
 ---
 
