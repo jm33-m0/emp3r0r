@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.12.1](https://github.com/jm33-m0/emp3r0r/compare/v4.12.0...v4.12.1) (2026-08-24)
+
+
+### Bug Fixes
+
+* **stager:** configurable build to address compatibility issues ([7f23309](https://github.com/jm33-m0/emp3r0r/commit/7f233097cfbfdfe1a879a0dab7ba85939f046e8f))
+* **stager:** improve robustness in symbol resolution ([ce88f92](https://github.com/jm33-m0/emp3r0r/commit/ce88f9244edaf45e54408d5c83b576dc52d74104))
+
 ## [4.12.0](https://github.com/jm33-m0/emp3r0r/compare/v4.11.0...v4.12.0) (2026-08-24)
 
 
