@@ -24,6 +24,7 @@ typedef struct {
 #define DT_HASH 4
 #define DT_STRTAB 5
 #define DT_SYMTAB 6
+#define DT_GNU_HASH 0x6ffffef5
 
 /* Cached dl* entry points live in the writable runtime state block (see
  * state.h), not in .data, because the stager image is mapped RX. */
@@ -83,6 +84,62 @@ static unsigned long find_libc_base(void) {
   return 0;
 }
 
+/* GNU ELF string hash used by DT_GNU_HASH tables. */
+static uint32_t elf_gnu_hash(const char *name) {
+  uint32_t h = 5381;
+  for (const unsigned char *p = (const unsigned char *)name; *p; p++)
+    h = (h << 5) + h + (uint32_t)*p;
+  return h;
+}
+
+/* Resolve `name` via a GNU hash table (DT_GNU_HASH).
+ *
+ * Layout (Elf64): nbuckets, symoffset, bloom_size, bloom_shift,
+ * bloom[bloom_size] (uint64_t each), buckets[nbuckets], chains[].
+ * chains[] is indexed relative to symoffset: the chain entry for dynamic
+ * symbol i lives at chains[i - symoffset].
+ *
+ * Returns the symbol address (base + st_value) or 0 if not found. */
+static void *resolve_sym_gnu(void *base, Elf64_Sym *symtab, const char *strtab,
+                             const uint32_t *ghash, const char *name) {
+  uint32_t nbuckets = ghash[0];
+  uint32_t symoffset = ghash[1];
+  uint32_t bloom_size = ghash[2];
+  uint32_t bloom_shift = ghash[3];
+  if (nbuckets == 0 || bloom_size == 0)
+    return 0;
+
+  const uint64_t *bloom = (const uint64_t *)(ghash + 4);
+  const uint32_t *buckets = (const uint32_t *)(bloom + bloom_size);
+  const uint32_t *chains = buckets + nbuckets;
+
+  uint64_t h = elf_gnu_hash(name);
+
+  /* Cheap bloom-filter rejection. */
+  uint64_t word = bloom[(h / 64) % bloom_size];
+  uint64_t mask = (1ULL << (h % 64)) | (1ULL << ((h >> bloom_shift) % 64));
+  if ((word & mask) != mask)
+    return 0;
+
+  uint32_t si = buckets[h % nbuckets];
+  if (si == 0)
+    return 0;
+
+  const uint32_t *chain = chains - symoffset;
+  for (uint32_t i = si;; i++) {
+    uint32_t eh = chain[i];
+    if ((eh | 1) == (h | 1)) {
+      const Elf64_Sym *sym = &symtab[i];
+      if (sym->st_name != 0 && sym->st_shndx != 0 &&
+          strcmp(strtab + sym->st_name, name) == 0)
+        return (void *)((char *)base + sym->st_value);
+    }
+    if (eh & 1)
+      break;
+  }
+  return 0;
+}
+
 /* Resolve a dynamic symbol `name` from the ELF module loaded at `base`. */
 static void *resolve_sym(void *base, const char *name) {
   Syscall_Elf64_Ehdr *ehdr = (Syscall_Elf64_Ehdr *)base;
@@ -104,7 +161,8 @@ static void *resolve_sym(void *base, const char *name) {
 
   Elf64_Sym *symtab = 0;
   const char *strtab = 0;
-  unsigned long nchain = 0;
+  const uint32_t *sysv_hash = 0;
+  const uint32_t *ghash = 0;
   for (; dyn->d_tag != DT_NULL; dyn++) {
     /* Pointer-type DT_* entries hold absolute runtime addresses (the loader
      * relocates them); only st_value below needs the module base added. */
@@ -113,17 +171,31 @@ static void *resolve_sym(void *base, const char *name) {
     else if (dyn->d_tag == DT_STRTAB)
       strtab = (const char *)dyn->d_val;
     else if (dyn->d_tag == DT_HASH)
-      nchain = ((const uint32_t *)dyn->d_val)[1];
+      sysv_hash = (const uint32_t *)dyn->d_val;
+    else if (dyn->d_tag == DT_GNU_HASH)
+      ghash = (const uint32_t *)dyn->d_val;
   }
-  if (!symtab || !strtab || nchain == 0)
+  if (!symtab || !strtab)
     return 0;
 
-  for (unsigned long i = 0; i < nchain; i++) {
-    const Elf64_Sym *sym = &symtab[i];
-    if (sym->st_name != 0 && sym->st_shndx != 0 &&
-        strcmp(strtab + sym->st_name, name) == 0)
-      return (void *)((char *)base + sym->st_value);
+  /* SysV hash table (DT_HASH): layout is nbucket, nchain, buckets, chains.
+   * nchain is the exact dynamic-symbol count, so a linear scan is safe. */
+  if (sysv_hash) {
+    unsigned long nchain = sysv_hash[1];
+    for (unsigned long i = 0; i < nchain; i++) {
+      const Elf64_Sym *sym = &symtab[i];
+      if (sym->st_name != 0 && sym->st_shndx != 0 &&
+          strcmp(strtab + sym->st_name, name) == 0)
+        return (void *)((char *)base + sym->st_value);
+    }
+    return 0;
   }
+
+  /* Some binaries ship only a GNU hash table (DT_GNU_HASH), e.g. glibc built
+   * with --hash-style=gnu. Use it when DT_HASH is absent. */
+  if (ghash)
+    return resolve_sym_gnu(base, symtab, strtab, ghash, name);
+
   return 0;
 }
 
