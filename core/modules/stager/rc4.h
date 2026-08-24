@@ -5,8 +5,10 @@
 #include <stdint.h>
 
 /* Minimal RC4 stream cipher.
- * RC4 is symmetric: the same operation encrypts and decrypts.
- * It is used here in place of AES to keep the stager binary small. */
+ *
+ * RC4 is symmetric: the same operation encrypts and decrypts. It is used here
+ * in place of AES to keep the stager binary small. Keys are 1..256 bytes;
+ * empty keys are treated as a single zero byte. */
 
 typedef struct {
   uint8_t s[256];

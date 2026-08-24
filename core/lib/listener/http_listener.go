@@ -2,7 +2,6 @@ package listener
 
 import (
 	"context"
-	"encoding/binary"
 	"fmt"
 	"net/http"
 	"os"
@@ -13,23 +12,6 @@ var (
 	server       *http.Server
 	httpServerMu sync.RWMutex
 )
-
-// deriveKeyFromString derives a 16-byte key from a string.
-// The key is derived by XORing the characters of the string.
-func deriveKeyFromString(str string) []byte {
-	key := make([]uint32, 4)
-	for i := 0; i < 4; i++ {
-		for j := 0; j < len(str)/4; j++ {
-			key[i] ^= uint32(str[i+j*4]) << (j % 4 * 8)
-		}
-	}
-	keyBytes := make([]byte, 16)
-	for i, v := range key {
-		binary.LittleEndian.PutUint32(keyBytes[i*4:], v)
-	}
-	listenerLogf("Derived key: %08x %08x %08x %08x", key[0], key[1], key[2], key[3])
-	return keyBytes[:16] // Ensure the key is 16 bytes long
-}
 
 // serveStager serves the encrypted stager file over HTTP.
 func serveStager(stager_enc []byte, port string) error {

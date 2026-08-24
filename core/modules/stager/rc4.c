@@ -7,11 +7,16 @@ static void rc4_swap(uint8_t *a, uint8_t *b) {
 }
 
 void rc4_init(rc4_ctx *ctx, const uint8_t *key, size_t key_len) {
+  static const uint8_t zero_key = 0;
   size_t i;
   uint8_t j = 0;
 
-  if (key_len == 0)
-    key_len = 1; /* avoid div-by-zero; zero-length key is a no-op stream */
+  /* RC4 keys are 1..256 bytes. Guard against NULL/empty keys (which would
+   * divide by zero below) by treating them as a single zero byte. */
+  if (key == NULL || key_len == 0) {
+    key = &zero_key;
+    key_len = 1;
+  }
 
   for (i = 0; i < 256; i++)
     ctx->s[i] = (uint8_t)i;

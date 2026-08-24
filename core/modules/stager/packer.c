@@ -14,12 +14,12 @@ void decode_config_string(char *dest, const unsigned char *encoded,
 }
 
 void derive_key_from_string(const char *str, uint8_t *key) {
-  uint32_t temp_key[4] = {0};
+  uint32_t temp_key[DERIVED_KEY_LEN / 4] = {0};
   size_t len = strlen(str);
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < DERIVED_KEY_LEN / 4; i++) {
     for (size_t j = 0; j < len / 4; j++) {
       temp_key[i] ^= ((uint32_t)str[i + j * 4]) << (j % 4 * 8);
     }
   }
-  memcpy(key, temp_key, 16);
+  memcpy(key, temp_key, DERIVED_KEY_LEN);
 }
