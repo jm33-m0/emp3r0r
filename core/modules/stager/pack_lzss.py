@@ -2,21 +2,9 @@
 """LZSS packer for the self-unpacker stub.
 
 Usage: pack_lzss.py <stub.bin> <stub.elf> <stager.bin> <out.bin>
-
-Compresses stager.bin with a greedy LZSS, patches the header (unpacked_size,
-packed_size; key stays zero) in the stub at the correct .data vaddr offset
-(read from the ELF), and appends the compressed payload.
-
-The header offset is determined by reading the .data section vaddr directly
-from the ELF rather than computing it from accumulated section sizes.  This is
-necessary because the linker may insert alignment padding between sections
-(e.g. when .rodata is absent, .data is aligned to 16 bytes relative to .text),
-which objcopy -O binary preserves but a naive size-sum would miss.
 """
 
-import struct
-import subprocess
-import sys
+from pack_common import parse_args, patch_and_write_packed
 
 MIN_MATCH = 3
 MAX_MATCH = 18
@@ -79,41 +67,12 @@ def lzss_compress(data):
     return bytes(out)
 
 
-def get_data_vaddr(elf_path):
-    """Return the vaddr of the .data section from the ELF, or raise on failure."""
-    result = subprocess.run(
-        ['readelf', '-S', '--wide', elf_path],
-        capture_output=True, text=True, check=True,
-    )
-    for line in result.stdout.splitlines():
-        parts = line.split()
-        # readelf -S --wide line format (one section per line):
-        #   [ Nr] Name  Type  Addr  Off  Size  ES  Flg  Lk  Inf  Al
-        # The Name field may have a leading '[' index; find '.data' token.
-        if '.data' in parts:
-            idx = parts.index('.data')
-            # The address field follows the type field (two after '.data').
-            vaddr_hex = parts[idx + 2]
-            return int(vaddr_hex, 16)
-    raise ValueError(f"No .data section found in {elf_path}")
-
-
 def main():
-    stub_path, elf_path, payload_path, out_path = (
-        sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
-    )
-
+    stub_path, elf_path, payload_path, out_path = parse_args()
     payload = open(payload_path, 'rb').read()
     packed = lzss_compress(payload)
-
-    hdr_off = get_data_vaddr(elf_path)
-
-    stub = bytearray(open(stub_path, 'rb').read())
-    stub[hdr_off:hdr_off + 8] = struct.pack('<II', len(payload), len(packed))
-
-    open(out_path, 'wb').write(bytes(stub) + packed)
-    print(f"packed(lzss): {len(stub) + len(packed)} bytes "
-          f"(stub={len(stub)} packed={len(packed)} unpacked={len(payload)})")
+    patch_and_write_packed(stub_path, elf_path, payload, packed, out_path,
+                           algo_name='lzss')
 
 
 if __name__ == '__main__':

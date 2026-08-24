@@ -32,17 +32,13 @@ static void lzss_decompress(const uint8_t *src, size_t src_len, uint8_t *dst,
   }
 }
 
+static void do_unpack_lzss(const uint8_t *src, const struct unpack_header *h,
+                           uint8_t *dst) {
+  lzss_decompress(src, h->packed_size, dst, h->unpacked_size);
+}
+
 __attribute__((noreturn, used)) void unpack_and_run(void) {
-  const uint8_t *src = (const uint8_t *)(&hdr + 1);
-  long addr = unpack_mmap(0, hdr.unpacked_size, 7 /* RWX */,
-                          0x22 /* MAP_PRIVATE|MAP_ANONYMOUS */, -1, 0);
-  if (addr < 0)
-    __builtin_trap();
-
-  lzss_decompress(src, hdr.packed_size, (uint8_t *)addr, hdr.unpacked_size);
-
-  ((void (*)(void))addr)(); /* original stager _start */
-  __builtin_trap();
+  unpack_run_stub(&hdr, do_unpack_lzss);
 }
 
 UNPACK_ENTRY();

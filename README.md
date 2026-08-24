@@ -85,14 +85,16 @@ Direct agent-to-agent file sharing via P2P relay transport (mTLS/KCP) to acceler
 
 ---
 
-### 📡 Multi-Protocol Listeners & Stagers
+### 📡 Multi-Protocol Listeners & Pluggable Stagers
 
 Flexible Stage 0 downloader stagers and protocol listeners for initial access and payload delivery.
 
 - **Multi-Protocol Listeners:** Embedded and standalone HTTP, TCP, and UDP listeners with reliable sequence-acknowledgment framing, optional TLS support, and custom HTTP profiles.
 - **Standalone C Downloader Stager:** Built with direct, libc-independent Linux syscalls for compatibility across distributions without symbol errors.
-- **Modular Transports:** Support for built-in freestanding transports (HTTP, TCP, UDP via raw syscalls) as well as dynamically loaded custom transports (e.g., `libcurl` via shared runtime dynamic symbol resolution).
-- **Pluggable Self-Unpacking Packers:** Extensible stub/packer architecture supporting custom payload encryption/compression algorithms such as RC4 stream encryption and greedy LZSS compression with automated header patching.
+- **Pluggable Stager Transports:** Modular transport system allowing operators to drop in custom C transport modules (`transport_<name>.c`). Built-in freestanding options include HTTP, TCP, and UDP via raw syscalls, as well as dynamic library transports (e.g. `libcurl` via runtime symbol resolution).
+  - *Benefits:* Bypasses egress filtering and network detection by seamlessly blending traffic into legitimate system channels (e.g. native `libcurl` or custom protocol implementations) without altering core stager logic.
+- **Pluggable Self-Unpacking Packers:** Extensible stub and packer module interface (`pack_<name>.py` + `unpack_stub_<name>.c`). Operators can write custom packing/obfuscation algorithms (built-in options include RC4 stream encryption and greedy LZSS compression) with automatic runtime header patching.
+  - *Benefits:* Breaks static AV/EDR YARA rules and signature matching by encrypting/compressing the Stage 0 payload with unique keys or algorithms, self-unpacking directly into RWX memory at runtime.
 - **Tiny Payload Size:** While emp3r0r agent binaries are ~20MB without compression, this stager is below 1.5KB; the sRDI-like payload it fetches from emp3r0r listener, is ~8MB (compressed from agent binary in ELF shared object format).
 - **Flexible Formats:** Compiles into raw position-independent shellcode (`.bin`), self-unpacking packed shellcode (`packed`), standalone ELF executables, or shared objects (`.so`).
 - **In-Memory Hardening:** Allocates stage memory with read-write permissions, de-obfuscates payloads, and enforces read-execute prior to reflectively executing Stage 1.

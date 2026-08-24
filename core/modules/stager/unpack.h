@@ -11,7 +11,7 @@
  *
  *   [stub .init: _start][stub .text][stub .data: header][packed payload]
  *
- * `_start` (extracted first, so it sits at offset 0 of the packed blob) calls
+ * `_start` (extracted first, sitting at offset 0 of the packed blob) calls
  * the stub's unpack_and_run(), which transforms the packed payload back into
  * the original stager and jumps to it.
  *
@@ -22,10 +22,11 @@
  *   key:           unpacker-specific material (e.g. RC4 key); zero if unused.
  *
  * To add an unpacker:
- *   1. Implement unpack_stub_<name>.c: define unpack_and_run() and call
- *      UNPACK_ENTRY() (see unpack_stub_rc4.c).
- *   2. Implement pack_<name>.py: transform stager.bin and patch the header
- *      (see pack_rc4.py).
+ *   1. Implement unpack_stub_<name>.c: define your unpacker-specific payload
+ *      transformation function and pass it to unpack_run_stub() in
+ *      unpack_and_run(), then call UNPACK_ENTRY() (see unpack_stub_rc4.c).
+ *   2. Implement pack_<name>.py: transform stager.bin using helpers from
+ *      pack_common.py (see pack_rc4.py).
  *   3. Select it with `make packed UNPACKER=<name>`.
  */
 
@@ -54,12 +55,31 @@ static inline long unpack_mmap(void *addr, size_t len, long prot, long flags,
 /* Emit the entry point in .init (offset 0 of the packed blob). Calls the
  * stub's unpack_and_run() and traps if it ever returns. */
 #define UNPACK_ENTRY()                                                        \
-  __asm__(".section .init,\"ax\",@progbits\n"                                \
-          ".global _start\n"                                                 \
-          "_start:\n"                                                        \
-          "xor %rbp, %rbp\n"                                                 \
-          "and $0xfffffffffffffff0, %rsp\n"                                  \
-          "call unpack_and_run\n"                                            \
+  __asm__(".section .init,\"ax\",@progbits\n"                                 \
+          ".global _start\n"                                                  \
+          "_start:\n"                                                         \
+          "xor %rbp, %rbp\n"                                                  \
+          "and $0xfffffffffffffff0, %rsp\n"                                   \
+          "call unpack_and_run\n"                                             \
           "ud2\n")
+
+/* Shared entry logic for all self-unpackers.
+ * Allocates RWX memory via unpack_mmap, invokes the unpacker-specific
+ * payload transformation callback, and jumps to the unpacked entry point. */
+__attribute__((noreturn)) static inline void unpack_run_stub(
+    const struct unpack_header *h,
+    void (*unpack_func)(const uint8_t *src, const struct unpack_header *hdr,
+                        uint8_t *dst)) {
+  const uint8_t *src = (const uint8_t *)(h + 1);
+  long addr = unpack_mmap(0, h->unpacked_size, 7 /* RWX */,
+                          0x22 /* MAP_PRIVATE|MAP_ANONYMOUS */, -1, 0);
+  if (addr < 0)
+    __builtin_trap();
+
+  unpack_func(src, h, (uint8_t *)addr);
+
+  ((void (*)(void))addr)(); /* original stager _start */
+  __builtin_trap();
+}
 
 #endif /* UNPACK_H */
