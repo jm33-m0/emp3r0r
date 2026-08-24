@@ -53,6 +53,20 @@
       "default": "rc4",
       "choices": ["rc4", "lzss"],
       "type": "cstr"
+    },
+    {
+      "name": "dynload-mode",
+      "description": "Which dl* symbols to resolve from libc at runtime: 'public' (dlopen/dlsym/dlclose, glibc >= 2.34) or 'libc_dl' (glibc-internal __libc_dlopen_mode/__libc_dlsym/__libc_dlclose for older glibc)",
+      "default": "public",
+      "choices": ["public", "libc_dl"],
+      "type": "cstr"
+    },
+    {
+      "name": "hash-style",
+      "description": "Dynamic symbol hash table to use: 'auto' (DT_HASH then DT_GNU_HASH), 'sysv' (DT_HASH only), or 'gnu' (DT_GNU_HASH only)",
+      "default": "auto",
+      "choices": ["auto", "sysv", "gnu"],
+      "type": "cstr"
     }
   ]
 }

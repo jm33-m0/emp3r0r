@@ -22,10 +22,15 @@
  *
  * The built-in transports (transport_http.c, transport_tcp.c,
  * transport_udp.c) use raw syscalls and work for every output format,
- * including raw shellcode (.bin). A transport that relies on a dynamic library
- * (dlopen/dlsym against libcurl.so.N, libssl.so.N, ...) only works for the ELF
- * executable and shared-library formats, because raw shellcode has no dynamic
- * linker. See transport_libcurl.c for a complete example.
+ * including raw shellcode (.bin). Transports that need a shared library at
+ * runtime (e.g. libcurl.so.N, libssl.so.N) work for every format too: the
+ * freestanding dynamic loader in dynload.c resolves dlopen/dlsym/dlclose from
+ * libc and loads the library without linking against it. See
+ * transport_libcurl.c for a complete example.
+ *
+ * The Makefile only compiles the support modules a transport needs: raw-socket
+ * transports pull in net_utils.c, dynamic-library transports pull in
+ * dynload.c.
  */
 
 /* Human-readable name of the selected transport (for debug output). */

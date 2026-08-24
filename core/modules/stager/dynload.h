@@ -17,6 +17,17 @@
  *   void *h = dynload_open("libcurl.so.4", RTLD_NOW | RTLD_LOCAL);
  *   void *f = dynload_sym(h, "curl_easy_init");
  *   dynload_close(h);
+ *
+ * Build-time configuration (set via -D in the Makefile, see also build.sh):
+ *   DYNLOAD_MODE=0 (default): resolve public dlopen/dlsym/dlclose from
+ *     libc.so.6 (glibc >= 2.34).
+ *   DYNLOAD_MODE=1: resolve glibc-internal __libc_dlopen_mode/__libc_dlsym/
+ *     __libc_dlclose from libc.so.6 (pre-2.34 glibc).
+ *     Pick the mode matching the target glibc; both resolve only from libc.
+ *
+ *   DYNLOAD_HASH_STYLE=0 (default): use DT_HASH if present, else DT_GNU_HASH.
+ *   DYNLOAD_HASH_STYLE=1: use DT_HASH only.
+ *   DYNLOAD_HASH_STYLE=2: use DT_GNU_HASH only.
  */
 
 /* dlopen() flags (Linux/glibc). */

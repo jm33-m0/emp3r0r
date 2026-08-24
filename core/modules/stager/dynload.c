@@ -26,6 +26,43 @@ typedef struct {
 #define DT_SYMTAB 6
 #define DT_GNU_HASH 0x6ffffef5
 
+/* ---- build-time configuration (overridable via -D in the Makefile) ---- */
+
+/* dl* symbol resolution strategy. Both modes resolve only from libc.so.6.
+ *   DYNLOAD_MODE_PUBLIC  (0): public dlopen/dlsym/dlclose. glibc >= 2.34
+ *     exports them from libc itself.
+ *   DYNLOAD_MODE_LIBC_DL (1): glibc-internal __libc_dlopen_mode/__libc_dlsym/
+ *     __libc_dlclose, always present in libc.so.6 on pre-2.34 glibc where the
+ *     public dl* symbols live in a separate libdl.so.2.
+ */
+#define DYNLOAD_MODE_PUBLIC 0
+#define DYNLOAD_MODE_LIBC_DL 1
+#ifndef DYNLOAD_MODE
+#define DYNLOAD_MODE DYNLOAD_MODE_PUBLIC
+#endif
+
+#if DYNLOAD_MODE == DYNLOAD_MODE_LIBC_DL
+#define DYNLOAD_SYM_DLOPEN "__libc_dlopen_mode"
+#define DYNLOAD_SYM_DLSYM "__libc_dlsym"
+#define DYNLOAD_SYM_DLCLOSE "__libc_dlclose"
+#else
+#define DYNLOAD_SYM_DLOPEN "dlopen"
+#define DYNLOAD_SYM_DLSYM "dlsym"
+#define DYNLOAD_SYM_DLCLOSE "dlclose"
+#endif
+
+/* Dynamic-symbol hash table preference.
+ *   DYNLOAD_HASH_AUTO (0): DT_HASH if present, else DT_GNU_HASH.
+ *   DYNLOAD_HASH_SYSV (1): DT_HASH only.
+ *   DYNLOAD_HASH_GNU  (2): DT_GNU_HASH only.
+ */
+#define DYNLOAD_HASH_AUTO 0
+#define DYNLOAD_HASH_SYSV 1
+#define DYNLOAD_HASH_GNU 2
+#ifndef DYNLOAD_HASH_STYLE
+#define DYNLOAD_HASH_STYLE DYNLOAD_HASH_AUTO
+#endif
+
 /* Cached dl* entry points live in the writable runtime state block (see
  * state.h), not in .data, because the stager image is mapped RX. */
 
@@ -48,8 +85,10 @@ static unsigned long parse_hex(const char *s) {
   return v;
 }
 
-/* Scan /proc/self/maps for libc's base address (0 on failure). */
-static unsigned long find_libc_base(void) {
+/* Scan /proc/self/maps for the base address of the first mapping whose
+ * pathname contains `needle` (e.g. "libc.so" or "libdl.so"). Returns 0 on
+ * failure. */
+static unsigned long find_lib_base(const char *needle) {
   char buf[65536];
   size_t total = 0;
 
@@ -74,7 +113,7 @@ static unsigned long find_libc_base(void) {
       nl++;
     char saved = *nl;
     *nl = '\0';
-    if (strstr(line, "libc.so")) {
+    if (strstr(line, needle)) {
       return parse_hex(line);
     }
     if (saved == '\0')
@@ -84,6 +123,9 @@ static unsigned long find_libc_base(void) {
   return 0;
 }
 
+static unsigned long find_libc_base(void) { return find_lib_base("libc.so"); }
+
+#if DYNLOAD_HASH_STYLE != DYNLOAD_HASH_SYSV
 /* GNU ELF string hash used by DT_GNU_HASH tables. */
 static uint32_t elf_gnu_hash(const char *name) {
   uint32_t h = 5381;
@@ -139,6 +181,7 @@ static void *resolve_sym_gnu(void *base, Elf64_Sym *symtab, const char *strtab,
   }
   return 0;
 }
+#endif /* DYNLOAD_HASH_STYLE != DYNLOAD_HASH_SYSV */
 
 /* Resolve a dynamic symbol `name` from the ELF module loaded at `base`. */
 static void *resolve_sym(void *base, const char *name) {
@@ -161,8 +204,8 @@ static void *resolve_sym(void *base, const char *name) {
 
   Elf64_Sym *symtab = 0;
   const char *strtab = 0;
-  const uint32_t *sysv_hash = 0;
-  const uint32_t *ghash = 0;
+  const uint32_t *sysv_hash __attribute__((unused)) = 0;
+  const uint32_t *ghash __attribute__((unused)) = 0;
   for (; dyn->d_tag != DT_NULL; dyn++) {
     /* Pointer-type DT_* entries hold absolute runtime addresses (the loader
      * relocates them); only st_value below needs the module base added. */
@@ -178,6 +221,7 @@ static void *resolve_sym(void *base, const char *name) {
   if (!symtab || !strtab)
     return 0;
 
+#if DYNLOAD_HASH_STYLE != DYNLOAD_HASH_GNU
   /* SysV hash table (DT_HASH): layout is nbucket, nchain, buckets, chains.
    * nchain is the exact dynamic-symbol count, so a linear scan is safe. */
   if (sysv_hash) {
@@ -190,11 +234,15 @@ static void *resolve_sym(void *base, const char *name) {
     }
     return 0;
   }
+#endif
 
+#if DYNLOAD_HASH_STYLE != DYNLOAD_HASH_SYSV
   /* Some binaries ship only a GNU hash table (DT_GNU_HASH), e.g. glibc built
-   * with --hash-style=gnu. Use it when DT_HASH is absent. */
+   * with --hash-style=gnu. Use it when DT_HASH is absent (or when the build
+   * forces GNU-only). */
   if (ghash)
     return resolve_sym_gnu(base, symtab, strtab, ghash, name);
+#endif
 
   return 0;
 }
@@ -205,12 +253,16 @@ static int resolve_dl(void) {
   if (st->dl_ready == 0)
     return (st->dlopen_ && st->dlsym_ && st->dlclose_) ? 0 : -1;
 
+  /* libc is always mapped in the process; libdl may not be. Resolve the
+   * configured symbol names (public dl* or glibc-internal __libc_dl*) from
+   * libc only. On pre-2.34 glibc use DYNLOAD_MODE=libc_dl. */
   unsigned long libc = find_libc_base();
   if (libc) {
-    st->dlopen_ = (dlopen_fn)resolve_sym((void *)libc, "dlopen");
-    st->dlsym_ = (dlsym_fn)resolve_sym((void *)libc, "dlsym");
-    st->dlclose_ = (dlclose_fn)resolve_sym((void *)libc, "dlclose");
+    st->dlopen_ = (dlopen_fn)resolve_sym((void *)libc, DYNLOAD_SYM_DLOPEN);
+    st->dlsym_ = (dlsym_fn)resolve_sym((void *)libc, DYNLOAD_SYM_DLSYM);
+    st->dlclose_ = (dlclose_fn)resolve_sym((void *)libc, DYNLOAD_SYM_DLCLOSE);
   }
+
   st->dl_ready = 0;
   return (st->dlopen_ && st->dlsym_ && st->dlclose_) ? 0 : -1;
 }
