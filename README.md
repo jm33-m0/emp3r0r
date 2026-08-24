@@ -89,15 +89,16 @@ Direct agent-to-agent file sharing via P2P relay transport (mTLS/KCP) to acceler
 
 Flexible Stage 0 downloader stagers and protocol listeners for initial access and payload delivery.
 
-- **Multi-Protocol Listeners:** Embedded and standalone HTTP, TCP, and UDP listeners with reliable sequence-acknowledgment framing, optional TLS support, and custom HTTP profiles.
+- **Multi-Protocol Listeners:** Embedded and standalone HTTP, TCP, and UDP listeners with reliable sequence-acknowledgment framing and custom HTTP profiles. The standalone listener supports optional TLS (`-tls`), auto-generating a self-signed certificate when no cert/key pair is supplied.
 - **Standalone C Downloader Stager:** Built with direct, libc-independent Linux syscalls for compatibility across distributions without symbol errors.
+- **Encrypted Stage Delivery:** The listener encrypts the staged payload with RC4 using a key derived from an operator-supplied secret; the stager decrypts it in memory before reflective loading.
 - **Pluggable Stager Transports:** Modular transport system allowing operators to drop in custom C transport modules (`transport_<name>.c`). Built-in freestanding options include HTTP, TCP, and UDP via raw syscalls, as well as dynamic library transports (e.g. `libcurl` via runtime symbol resolution).
   - *Benefits:* Bypasses egress filtering and network detection by seamlessly blending traffic into legitimate system channels (e.g. native `libcurl` or custom protocol implementations) without altering core stager logic.
 - **Pluggable Self-Unpacking Packers:** Extensible stub and packer module interface (`pack_<name>.py` + `unpack_stub_<name>.c`). Operators can write custom packing/obfuscation algorithms (built-in options include RC4 stream encryption and greedy LZSS compression) with automatic runtime header patching.
-  - *Benefits:* Breaks static AV/EDR YARA rules and signature matching by encrypting/compressing the Stage 0 payload with unique keys or algorithms, self-unpacking directly into RWX memory at runtime.
+  - *Benefits:* Breaks static AV/EDR YARA rules and signature matching by encrypting/compressing the Stage 0 payload with unique keys or algorithms, self-unpacking into read/write memory that is then flipped to read/execute before execution.
 - **Tiny Payload Size:** While emp3r0r agent binaries are ~20MB without compression, this stager is below 1.5KB; the sRDI-like payload it fetches from emp3r0r listener, is ~8MB (compressed from agent binary in ELF shared object format).
 - **Flexible Formats:** Compiles into raw position-independent shellcode (`.bin`), self-unpacking packed shellcode (`packed`), standalone ELF executables, or shared objects (`.so`).
-- **In-Memory Hardening:** Allocates stage memory with read-write permissions, de-obfuscates payloads, and enforces read-execute prior to reflectively executing Stage 1.
+- **In-Memory Hardening:** Allocates stage memory read/write, de-obfuscates payloads, then enforces read/execute before reflective loading. The self-unpacker never maps RWX (read/write → unpack → read/execute), and mutable stager state lives in a dedicated read/write page rather than in writable code.
 
 ---
 
@@ -153,7 +154,7 @@ Building emp3r0r requires Docker or Podman on the host. No local Go toolchain is
 git clone --depth=1 https://github.com/jm33-m0/emp3r0r.git && cd emp3r0r
 
 # Build inside a container and install locally
-./install.sh
+./install.py
 ```
 
 The installer compiles the core binaries inside a throwaway container, generates the precompiled `emp3r0r-operator-kit.tar.zst`, configures required Linux capabilities (`setcap`), and sets up system runtime directories.
@@ -161,8 +162,11 @@ The installer compiles the core binaries inside a throwaway container, generates
 Options:
 
 ```bash
-./install.sh [--debug] [--disable-garble] [--prefix /usr/local] [--skip-build]
+./install.py [--debug] [--disable-garble] [--prefix /usr/local] [--skip-build] \
+  [--lightweight] [--targets linux/amd64,windows/amd64]
 ```
+
+Use `--lightweight` to build only `linux/amd64` and `windows/amd64` exe/dll targets (fastest, for x86-64-only deployments), or `--targets OS/ARCH,...` to compile a specific set of payload types.
 
 Launch the C2 server:
 
@@ -180,7 +184,7 @@ Transfer the generated `emp3r0r-operator-kit.tar.zst` to your operator machine a
 
 ```bash
 tar --zstd -xpf emp3r0r-operator-kit.tar.zst
-cd ./emp3r0r-operator-kit && ./install.sh
+cd ./emp3r0r-operator-kit && ./install.py
 ```
 
 Connect the operator client to the C2 server using the WireGuard tunnel credentials printed by the server:
