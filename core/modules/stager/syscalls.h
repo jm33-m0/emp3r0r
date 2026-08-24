@@ -400,7 +400,7 @@ typedef struct {
 
 /*
  * Cache for the resolved gadget.
- * Defined in utils.c (single shared instance per binary).
+ * Defined in utils_min.c (single shared instance per binary).
  * MUST be initialized to a non-zero value to be placed in .data (not .bss).
  * Before init_indirect_syscalls() is called, this points to 0x1 (invalid).
  * After init, it points to either a vDSO gadget or the embedded fallback.

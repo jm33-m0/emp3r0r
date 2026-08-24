@@ -1,8 +1,8 @@
 #include "syscalls.h"
 #include "utils.h"
 
-#include <stdarg.h>
-
+/* Single shared instance of the syscall gadget cache.
+ * See syscalls.h for the extern declaration. */
 void *_cached_syscall_gadget __attribute__((visibility("hidden"))) = (void *)1;
 
 void *memcpy(void *dest, const void *src, size_t n) {
@@ -35,37 +35,6 @@ size_t strlen(const char *s) {
   while (*s++)
     len++;
   return len;
-}
-
-int strncmp(const char *s1, const char *s2, size_t n) {
-  while (n && *s1 && (*s1 == *s2)) {
-    s1++;
-    s2++;
-    n--;
-  }
-  if (n == 0)
-    return 0;
-  return *(const unsigned char *)s1 - *(const unsigned char *)s2;
-}
-
-char *strstr(const char *haystack, const char *needle) {
-  size_t nlen = strlen(needle);
-  if (nlen == 0)
-    return (char *)haystack;
-  size_t hlen = strlen(haystack);
-  if (hlen < nlen)
-    return NULL;
-
-  for (size_t i = 0; i <= hlen - nlen; i++) {
-    if (strncmp(haystack + i, needle, nlen) == 0) {
-      return (char *)(haystack + i);
-    }
-  }
-  return NULL;
-}
-
-long getrandom(void *buf, size_t buflen, unsigned int flags) {
-  return syscall3(SYS_getrandom, (long)buf, buflen, flags);
 }
 
 long write(int fd, const void *buf, size_t count) {

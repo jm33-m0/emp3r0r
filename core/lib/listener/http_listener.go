@@ -2,51 +2,17 @@ package listener
 
 import (
 	"context"
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/rand"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"net/http"
 	"os"
 	"sync"
-
-	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 var (
 	server       *http.Server
 	httpServerMu sync.RWMutex
 )
-
-// encryptData encrypts the given data using the AES-128-CTR algorithm and the provided key.
-// The IV is prepended to the encrypted data.
-func encryptData(data, key []byte) []byte {
-	if len(key) != 16 {
-		logging.Fatalf("Key length must be 16 bytes for AES-128-CTR")
-	}
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		logging.Fatalf("Failed to create AES cipher: %v", err)
-	}
-
-	// Generate a random IV
-	iv := make([]byte, aes.BlockSize)
-	if _, err := rand.Read(iv); err != nil {
-		logging.Fatalf("Failed to generate IV: %v", err)
-	}
-	listenerLogf("Generated IV: %s", hex.EncodeToString(iv))
-
-	// Use CTR mode for encryption
-	stream := cipher.NewCTR(block, iv)
-
-	encrypted := make([]byte, len(data))
-	stream.XORKeyStream(encrypted, data)
-
-	// Prepend the IV to the encrypted data
-	return append(iv, encrypted...)
-}
 
 // deriveKeyFromString derives a 16-byte key from a string.
 // The key is derived by XORing the characters of the string.
