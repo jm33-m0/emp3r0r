@@ -72,15 +72,19 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	if os.Getenv("EMP3R0R_RACE_ON") == "1" {
 		t.Skip("Skipping test: race detector is enabled")
 	}
+	transports := []string{"http", "libcurl"}
 	for _, mode := range []string{def.C2ChannelModeH2Conn, "http_poll"} {
-		mode := mode
-		t.Run(mode, func(t *testing.T) {
-			runAgentEndToEndLifecycle(t, mode)
-		})
+		for _, tr := range transports {
+			mode := mode
+			tr := tr
+			t.Run(mode+"/"+tr, func(t *testing.T) {
+				runAgentEndToEndLifecycle(t, mode, tr)
+			})
+		}
 	}
 }
 
-func runAgentEndToEndLifecycle(t *testing.T, mode string) {
+func runAgentEndToEndLifecycle(t *testing.T, mode, tr string) {
 	// 1. Setup workspace
 	tmpDir, err := os.MkdirTemp("", "stager_test_*")
 	if err != nil {
@@ -310,7 +314,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 		"--download-path", "/",
 		"--download-key", stagerKey,
 		"--stager-format", "shellcode",
-		"--listener-type", "HTTP",
+		"--transport", tr,
 		"--debug",
 	)
 	buildCmd.Dir = ".."
@@ -319,14 +323,14 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 	if err != nil {
 		t.Fatalf("build.sh failed: %v\nOutput: %s", err, string(out))
 	}
-	logging.Successf("Stager compiled successfully via build.sh")
+	logging.Successf("Stager compiled successfully via build.sh (%s)", tr)
 
-	stagerBinPath := filepath.Join(tmpDir, "stager.bin")
+	stagerArtifact := filepath.Join(tmpDir, "stager.bin")
 	input, err := os.ReadFile("../stager.bin")
 	if err != nil {
 		t.Fatalf("Failed to read stager.bin: %v", err)
 	}
-	if err := os.WriteFile(stagerBinPath, input, 0o755); err != nil {
+	if err := os.WriteFile(stagerArtifact, input, 0o755); err != nil {
 		t.Fatalf("Failed to copy stager.bin to tmp: %v", err)
 	}
 	logging.Infof("Stage 0 stager size: %d bytes", len(input))
@@ -358,8 +362,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 		t.Fatalf("Stager listener failed to start on port %s", stagerPortStr)
 	}
 
-	// 8. Build a thin shellcode runner for stager.bin.
-	//
+	// 8. Build a thin runner that mmap's the raw stager shellcode and calls it.
 	// stager.bin has its own _start (assembled in downloader.c) so we simply
 	// mmap it RWX and call it with no arguments — the downloader sets up its
 	// own stack frame internally.
@@ -393,9 +396,10 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 		t.Fatalf("Failed to build stager runner: %v\nOutput: %s", err, string(out))
 	}
 
-	// 9. Run the stager runner
-	cmdRunner := exec.Command(runnerBin, stagerBinPath)
 	var stdout, stderr bytes.Buffer
+	cmdRunner := exec.Command(runnerBin, stagerArtifact)
+	logging.Infof("Running stager runner (%s)...", tr)
+
 	cmdRunner.Stdout = &stdout
 	cmdRunner.Stderr = &stderr
 	cmdRunner.Env = append(
@@ -403,9 +407,8 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string) {
 		fmt.Sprintf("HOME=%s", tmpDir),
 		"STAGER_TEST=1",
 	)
-	logging.Infof("Running stager runner...")
 	if err := cmdRunner.Start(); err != nil {
-		t.Fatalf("Failed to start stager runner: %v", err)
+		t.Fatalf("Failed to start stager: %v", err)
 	}
 	doneChan := make(chan error, 1)
 	go func() { doneChan <- cmdRunner.Wait() }()
