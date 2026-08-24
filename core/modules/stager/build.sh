@@ -8,6 +8,7 @@ DOWNLOAD_HOST="127.0.0.1"
 DOWNLOAD_PORT="8000"
 DOWNLOAD_PATH="/"
 DOWNLOAD_KEY=""
+UNPACKER="rc4"
 
 DEBUG_FLAG=""
 
@@ -42,6 +43,10 @@ while [[ $# -gt 0 ]]; do
     DOWNLOAD_KEY="$2"
     shift 2
     ;;
+  --unpacker)
+    UNPACKER="$2"
+    shift 2
+    ;;
   *)
     # Handle --key=value style arguments if passed
     if [[ "$1" == --*=* ]]; then
@@ -55,6 +60,7 @@ while [[ $# -gt 0 ]]; do
       --download-port | --download_port) DOWNLOAD_PORT="$val" ;;
       --download-path | --download_path) DOWNLOAD_PATH="$val" ;;
       --download-key | --download_key) DOWNLOAD_KEY="$val" ;;
+      --unpacker) UNPACKER="$val" ;;
       esac
       shift 1
     else
@@ -67,6 +73,7 @@ done
 echo "[+] Building shellcode stager with options:"
 echo "    Format:        $STAGER_FORMAT"
 echo "    Transport:     $TRANSPORT"
+echo "    Unpacker:      $UNPACKER"
 echo "    Download Host: $DOWNLOAD_HOST"
 echo "    Download Port: $DOWNLOAD_PORT"
 echo "    Download Path: $DOWNLOAD_PATH"
@@ -75,7 +82,7 @@ echo "    Download Key:  [SET]"
 # Clean previous build artifacts
 make clean
 
-# Determine build target based on requested stager format from config.json choices ["so", "executable", "raw"]
+# Determine build target based on requested stager format from config.json choices
 MAKE_TARGET="raw"
 case "$STAGER_FORMAT" in
   so|shared)
@@ -83,6 +90,9 @@ case "$STAGER_FORMAT" in
     ;;
   executable|elf)
     MAKE_TARGET="executable"
+    ;;
+  packed)
+    MAKE_TARGET="packed"
     ;;
   raw|shellcode|"")
     MAKE_TARGET="raw"
@@ -98,6 +108,7 @@ make "$MAKE_TARGET" $DEBUG_FLAG \
   DOWNLOAD_PORT="$DOWNLOAD_PORT" \
   DOWNLOAD_PATH="$DOWNLOAD_PATH" \
   DOWNLOAD_KEY="$DOWNLOAD_KEY" \
-  TRANSPORT="$TRANSPORT"
+  TRANSPORT="$TRANSPORT" \
+  UNPACKER="$UNPACKER"
 
 echo "[+] Stager build complete."

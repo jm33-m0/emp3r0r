@@ -12,8 +12,8 @@
  * self-signed certificates.
  */
 
-#include "transport.h"
 #include "dynload.h"
+#include "transport.h"
 #include "utils.h"
 
 /* Fixed-width rows (not a pointer array) keep this position-independent. */

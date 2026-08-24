@@ -10,9 +10,9 @@
   "parameters": [
     {
       "name": "stager-format",
-      "description": "Stager can be generated as shared library (.so), ELF executable, or raw shellcode (.bin)",
+      "description": "Stager can be generated as shared library (.so), ELF executable, raw shellcode (.bin), or self-unpacking packed shellcode (.bin)",
       "default": "shellcode",
-      "choices": ["so", "executable", "raw"],
+      "choices": ["so", "executable", "raw", "packed"],
       "type": "cstr"
     },
     {
@@ -46,6 +46,13 @@
       "default": "",
       "type": "cstr",
       "secret": true
+    },
+    {
+      "name": "unpacker",
+      "description": "Packing algorithm used for the self-unpacking packed format (rc4: encrypted, lzss: compressed)",
+      "default": "rc4",
+      "choices": ["rc4", "lzss"],
+      "type": "cstr"
     }
   ]
 }
