@@ -47,7 +47,7 @@ COMMON_CFLAGS += -DENCODED_MODULE_PATH="$(XOR_MODULE_PATH)"
 COMMON_CFLAGS += -DENCODED_LIB_PATH="$(XOR_LIB_PATH)"
 COMMON_CFLAGS += -DCONFIG_XOR_KEY=$(XOR_KEY_VALUE)
 
-STAGE0_SRCS = downloader.c $(TRANSPORT_SRC) net_utils.c utils_min.c packer.c rc4.c debug.c syscalls.c
+STAGE0_SRCS = downloader.c dynload.c $(TRANSPORT_SRC) net_utils.c utils_min.c packer.c rc4.c debug.c syscalls.c
 
 STAGE0_TARGET = stager
 SHELLCODE = stager.bin

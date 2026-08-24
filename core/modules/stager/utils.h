@@ -22,9 +22,11 @@
 void *memcpy(void *dest, const void *src, size_t n);
 void *memset(void *s, int c, size_t n);
 size_t strlen(const char *s);
+int strcmp(const char *s1, const char *s2);
+char *strstr(const char *haystack, const char *needle);
 long write(int fd, const void *buf, size_t count);
 long close(int fd);
-long exit(int error_code);
+void exit(int error_code);
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, long offset);
 long munmap(void *addr, size_t length);
 long mprotect(void *addr, size_t len, int prot);
