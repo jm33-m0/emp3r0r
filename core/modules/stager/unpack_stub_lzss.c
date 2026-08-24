@@ -1,6 +1,7 @@
 // unpack_stub_lzss.c — LZSS self-unpacker stub.
 //
-// Decompresses the packed payload into a fresh RWX mapping and jumps to it.
+// Decompresses the packed payload into a fresh RW mapping, which is then
+// flipped to RX, and jumps to it.
 // See unpack.h for the stub/packer contract.
 
 #include "unpack.h"

@@ -18,8 +18,9 @@ def lzss_compress(data):
     heads = {}  # 4-byte hash -> recent positions (oldest first)
 
     def h4(p):
-        return (data[p] | (data[p + 1] << 8) | (data[p + 2] << 16) |
-                (data[p + 3] << 24)) & 0xFFFFFFFF
+        return (
+            data[p] | (data[p + 1] << 8) | (data[p + 2] << 16) | (data[p + 3] << 24)
+        ) & 0xFFFFFFFF
 
     while pos < n:
         flagpos = len(out)
@@ -54,7 +55,7 @@ def lzss_compress(data):
                     heads[h].pop(0)
 
             if best_len >= MIN_MATCH:
-                flags |= (1 << bit)
+                flags |= 1 << bit
                 off = best_off - 1
                 lenc = best_len - MIN_MATCH
                 out.append(off & 0xFF)
@@ -69,11 +70,12 @@ def lzss_compress(data):
 
 def main():
     stub_path, elf_path, payload_path, out_path = parse_args()
-    payload = open(payload_path, 'rb').read()
+    payload = open(payload_path, "rb").read()
     packed = lzss_compress(payload)
-    patch_and_write_packed(stub_path, elf_path, payload, packed, out_path,
-                           algo_name='lzss')
+    patch_and_write_packed(
+        stub_path, elf_path, payload, packed, out_path, algo_name="lzss"
+    )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

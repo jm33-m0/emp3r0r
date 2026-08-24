@@ -52,31 +52,48 @@ static inline long unpack_mmap(void *addr, size_t len, long prot, long flags,
   return ret;
 }
 
+/* Minimal mprotect (SYS_mprotect = 10). Used to flip the unpacked payload
+ * from RW to RX before jumping to it. */
+static inline long unpack_mprotect(void *addr, size_t len, long prot) {
+  long ret;
+  __asm__ __volatile__("syscall"
+                       : "=a"(ret)
+                       : "a"(10), "D"(addr), "S"(len), "d"(prot)
+                       : "rcx", "r11", "memory");
+  return ret;
+}
+
 /* Emit the entry point in .init (offset 0 of the packed blob). Calls the
  * stub's unpack_and_run() and traps if it ever returns. */
-#define UNPACK_ENTRY()                                                        \
-  __asm__(".section .init,\"ax\",@progbits\n"                                 \
-          ".global _start\n"                                                  \
-          "_start:\n"                                                         \
-          "xor %rbp, %rbp\n"                                                  \
-          "and $0xfffffffffffffff0, %rsp\n"                                   \
-          "call unpack_and_run\n"                                             \
+#define UNPACK_ENTRY()                                                         \
+  __asm__(".section .init,\"ax\",@progbits\n"                                  \
+          ".global _start\n"                                                   \
+          "_start:\n"                                                          \
+          "xor %rbp, %rbp\n"                                                   \
+          "and $0xfffffffffffffff0, %rsp\n"                                    \
+          "call unpack_and_run\n"                                              \
           "ud2\n")
 
 /* Shared entry logic for all self-unpackers.
- * Allocates RWX memory via unpack_mmap, invokes the unpacker-specific
- * payload transformation callback, and jumps to the unpacked entry point. */
+ * Allocates read/write memory via unpack_mmap, invokes the unpacker-specific
+ * payload transformation callback, flips the result to read/execute, and
+ * jumps to the unpacked entry point. The unpacked stager manages its own
+ * writable state (see state.h), so the payload never needs to be RWX. */
 __attribute__((noreturn)) static inline void unpack_run_stub(
     const struct unpack_header *h,
     void (*unpack_func)(const uint8_t *src, const struct unpack_header *hdr,
                         uint8_t *dst)) {
   const uint8_t *src = (const uint8_t *)(h + 1);
-  long addr = unpack_mmap(0, h->unpacked_size, 7 /* RWX */,
+  long addr = unpack_mmap(0, h->unpacked_size, 3 /* RW */,
                           0x22 /* MAP_PRIVATE|MAP_ANONYMOUS */, -1, 0);
   if (addr < 0)
     __builtin_trap();
 
   unpack_func(src, h, (uint8_t *)addr);
+
+  /* W^X: make the unpacked stager read-only + executable before jumping. */
+  if (unpack_mprotect((void *)addr, h->unpacked_size, 5 /* RX */) != 0)
+    __builtin_trap();
 
   ((void (*)(void))addr)(); /* original stager _start */
   __builtin_trap();

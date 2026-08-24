@@ -90,7 +90,7 @@ __attribute__((noinline)) void init_indirect_syscalls(void) {
       if (buf[i] == AT_SYSINFO_EHDR) {
         void *gadget = _scan_vdso(buf[i + 1]);
         if (gadget) {
-          _cached_syscall_gadget = gadget;
+          get_stager_state()->syscall_gadget = gadget;
           return;
         }
         break;
@@ -101,5 +101,5 @@ __attribute__((noinline)) void init_indirect_syscalls(void) {
   }
 
 fallback:
-  _cached_syscall_gadget = boot_gadget;
+  get_stager_state()->syscall_gadget = boot_gadget;
 }

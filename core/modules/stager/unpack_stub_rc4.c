@@ -1,7 +1,8 @@
 // unpack_stub_rc4.c — RC4 self-unpacker stub.
 //
-// Decrypts the packed payload (RC4, key from the header) into a fresh RWX
-// mapping and jumps to it. See unpack.h for the stub/packer contract.
+// Decrypts the packed payload (RC4, key from the header) into a fresh RW
+// mapping, which is then flipped to RX, and jumps to it. See unpack.h for the
+// stub/packer contract.
 
 #include "rc4.h"
 #include "unpack.h"

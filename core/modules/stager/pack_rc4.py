@@ -26,12 +26,13 @@ def rc4(data, key):
 
 def main():
     stub_path, elf_path, payload_path, out_path = parse_args()
-    payload = open(payload_path, 'rb').read()
+    payload = open(payload_path, "rb").read()
     key = os.urandom(16)
     packed = rc4(payload, key)
-    patch_and_write_packed(stub_path, elf_path, payload, packed, out_path,
-                           key=key, algo_name='rc4')
+    patch_and_write_packed(
+        stub_path, elf_path, payload, packed, out_path, key=key, algo_name="rc4"
+    )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

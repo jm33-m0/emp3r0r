@@ -1,7 +1,7 @@
 CC = gcc
 COMMON_CFLAGS = -Wall -Wextra -Os -fno-builtin -fno-stack-protector -fPIC -nostdlib -I. \
 								-fno-toplevel-reorder -s -fno-ident -ffunction-sections -fdata-sections \
-								-fno-asynchronous-unwind-tables -fvisibility=hidden
+								-fno-asynchronous-unwind-tables -fvisibility=hidden -ffixed-r15
 
 # Debug support
 ifdef DEBUG
