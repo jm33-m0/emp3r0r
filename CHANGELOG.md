@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.12.2](https://github.com/jm33-m0/emp3r0r/compare/v4.12.1...v4.12.2) (2026-08-26)
+
+
+### Bug Fixes
+
+* **build:** `garble` master branch has upgraded to Go 1.27. Pinning `garble` at `v0.17.0` to retain Go 1.26 compatibility ([254786f](https://github.com/jm33-m0/emp3r0r/commit/254786fa09ced60d40e0a08056f21064d09cd49c))
+* **injection:** fix thread injection (`priv`) module with operator-selected token support ([a602c9f](https://github.com/jm33-m0/emp3r0r/commit/a602c9f8b3819c6622c828059d22f2fa1d0ec896))
+
 ## [4.12.1](https://github.com/jm33-m0/emp3r0r/compare/v4.12.0...v4.12.1) (2026-08-24)
 
 
