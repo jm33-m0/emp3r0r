@@ -1,10 +1,10 @@
 [
   {
-    "name": "impersonate",
+    "name": "thread_inject",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-07-26",
-    "comment": "Inject emp3r0r shellcode into a target process and impersonate it. Original implementation is from Sliver C2",
+    "comment": "Inject shellcode into a target process as a remote thread, running under the operator-selected token (--token <SID>) instead of stealing/adjusting one itself",
     "is_local": false,
     "platform": "Windows",
     "path": "",
@@ -19,22 +19,22 @@
       },
       {
         "name": "payload",
-        "description": "Shellcode payload filename to download via agent.fetch_file. Please generate a NEW payload to avoid duplicated agents. Payloads should be placed under /tmp/emp3r0r/www.",
+        "description": "Shellcode payload filename to fetch via agent.fetch_file. Payloads should be placed under /tmp/emp3r0r/www.",
         "default": "",
         "type": "string",
         "required": true
       },
       {
         "name": "checksum",
-        "description": "SHA256 of the payload.",
+        "description": "SHA256 of the payload, used to verify integrity; won't check if empty",
         "default": "",
         "type": "string",
-        "required": true
+        "required": false
       }
     ],
     "agent_config": {
-      "exec": "impersonate.star",
-      "files": ["impersonate.star"],
+      "exec": "thread_inject.star",
+      "files": ["thread_inject.star"],
       "in_memory": true,
       "type": "starlark",
       "interactive": false

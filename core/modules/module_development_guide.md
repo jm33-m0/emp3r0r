@@ -466,7 +466,7 @@ See these reference implementations:
 | Script                                  | What it demonstrates                                                          |
 | --------------------------------------- | ----------------------------------------------------------------------------- |
 | `core/modules/SA/whoami.star`           | Full token inspection: user, groups, privileges. Thread-token-first fallback. |
-| `core/modules/priv/impersonate.star`    | Enabling privileges on the effective token, remote process injection.         |
+| `core/modules/injection/thread_inject.star` | Remote thread injection under the operator-selected token.          |
 | `core/modules/SA/get_dpapi_system.star` | Checking token elevation before attempting LSA secret extraction.             |
 
 ### 6.5 COFF (BOF) Modules and Tokens
