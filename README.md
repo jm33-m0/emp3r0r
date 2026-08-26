@@ -16,7 +16,7 @@
 
 ---
 
-<img width="1919" height="1076" alt="Screenshot From 2026-08-10 19-37-20" src="https://github.com/user-attachments/assets/d3e4c956-f1e5-4aef-aa35-09573a81b092" />
+<img width="1908" height="1141" alt="Screenshot From 2026-08-26 14-20-24" src="https://github.com/user-attachments/assets/8952f405-2af9-4840-b57f-086498f389b8" />
 
 ## What is emp3r0r?
 
