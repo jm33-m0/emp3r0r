@@ -41,7 +41,7 @@ RUN echo '#!/bin/sh' > /usr/local/bin/x86_64-w64-mingw32-gcc \
 ENV PATH="/usr/local/go/bin:${PATH}"
 
 # Install garble obfuscator globally
-RUN go install mvdan.cc/garble@master \
+RUN go install mvdan.cc/garble@v0.17.0 \
   && mv /root/go/bin/garble /usr/local/bin/garble \
   && rm -rf /root/go
 
