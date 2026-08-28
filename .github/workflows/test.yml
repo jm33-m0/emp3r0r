@@ -82,11 +82,24 @@ jobs:
             mingw-w64-x86_64-gcc
             mingw-w64-i686-gcc
             make
+            nasm
+
+      # The SilentMoonwalk cgo package (lib/syscall/smw) needs
+      # desyncspoofer.syso, assembled from csrc/DesyncSpoofer.asm with nasm
+      # at build time. The .syso is gitignored, so generate it here before
+      # any cgo-enabled test build (go test -race requires cgo).
+      - name: Generate SilentMoonwalk desync object (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        working-directory: ./core
+        run: |
+          make -C lib/syscall/smw
 
       - name: Run tests (Windows, with race)
         if: runner.os == 'Windows'
         working-directory: ./core
         env:
+          CGO_ENABLED: "1"
           EMP3R0R_RACE_ON: "1"
         run: |
           go test -v -race ./...

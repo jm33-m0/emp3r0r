@@ -3,8 +3,9 @@
 #include "textflag.h"
 
 // Signature: func executeSyscall(ssn uint32, gadget uintptr, args []uintptr) uint32
-// Stack frame: $160-48 allocates local stack space for up to 16 arguments
-TEXT ·executeSyscall(SB), NOSPLIT, $160-48
+// Stack frame: $160-44 allocates local stack space for up to 16 arguments.
+// Argument size is 44 = 40 (aligned params) + 4 (uint32 result).
+TEXT ·executeSyscall(SB), NOSPLIT, $160-44
     // Preserve non-volatile registers required by Windows x64 ABI
     MOVQ BX,  120(SP)
     MOVQ R12, 128(SP)
@@ -17,7 +18,7 @@ TEXT ·executeSyscall(SB), NOSPLIT, $160-48
     MOVQ gadget+8(FP), R11
 
     // Extract slice pointer and length
-    MOVQ args_ptr+16(FP), SI
+    MOVQ args_base+16(FP), SI
     MOVQ args_len+24(FP), CX
 
     CMPQ CX, $0
@@ -69,5 +70,5 @@ do_call:
     MOVQ 152(SP), DI
 
     // Move return value from RAX into Go return frame slot
-    MOVQ AX, ret+40(FP)
+    MOVL AX, ret+40(FP)
     RET
