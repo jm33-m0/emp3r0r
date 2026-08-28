@@ -1,0 +1,36 @@
+{
+  "name": "kkyum",
+  "build": "",
+  "author": "jm33-ng",
+  "date": "2026-08-28",
+  "comment": "Load the signed kkyum kernel driver in memory via the in-memory driver loader (driver_load_bytes)",
+  "is_local": false,
+  "platform": "Windows",
+  "path": "",
+  "fileless": true,
+  "module_files_memfs": true,
+  "parameters": [
+    {
+      "name": "action",
+      "description": "Action to take: load, unload, or status",
+      "default": "load",
+      "type": "string",
+      "required": false
+    },
+    {
+      "name": "service",
+      "description": "Driver service name to install/load under",
+      "default": "kkyum",
+      "type": "string",
+      "required": false
+    }
+  ],
+  "agent_config": {
+    "exec": "kkyum.star",
+    "files": ["kkyum.star", "8516410b49bb79c08c19a37c516dad72.sys"],
+    "in_memory": true,
+    "type": "starlark",
+    "interactive": false
+  },
+  "invocation": {}
+}
