@@ -51,6 +51,11 @@ func Run(src []byte, argv []string, customGlobals map[string]any, token uintptr)
 	}
 	predeclared["argv"] = argvList
 
+	// module_files is always predeclared (empty by default). Multi-file
+	// module loaders override it with the memfs paths of companion files so
+	// scripts can enumerate them; a plain script run just sees an empty list.
+	predeclared["module_files"] = starlark.NewList(nil)
+
 	// Load custom globals if any
 	for k, v := range customGlobals {
 		if val, err := convertToStarlarkValue(v); err == nil {

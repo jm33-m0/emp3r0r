@@ -58,6 +58,149 @@ func createTestModule(t *testing.T, content []byte) (path, checksum string) {
 	return tmpFile, checksum
 }
 
+func TestUploadModuleFiles(t *testing.T) {
+	origFetchFile := fetchFile
+	defer func() { fetchFile = origFetchFile }()
+
+	content := []byte("encrypted memfs companion payload")
+	compressed, err := util.Compress(content)
+	if err != nil {
+		t.Fatalf("compress: %v", err)
+	}
+
+	// Stub out the downloader: return the compressed blob for the requested name.
+	fetched := 0
+	fetchFile = func(config *def.Config, peer, file_to_download, path, checksum string) ([]byte, error) {
+		fetched++
+		return compressed, nil
+	}
+
+	memPath := "mem:///multifilemod/data.txt"
+	inv := def.ResolvedInvocation{
+		ModuleFiles: []def.ResolvedModuleFile{
+			{Name: "multifilemod.data.txt.xz", MemPath: memPath, Checksum: "ignored-in-stub"},
+		},
+	}
+
+	memPaths, err := uploadModuleFiles("", inv)
+	if err != nil {
+		t.Fatalf("uploadModuleFiles: %v", err)
+	}
+	if len(memPaths) != 1 || memPaths[0] != memPath {
+		t.Fatalf("unexpected mem paths: %v", memPaths)
+	}
+	if fetched != 1 {
+		t.Fatalf("expected 1 fetch, got %d", fetched)
+	}
+
+	// The companion must be readable from memfs, decompressed.
+	got, err := util.ReadFileAgent(memPath)
+	if err != nil {
+		t.Fatalf("read memfs companion: %v", err)
+	}
+	if string(got) != string(content) {
+		t.Fatalf("memfs content mismatch: got %q want %q", got, content)
+	}
+
+	util.RemoveFileAgent(memPath)
+}
+
+func TestUploadModuleFilesEmptyInvocation(t *testing.T) {
+	origFetchFile := fetchFile
+	defer func() { fetchFile = origFetchFile }()
+
+	fetched := 0
+	fetchFile = func(config *def.Config, peer, file_to_download, path, checksum string) ([]byte, error) {
+		fetched++
+		return nil, nil
+	}
+
+	// No ModuleFiles in the invocation => nothing is fetched or cached.
+	memPaths, err := uploadModuleFiles("", def.ResolvedInvocation{})
+	if err != nil {
+		t.Fatalf("uploadModuleFiles: %v", err)
+	}
+	if memPaths != nil {
+		t.Fatalf("expected nil mem paths, got %v", memPaths)
+	}
+	if fetched != 0 {
+		t.Fatalf("expected no fetch, got %d", fetched)
+	}
+}
+
+func TestModuleHandlerMultiFileStarlark(t *testing.T) {
+	origFetchFile := fetchFile
+	defer func() { fetchFile = origFetchFile }()
+
+	// Main entry-point script (files[0]).
+	mainSrc := `
+def main(*args):
+    if len(module_files) != 1:
+        return "Fail: expected 1 companion file, got %d" % len(module_files)
+    data = read_file(module_files[0])
+    if "companion" not in data:
+        return "Fail: companion content not readable"
+    return "OK"
+`
+	mainCompressed, err := util.Compress([]byte(mainSrc))
+	if err != nil {
+		t.Fatalf("compress main: %v", err)
+	}
+	mainFile := filepath.Join(t.TempDir(), "multi.star.xz")
+	if err := os.WriteFile(mainFile, mainCompressed, 0o600); err != nil {
+		t.Fatalf("write main: %v", err)
+	}
+
+	// Companion file (files[1]), hosted compressed exactly like the C2 does.
+	companionName := "test_multi.data.txt.xz"
+	companionContent := "companion data from memfs"
+	companionCompressed, err := util.Compress([]byte(companionContent))
+	if err != nil {
+		t.Fatalf("compress companion: %v", err)
+	}
+	companionFile := filepath.Join(t.TempDir(), companionName)
+	if err := os.WriteFile(companionFile, companionCompressed, 0o600); err != nil {
+		t.Fatalf("write companion: %v", err)
+	}
+
+	// Downloader stub: serve the right file by name.
+	fetchFile = func(config *def.Config, peer, file_to_download, path, checksum string) ([]byte, error) {
+		switch file_to_download {
+		case mainFile:
+			return mainCompressed, nil
+		case companionName:
+			return companionCompressed, nil
+		}
+		t.Fatalf("unexpected download request: %s", file_to_download)
+		return nil, nil
+	}
+
+	inv := def.ResolvedInvocation{
+		ModuleFiles: []def.ResolvedModuleFile{
+			{
+				Name:     companionName,
+				MemPath:  "mem:///test_multi/data.txt",
+				Checksum: crypto.SHA256SumRaw(companionCompressed),
+			},
+		},
+	}
+
+	out := ModuleHandler("", mainFile, "starlark", "test_multi", crypto.SHA256SumRaw(mainCompressed), inv)
+	if !strings.Contains(out, "OK") {
+		t.Fatalf("expected OK, got: %q", out)
+	}
+
+	// The companion must have landed in memfs for the script to read it.
+	got, err := util.ReadFileAgent("mem:///test_multi/data.txt")
+	if err != nil {
+		t.Fatalf("companion not cached in memfs: %v", err)
+	}
+	if string(got) != companionContent {
+		t.Fatalf("memfs content mismatch: got %q want %q", got, companionContent)
+	}
+	util.RemoveFileAgent("mem:///test_multi/data.txt")
+}
+
 func TestModuleHandler_Bash(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Bash is unix-specific")

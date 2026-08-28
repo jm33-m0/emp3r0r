@@ -10,6 +10,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/script"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -1129,6 +1130,87 @@ func TestReadModConfigWindowsCOFFAutoDependency(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("expected Windows COFF module to auto-depend on coffloader, got %v", config.Dependencies)
+	}
+}
+
+func TestReadModConfigModuleFilesMemFS(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "emp3r0r-modfiles")
+	if err != nil {
+		t.Fatalf("temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	jsonConfig := `{
+		"name": "multifile_mod",
+		"module_files_memfs": true,
+		"agent_config": {
+			"files": ["run.star", "data.txt"],
+			"in_memory": true,
+			"type": "starlark"
+		},
+		"parameters": [],
+		"invocation": {}
+	}`
+
+	configFile := filepath.Join(tmpDir, "config.json")
+	if err := os.WriteFile(configFile, []byte(jsonConfig), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	config, err := readModCondig(configFile)
+	if err != nil {
+		t.Fatalf("readModCondig: %v", err)
+	}
+	if !config.ModuleFilesMemFS {
+		t.Fatalf("expected ModuleFilesMemFS true, got false")
+	}
+	if len(config.AgentConfig.Files) != 2 {
+		t.Fatalf("expected 2 files, got %d", len(config.AgentConfig.Files))
+	}
+}
+
+func TestHostModuleFile(t *testing.T) {
+	origWWWRoot := live.WWWRoot
+	live.WWWRoot = t.TempDir()
+	defer func() { live.WWWRoot = origWWWRoot }()
+
+	// Companion file content that must survive the gzip round-trip.
+	content := []byte("multi-file companion data\n")
+	srcDir := t.TempDir()
+	srcFile := filepath.Join(srcDir, "data.txt")
+	if err := os.WriteFile(srcFile, content, 0o600); err != nil {
+		t.Fatalf("write companion: %v", err)
+	}
+
+	companion, err := hostModuleFile("MultiFileMod", "data.txt", srcFile)
+	if err != nil {
+		t.Fatalf("hostModuleFile: %v", err)
+	}
+
+	// Memfs destination is deterministic and module-scoped.
+	if companion.MemPath != "mem:///multifilemod/data.txt" {
+		t.Fatalf("unexpected MemPath: %q", companion.MemPath)
+	}
+	// Hosted name must be module-unique to avoid cache collisions.
+	if companion.Name != "multifilemod.data.txt.xz" {
+		t.Fatalf("unexpected hosted name: %q", companion.Name)
+	}
+
+	hostedPath := filepath.Join(live.WWWRoot, companion.Name)
+	compressed, err := os.ReadFile(hostedPath)
+	if err != nil {
+		t.Fatalf("hosted file missing: %v", err)
+	}
+	if crypto.SHA256SumRaw(compressed) != companion.Checksum {
+		t.Fatalf("checksum mismatch: %q vs %q", crypto.SHA256SumRaw(compressed), companion.Checksum)
+	}
+
+	decompressed, err := util.Decompress(compressed)
+	if err != nil {
+		t.Fatalf("decompress hosted: %v", err)
+	}
+	if string(decompressed) != string(content) {
+		t.Fatalf("round-trip mismatch: got %q want %q", decompressed, content)
 	}
 }
 
