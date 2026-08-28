@@ -28,14 +28,11 @@ func skipUnderRace(t *testing.T) {
 func ensureSyscallTable(t *testing.T) *ntsyscall.SyscallTable {
 	t.Helper()
 	skipUnderRace(t)
-	if ntsyscall.RuntimeSyscallTable == nil {
-		table, err := ntsyscall.InitializeSyscallTable()
-		if err != nil {
-			t.Fatalf("InitializeSyscallTable failed: %v", err)
-		}
-		ntsyscall.RuntimeSyscallTable = table
+	table, err := ntsyscall.GetRuntimeSyscallTable()
+	if err != nil {
+		t.Fatalf("GetRuntimeSyscallTable failed: %v", err)
 	}
-	return ntsyscall.RuntimeSyscallTable
+	return table
 }
 
 // readSystemDLL returns the bytes of a DLL from the system directory that

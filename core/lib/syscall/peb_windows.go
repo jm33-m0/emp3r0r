@@ -63,6 +63,65 @@ type IMAGE_EXPORT_DIRECTORY struct {
 	AddressOfNameOrdinals uint32
 }
 
+// IMAGE_SECTION_HEADER matches the native PE section table entry layout.
+type IMAGE_SECTION_HEADER struct {
+	Name                 [8]byte
+	VirtualSize          uint32
+	VirtualAddress       uint32
+	SizeOfRawData        uint32
+	PointerToRawData     uint32
+	PointerToRelocations uint32
+	PointerToLinenumbers uint32
+	NumberOfRelocations  uint16
+	NumberOfLinenumbers  uint16
+	Characteristics      uint32
+}
+
+// IMAGE_SCN_MEM_EXECUTE marks a section containing executable code.
+const IMAGE_SCN_MEM_EXECUTE = 0x20000000
+
+// executableRanges returns the [start, end) virtual address ranges of the
+// executable sections in the PE image at base. The syscall gadget lives in
+// the executable text section, so restricting scans to these ranges both
+// speeds them up and avoids false positives from data sections.
+func executableRanges(base uintptr) [][2]uintptr {
+	dosHeader := (*IMAGE_DOS_HEADER)(unsafe.Pointer(base))
+	if dosHeader.E_magic != 0x5A4D { // "MZ"
+		return nil
+	}
+
+	ntHeaderPtr := base + uintptr(dosHeader.E_lfanew)
+	if *(*uint32)(unsafe.Pointer(ntHeaderPtr)) != 0x00004550 { // "PE\0\0"
+		return nil
+	}
+
+	// IMAGE_FILE_HEADER layout: NumberOfSections at +2, SizeOfOptionalHeader at +16.
+	numSections := int(*(*uint16)(unsafe.Pointer(ntHeaderPtr + 6)))
+	sizeOfOptionalHeader := uintptr(*(*uint16)(unsafe.Pointer(ntHeaderPtr + 20)))
+	sectionsPtr := ntHeaderPtr + 24 + sizeOfOptionalHeader
+
+	var ranges [][2]uintptr
+	for i := 0; i < numSections; i++ {
+		sh := (*IMAGE_SECTION_HEADER)(unsafe.Pointer(sectionsPtr + uintptr(i)*unsafe.Sizeof(IMAGE_SECTION_HEADER{})))
+		if sh.Characteristics&IMAGE_SCN_MEM_EXECUTE == 0 {
+			continue
+		}
+
+		size := uintptr(sh.VirtualSize)
+		if uintptr(sh.SizeOfRawData) > size {
+			size = uintptr(sh.SizeOfRawData)
+		}
+		if size == 0 {
+			continue
+		}
+
+		start := base + uintptr(sh.VirtualAddress)
+		ranges = append(ranges, [2]uintptr{start, start + size})
+	}
+
+	return ranges
+}
+
 // String converts a native UNICODE_STRING buffer into a standard Go string.
 func (us *UNICODE_STRING) String() string {
 	if us == nil || us.Buffer == nil || us.Length == 0 {

@@ -36,15 +36,8 @@ func init() {
 // memmod if it has not been set up yet (the agent normally initializes it at
 // startup).
 func ensureSyscallTable() error {
-	if ntsyscall.RuntimeSyscallTable != nil {
-		return nil
-	}
-	table, err := ntsyscall.InitializeSyscallTable()
-	if err != nil {
-		return err
-	}
-	ntsyscall.RuntimeSyscallTable = table
-	return nil
+	_, err := ntsyscall.GetRuntimeSyscallTable()
+	return err
 }
 
 // starlarkMemLoadLibrary maps a DLL image into the current process entirely

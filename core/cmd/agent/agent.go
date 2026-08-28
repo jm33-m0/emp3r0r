@@ -147,9 +147,8 @@ func agent_main() {
 		common.RuntimeConfig.C2TransportProxy = cdnproxyAddr
 	}
 
-	// Initialize Windows syscall table
-	syscall.RuntimeSyscallTable, err = syscall.InitializeSyscallTable()
-	if err != nil {
+	// Initialize Windows syscall table (idempotent, safe for concurrent callers)
+	if _, err := syscall.GetRuntimeSyscallTable(); err != nil {
 		logging.Errorf("Failed to initialize syscall table: %v", err)
 	}
 

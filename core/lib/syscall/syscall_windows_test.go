@@ -108,6 +108,81 @@ func TestInitializeSyscallTable(t *testing.T) {
 	}
 }
 
+func TestGadgetRotation(t *testing.T) {
+	table, err := InitializeSyscallTable()
+	if err != nil {
+		t.Fatalf("InitializeSyscallTable failed: %v", err)
+	}
+
+	if len(table.gadgets) == 0 {
+		t.Fatalf("no syscall gadgets discovered")
+	}
+	t.Logf("discovered %d syscall gadgets", len(table.gadgets))
+
+	seen := make(map[uintptr]bool)
+	for _, g := range table.gadgets {
+		if g == 0 {
+			t.Errorf("gadget address is 0")
+		}
+		if seen[g] {
+			t.Errorf("duplicate gadget address 0x%x", g)
+		}
+		seen[g] = true
+	}
+
+	// Every gadget must lie inside an executable section of ntdll.
+	ranges := executableRanges(ntdllBaseOf(t))
+	for _, g := range table.gadgets {
+		if !addrInRanges(g, ranges) {
+			t.Errorf("gadget 0x%x outside executable sections", g)
+		}
+	}
+
+	info, found := table.GetSyscall("NtOpenProcess")
+	if !found {
+		t.Fatalf("NtOpenProcess not found in SyscallTable")
+	}
+	if info.GadgetAddr == 0 {
+		t.Errorf("default GadgetAddr is 0")
+	}
+}
+
+func ntdllBaseOf(t *testing.T) uintptr {
+	t.Helper()
+	base := GetModuleBaseAddress("ntdll.dll")
+	if base == 0 {
+		t.Fatalf("GetModuleBaseAddress(\"ntdll.dll\") returned 0")
+	}
+	return base
+}
+
+func addrInRanges(addr uintptr, ranges [][2]uintptr) bool {
+	for _, r := range ranges {
+		if addr >= r[0] && addr < r[1] {
+			return true
+		}
+	}
+	return false
+}
+
+func TestGetRuntimeSyscallTable(t *testing.T) {
+	table1, err1 := GetRuntimeSyscallTable()
+	if err1 != nil {
+		t.Fatalf("GetRuntimeSyscallTable failed: %v", err1)
+	}
+	if table1 == nil {
+		t.Fatalf("GetRuntimeSyscallTable returned nil table")
+	}
+
+	table2, err2 := GetRuntimeSyscallTable()
+	if err2 != nil {
+		t.Fatalf("second GetRuntimeSyscallTable failed: %v", err2)
+	}
+	if table2 != table1 {
+		t.Errorf("GetRuntimeSyscallTable not idempotent: got different tables")
+	}
+}
+
 func TestNtSyscalls(t *testing.T) {
 	table, err := InitializeSyscallTable()
 	if err != nil {

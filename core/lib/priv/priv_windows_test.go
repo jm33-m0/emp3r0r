@@ -9,19 +9,14 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// ensureTable sets syscall.RuntimeSyscallTable if it is not already
-// initialized, so that functions relying on the global (Whoami,
+// ensureTable initializes the global syscall table once via
+// GetRuntimeSyscallTable, so that functions relying on the global (Whoami,
 // EnablePrivilege, ExecuteAsToken, GetTokenUserSid, etc.) work in tests.
 func ensureTable(t *testing.T) {
 	t.Helper()
-	if syscall.RuntimeSyscallTable != nil {
-		return
+	if _, err := syscall.GetRuntimeSyscallTable(); err != nil {
+		t.Fatalf("GetRuntimeSyscallTable failed: %v", err)
 	}
-	table, err := syscall.InitializeSyscallTable()
-	if err != nil {
-		t.Fatalf("InitializeSyscallTable failed: %v", err)
-	}
-	syscall.RuntimeSyscallTable = table
 }
 
 func TestWhoami(t *testing.T) {

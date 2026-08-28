@@ -98,15 +98,8 @@ func RunWindowsCOFFViaDLL(dllData, payload []byte, entry string, args []CoffArg,
 // memmod if it has not been set up yet (the agent normally initializes it at
 // startup).
 func ensureSyscallTable() error {
-	if ntsyscall.RuntimeSyscallTable != nil {
-		return nil
-	}
-	table, err := ntsyscall.InitializeSyscallTable()
-	if err != nil {
-		return err
-	}
-	ntsyscall.RuntimeSyscallTable = table
-	return nil
+	_, err := ntsyscall.GetRuntimeSyscallTable()
+	return err
 }
 
 // buildLoadAndRunBuffer builds the buffer expected by COFFLoader's
