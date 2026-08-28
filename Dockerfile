@@ -5,7 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Install build-time and runtime dependencies
 RUN yum update -y && yum install -y epel-release \
-  && yum install -y sudo curl wget git jq tmux zstd libcap make clang xz ca-certificates \
+  && yum install -y sudo curl wget git jq tmux zstd libcap make clang xz nasm ca-certificates \
   && yum clean all \
   && rm -rf /var/cache/yum \
   && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python3

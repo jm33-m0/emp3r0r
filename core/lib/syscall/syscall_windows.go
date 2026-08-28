@@ -81,15 +81,13 @@ func GetRuntimeSyscallTable() (*SyscallTable, error) {
 // Assembly primitive declaration accepting variadic slice
 func executeSyscall(ssn uint32, gadget uintptr, args []uintptr) uint32
 
-// InvokeSyscall executes any NT system call via indirect syscall using variadic arguments
+// InvokeSyscall executes any NT system call using variadic arguments.
+//
+// In windows/amd64 builds with cgo enabled the syscall is executed through
+// SilentMoonwalk (call-stack spoofing) via spoof_call; otherwise it uses a
+// plain indirect syscall through the executeSyscall assembly primitive.
 func (table *SyscallTable) InvokeSyscall(name string, args ...uintptr) (uint32, error) {
-	info, found := table.GetSyscall(name)
-	if !found {
-		return 0, fmt.Errorf("system call %s not found in table", name)
-	}
-
-	status := executeSyscall(info.SSN, table.selectGadget(), args)
-	return status, nil
+	return table.invokeSyscall(name, args...)
 }
 
 // selectGadget picks a syscall gadget for this invocation. Rotating across
@@ -217,6 +215,13 @@ func (t *SyscallTable) GetSyscall(name string) (SyscallInfo, bool) {
 
 	info, exists := t.syscalls[name]
 	return info, exists
+}
+
+// GadgetCount returns the number of syscall gadgets available for rotation.
+func (t *SyscallTable) GadgetCount() int {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return len(t.gadgets)
 }
 
 func bytePtrToString(ptr *byte) string {

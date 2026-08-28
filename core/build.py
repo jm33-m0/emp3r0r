@@ -228,7 +228,7 @@ def check_zig() -> None:
 
 
 def check_build_toolchain() -> None:
-    required = ["make", "clang", "gcc"]
+    required = ["make", "clang", "gcc", "nasm"]
     missing = []
     for tool in required:
         if not shutil.which(tool):
@@ -248,6 +248,49 @@ def check_build_toolchain() -> None:
             log_warn(f"[DRY-RUN] {msg}")
         else:
             log_error(msg)
+
+
+# Path to the SilentMoonwalk desync core relative to core_dir.
+SMW_ASM_REL = pathlib.Path("lib/syscall/smw/csrc/DesyncSpoofer.asm")
+SMW_SYSO_REL = pathlib.Path("lib/syscall/smw/desyncspoofer.syso")
+
+
+def assemble_smw(core_dir: pathlib.Path) -> None:
+    """Assemble the SilentMoonwalk desync core into a .syso object.
+
+    The Go linker consumes .syso files found in a package directory, so the
+    cgo build of lib/syscall/smw needs desyncspoofer.syso to exist. It is
+    generated here (and via `go generate` / `make -C lib/syscall/smw`) rather
+    than committed, so the NASM source stays the single source of truth and
+    only the build environment needs nasm installed.
+    """
+    asm_file = core_dir / SMW_ASM_REL
+    syso_file = core_dir / SMW_SYSO_REL
+
+    if not asm_file.is_file():
+        log_error(f"SilentMoonwalk assembly not found: {asm_file}")
+        return
+
+    # Skip the rebuild when the object is already up to date.
+    try:
+        if syso_file.is_file() and syso_file.stat().st_mtime >= asm_file.stat().st_mtime:
+            log_info(f"SilentMoonwalk .syso is up to date: {syso_file.relative_to(core_dir)}")
+            return
+    except OSError:
+        pass
+
+    nasm = shutil.which("nasm")
+    if not nasm:
+        log_error("nasm not found. Install nasm (see Dockerfile) or run the build inside the builder container.")
+        return
+
+    cmd = f'{nasm} -f win64 "{asm_file}" -o "{syso_file}"'
+    log_info(f"Assembling SilentMoonwalk desync core: {cmd}")
+    if IS_DRY_RUN:
+        return
+    res = run_cmd(cmd, check=False, cwd=str(core_dir), shell=True)
+    if res.returncode != 0 or not syso_file.is_file():
+        log_error(f"Failed to assemble SilentMoonwalk desync core: {cmd}")
 
 
 def install_donut(target_dir: pathlib.Path, search_dir: pathlib.Path | None = None) -> None:
@@ -550,6 +593,7 @@ def build(arg1: str, temp_dir: pathlib.Path, core_dir: pathlib.Path,
             mod_opt = ""
 
     check_zig()
+    assemble_smw(core_dir)
 
     magic_str = hashlib.sha256(os.urandom(32)).hexdigest()
     version = get_version(core_dir)

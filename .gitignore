@@ -291,3 +291,6 @@ vendor/
 
 # Go
 .config/
+
+# SilentMoonwalk desync core (assembled by build.py / go generate / make)
+core/lib/syscall/smw/*.syso
