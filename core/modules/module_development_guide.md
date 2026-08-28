@@ -248,6 +248,7 @@ Must be either `"coff"` (for BOFs) or `"starlark"`.
 An array of relative paths (relative to the directory where `config.json` lives) pointing to the compiled payloads or script files.
 
 - For BOFs, provide the `.x64.o` and `.x86.o` compiled object files. The agent will dynamically load the correct architecture file at runtime.
+- For starlark modules, `files[0]` is the entry-point script; every other entry is a **companion file** that is uploaded to the agent and cached in encrypted memfs (`mem:///`) before the script runs. The script reads them transparently with `read_file()` and can enumerate them via the `module_files` global. This is enabled per-module by setting `"module_files_memfs": true` in the module's own `config.json` (off by default). See `core/modules/kkyum/` for an example: `kkyum.star` loads the companion kernel-driver `.sys` from memfs with `driver_load_bytes`.
 
 #### `parameters`
 
@@ -297,7 +298,7 @@ When the emp3r0r C2 starts, it parses the modules via `InitModules` in `core/int
 3. **Registration:** Stores the valid module into the `def.Modules` memory map.
 4. **Execution:** When the operator runs your module, `moduleCustom` reads the operator's input, validates it against your `parameters`, packs it according to the `type` aliases, and dispatches the task down to the agent memory for fileless execution.
 
-_Note: Currently, only the first file in the `files` list is executed, which in most cases means only `x64` BOFs are picked up._
+_Note: For BOFs, only the arch-matching file from the `files` list is executed (e.g. only the `.x64.o` when the target is amd64). For starlark modules, `files[0]` is the entry point and the rest are memfs companion files (see `agent_config.files` above)._
 
 ---
 
