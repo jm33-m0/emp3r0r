@@ -3,6 +3,11 @@
 // Command smwtool verifies the SilentMoonwalk + indirect-syscall integration
 // in lib/syscall.
 //
+// FIXME: SilentMoonwalk is broken in cgo agents and disabled (see
+// lib/syscall/smw); the spoofed-path checks in this harness are expected to
+// fail until the underlying issue is fixed. The pure-Go fallback checks
+// remain valid.
+//
 // What it exercises:
 //
 //  1. ntdll SSN resolution (table sort vs stub-byte extraction)

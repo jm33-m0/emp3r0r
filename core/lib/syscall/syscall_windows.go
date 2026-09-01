@@ -83,9 +83,9 @@ func executeSyscall(ssn uint32, gadget uintptr, args []uintptr) uint32
 
 // InvokeSyscall executes any NT system call using variadic arguments.
 //
-// In windows/amd64 builds with cgo enabled the syscall is executed through
-// SilentMoonwalk (call-stack spoofing) via spoof_call; otherwise it uses a
-// plain indirect syscall through the executeSyscall assembly primitive.
+// FIXME: SilentMoonwalk call-stack spoofing (lib/syscall/smw) is broken in
+// cgo agents and is disabled; every build (cgo or not) executes the syscall
+// through the pure-Go executeSyscall indirect-syscall primitive.
 func (table *SyscallTable) InvokeSyscall(name string, args ...uintptr) (uint32, error) {
 	return table.invokeSyscall(name, args...)
 }

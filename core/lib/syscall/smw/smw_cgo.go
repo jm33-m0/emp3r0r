@@ -1,7 +1,15 @@
 //go:build windows && amd64 && cgo
 
 // Package smw bridges the Go syscall package to the SilentMoonwalk (SMW)
-// desync call-stack spoofer. It is deliberately a separate package: a cgo
+// desync call-stack spoofer.
+//
+// FIXME: this package is disabled — SilentMoonwalk does not work in cgo
+// agents (the desync trampoline conflicts with cgo's stack/unwind model), so
+// lib/syscall never routes through it and always uses the pure-Go indirect
+// syscall. The code is kept (with its build-time .syso assembly) for when
+// the underlying issue is fixed; see smw_windows_cgo.go.
+//
+// It is deliberately a separate package: a cgo
 // package cannot contain Go assembly files, and the syscall package needs
 // its Go-assembly syscall primitives for the plain (fallback) path.
 //

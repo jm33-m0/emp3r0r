@@ -2,29 +2,17 @@
 
 package syscall
 
-import (
-	"fmt"
+import "fmt"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/syscall/smw"
-)
-
-// invokeSyscall executes an NT syscall with SilentMoonwalk call-stack
-// spoofing: the SMW C wrapper synthesizes fake unwind frames and jumps to a
-// ntdll "syscall; ret" gadget with EAX=SSN. Syscalls with more than 8
-// arguments (e.g. NtCreateUserProcess) or a failed SMW initialization
-// degrade to a plain indirect syscall.
+// FIXME: SilentMoonwalk call-stack spoofing (lib/syscall/smw) is broken in
+// cgo agents — the desync trampoline conflicts with cgo's stack/unwind
+// model, so the spoofed path is disabled. All syscalls are routed through
+// the pure-Go indirect syscall (executeSyscall), exactly like the non-cgo
+// builds; see lib/syscall/smw for the disabled implementation.
 func (table *SyscallTable) invokeSyscall(name string, args ...uintptr) (uint32, error) {
 	info, found := table.GetSyscall(name)
 	if !found {
 		return 0, fmt.Errorf("system call %s not found in table", name)
 	}
-	if len(args) > 8 {
-		return executeSyscall(info.SSN, table.selectGadget(), args), nil
-	}
-
-	status, err := smw.Call(info.SSN, table.selectGadget(), args)
-	if err != nil {
-		return executeSyscall(info.SSN, table.selectGadget(), args), nil
-	}
-	return status, nil
+	return executeSyscall(info.SSN, table.selectGadget(), args), nil
 }

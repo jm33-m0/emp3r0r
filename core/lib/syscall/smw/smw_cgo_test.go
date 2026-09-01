@@ -13,7 +13,13 @@ import (
 
 // TestCallSpoofedSyscall exercises the SilentMoonwalk desync path directly
 // with a real NT syscall (NtOpenProcess on the current process).
+//
+// FIXME: skipped — SilentMoonwalk is broken in cgo agents and disabled
+// (see lib/syscall/smw), so the spoofed path must not be exercised until it
+// is fixed. Remove the Skip once smw_windows_cgo.go routes through smw.Call
+// again.
 func TestCallSpoofedSyscall(t *testing.T) {
+	t.Skip("FIXME: SilentMoonwalk is disabled in cgo agents (lib/syscall/smw)")
 	table, err := ntsyscall.InitializeSyscallTable()
 	if err != nil {
 		t.Fatalf("InitializeSyscallTable failed: %v", err)
