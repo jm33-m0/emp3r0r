@@ -142,7 +142,7 @@ func ParseSessionsOutput(data []byte) (*ParsedCommandOutput, error) {
 	for _, s := range sessions {
 		identity := s.User
 		if s.Domain != "" && s.Domain != "." {
-			identity = fmt.Sprintf("%s\\%s", s.Domain, s.User)
+			identity = fmt.Sprintf("%s/%s", s.Domain, s.User)
 		}
 		result.Rows = append(result.Rows, []string{
 			s.Name,

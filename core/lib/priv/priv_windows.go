@@ -326,7 +326,7 @@ func GetTokenUserSid(hToken windows.Handle) (string, error) {
 	return userSid.String(), nil
 }
 
-// GetTokenFriendlyName resolves a token handle to "DOMAIN\User (SID)".
+// GetTokenFriendlyName resolves a token handle to "DOMAIN/User (SID)".
 func GetTokenFriendlyName(hToken windows.Handle) string {
 	buf, err := queryTokenInfo(hToken, syscall.TokenUser)
 	if err != nil {
@@ -338,7 +338,10 @@ func GetTokenFriendlyName(hToken windows.Handle) string {
 	if err != nil {
 		return fmt.Sprintf("%s (lookup failed)", sidStr)
 	}
-	return fmt.Sprintf("%s\\%s (%s)", domain, account, sidStr)
+	// '/' (not '\') keeps the display consistent with make_token session
+	// names (DOMAIN/user), which use '/' so they survive the CC console's
+	// shell-style word splitting unquoted.
+	return fmt.Sprintf("%s/%s (%s)", domain, account, sidStr)
 }
 
 // GetTokenIntegrityLevel returns the mandatory integrity level SID.
@@ -409,7 +412,7 @@ func lookupPrivilegeName(luid windows.LUID) (string, error) {
 // Whoami (current effective identity)
 // ---------------------------------------------------------------------------
 
-// Whoami returns "DOMAIN\User (SID)" for the current effective security
+// Whoami returns "DOMAIN/User (SID)" for the current effective security
 // context, checking the thread token first (impersonation) then the process
 // token.
 func Whoami() (string, error) {

@@ -9,8 +9,8 @@ import (
 
 func TestParseTokensOutput(t *testing.T) {
 	entries := []def.TokenEntry{
-		{Key: "S-1-5-21-1-2-3", FriendlyName: "CORP\\alice", IsSession: false},
-		{Key: "CORP\\bob", FriendlyName: "CORP\\bob", IsSession: true},
+		{Key: "S-1-5-21-1-2-3", FriendlyName: "CORP/alice", IsSession: false},
+		{Key: "CORP/bob", FriendlyName: "CORP/bob", IsSession: true},
 	}
 	data, err := cbor.Marshal(entries)
 	if err != nil {
@@ -27,7 +27,7 @@ func TestParseTokensOutput(t *testing.T) {
 	if parsed.Rows[0][0] != "S-1-5-21-1-2-3" || parsed.Rows[0][2] != "token" {
 		t.Fatalf("row0 = %v", parsed.Rows[0])
 	}
-	if parsed.Rows[1][0] != "CORP\\bob" || parsed.Rows[1][2] != "make_token session" {
+	if parsed.Rows[1][0] != "CORP/bob" || parsed.Rows[1][2] != "make_token session" {
 		t.Fatalf("row1 = %v", parsed.Rows[1])
 	}
 
@@ -49,7 +49,7 @@ func TestParseTokensOutput(t *testing.T) {
 
 func TestParseSessionsOutput(t *testing.T) {
 	entries := []def.SessionEntry{
-		{Name: "CORP\\jdoe", User: "jdoe", Domain: "CORP", LogonID: 0x1a2b3c4d, CreatedAt: "2026-09-01T00:00:00Z"},
+		{Name: "CORP/jdoe", User: "jdoe", Domain: "CORP", LogonID: 0x1a2b3c4d, CreatedAt: "2026-09-01T00:00:00Z"},
 		{Name: "localadmin", User: "localadmin", Domain: ".", LogonID: 0x42, CreatedAt: "2026-09-01T00:00:00Z"},
 	}
 	data, err := cbor.Marshal(entries)
@@ -64,7 +64,7 @@ func TestParseSessionsOutput(t *testing.T) {
 	if len(parsed.Rows) != 2 {
 		t.Fatalf("unexpected rows: %v", parsed.Rows)
 	}
-	if parsed.Rows[0][0] != "CORP\\jdoe" || parsed.Rows[0][1] != "CORP\\jdoe" || parsed.Rows[0][2] != "0x1a2b3c4d" {
+	if parsed.Rows[0][0] != "CORP/jdoe" || parsed.Rows[0][1] != "CORP/jdoe" || parsed.Rows[0][2] != "0x1a2b3c4d" {
 		t.Fatalf("row0 = %v", parsed.Rows[0])
 	}
 	if parsed.Rows[1][1] != "localadmin" {

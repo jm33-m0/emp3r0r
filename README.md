@@ -120,7 +120,7 @@ Execute in-memory binary modules on both Windows and Linux targets:
 Agents on Windows can steal, cache, and impersonate access tokens from running processes — entirely in-process using indirect NT syscalls.
 
 - **Steal & Cache:** `steal_token --pid <PID>` duplicates a process token via `NtOpenProcess` + `NtDuplicateToken` and stores it in memory by SID. Optionally chain impersonation with `--token <sid>` to escalate from one stolen identity to another.
-- **Enumerate:** `list_tokens` displays all cached tokens with `DOMAIN\User (SID)` names.
+- **Enumerate:** `list_tokens` displays all cached tokens with `DOMAIN/User (SID)` names.
 - **Universal Impersonation:** Reference a cached token by SID (`--token <sid>`) in **any** module — Go, Starlark, COFF/BOF. Thread-level impersonation (`NtSetInformationThread`) is applied around sensitive operations.
 - **Token-Aware Starlark:** Builtins (`read_file`, `write_file`, `exec_cmd`, Win32 API proxy, etc.) automatically impersonate per-syscall when a token is set, and `exec_cmd` can spawn child processes under the stolen identity via `CreateProcessWithTokenW`.
 

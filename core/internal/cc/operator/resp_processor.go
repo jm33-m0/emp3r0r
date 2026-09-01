@@ -80,7 +80,7 @@ func handleListTokens(out []byte, target *def.Emp3r0rAgent) string {
 		return ""
 	}
 	if len(parsed.Rows) == 0 {
-		return "No cached tokens (run: !steal_token --pid <PID> or !make_token --user <USER>)"
+		return "No cached tokens (run: steal_token --pid <PID> or make_token --user <USER>)"
 	}
 
 	outTable := cli.BuildTable(parsed.Headers, parsed.Rows)
@@ -96,7 +96,7 @@ func handleListSessions(out []byte, target *def.Emp3r0rAgent) string {
 		return ""
 	}
 	if len(parsed.Rows) == 0 {
-		return "No netlogon sessions (run: !make_token --user <USER>)"
+		return "No netlogon sessions (run: make_token --user <USER>)"
 	}
 
 	outTable := cli.BuildTable(parsed.Headers, parsed.Rows)

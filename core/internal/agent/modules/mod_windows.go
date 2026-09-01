@@ -59,7 +59,7 @@ func executeWithToken(sid string, action func(token uintptr) error) error {
 
 	raw, ok := priv.TokenMap.Load(sid)
 	if !ok {
-		return fmt.Errorf("token/session not found for %q – steal a token first with steal-token, or create a session with make_token", sid)
+		return fmt.Errorf("token/session not found for %q – steal a token first with steal_token, or create a session with make_token", sid)
 	}
 
 	hToken, ok := raw.(windows.Handle)
@@ -92,7 +92,7 @@ func resolveTokenKey(invocation def.ResolvedInvocation) (string, error) {
 		// --token: SID of a stolen token or a make_token session name.
 		raw, ok := priv.TokenMap.Load(key)
 		if !ok {
-			return "", fmt.Errorf("token/session %q not found – steal a token first (steal-token) or create a session (make_token)", key)
+			return "", fmt.Errorf("token/session %q not found – steal a token first (steal_token) or create a session (make_token)", key)
 		}
 		h, ok := raw.(windows.Handle)
 		if !ok {
@@ -129,18 +129,23 @@ func resolveTokenKey(invocation def.ResolvedInvocation) (string, error) {
 	return key, nil
 }
 
-// splitUserDomain splits "DOMAIN\\user" (or a bare "user") into its parts.
+// splitUserDomain splits "DOMAIN/user" (or the legacy "DOMAIN\user", or a
+// bare "user") into its parts. "DOMAIN/user" is the canonical form: it
+// survives the CC console's shell-style word splitting unquoted, whereas a
+// backslash would be consumed as a shell escape.
 func splitUserDomain(user string) (name, domain string) {
-	if i := strings.Index(user, "\\"); i != -1 {
+	if i := strings.IndexAny(user, "/\\"); i != -1 {
 		return user[i+1:], user[:i]
 	}
 	return user, "."
 }
 
 // sessionNameFor returns the canonical session name for a user/domain pair.
+// See DefaultSessionName: the separator is '/' so the name can be typed
+// unquoted in the CC console without shell-escape mangling.
 func sessionNameFor(user, domain string) string {
 	if domain != "" && domain != "." {
-		return fmt.Sprintf("%s\\%s", domain, user)
+		return fmt.Sprintf("%s/%s", domain, user)
 	}
 	return user
 }

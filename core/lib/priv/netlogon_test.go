@@ -20,8 +20,8 @@ func TestSessionStore(t *testing.T) {
 		Token:   0x1234,
 		LogonID: 0x1a2b3c4d,
 	}
-	if name := DefaultSessionName(sess); name != "CORP\\jdoe" {
-		t.Fatalf("DefaultSessionName = %q, want CORP\\jdoe", name)
+	if name := DefaultSessionName(sess); name != "CORP/jdoe" {
+		t.Fatalf("DefaultSessionName = %q, want CORP/jdoe", name)
 	}
 	// Domain "." is treated as a local account → bare username.
 	local := &LogonSession{User: "admin", Domain: "."}
@@ -41,15 +41,15 @@ func TestSessionStore(t *testing.T) {
 
 	// Auto name from DefaultSessionName.
 	StoreSession("", sess)
-	if _, ok := GetSession("CORP\\jdoe"); !ok {
-		t.Fatalf("session not stored under default name CORP\\jdoe")
+	if _, ok := GetSession("CORP/jdoe"); !ok {
+		t.Fatalf("session not stored under default name CORP/jdoe")
 	}
 
 	// ListSessions reflects the stored entries.
 	entries := ListSessions()
 	found := false
 	for _, e := range entries {
-		if strings.Contains(e, "CORP\\jdoe") && strings.Contains(e, "luid=0x1a2b3c4d") {
+		if strings.Contains(e, "CORP/jdoe") && strings.Contains(e, "luid=0x1a2b3c4d") {
 			found = true
 		}
 	}

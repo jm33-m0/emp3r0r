@@ -396,18 +396,18 @@ emp3r0r supports stealing Windows access tokens from running processes and using
 
 | Command                             | Description                                                                                                                 |
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `!steal_token --pid <PID>`          | Steal the primary token from a process and cache it. Enables `SeDebugPrivilege` and `SeImpersonatePrivilege` automatically. |
-| `!list_tokens`                      | List all cached tokens (DOMAIN\\User + SID).                                                                                |
-| `!make_token --user <USER> ...`     | Create a **netlogon logon session** for a domain user using a dummy password (see §6.8).                                   |
-| `!list_sessions`                    | List all netlogon logon sessions created by `make_token`.                                                                  |
-| `!import_ticket --session <NAME> ...` | Import a base64 KRB-CRED (.kirbi) Kerberos ticket into a session's logon session (see §6.8).                              |
+| `steal_token --pid <PID>`          | Steal the primary token from a process and cache it. Enables `SeDebugPrivilege` and `SeImpersonatePrivilege` automatically. |
+| `list_tokens`                      | List all cached tokens (DOMAIN/User + SID).                                                                                |
+| `make_token --user <USER> ...`     | Create a **netlogon logon session** for a domain user using a dummy password (see §6.8).                                   |
+| `list_sessions`                    | List all netlogon logon sessions created by `make_token`.                                                                  |
+| `import_ticket --session <NAME> ...` | Import a base64 KRB-CRED (.kirbi) Kerberos ticket into a session's logon session (see §6.8).                              |
 
 Every module registered via `config.json` automatically receives three universal parameters:
 
 | Parameter    | Meaning                                                                                                                 |
 | ------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| `--token`    | SID of a stolen token (`!list_tokens`) **or** a make_token session name (`!list_sessions`) to impersonate.               |
-| `--user`     | Create/reuse a make_token netlogon session for this user (`DOMAIN\\user` or plain) and run the module under it.          |
+| `--token`    | SID of a stolen token (`list_tokens`) **or** a make_token session name (`list_sessions`) to impersonate.               |
+| `--user`     | Create/reuse a make_token netlogon session for this user (`DOMAIN/user` or plain) and run the module under it.          |
 | `--ticket`   | Base64 KRB-CRED (.kirbi) to import into the module's logon session (the `--token`/`--user` session, or the current one). |
 
 `--user` is ignored when `--token` is set. If a module declares its own `user`/`ticket` parameter in `config.json`, that declaration wins and the universal meaning is disabled for that module.
@@ -506,7 +506,7 @@ No changes are needed in the BOF source code.
 
 ### 6.7 Privilege Requirements
 
-`!steal_token` automatically enables:
+`steal_token` automatically enables:
 
 - `SeDebugPrivilege` — required to open handles to most processes (especially SYSTEM-level).
 - `SeImpersonatePrivilege` — required to set thread tokens and spawn children via `CreateProcessWithTokenW`.
@@ -541,13 +541,13 @@ The universal `--user`/`--ticket` options let you skip the manual two-step setup
 ```
 kerbeus_klist --user jdoe --ticket <base64 TGT> --token jdoe
 # or, session created on the fly (no --token needed):
-kerbeus_klist --user CORP.LOCAL\jdoe --ticket <base64 TGT>
+kerbeus_klist --user CORP.LOCAL/jdoe --ticket <base64 TGT>
 ```
 
 Notes:
 
-- `!import_ticket --luid <hex> --ticket <b64>` targets an explicit logon session LUID (as printed by `list_sessions`); importing into a session owned by another user requires SYSTEM.
-- `!list_tokens` also shows make_token sessions (annotated with `[make_token session]`), and the `--token`/`--session` completers offer both SIDs and session names.
+- `import_ticket --luid <hex> --ticket <b64>` targets an explicit logon session LUID (as printed by `list_sessions`); importing into a session owned by another user requires SYSTEM.
+- `list_tokens` also shows make_token sessions (annotated with `[make_token session]`), and the `--token`/`--session` completers offer both SIDs and session names.
 - The session token is an impersonation duplicate of the logon token; it remains valid until the agent exits or the session is recreated under the same name.
 
 ---

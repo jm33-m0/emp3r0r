@@ -16,7 +16,7 @@ const (
 	ModStealToken = "steal_token"
 
 	// ModListTokens lists all tokens currently cached in the agent's priv.TokenMap,
-	// displaying each entry as "DOMAIN\User (SID)" for easy reference.
+	// displaying each entry as "DOMAIN/User (SID)" for easy reference.
 	ModListTokens = "list_tokens"
 
 	// ModMakeToken creates a netlogon logon session for a domain user using
@@ -152,7 +152,7 @@ type ResolvedInvocation struct {
 	// read them transparently via read_file("mem:///...").
 	ModuleFiles []ResolvedModuleFile `cbor:"10,keyasint"`
 
-	// SessionUser is the username (optionally DOMAIN\user) of a make_token
+	// SessionUser is the username (optionally DOMAIN/user) of a make_token
 	// netlogon session to create (or reuse) and run this module under.
 	// Windows-only; used when Token is empty. The agent creates the session
 	// with a dummy password if it does not exist yet.
@@ -405,7 +405,7 @@ func populateModules() {
 		Name:     ModListTokens,
 		Build:    "",
 		Date:     "2026-08-09",
-		Comment:  "List all Windows access tokens currently cached in the agent's token store (DOMAIN\\User + SID)",
+		Comment:  "List all Windows access tokens currently cached in the agent's token store (DOMAIN/User + SID)",
 		IsLocal:  false,
 		Platform: "Windows",
 		Path:     "",
@@ -436,7 +436,7 @@ func populateModules() {
 		Options: ModOptions{
 			"user": &ModOption{
 				Name:     "user",
-				Desc:     "Username, optionally DOMAIN\\user",
+				Desc:     "Username, optionally DOMAIN/user",
 				Val:      "",
 				Type:     "string",
 				Required: true,
@@ -456,7 +456,7 @@ func populateModules() {
 			},
 			"name": &ModOption{
 				Name: "name",
-				Desc: "Session name to reference later via the token option (default: DOMAIN\\user)",
+				Desc: "Session name to reference later via the token option (default: DOMAIN/user)",
 				Val:  "",
 				Type: "string",
 			},
@@ -573,7 +573,7 @@ func InjectTokenOption(mod *ModuleConfig) {
 
 	// The token-management built-ins define their own user/ticket parameters.
 	if !isTokenManagementModule(mod.Name) {
-		inject("user", "(Windows) create a make_token netlogon session for this user (DOMAIN\\user or plain) and run the module under it; ignored when --token is set")
+		inject("user", "(Windows) create a make_token netlogon session for this user (DOMAIN/user or plain) and run the module under it; ignored when --token is set")
 		inject("ticket", "(Windows) base64 KRB-CRED (.kirbi) to import into the module's logon session (the --token/--user session, or the current session) before it runs")
 	}
 }

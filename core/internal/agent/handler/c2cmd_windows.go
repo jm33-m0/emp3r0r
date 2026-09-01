@@ -49,10 +49,10 @@ func platformCommands(cmd *cobra.Command) {
 		GroupID: "windows",
 		Run:     runMakeToken,
 	}
-	makeTokenCmd.Flags().StringP("user", "", "", "Username, optionally DOMAIN\\user")
+	makeTokenCmd.Flags().StringP("user", "", "", "Username, optionally DOMAIN/user")
 	makeTokenCmd.Flags().StringP("domain", "", "", "Domain (default: machine domain; '.' for local account)")
 	makeTokenCmd.Flags().StringP("password", "", "", "Password; any dummy value works for a netlogon session")
-	makeTokenCmd.Flags().StringP("name", "", "", "Session name (default: DOMAIN\\user); usable via the token option")
+	makeTokenCmd.Flags().StringP("name", "", "", "Session name (default: DOMAIN/user); usable via the token option")
 	cmd.AddCommand(makeTokenCmd)
 
 	// !list_sessions
@@ -172,9 +172,11 @@ func runMakeToken(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// Accept DOMAIN\user in --user when --domain is not given.
+	// Accept DOMAIN/user (or legacy DOMAIN\user) in --user when --domain is
+	// not given. '/' is the canonical separator: a backslash would be eaten
+	// by the CC console's shell-style word splitting before it gets here.
 	if domain == "" {
-		if i := strings.Index(user, "\\"); i != -1 {
+		if i := strings.IndexAny(user, "/\\"); i != -1 {
 			domain = user[:i]
 			user = user[i+1:]
 		} else {
@@ -199,8 +201,8 @@ func runMakeToken(cmd *cobra.Command, args []string) {
 		"Successfully created netlogon logon session for %s\n"+
 			"  session name : %s (usable via the token option of any BOF/starlark module)\n"+
 			"  logon LUID   : 0x%08x (for kerbeus ptt /luid:)\n"+
-			"  next step    : %s --session %s --ticket <base64 kirbi> to import a ticket",
-		friendly, sessionName, session.LogonID, "!import_ticket", sessionName)
+			"  next step    : import_ticket --session %s --ticket <base64 kirbi> to import a ticket",
+		friendly, sessionName, session.LogonID, sessionName)
 }
 
 // runListSessions implements !list_sessions

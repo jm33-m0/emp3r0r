@@ -161,7 +161,7 @@ func MakeToken(user, domain, password string) (*LogonSession, error) {
 		uintptr(unsafe.Pointer(&hPrimary)),
 	)
 	if r1 == 0 {
-		return nil, fmt.Errorf("LogonUserW(%s\\%s): %v", domain, user, e1)
+		return nil, fmt.Errorf("LogonUserW(%s/%s): %v", domain, user, e1)
 	}
 	defer windows.CloseHandle(hPrimary)
 

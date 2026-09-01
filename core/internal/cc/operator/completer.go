@@ -168,7 +168,7 @@ func listTokens(ctx carapace.Context) carapace.Action {
 }
 
 // autocomplete make_token netlogon session names from target agent
-// Returns only the session name (quoted), e.g. "DOMAIN\\user"
+// Returns only the session name (quoted), e.g. "DOMAIN/user"
 func listSessions(ctx carapace.Context) carapace.Action {
 	activeAgent := agents.MustGetActiveAgent()
 	if activeAgent == nil {

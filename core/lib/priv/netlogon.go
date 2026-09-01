@@ -53,13 +53,18 @@ func GetSession(name string) (*LogonSession, bool) {
 	return session, ok
 }
 
-// DefaultSessionName returns "DOMAIN\user" (or just "user" for local).
+// DefaultSessionName returns "DOMAIN/user" (or just "user" for local).
+//
+// A forward slash is used instead of Windows' backslash so the name survives
+// the CC console's shell-style word splitting unquoted: typing DOMAIN/user
+// keeps its separator, while DOMAIN\user would be consumed as a shell escape
+// and arrive as DOMAINuser.
 func DefaultSessionName(session *LogonSession) string {
 	if session == nil {
 		return ""
 	}
 	if session.Domain != "" && session.Domain != "." {
-		return fmt.Sprintf("%s\\%s", session.Domain, session.User)
+		return fmt.Sprintf("%s/%s", session.Domain, session.User)
 	}
 	return session.User
 }
@@ -72,7 +77,7 @@ func ListSessions() []string {
 		if !ok {
 			return true
 		}
-		entries = append(entries, fmt.Sprintf("%s  %s\\%s  luid=0x%08x  created=%s",
+		entries = append(entries, fmt.Sprintf("%s  %s/%s  luid=0x%08x  created=%s",
 			session.Name, session.Domain, session.User,
 			session.LogonID, session.CreatedAt.Format(time.RFC3339)))
 		return true

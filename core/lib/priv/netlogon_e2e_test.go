@@ -74,7 +74,7 @@ func TestE2EMakeTokenDomainUser(t *testing.T) {
 	// 1) Create session with dummy password, as the operator would.
 	session, err := MakeToken(user, domain, "DummyP4ss!")
 	if err != nil {
-		t.Fatalf("MakeToken(%s\\%s): %v", domain, user, err)
+		t.Fatalf("MakeToken(%s/%s): %v", domain, user, err)
 	}
 	defer windows.CloseHandle(windows.Handle(session.Token))
 	t.Logf("session user=%s domain=%s token=0x%x luid=0x%08x",
@@ -173,7 +173,7 @@ func TestE2EImportRealTGT(t *testing.T) {
 	// 1) make_token session for the SAME principal as the ticket.
 	session, err := MakeToken(machine, domain, "DummyP4ss!")
 	if err != nil {
-		t.Fatalf("MakeToken(%s\\%s): %v", domain, machine, err)
+		t.Fatalf("MakeToken(%s/%s): %v", domain, machine, err)
 	}
 	defer windows.CloseHandle(windows.Handle(session.Token))
 	StoreSession("", session)
