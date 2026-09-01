@@ -93,7 +93,7 @@ func addModuleCommands(rootCmd *cobra.Command) {
 				if len(opt.Vals) > 0 {
 					vals := append([]string(nil), opt.Vals...)
 					flagActions[opt.Name] = carapace.ActionValues(vals...)
-				} else if opt.Name == "token" {
+				} else if opt.Name == "token" || opt.Name == "session" {
 					flagActions[opt.Name] = carapace.ActionCallback(listTokens)
 				}
 			}

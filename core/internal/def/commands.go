@@ -12,6 +12,9 @@ const (
 	C2CmdCleanLog     = "!clean_log"
 	C2CmdStealToken   = "!steal_token"
 	C2CmdListTokens   = "!list_tokens" // API for token auto-completion
+	C2CmdMakeToken    = "!make_token"
+	C2CmdListSessions = "!list_sessions" // API for logon session auto-completion
+	C2CmdImportTicket = "!import_ticket"
 	C2CmdCustomModule = "!custom_module"
 
 	C2CmdStat           = "!stat"

@@ -885,6 +885,22 @@ func resolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.R
 		resolved.Token = strings.TrimSpace(tokenSID)
 	}
 
+	// ── make_token session user + Kerberos ticket (Windows) ────────────────
+	// Injected options: --user creates/reuses a netlogon session for the user
+	// and --ticket imports a KRB-CRED into the resolved session before the
+	// module runs. Only wired when the option was injected (i.e. the module
+	// did not declare its own "user"/"ticket" parameter).
+	if def.OptionWasInjected(config.Name, "user") {
+		if user, ok := flags["user"]; ok {
+			resolved.SessionUser = strings.TrimSpace(user)
+		}
+	}
+	if def.OptionWasInjected(config.Name, "ticket") {
+		if ticket, ok := flags["ticket"]; ok {
+			resolved.Ticket = strings.TrimSpace(ticket)
+		}
+	}
+
 	// ── dependencies & DLL invocation ─────────────────────────────────────
 	resolved.Dependencies = config.Dependencies
 	resolved.DllExport = config.Invocation.DllExport

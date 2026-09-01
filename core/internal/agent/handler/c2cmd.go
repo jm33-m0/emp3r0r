@@ -86,7 +86,7 @@ func C2Commands() *cobra.Command {
 	customModuleCmd.Flags().StringP("file_to_download", "f", "", "File to download")
 	customModuleCmd.RegisterFlagCompletionFunc("file_to_download", memFileCompletion)
 	customModuleCmd.Flags().StringP("peer", "d", "", "Peer agent IP")
-	customModuleCmd.Flags().StringP("token", "k", "", "SID of cached token to impersonate (Windows only)")
+	customModuleCmd.Flags().StringP("token", "k", "", "SID of cached token, or make_token session name, to impersonate (Windows only)")
 	rootCmd.AddCommand(customModuleCmd)
 
 	// C2 Listener command

@@ -189,6 +189,63 @@ func TestResolveInvocationMissingRequired(t *testing.T) {
 	}
 }
 
+// TestResolveInvocationTokenContext verifies that the injected --user/--ticket
+// options are wired into ResolvedInvocation only when they were injected (not
+// declared by the module itself), while --token is always honored.
+func TestResolveInvocationTokenContext(t *testing.T) {
+	// Module with injected options: user/ticket are wired.
+	config := &def.ModuleConfig{
+		Name:        "test_tok_ctx",
+		AgentConfig: def.AgentModuleConfig{Type: "starlark"},
+		Invocation:  def.InvocationSpec{Argv: []def.InvocationArg{}},
+	}
+	def.InjectTokenOption(config)
+
+	inv, err := resolveInvocation(config, map[string]string{
+		"token":  "CORP\\jdoe",
+		"user":   "CORP\\jdoe",
+		"ticket": "doIF8DCCBey...",
+	})
+	if err != nil {
+		t.Fatalf("resolveInvocation: %v", err)
+	}
+	if inv.Token != "CORP\\jdoe" {
+		t.Fatalf("Token = %q, want CORP\\jdoe", inv.Token)
+	}
+	if inv.SessionUser != "CORP\\jdoe" {
+		t.Fatalf("SessionUser = %q, want CORP\\jdoe", inv.SessionUser)
+	}
+	if inv.Ticket != "doIF8DCCBey..." {
+		t.Fatalf("Ticket = %q", inv.Ticket)
+	}
+
+	// Module that declares its own "user" option: it is NOT wired to
+	// SessionUser (it stays a module parameter), but the injected "ticket"
+	// still is.
+	own := &def.ModuleConfig{
+		Name:        "test_tok_own",
+		AgentConfig: def.AgentModuleConfig{Type: "coff"},
+		Invocation:  def.InvocationSpec{Argv: []def.InvocationArg{}},
+		Options: def.ModOptions{
+			"user": {Name: "user", Type: "wstr"},
+		},
+	}
+	def.InjectTokenOption(own)
+	inv2, err := resolveInvocation(own, map[string]string{
+		"user":   "modulearg",
+		"ticket": "abc123",
+	})
+	if err != nil {
+		t.Fatalf("resolveInvocation(own): %v", err)
+	}
+	if inv2.SessionUser != "" {
+		t.Fatalf("SessionUser = %q, want empty for module-declared user", inv2.SessionUser)
+	}
+	if inv2.Ticket != "abc123" {
+		t.Fatalf("Ticket = %q, want abc123", inv2.Ticket)
+	}
+}
+
 func TestResolveInvocationStarlarkArgsFlexible(t *testing.T) {
 	config := &def.ModuleConfig{
 		AgentConfig: def.AgentModuleConfig{Type: "starlark"},
