@@ -87,3 +87,21 @@ type MsgTunData struct {
 	PeerList         []string          `cbor:"9,keyasint"`  // pushed by CC to help with discovery
 	EnrichedPeerList *EnrichedPeerList `cbor:"10,keyasint"` // C2 CA-signed enriched peer list
 }
+
+// TokenEntry is one entry of a !list_tokens response, marshaled as CBOR by
+// the agent and decoded by the CC (completion + console rendering).
+type TokenEntry struct {
+	Key          string `cbor:"1,keyasint"` // SID, or make_token session name when IsSession
+	FriendlyName string `cbor:"2,keyasint"` // human-readable identity of the token
+	IsSession    bool   `cbor:"3,keyasint"` // true when Key is a make_token logon session
+}
+
+// SessionEntry is one entry of a !list_sessions response, marshaled as CBOR
+// by the agent and decoded by the CC (completion + console rendering).
+type SessionEntry struct {
+	Name      string `cbor:"1,keyasint"` // session reference name (usable via the token option)
+	User      string `cbor:"2,keyasint"` // account name
+	Domain    string `cbor:"3,keyasint"` // domain ("." for local accounts)
+	LogonID   uint64 `cbor:"4,keyasint"` // logon session AuthenticationId (LUID)
+	CreatedAt string `cbor:"5,keyasint"` // RFC3339 timestamp
+}

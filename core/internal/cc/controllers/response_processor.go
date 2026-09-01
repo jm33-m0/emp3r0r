@@ -101,6 +101,15 @@ func ProcessAgentResponse(data *def.MsgTunData) (*ProcessedResponse, error) {
 
 	// Determine if output should be shown
 	noNeedToShow := strings.HasPrefix(resp.Command, def.C2CmdListDir)
+	// Quiet responses (completion queries like `!list_tokens --quiet`) still
+	// carry their data back for the completion machinery, but must not be
+	// rendered in the operator console.
+	for _, a := range data.CmdSlice[1:] {
+		if a == "--quiet" {
+			noNeedToShow = true
+			break
+		}
+	}
 
 	resp.ShouldShow = !noNeedToShow
 

@@ -23,6 +23,8 @@ func init() {
 	CommandHandlers.Store("ps", CommandHandler(handlePS))
 	CommandHandlers.Store("ls", CommandHandler(handleLS))
 	CommandHandlers.Store("stat", CommandHandler(handleStat))
+	CommandHandlers.Store("list_tokens", CommandHandler(handleListTokens))
+	CommandHandlers.Store("list_sessions", CommandHandler(handleListSessions))
 }
 
 func handlePS(out []byte, target *def.Emp3r0rAgent) string {
@@ -65,6 +67,38 @@ func handleStat(out []byte, target *def.Emp3r0rAgent) string {
 	}
 
 	// UI rendering only
+	outTable := cli.BuildTable(parsed.Headers, parsed.Rows)
+	cli.AdaptiveTable(outTable)
+	return outTable
+}
+
+func handleListTokens(out []byte, target *def.Emp3r0rAgent) string {
+	parsed, err := controllers.ParseTokensOutput(out)
+	if err != nil {
+		logging.Debugf("list_tokens: %v", err)
+		logging.Errorf("list_tokens: %v", err)
+		return ""
+	}
+	if len(parsed.Rows) == 0 {
+		return "No cached tokens (run: !steal_token --pid <PID> or !make_token --user <USER>)"
+	}
+
+	outTable := cli.BuildTable(parsed.Headers, parsed.Rows)
+	cli.AdaptiveTable(outTable)
+	return outTable
+}
+
+func handleListSessions(out []byte, target *def.Emp3r0rAgent) string {
+	parsed, err := controllers.ParseSessionsOutput(out)
+	if err != nil {
+		logging.Debugf("list_sessions: %v", err)
+		logging.Errorf("list_sessions: %v", err)
+		return ""
+	}
+	if len(parsed.Rows) == 0 {
+		return "No netlogon sessions (run: !make_token --user <USER>)"
+	}
+
 	outTable := cli.BuildTable(parsed.Headers, parsed.Rows)
 	cli.AdaptiveTable(outTable)
 	return outTable

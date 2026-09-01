@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/carapace-sh/carapace"
+	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/controllers"
@@ -166,9 +167,24 @@ func listTokens(ctx carapace.Context) carapace.Action {
 	return carapace.ActionValues(tokens...)
 }
 
+// autocomplete make_token netlogon session names from target agent
+// Returns only the session name (quoted), e.g. "DOMAIN\\user"
+func listSessions(ctx carapace.Context) carapace.Action {
+	activeAgent := agents.MustGetActiveAgent()
+	if activeAgent == nil {
+		logging.Debugf("No valid target selected so no auto-completion for sessions")
+		return carapace.ActionValues()
+	}
+
+	sessions := listSessionsWorker(activeAgent.Tag)
+	return carapace.ActionValues(sessions...)
+}
+
 func listTokensWorker(agent_tag string) (tokens []string) {
 	tokens = make([]string, 0)
-	cmd := def.C2CmdListTokens
+	// --quiet: the data still comes back (read from CmdResults below) but the
+	// CC console skips rendering it (see controllers.ProcessAgentResponse).
+	cmd := def.C2CmdListTokens + " --quiet"
 	job_id := uuid.NewString()
 	resultReady := make(chan struct{}, 1)
 	live.CmdResultsReady.Store(job_id, resultReady)
@@ -179,29 +195,59 @@ func listTokensWorker(agent_tag string) (tokens []string) {
 		logging.Debugf("Cannot list tokens: %v", err)
 		return tokens
 	}
-	raw_entries := []string{}
 	listingCtx, listingCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer listingCancel()
 	select {
 	case <-resultReady:
 		if res, exists := live.CmdResults.Load(job_id); exists {
-			safeListing := util.SanitizeText(res.(string))
-			raw_entries = strings.Split(safeListing, "\n")
+			var entries []def.TokenEntry
+			if err := cbor.Unmarshal([]byte(res.(string)), &entries); err != nil {
+				logging.Debugf("listTokensWorker: unmarshal: %v", err)
+			} else {
+				for _, e := range entries {
+					tokens = append(tokens, strconv.Quote(e.Key))
+				}
+			}
 			live.CmdResults.Delete(job_id)
 		}
 	case <-listingCtx.Done():
 		live.CmdResultsReady.Delete(job_id)
 		logging.Debugf("listTokensWorker: timeout waiting for result")
 	}
-	for _, line := range raw_entries {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "Cached tokens") || strings.HasPrefix(line, "No cached tokens") {
-			continue
-		}
-		// Agent outputs "SID  friendly_name", take the SID (first field)
-		if fields := strings.Fields(line); len(fields) > 0 {
-			tokens = append(tokens, strconv.Quote(fields[0]))
-		}
-	}
 	return tokens
+}
+
+func listSessionsWorker(agent_tag string) (sessions []string) {
+	sessions = make([]string, 0)
+	cmd := def.C2CmdListSessions + " --quiet"
+	job_id := uuid.NewString()
+	resultReady := make(chan struct{}, 1)
+	live.CmdResultsReady.Store(job_id, resultReady)
+
+	err := controllers.ExecuteCommand(cmd, job_id, agent_tag)
+	if err != nil {
+		live.CmdResultsReady.Delete(job_id)
+		logging.Debugf("Cannot list sessions: %v", err)
+		return sessions
+	}
+	listingCtx, listingCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer listingCancel()
+	select {
+	case <-resultReady:
+		if res, exists := live.CmdResults.Load(job_id); exists {
+			var entries []def.SessionEntry
+			if err := cbor.Unmarshal([]byte(res.(string)), &entries); err != nil {
+				logging.Debugf("listSessionsWorker: unmarshal: %v", err)
+			} else {
+				for _, e := range entries {
+					sessions = append(sessions, strconv.Quote(e.Name))
+				}
+			}
+			live.CmdResults.Delete(job_id)
+		}
+	case <-listingCtx.Done():
+		live.CmdResultsReady.Delete(job_id)
+		logging.Debugf("listSessionsWorker: timeout waiting for result")
+	}
+	return sessions
 }

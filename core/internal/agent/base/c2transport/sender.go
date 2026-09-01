@@ -57,6 +57,13 @@ func NotifyC2(cmd *cobra.Command, format string, args ...any) {
 	msg.AgentUUIDSig = base64.URLEncoding.EncodeToString(sig)
 	job_id, _ := cmd.Flags().GetString("job_id")
 	cmdSlice := []string{cmd.Name()}
+	// A --quiet invocation (e.g. `!list_tokens --quiet` issued by the CC
+	// completion machinery) still ships its data back to the CC, but the CC
+	// uses the marker to skip rendering it in the operator console.
+	// Commands without a --quiet flag simply never match (GetBool error ignored).
+	if quiet, _ := cmd.Flags().GetBool("quiet"); quiet {
+		cmdSlice = append(cmdSlice, "--quiet")
+	}
 	msg.JobID = job_id
 	msg.CmdSlice = cmdSlice
 	msg.Response = []byte(fmt.Sprintf(format, args...))
@@ -94,6 +101,11 @@ func NotifyC2Binary(cmd *cobra.Command, data []byte) {
 	msg.AgentUUIDSig = base64.URLEncoding.EncodeToString(sig)
 	job_id, _ := cmd.Flags().GetString("job_id")
 	cmdSlice := []string{cmd.Name()}
+	// Same quiet marker as NotifyC2: completion invocations ship their data
+	// back but are not rendered in the operator console.
+	if quiet, _ := cmd.Flags().GetBool("quiet"); quiet {
+		cmdSlice = append(cmdSlice, "--quiet")
+	}
 	msg.JobID = job_id
 	msg.CmdSlice = cmdSlice
 	msg.Response = data
