@@ -19,6 +19,7 @@ const (
 	// TOKEN_INFORMATION_CLASS values for NtQueryInformationToken
 	TokenUser           = 1
 	TokenPrivileges     = 3
+	TokenStatistics     = 10
 	TokenIntegrityLevel = 25
 
 	// PS_ATTRIBUTE_NUM values for NtCreateUserProcess
