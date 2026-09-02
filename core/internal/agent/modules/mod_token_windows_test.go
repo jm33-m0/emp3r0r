@@ -52,21 +52,21 @@ func TestResolveTokenKeyUserSession(t *testing.T) {
 		return true
 	})
 
-	inv := def.ResolvedInvocation{SessionUser: "CORP\\jdoe"}
+	inv := def.ResolvedInvocation{SessionUser: "CORP/jdoe"}
 	key, err := resolveTokenKey(inv)
 	if err != nil {
 		t.Fatalf("resolveTokenKey(user): %v", err)
 	}
-	if key != "CORP\\jdoe" {
-		t.Fatalf("resolveTokenKey returned key %q, want CORP\\jdoe", key)
+	if key != "CORP/jdoe" {
+		t.Fatalf("resolveTokenKey returned key %q, want CORP/jdoe", key)
 	}
 
 	// Session must be cached and its token registered under the session name.
-	session, ok := priv.GetSession("CORP\\jdoe")
+	session, ok := priv.GetSession("CORP/jdoe")
 	if !ok || session == nil {
 		t.Fatalf("make_token session not stored")
 	}
-	if _, ok := priv.TokenMap.Load("CORP\\jdoe"); !ok {
+	if _, ok := priv.TokenMap.Load("CORP/jdoe"); !ok {
 		t.Fatalf("session token not registered in TokenMap")
 	}
 	if err := executeWithToken(key, func(tok uintptr) error {
@@ -79,13 +79,13 @@ func TestResolveTokenKeyUserSession(t *testing.T) {
 	}
 
 	// Re-resolving with the same user string must reuse the existing session.
-	session1, _ := priv.GetSession("CORP\\jdoe")
-	key2, err := resolveTokenKey(def.ResolvedInvocation{SessionUser: "CORP\\jdoe"})
+	session1, _ := priv.GetSession("CORP/jdoe")
+	key2, err := resolveTokenKey(def.ResolvedInvocation{SessionUser: "CORP/jdoe"})
 	if err != nil {
 		t.Fatalf("resolveTokenKey second call: %v", err)
 	}
-	session2, _ := priv.GetSession("CORP\\jdoe")
-	if key2 != "CORP\\jdoe" || session1 != session2 {
+	session2, _ := priv.GetSession("CORP/jdoe")
+	if key2 != "CORP/jdoe" || session1 != session2 {
 		t.Fatalf("resolveTokenKey did not reuse the session (key2=%q)", key2)
 	}
 

@@ -19,12 +19,13 @@ const (
 	// displaying each entry as "DOMAIN/User (SID)" for easy reference.
 	ModListTokens = "list_tokens"
 
-	// ModMakeToken creates a netlogon logon session for a domain user using
-	// a (dummy) password via LogonUserW(LOGON32_LOGON_NEW_CREDENTIALS). The
-	// resulting session is cached in priv.SessionMap (and its token handle in
-	// priv.TokenMap under the session name) so BOFs/starlark modules can run
-	// under it via the universal "token" option, and Kerberos tickets can be
-	// imported into it.
+	// ModMakeToken creates a netonly netlogon logon session for a domain user
+	// via LogonUserW(LOGON32_LOGON_NEW_CREDENTIALS) — the password is never
+	// validated, any value works (exactly like Cobalt Strike make_token /
+	// runas /netonly). The resulting session is cached in priv.SessionMap (and
+	// its token handle in priv.TokenMap under the session name) so Kerberos
+	// tickets can be imported into it and BOFs/starlark modules can run under
+	// it via the universal "token" option.
 	ModMakeToken = "make_token"
 
 	// ModListSessions lists all netlogon logon sessions created by make_token.
@@ -428,7 +429,7 @@ func populateModules() {
 		Name:     ModMakeToken,
 		Build:    "",
 		Date:     "2026-09-01",
-		Comment:  "Create a netlogon logon session for a domain user (dummy password OK); run BOFs/starlark modules under it via the token option and import Kerberos tickets into it",
+		Comment:  "Create a netonly netlogon logon session for a domain user (any password works, never validated); import Kerberos tickets into it and run BOFs/starlark modules under it via the token option",
 		IsLocal:  false,
 		Platform: "Windows",
 		Path:     "",
@@ -449,7 +450,7 @@ func populateModules() {
 			},
 			"password": &ModOption{
 				Name:   "password",
-				Desc:   "Password; a dummy value is enough for a netlogon (new-credentials) logon",
+				Desc:   "Password; any value works — never validated (netonly / runas /netonly logon, like Cobalt Strike make_token)",
 				Val:    "",
 				Type:   "string",
 				Secret: true,

@@ -51,7 +51,7 @@ func platformCommands(cmd *cobra.Command) {
 	}
 	makeTokenCmd.Flags().StringP("user", "", "", "Username, optionally DOMAIN/user")
 	makeTokenCmd.Flags().StringP("domain", "", "", "Domain (default: machine domain; '.' for local account)")
-	makeTokenCmd.Flags().StringP("password", "", "", "Password; any dummy value works for a netlogon session")
+	makeTokenCmd.Flags().StringP("password", "", "", "Password; any value works — never validated (netonly / runas /netonly, like Cobalt Strike make_token)")
 	makeTokenCmd.Flags().StringP("name", "", "", "Session name (default: DOMAIN/user); usable via the token option")
 	cmd.AddCommand(makeTokenCmd)
 
@@ -201,6 +201,8 @@ func runMakeToken(cmd *cobra.Command, args []string) {
 		"Successfully created netlogon logon session for %s\n"+
 			"  session name : %s (usable via the token option of any BOF/starlark module)\n"+
 			"  logon LUID   : 0x%08x (for kerbeus ptt /luid:)\n"+
+			"  note         : netonly session (runas /netonly) — whoami still shows the current user;\n"+
+			"                 after importing a ticket, network access authenticates WITH the ticket\n"+
 			"  next step    : import_ticket --session %s --ticket <base64 kirbi> to import a ticket",
 		friendly, sessionName, session.LogonID, sessionName)
 }

@@ -517,14 +517,14 @@ If the agent does not hold these privileges (e.g. running as a low-privilege use
 
 Thread impersonation alone is not enough for Kerberos: `ptt`, `asktgt /ptt`, `klist`, … talk to LSA and are bound to a **logon session** (the `AuthenticationId`/LUID registered in LSASS), not to a token. BOFs/starlark modules are token-aware, so without a matching logon session ticket imports fail (`STATUS_ACCESS_DENIED`/`0xC0000022` or the ticket simply not showing up in `klist`).
 
-`make_token` solves this by creating a **netlogon (new-credentials) logon session**:
+`make_token` solves this by creating a **netonly netlogon (new-credentials) logon session** (the same primitive Cobalt Strike's `make_token` / `runas /netonly` use):
 
 ```
 make_token --user jdoe --domain corp.local --password dummy --name jdoe
 # → session name: jdoe, logon LUID: 0x12345678
 ```
 
-Internally it calls `LogonUserW(user, domain, dummy_password, LOGON32_LOGON_NEW_CREDENTIALS, LOGON32_PROVIDER_WINNT50)`, which registers a brand-new logon session in LSASS — no valid password is required. The session is cached agent-side (`priv.SessionMap`) and its token is registered in `priv.TokenMap` under the session name, so **the universal `--token <session>` parameter works for any BOF/starlark module**.
+Internally it calls `LogonUserW(user, domain, any_password, LOGON32_LOGON_NEW_CREDENTIALS, LOGON32_PROVIDER_WINNT50)`, which registers a brand-new logon session in LSASS. **The password is never validated** — any value (or none) works. Because this is a *new-credentials* (netonly) logon, the session token keeps the **calling user's local identity** (`whoami` is unchanged) and the supplied credentials are used only for outbound network connections; what the session gives you is a fresh `AuthenticationId` (LUID) that Kerberos tickets can be bound to. The session is cached agent-side (`priv.SessionMap`) and its token is registered in `priv.TokenMap` under the session name, so **the universal `--token <session>` parameter works for any BOF/starlark module**.
 
 Typical Kerberos workflow:
 
@@ -546,6 +546,8 @@ kerbeus_klist --user CORP.LOCAL/jdoe --ticket <base64 TGT>
 
 Notes:
 
+- After `import_ticket`, outbound network access (SMB shares, RPC, …) under the session authenticates **with the imported Kerberos ticket** — this is the pass-the-ticket flow: `make_token` is the container, the ticket is the identity. Without an imported ticket, network access falls back to the netonly credentials (a dummy password then yields `ERROR_LOGON_FAILURE (1326)` on network resources, as with Cobalt Strike's `make_token`).
+- `whoami`/token-identity BOFs still report the *current* user: the netonly token's SID never changes (PTT changes network identity, not the token SID) — exactly as with Cobalt Strike's `make_token`/`ptt`.
 - `import_ticket --luid <hex> --ticket <b64>` targets an explicit logon session LUID (as printed by `list_sessions`); importing into a session owned by another user requires SYSTEM.
 - `list_tokens` also shows make_token sessions (annotated with `[make_token session]`), and the `--token`/`--session` completers offer both SIDs and session names.
 - The session token is an impersonation duplicate of the logon token; it remains valid until the agent exits or the session is recreated under the same name.

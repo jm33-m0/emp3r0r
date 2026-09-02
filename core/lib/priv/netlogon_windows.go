@@ -117,23 +117,47 @@ func luidFromUint64(v uint64) windows.LUID {
 // make_token
 // ─────────────────────────────────────────────────────────────────────────────
 
-// MakeToken creates a netlogon logon session for the given user using a
-// (dummy) password via LogonUserW(LOGON32_LOGON_NEW_CREDENTIALS,
-// LOGON32_PROVIDER_WINNT50). The returned session carries an
-// impersonation-capable duplicate of the logon token plus the logon session
-// LUID (AuthenticationId), which is what ticket import and LSA-bound Kerberos
+// MakeToken creates a netonly (netlogon) logon session for the given user via
+// LogonUserW(LOGON32_LOGON_NEW_CREDENTIALS, LOGON32_PROVIDER_WINNT50) and
+// returns an impersonation-capable duplicate of the logon token plus the logon
+// session LUID (AuthenticationId) — what ticket import and LSA-bound Kerberos
 // operations need.
+//
+// The password is NEVER validated (exactly like Cobalt Strike's make_token /
+// runas /netonly): any value works, including a dummy or empty one. The
+// resulting token keeps the CALLING user's identity (whoami is unchanged) and
+// the supplied credentials are used only for outbound network connections.
+// Kerberos tickets can be imported into the session's fresh LUID; see
+// LogonSession.NetOnly.
 //
 // It does NOT store the session anywhere: callers use StoreSession to cache
 // it and RegisterSessionToken to make it addressable through the universal
 // "token" option.
 func MakeToken(user, domain, password string) (*LogonSession, error) {
-	if strings.TrimSpace(user) == "" {
+	user = strings.TrimSpace(user)
+	domain = strings.TrimSpace(domain)
+	if user == "" {
 		return nil, errors.New("MakeToken: user must not be empty")
 	}
-	if strings.TrimSpace(domain) == "" {
+	if domain == "" {
 		domain = "."
 	}
+
+	session, err := logonOnce(user, domain, password, logon32LogonNewCredentials)
+	if err != nil {
+		return nil, err
+	}
+	// NEW_CREDENTIALS = runas /netonly: identity is the caller's, credentials
+	// are used for outbound connections only.
+	session.NetOnly = true
+	return session, nil
+}
+
+// logonOnce performs a single LogonUserW of the given type and wraps the
+// resulting primary token into a LogonSession (impersonation duplicate +
+// LUID). A netonly (NEW_CREDENTIALS) logon with an empty password uses the
+// dummy password constant — NEW_CREDENTIALS never validates it.
+func logonOnce(user, domain, password string, logonType uint32) (*LogonSession, error) {
 	if strings.TrimSpace(password) == "" {
 		password = defaultDummyPassword
 	}
@@ -156,12 +180,12 @@ func MakeToken(user, domain, password string) (*LogonSession, error) {
 		uintptr(unsafe.Pointer(userPtr)),
 		uintptr(unsafe.Pointer(domainPtr)),
 		uintptr(unsafe.Pointer(passPtr)),
-		uintptr(logon32LogonNewCredentials),
+		uintptr(logonType),
 		uintptr(logon32ProviderWinnt50),
 		uintptr(unsafe.Pointer(&hPrimary)),
 	)
 	if r1 == 0 {
-		return nil, fmt.Errorf("LogonUserW(%s/%s): %v", domain, user, e1)
+		return nil, fmt.Errorf("LogonUserW(%s/%s, type=%d): %v", domain, user, logonType, e1)
 	}
 	defer windows.CloseHandle(hPrimary)
 

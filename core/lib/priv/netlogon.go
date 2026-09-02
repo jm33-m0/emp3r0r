@@ -26,6 +26,14 @@ type LogonSession struct {
 	Token     uintptr // impersonation-capable token for this session
 	LogonID   uint64  // AuthenticationId (LUID) of the session's logon session
 	CreatedAt time.Time
+
+	// NetOnly is always true for sessions created by MakeToken: it uses
+	// LOGON32_LOGON_NEW_CREDENTIALS (runas /netonly semantics, like Cobalt
+	// Strike's make_token), so the password is never validated, the token
+	// keeps the calling user's identity (whoami is unchanged) and the supplied
+	// credentials are used only for outbound network connections. Kerberos
+	// ticket import still works against the session's fresh LUID.
+	NetOnly bool
 }
 
 // StoreSession caches a session under name in SessionMap.
