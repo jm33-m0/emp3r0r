@@ -466,6 +466,9 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		}
 		rootCmd.AddCommand(socksStatusCmd)
 
+		// sing-tun based transparent proxy (operator side)
+		rootCmd.AddCommand(buildTun2SocksCommand())
+
 		return rootCmd
 	}
 }

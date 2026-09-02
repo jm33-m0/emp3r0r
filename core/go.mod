@@ -21,6 +21,8 @@ require (
 	github.com/posener/h2conn v0.0.0-20231204025407-3997deeca0f0
 	github.com/reeflective/console v0.5.0
 	github.com/refraction-networking/utls v1.8.2
+	github.com/sagernet/sing v0.8.12-0.20260717023913-84ab32b56cb8
+	github.com/sagernet/sing-tun v0.9.0-beta.4
 	github.com/schollz/progressbar/v3 v3.19.1
 	github.com/shadowsocks/go-shadowsocks2 v0.1.5
 	github.com/sliverarmory/malasada v0.0.3
@@ -45,6 +47,13 @@ require (
 )
 
 require (
+	github.com/florianl/go-nfqueue/v2 v2.1.0 // indirect
+	github.com/sagernet/netlink v0.0.0-20260814022025-64455d367bbf // indirect
+	github.com/sagernet/nftables v0.3.0-mod.4 // indirect
+	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba // indirect
+)
+
+require (
 	github.com/Code-Hex/go-wordwrap v1.0.0 // indirect
 	github.com/andybalholm/brotli v1.2.2 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
@@ -53,6 +62,8 @@ require (
 	github.com/coreos/go-iptables v0.8.0 // indirect
 	github.com/dlclark/regexp2 v1.12.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
@@ -85,6 +96,8 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/riobard/go-bloom v0.0.0-20200614022211-cdc8013cb5b3 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/sagernet/fswatch v0.1.2 // indirect
+	github.com/sagernet/gvisor v0.0.0-20260727.0-sing-box-mod.1 // indirect
 	github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529 // indirect
 	github.com/tetratelabs/wazero v1.12.0 // indirect
 	github.com/tjfoc/gmsm v1.4.1 // indirect
