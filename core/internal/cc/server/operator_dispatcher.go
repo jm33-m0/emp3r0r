@@ -50,6 +50,12 @@ func operationDispatcher(w http.ResponseWriter, r *http.Request) {
 		handleGetCA(w, r)
 	case transport.OperatorSignAgent:
 		handleSignAgent(w, r)
+	case transport.OperatorSocks5Start:
+		handleSocks5Start(w, r)
+	case transport.OperatorSocks5Stop:
+		handleSocks5Stop(w, r)
+	case transport.OperatorSocks5List:
+		handleSocks5List(w, r)
 	default:
 		http.Error(w, fmt.Sprintf("Invalid API: %s", api), http.StatusNotFound)
 	}

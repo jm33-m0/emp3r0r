@@ -42,4 +42,10 @@ const (
 	OperatorUpdateConfig = OperatorRoot + "/update_config"
 	// OperatorResume
 	OperatorResume = OperatorRoot + "/resume"
+	// OperatorSocks5Start starts a C2-resident SOCKS5 pivot listener bound to an agent
+	OperatorSocks5Start = OperatorRoot + "/socks5_start"
+	// OperatorSocks5Stop stops a C2-resident SOCKS5 pivot listener
+	OperatorSocks5Stop = OperatorRoot + "/socks5_stop"
+	// OperatorSocks5List lists running C2-resident SOCKS5 pivots
+	OperatorSocks5List = OperatorRoot + "/socks5_list"
 )

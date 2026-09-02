@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -404,6 +405,11 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			// if not a handshake, forward message to operators
 			// also cache it for automated tests or local usage
 			if msg.JobID != "" {
+				// Job responses whose IDs belong to the CC-internal SOCKS5 pivot
+				// are consumed by the socks manager (via live.CmdResultsReady) and
+				// are never owned by an operator session — do not treat their
+				// arrival as an operator-facing problem.
+				socksInternal := strings.HasPrefix(msg.JobID, socksProxyTokenPrefix)
 				if _, knownJob := live.CmdTime.Load(msg.JobID); knownJob {
 					responseToCache := msg.Response
 					if len(responseToCache) > maxCmdResultCacheBytes {
@@ -417,7 +423,7 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 					}
 					// persistence
 					jobs.HandleOutput(msg.JobID, responseToCache)
-				} else {
+				} else if !socksInternal {
 					logging.Warningf("handleMessageTunnel: dropping response for unknown job ID %s", strconv.Quote(msg.JobID))
 				}
 
@@ -431,6 +437,10 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 							logging.Warningf("handleMessageTunnel: targeted relay failed for job %s owner %s: %v", strconv.Quote(msgCopy.JobID), strconv.Quote(ownerSession), relayErr)
 						}
 					}()
+					continue
+				}
+				if socksInternal {
+					logging.Debugf("handleMessageTunnel: SOCKS5 pivot dial failure for job %s", strconv.Quote(msg.JobID))
 					continue
 				}
 				logging.Warningf("CRITICAL: no operator owner for job response %s from agent %s", strconv.Quote(msg.JobID), strconv.Quote(authAgentUUID))

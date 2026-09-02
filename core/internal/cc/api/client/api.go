@@ -171,3 +171,35 @@ func ResumeOperator() error {
 	_, err := SendCBORRequest(transport.OperatorResume, nil)
 	return err
 }
+
+// StartSocks5Proxy asks the C2 server to start a SOCKS5 pivot listener bound to
+// the given agent. Operator traffic (e.g. proxychains over WireGuard) reaching
+// that listener is relayed through the agent.
+func StartSocks5Proxy(agentTag string, port int, bindAddr string) error {
+	_, err := SendCBORRequest(transport.OperatorSocks5Start, def.Socks5ProxyRequest{
+		AgentTag: agentTag,
+		Port:     port,
+		BindAddr: bindAddr,
+	})
+	return err
+}
+
+// StopSocks5Proxy asks the C2 server to stop a running SOCKS5 pivot listener.
+func StopSocks5Proxy(port int) error {
+	_, err := SendCBORRequest(transport.OperatorSocks5Stop, def.Socks5ProxyRequest{Port: port})
+	return err
+}
+
+// ListSocks5Proxies asks the C2 server which SOCKS5 pivots are currently
+// running, so the operator console can auto-populate ports and addresses.
+func ListSocks5Proxies() ([]def.Socks5ProxyStatus, error) {
+	body, err := SendCBORRequest(transport.OperatorSocks5List, nil)
+	if err != nil {
+		return nil, err
+	}
+	var proxies []def.Socks5ProxyStatus
+	if err := cbor.Unmarshal(body, &proxies); err != nil {
+		return nil, fmt.Errorf("unmarshal socks5 proxies: %w", err)
+	}
+	return proxies, nil
+}

