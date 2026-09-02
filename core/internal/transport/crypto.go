@@ -39,8 +39,15 @@ func (b *ByteReadWriteCloser) SetDeadline(t time.Time) error      { return nil }
 func (b *ByteReadWriteCloser) SetReadDeadline(t time.Time) error  { return nil }
 func (b *ByteReadWriteCloser) SetWriteDeadline(t time.Time) error { return nil }
 
-// NewSecureConn creates a new SecureConn using the global AESPassword if no key is provided
+// NewSecureConn creates a new SecureConn using the global AESPassword if no key is provided.
+// If conn is already a *SecureConn it is returned unchanged so callers can safely
+// "wrap" a connection that may have been pre-keyed (e.g. switched to an ephemeral
+// PFS session key) without adding a second encryption/framing layer.
 func NewSecureConn(conn io.ReadWriteCloser) *SecureConn {
+	if sc, ok := conn.(*SecureConn); ok {
+		return sc
+	}
+
 	// If conn is not a net.Conn, wrap it
 	var netConn net.Conn
 	var ok bool

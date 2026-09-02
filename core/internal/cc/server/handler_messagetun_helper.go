@@ -16,8 +16,18 @@ import (
 )
 
 // processKeyExchange handles the ECDH key exchange and session key derivation.
+// The ephemeral session key is established EXACTLY ONCE per tunnel session, during
+// the initial handshake. A fresh ECDH offer after PFS has been established would be
+// a mid-session key change and is not allowed.
 func processKeyExchange(msg *def.MsgTunData, pfsEstablished bool) (replyData, sessionKey []byte, err error) {
 	if len(msg.EphemPublicKey) > 0 {
+		if pfsEstablished {
+			// SECURITY: the session key was already negotiated for this tunnel.
+			// Accepting another ECDH offer would let an authenticated-but-hostile
+			// peer (or a compromised stream) swap the session key mid-session.
+			return nil, nil, fmt.Errorf("agent %s attempted a mid-session PFS re-key (not allowed)", msg.Tag)
+		}
+
 		// 1. Generate Server Ephemeral Key Pair
 		serverPrivKey, err := transport.GenerateEphemeralKeyPair()
 		if err != nil {

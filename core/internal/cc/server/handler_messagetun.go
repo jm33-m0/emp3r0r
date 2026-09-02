@@ -49,10 +49,19 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 	if logging.Level >= 4 {
 		logging.Debugf("handleMessageTunnel: stream start uuid=%s remote=%s", initialAgentUUID, remoteAddr)
 	}
+	// Track PFS state for this connection
+	var (
+		pfsEstablished    bool
+		establishedPFSKey []byte // current ephemeral session key of this tunnel
+	)
 	var wg sync.WaitGroup
 	defer func() {
 		logging.Debugf("handleMessageTunnel exiting")
 		cancel() // Signal goroutine to stop
+		// Drop the ephemeral PFS key before tearing the session down. Guarded by
+		// key equality so the teardown of this tunnel never wipes a newer session
+		// key that may have been negotiated by a racing reconnect.
+		forgetPFSSessionKey(authAgentUUID, establishedPFSKey)
 		// Close the connection BEFORE waiting for the read goroutine.
 		// The goroutine blocks on dec.Decode() reading from this conn, so
 		// without closing first wg.Wait() would deadlock until the agent
@@ -90,8 +99,6 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 		}
 		logging.Debugf("handleMessageTunnel exited")
 	}()
-	// Track PFS state for this connection
-	var pfsEstablished bool
 
 	wg.Go(func() {
 		defer cancel()
@@ -315,6 +322,14 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 					return
 				}
 
+				// Register the ephemeral PFS session key for this agent BEFORE
+				// replying: auxiliary streams (FTP/WWW/proxy) the agent opens right
+				// after the handshake are re-keyed to it by the dispatcher.
+				if sessionKey != nil {
+					establishedPFSKey = sessionKey
+					rememberPFSSessionKey(authAgentUUID, sessionKey)
+				}
+
 				// respond with Server Public Key (or random data), wrapped in MsgTunData
 				replyMsg := def.MsgTunData{
 					JobID:    msg.JobID,
@@ -325,14 +340,11 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 				err = encoder.Encode(replyMsg)
 				if err == nil {
 					if sessionKey != nil {
-						// 6. Switch to Session Key (only if exchange was successful)
+						// 6. Switch to Session Key (only the initial exchange can yield
+						// one — mid-session re-key offers are rejected upstream).
 						secureConn.SetKey(sessionKey)
-						if !pfsEstablished {
-							logging.Infof("SecureConn: Switched to ephemeral session key for %s (PFS enabled)", msg.Tag)
-							pfsEstablished = true
-						} else {
-							logging.Debugf("SecureConn: Re-keyed ephemeral session key for %s", msg.Tag)
-						}
+						logging.Infof("SecureConn: Switched to ephemeral session key for %s (PFS enabled)", msg.Tag)
+						pfsEstablished = true
 					}
 
 					// Only push PeerList to TRUSTED agents (must have established PFS)
