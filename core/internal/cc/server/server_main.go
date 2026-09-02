@@ -12,6 +12,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/relay"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/wireguard"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
@@ -96,38 +97,38 @@ func wg(wg_port, numOperators int) {
 		if err != nil {
 			logging.Fatalf("Failed to parse WireGuard config: %v", err)
 		}
-		netutil.WgServerIP = config.ServerIP
+		wireguard.WgServerIP = config.ServerIP
 		server_privkey = config.ServerPrivateKey
 		subnet = config.Subnet
 		operators = config.Operators
 
-		server_pubkey, err = netutil.PublicKeyFromPrivate(server_privkey)
+		server_pubkey, err = wireguard.PublicKeyFromPrivate(server_privkey)
 		if err != nil {
 			logging.Fatalf("Failed to generate server public key: %v", err)
 		}
 	} else {
-		server_privkey, err = netutil.GeneratePrivateKey()
+		server_privkey, err = wireguard.GeneratePrivateKey()
 		if err != nil {
 			logging.Fatalf("Failed to generate server private key: %v", err)
 		}
-		server_pubkey, err = netutil.PublicKeyFromPrivate(server_privkey)
+		server_pubkey, err = wireguard.PublicKeyFromPrivate(server_privkey)
 		if err != nil {
 			logging.Fatalf("Failed to generate server public key: %v", err)
 		}
 
 		// network address
 		subnet = netutil.GenerateRandomPrivateSubnet24()
-		netutil.WgServerIP, _ = netutil.GenerateRandomIPInSubnet24(subnet)
+		wireguard.WgServerIP, _ = netutil.GenerateRandomIPInSubnet24(subnet)
 
 		// Generate operator configs
 		operators = make([]OperatorConfig, numOperators)
 
 		for i := range numOperators {
-			operator_privkey, err := netutil.GeneratePrivateKey()
+			operator_privkey, err := wireguard.GeneratePrivateKey()
 			if err != nil {
 				logging.Fatalf("Failed to generate operator private key: %v", err)
 			}
-			operator_pubkey, err := netutil.PublicKeyFromPrivate(operator_privkey)
+			operator_pubkey, err := wireguard.PublicKeyFromPrivate(operator_privkey)
 			if err != nil {
 				logging.Fatalf("Failed to generate operator public key: %v", err)
 			}
@@ -135,7 +136,7 @@ func wg(wg_port, numOperators int) {
 
 			// Save for the first operator (backward compatibility)
 			if i == 0 {
-				netutil.WgOperatorIP = operatorIP
+				wireguard.WgOperatorIP = operatorIP
 			}
 
 			operators[i] = OperatorConfig{
@@ -147,7 +148,7 @@ func wg(wg_port, numOperators int) {
 
 		// Save config
 		config := SavedWgConfig{
-			ServerIP:         netutil.WgServerIP,
+			ServerIP:         wireguard.WgServerIP,
 			ServerPrivateKey: server_privkey,
 			Subnet:           subnet,
 			Operators:        operators,
@@ -162,27 +163,27 @@ func wg(wg_port, numOperators int) {
 		}
 	}
 
-	peers := make([]netutil.PeerConfig, len(operators))
+	peers := make([]wireguard.PeerConfig, len(operators))
 	for i, op := range operators {
-		peers[i] = netutil.PeerConfig{
+		peers[i] = wireguard.PeerConfig{
 			PublicKey:  op.PublicKey,
 			AllowedIPs: op.IP + "/32",
 		}
 		// Save for the first operator (backward compatibility)
 		if i == 0 {
-			netutil.WgOperatorIP = op.IP
+			wireguard.WgOperatorIP = op.IP
 		}
 	}
 
-	wgConfig := netutil.WireGuardConfig{
-		IPAddress:     netutil.WgServerIP + "/24",
+	wgConfig := wireguard.WireGuardConfig{
+		IPAddress:     wireguard.WgServerIP + "/24",
 		InterfaceName: "emp_server",
 		ListenPort:    wg_port,
 		PrivateKey:    server_privkey,
 		Peers:         peers,
 	}
 	go func() {
-		netutil.WgServer, err = netutil.WireGuardMain(wgConfig)
+		wireguard.WgServer, err = wireguard.WireGuardMain(wgConfig)
 		if err != nil {
 			logging.Fatalf("Failed to start WireGuard server: %v", err)
 		}
@@ -191,7 +192,7 @@ func wg(wg_port, numOperators int) {
 	// Create server config table
 	headers := []string{"Parameter", "Value"}
 	rows := [][]string{
-		{"C2 Server IP (WG)", netutil.WgServerIP},
+		{"C2 Server IP (WG)", wireguard.WgServerIP},
 		{"C2 Server Port", strconv.Itoa(wg_port)},
 		{"C2 Public Key", server_pubkey},
 	}
@@ -313,9 +314,9 @@ func generateConnectionCommands(wg_port int, server_pubkey string, operators []O
 	if len(operators) > 0 {
 		op := operators[0]
 		localCmd := fmt.Sprintf("emp3r0r client --c2-host 127.0.0.1 --operator-port %d --server-wg-key '%s' --server-wg-ip '%s' --operator-wg-ip '%s' --operator-wg-key '%s'",
-			wg_port, server_pubkey, netutil.WgServerIP, op.IP, op.PrivateKey)
+			wg_port, server_pubkey, wireguard.WgServerIP, op.IP, op.PrivateKey)
 		remoteCmd := fmt.Sprintf("emp3r0r client --operator-port %d --server-wg-key '%s' --server-wg-ip '%s' --operator-wg-ip '%s' --operator-wg-key '%s' --c2-host <YOUR_PUBLIC_IP>",
-			wg_port, server_pubkey, netutil.WgServerIP, op.IP, op.PrivateKey)
+			wg_port, server_pubkey, wireguard.WgServerIP, op.IP, op.PrivateKey)
 
 		logging.Successf("\n💡 Example Commands (for Operator 1):")
 		logging.Successf("   Local:  %s", localCmd)
@@ -326,5 +327,5 @@ func generateConnectionCommands(wg_port int, server_pubkey string, operators []O
 // generateClientCommand generates a client connection command for a specific operator
 func generateClientCommand(wg_port int, server_pubkey string, op OperatorConfig) string {
 	return fmt.Sprintf("emp3r0r client --operator-port %d --server-wg-key '%s' --server-wg-ip '%s' --operator-wg-ip '%s' --operator-wg-key '%s' --c2-host <C2_PUBLIC_IP>",
-		wg_port, server_pubkey, netutil.WgServerIP, op.IP, op.PrivateKey)
+		wg_port, server_pubkey, wireguard.WgServerIP, op.IP, op.PrivateKey)
 }

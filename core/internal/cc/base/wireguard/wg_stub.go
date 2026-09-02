@@ -1,7 +1,7 @@
 //go:build !linux
 // +build !linux
 
-package netutil
+package wireguard
 
 import (
 	"context"

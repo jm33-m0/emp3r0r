@@ -15,12 +15,12 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	clientpkg "github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/wireguard"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
-	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 )
 
 func TestOperatorConnection(t *testing.T) {
@@ -49,8 +49,8 @@ func TestOperatorConnection(t *testing.T) {
 	transport.OperatorClientKeyFile = filepath.Join(tempDir, "operator-client-key.pem")
 
 	// Set WireGuard IP to localhost for testing
-	netutil.WgServerIP = "127.0.0.1"
-	netutil.WgOperatorIP = "127.0.0.1"
+	wireguard.WgServerIP = "127.0.0.1"
+	wireguard.WgOperatorIP = "127.0.0.1"
 
 	// Set IsServer to true so InitCertsAndConfig generates certs
 	live.IsServer = true

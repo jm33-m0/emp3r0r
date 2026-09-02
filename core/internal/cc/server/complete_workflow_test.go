@@ -20,10 +20,10 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/wireguard"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
-	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 )
 
 func TestCompleteWorkflow_MultiOperator(t *testing.T) {
@@ -58,7 +58,7 @@ func TestCompleteWorkflow_MultiOperator(t *testing.T) {
 	}
 
 	// Important: We need a stable IP for the SANs that we will use in SNI
-	netutil.WgOperatorIP = "10.0.0.1"
+	wireguard.WgOperatorIP = "10.0.0.1"
 
 	// Generate operator server cert with multiple operator IPs in SANs
 	_, err = transport.GenCerts([]string{"10.0.0.1", "10.0.0.2", "127.0.0.1"}, transport.OperatorServerCrtFile, transport.OperatorServerKeyFile, transport.OperatorCaKeyFile, transport.OperatorCaCrtFile, false)
@@ -163,7 +163,7 @@ func TestCompleteWorkflow_MultiOperator(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			relayAddr := tt.relay.Listener.Addr().(*net.TCPAddr)
-			netutil.WgRelayedHTTPPort = relayAddr.Port
+			wireguard.WgRelayedHTTPPort = relayAddr.Port
 			relayIP := relayAddr.IP.String()
 
 			// Build request RemoteAddr
@@ -173,11 +173,11 @@ func TestCompleteWorkflow_MultiOperator(t *testing.T) {
 			}
 
 			// Setup WgOperatorIP
-			originalOpIP := netutil.WgOperatorIP
+			originalOpIP := wireguard.WgOperatorIP
 			if tt.setPrimaryIO != "" {
-				netutil.WgOperatorIP = tt.setPrimaryIO
+				wireguard.WgOperatorIP = tt.setPrimaryIO
 			}
-			defer func() { netutil.WgOperatorIP = originalOpIP }()
+			defer func() { wireguard.WgOperatorIP = originalOpIP }()
 
 			req := httptest.NewRequest(http.MethodGet, "/api/www/"+agentUUID+"?file_to_download="+tt.fileName, nil)
 			req.RemoteAddr = reqRemote

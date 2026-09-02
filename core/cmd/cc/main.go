@@ -11,13 +11,13 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/ftp"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/wireguard"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/operator"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
-	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 	"github.com/spf13/cobra"
@@ -198,7 +198,7 @@ func runClientMode(opts *Options) {
 	}
 
 	// download and extract config files
-	url := fmt.Sprintf("http://%s:%d/%s", netutil.WgServerIP, netutil.WgFileServerPort, "emp3r0r_operator_config.tar.gz")
+	url := fmt.Sprintf("http://%s:%d/%s", wireguard.WgServerIP, wireguard.WgFileServerPort, "emp3r0r_operator_config.tar.gz")
 	err = live.DownloadExtractConfig(url, ftp.DownloadFile)
 	if err != nil {
 		logging.Fatalf("Failed to extract config: %v", err)
@@ -253,8 +253,8 @@ func connectWg(opts *Options) {
 	if opts.wg_operator_ip == "" {
 		logging.Fatalf("Please provide the operator's WireGuard IP")
 	}
-	netutil.WgServerIP = opts.wg_server_ip
-	netutil.WgOperatorIP = opts.wg_operator_ip
+	wireguard.WgServerIP = opts.wg_server_ip
+	wireguard.WgOperatorIP = opts.wg_operator_ip
 	operator.ServerIP = opts.c2_server_ip
 	operator.ServerKey = opts.wg_server_key
 
@@ -272,25 +272,25 @@ func connectWg(opts *Options) {
 		}
 	}
 
-	_, err := netutil.PublicKeyFromPrivate(wg_key)
+	_, err := wireguard.PublicKeyFromPrivate(wg_key)
 	if err != nil {
 		logging.Fatalf("Invalid key: %v", err)
 	}
-	wgConfig := netutil.WireGuardConfig{
+	wgConfig := wireguard.WireGuardConfig{
 		PrivateKey: wg_key,
-		IPAddress:  netutil.WgOperatorIP + "/24",
+		IPAddress:  wireguard.WgOperatorIP + "/24",
 		ListenPort: util.RandInt(1024, 65535),
-		Peers: []netutil.PeerConfig{
+		Peers: []wireguard.PeerConfig{
 			{
 				PublicKey:  opts.wg_server_key,
-				AllowedIPs: netutil.WgServerIP + "/32",
+				AllowedIPs: wireguard.WgServerIP + "/32",
 				Endpoint:   fmt.Sprintf("%s:%d", opts.c2_server_ip, opts.c2_operator_server_port),
 			},
 		},
 	}
 	logging.Infof("Connecting to C2 WireGuard server at %s:%d...", opts.c2_server_ip, opts.c2_operator_server_port)
 	go func() {
-		_, err = netutil.WireGuardMain(wgConfig)
+		_, err = wireguard.WireGuardMain(wgConfig)
 		if err != nil {
 			logging.Fatalf("WireGuard connection error: %v", err)
 		}

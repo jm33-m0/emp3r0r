@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/wireguard"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -280,8 +281,8 @@ func GenC2Certs(hosts_str string) error {
 		return fmt.Errorf("generating C2 TLS cert: %v", certErr)
 	}
 	// generate operator mTLS cert
-	hosts = append(hosts, netutil.WgServerIP)   // add wireguard IP for operator
-	hosts = append(hosts, netutil.WgOperatorIP) // add wireguard IP for operator
+	hosts = append(hosts, wireguard.WgServerIP)   // add wireguard IP for operator
+	hosts = append(hosts, wireguard.WgOperatorIP) // add wireguard IP for operator
 	_, certErr = transport.GenCerts(hosts, transport.OperatorServerCrtFile, transport.OperatorServerKeyFile, transport.OperatorCaKeyFile, transport.OperatorCaCrtFile, false)
 	if certErr != nil {
 		return fmt.Errorf("generating operator cert: %v", certErr)

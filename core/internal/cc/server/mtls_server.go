@@ -10,9 +10,9 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/wireguard"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
-	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 )
 
 // StartOperatorMTLSServer starts the operator TLS server with mTLS.
@@ -40,7 +40,7 @@ func StartOperatorMTLSServer(port int) {
 	}
 
 	network.MTLSServer = &http.Server{
-		Addr:      fmt.Sprintf("%s:%d", netutil.WgServerIP, port),
+		Addr:      fmt.Sprintf("%s:%d", wireguard.WgServerIP, port),
 		Handler:   r,
 		TLSConfig: tlsConfig,
 	}

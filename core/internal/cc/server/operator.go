@@ -19,11 +19,11 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/wireguard"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
-	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -44,7 +44,7 @@ var (
 	operatorClaimNonceCache sync.Map
 
 	// SERVER_WG_CONFIG is the wireguard config for the server
-	SERVER_WG_CONFIG *netutil.WireGuardConfig
+	SERVER_WG_CONFIG *wireguard.WireGuardConfig
 )
 
 const operatorClaimNonceTTLSeconds int64 = 600

@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/wireguard"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
-	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 )
 
 // WgFileServer serves a file over HTTP on WireGuard interface
@@ -15,7 +15,7 @@ func WgFileServer(path_to_file string) (err error) {
 	mux.HandleFunc("/", func(wrt http.ResponseWriter, req *http.Request) {
 		http.ServeFile(wrt, req, path_to_file)
 	})
-	listenAddr := fmt.Sprintf("%s:%d", netutil.WgServerIP, netutil.WgFileServerPort)
+	listenAddr := fmt.Sprintf("%s:%d", wireguard.WgServerIP, wireguard.WgFileServerPort)
 
 	// retry until we can bind to the address (WireGuard interface might be slow to come up)
 	for i := range 100 {

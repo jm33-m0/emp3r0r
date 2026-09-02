@@ -14,6 +14,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/ftp"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/wireguard"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/controllers"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -21,7 +22,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
-	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/reeflective/console"
 )
 
@@ -52,7 +52,7 @@ func backgroundJobs() {
 	}
 	client.SessionID = uuid.NewString()
 
-	OperatorAddr = fmt.Sprintf("%s:%d", netutil.WgServerIP, OperatorPort)
+	OperatorAddr = fmt.Sprintf("%s:%d", wireguard.WgServerIP, OperatorPort)
 	logging.Infof("Operator's address: %s", OperatorAddr)
 
 	// Update operator's IP to Wireguard IP
