@@ -1,5 +1,27 @@
 # Changelog
 
+## [4.13.0](https://github.com/jm33-m0/emp3r0r/compare/v4.12.2...v4.13.0) (2026-09-02)
+
+
+### Features
+
+* **agent:** structured CBOR listings and --quiet for token/session completion ([36e76a3](https://github.com/jm33-m0/emp3r0r/commit/36e76a3f388f71d0dee535d2f7d9af5dfac87e54))
+* **agent:** wire make_token/import_ticket into agent commands and modules ([8c6e313](https://github.com/jm33-m0/emp3r0r/commit/8c6e31338dc300a24423848667d0906bb9c43618))
+* **driver:** implement Windows kernel driver loading and management ([059064c](https://github.com/jm33-m0/emp3r0r/commit/059064cc04a4ebc72fdaddeab8fa6bb3eeb4fa83))
+* **kkyum:** add kkyum LOL driver module with Starlark entrypoint (demo driver loader) ([de8913e](https://github.com/jm33-m0/emp3r0r/commit/de8913ec108a81dc202589abbf2a8961603c72f1))
+* **module:** implement multi-file module support with companion file caching in memfs ([a7299a3](https://github.com/jm33-m0/emp3r0r/commit/a7299a3428358b4963aa7e29ca7cdeff8fffc676))
+* **priv:** implement make_token netlogon sessions and Kerberos ticket import ([7f79f9a](https://github.com/jm33-m0/emp3r0r/commit/7f79f9a6b298f11f771becbdd03655f9da4ea560))
+* **SA:** detailed error reporting in starlark modules; add starlarkrunner ([b5fc1d3](https://github.com/jm33-m0/emp3r0r/commit/b5fc1d3174951a1e744bb698e0cddb33007a9708))
+* **script:** add Starlark bindings for Windows driver and DLL reflective loading APIs ([04b5ec9](https://github.com/jm33-m0/emp3r0r/commit/04b5ec9461b1bdf05167ee791b51a1feb6888355))
+* **syscall:** add SilentMoonwalk call-stack spoofing via cgo ([fb220ad](https://github.com/jm33-m0/emp3r0r/commit/fb220ad08a70b1c762ff4df2d5b8e434221e76b7))
+
+
+### Bug Fixes
+
+* **make_token:** netonly PTT container, atomic session-name and token fixes ([5c6b1ca](https://github.com/jm33-m0/emp3r0r/commit/5c6b1caf1412ea11f7f3372c4d82180e5ec10f46))
+* **priv:** `\` escaping issue and command suggestion inconsistency ([bce4665](https://github.com/jm33-m0/emp3r0r/commit/bce4665c47b70096776f6e8aa2d714eadaa3d0fb))
+* **syscall:** disable SilentMoonwalk in cgo builds, use pure-Go syscall path ([8214b43](https://github.com/jm33-m0/emp3r0r/commit/8214b4358b729e4afbe7ca764625a396b6fb6edc))
+
 ## [4.12.2](https://github.com/jm33-m0/emp3r0r/compare/v4.12.1...v4.12.2) (2026-08-26)
 
 
