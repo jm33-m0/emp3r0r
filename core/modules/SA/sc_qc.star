@@ -39,9 +39,10 @@ def sc_qc(service_name, hostname=None):
     SC_MANAGER_CONNECT = 1
     GENERIC_READ = 0x80000000
 
-    h_scm = win_call("advapi32.dll", "OpenSCManagerA", 0, 0, SC_MANAGER_CONNECT | GENERIC_READ)["r1"]
+    res_scm = win_call("advapi32.dll", "OpenSCManagerA", 0, 0, SC_MANAGER_CONNECT | GENERIC_READ)
+    h_scm = res_scm["r1"]
     if h_scm == 0:
-        print("[-] OpenSCManagerA failed for service %s" % service_name)
+        print("[-] OpenSCManagerA failed for service %s (error %d: %s)" % (service_name, res_scm.get("err_code", 0), res_scm.get("error", "")))
         return "Fail"
 
     # Convert service_name to ASCII ptr
@@ -50,12 +51,13 @@ def sc_qc(service_name, hostname=None):
         write_byte(name_ptr, i, ord(service_name[i]))
     write_byte(name_ptr, len(service_name), 0)
 
-    h_service = win_call("advapi32.dll", "OpenServiceA", h_scm, name_ptr, GENERIC_READ)["r1"]
+    res_svc = win_call("advapi32.dll", "OpenServiceA", h_scm, name_ptr, GENERIC_READ)
+    h_service = res_svc["r1"]
     win_free(name_ptr)
 
     if h_service == 0:
         win_call("advapi32.dll", "CloseServiceHandle", h_scm)
-        print("[-] OpenServiceA failed for service %s" % service_name)
+        print("[-] OpenServiceA failed for service %s (error %d: %s)" % (service_name, res_svc.get("err_code", 0), res_svc.get("error", "")))
         return "Fail"
 
     bytes_needed = win_alloc(4)

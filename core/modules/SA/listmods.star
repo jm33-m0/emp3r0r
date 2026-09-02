@@ -7,13 +7,15 @@ def listmods(pid=0):
 
     target_pid = int(pid) if pid and str(pid) != "0" else win_call("kernel32.dll", "GetCurrentProcessId")["r1"]
 
-    h_proc = win_call("kernel32.dll", "OpenProcess", PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, 0, target_pid)["r1"]
+    res_open = win_call("kernel32.dll", "OpenProcess", PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, 0, target_pid)
+    h_proc = res_open["r1"]
     if h_proc == 0:
         target_pid = win_call("kernel32.dll", "GetCurrentProcessId")["r1"]
-        h_proc = win_call("kernel32.dll", "OpenProcess", PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, 0, target_pid)["r1"]
+        res_open = win_call("kernel32.dll", "OpenProcess", PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, 0, target_pid)
+        h_proc = res_open["r1"]
 
     if h_proc == 0:
-        print("[-] OpenProcess failed for PID %d" % target_pid)
+        print("[-] OpenProcess failed for PID %d (error %d: %s)" % (target_pid, res_open.get("err_code", 0), res_open.get("error", "")))
         return "Fail"
 
     # Allocate module array (1024 module pointers = 8192 bytes)
@@ -25,7 +27,7 @@ def listmods(pid=0):
         win_free(mods_buf)
         win_free(cb_needed_ptr)
         win_call("kernel32.dll", "CloseHandle", h_proc)
-        print("[-] EnumProcessModules failed for PID %d" % target_pid)
+        print("[-] EnumProcessModules failed for PID %d (error %d: %s)" % (target_pid, res.get("err_code", 0), res.get("error", "")))
         return "Fail"
 
     needed = read_uint32(cb_needed_ptr, 0)

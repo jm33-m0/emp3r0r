@@ -6,9 +6,10 @@ def driversigs():
     SERVICE_DRIVER = 11
     SERVICE_ACTIVE = 1
 
-    h_scm = win_call("advapi32.dll", "OpenSCManagerA", 0, 0, SC_MANAGER_ENUMERATE_SERVICE)["r1"]
+    res_scm = win_call("advapi32.dll", "OpenSCManagerA", 0, 0, SC_MANAGER_ENUMERATE_SERVICE)
+    h_scm = res_scm["r1"]
     if h_scm == 0:
-        print("[-] OpenSCManagerA failed")
+        print("[-] OpenSCManagerA failed (error %d: %s)" % (res_scm.get("err_code", 0), res_scm.get("error", "")))
         return "Fail"
 
     bytes_needed = win_alloc(4)

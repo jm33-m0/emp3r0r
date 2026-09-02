@@ -33,9 +33,10 @@ def write_uint32(addr, offset, val):
 
 def tasklist():
     TH32CS_SNAPPROCESS = 0x00000002
-    h_snap = win_call("kernel32.dll", "CreateToolhelp32Snapshot", TH32CS_SNAPPROCESS, 0)["r1"]
+    res_snap = win_call("kernel32.dll", "CreateToolhelp32Snapshot", TH32CS_SNAPPROCESS, 0)
+    h_snap = res_snap["r1"]
     if h_snap == 0 or h_snap == 0xFFFFFFFFFFFFFFFF:
-        print("[-] CreateToolhelp32Snapshot failed")
+        print("[-] CreateToolhelp32Snapshot failed (error %d: %s)" % (res_snap.get("err_code", 0), res_snap.get("error", "")))
         return "Fail"
 
     # PROCESSENTRY32W size (x64) is 560 bytes

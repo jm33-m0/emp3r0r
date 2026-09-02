@@ -13,7 +13,7 @@ def enum_filter_drivers():
         win_free(buf)
         win_free(bytes_returned)
         win_free(h_filter_ptr)
-        print("[-] FilterFindFirst failed (status %d)" % res["r1"])
+        print("[-] FilterFindFirst failed (status %d, error %d: %s)" % (res["r1"], res.get("err_code", 0), res.get("error", "")))
         return "Fail"
 
     h_filter = read_ptr(h_filter_ptr, 0)

@@ -12,7 +12,7 @@ def enum_local_sessions():
     if res["r1"] == 0:
         win_free(wts_info_ptr)
         win_free(count_ptr)
-        print("[-] WTSEnumerateSessionsA failed")
+        print("[-] WTSEnumerateSessionsA failed (error %d: %s)" % (res.get("err_code", 0), res.get("error", "")))
         return "Fail"
 
     p_info = read_ptr(wts_info_ptr, 0)

@@ -7,7 +7,7 @@ def get_aad_join_info():
 
     if res["r1"] != 0:
         win_free(buf_ptr)
-        print("[-] Host is not cloud/AAD joined (status %d)" % res["r1"])
+        print("[-] Host is not cloud/AAD joined (status %d, error %d: %s)" % (res["r1"], res.get("err_code", 0), res.get("error", "")))
         return "Fail"
 
     p = read_ptr(buf_ptr, 0)

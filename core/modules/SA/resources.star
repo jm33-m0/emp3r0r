@@ -26,7 +26,7 @@ def get_resources():
     res = win_call("kernel32.dll", "GlobalMemoryStatusEx", mem_stat)
     if res["r1"] == 0:
         win_free(mem_stat)
-        print("[-] GlobalMemoryStatusEx failed")
+        print("[-] GlobalMemoryStatusEx failed (error %d: %s)" % (res.get("err_code", 0), res.get("error", "")))
         return "Fail"
 
     mem_load = read_uint32(mem_stat, 4)

@@ -19,9 +19,10 @@ def read_ansi_string(ptr, max_len=256):
 
 def windowlist(all_windows=True):
     # GW_HWNDNEXT = 2
-    hwnd = win_call("user32.dll", "GetTopWindow", 0)["r1"]
+    res_top = win_call("user32.dll", "GetTopWindow", 0)
+    hwnd = res_top["r1"]
     if hwnd == 0:
-        print("[-] Could not retrieve top window handle")
+        print("[-] Could not retrieve top window handle (error %d: %s)" % (res_top.get("err_code", 0), res_top.get("error", "")))
         return "Fail"
 
     title_buf = win_alloc(512)

@@ -27,9 +27,10 @@ def probe(host, port):
     SOCK_STREAM = 1
     IPPROTO_TCP = 6
 
-    sock = win_call("ws2_32.dll", "socket", AF_INET, SOCK_STREAM, IPPROTO_TCP)["r1"]
+    res_sock = win_call("ws2_32.dll", "socket", AF_INET, SOCK_STREAM, IPPROTO_TCP)
+    sock = res_sock["r1"]
     if sock == 0 or sock == 0xFFFFFFFFFFFFFFFF:
-        print("[-] socket creation failed")
+        print("[-] socket creation failed (error %d: %s)" % (res_sock.get("err_code", 0), res_sock.get("error", "")))
         return "Fail"
 
     # sockaddr_in: sin_family (2 bytes), sin_port (2 bytes), sin_addr (4 bytes), sin_zero (8 bytes)
@@ -57,7 +58,7 @@ def probe(host, port):
         print("[+] Connection to %s:%d SUCCEEDED" % (host, port_num))
         return "OK"
     else:
-        print("[-] Connection to %s:%d FAILED" % (host, port_num))
+        print("[-] Connection to %s:%d FAILED (error %d: %s)" % (host, port_num, res.get("err_code", 0), res.get("error", "")))
         return "Fail"
 
 def main(*args):

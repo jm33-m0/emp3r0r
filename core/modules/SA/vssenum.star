@@ -57,7 +57,7 @@ def vssenum(hostname="localhost", sharename="C$"):
 
     h_file = res["r1"]
     if h_file == 0 or h_file == 0xFFFFFFFFFFFFFFFF:
-        print("[-] Could not open target folder %s for VSS enumeration" % target)
+        print("[-] Could not open target folder %s for VSS enumeration (error %d: %s)" % (target, res.get("err_code", 0), res.get("error", "")))
         return "Fail"
 
     FSCTL_SRV_ENUMERATE_SNAPSHOTS = 0x00144064

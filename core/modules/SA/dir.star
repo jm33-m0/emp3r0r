@@ -12,8 +12,10 @@ def list_dir(search_path="C:\\*"):
 
     h_find = res["r1"]
     if h_find == 0 or h_find == 0xFFFFFFFFFFFFFFFF:
+        err_code = res.get("err_code", 0)
+        err_msg = res.get("error", "")
         win_free(find_data)
-        print("[-] FindFirstFileW failed for %s" % search_path)
+        print("[-] FindFirstFileW failed for %s: error %d (%s)" % (search_path, err_code, err_msg))
         return "Fail"
 
     print("Directory listing for %s:" % search_path)
