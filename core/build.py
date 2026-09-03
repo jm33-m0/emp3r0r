@@ -628,10 +628,13 @@ def build(arg1: str, temp_dir: pathlib.Path, core_dir: pathlib.Path,
         log_info("No target filter: building all platforms")
 
     # ── C2 server binaries (always built, no target filter) ──────────────────
+    # `with_gvisor` is required by the operator-side tun2socks engine
+    # (internal/cc/base/tun2socks): it builds the gVisor user-space TCP stack
+    # into the operator console. cat/listener do not use it.
     log_info("Building CC")
     env_cgo0 = os.environ.copy()
     env_cgo0["CGO_ENABLED"] = "0"
-    cc_cmd = f"{go_bin} build {mod_opt} -buildvcs=false -o \"{temp_dir / 'cc.exe'}\" -ldflags=\"{ldflags}\""
+    cc_cmd = f"{go_bin} build {mod_opt} -tags with_gvisor -buildvcs=false -o \"{temp_dir / 'cc.exe'}\" -ldflags=\"{ldflags}\""
     res = run_cmd(cc_cmd, check=False, cwd=core_dir / "cmd" / "cc", env=env_cgo0, shell=True)
     if res.returncode != 0:
         log_error("Failed to build CC")
