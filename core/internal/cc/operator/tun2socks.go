@@ -1,14 +1,15 @@
 package operator
 
 // tun2socks.go — operator-side transparent proxy using sagernet/sing-tun (the
-// same library sing-box uses). Unlike the hand-rolled gVisor version, sing-tun
-// owns the TUN device, the gVisor stack and the transparent auto-routing, and
-// removes routes/rules/device on Close.
+// same library sing-box uses). sing-tun owns the TUN device, the gVisor stack
+// and the selective routing (and its cleanup). Only the destination networks
+// given with --route are routed into the TUN and proxied through the C2 SOCKS5
+// pivot; the operator's default route is never touched.
 //
-//     target <agent>            # agent to pivot through
-//     socks_start 1080          # SOCKS5 pivot on the C2 (WG IP:1080)
-//     tun2socks start           # everything is auto-populated
-//     curl http://10.10.0.5     # routed transparently
+//     target <agent>                # agent to pivot through
+//     socks_start 1080              # SOCKS5 pivot on the C2 (WG IP:1080)
+//     tun2socks start --route 10.10.0.0/24   # reach agent-side 10.10.0.0/24
+//     curl http://10.10.0.5         # routed via the TUN -> pivot -> agent
 //     tun2socks stop
 
 import (
@@ -51,7 +52,25 @@ func tun2socksStartCmdRun(cmd *cobra.Command, _ []string) {
 	tunName, _ := cmd.Flags().GetString("name")
 	addr, _ := cmd.Flags().GetString("addr")
 	mtu, _ := cmd.Flags().GetInt("mtu")
+	routes, _ := cmd.Flags().GetStringSlice("route")
 	excludes, _ := cmd.Flags().GetStringSlice("exclude")
+
+	// Destinations to route through the TUN. Required: the default route is
+	// intentionally never changed, so without explicit targets nothing would
+	// be proxied (and with AutoRoute alone sing-tun would hijack everything).
+	routePrefixes := make([]netip.Prefix, 0, len(routes))
+	for _, r := range routes {
+		p, err := netip.ParsePrefix(r)
+		if err != nil {
+			logging.Errorf("tun2socks: invalid --route %q: %v", r, err)
+			return
+		}
+		routePrefixes = append(routePrefixes, p.Masked())
+	}
+	if len(routePrefixes) == 0 {
+		logging.Errorf("tun2socks: specify at least one --route prefix (e.g. `tun2socks start --route 10.10.0.0/24`); the default route is never modified")
+		return
+	}
 
 	socksAddr := override
 	if socksAddr == "" {
@@ -92,7 +111,7 @@ func tun2socksStartCmdRun(cmd *cobra.Command, _ []string) {
 	}
 
 	// The pivot itself must never be routed into the TUN, otherwise the engine
-	// would proxy its own SOCKS dials. Loopback is always kept by sing-tun.
+	// would proxy its own SOCKS dials. These are subtracted from --route.
 	prefixes := make([]netip.Prefix, 0, len(excludes)+1)
 	for _, e := range excludes {
 		p, err := netip.ParsePrefix(e)
@@ -137,6 +156,7 @@ func tun2socksStartCmdRun(cmd *cobra.Command, _ []string) {
 		MTU:           uint32(mtu),
 		Inet4Address:  inet4,
 		Socks5Addr:    socksAddr,
+		Route:         routePrefixes,
 		RouteExcludes: prefixes,
 		LogTag:        tunName,
 	})
@@ -149,7 +169,7 @@ func tun2socksStartCmdRun(cmd *cobra.Command, _ []string) {
 	tun2socksInstances[tunName] = &tun2socksInstance{name: tunName, socksAddr: socksAddr, engine: eng}
 	tun2socksMu.Unlock()
 
-	logging.Successf("tun2socks %q started: SOCKS5 %s, tun %s, auto-route enabled", tunName, socksAddr, addr)
+	logging.Successf("tun2socks %q started: SOCKS5 %s, tun %s; routing %v through the TUN (default route untouched)", tunName, socksAddr, addr, routePrefixes)
 	logging.Warningf("Use `tun2socks stop` to remove routes and the TUN device")
 }
 
@@ -190,14 +210,21 @@ func buildTun2SocksCommand() *cobra.Command {
 	root := &cobra.Command{
 		Use:     "tun2socks",
 		GroupID: "c2",
-		Short:   "Transparently route operator traffic through the selected agent (sing-box tun engine)",
-		Example: "target <agent-id>\n  socks_start 1080\n  tun2socks start\n  curl http://10.10.0.5",
+		Short:   "Route operator traffic to agent-side networks through the selected agent (sing-box tun engine)",
+		Example: "target <agent-id>\n  socks_start 1080\n  tun2socks start --route 10.10.0.0/24\n  curl http://10.10.0.5",
 	}
 
 	startCmd := &cobra.Command{
 		Use:   "start",
-		Short: "Create a TUN with auto-route and proxy TCP through the C2 SOCKS5 pivot",
-		Run:   tun2socksStartCmdRun,
+		Short: "Create a TUN and proxy TCP to --route networks through the C2 SOCKS5 pivot",
+		Long: `Create a TUN device and proxy TCP through the C2 SOCKS5 pivot.
+
+Only the networks given with --route are routed into the TUN (repeatable,
+e.g. --route 10.10.0.0/24 --route 192.168.2.0/24). The default route of this
+host is never modified, so normal connectivity keeps working. Traffic to the
+routed networks is terminated by the gVisor stack and re-opened through the
+SOCKS5 pivot, i.e. it appears to originate from the selected agent.`,
+		Run: tun2socksStartCmdRun,
 	}
 	startCmd.Flags().IntP("port", "p", defaultSocksPort, "C2 SOCKS5 pivot port (auto-discovered when omitted)")
 	startCmd.Flags().StringP("host", "", wireguard.WgServerIP, "C2 host (WireGuard IP; 127.0.0.1 in local mode)")
@@ -205,7 +232,8 @@ func buildTun2SocksCommand() *cobra.Command {
 	startCmd.Flags().StringP("name", "n", defaultTunName, "TUN device name")
 	startCmd.Flags().StringP("addr", "", defaultTunAddr, "Address assigned to the TUN device (ip/prefix)")
 	startCmd.Flags().IntP("mtu", "", defaultTunMTU, "TUN MTU")
-	startCmd.Flags().StringSliceP("exclude", "x", nil, "Extra networks never routed into the TUN (repeatable)")
+	startCmd.Flags().StringSliceP("route", "r", nil, "Destination network routed into the TUN (repeatable), e.g. 10.10.0.0/24; the default route is never changed")
+	startCmd.Flags().StringSliceP("exclude", "x", nil, "Subnets subtracted from --route so they stay on the normal path (repeatable)")
 	root.AddCommand(startCmd)
 
 	stopCmd := &cobra.Command{

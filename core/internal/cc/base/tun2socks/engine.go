@@ -1,8 +1,11 @@
 // Package tun2socks is an operator-side transparent proxy engine built on
 // sagernet/sing-tun (the library sing-box uses). sing-tun owns the TUN
-// device, the gVisor stack and transparent auto-routing (and its cleanup);
-// this package only supplies the Handler that dials every proxied TCP
-// connection through the C2-resident SOCKS5 pivot started with `socks_start`.
+// device, the gVisor stack and the selective routing (and its cleanup); this
+// package only supplies the Handler that dials every proxied TCP connection
+// through the C2-resident SOCKS5 pivot started with `socks_start`. Only the
+// prefixes given in Config.Route are routed into the TUN (sing-box's
+// `route_address` mode): the host's default route is never modified, so the
+// rest of the connectivity is left untouched.
 // It is intentionally independent of the operator console so other cc
 // components can start instances programmatically.
 //
@@ -36,9 +39,16 @@ type Config struct {
 	// Socks5Addr is the C2 SOCKS5 pivot (host:port) every connection is
 	// relayed through. Reachable over the WireGuard network.
 	Socks5Addr string
-	// RouteExcludes are extra networks that must never enter the TUN (e.g.
-	// the WireGuard subnet the operator reaches the C2 through). Loopback
-	// and local subnets are excluded by sing-tun automatically.
+	// Route is the destination network(s) that are routed through the TUN
+	// device (sing-tun's Inet4RouteAddress, i.e. sing-box's route_address).
+	// Only traffic to these prefixes enters the TUN; the host's default
+	// route is never modified, so the rest of the connectivity is left
+	// untouched. At least one prefix is required.
+	Route []netip.Prefix
+	// RouteExcludes are networks subtracted from Route so they always stay
+	// on the normal path (typically the SOCKS5 pivot host — capturing it
+	// would make the engine proxy its own dials). Loopback is excluded by
+	// the kernel automatically.
 	RouteExcludes []netip.Prefix
 	// LogTag prefixes log lines (default "tun2socks").
 	LogTag string
@@ -75,9 +85,10 @@ type Engine struct {
 	cancel         context.CancelFunc
 }
 
-// Start creates the TUN device, configures transparent auto-routing through
-// sing-tun, brings up the gVisor stack and starts forwarding TCP to the given
-// SOCKS5 pivot. Requires root/CAP_NET_ADMIN (/dev/net/tun).
+// Start creates the TUN device, brings up the gVisor stack and starts
+// forwarding TCP to the given SOCKS5 pivot. Only cfg.Route destinations are
+// routed into the TUN (via sing-tun's selective routing); the host's default
+// route is never changed. Requires root/CAP_NET_ADMIN (/dev/net/tun).
 //
 // A network/interface monitor is mandatory: sing-tun's Tun.Start() calls
 // Options.InterfaceMonitor.RegisterMyInterface() (and the routing code uses
@@ -99,6 +110,30 @@ func Start(cfg Config) (eng *Engine, err error) {
 	cfg = cfg.withDefaults()
 	if cfg.Socks5Addr == "" {
 		return nil, fmt.Errorf("tun2socks: SOCKS5 pivot address is required")
+	}
+	if len(cfg.Route) == 0 {
+		return nil, fmt.Errorf("tun2socks: no destination to route through the TUN — set Route (CLI: --route 10.10.0.0/24); the default route is intentionally never touched")
+	}
+
+	// Masked, deduplicated set of destinations that may enter the TUN.
+	route := make([]netip.Prefix, 0, len(cfg.Route))
+	seen := make(map[netip.Prefix]bool, len(cfg.Route))
+	for _, p := range cfg.Route {
+		if !p.IsValid() {
+			return nil, fmt.Errorf("tun2socks: invalid route prefix %q", p)
+		}
+		p = p.Masked()
+		if seen[p] {
+			continue
+		}
+		seen[p] = true
+		route = append(route, p)
+	}
+	excludes := make([]netip.Prefix, 0, len(cfg.RouteExcludes))
+	for _, p := range cfg.RouteExcludes {
+		if p.IsValid() {
+			excludes = append(excludes, p.Masked())
+		}
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -141,13 +176,13 @@ func Start(cfg Config) (eng *Engine, err error) {
 		Inet4Address:             cfg.Inet4Address,
 		AutoRoute:                true,
 		DNSMode:                  tun.DNSModeDisabled,
-		Inet4RouteExcludeAddress: cfg.RouteExcludes,
+		Inet4RouteAddress:        route,
+		Inet4RouteExcludeAddress: excludes,
 		InterfaceFinder:          interfaceFinder,
 		InterfaceMonitor:         interfaceMonitor,
+		IPRoute2TableIndex:       tun.DefaultIPRoute2TableIndex,
+		IPRoute2RuleIndex:        tun.DefaultIPRoute2RuleIndex,
 		Logger:                   logger,
-	}
-	if len(cfg.Inet4Address) > 0 {
-		opts.Inet4Gateway = cfg.Inet4Address[0].Addr()
 	}
 
 	device, err := tun.New(opts)
@@ -185,7 +220,7 @@ func Start(cfg Config) (eng *Engine, err error) {
 		return fail(fmt.Errorf("start gvisor stack: %w", err))
 	}
 
-	logging.Infof("tun2socks[%s]: started, SOCKS5 %s, routing via sing-tun auto-route", cfg.LogTag, cfg.Socks5Addr)
+	logging.Infof("tun2socks[%s]: started, SOCKS5 %s; routing ONLY %v through %s (default route untouched)", cfg.LogTag, cfg.Socks5Addr, route, cfg.Name)
 	return &Engine{
 		cfg:            cfg,
 		device:         device,
