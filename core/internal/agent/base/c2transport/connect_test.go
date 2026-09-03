@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -375,7 +376,7 @@ func TestDuplicatedCheckin(t *testing.T) {
 		live.AgentControlMap.Delete(key)
 		return true
 	})
-	live.AgentList = make([]*def.Emp3r0rAgent, 0)
+	live.AgentList = sync.Map{}
 
 	// Start Real C2 Server
 	startTestC2Server(t)

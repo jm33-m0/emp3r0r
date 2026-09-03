@@ -4,8 +4,6 @@ import (
 	"context"
 	"net"
 	"sync"
-
-	"github.com/jm33-m0/emp3r0r/core/internal/def"
 )
 
 var (
@@ -34,8 +32,22 @@ type AgentControl struct {
 
 var (
 	// AgentControlMap runtime projection of live agent control state.
+	//
+	// Keys (*def.Emp3r0rAgent) and values (*AgentControl) are treated as
+	// immutable after publication: no code may mutate a stored object in place.
+	// Updates are published by copying the current snapshot, changing the copy,
+	// and re-Storing it (e.g. handleMessageTunnelStream, agents label setters).
+	// sync.Map then guarantees every Load/Range observes a consistent,
+	// never-mutated value, which keeps concurrent readers (agent lists, SOCKS5
+	// pivot startup, message-tunnel teardown) race-free.
 	AgentControlMap sync.Map
 
-	// AgentList list of connected agents
-	AgentList = make([]*def.Emp3r0rAgent, 0)
+	// AgentList mirrors the agents this process knows about. On the CC server
+	// it is a legacy duplicate of AgentControlMap (agents are admitted there);
+	// on the operator console it holds the snapshot list fetched from the CC
+	// API by the background agentListRefresher goroutine. It is a sync.Map
+	// keyed by agent UUID -> *def.Emp3r0rAgent so the refresher can publish new
+	// snapshots while REPL handlers and autocompletion read the list: a plain
+	// shared slice would race those goroutines.
+	AgentList sync.Map
 )

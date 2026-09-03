@@ -1,8 +1,6 @@
 package agents
 
 import (
-	"sync"
-
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -35,12 +33,7 @@ func DisconnectAgentByUUID(uuid string) bool {
 	}
 
 	live.AgentControlMap.Delete(key)
-	for i, a := range live.AgentList {
-		if a != nil && a.UUID == uuid {
-			live.AgentList = append(live.AgentList[:i], live.AgentList[i+1:]...)
-			break
-		}
-	}
+	live.AgentList.Delete(uuid)
 
 	if err := EndSession(uuid); err != nil {
 		logging.Debugf("Failed to end session for %s: %v", uuid, err)
@@ -91,7 +84,10 @@ func DisconnectAllAgents() {
 		return true
 	})
 
-	// Clear the map
-	live.AgentControlMap = sync.Map{}
+	// Clear both registries. sync.Map.Clear (Go 1.23+) is safe to call while
+	// other goroutines are still using the same map variable; reassigning
+	// `= sync.Map{}` would race any concurrent Load/Range on the old value.
+	live.AgentControlMap.Clear()
+	live.AgentList.Clear()
 	logging.Infof("All agents disconnected")
 }

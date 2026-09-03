@@ -269,7 +269,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	}
 
 	live.AgentControlMap = sync.Map{}
-	live.AgentList = make([]*def.Emp3r0rAgent, 0)
+	live.AgentList = sync.Map{}
 	time.Sleep(100 * time.Millisecond)
 
 	// -----------------------------------------------------------------------

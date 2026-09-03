@@ -146,7 +146,7 @@ func TestFullAgentLifecycle(t *testing.T) {
 
 	// Reset live maps
 	live.AgentControlMap = sync.Map{}
-	live.AgentList = make([]*def.Emp3r0rAgent, 0)
+	live.AgentList = sync.Map{}
 
 	// Initialize agent database for tracking
 	dbPath := filepath.Join(tmpDir, "agents.db")

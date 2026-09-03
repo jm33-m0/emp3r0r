@@ -50,12 +50,14 @@ func GetAgentByTag(tag string) (target *def.Emp3r0rAgent) {
 		return true
 	})
 	if target == nil {
-		for _, t := range live.AgentList {
-			if t.Tag == tag {
+		live.AgentList.Range(func(_, value any) bool {
+			t, ok := value.(*def.Emp3r0rAgent)
+			if ok && t != nil && t.Tag == tag {
 				target = t
-				break
+				return false // stop iteration
 			}
-		}
+			return true
+		})
 	}
 	return target
 }
@@ -71,12 +73,14 @@ func GetAgentByUUID(uuid string) (target *def.Emp3r0rAgent) {
 		return true
 	})
 	if target == nil {
-		for _, t := range live.AgentList {
-			if t.UUID == uuid {
+		live.AgentList.Range(func(_, value any) bool {
+			t, ok := value.(*def.Emp3r0rAgent)
+			if ok && t != nil && t.UUID == uuid {
 				target = t
-				break
+				return false // stop iteration
 			}
-		}
+			return true
+		})
 	}
 	return target
 }

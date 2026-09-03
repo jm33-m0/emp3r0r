@@ -58,11 +58,15 @@ func MustGetActiveAgent() *def.Emp3r0rAgent {
 	}
 
 	// find target in live.AgentList
-	for _, agent := range live.AgentList {
-		if live.ActiveAgent.Tag == agent.Tag {
-			return agent
+	var fresh *def.Emp3r0rAgent
+	live.AgentList.Range(func(_, value any) bool {
+		agent, ok := value.(*def.Emp3r0rAgent)
+		if ok && agent != nil && live.ActiveAgent.Tag == agent.Tag {
+			fresh = agent
+			return false // stop iteration
 		}
-	}
+		return true
+	})
 
-	return nil
+	return fresh
 }

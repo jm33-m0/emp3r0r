@@ -22,11 +22,16 @@ import (
 // autocomplete agent tags
 func listAgents(ctx carapace.Context) carapace.Action {
 	names := make([]string, 0)
-	for _, t := range live.AgentList {
+	live.AgentList.Range(func(_, value any) bool {
+		t, ok := value.(*def.Emp3r0rAgent)
+		if !ok || t == nil {
+			return true
+		}
 		tag := t.Tag
 		tag = strconv.Quote(tag) // escape special characters
 		names = append(names, tag)
-	}
+		return true
+	})
 	return carapace.ActionValues(names...)
 }
 

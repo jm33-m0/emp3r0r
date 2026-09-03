@@ -593,12 +593,7 @@ func RemoveAgent(uuid string) error {
 		}
 		return true
 	})
-	for i, a := range live.AgentList {
-		if a.UUID == uuid {
-			live.AgentList = append(live.AgentList[:i], live.AgentList[i+1:]...)
-			break
-		}
-	}
+	live.AgentList.Delete(uuid)
 
 	return nil
 }

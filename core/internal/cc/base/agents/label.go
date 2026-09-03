@@ -84,7 +84,11 @@ func RefreshAgentLabel(a *def.Emp3r0rAgent) (label string) {
 	for _, labeled := range labeledAgents {
 		if a.Tag == labeled.Tag {
 			if val, ok := live.AgentControlMap.Load(a); ok {
-				val.(*live.AgentControl).Label = labeled.Label
+				// AgentControlMap values are immutable snapshots: copy, update, publish.
+				cur := val.(*live.AgentControl)
+				cp := *cur
+				cp.Label = labeled.Label
+				live.AgentControlMap.Store(a, &cp)
 			}
 			return labeled.Label
 		}
@@ -120,7 +124,11 @@ func SetAgentLabel(agentID, label string) error {
 	}
 
 	if val, ok := live.AgentControlMap.Load(target); ok {
-		val.(*live.AgentControl).Label = label // set label
+		// AgentControlMap values are immutable snapshots: copy, update, publish.
+		cur := val.(*live.AgentControl)
+		cp := *cur
+		cp.Label = label
+		live.AgentControlMap.Store(target, &cp)
 	}
 	PersistLabeledAgentsToFile()
 	logging.Successf("%s has been labeled as %s", target.Tag, label)

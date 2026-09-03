@@ -287,7 +287,15 @@ func refreshAgentList() error {
 			logging.Debugf("refreshAgentList: %s LastSeen=%v (%.0fs ago)", a.Tag, a.LastSeen, time.Since(a.LastSeen).Seconds())
 		}
 	}
-	live.AgentList = agents
+	// Publish the refreshed list as an immutable snapshot set (agent UUID ->
+	// agent). live.AgentList is a sync.Map because this refresher runs on its
+	// own goroutine while REPL handlers and autocompletion read the list.
+	live.AgentList.Clear()
+	for _, a := range agents {
+		if a != nil && a.UUID != "" {
+			live.AgentList.Store(a.UUID, a)
+		}
+	}
 	// Update active agent pointer to avoid staleness
 	if live.ActiveAgent != nil {
 		for _, a := range agents {
@@ -300,6 +308,6 @@ func refreshAgentList() error {
 		}
 	}
 
-	RenderAgentTable(live.AgentList)
+	RenderAgentTable(agents)
 	return nil
 }

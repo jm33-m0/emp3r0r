@@ -114,7 +114,7 @@ func runCheckinACK(t *testing.T, mode string) {
 	}
 
 	live.AgentControlMap = sync.Map{}
-	live.AgentList = make([]*def.Emp3r0rAgent, 0)
+	live.AgentList = sync.Map{}
 
 	go server.StartC2AgentTLSServer()
 	server.MarkOperatorOnline("test-operator")

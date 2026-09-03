@@ -130,7 +130,7 @@ func runSocks5PivotE2E(t *testing.T, mode string, expectRefused bool) {
 	}
 
 	live.AgentControlMap = sync.Map{}
-	live.AgentList = make([]*def.Emp3r0rAgent, 0)
+	live.AgentList = sync.Map{}
 	live.RuntimeConfig = &def.Config{
 		CCH2Port:      fmt.Sprintf("%d", tlsPort),
 		CCHTTPPort:    fmt.Sprintf("%d", httpPort),
