@@ -1,5 +1,21 @@
 # Changelog
 
+## [4.14.0](https://github.com/jm33-m0/emp3r0r/compare/v4.13.0...v4.14.0) (2026-09-03)
+
+
+### Features
+
+* **socks5:** SOCKS5 pivot relayed through agents ([463b5a3](https://github.com/jm33-m0/emp3r0r/commit/463b5a3c75bfe6bed401aee8a2e8386546a3a4dc))
+* **tun2socks:** integrate `sing-tun` to enable tun2socks on operator side ([be3f58d](https://github.com/jm33-m0/emp3r0r/commit/be3f58db5449acb7b11004f9cb7766d5c79c9098))
+
+
+### Bug Fixes
+
+* **C2:** expand PFS coverage to all possible paths and improve secure conn tunnel ([5d844ea](https://github.com/jm33-m0/emp3r0r/commit/5d844ea3449aeadea1ee54cab334e789eb12f173))
+* cleanup incomplete ([dfcf308](https://github.com/jm33-m0/emp3r0r/commit/dfcf308abe922a4d3f3cd51392209c7bf50c57cd))
+* resolve names too in case own IP gets routed ([8ecf010](https://github.com/jm33-m0/emp3r0r/commit/8ecf010082bb9a50b17cfa72088a49b316625891))
+* **tun2socks:** panic ([cb7d017](https://github.com/jm33-m0/emp3r0r/commit/cb7d017b63a0de67c2fdc8f0147b8ecb1444e219))
+
 ## [4.13.0](https://github.com/jm33-m0/emp3r0r/compare/v4.12.2...v4.13.0) (2026-09-02)
 
 
