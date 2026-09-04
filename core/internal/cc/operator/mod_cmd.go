@@ -23,6 +23,10 @@ import (
 // per-run map without ever writing them back into the shared module config.
 // Omitting a flag therefore always falls back to its JSON default, never to
 // the previous run's value.
+//
+// NOTE: modules are invoked as top-level commands with per-option flags
+// (e.g. `sa_whoami --pid 1234`). There is no `use`/`set`/`run` module
+// console — do not reintroduce docs or code that assume one.
 
 func addModuleCommands(rootCmd *cobra.Command) {
 	mods := make([]*def.ModuleConfig, 0)

@@ -1,0 +1,97 @@
+[
+  {
+    "name": "cifs_upload",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-09-04",
+    "comment": "Upload a file to a remote SMB/CIFS share (UNC) under the module's token/ticket identity. Use it for hosts that do not run an agent: stage the payload on this agent first (CC 'put --src <local> --dst mem:///...' into memfs, or host it and pass an http(s):// URL), then push it straight onto \\\\target\\ADMIN$\\... / C$\\... with the DA identity. Run with --token <SID|session> (stolen DA token or make_token session), or --user <DOMAIN/user> --ticket <base64 kirbi> for the PTT flow. Every CreateFileW/WriteFile impersonates the assigned token, so the SMB redirector authenticates with the stolen identity or the session's imported Kerberos ticket. Pair with 'scshell' to execute the uploaded file on the target.",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "src",
+        "description": "Payload source on this agent: mem:///path (memfs), a local path like C:\\x\\payload.exe, or http(s)://URL",
+        "default": "",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "dest",
+        "description": "Destination UNC path below an existing share, e.g. \\\\DC01\\ADMIN$\\Temp\\stage.exe (intermediate folders are auto-created). Use the hostname rather than an IP for --ticket/PTT flows so Kerberos is used",
+        "default": "",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "chunk_kb",
+        "description": "WriteFile chunk size in KiB",
+        "default": "1024",
+        "type": "int",
+        "required": false
+      },
+      {
+        "name": "delete_src",
+        "description": "Remove the local/memfs source file after a successful upload",
+        "default": "false",
+        "type": "bool",
+        "required": false
+      },
+      {
+        "name": "verify",
+        "description": "Re-open the destination and confirm its size after upload",
+        "default": "false",
+        "type": "bool",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "cifs_upload.star",
+      "files": ["cifs_upload.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {
+      "argv": [{ "literal": "upload" }]
+    }
+  },
+  {
+    "name": "cifs_rm",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-09-04",
+    "comment": "Remove a file (or an empty directory) from a remote SMB/CIFS share under the module's token/ticket identity — the cleanup half of cifs_upload. dest is a UNC path like \\\\DC01\\ADMIN$\\Temp\\stage.exe; pass --rmdir true to remove a directory instead. Same token model as cifs_upload: --token <SID|session>, or --user/--ticket for PTT. DeleteFileW/RemoveDirectoryW run impersonated, so the SMB redirector authenticates with the stolen identity or the imported Kerberos ticket.",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "dest",
+        "description": "UNC path of the file (or, with rmdir=true, the empty directory) to remove, e.g. \\\\DC01\\ADMIN$\\Temp\\stage.exe",
+        "default": "",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "rmdir",
+        "description": "Remove an empty directory instead of a file",
+        "default": "false",
+        "type": "bool",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "cifs_upload.star",
+      "files": ["cifs_upload.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {
+      "argv": [{ "literal": "delete" }]
+    }
+  }
+]
