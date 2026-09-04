@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/carapace-sh/carapace"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
@@ -18,15 +17,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// moduleOptionDefaults stores the original (JSON) default value for each
-// module option. pflag does NOT reset flag values to their defaults between
-// Execute() calls — only the Changed bool is reset. Without this map we
-// cannot distinguish "user explicitly set the flag" from "user didn't
-// provide the flag at all" on subsequent invocations.
-var (
-	moduleOptionDefaults   = make(map[string]map[string]string)
-	moduleOptionDefaultsMu sync.RWMutex
-)
+// Module option values live for a single invocation only. The console
+// regenerates the module command tree (flags defaulting to the module's JSON
+// defaults) before every run, and runModuleByName reads flag values into a
+// per-run map without ever writing them back into the shared module config.
+// Omitting a flag therefore always falls back to its JSON default, never to
+// the previous run's value.
 
 func addModuleCommands(rootCmd *cobra.Command) {
 	mods := make([]*def.ModuleConfig, 0)
@@ -82,14 +78,6 @@ func addModuleCommands(rootCmd *cobra.Command) {
 					help = strings.TrimSpace(help + " [required]")
 				}
 				cmd.Flags().String(opt.Name, opt.Val, help)
-				// Store the original JSON default so we can reset to it when
-				// the flag is not provided in a subsequent invocation.
-				moduleOptionDefaultsMu.Lock()
-				if moduleOptionDefaults[mod.Name] == nil {
-					moduleOptionDefaults[mod.Name] = make(map[string]string)
-				}
-				moduleOptionDefaults[mod.Name][opt.Name] = opt.Val
-				moduleOptionDefaultsMu.Unlock()
 				if len(opt.Vals) > 0 {
 					vals := append([]string(nil), opt.Vals...)
 					flagActions[opt.Name] = carapace.ActionValues(vals...)
@@ -129,32 +117,21 @@ func runModuleByName(cmd *cobra.Command, modName string) {
 
 	runtimeFlags := make(map[string]string)
 	for optName, opt := range mod.Options {
-		var val string
 		flag := cmd.Flags().Lookup(optName)
-		if flag != nil && flag.Changed {
-			// User explicitly provided this flag — use the supplied value.
-			var err error
-			val, err = cmd.Flags().GetString(optName)
-			if err != nil {
-				logging.Errorf("module %s: read flag %s: %v", mod.Name, optName, err)
-				continue
-			}
-		} else {
-			// Flag not provided — reset to the original JSON default.
-			// (pflag does NOT reset values between Execute() calls, only Changed.)
-			moduleOptionDefaultsMu.RLock()
-			if defaults, ok := moduleOptionDefaults[modName]; ok {
-				if defVal, ok2 := defaults[optName]; ok2 {
-					val = defVal
-				} else {
-					val = opt.Val
-				}
-			} else {
-				val = opt.Val
-			}
-			moduleOptionDefaultsMu.RUnlock()
+		if flag == nil {
+			// No registered flag (should not happen) — fall back to the JSON default.
+			runtimeFlags[optName] = opt.Val
+			continue
 		}
-		live.SetOption(optName, val)
+		// Parameter values live for this run only. The command tree is freshly
+		// regenerated before each invocation, so an omitted flag already holds
+		// its JSON default; we read it and never write it back into the shared
+		// module config (Options.Val stays pristine).
+		val, err := cmd.Flags().GetString(optName)
+		if err != nil {
+			logging.Errorf("module %s: read flag %s: %v", mod.Name, optName, err)
+			continue
+		}
 		runtimeFlags[optName] = val
 	}
 

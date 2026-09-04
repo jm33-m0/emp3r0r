@@ -97,7 +97,10 @@ func ModuleSearch(keyword string) []*def.ModuleConfig {
 	return search_results
 }
 
-// SetActiveModule set the active module to use: `use` command
+// SetActiveModule marks modName as the module being run. It is invoked right
+// before a module command executes (there is no interactive `use` command):
+// parameter values are read from the command line for that run only and never
+// persisted into the shared module config.
 func SetActiveModule(modName string) {
 	ensureBuiltInGoModuleRunners()
 
