@@ -134,6 +134,38 @@ def download_file(url: str, dest: pathlib.Path) -> bool:
         return False
 
 
+def write_text_atomic(path: pathlib.Path, content: str) -> None:
+    """Write a text file, force-overwriting whatever is already there.
+
+    On Linux, truncating a file that is still mapped or held open (a sourced
+    completion script, a previous installer still running, ...) fails with
+    ETXTBSY/EBUSY ("Text file busy"). Writing a temp file in the same
+    directory and renaming it over the target (os.replace) swaps the
+    directory entry and never touches the busy inode, so the overwrite
+    always succeeds.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(path.name + ".tmp")
+    tmp_path.write_text(content, encoding="utf-8")
+    os.replace(tmp_path, path)
+    path.chmod(0o644)
+
+def copy2_atomic(src: pathlib.Path, dst: pathlib.Path) -> None:
+    """Copy a file, force-overwriting any existing file.
+
+    On Linux, truncating a file that is still mapped/executed (e.g. a
+    running emp3r0r-cc during a reinstall) fails with ETXTBSY/EBUSY
+    ("Text file busy"). Copying to a temp file in the same directory and
+    renaming it over the target (os.replace) never touches the busy inode,
+    so reinstalling over a running binary works.
+    """
+    dst = pathlib.Path(dst)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dst.with_name(dst.name + ".tmp")
+    shutil.copy2(src, tmp)
+    os.replace(tmp, dst)
+
+
 def get_git_version() -> str:
     env_tag = os.environ.get("TAG")
     if env_tag:
@@ -317,7 +349,7 @@ def install_donut(target_dir: pathlib.Path, search_dir: pathlib.Path | None = No
                 if donut_bin:
                     bin_target = target_dir / "bin"
                     bin_target.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(donut_bin, bin_target / "donut")
+                    copy2_atomic(donut_bin, bin_target / "donut")
                     (bin_target / "donut").chmod(0o755)
 
                     usr_local_bin = pathlib.Path("/usr/local/bin")
@@ -631,6 +663,14 @@ def build(arg1: str, temp_dir: pathlib.Path, core_dir: pathlib.Path,
     # `with_gvisor` is required by the operator-side tun2socks engine
     # (internal/cc/base/tun2socks): it builds the gVisor user-space TCP stack
     # into the operator console. cat/listener do not use it.
+    #
+    # The cc GUI embeds xterm.js etc. which are gitignored; fetch them (with
+    # SHA-256 verification) before compiling so the embed has a full frontend.
+    log_info("Fetching GUI frontend assets (xterm.js, go generate)")
+    res = run_cmd([go_bin, "run", "./internal/cc/operator/guiassets"], check=False, cwd=core_dir)
+    if res.returncode != 0:
+        log_error("Failed to fetch GUI frontend assets (network access required)")
+
     log_info("Building CC")
     env_cgo0 = os.environ.copy()
     env_cgo0["CGO_ENABLED"] = "0"
@@ -761,27 +801,27 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
         (kit_dir / "lib" / "emp3r0r").mkdir(parents=True, exist_ok=True)
 
         if bin_src.exists():
-            shutil.copy2(bin_src, kit_dir / "bin" / "emp3r0r")
+            copy2_atomic(bin_src, kit_dir / "bin" / "emp3r0r")
         else:
             log_error("Failed to copy emp3r0r launcher")
 
         for binary in ["emp3r0r-cc", "emp3r0r-cat"]:
             src = lib_src / binary
             if src.exists():
-                shutil.copy2(src, kit_dir / "lib" / "emp3r0r" / binary)
+                copy2_atomic(src, kit_dir / "lib" / "emp3r0r" / binary)
             else:
                 log_error(f"Failed to copy {binary}")
 
         listener_src = installed_prefix / "bin" / "emp3r0r-listener"
         if listener_src.exists():
-            shutil.copy2(listener_src, kit_dir / "bin" / "emp3r0r-listener")
+            copy2_atomic(listener_src, kit_dir / "bin" / "emp3r0r-listener")
         else:
             log_warn(f"emp3r0r-listener not found at {listener_src}; skipping")
 
         for d in ["build", "modules", "tmux"]:
             src_dir = lib_src / d
             if src_dir.is_dir():
-                shutil.copytree(src_dir, kit_dir / "lib" / "emp3r0r" / d, dirs_exist_ok=True)
+                shutil.copytree(src_dir, kit_dir / "lib" / "emp3r0r" / d, dirs_exist_ok=True, copy_function=copy2_atomic)
             else:
                 log_warn(f"{src_dir} not found; operator package may be incomplete")
 
@@ -792,7 +832,7 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
         # Copy Python installer directly from repo root
         root_install_py = core_dir.parent / "install.py"
         if root_install_py.is_file():
-            shutil.copy2(root_install_py, kit_dir / "install.py")
+            copy2_atomic(root_install_py, kit_dir / "install.py")
             try:
                 (kit_dir / "install.py").chmod(0o755)
             except Exception:
@@ -839,19 +879,19 @@ def do_install(prefix: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> N
 
     if not IS_DRY_RUN:
         if (temp_dir / "tmux").is_dir():
-            shutil.copytree(temp_dir / "tmux", data_dir / "tmux", dirs_exist_ok=True)
+            shutil.copytree(temp_dir / "tmux", data_dir / "tmux", dirs_exist_ok=True, copy_function=copy2_atomic)
         if (temp_dir / "modules").is_dir():
-            shutil.copytree(temp_dir / "modules", data_dir / "modules", dirs_exist_ok=True)
+            shutil.copytree(temp_dir / "modules", data_dir / "modules", dirs_exist_ok=True, copy_function=copy2_atomic)
 
         for stub in temp_dir.glob("stub*"):
-            shutil.copy2(stub, build_dir / stub.name)
+            copy2_atomic(stub, build_dir / stub.name)
 
         tmux_conf = data_dir / "tmux" / ".tmux.conf"
         if tmux_conf.is_file():
             tmux_sh_dir = str(data_dir / "tmux" / "sh")
             content = tmux_conf.read_text(encoding="utf-8")
             content = content.replace("~/sh", tmux_sh_dir)
-            tmux_conf.write_text(content, encoding="utf-8")
+            write_text_atomic(tmux_conf, content)
 
         if (temp_dir / "cc.exe").is_file():
             (temp_dir / "cc.exe").chmod(0o755)
@@ -859,17 +899,17 @@ def do_install(prefix: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> N
             (temp_dir / "cat.exe").chmod(0o755)
 
         if (temp_dir / "emp3r0r").is_file():
-            shutil.copy2(temp_dir / "emp3r0r", bin_dir / "emp3r0r")
+            copy2_atomic(temp_dir / "emp3r0r", bin_dir / "emp3r0r")
             (bin_dir / "emp3r0r").chmod(0o755)
         if (temp_dir / "listener.exe").is_file():
-            shutil.copy2(temp_dir / "listener.exe", bin_dir / "emp3r0r-listener")
+            copy2_atomic(temp_dir / "listener.exe", bin_dir / "emp3r0r-listener")
             (bin_dir / "emp3r0r-listener").chmod(0o755)
 
         if (temp_dir / "cc.exe").is_file():
-            shutil.copy2(temp_dir / "cc.exe", data_dir / "emp3r0r-cc")
+            copy2_atomic(temp_dir / "cc.exe", data_dir / "emp3r0r-cc")
             (data_dir / "emp3r0r-cc").chmod(0o755)
         if (temp_dir / "cat.exe").is_file():
-            shutil.copy2(temp_dir / "cat.exe", data_dir / "emp3r0r-cat")
+            copy2_atomic(temp_dir / "cat.exe", data_dir / "emp3r0r-cat")
             (data_dir / "emp3r0r-cat").chmod(0o755)
 
     install_donut(data_dir, search_dir=temp_dir)
@@ -893,18 +933,24 @@ def do_install(prefix: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> N
             tmpfiles = pathlib.Path("/etc/tmpfiles.d")
             if tmpfiles.is_dir():
                 current_user = os.environ.get("SUDO_USER") or os.environ.get("USER") or "root"
-                (tmpfiles / "emp3r0r-wireguard.conf").write_text(
-                    f"d /var/run/wireguard 0755 {current_user} {current_user}\n", encoding="utf-8"
-                )
+                try:
+                    write_text_atomic(
+                        tmpfiles / "emp3r0r-wireguard.conf",
+                        f"d /var/run/wireguard 0755 {current_user} {current_user}\n",
+                    )
+                except OSError as e:
+                    log_warn(f"Could not write {tmpfiles / 'emp3r0r-wireguard.conf'} (overwrite failed: {e}); continuing")
 
         cc_bin = data_dir / "emp3r0r-cc"
         bash_comp_dir = pathlib.Path("/etc/bash_completion.d")
         if bash_comp_dir.is_dir():
             res = run_cmd([str(cc_bin), "completion", "bash"], check=False, capture_output=True)
             if res.returncode == 0 and res.stdout:
-                (bash_comp_dir / "emp3r0r").write_text(res.stdout, encoding="utf-8")
-                (bash_comp_dir / "emp3r0r").chmod(0o644)
-                log_info("Installed Bash completion to /etc/bash_completion.d/emp3r0r")
+                try:
+                    write_text_atomic(bash_comp_dir / "emp3r0r", res.stdout)
+                    log_info("Installed Bash completion to /etc/bash_completion.d/emp3r0r")
+                except OSError as e:
+                    log_warn(f"Could not install Bash completion (overwrite failed: {e}); continuing")
     else:
         log_info("Running inside container, skipping setcap, wireguard runtime dir, and autocomplete setup")
 
@@ -950,13 +996,13 @@ def prepare_misc_files(core_dir: pathlib.Path, temp_dir: pathlib.Path) -> None:
         src = core_dir / name
         if src.exists():
             if src.is_dir():
-                shutil.copytree(src, temp_dir / name, dirs_exist_ok=True)
+                shutil.copytree(src, temp_dir / name, dirs_exist_ok=True, copy_function=copy2_atomic)
             else:
-                shutil.copy2(src, temp_dir / name)
+                copy2_atomic(src, temp_dir / name)
 
     build_py = core_dir / "build.py"
     if build_py.exists():
-        shutil.copy2(build_py, temp_dir / "build.py")
+        copy2_atomic(build_py, temp_dir / "build.py")
 
 
 def create_tar(core_dir: pathlib.Path, temp_dir: pathlib.Path) -> None:

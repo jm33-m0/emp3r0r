@@ -82,6 +82,38 @@ def run_cmd(
         raise e
 
 
+def write_text_atomic(path: pathlib.Path, content: str) -> None:
+    """Write a text file, force-overwriting whatever is already there.
+
+    On Linux, truncating a file that is still mapped or held open (a sourced
+    completion script, a previous installer still running, ...) fails with
+    ETXTBSY/EBUSY ("Text file busy"). Writing a temp file in the same
+    directory and renaming it over the target (os.replace) swaps the
+    directory entry and never touches the busy inode, so the overwrite
+    always succeeds.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(path.name + ".tmp")
+    tmp_path.write_text(content, encoding="utf-8")
+    os.replace(tmp_path, path)
+    path.chmod(0o644)
+
+def copy2_atomic(src: pathlib.Path, dst: pathlib.Path) -> None:
+    """Copy a file, force-overwriting any existing file.
+
+    On Linux, truncating a file that is still mapped/executed (e.g. a
+    running emp3r0r-cc during a reinstall) fails with ETXTBSY/EBUSY
+    ("Text file busy"). Copying to a temp file in the same directory and
+    renaming it over the target (os.replace) never touches the busy inode,
+    so reinstalling over a running binary works.
+    """
+    dst = pathlib.Path(dst)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dst.with_name(dst.name + ".tmp")
+    shutil.copy2(src, tmp)
+    os.replace(tmp, dst)
+
+
 # ===========================================================================
 # Mode 1: Operator Kit Direct Installer
 # ===========================================================================
@@ -131,22 +163,22 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
 
     log_info("Installing binaries and data...")
     if not IS_DRY_RUN:
-        shutil.copy2(kit_dir / "bin" / "emp3r0r", bin_dir / "emp3r0r")
+        copy2_atomic(kit_dir / "bin" / "emp3r0r", bin_dir / "emp3r0r")
         (bin_dir / "emp3r0r").chmod(0o755)
 
         if (kit_dir / "bin" / "emp3r0r-listener").exists():
-            shutil.copy2(kit_dir / "bin" / "emp3r0r-listener", bin_dir / "emp3r0r-listener")
+            copy2_atomic(kit_dir / "bin" / "emp3r0r-listener", bin_dir / "emp3r0r-listener")
             (bin_dir / "emp3r0r-listener").chmod(0o755)
 
-        shutil.copy2(kit_dir / "lib" / "emp3r0r" / "emp3r0r-cc", data_dir / "emp3r0r-cc")
-        shutil.copy2(kit_dir / "lib" / "emp3r0r" / "emp3r0r-cat", data_dir / "emp3r0r-cat")
+        copy2_atomic(kit_dir / "lib" / "emp3r0r" / "emp3r0r-cc", data_dir / "emp3r0r-cc")
+        copy2_atomic(kit_dir / "lib" / "emp3r0r" / "emp3r0r-cat", data_dir / "emp3r0r-cat")
         (data_dir / "emp3r0r-cc").chmod(0o755)
         (data_dir / "emp3r0r-cat").chmod(0o755)
 
         for d in ["build", "modules", "tmux"]:
             src_d = kit_dir / "lib" / "emp3r0r" / d
             if src_d.is_dir():
-                shutil.copytree(src_d, data_dir / d, dirs_exist_ok=True)
+                shutil.copytree(src_d, data_dir / d, dirs_exist_ok=True, copy_function=copy2_atomic)
                 log_info(f"Installed {d}")
 
     donut_src = kit_dir / "lib" / "emp3r0r" / "bin" / "donut"
@@ -155,7 +187,7 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
         donut_dst = data_dir / "bin" / "donut"
         if not IS_DRY_RUN:
             donut_dst.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(donut_src, donut_dst)
+            copy2_atomic(donut_src, donut_dst)
             donut_dst.chmod(0o755)
             usr_local_bin = pathlib.Path("/usr/local/bin")
             usr_local_bin.mkdir(parents=True, exist_ok=True)
@@ -185,7 +217,24 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
             pass
 
     cc_bin = data_dir / "emp3r0r-cc"
-    run_cmd([str(cc_bin), "completion", "bash"], check=False, capture_output=True)
+    # Refresh shell completions from the freshly installed binary. Writing the
+    # output (not discarding it) keeps /etc/bash_completion.d/emp3r0r in sync
+    # with the binary — otherwise operators keep a stale script (missing newly
+    # added flags like --gui) after upgrading.
+    bash_comp_dir = pathlib.Path("/etc/bash_completion.d")
+    if bash_comp_dir.is_dir():
+        res = run_cmd([str(cc_bin), "completion", "bash"], check=False, capture_output=True)
+        if res.returncode == 0 and res.stdout:
+            if not IS_DRY_RUN:
+                try:
+                    write_text_atomic(bash_comp_dir / "emp3r0r", res.stdout)
+                except OSError as e:
+                    # never fail the install because of a busy/locked file
+                    log_warn(f"Could not install Bash completion (overwrite failed: {e}); continuing")
+                else:
+                    log_info("Installed Bash completion to /etc/bash_completion.d/emp3r0r")
+        else:
+            log_warn("Failed to generate Bash completion script")
 
     log_success(f"emp3r0r operator kit installed successfully to {prefix_path}")
     log_info("Run 'emp3r0r client --help' to get started.")
