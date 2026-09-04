@@ -128,7 +128,7 @@ func TmuxInitWindows() (err error) {
 	}
 
 	// Agent output
-	OutputPane, err = new_pane("Output", fmt.Sprintf("Saving to %s...\n", live.EmpLogFile), "v", "", 66)
+	OutputPane, err = new_pane("Output", fmt.Sprintf("Saving to %s...\n", live.EmpLogFile), "vb", "", 66)
 	if err != nil {
 		return err
 	}
