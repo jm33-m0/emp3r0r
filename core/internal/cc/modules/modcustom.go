@@ -78,6 +78,22 @@ func moduleCustom(ctx *c2context.C2Context) {
 		invocation.Coff = nil
 	}
 
+	// Pre-flight every dependency this module declares (module config
+	// "dependencies", e.g. the auto-added "coffloader" for Windows BOFs):
+	// make sure each dependency's payload is hosted and downloadable for the
+	// target agent's arch before we dispatch, so a missing dependency fails
+	// fast with a clear error instead of a download error on the agent.
+	// Dependency modules are ordinary modules — today they are DLL loader
+	// modules, but nothing in this path assumes that.
+	if ctx.Target != nil && len(config.Dependencies) > 0 {
+		for _, dep := range config.Dependencies {
+			if err := ensureModuleDependencyHosted(ctx, dep); err != nil {
+				logging.Errorf("Running %s on %s: %v", config.Name, ctx.Target.Tag, err)
+				return
+			}
+		}
+	}
+
 	invBytes, err := cbor.Marshal(invocation)
 	if err != nil {
 		logging.Errorf("Encoding invocation: %v", err)
@@ -171,11 +187,7 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 	}
 	if ctx.Target != nil && archVariants &&
 		(strings.EqualFold(payload_type, "dll") || strings.EqualFold(payload_type, "coff")) {
-		agentArch := ctx.Target.GOArch
-		if agentArch == "" {
-			agentArch = ctx.Target.Arch // older agents don't report GOArch yet
-		}
-		arch := normalizeAgentArch(agentArch)
+		arch := agentArch(ctx)
 		payloadFile = selectArchPayload(config.AgentConfig.Files, arch)
 		hostedName = fmt.Sprintf("%s.%s", strings.ToLower(live.ActiveModule.Name), arch)
 	}
@@ -355,29 +367,110 @@ func hostDLLModules() {
 			if arch == "" {
 				arch = "amd64"
 			}
-			hosted := filepath.Join(live.WWWRoot, fmt.Sprintf("%s.%s.gz", strings.ToLower(config.Name), arch))
-			if util.IsFileExist(hosted) {
-				continue
+			if _, err := hostModulePayload(config, file, arch); err != nil {
+				logging.Warningf("hostDLLModules: %v", err)
 			}
-			path := filepath.Join(config.Path, file)
-			data, err := os.ReadFile(path)
-			if err != nil {
-				logging.Warningf("hostDLLModules: read %s: %v", path, err)
-				continue
-			}
-			compressed, err := util.Compress(data)
-			if err != nil {
-				logging.Warningf("hostDLLModules: compress %s: %v", path, err)
-				continue
-			}
-			if err := os.WriteFile(hosted, compressed, 0o600); err != nil {
-				logging.Warningf("hostDLLModules: write %s: %v", hosted, err)
-				continue
-			}
-			logging.Infof("Hosted DLL module %s as %s", config.Name, hosted)
 		}
 		return true
 	})
+}
+
+// hostModulePayload compresses payload file of module config into
+// <module>.<arch>.gz under WWWRoot (unless already hosted) and returns the
+// hosted path. The module is not required to be a DLL module; any module with
+// payload files can be hosted this way.
+func hostModulePayload(config *def.ModuleConfig, file, arch string) (string, error) {
+	hosted := filepath.Join(live.WWWRoot, fmt.Sprintf("%s.%s.gz", strings.ToLower(config.Name), arch))
+	if util.IsFileExist(hosted) {
+		return hosted, nil
+	}
+	if err := os.MkdirAll(live.WWWRoot, 0o700); err != nil {
+		return "", fmt.Errorf("create %s: %w", live.WWWRoot, err)
+	}
+	path := filepath.Join(config.Path, file)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read %s: %w", path, err)
+	}
+	compressed, err := util.Compress(data)
+	if err != nil {
+		return "", fmt.Errorf("compress %s: %w", path, err)
+	}
+	if err := os.WriteFile(hosted, compressed, 0o600); err != nil {
+		return "", fmt.Errorf("write %s: %w", hosted, err)
+	}
+	logging.Infof("Hosted module %s as %s", config.Name, hosted)
+	return hosted, nil
+}
+
+// ensureModuleDependencyHosted makes sure the payload of dependency depName
+// is hosted and downloadable from the C2 file endpoint for the target agent's
+// arch before a module that depends on it is dispatched. hostDLLModules()
+// pre-hosts every DLL module's payload at startup, but hosting can fail
+// silently (payload not built yet, module directory added after startup,
+// WWWRoot recreated), so we host on demand and fail fast instead of letting
+// the agent download a 404.
+//
+// A dependency is an ordinary module with payload files: today BOF
+// dependencies are DLL loader modules ("coffloader"), but nothing in this
+// path assumes a particular payload type.
+func ensureModuleDependencyHosted(ctx *c2context.C2Context, depName string) error {
+	if ctx == nil || ctx.Target == nil {
+		return fmt.Errorf("no target selected")
+	}
+	arch := agentArch(ctx)
+	if arch == "" {
+		return fmt.Errorf("cannot determine target arch (GOArch=%q Arch=%q)", ctx.Target.GOArch, ctx.Target.Arch)
+	}
+	depName = strings.ToLower(depName)
+	hosted := filepath.Join(live.WWWRoot, fmt.Sprintf("%s.%s.gz", depName, arch))
+	if util.IsFileExist(hosted) {
+		return nil
+	}
+
+	// Locate the dependency module config (case-insensitive, module names are
+	// not guaranteed to be lowercase).
+	var config *def.ModuleConfig
+	def.Modules.Range(func(_, val any) bool {
+		c, ok := val.(*def.ModuleConfig)
+		if ok && strings.EqualFold(c.Name, depName) {
+			config = c
+			return false
+		}
+		return true
+	})
+	if config == nil {
+		return fmt.Errorf("dependency module %q is not loaded; install it so dependent modules can fetch it", depName)
+	}
+	if len(config.AgentConfig.Files) == 0 || config.Path == "" {
+		return fmt.Errorf("dependency module %q has no payload files", depName)
+	}
+
+	// Pick the payload for the target arch. Modules may ship per-arch
+	// payloads (COFFLoader.x64.dll / COFFLoader.x86.dll) or a single
+	// arch-agnostic file. selectArchPayload falls back to the first file when
+	// nothing matches, so make sure a mismatched per-arch payload is not
+	// silently served under the wrong arch name.
+	payloadFile := selectArchPayload(config.AgentConfig.Files, arch)
+	if fileArch := payloadArch(payloadFile); fileArch != "" && fileArch != arch {
+		return fmt.Errorf("dependency module %q ships no %s payload (found %s)", depName, arch, fileArch)
+	}
+	_, err := hostModulePayload(config, payloadFile, arch)
+	return err
+}
+
+// agentArch returns the canonical agent arch ("amd64"/"386") of ctx.Target,
+// preferring the agent binary's own GOArch over the OS kernel Arch (a 386
+// agent under WoW64 on x64 Windows reports kernel Arch "x64").
+func agentArch(ctx *c2context.C2Context) string {
+	if ctx == nil || ctx.Target == nil {
+		return ""
+	}
+	agentArch := ctx.Target.GOArch
+	if agentArch == "" {
+		agentArch = ctx.Target.Arch // older agents don't report GOArch yet
+	}
+	return normalizeAgentArch(agentArch)
 }
 
 // payloadArch derives the canonical arch ("amd64" or "386") from a payload
