@@ -58,10 +58,13 @@ func (h *pivotHandler) relayTCP(ctx context.Context, conn net.Conn, destination 
 	relayDuplex(conn, remote)
 }
 
-// NewPacketConnectionEx closes UDP flows: the SOCKS5 pivot only supports
-// CONNECT (TCP) for now.
-func (h *pivotHandler) NewPacketConnectionEx(context.Context, N.PacketConn, M.Socksaddr, M.Socksaddr, N.CloseHandlerFunc) {
-	// conn is closed by the caller on return; nothing to proxy for UDP.
+// NewPacketConnectionEx drops UDP flows: the SOCKS5 pivot only supports
+// CONNECT (TCP) for now. The NAT session must be closed here — the caller
+// does NOT close it when the handler returns, so leaving it open would keep a
+// NAT entry (and its packet channel) alive until the UDP timeout.
+func (h *pivotHandler) NewPacketConnectionEx(_ context.Context, conn N.PacketConn, _ M.Socksaddr, _ M.Socksaddr, _ N.CloseHandlerFunc) {
+	logging.Debugf("tun2socks[%s]: dropping UDP flow (SOCKS5 pivot is CONNECT-only)", h.tag)
+	_ = conn.Close()
 }
 
 // relayDuplex pipes bytes both ways until one side finishes, then closes both

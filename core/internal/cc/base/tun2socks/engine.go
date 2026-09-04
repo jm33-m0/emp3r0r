@@ -162,6 +162,7 @@ func Start(cfg Config) (eng *Engine, err error) {
 		return fail(fmt.Errorf("create interface monitor: %w", err))
 	}
 	if err = interfaceMonitor.Start(); err != nil {
+		_ = interfaceMonitor.Close()
 		_ = networkMonitor.Close()
 		return fail(fmt.Errorf("start interface monitor: %w", err))
 	}
