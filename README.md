@@ -115,18 +115,31 @@ Execute in-memory binary modules on both Windows and Linux targets:
 
 ---
 
-### 🔑 On-Demand Windows Token Manipulation
+### 🔑 Windows Tokens, Netonly Sessions & Kerberos Tickets (PTT)
 
-Agents on Windows can steal, cache, and impersonate access tokens from running processes — entirely in-process using indirect NT syscalls.
+Agents on Windows can steal, cache and impersonate access tokens from running processes — entirely in-process via indirect NT syscalls — and can build disposable **netonly logon sessions** with imported **Kerberos tickets** for pass‑the‑ticket (PTT) operations against remote hosts.
 
-- **Steal & Cache:** `steal_token --pid <PID>` duplicates a process token via `NtOpenProcess` + `NtDuplicateToken` and stores it in memory by SID. Optionally chain impersonation with `--token <sid>` to escalate from one stolen identity to another.
-- **Enumerate:** `list_tokens` displays all cached tokens with `DOMAIN/User (SID)` names.
-- **Universal Impersonation:** Reference a cached token by SID (`--token <sid>`) in **any** module — Go, Starlark, COFF/BOF. Thread-level impersonation (`NtSetInformationThread`) is applied around sensitive operations.
-- **Token-Aware Starlark:** Builtins (`read_file`, `write_file`, `exec_cmd`, Win32 API proxy, etc.) automatically impersonate per-syscall when a token is set, and `exec_cmd` can spawn child processes under the stolen identity via `CreateProcessWithTokenW`.
+- **Steal & Cache:** `steal_token --pid <PID>` duplicates a process token via `NtOpenProcess` + `NtDuplicateToken` and caches it by SID. Optionally chain impersonation with `--token <sid>` to escalate from one stolen identity to another.
+- **Enumerate:** `list_tokens` shows every cached token as `DOMAIN/User (SID)`.
+- **Netonly Logon Sessions:** `make_token --user CORP/da [--domain CORP] [--name da]` creates a netonly logon session (`LOGON32_LOGON_NEW_CREDENTIALS`, i.e. `runas /netonly`, like Cobalt Strike's `make_token`) — any password works and is never validated. The session keeps the agent's local identity and only carries the supplied credentials for **outbound** network access. `list_sessions` lists them (name, user, logon LUID); each session is addressable as `--token <session>`.
+- **Kerberos Ticket Import (PTT):** `import_ticket --session <name> --ticket <base64 KRB-CRED .kirbi>` submits the ticket into that session's LSA logon-session cache via `LsaCallAuthenticationPackage` (the same primitive as Kerbeus `ptt`, no BOF needed). `--luid <hex>` targets an explicit logon session LUID (requires SYSTEM for sessions owned by other users).
+- **One-shot `--user`/`--ticket` module flags:** every module also accepts `--user CORP/da` (create/reuse the session on the fly) and `--ticket <base64>` (import into it before execution), so the whole PTT setup is a single invocation.
+- **Universal Impersonation:** reference a stolen-token SID or a session name via `--token <...>` in **any** module — Go, Starlark, COFF/BOF. Thread-level impersonation (`NtSetInformationThread`) is applied around sensitive operations; token-aware Starlark builtins (`read_file`, `write_file`, `exec_cmd`, the Win32 API proxy, …) impersonate per syscall, and child processes can be spawned under the identity with `CreateProcessWithTokenW`.
+- **Tickets are per logon session:** an imported ticket only authenticates network traffic that runs under *its* session — that is the pass-the-ticket model. The session's network identity becomes the ticket's principal (e.g. the DA) while `whoami` still shows the original user. Use **hostnames** (not IPs) in UNC/SPN paths so Kerberos is selected, and connect to agent-less hosts over SMB/RPC with `cifs_upload`/`cifs_rm`/`scshell`. Inspect and manage caches with the bundled Kerbeus BOF suite (`kerbeus_asktgt`, `kerbeus_ptt`, `kerbeus_klist`).
 
-**Why this matters:** No external tools, no disk artifacts, no process-creation noise. Token theft and reuse happen entirely in-process using indirect syscalls, with stolen tokens immediately consumable by every built-in module.
+**Why this matters:** no external tools, no disk artifacts, no process-creation noise. Token theft, netonly sessions and ticket imports all happen in-process via indirect syscalls and LSA; DA material is quarantined in a disposable session that can be purged, keeping the agent process's own identity clean.
 
 ---
+
+### 🧦 SOCKS5 Pivoting & Operator-Side tun2socks
+
+Two-layer pivoting: a **SOCKS5 pivot on the C2 that relays through the selected agent**, plus an optional **TUN device on the operator machine** that transparently routes chosen networks through that SOCKS5 pivot — so traffic appears to originate from the agent, not the operator.
+
+- **SOCKS5 Pivot:** `target <agent>` then `socks_start 1080` binds a SOCKS5 proxy on the C2 that tunnels through the selected agent. Point any SOCKS5-aware tool at it (e.g. `proxychains: socks5 <C2 WireGuard IP> 1080`); `--bind` selects the C2 listen address. `socks_stop <port>` / `socks_status` manage running pivots.
+- **tun2socks (transparent proxy):** `tun2socks start --route 10.10.0.0/24 [--route ...] [--exclude ...]` (sing-box TUN engine with a gVisor user-space network stack) creates a TUN device on the operator host and terminates only the traffic destined for the `--route` networks, re-opening it through the C2 SOCKS5 pivot — i.e. it appears to originate from the selected agent. Your default route is never touched, so normal connectivity keeps working. `tun2socks stop [name]` / `tun2socks status` manage instances; options include `--mtu`, `--addr` and `--name`.
+- **Typical flow:** `target <agent>` → `socks_start 1080` → `tun2socks start --route 10.10.0.0/24` → `curl http://10.10.0.5` (or any tool) — no per-tool SOCKS5 configuration needed.
+
+**Why this matters:** full-network access to agent-side segments (e.g. a reachable DC or workstation subnet) with tool-agnostic, operator-side transparency and agent-originated egress — no persistent agent-side listeners or static port forwards.
 
 ### 🎭 Pluggable C2 Transport, uTLS JA3 Evasion & CBOR Protocol
 
