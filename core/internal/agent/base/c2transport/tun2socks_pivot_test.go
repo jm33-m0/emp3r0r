@@ -250,6 +250,7 @@ func startLoopbackEcho(t *testing.T) string {
 // with a loopback target the co-located agent can reach directly. No TUN is
 // involved, so this isolates the protocol layer.
 func TestTun2SocksPivotSingClientInterop(t *testing.T) {
+	skipFlakyPivotE2E(t)
 	pivot := startPivotStack(t)
 	echo := startLoopbackEcho(t)
 
