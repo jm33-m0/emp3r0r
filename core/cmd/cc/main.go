@@ -38,6 +38,7 @@ type Options struct {
 	debug                   bool   // Do not kill tmux session when crashing
 	server_debug            bool   // Enable verbose server logging (level 4)
 	num_operators           int    // Number of operator configurations to generate
+	gui                     bool   // Launch the browser GUI console instead of tmux
 }
 
 const (
@@ -81,6 +82,7 @@ func main() {
 
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&opts.cdnProxy, "cdn2proxy", "", "Start cdn2proxy server on this port")
+	rootCmd.PersistentFlags().BoolVar(&opts.gui, "gui", false, "Run the operator console in a browser GUI (no tmux required) — paste the C2 connection command into the login box")
 
 	// Client subcommand
 	clientCmd := &cobra.Command{
@@ -165,6 +167,19 @@ Zsh:
 }
 
 func runClientMode(opts *Options) {
+	// GUI mode: no WireGuard flags or tmux required up front — the operator
+	// pastes the C2 server's connection command into the login box and the
+	// GUI extracts the WG credentials, connects, downloads the config and
+	// starts the interactive console inside a browser terminal.
+	if opts.gui {
+		operator.GuiMain(operator.GuiStartOptions{
+			C2Host:       opts.c2_server_ip,
+			OperatorPort: opts.c2_operator_server_port,
+			CdnProxy:     opts.cdnProxy,
+		})
+		return
+	}
+
 	err := live.CopyStubs()
 	if err != nil {
 		logging.Fatalf("Failed to copy stubs: %v", err)
@@ -213,6 +228,9 @@ func runClientMode(opts *Options) {
 }
 
 func runServerMode(opts *Options) {
+	if opts.gui {
+		logging.Fatalf("--gui is only supported in client mode: run `emp3r0r client --gui`")
+	}
 	var err error
 	live.IsServer = true
 	logging.AddWriter(os.Stderr)

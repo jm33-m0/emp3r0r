@@ -10,6 +10,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
+	"github.com/jm33-m0/emp3r0r/core/lib/gui"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
@@ -45,12 +46,17 @@ func operatorIdleFor(agentTag string) (time.Duration, bool) {
 	return time.Since(last), true
 }
 
-// cmdSetActiveAgent sets the active agent for the operator
-func CmdSetActiveAgent(cmd *cobra.Command, args []string) {
-	agent, err := client.SetActiveAgent(args[0])
+// setActiveTarget selects an agent (by tag or numeric index) as the active
+// target, updates the operator-side pointer and refreshes the agent list. It
+// is the shared backend used by both the `target` console command and the GUI
+// agent table click. UI-specific side effects (tmux window titles, pane
+// switches) are applied by the callers. It returns false when selection
+// failed.
+func setActiveTarget(identifier string) bool {
+	agent, err := client.SetActiveAgent(identifier)
 	if err != nil {
 		logging.Errorf("Failed to set active agent: %v", err)
-		return
+		return false
 	}
 	live.ActiveAgent = agent
 	logging.Successf("Now targeting %s", live.ActiveAgent.Tag)
@@ -62,7 +68,17 @@ func CmdSetActiveAgent(cmd *cobra.Command, args []string) {
 	// Refresh the list immediately so the newly selected agent's Last seen/RTT
 	// reflect the latest server state instead of waiting for the next 10s tick.
 	safeRefreshAgentList()
+	return true
+}
 
+// cmdSetActiveAgent sets the active agent for the operator
+func CmdSetActiveAgent(cmd *cobra.Command, args []string) {
+	if !setActiveTarget(args[0]) {
+		return
+	}
+	if GuiMode {
+		return
+	}
 	// Update tmux window title to show active agent
 	setTitleErr := cli.TmuxSetWindowTitle(live.ActiveAgent.ShortID, cli.CommandPane.WindowID)
 	if setTitleErr != nil {
@@ -77,11 +93,26 @@ func CmdListAgents(_ *cobra.Command, _ []string) {
 		logging.Errorf("Failed to list agents: %v", err)
 		return
 	}
+	if GuiMode {
+		count := 0
+		live.AgentList.Range(func(_, _ any) bool {
+			count++
+			return true
+		})
+		logging.Infof("%d agent(s) connected — see the left panel", count)
+		return
+	}
 	cli.TmuxSwitchWindow(cli.AgentListPane.WindowID)
 }
 
 // RenderAgentTable builds and returns a table string for the given agents.
 func RenderAgentTable(agents []*def.Emp3r0rAgent) {
+	// In GUI mode the frontend renders its own table / mesh view from a
+	// structured snapshot (gui_agents.go), so skip all tmux logic here.
+	if GuiMode {
+		gui.PublishAgents(guiAgentViews(agents))
+		return
+	}
 	// build table data
 	tdata := [][]string{}
 	var tail []string
@@ -90,12 +121,7 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 		if target == nil {
 			continue
 		}
-		procInfo := "unknown"
-		if target.Process != nil {
-			agentProc := *target.Process
-			procInfo = fmt.Sprintf("%s (%d) <- %s (%d)",
-				agentProc.Cmdline, agentProc.PID, agentProc.Parent, agentProc.PPID)
-		}
+		procInfo := agentProcessString(target)
 		ips := strings.Join(target.IPs, ", ")
 		infoMap := map[string]string{
 			"OS":      util.SplitLongLine(target.OS, 20),
@@ -240,6 +266,56 @@ func formatIdle(seconds float64) string {
 	}
 }
 
+// agentProcessString renders an agent's process for display (CLI table and
+// the GUI agent snapshot share this formatter).
+func agentProcessString(a *def.Emp3r0rAgent) string {
+	if a == nil || a.Process == nil {
+		return "unknown"
+	}
+	p := *a.Process
+	return fmt.Sprintf("%s (%d) <- %s (%d)", p.Cmdline, p.PID, p.Parent, p.PPID)
+}
+
+// guiAgentViews maps the canonical agent records to the GUI's wire DTOs. This
+// is the single def -> gui.Agent conversion in the codebase; lib/gui never
+// imports internal/def. It reuses the same display helpers as the CLI table.
+func guiAgentViews(agents []*def.Emp3r0rAgent) []gui.Agent {
+	views := make([]gui.Agent, 0, len(agents))
+	for _, a := range agents {
+		if a == nil {
+			continue
+		}
+		active := live.ActiveAgent != nil && live.ActiveAgent.Tag == a.Tag
+		v := gui.Agent{
+			ID:             a.ShortID,
+			Tag:            a.Tag,
+			Name:           a.Name,
+			UUID:           a.UUID,
+			Version:        a.Version,
+			OS:             a.OS,
+			Goos:           a.GOOS,
+			Arch:           a.GOArch,
+			User:           a.User,
+			Process:        agentProcessString(a),
+			IPs:            a.IPs,
+			From:           a.From,
+			Transport:      a.Transport,
+			MeshRoute:      a.MeshRoute,
+			P2PRelayPort:   a.P2PRelayPort,
+			MeshGossipPort: a.MeshGossipPort,
+			CWD:            a.CWD,
+			HasRoot:        a.HasRoot,
+			LastSeen:       agentLastSeen(a),
+			Active:         active,
+		}
+		if a.LastSeenRTT > 0 {
+			v.LastSeenRTT = float64(a.LastSeenRTT) / float64(time.Millisecond)
+		}
+		views = append(views, v)
+	}
+	return views
+}
+
 // agentLastSeen formats an agent's last-seen time for display in the agent list.
 func agentLastSeen(a *def.Emp3r0rAgent) string {
 	if a == nil || a.LastSeen.IsZero() {
@@ -302,7 +378,9 @@ func refreshAgentList() error {
 			if a.UUID == live.ActiveAgent.UUID {
 				live.ActiveAgent = a
 				// Update tmux window title
-				_ = cli.TmuxSetWindowTitle(live.ActiveAgent.ShortID, cli.CommandPane.WindowID)
+				if !GuiMode {
+					_ = cli.TmuxSetWindowTitle(live.ActiveAgent.ShortID, cli.CommandPane.WindowID)
+				}
 				break
 			}
 		}

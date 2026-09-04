@@ -20,6 +20,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
+	"github.com/jm33-m0/emp3r0r/core/lib/gui"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/reeflective/console"
 	"github.com/reeflective/console/commands/readline"
@@ -580,6 +581,11 @@ func exitEmp3r0r(_ *console.Console) {
 	if common.RuntimeConfig.PreflightEnabled {
 		logging.Warningf("Remember to remove the conditional C2 preflight URL from your server or agents will make too much noise: %s",
 			common.RuntimeConfig.PreflightURL)
+	}
+	if GuiMode {
+		// leaving on purpose (Exit button / `exit`): lib/gui logs synchronously,
+		// forgets the saved session, tears the GUI down and exits the process.
+		gui.ExitProcess()
 	}
 	cli.TmuxDeinitWindows()
 	os.Exit(0)

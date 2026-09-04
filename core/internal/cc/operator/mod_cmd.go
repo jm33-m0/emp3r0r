@@ -148,6 +148,13 @@ func runModuleByName(cmd *cobra.Command, modName string) {
 			if !ok {
 				return fmt.Errorf("expected string, got %T", data)
 			}
+			if GuiMode {
+				// GUI mode has no tmux: surface the connection string so the
+				// operator can run it locally (e.g. inside the command pane
+				// through a shell or a separate terminal).
+				logging.Successf("Shell ready! Run locally: %s", connStr)
+				return nil
+			}
 			logging.Successf("Shell ready! Opening tmux...")
 			windowName := "shell"
 			if ctxTarget := agents.MustGetActiveAgent(); ctxTarget != nil {

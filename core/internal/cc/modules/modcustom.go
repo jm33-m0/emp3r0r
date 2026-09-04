@@ -579,6 +579,18 @@ func InitModules() {
 						}
 					}()
 
+					// First module dir wins. Built/local modules (IsLocal or
+					// Build != "") are copied into the workspace module dir by
+					// the scan of the first dir, and the workspace dir is then
+					// scanned again — without this guard every copied module
+					// would "conflict" with itself and be re-registered from the
+					// (possibly stale) workspace copy. Skip it instead: the
+					// canonical copy from the earlier search dir stays loaded.
+					if _, exists := def.Modules.Load(config.Name); exists {
+						logging.Debugf("Skipping duplicate module %s: already loaded from an earlier module dir", config.Name)
+						return
+					}
+
 					// module path, eg. ~/.emp3r0r/modules/foo
 					originalPath := fmt.Sprintf("%s/%s", mod_search_dir, dir.Name())
 					config.Path = originalPath
@@ -613,11 +625,6 @@ func InitModules() {
 
 					// add to module helpers
 					registerModuleRunner(config.Name, moduleCustom)
-
-					// Check for conflicting module names
-					if _, exists := def.Modules.Load(config.Name); exists {
-						logging.Warningf("Conflicting module name: module '%s' is already registered/loaded. The new definition will overwrite it.", config.Name)
-					}
 
 					// Store FIRST so that updateModuleHelp can Load and patch the Options map.
 					// Without this, the Load inside updateModuleHelp always misses and the

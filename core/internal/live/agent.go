@@ -21,6 +21,38 @@ var (
 	CmdTime sync.Map
 )
 
+// Agent is the canonical operator-side snapshot of one connected agent, ready
+// for presentation (JSON for the GUI, or reused by any other frontend). It is
+// deliberately a plain DTO: the operator console builds it from the canonical
+// internal/def.Emp3r0rAgent (see operator.guiAgentViews) and injects it into
+// presentations via their host interface — the type lives here, next to
+// AgentList, so it is declared exactly once and never duplicated.
+//
+// Field names/tags are part of the GUI wire contract; keep them stable.
+type Agent struct {
+	ID             string   `json:"id"` // ShortID, same identifier shown by the CLI table
+	Tag            string   `json:"tag"`
+	Name           string   `json:"name"`
+	UUID           string   `json:"uuid"`
+	Version        string   `json:"version"`
+	OS             string   `json:"os"`
+	Goos           string   `json:"goos"` // runtime.GOOS of the agent binary ("linux", "windows", ...)
+	Arch           string   `json:"arch"`
+	User           string   `json:"user"`
+	Process        string   `json:"process"`
+	IPs            []string `json:"ips"`
+	From           string   `json:"from"`
+	Transport      string   `json:"transport"`
+	MeshRoute      string   `json:"meshRoute"`
+	P2PRelayPort   string   `json:"p2pRelayPort"`
+	MeshGossipPort string   `json:"meshGossipPort"`
+	CWD            string   `json:"cwd"`
+	HasRoot        bool     `json:"hasRoot"`
+	LastSeen       string   `json:"lastSeen"`
+	LastSeenRTT    float64  `json:"lastSeenRttMs"`
+	Active         bool     `json:"active"`
+}
+
 // AgentControl controller interface of a target
 type AgentControl struct {
 	Index  int      // index of a connected agent

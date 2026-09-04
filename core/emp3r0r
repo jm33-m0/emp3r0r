@@ -40,6 +40,41 @@ workspace="$HOME/.emp3r0r"
 [[ -d "$workspace" ]] || mkdir -p "$workspace"
 cd "$workspace" || error "Failed to enter $workspace"
 
+# GUI mode is fully decoupled from tmux: `emp3r0r client --gui` runs the
+# embedded browser GUI (emp3r0r-cc client --gui). The GUI is a local HTTP
+# app with its own in-process console and logs to ~/.emp3r0r/emp3r0r.log, so
+# it is launched DETACHED from this terminal: closing the terminal or an SSH
+# drop can no longer kill the operator session (SIGHUP). Detect --gui
+# anywhere in the args and skip all tmux logic.
+for arg in "$@"; do
+  if [[ "$arg" = "--gui" ]]; then
+    logfile="$workspace/emp3r0r.log"
+    info "Starting emp3r0r GUI (detached, no tmux)"
+    if command -v setsid >/dev/null 2>&1; then
+      setsid "$cc" "$@" </dev/null >>"$logfile" 2>&1 &
+    else
+      "$cc" "$@" </dev/null >>"$logfile" 2>&1 &
+      disown 2>/dev/null || true
+    fi
+    # wait for the GUI to come up and print its URL (poll the log)
+    url=""
+    for _ in $(seq 1 100); do
+      url=$(grep -o 'http://127.0.0.1:[0-9]*/?token=[a-f0-9]*' "$logfile" 2>/dev/null | tail -n 1)
+      [[ -n "$url" ]] && break
+      sleep 0.2
+    done
+    if [[ -n "$url" ]]; then
+      gui_pid=$(grep 'GUI waiting for operator session' "$logfile" 2>/dev/null | tail -n 1 | grep -o '[0-9]*' | tail -n 1)
+      success "emp3r0r GUI is running:"
+      echo "    $url"
+      [[ -n "$gui_pid" ]] && echo "    logs: $logfile    stop: kill $gui_pid  (or use Exit inside the GUI)"
+    else
+      warn "GUI may have failed to start — check $logfile"
+    fi
+    exit 0
+  fi
+done
+
 # if 'emp3r0r client' is run
 if [[ "$1" = "client" ]]; then
   # Run C2 server with tmux UI

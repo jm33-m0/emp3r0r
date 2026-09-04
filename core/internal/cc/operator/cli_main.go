@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	cowsay "github.com/Code-Hex/Neo-cowsay/v2"
@@ -21,8 +22,10 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
+	"github.com/jm33-m0/emp3r0r/core/lib/gui"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/reeflective/console"
+	"runtime/debug"
 )
 
 const AppName = "emp3r0r"
@@ -30,6 +33,12 @@ const AppName = "emp3r0r"
 var (
 	// EMP3R0R_CONSOLE: the main console interface
 	EMP3R0R_CONSOLE = console.New(AppName)
+
+	// GuiMode is true when the operator console is being served by the
+	// embedded GUI (emp3r0r client --gui) instead of the tmux-based CLI.
+	// Several UI helpers (agent table, window titles, pane switching) branch
+	// on it so they never touch tmux while the GUI is active.
+	GuiMode = false
 
 	// SERVER_IP: operator server IP, non-WireGuard IP
 	ServerIP string
@@ -68,7 +77,21 @@ func backgroundJobs() {
 	// refresh agent list every 10 seconds
 	go agentListRefresher()
 	// handle messages from operator
-	go client.StartMessageTunnel(processAgentData, func(err error) {
+	go client.StartMessageTunnel(func(data *def.MsgTunData) {
+		// processAgentData runs on the tunnel goroutine inside the client
+		// package: recover here so a bad frame can never silently kill the
+		// whole operator process.
+		defer func() {
+			if r := recover(); r != nil {
+				if GuiMode {
+					gui.LogSync("processAgentData panic: %v\n%s", r, debug.Stack())
+				} else {
+					logging.Errorf("processAgentData panic: %v", r)
+				}
+			}
+		}()
+		processAgentData(data)
+	}, func(err error) {
 		logging.Errorf("Message tunnel: %v", err)
 	})
 }
@@ -81,12 +104,57 @@ func CliMain(wg_server_ip string, wg_server_port int) {
 		}
 		logging.Infof("CliMain resumed (or returned normally)")
 	}()
+	GuiMode = false
 	OperatorPort = wg_server_port + 1
 	ServerIP = wg_server_ip
 
-	// unlock incomplete downloads
-	err := tools.UnlockDownloads()
+	// Console commands, prompts, history & modules (shared with GUI mode)
+	setupOperatorConsole()
+
+	// Tmux setup, we will need to log to tmux window
+	cli.CAT = live.CAT // emp3r0r-cat is set up in internal/live/config.go
+	err := cli.TmuxInitWindows()
 	if err != nil {
+		logging.Fatalf("Fatal TMUX error: %v, please run `tmux kill-session -t emp3r0r` and re-run emp3r0r", err)
+	}
+
+	// Log to tmux window as well
+	f, err := os.OpenFile(cli.OutputPane.TTY, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
+	if err != nil {
+		logging.Fatalf("Failed to open tmux pane: %v", err)
+	}
+	logging.AddWriter(f)
+
+	// when the console is closed, deinit tmux windows
+	defer cli.TmuxDeinitWindows()
+
+	// Background jobs
+	backgroundJobs()
+
+	// Run the console
+	logging.Fatal(EMP3R0R_CONSOLE.Start())
+}
+
+// setupConsoleOnce guards setupOperatorConsole so its one-shot work (module
+// init, command tree, history source) is never repeated inside one process:
+// the tmux CLI (CliMain) and the GUI (startConsoleSession after a login) both
+// call it, and a second pass would re-init modules and re-add commands and
+// history sources to the shared console object.
+var setupConsoleOnce sync.Once
+
+// setupOperatorConsole configures the shared emp3r0r console object: modules,
+// command tree, prompt, history and readline behavior. It is called by both
+// the tmux CLI (CliMain) and the GUI (gui.go) after the operator config has
+// been loaded, because module commands and completions need it. It must run
+// exactly once per process.
+func setupOperatorConsole() {
+	setupConsoleOnce.Do(configureOperatorConsole)
+}
+
+// configureOperatorConsole performs the actual one-time console setup.
+func configureOperatorConsole() {
+	// unlock incomplete downloads
+	if err := tools.UnlockDownloads(); err != nil {
 		logging.Debugf("UnlockDownloads: %v", err)
 	}
 	// Load modules before command tree creation so module_name commands and flags exist for completion.
@@ -123,28 +191,17 @@ func CliMain(wg_server_ip string, wg_server_port int) {
 	EMP3R0R_CONSOLE.Shell().Config.Set("completion-ignore-case", true)
 	EMP3R0R_CONSOLE.Shell().Config.Set("usage-hint-always", true)
 
-	// Tmux setup, we will need to log to tmux window
-	cli.CAT = live.CAT // emp3r0r-cat is set up in internal/live/config.go
-	err = cli.TmuxInitWindows()
-	if err != nil {
-		logging.Fatalf("Fatal TMUX error: %v, please run `tmux kill-session -t emp3r0r` and re-run emp3r0r", err)
+	if GuiMode {
+		// The GUI console's stdin/stdout are a pty whose far end is a browser
+		// tab that may not be attached (or may be reconnecting) exactly when
+		// readline issues its per-refresh ESC[6n cursor-position probe. While
+		// such a probe goes unanswered, readline blocks on stdin and silently
+		// absorbs every keystroke — the prompt is on screen but nothing typed
+		// ever shows up, i.e. a "frozen" console. The readline fallback anchors
+		// the input line at the printed prompt width instead, so input always
+		// works; only exact bottom-of-window redraws may overlap a row.
+		EMP3R0R_CONSOLE.Shell().Config.Set("cursor-position-probe", false)
 	}
-
-	// Log to tmux window as well
-	f, err := os.OpenFile(cli.OutputPane.TTY, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
-	if err != nil {
-		logging.Fatalf("Failed to open tmux pane: %v", err)
-	}
-	logging.AddWriter(f)
-
-	// when the console is closed, deinit tmux windows
-	defer cli.TmuxDeinitWindows()
-
-	// Background jobs
-	backgroundJobs()
-
-	// Run the console
-	logging.Fatal(EMP3R0R_CONSOLE.Start())
 }
 
 func highLighter(line []rune) string {

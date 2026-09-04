@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>emp3r0r — operator GUI</title>
+<link rel="stylesheet" href="./assets/xterm.css"/>
+<link rel="stylesheet" href="./style.css"/>
+</head>
+<body>
+
+<!-- ─── Login overlay ─────────────────────────────────────────────────── -->
+<div id="login-overlay" class="overlay">
+  <div class="login-card">
+    <div class="brand">
+      <span class="brand-logo">emp3r0r</span>
+      <span class="brand-sub">C2 operator GUI</span>
+    </div>
+    <p class="login-hint">
+      Paste the <b>connection command</b> printed by your C2 server
+      (<code>emp3r0r server</code>). The WireGuard credentials it contains are
+      extracted automatically and used to log into the C2.
+    </p>
+    <textarea id="login-command" rows="3" spellcheck="false"
+      placeholder='emp3r0r client --operator-port 13377 --server-wg-key "..." --server-wg-ip "10.0.0.1" --operator-wg-ip "10.0.0.2" --operator-wg-key "..." --c2-host 1.2.3.4'></textarea>
+    <button id="login-btn" class="btn accent">Connect to C2</button>
+    <div id="login-error" class="error-msg"></div>
+    <pre id="login-log" class="log-body mini"></pre>
+  </div>
+</div>
+
+<!-- ─── Main app: tabbed pages ───────────────────────────────────────── -->
+<div id="app" class="app hidden">
+
+  <header class="toolbar">
+    <div class="toolbar-left">
+      <span class="brand-sm">emp3r0r</span>
+      <span class="sep">|</span>
+      <span id="conn-tag" class="conn-tag off">not connected</span>
+    </div>
+    <div class="toolbar-right">
+      <span id="agent-count" class="agent-count"></span>
+      <button id="disconnect-btn" class="btn danger small">Exit</button>
+    </div>
+  </header>
+
+  <div class="app-body">
+
+    <!-- left tab rail: each tab switches the whole main area -->
+    <nav class="nav-rail" id="nav-rail">
+      <button class="nav-btn active" data-page="console">Console</button>
+      <button class="nav-btn" data-page="agents">Agents</button>
+      <button class="nav-btn" data-page="shell">OS Shell</button>
+    </nav>
+
+    <!-- Console page: output/log on top, emp3r0r console below -->
+    <main class="page" id="page-console">
+      <div class="page-head">
+        <span>Output / Logs</span>
+        <button id="clear-log-btn" class="tb-btn">Clear log</button>
+      </div>
+      <div class="log-pane">
+        <pre id="log-body" class="log-body"></pre>
+      </div>
+      <div class="term-pane">
+        <div id="term" class="term-host"></div>
+      </div>
+    </main>
+
+    <!-- Agents page: table / mesh -->
+    <main class="page hidden" id="page-agents">
+      <div class="page-head">
+        <span>Agents <span id="agents-summary" class="muted"></span></span>
+        <div class="view-toggle" id="agent-view-toggle">
+          <button class="tb-btn active" data-aview="table">Table</button>
+          <button class="tb-btn" data-aview="mesh">Mesh</button>
+        </div>
+      </div>
+      <div id="agent-table-wrap" class="agent-table-wrap">
+        <table id="agent-table">
+          <thead>
+            <tr>
+              <th>ID</th><th>Tag</th><th>OS</th><th>User</th>
+              <th>From</th><th>C2</th><th>Mesh</th><th>Seen</th><th>RTT</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="mesh-wrap hidden" id="mesh-wrap">
+        <svg id="mesh-svg" xmlns="http://www.w3.org/2000/svg"><g id="mesh-root"></g></svg>
+        <div class="graph-legend">
+          <span class="leg-item"><span class="leg-line" style="border-top:3px solid #3fb950"></span> direct</span>
+          <span class="leg-item"><span class="leg-line" style="border-top:3px solid #f85149"></span> root / admin</span>
+          <span class="leg-item"><span class="leg-line" style="border-top:3px solid #4d9fe6"></span> via gateway (mesh)</span>
+          <span class="leg-sep">|</span>
+          <span class="leg-item" style="color:var(--muted)">drag empty area to pan · scroll to zoom · click an agent icon to select it</span>
+          <span class="spacer"></span>
+          <button id="mesh-reset-btn" class="tb-btn" type="button">Reset Layout</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- OS Shell page: local operator shell on its own pty -->
+    <main class="page hidden" id="page-shell">
+      <div class="page-head">
+        <span>OS Shell <span class="muted" id="shell-status"></span></span>
+        <button id="shell-restart-btn" class="tb-btn">Restart</button>
+      </div>
+      <div id="shell-term" class="term-host shell-term"></div>
+    </main>
+
+  </div>
+</div>
+
+<script src="./assets/xterm.js"></script>
+<script src="./assets/xterm-addon-fit.js"></script>
+<script src="./app.js"></script>
+
+<!-- agent context menu (right-click on a graph node) -->
+<div id="agent-ctx" class="agent-ctx hidden" role="menu"></div>
+</body>
+</html>

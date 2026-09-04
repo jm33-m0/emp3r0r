@@ -667,7 +667,7 @@ def build(arg1: str, temp_dir: pathlib.Path, core_dir: pathlib.Path,
     # The cc GUI embeds xterm.js etc. which are gitignored; fetch them (with
     # SHA-256 verification) before compiling so the embed has a full frontend.
     log_info("Fetching GUI frontend assets (xterm.js, go generate)")
-    res = run_cmd([go_bin, "run", "./internal/cc/operator/guiassets"], check=False, cwd=core_dir)
+    res = run_cmd([go_bin, "run", "./lib/gui/guiassets"], check=False, cwd=core_dir)
     if res.returncode != 0:
         log_error("Failed to fetch GUI frontend assets (network access required)")
 

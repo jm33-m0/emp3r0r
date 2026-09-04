@@ -108,6 +108,10 @@ func CmdKill(cmd *cobra.Command, args []string) {
 }
 
 func CmdResetLayout(_ *cobra.Command, _ []string) {
+	if GuiMode {
+		logging.Infof("reset_layout is a tmux-only command, the GUI layout is fixed")
+		return
+	}
 	err := cli.ResetPaneLayout()
 	if err != nil {
 		logging.Errorf("Failed to reset pane layout: %v", err)
