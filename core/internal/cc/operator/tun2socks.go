@@ -111,7 +111,10 @@ func tun2socksStartCmdRun(cmd *cobra.Command, _ []string) {
 	}
 
 	// The pivot itself must never be routed into the TUN, otherwise the engine
-	// would proxy its own SOCKS dials. These are subtracted from --route.
+	// would proxy its own SOCKS dials. These are subtracted from --route. The
+	// pivot host is added by IP, resolving hostnames too: a hostname that
+	// resolves inside a routed prefix would otherwise capture the engine's own
+	// SOCKS dials and loop forever.
 	prefixes := make([]netip.Prefix, 0, len(excludes)+1)
 	for _, e := range excludes {
 		p, err := netip.ParsePrefix(e)
@@ -123,7 +126,16 @@ func tun2socksStartCmdRun(cmd *cobra.Command, _ []string) {
 	}
 	if h, _, err := net.SplitHostPort(socksAddr); err == nil {
 		if ip := net.ParseIP(h); ip != nil {
-			prefixes = append(prefixes, netip.PrefixFrom(netip.MustParseAddr(h), 32).Masked())
+			if addr, ok := netip.AddrFromSlice(ip); ok {
+				prefixes = append(prefixes, netip.PrefixFrom(addr.Unmap(), addr.Unmap().BitLen()))
+			}
+		} else if ips, err := net.LookupIP(h); err == nil {
+			for _, ip := range ips {
+				if addr, ok := netip.AddrFromSlice(ip); ok {
+					addr = addr.Unmap()
+					prefixes = append(prefixes, netip.PrefixFrom(addr, addr.BitLen()))
+				}
+			}
 		}
 	}
 
