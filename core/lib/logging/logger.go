@@ -60,7 +60,11 @@ func NewLogger(logFilePath string, level int) (*Logger, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error opening file: %v", err)
 		}
-		writer = io.MultiWriter(logf)
+		// The file receives plain text only: the console writer in the same
+		// MultiWriter keeps ANSI colors, but the on-disk log is stripped so
+		// module output in it stays machine-parseable (e.g. bofhound reading
+		// ldapsearch results from emp3r0r.log).
+		writer = io.MultiWriter(PlainFileWriter(logf))
 	}
 
 	logger := &Logger{

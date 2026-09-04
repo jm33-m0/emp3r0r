@@ -50,7 +50,9 @@ func setupLogging() {
 	if err != nil {
 		logging.Fatalf("Failed to open log file: %v", err)
 	}
-	logging.SetOutput(logf)
+	// Plain text on disk (no ANSI colors): module output in emp3r0r.log must
+	// stay machine-parseable (e.g. bofhound ingesting ldapsearch results).
+	logging.SetOutput(logging.PlainFileWriter(logf))
 }
 
 func init() {
