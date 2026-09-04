@@ -46,6 +46,7 @@ type Emp3r0rAgent struct {
 	P2PRelayPort   string        `cbor:"38,keyasint"` // dynamic P2P relay port assigned to this agent
 	MeshGossipPort string        `cbor:"39,keyasint"` // dynamic mesh gossip port assigned to this agent
 	Files          []string      `cbor:"40,keyasint"` // list of available files/modules in agent storage/MemFS
+	GOArch         string        `cbor:"41,keyasint"` // runtime.GOARCH of the agent binary (not the OS kernel arch)
 }
 
 // EnrichedPeer holds detailed peer information signed by C2

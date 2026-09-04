@@ -155,22 +155,37 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 		return
 	}
 
-	// DLL modules may ship per-arch payloads (e.g. COFFLoader.x64.dll and
-	// COFFLoader.x86.dll). Pick the file matching the target agent arch.
+	// DLL loader modules (COFFLoader.x64.dll / COFFLoader.x86.dll) and
+	// COFF/BOF modules (asktgt.x64.o / asktgt.x86.o) ship per-arch payloads.
+	// Pick the file matching the target agent's own binary arch
+	// (runtime.GOARCH). Prefer GOArch over the OS kernel Arch: a 386 agent
+	// running under WoW64 on x64 Windows reports Arch "x64".
 	payloadFile := config.AgentConfig.Files[0]
 	hostedName := strings.ToLower(live.ActiveModule.Name)
-	if strings.EqualFold(payload_type, "dll") && ctx.Target != nil {
-		arch := normalizeAgentArch(ctx.Target.Arch)
-		payloadFile = selectDLLFile(config.AgentConfig.Files, arch)
+	archVariants := false
+	for _, f := range config.AgentConfig.Files {
+		if payloadArch(f) != "" {
+			archVariants = true
+			break
+		}
+	}
+	if ctx.Target != nil && archVariants &&
+		(strings.EqualFold(payload_type, "dll") || strings.EqualFold(payload_type, "coff")) {
+		agentArch := ctx.Target.GOArch
+		if agentArch == "" {
+			agentArch = ctx.Target.Arch // older agents don't report GOArch yet
+		}
+		arch := normalizeAgentArch(agentArch)
+		payloadFile = selectArchPayload(config.AgentConfig.Files, arch)
 		hostedName = fmt.Sprintf("%s.%s", strings.ToLower(live.ActiveModule.Name), arch)
 	}
 
 	// Multi-file modules: host every companion file (all entries except the
 	// selected payload) and tell the agent where to cache them in memfs.
-	// Gated by the module's own config.json (module_files_memfs). DLL modules
-	// are excluded — their extra files are per-arch alternatives, not
+	// Gated by the module's own config.json (module_files_memfs). DLL and COFF
+	// modules are excluded — their extra files are per-arch alternatives, not
 	// companions.
-	if config.ModuleFilesMemFS && !strings.EqualFold(payload_type, "dll") {
+	if config.ModuleFilesMemFS && !strings.EqualFold(payload_type, "dll") && !strings.EqualFold(payload_type, "coff") {
 		for _, file := range config.AgentConfig.Files {
 			if file == payloadFile {
 				continue
@@ -336,7 +351,7 @@ func hostDLLModules() {
 			return true
 		}
 		for _, file := range config.AgentConfig.Files {
-			arch := dllArch(file)
+			arch := payloadArch(file)
 			if arch == "" {
 				arch = "amd64"
 			}
@@ -365,8 +380,11 @@ func hostDLLModules() {
 	})
 }
 
-// dllArch derives the canonical arch ("amd64" or "386") from a DLL file name.
-func dllArch(file string) string {
+// payloadArch derives the canonical arch ("amd64" or "386") from a payload
+// file name. It handles DLL loader payloads (COFFLoader.x64.dll) and BOF
+// object files (asktgt.x86.o) alike; returns "" when the name carries no
+// arch marker.
+func payloadArch(file string) string {
 	lower := strings.ToLower(file)
 	switch {
 	case strings.Contains(lower, "x64"), strings.Contains(lower, "amd64"):
@@ -389,11 +407,12 @@ func normalizeAgentArch(arch string) string {
 	return strings.ToLower(arch)
 }
 
-// selectDLLFile picks the DLL payload matching the given canonical arch,
-// falling back to the first file when no match is found.
-func selectDLLFile(files []string, arch string) string {
+// selectArchPayload picks the payload file (DLL loader payload or BOF object)
+// matching the given canonical arch, falling back to the first file when no
+// match is found.
+func selectArchPayload(files []string, arch string) string {
 	for _, file := range files {
-		if dllArch(file) == arch {
+		if payloadArch(file) == arch {
 			return file
 		}
 	}

@@ -1271,12 +1271,24 @@ func TestHostModuleFile(t *testing.T) {
 	}
 }
 
-func TestDLLArchHelpers(t *testing.T) {
-	if got := dllArch("COFFLoader.x64.dll"); got != "amd64" {
-		t.Fatalf("dllArch x64: got %q", got)
+func TestPayloadArchHelpers(t *testing.T) {
+	// DLL loader payloads
+	if got := payloadArch("COFFLoader.x64.dll"); got != "amd64" {
+		t.Fatalf("payloadArch x64 dll: got %q", got)
 	}
-	if got := dllArch("COFFLoader.x86.dll"); got != "386" {
-		t.Fatalf("dllArch x86: got %q", got)
+	if got := payloadArch("COFFLoader.x86.dll"); got != "386" {
+		t.Fatalf("payloadArch x86 dll: got %q", got)
+	}
+	// BOF object files
+	if got := payloadArch("_bin/asktgt.x64.o"); got != "amd64" {
+		t.Fatalf("payloadArch x64 BOF: got %q", got)
+	}
+	if got := payloadArch("SA/dir/dir.x86.o"); got != "386" {
+		t.Fatalf("payloadArch x86 BOF: got %q", got)
+	}
+	// Non-payload files carry no arch marker
+	if got := payloadArch("run.star"); got != "" {
+		t.Fatalf("payloadArch non-payload: got %q", got)
 	}
 	if got := normalizeAgentArch("x64"); got != "amd64" {
 		t.Fatalf("normalizeAgentArch x64: got %q", got)
@@ -1287,11 +1299,26 @@ func TestDLLArchHelpers(t *testing.T) {
 	if got := normalizeAgentArch("386"); got != "386" {
 		t.Fatalf("normalizeAgentArch 386: got %q", got)
 	}
-	files := []string{"COFFLoader.x64.dll", "COFFLoader.x86.dll"}
-	if got := selectDLLFile(files, "386"); got != "COFFLoader.x86.dll" {
-		t.Fatalf("selectDLLFile 386: got %q", got)
+
+	// DLL loader payload selection
+	dllFiles := []string{"COFFLoader.x64.dll", "COFFLoader.x86.dll"}
+	if got := selectArchPayload(dllFiles, "386"); got != "COFFLoader.x86.dll" {
+		t.Fatalf("selectArchPayload 386 dll: got %q", got)
 	}
-	if got := selectDLLFile(files, "amd64"); got != "COFFLoader.x64.dll" {
-		t.Fatalf("selectDLLFile amd64: got %q", got)
+	if got := selectArchPayload(dllFiles, "amd64"); got != "COFFLoader.x64.dll" {
+		t.Fatalf("selectArchPayload amd64 dll: got %q", got)
+	}
+
+	// BOF object selection must honor the agent arch too
+	bofFiles := []string{"_bin/asktgt.x64.o", "_bin/asktgt.x86.o"}
+	if got := selectArchPayload(bofFiles, "386"); got != "_bin/asktgt.x86.o" {
+		t.Fatalf("selectArchPayload 386 BOF: got %q", got)
+	}
+	if got := selectArchPayload(bofFiles, "amd64"); got != "_bin/asktgt.x64.o" {
+		t.Fatalf("selectArchPayload amd64 BOF: got %q", got)
+	}
+	// Unmapped arch falls back to the first file
+	if got := selectArchPayload(bofFiles, "arm64"); got != "_bin/asktgt.x64.o" {
+		t.Fatalf("selectArchPayload unknown arch: got %q", got)
 	}
 }
