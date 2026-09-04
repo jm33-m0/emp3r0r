@@ -1249,7 +1249,7 @@ func TestHostModuleFile(t *testing.T) {
 		t.Fatalf("unexpected MemPath: %q", companion.MemPath)
 	}
 	// Hosted name must be module-unique to avoid cache collisions.
-	if companion.Name != "multifilemod.data.txt.xz" {
+	if companion.Name != "multifilemod.data.txt.gz" {
 		t.Fatalf("unexpected hosted name: %q", companion.Name)
 	}
 

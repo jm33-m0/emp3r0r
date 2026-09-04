@@ -135,7 +135,7 @@ func TestCrystalKitFullLifecycle(t *testing.T) {
 		t.Fatalf("resolveInvocation: %v", err)
 	}
 
-	// The C2 hosts CrystalKit.x64.dll as crystal_kit.amd64.xz; the agent
+	// The C2 hosts CrystalKit.x64.dll as crystal_kit.amd64.gz; the agent
 	// downloads/decompresses it into payload_data and uses it as the loader.
 	compressedPath, checksum := hostBOFFile(t, dll)
 

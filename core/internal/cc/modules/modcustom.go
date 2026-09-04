@@ -191,7 +191,7 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 	}
 	invB64 := base64.StdEncoding.EncodeToString(invBytes)
 
-	hosted_file := filepath.Join(live.WWWRoot, hostedName+".xz")
+	hosted_file := filepath.Join(live.WWWRoot, hostedName+".gz")
 	logging.Infof("Compressing %s with gzip...", hostedName)
 
 	path := filepath.Join(config.Path, payloadFile)
@@ -241,7 +241,7 @@ func hostModuleFile(moduleName, fileName, path string) (def.ResolvedModuleFile, 
 	base := filepath.Base(fileName)
 	// Unique per module so the agent's memfs cache key (derived from the
 	// basename) cannot collide across modules.
-	hostedBase := fmt.Sprintf("%s.%s.xz", strings.ToLower(moduleName), base)
+	hostedBase := fmt.Sprintf("%s.%s.gz", strings.ToLower(moduleName), base)
 	hostedPath := filepath.Join(live.WWWRoot, hostedBase)
 	if err := os.WriteFile(hostedPath, compressed, 0o600); err != nil {
 		return def.ResolvedModuleFile{}, fmt.Errorf("writing %s: %w", hostedPath, err)
@@ -325,7 +325,7 @@ func handleInteractiveModule(config def.ModuleConfig, job_id string) {
 
 // hostDLLModules compresses and hosts every DLL module's payload so that
 // dependent BOF modules can fetch the correct arch from the C2 file endpoint
-// at runtime. DLL payloads are hosted as <name>.<arch>.xz.
+// at runtime. DLL payloads are hosted as <name>.<arch>.gz.
 func hostDLLModules() {
 	def.Modules.Range(func(_, val any) bool {
 		config, ok := val.(*def.ModuleConfig)
@@ -340,7 +340,7 @@ func hostDLLModules() {
 			if arch == "" {
 				arch = "amd64"
 			}
-			hosted := filepath.Join(live.WWWRoot, fmt.Sprintf("%s.%s.xz", strings.ToLower(config.Name), arch))
+			hosted := filepath.Join(live.WWWRoot, fmt.Sprintf("%s.%s.gz", strings.ToLower(config.Name), arch))
 			if util.IsFileExist(hosted) {
 				continue
 			}
