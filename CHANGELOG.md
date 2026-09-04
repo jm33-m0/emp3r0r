@@ -1,5 +1,20 @@
 # Changelog
 
+## [4.15.0](https://github.com/jm33-m0/emp3r0r/compare/v4.14.0...v4.15.0) (2026-09-04)
+
+
+### Features
+
+* **module:** cifs module (file upload and deletion via CIFS) ([d96c479](https://github.com/jm33-m0/emp3r0r/commit/d96c479e52d3439f277b813ea7bf6a8425bee7c1))
+* **module:** SCShell ([e1b81be](https://github.com/jm33-m0/emp3r0r/commit/e1b81be5e0c05a1bfe437078b872f2a6181bf131))
+
+
+### Bug Fixes
+
+* incorrect module parameter caching ([c33e485](https://github.com/jm33-m0/emp3r0r/commit/c33e4852e10fdceb4cd9833bb061213e6117dcce))
+* payload arch selection ([a23503a](https://github.com/jm33-m0/emp3r0r/commit/a23503a719b402a001834db6e9a9898dc4aaeb9f))
+* prepare module dependencies ([6af129c](https://github.com/jm33-m0/emp3r0r/commit/6af129c75056e453b4a2d40fc537e5b5a051426b))
+
 ## [4.14.0](https://github.com/jm33-m0/emp3r0r/compare/v4.13.0...v4.14.0) (2026-09-03)
 
 
