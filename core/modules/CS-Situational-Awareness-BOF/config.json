@@ -445,7 +445,7 @@
       },
       {
         "name": "domain",
-        "description": "Distinguished Name for search base (e.g., 'DC=corp,DC=local'). Default: current domain DN.",
+        "description": "LDAP search base DN, derived from the domain name as DC= parts — e.g. for domain corp.local use DC=corp,DC=local (a bare domain name like corp.local is not a valid base). May be narrowed, e.g. OU=Employees,DC=corp,DC=local. Empty: auto-derived from the current user's DN (requires a domain-joined context).",
         "default": "",
         "type": "cstr",
         "required": false
@@ -1018,7 +1018,7 @@
       },
       {
         "name": "dn",
-        "description": "Distinguished Name for search base (e.g., 'DC=corp,DC=local'). Default: current domain DN.",
+        "description": "LDAP search base DN, derived from the domain name as DC= parts — e.g. for domain corp.local use DC=corp,DC=local (a bare domain name like corp.local is not a valid base). May be narrowed, e.g. OU=Employees,DC=corp,DC=local. Empty: auto-derived from the current user's DN (requires a domain-joined context).",
         "default": "",
         "type": "cstr",
         "required": false
