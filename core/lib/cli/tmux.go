@@ -123,35 +123,23 @@ func TmuxInitWindows() (err error) {
 		return pane, err
 	}
 
-	// if window size is too small, use simplified layout
-	use_simplified_layout := false
 	if TermWidth < 180 || TermHeight < 40 {
 		logging.Warningf("Window size is too small, please resize the window to at least 180x40")
-		logging.Infof("Current size: %d x %d. Using simplified layout", TermWidth, TermHeight)
-		use_simplified_layout = true
 	}
 
 	// Agent output
-	OutputPane, err = new_pane("Output", fmt.Sprintf("Saving to %s...\n", live.EmpLogFile), "v", "", 60)
+	OutputPane, err = new_pane("Output", fmt.Sprintf("Saving to %s...\n", live.EmpLogFile), "v", "", 66)
 	if err != nil {
 		return err
 	}
 
-	if use_simplified_layout {
-		// Agent List
-		AgentListPane, err = new_pane("Agent List", "No agents connected", "", "", 0)
-		if err != nil {
-			return err
-		}
-		if setOptErr := TmuxSetOpt(AgentListPane.WindowID, "remain-on-exit on"); setOptErr != nil {
-			return fmt.Errorf("TmuxSetOpt: %v", setOptErr)
-		}
-	} else {
-		// Agent List
-		AgentListPane, err = new_pane("Agent List", "No agents connected", "h", "", 40)
-		if err != nil {
-			return err
-		}
+	// Agent List
+	AgentListPane, err = new_pane("Agent List", "No agents connected", "", "", 0)
+	if err != nil {
+		return err
+	}
+	if setOptErr := TmuxSetOpt(AgentListPane.WindowID, "remain-on-exit on"); setOptErr != nil {
+		return fmt.Errorf("TmuxSetOpt: %v", setOptErr)
 	}
 
 	// check panes
