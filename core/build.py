@@ -126,7 +126,10 @@ def download_file(url: str, dest: pathlib.Path) -> bool:
     except Exception as e:
         log_warn(f"Failed to download via urllib ({e}). Trying curl/wget...")
         if shutil.which("curl"):
-            res = run_cmd(["curl", "-sSL", "--connect-timeout", "15", url, "-o", str(dest)], check=False)
+            res = run_cmd(
+                ["curl", "-sSL", "--connect-timeout", "15", url, "-o", str(dest)],
+                check=False,
+            )
             return res.returncode == 0
         elif shutil.which("wget"):
             res = run_cmd(["wget", "-qO", str(dest), url], check=False)
@@ -150,6 +153,7 @@ def write_text_atomic(path: pathlib.Path, content: str) -> None:
     os.replace(tmp_path, path)
     path.chmod(0o644)
 
+
 def copy2_atomic(src: pathlib.Path, dst: pathlib.Path) -> None:
     """Copy a file, force-overwriting any existing file.
 
@@ -170,7 +174,9 @@ def get_git_version() -> str:
     env_tag = os.environ.get("TAG")
     if env_tag:
         return env_tag
-    res = run_cmd(["git", "describe", "--tags", "--always"], check=False, capture_output=True)
+    res = run_cmd(
+        ["git", "describe", "--tags", "--always"], check=False, capture_output=True
+    )
     if res.returncode == 0 and res.stdout.strip():
         return res.stdout.strip()
     return "unknown"
@@ -227,7 +233,11 @@ def check_required_go() -> str:
     os.environ["PATH"] = os.path.pathsep.join(new_paths)
 
     official_go = goroot / "bin" / "go"
-    actual_go = str(official_go) if official_go.is_file() and os.access(official_go, os.X_OK) else go_bin
+    actual_go = (
+        str(official_go)
+        if official_go.is_file() and os.access(official_go, os.X_OK)
+        else go_bin
+    )
     log_info(f"Using Go toolchain: {actual_go} (version {current_ver})")
     return actual_go
 
@@ -266,7 +276,9 @@ def check_build_toolchain() -> None:
         if not shutil.which(tool):
             missing.append(tool)
 
-    has_mingw = shutil.which("x86_64-w64-mingw32-gcc") or shutil.which("i686-w64-mingw32-gcc")
+    has_mingw = shutil.which("x86_64-w64-mingw32-gcc") or shutil.which(
+        "i686-w64-mingw32-gcc"
+    )
     if not has_mingw:
         missing.append("mingw-w64")
 
@@ -305,15 +317,22 @@ def assemble_smw(core_dir: pathlib.Path) -> None:
 
     # Skip the rebuild when the object is already up to date.
     try:
-        if syso_file.is_file() and syso_file.stat().st_mtime >= asm_file.stat().st_mtime:
-            log_info(f"SilentMoonwalk .syso is up to date: {syso_file.relative_to(core_dir)}")
+        if (
+            syso_file.is_file()
+            and syso_file.stat().st_mtime >= asm_file.stat().st_mtime
+        ):
+            log_info(
+                f"SilentMoonwalk .syso is up to date: {syso_file.relative_to(core_dir)}"
+            )
             return
     except OSError:
         pass
 
     nasm = shutil.which("nasm")
     if not nasm:
-        log_error("nasm not found. Install nasm (see Dockerfile) or run the build inside the builder container.")
+        log_error(
+            "nasm not found. Install nasm (see Dockerfile) or run the build inside the builder container."
+        )
         return
 
     cmd = f'{nasm} -f win64 "{asm_file}" -o "{syso_file}"'
@@ -325,7 +344,9 @@ def assemble_smw(core_dir: pathlib.Path) -> None:
         log_error(f"Failed to assemble SilentMoonwalk desync core: {cmd}")
 
 
-def install_donut(target_dir: pathlib.Path, search_dir: pathlib.Path | None = None) -> None:
+def install_donut(
+    target_dir: pathlib.Path, search_dir: pathlib.Path | None = None
+) -> None:
     donut_archive = None
     if search_dir and (search_dir / DONUT_ARCHIVE_NAME).is_file():
         donut_archive = search_dir / DONUT_ARCHIVE_NAME
@@ -339,7 +360,9 @@ def install_donut(target_dir: pathlib.Path, search_dir: pathlib.Path | None = No
         log_info("Extracting and installing donut...")
         with tempfile.TemporaryDirectory(prefix="donut-extract-") as tmp_dir:
             tmp_path = pathlib.Path(tmp_dir)
-            res = run_cmd(["tar", "-xzf", str(donut_archive), "-C", str(tmp_path)], check=False)
+            res = run_cmd(
+                ["tar", "-xzf", str(donut_archive), "-C", str(tmp_path)], check=False
+            )
             if res.returncode == 0:
                 donut_bin = None
                 for p in tmp_path.rglob("donut"):
@@ -386,7 +409,9 @@ def build_agent_pure(
     log_info(f"Building pure agent stub for {os_name} {arch}")
 
     tags = "netgo agent" if arg1 == "--debug" else "netgo release agent"
-    win_gui_flag = "-H=windowsgui " if (arg1 != "--debug" and os_name == "windows") else ""
+    win_gui_flag = (
+        "-H=windowsgui " if (arg1 != "--debug" and os_name == "windows") else ""
+    )
 
     current_ldflags = ldflags
     if extra_extldflags:
@@ -400,7 +425,7 @@ def build_agent_pure(
 
     cmd_str = (
         f"{gobuild_cmd} {build_opt} {extra_flags} -trimpath -buildvcs=false "
-        f"-tags '{tags}' -o \"{out_file}\" -ldflags=\"{win_gui_flag}{current_ldflags}\""
+        f'-tags \'{tags}\' -o "{out_file}" -ldflags="{win_gui_flag}{current_ldflags}"'
     )
 
     print(f"Running: CGO_ENABLED=0 GOARCH={arch} GOOS={os_name} {cmd_str}")
@@ -456,7 +481,9 @@ def build_agent_cgo(
         f"-tags '{tags}' -o \"{out_file}\" -ldflags=\"{ldflags} -linkmode external -extldflags '{extldflags}'\""
     )
 
-    print(f"Running: CGO_ENABLED=1 CC=\"{cc_cmd}\" GOARCH={arch} GOOS={os_name} {cmd_str}")
+    print(
+        f'Running: CGO_ENABLED=1 CC="{cc_cmd}" GOARCH={arch} GOOS={os_name} {cmd_str}'
+    )
     agent_cmd_dir = core_dir / "cmd" / "agent"
     res = run_cmd(cmd_str, check=False, cwd=agent_cmd_dir, env=env, shell=True)
     if res.returncode != 0:
@@ -481,7 +508,9 @@ def build_shared_object(
     if arg1 != "--debug":
         extldflags = f"-s {extldflags}"
 
-    win_gui_flag = "-H=windowsgui " if (arg1 != "--debug" and os_name == "windows") else ""
+    win_gui_flag = (
+        "-H=windowsgui " if (arg1 != "--debug" and os_name == "windows") else ""
+    )
     out_file = temp_dir / output
 
     env = os.environ.copy()
@@ -509,8 +538,8 @@ def build_shared_object(
             env["CC"] = f"zig cc -target {zig_target}"
 
     cmd_str = (
-        f"{gobuild_cmd} {build_opt} -trimpath -buildvcs=false -tags \"{tags}\" "
-        f"-o \"{out_file}\" -buildmode c-shared -ldflags=\"{win_gui_flag}{ldflags} -linkmode external -extldflags '{extldflags}'\""
+        f'{gobuild_cmd} {build_opt} -trimpath -buildvcs=false -tags "{tags}" '
+        f'-o "{out_file}" -buildmode c-shared -ldflags="{win_gui_flag}{ldflags} -linkmode external -extldflags \'{extldflags}\'"'
     )
 
     print(f"Running shared object build for {os_name} {arch}: {cmd_str}")
@@ -525,10 +554,12 @@ def build_shared_object(
 # ---------------------------------------------------------------------------
 
 # Lightweight preset: linux/amd64 exe+so and windows/amd64 exe+dll.
-LIGHTWEIGHT_TARGETS: frozenset[str] = frozenset({
-    "linux/amd64",
-    "windows/amd64",
-})
+LIGHTWEIGHT_TARGETS: frozenset[str] = frozenset(
+    {
+        "linux/amd64",
+        "windows/amd64",
+    }
+)
 
 
 def parse_targets(targets_str: str) -> frozenset[str]:
@@ -572,8 +603,12 @@ def resolve_target_filter(args: "argparse.Namespace") -> frozenset[str]:
       4. EMP3R0R_TARGETS env var
       5. Empty set (build all)
     """
-    if getattr(args, "lightweight", False) or os.environ.get("EMP3R0R_LIGHTWEIGHT", "0").lower() in ("1", "true", "yes"):
-        log_info(f"Lightweight build: restricting targets to {sorted(LIGHTWEIGHT_TARGETS)}")
+    if getattr(args, "lightweight", False) or os.environ.get(
+        "EMP3R0R_LIGHTWEIGHT", "0"
+    ).lower() in ("1", "true", "yes"):
+        log_info(
+            f"Lightweight build: restricting targets to {sorted(LIGHTWEIGHT_TARGETS)}"
+        )
         return LIGHTWEIGHT_TARGETS
 
     raw = getattr(args, "targets", None) or os.environ.get("EMP3R0R_TARGETS", "")
@@ -589,8 +624,13 @@ def resolve_target_filter(args: "argparse.Namespace") -> frozenset[str]:
 # Core build function
 # ---------------------------------------------------------------------------
 
-def build(arg1: str, temp_dir: pathlib.Path, core_dir: pathlib.Path,
-          target_filter: frozenset[str] | None = None) -> None:
+
+def build(
+    arg1: str,
+    temp_dir: pathlib.Path,
+    core_dir: pathlib.Path,
+    target_filter: frozenset[str] | None = None,
+) -> None:
     """Build all emp3r0r components.
 
     Args:
@@ -615,13 +655,17 @@ def build(arg1: str, temp_dir: pathlib.Path, core_dir: pathlib.Path,
         log_info("Using existing vendor/ directory for local modules")
         mod_opt = "-mod=vendor"
     else:
-        log_info("vendor/ directory missing or incomplete, attempting to vendor dependencies...")
+        log_info(
+            "vendor/ directory missing or incomplete, attempting to vendor dependencies..."
+        )
         res = run_cmd([go_bin, "mod", "vendor"], check=False, cwd=core_dir)
         if res.returncode == 0:
             log_info("Successfully vendored modules")
             mod_opt = "-mod=vendor"
         else:
-            log_warn("go mod vendor failed; falling back to default Go module resolution")
+            log_warn(
+                "go mod vendor failed; falling back to default Go module resolution"
+            )
             mod_opt = ""
 
     check_zig()
@@ -635,7 +679,11 @@ def build(arg1: str, temp_dir: pathlib.Path, core_dir: pathlib.Path,
         f"-X 'github.com/jm33-m0/emp3r0r/core/internal/def.Version={version}'"
     )
 
-    disable_garble = os.environ.get("EMP3R0R_DISABLE_GARBLE", "0").lower() in ("1", "true", "yes")
+    disable_garble = os.environ.get("EMP3R0R_DISABLE_GARBLE", "0").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
 
     if arg1 == "--debug":
         gobuild_cmd = go_bin
@@ -652,10 +700,14 @@ def build(arg1: str, temp_dir: pathlib.Path, core_dir: pathlib.Path,
             ldflags += " -s -w"
             log_info("Using garble for obfuscation")
             if not shutil.which("garble"):
-                log_error("garble not found. It should be installed in the builder container.")
+                log_error(
+                    "garble not found. It should be installed in the builder container."
+                )
 
     if target_filter:
-        log_info(f"Active target filter: {sorted(target_filter)} — skipping all other stubs")
+        log_info(
+            f"Active target filter: {sorted(target_filter)} — skipping all other stubs"
+        )
     else:
         log_info("No target filter: building all platforms")
 
@@ -663,31 +715,34 @@ def build(arg1: str, temp_dir: pathlib.Path, core_dir: pathlib.Path,
     # `with_gvisor` is required by the operator-side tun2socks engine
     # (internal/cc/base/tun2socks): it builds the gVisor user-space TCP stack
     # into the operator console. cat/listener do not use it.
-    #
-    # The cc GUI embeds xterm.js etc. which are gitignored; fetch them (with
-    # SHA-256 verification) before compiling so the embed has a full frontend.
-    log_info("Fetching GUI frontend assets (xterm.js, go generate)")
-    res = run_cmd([go_bin, "run", "./internal/cc/operator/guiassets"], check=False, cwd=core_dir)
-    if res.returncode != 0:
-        log_error("Failed to fetch GUI frontend assets (network access required)")
 
     log_info("Building CC")
     env_cgo0 = os.environ.copy()
     env_cgo0["CGO_ENABLED"] = "0"
     cc_cmd = f"{go_bin} build {mod_opt} -tags with_gvisor -buildvcs=false -o \"{temp_dir / 'cc.exe'}\" -ldflags=\"{ldflags}\""
-    res = run_cmd(cc_cmd, check=False, cwd=core_dir / "cmd" / "cc", env=env_cgo0, shell=True)
+    res = run_cmd(
+        cc_cmd, check=False, cwd=core_dir / "cmd" / "cc", env=env_cgo0, shell=True
+    )
     if res.returncode != 0:
         log_error("Failed to build CC")
 
     log_info("Building cat")
     cat_cmd = f"{go_bin} build {mod_opt} -buildvcs=false -o \"{temp_dir / 'cat.exe'}\" -ldflags=\"{ldflags}\""
-    res = run_cmd(cat_cmd, check=False, cwd=core_dir / "cmd" / "cat", env=env_cgo0, shell=True)
+    res = run_cmd(
+        cat_cmd, check=False, cwd=core_dir / "cmd" / "cat", env=env_cgo0, shell=True
+    )
     if res.returncode != 0:
         log_error("Failed to build cat")
 
     log_info("Building listener")
     listener_cmd = f"{go_bin} build {mod_opt} -buildvcs=false -o \"{temp_dir / 'listener.exe'}\" -ldflags=\"{ldflags}\""
-    res = run_cmd(listener_cmd, check=False, cwd=core_dir / "cmd" / "listener", env=env_cgo0, shell=True)
+    res = run_cmd(
+        listener_cmd,
+        check=False,
+        cwd=core_dir / "cmd" / "listener",
+        env=env_cgo0,
+        shell=True,
+    )
     if res.returncode != 0:
         log_error("Failed to build listener")
 
@@ -703,45 +758,247 @@ def build(arg1: str, temp_dir: pathlib.Path, core_dir: pathlib.Path,
 
     # ── Linux agent stubs ────────────────────────────────────────────────────
     if _want("linux", "amd64"):
-        build_agent_cgo("amd64", "linux", "stub-amd64", pie_flags, ext_pie, arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+        build_agent_cgo(
+            "amd64",
+            "linux",
+            "stub-amd64",
+            pie_flags,
+            ext_pie,
+            arg1,
+            ldflags,
+            temp_dir,
+            core_dir,
+            gobuild_cmd,
+            build_opt,
+        )
     if _want("linux", "386"):
-        build_agent_cgo("386", "linux", "stub-386", pie_flags, ext_pie, arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+        build_agent_cgo(
+            "386",
+            "linux",
+            "stub-386",
+            pie_flags,
+            ext_pie,
+            arg1,
+            ldflags,
+            temp_dir,
+            core_dir,
+            gobuild_cmd,
+            build_opt,
+        )
     if _want("linux", "arm"):
-        build_agent_pure("arm", "linux", "stub-arm", "", "", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+        build_agent_pure(
+            "arm",
+            "linux",
+            "stub-arm",
+            "",
+            "",
+            arg1,
+            ldflags,
+            temp_dir,
+            core_dir,
+            gobuild_cmd,
+            build_opt,
+        )
     if _want("linux", "arm64"):
-        build_agent_cgo("arm64", "linux", "stub-arm64", pie_flags, ext_pie, arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+        build_agent_cgo(
+            "arm64",
+            "linux",
+            "stub-arm64",
+            pie_flags,
+            ext_pie,
+            arg1,
+            ldflags,
+            temp_dir,
+            core_dir,
+            gobuild_cmd,
+            build_opt,
+        )
     if _want("linux", "mips"):
-        build_agent_pure("mips", "linux", "stub-mips", "", "", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+        build_agent_pure(
+            "mips",
+            "linux",
+            "stub-mips",
+            "",
+            "",
+            arg1,
+            ldflags,
+            temp_dir,
+            core_dir,
+            gobuild_cmd,
+            build_opt,
+        )
     if _want("linux", "mips64"):
-        build_agent_pure("mips64", "linux", "stub-mips64", "", "", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+        build_agent_pure(
+            "mips64",
+            "linux",
+            "stub-mips64",
+            "",
+            "",
+            arg1,
+            ldflags,
+            temp_dir,
+            core_dir,
+            gobuild_cmd,
+            build_opt,
+        )
     if _want("linux", "riscv64"):
-        build_agent_cgo("riscv64", "linux", "stub-riscv64", pie_flags, ext_pie, arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+        build_agent_cgo(
+            "riscv64",
+            "linux",
+            "stub-riscv64",
+            pie_flags,
+            ext_pie,
+            arg1,
+            ldflags,
+            temp_dir,
+            core_dir,
+            gobuild_cmd,
+            build_opt,
+        )
     if _want("linux", "ppc64"):
-        build_agent_pure("ppc64", "linux", "stub-ppc64", "", "", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+        build_agent_pure(
+            "ppc64",
+            "linux",
+            "stub-ppc64",
+            "",
+            "",
+            arg1,
+            ldflags,
+            temp_dir,
+            core_dir,
+            gobuild_cmd,
+            build_opt,
+        )
 
     # ── Windows agent stubs ──────────────────────────────────────────────────
     if _want("windows", "amd64"):
-        build_agent_pure("amd64", "windows", "stub-win-amd64", "", "", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+        build_agent_pure(
+            "amd64",
+            "windows",
+            "stub-win-amd64",
+            "",
+            "",
+            arg1,
+            ldflags,
+            temp_dir,
+            core_dir,
+            gobuild_cmd,
+            build_opt,
+        )
     if _want("windows", "386"):
-        build_agent_pure("386", "windows", "stub-win-386", "", "", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+        build_agent_pure(
+            "386",
+            "windows",
+            "stub-win-386",
+            "",
+            "",
+            arg1,
+            ldflags,
+            temp_dir,
+            core_dir,
+            gobuild_cmd,
+            build_opt,
+        )
     if _want("windows", "arm64"):
-        build_agent_pure("arm64", "windows", "stub-win-arm64", "", "", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+        build_agent_pure(
+            "arm64",
+            "windows",
+            "stub-win-arm64",
+            "",
+            "",
+            arg1,
+            ldflags,
+            temp_dir,
+            core_dir,
+            gobuild_cmd,
+            build_opt,
+        )
 
     # ── Shared Objects ───────────────────────────────────────────────────────
     if _want("windows", "amd64"):
-        build_shared_object("amd64", "windows", "stub-win-amd64.dll", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+        build_shared_object(
+            "amd64",
+            "windows",
+            "stub-win-amd64.dll",
+            arg1,
+            ldflags,
+            temp_dir,
+            core_dir,
+            gobuild_cmd,
+            build_opt,
+        )
     if _want("windows", "386"):
-        build_shared_object("386", "windows", "stub-win-386.dll", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+        build_shared_object(
+            "386",
+            "windows",
+            "stub-win-386.dll",
+            arg1,
+            ldflags,
+            temp_dir,
+            core_dir,
+            gobuild_cmd,
+            build_opt,
+        )
     if _want("windows", "arm64"):
-        build_shared_object("arm64", "windows", "stub-win-arm64.dll", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+        build_shared_object(
+            "arm64",
+            "windows",
+            "stub-win-arm64.dll",
+            arg1,
+            ldflags,
+            temp_dir,
+            core_dir,
+            gobuild_cmd,
+            build_opt,
+        )
     if _want("linux", "amd64"):
-        build_shared_object("amd64", "linux", "stub-amd64.so", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+        build_shared_object(
+            "amd64",
+            "linux",
+            "stub-amd64.so",
+            arg1,
+            ldflags,
+            temp_dir,
+            core_dir,
+            gobuild_cmd,
+            build_opt,
+        )
     if _want("linux", "386"):
-        build_shared_object("386", "linux", "stub-386.so", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+        build_shared_object(
+            "386",
+            "linux",
+            "stub-386.so",
+            arg1,
+            ldflags,
+            temp_dir,
+            core_dir,
+            gobuild_cmd,
+            build_opt,
+        )
     if _want("linux", "arm"):
-        build_shared_object("arm", "linux", "stub-arm.so", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+        build_shared_object(
+            "arm",
+            "linux",
+            "stub-arm.so",
+            arg1,
+            ldflags,
+            temp_dir,
+            core_dir,
+            gobuild_cmd,
+            build_opt,
+        )
     if _want("linux", "riscv64"):
-        build_shared_object("riscv64", "linux", "stub-riscv64.so", arg1, ldflags, temp_dir, core_dir, gobuild_cmd, build_opt)
+        build_shared_object(
+            "riscv64",
+            "linux",
+            "stub-riscv64.so",
+            arg1,
+            ldflags,
+            temp_dir,
+            core_dir,
+            gobuild_cmd,
+            build_opt,
+        )
 
     # ── Modules (make_all.sh) — always run, target-filtering not applicable ──
     # Native modules are OS/arch-agnostic build artefacts (BOFs, etc.) so we
@@ -754,14 +1011,20 @@ def build(arg1: str, temp_dir: pathlib.Path, core_dir: pathlib.Path,
         for mod_dir in modules_dir.iterdir():
             make_all = mod_dir / "make_all.sh"
             if mod_dir.is_dir() and make_all.is_file():
-                log_info(f"Running make_all.sh in {mod_dir.name} ({'debug' if arg1 == '--debug' else 'release'})")
+                log_info(
+                    f"Running make_all.sh in {mod_dir.name} ({'debug' if arg1 == '--debug' else 'release'})"
+                )
                 try:
                     make_all.chmod(0o755)
                 except Exception:
                     pass
-                res = run_cmd(["./make_all.sh"], check=False, cwd=mod_dir, env=module_env)
+                res = run_cmd(
+                    ["./make_all.sh"], check=False, cwd=mod_dir, env=module_env
+                )
                 if res.returncode != 0:
-                    log_warn(f"Failed to build modules in {mod_dir.name} via make_all.sh")
+                    log_warn(
+                        f"Failed to build modules in {mod_dir.name} via make_all.sh"
+                    )
 
     log_info("Building Linux test BOFs")
     hello_linux = modules_dir / "hello_linux"
@@ -780,7 +1043,9 @@ def find_installed_prefix(prefix: str) -> pathlib.Path:
                 break
 
     if not (detected / "lib" / "emp3r0r" / "emp3r0r-cc").is_file():
-        log_error("emp3r0r is not installed. Please run --install on the C2 server first")
+        log_error(
+            "emp3r0r is not installed. Please run --install on the C2 server first"
+        )
 
     return detected
 
@@ -821,7 +1086,12 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
         for d in ["build", "modules", "tmux"]:
             src_dir = lib_src / d
             if src_dir.is_dir():
-                shutil.copytree(src_dir, kit_dir / "lib" / "emp3r0r" / d, dirs_exist_ok=True, copy_function=copy2_atomic)
+                shutil.copytree(
+                    src_dir,
+                    kit_dir / "lib" / "emp3r0r" / d,
+                    dirs_exist_ok=True,
+                    copy_function=copy2_atomic,
+                )
             else:
                 log_warn(f"{src_dir} not found; operator package may be incomplete")
 
@@ -844,7 +1114,16 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
         operator_bundle_name = "emp3r0r-operator-kit.tar.zst"
         bundle_tar = core_dir / operator_bundle_name
         res = run_cmd(
-            ["tar", "-I", "zstd", "-cpf", str(bundle_tar), "-C", str(stage_path), "emp3r0r-operator-kit"],
+            [
+                "tar",
+                "-I",
+                "zstd",
+                "-cpf",
+                str(bundle_tar),
+                "-C",
+                str(stage_path),
+                "emp3r0r-operator-kit",
+            ],
             check=False,
         )
         if res.returncode != 0:
@@ -852,11 +1131,18 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
 
         log_success(f"Created portable operator package: {bundle_tar}")
         log_success("Transfer to your operator machine, then:")
-        log_success(f"  tar -I zstd -xpf {operator_bundle_name} && ./emp3r0r-operator-kit/install.py")
+        log_success(
+            f"  tar -I zstd -xpf {operator_bundle_name} && ./emp3r0r-operator-kit/install.py"
+        )
 
 
 def do_install(prefix: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> None:
-    if not IS_DRY_RUN and os.name != "nt" and hasattr(os, "geteuid") and os.geteuid() != 0:
+    if (
+        not IS_DRY_RUN
+        and os.name != "nt"
+        and hasattr(os, "geteuid")
+        and os.geteuid() != 0
+    ):
         log_error("You must be root to install emp3r0r")
 
     log_info(f"emp3r0r will be installed to {prefix}")
@@ -879,9 +1165,19 @@ def do_install(prefix: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> N
 
     if not IS_DRY_RUN:
         if (temp_dir / "tmux").is_dir():
-            shutil.copytree(temp_dir / "tmux", data_dir / "tmux", dirs_exist_ok=True, copy_function=copy2_atomic)
+            shutil.copytree(
+                temp_dir / "tmux",
+                data_dir / "tmux",
+                dirs_exist_ok=True,
+                copy_function=copy2_atomic,
+            )
         if (temp_dir / "modules").is_dir():
-            shutil.copytree(temp_dir / "modules", data_dir / "modules", dirs_exist_ok=True, copy_function=copy2_atomic)
+            shutil.copytree(
+                temp_dir / "modules",
+                data_dir / "modules",
+                dirs_exist_ok=True,
+                copy_function=copy2_atomic,
+            )
 
         for stub in temp_dir.glob("stub*"):
             copy2_atomic(stub, build_dir / stub.name)
@@ -914,7 +1210,10 @@ def do_install(prefix: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> N
 
     install_donut(data_dir, search_dir=temp_dir)
 
-    is_container = pathlib.Path("/.dockerenv").exists() or pathlib.Path("/run/.containerenv").exists()
+    is_container = (
+        pathlib.Path("/.dockerenv").exists()
+        or pathlib.Path("/run/.containerenv").exists()
+    )
 
     if not is_container:
         log_info("Setting capabilities for emp3r0r-cc...")
@@ -925,34 +1224,48 @@ def do_install(prefix: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> N
             try:
                 wg_dir.mkdir(parents=True, exist_ok=True)
                 wg_dir.chmod(0o755)
-                current_user = os.environ.get("SUDO_USER") or os.environ.get("USER") or "root"
+                current_user = (
+                    os.environ.get("SUDO_USER") or os.environ.get("USER") or "root"
+                )
                 shutil.chown(wg_dir, user=current_user, group=current_user)
             except Exception:
                 pass
 
             tmpfiles = pathlib.Path("/etc/tmpfiles.d")
             if tmpfiles.is_dir():
-                current_user = os.environ.get("SUDO_USER") or os.environ.get("USER") or "root"
+                current_user = (
+                    os.environ.get("SUDO_USER") or os.environ.get("USER") or "root"
+                )
                 try:
                     write_text_atomic(
                         tmpfiles / "emp3r0r-wireguard.conf",
                         f"d /var/run/wireguard 0755 {current_user} {current_user}\n",
                     )
                 except OSError as e:
-                    log_warn(f"Could not write {tmpfiles / 'emp3r0r-wireguard.conf'} (overwrite failed: {e}); continuing")
+                    log_warn(
+                        f"Could not write {tmpfiles / 'emp3r0r-wireguard.conf'} (overwrite failed: {e}); continuing"
+                    )
 
         cc_bin = data_dir / "emp3r0r-cc"
         bash_comp_dir = pathlib.Path("/etc/bash_completion.d")
         if bash_comp_dir.is_dir():
-            res = run_cmd([str(cc_bin), "completion", "bash"], check=False, capture_output=True)
+            res = run_cmd(
+                [str(cc_bin), "completion", "bash"], check=False, capture_output=True
+            )
             if res.returncode == 0 and res.stdout:
                 try:
                     write_text_atomic(bash_comp_dir / "emp3r0r", res.stdout)
-                    log_info("Installed Bash completion to /etc/bash_completion.d/emp3r0r")
+                    log_info(
+                        "Installed Bash completion to /etc/bash_completion.d/emp3r0r"
+                    )
                 except OSError as e:
-                    log_warn(f"Could not install Bash completion (overwrite failed: {e}); continuing")
+                    log_warn(
+                        f"Could not install Bash completion (overwrite failed: {e}); continuing"
+                    )
     else:
-        log_info("Running inside container, skipping setcap, wireguard runtime dir, and autocomplete setup")
+        log_info(
+            "Running inside container, skipping setcap, wireguard runtime dir, and autocomplete setup"
+        )
 
     log_success("Installed emp3r0r, please check")
 
@@ -996,7 +1309,9 @@ def prepare_misc_files(core_dir: pathlib.Path, temp_dir: pathlib.Path) -> None:
         src = core_dir / name
         if src.exists():
             if src.is_dir():
-                shutil.copytree(src, temp_dir / name, dirs_exist_ok=True, copy_function=copy2_atomic)
+                shutil.copytree(
+                    src, temp_dir / name, dirs_exist_ok=True, copy_function=copy2_atomic
+                )
             else:
                 copy2_atomic(src, temp_dir / name)
 
@@ -1010,7 +1325,16 @@ def create_tar(core_dir: pathlib.Path, temp_dir: pathlib.Path) -> None:
     log_info("Creating archive...")
     release_tar = core_dir / "emp3r0r.tar.zst"
     res = run_cmd(
-        ["tar", "-I", "zstd", "-cpf", str(release_tar), "-C", str(temp_dir.parent), temp_dir.name],
+        [
+            "tar",
+            "-I",
+            "zstd",
+            "-cpf",
+            str(release_tar),
+            "-C",
+            str(temp_dir.parent),
+            temp_dir.name,
+        ],
         check=False,
     )
     if res.returncode != 0:
@@ -1024,14 +1348,44 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("--build", action="store_true", help="Build binaries and agent stubs in temp directory")
-    group.add_argument("--install", action="store_true", help="Build binaries, install to prefix, package operator bundle")
-    group.add_argument("--install-only", action="store_true", help="Skip build; install pre-built binaries")
-    group.add_argument("--debug", action="store_true", help="Build with debug mode (no garble), install, package operator bundle")
-    group.add_argument("--release", action="store_true", help="Build and package full release tarball")
-    group.add_argument("--uninstall", action="store_true", help="Remove installed files and completions")
-    group.add_argument("--package-operator", action="store_true", help="Package existing install into operator kit")
-    parser.add_argument("--dry-run", action="store_true", help="Print build and setup commands without executing them")
+    group.add_argument(
+        "--build",
+        action="store_true",
+        help="Build binaries and agent stubs in temp directory",
+    )
+    group.add_argument(
+        "--install",
+        action="store_true",
+        help="Build binaries, install to prefix, package operator bundle",
+    )
+    group.add_argument(
+        "--install-only",
+        action="store_true",
+        help="Skip build; install pre-built binaries",
+    )
+    group.add_argument(
+        "--debug",
+        action="store_true",
+        help="Build with debug mode (no garble), install, package operator bundle",
+    )
+    group.add_argument(
+        "--release", action="store_true", help="Build and package full release tarball"
+    )
+    group.add_argument(
+        "--uninstall",
+        action="store_true",
+        help="Remove installed files and completions",
+    )
+    group.add_argument(
+        "--package-operator",
+        action="store_true",
+        help="Package existing install into operator kit",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print build and setup commands without executing them",
+    )
 
     # ── Target selection ─────────────────────────────────────────────────────
     tgt_group = parser.add_argument_group(

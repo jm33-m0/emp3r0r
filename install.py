@@ -98,6 +98,7 @@ def write_text_atomic(path: pathlib.Path, content: str) -> None:
     os.replace(tmp_path, path)
     path.chmod(0o644)
 
+
 def copy2_atomic(src: pathlib.Path, dst: pathlib.Path) -> None:
     """Copy a file, force-overwriting any existing file.
 
@@ -118,9 +119,16 @@ def copy2_atomic(src: pathlib.Path, dst: pathlib.Path) -> None:
 # Mode 1: Operator Kit Direct Installer
 # ===========================================================================
 def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> None:
-    if not IS_DRY_RUN and os.name != "nt" and hasattr(os, "geteuid") and os.geteuid() != 0:
+    if (
+        not IS_DRY_RUN
+        and os.name != "nt"
+        and hasattr(os, "geteuid")
+        and os.geteuid() != 0
+    ):
         log_info("Re-running with sudo...")
-        os.execvp("sudo", ["sudo", sys.executable, str(kit_dir / "install.py")] + sys.argv[1:])
+        os.execvp(
+            "sudo", ["sudo", sys.executable, str(kit_dir / "install.py")] + sys.argv[1:]
+        )
 
     bin_dir = prefix_path / "bin"
     data_dir = prefix_path / "lib" / "emp3r0r"
@@ -167,18 +175,26 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
         (bin_dir / "emp3r0r").chmod(0o755)
 
         if (kit_dir / "bin" / "emp3r0r-listener").exists():
-            copy2_atomic(kit_dir / "bin" / "emp3r0r-listener", bin_dir / "emp3r0r-listener")
+            copy2_atomic(
+                kit_dir / "bin" / "emp3r0r-listener", bin_dir / "emp3r0r-listener"
+            )
             (bin_dir / "emp3r0r-listener").chmod(0o755)
 
-        copy2_atomic(kit_dir / "lib" / "emp3r0r" / "emp3r0r-cc", data_dir / "emp3r0r-cc")
-        copy2_atomic(kit_dir / "lib" / "emp3r0r" / "emp3r0r-cat", data_dir / "emp3r0r-cat")
+        copy2_atomic(
+            kit_dir / "lib" / "emp3r0r" / "emp3r0r-cc", data_dir / "emp3r0r-cc"
+        )
+        copy2_atomic(
+            kit_dir / "lib" / "emp3r0r" / "emp3r0r-cat", data_dir / "emp3r0r-cat"
+        )
         (data_dir / "emp3r0r-cc").chmod(0o755)
         (data_dir / "emp3r0r-cat").chmod(0o755)
 
         for d in ["build", "modules", "tmux"]:
             src_d = kit_dir / "lib" / "emp3r0r" / d
             if src_d.is_dir():
-                shutil.copytree(src_d, data_dir / d, dirs_exist_ok=True, copy_function=copy2_atomic)
+                shutil.copytree(
+                    src_d, data_dir / d, dirs_exist_ok=True, copy_function=copy2_atomic
+                )
                 log_info(f"Installed {d}")
 
     donut_src = kit_dir / "lib" / "emp3r0r" / "bin" / "donut"
@@ -204,7 +220,9 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
 
     if shutil.which("setcap") or IS_DRY_RUN:
         log_info("Setting cap_net_admin on emp3r0r-cc...")
-        run_cmd(["setcap", "cap_net_admin=eip", str(data_dir / "emp3r0r-cc")], check=False)
+        run_cmd(
+            ["setcap", "cap_net_admin=eip", str(data_dir / "emp3r0r-cc")], check=False
+        )
 
     log_info("Creating /var/run/wireguard...")
     wg_dir = pathlib.Path("/var/run/wireguard")
@@ -223,16 +241,22 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
     # added flags like --gui) after upgrading.
     bash_comp_dir = pathlib.Path("/etc/bash_completion.d")
     if bash_comp_dir.is_dir():
-        res = run_cmd([str(cc_bin), "completion", "bash"], check=False, capture_output=True)
+        res = run_cmd(
+            [str(cc_bin), "completion", "bash"], check=False, capture_output=True
+        )
         if res.returncode == 0 and res.stdout:
             if not IS_DRY_RUN:
                 try:
                     write_text_atomic(bash_comp_dir / "emp3r0r", res.stdout)
                 except OSError as e:
                     # never fail the install because of a busy/locked file
-                    log_warn(f"Could not install Bash completion (overwrite failed: {e}); continuing")
+                    log_warn(
+                        f"Could not install Bash completion (overwrite failed: {e}); continuing"
+                    )
                 else:
-                    log_info("Installed Bash completion to /etc/bash_completion.d/emp3r0r")
+                    log_info(
+                        "Installed Bash completion to /etc/bash_completion.d/emp3r0r"
+                    )
         else:
             log_warn("Failed to generate Bash completion script")
 
@@ -249,7 +273,9 @@ def detect_container_engine() -> str:
     elif shutil.which("podman"):
         engine = "podman"
     else:
-        log_warn("Neither 'docker' nor 'podman' was found. Attempting to install 'podman'...")
+        log_warn(
+            "Neither 'docker' nor 'podman' was found. Attempting to install 'podman'..."
+        )
         if shutil.which("apt-get"):
             try:
                 run_cmd(["sudo", "apt-get", "update", "-qq"])
@@ -292,11 +318,15 @@ def check_host_deps(repo_root: pathlib.Path) -> None:
             except Exception:
                 log_error(f"Failed to install host tools via yum: {' '.join(missing)}")
         else:
-            log_error(f"Missing host tools: {' '.join(missing)}. Please install them manually.")
+            log_error(
+                f"Missing host tools: {' '.join(missing)}. Please install them manually."
+            )
 
     build_py = repo_root / "core" / "build.py"
     if not build_py.exists():
-        log_error(f"core/build.py not found under {repo_root}. Run install.py from the emp3r0r repo root.")
+        log_error(
+            f"core/build.py not found under {repo_root}. Run install.py from the emp3r0r repo root."
+        )
 
 
 def docker_build(
@@ -317,10 +347,20 @@ def docker_build(
     )
 
     if inspect_res.returncode != 0 and not IS_DRY_RUN:
-        log_info(f"Builder image '{builder_image}' not found. Building it from Dockerfile...")
+        log_info(
+            f"Builder image '{builder_image}' not found. Building it from Dockerfile..."
+        )
         dockerfile = repo_root / "Dockerfile"
         res = run_cmd(
-            [container_engine, "build", "-t", builder_image, "-f", str(dockerfile), str(repo_root)],
+            [
+                container_engine,
+                "build",
+                "-t",
+                builder_image,
+                "-f",
+                str(dockerfile),
+                str(repo_root),
+            ],
             check=False,
         )
         if res.returncode != 0:
@@ -328,7 +368,9 @@ def docker_build(
     else:
         log_info(f"Using builder image '{builder_image}'")
 
-    log_info(f"Starting Docker build container ({builder_image}) to compile emp3r0r and modules...")
+    log_info(
+        f"Starting Docker build container ({builder_image}) to compile emp3r0r and modules..."
+    )
 
     build_env = []
     if disable_garble or os.environ.get("EMP3R0R_DISABLE_GARBLE") == "1":
@@ -351,7 +393,7 @@ def docker_build(
         "export GOPATH=/root/go\n"
         "export PYTHONUNBUFFERED=1\n"
         "PYTHON_BIN=$(command -v python3 || command -v python3.12 || command -v python3.11 || command -v python3.10 || find /usr/local/bin /usr/bin -name 'python3*' 2>/dev/null | head -n 1)\n"
-        "if [ -z \"$PYTHON_BIN\" ]; then\n"
+        'if [ -z "$PYTHON_BIN" ]; then\n'
         "  echo '[ERROR] Python 3 binary not found in builder container.' >&2\n"
         "  exit 1\n"
         "fi\n"
@@ -517,7 +559,9 @@ def main() -> None:
         container_engine = detect_container_engine()
         check_host_deps(script_dir)
         log_info("Starting emp3r0r installation (Docker-based build from local source)")
-        docker_build(container_engine, script_dir, build_arg, disable_garble, extra_build_flags)
+        docker_build(
+            container_engine, script_dir, build_arg, disable_garble, extra_build_flags
+        )
         install_from_operator_kit(cached_kit, args.prefix)
 
     log_success(f"emp3r0r installed successfully to {args.prefix}")
