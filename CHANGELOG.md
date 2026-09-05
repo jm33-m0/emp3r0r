@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.15.1](https://github.com/jm33-m0/emp3r0r/compare/v4.15.0...v4.15.1) (2026-09-05)
+
+
+### Bug Fixes
+
+* cifs lacks download ([0989f98](https://github.com/jm33-m0/emp3r0r/commit/0989f98b883c4c8df4f2b4774b03a4f4b4ec625f))
+* **logging:** write logs in plaintext for better parsing compatibility ([0eecd43](https://github.com/jm33-m0/emp3r0r/commit/0eecd4381cad3897d311777901a7a14f2ecccf9b))
+
 ## [4.15.0](https://github.com/jm33-m0/emp3r0r/compare/v4.14.0...v4.15.0) (2026-09-04)
 
 
