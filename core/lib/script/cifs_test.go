@@ -9,27 +9,27 @@ import (
 	"testing"
 )
 
-// TestCIFSUploadModuleScript exercises the real cifs_upload / cifs_rm module
-// (core/modules/cifs_upload/cifs_upload.star) through the engine. Only the
+// TestCIFSModuleScript exercises the real cifs_upload / cifs_download /
+// cifs_rm module (core/modules/cifs/cifs.star) through the engine. Only the
 // safe, platform-independent paths are executed: command dispatch, argument
 // validation, UNC parsing and payload-source resolution. The actual
-// CreateFileW/WriteFile/DeleteFileW SMB operations need a live share +
-// Windows and are intentionally not attempted here.
-func TestCIFSUploadModuleScript(t *testing.T) {
+// CreateFileW/WriteFile/ReadFile/DeleteFileW SMB operations need a live
+// share + Windows and are intentionally not attempted here.
+func TestCIFSModuleScript(t *testing.T) {
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatalf("unable to resolve caller path")
 	}
 	// core/lib/script -> core (repo root)
 	repoRoot := filepath.Dir(filepath.Dir(filepath.Dir(thisFile)))
-	modDir := filepath.Join(repoRoot, "modules", "cifs_upload")
-	starPath := filepath.Join(modDir, "cifs_upload.star")
+	modDir := filepath.Join(repoRoot, "modules", "cifs")
+	starPath := filepath.Join(modDir, "cifs.star")
 	src, err := os.ReadFile(starPath)
 	if err != nil {
-		t.Fatalf("read cifs_upload.star: %v", err)
+		t.Fatalf("read cifs.star: %v", err)
 	}
 
-	// config.json must define both commands with correct literal argv
+	// config.json must define all three commands with correct literal argv
 	// prefixes, reference the existing entry script and target Windows.
 	cfgData, err := os.ReadFile(filepath.Join(modDir, "config.json"))
 	if err != nil {
@@ -52,7 +52,7 @@ func TestCIFSUploadModuleScript(t *testing.T) {
 	if err := json.Unmarshal(cfgData, &cfgs); err != nil {
 		t.Fatalf("config.json is not valid JSON: %v", err)
 	}
-	wantCmds := map[string]string{"cifs_upload": "upload", "cifs_rm": "delete"}
+	wantCmds := map[string]string{"cifs_upload": "upload", "cifs_download": "download", "cifs_rm": "delete"}
 	for _, c := range cfgs {
 		if c.AgentConfig.Type == "" {
 			continue // not one of ours
@@ -67,7 +67,7 @@ func TestCIFSUploadModuleScript(t *testing.T) {
 		if !strings.EqualFold(c.AgentConfig.Type, "starlark") {
 			t.Fatalf("module %s type must be starlark, got %q", c.Name, c.AgentConfig.Type)
 		}
-		if c.AgentConfig.Exec != "cifs_upload.star" {
+		if c.AgentConfig.Exec != "cifs.star" {
 			t.Fatalf("module %s unexpected exec %q", c.Name, c.AgentConfig.Exec)
 		}
 		if len(c.Invocation.Argv) != 1 || c.Invocation.Argv[0].Literal != wantCmd {
@@ -131,7 +131,34 @@ func TestCIFSUploadModuleScript(t *testing.T) {
 		t.Fatalf("must not attempt a remote upload for a missing source, got: %q", out)
 	}
 
-	// 5. delete with no dest → clear failure (no Win32 call yet).
+	// 5. download with no src/dest → clear failure (no Win32 call yet).
+	out, err = run("download")
+	if err != nil {
+		t.Fatalf("Run download (no args): %v", err)
+	}
+	if !strings.Contains(out, "Fail: both src and dest are required") {
+		t.Fatalf("expected download src/dest failure, got: %q", out)
+	}
+
+	// 6. download with a non-UNC src → clear failure.
+	out, err = run("download", `C:\Windows\system32\config\SAM`, `mem:///SAM`)
+	if err != nil {
+		t.Fatalf("Run download (non-UNC src): %v", err)
+	}
+	if !strings.Contains(out, "Fail: src must be a full UNC path") {
+		t.Fatalf("expected download UNC failure, got: %q", out)
+	}
+
+	// 7. download with a UNC src but a UNC dest → rejected before any SMB I/O.
+	out, err = run("download", `\\DC01\C$\Windows\system32\config\SAM`, `\\other\share\x.bin`)
+	if err != nil {
+		t.Fatalf("Run download (UNC dest): %v", err)
+	}
+	if !strings.Contains(out, "Fail: dest must be a mem:/// path") {
+		t.Fatalf("expected local/memfs dest failure, got: %q", out)
+	}
+
+	// 8. delete with no dest → clear failure (no Win32 call yet).
 	out, err = run("delete")
 	if err != nil {
 		t.Fatalf("Run delete (no dest): %v", err)
@@ -140,7 +167,7 @@ func TestCIFSUploadModuleScript(t *testing.T) {
 		t.Fatalf("expected delete dest failure, got: %q", out)
 	}
 
-	// 6. delete with a non-UNC dest → clear failure.
+	// 9. delete with a non-UNC dest → clear failure.
 	out, err = run("delete", `C:\Windows\Temp\stage.exe`)
 	if err != nil {
 		t.Fatalf("Run delete (non-UNC dest): %v", err)
@@ -149,7 +176,7 @@ func TestCIFSUploadModuleScript(t *testing.T) {
 		t.Fatalf("expected delete UNC failure, got: %q", out)
 	}
 
-	// 7. unknown command word falls back to legacy upload behaviour.
+	// 10. unknown command word falls back to legacy upload behaviour.
 	out, err = run("bogus")
 	if err != nil {
 		t.Fatalf("Run (bogus command): %v", err)
