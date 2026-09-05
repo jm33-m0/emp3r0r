@@ -22,7 +22,6 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 	"time"
 
@@ -107,8 +106,10 @@ func startPivotStack(t *testing.T) (pivotAddr string) {
 		CloseValue:    "close=1",
 	}
 
-	live.AgentControlMap = sync.Map{}
-	live.AgentList = sync.Map{}
+	// Clear in place: reassigning `= sync.Map{}` would race any handler
+	// goroutine from an earlier test still Load/Range-ing the old instance.
+	live.AgentControlMap.Clear()
+	live.AgentList.Clear()
 	live.RuntimeConfig = &def.Config{
 		CCH2Port:      fmt.Sprintf("%d", tlsPort),
 		CCHTTPPort:    fmt.Sprintf("%d", httpPort),

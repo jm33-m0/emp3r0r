@@ -16,7 +16,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -376,7 +375,8 @@ func TestDuplicatedCheckin(t *testing.T) {
 		live.AgentControlMap.Delete(key)
 		return true
 	})
-	live.AgentList = sync.Map{}
+	// Clear AgentList in place to match AgentControlMap above.
+	live.AgentList.Clear()
 
 	// Start Real C2 Server
 	startTestC2Server(t)

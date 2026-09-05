@@ -20,7 +20,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -268,8 +267,10 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 		MalleableC2:      malleableCfg,
 	}
 
-	live.AgentControlMap = sync.Map{}
-	live.AgentList = sync.Map{}
+	// Clear in place: reassigning `= sync.Map{}` would race any handler
+	// goroutine from an earlier test still Load/Range-ing the old instance.
+	live.AgentControlMap.Clear()
+	live.AgentList.Clear()
 	time.Sleep(100 * time.Millisecond)
 
 	// -----------------------------------------------------------------------

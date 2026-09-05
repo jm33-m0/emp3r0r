@@ -3,7 +3,6 @@ package ftp
 import (
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -35,8 +34,9 @@ func TestStatFile(t *testing.T) {
 		return nil
 	}
 
-	// Initialize live.CmdResults
-	live.CmdResults = sync.Map{}
+	// Clear in place: reassigning `= sync.Map{}` would race any concurrent
+	// Load/Range on the old value.
+	live.CmdResults.Clear()
 
 	agent := &def.Emp3r0rAgent{
 		Tag: "test-agent",

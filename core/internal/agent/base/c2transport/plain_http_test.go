@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 	"time"
 
@@ -113,8 +112,10 @@ func runCheckinACK(t *testing.T, mode string) {
 		},
 	}
 
-	live.AgentControlMap = sync.Map{}
-	live.AgentList = sync.Map{}
+	// Clear in place: reassigning `= sync.Map{}` would race any handler
+	// goroutine from an earlier test still Load/Range-ing the old instance.
+	live.AgentControlMap.Clear()
+	live.AgentList.Clear()
 
 	go server.StartC2AgentTLSServer()
 	server.MarkOperatorOnline("test-operator")
