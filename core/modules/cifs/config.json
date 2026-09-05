@@ -1,5 +1,60 @@
 [
   {
+    "name": "cifs_download",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-09-05",
+    "comment": "Download a file from a remote SMB/CIFS share (UNC) under the module's token/ticket identity — the pull half of the cifs module: exfiltrate files from agent-less hosts straight over \\\\target\\\\ADMIN$\\\\... / C$\\\\... (e.g. C$\\\\Windows\\\\system32\\\\config\\\\SAM). Streams the file with chunked ReadFile over the UNC path into mem:/// (encrypted memfs — retrieve with CC 'get') or a local path, then optionally re-reads and hashes it to confirm integrity. Same token model as cifs_upload: --token <SID|session> (stolen DA token or make_token session), or --user <DOMAIN/user> --ticket <base64 kirbi> for the PTT flow.",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "parameters": [
+      {
+        "name": "src",
+        "description": "Source UNC path below an existing share, e.g. \\\\DC01\\\\C$\\\\Windows\\\\system32\\\\config\\\\SAM. Use the hostname rather than an IP for --ticket/PTT flows so Kerberos is used",
+        "default": "",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "dest",
+        "description": "Destination on this agent: mem:///path (encrypted memfs — retrieve with CC 'get') or a local path like C:\\\\loot.bin",
+        "default": "",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "chunk_kb",
+        "description": "ReadFile chunk size in KiB",
+        "default": "1024",
+        "type": "int",
+        "required": false
+      },
+      {
+        "name": "verify",
+        "description": "Re-read the remote file and compare hashes to detect mid-transfer changes",
+        "default": "false",
+        "type": "bool",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "cifs.star",
+      "files": ["cifs.star"],
+      "in_memory": true,
+      "type": "starlark",
+      "interactive": false
+    },
+    "invocation": {
+      "argv": [
+        {
+          "literal": "download"
+        }
+      ]
+    }
+  },
+  {
     "name": "cifs_upload",
     "build": "",
     "author": "jm33-ng",
@@ -47,8 +102,8 @@
       }
     ],
     "agent_config": {
-      "exec": "cifs_upload.star",
-      "files": ["cifs_upload.star"],
+      "exec": "cifs.star",
+      "files": ["cifs.star"],
       "in_memory": true,
       "type": "starlark",
       "interactive": false
@@ -84,8 +139,8 @@
       }
     ],
     "agent_config": {
-      "exec": "cifs_upload.star",
-      "files": ["cifs_upload.star"],
+      "exec": "cifs.star",
+      "files": ["cifs.star"],
       "in_memory": true,
       "type": "starlark",
       "interactive": false

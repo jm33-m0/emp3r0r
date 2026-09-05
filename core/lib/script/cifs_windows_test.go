@@ -1,7 +1,7 @@
 package script
 
 // Windows-only functional test for the file-streaming primitives used by the
-// cifs_upload module (core/modules/cifs_upload/cifs_upload.star):
+// cifs module (core/modules/cifs/cifs.star):
 //
 //   cstring_ptr(content)   – binary-safe copy of payload bytes into VirtualAlloc
 //   CreateFileW             – open destination (here: local file, same handle
@@ -21,7 +21,7 @@ import (
 )
 
 const cifsTestDriver = `
-# mirrors core/modules/cifs_upload/cifs_upload.star: open_dest/stream_write/verify_remote
+# mirrors core/modules/cifs/cifs.star: open_dest/stream_write/verify_remote
 GENERIC_WRITE = 0x40000000
 GENERIC_READ = 0x80000000
 FILE_SHARE_READ = 0x00000001
@@ -86,7 +86,7 @@ def main(*args):
 `
 
 func TestCIFSUploadWritePrimitivesWindows(t *testing.T) {
-	dst := filepath.Join(os.TempDir(), "emp3r0r_cifs_upload_test.bin")
+	dst := filepath.Join(os.TempDir(), "emp3r0r_cifs_test.bin")
 	_ = os.Remove(dst)
 	defer os.Remove(dst)
 

