@@ -532,115 +532,9 @@ func InitModules() {
 		os.MkdirAll(live.WWWRoot, 0o700)
 	}
 
-	load_mod := func(mod_search_dir string) {
-		// don't bother if module dir not found
-		if !util.IsExist(mod_search_dir) {
-			return
-		}
-
-		// Ensure bof_common is in the workspace modules directory if it exists in search dir
-		src_bof_common := filepath.Join(mod_search_dir, "bof_common")
-		dst_bof_common := filepath.Join(live.EmpWorkSpace, "modules", "bof_common")
-		if util.IsExist(src_bof_common) && src_bof_common != dst_bof_common {
-			_ = os.MkdirAll(filepath.Dir(dst_bof_common), 0o700)
-			_ = util.Copy(src_bof_common, dst_bof_common)
-		}
-
-		logging.Debugf("Scanning %s for modules", mod_search_dir)
-		dirs, readdirErr := os.ReadDir(mod_search_dir)
-		if readdirErr != nil {
-			logging.Errorf("Failed to scan custom modules: %v", readdirErr)
-			return
-		}
-		for _, dir := range dirs {
-			if !dir.IsDir() {
-				continue
-			}
-			config_file := fmt.Sprintf("%s/%s/config.json", mod_search_dir, dir.Name())
-			if !util.IsExist(config_file) {
-				continue
-			}
-			configs, readConfigErr := readModConfigs(config_file)
-			if readConfigErr != nil {
-				logging.Warningf("Reading config from %s: %v", dir.Name(), readConfigErr)
-				continue
-			}
-
-			var copiedPath string
-			var hasCopied bool
-
-			for _, config := range configs {
-				func() {
-					defer func() {
-						if r := recover(); r != nil {
-							logging.Errorf("Panic while loading module %s: %v. Rolling back registration.", config.Name, r)
-							def.Modules.Delete(config.Name)
-							deleteModuleRunner(config.Name)
-						}
-					}()
-
-					// module path, eg. ~/.emp3r0r/modules/foo
-					originalPath := fmt.Sprintf("%s/%s", mod_search_dir, dir.Name())
-					config.Path = originalPath
-					if config.IsLocal || config.Build != "" {
-						if hasCopied {
-							config.Path = copiedPath
-						} else {
-							mod_dir := filepath.Join(live.EmpWorkSpace, "modules", dir.Name())
-							absConfigPath, _ := filepath.Abs(config.Path)
-							absModDir, _ := filepath.Abs(mod_dir)
-							if absConfigPath == absModDir {
-								logging.Debugf("Module %s is already in workspace, skipping copy", config.Name)
-								copiedPath = mod_dir
-								hasCopied = true
-							} else {
-								err := os.MkdirAll(mod_dir, 0o700)
-								if err != nil {
-									logging.Warningf("Failed to create %s: %v", mod_dir, err)
-									return
-								}
-								err = util.Copy(config.Path, mod_dir)
-								if err != nil {
-									logging.Warningf("Copying %s to %s: %v", config.Path, mod_dir, err)
-									return
-								}
-								config.Path = mod_dir
-								copiedPath = mod_dir
-								hasCopied = true
-							}
-						}
-					}
-
-					// add to module helpers
-					registerModuleRunner(config.Name, moduleCustom)
-
-					// Check for conflicting module names
-					if _, exists := def.Modules.Load(config.Name); exists {
-						logging.Warningf("Conflicting module name: module '%s' is already registered/loaded. The new definition will overwrite it.", config.Name)
-					}
-
-					// Store FIRST so that updateModuleHelp can Load and patch the Options map.
-					// Without this, the Load inside updateModuleHelp always misses and the
-					// validated options are silently discarded.
-					def.InjectTokenOption(config)
-					def.Modules.Store(config.Name, config)
-					readConfigErr = updateModuleHelp(config)
-					if readConfigErr != nil {
-						logging.Warningf("Loading config from %s: %v", config.Name, readConfigErr)
-						def.Modules.Delete(config.Name) // rollback — don't expose a broken entry
-						deleteModuleRunner(config.Name)
-						return
-					}
-					logging.Debugf("Loaded module %s", strconv.Quote(config.Name))
-				}()
-			}
-		}
-	}
-
-	// read from every defined module dir
-	for _, mod_search_dir := range live.ModuleDirs {
-		load_mod(mod_search_dir)
-	}
+	// build the module registries from the same scan, so every loaded config
+	// has a runner and a console command
+	loadModFromDirs()
 
 	// Pre-host DLL modules so BOF module dependencies can download them on
 	// demand even if the operator never ran the DLL module directly.
@@ -652,6 +546,197 @@ func InitModules() {
 		return true
 	})
 	logging.Infof("Loaded %d modules", count)
+}
+
+// scanModuleDirs walks every directory in live.ModuleDirs (in order) and
+// calls handleModuleConfig for each module config found. Modules are loaded
+// from later dirs (the operator workspace) over earlier ones (the install
+// prefix).
+func scanModuleDirs(handleModuleConfig func(dir string) error) {
+	for _, mod_search_dir := range live.ModuleDirs {
+		// don't bother if module dir not found
+		if !util.IsExist(mod_search_dir) {
+			continue
+		}
+		logging.Debugf("Scanning %s for modules", mod_search_dir)
+		dirs, readdirErr := os.ReadDir(mod_search_dir)
+		if readdirErr != nil {
+			logging.Errorf("Failed to scan custom modules in %s: %v", mod_search_dir, readdirErr)
+			continue
+		}
+		for _, dir := range dirs {
+			if !dir.IsDir() {
+				continue
+			}
+			modDir := filepath.Join(mod_search_dir, dir.Name())
+			configFile := filepath.Join(modDir, "config.json")
+			if !util.IsFileExist(configFile) {
+				continue
+			}
+			if err := handleModuleConfig(modDir); err != nil {
+				logging.Warningf("Loading module from %s: %v", modDir, err)
+			}
+		}
+	}
+}
+
+// loadModFromDirs registers every module config found in live.ModuleDirs.
+// It also mirrors the shared bof_common payload into the operator workspace,
+// where buildable/local modules expect it.
+func loadModFromDirs() {
+	// Ensure bof_common is in the workspace modules directory if it exists in
+	// a search dir
+	for _, mod_search_dir := range live.ModuleDirs {
+		src_bof_common := filepath.Join(mod_search_dir, "bof_common")
+		dst_bof_common := filepath.Join(live.EmpWorkSpace, "modules", "bof_common")
+		if util.IsExist(src_bof_common) && src_bof_common != dst_bof_common {
+			_ = os.MkdirAll(filepath.Dir(dst_bof_common), 0o700)
+			_ = util.Copy(src_bof_common, dst_bof_common)
+		}
+	}
+
+	scanModuleDirs(func(dir string) error {
+		_, err := loadModuleDir(dir)
+		return err
+	})
+}
+
+// loadModuleDir parses config.json inside moduleDir and (re)registers the
+// modules it declares, copying the sources of local/buildable modules into
+// the operator workspace first. It returns the parsed module names on
+// success, and an error when the config is unusable (in which case the dir's
+// modules are unregistered so a broken config is never exposed).
+func loadModuleDir(moduleDir string) ([]string, error) {
+	configFile := filepath.Join(moduleDir, "config.json")
+	configs, readConfigErr := readModConfigs(configFile)
+	if readConfigErr != nil {
+		unregisterModuleConfigs(moduleDir)
+		return nil, readConfigErr
+	}
+
+	names := make([]string, 0, len(configs))
+	var copiedPath string
+	var hasCopied bool
+	for _, config := range configs {
+		if err := registerModuleConfig(moduleDir, config, &copiedPath, &hasCopied); err != nil {
+			// the module is broken: unregister it so it is not exposed
+			unregisterModuleConfigs(moduleDir)
+			return nil, err
+		}
+		if config != nil && config.Name != "" {
+			names = append(names, config.Name)
+		}
+	}
+	return names, nil
+}
+
+// registerModuleConfig loads a single module config: resolves its Path
+// (copying local/buildable module sources into the workspace when needed),
+// registers its runner and validates its help text, then stores it.
+// It returns an error when the config is unusable, after rolling back any
+// partial registration.
+func registerModuleConfig(moduleDir string, config *def.ModuleConfig, copiedPath *string, hasCopied *bool) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic while loading module %s: %v", config.Name, r)
+		}
+	}()
+
+	// module path, eg. ~/.emp3r0r/modules/foo
+	config.Path = moduleDir
+	if config.IsLocal || config.Build != "" {
+		if *hasCopied {
+			config.Path = *copiedPath
+		} else {
+			mod_dir := filepath.Join(live.EmpWorkSpace, "modules", filepath.Base(moduleDir))
+			absConfigPath, _ := filepath.Abs(config.Path)
+			absModDir, _ := filepath.Abs(mod_dir)
+			if absConfigPath == absModDir {
+				logging.Debugf("Module %s is already in workspace, skipping copy", config.Name)
+				*copiedPath = mod_dir
+				*hasCopied = true
+			} else {
+				err := os.MkdirAll(mod_dir, 0o700)
+				if err != nil {
+					return fmt.Errorf("failed to create %s: %v", mod_dir, err)
+				}
+				err = util.Copy(config.Path, mod_dir)
+				if err != nil {
+					return fmt.Errorf("copying %s to %s: %v", config.Path, mod_dir, err)
+				}
+				config.Path = mod_dir
+				*copiedPath = mod_dir
+				*hasCopied = true
+			}
+		}
+	}
+
+	// add to module helpers
+	registerModuleRunner(config.Name, moduleCustom)
+
+	// Check for conflicting module names. A plain overwrite (the same module
+	// being (re)loaded — e.g. a workspace shadow of an install-prefix module,
+	// or a hot reload of an edited config) is silent: def.Modules is a
+	// map-like store and the new definition wins by design. Only definitions
+	// that actually differ are worth a warning.
+	if existing, exists := def.Modules.Load(config.Name); exists {
+		if old, ok := existing.(*def.ModuleConfig); ok && !sameModuleDef(old, config) {
+			logging.Warningf("Conflicting module name: module '%s' is already registered/loaded with a different definition. The new definition will overwrite it.", config.Name)
+		}
+	}
+
+	// Store FIRST so that updateModuleHelp can Load and patch the Options map.
+	// Without this, the Load inside updateModuleHelp always misses and the
+	// validated options are silently discarded.
+	def.InjectTokenOption(config)
+	def.Modules.Store(config.Name, config)
+	if helpErr := updateModuleHelp(config); helpErr != nil {
+		def.Modules.Delete(config.Name) // rollback — don't expose a broken entry
+		deleteModuleRunner(config.Name)
+		return fmt.Errorf("%s config error: %v", config.Name, helpErr)
+	}
+	return nil
+}
+
+// sameModuleDef reports whether two configs for the same module name describe
+// the same module (comparing the fields that make a definition unique). It is
+// used to decide whether an overwrite is a reload of the same module (silent)
+// or a genuine name conflict (worth a warning).
+func sameModuleDef(a, b *def.ModuleConfig) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	return a.IsLocal == b.IsLocal &&
+		a.Build == b.Build &&
+		a.Platform == b.Platform &&
+		a.AgentConfig.Type == b.AgentConfig.Type &&
+		a.AgentConfig.Exec == b.AgentConfig.Exec
+}
+
+// unregisterModuleConfigs removes every module whose config lives in moduleDir
+// from def.Modules and from ModuleRunners, and returns the names it removed.
+// It never touches modules that were declared by a later (higher-priority)
+// module dir: the authoritative module dir is read back from the registry
+// itself, so a module that a workspace copy overrides is left alone.
+func unregisterModuleConfigs(moduleDir string) []string {
+	absDir, _ := filepath.Abs(moduleDir)
+	unregister := make([]string, 0)
+	def.Modules.Range(func(key, val any) bool {
+		config, ok := val.(*def.ModuleConfig)
+		if !ok || config == nil {
+			return true
+		}
+		absPath, _ := filepath.Abs(config.Path)
+		if absPath == absDir {
+			unregister = append(unregister, key.(string))
+		}
+		return true
+	})
+	for _, name := range unregister {
+		def.Modules.Delete(name)
+		deleteModuleRunner(name)
+	}
+	return unregister
 }
 
 // readModCondig read config.json of a module

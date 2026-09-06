@@ -9,6 +9,7 @@ require (
 	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/coder/websocket v1.8.15
 	github.com/fatih/color v1.19.0
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/fxamacker/cbor/v2 v2.9.2
 	github.com/gonutz/w32/v2 v2.12.1
 	github.com/google/uuid v1.6.0
@@ -62,7 +63,6 @@ require (
 	github.com/coreos/go-iptables v0.8.0 // indirect
 	github.com/dlclark/regexp2 v1.12.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/btree v1.1.3 // indirect

@@ -91,6 +91,11 @@ func CliMain(wg_server_ip string, wg_server_port int) {
 	}
 	// Load modules before command tree creation so module_name commands and flags exist for completion.
 	modules.InitModules()
+	// Hot-reload module dir changes: new/edited/removed module configs are
+	// re-synced into def.Modules (and thus into the command tree, which is
+	// rebuilt from it on every prompt cycle). Only the changed modules are
+	// logged.
+	modules.StartModuleWatch()
 	mainMenu := EMP3R0R_CONSOLE.ActiveMenu()
 	EMP3R0R_CONSOLE.SetPrintLogo(CliBanner)
 
