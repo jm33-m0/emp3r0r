@@ -18,8 +18,15 @@ var (
 	EmpTLSListener     net.Listener
 	EmpTLSServerCtx    context.Context
 	EmpTLSServerCancel context.CancelFunc
-	EmpKCPCtx          context.Context
-	EmpKCPCancel       context.CancelFunc
+
+	httpServerMu sync.RWMutex
+	// EmpHTTPServer is guarded by httpServerMu because StartC2HTTPServer runs in
+	// its own goroutine and publishes the pointer while test cleanups (and a
+	// subsequent StartC2HTTPServer) may concurrently Stop it.
+	EmpHTTPServer *http.Server
+
+	EmpKCPCtx    context.Context
+	EmpKCPCancel context.CancelFunc
 
 	// Shared stream handlers and maps
 	FTPStreams sync.Map
@@ -41,6 +48,37 @@ func StopEmpTLSServer() {
 		EmpTLSListener = nil
 	}
 	EmpTLSServerCtx = nil
+}
+
+// SetEmpHTTPServer publishes the plain-HTTP C2 server instance so it can be
+// stopped later. Called by StartC2HTTPServer before ListenAndServe.
+func SetEmpHTTPServer(s *http.Server) {
+	httpServerMu.Lock()
+	EmpHTTPServer = s
+	httpServerMu.Unlock()
+}
+
+// StopEmpHTTPServer stops the plain HTTP C2 transport server if one is
+// running. The HTTP server is tracked separately from the TLS one because a
+// C2 (or a test) may run both at once (h2conn + http_poll modes); stopping
+// only the TLS endpoint would leave the HTTP server and its tunnel handlers
+// running forever, which leaks goroutines and cross-test agent/session state.
+func StopEmpHTTPServer() {
+	httpServerMu.Lock()
+	srv := EmpHTTPServer
+	EmpHTTPServer = nil
+	httpServerMu.Unlock()
+	if srv != nil {
+		_ = srv.Shutdown(context.Background())
+	}
+}
+
+// StopEmpServers stops every C2 transport server endpoint (TLS/h2 and plain
+// HTTP). It is what tests and embedders should call between stacks so no
+// server goroutine from a previous stack outlives the next one.
+func StopEmpServers() {
+	StopEmpTLSServer()
+	StopEmpHTTPServer()
 }
 
 // StreamHandler allows the HTTP handler to use CBOR-encapsulated streams.

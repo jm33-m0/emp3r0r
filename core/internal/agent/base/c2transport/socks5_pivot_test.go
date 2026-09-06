@@ -82,6 +82,14 @@ func TestSocks5PivotCONNECTRefused(t *testing.T) {
 func runSocks5PivotE2E(t *testing.T, mode string, expectRefused bool) {
 	t.Helper()
 
+	// A previous full-stack test may still have server goroutines (both the
+	// TLS/h2 and the plain-HTTP C2 endpoints) draining. Stop and drain every
+	// endpoint so their tunnel/session/PFS teardown cannot race the fresh
+	// stack below (observed as an intermittent relay SecureConn decryption
+	// failure / EOF right after the PFS handshake when tests run back-to-back).
+	network.StopEmpServers()
+	time.Sleep(150 * time.Millisecond)
+
 	// -----------------------------------------------------------------------
 	// Certs + runtime config (mirrors plain_http_test / lifecycle_test setup).
 	// -----------------------------------------------------------------------
@@ -163,12 +171,23 @@ func runSocks5PivotE2E(t *testing.T, mode string, expectRefused bool) {
 	server.MarkOperatorOnline("test-operator")
 	t.Cleanup(func() {
 		server.MarkOperatorOffline("test-operator")
-		network.StopEmpTLSServer()
+		network.StopEmpServers()
 	})
 	if mode == def.C2ChannelModePlainHTTP {
 		go server.StartC2HTTPServer()
 	}
-	time.Sleep(1 * time.Second)
+
+	// Wait until the C2 listener(s) are actually accepting (not a blind
+	// sleep): agent enrollment below must not race a half-bound server, and a
+	// plain-HTTP subtest must not start polling a TLS endpoint that is not up.
+	if err := waitForPort(fmt.Sprintf("127.0.0.1:%d", tlsPort), time.Now().Add(10*time.Second)); err != nil {
+		t.Fatalf("C2 TLS server did not become ready: %v", err)
+	}
+	if mode == def.C2ChannelModePlainHTTP {
+		if err := waitForPort(fmt.Sprintf("127.0.0.1:%d", httpPort), time.Now().Add(10*time.Second)); err != nil {
+			t.Fatalf("Plain HTTP server did not become ready: %v", err)
+		}
+	}
 
 	// -----------------------------------------------------------------------
 	// Agent identity + enrollment + message tunnel (PFS handshake inside).

