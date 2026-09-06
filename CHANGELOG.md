@@ -1,5 +1,20 @@
 # Changelog
 
+## [4.16.0](https://github.com/jm33-m0/emp3r0r/compare/v4.15.0...v4.16.0) (2026-09-06)
+
+
+### Features
+
+* **module:** cifs download ([7e38ec2](https://github.com/jm33-m0/emp3r0r/commit/7e38ec2cc048e814542c2c7952b44459140fca5d))
+* **module:** monitor module dir and dynamically reload modules on-demand ([1328f7a](https://github.com/jm33-m0/emp3r0r/commit/1328f7ac227a7e74106f7c3f85193ecd6e08deee))
+
+
+### Bug Fixes
+
+* improve c2 server shutdown logic ([9b71e6f](https://github.com/jm33-m0/emp3r0r/commit/9b71e6f3141e7010dc881c80793dd5f2b2e09910))
+* **logging:** write logs in plaintext for better parsing compatibility ([0eecd43](https://github.com/jm33-m0/emp3r0r/commit/0eecd4381cad3897d311777901a7a14f2ecccf9b))
+* **module:** promote SA/Remote-OPs BOF to top level command (without prefixes) ([104e105](https://github.com/jm33-m0/emp3r0r/commit/104e105673a9a5394cd5a5595f34b88910e8f9ab))
+
 ## [4.15.0](https://github.com/jm33-m0/emp3r0r/compare/v4.14.0...v4.15.0) (2026-09-04)
 
 
