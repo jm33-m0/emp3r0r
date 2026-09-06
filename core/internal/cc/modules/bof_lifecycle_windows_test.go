@@ -131,14 +131,14 @@ func TestBOFFullLifecycle(t *testing.T) {
 		{
 			name:       "Remote-OPs/get_priv",
 			configPath: filepath.Join(modulesRoot, "Remote-OPs", "config.json"),
-			moduleName: "remote_ops_get_priv",
+			moduleName: "get_priv",
 			flags:      map[string]string{"privilege": "SeShutdownPrivilege"},
 			wantOut:    []string{"SeShutdownPrivilege"},
 		},
 		{
 			name:       "Remote-OPs/process-list-handles",
 			configPath: filepath.Join(modulesRoot, "Remote-OPs", "config.json"),
-			moduleName: "remote_ops_process-list-handles",
+			moduleName: "process-list-handles",
 			flags:      map[string]string{"pid": strconv.Itoa(os.Getpid())},
 			wantOut:    []string{"Listing handles for PID"},
 		},
@@ -213,7 +213,7 @@ func TestBOFDependencyDownloadLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("readModConfigs: %v", err)
 	}
-	config := findConfig(t, configs, "remote_ops_get_priv")
+	config := findConfig(t, configs, "get_priv")
 	config.Path = filepath.Dir(filepath.Join(modulesRoot, "Remote-OPs", "config.json"))
 	invocation, err := resolveInvocation(config, map[string]string{"privilege": "SeShutdownPrivilege"})
 	if err != nil {
@@ -251,7 +251,7 @@ func TestBOFDependencyDownloadLifecycle(t *testing.T) {
 	}()
 
 	compressedPath, checksum := hostBOFFile(t, bof)
-	out := agentmodules.ModuleHandler("", compressedPath, "coff", "remote_ops_get_priv", checksum, invocation)
+	out := agentmodules.ModuleHandler("", compressedPath, "coff", "get_priv", checksum, invocation)
 	t.Logf("BOF output:\n%s", out)
 	if !strings.Contains(out, "SeShutdownPrivilege") {
 		t.Fatalf("BOF output missing privilege name: %q", out)
@@ -304,7 +304,7 @@ func TestBOFCrashIsContained(t *testing.T) {
 	if err != nil {
 		t.Fatalf("readModConfigs: %v", err)
 	}
-	config := findConfig(t, configs, "remote_ops_get_priv")
+	config := findConfig(t, configs, "get_priv")
 	config.Path = filepath.Dir(filepath.Join(modulesRoot, "Remote-OPs", "config.json"))
 	invocation, err := resolveInvocation(config, map[string]string{"privilege": "SeShutdownPrivilege"})
 	if err != nil {
@@ -339,7 +339,7 @@ func TestBOFLifecycleErrorResilience(t *testing.T) {
 	if err != nil {
 		t.Fatalf("readModConfigs: %v", err)
 	}
-	config := findConfig(t, configs, "remote_ops_get_priv")
+	config := findConfig(t, configs, "get_priv")
 	config.Path = filepath.Dir(filepath.Join(modulesRoot, "Remote-OPs", "config.json"))
 	invocation, err := resolveInvocation(config, map[string]string{"privilege": "SeShutdownPrivilege"})
 	if err != nil {
@@ -348,7 +348,7 @@ func TestBOFLifecycleErrorResilience(t *testing.T) {
 
 	t.Run("bad checksum", func(t *testing.T) {
 		compressedPath, _ := hostBOFFile(t, bof)
-		out := agentmodules.ModuleHandler("", compressedPath, "coff", "remote_ops_get_priv", "deadbeef", invocation)
+		out := agentmodules.ModuleHandler("", compressedPath, "coff", "get_priv", "deadbeef", invocation)
 		if out == "" {
 			t.Fatalf("expected an error string for a bad checksum")
 		}
@@ -360,7 +360,7 @@ func TestBOFLifecycleErrorResilience(t *testing.T) {
 	t.Run("empty BOF payload", func(t *testing.T) {
 		cacheCoffLoaderDLL(t, dll)
 		compressedPath, checksum := hostBOFFile(t, []byte{})
-		out := agentmodules.ModuleHandler("", compressedPath, "coff", "remote_ops_get_priv", checksum, invocation)
+		out := agentmodules.ModuleHandler("", compressedPath, "coff", "get_priv", checksum, invocation)
 		if out == "" {
 			t.Fatalf("expected an error string for an empty BOF")
 		}
@@ -374,7 +374,7 @@ func TestBOFLifecycleErrorResilience(t *testing.T) {
 		// Valid gzip but garbage COFF bytes: the DLL loader must reject it
 		// (or contain any native fault) without killing the test process.
 		compressedPath, checksum := hostBOFFile(t, []byte("this is definitely not a COFF object"))
-		out := agentmodules.ModuleHandler("", compressedPath, "coff", "remote_ops_get_priv", checksum, invocation)
+		out := agentmodules.ModuleHandler("", compressedPath, "coff", "get_priv", checksum, invocation)
 		if out == "" {
 			t.Fatalf("expected an error string for a malformed COFF object")
 		}
@@ -401,7 +401,7 @@ func TestBOFLifecycleErrorResilience(t *testing.T) {
 		}()
 
 		compressedPath, checksum := hostBOFFile(t, bof)
-		out := agentmodules.ModuleHandler("", compressedPath, "coff", "remote_ops_get_priv", checksum, invocation)
+		out := agentmodules.ModuleHandler("", compressedPath, "coff", "get_priv", checksum, invocation)
 		if out == "" {
 			t.Fatalf("expected an error string when the coffloader dependency is missing")
 		}
