@@ -47,6 +47,15 @@ func startPivotStack(t *testing.T) (pivotAddr string) {
 	t.Helper()
 	mode := def.C2ChannelModeH2Conn
 
+	// A previous full-stack test may still have server goroutines (both the
+	// TLS/h2 and the plain-HTTP C2 endpoints) draining. If any of them outlives
+	// this stack, its tunnel/session/PFS teardown can race the fresh tunnel we
+	// are about to build (observed as the relay's SecureConn dying with a
+	// decryption error right after PFS handshake). Stop and drain every
+	// endpoint before starting a new stack.
+	network.StopEmpServers()
+	time.Sleep(150 * time.Millisecond) // allow drained handlers to finish
+
 	tmpDir, err := os.MkdirTemp("", "tun2socks_pivot_test")
 	if err != nil {
 		t.Fatalf("MkdirTemp: %v", err)
@@ -123,9 +132,14 @@ func startPivotStack(t *testing.T) (pivotAddr string) {
 	server.MarkOperatorOnline("test-operator")
 	t.Cleanup(func() {
 		server.MarkOperatorOffline("test-operator")
-		network.StopEmpTLSServer()
+		network.StopEmpServers()
 	})
-	time.Sleep(1 * time.Second)
+
+	// Wait until the C2 TLS/h2 listener is actually accepting (not a blind
+	// sleep): the agent enrollment below must not race a half-bound server.
+	if err := waitForPort(fmt.Sprintf("127.0.0.1:%d", tlsPort), time.Now().Add(10*time.Second)); err != nil {
+		t.Fatalf("C2 TLS server did not become ready: %v", err)
+	}
 
 	// Agent identity + enrollment + message tunnel.
 	agentUUID := uuid.New().String()

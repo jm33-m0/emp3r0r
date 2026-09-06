@@ -8,6 +8,7 @@ import (
 
 	"golang.org/x/time/rate"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -37,6 +38,11 @@ func StartC2HTTPServer() {
 		logging.Errorf("StartC2HTTPServer: CCHTTPPort is not set in config")
 		return
 	}
+
+	// Stop any previous plain-HTTP endpoint before starting a new one so a
+	// stale server (and its tunnel/session handlers) never outlives the new
+	// stack. Mirrors what setupC2TLSListener does for the TLS/h2 server.
+	network.StopEmpHTTPServer()
 
 	mux := http.NewServeMux()
 	registerPreflightFeature(mux)
@@ -80,6 +86,13 @@ func StartC2HTTPServer() {
 		Addr:    fmt.Sprintf(":%s", live.RuntimeConfig.CCHTTPPort),
 		Handler: mux,
 	}
+	// Publish the server so StopEmpHTTPServer / StopEmpServers can shut it
+	// down. Do NOT nil it out after Serve returns: that write would race a
+	// concurrent StopEmpHTTPServer (Shutdown is safe to call on a server whose
+	// Serve has already returned). A later StartC2HTTPServer first calls
+	// StopEmpHTTPServer, which replaces the pointer under the same assignment
+	// discipline the TLS/h2 server uses.
+	network.SetEmpHTTPServer(server)
 
 	logging.Successf("🚀 Starting plain HTTP C2 server at port %s", live.RuntimeConfig.CCHTTPPort)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
