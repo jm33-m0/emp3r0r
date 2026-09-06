@@ -1,6 +1,6 @@
 [
   {
-    "name": "sa_bof_windowlist",
+    "name": "windowlist",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Lists windows in the current user's desktop session",
@@ -32,7 +32,7 @@
     }
   },
   {
-    "name": "sa_bof_aadjoininfo",
+    "name": "aadjoininfo",
     "author": "c2biz",
     "date": "2026-08-16",
     "comment": "Displays Entra ID (Azure AD) join information",
@@ -56,7 +56,7 @@
     }
   },
   {
-    "name": "sa_bof_dir",
+    "name": "dir",
     "author": "c2biz",
     "date": "2026-08-16",
     "comment": "Lists files and directories in a target path, with optional recursive listing.",
@@ -92,7 +92,7 @@
     }
   },
   {
-    "name": "sa_bof_listdns",
+    "name": "listdns",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Lists DNS cache entries with their record types",
@@ -113,7 +113,7 @@
     }
   },
   {
-    "name": "sa_bof_get_netsession2",
+    "name": "get_netsession2",
     "author": "c2biz",
     "date": "2026-08-16",
     "comment": "Enumerate network sessions with client hostname resolution (BOFHound compatible)",
@@ -159,7 +159,7 @@
     }
   },
   {
-    "name": "sa_bof_routeprint",
+    "name": "routeprint",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Prints IPv4 routing table, interface list, and default gateway",
@@ -183,7 +183,7 @@
     }
   },
   {
-    "name": "sa_bof_netlocalgroup2",
+    "name": "netlocalgroup2",
     "author": "c2biz",
     "date": "2026-08-16",
     "comment": "List local group members with detailed info (SID, type) for BOFHound.",
@@ -222,7 +222,7 @@
     }
   },
   {
-    "name": "sa_bof_resources",
+    "name": "resources",
     "author": "c2biz",
     "date": "2026-08-16",
     "comment": "Display system memory and disk usage",
@@ -243,7 +243,7 @@
     }
   },
   {
-    "name": "sa_bof_netloggedon",
+    "name": "netloggedon",
     "author": "c2biz",
     "date": "2026-08-16",
     "comment": "List users currently logged on to local or remote computer.",
@@ -275,7 +275,7 @@
     }
   },
   {
-    "name": "sa_bof_arp",
+    "name": "arp",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Lists ARP table entries (IP to MAC address mappings)",
@@ -296,7 +296,7 @@
     }
   },
   {
-    "name": "sa_bof_sc_qfailure",
+    "name": "sc_qfailure",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Query the failure recovery actions for a Windows service",
@@ -335,7 +335,7 @@
     }
   },
   {
-    "name": "sa_bof_tasklist",
+    "name": "tasklist",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "List running processes with PID, PPID, session ID and command line via WMI",
@@ -364,7 +364,7 @@
     }
   },
   {
-    "name": "sa_bof_netloggedon2",
+    "name": "netloggedon2",
     "author": "c2biz",
     "date": "2026-08-16",
     "comment": "List logged-on users with structured output for BOFHound.",
@@ -396,7 +396,7 @@
     }
   },
   {
-    "name": "sa_bof_nonpagedldapsearch",
+    "name": "nonpagedldapsearch",
     "author": "c2biz",
     "date": "2026-08-16",
     "comment": "Execute non-paged LDAP searches against Active Directory",
@@ -456,7 +456,7 @@
     }
   },
   {
-    "name": "sa_bof_notepad",
+    "name": "notepad",
     "author": "c2biz",
     "date": "2026-08-16",
     "comment": "Search for open notepad and notepad++ windows and grab text from the editor control object",
@@ -477,7 +477,7 @@
     }
   },
   {
-    "name": "sa_bof_listmods",
+    "name": "listmods",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "List loaded modules (DLLs) for a process with version info",
@@ -506,7 +506,7 @@
     }
   },
   {
-    "name": "sa_bof_nettime",
+    "name": "nettime",
     "author": "c2biz",
     "date": "2026-08-16",
     "comment": "Display current time on local or remote computer.",
@@ -535,7 +535,7 @@
     }
   },
   {
-    "name": "sa_bof_netuser",
+    "name": "netuser",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Get detailed information about a specific user account.",
@@ -571,7 +571,7 @@
     }
   },
   {
-    "name": "sa_bof_adcs_enum_com2",
+    "name": "adcs_enum_com2",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Enumerate AD Certificate Services via IX509PolicyServerListManager and enrollment policy servers",
@@ -595,7 +595,7 @@
     }
   },
   {
-    "name": "sa_bof_get_netsession",
+    "name": "get_netsession",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Enumerate network sessions established to a computer using NetSessionEnum",
@@ -627,7 +627,7 @@
     }
   },
   {
-    "name": "sa_bof_netview",
+    "name": "netview",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "List computers visible on the network or in a domain.",
@@ -656,7 +656,7 @@
     }
   },
   {
-    "name": "sa_bof_regsession",
+    "name": "regsession",
     "author": "c2biz",
     "date": "2026-08-16",
     "comment": "Enumerate logged-on user SIDs from HKEY_USERS registry hive",
@@ -688,7 +688,7 @@
     }
   },
   {
-    "name": "sa_bof_useridletime",
+    "name": "useridletime",
     "author": "c2biz",
     "date": "2026-08-16",
     "comment": "Display the idle time for the current user session on the local system",
@@ -712,7 +712,7 @@
     }
   },
   {
-    "name": "sa_bof_probe",
+    "name": "probe",
     "author": "c2biz",
     "date": "2026-08-16",
     "comment": "Check if a TCP port is open on a remote host",
@@ -755,7 +755,7 @@
     }
   },
   {
-    "name": "sa_bof_netuse_add",
+    "name": "netuse_add",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Connect to a network share",
@@ -826,7 +826,7 @@
     }
   },
   {
-    "name": "sa_bof_netuse_list",
+    "name": "netuse_list",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "List network share connections",
@@ -862,7 +862,7 @@
     }
   },
   {
-    "name": "sa_bof_netuse_delete",
+    "name": "netuse_delete",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Disconnect from a network share",
@@ -912,7 +912,7 @@
     }
   },
   {
-    "name": "sa_bof_wmi_query",
+    "name": "wmi_query",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Run a WMI query and display results in CSV format",
@@ -962,7 +962,7 @@
     }
   },
   {
-    "name": "sa_bof_ldapsearch",
+    "name": "ldapsearch",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Execute paged LDAP searches against Active Directory",
@@ -1036,7 +1036,7 @@
     }
   },
   {
-    "name": "sa_bof_ipconfig",
+    "name": "ipconfig",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Lists network adapters with IPv4 addresses, MAC addresses, hostname, DNS suffix and DNS servers",
@@ -1057,7 +1057,7 @@
     }
   },
   {
-    "name": "sa_bof_schtasksquery",
+    "name": "schtasksquery",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Query details for a specific scheduled task",
@@ -1096,7 +1096,7 @@
     }
   },
   {
-    "name": "sa_bof_sc_enum",
+    "name": "sc_enum",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Enumerate all Windows services with detailed configuration",
@@ -1125,7 +1125,7 @@
     }
   },
   {
-    "name": "sa_bof_reg_query",
+    "name": "reg_query",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Query the Windows registry for keys and values",
@@ -1182,7 +1182,7 @@
     }
   },
   {
-    "name": "sa_bof_get_session_info",
+    "name": "get_session_info",
     "author": "c2biz",
     "date": "2026-08-16",
     "comment": "Retrieve detailed logon session information for the current process token",
@@ -1206,7 +1206,7 @@
     }
   },
   {
-    "name": "sa_bof_adcs_enum",
+    "name": "adcs_enum",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Enumerate AD Certificate Services CAs and templates using CERTCLI Win32 APIs",
@@ -1235,7 +1235,7 @@
     }
   },
   {
-    "name": "sa_bof_sc_qdescription",
+    "name": "sc_qdescription",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Query the description text of a Windows service",
@@ -1274,7 +1274,7 @@
     }
   },
   {
-    "name": "sa_bof_find_loaded_module",
+    "name": "find_loaded_module",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Find processes that have a specific module loaded",
@@ -1313,7 +1313,7 @@
     }
   },
   {
-    "name": "sa_bof_sc_qtriggerinfo",
+    "name": "sc_qtriggerinfo",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Query the start/stop trigger conditions for a Windows service",
@@ -1352,7 +1352,7 @@
     }
   },
   {
-    "name": "sa_bof_netuserenum",
+    "name": "netuserenum",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Enumerate user accounts on local system or domain.",
@@ -1391,7 +1391,7 @@
     }
   },
   {
-    "name": "sa_bof_sc_qc",
+    "name": "sc_qc",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Query configuration for a specific Windows service",
@@ -1427,7 +1427,7 @@
     }
   },
   {
-    "name": "sa_bof_adcs_enum_com",
+    "name": "adcs_enum_com",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Enumerate AD Certificate Services CAs and templates using ICertConfig/ICertRequest COM interfaces",
@@ -1451,7 +1451,7 @@
     }
   },
   {
-    "name": "sa_bof_sc_query",
+    "name": "sc_query",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Query the status of Windows services",
@@ -1487,7 +1487,7 @@
     }
   },
   {
-    "name": "sa_bof_get_password_policy",
+    "name": "get_password_policy",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Retrieve password policy and account lockout settings from a server or domain",
@@ -1519,7 +1519,7 @@
     }
   },
   {
-    "name": "sa_bof_vssenum",
+    "name": "vssenum",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Enumerates Volume Shadow Copy snapshots on a remote share",
@@ -1555,7 +1555,7 @@
     }
   },
   {
-    "name": "sa_bof_adv_audit_policies",
+    "name": "adv_audit_policies",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Retrieves advanced security audit policies from local Group Policy",
@@ -1587,7 +1587,7 @@
     }
   },
   {
-    "name": "sa_bof_env",
+    "name": "env",
     "author": "c2biz",
     "date": "2026-08-16",
     "comment": "List process environment variables",
@@ -1608,7 +1608,7 @@
     }
   },
   {
-    "name": "sa_bof_netstat",
+    "name": "netstat",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Lists TCP/UDP IPv4/IPv6 connections with owning process name and PID",
@@ -1637,7 +1637,7 @@
     }
   },
   {
-    "name": "sa_bof_netgroup",
+    "name": "netgroup",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "List domain groups or enumerate members of a specific group.",
@@ -1680,7 +1680,7 @@
     }
   },
   {
-    "name": "sa_bof_netlocalgroup",
+    "name": "netlocalgroup",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "List local groups or enumerate members of a specific local group.",
@@ -1726,7 +1726,7 @@
     }
   },
   {
-    "name": "sa_bof_whoami",
+    "name": "whoami",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Displays current user, group memberships, and token privileges",
@@ -1747,7 +1747,7 @@
     }
   },
   {
-    "name": "sa_bof_enum_local_sessions",
+    "name": "enum_local_sessions",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Enumerate active and disconnected user sessions on the local system (console and RDP)",
@@ -1771,7 +1771,7 @@
     }
   },
   {
-    "name": "sa_bof_locale",
+    "name": "locale",
     "author": "c2biz",
     "date": "2026-08-16",
     "comment": "List system locale language, locale ID, date, time, and country",
@@ -1792,7 +1792,7 @@
     }
   },
   {
-    "name": "sa_bof_sha1",
+    "name": "sha1",
     "author": "c2biz",
     "date": "2026-08-16",
     "comment": "Calculates the SHA1 hash of a file.",
@@ -1821,7 +1821,7 @@
     }
   },
   {
-    "name": "sa_bof_enum_filter_driver",
+    "name": "enum_filter_driver",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Enumerates security-related filter drivers (AV, activity monitors, content screeners)",
@@ -1853,7 +1853,7 @@
     }
   },
   {
-    "name": "sa_bof_driversigs",
+    "name": "driversigs",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Checks loaded drivers for signatures from known EDR vendors",
@@ -1877,7 +1877,7 @@
     }
   },
   {
-    "name": "sa_bof_sha256",
+    "name": "sha256",
     "author": "c2biz",
     "date": "2026-08-16",
     "comment": "Calculates the SHA256 hash of a file.",
@@ -1906,7 +1906,7 @@
     }
   },
   {
-    "name": "sa_bof_ldapsecuritycheck",
+    "name": "ldapsecuritycheck",
     "author": "c2biz",
     "date": "2026-08-16",
     "comment": "Check LDAP signing and LDAPS channel binding requirements",
@@ -1938,7 +1938,7 @@
     }
   },
   {
-    "name": "sa_bof_list_firewall_rules",
+    "name": "list_firewall_rules",
     "author": "c2biz",
     "date": "2026-08-16",
     "comment": "List Windows firewall rules",
@@ -1962,7 +1962,7 @@
     }
   },
   {
-    "name": "sa_bof_md5",
+    "name": "md5",
     "author": "c2biz",
     "date": "2026-08-16",
     "comment": "Calculates the MD5 hash of a file.",
@@ -1991,7 +1991,7 @@
     }
   },
   {
-    "name": "sa_bof_netuptime",
+    "name": "netuptime",
     "author": "c2biz",
     "date": "2026-08-16",
     "comment": "Display boot time of local or remote computer.",
@@ -2020,7 +2020,7 @@
     }
   },
   {
-    "name": "sa_bof_schtasksenum",
+    "name": "schtasksenum",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Enumerate all scheduled tasks on a machine",
@@ -2052,7 +2052,7 @@
     }
   },
   {
-    "name": "sa_bof_netshares",
+    "name": "netshares",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "List network shares on local or remote computer.",
@@ -2088,7 +2088,7 @@
     }
   },
   {
-    "name": "sa_bof_nslookup",
+    "name": "nslookup",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Perform DNS lookups using the Windows DNS API",
@@ -2131,7 +2131,7 @@
     }
   },
   {
-    "name": "sa_bof_uptime",
+    "name": "uptime",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Displays system uptime, local time, and boot time (x64 only shows boot time)",
@@ -2152,7 +2152,7 @@
     }
   },
   {
-    "name": "sa_bof_get_dpapi_system",
+    "name": "get_dpapi_system",
     "author": "c2biz",
     "date": "2026-08-16",
     "comment": "Extract the DPAPI_SYSTEM LSA secret (requires high integrity/elevation)",
@@ -2176,7 +2176,7 @@
     }
   },
   {
-    "name": "sa_bof_cacls",
+    "name": "cacls",
     "author": "moloch--",
     "date": "2026-08-16",
     "comment": "Lists file or directory DACL permissions, with wildcard support.",

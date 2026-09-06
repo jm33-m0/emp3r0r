@@ -1,6 +1,6 @@
 [
   {
-    "name": "remote_ops_sc-description",
+    "name": "sc-description",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Change the description of a service on a local or remote machine",
@@ -46,7 +46,7 @@
     }
   },
   {
-    "name": "remote_ops_process-destroy",
+    "name": "process-destroy",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Crash a process by closing its handles via NtDuplicateObject",
@@ -85,7 +85,7 @@
     }
   },
   {
-    "name": "remote_ops_sc-start",
+    "name": "sc-start",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Start a service on a local or remote machine",
@@ -124,7 +124,7 @@
     }
   },
   {
-    "name": "remote_ops_schtasks-delete",
+    "name": "schtasks-delete",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Delete a scheduled task or task folder",
@@ -170,7 +170,7 @@
     }
   },
   {
-    "name": "remote_ops_sc-create",
+    "name": "sc-create",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Create a new service on a local or remote machine",
@@ -251,7 +251,7 @@
     }
   },
   {
-    "name": "remote_ops_process-list-handles",
+    "name": "process-list-handles",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "List the open handles of a process",
@@ -283,7 +283,7 @@
     }
   },
   {
-    "name": "remote_ops_sc-stop",
+    "name": "sc-stop",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Stop a service on a local or remote machine",
@@ -322,7 +322,7 @@
     }
   },
   {
-    "name": "remote_ops_disableuser",
+    "name": "disableuser",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Disable a local or remote user account",
@@ -361,7 +361,7 @@
     }
   },
   {
-    "name": "remote_ops_get_priv",
+    "name": "get_priv",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Activate a token privilege on the current process or thread",
@@ -393,7 +393,7 @@
     }
   },
   {
-    "name": "remote_ops_adcs_request_on_behalf",
+    "name": "adcs_request_on_behalf",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Request an enrollment certificate on behalf of another user",
@@ -446,7 +446,7 @@
     }
   },
   {
-    "name": "remote_ops_make_token_cert",
+    "name": "make_token_cert",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Create an impersonation token from a certificate PFX file",
@@ -485,7 +485,7 @@
     }
   },
   {
-    "name": "remote_ops_adduser",
+    "name": "adduser",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Add a new user to a local or remote machine",
@@ -531,7 +531,7 @@
     }
   },
   {
-    "name": "remote_ops_reg-delete",
+    "name": "reg-delete",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Delete a registry key or value",
@@ -591,7 +591,7 @@
     }
   },
   {
-    "name": "remote_ops_ask-mfa",
+    "name": "ask-mfa",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Display a fake Microsoft Authenticator MFA approval dialog",
@@ -623,7 +623,7 @@
     }
   },
   {
-    "name": "remote_ops_suspendresume",
+    "name": "suspendresume",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Suspend or resume all threads in a process",
@@ -662,7 +662,7 @@
     }
   },
   {
-    "name": "remote_ops_adcs-request",
+    "name": "adcs-request",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Request an enrollment certificate from an AD certificate authority",
@@ -750,7 +750,7 @@
     }
   },
   {
-    "name": "remote_ops_sc-delete",
+    "name": "sc-delete",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Delete a service from a local or remote machine",
@@ -789,7 +789,7 @@
     }
   },
   {
-    "name": "remote_ops_schtasksrun",
+    "name": "schtasksrun",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Run a scheduled task on a local or remote machine",
@@ -828,7 +828,7 @@
     }
   },
   {
-    "name": "remote_ops_office-tokens",
+    "name": "office-tokens",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Search a process's memory for Office JWT access tokens",
@@ -860,7 +860,7 @@
     }
   },
   {
-    "name": "remote_ops_unexpireuser",
+    "name": "unexpireuser",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Set a user account to never expire",
@@ -899,7 +899,7 @@
     }
   },
   {
-    "name": "remote_ops_schtasks-stop",
+    "name": "schtasks-stop",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Stop a running scheduled task on a local or remote machine",
@@ -938,7 +938,7 @@
     }
   },
   {
-    "name": "remote_ops_reg-set",
+    "name": "reg-set",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Set a registry value on a local or remote machine",
@@ -1005,7 +1005,7 @@
     }
   },
   {
-    "name": "remote_ops_sc-config",
+    "name": "sc-config",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Configure an existing service on a local or remote machine",
@@ -1065,7 +1065,7 @@
     }
   },
   {
-    "name": "remote_ops_shspawnas",
+    "name": "shspawnas",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Spawn a process as another user and inject shellcode into it",
@@ -1118,7 +1118,7 @@
     }
   },
   {
-    "name": "remote_ops_enable-user",
+    "name": "enable-user",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Unlock and enable a local or remote user account",
@@ -1157,7 +1157,7 @@
     }
   },
   {
-    "name": "remote_ops_shutdown",
+    "name": "shutdown",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Shutdown or reboot a local or remote machine",
@@ -1217,7 +1217,7 @@
     }
   },
   {
-    "name": "remote_ops_addusertogroup",
+    "name": "addusertogroup",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Add a user to a domain group",
@@ -1270,7 +1270,7 @@
     }
   },
   {
-    "name": "remote_ops_get-azure-token",
+    "name": "get-azure-token",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Perform an OAuth code grant against Azure and print the returned tokens",
@@ -1330,7 +1330,7 @@
     }
   },
   {
-    "name": "remote_ops_reg-save",
+    "name": "reg-save",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Save a registry hive to a file on disk",
@@ -1376,7 +1376,7 @@
     }
   },
   {
-    "name": "remote_ops_sc_failure",
+    "name": "sc_failure",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Configure failure recovery actions for a service",
@@ -1450,7 +1450,7 @@
     }
   },
   {
-    "name": "remote_ops_schtaskscreate",
+    "name": "schtaskscreate",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Create a scheduled task from XML on a local or remote machine",
@@ -1524,7 +1524,7 @@
     }
   },
   {
-    "name": "remote_ops_procdump",
+    "name": "procdump",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Dump a process to a file on disk",
@@ -1563,7 +1563,7 @@
     }
   },
   {
-    "name": "remote_ops_setthreadcontext",
+    "name": "setthreadcontext",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode into a process via thread context hijack",
@@ -1602,7 +1602,7 @@
     }
   },
   {
-    "name": "remote_ops_conhost",
+    "name": "conhost",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode via conhost.exe ConsoleWindowClass vftable hijack",
@@ -1641,7 +1641,7 @@
     }
   },
   {
-    "name": "remote_ops_ntcreatethread",
+    "name": "ntcreatethread",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode into a process via NtCreateThreadEx syscall",
@@ -1680,7 +1680,7 @@
     }
   },
   {
-    "name": "remote_ops_ctray",
+    "name": "ctray",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode into explorer.exe via CTray window class",
@@ -1712,7 +1712,7 @@
     }
   },
   {
-    "name": "remote_ops_createremotethread",
+    "name": "createremotethread",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode into a process via CreateRemoteThread",
@@ -1751,7 +1751,7 @@
     }
   },
   {
-    "name": "remote_ops_clipboard",
+    "name": "clipboard",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode via clipboard window class (CLIPBRDWNDCLASS)",
@@ -1790,7 +1790,7 @@
     }
   },
   {
-    "name": "remote_ops_tooltip",
+    "name": "tooltip",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode via tooltips_class32 window vftable hijack",
@@ -1829,7 +1829,7 @@
     }
   },
   {
-    "name": "remote_ops_kernelcallbacktable",
+    "name": "kernelcallbacktable",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode via PEB KernelCallbackTable hijack",
@@ -1868,7 +1868,7 @@
     }
   },
   {
-    "name": "remote_ops_ntqueueapcthread",
+    "name": "ntqueueapcthread",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode into a process via NtQueueApcThread syscall",
@@ -1907,7 +1907,7 @@
     }
   },
   {
-    "name": "remote_ops_uxsubclassinfo",
+    "name": "uxsubclassinfo",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode into explorer.exe via UxSubclassInfo property",
@@ -1939,7 +1939,7 @@
     }
   },
   {
-    "name": "remote_ops_dde",
+    "name": "dde",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode into explorer.exe via DDE window class",
@@ -1968,7 +1968,7 @@
     }
   },
   {
-    "name": "remote_ops_svcctrl",
+    "name": "svcctrl",
     "author": "TrustedSec",
     "date": "2026-07-17",
     "comment": "Inject shellcode via service dispatch table overwrite",
@@ -2007,4 +2007,3 @@
     }
   }
 ]
-
