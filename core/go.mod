@@ -17,7 +17,6 @@ require (
 	github.com/hashicorp/memberlist v0.6.0
 	github.com/jm33-m0/go-cdn2proxy v1.1.2
 	github.com/lithammer/fuzzysearch v1.1.8
-	github.com/miekg/dns v1.1.72
 	github.com/ncruces/go-dns v1.3.3
 	github.com/pkg/errors v0.9.1
 	github.com/posener/h2conn v0.0.0-20231204025407-3997deeca0f0
@@ -87,6 +86,7 @@ require (
 	github.com/mdlayher/genetlink v1.4.0 // indirect
 	github.com/mdlayher/netlink v1.11.2 // indirect
 	github.com/mdlayher/socket v0.6.1 // indirect
+	github.com/miekg/dns v1.1.72 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/moloch--/go-keystone v0.0.2 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
