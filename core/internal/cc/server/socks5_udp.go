@@ -89,8 +89,16 @@ func (ls *socks5Listener) handleUDPAssociate(sock net.Conn) error {
 	}
 	defer pc.Close()
 
-	_, localPortStr, _ := net.SplitHostPort(pc.LocalAddr().String())
-	localPort, _ := strconv.Atoi(localPortStr)
+	_, localPortStr, err := net.SplitHostPort(pc.LocalAddr().String())
+	if err != nil {
+		_ = socks5Reply(sock, socks5RepGeneralFailure, "0.0.0.0", 0)
+		return fmt.Errorf("socks5: parse udp relay addr: %w", err)
+	}
+	localPort, err := strconv.ParseUint(localPortStr, 10, 16)
+	if err != nil {
+		_ = socks5Reply(sock, socks5RepGeneralFailure, "0.0.0.0", 0)
+		return fmt.Errorf("socks5: parse udp relay port %q: %w", localPortStr, err)
+	}
 
 	if err := socks5Reply(sock, socks5RepSuccess, reachHost, uint16(localPort)); err != nil {
 		return fmt.Errorf("socks5: udp associate reply: %w", err)
