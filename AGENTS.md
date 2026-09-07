@@ -33,6 +33,18 @@ This project is a Go codebase. Work from the module root (`core/` for the Go mod
 - Do not write files with predictable or brand-identifying names; prefer in-memory or opaque temporary storage (`memfs`).
 - Use `crypto/rand` (or the project's crypto-backed helpers) for anything security-relevant; do not introduce `math/rand` for keys, nonces, or names.
 
+## Compatibility
+
+- No legacy/back-compat code: all binaries (agent, CC/operator, tools) must come from the same build batch. If wire format or a scheme changes, migrate everything in one change — do not keep old-path shims or "legacy" aliases.
+
+## memfs
+
+- Only scheme is `memfs://` (e.g. `memfs:///test.bin`); emit it, never `mem://` or any other alias.
+- Flat map (`MemFileMap` under `MemFileLock`): no real dirs, just root `memfs:///`; path-like keys group by string prefix.
+- No `mkdir` on memfs (fail with error, see `MkdirAgent`). `ls` lists the root or a key prefix; `rm` deletes a key or a whole prefix, cleaning its spill files; never delete the root.
+- Over-budget writes spill AES-GCM-encrypted to unmarked `os.CreateTemp(dir, "")` files; keep disk I/O out of `MemFileLock`.
+- Never persisted; agent advertises keys via mesh gossip for peer pulls.
+
 ## Module System
 
 - Read `module_development_guide.md`.
