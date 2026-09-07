@@ -11,7 +11,12 @@ import (
 	"encoding/binary"
 	"errors"
 	"net"
+	"os"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/miekg/dns"
 )
 
 // sampleDNSQuery builds a minimal single-question A query for name (relative,
@@ -228,4 +233,159 @@ func TestDNSBase64RoundTrip(t *testing.T) {
 	if string(decoded) != string(raw) {
 		t.Fatal("base64 round trip mismatch")
 	}
+}
+
+// --- Real-DNS-server tests: forwardDNSQuery must actually resolve against a
+// live upstream, not just re-encode. These use an in-process authoritative
+// server (github.com/miekg/dns is already a module dependency via memberlist)
+// bound to 127.0.0.1, so no external network is needed.
+// startTestDNSServer runs an in-process authoritative DNS server on 127.0.0.1
+// answering every A query for the given records. Returns its address host:port.
+func startTestDNSServer(t *testing.T, records map[string]string) string {
+	t.Helper()
+	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("dns listen: %v", err)
+	}
+	t.Cleanup(func() { pc.Close() })
+
+	srv := &dns.Server{PacketConn: pc, Handler: dns.HandlerFunc(func(w dns.ResponseWriter, r *dns.Msg) {
+		m := new(dns.Msg).SetReply(r)
+		if len(r.Question) != 1 {
+			_ = w.WriteMsg(m)
+			return
+		}
+		q := r.Question[0]
+		if ipStr, ok := records[strings.ToLower(q.Name)]; ok && q.Qtype == dns.TypeA {
+			ip := net.ParseIP(ipStr).To4()
+			if ip != nil {
+				m.Answer = append(m.Answer, &dns.A{
+					Hdr: dns.RR_Header{Name: q.Name, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 60},
+					A:   ip,
+				})
+			}
+		}
+		_ = w.WriteMsg(m)
+	})}
+	go func() { _ = srv.ActivateAndServe() }()
+	return pc.LocalAddr().String()
+}
+
+// TestForwardDNSQueryToRealServer proves forwardDNSQuery sends the raw query to
+// the requested server and returns the server's own (authoritative) answer —
+// the path that makes operator-side DNS work against an internal DC.
+func TestForwardDNSQueryToRealServer(t *testing.T) {
+	addr := startTestDNSServer(t, map[string]string{"corp.internal.": "10.20.30.40"})
+	q := sampleDNSQuery(0x5151, "corp.internal", dnsTypeA)
+
+	reply, err := forwardDNSQuery(q, addr)
+	if err != nil {
+		t.Fatalf("forwardDNSQuery: %v", err)
+	}
+	if binary.BigEndian.Uint16(reply[0:2]) != 0x5151 {
+		t.Fatalf("reply id 0x%x", binary.BigEndian.Uint16(reply[0:2]))
+	}
+	if binary.BigEndian.Uint16(reply[2:4])&0x8000 == 0 {
+		t.Fatal("QR not set on reply")
+	}
+	if !strings.Contains(string(reply), string([]byte{10, 20, 30, 40})) {
+		t.Fatalf("authoritative A 10.20.30.40 missing from reply %x", reply)
+	}
+}
+
+// TestForwardDNSQueryIDMismatch verifies forwardDNSQuery refuses a reply whose
+// ID does not echo the query (stray/late datagram).
+func TestForwardDNSQueryIDMismatch(t *testing.T) {
+	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer pc.Close()
+	go func() {
+		buf := make([]byte, 512)
+		n, addr, err := pc.ReadFrom(buf)
+		if err != nil {
+			return
+		}
+		// echo with a mangled ID (query id +1)
+		reply := append([]byte(nil), buf[:n]...)
+		reply[1] = reply[1] + 1
+		_, _ = pc.WriteTo(reply, addr)
+	}()
+	q := sampleDNSQuery(0x2222, "a.example", dnsTypeA)
+	if _, err := forwardDNSQuery(q, pc.LocalAddr().String()); err == nil {
+		t.Fatal("expected ID-mismatch error")
+	}
+}
+
+// TestForwardDNSQueryServerDown verifies a dead upstream yields an error (and
+// the caller falls back to local resolution).
+func TestForwardDNSQueryServerDown(t *testing.T) {
+	// Grab a port, close it, then try to forward there.
+	pc, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	addr := pc.LocalAddr().String()
+	pc.Close()
+
+	q := sampleDNSQuery(0x3333, "dead.example", dnsTypeA)
+	if _, err := forwardDNSQuery(q, addr); err == nil {
+		t.Fatal("expected error forwarding to a closed port")
+	}
+}
+
+// TestForwardDNSQueryRealExternal resolves a real public name through a real
+// public resolver (the same path a live operator's DNS query takes). Skipped
+// when the box has no internet so the suite stays hermetic offline.
+func TestForwardDNSQueryRealExternal(t *testing.T) {
+	// Discover an upstream from the system resolver config (e.g. 1.1.1.1, the
+	// gateway DNS...). Read /etc/resolv.conf nameservers; fall back to 1.1.1.1.
+	upstream := "1.1.1.1"
+	if ns := firstNameserver(); ns != "" {
+		upstream = ns
+	}
+	if !udpReachable(upstream + ":53") {
+		t.Skipf("no reachable external DNS at %s", upstream)
+	}
+
+	q := sampleDNSQuery(0x4242, "google.com", dnsTypeA)
+	reply, err := forwardDNSQuery(q, net.JoinHostPort(upstream, "53"))
+	if err != nil {
+		t.Fatalf("forwardDNSQuery(%s): %v", upstream, err)
+	}
+	if binary.BigEndian.Uint16(reply[0:2]) != 0x4242 {
+		t.Fatalf("reply id 0x%x", binary.BigEndian.Uint16(reply[0:2]))
+	}
+	if binary.BigEndian.Uint16(reply[6:8]) == 0 {
+		t.Fatalf("google.com A query via %s returned no answers: %x", upstream, reply)
+	}
+}
+
+// firstNameserver returns the first nameserver in /etc/resolv.conf ("" if
+// none or unreadable).
+func firstNameserver() string {
+	data, err := os.ReadFile("/etc/resolv.conf")
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		f := strings.Fields(line)
+		if len(f) >= 2 && f[0] == "nameserver" {
+			return f[1]
+		}
+	}
+	return ""
+}
+
+// udpReachable reports whether a UDP dial to addr succeeds within 2s (best
+// effort: no packet round trip required, just that the socket can be created /
+// the host is not hard-unreachable).
+func udpReachable(addr string) bool {
+	conn, err := net.DialTimeout("udp", addr, 2*time.Second)
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
 }

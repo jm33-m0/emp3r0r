@@ -377,4 +377,48 @@ func runSocks5PivotE2E(t *testing.T, mode string, expectRefused bool) {
 		}
 	}
 	logging.Successf("SOCKS5 pivot round trip OK (%d bytes x3)", len(payload))
+
+	// Domain CONNECT (ATYP=3) — the path proxy-ns fake-DNS uses: the client
+	// sends the *name*, and the agent resolves it from its own position. Use
+	// "localhost" so the agent resolves it to 127.0.0.1 and reaches the same
+	// echo target, in both channel modes.
+	dconn, err := net.DialTimeout("tcp", fmt.Sprintf("127.0.0.1:%d", socksPort), 5*time.Second)
+	if err != nil {
+		t.Fatalf("dial pivot (domain): %v", err)
+	}
+	defer dconn.Close()
+	_ = dconn.SetDeadline(time.Now().Add(40 * time.Second))
+	if _, err = dconn.Write([]byte{0x05, 0x01, 0x00}); err != nil {
+		t.Fatalf("greeting (domain): %v", err)
+	}
+	gr := make([]byte, 2)
+	if _, err = io.ReadFull(dconn, gr); err != nil {
+		t.Fatalf("greeting reply (domain): %v", err)
+	}
+	name := "localhost"
+	dreq := []byte{0x05, 0x01, 0x00, 0x03, byte(len(name))}
+	dreq = append(dreq, name...)
+	dreq = append(dreq, byte(targetPort>>8), byte(targetPort&0xff))
+	if _, err = dconn.Write(dreq); err != nil {
+		t.Fatalf("domain connect: %v", err)
+	}
+	// Reply is VER REP RSV ATYP(1) BND.ADDR(4) BND.PORT(2) for a v4 bind.
+	drep := make([]byte, 10)
+	if _, err = io.ReadFull(dconn, drep); err != nil {
+		t.Fatalf("read domain CONNECT reply: %v", err)
+	}
+	if drep[1] != 0 {
+		t.Fatalf("domain CONNECT failed with rep 0x%02x", drep[1])
+	}
+	if _, err = dconn.Write(payload); err != nil {
+		t.Fatalf("domain write: %v", err)
+	}
+	buf2 := make([]byte, len(payload))
+	if _, err = io.ReadFull(dconn, buf2); err != nil {
+		t.Fatalf("domain echo read: %v", err)
+	}
+	if string(buf2) != string(payload) {
+		t.Fatalf("domain echo mismatch: got %q want %q", buf2, payload)
+	}
+	logging.Successf("SOCKS5 domain CONNECT round trip OK")
 }

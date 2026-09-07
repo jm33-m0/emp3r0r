@@ -42,10 +42,6 @@ import (
 )
 
 const (
-	// dnsPort is the destination port that marks a UDP-ASSOCIATE datagram as a
-	// DNS query. Only these are relayed to the agent.
-	dnsPort = 53
-
 	// dnsHeaderSize is the fixed DNS message header length (RFC 1035 §4.1.1).
 	dnsHeaderSize = 12
 
@@ -147,13 +143,13 @@ func (ls *socks5Listener) handleUDPAssociate(sock net.Conn) error {
 			continue
 		}
 		dstHost, dstPort, bodyStart, ok := parseSocks5UDPAddr(relay)
-		if !ok || dstPort != dnsPort {
-			logging.Debugf("socks5 udp: dropping non-DNS datagram (dst %s:%d) from %s", dstHost, dstPort, clientAddr)
+		if !ok {
+			logging.Debugf("socks5 udp: dropping datagram with unparsable addr from %s", clientAddr)
 			continue
 		}
 		query := append([]byte(nil), relay[bodyStart:]...)
-		if len(query) < dnsHeaderSize || len(query) > dnsMaxQueryBytes {
-			logging.Debugf("socks5 udp: dropping malformed DNS query (%d bytes) from %s", len(query), clientAddr)
+		if !looksLikeDNSQuery(query) {
+			logging.Debugf("socks5 udp: dropping non-DNS datagram (dst %s:%d, %d bytes) from %s", dstHost, dstPort, len(query), clientAddr)
 			continue
 		}
 
@@ -163,7 +159,12 @@ func (ls *socks5Listener) handleUDPAssociate(sock net.Conn) error {
 			go func(client net.Addr, q []byte) {
 				defer dnsWG.Done()
 				defer func() { <-workerSem }()
-				reply, err := ls.relayDNSQuery(agent, q)
+				// dstHost:dstPort is the DNS server the operator's client
+				// addressed (e.g. a corporate DC, possibly on a non-53 port).
+				// Pass it on so the agent forwards the query there instead of
+				// re-resolving with its own resolver.
+				dnsServer := net.JoinHostPort(dstHost, strconv.Itoa(int(dstPort)))
+				reply, err := ls.relayDNSQuery(agent, q, dnsServer)
 				if err != nil {
 					logging.Debugf("socks5 udp: dns relay for %s failed: %v", client, err)
 					// Synthesize SERVFAIL so the client fails fast instead of
@@ -185,12 +186,14 @@ func (ls *socks5Listener) handleUDPAssociate(sock net.Conn) error {
 }
 
 // relayDNSQuery sends one DNS query to the agent with !dns_query and waits for
-// the reply. Success and failure both arrive on the message tunnel as a job
-// response with JobID = token: the raw DNS reply (NotifyC2Binary) or a textual
-// error (NotifyC2). The tunnel handler caches the payload in live.CmdResults
-// and wakes our resultCh (via live.CmdResultsReady), exactly like the CONNECT
-// relay path.
-func (ls *socks5Listener) relayDNSQuery(agent *def.Emp3r0rAgent, query []byte) ([]byte, error) {
+// the reply. dnsServer is the destination DNS server the operator's client
+// addressed (empty when the datagram had none, e.g. a domain DST); it is
+// passed to the agent so it can forward the raw query there. Success and
+// failure both arrive on the message tunnel as a job response with JobID =
+// token: the raw DNS reply (NotifyC2Binary) or a textual error (NotifyC2). The
+// tunnel handler caches the payload in live.CmdResults and wakes our resultCh
+// (via live.CmdResultsReady), exactly like the CONNECT relay path.
+func (ls *socks5Listener) relayDNSQuery(agent *def.Emp3r0rAgent, query []byte, dnsServer string) ([]byte, error) {
 	token := socksProxyTokenPrefix + "dns-" + uuid.NewString()
 
 	live.CmdTime.Store(token, time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST"))
@@ -199,6 +202,9 @@ func (ls *socks5Listener) relayDNSQuery(agent *def.Emp3r0rAgent, query []byte) (
 
 	cmdLine := fmt.Sprintf("%s --token %s --query %s",
 		def.C2CmdDNSQuery, token, base64.StdEncoding.EncodeToString(query))
+	if dnsServer != "" {
+		cmdLine += " --server " + dnsServer
+	}
 	if err := agents.SendCmd(cmdLine, token, agent); err != nil {
 		clearProxyJobBookkeeping(token)
 		return nil, fmt.Errorf("instruct agent: %w", err)
@@ -232,6 +238,39 @@ func (ls *socks5Listener) relayDNSQuery(agent *def.Emp3r0rAgent, query []byte) (
 		clearProxyJobBookkeeping(token)
 		return nil, fmt.Errorf("listener stopped")
 	}
+}
+
+// looksLikeDNSQuery reports whether b is a plausible single-question DNS query
+// packet: QR is clear (it is a query, not a response), QDCOUNT is 1, and the
+// question name parses within bounds. This keeps arbitrary UDP (which the
+// pivot cannot relay) from being forwarded to the agent as DNS.
+func looksLikeDNSQuery(b []byte) bool {
+	if len(b) < dnsHeaderSize+5 || len(b) > dnsMaxQueryBytes {
+		return false
+	}
+	if b[2]&0x80 != 0 { // QR must be 0 (a query)
+		return false
+	}
+	if binary.BigEndian.Uint16(b[4:6]) != 1 { // exactly one question
+		return false
+	}
+	pos := dnsHeaderSize
+	for {
+		if pos >= len(b) {
+			return false
+		}
+		l := int(b[pos])
+		if l == 0 {
+			pos++
+			break
+		}
+		if l > 63 || pos+1+l >= len(b) {
+			return false // compression pointer / truncated name in a query is invalid
+		}
+		pos += 1 + l
+	}
+	// QTYPE + QCLASS must follow the name.
+	return pos+4 <= len(b)
 }
 
 // parseSocks5UDPAddr parses the variable address part of a UDP-ASSOCIATE

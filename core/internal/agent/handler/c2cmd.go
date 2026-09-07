@@ -144,6 +144,7 @@ func C2Commands() *cobra.Command {
 	}
 	dnsQueryCmd.Flags().StringP("token", "", "", "Query token (ties the answer to the C2 DNS request)")
 	dnsQueryCmd.Flags().StringP("query", "", "", "Base64-encoded raw DNS query packet")
+	dnsQueryCmd.Flags().StringP("server", "", "", "DNS server the client addressed (host[:port]); forwards the raw query there")
 	rootCmd.AddCommand(dnsQueryCmd)
 
 	platformCommands(rootCmd)
