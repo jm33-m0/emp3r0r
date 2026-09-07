@@ -181,7 +181,7 @@ func TestFileTransfer_EndToEnd(t *testing.T) {
 	})
 
 	t.Run("MemFS Virtual Memory Transfer End-to-End", func(t *testing.T) {
-		destMemPath := fmt.Sprintf("mem:///downloaded_%d.txt", time.Now().UnixNano())
+		destMemPath := fmt.Sprintf("memfs:///downloaded_%d.txt", time.Now().UnixNano())
 
 		_, err := FetchFilePeer("127.0.0.1", safeFilePath, destMemPath, checksum)
 		if err != nil {
@@ -190,7 +190,7 @@ func TestFileTransfer_EndToEnd(t *testing.T) {
 
 		got, err := util.ReadFileAgent(destMemPath)
 		if err != nil {
-			t.Fatalf("read downloaded mem:/// file: %v", err)
+			t.Fatalf("read downloaded memfs:/// file: %v", err)
 		}
 		if string(got) != string(testContent) {
 			t.Fatalf("mem content mismatch: got %q want %q", got, testContent)
@@ -199,14 +199,14 @@ func TestFileTransfer_EndToEnd(t *testing.T) {
 	})
 
 	t.Run("Serving From MemFS End-to-End", func(t *testing.T) {
-		memFileName := fmt.Sprintf("mem:///hosted_%d.txt", time.Now().UnixNano())
+		memFileName := fmt.Sprintf("memfs:///hosted_%d.txt", time.Now().UnixNano())
 		memContent := []byte("Content stored inside host agent memfs virtual filesystem!")
 		if err := util.WriteFileAgent(memFileName, memContent, 0o600); err != nil {
 			t.Fatalf("write to memfs: %v", err)
 		}
 
 		memChecksum := crypto.SHA256SumRaw(memContent)
-		destMemPath := fmt.Sprintf("mem:///received_from_memfs_%d.txt", time.Now().UnixNano())
+		destMemPath := fmt.Sprintf("memfs:///received_from_memfs_%d.txt", time.Now().UnixNano())
 
 		_, err := FetchFilePeer("127.0.0.1", memFileName, destMemPath, memChecksum)
 		if err != nil {
@@ -230,7 +230,7 @@ func TestFetchFile_MemFSCaching(t *testing.T) {
 	content := []byte("#!/bin/bash\necho 'whoami module content'")
 	checksum := crypto.SHA256SumRaw(content)
 
-	// Pre-populate memfs with the canonical key (mem:///sa_whoami_...)
+	// Pre-populate memfs with the canonical key (memfs:///sa_whoami_...)
 	memKey := MemFSKey(moduleName)
 	if err := util.WriteFileAgent(memKey, content, 0o600); err != nil {
 		t.Fatalf("WriteFileAgent failed: %v", err)
@@ -282,7 +282,7 @@ func TestFetchFile_GossipPeerDiscovery(t *testing.T) {
 	defer func() { PeerFileProvider = nil }()
 
 	// Clear local cache for moduleName (under a different key) so it has to fetch from peer
-	destMemPath := fmt.Sprintf("mem:///result_%d.txt", time.Now().UnixNano())
+	destMemPath := fmt.Sprintf("memfs:///result_%d.txt", time.Now().UnixNano())
 
 	// Call FetchFile with peer="" -> should use PeerFileProvider, discover 127.0.0.1:serverPort, and pull from it
 	data, err := FetchFile(common.RuntimeConfig, "", moduleName, destMemPath, checksum)

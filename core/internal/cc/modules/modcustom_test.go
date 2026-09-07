@@ -1135,11 +1135,11 @@ func TestReadModConfigDLL(t *testing.T) {
 		t.Fatalf("unexpected dependencies: %v", config.Dependencies)
 	}
 
-	inv, err := resolveInvocation(config, map[string]string{"file": "mem:///get_priv.x64.o", "priv": "SeDebugPrivilege"})
+	inv, err := resolveInvocation(config, map[string]string{"file": "memfs:///get_priv.x64.o", "priv": "SeDebugPrivilege"})
 	if err != nil {
 		t.Fatalf("resolveInvocation: %v", err)
 	}
-	if inv.DllFileValue != "mem:///get_priv.x64.o" {
+	if inv.DllFileValue != "memfs:///get_priv.x64.o" {
 		t.Fatalf("unexpected DllFileValue: %q", inv.DllFileValue)
 	}
 	if inv.Coff == nil || len(inv.Coff.Args) != 1 || inv.Coff.Args[0].WireType != "z" {
@@ -1245,7 +1245,7 @@ func TestHostModuleFile(t *testing.T) {
 	}
 
 	// Memfs destination is deterministic and module-scoped.
-	if companion.MemPath != "mem:///multifilemod/data.txt" {
+	if companion.MemPath != "memfs:///multifilemod/data.txt" {
 		t.Fatalf("unexpected MemPath: %q", companion.MemPath)
 	}
 	// Hosted name must be module-unique to avoid cache collisions.

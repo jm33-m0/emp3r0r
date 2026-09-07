@@ -90,9 +90,9 @@ func putCmdRun(cmd *cobra.Command, args []string) {
 	}
 
 	// Determine storage strategy based on destination path
-	// If path is mem:// prefix, force memory. Otherwise, force disk (don't use Auto)
+	// If path is a memfs path, force memory. Otherwise, force disk (don't use Auto)
 	strategy := util.StorageDisk
-	if strings.HasPrefix(destPath, "mem://") {
+	if util.IsMemPath(destPath) {
 		strategy = util.StorageMemory
 	}
 
@@ -117,7 +117,7 @@ func putCmdRun(cmd *cobra.Command, args []string) {
 		// Check if it's in memory map
 		isMem := false
 		util.MemFileLock.RLock()
-		_, isMem = util.MemFileMap[destPath]
+		_, isMem = util.MemFileMap[util.NormalizeMemPath(destPath)]
 		util.MemFileLock.RUnlock()
 
 		if isMem {

@@ -81,7 +81,7 @@ func hostBOFFile(t *testing.T, bof []byte) (path, checksum string) {
 // the cache key produced by ModuleHandler's dll branch / fetchDependencyDLL.
 func cacheCoffLoaderDLL(t *testing.T, dll []byte) {
 	t.Helper()
-	if err := util.WriteFileAgent("mem:///coffloader.dll", dll, 0o600); err != nil {
+	if err := util.WriteFileAgent("memfs:///coffloader.dll", dll, 0o600); err != nil {
 		t.Fatalf("cache COFFLoader DLL in memfs: %v", err)
 	}
 }
@@ -103,11 +103,11 @@ func TestBOFFullLifecycle(t *testing.T) {
 	dll := readOrSkip(t, dllPath)
 
 	// Every BOF in this test runs through the cached coffloader DLL
-	// (mem:///coffloader.dll). To prove fetchDependencyDLL really uses that
+	// (memfs:///coffloader.dll). To prove fetchDependencyDLL really uses that
 	// cache, evict the hosted .gz and chdir into an empty scratch dir so no
 	// download fallback can satisfy the dependency.
 	cacheCoffLoaderDLL(t, dll)
-	_ = util.RemoveFileAgent("mem:///coffloader.amd64.gz")
+	_ = util.RemoveFileAgent("memfs:///coffloader.amd64.gz")
 	origWD, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("getwd: %v", err)
@@ -234,8 +234,8 @@ func TestBOFDependencyDownloadLifecycle(t *testing.T) {
 
 	// Force a clean dependency state: no memfs cache for either the .dll or
 	// the .gz, then run with the scratch directory as CWD.
-	_ = util.RemoveFileAgent("mem:///coffloader.dll")
-	_ = util.RemoveFileAgent("mem:///coffloader.amd64.gz")
+	_ = util.RemoveFileAgent("memfs:///coffloader.dll")
+	_ = util.RemoveFileAgent("memfs:///coffloader.amd64.gz")
 
 	origWD, err := os.Getwd()
 	if err != nil {
@@ -258,7 +258,7 @@ func TestBOFDependencyDownloadLifecycle(t *testing.T) {
 	}
 
 	// The dependency must now be cached for future BOF runs.
-	if cached, err := util.ReadFileAgent("mem:///coffloader.dll"); err != nil || len(cached) == 0 {
+	if cached, err := util.ReadFileAgent("memfs:///coffloader.dll"); err != nil || len(cached) == 0 {
 		t.Fatalf("coffloader DLL was not cached after download: %v", err)
 	}
 }
@@ -381,8 +381,8 @@ func TestBOFLifecycleErrorResilience(t *testing.T) {
 	})
 
 	t.Run("missing coffloader dependency", func(t *testing.T) {
-		_ = util.RemoveFileAgent("mem:///coffloader.dll")
-		_ = util.RemoveFileAgent("mem:///coffloader.amd64.gz")
+		_ = util.RemoveFileAgent("memfs:///coffloader.dll")
+		_ = util.RemoveFileAgent("memfs:///coffloader.amd64.gz")
 
 		// Point the process CWD at an empty directory so the dependency
 		// download has no local file to fall back to. ModuleHandler must

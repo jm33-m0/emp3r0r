@@ -110,7 +110,7 @@ func TestCIFSModuleScript(t *testing.T) {
 	}
 
 	// 3. upload with a non-UNC dest → usage + clear failure.
-	out, err = run("upload", "mem:///payload.exe", `C:\Windows\Temp\stage.exe`)
+	out, err = run("upload", "memfs:///payload.exe", `C:\Windows\Temp\stage.exe`)
 	if err != nil {
 		t.Fatalf("Run upload (non-UNC dest): %v", err)
 	}
@@ -120,7 +120,7 @@ func TestCIFSModuleScript(t *testing.T) {
 
 	// 4. upload with valid UNC dest but missing memfs source → clean failure
 	//    before any Win32 call (no share is ever touched).
-	out, err = run("upload", "mem:///cifs_upload_missing_payload.bin", `\\DC01\ADMIN$\Temp\stage.exe`)
+	out, err = run("upload", "memfs:///cifs_upload_missing_payload.bin", `\\DC01\ADMIN$\Temp\stage.exe`)
 	if err != nil {
 		t.Fatalf("Run upload (missing source): %v", err)
 	}
@@ -141,7 +141,7 @@ func TestCIFSModuleScript(t *testing.T) {
 	}
 
 	// 6. download with a non-UNC src → clear failure.
-	out, err = run("download", `C:\Windows\system32\config\SAM`, `mem:///SAM`)
+	out, err = run("download", `C:\Windows\system32\config\SAM`, `memfs:///SAM`)
 	if err != nil {
 		t.Fatalf("Run download (non-UNC src): %v", err)
 	}
@@ -154,7 +154,7 @@ func TestCIFSModuleScript(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run download (UNC dest): %v", err)
 	}
-	if !strings.Contains(out, "Fail: dest must be a mem:/// path") {
+	if !strings.Contains(out, "Fail: dest must be a memfs:/// path") {
 		t.Fatalf("expected local/memfs dest failure, got: %q", out)
 	}
 

@@ -383,7 +383,7 @@ func GetPeersForFile(fileName string) map[string]int {
 		return nil
 	}
 
-	memKey := "mem:///" + filepath.Base(fileName)
+	memKey := "memfs:///" + filepath.Base(fileName)
 	baseName := filepath.Base(fileName)
 	result := make(map[string]int)
 

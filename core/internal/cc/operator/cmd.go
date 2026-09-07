@@ -133,7 +133,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Use:     "ls [dir]",
 			GroupID: "filesystem",
 			Short:   "List a directory of selected agent, without argument it lists current directory",
-			Example: "ls /tmp\nls mem:///",
+			Example: "ls /tmp\nls memfs:///",
 			Args:    cobra.MaximumNArgs(1),
 			Run:     CmdLs,
 		}
@@ -292,8 +292,8 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		putCmd := &cobra.Command{
 			Use:     "put --src /path/to/local_file --dst /path/to/remote_file",
 			GroupID: "filesystem",
-			Short:   "Upload a file to selected agent. Supports mem:///path/to/file paths.",
-			Example: "put --src /tmp/1.txt --dst /tmp/2.txt\nput --src /tmp/loader.so --dst mem:///tmp/loader.so",
+			Short:   "Upload a file to selected agent. Supports memfs:///path/to/file paths.",
+			Example: "put --src /tmp/1.txt --dst /tmp/2.txt\nput --src /tmp/loader.so --dst memfs:///loader.so",
 			Run: func(cmd *cobra.Command, args []string) {
 				target := agents.MustGetActiveAgent()
 				if target == nil {
@@ -314,8 +314,8 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			},
 		}
 		putCmd.Flags().StringP("src", "s", "", "Local source file path")
-		putCmd.Flags().StringP("dst", "d", "", "Destination file path (mem:///path/to/file will save to memory)")
-		putCmd.Flags().BoolP("mem", "m", false, "Save to memory on agent (optional if dst is mem:///path/to/file)")
+		putCmd.Flags().StringP("dst", "d", "", "Destination file path (memfs:///path/to/file will save to memory)")
+		putCmd.Flags().BoolP("mem", "m", false, "Save to memory on agent (optional if dst is memfs:///path/to/file)")
 		putCmd.MarkFlagRequired("src")
 		putCmd.MarkFlagRequired("dst")
 		rootCmd.AddCommand(putCmd)

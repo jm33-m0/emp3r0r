@@ -13,9 +13,9 @@ import (
 // TestMultiFileModuleTransparency verifies the multi-file module flow from
 // the script's point of view: companion files cached in memfs by the module
 // loader are readable via read_file(), and the module_files global exposes
-// their mem:/// paths.
+// their memfs:/// paths.
 func TestMultiFileModuleTransparency(t *testing.T) {
-	const memPath = "mem:///multifilemod/data.txt"
+	const memPath = "memfs:///multifilemod/data.txt"
 	content := "emp3r0r multi-file module companion data\n"
 
 	if err := util.WriteFileAgent(memPath, []byte(content), 0o600); err != nil {
@@ -27,7 +27,7 @@ func TestMultiFileModuleTransparency(t *testing.T) {
 def main(*args):
     if len(module_files) != 1:
         return "Fail: expected 1 companion file, got %d" % len(module_files)
-    if module_files[0] != "mem:///multifilemod/data.txt":
+    if module_files[0] != "memfs:///multifilemod/data.txt":
         return "Fail: unexpected path %s" % module_files[0]
     data = read_file(module_files[0])
     if "emp3r0r" not in data:

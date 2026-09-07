@@ -75,7 +75,7 @@ func TestUploadModuleFiles(t *testing.T) {
 		return compressed, nil
 	}
 
-	memPath := "mem:///multifilemod/data.txt"
+	memPath := "memfs:///multifilemod/data.txt"
 	inv := def.ResolvedInvocation{
 		ModuleFiles: []def.ResolvedModuleFile{
 			{Name: "multifilemod.data.txt.gz", MemPath: memPath, Checksum: "ignored-in-stub"},
@@ -179,7 +179,7 @@ def main(*args):
 		ModuleFiles: []def.ResolvedModuleFile{
 			{
 				Name:     companionName,
-				MemPath:  "mem:///test_multi/data.txt",
+				MemPath:  "memfs:///test_multi/data.txt",
 				Checksum: crypto.SHA256SumRaw(companionCompressed),
 			},
 		},
@@ -191,14 +191,14 @@ def main(*args):
 	}
 
 	// The companion must have landed in memfs for the script to read it.
-	got, err := util.ReadFileAgent("mem:///test_multi/data.txt")
+	got, err := util.ReadFileAgent("memfs:///test_multi/data.txt")
 	if err != nil {
 		t.Fatalf("companion not cached in memfs: %v", err)
 	}
 	if string(got) != companionContent {
 		t.Fatalf("memfs content mismatch: got %q want %q", got, companionContent)
 	}
-	util.RemoveFileAgent("mem:///test_multi/data.txt")
+	util.RemoveFileAgent("memfs:///test_multi/data.txt")
 }
 
 func TestModuleHandler_Bash(t *testing.T) {

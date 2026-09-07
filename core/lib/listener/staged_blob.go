@@ -48,7 +48,7 @@ func rc4Crypt(data, key []byte) error {
 }
 
 func buildServedBlob(payloadPath, keyStr string) ([]byte, error) {
-	// ReadFileAgent handles both mem:// and disk paths
+	// ReadFileAgent handles both memfs:// and disk paths
 	payload, err := util.ReadFileAgent(payloadPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read payload: %v", err)

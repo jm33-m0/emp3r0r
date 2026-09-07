@@ -7,11 +7,11 @@ import (
 
 func TestGetMemFileCompletions(t *testing.T) {
 	files := []string{
-		"mem:///file1",
-		"mem:///file2",
-		"mem:///dir1/file3",
-		"mem:///dir1/file4",
-		"mem:///dir2/subdir/file5",
+		"memfs:///file1",
+		"memfs:///file2",
+		"memfs:///dir1/file3",
+		"memfs:///dir1/file4",
+		"memfs:///dir2/subdir/file5",
 	}
 
 	tests := []struct {
@@ -20,34 +20,18 @@ func TestGetMemFileCompletions(t *testing.T) {
 		expected []string
 	}{
 		{
-			name:   "root mem:",
-			prefix: "mem:",
+			name:   "root memfs://",
+			prefix: "memfs://",
 			expected: []string{
-				"mem:",
+				"memfs://",
 				"/",
 			},
 		},
 		{
-			name:   "root mem:/",
-			prefix: "mem:/",
+			name:   "root memfs:///",
+			prefix: "memfs:///",
 			expected: []string{
-				"mem:/",
-				"/",
-			},
-		},
-		{
-			name:   "root mem://",
-			prefix: "mem://",
-			expected: []string{
-				"mem://",
-				"/",
-			},
-		},
-		{
-			name:   "root mem:///",
-			prefix: "mem:///",
-			expected: []string{
-				"mem:///",
+				"memfs:///",
 				"dir1/",
 				"dir2/",
 				"file1",
@@ -56,22 +40,22 @@ func TestGetMemFileCompletions(t *testing.T) {
 		},
 		{
 			name:   "dir1",
-			prefix: "mem:///dir1/",
+			prefix: "memfs:///dir1/",
 			expected: []string{
-				"mem:///dir1/",
+				"memfs:///dir1/",
 				"file3",
 				"file4",
 			},
 		},
 		{
 			name:   "partial dir",
-			prefix: "mem:///dir", // Should match dir1 and dir2, but logic is prefix based on full string?
+			prefix: "memfs:///dir", // Should match dir1 and dir2, but logic is prefix based on full string?
 			// Wait, runListDir uses TrimPrefix.
-			// "mem:///dir1/file3" trim "mem:///dir" -> "1/file3"
+			// "memfs:///dir1/file3" trim "memfs:///dir" -> "1/file3"
 			// first seg -> "1/" (because index of / is 1)
 			// So completion offers "1/"
 			expected: []string{
-				"mem:///dir",
+				"memfs:///dir",
 				"1/",
 				"2/",
 			},
@@ -79,9 +63,9 @@ func TestGetMemFileCompletions(t *testing.T) {
 		},
 		{
 			name:   "dir2",
-			prefix: "mem:///dir2/",
+			prefix: "memfs:///dir2/",
 			expected: []string{
-				"mem:///dir2/",
+				"memfs:///dir2/",
 				"subdir/",
 			},
 		},

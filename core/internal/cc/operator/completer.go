@@ -80,14 +80,15 @@ func listRemoteDir(ctx carapace.Context) carapace.Action {
 		dir_to_list = "/"
 	}
 
-	// Handle memfs paths: if user typed mem:// or mem:///, we need to preserve that
-	// ctx.Parts might be ["mem:", ""] for "mem:/" or ["mem:", "", ""] for "mem://"
-	// We want to reconstruct the proper mem:// prefix
-	if len(ctx.Parts) > 0 && strings.HasPrefix(ctx.Parts[0], "mem") {
-		// Reconstruct as mem:// + rest of path
+	// Handle memfs paths: if user typed memfs://, preserve the scheme and
+	// complete within the flat memfs namespace. ctx.Parts might be ["memfs:",
+	// ""] for "memfs:/" or ["memfs:", "", ""] for "memfs://".
+	// We reconstruct the proper memfs:// prefix and hand the rest to the agent's
+	// prefix-based ls.
+	if len(ctx.Parts) > 0 && strings.HasPrefix(ctx.Parts[0], "memfs") {
 		restParts := ctx.Parts[1:]
 		if len(restParts) == 0 || (len(restParts) == 1 && restParts[0] == "") {
-			dir_to_list = "mem://"
+			dir_to_list = "memfs://"
 		} else {
 			// Remove empty parts and rejoin
 			var nonEmpty []string
@@ -97,9 +98,9 @@ func listRemoteDir(ctx carapace.Context) carapace.Action {
 				}
 			}
 			if len(nonEmpty) == 0 {
-				dir_to_list = "mem://"
+				dir_to_list = "memfs://"
 			} else {
-				dir_to_list = "mem:///" + strings.Join(nonEmpty, "/")
+				dir_to_list = "memfs:///" + strings.Join(nonEmpty, "/")
 			}
 		}
 	}

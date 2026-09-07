@@ -278,7 +278,7 @@ func hostModuleFile(moduleName, fileName, path string) (def.ResolvedModuleFile, 
 
 	return def.ResolvedModuleFile{
 		Name:     hostedBase,
-		MemPath:  fmt.Sprintf("mem:///%s/%s", strings.ToLower(moduleName), base),
+		MemPath:  fmt.Sprintf("memfs:///%s/%s", strings.ToLower(moduleName), base),
 		Checksum: crypto.SHA256SumFile(hostedPath),
 	}, nil
 }
@@ -826,7 +826,7 @@ func readModConfigs(file string) (configs []*def.ModuleConfig, err error) {
 		Dependencies []string        `json:"dependencies"`
 		// ModuleFilesMemFS uploads and caches all companion files in
 		// encrypted memfs so multi-file starlark modules can read them via
-		// read_file("mem:///...").
+		// read_file("memfs:///...").
 		ModuleFilesMemFS bool `json:"module_files_memfs"`
 	}
 
@@ -1216,7 +1216,7 @@ func resolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.R
 
 	// ── DLL file parameter ────────────────────────────────────────────────
 	// The named parameter points at the BOF object file on the agent
-	// (mem:/// or disk). It is resolved here but not packed as a BOF arg.
+	// (memfs:/// or disk). It is resolved here but not packed as a BOF arg.
 	if config.Invocation.DllFileParam != "" {
 		fileVal, _, err := coerceVal(config.Invocation.DllFileParam)
 		if err != nil {

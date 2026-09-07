@@ -350,10 +350,12 @@ func runFileDownloader(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// Destination path on downloading agent strictly follows mem:///path/to/file convention
-	cleanSrc := strings.TrimPrefix(srcPath, "mem://")
+	// Destination path on downloading agent strictly follows the memfs:/// path
+	// convention: mirror the requested source path under the flat memfs
+	// namespace (e.g. /tmp/agent.exe -> memfs:///tmp/agent.exe).
+	cleanSrc := strings.TrimPrefix(srcPath, "memfs://")
 	cleanSrc = strings.TrimPrefix(cleanSrc, "/")
-	dstMemPath := fmt.Sprintf("mem:///%s", cleanSrc)
+	dstMemPath := "memfs:///" + cleanSrc
 
 	// FetchFile automatically tries peer download via peerIP if provided, and falls back to C2
 	_, err := c2transport.FetchFile(common.RuntimeConfig, peerIP, srcPath, dstMemPath, checksum)
@@ -386,9 +388,9 @@ func getMemFileCompletions(prefix string, files []string) []string {
 
 		// Find next separator
 		// If rel starts with /, we treat / as the segment (directory)
-		// e.g. path="mem:", rel="///file" -> seg="/"
-		// path="mem:///", rel="file" -> seg="file"
-		// path="mem:///dir", rel="/file" -> seg="/"
+		// e.g. path="memfs:", rel="///file" -> seg="/"
+		// path="memfs:///", rel="file" -> seg="file"
+		// path="memfs:///dir", rel="/file" -> seg="/"
 
 		seg := rel
 		if idx := strings.Index(rel, "/"); idx != -1 {

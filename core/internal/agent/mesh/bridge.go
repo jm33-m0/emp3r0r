@@ -253,7 +253,7 @@ func handleFileRequest(peer net.Conn) {
 
 	peer.SetDeadline(time.Time{}) // clear deadline before potentially slow file read
 
-	// Read file — ReadFileAgent handles both disk and mem:/// paths
+	// Read file — ReadFileAgent handles both disk and memfs:/// paths
 	data, err := util.ReadFileAgent(filename)
 	if err != nil {
 		logging.Warningf("Mesh file: %s not found locally, will attempt C2 fallback on peer side", filename)

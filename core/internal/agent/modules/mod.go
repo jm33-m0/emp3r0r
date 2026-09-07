@@ -43,7 +43,7 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 
 	// Multi-file modules: fetch every companion file and cache it in
 	// encrypted memfs so starlark scripts can read them transparently via
-	// read_file("mem:///...").
+	// read_file("memfs:///...").
 	moduleFiles, err := uploadModuleFiles(peerIP, invocation)
 	if err != nil {
 		return logging.Sprintf("uploading module files: %v", err)
@@ -142,7 +142,7 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 		// Cache the decompressed DLL image in memfs so dependent BOF modules
 		// can re-load it without re-downloading from C2. Module names are
 		// canonicalized to lowercase to match fetchDependencyDLL.
-		_ = util.WriteFileAgent("mem:///"+modName+".dll", payload_data, 0o600)
+		_ = util.WriteFileAgent("memfs:///"+modName+".dll", payload_data, 0o600)
 		err = executeWithToken(invocation.Token, func(token uintptr) error {
 			var execErr error
 			out, execErr = runDLLModule(payload_data, invocation, token)
@@ -161,7 +161,7 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 }
 
 func downloadAndVerifyModule(file_to_download, checksum, peerIP string) (data []byte, err error) {
-	// Modules are cached in memfs under their basename (e.g. mem:///sa_whoami).
+	// Modules are cached in memfs under their basename (e.g. memfs:///sa_whoami).
 	// FetchFile already checks the memfs cache as tier-1, so we just call it.
 	// On success, cache is populated automatically for future calls.
 	for retry := 0; retry < 3; retry++ {
@@ -186,7 +186,7 @@ func downloadAndVerifyModule(file_to_download, checksum, peerIP string) (data []
 
 // uploadModuleFiles downloads every companion file listed in the invocation
 // and caches it in encrypted memfs (util.WriteFileAgent) so multi-file
-// starlark modules can read them transparently via read_file("mem:///...").
+// starlark modules can read them transparently via read_file("memfs:///...").
 //
 // The invocation only carries companion files when the module enabled them
 // via "module_files_memfs" in its config.json; an empty list is a no-op.

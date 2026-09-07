@@ -113,7 +113,7 @@ func starlarkB64ToBytes(_ *starlark.Thread, fn *starlark.Builtin, args starlark.
 	return starlark.Bytes(out), nil
 }
 
-// starlarkWriteBytes writes a bytes/string value to a local or mem:///
+// starlarkWriteBytes writes a bytes/string value to a local or memfs:///
 // path via the agent's centralised file writer (WriteFileAgent), which
 // handles memfs storage transparently and runs under the module's token.
 // Returning the written size lets the script verify the length.

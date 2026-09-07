@@ -137,9 +137,9 @@ func C2Commands() *cobra.Command {
 	return rootCmd
 }
 
-// memFileCompletion completes mem:// paths with hierarchical completion
+// memFileCompletion completes memfs:// paths with hierarchical completion
 func memFileCompletion(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	if strings.HasPrefix(toComplete, "mem://") {
+	if strings.HasPrefix(toComplete, "memfs://") {
 		// Use hierarchical completion like the ls command does
 		files := util.ListMemFiles()
 		return getMemFileCompletions(toComplete, files), cobra.ShellCompDirectiveNoFileComp
