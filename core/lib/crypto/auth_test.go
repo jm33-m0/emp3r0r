@@ -2,6 +2,9 @@ package crypto
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"testing"
 )
 
@@ -281,15 +284,57 @@ func TestComputeSharedSecret(t *testing.T) {
 	})
 }
 
-// TestSignDataECDSA tests the SignDataECDSA function
+// TestSignDataECDSA tests the SignDataECDSA function with a real ECDSA key.
 func TestSignDataECDSA(t *testing.T) {
-	// We need to generate an ECDSA key pair for signing
-	// Note: GenerateEphemeralKey returns ECDH keys, not ECDSA keys
-	// For now, we'll skip this test as it requires ECDSA key generation
-	t.Skip("Skipping ECDSA tests - requires ECDSA key generation implementation")
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generate ECDSA key: %v", err)
+	}
+	data := []byte("message to sign")
+	sig, err := SignDataECDSA(priv, data)
+	if err != nil {
+		t.Fatalf("SignDataECDSA failed: %v", err)
+	}
+	if len(sig) == 0 {
+		t.Fatal("empty signature")
+	}
+	if !VerifySignatureECDSA(&priv.PublicKey, data, sig) {
+		t.Fatal("valid signature failed verification")
+	}
+
+	// Tampered message must fail.
+	if VerifySignatureECDSA(&priv.PublicKey, []byte("other message"), sig) {
+		t.Fatal("signature verified for tampered data")
+	}
+
+	// Signature under a different key must fail.
+	otherPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generate second ECDSA key: %v", err)
+	}
+	if VerifySignatureECDSA(&otherPriv.PublicKey, data, sig) {
+		t.Fatal("signature verified under a different public key")
+	}
+
+	// Corrupted signature bytes must fail (not panic).
+	bad := append([]byte(nil), sig...)
+	bad[len(bad)-1] ^= 0xff
+	if VerifySignatureECDSA(&priv.PublicKey, data, bad) {
+		t.Fatal("corrupted signature verified")
+	}
 }
 
-// TestVerifySignatureECDSA tests the VerifySignatureECDSA function
+// TestVerifySignatureECDSA verifies that VerifySignatureECDSA returns false
+// for garbage signatures without panicking.
 func TestVerifySignatureECDSA(t *testing.T) {
-	t.Skip("Skipping ECDSA tests - requires ECDSA key generation implementation")
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("generate ECDSA key: %v", err)
+	}
+	if VerifySignatureECDSA(&priv.PublicKey, []byte("data"), []byte("garbage")) {
+		t.Fatal("garbage signature verified")
+	}
+	if VerifySignatureECDSA(&priv.PublicKey, []byte("data"), nil) {
+		t.Fatal("nil signature verified")
+	}
 }
