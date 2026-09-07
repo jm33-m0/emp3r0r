@@ -94,7 +94,7 @@ func handleProxyRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remote
 	// The outcome is decided: no dial-failure response will follow, so drop the
 	// job bookkeeping we registered when ordering the agent.
 	clearProxyJobBookkeeping(streamID)
-	if err := socks5Reply(entry.sock, socks5RepSuccess); err != nil {
+	if err := socks5Reply(entry.sock, socks5RepSuccess, "0.0.0.0", 0); err != nil {
 		logging.Errorf("proxy relay: CONNECT reply failed for %q: %v", streamID, err)
 		entry.teardown()
 		return

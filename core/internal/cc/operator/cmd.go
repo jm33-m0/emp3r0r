@@ -440,7 +440,14 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Use:     "socks_start [port]",
 			GroupID: "c2",
 			Short:   "Start a SOCKS5 pivot on the C2, relaying through the selected agent",
-			Example: "socks_start 1080\n\tproxychains: socks5 <C2 WireGuard IP> 1080",
+			Long: `Start a SOCKS5 pivot on the C2, relaying through the selected agent.
+
+CONNECT and UDP-ASSOCIATE (DNS) are supported. UDP-ASSOCIATE datagrams whose
+payload is a DNS query are resolved by the bound agent (which answers as if it
+were a DNS server for the target network) and the reply is sent back, so
+proxychains proxy_dns and apps that resolve through the proxy work. Non-DNS
+UDP is dropped: the pivot is a stream relay and has no UDP path to the agent.`,
+			Example: "socks_start 1080\n\tproxychains (proxy_dns): socks5 <C2 WireGuard IP> 1080",
 			Args:    cobra.MaximumNArgs(1),
 			Run:     socks5StartCmdRun,
 		}

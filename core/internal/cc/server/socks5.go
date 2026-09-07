@@ -15,6 +15,10 @@ package server
 // the agent's implicit "CONNECT succeeded" acknowledgement; a dial failure is
 // reported by the agent as a normal command error (JobID = stream token) which
 // the message-tunnel handler funnels back to us via live.CmdResultsReady.
+//
+// UDP-ASSOCIATE is also accepted (see socks5_udp.go): DNS datagrams are
+// terminated on the C2 and answered by the bound agent via !dns_query, so
+// DNS resolution works through the pivot even though it cannot carry raw UDP.
 
 import (
 	"context"
@@ -25,6 +29,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,6 +50,24 @@ const (
 	socks5RepCommandNotSupport = 0x07
 	socks5RepAddrTypeNotSup    = 0x08
 )
+
+// SOCKS5 commands (RFC 1928).
+const (
+	socks5CmdConnect      = 0x01
+	socks5CmdBind         = 0x02
+	socks5CmdUDPAssociate = 0x03
+)
+
+// SOCKS5 address types.
+const (
+	socks5AtypIPv4   byte = 0x01
+	socks5AtypDomain byte = 0x03
+	socks5AtypIPv6   byte = 0x04
+)
+
+// SOCKS5 UDP relay header: RSV(2) FRAG(1) ATYP(1) DST.ADDR DST.PORT | payload.
+// (RFC 1928 §7). FRAG must be 0; we never fragment.
+const socks5UDPMinHeader = 4
 
 const (
 	// socks5ProxyDialTimeout caps how long a CONNECT waits for the agent to
@@ -327,22 +350,28 @@ func (ls *socks5Listener) handleOperatorConn(conn net.Conn) {
 		return
 	}
 
-	cmd, target, err := readSocks5Request(conn)
+	cmd, host, port, _, err := readSocks5Request(conn)
 	if err != nil {
 		logging.Debugf("socks5 request from %s failed: %v", conn.RemoteAddr(), err)
-		_ = socks5Reply(conn, socks5RepGeneralFailure)
-		return
-	}
-	if cmd != 0x01 { // only CONNECT is supported
-		logging.Warningf("socks5: unsupported command 0x%02x from %s", cmd, conn.RemoteAddr())
-		_ = socks5Reply(conn, socks5RepCommandNotSupport)
+		_ = socks5Reply(conn, socks5RepGeneralFailure, "0.0.0.0", 0)
 		return
 	}
 
-	// Handshake done — the relay may idle for a long time.
-	_ = conn.SetDeadline(time.Time{})
-	if err := ls.proxyToAgent(conn, target); err != nil {
-		logging.Debugf("socks5: %v", err)
+	switch cmd {
+	case socks5CmdConnect:
+		// Handshake done — the relay may idle for a long time.
+		_ = conn.SetDeadline(time.Time{})
+		target := net.JoinHostPort(host, strconv.Itoa(int(port)))
+		if err := ls.proxyToAgent(conn, target); err != nil {
+			logging.Debugf("socks5: %v", err)
+		}
+	case socks5CmdUDPAssociate:
+		if err := ls.handleUDPAssociate(conn); err != nil {
+			logging.Debugf("socks5 udp associate: %v", err)
+		}
+	default:
+		logging.Warningf("socks5: unsupported command 0x%02x from %s", cmd, conn.RemoteAddr())
+		_ = socks5Reply(conn, socks5RepCommandNotSupport, "0.0.0.0", 0)
 	}
 }
 
@@ -379,7 +408,7 @@ func (ls *socks5Listener) proxyToAgent(sock net.Conn, target string) error {
 		clearProxyJobBookkeeping(token)
 		// Fail the operator's SOCKS5 CONNECT fast (agent offline/dead) instead
 		// of letting the client hang until its own timeout.
-		_ = socks5Reply(sock, socks5RepConnectionRefused)
+		_ = socks5Reply(sock, socks5RepConnectionRefused, "0.0.0.0", 0)
 		entry.teardown()
 		return fmt.Errorf("socks5: instruct agent %s: %w", ls.agentTag, err)
 	}
@@ -394,14 +423,14 @@ func (ls *socks5Listener) proxyToAgent(sock net.Conn, target string) error {
 	case <-resultCh:
 		errAny, _ := live.CmdResults.LoadAndDelete(token)
 		clearProxyJobBookkeeping(token)
-		_ = socks5Reply(sock, socks5RepConnectionRefused)
+		_ = socks5Reply(sock, socks5RepConnectionRefused, "0.0.0.0", 0)
 		entry.teardown()
 		errMsg, _ := errAny.(string)
 		return fmt.Errorf("socks5: agent %s could not reach %s: %s", ls.agentTag, target, errMsg)
 
 	case <-time.After(socks5ProxyDialTimeout):
 		clearProxyJobBookkeeping(token)
-		_ = socks5Reply(sock, socks5RepHostUnreachable)
+		_ = socks5Reply(sock, socks5RepHostUnreachable, "0.0.0.0", 0)
 		entry.teardown()
 		return fmt.Errorf("socks5: timed out waiting for agent %s to open relay to %s", ls.agentTag, target)
 
@@ -440,66 +469,106 @@ func socks5SupportsNoAuth(methods []byte) bool {
 	return false
 }
 
-// readSocks5Request parses a SOCKS5 CONNECT-style request and returns the
-// command byte and the destination as "host:port".
-func readSocks5Request(conn net.Conn) (cmd byte, target string, err error) {
+// readSocks5Request parses a SOCKS5 request (CONNECT or UDP-ASSOCIATE) and
+// returns the command byte and the destination. host is the decoded address
+// (IP literal for ATYP 1/4, or the domain name for ATYP 3).
+func readSocks5Request(conn net.Conn) (cmd byte, host string, port uint16, atyp byte, err error) {
 	hdr := make([]byte, 4)
 	if _, err = io.ReadFull(conn, hdr); err != nil {
-		return 0, "", err
+		return 0, "", 0, 0, err
 	}
 	if hdr[0] != 0x05 {
-		return 0, "", fmt.Errorf("bad SOCKS5 version 0x%02x in request", hdr[0])
+		return 0, "", 0, 0, fmt.Errorf("bad SOCKS5 version 0x%02x in request", hdr[0])
 	}
 	cmd = hdr[1]
-	atyp := hdr[3]
+	atyp = hdr[3]
 
-	var host string
 	switch atyp {
-	case 0x01: // IPv4
+	case socks5AtypIPv4:
 		raw := make([]byte, 4)
 		if _, err = io.ReadFull(conn, raw); err != nil {
-			return 0, "", err
+			return 0, "", 0, 0, err
 		}
 		host = net.IP(raw).String()
-	case 0x04: // IPv6
+	case socks5AtypIPv6:
 		raw := make([]byte, 16)
 		if _, err = io.ReadFull(conn, raw); err != nil {
-			return 0, "", err
+			return 0, "", 0, 0, err
 		}
 		host = net.IP(raw).String()
-	case 0x03: // domain name
+	case socks5AtypDomain:
 		lenBuf := make([]byte, 1)
 		if _, err = io.ReadFull(conn, lenBuf); err != nil {
-			return 0, "", err
+			return 0, "", 0, 0, err
 		}
 		n := int(lenBuf[0])
 		if n == 0 || n > 255 {
-			return 0, "", fmt.Errorf("invalid domain length %d", n)
+			return 0, "", 0, 0, fmt.Errorf("invalid domain length %d", n)
 		}
 		name := make([]byte, n)
 		if _, err = io.ReadFull(conn, name); err != nil {
-			return 0, "", err
+			return 0, "", 0, 0, err
 		}
 		host = string(name)
 	default:
-		return 0, "", fmt.Errorf("unsupported address type 0x%02x", atyp)
+		return 0, "", 0, 0, fmt.Errorf("unsupported address type 0x%02x", atyp)
 	}
 
 	portBuf := make([]byte, 2)
 	if _, err = io.ReadFull(conn, portBuf); err != nil {
-		return 0, "", err
+		return 0, "", 0, 0, err
 	}
-	port := binary.BigEndian.Uint16(portBuf)
-	if port == 0 {
-		return 0, "", fmt.Errorf("invalid destination port 0")
-	}
-	return cmd, net.JoinHostPort(host, strconv.Itoa(int(port))), nil
+	port = binary.BigEndian.Uint16(portBuf)
+	return cmd, host, port, atyp, nil
 }
 
-// socks5Reply writes a CONNECT reply with the given rep code.
-func socks5Reply(conn net.Conn, rep byte) error {
-	// VER REP RSV ATYP(IPv4) BND.ADDR(0.0.0.0) BND.PORT(0)
-	reply := []byte{0x05, rep, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+// socks5Addr encodes host/port/atyp into a SOCKS5 address (no leading ATYP
+// byte; the caller supplies it). It is used to build BND.ADDR in replies and
+// DST.ADDR in UDP relay headers.
+func socks5Addr(host string, port uint16, atyp byte) []byte {
+	switch atyp {
+	case socks5AtypIPv4:
+		ip := net.ParseIP(host).To4()
+		if ip == nil {
+			ip = net.IPv4zero.To4()
+		}
+		out := make([]byte, 0, 6)
+		out = append(out, ip...)
+		out = binary.BigEndian.AppendUint16(out, port)
+		return out
+	case socks5AtypIPv6:
+		ip := net.ParseIP(host).To16()
+		if ip == nil {
+			ip = net.IPv6zero
+		}
+		out := make([]byte, 0, 18)
+		out = append(out, ip...)
+		out = binary.BigEndian.AppendUint16(out, port)
+		return out
+	default: // domain
+		host = strings.TrimSuffix(host, ".")
+		if len(host) > 255 {
+			host = host[:255]
+		}
+		out := make([]byte, 0, 1+len(host)+2)
+		out = append(out, byte(len(host)))
+		out = append(out, host...)
+		out = binary.BigEndian.AppendUint16(out, port)
+		return out
+	}
+}
+
+// socks5Reply writes a reply with the given rep code. For UDP-ASSOCIATE the
+// BND.ADDR must be the UDP relay address the client sends datagrams to.
+func socks5Reply(conn net.Conn, rep byte, bindHost string, bindPort uint16) error {
+	atyp := socks5AtypIPv4
+	if ip := net.ParseIP(bindHost); ip != nil && ip.To4() == nil {
+		atyp = socks5AtypIPv6
+	}
+	addr := socks5Addr(bindHost, bindPort, atyp)
+	reply := make([]byte, 0, 4+len(addr))
+	reply = append(reply, 0x05, rep, 0x00, atyp)
+	reply = append(reply, addr...)
 	_, err := conn.Write(reply)
 	return err
 }
