@@ -1,5 +1,15 @@
 # Changelog
 
+## [4.16.1](https://github.com/jm33-m0/emp3r0r/compare/v4.16.0...v4.16.1) (2026-09-07)
+
+
+### Bug Fixes
+
+* **agent:** guard empty/whitespace-only command frames from panicking ([4b3dfe4](https://github.com/jm33-m0/emp3r0r/commit/4b3dfe4302b1827fc158975dc1eddb97519e8d8d))
+* **sanitize:** strip complete CSI/OSC terminal escape sequences ([39508a1](https://github.com/jm33-m0/emp3r0r/commit/39508a1cfc04c7f4159a9a4bd392638c5f50db00))
+* **transport:** make IPinCIDR overflow-safe, emit real IPs, add ParseTarget ([eb6014c](https://github.com/jm33-m0/emp3r0r/commit/eb6014c525c0f033d595e391ef4dc3545697c91c))
+* **util:** memfs — write-time RAM budget from free memory, spill to unmarked temp files ([6084a49](https://github.com/jm33-m0/emp3r0r/commit/6084a493822286eaac42fb015ce7a074f3f2f899))
+
 ## [4.16.0](https://github.com/jm33-m0/emp3r0r/compare/v4.15.0...v4.16.0) (2026-09-06)
 
 
