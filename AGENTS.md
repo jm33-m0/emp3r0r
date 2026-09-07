@@ -6,7 +6,7 @@ Try not to `grep` from `stdout` of a command. Always prefer writing logs to disk
 
 ## Code style
 
-- Run `gofumpt -w` and `goimports -w` on every changed `.go` file before committing. `gofmt` alone is not sufficient: the project expects the stricter gofumpt formatting and goimports group/ordering.
+- Run `gofumpt -w` and `goimports -w` on every changed `.go` file. `gofmt` alone is not sufficient: the project expects the stricter gofumpt formatting and goimports group/ordering.
 - Verify the whole module still builds and the affected packages' tests pass after formatting.
 - Wrap errors with context: `fmt.Errorf("do x: %w", err)`. Match the surrounding file's style.
 - Do not introduce or keep `TestDummy`-style empty tests. Tests must assert real behavior; delete meaningless tests instead of faking coverage.
