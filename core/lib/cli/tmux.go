@@ -529,53 +529,7 @@ func TmuxNewWindow(name, cmd string) error {
 	return nil
 }
 
-// TmuxSplit split tmux window, and run command in the new pane
-func TmuxSplit(hV, cmd string) error {
-	if os.Getenv("TMUX") == "" ||
-		!util.IsCommandExist("tmux") {
-		return errors.New("you need to run emp3r0r under tmux")
-	}
-
-	out, err := exec.Command("tmux", "split-window", "-"+hV, cmd).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%v: %s", err, out)
-	}
-
-	return nil
-}
-
-// FitPanes adjust width of panes to fit them in the terminal window
-// triggered by agent output
-func FitPanes(output_pane_x int) {
-	TmuxUpdatePanes()
-	// update panes
-	defer TmuxUpdatePanes()
-
-	// in this case no need to resize
-	if output_pane_x <= OutputPane.Width {
-		logging.Debugf("No need to fit panes")
-		return
-	}
-
-	TermWidth, TermHeight = TmuxWindowSize()
-	if TermHeight < 0 || TermWidth < 0 {
-		logging.Warningf("Unable to get terminal size")
-		return
-	}
-
-	// if Output pane too wide
-	if output_pane_x >= TermWidth {
-		logging.Warningf("Terminal too narrow (%d chars)", TermWidth)
-		return
-	}
-
-	// resize
-	target_width := output_pane_x - OutputPane.Width
-	CommandPane.ResizePane("L", target_width)
-	logging.Debugf("Resizing agent handler pane %d-%d=%d chars to the left",
-		output_pane_x, OutputPane.Width, target_width)
-}
-
+// TmuxUpdatePanes refreshes stored pane geometry.
 func TmuxUpdatePanes() {
 	TmuxUpdatePane(CommandPane)
 	TmuxUpdatePane(OutputPane)

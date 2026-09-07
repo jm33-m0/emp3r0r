@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"sync"
 	"time"
 )
@@ -62,35 +61,6 @@ func handleTCPConnection(conn net.Conn, data []byte) {
 	}
 
 	listenerLogf("Sent %d bytes to %s", len(data), conn.RemoteAddr())
-}
-
-// TCPBareListener serves the stager file over raw TCP without encryption or compression.
-func TCPBareListener(stagerPath, port string) error {
-	stager, err := os.ReadFile(stagerPath)
-	if err != nil {
-		return fmt.Errorf("failed to read stager file: %v", err)
-	}
-
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
-	if err != nil {
-		return fmt.Errorf("failed to start TCP listener: %v", err)
-	}
-	defer listener.Close()
-
-	listenerLogf("TCP listener (bare) started on port %s", port)
-
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			if errors.Is(err, net.ErrClosed) {
-				return nil
-			}
-			listenerLogf("Failed to accept connection: %v", err)
-			continue
-		}
-
-		go handleTCPConnection(conn, stager)
-	}
 }
 
 // UDPListener serves the encrypted payload file over UDP.

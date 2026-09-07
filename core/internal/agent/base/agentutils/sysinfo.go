@@ -72,7 +72,6 @@ func GatherSystemDetails() *def.Emp3r0rAgent {
 	info.Hardware = "N/A"
 	info.Container = "N/A" // sysinfo.CheckContainer() might be light, but skipping for minimal
 	info.Transport = genC2TransportString()
-	def.Transport = info.Transport
 	info.P2PRelayPort = common.RuntimeConfig.P2PRelayPort
 	info.MeshGossipPort = common.RuntimeConfig.MeshGossipPort
 	info.Files = util.ListMemFiles()
@@ -141,83 +140,6 @@ func GatherSystemDetails() *def.Emp3r0rAgent {
 // GetUptime get system uptime
 func GetUptime() string {
 	return util.GetUptime()
-}
-
-// CollectFullSystemInfo build full system info object
-func CollectFullSystemInfo() *def.Emp3r0rAgent {
-	logging.Infof("Collecting full system info")
-	var info def.Emp3r0rAgent
-	osinfo := sysinfo.GetOSInfo()
-	info.GOOS = runtime.GOOS
-	info.GOArch = runtime.GOARCH
-
-	info.OS = fmt.Sprintf("%s %s %s (%s)", osinfo.Vendor, osinfo.Name, osinfo.Version, osinfo.Architecture)
-	hostname, err := os.Hostname()
-	if err != nil {
-		logging.Infof("Gethostname: %v", err)
-		hostname = "unknown_host"
-	}
-	info.Hardware = "N/A"
-	info.CWD, err = os.Getwd()
-	if err != nil {
-		logging.Infof("Getwd: %v", err)
-		info.CWD = "."
-	}
-
-	info.Tag = common.RuntimeConfig.AgentTag
-	info.UUID = common.RuntimeConfig.AgentUUID
-	info.UUIDSig = common.RuntimeConfig.AgentUUIDSig
-	info.Hostname = hostname
-	info.Name = strings.Split(info.Tag, "-agent")[0]
-	info.Version = def.Version
-	info.Kernel = osinfo.Kernel
-	info.Arch = osinfo.Architecture
-	info.CPU = "N/A"
-	info.GPU = "N/A"
-	info.Mem = "N/A"
-	info.Container = sysinfo.CheckContainer()
-	info.Transport = genC2TransportString()
-	def.Transport = info.Transport
-	info.P2PRelayPort = common.RuntimeConfig.P2PRelayPort
-	info.MeshGossipPort = common.RuntimeConfig.MeshGossipPort
-	info.Files = util.ListMemFiles()
-
-	// have root?
-	info.HasRoot = sysinfo.HasRoot()
-
-	// process
-	info.Process = getAgentProcess()
-
-	// user account info
-	u, err := user.Current()
-	if err != nil {
-		logging.Errorf("%v", err)
-		info.User = "Not available"
-	}
-	info.User = fmt.Sprintf("%s (%s), uid=%s, gid=%s", u.Username, u.HomeDir, u.Uid, u.Gid)
-
-	// is cc on tor?
-	info.HasTor = netutil.IsTor(def.CCAddress)
-
-	// has internet?
-	if common.RuntimeConfig.EnableNCSI {
-		info.HasInternet = transport.TestConnectivity(transport.UbuntuConnectivityURL, common.RuntimeConfig.C2TransportProxy)
-		info.NCSIEnabled = true
-	} else {
-		info.HasInternet = false
-		info.NCSIEnabled = false
-	}
-
-	// IP address?
-	info.IPs = netutil.IPa()
-
-	// arp -a ?
-	info.ARP = netutil.IPNeigh()
-
-	// exes in PATH
-	info.Exes = util.ScanPATH()
-
-	return &info
 }
 
 // GetContainerName check if we are in a container

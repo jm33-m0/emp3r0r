@@ -3,7 +3,6 @@ package listener
 import (
 	"fmt"
 	"net"
-	"sort"
 	"strings"
 	"sync"
 
@@ -88,32 +87,6 @@ func StopUDPListener(port string) error {
 		return fmt.Errorf("stop udp listener on port %s: %v", port, err)
 	}
 	return nil
-}
-
-func ListTCPListenerPorts() []string {
-	ports := []string{}
-	tcpListeners.Range(func(key, value any) bool {
-		port, ok := key.(string)
-		if ok {
-			ports = append(ports, port)
-		}
-		return true
-	})
-	sort.Strings(ports)
-	return ports
-}
-
-func ListUDPListenerPorts() []string {
-	ports := []string{}
-	udpListeners.Range(func(key, value any) bool {
-		port, ok := key.(string)
-		if ok {
-			ports = append(ports, port)
-		}
-		return true
-	})
-	sort.Strings(ports)
-	return ports
 }
 
 func HTTPListenerPort() (string, bool) {

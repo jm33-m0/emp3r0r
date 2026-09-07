@@ -35,20 +35,6 @@ var SendCmd = func(cmd, job_id string, a *def.Emp3r0rAgent) error {
 	return SendMessageToAgent(&cmdData, a)
 }
 
-// SendCmdToCurrentAgent sends a command to the currently active agent
-func SendCmdToCurrentAgent(cmd, job_id string) error {
-	target := live.ActiveAgent
-	if target == nil {
-		return fmt.Errorf("SendCmdToCurrentAgent: no active agent")
-	}
-	return SendCmd(cmd, job_id, target)
-}
-
-// SanitizeAgentData cleans all string fields in Emp3r0rAgent to prevent terminal injection
-func SanitizeAgentData(a *def.Emp3r0rAgent) {
-	util.SanitizeAgentMetadata(a)
-}
-
 // MustGetActiveAgent check if current target is set and alive
 func MustGetActiveAgent() *def.Emp3r0rAgent {
 	// find target

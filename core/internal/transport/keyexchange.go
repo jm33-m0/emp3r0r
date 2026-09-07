@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	"net"
 
 	"golang.org/x/crypto/hkdf"
 )
@@ -74,23 +73,6 @@ func DeriveSessionKey(sharedSecret []byte, agentUUID string) ([]byte, error) {
 // This is used by the C2 server to generate a unique key for each agent session
 func GenerateEphemeralKeyPair() (*ecdsa.PrivateKey, error) {
 	return ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-}
-
-// NewSecureConnWithKey creates a SecureConn with a custom session key
-// This is used after ECDH key exchange to create an encrypted connection
-func NewSecureConnWithKey(conn io.ReadWriteCloser, sessionKey []byte) *SecureConn {
-	// If conn is not a net.Conn, wrap it
-	var netConn net.Conn
-	var ok bool
-	if netConn, ok = conn.(net.Conn); !ok {
-		netConn = &ByteReadWriteCloser{conn}
-	}
-
-	return &SecureConn{
-		Conn:    netConn,
-		key:     sessionKey,
-		readBuf: make([]byte, 0),
-	}
 }
 
 // SerializePublicKey converts an ECDSA public key to a byte slice

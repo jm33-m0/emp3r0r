@@ -2,11 +2,7 @@ package def
 
 import (
 	"io"
-	"net"
 	"net/http"
-	"sync"
-
-	"github.com/txthinking/socks5"
 )
 
 var (
@@ -14,26 +10,11 @@ var (
 	// use: C2 message construction and encryption
 	MagicString = "64781530-1475-4cf8-950c-dcdf4c619dbc"
 
-	// Transport what transport is this agent using? (HTTP2 / CDN / TOR)
-	Transport = "HTTP2"
-
 	// HTTPClient handles agent's http communication
 	HTTPClient *http.Client
 
 	// CCMsgConn the connection to CC, for JSON message-based communication
 	CCMsgConn io.ReadWriteCloser
-
-	// ProxyServer Socks5 proxy listening on agent
-	ProxyServer *socks5.Server
-
-	// ProxyListener Socks5 proxy listener
-	ProxyListener net.Listener
-
-	// ProxyLock protects ProxyServer and ProxyListener
-	ProxyLock sync.Mutex
-
-	// ProxyDone channel to signal proxy server exit
-	ProxyDone chan struct{}
 
 	// will be updated by ReadJSONConfig
 
@@ -55,12 +36,6 @@ var (
 )
 
 const (
-	// RShellBufSize buffer size of reverse shell stream
-	RShellBufSize = 128
-
-	// ProxyBufSize buffer size of port fwd
-	ProxyBufSize = 1024
-
 	// Unknown
 	Unknown = "Unknown"
 )

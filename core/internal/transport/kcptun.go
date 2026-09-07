@@ -7,14 +7,12 @@ import (
 	"crypto/rand"
 	"crypto/sha1"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"io"
 	"math/big"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
-	"os"
 	"sync"
 	"time"
 
@@ -74,16 +72,6 @@ type Config struct {
 	QPP          bool   `json:"qpp"`         // Enable Quantum Permutation Pads (QPP) for added encryption security
 	QPPCount     int    `json:"qpp-count"`   // Number of pads to use for QPP (must be a prime number)
 	CloseWait    int    `json:"closewait"`   // Time (in seconds) to wait before tearing down a connection
-}
-
-func ParseJSONConfig(config *Config, path string) error {
-	file, err := os.Open(path) // For read access.
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	return json.NewDecoder(file).Decode(config)
 }
 
 // remote_addr: KCP server address (host)

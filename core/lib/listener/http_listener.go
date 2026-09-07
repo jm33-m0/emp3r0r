@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
-	"os"
 	"sync"
 )
 
@@ -84,17 +83,6 @@ func HTTPListenerTLS(stagerPath, port, keyStr string, tlsConfig *tls.Config) err
 
 	listenerLogf("Serving payload on port %s via HTTPS", port)
 	return serveStagerTLS(blob, port, tlsConfig)
-}
-
-// HTTPBareListener serves the stager file over HTTP without any encryption or compression.
-func HTTPBareListener(stagerPath, port string) error {
-	stager, err := os.ReadFile(stagerPath)
-	if err != nil {
-		return fmt.Errorf("failed to read stager file: %v", err)
-	}
-
-	listenerLogf("Serving stager file on port %s", port)
-	return serveStager(stager, port)
 }
 
 // StopHTTP stops the HTTP server.

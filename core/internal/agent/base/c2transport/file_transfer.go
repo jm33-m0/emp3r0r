@@ -3,7 +3,6 @@ package c2transport
 import (
 	"bytes"
 	"compress/gzip"
-	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -11,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -31,18 +29,11 @@ func init() {
 }
 
 var (
-	// AgentFileTransferSessions stores active file transfer sessions between agents
-	AgentFileTransferSessions sync.Map
-
 	// PeerIPsProvider is set by internal/agent/mesh to return all active mesh peer IPs.
 	PeerIPsProvider func() []string
 
 	// PeerFileProvider is set by internal/agent/mesh to return peerIP -> p2pPort for peers holding fileName.
 	PeerFileProvider func(fileName string) map[string]int
-
-	// FileServer switch (kept for API compat, file serving is now done in mesh/bridge.go)
-	FileServerCtx    context.Context
-	FileServerCancel context.CancelFunc
 )
 
 // MemFSKey returns the canonical memfs key for a named resource.
@@ -364,18 +355,4 @@ func FetchFilePeerWithPort(peerIP string, peerPort int, file_to_download, path, 
 		return nil, nil
 	}
 	return data, nil
-}
-
-// CancelFileTransfer cancels an ongoing file transfer session
-func CancelFileTransfer(clientAddr, filepath string) {
-	sessionID := fmt.Sprintf("%s:%s", clientAddr, filepath)
-
-	if val, exists := AgentFileTransferSessions.Load(sessionID); exists {
-		cancel := val.(context.CancelFunc)
-		cancel()
-		logging.Infof("File transfer session for %s canceled", sessionID)
-		AgentFileTransferSessions.Delete(sessionID)
-	} else {
-		logging.Infof("No active file transfer session for %s", sessionID)
-	}
 }
