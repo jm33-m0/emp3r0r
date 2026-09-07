@@ -12,7 +12,7 @@
     "parameters": [
       {
         "name": "file",
-        "description": "BOF object file to execute (agent local path or mem:///path)",
+        "description": "BOF object file to execute (agent local path or memfs:///path)",
         "default": "",
         "type": "string",
         "required": true

@@ -6,7 +6,7 @@
 #
 # kkyum.star is the entry point (files[0]). The driver image is a companion
 # file: the module loader uploads it and caches it in encrypted memfs before
-# this script runs, and the `module_files` global lists its mem:/// path.
+# this script runs, and the `module_files` global lists its memfs:/// path.
 # read_file() reads it straight out of memfs, so the driver image never
 # touches disk as plaintext.
 #

