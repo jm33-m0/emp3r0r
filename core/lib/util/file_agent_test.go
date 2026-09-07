@@ -6,8 +6,8 @@ import (
 )
 
 func TestMemFileOperations(t *testing.T) {
-	// 1. WriteFileAgent with mem:// prefix
-	filepath := "mem:///test_file.txt"
+	// 1. WriteFileAgent with memfs:// prefix
+	filepath := "memfs:///test_file.txt"
 	content := []byte("hello world")
 	err := WriteFileAgent(filepath, content, 0o600)
 	if err != nil {
@@ -35,8 +35,8 @@ func TestMemFileOperations(t *testing.T) {
 		t.Errorf("ReadFileAgent content mismatch: got %s, want %s", readData, content)
 	}
 
-	// 3. CopyAgent mem:// to mem://
-	dstPath := "mem:///copy_test.txt"
+	// 3. CopyAgent memfs:// to memfs://
+	dstPath := "memfs:///copy_test.txt"
 	err = CopyAgent(filepath, dstPath)
 	if err != nil {
 		t.Fatalf("CopyAgent mem->mem failed: %v", err)
@@ -54,7 +54,7 @@ func TestMemFileOperations(t *testing.T) {
 		t.Errorf("Copy content mismatch")
 	}
 
-	// 4. CopyAgent mem:// to disk
+	// 4. CopyAgent memfs:// to disk
 	diskPath := "/tmp/disk_copy_test.txt"
 	defer os.Remove(diskPath)
 	err = CopyAgent(filepath, diskPath)
@@ -91,8 +91,8 @@ func TestListMemFiles(t *testing.T) {
 	defer resetMemfsState()
 
 	MemFileLock.Lock()
-	MemFileMap["mem:///file1"] = []byte("1")
-	MemFileMap["mem:///file2"] = []byte("2")
+	MemFileMap["memfs:///file1"] = []byte("1")
+	MemFileMap["memfs:///file2"] = []byte("2")
 	MemFileMap["/tmp/not_mem"] = []byte("3")
 	MemFileLock.Unlock()
 
@@ -104,10 +104,10 @@ func TestListMemFiles(t *testing.T) {
 	found1 := false
 	found2 := false
 	for _, f := range files {
-		if f == "mem:///file1" {
+		if f == "memfs:///file1" {
 			found1 = true
 		}
-		if f == "mem:///file2" {
+		if f == "memfs:///file2" {
 			found2 = true
 		}
 	}

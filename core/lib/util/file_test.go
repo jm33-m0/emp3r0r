@@ -15,7 +15,7 @@ func TestSaveFileAgent(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Test StorageMemory
-	memFile := "mem:///mem_test.txt"
+	memFile := "memfs:///mem_test.txt"
 	data := []byte("memory file content")
 	err := SaveFileAgent(memFile, data, 0o600, StorageMemory)
 	if err != nil {
@@ -128,7 +128,7 @@ func TestUnarchiveAgent_ZipSlip(t *testing.T) {
 	}
 
 	// Save it using SaveFileAgent (so ReadFileAgent can read it)
-	tarballPath := "mem:///malicious.tar.gz"
+	tarballPath := "memfs:///malicious.tar.gz"
 	err = SaveFileAgent(tarballPath, xzData, 0o600, StorageMemory)
 	if err != nil {
 		t.Fatalf("Failed to save tarball: %v", err)
@@ -151,25 +151,25 @@ func TestUnarchiveAgent_ZipSlip(t *testing.T) {
 
 func TestLsPath_MemFS(t *testing.T) {
 	// Add test files to MemFileMap
-	f1 := "mem:///test_ls_1.txt"
-	f2 := "mem:///dir1/test_ls_2.txt"
+	f1 := "memfs:///test_ls_1.txt"
+	f2 := "memfs:///dir1/test_ls_2.txt"
 
 	_ = WriteFileAgent(f1, []byte("hello 1"), 0o600)
 	_ = WriteFileAgent(f2, []byte("hello 2"), 0o600)
 
 	// List root memfs
-	data, err := LsPath("mem:///")
+	data, err := LsPath("memfs:///")
 	if err != nil {
-		t.Fatalf("LsPath mem:/// failed: %v", err)
+		t.Fatalf("LsPath memfs:/// failed: %v", err)
 	}
 
 	var dents []Dentry
 	err = cbor.Unmarshal(data, &dents)
 	if err != nil {
-		t.Fatalf("Failed to unmarshal CBOR from LsPath mem:///: %v", err)
+		t.Fatalf("Failed to unmarshal CBOR from LsPath memfs:///: %v", err)
 	}
 
-	// memfs is flat: Name is the full mem:/// path, no directory entries
+	// memfs is flat: Name is the full memfs:/// path, no directory entries
 	foundFile1 := false
 	foundFile2 := false
 	for _, d := range dents {
@@ -182,9 +182,9 @@ func TestLsPath_MemFS(t *testing.T) {
 	}
 
 	if !foundFile1 {
-		t.Errorf("%s not found in mem:/// listing; got: %v", f1, dents)
+		t.Errorf("%s not found in memfs:/// listing; got: %v", f1, dents)
 	}
 	if !foundFile2 {
-		t.Errorf("%s not found in mem:/// listing; got: %v", f2, dents)
+		t.Errorf("%s not found in memfs:/// listing; got: %v", f2, dents)
 	}
 }

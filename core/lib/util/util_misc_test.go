@@ -159,7 +159,7 @@ func TestAppendToFileAgent_Memfs(t *testing.T) {
 	resetMemfsState()
 	defer resetMemfsState()
 
-	key := "mem:///append_mem.bin"
+	key := "memfs:///append_mem.bin"
 	if err := AppendToFileAgent(key, []byte("hello ")); err != nil {
 		t.Fatalf("mem append: %v", err)
 	}

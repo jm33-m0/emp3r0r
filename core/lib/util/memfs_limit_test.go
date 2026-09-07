@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/fxamacker/cbor/v2"
 )
 
 // memfs helpers / spill behavior tests.
@@ -75,16 +77,16 @@ func TestMemfsSpillsInsteadOfRejecting(t *testing.T) {
 	small := bytes.Repeat([]byte{0x41}, 512)
 	big := bytes.Repeat([]byte{0x42}, 4096) // > budget
 
-	if err := SaveFileAgent("mem:///a.bin", small, 0o600, StorageMemory); err != nil {
+	if err := SaveFileAgent("memfs:///a.bin", small, 0o600, StorageMemory); err != nil {
 		t.Fatalf("write a.bin: %v", err)
 	}
 	// Writing a 4KiB entry with a 2KiB budget must succeed (no rejection) and
 	// must spill entries until under budget.
-	if err := SaveFileAgent("mem:///big.bin", big, 0o600, StorageMemory); err != nil {
+	if err := SaveFileAgent("memfs:///big.bin", big, 0o600, StorageMemory); err != nil {
 		t.Fatalf("oversized memfs write was rejected: %v", err)
 	}
 
-	got, err := ReadFileAgent("mem:///big.bin")
+	got, err := ReadFileAgent("memfs:///big.bin")
 	if err != nil || !bytes.Equal(got, big) {
 		t.Fatalf("big.bin round-trip failed: err=%v len=%d", err, len(got))
 	}
@@ -120,7 +122,7 @@ func TestMemfsSpillIsStealthy(t *testing.T) {
 
 	for i := 0; i < 4; i++ {
 		payload := bytes.Repeat([]byte{byte('s' + i)}, 1024)
-		if err := SaveFileAgent(fmt.Sprintf("mem:///stealth_%d.bin", i), payload, 0o600, StorageMemory); err != nil {
+		if err := SaveFileAgent(fmt.Sprintf("memfs:///stealth_%d.bin", i), payload, 0o600, StorageMemory); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -176,7 +178,7 @@ func TestMemfsSpillRoundTrip(t *testing.T) {
 
 	for i := 0; i < 6; i++ {
 		payload := bytes.Repeat([]byte{byte('a' + i)}, 2048)
-		key := "mem:///file_" + string(rune('a'+i)) + ".bin"
+		key := "memfs:///file_" + string(rune('a'+i)) + ".bin"
 		if err := SaveFileAgent(key, payload, 0o600, StorageMemory); err != nil {
 			t.Fatalf("write %s: %v", key, err)
 		}
@@ -187,7 +189,7 @@ func TestMemfsSpillRoundTrip(t *testing.T) {
 
 	for i := 0; i < 6; i++ {
 		payload := bytes.Repeat([]byte{byte('a' + i)}, 2048)
-		key := "mem:///file_" + string(rune('a'+i)) + ".bin"
+		key := "memfs:///file_" + string(rune('a'+i)) + ".bin"
 		got, err := ReadFileAgent(key)
 		if err != nil {
 			t.Fatalf("read %s: %v", key, err)
@@ -205,7 +207,7 @@ func TestMemfsSpillRoundTrip(t *testing.T) {
 		}
 	}
 	// LsPath must report all files with sane sizes.
-	data, err := LsPath("mem:///")
+	data, err := LsPath("memfs:///")
 	if err != nil {
 		t.Fatalf("LsPath: %v", err)
 	}
@@ -229,7 +231,7 @@ func TestMemfsDiskStrategyUntouched(t *testing.T) {
 	if _, err := os.Stat(disk); err != nil {
 		t.Fatalf("disk file missing: %v", err)
 	}
-	if IsFileExist("mem:///plain.bin") {
+	if IsFileExist("memfs:///plain.bin") {
 		t.Fatal("disk file leaked into memfs namespace")
 	}
 }
@@ -246,7 +248,7 @@ func TestMemfsRemoveCleansSpill(t *testing.T) {
 
 	for i := 0; i < 3; i++ {
 		payload := bytes.Repeat([]byte{byte('x' + i)}, 1024)
-		if err := SaveFileAgent("mem:///r.bin", payload, 0o600, StorageMemory); err != nil {
+		if err := SaveFileAgent("memfs:///r.bin", payload, 0o600, StorageMemory); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -371,5 +373,149 @@ func TestMemfsBudgetEnvOverride(t *testing.T) {
 	memfsBudgetCacheMu.Unlock()
 	if got := memfsBudgetBytes(); got <= 0 || got == 12345 {
 		t.Fatalf("garbage env value did not fall back to heuristic: %d", got)
+	}
+}
+
+// TestMemfsOnlyCanonicalPrefix verifies memfs:// is the only recognized
+// scheme: an unsupported spelling like mem:// is not treated as memfs and is
+// left untouched (a plain disk path), while memfs:// paths normalize to the
+// memfs:/// key form and stored keys always use that prefix.
+func TestMemfsOnlyCanonicalPrefix(t *testing.T) {
+	resetMemfsState()
+	defer resetMemfsState()
+
+	// mem:// is not memfs: it must not be recognized or rewritten.
+	if IsMemPath("mem:///not_memfs.bin") {
+		t.Fatal("mem:// must not be recognized as a memfs path")
+	}
+	if got := NormalizeMemPath("mem:///not_memfs.bin"); got != "mem:///not_memfs.bin" {
+		t.Fatalf("mem:// path rewritten to %q; only memfs:// is supported", got)
+	}
+
+	// The memfs:// scheme round-trips under the canonical memfs:/// key only.
+	if err := WriteFileAgent("memfs:///canonical.bin", []byte("ok"), 0o600); err != nil {
+		t.Fatalf("write canonical: %v", err)
+	}
+	got, err := ReadFileAgent("memfs:///canonical.bin")
+	if err != nil || string(got) != "ok" {
+		t.Fatalf("read canonical: %q err=%v", got, err)
+	}
+	MemFileLock.RLock()
+	for k := range MemFileMap {
+		if !strings.HasPrefix(k, memfsPrefix) {
+			MemFileLock.RUnlock()
+			t.Fatalf("stored key %q does not use the %s prefix", k, memfsPrefix)
+		}
+	}
+	MemFileLock.RUnlock()
+}
+
+// TestMemfsRemovePrefix verifies rm semantics in the flat namespace: removing a
+// container-like path (memfs:///sub or memfs:///sub/) removes every key stored
+// under that prefix and cleans up any spilled backing files; the root cannot be
+// removed.
+func TestMemfsRemovePrefix(t *testing.T) {
+	os.Setenv("EMP3R0R_MEMFS_LIMIT", "128")
+	defer os.Unsetenv("EMP3R0R_MEMFS_LIMIT")
+	resetMemfsState()
+	defer resetMemfsState()
+	SetFileCryptoKey([]byte("12345678901234567890123456789012"))
+	defer SetFileCryptoKey(nil)
+
+	// Write enough under one prefix to force a spill of at least one entry.
+	keys := []string{
+		"memfs:///sub/a.txt",
+		"memfs:///sub/deep/b.txt",
+		"memfs:///other.txt",
+	}
+	for i, k := range keys {
+		payload := bytes.Repeat([]byte{byte('a' + i)}, 1024)
+		if err := SaveFileAgent(k, payload, 0o600, StorageMemory); err != nil {
+			t.Fatalf("write %s: %v", k, err)
+		}
+	}
+	spilled := memfsSpillKeys()
+	if len(spilled) == 0 {
+		t.Fatal("expected at least one spilled entry under the tiny budget")
+	}
+
+	// Track the backing files so we can assert cleanup.
+	backing := map[string]string{}
+	for _, k := range spilled {
+		backing[k] = memSpillPath(k)
+	}
+
+	// Removing the container prefix deletes both sub keys (incl. their spills).
+	if err := RemoveFileAgent("memfs:///sub"); err != nil {
+		t.Fatalf("rm prefix: %v", err)
+	}
+	for _, k := range []string{"memfs:///sub/a.txt", "memfs:///sub/deep/b.txt"} {
+		if IsFileExist(k) {
+			t.Errorf("%s still exists after prefix rm", k)
+		}
+		if p, ok := backing[k]; ok {
+			if _, err := os.Stat(p); !os.IsNotExist(err) {
+				t.Errorf("spill backing %s for %s was not cleaned up", p, k)
+			}
+		}
+	}
+	if !IsFileExist("memfs:///other.txt") {
+		t.Error("sibling outside the removed prefix disappeared")
+	}
+
+	// Removing a bare file leaves other keys intact.
+	if err := RemoveFileAgent("memfs:///other.txt"); err != nil {
+		t.Fatalf("rm file: %v", err)
+	}
+	if IsFileExist("memfs:///other.txt") {
+		t.Error("file still exists after rm")
+	}
+
+	// The root is not removable.
+	if err := RemoveFileAgent("memfs:///"); err == nil {
+		t.Fatal("rm of the memfs root should be rejected")
+	}
+}
+
+// TestMemfsNoDirs verifies memfs has no real directory nodes: mkdir is
+// rejected, the root exists as the only "directory", and a prefix listing only
+// reports stored keys (no synthetic dir entries).
+func TestMemfsNoDirs(t *testing.T) {
+	resetMemfsState()
+	defer resetMemfsState()
+
+	if err := MkdirAgent("memfs:///newdir", 0o700); err == nil {
+		t.Fatal("mkdir on a memfs path must be rejected")
+	}
+	if !IsDirExist("memfs:///") {
+		t.Error("memfs root should always exist as a directory")
+	}
+	if IsDirExist("memfs:///nonexistent") {
+		t.Error("nonexistent memfs prefix reported as a dir")
+	}
+
+	// A key that looks like it sits under a "subdir" makes that prefix show up
+	// as a dir only because a file lives under it (prefix semantics).
+	if err := WriteFileAgent("memfs:///grouped/a.txt", []byte("x"), 0o600); err != nil {
+		t.Fatalf("write grouped: %v", err)
+	}
+	if !IsDirExist("memfs:///grouped") {
+		t.Error("existing prefix should be reported as a dir")
+	}
+	if !IsDirExist("memfs:///grouped/a.txt") {
+		t.Error("existing file should be reported as present")
+	}
+
+	// ls of a subdir lists exactly the keys under that prefix.
+	data, err := LsPath("memfs:///grouped")
+	if err != nil {
+		t.Fatalf("ls subdir: %v", err)
+	}
+	var dents []Dentry
+	if err := cbor.Unmarshal(data, &dents); err != nil {
+		t.Fatalf("unmarshal ls: %v", err)
+	}
+	if len(dents) != 1 || dents[0].Name != "memfs:///grouped/a.txt" {
+		t.Fatalf("ls prefix = %+v, want only memfs:///grouped/a.txt", dents)
 	}
 }
