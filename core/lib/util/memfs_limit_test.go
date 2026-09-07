@@ -315,15 +315,22 @@ func TestMemfsBudgetLazyAndCached(t *testing.T) {
 		t.Fatal("budget was recomputed within the cache window")
 	}
 
-	// Advancing the clock past the cache interval forces a refresh.
+	// Advancing the clock past the cache interval forces a refresh: the stale
+	// timestamp marker must be replaced by a fresh computation. On Windows the
+	// clock ticks are coarse enough that the whole test can run inside a single
+	// tick, so the refreshed memfsBudgetCachedAt may not be strictly after the
+	// original cachedAt even though the refresh ran. What is guaranteed is that
+	// the 6s-old backdated marker no longer stands: refresh assigns time.Now(),
+	// which can never equal a timestamp from 6s in the past.
 	memfsBudgetCacheMu.Lock()
-	memfsBudgetCachedAt = time.Now().Add(-memfsBudgetCacheIntv - time.Second)
+	staleMarker := time.Now().Add(-memfsBudgetCacheIntv - time.Second)
+	memfsBudgetCachedAt = staleMarker
 	memfsBudgetCacheMu.Unlock()
 	_ = memfsBudgetBytes()
 	memfsBudgetCacheMu.Lock()
-	fresh := memfsBudgetCachedAt.After(cachedAt)
+	refreshed := !memfsBudgetCachedAt.Equal(staleMarker)
 	memfsBudgetCacheMu.Unlock()
-	if !fresh {
+	if !refreshed {
 		t.Fatal("budget was not refreshed after the cache interval expired")
 	}
 
