@@ -16,7 +16,8 @@
 
 ---
 
-<img width="1908" height="1141" alt="emp3r0r operator console screenshot" src="https://github.com/user-attachments/assets/8952f405-2af9-4840-b57f-086498f389b8" />
+<img width="1920" height="1173" alt="emp3r0r" src="https://github.com/user-attachments/assets/6b65b214-0b16-4b79-a1df-949cb3d4966e" />
+
 
 ## What is emp3r0r?
 
