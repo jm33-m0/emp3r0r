@@ -1,4 +1,8 @@
-This project is a Go codebase. Work from the module root (`core/` for the Go module). Read `README.md` and `TESTING.md` before making changes. Keep responses concise and finish tasks rather than stopping early.
+## Background
+
+This project is a Go codebase. Work from the module root (`core/` for the Go module). Read `README.md` and `TESTING.md` before making changes. Keep responses concise and finish tasks rather than stopping early. Do not attempt reading the whole codebase before starting your work; only focus on relevant files and start coding as early as possible; expand code scanning while you are coding and fix errors accordingly.
+
+Try not to `grep` from `stdout` of a command. Always prefer writing logs to disk before `grep`.
 
 ## Code style
 
