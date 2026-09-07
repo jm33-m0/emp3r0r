@@ -38,10 +38,15 @@ const (
 // admitted by the C2.
 var c2Backoff = c2BackoffInitial
 
+// c2BackoffSleep is the sleep used by takeC2Backoff; a var so tests can
+// substitute a no-op sleeper and exercise the doubling/cap logic without
+// actually waiting out the backoff.
+var c2BackoffSleep = time.Sleep
+
 // takeC2Backoff sleeps for the current backoff and then doubles it.
 func takeC2Backoff() {
 	logging.Warningf("Backing off for %v before reconnect", c2Backoff)
-	time.Sleep(c2Backoff)
+	c2BackoffSleep(c2Backoff)
 	c2Backoff *= 2
 	if c2Backoff > c2BackoffMax {
 		c2Backoff = c2BackoffMax
