@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.16.2](https://github.com/jm33-m0/emp3r0r/compare/v4.16.1...v4.16.2) (2026-09-07)
+
+
+### Bug Fixes
+
+* **socks5:** DNS not working ([6b8eed4](https://github.com/jm33-m0/emp3r0r/commit/6b8eed485ed7df2ef49f5a7315d34a27592471a6))
+* **socks5:** DNS support ([1d79d5a](https://github.com/jm33-m0/emp3r0r/commit/1d79d5a8e9982092e64d1dba32bdccf5c0049df5))
+
 ## [4.16.1](https://github.com/jm33-m0/emp3r0r/compare/v4.16.0...v4.16.1) (2026-09-07)
 
 
