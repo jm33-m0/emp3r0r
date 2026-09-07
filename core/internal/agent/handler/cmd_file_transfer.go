@@ -121,7 +121,10 @@ func putCmdRun(cmd *cobra.Command, args []string) {
 		util.MemFileLock.RUnlock()
 
 		if isMem {
-			msg += fmt.Sprintf("\n\nFile saved to memory: %s. Use `decrypt` to save to disk.", destPath)
+			// The file is tracked in memfs. It may live in RAM or, when the
+			// RAM budget was exceeded, spilled (encrypted) to an unmarked temp
+			// backing file.
+			msg += fmt.Sprintf("\n\nFile saved to encrypted memfs: %s. Use `decrypt` to save plaintext to disk.", destPath)
 		} else {
 			msg += "\n\nFile saved to DISK (encrypted)."
 		}

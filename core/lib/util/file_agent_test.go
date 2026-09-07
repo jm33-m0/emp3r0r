@@ -87,11 +87,10 @@ func TestMemFileOperations(t *testing.T) {
 }
 
 func TestListMemFiles(t *testing.T) {
+	resetMemfsState()
+	defer resetMemfsState()
+
 	MemFileLock.Lock()
-	// clean map
-	for k := range MemFileMap {
-		delete(MemFileMap, k)
-	}
 	MemFileMap["mem:///file1"] = []byte("1")
 	MemFileMap["mem:///file2"] = []byte("2")
 	MemFileMap["/tmp/not_mem"] = []byte("3")

