@@ -84,6 +84,13 @@ func HandleC2Command(cmdData *def.MsgTunData) {
 
 	job_id := cmdData.JobID
 	cmd_argc := len(cmdData.CmdSlice)
+	if cmd_argc == 0 {
+		// A command frame with no command words (e.g. a keep-alive or a
+		// whitespace-only operator command that parsed to nothing) must not
+		// panic the handler on cmdSlice[0].
+		logging.Warningf("HandleC2Command: empty command frame (job %q), ignoring", job_id)
+		return
+	}
 	cmdSlice := append(cmdData.CmdSlice, []string{"--job_id", job_id}...)
 	if cmd_argc < 0 {
 		logging.Warningf("Invalid command: %v", cmdSlice)

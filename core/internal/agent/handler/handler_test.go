@@ -433,3 +433,81 @@ func TestHelperProcess(t *testing.T) {
 	time.Sleep(100 * time.Second)
 	os.Exit(0)
 }
+
+// TestExecCmdRunEmptyInput verifies exec with empty or whitespace-only input
+// fails gracefully instead of panicking on parsed[0] (index out of range).
+func TestExecCmdRunEmptyInput(t *testing.T) {
+	if common.RuntimeConfig == nil {
+		common.RuntimeConfig = &def.Config{}
+	}
+	common.RuntimeConfig.AgentTag = "test-agent"
+	common.RuntimeConfig.AgentUUID = "test-agent-uuid"
+
+	var mockConn bytes.Buffer
+	c2transport.Connection = &mockConn
+	defer func() { c2transport.Connection = nil }()
+
+	rootCmd := CoreCommands()
+
+	for _, bad := range []string{"   ", "\t\n  ", ""} {
+		mockConn.Reset()
+		rootCmd.SetArgs([]string{"exec", "--cmd", bad})
+		if err := rootCmd.Execute(); err != nil {
+			t.Fatalf("exec %q returned error: %v", bad, err)
+		}
+		// The handler must report a clean error to the C2, not crash.
+		if !strings.Contains(mockConn.String(), "exec") && mockConn.Len() == 0 {
+			t.Fatalf("exec %q produced no C2 response", bad)
+		}
+	}
+}
+
+// TestExecCmdRunRealCommand runs a real argv-based command through the handler
+// to prove quoting/whitespace input is executed safely and output is returned.
+func TestExecCmdRunRealCommand(t *testing.T) {
+	if common.RuntimeConfig == nil {
+		common.RuntimeConfig = &def.Config{}
+	}
+	common.RuntimeConfig.AgentTag = "test-agent"
+	common.RuntimeConfig.AgentUUID = "test-agent-uuid"
+
+	var mockConn bytes.Buffer
+	c2transport.Connection = &mockConn
+	defer func() { c2transport.Connection = nil }()
+
+	rootCmd := CoreCommands()
+	rootCmd.SetArgs([]string{"exec", "--cmd", "echo hello-robust"})
+	if err := rootCmd.Execute(); err != nil {
+		t.Fatalf("exec failed: %v", err)
+	}
+	var msg def.MsgTunData
+	if err := cbor.Unmarshal(mockConn.Bytes(), &msg); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if !strings.Contains(string(msg.Response), "hello-robust") {
+		t.Fatalf("expected echo output in response, got: %q", msg.Response)
+	}
+}
+
+// TestHandleC2CommandEmptyCmdSlice verifies an inbound command frame with no
+// command words is ignored instead of panicking on cmdSlice[0].
+func TestHandleC2CommandEmptyCmdSlice(t *testing.T) {
+	if common.RuntimeConfig == nil {
+		common.RuntimeConfig = &def.Config{}
+	}
+	common.RuntimeConfig.AgentTag = "test-agent"
+	common.RuntimeConfig.AgentUUID = "test-agent-uuid"
+
+	var mockConn bytes.Buffer
+	c2transport.Connection = &mockConn
+	defer func() { c2transport.Connection = nil }()
+
+	// Must not panic.
+	HandleC2Command(&def.MsgTunData{JobID: "job-empty", CmdSlice: []string{}})
+	HandleC2Command(&def.MsgTunData{JobID: "job-nil"})
+
+	// Must not have tried to run anything against the mock C2.
+	if mockConn.Len() != 0 {
+		t.Fatalf("empty command frame produced C2 traffic: %q", mockConn.String())
+	}
+}
