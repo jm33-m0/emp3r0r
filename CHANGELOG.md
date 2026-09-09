@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.17.0](https://github.com/jm33-m0/emp3r0r/compare/v4.16.2...v4.17.0) (2026-09-09)
+
+
+### Features
+
+* **loader:** add a shellcode loader for Windows SCM-based workflows. ([f6a115d](https://github.com/jm33-m0/emp3r0r/commit/f6a115d73424ef9ab6a4229bb4bac8c079fcce4e))
+
+
+### Bug Fixes
+
+* **console:** command history not saved ([b6763ad](https://github.com/jm33-m0/emp3r0r/commit/b6763adc7af4fb166b994ecdd147615ac0577923))
+* **loader:** move indirect syscalls to common/ntsys; fix stack-frame and ([4b6c7c3](https://github.com/jm33-m0/emp3r0r/commit/4b6c7c39382d690ee7963109284427fea92f0d2c))
+* **module:** do not inject Windows impersonation flags where they don't make sense ([bc0f0df](https://github.com/jm33-m0/emp3r0r/commit/bc0f0df3b8503c15251435ffff417d81b21a1638))
+
 ## [4.16.2](https://github.com/jm33-m0/emp3r0r/compare/v4.16.1...v4.16.2) (2026-09-07)
 
 
