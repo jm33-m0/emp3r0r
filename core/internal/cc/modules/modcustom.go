@@ -973,7 +973,7 @@ func readModConfigs(file string) (configs []*def.ModuleConfig, err error) {
 		}
 
 		// Windows BOF modules automatically depend on the in-memory COFFLoader DLL.
-		if isCOFF && strings.EqualFold(raw.Platform, "windows") {
+		if isCOFF && def.IsWindowsPlatform(raw.Platform) {
 			found := false
 			for _, dep := range config.Dependencies {
 				if strings.EqualFold(dep, "coffloader") {

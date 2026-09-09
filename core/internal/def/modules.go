@@ -1,6 +1,9 @@
 package def
 
-import "sync"
+import (
+	"strings"
+	"sync"
+)
 
 // built-in module names
 const (
@@ -549,10 +552,30 @@ func populateModules() {
 //   - set --ticket <BASE64> so a KRB-CRED ticket is imported into the
 //     resolved logon session before the module runs.
 //
-// The token-management built-ins (steal_token, list_tokens, make_token,
-// list_sessions, import_ticket) only receive the "token" option — they have
-// their own dedicated flags and runners.
+// Injection is context-aware, so the flags only surface where they can
+// actually do something:
+//
+//   - C2-local plugins (IsLocal) never execute on an agent, so nothing is
+//     injected.
+//   - Token impersonation, netlogon sessions and Kerberos ticket import are
+//     Windows-only agent-side machinery, so non-Windows modules get nothing.
+//   - Among Windows agent modules, only the kinds the agent executes inside
+//     its own process under the impersonated token (starlark, coff, dll)
+//     receive the options. Child-process kinds (powershell/bash/python/exe…)
+//     spawn interpreters as the agent's own user and would silently ignore
+//     the token, so injecting it would just be noise.
+//
+// The Windows token-management built-ins declare their own dedicated flags
+// and runners instead: steal_token keeps the universal "token" option (an
+// existing cached token/session to impersonate while opening the victim
+// process), while list_tokens, list_sessions, make_token and import_ticket
+// get nothing injected — a --token/--user/--ticket flag there would be
+// silently dropped by their runners.
 func InjectTokenOption(mod *ModuleConfig) {
+	if mod == nil || mod.IsLocal || !IsWindowsPlatform(mod.Platform) {
+		return
+	}
+
 	if mod.Options == nil {
 		mod.Options = make(ModOptions)
 	}
@@ -570,21 +593,42 @@ func InjectTokenOption(mod *ModuleConfig) {
 		markOptionInjected(mod.Name, name)
 	}
 
-	inject("token", "(Windows) SID of a stolen token, or the name of a make_token logon session, to impersonate when running this module; leave empty to run as the current user")
-
-	// The token-management built-ins define their own user/ticket parameters.
-	if !isTokenManagementModule(mod.Name) {
-		inject("user", "(Windows) create a make_token netlogon session for this user (DOMAIN/user or plain) and run the module under it; ignored when --token is set")
-		inject("ticket", "(Windows) base64 KRB-CRED (.kirbi) to import into the module's logon session (the --token/--user session, or the current session) before it runs")
+	switch mod.Name {
+	case ModStealToken:
+		inject("token", "(Windows) SID of a stolen token, or the name of a make_token logon session, to impersonate while opening the target process; leave empty to steal under the current identity")
+		return
+	case ModListTokens, ModMakeToken, ModListSessions, ModImportTicket:
+		return
 	}
+
+	if !tokenContextType(mod.AgentConfig.Type) {
+		return
+	}
+
+	inject("token", "(Windows) SID of a stolen token, or the name of a make_token logon session, to impersonate when running this module; leave empty to run as the current user")
+	inject("user", "(Windows) create a make_token netlogon session for this user (DOMAIN/user or plain) and run the module under it; ignored when --token is set")
+	inject("ticket", "(Windows) base64 KRB-CRED (.kirbi) to import into the module's logon session (the --token/--user session, or the current session) before it runs")
 }
 
-// isTokenManagementModule reports whether the module is one of the Windows
-// built-ins that manage tokens/sessions/tickets and therefore should not
-// receive the injected --user/--ticket options.
-func isTokenManagementModule(name string) bool {
-	switch name {
-	case ModStealToken, ModListTokens, ModMakeToken, ModListSessions, ModImportTicket:
+// IsWindowsPlatform reports whether a module's Platform field targets
+// Windows. Comparison is case-insensitive and tolerant of surrounding spaces
+// because JSON module configs spell the value either way; any other value
+// (linux, generic, empty, …) is treated as not Windows.
+func IsWindowsPlatform(platform string) bool {
+	return strings.EqualFold(strings.TrimSpace(platform), "windows")
+}
+
+// tokenContextType reports whether a module kind executes inside the agent
+// process (or its loader) under an impersonated token, i.e. whether the
+// agent's ModuleHandler actually honors the universal token context.
+// Starlark builtins impersonate around individual syscalls, COFF/BOF payloads
+// and DLL modules run through the in-memory loader with a PreExecHook
+// impersonation. Child-process kinds (powershell/bash/python/…) inherit the
+// agent's process token, never the impersonation token, so they cannot make
+// use of it.
+func tokenContextType(t string) bool {
+	switch strings.ToLower(strings.TrimSpace(t)) {
+	case "starlark", "coff", "dll":
 		return true
 	default:
 		return false

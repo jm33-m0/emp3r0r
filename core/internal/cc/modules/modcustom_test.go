@@ -196,6 +196,7 @@ func TestResolveInvocationTokenContext(t *testing.T) {
 	// Module with injected options: user/ticket are wired.
 	config := &def.ModuleConfig{
 		Name:        "test_tok_ctx",
+		Platform:    "Windows",
 		AgentConfig: def.AgentModuleConfig{Type: "starlark"},
 		Invocation:  def.InvocationSpec{Argv: []def.InvocationArg{}},
 	}
@@ -224,6 +225,7 @@ func TestResolveInvocationTokenContext(t *testing.T) {
 	// still is.
 	own := &def.ModuleConfig{
 		Name:        "test_tok_own",
+		Platform:    "Windows",
 		AgentConfig: def.AgentModuleConfig{Type: "coff"},
 		Invocation:  def.InvocationSpec{Argv: []def.InvocationArg{}},
 		Options: def.ModOptions{
