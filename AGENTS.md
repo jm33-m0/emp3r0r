@@ -33,6 +33,7 @@ Try not to `grep` from `stdout` of a command. Always prefer writing logs to disk
 ## Logging and I/O
 
 - Use the project's `lib/logging` package (`logging.Infof`, `Debugf`, `Warningf`, `Errorf`), never the stdlib `log`.
+- `logging` is no-op when compiled as release. When writing C, adopt the same logic, use a macro (`DEBUG`) to control logging behavior. Minimize string literals in the release binary.
 - Sanitize untrusted text before rendering or logging it; never print agent/remote-controlled bytes raw.
 - Treat all remote input as hostile: validate lengths, indexes, and types; never panic on malformed input. Guard before indexing slices derived from input.
 - Do not write files with predictable or brand-identifying names; prefer in-memory or opaque temporary storage (`memfs`).
