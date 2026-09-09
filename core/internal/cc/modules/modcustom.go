@@ -581,17 +581,21 @@ func scanModuleDirs(handleModuleConfig func(dir string) error) {
 }
 
 // loadModFromDirs registers every module config found in live.ModuleDirs.
-// It also mirrors the shared bof_common payload into the operator workspace,
-// where buildable/local modules expect it.
+// It also mirrors shared payload directories (bof_common for BOF headers,
+// common for cross-platform payload C sources) into the operator workspace,
+// where buildable/local modules reference them via relative paths.
 func loadModFromDirs() {
-	// Ensure bof_common is in the workspace modules directory if it exists in
-	// a search dir
-	for _, mod_search_dir := range live.ModuleDirs {
-		src_bof_common := filepath.Join(mod_search_dir, "bof_common")
-		dst_bof_common := filepath.Join(live.EmpWorkSpace, "modules", "bof_common")
-		if util.IsExist(src_bof_common) && src_bof_common != dst_bof_common {
-			_ = os.MkdirAll(filepath.Dir(dst_bof_common), 0o700)
-			_ = util.Copy(src_bof_common, dst_bof_common)
+	// Ensure the shared module directories exist in the workspace if they are
+	// present in a search dir.
+	sharedDirs := []string{"bof_common", "common"}
+	for _, shared := range sharedDirs {
+		for _, mod_search_dir := range live.ModuleDirs {
+			src := filepath.Join(mod_search_dir, shared)
+			dst := filepath.Join(live.EmpWorkSpace, "modules", shared)
+			if util.IsExist(src) && src != dst {
+				_ = os.MkdirAll(filepath.Dir(dst), 0o700)
+				_ = util.Copy(src, dst)
+			}
 		}
 	}
 

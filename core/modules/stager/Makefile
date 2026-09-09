@@ -1,5 +1,5 @@
 CC = gcc
-COMMON_CFLAGS = -Wall -Wextra -Os -fno-builtin -fno-stack-protector -fPIC -nostdlib -I. \
+COMMON_CFLAGS = -Wall -Wextra -Os -fno-builtin -fno-stack-protector -fPIC -nostdlib -I. -I../common \
 								-fno-toplevel-reorder -s -fno-ident -ffunction-sections -fdata-sections \
 								-fno-asynchronous-unwind-tables -fvisibility=hidden -ffixed-r15
 
@@ -79,7 +79,7 @@ COMMON_CFLAGS += -DCONFIG_XOR_KEY=$(XOR_KEY_VALUE)
 SOCKET_TRANSPORTS := http tcp udp
 DYNLOAD_TRANSPORTS := libcurl
 
-STAGE0_SRCS = downloader.c utils_min.c packer.c rc4.c debug.c syscalls.c
+STAGE0_SRCS = downloader.c utils_min.c packer.c ../common/rc4.c debug.c syscalls.c
 ifneq ($(filter $(TRANSPORT),$(SOCKET_TRANSPORTS)),)
   STAGE0_SRCS += net_utils.c
 endif
@@ -96,7 +96,7 @@ SHARED_LIB = stager.so
 # has a stub (unpack_stub_<name>.c) and a matching packer (pack_<name>.py).
 UNPACKER ?= rc4
 ifeq ($(UNPACKER),rc4)
-  UNPACK_SRCS = unpack_stub_rc4.c rc4.c
+  UNPACK_SRCS = unpack_stub_rc4.c ../common/rc4.c
 else
   UNPACK_SRCS = unpack_stub_$(UNPACKER).c
 endif
