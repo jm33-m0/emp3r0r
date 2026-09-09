@@ -66,9 +66,14 @@ func cleanupConfig() (err error) {
 		return err
 	}
 	for _, d := range dents {
+		// Reset stale operator config/certs, but never wipe *.history files:
+		// the console (reeflective) persists its command history right next to
+		// the configs as <workspace>/emp3r0r.history, and cleanup runs on every
+		// operator start, so deleting it here would silently reset the history
+		// the operator relies on across sessions. The config tarball never
+		// carries a history file, so there is nothing to "clean" there.
 		if strings.HasSuffix(d.Name(), ".json") ||
-			strings.HasSuffix(d.Name(), ".pem") ||
-			strings.HasSuffix(d.Name(), ".history") {
+			strings.HasSuffix(d.Name(), ".pem") {
 			err = os.Remove(EmpWorkSpace + "/" + d.Name())
 			if err != nil {
 				return err
