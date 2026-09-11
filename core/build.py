@@ -58,6 +58,7 @@ import urllib.request
 DONUT_URL = "https://github.com/TheWover/donut/releases/download/v1.1/donut_v1.1.tar.gz"
 DONUT_ARCHIVE_NAME = "donut_v1.1.tar.gz"
 REQUIRED_GO_VERSION = "1.26.2"
+REQUIRED_ZIG_VERSION = "0.16.0"
 REQUIRED_FREE_KB = 10 * 1024 * 1024  # 10 GB
 
 USE_COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
@@ -260,7 +261,10 @@ def check_disk_space(core_dir: pathlib.Path) -> None:
 
 def check_zig() -> None:
     if not shutil.which("zig"):
-        msg = "zig not found. Please run build inside the builder container, or install zig 0.13.0 manually on the host."
+        msg = (
+            "zig not found. Please run build inside the builder container, "
+            f"or install zig {REQUIRED_ZIG_VERSION} manually on the host."
+        )
         if IS_DRY_RUN:
             log_warn(f"[DRY-RUN] {msg}")
         else:
@@ -504,7 +508,17 @@ def build_shared_object(
     log_info(f"Building shared object for {os_name} {arch}")
 
     tags = "emp3r0r_so" if arg1 == "--debug" else "release emp3r0r_so"
+    # mingw-w64's DLL pseudo-relocation startup (_pei386_runtime_relocator)
+    # calls alloca() with a runtime-computed size, which the compiler lowers to
+    # a ___chkstk_ms stack-probe call. zig 0.16 honours -nostdlib by dropping
+    # compiler-rt (the only provider of that helper); zig 0.13 always linked
+    # compiler-rt regardless. Link it back explicitly with -lgcc, which resolves
+    # to zig's bundled compiler_rt.lib, or lld-link fails on the undefined
+    # symbol. -lgcc adds only compiler builtins, not libc. Linux objects contain
+    # no such reference, so the flag is Windows-only.
     extldflags = "-nostdlib -nodefaultlibs -Wl,--gc-sections"
+    if os_name == "windows":
+        extldflags = "-lgcc " + extldflags
     if arg1 != "--debug":
         extldflags = f"-s {extldflags}"
 

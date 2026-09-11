@@ -57,10 +57,14 @@ jobs:
 
       - name: Install zig (for shellcode stager test)
         if: runner.os == 'Linux'
+        env:
+          ZIG_VERSION: "0.16.0"
+          ZIG_SHA256: "70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00"
         run: |
-          wget -q https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz
-          tar -xf zig-linux-x86_64-0.13.0.tar.xz
-          sudo mv zig-linux-x86_64-0.13.0 /usr/local/zig
+          wget -q "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
+          echo "${ZIG_SHA256}  zig-x86_64-linux-${ZIG_VERSION}.tar.xz" | sha256sum -c -
+          tar -xf "zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
+          sudo mv "zig-x86_64-linux-${ZIG_VERSION}" /usr/local/zig
           sudo ln -sf /usr/local/zig/zig /usr/local/bin/zig
 
       - name: Run shellcode stager lifecycle test (cgo, no race)

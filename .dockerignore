@@ -1,0 +1,6 @@
+# The builder image never COPYs/ADDs anything from the build context: install.py
+# bind-mounts the source tree at runtime. Excluding everything keeps the context
+# tiny (no .git, modules or build artifacts get shipped to the daemon on every
+# build). Docker still reads the Dockerfile and .dockerignore themselves.
+**
+!Dockerfile
