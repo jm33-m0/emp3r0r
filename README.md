@@ -16,7 +16,7 @@
 
 ---
 
-<img width="1920" height="1173" alt="emp3r0r" src="https://github.com/user-attachments/assets/6b65b214-0b16-4b79-a1df-949cb3d4966e" />
+<img width="1925" height="1147" alt="emp3r0r-readme" src="https://github.com/user-attachments/assets/945aef28-1c07-4701-a6d9-b8029ad8251e" />
 
 
 ## What is emp3r0r?
