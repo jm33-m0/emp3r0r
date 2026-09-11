@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.17.1](https://github.com/jm33-m0/emp3r0r/compare/v4.17.0...v4.17.1) (2026-09-11)
+
+
+### Bug Fixes
+
+* remove redundant `make_token` and `import_ticket` ([41daf3b](https://github.com/jm33-m0/emp3r0r/commit/41daf3b3858912cf26a3e12be2ceee03c170b973))
+
 ## [4.17.0](https://github.com/jm33-m0/emp3r0r/compare/v4.16.2...v4.17.0) (2026-09-09)
 
 
