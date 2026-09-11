@@ -144,6 +144,9 @@ func CliMain(wg_server_ip string, wg_server_port int) {
 
 	// when the console is closed, deinit tmux windows
 	defer cli.TmuxDeinitWindows()
+	// Also run tmux cleanup for explicit process exits (live.Exit), which skip
+	// deferred functions because they terminate the process.
+	live.OnShutdown(cli.TmuxDeinitWindows)
 
 	// Background jobs
 	backgroundJobs()

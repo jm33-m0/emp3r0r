@@ -2,7 +2,6 @@ package operator
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"text/template"
@@ -19,7 +18,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
-	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/reeflective/console"
 	"github.com/reeflective/console/commands/readline"
@@ -586,8 +584,9 @@ func exitEmp3r0r(_ *console.Console) {
 		logging.Warningf("Remember to remove the conditional C2 preflight URL from your server or agents will make too much noise: %s",
 			common.RuntimeConfig.PreflightURL)
 	}
-	cli.TmuxDeinitWindows()
-	os.Exit(0)
+	// live.Exit runs the registered tmux-cleanup shutdown hook, so no separate
+	// cli.TmuxDeinitWindows call is needed here.
+	live.Exit(0)
 }
 
 func gen_agent_cmd() *cobra.Command {

@@ -35,19 +35,18 @@ func publicKey(priv any) any {
 	}
 }
 
-func pemBlockForKey(priv any) *pem.Block {
+func pemBlockForKey(priv any) (*pem.Block, error) {
 	switch k := priv.(type) {
 	case *rsa.PrivateKey:
-		return &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(k)}
+		return &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(k)}, nil
 	case *ecdsa.PrivateKey:
 		b, err := x509.MarshalECPrivateKey(k)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Unable to marshal ECDSA private key: %v", err)
-			os.Exit(2)
+			return nil, fmt.Errorf("marshal ECDSA private key: %w", err)
 		}
-		return &pem.Block{Type: "EC PRIVATE KEY", Bytes: b}
+		return &pem.Block{Type: "EC PRIVATE KEY", Bytes: b}, nil
 	default:
-		return nil
+		return nil, fmt.Errorf("unsupported private key type %T", priv)
 	}
 }
 
@@ -140,7 +139,13 @@ func GenCerts(
 	}
 	out.Reset()
 	// key
-	pem.Encode(out, pemBlockForKey(priv))
+	keyBlock, err := pemBlockForKey(priv)
+	if err != nil {
+		return nil, err
+	}
+	if err := pem.Encode(out, keyBlock); err != nil {
+		return nil, fmt.Errorf("encode %s: %v", outkey, err)
+	}
 	err = os.WriteFile(outkey, out.Bytes(), 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("write %s: %v", outkey, err)
@@ -213,8 +218,14 @@ func GenerateSSHKeyPair() (privateKey, publicKey []byte, err error) {
 
 	}
 	// pem encode
+	keyBlock, err := pemBlockForKey(priv)
+	if err != nil {
+		return privateKey, publicKey, err
+	}
 	priv_buf := new(bytes.Buffer)
-	pem.Encode(priv_buf, pemBlockForKey(priv))
+	if err := pem.Encode(priv_buf, keyBlock); err != nil {
+		return privateKey, publicKey, fmt.Errorf("encode private key: %v", err)
+	}
 	privateKey = priv_buf.Bytes()
 
 	// public

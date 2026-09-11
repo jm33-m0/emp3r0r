@@ -213,13 +213,12 @@ func (l *Logger) Success(format string, a ...any) {
 	l.helper(format, a, color.New(color.FgHiGreen, color.Bold), SUCCESS, true)
 }
 
-// Fatal prints a fatal error message in red, bold and italic font to console and log file, then exits the program
+// Fatal prints a fatal error message in red, bold and italic font to console and log file, then exits the program.
 func (l *Logger) Fatal(format string, a ...any) {
 	l.helper(format, a, color.New(color.FgHiRed, color.Bold, color.Italic), FATAL, true)
 	l.Msg("Run 'tmux kill-session -t emp3r0r' to clean up dead emp3r0r windows")
 	time.Sleep(2 * time.Second) // give user some time to read the error message
-	safeArgs := sanitizeLogArgs(a)
-	log.Fatal(color.New(color.Bold, color.FgHiRed).Sprint(fmt.Sprintf(format, safeArgs...)))
+	os.Exit(1)
 }
 
 // Error prints an error message in red and bold font to console and log file, regardless of log level
