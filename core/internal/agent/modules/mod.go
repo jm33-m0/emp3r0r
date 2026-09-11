@@ -50,7 +50,7 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 	}
 
 	// Resolve the token context: --token/--user/--ticket (Windows). This may
-	// create a make_token netlogon session for --user and import --ticket
+	// create a netlogon session for --user and import --ticket
 	// into the resolved session before the module executes, so Kerberos-bound
 	// BOFs/starlark modules see the ticket. The resolved key (SID or session
 	// name) replaces invocation.Token for executeWithToken below.

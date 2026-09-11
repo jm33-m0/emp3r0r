@@ -34,7 +34,7 @@ func netlogonE2EEnabled() bool {
 }
 
 // TestResolveTokenKeyUserSession verifies that --user triggers get-or-create
-// of a make_token session (session stored + token registered) and that the
+// of a netlogon session (session stored + token registered) and that the
 // returned key resolves through executeWithToken.
 func TestResolveTokenKeyUserSession(t *testing.T) {
 	if !netlogonE2EEnabled() {
@@ -64,7 +64,7 @@ func TestResolveTokenKeyUserSession(t *testing.T) {
 	// Session must be cached and its token registered under the session name.
 	session, ok := priv.GetSession("CORP/jdoe")
 	if !ok || session == nil {
-		t.Fatalf("make_token session not stored")
+		t.Fatalf("netlogon session not stored")
 	}
 	if _, ok := priv.TokenMap.Load("CORP/jdoe"); !ok {
 		t.Fatalf("session token not registered in TokenMap")

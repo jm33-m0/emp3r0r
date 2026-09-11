@@ -27,7 +27,7 @@ func TestParseTokensOutput(t *testing.T) {
 	if parsed.Rows[0][0] != "S-1-5-21-1-2-3" || parsed.Rows[0][2] != "token" {
 		t.Fatalf("row0 = %v", parsed.Rows[0])
 	}
-	if parsed.Rows[1][0] != "CORP/bob" || parsed.Rows[1][2] != "make_token session" {
+	if parsed.Rows[1][0] != "CORP/bob" || parsed.Rows[1][2] != "netlogon session" {
 		t.Fatalf("row1 = %v", parsed.Rows[1])
 	}
 

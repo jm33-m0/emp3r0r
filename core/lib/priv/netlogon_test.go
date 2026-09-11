@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// TestSessionStore exercises the platform-neutral make_token session store:
+// TestSessionStore exercises the platform-neutral netlogon session store:
 // StoreSession / GetSession / DefaultSessionName / ListSessions.
 func TestSessionStore(t *testing.T) {
 	// Ensure clean state for this test.

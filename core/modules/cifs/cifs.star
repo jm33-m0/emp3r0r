@@ -44,7 +44,7 @@
 #   * every win_call below runs under runWithToken(), which impersonates the
 #     assigned token for the duration of the call. The SMB redirector opens a
 #     session for that identity the first time the UNC path is touched.
-#   * with a make_token session the network identity is the imported Kerberos
+#   * with a netlogon session the network identity is the imported Kerberos
 #     ticket (classic PTT); with a stolen DA token the redirector
 #     authenticates as the DA (Kerberos from that logon session's LSA cache,
 #     or NTLM).
@@ -55,7 +55,7 @@
 # ticket/PTT flows so the redirector requests cifs/<hostname> with the
 # imported ticket. An IP address forces NTLM, which only works when the logon
 # session has real credentials (stolen token), not with a dummy-password
-# netonly make_token session.
+# netonly netlogon session.
 
 GENERIC_WRITE        = 0x40000000
 GENERIC_READ         = 0x80000000
@@ -155,7 +155,7 @@ def parse_unc(unc):
 
 
 # effective_identity returns "DOMAIN\user (S-1-...)" of the identity the
-# module currently runs under (the assigned stolen token, make_token session,
+# module currently runs under (the assigned stolen token, netlogon session,
 # or the process identity when none was set). Returns "" when unresolvable.
 def effective_identity():
     TokenUser = 1
@@ -698,8 +698,8 @@ def usage():
     print("    cifs_rm --dest \\\\SERVER\\SHARE\\dir\\file")
     print("            [--rmdir true]   # dest is an (empty) directory instead of a file")
     print("  identity (any):")
-    print("    --token <SID|session>   # stolen DA token / make_token session")
-    print("    --user DOMAIN/user      # or create a make_token session…")
+    print("    --token <SID|session>   # stolen DA token / netlogon session")
+    print("    --user DOMAIN/user      # or create a netlogon session…")
     print("    --ticket <b64 kirbi>    # …and import a Kerberos ticket into it")
 
 

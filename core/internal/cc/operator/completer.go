@@ -173,19 +173,6 @@ func listTokens(ctx carapace.Context) carapace.Action {
 	return carapace.ActionValues(tokens...)
 }
 
-// autocomplete make_token netlogon session names from target agent
-// Returns only the session name (quoted), e.g. "DOMAIN/user"
-func listSessions(ctx carapace.Context) carapace.Action {
-	activeAgent := agents.MustGetActiveAgent()
-	if activeAgent == nil {
-		logging.Debugf("No valid target selected so no auto-completion for sessions")
-		return carapace.ActionValues()
-	}
-
-	sessions := listSessionsWorker(activeAgent.Tag)
-	return carapace.ActionValues(sessions...)
-}
-
 func listTokensWorker(agent_tag string) (tokens []string) {
 	tokens = make([]string, 0)
 	// --quiet: the data still comes back (read from CmdResults below) but the
@@ -221,39 +208,4 @@ func listTokensWorker(agent_tag string) (tokens []string) {
 		logging.Debugf("listTokensWorker: timeout waiting for result")
 	}
 	return tokens
-}
-
-func listSessionsWorker(agent_tag string) (sessions []string) {
-	sessions = make([]string, 0)
-	cmd := def.C2CmdListSessions + " --quiet"
-	job_id := uuid.NewString()
-	resultReady := make(chan struct{}, 1)
-	live.CmdResultsReady.Store(job_id, resultReady)
-
-	err := controllers.ExecuteCommand(cmd, job_id, agent_tag)
-	if err != nil {
-		live.CmdResultsReady.Delete(job_id)
-		logging.Debugf("Cannot list sessions: %v", err)
-		return sessions
-	}
-	listingCtx, listingCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer listingCancel()
-	select {
-	case <-resultReady:
-		if res, exists := live.CmdResults.Load(job_id); exists {
-			var entries []def.SessionEntry
-			if err := cbor.Unmarshal([]byte(res.(string)), &entries); err != nil {
-				logging.Debugf("listSessionsWorker: unmarshal: %v", err)
-			} else {
-				for _, e := range entries {
-					sessions = append(sessions, strconv.Quote(e.Name))
-				}
-			}
-			live.CmdResults.Delete(job_id)
-		}
-	case <-listingCtx.Done():
-		live.CmdResultsReady.Delete(job_id)
-		logging.Debugf("listSessionsWorker: timeout waiting for result")
-	}
-	return sessions
 }

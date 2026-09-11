@@ -121,7 +121,7 @@ func ParseTokensOutput(data []byte) (*ParsedCommandOutput, error) {
 	for _, t := range tokens {
 		typ := "token"
 		if t.IsSession {
-			typ = "make_token session"
+			typ = "netlogon session"
 		}
 		result.Rows = append(result.Rows, []string{t.Key, t.FriendlyName, typ})
 	}

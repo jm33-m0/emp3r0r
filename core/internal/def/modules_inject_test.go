@@ -105,7 +105,7 @@ func TestInjectTokenOption(t *testing.T) {
 	if _, ok := steal.Options["ticket"]; ok {
 		t.Fatalf("%s should not get injected --ticket", ModStealToken)
 	}
-	for _, name := range []string{ModListTokens, ModMakeToken, ModListSessions, ModImportTicket} {
+	for _, name := range []string{ModListTokens, ModListSessions} {
 		mod := &ModuleConfig{Name: name, Platform: "Windows", AgentConfig: AgentModuleConfig{Type: "go"}}
 		InjectTokenOption(mod)
 		if len(mod.Options) != 0 {

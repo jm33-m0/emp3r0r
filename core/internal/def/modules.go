@@ -22,21 +22,9 @@ const (
 	// displaying each entry as "DOMAIN/User (SID)" for easy reference.
 	ModListTokens = "list_tokens"
 
-	// ModMakeToken creates a netonly netlogon logon session for a domain user
-	// via LogonUserW(LOGON32_LOGON_NEW_CREDENTIALS) — the password is never
-	// validated, any value works (exactly like Cobalt Strike make_token /
-	// runas /netonly). The resulting session is cached in priv.SessionMap (and
-	// its token handle in priv.TokenMap under the session name) so Kerberos
-	// tickets can be imported into it and BOFs/starlark modules can run under
-	// it via the universal "token" option.
-	ModMakeToken = "make_token"
-
-	// ModListSessions lists all netlogon logon sessions created by make_token.
+	// ModListSessions lists all netlogon logon sessions created by the
+	// universal "user" module option.
 	ModListSessions = "list_sessions"
-
-	// ModImportTicket imports a base64 KRB-CRED (.kirbi) ticket into the
-	// logon session of a make_token session (or an explicit LUID).
-	ModImportTicket = "import_ticket"
 )
 
 // ModOption represents a module parameter.
@@ -139,7 +127,7 @@ type ResolvedInvocation struct {
 	Coff           *ResolvedCoffInvocation `cbor:"4,keyasint"`
 	// Token is the SID string key into priv.TokenMap for token impersonation.
 	// When non-empty on Windows, module execution runs under that token context.
-	// It may also be a make_token session name (sessions are registered in
+	// It may also be a netlogon session name (sessions are registered in
 	// TokenMap under their name).
 	Token string `cbor:"5,keyasint"`
 	// Dependencies are module names that must be loaded before this module.
@@ -156,7 +144,7 @@ type ResolvedInvocation struct {
 	// read them transparently via read_file("memfs:///...").
 	ModuleFiles []ResolvedModuleFile `cbor:"10,keyasint"`
 
-	// SessionUser is the username (optionally DOMAIN/user) of a make_token
+	// SessionUser is the username (optionally DOMAIN/user) of a netonly
 	// netlogon session to create (or reuse) and run this module under.
 	// Windows-only; used when Token is empty. The agent creates the session
 	// with a dummy password if it does not exist yet.
@@ -424,108 +412,18 @@ func populateModules() {
 		},
 	}
 
-	// make_token – Windows built-in to create a netlogon logon session with
-	// a (dummy) password. The session can be referenced by the universal
-	// "token" option (under its --name), and Kerberos tickets can be imported
-	// into it with the import_ticket module.
-	builtIn[ModMakeToken] = &ModuleConfig{
-		Name:     ModMakeToken,
-		Build:    "",
-		Date:     "2026-09-01",
-		Comment:  "Create a netonly netlogon logon session for a domain user (any password works, never validated); import Kerberos tickets into it and run BOFs/starlark modules under it via the token option",
-		IsLocal:  false,
-		Platform: "Windows",
-		Path:     "",
-		Fileless: true,
-		Options: ModOptions{
-			"user": &ModOption{
-				Name:     "user",
-				Desc:     "Username, optionally DOMAIN/user",
-				Val:      "",
-				Type:     "string",
-				Required: true,
-			},
-			"domain": &ModOption{
-				Name: "domain",
-				Desc: "Domain (default: machine domain or '.' for local account)",
-				Val:  "",
-				Type: "string",
-			},
-			"password": &ModOption{
-				Name:   "password",
-				Desc:   "Password; any value works — never validated (netonly / runas /netonly logon, like Cobalt Strike make_token)",
-				Val:    "",
-				Type:   "string",
-				Secret: true,
-			},
-			"name": &ModOption{
-				Name: "name",
-				Desc: "Session name to reference later via the token option (default: DOMAIN/user)",
-				Val:  "",
-				Type: "string",
-			},
-		},
-		AgentConfig: AgentModuleConfig{
-			Exec:          "built-in",
-			Files:         []string{},
-			InMemory:      false,
-			Type:          "go",
-			IsInteractive: false,
-		},
-	}
-
-	// list_sessions – Windows built-in to list all make_token logon sessions
+	// list_sessions – Windows built-in to list all netlogon logon sessions
+	// created by the universal "user" module option.
 	builtIn[ModListSessions] = &ModuleConfig{
 		Name:     ModListSessions,
 		Build:    "",
 		Date:     "2026-09-01",
-		Comment:  "List all netlogon logon sessions created by make_token (name, user, logon LUID)",
+		Comment:  "List all netlogon logon sessions created by the --user module option (name, user, logon LUID)",
 		IsLocal:  false,
 		Platform: "Windows",
 		Path:     "",
 		Fileless: true,
 		Options:  ModOptions{},
-		AgentConfig: AgentModuleConfig{
-			Exec:          "built-in",
-			Files:         []string{},
-			InMemory:      false,
-			Type:          "go",
-			IsInteractive: false,
-		},
-	}
-
-	// import_ticket – Windows built-in to import a KRB-CRED into a session's
-	// logon session via LSA (LsaCallAuthenticationPackage/Kerberos SSP).
-	builtIn[ModImportTicket] = &ModuleConfig{
-		Name:     ModImportTicket,
-		Build:    "",
-		Date:     "2026-09-01",
-		Comment:  "Import a base64 KRB-CRED (.kirbi) ticket into a make_token session's logon session (or an explicit LUID, requires SYSTEM)",
-		IsLocal:  false,
-		Platform: "Windows",
-		Path:     "",
-		Fileless: true,
-		Options: ModOptions{
-			"session": &ModOption{
-				Name: "session",
-				Desc: "Name of the session created by make_token to import the ticket into",
-				Val:  "",
-				Type: "string",
-			},
-			"luid": &ModOption{
-				Name: "luid",
-				Desc: "Explicit logon session LUID (hex, e.g. 3ea8) to import the ticket into; requires SYSTEM for sessions owned by other users",
-				Val:  "",
-				Type: "string",
-			},
-			"ticket": &ModOption{
-				Name:     "ticket",
-				Desc:     "Base64-encoded KRB-CRED (.kirbi) ticket to import",
-				Val:      "",
-				Type:     "string",
-				Required: true,
-			},
-		},
 		AgentConfig: AgentModuleConfig{
 			Exec:          "built-in",
 			Files:         []string{},
@@ -546,8 +444,8 @@ func populateModules() {
 // options always win). This allows operators to:
 //
 //   - set --token <SID|session> so module execution runs under an
-//     impersonation token or a make_token logon session;
-//   - set --user <USER> so the agent creates/reuses a make_token netlogon
+//     impersonation token or a netlogon logon session;
+//   - set --user <USER> so the agent creates/reuses a netonly netlogon
 //     session for that user and runs the module under it;
 //   - set --ticket <BASE64> so a KRB-CRED ticket is imported into the
 //     resolved logon session before the module runs.
@@ -568,9 +466,9 @@ func populateModules() {
 // The Windows token-management built-ins declare their own dedicated flags
 // and runners instead: steal_token keeps the universal "token" option (an
 // existing cached token/session to impersonate while opening the victim
-// process), while list_tokens, list_sessions, make_token and import_ticket
-// get nothing injected — a --token/--user/--ticket flag there would be
-// silently dropped by their runners.
+// process), while list_tokens and list_sessions get nothing injected — a
+// --token/--user/--ticket flag there would be silently dropped by their
+// runners.
 func InjectTokenOption(mod *ModuleConfig) {
 	if mod == nil || mod.IsLocal || !IsWindowsPlatform(mod.Platform) {
 		return
@@ -595,9 +493,9 @@ func InjectTokenOption(mod *ModuleConfig) {
 
 	switch mod.Name {
 	case ModStealToken:
-		inject("token", "(Windows) SID of a stolen token, or the name of a make_token logon session, to impersonate while opening the target process; leave empty to steal under the current identity")
+		inject("token", "(Windows) SID of a stolen token, or the name of a netlogon session (created with --user), to impersonate while opening the target process; leave empty to steal under the current identity")
 		return
-	case ModListTokens, ModMakeToken, ModListSessions, ModImportTicket:
+	case ModListTokens, ModListSessions:
 		return
 	}
 
@@ -605,8 +503,8 @@ func InjectTokenOption(mod *ModuleConfig) {
 		return
 	}
 
-	inject("token", "(Windows) SID of a stolen token, or the name of a make_token logon session, to impersonate when running this module; leave empty to run as the current user")
-	inject("user", "(Windows) create a make_token netlogon session for this user (DOMAIN/user or plain) and run the module under it; ignored when --token is set")
+	inject("token", "(Windows) SID of a stolen token, or the name of a netlogon session (created with --user), to impersonate when running this module; leave empty to run as the current user")
+	inject("user", "(Windows) create/reuse a netonly netlogon session for this user (DOMAIN/user or plain) and run the module under it; ignored when --token is set")
 	inject("ticket", "(Windows) base64 KRB-CRED (.kirbi) to import into the module's logon session (the --token/--user session, or the current session) before it runs")
 }
 

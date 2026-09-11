@@ -1086,7 +1086,7 @@ func resolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.R
 		resolved.Token = strings.TrimSpace(tokenSID)
 	}
 
-	// ── make_token session user + Kerberos ticket (Windows) ────────────────
+	// ── --user netlogon session + Kerberos ticket (Windows) ────────────────
 	// Injected options: --user creates/reuses a netlogon session for the user
 	// and --ticket imports a KRB-CRED into the resolved session before the
 	// module runs. Only wired when the option was injected (i.e. the module

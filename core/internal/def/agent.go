@@ -92,9 +92,9 @@ type MsgTunData struct {
 // TokenEntry is one entry of a !list_tokens response, marshaled as CBOR by
 // the agent and decoded by the CC (completion + console rendering).
 type TokenEntry struct {
-	Key          string `cbor:"1,keyasint"` // SID, or make_token session name when IsSession
+	Key          string `cbor:"1,keyasint"` // SID, or netlogon session name when IsSession
 	FriendlyName string `cbor:"2,keyasint"` // human-readable identity of the token
-	IsSession    bool   `cbor:"3,keyasint"` // true when Key is a make_token logon session
+	IsSession    bool   `cbor:"3,keyasint"` // true when Key is a netlogon logon session
 }
 
 // SessionEntry is one entry of a !list_sessions response, marshaled as CBOR

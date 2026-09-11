@@ -77,7 +77,7 @@ func DefaultSessionName(session *LogonSession) string {
 	return session.User
 }
 
-// ListSessions returns a human-readable summary of every make_token session.
+// ListSessions returns a human-readable summary of every netlogon session.
 func ListSessions() []string {
 	var entries []string
 	SessionMap.Range(func(key, value any) bool {

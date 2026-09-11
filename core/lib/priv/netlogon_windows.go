@@ -16,7 +16,7 @@ import (
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Netlogon (make_token) logon sessions — Windows implementation
+// Netlogon logon sessions — Windows implementation
 //
 // BOFs and starlark modules are token-aware: they run under a thread token
 // (see ExecuteAsToken / ImpersonateThread). However, Kerberos operations that
@@ -114,7 +114,7 @@ func luidFromUint64(v uint64) windows.LUID {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// make_token
+// netlogon session (MakeToken)
 // ─────────────────────────────────────────────────────────────────────────────
 
 // MakeToken creates a netonly (netlogon) logon session for the given user via

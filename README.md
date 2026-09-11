@@ -114,9 +114,9 @@ Run compiled C modules in-process on either platform:
 Once you're on a Windows host, emp3r0r lets you *become* the users on it — without ever dropping a tool.
 
 - Steal an access token from any running process and use it everywhere: Go modules, Starlark, BOFs.
-- Create disposable netonly sessions (`make_token`) that keep your agent's own identity and only borrow the target user's for outbound access — any password works, nothing is ever validated.
-- Import Kerberos tickets (`import_ticket`) into those sessions for full pass-the-ticket: your network identity becomes the ticket's (say, the Domain Admin) while your local identity never changes.
-- Every module accepts `--token`, `--user`, and `--ticket`, so switching identity is one flag away — including creating a session and loading a ticket in a single command.
+- Create disposable netonly sessions with a module's `--user` flag: they keep your agent's own identity and only borrow the target user's for outbound access — any password works, nothing is ever validated.
+- Import Kerberos tickets with the `--ticket` flag for full pass-the-ticket: your network identity becomes the ticket's (say, the Domain Admin) while your local identity never changes.
+- Every token-aware module accepts `--token`, `--user`, and `--ticket`, so switching identity is one flag away — including creating a session and loading a ticket in a single command.
 - Tickets live per logon session, so the DA material stays quarantined in a disposable session you can purge, and the agent process itself stays clean.
 
 **Why this matters:** lateral movement to machines running no agent at all — SMB shares, service control, CIFS — becomes a normal part of your workflow, authenticated as the user you've borrowed, not as a tool on disk.

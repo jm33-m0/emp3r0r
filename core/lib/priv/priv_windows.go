@@ -338,7 +338,7 @@ func GetTokenFriendlyName(hToken windows.Handle) string {
 	if err != nil {
 		return fmt.Sprintf("%s (lookup failed)", sidStr)
 	}
-	// '/' (not '\') keeps the display consistent with make_token session
+	// '/' (not '\') keeps the display consistent with netlogon session
 	// names (DOMAIN/user), which use '/' so they survive the CC console's
 	// shell-style word splitting unquoted.
 	return fmt.Sprintf("%s/%s (%s)", domain, account, sidStr)

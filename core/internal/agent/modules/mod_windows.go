@@ -59,7 +59,7 @@ func executeWithToken(sid string, action func(token uintptr) error) error {
 
 	raw, ok := priv.TokenMap.Load(sid)
 	if !ok {
-		return fmt.Errorf("token/session not found for %q – steal a token first with steal_token, or create a session with make_token", sid)
+		return fmt.Errorf("token/session not found for %q – steal a token first with steal_token, or run a module with --user to create a netlogon session", sid)
 	}
 
 	hToken, ok := raw.(windows.Handle)
@@ -71,11 +71,11 @@ func executeWithToken(sid string, action func(token uintptr) error) error {
 }
 
 // resolveTokenKey resolves the module invocation's --token/--user/--ticket
-// options into the token key (SID or make_token session name) that
+// options into the token key (SID or netlogon session name) that
 // executeWithToken should use, performing the side effects along the way:
 //
 //   - --token  → the token key itself (looked up by executeWithToken).
-//   - --user   → a make_token netlogon session for that user is created (with
+//   - --user   → a netonly netlogon session for that user is created (with
 //     a dummy password) if it does not exist yet, and its name becomes the key.
 //   - --ticket → the base64 KRB-CRED is imported into the resolved logon
 //     session before the module runs (the --token/--user session, or the
@@ -89,10 +89,10 @@ func resolveTokenKey(invocation def.ResolvedInvocation) (string, error) {
 
 	switch {
 	case key != "":
-		// --token: SID of a stolen token or a make_token session name.
+		// --token: SID of a stolen token or a netlogon session name.
 		raw, ok := priv.TokenMap.Load(key)
 		if !ok {
-			return "", fmt.Errorf("token/session %q not found – steal a token first (steal_token) or create a session (make_token)", key)
+			return "", fmt.Errorf("token/session %q not found – steal a token first (steal_token) or run a module with --user", key)
 		}
 		h, ok := raw.(windows.Handle)
 		if !ok {
@@ -110,7 +110,7 @@ func resolveTokenKey(invocation def.ResolvedInvocation) (string, error) {
 		} else {
 			session, err := priv.MakeToken(user, domain, "")
 			if err != nil {
-				return "", fmt.Errorf("make_token for %s: %w", invocation.SessionUser, err)
+				return "", fmt.Errorf("creating netlogon session for %s: %w", invocation.SessionUser, err)
 			}
 			priv.StoreSession(name, session)
 			priv.RegisterSessionToken(session)
