@@ -9,7 +9,6 @@ package def
 // C2Commands are internal APIs used by the operator
 const (
 	C2CmdListDir      = "!ls_dir" // API for path auto-completion
-	C2CmdCleanLog     = "!clean_log"
 	C2CmdStealToken   = "!steal_token"
 	C2CmdListTokens   = "!list_tokens"   // API for token auto-completion
 	C2CmdListSessions = "!list_sessions" // API for logon session auto-completion

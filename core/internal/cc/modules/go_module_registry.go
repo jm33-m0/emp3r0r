@@ -23,8 +23,6 @@ type builtInGoModuleMeta struct {
 }
 
 var builtInGoModules = map[string]builtInGoModuleMeta{
-	def.ModCLEAN_LOG: {C2Cmd: def.C2CmdCleanLog},
-
 	def.ModListener:   {C2Cmd: def.C2CmdListener},
 	def.ModDownloader: {C2Cmd: def.C2CmdFileDownloader},
 

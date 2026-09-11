@@ -7,8 +7,6 @@ import (
 
 // built-in module names
 const (
-	ModCLEAN_LOG = "clean_log"
-
 	ModListener     = "listener"
 	ModSSHHarvester = "ssh_harvester"
 	ModDownloader   = "file_downloader"
@@ -221,32 +219,6 @@ func init() {
 
 func populateModules() {
 	builtIn := map[string]*ModuleConfig{
-		ModCLEAN_LOG: {
-			Name:     ModCLEAN_LOG,
-			Build:    "",
-			Date:     "2020-01-25",
-			Comment:  "Delete lines containing keyword from xtmp logs",
-			IsLocal:  false,
-			Platform: "Linux",
-			Path:     "",
-			Fileless: true,
-			Options: ModOptions{
-				"keyword": &ModOption{
-					Name: "keyword",
-					Desc: "Delete all log entries containing this keyword",
-					Vals: []string{"root", "admin"},
-					Val:  "root",
-				},
-			},
-			AgentConfig: AgentModuleConfig{
-				Exec:          "built-in",
-				Files:         []string{},
-				InMemory:      false,
-				Type:          "go",
-				IsInteractive: false,
-			},
-		},
-
 		ModListener: {
 			Name:     ModListener,
 			Build:    "",
