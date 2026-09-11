@@ -18,13 +18,23 @@ type agentCommandQueue struct {
 // agentCommandQueues maps agent UUID to its pending command queue.
 var agentCommandQueues sync.Map // agentUUID -> *agentCommandQueue
 
+// asAgentCommandQueue extracts a *agentCommandQueue from a sync.Map value,
+// tolerating a mismatched entry instead of panicking on the type assertion.
+func asAgentCommandQueue(val any) (*agentCommandQueue, bool) {
+	q, ok := val.(*agentCommandQueue)
+	return q, ok && q != nil
+}
+
 // enqueueAgentCommand appends a command to an agent's pending queue.
 func enqueueAgentCommand(agentUUID string, msg def.MsgTunData) {
 	if agentUUID == "" {
 		return
 	}
 	val, _ := agentCommandQueues.LoadOrStore(agentUUID, &agentCommandQueue{})
-	q := val.(*agentCommandQueue)
+	q, ok := asAgentCommandQueue(val)
+	if !ok {
+		return
+	}
 	q.mu.Lock()
 	q.cmds = append(q.cmds, msg)
 	depth := len(q.cmds)
@@ -41,7 +51,10 @@ func hasQueuedCommands(agentUUID string) bool {
 	if !ok {
 		return false
 	}
-	q := val.(*agentCommandQueue)
+	q, ok := asAgentCommandQueue(val)
+	if !ok {
+		return false
+	}
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	return len(q.cmds) > 0
@@ -54,7 +67,10 @@ func dequeueAgentCommands(agentUUID string, max int) []def.MsgTunData {
 	if !ok {
 		return nil
 	}
-	q := val.(*agentCommandQueue)
+	q, ok := asAgentCommandQueue(val)
+	if !ok {
+		return nil
+	}
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if max <= 0 || max > len(q.cmds) {
@@ -76,7 +92,10 @@ func requeueAgentCommands(agentUUID string, cmds []def.MsgTunData) {
 		return
 	}
 	val, _ := agentCommandQueues.LoadOrStore(agentUUID, &agentCommandQueue{})
-	q := val.(*agentCommandQueue)
+	q, ok := asAgentCommandQueue(val)
+	if !ok {
+		return
+	}
 	q.mu.Lock()
 	q.cmds = append(cmds, q.cmds...)
 	q.mu.Unlock()

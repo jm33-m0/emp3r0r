@@ -49,9 +49,9 @@ func DownloadFromAgent(target *def.Emp3r0rAgent, filePath string, isRecursive bo
 		logging.Infof("Waiting for response from agent %s", target.Tag)
 		var result string
 		for i := 0; i < 10; i++ {
-			res, ok := live.CmdResults.Load(job_id)
+			res, ok := live.CmdResultString(job_id)
 			if ok {
-				result = res.(string)
+				result = res
 				logging.Infof("Got file list from %s", target.Tag)
 				live.CmdResults.Delete(job_id)
 				if result == "" {
@@ -99,8 +99,7 @@ func DownloadFromAgent(target *def.Emp3r0rAgent, filePath string, isRecursive bo
 			// wait for file to be downloaded
 			for {
 				if val, ok := network.FTPStreams.Load(file); ok {
-					sh := val.(*network.StreamHandler)
-					if ftpSh.Token == sh.Token {
+					if sh, ok := val.(*network.StreamHandler); ok && sh != nil && ftpSh.Token == sh.Token {
 						util.TakeABlink()
 						continue
 					}

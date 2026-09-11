@@ -46,26 +46,23 @@ func ensureBuiltInGoModuleRunners() {
 			registerModuleRunner(def.ModListSessions, runListSessions)
 		}
 
-		def.Modules.Range(func(key, value any) bool {
-			name := key.(string)
+		def.ForEachModule(func(name string, mod *def.ModuleConfig) {
 			meta, ok := builtInGoModules[name]
 			if !ok || meta.Special {
-				return true
+				return
 			}
 			if hasModuleRunner(name) {
-				return true
+				return
 			}
 
-			mod := value.(*def.ModuleConfig)
 			if strings.ToLower(mod.AgentConfig.Exec) != "built-in" || strings.ToLower(mod.AgentConfig.Type) != "go" {
-				return true
+				return
 			}
 			if meta.C2Cmd == "" {
-				return true
+				return
 			}
 
 			registerModuleRunner(name, makeAutoBuiltInRunner(name))
-			return true
 		})
 	})
 }
@@ -84,11 +81,10 @@ func runAutoBuiltInModule(ctx *c2context.C2Context, modName string) error {
 		return fmt.Errorf("no active agent")
 	}
 
-	val, ok := def.Modules.Load(modName)
+	mod, ok := def.GetModule(modName)
 	if !ok {
 		return fmt.Errorf("module %s config not found", modName)
 	}
-	mod := val.(*def.ModuleConfig)
 
 	meta, ok := builtInGoModules[modName]
 	if !ok {

@@ -118,3 +118,40 @@ func GetActiveAgent() *def.Emp3r0rAgent {
 func SetActiveAgent(a *def.Emp3r0rAgent) {
 	activeAgent.Store(a)
 }
+
+// CmdResultString returns the string result cached for jobID. It reports false
+// when no result is cached or the cached value is not a string, so callers
+// never need an unchecked type assertion on CmdResults.
+func CmdResultString(jobID string) (string, bool) {
+	v, ok := CmdResults.Load(jobID)
+	if !ok {
+		return "", false
+	}
+	s, ok := v.(string)
+	return s, ok
+}
+
+// TakeCmdResultString atomically fetches and removes the string result cached
+// for jobID.
+func TakeCmdResultString(jobID string) (string, bool) {
+	v, ok := CmdResults.LoadAndDelete(jobID)
+	if !ok {
+		return "", false
+	}
+	s, ok := v.(string)
+	return s, ok
+}
+
+// SignalCmdResultReady closes and removes the notification channel registered
+// for jobID, waking any waiter. LoadAndDelete guarantees exactly one closer, so
+// the channel is never double-closed. It is a no-op when nothing is registered
+// or the registered value has an unexpected type.
+func SignalCmdResultReady(jobID string) {
+	v, ok := CmdResultsReady.LoadAndDelete(jobID)
+	if !ok {
+		return
+	}
+	if ch, ok := v.(chan struct{}); ok && ch != nil {
+		close(ch)
+	}
+}

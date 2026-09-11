@@ -84,18 +84,17 @@ func ProcessAgentResponse(data *def.MsgTunData) (*ProcessedResponse, error) {
 	// Cache command result
 	live.CmdResults.Store(data.JobID, resp.Output)
 	// Signal any waiting goroutine that a result is ready.
-	if ch, ok := live.CmdResultsReady.LoadAndDelete(data.JobID); ok {
-		close(ch.(chan struct{}))
-	}
+	live.SignalCmdResultReady(data.JobID)
 
 	// Calculate time spent
 	if val, ok := live.CmdTime.Load(data.JobID); ok {
-		cmdtime := val.(string)
-		startTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", cmdtime)
-		if err == nil {
-			resp.TimeSpent = time.Since(startTime)
-			target.LastSeenRTT = resp.TimeSpent
-			target.LastSeen = time.Now()
+		if cmdtime, isString := val.(string); isString {
+			startTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", cmdtime)
+			if err == nil {
+				resp.TimeSpent = time.Since(startTime)
+				target.LastSeenRTT = resp.TimeSpent
+				target.LastSeen = time.Now()
+			}
 		}
 	}
 

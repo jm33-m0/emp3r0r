@@ -20,11 +20,18 @@ type ipRateLimiter struct {
 
 func (l *ipRateLimiter) getLimiter(ip string) *rate.Limiter {
 	if val, ok := l.ips.Load(ip); ok {
-		return val.(*rate.Limiter)
+		if limiter, ok := val.(*rate.Limiter); ok && limiter != nil {
+			return limiter
+		}
 	}
 	newLimiter := rate.NewLimiter(rate.Limit(10), 20) // 10 rps per IP, burst of 20
 	val, _ := l.ips.LoadOrStore(ip, newLimiter)
-	return val.(*rate.Limiter)
+	if limiter, ok := val.(*rate.Limiter); ok && limiter != nil {
+		return limiter
+	}
+	// A concurrent writer stored a value this process does not understand;
+	// fall back to the freshly built limiter rather than panicking.
+	return newLimiter
 }
 
 var (

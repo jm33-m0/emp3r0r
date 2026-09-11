@@ -31,11 +31,8 @@ func UpdateOptions(modName string) (exist bool) {
 		return exist
 	}
 
-	var modconfig *def.ModuleConfig
-	if val, ok := def.Modules.Load(modName); ok {
-		modconfig = val.(*def.ModuleConfig)
-	}
-	if modconfig == nil {
+	modconfig, ok := def.GetModule(modName)
+	if !ok || modconfig == nil {
 		logging.Errorf("UpdateOptions: module %s config not found", modName)
 		return exist
 	}
@@ -80,11 +77,8 @@ func ModuleRun(ctx *context.C2Context) {
 // ModuleSearch searches modules, powered by fuzzysearch
 func ModuleSearch(keyword string) []*def.ModuleConfig {
 	search_targets := new([]string)
-	def.Modules.Range(func(key, value any) bool {
-		name := key.(string)
-		mod_config := value.(*def.ModuleConfig)
+	def.ForEachModule(func(name string, mod_config *def.ModuleConfig) {
 		*search_targets = append(*search_targets, fmt.Sprintf("%s: %s", name, mod_config.Comment))
-		return true
 	})
 	result := fuzzy.Find(keyword, *search_targets)
 
@@ -92,8 +86,7 @@ func ModuleSearch(keyword string) []*def.ModuleConfig {
 	search_results := make([]*def.ModuleConfig, 0)
 	for _, r := range result {
 		mod_name := strings.Split(r, ":")[0]
-		if val, ok := def.Modules.Load(mod_name); ok {
-			mod := val.(*def.ModuleConfig)
+		if mod, ok := def.GetModule(mod_name); ok {
 			search_results = append(search_results, mod)
 		}
 	}
@@ -108,29 +101,29 @@ func SetActiveModule(modName string) {
 	ensureBuiltInGoModuleRunners()
 
 	if hasModuleRunner(modName) {
-		if val, ok := def.Modules.Load(modName); ok {
-			live.ActiveModule = val.(*def.ModuleConfig)
+		mod, ok := def.GetModule(modName)
+		if !ok {
+			logging.Errorf("No such module: %s", strconv.Quote(modName))
+			return
 		}
+		live.ActiveModule = mod
 		UpdateOptions(modName)
 		logging.Infof("Using module %s", strconv.Quote(modName))
-		if val, exists := def.Modules.Load(modName); exists {
-			mod := val.(*def.ModuleConfig)
-			logging.Successf("%s: %s", modName, mod.Comment)
+		logging.Successf("%s: %s", modName, mod.Comment)
 
-			// OPSEC warnings
-			if mod.AgentConfig.Exec != "built-in" && !mod.IsLocal {
-				if mod.AgentConfig.Type == "coff" || mod.AgentConfig.Type == "starlark" {
-					logging.Infof("OPSEC: This is a BOF/Starlark module, which is recommended for OPSEC (runs in-memory)")
-				} else {
-					logging.Warningf("OPSEC: This module may involve fork-and-run or disk activity")
-				}
+		// OPSEC warnings
+		if mod.AgentConfig.Exec != "built-in" && !mod.IsLocal {
+			if mod.AgentConfig.Type == "coff" || mod.AgentConfig.Type == "starlark" {
+				logging.Infof("OPSEC: This is a BOF/Starlark module, which is recommended for OPSEC (runs in-memory)")
+			} else {
+				logging.Warningf("OPSEC: This module may involve fork-and-run or disk activity")
 			}
-			if mod.AgentConfig.IsInteractive {
-				logging.Warningf("OPSEC: Interactive modules like this one involve forking a shell/process on the agent")
-			}
-			if !mod.Fileless && !mod.IsLocal {
-				logging.Warningf("OPSEC: This module is NOT fileless, it WILL touch the agent's disk")
-			}
+		}
+		if mod.AgentConfig.IsInteractive {
+			logging.Warningf("OPSEC: Interactive modules like this one involve forking a shell/process on the agent")
+		}
+		if !mod.Fileless && !mod.IsLocal {
+			logging.Warningf("OPSEC: This module is NOT fileless, it WILL touch the agent's disk")
 		}
 		return
 	}

@@ -452,7 +452,10 @@ func HandleHTTPServerSession(w http.ResponseWriter, req *http.Request, config *d
 	if isClose {
 		logging.Debugf("HandleHTTPServerSession: closing session %s", sessionID)
 		if val, ok := serverSessions.Load(sessionID); ok {
-			stream = val.(*HTTPServerStream)
+			if stream, ok = val.(*HTTPServerStream); !ok || stream == nil {
+				http.Error(w, "invalid session", http.StatusNotFound)
+				return nil, ErrPollingRequest
+			}
 			stream.Close()
 		}
 		w.WriteHeader(http.StatusOK)
@@ -465,7 +468,11 @@ func HandleHTTPServerSession(w http.ResponseWriter, req *http.Request, config *d
 		http.Error(w, "invalid session", http.StatusNotFound)
 		return nil, ErrPollingRequest
 	}
-	stream = val.(*HTTPServerStream)
+	stream, ok = val.(*HTTPServerStream)
+	if !ok || stream == nil {
+		http.Error(w, "invalid session", http.StatusNotFound)
+		return nil, ErrPollingRequest
+	}
 	if stream.isClosing() && req.Method != http.MethodGet {
 		http.Error(w, "invalid session", http.StatusNotFound)
 		return nil, ErrPollingRequest

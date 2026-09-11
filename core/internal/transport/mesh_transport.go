@@ -164,8 +164,10 @@ func RegisterTransport(name, desc string, t MeshTransport) {
 // AllTransportNames returns a sorted list of registered transport names.
 func AllTransportNames() []string {
 	var names []string
-	Transports.Range(func(key, value any) bool {
-		names = append(names, key.(string))
+	Transports.Range(func(key, _ any) bool {
+		if name, ok := key.(string); ok {
+			names = append(names, name)
+		}
 		return true
 	})
 	sort.Strings(names)

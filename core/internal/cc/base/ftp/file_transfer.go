@@ -41,8 +41,8 @@ func StatFile(filepath string, a *def.Emp3r0rAgent) (fi *util.FileStat, err erro
 	for range 10 {
 		time.Sleep(1 * time.Second)
 		// check if cmd results ready
-		if res, exists := live.CmdResults.Load(job_id); exists {
-			err = cbor.Unmarshal([]byte(res.(string)), &fileinfo)
+		if res, ok := live.CmdResultString(job_id); ok {
+			err = cbor.Unmarshal([]byte(res), &fileinfo)
 			if err != nil {
 				return fi, err
 			}

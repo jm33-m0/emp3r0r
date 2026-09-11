@@ -38,6 +38,31 @@ var (
 	wwwRelayStreams   sync.Map // map[streamID]*relayStream
 )
 
+// asRelayStream extracts a *relayStream from a sync.Map value, tolerating a
+// missing or mismatched entry instead of panicking on the type assertion.
+func asRelayStream(val any) (*relayStream, bool) {
+	rs, ok := val.(*relayStream)
+	return rs, ok && rs != nil
+}
+
+// loadRelayStream is the checked Load counterpart for the relay registries.
+func loadRelayStream(m *sync.Map, streamID string) (*relayStream, bool) {
+	val, ok := m.Load(streamID)
+	if !ok {
+		return nil, false
+	}
+	return asRelayStream(val)
+}
+
+// loadDeleteRelayStream is the checked LoadAndDelete counterpart.
+func loadDeleteRelayStream(m *sync.Map, streamID string) (*relayStream, bool) {
+	val, ok := m.LoadAndDelete(streamID)
+	if !ok {
+		return nil, false
+	}
+	return asRelayStream(val)
+}
+
 func verifyAuxRouteAgent(agentUUID, remoteAddr, route string) bool {
 	if agentUUID == "" {
 		logging.Errorf("%s relay: blocked stream from %s with empty agentUUID", route, remoteAddr)
@@ -218,8 +243,7 @@ func handleOperatorRelayFrame(operatorSession string, msg *def.MsgTunData) {
 	switch {
 	case strings.HasPrefix(tag, def.TagProxyRelayBackPrefix):
 		streamID := strings.TrimPrefix(tag, def.TagProxyRelayBackPrefix)
-		if val, ok := proxyRelayStreams.Load(streamID); ok {
-			rs := val.(*relayStream)
+		if rs, ok := loadRelayStream(&proxyRelayStreams, streamID); ok {
 			if rs.ownerSession != operatorSession {
 				logging.Errorf("CRITICAL: proxy relay owner mismatch for %q", streamID)
 				return
@@ -230,16 +254,14 @@ func handleOperatorRelayFrame(operatorSession string, msg *def.MsgTunData) {
 		}
 	case strings.HasPrefix(tag, def.TagProxyRelayDonePrefix):
 		streamID := strings.TrimPrefix(tag, def.TagProxyRelayDonePrefix)
-		if val, ok := proxyRelayStreams.Load(streamID); ok {
-			rs := val.(*relayStream)
+		if rs, ok := loadRelayStream(&proxyRelayStreams, streamID); ok {
 			if rs.ownerSession == operatorSession {
 				_ = rs.conn.Close()
 			}
 		}
 	case strings.HasPrefix(tag, def.TagWWWRelayDataPrefix):
 		streamID := strings.TrimPrefix(tag, def.TagWWWRelayDataPrefix)
-		if val, ok := wwwRelayStreams.Load(streamID); ok {
-			rs := val.(*relayStream)
+		if rs, ok := loadRelayStream(&wwwRelayStreams, streamID); ok {
 			if rs.ownerSession != operatorSession {
 				logging.Errorf("CRITICAL: www relay owner mismatch for %q", streamID)
 				return
@@ -256,8 +278,7 @@ func handleOperatorRelayFrame(operatorSession string, msg *def.MsgTunData) {
 		}
 	case strings.HasPrefix(tag, def.TagWWWRelayDonePrefix):
 		streamID := strings.TrimPrefix(tag, def.TagWWWRelayDonePrefix)
-		if val, ok := wwwRelayStreams.LoadAndDelete(streamID); ok {
-			rs := val.(*relayStream)
+		if rs, ok := loadDeleteRelayStream(&wwwRelayStreams, streamID); ok {
 			if rs.ownerSession == operatorSession {
 				rs.signalDone()
 				_ = rs.conn.Close()
@@ -266,8 +287,7 @@ func handleOperatorRelayFrame(operatorSession string, msg *def.MsgTunData) {
 	case strings.HasPrefix(tag, def.TagWWWRelayErrorPrefix):
 		streamID := strings.TrimPrefix(tag, def.TagWWWRelayErrorPrefix)
 		logging.Errorf("WWW relay failed for %q: %s", streamID, string(msg.Response))
-		if val, ok := wwwRelayStreams.LoadAndDelete(streamID); ok {
-			rs := val.(*relayStream)
+		if rs, ok := loadDeleteRelayStream(&wwwRelayStreams, streamID); ok {
 			if rs.ownerSession == operatorSession {
 				rs.signalDone()
 				_ = rs.conn.Close()

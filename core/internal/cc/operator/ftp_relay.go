@@ -66,6 +66,18 @@ func (c *relayFTPConn) Push(data []byte) error {
 
 var ftpRelayConns sync.Map // map[token]*relayFTPConn
 
+// dropFTPRelayConn removes token from the relay registry and closes its
+// connection, tolerating a missing or mismatched entry.
+func dropFTPRelayConn(token string) {
+	val, ok := ftpRelayConns.LoadAndDelete(token)
+	if !ok {
+		return
+	}
+	if rc, ok := val.(*relayFTPConn); ok && rc != nil {
+		_ = rc.Close()
+	}
+}
+
 func getOrCreateFTPRelay(token string) (*relayFTPConn, error) {
 	if val, ok := ftpRelayConns.Load(token); ok {
 		if conn, castOK := val.(*relayFTPConn); castOK && conn != nil {
@@ -88,7 +100,12 @@ func getOrCreateFTPRelay(token string) (*relayFTPConn, error) {
 	conn := newRelayFTPConn()
 	actual, loaded := ftpRelayConns.LoadOrStore(token, conn)
 	if loaded {
-		return actual.(*relayFTPConn), nil
+		if existing, ok := actual.(*relayFTPConn); ok && existing != nil {
+			return existing, nil
+		}
+		// The registry held an unexpected value; publish our connection so the
+		// caller and later readers agree on one instance.
+		ftpRelayConns.Store(token, conn)
 	}
 
 	go ftp.HandleFTPStream(conn, token, "relay", func() {})
@@ -115,16 +132,12 @@ func handleFTPRelayMessage(data *def.MsgTunData) bool {
 		return true
 	case strings.HasPrefix(tag, def.TagFTPRelayDonePrefix):
 		token := strings.TrimPrefix(tag, def.TagFTPRelayDonePrefix)
-		if val, ok := ftpRelayConns.LoadAndDelete(token); ok {
-			_ = val.(*relayFTPConn).Close()
-		}
+		dropFTPRelayConn(token)
 		return true
 	case strings.HasPrefix(tag, def.TagFTPRelayErrorPrefix):
 		token := strings.TrimPrefix(tag, def.TagFTPRelayErrorPrefix)
 		logging.Errorf("FTP relay failed for token %q: %s", token, string(data.Response))
-		if val, ok := ftpRelayConns.LoadAndDelete(token); ok {
-			_ = val.(*relayFTPConn).Close()
-		}
+		dropFTPRelayConn(token)
 		return true
 	default:
 		return false

@@ -34,7 +34,9 @@ func CreateJob(name, module, agentTag string) *def.Job {
 // GetJob retrieves a job by ID
 func GetJob(id string) *def.Job {
 	if val, ok := Jobs.Load(id); ok {
-		return val.(*def.Job)
+		if job, ok := val.(*def.Job); ok && job != nil {
+			return job
+		}
 	}
 	return nil
 }
@@ -72,7 +74,9 @@ func HandleOutput(jobID string, output []byte) {
 func GetJobs() []*def.Job {
 	var jobs []*def.Job
 	Jobs.Range(func(key, value any) bool {
-		jobs = append(jobs, value.(*def.Job))
+		if job, ok := value.(*def.Job); ok && job != nil {
+			jobs = append(jobs, job)
+		}
 		return true
 	})
 	return jobs

@@ -213,6 +213,42 @@ type ModuleConfig struct {
 // Module help info and options
 var Modules sync.Map // map[string]*ModuleConfig
 
+// GetModule returns the registered module with the given name. The second
+// return is false when the module is absent or holds an unexpected value, so
+// callers never need an unchecked type assertion on the module map.
+func GetModule(name string) (*ModuleConfig, bool) {
+	v, ok := Modules.Load(name)
+	if !ok {
+		return nil, false
+	}
+	mod, ok := v.(*ModuleConfig)
+	return mod, ok && mod != nil
+}
+
+// ForEachModule calls fn for every registered module. Entries whose key or
+// value has an unexpected type are skipped rather than panicking.
+func ForEachModule(fn func(name string, mod *ModuleConfig)) {
+	Modules.Range(func(k, v any) bool {
+		name, ok := k.(string)
+		if !ok {
+			return true
+		}
+		mod, ok := v.(*ModuleConfig)
+		if !ok || mod == nil {
+			return true
+		}
+		fn(name, mod)
+		return true
+	})
+}
+
+// CountModules returns the number of registered modules.
+func CountModules() int {
+	count := 0
+	ForEachModule(func(string, *ModuleConfig) { count++ })
+	return count
+}
+
 func init() {
 	populateModules()
 }

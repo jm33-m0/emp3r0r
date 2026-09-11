@@ -30,12 +30,11 @@ func moduleCustom(ctx *c2context.C2Context) {
 		logging.Warningf("No module selected")
 		return
 	}
-	val, exists := def.Modules.Load(live.ActiveModule.Name)
-	if !exists {
+	config, ok := def.GetModule(live.ActiveModule.Name)
+	if !ok {
 		logging.Errorf("Config of %s does not exist", live.ActiveModule.Name)
 		return
 	}
-	config := val.(*def.ModuleConfig)
 
 	// Only require target for non-local modules
 	if ctx.Target == nil && !config.IsLocal {
@@ -334,8 +333,8 @@ func handleInteractiveModule(config def.ModuleConfig, job_id string) {
 	look_for := crypto.SHA256SumRaw([]byte(def.MagicString))
 
 	for i := 0; i < 10; i++ {
-		if res, ok := live.CmdResults.Load(job_id); ok {
-			if strings.Contains(res.(string), look_for) {
+		if res, ok := live.CmdResultString(job_id); ok {
+			if strings.Contains(res, look_for) {
 				break
 			}
 		}
@@ -354,13 +353,12 @@ func handleInteractiveModule(config def.ModuleConfig, job_id string) {
 // dependent BOF modules can fetch the correct arch from the C2 file endpoint
 // at runtime. DLL payloads are hosted as <name>.<arch>.gz.
 func hostDLLModules() {
-	def.Modules.Range(func(_, val any) bool {
-		config, ok := val.(*def.ModuleConfig)
-		if !ok || !strings.EqualFold(config.AgentConfig.Type, "dll") {
-			return true
+	def.ForEachModule(func(_ string, config *def.ModuleConfig) {
+		if !strings.EqualFold(config.AgentConfig.Type, "dll") {
+			return
 		}
 		if len(config.AgentConfig.Files) == 0 || config.Path == "" {
-			return true
+			return
 		}
 		for _, file := range config.AgentConfig.Files {
 			arch := payloadArch(file)
@@ -371,7 +369,6 @@ func hostDLLModules() {
 				logging.Warningf("hostDLLModules: %v", err)
 			}
 		}
-		return true
 	})
 }
 
@@ -431,13 +428,13 @@ func ensureModuleDependencyHosted(ctx *c2context.C2Context, depName string) erro
 	// Locate the dependency module config (case-insensitive, module names are
 	// not guaranteed to be lowercase).
 	var config *def.ModuleConfig
-	def.Modules.Range(func(_, val any) bool {
-		c, ok := val.(*def.ModuleConfig)
-		if ok && strings.EqualFold(c.Name, depName) {
-			config = c
-			return false
+	def.ForEachModule(func(_ string, c *def.ModuleConfig) {
+		if config != nil {
+			return // first match wins
 		}
-		return true
+		if strings.EqualFold(c.Name, depName) {
+			config = c
+		}
 	})
 	if config == nil {
 		return fmt.Errorf("dependency module %q is not loaded; install it so dependent modules can fetch it", depName)
@@ -540,11 +537,7 @@ func InitModules() {
 	// demand even if the operator never ran the DLL module directly.
 	hostDLLModules()
 
-	count := 0
-	def.Modules.Range(func(_, _ any) bool {
-		count++
-		return true
-	})
+	count := def.CountModules()
 	logging.Infof("Loaded %d modules", count)
 }
 
@@ -725,16 +718,11 @@ func sameModuleDef(a, b *def.ModuleConfig) bool {
 func unregisterModuleConfigs(moduleDir string) []string {
 	absDir, _ := filepath.Abs(moduleDir)
 	unregister := make([]string, 0)
-	def.Modules.Range(func(key, val any) bool {
-		config, ok := val.(*def.ModuleConfig)
-		if !ok || config == nil {
-			return true
-		}
+	def.ForEachModule(func(name string, config *def.ModuleConfig) {
 		absPath, _ := filepath.Abs(config.Path)
 		if absPath == absDir {
-			unregister = append(unregister, key.(string))
+			unregister = append(unregister, name)
 		}
-		return true
 	})
 	for _, name := range unregister {
 		def.Modules.Delete(name)
@@ -999,10 +987,11 @@ func updateModuleHelp(config *def.ModuleConfig) error {
 			return fmt.Errorf("%s config error: %s incomplete", config.Name, opt)
 		}
 		help_map[opt] = modOption
-		if val, ok := def.Modules.Load(config.Name); ok {
-			mod := val.(*def.ModuleConfig)
-			mod.Options = help_map
-			def.Modules.Store(config.Name, mod)
+		if mod, ok := def.GetModule(config.Name); ok {
+			// Modules map values are shared snapshots: copy, change, publish.
+			cp := *mod
+			cp.Options = help_map
+			def.Modules.Store(config.Name, &cp)
 		}
 	}
 	return nil

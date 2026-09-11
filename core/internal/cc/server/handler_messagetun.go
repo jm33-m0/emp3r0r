@@ -437,9 +437,7 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 					}
 					live.CmdResults.Store(msg.JobID, string(responseToCache))
 					// Signal any goroutine waiting for this job's result.
-					if ch, ok := live.CmdResultsReady.LoadAndDelete(msg.JobID); ok {
-						close(ch.(chan struct{}))
-					}
+					live.SignalCmdResultReady(msg.JobID)
 					// persistence
 					jobs.HandleOutput(msg.JobID, responseToCache)
 				} else if !socksInternal {

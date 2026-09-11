@@ -129,8 +129,8 @@ func listRemoteDirWorker(path_to_list, agent_tag string) (cwd string, names []st
 	defer listingCancel()
 	select {
 	case <-resultReady:
-		if res, exists := live.CmdResults.Load(job_id); exists {
-			safeListing := util.SanitizeText(res.(string))
+		if res, ok := live.CmdResultString(job_id); ok {
+			safeListing := util.SanitizeText(res)
 			remote_entries = strings.Split(safeListing, "\n")
 			live.CmdResults.Delete(job_id)
 		}
@@ -186,9 +186,9 @@ func listTokensWorker(agent_tag string) (tokens []string) {
 	defer listingCancel()
 	select {
 	case <-resultReady:
-		if res, exists := live.CmdResults.Load(job_id); exists {
+		if res, ok := live.CmdResultString(job_id); ok {
 			var entries []def.TokenEntry
-			if err := cbor.Unmarshal([]byte(res.(string)), &entries); err != nil {
+			if err := cbor.Unmarshal([]byte(res), &entries); err != nil {
 				logging.Debugf("listTokensWorker: unmarshal: %v", err)
 			} else {
 				for _, e := range entries {

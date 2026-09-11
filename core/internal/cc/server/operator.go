@@ -495,7 +495,11 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 		sessionID: operator_session,
 		conn:      conn,
 	})
-	operator := op.(*operator_t)
+	operator, ok := op.(*operator_t)
+	if !ok || operator == nil {
+		logging.Errorf("Operator %s: unexpected value in operator registry", operator_session)
+		return
+	}
 	operator.conn = conn
 	OPERATORS.Store(operator_session, operator)
 

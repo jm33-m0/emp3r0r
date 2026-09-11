@@ -6,11 +6,10 @@ import (
 
 // GetModuleDetails returns module metadata
 func GetModuleDetails(modName string) *def.ModuleInfo {
-	val, exists := def.Modules.Load(modName)
-	if !exists {
+	config, ok := def.GetModule(modName)
+	if !ok {
 		return nil
 	}
-	config := val.(*def.ModuleConfig)
 
 	return &def.ModuleInfo{
 		Name:     config.Name,

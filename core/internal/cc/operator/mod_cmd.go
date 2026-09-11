@@ -163,10 +163,8 @@ func runModuleByName(cmd *cobra.Command, modName string) {
 func cmdListModules(_ *cobra.Command, _ []string) {
 	// table output
 	rows := [][]string{}
-	def.Modules.Range(func(key, value any) bool {
-		mod := value.(*def.ModuleConfig)
+	def.ForEachModule(func(_ string, mod *def.ModuleConfig) {
 		rows = append(rows, []string{mod.Name, mod.Comment})
-		return true
 	})
 	tableStr := cli.BuildTable([]string{"Module", "Description"}, rows)
 	cli.AdaptiveTable(tableStr)
