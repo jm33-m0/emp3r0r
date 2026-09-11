@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,7 +23,10 @@ import (
 func startTestFileServer(t *testing.T, ctx context.Context) string {
 	t.Helper()
 
-	tr := transport.GetTransportImplementation("mtls")
+	tr, err := transport.GetTransportImplementationStrict("mtls")
+	if err != nil {
+		t.Fatalf("resolve mtls transport: %v", err)
+	}
 	if camo, ok := tr.(*transport.CamouflageMTLS); ok {
 		camo.CertOrg = common.RuntimeConfig.CamouflageCertOrg
 		camo.CertCN = common.RuntimeConfig.CamouflageCertCN
@@ -273,9 +277,11 @@ func TestFetchFile_GossipPeerDiscovery(t *testing.T) {
 	checksum := crypto.SHA256SumRaw(content)
 
 	// Mock PeerFileProvider to simulate gossip metadata indicating 127.0.0.1 has moduleName on serverPort
-	PeerFileProvider = func(fileName string) map[string]int {
+	PeerFileProvider = func(fileName string) map[string]transport.PeerEndpoint {
 		if fileName == moduleName || fileName == memKey {
-			return map[string]int{"127.0.0.1": serverPort}
+			return map[string]transport.PeerEndpoint{
+				"127.0.0.1": {Addr: "127.0.0.1", Port: serverPort, Transport: "mtls"},
+			}
 		}
 		return nil
 	}
@@ -298,4 +304,28 @@ func TestFetchFile_GossipPeerDiscovery(t *testing.T) {
 		t.Fatalf("content mismatch: got %q, want %q", string(readData), string(content))
 	}
 	_ = data
+}
+
+// TestFetchFilePeerRejectsUnknownTransport asserts that a peer advertising a
+// transport this build cannot resolve fails before any network I/O, so callers
+// can cheaply skip it and fall back to C2.
+func TestFetchFilePeerRejectsUnknownTransport(t *testing.T) {
+	oldCfg := common.RuntimeConfig
+	t.Cleanup(func() { common.RuntimeConfig = oldCfg })
+	common.RuntimeConfig = &def.Config{
+		Password:     "pw",
+		P2PTransport: "mtls",
+		P2PRelayPort: "1",
+	}
+
+	_, err := FetchFilePeerWithEndpoint(
+		transport.PeerEndpoint{Addr: "127.0.0.1", Port: 1, Transport: "no-such-transport"},
+		"whatever", "", "",
+	)
+	if err == nil {
+		t.Fatal("expected error for unknown peer transport")
+	}
+	if !strings.Contains(err.Error(), "no-such-transport") {
+		t.Fatalf("error should name the offending transport, got: %v", err)
+	}
 }

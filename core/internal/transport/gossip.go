@@ -228,8 +228,11 @@ func GetAuthorizedPeers(list *memberlist.Memberlist, capability string) []def.Me
 		}
 
 		peers = append(peers, def.MeshNodeMeta{
-			Addr:     member.Addr.String(),
-			Distance: meta.Distance,
+			Addr:         member.Addr.String(),
+			Distance:     meta.Distance,
+			P2PPort:      meta.P2PPort,
+			P2PTransport: meta.P2PTransport,
+			Files:        meta.Files,
 		})
 	}
 

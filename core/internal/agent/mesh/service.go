@@ -37,13 +37,13 @@ var (
 	gossipMu       sync.RWMutex
 	gossipDelegate *transport.GossipDelegate
 
-	// gatewayIP is the current best gateway IP for the Silent Node relay.
+	// gatewayPeer is the current best gateway for the Silent Node relay.
 	// Protected by gatewayMu; updated by watchPeers whenever a better peer appears.
-	// Set to "" when the current gateway is confirmed dead.
-	gatewayIP  string
-	gatewayMu  sync.RWMutex
-	routeReady = make(chan struct{}) // closed once on first gateway found
-	routeOnce  sync.Once
+	// Its Addr is set to "" when the current gateway is confirmed dead.
+	gatewayPeer def.MeshNodeMeta
+	gatewayMu   sync.RWMutex
+	routeReady  = make(chan struct{}) // closed once on first gateway found
+	routeOnce   sync.Once
 
 	// GatewayDeadCh receives a token whenever the active gateway becomes
 	// unreachable. agent.go listens on this to drop and rebuild the HTTP client.
@@ -85,10 +85,11 @@ func getDistance() int {
 // currentMeta returns the current MeshNodeMeta for gossip advertisement.
 func currentMeta() *def.MeshNodeMeta {
 	return &def.MeshNodeMeta{
-		Token:    common.RuntimeConfig.MyAgentToken,
-		Distance: getDistance(),
-		P2PPort:  GetLocalP2PPort(),
-		Files:    util.ListMemFiles(),
+		Token:        common.RuntimeConfig.MyAgentToken,
+		Distance:     getDistance(),
+		P2PPort:      GetLocalP2PPort(),
+		P2PTransport: common.RuntimeConfig.P2PTransport,
+		Files:        util.ListMemFiles(),
 	}
 }
 
@@ -155,9 +156,26 @@ func WaitForRoute() string {
 // GetGatewayIP returns the current best gateway IP (may change if gossip updates).
 // Returns "" if no gateway is known yet or the last known gateway is dead.
 func GetGatewayIP() string {
+	return GetGatewayPeer().Addr
+}
+
+// GetGatewayPeer returns the full descriptor of the current gateway, including
+// the transport its relay listens on, so dialers use the peer's transport
+// rather than assuming the local default.
+func GetGatewayPeer() def.MeshNodeMeta {
 	gatewayMu.RLock()
 	defer gatewayMu.RUnlock()
-	return gatewayIP
+	return gatewayPeer
+}
+
+// setGatewayPeer publishes the selected gateway and returns the previous
+// gateway address (for change detection / logging).
+func setGatewayPeer(p def.MeshNodeMeta) (prev string) {
+	gatewayMu.Lock()
+	defer gatewayMu.Unlock()
+	prev = gatewayPeer.Addr
+	gatewayPeer = p
+	return prev
 }
 
 // UpdateGossipMeta triggers an immediate re-broadcast of this node's NodeMeta
@@ -242,6 +260,23 @@ func watchPeers(ctx context.Context) {
 			return false
 		}
 
+		// Keep only peers whose advertised relay transport this node can dial.
+		// The mesh may be mixed (e.g. Windows SMB-only nodes alongside mTLS
+		// nodes), so a peer we cannot reach must not be chosen as gateway.
+		dialable := peers[:0]
+		for _, p := range peers {
+			if transport.PeerDialable(p.P2PTransport, common.RuntimeConfig.P2PTransport) {
+				dialable = append(dialable, p)
+			} else {
+				logging.Debugf("Mesh: skipping peer %s (transport %q unusable here)", p.Addr, p.P2PTransport)
+			}
+		}
+		peers = dialable
+		if len(peers) == 0 {
+			logging.Debugf("Mesh: no reachable peer shares a usable transport")
+			return false
+		}
+
 		bestDistance := peers[0].Distance
 		bestPeers := make([]def.MeshNodeMeta, 0, len(peers))
 		for _, p := range peers {
@@ -286,16 +321,13 @@ func watchPeers(ctx context.Context) {
 		}
 
 		for _, p := range bestPeers {
-			// Probe dial: verify the gateway is reachable.
-			if err := t.Ping(ctx, p.Addr, ""); err != nil {
-				logging.Debugf("Mesh: peer %s failed: %v", p.Addr, err)
+			// Probe dial: verify the gateway is reachable (using its transport).
+			if err := t.Ping(ctx, p); err != nil {
+				logging.Debugf("Mesh: peer %s via %s failed: %v", p.Addr, p.P2PTransport, err)
 				continue
 			}
 			SetDistance(p.Distance + 1)
-			gatewayMu.Lock()
-			prev := gatewayIP
-			gatewayIP = p.Addr
-			gatewayMu.Unlock()
+			prev := setGatewayPeer(p)
 			if prev != p.Addr {
 				logging.Infof("Mesh: gateway updated %s → %s", prev, p.Addr)
 			}
@@ -314,19 +346,17 @@ func watchPeers(ctx context.Context) {
 	// checkCurrentGateway probes the currently cached gateway.
 	// If it fails, clears the IP and signals the agent to re-establish C2.
 	checkCurrentGateway := func() {
-		ip := GetGatewayIP()
-		if ip == "" {
+		peer := GetGatewayPeer()
+		if peer.Addr == "" {
 			return // already cleared
 		}
-		if err := t.Ping(ctx, ip, ""); err != nil {
-			logging.Warningf("Mesh: current gateway %s is unreachable (%v), clearing route", ip, err)
-			gatewayMu.Lock()
-			gatewayIP = ""
-			gatewayMu.Unlock()
+		if err := t.Ping(ctx, peer); err != nil {
+			logging.Warningf("Mesh: current gateway %s is unreachable (%v), clearing route", peer.Addr, err)
+			setGatewayPeer(def.MeshNodeMeta{})
 			SetDistance(-1)
 			signalGatewayDead()
 		} else {
-			logging.Debugf("Mesh: current gateway %s is alive", ip)
+			logging.Debugf("Mesh: current gateway %s is alive", peer.Addr)
 		}
 	}
 
@@ -373,9 +403,11 @@ func meshGossipPort() int {
 	return 7946 // memberlist default
 }
 
-// GetPeersForFile returns a map of peerIP -> p2pPort for all gossip cluster peers
-// that advertise having the requested file in their MemFS/local storage.
-func GetPeersForFile(fileName string) map[string]int {
+// GetPeersForFile returns peerIP -> relay endpoint for all gossip cluster peers
+// that advertise having the requested file in their MemFS/local storage. The
+// endpoint carries the peer's advertised transport so the fetcher dials it
+// correctly in a mixed-transport mesh.
+func GetPeersForFile(fileName string) map[string]transport.PeerEndpoint {
 	gossipMu.RLock()
 	list := gossipList
 	gossipMu.RUnlock()
@@ -385,7 +417,7 @@ func GetPeersForFile(fileName string) map[string]int {
 
 	memKey := "memfs:///" + filepath.Base(fileName)
 	baseName := filepath.Base(fileName)
-	result := make(map[string]int)
+	result := make(map[string]transport.PeerEndpoint)
 
 	for _, m := range list.Members() {
 		if m.Name == common.RuntimeConfig.AgentUUID {
@@ -400,16 +432,13 @@ func GetPeersForFile(fileName string) map[string]int {
 		}
 		for _, f := range meta.Files {
 			if f == fileName || f == memKey || filepath.Base(f) == baseName {
-				port := meta.P2PPort
-				if port <= 0 {
-					if p, err := strconv.Atoi(common.RuntimeConfig.P2PRelayPort); err == nil && p > 0 {
-						port = p
-					}
+				addr := m.Addr.String()
+				result[addr] = transport.PeerEndpoint{
+					Addr:      addr,
+					Port:      meta.P2PPort,
+					Transport: meta.P2PTransport,
 				}
-				if port > 0 {
-					result[m.Addr.String()] = port
-					break
-				}
+				break
 			}
 		}
 	}

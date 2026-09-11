@@ -135,6 +135,10 @@ type MeshTransport interface {
 	Dial(addr, password, salt string) (net.Conn, error)
 	Listen(port, password, salt string) (net.Listener, error)
 	Accept(ctx context.Context, l net.Listener) (net.Conn, error)
+	// Supported reports whether this transport can actually be used on the
+	// current platform/build. A registered-but-unsupported transport (e.g. smb
+	// on Linux) must never be selected for dialling or listening.
+	Supported() bool
 }
 
 // Transports is a registry of mesh transports, using sync.Map for thread-safety
@@ -157,24 +161,6 @@ func RegisterTransport(name, desc string, t MeshTransport) {
 	})
 }
 
-// GetTransportImplementation retrieves the implementation for a named transport.
-// Defaults to mtls if not found.
-func GetTransportImplementation(name string) MeshTransport {
-	val, ok := Transports.Load(name)
-	if !ok {
-		// Fallback to mtls
-		val, ok = Transports.Load("mtls")
-		if !ok {
-			return nil
-		}
-	}
-	td, ok := val.(*TransportDescriptor)
-	if !ok {
-		return nil
-	}
-	return td.Transport
-}
-
 // AllTransportNames returns a sorted list of registered transport names.
 func AllTransportNames() []string {
 	var names []string
@@ -193,6 +179,8 @@ func init() {
 
 // KCPTransport wraps the existing KCP implementation.
 type KCPTransport struct{}
+
+func (t KCPTransport) Supported() bool { return true }
 
 func (t KCPTransport) Dial(addr, password, salt string) (net.Conn, error) {
 	return DialKCP(addr, password, salt)
@@ -217,6 +205,8 @@ type CamouflageMTLS struct {
 	CertOrg string
 	CertCN  string
 }
+
+func (t CamouflageMTLS) Supported() bool { return true }
 
 // Dial connects to a peer, performs a "Fake mTLS" handshake, and upgrades to AES-GCM.
 func (t CamouflageMTLS) Dial(addr, password, salt string) (net.Conn, error) {
@@ -281,32 +271,11 @@ func (cl *CamouflageListener) Accept() (net.Conn, error) {
 	}
 
 	// Upgrade to AES-GCM payload security
-	gcmConn, err := NewGCMConn(conn, cl.Password, cl.Salt)
-	if err != nil {
-		conn.Close()
-		return nil, err
-	}
-
-	return gcmConn, nil
+	return wrapGCMConn(conn, cl.Password, cl.Salt)
 }
 
 func (t CamouflageMTLS) Accept(ctx context.Context, l net.Listener) (net.Conn, error) {
-	// standard net.Listener accept, we must wrap it to respect ctx
-	type acceptRes struct {
-		c   net.Conn
-		err error
-	}
-	ch := make(chan acceptRes, 1)
-	go func() {
-		c, e := l.Accept()
-		ch <- acceptRes{c, e}
-	}()
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case res := <-ch:
-		return res.c, res.err
-	}
+	return acceptWithContext(ctx, l)
 }
 
 // -----------------------------------------------------------------------------
@@ -438,9 +407,9 @@ func (c *GCMConn) Write(b []byte) (n int, err error) {
 // P2PTunServer starts a tunnel server using the configured P2P mesh transport.
 // It listens on listenPortStr using P2PTransport and forwards accepted connections to target.
 func P2PTunServer(target, listenPortStr, password, salt, p2pTransport, certOrg, certCN string, ctx context.Context, cancel context.CancelFunc) error {
-	t := GetTransportImplementation(p2pTransport)
-	if t == nil {
-		return fmt.Errorf("P2PTunServer: transport %s not found", p2pTransport)
+	t, err := UsableTransport(p2pTransport)
+	if err != nil {
+		return fmt.Errorf("P2PTunServer: %w", err)
 	}
 	if camo, ok := t.(*CamouflageMTLS); ok {
 		if certOrg != "" {
@@ -506,9 +475,9 @@ func P2PTunClient(remoteAddr, localPortStr, password, salt, p2pTransport, certOr
 		listener.Close()
 	}()
 
-	t := GetTransportImplementation(p2pTransport)
-	if t == nil {
-		return fmt.Errorf("P2PTunClient: transport %s not found", p2pTransport)
+	t, err := UsableTransport(p2pTransport)
+	if err != nil {
+		return fmt.Errorf("P2PTunClient: %w", err)
 	}
 	if camo, ok := t.(*CamouflageMTLS); ok {
 		if certOrg != "" {

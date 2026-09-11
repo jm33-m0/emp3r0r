@@ -204,7 +204,20 @@ generate --type linux_executable --arch amd64 --cc your.domain.com \
 # Mesh intermediate peer (relays for other agents)
 generate --type linux_executable --arch amd64 --cc your.domain.com \
   --p2p --p2p-transport mtls --peers 1.2.3.4
+
+# Windows mesh peer over SMB named pipes (local \\.\pipe, cross-host \\host\pipe),
+# AES-GCM framed like the other transports
+# (requires the Windows SMB stack / logon session to reach the peer)
+generate --type windows_executable --arch amd64 --cc your.domain.com \
+  --p2p --p2p-transport smb
 ```
+
+Mesh nodes may run different transports. Each agent advertises the transport and
+port its relay listens on, and dialers always use the *peer's* advertised
+transport, so a mixed mesh (for example Windows SMB nodes alongside Linux mTLS
+nodes) routes through a peer that shares a usable transport instead of assuming
+everyone runs the local default. `smb` is only accepted for Windows payloads;
+kcp/mtls work everywhere.
 
 ---
 

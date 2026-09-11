@@ -47,6 +47,7 @@ type Emp3r0rAgent struct {
 	MeshGossipPort string        `cbor:"39,keyasint"` // dynamic mesh gossip port assigned to this agent
 	Files          []string      `cbor:"40,keyasint"` // list of available files/modules in agent storage/MemFS
 	GOArch         string        `cbor:"41,keyasint"` // runtime.GOARCH of the agent binary (not the OS kernel arch)
+	P2PTransport   string        `cbor:"42,keyasint"` // transport the agent's P2P relay listens on (kcp/mtls/smb)
 }
 
 // EnrichedPeer holds detailed peer information signed by C2
@@ -58,6 +59,7 @@ type EnrichedPeer struct {
 	MeshGossipPort string   `cbor:"5,keyasint"`
 	Files          []string `cbor:"6,keyasint"`
 	LastSeen       int64    `cbor:"7,keyasint"`
+	P2PTransport   string   `cbor:"8,keyasint"` // transport the peer's relay listens on
 }
 
 // EnrichedPeerList represents the C2 CA-signed list of active peers
