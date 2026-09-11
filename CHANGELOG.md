@@ -1,5 +1,22 @@
 # Changelog
 
+## [4.18.0](https://github.com/jm33-m0/emp3r0r/compare/v4.17.0...v4.18.0) (2026-09-11)
+
+
+### Features
+
+* **p2p:** smb transport ([af65a02](https://github.com/jm33-m0/emp3r0r/commit/af65a029ccfd1493ca27a47c828c23757a45c6ee))
+* **stager:** `libssl` downloader ([0d087dc](https://github.com/jm33-m0/emp3r0r/commit/0d087dcb042652d88a2215f3126246a96fc2e936))
+
+
+### Bug Fixes
+
+* **listener:** report stager HTTP write failures ([5d6535d](https://github.com/jm33-m0/emp3r0r/commit/5d6535d9a6425a4c662f95036cab657be2291094))
+* remove broken xtmp module ([d723301](https://github.com/jm33-m0/emp3r0r/commit/d72330148acb552779824f0524b08e33b81ea46f))
+* remove redundant `make_token` and `import_ticket` ([41daf3b](https://github.com/jm33-m0/emp3r0r/commit/41daf3b3858912cf26a3e12be2ceee03c170b973))
+* **ssh_harvester:** validate maps range and bound code pattern scan ([b3a82e1](https://github.com/jm33-m0/emp3r0r/commit/b3a82e17b8cdbc7d175d892d87534a429f28c66c))
+* **ui:** make active target selection race-free ([bb7d999](https://github.com/jm33-m0/emp3r0r/commit/bb7d999b92b62840d4ad284b3e68e544214d6182))
+
 ## [4.17.0](https://github.com/jm33-m0/emp3r0r/compare/v4.16.2...v4.17.0) (2026-09-09)
 
 
