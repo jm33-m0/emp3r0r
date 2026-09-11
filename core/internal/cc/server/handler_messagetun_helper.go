@@ -134,11 +134,8 @@ func collectEnrichedPeerList() (*def.EnrichedPeerList, []string, error) {
 	peers := make([]def.EnrichedPeer, 0)
 	simpleIPsMap := make(map[string]bool)
 
-	live.AgentControlMap.Range(func(key, value any) bool {
-		agent, ok := key.(*def.Emp3r0rAgent)
-		if !ok || agent == nil {
-			return true
-		}
+	live.RangeAgents(func(rec *live.AgentRecord) bool {
+		agent := rec.Agent
 
 		fromIP := strings.Split(agent.From, ":")[0]
 		if fromIP != "" && fromIP != "127.0.0.1" {

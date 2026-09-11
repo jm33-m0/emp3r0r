@@ -80,7 +80,7 @@ func setupMessageTunnelTestWithOptions(t *testing.T, uuid string, opts messageTu
 	if err := agents.RecordAgentCheckin(agent); err != nil {
 		t.Fatalf("record agent checkin: %v", err)
 	}
-	live.AgentControlMap.Store(agent, &live.AgentControl{Index: 0})
+	live.PublishAgent(&live.AgentRecord{Agent: agent, Control: &live.AgentControl{Index: 0}})
 
 	if err := agents.StartSession(uuid, "test-session", opts.remoteAddr); err != nil {
 		t.Fatalf("start session: %v", err)
@@ -103,7 +103,7 @@ func setupMessageTunnelTestWithOptions(t *testing.T, uuid string, opts messageTu
 		handshakeCheckInterval = origInterval
 		live.RuntimeConfig.OperatorIdleTimeout = 1800
 		OPERATORS.Delete("test-operator")
-		live.AgentControlMap.Delete(agent)
+		live.ForgetAgent(agent.UUID)
 		_ = agents.EndSession(uuid)
 		_ = agents.CloseAgentDB()
 		_ = serverSecure.Close()
@@ -147,7 +147,7 @@ func TestMessageTunnelCommandResponseKeepsAlive(t *testing.T) {
 
 	// Several ticks have fired by now. The command responses must have kept
 	// the handshake timer fresh, so the agent must still be connected.
-	if _, _, _, found := agents.RuntimeControlByUUID(uuid); !found {
+	if _, _, found := agents.RuntimeControlByUUID(uuid); !found {
 		t.Fatal("agent was disconnected even though it kept sending command responses")
 	}
 }
@@ -197,7 +197,7 @@ func TestMessageTunnelCommandResponseWithOperator(t *testing.T) {
 	if err := enc.Encode(&def.MsgTunData{JobID: "job-2", Response: []byte("result2")}); err != nil {
 		t.Fatalf("tunnel closed after command response: %v", err)
 	}
-	if _, _, _, found := agents.RuntimeControlByUUID(uuid); !found {
+	if _, _, found := agents.RuntimeControlByUUID(uuid); !found {
 		t.Fatal("agent was removed after command response forwarding")
 	}
 }
@@ -230,7 +230,7 @@ func TestMessageTunnelSurvivesSetActiveAgent(t *testing.T) {
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
-	if _, _, _, found := agents.RuntimeControlByUUID(uuid); !found {
+	if _, _, found := agents.RuntimeControlByUUID(uuid); !found {
 		t.Fatal("agent removed after SetActiveAgent")
 	}
 }
@@ -264,7 +264,7 @@ func TestMessageTunnelSilenceTimesOut(t *testing.T) {
 	// A silent tunnel never sets ctrl.Conn, so the handler must still remove
 	// the agent from the runtime map. Otherwise the operator list keeps showing
 	// it with an ever-growing LastSeen.
-	if _, _, _, found := agents.RuntimeControlByUUID(uuid); found {
+	if _, _, found := agents.RuntimeControlByUUID(uuid); found {
 		t.Fatal("silent agent was not removed from runtime map after silence timeout")
 	}
 	if connected := agents.GetConnectedAgents(); len(connected) != 0 {
@@ -368,7 +368,7 @@ func TestMessageTunnelLastSeenUpdatedByKeepalive(t *testing.T) {
 	time.Sleep(100 * time.Millisecond) // let the server goroutine process it
 
 	// Fetch the live agent entry to read its current LastSeen.
-	a1, _, _, found1 := agents.RuntimeControlByUUID(uuid)
+	a1, _, found1 := agents.RuntimeControlByUUID(uuid)
 	if !found1 {
 		t.Fatal("agent not in runtime map after first keepalive")
 	}
@@ -388,7 +388,7 @@ func TestMessageTunnelLastSeenUpdatedByKeepalive(t *testing.T) {
 	}
 	time.Sleep(100 * time.Millisecond)
 
-	a2, _, _, found2 := agents.RuntimeControlByUUID(uuid)
+	a2, _, found2 := agents.RuntimeControlByUUID(uuid)
 	if !found2 {
 		t.Fatal("agent not in runtime map after second keepalive")
 	}
@@ -447,7 +447,7 @@ func TestMessageTunnelLastSeenOnlyUpdatedByAgentNotByOperator(t *testing.T) {
 	// state changes.
 	time.Sleep(500 * time.Millisecond)
 
-	a, _, _, found := agents.RuntimeControlByUUID(uuid)
+	a, _, found := agents.RuntimeControlByUUID(uuid)
 	if !found {
 		t.Fatal("agent not in runtime map")
 	}
@@ -519,7 +519,7 @@ func TestMessageTunnelHandshakeTimerResetOnKeepalive(t *testing.T) {
 	t.Logf("Successfully sent %d keepalive frames over 5s without tunnel dying", processed.Load())
 
 	// The agent must still be tracked after the test window.
-	if _, _, _, found := agents.RuntimeControlByUUID(uuid); !found {
+	if _, _, found := agents.RuntimeControlByUUID(uuid); !found {
 		t.Fatal("agent was removed during keepalive window — lastHandshake timer was not being reset")
 	}
 }
@@ -556,7 +556,7 @@ func TestMessageTunnelOperatorIdleRemovesAgent(t *testing.T) {
 		t.Fatal("tunnel did not close after operator idle timeout")
 	}
 
-	if _, _, _, found := agents.RuntimeControlByUUID(uuid); found {
+	if _, _, found := agents.RuntimeControlByUUID(uuid); found {
 		t.Fatal("agent still in runtime map after operator idle teardown")
 	}
 	if connected := agents.GetConnectedAgents(); len(connected) != 0 {
@@ -588,7 +588,7 @@ func TestMessageTunnelOperatorIdleRemovesSilentAgent(t *testing.T) {
 		t.Fatal("tunnel did not close after operator idle timeout")
 	}
 
-	if _, _, _, found := agents.RuntimeControlByUUID(uuid); found {
+	if _, _, found := agents.RuntimeControlByUUID(uuid); found {
 		t.Fatal("silent agent still in runtime map after operator idle teardown")
 	}
 	if connected := agents.GetConnectedAgents(); len(connected) != 0 {
@@ -638,7 +638,7 @@ func TestMessageTunnelSelectedAgentWithActiveOperatorSurvivesWithoutCommands(t *
 		t.Fatal("operatorIsActive returned false despite active operator activity")
 	}
 
-	a, _, _, found := agents.RuntimeControlByUUID(uuid)
+	a, _, found := agents.RuntimeControlByUUID(uuid)
 	if !found {
 		t.Fatal("agent disappeared from RuntimeControlByUUID")
 	}

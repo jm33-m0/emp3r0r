@@ -30,7 +30,7 @@ func startUDPAssociateTest(t *testing.T) (int, func()) {
 	t.Helper()
 	agent := &def.Emp3r0rAgent{UUID: uuid.NewString(), Tag: "udp-test-agent"}
 	srv, _ := net.Pipe()
-	live.AgentControlMap.Store(agent, &live.AgentControl{Index: 0, Conn: srv})
+	live.PublishAgent(&live.AgentRecord{Agent: agent, Control: &live.AgentControl{Index: 0, Conn: srv}})
 
 	agents.SendCmd = func(cmd, jobID string, a *def.Emp3r0rAgent) error {
 		if a == nil || !strings.Contains(cmd, def.C2CmdDNSQuery) {
@@ -57,7 +57,7 @@ func startUDPAssociateTest(t *testing.T) (int, func()) {
 		// still be calling agents.SendCmd when we nil it.
 		_ = StopSocks5Proxy(port)
 		agents.SendCmd = nil
-		live.AgentControlMap.Delete(agent)
+		live.ForgetAgent(agent.UUID)
 		_ = srv.Close()
 	}
 }
@@ -200,7 +200,7 @@ func TestSocks5UDPAssociateConcurrentQueries(t *testing.T) {
 func TestSocks5UDPAssociateAgentErrorSynthesizesServfail(t *testing.T) {
 	agent := &def.Emp3r0rAgent{UUID: uuid.NewString(), Tag: "udp-test-agent-servfail"}
 	srv, _ := net.Pipe()
-	live.AgentControlMap.Store(agent, &live.AgentControl{Index: 0, Conn: srv})
+	live.PublishAgent(&live.AgentRecord{Agent: agent, Control: &live.AgentControl{Index: 0, Conn: srv}})
 
 	agents.SendCmd = func(cmd, jobID string, a *def.Emp3r0rAgent) error {
 		if a == nil || !strings.Contains(cmd, def.C2CmdDNSQuery) {
@@ -217,7 +217,7 @@ func TestSocks5UDPAssociateAgentErrorSynthesizesServfail(t *testing.T) {
 	defer func() {
 		_ = StopSocks5Proxy(port)
 		agents.SendCmd = nil
-		live.AgentControlMap.Delete(agent)
+		live.ForgetAgent(agent.UUID)
 		_ = srv.Close()
 	}()
 

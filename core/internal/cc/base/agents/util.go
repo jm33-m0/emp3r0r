@@ -43,12 +43,11 @@ func MustGetActiveAgent() *def.Emp3r0rAgent {
 		return nil
 	}
 
-	// find target in live.AgentList
+	// find target in the registry
 	var fresh *def.Emp3r0rAgent
-	live.AgentList.Range(func(_, value any) bool {
-		agent, ok := value.(*def.Emp3r0rAgent)
-		if ok && agent != nil && live.ActiveAgent.Tag == agent.Tag {
-			fresh = agent
+	live.RangeAgents(func(rec *live.AgentRecord) bool {
+		if rec.Agent.Tag == live.ActiveAgent.Tag {
+			fresh = SnapshotAgent(rec.Agent)
 			return false // stop iteration
 		}
 		return true

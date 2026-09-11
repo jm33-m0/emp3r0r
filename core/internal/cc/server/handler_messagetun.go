@@ -70,7 +70,7 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 		_ = secureConn.Close()
 		wg.Wait() // Wait for goroutine to finish before returning
 
-		agent, ctrl, key, found := agents.RuntimeControlByConn(secureConn)
+		agent, ctrl, found := agents.RuntimeControlByConn(secureConn)
 		if !found {
 			// The agent may have been admitted but never sent a frame on this
 			// tunnel (e.g. operator idle teardown before the first hello). In
@@ -78,7 +78,7 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			// find it; fall back to the authenticated UUID so it is removed
 			// from the operator-facing list instead of showing a stale,
 			// ever-growing LastSeen.
-			agent, ctrl, key, found = agents.RuntimeControlByUUID(authAgentUUID)
+			agent, ctrl, found = agents.RuntimeControlByUUID(authAgentUUID)
 			if found && ctrl != nil && ctrl.Conn != nil && ctrl.Conn != secureConn {
 				found = false // another live tunnel owns this agent
 			}
@@ -88,7 +88,7 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			logging.Debugf("handleMessageTunnel: teardown uuid=%s found=%v ctrlConnNil=%v", authAgentUUID, found, ctrlConnNil)
 		}
 		if found {
-			live.AgentControlMap.Delete(key)
+			live.ForgetAgent(agent.UUID)
 			if endErr := agents.EndSession(agent.UUID); endErr != nil {
 				logging.Debugf("handleMessageTunnel: end session for %s failed: %v", strconv.Quote(agent.UUID), endErr)
 			}
@@ -264,39 +264,42 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			if shortname == "" {
 				shortname = agent.Tag
 			}
-			// Publish control state as an immutable snapshot. The *live.AgentControl
-			// values in AgentControlMap are shared with readers that run outside
-			// this goroutine (operator agent list, SOCKS5 pivot startup, message
-			// tunnel teardown, SendMessageToAgent, ...). Mutating a stored value in
-			// place would race those readers, so copy the current snapshot, update
-			// the copy, and publish it: sync.Map then hands every Load/Range a
-			// consistent, never-mutated value.
-			var published *live.AgentControl
-			if val, ok := live.AgentControlMap.Load(agent); ok {
-				cur := val.(*live.AgentControl)
-				if cur.Conn == nil {
-					operatorBroadcastPrintf(logging.SUCCESS,
-						"Knock.. Knock... Agent %s is connected",
-						strconv.Quote(shortname))
+			// Publish the registry record as an immutable snapshot. AgentRecord
+			// values are shared with readers that run outside this goroutine
+			// (operator agent list, SOCKS5 pivot startup, message tunnel teardown,
+			// SendMessageToAgent, ...). Mutating a published record in place would
+			// race those readers, so copy the current record, update the copy, and
+			// publish it: sync.Map then hands every Load/Range a consistent,
+			// never-mutated value.
+			rec := &live.AgentRecord{Agent: agent}
+			if existing, ok := live.LookupAgent(agent.UUID); ok {
+				rec.Label = existing.Label
+				if existing.Control != nil {
+					if existing.Control.Conn == nil {
+						operatorBroadcastPrintf(logging.SUCCESS,
+							"Knock.. Knock... Agent %s is connected",
+							strconv.Quote(shortname))
+					}
+					cp := *existing.Control
+					rec.Control = &cp
 				}
-				cp := *cur
-				published = &cp
-			} else {
+			}
+			if rec.Control == nil {
 				operatorBroadcastPrintf(logging.SUCCESS,
 					"Knock.. Knock... Agent %s is connected",
 					strconv.Quote(shortname))
-				published = &live.AgentControl{Index: agents.AssignAgentIndex()}
+				rec.Control = &live.AgentControl{Index: agents.AssignAgentIndex()}
 			}
 			now := time.Now()
 			agents.MarkAgentSeen(agent, now)
 			if logging.Level >= 4 {
 				logging.Debugf("handleMessageTunnel: authenticated frame uuid=%s tag=%q cmd=%d resp=%d job=%q", authAgentUUID, msg.Tag, len(msg.CmdSlice), len(msg.Response), msg.JobID)
 			}
-			// Update the copy and publish it to ensure memory visibility.
-			published.Conn = secureConn
-			published.Ctx = ctx
-			published.Cancel = cancel
-			live.AgentControlMap.Store(agent, published)
+			// Point the copy at this tunnel, then publish it.
+			rec.Control.Conn = secureConn
+			rec.Control.Ctx = ctx
+			rec.Control.Cancel = cancel
+			live.PublishAgent(rec)
 
 			// Any authenticated frame (keep-alive hello OR command response)
 			// proves the agent is still alive, so refresh the handshake timer
@@ -387,7 +390,7 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 				// Trust condition: agent has a live MsgTun session (checked-in + communicating).
 				// The issued token is cached by UUID (agents.AgentTokenFor) instead of
 				// being stored on the shared agent object: this goroutine must not
-				// mutate an AgentControlMap key that other goroutines snapshot.
+				// mutate a live.AgentRegistry record that other goroutines snapshot.
 				curToken := agents.AgentTokenFor(authAgentUUID)
 				needsToken := curToken == nil ||
 					time.Until(time.Unix(curToken.ExpiresAt, 0)) < 6*time.Hour

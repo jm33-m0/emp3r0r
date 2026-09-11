@@ -296,18 +296,7 @@ func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
 	}
 
 	// Try to get agent details from memory first (if connected/recently connected)
-	var targetAgent *def.Emp3r0rAgent
-	live.AgentControlMap.Range(func(key, value any) bool {
-		a := key.(*def.Emp3r0rAgent)
-		if a.UUID == uuid {
-			targetAgent = a
-			return false // stop iteration
-		}
-		return true
-	})
-	if targetAgent == nil {
-		targetAgent = agents.GetAgentByUUID(uuid)
-	}
+	targetAgent := agents.GetAgentByUUID(uuid)
 	if targetAgent != nil && targetAgent.Tag != "" {
 		agentDetails += fmt.Sprintf("\n  Tag: %s\n  Hostname: %s\n  IPs: %s\n  OS: %s",
 			targetAgent.Tag, targetAgent.Hostname, strings.Join(targetAgent.IPs, ", "), targetAgent.OS)
@@ -344,7 +333,7 @@ func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
 
 	// Remove from memory
 	if targetAgent != nil {
-		live.AgentControlMap.Delete(targetAgent)
+		live.ForgetAgent(uuid)
 		logging.Successf("Operator removed agent %s from memory", uuid)
 	}
 	wrt.WriteHeader(http.StatusOK)

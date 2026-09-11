@@ -117,8 +117,7 @@ func startPivotStack(t *testing.T) (pivotAddr string) {
 
 	// Clear in place: reassigning `= sync.Map{}` would race any handler
 	// goroutine from an earlier test still Load/Range-ing the old instance.
-	live.AgentControlMap.Clear()
-	live.AgentList.Clear()
+	live.ClearAgents()
 	live.RuntimeConfig = &def.Config{
 		CCH2Port:      fmt.Sprintf("%d", tlsPort),
 		CCHTTPPort:    fmt.Sprintf("%d", httpPort),
@@ -214,10 +213,8 @@ func startPivotStack(t *testing.T) (pivotAddr string) {
 			t.Fatalf("agent never reached live tunnel state")
 		}
 		admitted := false
-		live.AgentControlMap.Range(func(key, value any) bool {
-			k := key.(*def.Emp3r0rAgent)
-			v := value.(*live.AgentControl)
-			if k.Tag == agentTag && v.Conn != nil {
+		live.RangeAgents(func(rec *live.AgentRecord) bool {
+			if rec.Agent.Tag == agentTag && rec.Control != nil && rec.Control.Conn != nil {
 				admitted = true
 				return false
 			}

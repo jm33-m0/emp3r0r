@@ -198,7 +198,7 @@ func StartSocks5Proxy(agentTag string, port int, bindAddr string) error {
 	if agent == nil {
 		return fmt.Errorf("socks5: agent %s not found", agentTag)
 	}
-	if _, ctrl, _, found := agents.RuntimeControlByUUID(agent.UUID); !found || ctrl == nil || ctrl.Conn == nil {
+	if _, ctrl, found := agents.RuntimeControlByUUID(agent.UUID); !found || ctrl == nil || ctrl.Conn == nil {
 		return fmt.Errorf("socks5: agent %s is not connected", agentTag)
 	}
 

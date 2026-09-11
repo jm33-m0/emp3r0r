@@ -287,13 +287,21 @@ func refreshAgentList() error {
 			logging.Debugf("refreshAgentList: %s LastSeen=%v (%.0fs ago)", a.Tag, a.LastSeen, time.Since(a.LastSeen).Seconds())
 		}
 	}
-	// Publish the refreshed list as an immutable snapshot set (agent UUID ->
-	// agent). live.AgentList is a sync.Map because this refresher runs on its
-	// own goroutine while REPL handlers and autocompletion read the list.
-	live.AgentList.Clear()
+	// Rebuild the registry from the server snapshot. Labels are process-local
+	// presentation metadata, so carry them across the refresh. live.AgentRegistry
+	// is a sync.Map because this refresher runs on its own goroutine while REPL
+	// handlers and autocompletion read the list.
+	labels := make(map[string]string)
+	live.RangeAgents(func(rec *live.AgentRecord) bool {
+		if rec.Label != "" {
+			labels[rec.Agent.UUID] = rec.Label
+		}
+		return true
+	})
+	live.ClearAgents()
 	for _, a := range agents {
 		if a != nil && a.UUID != "" {
-			live.AgentList.Store(a.UUID, a)
+			live.PublishAgent(&live.AgentRecord{Agent: a, Label: labels[a.UUID]})
 		}
 	}
 	// Update active agent pointer to avoid staleness

@@ -172,24 +172,18 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 	}
 
 	// ── Phase 4: Runtime Projection Update (Non-Security State) ────────────
-	var (
-		existingCtrl *live.AgentControl
-		placeholder  any // the key (agent pointer) currently in the map
-	)
-	if _, ctrl, key, found := agents.RuntimeControlByUUID(target.UUID); found {
-		existingCtrl = ctrl
-		placeholder = key
+	// Upsert the registry entry by UUID. A re-check-in keeps the existing live
+	// tunnel and label instead of resetting them.
+	existing, alreadyKnown := live.LookupAgent(target.UUID)
+	rec := &live.AgentRecord{Agent: target}
+	if alreadyKnown {
+		rec.Control = existing.Control
+		rec.Label = existing.Label
 	}
-
-	if placeholder != nil {
-		// Replace placeholder/old entry with the new authoritative data
-		live.AgentControlMap.Delete(placeholder)
+	if rec.Control == nil {
+		rec.Control = &live.AgentControl{Index: agents.AssignAgentIndex()}
 	}
-
-	if existingCtrl == nil {
-		existingCtrl = &live.AgentControl{Index: agents.AssignAgentIndex()}
-	}
-	live.AgentControlMap.Store(target, existingCtrl)
+	live.PublishAgent(rec)
 
 	logging.Infof("Updated agent %q with full data from CBOR", target.UUID)
 
@@ -206,7 +200,7 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 		}
 	}
 
-	if placeholder == nil {
+	if !alreadyKnown {
 		logging.Notify(logging.INFO, "Checked in: %s from %s, running %s", strconv.Quote(shortname), fmt.Sprintf("'%s - %s'", target.From, target.Transport), strconv.Quote(target.OS))
 	} else {
 		if logging.Level >= 4 {

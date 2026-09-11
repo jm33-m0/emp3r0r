@@ -33,24 +33,21 @@ func PersistLabeledAgentsToFile() {
 			_ = json.Unmarshal(data, &old)
 		}
 	}
-	live.AgentControlMap.Range(func(tag, control any) bool {
-		t := tag.(*def.Emp3r0rAgent)
-		c := control.(*live.AgentControl)
-		if c.Label == "" {
+	live.RangeAgents(func(rec *live.AgentRecord) bool {
+		if rec.Label == "" {
 			return true
 		}
-		labeled := &LabeledAgent{
-			Tag:   t.Tag,
-			Label: c.Label,
+		labeled := LabeledAgent{
+			Tag:   rec.Agent.Tag,
+			Label: rec.Label,
 		}
 		for i, l := range old {
 			if l.Tag == labeled.Tag {
 				old[i].Label = labeled.Label // update label
-				old[i] = l
-				return true // continue outter loop (simulated by returning true)
+				return true                  // already known from a previous run
 			}
 		}
-		labeledAgents = append(labeledAgents, *labeled)
+		labeledAgents = append(labeledAgents, labeled)
 		return true
 	})
 	labeledAgents = append(labeledAgents, old...)
@@ -62,36 +59,37 @@ func PersistLabeledAgentsToFile() {
 		logging.Warningf("Saving labeled agents: %v", marshalErr)
 		return
 	}
-	marshalErr = os.WriteFile(AgentsJSON, data, 0o600)
-	if marshalErr != nil {
+	if marshalErr = os.WriteFile(AgentsJSON, data, 0o600); marshalErr != nil {
 		logging.Warningf("Saving labeled agents: %v", marshalErr)
 	}
 }
 
 // RefreshAgentLabel sets the label for an agent based on saved labels in JSON file.
 func RefreshAgentLabel(a *def.Emp3r0rAgent) (label string) {
+	if a == nil {
+		return ""
+	}
 	data, err := os.ReadFile(AgentsJSON)
 	if err != nil {
 		logging.Warningf("Updating agent label: %v", err)
 		return label
 	}
 	var labeledAgents []LabeledAgent
-	err = json.Unmarshal(data, &labeledAgents)
-	if err != nil {
+	if err = json.Unmarshal(data, &labeledAgents); err != nil {
 		logging.Warningf("Invalid JSON: %v", err)
 		return label
 	}
 	for _, labeled := range labeledAgents {
-		if a.Tag == labeled.Tag {
-			if val, ok := live.AgentControlMap.Load(a); ok {
-				// AgentControlMap values are immutable snapshots: copy, update, publish.
-				cur := val.(*live.AgentControl)
-				cp := *cur
-				cp.Label = labeled.Label
-				live.AgentControlMap.Store(a, &cp)
-			}
-			return labeled.Label
+		if a.Tag != labeled.Tag {
+			continue
 		}
+		// Records are immutable snapshots: copy, update, publish.
+		if rec, ok := live.LookupAgent(a.UUID); ok {
+			cp := *rec
+			cp.Label = labeled.Label
+			live.PublishAgent(&cp)
+		}
+		return labeled.Label
 	}
 	return label
 }
@@ -103,32 +101,28 @@ func SetAgentLabel(agentID, label string) error {
 		return fmt.Errorf("agent ID and label are required")
 	}
 
-	target := new(def.Emp3r0rAgent)
+	var target *def.Emp3r0rAgent
 
 	// select by tag or index
 	index, e := strconv.Atoi(agentID)
 	if e != nil {
-		// try by tag
 		target = GetAgentByTag(agentID)
 		if target == nil {
 			return fmt.Errorf("cannot find agent by tag: %s", agentID)
 		}
 	} else {
-		// try by index
 		target = GetAgentByIndex(index)
 	}
 
-	// target exists?
 	if target == nil {
 		return fmt.Errorf("agent does not exist: %s", agentID)
 	}
 
-	if val, ok := live.AgentControlMap.Load(target); ok {
-		// AgentControlMap values are immutable snapshots: copy, update, publish.
-		cur := val.(*live.AgentControl)
-		cp := *cur
+	// Records are immutable snapshots: copy, update, publish.
+	if rec, ok := live.LookupAgent(target.UUID); ok {
+		cp := *rec
 		cp.Label = label
-		live.AgentControlMap.Store(target, &cp)
+		live.PublishAgent(&cp)
 	}
 	PersistLabeledAgentsToFile()
 	logging.Successf("%s has been labeled as %s", target.Tag, label)

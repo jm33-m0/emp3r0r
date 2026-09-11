@@ -296,8 +296,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 
 	// Clear in place: reassigning `= sync.Map{}` would race any handler
 	// goroutine from an earlier test still Load/Range-ing the old instance.
-	live.AgentControlMap.Clear()
-	live.AgentList.Clear()
+	live.ClearAgents()
 	time.Sleep(100 * time.Millisecond)
 
 	// -----------------------------------------------------------------------
@@ -598,11 +597,9 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 			fmt.Printf("Runner Stderr:\n%s\n", stderr.String())
 			t.Fatalf("Timeout waiting for agent checkin")
 		}
-		live.AgentControlMap.Range(func(key, value any) bool {
-			k := key.(*def.Emp3r0rAgent)
-			v := value.(*live.AgentControl)
-			if k.Tag != "" && v.Conn != nil {
-				agent = k
+		live.RangeAgents(func(rec *live.AgentRecord) bool {
+			if rec.Agent.Tag != "" && rec.Control != nil && rec.Control.Conn != nil {
+				agent = rec.Agent
 				return false
 			}
 			return true
@@ -635,8 +632,8 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 
 	outputReceived := false
 	for i := 0; i < 20; i++ {
-		if val, ok := live.AgentControlMap.Load(agent); ok {
-			if val.(*live.AgentControl).Conn == nil {
+		if rec, ok := live.LookupAgent(agent.UUID); ok {
+			if rec.Control == nil || rec.Control.Conn == nil {
 				t.Fatalf("Agent disconnected while waiting for command output!")
 			}
 		}
@@ -710,33 +707,29 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 		syscall.Kill(childPid, syscall.SIGKILL)
 
 		var oldConn net.Conn
-		if val, ok := live.AgentControlMap.Load(agent); ok {
-			if ctrl, ok := val.(*live.AgentControl); ok {
-				oldConn = ctrl.Conn
-			}
+		if rec, ok := live.LookupAgent(agent.UUID); ok && rec.Control != nil {
+			oldConn = rec.Control.Conn
 		}
 		startRestart := time.Now()
 		reconnected := false
 		lastCleanup := time.Time{}
 		cleanupByUUID := func(u string) {
-			live.AgentControlMap.Range(func(key, value any) bool {
-				a, okA := key.(*def.Emp3r0rAgent)
-				ctrl, okC := value.(*live.AgentControl)
-				if !okA || !okC || a.UUID != u {
-					return true
+			rec, ok := live.LookupAgent(u)
+			if !ok {
+				return
+			}
+			if rec.Control != nil {
+				if rec.Control.Cancel != nil {
+					rec.Control.Cancel()
 				}
-				if ctrl.Cancel != nil {
-					ctrl.Cancel()
+				if rec.Control.Conn != nil {
+					rec.Control.Conn.Close()
 				}
-				if ctrl.Conn != nil {
-					ctrl.Conn.Close()
-				}
-				live.AgentControlMap.Delete(key)
-				return true
-			})
+			}
+			live.ForgetAgent(u)
 		}
 		for time.Since(startRestart) < 30*time.Second {
-			if k, v, _, found := agents.RuntimeControlByUUID(agent.UUID); found {
+			if k, v, found := agents.RuntimeControlByUUID(agent.UUID); found {
 				newConn := v != nil && v.Conn != nil && (oldConn == nil || v.Conn != oldConn)
 				fresh := !k.LastSeen.IsZero() && !k.LastSeen.Before(startRestart)
 				newPID := k.Process != nil && k.Process.PID != childPid

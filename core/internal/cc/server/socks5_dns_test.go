@@ -50,7 +50,7 @@ func startRealDNSRelayServer(t *testing.T) (int, func()) {
 	// The handler's reply goes through send2CC -> def.CCMsgConn. Point it at one
 	// end of a pipe; the other end is decoded like the real message tunnel.
 	agentPipe, ccPipe := net.Pipe()
-	live.AgentControlMap.Store(agent, &live.AgentControl{Index: 0, Conn: ccPipe})
+	live.PublishAgent(&live.AgentRecord{Agent: agent, Control: &live.AgentControl{Index: 0, Conn: ccPipe}})
 	origCCMsgConn := def.CCMsgConn
 	def.CCMsgConn = agentPipe
 
@@ -109,7 +109,7 @@ func startRealDNSRelayServer(t *testing.T) (int, func()) {
 	return port, func() {
 		_ = StopSocks5Proxy(port)
 		agents.SendCmd = nil
-		live.AgentControlMap.Delete(agent)
+		live.ForgetAgent(agent.UUID)
 		_ = agentPipe.Close()
 		_ = ccPipe.Close()
 		def.CCMsgConn = origCCMsgConn

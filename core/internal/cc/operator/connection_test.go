@@ -113,11 +113,8 @@ func TestOperatorConnection(t *testing.T) {
 
 	// Mock active agent
 	agentTag := "test-agent"
-	agent := &def.Emp3r0rAgent{Tag: agentTag}
-	live.AgentControlMap.Store(agent, &live.AgentControl{
-		Index: 0,
-		Label: "test-label",
-	})
+	agent := &def.Emp3r0rAgent{UUID: "test-agent-uuid", Tag: agentTag}
+	live.PublishAgent(&live.AgentRecord{Agent: agent, Control: &live.AgentControl{Index: 0}, Label: "test-label"})
 
 	// Mock SendCmd
 	originalSendCmd := agents.SendCmd
@@ -182,7 +179,7 @@ func TestOperatorConnection(t *testing.T) {
 
 	// Verify the agent-list poll path (list_connected_agents) round-trips
 	// LastSeen correctly.
-	live.AgentControlMap.Store(&def.Emp3r0rAgent{UUID: "u-poll", Tag: "t-poll", LastSeen: time.Now()}, &live.AgentControl{Index: 0})
+	live.PublishAgent(&live.AgentRecord{Agent: &def.Emp3r0rAgent{UUID: "u-poll", Tag: "t-poll", LastSeen: time.Now()}, Control: &live.AgentControl{Index: 0}})
 	pollAgents, pollErr := clientpkg.GetAgentList()
 	if pollErr != nil {
 		t.Fatalf("GetAgentList failed: %v", pollErr)

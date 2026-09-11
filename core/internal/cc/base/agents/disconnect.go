@@ -1,7 +1,6 @@
 package agents
 
 import (
-	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
@@ -13,7 +12,7 @@ func DisconnectAgentByUUID(uuid string) bool {
 		return false
 	}
 
-	agent, ctrl, key, found := RuntimeControlByUUID(uuid)
+	agent, ctrl, found := RuntimeControlByUUID(uuid)
 	if !found {
 		if err := EndSession(uuid); err != nil {
 			logging.Debugf("Failed to end session for %s: %v", uuid, err)
@@ -32,8 +31,7 @@ func DisconnectAgentByUUID(uuid string) bool {
 		}
 	}
 
-	live.AgentControlMap.Delete(key)
-	live.AgentList.Delete(uuid)
+	live.ForgetAgent(uuid)
 
 	if err := EndSession(uuid); err != nil {
 		logging.Debugf("Failed to end session for %s: %v", uuid, err)
@@ -43,11 +41,11 @@ func DisconnectAgentByUUID(uuid string) bool {
 	return true
 }
 
-// DisconnectAllAgents closes all agent connections
-// This should be called when the last operator disconnects
+// DisconnectAllAgents closes all agent connections.
+// This should be called when the last operator disconnects.
 func DisconnectAllAgents() {
 	count := 0
-	live.AgentControlMap.Range(func(key, value any) bool {
+	live.RangeAgents(func(_ *live.AgentRecord) bool {
 		count++
 		return true
 	})
@@ -57,9 +55,8 @@ func DisconnectAllAgents() {
 
 	logging.Infof("Disconnecting all %d agent(s) due to operator exit", count)
 
-	live.AgentControlMap.Range(func(key, value any) bool {
-		agent := key.(*def.Emp3r0rAgent)
-		ctrl := value.(*live.AgentControl)
+	live.RangeAgents(func(rec *live.AgentRecord) bool {
+		ctrl := rec.Control
 		if ctrl == nil {
 			return true
 		}
@@ -67,7 +64,7 @@ func DisconnectAllAgents() {
 		// Close the connection
 		if ctrl.Conn != nil {
 			if err := ctrl.Conn.Close(); err != nil {
-				logging.Debugf("Error closing connection for agent %s: %v", agent.Tag, err)
+				logging.Debugf("Error closing connection for agent %s: %v", rec.Agent.Tag, err)
 			}
 		}
 
@@ -77,17 +74,13 @@ func DisconnectAllAgents() {
 		}
 
 		// End DB session tracking
-		if err := EndSession(agent.UUID); err != nil {
-			logging.Debugf("Failed to end session for %s: %v", agent.UUID, err)
+		if err := EndSession(rec.Agent.UUID); err != nil {
+			logging.Debugf("Failed to end session for %s: %v", rec.Agent.UUID, err)
 		}
 
 		return true
 	})
 
-	// Clear both registries. sync.Map.Clear (Go 1.23+) is safe to call while
-	// other goroutines are still using the same map variable; reassigning
-	// `= sync.Map{}` would race any concurrent Load/Range on the old value.
-	live.AgentControlMap.Clear()
-	live.AgentList.Clear()
+	live.ClearAgents()
 	logging.Infof("All agents disconnected")
 }

@@ -145,8 +145,7 @@ func TestFullAgentLifecycle(t *testing.T) {
 
 	// Reset live maps without replacing the sync.Map instance (Clear is safe
 	// with concurrent readers; `= sync.Map{}` would race them).
-	live.AgentControlMap.Clear()
-	live.AgentList.Clear()
+	live.ClearAgents()
 
 	// Initialize agent database for tracking
 	dbPath := filepath.Join(tmpDir, "agents.db")
@@ -316,7 +315,8 @@ func TestFullAgentLifecycle(t *testing.T) {
 		t.Fatalf("Agent not found on server by UUID: %s", agentUUID)
 	}
 
-	// Register the connection in AgentControlMap if it's not already there (it should be after first handshake)
+	// Give the first handshake a moment to publish the registry record, then
+	// send a command through the live tunnel.
 	time.Sleep(1 * time.Second)
 	agents.SendMessageToAgent(&def.MsgTunData{
 		Tag:      agentTag,

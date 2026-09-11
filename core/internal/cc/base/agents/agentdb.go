@@ -584,16 +584,8 @@ func RemoveAgent(uuid string) error {
 
 	logging.Successf("Agent %s removed from database", uuid)
 
-	// Also clear from in-memory maps to ensure PINNED KEYS are forgotten.
-	live.AgentControlMap.Range(func(key, value any) bool {
-		a := key.(*def.Emp3r0rAgent)
-		if a.UUID == uuid {
-			live.AgentControlMap.Delete(key)
-			return false
-		}
-		return true
-	})
-	live.AgentList.Delete(uuid)
+	// Also drop the in-memory registry entry so PINNED KEYS are forgotten.
+	live.ForgetAgent(uuid)
 
 	return nil
 }

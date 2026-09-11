@@ -13,8 +13,8 @@ import (
 // CmdResults machinery but are not rendered in the operator console.
 func TestProcessAgentResponseQuietSuppression(t *testing.T) {
 	agent := &def.Emp3r0rAgent{Tag: "quiet-test", UUID: "quiet-test-uuid"}
-	live.AgentControlMap.Store(agent, &live.AgentControl{})
-	defer live.AgentControlMap.Delete(agent)
+	live.PublishAgent(&live.AgentRecord{Agent: agent, Control: &live.AgentControl{}})
+	defer live.ForgetAgent(agent.UUID)
 
 	msg := func(cmdSlice []string) *def.MsgTunData {
 		return &def.MsgTunData{

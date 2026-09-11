@@ -370,13 +370,9 @@ func TestDuplicatedCheckin(t *testing.T) {
 		},
 	}
 
-	// Reset live maps without replacing sync.Map instance (avoids races with goroutines)
-	live.AgentControlMap.Range(func(key, _ any) bool {
-		live.AgentControlMap.Delete(key)
-		return true
-	})
-	// Clear AgentList in place to match AgentControlMap above.
-	live.AgentList.Clear()
+	// Reset the live registry in place (avoids races with goroutines from an
+	// earlier test that still Load/Range the old instance).
+	live.ClearAgents()
 
 	// Start Real C2 Server
 	startTestC2Server(t)

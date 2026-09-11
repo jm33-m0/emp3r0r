@@ -8,8 +8,8 @@ import (
 
 // agentTokens caches the most recent AgentToken issued to each agent UUID.
 //
-// The token must NOT be stored on the shared *def.Emp3r0rAgent objects used as
-// AgentControlMap keys: the message-tunnel goroutine refreshes tokens while
+// The token must NOT be stored on the shared *def.Emp3r0rAgent objects held in
+// live.AgentRegistry records: the message-tunnel goroutine refreshes tokens while
 // other goroutines snapshot those same objects (SnapshotAgent, agent listings,
 // SOCKS5 pivot startup), and mutating the shared key in place is a data race.
 // Keeping the cache in a side map keyed by UUID gives writers and readers
