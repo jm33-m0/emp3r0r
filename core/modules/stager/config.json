@@ -3,7 +3,7 @@
   "build": "bash ./build.sh",
   "author": "jm33-ng",
   "date": "2025-12-12",
-  "comment": "A Linux stager with modular payload transports (http, tcp, udp, and custom ones such as libcurl) and RC4 obfuscation. Use with emp3r0r-listener",
+  "comment": "A Linux stager with modular payload transports (http, tcp, udp, and library-backed ones such as libcurl and libssl) and RC4 obfuscation. Use with emp3r0r-listener",
   "is_local": true,
   "platform": "Linux",
   "path": "",
@@ -17,9 +17,9 @@
     },
     {
       "name": "transport",
-      "description": "Transport used to download the payload. Built-in: http, tcp, udp. Custom transports can be added as transport_<name>.c (e.g. libcurl)",
+      "description": "Transport used to download the payload. Built-in: http, tcp, udp. Runtime-library transports: libcurl, libssl (HTTPS with a malleable HTTP profile). Custom transports can be added as transport_<name>.c",
       "default": "http",
-      "choices": ["http", "tcp", "udp", "libcurl"],
+      "choices": ["http", "tcp", "udp", "libcurl", "libssl"],
       "type": "cstr"
     },
     {
@@ -66,6 +66,19 @@
       "description": "Dynamic symbol hash table to use: 'auto' (DT_HASH then DT_GNU_HASH), 'sysv' (DT_HASH only), or 'gnu' (DT_GNU_HASH only)",
       "default": "auto",
       "choices": ["auto", "sysv", "gnu"],
+      "type": "cstr"
+    },
+    {
+      "name": "ech",
+      "description": "Enable Encrypted Client Hello (ECH) for the libssl transport. Requires OpenSSL 4.0+ on the target and an ECH-capable front (eg. Cloudflare); falls back to normal TLS when unsupported. Ignored by other transports",
+      "default": "off",
+      "choices": ["off", "on"],
+      "type": "cstr"
+    },
+    {
+      "name": "ech-config",
+      "description": "Base64 ECHConfigList from the front domain's DNS HTTPS RR (used when ech=on): dig +short HTTPS cdn.example.com, take the value after 'ech='",
+      "default": "",
       "type": "cstr"
     }
   ]

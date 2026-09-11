@@ -14,6 +14,7 @@
 // Socket options
 #define SOL_SOCKET 1
 #define SO_RCVTIMEO 20
+#define SO_SNDTIMEO 21
 
 struct sockaddr {
   unsigned short sa_family;
