@@ -38,6 +38,7 @@ Try not to `grep` from `stdout` of a command. Always prefer writing logs to disk
 - Treat all remote input as hostile: validate lengths, indexes, and types; never panic on malformed input. Guard before indexing slices derived from input.
 - Do not write files with predictable or brand-identifying names; prefer in-memory or opaque temporary storage (`memfs`).
 - Use `crypto/rand` (or the project's crypto-backed helpers) for anything security-relevant; do not introduce `math/rand` for keys, nonces, or names.
+- Use I/O functions such as `WriteFileAgent` for agent side file I/O, utilizing `memfs`. No file write except disk spillage by `memfs`. No spawning subprocess on agent side unless explicitly allowed.
 
 ## Compatibility
 
