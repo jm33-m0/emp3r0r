@@ -1,5 +1,4 @@
 //go:build windows
-// +build windows
 
 package util
 
@@ -24,9 +23,10 @@ var (
 	ConsoleExtraHeight = 0 // title bar
 )
 
-// IsMainWindow returns true if a window with the specified handle is a main window.
+// IsMainWindow reports whether the given window handle is a top-level window
+// (one with no owner). Visibility is deliberately not required: a minimized or
+// hidden main window is still the process's console.
 func IsMainWindow(hwnd w32.HWND) bool {
-	// return w32.GetWindow(hwnd, w32.GW_OWNER) == 0 && w32.IsWindowVisible(hwnd)
 	return w32.GetWindow(hwnd, w32.GW_OWNER) == 0
 }
 

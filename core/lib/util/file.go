@@ -499,7 +499,7 @@ func IsDirWritable(path string) bool {
 		return false
 	}
 	// Check if the current user can write to the directory
-	testFile := filepath.Join(path, RandMD5String())
+	testFile := filepath.Join(path, RandHexString())
 	file, err := os.Create(testFile)
 	if err != nil {
 		return false
@@ -698,13 +698,17 @@ func copyDirAgent(src, dst string) error {
 	})
 }
 
-// SetFileCryptoKey sets the key for file encryption
+// fileCryptoKey is the AES-GCM key used to encrypt agent file storage. An
+// empty key disables encryption; it is set once by SetFileCryptoKey from the
+// runtime config password.
 var fileCryptoKey []byte
 
 // MemFileMap is the flat memfs namespace. For entries that live in RAM the
 // value holds the (possibly encrypted) bytes; for entries that have spilled to
 // the on-disk backing store the value is nil and the bytes live in an unmarked
-// temp file (see memSpillPaths). Keep it exported for legacy callers/tests.
+// temp file (see memSpillPaths). It is exported because memfs helpers and their
+// tests inspect it directly; production callers should use the locking
+// ReadFileAgent/WriteFileAgent/RemoveFileAgent wrappers instead of this map.
 //
 // MemFileMap doubles as the namespace index: keys are never deleted on spill,
 // only on RemoveFileAgent, so listing/existence queries stay simple.

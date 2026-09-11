@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 // TestParseCmd tests the ParseCmd function with various inputs
@@ -215,13 +216,31 @@ func TestRandInt(t *testing.T) {
 		}
 	})
 
-	// Test invalid range handling (min > max)
+	// Test invalid range handling (min > max): an empty interval has no
+	// representable value, so the contract is to return min deterministically.
 	t.Run("invalid range min > max", func(t *testing.T) {
-		// The function handles this by adjusting the range
-		result := RandInt(20, 10)
-		// Just verify it doesn't panic
-		_ = result
+		if got := RandInt(20, 10); got != 20 {
+			t.Errorf("RandInt(20, 10) = %d, want 20 for an empty range", got)
+		}
+		if got := RandInt(7, 7); got != 7 {
+			t.Errorf("RandInt(7, 7) = %d, want 7 for an empty range", got)
+		}
 	})
+}
+
+// TestRandHexString checks the replacement for the old MD5 helper: the output
+// must be 32 lowercase hex characters and must vary between calls.
+func TestRandHexString(t *testing.T) {
+	s := RandHexString()
+	if len(s) != 32 {
+		t.Fatalf("RandHexString() = %q (len %d), want 32 hex chars", s, len(s))
+	}
+	if strings.Trim(s, "0123456789abcdef") != "" {
+		t.Fatalf("RandHexString() = %q, contains non-hex characters", s)
+	}
+	if again := RandHexString(); again == s {
+		t.Fatalf("RandHexString() returned the same value twice: %q", s)
+	}
 }
 
 // TestRandStr tests the RandStr function
@@ -366,50 +385,39 @@ func TestParseEnvStr(t *testing.T) {
 	}
 }
 
-func TestSplitLongLine(t *testing.T) {
+// TestTruncate pins the desired behavior of Truncate: it is a hard byte budget
+// that keeps whole runes and reserves room for an ellipsis. The trivially-true
+// "no-op" cases from the old SplitLongLine test are kept as boundary checks.
+func TestTruncate(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		length   int
+		max      int
 		expected string
 	}{
-		{
-			name:     "short string",
-			input:    "hello",
-			length:   10,
-			expected: "hello",
-		},
-		{
-			name:     "exact length",
-			input:    "hello",
-			length:   5,
-			expected: "hello",
-		},
-		{
-			name:     "long string split",
-			input:    "helloworld",
-			length:   5,
-			expected: "helloworld", // Function is currently a no-op
-		},
-		{
-			name:     "long string split multiple times",
-			input:    "helloworldagain",
-			length:   5,
-			expected: "helloworldagain", // Function is currently a no-op
-		},
-		{
-			name:     "empty string",
-			input:    "",
-			length:   5,
-			expected: "",
-		},
+		{name: "short string", input: "hello", max: 10, expected: "hello"},
+		{name: "exact length", input: "hello", max: 5, expected: "hello"},
+		{name: "empty string", input: "", max: 5, expected: ""},
+		{name: "truncates with ellipsis", input: "helloworld", max: 5, expected: "he..."},
+		{name: "longer input still fits budget", input: "helloworldagain", max: 5, expected: "he..."},
+		{name: "budget only fits ellipsis", input: "hello", max: 3, expected: "..."},
+		{name: "ellipsis itself truncated", input: "hello", max: 2, expected: ".."},
+		{name: "zero budget", input: "hello", max: 0, expected: ""},
+		{name: "negative budget", input: "hello", max: -1, expected: ""},
+		{name: "never splits multi-byte runes", input: "你好世界", max: 7, expected: "你..."},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := SplitLongLine(tt.input, tt.length)
+			result := Truncate(tt.input, tt.max)
 			if result != tt.expected {
-				t.Errorf("SplitLongLine(%q, %d) = %q, expected %q", tt.input, tt.length, result, tt.expected)
+				t.Errorf("Truncate(%q, %d) = %q, expected %q", tt.input, tt.max, result, tt.expected)
+			}
+			if !utf8.ValidString(result) {
+				t.Errorf("Truncate(%q, %d) = %q, which is not valid UTF-8", tt.input, tt.max, result)
+			}
+			if tt.max >= 0 && len(result) > tt.max {
+				t.Errorf("Truncate(%q, %d) = %q, which exceeds the %d-byte budget", tt.input, tt.max, result, tt.max)
 			}
 		})
 	}

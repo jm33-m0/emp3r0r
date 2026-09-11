@@ -42,8 +42,8 @@ func ParsePSOutput(data []byte) (*ParsedCommandOutput, error) {
 	}
 
 	for _, p := range procs {
-		pname := util.SplitLongLine(p.Name, 20)
-		cmdline := util.SplitLongLine(p.Cmdline, 35)
+		pname := util.Truncate(p.Name, 20)
+		cmdline := util.Truncate(p.Cmdline, 35)
 
 		row := []string{
 			strconv.Itoa(p.PID),
@@ -74,7 +74,7 @@ func ParseLSOutput(data []byte) (*ParsedCommandOutput, error) {
 	}
 
 	for _, d := range dents {
-		dname := util.SplitLongLine(d.Name, 20)
+		dname := util.Truncate(d.Name, 20)
 		result.Rows = append(result.Rows, []string{
 			dname,
 			d.Ftype,

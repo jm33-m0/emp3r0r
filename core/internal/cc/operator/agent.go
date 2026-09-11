@@ -98,17 +98,17 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 		}
 		ips := strings.Join(target.IPs, ", ")
 		infoMap := map[string]string{
-			"OS":      util.SplitLongLine(target.OS, 20),
-			"Process": util.SplitLongLine(procInfo, 20),
-			"User":    util.SplitLongLine(target.User, 20),
+			"OS":      util.Truncate(target.OS, 20),
+			"Process": util.Truncate(procInfo, 20),
+			"User":    util.Truncate(target.User, 20),
 			"From":    target.From,
-			"C2":      util.SplitLongLine(target.Transport, 20),
-			"Mesh":    util.SplitLongLine(target.MeshRoute, 18),
+			"C2":      util.Truncate(target.Transport, 20),
+			"Mesh":    util.Truncate(target.MeshRoute, 18),
 			"IPs":     ips,
 		}
 		row := []string{
 			target.ShortID,
-			util.SplitLongLine(target.Tag, 15),
+			util.Truncate(target.Tag, 15),
 			infoMap["OS"], infoMap["Process"], infoMap["User"], infoMap["IPs"], infoMap["From"], infoMap["C2"], infoMap["Mesh"],
 			agentLastSeen(target),
 		}

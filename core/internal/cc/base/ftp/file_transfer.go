@@ -188,7 +188,7 @@ func GetFile(file_path string, agent *def.Emp3r0rAgent) (ftpSh *network.StreamHa
 	// mark this file transfer stream
 	ftpSh = &network.StreamHandler{}
 	// tell agent where to seek the left bytes
-	ftpSh.Token = fmt.Sprintf("%s-%s", util.RandMD5String(), fileinfo.Checksum)
+	ftpSh.Token = fmt.Sprintf("%s-%s", util.RandHexString(), fileinfo.Checksum)
 	ftpSh.OperatorSession = client.SessionID
 	ftpSh.ExpectedSize = filesize
 	ftpSh.Checksum = fileinfo.Checksum

@@ -2,7 +2,7 @@ package netutil
 
 import (
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"net"
 	"net/url"
 	"regexp"
@@ -211,9 +211,9 @@ func FindIPToUse(target string) string {
 
 // GenerateRandomSubnet24 generates a random /24 subnet
 func GenerateRandomSubnet24() string {
-	first := rand.Intn(256)
-	second := rand.Intn(256)
-	third := rand.Intn(256)
+	first := rand.IntN(256)
+	second := rand.IntN(256)
+	third := rand.IntN(256)
 
 	return fmt.Sprintf("%d.%d.%d.0/24", first, second, third)
 }
@@ -222,7 +222,7 @@ func GenerateRandomSubnet24() string {
 func GenerateRandomPrivateSubnet24() string {
 	// Choose which private address range to use
 
-	rangeType := rand.Intn(3)
+	rangeType := rand.IntN(3)
 
 	var first, second, third int
 
@@ -230,18 +230,18 @@ func GenerateRandomPrivateSubnet24() string {
 	case 0:
 		// 10.0.0.0/8 range
 		first = 10
-		second = rand.Intn(256)
-		third = rand.Intn(256)
+		second = rand.IntN(256)
+		third = rand.IntN(256)
 	case 1:
 		// 172.16.0.0/12 range
 		first = 172
-		second = rand.Intn(16) + 16 // 16-31
-		third = rand.Intn(256)
+		second = rand.IntN(16) + 16 // 16-31
+		third = rand.IntN(256)
 	case 2:
 		// 192.168.0.0/16 range
 		first = 192
 		second = 168
-		third = rand.Intn(256)
+		third = rand.IntN(256)
 	}
 
 	return fmt.Sprintf("%d.%d.%d.0/24", first, second, third)
@@ -262,7 +262,7 @@ func GenerateRandomIPInSubnet24(subnet string) (string, error) {
 	}
 
 	// Generate random last octet (1-254, avoiding 0 and 255)
-	lastOctet := rand.Intn(254) + 1
+	lastOctet := rand.IntN(254) + 1
 
 	// Create a new IP
 	randomIP := net.IPv4(ip[0], ip[1], ip[2], byte(lastOctet))

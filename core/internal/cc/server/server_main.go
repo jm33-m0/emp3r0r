@@ -134,11 +134,6 @@ func wg(wg_port, numOperators int) {
 			}
 			operatorIP, _ := netutil.GenerateRandomIPInSubnet24(subnet)
 
-			// Save for the first operator (backward compatibility)
-			if i == 0 {
-				wireguard.WgOperatorIP = operatorIP
-			}
-
 			operators[i] = OperatorConfig{
 				PrivateKey: operator_privkey,
 				PublicKey:  operator_pubkey,
@@ -169,7 +164,10 @@ func wg(wg_port, numOperators int) {
 			PublicKey:  op.PublicKey,
 			AllowedIPs: op.IP + "/32",
 		}
-		// Save for the first operator (backward compatibility)
+		// Publish the first operator's IP as the single-operator default used by
+		// callers that still assume one operator (C2 cert SANs and the
+		// standalone-operator tunnel path). Every operator still gets its own
+		// peer entry below.
 		if i == 0 {
 			wireguard.WgOperatorIP = op.IP
 		}

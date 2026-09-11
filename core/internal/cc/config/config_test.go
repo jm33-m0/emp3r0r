@@ -349,3 +349,61 @@ func TestReadJSONConfigFullCoverage(t *testing.T) {
 		t.Errorf("Expected ModulePath /tmp/test, got %s", loaded.ModulePath)
 	}
 }
+
+// TestReadJSONConfigAppliesDefaultsAndIgnoresLegacyKeys pins the schema after
+// the removal of the PascalCase compatibility loader: only snake_case keys are
+// honored, an absent operator_idle_timeout defaults to 1800, an explicit 0
+// disables it, and a missing agent UUID is generated.
+func TestReadJSONConfigAppliesDefaultsAndIgnoresLegacyKeys(t *testing.T) {
+	t.Run("absent idle timeout defaults to 1800", func(t *testing.T) {
+		cfg := &def.Config{}
+		if err := readJSONConfig([]byte(`{"cc_address":"127.0.0.1"}`), cfg); err != nil {
+			t.Fatalf("readJSONConfig: %v", err)
+		}
+		if cfg.OperatorIdleTimeout != 1800 {
+			t.Errorf("OperatorIdleTimeout = %d, want 1800", cfg.OperatorIdleTimeout)
+		}
+		if cfg.AgentUUID == "" {
+			t.Error("AgentUUID should be generated when absent")
+		}
+	})
+
+	t.Run("explicit zero disables idle timeout", func(t *testing.T) {
+		cfg := &def.Config{OperatorIdleTimeout: 1800}
+		if err := readJSONConfig([]byte(`{"operator_idle_timeout":0}`), cfg); err != nil {
+			t.Fatalf("readJSONConfig: %v", err)
+		}
+		if cfg.OperatorIdleTimeout != 0 {
+			t.Errorf("OperatorIdleTimeout = %d, want 0 (explicitly disabled)", cfg.OperatorIdleTimeout)
+		}
+	})
+
+	t.Run("PascalCase legacy keys are ignored", func(t *testing.T) {
+		cfg := &def.Config{}
+		if err := readJSONConfig([]byte(`{"CCAddress":"10.0.0.9","CCHTTPPort":"9999"}`), cfg); err != nil {
+			t.Fatalf("readJSONConfig: %v", err)
+		}
+		if cfg.CCAddress != "" {
+			t.Errorf("CCAddress = %q, want empty; legacy PascalCase keys must be ignored", cfg.CCAddress)
+		}
+		if cfg.CCHTTPPort != "" {
+			t.Errorf("CCHTTPPort = %q, want empty; legacy PascalCase keys must be ignored", cfg.CCHTTPPort)
+		}
+	})
+
+	t.Run("absent fields keep caller seeds", func(t *testing.T) {
+		cfg := &def.Config{CCAddress: "seeded.example.com", CCH2Port: "4444"}
+		if err := readJSONConfig([]byte(`{"cc_host":"h"}`), cfg); err != nil {
+			t.Fatalf("readJSONConfig: %v", err)
+		}
+		if cfg.CCAddress != "seeded.example.com" {
+			t.Errorf("CCAddress = %q, want seeded value preserved", cfg.CCAddress)
+		}
+		if cfg.CCH2Port != "4444" {
+			t.Errorf("CCH2Port = %q, want seeded value preserved", cfg.CCH2Port)
+		}
+		if cfg.CCHost != "h" {
+			t.Errorf("CCHost = %q, want h", cfg.CCHost)
+		}
+	})
+}

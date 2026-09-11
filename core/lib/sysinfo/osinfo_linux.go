@@ -5,7 +5,6 @@
 // adapted by jm33-m0, 2021
 
 //go:build linux
-// +build linux
 
 package sysinfo
 

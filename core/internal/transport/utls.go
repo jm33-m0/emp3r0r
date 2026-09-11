@@ -149,7 +149,6 @@ func (rt *UTLSRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 // helper (the browser has its own proxy support), when using uTLS we have to
 // craft our own proxy connections.
 func makeProxyDialer(proxyURL *url.URL, cfg *utls.Config, clientHelloID *utls.ClientHelloID) (proxy.Dialer, error) {
-	// var proxyDialer proxy.Dialer = proxy.Direct
 	var proxyDialer proxy.Dialer = &net.Dialer{
 		Timeout: 10 * time.Second,
 	}

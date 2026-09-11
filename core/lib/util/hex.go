@@ -3,6 +3,7 @@ package util
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"unicode"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -15,34 +16,16 @@ const (
 	textCheckLimit = 512         // Check first 512 bytes to determine if it's a text file
 )
 
-// DumpFile returns a hex dump or text of the given file.
+// DumpFile returns a hex dump or, for text files, the file content itself.
+// Output is capped at truncateLimit bytes. Reads go through ReadFileAgent, so
+// this transparently handles memfs and encrypted disk files.
 func DumpFile(filename string) (string, error) {
-	// Check memory or disk via ReadFileAgent (handles decryption)
 	data, err := ReadFileAgent(filename)
 	if err != nil {
 		return "", err
 	}
 
-	// Check if text
-	isText := true
-	checkLimit := textCheckLimit
-	if len(data) < checkLimit {
-		checkLimit = len(data)
-	}
-
-	// Scan first bytes
-	scanner := data[:checkLimit]
-	nonPrintableCount := 0
-	for _, b := range scanner {
-		if b == 0 || (!unicode.IsPrint(rune(b)) && !unicode.IsSpace(rune(b))) {
-			nonPrintableCount++
-		}
-	}
-	if float64(nonPrintableCount)/float64(checkLimit) > 0.1 {
-		isText = false
-	}
-
-	if isText {
+	if looksLikeText(data) {
 		if len(data) > truncateLimit {
 			return string(data[:truncateLimit]) + "\n(Output truncated)", nil
 		}
@@ -53,13 +36,13 @@ func DumpFile(filename string) (string, error) {
 		logging.Debugf("Warning: File exceeds limit. Output truncated.\n")
 	}
 
-	result := ""
+	// Render with a Builder: the previous implementation concatenated strings
+	// in a loop, which is quadratic in the number of output lines.
+	var b strings.Builder
 	offset := 0
-	bytesRead := 0
-
-	for bytesRead < len(data) {
+	for bytesRead := 0; bytesRead < len(data); {
 		if bytesRead >= truncateLimit {
-			result += "Output truncated.\n"
+			b.WriteString("Output truncated.\n")
 			break
 		}
 
@@ -70,60 +53,69 @@ func DumpFile(filename string) (string, error) {
 		chunk := data[bytesRead:end]
 		n := len(chunk)
 
-		// Append offset
-		result += fmt.Sprintf("%08x: ", offset)
+		// Offset column.
+		fmt.Fprintf(&b, "%08x: ", offset)
 
-		// Append hex bytes
+		// Hex column, padded so the ASCII column stays aligned on short lines.
 		for i := 0; i < bytesPerLine; i++ {
 			if i < n {
-				result += fmt.Sprintf("%02x ", chunk[i])
+				fmt.Fprintf(&b, "%02x ", chunk[i])
 			} else {
-				result += "   " // Align output for short lines
+				b.WriteString("   ")
 			}
 			if i == 7 {
-				result += " "
+				b.WriteByte(' ')
 			}
 		}
+		b.WriteByte(' ')
 
-		result += " "
-
-		// Append ASCII representation
+		// Printable ASCII column.
 		for i := 0; i < n; i++ {
 			if chunk[i] >= 32 && chunk[i] <= 126 {
-				result += fmt.Sprintf("%c", chunk[i])
+				b.WriteByte(chunk[i])
 			} else {
-				result += "."
+				b.WriteByte('.')
 			}
 		}
+		b.WriteByte('\n')
 
-		result += "\n"
 		offset += n
 		bytesRead += n
 	}
 
-	return result, nil
+	return b.String(), nil
 }
 
-// isTextFile checks if the file is likely a text file by scanning the first few bytes.
+// looksLikeText reports whether data is likely text: fewer than 10% of the
+// sampled leading bytes are NUL or non-printable. The sample is capped at
+// textCheckLimit bytes, and empty input is considered text.
+func looksLikeText(data []byte) bool {
+	limit := textCheckLimit
+	if len(data) < limit {
+		limit = len(data)
+	}
+	if limit == 0 {
+		return true
+	}
+
+	nonPrintable := 0
+	for _, b := range data[:limit] {
+		if b == 0 || (!unicode.IsPrint(rune(b)) && !unicode.IsSpace(rune(b))) {
+			nonPrintable++
+		}
+	}
+	return float64(nonPrintable)/float64(limit) <= 0.1
+}
+
+// isTextFile checks if the file is likely a text file by scanning the first
+// few bytes. It shares looksLikeText with DumpFile so both paths classify a
+// file identically.
 func isTextFile(filename string) (bool, error) {
 	data, err := ReadFileAgent(filename)
 	if err != nil {
 		return false, err
 	}
-
-	limit := textCheckLimit
-	if len(data) < limit {
-		limit = len(data)
-	}
-
-	nonPrintableCount := 0
-	for i := 0; i < limit; i++ {
-		if data[i] == 0 || (!unicode.IsPrint(rune(data[i])) && !unicode.IsSpace(rune(data[i]))) {
-			nonPrintableCount++
-		}
-	}
-
-	return float64(nonPrintableCount)/float64(limit) < 0.1, nil
+	return looksLikeText(data), nil
 }
 
 func isPrintable(b byte) bool {

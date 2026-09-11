@@ -9,7 +9,7 @@ package mesh
 
 import (
 	"context"
-	"math/rand"
+	"math/rand/v2"
 	"path/filepath"
 	"strconv"
 	"sync"
