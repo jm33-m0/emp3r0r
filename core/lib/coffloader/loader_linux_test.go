@@ -153,9 +153,25 @@ func TestZigCompiledBOF(t *testing.T) {
 	tmpDir := t.TempDir()
 	objPath := filepath.Join(tmpDir, "hello_linux_zig.o")
 
-	// Use zig cc
+	// Use zig cc.
+	//
+	// zig 0.16's `zig cc` injects a default -fsanitize=... set, so the object
+	// ends up referencing UBSan runtime handlers (__ubsan_handle_*) that a BOF
+	// loader can never resolve: a BOF is freestanding position-independent code
+	// with no sanitizer runtime. Production BOFs are built with gcc
+	// (modules/hello_linux/Makefile), which enables no such instrumentation.
+	// Disable sanitizers here so the test exercises the loader against a valid
+	// BOF rather than a miscompiled object.
 	compiler := "zig"
-	args := []string{"cc", "-fPIC", "-c", "-I" + commonDir, "-fno-stack-protector", "-fvisibility=hidden", "-target", "x86_64-linux-musl", srcPath, "-o", objPath}
+	args := []string{
+		"cc", "-fPIC", "-c",
+		"-I" + commonDir,
+		"-fno-stack-protector",
+		"-fvisibility=hidden",
+		"-fno-sanitize=all",
+		"-target", "x86_64-linux-musl",
+		srcPath, "-o", objPath,
+	}
 
 	if _, err := exec.LookPath("zig"); err != nil {
 		t.Skip("zig not found")

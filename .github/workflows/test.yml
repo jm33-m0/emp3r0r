@@ -45,17 +45,7 @@ jobs:
         run: |
           go test -v -race "-coverprofile=coverage.txt" -covermode=atomic ./...
 
-      - name: Run Linux BOF loader and integration test (cgo)
-        if: runner.os == 'Linux'
-        working-directory: ./core
-        env:
-          CGO_ENABLED: 1
-          EMP3R0R_RACE_ON: "0"
-        run: |
-          go test -v ./lib/coffloader -count=1
-          go test -v ./internal/cc/modules -count=1
-
-      - name: Install zig (for shellcode stager test)
+      - name: Install zig (for BOF loader and shellcode stager tests)
         if: runner.os == 'Linux'
         env:
           ZIG_VERSION: "0.16.0"
@@ -66,6 +56,18 @@ jobs:
           tar -xf "zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
           sudo mv "zig-x86_64-linux-${ZIG_VERSION}" /usr/local/zig
           sudo ln -sf /usr/local/zig/zig /usr/local/bin/zig
+
+      # zig must be installed before this step: TestZigCompiledBOF skips when
+      # zig is absent, so installing it later silently disabled the test.
+      - name: Run Linux BOF loader and integration test (cgo)
+        if: runner.os == 'Linux'
+        working-directory: ./core
+        env:
+          CGO_ENABLED: 1
+          EMP3R0R_RACE_ON: "0"
+        run: |
+          go test -v ./lib/coffloader -count=1
+          go test -v ./internal/cc/modules -count=1
 
       - name: Run shellcode stager lifecycle test (cgo, no race)
         if: runner.os == 'Linux'
