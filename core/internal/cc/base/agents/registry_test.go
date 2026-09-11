@@ -2,6 +2,7 @@ package agents
 
 import (
 	"net"
+	"sync"
 	"testing"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -18,11 +19,11 @@ func newAgent(uuid, tag string) *def.Emp3r0rAgent {
 func clearRegistry(t *testing.T) {
 	t.Helper()
 	live.ClearAgents()
-	prevActive := live.ActiveAgent
-	live.ActiveAgent = nil
+	prevActive := live.GetActiveAgent()
+	live.SetActiveAgent(nil)
 	t.Cleanup(func() {
 		live.ClearAgents()
-		live.ActiveAgent = prevActive
+		live.SetActiveAgent(prevActive)
 	})
 }
 
@@ -155,8 +156,8 @@ func TestMustGetActiveAgentReturnsFreshSnapshot(t *testing.T) {
 	clearRegistry(t)
 
 	live.PublishAgent(&live.AgentRecord{Agent: newAgent("uuid-active", "active-tag")})
-	live.ActiveAgent = GetAgentByTag("active-tag")
-	if live.ActiveAgent == nil {
+	live.SetActiveAgent(GetAgentByTag("active-tag"))
+	if live.GetActiveAgent() == nil {
 		t.Fatal("test setup: active agent not found")
 	}
 
@@ -174,3 +175,48 @@ func TestMustGetActiveAgentReturnsFreshSnapshot(t *testing.T) {
 type stubConn struct{ net.Conn }
 
 func (s *stubConn) Close() error { return nil }
+
+// TestActiveAgentConcurrentAccess is the regression test for the former plain
+// *def.Emp3r0rAgent global: it was written on the agent-list refresher goroutine
+// and read by REPL/completer/status-bar goroutines with no synchronization,
+// which is a data race. Run with -race to catch a regression.
+func TestActiveAgentConcurrentAccess(t *testing.T) {
+	clearRegistry(t)
+
+	const workers = 8
+	const iterations = 2000
+	var wg sync.WaitGroup
+
+	// Writers flip the selection between two agents.
+	for w := 0; w < workers; w++ {
+		live.PublishAgent(&live.AgentRecord{Agent: newAgent("ra-a", "ra-tag-a")})
+		live.PublishAgent(&live.AgentRecord{Agent: newAgent("ra-b", "ra-tag-b")})
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < iterations; i++ {
+				if i%2 == 0 {
+					live.SetActiveAgent(GetAgentByTag("ra-tag-a"))
+				} else {
+					live.SetActiveAgent(GetAgentByTag("ra-tag-b"))
+				}
+			}
+		}()
+	}
+
+	// Readers observe the selection the way the REPL and status bar do.
+	for r := 0; r < workers; r++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < iterations; i++ {
+				if a := live.GetActiveAgent(); a != nil {
+					_ = a.Tag
+				}
+				_ = MustGetActiveAgent()
+			}
+		}()
+	}
+
+	wg.Wait()
+}

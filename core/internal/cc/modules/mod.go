@@ -50,8 +50,11 @@ func ModuleRun(ctx *context.C2Context) {
 		logging.Errorf("No active module")
 		return
 	}
-	if live.ActiveAgent != nil {
-		target_os := live.ActiveAgent.GOOS
+	// Snapshot the selected target once: it can be replaced concurrently by
+	// the agent-list refresher.
+	active := live.GetActiveAgent()
+	if active != nil {
+		target_os := active.GOOS
 		mod_os := strings.ToLower(live.ActiveModule.Platform)
 		if mod_os != "generic" && target_os != mod_os {
 			logging.Errorf("ModuleRun: module %s does not support %s", strconv.Quote(live.ActiveModule.Name), target_os)
@@ -60,7 +63,7 @@ func ModuleRun(ctx *context.C2Context) {
 	}
 
 	// is a target needed?
-	if live.ActiveAgent == nil && !live.ActiveModule.IsLocal {
+	if active == nil && !live.ActiveModule.IsLocal {
 		logging.Errorf("Target not specified")
 		return
 	}

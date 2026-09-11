@@ -179,7 +179,7 @@ func handleSetActiveAgent(wrt http.ResponseWriter, req *http.Request) {
 	// agent metadata (especially LastSeen/RTT) instead of the shared pointer
 	// that the message-tunnel goroutine is mutating.
 	wrt.Header().Set("Content-Type", "application/cbor")
-	if err := cbor.NewEncoder(wrt).Encode(agents.SnapshotAgent(live.ActiveAgent)); err != nil {
+	if err := cbor.NewEncoder(wrt).Encode(agents.SnapshotAgent(live.GetActiveAgent())); err != nil {
 		http.Error(wrt, err.Error(), http.StatusInternalServerError)
 	}
 }

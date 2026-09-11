@@ -38,7 +38,8 @@ var SendCmd = func(cmd, job_id string, a *def.Emp3r0rAgent) error {
 // MustGetActiveAgent check if current target is set and alive
 func MustGetActiveAgent() *def.Emp3r0rAgent {
 	// find target
-	if live.ActiveAgent == nil {
+	active := live.GetActiveAgent()
+	if active == nil {
 		logging.Debugf("Validate active target: target does not exist")
 		return nil
 	}
@@ -46,7 +47,7 @@ func MustGetActiveAgent() *def.Emp3r0rAgent {
 	// find target in the registry
 	var fresh *def.Emp3r0rAgent
 	live.RangeAgents(func(rec *live.AgentRecord) bool {
-		if rec.Agent.Tag == live.ActiveAgent.Tag {
+		if rec.Agent.Tag == active.Tag {
 			fresh = SnapshotAgent(rec.Agent)
 			return false // stop iteration
 		}

@@ -170,16 +170,16 @@ func SetDynamicPrompt() string {
 	transport := color.New(color.FgRed).Sprint("local")
 	cwd := color.New(color.FgHiBlue).Sprint("cwd:local")
 
-	if live.ActiveAgent != nil {
-		// live.ActiveAgent is already sanitized at storage time
-		shortName = strings.Split(live.ActiveAgent.Tag, "-agent")[0]
-		if live.ActiveAgent.HasRoot {
+	if active := live.GetActiveAgent(); active != nil {
+		// The stored snapshot is already sanitized at write time.
+		shortName = strings.Split(active.Tag, "-agent")[0]
+		if active.HasRoot {
 			prompt_arrow = color.New(color.Bold, color.FgHiGreen).Sprint("\n# ")
 			prompt_name = color.New(color.Bold, color.FgBlack, color.BgHiGreen).Sprint(AppName)
 		}
-		transport = getTransport(live.ActiveAgent.Transport)
-		if live.ActiveAgent.CWD != "" {
-			cwd = color.New(color.FgHiBlue).Sprint(live.ActiveAgent.CWD)
+		transport = getTransport(active.Transport)
+		if active.CWD != "" {
+			cwd = color.New(color.FgHiBlue).Sprint(active.CWD)
 		} else {
 			cwd = color.New(color.FgHiBlue).Sprint("cwd:unknown")
 		}

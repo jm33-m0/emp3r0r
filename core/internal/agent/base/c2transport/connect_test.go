@@ -256,7 +256,7 @@ func TestEstablishC2Connection(t *testing.T) {
 	t.Logf("Agent found on server: %s", agent.Tag)
 
 	// Set active agent
-	live.ActiveAgent = agent
+	live.SetActiveAgent(agent)
 
 	// Send Command "ls"
 	cmdID := "test-cmd-id"

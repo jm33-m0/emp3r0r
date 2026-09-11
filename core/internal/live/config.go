@@ -6,6 +6,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -20,8 +21,13 @@ var (
 	// HOME is the user's home directory
 	HOME = ""
 
-	// ActiveAgent selected target
-	ActiveAgent *def.Emp3r0rAgent
+	// activeAgent holds the currently selected target. It is written by the
+	// operator (`target <agent>` and each agent-list refresh) and read by REPL
+	// handlers, completers, module dispatch and the status bar, which run on
+	// different goroutines. Access goes through atomic load/store because a
+	// plain pointer would race those readers. A stored value is an immutable
+	// snapshot: replace it, never mutate it in place.
+	activeAgent atomic.Pointer[def.Emp3r0rAgent]
 
 	// WWWRoot host static files for agent
 	WWWRoot = Temp + "www/"

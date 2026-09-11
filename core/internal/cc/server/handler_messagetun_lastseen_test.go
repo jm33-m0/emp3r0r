@@ -211,7 +211,7 @@ func TestMessageTunnelSurvivesSetActiveAgent(t *testing.T) {
 
 	// Simulate handleSetActiveAgent (operator `target <agent>`).
 	agents.SetActiveAgent("test-agent-" + uuid)
-	if _, err := cbor.Marshal(live.ActiveAgent); err != nil {
+	if _, err := cbor.Marshal(live.GetActiveAgent()); err != nil {
 		t.Fatalf("encode active agent: %v", err)
 	}
 

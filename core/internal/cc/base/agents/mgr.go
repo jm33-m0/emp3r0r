@@ -99,7 +99,7 @@ func SetActiveAgent(identifier string) {
 		logging.Errorf("Target does not exist, no target has been selected")
 		return
 	}
-	live.ActiveAgent = targetToSet
+	live.SetActiveAgent(targetToSet)
 }
 
 // IsAgentExistByTag is agent already in target list?

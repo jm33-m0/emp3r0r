@@ -106,3 +106,15 @@ func RangeAgents(fn func(*AgentRecord) bool) {
 		return fn(rec)
 	})
 }
+
+// GetActiveAgent returns the currently selected target, or nil if none is
+// selected. The returned pointer is an immutable snapshot.
+func GetActiveAgent() *def.Emp3r0rAgent {
+	return activeAgent.Load()
+}
+
+// SetActiveAgent publishes the selected target. Passing nil clears the
+// selection.
+func SetActiveAgent(a *def.Emp3r0rAgent) {
+	activeAgent.Store(a)
+}

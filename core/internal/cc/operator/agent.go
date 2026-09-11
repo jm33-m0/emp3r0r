@@ -52,19 +52,19 @@ func CmdSetActiveAgent(cmd *cobra.Command, args []string) {
 		logging.Errorf("Failed to set active agent: %v", err)
 		return
 	}
-	live.ActiveAgent = agent
-	logging.Successf("Now targeting %s", live.ActiveAgent.Tag)
+	live.SetActiveAgent(agent)
+	logging.Successf("Now targeting %s", agent.Tag)
 
 	// Reset operator-idle tracking for the newly selected agent so the status
 	// bar shows "Operator idle: 0s" instead of "--".
-	markAgentCommandSent(live.ActiveAgent.Tag)
+	markAgentCommandSent(agent.Tag)
 
 	// Refresh the list immediately so the newly selected agent's Last seen/RTT
 	// reflect the latest server state instead of waiting for the next 10s tick.
 	safeRefreshAgentList()
 
 	// Update tmux window title to show active agent
-	setTitleErr := cli.TmuxSetWindowTitle(live.ActiveAgent.ShortID, cli.CommandPane.WindowID)
+	setTitleErr := cli.TmuxSetWindowTitle(agent.ShortID, cli.CommandPane.WindowID)
 	if setTitleErr != nil {
 		logging.Warningf("Failed to set tmux window title: %v", setTitleErr)
 	}
@@ -86,6 +86,9 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 	tdata := [][]string{}
 	var tail []string
 
+	// Snapshot the selection once: the agent-list refresher may replace it while
+	// we render.
+	activeAgent := live.GetActiveAgent()
 	for _, target := range agents {
 		if target == nil {
 			continue
@@ -112,7 +115,7 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 			infoMap["OS"], infoMap["Process"], infoMap["User"], infoMap["IPs"], infoMap["From"], infoMap["C2"], infoMap["Mesh"],
 			agentLastSeen(target),
 		}
-		if live.ActiveAgent != nil && live.ActiveAgent.Tag == target.Tag {
+		if activeAgent != nil && activeAgent.Tag == target.Tag {
 			tail = row
 			continue
 		}
@@ -129,13 +132,13 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 	operatorIdle := "Operator idle: --"
 	operatorIdleColor := "red"
 
-	if live.ActiveAgent != nil {
+	if activeAgent != nil {
 		// Use the freshly-fetched agent entry rather than the possibly stale
-		// live.ActiveAgent pointer, so LastSeen/RTT always reflect the server's
+		// activeAgent snapshot, so LastSeen/RTT always reflect the server's
 		// latest state for the selected agent.
 		var active *def.Emp3r0rAgent
 		for _, a := range agents {
-			if a != nil && a.UUID == live.ActiveAgent.UUID {
+			if a != nil && a.UUID == activeAgent.UUID {
 				active = a
 				break
 			}
@@ -170,7 +173,7 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 			}
 		}
 
-		if opIdle, ok := operatorIdleFor(live.ActiveAgent.Tag); ok {
+		if opIdle, ok := operatorIdleFor(activeAgent.Tag); ok {
 			operatorIdle = fmt.Sprintf("Operator idle: %s", formatIdle(opIdle.Seconds()))
 			operatorIdleColor = "green"
 		}
@@ -191,7 +194,7 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 	// When no target is selected, avoid showing a misleading red "timeout"
 	// status; the per-agent Last seen column in the list carries that info.
 	var status_right string
-	if live.ActiveAgent == nil {
+	if activeAgent == nil {
 		status_right = fmt.Sprintf("#[fg=colour15,bg=colour235,bold] %s | #[fg=yellow]No active target ",
 			rtt)
 	} else {
@@ -304,13 +307,13 @@ func refreshAgentList() error {
 			live.PublishAgent(&live.AgentRecord{Agent: a, Label: labels[a.UUID]})
 		}
 	}
-	// Update active agent pointer to avoid staleness
-	if live.ActiveAgent != nil {
+	// Update the selected target to the refreshed object to avoid staleness.
+	if active := live.GetActiveAgent(); active != nil {
 		for _, a := range agents {
-			if a.UUID == live.ActiveAgent.UUID {
-				live.ActiveAgent = a
+			if a.UUID == active.UUID {
+				live.SetActiveAgent(a)
 				// Update tmux window title
-				_ = cli.TmuxSetWindowTitle(live.ActiveAgent.ShortID, cli.CommandPane.WindowID)
+				_ = cli.TmuxSetWindowTitle(a.ShortID, cli.CommandPane.WindowID)
 				break
 			}
 		}
