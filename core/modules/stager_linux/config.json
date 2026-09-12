@@ -1,5 +1,5 @@
 {
-  "name": "stager",
+  "name": "stager_linux",
   "build": "bash ./build.sh",
   "author": "jm33-ng",
   "date": "2025-12-12",
