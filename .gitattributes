@@ -17,6 +17,16 @@
 *.mod text eol=lf
 *.sum text eol=lf
 *.toml text eol=lf
+*.c text eol=lf
+*.h text eol=lf
+*.cc text eol=lf
+*.cpp text eol=lf
+*.asm text eol=lf
+*.S text eol=lf
+*.s text eol=lf
+*.rc text eol=lf
+*.ld text eol=lf
+*.spec text eol=lf
 
 # Binary files
 *.exe binary
