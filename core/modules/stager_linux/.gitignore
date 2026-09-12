@@ -1,0 +1,10 @@
+stager
+stager.bin
+stager.so
+stager-packed.bin
+downloader
+downloader.bin
+downloader_blob.h
+unpack_stub.elf
+unpack_stub.bin
+*.o

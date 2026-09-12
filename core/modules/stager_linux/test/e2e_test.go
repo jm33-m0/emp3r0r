@@ -56,6 +56,10 @@ type stagerOpts struct {
 	ech bool
 	// echConfig is the base64 ECHConfigList embedded when ech is set.
 	echConfig string
+	// supervised enables the stager's sacrificial-child supervision mode: the
+	// agent PIC runs in a forked child that the parent kills and restarts while
+	// caching the agent's ephemeral identity key.
+	supervised bool
 }
 
 // testECHConfigList is a syntactically valid ECHConfigList (RFC 9849). On a
@@ -161,6 +165,17 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 			transport: "libssl",
 			ech:       true,
 			echConfig: testECHConfigList,
+		}
+		runAgentEndToEndLifecycle(t, def.C2ChannelModeH2Conn, opts)
+	})
+
+	// Exercise the supervision mode: the agent runs in a sacrificial child and
+	// the parent must terminate/restart it with the cached identity key.
+	t.Run(def.C2ChannelModeH2Conn+"/supervised", func(t *testing.T) {
+		opts := stagerOpts{
+			format:     "shellcode",
+			transport:  "http",
+			supervised: true,
 		}
 		runAgentEndToEndLifecycle(t, def.C2ChannelModeH2Conn, opts)
 	})
@@ -466,6 +481,14 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	}
 	if opts.ech {
 		buildArgs = append(buildArgs, "--ech", "on", "--ech-config", opts.echConfig)
+	}
+	if opts.supervised {
+		// Keep the restart interval short so the kill/reconnect sub-test does
+		// not have to wait out the production sleep range.
+		buildArgs = append(buildArgs,
+			"--supervise", "on",
+			"--supervise-sleep-min", "0",
+			"--supervise-sleep-max", "1")
 	}
 
 	buildCmd := exec.Command("./build.sh", buildArgs...)

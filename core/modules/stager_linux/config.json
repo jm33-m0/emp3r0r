@@ -80,6 +80,25 @@
       "description": "Base64 ECHConfigList from the front domain's DNS HTTPS RR (used when ech=on): dig +short HTTPS cdn.example.com, take the value after 'ech='",
       "default": "",
       "type": "cstr"
+    },
+    {
+      "name": "supervise",
+      "description": "Run the agent PIC in a sacrificial child process and cache its ephemeral identity key pair across restarts: the parent kills and restarts the child, so the agent's memory is fully reclaimed while the C2's pinned TOFU identity survives. Requires an agent built with --stager",
+      "default": "off",
+      "choices": ["off", "on"],
+      "type": "cstr"
+    },
+    {
+      "name": "supervise-sleep-min",
+      "description": "Minimum seconds the supervisor sleeps before restarting the agent (only used when supervise=on)",
+      "default": "5",
+      "type": "int"
+    },
+    {
+      "name": "supervise-sleep-max",
+      "description": "Maximum seconds the supervisor sleeps before restarting the agent (only used when supervise=on)",
+      "default": "30",
+      "type": "int"
     }
   ]
 }
