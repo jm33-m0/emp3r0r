@@ -58,6 +58,10 @@ func (t SMBTransport) Supported() bool { return t.SupportedOn(runtime.GOOS) }
 // operator can validate a transport against a payload's *target* OS.
 func (t SMBTransport) SupportedOn(goos string) bool { return goos == "windows" }
 
+// Portless reports that SMB opens no network port: the configured relay port is
+// only an input to the derived pipe name.
+func (t SMBTransport) Portless() bool { return true }
+
 // Dial opens a named pipe on the peer and wraps it in the AES-GCM frame cipher.
 func (t SMBTransport) Dial(addr, password, salt string) (net.Conn, error) {
 	host, port := parseSMBAddr(addr)

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -205,9 +206,9 @@ func TestModuleHandler_Bash(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Bash is unix-specific")
 	}
-	def.DefaultShell = "/bin/bash" // Ensure it is set
-	if _, err := os.Stat(def.DefaultShell); err != nil {
-		t.Skipf("shell %s not found", def.DefaultShell)
+	shell := agentutils.DefaultShell()
+	if shell == "" {
+		t.Skip("no shell available for bash module test")
 	}
 
 	script := "echo 'hello bash'"

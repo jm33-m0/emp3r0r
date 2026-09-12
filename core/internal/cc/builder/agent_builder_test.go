@@ -7,9 +7,46 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
+
+func TestPayloadGOOS(t *testing.T) {
+	cases := map[string]string{
+		PayloadTypeLinuxExecutable:   "linux",
+		PayloadTypeLinuxSO:           "linux",
+		PayloadTypeWindowsExecutable: "windows",
+		PayloadTypeWindowsDLL:        "windows",
+	}
+	for payloadType, want := range cases {
+		if got := PayloadGOOS(payloadType); got != want {
+			t.Errorf("PayloadGOOS(%q) = %q, want %q", payloadType, got, want)
+		}
+	}
+}
+
+func TestTransportSupportedOn(t *testing.T) {
+	// SMB is Windows-only; kcp/mtls run everywhere.
+	cases := []struct {
+		transport string
+		goos      string
+		want      bool
+	}{
+		{"smb", "windows", true},
+		{"smb", "linux", false},
+		{"kcp", "windows", true},
+		{"kcp", "linux", true},
+		{"mtls", "windows", true},
+		{"mtls", "linux", true},
+		{"unknown-transport", "linux", false},
+	}
+	for _, tc := range cases {
+		if got := transport.TransportSupportedOn(tc.transport, tc.goos); got != tc.want {
+			t.Errorf("TransportSupportedOn(%q, %q) = %v, want %v", tc.transport, tc.goos, got, tc.want)
+		}
+	}
+}
 
 func TestEncryptAgentConfig(t *testing.T) {
 	// Setup temp config file

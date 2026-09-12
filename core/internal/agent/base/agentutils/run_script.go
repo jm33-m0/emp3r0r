@@ -6,7 +6,6 @@ import (
 	"io"
 	"os/exec"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -95,17 +94,12 @@ func ExecuteBatch(scriptBytes []byte, argv, env []string) (output string, err er
 	return feedScriptToStdin(cmd, scriptBytes)
 }
 
-// ExecuteShell runs a bash script on target
+// ExecuteShell runs a script on target with the host's available shell
+// (bash when installed, otherwise sh).
 func ExecuteShell(scriptBytes []byte, argv, env []string) (output string, err error) {
-	shell := def.DefaultShell
-	if !util.IsFileExist(shell) {
-		shell = "/bin/bash"
-		if !util.IsFileExist(shell) {
-			shell = "/bin/sh"
-			if !util.IsFileExist(shell) {
-				return "", fmt.Errorf("shell not found: %s", def.DefaultShell)
-			}
-		}
+	shell := DefaultShell()
+	if shell == "" {
+		return "", fmt.Errorf("no shell found on this host (tried %v)", shellCandidates)
 	}
 
 	cmd := exec.Command(shell, argv...)

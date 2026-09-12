@@ -226,7 +226,7 @@ func MakeConfig(opts AgentConfig) error {
 		}
 		live.RuntimeConfig.P2PTransport = *opts.P2PTransport
 	} else if live.RuntimeConfig.P2PTransport == "" {
-		live.RuntimeConfig.P2PTransport = "mtls"
+		live.RuntimeConfig.P2PTransport = transport.DefaultMeshTransport
 	}
 
 	// Standalone agents always contact C2 directly.

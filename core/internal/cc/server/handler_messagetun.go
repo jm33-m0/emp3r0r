@@ -392,7 +392,7 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 				needsToken := curToken == nil ||
 					time.Until(time.Unix(curToken.ExpiresAt, 0)) < 6*time.Hour
 				if needsToken {
-					tok, err := SignAgentToken(agent.UUID, agent.From, def.CapabilityProxy, 24*time.Hour)
+					tok, err := SignAgentToken(agent.UUID, agent.From, def.CapabilityRouter, 24*time.Hour)
 					if err != nil {
 						logging.Errorf("handleMessageTunnel: SignAgentToken for %s: %v", agent.Name, err)
 					} else {

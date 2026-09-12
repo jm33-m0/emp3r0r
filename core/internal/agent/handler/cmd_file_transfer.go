@@ -73,8 +73,9 @@ func putCmdRun(cmd *cobra.Command, args []string) {
 	size, _ := cmd.Flags().GetInt64("size")
 	origChecksum, _ := cmd.Flags().GetString("checksum")
 	downloadAddr, _ := cmd.Flags().GetString("addr")
-	// saveToMem flag is deprecated in logic, we infer from path or default to auto
-	// saveToMem, _ := cmd.Flags().GetBool("mem")
+	// Storage is determined by the destination path: memfs:/// keys stay in
+	// encrypted RAM (spilling when the budget is exceeded), any other path goes
+	// to disk. There is no separate in-memory toggle.
 
 	if fileName == "" || destPath == "" || size == 0 {
 		c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("args error: %v", args))

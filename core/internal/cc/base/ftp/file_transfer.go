@@ -59,8 +59,9 @@ func StatFile(filepath string, a *def.Emp3r0rAgent) (fi *util.FileStat, err erro
 	return fi, err
 }
 
-// PutFile put file to agent
-func PutFile(lpath, rpath string, a *def.Emp3r0rAgent, saveToMemory bool) error {
+// PutFile put file to agent. The destination path selects the storage: a
+// memfs:/// key is kept in encrypted RAM, any other path is written to disk.
+func PutFile(lpath, rpath string, a *def.Emp3r0rAgent) error {
 	// file sha256sum
 	logging.Infof("Calculating sha256sum of '%s'", lpath)
 	sum := crypto.SHA256SumFile(lpath)
@@ -87,9 +88,6 @@ func PutFile(lpath, rpath string, a *def.Emp3r0rAgent, saveToMemory bool) error 
 
 	// send cmd
 	cmd := fmt.Sprintf("put --file '%s' --path '%s' --checksum %s --size %d", lpath, rpath, sum, size)
-	if saveToMemory {
-		cmd += " --mem"
-	}
 	err = ExecCmd(cmd, "", a.Tag)
 	if err != nil {
 		return fmt.Errorf("PutFile send command: %v", err)

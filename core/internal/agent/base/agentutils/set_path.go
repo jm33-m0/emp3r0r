@@ -2,38 +2,30 @@ package agentutils
 
 import (
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
-
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// InitializePath get current PATH variable and append it with common paths, then remove duplicates
+// InitializePath augments PATH with the platform's common tool directories and
+// removes duplicates, so modules and spawned tools resolve even when the loader
+// handed us a minimal environment. Existing entries are kept (normalized in
+// place) and take precedence over the appended defaults.
 func InitializePath() {
-	common_paths := []string{}
-	current_paths := os.Getenv("PATH")
-	path_delimiter := ":"
-	switch runtime.GOOS {
-	case "windows":
-		common_paths = []string{
+	var common []string
+	if runtime.GOOS == "windows" {
+		common = []string{
 			`c:\windows\system32`,
 			`c:\windows`,
 			`c:\windows\system32\wbem`,
 			`c:\windows\system32\windowspowershell\v1.0`,
 			`c:\windows\system32\openssh`,
 		}
-		path_delimiter = ";"
-		temp := []string{}
-		for _, path := range strings.Split(current_paths, path_delimiter) {
-			temp = append(temp,
-				strings.Trim(strings.ToLower(path), "\\"))
-		}
-		current_paths = strings.Join(temp, path_delimiter)
-
-	case "linux":
-		common_paths = []string{
+	} else {
+		common = []string{
 			"/bin",
 			"/sbin",
 			"/usr/bin",
@@ -43,22 +35,45 @@ func InitializePath() {
 			"/usr/local/sbin",
 			"/snap/bin",
 		}
-		temp := []string{}
-		for _, path := range strings.Split(current_paths, path_delimiter) {
-			temp = append(temp,
-				strings.Trim(path, "/"))
-		}
-		current_paths = strings.Join(temp, path_delimiter)
-	}
-	current_paths_array := strings.Split(current_paths, path_delimiter)
-	paths := append(current_paths_array, common_paths...)
-	paths = util.RemoveDupsFromArray(paths)
-	// UtilsPath is deprecated, no need to append it
-	path_str := strings.Join(paths, path_delimiter)
-	if runtime.GOOS == "windows" {
-		path_str += path_delimiter
 	}
 
-	os.Setenv("PATH", path_str)
-	logging.Infof("PATH=%s", path_str)
+	entries := splitPath(os.Getenv("PATH"))
+	if runtime.GOOS == "windows" {
+		// Windows PATH lookups are case-insensitive, so canonicalize the case
+		// to make duplicate detection reliable.
+		for i, p := range entries {
+			entries[i] = strings.ToLower(p)
+		}
+	}
+	// Existing entries win over the defaults by appearing first.
+	entries = util.RemoveDupsFromArray(append(entries, common...))
+
+	separator := string(os.PathListSeparator)
+	pathStr := strings.Join(entries, separator)
+	if runtime.GOOS == "windows" {
+		// A trailing separator is conventional on Windows.
+		pathStr += separator
+	}
+	if err := os.Setenv("PATH", pathStr); err != nil {
+		logging.Warningf("cannot update PATH: %v", err)
+		return
+	}
+	logging.Infof("PATH=%s", pathStr)
+}
+
+// splitPath splits a PATH value into cleaned, non-empty entries. Cleaning keeps
+// absolute paths absolute; the previous implementation trimmed the leading
+// separator, which turned "/usr/bin" into the relative "usr/bin".
+func splitPath(value string) []string {
+	var out []string
+	for _, p := range strings.Split(value, string(os.PathListSeparator)) {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			// An empty PATH entry means "current directory" and is both a
+			// hazard and unhelpful for deduplication, so drop it.
+			continue
+		}
+		out = append(out, filepath.Clean(p))
+	}
+	return out
 }

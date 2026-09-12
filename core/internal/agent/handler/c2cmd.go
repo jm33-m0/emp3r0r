@@ -55,21 +55,6 @@ func C2Commands() *cobra.Command {
 	statCmd.RegisterFlagCompletionFunc("path", memFileCompletion)
 	rootCmd.AddCommand(statCmd)
 
-	// C2 Put command
-	putCmd := &cobra.Command{
-		Use:     "put",
-		Short:   "Upload file to agent",
-		Example: "!put --path <path> --addr <url> --mem <bool> --force <bool>",
-		GroupID: "generic",
-		Run:     putCmdRun,
-	}
-	putCmd.Flags().StringP("path", "p", "", "Path to save file on agent")
-	putCmd.Flags().StringP("addr", "", "", "Download address")
-	putCmd.Flags().BoolP("mem", "m", false, "Save file to memory")
-	putCmd.Flags().BoolP("force", "", false, "Force write to disk if memory is unavailable")
-	putCmd.RegisterFlagCompletionFunc("path", memFileCompletion)
-	rootCmd.AddCommand(putCmd)
-
 	// C2 Custom Module command
 	customModuleCmd := &cobra.Command{
 		Use:     def.C2CmdCustomModule,

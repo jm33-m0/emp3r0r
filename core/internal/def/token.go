@@ -29,12 +29,8 @@ const TagAgentToken = "agent_token"
 const TagPeerList = "peer_list"
 
 // CapabilityRouter is the capability value that authorises a node to serve
-// as a mesh router (accept relay connections via KCP and pipe them to C2).
+// as a mesh router (accept relay connections and pipe them to C2).
 const CapabilityRouter = "router"
-
-// CapabilityProxy is kept as an alias for backward compat with handler_signing.go.
-// New code should use CapabilityRouter.
-const CapabilityProxy = CapabilityRouter
 
 const (
 	// TagFTPRelayDataPrefix marks operator-tunnel frames carrying raw FTP stream chunks.

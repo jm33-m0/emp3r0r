@@ -16,7 +16,7 @@ import (
 
 // UploadToAgent uploads a file to an agent.
 // This is a convenience wrapper around PutFile that can be called from operator.
-func UploadToAgent(src, dst string, target *def.Emp3r0rAgent, saveToMem bool) error {
+func UploadToAgent(src, dst string, target *def.Emp3r0rAgent) error {
 	if target == nil {
 		return fmt.Errorf("no target agent selected")
 	}
@@ -24,7 +24,7 @@ func UploadToAgent(src, dst string, target *def.Emp3r0rAgent, saveToMem bool) er
 		return fmt.Errorf("source and destination paths are required")
 	}
 
-	return PutFile(src, dst, target, saveToMem)
+	return PutFile(src, dst, target)
 }
 
 // DownloadFromAgent downloads a file or directory from an agent.

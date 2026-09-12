@@ -12,6 +12,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/donut"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -29,6 +30,18 @@ var PayloadTypeList = []string{
 	PayloadTypeLinuxSO,
 	PayloadTypeWindowsExecutable,
 	PayloadTypeWindowsDLL,
+}
+
+// PayloadGOOS returns the target GOOS for a payload type. It is the single place
+// that maps a payload type to its OS, used to validate platform-specific
+// features (e.g. the SMB transport) at generation time.
+func PayloadGOOS(payloadType string) string {
+	switch payloadType {
+	case PayloadTypeWindowsExecutable, PayloadTypeWindowsDLL:
+		return "windows"
+	default:
+		return "linux"
+	}
 }
 
 var ArchListWindows = []string{
@@ -223,6 +236,16 @@ func GenerateAgentWorkflow(opts AgentConfig, payloadType, archChoice string, sig
 	// 1. Pass config to controller
 	if err := MakeConfig(opts); err != nil {
 		return nil, fmt.Errorf("configure agent: %w", err)
+	}
+
+	// Reject transport/target-OS combinations that can never work (e.g. SMB on a
+	// Linux payload): a relay listener that cannot start would silently disable
+	// the mesh transport on the target.
+	if live.RuntimeConfig.IsP2PEnabled {
+		goos := PayloadGOOS(payloadType)
+		if !transport.TransportSupportedOn(live.RuntimeConfig.P2PTransport, goos) {
+			return nil, fmt.Errorf("p2p-transport %q is not supported on %s payloads", live.RuntimeConfig.P2PTransport, goos)
+		}
 	}
 
 	// 2. Generate UUID and Sign

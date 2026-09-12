@@ -709,13 +709,12 @@ var fileCryptoKey []byte
 // MemFileMap doubles as the namespace index: keys are never deleted on spill,
 // only on RemoveFileAgent, so listing/existence queries stay simple.
 var (
-	MemFileMap       = make(map[string][]byte)
-	MemFileLock      sync.RWMutex
-	MemFileSizeLimit = 10 * 1024 * 1024          // 10MB (legacy constant; see memfsBudgetBytes)
-	memSpilled       = make(map[string]struct{}) // keys whose content is on the spill disk
-	memSpillPaths    = make(map[string]string)   // spilled key -> unmarked temp backing file
-	memTotalBytes    int64                       // current in-RAM memfs bytes (encrypted)
-	OnMemFSChanged   func()
+	MemFileMap     = make(map[string][]byte)
+	MemFileLock    sync.RWMutex
+	memSpilled     = make(map[string]struct{}) // keys whose content is on the spill disk
+	memSpillPaths  = make(map[string]string)   // spilled key -> unmarked temp backing file
+	memTotalBytes  int64                       // current in-RAM memfs bytes (encrypted)
+	OnMemFSChanged func()
 
 	// memfsBudgetCache caches the most recently computed RAM budget so a
 	// write burst does not re-probe /proc/meminfo (or equivalent) on every

@@ -154,6 +154,24 @@ func TestTransportCapabilities(t *testing.T) {
 	}
 }
 
+// TestTransportUsesNetworkPort guards the operator-facing distinction between
+// transports that open a dialable port and SMB, whose relay "port" only derives
+// the pipe name.
+func TestTransportUsesNetworkPort(t *testing.T) {
+	for _, name := range []string{"kcp", "mtls"} {
+		if !TransportUsesNetworkPort(name) {
+			t.Errorf("%s should report using a network port", name)
+		}
+	}
+	if TransportUsesNetworkPort(smbTransportName) {
+		t.Errorf("%s should report no network port", smbTransportName)
+	}
+	// Unknown transports default to "uses a port", the safe default for messaging.
+	if !TransportUsesNetworkPort("does-not-exist") {
+		t.Error("unknown transport should default to using a network port")
+	}
+}
+
 // TestPeerDialContextContract guards that the dial path keeps using the
 // transport's own Dial signature; it is the seam agent code relies on.
 func TestPeerDialContextContract(t *testing.T) {

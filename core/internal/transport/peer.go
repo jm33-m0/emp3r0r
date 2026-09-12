@@ -92,6 +92,28 @@ type PlatformTransport interface {
 	SupportedOn(goos string) bool
 }
 
+// PortlessTransport is implemented by transports that do not open a network
+// port, so the configured relay port only acts as an identifier (SMB derives its
+// pipe name from it). Operator-facing output uses this to avoid describing a
+// non-existent port as something peers can dial.
+type PortlessTransport interface {
+	Portless() bool
+}
+
+// TransportUsesNetworkPort reports whether the named transport opens a network
+// port for peers to dial. Unknown transports are assumed to use one, which is
+// the safe default for operator messaging.
+func TransportUsesNetworkPort(name string) bool {
+	t, err := GetTransportImplementationStrict(name)
+	if err != nil {
+		return true
+	}
+	if p, ok := t.(PortlessTransport); ok {
+		return !p.Portless()
+	}
+	return true
+}
+
 // TransportSupportedOn reports whether the named transport can run on the given
 // GOOS. The operator uses this at generation time to reject payload/transport
 // combinations that could never work, since the runtime Supported() check

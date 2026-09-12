@@ -22,9 +22,6 @@ var (
 	// in form https://host:port
 	CCAddress = ""
 
-	// DefaultShell is the default shell to use, will use custom bash if vaccine is installed
-	DefaultShell = ""
-
 	// AESPassword generated from Tag -> md5sum, type: []byte
 	AESPassword []byte
 )

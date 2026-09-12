@@ -109,8 +109,8 @@ func TestAgentTokenConstants(t *testing.T) {
 	if def.TagAgentToken == "" {
 		t.Error("TagAgentToken must not be empty")
 	}
-	if def.CapabilityProxy == "" {
-		t.Error("CapabilityProxy must not be empty")
+	if def.CapabilityRouter == "" {
+		t.Error("CapabilityRouter must not be empty")
 	}
 }
 
@@ -118,7 +118,7 @@ func TestAgentTokenCBORRoundTrip(t *testing.T) {
 	original := &def.AgentToken{
 		AgentID:    "agent-123",
 		IP:         "10.0.0.1",
-		Capability: def.CapabilityProxy,
+		Capability: def.CapabilityRouter,
 		ExpiresAt:  time.Now().Add(24 * time.Hour).Unix(),
 		Signature:  []byte{0xde, 0xad, 0xbe, 0xef},
 	}
@@ -229,7 +229,7 @@ func TestAgentTokenSignAndVerify(t *testing.T) {
 	tok := &def.AgentToken{
 		AgentID:    "uuid-abc",
 		IP:         "192.168.1.50",
-		Capability: def.CapabilityProxy,
+		Capability: def.CapabilityRouter,
 		ExpiresAt:  time.Now().Add(24 * time.Hour).Unix(),
 	}
 
@@ -265,7 +265,7 @@ func TestGossipDelegate_NodeMeta_ValidToken(t *testing.T) {
 	tok := &def.AgentToken{
 		AgentID:    "agent-xyz",
 		IP:         "10.1.2.3",
-		Capability: def.CapabilityProxy,
+		Capability: def.CapabilityRouter,
 		ExpiresAt:  time.Now().Add(time.Hour).Unix(),
 		Signature:  []byte{1, 2, 3, 4},
 	}
@@ -285,11 +285,45 @@ func TestGossipDelegate_NodeMeta_ValidToken(t *testing.T) {
 	}
 }
 
+func TestGossipDelegate_NodeMeta_CarriesTransportAndPort(t *testing.T) {
+	// The mesh decides which transport to dial a peer with from this gossip
+	// payload, so the advertised transport/port must survive the CBOR round-trip.
+	tok := &def.AgentToken{
+		AgentID:    "agent-transport",
+		IP:         "10.1.2.3",
+		Capability: def.CapabilityRouter,
+		ExpiresAt:  time.Now().Add(time.Hour).Unix(),
+		Signature:  []byte{9, 9},
+	}
+	want := &def.MeshNodeMeta{
+		Token:        tok,
+		Distance:     1,
+		P2PPort:      41234,
+		P2PTransport: "smb",
+		Files:        []string{"memfs:///stage.exe"},
+	}
+	d := &GossipDelegate{GetMeta: func() *def.MeshNodeMeta { return want }}
+
+	var decoded def.MeshNodeMeta
+	if err := cbor.Unmarshal(d.NodeMeta(1024), &decoded); err != nil {
+		t.Fatalf("unmarshal NodeMeta: %v", err)
+	}
+	if decoded.P2PTransport != want.P2PTransport {
+		t.Errorf("P2PTransport = %q, want %q", decoded.P2PTransport, want.P2PTransport)
+	}
+	if decoded.P2PPort != want.P2PPort {
+		t.Errorf("P2PPort = %d, want %d", decoded.P2PPort, want.P2PPort)
+	}
+	if len(decoded.Files) != 1 || decoded.Files[0] != want.Files[0] {
+		t.Errorf("Files = %v, want %v", decoded.Files, want.Files)
+	}
+}
+
 func TestGossipDelegate_NodeMeta_ExceedsLimit(t *testing.T) {
 	tok := &def.AgentToken{
 		AgentID:    "agent-xyz",
 		IP:         "10.1.2.3",
-		Capability: def.CapabilityProxy,
+		Capability: def.CapabilityRouter,
 		ExpiresAt:  time.Now().Add(time.Hour).Unix(),
 		Signature:  make([]byte, 200), // large
 	}
@@ -302,7 +336,7 @@ func TestGossipDelegate_NodeMeta_ExceedsLimit(t *testing.T) {
 }
 
 func TestGossipDelegate_LocalState(t *testing.T) {
-	tok := &def.AgentToken{AgentID: "x", Capability: def.CapabilityProxy, ExpiresAt: time.Now().Add(time.Hour).Unix()}
+	tok := &def.AgentToken{AgentID: "x", Capability: def.CapabilityRouter, ExpiresAt: time.Now().Add(time.Hour).Unix()}
 	d := &GossipDelegate{GetMeta: func() *def.MeshNodeMeta { return &def.MeshNodeMeta{Token: tok, Distance: 0} }}
 	// LocalState calls NodeMeta(512); just ensure no panic and non-empty result
 	state := d.LocalState(false)
@@ -362,10 +396,10 @@ func TestGetAuthorizedPeers_Logic(t *testing.T) {
 		return tok
 	}
 
-	validProxy := makeToken(def.CapabilityProxy, now.Add(time.Hour).Unix(), false)
-	expiredProxy := makeToken(def.CapabilityProxy, now.Add(-time.Hour).Unix(), false)
+	validRouter := makeToken(def.CapabilityRouter, now.Add(time.Hour).Unix(), false)
+	expiredRouter := makeToken(def.CapabilityRouter, now.Add(-time.Hour).Unix(), false)
 	wrongCap := makeToken("relay", now.Add(time.Hour).Unix(), false)
-	tamperedProxy := makeToken(def.CapabilityProxy, now.Add(time.Hour).Unix(), true)
+	tamperedRouter := makeToken(def.CapabilityRouter, now.Add(time.Hour).Unix(), true)
 
 	tests := []struct {
 		name   string
@@ -373,11 +407,11 @@ func TestGetAuthorizedPeers_Logic(t *testing.T) {
 		cap    string
 		want   int // expected count of authorized
 	}{
-		{"valid proxy token", []def.AgentToken{validProxy}, def.CapabilityProxy, 1},
-		{"expired token rejected", []def.AgentToken{expiredProxy}, def.CapabilityProxy, 0},
-		{"wrong capability rejected", []def.AgentToken{wrongCap}, def.CapabilityProxy, 0},
-		{"tampered signature rejected", []def.AgentToken{tamperedProxy}, def.CapabilityProxy, 0},
-		{"mixed: only valid passes", []def.AgentToken{validProxy, expiredProxy, wrongCap, tamperedProxy}, def.CapabilityProxy, 1},
+		{"valid router token", []def.AgentToken{validRouter}, def.CapabilityRouter, 1},
+		{"expired token rejected", []def.AgentToken{expiredRouter}, def.CapabilityRouter, 0},
+		{"wrong capability rejected", []def.AgentToken{wrongCap}, def.CapabilityRouter, 0},
+		{"tampered signature rejected", []def.AgentToken{tamperedRouter}, def.CapabilityRouter, 0},
+		{"mixed: only valid passes", []def.AgentToken{validRouter, expiredRouter, wrongCap, tamperedRouter}, def.CapabilityRouter, 1},
 	}
 
 	for _, tt := range tests {
@@ -422,7 +456,7 @@ func TestStartGossip_BootstrapRetry(t *testing.T) {
 	rand.Read(def.AESPassword)
 	defer func() { def.AESPassword = origPW }()
 
-	tokA := &def.AgentToken{AgentID: "node-a", Capability: def.CapabilityProxy, ExpiresAt: time.Now().Add(time.Hour).Unix()}
+	tokA := &def.AgentToken{AgentID: "node-a", Capability: def.CapabilityRouter, ExpiresAt: time.Now().Add(time.Hour).Unix()}
 	listA, err := startGossipWithTakeASnap(ctx, "bootstrap-retry-node-a", nil, portA, func() *def.MeshNodeMeta {
 		return &def.MeshNodeMeta{Token: tokA, Distance: 0}
 	}, testTakeASnap)
@@ -431,7 +465,7 @@ func TestStartGossip_BootstrapRetry(t *testing.T) {
 	}
 
 	// 2. Start Node B with Node A as bootstrap
-	tokB := &def.AgentToken{AgentID: "node-b", Capability: def.CapabilityProxy, ExpiresAt: time.Now().Add(time.Hour).Unix()}
+	tokB := &def.AgentToken{AgentID: "node-b", Capability: def.CapabilityRouter, ExpiresAt: time.Now().Add(time.Hour).Unix()}
 	bootstrap := []byte(fmt.Sprintf("127.0.0.1:%d", portA))
 	// We need a different port for Node B
 	lB, _ := net.Listen("tcp", "127.0.0.1:0")
@@ -516,7 +550,7 @@ func TestStartGossip_SingleNode(t *testing.T) {
 
 	tok := &def.AgentToken{
 		AgentID:    "local",
-		Capability: def.CapabilityProxy,
+		Capability: def.CapabilityRouter,
 		ExpiresAt:  time.Now().Add(time.Hour).Unix(),
 	}
 

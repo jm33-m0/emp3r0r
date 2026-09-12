@@ -4,6 +4,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/builder"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/spf13/cobra"
 )
@@ -69,9 +70,17 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 
 	if live.RuntimeConfig.IsP2PEnabled {
 		logging.Successf("P2P Mesh Configured for Agent:")
-		logging.Infof("  P2P Relay Port:  %s", live.RuntimeConfig.P2PRelayPort)
+		logging.Infof("  P2P Transport:    %s", live.RuntimeConfig.P2PTransport)
+		if transport.TransportUsesNetworkPort(live.RuntimeConfig.P2PTransport) {
+			logging.Infof("  P2P Relay Port:   %s", live.RuntimeConfig.P2PRelayPort)
+		} else {
+			// SMB named pipes open no port: the value only salts the pipe name,
+			// which every peer derives from the shared password and its value.
+			logging.Infof("  P2P Relay ID:     %s (no network port; derives the pipe name)", live.RuntimeConfig.P2PRelayPort)
+		}
 		logging.Infof("  Mesh Gossip Port: %s", live.RuntimeConfig.MeshGossipPort)
-		logging.Infof("  To use this agent as a bootstrap peer for other agents, specify: --peers <agent_ip>:%s", live.RuntimeConfig.MeshGossipPort)
+		logging.Infof("  Bootstrap peers:  --peers <agent_ip>:%s", live.RuntimeConfig.MeshGossipPort)
+		logging.Infof("  Routing uses each peer's advertised transport when this agent can dial it")
 	}
 
 	if res.ShellcodeErr != nil {

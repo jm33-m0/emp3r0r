@@ -36,8 +36,6 @@ func InitConfig() (err error) {
 		RuntimeConfig.Jitter = 20
 	}
 
-	// Deprecated: AgentRoot and UtilsPath are no longer used
-
 	// CC Address
 	def.CCAddress = RuntimeConfig.CCAddress
 	isTor := netutil.IsTor(def.CCAddress)

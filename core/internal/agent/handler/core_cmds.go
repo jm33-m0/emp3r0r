@@ -186,7 +186,6 @@ func CoreCommands() *cobra.Command {
 	putCmd.Flags().Int64P("size", "", 0, "Size of file")
 	putCmd.Flags().StringP("checksum", "", "", "File checksum")
 	putCmd.Flags().StringP("addr", "", "", "Download address")
-	putCmd.Flags().BoolP("mem", "m", false, "Save file to memory")
 	rootCmd.AddCommand(putCmd)
 
 	decryptCmd := &cobra.Command{

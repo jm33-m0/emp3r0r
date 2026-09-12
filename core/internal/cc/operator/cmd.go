@@ -303,10 +303,9 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 
 				src, _ := cmd.Flags().GetString("src")
 				dst, _ := cmd.Flags().GetString("dst")
-				saveToMem, _ := cmd.Flags().GetBool("mem")
 
 				go func() {
-					err := ftp.UploadToAgent(src, dst, target, saveToMem)
+					err := ftp.UploadToAgent(src, dst, target)
 					if err != nil {
 						logging.Errorf("Upload failed: %v", err)
 					}
@@ -314,8 +313,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			},
 		}
 		putCmd.Flags().StringP("src", "s", "", "Local source file path")
-		putCmd.Flags().StringP("dst", "d", "", "Destination file path (memfs:///path/to/file will save to memory)")
-		putCmd.Flags().BoolP("mem", "m", false, "Save to memory on agent (optional if dst is memfs:///path/to/file)")
+		putCmd.Flags().StringP("dst", "d", "", "Destination path; memfs:///path/to/file keeps it in encrypted RAM, anything else writes to disk")
 		putCmd.MarkFlagRequired("src")
 		putCmd.MarkFlagRequired("dst")
 		rootCmd.AddCommand(putCmd)
@@ -644,7 +642,7 @@ func gen_agent_cmd() *cobra.Command {
 
 	// Group 4: Mesh / P2P
 	genAgentCmd.Flags().BoolP("p2p", "", false, "Enable P2P mesh networking")
-	genAgentCmd.Flags().StringP("p2p-transport", "", "mtls", "Transport type for P2P mesh connections")
+	genAgentCmd.Flags().StringP("p2p-transport", "", transport.DefaultMeshTransport, "Transport for P2P mesh relay: kcp/mtls on all platforms, smb on Windows payloads only")
 	genAgentCmd.Flags().StringP("p2p-relay-port", "", "", "Custom P2P relay port (default: auto-generate unique port)")
 	genAgentCmd.Flags().StringP("mesh-gossip-port", "", "", "Custom mesh gossip port (default: auto-generate unique port)")
 	genAgentCmd.Flags().BoolP("direct-c2", "", false, "Gateway mode: contacts C2 directly AND relays for Silent Nodes")
