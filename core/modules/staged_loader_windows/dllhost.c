@@ -45,10 +45,12 @@ __declspec(dllexport) int __cdecl Run(void) {
   return run_stage(1, argv);
 }
 
+#ifdef DEBUG
 __declspec(dllexport) int __cdecl SelfTest(void) {
   wchar_t *argv[] = {L"staged_loader", L"--selftest"};
   return run_stage(2, argv);
 }
+#endif /* DEBUG */
 
 BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID reserved) {
   (void)reserved;

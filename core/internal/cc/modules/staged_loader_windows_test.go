@@ -161,7 +161,7 @@ func TestStagedLoaderBuildAndSelfTest(t *testing.T) {
 	keyHex := "feedfacecafebeefdeadbeef01234567"
 
 	outExe := filepath.Join(tmp, "staged_loader.exe")
-	stagedLoaderBuild(t, dir, scPath, outExe, "--key", keyHex)
+	stagedLoaderBuild(t, dir, scPath, outExe, "--key", keyHex, "--debug")
 	checkStagedLoaderPE(t, outExe)
 
 	checkStagedLoaderSelfTest(t, stagedLoaderSelfTest(t, outExe), plain)
@@ -170,7 +170,7 @@ func TestStagedLoaderBuildAndSelfTest(t *testing.T) {
 	// --smw off must build without the spoofer (and without nasm) and still
 	// pass the staged selftest.
 	noSmwExe := filepath.Join(tmp, "staged_loader_nosmw.exe")
-	stagedLoaderBuild(t, dir, scPath, noSmwExe, "--key", keyHex, "--smw", "off")
+	stagedLoaderBuild(t, dir, scPath, noSmwExe, "--key", keyHex, "--smw", "off", "--debug")
 	checkStagedLoaderSelfTest(t, stagedLoaderSelfTest(t, noSmwExe), plain)
 }
 
@@ -187,12 +187,12 @@ func TestStagedLoaderExeAndDllFormats(t *testing.T) {
 	keyHex := "feedfacecafebeefdeadbeef01234567"
 
 	exePath := filepath.Join(tmp, "svc_noservice.exe")
-	stagedLoaderBuild(t, dir, scPath, exePath, "--key", keyHex, "--format", "exe")
+	stagedLoaderBuild(t, dir, scPath, exePath, "--key", keyHex, "--format", "exe", "--debug")
 	checkStagedLoaderPE(t, exePath)
 	checkStagedLoaderSelfTest(t, stagedLoaderSelfTest(t, exePath), plain)
 
 	dllPath := filepath.Join(tmp, "staged_loader.dll")
-	stagedLoaderBuild(t, dir, scPath, dllPath, "--key", keyHex, "--format", "dll")
+	stagedLoaderBuild(t, dir, scPath, dllPath, "--key", keyHex, "--format", "dll", "--debug")
 	checkStagedLoaderPE(t, dllPath)
 
 	dll, err := windows.LoadDLL(dllPath)

@@ -91,11 +91,10 @@ staged_loader --shellcode /path/to/agent.exe.bin [--format service|exe|dll]
   process after injection before declaring success (default `5000`; `0`
   disables the check). Raise it for slow-starting payloads.
 * `--debug` — keep verbose diagnostics in the binaries. **Off by default**: in
-  production builds all logging is compiled out (`LOG()` expands to nothing,
-  the long-form help is replaced by a terse command list), so the shipped
-  `.exe` carries no descriptive strings. Use `--debug` only for lab builds.
-  The `--selftest` output (a short `SELFTEST ...` line) is always available
-  and is what CI validates.
+  production builds all diagnostic output is compiled out (`LOG()` expands to
+  nothing, the help text and `--selftest` are not built, the installer prints
+  nothing), so the shipped `.exe` carries no descriptive strings. Use
+  `--debug` only for lab builds. CI builds with `--debug` to run `--selftest`.
 
 ### Build dependencies
 
@@ -128,7 +127,7 @@ foreground injection.
 
 ```
 loader.exe                   # inject once
-loader.exe --selftest        # unstage + decrypt, print SELFTEST
+loader.exe --selftest        # --debug build only: unstage + decrypt
 ```
 
 A `dll` build exports two functions for any loader (for example
@@ -147,13 +146,13 @@ A `service` build also accepts these console commands:
 | `--uninstall`       | remove the service                              |
 | `--start` / `--stop`| start / stop it                                 |
 | `--run`             | inject once in the foreground (debugging)       |
-| `--selftest`        | unstage the loader, decrypt the blob and print a parseable `SELFTEST ...` line (sizes, head/tail hex, SSN and SMW status) — never spawns a process |
+| `--selftest`        | `--debug` builds only: unstage the loader, decrypt the blob and print a parseable `SELFTEST ...` line (sizes, head/tail hex, SSN) — never spawns a process |
 
-`--selftest` is what CI uses to verify the staging and RC4 pipeline
-end to end without injecting anything. It exercises the real reflective
-loader, the Zw-twin SSN ranking and (x64) a live SilentMoonwalk-spoofed
-`NtAllocateVirtualMemory`/`NtWriteVirtualMemory`/`NtProtectVirtualMemory`
-round trip.
+`--selftest` is what CI uses to verify the staging and RC4 pipeline end to
+end without injecting anything (CI builds with `--debug`). It exercises the
+real reflective loader and the Zw-twin SSN ranking. The live
+SilentMoonwalk-spoofed round trip is opt-in via `STAGED_LOADER_SMW_SELFTEST=1`
+because its host-specific discovery can fault.
 
 ## How it works
 
