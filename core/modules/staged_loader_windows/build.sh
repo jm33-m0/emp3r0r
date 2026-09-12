@@ -14,7 +14,7 @@
 #
 #   service  one-shot Windows service executable (default)
 #   exe      plain console executable (no service code)
-#   dll      DLL exporting Run()/SelfTest() for in-memory or normal loading
+#   dll      DLL exporting Run() for in-memory or normal loading
 #
 # The packed artifacts are embedded with .incbin (stage_data.S), not RCDATA,
 # so the DLL form works when mapped in memory. Shared payload sources (rc4,
@@ -49,7 +49,7 @@ options:
                        host container to build (default: service)
                          service = one-shot Windows service executable
                          exe     = plain console executable
-                         dll     = DLL exporting Run()/SelfTest()
+                         dll     = DLL exporting Run()
   --process <name>     sacrificial process: bare name (System32) or full path
                        (default: svchost.exe, e.g. dllhost.exe)
   --process-args <s>   optional args for the sacrificial process

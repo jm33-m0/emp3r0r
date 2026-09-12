@@ -4,7 +4,7 @@ A **local (C2-side) module** that turns a Donut sRDI shellcode blob (e.g. the
 `agent.exe.bin` produced by `agent generate --type exe`) into a
 **self-unpacking Windows loader** that runs the shellcode inside a sacrificial
 process. `--format` selects the host container: a **service exe** (default), a
-plain **exe**, or a **DLL** exporting `Run()`/`SelfTest()`.
+plain **exe**, or a **DLL** exporting `Run()`.
 
 The shipped artifact is a **stager**: it carries the real loader as an
 RC4-encrypted DLL and the shellcode as an RC4-encrypted blob, both embedded in
@@ -57,9 +57,9 @@ staged_loader --shellcode /path/to/agent.exe.bin [--format service|exe|dll]
     `--install`/`--start`/... commands.
   * `exe` — plain console executable with the service code compiled out;
     running it with no command performs one foreground injection.
-  * `dll` — DLL exporting `Run()` (one injection) and `SelfTest()` (returns 0).
-    The packed data lives in a data section, so it works both when loaded
-    normally and when mapped in memory.
+  * `dll` — DLL exporting `Run()` (one injection). The packed data lives in a
+    data section, so it works both when loaded normally and when mapped in
+    memory.
 * `--process` — sacrificial process: a bare name is resolved under `System32`
   (`svchost.exe`, `dllhost.exe`, ...); anything containing a path separator is
   used verbatim.
@@ -92,9 +92,8 @@ staged_loader --shellcode /path/to/agent.exe.bin [--format service|exe|dll]
   disables the check). Raise it for slow-starting payloads.
 * `--debug` — keep verbose diagnostics in the binaries. **Off by default**: in
   production builds all diagnostic output is compiled out (`LOG()` expands to
-  nothing, the help text and `--selftest` are not built, the installer prints
-  nothing), so the shipped `.exe` carries no descriptive strings. Use
-  `--debug` only for lab builds. CI builds with `--debug` to run `--selftest`.
+  nothing, the help text and installer messages are not built), so the shipped
+  `.exe` carries no descriptive strings. Use `--debug` only for lab builds.
 
 ### Build dependencies
 
@@ -127,15 +126,13 @@ foreground injection.
 
 ```
 loader.exe                   # inject once
-loader.exe --selftest        # --debug build only: unstage + decrypt
 ```
 
-A `dll` build exports two functions for any loader (for example
+A `dll` build exports one function for any loader (for example
 `rundll32 loader.dll,Run`):
 
 ```c
 int __cdecl Run(void);       /* one foreground injection */
-int __cdecl SelfTest(void);  /* 0 on success */
 ```
 
 A `service` build also accepts these console commands:
@@ -146,13 +143,6 @@ A `service` build also accepts these console commands:
 | `--uninstall`       | remove the service                              |
 | `--start` / `--stop`| start / stop it                                 |
 | `--run`             | inject once in the foreground (debugging)       |
-| `--selftest`        | `--debug` builds only: unstage the loader, decrypt the blob and print a parseable `SELFTEST ...` line (sizes, head/tail hex, SSN) — never spawns a process |
-
-`--selftest` is what CI uses to verify the staging and RC4 pipeline end to
-end without injecting anything (CI builds with `--debug`). It exercises the
-real reflective loader and the Zw-twin SSN ranking. The live
-SilentMoonwalk-spoofed round trip is opt-in via `STAGED_LOADER_SMW_SELFTEST=1`
-because its host-specific discovery can fault.
 
 ## How it works
 

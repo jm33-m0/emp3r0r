@@ -4,8 +4,7 @@
  * Built as `dll`, this wraps the same packed stage in a DLL instead of an
  * executable. It exports:
  *
- *   int __cdecl Run(void)       run one foreground injection
- *   int __cdecl SelfTest(void)  run the stage selftest (0 on success)
+ *   int __cdecl Run(void)  run one foreground injection
  *
  * Any loader that can map a PE and call a named export can use it. Because
  * the packed artifacts live in a data section (stage_data.S) rather than in
@@ -44,13 +43,6 @@ __declspec(dllexport) int __cdecl Run(void) {
   wchar_t *argv[] = {L"staged_loader"};
   return run_stage(1, argv);
 }
-
-#ifdef DEBUG
-__declspec(dllexport) int __cdecl SelfTest(void) {
-  wchar_t *argv[] = {L"staged_loader", L"--selftest"};
-  return run_stage(2, argv);
-}
-#endif /* DEBUG */
 
 BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID reserved) {
   (void)reserved;

