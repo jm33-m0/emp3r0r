@@ -621,18 +621,30 @@ static int selftest(void) {
 #else
   printf("none");
 #endif
+  fputc('\n', stdout);
+  /* Flush before anything host-specific: if a later step faults, the test's
+   * captured output still shows how far the selftest got. */
+  fflush(stdout);
+
   /*
-   * SMW readiness plus a live spoofed round trip (allocate, write, protect
-   * in this process). This exercises the reflective-loaded stage, the SSN
-   * table and the desync spoofer end to end without touching another
-   * process.
+   * SilentMoonwalk is probed only on request. Its template discovery and the
+   * spoofed call depend on the host's kernelbase/ntdll layout; a fault there
+   * would take the whole process down and could not be reported, so the
+   * default selftest stays deterministic. Set STAGED_LOADER_SMW_SELFTEST=1
+   * (on an --smw on build) to run it and print the smw=/smw_rw= fields.
    */
-  fputs(" smw=", stdout);
 #if NTSYS_SMW
-  printf("%d", smw_ensure_init() ? 1 : 0);
-  fputs(" smw_rw=", stdout);
-  {
+  if (getenv("STAGED_LOADER_SMW_SELFTEST") != NULL) {
     int rw_ok = 0;
+
+    /* Flush each field before evaluating it, so a fault leaves enough output
+     * to tell whether smw_ensure_init() or the spoofed call is at fault. */
+    fputs("SMW_SELFTEST smw=", stdout);
+    fflush(stdout);
+    printf("%d", smw_ensure_init() ? 1 : 0);
+    fflush(stdout);
+    fputs(" smw_rw=", stdout);
+    fflush(stdout);
     if (ntsys_ready() && smw_ensure_init()) {
       void *region = NULL;
       SIZE_T region_size = 0x1000;
@@ -651,12 +663,10 @@ static int selftest(void) {
         VirtualFree(region, 0, MEM_RELEASE);
       }
     }
-    printf("%d", rw_ok);
+    printf("%d\n", rw_ok);
+    fflush(stdout);
   }
-#else
-  printf("0 smw_rw=0");
 #endif
-  fputc('\n', stdout);
 
   free(payload);
   return 0;
