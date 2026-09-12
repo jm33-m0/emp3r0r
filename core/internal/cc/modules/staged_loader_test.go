@@ -14,10 +14,10 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 )
 
-// svcLoaderModulesRoot resolves <repo>/core/modules relative to this test
+// stagedLoaderModulesRoot resolves <repo>/core/modules relative to this test
 // file. Named uniquely: the package already has windows-only helpers called
 // modulesRootFromTest / findConfig in other test files.
-func svcLoaderModulesRoot(t *testing.T) string {
+func stagedLoaderModulesRoot(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {
@@ -26,12 +26,12 @@ func svcLoaderModulesRoot(t *testing.T) string {
 	return filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(thisFile)))), "modules")
 }
 
-func svcLoaderDir(t *testing.T) string {
+func stagedLoaderDir(t *testing.T) string {
 	t.Helper()
-	return filepath.Join(svcLoaderModulesRoot(t), "svc_loader")
+	return filepath.Join(stagedLoaderModulesRoot(t), "staged_loader_windows")
 }
 
-func svcLoaderFindConfig(t *testing.T, configs []*def.ModuleConfig, name string) *def.ModuleConfig {
+func stagedLoaderFindConfig(t *testing.T, configs []*def.ModuleConfig, name string) *def.ModuleConfig {
 	t.Helper()
 	for _, c := range configs {
 		if c.Name == name {
@@ -42,16 +42,16 @@ func svcLoaderFindConfig(t *testing.T, configs []*def.ModuleConfig, name string)
 	return nil
 }
 
-// svcLoaderHostCC returns the first native C compiler on PATH, skipping the
+// stagedLoaderHostCC returns the first native C compiler on PATH, skipping the
 // test when there is none (the pack helper is compiled with it).
-func svcLoaderHostCC(t *testing.T) string {
+func stagedLoaderHostCC(t *testing.T) string {
 	t.Helper()
 	for _, c := range []string{"cc", "gcc", "clang"} {
 		if p, err := exec.LookPath(c); err == nil {
 			return p
 		}
 	}
-	t.Skip("svc_loader pack test: no host C compiler (cc/gcc/clang) in PATH")
+	t.Skip("staged_loader_windows pack test: no host C compiler (cc/gcc/clang) in PATH")
 	return ""
 }
 
@@ -72,6 +72,15 @@ func TestSharedModuleDirsMirrored(t *testing.T) {
 	if err := os.WriteFile(marker, []byte("shared-marker"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// staged_loader_windows also pulls the SilentMoonwalk sources from common/smw; the
+	// mirror must recurse into subdirectories for that to reach the workspace.
+	smwMarker := filepath.Join(searchDir, "common", "smw", "smw.h")
+	if err := os.MkdirAll(filepath.Dir(smwMarker), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(smwMarker, []byte("smw-marker"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	loadModFromDirs()
 
@@ -86,32 +95,63 @@ func TestSharedModuleDirsMirrored(t *testing.T) {
 	if err != nil || string(mirrored) != "shared-marker" {
 		t.Fatalf("mirrored common/rc4.h content mismatch: %q, %v", mirrored, err)
 	}
+	mirroredSmw, err := os.ReadFile(filepath.Join(workspace, "modules", "common", "smw", "smw.h"))
+	if err != nil || string(mirroredSmw) != "smw-marker" {
+		t.Fatalf("mirrored common/smw/smw.h content mismatch: %q, %v", mirroredSmw, err)
+	}
 }
 
-// TestSvcLoaderConfigParse verifies the local module registry: it must be a
+// TestStagedLoaderSmwVendoredInSync locks the SilentMoonwalk sources vendored
+// into modules/common/smw to the canonical core/lib/syscall/smw/csrc copy.
+// staged_loader_windows cannot depend on lib/ (it is not mirrored to the operator
+// workspace), so the spoofer is duplicated; this test turns drift into a
+// concrete failure instead of a stale spoofer at build time.
+func TestStagedLoaderSmwVendoredInSync(t *testing.T) {
+	coreRoot := filepath.Dir(stagedLoaderModulesRoot(t))
+	src := filepath.Join(coreRoot, "lib", "syscall", "smw", "csrc")
+	dst := filepath.Join(stagedLoaderModulesRoot(t), "common", "smw")
+
+	for _, name := range []string{
+		"Common.h", "Functions.h", "Spoof.h", "SilentMoonwalk.c", "DesyncSpoofer.asm",
+	} {
+		want, err := os.ReadFile(filepath.Join(src, name))
+		if err != nil {
+			t.Fatalf("read canonical %s: %v", name, err)
+		}
+		got, err := os.ReadFile(filepath.Join(dst, name))
+		if err != nil {
+			t.Fatalf("read vendored %s: %v", name, err)
+		}
+		if !bytes.Equal(want, got) {
+			t.Errorf("vendored %s differs from core/lib/syscall/smw/csrc/%s; re-copy it", name, name)
+		}
+	}
+}
+
+// TestStagedLoaderConfigParse verifies the local module registry: it must be a
 // local module driven by build.sh and expose the parameters operators use.
-func TestSvcLoaderConfigParse(t *testing.T) {
-	configs, err := readModConfigs(filepath.Join(svcLoaderDir(t), "config.json"))
+func TestStagedLoaderConfigParse(t *testing.T) {
+	configs, err := readModConfigs(filepath.Join(stagedLoaderDir(t), "config.json"))
 	if err != nil {
 		t.Fatalf("readModConfigs: %v", err)
 	}
 
-	cfg := svcLoaderFindConfig(t, configs, "svc_loader")
+	cfg := stagedLoaderFindConfig(t, configs, "staged_loader_windows")
 	if !cfg.IsLocal {
-		t.Fatalf("svc_loader should be a local (C2-side) module, got IsLocal=%v", cfg.IsLocal)
+		t.Fatalf("staged_loader_windows should be a local (C2-side) module, got IsLocal=%v", cfg.IsLocal)
 	}
 	if cfg.Build != "bash ./build.sh" {
-		t.Fatalf("svc_loader build = %q, want %q", cfg.Build, "bash ./build.sh")
+		t.Fatalf("staged_loader_windows build = %q, want %q", cfg.Build, "bash ./build.sh")
 	}
 	if !strings.EqualFold(cfg.Platform, "windows") {
-		t.Fatalf("svc_loader platform = %q, want Windows", cfg.Platform)
+		t.Fatalf("staged_loader_windows platform = %q, want Windows", cfg.Platform)
 	}
 
 	mustOption := func(name string) *def.ModOption {
 		t.Helper()
 		opt := cfg.Options[name]
 		if opt == nil {
-			t.Fatalf("parameter %q missing from svc_loader config", name)
+			t.Fatalf("parameter %q missing from staged_loader_windows config", name)
 		}
 		return opt
 	}
@@ -130,16 +170,36 @@ func TestSvcLoaderConfigParse(t *testing.T) {
 	if len(arch.Vals) != 2 || arch.Vals[0] != "x64" || arch.Vals[1] != "x86" {
 		t.Fatalf("arch choices = %v, want [x64 x86]", arch.Vals)
 	}
+
+	// The build-time knobs the module exposes alongside the existing ones.
+	format := mustOption("format")
+	if format.Val != "service" {
+		t.Fatalf("format default = %q, want service", format.Val)
+	}
+	if len(format.Vals) != 3 || format.Vals[0] != "service" || format.Vals[1] != "exe" || format.Vals[2] != "dll" {
+		t.Fatalf("format choices = %v, want [service exe dll]", format.Vals)
+	}
+	smw := mustOption("smw")
+	if smw.Val != "on" {
+		t.Fatalf("smw default = %q, want on", smw.Val)
+	}
+	if len(smw.Vals) != 2 || smw.Vals[0] != "on" || smw.Vals[1] != "off" {
+		t.Fatalf("smw choices = %v, want [on off]", smw.Vals)
+	}
+	verifyMS := mustOption("verify-ms")
+	if verifyMS.Val != "5000" {
+		t.Fatalf("verify-ms default = %q, want 5000", verifyMS.Val)
+	}
 }
 
-// TestSvcLoaderPackRC4RoundTrip builds the production RC4 pack helper with the
+// TestStagedLoaderPackRC4RoundTrip builds the production RC4 pack helper with the
 // host C compiler and checks it against the Go standard library's crypto/rc4
 // as an independent reference: fixed-key ciphertext must match exactly, the
 // Go decrypt must recover the original blob, and the random-key/invalid-key
 // paths must behave.
-func TestSvcLoaderPackRC4RoundTrip(t *testing.T) {
-	cc := svcLoaderHostCC(t)
-	dir := svcLoaderDir(t)
+func TestStagedLoaderPackRC4RoundTrip(t *testing.T) {
+	cc := stagedLoaderHostCC(t)
+	dir := stagedLoaderDir(t)
 	tmp := t.TempDir()
 
 	packExe := filepath.Join(tmp, "pack")
