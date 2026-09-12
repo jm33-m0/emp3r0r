@@ -28,12 +28,14 @@ typedef struct {
 
 /* ---- build-time configuration (overridable via -D in the Makefile) ---- */
 
-/* dl* symbol resolution strategy. Both modes resolve only from libc.so.6.
- *   DYNLOAD_MODE_PUBLIC  (0): public dlopen/dlsym/dlclose. glibc >= 2.34
- *     exports them from libc itself.
+/* dl* symbol resolution strategy. Both modes resolve from libc.so.6 only;
+ * libdl.so.2 is never involved.
+ *   DYNLOAD_MODE_PUBLIC  (0, default): the public dlopen/dlsym/dlclose, which
+ *     libc itself exports since glibc 2.34.
  *   DYNLOAD_MODE_LIBC_DL (1): glibc-internal __libc_dlopen_mode/__libc_dlsym/
- *     __libc_dlclose, always present in libc.so.6 on pre-2.34 glibc where the
- *     public dl* symbols live in a separate libdl.so.2.
+ *     __libc_dlclose, which libc has always exported. Use this on pre-2.34
+ *     glibc (RHEL/CentOS 7, old Debian) where the public names live only in
+ *     the separate libdl.so.2.
  */
 #define DYNLOAD_MODE_PUBLIC 0
 #define DYNLOAD_MODE_LIBC_DL 1
@@ -86,7 +88,7 @@ static unsigned long parse_hex(const char *s) {
 }
 
 /* Scan /proc/self/maps for the base address of the first mapping whose
- * pathname contains `needle` (e.g. "libc.so" or "libdl.so"). Returns 0 on
+ * pathname contains `needle` (e.g. "libc.so" or "libc"). Returns 0 on
  * failure. */
 static unsigned long find_lib_base(const char *needle) {
   char buf[65536];
@@ -123,7 +125,14 @@ static unsigned long find_lib_base(const char *needle) {
   return 0;
 }
 
-static unsigned long find_libc_base(void) { return find_lib_base("libc.so"); }
+/* Base address of libc.so.6. /proc/self/maps reports the real file name, which
+ * is libc.so.6 on Debian/Ubuntu and libc-2.17.so on RHEL/CentOS. */
+static unsigned long find_libc_base(void) {
+  unsigned long base = find_lib_base("libc.so");
+  if (base == 0)
+    base = find_lib_base("libc-");
+  return base;
+}
 
 #if DYNLOAD_HASH_STYLE != DYNLOAD_HASH_SYSV
 /* GNU ELF string hash used by DT_GNU_HASH tables. */
@@ -247,16 +256,17 @@ static void *resolve_sym(void *base, const char *name) {
   return 0;
 }
 
-/* Resolve dlopen/dlsym/dlclose from libc once. Returns 0 on success. */
+/* Resolve the configured dl* entry points (public dlopen/dlsym/dlclose or
+ * glibc-internal __libc_dlopen_mode/__libc_dlsym/__libc_dlclose) from libc
+ * once. Returns 0 on success. */
 static int resolve_dl(void) {
   struct stager_state *st = get_stager_state();
+  unsigned long libc;
+
   if (st->dl_ready == 0)
     return (st->dlopen_ && st->dlsym_ && st->dlclose_) ? 0 : -1;
 
-  /* libc is always mapped in the process; libdl may not be. Resolve the
-   * configured symbol names (public dl* or glibc-internal __libc_dl*) from
-   * libc only. On pre-2.34 glibc use DYNLOAD_MODE=libc_dl. */
-  unsigned long libc = find_libc_base();
+  libc = find_libc_base();
   if (libc) {
     st->dlopen_ = (dlopen_fn)resolve_sym((void *)libc, DYNLOAD_SYM_DLOPEN);
     st->dlsym_ = (dlsym_fn)resolve_sym((void *)libc, DYNLOAD_SYM_DLSYM);

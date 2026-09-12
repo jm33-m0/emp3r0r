@@ -21,8 +21,8 @@
  *
  * 1. LIBSONAMES below: the OpenSSL sonames tried at runtime, newest first.
  *    Match the target's OpenSSL (libssl.so.4 for OpenSSL 4.x, .3 for 3.x, .1.1
- *    for 1.1.1, .1.0.0 for older). Some embedded systems expose only
- *    "libssl.so".
+ *    for 1.1.1, .10 for 1.0.1/1.0.2, .1.0.0 for 1.0.0). Some embedded systems
+ *    expose only "libssl.so".
  *
  * 2. MALLEABLE_TLS_SNI: the SNI / certificate hostname presented in the
  *    handshake. Defaults to the download host. Set this when the target dials
@@ -76,9 +76,11 @@
  * ------------------------------------------------------------------------ */
 
 /* OpenSSL sonames to try, newest first. Max 15 chars (see the fixed-width
- * rows below). libssl.so.4 is OpenSSL 4.x, the first branch with ECH. */
+ * rows below). libssl.so.4 is OpenSSL 4.x, the first branch with ECH; .10 is
+ * the RHEL/CentOS 1.0.1/1.0.2 soname. */
 static const char LIBSONAMES[][16] = {"libssl.so.4", "libssl.so.3",
-                                      "libssl.so.1.1", "libssl.so.1.0.0"};
+                                      "libssl.so.1.1", "libssl.so.10",
+                                      "libssl.so.1.0.0"};
 
 /* SNI / cert hostname; empty means "use the download host". */
 #ifndef MALLEABLE_TLS_SNI

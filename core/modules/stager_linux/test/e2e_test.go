@@ -72,6 +72,37 @@ func (o stagerOpts) artifactName() string {
 	return "stager.bin"
 }
 
+// hostDynloadMode picks the stager's --dynload-mode for the host glibc. Both
+// modes resolve the dl* symbols from libc.so.6; only their names differ:
+// glibc >= 2.34 exports the public dlopen/dlsym/dlclose, while older glibc
+// (RHEL/CentOS 7, old Debian) exports the internal __libc_dlopen_mode/
+// __libc_dlsym/__libc_dlclose and keeps the public names in libdl.so.2.
+func hostDynloadMode(t *testing.T) string {
+	t.Helper()
+	out, err := exec.Command("getconf", "GNU_LIBC_VERSION").Output()
+	if err != nil {
+		return "public"
+	}
+	// Output looks like "glibc 2.17" or "glibc 2.43".
+	fields := strings.Fields(strings.TrimSpace(string(out)))
+	if len(fields) < 2 {
+		return "public"
+	}
+	parts := strings.SplitN(fields[1], ".", 3)
+	if len(parts) < 2 {
+		return "public"
+	}
+	major, errMajor := strconv.Atoi(parts[0])
+	minor, errMinor := strconv.Atoi(parts[1])
+	if errMajor != nil || errMinor != nil {
+		return "public"
+	}
+	if major < 2 || (major == 2 && minor < 34) {
+		return "libc_dl"
+	}
+	return "public"
+}
+
 // signUUID signs the agent UUID with the CA private key.
 func signUUID(uuidStr, keyFile string) (string, error) {
 	keyBytes, err := os.ReadFile(keyFile)
@@ -427,6 +458,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 		"--download-key", stagerKey,
 		"--stager-format", opts.format,
 		"--transport", opts.transport,
+		"--dynload-mode", hostDynloadMode(t),
 		"--debug",
 	}
 	if opts.format == "packed" && opts.unpacker != "" {
