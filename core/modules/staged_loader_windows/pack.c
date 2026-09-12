@@ -3,16 +3,19 @@
  *
  * The generated loader decrypts at runtime, so "encryption" here means
  * obfuscation at rest; the point is that the shellcode bytes never appear in
- * plaintext in the shipped .exe or its resource section.
+ * plaintext in the shipped host executable/DLL.
  *
  * Usage:
  *   pack <in.bin> <payload.bin> <key.bin> [key-hex]
  *
- *   in.bin     Donut sRDI shellcode to embed
- *   payload.bin  output: RC4-encrypted blob (becomes RCDATA IDR_PAYLOAD)
- *   key.bin      output: raw RC4 key bytes (becomes RCDATA IDR_KEY)
- *   key-hex    optional 1..256-byte key as hex; a fresh random 16-byte key
- *              is generated when omitted
+ *   in.bin       Donut sRDI shellcode (or stage DLL) to embed
+ *   payload.bin  output: RC4-encrypted blob
+ *   key.bin      output: raw RC4 key bytes
+ *   key-hex      optional 1..256-byte key as hex; a fresh random 16-byte key
+ *                is generated when omitted
+ *
+ * The pair is embedded by build.sh's stage_data.S (.incbin), not as an
+ * RCDATA resource, so the DLL host works when mapped in memory.
  *
  * Compiled with the host C compiler by build.sh, so it runs natively on the
  * C2 (Linux) or on Windows (msys2). The random key source is /dev/urandom on

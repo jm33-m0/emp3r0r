@@ -1,10 +1,10 @@
 [
   {
-    "name": "svc_loader",
+    "name": "staged_loader_windows",
     "build": "bash ./build.sh",
     "author": "jm33-ng",
     "date": "2026-09-08",
-    "comment": "Generate a one-shot Windows service executable that early-bird injects RC4-encrypted Donut sRDI shellcode (e.g. the agent.exe.bin produced by `agent generate --type exe`) into a sacrificial process (svchost.exe, dllhost.exe). The service starts, injects, verifies the child, then stops itself.",
+    "comment": "Generate a self-unpacking Windows loader (service exe, plain exe, or DLL) that early-bird injects RC4-encrypted Donut sRDI shellcode (e.g. the agent.exe.bin produced by `agent generate --type exe`) into a sacrificial process (svchost.exe, dllhost.exe). The stager carries the real loader as an RC4-encrypted DLL and reflectively maps it in memory; the loader decrypts the blob, injects and verifies the child. Injection syscalls are indirect and, on x64, spoofed with SilentMoonwalk.",
     "is_local": true,
     "platform": "Windows",
     "path": "",
@@ -19,8 +19,16 @@
       },
       {
         "name": "output",
-        "description": "Output .exe path (default: <shellcode dir>/<name>_svc.exe)",
+        "description": "Output path (default: <shellcode dir>/<name>_svc.exe for service, <name>.exe for exe, <name>.dll for dll)",
         "default": "",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "format",
+        "description": "Host container to build: service = one-shot Windows service executable (default), exe = plain console executable, dll = DLL exporting Run()/SelfTest() for in-memory or normal loading",
+        "default": "service",
+        "choices": ["service", "exe", "dll"],
         "type": "string",
         "required": false
       },
@@ -60,6 +68,21 @@
         "default": "apc",
         "choices": ["apc", "ct"],
         "type": "string",
+        "required": false
+      },
+      {
+        "name": "smw",
+        "description": "SilentMoonwalk call-stack spoofing for the loader's indirect syscalls (x64 only): on (default) or off. Off also drops the nasm build dependency.",
+        "default": "on",
+        "choices": ["on", "off"],
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "verify-ms",
+        "description": "Milliseconds to watch the spawned process after injection before declaring success (default 5000, 0 skips the check)",
+        "default": "5000",
+        "type": "int",
         "required": false
       },
       {

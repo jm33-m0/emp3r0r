@@ -3,8 +3,8 @@
  * this file from the module parameters; the committed copy below is only a
  * fallback so the loader still compiles when built by hand.
  */
-#ifndef SVC_LOADER_CONFIG_H
-#define SVC_LOADER_CONFIG_H
+#ifndef STAGED_LOADER_CONFIG_H
+#define STAGED_LOADER_CONFIG_H
 
 /* Sacrificial process: a bare name is resolved under System32, anything with
  * a path separator or drive letter is used verbatim. */
@@ -15,4 +15,4 @@
  * flow these arguments are never seen by the process. */
 #define SACRIFICIAL_ARGS L""
 
-#endif /* SVC_LOADER_CONFIG_H */
+#endif /* STAGED_LOADER_CONFIG_H */

