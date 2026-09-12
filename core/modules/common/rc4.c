@@ -1,5 +1,8 @@
 #include "rc4.h"
 
+#include <stdlib.h>
+#include <string.h>
+
 static void rc4_swap(uint8_t *a, uint8_t *b) {
   uint8_t t = *a;
   *a = *b;
@@ -44,4 +47,28 @@ void rc4_crypt(rc4_ctx *ctx, uint8_t *data, size_t len) {
 
   ctx->i = i;
   ctx->j = j;
+}
+
+int rc4_decrypt_alloc(const uint8_t *cipher, size_t cipher_len,
+                      const uint8_t *key, size_t key_len, uint8_t **plain,
+                      size_t *plain_len) {
+  uint8_t *buf;
+  rc4_ctx ctx;
+
+  *plain = NULL;
+  *plain_len = 0;
+  if (cipher == NULL || cipher_len == 0 || key == NULL || key_len == 0 ||
+      key_len > 256) {
+    return -1;
+  }
+  buf = malloc(cipher_len);
+  if (buf == NULL) {
+    return -1;
+  }
+  memcpy(buf, cipher, cipher_len);
+  rc4_init(&ctx, key, key_len);
+  rc4_crypt(&ctx, buf, cipher_len);
+  *plain = buf;
+  *plain_len = cipher_len;
+  return 0;
 }
