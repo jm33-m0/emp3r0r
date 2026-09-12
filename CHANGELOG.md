@@ -1,5 +1,22 @@
 # Changelog
 
+## [4.19.0](https://github.com/jm33-m0/emp3r0r/compare/v4.18.0...v4.19.0) (2026-09-12)
+
+
+### Features
+
+* **modules:** vendor SilentMoonwalk and spoof indirect syscalls ([45634d5](https://github.com/jm33-m0/emp3r0r/commit/45634d52e0128725bac97373738c60d8374e983f))
+* **staged_loader:** stage the Windows loader as a service/exe/dll host ([641f9b6](https://github.com/jm33-m0/emp3r0r/commit/641f9b6115b348735d72ee390a225afd05ce8a61))
+
+
+### Bug Fixes
+
+* **staged_loader:** compile diagnostics out of release images ([0a807a3](https://github.com/jm33-m0/emp3r0r/commit/0a807a3ef66b580a23877ea2bcff364e44de1e9f))
+* **staged_loader:** make the SilentMoonwalk selftest probe opt-in ([18399ed](https://github.com/jm33-m0/emp3r0r/commit/18399edb6a316e20a4fde44ac6c967fbbbc5d880))
+* **stager_linux:** load dl* and libssl on older glibc/OpenSSL ([9246760](https://github.com/jm33-m0/emp3r0r/commit/92467602e554adb16daff822efb4db333ea0d20e))
+* **stager_linux:** restore the executable bit on build.sh ([42d9d19](https://github.com/jm33-m0/emp3r0r/commit/42d9d190a6edbbd392e7b294707b23f50e9c349f))
+* **stager:** restored sleep & cleanup in linux stager ([e3d850c](https://github.com/jm33-m0/emp3r0r/commit/e3d850c5c6edaf4d602063522fab21c175ea197f))
+
 ## [4.18.0](https://github.com/jm33-m0/emp3r0r/compare/v4.17.0...v4.18.0) (2026-09-11)
 
 
