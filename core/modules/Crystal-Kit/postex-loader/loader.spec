@@ -29,23 +29,28 @@ x64:
     attach "KERNEL32$VirtualFree"    "_VirtualFree"
 
     # mask & link the dll
+    # Crystal Palace resolves a relocation against a linked section by its
+    # symbol name. Clang emits relocations against the C marker symbols
+    # (_DLL_/_MASK_/_PICO_/...); GCC instead emits the section symbols
+    # (dll/mask/pico/...). This project builds with Zig's clang, so link
+    # under the marker names.
     generate $MASK 128
     push $DLL
         xor $MASK
         preplen
-        link "dll"
+        link "_DLL_"
 
     push $MASK
         preplen
-        link "mask"
+        link "_MASK_"
 
     # DLL Args from File
     load %ARGFILE
         preplen
-        link "dll_args"
+        link "_DLLARGS_"
 
     # now get the tradecraft as a PICO
     run "pico.spec"
-        link "pico"
+        link "_PICO_"
 
     export
