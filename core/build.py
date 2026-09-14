@@ -57,6 +57,16 @@ import urllib.request
 
 DONUT_URL = "https://github.com/TheWover/donut/releases/download/v1.1/donut_v1.1.tar.gz"
 DONUT_ARCHIVE_NAME = "donut_v1.1.tar.gz"
+# Crystal Palace (the Crystal-Kit module's crystal_pack linker). The
+# distribution directory is gitignored, so the build installs it. The URL is a
+# moving "latest" alias, so the pinned digest must be refreshed when upstream
+# cuts a new release; the build fails closed rather than extracting an
+# unverified archive.
+CRYSTALPALACE_URL = "https://tradecraftgarden.org/download/cpdist-latest.tgz"
+CRYSTALPALACE_ARCHIVE_NAME = "cpdist-latest.tgz"
+CRYSTALPALACE_SHA256 = (
+    "39af4ad53d612b0a2c9c3948ef97d9de3a2fc4730012a54e2bab7f081d5d4e32"
+)
 REQUIRED_GO_VERSION = "1.26.2"
 REQUIRED_ZIG_VERSION = "0.16.0"
 REQUIRED_FREE_KB = 10 * 1024 * 1024  # 10 GB
@@ -119,23 +129,49 @@ def run_cmd(
         raise e
 
 
-def download_file(url: str, dest: pathlib.Path) -> bool:
+def verify_sha256(path: pathlib.Path, expected: str) -> bool:
+    """Return True when path's SHA-256 matches expected (case-insensitive)."""
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            digest.update(chunk)
+    actual = digest.hexdigest()
+    if actual.lower() != expected.lower():
+        log_warn(f"Checksum mismatch for {path}: got {actual}, want {expected}")
+        return False
+    return True
+
+
+# The origin (Cloudflare) rejects the stdlib default Python-urllib/x.y UA with
+# 403, so present a browser UA.
+DOWNLOAD_USER_AGENT = (
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
+
+
+def download_file(url: str, dest: pathlib.Path, sha256: str | None = None) -> bool:
+    """Download url to dest using urllib only.
+
+    When sha256 is set the archive is verified and a mismatch deletes it and
+    fails closed, so callers never consume an unverified download.
+    """
+    request = urllib.request.Request(
+        url, headers={"User-Agent": DOWNLOAD_USER_AGENT}
+    )
     try:
         log_info(f"Downloading {url} to {dest}...")
-        urllib.request.urlretrieve(url, str(dest))
-        return True
+        with urllib.request.urlopen(request, timeout=60) as response:
+            with open(dest, "wb") as f:
+                shutil.copyfileobj(response, f)
     except Exception as e:
-        log_warn(f"Failed to download via urllib ({e}). Trying curl/wget...")
-        if shutil.which("curl"):
-            res = run_cmd(
-                ["curl", "-sSL", "--connect-timeout", "15", url, "-o", str(dest)],
-                check=False,
-            )
-            return res.returncode == 0
-        elif shutil.which("wget"):
-            res = run_cmd(["wget", "-qO", str(dest), url], check=False)
-            return res.returncode == 0
+        log_warn(f"Failed to download {url}: {e}")
+        dest.unlink(missing_ok=True)
         return False
+    if sha256 is not None and not verify_sha256(dest, sha256):
+        dest.unlink(missing_ok=True)
+        return False
+    return True
 
 
 def write_text_atomic(path: pathlib.Path, content: str) -> None:
@@ -395,6 +431,49 @@ def install_donut(
                 log_warn(f"Failed to extract {donut_archive}")
     else:
         log_warn("Donut archive could not be obtained; skipping donut installation")
+
+
+def install_crystalpalace(
+    target_dir: pathlib.Path, search_dir: pathlib.Path | None = None
+) -> None:
+    """Install the Crystal Palace distribution into the Crystal-Kit module.
+
+    The distribution is gitignored, so the build fetches it where crystal_pack
+    expects it. The archive is SHA-256 verified before extraction; it ships a
+    top-level crystalpalace/ directory, so extracting into target_dir yields
+    target_dir/crystalpalace/crystalpalace.jar.
+    """
+    installed = target_dir / "crystalpalace" / "crystalpalace.jar"
+    if installed.is_file():
+        log_info(f"Crystal Palace already installed at {installed}")
+        return
+
+    archive = None
+    if search_dir and (search_dir / CRYSTALPALACE_ARCHIVE_NAME).is_file():
+        archive = search_dir / CRYSTALPALACE_ARCHIVE_NAME
+    if archive is None:
+        tmp_archive = (
+            pathlib.Path(tempfile.gettempdir()) / CRYSTALPALACE_ARCHIVE_NAME
+        )
+        if download_file(CRYSTALPALACE_URL, tmp_archive, CRYSTALPALACE_SHA256):
+            archive = tmp_archive
+    if archive is None:
+        log_warn(
+            "Crystal Palace archive could not be obtained; crystal_pack will "
+            "not work until it is installed"
+        )
+        return
+    if not verify_sha256(archive, CRYSTALPALACE_SHA256):
+        archive.unlink(missing_ok=True)
+        log_error("Crystal Palace checksum verification failed; refusing to extract")
+
+    log_info("Extracting and installing Crystal Palace...")
+    target_dir.mkdir(parents=True, exist_ok=True)
+    res = run_cmd(["tar", "-xzf", str(archive), "-C", str(target_dir)], check=False)
+    if res.returncode == 0 and installed.is_file():
+        log_success(f"Installed Crystal Palace to {installed.parent}")
+    else:
+        log_warn(f"Failed to extract Crystal Palace archive {archive}")
 
 
 def build_agent_pure(
@@ -684,6 +763,10 @@ def build(
 
     check_zig()
     assemble_smw(core_dir)
+
+    crystal_kit_dir = core_dir / "modules" / "Crystal-Kit"
+    if crystal_kit_dir.is_dir():
+        install_crystalpalace(crystal_kit_dir)
 
     magic_str = hashlib.sha256(os.urandom(32)).hexdigest()
     version = get_version(core_dir)

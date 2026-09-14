@@ -70,7 +70,11 @@ bash make_all.sh
 - `x86_64-w64-mingw32-gcc` for `CrystalKit.x64.dll` and the postex-loader
   objects.
 - `nasm` for the SilentMoonwalk stack-spoofing stub.
-- Java + `crystalpalace/crystalpalace.jar` for the `crystal_pack` link step.
+- Java for the `crystal_pack` link step.
+- Crystal Palace: `core/build.py` downloads
+  `https://tradecraftgarden.org/download/cpdist-latest.tgz`, verifies its
+  pinned SHA-256, and unpacks it into the gitignored `crystalpalace/`
+  directory before the module build runs.
 
 ## Notes
 
